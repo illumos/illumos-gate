@@ -126,8 +126,14 @@ smb_uiomove(smb_clone_t *cp, uio_t *uio)
 		smbios_entry_t *ep = kmem_zalloc(cp->c_eplen, KM_SLEEP);
 		size_t eprlen = MIN(len, cp->c_eplen - off);
 
-		smbios_info_smbios(cp->c_hdl, ep);
-		ep->smbe_staddr = (uint32_t)cp->c_eplen;
+		switch (smbios_info_smbios(cp->c_hdl, ep)) {
+		case SMBIOS_ENTRY_POINT_21:
+			ep->ep21.smbe_staddr = (uint32_t)cp->c_eplen;
+			break;
+		case SMBIOS_ENTRY_POINT_30:
+			ep->ep30.smbe_staddr = (uint64_t)cp->c_eplen;
+			break;
+		}
 		smbios_checksum(cp->c_hdl, ep);
 
 		err = uiomove((char *)ep + off, eprlen, UIO_READ, uio);

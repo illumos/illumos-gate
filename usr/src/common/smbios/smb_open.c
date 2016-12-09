@@ -72,6 +72,144 @@ smb_strip(smbios_hdl_t *shp)
 	}
 }
 
+static int
+smbios_bufopen_21(smbios_hdl_t *shp, const smbios_21_entry_t *ep, size_t len,
+    int flags)
+{
+	if (strncmp(ep->smbe_eanchor, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN))
+		return (ESMB_HEADER);
+
+	if (strncmp(ep->smbe_ianchor, SMB_ENTRY_IANCHOR, SMB_ENTRY_IANCHORLEN))
+		return (ESMB_HEADER);
+
+	smb_dprintf(shp, "opening SMBIOS version %u.%u bcdrev 0x%x\n",
+	    ep->smbe_major, ep->smbe_minor, ep->smbe_bcdrev);
+
+	if (!(flags & SMB_O_NOVERS)) {
+		if (ep->smbe_major > SMB_MAJOR(SMB_VERSION))
+			return (ESMB_NEW);
+
+		if (ep->smbe_major < SMB_MAJOR(SMB_VERSION_23) || (
+		    ep->smbe_major == SMB_MAJOR(SMB_VERSION_23) &&
+		    ep->smbe_minor < SMB_MINOR(SMB_VERSION_23)))
+			return (ESMB_OLD);
+	}
+
+	if (len < sizeof (smb_header_t) ||
+	    ep->smbe_stlen < sizeof (smb_header_t) || len < ep->smbe_stlen)
+		return (ESMB_SHORT);
+
+	if (!(flags & SMB_O_NOCKSUM)) {
+		uint8_t esum = 0, isum = 0;
+		const uchar_t *p, *q;
+		q = (uchar_t *)ep;
+
+		for (p = q; p < q + ep->smbe_elen; p++)
+			esum += *p;
+
+		for (p = (uchar_t *)ep->smbe_ianchor; p < q + sizeof (*ep); p++)
+			isum += *p;
+
+		if (esum != 0 || isum != 0) {
+			smb_dprintf(shp, "bad cksum: e=%x i=%x\n", esum, isum);
+			return (ESMB_CKSUM);
+		}
+	}
+
+	/*
+	 * Copy the entry point into our handle.  The underlying entry point
+	 * may be larger than our structure definition, so reset smbe_elen
+	 * to our internal size and recompute good checksums for our copy.
+	 */
+	shp->sh_ent_type = SMBIOS_ENTRY_POINT_21;
+	bcopy(ep, &shp->sh_ent, sizeof (smbios_entry_t));
+	shp->sh_ent.ep21.smbe_elen = sizeof (smbios_entry_t);
+	smbios_checksum(shp, &shp->sh_ent);
+
+	shp->sh_ent_stnum = ep->smbe_stnum;
+	shp->sh_smbvers = SMB_MAJMIN(ep->smbe_major, ep->smbe_minor);
+	return (0);
+}
+
+static int
+smbios_bufopen_30(smbios_hdl_t *shp, const smbios_30_entry_t *ep, size_t len,
+    int flags)
+{
+	if (strncmp(ep->smbe_eanchor, SMB3_ENTRY_EANCHOR,
+	    SMB3_ENTRY_EANCHORLEN))
+		return (ESMB_HEADER);
+
+	smb_dprintf(shp, "opening SMBIOS version %u.%u\n",
+	    ep->smbe_major, ep->smbe_minor);
+
+	if (!(flags & SMB_O_NOVERS)) {
+		if (ep->smbe_major > SMB_MAJOR(SMB_VERSION))
+			return (ESMB_NEW);
+
+		if (ep->smbe_major < SMB_MAJOR(SMB_VERSION_23) || (
+		    ep->smbe_major == SMB_MAJOR(SMB_VERSION_23) &&
+		    ep->smbe_minor < SMB_MINOR(SMB_VERSION_23)))
+			return (ESMB_OLD);
+	}
+
+	if (len < sizeof (smb_header_t) ||
+	    ep->smbe_stlen < sizeof (smb_header_t) || len < ep->smbe_stlen)
+		return (ESMB_SHORT);
+
+	if (!(flags & SMB_O_NOCKSUM)) {
+		uint8_t esum = 0;
+		const uchar_t *p, *q;
+		q = (uchar_t *)ep;
+
+		for (p = q; p < q + ep->smbe_elen; p++)
+			esum += *p;
+
+		if (esum != 0) {
+			smb_dprintf(shp, "bad cksum: e=%x\n", esum);
+			return (ESMB_CKSUM);
+		}
+	}
+
+	/*
+	 * Copy the entry point into our handle.  The underlying entry point
+	 * may be larger than our structure definition, so reset smbe_elen
+	 * to our internal size and recompute good checksums for our copy.
+	 */
+	shp->sh_ent_type = SMBIOS_ENTRY_POINT_30;
+	bcopy(ep, &shp->sh_ent, sizeof (smbios_entry_t));
+	shp->sh_ent.ep30.smbe_elen = sizeof (smbios_entry_t);
+	smbios_checksum(shp, &shp->sh_ent);
+
+	shp->sh_smbvers = SMB_MAJMIN(ep->smbe_major, ep->smbe_minor);
+
+	return (0);
+}
+
+static uint_t
+smbios_table_nentries(const char *smbe_staddr, uint32_t smbe_stlen)
+{
+	uint_t i = 0;
+	char *dmi;
+	smb_header_t *hdr;
+
+	if (smbe_staddr == NULL)
+		return (i);
+
+	for (dmi = (char *)smbe_staddr; dmi < smbe_staddr + smbe_stlen; i++) {
+		hdr = (smb_header_t *)dmi;
+		dmi += hdr->smbh_len;
+		/*
+		 * Search for the end of the string area.
+		 */
+		while (dmi + 1 < smbe_staddr + smbe_stlen &&
+		    dmi[0] != '\0' && dmi[1] != '\0') {
+			dmi++;
+		}
+		dmi += 2;
+	}
+	return (i);
+}
+
 smbios_hdl_t *
 smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
     int version, int flags, int *errp)
@@ -80,6 +218,7 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 	const smb_header_t *hp, *nhp;
 	const uchar_t *p, *q, *s;
 	uint_t i, h;
+	int err;
 
 	switch (version) {
 	case SMB_VERSION_23:
@@ -104,70 +243,39 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 	if (_smb_debug)
 		shp->sh_flags |= SMB_FL_DEBUG;
 
-	if (strncmp(ep->smbe_eanchor, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN))
-		return (smb_open_error(shp, errp, ESMB_HEADER));
-
-	if (strncmp(ep->smbe_ianchor, SMB_ENTRY_IANCHOR, SMB_ENTRY_IANCHORLEN))
-		return (smb_open_error(shp, errp, ESMB_HEADER));
-
-	smb_dprintf(shp, "opening SMBIOS version %u.%u bcdrev 0x%x\n",
-	    ep->smbe_major, ep->smbe_minor, ep->smbe_bcdrev);
-
-	if (!(flags & SMB_O_NOVERS)) {
-		if (ep->smbe_major > SMB_MAJOR(SMB_VERSION))
-			return (smb_open_error(shp, errp, ESMB_NEW));
-
-		if (ep->smbe_major < SMB_MAJOR(SMB_VERSION_23) || (
-		    ep->smbe_major == SMB_MAJOR(SMB_VERSION_23) &&
-		    ep->smbe_minor < SMB_MINOR(SMB_VERSION_23)))
-			return (smb_open_error(shp, errp, ESMB_OLD));
+	err = smbios_bufopen_21(shp, &ep->ep21, len, flags);
+	if (err != 0) {
+		err = smbios_bufopen_30(shp, &ep->ep30, len, flags);
+		if (err != 0)
+			return (smb_open_error(shp, errp, err));
+		shp->sh_ent_stnum =
+		    smbios_table_nentries(buf, ep->ep30.smbe_stlen);
 	}
-
-	if (len < sizeof (smb_header_t) ||
-	    ep->smbe_stlen < sizeof (smb_header_t) || len < ep->smbe_stlen)
-		return (smb_open_error(shp, errp, ESMB_SHORT));
-
-	if (!(flags & SMB_O_NOCKSUM)) {
-		uint8_t esum = 0, isum = 0;
-		q = (uchar_t *)ep;
-
-		for (p = q; p < q + ep->smbe_elen; p++)
-			esum += *p;
-
-		for (p = (uchar_t *)ep->smbe_ianchor; p < q + sizeof (*ep); p++)
-			isum += *p;
-
-		if (esum != 0 || isum != 0) {
-			smb_dprintf(shp, "bad cksum: e=%x i=%x\n", esum, isum);
-			return (smb_open_error(shp, errp, ESMB_CKSUM));
-		}
-	}
-
-	/*
-	 * Copy the entry point into our handle.  The underlying entry point
-	 * may be larger than our structure definition, so reset smbe_elen
-	 * to our internal size and recompute good checksums for our copy.
-	 */
-	bcopy(ep, &shp->sh_ent, sizeof (smbios_entry_t));
-	shp->sh_ent.smbe_elen = sizeof (smbios_entry_t);
-	smbios_checksum(shp, &shp->sh_ent);
 
 	shp->sh_buf = buf;
 	shp->sh_buflen = len;
-	shp->sh_structs = smb_alloc(sizeof (smb_struct_t) * ep->smbe_stnum);
+	shp->sh_structs = smb_alloc(sizeof (smb_struct_t) * shp->sh_ent_stnum);
 	shp->sh_nstructs = 0;
 	shp->sh_hashlen = _smb_hashlen;
 	shp->sh_hash = smb_zalloc(sizeof (smb_struct_t *) * shp->sh_hashlen);
 	shp->sh_libvers = version;
-	shp->sh_smbvers = SMB_MAJMIN(ep->smbe_major, ep->smbe_minor);
 
 	if (shp->sh_structs == NULL || shp->sh_hash == NULL)
 		return (smb_open_error(shp, errp, ESMB_NOMEM));
 
 	hp = shp->sh_buf;
-	q = (const uchar_t *)buf + MIN(ep->smbe_stlen, len);
+	switch (shp->sh_ent_type) {
+	case SMBIOS_ENTRY_POINT_21:
+		q = (const uchar_t *)buf + MIN(ep->ep21.smbe_stlen, len);
+		break;
+	case SMBIOS_ENTRY_POINT_30:
+		q = (const uchar_t *)buf + MIN(ep->ep30.smbe_stlen, len);
+		break;
+	default:
+		return (smb_open_error(shp, errp, ESMB_VERSION));
+	}
 
-	for (i = 0; i < ep->smbe_stnum; i++, hp = nhp) {
+	for (i = 0; i < shp->sh_ent_stnum; i++, hp = nhp) {
 		smb_struct_t *stp = &shp->sh_structs[i];
 		uint_t n = 0;
 
@@ -239,7 +347,6 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 void
 smbios_close(smbios_hdl_t *shp)
 {
-	const smbios_entry_t *ep = &shp->sh_ent;
 	uint_t i;
 
 	for (i = 0; i < shp->sh_nstructs; i++) {
@@ -247,7 +354,7 @@ smbios_close(smbios_hdl_t *shp)
 		    sizeof (uint16_t) * shp->sh_structs[i].smbst_strtablen);
 	}
 
-	smb_free(shp->sh_structs, sizeof (smb_struct_t) * ep->smbe_stnum);
+	smb_free(shp->sh_structs, sizeof (smb_struct_t) * shp->sh_ent_stnum);
 	smb_free(shp->sh_hash, sizeof (smb_struct_t *) * shp->sh_hashlen);
 
 	if (shp->sh_flags & SMB_FL_BUFALLOC)
@@ -268,17 +375,32 @@ smbios_checksum(smbios_hdl_t *shp, smbios_entry_t *ep)
 	uchar_t *p, *q = (uchar_t *)ep;
 	uint8_t esum = 0, isum = 0;
 
-	ep->smbe_ecksum = ep->smbe_icksum = 0;
+	switch (shp->sh_ent_type) {
+	case SMBIOS_ENTRY_POINT_21:
+		ep->ep21.smbe_ecksum = ep->ep21.smbe_icksum = 0;
 
-	for (p = (uchar_t *)ep->smbe_ianchor; p < q + sizeof (*ep); p++)
-		isum += *p;
+		for (p = (uchar_t *)ep->ep21.smbe_ianchor;
+		    p < q + sizeof (*ep); p++) {
+			isum += *p;
+		}
 
-	ep->smbe_icksum = -isum;
+		ep->ep21.smbe_icksum = -isum;
 
-	for (p = q; p < q + ep->smbe_elen; p++)
-		esum += *p;
+		for (p = q; p < q + ep->ep21.smbe_elen; p++)
+			esum += *p;
 
-	ep->smbe_ecksum = -esum;
+		ep->ep21.smbe_ecksum = -esum;
+		break;
+	case SMBIOS_ENTRY_POINT_30:
+		ep->ep30.smbe_ecksum = 0;
+		for (p = q; p < q + ep->ep30.smbe_elen; p++)
+			esum += *p;
+
+		ep->ep30.smbe_ecksum = -esum;
+		break;
+	default:
+		break;
+	}
 }
 
 const void *

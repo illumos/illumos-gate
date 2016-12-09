@@ -458,7 +458,9 @@ typedef struct smb_struct {
 } smb_struct_t;
 
 struct smbios_hdl {
+	smbios_entry_point_t sh_ent_type; /* structure table entry point type */
 	smbios_entry_t sh_ent;		/* structure table entry point */
+	uint_t sh_ent_stnum;		/* number of structure table entries */
 	const void *sh_buf;		/* structure table buffer */
 	size_t sh_buflen;		/* size of structure table buffer */
 	smb_struct_t *sh_structs;	/* array of structure descriptors */
