@@ -22,6 +22,7 @@
 #include <sys/usb/hcd/xhci/xhci.h>
 #include <sys/sysmacros.h>
 #include <sys/strsun.h>
+#include <sys/strsubr.h>
 
 static xhci_t *
 xhci_hcdi_get_xhcip_from_dev(usba_device_t *ud)
@@ -1116,6 +1117,7 @@ xhci_hcdi_intr_oneshot(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 	xhci_endpoint_t *xep;
 	xhci_transfer_t *xt;
 	boolean_t datain;
+	mblk_t *mp = NULL;
 
 	mutex_enter(&xhcip->xhci_lock);
 	if (xhcip->xhci_state & XHCI_S_ERROR) {
@@ -1153,6 +1155,26 @@ xhci_hcdi_intr_oneshot(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 		xt->xt_timeout = HCDI_DEFAULT_TIMEOUT;
 	}
 
+	/*
+	 * Unlike other request types, USB Interrupt-IN requests aren't required
+	 * to have allocated the message block for data. If they haven't, we
+	 * take care of that now.
+	 */
+	if (uirp->intr_len > 0 && datain == B_TRUE && uirp->intr_data == NULL) {
+		if (usb_flags & USB_FLAGS_SLEEP) {
+			mp = allocb_wait(uirp->intr_len, BPRI_LO, STR_NOSIG,
+			    NULL);
+		} else {
+			mp = allocb(uirp->intr_len, 0);
+		}
+		if (mp == NULL) {
+			xhci_transfer_free(xhcip, xt);
+			mutex_exit(&xhcip->xhci_lock);
+			return (USB_NO_RESOURCES);
+		}
+		uirp->intr_data = mp;
+	}
+
 	if (uirp->intr_len > 0 && datain == B_FALSE) {
 		xhci_transfer_copy(xt, uirp->intr_data->b_rptr, uirp->intr_len,
 		    B_FALSE);
@@ -1172,6 +1194,10 @@ xhci_hcdi_intr_oneshot(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 	xhci_transfer_trb_fill_data(xep, xt, 0, datain);
 	mutex_enter(&xhcip->xhci_lock);
 	if (xhci_endpoint_schedule(xhcip, xd, xep, xt, B_TRUE) != 0) {
+		if (mp != NULL) {
+			uirp->intr_data = NULL;
+			freemsg(mp);
+		}
 		xhci_transfer_free(xhcip, xt);
 		mutex_exit(&xhcip->xhci_lock);
 		return (USB_NO_RESOURCES);

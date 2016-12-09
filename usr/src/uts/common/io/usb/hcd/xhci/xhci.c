@@ -2025,15 +2025,20 @@ xhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	cv_init(&xhcip->xhci_statecv, NULL, CV_DRIVER, NULL);
 	xhcip->xhci_seq |= XHCI_ATTACH_SYNCH;
 
-	if (xhci_ddi_intr_enable(xhcip) == B_FALSE)
-		goto err;
-	xhcip->xhci_seq |= XHCI_ATTACH_INTR_ENABLE;
-
 	if (xhci_port_count(xhcip) == B_FALSE)
 		goto err;
 
 	if (xhci_controller_takeover(xhcip) == B_FALSE)
 		goto err;
+
+	/*
+	 * We don't enable interrupts until after we take over the controller
+	 * from the BIOS. We've observed cases where this can cause spurious
+	 * interrupts.
+	 */
+	if (xhci_ddi_intr_enable(xhcip) == B_FALSE)
+		goto err;
+	xhcip->xhci_seq |= XHCI_ATTACH_INTR_ENABLE;
 
 	if ((ret = xhci_controller_stop(xhcip)) != 0) {
 		xhci_error(xhcip, "failed to stop controller: %s",

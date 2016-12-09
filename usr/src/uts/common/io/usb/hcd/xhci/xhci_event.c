@@ -158,10 +158,20 @@ xhci_event_process(xhci_t *xhcip)
 	}
 	mutex_exit(&xhcip->xhci_lock);
 
+	/*
+	 * We've seen a few cases, particularly when dealing with controllers
+	 * where BIOS takeover is involved, that an interrupt gets injected into
+	 * the system before we've actually finished setting things up. If for
+	 * some reason that happens, and we don't actually have a ring yet,
+	 * don't try and do anything.
+	 */
+	if (xhcip->xhci_event.xev_segs == NULL)
+		return (B_TRUE);
+
 	XHCI_DMA_SYNC(xrp->xr_dma, DDI_DMA_SYNC_FORKERNEL);
 	if (xhci_check_dma_handle(xhcip, &xrp->xr_dma) != DDI_FM_OK) {
 		xhci_error(xhcip, "encountered fatal FM error trying to "
-		    "synchronize event ring: reseting device");
+		    "synchronize event ring: resetting device");
 		xhci_fm_runtime_reset(xhcip);
 		return (B_FALSE);
 	}
@@ -215,7 +225,7 @@ xhci_event_process(xhci_t *xhcip)
 	xhci_put64(xhcip, XHCI_R_RUN, XHCI_ERDP(0), addr);
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to write to event ring dequeue "
-		    "pointer: encountered fatal FM error, reseting device");
+		    "pointer: encountered fatal FM error, resetting device");
 		xhci_fm_runtime_reset(xhcip);
 		return (B_FALSE);
 	}
