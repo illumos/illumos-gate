@@ -140,7 +140,7 @@ lx_sched_yield(void)
 static void
 ltos_cpuset(lx_affmask_t *lmask, cpuset_t *smask)
 {
-	ASSERT(NCPU <= LX_NCPU);
+	/* NOTE: fix this code if NCPU is ever made > LX_NCPU */
 
 	cpuset_zero(smask);
 	for (int i = 0; i < NCPU; i++) {
@@ -153,7 +153,7 @@ ltos_cpuset(lx_affmask_t *lmask, cpuset_t *smask)
 static void
 stol_cpuset(cpuset_t *smask, lx_affmask_t *lmask)
 {
-	ASSERT(NCPU <= LX_NCPU);
+	/* NOTE: fix this code if NCPU is ever made > LX_NCPU */
 
 	bzero(lmask, sizeof (*lmask));
 	for (int i = 0; i < NCPU; i++) {
