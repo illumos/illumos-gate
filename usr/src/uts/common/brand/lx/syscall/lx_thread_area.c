@@ -138,9 +138,6 @@ lx_set_thread_area(struct ldt_info *inf)
 	int entry;
 	int i;
 
-	/* Check that casts for accessing the words in user_desc are valid */
-	ASSERT(sizeof (user_desc_t) == 8);
-
 	if (copyin(inf, &ldt_inf, sizeof (ldt_inf)))
 		return (set_errno(EFAULT));
 

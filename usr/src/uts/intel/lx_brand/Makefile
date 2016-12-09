@@ -77,6 +77,8 @@ LDFLAGS		+= -dy -Nexec/elfexec -Nfs/fifofs -Nfs/sockfs -Ndrv/ip -Nfs/zfs
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+# Due to zfs_ioctl.h inlines.  gcc catches non-inline ones during compilation.
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 #
 #	Default build targets.
