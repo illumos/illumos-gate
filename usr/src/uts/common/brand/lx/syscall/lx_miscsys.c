@@ -80,6 +80,7 @@ extern int fs_need_estale_retry(int);
 typedef struct {
 	vnode_t	*lcfa_vp;
 	boolean_t lcfa_type;
+	boolean_t lcfa_traverse;
 } lx_clone_fs_arg_t;
 
 long
@@ -95,12 +96,16 @@ lx_clone_fs_cb(proc_t *pp, void *arg)
 	int err;
 
 	/*
-	 * The initial lookupname() from lx_clone_fs_do_group() will have added
-	 * a hold on the vnode to ensure its existence throughout the walk. We
-	 * need to add another hold for each process in the group.
+	 * Either:
+	 * A) The initial lookupname() from lx_clone_fs_do_group() will have
+	 *    added a hold on the vnode to ensure its existence throughout the
+	 *    walk.
+	 * B) We added a hold in fchdir.
+	 * We need to add another hold for each process in the group.
 	 */
 	VN_HOLD(ap->lcfa_vp);
-	if ((err = chdir_proc(pp, ap->lcfa_vp, ap->lcfa_type, B_TRUE)) != 0) {
+	if ((err = chdir_proc(pp, ap->lcfa_vp, ap->lcfa_type,
+	    ap->lcfa_traverse)) != 0) {
 		/* if we failed, chdir_proc already did a rele on vp */
 		return (err);
 	}
@@ -138,6 +143,7 @@ retry:
 
 	arg.lcfa_vp = vp;
 	arg.lcfa_type = is_chroot;
+	arg.lcfa_traverse = B_TRUE;
 
 	/*
 	 * We use the VN_HOLD from the lookup to guarantee vp exists for the
@@ -183,6 +189,37 @@ lx_creat(char *path, mode_t mode)
 long
 lx_fchdir(int fd)
 {
+	lx_proc_data_t *lproc = ttolxproc(curthread);
+
+	if (lx_clone_grp_member(lproc, LX_CLONE_FS)) {
+		/* Handle the rare case of being in a CLONE_FS clone group */
+		file_t *fp;
+		vnode_t *vp;
+		lx_clone_fs_arg_t arg;
+		int err;
+
+		if ((fp = getf(fd)) == NULL)
+			return (set_errno(EBADF));
+		vp = fp->f_vnode;
+		VN_HOLD(vp);
+		releasef(fd);
+
+		arg.lcfa_vp = vp;
+		arg.lcfa_type = B_FALSE;
+		arg.lcfa_traverse = B_FALSE;
+
+		/*
+		 * We use the VN_HOLD above to guarantee vp exists for the
+		 * entire walk.
+		 */
+		err = lx_clone_grp_walk(lproc, LX_CLONE_FS, lx_clone_fs_cb,
+		    (void *)&arg);
+		VN_RELE(vp);
+		if (err)
+			return (set_errno(err));
+		return (0);
+	}
+
 	return (fchdir(fd));
 }
 
