@@ -717,15 +717,12 @@ svc_cots_kfreeres(SVCXPRT *clone_xprt)
 #define	MAXDUPREQS	8192
 
 /*
- * This should be appropriately scaled to MAXDUPREQS.
+ * This should be appropriately scaled to MAXDUPREQS.  To produce as less as
+ * possible collisions it is suggested to set this to a prime.
  */
 #define	DRHASHSZ	2053
 
-#if ((DRHASHSZ & (DRHASHSZ - 1)) == 0)
-#define	XIDHASH(xid)	((xid) & (DRHASHSZ - 1))
-#else
 #define	XIDHASH(xid)	((xid) % DRHASHSZ)
-#endif
 #define	DRHASH(dr)	XIDHASH((dr)->dr_xid)
 #define	REQTOXID(req)	((req)->rq_xprt->xp_xid)
 
