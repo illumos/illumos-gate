@@ -22,6 +22,7 @@
  CDDL HEADER END
 
 	Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+	Copyright (c) 2012 by Delphix. All rights reserved.
 	Copyright 2014 Nexenta Systems, Inc.  All rights reserved
 	Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 
@@ -40,7 +41,7 @@
 <service
 	name='network/nfs/server'
 	type='service'
-	version='1'>
+	version='2'>
 
 	<dependency name='network'
 	    grouping='require_any'
@@ -174,7 +175,7 @@
 	   <propval name='server_delegation' type='astring' value='on'/>
 	   <propval name='server_versmax' type='integer' value='4'/>
 	   <propval name='server_versmin' type='integer' value='2'/>
-	   <propval name='servers' type='integer' value='16'/>
+	   <propval name='servers' type='integer' value='1024'/>
 	   <propval name='mountd_listen_backlog' type='integer' value='64'/>
 	   <propval name='mountd_max_threads' type='integer' value='16'/>
 	 </property_group>

@@ -32,6 +32,7 @@ include		../../Makefile.fstype
 
 OBJS=		$(LIBPROG).o
 SRCS=		$(LIBPROG).c
+LDLIBS +=	-lefi
 
 # for messaging catalog
 #

@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  *  Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -747,18 +748,15 @@ svc_clts_kfreeres(SVCXPRT *clone_xprt)
  * to the service load so that there is likely to be a response entry
  * when the first retransmission comes in.
  */
-#define	MAXDUPREQS	1024
+#define	MAXDUPREQS	8192
 
 /*
- * This should be appropriately scaled to MAXDUPREQS.
+ * This should be appropriately scaled to MAXDUPREQS.  To produce as less as
+ * possible collisions it is suggested to set this to a prime.
  */
-#define	DRHASHSZ	257
+#define	DRHASHSZ	2053
 
-#if ((DRHASHSZ & (DRHASHSZ - 1)) == 0)
-#define	XIDHASH(xid)	((xid) & (DRHASHSZ - 1))
-#else
 #define	XIDHASH(xid)	((xid) % DRHASHSZ)
-#endif
 #define	DRHASH(dr)	XIDHASH((dr)->dr_xid)
 #define	REQTOXID(req)	((req)->rq_xprt->xp_xid)
 
@@ -795,7 +793,7 @@ struct dupreq *drmru;
  */
 static int
 svc_clts_kdup(struct svc_req *req, caddr_t res, int size, struct dupreq **drpp,
-	bool_t *dupcachedp)
+    bool_t *dupcachedp)
 {
 	struct rpc_clts_server *stats = CLONE2STATS(req->rq_xprt);
 	struct dupreq *dr;
@@ -926,7 +924,7 @@ svc_clts_kdup(struct svc_req *req, caddr_t res, int size, struct dupreq **drpp,
  */
 static void
 svc_clts_kdupdone(struct dupreq *dr, caddr_t res, void (*dis_resfree)(),
-	int size, int status)
+    int size, int status)
 {
 
 	ASSERT(dr->dr_resfree == NULL);
