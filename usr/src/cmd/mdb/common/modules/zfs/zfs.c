@@ -1299,7 +1299,8 @@ typedef struct mdb_metaslab {
 	uint64_t ms_fragmentation;
 	uint64_t ms_weight;
 	uintptr_t ms_alloctree[TXG_SIZE];
-	uintptr_t ms_freetree[TXG_SIZE];
+	uintptr_t ms_freeingtree;
+	uintptr_t ms_freedtree;
 	uintptr_t ms_tree;
 	uintptr_t ms_sm;
 } mdb_metaslab_t;
@@ -1916,7 +1917,8 @@ typedef struct mdb_dsl_dir_phys {
 
 typedef struct space_data {
 	uint64_t ms_alloctree[TXG_SIZE];
-	uint64_t ms_freetree[TXG_SIZE];
+	uint64_t ms_freeingtree;
+	uint64_t ms_freedtree;
 	uint64_t ms_tree;
 	int64_t ms_deferspace;
 	uint64_t avail;
@@ -1945,16 +1947,22 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 
 		sd->ms_alloctree[i] += rt.rt_space;
 
-		if (mdb_ctf_vread(&rt, "range_tree_t",
-		    "mdb_range_tree_t", ms.ms_freetree[i], 0) == -1)
-			return (WALK_ERR);
-
-		sd->ms_freetree[i] += rt.rt_space;
 	}
+
+	if (mdb_ctf_vread(&rt, "range_tree_t",
+	    "mdb_range_tree_t", ms.ms_freeingtree, 0) == -1)
+		return (WALK_ERR);
+	sd->ms_freeingtree += rt.rt_space;
+
+	if (mdb_ctf_vread(&rt, "range_tree_t",
+	    "mdb_range_tree_t", ms.ms_freedtree, 0) == -1)
+		return (WALK_ERR);
+	sd->ms_freedtree += rt.rt_space;
 
 	if (mdb_ctf_vread(&rt, "range_tree_t",
 	    "mdb_range_tree_t", ms.ms_tree, 0) == -1)
 		return (WALK_ERR);
+	sd->ms_tree += rt.rt_space;
 
 	if (ms.ms_sm != NULL &&
 	    mdb_ctf_vread(&sm, "space_map_t",
@@ -1967,7 +1975,6 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 	}
 
 	sd->ms_deferspace += ms.ms_deferspace;
-	sd->ms_tree += rt.rt_space;
 	sd->avail += sm.sm_size - sm.sm_alloc;
 	sd->nowavail += sm.sm_size - smp.smp_alloc;
 
@@ -2043,11 +2050,10 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    sd.ms_alloctree[1] >> shift, suffix,
 	    sd.ms_alloctree[2] >> shift, suffix,
 	    sd.ms_alloctree[3] >> shift, suffix);
-	mdb_printf("ms_freemap = %llu%s %llu%s %llu%s %llu%s\n",
-	    sd.ms_freetree[0] >> shift, suffix,
-	    sd.ms_freetree[1] >> shift, suffix,
-	    sd.ms_freetree[2] >> shift, suffix,
-	    sd.ms_freetree[3] >> shift, suffix);
+	mdb_printf("ms_freeingtree = %llu%s\n",
+	    sd.ms_freeingtree >> shift, suffix);
+	mdb_printf("ms_freedtree = %llu%s\n",
+	    sd.ms_freedtree >> shift, suffix);
 	mdb_printf("ms_tree = %llu%s\n", sd.ms_tree >> shift, suffix);
 	mdb_printf("ms_deferspace = %llu%s\n",
 	    sd.ms_deferspace >> shift, suffix);
