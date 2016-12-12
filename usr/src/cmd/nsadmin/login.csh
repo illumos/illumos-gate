@@ -41,6 +41,11 @@ else
 	endif
 endif
 
+#
+# use less(1) as the default pager for the man(1) command.
+#
+setenv PAGER "/usr/bin/less -ins"
+
 if (! -e .hushlogin ) then
 	/usr/sbin/quota
 	/bin/cat -s /etc/motd

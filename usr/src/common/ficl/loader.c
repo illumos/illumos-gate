@@ -48,6 +48,11 @@
 #endif
 #include "bootstrap.h"
 #endif
+#ifdef STAND
+#include <uuid.h>
+#else
+#include <uuid/uuid.h>
+#endif
 #include <string.h>
 #include "ficl.h"
 
@@ -71,6 +76,8 @@ extern uint32_t biospci_locator(uint8_t, uint8_t, uint8_t);
  *		pnpdevices  ( -- addr )
  *		pnphandlers ( -- addr )
  *		ccall       ( [[...[p10] p9] ... p1] n addr -- result )
+ *		uuid-from-string ( addr n -- addr' )
+ *		uuid-to-string ( addr' -- addr n | -1 )
  *		.#	    ( value -- )
  */
 
@@ -322,6 +329,78 @@ ficlCcall(ficlVm *pVM)
 	    p[9]);
 
 	ficlStackPushInteger(ficlVmGetDataStack(pVM), result);
+}
+
+void
+ficlUuidFromString(ficlVm *pVM)
+{
+	char	*uuid;
+	char	*uuid_ptr;
+	int	uuid_size;
+	uuid_t	*u;
+#ifdef STAND
+	uint32_t status;
+#else
+	int status;
+#endif
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 2, 0);
+
+	uuid_size = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	uuid_ptr = ficlStackPopPointer(ficlVmGetDataStack(pVM));
+
+	uuid = ficlMalloc(uuid_size + 1);
+	if (!uuid)
+		ficlVmThrowError(pVM, "Error: out of memory");
+	(void) memcpy(uuid, uuid_ptr, uuid_size);
+	uuid[uuid_size] = '\0';
+
+	u = ficlMalloc(sizeof (*u));
+#ifdef STAND
+	uuid_from_string(uuid, u, &status);
+	ficlFree(uuid);
+	if (status != uuid_s_ok) {
+		ficlFree(u);
+		u = NULL;
+	}
+#else
+	status = uuid_parse(uuid, *u);
+	ficlFree(uuid);
+	if (status != 0) {
+		ficlFree(u);
+		u = NULL;
+	}
+#endif
+	ficlStackPushPointer(ficlVmGetDataStack(pVM), u);
+}
+
+void
+ficlUuidToString(ficlVm *pVM)
+{
+	char	*uuid;
+	uuid_t	*u;
+#ifdef STAND
+	uint32_t status;
+#endif
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 1, 0);
+
+	u = ficlStackPopPointer(ficlVmGetDataStack(pVM));
+#ifdef STAND
+	uuid_to_string(u, &uuid, &status);
+	if (status == uuid_s_ok) {
+		ficlStackPushPointer(ficlVmGetDataStack(pVM), uuid);
+		ficlStackPushInteger(ficlVmGetDataStack(pVM), strlen(uuid));
+	} else
+#else
+	uuid = ficlMalloc(UUID_PRINTABLE_STRING_LENGTH);
+	if (uuid != NULL) {
+		uuid_unparse(*u, uuid);
+		ficlStackPushPointer(ficlVmGetDataStack(pVM), uuid);
+		ficlStackPushInteger(ficlVmGetDataStack(pVM), strlen(uuid));
+	} else
+#endif
+		ficlStackPushInteger(ficlVmGetDataStack(pVM), -1);
 }
 
 /*
@@ -1038,6 +1117,10 @@ ficlSystemCompilePlatform(ficlSystem *pSys)
 	ficlDictionarySetPrimitive(dp, "findfile", ficlFindfile,
 	    FICL_WORD_DEFAULT);
 	ficlDictionarySetPrimitive(dp, "ccall", ficlCcall, FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "uuid-from-string", ficlUuidFromString,
+	    FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "uuid-to-string", ficlUuidToString,
+	    FICL_WORD_DEFAULT);
 #ifdef STAND
 #ifdef __i386__
 	ficlDictionarySetPrimitive(dp, "outb", ficlOutb, FICL_WORD_DEFAULT);

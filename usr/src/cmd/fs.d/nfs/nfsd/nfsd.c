@@ -138,7 +138,7 @@ main(int ac, char *av[])
 	int allflag = 0;
 	int df_allflag = 0;
 	int opt_cnt = 0;
-	int maxservers = 1;	/* zero allows inifinte number of threads */
+	int maxservers = 1024;	/* zero allows inifinte number of threads */
 	int maxservers_set = 0;
 	int logmaxservers = 0;
 	int pid;
@@ -231,7 +231,7 @@ main(int ac, char *av[])
 		errno = 0;
 		maxservers = strtol(value, (char **)NULL, 10);
 		if (errno != 0)
-			maxservers = 1;
+			maxservers = 1024;
 		else
 			maxservers_set = 1;
 	}
