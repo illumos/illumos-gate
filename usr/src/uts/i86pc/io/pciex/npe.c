@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -414,18 +415,18 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
     off_t offset, off_t len, caddr_t *vaddrp)
 {
 	int 		rnumber;
-	int		length;
 	int		space;
 	ddi_acc_impl_t	*ap;
 	ddi_acc_hdl_t	*hp;
 	ddi_map_req_t	mr;
 	pci_regspec_t	pci_reg;
 	pci_regspec_t	*pci_rp;
-	struct regspec	reg;
+	struct regspec64 reg;
 	pci_acc_cfblk_t	*cfp;
 	int		retval;
 	int64_t		*ecfginfo;
 	uint_t		nelem;
+	uint64_t	pci_rlength;
 
 	mr = *mp; /* Get private copy of request */
 	mp = &mr;
@@ -452,15 +453,15 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 * make sure that everything is okay.
 		 */
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, rdip,
-		    DDI_PROP_DONTPASS, "reg", (int **)&pci_rp,
-		    (uint_t *)&length) != DDI_PROP_SUCCESS)
+		    DDI_PROP_DONTPASS, "reg", (int **)&pci_rp, &nelem) !=
+		    DDI_PROP_SUCCESS)
 			return (DDI_FAILURE);
 
 		/*
 		 * validate the register number.
 		 */
-		length /= (sizeof (pci_regspec_t) / sizeof (int));
-		if (rnumber >= length) {
+		nelem /= (sizeof (pci_regspec_t) / sizeof (int));
+		if (rnumber >= nelem) {
 			ddi_prop_free(pci_rp);
 			return (DDI_FAILURE);
 		}
@@ -517,13 +518,6 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 			/* FALLTHROUGH */
 		case PCI_ADDR_MEM64:
-			/*
-			 * MEM64 requires special treatment on map, to check
-			 * that the device is below 4G.  On unmap, however,
-			 * we can assume that everything is OK... the map
-			 * must have succeeded.
-			 */
-			/* FALLTHROUGH */
 		case PCI_ADDR_MEM32:
 			reg.regspec_bustype = 0;
 			break;
@@ -532,18 +526,23 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			return (DDI_FAILURE);
 		}
 
+		reg.regspec_addr = (uint64_t)pci_rp->pci_phys_mid << 32 |
+		    (uint64_t)pci_rp->pci_phys_low;
+		reg.regspec_size = (uint64_t)pci_rp->pci_size_hi << 32 |
+		    (uint64_t)pci_rp->pci_size_low;
+
 		/*
 		 * Adjust offset and length
 		 * A non-zero length means override the one in the regspec.
 		 */
-		pci_rp->pci_phys_low += (uint_t)offset;
+		if (reg.regspec_addr + offset < MAX(reg.regspec_addr, offset))
+			return (DDI_FAILURE);
+		reg.regspec_addr += offset;
 		if (len != 0)
-			pci_rp->pci_size_low = len;
+			reg.regspec_size = len;
 
-		reg.regspec_addr = pci_rp->pci_phys_low;
-		reg.regspec_size = pci_rp->pci_size_low;
-
-		mp->map_obj.rp = &reg;
+		mp->map_obj.rp = (struct regspec *)&reg;
+		mp->map_flags |= DDI_MF_EXT_REGSPEC;
 		retval = ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp);
 		if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
 		    mp->map_handlep->ah_acc.devacc_attr_access !=
@@ -624,21 +623,15 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		}
 	}
 
-	length = pci_rp->pci_size_low;
-
 	/*
 	 * range check
 	 */
-	if ((offset >= length) || (len > length) || (offset + len > length))
+	pci_rlength = (uint64_t)pci_rp->pci_size_low |
+	    (uint64_t)pci_rp->pci_size_hi << 32;
+	if ((offset >= pci_rlength) || (len > pci_rlength) ||
+	    (offset + len > pci_rlength) || (offset + len < MAX(offset, len))) {
 		return (DDI_FAILURE);
-
-	/*
-	 * Adjust offset and length
-	 * A non-zero length means override the one in the regspec.
-	 */
-	pci_rp->pci_phys_low += (uint_t)offset;
-	if (len != 0)
-		pci_rp->pci_size_low = len;
+	}
 
 	/*
 	 * convert the pci regsec into the generic regspec used by the
@@ -650,16 +643,6 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		break;
 	case PCI_ADDR_CONFIG:
 	case PCI_ADDR_MEM64:
-		/*
-		 * We can't handle 64-bit devices that are mapped above
-		 * 4G or that are larger than 4G.
-		 */
-		if (pci_rp->pci_phys_mid != 0 || pci_rp->pci_size_hi != 0)
-			return (DDI_FAILURE);
-		/*
-		 * Other than that, we can treat them as 32-bit mappings
-		 */
-		/* FALLTHROUGH */
 	case PCI_ADDR_MEM32:
 		reg.regspec_bustype = 0;
 		break;
@@ -667,10 +650,23 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		return (DDI_FAILURE);
 	}
 
-	reg.regspec_addr = pci_rp->pci_phys_low;
-	reg.regspec_size = pci_rp->pci_size_low;
+	reg.regspec_addr = (uint64_t)pci_rp->pci_phys_mid << 32 |
+	    (uint64_t)pci_rp->pci_phys_low;
+	reg.regspec_size = pci_rlength;
 
-	mp->map_obj.rp = &reg;
+	/*
+	 * Adjust offset and length
+	 * A non-zero length means override the one in the regspec.
+	 */
+	if (reg.regspec_addr + offset < MAX(reg.regspec_addr, offset))
+		return (DDI_FAILURE);
+	reg.regspec_addr += offset;
+	if (len != 0)
+		reg.regspec_size = len;
+
+
+	mp->map_obj.rp = (struct regspec *)&reg;
+	mp->map_flags |= DDI_MF_EXT_REGSPEC;
 	retval = ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp);
 	if (retval == DDI_SUCCESS) {
 		/*
@@ -705,9 +701,8 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 /*ARGSUSED*/
 static int
 npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
-	int		rn;
 	int		totreg;
 	uint_t		reglen;
 	pci_regspec_t	*drv_regp;
@@ -750,12 +745,27 @@ npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		if (ctlop == DDI_CTLOPS_NREGS)
 			*(int *)result = totreg;
 		else if (ctlop == DDI_CTLOPS_REGSIZE) {
+			uint64_t val;
+			int rn;
+
 			rn = *(int *)arg;
 			if (rn >= totreg) {
 				ddi_prop_free(drv_regp);
 				return (DDI_FAILURE);
 			}
-			*(off_t *)result = drv_regp[rn].pci_size_low;
+			val = drv_regp[rn].pci_size_low |
+			    (uint64_t)drv_regp[rn].pci_size_hi << 32;
+			if (val > OFF_MAX) {
+				int ce = CE_NOTE;
+#ifdef DEBUG
+				ce = CE_WARN;
+#endif
+				dev_err(rdip, ce, "failed to get register "
+				    "size, value larger than OFF_MAX: 0x%"
+				    PRIx64 "\n", val);
+				return (DDI_FAILURE);
+			}
+			*(off_t *)result = (off_t)val;
 		}
 		ddi_prop_free(drv_regp);
 
