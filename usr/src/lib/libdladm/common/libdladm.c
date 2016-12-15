@@ -825,14 +825,21 @@ dladm_valid_linkname(const char *link)
 {
 	size_t		len = strlen(link);
 	const char	*cp;
+	int		nd = 0;
 
 	if (len >= MAXLINKNAMELEN)
 		return (B_FALSE);
 
-	/*
-	 * The link name cannot start with a digit and must end with a digit.
-	 */
-	if ((isdigit(link[0]) != 0) || (isdigit(link[len - 1]) == 0))
+	/* Link name cannot start with a digit */
+	if (isdigit(link[0]))
+		return (B_FALSE);
+	/* Link name must end with a number without leading zeroes */
+	cp = link + len - 1;
+	while (isdigit(*cp)) {
+		cp--;
+		nd++;
+	}
+	if (nd == 0 || (nd > 1 && *(cp + 1) == '0'))
 		return (B_FALSE);
 
 	/*
@@ -1075,8 +1082,8 @@ fail:
  * is allocated here but should be freed by the caller.
  */
 dladm_status_t
-dladm_strs2range(char **prop_val, uint_t val_cnt,
-	mac_propval_type_t type, mac_propval_range_t **range)
+dladm_strs2range(char **prop_val, uint_t val_cnt, mac_propval_type_t type,
+    mac_propval_range_t **range)
 {
 	int			i;
 	char			*endp;
