@@ -1,470 +1,388 @@
-'\" te
-.\" Copyright (c) 2014, Nexenta Systems, Inc. All Rights Reserved.
-.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CMN_ERR 9F "Oct 28, 2014"
-.SH NAME
-cmn_err, dev_err, vcmn_err, zcmn_err, vzcmn_err \-
-display an error message or panic the system
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/cmn_err.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-
-
-
-\fBvoid\fR \fBcmn_err\fR(\fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, ...);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBdev_err\fR(\fBdev_info_t\fR \fI*dip\fR, \fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, ...);
-.fi
-
-.LP
-.nf
-#include <sys/varargs.h>
-
-
-
-\fBvoid\fR \fBvcmn_err\fR(\fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
-.fi
-
-.LP
-.nf
-#include <sys/types.h>
-
-
-
-\fBvoid\fR \fBzcmn_err\fR(\fBzoneid_t\fR \fIzoneid\fR, \fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, ...);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBvzcmn_err\fR(\fBzoneid_t\fR \fIzoneid\fR, \fBint\fR \fIlevel\fR, \fBchar *\fR\fIformat\fR, \fBva_list\fR \fIap\fR);
-.fi
-
-.SH INTERFACE LEVEL
-.LP
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd Dec 1, 2016
+.Dt CMN_ERR 9F
+.Os
+.Sh NAME
+.Nm cmn_err, dev_err, vcmn_err, zcmn_err, vzcmn_err
+.Nd display an error message or panic the system
+.Sh SYNOPSIS
+.In sys/cmn_err.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Ft void
+.Fo cmn_err
+.Fa "int level"
+.Fa "char *format"
+.Fa ...
+.Fc
+.Ft void
+.Fo dev_err
+.Fa "dev_info_t *dip"
+.Fa "int level"
+.Fa "char *format"
+.Fa ...
+.Fc
+.In sys/varargs.h
+.Ft void
+.Fo vcmn_err
+.Fa "int level"
+.Fa "char *format"
+.Fa "va_list ap"
+.Fc
+.In sys/types.h
+.Ft void
+.Fo zcmn_err
+.Fa "zoneid_t zoneid"
+.Fa "int level"
+.Fa "char *format"
+.Fa  ...
+.Fc
+.Ft void
+.Fo vzcmn_err
+.Fa "zoneid_t zoneid"
+.Fa "int level"
+.Fa "char *format"
+.Fa "va_list ap"
+.Fc
+.Sh INTERFACE LEVEL
 Architecture independent level 1 (DDI/DKI).
-.SH PARAMETERS
-.SS "cmn_err(\|)"
-.ne 2
-.na
-\fB\fIlevel\fR\fR
-.ad
-.RS 10n
+.Sh PARAMETERS
+.Ss Fn cmn_err
+.Bl -tag -width Ds
+.It Fa level
 A constant indicating the severity of the error condition.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIformat\fR\fR
-.ad
-.RS 10n
+.It Fa format
 Message to be displayed.
-.RE
-
-.SS "dev_err(\|)"
-.LP
-The \fBdev_err()\fR function works exactly like \fBcmn_err()\fR, but includes
-an additional argument:
-.sp
-.ne 2
-.na
-\fB\fIdip\fR\fR
-.ad
-.RS 10n
-A pointer to the device's \fBdev_info\fR structure.
-.RE
-
-.SS "vcmn_err(\|)"
-.LP
-The \fBvcmn_err()\fR function takes \fIlevel\fR and \fIformat\fR as described
-for \fBcmn_err()\fR, but its third argument is different:
-.sp
-.ne 2
-.na
-\fB\fIap\fR\fR
-.ad
-.RS 6n
+.El
+.Ss Fn dev_err
+The
+.Fn dev_err
+function works exactly like
+.Fn cmn_err ,
+but includes an additional argument:
+.Bl -tag -width Ds
+.It Fa dip
+A pointer to the device's
+.Ft dev_info
+structure.
+.El
+.Ss Fn vcmn_err
+The
+.Fn vcmn_err
+function takes
+.Fa level
+and
+.Fa format
+as described for
+.Fn cmn_err ,
+but its third argument is different:
+.Bl -tag -width Ds
+.It Fa ap
 Variable argument list passed to the function.
-.RE
-
-.SS "zcmn_err(\|)"
-.LP
-The \fBzcmn_err()\fR function works exactly like \fBcmn_err()\fR, but includes
-an additional argument:
-.sp
-.ne 2
-.na
-\fB\fIzoneid\fR\fR
-.ad
-.RS 10n
-Zone to which log messages should be directed. See \fBzones\fR(5).
-.RE
-
-.SS "vzcmn_err(\|)"
-.LP
-The \fBvzcmn_err()\fR function works exactly like \fBvcmn_err()\fR, but includes
-an additional argument:
-.sp
-.ne 2
-.na
-\fB\fIzoneid\fR\fR
-.ad
-.RS 10n
-Zone to which log messages should be directed. See \fBzones\fR(5).
-.RE
-
-.SH DESCRIPTION
-.SS "cmn_err(\|)"
-.LP
-The \fBcmn_err()\fR function displays a specified message on the console.
-\fBcmn_err()\fR can also panic the system. When the system panics, it attempts
-to save recent changes to data, display a "panic message" on the console,
-attempt to write a core file, and halt system processing. See the
-\fBCE_PANIC\fR \fIlevel\fR below.
-.sp
-.LP
-\fIlevel\fR is a constant indicating the severity of the error condition. The
-four severity levels are:
-.sp
-.ne 2
-.na
-\fB\fBCE_CONT\fR\fR
-.ad
-.RS 12n
+.El
+.Ss Fn zcmn_err
+The
+.Fn zcmn_err
+function works exactly like
+.Fn cmn_err ,
+but includes an additional argument:
+.Bl -tag -width Ds
+.It Fa zoneid
+Zone to which log messages should be directed.
+See
+.Xr zones 5 .
+.El
+.Ss Fn vzcmn_err
+The
+.Fn vzcmn_err
+function works exactly like
+.Fn vcmn_err ,
+but includes an additional argument:
+.Bl -tag -width Ds
+.It Fa zoneid
+Zone to which log messages should be directed.
+See
+.Xr zones 5 .
+.El
+.Sh DESCRIPTION
+.Ss Fn cmn_err
+The
+.Fn cmn_err
+function displays a specified message on the console.
+.Fn cmn_err
+can also panic the system.
+When the system panics, it attempts to save recent changes to data, display a
+.Qq panic message
+on the console, attempt to write a core file, and halt system processing.
+See the
+.Sy CE_PANIC
+.Fa level
+below.
+.Pp
+.Fa level
+is a constant indicating the severity of the error condition.
+The four severity levels are:
+.Bl -tag -width "CE_PANIC"
+.It Sy CE_CONT
 Used to continue another message or to display an informative message not
-associated with an error. Note that multiple \fBCE_CONT\fR messages without a
-newline may or may not appear on the system console or in the system log as a
-single line message. A single line message may be produced by constructing the
-message with \fBsprintf\fR(9F) or \fBvsprintf\fR(9F) before calling
-\fBcmn_err()\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCE_NOTE\fR\fR
-.ad
-.RS 12n
-Used to display a message preceded with \fBNOTICE\fR. This message is used to
-report system events that do not necessarily require user action, but may
-interest the system administrator. For example, a message saying that a sector
-on a disk needs to be accessed repeatedly before it can be accessed correctly
-might be noteworthy.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCE_WARN\fR\fR
-.ad
-.RS 12n
-Used to display a message preceded with \fBWARNING\fR. This message is used to
-report system events that require immediate attention, such as those where if
-an action is not taken, the system may panic. For example, when a peripheral
-device does not initialize correctly, this level should be used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCE_PANIC\fR\fR
-.ad
-.RS 12n
-Used to display a message preceded with \fB"panic"\fR, and to panic the system.
+associated with an error.
+Note that multiple
+.Sy CE_CONT
+messages without a newline may or may not appear on the system console or in the
+system log as a single line message.
+A single line message may be produced by constructing the message with
+.Xr sprintf 9F
+or
+.Xr vsprintf 9F
+before calling
+.Fn cmn_err .
+.It Sy CE_NOTE
+Used to display a message preceded with
+.Sy NOTICE .
+This message is used to report system events that do not necessarily require
+user action, but may interest the system administrator.
+For example, a message saying that a sector on a disk needs to be accessed
+repeatedly before it can be accessed correctly might be noteworthy.
+.It Sy CE_WARN
+Used to display a message preceded with
+.Sy WARNING .
+This message is used to report system events that require immediate attention,
+such as those where if an action is not taken, the system may panic.
+For example, when a peripheral device does not initialize correctly, this level
+should be used.
+.It Sy CE_PANIC
+Used to display a message preceded with
+.Qq Sy panic ,
+and to panic the system.
 Drivers should specify this level only under the most severe conditions or when
-debugging a driver. A valid use of this level is when the system cannot
-continue to function. If the error is recoverable, or not essential to
-continued system operation, do not panic the system.
-.RE
-
-.sp
-.LP
-\fIformat\fR is the message to be displayed. It is a character string which may
-contain plain characters and conversion specifications. By default, the message
-is sent both to the system console and to the system log.
-.sp
-.LP
-Each conversion specification in \fIformat\fR is introduced by the \fB%\fR
-character, after which the following appear in sequence:
-.sp
-.LP
-An optional decimal digit specifying a minimum field width for numeric
-conversion. The converted value will be right-justified and padded with leading
-zeroes if it has fewer characters than the minimum.
-.sp
-.LP
-An optional \fBl\fR (\fBll\fR) specifying that a following \fBd\fR, \fBD\fR,
-\fBo\fR, \fBO\fR, \fBx\fR, \fBX\fR, or \fBu\fR conversion character applies to
-a \fBlong\fR (\fBlong long\fR) integer argument. An \fBl\fR (\fBll\fR) before
-any other conversion character is ignored.
-.sp
-.LP
-A character indicating the type of conversion to be applied:
-.sp
-.ne 2
-.na
-\fB\fBd\fR,\fBD\fR,\fBo\fR,\fBO\fR,\fBx\fR,\fBX\fR,\fBu\fR\fR
-.ad
-.RS 17n
-The integer argument is converted to signed decimal (\fBd\fR, \fBD\fR),
-unsigned octal (\fBo\fR, \fBO\fR), unsigned hexadecimal (\fBx\fR, \fBX\fR), or
-unsigned decimal (\fBu\fR), respectively, and displayed. The letters
-\fBabcdef\fR are used for \fBx\fR and \fBX\fR conversion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBc\fR\fR
-.ad
-.RS 17n
-The character value of the argument is displayed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBb\fR\fR
-.ad
-.RS 17n
-The \fB%b\fR conversion specification allows bit values to be displayed
-meaningfully. Each \fB%b\fR takes an integer value and a format string from the
-argument list. The first character of the format string should be the output
-base encoded as a control character. This base is used to display the integer
-argument. The remaining groups of characters in the format string consist of a
-bit number (between 1 and 32, also encoded as a control character) and the next
-characters (up to the next control character or '\e0') give the name of the bit
-field. The string corresponding to the bit fields set in the integer argument
-is displayed after the numerical value. See EXAMPLE section.
-.RE
-
-.sp
-.ne 2
-.na
-\fBp\fR
-.ad
-.RS 17n
-The argument is taken to be a pointer; the value of the pointer is displayed in
-unsigned hexadecimal. The display format is equivalent to \fB%lx\fR. To avoid
-lint warnings, cast pointers to type \fBvoid *\fR when using the \fB%p\fR
-format specifier.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBs\fR\fR
-.ad
-.RS 17n
-The argument is taken to be a string (character pointer), and characters from
-the string are displayed until a null character is encountered. If the
-character pointer is \fINULL\fR, the string \fB<null string>\fR is used in its
-place.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB%\fR\fR
-.ad
-.RS 17n
-Copy a \fB%\fR; no argument is converted.
-.RE
-
-.sp
-.LP
-The first character in \fIformat\fR affects where the message will be written:
-.sp
-.ne 2
-.na
-\fB\fB!\fR\fR
-.ad
-.RS 5n
+debugging a driver.
+A valid use of this level is when the system cannot continue to function.
+If the error is recoverable, or not essential to continued system operation, do
+not panic the system.
+.El
+.Pp
+The
+.Fa format
+is identical to the one described in
+.Xr sprintf 9F
+with additional meaning of the first character affecting where the message will
+be written:
+.Bl -tag -width Ds
+.It Sy \!
 The message goes only to the system log.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB^\fR\fR
-.ad
-.RS 5n
+.It Sy ^
 The message goes only to the console.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB?\fR\fR
-.ad
-.RS 5n
-If \fIlevel\fR is also \fBCE_CONT,\fR the message is always sent to the system
-log, but is only written to the console when the system has been booted in
-verbose mode. See \fBkernel\fR(1M). If neither condition is met, the '?\|'
+.It Sy \?
+If
+.Fa level
+is also
+.Sy CE_CONT ,
+the message is always sent to the system log, but is only written to the console
+when the system has been booted in verbose mode.
+See
+.Xr kernel 1M .
+If neither condition is met, the
+.Qq Sy \?
 character has no effect and is simply ignored.
-.RE
-.sp
-.LP
-Refer to \fBsyslogd\fR(1M) to determine where the system log is written.
-.sp
-.LP
-The \fBcmn_err()\fR function sends log messages to the log of the global zone.
-\fBcmn_err()\fR appends a \fB\en\fR to each \fIformat\fR, except when
-\fIlevel\fR is \fBCE_CONT\fR.
-.SS "dev_err(\|)"
-.LP
-With the exception of its first argument (\fBdip\fR), \fBdev_err()\fR is
-identical to \fBcmn_err()\fR. \fBdip\fR is a pointer to a device's
-\fBdev_info\fR structure, which is used to prepend the driver name and
-instance number to the message. The driver name and instance number are
-retrieved using \fBddi_driver_name\fR(9F) and \fBddi_get_instance\fR(9F).
-.SS "vcmn_err(\|)"
-.LP
-The \fBvcmn_err()\fR function is identical to \fBcmn_err()\fR except that its
-last argument, \fIap\fR, is a pointer to a variable list of arguments. \fIap\fR
+.El
+.Pp
+Refer to
+.Xr syslogd 1M
+to determine where the system log is written.
+.Pp
+The
+.Fn cmn_err
+function sends log messages to the log of the global zone.
+.Fn cmn_err
+appends a
+.Sy \en
+to each
+.Fa format ,
+except when
+.Fa level
+is
+.Sy CE_CONT .
+.Ss Fn dev_err
+With the exception of its first argument
+.Pq Fa dip ,
+.Fn dev_err
+is identical to
+.Fn cmn_err .
+.Fa dip
+is a pointer to a device's
+.Ft dev_info
+structure, which is used to prepend the driver name and instance number to the
+message.
+The driver name and instance number are retrieved using
+.Xr ddi_driver_name 9F
+and
+.Xr ddi_get_instance 9F .
+.Ss Fn vcmn_err
+The
+.Fn vcmn_err
+function is identical to
+.Fn cmn_err
+except that its last argument,
+.Fa ap ,
+is a pointer to a variable list of arguments.
+.Fa ap
 contains the list of arguments used by the conversion specifications in
-\fIformat\fR. \fIap\fR must be initialized by calling \fBva_start\fR(9F).
-\fBva_end\fR(9F) is used to clean up and must be called after each traversal of
-the list. Multiple traversals of the argument list, each bracketed by
-\fBva_start\fR(9F) and \fBva_end\fR(9F), are possible.
-.SS "zcmn_err(\|)"
-.LP
-With the exception of its first argument (\fBzoneid\fR), \fBzcmn_err()\fR is
-identical to \fBcmn_err()\fR. \fBzoneid\fR is the numeric ID of the zone to
-which the message should be directed. Note that \fBzoneid\fR only has an effect
-if the message is sent to the system log. Using \fBzoneid\fR will cause
-messages to be sent to the log associated with the specified local zone rather
-than the log in the global zone. This is accomplished by the message being
-received and processed by the \fBsyslogd\fR(1M) process running in the
-specified zone instead of the one running in the global zone. You can retrieve
-a process zone ID from its credential structure using \fBcrgetzoneid\fR(9F).
-.SS "vzcmn_err(\|)"
-.LP
-With the exception of its first argument (\fBzoneid\fR), \fBvzcmn_err()\fR is
-identical to \fBvcmn_err()\fR. See the description of \fBzcmn_err()\fR
-above for an explanation on how the \fBzoneid\fR argument is handled.
-.SH RETURN VALUES
-.LP
-None. However, if an unknown \fIlevel\fR is passed to \fBcmn_err()\fR, the
-following panic error message is displayed:
-.sp
-.in +2
-.nf
-panic: unknown level in cmn_err (level=\fIlevel\fR, msg=format)
-.fi
-.in -2
-.sp
-
-.SH CONTEXT
-.LP
-The \fBcmn_err()\fR function can be called from user, kernel, interrupt, or
-high-level interrupt context.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRUsing \fBcmn_err()\fR
-.sp
-.LP
-This first example shows how \fBcmn_err()\fR can record tracing and debugging
-information only in the system log (lines 17); display problems with a device
-only on the system console (line 23); or display problems with the device on
-both the system console and in the system log (line 28).
-
-.sp
-.in +2
-.nf
+.Fa format .
+.Fa ap
+must be initialized by calling
+.Xr va_start 9F .
+.Xr va_end 9F
+is used to clean up and must be called after each traversal of the list.
+Multiple traversals of the argument list, each bracketed by
+.Xr va_start 9F
+and
+.Xr va_end 9F ,
+are possible.
+.Ss Fn zcmn_err
+With the exception of its first argument
+.Pq Fa zoneid ,
+.Fn zcmn_err
+is identical to
+.Fn cmn_err .
+.Fa zoneid
+is the numeric ID of the zone to which the message should be directed.
+Note that
+.Fa zoneid
+only has an effect if the message is sent to the system log.
+Using
+.Fa zoneid
+will cause messages to be sent to the log associated with the specified local
+zone rather than the log in the global zone.
+This is accomplished by the message being received and processed by the
+.Xr syslogd 1M
+process running in the specified zone instead of the one running in the global
+zone.
+You can retrieve a process zone ID from its credential structure using
+.Xr crgetzoneid 9F .
+.Ss Fn vzcmn_err
+With the exception of its first argument
+.Pq Fa zoneid ,
+.Fn vzcmn_err
+is identical to
+.Fn vcmn_err .
+See the description of
+.Fn zcmn_err
+above for an explanation on how the
+.Fa zoneid
+argument is handled.
+.Sh CONTEXT
+The
+.Fn cmn_err
+function can be called from user, kernel, interrupt, or high-level interrupt
+context.
+.Sh RETURN VALUES
+None. However, if an unknown
+.Fa level
+is passed to
+.Fn cmn_err ,
+the following panic error message is displayed:
+.Bd -literal
+panic: unknown level in cmn_err (level=level, msg=format)
+.Ed
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Using Fn cmn_err
+This first example shows how
+.Fn cmn_err
+can record tracing and debugging information only in the system log
+.Pq lines 17 ;
+display problems with a device only on the system console
+.Pq line 23 ;
+or display problems with the device on both the system console and in the system
+log
+.Pq line 28 .
+.Bd -literal
 1  struct  reg {
 2          uchar_t data;
 3          uchar_t csr;
 4  };
 5
 6  struct  xxstate {
-7          .\|.\|.
+7          ...
 8          dev_info_t *dip;
 9          struct reg *regp;
-10          .\|.\|.
+10         ...
 11  };
 12
 13  dev_t dev;
 14  struct xxstate *xsp;
-15    .\|.\|.
+15    ...
 16  #ifdef DEBUG    /* in debugging mode, log function call */
 17     cmn_err(CE_CONT, "!%s%d: xxopen function called.",
 18          ddi_binding_name(xsp->dip), getminor(dev));
 19  #endif  /* end DEBUG */
-20    .\|.\|.
+20    ...
 21  /* display device power failure on system console */
 22     if ((xsp->regp->csr & POWER) == OFF)
 23          cmn_err(CE_NOTE, "^OFF.",
 24               ddi_binding_name(xsp->dip), getminor(dev));
-25    .\|.\|.
+25    ...
 26  /* display warning if device has bad VTOC */
 27     if (xsp->regp->csr & BADVTOC)
 28          cmn_err(CE_WARN, "%s%d: xxopen: Bad VTOC.",
 29               ddi_binding_name(xsp->dip), getminor(dev));
-.fi
-.in -2
-
-.LP
-\fBExample 2 \fRUsing the %b conversion specification
-.sp
-.LP
-This example shows how to use the \fB%b\fR conversion specification. Because of
-the leading '?\|' character in the format string, this message will always be
-logged, but it will only be displayed when the kernel is booted in verbose
-mode.
-
-.sp
-.in +2
-.nf
+.Ed
+.It Sy Example 2 No Using the %b conversion specification
+This example shows how to use the
+.Sy %b
+conversion specification.
+Because of the leading
+.Qq Sy \?
+character in the format string, this message will always be logged, but it will
+only be displayed when the kernel is booted in verbose mode.
+.Bd -literal
 cmn_err(CE_CONT, "?reg=0x%b\en", regval, "\e020\e3Intr\e2Err\e1Enable");
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRUsing \fIregval\fR
-.sp
-.LP
-When \fIregval\fR is set to (decimal) \fB13\fR, the following message would be
-displayed:
-
-.sp
-.in +2
-.nf
+.Ed
+.It Sy Example 3 No Using Fa regval
+When
+.Fa regval
+is set to
+.Pq decimal
+13, the following message would be displayed:
+.Bd -literal
 reg=0xd<Intr,,Enable>
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 4 \fRError Routine
-.sp
-.LP
+.Ed
+.It Sy Example 4 No Error Routine
 This example shows an error reporting routine which accepts a variable number
 of arguments and displays a single line error message both in the system log
-and on the system console. Note the use of \fBvsprintf()\fR to construct the
-error message before calling \fBcmn_err()\fR.
-
-.sp
-.in +2
-.nf
+and on the system console.
+Note the use of
+.Fn vsprintf
+to construct the error message before calling
+.Fn cmn_err .
+.Bd -literal
 #include <sys/varargs.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #define MAX_MSG 256;
 
 void
-xxerror(dev_info_t *dip, int level, const char *fmt, .\|.\|.\|)
+xxerror(dev_info_t *dip, int level, const char *fmt, ...)
 {
     va_list     ap;
     int         instance;
@@ -484,44 +402,52 @@ va_end(ap);
 cmn_err(level, "%s%d: %s", name, instance, buf);
 
 }
-.fi
-.in -2
-
-.LP
-\fBExample 5 \fRLog to Current Zone
-.sp
-.LP
+.Ed
+.It Sy Example 5 No Log to Current Zone
 This example shows how messages can be sent to  the log of the zone in which a
-thread is currently running, when applicable. Note that most hardware-related
-messages should instead be sent to the global zone using \fBcmn_err()\fR.
-
-.sp
-.in +2
-.nf
+thread is currently running, when applicable.
+Note that most hardware-related messages should instead be sent to the global
+zone using
+.Fn cmn_err .
+.Bd -literal
 zcmn_err(crgetzoneid(ddi_get_cred()), CE_NOTE, "out of processes");
-.fi
-.in -2
-
-.SH SEE ALSO
-.LP
-\fBdmesg\fR(1M), \fBkernel\fR(1M), \fBprintf\fR(3C), \fBzones\fR(5),
-\fBddi_binding_name\fR(9F), \fBddi_cred\fR(9F), \fBddi_driver_name\fR(9F),
-\fBddi_get_instance\fR(9F), \fBsprintf\fR(9F), \fBva_arg\fR(9F),
-\fBva_end\fR(9F), \fBva_start\fR(9F), \fBvsprintf\fR(9F)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.SH WARNINGS
-.LP
-The \fBcmn_err()\fR function with the \fBCE_CONT\fR argument can be used by
-driver developers as a driver code debugging tool. However, using
-\fBcmn_err()\fR in this capacity can change system timing characteristics.
-.SH NOTES
-.LP
-Messages of arbitrary length can be generated using \fBcmn_err()\fR, but if the
-call to \fBcmn_err()\fR is made from high-level interrupt context and
-insufficient memory is available to create a buffer of the specified size, the
-message will be truncated to \fBLOG_MSGSIZE\fR bytes (see <\fBsys/log.h\fR>).
-For this reason, callers of \fBcmn_err()\fR that require complete and accurate
-message generation should post down from high-level interrupt context before
-calling \fBcmn_err()\fR.
+.Ed
+.El
+.Sh SEE ALSO
+.Xr dmesg 1M ,
+.Xr kernel 1M ,
+.Xr zones 5 ,
+.Xr ddi_binding_name 9F ,
+.Xr ddi_cred 9F ,
+.Xr ddi_driver_name 9F ,
+.Xr ddi_get_instance 9F ,
+.Xr sprintf 9F ,
+.Xr va_arg 9F ,
+.Xr va_end 9F ,
+.Xr va_start 9F
+.Pp
+Writing Device Drivers
+.Sh WARNINGS
+The
+.Fn cmn_err
+function with the
+.Sy CE_CONT
+argument can be used by driver developers as a driver code debugging tool.
+However, using
+.Fn cmn_err
+in this capacity can change system timing characteristics.
+.Sh NOTES
+Messages of arbitrary length can be generated using
+.Fn cmn_err ,
+but if the call to
+.Fn cmn_err
+is made from high-level interrupt context and insufficient memory is available
+to create a buffer of the specified size, the message will be truncated to
+LOG_MSGSIZE
+bytes
+.Pq see Pa sys/log.h .
+For this reason, callers of
+.Fn cmn_err
+that require complete and accurate message generation should post down from
+high-level interrupt context before calling
+.Fn cmn_err .
