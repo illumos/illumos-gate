@@ -172,8 +172,10 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 			for (i = 0; i < cnt; i++) {
 				if (e[i].hle_nlen == 0 ||
-				    e[i].hle_nlen >= sizeof (nm))
+				    e[i].hle_nlen >= sizeof (nm)) {
+					kmem_free(e, len);
 					return (EINVAL);
+				}
 
 				if (copyin(e[i].hle_name, nm, e[i].hle_nlen)
 				    != 0) {
@@ -184,8 +186,10 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 				if (cmd == HYPRLOFS_ADD_ENTRIES) {
 					if (e[i].hle_plen == 0 ||
-					    e[i].hle_plen >= sizeof (path))
+					    e[i].hle_plen >= sizeof (path)) {
+						kmem_free(e, len);
 						return (EINVAL);
+					}
 
 					if (copyin(e[i].hle_path, path,
 					    e[i].hle_plen) != 0) {
@@ -232,8 +236,10 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 			for (i = 0; i < cnt; i++) {
 				if (e32[i].hle_nlen == 0 ||
-				    e32[i].hle_nlen >= sizeof (nm))
+				    e32[i].hle_nlen >= sizeof (nm)) {
+					kmem_free(e32, len);
 					return (EINVAL);
+				}
 
 				if (copyin((void *)(unsigned long)
 				    e32[i].hle_name, nm,
@@ -245,8 +251,10 @@ hyprlofs_ioctl(vnode_t *vp, int cmd, intptr_t data, int flag,
 
 				if (cmd == HYPRLOFS_ADD_ENTRIES) {
 					if (e32[i].hle_plen == 0 ||
-					    e32[i].hle_plen >= sizeof (path))
+					    e32[i].hle_plen >= sizeof (path)) {
+						kmem_free(e32, len);
 						return (EINVAL);
+					}
 
 					if (copyin((void *)(unsigned long)
 					    e32[i].hle_path, path,
