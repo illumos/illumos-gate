@@ -22,9 +22,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Handling of unintentional faults (i.e. bugs) in the debugger.
@@ -44,7 +43,8 @@
 void
 kmdb_fault(kreg_t tt, kreg_t pc, kreg_t sp, int cpuid)
 {
-	int debug_self_confirm = 0, try;
+	int debug_self_confirm = 0;
+	volatile int try;
 	jmp_buf pcb, *old;
 	char c;
 
