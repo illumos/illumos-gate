@@ -1000,7 +1000,8 @@ lx_get_robust_list(pid_t pid, void **listp, size_t *lenp)
 		mutex_enter(&curproc->p_lock);
 		sprlock_proc(rproc);
 	} else {
-		if (lx_lpid_lock(pid, curzone, PRLOCK, &rproc, &rthr) != 0) {
+		if (lx_lpid_lock(pid, curzone, LXP_PRLOCK, &rproc,
+		    &rthr) != 0) {
 			return (set_errno(ESRCH));
 		}
 

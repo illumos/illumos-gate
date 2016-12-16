@@ -678,9 +678,12 @@ extern void lx_emulate_user32(klwp_t *, int, uintptr_t *);
 extern int lx_debug;
 #define	lx_print	if (lx_debug) printf
 
+/*
+ * Flags for lx_lpid_lock()
+ */
 typedef enum {
-	NO_PRLOCK,
-	PRLOCK
+	LXP_PRLOCK	= 0x1,	/* acquire PR_LOCK as part of locking */
+	LXP_ZOMBOK	= 0x2	/* allow locking of zombies */
 } lx_pid_flag_t;
 
 extern void lx_pid_assign(kthread_t *, struct lx_pid *);

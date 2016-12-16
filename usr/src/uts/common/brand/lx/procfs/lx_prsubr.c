@@ -214,7 +214,12 @@ retry:
 		mutex_enter(&p->p_lock);
 		sprlock_proc(p);
 	} else {
-		if (lx_lpid_lock(pid, zone, PRLOCK, &p, &t) != 0) {
+		lx_pid_flag_t flags = LXP_PRLOCK;
+
+		if (zombie_ok == ZOMB_OK) {
+			flags |= LXP_ZOMBOK;
+		}
+		if (lx_lpid_lock(pid, zone, flags, &p, &t) != 0) {
 			return (NULL);
 		}
 	}
