@@ -180,12 +180,14 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_userquota_prop_prefixes;
 	zfs_zpl_version_map;
 	zpool_add;
+	zpool_checkpoint;
 	zpool_clear;
 	zpool_clear_label;
 	zpool_close;
 	zpool_create;
 	zpool_destroy;
 	zpool_disable_datasets;
+	zpool_discard_checkpoint;
 	zpool_dump_ddt;
 	zpool_enable_datasets;
 	zpool_expand_proplist;

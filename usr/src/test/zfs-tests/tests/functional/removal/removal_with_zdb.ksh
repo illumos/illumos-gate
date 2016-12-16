@@ -15,7 +15,7 @@
 #
 
 #
-# Copyright (c) 2014, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2014, 2017 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -34,15 +34,12 @@ log_onexit cleanup
 
 function callback
 {
-	typeset count=$1
-	if (( count == 0 )); then
-		if ! ksh -c "zdb -cudi $TESTPOOL >$zdbout 2>&1"; then
-			log_note "Output: zdb -cudi $TESTPOOL"
-			cat $zdbout
-			log_fail "zdb detected errors."
-		fi
-		log_note "zdb -cudi $TESTPOOL >zdbout 2>&1"
+	if ! ksh -c "zdb -cudi $TESTPOOL >$zdbout 2>&1"; then
+		log_note "Output: zdb -cudi $TESTPOOL"
+		cat $zdbout
+		log_fail "zdb detected errors."
 	fi
+	log_note "zdb -cudi $TESTPOOL >zdbout 2>&1"
 	return 0
 }
 

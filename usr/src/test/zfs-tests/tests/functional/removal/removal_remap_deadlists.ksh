@@ -15,7 +15,7 @@
 #
 
 #
-# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2017 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -34,8 +34,7 @@ log_must zfs snapshot $TESTPOOL/$TESTFS@snap-pre2
 log_must dd if=/dev/zero of=$TESTDIR/file bs=1024k count=100 \
     conv=notrunc seek=200
 
-log_must zpool remove $TESTPOOL $REMOVEDISK
-log_must wait_for_removal $TESTPOOL zdb -cd $TESTPOOL
+log_must attempt_during_removal $TESTPOOL $REMOVEDISK zdb -cd $TESTPOOL
 log_mustnot vdevs_in_pool $TESTPOOL $REMOVEDISK
 log_must zdb -cd $TESTPOOL
 
