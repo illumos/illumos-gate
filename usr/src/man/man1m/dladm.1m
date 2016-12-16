@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLADM 1M "Oct 01, 2016"
+.TH DLADM 1M "Dec 16, 2016"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
@@ -506,7 +506,7 @@ Number of packets sent on this link.
 .ad
 .sp .6
 .RS 4n
-Number of bytes received on this link.
+Number of bytes sent on this link.
 .RE
 
 .sp
@@ -991,7 +991,7 @@ should operate. Supported values are \fBoff\fR, \fBactive\fR or \fBpassive\fR.
 .sp .6
 .RS 4n
 Specifies the \fBLACP\fR timer value. The supported values are \fBshort\fR or
-\fBlong\fRjjj.
+\fBlong\fR.
 .RE
 
 .sp
@@ -2525,7 +2525,7 @@ See "Options," above.
 .RS 4n
 Display VLAN configuration for all VLAN links or for the specified VLAN link.
 .sp
-The \fBshow-vlan\fRsubcommand accepts the following options:
+The \fBshow-vlan\fR subcommand accepts the following options:
 .sp
 .ne 2
 .na
@@ -4822,7 +4822,7 @@ properties at initial negotiation.
 .LP
 Note that the \fBadv_autoneg_cap\fR does not have an \fBen_autoneg_cap\fR
 counterpart: the \fBadv_autoneg_cap\fR is a 0/1 switch that turns off/on
-autonegotiation itself, and therefore cannot be impacted by Power Management.
+auto-negotiation itself, and therefore cannot be impacted by Power Management.
 .sp
 .LP
 In addition, the following Ethernet properties are reported:
