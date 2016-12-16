@@ -5405,6 +5405,37 @@ lxpr_read_filesystems(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * Calculate the number of links in the task dir. Some code (e.g. chromium)
+ * depends on this value being accurate.
+ */
+static uint_t
+lxpr_count_taskdir(lxpr_node_t *lxpnp)
+{
+	proc_t *p;
+	uint_t cnt;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_TASKDIR);
+
+	p = lxpr_lock(lxpnp, ZOMB_OK);
+	if (p == NULL)
+		return (0);
+
+	/* Just count "." and ".." for system processes and zombies. */
+	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
+	    (p->p_as == &kas)) {
+		lxpr_unlock(p);
+		return (2);
+	}
+
+	cnt = p->p_lwpcnt;
+	lxpr_unlock(p);
+
+	/* Add the fixed entries ("." & "..") */
+	cnt += 2;
+	return (cnt);
+}
+
+/*
  * lxpr_getattr(): Vnode operation for VOP_GETATTR()
  */
 static int
@@ -5471,6 +5502,10 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	case LXPR_PIDDIR:
 		vap->va_nlink = PIDDIRFILES;
 		vap->va_size = PIDDIRFILES * LXPR_SDSIZE;
+		break;
+	case LXPR_PID_TASKDIR:
+		vap->va_nlink = lxpr_count_taskdir(lxpnp);
+		vap->va_size = vap->va_nlink * LXPR_SDSIZE;
 		break;
 	case LXPR_PID_TASK_IDDIR:
 		vap->va_nlink = TIDDIRFILES;
