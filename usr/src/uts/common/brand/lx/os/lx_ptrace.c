@@ -410,7 +410,7 @@ lx_ptrace_accord_get_by_pid(pid_t lxpid, lx_ptrace_accord_t **accordp)
 	 * Locate the process containing the tracer LWP based on its Linux pid
 	 * and lock it.
 	 */
-	if (lx_lpid_lock(lxpid, curzone, PRLOCK, &aproc, &athr) != 0) {
+	if (lx_lpid_lock(lxpid, curzone, LXP_PRLOCK, &aproc, &athr) != 0) {
 		return (ESRCH);
 	}
 
@@ -1014,7 +1014,7 @@ lx_ptrace_attach(pid_t lx_pid)
 	 * Locate the process containing the tracee LWP based on its Linux pid
 	 * and lock it.
 	 */
-	if (lx_lpid_lock(lx_pid, curzone, PRLOCK, &rproc, &rthr) != 0) {
+	if (lx_lpid_lock(lx_pid, curzone, LXP_PRLOCK, &rproc, &rthr) != 0) {
 		/*
 		 * We could not find the target process.
 		 */

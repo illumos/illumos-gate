@@ -106,7 +106,7 @@ lx_thrkill(pid_t tgid, pid_t pid, int lx_sig, boolean_t tgkill)
 	/*
 	 * Find the process for the passed pid...
 	 */
-	if (lx_lpid_lock(pid, curzone, NO_PRLOCK, &pp, &t) != 0) {
+	if (lx_lpid_lock(pid, curzone, 0, &pp, &t) != 0) {
 		rv = set_errno(ESRCH);
 		goto free_and_exit;
 	}
@@ -356,7 +356,7 @@ lx_helper_rt_tgsigqueueinfo(pid_t tgid, pid_t tid, int sig, siginfo_t *uinfo)
 	}
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 
-	if (lx_lpid_lock(tid, curzone, NO_PRLOCK, &p, &t) != 0) {
+	if (lx_lpid_lock(tid, curzone, 0, &p, &t) != 0) {
 		err = ESRCH;
 		goto errout;
 	}

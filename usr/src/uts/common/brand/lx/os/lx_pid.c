@@ -334,24 +334,38 @@ retry:
 		return (-1);
 	}
 
-	/* Bail on system processes or those which are incomplete */
-	if (p->p_stat == SIDL || (p->p_flag & SSYS) != 0) {
+	/*
+	 * Bail on processes belonging to the system, those which are not yet
+	 * complete and zombies (unless explicitly allowed via the flags).
+	 */
+	if (p->p_stat == SIDL || (p->p_flag & SSYS) != 0 ||
+	    (p->p_stat == SZOMB && (flag & LXP_ZOMBOK) == 0)) {
 		mutex_exit(&pidlock);
 		return (-1);
 	}
 	mutex_enter(&p->p_lock);
 	mutex_exit(&pidlock);
 
-	if (flag == PRLOCK) {
-		int res;
-
-		res = sprtrylock_proc(p);
-		if (res < 0) {
+	if (flag & LXP_PRLOCK) {
+		/*
+		 * It would be convenient to call sprtrylock_proc() for this
+		 * task.  Unfortunately, its behavior of filtering zombies is
+		 * excessive for some lx_proc use cases.  Instead, when the
+		 * provided flags do not indicate that zombies are allowed,
+		 * exiting processes are filtered out (as would be performed by
+		 * sprtrylock_proc).
+		 */
+		if ((p->p_flag & (SEXITING|SEXITLWPS)) != 0 &&
+		    (flag & LXP_ZOMBOK) == 0) {
 			mutex_exit(&p->p_lock);
 			return (-1);
-		} else if (res > 0) {
+		}
+		if (p->p_proc_flag & P_PR_LOCK) {
 			sprwaitlock_proc(p);
 			goto retry;
+		} else {
+			p->p_proc_flag |= P_PR_LOCK;
+			THREAD_KPRI_REQUEST();
 		}
 	}
 
@@ -362,7 +376,7 @@ retry:
 
 		ld = lwp_hash_lookup(p, tid);
 		if (ld == NULL) {
-			if (flag == PRLOCK) {
+			if (flag & LXP_PRLOCK) {
 				sprunprlock(p);
 			}
 			mutex_exit(&p->p_lock);

@@ -189,7 +189,7 @@ lx_sched_pidlock(l_pid_t pid, proc_t **pp, kthread_t **tp, boolean_t is_write)
 		return (0);
 	}
 
-	if (lx_lpid_lock((pid_t)pid, curzone, PRLOCK, &p, &t) != 0) {
+	if (lx_lpid_lock((pid_t)pid, curzone, LXP_PRLOCK, &p, &t) != 0) {
 		return (ESRCH);
 	}
 
