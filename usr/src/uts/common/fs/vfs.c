@@ -4631,7 +4631,6 @@ getfsname(char *askfor, char *name, size_t namelen)
 static void
 getrootfs(char **fstypp, char **fsmodp)
 {
-	extern char *strplumb_get_netdev_path(void);
 	char *propstr = NULL;
 
 	/*
@@ -4681,11 +4680,7 @@ getrootfs(char **fstypp, char **fsmodp)
 		(void) strncpy(rootfs.bo_name, propstr, BO_MAXOBJNAME);
 		ddi_prop_free(propstr);
 	} else {
-		/* attempt to determine netdev_path via boot_mac address */
-		netdev_path = strplumb_get_netdev_path();
-		if (netdev_path == NULL)
-			panic("cannot find boot network interface");
-		(void) strncpy(rootfs.bo_name, netdev_path, BO_MAXOBJNAME);
+		rootfs.bo_name[0] = '\0';
 	}
 	*fstypp = rootfs.bo_fstype;
 	*fsmodp = "nfs";
