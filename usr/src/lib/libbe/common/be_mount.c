@@ -80,6 +80,7 @@ static int be_mount_one_zone(zfs_handle_t *, be_mount_data_t *, char *, char *,
     char *);
 static int be_unmount_one_zone(be_unmount_data_t *, char *, char *, char *);
 static int be_get_ds_from_dir_callback(zfs_handle_t *, void *);
+static int mount_zfs(zfs_handle_t *, char *);
 
 
 /* ********************************************************************	*/
@@ -1165,8 +1166,7 @@ be_mount_callback(zfs_handle_t *zhp, void *data)
 
 	/*
 	 * Set this filesystem's 'canmount' property to 'noauto' just incase
-	 * it's been set 'on'.  We do this so that when we change its
-	 * mountpoint zfs won't immediately try to mount it.
+	 * it's been set 'on'.
 	 */
 	if (zfs_prop_set(zhp, zfs_prop_to_name(ZFS_PROP_CANMOUNT), "noauto")) {
 		be_print_err(gettext("be_mount_callback: failed to "
@@ -1211,31 +1211,11 @@ be_mount_callback(zfs_handle_t *zhp, void *data)
 
 		goto next;
 
-	} else if (sourcetype & ZPROP_SRC_INHERITED) {
+	} else if ((sourcetype & (ZPROP_SRC_INHERITED|ZPROP_SRC_LOCAL)) == 0) {
 		/*
-		 * If the mountpoint is inherited, its parent should have
-		 * already been processed so its current mountpoint value
-		 * is what its mountpoint ought to be.
+		 * Skip dataset if mountpoint is not inherited
+		 * or explicitly set.
 		 */
-		(void) strlcpy(mountpoint, zhp_mountpoint, sizeof (mountpoint));
-	} else if (sourcetype & ZPROP_SRC_LOCAL) {
-		/*
-		 * Else process dataset with explicitly set mountpoint.
-		 */
-		(void) snprintf(mountpoint, sizeof (mountpoint),
-		    "%s%s", altroot, zhp_mountpoint);
-
-		/* Set the new mountpoint for the dataset */
-		if (zfs_prop_set(zhp,
-		    zfs_prop_to_name(ZFS_PROP_MOUNTPOINT),
-		    mountpoint)) {
-			be_print_err(gettext("be_mount_callback: "
-			    "failed to set mountpoint for %s to "
-			    "%s\n"), fs_name, mountpoint);
-			ZFS_CLOSE(zhp);
-			return (BE_ERR_ZFS);
-		}
-	} else {
 		be_print_err(gettext("be_mount_callback: "
 		    "mountpoint sourcetype of %s is %d, skipping ...\n"),
 		    fs_name, sourcetype);
@@ -1244,21 +1224,10 @@ be_mount_callback(zfs_handle_t *zhp, void *data)
 	}
 
 	/* Mount this filesystem */
-	if (zfs_mount(zhp, NULL, 0) != 0) {
+	if (mount_zfs(zhp, altroot) != 0) {
 		be_print_err(gettext("be_mount_callback: failed to "
 		    "mount dataset %s at %s: %s\n"), fs_name, mountpoint,
-		    libzfs_error_description(g_zfs));
-		/*
-		 * Set this filesystem's 'mountpoint' property back to what
-		 * it was
-		 */
-		if (sourcetype & ZPROP_SRC_LOCAL &&
-		    strcmp(zhp_mountpoint, ZFS_MOUNTPOINT_LEGACY) != 0) {
-			(void) zfs_prop_set(zhp,
-			    zfs_prop_to_name(ZFS_PROP_MOUNTPOINT),
-			    zhp_mountpoint);
-		}
-
+		    strerror(errno));
 		ZFS_CLOSE(zhp);
 		return (BE_ERR_MOUNT);
 	}
@@ -1377,15 +1346,11 @@ be_unmount_callback(zfs_handle_t *zhp, void *data)
 					ret = zfs_err_to_be_err(g_zfs);
 				}
 			} else {
-				be_print_err(
-				    gettext("be_unmount_callback: "
-				    "%s not mounted under BE's altroot %s, "
-				    "skipping ...\n"), fs_name, ud->altroot);
 				/*
-				 * fs_name is mounted but not under the
-				 * root for this BE.
+				 * Nothing to do, mountpoint shouldn't be
+				 * corrected.
 				 */
-				ret = BE_ERR_INVALMOUNTPOINT;
+				goto done;
 			}
 		}
 	} else {
@@ -2131,8 +2096,7 @@ be_mount_root(zfs_handle_t *zhp, char *altroot)
 
 	/*
 	 * Set the canmount property for the BE's root dataset to 'noauto' just
-	 * in case it's been set to 'on'.  We do this so that when we change its
-	 * mountpoint, zfs won't immediately try to mount it.
+	 * in case it's been set to 'on'.
 	 */
 	if (zfs_prop_set(zhp, zfs_prop_to_name(ZFS_PROP_CANMOUNT), "noauto")
 	    != 0) {
@@ -2142,28 +2106,12 @@ be_mount_root(zfs_handle_t *zhp, char *altroot)
 		return (zfs_err_to_be_err(g_zfs));
 	}
 
-	/* Set mountpoint for BE's root filesystem */
-	if (zfs_prop_set(zhp, zfs_prop_to_name(ZFS_PROP_MOUNTPOINT), altroot)
-	    != 0) {
-		be_print_err(gettext("be_mount_root: failed to "
-		    "set mountpoint of %s to %s: %s\n"),
-		    zfs_get_name(zhp), altroot,
-		    libzfs_error_description(g_zfs));
-		return (zfs_err_to_be_err(g_zfs));
-	}
-
 	/* Mount the BE's root filesystem */
-	if (zfs_mount(zhp, NULL, 0) != 0) {
+	if (mount_zfs(zhp, altroot) != 0) {
 		be_print_err(gettext("be_mount_root: failed to "
 		    "mount dataset %s at %s: %s\n"), zfs_get_name(zhp),
-		    altroot, libzfs_error_description(g_zfs));
-		/*
-		 * Set this BE's root filesystem 'mountpoint' property
-		 * back to what it was before.
-		 */
-		(void) zfs_prop_set(zhp, zfs_prop_to_name(ZFS_PROP_MOUNTPOINT),
-		    mountpoint);
-		return (zfs_err_to_be_err(g_zfs));
+		    altroot, strerror(errno));
+		return (BE_ERR_ZFS);
 	}
 
 	return (BE_SUCCESS);
@@ -2726,4 +2674,77 @@ be_get_ds_from_dir_callback(zfs_handle_t *zhp, void *data)
 	ZFS_CLOSE(zhp);
 
 	return (zret);
+}
+
+/*
+ * Function:    mount_zfs
+ * Description: This is a function to mount zfs filesystem to alternative
+ *              root without changing zfs mountpoint property. Logic is
+ *              similar to zfs_mount.
+ * Parameters:
+ *              zhp - zfs_handle_t pointer to current dataset being processed.
+ *              altroot - char pointer to current alternative root.
+ * Returns:
+ *              BE_SUCCESS - Success
+ *              be_errno_t - Failure
+ * Scope:
+ *              Private
+ */
+static int
+mount_zfs(zfs_handle_t *zhp, char *altroot)
+{
+	int	flags = 0;
+	char	mountpoint[MAXPATHLEN];
+	char	real_mountpoint[MAXPATHLEN];
+	char	source[MAXNAMELEN];
+	zprop_source_t	sourcetype;
+	struct stat	buf;
+
+	/* Get dataset's mountpoint and source values */
+	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
+	    sizeof (mountpoint), &sourcetype, source, sizeof (source),
+	    B_FALSE) != 0) {
+		be_print_err(gettext("mount_zfs: "
+		    "failed to get mountpoint and sourcetype for %s\n"),
+		    zfs_get_name(zhp));
+		ZFS_CLOSE(zhp);
+		return (BE_ERR_ZFS);
+	}
+
+	if (strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0 ||
+	    strcmp(mountpoint, "/") == 0) {
+	/*
+	 * We are called  only from be_mount_root or be_mount_callback
+	 * when mountpoint != LEGACY
+	 */
+		mountpoint[0] = '\0';
+	}
+
+	(void) snprintf(real_mountpoint, MAXPATHLEN, "%s%s", altroot,
+	    mountpoint);
+
+	if (zpool_get_prop_int(zfs_get_pool_handle(zhp), ZPOOL_PROP_READONLY,
+	    NULL))
+		flags |= MS_RDONLY;
+
+	/* Create the directory if it doesn't already exist */
+	if (lstat(real_mountpoint, &buf) != 0) {
+		if (mkdirp(real_mountpoint, 0755) != 0) {
+			be_print_err(gettext("mount_zfs: "
+			    "failed to create mountpoint for %s\n"),
+			    zfs_get_name(zhp));
+			ZFS_CLOSE(zhp);
+			return (BE_ERR_ZFS);
+		}
+	}
+
+	if (mount(zfs_get_name(zhp), real_mountpoint, flags, MNTTYPE_ZFS,
+	    NULL, 0, NULL, 0)) {
+		be_print_err(gettext("mount_zfs: failed to "
+		    "mount dataset %s at %s\n"), zfs_get_name(zhp),
+		    real_mountpoint);
+		return (BE_ERR_ZFS);
+	}
+
+	return (BE_SUCCESS);
 }
