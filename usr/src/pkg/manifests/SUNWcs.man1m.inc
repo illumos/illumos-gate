@@ -104,6 +104,7 @@ file path=usr/share/man/man1m/getvol.1m
 file path=usr/share/man/man1m/groupadd.1m
 file path=usr/share/man/man1m/groupdel.1m
 file path=usr/share/man/man1m/groupmod.1m
+file path=usr/share/man/man1m/growfs.1m
 file path=usr/share/man/man1m/halt.1m
 file path=usr/share/man/man1m/hostconfig.1m
 file path=usr/share/man/man1m/id.1m

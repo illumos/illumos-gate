@@ -52,8 +52,6 @@ PROGS= \
 	metaimport \
 	metaclust
 
-GROWFSSCRIPT = growfs
-
 MANIFEST=	metainit.xml \
 		metasync.xml
 
@@ -61,11 +59,6 @@ SVCMETHOD=	svc-metainit \
 		svc-metasync
 
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
-
-SCRIPTS = \
-	$(GROWFSSCRIPT)
-
-CLOBBERFILES += growfs
 
 SRCS = $(PROGS:%=%.c)
 
@@ -93,8 +86,6 @@ catalog:	$(POFILE)
 $(POFILE):	$(MSGFILES)
 	$(BUILDPO.msgfiles)
 
-GROWFSFILE=	$(GROWFSSCRIPT:%=$(ROOTUSRSBIN)/%)
-
 lint: $(SUBDIRS)
 
 check:	$(CHKMANIFEST)
@@ -104,8 +95,7 @@ clobber: $(SUBDIRS)
 clean: $(SUBDIRS)
 	$(RM) $(MSGFILES)
 
-install:	$(SCRIPTS) $(GROWFSFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) \
-		$(SUBDIRS)
+install:	$(ROOTSVCMETHOD) $(ROOTMANIFEST) $(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
