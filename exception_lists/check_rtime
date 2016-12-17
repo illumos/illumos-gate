@@ -175,6 +175,7 @@ UNREF_OBJ	/lib.*\ of\ .*libxslt\.so\.1
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.4
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.4\.so\.1\.0
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.6\.so\.1\.0
+UNREF_OBJ	/lib.*\ of\ .*libpython2\.7\.so\.1\.0
 UNREF_OBJ	/libgcc_s.*\ of\ .*libstdc\+\+\.so\.6
 UNREF_OBJ	/libgcc_s.*\ of\ .*libgmodule-2\.0\.so\.0
 
