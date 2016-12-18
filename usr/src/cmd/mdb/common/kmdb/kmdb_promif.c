@@ -543,8 +543,16 @@ kmdb_prom_term_init(kmdb_auxv_t *kav, kmdb_promif_t *pif)
 	    0x00, 0x11, 0x13, 0x1a, 0x19, 0x12, 0x0f, 0x17, 0x16 };
 	char *conin = NULL, *conout = NULL;
 
-	if (kmdb_prom_stdout_is_framebuffer(kav))
+	if (kmdb_prom_stdout_is_framebuffer(kav)) {
+		struct winsize *wsz = &pif->pif_wsz;
+
+		/* Set default dimensions. */
+		wsz->ws_row = KMDB_PIF_WINSIZE_ROWS;
+		wsz->ws_col = KMDB_PIF_WINSIZE_COLS;
+
+		kmdb_prom_get_tem_size(kav, &wsz->ws_row, &wsz->ws_col);
 		pif->pif_oterm = ATTACHED_TERM_TYPE;
+	}
 
 	bzero(&pif->pif_tios, sizeof (struct termios));
 
@@ -680,8 +688,9 @@ kmdb_prom_term_ctl(int req, void *arg)
 		 */
 		if (mdb.m_promif->pif_oterm != NULL) {
 			struct winsize *wsz = arg;
-			wsz->ws_row = KMDB_PIF_WINSIZE_ROWS;
-			wsz->ws_col = KMDB_PIF_WINSIZE_COLS;
+
+			wsz->ws_row = mdb.m_promif->pif_wsz.ws_row;
+			wsz->ws_col = mdb.m_promif->pif_wsz.ws_col;
 			wsz->ws_xpixel = wsz->ws_ypixel = 0;
 			return (0);
 		}

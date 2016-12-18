@@ -27,8 +27,6 @@
 #ifndef _KMDB_PROMIF_IMPL_H
 #define	_KMDB_PROMIF_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/consdev.h>
 
 #include <kmdb/kmdb_promif.h>
@@ -57,6 +55,7 @@ extern struct boot_syscalls *kmdb_sysp;
 typedef struct kmdb_promif {
 	char *pif_oterm;	/* term type for local console (NULL if rem) */
 	struct termios pif_tios; /* derived settings for console */
+	struct winsize pif_wsz;	/* winsize for local console */
 } kmdb_promif_t;
 
 extern void kmdb_prom_init_finish_isadep(kmdb_auxv_t *);
@@ -67,6 +66,7 @@ extern void kmdb_prom_free_ddi_prop(char *);
 extern ssize_t kmdb_prom_obp_writer(caddr_t, size_t);
 
 extern int kmdb_prom_stdout_is_framebuffer(kmdb_auxv_t *);
+extern void kmdb_prom_get_tem_size(kmdb_auxv_t *, ushort_t *, ushort_t *);
 
 #ifdef __cplusplus
 }
