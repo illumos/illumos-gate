@@ -924,6 +924,22 @@ extern SVCXPRT	*svc_tp_create(void (*)(struct svc_req *, SVCXPRT *),
 	 */
 
 /*
+ * Variant of svc_tp_create that accepts a binding address.
+ * If addr == NULL, this is the same as svc_tp_create().
+ */
+extern SVCXPRT	*svc_tp_create_addr(void (*)(struct svc_req *, SVCXPRT *),
+				const rpcprog_t, const rpcvers_t,
+				const struct netconfig *,
+				const struct netbuf *);
+	/*
+	 * void (*dispatch)();			-- dispatch routine
+	 * const rpcprog_t prognum;		-- program number
+	 * const rpcvers_t versnum;		-- version number
+	 * const struct netconfig *nconf;	-- netconfig structure
+	 * const struct netbuf *addr;		-- address to bind
+	 */
+
+/*
  * Generic TLI create routine
  */
 extern  SVCXPRT	*svc_tli_create(const int, const struct netconfig *,
