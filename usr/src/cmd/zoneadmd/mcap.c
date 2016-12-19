@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -138,6 +138,13 @@ uint64_t	scale_rss = 0;
 uint64_t	prev_fast_rss = 0;
 uint64_t	fast_rss = 0;
 uint64_t	accurate_rss = 0;
+
+/*
+ * Tunable for chunk size when breaking up large segment page-out ops.
+ * The initial value has been set at 64MB, trying to strike a balance between
+ * responsiveness and the load placed on locks.
+ */
+static size_t	pageout_chunk_size = 0x4000000;
 
 static char	zoneproc[MAXPATHLEN];
 static char	debug_log[MAXPATHLEN];
@@ -349,24 +356,45 @@ done:
 
 /*
  * Attempt to invalidate the entire mapping from within the given process's
- * address space. May return nonzero with errno as:
- *    ESRCH  - process not found
- *    ENOMEM - segment not found
- *    EINVAL - mapping exceeds a single segment
+ * address space.
  */
-static int
+static void
 pageout_mapping(pid_t pid, prmap_t *pmp)
 {
-	int res;
+	uintptr_t base;
+	size_t remain;
 
 	if (pmp->pr_mflags & MA_ISM || pmp->pr_mflags & MA_SHM)
-		return (0);
+		return;
 
 	errno = 0;
-	res = syscall(SYS_rusagesys, _RUSAGESYS_INVALMAP, pid, pmp->pr_vaddr,
-	    pmp->pr_size);
+	base = pmp->pr_vaddr;
+	remain = pmp->pr_size;
+	while (remain > 0 && !shutting_down) {
+		size_t chunk;
 
-	return (res);
+		/*
+		 * The rusagesys(INVALMAP) call is split up into smaller chunks
+		 * when applied to large mappings.  This is meant to avoid the
+		 * situation where large writable segments take an extrememly
+		 * long time to page out, keeping locks held in the process.
+		 */
+		if (remain > pageout_chunk_size) {
+			chunk = pageout_chunk_size;
+		} else {
+			chunk = remain;
+		}
+
+		if (syscall(SYS_rusagesys, _RUSAGESYS_INVALMAP, pid, base,
+		    chunk) != 0) {
+			debug("pid %ld: mapping 0x%p %ldkb unpageable (%d)\n",
+			    pid, base, chunk / 1024, errno);
+			return;
+		}
+
+		base += chunk;
+		remain -= chunk;
+	}
 }
 
 /*
@@ -379,7 +407,6 @@ pageout_process(pid_t pid, int64_t excess)
 	int			psfd;
 	prmap_t			*pmap;
 	proc_map_t		cur;
-	int			res;
 	int64_t			sum_d_rss, d_rss;
 	int64_t			old_rss;
 	int			map_cnt;
@@ -431,9 +458,7 @@ pageout_process(pid_t pid, int64_t excess)
 	sum_d_rss = 0;
 	while (excess > 0 && pmap != NULL && !shutting_down) {
 		/* invalidate the entire mapping */
-		if ((res = pageout_mapping(pid, pmap)) < 0)
-			debug("pid %ld: mapping 0x%p %ldkb unpageable (%d)\n",
-			    pid, pmap->pr_vaddr, pmap->pr_size / 1024, errno);
+		pageout_mapping(pid, pmap);
 
 		map_cnt++;
 
