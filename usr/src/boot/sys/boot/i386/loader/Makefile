@@ -110,7 +110,7 @@ vers.c:	../../common/newvers.sh version
 	$(SH) ../../common/newvers.sh version ${NEWVERSWHAT}
 
 ${LOADER}: ${LOADER}.bin ${BTXLDR} ${BTXKERN}
-	$(BTXLD) -v -f aout -e ${LOADER_ADDRESS} -o $@ -l ${BTXLDR} \
+	$(BTXLD) -f aout -e ${LOADER_ADDRESS} -o $@ -l ${BTXLDR} \
 		-b ${BTXKERN} ${LOADER}.bin
 
 ${LOADER}.bin: ${LOADER}.sym

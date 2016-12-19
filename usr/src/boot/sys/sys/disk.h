@@ -33,7 +33,7 @@ void disk_err(struct bio *bp, const char *what, int blkdone, int nl);
 	 * Usually this is a power of 2 but it might not be (i.e. CDROM audio).
 	 */
 
-#define	DIOCGMEDIASIZE	_IOR('d', 129, off_t)	/* Get media size in bytes */
+#define	DIOCGMEDIASIZE	_IOR('d', 129, uint64_t) /* Get media size in bytes */
 	/*
 	 * Get the size of the entire device in bytes.  This should be a
 	 * multiple of the sector size.

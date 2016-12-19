@@ -66,7 +66,7 @@ ${LDR}: ${OBJS}
 	${LD} ${LDFLAGS} -o $@ $^
 
 ${LOADER}: ${LOADERBIN} ${BTXLDR} ${BTXKERN}
-	$(BTXLD) -v -f aout -e ${LOADER_ADDRESS} -o $@ -l ${BTXLDR} \
+	$(BTXLD) -f aout -e ${LOADER_ADDRESS} -o $@ -l ${BTXLDR} \
 	    -b ${BTXKERN} ${LOADERBIN}
 
 all: ${BOOT}

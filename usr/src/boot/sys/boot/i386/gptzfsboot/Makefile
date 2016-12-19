@@ -85,7 +85,7 @@ OBJS =	multiboot.o zfsboot.o sio.o cons.o panic.o devopen.o \
 CLEANFILES=	gptzfsboot $(OBJS)
 
 gptzfsboot: gptldr.bin gptzfsboot.bin ${BTXKERN}
-	$(BTXLD) -v -E ${ORG2} -f bin -b ${BTXKERN} -V ${BOOT2_VERSION} -l \
+	$(BTXLD) -E ${ORG2} -f bin -b ${BTXKERN} -V ${BOOT2_VERSION} -l \
 		gptldr.bin -o $@ gptzfsboot.bin
 
 CLEANFILES +=	gptldr.bin gptldr.out gptldr.o
