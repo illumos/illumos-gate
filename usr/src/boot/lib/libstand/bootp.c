@@ -39,6 +39,8 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
+#include <sys/limits.h>
+#include <sys/endian.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 
@@ -92,9 +94,7 @@ struct in_addr dhcp_serverip;
 
 /* Fetch required bootp infomation */
 void
-bootp(sock, flag)
-	int sock;
-	int flag;
+bootp(int sock, int flag)
 {
 	struct iodesc *d;
 	struct bootp *bp;
@@ -264,10 +264,7 @@ bootp(sock, flag)
 
 /* Transmit a bootp request */
 static ssize_t
-bootpsend(d, pkt, len)
-	struct iodesc *d;
-	void *pkt;
-	size_t len;
+bootpsend(struct iodesc *d, void *pkt, size_t len)
 {
 	struct bootp *bp;
 
@@ -288,11 +285,7 @@ bootpsend(d, pkt, len)
 }
 
 static ssize_t
-bootprecv(d, pkt, len, tleft)
-struct iodesc *d;
-void *pkt;
-size_t len;
-time_t tleft;
+bootprecv(struct iodesc *d, void *pkt, size_t len, time_t tleft)
 {
 	ssize_t n;
 	struct bootp *bp;
@@ -347,9 +340,7 @@ bad:
 }
 
 static int
-vend_rfc1048(cp, len)
-	u_char *cp;
-	u_int len;
+vend_rfc1048(u_char *cp, u_int len)
 {
 	u_char *ep;
 	int size;
@@ -393,6 +384,31 @@ vend_rfc1048(cp, len)
 				val = (const char *)cp;
 			strlcpy(hostname, val, sizeof(hostname));
 		}
+		if (tag == TAG_INTF_MTU) {
+			intf_mtu = 0;
+			if ((val = getenv("dhcp.interface-mtu")) != NULL) {
+				unsigned long tmp;
+				char *end;
+
+				errno = 0;
+				/*
+				 * Do not allow MTU to exceed max IPv4 packet
+				 * size, max value of 16-bit word.
+				 */
+				tmp = strtoul(val, &end, 0);
+				if (errno != 0 ||
+				    *val == '\0' || *end != '\0' ||
+				    tmp > USHRT_MAX) {
+					printf("%s: bad value: \"%s\", "
+					    "ignoring\n",
+					    "dhcp.interface-mtu", val);
+				} else {
+					intf_mtu = (u_int)tmp;
+				}
+			}
+			if (intf_mtu == 0)
+				intf_mtu = be16dec(cp);
+		}
 #ifdef SUPPORT_DHCP
 		if (tag == TAG_DHCP_MSGTYPE) {
 			if(*cp != expected_dhcpmsgtype)
@@ -411,8 +427,7 @@ vend_rfc1048(cp, len)
 
 #ifdef BOOTP_VEND_CMU
 static void
-vend_cmu(cp)
-	u_char *cp;
+vend_cmu(u_char *cp)
 {
 	struct cmu_vend *vp;
 

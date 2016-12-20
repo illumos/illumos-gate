@@ -21,8 +21,9 @@
 .\"
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2016 Jason King.
 .\"
-.Dd November 10, 2014
+.Dd December 16, 2016
 .Dt SHARE_NFS 1M
 .Os
 .Sh NAME
@@ -157,6 +158,13 @@ is specified, the default values associated with the global tag in
 .Pa /etc/nfs/nfslog.conf
 are used. Support of NFS server logging is only available for NFS Version 2 and
 Version 3 requests.
+.It Sy noaclfab
+By default, the NFS server will fabricate POSIX-draft style ACLs in response
+to ACL requests from NFS Version 2 or Version 3 clients accessing shared
+file systems that do not support POSIX-draft ACLs (such as ZFS).
+Specifying
+.Sy noaclfab
+disables this behavior.
 .It Sy none Ns = Ns Ar access_list
 Access is not allowed to any client that matches the access list. The exception
 is when the access list is an asterisk (*), in which case
@@ -519,6 +527,7 @@ share -o uidmap=100:joe:@10.0.0.1 /export
 .Xr getnetbyname 3SOCKET ,
 .Xr netgroup 4 ,
 .Xr nfslog.conf 4 ,
+.Xr acl 5 ,
 .Xr attributes 5 ,
 .Xr nfssec 5
 .Sh NOTES

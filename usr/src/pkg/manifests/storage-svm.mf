@@ -119,7 +119,6 @@ file path=sbin/metastat mode=0555
 file path=usr/lib/drv/preen_md.so.1 mode=0555
 file path=usr/lib/lvm/mddoors mode=0555
 file path=usr/lib/lvm/metaclust mode=0555
-file path=usr/sbin/growfs mode=0555
 file path=usr/sbin/mdmonitord mode=0555
 file path=usr/sbin/medstat mode=0555
 file path=usr/sbin/metaclear mode=0555
@@ -139,7 +138,6 @@ file path=usr/sbin/rpc.mdcommd mode=0555
 file path=usr/sbin/rpc.metad mode=0555
 file path=usr/sbin/rpc.metamedd mode=0555
 file path=usr/sbin/rpc.metamhd mode=0555
-file path=usr/share/man/man1m/growfs.1m
 file path=usr/share/man/man1m/mdmonitord.1m
 file path=usr/share/man/man1m/medstat.1m
 file path=usr/share/man/man1m/metaclear.1m

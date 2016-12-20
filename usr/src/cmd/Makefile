@@ -186,6 +186,7 @@ COMMON_SUBDIRS=		\
 	grep		\
 	grep_xpg4	\
 	groups		\
+	growfs		\
 	grpck		\
 	gss		\
 	hal		\

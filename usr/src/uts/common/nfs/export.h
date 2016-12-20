@@ -22,6 +22,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Jason King.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -185,8 +186,9 @@ struct exportdata32 {
 #endif /* VOLATILE_FH_TEST */
 
 #define	EX_CHARMAP	0x1000	/* NFS may need a character set conversion */
-#define	EX_NOACLFAB	0x2000	/* If set, NFSv2 and v3 servers doesn't */
-				/* fabricate ACL for VOP_GETSECATTR OTW call */
+#define	EX_NOACLFAB	0x2000	/* If set, NFSv2 and v3 servers won't */
+				/* fabricate an aclent_t ACL on file systems */
+				/* that don't support aclent_t ACLs */
 
 #ifdef	_KERNEL
 
