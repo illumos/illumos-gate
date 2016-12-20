@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -4845,11 +4846,12 @@ devfsadm_enumerate_int(char *devfs_path, int index, char **buf,
 }
 
 int
-disk_enumerate_int(char *devfs_path, int index, char **buf,
-    devfsadm_enumerate_t rules[], int nrules)
+ctrl_enumerate_int(char *devfs_path, int index, char **buf,
+    devfsadm_enumerate_t rules[], int nrules, int multiple,
+    boolean_t scsi_vhci)
 {
 	return (find_enum_id(rules, nrules,
-	    devfs_path, index, "0", INTEGER, buf, 1));
+	    devfs_path, index, scsi_vhci ? "0" : "1", INTEGER, buf, multiple));
 }
 
 /*

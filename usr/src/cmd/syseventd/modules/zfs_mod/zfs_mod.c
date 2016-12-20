@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -822,6 +822,7 @@ slm_fini()
 {
 	unavailpool_t *pool;
 
+	(void) thr_join(g_zfs_tid, NULL, NULL);
 	if (g_tpool != NULL) {
 		tpool_wait(g_tpool);
 		tpool_destroy(g_tpool);
@@ -831,7 +832,6 @@ slm_fini()
 		zpool_close(pool->uap_zhp);
 		free(pool);
 	}
-	(void) thr_join(g_zfs_tid, NULL, NULL);
 	list_destroy(&g_pool_list);
 	libzfs_fini(g_zfshdl);
 }
