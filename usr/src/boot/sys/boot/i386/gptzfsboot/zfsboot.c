@@ -143,7 +143,7 @@ struct probe_args {
  * strategy() directly.
  */
 static int
-parttblread(void *arg, void *buf, size_t blocks, off_t offset)
+parttblread(void *arg, void *buf, size_t blocks, uint64_t offset)
 {
 	struct probe_args *ppa = arg;
 	size_t size = ppa->secsz * blocks;
@@ -208,7 +208,7 @@ probe_disk(char *devname)
 {
 	struct ptable *table;
 	struct probe_args pa;
-	off_t mediasz;
+	uint64_t mediasz;
 	int ret;
 
 	pa.offset = 0;

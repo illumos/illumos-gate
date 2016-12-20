@@ -1326,6 +1326,7 @@ file path=usr/sbin/getmajor group=sys mode=0755
 file path=usr/sbin/groupadd group=sys mode=0555
 file path=usr/sbin/groupdel group=sys mode=0555
 file path=usr/sbin/groupmod group=sys mode=0555
+file path=usr/sbin/growfs mode=0555
 file path=usr/sbin/grpck mode=0555
 file path=usr/sbin/halt mode=0755
 file path=usr/sbin/hotplug mode=0555

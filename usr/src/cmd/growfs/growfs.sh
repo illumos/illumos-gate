@@ -20,8 +20,7 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -119,7 +118,7 @@ if [ $retv -eq $UFS_MKFS_NOTENOUGHSPACE ]; then
 			echo "$myname: the file system is full and cannot be grown, please delete some files"
 			exit 2
 		fi
-	
+
 		cmd="$UFS_MKFS $mkfs_opts $mkfs_subopts $raw_special $newsize"; retv=$?
 		if [ -n "$verbose" ]; then
 			echo $cmd
