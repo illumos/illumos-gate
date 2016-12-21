@@ -10,11 +10,8 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
-
-SUBDIRS = functional perf
-
+include $(SRC)/test/zfs-tests/Makefile.com
 include $(SRC)/test/Makefile.com

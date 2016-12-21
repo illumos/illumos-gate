@@ -10,40 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_upgrade
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_upgrade
 
-PROGS = cleanup \
-	setup \
-	zfs_upgrade_001_pos \
-	zfs_upgrade_002_pos \
-	zfs_upgrade_003_pos \
-	zfs_upgrade_004_pos \
-	zfs_upgrade_005_pos \
-	zfs_upgrade_006_neg \
-	zfs_upgrade_007_neg
-
-FILES = zfs_upgrade.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

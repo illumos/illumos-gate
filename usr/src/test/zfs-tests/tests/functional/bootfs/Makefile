@@ -10,38 +10,13 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/bootfs
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/bootfs
 
-PROGS = bootfs_001_pos \
-	bootfs_002_neg \
-	bootfs_003_pos \
-	bootfs_004_neg \
-	bootfs_005_neg \
-	bootfs_006_pos \
-	bootfs_007_pos \
-	bootfs_008_pos
-
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%.cfg: %.cfg
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

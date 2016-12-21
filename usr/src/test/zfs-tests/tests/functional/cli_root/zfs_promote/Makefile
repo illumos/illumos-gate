@@ -10,41 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_promote
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_promote
 
-PROGS = cleanup \
-	setup \
-	zfs_promote_001_pos \
-	zfs_promote_002_pos \
-	zfs_promote_003_pos \
-	zfs_promote_004_pos \
-	zfs_promote_005_pos \
-	zfs_promote_006_neg \
-	zfs_promote_007_neg \
-	zfs_promote_008_pos
-
-FILES = zfs_promote.cfg
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

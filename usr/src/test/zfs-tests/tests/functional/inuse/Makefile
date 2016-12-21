@@ -10,41 +10,12 @@
 #
 
 #
-# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/inuse
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/inuse
 
-PROGS = cleanup \
-	inuse_001_pos \
-	inuse_003_pos \
-	inuse_004_pos \
-	inuse_005_pos \
-	inuse_006_pos \
-	inuse_007_pos \
-	inuse_008_pos \
-	inuse_009_pos \
-	setup
-
-FILES = inuse.cfg
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

@@ -10,50 +10,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/userquota
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/userquota
 
-PROGS = cleanup \
-	groupspace_001_pos \
-	groupspace_002_pos \
-	setup \
-	userquota_001_pos \
-	userquota_002_pos \
-	userquota_003_pos \
-	userquota_004_pos \
-	userquota_005_neg \
-	userquota_006_pos \
-	userquota_007_pos \
-	userquota_008_pos \
-	userquota_009_pos \
-	userquota_010_pos \
-	userquota_011_pos \
-	userquota_012_neg \
-	userspace_001_pos \
-	userspace_002_pos
-
-FILES = userquota.cfg \
-	userquota_common.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com
