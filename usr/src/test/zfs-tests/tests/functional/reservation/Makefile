@@ -10,55 +10,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/reservation
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/reservation
 
-PROGS = cleanup \
-	reservation_001_pos \
-	reservation_002_pos \
-	reservation_003_pos \
-	reservation_004_pos \
-	reservation_005_pos \
-	reservation_006_pos \
-	reservation_007_pos \
-	reservation_008_pos \
-	reservation_009_pos \
-	reservation_010_pos \
-	reservation_011_pos \
-	reservation_012_pos \
-	reservation_013_pos \
-	reservation_014_pos \
-	reservation_015_pos \
-	reservation_016_pos \
-	reservation_017_pos \
-	reservation_018_pos \
-	setup
-
-FILES = reservation.cfg \
-	reservation.shlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.sh
-	$(INS.rename)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

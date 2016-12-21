@@ -10,42 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_snapshot
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_snapshot
 
-PROGS = cleanup \
-	setup \
-	zfs_snapshot_001_neg \
-	zfs_snapshot_002_neg \
-	zfs_snapshot_003_neg \
-	zfs_snapshot_004_neg \
-	zfs_snapshot_005_neg \
-	zfs_snapshot_006_pos \
-	zfs_snapshot_007_neg \
-	zfs_snapshot_008_neg \
-	zfs_snapshot_009_pos
-
-FILES = zfs_snapshot.cfg
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

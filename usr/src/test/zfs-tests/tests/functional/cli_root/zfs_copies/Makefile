@@ -10,40 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_copies
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_copies
 
-PROGS = cleanup \
-	setup \
-	zfs_copies_001_pos \
-	zfs_copies_002_pos \
-	zfs_copies_003_pos \
-	zfs_copies_004_neg \
-	zfs_copies_005_neg \
-	zfs_copies_006_pos
-
-FILES = zfs_copies.cfg \
-	zfs_copies.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

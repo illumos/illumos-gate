@@ -10,37 +10,13 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
-
-.PARALLEL: $(SUBDIRS)
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/zvol
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/zvol
 
-FILES = zvol.cfg \
-	zvol_common.shlib
-
-CMDS = $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-SUBDIRS = zvol_ENOSPC \
-	zvol_cli \
-	zvol_misc \
-	zvol_swap
-
+include $(SRC)/test/zfs-tests/Makefile.com
 include $(SRC)/test/Makefile.com

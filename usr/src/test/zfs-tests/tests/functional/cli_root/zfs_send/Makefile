@@ -10,40 +10,12 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_send
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_send
 
-PROGS = cleanup \
-	setup \
-	zfs_send_001_pos \
-	zfs_send_002_pos \
-	zfs_send_003_pos \
-	zfs_send_004_neg \
-	zfs_send_005_pos \
-	zfs_send_006_pos \
-	zfs_send_007_pos
-
-FILES = zfs_send.cfg
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
 #
@@ -167,19 +167,19 @@ file path=opt/zfs-tests/bin/readmmap mode=0555
 file path=opt/zfs-tests/bin/rename_dir mode=0555
 file path=opt/zfs-tests/bin/rm_lnkcnt_zero_file mode=0555
 file path=opt/zfs-tests/bin/zfstest mode=0555
-file path=opt/zfs-tests/callbacks/zfs_dbgmsg.ksh mode=0555
-file path=opt/zfs-tests/include/commands.cfg mode=0555
-file path=opt/zfs-tests/include/default.cfg mode=0555
-file path=opt/zfs-tests/include/libtest.shlib mode=0555
-file path=opt/zfs-tests/include/math.shlib mode=0555
-file path=opt/zfs-tests/include/properties.shlib mode=0555
+file path=opt/zfs-tests/callbacks/zfs_dbgmsg mode=0555
+file path=opt/zfs-tests/include/commands.cfg mode=0444
+file path=opt/zfs-tests/include/default.cfg mode=0444
+file path=opt/zfs-tests/include/libtest.shlib mode=0444
+file path=opt/zfs-tests/include/math.shlib mode=0444
+file path=opt/zfs-tests/include/properties.shlib mode=0444
 file path=opt/zfs-tests/runfiles/delphix.run mode=0444
 file path=opt/zfs-tests/runfiles/omnios.run mode=0444
 file path=opt/zfs-tests/runfiles/openindiana.run mode=0444
 file path=opt/zfs-tests/runfiles/perf-regression.run mode=0444
-file path=opt/zfs-tests/tests/functional/acl/acl.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/acl/acl_common.kshlib mode=0555
-file path=opt/zfs-tests/tests/functional/acl/cifs/cifs.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/acl/acl.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/acl/acl_common.kshlib mode=0444
+file path=opt/zfs-tests/tests/functional/acl/cifs/cifs.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/acl/cifs/cifs_attr_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/acl/cifs/cifs_attr_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/acl/cifs/cifs_attr_003_pos mode=0555
@@ -303,10 +303,10 @@ file path=opt/zfs-tests/tests/functional/acl/trivial/zfs_acl_tar_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/acl/trivial/zfs_acl_tar_002_neg \
     mode=0555
-file path=opt/zfs-tests/tests/functional/atime/atime.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/atime/atime.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/atime/atime_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/atime/atime_002_neg mode=0555
-file path=opt/zfs-tests/tests/functional/atime/atime_common.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/atime/atime_common.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/atime/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/atime/setup mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_001_pos mode=0555
@@ -317,8 +317,8 @@ file path=opt/zfs-tests/tests/functional/bootfs/bootfs_005_neg mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_006_pos mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/bootfs/bootfs_008_pos mode=0555
-file path=opt/zfs-tests/tests/functional/cache/cache.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/cache/cache.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/cache/cache.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/cache/cache.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/cache/cache_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache_003_pos mode=0555
@@ -332,8 +332,8 @@ file path=opt/zfs-tests/tests/functional/cache/cache_010_neg mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache_011_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cache/setup mode=0555
-file path=opt/zfs-tests/tests/functional/cachefile/cachefile.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/cachefile/cachefile.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/cachefile/cachefile.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/cachefile/cachefile.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile_003_pos mode=0555
@@ -405,11 +405,11 @@ file path=opt/zfs-tests/tests/functional/clean_mirror/clean_mirror_004_pos \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/clean_mirror/clean_mirror_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/clean_mirror/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/clean_mirror/default.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/clean_mirror/default.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/clean_mirror/setup mode=0555
-file path=opt/zfs-tests/tests/functional/cli_root/cli_common.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/cli_common.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zdb/zdb_001_neg mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zdb/zdb_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs/cleanup mode=0555
@@ -442,9 +442,9 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_clone/zfs_clone_010_pos \
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_copies/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_copies/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_copies/zfs_copies.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_copies/zfs_copies.kshlib \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_copies/zfs_copies_001_pos \
     mode=0555
@@ -465,10 +465,10 @@ file \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_create/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_create/properties.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_create/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_001_pos \
     mode=0555
@@ -510,12 +510,12 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy/zfs_destroy.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy/zfs_destroy_001_pos \
     mode=0555
@@ -566,7 +566,7 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy/zfs_destroy_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_get/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_get/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_get/zfs_get_001_pos \
@@ -591,10 +591,10 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_get/zfs_get_010_neg \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_get/zfs_get_common.kshlib \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_get/zfs_get_list_d.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_inherit/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_inherit/setup mode=0555
@@ -610,9 +610,9 @@ file \
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_002_pos \
@@ -644,7 +644,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_promote/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_promote/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_promote/zfs_promote.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_promote/zfs_promote_001_pos \
     mode=0555
@@ -720,9 +720,9 @@ file \
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/zfs_rename.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/zfs_rename.kshlib \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/zfs_rename_001_pos \
     mode=0555
@@ -777,7 +777,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_rollback/cleanup \
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rollback/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_rollback/zfs_rollback.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_rollback/zfs_rollback_001_pos \
     mode=0555
@@ -792,11 +792,11 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_rollback/zfs_rollback_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send_002_pos \
@@ -872,11 +872,11 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_set/zfs_set_003_neg \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_set/zfs_set_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_share/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_share/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_share/zfs_share.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_share/zfs_share_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_share/zfs_share_002_pos \
@@ -904,7 +904,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_snapshot/cleanup \
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_snapshot/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_snapshot/zfs_snapshot.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_snapshot/zfs_snapshot_001_neg \
     mode=0555
@@ -936,10 +936,10 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_unmount/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_unmount/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_unmount/zfs_unmount.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_unmount/zfs_unmount.kshlib \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_unmount/zfs_unmount_001_pos \
     mode=0555
@@ -993,7 +993,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_upgrade/cleanup \
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_upgrade/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_upgrade/zfs_upgrade.kshlib \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_upgrade/zfs_upgrade_001_pos \
     mode=0555
@@ -1026,9 +1026,9 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool/zpool_003_pos \
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add_002_pos \
@@ -1057,7 +1057,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/zpool_clear.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/zpool_clear_001_pos \
     mode=0555
@@ -1072,10 +1072,10 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/cleanup \
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create.shlib \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_001_pos \
     mode=0555
@@ -1156,7 +1156,7 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_destroy/zpool_destroy.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_destroy/zpool_destroy_001_pos \
     mode=0555
@@ -1177,7 +1177,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_expand/cleanup \
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_expand/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_expand/zpool_expand.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_expand/zpool_expand_001_pos \
     mode=0555
@@ -1205,7 +1205,7 @@ file \
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_get/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_get/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_get/zpool_get.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_get/zpool_get_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_get/zpool_get_002_pos \
@@ -1232,7 +1232,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_import/cleanup \
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_import/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import_001_pos \
     mode=0555
@@ -1320,7 +1320,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_remove/cleanup \
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_remove/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_remove/zpool_remove.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_remove/zpool_remove_001_neg \
     mode=0555
@@ -1341,7 +1341,7 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub_001_neg \
     mode=0555
@@ -1534,10 +1534,10 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade/setup \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.cfg \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib \
-    mode=0555
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade/zpool_upgrade_001_pos \
     mode=0555
@@ -1566,7 +1566,7 @@ file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade/zpool_upgrade_009_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/misc/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/cli_user/misc/misc.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/cli_user/misc/misc.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/cli_user/misc/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/misc/zdb_001_neg mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/misc/zfs_001_neg mode=0555
@@ -1650,9 +1650,9 @@ file path=opt/zfs-tests/tests/functional/cli_user/misc/zpool_upgrade_001_neg \
 file path=opt/zfs-tests/tests/functional/cli_user/zfs_list/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/zfs_list/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/zfs_list/zfs_list.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_user/zfs_list/zfs_list.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/cli_user/zfs_list/zfs_list_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/zfs_list/zfs_list_002_pos \
@@ -1686,7 +1686,7 @@ file \
     path=opt/zfs-tests/tests/functional/cli_user/zpool_list/zpool_list_002_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/compression/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/compression/compress.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/compression/compress.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/compression/compress_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/compression/compress_002_pos \
@@ -1700,9 +1700,9 @@ file path=opt/zfs-tests/tests/functional/ctime/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/ctime/ctime_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/ctime/setup mode=0555
 file path=opt/zfs-tests/tests/functional/delegate/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/delegate/delegate.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/delegate/delegate.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/delegate/delegate_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/delegate/setup mode=0555
 file path=opt/zfs-tests/tests/functional/delegate/zfs_allow_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/delegate/zfs_allow_002_pos mode=0555
@@ -1733,12 +1733,12 @@ file path=opt/zfs-tests/tests/functional/delegate/zfs_unallow_007_neg \
 file path=opt/zfs-tests/tests/functional/delegate/zfs_unallow_008_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/devices/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/devices/devices.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/devices/devices.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/devices/devices_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/devices/devices_002_neg mode=0555
 file path=opt/zfs-tests/tests/functional/devices/devices_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/devices/devices_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/devices/setup mode=0555
 file path=opt/zfs-tests/tests/functional/exec/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/exec/exec_001_pos mode=0555
@@ -1753,15 +1753,15 @@ file path=opt/zfs-tests/tests/functional/features/async_destroy/cleanup \
 file path=opt/zfs-tests/tests/functional/features/async_destroy/setup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/grow_pool/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/grow_pool/grow_pool.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/grow_pool/grow_pool.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/grow_pool/grow_pool_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/grow_pool/setup mode=0555
 file path=opt/zfs-tests/tests/functional/grow_replicas/grow_replicas.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/grow_replicas/grow_replicas_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/history/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/history/history.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/history/history.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/history/history_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/history/history_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/history/history_003_pos mode=0555
@@ -1773,7 +1773,7 @@ file path=opt/zfs-tests/tests/functional/history/history_008_pos mode=0555
 file path=opt/zfs-tests/tests/functional/history/history_009_pos mode=0555
 file path=opt/zfs-tests/tests/functional/history/history_010_pos mode=0555
 file path=opt/zfs-tests/tests/functional/history/history_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/history/i386.migratedpool.DAT.Z \
     mode=0444
 file path=opt/zfs-tests/tests/functional/history/i386.orig_history.txt \
@@ -1785,61 +1785,61 @@ file path=opt/zfs-tests/tests/functional/history/sparc.orig_history.txt \
     mode=0444
 file path=opt/zfs-tests/tests/functional/history/zfs-pool-v4.dat.Z mode=0444
 file path=opt/zfs-tests/tests/functional/holes/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/holes/holes.shlib mode=0555
+file path=opt/zfs-tests/tests/functional/holes/holes.shlib mode=0444
 file path=opt/zfs-tests/tests/functional/holes/holes_sanity mode=0555
 file path=opt/zfs-tests/tests/functional/holes/setup mode=0555
 file path=opt/zfs-tests/tests/functional/inheritance/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config001.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config002.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config003.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config004.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config005.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config006.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config007.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config008.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config009.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config010.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config011.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config012.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config013.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config014.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config015.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config016.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config017.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config018.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config019.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config020.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config021.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config022.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config023.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/config024.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/inherit.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/inheritance/config001.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config002.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config003.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config004.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config005.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config006.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config007.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config008.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config009.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config010.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config011.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config012.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config013.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config014.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config015.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config016.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config017.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config018.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config019.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config020.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config021.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config022.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config023.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/config024.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/inherit.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/inheritance/inherit_001_pos mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state001.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state002.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state003.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state004.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state005.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state006.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state007.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state008.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state009.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state010.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state011.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state012.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state013.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state014.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state015.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state016.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state017.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state018.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state019.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state020.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state021.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state022.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state023.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inheritance/state024.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/inuse/inuse.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/inheritance/state001.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state002.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state003.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state004.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state005.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state006.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state007.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state008.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state009.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state010.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state011.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state012.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state013.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state014.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state015.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state016.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state017.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state018.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state019.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state020.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state021.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state022.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state023.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inheritance/state024.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/inuse/inuse.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/inuse/inuse_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_004_pos mode=0555
@@ -1854,7 +1854,7 @@ file path=opt/zfs-tests/tests/functional/large_files/large_files_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/large_files/setup mode=0555
 file path=opt/zfs-tests/tests/functional/largest_pool/largest_pool.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/largest_pool/largest_pool_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/libzfs/many_fds mode=0555
@@ -1865,8 +1865,8 @@ file path=opt/zfs-tests/tests/functional/mdb/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/mdb/mdb_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/mdb/setup mode=0555
 file path=opt/zfs-tests/tests/functional/migration/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/migration/migration.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/migration/migration.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/migration/migration.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/migration/migration.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/migration/migration_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/migration/migration_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/migration/migration_003_pos mode=0555
@@ -1889,22 +1889,22 @@ file path=opt/zfs-tests/tests/functional/mount/setup mode=0555
 file path=opt/zfs-tests/tests/functional/mount/umount_001 mode=0555
 file path=opt/zfs-tests/tests/functional/mount/umountall_001 mode=0555
 file path=opt/zfs-tests/tests/functional/mv_files/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/mv_files/mv_files.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/mv_files/mv_files.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/mv_files/mv_files_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/mv_files/mv_files_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/mv_files/mv_files_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/mv_files/setup mode=0555
 file path=opt/zfs-tests/tests/functional/nestedfs/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/nestedfs/nestedfs_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/nestedfs/setup mode=0555
 file path=opt/zfs-tests/tests/functional/no_space/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/no_space/enospc.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/no_space/enospc.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/no_space/enospc_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/no_space/enospc_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/no_space/setup mode=0555
 file path=opt/zfs-tests/tests/functional/nopwrite/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/nopwrite/nopwrite.shlib mode=0555
+file path=opt/zfs-tests/tests/functional/nopwrite/nopwrite.shlib mode=0444
 file path=opt/zfs-tests/tests/functional/nopwrite/nopwrite_copies mode=0555
 file path=opt/zfs-tests/tests/functional/nopwrite/nopwrite_mtime mode=0555
 file path=opt/zfs-tests/tests/functional/nopwrite/nopwrite_negative mode=0555
@@ -1939,8 +1939,8 @@ file path=opt/zfs-tests/tests/functional/privilege/privilege_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/privilege/privilege_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/privilege/setup mode=0555
 file path=opt/zfs-tests/tests/functional/quota/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/quota/quota.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/quota/quota.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/quota/quota.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/quota/quota.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/quota/quota_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/quota/quota_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/quota/quota_003_pos mode=0555
@@ -1949,9 +1949,9 @@ file path=opt/zfs-tests/tests/functional/quota/quota_005_pos mode=0555
 file path=opt/zfs-tests/tests/functional/quota/quota_006_neg mode=0555
 file path=opt/zfs-tests/tests/functional/quota/setup mode=0555
 file path=opt/zfs-tests/tests/functional/redundancy/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/redundancy/redundancy.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/redundancy/redundancy.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/redundancy/redundancy.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/redundancy/redundancy_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/redundancy/redundancy_002_pos \
@@ -1970,7 +1970,7 @@ file path=opt/zfs-tests/tests/functional/refquota/refquota_005_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refquota/refquota_006_neg mode=0555
 file path=opt/zfs-tests/tests/functional/refquota/setup mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/refreserv/refreserv.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/refreserv/refreserv.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_003_pos mode=0555
@@ -1982,7 +1982,7 @@ file path=opt/zfs-tests/tests/functional/rename_dirs/rename_dirs_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/rename_dirs/setup mode=0555
 file path=opt/zfs-tests/tests/functional/replacement/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/replacement/replacement.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/replacement/replacement.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/replacement/replacement_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/replacement/replacement_002_pos \
@@ -1991,9 +1991,9 @@ file path=opt/zfs-tests/tests/functional/replacement/replacement_003_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/replacement/setup mode=0555
 file path=opt/zfs-tests/tests/functional/reservation/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/reservation/reservation.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/reservation/reservation.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/reservation/reservation.shlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/reservation/reservation_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/reservation/reservation_002_pos \
@@ -2037,8 +2037,8 @@ file path=opt/zfs-tests/tests/functional/rootpool/rootpool_003_neg mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/rootpool_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/setup mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/rsend/rsend.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/rsend/rsend.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/rsend.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/rsend/rsend.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/rsend/rsend_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend_003_pos mode=0555
@@ -2081,7 +2081,7 @@ file path=opt/zfs-tests/tests/functional/rsend/send-cpL_varied_recsize \
     mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/setup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/scrub_mirror/default.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/scrub_mirror/default.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/scrub_mirror/scrub_mirror_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/scrub_mirror_002_pos \
@@ -2092,12 +2092,12 @@ file path=opt/zfs-tests/tests/functional/scrub_mirror/scrub_mirror_004_pos \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/scrub_mirror/scrub_mirror_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/scrub_mirror/setup mode=0555
 file path=opt/zfs-tests/tests/functional/slog/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/slog/setup mode=0555
-file path=opt/zfs-tests/tests/functional/slog/slog.cfg mode=0555
-file path=opt/zfs-tests/tests/functional/slog/slog.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/slog/slog.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/slog/slog.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/slog/slog_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_003_pos mode=0555
@@ -2118,7 +2118,7 @@ file path=opt/zfs-tests/tests/functional/snapshot/rollback_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/rollback_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/rollback_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/setup mode=0555
-file path=opt/zfs-tests/tests/functional/snapshot/snapshot.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/snapshot/snapshot.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/snapshot/snapshot_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/snapshot_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/snapshot_003_pos mode=0555
@@ -2138,7 +2138,7 @@ file path=opt/zfs-tests/tests/functional/snapshot/snapshot_016_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/snapshot_017_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapused/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/snapused/setup mode=0555
-file path=opt/zfs-tests/tests/functional/snapused/snapused.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/snapused/snapused.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/snapused/snapused_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapused/snapused_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapused/snapused_003_pos mode=0555
@@ -2146,7 +2146,7 @@ file path=opt/zfs-tests/tests/functional/snapused/snapused_004_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapused/snapused_005_pos mode=0555
 file path=opt/zfs-tests/tests/functional/sparse/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/sparse/setup mode=0555
-file path=opt/zfs-tests/tests/functional/sparse/sparse.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/sparse/sparse.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/sparse/sparse_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/threadsappend/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/threadsappend/setup mode=0555
@@ -2155,7 +2155,7 @@ file path=opt/zfs-tests/tests/functional/threadsappend/threadsappend_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/truncate/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/truncate/setup mode=0555
-file path=opt/zfs-tests/tests/functional/truncate/truncate.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/truncate/truncate.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/truncate/truncate_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/truncate/truncate_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/cleanup mode=0555
@@ -2164,7 +2164,7 @@ file path=opt/zfs-tests/tests/functional/userquota/groupspace_001_pos \
 file path=opt/zfs-tests/tests/functional/userquota/groupspace_002_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/setup mode=0555
-file path=opt/zfs-tests/tests/functional/userquota/userquota.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/userquota/userquota.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/userquota/userquota_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userquota_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userquota_003_pos mode=0555
@@ -2178,14 +2178,14 @@ file path=opt/zfs-tests/tests/functional/userquota/userquota_010_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userquota_011_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userquota_012_neg mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userquota_common.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/userquota/userspace_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userspace_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/utils_test/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/utils_test/setup mode=0555
-file path=opt/zfs-tests/tests/functional/utils_test/utils_test.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/utils_test/utils_test.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/utils_test/utils_test.kshlib \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/utils_test/utils_test_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/utils_test/utils_test_002_pos \
@@ -2206,7 +2206,7 @@ file path=opt/zfs-tests/tests/functional/utils_test/utils_test_009_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/vdev_zaps/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/vdev_zaps/setup mode=0555
-file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/vdev_zaps/vdev_zaps_003_pos mode=0555
@@ -2235,8 +2235,8 @@ file path=opt/zfs-tests/tests/functional/xattr/xattr_010_neg mode=0555
 file path=opt/zfs-tests/tests/functional/xattr/xattr_011_pos mode=0555
 file path=opt/zfs-tests/tests/functional/xattr/xattr_012_pos mode=0555
 file path=opt/zfs-tests/tests/functional/xattr/xattr_013_pos mode=0555
-file path=opt/zfs-tests/tests/functional/xattr/xattr_common.kshlib mode=0555
-file path=opt/zfs-tests/tests/functional/zvol/zvol.cfg mode=0555
+file path=opt/zfs-tests/tests/functional/xattr/xattr_common.kshlib mode=0444
+file path=opt/zfs-tests/tests/functional/zvol/zvol.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/zvol/zvol_ENOSPC/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_ENOSPC/setup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_ENOSPC/zvol_ENOSPC_001_pos \
@@ -2249,7 +2249,7 @@ file path=opt/zfs-tests/tests/functional/zvol/zvol_cli/zvol_cli_002_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_cli/zvol_cli_003_neg \
     mode=0555
-file path=opt/zfs-tests/tests/functional/zvol/zvol_common.shlib mode=0555
+file path=opt/zfs-tests/tests/functional/zvol/zvol_common.shlib mode=0444
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/setup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/zvol_misc_001_neg \
@@ -2267,7 +2267,7 @@ file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/zvol_misc_006_pos \
 file path=opt/zfs-tests/tests/functional/zvol/zvol_swap/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_swap/setup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_swap/zvol_swap.cfg \
-    mode=0555
+    mode=0444
 file path=opt/zfs-tests/tests/functional/zvol/zvol_swap/zvol_swap_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_swap/zvol_swap_002_pos \
@@ -2286,7 +2286,7 @@ file path=opt/zfs-tests/tests/perf/fio/random_readwrite.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/random_writes.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/sequential_reads.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/sequential_writes.fio mode=0444
-file path=opt/zfs-tests/tests/perf/perf.shlib mode=0555
+file path=opt/zfs-tests/tests/perf/perf.shlib mode=0444
 file path=opt/zfs-tests/tests/perf/regression/random_reads mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_readwrite mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_writes mode=0555
@@ -2297,8 +2297,8 @@ file path=opt/zfs-tests/tests/perf/regression/sequential_reads_cached_clone \
     mode=0555
 file path=opt/zfs-tests/tests/perf/regression/sequential_writes mode=0555
 file path=opt/zfs-tests/tests/perf/regression/setup mode=0555
-file path=opt/zfs-tests/tests/perf/scripts/io.d mode=0555
-file path=opt/zfs-tests/tests/perf/scripts/prefetch_io.d mode=0555
+file path=opt/zfs-tests/tests/perf/scripts/io.d mode=0444
+file path=opt/zfs-tests/tests/perf/scripts/prefetch_io.d mode=0444
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend fmri=system/file-system/zfs/tests type=require

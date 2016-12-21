@@ -10,27 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-BLOCKFILESDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zpool_import/blockfiles
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zpool_import/blockfiles
 
-FILES = unclean_export.dat.bz2
-
-CMDS = $(FILES:%=$(BLOCKFILESDIR)/%)
-$(CMDS) := FILEMODE = 0444
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(BLOCKFILESDIR)
-
-$(BLOCKFILESDIR):
-	$(INS.dir)
-
-$(BLOCKFILESDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

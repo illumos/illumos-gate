@@ -15,22 +15,7 @@
 
 include $(SRC)/Makefile.master
 
-CALLBACKS = zfs_dbgmsg.ksh
-
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-CALLBACKSDIR = $(ROOTOPTPKG)/callbacks
+TARGETDIR = $(ROOTOPTPKG)/callbacks
 
-FILES = $(CALLBACKS:%=$(CALLBACKSDIR)/%)
-$(FILES) := FILEMODE = 0555
-
-all: $(CALLBACKS)
-
-install: $(CALLBACKSDIR) $(FILES)
-
-clean lint clobber:
-
-$(CALLBACKSDIR):
-	$(INS.dir)
-
-$(CALLBACKSDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com
