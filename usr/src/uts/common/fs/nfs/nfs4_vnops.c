@@ -13998,7 +13998,7 @@ nfs4frlock_update_state(LOCK4args *lock_args, LOCKU4args *locku_args,
 		 * Clean that up here.  It's unclear whether we should do
 		 * this even if the filesystem has been forcibly unmounted.
 		 * For most servers, it's probably wasted effort, but
-		 * RFC3530 lets servers require that unlocks exactly match
+		 * RFC 7530 lets servers require that unlocks exactly match
 		 * the locks that are held.
 		 */
 		if (resend_rqstp != NULL &&

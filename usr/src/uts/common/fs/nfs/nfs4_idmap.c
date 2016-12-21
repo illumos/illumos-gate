@@ -25,7 +25,7 @@
 
 /*
  * There are well defined policies for mapping uid and gid values to and
- * from utf8 strings, as specified in RFC 3530. The protocol ops that are
+ * from utf8 strings, as specified in RFC 7530. The protocol ops that are
  * most significantly affected by any changes in policy are GETATTR and
  * SETATTR, as these have different behavior depending on whether the id
  * mapping code is executing on the client or server. Thus, the following
@@ -1267,12 +1267,15 @@ nfs_idmap_reclaim(void *arg)
  * string. If found, the corresponding mapping is returned in id_buf and
  * the cache entry is updated to the head of the LRU list. The computed
  * hash queue number, is returned in hashno.
+ *
+ * cip    - cache info ptr
+ * u8s    - utf8 string to resolve
+ * hashno - hash number, retval
+ * id_buf - if found, id for u8s
  */
 static uint_t
-nfs_idmap_cache_s2i_lkup(idmap_cache_info_t *cip,	/* cache info ptr */
-			utf8string *u8s,	/* utf8 string to resolve */
-			uint_t *hashno,		/* hash number, retval */
-			uid_t *id_buf)		/* if found, id for u8s */
+nfs_idmap_cache_s2i_lkup(idmap_cache_info_t *cip, utf8string *u8s,
+    uint_t *hashno, uid_t *id_buf)
 {
 	nfsidmap_t	*p;
 	nfsidmap_t	*pnext;
@@ -1345,13 +1348,16 @@ nfs_idmap_cache_s2i_lkup(idmap_cache_info_t *cip,	/* cache info ptr */
  * to do it. If NOT found, then a new entry is allocated for the specified
  * cache, and inserted. The hash queue number is obtained from hash_number
  * if the behavior is HQ_HASH_HINT, or computed otherwise.
+ *
+ * cip         - cache info ptr
+ * id          - id result from upcall
+ * u8s         - utf8 string to resolve
+ * behavior    - hash algorithm behavior
+ * hash_number - hash number iff hint
  */
 static void
-nfs_idmap_cache_s2i_insert(idmap_cache_info_t *cip,	/* cache info ptr */
-			uid_t id,		/* id result from upcall */
-			utf8string *u8s,	/* utf8 string to resolve */
-			hash_stat behavior,	/* hash algorithm behavior */
-			uint_t hash_number)	/* hash number iff hint */
+nfs_idmap_cache_s2i_insert(idmap_cache_info_t *cip, uid_t id, utf8string *u8s,
+    hash_stat behavior, uint_t hash_number)
 {
 	uint_t			 hashno;
 	char			*c_str;
@@ -1445,12 +1451,15 @@ nfs_idmap_cache_s2i_insert(idmap_cache_info_t *cip,	/* cache info ptr */
  * If found, the corresponding mapping is returned in u8s and the
  * cache entry is updated to the head of the LRU list. The computed
  * hash queue number, is returned in hashno.
+ *
+ * cip    - cache info ptr
+ * id     - id to resolve
+ * hashno - hash number, retval
+ * u8s    - if found, utf8 str for id
  */
 static uint_t
-nfs_idmap_cache_i2s_lkup(idmap_cache_info_t *cip,   /* cache info ptr */
-			uid_t id,		    /* id to resolve */
-			uint_t *hashno,		    /* hash number, retval */
-			utf8string *u8s)	/* if found, utf8 str for id */
+nfs_idmap_cache_i2s_lkup(idmap_cache_info_t *cip, uid_t id, uint_t *hashno,
+    utf8string *u8s)
 {
 	uint_t			 found_stat = 0;
 	nfsidmap_t		*p;
@@ -1513,13 +1522,16 @@ nfs_idmap_cache_i2s_lkup(idmap_cache_info_t *cip,   /* cache info ptr */
  * do it. If NOT found, then a new entry is allocated for the specified
  * cache, and inserted. The hash queue number is obtained from hash_number
  * if the behavior is HQ_HASH_HINT, or computed otherwise.
+ *
+ * cip         - cache info ptr
+ * id          - id to resolve
+ * u8s         - utf8 result from upcall
+ * behavior    - has algorithm behavior
+ * hash_number - hash number iff hint
  */
 static void
-nfs_idmap_cache_i2s_insert(idmap_cache_info_t *cip, /* cache info ptr */
-			uid_t id,		    /* id to resolve */
-			utf8string *u8s,	/* utf8 result from upcall */
-			hash_stat behavior,	/* has algorithm behavior */
-			uint_t hash_number)	/* hash number iff hint */
+nfs_idmap_cache_i2s_insert(idmap_cache_info_t *cip, uid_t id, utf8string *u8s,
+    hash_stat behavior, uint_t hash_number)
 {
 	uint_t		 hashno;
 	nfsidhq_t	*hq;

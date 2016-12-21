@@ -25,7 +25,7 @@
 /*
  * PSARC/2004/154 nfsmapid DNS enhancements implementation.
  *
- * As per RFC 3530, file owner and group attributes in version 4 of the
+ * As per RFC 7530, file owner and group attributes in version 4 of the
  * NFS protocol are no longer exchanged between client and server as 32
  * bit integral values. Instead, owner and group file attributes are
  * exchanged between client and server as UTF8 strings of form
