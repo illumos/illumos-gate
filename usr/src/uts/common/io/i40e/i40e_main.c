@@ -1226,14 +1226,14 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 
 	if (hw->aq.api_maj_ver == I40E_FW_API_VERSION_MAJOR &&
 	    hw->aq.api_min_ver > I40E_FW_API_VERSION_MINOR) {
-		i40e_notice(i40e, "!The driver for the device detected a newer "
+		i40e_log(i40e, "The driver for the device detected a newer "
 		    "version of the NVM image (%d.%d) than expected (%d.%d).\n"
 		    "Please install the most recent version of the network "
 		    "driver.\n", hw->aq.api_maj_ver, hw->aq.api_min_ver,
 		    I40E_FW_API_VERSION_MAJOR, I40E_FW_API_VERSION_MINOR);
 	} else if (hw->aq.api_maj_ver < I40E_FW_API_VERSION_MAJOR ||
 	    hw->aq.api_min_ver < (I40E_FW_API_VERSION_MINOR - 1)) {
-		i40e_notice(i40e, "!The driver for the device detected an older"
+		i40e_log(i40e, "The driver for the device detected an older"
 		    " version of the NVM image (%d.%d) than expected (%d.%d)."
 		    "\nPlease update the NVM image.\n",
 		    hw->aq.api_maj_ver, hw->aq.api_min_ver,
