@@ -1066,7 +1066,9 @@ smbreq_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf(
 			    "worker thread: %p\n",
 			    sr->sr_worker);
-			smb_worker_findstack((uintptr_t)sr->sr_worker);
+			if (sr->sr_worker != NULL) {
+				smb_worker_findstack((uintptr_t)sr->sr_worker);
+			}
 		} else {
 			if (DCMD_HDRSPEC(flags))
 				mdb_printf(
