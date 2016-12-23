@@ -41,8 +41,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -147,9 +145,9 @@ CONST_OID ansiX962c2tnb431r1[] = { ANSI_X962_GF2m_OID, 0x14 };
 /* XXX this is incorrect */
 #define	INVALID_CERT_EXTENSION 1
 
-#define CKM_ECDSA                      0x00001041
-#define CKM_ECDSA_SHA1                 0x00001042
-#define CKM_ECDH1_DERIVE               0x00001050
+#define CKM_ECDSA                      0x00001041UL
+#define CKM_ECDSA_SHA1                 0x00001042UL
+#define CKM_ECDH1_DERIVE               0x00001050UL
 
 static SECOidData ANSI_prime_oids[] = {
     { { siDEROID, NULL, 0 }, ECCurve_noName,

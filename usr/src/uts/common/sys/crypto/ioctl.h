@@ -45,13 +45,13 @@ extern "C" {
 #define	MAX_NUM_THRESHOLD	7
 
 /* the PKCS11 Mechanisms */
-#define	CKM_RC4			0x00000111
-#define	CKM_DES3_ECB		0x00000132
-#define	CKM_DES3_CBC		0x00000133
-#define	CKM_MD5			0x00000210
-#define	CKM_SHA_1		0x00000220
-#define	CKM_AES_ECB		0x00001081
-#define	CKM_AES_CBC		0x00001082
+#define	CKM_RC4			0x00000111UL
+#define	CKM_DES3_ECB		0x00000132UL
+#define	CKM_DES3_CBC		0x00000133UL
+#define	CKM_MD5			0x00000210UL
+#define	CKM_SHA_1		0x00000220UL
+#define	CKM_AES_ECB		0x00001081UL
+#define	CKM_AES_CBC		0x00001082UL
 
 /*
  * General Purpose Ioctls
