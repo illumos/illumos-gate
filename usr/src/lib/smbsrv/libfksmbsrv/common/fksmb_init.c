@@ -69,6 +69,17 @@ uint_t	smb_audit_flags =
 #endif
 
 /*
+ * We don't normally have nbmand support in the test share
+ * used by fksmbd, but we'd still like the locking code
+ * to be testable.  Intereactions with NFS etc. are not a
+ * concern in fksmbd, so allow it to use advisory locks.
+ *
+ * Should fix the fksmbd test share so it supports nbmand,
+ * and then set this to zero like the real server.
+ */
+int smb_allow_advisory_locks = 1;	/* See smb_vops.c */
+
+/*
  * Maximum number of simultaneous authentication, share mapping, pipe open
  * requests to be processed.
  */
