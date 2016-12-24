@@ -1597,7 +1597,7 @@ extern clock_t nfs_write_error_interval;
  * Found through rnodes.
  *
  * The os_open_ref_count keeps track the number of open file descriptor
- * refernces on this data structure.  It will be bumped for any successful
+ * references on this data structure.  It will be bumped for any successful
  * OTW OPEN call and any OPEN call that determines the OTW call is not
  * necessary and the open stream hasn't just been created (see
  * nfs4_is_otw_open_necessary).
@@ -1625,7 +1625,7 @@ extern clock_t nfs_write_error_interval;
  * 'os_pending_close' is set when an over-the-wire CLOSE is deferred to the
  * lost state queue.
  *
- * 'open_stateid' is set the last open stateid returned by the server unless
+ * 'open_stateid' is set to the last open stateid returned by the server unless
  * 'os_delegation' is 1, in which case 'open_stateid' refers to the
  * delegation stateid returned by the server.  This is used in cases where the
  * client tries to OPEN a file but already has a suitable delegation, so we

@@ -116,7 +116,7 @@ typedef enum nfs4_acl_op {
 	NFS4_ACL_SET
 } nfs4_acl_op_t;
 
-static struct lm_sysid *nfs4_find_sysid(mntinfo4_t *mi);
+static struct lm_sysid *nfs4_find_sysid(mntinfo4_t *);
 
 static void	nfs4_update_dircaches(change_info4 *, vnode_t *, vnode_t *,
 			char *, dirattr_info_t *);
@@ -10507,7 +10507,6 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 		return (EINTR);
 	}
 
-
 	if (vp->v_flag & VNOCACHE) {
 		error = EAGAIN;
 		goto done;
@@ -10945,8 +10944,9 @@ nfs4_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 				}
 				if (lwp != NULL)
 					lwp->lwp_nostop--;
-				} else
-					cv_wait(&rp->r_cv, &rp->r_statelock);
+			} else {
+				cv_wait(&rp->r_cv, &rp->r_statelock);
+			}
 		}
 		mutex_exit(&rp->r_statelock);
 		if (rc != 0)
@@ -13004,7 +13004,7 @@ nfs4frlock_pre_setup(clock_t *tick_delayp, nfs4_recov_state_t *recov_statep,
 /*
  * Initialize and allocate the data structures necessary for
  * the nfs4frlock call.
- * Allocates argsp's op array, frees up the saved_rqstpp if there is one.
+ * Allocates argsp's op array.
  */
 static void
 nfs4frlock_call_init(COMPOUND4args_clnt *argsp, COMPOUND4args_clnt **argspp,
@@ -13353,12 +13353,7 @@ nfs4frlock_setup_locku_args(nfs4_lock_call_type_t ctype, nfs_argop4 *argop,
 	locku_args = &argop->nfs_argop4_u.oplocku;
 	*locku_argsp = locku_args;
 
-	/*
-	 * XXX what should locku_args->locktype be?
-	 * setting to ALWAYS be READ_LT so at least
-	 * it is a valid locktype.
-	 */
-
+	/* locktype should be set to any legal value */
 	locku_args->locktype = READ_LT;
 
 	pid = ctype == NFS4_LCK_CTYPE_NORM ? curproc->p_pidp->pid_id :
@@ -13496,8 +13491,6 @@ out:
 /*
  * After we get the reply from the server, record the proper information
  * for possible resend lock requests.
- *
- * Allocates memory for the saved_rqstp if we have a lost lock to save.
  */
 static void
 nfs4frlock_save_lost_rqst(nfs4_lock_call_type_t ctype, int error,
@@ -14275,7 +14268,6 @@ recov_retry:
 
 		switch (cmd) {
 		case F_GETLK:
-		case F_O_GETLK:
 			nfs4frlock_setup_lockt_args(ctype, &argop[1],
 			    &lockt_args, argsp, flk, rp);
 			break;
@@ -15890,7 +15882,7 @@ nfs4_reinstitute_local_lock_state(vnode_t *vp, flock64_t *lost_flp, cred_t *cr,
 	 * Now we have the list of intersections with the lost lock. These are
 	 * the locks that were/are active before the server replied to the
 	 * last/lost lock. Issue these locks to the server here. Playing these
-	 * locks to the server will re-establish aur current local locking state
+	 * locks to the server will re-establish our current local locking state
 	 * with the v4 server.
 	 * If we get an error, send SIGLOST to the application for that lock.
 	 */
