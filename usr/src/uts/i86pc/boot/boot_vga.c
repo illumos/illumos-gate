@@ -31,6 +31,8 @@
 #include <sys/archsystm.h>
 #include <sys/vgareg.h>
 #include <sys/framebuffer.h>
+#include <sys/boot_console.h>
+#include "boot_console_impl.h"
 
 #include "boot_console_impl.h"
 #if defined(_BOOT)
@@ -50,7 +52,7 @@
  * there.
  */
 extern unsigned short *video_fb;
-#define	VGA_SCREEN		((unsigned short *)video_fb)
+#define	VGA_SCREEN		(video_fb)
 
 #else /* __xpv && _BOOT */
 
@@ -59,20 +61,44 @@ extern unsigned short *video_fb;
 
 #endif /* __xpv && _BOOT */
 
+static int cons_color = CONS_COLOR;
 
 static void vga_init(void);
-static void vga_cursor_display(void);
+static void vga_drawc(int);
+static void vga_setpos(int, int);
+static void vga_getpos(int *, int *);
+static void vga_scroll(int);
 static void vga_clear(int);
+static void vga_shiftline(int);
+static void vga_eraseline(void);
+static void vga_cursor_display(boolean_t);
+
 static void vga_set_crtc(int index, unsigned char val);
 static unsigned char vga_get_crtc(int index);
 static void vga_set_atr(int index, unsigned char val);
 static unsigned char vga_get_atr(int index);
 
+static int
+get_vga_color(void)
+{
+	int color;
+	uint32_t fg, bg;
+	uint8_t solaris_color_to_pc_color[16] = {
+		15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+	};
+
+	boot_get_color(&fg, &bg);
+	color = solaris_color_to_pc_color[bg] << 4;
+	color |= solaris_color_to_pc_color[fg];
+	return (color);
+}
+
 void
-boot_vga_init(int cons_color)
+boot_vga_init(bcons_dev_t *bcons_dev)
 {
 	fb_info.terminal.x = VGA_TEXT_COLS;
 	fb_info.terminal.y = VGA_TEXT_ROWS;
+	cons_color = get_vga_color();
 
 #if defined(_BOOT)
 	/*
@@ -82,7 +108,7 @@ boot_vga_init(int cons_color)
 	 */
 	vga_init();
 	fb_info.cursor.visible = B_FALSE;
-	vga_cursor_display();
+	vga_cursor_display(B_TRUE);
 
 	/*
 	 * In general we should avoid resetting the display during the boot,
@@ -97,6 +123,12 @@ boot_vga_init(int cons_color)
 		vga_clear(cons_color);
 	vga_setpos(fb_info.cursor.pos.y, fb_info.cursor.pos.x);
 #endif /* _BOOT */
+
+	bcons_dev->bd_putchar = vga_drawc;
+	bcons_dev->bd_eraseline = vga_eraseline;
+	bcons_dev->bd_cursor = vga_cursor_display;
+	bcons_dev->bd_setpos = vga_setpos;
+	bcons_dev->bd_shift = vga_shiftline;
 }
 
 static void
@@ -112,9 +144,12 @@ vga_init(void)
 }
 
 static void
-vga_cursor_display(void)
+vga_cursor_display(boolean_t visible)
 {
 	unsigned char val, msl;
+
+	if (fb_info.cursor.visible == visible)
+		return;
 
 	/*
 	 * Figure out the maximum scan line value.  We need this to set the
@@ -132,6 +167,10 @@ vga_cursor_display(void)
 	 * - Bit 5 is the cursor disable bit.
 	 */
 	val = vga_get_crtc(VGA_CRTC_CSSL) & 0xc0;
+
+	if (visible == B_FALSE)
+		val |= (1 << 5);
+
 	vga_set_crtc(VGA_CRTC_CSSL, val);
 
 	/*
@@ -145,50 +184,120 @@ vga_cursor_display(void)
 	vga_set_crtc(VGA_CRTC_CESL, msl);
 }
 
+static void
+vga_eraseline_impl(int x, int y, int color)
+{
+	unsigned short val, *buf;
+	int i;
+
+	buf = VGA_SCREEN + x + y * VGA_TEXT_COLS;
+	val = (color << 8) | ' ';
+	for (i = x; i < VGA_TEXT_COLS; i++)
+		buf[i] = val;
+}
+
+static void
+vga_eraseline(void)
+{
+	int x, y;
+
+	x = fb_info.cursor.pos.x;
+	y = fb_info.cursor.pos.y;
+	vga_eraseline_impl(x, y, cons_color);
+}
+
+static void
+vga_shiftline(int chars)
+{
+	unsigned short *src, *dst;
+	int x, y, len;
+
+	x = fb_info.cursor.pos.x;
+	y = fb_info.cursor.pos.y;
+	len = VGA_TEXT_COLS - x - chars;
+	if (len <= 0)
+		return;
+
+	src = VGA_SCREEN + x + y * VGA_TEXT_COLS;
+	dst = src + chars;
+	if (dst <= src) {
+		do {
+			*dst++ = *src++;
+		} while (--len != 0);
+	} else {
+		dst += len;
+		src += len;
+		do {
+			*--dst = *--src;
+		} while (--len != 0);
+	}
+}
 
 static void
 vga_clear(int color)
 {
-	unsigned short val;
 	int i;
 
-	val = (color << 8) | ' ';
-
-	for (i = 0; i < VGA_TEXT_ROWS * VGA_TEXT_COLS; i++) {
-		VGA_SCREEN[i] = val;
-	}
+	for (i = 0; i < VGA_TEXT_ROWS; i++)
+		vga_eraseline_impl(0, i, color);
 }
 
-void
-vga_drawc(int c, int color)
+static void
+vga_drawc(int c)
 {
 	int row;
 	int col;
 
 	vga_getpos(&row, &col);
-	VGA_SCREEN[row*VGA_TEXT_COLS + col] = (color << 8) | c;
+
+	if (c == '\n') {
+		if (row < fb_info.terminal.y - 1)
+			vga_setpos(row + 1, col);
+		else
+			vga_scroll(cons_color);
+		return;
+	}
+
+	/*
+	 * VGA_SCREEN is an array of 16-bit unsigned ints, we do let
+	 * the compiler to take care of truncation here.
+	 */
+	VGA_SCREEN[row * VGA_TEXT_COLS + col] = (cons_color << 8) | c;
+
+	if (col < VGA_TEXT_COLS - 1)
+		vga_setpos(row, col + 1);
+	else if (row < VGA_TEXT_ROWS - 1)
+		vga_setpos(row + 1, 0);
+	else {
+		vga_setpos(row, 0);
+		vga_scroll(cons_color);
+	}
 }
 
-void
+static void
 vga_scroll(int color)
 {
-	unsigned short val;
 	int i;
 
-	val = (color << 8) | ' ';
-
-	for (i = 0; i < (VGA_TEXT_ROWS-1)*VGA_TEXT_COLS; i++) {
+	for (i = 0; i < (VGA_TEXT_ROWS - 1) * VGA_TEXT_COLS; i++) {
 		VGA_SCREEN[i] = VGA_SCREEN[i + VGA_TEXT_COLS];
 	}
-	for (; i < VGA_TEXT_ROWS * VGA_TEXT_COLS; i++) {
-		VGA_SCREEN[i] = val;
-	}
+	vga_eraseline_impl(0, VGA_TEXT_ROWS - 1, color);
 }
 
-void
+static void
 vga_setpos(int row, int col)
 {
 	int off;
+
+	if (row < 0)
+		row = 0;
+	if (row >= fb_info.terminal.y)
+		row = fb_info.terminal.y - 1;
+	if (col < 0)
+		col = 0;
+	if (col >= fb_info.terminal.x)
+		col = fb_info.terminal.x - 1;
 
 	off = row * VGA_TEXT_COLS + col;
 	vga_set_crtc(VGA_CRTC_CLAH, off >> 8);
@@ -198,7 +307,7 @@ vga_setpos(int row, int col)
 	fb_info.cursor.pos.x = col;
 }
 
-void
+static void
 vga_getpos(int *row, int *col)
 {
 	int off;
