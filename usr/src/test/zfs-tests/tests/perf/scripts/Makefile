@@ -10,28 +10,12 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/perf/scripts
+TARGETDIR = $(ROOTOPTPKG)/tests/perf/scripts
 
-PROGS = io.d \
-	prefetch_io.d
-
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

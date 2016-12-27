@@ -10,35 +10,13 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
-
-.PARALLEL: $(SUBDIRS)
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/perf
+TARGETDIR = $(ROOTOPTPKG)/tests/perf
 
-PROGS = perf.shlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-SUBDIRS = fio \
-	regression \
-	scripts
-
+include $(SRC)/test/zfs-tests/Makefile.com
 include $(SRC)/test/Makefile.com

@@ -10,18 +10,8 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
-
-include $(SRC)/Makefile.master
-
-ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/features/async_destroy
-
-all install lint clean clobber:
-
-SUBDIRS = async_destroy
-
+include $(SRC)/test/zfs-tests/Makefile.com
 include $(SRC)/test/Makefile.com

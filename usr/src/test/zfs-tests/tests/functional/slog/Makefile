@@ -10,48 +10,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/slog
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/slog
 
-PROGS = cleanup \
-	setup \
-	slog_001_pos \
-	slog_002_pos \
-	slog_003_pos \
-	slog_004_pos \
-	slog_005_pos \
-	slog_006_pos \
-	slog_007_pos \
-	slog_008_neg \
-	slog_009_neg \
-	slog_010_neg \
-	slog_011_neg \
-	slog_012_neg \
-	slog_013_pos \
-	slog_014_pos
-
-FILES = slog.cfg \
-	slog.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

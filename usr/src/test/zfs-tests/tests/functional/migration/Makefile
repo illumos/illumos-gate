@@ -10,46 +10,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/migration
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/migration
 
-PROGS = cleanup \
-	migration_001_pos \
-	migration_002_pos \
-	migration_003_pos \
-	migration_004_pos \
-	migration_005_pos \
-	migration_006_pos \
-	migration_007_pos \
-	migration_008_pos \
-	migration_009_pos \
-	migration_010_pos \
-	migration_011_pos \
-	migration_012_pos \
-	setup
-
-FILES = migration.cfg \
-	migration.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

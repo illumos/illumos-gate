@@ -15,6 +15,6 @@
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = cmd include runfiles tests doc callbacks
+SUBDIRS:sh = find ./* -type d -maxdepth 0
 
 include $(SRC)/test/Makefile.com

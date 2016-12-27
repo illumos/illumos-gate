@@ -10,43 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zpool_add
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zpool_add
 
-PROGS = cleanup \
-	setup \
-	zpool_add_001_pos \
-	zpool_add_002_pos \
-	zpool_add_003_pos \
-	zpool_add_004_pos \
-	zpool_add_005_pos \
-	zpool_add_006_pos \
-	zpool_add_007_neg \
-	zpool_add_008_neg \
-	zpool_add_009_neg
-
-FILES = zpool_add.cfg \
-	zpool_add.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

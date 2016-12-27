@@ -10,34 +10,12 @@
 #
 
 #
-# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/online_offline
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/online_offline
 
-PROGS = cleanup \
-	online_offline_001_pos \
-	online_offline_002_neg \
-	online_offline_003_neg \
-	setup
-
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

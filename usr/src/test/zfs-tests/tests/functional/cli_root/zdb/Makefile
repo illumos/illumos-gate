@@ -10,31 +10,12 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zdb
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zdb
 
-PROGS = zdb_001_neg \
-	zdb_002_pos
-
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

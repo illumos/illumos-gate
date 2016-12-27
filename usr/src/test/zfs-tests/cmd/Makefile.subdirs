@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/test/Makefile.com
@@ -24,6 +24,7 @@ SRCS = $(OBJS:%.o=%.c)
 CMDS = $(PROG:%=$(ROOTBIN)/%)
 $(CMDS) := FILEMODE = 0555
 
+C99MODE = $(C99_ENABLE)
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 all: $(PROG)

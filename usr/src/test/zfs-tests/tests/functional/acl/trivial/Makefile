@@ -10,48 +10,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/acl/trivial
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/acl/trivial
 
-PROGS = cleanup \
-	setup \
-	zfs_acl_aclmode_restricted_001_pos \
-	zfs_acl_chmod_001_pos \
-	zfs_acl_compress_001_pos \
-	zfs_acl_cp_001_pos \
-	zfs_acl_cp_002_neg \
-	zfs_acl_cp_003_neg \
-	zfs_acl_find_001_pos \
-	zfs_acl_find_002_neg \
-	zfs_acl_ls_001_pos \
-	zfs_acl_ls_002_neg \
-	zfs_acl_mv_001_pos \
-	zfs_acl_pack_001_pos \
-	zfs_acl_pax_001_pos \
-	zfs_acl_pax_002_pos \
-	zfs_acl_pax_003_pos \
-	zfs_acl_pax_004_pos \
-	zfs_acl_pax_005_pos \
-	zfs_acl_pax_006_pos \
-	zfs_acl_tar_001_pos \
-	zfs_acl_tar_002_neg
-
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

@@ -10,44 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_unmount
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_unmount
 
-PROGS = cleanup \
-	setup \
-	zfs_unmount_001_pos \
-	zfs_unmount_002_pos \
-	zfs_unmount_003_pos \
-	zfs_unmount_004_pos \
-	zfs_unmount_005_pos \
-	zfs_unmount_006_pos \
-	zfs_unmount_007_neg \
-	zfs_unmount_008_neg \
-	zfs_unmount_009_pos \
-	zfs_unmount_all_001_pos
-
-FILES = zfs_unmount.cfg \
-	zfs_unmount.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com
