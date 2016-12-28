@@ -37,4 +37,8 @@ $(ROOTONBLDLIBMACH)/%: %
 $(ROOTONBLDLIBMACH64)/%: %
 	$(INS.file)
 
+# We can't create CTF in the tools build because of a bootstrap bug with the new CTF
+$(DYNLIB) := CTFMERGE_POST= :
+CTFCONVERT_O= :
+
 include $(SRC)/lib/Makefile.targ

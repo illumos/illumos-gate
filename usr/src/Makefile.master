@@ -928,8 +928,8 @@ CTFMRGFLAGS=
 # do not support stabs (eg. Sun Studio), so if GNUC is not set, we don't
 # honor them.
 #
-$(_GNUC)CTFCONVERT=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfconvert-altexec
-$(_GNUC)CTFMERGE=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfmerge-altexec
+$(__GNUC)CTFCONVERT=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfconvert-altexec
+$(__GNUC)CTFMERGE=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfmerge-altexec
 
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 

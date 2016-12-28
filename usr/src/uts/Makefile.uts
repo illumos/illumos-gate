@@ -645,4 +645,4 @@ USBDEVS_DATA =	$(SRC)/uts/common/io/usb/usbdevs
 # are building with the private -X option to ctfconvert which allows us
 # to fixup the struct cpu to account for machcpu.
 #
-$(ENABLE_NEW_CTF)$(_GNUC)CTFCVTFLAGS += -X
+$(ENABLE_NEW_CTF)$(__GNUC)CTFCVTFLAGS += -X

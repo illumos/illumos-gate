@@ -1027,7 +1027,8 @@ ctf_dwarf_member_offset(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t mid,
     ulong_t *offp)
 {
 	int ret;
-	Dwarf_Unsigned loc, bitsz, bytesz, bitoff;
+	Dwarf_Unsigned loc, bitsz, bytesz;
+	Dwarf_Signed bitoff;
 	size_t off, tsz;
 
 	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_data_bit_offset,
@@ -1042,7 +1043,7 @@ ctf_dwarf_member_offset(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t mid,
 		return (ret);
 	off = loc * 8;
 
-	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_bit_offset,
+	if ((ret = ctf_dwarf_signed(cdp, die, DW_AT_bit_offset,
 	    &bitoff)) != 0) {
 		if (ret != ENOENT)
 			return (ret);
