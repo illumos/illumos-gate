@@ -232,12 +232,12 @@ typedef uint64_t   UINTN;
 
 
     #define LOAD_INTERNAL_DRIVER(_if, type, name, entry)      \
-        (_if)->LoadInternal(type, name, NULL)             
+        (_if)->LoadInternal(type, name, NULL)
 
-#else // EFI_NT_EMULATOR 
+#else // EFI_NT_EMULATOR
 
 //
-// When build similiar to FW, then link everything together as
+// When building similar to FW, link everything together as
 // one big module.
 //
 

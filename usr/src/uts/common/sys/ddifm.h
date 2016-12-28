@@ -26,8 +26,6 @@
 #ifndef	_DDIFM_H
 #define	_DDIFM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

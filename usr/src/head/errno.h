@@ -32,8 +32,6 @@
 #ifndef _ERRNO_H
 #define	_ERRNO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.1.5 */
-
 /*
  * Error codes
  */

@@ -31,8 +31,6 @@
 #ifndef _SYS_STRMDEP_H
 #define	_SYS_STRMDEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -1,0 +1,344 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.Dd Dec 1, 2016
+.Dt SPRINTF 9F
+.Os
+.Sh NAME
+.Nm sprintf, snprintf, vsprintf, vsnprintf
+.Nd format characters in memory
+.Sh SYNOPSIS
+.In sys/cmn_err.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Ft "char *"
+.Fo sprintf
+.Fa "char *s"
+.Fa "const char *format"
+.Fa ...
+.Fc
+.Ft size_t
+.Fo snprintf
+.Fa "char *s"
+.Fa "size_t n"
+.Fa "const char *format"
+.Fa ...
+.Fc
+.In sys/varargs.h
+.Ft "char *"
+.Fo vsprintf
+.Fa "char *s"
+.Fa "const char *format"
+.Fa "va_list ap"
+.Fc
+.Ft size_t
+.Fo vsnprintf
+.Fa "char *s"
+.Fa "size_t n"
+.Fa "const char *format"
+.Fa "va_list ap"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa s
+Pointer to a character string.
+.It Fa n
+Size of the buffer pointed to by
+.Fa s .
+.It Fa format
+Pointer to a character string.
+.It Fa ap
+Pointer to a variable argument list.
+.El
+.Sh DESCRIPTION
+The
+.Fn sprintf
+function places output, followed by the null byte
+.Pq \e0 ,
+in consecutive bytes starting at
+.Fa s ;
+it is the user's responsibility to ensure that enough storage is available.
+.Pp
+The
+.Fn snprintf
+function is identical to
+.Fn sprintf
+with the addition of the argument
+.Fa n ,
+which specifies the size of the buffer referred to by
+.Fa s .
+If
+.Fa n
+is 0, nothing is written and
+.Fa s
+can be a null pointer.
+Otherwise, output bytes beyond the
+.Fa n Ns \-1st
+are discarded instead of being written to the array and a null byte is written
+at the end of the bytes actually written into the array.
+.Pp
+The
+.Fn vsprintf
+and
+.Fn vsnprintf
+functions are the same as
+.Fn sprintf
+and
+.Fn snprintf ,
+respectively, except that instead of being called with a variable number of
+arguments, they are called with an argument list,
+.Fa ap ,
+used by the conversion specifications in
+.Fa format .
+.Fa ap
+is a variable argument list and must be initialized by calling
+.Xr va_start 9F .
+.Xr va_end 9F
+is used to clean up and must be called after each traversal of the list.
+Multiple traversals of the argument list, each bracketed by
+.Xr va_start 9F
+and
+.Xr va_end 9F ,
+are possible.
+.Pp
+Each of these functions converts, formats, and prints its arguments under
+control of the
+.Fa format .
+The
+.Fa format
+is composed of zero or more directives: ordinary characters, which are simply
+copied to the output stream and conversion specifications, each of which results
+in the fetching of zero or more arguments.
+The results are undefined if there are insufficient arguments for the
+.Fa format .
+If the
+.Fa format
+is exhausted while arguments remain, the excess arguments are evaluated but are
+otherwise ignored.
+.Ss Conversion Specifications
+Each conversion specification is introduced by the
+.Qq Sy %
+character after which the following appear in sequence:
+.Bl -bullet
+.It
+Zero or more flags
+.Pq in any order ,
+which modify the meaning of the conversion specification.
+.It
+An optional minimum field width.
+If the converted value has fewer bytes than the field width, it will be padded
+with spaces by default on the left; it will be padded on the right, if the
+left-adjustment flag
+.Pq Qq Sy ‐ ,
+described below, is given to the field width.
+The field width takes the form of an asterisk
+.Pq Qq Sy * ,
+described below, or a decimal integer.
+.It
+An optional precision that gives the minimum number of digits to appear for the
+.Sy d , D , o , O , x , X ,
+or
+.Sy u
+conversions
+.Pq the field is padded with leading zeros ;
+or the maximum number of bytes to be printed from a string in s conversion.
+The precision takes the form of a period
+.Pq Qq Sy \&.
+followed either by an asterisk
+.Pq Qq Sy * ,
+described below, or an optional decimal digit string, where a null digit string
+is treated as 0.
+If a precision appears with any other conversion specifier, the behavior is
+undefined.
+.It
+An optional length modifier that specified the size of the argument.
+.It
+A conversion specifier that indicates the type of conversion to be applied.
+.El
+.Pp
+A field width, or precision, or both can be indicated by an asterisk
+.Pq Qq Sy * .
+In this case, an argument of type int supplies the field width or precision.
+Arguments specifying field width, or precision, or both must appear in that
+order before the argument, if any, to be converted.
+A negative field width is taken as a
+.Qq Sy \-
+flag followed by a positive field width.
+A negative precision is taken as if the precision were omitted.
+.Ss Flag Characters
+The flag characters and their meanings are:
+.Bl -tag -width Ds
+.It Sy \-
+The result of the conversion will be left-justified within the field.
+The conversion will be right-justified if this flag is not specified.
+.It Sy 0
+For
+.Sy d , D , o , O , x , X ,
+or
+.Sy u
+conversions, leading zeros
+.Pq following any indication of sign or base
+are used to pad to the field width; no space padding is performed.
+If the
+.Sy 0
+and
+.Sy \-
+flags both appear, the
+.Sy 0
+flag will be ignored.
+If a precision is specified, the
+.Sy 0
+flag will be ignored.
+For other conversions, the behavior is undefined.
+.El
+.Ss Length Modifiers
+The length modifiers and their meanings are:
+.Bl -tag -width Ds
+.It Sy h
+Specifies that a following
+.Sy d , D , o , O , x , X ,
+or
+.Sy u
+conversion specifier applies to a short or unsigned
+short argument
+.Po the argument will have been promoted according to the integer promotions,
+but its value will be converted to short or unsigned short before printing
+.Pc .
+.It Sy hh
+Specifies that a following
+.Sy d , D , o , O , x , X ,
+or
+.Sy u
+conversion specifier applies to a signed char or unsigned char argument
+.Po the argument will have been promoted according to the integer promotions,
+but its value will be converted to signed char or unsigned char before printing
+.Pc .
+.It Sy l
+Specifies that a following
+.Sy d , D , o , O , x , X ,
+or
+.Sy u
+conversion specifier applies to a long or unsigned long argument.
+.It Sy ll
+Specifies that a following
+.Sy d , D , o , O , x , X ,
+or
+.Sy u
+conversion specifier applies to a long long or unsigned long long argument.
+.El
+.Ss Conversion Specifiers
+Each conversion specifier results in fetching zero or more arguments.
+The results are undefined if there are insufficient arguments for the
+.Fa format .
+If the
+.Fa format
+is exhausted while arguments remain, the excess arguments are ignored.
+.Pp
+The conversion specifiers and their meanings are:
+.Bl -tag -width Ds
+.It Sy d , D , o , O , x , X , u
+The integer argument is converted to signed decimal
+.Pq Sy d , D ,
+unsigned octal
+.Pq Sy o , O ,
+unsigned hexadecimal
+.Pq Sy x , X ,
+or unsigned decimal
+.Pq Sy u ,
+respectively.
+The letters
+.Qq Sy abcdef
+are used for
+.Sy x
+and letters
+.Qq Sy ABCDEF
+for
+.Sy X
+conversions.
+.It Sy c
+The character value of the argument is printed.
+.It Sy b
+The
+.Sy %b
+conversion specification allows bit values to be printed meaningfully.
+Each
+.Sy %b
+takes an integer value and a format string from the argument list.
+The first character of the format string should be the output base encoded as a
+control character.
+This base is used to print the integer argument.
+The remaining groups of characters in the format string consist of a bit number
+.Pq between 1 and 32, also encoded as a control character
+and the next characters
+.Pq up to the next control character or '\e0'
+give the name of the bit field.
+The string corresponding to the bit fields set in the integer argument is
+printed after the numerical value.
+.It Sy p
+The argument is taken to be a pointer; the value of the pointer is printed in
+unsigned hexadecimal.
+The print format is equivalent to
+.Sy %lx .
+To avoid lint warnings, cast pointers to type
+.Ft "void *"
+when using the
+.Sy %p
+format specifier.
+.It Sy s
+The argument is taken to be a string
+.Pq character pointer ,
+and characters from the string are printed until a null character is ecountered.
+If the character pointer is
+.Sy NULL ,
+the string
+.Qq <null string>
+is used in its place.
+.It Sy %
+Copy a
+.Sy % ;
+no argument is converted.
+.El
+.Sh CONTEXT
+These functions can be called from user, kernel, interrupt, or
+high-level interrupt context.
+.Sh RETURN VALUES
+.Fn sprintf
+and
+.Fn vsprintf
+return
+.Fa s .
+.Pp
+.Fn snprintf
+and
+.Fn vsnprintf
+return the number of bytes that would have been written to
+.Fa s
+if
+.Fa n
+had been sufficiently large
+.Pq excluding the terminating null byte .
+.Sh SEE ALSO
+.Xr cmn_err 9F ,
+.Xr va_arg 9F ,
+.Xr va_end 9F ,
+.Xr va_start 9F

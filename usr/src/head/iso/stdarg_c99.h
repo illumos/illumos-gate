@@ -31,8 +31,6 @@
 #ifndef _ISO_STDARG_C99_H
 #define	_ISO_STDARG_C99_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* SVr4.0 1.8 */
-
 /*
  * An application should not include this header directly.  Instead it
  * should be included only through the inclusion of other Sun headers.

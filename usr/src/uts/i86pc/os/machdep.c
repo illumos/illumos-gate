@@ -427,15 +427,19 @@ abort_sequence_enter(char *msg)
 /*
  * Enter debugger.  Called when the user types ctrl-alt-d or whenever
  * code wants to enter the debugger and possibly resume later.
+ *
+ * msg:	message to print, possibly NULL.
  */
 void
-debug_enter(
-	char	*msg)		/* message to print, possibly NULL */
+debug_enter(char *msg)
 {
 	if (dtrace_debugger_init != NULL)
 		(*dtrace_debugger_init)();
 
-	if (msg)
+	if (msg != NULL || (boothowto & RB_DEBUG))
+		prom_printf("\n");
+
+	if (msg != NULL)
 		prom_printf("%s\n", msg);
 
 	if (boothowto & RB_DEBUG)

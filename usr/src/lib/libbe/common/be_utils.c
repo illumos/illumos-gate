@@ -1519,7 +1519,7 @@ be_change_grub_default(char *be_name, char *be_root_pool)
 {
 	zfs_handle_t	*zhp = NULL;
 	char	grub_file[MAXPATHLEN];
-	char	*temp_grub;
+	char	*temp_grub = NULL;
 	char	*pool_mntpnt = NULL;
 	char	*ptmp_mntpnt = NULL;
 	char	*orig_mntpnt = NULL;

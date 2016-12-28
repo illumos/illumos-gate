@@ -26,8 +26,6 @@
 #ifndef _SYS_TTYDEV_H
 #define	_SYS_TTYDEV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* UCB 4.3 83/05/18 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

@@ -26,8 +26,6 @@
 #ifndef	_SYS_U8_TEXTPREP_H
 #define	_SYS_U8_TEXTPREP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 #include <sys/types.h>
 #include <sys/errno.h>

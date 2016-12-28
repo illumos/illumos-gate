@@ -27,8 +27,6 @@
 #ifndef _UTRAP_H
 #define	_UTRAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -88,7 +86,7 @@ typedef void *utrap_handler_t;	/* user trap handler entry point */
 #ifdef __sparcv8plus
 int
 install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
-	utrap_handler_t *old_handlerp);
+    utrap_handler_t *old_handlerp);
 #endif /* __sparcv8plus */
 
 #ifdef _KERNEL
@@ -100,8 +98,8 @@ void utrap_free(struct proc *p);
 #ifdef __sparcv9
 int
 __sparc_utrap_install(utrap_entry_t type,
-	utrap_handler_t new_precise, utrap_handler_t new_deferred,
-	utrap_handler_t *old_precise, utrap_handler_t *old_deferred);
+    utrap_handler_t new_precise, utrap_handler_t new_deferred,
+    utrap_handler_t *old_precise, utrap_handler_t *old_deferred);
 #endif
 
 /* The trap_instruction user traps are precise only. */

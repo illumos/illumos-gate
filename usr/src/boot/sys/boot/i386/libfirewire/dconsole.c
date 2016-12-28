@@ -47,13 +47,13 @@ static int	dcons_started = 0;
 static struct dcons_softc sc[DCONS_NPORT];
 uint32_t dcons_paddr;
 
-/* The buffer must be allocated in BSS becase:
+/* The buffer must be allocated in BSS because:
  *    - The dcons driver in the kernel is initialized before VM/pmap is
- *	initialized, so that the buffer must be allocate in the region
+ *	initialized, so that the buffer must be allocated in the region
  *	that is mapped at the very early boot state.
- *    - We expect identiy map only for regions before KERNLOAD
+ *    - We expect identity map only for regions before KERNLOAD
  *	(i386:4MB amd64:1MB).
- *    - It seems that heap in conventional memory(640KB) is not sufficent
+ *    - It seems that heap in conventional memory(640KB) is not sufficient
  *	and we move it to high address as LOADER_SUPPORT_BZIP2.
  *    - BSS is placed in conventional memory.
  */

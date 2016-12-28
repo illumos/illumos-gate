@@ -27,8 +27,6 @@
 #ifndef _SYS_WATCHPOINT_H
 #define	_SYS_WATCHPOINT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <vm/seg_enum.h>
 #include <sys/copyops.h>
