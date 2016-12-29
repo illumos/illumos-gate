@@ -1,0 +1,11 @@
+    libdis_test:      66 0f c7 30        vmclear (%rax)
+    libdis_test+0x4:  0f c7 30           vmptrld (%rax)
+    libdis_test+0x7:  0f c7 38           vmptrst (%rax)
+    libdis_test+0xa:  0f 78 d8           vmread %rbx,%rax
+    libdis_test+0xd:  0f 78 18           vmread %rbx,(%rax)
+    libdis_test+0x10: 0f 78 d8           vmread %rbx,%rax
+    libdis_test+0x13: 0f 78 18           vmread %rbx,(%rax)
+    libdis_test+0x16: 0f 79 d8           vmwrite %rax,%rbx
+    libdis_test+0x19: 0f 79 18           vmwrite (%rax),%rbx
+    libdis_test+0x1c: 0f 79 d8           vmwrite %rax,%rbx
+    libdis_test+0x1f: 0f 79 18           vmwrite (%rax),%rbx

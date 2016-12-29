@@ -1,0 +1,2 @@
+    libdis_test:     0f 01 c8           monitor 
+    libdis_test+0x3: 0f 01 c9           mwait  

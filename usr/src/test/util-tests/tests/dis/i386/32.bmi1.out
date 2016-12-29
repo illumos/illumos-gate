@@ -1,0 +1,21 @@
+    libdis_test:      c4 e2 60 f2 d0     andn   %eax,%ebx,%edx
+    libdis_test+0x5:  c4 e2 60 f2 10     andn   (%eax),%ebx,%edx
+    libdis_test+0xa:  c4 e2 60 f2 50 40  andn   0x40(%eax),%ebx,%edx
+    libdis_test+0x10: c4 e2 60 f7 d0     bextr  %ebx,%eax,%edx
+    libdis_test+0x15: c4 e2 60 f7 10     bextr  %ebx,(%eax),%edx
+    libdis_test+0x1a: c4 e2 60 f7 50 40  bextr  %ebx,0x40(%eax),%edx
+    libdis_test+0x20: c4 e2 68 f3 d8     blsi   %eax,%edx
+    libdis_test+0x25: c4 e2 68 f3 18     blsi   (%eax),%edx
+    libdis_test+0x2a: c4 e2 68 f3 58 40  blsi   0x40(%eax),%edx
+    libdis_test+0x30: c4 e2 68 f3 d0     blsmsk %eax,%edx
+    libdis_test+0x35: c4 e2 68 f3 10     blsmsk (%eax),%edx
+    libdis_test+0x3a: c4 e2 68 f3 50 40  blsmsk 0x40(%eax),%edx
+    libdis_test+0x40: c4 e2 68 f3 c8     blsr   %eax,%edx
+    libdis_test+0x45: c4 e2 68 f3 08     blsr   (%eax),%edx
+    libdis_test+0x4a: c4 e2 68 f3 48 40  blsr   0x40(%eax),%edx
+    libdis_test+0x50: 66 f3 0f bc d0     tzcnt  %ax,%dx
+    libdis_test+0x55: 66 f3 0f bc 10     tzcnt  (%eax),%dx
+    libdis_test+0x5a: 66 f3 0f bc 50 40  tzcnt  0x40(%eax),%dx
+    libdis_test+0x60: f3 0f bc d0        tzcnt  %eax,%edx
+    libdis_test+0x64: f3 0f bc 10        tzcnt  (%eax),%edx
+    libdis_test+0x68: f3 0f bc 50 40     tzcnt  0x40(%eax),%edx

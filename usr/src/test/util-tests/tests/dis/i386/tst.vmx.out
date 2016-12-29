@@ -1,0 +1,4 @@
+    libdis_test:     0f 01 c1           vmcall 
+    libdis_test+0x3: 0f 01 c2           vmlaunch 
+    libdis_test+0x6: 0f 01 c3           vmresume 
+    libdis_test+0x9: 0f 01 c4           vmxoff 

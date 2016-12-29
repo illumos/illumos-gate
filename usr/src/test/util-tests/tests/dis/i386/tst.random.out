@@ -1,0 +1,4 @@
+    libdis_test:     66 0f c7 f3        rdrand %bx
+    libdis_test+0x4: 66 0f c7 f3        rdrand %bx
+    libdis_test+0x8: 0f c7 fb           rdseed %ebx
+    libdis_test+0xb: 0f c7 fb           rdseed %ebx

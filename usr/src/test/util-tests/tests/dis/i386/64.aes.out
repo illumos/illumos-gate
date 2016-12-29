@@ -1,0 +1,12 @@
+    libdis_test:      66 0f 38 dc c8     aesenc %xmm0,%xmm1
+    libdis_test+0x5:  66 0f 38 dc 0b     aesenc (%rbx),%xmm1
+    libdis_test+0xa:  66 0f 38 dd c8     aesenclast %xmm0,%xmm1
+    libdis_test+0xf:  66 0f 38 dd 0b     aesenclast (%rbx),%xmm1
+    libdis_test+0x14: 66 0f 38 de c8     aesdec %xmm0,%xmm1
+    libdis_test+0x19: 66 0f 38 de 0b     aesdec (%rbx),%xmm1
+    libdis_test+0x1e: 66 0f 38 df c8     aesdeclast %xmm0,%xmm1
+    libdis_test+0x23: 66 0f 38 df 0b     aesdeclast (%rbx),%xmm1
+    libdis_test+0x28: 66 0f 38 db c8     aesimc %xmm0,%xmm1
+    libdis_test+0x2d: 66 0f 38 db 0b     aesimc (%rbx),%xmm1
+    libdis_test+0x32: 66 0f 3a df c8 42  aeskeygenassist $0x42,%xmm0,%xmm1
+    libdis_test+0x38: 66 0f 3a df 0b 42  aeskeygenassist $0x42,(%rbx),%xmm1
