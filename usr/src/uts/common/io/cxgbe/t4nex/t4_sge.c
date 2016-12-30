@@ -75,8 +75,8 @@ static int service_iq(struct sge_iq *iq, int budget);
 static inline void init_iq(struct sge_iq *iq, struct adapter *sc, int tmr_idx,
     int8_t pktc_idx, int qsize, uint8_t esize);
 static inline void init_fl(struct sge_fl *fl, uint16_t qsize);
-static inline void init_eq(struct sge_eq *eq, uint16_t eqtype, uint16_t qsize,
-    uint8_t tx_chan, uint16_t iqid);
+static inline void init_eq(struct adapter *sc, struct sge_eq *eq,
+    uint16_t eqtype, uint16_t qsize,uint8_t tx_chan, uint16_t iqid);
 static int alloc_iq_fl(struct port_info *pi, struct sge_iq *iq,
     struct sge_fl *fl, int intr_idx, int cong);
 static int free_iq_fl(struct port_info *pi, struct sge_iq *iq,
@@ -295,6 +295,8 @@ t4_sge_init(struct adapter *sc)
 	(void) t4_register_cpl_handler(sc, CPL_FW4_MSG, handle_fw_rpl);
 	(void) t4_register_cpl_handler(sc, CPL_FW6_MSG, handle_fw_rpl);
 	(void) t4_register_cpl_handler(sc, CPL_RX_PKT, t4_eth_rx);
+	(void) t4_register_fw_msg_handler(sc, FW6_TYPE_CMD_RPL,
+		    t4_handle_fw_rpl);
 }
 
 /*
@@ -368,7 +370,7 @@ first_vector(struct port_info *pi)
 		 * NIC queues exist and they'd better be taking direct
 		 * interrupts.
 		 */
-		KASSERT(!(sc->flags & INTR_FWD));
+		ASSERT(!(sc->flags & INTR_FWD));
 		rc += p->nrxq;
 #endif
 	}
@@ -528,7 +530,7 @@ t4_setup_port_queues(struct port_info *pi)
 		uint16_t iqid;
 
 		iqid = port_intr_iq(pi, j)->cntxt_id;
-		init_eq(&txq->eq, EQ_ETH, p->qsize_txq, pi->tx_chan, iqid);
+		init_eq(sc, &txq->eq, EQ_ETH, p->qsize_txq, pi->tx_chan, iqid);
 		rc = alloc_txq(pi, txq, i);
 		if (rc != 0)
 			goto done;
@@ -539,7 +541,7 @@ t4_setup_port_queues(struct port_info *pi)
 		uint16_t iqid;
 
 		iqid = port_intr_iq(pi, j)->cntxt_id;
-		init_eq(&ofld_txq->eq, EQ_OFLD, p->qsize_txq, pi->tx_chan,
+		init_eq(sc, &ofld_txq->eq, EQ_OFLD, p->qsize_txq, pi->tx_chan,
 		    iqid);
 		rc = alloc_wrq(sc, pi, ofld_txq, i);
 		if (rc != 0)
@@ -552,7 +554,7 @@ t4_setup_port_queues(struct port_info *pi)
 	 */
 	ctrlq = &sc->sge.ctrlq[pi->port_id];
 	iqid = port_intr_iq(pi, 0)->cntxt_id;
-	init_eq(&ctrlq->eq, EQ_CTRL, CTRL_EQ_QSIZE, pi->tx_chan, iqid);
+	init_eq(sc, &ctrlq->eq, EQ_CTRL, CTRL_EQ_QSIZE, pi->tx_chan, iqid);
 	rc = alloc_wrq(sc, pi, ctrlq, 0);
 
 done:
@@ -922,7 +924,7 @@ t4_wrq_tx_locked(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m0)
 /* Header of a tx LSO WR, before SGL of first packet (in flits) */
 #define	TXPKT_LSO_WR_HDR ((\
 	sizeof (struct fw_eth_tx_pkt_wr) + \
-	sizeof (struct cpl_tx_pkt_lso) + \
+	sizeof(struct cpl_tx_pkt_lso_core) + \
 	sizeof (struct cpl_tx_pkt_core)) / 8)
 
 mblk_t *
@@ -1070,12 +1072,22 @@ init_fl(struct sge_fl *fl, uint16_t qsize)
 }
 
 static inline void
-init_eq(struct sge_eq *eq, uint16_t eqtype, uint16_t qsize, uint8_t tx_chan,
-    uint16_t iqid)
+init_eq(struct adapter *sc, struct sge_eq *eq, uint16_t eqtype, uint16_t qsize,
+    uint8_t tx_chan, uint16_t iqid)
 {
+	struct sge *s = &sc->sge;
+	uint32_t r;
+
 	ASSERT(tx_chan < NCHAN);
 	ASSERT(eqtype <= EQ_TYPEMASK);
 
+	if (is_t5(sc->params.chip)) {
+		r = t4_read_reg(sc, A_SGE_EGRESS_QUEUES_PER_PAGE_PF);
+		r >>= S_QUEUESPERPAGEPF0 +
+		    (S_QUEUESPERPAGEPF1 - S_QUEUESPERPAGEPF0) * sc->pf;
+		s->s_qpp = r & M_QUEUESPERPAGEPF0;
+	}
+ 
 	eq->flags = eqtype & EQ_TYPEMASK;
 	eq->tx_chan = tx_chan;
 	eq->iqid = iqid;
@@ -1098,7 +1110,7 @@ static int
 alloc_iq_fl(struct port_info *pi, struct sge_iq *iq, struct sge_fl *fl,
     int intr_idx, int cong)
 {
-	int rc, cntxt_id;
+	int rc, i, cntxt_id;
 	size_t len;
 	struct fw_iq_cmd c;
 	struct adapter *sc = iq->adapter;
@@ -1217,6 +1229,31 @@ alloc_iq_fl(struct port_info *pi, struct sge_iq *iq, struct sge_fl *fl,
 		iq->flags |= IQ_HAS_FL;
 	}
 
+	if (is_t5(sc->params.chip) && cong >= 0) {
+		uint32_t param, val;
+
+		param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DMAQ) |
+			V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DMAQ_CONM_CTXT) |
+			V_FW_PARAMS_PARAM_YZ(iq->cntxt_id);
+		if (cong == 0)
+			val = 1 << 19;
+		else {
+			val = 2 << 19;
+			for (i = 0; i < 4; i++) {
+				if (cong & (1 << i))
+					val |= 1 << (i << 2);
+			}
+		}
+
+		rc = -t4_set_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
+		if (rc != 0) {
+			/* report error but carry on */
+			cxgb_printf(sc->dip, CE_WARN,
+			    "failed to set congestion manager context for "
+			    "ingress queue %d: %d", iq->cntxt_id, rc);
+		}
+	}
+
 	/* Enable IQ interrupts */
 	iq->state = IQS_IDLE;
 	t4_write_reg(sc, MYPF_REG(A_SGE_PF_GTS), V_SEINTARM(iq->intr_params) |
@@ -1314,7 +1351,7 @@ alloc_mgmtq(struct adapter *sc)
 	int rc;
 	struct sge_wrq *mgmtq = &sc->sge.mgmtq;
 
-	init_eq(&mgmtq->eq, EQ_CTRL, CTRL_EQ_QSIZE, sc->port[0]->tx_chan,
+	init_eq(sc, &mgmtq->eq, EQ_CTRL, CTRL_EQ_QSIZE, sc->port[0]->tx_chan,
 	    sc->sge.fwq.cntxt_id);
 	rc = alloc_wrq(sc, NULL, mgmtq, 0);
 	if (rc != 0) {
@@ -1536,6 +1573,7 @@ alloc_eq(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 	eq->spg = (void *)&eq->desc[eq->cap];
 	eq->avail = eq->cap - 1;	/* one less to avoid cidx = pidx */
 	eq->pidx = eq->cidx = 0;
+	eq->doorbells = sc->doorbells;
 
 	switch (eq->flags & EQ_TYPEMASK) {
 	case EQ_CTRL:
@@ -1556,6 +1594,25 @@ alloc_eq(struct adapter *sc, struct port_info *pi, struct sge_eq *eq)
 		panic("%s: invalid eq type %d.", __func__,
 		    eq->flags & EQ_TYPEMASK);
 	}
+
+	if (eq->doorbells &
+		(DOORBELL_UDB | DOORBELL_UDBWC | DOORBELL_WCWR)) {
+		uint32_t s_qpp = sc->sge.s_qpp;
+		uint32_t mask = (1 << s_qpp) - 1;
+		volatile uint8_t *udb;
+
+		udb = (volatile uint8_t *)sc->reg1p + UDBS_DB_OFFSET;
+		udb += (eq->cntxt_id >> s_qpp) << PAGE_SHIFT;   /* pg offset */
+		eq->udb_qid = eq->cntxt_id & mask;              /* id in page */
+		if (eq->udb_qid > PAGE_SIZE / UDBS_SEG_SIZE)
+			eq->doorbells &= ~DOORBELL_WCWR;
+		else {
+			udb += eq->udb_qid << UDBS_SEG_SHIFT;   /* seg offset */
+			eq->udb_qid = 0;
+		}
+		eq->udb = (volatile void *)udb;
+	}
+
 	if (rc != 0) {
 		cxgb_printf(sc->dip, CE_WARN,
 		    "failed to allocate egress queue(%d): %d",
@@ -2578,7 +2635,7 @@ write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
 	ctrl = sizeof (struct cpl_tx_pkt_core);
 	if (txinfo->flags & HW_LSO) {
 		nflits = TXPKT_LSO_WR_HDR;
-		ctrl += sizeof (struct cpl_tx_pkt_lso);
+		ctrl += sizeof(struct cpl_tx_pkt_lso_core);
 	} else
 		nflits = TXPKT_WR_HDR;
 	if (txinfo->nsegs > 0)
@@ -2602,7 +2659,7 @@ write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
 	wr->r3 = 0;
 
 	if (txinfo->flags & HW_LSO) {
-		struct cpl_tx_pkt_lso *lso = (void *)(wr + 1);
+		struct cpl_tx_pkt_lso_core *lso = (void *)(wr + 1);
 		char *p = (void *)m->b_rptr;
 		ctrl = V_LSO_OPCODE((u32)CPL_TX_PKT_LSO) | F_LSO_FIRST_SLICE |
 		    F_LSO_LAST_SLICE;
@@ -2625,7 +2682,10 @@ write_txpkt_wr(struct port_info *pi, struct sge_txq *txq, mblk_t *m,
 		lso->ipid_ofst = cpu_to_be16(0);
 		lso->mss = cpu_to_be16(txinfo->mss);
 		lso->seqno_offset = cpu_to_be32(0);
-		lso->len = cpu_to_be32(txinfo->len);
+		if (is_t4(pi->adapter->params.chip))
+			lso->len = cpu_to_be32(txinfo->len);
+		else
+			lso->len = cpu_to_be32(V_LSO_T5_XFER_SIZE(txinfo->len));
 
 		cpl = (void *)(lso + 1);
 
@@ -2800,6 +2860,12 @@ copy_to_txd(struct sge_eq *eq, caddr_t from, caddr_t *to, int len)
 static inline void
 ring_tx_db(struct adapter *sc, struct sge_eq *eq)
 {
+	int val, db_mode;
+	u_int db = eq->doorbells;
+
+	if (eq->pending > 1)
+		db &= ~DOORBELL_WCWR;
+
 	if (eq->pending > eq->pidx) {
 		int offset = eq->cap - (eq->pending - eq->pidx);
 
@@ -2820,9 +2886,50 @@ ring_tx_db(struct adapter *sc, struct sge_eq *eq)
 
 	membar_producer();
 
-	t4_write_reg(sc, MYPF_REG(A_SGE_PF_KDOORBELL),
-	    V_QID(eq->cntxt_id) | V_PIDX(eq->pending));
+	if (is_t4(sc->params.chip))
+		val = V_PIDX(eq->pending);
+	else
+		val = V_PIDX_T5(eq->pending);
 
+	db_mode = (1 << (ffs(db) - 1));
+	switch (db_mode) {
+		case DOORBELL_UDB:
+			*eq->udb = LE_32(V_QID(eq->udb_qid) | val);
+			break;
+
+		case DOORBELL_WCWR: 
+			{
+				volatile uint64_t *dst, *src;
+				int i;
+				/*
+				 * Queues whose 128B doorbell segment fits in
+				 * the page do not use relative qid
+				 * (udb_qid is always 0).  Only queues with
+				 * doorbell segments can do WCWR.
+				 */
+				ASSERT(eq->udb_qid == 0 && eq->pending == 1);
+
+				dst = (volatile void *)((uintptr_t)eq->udb +
+				    UDBS_WR_OFFSET - UDBS_DB_OFFSET);
+				i = eq->pidx ? eq->pidx - 1 : eq->cap - 1;
+				src = (void *)&eq->desc[i];
+				while (src != (void *)&eq->desc[i + 1])
+				        *dst++ = *src++;
+				membar_producer();
+				break;
+			}
+
+		case DOORBELL_UDBWC:
+			*eq->udb = LE_32(V_QID(eq->udb_qid) | val);
+			membar_producer();
+			break;
+
+		case DOORBELL_KDB:
+			t4_write_reg(sc, MYPF_REG(A_SGE_PF_KDOORBELL),
+			    V_QID(eq->cntxt_id) | val);
+			break;
+	}
+ 
 	eq->pending = 0;
 }
 
@@ -2964,6 +3071,7 @@ static inline void
 ring_fl_db(struct adapter *sc, struct sge_fl *fl)
 {
 	int desc_start, desc_last, ndesc;
+	uint32_t v;
 
 	ndesc = FL_HW_IDX(fl->pending);
 
@@ -2999,10 +3107,15 @@ ring_fl_db(struct adapter *sc, struct sge_fl *fl)
 		    ndesc * RX_FL_ESIZE, DDI_DMA_SYNC_FORDEV);
 	}
 
+	if (is_t4(sc->params.chip))
+		v = V_PIDX(ndesc);
+	else
+		v = V_PIDX_T5(ndesc) | F_DBTYPE;
+	v |= F_DBPRIO | V_QID(fl->cntxt_id) | V_PIDX(ndesc);
+
 	membar_producer();
 
-	t4_write_reg(sc, MYPF_REG(A_SGE_PF_KDOORBELL), F_DBPRIO |
-	    V_QID(fl->cntxt_id) | V_PIDX(ndesc));
+	t4_write_reg(sc, MYPF_REG(A_SGE_PF_KDOORBELL), v);
 
 	/*
 	 * Update pending count:
@@ -3015,14 +3128,18 @@ ring_fl_db(struct adapter *sc, struct sge_fl *fl)
 static int
 handle_fw_rpl(struct sge_iq *iq, const struct rss_header *rss, mblk_t *m)
 {
+	struct adapter *sc = iq->adapter;
 	const struct cpl_fw6_msg *cpl = (const void *)(rss + 1);
 
 	ASSERT(m == NULL);
 
-	if (cpl->type == FW6_TYPE_CMD_RPL)
-		(void) t4_handle_fw_rpl(iq->adapter, cpl->data);
+	if (cpl->type == FW_TYPE_RSSCPL || cpl->type == FW6_TYPE_RSSCPL) {
+		const struct rss_header *rss2;
 
-	return (0);
+		rss2 = (const struct rss_header *)&cpl->data[0];
+		return (sc->cpl_handler[rss2->opcode](iq, rss2, m));
+	}
+	return (sc->fw_msg_handler[cpl->type](sc, &cpl->data[0]));
 }
 
 int

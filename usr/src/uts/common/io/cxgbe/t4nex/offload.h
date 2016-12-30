@@ -91,8 +91,8 @@ struct tid_info {
 };
 
 struct t4_range {
-	unsigned int start;
-	unsigned int size;
+	u_int start;
+	u_int size;
 };
 
 struct t4_virt_res {		/* virtualized HW resources */
@@ -101,6 +101,7 @@ struct t4_virt_res {		/* virtualized HW resources */
 	struct t4_range stag;
 	struct t4_range rq;
 	struct t4_range pbl;
+	struct t4_range l2t;
 };
 
 struct adapter;

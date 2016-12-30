@@ -10,14 +10,14 @@
 #
 
 #
-# Copyright (c) 2013 by Chelsio Communications, Inc. All rights reserved.
+# Copyright (c) 2016 by Chelsio Communications, Inc. All rights reserved.
 #
 
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/cxgbe@$(PKGVERS)
 set name=pkg.description \
-    value="Chelsio Terminator 4 10 Gigabit Ethernet Adapter Driver"
-set name=pkg.summary value="Chelsio Terminator 4 10GE NIC Driver"
+    value="Chelsio T4/T5 10/40 Gigabit Ethernet Adapter Driver"
+set name=pkg.summary value="Chelsio T4/T5 10/40GE NIC Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
@@ -41,7 +41,52 @@ driver name=t4nex clone_perms="t4nex 0666 root sys" \
     alias=pciex1425,4409 \
     alias=pciex1425,440a \
     alias=pciex1425,440d \
-    alias=pciex1425,440e
+    alias=pciex1425,440e \
+    alias=pciex1425,5400 \
+    alias=pciex1425,5401 \
+    alias=pciex1425,5402 \
+    alias=pciex1425,5403 \
+    alias=pciex1425,5404 \
+    alias=pciex1425,5405 \
+    alias=pciex1425,5406 \
+    alias=pciex1425,5407 \
+    alias=pciex1425,5408 \
+    alias=pciex1425,5409 \
+    alias=pciex1425,540a \
+    alias=pciex1425,540b \
+    alias=pciex1425,540c \
+    alias=pciex1425,540d \
+    alias=pciex1425,540e \
+    alias=pciex1425,540f \
+    alias=pciex1425,5410 \
+    alias=pciex1425,5411 \
+    alias=pciex1425,5412 \
+    alias=pciex1425,5413 \
+    alias=pciex1425,5414 \
+    alias=pciex1425,5415 \
+    alias=pciex1425,5416 \
+    alias=pciex1425,5417 \
+    alias=pciex1425,5418 \
+    alias=pciex1425,5480 \
+    alias=pciex1425,5481 \
+    alias=pciex1425,5482 \
+    alias=pciex1425,5486 \
+    alias=pciex1425,5487 \
+    alias=pciex1425,5488 \
+    alias=pciex1425,5489 \
+    alias=pciex1425,5490 \
+    alias=pciex1425,5491 \
+    alias=pciex1425,5492 \
+    alias=pciex1425,5493 \
+    alias=pciex1425,5494 \
+    alias=pciex1425,5495 \
+    alias=pciex1425,5496 \
+    alias=pciex1425,5497 \
+    alias=pciex1425,5498 \
+    alias=pciex1425,5499 \
+    alias=pciex1425,549a \
+    alias=pciex1425,549b \
+    alias=pciex1425,549c
 file path=kernel/drv/$(ARCH64)/cxgbe group=sys
 file path=kernel/drv/$(ARCH64)/t4nex group=sys
 $(i386_ONLY)file path=kernel/drv/cxgbe group=sys
