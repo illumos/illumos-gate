@@ -10,47 +10,13 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zpool_upgrade
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zpool_upgrade
 
-PROGS = cleanup \
-	setup \
-	zpool_upgrade_001_pos \
-	zpool_upgrade_002_pos \
-	zpool_upgrade_003_pos \
-	zpool_upgrade_004_pos \
-	zpool_upgrade_005_neg \
-	zpool_upgrade_006_neg \
-	zpool_upgrade_007_pos \
-	zpool_upgrade_008_pos \
-	zpool_upgrade_009_neg
-
-FILES = zpool_upgrade.cfg \
-	zpool_upgrade.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-SUBDIRS = blockfiles
-
+include $(SRC)/test/zfs-tests/Makefile.com
 include $(SRC)/test/Makefile.com

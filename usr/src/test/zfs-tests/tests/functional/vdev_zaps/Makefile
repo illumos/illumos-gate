@@ -10,40 +10,12 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/vdev_zaps
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/vdev_zaps
 
-PROGS = setup \
-	vdev_zaps_001_pos \
-	vdev_zaps_002_pos \
-	vdev_zaps_003_pos \
-	vdev_zaps_004_pos \
-	vdev_zaps_005_pos \
-	vdev_zaps_006_pos \
-	vdev_zaps_007_pos \
-	cleanup
-
-FILES = vdev_zaps.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

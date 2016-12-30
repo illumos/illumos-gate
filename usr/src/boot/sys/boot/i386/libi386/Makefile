@@ -53,9 +53,6 @@ LIBZFS=  ../../zfs
 SRCS +=	$(LIBZFS)/devicename_stubs.c
 OBJS +=	devicename_stubs.o
 
-# Enable PXE TFTP or NFS support, not both.
-CFLAGS +=	-DLOADER_TFTP_SUPPORT
-
 BOOT_COMCONSOLE_PORT= 0x3f8
 CFLAGS +=	-DCOMPORT=${BOOT_COMCONSOLE_PORT}
 

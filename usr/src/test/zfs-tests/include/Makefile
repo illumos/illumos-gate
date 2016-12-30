@@ -10,35 +10,13 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/test/Makefile.com
-
 include $(SRC)/Makefile.master
 
-SRCS = commands.cfg \
-	default.cfg \
-	libtest.shlib \
-	math.shlib \
-	properties.shlib
-
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-INCLUDEDIR = $(ROOTOPTPKG)/include
+TARGETDIR = $(ROOTOPTPKG)/include
 
-CMDS = $(SRCS:%=$(INCLUDEDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all: $(SRCS)
-
-install: $(CMDS)
-
-clean lint clobber:
-
-$(CMDS): $(INCLUDEDIR) $(SRCS)
-
-$(INCLUDEDIR):
-	$(INS.dir)
-
-$(INCLUDEDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

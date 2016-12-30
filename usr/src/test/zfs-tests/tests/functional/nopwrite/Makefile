@@ -10,40 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/nopwrite
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/nopwrite
 
-PROGS = cleanup \
-	nopwrite.shlib \
-	nopwrite_copies \
-	nopwrite_mtime \
-	nopwrite_negative \
-	nopwrite_promoted_clone \
-	nopwrite_recsize \
-	nopwrite_sync \
-	nopwrite_varying_compression \
-	nopwrite_volume \
-	setup
-
-CMDS = $(PROGS:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%.shlib: %.shlib
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

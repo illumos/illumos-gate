@@ -27,8 +27,6 @@
 #ifndef _SYS_INTTYPES_H
 #define	_SYS_INTTYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This header, <sys/inttypes.h>, contains (through nested inclusion) the
  * vast majority of the facilities specified for <inttypes.h> as defined

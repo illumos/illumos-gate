@@ -10,46 +10,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/xattr
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/xattr
 
-PROGS = cleanup \
-	setup \
-	xattr_001_pos \
-	xattr_002_neg \
-	xattr_003_neg \
-	xattr_004_pos \
-	xattr_005_pos \
-	xattr_006_pos \
-	xattr_007_neg \
-	xattr_008_pos \
-	xattr_009_neg \
-	xattr_010_neg \
-	xattr_011_pos \
-	xattr_012_pos \
-	xattr_013_pos \
-
-FILES = xattr_common.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

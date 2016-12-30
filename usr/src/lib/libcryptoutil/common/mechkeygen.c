@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2016 Jason King.  All rights reserved.
  */
 
 #include <cryptoutil.h>
@@ -52,6 +53,8 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 	case CKM_RIPEMD128_RSA_PKCS:
 	case CKM_RIPEMD160_RSA_PKCS:
 	case CKM_RSA_PKCS_OAEP:
+	case CKM_RSA_PKCS_OAEP_TPM_1_1:
+	case CKM_RSA_PKCS_TPM_1_1:
 		*gen_mech = CKM_RSA_PKCS_KEY_PAIR_GEN;
 		break;
 
@@ -73,11 +76,23 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 	case CKM_DSA_KEY_PAIR_GEN:
 	case CKM_DSA:
 	case CKM_DSA_SHA1:
+	case CKM_DSA_SHA224:
+	case CKM_DSA_SHA256:
+	case CKM_DSA_SHA384:
+	case CKM_DSA_SHA512:
 		*gen_mech = CKM_DSA_KEY_PAIR_GEN;
 		break;
 
 	case CKM_DSA_PARAMETER_GEN:
 		*gen_mech = CKM_DSA_PARAMETER_GEN;
+		break;
+
+	case CKM_DSA_PROBABLISTIC_PARAMETER_GEN:
+		*gen_mech = CKM_DSA_PROBABLISTIC_PARAMETER_GEN;
+		break;
+
+	case CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN:
+		*gen_mech = CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN;
 		break;
 
 	case CKM_FORTEZZA_TIMESTAMP:
@@ -91,6 +106,10 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 
 	case CKM_ECDSA:
 	case CKM_ECDSA_SHA1:
+	case CKM_ECDSA_SHA224:
+	case CKM_ECDSA_SHA256:
+	case CKM_ECDSA_SHA384:
+	case CKM_ECDSA_SHA512:
 	case CKM_EC_KEY_PAIR_GEN:
 	case CKM_ECDH1_DERIVE:
 	case CKM_ECDH1_COFACTOR_DERIVE:
@@ -132,10 +151,19 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 	case CKM_SHA512:
 	case CKM_SHA512_HMAC:
 	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_224:
+	case CKM_SHA512_224_HMAC:
+	case CKM_SHA512_224_HMAC_GENERAL:
+	case CKM_SHA512_224_KEY_DERIVATION:
+	case CKM_SHA512_256:
+	case CKM_SHA512_256_HMAC:
+	case CKM_SHA512_256_HMAC_GENERAL:
+	case CKM_SHA512_256_KEY_DERIVATION:
 	case CKM_GENERIC_SECRET_KEY_GEN:
 	case CKM_FASTHASH:
 	case CKM_PKCS5_PBKD2:
 	case CKM_PBA_SHA1_WITH_SHA1_HMAC:
+	case CKM_CMS_SIG:
 		*gen_mech = CKM_GENERIC_SECRET_KEY_GEN;
 		break;
 
@@ -237,7 +265,14 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 	case CKM_PBE_SHA1_DES3_EDE_CBC:
 	case CKM_DES3_ECB_ENCRYPT_DATA:
 	case CKM_DES3_CBC_ENCRYPT_DATA:
+	case CKM_DES3_CMAC:
+	case CKM_DES3_CMAC_GENERAL:
 		*gen_mech = CKM_DES3_KEY_GEN;
+		break;
+
+	case CKM_ACTI:
+	case CKM_ACTI_KEY_GEN:
+		*gen_mech = CKM_ACTI_KEY_GEN;
 		break;
 
 	case CKM_CAST_KEY_GEN:
@@ -260,15 +295,16 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 		*gen_mech = CKM_CAST3_KEY_GEN;
 		break;
 
-	case CKM_CAST128_KEY_GEN:
-	case CKM_CAST128_ECB:
-	case CKM_CAST128_CBC:
-	case CKM_CAST128_MAC:
-	case CKM_CAST128_MAC_GENERAL:
-	case CKM_CAST128_CBC_PAD:
-	case CKM_PBE_MD5_CAST128_CBC:
-	case CKM_PBE_SHA1_CAST128_CBC:
-		*gen_mech = CKM_CAST128_KEY_GEN;
+	/* CAST5 and CAST128 are the same alg */
+	case CKM_CAST5_CBC:
+	case CKM_CAST5_CBC_PAD:
+	case CKM_CAST5_ECB:
+	case CKM_CAST5_KEY_GEN:
+	case CKM_CAST5_MAC:
+	case CKM_CAST5_MAC_GENERAL:
+	case CKM_PBE_MD5_CAST5_CBC:
+	case CKM_PBE_SHA1_CAST5_CBC:
+		*gen_mech = CKM_CAST5_KEY_GEN;
 		break;
 
 	case CKM_RC5_KEY_GEN:
@@ -339,17 +375,94 @@ pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type, CK_MECHANISM_TYPE *gen_mech)
 	case CKM_AES_CBC_PAD:
 	case CKM_AES_ECB_ENCRYPT_DATA:
 	case CKM_AES_CBC_ENCRYPT_DATA:
+	case CKM_AES_CCM:
+	case CKM_AES_CFB1:
+	case CKM_AES_CFB128:
+	case CKM_AES_CFB64:
+	case CKM_AES_CFB8:
+	case CKM_AES_CMAC:
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CTR:
+	case CKM_AES_CTS:
+	case CKM_AES_GCM:
+	case CKM_AES_GMAC:
+	case CKM_AES_KEY_WRAP:
+	case CKM_AES_KEY_WRAP_PAD:
+	case CKM_AES_OFB:
+	case CKM_AES_XCBC_MAC:
+	case CKM_AES_XCBC_MAC_96:
 		*gen_mech = CKM_AES_KEY_GEN;
 		break;
 
 	case CKM_BLOWFISH_KEY_GEN:
 	case CKM_BLOWFISH_CBC:
+	case CKM_BLOWFISH_CBC_PAD:
 		*gen_mech = CKM_BLOWFISH_KEY_GEN;
 		break;
 
 	case CKM_TWOFISH_KEY_GEN:
 	case CKM_TWOFISH_CBC:
 		*gen_mech = CKM_TWOFISH_KEY_GEN;
+		break;
+
+	case CKM_CAMELLIA_CBC:
+	case CKM_CAMELLIA_CBC_ENCRYPT_DATA:
+	case CKM_CAMELLIA_CBC_PAD:
+	case CKM_CAMELLIA_CTR:
+	case CKM_CAMELLIA_ECB:
+	case CKM_CAMELLIA_ECB_ENCRYPT_DATA:
+	case CKM_CAMELLIA_KEY_GEN:
+	case CKM_CAMELLIA_MAC:
+	case CKM_CAMELLIA_MAC_GENERAL:
+		*gen_mech = CKM_CAMELLIA_KEY_GEN;
+		break;
+
+	case CKM_ARIA_CBC:
+	case CKM_ARIA_CBC_ENCRYPT_DATA:
+	case CKM_ARIA_CBC_PAD:
+	case CKM_ARIA_ECB:
+	case CKM_ARIA_ECB_ENCRYPT_DATA:
+	case CKM_ARIA_KEY_GEN:
+	case CKM_ARIA_MAC:
+	case CKM_ARIA_MAC_GENERAL:
+		*gen_mech = CKM_ARIA_KEY_GEN;
+		break;
+
+	case CKM_GOST28147:
+	case CKM_GOST28147_ECB:
+	case CKM_GOST28147_KEY_GEN:
+	case CKM_GOST28147_KEY_WRAP:
+	case CKM_GOST28147_MAC:
+		*gen_mech = CKM_GOST28147_KEY_GEN;
+		break;
+
+	case CKM_GOSTR3410:
+	case CKM_GOSTR3410_DERIVE:
+	case CKM_GOSTR3410_KEY_PAIR_GEN:
+	case CKM_GOSTR3410_KEY_WRAP:
+	case CKM_GOSTR3410_WITH_GOSTR3411:
+		*gen_mech = CKM_GOSTR3410_KEY_PAIR_GEN;
+		break;
+
+	case CKM_HOTP:
+	case CKM_HOTP_KEY_GEN:
+		*gen_mech = CKM_HOTP_KEY_GEN;
+		break;
+
+	case CKM_SECURID:
+	case CKM_SECURID_KEY_GEN:
+		*gen_mech = CKM_SECURID_KEY_GEN;
+		break;
+
+	case CKM_SEED_CBC:
+	case CKM_SEED_CBC_ENCRYPT_DATA:
+	case CKM_SEED_CBC_PAD:
+	case CKM_SEED_ECB:
+	case CKM_SEED_ECB_ENCRYPT_DATA:
+	case CKM_SEED_KEY_GEN:
+	case CKM_SEED_MAC:
+	case CKM_SEED_MAC_GENERAL:
+		*gen_mech = CKM_SEED_KEY_GEN;
 		break;
 
 	default:

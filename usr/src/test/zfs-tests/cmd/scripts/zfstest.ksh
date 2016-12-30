@@ -26,7 +26,7 @@ runner="/opt/test-runner/bin/run"
 auto_detect=false
 
 if [[ -z "$TESTFAIL_CALLBACKS" ]] ; then
-	export TESTFAIL_CALLBACKS="$STF_SUITE/callbacks/zfs_dbgmsg.ksh"
+	export TESTFAIL_CALLBACKS="$STF_SUITE/callbacks/zfs_dbgmsg"
 fi
 
 function fail

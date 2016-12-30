@@ -10,27 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-ROOTBIN = $(ROOTOPTPKG)/bin
+TARGETDIR = $(ROOTOPTPKG)/bin
 
-PROGS = zfstest
-
-CMDS = $(PROGS:%=$(ROOTBIN)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(ROOTBIN)
-
-$(ROOTBIN):
-	$(INS.dir)
-
-$(ROOTBIN)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

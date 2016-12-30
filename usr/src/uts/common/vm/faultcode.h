@@ -39,8 +39,6 @@
 #ifndef	_VM_FAULTCODE_H
 #define	_VM_FAULTCODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

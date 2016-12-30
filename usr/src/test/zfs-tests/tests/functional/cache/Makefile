@@ -10,45 +10,12 @@
 #
 
 #
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cache
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cache
 
-PROGS = cleanup \
-	setup \
-	cache_001_pos \
-	cache_002_pos \
-	cache_003_pos \
-	cache_004_neg \
-	cache_005_neg \
-	cache_006_pos \
-	cache_007_neg \
-	cache_008_neg \
-	cache_009_pos \
-	cache_010_neg \
-	cache_011_pos
-
-FILES = cache.cfg \
-	cache.kshlib
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com

@@ -10,44 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_share
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/cli_root/zfs_share
 
-PROGS = cleanup \
-	setup \
-	zfs_share_001_pos \
-	zfs_share_002_pos \
-	zfs_share_003_pos \
-	zfs_share_004_pos \
-	zfs_share_005_pos \
-	zfs_share_006_pos \
-	zfs_share_007_neg \
-	zfs_share_008_neg \
-	zfs_share_009_neg \
-	zfs_share_010_neg \
-	zfs_share_011_pos
-
-FILES = zfs_share.cfg
-
-CMDS = $(PROGS:%=$(TESTDIR)/%) $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
-
-$(TESTDIR)/%: %.ksh
-	$(INS.rename)
+include $(SRC)/test/zfs-tests/Makefile.com

@@ -10,32 +10,12 @@
 #
 
 #
-# Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
-TESTDIR = $(ROOTOPTPKG)/tests/perf/fio
+TARGETDIR = $(ROOTOPTPKG)/tests/perf/fio
 
-FILES = mkfiles.fio \
-	random_reads.fio \
-	random_readwrite.fio \
-	random_writes.fio \
-	sequential_reads.fio \
-	sequential_writes.fio
-
-CMDS = $(FILES:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0444
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(TESTDIR)
-
-$(TESTDIR):
-	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
+include $(SRC)/test/zfs-tests/Makefile.com
