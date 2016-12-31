@@ -114,7 +114,7 @@ foreach $a (@FILES) {
 	dofile($a);
 }
 
-foreach my $lic (keys %LICENSE) {
+foreach my $lic (sort keys %LICENSE) {
 	my @files = @{$LICENSE{$lic}};
 	print "\nThe following files from the C library:\n";
 	foreach my $f (@files) {
