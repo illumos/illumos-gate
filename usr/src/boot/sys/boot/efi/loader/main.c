@@ -47,10 +47,7 @@
 
 #include "loader_efi.h"
 
-extern char bootprog_name[];
-extern char bootprog_rev[];
-extern char bootprog_date[];
-extern char bootprog_maker[];
+extern char bootprog_info[];
 
 struct arch_switch archsw;	/* MI/MD interface boundary */
 
@@ -390,9 +387,7 @@ main(int argc, CHAR16 *argv[])
 	printf(" (rev %d.%02d)\n", ST->FirmwareRevision >> 16,
 	    ST->FirmwareRevision & 0xffff);
 
-	printf("\n");
-	printf("%s, Revision %s\n", bootprog_name, bootprog_rev);
-	printf("(%s, %s)\n", bootprog_maker, bootprog_date);
+	printf("\n%s", bootprog_info);
 
 	/*
 	 * Disable the watchdog timer. By default the boot manager sets

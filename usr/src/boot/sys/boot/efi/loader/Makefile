@@ -15,6 +15,7 @@
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/boot/Makefile.version
 
 CC=		$(GCC_ROOT)/bin/gcc
 LD=		$(GNU_ROOT)/bin/gld
@@ -100,8 +101,8 @@ all: loader.efi
 
 install: all $(ROOTBOOTFILES)
 
-vers.c:	../../common/newvers.sh ../../efi/loader/version
-	$(SH) ../../common/newvers.sh version ${NEWVERSWHAT}
+vers.c:	../../common/newvers.sh $(SRC)/boot/Makefile.version
+	$(SH) ../../common/newvers.sh ${LOADER_VERSION} ${NEWVERSWHAT}
 
 EFI_TARGET=	pei-x86-64
 
