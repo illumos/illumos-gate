@@ -552,7 +552,7 @@ nfs4_get_open_stateid(rnode4_t *rp, cred_t *cr, mntinfo4_t *mi, stateid4 *sid)
  */
 stateid4
 nfs4_get_w_stateid(cred_t *cr, rnode4_t *rp, pid_t pid, mntinfo4_t *mi,
-	nfs_opnum4 op, nfs4_stateid_types_t *sid_tp)
+    nfs_opnum4 op, nfs4_stateid_types_t *sid_tp)
 {
 	stateid4 sid;
 
@@ -596,7 +596,7 @@ nfs4_get_w_stateid(cred_t *cr, rnode4_t *rp, pid_t pid, mntinfo4_t *mi,
  */
 stateid4
 nfs4_get_stateid(cred_t *cr, rnode4_t *rp, pid_t pid, mntinfo4_t *mi,
-	nfs_opnum4 op, nfs4_stateid_types_t *sid_tp, bool_t async_read)
+    nfs_opnum4 op, nfs4_stateid_types_t *sid_tp, bool_t async_read)
 {
 	stateid4 sid;
 
@@ -780,7 +780,7 @@ create_open_stream(nfs4_open_owner_t *oop, rnode4_t *rp)
  */
 nfs4_open_stream_t *
 find_or_create_open_stream(nfs4_open_owner_t *oop, rnode4_t *rp,
-	int *created_osp)
+    int *created_osp)
 {
 	nfs4_open_stream_t *osp;
 
@@ -1000,11 +1000,11 @@ int bypass_otw[2];
 /*
  * Checks to see if the OPEN OTW is necessary that is, if it's already
  * been opened with the same access and deny bits we are now asking for.
- * Note, this assumes that *vpp is a rnode.
+ * Note, this assumes that *vp is a rnode.
  */
 int
 nfs4_is_otw_open_necessary(nfs4_open_owner_t *oop, int flag, vnode_t *vp,
-	int just_been_created, int *errorp, int acc, nfs4_recov_state_t *rsp)
+    int just_been_created, int *errorp, int acc, nfs4_recov_state_t *rsp)
 {
 	rnode4_t *rp;
 	nfs4_open_stream_t *osp;
@@ -1181,7 +1181,7 @@ get_dtype(rnode4_t *rp)
 
 void
 nfs4_setup_lock_args(nfs4_lock_owner_t *lop, nfs4_open_owner_t *oop,
-	nfs4_open_stream_t *osp, clientid4 clientid, locker4 *locker)
+    nfs4_open_stream_t *osp, clientid4 clientid, locker4 *locker)
 {
 	ASSERT(lop->lo_flags & NFS4_LOCK_SEQID_INUSE);
 	if (lop->lo_just_created == NFS4_JUST_CREATED) {
@@ -1311,8 +1311,8 @@ nfs4_end_lock_seqid_sync(nfs4_lock_owner_t *lop)
  */
 nfsstat4
 nfs4_find_or_create_lock_owner(pid_t pid, rnode4_t *rp, cred_t *cr,
-	nfs4_open_owner_t **oopp, nfs4_open_stream_t **ospp,
-	nfs4_lock_owner_t **lopp)
+    nfs4_open_owner_t **oopp, nfs4_open_stream_t **ospp,
+    nfs4_lock_owner_t **lopp)
 {
 	nfs4_lock_owner_t *lop, *next_lop;
 	mntinfo4_t *mi;
@@ -1445,7 +1445,7 @@ failed:
  */
 static nfs4_open_owner_t *
 find_freed_open_owner(cred_t *cr, nfs4_oo_hash_bucket_t *bucketp,
-	mntinfo4_t *mi)
+    mntinfo4_t *mi)
 {
 	nfs4_open_owner_t		*foop;
 
@@ -1538,7 +1538,7 @@ nfs4_get_open_seqid(nfs4_open_owner_t *oop)
  */
 void
 nfs4_set_open_seqid(seqid4 seqid, nfs4_open_owner_t *oop,
-	nfs4_tag_type_t tag_type)
+    nfs4_tag_type_t tag_type)
 {
 	ASSERT(oop->oo_seqid_inuse);
 	oop->oo_seqid = seqid;
@@ -1608,7 +1608,7 @@ nfs4_get_otw_cred(cred_t *cr, mntinfo4_t *mi, nfs4_open_owner_t *provided_oop)
  */
 cred_t *
 nfs4_get_otw_cred_by_osp(rnode4_t *rp, cred_t *cr,
-	nfs4_open_stream_t **osp, bool_t *first_time, bool_t *last_time)
+    nfs4_open_stream_t **osp, bool_t *first_time, bool_t *last_time)
 {
 	nfs4_open_stream_t *next_osp = NULL;
 	cred_t *ret_cr;
@@ -1758,8 +1758,8 @@ nfs4_create_bseqid_entry(nfs4_open_owner_t *oop, nfs4_lock_owner_t *lop,
 
 void
 nfs4open_dg_save_lost_rqst(int error, nfs4_lost_rqst_t *lost_rqstp,
-	nfs4_open_owner_t *oop, nfs4_open_stream_t *osp, cred_t *cr,
-	vnode_t *vp, int access_close, int deny_close)
+    nfs4_open_owner_t *oop, nfs4_open_stream_t *osp, cred_t *cr,
+    vnode_t *vp, int access_close, int deny_close)
 {
 	lost_rqstp->lr_putfirst = FALSE;
 
@@ -1796,8 +1796,8 @@ nfs4open_dg_save_lost_rqst(int error, nfs4_lost_rqst_t *lost_rqstp,
  */
 void
 nfs4_open_downgrade(int access_close, int deny_close, nfs4_open_owner_t *oop,
-	nfs4_open_stream_t *osp, vnode_t *vp, cred_t *cr, nfs4_lost_rqst_t *lrp,
-	nfs4_error_t *ep, cred_t **recov_credpp, seqid4 *recov_seqidp)
+    nfs4_open_stream_t *osp, vnode_t *vp, cred_t *cr, nfs4_lost_rqst_t *lrp,
+    nfs4_error_t *ep, cred_t **recov_credpp, seqid4 *recov_seqidp)
 {
 	mntinfo4_t		*mi;
 	int			downgrade_acc, downgrade_deny;
@@ -2012,7 +2012,7 @@ no_args_out:
  */
 void
 nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
-	nfs4_error_t *ep)
+    nfs4_error_t *ep)
 {
 	COMPOUND4args_clnt	args;
 	COMPOUND4res_clnt	res;
