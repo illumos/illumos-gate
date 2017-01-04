@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -1242,8 +1242,7 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	 * Before we remove the link from its current zone, make sure that
 	 * there isn't a link with the same name in the destination zone.
 	 */
-	if (zoneid != GLOBAL_ZONEID &&
-	    link_by_name(linkp->ll_link, newzoneid) != NULL) {
+	if (link_by_name(linkp->ll_link, newzoneid) != NULL) {
 		err = EEXIST;
 		goto done;
 	}
