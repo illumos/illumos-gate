@@ -414,8 +414,6 @@ static const sl_arch_layout_t layout_sparcv9 = {
 };
 
 
-
-
 const sl_arch_layout_t *
 struct_layout_sparcv9(void)
 {
