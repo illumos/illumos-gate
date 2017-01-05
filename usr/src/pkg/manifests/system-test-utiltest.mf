@@ -24,12 +24,84 @@ dir path=opt/util-tests
 dir path=opt/util-tests/bin
 dir path=opt/util-tests/runfiles
 dir path=opt/util-tests/tests
+dir path=opt/util-tests/tests/dis
+dir path=opt/util-tests/tests/dis/i386
+dir path=opt/util-tests/tests/dis/sparc
 dir path=opt/util-tests/tests/libnvpair_json
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
 file path=opt/util-tests/runfiles/default.run mode=0444
 file path=opt/util-tests/tests/allowed-ips mode=0555
+file path=opt/util-tests/tests/dis/distest mode=0555
+file path=opt/util-tests/tests/dis/i386/32.adx.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.adx.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.aes.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.aes.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.bmi1.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.bmi1.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.bmi2.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.bmi2.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-pd.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-pd.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-ps.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-ps.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-sd.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-sd.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-ss.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.fma-ss.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.lzcnt.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.lzcnt.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.popcnt.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.popcnt.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.sse-4.2.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.sse-4.2.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.ssse3.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.ssse3.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.xsave.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.xsave.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.adx.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.adx.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.aes.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.aes.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.bmi1.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.bmi1.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.bmi2.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.bmi2.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.ept.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.ept.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-pd.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-pd.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-ps.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-ps.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-sd.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-sd.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-ss.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.fma-ss.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.lzcnt.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.lzcnt.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.popcnt.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.popcnt.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.random.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.random.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.sse-4.2.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.sse-4.2.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.ssse3.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.ssse3.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.vmx.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.vmx.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.xsave.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.xsave.s mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.mwait.out mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.mwait.s mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.random.out mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.random.s mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.smap.out mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.smap.s mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.vmx.out mode=0555
+file path=opt/util-tests/tests/dis/i386/tst.vmx.s mode=0555
+file path=opt/util-tests/tests/dis/sparc/tst.regs.out mode=0555
+file path=opt/util-tests/tests/dis/sparc/tst.regs.s mode=0555
 file path=opt/util-tests/tests/iconv_test mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_00_blank mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_01_boolean mode=0555
