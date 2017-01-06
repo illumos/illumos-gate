@@ -369,6 +369,7 @@ print_be_nodes(const char *be_name, boolean_t parsable, struct hdr_info *hdr,
 		const char *datetime_fmt = "%F %R";
 		const char *name = cur_be->be_node_name;
 		const char *mntpt = cur_be->be_mntpt;
+		const char *uuid_str = cur_be->be_uuid_str;
 		be_snapshot_list_t *snap = NULL;
 		uint64_t used = cur_be->be_space_used;
 		time_t creation = cur_be->be_node_creation;
@@ -403,7 +404,7 @@ print_be_nodes(const char *be_name, boolean_t parsable, struct hdr_info *hdr,
 		if (parsable)
 			(void) printf("%s;%s;%s;%s;%llu;%s;%ld\n",
 			    name,
-			    cur_be->be_uuid_str,
+			    (uuid_str != NULL ? uuid_str: ""),
 			    active,
 			    (cur_be->be_mounted ? mntpt: ""),
 			    used,
