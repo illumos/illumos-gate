@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -163,6 +163,72 @@ lxs_getattrs(zone_dochandle_t zdh, char **krelease)
 		lxs_err(gettext("error accessing zone configuration"));
 }
 
+/*
+ * Attempt to lookup the "tty" gid from within the zone's /etc/group file.
+ * The gid is used to emulate existing Linux udev behavior for setting the gid
+ * on a pty. If we cannot lookup the gid for some reason, we still allow
+ * the zone to boot.
+ *
+ * Because we're reading the lx zone's /etc/group file, we have to parse it
+ * ourselves, but this is simple since we only need the gid.
+ */
+static void
+lxs_set_ttygid(zoneid_t zoneid)
+{
+	char	buf[MAXPATHLEN];
+	FILE	*fp;
+	gid_t	tty_gid = 0;
+
+	if (snprintf(buf, sizeof (buf), "%s/root/etc/group", zoneroot) >=
+	    sizeof (buf))
+		return;
+
+	if ((fp = fopen(buf, "r")) == NULL)
+		return;
+
+	/*
+	 * Look for the "tty" line and get the gid. Note that this loop will
+	 * properly handle a long line that won't fit into buf on a single
+	 * fgets. The subsequent fgets will consume more of the line but we
+	 * continue on through that. In practice this is unlikely to occur.
+	 */
+	while (fgets(buf, sizeof (buf), fp) != NULL) {
+		char *p, *p_id;
+		long val;
+
+		/* group name */
+		if ((p = strchr(buf, ':')) == NULL)
+			continue;
+		*p = '\0';
+		if (strcmp(buf, "tty") != 0)
+			continue;
+
+		/* found tty entry, skip the "x" field */
+		if ((p = strchr(p + 1, ':')) == NULL)
+			goto done;
+		/* gid field */
+		p_id = p + 1;
+		if ((p = strchr(p_id, ':')) == NULL)
+			goto done;
+		*p = '\0';
+
+		errno = 0;
+		val = strtol(p_id, &p, 10);
+		/* Perform simple validation on the gid */
+		if (errno != 0 || *p != '\0' || val > MAXUID || val < 0)
+			goto done;
+		tty_gid = (gid_t)val;
+		break;
+	}
+
+	if (tty_gid != 0)
+		(void) zone_setattr(zoneid, LX_ATTR_TTY_GID, &tty_gid,
+		    sizeof (tty_gid));
+
+done:
+	fclose(fp);
+}
+
 static int
 lxs_boot()
 {
@@ -204,6 +270,8 @@ lxs_boot()
 		    strlen(krelease)) < 0)
 			lxs_err(gettext("unable to set kernel version"));
 	}
+
+	lxs_set_ttygid(zoneid);
 
 	return (0);
 }

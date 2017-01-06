@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _LX_BRAND_H
@@ -162,6 +162,7 @@ typedef enum lx_ptrace_options {
 
 #define	LX_ATTR_KERN_RELEASE	ZONE_ATTR_BRAND_ATTRS
 #define	LX_ATTR_KERN_VERSION	(ZONE_ATTR_BRAND_ATTRS + 1)
+#define	LX_ATTR_TTY_GID		(ZONE_ATTR_BRAND_ATTRS + 2)
 
 /*
  * Aux vector containing phdr of Linux executable and ehdr of interpreter
@@ -606,6 +607,7 @@ typedef struct lx_zone_data {
 	char lxzd_kernel_version[LX_KERN_VERSION_MAX];
 	ksocket_t lxzd_ioctl_sock;
 	char lxzd_bootid[LX_BOOTID_LEN];	/* procfs boot_id */
+	gid_t lxzd_ttygrp;			/* tty gid for pty chown */
 	vfs_t *lxzd_cgroup;			/* cgroup for this zone */
 	list_t *lxzd_vdisks;			/* virtual disks (zvols) */
 	dev_t lxzd_zfs_dev;			/* major num for zfs */

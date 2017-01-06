@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016, Joyent, Inc. All rights reserved.
+ * Copyright 2017, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -405,6 +405,19 @@ lx_setattr(zone_t *zone, int attr, void *ubuf, size_t ubufsz)
 		mutex_enter(&lxzd->lxzd_lock);
 		(void) strlcpy(lxzd->lxzd_kernel_version, buf,
 		    LX_KERN_VERSION_MAX);
+		mutex_exit(&lxzd->lxzd_lock);
+		return (0);
+	}
+	case LX_ATTR_TTY_GID: {
+		gid_t	gid;
+		if (ubufsz != sizeof (gid)) {
+			return (ERANGE);
+		}
+		if (copyin(ubuf, &gid, ubufsz) != 0) {
+			return (EFAULT);
+		}
+		mutex_enter(&lxzd->lxzd_lock);
+		lxzd->lxzd_ttygrp = gid;
 		mutex_exit(&lxzd->lxzd_lock);
 		return (0);
 	}
