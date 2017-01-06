@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_USB_HIDVAR_H
@@ -33,6 +33,7 @@ extern "C" {
 #endif
 
 #include <sys/usb/usba/usbai_private.h>
+#include <sys/usb/usba/usba_ugen.h>
 
 /*
  * HID : This header file contains the internal structures
@@ -222,6 +223,8 @@ typedef struct hid_state {
 	queue_t			*hid_inuse_rq;
 	int			hid_internal_flag;	/* see below */
 	int			hid_external_flag;	/* see below */
+
+	usb_ugen_hdl_t		hid_ugen_hdl;		/* ugen support */
 } hid_state_t;
 
 /* warlock directives, stable data */

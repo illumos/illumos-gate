@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -139,6 +139,12 @@ static int	hid_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int	hid_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	hid_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	hid_power(dev_info_t *, int, int);
+/* These are to enable ugen support: */
+static int	hid_chropen(dev_t *, int, int, cred_t *);
+static int	hid_chrclose(dev_t, int, int, cred_t *);
+static int	hid_read(dev_t, struct uio *, cred_t *);
+static int	hid_write(dev_t, struct uio *, cred_t *);
+static int	hid_poll(dev_t, short, int, short *, struct pollhead **);
 
 /*
  * Warlock is not aware of the automatic locking mechanisms for
@@ -198,18 +204,18 @@ struct streamtab hid_streamtab = {
 };
 
 struct cb_ops hid_cb_ops = {
-	nulldev,		/* open  */
-	nulldev,		/* close */
+	hid_chropen,		/* open  */
+	hid_chrclose,		/* close */
 	nulldev,		/* strategy */
 	nulldev,		/* print */
 	nulldev,		/* dump */
-	nulldev,		/* read */
-	nulldev,		/* write */
+	hid_read,		/* read */
+	hid_write,		/* write */
 	nulldev,		/* ioctl */
 	nulldev,		/* devmap */
 	nulldev,		/* mmap */
 	nulldev,		/* segmap */
-	nochpoll,		/* poll */
+	hid_poll,		/* poll */
 	ddi_prop_op,		/* cb_prop_op */
 	&hid_streamtab,		/* streamtab  */
 	D_MP | D_MTPERQ
@@ -349,6 +355,7 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usb_alt_if_data_t	*altif_data;
 	char			minor_name[HID_MINOR_NAME_LEN];
 	usb_ep_data_t		*ep_data;
+	usb_ugen_info_t 	usb_ugen_info;
 
 	switch (cmd) {
 		case DDI_ATTACH:
@@ -489,6 +496,28 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* we copied the descriptors we need, free the dev_data */
 	usb_free_dev_data(dip, dev_data);
 	hidp->hid_dev_data = NULL;
+
+	if (usb_owns_device(dip)) {
+		/* Get a ugen handle. */
+		bzero(&usb_ugen_info, sizeof (usb_ugen_info));
+
+		usb_ugen_info.usb_ugen_flags = 0;
+		usb_ugen_info.usb_ugen_minor_node_ugen_bits_mask =
+		    (dev_t)HID_MINOR_UGEN_BITS_MASK;
+		usb_ugen_info.usb_ugen_minor_node_instance_mask =
+		    (dev_t)HID_MINOR_INSTANCE_MASK;
+		hidp->hid_ugen_hdl = usb_ugen_get_hdl(dip, &usb_ugen_info);
+
+		if (usb_ugen_attach(hidp->hid_ugen_hdl, cmd) !=
+		    USB_SUCCESS) {
+			USB_DPRINTF_L2(PRINT_MASK_ATTA,
+			    hidp->hid_log_handle,
+			    "usb_ugen_attach failed");
+
+			usb_ugen_release_hdl(hidp->hid_ugen_hdl);
+			hidp->hid_ugen_hdl = NULL;
+		}
+	}
 
 	/*
 	 * Don't get the report descriptor if parsing hid descriptor earlier
@@ -768,6 +797,149 @@ hid_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (rval);
 }
 
+static int
+hid_chropen(dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	int rval;
+	minor_t minor = getminor(*devp);
+	int instance;
+	hid_state_t *hidp;
+
+	instance = HID_MINOR_TO_INSTANCE(minor);
+
+	hidp = ddi_get_soft_state(hid_statep, instance);
+	if (hidp == NULL) {
+		return (ENXIO);
+	}
+
+	if (!HID_IS_UGEN_OPEN(minor)) {
+		return (ENXIO);
+	}
+
+	hid_pm_busy_component(hidp);
+	(void) pm_raise_power(hidp->hid_dip, 0, USB_DEV_OS_FULL_PWR);
+
+	mutex_enter(&hidp->hid_mutex);
+
+	rval = usb_ugen_open(hidp->hid_ugen_hdl, devp, flag,
+	    sflag, credp);
+
+	mutex_exit(&hidp->hid_mutex);
+
+	if (rval != 0) {
+		hid_pm_idle_component(hidp);
+	}
+
+	return (rval);
+}
+
+static int
+hid_chrclose(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+	int rval;
+	minor_t minor = getminor(dev);
+	int instance;
+	hid_state_t *hidp;
+
+	instance = HID_MINOR_TO_INSTANCE(minor);
+
+	hidp = ddi_get_soft_state(hid_statep, instance);
+	if (hidp == NULL) {
+		return (ENXIO);
+	}
+
+	if (!HID_IS_UGEN_OPEN(minor)) {
+		return (ENXIO);
+	}
+
+	mutex_enter(&hidp->hid_mutex);
+
+	rval = usb_ugen_close(hidp->hid_ugen_hdl, dev, flag,
+	    otyp, credp);
+
+	mutex_exit(&hidp->hid_mutex);
+
+	if (rval == 0) {
+		hid_pm_idle_component(hidp);
+	}
+
+	return (rval);
+}
+
+static int
+hid_read(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+	int rval;
+	minor_t minor = getminor(dev);
+	int instance;
+	hid_state_t *hidp;
+
+	instance = HID_MINOR_TO_INSTANCE(minor);
+
+	hidp = ddi_get_soft_state(hid_statep, instance);
+	if (hidp == NULL) {
+		return (ENXIO);
+	}
+
+	if (!HID_IS_UGEN_OPEN(minor)) {
+		return (ENXIO);
+	}
+
+	rval = usb_ugen_read(hidp->hid_ugen_hdl, dev, uiop, credp);
+
+	return (rval);
+}
+
+static int
+hid_write(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+	int rval;
+	minor_t minor = getminor(dev);
+	int instance;
+	hid_state_t *hidp;
+
+	instance = HID_MINOR_TO_INSTANCE(minor);
+
+	hidp = ddi_get_soft_state(hid_statep, instance);
+	if (hidp == NULL) {
+		return (ENXIO);
+	}
+
+	if (!HID_IS_UGEN_OPEN(minor)) {
+		return (ENXIO);
+	}
+
+	rval = usb_ugen_write(hidp->hid_ugen_hdl, dev, uiop, credp);
+
+	return (rval);
+}
+
+static int
+hid_poll(dev_t dev, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp)
+{
+	int rval;
+	minor_t minor = getminor(dev);
+	int instance;
+	hid_state_t *hidp;
+
+	instance = HID_MINOR_TO_INSTANCE(minor);
+
+	hidp = ddi_get_soft_state(hid_statep, instance);
+	if (hidp == NULL) {
+		return (ENXIO);
+	}
+
+	if (!HID_IS_UGEN_OPEN(minor)) {
+		return (ENXIO);
+	}
+
+	rval = usb_ugen_poll(hidp->hid_ugen_hdl, dev, events, anyyet,
+	    reventsp, phpp);
+
+	return (rval);
+}
+
 /*
  * hid_open :
  *	Open entry point: Opens the interrupt pipe.  Sets up queues.
@@ -786,12 +958,20 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	hidp = ddi_get_soft_state(hid_statep, instance);
 	if (hidp == NULL) {
-
 		return (ENXIO);
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, hidp->hid_log_handle,
 	    "hid_open: Begin");
+
+	/*
+	 * If this is a ugen device, return ENOSTR (no streams). This will
+	 * cause spec_open to try hid_chropen from our regular ops_cb instead
+	 * (and thus treat us as a plain character device).
+	 */
+	if (HID_IS_UGEN_OPEN(minor)) {
+		return (ENOSTR);
+	}
 
 	if (sflag) {
 		/* clone open NOT supported here */
@@ -802,6 +982,8 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		return (EIO);
 	}
 
+	mutex_enter(&hidp->hid_mutex);
+
 	/*
 	 * This is a workaround:
 	 *	Currently, if we open an already disconnected device, and send
@@ -811,7 +993,6 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 *	The consconfig_dacf module need this interface to detect if the
 	 *	device is already disconnnected.
 	 */
-	mutex_enter(&hidp->hid_mutex);
 	if (HID_IS_INTERNAL_OPEN(minor) &&
 	    (hidp->hid_dev_state == USB_DEV_DISCONNECTED)) {
 		mutex_exit(&hidp->hid_mutex);
@@ -1687,6 +1868,11 @@ hid_cpr_suspend(hid_state_t *hidp)
 	}
 	mutex_exit(&hidp->hid_mutex);
 
+	if ((retval == USB_SUCCESS) && hidp->hid_ugen_hdl != NULL) {
+		retval = usb_ugen_detach(hidp->hid_ugen_hdl,
+		    DDI_SUSPEND);
+	}
+
 	return (retval);
 }
 
@@ -1698,6 +1884,10 @@ hid_cpr_resume(hid_state_t *hidp)
 	    "hid_cpr_resume: dip=0x%p", (void *)hidp->hid_dip);
 
 	hid_restore_device_state(hidp->hid_dip, hidp);
+
+	if (hidp->hid_ugen_hdl != NULL) {
+		(void) usb_ugen_attach(hidp->hid_ugen_hdl, DDI_RESUME);
+	}
 }
 
 
@@ -2133,6 +2323,12 @@ hid_detach_cleanup(dev_info_t *dip, hid_state_t *hidp)
 		freemsg(hidpm->hid_pm_pwrup);
 		kmem_free(hidpm, sizeof (hid_power_t));
 		hidp->hid_pm = NULL;
+	}
+
+	if (hidp->hid_ugen_hdl != NULL) {
+		rval = usb_ugen_detach(hidp->hid_ugen_hdl, DDI_DETACH);
+		VERIFY0(rval);
+		usb_ugen_release_hdl(hidp->hid_ugen_hdl);
 	}
 
 	mutex_exit(&hidp->hid_mutex);
