@@ -21,7 +21,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -334,7 +334,7 @@ rnd_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 		 * A non NULL pollhead pointer should be returned in case
 		 * user polls for 0 events.
 		 */
-		if (*reventsp == 0 && !anyyet)
+		if ((*reventsp == 0 && !anyyet) || (events & POLLET))
 			*phpp = &urnd_pollhd;
 
 		break;

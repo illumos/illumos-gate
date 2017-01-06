@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2016 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2015 The MathWorks, Inc.  All rights reserved.
  */
 
@@ -1224,7 +1224,6 @@ inotify_read(dev_t dev, uio_t *uio, cred_t *cr)
 	return (err);
 }
 
-/*ARGSUSED*/
 static int
 inotify_poll(dev_t dev, short events, int anyyet, short *reventsp,
     struct pollhead **phpp)
@@ -1240,9 +1239,10 @@ inotify_poll(dev_t dev, short events, int anyyet, short *reventsp,
 		*reventsp = events & (POLLRDNORM | POLLIN);
 	} else {
 		*reventsp = 0;
+	}
 
-		if (!anyyet)
-			*phpp = &state->ins_pollhd;
+	if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
+		*phpp = &state->ins_pollhd;
 	}
 
 	mutex_exit(&state->ins_lock);
