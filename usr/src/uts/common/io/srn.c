@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -253,7 +254,7 @@ srn_perms(int perm, cred_t *cr)
 
 static int
 srn_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
-	struct pollhead **phpp)
+    struct pollhead **phpp)
 {
 	extern struct pollhead srn_pollhead[];
 	int	clone;
@@ -263,9 +264,10 @@ srn_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 		*reventsp |= (POLLIN | POLLRDNORM);
 	} else {
 		*reventsp = 0;
-		if (!anyyet) {
-			*phpp = &srn_pollhead[clone];
-		}
+	}
+
+	if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
+		*phpp = &srn_pollhead[clone];
 	}
 	return (0);
 }

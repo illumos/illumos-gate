@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -5118,16 +5118,10 @@ vnd_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 		mutex_exit(&vqp->vdq_lock);
 	}
 
-	if (ready != 0) {
-		*reventsp = ready;
-		vnd_dev_rele(vdp);
-		return (0);
-	}
-
-	*reventsp = 0;
-	if (!anyyet)
+	if ((ready == 0 && !anyyet) || (events & POLLET)) {
 		*phpp = &vdp->vdd_ph;
-
+	}
+	*reventsp = ready;
 	vnd_dev_rele(vdp);
 	return (0);
 }

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -228,8 +228,10 @@ eventfd_poll(dev_t dev, short events, int anyyet, short *reventsp,
 	if (state->efd_value < EVENTFD_VALMAX)
 		revents |= POLLWRNORM | POLLOUT;
 
-	if (!(*reventsp = revents & events) && !anyyet)
+	*reventsp = revents & events;
+	if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
 		*phpp = &state->efd_pollhd;
+	}
 
 	mutex_exit(&state->efd_lock);
 

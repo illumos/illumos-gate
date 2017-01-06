@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -42,8 +43,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  *
  */
-
-#pragma ident	"@(#)heci_main.c	1.7	08/03/07 SMI"
 
 #include <sys/types.h>
 #include <sys/note.h>
@@ -517,8 +516,8 @@ heci_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
  * @return 1 if callback removed from the list, 0 otherwise
  */
 static int
-heci_clear_list(struct iamt_heci_device *dev,
-	struct heci_file *file, struct list_node *heci_cb_list)
+heci_clear_list(struct iamt_heci_device *dev, struct heci_file *file,
+    struct list_node *heci_cb_list)
 {
 	struct heci_cb_private *priv_cb_pos = NULL;
 	struct heci_cb_private *priv_cb_next = NULL;
@@ -775,7 +774,7 @@ heci_close(dev_t devt, int flag, int otyp, struct cred *cred)
 
 static struct heci_cb_private *
 find_read_list_entry(struct iamt_heci_device *dev,
-	struct heci_file_private *file_ext)
+    struct heci_file_private *file_ext)
 {
 	struct heci_cb_private *priv_cb_pos = NULL;
 	struct heci_cb_private *priv_cb_next = NULL;
@@ -1321,8 +1320,8 @@ heci_ioctl(dev_t devt, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
  * heci_poll - the poll function
  */
 static int
-heci_poll(dev_t devt, short events, int anyyet,
-		short *reventsp, struct pollhead **phpp)
+heci_poll(dev_t devt, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp)
 {
 	struct heci_file *file;
 	struct heci_file_private *file_extension;
@@ -1367,11 +1366,12 @@ heci_poll(dev_t devt, short events, int anyyet,
 		} else {
 			DBG("heci_poll: iamthif no event\n");
 			*reventsp = 0;
-			if (!anyyet)
-				*phpp = &device->iamthif_file_ext.pollwait;
 		}
 		mutex_exit(&device->iamthif_file_ext.file_lock);
 
+		if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
+			*phpp = &device->iamthif_file_ext.pollwait;
+		}
 	} else {
 		mutex_enter(&file_extension->write_io_lock);
 		if (HECI_WRITE_COMPLETE == file_extension->writing_state) {
@@ -1380,12 +1380,12 @@ heci_poll(dev_t devt, short events, int anyyet,
 		} else {
 			DBG("heci_poll: file_extension no event\n");
 			*reventsp = 0;
-			if (!anyyet)
-				*phpp = &file_extension->tx_pollwait;
 		}
 		mutex_exit(&file_extension->write_io_lock);
 
-
+		if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
+			*phpp = &file_extension->tx_pollwait;
+		}
 	}
 
 	return (0);
