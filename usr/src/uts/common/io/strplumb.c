@@ -214,8 +214,13 @@ int	ndev_unit = 0;
 
 /*
  * If we booted diskless then strplumb() will have been called from
- * swapgeneric.c:rootconf(). All we can do in that case is plumb the
- * network device that we booted from.
+ * either:
+ *	in case of x86 NEWBOOT: vfs.c:rootconf()
+ *	in case of nfs root, the rootfs.bo_name is reset from /ramdisk:a
+ *	to empty string and we will copy netdev_path there.
+ * or
+ *	in case of sparc: swapgeneric.c:rootconf().
+ * All we can do in that case is plumb the network device that we booted from.
  *
  * If we booted from a local disk, we will have been called from main(),
  * and normally we defer the plumbing of interfaces until network/physical.
@@ -232,10 +237,17 @@ resolve_boot_path(void)
 	char			stripped_path[OBP_MAXPATHLEN];
 #endif
 
-	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0)
+	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0 &&
+	    rootfs.bo_name[0] != '\0') {
 		devpath = rootfs.bo_name;
-	else
+	} else {
 		devpath = strplumb_get_netdev_path();
+		netdev_path = devpath;
+		if (netdev_path != NULL) {
+			(void) strncpy(rootfs.bo_name, netdev_path,
+			    BO_MAXOBJNAME);
+		}
+	}
 
 	if (devpath != NULL) {
 		DBG1("resolving boot-path: %s\n", devpath);
