@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_USB_HIDMINOR_H
@@ -44,20 +44,27 @@ extern "C" {
  * transparent.
  *
  * So we change minor node numbering scheme to be:
- *	external node minor num == instance << 1
- *	internal node minor num == instance << 1 | 0x1
+ *	external node minor num == instance << 9
+ *	internal node minor num == instance << 9 | 0x100
  * (There are only internal nodes for keyboard/mouse now.)
+ *
+ * The 8 bits of the LSB are used for ugen minor numbering (hence the use
+ * of the first bit of the next byte for the "internal" flag)
  */
-#define	HID_MINOR_BITS_MASK		0x1
+#define	HID_MINOR_BITS_MASK		0x1ff
+#define	HID_MINOR_UGEN_BITS_MASK	0xff
 #define	HID_MINOR_INSTANCE_MASK		~HID_MINOR_BITS_MASK
-#define	HID_MINOR_INSTANCE_SHIFT	1
+#define	HID_MINOR_INSTANCE_SHIFT	9
 
-#define	HID_MINOR_INTERNAL		0x1
+#define	HID_MINOR_INTERNAL		0x100
 #define	HID_MINOR_MAKE_INTERNAL(minor) \
 		((minor) | HID_MINOR_INTERNAL)
 
 #define	HID_IS_INTERNAL_OPEN(minor) \
 		(((minor) & HID_MINOR_INTERNAL))
+
+#define	HID_IS_UGEN_OPEN(minor) \
+		(((minor) & HID_MINOR_UGEN_BITS_MASK))
 
 #define	HID_MINOR_TO_INSTANCE(minor) \
 		(((minor) & HID_MINOR_INSTANCE_MASK) >> \
