@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -1021,6 +1021,7 @@ ict_gptn(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	pt_own_t pto;
 	int error, rv;
 	int ptyno;
+	lx_zone_data_t *lxzd = ztolxzd(curproc->p_zone);
 
 	/* This operation is only valid for the lx_ptm device. */
 	if (getmajor(fp->f_vnode->v_rdev) != ddi_name_to_major(LX_PTM_DRV))
@@ -1028,7 +1029,18 @@ ict_gptn(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 
 	cr = CRED();
 	pto.pto_ruid = cr->cr_uid;
-	pto.pto_rgid = cr->cr_gid;
+	/*
+	 * Both Linux and our native code (see grantpt() in native libc)
+	 * prefer assigning the "tty" gid to the new pty. On Linux this is
+	 * done by udev. Since we're in the kernel we cannot lookup the gid, so
+	 * we rely on the lx_support program to initialize the value in the
+	 * zone data at boot time.
+	 */
+	if (lxzd->lxzd_ttygrp == 0) {
+		pto.pto_rgid = cr->cr_gid;
+	} else {
+		pto.pto_rgid = lxzd->lxzd_ttygrp;
+	}
 
 	istr.ic_cmd = OWNERPT;
 	istr.ic_len = sizeof (pto);
