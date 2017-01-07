@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -74,6 +74,7 @@ timeout = 600
 [/opt/libc-tests/tests/endian.32]
 [/opt/libc-tests/tests/endian.64]
 [/opt/libc-tests/tests/quick_exit]
+[/opt/libc-tests/tests/printf-6961.64]
 [/opt/libc-tests/tests/priv_gettext]
 [/opt/libc-tests/tests/strerror]
 [/opt/libc-tests/tests/timespec_get.32]

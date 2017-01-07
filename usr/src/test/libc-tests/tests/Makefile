@@ -50,7 +50,9 @@ SCRIPTS = \
 CPPFLAGS += -D_REENTRANT
 
 PROGS32 = $(PROGS:%=%.32)
-PROGS64 = $(PROGS:%=%.64)
+PROGS64 = \
+	$(PROGS:%=%.64) \
+	printf-6961.64
 
 aligned_alloc.32 :=	LDLIBS += -lproc
 aligned_alloc.64 :=	LDLIBS64 += -lproc
