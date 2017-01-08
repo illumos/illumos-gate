@@ -84,6 +84,9 @@ DRMACH_IO	= $(UTSBASE)/i86pc/io/acpi/drmach_acpi
 DRMACH_GENERR	= $(DRMACH_IO)/sbdgenerr
 DR_IO		= $(UTSBASE)/i86pc/io/dr
 DR_GENERR	= $(DR_IO)/sbdgenerr
+VGATEXT_FONT	= 8x16
+VGATEXT_FONT_SRC= 8859-1
+VGATEXT_FONT_DIR= $(UTSBASE)/common/font
 
 $(DRMACH_GENERR):	$(DR_IO)/sbdgenerr.pl
 	$(RM) $@
@@ -183,6 +186,19 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/font/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf \
+	$(VGATEXT_FONT_DIR)/bdf_to_c.awk
+	$(AWK) -f $(VGATEXT_FONT_DIR)/bdf_to_c.awk	\
+		$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf > $@
+
+$(OBJS_DIR)/%.o:		$(OBJS_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -243,7 +259,22 @@ $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.c
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/%.s
 	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
 
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/common/font/%.c
+	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/$(VGATEXT_FONT).c:	\
+	$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf	\
+	$(VGATEXT_FONT_DIR)/bdf_to_c.awk
+	$(AWK) -f $(VGATEXT_FONT_DIR)/bdf_to_c.awk	\
+		$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf > $@
+
+$(DBOOT_OBJS_DIR)/%.o:		$(DBOOT_OBJS_DIR)/%.c
+	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/sha1/%.c
+	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(DBOOT_OBJS_DIR)/%.c
 	$(i386_CC) $(DBOOT_FLAGS) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
@@ -410,6 +441,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/boot/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/vm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/font/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -458,6 +492,12 @@ $(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/dboot/%.c
 	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
 
 $(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/i86pc/dboot/%.s
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(DBOOT_LINTS_DIR)/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln: $(UTSBASE)/common/font/%.c
 	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
 
 $(DBOOT_LINTS_DIR)/%.ln: $(COMMONBASE)/crypto/sha1/%.c
