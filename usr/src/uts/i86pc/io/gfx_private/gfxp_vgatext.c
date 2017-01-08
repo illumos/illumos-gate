@@ -26,7 +26,7 @@
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*		All Rights Reserved	*/
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -611,7 +611,7 @@ gfxp_vga_ioctl(
  * vgatext_suspend
  * vgatext_resume
  *
- * 	Routines to save and restore contents of the VGA text area
+ *	Routines to save and restore contents of the VGA text area
  * Mostly, this is to support Suspend/Resume operation for graphics
  * device drivers.  Here in the VGAtext common code, we simply squirrel
  * away the contents of the hardware's text area during Suspend and then
@@ -815,6 +815,8 @@ vgatext_devinit(struct gfxp_fb_softc *softc, struct vis_devinit *data)
 	data->mode = VIS_TEXT;
 	data->polledio = &softc->polledio;
 
+	vgatext_save_text(softc);	/* save current console */
+	vgatext_hide_cursor(softc);
 	return (0);
 }
 
@@ -953,7 +955,6 @@ vgatext_polled_copy(
 	vgatext_cons_copy((struct gfxp_fb_softc *)arg, ca);
 }
 
-
 static void
 vgatext_cons_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 {
@@ -997,27 +998,43 @@ vgatext_polled_cursor(
 	vgatext_cons_cursor((struct gfxp_fb_softc *)arg, ca);
 }
 
-
-
-/*ARGSUSED*/
 static void
 vgatext_hide_cursor(struct gfxp_fb_softc *softc)
 {
-	/* Nothing at present */
+	uint8_t msl, s;
+
+	if (vgatext_silent)
+		return;
+
+	msl = vga_get_crtc(&softc->regs, VGA_CRTC_MAX_S_LN) & 0x1f;
+	s = vga_get_crtc(&softc->regs, VGA_CRTC_CSSL) & 0xc0;
+	s |= (1 << 5);
+
+	/* disable cursor */
+	vga_set_crtc(&softc->regs, VGA_CRTC_CSSL, s);
+	vga_set_crtc(&softc->regs, VGA_CRTC_CESL, msl);
 }
 
 static void
 vgatext_set_cursor(struct gfxp_fb_softc *softc, int row, int col)
 {
 	short	addr;
+	uint8_t msl, s;
 
 	if (vgatext_silent)
 		return;
+
+	msl = vga_get_crtc(&softc->regs, VGA_CRTC_MAX_S_LN) & 0x1f;
+	s = vga_get_crtc(&softc->regs, VGA_CRTC_CSSL) & 0xc0;
 
 	addr = row * TEXT_COLS + col;
 
 	vga_set_crtc(&softc->regs, VGA_CRTC_CLAH, addr >> 8);
 	vga_set_crtc(&softc->regs, VGA_CRTC_CLAL, addr & 0xff);
+
+	/* enable cursor */
+	vga_set_crtc(&softc->regs, VGA_CRTC_CSSL, s);
+	vga_set_crtc(&softc->regs, VGA_CRTC_CESL, msl);
 }
 
 static int vga_row, vga_col;
