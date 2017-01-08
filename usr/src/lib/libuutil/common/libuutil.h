@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBUUTIL_H
@@ -90,6 +91,8 @@ extern void uu_vdie(const char *, va_list) __NORETURN;
 /*PRINTFLIKE2*/
 extern void uu_xdie(int, const char *, ...) __NORETURN;
 extern void uu_vxdie(int, const char *, va_list) __NORETURN;
+/*PRINTFLIKE1*/
+extern void uu_panic(const char *, ...) __NORETURN;
 
 /*
  * Exit status functions (not to be used directly)

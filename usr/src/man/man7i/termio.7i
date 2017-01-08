@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TERMIO 7I "Sep 14, 2005"
+.TH TERMIO 7I "Dec 30, 2016"
 .SH NAME
 termio \- general terminal interface
 .SH SYNOPSIS
@@ -29,7 +29,6 @@ termio \- general terminal interface
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This release supports a general interface for asynchronous communications ports
 that is hardware-independent. The user interface to this functionality is using
@@ -60,7 +59,6 @@ input characters that have not yet been read by some program. When the input
 limit is reached, all the characters saved in the buffer up to that point are
 thrown away without notice.
 .SS "Session Management (Job Control)"
-.sp
 .LP
 A control terminal will distinguish one of the process groups in the session
 associated with it to be the  foreground process group. All other process
@@ -113,7 +111,6 @@ process is not ignoring or holding \fBSIGTTOU\fR and is a member of an orphaned
 process group, the write will fail with  \fBerrno\fR set to \fBEIO\fR, and no
 signal will be sent.
 .SS "Canonical Mode Input Processing"
-.sp
 .LP
 Normally, terminal input is processed in units of lines. A line is delimited by
 a newline (\fBASCII LF\fR) character, an end-of-file (\fBASCII EOT\fR)
@@ -124,15 +121,15 @@ It is not necessary, however, to read a whole line at once; any number of
 characters may be requested in a read, even one, without losing information.
 .sp
 .LP
-During input, erase and kill processing is normally done. The \fBERASE\fR
-character (by default, the character \fBDEL\fR) erases the last character
+During input, erase, erase2, and kill processing is normally done. The
+\fBERASE\fR and \fBERASE2\fR character (by default, the character \fBDEL\fR for \fBERASE\fR and \fBControl-h\fR for \fBERASE2\fR) erases the last character
 typed. The \fBWERASE\fR character (the character  \fBControl-w\fR) erases the
 last "word" typed in the current input line (but not any preceding spaces or
 tabs). A "word" is defined as a sequence of non-blank characters, with tabs
-counted as blanks. Neither \fBERASE\fR nor \fBWERASE\fR will erase beyond the
-beginning of the line.  The \fBKILL\fR character (by default, the character
-\fBNAK\fR) kills (deletes) the entire input line, and optionally outputs a
-newline character. All these characters operate on a key stroke basis,
+counted as blanks. None of \fBERASE\fR or \fBERASE2\fR or \fBWERASE\fR will
+erase beyond the beginning of the line.  The \fBKILL\fR character (by default,
+the character \fBNAK\fR) kills (deletes) the entire input line, and optionally
+outputs a newline character. All these characters operate on a key stroke basis,
 independent of any backspacing or tabbing that may have been done. The
 \fBREPRINT\fR character (the character Control-r) prints a newline followed by
 all characters that have not been read. Reprinting also occurs automatically if
@@ -141,11 +138,11 @@ output. The characters are reprinted as if they were being echoed;
 consequencely, if \fBECHO\fR is not set, they are not printed.
 .sp
 .LP
-The \fBERASE\fR and \fBKILL\fR characters may be entered literally by preceding
-them with the escape character. In this case, the escape character is not read.
-The erase and kill characters may be changed.
+The \fBERASE\fR, \fBERASE2\fR, and \fBKILL\fR characters may be entered
+literally by preceding them with the escape character. In this case, the
+escape character is not read.  The erase, erase2, and kill characters may be
+changed.
 .SS "Non-canonical Mode Input Processing"
-.sp
 .LP
 In non-canonical mode input processing, input characters are not assembled into
 lines, and erase and kill processing does not occur. The \fBMIN\fR and
@@ -222,7 +219,6 @@ returned without waiting for more characters to be input.
 .RE
 
 .SS "Comparing Different Cases of MIN, TIME Interaction"
-.sp
 .LP
 Some points to note about  \fBMIN\fR and  \fBTIME\fR :
 .RS +4
@@ -263,7 +259,6 @@ denote a record length. For example, if a program does a read of 20 bytes,
 \fBMIN\fR is 10, and 25 characters are present, then 20 characters will be
 returned to the user.
 .SS "Writing Characters"
-.sp
 .LP
 When one or more characters are written, they are transmitted to the terminal
 as soon as previously written characters have finished typing. Input characters
@@ -272,7 +267,6 @@ characters more rapidly than they can be typed, it will be suspended when its
 output queue exceeds some limit. When the queue is drained down to some
 threshold, the program is resumed.
 .SS "Special Characters"
-.sp
 .LP
 Certain characters have special functions on input. These functions and their
 default character values are summarized as follows:
@@ -307,9 +301,19 @@ file (called  \fBcore\fR) will be created in the current working directory.
 \fB\fBERASE\fR\fR
 .ad
 .RS 11n
-(DEL) erases the preceding character. It does not erase beyond the start of a
-line, as delimited by a \fBNL\fR, \fBEOF\fR, \fBEOL\fR, or \fBEOL2\fR
-character.
+(DEL) erases the preceding character. It does not erase beyond
+the start of a line, as delimited by a \fBNL\fR, \fBEOF\fR, \fBEOL\fR, or
+\fBEOL2\fR character.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBERASE2\fR\fR
+.ad
+.RS 11n
+(Control-h or \fBASCII BS\fR) erases the preceding character, with behaviour
+identical to that of ERASE.
 .RE
 
 .sp
@@ -476,19 +480,20 @@ signal will be ignored.
 to be ignored.  This works for all the special characters mentioned above. It
 allows characters to be input that would otherwise be interpreted by the system
 (for example \fBKILL, QUIT\fR).  The character values for \fBINTR\fR,
-\fBQUIT\fR, \fBERASE\fR, \fBWERASE\fR, \fBKILL\fR, \fBREPRINT\fR, \fBEOF\fR,
-\fBEOL\fR, \fBEOL2\fR, \fBSWTCH\fR, \fBSUSP\fR, \fBDSUSP\fR, \fBSTOP\fR,
-\fBSTART\fR, \fBDISCARD\fR, \fBSTATUS\fR, and \fBLNEXT\fR may be changed to suit
-individual tastes. If the value of a special control character is
-_POSIX_VDISABLE (0), the function of that special control character is disabled.
-The \fBERASE\fR, \fBKILL\fR, and \fBEOF\fR characters may be escaped by a
-preceding backslash (\e) character, in which case no special function is done.
+\fBQUIT\fR, \fBERASE\fR, \fBERASE2\fR, \fBWERASE\fR, \fBKILL\fR, \fBREPRINT\fR,
+\fBEOF\fR, \fBEOL\fR, \fBEOL2\fR, \fBSWTCH\fR, \fBSUSP\fR, \fBDSUSP\fR,
+\fBSTOP\fR, \fBSTART\fR, \fBDISCARD\fR, \fBSTATUS\fR, and \fBLNEXT\fR may be
+changed to suit individual tastes. If the value of a special control character
+is _POSIX_VDISABLE (0), the function of that special control character is
+disabled.
+The \fBERASE\fR, \fBERASE2\fR, \fBKILL\fR, and \fBEOF\fR characters may be
+escaped by a preceding backslash (\e) character, in which case no special
+function is done.
 Any of the special characters may be preceded by the \fBLNEXT\fR character, in
 which case no special function is done.
 .RE
 
 .SS "Modem Disconnect"
-.sp
 .LP
 When a modem disconnect is detected, a \fBSIGHUP\fR signal is sent to the
 terminal's controlling process. Unless other arrangements have been made, these
@@ -514,7 +519,6 @@ The controlling terminal will remain in this state until it is  reinitialized
 with a successful open by the controlling process, or deallocated by the
 controlling process.
 .SS "Terminal Parameters"
-.sp
 .LP
 The parameters that control the behavior of devices and modules providing the
 \fBtermios\fR interface are specified by the \fBtermios\fR structure defined by
@@ -580,11 +584,12 @@ _
 _
 16	VSTATUS	DC4
 _
-17-19	Reserved	
+17	VERASE2	BS
+_
+18-19	Reserved
 .TE
 
 .SS "Input Modes"
-.sp
 .LP
 The \fBc_iflag\fR field describes the basic terminal input control:
 .sp
@@ -785,7 +790,6 @@ the input stream is not disturbed.  If  \fBIMAXBEL\fR is not set, no \fBBEL\fR
 character is echoed, and all input present in the input queue is discarded if
 the input stream overflows.
 .SS "Output Modes"
-.sp
 .LP
 The  \fBc_oflag\fR field specifies the  system treatment of output:
 .sp
@@ -1064,7 +1068,6 @@ character is transmitted.
 .LP
 The actual delays depend on line speed and system load.
 .SS "Control Modes"
-.sp
 .LP
 The \fBc_cflag\fR field describes the hardware control of the terminal:
 .sp
@@ -1619,7 +1622,6 @@ flow control and RTS signal to do inbound flow control.
 .RE
 
 .SS "Local Modes"
-.sp
 .LP
 The \fBc_lflag\fR field of the argument structure is used by the line
 discipline to control terminal functions. The basic line discipline provides
@@ -1820,16 +1822,16 @@ When \fBICANON\fR is set, the following echo functions are possible.
 .ie t \(bu
 .el o
 If \fBECHO\fR and \fBECHOE\fR are set, and  \fBECHOPRT\fR is not set,  the
-\fBERASE\fR and \fBWERASE\fR characters are echoed as one or more ASCII BS SP
-BS, which clears the last character(s) from a \fBCRT\fR screen.
+\fBERASE\fR, \fBERASE2\fR, and \fBWERASE\fR characters are echoed as one or
+more ASCII BS SP BS, which clears the last character(s) from a \fBCRT\fR screen.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-If \fBECHO\fR, \fBECHOPRT\fR, and \fBIEXTEN\fR are set, the first \fBERASE\fR
-and \fBWERASE\fR character in a sequence echoes as a backslash (\fB\e\fR),
-followed by the characters being erased.  Subsequent \fBERASE\fR and
+If \fBECHO\fR, \fBECHOPRT\fR, and \fBIEXTEN\fR are set, the first \fBERASE\fR,
+\fBERASE2\fR, and \fBWERASE\fR character in a sequence echoes as a backslash
+(\fB\e\fR), followed by the characters being erased.  Subsequent \fBERASE\fR and
 \fBWERASE\fR characters echo the characters being erased, in reverse order. The
 next non-erase character causes a `/' (slash) to be typed before it is echoed.
 \fBECHOPRT\fR should be used for hard copy terminals.
@@ -1900,13 +1902,11 @@ enabled:  special characters ( \fBWERASE\fR, \fBREPRINT\fR, \fBDISCARD\fR, and
 \fBLNEXT\fR) and local flags ( \fBTOSTOP\fR, \fBECHOCTL\fR, \fBECHOPRT\fR,
 \fBECHOKE\fR, \fBFLUSHO\fR, and \fBPENDIN\fR).
 .SS "Minimum and Timeout"
-.sp
 .LP
 The \fBMIN\fR and \fBTIME\fR values were described previously, in the
 subsection, \fBNon-canonical Mode Input Processing\fR. The initial value of
 \fBMIN\fR is 1, and the initial value of \fBTIME\fR is 0.
 .SS "Terminal Size"
-.sp
 .LP
 The number of lines and columns on the terminal's display is specified in the
 \fBwinsize\fR structure defined by  \fBsys/termios.h\fR and includes the
@@ -1922,7 +1922,6 @@ unsigned short	ws_ypixel; /* vertical size, in pixels */
 .in -2
 
 .SS "Termio Structure"
-.sp
 .LP
 The SunOS/SVR4 \fBtermio\fR structure is used by some \fBioctl\fRs; it is
 defined by \fBsys/termio.h\fR and includes the following members:
@@ -1983,7 +1982,6 @@ The calls that use the \fBtermio\fR structure only affect the flags and control
 characters that can be stored in the \fBtermio\fR structure; all other flags
 and control characters are unaffected.
 .SS "Modem Lines"
-.sp
 .LP
 On special files representing serial ports, modem control lines can be read.
 Control lines  (if the underlying hardware supports it) may also be changed.
@@ -2093,7 +2091,6 @@ To be able to issue the \fBTIOCGSOFTCAR\fR and \fBTIOCSSOFTCAR\fR \fBioctl\fR
 calls, the \fBtty\fR line should be opened with \fBO_NDELAY\fR so that the
 \fBopen\fR(2) will not wait for the carrier.
 .SS "Default Values"
-.sp
 .LP
 The initial  \fBtermios\fR values upon driver open is configurable. This is
 accomplished by setting the "ttymodes" property in the file
@@ -2111,7 +2108,6 @@ effect.  The initial input control value is \fBBRKINT\fR, \fBICRNL\fR,
 \fBISIG\fR, \fBICANON\fR, \fBIEXTEN\fR, \fBECHO\fR, \fBECHOK\fR, \fBECHOE\fR,
 \fBECHOKE\fR, \fBECHOCTL\fR.
 .SH IOCTLS
-.sp
 .LP
 The \fBioctl\fRs supported by devices and \fBSTREAMS\fR modules providing the
 \fBtermios\fR(3C) interface are listed below. Some calls may not be supported
@@ -2415,11 +2411,9 @@ will automatically calibrate to it.
 .RE
 
 .SH FILES
-.sp
 .LP
 Files in or under /\fBdev\fR
 .SH SEE ALSO
-.sp
 .LP
 \fBstty\fR(1), \fBfork\fR(2), \fBgetpgid\fR(2), \fBgetsid\fR(2),
 \fBioctl\fR(2), \fBsetsid\fR(2), \fBsigaction\fR(2), \fBsignal\fR(3C),

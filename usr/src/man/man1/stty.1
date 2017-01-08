@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STTY 1 "Jan 04, 2014"
+.TH STTY 1 "Dec 30, 2016"
 .SH NAME
 stty \- set the options for a terminal
 .SH SYNOPSIS
@@ -46,7 +46,6 @@ stty \- set the options for a terminal
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBstty\fR utility sets certain terminal I/O options for the device that is
 the current standard input. Without arguments, \fBstty\fR reports the settings
@@ -70,7 +69,6 @@ options in the earlier sections. Notice that many combinations of options make
 no sense, but no sanity checking is performed. Hardware flow control and clock
 modes options might not be supported by all hardware interfaces.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -94,11 +92,9 @@ it. Otherwise, it emits termio-type output.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following \fImode\fR operands are supported:
 .SS "Control Modes"
-.sp
 .ne 2
 .na
 \fB\fBparenb\fR(\fB-parenb\fR)\fR
@@ -293,7 +289,6 @@ the line is hung up immediately.
 .RE
 
 .SS "Input Modes"
-.sp
 .ne 2
 .na
 \fB\fBignbrk\fR (\fB-ignbrk\fR)\fR
@@ -427,7 +422,6 @@ stream overflows.
 .RE
 
 .SS "Output Modes"
-.sp
 .ne 2
 .na
 \fB\fBopost\fR (\fB-opost\fR)\fR
@@ -555,7 +549,6 @@ Select style of delay for vertical tabs (see \fBtermio\fR(7I)).
 .RE
 
 .SS "Local Modes"
-.sp
 .ne 2
 .na
 \fB\fBisig\fR(\fB-isig\fR)\fR
@@ -738,7 +731,6 @@ Use application mode (use line mode) on a synchronous line.
 .RE
 
 .SS "Hardware Flow Control Modes"
-.sp
 .ne 2
 .na
 \fB\fBrtsxoff\fR (\fB-rtsxoff\fR)\fR
@@ -784,7 +776,6 @@ Enable (disable) isochronous hardware flow control on input.
 .RE
 
 .SS "Clock Modes"
-.sp
 .ne 2
 .na
 \fB\fBxcibrg\fR\fR
@@ -941,7 +932,6 @@ timing (DTE source) lead, CCITT V.24 circuit 128, no EIA-232-D pin.
 .RE
 
 .SS "Control Assignments"
-.sp
 .ne 2
 .na
 \fB\fIcontrol-character\fR \fIc\fR\fR
@@ -956,10 +946,10 @@ Set \fIcontrol-character\fR to \fIc\fR, where:
 .ad
 .RS 21n
 is \fBctab\fR, \fBdiscard\fR, \fBdsusp\fR, \fBeof\fR, \fBeol\fR, \fBeol2\fR,
-\fBerase\fR, \fBintr\fR, \fBkill\fR, \fBlnext\fR, \fBquit\fR, \fBreprint\fR,
-\fBstart\fR, \fBstop\fR, \fBsusp\fR, \fBstatus\fR, \fBswtch\fR, or \fBwerase\fR
-(\fBctab\fR is used with \fB-stappl\fR, see \fBtermio\fR(7I)). For information
-on \fBswtch\fR, see NOTES.
+\fBerase\fR, \fBerase2\fR, \fBintr\fR, \fBkill\fR, \fBlnext\fR, \fBquit\fR,
+\fBreprint\fR, \fBstart\fR, \fBstop\fR, \fBsusp\fR, \fBstatus\fR, \fBswtch\fR,
+or \fBwerase\fR (\fBctab\fR is used with \fB-stappl\fR, see \fBtermio\fR(7I)).
+For information on \fBswtch\fR, see NOTES.
 .RE
 
 .sp
@@ -1025,7 +1015,6 @@ Set line discipline to \fIi\fR ( \fB0\fR< \fIi\fR <\fB127\fR).
 .RE
 
 .SS "Combination Modes"
-.sp
 .ne 2
 .na
 \fB\fIsaved\fR \fIsettings\fR\fR
@@ -1125,7 +1114,6 @@ stty cs8 -icanon min 1 time 0 -isig -xcase \e
 .RE
 
 .SS "/usr/bin/stty, /usr/xpg6/bin/stty"
-.sp
 .ne 2
 .na
 \fB\fBnl\fR (\fB-nl\fR)\fR
@@ -1136,7 +1124,6 @@ Unset (set) \fBicrnl\fR, \fBonlcr\fR. In addition \fB-nl\fR unsets \fBinlcr\fR,
 .RE
 
 .SS "/usr/xpg4/bin/stty"
-.sp
 .ne 2
 .na
 \fB\fBnl\fR (\fB-nl\fR)\fR
@@ -1180,7 +1167,8 @@ Preserve (expand to spaces) tabs when printing.
 \fB\fBek\fR\fR
 .ad
 .RS 24n
-Reset ERASE and KILL characters back to normal DEL and CTRL-u, respectively.
+Reset ERASE, ERASE2, and KILL characters back to normal DEL, CTRL-h, and CTRL-u,
+respectively.
 .RE
 
 .sp
@@ -1214,7 +1202,6 @@ Set normal asynchronous communications where clock settings are \fBxcibrg\fR,
 .RE
 
 .SS "Window Size"
-.sp
 .ne 2
 .na
 \fB\fBrows\fR \fIn\fR\fR
@@ -1261,7 +1248,6 @@ Set horizontal window size to \fIn\fR pixels.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fB-g\fR flag is designed to facilitate the saving and restoring of
 terminal state from the shell level. For example, a program can:
@@ -1281,13 +1267,11 @@ stty $saveterm             # restore terminal state
 Since the \fB-a\fR format is so loosely specified, scripts that save and
 restore terminal settings should use the \fB-g\fR option.
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBstty\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1309,13 +1293,9 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/xpg4/bin/stty"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -1328,9 +1308,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "/usr/xpg6/bin/stty"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -1343,13 +1320,11 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBtabs\fR(1), \fBioctl\fR(2), \fBwrite\fR(2), \fBgetwidth\fR(3C),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5), \fBldterm\fR(7M),
 \fBtermio\fR(7I), \fBtermiox\fR(7I)
 .SH NOTES
-.sp
 .LP
 Solaris does not support any of the actions implied by \fBswtch\fR, which was
 used by the \fBsxt\fR driver on System V release 4. Solaris allows the

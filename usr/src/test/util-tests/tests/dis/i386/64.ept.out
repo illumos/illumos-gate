@@ -1,0 +1,2 @@
+    libdis_test:     66 0f 38 80 18     invept %rbx,(%rax)
+    libdis_test+0x5: 66 0f 38 81 18     invvpid %rbx,(%rax)

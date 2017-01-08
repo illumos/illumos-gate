@@ -1,0 +1,2 @@
+    libdis_test:     0f 01 cb           stac   
+    libdis_test+0x3: 0f 01 ca           clac   

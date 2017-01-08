@@ -1768,7 +1768,7 @@ ldterm_docanon(uchar_t c, mblk_t *bpt, size_t ebsize, queue_t *q,
 	 * the end of the buffer is a multi-byte and/or multi-column
 	 * character.
 	 */
-	if (c == tp->t_modes.c_cc[VERASE]) {
+	if (c == tp->t_modes.c_cc[VERASE] || c == tp->t_modes.c_cc[VERASE2]) {
 		if (tp->t_state & TS_QUOT) {
 			/*
 			 * Get rid of the backslash, and put the
@@ -3972,7 +3972,7 @@ outofbufs:
 #if !defined(__sparc)
 int
 movtuc(size_t size, unsigned char *from, unsigned char *origto,
-	unsigned char *table)
+    unsigned char *table)
 {
 	unsigned char *to = origto;
 	unsigned char c;

@@ -3578,6 +3578,7 @@ ipadm_enable_addr(ipadm_handle_t iph, const char *aobjname, uint32_t flags)
 			break;
 	}
 
+	nvlist_free(addrnvl);
 	return (status);
 }
 

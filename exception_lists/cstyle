@@ -167,6 +167,7 @@ usr/src/cmd/mandoc/term_ps.c
 usr/src/cmd/mandoc/term.c
 usr/src/cmd/mandoc/term.h
 usr/src/cmd/mandoc/tree.c
+usr/src/cmd/ttymon/sttyparse.c
 usr/src/common/ficl/ficltokens.h
 usr/src/common/bzip2/bzlib.h
 usr/src/common/bzip2/crctable.c

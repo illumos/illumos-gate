@@ -52,7 +52,8 @@ static struct termios default_termios = {
 		CFLUSH,
 		CWERASE,
 		CLNEXT,
-		CSTATUS
+		CSTATUS,
+		CERASE2
 	}
 };
 
@@ -421,7 +422,7 @@ allocfailure:
 	return (ioctlrespsize);
 }
 
-#define	NFIELDS	21	/* 16 control characters + 4 sets of modes */
+#define	NFIELDS	22	/* 18 control characters + 4 sets of modes */
 
 /*
  * Init routine run from main at boot time.

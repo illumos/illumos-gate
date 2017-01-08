@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TERMIOS.H 3HEAD "Jan 04, 2014"
+.TH TERMIOS.H 3HEAD "Dec 30, 2016"
 .SH NAME
 termios.h, termios \- define values for termios
 .SH SYNOPSIS
@@ -17,13 +17,11 @@ termios.h, termios \- define values for termios
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The <\fBtermios.h\fR> header contains the definitions used by the terminal I/O
 interfaces. See \fBtermios\fR(3C) and \fBtermio\fR(7I) for an overview of the
 terminal interface.
 .SS "The termios Structure"
-.sp
 .LP
 The following data types are defined through \fBtypedef\fR:
 .sp
@@ -97,11 +95,13 @@ The following subscript names for the array \fBc_cc\fR are defined:
 .TS
 c c c
 l l l .
-Subscript UsageCanonical Mode	Subscript UsageNon-Canonical Mode	Description
+Subscript Usage	Subscript Usage	Description
+Canonical Mode	Non-Canonical Mode
 _
 \fBVEOF\fR		EOF character
 \fBVEOL\fR		EOL character
 \fBVERASE\fR		ERASE character
+\fBVERASE2\fR		ERASE2 character
 \fBVINTR\fR	\fBVINTR\fR	INTR character
 \fBVKILL\fR		KILL character
 	\fBVMIN\fR	MIN value
@@ -122,7 +122,6 @@ subscripts, respectively.
 .LP
 The header file provides the flags described below.
 .SS "Input Modes"
-.sp
 .LP
 The \fBc_iflag\fR field describes the basic terminal input control:
 .sp
@@ -234,7 +233,6 @@ Mark parity errors.
 .RE
 
 .SS "Output Modes"
-.sp
 .LP
 The \fBc_oflag\fR field specifies the system treatment of output:
 .sp
@@ -490,7 +488,6 @@ form-feed delay type 1
 .RE
 
 .SS "Baud Rate Selection"
-.sp
 .LP
 The input and output baud rates are stored in the \fBtermios\fR structure.
 These are the valid values for objects of type \fBspeed_ t\fR. The following
@@ -641,7 +638,6 @@ Hang up
 .RE
 
 .SS "Control Modes"
-.sp
 .LP
 The \fBc_cflag\fR field describes the hardware control of the terminal; not all
 values specified are required to be supported by the underlying hardware:
@@ -749,7 +745,6 @@ Ignore modem status lines.
 The implementation supports the functionality associated with the symbols
 \fBCS7\fR, \fBCS8\fR, \fBCSTOPB\fR, \fBPARODD\fR, and \fBPARENB\fR.
 .SS "Local Modes"
-.sp
 .LP
 The \fBc_lflag\fR field of the argument structure is used to control various
 terminal functions:
@@ -835,7 +830,6 @@ Send \fBSIGTTOU\fR for background output.
 .RE
 
 .SS "Attribute Selection"
-.sp
 .LP
 The following symbolic constants for use with \fBtcsetattr()\fR are defined:
 .sp
@@ -866,7 +860,6 @@ Change attributes when output has drained; also flush pending input.
 .RE
 
 .SS "Line Control"
-.sp
 .LP
 The following symbolic constants for use with \fBtcflush()\fR are defined:
 .sp
@@ -936,7 +929,6 @@ Restart output.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -952,7 +944,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetconf\fR(1), \fBcfgetispeed\fR(3C), \fBcfsetispeed\fR(3C),
 \fBconfstr\fR(3C), \fBtcdrain\fR(3C), \fBtcflow\fR(3C), \fBtcflush\fR(3C),

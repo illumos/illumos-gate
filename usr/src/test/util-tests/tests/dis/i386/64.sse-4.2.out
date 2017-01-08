@@ -1,0 +1,19 @@
+    libdis_test:      f2 0f 38 f0 d8     crc32b %al,%ebx
+    libdis_test+0x5:  f2 48 0f 38 f0 d8  crc32b %al,%rbx
+    libdis_test+0xb:  f2 0f 38 f0 18     crc32b (%rax),%ebx
+    libdis_test+0x10: 66 f2 0f 38 f1 d8  crc32w %ax,%ebx
+    libdis_test+0x16: 66 f2 0f 38 f1 18  crc32w (%rax),%ebx
+    libdis_test+0x1c: f2 0f 38 f1 d8     crc32l %eax,%ebx
+    libdis_test+0x21: f2 0f 38 f1 18     crc32l (%rax),%ebx
+    libdis_test+0x26: f2 48 0f 38 f1 d8  crc32q %rax,%rbx
+    libdis_test+0x2c: f2 48 0f 38 f1 18  crc32q (%rax),%rbx
+    libdis_test+0x32: 66 0f 3a 61 c8 23  pcmpestri $0x23,%xmm0,%xmm1
+    libdis_test+0x38: 66 0f 3a 61 08 23  pcmpestri $0x23,(%rax),%xmm1
+    libdis_test+0x3e: 66 0f 3a 60 c8 23  pcmpestrm $0x23,%xmm0,%xmm1
+    libdis_test+0x44: 66 0f 3a 60 08 23  pcmpestrm $0x23,(%rax),%xmm1
+    libdis_test+0x4a: 66 0f 38 37 c8     pcmpgtq %xmm0,%xmm1
+    libdis_test+0x4f: 66 0f 38 37 08     pcmpgtq (%rax),%xmm1
+    libdis_test+0x54: 66 0f 3a 63 c8 23  pcmpistri $0x23,%xmm0,%xmm1
+    libdis_test+0x5a: 66 0f 3a 63 08 23  pcmpistri $0x23,(%rax),%xmm1
+    libdis_test+0x60: 66 0f 3a 62 c8 23  pcmpistrm $0x23,%xmm0,%xmm1
+    libdis_test+0x66: 66 0f 3a 62 08 23  pcmpistrm $0x23,(%rax),%xmm1
