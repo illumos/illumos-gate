@@ -583,6 +583,9 @@ i40e_link_check(i40e_t *i40e)
 		case I40E_LINK_SPEED_40GB:
 			i40e->i40e_link_speed = 40000;
 			break;
+		case I40E_LINK_SPEED_25GB:
+			i40e->i40e_link_speed = 25000;
+			break;
 		default:
 			i40e->i40e_link_speed = 0;
 			break;
@@ -1223,14 +1226,14 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 
 	if (hw->aq.api_maj_ver == I40E_FW_API_VERSION_MAJOR &&
 	    hw->aq.api_min_ver > I40E_FW_API_VERSION_MINOR) {
-		i40e_notice(i40e, "The driver for the device detected a newer "
+		i40e_log(i40e, "The driver for the device detected a newer "
 		    "version of the NVM image (%d.%d) than expected (%d.%d).\n"
 		    "Please install the most recent version of the network "
 		    "driver.\n", hw->aq.api_maj_ver, hw->aq.api_min_ver,
 		    I40E_FW_API_VERSION_MAJOR, I40E_FW_API_VERSION_MINOR);
 	} else if (hw->aq.api_maj_ver < I40E_FW_API_VERSION_MAJOR ||
 	    hw->aq.api_min_ver < (I40E_FW_API_VERSION_MINOR - 1)) {
-		i40e_notice(i40e, "The driver for the device detected an older"
+		i40e_log(i40e, "The driver for the device detected an older"
 		    " version of the NVM image (%d.%d) than expected (%d.%d)."
 		    "\nPlease update the NVM image.\n",
 		    hw->aq.api_maj_ver, hw->aq.api_min_ver,
@@ -1419,7 +1422,7 @@ i40e_final_init(i40e_t *i40e)
 	return (B_TRUE);
 }
 
-static boolean_t
+static void
 i40e_identify_hardware(i40e_t *i40e)
 {
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
@@ -1440,12 +1443,6 @@ i40e_identify_hardware(i40e_t *i40e)
 	 * require that it be set in any ways, it seems to be mostly for
 	 * book-keeping.
 	 */
-
-	/* Call common code to set the MAC type for this adapter. */
-	if (i40e_set_mac_type(hw) != I40E_SUCCESS)
-		return (B_FALSE);
-
-	return (B_TRUE);
 }
 
 static boolean_t
@@ -2778,10 +2775,7 @@ i40e_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 	i40e->i40e_attach_progress |= I40E_ATTACH_PCI_CONFIG;
 
-	if (!i40e_identify_hardware(i40e)) {
-		i40e_error(i40e, "Failed to identify hardware");
-		goto attach_fail;
-	}
+	i40e_identify_hardware(i40e);
 
 	if (!i40e_regs_map(i40e)) {
 		i40e_error(i40e, "Failed to map device registers.");

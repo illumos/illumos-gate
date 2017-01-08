@@ -27,15 +27,6 @@ extern "C" {
 #include <sys/pci_cap.h>
 #include <sys/sysmacros.h>
 
-/*
- * For the moment, we use this to basically deal with a few custom changes
- * particularly around the use of sprintf() in the common code. The DDI defines
- * sprintf() in a rather different way than the rest of the world expects it.
- * This is currently necessary to indicate that we should use an alternate
- * behavior.
- */
-#define	I40E_ILLUMOS 1
-
 #define	DEBUGOUT(S)				i40e_debug(NULL, 0, S)
 #define	DEBUGOUT1(S, A)				i40e_debug(NULL, 0, S, A)
 #define	DEBUGOUT2(S, A, B)			i40e_debug(NULL, 0, S, A, B)
