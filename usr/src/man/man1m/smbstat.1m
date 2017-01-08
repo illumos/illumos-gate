@@ -1,126 +1,178 @@
-'\" te
-.\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMBSTAT 1M "Aug 4, 2008"
-.SH NAME
-smbstat \- show Solaris CIFS file server statistics
-.SH SYNOPSIS
-.LP
-.nf
-\fBsmbstat\fR [\fB-di\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBsmbstat\fR command shows statistical information for the \fBsmbd\fR
-server. When the \fB-i\fR option is specified, the \fBsmbstat\fR command shows
-general information about the \fBCIFS\fR service. For instance, \fBsmbstat\fR
-\fB-i\fR shows the number of sessions, connections, and open files. The
-\fB-d\fR option shows dispatched \fBCIFS\fR request counters.
-.sp
-.LP
-By default, the \fBsmbstat\fR command shows all statistics.
-.SH OPTIONS
-.sp
-.LP
-The \fBsmbstat\fR command includes the following options:
-.sp
-.ne 2
-.na
-\fB\fB-d\fR\fR
-.ad
-.sp .6
-.RS 4n
-Shows all the dispatched \fBCIFS\fR requests on the \fBCIFS\fR server. This
-option shows count statistics based on request activity.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR\fR
-.ad
-.sp .6
-.RS 4n
-Shows the following information for the \fBCIFS\fR server:
-.sp
-.ne 2
-.na
-\fB\fBconnections\fR\fR
-.ad
-.sp .6
-.RS 4n
-Number of \fBCIFS\fR connections.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBopen_files\fR\fR
-.ad
-.sp .6
-.RS 4n
-Number of files open on the \fBCIFS\fR server.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsessions\fR\fR
-.ad
-.sp .6
-.RS 4n
-Number of active \fBCIFS\fR sessions.
-.RE
-
-.RE
-
-.SH EXIT STATUS
-.sp
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB0\fR
-.ad
-.RS 13n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB>0\fR
-.ad
-.RS 13n
-An error occurred.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See the \fBattributes\fR(5) man page for descriptions of the following
-attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Uncommitted
-_
-Utility Output Format	Not-an-Interface
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBsharectl\fR(1M), \fBsharemgr\fR(1M), \fBsmbadm\fR(1M), \fBsmbstat\fR(1M),
-\fBattributes\fR(5)
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2014 Nexenta Systems, Inc.
+.\"
+.Dd Nov 22, 2013
+.Dt SMBSTAT 1M
+.Os
+.Sh NAME
+.Nm smbstat
+.Nd report SMB server statistics
+.Sh SYNOPSIS
+.Nm smbstat
+.Op Fl ctu
+.Op Fl r Op Fl anz
+.Op Ar interval
+.Sh DESCRIPTION
+The
+.Nm
+command shows statistical information for the SMB server, including any or all
+of the following four categories:
+.Sy counters ,
+.Sy throughput ,
+.Sy utilization ,
+.Sy requests .
+By default,
+.Nm
+shows
+.Sy throughput
+and
+.Sy utilization .
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl c
+Display
+.Sy counters .
+The columns shown are:
+.Bl -tag -width "users" -compact
+.It Sy nbt
+NetBIOS connections
+.It Sy tcp
+TCP connections
+.It Sy users
+logged on users
+.It Sy trees
+share connections
+.It Sy files
+open files and directories
+.It Sy pipes
+open named pipes
+.El
+.It Fl r
+Display
+.Sy request
+data, one row for each SMB command.
+The columns shown are, for each request type:
+.Bl -tag -width "rt-stddev" -compact
+.It Pq name
+command name
+.It Sy code
+command code
+.It Sy %
+% of requests that fall in this row
+.It Sy rbytes/s
+received bytes per second
+.It Sy tbytes/s
+transmitted bytes per second
+.It Sy reqs/s
+requests per second
+.It Sy rt-mean
+response time average
+.It Sy rt-stddev
+response time standard deviation
+.El
+.It Fl t
+Display
+.Sy throughput .
+The columns shown are:
+.Bl -tag -width "rbytes/s" -compact
+.It Sy rbytes/s
+received bytes per second
+.It Sy tbytes/s
+transmitted bytes per second
+.It Sy reqs/s
+requests per second
+.It Sy reads/s
+number of read requests per second
+.It Sy writes/s
+number of write requests per second
+.El
+.It Fl u
+Display
+.Sy utilization .
+The columns shown are:
+.Bl -tag -width "wtime" -compact
+.It Sy wcnt
+average number of waiting requests
+.It Sy rcnt
+average number of running requests
+.It Sy wtime
+average wait time per request
+.It Sy rtime
+average run time per request
+.It Sy w%
+% of time there were waiting requests
+.It Sy r%
+% of time there were running requests
+.It Sy u%
+utilization, computed as
+.Sy rcnt Ns / Ns Sy max_workers
+.It Sy sat
+has the server been
+.Qq saturated
+.Pq u% at 100
+.It Sy usr%
+% of CPU time in user space
+.It Sy sys%
+% of CPU time in kernel
+.It Sy idle%
+% of CPU time spent idle
+.El
+.El
+.Pp
+The
+.Fl r
+option supports additional modifiers including:
+.Bl -tag -width Ds
+.It Fl a
+show
+.Qq all
+request types
+.Pq including unsupported ones
+.It Fl n
+.Qq name
+order
+.Pq sort by request name
+.It Fl z
+suppress
+.Qq zero
+count rows
+.Pq types for which none were received
+.El
+.Sh OPERANDS
+.Bl -tag -width Ds
+.It Ar interval
+When
+.Ar interval
+is specified,
+.Nm
+runs in a loop, printing the requested output every
+.Ar interval
+seconds.
+When no
+.Ar interval
+is specified, the statistics presented are based on running averages accumulated
+since the system started.
+The first output shows the same cumulative statistics one would see without the
+.Ar interval
+specified, and subsequent outputs represent the activity in the interval that
+just finished.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommited .
+Output format is
+.Sy Not-an-Interface.
+.Sh SEE ALSO
+.Xr sharectl 1M ,
+.Xr sharemgr 1M ,
+.Xr smbadm 1M ,
+.Xr smbd 1M
