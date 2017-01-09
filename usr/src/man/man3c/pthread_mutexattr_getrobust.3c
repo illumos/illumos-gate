@@ -9,7 +9,7 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright (c) 2014, Joyent, Inc. 
+.\" Copyright (c) 2014, Joyent, Inc.
 .\"
 .Dd "Dec 22, 2014"
 .Dt PTHREAD_MUTEXATTR_GETROBUST 3C
