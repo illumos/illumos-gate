@@ -24,6 +24,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -612,8 +613,8 @@ page_done:
 
 int
 mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action, uint8_t pagetype,
-	uint32_t pageaddress, uint8_t pagenumber, uint8_t pageversion,
-	uint8_t pagelength, uint32_t SGEflagslength, uint64_t SGEaddress)
+    uint32_t pageaddress, uint8_t pagenumber, uint8_t pageversion,
+    uint8_t pagelength, uint32_t SGEflagslength, uint64_t SGEaddress)
 {
 	pMpi2ConfigRequest_t	config;
 	int			send_numbytes;
@@ -648,9 +649,9 @@ mptsas_send_config_request_msg(mptsas_t *mpt, uint8_t action, uint8_t pagetype,
 
 int
 mptsas_send_extended_config_request_msg(mptsas_t *mpt, uint8_t action,
-	uint8_t extpagetype, uint32_t pageaddress, uint8_t pagenumber,
-	uint8_t pageversion, uint16_t extpagelength,
-	uint32_t SGEflagslength, uint64_t SGEaddress)
+    uint8_t extpagetype, uint32_t pageaddress, uint8_t pagenumber,
+    uint8_t pageversion, uint16_t extpagelength,
+    uint32_t SGEflagslength, uint64_t SGEaddress)
 {
 	pMpi2ConfigRequest_t	config;
 	int			send_numbytes;
@@ -717,7 +718,7 @@ mptsas_ioc_wait_for_doorbell(mptsas_t *mpt)
 
 int
 mptsas_send_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
-	ddi_acc_handle_t accessp)
+    ddi_acc_handle_t accessp)
 {
 	int	i;
 
@@ -769,7 +770,7 @@ mptsas_send_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
 
 int
 mptsas_get_handshake_msg(mptsas_t *mpt, caddr_t memp, int numbytes,
-	ddi_acc_handle_t accessp)
+    ddi_acc_handle_t accessp)
 {
 	int		i, totalbytes, bytesleft;
 	uint16_t	val;
@@ -1086,7 +1087,7 @@ mptsas_return_to_pool(mptsas_t *mpt, mptsas_cmd_t *cmd)
  */
 int
 mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
-	int lun, uint8_t *reply, uint32_t reply_size, int mode)
+    int lun, uint8_t *reply, uint32_t reply_size, int mode)
 {
 	/*
 	 * In order to avoid allocating variables on the stack,
@@ -2795,6 +2796,90 @@ done:
 	if (free_page)
 		mptsas_dma_addr_destroy(&page_dma_handle, &page_accessp);
 	MPTSAS_ENABLE_INTR(mpt);
+
+	return (rval);
+}
+
+static int
+mptsas_enclosurepage_0_cb(mptsas_t *mpt, caddr_t page_memp,
+    ddi_acc_handle_t accessp, uint16_t iocstatus, uint32_t iocloginfo,
+    va_list ap)
+{
+	uint32_t 			page_address;
+	pMpi2SasEnclosurePage0_t	encpage, encout;
+
+	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
+	    (iocstatus != MPI2_IOCSTATUS_CONFIG_INVALID_PAGE)) {
+		mptsas_log(mpt, CE_WARN, "mptsas_get_enclsourepage0 "
+		    "header: IOCStatus=0x%x, IOCLogInfo=0x%x",
+		    iocstatus, iocloginfo);
+		return (DDI_FAILURE);
+	}
+
+	page_address = va_arg(ap, uint32_t);
+	encout = va_arg(ap, pMpi2SasEnclosurePage0_t);
+	encpage = (pMpi2SasEnclosurePage0_t)page_memp;
+
+	/*
+	 * The INVALID_PAGE status is normal if using GET_NEXT_HANDLE and there
+	 * are no more pages.  If everything is OK up to this point but the
+	 * status is INVALID_PAGE, change rval to FAILURE and quit.  Also,
+	 * signal that enclosure traversal is complete.
+	 */
+	if (iocstatus == MPI2_IOCSTATUS_CONFIG_INVALID_PAGE) {
+		if ((page_address & MPI2_SAS_DEVICE_PGAD_FORM_MASK) ==
+		    MPI2_SAS_DEVICE_PGAD_FORM_GET_NEXT_HANDLE) {
+			mpt->m_done_traverse_enc = 1;
+		}
+		return (DDI_FAILURE);
+	}
+
+	encout->Header.PageVersion = ddi_get8(accessp,
+	    &encpage->Header.PageVersion);
+	encout->Header.PageNumber = ddi_get8(accessp,
+	    &encpage->Header.PageNumber);
+	encout->Header.PageType = ddi_get8(accessp, &encpage->Header.PageType);
+	encout->Header.ExtPageLength = ddi_get16(accessp,
+	    &encpage->Header.ExtPageLength);
+	encout->Header.ExtPageType = ddi_get8(accessp,
+	    &encpage->Header.ExtPageType);
+
+	encout->EnclosureLogicalID.Low = ddi_get32(accessp,
+	    &encpage->EnclosureLogicalID.Low);
+	encout->EnclosureLogicalID.High = ddi_get32(accessp,
+	    &encpage->EnclosureLogicalID.High);
+	encout->Flags = ddi_get16(accessp, &encpage->Flags);
+	encout->EnclosureHandle = ddi_get16(accessp, &encpage->EnclosureHandle);
+	encout->NumSlots = ddi_get16(accessp, &encpage->NumSlots);
+	encout->StartSlot = ddi_get16(accessp, &encpage->StartSlot);
+	encout->EnclosureLevel = ddi_get8(accessp, &encpage->EnclosureLevel);
+	encout->SEPDevHandle = ddi_get16(accessp, &encpage->SEPDevHandle);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Request information about the SES enclosures.
+ */
+int
+mptsas_get_enclosure_page0(mptsas_t *mpt, uint32_t page_address,
+    mptsas_enclosure_t *mep)
+{
+	int rval = DDI_SUCCESS;
+	Mpi2SasEnclosurePage0_t	encpage;
+
+	ASSERT(MUTEX_HELD(&mpt->m_mutex));
+
+	bzero(&encpage, sizeof (encpage));
+	rval = mptsas_access_config_page(mpt,
+	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT,
+	    MPI2_CONFIG_EXTPAGETYPE_ENCLOSURE, 0, page_address,
+	    mptsas_enclosurepage_0_cb, page_address, &encpage);
+
+	if (rval == DDI_SUCCESS) {
+		mep->me_enchdl = encpage.EnclosureHandle;
+		mep->me_flags = encpage.Flags;
+	}
 
 	return (rval);
 }

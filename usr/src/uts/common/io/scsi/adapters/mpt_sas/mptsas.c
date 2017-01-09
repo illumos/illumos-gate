@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
@@ -144,6 +144,8 @@ static void mptsas_config_space_fini(mptsas_t *mpt);
 static void mptsas_iport_register(mptsas_t *mpt);
 static int mptsas_smp_setup(mptsas_t *mpt);
 static void mptsas_smp_teardown(mptsas_t *mpt);
+static int mptsas_enc_setup(mptsas_t *mpt);
+static void mptsas_enc_teardown(mptsas_t *mpt);
 static int mptsas_cache_create(mptsas_t *mpt);
 static void mptsas_cache_destroy(mptsas_t *mpt);
 static int mptsas_alloc_request_frames(mptsas_t *mpt);
@@ -155,6 +157,7 @@ static void mptsas_alloc_reply_args(mptsas_t *mpt);
 static int mptsas_alloc_extra_sgl_frame(mptsas_t *mpt, mptsas_cmd_t *cmd);
 static void mptsas_free_extra_sgl_frame(mptsas_t *mpt, mptsas_cmd_t *cmd);
 static int mptsas_init_chip(mptsas_t *mpt, int first_time);
+static void mptsas_update_hashtab(mptsas_t *mpt);
 
 /*
  * SCSA function prototypes
@@ -1080,6 +1083,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char			config_setup = 0;
 	char			hba_attach_setup = 0;
 	char			smp_attach_setup = 0;
+	char			enc_attach_setup = 0;
 	char			mutex_init_done = 0;
 	char			event_taskq_create = 0;
 	char			dr_taskq_create = 0;
@@ -1433,6 +1437,10 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	smp_attach_setup++;
 
+	if (mptsas_enc_setup(mpt) == FALSE)
+		goto fail;
+	enc_attach_setup++;
+
 	if (mptsas_cache_create(mpt) == FALSE)
 		goto fail;
 
@@ -1575,6 +1583,9 @@ fail:
 
 		if (smp_attach_setup) {
 			mptsas_smp_teardown(mpt);
+		}
+		if (enc_attach_setup) {
+			mptsas_enc_teardown(mpt);
 		}
 		if (hba_attach_setup) {
 			mptsas_hba_teardown(mpt);
@@ -2059,6 +2070,7 @@ mptsas_do_detach(dev_info_t *dip)
 	cv_destroy(&mpt->m_extreq_sense_refcount_cv);
 
 	mptsas_smp_teardown(mpt);
+	mptsas_enc_teardown(mpt);
 	mptsas_hba_teardown(mpt);
 
 	mptsas_config_space_fini(mpt);
@@ -2306,6 +2318,42 @@ mptsas_smp_teardown(mptsas_t *mpt)
 		mpt->m_smptran = NULL;
 	}
 	mpt->m_smp_devhdl = 0;
+}
+
+static int
+mptsas_enc_setup(mptsas_t *mpt)
+{
+	list_create(&mpt->m_enclosures, sizeof (mptsas_enclosure_t),
+	    offsetof(mptsas_enclosure_t, me_link));
+	return (TRUE);
+}
+
+static void
+mptsas_enc_teardown(mptsas_t *mpt)
+{
+	mptsas_enclosure_t *mep;
+
+	while ((mep = list_remove_head(&mpt->m_enclosures)) != NULL) {
+		kmem_free(mep, sizeof (mptsas_enclosure_t));
+	}
+	list_destroy(&mpt->m_enclosures);
+}
+
+static mptsas_enclosure_t *
+mptsas_enc_lookup(mptsas_t *mpt, uint16_t hdl)
+{
+	mptsas_enclosure_t *mep;
+
+	ASSERT(MUTEX_HELD(&mpt->m_mutex));
+
+	for (mep = list_head(&mpt->m_enclosures); mep != NULL;
+	    mep = list_next(&mpt->m_enclosures, mep)) {
+		if (hdl == mep->me_enchdl) {
+			return (mep);
+		}
+	}
+
+	return (NULL);
 }
 
 static int
@@ -7720,18 +7768,28 @@ mptsas_handle_event(void *args)
 	{
 		pMpi2EventDataSasEnclDevStatusChange_t	encstatus;
 		uint8_t					rc;
+		uint16_t				enchdl;
 		char					string[80];
+		mptsas_enclosure_t			*mep;
 
 		encstatus = (pMpi2EventDataSasEnclDevStatusChange_t)
 		    eventreply->EventData;
 
 		rc = ddi_get8(mpt->m_acc_reply_frame_hdl,
 		    &encstatus->ReasonCode);
+		enchdl = ddi_get16(mpt->m_acc_reply_frame_hdl,
+		    &encstatus->EnclosureHandle);
+
 		switch (rc) {
 		case MPI2_EVENT_SAS_ENCL_RC_ADDED:
 			(void) sprintf(string, "added");
 			break;
 		case MPI2_EVENT_SAS_ENCL_RC_NOT_RESPONDING:
+			mep = mptsas_enc_lookup(mpt, enchdl);
+			if (mep != NULL) {
+				list_remove(&mpt->m_enclosures, mep);
+				kmem_free(mep, sizeof (*mep));
+			}
 			(void) sprintf(string, ", not responding");
 			break;
 		default:
@@ -7741,6 +7799,13 @@ mptsas_handle_event(void *args)
 		    "%x%s\n", mpt->m_instance,
 		    ddi_get16(mpt->m_acc_reply_frame_hdl,
 		    &encstatus->EnclosureHandle), string));
+
+		/*
+		 * No matter what has happened, update all of our device state
+		 * for enclosures, by retriggering an evaluation.
+		 */
+		mpt->m_done_traverse_enc = 0;
+		mptsas_update_hashtab(mpt);
 		break;
 	}
 
@@ -14494,7 +14559,29 @@ mptsas_offline_missed_luns(dev_info_t *pdip, uint16_t *repluns,
 	}
 }
 
-void
+/*
+ * If this enclosure doesn't exist in the enclosure list, add it. If it does,
+ * update it.
+ */
+static void
+mptsas_enclosure_update(mptsas_t *mpt, mptsas_enclosure_t *mep)
+{
+	mptsas_enclosure_t *m;
+
+	ASSERT(MUTEX_HELD(&mpt->m_mutex));
+	m = mptsas_enc_lookup(mpt, mep->me_enchdl);
+	if (m != NULL) {
+		m->me_flags = mep->me_flags;
+		return;
+	}
+
+	m = kmem_zalloc(sizeof (*m), KM_SLEEP);
+	m->me_enchdl = mep->me_enchdl;
+	m->me_flags = mep->me_flags;
+	list_insert_tail(&mpt->m_enclosures, m);
+}
+
+static void
 mptsas_update_hashtab(struct mptsas *mpt)
 {
 	uint32_t	page_address;
@@ -14509,7 +14596,7 @@ mptsas_update_hashtab(struct mptsas *mpt)
 	(void) mptsas_get_raid_info(mpt);
 
 	dev_handle = mpt->m_smp_devhdl;
-	for (; mpt->m_done_traverse_smp == 0; ) {
+	while (mpt->m_done_traverse_smp == 0) {
 		page_address = (MPI2_SAS_EXPAND_PGAD_FORM_GET_NEXT_HNDL &
 		    MPI2_SAS_EXPAND_PGAD_FORM_MASK) | (uint32_t)dev_handle;
 		if (mptsas_get_sas_expander_page0(mpt, page_address, &smp_node)
@@ -14521,16 +14608,34 @@ mptsas_update_hashtab(struct mptsas *mpt)
 	}
 
 	/*
+	 * Loop over enclosures so we can understand what's there.
+	 */
+	dev_handle = MPTSAS_INVALID_DEVHDL;
+	while (mpt->m_done_traverse_enc == 0) {
+		mptsas_enclosure_t me;
+
+		page_address = (MPI2_SAS_ENCLOS_PGAD_FORM_GET_NEXT_HANDLE &
+		    MPI2_SAS_ENCLOS_PGAD_FORM_MASK) | (uint32_t)dev_handle;
+
+		if (mptsas_get_enclosure_page0(mpt, page_address, &me) !=
+		    DDI_SUCCESS) {
+			break;
+		}
+		dev_handle = me.me_enchdl;
+		mptsas_enclosure_update(mpt, &me);
+	}
+
+	/*
 	 * Config target devices
 	 */
 	dev_handle = mpt->m_dev_handle;
 
 	/*
-	 * Do loop to get sas device page 0 by GetNextHandle till the
+	 * Loop to get sas device page 0 by GetNextHandle till the
 	 * the last handle. If the sas device is a SATA/SSP target,
 	 * we try to config it.
 	 */
-	for (; mpt->m_done_traverse_dev == 0; ) {
+	while (mpt->m_done_traverse_dev == 0) {
 		ptgt = NULL;
 		page_address =
 		    (MPI2_SAS_DEVICE_PGAD_FORM_GET_NEXT_HANDLE &
@@ -14587,6 +14692,7 @@ mptsas_update_driver_data(struct mptsas *mpt)
 	}
 	mpt->m_done_traverse_dev = 0;
 	mpt->m_done_traverse_smp = 0;
+	mpt->m_done_traverse_enc = 0;
 	mpt->m_dev_handle = mpt->m_smp_devhdl = MPTSAS_INVALID_DEVHDL;
 	mptsas_update_hashtab(mpt);
 }
@@ -14617,7 +14723,8 @@ mptsas_config_all(dev_info_t *pdip)
 
 	mutex_enter(&mpt->m_mutex);
 
-	if (!mpt->m_done_traverse_dev || !mpt->m_done_traverse_smp) {
+	if (!mpt->m_done_traverse_dev || !mpt->m_done_traverse_smp ||
+	    !mpt->m_done_traverse_enc) {
 		mptsas_update_hashtab(mpt);
 	}
 
@@ -16494,6 +16601,8 @@ mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
 	Mpi2SepRequest_t	req;
 	Mpi2SepReply_t		rep;
 	int			ret;
+	mptsas_enclosure_t	*mep;
+	uint16_t 		enctype;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
 
@@ -16512,6 +16621,21 @@ mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
 	 */
 	if (!(ptgt->m_deviceinfo & DEVINFO_DIRECT_ATTACHED) ||
 	    ptgt->m_addr.mta_phymask == 0) {
+		return (ENOTTY);
+	}
+
+	/*
+	 * Look through the enclosures and make sure that this enclosure is
+	 * something that is directly attached device. If we didn't find an
+	 * enclosure for this device, don't send the ioctl.
+	 */
+	mep = mptsas_enc_lookup(mpt, ptgt->m_enclosure);
+	if (mep == NULL)
+		return (ENOTTY);
+	enctype = mep->me_flags & MPI2_SAS_ENCLS0_FLAGS_MNG_MASK;
+	if (enctype != MPI2_SAS_ENCLS0_FLAGS_MNG_IOC_SES &&
+	    enctype != MPI2_SAS_ENCLS0_FLAGS_MNG_IOC_SGPIO &&
+	    enctype != MPI2_SAS_ENCLS0_FLAGS_MNG_IOC_GPIO) {
 		return (ENOTTY);
 	}
 
