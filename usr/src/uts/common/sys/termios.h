@@ -144,7 +144,8 @@ extern pid_t tcgetsid(int);
 #define	VWERASE		14
 #define	VLNEXT		15
 #define	VSTATUS		16
-/* 17 through 19 reserved for future use */
+#define	VERASE2		17
+/* 18 through 19 reserved for future use */
 
 /*
  * control characters form Xenix termio.h
@@ -161,6 +162,7 @@ extern pid_t tcgetsid(int);
 #define	CINTR	CTRL('c')
 #define	CQUIT	034	/* FS, cntl | */
 #define	CERASE	0177	/* DEL */
+#define	CERASE2	CTRL('h')
 #define	CKILL	CTRL('u')
 #define	CEOT	04
 #define	CEOL	0

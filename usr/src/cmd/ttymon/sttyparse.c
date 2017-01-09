@@ -131,11 +131,15 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 					cb->c_cc[VLNEXT] = gct(*++argv, term);
 				else if (eq("status") && --argc)
 					cb->c_cc[VSTATUS] = gct(*++argv, term);
+				else if (eq("erase2") && --argc)
+					cb->c_cc[VERASE2] = gct(*++argv, term);
 			}
 			if (match)
 				continue;
 			if (eq("ek")) {
 				cb->c_cc[VERASE] = CERASE;
+				if (term & TERMIOS)
+					cb->c_cc[VERASE2] = CERASE2;
 				cb->c_cc[VKILL] = CKILL;
 			} else if (eq("line") &&
 			    !(term & TERMIOS) && --argc) {
@@ -149,6 +153,8 @@ sttyparse(int argc, char *argv[], int term, struct termio *ocb,
 				cb->c_cc[VEOL] = CNUL;
 			} else if (eq("sane")) {
 				cb->c_cc[VERASE] = CERASE;
+				if (term & TERMIOS)
+					cb->c_cc[VERASE2] = CERASE2;
 				cb->c_cc[VKILL] = CKILL;
 				cb->c_cc[VQUIT] = CQUIT;
 				cb->c_cc[VINTR] = CINTR;
