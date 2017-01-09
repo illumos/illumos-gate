@@ -1,0 +1,28 @@
+    libdis_test:      0f 3a cc c8 01     sha1rnds4 $0x1,%xmm0,%xmm1
+    libdis_test+0x5:  0f 3a cc 0b 02     sha1rnds4 $0x2,(%ebx),%xmm1
+    libdis_test+0xa:  0f 3a cc 4b 23 03  sha1rnds4 $0x3,0x23(%ebx),%xmm1
+    libdis_test+0x10: 0f 3a cc 0c 8b 02  sha1rnds4 $0x2,(%ebx,%ecx,4),%xmm1
+    libdis_test+0x16: 0f 38 c8 c8        sha1nexte %xmm0,%xmm1
+    libdis_test+0x1a: 0f 38 c8 0b        sha1nexte (%ebx),%xmm1
+    libdis_test+0x1e: 0f 38 c8 4b 23     sha1nexte 0x23(%ebx),%xmm1
+    libdis_test+0x23: 0f 38 c8 0c 8b     sha1nexte (%ebx,%ecx,4),%xmm1
+    libdis_test+0x28: 0f 38 c9 c8        sha1msg1 %xmm0,%xmm1
+    libdis_test+0x2c: 0f 38 c9 0b        sha1msg1 (%ebx),%xmm1
+    libdis_test+0x30: 0f 38 c9 4b 23     sha1msg1 0x23(%ebx),%xmm1
+    libdis_test+0x35: 0f 38 c9 0c 8b     sha1msg1 (%ebx,%ecx,4),%xmm1
+    libdis_test+0x3a: 0f 38 ca c8        sha1msg2 %xmm0,%xmm1
+    libdis_test+0x3e: 0f 38 ca 0b        sha1msg2 (%ebx),%xmm1
+    libdis_test+0x42: 0f 38 ca 4b 23     sha1msg2 0x23(%ebx),%xmm1
+    libdis_test+0x47: 0f 38 ca 0c 8b     sha1msg2 (%ebx,%ecx,4),%xmm1
+    libdis_test+0x4c: 0f 38 cb ec        sha256rnds2 %xmm4,%xmm5
+    libdis_test+0x50: 0f 38 cb 2b        sha256rnds2 (%ebx),%xmm5
+    libdis_test+0x54: 0f 38 cb 6b 23     sha256rnds2 0x23(%ebx),%xmm5
+    libdis_test+0x59: 0f 38 cb 2c 8b     sha256rnds2 (%ebx,%ecx,4),%xmm5
+    libdis_test+0x5e: 0f 38 cc c8        sha256msg1 %xmm0,%xmm1
+    libdis_test+0x62: 0f 38 cc 0b        sha256msg1 (%ebx),%xmm1
+    libdis_test+0x66: 0f 38 cc 4b 23     sha256msg1 0x23(%ebx),%xmm1
+    libdis_test+0x6b: 0f 38 cc 0c 8b     sha256msg1 (%ebx,%ecx,4),%xmm1
+    libdis_test+0x70: 0f 38 cd c8        sha256msg2 %xmm0,%xmm1
+    libdis_test+0x74: 0f 38 cd 0b        sha256msg2 (%ebx),%xmm1
+    libdis_test+0x78: 0f 38 cd 4b 23     sha256msg2 0x23(%ebx),%xmm1
+    libdis_test+0x7d: 0f 38 cd 0c 8b     sha256msg2 (%ebx,%ecx,4),%xmm1

@@ -54,6 +54,8 @@ file path=opt/util-tests/tests/dis/i386/32.lzcnt.out mode=0555
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.s mode=0555
 file path=opt/util-tests/tests/dis/i386/32.popcnt.out mode=0555
 file path=opt/util-tests/tests/dis/i386/32.popcnt.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.sha.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.sha.s mode=0555
 file path=opt/util-tests/tests/dis/i386/32.sse-4.2.out mode=0555
 file path=opt/util-tests/tests/dis/i386/32.sse-4.2.s mode=0555
 file path=opt/util-tests/tests/dis/i386/32.ssse3.out mode=0555
@@ -84,6 +86,8 @@ file path=opt/util-tests/tests/dis/i386/64.popcnt.out mode=0555
 file path=opt/util-tests/tests/dis/i386/64.popcnt.s mode=0555
 file path=opt/util-tests/tests/dis/i386/64.random.out mode=0555
 file path=opt/util-tests/tests/dis/i386/64.random.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.sha.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.sha.s mode=0555
 file path=opt/util-tests/tests/dis/i386/64.sse-4.2.out mode=0555
 file path=opt/util-tests/tests/dis/i386/64.sse-4.2.s mode=0555
 file path=opt/util-tests/tests/dis/i386/64.ssse3.out mode=0555
