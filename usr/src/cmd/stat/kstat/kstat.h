@@ -159,15 +159,7 @@ typedef union ks_value {
 	"module: %-30.30s  instance: %-6d\n"		\
 	"name:   %-30.30s  class:    %-.30s\n"
 
-#define	JSON_FMT					\
-	"{\n\t\"module\": \"%s\",\n"			\
-	"\t\"instance\": %d,\n"				\
-	"\t\"name\": \"%s\",\n"				\
-	"\t\"class\": \"%s\",\n"			\
-	"\t\"type\": %d,\n"
-
 #define	KS_DFMT	"\t%-30s  "
-#define	KS_JFMT	"\t\t\"%s\": "
 #define	KS_PFMT	"%s:%d:%s:%s"
 
 typedef struct ks_instance {
@@ -208,7 +200,6 @@ static boolean_t	ks_match(const char *, ks_pattern_t *);
 static ks_selector_t	*new_selector(void);
 static void	ks_instances_read(kstat_ctl_t *);
 static void	ks_value_print(ks_nvpair_t *);
-static void	ks_instance_print(ks_instance_t *, ks_nvpair_t *);
 static void	ks_instances_print(void);
 static char	*ks_safe_strdup(char *);
 static void	ks_sleep_until(hrtime_t *, hrtime_t, int, int *);

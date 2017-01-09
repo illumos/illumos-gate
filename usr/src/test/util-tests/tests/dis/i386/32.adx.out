@@ -1,0 +1,6 @@
+    libdis_test:      66 0f 38 f6 c3     adcx   %ebx,%eax
+    libdis_test+0x5:  66 0f 38 f6 43 40  adcx   0x40(%ebx),%eax
+    libdis_test+0xb:  66 0f 38 f6 13     adcx   (%ebx),%edx
+    libdis_test+0x10: f3 0f 38 f6 c3     adox   %ebx,%eax
+    libdis_test+0x15: f3 0f 38 f6 43 40  adox   0x40(%ebx),%eax
+    libdis_test+0x1b: f3 0f 38 f6 13     adox   (%ebx),%edx

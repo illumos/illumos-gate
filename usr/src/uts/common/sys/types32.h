@@ -26,8 +26,6 @@
 #ifndef _SYS_TYPES32_H
 #define	_SYS_TYPES32_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/int_types.h>
 
 #ifdef	__cplusplus

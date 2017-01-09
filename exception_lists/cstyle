@@ -167,6 +167,7 @@ usr/src/cmd/mandoc/term_ps.c
 usr/src/cmd/mandoc/term.c
 usr/src/cmd/mandoc/term.h
 usr/src/cmd/mandoc/tree.c
+usr/src/cmd/ttymon/sttyparse.c
 usr/src/common/ficl/ficltokens.h
 usr/src/common/bzip2/bzlib.h
 usr/src/common/bzip2/crctable.c
@@ -961,6 +962,7 @@ usr/src/uts/common/io/bge/bge_kstats.c
 usr/src/uts/common/io/bge/bge_impl.h
 usr/src/uts/common/io/bge/bge_send.c
 usr/src/uts/common/io/bge/bge_hw.h
+usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/e1000api/e1000_80003es2lan.c
 usr/src/uts/common/io/e1000api/e1000_80003es2lan.h
 usr/src/uts/common/io/e1000api/e1000_82540.c

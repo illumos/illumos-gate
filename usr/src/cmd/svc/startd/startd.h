@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_STARTD_H
@@ -82,16 +82,9 @@ extern "C" {
 
 #endif
 
-#ifndef NDEBUG
-#define	bad_error(func, err)	{					\
-	(void) fprintf(stderr, "%s:%d: %s() failed with unexpected "	\
-	    "error %d.  Aborting.\n", __FILE__, __LINE__, (func), (err)); \
-	abort();							\
-}
-#else
-#define	bad_error(func, err)	abort()
-#endif
-
+#define	bad_error(func, err)					\
+	uu_panic("%s:%d: %s() failed with unexpected "		\
+	    "error %d.  Aborting.\n", __FILE__, __LINE__, (func), (err));
 
 #define	min(a, b)	(((a) < (b)) ? (a) : (b))
 

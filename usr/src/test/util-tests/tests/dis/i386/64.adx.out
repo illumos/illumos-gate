@@ -1,0 +1,8 @@
+    libdis_test:      66 48 0f 38 f6 c3  adcx   %rbx,%rax
+    libdis_test+0x6:  66 48 0f 38 f6 43  adcx   0x40(%rbx),%rax
+                      40 
+    libdis_test+0xd:  66 48 0f 38 f6 13  adcx   (%rbx),%rdx
+    libdis_test+0x13: f3 48 0f 38 f6 c3  adox   %rbx,%rax
+    libdis_test+0x19: f3 48 0f 38 f6 43  adox   0x40(%rbx),%rax
+                      40 
+    libdis_test+0x20: f3 48 0f 38 f6 13  adox   (%rbx),%rdx

@@ -471,6 +471,7 @@ file path=usr/share/man/man9f/scsi_unprobe.9f
 file path=usr/share/man/man9f/scsi_validate_sense.9f
 file path=usr/share/man/man9f/scsi_vu_errmsg.9f
 file path=usr/share/man/man9f/semaphore.9f
+file path=usr/share/man/man9f/sprintf.9f
 file path=usr/share/man/man9f/stoi.9f
 file path=usr/share/man/man9f/string.9f
 file path=usr/share/man/man9f/strlog.9f
@@ -491,7 +492,6 @@ file path=usr/share/man/man9f/untimeout.9f
 file path=usr/share/man/man9f/ureadc.9f
 file path=usr/share/man/man9f/uwritec.9f
 file path=usr/share/man/man9f/va_arg.9f
-file path=usr/share/man/man9f/vsprintf.9f
 link path=usr/share/man/man9f/AVL_NEXT.9f target=avl.9f
 link path=usr/share/man/man9f/AVL_PREV.9f target=avl.9f
 link path=usr/share/man/man9f/SIZEOF_PTR.9f target=STRUCT_DECL.9f
@@ -908,13 +908,13 @@ link path=usr/share/man/man9f/dlerrorack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dlokack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dlphysaddrack.9f target=dlbindack.9f
 link path=usr/share/man/man9f/dluderrorind.9f target=dlbindack.9f
-link path=usr/share/man/man9f/free_pktiopb.9f target=get_pktiopb.9f
 link path=usr/share/man/man9f/firmware_close.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_free.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_get_size.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_malloc.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_open.9f target=firmload.9f
 link path=usr/share/man/man9f/firmware_read.9f target=firmload.9f
+link path=usr/share/man/man9f/free_pktiopb.9f target=get_pktiopb.9f
 link path=usr/share/man/man9f/gld_intr.9f target=gld.9f
 link path=usr/share/man/man9f/gld_mac_alloc.9f target=gld.9f
 link path=usr/share/man/man9f/gld_mac_free.9f target=gld.9f
@@ -1274,6 +1274,7 @@ link path=usr/share/man/man9f/sema_p.9f target=semaphore.9f
 link path=usr/share/man/man9f/sema_p_sig.9f target=semaphore.9f
 link path=usr/share/man/man9f/sema_tryp.9f target=semaphore.9f
 link path=usr/share/man/man9f/sema_v.9f target=semaphore.9f
+link path=usr/share/man/man9f/snprintf.9f target=sprintf.9f
 link path=usr/share/man/man9f/strcasecmp.9f target=string.9f
 link path=usr/share/man/man9f/strcat.9f target=string.9f
 link path=usr/share/man/man9f/strchr.9f target=string.9f
@@ -1302,6 +1303,8 @@ link path=usr/share/man/man9f/va_copy.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_end.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_start.9f target=va_arg.9f
 link path=usr/share/man/man9f/vcmn_err.9f target=cmn_err.9f
+link path=usr/share/man/man9f/vsnprintf.9f target=sprintf.9f
+link path=usr/share/man/man9f/vsprintf.9f target=sprintf.9f
 link path=usr/share/man/man9f/vzcmn_err.9f target=cmn_err.9f
 link path=usr/share/man/man9f/wr.9f target=WR.9f
 link path=usr/share/man/man9f/zcmn_err.9f target=cmn_err.9f

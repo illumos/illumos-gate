@@ -136,10 +136,10 @@ typedef enum {
     @param[in] Width         - Width of rectangle in BltBuffer in pixels.
     @param[in] Height        - Hight of rectangle in BltBuffer in pixels.
     @param[in] Delta         - OPTIONAL
-  
+
     @retval EFI_SUCCESS           - The Blt operation completed.
     @retval EFI_INVALID_PARAMETER - BltOperation is not valid.
-    @retval EFI_DEVICE_ERROR      - A hardware error occured writting to the video buffer.
+    @retval EFI_DEVICE_ERROR      - A hardware error occurred writing to the video buffer.
 
 --*/
 typedef

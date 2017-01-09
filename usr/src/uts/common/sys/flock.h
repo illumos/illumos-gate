@@ -253,6 +253,7 @@ void	flk_init_callback(flk_callback_t *,
 void	flk_add_callback(flk_callback_t *,
 		callb_cpr_t *(*)(flk_cb_when_t, void *), void *,
 		flk_callback_t *);
+void	flk_del_callback(flk_callback_t *);
 callb_cpr_t *flk_invoke_callbacks(flk_callback_t *, flk_cb_when_t);
 
 /* Zones hooks */

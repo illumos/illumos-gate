@@ -27,8 +27,6 @@
 #ifndef _UTRAP_H
 #define	_UTRAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

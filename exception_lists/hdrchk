@@ -321,6 +321,7 @@ usr/src/uts/common/io/bnxe/bnxe_binding.h
 usr/src/uts/common/io/bnxe/bnxe_debug.h
 usr/src/uts/common/io/bnxe/bnxe.h
 usr/src/uts/common/io/bnxe/version.h
+usr/src/uts/common/io/cxgbe/firmware/*
 usr/src/uts/common/io/e1000api/e1000_80003es2lan.h
 usr/src/uts/common/io/e1000api/e1000_82541.h
 usr/src/uts/common/io/e1000api/e1000_82543.h

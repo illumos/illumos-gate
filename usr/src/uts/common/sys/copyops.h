@@ -27,8 +27,6 @@
 #ifndef	_SYS_COPYOPS_H
 #define	_SYS_COPYOPS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/buf.h>

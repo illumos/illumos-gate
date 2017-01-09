@@ -26,8 +26,6 @@
 #ifndef	_SYS_IPC_RCTL_H
 #define	_SYS_IPC_RCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/rctl.h>
 
 #ifdef	__cplusplus

@@ -23,6 +23,7 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2015 Jason King.
  */
 
 /*
@@ -71,6 +72,8 @@ pkcs11_strerror(CK_RV rv)
 			return ("CKR_ATTRIBUTE_TYPE_INVALID");
 		case CKR_ATTRIBUTE_VALUE_INVALID:
 			return ("CKR_ATTRIBUTE_VALUE_INVALID");
+		case CKR_ACTION_PROHIBITED:
+			return ("CKR_ACTION_PROHIBITED");
 		case CKR_DATA_INVALID:
 			return ("CKR_DATA_INVALID");
 		case CKR_DATA_LEN_RANGE:
@@ -195,6 +198,8 @@ pkcs11_strerror(CK_RV rv)
 			return ("CKR_RANDOM_NO_RNG");
 		case CKR_DOMAIN_PARAMS_INVALID:
 			return ("CKR_DOMAIN_PARAMS_INVALID");
+		case CKR_CURVE_NOT_SUPPORTED:
+			return ("CLR_CURVE_NOT_SUPPORTED");
 		case CKR_BUFFER_TOO_SMALL:
 			return ("CKR_BUFFER_TOO_SMALL");
 		case CKR_SAVED_STATE_INVALID:
@@ -211,6 +216,22 @@ pkcs11_strerror(CK_RV rv)
 			return ("CKR_MUTEX_BAD");
 		case CKR_MUTEX_NOT_LOCKED:
 			return ("CKR_MUTEX_NOT_LOCKED");
+		case CKR_NEW_PIN_MODE:
+			return ("CKR_NEW_PIN_MODE");
+		case CKR_NEXT_OTP:
+			return ("CKR_NEXT_OTP");
+		case CKR_EXCEEDED_MAX_ITERATIONS:
+			return ("CKR_EXCEEDED_MAX_ITERATIONS");
+		case CKR_FIPS_SELF_TEST_FAILED:
+			return ("CKR_FIPS_SELF_TEST_FAILED");
+		case CKR_LIBRARY_LOAD_FAILED:
+			return ("CKR_LIBRARY_LOAD_FAILED");
+		case CKR_PIN_TOO_WEAK:
+			return ("CKR_PIN_TOO_WEAK");
+		case CKR_PUBLIC_KEY_INVALID:
+			return ("CKR_PUBLIC_KEY_INVALID");
+		case CKR_FUNCTION_REJECTED:
+			return ("CKR_FUNCTION_REJECTED");
 		case CKR_VENDOR_DEFINED:
 			return ("CKR_VENDOR_DEFINED");
 		default:

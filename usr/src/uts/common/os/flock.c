@@ -532,12 +532,8 @@ ofdcleanlock(file_t *fp)
  * scheme.
  */
 int
-reclock(vnode_t		*vp,
-	flock64_t	*lckdat,
-	int		cmd,
-	int		flag,
-	u_offset_t	offset,
-	flk_callback_t	*flk_cbp)
+reclock(vnode_t *vp, flock64_t *lckdat, int cmd, int flag, u_offset_t offset,
+    flk_callback_t *flk_cbp)
 {
 	lock_descriptor_t	stack_lock_request;
 	lock_descriptor_t	*lock_request;
@@ -869,7 +865,7 @@ flk_invoke_callbacks(flk_callback_t *cblist, flk_cb_when_t when)
 
 void
 flk_init_callback(flk_callback_t *flk_cb,
-	callb_cpr_t *(*cb_fcn)(flk_cb_when_t, void *), void *cbdata)
+    callb_cpr_t *(*cb_fcn)(flk_cb_when_t, void *), void *cbdata)
 {
 	flk_cb->cb_next = flk_cb;
 	flk_cb->cb_prev = flk_cb;
@@ -884,8 +880,8 @@ flk_init_callback(flk_callback_t *flk_cb,
 
 void
 flk_add_callback(flk_callback_t *newcb,
-		callb_cpr_t *(*cb_fcn)(flk_cb_when_t, void *),
-		void *cbdata, flk_callback_t *cblist)
+    callb_cpr_t *(*cb_fcn)(flk_cb_when_t, void *),
+    void *cbdata, flk_callback_t *cblist)
 {
 	flk_init_callback(newcb, cb_fcn, cbdata);
 
@@ -896,6 +892,20 @@ flk_add_callback(flk_callback_t *newcb,
 	newcb->cb_next = cblist;
 	cblist->cb_prev->cb_next = newcb;
 	cblist->cb_prev = newcb;
+}
+
+/*
+ * Remove the callback from a list.
+ */
+
+void
+flk_del_callback(flk_callback_t *flk_cb)
+{
+	flk_cb->cb_next->cb_prev = flk_cb->cb_prev;
+	flk_cb->cb_prev->cb_next = flk_cb->cb_next;
+
+	flk_cb->cb_prev = flk_cb;
+	flk_cb->cb_next = flk_cb;
 }
 
 /*
@@ -1470,7 +1480,7 @@ flk_wait_execute_request(lock_descriptor_t *request)
 
 static int
 flk_add_edge(lock_descriptor_t *from_lock, lock_descriptor_t *to_lock,
-			int check_cycle, int update_graph)
+    int check_cycle, int update_graph)
 {
 	edge_t	*edge;
 	edge_t	*ep;
@@ -2153,8 +2163,7 @@ flk_wakeup(lock_descriptor_t *lock, int adj_list_remove)
 
 static void
 flk_recompute_dependencies(lock_descriptor_t *request,
-		lock_descriptor_t **topology,
-			int nvertex, int update_graph)
+    lock_descriptor_t **topology, int nvertex, int update_graph)
 {
 	lock_descriptor_t *vertex, *lock;
 	graph_t	*gp = request->l_graph;
@@ -2984,13 +2993,8 @@ cleanlocks(vnode_t *vp, pid_t pid, int sysid)
  */
 
 int
-chklock(
-	struct vnode	*vp,
-	int 		iomode,
-	u_offset_t	offset,
-	ssize_t		len,
-	int 		fmode,
-	caller_context_t *ct)
+chklock(struct vnode *vp, int iomode, u_offset_t offset, ssize_t len, int fmode,
+    caller_context_t *ct)
 {
 	register int	i;
 	struct flock64 	bf;
@@ -3019,11 +3023,7 @@ chklock(
  * given whence.
  */
 int
-convoff(vp, lckdat, whence, offset)
-	struct vnode 	*vp;
-	struct flock64 	*lckdat;
-	int 		whence;
-	offset_t	offset;
+convoff(struct vnode *vp, struct flock64 *lckdat, int whence, offset_t offset)
 {
 	int 		error;
 	struct vattr 	vattr;
@@ -3658,7 +3658,7 @@ flk_set_lockmgr_status(flk_lockmgr_status_t status)
 
 locklist_t *
 get_lock_list(int list_type, int lock_state, int sysid, boolean_t use_sysid,
-		pid_t pid, const vnode_t *vp, zoneid_t zoneid)
+    pid_t pid, const vnode_t *vp, zoneid_t zoneid)
 {
 	lock_descriptor_t	*lock;
 	lock_descriptor_t	*graph_head;
@@ -4118,8 +4118,6 @@ create_flock(lock_descriptor_t *lp, flock64_t *flp)
  * Convert flock_t data describing a lock range into unsigned long starting
  * and ending points, which are put into lock_request.  Returns 0 or an
  * errno value.
- * Large Files: max is passed by the caller and we return EOVERFLOW
- * as defined by LFS API.
  */
 
 int
@@ -4287,7 +4285,7 @@ cl_flk_change_nlm_state_to_unknown(int nlmid)
 
 int
 nbl_lock_conflict(vnode_t *vp, nbl_op_t op, u_offset_t offset,
-		ssize_t length, int svmand, caller_context_t *ct)
+    ssize_t length, int svmand, caller_context_t *ct)
 {
 	int conflict = 0;
 	graph_t			*gp;
@@ -4333,7 +4331,7 @@ nbl_lock_conflict(vnode_t *vp, nbl_op_t op, u_offset_t offset,
 
 static int
 lock_blocks_io(nbl_op_t op, u_offset_t offset, ssize_t length,
-	    int lock_type, u_offset_t lock_start, u_offset_t lock_end)
+    int lock_type, u_offset_t lock_start, u_offset_t lock_end)
 {
 	ASSERT(op == NBL_READ || op == NBL_WRITE || op == NBL_READWRITE);
 	ASSERT(lock_type == F_RDLCK || lock_type == F_WRLCK);

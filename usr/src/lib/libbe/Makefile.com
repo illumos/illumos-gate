@@ -54,9 +54,6 @@ C99MODE=	$(C99_ENABLE)
 LDLIBS +=	-lficl-sys -lzfs -linstzones -luuid -lnvpair -lc -lgen
 LDLIBS +=	-ldevinfo -lefi
 CPPFLAGS +=	$(INCS)
-CERRWARN +=	-_gcc=-Wno-unused-label
-CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-address
 
 CLOBBERFILES += $(LIBRARY)
 

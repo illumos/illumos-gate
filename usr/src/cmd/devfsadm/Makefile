@@ -20,6 +20,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Joyent, Inc.
 #
 # cmd/devfsadm/Makefile
 #
@@ -61,8 +62,10 @@ clean lint _msg:	$(SUBDIRS)
 clobber: $(SUBDIRS)
 	$(RM) $(ROOTETCDEVFILES)
 
-install: $(SUBDIRS) $(ROOTETCDEFAULTFILES) $(ROOTETCDEVFILES) \
-	$(ROOTUSRINCLUDEFILES)
+install_h: $(ROOTUSRINCLUDEFILES)
+
+install: $(SUBDIRS) install_h $(ROOTETCDEFAULTFILES) $(ROOTETCDEVFILES)
+
 
 $(ROOTETCDEV):
 	$(INS.dir)

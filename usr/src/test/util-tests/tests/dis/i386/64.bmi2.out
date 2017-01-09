@@ -1,0 +1,32 @@
+    libdis_test:      c4 e2 78 f5 cb     bzhi   %eax,%ebx,%ecx
+    libdis_test+0x5:  c4 e2 78 f5 0b     bzhi   %eax,(%rbx),%ecx
+    libdis_test+0xa:  c4 e2 63 f6 c8     mulx   %eax,%ebx,%ecx
+    libdis_test+0xf:  c4 e2 63 f6 08     mulx   (%rax),%ebx,%ecx
+    libdis_test+0x14: c4 e2 63 f5 c8     pdep   %eax,%ebx,%ecx
+    libdis_test+0x19: c4 e2 63 f5 08     pdep   (%rax),%ebx,%ecx
+    libdis_test+0x1e: c4 e2 62 f5 c8     pext   %eax,%ebx,%ecx
+    libdis_test+0x23: c4 e2 62 f5 08     pext   (%rax),%ebx,%ecx
+    libdis_test+0x28: c4 e3 7b f0 d8 03  rorx   $0x3,%eax,%ebx
+    libdis_test+0x2e: c4 e3 7b f0 18 03  rorx   $0x3,(%rax),%ebx
+    libdis_test+0x34: c4 e2 7a f7 cb     sarx   %eax,%ebx,%ecx
+    libdis_test+0x39: c4 e2 7a f7 0b     sarx   %eax,(%rbx),%ecx
+    libdis_test+0x3e: c4 e2 79 f7 cb     shlx   %eax,%ebx,%ecx
+    libdis_test+0x43: c4 e2 79 f7 0b     shlx   %eax,(%rbx),%ecx
+    libdis_test+0x48: c4 e2 7b f7 cb     shrx   %eax,%ebx,%ecx
+    libdis_test+0x4d: c4 e2 7b f7 0b     shrx   %eax,(%rbx),%ecx
+    libdis_test+0x52: c4 e2 f8 f5 cb     bzhi   %rax,%rbx,%rcx
+    libdis_test+0x57: c4 e2 f8 f5 0b     bzhi   %rax,(%rbx),%rcx
+    libdis_test+0x5c: c4 e2 e3 f6 c8     mulx   %rax,%rbx,%rcx
+    libdis_test+0x61: c4 e2 e3 f6 08     mulx   (%rax),%rbx,%rcx
+    libdis_test+0x66: c4 e2 e3 f5 c8     pdep   %rax,%rbx,%rcx
+    libdis_test+0x6b: c4 e2 e3 f5 08     pdep   (%rax),%rbx,%rcx
+    libdis_test+0x70: c4 e2 e2 f5 c8     pext   %rax,%rbx,%rcx
+    libdis_test+0x75: c4 e2 e2 f5 08     pext   (%rax),%rbx,%rcx
+    libdis_test+0x7a: c4 e3 fb f0 d8 03  rorx   $0x3,%rax,%rbx
+    libdis_test+0x80: c4 e3 fb f0 18 03  rorx   $0x3,(%rax),%rbx
+    libdis_test+0x86: c4 e2 fa f7 cb     sarx   %rax,%rbx,%rcx
+    libdis_test+0x8b: c4 e2 fa f7 0b     sarx   %rax,(%rbx),%rcx
+    libdis_test+0x90: c4 e2 f9 f7 cb     shlx   %rax,%rbx,%rcx
+    libdis_test+0x95: c4 e2 f9 f7 0b     shlx   %rax,(%rbx),%rcx
+    libdis_test+0x9a: c4 e2 fb f7 cb     shrx   %rax,%rbx,%rcx
+    libdis_test+0x9f: c4 e2 fb f7 0b     shrx   %rax,(%rbx),%rcx

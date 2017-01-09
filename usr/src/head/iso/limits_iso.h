@@ -43,8 +43,6 @@
 #ifndef _ISO_LIMITS_ISO_H
 #define	_ISO_LIMITS_ISO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* SVr4.0 1.34 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif

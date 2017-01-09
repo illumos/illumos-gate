@@ -46,7 +46,7 @@ extern struct ses_to_be_freed_list ses_delay_freed;
 
 /* CK_INFO: Information about cryptoki */
 #define	CRYPTOKI_VERSION_MAJOR	2
-#define	CRYPTOKI_VERSION_MINOR	20
+#define	CRYPTOKI_VERSION_MINOR	40
 #define	LIBRARY_DESCRIPTION	"Sun Crypto Softtoken            "
 #define	LIBRARY_VERSION_MAJOR	1
 #define	LIBRARY_VERSION_MINOR	1

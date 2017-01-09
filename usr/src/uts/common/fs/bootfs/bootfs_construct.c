@@ -292,11 +292,10 @@ bootfs_construct_entry(bootfs_t *bfs, uintptr_t addr, uint64_t size,
 void
 bootfs_construct(bootfs_t *bfs)
 {
-	uint_t id = 0, ndata;
+	uint_t id = 0;
 	char paddr[64], psize[64], pname[64], *mname;
 	dev_info_t *root;
-	uchar_t *datap;
-	uint64_t size = 0, addr = 0;
+	uint64_t size, addr;
 	int ret;
 
 	bootfs_mkroot(bfs);
@@ -318,25 +317,14 @@ bootfs_construct(bootfs_t *bfs)
 		    sizeof (paddr))
 			break;
 
-		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, root,
-		    DDI_PROP_DONTPASS, paddr, &datap, &ndata) !=
-		    DDI_PROP_SUCCESS)
+		addr = (uint64_t)ddi_prop_get_int64(DDI_DEV_T_ANY, root,
+		    DDI_PROP_DONTPASS, paddr, 0);
+		if (addr == 0 || addr == DDI_PROP_NOT_FOUND)
 			break;
 
-		if (ndata == 8)
-			bcopy(datap, &addr, sizeof (uint64_t));
-		ddi_prop_free(datap);
-		if (ndata != 8)
-			break;
-
-		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, root,
-		    DDI_PROP_DONTPASS, psize, &datap, &ndata) !=
-		    DDI_PROP_SUCCESS)
-			break;
-		if (ndata == 8)
-			bcopy(datap, &size, sizeof (uint64_t));
-		ddi_prop_free(datap);
-		if (ndata != 8)
+		size = (uint64_t)ddi_prop_get_int64(DDI_DEV_T_ANY, root,
+		    DDI_PROP_DONTPASS, psize, 0);
+		if (size == 0 || size == DDI_PROP_NOT_FOUND)
 			break;
 
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, root,

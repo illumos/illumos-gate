@@ -78,7 +78,7 @@ void	bcache_add_dev(int);
 void	*bcache_allocate(void);
 void	bcache_free(void *);
 int	bcache_strategy(void *devdata, int rw, daddr_t blk,
-    size_t offset, size_t size, char *buf, size_t *rsize);
+    size_t size, char *buf, size_t *rsize);
 
 /*
  * Disk block cache
@@ -86,7 +86,7 @@ int	bcache_strategy(void *devdata, int rw, daddr_t blk,
 struct bcache_devdata
 {
     int         (*dv_strategy)(void *devdata, int rw, daddr_t blk,
-		    size_t offset, size_t size, char *buf, size_t *rsize);
+		    size_t size, char *buf, size_t *rsize);
     void	*dv_devdata;
     void	*dv_cache;
 };

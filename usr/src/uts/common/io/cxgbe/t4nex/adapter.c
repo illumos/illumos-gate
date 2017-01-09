@@ -110,6 +110,13 @@ iq_to_rxq(struct sge_iq *iq)
 	return (container_of(iq, struct sge_rxq, iq));
 }
 
+bool
+is_40G_port(const struct port_info *pi)
+{
+	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_40G) != 0);
+}
+
+#ifndef TCP_OFFLOAD_DISABLE
 int
 t4_wrq_tx(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m)
 {
@@ -120,3 +127,4 @@ t4_wrq_tx(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m)
 	TXQ_UNLOCK(wrq);
 	return (rc);
 }
+#endif

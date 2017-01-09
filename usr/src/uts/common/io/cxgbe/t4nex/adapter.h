@@ -203,6 +203,9 @@ enum {
 	EQ_STARTED	= (1 << 8),	/* started */
 };
 
+/* Listed in order of preference.  Update t4_sysctls too if you change these */
+enum {DOORBELL_UDB=0x1 , DOORBELL_WCWR=0x2, DOORBELL_UDBWC=0x4, DOORBELL_KDB=0x8};
+
 /*
  * Egress Queue: driver is producer, T4 is consumer.
  *
@@ -218,6 +221,9 @@ struct sge_eq {
 	struct tx_desc *desc;	/* KVA of descriptor ring */
 	uint64_t ba;		/* bus address of descriptor ring */
 	struct sge_qstat *spg;	/* status page, for convenience */
+	int doorbells;
+	volatile uint32_t *udb; /* KVA of doorbell (lies within BAR2) */
+	u_int udb_qid;		/* relative qid within the doorbell page */
 	uint16_t cap;		/* max # of desc, for convenience */
 	uint16_t avail;		/* available descriptors, for convenience */
 	uint16_t qsize;		/* size (# of entries) of the queue */
@@ -363,6 +369,7 @@ struct sge_wrq {
 
 struct sge {
 	int fl_starve_threshold;
+	int s_qpp;
 
 	int nrxq;	/* total rx queues (all ports and the rest) */
 	int ntxq;	/* total tx queues (all ports and the rest) */
@@ -374,7 +381,9 @@ struct sge {
 	int neq;	/* total egress queues */
 
 	struct sge_iq fwq;	/* Firmware event queue */
+#ifndef TCP_OFFLOAD_DISABLE
 	struct sge_wrq mgmtq;	/* Management queue (Control queue) */
+#endif
 	struct sge_txq *txq;	/* NIC tx queues */
 	struct sge_rxq *rxq;	/* NIC rx queues */
 #ifndef TCP_OFFLOAD_DISABLE
@@ -423,11 +432,14 @@ struct driver_properties {
 
 	int timer_val[SGE_NTIMERS];
 	int counter_val[SGE_NCOUNTERS];
+
+	int wc;
 };
 
 struct rss_header;
 typedef int (*cpl_handler_t)(struct sge_iq *, const struct rss_header *,
     mblk_t *);
+typedef int (*fw_msg_handler_t)(struct adapter *, const __be64 *);
 
 struct adapter {
 	SLIST_ENTRY(adapter) link;
@@ -445,6 +457,9 @@ struct adapter {
 	/* MMIO register access handle */
 	ddi_acc_handle_t regh;
 	caddr_t regp;
+	/* BAR1 register access handle */
+	ddi_acc_handle_t reg1h;
+	caddr_t reg1p;
 
 	/* Interrupt information */
 	int intr_type;
@@ -455,6 +470,7 @@ struct adapter {
 
 	struct driver_properties props;
 	kstat_t *ksp;
+	kstat_t *ksp_stat;
 
 	struct sge sge;
 
@@ -465,6 +481,7 @@ struct adapter {
 	struct l2t_data *l2t;	/* L2 table */
 	struct tid_info tids;
 
+	int doorbells;
 	int registered_device_map;
 	int open_device_map;
 	int flags;
@@ -488,6 +505,7 @@ struct adapter {
 	uint16_t iscsicaps;
 	uint16_t fcoecaps;
 
+	fw_msg_handler_t fw_msg_handler[5]; /* NUM_FW6_TYPES */
 	cpl_handler_t cpl_handler[0xef]; /* NUM_CPL_CMDS */
 
 	kmutex_t lock;
@@ -578,6 +596,7 @@ void t4_write_reg64(struct adapter *sc, uint32_t reg, uint64_t val);
 struct port_info *adap2pinfo(struct adapter *sc, int idx);
 void t4_os_set_hw_addr(struct adapter *sc, int idx, uint8_t hw_addr[]);
 bool is_10G_port(const struct port_info *pi);
+bool is_40G_port(const struct port_info *pi);
 struct sge_rxq *iq_to_rxq(struct sge_iq *iq);
 int t4_wrq_tx(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m);
 
@@ -591,6 +610,7 @@ int port_full_uninit(struct port_info *pi);
 void enable_port_queues(struct port_info *pi);
 void disable_port_queues(struct port_info *pi);
 int t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h);
+int t4_register_fw_msg_handler(struct adapter *, int, fw_msg_handler_t);
 void t4_iterate(void (*func)(int, void *), void *arg);
 
 /* t4_sge.c */
@@ -603,7 +623,11 @@ uint_t t4_intr_all(caddr_t arg1, caddr_t arg2);
 uint_t t4_intr(caddr_t arg1, caddr_t arg2);
 uint_t t4_intr_err(caddr_t arg1, caddr_t arg2);
 int t4_mgmt_tx(struct adapter *sc, mblk_t *m);
+#ifndef TCP_OFFLOAD_DISABLE
 int t4_wrq_tx_locked(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m0);
+#endif
+void memwin_info(struct adapter *, int, uint32_t *, uint32_t *);
+uint32_t position_memwin(struct adapter *, int, uint32_t);
 
 mblk_t *t4_eth_tx(struct port_info *pi, struct sge_txq *txq, mblk_t *frame);
 int t4_alloc_tx_maps(struct adapter *sc, struct tx_maps *txmaps,  int count,
