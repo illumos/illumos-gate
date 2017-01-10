@@ -244,6 +244,118 @@ tem_safe_polled_write(
 	tem_safe_terminal_emulate(tem, buf, len, NULL, CALLED_FROM_STANDALONE);
 }
 
+/* Process partial UTF-8 sequence. */
+static void
+tem_safe_input_partial(struct tem_vt_state *tem, cred_t *credp,
+    enum called_from called_from)
+{
+	int i;
+	uint8_t c;
+
+	if (tem->tvs_utf8_left == 0)
+		return;
+
+	for (i = 0; i < sizeof (tem->tvs_utf8_partial); i++) {
+		c = (tem->tvs_utf8_partial >> (24 - (i << 3))) & 0xff;
+		if (c != 0) {
+			tem_safe_parse(tem, c, credp, called_from);
+		}
+	}
+	tem->tvs_utf8_left = 0;
+	tem->tvs_utf8_partial = 0;
+}
+
+/*
+ * Handle UTF-8 sequences.
+ */
+static void
+tem_safe_input_byte(struct tem_vt_state *tem, uchar_t c, cred_t *credp,
+    enum called_from called_from)
+{
+	/*
+	 * Check for UTF-8 code points. In case of error fall back to
+	 * 8-bit code. As we only have 8859-1 fonts for console, this will set
+	 * the limits on what chars we actually can display, therefore we
+	 * have to return to this code once we have solved the font issue.
+	 */
+	if ((c & 0x80) == 0x00) {
+		/* One-byte sequence. */
+		tem_safe_input_partial(tem, credp, called_from);
+		tem_safe_parse(tem, c, credp, called_from);
+		return;
+	}
+	if ((c & 0xe0) == 0xc0) {
+		/* Two-byte sequence. */
+		tem_safe_input_partial(tem, credp, called_from);
+		tem->tvs_utf8_left = 1;
+		tem->tvs_utf8_partial = c;
+		return;
+	}
+	if ((c & 0xf0) == 0xe0) {
+		/* Three-byte sequence. */
+		tem_safe_input_partial(tem, credp, called_from);
+		tem->tvs_utf8_left = 2;
+		tem->tvs_utf8_partial = c;
+		return;
+	}
+	if ((c & 0xf8) == 0xf0) {
+		/* Four-byte sequence. */
+		tem_safe_input_partial(tem, credp, called_from);
+		tem->tvs_utf8_left = 3;
+		tem->tvs_utf8_partial = c;
+		return;
+	}
+	if ((c & 0xc0) == 0x80) {
+		/* Invalid state? */
+		if (tem->tvs_utf8_left == 0) {
+			tem_safe_parse(tem, c, credp, called_from);
+			return;
+		}
+		tem->tvs_utf8_left--;
+		tem->tvs_utf8_partial = (tem->tvs_utf8_partial << 8) | c;
+		if (tem->tvs_utf8_left == 0) {
+			tem_char_t v, u;
+			uint8_t b;
+
+			/*
+			 * Transform the sequence of 2 to 4 bytes to
+			 * unicode number.
+			 */
+			v = 0;
+			u = tem->tvs_utf8_partial;
+			b = (u >> 24) & 0xff;
+			if (b != 0) {		/* Four-byte sequence */
+				v = b & 0x07;
+				b = (u >> 16) & 0xff;
+				v = (v << 6) | (b & 0x3f);
+				b = (u >> 8) & 0xff;
+				v = (v << 6) | (b & 0x3f);
+				b = u & 0xff;
+				v = (v << 6) | (b & 0x3f);
+			} else if ((b = (u >> 16) & 0xff) != 0) {
+				v = b & 0x0f;	/* Three-byte sequence */
+				b = (u >> 8) & 0xff;
+				v = (v << 6) | (b & 0x3f);
+				b = u & 0xff;
+				v = (v << 6) | (b & 0x3f);
+			} else if ((b = (u >> 8) & 0xff) != 0) {
+				v = b & 0x1f;	/* Two-byte sequence */
+				b = u & 0xff;
+				v = (v << 6) | (b & 0x3f);
+			}
+
+			/* Use '?' as replacement if needed. */
+			if (v > 0xff)
+				v = '?';
+			tem_safe_parse(tem, v, credp, called_from);
+			tem->tvs_utf8_partial = 0;
+		}
+		return;
+	}
+	/* Anything left is illegal in UTF-8 sequence. */
+	tem_safe_input_partial(tem, credp, called_from);
+	tem_safe_parse(tem, c, credp, called_from);
+}
 
 /*
  * This is the main entry point into the terminal emulator.
@@ -270,7 +382,7 @@ tem_safe_terminal_emulate(
 		    VIS_HIDE_CURSOR, credp, called_from);
 
 	for (; len > 0; len--, buf++)
-		tem_safe_parse(tem, *buf, credp, called_from);
+		tem_safe_input_byte(tem, *buf, credp, called_from);
 
 	/*
 	 * Send the data we just got to the framebuffer.

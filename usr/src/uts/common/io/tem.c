@@ -242,6 +242,9 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 	tem_safe_reset_display(ptem, credp, CALLED_FROM_NORMAL,
 	    clear_screen, init_color);
 
+	ptem->tvs_utf8_left = 0;
+	ptem->tvs_utf8_partial = 0;
+
 	tem_safe_get_color(ptem, &fg, &bg, TEM_ATTR_SCREEN_REVERSE);
 	for (i = 0; i < height; i++)
 		for (j = 0; j < width; j++) {
