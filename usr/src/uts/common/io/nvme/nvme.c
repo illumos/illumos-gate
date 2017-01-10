@@ -197,6 +197,10 @@
 #include <sys/archsystm.h>
 #include <sys/sata/sata_hba.h>
 
+#ifdef __x86
+#include <sys/x86_archext.h>
+#endif
+
 #include "nvme_reg.h"
 #include "nvme_var.h"
 
@@ -2409,6 +2413,10 @@ nvme_setup_interrupts(nvme_t *nvme, int intr_type, int nqpairs)
 			    __func__);
 			return (ret);
 		}
+#ifdef __x86
+		if (get_hwenv() == HW_VMWARE)
+			nvme->n_intr_types &= ~DDI_INTR_TYPE_MSIX;
+#endif
 	}
 
 	if ((nvme->n_intr_types & intr_type) == 0)
