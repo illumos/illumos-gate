@@ -1,244 +1,248 @@
-'\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2016 Jason King.
+.\"
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBPKCS11 3LIB "Aug 4, 2008"
-.SH NAME
-libpkcs11 \- PKCS#11 Cryptographic Framework library
-.SH SYNOPSIS
-.LP
-.nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpkcs11\fR [ \fIlibrary\fR... ]
-#include <\fBsecurity/cryptoki.h\fR>
-#include <\fBsecurity/pkcs11.h\fR>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBlibpkcs11\fR library implements the RSA Security Inc. PKCS#11
-Cryptographic Token Interface (Cryptoki), v2.20 specification by using plug-ins
+.Dd Oct 19, 2016
+.Dt LIBPKCS11 3LIB
+.Os
+.Sh NAME
+.Nm libpkcs11
+.Nd PKCS#11 Cryptographic Framework library
+.Sh SYNOPSIS
+.Lb libpkcs11
+.In security/cryptoki.h
+.In security/pkcs11.h
+.Sh DESCRIPTION
+The
+.Nm
+library implements the RSA Security Inc. PKCS#11
+Cryptographic Token Interface (Cryptoki), v2.40 specification by using plug-ins
 to provide the slots.
-.sp
-.LP
-Each plug-in, which also implements RSA PKCS#11 v2.20, represents one or more
+.Lp
+Each plug-in, which also implements RSA PKCS#11 v2.40, represents one or more
 slots.
-.sp
-.LP
-The \fBlibpkcs11\fR library provides a special slot called the meta slot. The
+.Lp
+The
+.Nm
+library provides a special slot called the meta slot. The
 meta slot provides a virtual union of capabilities of all other slots. When
-available, the meta slot is always the first slot provided by \fBlibpkcs11\fR.
-.sp
-.LP
+available, the meta slot is always the first slot provided by
+.Nm .
+.Lp
 The meta slot feature can be configured either system-wide or by individual
 users. System-wide configuration for meta slot features is done with the
-\fBcryptoadm\fR(1M) utility. User configuration for meta slot features is
+.Xr cryptoadm 1M
+utility. User configuration for meta slot features is
 performed with environment variables.
-.sp
-.LP
+.Lp
 By default, the following is the system-wide configuration for meta slot. Meta
 slot is enabled. Meta slot provides token-based object support with the
-Software RSA PKCS#11 softtoken (\fBpkcs11_softtoken\fR(5)). Meta slot is
+Software RSA PKCS#11 softtoken
+.Pf ( Xr pkcs11_softtoken 5 ) .
+Meta slot is
 allowed to move sensitive token objects to other slots if that is necessary to
 perform an operation.
-.sp
-.LP
+.Lp
 Users can overwrite one or more system-wide configuration options for meta slot
 using these environment variables.
-.sp
-.LP
-The \fB${METASLOT_OBJECTSTORE_SLOT}\fR and \fB${METASLOT_OBJECTSTORE_TOKEN}\fR
+.Lp
+The
+.Ev ${METASLOT_OBJECTSTORE_SLOT}
+and
+.Ev ${METASLOT_OBJECTSTORE_TOKEN}
 environment variables are used to specify an alternate token object store. A
-user can specify either slot-description in \fB${METASLOT_OBJECTSTORE_SLOT}\fR
-or token-label in \fB${METASLOT_OBJECTSTORE_TOKEN}\fR, or both. Valid values
+user can specify either slot-description in
+.Ev ${METASLOT_OBJECTSTORE_SLOT}
+or token-label in
+.Ev ${METASLOT_OBJECTSTORE_TOKEN} , or both. Valid values
 for slot-description and token-label are available from output of the command:
-.sp
-.in +2
-.nf
-cryptoadm list -v
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The \fB${METASLOT_ENABLED}\fR environment variable is used to specify whether
+.Bd -literal -offset indent
+# cryptoadm list -v
+.Ed
+.Lp
+The
+.Ev ${METASLOT_ENABLED}
+environment variable is used to specify whether
 the user wants to turn the metaslot feature on or off. Only two values are
 recognized. The value "true" means meta slot will be on. The value "false"
 means meta slot will be off.
-.sp
-.LP
-The \fB${METASLOT_AUTO_KEY_MIGRATE}\fR environment variable is used to specify
+.Lp
+The
+.Ev ${METASLOT_AUTO_KEY_MIGRATE}
+environment variable is used to specify
 whether the user wants sensitive token objects to move to other slots for
 cryptographic operations. Only two values are recognized. The value "true"
 means meta slot will migrate sensitive token objects to other slots if
 necessary. The value "false" means meta slot will not migrate sensitive token
 objects to other slots even if it is necessary.
-.sp
-.LP
+.Lp
 When the meta slot feature is enabled, the slot that provides token-based
 object support is not shown as one of the available slots. All of its
 functionality can be used with the meta slot.
-.sp
-.LP
+.Lp
 This library filters the list of mechanisms available from plug-ins based on
-the policy set by \fBcryptoadm\fR(1M).
-.sp
-.LP
-This library provides entry points for all PKCS#11 v2.20 functions. See the RSA
-PKCS#11 v2.20 specification at http://www.rsasecurity.com.
-.sp
-.LP
-Plug-ins are added to \fBlibpkcs11\fR by the \fBpkcs11conf\fR class action
-script during execution of \fBpkgadd\fR(1M). The available mechanisms are
-administered by the \fBcryptoadm\fR(1M) utility.
-.sp
-.LP
+the policy set by
+.Xr cryptoadm 1M .
+.Lp
+This library provides entry points for all PKCS#11 v2.40 functions. See the
+PKCS#11 v2.40 specifications at
+.Lk http://www.oasis-open.org.
+.Lp
+Plug-ins are added to
+.Nm
+by the
+.Sy pkcs11conf
+class action
+script during execution of
+.Xr pkgadd 1M .
+The available mechanisms are administered by the
+.Xr cryptoadm 1M
+utility.
+.Lp
 Plug-ins must have all of their library dependancies specified, including
-\fBlibc\fR(3LIB). Libraries that have unresolved symbols, including those from
-\fBlibc\fR, will be rejected and a message will be sent to \fBsyslog\fR(3C) for
-such plug-ins.
-.sp
-.LP
+.Xr libc 3LIB .
+Libraries that have unresolved symbols, including those from
+.Xr libc 3LIB ,
+will be rejected and a message will be sent to
+.Xr syslog 3C
+for such plug-ins.
+.Lp
 Due to U.S. Export regulations, all plug-ins are required to be
-cryptographically signed using the \fBelfsign\fR utility.
-.sp
-.LP
+cryptographically signed using the
+.Xr elfsign 1
+utility.
+.Lp
 Any plug-in that is not signed or is not a compatible version of PKCS#11 will
-be dropped by \fBlibpkcs11\fR. When a plug-in is dropped, the administrator is
-alerted by the \fBsyslog\fR(3C) utility.
-.sp
-.LP
-The <\fBsecurity/pkcs11f.h\fR> header contains function definitions. The
-<\fBsecurity/pkcs11t.h\fR> header contains type definitions. Applications can
-include either of these headers in place of <\fBsecurity/pkcs11.h\fR>, which
-contains both function and type definitions.
-.SH INTERFACES
-.sp
-.LP
-The shared object \fBlibpkcs11.so.1\fR provides the public interfaces defined
-below. See \fBIntro\fR(3) for additional information on shared object
-interfaces.
-.SS "PKCS#11 Standard"
-.sp
-
-.sp
-.TS
-l l
-l l .
-\fBC_CloseAllSessions\fR	\fBC_CloseSession\fR
-\fBC_CopyObject\fR	\fBC_CreateObject\fR
-\fBC_Decrypt\fR	\fBC_DecryptDigestUpdate\fR
-\fBC_DecryptFinal\fR	\fBC_DecryptInit\fR
-\fBC_DecryptUpdate\fR	\fBC_DecryptVerifyUpdate\fR
-\fBC_DeriveKey\fR	\fBC_DestroyObject\fR
-\fBC_Digest\fR	\fBC_DigestEncryptUpdate\fR
-\fBC_DigestFinal\fR	\fBC_DigestInit\fR
-\fBC_DigestKey\fR	\fBC_DigestUpdate\fR
-\fBC_Encrypt\fR	\fBC_EncryptFinal\fR
-\fBC_EncryptInit\fR	\fBC_EncryptUpdate\fR
-\fBC_Finalize\fR	\fBC_FindObjects\fR
-\fBC_FindObjectsFinal\fR	\fBC_FindObjectsInit\fR
-\fBC_GenerateKey\fR	\fBC_GenerateKeyPair\fR
-\fBC_GenerateRandom\fR	\fBC_GetAttributeValue\fR
-\fBC_GetFunctionList\fR	\fBC_GetInfo\fR
-\fBC_GetMechanismInfo\fR	\fBC_GetMechanismList\fR
-\fBC_GetObjectSize\fR	\fBC_GetOperationState\fR
-\fBC_GetSessionInfo\fR	\fBC_GetSlotInfo\fR
-\fBC_GetSlotList\fR	\fBC_GetTokenInfo\fR
-\fBC_InitPIN\fR	\fBC_InitToken\fR
-\fBC_Initialize\fR	\fBC_Login\fR
-\fBC_Logout\fR	\fBC_OpenSession\fR
-\fBC_SeedRandom\fR	\fBC_SetAttributeValue\fR
-\fBC_SetOperationState\fR	\fBC_SetPIN\fR
-\fBC_Sign\fR	\fBC_SignEncryptUpdate\fR
-\fBC_SignFinal\fR	\fBC_SignInit\fR
-\fBC_SignRecover\fR	\fBC_SignRecoverInit\fR
-\fBC_SignUpdate\fR	\fBC_UnwrapKey\fR
-\fBC_Verify\fR	\fBC_VerifyFinal\fR
-\fBC_VerifyInit\fR	\fBC_VerifyRecover\fR
-\fBC_VerifyRecoverInit\fR	\fBC_VerifyUpdate\fR
-\fBC_WaitForSlotEvent\fR	\fBC_WrapKey\fR
-.TE
-
-.SS "SUNW Extensions"
-.sp
-
-.sp
-.TS
-l l .
-\fBSUNW_C_GetMechSession\fR	\fBSUNW_C_KeyToObject\fR
-.TE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/libpkcs11.so.1\fR\fR
-.ad
-.RS 30n
+be dropped by
+.Nm .
+When a plug-in is dropped, the administrator is alerted by the
+.Xr syslog 3C
+utility.
+.Lp
+The
+.In security/pkcs11f.h
+header contains function definitions. The
+.In security/pkcs11t.h
+header contains type definitions. Applications can
+include either of these headers in place of
+.In security/pkcs11.h ,
+which contains both function and type definitions.
+.Sh INTERFACES
+The shared object
+.Lb libpkcs11.so.1
+provides the public interfaces defined below. See
+.Xr Intro 3
+for additional information on shared object interfaces.
+.Ss "PKCS#11 Standard"
+.\"
+.\" Use SUNW_C_GetMechSession for the first column so both sections will
+.\" line up better when rendered
+.\"
+.Bl -column -offset indent ".Sy SUNW_C_GetMechSession" ".Sy C_DecryptDigestUpdate"
+.It Sy C_CloseAllSessions Ta Sy C_CloseSession
+.It Sy C_CopyObject Ta Sy C_CreateObject
+.It Sy C_Decrypt Ta Sy C_DecryptDigestUpdate
+.It Sy C_DecryptFinal Ta Sy C_DecryptInit
+.It Sy C_DecryptUpdate Ta Sy C_DecryptVerifyUpdate
+.It Sy C_DeriveKey Ta Sy C_DestroyObject
+.It Sy C_Digest Ta Sy C_DigestEncryptUpdate
+.It Sy C_DigestFinal Ta Sy C_DigestInit
+.It Sy C_DigestKey Ta Sy C_DigestUpdate
+.It Sy C_Encrypt Ta Sy C_EncryptFinal
+.It Sy C_EncryptInit Ta Sy C_EncryptUpdate
+.It Sy C_Finalize Ta Sy C_FindObjects
+.It Sy C_FindObjectsFinal Ta Sy C_FindObjectsInit
+.It Sy C_GenerateKey Ta Sy C_GenerateKeyPair
+.It Sy C_GenerateRandom Ta Sy C_GetAttributeValue
+.It Sy C_GetFunctionList Ta Sy C_GetInfo
+.It Sy C_GetMechanismInfo Ta Sy C_GetMechanismList
+.It Sy C_GetObjectSize Ta Sy C_GetOperationState
+.It Sy C_GetSessionInfo Ta Sy C_GetSlotInfo
+.It Sy C_GetSlotList Ta Sy C_GetTokenInfo
+.It Sy C_InitPIN Ta Sy C_InitToken
+.It Sy C_Initialize Ta Sy C_Login
+.It Sy C_Logout Ta Sy C_OpenSession
+.It Sy C_SeedRandom Ta Sy C_SetAttributeValue
+.It Sy C_SetOperationState Ta Sy C_SetPIN
+.It Sy C_Sign Ta Sy C_SignEncryptUpdate
+.It Sy C_SignFinal Ta Sy C_SignInit
+.It Sy C_SignRecover Ta Sy C_SignRecoverInit
+.It Sy C_SignUpdate Ta Sy C_UnwrapKey
+.It Sy C_Verify Ta Sy C_VerifyFinal
+.It Sy C_VerifyInit Ta Sy C_VerifyRecover
+.It Sy C_VerifyRecoverInit Ta Sy C_VerifyUpdate
+.It Sy C_WaitForSlotEvent Ta Sy C_WrapKey
+.El
+.Ss "SUNW Extensions"
+.Bl -column -offset indent ".Sy SUNW_C_GetMechSession" ".Sy C_DecryptDigestUpdate"
+.It Sy SUNW_C_GetMechSession Ta Sy SUNW_C_KeyToObject
+.El
+.Sh FILES
+.Bl -tag -compact -width Pa
+.It Pa /usr/lib/libpkcs11.so.1
 shared object
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/64/libpkcs11.so.1\fR\fR
-.ad
-.RS 30n
+.It Pa /usr/lib/64/libpkcs11.so.1
 64-bit shared object
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-Interface Stability	Committed
-_
-MT-Level	See below.
-_
-Standard	See below.
-.TE
-
-.sp
-.LP
+.El
+.Sh ATTRIBUTES
+See
+.Xr attributes 5
+for descriptions of the following attributes:
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
 The SUNW Extension functions are MT-Safe. The PKCS#11 Standard functions are
-MT-Safe with exceptions. See Section 6.5.2 of RSA PKCS#11 v2.20.
-.sp
-.LP
-The PKCS#11 Standard functions conform to PKCS#11 v2.20.
-.SH SEE ALSO
-.sp
-.LP
-\fBcryptoadm\fR(1M), \fBpkgadd\fR(1M), \fBIntro\fR(3),
-\fBSUNW_C_GetMechSession\fR(3EXT), \fBsyslog\fR(3C), \fBattributes\fR(5) ,
-\fBpkcs11_kernel\fR(5), \fBpkcs11_softtoken\fR(5)
-.sp
-.LP
-RSA PKCS#11 v2.20 http://www.rsasecurity.com
-.SH NOTES
-.sp
-.LP
-If an application calls \fBC_WaitForSlotEvent()\fR without the
-\fBCKF_DONT_BLOCK\fR flag set, \fBlibpkcs11\fR must create threads internally.
-If, however, \fBCKF_LIBRARY_CANT_CREATE_OS_THREADS\fR is set,
-\fBC_WaitForSlotEvent()\fR returns \fBCKR_FUNCTION_FAILED\fR.
-.sp
-.LP
+MT-Safe with exceptions. See Section 2.5.3 of PKCS#11 Cryptographic Token Usage
+Guide v2.40 and Section 5.1.5 of PKCS#11 Cryptographic Token Interface Base
+Standard v2.40
+.Sh STANDARD
+The PKCS#11 Standard functions conform to PKCS#11 Cryptographic Token
+Interface Profiles v2.40 Extended Provider.
+.Sh SEE ALSO
+.Xr cryptoadm 1M ,
+.Xr pkgadd 1M ,
+.Xr Intro 3 ,
+.Xr syslog 3C ,
+.Xr SUNW_C_GetMechSession 3EXT ,
+.Xr attributes 5  ,
+.Xr pkcs11_kernel 5 ,
+.Xr pkcs11_softtoken 5
+.Rs
+.%T "PKCS#11 Cryptographic Token Interface Base Specification v2.40 Plus Errata 01"
+.%U http://docs.oasis-open.org/pkcs11/pkcs11-base/v2.40/errata01/os/pkcs11-base-v2.40-errata01-os.html
+.Re
+.Rs
+.%T "PKCS#11 Cryptographic Token Interface Profiles v2.40"
+.%U http://docs.oasis-open.org/pkcs11/pkcs11-profiles/v2.40/pkcs11-profiles-v2.40.html
+.Re
+.Rs
+.%T "PKCS#11 Cryptographic Token Interface Usage Guide v2.40"
+.%U http://docs.oasis-open.org/pkcs11/pkcs11-ug/v2.40/pkcs11-ug-v2.40.html
+.Re
+.Sh NOTES
+If an application calls
+.Fn C_WaitForSlotEvent
+without the
+.Dv CKF_DONT_BLOCK
+flag set,
+.Nm
+must create threads internally.  If, however,
+.Dv CKF_LIBRARY_CANT_CREATE_OS_THREADS
+is set,
+.Fn C_WaitForSlotEvent
+returns
+.Dv CKR_FUNCTION_FAILED .
+.Lp
 The PKCS#11 library does not work with Netscape 4.\fIx\fR but does work with
 more recent versions of Netscape and Mozilla.
-.sp
-.LP
-Because \fBC_Initalize()\fR might have been called by both an application and a
+.Lp
+Because
+.Fn C_Initalize
+might have been called by both an application and a
 library, it is not safe for a library or its plugins to call
-\fBC_Finalize()\fR. A library can be finished calling functions from
-\fBlibpkcs11\fR, while an application might not.
+.Fn C_Finalize .
+A library can be finished calling functions from
+.Nm ,
+while an application might not.

@@ -354,11 +354,9 @@ be_free_list(be_node_list_t *be_nodes)
  *		Semi-private (library wide use only)
  */
 int
-be_get_zone_be_list(
 /* LINTED */
-	char *zone_be_name,
-	char *zone_be_container_ds,
-	be_node_list_t **zbe_nodes)
+be_get_zone_be_list(char *zone_be_name, char *zone_be_container_ds,
+    be_node_list_t **zbe_nodes)
 {
 	zfs_handle_t *zhp = NULL;
 	list_callback_data_t cb = { 0 };
@@ -1066,7 +1064,7 @@ be_get_node_data(
 				be_node->be_active_on_boot = B_TRUE;
 			else
 				be_node->be_active_on_boot = B_FALSE;
-		else if (prop_buf != NULL && strcmp(prop_buf, be_ds) == 0)
+		else if (strcmp(prop_buf, be_ds) == 0)
 			be_node->be_active_on_boot = B_TRUE;
 		else
 			be_node->be_active_on_boot = B_FALSE;

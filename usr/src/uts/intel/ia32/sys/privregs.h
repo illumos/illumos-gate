@@ -27,8 +27,6 @@
 #ifndef	_IA32_SYS_PRIVREGS_H
 #define	_IA32_SYS_PRIVREGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

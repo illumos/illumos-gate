@@ -6,8 +6,6 @@
 #ifndef _MD5_H
 #define	_MD5_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * MD5.H - header file for MD5C.C
  */

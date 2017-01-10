@@ -27,8 +27,6 @@
 #ifndef _STDIO_IMPL_H
 #define	_STDIO_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 
 #ifdef	__cplusplus

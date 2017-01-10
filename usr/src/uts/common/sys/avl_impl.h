@@ -27,8 +27,6 @@
 #ifndef	_AVL_IMPL_H
 #define	_AVL_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is a private header file.  Applications should not directly include
  * this file.

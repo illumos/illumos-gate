@@ -25,6 +25,7 @@
 
 #include "shared.h"
 #include "t4_hw.h"
+#include "t4_chip_type.h"
 
 #define	GLBL_INTR_MASK (F_CIM | F_MPS | F_PL | F_PCIE | F_MC | F_EDC0 | \
 		F_EDC1 | F_LE | F_TP | F_MA | F_PM_TX | F_PM_RX | F_ULP_RX | \
@@ -39,15 +40,19 @@ enum {
 	MACADDR_LEN	= 12,	/* MAC Address length */
 };
 
-enum { MEM_EDC0, MEM_EDC1, MEM_MC };
+enum { MEM_EDC0, MEM_EDC1, MEM_MC, MEM_MC0 = MEM_MC, MEM_MC1 };
 
 enum {
 	MEMWIN0_APERTURE = 2048,
 	MEMWIN0_BASE	 = 0x1b800,
 	MEMWIN1_APERTURE = 32768,
 	MEMWIN1_BASE	 = 0x28000,
-	MEMWIN2_APERTURE = 65536,
-	MEMWIN2_BASE	 = 0x30000,
+
+	MEMWIN2_APERTURE_T4 = 65536,
+	MEMWIN2_BASE_T4     = 0x30000,
+
+	MEMWIN2_APERTURE_T5 = 128 * 1024,
+	MEMWIN2_BASE_T5     = 0x60000,
 };
 
 enum dev_master { MASTER_CANT, MASTER_MAY, MASTER_MUST };
@@ -58,6 +63,11 @@ enum {
 	PAUSE_RX	= 1 << 0,
 	PAUSE_TX	= 1 << 1,
 	PAUSE_AUTONEG	= 1 << 2
+};
+
+struct memwin {
+	uint32_t base;
+	uint32_t aperture;
 };
 
 struct port_stats {
@@ -194,7 +204,6 @@ struct tp_proxy_stats {
 struct tp_cpl_stats {
 	u32 req[4];
 	u32 rsp[4];
-	u32 tx_err[4];
 };
 
 struct tp_rdma_stats {
@@ -221,7 +230,7 @@ struct vpd_params {
 
 struct pci_params {
 	unsigned int  vpd_cap_addr;
-	unsigned char speed;
+	unsigned short speed;
 	unsigned char width;
 };
 
@@ -263,7 +272,15 @@ struct adapter_params {
 
 	unsigned char bypass;
 
+	enum chip_type chip;		/* chip code */
+
 	unsigned int ofldq_wr_cred;
+
+	unsigned int nsched_cls;	/* number of traffic classes */
+
+	unsigned int max_ordird_qp;	/* Max read depth per RDMA QP */
+	unsigned int max_ird_adapter;	/* Max read depth per adapter */
+	bool ulptx_memwrite_dsgl;	/* use of T5 DSGL allowed */
 };
 
 enum {					/* chip revisions */
@@ -335,7 +352,7 @@ int t4_seeprom_wp(struct adapter *adapter, int enable);
 int t4_read_flash(struct adapter *adapter, unsigned int addr,
 	unsigned int nwords, u32 *data, int byte_oriented);
 int t4_load_fw(struct adapter *adapter, const u8 *fw_data, unsigned int size);
-unsigned int t4_flash_cfg_addr(struct adapter *adapter);
+int t4_flash_cfg_addr(struct adapter *adapter);
 int t4_load_cfg(struct adapter *adapter, const u8 *cfg_data, unsigned int size);
 int t4_get_fw_version(struct adapter *adapter, u32 *vers);
 int t4_get_tp_version(struct adapter *adapter, u32 *vers);
@@ -388,7 +405,8 @@ int t4_cim_read_la(struct adapter *adap, u32 *la_buf, unsigned int *wrptr);
 void t4_cim_read_pif_la(struct adapter *adap, u32 *pif_req, u32 *pif_rsp,
 	unsigned int *pif_req_wrptr, unsigned int *pif_rsp_wrptr);
 void t4_cim_read_ma_la(struct adapter *adap, u32 *ma_req, u32 *ma_rsp);
-int t4_mc_read(struct adapter *adap, u32 addr, __be32 *data, u64 *parity);
+int t4_mc_read(struct adapter *adap, int idx, u32 addr,
+	__be32 *data, u64 *parity);
 int t4_edc_read(struct adapter *adap, int idx, u32 addr, __be32 *data,
 	u64 *parity);
 int t4_mem_read(struct adapter *adap, int mtype, u32 addr, u32 size,
@@ -396,6 +414,9 @@ int t4_mem_read(struct adapter *adap, int mtype, u32 addr, u32 size,
 int t4_mem_win_read(struct adapter *adap, u32 addr, __be32 *data);
 
 void t4_get_port_stats(struct adapter *adap, int idx, struct port_stats *p);
+void t4_get_port_stats_offset(struct adapter *adap, int idx,
+	struct port_stats *stats,
+	struct port_stats *offset);
 void t4_get_lb_stats(struct adapter *adap, int idx, struct lb_port_stats *p);
 void t4_clr_port_stats(struct adapter *adap, int idx);
 
@@ -436,10 +457,15 @@ int t4_wol_pat_enable(struct adapter *adap, unsigned int port, unsigned int map,
 
 int t4_fw_hello(struct adapter *adap, unsigned int mbox, unsigned int evt_mbox,
 	enum dev_master master, enum dev_state *state);
-int t4_fw_initialize(struct adapter *adap, unsigned int mbox);
 int t4_fw_bye(struct adapter *adap, unsigned int mbox);
 int t4_early_init(struct adapter *adap, unsigned int mbox);
 int t4_fw_reset(struct adapter *adap, unsigned int mbox, int reset);
+int t4_fw_halt(struct adapter *adap, unsigned int mbox, int force);
+int t4_fw_restart(struct adapter *adap, unsigned int mbox, int reset);
+int t4_fw_upgrade(struct adapter *adap, unsigned int mbox,
+	const u8 *fw_data, unsigned int size, int force);
+int t4_fw_initialize(struct adapter *adap, unsigned int mbox);
+
 int t4_query_params(struct adapter *adap, unsigned int mbox, unsigned int pf,
 	unsigned int vf, unsigned int nparams, const u32 *params, u32 *val);
 int t4_set_params(struct adapter *adap, unsigned int mbox, unsigned int pf,
@@ -450,6 +476,10 @@ int t4_cfg_pfvf(struct adapter *adap, unsigned int mbox, unsigned int pf,
 	unsigned int rxqi, unsigned int rxq, unsigned int tc, unsigned int vi,
 	unsigned int cmask, unsigned int pmask, unsigned int exactf,
 	unsigned int rcaps, unsigned int wxcaps);
+int t4_alloc_vi_func(struct adapter *adap, unsigned int mbox,
+	unsigned int port, unsigned int pf, unsigned int vf,
+	unsigned int nmac, u8 *mac, unsigned int *rss_size,
+	unsigned int portfunc, unsigned int idstype);
 int t4_alloc_vi(struct adapter *adap, unsigned int mbox, unsigned int port,
 	unsigned int pf, unsigned int vf, unsigned int nmac, u8 *mac,
 	unsigned int *rss_size);
@@ -490,7 +520,6 @@ int t4_sge_ctxt_rd(struct adapter *adap, unsigned int mbox, unsigned int cid,
 int t4_sge_ctxt_rd_bd(struct adapter *adap, unsigned int cid,
 	enum ctxt_type ctype, u32 *data);
 int t4_handle_fw_rpl(struct adapter *adap, const __be64 *rpl);
-
 /* common.c */
 int is_offload(const struct adapter *adap);
 unsigned int core_ticks_per_usec(const struct adapter *adap);
@@ -509,4 +538,7 @@ int t4_wait_op_done(struct adapter *adapter, int reg, u32 mask, int polarity,
 int t4_wait_op_done_val(struct adapter *adapter, int reg, u32 mask,
 	int polarity, int attempts, int delay, u32 *valp);
 
+int is_t4(enum chip_type chip);
+int is_t5(enum chip_type chip);
+int is_fpga(enum chip_type chip);
 #endif /* __CXGBE_COMMON_H */

@@ -93,7 +93,7 @@ extern "C" {
 
 /* CK_INFO: Information about cryptoki */
 #define	METASLOT_CRYPTOKI_VERSION_MAJOR	2
-#define	METASLOT_CRYPTOKI_VERSION_MINOR	11
+#define	METASLOT_CRYPTOKI_VERSION_MINOR	40
 #define	METASLOT_MANUFACTURER_ID	"Sun Microsystems, Inc.          "
 #define	METASLOT_LIBRARY_DESCRIPTION	"Sun Metaslot                    "
 #define	METASLOT_LIBRARY_VERSION_MAJOR	1

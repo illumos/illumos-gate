@@ -1501,6 +1501,8 @@ ipadm_enable_if(ipadm_handle_t iph, const char *ifname, uint32_t flags)
 	iph->iph_flags |= IPH_INIT;
 	status = i_ipadm_init_ifobj(iph, ifname, ifnvl);
 	iph->iph_flags &= ~IPH_INIT;
+
+	nvlist_free(ifnvl);
 	return (status);
 }
 

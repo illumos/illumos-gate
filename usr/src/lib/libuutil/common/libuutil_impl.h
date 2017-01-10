@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ */
+
 #ifndef	_LIBUUTIL_IMPL_H
 #define	_LIBUUTIL_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libuutil.h>
 #include <pthread.h>
@@ -41,10 +43,6 @@ extern "C" {
 
 void uu_set_error(uint_t);
 #pragma rarely_called(uu_set_error)
-
-/*PRINTFLIKE1*/
-void uu_panic(const char *format, ...);
-#pragma rarely_called(uu_panic)
 
 struct uu_dprintf {
 	char	*uud_name;

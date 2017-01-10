@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -112,15 +112,9 @@
 
 #define	uu_list_append(lst, e)	uu_list_insert_before(lst, NULL, e)
 
-#ifdef NDEBUG
-#define	bad_error(func, err)	abort()
-#else
 #define	bad_error(func, err)						\
-	(void) fprintf(stderr, "%s:%d: %s() failed with unknown error %d.\n", \
-	    __FILE__, __LINE__, func, err);				\
-	abort();
-#endif
-
+	uu_panic("%s:%d: %s() failed with unknown error %d.\n",		\
+	    __FILE__, __LINE__, func, err);
 
 typedef struct {
 	const char *svcname;

@@ -176,9 +176,9 @@ typedef uint64_t   UINTN;
 #define VOLATILE    volatile
 
 //
-// BugBug: Need to find out if this is portable accross compliers.
+// BugBug: Need to find out if this is portable across compilers.
 //
-void __mfa (void);                       
+void __mfa (void);
 #define MEMORY_FENCE()    __mfa()
 
 #ifdef EFI_NO_INTERFACE_DECL
@@ -190,7 +190,7 @@ void __mfa (void);
 #endif
 
 //
-// When build similiar to FW, then link everything together as
+// When building similar to FW, link everything together as
 // one big module.
 //
 

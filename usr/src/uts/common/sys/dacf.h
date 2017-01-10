@@ -26,8 +26,6 @@
 #ifndef	_DACF_H
 #define	_DACF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Device autoconfiguration framework (dacf)
  */

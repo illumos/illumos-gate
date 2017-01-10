@@ -1,0 +1,6 @@
+    libdis_test:      66 f3 0f b8 d8     popcntw %ax,%bx
+    libdis_test+0x5:  66 f3 0f b8 18     popcntw (%rax),%bx
+    libdis_test+0xa:  f3 0f b8 d8        popcntl %eax,%ebx
+    libdis_test+0xe:  f3 0f b8 18        popcntl (%rax),%ebx
+    libdis_test+0x12: f3 48 0f b8 d8     popcntq %rax,%rbx
+    libdis_test+0x17: f3 48 0f b8 18     popcntq (%rax),%rbx

@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, Joyent, Inc. All rights reserved.
 #
 
 #
@@ -101,6 +102,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	uu_memdup;
 	uu_msprintf;
 	uu_open_tmp;
+	uu_panic;
 	uu_setpname;
 	uu_strbw;
 	uu_strcaseeq;

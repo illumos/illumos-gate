@@ -80,8 +80,7 @@ static boolean_t g_pflg = B_FALSE;
 static boolean_t g_qflg = B_FALSE;
 static ks_pattern_t	g_ks_class = {"*", 0};
 
-/* Return zero if a selector did match */
-static int	g_matched = 1;
+static boolean_t g_matched = B_FALSE;
 
 /* Sorted list of kstat instances */
 static list_t	instances_list;
@@ -138,6 +137,13 @@ main(int argc, char **argv)
 			g_qflg = B_TRUE;
 			break;
 		case 'j':
+			/*
+			 * If we're printing JSON, we're going to force numeric
+			 * representation to be in the C locale to assure that
+			 * the decimal point is compliant with RFC 7159 (i.e.,
+			 * ASCII 0x2e).
+			 */
+			(void) setlocale(LC_NUMERIC, "C");
 			g_jflg = B_TRUE;
 			break;
 		case 'l':
@@ -341,7 +347,10 @@ main(int argc, char **argv)
 
 	(void) kstat_close(kc);
 
-	return (g_matched);
+	/*
+	 * Return a non-zero exit code if we didn't match anything.
+	 */
+	return (g_matched ? 0 : 1);
 }
 
 /*
@@ -743,8 +752,9 @@ ks_value_print(ks_nvpair_t *nvpair)
 /*
  * Print a single instance.
  */
+/*ARGSUSED*/
 static void
-ks_instance_print(ks_instance_t *ksi, ks_nvpair_t *nvpair)
+ks_instance_print(ks_instance_t *ksi, ks_nvpair_t *nvpair, boolean_t last)
 {
 	if (g_headerflg) {
 		if (!g_pflg) {
@@ -772,16 +782,82 @@ ks_instance_print(ks_instance_t *ksi, ks_nvpair_t *nvpair)
 }
 
 /*
+ * Print a C string as a JSON string.
+ */
+static void
+ks_print_json_string(const char *str)
+{
+	char c;
+
+	(void) putchar('"');
+
+	while ((c = *str++) != '\0') {
+		/*
+		 * For readability, we use the allowed alternate escape
+		 * sequence for quote, question mark, reverse solidus (look
+		 * it up!), newline and tab -- and use the universal escape
+		 * sequence for all other control characters.
+		 */
+		switch (c) {
+		case '"':
+		case '?':
+		case '\\':
+			(void) fprintf(stdout, "\\%c", c);
+			break;
+
+		case '\n':
+			(void) fprintf(stdout, "\\n");
+			break;
+
+		case '\t':
+			(void) fprintf(stdout, "\\t");
+			break;
+
+		default:
+			/*
+			 * By escaping those characters for which isprint(3C)
+			 * is false, we escape both the RFC 7159 mandated
+			 * escaped range of 0x01 through 0x1f as well as DEL
+			 * (0x7f -- the control character that RFC 7159 forgot)
+			 * and then everything else that's unprintable for
+			 * good measure.
+			 */
+			if (!isprint(c)) {
+				(void) fprintf(stdout, "\\u%04hhx", (uint8_t)c);
+				break;
+			}
+
+			(void) putchar(c);
+			break;
+		}
+	}
+
+	(void) putchar('"');
+}
+
+/*
  * Print a single instance in JSON format.
  */
 static void
-ks_instance_print_json(ks_instance_t *ksi, ks_nvpair_t *nvpair)
+ks_instance_print_json(ks_instance_t *ksi, ks_nvpair_t *nvpair, boolean_t last)
 {
+	static int headers;
+
 	if (g_headerflg) {
-		(void) fprintf(stdout, JSON_FMT,
-		    ksi->ks_module, ksi->ks_instance,
-		    ksi->ks_name, ksi->ks_class,
-		    ksi->ks_type);
+		if (headers++ > 0)
+			(void) fprintf(stdout, ", ");
+
+		(void) fprintf(stdout, "{\n\t\"module\": ");
+		ks_print_json_string(ksi->ks_module);
+
+		(void) fprintf(stdout,
+		    ",\n\t\"instance\": %d,\n\t\"name\": ", ksi->ks_instance);
+		ks_print_json_string(ksi->ks_name);
+
+		(void) fprintf(stdout, ",\n\t\"class\": ");
+		ks_print_json_string(ksi->ks_class);
+
+		(void) fprintf(stdout, ",\n\t\"type\": %d,\n", ksi->ks_type);
 
 		if (ksi->ks_snaptime == 0)
 			(void) fprintf(stdout, "\t\"snaptime\": 0,\n");
@@ -794,15 +870,25 @@ ks_instance_print_json(ks_instance_t *ksi, ks_nvpair_t *nvpair)
 		g_headerflg = B_FALSE;
 	}
 
-	(void) fprintf(stdout, KS_JFMT, nvpair->name);
-	if (nvpair->data_type == KSTAT_DATA_STRING) {
-		(void) putchar('\"');
+	(void) fprintf(stdout, "\t\t");
+	ks_print_json_string(nvpair->name);
+	(void) fprintf(stdout, ": ");
+
+	switch (nvpair->data_type) {
+	case KSTAT_DATA_CHAR:
+		ks_print_json_string(nvpair->value.c);
+		break;
+
+	case KSTAT_DATA_STRING:
+		ks_print_json_string(KSTAT_NAMED_STR_PTR(nvpair));
+		break;
+
+	default:
 		ks_value_print(nvpair);
-		(void) putchar('\"');
-	} else {
-		ks_value_print(nvpair);
+		break;
 	}
-	if (nvpair != list_tail(&ksi->ks_nvlist))
+
+	if (!last)
 		(void) putchar(',');
 
 	(void) putchar('\n');
@@ -814,11 +900,11 @@ ks_instance_print_json(ks_instance_t *ksi, ks_nvpair_t *nvpair)
 static void
 ks_instances_print(void)
 {
-	ks_selector_t	*selector;
-	ks_instance_t	*ksi, *ktmp;
-	ks_nvpair_t	*nvpair, *ntmp;
-	void		(*ks_print_fn)(ks_instance_t *, ks_nvpair_t *);
-	char		*ks_number;
+	ks_selector_t *selector;
+	ks_instance_t *ksi, *ktmp;
+	ks_nvpair_t *nvpair, *ntmp, *next;
+	void (*ks_print_fn)(ks_instance_t *, ks_nvpair_t *, boolean_t);
+	char *ks_number;
 
 	if (g_timestamp_fmt != NODATE)
 		print_timestamp(g_timestamp_fmt);
@@ -849,25 +935,48 @@ ks_instances_print(void)
 
 			free(ks_number);
 
-			/* Finally iterate over each statistic */
 			g_headerflg = B_TRUE;
+
+			/*
+			 * Find our first statistic to print.
+			 */
 			for (nvpair = list_head(&ksi->ks_nvlist);
 			    nvpair != NULL;
 			    nvpair = list_next(&ksi->ks_nvlist, nvpair)) {
-				if (!ks_match(nvpair->name,
+				if (ks_match(nvpair->name,
 				    &selector->ks_statistic))
-					continue;
+					break;
+			}
 
-				g_matched = 0;
+			while (nvpair != NULL) {
+				boolean_t last;
+
+				/*
+				 * Find the next statistic to print so we can
+				 * indicate to the print function if this
+				 * statistic is the last to be printed for
+				 * this instance.
+				 */
+				for (next = list_next(&ksi->ks_nvlist, nvpair);
+				    next != NULL;
+				    next = list_next(&ksi->ks_nvlist, next)) {
+					if (ks_match(next->name,
+					    &selector->ks_statistic))
+						break;
+				}
+
+				g_matched = B_TRUE;
+				last = next == NULL ? B_TRUE : B_FALSE;
+
 				if (!g_qflg)
-					(*ks_print_fn)(ksi, nvpair);
+					(*ks_print_fn)(ksi, nvpair, last);
+
+				nvpair = next;
 			}
 
 			if (!g_headerflg) {
 				if (g_jflg) {
 					(void) fprintf(stdout, "\t}\n}");
-					if (ksi != list_tail(&instances_list))
-						(void) putchar(',');
 				} else if (!g_pflg) {
 					(void) putchar('\n');
 				}
@@ -1387,6 +1496,16 @@ save_named(kstat_t *kp, ks_instance_t *ksi)
 	int	n;
 
 	for (n = kp->ks_ndata, knp = KSTAT_NAMED_PTR(kp); n > 0; n--, knp++) {
+		/*
+		 * Annoyingly, some drivers have kstats with uninitialized
+		 * members (which kstat_install(9F) is sadly powerless to
+		 * prevent, and kstat_read(3KSTAT) unfortunately does nothing
+		 * to stop).  To prevent these from confusing us to be
+		 * KSTAT_DATA_CHAR statistics, we skip over them.
+		 */
+		if (knp->name[0] == '\0')
+			continue;
+
 		switch (knp->data_type) {
 		case KSTAT_DATA_CHAR:
 			nvpair_insert(ksi, knp->name,

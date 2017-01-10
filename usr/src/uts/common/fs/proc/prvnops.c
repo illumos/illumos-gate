@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
@@ -3428,21 +3428,34 @@ prcreate(vnode_t *dp, char *comp, vattr_t *vap, vcexcl_t excl,
 
 	if ((error = prlookup(dp, comp, vpp, NULL, 0, NULL, cr,
 	    ct, NULL, NULL)) != 0) {
-		if (error == ENOENT)	/* can't O_CREAT nonexistent files */
-			error = EACCES;		/* unwriteable directories */
-	} else {
-		if (excl == EXCL)			/* O_EXCL */
-			error = EEXIST;
-		else if (vap->va_mask & AT_SIZE) {	/* O_TRUNC */
-			vnode_t *vp = *vpp;
-			uint_t mask;
+		if (error == ENOENT) {
+			/* One can't O_CREAT nonexistent files in /proc. */
+			error = EACCES;
+		}
+		return (error);
+	}
 
-			if (vp->v_type == VDIR)
+	if (excl == EXCL) {
+		/* Disallow the O_EXCL case */
+		error = EEXIST;
+	} else if ((error = praccess(*vpp, mode, 0, cr, ct)) == 0) {
+		/* Before proceeding, handle O_TRUNC if necessary. */
+		if (vap->va_mask & AT_SIZE) {
+			vnode_t *vp = *vpp;
+
+			if (vp->v_type == VDIR) {
+				/* Only allow O_TRUNC on files */
 				error = EISDIR;
-			else if (vp->v_type != VPROC ||
-			    VTOP(vp)->pr_type != PR_FD)
+			} else if (vp->v_type != VPROC ||
+			    VTOP(vp)->pr_type != PR_FD) {
+				/*
+				 * Disallow for files outside of the
+				 * /proc/<pid>/fd/<n> entries
+				 */
 				error = EACCES;
-			else {		/* /proc/<pid>/fd/<n> */
+			} else {
+				uint_t mask;
+
 				vp = VTOP(vp)->pr_realvp;
 				mask = vap->va_mask;
 				vap->va_mask = AT_SIZE;
@@ -3450,10 +3463,11 @@ prcreate(vnode_t *dp, char *comp, vattr_t *vap, vcexcl_t excl,
 				vap->va_mask = mask;
 			}
 		}
-		if (error) {
-			VN_RELE(*vpp);
-			*vpp = NULL;
-		}
+	}
+
+	if (error) {
+		VN_RELE(*vpp);
+		*vpp = NULL;
 	}
 	return (error);
 }

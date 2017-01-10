@@ -24,6 +24,8 @@
 #
 # cmd/stat/Makefile.stat
 
+include $(SRC)/cmd/Makefile.ctf
+
 STATSRC = $(SRC)/cmd/stat
 STATCOMMONDIR = $(STATSRC)/common
 

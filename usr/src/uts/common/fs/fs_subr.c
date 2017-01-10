@@ -113,44 +113,26 @@ fs_freevfs(vfs_t *vfsp)
 
 /* ARGSUSED */
 int
-fs_nosys_map(struct vnode *vp,
-	offset_t off,
-	struct as *as,
-	caddr_t *addrp,
-	size_t len,
-	uchar_t prot,
-	uchar_t maxprot,
-	uint_t flags,
-	struct cred *cr,
-	caller_context_t *ct)
+fs_nosys_map(struct vnode *vp, offset_t off, struct as *as, caddr_t *addrp,
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	return (ENOSYS);
 }
 
 /* ARGSUSED */
 int
-fs_nosys_addmap(struct vnode *vp,
-	offset_t off,
-	struct as *as,
-	caddr_t addr,
-	size_t len,
-	uchar_t prot,
-	uchar_t maxprot,
-	uint_t flags,
-	struct cred *cr,
-	caller_context_t *ct)
+fs_nosys_addmap(struct vnode *vp, offset_t off, struct as *as, caddr_t addr,
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	return (ENOSYS);
 }
 
 /* ARGSUSED */
 int
-fs_nosys_poll(vnode_t *vp,
-	register short events,
-	int anyyet,
-	register short *reventsp,
-	struct pollhead **phpp,
-	caller_context_t *ct)
+fs_nosys_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp, caller_context_t *ct)
 {
 	return (ENOSYS);
 }
@@ -183,7 +165,7 @@ fs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 /* ARGSUSED */
 int
 fs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
-	caller_context_t *ctp)
+    caller_context_t *ctp)
 {
 	return (0);
 }
@@ -194,7 +176,7 @@ fs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
 /* ARGSUSED */
 int
 fs_ioctl(vnode_t *vp, int com, intptr_t data, int flag, cred_t *cred,
-	int *rvalp)
+    int *rvalp)
 {
 	return (0);
 }
@@ -240,9 +222,8 @@ fs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
  */
 /* ARGSUSED */
 int
-fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
-	offset_t offset, flk_callback_t *flk_cbp, cred_t *cr,
-	caller_context_t *ct)
+fs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag, offset_t offset,
+    flk_callback_t *flk_cbp, cred_t *cr, caller_context_t *ct)
 {
 	int frcmd;
 	int nlmid;
@@ -384,6 +365,9 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	if (!skip_lock)
 		error = reclock(vp, bfp, frcmd, flag, offset, flk_cbp);
 
+	if (serialize && (frcmd & SLPFLCK) != 0)
+		flk_del_callback(&serialize_callback);
+
 done:
 	if (serialize)
 		nbl_end_crit(vp);
@@ -416,12 +400,7 @@ frlock_serialize_blocked(flk_cb_when_t when, void *infop)
  */
 /* ARGSUSED */
 int
-fs_setfl(
-	vnode_t *vp,
-	int oflags,
-	int nflags,
-	cred_t *cr,
-	caller_context_t *ct)
+fs_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr, caller_context_t *ct)
 {
 	return (0);
 }
@@ -434,12 +413,8 @@ struct pollhead fs_pollhd;
 
 /* ARGSUSED */
 int
-fs_poll(vnode_t *vp,
-	register short events,
-	int anyyet,
-	register short *reventsp,
-	struct pollhead **phpp,
-	caller_context_t *ct)
+fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp, caller_context_t *ct)
 {
 	*reventsp = 0;
 	if (events & POLLIN)
@@ -461,15 +436,11 @@ fs_poll(vnode_t *vp,
  */
 /* ARGSUSED */
 int
-fs_pathconf(
-	vnode_t *vp,
-	int cmd,
-	ulong_t *valp,
-	cred_t *cr,
-	caller_context_t *ct)
+fs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+    caller_context_t *ct)
 {
-	register ulong_t val;
-	register int error = 0;
+	ulong_t val;
+	int error = 0;
 	struct statvfs64 vfsbuf;
 
 	switch (cmd) {
@@ -568,13 +539,8 @@ fs_pathconf(
  */
 /* ARGSUSED */
 void
-fs_dispose(
-	struct vnode *vp,
-	page_t *pp,
-	int fl,
-	int dn,
-	struct cred *cr,
-	caller_context_t *ct)
+fs_dispose(struct vnode *vp, page_t *pp, int fl, int dn, struct cred *cr,
+    caller_context_t *ct)
 {
 
 	ASSERT(fl == B_FREE || fl == B_INVAL);
@@ -587,13 +553,8 @@ fs_dispose(
 
 /* ARGSUSED */
 void
-fs_nodispose(
-	struct vnode *vp,
-	page_t *pp,
-	int fl,
-	int dn,
-	struct cred *cr,
-	caller_context_t *ct)
+fs_nodispose(struct vnode *vp, page_t *pp, int fl, int dn, struct cred *cr,
+    caller_context_t *ct)
 {
 	cmn_err(CE_PANIC, "fs_nodispose invoked");
 }
@@ -603,12 +564,8 @@ fs_nodispose(
  */
 /* ARGSUSED */
 int
-fs_fab_acl(
-	vnode_t *vp,
-	vsecattr_t *vsecattr,
-	int flag,
-	cred_t *cr,
-	caller_context_t *ct)
+fs_fab_acl(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
+    caller_context_t *ct)
 {
 	aclent_t	*aclentp;
 	struct vattr	vattr;
@@ -664,13 +621,8 @@ fs_fab_acl(
  */
 /* ARGSUSED4 */
 int
-fs_shrlock(
-	struct vnode *vp,
-	int cmd,
-	struct shrlock *shr,
-	int flag,
-	cred_t *cr,
-	caller_context_t *ct)
+fs_shrlock(struct vnode *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 

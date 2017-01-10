@@ -27,8 +27,6 @@
 #ifndef	_RCTL_H
 #define	_RCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/rctl.h>
 #include <sys/types.h>
 

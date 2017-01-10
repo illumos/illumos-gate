@@ -26,8 +26,6 @@
 #ifndef	_SYS_DDI_ISA_H
 #define	_SYS_DDI_ISA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 #include <sys/ndifm.h>
 #include <sys/dditypes.h>
@@ -160,62 +158,62 @@ i_ddi_swap_put64(ddi_acc_impl_t *hdlp, uint64_t *addr, uint64_t value);
  */
 void
 i_ddi_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr, uint8_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr, uint16_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr, uint32_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr, uint64_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_swap_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags);
+    uint16_t *dev_addr, size_t repcount, uint_t flags);
 
 void
 i_ddi_swap_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags);
+    uint32_t *dev_addr, size_t repcount, uint_t flags);
 
 void
 i_ddi_swap_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags);
+    uint64_t *dev_addr, size_t repcount, uint_t flags);
 
 /*
  * Repeated output functions for memory mapped IO
  */
 void
 i_ddi_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr, uint8_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr, uint16_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_rep_put32(ddi_acc_impl_t *hdl, uint32_t *host_addr, uint32_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_rep_put64(ddi_acc_impl_t *hdl, uint64_t *host_addr, uint64_t *dev_addr,
-	size_t repcount, uint_t flags);
+    size_t repcount, uint_t flags);
 
 void
 i_ddi_swap_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags);
+    uint16_t *dev_addr, size_t repcount, uint_t flags);
 
 void
 i_ddi_swap_rep_put32(ddi_acc_impl_t *hdl, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags);
+    uint32_t *dev_addr, size_t repcount, uint_t flags);
 
 void
 i_ddi_swap_rep_put64(ddi_acc_impl_t *hdl, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags);
+    uint64_t *dev_addr, size_t repcount, uint_t flags);
 
 /*
  * Default fault-checking and notification functions

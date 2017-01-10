@@ -106,6 +106,7 @@ static paddr_t high_phys = -(paddr_t)1;	/* last used physical address */
  */
 #define	BUFFERSIZE	512
 static char buffer[BUFFERSIZE];
+
 /*
  * stuff to store/report/manipulate boot property settings.
  */
@@ -547,6 +548,56 @@ parse_value(char *p, uint64_t *retval)
 	return (0);
 }
 
+static boolean_t
+unprintable(char *value, int size)
+{
+	int i;
+
+	if (size <= 0 || value[0] == '\0')
+		return (B_TRUE);
+
+	for (i = 0; i < size; i++) {
+		if (value[i] == '\0')
+			return (i != (size - 1));
+
+		if (!isprint(value[i]))
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * Print out information about all boot properties.
+ * buffer is pointer to pre-allocated space to be used as temporary
+ * space for property values.
+ */
+static void
+boot_prop_display(char *buffer)
+{
+	char *name = "";
+	int i, len;
+
+	bop_printf(NULL, "\nBoot properties:\n");
+
+	while ((name = do_bsys_nextprop(NULL, name)) != NULL) {
+		bop_printf(NULL, "\t0x%p %s = ", (void *)name, name);
+		(void) do_bsys_getprop(NULL, name, buffer);
+		len = do_bsys_getproplen(NULL, name);
+		bop_printf(NULL, "len=%d ", len);
+		if (!unprintable(buffer, len)) {
+			buffer[len] = 0;
+			bop_printf(NULL, "%s\n", buffer);
+			continue;
+		}
+		for (i = 0; i < len; i++) {
+			bop_printf(NULL, "%02x", buffer[i] & 0xff);
+			if (i < len - 1)
+				bop_printf(NULL, ".");
+		}
+		bop_printf(NULL, "\n");
+	}
+}
+
 /*
  * 2nd part of building the table of boot properties. This includes:
  * - values from /boot/solaris/bootenv.rc (ie. eeprom(1m) values)
@@ -740,19 +791,8 @@ done:
 		bcons_init2(inputdev, outputdev, consoledev);
 	}
 
-	if (strstr((char *)xbootp->bi_cmdline, "prom_debug") || kbm_debug) {
-		value = line;
-		bop_printf(NULL, "\nBoot properties:\n");
-		name = "";
-		while ((name = do_bsys_nextprop(NULL, name)) != NULL) {
-			bop_printf(NULL, "\t0x%p %s = ", (void *)name, name);
-			(void) do_bsys_getprop(NULL, name, value);
-			v_len = do_bsys_getproplen(NULL, name);
-			bop_printf(NULL, "len=%d ", v_len);
-			value[v_len] = 0;
-			bop_printf(NULL, "%s\n", value);
-		}
-	}
+	if (strstr((char *)xbootp->bi_cmdline, "prom_debug") || kbm_debug)
+		boot_prop_display(line);
 }
 
 /*
@@ -1858,28 +1898,10 @@ _start(struct xboot_info *xbp)
 	build_boot_properties(xbp);
 
 	if (strstr((char *)xbp->bi_cmdline, "prom_debug") || kbm_debug) {
-		char *name;
 		char *value;
-		char *cp;
-		int len;
 
 		value = do_bsys_alloc(NULL, NULL, MMU_PAGESIZE, MMU_PAGESIZE);
-		bop_printf(NULL, "\nBoot properties:\n");
-		name = "";
-		while ((name = do_bsys_nextprop(NULL, name)) != NULL) {
-			bop_printf(NULL, "\t0x%p %s = ", (void *)name, name);
-			(void) do_bsys_getprop(NULL, name, value);
-			len = do_bsys_getproplen(NULL, name);
-			bop_printf(NULL, "len=%d ", len);
-			value[len] = 0;
-			for (cp = value; *cp; ++cp) {
-				if (' ' <= *cp && *cp <= '~')
-					bop_printf(NULL, "%c", *cp);
-				else
-					bop_printf(NULL, "-0x%x-", *cp);
-			}
-			bop_printf(NULL, "\n");
-		}
+		boot_prop_display(value);
 	}
 
 	/*

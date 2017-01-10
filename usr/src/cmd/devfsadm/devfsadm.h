@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _DEVFSADM_H
@@ -231,10 +232,11 @@ void devfsadm_free_dev_names(char **dev_names, int len);
 di_devlink_handle_t devfsadm_devlink_cache(void);
 
 /*
- * Private enumerate interface for disks and sgen modules
+ * Private enumerate interface for controllers, disks, and sgen modules
  */
-int disk_enumerate_int(char *devfs_path, int index, char **buf,
-			    devfsadm_enumerate_t rules[], int nrules);
+int ctrl_enumerate_int(char *devfs_path, int index, char **buf,
+			    devfsadm_enumerate_t rules[], int nrules,
+			    int multiple, boolean_t scsi_vhci);
 /*
  * Private interfaces for ports module (port_link.c).
  */

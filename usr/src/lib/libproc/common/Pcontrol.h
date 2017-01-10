@@ -93,7 +93,7 @@ typedef struct sym_tbl {	/* symbol table */
 
 typedef struct file_info {	/* symbol information for a mapped file */
 	plist_t	file_list;	/* linked list */
-	char	file_pname[PRMAPSZ];	/* name from prmap_t */
+	char	file_pname[PATH_MAX];	/* name from prmap_t */
 	struct map_info *file_map;	/* primary (text) mapping */
 	int	file_ref;	/* references from map_info_t structures */
 	int	file_fd;	/* file descriptor for the mapped file */
