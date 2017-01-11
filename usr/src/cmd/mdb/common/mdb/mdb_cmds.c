@@ -28,7 +28,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright (c) 2015 Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
- * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2015, 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/elf.h>
@@ -198,6 +198,94 @@ write_uint64(mdb_tgt_as_t as, mdb_tgt_addr_t addr, uint64_t n, uint_t rdback)
 	return (addr + sizeof (n));
 }
 
+/*
+ * Writes to objects of size 1, 2, 4, or 8 bytes. The function
+ * doesn't care if the object is a number or not (e.g. it could
+ * be a byte array, or a struct) as long as the size of the write
+ * is one of the aforementioned ones.
+ */
+static mdb_tgt_addr_t
+write_var_uint(mdb_tgt_as_t as, mdb_tgt_addr_t addr, uint64_t val, size_t size,
+    uint_t rdback)
+{
+	if (size < sizeof (uint64_t)) {
+		uint64_t max_num = 1ULL << (size * NBBY);
+
+		if (val >= max_num) {
+			uint64_t write_len = 0;
+
+			/* count bytes needed for val */
+			while (val != 0) {
+				write_len++;
+				val >>= NBBY;
+			}
+
+			mdb_warn("value too big for the length of the write: "
+			    "supplied %llu bytes but maximum is %llu bytes\n",
+			    (u_longlong_t)write_len, (u_longlong_t)size);
+			return (addr);
+		}
+	}
+
+	switch (size) {
+	case 1:
+		return (write_uint8(as, addr, val, rdback));
+	case 2:
+		return (write_uint16(as, addr, val, rdback));
+	case 4:
+		return (write_uint32(as, addr, val, rdback));
+	case 8:
+		return (write_uint64(as, addr, val, rdback));
+	default:
+		mdb_warn("writes of size %u are not supported\n ", size);
+		return (addr);
+	}
+}
+
+static mdb_tgt_addr_t
+write_ctf_uint(mdb_tgt_as_t as, mdb_tgt_addr_t addr, uint64_t n, uint_t rdback)
+{
+	mdb_ctf_id_t mid;
+	size_t size;
+	ssize_t type_size;
+	int kind;
+
+	if (mdb_ctf_lookup_by_addr(addr, &mid) != 0) {
+		mdb_warn("no CTF data found at this address\n");
+		return (addr);
+	}
+
+	kind = mdb_ctf_type_kind(mid);
+	if (kind == CTF_ERR) {
+		mdb_warn("CTF data found but type kind could not be read");
+		return (addr);
+	}
+
+	if (kind == CTF_K_TYPEDEF) {
+		mdb_ctf_id_t temp_id;
+		if (mdb_ctf_type_resolve(mid, &temp_id) != 0) {
+			mdb_warn("failed to resolve type");
+			return (addr);
+		}
+		kind = mdb_ctf_type_kind(temp_id);
+	}
+
+	if (kind != CTF_K_INTEGER && kind != CTF_K_POINTER &&
+	    kind != CTF_K_ENUM) {
+		mdb_warn("CTF type should be integer, pointer, or enum\n");
+		return (addr);
+	}
+
+	type_size = mdb_ctf_type_size(mid);
+	if (type_size < 0) {
+		mdb_warn("CTF data found but size could not be read");
+		return (addr);
+	}
+	size = type_size;
+
+	return (write_var_uint(as, addr, n, size, rdback));
+}
+
 static int
 write_arglist(mdb_tgt_as_t as, mdb_tgt_addr_t addr,
     int argc, const mdb_arg_t *argv)
@@ -221,6 +309,9 @@ write_arglist(mdb_tgt_as_t as, mdb_tgt_addr_t addr,
 		break;
 	case 'w':
 		write_value = write_uint16;
+		break;
+	case 'z':
+		write_value = write_ctf_uint;
 		break;
 	case 'W':
 		write_value = write_uint32;
@@ -487,7 +578,7 @@ print_common(mdb_tgt_as_t as, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_tgt_addr_t addr = mdb_nv_get_value(mdb.m_dot);
 
 	if (argc != 0 && argv->a_type == MDB_TYPE_CHAR) {
-		if (strchr("vwWZ", argv->a_un.a_char))
+		if (strchr("vwzWZ", argv->a_un.a_char))
 			return (write_arglist(as, addr, argc, argv));
 		if (strchr("lLM", argv->a_un.a_char))
 			return (match_arglist(as, flags, addr, argc, argv));
@@ -2793,6 +2884,94 @@ cmd_delete(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (ve_delete_spec(&spec));
 }
 
+static int
+cmd_write(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	mdb_tgt_as_t as;
+	int rdback = mdb.m_flags & MDB_FL_READBACK;
+	mdb_tgt_addr_t naddr;
+	size_t forced_size = 0;
+	boolean_t opt_p, opt_o, opt_l;
+	uint64_t val = 0;
+	int i;
+
+	opt_p = opt_o = opt_l = B_FALSE;
+
+	i = mdb_getopts(argc, argv,
+	    'p', MDB_OPT_SETBITS, B_TRUE, &opt_p,
+	    'o', MDB_OPT_SETBITS, B_TRUE, &opt_o,
+	    'l', MDB_OPT_UINTPTR_SET, &opt_l, (uintptr_t *)&forced_size, NULL);
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (opt_p && opt_o) {
+		mdb_warn("-o and -p are incompatible\n");
+		return (DCMD_USAGE);
+	}
+
+	argc -= i;
+	argv += i;
+
+	if (argc == 0)
+		return (DCMD_USAGE);
+
+	switch (argv[0].a_type) {
+	case MDB_TYPE_STRING:
+		val = mdb_strtoull(argv[0].a_un.a_str);
+		break;
+	case MDB_TYPE_IMMEDIATE:
+		val = argv[0].a_un.a_val;
+		break;
+	default:
+		return (DCMD_USAGE);
+	}
+
+	if (opt_p)
+		as = MDB_TGT_AS_PHYS;
+	else if (opt_o)
+		as = MDB_TGT_AS_FILE;
+	else
+		as = MDB_TGT_AS_VIRT;
+
+	if (opt_l)
+		naddr = write_var_uint(as, addr, val, forced_size, rdback);
+	else
+		naddr = write_ctf_uint(as, addr, val, rdback);
+
+	if (addr == naddr) {
+		mdb_warn("failed to write %llr at address %#llx", val, addr);
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
+}
+
+void
+write_help(void)
+{
+	mdb_printf(
+	    "-l length  force a write with the specified length in bytes\n"
+	    "-o         write data to the object file location specified\n"
+	    "-p         write data to the physical address specified\n"
+	    "\n"
+	    "Attempts to write the given value to the address provided.\n"
+	    "If -l is not specified, the address must be the position of a\n"
+	    "symbol that is either of integer, pointer, or enum type. The\n"
+	    "type and the size of the symbol are inferred by the CTF found\n"
+	    "in the provided address. The length of the write is guaranteed\n"
+	    "to be the inferred size of the symbol.\n"
+	    "\n"
+	    "If no CTF data exists, or the address provided is not a symbol\n"
+	    "of integer or pointer type, then the write fails. At that point\n"
+	    "the user can force the write by using the '-l' option and\n"
+	    "specifying its length.\n"
+	    "\n"
+	    "Note that forced writes with a length that are bigger than\n"
+	    "the size of the biggest data pointer supported are not allowed."
+	    "\n");
+}
+
 static void
 srcexec_file_help(void)
 {
@@ -2999,6 +3178,9 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    cmd_whatis, whatis_help },
 	{ "whence", "[-v] name ...", "show source of walk or dcmd", cmd_which },
 	{ "which", "[-v] name ...", "show source of walk or dcmd", cmd_which },
+	{ "write", "?[-op] [-l len] value",
+	    "write value to the provided memory location", cmd_write,
+	    write_help },
 	{ "xdata", NULL, "print list of external data buffers", cmd_xdata },
 
 #ifdef _KMDB
