@@ -1143,13 +1143,10 @@ smb_ofile_open_check(smb_ofile_t *of, uint32_t desired_access,
 /*
  * smb_ofile_rename_check
  *
- * An open file can be renamed if
- *
- *  1. isn't opened for data writing or deleting
- *
- *  2. Opened with "Deny Delete" share mode
- *         But not opened for data reading or executing
- *         (opened for accessing meta data)
+ * This does the work described in MS-FSA 2.1.5.1.2.2 (Algorithm
+ * to Check Sharing Access to an Existing Stream or Directory),
+ * where the "open in-progress" has DesiredAccess = DELETE and
+ * SharingMode = SHARE_READ | SHARE_WRITE | SHARE_DELETE.
  */
 
 uint32_t
@@ -1164,18 +1161,14 @@ smb_ofile_rename_check(smb_ofile_t *of)
 		return (NT_STATUS_INVALID_HANDLE);
 	}
 
-	if (of->f_granted_access &
-	    (FILE_WRITE_DATA | FILE_APPEND_DATA | DELETE)) {
+	if ((of->f_granted_access & FILE_DATA_ALL) == 0) {
 		mutex_exit(&of->f_mutex);
-		return (NT_STATUS_SHARING_VIOLATION);
+		return (NT_STATUS_SUCCESS);
 	}
 
 	if ((of->f_share_access & FILE_SHARE_DELETE) == 0) {
-		if (of->f_granted_access &
-		    (FILE_READ_DATA | FILE_EXECUTE)) {
-			mutex_exit(&of->f_mutex);
-			return (NT_STATUS_SHARING_VIOLATION);
-		}
+		mutex_exit(&of->f_mutex);
+		return (NT_STATUS_SHARING_VIOLATION);
 	}
 
 	mutex_exit(&of->f_mutex);
