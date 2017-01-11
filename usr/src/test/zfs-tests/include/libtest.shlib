@@ -855,7 +855,7 @@ function get_prop # property dataset
 		return 1
 	fi
 
-	echo $prop_val
+	echo "$prop_val"
 	return 0
 }
 
