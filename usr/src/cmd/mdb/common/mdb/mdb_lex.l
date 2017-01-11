@@ -27,6 +27,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -213,7 +214,7 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_DCMD);
 	}
 
-<S_INITIAL>[/\\?][ \t]*[vwWZlLM]	{
+<S_INITIAL>[/\\?][ \t]*[vwzWZlLM]	{
 		/*
 		 * Format verb followed by write or match signifier -- switch
 		 * to the value list state and return the verb character.  We

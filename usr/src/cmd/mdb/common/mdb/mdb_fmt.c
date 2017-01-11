@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -118,6 +119,7 @@ static const char help_match32[] = "int";
 static const char help_match64[] = "long long";
 static const char help_match16[] = "short";
 static const char help_uintptr[] = "hexadecimal uintptr_t";
+static const char help_ctf[] = "whose size is inferred by CTF info";
 
 /*ARGSUSED*/
 static mdb_tgt_addr_t
@@ -618,7 +620,7 @@ static const mdb_fmt_desc_t fmttab[] = {
 	{ FMT_PRINTF|FMT_WRITE, "%-8hr", NULL, 2 },		/* 119 = w */
 	{ FMT_PRINTF, "%-8hx", NULL, 2 },			/* 120 = x */
 	{ FMT_FUNC, FUNCP(fmt_time64), help_time64, 8 },	/* 121 = y */
-	{ FMT_NONE, NULL, NULL, 0 },				/* 122 = z */
+	{ FMT_WRITE, NULL, help_ctf, 0 },			/* 122 = z */
 };
 
 mdb_tgt_addr_t
