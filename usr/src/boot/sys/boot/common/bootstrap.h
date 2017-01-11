@@ -103,7 +103,8 @@ struct console
 #define C_PRESENTOUT	(1<<1)	    /* console can provide output */
 #define C_ACTIVEIN	(1<<2)	    /* user wants input from console */
 #define C_ACTIVEOUT	(1<<3)	    /* user wants output to console */
-#define C_MODERAW	(1<<4)	    /* raw mode */
+#define C_WIDEOUT	(1<<4)	    /* c_out routine groks wide chars */
+#define C_MODERAW	(1<<5)	    /* raw mode */
     void	(*c_probe)(struct console *);	/* set c_flags to match hardware */
     int		(*c_init)(struct console *, int);	/* reinit XXX may need more args */
     void	(*c_out)(struct console *, int);	/* emit c */
