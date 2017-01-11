@@ -83,7 +83,7 @@ int syscallnum[190] = {	SYS_syscall,	SYS_exit,	-1 /*fork1*/,
 	0,		-1 /*setpgid*/, SYS_pathconf,	SYS_uname,
 };
 
-int
+long
 syscall(int sysnum, ...)
 {
 	va_list ap;

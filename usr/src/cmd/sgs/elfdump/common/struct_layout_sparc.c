@@ -377,12 +377,12 @@ static const sl_prfdinfo_layout_t prfdinfo_layout = {
 
 
 static const sl_prsecflags_layout_t prsecflags_layout = {
-	{ 0,	40,	0,	0 },		 /* sizeof (prsecflags_t) */
-	{ 0,	4,	0,	0 },		 /* pr_version */
-	{ 8,	8,	0,	0 },		 /* pr_effective */
-	{ 16,	8,	0,	0 },		 /* pr_inherit */
-	{ 24,	8,	0,	0 },		 /* pr_lower */
-	{ 32,	8,	0,	0 },		 /* pr_upper */
+	{ 0,	40,	0,	0 },		/* sizeof (prsecflags_t) */
+	{ 0,	4,	0,	0 },		/* pr_version */
+	{ 8,	8,	0,	0 },		/* pr_effective */
+	{ 16,	8,	0,	0 },		/* pr_inherit */
+	{ 24,	8,	0,	0 },		/* pr_lower */
+	{ 32,	8,	0,	0 },		/* pr_upper */
 };
 
 
