@@ -23,7 +23,10 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# Was renamed to system/library/svm-rcm, both now obsolete.
+#
+
 set name=pkg.fmri value=pkg:/SUNWmddr@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/system/library/svm-rcm@0.5.11,5.11-0.133 type=require

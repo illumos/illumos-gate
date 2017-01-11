@@ -56,7 +56,6 @@ typedef int (*detectorp)(char *, nvlist_t *, int *);
 
 static detectorp detectors[] = {
 	inuse_mnt,
-	inuse_svm,
 	inuse_active_zpool,
 	inuse_lu,
 	inuse_dump,

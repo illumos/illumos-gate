@@ -544,12 +544,9 @@ int	label_type;
 /*
  * logging support
  */
-int	ismdd;			/* true if device is a SVM device */
-int	islog;			/* true if ufs or SVM logging is enabled */
-int	islogok;		/* true if ufs/SVM log state is good */
-
-static int	isufslog;	/* true if ufs logging is enabled */
-static int	waslog;		/* true when ufs logging disabled during grow */
+int	islog;			/* true if ufs logging is enabled */
+int	islogok;		/* true if ufs log state is good */
+int	waslog;			/* true when ufs logging disabled during grow */
 
 /*
  * growfs defines, globals, and forward references
@@ -631,7 +628,6 @@ main(int argc, char *argv[])
 	char *special;
 	struct statvfs64 fs;
 	struct dk_geom dkg;
-	struct dk_cinfo dkcinfo;
 	struct dk_minfo dkminfo;
 	char pbuf[sizeof (uint64_t) * 3 + 1];
 	char *tmpbuf;
@@ -1373,26 +1369,9 @@ retry_alternate_logic:
 	/*
 	 * get the controller info
 	 */
-	ismdd = 0;
 	islog = 0;
 	islogok = 0;
 	waslog = 0;
-
-	if (ioctl(fsi, DKIOCINFO, &dkcinfo) == 0)
-		/*
-		 * if it is an MDD (disksuite) device
-		 */
-		if (dkcinfo.dki_ctype == DKC_MD) {
-			ismdd++;
-			/*
-			 * check the logging device
-			 */
-			if (ioctl(fsi, _FIOISLOG, NULL) == 0) {
-				islog++;
-				if (ioctl(fsi, _FIOISLOGOK, NULL) == 0)
-					islogok++;
-			}
-		}
 
 	/*
 	 * Do not grow the file system, but print on stdout the maximum
@@ -3997,7 +3976,7 @@ checksblock(struct fs sb, int proceed)
 
 /*
  * Roll the embedded log, if any, and set up the global variables
- * islog, islogok and isufslog.
+ * islog and islogok.
  */
 static void
 logsetup(char *devstr)
@@ -4014,17 +3993,14 @@ logsetup(char *devstr)
 		/*
 		 * No log present, nothing to do.
 		 */
-		islogok = 0;
 		islog = 0;
-		isufslog = 0;
+		islogok = 0;
 		return;
 	} else {
 		/*
 		 * There's a log in a yet unknown state, attempt to roll it.
 		 */
-		islog = 1;
 		islogok = 0;
-		isufslog = 0;
 
 		/*
 		 * We failed to roll the log, bail out.
@@ -4032,7 +4008,7 @@ logsetup(char *devstr)
 		if (rl_roll_log(devstr) != RL_SUCCESS)
 			return;
 
-		isufslog = 1;
+		islog = 1;
 
 		/* log is not okay; check the fs */
 		if ((FSOKAY != (sblock.fs_state + sblock.fs_time)) ||
@@ -4140,7 +4116,7 @@ growinit(char *devstr)
 	/*
 	 * disable ufs logging for growing
 	 */
-	if (isufslog) {
+	if (islog) {
 		if (rl_log_control(devstr, _FIOLOGDISABLE) != RL_SUCCESS) {
 			(void) fprintf(stderr, gettext(
 			    "failed to disable logging\n"));

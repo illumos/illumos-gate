@@ -18,8 +18,11 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 # Common definitions for open and closed headers.
@@ -99,9 +102,6 @@ idm/%.check:		idm/%.h
 	$(DOT_H_CHECK)
 
 iscsit/%.check:		iscsit/%.h
-	$(DOT_H_CHECK)
-
-lvm/%.check:	lvm/%.h
 	$(DOT_H_CHECK)
 
 scsi/%.check:		scsi/%.h
@@ -213,7 +213,6 @@ ROOTDIRS=			\
 	$(ROOTDIR)/ib/clients/of/sol_ucma	\
 	$(ROOTDIR)/idm		\
 	$(ROOTDIR)/iscsit	\
-	$(ROOTDIR)/lvm		\
 	$(ROOTDIR)/scsi		\
 	$(ROOTDIR)/scsi/conf	\
 	$(ROOTDIR)/scsi/generic	\
@@ -278,8 +277,6 @@ ROOTFMIOHDRS= $(FMIOHDRS:%=$(ROOTDIR)/fm/io/%)
 ROOTFMFSHDRS= $(FMFSHDRS:%=$(ROOTDIR)/fm/fs/%)
 
 ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
-
-ROOTLVMHDRS= $(ALL_LVMHDRS:%=$(ROOTDIR)/lvm/%)
 
 ROOTSCSIHDRS= $(SCSIHDRS:%=$(ROOTDIR)/scsi/%)
 ROOTSATAGENHDRS= $(SATAGENHDRS:%=$(ROOTDIR)/sata/%)
@@ -413,9 +410,6 @@ $(ROOTDIR)/ib/adapters/hermon/%:	ib/adapters/hermon/%
 	$(INS.file)
 
 $(ROOTDIR)/ib/adapters/%:	ib/adapters/%
-	$(INS.file)
-
-$(ROOTDIR)/lvm/%: lvm/%
 	$(INS.file)
 
 $(ROOTDIR)/scsi/%:		scsi/%

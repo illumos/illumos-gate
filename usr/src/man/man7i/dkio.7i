@@ -1,9 +1,24 @@
-'\" te
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DKIO 7I "Aug 3, 2009"
+.\" Copyright 2016 Nexenta Systems, Inc.
+.\"
+.TH DKIO 7I "Oct 8, 2016"
 .SH NAME
 dkio \- disk control operations
 .SH SYNOPSIS
@@ -19,13 +34,11 @@ dkio \- disk control operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Disk drivers support a set of \fBioctl\fR(2) requests for disk controller,
 geometry, and partition information. Basic to these \fBioctl()\fR requests are
 the definitions in \fB<sys/dkio.h>\fR\&.
 .SH IOCTLS
-.sp
 .LP
 The following \fBioctl()\fR requests set and/or retrieve the current disk
 controller, partitions, or geometry information on all architectures:
@@ -84,8 +97,6 @@ struct dk_cinfo {
      #define DKC_SMSFLOPPY    12
      #define DKC_SCSI_CCS     13        /* SCSI CCS compatible */
      #define DKC_INTEL82072   14        /* native floppy chip */
-     #define DKC_MD           16        /* meta-disk (virtual-disk) */
-                                        /* driver */
      #define DKC_INTEL82077   19        /* 82077 floppy disk */
                                         /* controller */
      #define DKC_DIRECT       20        /* Intel direct attached */
@@ -754,12 +765,10 @@ if (retval != EINVAL || retval != ENOTSUP) {
 .RE
 
 .SS "RETURN VALUES"
-.sp
 .LP
 Upon successful completion, the value returned is \fB0\fR. Otherwise, \fB-1\fR
 is returned and \fBerrno\fR is set to indicate the error.
 .SS "x86 Only"
-.sp
 .LP
 The following \fBioctl()\fR requests set and/or retrieve the current disk
 controller, partitions, or geometry information on the x86 architecture.
@@ -903,12 +912,10 @@ recreation of all logical device nodes.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBaddbadsec\fR(1M), \fBfdisk\fR(1M), \fBformat\fR(1M), \fBioctl\fR(2),
 \fBcdio\fR(7I), \fBcmdk\fR(7D), \fBfdio\fR(7I), \fBhdio\fR(7I), \fBsd\fR(7D)
 .SH NOTES
-.sp
 .LP
 Blocksize information provided in \fBDKIOCGMEDIAINFO\fR is the size (in bytes)
 of the device's basic unit of operation and can differ from the blocksize that

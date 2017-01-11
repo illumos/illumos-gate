@@ -38,7 +38,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <door.h>
-#include <meta.h>
 #include <libsysevent.h>
 #include <wait.h>
 #include <semaphore.h>

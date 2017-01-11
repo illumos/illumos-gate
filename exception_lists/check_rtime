@@ -92,7 +92,6 @@ STAB	^platform/.*/MACH(kernel)/unix$
 
 # Files that are allowed undefined references
 UNDEF_REF	^usr/lib/libnisdb\.so\.2$
-UNDEF_REF	^usr/snadm/lib/libsvm\.so\.1$
 
 # Objects allowed to have unused dependencies
 UNUSED_DEPS	^usr/lib/picl/plugins/		# require devtree dependencies

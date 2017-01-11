@@ -130,9 +130,6 @@ if [ "$nouser" = true -o "$rootro" = true ]; then
 	echo >&2 "
 This must be rectified before $0 can continue.
 
-If / or /usr are on SVM (md(7d)) partitions, first run
-    /lib/svc/method/svc-metainit
-
 To properly mount / and /usr, run:
     /lib/svc/method/fs-root
 then
