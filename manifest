@@ -3247,7 +3247,6 @@ d usr/include/scsi/plugins/smp 0755 root bin
 d usr/include/scsi/plugins/smp/engine 0755 root bin
 d usr/include/scsi/plugins/smp/framework 0755 root bin
 f usr/include/sdp.h 0644 root bin
-f usr/include/sdssc.h 0644 root bin
 f usr/include/search.h 0644 root bin
 f usr/include/secdb.h 0644 root bin
 d usr/include/security 0755 root bin
