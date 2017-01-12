@@ -873,6 +873,11 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_012_neg \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_all_001_pos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_all_fail \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_all_mountpoints \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_promote/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_promote/setup mode=0555
