@@ -18,13 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 #ifndef _SYS_SYSTM_H
@@ -87,7 +88,6 @@ extern pgcnt_t	freemem;	/* Current free memory.			*/
 
 extern dev_t	rootdev;	/* device of the root */
 extern struct vnode *rootvp;	/* vnode of root device */
-extern boolean_t root_is_svm;		/* root is a mirrored device flag */
 extern boolean_t root_is_ramdisk;	/* root is boot_archive ramdisk */
 extern uint32_t  ramdisk_size;		/* (KB) set only for sparc netboots */
 extern char *volatile panicstr;	/* panic string pointer */

@@ -18,8 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 include ../../Makefile.cmd
@@ -32,7 +34,7 @@ RCM_SRC = \
 	$(COMMON)/rcm_impl.c \
 	$(COMMON)/rcm_subr.c \
 	$(COMMON)/rcm_lock.c \
-	$(COMMON)/rcm_script.c 
+	$(COMMON)/rcm_script.c
 
 RCM_OBJ = \
 	rcm_event.o \
@@ -127,7 +129,7 @@ rcm_daemon := LDFLAGS += $(MAPFILES:%=-M%)
 
 LINTFLAGS += -u -erroff=E_FUNC_ARG_UNUSED
 
-LDLIBS_MODULES = 
+LDLIBS_MODULES =
 SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
 SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_vlan_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm

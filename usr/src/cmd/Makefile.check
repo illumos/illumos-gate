@@ -19,8 +19,11 @@
 # CDDL HEADER END
 #
 
+#
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2016 Nexenta Systems, Inc.
+#
 
 include ../Makefile.master
 
@@ -117,12 +120,6 @@ MANIFEST_SUBDIRS=			\
 	krb5/krb5kdc			\
 	krb5/kwarn			\
 	krb5/slave			\
-	lvm/rpc.mdcommd			\
-	lvm/rpc.metad			\
-	lvm/rpc.metamedd		\
-	lvm/rpc.metamhd			\
-	lvm/md_monitord			\
-	lvm/util			\
 	picl/picld			\
 	pools/poold			\
 	rcap/rcapd			\

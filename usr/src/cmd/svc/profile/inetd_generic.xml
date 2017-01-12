@@ -56,18 +56,6 @@
 	<service name='network/rpc/gss' version='1' type='service'>
 		<instance name='default' enabled='true'/>
 	</service>
-	<service name='network/rpc/mdcomm' version='1' type='service'>
-		<instance name='default' enabled='true'/>
-	</service>
-	<service name='network/rpc/meta' version='1' type='service'>
-		<instance name='default' enabled='true'/>
-	</service>
-	<service name='network/rpc/metamed' version='1' type='service'>
-		<instance name='default' enabled='true'/>
-	</service>
-	<service name='network/rpc/metamh' version='1' type='service'>
-		<instance name='default' enabled='true'/>
-	</service>
 	<service name='network/rpc/rstat' version='1' type='service'>
 		<instance name='default' enabled='true'/>
 	</service>

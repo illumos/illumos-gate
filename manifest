@@ -2963,11 +2963,8 @@ f usr/include/malloc.h 0644 root bin
 f usr/include/math.h 0644 root bin
 f usr/include/md4.h 0644 root bin
 f usr/include/md5.h 0644 root bin
-f usr/include/mdiox.h 0644 root bin
-f usr/include/mdmn_changelog.h 0644 root bin
 f usr/include/memory.h 0644 root bin
 f usr/include/menu.h 0644 root bin
-f usr/include/mhdx.h 0644 root bin
 f usr/include/mon.h 0644 root bin
 f usr/include/monetary.h 0644 root bin
 f usr/include/mp.h 0644 root bin
@@ -3916,27 +3913,6 @@ f usr/include/sys/log.h 0644 root bin
 f usr/include/sys/logindmux.h 0644 root bin
 f usr/include/sys/logindmux_impl.h 0644 root bin
 f usr/include/sys/lpif.h 0644 root bin
-d usr/include/sys/lvm 0755 root bin
-f usr/include/sys/lvm/md_basic.h 0644 root bin
-f usr/include/sys/lvm/md_convert.h 0644 root bin
-f usr/include/sys/lvm/md_crc.h 0644 root bin
-f usr/include/sys/lvm/md_hotspares.h 0644 root bin
-f usr/include/sys/lvm/md_mddb.h 0644 root bin
-f usr/include/sys/lvm/md_mdiox.h 0644 root bin
-f usr/include/sys/lvm/md_mhdx.h 0644 root bin
-f usr/include/sys/lvm/md_mirror.h 0644 root bin
-f usr/include/sys/lvm/md_mirror_shared.h 0644 root bin
-f usr/include/sys/lvm/md_names.h 0644 root bin
-f usr/include/sys/lvm/md_notify.h 0644 root bin
-f usr/include/sys/lvm/md_raid.h 0644 root bin
-f usr/include/sys/lvm/md_rename.h 0644 root bin
-f usr/include/sys/lvm/md_sp.h 0644 root bin
-f usr/include/sys/lvm/md_stripe.h 0644 root bin
-f usr/include/sys/lvm/md_trans.h 0644 root bin
-f usr/include/sys/lvm/mdio.h 0644 root bin
-f usr/include/sys/lvm/mdmed.h 0644 root bin
-f usr/include/sys/lvm/mdmn_commd.h 0644 root bin
-f usr/include/sys/lvm/mdvar.h 0644 root bin
 f usr/include/sys/lwp.h 0644 root bin
 f usr/include/sys/lwp_timer_impl.h 0644 root bin
 f usr/include/sys/lwp_upimutex_impl.h 0644 root bin
@@ -4316,7 +4292,6 @@ f usr/include/sys/sysevent/env.h 0644 root bin
 f usr/include/sys/sysevent/eventdefs.h 0644 root bin
 f usr/include/sys/sysevent/ipmp.h 0644 root bin
 f usr/include/sys/sysevent/pwrctl.h 0644 root bin
-f usr/include/sys/sysevent/svm.h 0644 root bin
 f usr/include/sys/sysevent/vrrp.h 0644 root bin
 f usr/include/sys/sysevent_impl.h 0644 root bin
 f usr/include/sys/sysi86.h 0644 root bin
@@ -9561,7 +9536,6 @@ f usr/lib/mdb/kvm/amd64/krtld.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/lofs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/logindmux.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mac.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/md.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mdb_kb.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mdb_ks.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/mm.so 0555 root sys
@@ -9620,7 +9594,6 @@ f usr/lib/mdb/kvm/krtld.so 0555 root sys
 f usr/lib/mdb/kvm/lofs.so 0555 root sys
 f usr/lib/mdb/kvm/logindmux.so 0555 root sys
 f usr/lib/mdb/kvm/mac.so 0555 root sys
-f usr/lib/mdb/kvm/md.so 0555 root sys
 f usr/lib/mdb/kvm/mdb_kb.so 0555 root sys
 f usr/lib/mdb/kvm/mdb_ks.so 0555 root sys
 f usr/lib/mdb/kvm/mm.so 0555 root sys
@@ -18469,12 +18442,9 @@ f usr/share/man/man4/logindevperm.4 0444 root bin
 f usr/share/man/man4/loginlog.4 0444 root bin
 f usr/share/man/man4/magic.4 0444 root bin
 f usr/share/man/man4/mailer.conf.4 0444 root bin
-f usr/share/man/man4/md.tab.4 0444 root bin
-f usr/share/man/man4/mddb.cf.4 0444 root bin
 s usr/share/man/man4/mdi_ib_cache.4=devices.4
 s usr/share/man/man4/mdi_scsi_vhci_cache.4=devices.4
 f usr/share/man/man4/mech.4 0444 root bin
-f usr/share/man/man4/meddb.4 0444 root bin
 f usr/share/man/man4/mnttab.4 0444 root bin
 f usr/share/man/man4/mod_ipp.4 0444 root bin
 f usr/share/man/man4/mpapi.conf.4 0444 root bin
@@ -18576,8 +18546,6 @@ f usr/share/man/man4/user_attr.4 0444 root bin
 f usr/share/man/man4/utmp.4 0444 root bin
 f usr/share/man/man4/utmpx.4 0444 root bin
 f usr/share/man/man4/vfstab.4 0444 root bin
-f usr/share/man/man4/volume-config.4 0444 root bin
-f usr/share/man/man4/volume-request.4 0444 root bin
 f usr/share/man/man4/warn.conf.4 0444 root bin
 s usr/share/man/man4/wtmp.4=utmp.4
 s usr/share/man/man4/wtmpx.4=utmpx.4

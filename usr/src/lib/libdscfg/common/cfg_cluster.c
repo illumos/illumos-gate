@@ -349,23 +349,7 @@ cfg_l_dgname(const char *pathname, char *buffer, size_t buflen)
 
 	start = pathname + ll;
 
-	if (strncmp(start, md, (ll = strlen(md))) == 0) {
-		/*
-		 * SVM --
-		 * /dev/md/dgname/{r}dsk/partition
-		 */
-
-		start += ll;
-
-		if (strncmp(start, dsk, strlen(dsk)) == 0 ||
-		    (*start == 'r' &&
-		    strncmp((start + 1), dsk, strlen(dsk)) == 0)) {
-			/* no dgname */
-			return (buffer);
-		}
-
-		chkdsk = 1;	/* check for trailing {r}dsk */
-	} else if (strncmp(start, vx, (ll = strlen(vx))) == 0) {
+	if (strncmp(start, vx, (ll = strlen(vx))) == 0) {
 		/*
 		 * Veritas --
 		 * /dev/vx/{r}dsk/dgname/partition

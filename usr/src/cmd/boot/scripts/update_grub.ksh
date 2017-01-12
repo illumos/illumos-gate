@@ -23,6 +23,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
@@ -70,7 +71,7 @@ check_zfs_boot()
 }
 
 #
-# Detect SVM root and return the list of raw devices under the mirror
+# Return the list of raw devices
 #
 get_rootdev_list()
 {
@@ -90,14 +91,10 @@ get_rootdev_list()
 		    egrep -v "mirror|spare|replacing" |
 		    sed -n -e '/--/q' -e p | awk '{print $1}'`
 	else
-		metadev=`grep -v "^#" "$ALT_ROOT"/etc/vfstab | \
-		    grep "[	 ]/[ 	]" | nawk '{print $2}'`
-		if [[ $metadev = /dev/rdsk/* ]]; then
-			rootdevlist=`basename "$metadev"`
-		elif [[ $metadev = /dev/md/rdsk/* ]]; then
-			metavol=`basename "$metadev"`
-			rootdevlist=`metastat -p $metavol |\
-			    grep -v "^$metavol[	 ]" | nawk '{print $4}'`
+		dev=`grep -v "^#" "$ALT_ROOT"/etc/vfstab | \
+		    grep "[      ]/[    ]" | nawk '{print $2}'`
+		if [[ $dev = /dev/rdsk/* ]]; then
+			rootdevlist=`basename "$dev"`
 		fi
 	fi
 	for rootdev in $rootdevlist

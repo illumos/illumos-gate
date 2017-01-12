@@ -297,7 +297,7 @@ sparc_SUBDIRS=		\
 #
 NOWAIT_SUBDIRS= $(SUBDIRS:.WAIT=)
 
-DCSUBDIRS =
+DCSUBDIRS=
 
 MSGSUBDIRS=		\
 	abi		\
@@ -687,7 +687,6 @@ libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb
 libzonestat:	libcmdutils libumem
 libzpool:	libavl libumem libcmdutils libsysevent
-lvm:		libadm libdevid libdevinfo libefi libgen libscf
 madv:		libgen
 mpapi:		libpthread libdevinfo libsysevent
 mpss:		libgen
