@@ -11,8 +11,8 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -75,6 +75,7 @@ dir path=opt/zfs-tests/tests/functional/cli_root/zpool_get
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_history
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_import
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_import/blockfiles
+dir path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_offline
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_online
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_remove
@@ -1295,6 +1296,15 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import_rename_001_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear/labelclear.cfg \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear/zpool_labelclear_active \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear/zpool_labelclear_exported \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_offline/cleanup \
     mode=0555
