@@ -44,7 +44,8 @@ OBJECTS		= $(VGATEXT_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(VGATEXT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
-LDFLAGS +=	-dy -Nmisc/agpmaster
+LDFLAGS +=	-dy
+
 #
 #	Include common rules.
 #
