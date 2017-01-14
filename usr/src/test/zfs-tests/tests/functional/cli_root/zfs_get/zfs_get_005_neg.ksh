@@ -112,10 +112,10 @@ function test_options_bookmarks
 	for dst in ${bookmark[@]}; do
 		for opt in $opts; do
 			for prop in $props; do
-				$ZFS get $opt -- $prop $dst > /dev/null 2>&1
+				zfs get $opt -- $prop $dst > /dev/null 2>&1
 				ret=$?
 				if [[ $ret == 0 ]]; then
-					log_fail "$ZFS get $opt -- $prop " \
+					log_fail "zfs get $opt -- $prop " \
 					    "$dst unexpectedly succeeded."
 				fi
 			done
