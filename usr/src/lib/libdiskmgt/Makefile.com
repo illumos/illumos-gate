@@ -18,18 +18,34 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 LIBRARY =	libdiskmgt.a
 VERS =		.1
-OBJECTS =	assoc_types.o \
-		entry.o cache.o drive.o controller.o alias.o path.o \
-                media.o slice.o partition.o findevs.o events.o \
-                bus.o inuse_mnt.o inuse_svm.o inuse_lu.o inuse_fs.o \
-                inuse_vxvm.o inuse_dump.o inuse_zpool.o
+OBJECTS =	alias.o \
+		assoc_types.o \
+		bus.o \
+		cache.o \
+		controller.o \
+		drive.o \
+		entry.o \
+		events.o \
+		findevs.o \
+		inuse_dump.o \
+		inuse_fs.o \
+		inuse_lu.o \
+		inuse_mnt.o \
+		inuse_vxvm.o \
+		inuse_zpool.o \
+		media.o \
+		partition.o \
+		path.o \
+		slice.o
 
 include ../../Makefile.lib
 
@@ -37,7 +53,7 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 i386_LDLIBS =   -lfdisk
 sparc_LDLIBS =
 LDLIBS +=       -ldevinfo -ladm -ldevid -lkstat -lsysevent \
-                -lnvpair -lefi -lc $($(MACH)_LDLIBS)
+		-lnvpair -lefi -lc $($(MACH)_LDLIBS)
 DYNFLAGS +=	-R/opt/VRTSvxvm/lib
 
 SRCDIR =	../common
@@ -47,7 +63,7 @@ CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
-CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libdiskmgt/common 
+CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libdiskmgt/common
 
 .KEEP_STATE:
 

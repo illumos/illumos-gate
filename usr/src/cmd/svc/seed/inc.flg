@@ -19,17 +19,15 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 echo_file usr/src/cmd/cmd-inet/usr.lib/inetd/inetd-upgrade.xml
 echo_file usr/src/cmd/rpcbind/bind.xml
 echo_file usr/src/cmd/dlmgmtd/dlmgmt.xml
 echo_file usr/src/cmd/utmpd/utmp.xml
-echo_file usr/src/cmd/lvm/util/metainit.xml
-echo_file usr/src/cmd/lvm/md_monitord/mdmonitor.xml
 find_files "s.*.xml" usr/src/cmd/svc/milestone

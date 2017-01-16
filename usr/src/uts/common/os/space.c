@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -110,7 +111,6 @@ struct vnode kvps[KV_MAX];
  */
 struct vnode *rootvp;		/* vnode of the root device */
 dev_t rootdev;			/* dev_t of the root device */
-boolean_t root_is_svm;		/* root is a mirrored device flag */
 boolean_t root_is_ramdisk;	/* root is ramdisk */
 uint32_t ramdisk_size;		/* (KB) currently set only for sparc netboots */
 

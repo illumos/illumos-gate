@@ -19,12 +19,13 @@
 # CDDL HEADER END
 #
 
+#
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright (c) 2015, Joyent, Inc. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Gary Mills
-
+# Copyright 2016 Nexenta Systems, Inc.
+#
 
 #
 #	This makefile contains the common definitions for all sparc
@@ -217,7 +218,7 @@ DRV_KMODS	+= ipsecesp iptun iwscn keysock kmdb kstat ksyms llc1
 DRV_KMODS	+= lofi
 DRV_KMODS	+= log logindmux kssl mm nca physmem pm poll pool
 DRV_KMODS	+= pseudo ptc ptm pts ptsl ramdisk random rsm rts sad
-DRV_KMODS	+= simnet softmac sppp sppptun sy sysevent sysmsg 
+DRV_KMODS	+= simnet softmac sppp sppptun sy sysevent sysmsg
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= tcp tcp6 timerfd tl tnf ttymux udp udp6 wc winlock zcons
 DRV_KMODS	+= ippctl
@@ -313,7 +314,7 @@ DRV_KMODS	+= qlt
 DRV_KMODS	+= iscsit
 DRV_KMODS	+= pppt
 DRV_KMODS	+= ncall nsctl sdbc nskern sv
-DRV_KMODS	+= ii rdc rdcsrv rdcstub 
+DRV_KMODS	+= ii rdc rdcsrv rdcstub
 DRV_KMODS	+= iscsi
 DRV_KMODS	+= emlxs
 DRV_KMODS	+= oce
@@ -335,12 +336,6 @@ DRV_KMODS	+= emul64
 DRV_KMODS	+= pcs
 MISC_KMODS	+= busra cardbus dada pcmcia
 DRV_KMODS	+= pcic
-
-# Add lvm
-#
-DRV_KMODS       += md
-MISC_KMODS      += md_mirror md_stripe md_hotspares md_raid md_trans md_notify
-MISC_KMODS      += md_sp
 
 #
 #	Exec Class Modules (/kernel/exec):
@@ -405,7 +400,7 @@ MISC_KMODS	+= idm
 MISC_KMODS	+= idmap
 MISC_KMODS	+= hook
 MISC_KMODS	+= neti
-MISC_KMODS	+= ctf 
+MISC_KMODS	+= ctf
 MISC_KMODS	+= mac dls
 MISC_KMODS	+= cmlb
 MISC_KMODS	+= tem

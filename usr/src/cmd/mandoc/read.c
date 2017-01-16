@@ -1,7 +1,7 @@
-/*	$Id: read.c,v 1.149 2016/07/10 13:34:30 schwarze Exp $ */
+/*	$Id: read.c,v 1.150.2.5 2017/01/09 02:25:53 schwarze Exp $ */
 /*
  * Copyright (c) 2008, 2009, 2010, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2010-2016 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2010-2017 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2010, 2012 Joerg Sonnenberger <joerg@netbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -110,10 +110,11 @@ static	const char * const	mandocerrs[MANDOCERR_MAX] = {
 	"no document body",
 	"content before first section header",
 	"first section is not \"NAME\"",
-	"NAME section without name",
+	"NAME section without Nm before Nd",
 	"NAME section without description",
 	"description not at the end of NAME",
 	"bad NAME section content",
+	"missing comma before name",
 	"missing description line, using \"\"",
 	"sections out of conventional order",
 	"duplicate section title",
@@ -143,7 +144,7 @@ static	const char * const	mandocerrs[MANDOCERR_MAX] = {
 	"empty argument, using 0n",
 	"missing display type, using -ragged",
 	"list type is not the first argument",
-	"missing -width in -tag list, using 8n",
+	"missing -width in -tag list, using 6n",
 	"missing utility name, using \"\"",
 	"missing function name, using \"\"",
 	"empty head in list item",
@@ -152,6 +153,7 @@ static	const char * const	mandocerrs[MANDOCERR_MAX] = {
 	"unknown font type, using \\fR",
 	"nothing follows prefix",
 	"empty reference block",
+	"missing section argument",
 	"missing -std argument, adding it",
 	"missing option string, using \"\"",
 	"missing resource identifier, using \"\"",
@@ -291,13 +293,6 @@ choose_parser(struct mparse *curp)
 		}
 	}
 
-	if (curp->man == NULL) {
-		curp->man = roff_man_alloc(curp->roff, curp, curp->defos,
-		    curp->options & MPARSE_QUICK ? 1 : 0);
-		curp->man->macroset = MACROSET_MAN;
-		curp->man->first->tok = TOKEN_NONE;
-	}
-
 	if (format == MPARSE_MDOC) {
 		mdoc_hash_init();
 		curp->man->macroset = MACROSET_MDOC;
@@ -324,6 +319,7 @@ mparse_buf_r(struct mparse *curp, struct buf blk, size_t i, int start)
 	const char	*save_file;
 	char		*cp;
 	size_t		 pos; /* byte number in the ln buffer */
+	size_t		 j;  /* auxiliary byte number in the blk buffer */
 	enum rofferr	 rr;
 	int		 of;
 	int		 lnn; /* line number in the real file */
@@ -429,14 +425,21 @@ mparse_buf_r(struct mparse *curp, struct buf blk, size_t i, int start)
 			}
 
 			if ('"' == blk.buf[i + 1] || '#' == blk.buf[i + 1]) {
+				j = i;
 				i += 2;
 				/* Comment, skip to end of line */
 				for (; i < blk.sz; ++i) {
-					if ('\n' == blk.buf[i]) {
-						++i;
-						++lnn;
-						break;
-					}
+					if (blk.buf[i] != '\n')
+						continue;
+					if (blk.buf[i - 1] == ' ' ||
+					    blk.buf[i - 1] == '\t')
+						mandoc_msg(
+						    MANDOCERR_SPACE_EOL,
+						    curp, curp->line,
+						    pos + i-1 - j, NULL);
+					++i;
+					++lnn;
+					break;
 				}
 
 				/* Backout trailing whitespaces */
@@ -562,15 +565,7 @@ rerun:
 			break;
 		}
 
-		/*
-		 * If input parsers have not been allocated, do so now.
-		 * We keep these instanced between parsers, but set them
-		 * locally per parse routine since we can use different
-		 * parsers with each one.
-		 */
-
-		if (curp->man == NULL ||
-		    curp->man->macroset == MACROSET_NONE)
+		if (curp->man->macroset == MACROSET_NONE)
 			choose_parser(curp);
 
 		/*
@@ -683,10 +678,6 @@ read_whole_file(struct mparse *curp, const char *file, int fd,
 static void
 mparse_end(struct mparse *curp)
 {
-
-	if (curp->man == NULL && curp->sodest == NULL)
-		curp->man = roff_man_alloc(curp->roff, curp, curp->defos,
-		    curp->options & MPARSE_QUICK ? 1 : 0);
 	if (curp->man->macroset == MACROSET_NONE)
 		curp->man->macroset = MACROSET_MAN;
 	if (curp->man->macroset == MACROSET_MDOC)
@@ -842,11 +833,8 @@ mparse_alloc(int options, enum mandoclevel wlevel, mandocmsg mmsg,
 void
 mparse_reset(struct mparse *curp)
 {
-
 	roff_reset(curp->roff);
-
-	if (curp->man != NULL)
-		roff_man_reset(curp->man);
+	roff_man_reset(curp->man);
 	if (curp->secondary)
 		curp->secondary->sz = 0;
 
@@ -882,6 +870,13 @@ mparse_result(struct mparse *curp, struct roff_man **man,
 	}
 	if (man)
 		*man = curp->man;
+}
+
+void
+mparse_updaterc(struct mparse *curp, enum mandoclevel *rc)
+{
+	if (curp->file_status > *rc)
+		*rc = curp->file_status;
 }
 
 void

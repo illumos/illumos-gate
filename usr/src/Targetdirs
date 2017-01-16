@@ -26,8 +26,8 @@
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2013 RackTop Systems.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 #
@@ -260,7 +260,6 @@ DIRS= \
 	/usr/lib/class/SDC \
 	/usr/lib/class/TS \
 	/usr/lib/crypto \
-	/usr/lib/drv \
 	/usr/lib/elfedit \
 	/usr/lib/fm \
 	/usr/lib/font \
@@ -329,8 +328,6 @@ DIRS= \
 	/usr/share/lib/xml/dtd \
 	/usr/share/man \
 	/usr/share/src \
-	/usr/snadm \
-	/usr/snadm/lib \
 	/usr/ucb \
 	$(MACH32_DIRS) \
 	/usr/ucblib \
@@ -874,8 +871,6 @@ $(ROOT)/usr/lib/libmd.so.1:=		REALPATH=../../lib/libmd.so.1
 $(ROOT)/usr/lib/libmd.so:=		REALPATH=../../lib/libmd.so.1
 $(ROOT)/usr/lib/libmd5.so.1:=		REALPATH=../../lib/libmd5.so.1
 $(ROOT)/usr/lib/libmd5.so:=		REALPATH=../../lib/libmd5.so.1
-$(ROOT)/usr/lib/libmeta.so.1:=		REALPATH=../../lib/libmeta.so.1
-$(ROOT)/usr/lib/libmeta.so:=		REALPATH=../../lib/libmeta.so.1
 $(ROOT)/usr/lib/libmp.so.1:=		REALPATH=../../lib/libmp.so.1
 $(ROOT)/usr/lib/libmp.so.2:=		REALPATH=../../lib/libmp.so.2
 $(ROOT)/usr/lib/libmp.so:=		REALPATH=../../lib/libmp.so.2
@@ -995,8 +990,6 @@ $(ROOT)/usr/lib/llib-lm:=		REALPATH=../../lib/llib-lm
 $(ROOT)/usr/lib/llib-lm.ln:=		REALPATH=../../lib/llib-lm.ln
 $(ROOT)/usr/lib/llib-lmd5.ln:=		REALPATH=../../lib/llib-lmd5.ln
 $(ROOT)/usr/lib/llib-lmd5:=		REALPATH=../../lib/llib-lmd5
-$(ROOT)/usr/lib/llib-lmeta.ln:=		REALPATH=../../lib/llib-lmeta.ln
-$(ROOT)/usr/lib/llib-lmeta:=		REALPATH=../../lib/llib-lmeta
 $(ROOT)/usr/lib/llib-lnsl.ln:=		REALPATH=../../lib/llib-lnsl.ln
 $(ROOT)/usr/lib/llib-lnsl:=		REALPATH=../../lib/llib-lnsl
 $(ROOT)/usr/lib/llib-lnvpair.ln:=	REALPATH=../../lib/llib-lnvpair.ln
@@ -1505,8 +1498,6 @@ SYM.USRLIB= \
 	/usr/lib/libmd.so.1 \
 	/usr/lib/libmd5.so \
 	/usr/lib/libmd5.so.1 \
-	/usr/lib/libmeta.so \
-	/usr/lib/libmeta.so.1 \
 	/usr/lib/libmp.so \
 	/usr/lib/libmp.so.1 \
 	/usr/lib/libmp.so.2 \
@@ -1624,8 +1615,6 @@ SYM.USRLIB= \
 	/usr/lib/llib-lm.ln \
 	/usr/lib/llib-lmd5 \
 	/usr/lib/llib-lmd5.ln \
-	/usr/lib/llib-lmeta \
-	/usr/lib/llib-lmeta.ln \
 	/usr/lib/llib-lnsl \
 	/usr/lib/llib-lnsl.ln \
 	/usr/lib/llib-lnvpair \

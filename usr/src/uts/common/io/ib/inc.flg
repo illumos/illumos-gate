@@ -83,10 +83,6 @@ find_files "s.*"	\
 	usr/src/uts/intel/asm		\
 	usr/src/uts/intel/amd64
 
-# lvm
-find_files "s.*.x"	\
-	usr/src/uts/common/sys/lvm
-
 # makefiles
 echo_file  usr/src/Makefile.master
 echo_file  usr/src/Makefile.master.64
@@ -101,7 +97,6 @@ echo_file  usr/src/uts/sun/Makefile.rules
 echo_file  usr/src/uts/common/Makefile.files
 echo_file  usr/src/uts/common/Makefile.rules
 echo_file  usr/src/uts/common/sys/Makefile
-echo_file  usr/src/uts/common/sys/lvm/Makefile
 echo_file  usr/src/uts/sparc/Makefile
 echo_file  usr/src/uts/sparc/Makefile.files
 echo_file  usr/src/uts/sparc/Makefile.rules

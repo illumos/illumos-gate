@@ -904,17 +904,10 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 		 * If there is an error, but it isn't a no device found error
 		 * return the error as recorded. Otherwise, with a full
 		 * block name, we might not be able to get the slice
-		 * associated, and will get an ENODEV error. For example,
-		 * an SVM metadevice will return a value from getfullblkname()
-		 * but libdiskmgt won't be able to find this device for
-		 * statistics gathering. This is expected and we should not
-		 * report errnoneous errors.
+		 * associated, and will get an ENODEV error.
 		 */
-		if (*errp) {
-			if (*errp == ENODEV) {
-				*errp = 0;
-			}
-		}
+		if (*errp == ENODEV)
+			*errp = 0;
 		free(dname);
 		return (found);
 	}
@@ -1087,16 +1080,6 @@ dm_get_usage_string(char *what, char *how, char **usage_string)
 	} else if (strcmp(what, DM_USE_FS) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
 		    "%s contains a %s filesystem.\n");
-	} else if (strcmp(what, DM_USE_SVM) == 0) {
-		if (strcmp(how, "mdb") == 0) {
-			*usage_string = dgettext(TEXT_DOMAIN,
-			    "%s contains an SVM %s. Please see "
-			    "metadb(1M).\n");
-		} else {
-			*usage_string = dgettext(TEXT_DOMAIN,
-			    "%s is part of SVM volume %s. "
-			    "Please see metaclear(1M).\n");
-		}
 	} else if (strcmp(what, DM_USE_VXVM) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
 		    "%s is part of VxVM volume %s.\n");

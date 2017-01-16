@@ -18,9 +18,13 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Joyent, Inc.
+# Copyright 2016 Nexenta Systems, Inc.
+#
+
 #
 # MDB modules used for debugging user processes that every ISA's build
 # subdirectory will need to build.
@@ -74,7 +78,6 @@ COMMON_MODULES_KVM = \
 	lofs \
 	logindmux \
 	mac \
-	md \
 	mm \
 	mpt_sas \
 	mr_sas \

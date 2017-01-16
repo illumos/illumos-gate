@@ -19,13 +19,14 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-#
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
+
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 
@@ -94,14 +95,6 @@ if smf_is_globalzone && [ $rootiszfs = 0 ]; then
 	[ -n "$otherops" ] && mntopts="${mntopts},${otherops}"
 	[ "$fstype" = nfs ] && mntopts="${mntopts},llock"
 
-	# if root dev is a read-only metadevice then fail
-	case $special in
-	/dev/md/dsk/*)
-		dd if=/dev/null of=$special count=0 >/dev/null 2>&1 ||
-		    exit $SMF_EXIT_ERR_FATAL
-		;;
-	esac
-
 	mountfs -m $mountp $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
 fi
 
@@ -121,14 +114,6 @@ if [ "$rootiszfs" = 0 ] ; then
 			else
 				mntopts="remount"
 			fi
-
-			# if usr dev is a read-only metadevice then fail
-			case $special in
-			/dev/md/dsk/*)
-				dd if=/dev/null of=$special count=0 \
-				    >/dev/null 2>&1 || exit $SMF_EXIT_ERR_FATAL
-				;;
-			esac
 
 			mountfs - /usr $fstype $mntopts - ||
 			    exit $SMF_EXIT_ERR_FATAL

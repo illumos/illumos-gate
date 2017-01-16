@@ -21,7 +21,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -1478,8 +1478,8 @@ const instable_t dis_op0F38[256] = {
 
 /*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	TNSZ("sha1nexte",XMM,16),TNSZ("sha1msg1",XMM,16),TNSZ("sha1msg2",XMM,16),TNSZ("sha256rnds2",XMM,16),
+/*  [CC]  */	TNSZ("sha256msg1",XMM,16),TNSZ("sha256msg2",XMM,16),INVALID,		INVALID,
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1641,7 +1641,7 @@ const instable_t dis_op0F3A[256] = {
 /*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	TNSZ("sha1rnds4",XMMP,16),INVALID,		INVALID,		INVALID,
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -3286,6 +3286,8 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 				goto error;
 #endif
 			switch (dp->it_adrmode) {
+				case XMMP:
+					break;
 				case XMMP_66r:
 				case XMMPRM_66r:
 				case XMM3PM_66r:
@@ -3369,6 +3371,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 #endif
 			switch (dp->it_adrmode) {
 				case ADX:
+				case XMM:
 					break;
 				case RM_66r:
 				case XMM_66r:

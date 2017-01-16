@@ -2697,8 +2697,11 @@ mount_zfs(zfs_handle_t *zhp, char *altroot)
 	char	mountpoint[MAXPATHLEN];
 	char	real_mountpoint[MAXPATHLEN];
 	char	source[MAXNAMELEN];
+	char	optstr[MAX_MNTOPT_STR];
 	zprop_source_t	sourcetype;
 	struct stat	buf;
+
+	optstr[0] = '\0';
 
 	/* Get dataset's mountpoint and source values */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
@@ -2738,8 +2741,8 @@ mount_zfs(zfs_handle_t *zhp, char *altroot)
 		}
 	}
 
-	if (mount(zfs_get_name(zhp), real_mountpoint, flags, MNTTYPE_ZFS,
-	    NULL, 0, NULL, 0)) {
+	if (mount(zfs_get_name(zhp), real_mountpoint, MS_OPTIONSTR | flags,
+	    MNTTYPE_ZFS, NULL, 0, optstr, sizeof (optstr))) {
 		be_print_err(gettext("mount_zfs: failed to "
 		    "mount dataset %s at %s\n"), zfs_get_name(zhp),
 		    real_mountpoint);

@@ -23,7 +23,8 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+# Was renamed to storage/metassist, both now obsolete.
+
 set name=pkg.fmri value=pkg:/SUNWmda@0.5.11,5.11-0.133
-set name=pkg.renamed value=true
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=pkg:/storage/metassist@0.5.11,5.11-0.133 type=require

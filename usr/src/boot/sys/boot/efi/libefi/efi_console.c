@@ -64,7 +64,7 @@ int efi_cons_poll(struct console *);
 struct console efi_console = {
 	"text",
 	"EFI console",
-	0,
+	C_WIDEOUT,
 	efi_cons_probe,
 	efi_cons_init,
 	efi_cons_putchar,

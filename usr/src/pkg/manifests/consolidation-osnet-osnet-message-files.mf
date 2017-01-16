@@ -319,7 +319,6 @@ file path=usr/lib/locale/C/LC_MESSAGES/more.help group=sys
 file path=usr/lib/locale/C/LC_MESSAGES/priv_names group=sys
 file path=usr/lib/locale/C/LC_MESSAGES/uxlibc.src group=sys
 file path=usr/lib/locale/C/LC_TIME/SUNW_OST_OSCMD.po group=sys
-file path=usr/lib/locale/C/LC_TIME/SUNW_OST_OSLIB.po group=sys
 file path=usr/share/lib/locale/com/sun/admin/pm/client/pmHelpResources.java \
     group=lp
 file path=usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java \

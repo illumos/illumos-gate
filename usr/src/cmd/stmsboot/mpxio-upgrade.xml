@@ -23,8 +23,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -43,14 +41,6 @@
 	<create_default_instance enabled='false' />
 
 	<single_instance />
-
-	<dependency
-	    name='metainit'
-	    type='service'
-	    grouping='optional_all'
-	    restart_on='none'>
-		<service_fmri value='svc:/system/metainit' />
-	</dependency>
 
 	<dependency
 	    name='vxvm-sysboot'
