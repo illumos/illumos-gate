@@ -142,11 +142,11 @@ i=0
 while ((i < ${#bookmark[@]})); do
 	for opt in "${options[@]}"; do
 		for prop in ${bookmark_props[@]}; do
-			eval "$ZFS get $opt $prop ${bookmark[i]} > \
+			eval "zfs get $opt $prop ${bookmark[i]} > \
 			    $TESTDIR/$TESTFILE0"
 			ret=$?
 			if [[ $ret != 0 ]]; then
-				log_fail "$ZFS get returned: $ret"
+				log_fail "zfs get returned: $ret"
 			fi
 			check_return_value ${bookmark[i]} "$prop" "$opt"
 		done

@@ -103,7 +103,7 @@ for dst in ${bookmark[@]}; do
 	while (( i < opt_numb )); do
 		(( item = $RANDOM % ${#options[@]} ))
 		(( depth_item = $RANDOM % ${#depth_options[@]} ))
-		log_must eval "$ZFS get -${depth_options[depth_item]} ${options[item]} $bookmark_props $dst > /dev/null 2>&1"
+		log_must eval "zfs get -${depth_options[depth_item]} ${options[item]} $bookmark_props $dst > /dev/null 2>&1"
 		(( i += 1 ))
 	done
 done
