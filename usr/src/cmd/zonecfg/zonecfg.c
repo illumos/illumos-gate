@@ -4109,7 +4109,10 @@ clear_property(cmd_t *cmd)
 			return;
 		case PT_VLANID:
 			in_progress_nwiftab.zone_nwif_vlan_id[0] = '\0';
+			need_to_commit = B_TRUE;
+			return;
 		}
+		break;
 	case RT_SECFLAGS:
 		switch (prop_type) {
 		case PT_LOWER:
