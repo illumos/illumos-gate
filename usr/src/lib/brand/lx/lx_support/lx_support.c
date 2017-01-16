@@ -226,7 +226,7 @@ lxs_set_ttygid(zoneid_t zoneid)
 		    sizeof (tty_gid));
 
 done:
-	fclose(fp);
+	(void) fclose(fp);
 }
 
 static int
