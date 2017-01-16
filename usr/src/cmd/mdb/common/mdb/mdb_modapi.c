@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -53,6 +53,10 @@ typedef struct {
 int mdb_prop_postmortem = FALSE;	/* Are we examining a dump? */
 int mdb_prop_kernel = FALSE;		/* Are we examining a kernel? */
 int mdb_prop_datamodel = 0;		/* Data model (see mdb_target_impl.h) */
+
+static int
+call_idcmd(mdb_idcmd_t *idcp, uintmax_t addr, uintmax_t count,
+    uint_t flags, mdb_argvec_t *argv);
 
 ssize_t
 mdb_vread(void *buf, size_t nbytes, uintptr_t addr)
@@ -584,8 +588,8 @@ walk_dcmd(uintptr_t addr, const void *ignored, dcmd_walk_arg_t *dwp)
 	int status;
 
 	mdb.m_frame->f_cbactive = B_TRUE;
-	status = mdb_call_idcmd(dwp->dw_dcmd, addr, 1, dwp->dw_flags,
-	    &dwp->dw_argv, NULL, NULL);
+	status = call_idcmd(dwp->dw_dcmd, addr, 1, dwp->dw_flags,
+	    &dwp->dw_argv);
 	mdb.m_frame->f_cbactive = B_FALSE;
 
 	if (status == DCMD_USAGE || status == DCMD_ABORT)
@@ -710,7 +714,7 @@ mdb_call_dcmd(const char *name, uintptr_t dot, uint_t flags,
 
 	args.a_data = (mdb_arg_t *)argv;
 	args.a_nelems = args.a_size = argc;
-	status = mdb_call_idcmd(idcp, dot, 1, flags, &args, NULL, NULL);
+	status = call_idcmd(idcp, dot, 1, flags, &args);
 
 	if (status == DCMD_ERR || status == DCMD_ABORT)
 		return (set_errno(EMDB_DCFAIL));
@@ -719,6 +723,35 @@ mdb_call_dcmd(const char *name, uintptr_t dot, uint_t flags,
 		return (set_errno(EMDB_DCUSAGE));
 
 	return (0);
+}
+
+/*
+ * When dcmds or walkers call a dcmd that might be in another module,
+ * we need to set mdb.m_frame->f_cp to an mdb_cmd that represents the
+ * dcmd we're currently executing, otherwise mdb_get_module gets the
+ * module of the caller instead of the module for the current dcmd.
+ */
+static int
+call_idcmd(mdb_idcmd_t *idcp, uintmax_t addr, uintmax_t count,
+    uint_t flags, mdb_argvec_t *argv)
+{
+	mdb_cmd_t *save_cp;
+	mdb_cmd_t cmd;
+	int ret;
+
+	bzero(&cmd, sizeof (cmd));
+	cmd.c_dcmd = idcp;
+	cmd.c_argv = *argv;
+
+	save_cp = mdb.m_frame->f_cp;
+	mdb.m_frame->f_cp = &cmd;
+
+	ret = mdb_call_idcmd(cmd.c_dcmd, addr, count, flags,
+	    &cmd.c_argv, NULL, NULL);
+
+	mdb.m_frame->f_cp = save_cp;
+
+	return (ret);
 }
 
 int

@@ -6163,7 +6163,7 @@ rfs4_lookupfile(component4 *component, struct svc_req *req,
 
 static nfsstat4
 create_vnode(vnode_t *dvp, char *nm,  vattr_t *vap, createmode4 mode,
-    timespec32_t *mtime, cred_t *cr, vnode_t **vpp, bool_t *created)
+    cred_t *cr, vnode_t **vpp, bool_t *created)
 {
 	int error;
 	nfsstat4 status = NFS4_OK;
@@ -6233,11 +6233,12 @@ tryagain:
 		}
 
 		/* Check for duplicate request */
-		ASSERT(mtime != 0);
 		va.va_mask = AT_MTIME;
 		error = VOP_GETATTR(*vpp, &va, 0, cr, NULL);
 		if (!error) {
 			/* We found the file */
+			const timestruc_t *mtime = &vap->va_mtime;
+
 			if (va.va_mtime.tv_sec != mtime->tv_sec ||
 			    va.va_mtime.tv_nsec != mtime->tv_nsec) {
 				/* but its not our creation */
@@ -6472,7 +6473,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 		return (NFS4ERR_SERVERFAULT);
 	}
 
-	status = create_vnode(dvp, name, vap, args->mode, mtime,
+	status = create_vnode(dvp, name, vap, args->mode,
 	    cs->cr, &vp, &created);
 	if (nm != name)
 		kmem_free(name, MAXPATHLEN + 1);
