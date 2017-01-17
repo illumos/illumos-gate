@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/syscall.h>
@@ -73,6 +73,11 @@ typedef struct lx_aio_ctxt {
 } lx_aio_ctxt_t;
 
 int lx_aio_max_nr = 65536;
+
+/* Perform some basic validation on the context */
+#define	INVALID_CTX(C)	(C == NULL || (long)C == -1 || \
+			(C->lxaio_size == 0 && C->lxaio_nevents == 0) || \
+			C->lxaio_nevents > lx_aio_max_nr)
 
 long
 lx_io_setup(unsigned int nr_events, lx_aio_context_t *cidp)
@@ -143,7 +148,17 @@ lx_io_submit(lx_aio_context_t cid, long nr, uintptr_t **bpp)
 	struct aiocb *aiocb;
 	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
-	if (nr <= 0 || ctx == NULL)
+	/*
+	 * To accomodate LTP tests we have to check in a specific order.
+	 * Linux checks for invalid context first, then passes if nr == 0.
+	 */
+	if (INVALID_CTX(ctx))
+		return (-EINVAL);
+
+	if (nr == 0)
+		return (0);
+
+	if (nr < 0)
 		return (-EINVAL);
 
 	if ((iocbpp = (lx_iocb_t **)malloc(nr * sizeof (uintptr_t))) == NULL)
@@ -287,10 +302,15 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 	int rval, i, err;
 	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
-	/* ctx->lxaio_nevents already validated against lx_aio_max_nr */
+	if (INVALID_CTX(ctx))
+		return (-EINVAL);
+
 	if (min_nr < 0 || min_nr > ctx->lxaio_nevents ||
 	    nr < 0 || nr > ctx->lxaio_nevents)
 		return (-EINVAL);
+
+	if (events == NULL)
+		return (-EFAULT);
 
 	/*
 	 * We can't return ENOMEM from this syscall so EINTR is the closest
@@ -459,8 +479,12 @@ lx_io_cancel(lx_aio_context_t cid, lx_iocb_t *iocbp, lx_io_event_t *result)
 	lx_aiocb_t *lxcb;
 	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
 
+	/* This is in a specific order for LTP */
 	if (uucopy(iocbp, &iocb, sizeof (lx_iocb_t)) != 0)
 		return (-EFAULT);
+
+	if (INVALID_CTX(ctx))
+		return (-EINVAL);
 
 	mutex_enter(&ctx->lxaio_lock);
 
@@ -498,6 +522,9 @@ lx_io_destroy(lx_aio_context_t cid)
 	unsigned int nget = 0, i;
 	int port;
 	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
+
+	if (INVALID_CTX(ctx))
+		return (-EINVAL);
 
 	port = ctx->lxaio_port;
 	mutex_enter(&ctx->lxaio_lock);
