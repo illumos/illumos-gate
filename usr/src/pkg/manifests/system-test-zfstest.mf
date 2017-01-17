@@ -457,6 +457,12 @@ file \
     path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.recursive_pos \
     mode=0555
 file \
+    path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.return_large \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.return_large.zcp \
+    mode=0444
+file \
     path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.return_nvlist_neg \
     mode=0555
 file \
@@ -561,6 +567,30 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.rollback_one \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_destroy \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_destroy.zcp \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_neg \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_neg.zcp \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_recursive \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_recursive.zcp \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_simple \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_simple.zcp \
+    mode=0444
 $(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.amd64 \
     mode=0555
 $(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.i386 \
