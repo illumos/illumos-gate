@@ -18,12 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -913,32 +914,6 @@ vfs_mountroot(void)
 	if (getzoneid() == GLOBAL_ZONEID) {
 		vfs_mountfs("sharefs", "sharefs", "/etc/dfs/sharetab");
 	}
-
-#ifdef __sparc
-	/*
-	 * This bit of magic can go away when we convert sparc to
-	 * the new boot architecture based on ramdisk.
-	 *
-	 * Booting off a mirrored root volume:
-	 * At this point, we have booted and mounted root on a
-	 * single component of the mirror.  Complete the boot
-	 * by configuring SVM and converting the root to the
-	 * dev_t of the mirrored root device.  This dev_t conversion
-	 * only works because the underlying device doesn't change.
-	 */
-	if (root_is_svm) {
-		if (svm_rootconf()) {
-			panic("vfs_mountroot: cannot remount root");
-		}
-
-		/*
-		 * mnttab should reflect the new root device
-		 */
-		vfs_lock_wait(rootvfs);
-		vfs_setresource(rootvfs, rootfs.bo_name, 0);
-		vfs_unlock(rootvfs);
-	}
-#endif /* __sparc */
 
 	if (strcmp(rootfs.bo_fstype, "zfs") != 0) {
 		/*

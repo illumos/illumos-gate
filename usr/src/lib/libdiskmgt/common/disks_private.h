@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 #ifndef _DISKS_PRIVATE_H
@@ -255,7 +257,6 @@ int		libdiskmgt_str_eq(char *nm1, char *nm2);
 
 /* in-use detectors */
 int		inuse_mnt(char *slice, nvlist_t *attrs, int *errp);
-int		inuse_svm(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_lu(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_active_zpool(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_exported_zpool(char *slice, nvlist_t *attrs, int *errp);

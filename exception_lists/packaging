@@ -23,9 +23,9 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 #
@@ -298,15 +298,6 @@ usr/include/sys/dumpadm.h
 usr/include/sys/ontrap.h
 usr/include/sys/sysmsg_impl.h
 usr/include/sys/vlan.h
-#
-# These files are installed in the proto area so lvm can use
-# them during the build process.
-#
-lib/llib-lmeta
-lib/llib-lmeta.ln
-usr/include/sdssc.h
-usr/lib/llib-lmeta
-usr/lib/llib-lmeta.ln
 #
 # non-public pci header
 #
@@ -716,9 +707,10 @@ usr/include/sys/kiconv_utf8_gb2312.h
 usr/include/sys/kiconv_utf8_hkscs.h
 usr/include/sys/kiconv_utf8_uhc.h
 #
-# At this time, the ttydefs.cleanup file is only useful on sun4u systems
+# At this time, the directory and its contents
+# are only useful on sun4u systems
 #
-etc/flash/postdeployment/ttydefs.cleanup	i386
+etc/flash/postdeployment			i386
 #
 # This header file is shared only between the power commands and
 # ppm/srn modules # and should not be in any package

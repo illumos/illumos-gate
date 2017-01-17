@@ -35,6 +35,7 @@ I386_TESTS =		\
 	32.fma-ss 	\
 	32.lzcnt 	\
 	32.popcnt 	\
+	32.sha		\
 	32.sse-4.2 	\
 	32.ssse3 	\
 	32.xsave 	\
@@ -50,6 +51,7 @@ I386_TESTS =		\
 	64.lzcnt 	\
 	64.popcnt 	\
 	64.random 	\
+	64.sha		\
 	64.sse-4.2 	\
 	64.ssse3 	\
 	64.vmx 		\

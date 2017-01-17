@@ -286,15 +286,6 @@
   <service name='network/rpc/rusers' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
-  <service name='network/rpc/meta' version='1' type='service'>
-    <instance name='default' enabled='false'/>
-  </service>
-  <service name='network/rpc/metamed' version='1' type='service'>
-    <instance name='default' enabled='false'/>
-  </service>
-  <service name='network/rpc/metamh' version='1' type='service'>
-    <instance name='default' enabled='false'/>
-  </service>
 
   <!--
 	non-default inetd(1M) RPC services disabled

@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 #ifndef	_SYS_BOOTCONF_H
@@ -198,7 +200,6 @@ extern struct bootobj rootfs;
 extern struct bootobj swapfile;
 
 extern char obp_bootpath[BO_MAXOBJNAME];
-extern char svm_bootpath[BO_MAXOBJNAME];
 
 extern dev_t getrootdev(void);
 extern void getfsname(char *, char *, size_t);

@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1982, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 /*
@@ -135,13 +136,6 @@ rootconf(void)
 	if (error = clboot_rootconf())
 		return (error);
 
-	if (root_is_svm) {
-		(void) strncpy(rootfs.bo_name, obp_bootpath, BO_MAXOBJNAME);
-
-		BMDPRINTF(("rootconf: svm: rootfs name %s\n", rootfs.bo_name));
-		BMDPRINTF(("rootconf: svm: svm name %s\n", svm_bootpath));
-	}
-
 	/*
 	 * Run _init on the root filesystem (we already loaded it
 	 * but we've been waiting until now to _init it) which will
@@ -172,10 +166,6 @@ rootconf(void)
 	}
 	VFS_INIT(rootvfs, &vsw->vsw_vfsops, (caddr_t)0);
 	VFS_HOLD(rootvfs);
-
-	if (root_is_svm) {
-		rootvfs->vfs_flag |= VFS_RDONLY;
-	}
 
 	/*
 	 * This pm-releated call has to occur before root is mounted since we
@@ -234,41 +224,6 @@ rootconf(void)
 	else
 		cmn_err(CE_CONT, "?root on %s fstype %s\n",
 		    rootfs.bo_name, rootfs.bo_fstype);
-	return (error);
-}
-
-/*
- * Remount root on an SVM mirror root device
- * Only supported on UFS filesystems at present
- */
-int
-svm_rootconf(void)
-{
-	int	error;
-	extern int ufs_remountroot(struct vfs *vfsp);
-
-	ASSERT(root_is_svm == 1);
-
-	if (strcmp(rootfs.bo_fstype, "ufs") != 0) {
-		cmn_err(CE_CONT, "Mounting root on %s with filesystem "
-		    "type %s is not supported\n",
-		    rootfs.bo_name, rootfs.bo_fstype);
-		return (EINVAL);
-	}
-
-	(void) strncpy(rootfs.bo_name, svm_bootpath, BO_MAXOBJNAME);
-
-	BMDPRINTF(("svm_rootconf: rootfs %s\n", rootfs.bo_name));
-
-	error = ufs_remountroot(rootvfs);
-
-	if (error) {
-		cmn_err(CE_CONT, "Cannot remount root on %s fstype %s\n",
-		    rootfs.bo_name, rootfs.bo_fstype);
-	} else {
-		cmn_err(CE_CONT, "?root remounted on %s fstype %s\n",
-		    rootfs.bo_name, rootfs.bo_fstype);
-	}
 	return (error);
 }
 
@@ -350,22 +305,10 @@ loadrootmodules(void)
 	BMDPRINTF(("loadrootmodules: flags 0x%x\n", rootfs.bo_flags));
 
 	/*
-	 * zzz We need to honor what's in rootfs if it's not null.
-	 * non-null means use what's there.  This way we can
-	 * change rootfs with /etc/system AND with tunetool.
+	 * Get the root fstype and root device path from boot.
 	 */
-	if (root_is_svm) {
-		/* user replaced rootdev, record obp_bootpath */
-		obp_bootpath[0] = '\0';
-		(void) getphysdev("root", obp_bootpath, BO_MAXOBJNAME);
-		BMDPRINTF(("loadrootmodules: obp_bootpath %s\n", obp_bootpath));
-	} else {
-		/*
-		 * Get the root fstype and root device path from boot.
-		 */
-		rootfs.bo_fstype[0] = '\0';
-		rootfs.bo_name[0] = '\0';
-	}
+	rootfs.bo_fstype[0] = '\0';
+	rootfs.bo_name[0] = '\0';
 
 	/*
 	 * This lookup will result in modloadonly-ing the root
@@ -413,17 +356,13 @@ loop:
 	 */
 	err = 0;
 	BMDPRINTF(("loadrootmodules: rootfs %s\n", rootfs.bo_name));
-	if (root_is_svm == 0) {
-		BMDPRINTF(("loadrootmodules: rootfs %s\n", rootfs.bo_name));
-		name = rootfs.bo_name;
-		err = load_bootpath_drivers(rootfs.bo_name);
-	}
+	name = rootfs.bo_name;
+	err = load_bootpath_drivers(rootfs.bo_name);
 
 	/*
 	 * Load driver modules in obp_bootpath, this is always
 	 * required for mountroot to succeed. obp_bootpath is
-	 * is set if rootdev is set via /etc/system, which is
-	 * the case if booting of a SVM/VxVM mirror.
+	 * is set if rootdev is set via /etc/system.
 	 */
 	if ((err == 0) && obp_bootpath[0] != '\0') {
 		BMDPRINTF(("loadrootmodules: obp_bootpath %s\n", obp_bootpath));

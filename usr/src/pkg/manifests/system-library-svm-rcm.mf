@@ -24,18 +24,6 @@
 #
 
 set name=pkg.fmri value=pkg:/system/library/svm-rcm@$(PKGVERS)
-set name=pkg.description \
-    value="reconfiguration coordination manager module for SVM"
-set name=pkg.summary value="SVM RCM Module"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Libraries
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/rcm
-dir path=usr/lib/rcm/modules
-file path=usr/lib/rcm/modules/SUNW_svm_rcm.so mode=0555
-legacy pkg=SUNWmddr desc="reconfiguration coordination manager module for SVM" \
-    name="SVM RCM Module"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL

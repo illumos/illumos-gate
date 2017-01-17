@@ -12,8 +12,8 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Joyent, Inc.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 include		$(SRC)//Makefile.master
@@ -287,26 +287,7 @@ _MANFILES=	6to4relay.1m		\
 		mailwrapper.1m		\
 		makedbm.1m		\
 		makemap.1m		\
-		mdmonitord.1m		\
 		mdnsd.1m		\
-		medstat.1m		\
-		metaclear.1m		\
-		metadb.1m		\
-		metadevadm.1m		\
-		metahs.1m		\
-		metaimport.1m		\
-		metainit.1m		\
-		metaoffline.1m		\
-		metaparam.1m		\
-		metarecover.1m		\
-		metarename.1m		\
-		metareplace.1m		\
-		metaroot.1m		\
-		metaset.1m		\
-		metassist.1m		\
-		metastat.1m		\
-		metasync.1m		\
-		metattach.1m		\
 		mkdevalloc.1m		\
 		mkdevmaps.1m		\
 		mkfifo.1m		\
@@ -427,10 +408,6 @@ _MANFILES=	6to4relay.1m		\
 		route.1m		\
 		routeadm.1m		\
 		rpc.bootparamd.1m	\
-		rpc.mdcommd.1m		\
-		rpc.metad.1m		\
-		rpc.metamedd.1m		\
-		rpc.metamhd.1m		\
 		rpc.rexd.1m		\
 		rpc.rstatd.1m		\
 		rpc.rusersd.1m		\
@@ -621,8 +598,6 @@ MANLINKS=	acctcon1.1m			\
 		intro.1m			\
 		kadmin.local.1m			\
 		lastlogin.1m			\
-		metadetach.1m			\
-		metaonline.1m			\
 		monacct.1m			\
 		nulladm.1m			\
 		poweroff.1m			\
@@ -740,10 +715,6 @@ telinit.1m			:= LINKSRC = init.1m
 kadmin.local.1m			:= LINKSRC = kadmin.1m
 
 unlink.1m			:= LINKSRC = link.1m
-
-metaonline.1m			:= LINKSRC = metaoffline.1m
-
-metadetach.1m			:= LINKSRC = metattach.1m
 
 umount.1m			:= LINKSRC = mount.1m
 

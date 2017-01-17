@@ -18,9 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -69,7 +71,6 @@ static struct sysparam *sysparam_tl;	/* tail of parameters list */
 static vmem_t *mod_sysfile_arena;	/* parser memory */
 
 char obp_bootpath[BO_MAXOBJNAME];	/* bootpath from obp */
-char svm_bootpath[BO_MAXOBJNAME];	/* bootpath redirected via rootdev */
 
 #if defined(_PSM_MODULES)
 
@@ -1503,11 +1504,6 @@ setparams()
 			bootobjp = &rootfs;
 
 		switch (sysp->sys_type) {
-		case MOD_ROOTDEV:
-			root_is_svm = 1;
-			(void) copystr(sysp->sys_ptr, svm_bootpath,
-			    BO_MAXOBJNAME, NULL);
-			break;
 		case MOD_SWAPDEV:
 			bootobjp->bo_flags |= BO_VALID;
 			(void) copystr(sysp->sys_ptr, bootobjp->bo_name,
@@ -1519,6 +1515,7 @@ setparams()
 			(void) copystr(sysp->sys_ptr, bootobjp->bo_fstype,
 			    BO_MAXOBJNAME, NULL);
 			break;
+		case MOD_ROOTDEV:
 		default:
 			break;
 		}

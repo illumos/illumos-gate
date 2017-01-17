@@ -940,30 +940,32 @@ i_dladm_set_single_prop(dladm_handle_t handle, datalink_id_t linkid,
 
 		cnt = val_cnt;
 	} else {
-		boolean_t	defval = B_FALSE;
+		boolean_t	defval;
 
 		if (pdp->pd_defval.vd_name == NULL)
 			return (DLADM_STATUS_NOTSUP);
 
 		cnt = 1;
 		defval = (strlen(pdp->pd_defval.vd_name) > 0);
-		if ((pdp->pd_flags & PD_CHECK_ALLOC) != 0 || defval) {
-			if ((vdp = calloc(1, sizeof (val_desc_t))) == NULL)
-				return (DLADM_STATUS_NOMEM);
-
-			if (defval) {
-				(void) memcpy(vdp, &pdp->pd_defval,
-				    sizeof (val_desc_t));
-			} else if (pdp->pd_check != NULL) {
-				status = pdp->pd_check(handle, pdp, linkid,
-				    prop_val, &cnt, flags, &vdp, media);
-				if (status != DLADM_STATUS_OK)
-					goto done;
-			}
-		} else {
+		if ((pdp->pd_flags & PD_CHECK_ALLOC) == 0 && !defval) {
 			status = i_dladm_getset_defval(handle, pdp, linkid,
 			    media, flags);
 			return (status);
+		}
+
+		vdp = calloc(1, sizeof (val_desc_t));
+		if (vdp == NULL)
+			return (DLADM_STATUS_NOMEM);
+
+		if (defval) {
+			(void) memcpy(vdp, &pdp->pd_defval,
+			    sizeof (val_desc_t));
+		} else if (pdp->pd_check != NULL) {
+			needfree = ((pdp->pd_flags & PD_CHECK_ALLOC) != 0);
+			status = pdp->pd_check(handle, pdp, linkid, prop_val,
+			    &cnt, flags, &vdp, media);
+			if (status != DLADM_STATUS_OK)
+				goto done;
 		}
 	}
 	if (pdp->pd_flags & PD_AFTER_PERM)
@@ -4113,7 +4115,6 @@ get_flowctl(dladm_handle_t handle, prop_desc_t *pdp,
 static dladm_status_t
 i_dladm_set_private_prop(dladm_handle_t handle, datalink_id_t linkid,
     const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags)
-
 {
 	int		i, slen;
 	int 		bufsize = 0;

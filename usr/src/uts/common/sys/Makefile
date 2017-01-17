@@ -815,34 +815,6 @@ ISCSITHDRS=		\
 ISOHDRS=			\
 	signal_iso.h
 
-DERIVED_LVMHDRS=	\
-	md_mdiox.h		\
-	md_basic.h		\
-	mdmed.h			\
-	md_mhdx.h		\
-	mdmn_commd.h
-
-LVMHDRS=			\
-	md_convert.h		\
-	md_crc.h		\
-	md_hotspares.h		\
-	md_mddb.h		\
-	md_mirror.h		\
-	md_mirror_shared.h	\
-	md_names.h		\
-	md_notify.h		\
-	md_raid.h		\
-	md_rename.h		\
-	md_sp.h			\
-	md_stripe.h		\
-	md_trans.h		\
-	mdio.h			\
-	mdvar.h			
-
-ALL_LVMHDRS=			\
-	$(LVMHDRS)		\
-	$(DERIVED_LVMHDRS)
-
 FMHDRS=				\
 	protocol.h		\
 	util.h
@@ -1009,7 +981,6 @@ SYSEVENTHDRS=		\
 	eventdefs.h	\
 	ipmp.h		\
 	pwrctl.h	\
-	svm.h		\
 	vrrp.h
 
 CONTRACTHDRS=		\
@@ -1184,7 +1155,6 @@ CHECKHDRS=						\
 	$(FMFSHDRS:%.h=fm/fs/%.check)			\
 	$(FMIOHDRS:%.h=fm/io/%.check)			\
 	$(FSHDRS:%.h=fs/%.check)			\
-	$(LVMHDRS:%.h=lvm/%.check)			\
 	$(SCSIHDRS:%.h=scsi/%.check)			\
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check)		\
 	$(SCSICONFHDRS:%.h=scsi/conf/%.check)		\
@@ -1250,7 +1220,6 @@ CHECKHDRS=						\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
 	$(ROOTMLNXHDRS)		\
-	$(ROOTLVMHDRS)		\
 	$(ROOTSCSIHDRS)		\
 	$(ROOTSCSIADHDRS)	\
 	$(ROOTSCSICONFHDRS)	\
@@ -1284,7 +1253,6 @@ CHECKHDRS=						\
 
 install_h:			\
 	$(ROOTDIRS)		\
-	LVMDERIVED_H		\
 	.WAIT			\
 	$(ROOTHDRS)		\
 	$(ROOTAUDHDRS)		\
@@ -1319,7 +1287,6 @@ install_h:			\
 	$(ROOTTAVORHDRS)	\
 	$(ROOTHERMONHDRS)	\
 	$(ROOTMLNXHDRS)		\
-	$(ROOTLVMHDRS)		\
 	$(ROOTSCSIHDRS)		\
 	$(ROOTSCSIADHDRS)	\
 	$(ROOTSCSIISCSIHDRS)	\
@@ -1361,14 +1328,10 @@ priv_names.h: $(PRIVS_AWK) $(PRIVS_DEF)
 usb/usbdevs.h: $(USBDEVS_AWK) $(USBDEVS_DATA)
 	$(AWK) -f $(USBDEVS_AWK) $(USBDEVS_DATA) -H > $@
 
-LVMDERIVED_H:
-	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE) all_h
-
 clean:
 	$(RM) $(GENHDRS)
 
 clobber: clean
-	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE) clobber
 
 check:	$(CHECKHDRS)
 

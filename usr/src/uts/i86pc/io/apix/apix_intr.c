@@ -901,9 +901,13 @@ apix_do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 		(void) apix_do_softint(rp);
 		ASSERT(!interrupts_enabled());
 #ifdef TRAPTRACE
-	ttp->ttr_vector = T_SOFTINT;
+		ttp->ttr_vector = T_SOFTINT;
 #endif
-		return;
+		/*
+		 * We need to check again for pending interrupts that may have
+		 * arrived while the softint was running.
+		 */
+		goto do_pending;
 	}
 
 	/*
@@ -957,6 +961,7 @@ apix_do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 			return;
 	}
 
+do_pending:
 	if (apix_do_pending_hilevel(cpu, rp) < 0)
 		return;
 

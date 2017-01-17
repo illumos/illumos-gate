@@ -81,7 +81,7 @@ struct dk_cinfo {
 #define	DKC_SMSFLOPPY	12
 #define	DKC_SCSI_CCS	13	/* SCSI CCS compatible */
 #define	DKC_INTEL82072	14	/* native floppy chip */
-#define	DKC_MD		16	/* meta-disk (virtual-disk) driver */
+#define	DKC_MD		16	/* meta-disk (virtual-disk) driver (obsolete) */
 #define	DKC_INTEL82077	19	/* 82077 floppy disk controller */
 #define	DKC_DIRECT	20	/* Intel direct attached device i.e. IDE */
 #define	DKC_PCMCIA_MEM	21	/* PCMCIA memory disk-like type (Obsolete) */
