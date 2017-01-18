@@ -21,10 +21,6 @@
  * CDDL HEADER END
  */
 
-#ifndef lint
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#endif
-
 /*
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
@@ -45,21 +41,7 @@
 
 #define	ALL	-1	/* special symbol for all tables */
 
-/*
- * SunOS 4.x and Solaris 2.[1234] put Type 4 key tables into
- * the keytables directory with no type qualification.
- * If we're a SPARC, we might be using an NFS server that
- * doesn't have the new type-qualified directories.
- * (loadkeys wasn't used on non-SPARCs in 2.[1234].)
- */
-#ifdef	sparc
-#define	COMPATIBILITY_DIR
-#endif
-
 static char	keytable_dir[] = "/usr/share/lib/keytables/type_%d/";
-#ifdef	COMPATIBILITY_DIR
-static char	keytable_dir2[] = "/usr/share/lib/keytables/";
-#endif
 static char	layout_prefix[] = "layout_";
 
 struct keyentry {
@@ -132,6 +114,7 @@ static int	loadkey(int kbdfd, keyentry *kep);
 static int	dupkey(int kbdfd, dupentry *dep, int shiftmask);
 static int	swapkey(int kbdfd, dupentry *dep, int shiftmask);
 static int	yylex();
+extern int	yyparse(void);
 static int	readesc(FILE *stream, int delim, int single_char);
 static int	wordcmp(const void *w1, const void *w2);
 static int	yyerror(char *msg);
@@ -141,20 +124,18 @@ static FILE	*open_mapping_file(char *pathbuf, char *name,
 			boolean_t explicit_name, int type);
 
 int
-main(argc, argv)
-	int argc;
-	char **argv;
+main(int argc, char **argv)
 {
-	register int kbdfd;
+	int kbdfd;
 	int type;
 	int layout;
 	/* maxint is 8 hex digits. */
 	char layout_filename[sizeof(layout_prefix)+8];
 	char pathbuf[MAXPATHLEN];
-	register int shift;
+	int shift;
 	struct kiockeymap mapentry;
-	register keyentry *kep;
-	register dupentry *dep;
+	keyentry *kep;
+	dupentry *dep;
 	boolean_t explicit_name;
 
 	while(++argv, --argc) {
@@ -333,12 +314,8 @@ set_layout(char *arg)
  * else print a message on stderr and return NULL.
  */
 FILE *
-open_mapping_file(
-	char *pathbuf,
-	char *name,
-	boolean_t explicit_name,
-	int type
-) {
+open_mapping_file(char *pathbuf, char *name, boolean_t explicit_name, int type)
+{
 	/* If the user specified the name, try it "raw". */
 	if (explicit_name) {
 		strcpy(pathbuf, name);
@@ -358,23 +335,8 @@ open_mapping_file(
 		return (NULL);
 	}
 	(void) strcat(pathbuf, name);
-	infile = fopen(pathbuf, "r");
-	if (infile) return (infile);
-	if (errno != ENOENT) goto fopen_fail;
-
-#ifdef	COMPATIBILITY_DIR
-	/* If not, and either the name was specified explicitly */
-	/*     or this is a type 4... */
-	if (explicit_name || type == KB_SUN4) {
-		/* Try the compatibility name. */
-		/* No need to check len here, it's shorter. */
-		(void) strcpy(pathbuf, keytable_dir2);
-		(void) strcat(pathbuf, infilename);
-		infile = fopen(pathbuf, "r");
-		if (infile) return (infile);
-		if (errno != ENOENT) goto fopen_fail;
-	}
-#endif
+	if ((infile = fopen(pathbuf, "r")) != NULL)
+		return (infile);
 
 fopen_fail:
 	(void) fprintf(stderr, "loadkeys: ");
@@ -425,7 +387,7 @@ makeentry(tablemask, entry)
 	kep->ke_next = NULL;
 	kep->ke_entry.kio_tablemask = tablemask;
 	kep->ke_entry.kio_station = 0;
-	kep->ke_entry.kio_entry = (u_short)entry;
+	kep->ke_entry.kio_entry = entry;
 	index = entry - STRING;
 	if (index >= 0 && index <= 15)
 		(void) strncpy(kep->ke_entry.kio_string, strings[index],
@@ -624,6 +586,10 @@ code:
 		{
 		$$ = $1;
 		}
+|	INT
+		{
+		$$ = $1;
+		}
 |	'('
 		{
 		$$ = '(';
@@ -707,9 +673,18 @@ word_t	wordtab[] = {
 	{ "downarrow",	CONSTANT,	DOWNARROW },
 	{ "error",	CONSTANT,	ERROR },
 	{ "fa_acute",	CONSTANT,	FA_ACUTE },
+	{ "fa_apostrophe", CONSTANT,	FA_APOSTROPHE },
+	{ "fa_breve",	CONSTANT,	FA_BREVE },
+	{ "fa_caron",	CONSTANT,	FA_CARON },
 	{ "fa_cedilla",	CONSTANT,	FA_CEDILLA },
 	{ "fa_cflex",	CONSTANT,	FA_CFLEX },
+	{ "fa_dacute",	CONSTANT,	FA_DACUTE },
+	{ "fa_dot",	CONSTANT,	FA_DOT },
 	{ "fa_grave",	CONSTANT,	FA_GRAVE },
+	{ "fa_macron",	CONSTANT,	FA_MACRON },
+	{ "fa_ogonek",	CONSTANT,	FA_OGONEK },
+	{ "fa_ring",	CONSTANT,	FA_RING },
+	{ "fa_slash",	CONSTANT,	FA_SLASH },
 	{ "fa_tilde",	CONSTANT,	FA_TILDE },
 	{ "fa_umlaut",	CONSTANT,	FA_UMLAUT },
 	{ "hole",	CONSTANT,	HOLE },
@@ -910,7 +885,7 @@ yylex()
 				yylval.number = wptr->w_lval;
 				tokentype = wptr->w_type;
 			} else {
-				yylval.number = strtol(tokbuf, &ptr, 10);
+				yylval.number = strtol(tokbuf, &ptr, 0);
 				if (ptr == tokbuf)
 					yyerror("syntax error");
 				else

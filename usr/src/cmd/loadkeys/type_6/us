@@ -22,8 +22,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # US Type 6 (USB) key layout
 #
 key  49  base '\\' shift | caps '\\' ctrl ^\ altg nop

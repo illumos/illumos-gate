@@ -1265,7 +1265,7 @@ kbtrans_strsetwithdecimal(char *buf, uint_t val, uint_t maxdigs)
  */
 static void
 kbtrans_keypressed(struct kbtrans *upper, uchar_t key_station,
-		    Firm_event *fe, ushort_t base)
+    Firm_event *fe, ushort_t base)
 {
 
 	register short	id_addr;
@@ -1278,7 +1278,7 @@ kbtrans_keypressed(struct kbtrans *upper, uchar_t key_station,
 		 * not been CTRLed.
 		 */
 		if (lower->kbtrans_shiftmask & (CTRLMASK | CTLSMASK)) {
-			unsigned short *ke;
+			keymap_entry_t *ke;
 			unsigned int mask;
 
 			mask = lower->kbtrans_shiftmask &
@@ -1327,7 +1327,7 @@ send:
  */
 static void
 kbtrans_queuepress(struct kbtrans *upper,
-		    uchar_t key_station, Firm_event *fe)
+    uchar_t key_station, Firm_event *fe)
 {
 	register struct key_event *ke, *ke_free;
 	register int i;
@@ -1439,9 +1439,24 @@ kbtrans_putcode(register struct kbtrans *upper, uint_t code)
 
 	/*
 	 * We will strip out any high order information here.
+	 * Convert to UTF-8.
 	 */
-	/* NOTE the implicit cast here */
-	*bp->b_wptr++ = (uchar_t)code;
+	code = KEYCHAR(code);
+	if (code < 0x80) {
+		*bp->b_wptr++ = (char)code;
+	} else if (code < 0x800) {
+		*bp->b_wptr++ = 0xc0 | (code >> 6);
+		*bp->b_wptr++ = 0x80 | (code & 0x3f);
+	} else if (code < 0x10000) {
+		*bp->b_wptr++ = 0xe0 | (code >> 12);
+		*bp->b_wptr++ = 0x80 | ((code >> 6) & 0x3f);
+		*bp->b_wptr++ = 0x80 | (code & 0x3f);
+	} else {
+		*bp->b_wptr++ = 0xf0 | (code >> 18);
+		*bp->b_wptr++ = 0x80 | ((code >> 12) & 0x3f);
+		*bp->b_wptr++ = 0x80 | ((code >> 6) & 0x3f);
+		*bp->b_wptr++ = 0x80 | (code & 0x3f);
+	}
 
 	/*
 	 * Send the message up.
@@ -1788,7 +1803,7 @@ kbtrans_ascii_keypressed(
 	}
 
 	/*
-	 * Send the byte upstream.
+	 * Send the char upstream.
 	 */
 	kbtrans_putcode(upper, entry);
 
@@ -2089,7 +2104,7 @@ kbtrans_trans_event_setup_repeat(
  * Map old special codes to new ones.
  * Indexed by ((old special code) >> 4) & 0x07; add (old special code) & 0x0F.
  */
-static ushort_t  special_old_to_new[] = {
+static keymap_entry_t  special_old_to_new[] = {
 	SHIFTKEYS,
 	BUCKYBITS,
 	FUNNY,
@@ -2109,15 +2124,14 @@ static int
 kbtrans_setkey(struct kbtrans_lower *lower, struct kiockey *key, cred_t *cr)
 {
 	int	strtabindex, i;
-	unsigned short	*ke;
+	keymap_entry_t	*ke;
 	register int tablemask;
-	register ushort_t entry;
+	register keymap_entry_t entry;
 	register struct keyboard *kp;
 
 	kp = lower->kbtrans_keyboard;
 
 	if (key->kio_station >= kp->k_keymap_size)
-
 		return (EINVAL);
 
 	if (lower->kbtrans_keyboard == NULL)
@@ -2208,8 +2222,8 @@ static int
 kbtrans_getkey(struct kbtrans_lower *lower, struct kiockey *key)
 {
 	int	strtabindex;
-	unsigned short	*ke;
-	register ushort_t entry;
+	keymap_entry_t	*ke;
+	register keymap_entry_t entry;
 	struct keyboard *kp;
 
 	kp = lower->kbtrans_keyboard;
@@ -2267,7 +2281,7 @@ static int
 kbtrans_skey(struct kbtrans_lower *lower, struct kiockeymap *key, cred_t *cr)
 {
 	int	strtabindex, i;
-	unsigned short *ke;
+	keymap_entry_t *ke;
 	struct keyboard *kp;
 
 	kp = lower->kbtrans_keyboard;
@@ -2308,7 +2322,7 @@ kbtrans_skey(struct kbtrans_lower *lower, struct kiockeymap *key, cred_t *cr)
 		return (EINVAL);
 
 	if (key->kio_entry >= STRING &&
-	    key->kio_entry <= (ushort_t)(STRING + 15)) {
+	    key->kio_entry <= (STRING + 15)) {
 		strtabindex = key->kio_entry-STRING;
 		bcopy(key->kio_string,
 		    lower->kbtrans_keystringtab[strtabindex], KTAB_STRLEN);
@@ -2326,10 +2340,10 @@ kbtrans_skey(struct kbtrans_lower *lower, struct kiockeymap *key, cred_t *cr)
  *	Get individual keystation translation as new-style entry.
  */
 static int
-kbtrans_gkey(struct kbtrans_lower *lower, struct	kiockeymap *key)
+kbtrans_gkey(struct kbtrans_lower *lower, struct kiockeymap *key)
 {
 	int	strtabindex;
-	unsigned short *ke;
+	keymap_entry_t *ke;
 	struct keyboard *kp;
 
 	kp = lower->kbtrans_keyboard;
@@ -2360,7 +2374,7 @@ kbtrans_gkey(struct kbtrans_lower *lower, struct	kiockeymap *key)
 	key->kio_entry = *ke;
 
 	if (key->kio_entry >= STRING &&
-	    key->kio_entry <= (ushort_t)(STRING + 15)) {
+	    key->kio_entry <= (STRING + 15)) {
 		strtabindex = key->kio_entry-STRING;
 		bcopy(lower->kbtrans_keystringtab[strtabindex],
 		    key->kio_string, KTAB_STRLEN);

@@ -26,18 +26,18 @@
 # Belgian Type 6 (USB) key layout
 #
 #
-key  53  base ² shift ³ caps ² ctrl ² altg nop
+key  53  base 0x00B2 shift 0x00B3 caps 0x00B2 ctrl 0x00B2 altg nop
 key  30  base & shift 1 caps & ctrl & altg |
-key  31  base é shift 2 caps é ctrl é altg @
+key  31  base 0x00E9 shift 2 caps 0x00E9 ctrl 0x00E9 altg @
 key  32  base '"' shift 3 caps '"' ctrl '"' altg #
 key  33  base '\'' shift 4 caps '\'' ctrl '\'' altg nop
 key  34  base ( shift 5 caps ( ctrl ^[ altg nop
-key  35  base § shift 6 caps § ctrl ^_ altg ^
-key  36  base è shift 7 caps è ctrl è altg nop
+key  35  base 0x00A7 shift 6 caps 0x00A7 ctrl ^_ altg ^
+key  36  base 0x00E8 shift 7 caps 0x00E8 ctrl 0x00E8 altg nop
 key  37  base ! shift 8 caps ! ctrl ^\ altg nop
-key  38  base ç shift 9 caps ç ctrl ^^ altg {
-key  39  base à shift 0 caps à ctrl ^@ altg }
-key  45  base ) shift ° caps ) ctrl ^] altg nop
+key  38  base 0x00E7 shift 9 caps 0x00E7 ctrl ^^ altg {
+key  39  base 0x00E0 shift 0 caps 0x00E0 ctrl ^@ altg }
+key  45  base ) shift 0x00B0 caps ) ctrl ^] altg nop
 key  46  base - shift _ caps - ctrl ^_ altg nop
 key  20  base a shift A caps A ctrl ^A altg nop
 key  26  base z shift Z caps Z ctrl ^Z altg nop
@@ -45,8 +45,8 @@ key  47  base fa_cflex shift fa_umlaut caps fa_cflex ctrl fa_cflex altg [
 key  48  base $ shift * caps $ ctrl $ altg ]
 key   4  base q shift Q caps Q ctrl ^Q altg nop
 key  51  base m shift M caps M ctrl ^M altg nop
-key  52  base ù shift % caps ù ctrl ù altg fa_grave
-key  50  base µ shift £ caps µ ctrl µ altg fa_acute numl nonl up nop
+key  52  base 0x00F9 shift % caps 0x00F9 ctrl 0x00F9 altg fa_grave
+key  50  base 0x00B5 shift 0x00A3 caps 0x00B5 ctrl 0x00B5 altg fa_acute numl nonl up nop
 key  49  all hole
 key 100  base < shift > caps < ctrl < altg '\\' numl nonl up nop
 key  29  base w shift W caps W ctrl ^W altg nop

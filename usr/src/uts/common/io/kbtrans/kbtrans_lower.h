@@ -27,8 +27,6 @@
 #ifndef _KBTRANS_LOWER_H
 #define	_KBTRANS_LOWER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,8 +54,8 @@ struct kbtrans_lower {
 	uchar_t  kbtrans_state;		/* compose state */
 	uint_t   kbtrans_buckybits;	/* current buckybits */
 	uint_t   kbtrans_togglemask;   	/* Toggle shifts state */
-	ushort_t kbtrans_compose_key;	/* first compose key */
-	ushort_t kbtrans_fltaccent_entry; /* floating accent keymap entry */
+	kbtrans_key_t kbtrans_compose_key;	/* first compose key */
+	kbtrans_key_t kbtrans_fltaccent_entry; /* floating accent entry */
 
 	/*
 	 * Various mapping tables.
@@ -127,24 +125,15 @@ struct keyboard_callback {
  * Process a scancode.  This routine will call the functions in
  * keyboard_callback to handle the translated key.
  */
-void
-kbtrans_processkey(
-	struct kbtrans_lower *lower,
-	struct keyboard_callback *cb,
-	kbtrans_key_t key,
-	enum keystate state
-);
+void kbtrans_processkey(struct kbtrans_lower *, struct keyboard_callback *,
+    kbtrans_key_t, enum keystate);
 
 /*
  * This routine finds the entry for the specified keycode based on the
  * specified shift mask.
  */
-unsigned short *
-kbtrans_find_entry(
-	struct kbtrans_lower	*lower,
-	uint_t mask,
-	kbtrans_key_t
-);
+keymap_entry_t *kbtrans_find_entry(struct kbtrans_lower *, uint_t,
+    kbtrans_key_t);
 
 /*
  * Debug printing

@@ -22,8 +22,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Iceland Type 6 (USB) key layout
 #
 # Note, on the console, this keyboard layout is exactly

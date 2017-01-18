@@ -23,28 +23,26 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Spanish Type 6 (USB) key layout
 #
-key  53  base º shift ª caps º ctrl ^\ altg '\\'
+key  53  base 0x00BA shift 0x00AA caps 0x00BA ctrl ^\ altg '\\'
 key  30  base 1 shift ! caps 1 ctrl 1 altg |
 key  31  base 2 shift '"' caps 2 ctrl ^@ altg @
-key  32  base 3 shift · caps 3 ctrl 3 altg #
+key  32  base 3 shift 0x00B7 caps 3 ctrl 3 altg #
 key  33  base 4 shift $ caps 4 ctrl ^^ altg ^
 key  34  base 5 shift % caps 5 ctrl 5 altg ~
-key  35  base 6 shift & caps 6 ctrl 6 altg ¬
+key  35  base 6 shift & caps 6 ctrl 6 altg 0x00AC
 key  36  base 7 shift / caps 7 ctrl 7 altg nop
 key  37  base 8 shift ( caps 8 ctrl 8 altg nop
 key  38  base 9 shift ) caps 9 ctrl 9 altg nop
 key  39  base 0 shift = caps 0 ctrl 0 altg nop
 key  45  base '\'' shift ? caps '\'' ctrl '\'' altg '`'
-key  46  base ¡ shift ¿ caps ¡ ctrl ¡ altg nop
+key  46  base 0x00A1 shift 0x00BF caps 0x00A1 ctrl 0x00A1 altg nop
 key  47  base fa_grave shift fa_cflex caps fa_grave ctrl ^[ altg [
 key  48  base + shift * caps + ctrl ^] altg ]
-key  51  base ñ shift Ñ caps Ñ ctrl ñ altg nop
+key  51  base 0x00F1 shift 0x00D1 caps 0x00D1 ctrl 0x00F1 altg nop
 key  52  base fa_acute shift fa_umlaut caps fa_acute ctrl fa_acute altg {
-key  50  base ç shift Ç caps Ç ctrl ç altg } numl nonl up nop
+key  50  base 0x00E7 shift 0x00C7 caps 0x00C7 ctrl 0x00E7 altg } numl nonl up nop
 key  49  all hole
 key 100  base < shift > caps < ctrl ^^ altg nop numl nonl up nop
 key  54  base , shift ; caps , ctrl , altg nop

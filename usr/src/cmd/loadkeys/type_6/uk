@@ -22,13 +22,11 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # UK Type 6 (USB) key layout
 #
-key  53  base ` shift ¬ caps ` ctrl ` altg ¦
+key  53  base ` shift 0x00AC caps ` ctrl ` altg 0x00A6
 key  31  base 2 shift '"' caps 2 ctrl 2 altg nop
-key  32  base 3 shift £ caps 3 ctrl 3 altg nop
+key  32  base 3 shift 0x00A3 caps 3 ctrl 3 altg nop
 key  52  base '\'' shift @ caps '\'' ctrl ^@ altg nop
 key  50  base # shift ~ caps # ctrl # altg nop numl nonl up nop
 key  49  all hole

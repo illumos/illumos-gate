@@ -22,37 +22,35 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Dutch Type 6 (USB) key layout
 #
-key  53  base @ shift § caps @ ctrl ^@ altg '¬'
-key  30  base 1 shift ! caps 1 ctrl 1 altg ¹
-key  31  base 2 shift '"' caps 2 ctrl 2 altg ²
-key  32  base 3 shift # caps 3 ctrl 3 altg ³
-key  33  base 4 shift $ caps 4 ctrl 4 altg ¼
-key  34  base 5 shift % caps 5 ctrl 5 altg ½
-key  35  base 6 shift & caps 6 ctrl 6 altg ¾
-key  36  base 7 shift _ caps 7 ctrl ^_ altg £
+key  53  base @ shift 0x00A7 caps @ ctrl ^@ altg 0x00AC
+key  30  base 1 shift ! caps 1 ctrl 1 altg 0x00B9
+key  31  base 2 shift '"' caps 2 ctrl 2 altg 0x00B2
+key  32  base 3 shift # caps 3 ctrl 3 altg 0x00B3
+key  33  base 4 shift $ caps 4 ctrl 4 altg 0x00BC
+key  34  base 5 shift % caps 5 ctrl 5 altg 0x00BD
+key  35  base 6 shift & caps 6 ctrl 6 altg 0x00BE
+key  36  base 7 shift _ caps 7 ctrl ^_ altg 0x00A3
 key  37  base 8 shift ( caps 8 ctrl 8 altg {
 key  38  base 9 shift ) caps 9 ctrl ^] altg }
 key  39  base 0 shift '\'' caps 0 ctrl 0 altg '`'
 key  45  base / shift ? caps / ctrl ^\ altg '\\'
-key  46  base ° shift fa_tilde caps ° ctrl ° altg fa_cedilla
+key  46  base 0x00B0 shift fa_tilde caps 0x00B0 ctrl 0x00B0 altg fa_cedilla
 key  47  base fa_umlaut shift fa_cflex caps fa_umlaut ctrl fa_umlaut altg nop
 key  48  base * shift | caps * ctrl * altg ~
-key  22  base s shift S caps S ctrl ^S altg ß
-key  51  base + shift ± caps + ctrl + altg nop
+key  22  base s shift S caps S ctrl ^S altg 0x00DF
+key  51  base + shift 0x00B1 caps + ctrl + altg nop
 key  52  base fa_acute shift fa_grave caps fa_acute ctrl fa_acute altg nop
 key  50  base < shift > caps < ctrl ^^ altg ^ numl nonl up nop
 key  49  all hole
-key 100  base ] shift [ caps [ ctrl ^[ altg ¦ numl nonl up nop
-key  29  base z shift Z caps Z ctrl ^Z altg «
-key  27  base x shift X caps X ctrl ^X altg »
-key   6  base c shift C caps C ctrl ^C altg ¢
-key  16  base m shift M caps M ctrl '\r' altg µ
+key 100  base ] shift [ caps [ ctrl ^[ altg 0x00A6 numl nonl up nop
+key  29  base z shift Z caps Z ctrl ^Z altg 0x00AB
+key  27  base x shift X caps X ctrl ^X altg 0x00BB
+key   6  base c shift C caps C ctrl ^C altg 0x00A2
+key  16  base m shift M caps M ctrl '\r' altg 0x00B5
 key  54  base , shift ; caps , ctrl , altg nop
-key  55  base . shift : caps . ctrl . altg ·
+key  55  base . shift : caps . ctrl . altg 0x00B7
 key  56  base - shift = caps - ctrl ^_ altg nop
 #
 #

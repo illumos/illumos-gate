@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains generic keytable information across all
  * keyboard hardware.
@@ -217,7 +215,7 @@ signed char kb_compose_map[ASCII_SET_SIZE] = {
  *	    (top to bottom).
  */
 
-/* COMPOSE + first character + second character => ISO character */
+/* COMPOSE + first character + second character => UTF-8 character */
 
 struct compose_sequence_t kb_compose_table[] = {
 
@@ -341,9 +339,10 @@ struct compose_sequence_t kb_compose_table[] = {
  * Floating Accent Sequence Table
  */
 
-/* FA + ASCII character => ISO character */
+/* FA + ASCII character => UTF-8 character */
 struct fltaccent_sequence_t kb_fltaccent_table[] = {
 
+	{FA_UMLAUT, ' ', 0xA8},		/* umlaut/diaresis */
 	{FA_UMLAUT, 'A', 0xC4},		/* A with umlaut */
 	{FA_UMLAUT, 'E', 0xCB},		/* E with umlaut */
 	{FA_UMLAUT, 'I', 0xCF},		/* I with umlaut */
@@ -367,6 +366,7 @@ struct fltaccent_sequence_t kb_fltaccent_table[] = {
 	{FA_CFLEX, 'o', 0xF4},		/* o with circumflex */
 	{FA_CFLEX, 'u', 0xFB},		/* u with circumflex */
 
+	{FA_TILDE, ' ', '~'},		/* tilde */
 	{FA_TILDE, 'A', 0xC3},		/* A with tilde */
 	{FA_TILDE, 'N', 0xD1},		/* N with tilde */
 	{FA_TILDE, 'O', 0xD5},		/* O with tilde */
@@ -374,9 +374,11 @@ struct fltaccent_sequence_t kb_fltaccent_table[] = {
 	{FA_TILDE, 'n', 0xF1},		/* n with tilde */
 	{FA_TILDE, 'o', 0xF5},		/* o with tilde */
 
+	{FA_CEDILLA, ' ', 0xB8},	/* cedilla */
 	{FA_CEDILLA, 'C', 0xC7},	/* C with cedilla */
 	{FA_CEDILLA, 'c', 0xE7},	/* c with cedilla */
 
+	{FA_ACUTE, ' ', '\''},		/* apostrophe */
 	{FA_ACUTE, 'A', 0xC1},		/* A with acute accent */
 	{FA_ACUTE, 'E', 0xC9},		/* E with acute accent */
 	{FA_ACUTE, 'I', 0xCD},		/* I with acute accent */
@@ -389,6 +391,7 @@ struct fltaccent_sequence_t kb_fltaccent_table[] = {
 	{FA_ACUTE, 'u', 0xFA},		/* u with acute accent */
 	{FA_ACUTE, 'y', 0xFD},		/* y with acute accent */
 
+	{FA_GRAVE, ' ', '`'},		/* grave accent */
 	{FA_GRAVE, 'A', 0xC0},		/* A with grave accent */
 	{FA_GRAVE, 'E', 0xC8},		/* E with grave accent */
 	{FA_GRAVE, 'I', 0xCC},		/* I with grave accent */
@@ -399,6 +402,30 @@ struct fltaccent_sequence_t kb_fltaccent_table[] = {
 	{FA_GRAVE, 'i', 0xEC},		/* i with grave accent */
 	{FA_GRAVE, 'o', 0xF2},		/* o with grave accent */
 	{FA_GRAVE, 'u', 0xF9},		/* u with grave accent */
+
+	{FA_MACRON, ' ', 0xAF},		/* macron */
+
+	{FA_BREVE, ' ', 0x306},		/* combining breve */
+
+	{FA_DOT, ' ', 0x307},		/* combining dot above */
+
+	{FA_SLASH, 0, 0},		/* slash, invalid entry */
+
+	{FA_RING, ' ', 0x30A},		/* combining ring above */
+
+	{FA_APOSTROPHE, ' ', '\''},	/* apostrophe */
+
+	{FA_DACUTE, ' ', 0x30B},	/* combining double acute */
+
+	{FA_OGONEK, ' ', 0x328},	/* combining ogonek */
+
+	{FA_CARON, ' ', 0x2C7},		/* caron */
+	{FA_CARON, 'C', 0x10C},		/* C with caron */
+	{FA_CARON, 'S', 0x160},		/* S with caron */
+	{FA_CARON, 'Z', 0x17D},		/* Z with caron */
+	{FA_CARON, 'c', 0x10D},		/* c with caron */
+	{FA_CARON, 's', 0x161},		/* s with caron */
+	{FA_CARON, 'z', 0x17E},		/* z with caron */
 
 	{0, 0, 0},			/* end of table */
 };
