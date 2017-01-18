@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -37,6 +37,7 @@
 #include <libintl.h>
 #include <sys/mnttab.h>
 #include <sys/mntent.h>
+#include <assert.h>
 
 extern sa_share_t _sa_add_share(sa_group_t, char *, int, int *, uint64_t);
 extern sa_group_t _sa_create_zfs_group(sa_group_t, char *);
@@ -185,7 +186,7 @@ get_one_filesystem(zfs_handle_t *zhp, void *data)
 
 static void
 get_all_filesystems(sa_handle_impl_t impl_handle,
-			zfs_handle_t ***fslist, size_t *count)
+    zfs_handle_t ***fslist, size_t *count)
 {
 	get_all_cbdata_t cb = { 0 };
 	cb.cb_types = ZFS_TYPE_FILESYSTEM;
@@ -231,7 +232,7 @@ mountpoint_compare(const void *a, const void *b)
  * dataset.
  */
 int
-get_legacy_mountpoint(char *path, char *dataset, size_t dlen,
+get_legacy_mountpoint(const char *path, char *dataset, size_t dlen,
     char *mountpoint, size_t mlen)
 {
 	FILE *fp;
@@ -261,6 +262,51 @@ get_legacy_mountpoint(char *path, char *dataset, size_t dlen,
 	return (1);
 }
 
+
+static char *
+verify_zfs_handle(zfs_handle_t *hdl, const char *path, boolean_t search_mnttab)
+{
+	char mountpoint[ZFS_MAXPROPLEN];
+	char canmount[ZFS_MAXPROPLEN] = { 0 };
+	/* must have a mountpoint */
+	if (zfs_prop_get(hdl, ZFS_PROP_MOUNTPOINT, mountpoint,
+	    sizeof (mountpoint), NULL, NULL, 0, B_FALSE) != 0) {
+		/* no mountpoint */
+		return (NULL);
+	}
+
+	/* mountpoint must be a path */
+	if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
+	    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0) {
+		/*
+		 * Search mmttab for mountpoint and get dataset.
+		 */
+
+		if (search_mnttab == B_TRUE &&
+		    get_legacy_mountpoint(path, mountpoint,
+		    sizeof (mountpoint), NULL, 0) == 0) {
+			return (strdup(mountpoint));
+		}
+		return (NULL);
+	}
+
+	/* canmount must be set */
+	if (zfs_prop_get(hdl, ZFS_PROP_CANMOUNT, canmount,
+	    sizeof (canmount), NULL, NULL, 0, B_FALSE) != 0 ||
+	    strcmp(canmount, "off") == 0)
+		return (NULL);
+
+	/*
+	 * have a mountable handle but want to skip those marked none
+	 * and legacy
+	 */
+	if (strcmp(mountpoint, path) == 0) {
+		return (strdup((char *)zfs_get_name(hdl)));
+	}
+
+	return (NULL);
+}
+
 /*
  * get_zfs_dataset(impl_handle, path)
  *
@@ -274,58 +320,41 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path,
     boolean_t search_mnttab)
 {
 	size_t i, count = 0;
-	char *dataset = NULL;
 	zfs_handle_t **zlist;
-	char mountpoint[ZFS_MAXPROPLEN];
-	char canmount[ZFS_MAXPROPLEN];
+	char *cutpath;
+	zfs_handle_t *handle_from_path;
+	char *ret = NULL;
 
+	/*
+	 * First we optimistically assume that the mount path for the filesystem
+	 * is the same as the name of the filesystem (minus some number of
+	 * leading slashes). If this is true, then zfs_open should properly open
+	 * the filesystem. We duplicate the error checking done later in the
+	 * function for consistency. If anything fails, we resort to the
+	 * (extremely slow) search of all the filesystems.
+	 */
+	cutpath = path + strspn(path, "/");
+
+	assert(impl_handle->zfs_libhandle != NULL);
+	if ((handle_from_path = zfs_open(impl_handle->zfs_libhandle, cutpath,
+	    ZFS_TYPE_FILESYSTEM)) != NULL)
+		if ((ret = verify_zfs_handle(handle_from_path, path,
+		    search_mnttab)) != NULL)
+			return (ret);
+	/*
+	 * Couldn't find a filesystem optimistically, check all the handles we
+	 * can.
+	 */
 	get_all_filesystems(impl_handle, &zlist, &count);
 	for (i = 0; i < count; i++) {
-		/* must have a mountpoint */
-		if (zfs_prop_get(zlist[i], ZFS_PROP_MOUNTPOINT, mountpoint,
-		    sizeof (mountpoint), NULL, NULL, 0, B_FALSE) != 0) {
-			/* no mountpoint */
-			continue;
-		}
-
-		/* mountpoint must be a path */
-		if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
-		    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0) {
-			/*
-			 * Search mmttab for mountpoint and get dataset.
-			 */
-
-			if (search_mnttab == B_TRUE &&
-			    get_legacy_mountpoint(path, mountpoint,
-			    sizeof (mountpoint), NULL, 0) == 0) {
-				dataset = mountpoint;
-				break;
-			}
-			continue;
-		}
-
-		/* canmount must be set */
-		canmount[0] = '\0';
-		if (zfs_prop_get(zlist[i], ZFS_PROP_CANMOUNT, canmount,
-		    sizeof (canmount), NULL, NULL, 0, B_FALSE) != 0 ||
-		    strcmp(canmount, "off") == 0)
-			continue;
-
-		/*
-		 * have a mountable handle but want to skip those marked none
-		 * and legacy
-		 */
-		if (strcmp(mountpoint, path) == 0) {
-			dataset = (char *)zfs_get_name(zlist[i]);
-			break;
-		}
-
+		assert(zlist[i]);
+		if ((ret = verify_zfs_handle(zlist[i], path,
+		    search_mnttab)) != NULL)
+			return (ret);
 	}
 
-	if (dataset != NULL)
-		dataset = strdup(dataset);
-
-	return (dataset);
+	/* Couldn't find a matching dataset */
+	return (NULL);
 }
 
 /*
