@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -3072,7 +3072,7 @@ retrybuf:
 		 * The only feasible case here is where a NUL lookup is being
 		 * performed on rootdir prior to its v_path being populated.
 		 */
-		ASSERT(pvp->v_path_stamp = 0);
+		ASSERT(pvp->v_path_stamp == 0);
 		baselen = 0;
 		pstamp = 0;
 	} else {

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -388,7 +388,7 @@ pageout_mapping(pid_t pid, prmap_t *pmp)
 		if (syscall(SYS_rusagesys, _RUSAGESYS_INVALMAP, pid, base,
 		    chunk) != 0) {
 			debug("pid %ld: mapping 0x%p %ldkb unpageable (%d)\n",
-			    pid, base, chunk / 1024, errno);
+			    pid, (void *)base, (long)chunk / 1024L, errno);
 			return;
 		}
 
