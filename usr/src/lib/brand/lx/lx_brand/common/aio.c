@@ -294,13 +294,14 @@ lx_io_submit(lx_aio_context_t cid, long nr, uintptr_t **bpp)
 
 long
 lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
-    lx_io_event_t *events, struct timespec *timeout)
+    lx_io_event_t *events, struct timespec *timeoutp)
 {
 	port_event_t *list;
 	lx_io_event_t *out;
 	uint_t nget, max;
 	int rval, i, err;
 	lx_aio_ctxt_t *ctx = (lx_aio_ctxt_t *)cid;
+	struct timespec timeout, *tp;
 
 	if (INVALID_CTX(ctx))
 		return (-EINVAL);
@@ -311,6 +312,19 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 
 	if (events == NULL)
 		return (-EFAULT);
+
+	if (timeoutp == NULL) {
+		tp = NULL;
+	} else if (uucopy(timeoutp, &timeout, sizeof (struct timespec)) != 0) {
+		return (-EFAULT);
+	} else {
+		/* A timeout of 0:0 should behave like a NULL timeout */
+		if (timeout.tv_sec == 0 && timeout.tv_nsec == 0) {
+			tp = NULL;
+		} else {
+			tp = &timeout;
+		}
+	}
 
 	/*
 	 * We can't return ENOMEM from this syscall so EINTR is the closest
@@ -347,7 +361,7 @@ lx_io_getevents(lx_aio_context_t cid, long min_nr, long nr,
 	ctx->lxaio_waiters++;
 	mutex_exit(&ctx->lxaio_lock);
 
-	rval = port_getn(ctx->lxaio_port, list, max, &nget, timeout);
+	rval = port_getn(ctx->lxaio_port, list, max, &nget, tp);
 	err = errno;
 
 	mutex_enter(&ctx->lxaio_lock);
