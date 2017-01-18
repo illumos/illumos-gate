@@ -10,11 +10,11 @@
 #
 
 #
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2017 by Delphix. All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS:sh = find ./* -type d -maxdepth 0
+SUBDIRS:sh = find ./* -maxdepth 0 -type d
 
 include $(SRC)/test/Makefile.com
