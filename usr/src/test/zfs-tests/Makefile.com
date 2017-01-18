@@ -10,15 +10,27 @@
 #
 
 #
-# Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright (c) 2016, 2017 by Delphix. All rights reserved.
 #
 
 # The following file name generation rules allow the addition of tests,
 # libraries and other miscellaneous files without having to specify them
 # all individually in lower level Makefiles.
-PROGS:sh = echo ~(N)*(*.sh|*.ksh)
-FILES:sh = echo ~(N)*(*.cfg|*shlib|*.run|*.bz2|*.d|*.fio)
-FILES:sh += echo ~(N)*(*.Z|*.txt|*.out|*.err|*.zcp)
+PROGS:sh = find . -maxdepth 1 -type f \( \
+    -name "*.ksh" -o \
+    -name "*.sh" \)
+FILES:sh = find . -maxdepth 1 -type f \( \
+    -name "*.Z" -o \
+    -name "*.bz2" -o \
+    -name "*.cfg" -o \
+    -name "*.d" -o \
+    -name "*.err" -o \
+    -name "*.fio" -o \
+    -name "*.out" -o \
+    -name "*.run" -o \
+    -name "*shlib" -o \
+    -name "*.txt" -o \
+    -name "*.zcp" \)
 
 CMDS = $(PROGS:%.sh=$(TARGETDIR)/%)
 CMDS += $(PROGS:%.ksh=$(TARGETDIR)/%)
