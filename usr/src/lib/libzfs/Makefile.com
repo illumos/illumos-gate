@@ -72,6 +72,7 @@ C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
 	-ladm -lidmap -ltsol -lmd -lumem -lzfs_core
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 # There's no lint library for zlib, so only include this when building
 $(DYNLIB) := LDLIBS +=	-lz
