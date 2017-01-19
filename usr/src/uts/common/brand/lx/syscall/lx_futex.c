@@ -766,6 +766,7 @@ get_timeout(void *lx_timeout, timestruc_t *timeout, int cmd, int clock)
 		/*
 		 * We've been given an absolute time, nothing to do.
 		 */
+		/* EMPTY */
 	} else {
 		/*
 		 * This is a FUTEX_WAIT_BITSET operation, which (1) specifies
@@ -811,7 +812,7 @@ get_timeout(void *lx_timeout, timestruc_t *timeout, int cmd, int clock)
  * EAGAIN immediately.
  */
 static int
-futex_lock_pi(memid_t *memid, caddr_t addr, timespec_t *timeout,
+futex_lock_pi(memid_t *memid, uint32_t *addr, timespec_t *timeout,
     boolean_t is_trylock)
 {
 	kthread_t *t = curthread;
@@ -843,6 +844,7 @@ futex_lock_pi(memid_t *memid, caddr_t addr, timespec_t *timeout,
 
 	/* It would be very unusual to actually loop here. */
 	oldval = 0;
+	/* CONSTCOND */
 	while (1) {
 		uint32_t curval;
 		label_t ljb;
@@ -859,7 +861,7 @@ futex_lock_pi(memid_t *memid, caddr_t addr, timespec_t *timeout,
 		 * way of getting the current value. This also handles the
 		 * retry in the case when the futex only has the high bits set.
 		 */
-		curval = atomic_cas_32((uint32_t *)addr, oldval, mytid);
+		curval = atomic_cas_32(addr, oldval, mytid);
 		if (oldval == curval) {
 			no_fault();
 			mutex_exit(&futex_hash[index].fh_lock);
@@ -887,8 +889,7 @@ futex_lock_pi(memid_t *memid, caddr_t addr, timespec_t *timeout,
 			return (set_errno(EAGAIN));
 		}
 
-		curval = atomic_cas_32((uint32_t *)addr, oldval,
-		    oldval | FUTEX_WAITERS);
+		curval = atomic_cas_32(addr, oldval, oldval | FUTEX_WAITERS);
 		no_fault();
 		if (curval == oldval) {
 			/*
@@ -926,7 +927,7 @@ futex_lock_pi(memid_t *memid, caddr_t addr, timespec_t *timeout,
 		label_t ljb;
 
 		if (on_fault(&ljb) == 0) {
-			(void) atomic_cas_32((uint32_t *)addr, oldval,
+			(void) atomic_cas_32(addr, oldval,
 			    oldval | FUTEX_OWNER_DIED);
 		}
 		no_fault();
@@ -1006,7 +1007,7 @@ futex_lock_pi(memid_t *memid, caddr_t addr, timespec_t *timeout,
  * must preserve the current WAITERS and OWNER_DIED bits.
  */
 static int
-futex_unlock_pi_waiter(fwaiter_t *fnd_fwp, caddr_t addr, uint32_t curval)
+futex_unlock_pi_waiter(fwaiter_t *fnd_fwp, uint32_t *addr, uint32_t curval)
 {
 	label_t ljb;
 	pid_t tid;
@@ -1018,7 +1019,7 @@ futex_unlock_pi_waiter(fwaiter_t *fnd_fwp, caddr_t addr, uint32_t curval)
 	/* No waiter on this futex; again, not normal, but not an error. */
 	if (fnd_fwp == NULL) {
 		int res = 0;
-		if (atomic_cas_32((uint32_t *)addr, curval,
+		if (atomic_cas_32(addr, curval,
 		    0 | (curval & FUTEX_OWNER_DIED)) != curval)
 			res = EINVAL;
 		no_fault();
@@ -1026,7 +1027,7 @@ futex_unlock_pi_waiter(fwaiter_t *fnd_fwp, caddr_t addr, uint32_t curval)
 	}
 
 	tid = fnd_fwp->fw_tid | (curval & (FUTEX_WAITERS | FUTEX_OWNER_DIED));
-	if (atomic_cas_32((uint32_t *)addr, curval, tid) != curval) {
+	if (atomic_cas_32(addr, curval, tid) != curval) {
 		/*
 		 * The value was changed behind our back, return an error and
 		 * don't dequeue the waiter.
@@ -1052,7 +1053,7 @@ futex_unlock_pi_waiter(fwaiter_t *fnd_fwp, caddr_t addr, uint32_t curval)
  * tid to avoid cleanup races.
  */
 static int
-futex_unlock_pi(memid_t *memid, caddr_t addr, pid_t clean_tid)
+futex_unlock_pi(memid_t *memid, uint32_t *addr, pid_t clean_tid)
 {
 	kthread_t *t = curthread;
 	lx_lwp_data_t *lwpd = ttolxlwp(t);
@@ -1149,7 +1150,7 @@ futex_unlock_pi(memid_t *memid, caddr_t addr, pid_t clean_tid)
 			mutex_exit(&futex_hash[index].fh_lock);
 			return (EFAULT);
 		}
-		if (atomic_cas_32((uint32_t *)addr, curval,
+		if (atomic_cas_32(addr, curval,
 		    0 | (curval & FUTEX_OWNER_DIED)) != curval) {
 			res = EINVAL;
 		}
@@ -1197,7 +1198,7 @@ futex_unlock_pi(memid_t *memid, caddr_t addr, pid_t clean_tid)
  * a live process.
  */
 static int
-futex_trylock_pi(memid_t *memid, caddr_t addr)
+futex_trylock_pi(memid_t *memid, uint32_t *addr)
 {
 	uint32_t curval;
 	pid_t ftid;			/* current futex holder tid */
@@ -1370,15 +1371,15 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 		break;
 
 	case FUTEX_LOCK_PI:
-		rval = futex_lock_pi(&memid, (void *)addr, tptr, B_FALSE);
+		rval = futex_lock_pi(&memid, (uint32_t *)addr, tptr, B_FALSE);
 		break;
 
 	case FUTEX_TRYLOCK_PI:
-		rval = futex_trylock_pi(&memid, (void *)addr);
+		rval = futex_trylock_pi(&memid, (uint32_t *)addr);
 		break;
 
 	case FUTEX_UNLOCK_PI:
-		rval = futex_unlock_pi(&memid, (void *)addr, 0);
+		rval = futex_unlock_pi(&memid, (uint32_t *)addr, 0);
 		if (rval != 0)
 			set_errno(rval);
 		break;
@@ -1418,7 +1419,7 @@ futex_robust_wake(memid_t *memid, uint32_t tid)
 			 */
 			mutex_exit(&futex_hash[index].fh_lock);
 			(void) futex_unlock_pi(memid,
-			    (caddr_t)(uintptr_t)memid->val[1], tid);
+			    (uint32_t *)(uintptr_t)memid->val[1], tid);
 			return;
 		}
 
