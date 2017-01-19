@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -5539,6 +5539,7 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
 	lxpr_node_t *lxpnp = VTOLXP(vp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
+	boolean_t allow_pid_access = B_FALSE;
 	int shift = 0;
 	proc_t *tp;
 
@@ -5547,45 +5548,73 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 		return (EROFS);
 	}
 
-	/*
-	 * If this is a restricted file, check access permissions.
-	 */
-	switch (type) {
-	case LXPR_PIDDIR:
+	if (type == LXPR_PIDDIR) {
 		return (0);
-	case LXPR_PID_CURDIR:
-	case LXPR_PID_ENV:
-	case LXPR_PID_EXE:
-	case LXPR_PID_LIMITS:
-	case LXPR_PID_MAPS:
-	case LXPR_PID_MEM:
-	case LXPR_PID_ROOTDIR:
-	case LXPR_PID_FDDIR:
-	case LXPR_PID_FD_FD:
-	case LXPR_PID_TID_FDDIR:
-	case LXPR_PID_TID_FD_FD:
-		if ((tp = lxpr_lock(lxpnp, ZOMB_OK)) == NULL)
+	}
+	if (lxpnp->lxpr_pid != 0) {
+		if ((tp = lxpr_lock(lxpnp, ZOMB_OK)) == NULL) {
 			return (ENOENT);
-		if (tp != curproc && secpolicy_proc_access(cr) != 0 &&
-		    priv_proc_cred_perm(cr, tp, NULL, mode) != 0) {
-			lxpr_unlock(tp);
-			return (EACCES);
+		}
+		if (tp == curproc || secpolicy_proc_access(cr) == 0 ||
+		    priv_proc_cred_perm(cr, tp, NULL, mode) == 0) {
+			allow_pid_access = B_TRUE;
 		}
 		lxpr_unlock(tp);
-	default:
-		break;
+		switch (type) {
+		case LXPR_PID_CGROUP:
+		case LXPR_PID_CMDLINE:
+		case LXPR_PID_COMM:
+		case LXPR_PID_LIMITS:
+		case LXPR_PID_LOGINUID:
+		case LXPR_PID_MOUNTINFO:
+		case LXPR_PID_MOUNTS:
+		case LXPR_PID_OOM_SCR_ADJ:
+		case LXPR_PID_STAT:
+		case LXPR_PID_STATM:
+		case LXPR_PID_STATUS:
+		case LXPR_PID_TASKDIR:
+		case LXPR_PID_TASK_IDDIR:
+		case LXPR_PID_TID_CGROUP:
+		case LXPR_PID_TID_CMDLINE:
+		case LXPR_PID_TID_COMM:
+		case LXPR_PID_TID_LIMITS:
+		case LXPR_PID_TID_LOGINUID:
+		case LXPR_PID_TID_MOUNTINFO:
+		case LXPR_PID_TID_OOM_SCR_ADJ:
+		case LXPR_PID_TID_STAT:
+		case LXPR_PID_TID_STATM:
+		case LXPR_PID_TID_STATUS:
+			/*
+			 * These entries are accessible to any process on the
+			 * system which wishes to query them.
+			 */
+			break;
+		default:
+			/*
+			 * All other entries under the pid/tid hierarchy
+			 * require proper authorization to be accessed.
+			 */
+			if (!allow_pid_access) {
+				return (EACCES);
+			}
+			break;
+		}
 	}
 
+	/*
+	 * If this entry has an underlying vnode, rely upon its access checks.
+	 */
 	if (lxpnp->lxpr_realvp != NULL) {
-		/*
-		 * For these we use the underlying vnode's accessibility.
-		 */
 		return (VOP_ACCESS(lxpnp->lxpr_realvp, mode, flags, cr, ct));
 	}
 
-	/* If user is root allow access regardless of permission bits */
-	if (secpolicy_proc_access(cr) == 0)
+	/*
+	 * Allow access to those (root) possessing the correct privilege or
+	 * already authorized against a pid-specific resource.
+	 */
+	if (allow_pid_access || secpolicy_proc_access(cr) == 0) {
 		return (0);
+	}
 
 	/*
 	 * Access check is based on only one of owner, group, public.  If not
