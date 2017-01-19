@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -632,6 +632,8 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 		lxpnp->lxpr_mode = 0555;	/* read-search by all */
 		break;
 
+	case LXPR_PID_AUXV:
+	case LXPR_PID_PERSONALITY:
 	case LXPR_PID_ENV:
 	case LXPR_PID_MEM:
 		ASSERT(p != NULL);
