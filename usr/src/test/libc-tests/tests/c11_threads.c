@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -144,11 +144,11 @@ cthr_test_equal(void)
 
 	self = thrd_current();
 
-	VERIFY0(thrd_equal(self, self));
+	VERIFY3S(thrd_equal(self, self), !=, 0);
 	VERIFY3S(thrd_create(&other, cthr_test_sleep_thr, NULL), ==,
 	    thrd_success);
-	VERIFY3S(thrd_equal(self, other), !=, 0);
-	VERIFY3S(thrd_equal(other, other), ==, 0);
+	VERIFY3S(thrd_equal(self, other), ==, 0);
+	VERIFY3S(thrd_equal(other, other), !=, 0);
 	VERIFY3S(thrd_detach(other), ==, thrd_success);
 }
 
@@ -159,7 +159,7 @@ cthr_test_detach_err(void)
 
 	self = thrd_current();
 
-	VERIFY0(thrd_equal(self, self));
+	VERIFY3S(thrd_equal(self, self), !=, 0);
 	VERIFY3S(thrd_create(&other, cthr_test_sleep_thr, NULL), ==,
 	    thrd_success);
 	VERIFY3S(thrd_detach(other), ==, thrd_success);
