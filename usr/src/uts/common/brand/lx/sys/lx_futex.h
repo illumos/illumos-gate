@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc.  All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #ifndef _SYS_LX_FUTEX_H
@@ -113,6 +113,9 @@ typedef struct fwaiter {
 	struct fwaiter	*fw_next;	/* hash queue */
 	struct fwaiter	*fw_prev;	/* hash queue */
 	uint32_t	fw_bits;	/* bits waiting on */
+	pid_t		fw_tid;		/* for PI futexes; the waiter's tid */
+	int		fw_opri;	/* for PI futexes; original pri. */
+	boolean_t	fw_pri_up;	/* for PI futexes; pri. increased */
 	volatile int	fw_woken;
 } fwaiter_t;
 
