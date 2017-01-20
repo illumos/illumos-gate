@@ -10337,6 +10337,7 @@ s usr/sbin/devnm=df
 f usr/sbin/df 0555 root bin
 f usr/sbin/dfmounts 0555 root bin
 h usr/sbin/dfshares=usr/sbin/dfmounts
+f usr/sbin/diskinfo 0555 root bin
 h usr/sbin/disks=usr/sbin/devfsadm
 f usr/sbin/dispadmin 0555 root bin
 s usr/sbin/dladm=../../sbin/dladm
@@ -11932,6 +11933,7 @@ f usr/share/man/man1m/dfmounts_nfs.1m 0444 root bin
 f usr/share/man/man1m/dfshares.1m 0444 root bin
 f usr/share/man/man1m/dfshares_nfs.1m 0444 root bin
 f usr/share/man/man1m/dhcpagent.1m 0444 root bin
+f usr/share/man/man1m/diskinfo.1m 0444 root bin
 f usr/share/man/man1m/disks.1m 0444 root bin
 f usr/share/man/man1m/diskscan.1m 0444 root bin
 f usr/share/man/man1m/dispadmin.1m 0444 root bin

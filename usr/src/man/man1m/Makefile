@@ -99,6 +99,7 @@ _MANFILES=	6to4relay.1m		\
 		dfshares.1m		\
 		dfshares_nfs.1m		\
 		dhcpagent.1m		\
+		diskinfo.1m		\
 		disks.1m		\
 		diskscan.1m		\
 		dispadmin.1m		\
