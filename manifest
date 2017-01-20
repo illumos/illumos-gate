@@ -2061,6 +2061,7 @@ h usr/bin/digest=usr/lib/isaexec
 f usr/bin/dircmp 0555 root bin
 f usr/bin/dirname 0555 root bin
 f usr/bin/dis 0555 root bin
+# Compatibility: diskinfo changed on move from smartos-live to illumos-joyent
 s usr/bin/diskinfo=../sbin/diskinfo
 f usr/bin/diskscan 0555 root bin
 h usr/bin/dispgid=usr/bin/ckgid
