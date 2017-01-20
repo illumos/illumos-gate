@@ -1,0 +1,33 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Nexenta Systems, Inc.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/diagnostic/diskinfo@$(PKGVERS)
+set name=pkg.description value=diskinfo
+set name=pkg.summary value=diskinfo
+set name=info.classification \
+    value="org.opensolaris.category.2008:Applications/System Utilities"
+set name=variant.arch value=$(ARCH)
+dir path=usr group=sys
+dir path=usr/sbin
+dir path=usr/share/man/man1m
+file path=usr/sbin/diskinfo mode=0555
+file path=usr/share/man/man1m/diskinfo.1m mode=0444
+license lic_CDDL license=lic_CDDL
