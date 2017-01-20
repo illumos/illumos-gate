@@ -585,7 +585,7 @@ futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
 
 	/* LINTED: alignment */
 	if ((wake = futex_wake_op_execute((int32_t *)addr2, val3)) < 0) {
-		set_errno(-wake);	/* convert back to positive errno */
+		(void) set_errno(-wake); /* convert back to positive errno */
 		ret = -1;
 		goto out;
 	}
@@ -600,7 +600,7 @@ futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
 			 * A PI waiter. It is invalid to mix PI and non-PI
 			 * usage on the same futex.
 			 */
-			set_errno(EINVAL);
+			(void) set_errno(EINVAL);
 			ret = -1;
 			goto out;
 		}
@@ -626,7 +626,7 @@ futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
 			 * A PI waiter. It is invalid to mix PI and non-PI
 			 * usage on the same futex.
 			 */
-			set_errno(EINVAL);
+			(void) set_errno(EINVAL);
 			ret = -1;
 			goto out;
 		}
@@ -1381,7 +1381,7 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 	case FUTEX_UNLOCK_PI:
 		rval = futex_unlock_pi(&memid, (uint32_t *)addr, 0);
 		if (rval != 0)
-			set_errno(rval);
+			(void) set_errno(rval);
 		break;
 	}
 
