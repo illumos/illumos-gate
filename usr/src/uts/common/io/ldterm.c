@@ -728,11 +728,25 @@ ldtermopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	tp->eucwioc.scrw[0] = 1;
 	tp->t_maxeuc = 1;	/* the max len in bytes of an EUC char */
 	tp->t_eucp = NULL;
-	tp->t_eucp_mp = NULL;
-	tp->t_eucwarn = 0;	/* no bad chars seen yet */
-
-	tp->t_csdata = default_cs_data;
 	tp->t_csmethods = cs_methods[LDTERM_CS_TYPE_EUC];
+	tp->t_csdata = default_cs_data;
+
+	/*
+	 * Try to switch to UTF-8 mode by allocating buffer for multibyte
+	 * chars, keep EUC if allocation fails.
+	 */
+	if ((tp->t_eucp_mp = allocb(_TTY_BUFSIZ, BPRI_HI)) != NULL) {
+		tp->t_eucp = tp->t_eucp_mp->b_rptr;
+		tp->t_state = TS_MEUC;	/* Multibyte mode. */
+		tp->t_maxeuc = 4; /* the max len in bytes of an UTF-8 char */
+		tp->t_csdata.codeset_type = LDTERM_CS_TYPE_UTF8;
+		tp->t_csdata.csinfo_num = 4;
+		/* locale_name needs string length with terminating NUL */
+		tp->t_csdata.locale_name = (char *)kmem_alloc(6, KM_SLEEP);
+		(void) strcpy(tp->t_csdata.locale_name, "UTF-8");
+		tp->t_csmethods = cs_methods[LDTERM_CS_TYPE_UTF8];
+	}
+	tp->t_eucwarn = 0;	/* no bad chars seen yet */
 
 	qprocson(q);
 
