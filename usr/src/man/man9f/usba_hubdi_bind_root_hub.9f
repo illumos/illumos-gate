@@ -1,0 +1,137 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Sep 16, 2016
+.Dt USBA_HCDI_BIND_ROOT_HUB 9F
+.Os
+.Sh NAME
+.Nm usba_hubdi_bind_root_hub ,
+.Nm usba_hubdi_unbind_root_hub
+.Nd bind and unbind the root USB hub
+.Sh SYNOPSIS
+.In sys/usb/usba/hubdi.h
+.Ft int
+.Fo usba_hubdi_bind_root_hub
+.Fa "dev_info_t *dip"
+.Fa "uchar_t *hub_descr"
+.Fa "size_t descr_len"
+.Fa "usb_dev_descr_t *dev_descr"
+.Fc
+.Ft int
+.Fo usba_hubdi_unbind_root_hub
+.Fa "dev_info_t *dip"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to the device's
+.Sy dev_info
+structure.
+.It Fa hub_descr
+Pointer to a byte array that contains the standard descriptors for a USB
+Hub device.
+.It Fa descr_len
+The length in bytes of the
+.Fa hub_descr
+byte array.
+.It Fa dev_descr
+A filled in standard USB device descriptor.
+.El
+.Sh DESCRIPTION
+The
+.Fn usba_hubdi_bind_root_hub
+and
+.Fn usba_hubdi_unbind_root_hub
+functions are used to bind and unbind the root USB hub that is a part of
+every HCD driver. See
+.Xr usba_hcdi 9E
+for more information on this relationship.
+.Pp
+The
+.Fn usba_hubdi_root_bind_driver
+is used after calling the
+.Xr usba_hcdi_register 9F
+function during a device's
+.Xr attach 9E
+entry point.
+.Pp
+Because the root hub is generally a virtual hub, the HCD driver is
+responsible for making it appear to the system as a normal USB hub.
+.Pp
+The contents of the
+.Fa hub_descr
+should be the standard USB Hub class-specific descriptor. This hub
+descriptor should match a hub of a similar class of speed. For example,
+with the xhci controller, a USB 3.x Hub class-specific descriptor is
+used, where as for the ehci controller, a USB 2.x Hub class-specific
+descriptor is used. For more information, see the USB 3.1
+specification, section 10.15.2
+.Em Class-specific Descriptors .
+.Pp
+Similarly, the contents of the
+.Fa dev_descr
+need to be a filled in USB device descriptor that indicates that the
+root hub corresponds to the appropriate USB generation. For more
+information on the contents, see
+.Xr usb_dev_descr 9S
+and the USB 3.1 specification, section 10.15.1
+.Em Standard Descriptors for Hub Class .
+.Pp
+The
+.Fn usba_hubdi_unbind_root_hub
+function is used to detach the root hub associated with the HCD driver.
+This should be called during a device's
+.Xr detach 9E
+routine before calling
+.Xr usba_hcdi_unregister .
+.Pp
+If a call to the
+.Fn usba_hubdi_unbind_root_hub
+function fails during a device's
+.Xr detach 9E
+function, then it should fail the call to
+.Xr detach 9E .
+.Sh CONTEXT
+The
+.Fn usba_hubdi_bind_root_hub
+function should only be called during a device's
+.Xr attach 9E
+entry point.
+.Pp
+The
+.Fn usba_hubdi_unbind_root_hub
+function should only be called during a device's
+.Xr detach 9E entry point.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn usba_hubdi_bind_root_hub
+and
+.Fn usba_hubdi_unbind_root_hub
+functions return
+.Sy USB_SUCCESS .
+Otherwise, they return
+.Sy USB_FAILURE
+to indicate that they could not proceed.
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr usba_hcdi 9E ,
+.Xr usba_hcdi_register 9F ,
+.Xr usba_hcdi_unregister 9F ,
+.Xr usb_dev_Descr 9S

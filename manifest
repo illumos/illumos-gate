@@ -18829,6 +18829,7 @@ f usr/share/man/man7d/vni.7d 0444 root bin
 f usr/share/man/man7d/vr.7d 0444 root bin
 f usr/share/man/man7d/vnd.7d 0444 root bin
 f usr/share/man/man7d/wscons.7d 0444 root bin
+f usr/share/man/man7d/xhci.7d 0444 root bin
 f usr/share/man/man7d/xge.7d 0444 root bin
 f usr/share/man/man7d/yge.7d 0444 root bin
 f usr/share/man/man7d/zcons.7d 0444 root bin
@@ -19032,6 +19033,24 @@ f usr/share/man/man9e/tran_tgt_init.9e 0444 root bin
 f usr/share/man/man9e/tran_tgt_probe.9e 0444 root bin
 s usr/share/man/man9e/tran_unquiesce.9e=tran_quiesce.9e
 f usr/share/man/man9e/write.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi.9e 0444 root bin
+s usr/share/man/man9e/usba_hcdi_cb_close.9e=usba_hcdi_cb_ops.9e
+s usr/share/man/man9e/usba_hcdi_cb_ioctl.9e=usba_hcdi_cb_ops.9e
+s usr/share/man/man9e/usba_hcdi_cb_open.9e=usba_hcdi_cb_ops.9e
+f usr/share/man/man9e/usba_hcdi_cb_ops.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_device_address.9e 0444 root bin
+s usr/share/man/man9e/usba_hcdi_device_fini.9e=usba_hcdi_device_init.9e
+f usr/share/man/man9e/usba_hcdi_device_init.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_hub_update.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_pipe_bulk_xfer.9e 0444 root bin
+s usr/share/man/man9e/usba_hcdi_pipe_close.9e=usba_hcdi_pipe_open.9e
+f usr/share/man/man9e/usba_hcdi_pipe_ctrl_xfer.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_pipe_intr_xfer.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_pipe_isoc_xfer.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_pipe_open.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_pipe_reset.9e 0444 root bin
+f usr/share/man/man9e/usba_hcdi_pipe_stop_intr_polling.9e 0444 root bin
+s usr/share/man/man9e/usba_hcdi_pipe_stop_isoc_polling.9e=usba_hcdi_pipe_stop_intr_polling.9e
 d usr/share/man/man9f 0755 root bin
 f usr/share/man/man9f/ASSERT.9f 0444 root bin
 s usr/share/man/man9f/AVL_NEXT.9f=avl.9f
@@ -20231,6 +20250,22 @@ f usr/share/man/man9f/usb_reset_device.9f 0444 root bin
 s usr/share/man/man9f/usb_set_alt_if.9f=usb_get_alt_if.9f
 s usr/share/man/man9f/usb_set_cfg.9f=usb_get_cfg.9f
 s usr/share/man/man9f/usb_unregister_hotplug_cbs.9f=usb_register_hotplug_cbs.9f
+f usr/share/man/man9f/usba_alloc_hcdi_ops.9f 0444 root bin
+s usr/share/man/man9f/usba_free_hcdi_ops.9f=usba_alloc_hcdi_ops.9f
+f usr/share/man/man9f/usba_hcdi_cb.9f 0444 root bin
+f usr/share/man/man9f/usba_hcdi_dup_intr_req.9f 0444 root bin
+f usr/share/man/man9f/usba_hcdi_dup_isoc_req.9f 0444 root bin
+f usr/share/man/man9f/usba_hcdi_get_device_private.9f 0444 root bin
+f usr/share/man/man9f/usba_hcdi_register.9f 0444 root bin
+s usr/share/man/man9f/usba_hcdi_unregister.9f=usba_hcdi_register.9f
+f usr/share/man/man9f/usba_hubdi_bind_root_hub.9f 0444 root bin
+f usr/share/man/man9f/usba_hubdi_cb_ops.9f 0444 root bin
+s usr/share/man/man9f/usba_hubdi_close.9f=usba_hubdi_cb_ops.9f
+f usr/share/man/man9f/usba_hubdi_dev_ops.9f 0444 root bin
+s usr/share/man/man9f/usba_hubdi_ioctl.9f=usba_hubdi_cb_ops.9f
+s usr/share/man/man9f/usba_hubdi_open.9f=usba_hubdi_cb_ops.9f
+s usr/share/man/man9f/usba_hubdi_root_hub_power.9f=usba_hubdi_dev_ops.9f
+s usr/share/man/man9f/usba_hubdi_unbind_root_hub.9f=usba_hubdi_bind_root_hub.9f
 f usr/share/man/man9f/uwritec.9f 0444 root bin
 f usr/share/man/man9f/va_arg.9f 0444 root bin
 s usr/share/man/man9f/va_copy.9f=va_arg.9f
@@ -20358,6 +20393,14 @@ s usr/share/man/man9s/usb_isoc_request.9s=usb_isoc_req.9s
 f usr/share/man/man9s/usb_other_speed_cfg_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_request_attributes.9s 0444 root bin
 f usr/share/man/man9s/usb_string_descr.9s 0444 root bin
+f usr/share/man/man9s/usba_device.9s 0444 root bin
+s usr/share/man/man9s/usba_device_t.9s=usba_device.9s
+f usr/share/man/man9s/usba_hcdi_ops.9s 0444 root bin
+s usr/share/man/man9s/usba_hcdi_ops_t.9s=usba_hcdi_ops.9s
+f usr/share/man/man9s/usba_hcdi_register_args.9s 0444 root bin
+s usr/share/man/man9s/usba_hcdi_register_args_t.9s=usba_hcdi_register_args.9s
+f usr/share/man/man9s/usba_pipe_handle_data.9s 0444 root bin
+s usr/share/man/man9s/usba_pipe_handle_data_t.9s=usba_pipe_handle_data.9s
 d usr/share/src 0755 root sys
 s usr/spool=../var/spool
 s usr/src=share/src

@@ -1,0 +1,145 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Sep 16, 2016
+.Dt USBA_HCDI_CB 9F
+.Os
+.Sh NAME
+.Nm usba_hcdi_cb
+.Nd USBA transfer callback
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Ft void
+.Fo usba_hcdi_cb
+.Fa "usba_pipe_handle_data_t *ph"
+.Fa "usb_opaque_t req"
+.Fa "ucb_cr_t cr"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa ph
+A pointer to the USBA pipe handle that was passed to the HCD driver
+during a call to the
+.Xr usba_hcdi_pipe_open
+entry point.
+.It Fa req
+A pointer to the request structure that is being completed.
+.It Fa cr
+The completion code for the request.
+.El
+.Sh DESCRIPTION
+The
+.Fn usba_hcdi_cb
+function is used when the HCD controller has completed processing a USB
+transfer request, whether
+successfully or not.
+.Pp
+The USB transfer will have been initiated by a call to
+.Xr usba_hcdi_pipe_bulk_xfer 9E ,
+.Xr usba_hcdi_pipe_ctrl_xfer 9E ,
+.Xr usba_hcdi_pipe_intr_xfer 9E ,
+or
+.Xr usba_hcdi_pipe_isoc_xfer 9E .
+If the transfer initiated was a periodic transfer (certain Interrupt-IN
+and Isochronous-IN transfers), then there may be more than one callback
+performed over the life of the transfer.
+.Pp
+This function must not be used if the HCD driver returned a value
+other than
+.Sy USB_SUCCESS
+to one of the transfer initialization functions listed above. For more
+information on transfer request handling, see
+.Xr usba_hcdi 9E .
+.Pp
+The
+.Fa ph
+argument corresponds to the USBA framework's pipe handle that was given
+to the HCDI when the pipe was opened. See
+.Xr usba_hcdi_pipe_open 9E
+and
+.Xr usba_hcdi 9E
+for more information.
+.Pp
+The
+.Fa req
+argument is one of the four request structures,
+.Xr usb_bulk_req 9S ,
+.Xr usb_ctrl_req 9S ,
+.Xr usb_intr_req 9S ,
+or
+.Xr usb_isoc_req 9S ,
+which have been cast to the type
+.Ft usb_oapque_t .
+The caller should ensure that all appropriate members of the request
+structure have been filled in. For example, if expecting data from the
+device and the request has completed successfully, then  that data
+should be copied into the request structure's
+.Xr mblk 9S
+prior to handing the request structure to the
+.Fn usb_hcdi_cb
+function.
+Similarly, the
+.Xr usb_isoc_req 9S
+structure's
+.Sy isoc_pkt_descr
+member should be filled in with the appropriate data.
+.Pp
+Once the request structure has been passed to the
+.Fn usba_hcdi_cb
+function, the HCD driver must not access the structure ever again. It
+should be treated as freed memory.
+.Pp
+The
+.Fa cr
+argument us used to indicate whether the transfer was successful or not.
+If
+.Fa cr
+is set to
+.Sy USB_CR_OK
+that indicates that the transfer completed successfully. This should
+also be used when a permitted short transfer has occurred. Otherwise, it
+should be set to one of the completion reasons.
+.Ss Locking
+The HCD driver should not hold its own internal locks across a call to
+the
+.Fn usba_hcdi_cb
+function. It is possible that the driver will have once of its
+.Xr usba_hcdi 9E
+entry points called based on the return value specified.
+.Sh CONTEXT
+The
+.Fn usba_hcdi_cb
+function may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh SEE ALSO
+.Xr usba_hcdi 9E ,
+.Xr usba_hcdi_pipe_bulk_xfer 9E ,
+.Xr usba_hcdi_pipe_ctrl_xfer 9E ,
+.Xr usba_hcdi_pipe_intr_xfer 9E ,
+.Xr usba_hcdi_pipe_isoc_xfer 9E ,
+.Xr usba_hcdi_pipe_open 9E ,
+.Xr mblk 9S ,
+.Xr usb_bulk_req 9S ,
+.Xr usb_ctrl_req 9S ,
+.Xr usb_intr_req 9S ,
+.Xr usb_isoc_req 9S

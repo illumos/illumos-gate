@@ -1,0 +1,145 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Dec 20, 2016
+.Dt USBA_PIPE_HANDLE_DATA 9S
+.Os
+.Sh NAME
+.Nm usba_pipe_handle_data
+.Nm usba_pipe_handle_data_t
+.Nd USBA Pipe Handle Data Structure
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private
+.Pp
+This is a private data structure that is not part of the stable DDI. It
+may be removed or changed at any time.
+.Sh DESCRIPTION
+The
+.Sy usba_pipe_handle_data
+structure is the USB architecture's (USBA) way of representing a pipe.
+Every pipe is a part of a USB device. Pipe's may be shared between
+client drivers or be exclusive to one.  For more background on pipe's
+see the
+.Sy USB Endpoint Background
+section of
+.Xr usba_hcdi 9E .
+.Pp
+This structure is provided to HCD driver's when performing requests of
+various kinds. The majority of the structures listed here are
+.Em read-only ;
+however, HCD drivers are allowed to update a single member, listed
+below. All of the writable members are protected by a lock, the member
+.Sy p_mutex .
+See the
+.Sy Locking
+section in
+.Xr usba_hcdi 9E
+for more information on lock ordering and when HCD drivers should enter
+this lock.
+.Pp
+A pipe handle has an explicit life cycle wih a device driver. The driver
+first sees the pipe handle when its
+.Xr usba_hcdi_pipe_open 9E
+entry point is called. At that time, the HCD driver has the change to
+store private data on the handle. This pipe handle will be used in
+subsequent requests until the handle is closed, through a call to the
+HCD driver's
+.Xr usba_hcdi_pipe_close 9E
+entry point.
+.Sh STRUCTURE MEMBERS
+The
+.Sy usba_pipe_handle_data_t
+structure includes the following members:
+.Bd -literal -offset -indent
+usba_device_t		*p_usba_device;
+usb_ep_descr_t		p_ep;
+usb_ep_xdescr_t		p_xep;
+dev_info_t		p_dip;
+usb_opaque_t		p_hcd_private;
+kmutex_t		p_mutex;
+int			p_req_count;
+.Ed
+.Pp
+The
+.Sy p_usba_device
+member points to the
+.Xr usba_device 9S
+structure that this pipe belongs to. This member should always be set
+for an endpoint handed to an HCD driver.
+.Pp
+The
+.Sy p_ep
+member is filled in with the endpoint descriptor that represents this
+device. The endpoint structure is documented in
+.Xr usb_ep_descr 9S .
+.Pp
+The
+.Sy p_xep
+member is filled in with the endpoint descriptor and any additional
+endpoint descriptors that may exist. The structure is documented in
+.Xr usb_ep_xdescr 9S .
+The endpoint descriptor is the same in both
+.Sy p_ep
+and
+.Sy p_xep .
+.Pp
+The
+.Sy p_hcd_private
+member is reserved for use with HCD drivers. An HCD driver may set
+this member during
+.Xr usba_hcdi_pipe_open 9E .
+If set, it can reference this member throughout the life time of the
+pipe. The driver should ensure to clean it up when its
+.Xr usba_hcdi_pipe_close 9E
+entry point is called.
+.Pp
+The
+.Sy p_mutex
+member protects the member
+.Sy p_req_count .
+The mutex should be entered whenever the value is being manipulated.
+.Pp
+The
+.Sy p_req_count
+member indicates the number of outstanding requests on the pipe. When
+performing
+.Em periodic
+interrupt or isochronous transfers, it is the responsibility of the HCD
+driver to increment the value of
+.Sy p_req_count
+if it duplicates a request with either
+.Xr usba_hcdi_dup_intr_req 9F
+or
+.Xr usba_hcdi_dup_isoc_req 9F .
+.Pp
+Similarly, if the device driver for some reasons removes a request it
+duplicated without submitting it to the USBA, it should decrement the
+member.
+.Pp
+The HCD driver should take special care to ensure that the value of
+.Sy p_req_count
+is always greater than one. There should always be an outstanding
+request that an HCD driver has for the pipe, especially if it is a
+periodic endpoint. It should only manipulate this member while it owns
+.Sy p_mutex .
+.Sh SEE ALSO
+.Xr usba_hcdi_pipe_close 9E ,
+.Xr usba_hcdi_pipe_open 9E ,
+.Xr usba_hcdi_dup_intr_req 9F ,
+.Xr usba_hcdi_dup_isoc_req 9F ,
+.Xr usb_ep_descr 9S ,
+.Xr usb_ep_xdescr 9S ,
+.Xr usba_device 9S

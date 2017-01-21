@@ -1,0 +1,310 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Dec 20, 2016
+.Dt USBA_HCDI_OPS 9S
+.Os
+.Sh NAME
+.Nm usba_hcdi_ops ,
+.Nm usba_hcdi_ops_t
+.Nd USBA host controller driver operations vector
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private
+.Pp
+This is a private data structure that is not part of the stable DDI. It
+may be removed or changed at any time.
+.Sh DESCRIPTION
+The
+.Sy usba_hcdi_ops
+structure is usbed HCD drivers to register operations vectors and
+callbacks from the USBA HCD interface. See
+.Xr usba_hcdi 9E
+for more information on USB HCD device drivers.
+.Pp
+The structure is allocated through a call to the
+.Xr usba_alloc_hcdi_ops 9F
+function and is used with a call to
+.Xr usba_hcdi_register 9F .
+When the driver is done with the operations vector, either because
+registering has failed or it is unregistering, it should call
+.Xr usba_free_hcdi_ops 9F
+to free the associated memory.
+.Sh STRUCTURE MEMBERS
+The
+.Sy usba_hcdi_ops
+structure has the following members:
+.Bd -literal -offset indent
+int		usba_hcdi_ops_version;
+dev_info_t	*usba_hcdi_dip;
+
+int	(*usba_hcdi_pm_support)(dev_info_t *);
+int	(*usba_hcdi_pipe_open)(usba_pipe_handle_data_t *, usb_flags_t);
+int	(*usba_hcdi_pipe_close)(usba_pipe_handle_data_t *, usb_flags_t);
+int	(*usba_hcdi_pipe_reset)(usba_pipe_handle_data_t *, usb_flags_t);
+void	(*usba_hcdi_pipe_reset_data_toggle)(usba_pipe_handle_data_t *);
+
+int	(*usba_hcdi_pipe_ctrl_xfer)(usba_pipe_handle_data_t *,
+	    usb_ctrl_req_t *, usb_flags_t);
+
+int	(*usba_hcdi_bulk_transfer_size)(usba_device_t *, size_t *);
+int	(*usba_hcdi_pipe_bulk_xfer)(usba_pipe_handle_data_t *,
+	    usb_bulk_req_t *, usb_flags_t);
+
+int	(*usba_hcdi_pipe_intr_xfer)(usba_pipe_handle_data_t *,
+	    usb_intr_req_t *, usb_flags_t);
+int	(*usba_hcdi_pipe_stop_intr_polling)(usba_pipe_handle_data_t *,
+	    usb_flags_t);
+
+int	(*usba_hcdi_pipe_isoc_xfer)(usba_pipe_handle_data_t *,
+	    usb_isoc_req_t *, usb_flags_t);
+int	(*usba_hcdi_pipe_stop_isoc_polling)(usba_pipe_handle_data_t *,
+	    usb_flags_t);
+int	(*usba_hcdi_get_current_frame_number)(usba_device_t *,
+	    usb_frame_number_t *);
+int	(*usba_hcdi_get_max_isoc_pkts)(usba_device_t *, uint_t *);
+
+int	(*usba_hcdi_console_input_init)(usba_pipe_handle_data_t *,
+	    uchar_t **, usb_console_info_impl_t *);
+int	(*usba_hcdi_console_input_fini)(usb_console_info_impl_t *);
+int	(*usba_hcdi_console_input_enter)(usb_console_info_impl_t *);
+int	(*usba_hcdi_console_read)(usb_console_info_impl_t *, uint_t);
+int	(*usba_hcdi_console_input_exit)(usb_console_info_impl_t *);
+
+int	(*usba_hcdi_console_output_init)(usba_pipe_handle_data_t *,
+	    usb_console_info_impl_t *);
+int	(*usba_hcdi_console_output_fini)(usb_console_info_impl_t *);
+int	(*usba_hcdi_console_output_enter)(usb_console_info_impl_t *);
+int	(*usba_hcdi_console_write)(usb_console_info_impl_t *, uchar_t *,
+	    uint_t, uint_t *);
+int	(*usba_hcdi_console_output_exit)(usb_console_info_impl_t *);
+
+int	(*usba_hcdi_device_init)(usba_device_t *, usb_port_t, void **);
+void	(*usba_hcdi_device_fini)(usba_device_t *, void *);
+int	(*usba_hcdi_device_address)(usba_device_t *);
+
+int	(*usba_hcdi_hub_update)(usba_device_t *, uint8_t, uint8_t);
+.Ed
+.Pp
+The
+.Sy usba_hcdi_ops_version
+member is used to indicate the revision of the operations vector. HCD
+drivers should generally set this to
+.Dv HCDI_OPS_VERSION .
+.Pp
+The
+.Sy usba_hcdi_dip
+member should be set to the
+.Sy dev_info_t
+structure of the HCD driver that was received in
+.Xr attach 9E .
+.Pp
+The
+.Sy usba_hcdi_pm_support
+member is vestigial. If may be set to
+.Dv NULL
+or to a function which only returns
+.Sy USB_FAILURE .
+.Pp
+The
+.Sy usba_hcdi_pipe_open
+member should be set to a function which takes care of the all of the
+controller-specific actions of opening up an endpoint on a device and
+associating it with the pipe. See
+.Xr usba_hcdi_pipe_open 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_pipe_close
+member should be set to a function which takes care of releasing all of
+the controller-specific resources and actions taken when the pipe was
+opened. This function also has the responsibility to clean up any
+outstanding polling on the endpoint. See
+.Xr usba_hcdi_pipe_close 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_pipe_reset
+member should be set to a function that takes care of resetting a pipe.
+A pipe reset not only performs controller-specific functionality, but it
+also cleans up any outstanding requests and terminates polling. See
+.Xr usba_hcdi_pipe_reset 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_pipe_reset_data_toggle
+member should be set to a function that takes care of the USB data
+toggle, if the controller exposes this functionality to the host.
+.Pp
+The
+.Sy usba_hcdi_pipe_ctrl_xfer
+member should be set to a function that handles control transfers for any
+device, including the root hub. See
+.Xr usba_hcdi_pipe_ctrl_xfer 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_bulk_transfer_size
+member should be a set to a function which can return the maximum amount
+of data that can be performed in a given USB transfer for a bulk
+transfer.
+.Pp
+The
+.Sy usba_hcdi_pipe_bulk_xfer
+member should be set set to a function which performs a bulk transfer.
+See
+.Xr usba_hcdi_pipe_bulk_xfer 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_pipe_intr_xfer
+member should be set to a function which performs interrupt transfers.
+These may be both periodic and one-shot transfers. In addition, this may
+need to handle requests for the root hub. See
+.Xr usba_hcdi_pipe_intr_xfer 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_pipe_stop_intr_polling
+member should be set to a function which is used to terminate interrupt
+polling and return the original interrupt request. See
+.Xr usba_hcdi_pipe_stop_intr_polling 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_pipe_isoc_xfer
+member should be set to a function which performs isochronous transfers.
+These may be both periodic and one-shot transfers. See
+.Xr usba_hcdi_pipe_isoc_xfer 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_pipe_stop_isoc_polling
+member should be set to a function which is used to terminate isochronous
+polling and return the original isochronous request. See
+.Xr usba_hcdi_pipe_stop_isoc_polling 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_get_current_frame_number
+member should be set to a function which returns the current virtual
+frame number. While this entry point is required, at this time, nothing
+uses this functionality in illumos, so having a dummy function which
+just returns
+.Sy USB_FAILURE
+is acceptable.
+.Pp
+The
+.Sy usba_hcdi_max_isoc_pkts
+member should be set to a function that returns the maximum number of
+isochronous fragments that can be queued in a given transfer.
+.Pp
+The
+.Sy usba_hcdi_console_input_init ,
+.Sy usba_hcdi_console_input_fini ,
+.Sy usba_hcdi_console_input_enter ,
+.Sy usba_hcdi_console_read ,
+and
+.Sy usba_hcdi_console_input_exit
+members are used to facilitate a USB device acting as the system console
+and reading input from it. Support for this is optional in an HCD
+driver. HCD drivers which do not support this functionality should have
+functions which return
+.Sy USB_FAILURE .
+.Pp
+The
+.Sy usba_hcdi_console_output_init ,
+.Sy usba_hcdi_console_output_fini ,
+.Sy usba_hcdi_console_output_enter ,
+.Sy usba_hcdi_console_writ ,
+and
+.Sy usba_hcdi_console_output_exit
+members are used to facilitate a USB device acting as the system console
+and outputting data to it. Support for this is optional in an HCD
+driver. HCD drivers which do not support this functionality should have
+functions which return
+.Sy USB_FAILURE .
+.Pp
+The
+.Sy usba_hcdi_device_init
+member is an
+.Em optional
+entry point that will be called every time a new device is initialized
+and detected by the system. If an HCD does not need this functionality,
+the member should be set to
+.Dv NULL .
+See
+.Xr usba_hcdi_device_init 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_device_fini
+member is an
+.Em optional
+entry point that will be called every time a device is removed from the
+system, whether through it being unplugged or a
+.Xr cfgadm 1M
+action. If an HCD does not need this functionality,
+the member should be set to
+.Dv NULL .
+See
+.Xr usba_hcdi_device_fini 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_device_address
+member is an
+.Em optional
+entry point that will be called every time a USB device needs to be
+addressed. If an HCD driver does not need this functionality, the member
+should be set to
+.Dv NULL .
+See
+.Xr usba_hcdi_device_address 9E
+for more information.
+.Pp
+The
+.Sy usba_hcdi_hub_update
+member is an
+.Em optional
+entry point that will be called every time a device descriptor is read
+that turns out to be a hub. This gives HCD drivers a chance to perform
+any needed controller-specific functionality before the device is
+used. If an HCD driver does not need this functionality, the member
+should be set to
+.Dv NULL .
+See
+.Xr usba_hcdi_hub_update 9E
+for more information.
+.Sh SEE ALSO
+.Xr cfgadm 1M ,
+.Xr attach 9E ,
+.Xr usba_hcdi 9E ,
+.Xr usba_hcdi_device_address 9E ,
+.Xr usba_hcdi_device_fini 9E ,
+.Xr usba_hcdi_device_init 9E ,
+.Xr usba_hcdi_hub_update 9E ,
+.Xr usba_hcdi_pipe_bulk_xfer 9E ,
+.Xr usba_hcdi_pipe_close 9E ,
+.Xr usba_hcdi_pipe_ctrl_xfer 9E ,
+.Xr usba_hcdi_pipe_intr_xfer 9E ,
+.Xr usba_hcdi_pipe_isoc_xfer 9E ,
+.Xr usba_hcdi_pipe_open 9E ,
+.Xr usba_hcdi_pipe_reset 9E ,
+.Xr usba_hcdi_pipe_stop_intr_polling 9E ,
+.Xr usba_hcdi_pipe_stop_isoc_polling 9E ,
+.Xr usba_alloc_hcdi_ops 9F ,
+.Xr usba_free_hcdi_ops 9F ,
+.Xr usba_hcdi_register 9F
