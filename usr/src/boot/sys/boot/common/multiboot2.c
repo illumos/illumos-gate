@@ -696,6 +696,9 @@ multiboot2_exec(struct preloaded_file *fp)
 	if (error != 0)
 		goto error;
 
+	/* mb_kernel_cmdline() updates the environment. */
+	build_environment_module();
+
 	size = mbi_size(fp, cmdline);	/* Get the size for MBI. */
 
 	/* Set up the base for mb_malloc. */

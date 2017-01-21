@@ -232,6 +232,8 @@ void file_discard(struct preloaded_file *fp);
 void file_addmetadata(struct preloaded_file *fp, int type, size_t size, void *p);
 int  file_addmodule(struct preloaded_file *fp, char *modname, int version,
 	struct kernel_module **newmp);
+void build_environment_module(void);
+vm_offset_t bi_copyenv(vm_offset_t);
 
 /* MI module loaders */
 #ifdef __elfN

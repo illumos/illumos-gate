@@ -89,7 +89,7 @@ i386_loadaddr(u_int type, void *data, uint64_t addr)
 	/*
 	 * Our modules are page aligned.
 	 */
-	if (type == LOAD_RAW)
+	if (type == LOAD_RAW || type == LOAD_MEM)
                 return (roundup2(addr, MULTIBOOT_MOD_ALIGN));
 
         return (addr);
