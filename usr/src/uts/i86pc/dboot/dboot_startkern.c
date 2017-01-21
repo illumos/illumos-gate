@@ -963,13 +963,11 @@ init_mem_alloc(void)
 
 #else	/* !__xpv */
 
-/* Stub in this version. */
 static void
 dboot_multiboot1_xboot_consinfo(void)
 {
 }
 
-/* Stub in this version. */
 static void
 dboot_multiboot2_xboot_consinfo(void)
 {
@@ -1046,6 +1044,45 @@ dboot_multiboot_modcmdline(int index)
 		break;
 	}
 	return (0);
+}
+
+/*
+ * Find the environment module for console setup.
+ * Since we need the console to print early boot messages, the console is set up
+ * before anything else and therefore we need to pick up the environment module
+ * early too.
+ *
+ * Note, we just will search for and if found, will pass the env
+ * module to console setup, the proper module list processing will happen later.
+ */
+static void
+dboot_find_env(void)
+{
+	int i, modcount;
+	uint32_t mod_start, mod_end;
+	char *cmdline;
+
+	modcount = dboot_multiboot_modcount();
+
+	for (i = 0; i < modcount; ++i) {
+		cmdline = dboot_multiboot_modcmdline(i);
+		if (cmdline == NULL)
+			continue;
+
+		if (strstr(cmdline, "type=environment") == NULL)
+			continue;
+
+		mod_start = dboot_multiboot_modstart(i);
+		mod_end = dboot_multiboot_modend(i);
+		modules[0].bm_addr = mod_start;
+		modules[0].bm_size = mod_end - mod_start;
+		modules[0].bm_name = NULL;
+		modules[0].bm_hash = NULL;
+		modules[0].bm_type = BMT_ENV;
+		bi->bi_modules = (native_ptr_t)(uintptr_t)modules;
+		bi->bi_module_cnt = 1;
+		return;
+	}
 }
 
 static boolean_t
@@ -1144,6 +1181,8 @@ type_to_str(boot_module_type_t type)
 		return ("file");
 	case BMT_HASH:
 		return ("hash");
+	case BMT_ENV:
+		return ("environment");
 	default:
 		return ("unknown");
 	}
@@ -1262,6 +1301,8 @@ process_module(int midx)
 				modules[midx].bm_type = BMT_ROOTFS;
 			} else if (strcmp(q, "hash") == 0) {
 				modules[midx].bm_type = BMT_HASH;
+			} else if (strcmp(q, "environment") == 0) {
+				modules[midx].bm_type = BMT_ENV;
 			} else if (strcmp(q, "file") != 0) {
 				dboot_printf("\tmodule #%d: unknown module "
 				    "type '%s'; defaulting to 'file'",
@@ -1789,6 +1830,11 @@ dboot_init_xboot_consinfo(void)
 		    multiboot_version);
 		break;
 	}
+	/*
+	 * Lookup environment module for the console. Complete module list
+	 * will be built after console setup.
+	 */
+	dboot_find_env();
 #endif
 }
 
@@ -1919,9 +1965,6 @@ startup_kernel(void)
 	bootloader = dboot_loader_name();
 	cmdline = dboot_loader_cmdline();
 
-	prom_debug = (strstr(cmdline, "prom_debug") != NULL);
-	map_debug = (strstr(cmdline, "map_debug") != NULL);
-
 #if defined(__xpv)
 	/*
 	 * For dom0, before we initialize the console subsystem we'll
@@ -1935,11 +1978,14 @@ startup_kernel(void)
 
 	dboot_init_xboot_consinfo();
 	bi->bi_cmdline = (native_ptr_t)(uintptr_t)cmdline;
+	bcons_init(bi);
+
+	prom_debug = (find_boot_prop("prom_debug") != NULL);
+	map_debug = (find_boot_prop("map_debug") != NULL);
 
 #if !defined(__xpv)
 	dboot_multiboot_get_fwtables();
 #endif
-	bcons_init(cmdline);
 	DBG_MSG("\n\nillumos prekernel set: ");
 	DBG_MSG(cmdline);
 	DBG_MSG("\n");

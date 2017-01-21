@@ -793,7 +793,7 @@ done:
 		bcons_init2(inputdev, outputdev, consoledev);
 	}
 
-	if (strstr((char *)xbootp->bi_cmdline, "prom_debug") || kbm_debug)
+	if (find_boot_prop("prom_debug") || kbm_debug)
 		boot_prop_display(line);
 }
 
@@ -1202,6 +1202,125 @@ save_boot_info(struct xboot_info *xbi)
 }
 #endif	/* __xpv */
 
+/*
+ * Import boot environment module variables as properties, applying
+ * blacklist filter for variables we know we will not use.
+ *
+ * Since the environment can be relatively large, containing many variables
+ * used only for boot loader purposes, we will use a blacklist based filter.
+ * To keep the blacklist from growing too large, we use prefix based filtering.
+ * This is possible because in many cases, the loader variable names are
+ * using a structured layout.
+ *
+ * We will not overwrite already set properties.
+ */
+static struct bop_blacklist {
+	const char *bl_name;
+	int bl_name_len;
+} bop_prop_blacklist[] = {
+	{ "ISADIR", sizeof ("ISADIR") },
+	{ "acpi", sizeof ("acpi") },
+	{ "autoboot_delay", sizeof ("autoboot_delay") },
+	{ "autoboot_delay", sizeof ("autoboot_delay") },
+	{ "beansi_", sizeof ("beansi_") },
+	{ "beastie", sizeof ("beastie") },
+	{ "bemenu", sizeof ("bemenu") },
+	{ "boot.", sizeof ("boot.") },
+	{ "bootenv", sizeof ("bootenv") },
+	{ "currdev", sizeof ("currdev") },
+	{ "dhcp.", sizeof ("dhcp.") },
+	{ "interpret", sizeof ("interpret") },
+	{ "kernel", sizeof ("kernel") },
+	{ "loaddev", sizeof ("loaddev") },
+	{ "loader_", sizeof ("loader_") },
+	{ "module_path", sizeof ("module_path") },
+	{ "nfs.", sizeof ("nfs.") },
+	{ "pcibios", sizeof ("pcibios") },
+	{ "prompt", sizeof ("prompt") },
+	{ "smbios", sizeof ("smbios") },
+	{ "tem", sizeof ("tem") },
+	{ "twiddle_divisor", sizeof ("twiddle_divisor") },
+	{ "zfs_be", sizeof ("zfs_be") },
+};
+
+/*
+ * Match the name against prefixes in above blacklist. If the match was
+ * found, this name is blacklisted.
+ */
+static boolean_t
+name_is_blacklisted(const char *name)
+{
+	int i, n;
+
+	n = sizeof (bop_prop_blacklist) / sizeof (bop_prop_blacklist[0]);
+	for (i = 0; i < n; i++) {
+		if (strncmp(bop_prop_blacklist[i].bl_name, name,
+		    bop_prop_blacklist[i].bl_name_len - 1) == 0) {
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+static void
+process_boot_environment(struct boot_modules *benv)
+{
+	char *env, *ptr, *name, *value;
+	uint32_t size, name_len, value_len;
+
+	if (benv == NULL || benv->bm_type != BMT_ENV)
+		return;
+	ptr = env = benv->bm_addr;
+	size = benv->bm_size;
+	do {
+		name = ptr;
+		/* find '=' */
+		while (*ptr != '=') {
+			ptr++;
+			if (ptr > env + size) /* Something is very wrong. */
+				return;
+		}
+		name_len = ptr - name;
+		if (sizeof (buffer) <= name_len)
+			continue;
+
+		(void) strncpy(buffer, name, sizeof (buffer));
+		buffer[name_len] = '\0';
+		name = buffer;
+
+		value_len = 0;
+		value = ++ptr;
+		while ((uintptr_t)ptr - (uintptr_t)env < size) {
+			if (*ptr == '\0') {
+				ptr++;
+				value_len = (uintptr_t)ptr - (uintptr_t)env;
+				break;
+			}
+			ptr++;
+		}
+
+		/* Did we reach the end of the module? */
+		if (value_len == 0)
+			return;
+
+		if (*value == '\0')
+			continue;
+
+		/* Is this property already set? */
+		if (do_bsys_getproplen(NULL, name) >= 0)
+			continue;
+
+		if (name_is_blacklisted(name) == B_TRUE)
+			continue;
+
+		/* Create new property. */
+		bsetprops(name, value);
+
+		/* Avoid reading past the module end. */
+		if (size <= (uintptr_t)ptr - (uintptr_t)env)
+			return;
+	} while (*ptr != '\0');
+}
 
 /*
  * 1st pass at building the table of boot properties. This includes:
@@ -1221,7 +1340,7 @@ build_boot_properties(struct xboot_info *xbp)
 	int name_len;
 	char *value;
 	int value_len;
-	struct boot_modules *bm, *rdbm;
+	struct boot_modules *bm, *rdbm, *benv = NULL;
 	char *propbuf;
 	int quoted = 0;
 	int boot_arg_len;
@@ -1249,6 +1368,13 @@ build_boot_properties(struct xboot_info *xbp)
 			}
 			if (bm[i].bm_type == BMT_HASH || bm[i].bm_name == NULL)
 				continue;
+
+			if (bm[i].bm_type == BMT_ENV) {
+				if (benv == NULL)
+					benv = &bm[i];
+				else
+					continue;
+			}
 
 			(void) snprintf(modid, sizeof (modid),
 			    "module-name-%u", midx);
@@ -1482,6 +1608,8 @@ build_boot_properties(struct xboot_info *xbp)
 	 */
 	bsetprops("boot-args", boot_args);
 	bsetprops("bootargs", boot_args);
+
+	process_boot_environment(benv);
 
 #ifndef __xpv
 	/*
@@ -1858,13 +1986,13 @@ _start(struct xboot_info *xbp)
 	}
 #endif
 
-	bcons_init((void *)xbp->bi_cmdline);
+	bcons_init(xbp);
 	have_console = 1;
 
 	/*
 	 * enable debugging
 	 */
-	if (strstr((char *)xbp->bi_cmdline, "kbm_debug"))
+	if (find_boot_prop("kbm_debug") != NULL)
 		kbm_debug = 1;
 
 	DBG_MSG("\n\n*** Entered Solaris in _start() cmdline is: ");
@@ -1943,7 +2071,7 @@ _start(struct xboot_info *xbp)
 	DBG_MSG("Initializing boot properties:\n");
 	build_boot_properties(xbp);
 
-	if (strstr((char *)xbp->bi_cmdline, "prom_debug") || kbm_debug) {
+	if (find_boot_prop("prom_debug") || kbm_debug) {
 		char *value;
 
 		value = do_bsys_alloc(NULL, NULL, MMU_PAGESIZE, MMU_PAGESIZE);

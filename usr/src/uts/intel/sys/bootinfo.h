@@ -61,7 +61,8 @@ typedef void *native_ptr_t;
 typedef enum boot_module_type {
 	BMT_ROOTFS,
 	BMT_FILE,
-	BMT_HASH
+	BMT_HASH,
+	BMT_ENV
 } boot_module_type_t;
 
 struct boot_memlist {

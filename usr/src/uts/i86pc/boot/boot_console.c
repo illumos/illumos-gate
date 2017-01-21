@@ -61,6 +61,22 @@ static int cons_color = CONS_COLOR;
 static int console = CONS_SCREEN_TEXT;
 static int tty_num = 0;
 static int tty_addr[] = {0x3f8, 0x2f8, 0x3e8, 0x2e8};
+static char *boot_line;
+static struct boot_env {
+	char	*be_env;	/* ends with double ascii nul */
+	size_t	be_size;	/* size of the environment, including nul */
+} boot_env;
+
+static int serial_ischar(void);
+static int serial_getchar(void);
+static void serial_putchar(int);
+static void serial_adjust_prop(void);
+
+#if !defined(_BOOT)
+/* Set if the console or mode are expressed in the boot line */
+static int console_set, console_mode_set;
+#endif
+
 #if defined(__xpv)
 static int console_hypervisor_redirect = B_FALSE;
 static int console_hypervisor_device = CONS_INVALID;
@@ -75,18 +91,6 @@ console_hypervisor_dev_type(int *tnum)
 	return (console_hypervisor_device);
 }
 #endif /* __xpv */
-
-static int serial_ischar(void);
-static int serial_getchar(void);
-static void serial_putchar(int);
-static void serial_adjust_prop(void);
-
-static char *boot_line = NULL;
-
-#if !defined(_BOOT)
-/* Set if the console or mode are expressed in the boot line */
-static int console_set, console_mode_set;
-#endif
 
 /* Clear the screen and initialize VIDEO, XPOS and YPOS. */
 void
@@ -328,6 +332,67 @@ out:
 	return (ret);
 }
 
+/*
+ * Find prop from boot env module. The data in module is list of C strings
+ * name=value, the list is terminated by double nul.
+ */
+static const char *
+find_boot_env_prop(const char *name)
+{
+	char *ptr;
+	size_t len;
+	uintptr_t size;
+
+	if (boot_env.be_env == NULL)
+		return (NULL);
+
+	ptr = boot_env.be_env;
+	len = strlen(name);
+
+	/*
+	 * Make sure we have at least len + 2 bytes in the environment.
+	 * We are looking for name=value\0 constructs, and the environment
+	 * itself is terminated by '\0'.
+	 */
+	if (boot_env.be_size < len + 2)
+		return (NULL);
+
+	do {
+		if ((strncmp(ptr, name, len) == 0) && (ptr[len] == '=')) {
+			ptr += len + 1;
+			return (ptr);
+		}
+		/* find the first '\0' */
+		while (*ptr != '\0') {
+			ptr++;
+			size = (uintptr_t)ptr - (uintptr_t)boot_env.be_env;
+			if (size > boot_env.be_size)
+				return (NULL);
+		}
+		ptr++;
+
+		/* If the remainder is shorter than name + 2, get out. */
+		size = (uintptr_t)ptr - (uintptr_t)boot_env.be_env;
+		if (boot_env.be_size - size < len + 2)
+			return (NULL);
+	} while (*ptr != '\0');
+	return (NULL);
+}
+
+/*
+ * Get prop value from either command line or boot environment.
+ * We always check kernel command line first, as this will keep the
+ * functionality and will allow user to override the values in environment.
+ */
+const char *
+find_boot_prop(const char *name)
+{
+	const char *value = find_boot_line_prop(name);
+
+	if (value == NULL)
+		value = find_boot_env_prop(name);
+	return (value);
+}
 
 #define	MATCHES(p, pat)	\
 	(strncmp(p, pat, strlen(pat)) == 0 ? (p += strlen(pat), 1) : 0)
@@ -341,14 +406,14 @@ out:
 /*
  * find a tty mode property either from cmdline or from boot properties
  */
-static char *
+static const char *
 get_mode_value(char *name)
 {
 	/*
 	 * when specified on boot line it looks like "name" "="....
 	 */
 	if (boot_line != NULL) {
-		return (find_boot_line_prop(name));
+		return (find_boot_prop(name));
 	}
 
 #if defined(_BOOT)
@@ -377,8 +442,8 @@ static void
 serial_adjust_prop(void)
 {
 	char propname[20];
-	char *propval;
-	char *p;
+	const char *propval;
+	const char *p;
 	ulong_t baud;
 	uchar_t lcr = 0;
 	uchar_t mcr = DTR | RTS;
@@ -522,27 +587,47 @@ console_value_t console_devices[] = {
 	{ NULL, CONS_INVALID }
 };
 
+static void
+bcons_init_env(struct xboot_info *xbi)
+{
+	uint32_t i;
+	struct boot_modules *modules;
+
+	modules = (struct boot_modules *)(uintptr_t)xbi->bi_modules;
+	for (i = 0; i < xbi->bi_module_cnt; i++) {
+		if (modules[i].bm_type == BMT_ENV)
+			break;
+	}
+	if (i == xbi->bi_module_cnt)
+		return;
+
+	boot_env.be_env = (char *)(uintptr_t)modules[i].bm_addr;
+	boot_env.be_size = modules[i].bm_size;
+}
+
 void
-bcons_init(char *bootstr)
+bcons_init(struct xboot_info *xbi)
 {
 	console_value_t *consolep;
 	size_t len, cons_len;
-	char *cons_str;
+	const char *cons_str;
 #if !defined(_BOOT)
 	static char console_text[] = "text";
 	extern int post_fastreboot;
 #endif
 
-	boot_line = bootstr;
+	/* Set up data to fetch properties from commad line and boot env. */
+	boot_line = (char *)(uintptr_t)xbi->bi_cmdline;
+	bcons_init_env(xbi);
 	console = CONS_INVALID;
 
 #if defined(__xpv)
-	bcons_init_xen(bootstr);
+	bcons_init_xen(boot_line);
 #endif /* __xpv */
 
-	cons_str = find_boot_line_prop("console");
+	cons_str = find_boot_prop("console");
 	if (cons_str == NULL)
-		cons_str = find_boot_line_prop("output-device");
+		cons_str = find_boot_prop("output-device");
 
 #if !defined(_BOOT)
 	if (post_fastreboot && strcmp(cons_str, "graphics") == 0)
@@ -657,7 +742,6 @@ bcons_init(char *bootstr)
 		kb_init();
 		break;
 	}
-	boot_line = NULL;
 }
 
 #if !defined(_BOOT)
