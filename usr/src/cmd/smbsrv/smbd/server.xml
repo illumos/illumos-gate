@@ -157,6 +157,8 @@ file.
 			value='true' override='true'/>
 		<propval name='autohome_map' type='astring'
 			value='/etc' override='true'/>
+		<propval name='bypass_traverse_checking' type='boolean'
+			value='true' override='true'/>
 		<propval name='debug' type='integer'
 			value='0' override='true'/>
 		<propval name='domain_sid' type='astring'

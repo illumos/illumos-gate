@@ -148,6 +148,8 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_MAX_PROTOCOL, "max_protocol", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_ENCRYPT, "encrypt", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_MIN_PROTOCOL, "min_protocol", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_BYPASS_TRAVERSE_CHECKING,
+	    "bypass_traverse_checking", SCF_TYPE_BOOLEAN, 0},
 
 	/* SMB_CI_MAX */
 };

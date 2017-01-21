@@ -59,6 +59,22 @@ default path is \fB/etc\fR.
 .sp
 .ne 2
 .na
+\fB\fBbypass_traverse_checking\fR\fR
+.ad
+.sp .6
+.RS 4n
+When set, allows the SMB server to bypass ACL "traverse" checks.
+The default value is \fBtrue\fR, for Windows compatibility.
+If this parameter is \fBfalse\fR, ACL checks require that
+"traverse" (directory execute) is granted on every directory
+above the directory the SMB client tries to access.
+Windows shares are normally setup with the higher level
+directories not specifically granting such access.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBdisposition\fR\fR
 .ad
 .sp .6

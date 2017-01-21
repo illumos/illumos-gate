@@ -1008,10 +1008,15 @@ typedef struct smb_session {
 #define	SMB_USER_IS_ADMIN(U)	(((U)->u_flags & SMB_USER_FLAG_ADMIN) != 0)
 #define	SMB_USER_IS_GUEST(U)	(((U)->u_flags & SMB_USER_FLAG_GUEST) != 0)
 
-#define	SMB_USER_PRIV_TAKE_OWNERSHIP	0x00000001
-#define	SMB_USER_PRIV_BACKUP		0x00000002
-#define	SMB_USER_PRIV_RESTORE		0x00000004
-#define	SMB_USER_PRIV_SECURITY		0x00000008
+/*
+ * Internal privilege flags derived from smb_privilege.h numbers
+ * Would rather not include that in this file.
+ */
+#define	SMB_USER_PRIV_SECURITY		(1<<8)	/* SE_SECURITY_LUID */
+#define	SMB_USER_PRIV_TAKE_OWNERSHIP	(1<<9)	/* SE_TAKE_OWNERSHIP_LUID */
+#define	SMB_USER_PRIV_BACKUP		(1<<17)	/* SE_BACKUP_LUID */
+#define	SMB_USER_PRIV_RESTORE		(1<<18)	/* SE_RESTORE_LUID */
+#define	SMB_USER_PRIV_CHANGE_NOTIFY	(1<<23)	/* SE_CHANGE_NOTIFY_LUID */
 
 /*
  * See the long "User State Machine" comment in smb_user.c
