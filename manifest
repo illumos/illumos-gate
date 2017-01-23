@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
 # Keep this sorted as by LC_ALL=C sort -u -k2.
@@ -6196,6 +6196,7 @@ f usr/lib/libfcoe.so.1 0755 root bin
 s usr/lib/libfcoe.so=libfcoe.so.1
 s usr/lib/libfdisk.so.1=../../lib/libfdisk.so.1
 s usr/lib/libfdisk.so=../../lib/libfdisk.so.1
+f usr/lib/libficl-sys.so.4.1.0 0755 root bin
 f usr/lib/libform.so.1 0755 root bin
 s usr/lib/libform.so=libform.so.1
 f usr/lib/libfru.so.1 0755 root bin
