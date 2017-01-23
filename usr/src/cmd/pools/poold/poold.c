@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * poold - dynamically adjust pool configuration according to load.
  */
@@ -53,16 +51,6 @@
 #define	POOLD_DEF_CLASSPATH	"/usr/lib/pool/JPool.jar"
 #define	POOLD_DEF_LIBPATH	"/usr/lib/pool"
 #define	SMF_SVC_INSTANCE	"svc:/system/pools/dynamic:default"
-
-#if defined(sparc)
-#define	PLAT	"sparc"
-#else
-#if defined(i386)
-#define	PLAT	"i386"
-#else
-#error Unrecognized platform.
-#endif
-#endif
 
 #define	CLASS_FIELD_DESC(class_desc)	"L" class_desc ";"
 
