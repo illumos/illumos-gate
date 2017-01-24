@@ -691,16 +691,18 @@ zfs_bootfs(void *zdev)
 		STAILQ_FOREACH(kid, &vdev->v_children, v_childlink) {
 			/* use this kid? */
 			if (kid->v_state == VDEV_STATE_HEALTHY &&
-			    kid->v_phys_path != NULL);
+			    kid->v_phys_path != NULL) {
 				break;
+			}
 		}
 		if (kid != NULL) {
 			vdev = kid;
 			break;
 		}
 		if (vdev->v_state == VDEV_STATE_HEALTHY &&
-		    vdev->v_phys_path != NULL);
+		    vdev->v_phys_path != NULL) {
 			break;
+		}
 	}
 
 	/*
