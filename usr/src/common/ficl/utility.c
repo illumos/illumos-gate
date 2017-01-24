@@ -1,4 +1,5 @@
 #include "ficl.h"
+#include <limits.h>
 
 /*
  * a l i g n P t r
@@ -94,7 +95,7 @@ ficlLtoa(ficlInteger value, char *string, int radix)
 		*cp++ = '0';
 	else if (pwr != 0) {
 		ficlUnsigned v = (ficlUnsigned) value;
-		ficlUnsigned mask = (ficlUnsigned) ~(-1 << pwr);
+		ficlUnsigned mask = ~(ULONG_MAX << pwr);
 		while (v) {
 			*cp++ = digits[v & mask];
 			v >>= pwr;
