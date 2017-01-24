@@ -142,16 +142,21 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		    TOPO_FAC_TYPE_ANY, &fl, &err) == 0) {
 			for (lp = topo_list_next(&fl.tf_list); lp != NULL;
 			    lp = topo_list_next(lp)) {
+				uint32_t prop;
+
 				if (topo_prop_get_uint32(lp->tf_node,
 				    TOPO_PGROUP_FACILITY, TOPO_FACILITY_TYPE,
-				    &type, &err) != 0) {
+				    &prop, &err) != 0) {
 					continue;
 				}
+				type = (topo_led_type_t)prop;
+
 				if (topo_prop_get_uint32(lp->tf_node,
 				    TOPO_PGROUP_FACILITY, TOPO_LED_MODE,
-				    &mode, &err) != 0) {
+				    &prop, &err) != 0) {
 					continue;
 				}
+				mode = (topo_led_state_t)prop;
 
 				switch (type) {
 				case TOPO_LED_TYPE_SERVICE:

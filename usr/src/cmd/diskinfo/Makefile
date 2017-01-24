@@ -20,6 +20,8 @@ SRCS=		$(OBJS:%.o=%.c)
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/Makefile.ctf
 
+C99MODE=	$(C99_ENABLE)
+
 CPPFLAGS +=	-I$(SRC)/lib/fm/topo
 
 LDLIBS +=	-L$(ROOT)/usr/lib/fm -R/usr/lib/fm -ldiskmgt -lnvpair -ltopo
@@ -35,6 +37,6 @@ $(PROG):	$(OBJS)
 clean:
 		$(RM) $(OBJS)
 
-install:	all $(ROOTUSRSBINPROG)
+install:	all $(ROOTPROG)
 
 include		$(SRC)/cmd/Makefile.targ
