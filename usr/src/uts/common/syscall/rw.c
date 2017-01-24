@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -999,19 +999,24 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	int error = 0;
 	int i;
 
+	/*
+	 * In a 64-bit kernel, this interface supports native 64-bit
+	 * applications as well as 32-bit applications using both standard and
+	 * large-file access. For 32-bit large-file aware applications, the
+	 * offset is passed as two parameters which are joined into the actual
+	 * offset used. The 64-bit libc always passes 0 for the extended_offset.
+	 * Note that off_t is a signed value, but the preadv/pwritev API treats
+	 * the offset as a position in the file for the operation, so passing
+	 * a negative value will likely fail the maximum offset checks below
+	 * because we convert it to an unsigned value which will be larger than
+	 * the maximum valid offset.
+	 */
 #if defined(_SYSCALL32_IMPL) || defined(_ILP32)
 	u_offset_t fileoff = ((u_offset_t)extended_offset << 32) |
 	    (u_offset_t)offset;
 #else /* _SYSCALL32_IMPL || _ILP32 */
 	u_offset_t fileoff = (u_offset_t)(ulong_t)offset;
 #endif /* _SYSCALL32_IMPR || _ILP32 */
-#ifdef _SYSCALL32_IMPL
-	const u_offset_t maxoff = get_udatamodel() == DATAMODEL_ILP32 &&
-	    extended_offset == 0?
-	    MAXOFF32_T : MAXOFFSET_T;
-#else /* _SYSCALL32_IMPL */
-	const u_offset_t maxoff = MAXOFF32_T;
-#endif /* _SYSCALL32_IMPL */
 
 	int in_crit = 0;
 
@@ -1082,7 +1087,7 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		}
 	}
 
-	if ((bcount = (ssize_t)count) < 0) {
+	if ((bcount = count) < 0) {
 		if (aiovlen != 0)
 			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));
@@ -1098,22 +1103,36 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	}
 	vp = fp->f_vnode;
 	rwflag = 0;
-	if (vp->v_type == VREG) {
 
+	/*
+	 * Behaviour is same as read(2). Please see comments in read(2).
+	 */
+	if (vp->v_type == VREG) {
 		if (bcount == 0)
 			goto out;
 
-		/*
-		 * return EINVAL for offsets that cannot be
-		 * represented in an off_t.
-		 */
-		if (fileoff > maxoff) {
-			error = EINVAL;
+		/* Handle offset past maximum offset allowed for file. */
+		if (fileoff >= OFFSET_MAX(fp)) {
+			struct vattr va;
+			va.va_mask = AT_SIZE;
+
+			error = VOP_GETATTR(vp, &va, 0, fp->f_cred, NULL);
+			if (error == 0)  {
+				if (fileoff >= va.va_size) {
+					count = 0;
+				} else {
+					error = EOVERFLOW;
+				}
+			}
 			goto out;
 		}
 
-		if (fileoff + bcount > maxoff)
-			bcount = (ssize_t)((u_offset_t)maxoff - fileoff);
+		ASSERT(bcount == count);
+
+		/* Note: modified count used in nbl_conflict() call below. */
+		if ((fileoff + count) > OFFSET_MAX(fp))
+			count = (ssize_t)(OFFSET_MAX(fp) - fileoff);
+
 	} else if (vp->v_type == VFIFO) {
 		error = ESPIPE;
 		goto out;
@@ -1130,8 +1149,7 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_WRITE, fileoff, count, svmand,
-		    NULL)) {
+		if (nbl_conflict(vp, NBL_WRITE, fileoff, count, svmand, NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -1139,33 +1157,6 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 
 	(void) VOP_RWLOCK(vp, rwflag, NULL);
 
-	/*
-	 * Behaviour is same as read(2). Please see comments in
-	 * read(2).
-	 */
-
-	if ((vp->v_type == VREG) && (fileoff >= OFFSET_MAX(fp))) {
-		struct vattr va;
-		va.va_mask = AT_SIZE;
-		if ((error =
-		    VOP_GETATTR(vp, &va, 0, fp->f_cred, NULL)))  {
-			VOP_RWUNLOCK(vp, rwflag, NULL);
-			goto out;
-		}
-		if (fileoff >= va.va_size) {
-			VOP_RWUNLOCK(vp, rwflag, NULL);
-			count = 0;
-			goto out;
-		} else {
-			VOP_RWUNLOCK(vp, rwflag, NULL);
-			error = EOVERFLOW;
-			goto out;
-		}
-	}
-	if ((vp->v_type == VREG) &&
-	    (fileoff + count > OFFSET_MAX(fp))) {
-		count = (ssize_t)(OFFSET_MAX(fp) - fileoff);
-	}
 	auio.uio_loffset = fileoff;
 	auio.uio_iov = aiov;
 	auio.uio_iovcnt = iovcnt;
@@ -1218,19 +1209,15 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	int error = 0;
 	int i;
 
+	/*
+	 * See the comment in preadv for how the offset is handled.
+	 */
 #if defined(_SYSCALL32_IMPL) || defined(_ILP32)
 	u_offset_t fileoff = ((u_offset_t)extended_offset << 32) |
 	    (u_offset_t)offset;
 #else /* _SYSCALL32_IMPL || _ILP32 */
 	u_offset_t fileoff = (u_offset_t)(ulong_t)offset;
 #endif /* _SYSCALL32_IMPR || _ILP32 */
-#ifdef _SYSCALL32_IMPL
-	const u_offset_t maxoff = get_udatamodel() == DATAMODEL_ILP32 &&
-	    extended_offset == 0?
-	    MAXOFF32_T : MAXOFFSET_T;
-#else /* _SYSCALL32_IMPL */
-	const u_offset_t maxoff = MAXOFF32_T;
-#endif /* _SYSCALL32_IMPL */
 
 	int in_crit = 0;
 
@@ -1301,7 +1288,7 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		}
 	}
 
-	if ((bcount = (ssize_t)count) < 0) {
+	if ((bcount = count) < 0) {
 		if (aiovlen != 0)
 			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));
@@ -1317,19 +1304,24 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	}
 	vp = fp->f_vnode;
 	rwflag = 1;
-	if (vp->v_type == VREG) {
 
+	/*
+	 * The kernel's write(2) code checks the rctl & OFFSET_MAX and returns
+	 * EFBIG when fileoff exceeds either limit. We do the same.
+	 */
+	if (vp->v_type == VREG) {
 		if (bcount == 0)
 			goto out;
 
 		/*
-		 * return EINVAL for offsets that cannot be
-		 * represented in an off_t.
+		 * Don't allow pwritev to cause file size to exceed the proper
+		 * offset limit.
 		 */
-		if (fileoff > maxoff) {
-			error = EINVAL;
+		if (fileoff >= OFFSET_MAX(fp)) {
+			error = EFBIG;
 			goto out;
 		}
+
 		/*
 		 * Take appropriate action if we are trying
 		 * to write above the resource limit.
@@ -1352,17 +1344,13 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 			error = EFBIG;
 			goto out;
 		}
-		/*
-		 * Don't allow pwritev to cause file sizes to exceed
-		 * maxoff.
-		 */
-		if (fileoff == maxoff) {
-			error = EFBIG;
-			goto out;
-		}
 
-		if (fileoff + bcount > maxoff)
-			bcount = (ssize_t)((u_offset_t)maxoff - fileoff);
+		ASSERT(bcount == count);
+
+		/* Note: modified count used in nbl_conflict() call below. */
+		if ((fileoff + count) > OFFSET_MAX(fp))
+			count = (ssize_t)(OFFSET_MAX(fp) - fileoff);
+
 	} else if (vp->v_type == VFIFO) {
 		error = ESPIPE;
 		goto out;
@@ -1379,42 +1367,13 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_WRITE, fileoff, count, svmand,
-		    NULL)) {
+		if (nbl_conflict(vp, NBL_WRITE, fileoff, count, svmand, NULL)) {
 			error = EACCES;
 			goto out;
 		}
 	}
 
 	(void) VOP_RWLOCK(vp, rwflag, NULL);
-
-
-	/*
-	 * Behaviour is same as write(2). Please see comments for
-	 * write(2).
-	 */
-
-	if (vp->v_type == VREG) {
-		if (fileoff >= curproc->p_fsz_ctl) {
-			VOP_RWUNLOCK(vp, rwflag, NULL);
-			mutex_enter(&curproc->p_lock);
-			/* see above rctl_action comment */
-			(void) rctl_action(
-			    rctlproc_legacy[RLIMIT_FSIZE],
-			    curproc->p_rctls,
-			    curproc, RCA_UNSAFE_SIGINFO);
-			mutex_exit(&curproc->p_lock);
-			error = EFBIG;
-			goto out;
-		}
-		if (fileoff >= OFFSET_MAX(fp)) {
-			VOP_RWUNLOCK(vp, rwflag, NULL);
-			error = EFBIG;
-			goto out;
-		}
-		if (fileoff + count > OFFSET_MAX(fp))
-			count = (ssize_t)(OFFSET_MAX(fp) - fileoff);
-	}
 
 	auio.uio_loffset = fileoff;
 	auio.uio_iov = aiov;
