@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -76,3 +76,6 @@ user = root
 arch = i86pc
 timeout = 300
 tests = ['ldt', 'badseg']
+
+[/opt/os-tests/tests/writev.32]
+[/opt/os-tests/tests/writev.64]
