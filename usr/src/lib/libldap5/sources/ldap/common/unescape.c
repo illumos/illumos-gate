@@ -44,12 +44,15 @@ nsldapi_hex_unescape( char *s )
 
 	for ( p = s; *s != '\0'; ++s ) {
 		if ( *s == '%' ) {
-			if ( *++s != '\0' ) {
-				*p = unhex( *s ) << 4;
+			if ( *++s == '\0' ) {
+				break;
 			}
-			if ( *++s != '\0' ) {
-				*p++ += unhex( *s );
+			*p = unhex( *s ) << 4;
+			if ( *++s == '\0' ) {
+				break;
 			}
+			*p++ += unhex( *s );
+
 		} else {
 			*p++ = *s;
 		}
