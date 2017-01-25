@@ -41,7 +41,6 @@ set name=variant.arch value=$(ARCH)
 $(i386_ONLY)dir path=boot group=sys
 $(i386_ONLY)dir path=boot/grub group=sys
 $(i386_ONLY)dir path=boot/grub/bin group=sys
-dir path=etc/default group=sys
 dir path=lib
 dir path=usr/share/man
 dir path=usr/share/man/man5
@@ -70,7 +69,6 @@ $(i386_ONLY)file path=boot/grub/ufs_stage1_5 group=sys
 $(i386_ONLY)file path=boot/grub/vstafs_stage1_5 group=sys
 $(i386_ONLY)file path=boot/grub/xfs_stage1_5 group=sys
 $(i386_ONLY)file path=boot/grub/zfs_stage1_5 group=sys
-$(i386_ONLY)file path=etc/default/be group=sys mode=0444
 file path=lib/libgrubmgmt.so.1
 file path=lib/llib-lgrubmgmt
 file path=lib/llib-lgrubmgmt.ln
