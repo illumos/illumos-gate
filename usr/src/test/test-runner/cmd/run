@@ -12,6 +12,7 @@
 #
 
 #
+# Copyright 2017 Joyent, Inc.
 # Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 #
 
@@ -35,6 +36,7 @@ BASEDIR = '/var/tmp/test_results'
 KILL = '/usr/bin/kill'
 TRUE = '/usr/bin/true'
 SUDO = '/usr/bin/sudo'
+SU = '/usr/bin/su'
 
 # Custom class to reopen the log file in case it is forcibly closed by a test.
 class WatchedFileHandlerClosed(WatchedFileHandler):
@@ -162,7 +164,21 @@ class Cmd(object):
         sudo is required, this user was verified previously.
         """
         self.killed = True
-        do_sudo = len(self.user) != 0
+        cur_user = getpwuid(os.getuid()).pw_name
+
+        #
+        # The test runs in a child process of the process performing
+        # the kill and this child process may be owned by a different
+        # user (specified by self.user). If this is the case, and the
+        # parent process is not running as root, then sudo must be
+        # used. The verify_user function should prevent us from ever
+        # getting here on a system which doesn't have sudo.
+        #
+        if len(self.user) != 0 and self.user != cur_user and cur_user != 'root':
+            do_sudo = True
+        else:
+            do_sudo = False
+
         signal = '-TERM'
 
         cmd = [SUDO, KILL, signal, str(proc.pid)]
@@ -178,15 +194,23 @@ class Cmd(object):
     def update_cmd_privs(self, cmd, user):
         """
         If a user has been specified to run this Cmd and we're not already
-        running as that user, prepend the appropriate sudo command to run
-        as that user.
-        """
-        me = getpwuid(os.getuid())
+        running as that user, prepend the appropriate sudo command to
+        run as that user. If running as root use su instead. The
+        verify_user function should prevent us from ever getting here
+        on a system which doesn't have sudo.
 
-        if not user or user is me:
+        """
+
+        cur_user = getpwuid(os.getuid()).pw_name
+
+        if not user or user == cur_user:
             return cmd
 
-        ret = '%s -E -u %s %s' % (SUDO, user, cmd)
+        if cur_user == 'root':
+            ret = '%s %s -c %s' % (SU, user, cmd)
+        else:
+            ret = '%s -E -u %s %s' % (SUDO, user, cmd)
+
         return ret.split(' ')
 
     def collect_output(self, proc):
@@ -729,13 +753,27 @@ def verify_file(pathname):
 
 def verify_user(user, logger):
     """
-    Verify that the specified user exists on this system, and can execute
-    sudo without being prompted for a password.
+    Verify that the specified user exists on this system, and can
+    execute sudo without being prompted for a password. If the user
+    executing the test is the same as the requested user then this
+    check is skipped. If the user executing the test is root this
+    check is skipped as su can be used instead.
     """
+
     testcmd = [SUDO, '-n', '-u', user, TRUE]
 
     if user in Cmd.verified_users:
         return True
+
+    cur_user = getpwuid(os.getuid()).pw_name
+
+    if user == cur_user or cur_user == 'root':
+        Cmd.verified_users.append(user)
+        return True
+
+    if not os.path.isfile(SUDO):
+        logger.info("Warning: this test requires sudo but it doesn't exist.")
+        return False
 
     try:
         _ = getpwnam(user)
