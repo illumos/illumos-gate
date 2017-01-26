@@ -54,6 +54,9 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/random/arc4random_preforksig]
 [/opt/libc-tests/tests/random/arc4key.ksh]
 
+[/opt/libc-tests/tests/select/select.sh]
+timeout = 600
+
 [/opt/libc-tests/tests/aligned_alloc.32]
 [/opt/libc-tests/tests/aligned_alloc.64]
 [/opt/libc-tests/tests/c11_threads.32]

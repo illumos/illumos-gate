@@ -82,26 +82,10 @@ typedef struct {		/* signal set type */
  * Select uses bit masks of file descriptors in longs.
  * These macros manipulate such bit fields.
  * FD_SETSIZE may be defined by the user, but the default here
- * should be >= NOFILE (param.h).
+ * should be >= RLIM_FD_MAX.
  */
 #ifndef	FD_SETSIZE
-#ifdef _LP64
 #define	FD_SETSIZE	65536
-#else
-#define	FD_SETSIZE	1024
-#endif	/* _LP64 */
-#elif FD_SETSIZE > 1024 && !defined(_LP64)
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma	redefine_extname	select	select_large_fdset
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-#pragma	redefine_extname	pselect	pselect_large_fdset
-#endif
-#else	/* __PRAGMA_REDEFINE_EXTNAME */
-#define	select	select_large_fdset
-#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
-#define	pselect	pselect_large_fdset
-#endif
-#endif	/* __PRAGMA_REDEFINE_EXTNAME */
 #endif	/* FD_SETSIZE */
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
