@@ -23,7 +23,6 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2017 The MathWorks, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -754,7 +753,7 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
 
 	xi->i_bp = bp;
 	xi->i_func = func;
-	xi->i_blkno = bp->b_lblkno >> (bd->d_blkshift - DEV_BSHIFT);
+	xi->i_blkno = bp->b_lblkno;
 
 	if (bp->b_bcount == 0) {
 		xi->i_len = 0;
@@ -784,7 +783,7 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
 		    (bp->b_bcount + (bd->d_maxxfer - 1)) / bd->d_maxxfer;
 		xi->i_cur_win = 0;
 		xi->i_len = min(bp->b_bcount, bd->d_maxxfer);
-		xi->i_nblks = howmany(xi->i_len, (1U << shift));
+		xi->i_nblks = xi->i_len >> shift;
 		xi->i_kaddr = bp->b_un.b_addr;
 		xi->i_resid = bp->b_bcount;
 	} else {
@@ -807,7 +806,7 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
 			xi->i_cur_win = 0;
 			xi->i_offset = 0;
 			xi->i_len = bp->b_bcount;
-			xi->i_nblks = howmany(xi->i_len, (1U << shift));
+			xi->i_nblks = xi->i_len >> shift;
 			xi->i_resid = bp->b_bcount;
 			rv = 0;
 			break;
@@ -819,13 +818,13 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
 			    (ddi_dma_getwin(xi->i_dmah, 0, &xi->i_offset,
 			    &len, &xi->i_dmac, &xi->i_ndmac) !=
 			    DDI_SUCCESS) ||
-			    (P2PHASE(len, (1U << DEV_BSHIFT)) != 0)) {
+			    (P2PHASE(len, shift) != 0)) {
 				(void) ddi_dma_unbind_handle(xi->i_dmah);
 				rv = EFAULT;
 				goto done;
 			}
 			xi->i_len = len;
-			xi->i_nblks = howmany(xi->i_len, (1U << shift));
+			xi->i_nblks = xi->i_len >> shift;
 			xi->i_resid = bp->b_bcount;
 			rv = 0;
 			break;
@@ -1036,9 +1035,6 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 	bd_xfer_impl_t	*xi;
 	buf_t		*bp;
 	int		rv;
-	uint32_t	shift;
-	daddr_t		d_blkno;
-	int	d_nblk;
 
 	rw_enter(&bd_lock, RW_READER);
 
@@ -1049,9 +1045,6 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		rw_exit(&bd_lock);
 		return (ENXIO);
 	}
-	shift = bd->d_blkshift;
-	d_blkno = blkno >> (shift - DEV_BSHIFT);
-	d_nblk = howmany((nblk << DEV_BSHIFT), (1U << shift));
 	/*
 	 * do cmlb, but do it synchronously unless we already have the
 	 * partition (which we probably should.)
@@ -1062,7 +1055,7 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		return (ENXIO);
 	}
 
-	if ((d_blkno + d_nblk) > psize) {
+	if ((blkno + nblk) > psize) {
 		rw_exit(&bd_lock);
 		return (EINVAL);
 	}
@@ -1072,7 +1065,7 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		return (ENOMEM);
 	}
 
-	bp->b_bcount = nblk << DEV_BSHIFT;
+	bp->b_bcount = nblk << bd->d_blkshift;
 	bp->b_resid = bp->b_bcount;
 	bp->b_lblkno = blkno;
 	bp->b_un.b_addr = caddr;
@@ -1083,7 +1076,7 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		freerbuf(bp);
 		return (ENOMEM);
 	}
-	xi->i_blkno = d_blkno + pstart;
+	xi->i_blkno = blkno + pstart;
 	xi->i_flags = BD_XFER_POLL;
 	bd_submit(bd, xi);
 	rw_exit(&bd_lock);
@@ -1159,7 +1152,6 @@ bd_strategy(struct buf *bp)
 	bd_xfer_impl_t	*xi;
 	uint32_t	shift;
 	int		(*func)(void *, bd_xfer_t *);
-	diskaddr_t 	lblkno;
 
 	part = BDPART(bp->b_edev);
 	inst = BDINST(bp->b_edev);
@@ -1182,21 +1174,21 @@ bd_strategy(struct buf *bp)
 	}
 
 	shift = bd->d_blkshift;
-	lblkno = bp->b_lblkno >> (shift - DEV_BSHIFT);
-	if ((P2PHASE(bp->b_bcount, (1U << DEV_BSHIFT)) != 0) ||
-	    (lblkno > p_nblks)) {
+
+	if ((P2PHASE(bp->b_bcount, (1U << shift)) != 0) ||
+	    (bp->b_lblkno > p_nblks)) {
 		bioerror(bp, ENXIO);
 		biodone(bp);
 		return (0);
 	}
-	b_nblks = howmany(bp->b_bcount, (1U << shift));
-	if ((lblkno == p_nblks) || (bp->b_bcount == 0)) {
+	b_nblks = bp->b_bcount >> shift;
+	if ((bp->b_lblkno == p_nblks) || (bp->b_bcount == 0)) {
 		biodone(bp);
 		return (0);
 	}
 
-	if ((b_nblks + lblkno) > p_nblks) {
-		bp->b_resid = ((lblkno + b_nblks - p_nblks) << shift);
+	if ((b_nblks + bp->b_lblkno) > p_nblks) {
+		bp->b_resid = ((bp->b_lblkno + b_nblks - p_nblks) << shift);
 		bp->b_bcount -= bp->b_resid;
 	} else {
 		bp->b_resid = 0;
@@ -1212,7 +1204,7 @@ bd_strategy(struct buf *bp)
 		biodone(bp);
 		return (0);
 	}
-	xi->i_blkno = lblkno + p_lba;
+	xi->i_blkno = bp->b_lblkno + p_lba;
 
 	bd_submit(bd, xi);
 
@@ -1394,7 +1386,7 @@ bd_tg_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr, diskaddr_t start,
 
 	bd = ddi_get_soft_state(bd_state, ddi_get_instance(dip));
 
-	if (P2PHASE(length, (1U << DEV_BSHIFT)) != 0) {
+	if (P2PHASE(length, (1U << bd->d_blkshift)) != 0) {
 		/* We can only transfer whole blocks at a time! */
 		return (EINVAL);
 	}
@@ -1913,7 +1905,7 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 
 
 	if ((rv != DDI_SUCCESS) ||
-	    (P2PHASE(len, (1U << DEV_BSHIFT) != 0))) {
+	    (P2PHASE(len, (1U << xi->i_blkshift) != 0))) {
 		bd_runq_exit(xi, EFAULT);
 
 		bp->b_resid += xi->i_resid;
@@ -1923,7 +1915,7 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 		return;
 	}
 	xi->i_len = len;
-	xi->i_nblks = howmany(len, (1U << xi->i_blkshift));
+	xi->i_nblks = len >> xi->i_blkshift;
 
 	/* Submit next window to hardware. */
 	rv = xi->i_func(bd->d_private, &xi->i_public);
