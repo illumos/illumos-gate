@@ -28,7 +28,7 @@ S" FICL_WANT_EXTENDED_PREFIX" ENVIRONMENT? drop [if]
 : // postpone \ ; immediate
 
 
-\ ** add 0b, 0o, 0d, and 0x as prefixes
+\ ** add 0b, 0o, 0d, 0x and $ as prefixes
 \ ** these temporarily shift the base to 2, 8, 10, and 16 respectively
 \ ** and consume the next number in the input stream, pushing/compiling
 \ ** as normal
@@ -42,5 +42,6 @@ S" FICL_WANT_EXTENDED_PREFIX" ENVIRONMENT? drop [if]
 
 : 0d 10 __tempbase ; immediate
 : 0x 16 __tempbase ; immediate
+: $ 16 __tempbase ; immediate
 
 end-prefixes

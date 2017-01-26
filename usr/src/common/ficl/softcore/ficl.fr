@@ -63,4 +63,12 @@ S" FICL_WANT_LOCALS" ENVIRONMENT? drop [if]
 
 [endif]
 
+: xemit ( xchar -- )
+	dup $80 u< if emit exit then \ special case ASCII
+	0 swap $3F
+	begin 2dup u> while
+		2/ >r dup $3F and $80 or swap 6 rshift r>
+	repeat $7F xor 2* or
+	begin dup $80 u< 0= while emit repeat drop
+;
 \ end-of-file
