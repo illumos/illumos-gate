@@ -161,7 +161,7 @@ struct tem_vt_state {
 	struct tem_char_pos tvs_c_cursor;	/* current cursor position */
 	struct tem_char_pos tvs_r_cursor;	/* remembered cursor position */
 
-	unsigned char	*tvs_outbuf;	/* place to keep incomplete lines */
+	tem_char_t	*tvs_outbuf;	/* place to keep incomplete lines */
 	int		tvs_outbuf_size;
 	int		tvs_outindex;	/* index into a_outbuf */
 	void		*tvs_pix_data;	/* pointer to tmp bitmap area */
@@ -170,7 +170,7 @@ struct tem_vt_state {
 	text_color_t	tvs_bg_color;
 	int		tvs_first_line;	/* kernel console output begins */
 
-	unsigned char	*tvs_screen_buf;	/* whole screen buffer */
+	tem_char_t	*tvs_screen_buf;	/* whole screen buffer */
 	int		tvs_screen_buf_size;
 	text_color_t	*tvs_fg_buf;	/* fg_color attribute cache */
 	text_color_t	*tvs_bg_buf;	/* bg_color attribute cache */
@@ -187,7 +187,7 @@ struct tem_vt_state {
 _NOTE(MUTEX_PROTECTS_DATA(tem_vt_state::tvs_lock, tem_vt_state))
 
 typedef struct tem_safe_callbacks {
-	void (*tsc_display)(struct tem_vt_state *, unsigned char *, int,
+	void (*tsc_display)(struct tem_vt_state *, tem_char_t *, int,
 	    screen_pos_t, screen_pos_t, unsigned char, unsigned char,
 	    cred_t *, enum called_from);
 	void (*tsc_copy)(struct tem_vt_state *,
@@ -195,7 +195,7 @@ typedef struct tem_safe_callbacks {
 	    screen_pos_t, screen_pos_t, cred_t *, enum called_from);
 	void (*tsc_cursor)(struct tem_vt_state *, short, cred_t *,
 	    enum called_from);
-	void (*tsc_bit2pix)(struct tem_vt_state *, unsigned char,
+	void (*tsc_bit2pix)(struct tem_vt_state *, tem_char_t,
 	    unsigned char, unsigned char);
 	void (*tsc_cls)(struct tem_vt_state *, int,
 	    screen_pos_t, screen_pos_t, cred_t *, enum called_from);
@@ -219,7 +219,7 @@ typedef struct tem_state {
 	int	ts_pdepth;		/* pixel depth */
 	struct font	ts_font;	/* font table */
 
-	unsigned char	*ts_blank_line;	/* a blank line for scrolling */
+	tem_char_t	*ts_blank_line;	/* a blank line for scrolling */
 	tem_safe_callbacks_t	*ts_callbacks;	/* internal output functions */
 
 	int	ts_initialized;		/* initialization flag */
@@ -259,7 +259,7 @@ void	tem_safe_reset_display(struct tem_vt_state *, cred_t *,
 	    enum called_from, boolean_t, boolean_t);
 void	tem_safe_terminal_emulate(struct tem_vt_state *, uchar_t *, int,
 	    cred_t *, enum called_from);
-void	tem_safe_text_display(struct tem_vt_state *, uchar_t *,
+void	tem_safe_text_display(struct tem_vt_state *, tem_char_t *,
 	    int, screen_pos_t, screen_pos_t,
 	    text_color_t, text_color_t,
 	    cred_t *, enum called_from);
@@ -273,7 +273,7 @@ void	tem_safe_text_cursor(struct tem_vt_state *, short, cred_t *,
 void	tem_safe_text_cls(struct tem_vt_state *,
 	    int count, screen_pos_t row, screen_pos_t col,
 	    cred_t *credp, enum called_from called_from);
-void	tem_safe_pix_display(struct tem_vt_state *, uchar_t *,
+void	tem_safe_pix_display(struct tem_vt_state *, tem_char_t *,
 	    int, screen_pos_t, screen_pos_t,
 	    text_color_t, text_color_t,
 	    cred_t *, enum called_from);
@@ -284,7 +284,7 @@ void	tem_safe_pix_copy(struct tem_vt_state *,
 	    cred_t *, enum called_from);
 void	tem_safe_pix_cursor(struct tem_vt_state *, short, cred_t *,
 	    enum called_from);
-void	tem_safe_pix_bit2pix(struct tem_vt_state *, unsigned char,
+void	tem_safe_pix_bit2pix(struct tem_vt_state *, tem_char_t,
 	    unsigned char, unsigned char);
 void	tem_safe_pix_cls(struct tem_vt_state *, int, screen_pos_t, screen_pos_t,
 	    cred_t *, enum called_from);
