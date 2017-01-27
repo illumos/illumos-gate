@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <rpc/rpc.h>
 
@@ -44,5 +42,12 @@
  */
 struct opaque_auth _null_auth;
 fd_set svc_fdset;
+#if !defined(_LP64)
+/*
+ * This used to be how we dealt with larger than default fdsets on 32bit
+ * systems, the symbol is unfortunately part of the ABI.
+ */
+fd_set _new_svc_fdset;
+#endif
 pollfd_t *svc_pollfd;
 void (*_svc_getreqset_proc)();

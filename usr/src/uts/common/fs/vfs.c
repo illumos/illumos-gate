@@ -25,6 +25,7 @@
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -791,6 +792,7 @@ vfs_mountfs(char *module, char *spec, char *path)
 	struct mounta mounta;
 	vfs_t *vfsp;
 
+	bzero(&mounta, sizeof (mounta));
 	mounta.flags = MS_SYSSPACE | MS_DATA;
 	mounta.fstype = module;
 	mounta.spec = spec;

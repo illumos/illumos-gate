@@ -69,8 +69,7 @@ clnt_bcast.o	clnt_dg.o	clnt_door.o	clnt_generic.o	clnt_perror.o \
 clnt_raw.o	clnt_simple.o	clnt_vc.o	fdsync.o	getdname.o \
 inet_ntoa.o	key_call.o	key_prot.o	mt_misc.o \
 netname.o	netnamer.o	pmap_clnt.o	pmap_prot.o \
-rpc_callmsg.o	rpc_comdata.o	rpc_comdata1.o	rpc_generic.o	rpc_prot.o \
-rpc_sel2poll.o \
+rpc_callmsg.o	rpc_comdata.o	rpc_generic.o	rpc_prot.o rpc_sel2poll.o \
 rpc_soc.o	rpc_td.o	rpcb_clnt.o	rpcb_prot.o \
 rpcb_st_xdr.o	rpcdname.o	rpcsec_gss_if.o	rtime_tli.o	svc.o \
 svc_auth.o	svc_auth_loopb.o	svc_auth_sys.o	svc_dg.o \

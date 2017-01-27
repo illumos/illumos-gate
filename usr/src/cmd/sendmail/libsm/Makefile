@@ -23,10 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/sendmail/libsm/Makefile
-#
 
 include		../../Makefile.cmd
 include		../Makefile.cmd
@@ -53,6 +49,8 @@ TESTS=	t-event t-exc t-rpool t-string t-smstdio t-match t-strio t-heap \
 	t-memstat t-qic
 
 libsm=	libsm.a
+
+CERRWARN +=	-_gcc=-Wno-type-limits
 
 .KEEP_STATE:
 all: $(libsm)
