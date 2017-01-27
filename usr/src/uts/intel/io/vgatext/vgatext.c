@@ -1313,7 +1313,6 @@ vgatext_setfont(struct vgatext_softc *softc)
 {
 	static uchar_t fsreg[8] = {0x0, 0x30, 0x5, 0x35, 0xa, 0x3a, 0xf, 0x3f};
 
-	extern bitmap_data_t font_data_8x16;
 	uchar_t *from;
 	uchar_t volatile *to;
 	int	i, j, s;

@@ -196,6 +196,12 @@ DBOOT_LINTFLAGS_i86xpv	= $(LINTFLAGS_i386_$(CLASS)) $(LINTTAGS_i386_$(CLASS))
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
 	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/common/font/%.c
+	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(DBOOT_OBJS_DIR)/%.c
+	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/boot/%.c
 	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
 
@@ -230,6 +236,9 @@ DBOOT_DEFS += -D__xpv
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/cpr/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/font/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ioat/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -258,6 +267,12 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/intel/ia32/ml/%.s
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/common/font/%.c
+	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
+
+$(DBOOT_LINTS_DIR)/%.ln:		$(DBOOT_LINTS_DIR)/%.c
 	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
 
 $(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
