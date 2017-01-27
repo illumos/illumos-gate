@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -118,6 +119,29 @@ devid_get_minor_name(int fd, char **minor_namep)
 	/* return the minor name copy */
 	*minor_namep = myminor_name;
 	return (0);
+}
+
+char *
+devid_str_from_path(const char *path)
+{
+	int		fd;
+	ddi_devid_t	devid;
+	char		*minor, *ret = NULL;
+
+	if ((fd = open(path, O_RDONLY)) < 0)
+		return (NULL);
+
+	if (devid_get(fd, &devid) == 0) {
+		if (devid_get_minor_name(fd, &minor) != 0)
+			minor = NULL;
+		ret = devid_str_encode(devid, minor);
+		if (minor != NULL)
+			devid_str_free(minor);
+		devid_free(devid);
+	}
+	(void) close(fd);
+
+	return (ret);
 }
 
 /* list element of devid_nmlist_t information */
@@ -216,11 +240,8 @@ static di_devlink_handle_t devid_deviceid_to_nmlist_dlh = NULL;	/* SLINK */
  * the specified search path to avoid attaching all devices.
  */
 int
-devid_deviceid_to_nmlist(
-	char		*search_path,
-	ddi_devid_t	devid,
-	char		*minor_name,
-	devid_nmlist_t	**retlist)
+devid_deviceid_to_nmlist(char *search_path, ddi_devid_t devid, char *minor_name,
+    devid_nmlist_t **retlist)
 {
 	char			*cp;
 	int			dev;
