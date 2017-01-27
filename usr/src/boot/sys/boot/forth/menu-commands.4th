@@ -327,7 +327,7 @@ also menu-namespace also menu-command-helpers
 
 	cr
 	." To get back to the menu, type `menu' and press ENTER" cr
-	." or type `boot' and press ENTER to start illumos." cr
+	." or type `boot' and press ENTER to start OmniOS." cr
 	cr
 
 	FALSE \ exit the menu
