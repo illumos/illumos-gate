@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SYS_SCSI_SCSI_ADDRESS_H
@@ -171,6 +172,17 @@ char		*scsi_wwn_to_wwnstr(uint64_t wwn,
 void		scsi_wwnstr_hexcase(char *wwnstr, int lower_case);
 const char	*scsi_wwnstr_skip_ua_prefix(const char *wwnstr);
 void		scsi_free_wwnstr(char *wwnstr);
+
+/*
+ * Buffer lengths for SCSI strings. SCSI_WWN_STRLEN is the length of a WWN
+ * that's not in unit-address form. SCSI_WWN_UA_STRLEN includes the
+ * unit-address. SCSI_WWN_BUFLEN provides a buffer that's large enough for all
+ * of these.
+ */
+#define	SCSI_WWN_STRLEN	16
+#define	SCSI_WWN_UA_STRLEN	17
+#define	SCSI_WWN_BUFLEN	SCSI_MAXNAMELEN
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

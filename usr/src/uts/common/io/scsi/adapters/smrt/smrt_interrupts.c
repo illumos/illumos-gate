@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
@@ -34,6 +34,16 @@ static boolean_t
 smrt_try_msix(smrt_t *smrt)
 {
 	char *fwver = smrt->smrt_versions.smrtv_firmware_rev;
+
+	/*
+	 * Generation 9 controllers end up having a different firmware
+	 * versioning scheme than others.  If this is a generation 9 controller,
+	 * which all share the same PCI device ID, then we default to MSI.
+	 */
+	if (smrt->smrt_pci_vendor == SMRT_VENDOR_HP &&
+	    smrt->smrt_pci_device == SMRT_DEVICE_GEN9) {
+		return (B_FALSE);
+	}
 
 	if (fwver[0] == '8' && fwver[1] == '.' && isdigit(fwver[2]) &&
 	    isdigit(fwver[3])) {

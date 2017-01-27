@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2017, Joyent, Inc.
 #
 
 #
@@ -28,6 +28,11 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR     = $(UTSBASE)/common/io/scsi/adapters/smrt
 
 #
+#	Include common rules.
+#
+include $(UTSBASE)/intel/Makefile.intel
+
+#
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD)
@@ -38,11 +43,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # 	Kernel Module Dependencies
 #
 LDFLAGS		+= -dy -Nmisc/scsi
-
-#
-#	Include common rules.
-#
-include $(UTSBASE)/intel/Makefile.intel
 
 
 #

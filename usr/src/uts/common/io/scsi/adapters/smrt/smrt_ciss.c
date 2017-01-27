@@ -10,18 +10,172 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
 
+/*
+ * Discovery, Resets, Periodics, and Events
+ * ----------------------------------------
+ *
+ * Discovery is the act of figuring out what logical and physical volumes exist
+ * under the controller.  Discovery happens in response to the following events:
+ *
+ *   o iports for virtual and physical devices being attached
+ *   o Controller event notifications indicating potential topology changes
+ *   o After a reset of the controller, before we can perform I/O again
+ *
+ * Because we have to perform discovery after a reset, which can happen during
+ * panic(), that also means that discovery may be run in panic context.  We
+ * also need to emphasize the need for discovery to happen after a controller
+ * reset.  Once a reset is initiated, we cannot be certain about the addresses
+ * of any of the existing targets until the reset has completed.  The driver
+ * performs I/Os to addresses that the controller provides.  The controller
+ * specification says that these addresses may change after a controller reset.
+ *
+ * Unfortunately, all of this combined means that making sure we can correctly
+ * run discovery is somewhat complicated.  In non-panic contexts, discovery is
+ * always run from a taskq.  We'll kick off the discovery in the taskq if
+ * nothing is pending at that time.  The state is managed by bits in the
+ * smrt_status member of the smrt_t.  There are four bits at this time:
+ *
+ *	SMRT_CTLR_DISCOVERY_REQUESTED	This flag indicates that something has
+ *					requested that a discovery be performed.
+ *					If no flags are set when this is set,
+ *					then we will kick off discovery.  All
+ *					discovery requests are initiated via the
+ *					smrt_discover_request() function.
+ *
+ *	SMRT_CTLR_DISCOVERY_RUNNING	This flag is set at the start of us
+ *					running a discovery.  It is removed when
+ *					discovery finishes.
+ *
+ *	SMRT_CTLR_DISCOVERY_PERIODIC	This flag is set in a number of
+ *					circumstances, which will be described
+ *					in a subsequent section.  This indicates
+ *					that the periodic must kick off the
+ *					discovery process.
+ *
+ *	SMRT_CTLR_DISCOVERY_REQUIRED	This flag indicates that at some point a
+ *					controller reset occurred and we need to
+ *					have a successful discovery to finish
+ *					the act of resetting and allowing I/O to
+ *					continue.
+ *
+ * In general, a request to discover kicks off the taskq to discover entries, if
+ * it hasn't already been requested or started.  This also allows us to coalesce
+ * multiple requests, if needed.  Note that if a request comes in when a
+ * discovery is ongoing, we do not kick off discovery again.  Instead, we set
+ * the SMRT_CTLR_DISCOVERY_REQUESTED flag which will rerun discovery after the
+ * initial pass has completed.
+ *
+ * When a discovery starts, the first thing it does is clear the
+ * SMRT_CTLR_DISCOVERY_REQUESTED flag.  This is important, because any
+ * additional requests for discovery that come in after this has started likely
+ * indicate that we've missed something.  As such, when the discovery process
+ * finishes, if it sees the REQUESTED flag, then it will need to set the
+ * PERIODIC flag.  The PERIODIC flag is used to indicate that we should run
+ * discovery again, but not kick if off immediately.  Instead, it should be
+ * driven by the normal periodic behavior.
+ *
+ * If for some reason the act of discovery fails, or we fail to dispatch
+ * discovery due to a transient error, then we will flag PERIODIC so that the
+ * periodic tick will try and run things again.
+ *
+ * Now, we need to talk about SMRT_CTLR_DISCOVERY_REQUIRED.  This flag is set
+ * after a reset occurs.  The reset thread will be blocked on this.
+ * Importantly, none of the code in the discovery path can ask for a controller
+ * reset at this time.  If at the end of a discovery, this flag is set, then we
+ * will signal the reset thread that it should check on its status by
+ * broadcasting on the smrt_cv_finishq.  At that point, the reset thread will
+ * continue.
+ *
+ * Panic Context
+ * -------------
+ *
+ * All of this talk of threads and taskqs is well and good, but as an HBA
+ * driver, we have a serious responsibility to try and deal with panic sanely.
+ * In panic context, we will directly call the discovery functions and not poll
+ * for them to occur.
+ *
+ * However, because our discovery relies on the target maps, which aren't safe
+ * for panic context at this time, we have to take a different approach.  We
+ * leverage the fact that we have a generation number stored with every
+ * discovery.  If we try to do an I/O to a device where the generation doesn't
+ * match, then we know that it disappeared and should not be used.  We also
+ * sanity check the model, serial numbers, and WWNs to make sure that these are
+ * the same devices.  If they are, then we'll end up updating the address
+ * structures.
+ *
+ * Now, it is possible that when we were panicking, we had a thread that was in
+ * the process of running a discovery or even resetting the system.  Once we're
+ * in panic, those threads aren't running, so if they didn't end up producing a
+ * new view of the world that the SCSI framework is using, then it shouldn't
+ * really matter, as we won't have updated the list of devices.  Importantly,
+ * once we're in that context, we're not going to be attaching or detaching
+ * targets.  If we get a request for one of these targets which has disappeared,
+ * we're going to have to end up giving up.
+ *
+ * Request Attributes
+ * ------------------
+ *
+ * The CISS specification allows for three different kinds of attributes that
+ * describe how requests are queued to the controller.  These are:
+ *
+ * 	HEAD OF QUEUE		The request should go to the head of the
+ * 				controller queue.  This is used for resets and
+ * 				aborts to ensure that they're not blocked behind
+ * 				additional I/O.
+ *
+ * 	SIMPLE			This queues the request for normal processing.
+ * 				Commands queued this way are not special with
+ * 				respect to one another.  We use this for all I/O
+ * 				and discovery commands.
+ *
+ *	ORDERED			This attribute is used to indicate that commands
+ *				should be submitted and processed in some order.
+ *				This is used primarily for the event
+ *				notification bits so we can ensure that at the
+ *				return of a cancellation of the event
+ *				notification, that any outstanding request has
+ *				been honored.
+ */
+
 static int smrt_ctlr_versions(smrt_t *, uint16_t, smrt_versions_t *);
+static void smrt_discover(void *);
 
 /*
  * The maximum number of seconds to wait for the controller to come online.
  */
 unsigned smrt_ciss_init_time = 90;
 
+/*
+ * A tunable that determines the number of events per tick that we'll process
+ * via asynchronous event notification.  If this rate is very high, then we will
+ * not submit the event and it will be picked up at the next tick of the
+ * periodic.
+ */
+uint_t smrt_event_intervention_threshold = 1000;
+
+/*
+ * Converts a LUN Address to a BMIC Identifier.  The BMIC Identifier is used
+ * when performing various physical commands and generally should stay the same
+ * for a given device across inserts and removals; however, not across
+ * controller resets.  These are calculated based on what the CISS specification
+ * calls the 'Level 2' target and bus, which don't have a real meaning in the
+ * SAS world otherwise.
+ */
+uint16_t
+smrt_lun_addr_to_bmic(PhysDevAddr_t *paddr)
+{
+	uint16_t id;
+
+	id = (paddr->Target[1].PeripDev.Bus - 1) << 8;
+	id += paddr->Target[1].PeripDev.Dev;
+
+	return (id);
+}
 
 void
 smrt_write_lun_addr_phys(LUNAddr_t *lun, boolean_t masked, unsigned bus,
@@ -34,6 +188,18 @@ smrt_write_lun_addr_phys(LUNAddr_t *lun, boolean_t masked, unsigned bus,
 	lun->PhysDev.Bus = bus;
 
 	bzero(&lun->PhysDev.Target, sizeof (lun->PhysDev.Target));
+}
+
+/*
+ * According to the CISS Specification, the controller is always addressed in
+ * Mask Perhiperhal mode with a bus and target ID of zero.  This is used by
+ * commands that need to write to the controller itself, which is generally
+ * discovery and other commands.
+ */
+void
+smrt_write_controller_lun_addr(LUNAddr_t *lun)
+{
+	smrt_write_lun_addr_phys(lun, B_TRUE, 0, 0);
 }
 
 void
@@ -87,14 +253,14 @@ smrt_write_message_abort_one(smrt_command_t *smcm, uint32_t tag)
 }
 
 void
-smrt_write_message_abort_all(smrt_command_t *smcm, LogDevAddr_t *addr)
+smrt_write_message_abort_all(smrt_command_t *smcm, LUNAddr_t *addr)
 {
 	/*
 	 * When aborting all tasks for a particular Logical Volume,
 	 * the command is addressed not to the controller but to
 	 * the Volume itself.
 	 */
-	smcm->smcm_va_cmd->Header.LUN.LogDev = *addr;
+	smcm->smcm_va_cmd->Header.LUN = *addr;
 
 	smrt_write_message_common(smcm, CISS_MSG_ABORT, 0);
 
@@ -102,6 +268,51 @@ smrt_write_message_abort_all(smrt_command_t *smcm, LogDevAddr_t *addr)
 	 * Abort all commands for a particular Logical Volume.
 	 */
 	smcm->smcm_va_cmd->Request.CDB[1] = CISS_ABORT_TASKSET;
+}
+
+void
+smrt_write_message_event_notify(smrt_command_t *smcm)
+{
+	smrt_event_notify_req_t senr;
+
+	smrt_write_controller_lun_addr(&smcm->smcm_va_cmd->Header.LUN);
+
+	smcm->smcm_va_cmd->Request.Type.Type = CISS_TYPE_CMD;
+	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_ORDERED;
+	smcm->smcm_va_cmd->Request.Type.Direction = CISS_XFER_READ;
+	smcm->smcm_va_cmd->Request.Timeout = 0;
+	smcm->smcm_va_cmd->Request.CDBLen = sizeof (senr);
+
+	bzero(&senr, sizeof (senr));
+	senr.senr_opcode = CISS_SCMD_READ;
+	senr.senr_subcode = CISS_BMIC_NOTIFY_ON_EVENT;
+	senr.senr_flags = BE_32(0);
+	senr.senr_size = BE_32(SMRT_EVENT_NOTIFY_BUFLEN);
+
+	bcopy(&senr, &smcm->smcm_va_cmd->Request.CDB[0],
+	    MIN(CISS_CDBLEN, sizeof (senr)));
+}
+
+void
+smrt_write_message_cancel_event_notify(smrt_command_t *smcm)
+{
+	smrt_event_notify_req_t senr;
+
+	smrt_write_controller_lun_addr(&smcm->smcm_va_cmd->Header.LUN);
+
+	smcm->smcm_va_cmd->Request.Type.Type = CISS_TYPE_CMD;
+	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_ORDERED;
+	smcm->smcm_va_cmd->Request.Type.Direction = CISS_XFER_WRITE;
+	smcm->smcm_va_cmd->Request.Timeout = LE_16(SMRT_ASYNC_CANCEL_TIMEOUT);
+	smcm->smcm_va_cmd->Request.CDBLen = sizeof (senr);
+
+	bzero(&senr, sizeof (senr));
+	senr.senr_opcode = CISS_SCMD_WRITE;
+	senr.senr_subcode = CISS_BMIC_NOTIFY_ON_EVENT_CANCEL;
+	senr.senr_size = BE_32(SMRT_EVENT_NOTIFY_BUFLEN);
+
+	bcopy(&senr, &smcm->smcm_va_cmd->Request.CDB[0],
+	    MIN(CISS_CDBLEN, sizeof (senr)));
 }
 
 void
@@ -138,6 +349,24 @@ smrt_periodic(void *arg)
 	smrt_t *smrt = arg;
 
 	mutex_enter(&smrt->smrt_mutex);
+
+	/*
+	 * Before we even check if the controller is running to process
+	 * everything else, we must first check if we had a request to kick off
+	 * discovery.  We do this before the check if the controller is running,
+	 * as this may be required to finish a discovery.
+	 */
+	if ((smrt->smrt_status & SMRT_CTLR_DISCOVERY_PERIODIC) != 0 &&
+	    (smrt->smrt_status & SMRT_CTLR_DISCOVERY_RUNNING) == 0 &&
+	    (smrt->smrt_status & SMRT_CTLR_STATUS_RESETTING) == 0) {
+		if (ddi_taskq_dispatch(smrt->smrt_discover_taskq,
+		    smrt_discover, smrt, DDI_NOSLEEP) != DDI_SUCCESS) {
+			smrt->smrt_stats.smrts_discovery_tq_errors++;
+		} else {
+			smrt->smrt_status &= ~SMRT_CTLR_DISCOVERY_PERIODIC;
+		}
+	}
+
 	if (!(smrt->smrt_status & SMRT_CTLR_STATUS_RUNNING)) {
 		/*
 		 * The device is currently not active, e.g. due to an
@@ -152,6 +381,11 @@ smrt_periodic(void *arg)
 	 * controller has locked up, this routine will panic the system.
 	 */
 	smrt_lockup_check(smrt);
+
+	/*
+	 * Reset the event notification threshold counter.
+	 */
+	smrt->smrt_event_count = 0;
 
 	/*
 	 * Check inflight commands to see if they have timed out.
@@ -198,6 +432,23 @@ smrt_periodic(void *arg)
 	 * Process the abort queue.
 	 */
 	(void) smrt_process_abortq(smrt);
+
+	/*
+	 * Check if we have an outstanding event intervention request.  Note,
+	 * the command in question should always be in a state such that it is
+	 * usable by the system here.  The command is always prepared again by
+	 * the normal event notification path, even if a reset has occurred.
+	 * The reset will be processed before we'd ever consider running an
+	 * event again.  Note, if we fail to submit this, then we leave this for
+	 * the next occurrence of the periodic.
+	 */
+	if (smrt->smrt_status & SMRT_CTLR_ASYNC_INTERVENTION) {
+		smrt->smrt_stats.smrts_events_intervened++;
+
+		if (smrt_submit(smrt, smrt->smrt_event_cmd) == 0) {
+			smrt->smrt_status &= ~SMRT_CTLR_ASYNC_INTERVENTION;
+		}
+	}
 
 	mutex_exit(&smrt->smrt_mutex);
 }
@@ -270,10 +521,20 @@ smrt_submit(smrt_t *smrt, smrt_command_t *smcm)
 	VERIFY(smcm->smcm_type != SMRT_CMDTYPE_PREINIT);
 
 	/*
-	 * If the controller is currently being reset, do not allow command
-	 * submission.
+	 * Anything that asks us to ignore the running state of the controller
+	 * must be wired up to poll for completion.
 	 */
-	if (!(smrt->smrt_status & SMRT_CTLR_STATUS_RUNNING)) {
+	if (smcm->smcm_status & SMRT_CMD_IGNORE_RUNNING) {
+		VERIFY(smcm->smcm_status & SMRT_CMD_STATUS_POLLED);
+	}
+
+	/*
+	 * If the controller is currently being reset, do not allow command
+	 * submission.  However, if this is one of the commands needed to finish
+	 * reset, as indicated on the command structure, allow it.
+	 */
+	if (!(smrt->smrt_status & SMRT_CTLR_STATUS_RUNNING) &&
+	    !(smcm->smcm_status & SMRT_CMD_IGNORE_RUNNING)) {
 		return (EIO);
 	}
 
@@ -365,6 +626,10 @@ smrt_process_finishq_one(smrt_command_t *smcm)
 
 	case SMRT_CMDTYPE_SCSA:
 		smrt_hba_complete(smcm);
+		return;
+
+	case SMRT_CMDTYPE_EVENT:
+		smrt_event_complete(smcm);
 		return;
 
 	case SMRT_CMDTYPE_ABORTQ:
@@ -791,7 +1056,7 @@ smrt_ctlr_init(smrt_t *smrt)
 	 * Determine the firmware version of the controller so that we can
 	 * select which type of interrupts to use.
 	 */
-	if ((e = smrt_ctlr_versions(smrt, SMRT_LOGVOL_DISCOVER_TIMEOUT,
+	if ((e = smrt_ctlr_versions(smrt, SMRT_DISCOVER_TIMEOUT,
 	    &smrt->smrt_versions)) != 0) {
 		dev_err(smrt->smrt_dip, CE_WARN, "could not identify "
 		    "controller (%d)", e);
@@ -949,17 +1214,12 @@ smrt_ctlr_identify(smrt_t *smrt, uint16_t timeout,
 		return (ENOMEM);
 	}
 
-	/*
-	 * This BMIC command is addressed to the controller itself.  The
-	 * Masked Peripheral Device addressing mode is used, with a LUN of 0.
-	 */
-	smrt_write_lun_addr_phys(&smcm->smcm_va_cmd->Header.LUN, B_TRUE,
-	    0, 0);
+	smrt_write_controller_lun_addr(&smcm->smcm_va_cmd->Header.LUN);
 
 	smcm->smcm_va_cmd->Request.CDBLen = sizeof (smicr);
 	smcm->smcm_va_cmd->Request.Timeout = timeout;
 	smcm->smcm_va_cmd->Request.Type.Type = CISS_TYPE_CMD;
-	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_ORDERED;
+	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_SIMPLE;
 	smcm->smcm_va_cmd->Request.Type.Direction = CISS_XFER_READ;
 
 	/*
@@ -1210,13 +1470,12 @@ skip_check:
 	dev_err(smrt->smrt_dip, CE_NOTE, "soft reset: controller configured");
 
 	smrt_write_message_nop(smcm_nop, 0);
-	smcm_nop->smcm_status |= SMRT_CMD_STATUS_POLLED;
-	smrt->smrt_status |= SMRT_CTLR_STATUS_RUNNING;
+	smcm_nop->smcm_status |= SMRT_CMD_STATUS_POLLED |
+	    SMRT_CMD_IGNORE_RUNNING;
 	if ((r = smrt_submit(smrt, smcm_nop)) != 0) {
 		dev_err(smrt->smrt_dip, CE_PANIC, "soft reset failed: "
 		    "ping could not be submitted (%d)", r);
 	}
-	smrt->smrt_status &= ~SMRT_CTLR_STATUS_RUNNING;
 
 	/*
 	 * Interrupts are still masked at this stage.  Poll manually in
@@ -1276,12 +1535,45 @@ skip_check:
 	}
 
 	/*
-	 * Re-enable interrupts, mark the controller running and
-	 * the reset as complete....
+	 * Quiesce our discovery thread.  Note, because
+	 * SMRT_CTLR_STATUS_RESTARTING is set, nothing can cause it to be
+	 * enabled again.
+	 */
+	if (!ddi_in_panic()) {
+		mutex_exit(&smrt->smrt_mutex);
+		ddi_taskq_wait(smrt->smrt_discover_taskq);
+		mutex_enter(&smrt->smrt_mutex);
+	}
+
+	/*
+	 * Re-enable interrupts.  Now, we must kick off a discovery to make sure
+	 * that the system is in a sane state and that we can perform I/O.
 	 */
 	smrt_intr_set(smrt, B_TRUE);
-	smrt->smrt_status |= SMRT_CTLR_STATUS_RUNNING;
 	smrt->smrt_status &= ~SMRT_CTLR_STATUS_RESETTING;
+	smrt->smrt_status |= SMRT_CTLR_DISCOVERY_REQUIRED;
+
+	/*
+	 * Attempt a discovery to make sure that the drivers sees a realistic
+	 * view of the world.  If we're not in panic context, spin for the
+	 * asynchronous process to complete, otherwise we're in panic context
+	 * and this is going to happen regardless if we want it to or not.
+	 * Before we kick off the request to run discovery, we reset the
+	 * discovery request flags as we know that nothing else can consider
+	 * running discovery and we don't want to delay until the next smrt
+	 * periodic tick if we can avoid it.  In panic context, if this failed,
+	 * then we won't make it back.
+	 */
+	VERIFY0(smrt->smrt_status & SMRT_CTLR_DISCOVERY_RUNNING);
+	smrt->smrt_status &= ~(SMRT_CTLR_DISCOVERY_MASK);
+	smrt_discover(smrt);
+	if (!ddi_in_panic()) {
+		while (smrt->smrt_status & SMRT_CTLR_DISCOVERY_REQUIRED) {
+			cv_wait(&smrt->smrt_cv_finishq, &smrt->smrt_mutex);
+		}
+	}
+
+	smrt->smrt_status |= SMRT_CTLR_STATUS_RUNNING;
 	smrt->smrt_last_reset_finish = gethrtime();
 
 	/*
@@ -1299,4 +1591,433 @@ skip_check:
 	smrt_command_free(smcm_nop);
 	mutex_enter(&smrt->smrt_mutex);
 	return (0);
+}
+
+int
+smrt_event_init(smrt_t *smrt)
+{
+	int ret;
+	smrt_command_t *event, *cancel;
+
+	event = smrt_command_alloc(smrt, SMRT_CMDTYPE_EVENT, KM_NOSLEEP);
+	if (event == NULL)
+		return (ENOMEM);
+	if (smrt_command_attach_internal(smrt, event, SMRT_EVENT_NOTIFY_BUFLEN,
+	    KM_NOSLEEP) != 0) {
+		smrt_command_free(event);
+		return (ENOMEM);
+	}
+	smrt_write_message_event_notify(event);
+
+	cancel = smrt_command_alloc(smrt, SMRT_CMDTYPE_INTERNAL, KM_NOSLEEP);
+	if (cancel == NULL) {
+		smrt_command_free(event);
+		return (ENOMEM);
+	}
+	if (smrt_command_attach_internal(smrt, cancel, SMRT_EVENT_NOTIFY_BUFLEN,
+	    KM_NOSLEEP) != 0) {
+		smrt_command_free(event);
+		smrt_command_free(cancel);
+		return (ENOMEM);
+	}
+	smrt_write_message_cancel_event_notify(cancel);
+
+	cv_init(&smrt->smrt_event_queue, NULL, CV_DRIVER, NULL);
+
+	mutex_enter(&smrt->smrt_mutex);
+	if ((ret = smrt_submit(smrt, event)) != 0) {
+		mutex_exit(&smrt->smrt_mutex);
+		smrt_command_free(event);
+		smrt_command_free(cancel);
+		return (ret);
+	}
+
+	smrt->smrt_event_cmd = event;
+	smrt->smrt_event_cancel_cmd = cancel;
+	mutex_exit(&smrt->smrt_mutex);
+
+	return (0);
+}
+
+void
+smrt_event_complete(smrt_command_t *smcm)
+{
+	smrt_event_notify_t *sen;
+	boolean_t log, rescan;
+
+	boolean_t intervene = B_FALSE;
+	smrt_t *smrt = smcm->smcm_ctlr;
+
+	VERIFY(MUTEX_HELD(&smrt->smrt_mutex));
+	VERIFY3P(smcm, ==, smrt->smrt_event_cmd);
+	VERIFY0(smrt->smrt_status & SMRT_CTLR_ASYNC_INTERVENTION);
+
+	smrt->smrt_stats.smrts_events_received++;
+
+	if (smrt->smrt_status & SMRT_CTLR_STATUS_DETACHING) {
+		cv_signal(&smrt->smrt_event_queue);
+		return;
+	}
+
+	if (smrt->smrt_status & SMRT_CTLR_STATUS_RESETTING) {
+		intervene = B_TRUE;
+		goto clean;
+	}
+
+	/*
+	 * The event notification command failed for some reason.  Attempt to
+	 * drive on and try again at the next intervention period.  Because this
+	 * may represent a programmer error (though it's hard to know), we wait
+	 * until the next intervention period and don't panic.
+	 */
+	if (smcm->smcm_status & SMRT_CMD_STATUS_ERROR) {
+		ErrorInfo_t *ei = smcm->smcm_va_err;
+		intervene = B_TRUE;
+
+		smrt->smrt_stats.smrts_events_errors++;
+		dev_err(smrt->smrt_dip, CE_WARN, "!event notification request "
+		    "error: status 0x%x", ei->CommandStatus);
+		goto clean;
+	}
+
+	sen = smcm->smcm_internal->smcmi_va;
+	log = rescan = B_FALSE;
+	switch (sen->sen_class) {
+	case SMRT_EVENT_CLASS_PROTOCOL:
+		/*
+		 * Most of the event protocol class events aren't really
+		 * actionable.  However, subclass 1 indicates errors.  Today,
+		 * the only error is an event overflow.  If there's an event
+		 * overflow, then we must assume that we need to rescan.
+		 */
+		if (sen->sen_subclass == SMRT_EVENT_PROTOCOL_SUBCLASS_ERROR) {
+			rescan = B_TRUE;
+		}
+		break;
+	case SMRT_EVENT_CLASS_HOTPLUG:
+		/*
+		 * We want to log all hotplug events.  However we only need to
+		 * scan these if the subclass indicates the event is for a disk.
+		 */
+		log = B_TRUE;
+		if (sen->sen_subclass == SMRT_EVENT_HOTPLUG_SUBCLASS_DRIVE) {
+			rescan = B_TRUE;
+		}
+		break;
+	case SMRT_EVENT_CLASS_HWERROR:
+	case SMRT_EVENT_CLASS_ENVIRONMENT:
+		log = B_TRUE;
+		break;
+	case SMRT_EVENT_CLASS_PHYS:
+		log = B_TRUE;
+		/*
+		 * This subclass indicates some change for physical drives.  As
+		 * such, this should trigger a rescan.
+		 */
+		if (sen->sen_subclass == SMRT_EVENT_PHYS_SUBCLASS_STATE) {
+			rescan = B_TRUE;
+		}
+		break;
+	case SMRT_EVENT_CLASS_LOGVOL:
+		rescan = B_TRUE;
+		log = B_TRUE;
+		break;
+	default:
+		/*
+		 * While there are other classes of events, it's hard to say how
+		 * actionable they are for the moment.  If we revamp this such
+		 * that it becomes an ireport based system, then we should just
+		 * always log these.  We opt not to at the moment to try and be
+		 * kind to the system log.
+		 */
+		break;
+	}
+
+	/*
+	 * Ideally, this would be an ireport that we could pass onto
+	 * administrators; however, since we don't have any way to generate
+	 * that, we provide a subset of the event information.
+	 */
+	if (log) {
+		const char *rmsg;
+		if (rescan == B_TRUE) {
+			rmsg = "rescanning";
+		} else {
+			rmsg = "not rescanning";
+		}
+		if (sen->sen_message[0] != '\0') {
+			sen->sen_message[sizeof (sen->sen_message) - 1] = '\0';
+			dev_err(smrt->smrt_dip, CE_NOTE, "!controller event "
+			    "class/sub-class/detail %x, %x, %x: %s; %s devices",
+			    sen->sen_class, sen->sen_subclass, sen->sen_detail,
+			    sen->sen_message, rmsg);
+		} else {
+			dev_err(smrt->smrt_dip, CE_NOTE, "!controller event "
+			    "class/sub-class/detail %x, %x, %x; %s devices",
+			    sen->sen_class, sen->sen_subclass, sen->sen_detail,
+			    rmsg);
+		}
+	}
+
+	if (rescan)
+		smrt_discover_request(smrt);
+
+clean:
+	mutex_exit(&smrt->smrt_mutex);
+	smrt_command_reuse(smcm);
+	bzero(smcm->smcm_internal->smcmi_va, SMRT_EVENT_NOTIFY_BUFLEN);
+	mutex_enter(&smrt->smrt_mutex);
+
+	/*
+	 * Make sure we're not _now_ detaching or resetting.
+	 */
+	if (smrt->smrt_status & SMRT_CTLR_STATUS_DETACHING) {
+		cv_signal(&smrt->smrt_event_queue);
+		return;
+	}
+
+	if ((smrt->smrt_status & SMRT_CTLR_STATUS_RESETTING) != 0 ||
+	    intervene == B_TRUE) {
+		smrt->smrt_status |= SMRT_CTLR_ASYNC_INTERVENTION;
+		return;
+	}
+
+	/*
+	 * Check out command count per tick.  If it's too high, leave it for
+	 * intervention to solve.  Likely there is some serious driver or
+	 * firmware error going on.
+	 */
+	smrt->smrt_event_count++;
+	if (smrt->smrt_event_count > smrt_event_intervention_threshold) {
+		smrt->smrt_status |= SMRT_CTLR_ASYNC_INTERVENTION;
+		return;
+	}
+
+	if (smrt_submit(smrt, smcm) != 0) {
+		smrt->smrt_status |= SMRT_CTLR_ASYNC_INTERVENTION;
+	}
+}
+
+void
+smrt_event_fini(smrt_t *smrt)
+{
+	int ret;
+	smrt_command_t *event, *cancel;
+	mutex_enter(&smrt->smrt_mutex);
+
+	/*
+	 * If intervention has been requested, there is nothing for us to do. We
+	 * clear the flag so nothing else accidentally sees this and takes
+	 * action.  We also don't need to bother sending a cancellation request,
+	 * as there is no outstanding event.
+	 */
+	if (smrt->smrt_status & SMRT_CTLR_ASYNC_INTERVENTION) {
+		smrt->smrt_status &= ~SMRT_CTLR_ASYNC_INTERVENTION;
+		goto free;
+	}
+
+	/*
+	 * Submit a cancel request for the event notification queue.  Because we
+	 * submit both the cancel event and the regular notification event as an
+	 * ordered command, we know that by the time this completes, that the
+	 * existing one will have completed.
+	 */
+	smrt->smrt_event_cancel_cmd->smcm_status |= SMRT_CMD_STATUS_POLLED;
+	if ((ret = smrt_submit(smrt, smrt->smrt_event_cancel_cmd)) != 0) {
+		/*
+		 * This is unfortunate.  We've failed to submit the command.  At
+		 * this point all we can do is reset the device.  If the reset
+		 * succeeds, we're done and we can clear all the memory.  If it
+		 * fails, then all we can do is just leak the command and scream
+		 * to the system, sorry.
+		 */
+		if (smrt_ctlr_reset(smrt) != 0) {
+			dev_err(smrt->smrt_dip, CE_WARN, "failed to reset "
+			    "device after failure to submit cancellation "
+			    "(%d), abandoning smrt_command_t at address %p",
+			    ret, smrt->smrt_event_cmd);
+			smrt->smrt_event_cmd = NULL;
+			goto free;
+		}
+	}
+
+	smrt->smrt_event_cancel_cmd->smcm_expiry = gethrtime() +
+	    SMRT_ASYNC_CANCEL_TIMEOUT * NANOSEC;
+	if ((ret = smrt_poll_for(smrt, smrt->smrt_event_cancel_cmd)) != 0) {
+		VERIFY3S(ret, ==, ETIMEDOUT);
+		VERIFY0(smrt->smrt_event_cancel_cmd->smcm_status &
+		    SMRT_CMD_STATUS_POLL_COMPLETE);
+
+		/*
+		 * The command timed out.  All we can do is hope a reset will
+		 * work.
+		 */
+		if (smrt_ctlr_reset(smrt) != 0) {
+			dev_err(smrt->smrt_dip, CE_WARN, "failed to reset "
+			    "device after failure to poll for async "
+			    "cancellation command abandoning smrt_command_t "
+			    "event command at address %p and cancellation "
+			    "command at %p", smrt->smrt_event_cmd,
+			    smrt->smrt_event_cancel_cmd);
+			smrt->smrt_event_cmd = NULL;
+			smrt->smrt_event_cancel_cmd = NULL;
+			goto free;
+		}
+
+	}
+
+	/*
+	 * Well, in the end, it's results that count.
+	 */
+	if (smrt->smrt_event_cancel_cmd->smcm_status &
+	    SMRT_CMD_STATUS_RESET_SENT) {
+		goto free;
+	}
+
+	if (smrt->smrt_event_cancel_cmd->smcm_status & SMRT_CMD_STATUS_ERROR) {
+		ErrorInfo_t *ei = smrt->smrt_event_cancel_cmd->smcm_va_err;
+
+		/*
+		 * This can return a CISS_CMD_TARGET_STATUS entry when the
+		 * controller doesn't think a command is outstanding.  It is
+		 * possible we raced, so don't think too much about that case.
+		 * Anything else leaves us between a rock and a hard place, the
+		 * only way out is a reset.
+		 */
+		if (ei->CommandStatus != CISS_CMD_TARGET_STATUS &&
+		    smrt_ctlr_reset(smrt) != 0) {
+			dev_err(smrt->smrt_dip, CE_WARN, "failed to reset  "
+			    "device after receiving an error on the async "
+			    "cancellation command (%d); abandoning "
+			    "smrt_command_t event command at address %p and "
+			    "cancellation command at %p", ei->CommandStatus,
+			    smrt->smrt_event_cmd, smrt->smrt_event_cancel_cmd);
+			smrt->smrt_event_cmd = NULL;
+			smrt->smrt_event_cancel_cmd = NULL;
+			goto free;
+		}
+	}
+
+free:
+	event = smrt->smrt_event_cmd;
+	smrt->smrt_event_cmd = NULL;
+	cancel = smrt->smrt_event_cancel_cmd;
+	smrt->smrt_event_cancel_cmd = NULL;
+	mutex_exit(&smrt->smrt_mutex);
+	if (event != NULL)
+		smrt_command_free(event);
+	if (cancel != NULL)
+		smrt_command_free(cancel);
+	cv_destroy(&smrt->smrt_event_queue);
+}
+
+/*
+ * We've been asked to do a discovery in panic context.  This would have
+ * occurred because there was a device reset.  Because we can't rely on the
+ * target maps, all we can do at the moment is go over all the active targets
+ * and note which ones no longer exist.  If this target was required to dump,
+ * then the dump code will encounter a fatal error.  If not, then we should
+ * count ourselves surprisingly lucky.
+ */
+static void
+smrt_discover_panic_check(smrt_t *smrt)
+{
+	smrt_target_t *smtg;
+
+	ASSERT(MUTEX_HELD(&smrt->smrt_mutex));
+	for (smtg = list_head(&smrt->smrt_targets); smtg != NULL;
+	    smtg = list_next(&smrt->smrt_targets, smtg)) {
+		uint64_t gen;
+
+		if (smtg->smtg_physical) {
+			smrt_physical_t *smpt = smtg->smtg_lun.smtg_phys;
+			/*
+			 * Don't worry about drives that aren't visible.
+			 */
+			if (!smpt->smpt_visible)
+				continue;
+			gen = smpt->smpt_gen;
+		} else {
+			smrt_volume_t *smlv = smtg->smtg_lun.smtg_vol;
+			gen = smlv->smlv_gen;
+		}
+
+		if (gen != smrt->smrt_discover_gen) {
+			dev_err(smrt->smrt_dip, CE_WARN, "target %s "
+			    "disappeared during post-panic discovery",
+			    scsi_device_unit_address(smtg->smtg_scsi_dev));
+			smtg->smtg_gone = B_TRUE;
+		}
+	}
+}
+
+static void
+smrt_discover(void *arg)
+{
+	int log = 0, phys = 0;
+	smrt_t *smrt = arg;
+	uint64_t gen;
+	boolean_t runphys, runvirt;
+
+	mutex_enter(&smrt->smrt_mutex);
+	smrt->smrt_status |= SMRT_CTLR_DISCOVERY_RUNNING;
+	smrt->smrt_status &= ~SMRT_CTLR_DISCOVERY_REQUESTED;
+
+	smrt->smrt_discover_gen++;
+	gen = smrt->smrt_discover_gen;
+	runphys = smrt->smrt_phys_tgtmap != NULL;
+	runvirt = smrt->smrt_virt_tgtmap != NULL;
+	mutex_exit(&smrt->smrt_mutex);
+	if (runphys)
+		phys = smrt_phys_discover(smrt, SMRT_DISCOVER_TIMEOUT, gen);
+	if (runvirt)
+		log = smrt_logvol_discover(smrt, SMRT_DISCOVER_TIMEOUT, gen);
+	mutex_enter(&smrt->smrt_mutex);
+
+	if (phys != 0 || log != 0) {
+		if (!ddi_in_panic()) {
+			smrt->smrt_status |= SMRT_CTLR_DISCOVERY_PERIODIC;
+		} else {
+			panic("smrt_t %p failed to perform discovery after "
+			    "a reset in panic context, unable to continue. "
+			    "logvol: %d, phys: %d", smrt, log, phys);
+		}
+	} else {
+		if (!ddi_in_panic() &&
+		    smrt->smrt_status & SMRT_CTLR_DISCOVERY_REQUIRED) {
+			smrt->smrt_status &= ~SMRT_CTLR_DISCOVERY_REQUIRED;
+			cv_broadcast(&smrt->smrt_cv_finishq);
+		}
+
+		if (ddi_in_panic()) {
+			smrt_discover_panic_check(smrt);
+		}
+	}
+	smrt->smrt_status &= ~SMRT_CTLR_DISCOVERY_RUNNING;
+	if (smrt->smrt_status & SMRT_CTLR_DISCOVERY_REQUESTED)
+		smrt->smrt_status |= SMRT_CTLR_DISCOVERY_PERIODIC;
+	mutex_exit(&smrt->smrt_mutex);
+}
+
+/*
+ * Request discovery, which is always run via a taskq.
+ */
+void
+smrt_discover_request(smrt_t *smrt)
+{
+	boolean_t run;
+	ASSERT(MUTEX_HELD(&smrt->smrt_mutex));
+
+	if (ddi_in_panic()) {
+		smrt_discover(smrt);
+		return;
+	}
+
+	run = (smrt->smrt_status & SMRT_CTLR_DISCOVERY_MASK) == 0;
+	smrt->smrt_status |= SMRT_CTLR_DISCOVERY_REQUESTED;
+	if (run && ddi_taskq_dispatch(smrt->smrt_discover_taskq,
+	    smrt_discover, smrt, DDI_NOSLEEP) != DDI_SUCCESS) {
+		smrt->smrt_status |= SMRT_CTLR_DISCOVERY_PERIODIC;
+		smrt->smrt_stats.smrts_discovery_tq_errors++;
+	}
 }

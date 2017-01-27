@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
@@ -58,6 +58,7 @@ smrt_check_command_type(smrt_command_type_t type)
 	case SMRT_CMDTYPE_SCSA:
 	case SMRT_CMDTYPE_INTERNAL:
 	case SMRT_CMDTYPE_PREINIT:
+	case SMRT_CMDTYPE_EVENT:
 		return (type);
 	}
 

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
@@ -166,12 +166,85 @@ _info(struct modinfo *modinfop)
 }
 
 static int
+smrt_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+	const char *addr;
+	dev_info_t *pdip;
+	int instance;
+	smrt_t *smrt;
+
+	if (cmd != DDI_ATTACH)
+		return (DDI_FAILURE);
+
+	/*
+	 * Note, we cannot get to our parent via the tran's tran_hba_private
+	 * member.  This pointer is reset to NULL when the scsi_hba_tran_t
+	 * structure is duplicated.
+	 */
+	addr = scsi_hba_iport_unit_address(dip);
+	VERIFY(addr != NULL);
+	pdip = ddi_get_parent(dip);
+	instance = ddi_get_instance(pdip);
+	smrt = ddi_get_soft_state(smrt_state, instance);
+	VERIFY(smrt != NULL);
+
+	if (strcmp(addr, SMRT_IPORT_VIRT) == 0) {
+		if (smrt_logvol_hba_setup(smrt, dip) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+		smrt->smrt_virt_iport = dip;
+	} else if (strcmp(addr, SMRT_IPORT_PHYS) == 0) {
+		if (smrt_phys_hba_setup(smrt, dip) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+		smrt->smrt_phys_iport = dip;
+	} else {
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static int
+smrt_iport_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+	const char *addr;
+	scsi_hba_tran_t *tran;
+	smrt_t *smrt;
+
+	if (cmd != DDI_DETACH)
+		return (DDI_FAILURE);
+
+	tran = ddi_get_driver_private(dip);
+	VERIFY(tran != NULL);
+	smrt = tran->tran_hba_private;
+	VERIFY(smrt != NULL);
+
+	addr = scsi_hba_iport_unit_address(dip);
+	VERIFY(addr != NULL);
+
+	if (strcmp(addr, SMRT_IPORT_VIRT) == 0) {
+		smrt_logvol_hba_teardown(smrt, dip);
+		smrt->smrt_virt_iport = NULL;
+	} else if (strcmp(addr, SMRT_IPORT_PHYS) == 0) {
+		smrt_phys_hba_teardown(smrt, dip);
+		smrt->smrt_phys_iport = NULL;
+	} else {
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static int
 smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	uint32_t instance;
 	smrt_t *smrt;
 	boolean_t check_for_interrupts = B_FALSE;
 	int r;
+	char taskq_name[64];
+
+	if (scsi_hba_iport_unit_address(dip) != NULL)
+		return (smrt_iport_attach(dip, cmd));
 
 	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
@@ -206,6 +279,8 @@ smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    offsetof(smrt_command_t, smcm_link_abort));
 	list_create(&smrt->smrt_volumes, sizeof (smrt_volume_t),
 	    offsetof(smrt_volume_t, smlv_link));
+	list_create(&smrt->smrt_physicals, sizeof (smrt_physical_t),
+	    offsetof(smrt_physical_t, smpt_link));
 	list_create(&smrt->smrt_targets, sizeof (smrt_target_t),
 	    offsetof(smrt_target_t, smtg_link_ctlr));
 	avl_create(&smrt->smrt_inflight, smrt_command_comparator,
@@ -273,7 +348,7 @@ smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	if (smrt_hba_setup(smrt) != DDI_SUCCESS) {
+	if (smrt_ctrl_hba_setup(smrt) != DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "SCSI framework setup failed");
 		goto fail;
 	}
@@ -292,15 +367,28 @@ smrt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    SMRT_PERIODIC_RATE * NANOSEC, DDI_IPL_0);
 	smrt->smrt_init_level |= SMRT_INITLEVEL_PERIODIC;
 
-	/*
-	 * Discover the set of logical volumes attached to this controller:
-	 */
-	if ((r = smrt_logvol_discover(smrt, SMRT_LOGVOL_DISCOVER_TIMEOUT)) !=
-	    0) {
-		dev_err(dip, CE_WARN, "could not discover logical volumes "
+	(void) snprintf(taskq_name, sizeof (taskq_name), "smrt_discover_%u",
+	    instance);
+	smrt->smrt_discover_taskq = ddi_taskq_create(smrt->smrt_dip, taskq_name,
+	    1, TASKQ_DEFAULTPRI, 0);
+	if (smrt->smrt_discover_taskq == NULL) {
+		dev_err(dip, CE_WARN, "failed to create discovery task queue");
+		goto fail;
+	}
+	smrt->smrt_init_level |= SMRT_INITLEVEL_TASKQ;
+
+	if ((r = smrt_event_init(smrt)) != 0) {
+		dev_err(dip, CE_WARN, "could not initialize event subsystem "
 		    "(%d)", r);
 		goto fail;
 	}
+	smrt->smrt_init_level |= SMRT_INITLEVEL_ASYNC_EVENT;
+
+	if (scsi_hba_iport_register(dip, SMRT_IPORT_VIRT) != DDI_SUCCESS)
+		goto fail;
+
+	if (scsi_hba_iport_register(dip, SMRT_IPORT_PHYS) != DDI_SUCCESS)
+		goto fail;
 
 	/*
 	 * Announce the attachment of this controller.
@@ -326,6 +414,9 @@ smrt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	scsi_hba_tran_t *tran = (scsi_hba_tran_t *)ddi_get_driver_private(dip);
 	smrt_t *smrt = (smrt_t *)tran->tran_hba_private;
 
+	if (scsi_hba_iport_unit_address(dip) != NULL)
+		return (smrt_iport_detach(dip, cmd));
+
 	if (cmd != DDI_DETACH) {
 		return (DDI_FAILURE);
 	}
@@ -339,6 +430,13 @@ smrt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&smrt->smrt_mutex);
 		dev_err(smrt->smrt_dip, CE_WARN, "cannot detach; targets still "
 		    "using HBA");
+		return (DDI_FAILURE);
+	}
+
+	if (smrt->smrt_virt_iport != NULL || smrt->smrt_phys_iport != NULL) {
+		mutex_exit(&smrt->smrt_mutex);
+		dev_err(smrt->smrt_dip, CE_WARN, "cannot detach: iports still "
+		    "attached");
 		return (DDI_FAILURE);
 	}
 
@@ -386,14 +484,25 @@ smrt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 static void
 smrt_cleanup(smrt_t *smrt)
 {
+	if (smrt->smrt_init_level & SMRT_INITLEVEL_ASYNC_EVENT) {
+		smrt_event_fini(smrt);
+		smrt->smrt_init_level &= ~SMRT_INITLEVEL_ASYNC_EVENT;
+	}
+
 	smrt_interrupts_teardown(smrt);
+
+	if (smrt->smrt_init_level & SMRT_INITLEVEL_TASKQ) {
+		ddi_taskq_destroy(smrt->smrt_discover_taskq);
+		smrt->smrt_discover_taskq = NULL;
+		smrt->smrt_init_level &= ~SMRT_INITLEVEL_TASKQ;
+	}
 
 	if (smrt->smrt_init_level & SMRT_INITLEVEL_PERIODIC) {
 		ddi_periodic_delete(smrt->smrt_periodic);
 		smrt->smrt_init_level &= ~SMRT_INITLEVEL_PERIODIC;
 	}
 
-	smrt_hba_teardown(smrt);
+	smrt_ctrl_hba_teardown(smrt);
 
 	smrt_ctlr_teardown(smrt);
 
@@ -401,6 +510,7 @@ smrt_cleanup(smrt_t *smrt)
 
 	if (smrt->smrt_init_level & SMRT_INITLEVEL_BASIC) {
 		smrt_logvol_teardown(smrt);
+		smrt_phys_teardown(smrt);
 
 		cv_destroy(&smrt->smrt_cv_finishq);
 
@@ -411,6 +521,9 @@ smrt_cleanup(smrt_t *smrt)
 
 		VERIFY(list_is_empty(&smrt->smrt_volumes));
 		list_destroy(&smrt->smrt_volumes);
+
+		VERIFY(list_is_empty(&smrt->smrt_physicals));
+		list_destroy(&smrt->smrt_physicals);
 
 		VERIFY(list_is_empty(&smrt->smrt_targets));
 		list_destroy(&smrt->smrt_targets);

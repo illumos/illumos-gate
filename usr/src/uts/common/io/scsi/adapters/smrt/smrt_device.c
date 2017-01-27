@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
@@ -89,6 +89,26 @@ smrt_locate_cfgtbl(smrt_t *smrt, pci_regspec_t *regs, unsigned nregs,
 	return (DDI_FAILURE);
 }
 
+/*
+ * Determine the PCI vendor and device ID which is a proxy for which generation
+ * of controller we're working with.
+ */
+static int
+smrt_identify_device(smrt_t *smrt)
+{
+	ddi_acc_handle_t pci_hdl;
+
+	if (pci_config_setup(smrt->smrt_dip, &pci_hdl) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	smrt->smrt_pci_vendor = pci_config_get16(pci_hdl, PCI_CONF_VENID);
+	smrt->smrt_pci_device = pci_config_get16(pci_hdl, PCI_CONF_DEVID);
+
+	pci_config_teardown(&pci_hdl);
+
+	return (DDI_SUCCESS);
+}
+
 static int
 smrt_map_device(smrt_t *smrt)
 {
@@ -162,6 +182,9 @@ smrt_device_setup(smrt_t *smrt)
 		    "master");
 		return (DDI_FAILURE);
 	}
+
+	if (smrt_identify_device(smrt) != DDI_SUCCESS)
+		goto fail;
 
 	if (smrt_map_device(smrt) != DDI_SUCCESS) {
 		goto fail;

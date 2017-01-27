@@ -2167,7 +2167,9 @@ SMRT_OBJS =	smrt.o \
 		smrt_logvol.o \
 		smrt_hba.o \
 		smrt_ciss_simple.o \
-		smrt_ciss.o
+		smrt_ciss.o \
+		smrt_physical.o \
+		smrt_sata.o
 
 #
 #	ISCSI_INITIATOR module

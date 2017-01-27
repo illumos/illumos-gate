@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SMRT_H
@@ -54,6 +54,7 @@ extern "C" {
  * inclusion.
  */
 #define	SMRT_MAX_LOGDRV		64	/* Maximum number of logical drives */
+#define	SMRT_MAX_PHYSDEV	128	/* Maximum number of physical devices */
 
 #include <sys/scsi/adapters/smrt/smrt_ciss.h>
 #include <sys/scsi/adapters/smrt/smrt_scsi.h>
@@ -74,6 +75,8 @@ typedef enum smrt_init_level {
 	SMRT_INITLEVEL_INT_ENABLED =		(0x1 << 6),
 	SMRT_INITLEVEL_SCSA =			(0x1 << 7),
 	SMRT_INITLEVEL_MUTEX =			(0x1 << 8),
+	SMRT_INITLEVEL_TASKQ =			(0x1 << 9),
+	SMRT_INITLEVEL_ASYNC_EVENT =		(0x1 << 10),
 } smrt_init_level_t;
 
 /*
@@ -88,6 +91,13 @@ typedef enum smrt_init_level {
 #define	SMRT_PRE_TAG_NUMBER			0x00000bad
 #define	SMRT_MIN_TAG_NUMBER			0x00001000
 #define	SMRT_MAX_TAG_NUMBER			0x0fffffff
+
+/*
+ * Character strings that represent the names of the iports used for both
+ * physical and virtual volumes.
+ */
+#define	SMRT_IPORT_PHYS				"p0"
+#define	SMRT_IPORT_VIRT				"v0"
 
 /*
  * Definitions to support waiting for the controller to converge on a
@@ -112,10 +122,10 @@ typedef enum smrt_ctlr_mode {
 #define	SMRT_CONTROLLER_TARGET			128
 
 /*
- * When waiting for logical volume discovery to complete, we wait for a maximum
+ * When waiting for volume discovery to complete, we wait for a maximum
  * duration (in seconds) before giving up.
  */
-#define	SMRT_LOGVOL_DISCOVER_TIMEOUT		30
+#define	SMRT_DISCOVER_TIMEOUT			30
 
 /*
  * The maintenance routine which checks for controller lockup and aborts
@@ -131,30 +141,61 @@ typedef enum smrt_ctlr_mode {
  */
 #define	SMRT_PING_CHECK_TIMEOUT			60
 
+/*
+ * When detaching the device, we may need to have an asynchronous event
+ * cancellation be issued.  While this should be relatively smooth, we don't
+ * want to wait forever for it.  As such we set a timeout in seconds.
+ */
+#define	SMRT_ASYNC_CANCEL_TIMEOUT		60
+
+/*
+ * HP PCI vendor ID and Generation 9 device ID. Used to identify generations of
+ * supported controllers.
+ */
+#define	SMRT_VENDOR_HP				0x103c
+#define	SMRT_DEVICE_GEN9			0x3238
 
 typedef enum smrt_controller_status {
 	/*
-	 * A Logical Volume discovery is currently occuring.
-	 */
-	SMRT_CTLR_STATUS_DISCOVERY =		(0x1 << 0),
-
-	/*
 	 * An attempt is being made to detach the controller instance.
 	 */
-	SMRT_CTLR_STATUS_DETACHING =		(0x1 << 1),
+	SMRT_CTLR_STATUS_DETACHING =		(0x1 << 0),
 
 	/*
 	 * The controller is believed to be functioning correctly.  The driver
 	 * is to allow command submission, process interrupts, and perform
 	 * periodic background maintenance.
 	 */
-	SMRT_CTLR_STATUS_RUNNING =		(0x1 << 2),
+	SMRT_CTLR_STATUS_RUNNING =		(0x1 << 1),
 
 	/*
 	 * The controller is currently being reset.
 	 */
-	SMRT_CTLR_STATUS_RESETTING =		(0x1 << 3),
+	SMRT_CTLR_STATUS_RESETTING =		(0x1 << 2),
+
+	/*
+	 * Our async event notification command is currently in need of help
+	 * from the broader driver.  This will be set by smrt_event_complete()
+	 * to indicate that the command is not being processed due to a
+	 * controller reset or because another fatal error occurred.  The
+	 * periodic will have to pick up and recover this for us.  It is only
+	 * safe for the driver to manipulate the event command outside of
+	 * smrt_event_complete() if this flag is set.
+	 */
+	SMRT_CTLR_ASYNC_INTERVENTION =		(0x1 << 3),
+
+	/*
+	 * See the theory statement on discovery and resets in smrt_ciss.c for
+	 * an explanation of these values.
+	 */
+	SMRT_CTLR_DISCOVERY_REQUESTED =		(0x1 << 4),
+	SMRT_CTLR_DISCOVERY_RUNNING =		(0x1 << 5),
+	SMRT_CTLR_DISCOVERY_PERIODIC =		(0x1 << 6),
+	SMRT_CTLR_DISCOVERY_REQUIRED =		(0x1 << 7),
 } smrt_controller_status_t;
+
+#define	SMRT_CTLR_DISCOVERY_MASK	(SMRT_CTLR_DISCOVERY_REQUESTED | \
+    SMRT_CTLR_DISCOVERY_RUNNING | SMRT_CTLR_DISCOVERY_PERIODIC)
 
 typedef struct smrt_stats {
 	uint64_t smrts_tran_aborts;
@@ -165,6 +206,10 @@ typedef struct smrt_stats {
 	uint64_t smrts_unclaimed_interrupts;
 	uint64_t smrts_claimed_interrupts;
 	uint64_t smrts_ignored_scsi_cmds;
+	uint64_t smrts_events_received;
+	uint64_t smrts_events_errors;
+	uint64_t smrts_events_intervened;
+	uint64_t smrts_discovery_tq_errors;
 } smrt_stats_t;
 
 typedef struct smrt_versions {
@@ -180,10 +225,15 @@ typedef struct smrt_versions {
 	char smrtv_bootblock_rev[5];
 } smrt_versions_t;
 
+typedef struct smrt smrt_t;
+typedef struct smrt_command smrt_command_t;
+typedef struct smrt_command_internal smrt_command_internal_t;
+typedef struct smrt_command_scsa smrt_command_scsa_t;
+typedef struct smrt_pkt smrt_pkt_t;
+
 /*
  * Per-Controller Structure
  */
-typedef struct smrt smrt_t;
 struct smrt {
 	dev_info_t *smrt_dip;
 	int smrt_instance;
@@ -198,6 +248,16 @@ struct smrt {
 	uint32_t smrt_maxcmds;
 	uint32_t smrt_sg_cnt;
 	smrt_versions_t smrt_versions;
+	uint16_t smrt_pci_vendor;
+	uint16_t smrt_pci_device;
+
+	/*
+	 * iport specific data
+	 */
+	dev_info_t *smrt_virt_iport;
+	dev_info_t *smrt_phys_iport;
+	scsi_hba_tgtmap_t *smrt_virt_tgtmap;
+	scsi_hba_tgtmap_t *smrt_phys_tgtmap;
 
 	/*
 	 * The transport mode of the controller.
@@ -225,6 +285,11 @@ struct smrt {
 	list_t smrt_volumes;
 
 	/*
+	 * List of enumerated physical devices (smrt_physical_t).
+	 */
+	list_t smrt_physicals;
+
+	/*
 	 * List of attached SCSA target drivers (smrt_target_t).
 	 */
 	list_t smrt_targets;
@@ -237,7 +302,6 @@ struct smrt {
 
 	hrtime_t smrt_last_interrupt_claimed;
 	hrtime_t smrt_last_interrupt_unclaimed;
-	hrtime_t smrt_last_discovery;
 	hrtime_t smrt_last_reset_start;
 	hrtime_t smrt_last_reset_finish;
 
@@ -250,6 +314,14 @@ struct smrt {
 	list_t smrt_commands;		/* List of all commands. */
 	list_t smrt_finishq;		/* List of completed commands. */
 	list_t smrt_abortq;		/* List of commands to abort. */
+
+	/*
+	 * Discovery coordination
+	 */
+	ddi_taskq_t *smrt_discover_taskq;
+	hrtime_t smrt_last_phys_discovery;
+	hrtime_t smrt_last_log_discovery;
+	uint64_t smrt_discover_gen;
 
 	/*
 	 * Controller interrupt handler registration.
@@ -280,6 +352,14 @@ struct smrt {
 	uint32_t smrt_ct_baseaddr;
 	CfgTable_t *smrt_ct;
 	ddi_acc_handle_t smrt_ct_handle;
+
+	/*
+	 * Asynchronous Event State
+	 */
+	uint32_t smrt_event_count;
+	smrt_command_t *smrt_event_cmd;
+	smrt_command_t *smrt_event_cancel_cmd;
+	kcondvar_t smrt_event_queue;
 };
 
 /*
@@ -290,10 +370,11 @@ typedef enum smrt_volume_flags {
 } smrt_volume_flags_t;
 
 typedef struct smrt_volume {
-	LogDevAddr_t smlv_addr;
+	LUNAddr_t smlv_addr;
 	smrt_volume_flags_t smlv_flags;
 
 	uint8_t smlv_wwn[16];
+	uint64_t smlv_gen;
 
 	smrt_t *smlv_ctlr;
 	list_node_t smlv_link;
@@ -304,18 +385,46 @@ typedef struct smrt_volume {
 	list_t smlv_targets;
 } smrt_volume_t;
 
+typedef struct smrt_physical {
+	LUNAddr_t smpt_addr;
+	uint64_t smpt_wwn;
+	uint8_t smpt_dtype;
+	uint16_t smpt_bmic;
+	uint64_t smpt_gen;
+	boolean_t smpt_supported;
+	boolean_t smpt_visible;
+	boolean_t smpt_unsup_warn;
+	list_node_t smpt_link;
+	list_t smpt_targets;
+	smrt_t *smpt_ctlr;
+	smrt_identify_physical_drive_t *smpt_info;
+} smrt_physical_t;
+
 /*
  * Per-Target Structure
  */
 typedef struct smrt_target {
 	struct scsi_device *smtg_scsi_dev;
-	boolean_t smtg_controller_target;
+
+	boolean_t smtg_physical;
 
 	/*
-	 * Linkage back to the Logical Volume that this target represents:
+	 * This is only used when performing discovery during panic, as we need
+	 * a mechanism to determine if the set of drives has shifted.
 	 */
-	smrt_volume_t *smtg_volume;
-	list_node_t smtg_link_volume;
+	boolean_t smtg_gone;
+
+	/*
+	 * Linkage back to the device that this target represents. This may be
+	 * either a smrt_volume_t or a smrt_physical_t. We keep a pointer to the
+	 * address, as that's the one thing we generally care about.
+	 */
+	union {
+		smrt_physical_t *smtg_phys;
+		smrt_volume_t *smtg_vol;
+	} smtg_lun;
+	list_node_t smtg_link_lun;
+	LUNAddr_t *smtg_addr;
 
 	/*
 	 * Linkage back to the controller:
@@ -342,11 +451,6 @@ typedef struct smrt_dma {
 	uint_t smdma_dma_ncookies;
 } smrt_dma_t;
 
-
-typedef struct smrt_command smrt_command_t;
-typedef struct smrt_command_internal smrt_command_internal_t;
-typedef struct smrt_command_scsa smrt_command_scsa_t;
-typedef struct smrt_pkt smrt_pkt_t;
 
 typedef enum smrt_command_status {
 	/*
@@ -430,10 +534,19 @@ typedef enum smrt_command_status {
 	 * taken effect, it likely cannot be trusted.
 	 */
 	SMRT_CMD_STATUS_RESET_SENT =		(0x1 << 12),
+
+	/*
+	 * Certain commands related to discovery and pinging need to be run
+	 * during the context after a reset has occurred, but before the
+	 * controller is considered.  Such commands can use this flag to bypass
+	 * the normal smrt_submit() check.
+	 */
+	SMRT_CMD_IGNORE_RUNNING =		(0x1 << 13),
 } smrt_command_status_t;
 
 typedef enum smrt_command_type {
 	SMRT_CMDTYPE_INTERNAL = 1,
+	SMRT_CMDTYPE_EVENT,
 	SMRT_CMDTYPE_ABORTQ,
 	SMRT_CMDTYPE_SCSA,
 	SMRT_CMDTYPE_PREINIT,
@@ -551,18 +664,36 @@ uint32_t smrt_ctlr_get_cmdsoutmax(smrt_t *);
 uint32_t smrt_ctlr_get_maxsgelements(smrt_t *);
 
 /*
- * Device enumeration routines.
+ * Device enumeration and lookup routines.
  */
-int smrt_logvol_discover(smrt_t *, uint16_t);
+void smrt_discover_request(smrt_t *);
+
+int smrt_logvol_discover(smrt_t *, uint16_t, uint64_t);
 void smrt_logvol_teardown(smrt_t *);
-smrt_volume_t *smrt_logvol_lookup_by_id(smrt_t *, unsigned);
-smrt_volume_t *smrt_logvol_lookup_by_addr(smrt_t *, struct scsi_address *);
+smrt_volume_t *smrt_logvol_lookup_by_id(smrt_t *, unsigned long);
+void smrt_logvol_tgtmap_activate(void *, char *, scsi_tgtmap_tgt_type_t,
+    void **);
+boolean_t smrt_logvol_tgtmap_deactivate(void *, char *, scsi_tgtmap_tgt_type_t,
+    void *, scsi_tgtmap_deact_rsn_t);
+
+int smrt_phys_discover(smrt_t *, uint16_t, uint64_t);
+smrt_physical_t *smrt_phys_lookup_by_ua(smrt_t *, const char *);
+void smrt_phys_teardown(smrt_t *);
+void smrt_phys_tgtmap_activate(void *, char *, scsi_tgtmap_tgt_type_t,
+    void **);
+boolean_t smrt_phys_tgtmap_deactivate(void *, char *, scsi_tgtmap_tgt_type_t,
+    void *, scsi_tgtmap_deact_rsn_t);
 
 /*
  * SCSI framework routines.
  */
-int smrt_hba_setup(smrt_t *);
-void smrt_hba_teardown(smrt_t *);
+int smrt_ctrl_hba_setup(smrt_t *);
+void smrt_ctrl_hba_teardown(smrt_t *);
+
+int smrt_logvol_hba_setup(smrt_t *, dev_info_t *);
+void smrt_logvol_hba_teardown(smrt_t *, dev_info_t *);
+int smrt_phys_hba_setup(smrt_t *, dev_info_t *);
+void smrt_phys_hba_teardown(smrt_t *, dev_info_t *);
 
 void smrt_hba_complete(smrt_command_t *);
 
@@ -585,9 +716,12 @@ void smrt_command_reuse(smrt_command_t *);
  * Device message construction routines.
  */
 void smrt_write_lun_addr_phys(LUNAddr_t *, boolean_t, unsigned, unsigned);
+void smrt_write_controller_lun_addr(LUNAddr_t *);
+uint16_t smrt_lun_addr_to_bmic(PhysDevAddr_t *);
 void smrt_write_message_abort_one(smrt_command_t *, uint32_t);
-void smrt_write_message_abort_all(smrt_command_t *, LogDevAddr_t *);
+void smrt_write_message_abort_all(smrt_command_t *, LUNAddr_t *);
 void smrt_write_message_nop(smrt_command_t *, int);
+void smrt_write_message_event_notify(smrt_command_t *);
 
 /*
  * Device management routines.
@@ -597,6 +731,17 @@ void smrt_device_teardown(smrt_t *);
 uint32_t smrt_get32(smrt_t *, offset_t);
 void smrt_put32(smrt_t *, offset_t, uint32_t);
 
+/*
+ * SATA related routines.
+ */
+int smrt_sata_determine_wwn(smrt_t *, PhysDevAddr_t *, uint64_t *, uint16_t);
+
+/*
+ * Asynchronous Event Notification
+ */
+int smrt_event_init(smrt_t *);
+void smrt_event_fini(smrt_t *);
+void smrt_event_complete(smrt_command_t *);
 
 #ifdef	__cplusplus
 }

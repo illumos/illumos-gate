@@ -10,34 +10,86 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
 
-static boolean_t
-smrt_device_is_controller(struct scsi_device *sd)
+/*
+ * The controller is not allowed to attach.
+ */
+static int
+smrt_ctrl_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
+    scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
-	return (sd->sd_address.a_target == SMRT_CONTROLLER_TARGET &&
-	    sd->sd_address.a_lun == 0);
+	return (DDI_FAILURE);
+}
+
+/*
+ * The controller is not allowed to send packets.
+ */
+static int
+smrt_ctrl_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
+{
+	return (TRAN_BADPKT);
+}
+
+static boolean_t
+smrt_logvol_parse(const char *ua, uint_t *targp)
+{
+	long targ, lun;
+	const char *comma;
+	char *eptr;
+
+	comma = strchr(ua, ',');
+	if (comma == NULL) {
+		return (B_FALSE);
+	}
+
+	/*
+	 * We expect the target number for a logical unit number to be zero for
+	 * a logical volume.
+	 */
+	if (ddi_strtol(comma + 1, &eptr, 16, &lun) != 0 || *eptr != '\0' ||
+	    lun != 0) {
+		return (B_FALSE);
+	}
+
+	if (ddi_strtol(ua, &eptr, 16, &targ) != 0 || eptr != comma ||
+	    targ < 0 || targ >= SMRT_MAX_LOGDRV) {
+		return (B_FALSE);
+	}
+
+	*targp = (uint_t)targ;
+
+	return (B_TRUE);
 }
 
 static int
-smrt_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
+smrt_logvol_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
 	_NOTE(ARGUNUSED(hba_dip))
 
-	smrt_t *smrt = (smrt_t *)hba_tran->tran_hba_private;
 	smrt_volume_t *smlv;
 	smrt_target_t *smtg;
+	const char *ua;
+	uint_t targ;
+
+	smrt_t *smrt = (smrt_t *)hba_tran->tran_hba_private;
 	dev_info_t *dip = smrt->smrt_dip;
 
 	/*
-	 * Check to see if new logical volumes are available.
+	 * The unit address comes in the form of 'target,lun'.  We expect the
+	 * lun to be zero.  The target is what we set when we added it to the
+	 * target map earlier.
 	 */
-	if (smrt_logvol_discover(smrt, SMRT_LOGVOL_DISCOVER_TIMEOUT) != 0) {
-		dev_err(dip, CE_WARN, "discover logical volumes failure");
+	ua = scsi_device_unit_address(sd);
+	if (ua == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	if (!smrt_logvol_parse(ua, &targ)) {
 		return (DDI_FAILURE);
 	}
 
@@ -60,28 +112,19 @@ smrt_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 
 	/*
-	 * Check to see if this is the SCSI address of the pseudo target
-	 * representing the Smart Array controller itself.
+	 * Look for a logical volume for the SCSI unit address of this target.
 	 */
-	if (smrt_device_is_controller(sd)) {
-		smtg->smtg_controller_target = B_TRUE;
-		goto skip_logvol;
-	}
-
-	/*
-	 * Look for a logical volume for the SCSI address of this target.
-	 */
-	if ((smlv = smrt_logvol_lookup_by_addr(smrt, &sd->sd_address)) ==
-	    NULL) {
+	if ((smlv = smrt_logvol_lookup_by_id(smrt, targ)) == NULL) {
 		mutex_exit(&smrt->smrt_mutex);
 		kmem_free(smtg, sizeof (*smtg));
 		return (DDI_FAILURE);
 	}
 
-	smtg->smtg_volume = smlv;
+	smtg->smtg_lun.smtg_vol = smlv;
+	smtg->smtg_addr = &smlv->smlv_addr;
+	smtg->smtg_physical = B_FALSE;
 	list_insert_tail(&smlv->smlv_targets, smtg);
 
-skip_logvol:
 	/*
 	 * Link this target object to the controller:
 	 */
@@ -91,48 +134,144 @@ skip_logvol:
 	smtg->smtg_scsi_dev = sd;
 	VERIFY(sd->sd_dev == tgt_dip);
 
-	/*
-	 * We passed SCSI_HBA_TRAN_CLONE to scsi_hba_attach(9F), so we
-	 * can stash our target-specific data structure on the (cloned)
-	 * "hba_tran" without affecting the private data pointers of the
-	 * HBA or of other targets.
-	 */
-	hba_tran->tran_tgt_private = smtg;
+	scsi_device_hba_private_set(sd, smtg);
 
 	mutex_exit(&smrt->smrt_mutex);
 	return (DDI_SUCCESS);
 }
 
 static void
-smrt_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
+smrt_logvol_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
 	_NOTE(ARGUNUSED(hba_dip, tgt_dip))
 
 	smrt_t *smrt = (smrt_t *)hba_tran->tran_hba_private;
-	smrt_target_t *smtg = (smrt_target_t *)hba_tran->tran_tgt_private;
-	smrt_volume_t *smlv = smtg->smtg_volume;
+	smrt_target_t *smtg = scsi_device_hba_private_get(sd);
+	smrt_volume_t *smlv = smtg->smtg_lun.smtg_vol;
 
 	VERIFY(smtg->smtg_scsi_dev == sd);
+	VERIFY(smtg->smtg_physical == B_FALSE);
 
 	mutex_enter(&smrt->smrt_mutex);
-
-	/*
-	 * Remove this target from the tracking lists:
-	 */
-	if (!smtg->smtg_controller_target) {
-		list_remove(&smlv->smlv_targets, smtg);
-	}
+	list_remove(&smlv->smlv_targets, smtg);
 	list_remove(&smrt->smrt_targets, smtg);
 
-	/*
-	 * Clear the target-specific private data pointer; see comments
-	 * in smrt_tran_tgt_init() above.
-	 */
-	hba_tran->tran_tgt_private = NULL;
+	scsi_device_hba_private_set(sd, NULL);
 
 	mutex_exit(&smrt->smrt_mutex);
 
+	kmem_free(smtg, sizeof (*smtg));
+}
+
+static int
+smrt_phys_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
+    scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
+{
+	_NOTE(ARGUNUSED(hba_dip))
+
+	smrt_target_t *smtg;
+	smrt_physical_t *smpt;
+	const char *ua, *comma;
+	char *eptr;
+	long lun;
+
+	smrt_t *smrt = (smrt_t *)hba_tran->tran_hba_private;
+	dev_info_t *dip = smrt->smrt_dip;
+
+	/*
+	 * The unit address comes in the form of 'target,lun'.  We expect the
+	 * lun to be zero.  The target is what we set when we added it to the
+	 * target map earlier.
+	 */
+	ua = scsi_device_unit_address(sd);
+	if (ua == NULL)
+		return (DDI_FAILURE);
+
+	comma = strchr(ua, ',');
+	if (comma == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Confirm the LUN is zero.  We may want to instead check the scsi
+	 * 'lun'/'lun64' property or do so in addition to this logic.
+	 */
+	if (ddi_strtol(comma + 1, &eptr, 16, &lun) != 0 || *eptr != '\0' ||
+	    lun != 0) {
+		return (DDI_FAILURE);
+	}
+
+	if ((smtg = kmem_zalloc(sizeof (*smtg), KM_NOSLEEP)) == NULL) {
+		dev_err(dip, CE_WARN, "could not allocate target object "
+		    "due to memory exhaustion");
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&smrt->smrt_mutex);
+
+	if (smrt->smrt_status & SMRT_CTLR_STATUS_DETACHING) {
+		/*
+		 * We are detaching.  Do not accept any more requests to
+		 * attach targets from the framework.
+		 */
+		mutex_exit(&smrt->smrt_mutex);
+		kmem_free(smtg, sizeof (*smtg));
+		return (DDI_FAILURE);
+	}
+
+
+	/*
+	 * Look for a physical target based on the unit address of the target
+	 * (which will encode its WWN and LUN).
+	 */
+	smpt = smrt_phys_lookup_by_ua(smrt, ua);
+	if (smpt == NULL) {
+		mutex_exit(&smrt->smrt_mutex);
+		kmem_free(smtg, sizeof (*smtg));
+		return (DDI_FAILURE);
+	}
+
+	smtg->smtg_scsi_dev = sd;
+	smtg->smtg_physical = B_TRUE;
+	smtg->smtg_lun.smtg_phys = smpt;
+	list_insert_tail(&smpt->smpt_targets, smtg);
+	smtg->smtg_addr = &smpt->smpt_addr;
+
+	/*
+	 * Link this target object to the controller:
+	 */
+	smtg->smtg_ctlr = smrt;
+	list_insert_tail(&smrt->smrt_targets, smtg);
+
+	VERIFY(sd->sd_dev == tgt_dip);
+	smtg->smtg_scsi_dev = sd;
+
+	scsi_device_hba_private_set(sd, smtg);
+	mutex_exit(&smrt->smrt_mutex);
+
+	return (DDI_SUCCESS);
+}
+
+static void
+smrt_phys_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
+    scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
+{
+	_NOTE(ARGUNUSED(hba_dip, tgt_dip))
+
+	smrt_t *smrt = (smrt_t *)hba_tran->tran_hba_private;
+	smrt_target_t *smtg = scsi_device_hba_private_get(sd);
+	smrt_physical_t *smpt = smtg->smtg_lun.smtg_phys;
+
+	VERIFY(smtg->smtg_scsi_dev == sd);
+	VERIFY(smtg->smtg_physical == B_TRUE);
+
+	mutex_enter(&smrt->smrt_mutex);
+	list_remove(&smpt->smpt_targets, smtg);
+	list_remove(&smrt->smrt_targets, smtg);
+
+	scsi_device_hba_private_set(sd, NULL);
+	mutex_exit(&smrt->smrt_mutex);
 	kmem_free(smtg, sizeof (*smtg));
 }
 
@@ -153,13 +292,20 @@ smrt_tran_setup_pkt(struct scsi_pkt *pkt, int (*callback)(caddr_t),
 {
 	_NOTE(ARGUNUSED(arg))
 
-	scsi_hba_tran_t *tran = pkt->pkt_address.a_hba_tran;
-	smrt_t *smrt = (smrt_t *)tran->tran_hba_private;
-	smrt_target_t *smtg = (smrt_target_t *)tran->tran_tgt_private;
-	smrt_command_scsa_t *smcms = (smrt_command_scsa_t *)
-	    pkt->pkt_ha_private;
+	struct scsi_device *sd;
+	smrt_target_t *smtg;
+	smrt_t *smrt;
 	smrt_command_t *smcm;
+	smrt_command_scsa_t *smcms;
 	int kmflags = callback == SLEEP_FUNC ? KM_SLEEP : KM_NOSLEEP;
+
+	sd = scsi_address_device(&pkt->pkt_address);
+	VERIFY(sd != NULL);
+	smtg = scsi_device_hba_private_get(sd);
+	VERIFY(smtg != NULL);
+	smrt = smtg->smtg_ctlr;
+	VERIFY(smrt != NULL);
+	smcms = (smrt_command_scsa_t *)pkt->pkt_ha_private;
 
 	/*
 	 * Check that we have enough space in the command object for the
@@ -241,17 +387,79 @@ smrt_set_arq_data(struct scsi_pkt *pkt, uchar_t key)
 	pkt->pkt_state |= STATE_ARQ_DONE;
 }
 
+/*
+ * When faking up a REPORT LUNS data structure, we simply report one LUN, LUN 0.
+ * We need 16 bytes for this, 4 for the size, 4 reserved bytes, and the 8 for
+ * the actual LUN.
+ */
+static void
+smrt_fake_report_lun(smrt_command_t *smcm, struct scsi_pkt *pkt)
+{
+	size_t sz;
+	char resp[16];
+	struct buf *bp;
+
+	pkt->pkt_reason = CMD_CMPLT;
+	pkt->pkt_state |= STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD |
+	    STATE_GOT_STATUS;
+
+	/*
+	 * Check to make sure this is valid.  If reserved bits are set or if the
+	 * mode is one other than 0x00, 0x01, 0x02, then it's an illegal
+	 * request.
+	 */
+	if (pkt->pkt_cdbp[1] != 0 || pkt->pkt_cdbp[3] != 0 ||
+	    pkt->pkt_cdbp[4] != 0 || pkt->pkt_cdbp[5] != 0 ||
+	    pkt->pkt_cdbp[10] != 0 || pkt->pkt_cdbp[11] != 0 ||
+	    pkt->pkt_cdbp[2] > 0x2) {
+		smrt_set_arq_data(pkt, KEY_ILLEGAL_REQUEST);
+		return;
+	}
+
+	/*
+	 * Construct the actual REPORT LUNS reply.  We need to indicate a single
+	 * LUN of all zeros.  This means that the length needs to be 8 bytes,
+	 * the size of the lun.  Otherwise, the rest of this structure can be
+	 * zeros.
+	 */
+	bzero(resp, sizeof (resp));
+	resp[3] = sizeof (scsi_lun_t);
+
+	bp = scsi_pkt2bp(pkt);
+	sz = MIN(sizeof (resp), bp->b_bcount);
+
+	bp_mapin(bp);
+	bcopy(resp, bp->b_un.b_addr, sz);
+	bp_mapout(bp);
+	pkt->pkt_state |= STATE_XFERRED_DATA;
+	pkt->pkt_resid = bp->b_bcount - sz;
+	if (pkt->pkt_scblen >= 1) {
+		pkt->pkt_scbp[0] = STATUS_GOOD;
+	}
+}
+
 static int
 smrt_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 {
 	_NOTE(ARGUNUSED(sa))
 
-	scsi_hba_tran_t *tran = pkt->pkt_address.a_hba_tran;
-	smrt_t *smrt = (smrt_t *)tran->tran_hba_private;
-	smrt_command_scsa_t *smcms = (smrt_command_scsa_t *)
-	    pkt->pkt_ha_private;
-	smrt_command_t *smcm = smcms->smcms_command;
+	struct scsi_device *sd;
+	smrt_target_t *smtg;
+	smrt_t *smrt;
+	smrt_command_scsa_t *smcms;
+	smrt_command_t *smcm;
 	int r;
+
+	sd = scsi_address_device(&pkt->pkt_address);
+	VERIFY(sd != NULL);
+	smtg = scsi_device_hba_private_get(sd);
+	VERIFY(smtg != NULL);
+	smrt = smtg->smtg_ctlr;
+	VERIFY(smrt != NULL);
+	smcms = (smrt_command_scsa_t *)pkt->pkt_ha_private;
+	VERIFY(smcms != NULL);
+	smcm = smcms->smcms_command;
+	VERIFY(smcm != NULL);
 
 	if (smcm->smcm_status & SMRT_CMD_STATUS_TRAN_START) {
 		/*
@@ -273,6 +481,10 @@ smrt_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 	case SCMD_LOG_SENSE_G1:
 	case SCMD_MODE_SELECT:
 	case SCMD_PERSISTENT_RESERVE_IN:
+		if (smtg->smtg_physical) {
+			break;
+		}
+
 		smrt->smrt_stats.smrts_ignored_scsi_cmds++;
 		smcm->smcm_status |= SMRT_CMD_STATUS_TRAN_IGNORED;
 
@@ -291,6 +503,22 @@ smrt_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 
 		scsi_hba_pkt_comp(pkt);
 		return (TRAN_ACCEPT);
+	case SCMD_REPORT_LUNS:
+		/*
+		 * The SMRT controller does not accept a REPORT LUNS command for
+		 * logical volumes.  As such, we need to fake up a REPORT LUNS
+		 * response that has a single LUN, LUN 0.
+		 */
+		if (smtg->smtg_physical) {
+			break;
+		}
+
+		smrt_fake_report_lun(smcm, pkt);
+
+		scsi_hba_pkt_comp(pkt);
+		return (TRAN_ACCEPT);
+	default:
+		break;
 	}
 
 	if (pkt->pkt_flags & FLAG_NOINTR) {
@@ -322,27 +550,17 @@ smrt_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 		    LE_32(pkt->pkt_cookies[i].dmac_size);
 	}
 
-	if (smcm->smcm_target->smtg_controller_target) {
-		/*
-		 * The controller is, according to the CISS Specification,
-		 * always LUN 0 in the peripheral device addressing mode.
-		 */
-		smrt_write_lun_addr_phys(&smcm->smcm_va_cmd->Header.LUN,
-		    B_TRUE, 0, 0);
-	} else {
-		/*
-		 * Copy logical volume address from the target object:
-		 */
-		smcm->smcm_va_cmd->Header.LUN.LogDev = smcm->smcm_target->
-		    smtg_volume->smlv_addr;
-	}
+	/*
+	 * Copy logical volume address from the target object:
+	 */
+	smcm->smcm_va_cmd->Header.LUN = *smcm->smcm_target->smtg_addr;
 
 	/*
 	 * Initialise the command block.
 	 */
 	smcm->smcm_va_cmd->Request.CDBLen = pkt->pkt_cdblen;
 	smcm->smcm_va_cmd->Request.Type.Type = CISS_TYPE_CMD;
-	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_ORDERED;
+	smcm->smcm_va_cmd->Request.Type.Attribute = CISS_ATTR_SIMPLE;
 	smcm->smcm_va_cmd->Request.Timeout = LE_16(pkt->pkt_time);
 	if (pkt->pkt_numcookies > 0) {
 		/*
@@ -388,6 +606,23 @@ smrt_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 	 * Submit the command to the controller.
 	 */
 	mutex_enter(&smrt->smrt_mutex);
+
+	/*
+	 * If we're dumping, there's a chance that the target we're talking to
+	 * could have ended up disappearing during the process of discovery.  If
+	 * this target is part of the dump device, we check here and return that
+	 * we hit a fatal error.
+	 */
+	if (ddi_in_panic() && smtg->smtg_gone) {
+		mutex_exit(&smrt->smrt_mutex);
+
+		dev_err(smrt->smrt_dip, CE_WARN, "smrt_submit failed: target "
+		    "%s is gone, it did not come back after post-panic reset "
+		    "device discovery", scsi_device_unit_address(sd));
+
+		return (TRAN_FATAL_ERROR);
+	}
+
 	smrt->smrt_stats.smrts_tran_starts++;
 	if ((r = smrt_submit(smrt, smcm)) != 0) {
 		mutex_exit(&smrt->smrt_mutex);
@@ -427,10 +662,17 @@ smrt_tran_reset(struct scsi_address *sa, int level)
 {
 	_NOTE(ARGUNUSED(level))
 
-	scsi_hba_tran_t *tran = sa->a_hba_tran;
-	smrt_t *smrt = (smrt_t *)tran->tran_hba_private;
-	int r;
+	struct scsi_device *sd;
+	smrt_target_t *smtg;
+	smrt_t *smrt;
 	smrt_command_t *smcm;
+	int r;
+
+	sd = scsi_address_device(sa);
+	VERIFY(sd != NULL);
+	smtg = scsi_device_hba_private_get(sd);
+	VERIFY(smtg != NULL);
+	smrt = smtg->smtg_ctlr;
 
 	/*
 	 * The framework has requested some kind of SCSI reset.  A
@@ -549,10 +791,19 @@ skip_check:
 static int
 smrt_tran_abort(struct scsi_address *sa, struct scsi_pkt *pkt)
 {
-	scsi_hba_tran_t *tran = sa->a_hba_tran;
-	smrt_t *smrt = (smrt_t *)tran->tran_hba_private;
+	struct scsi_device *sd;
+	smrt_target_t *smtg;
+	smrt_t *smrt;
 	smrt_command_t *smcm = NULL;
 	smrt_command_t *abort_smcm;
+
+	sd = scsi_address_device(sa);
+	VERIFY(sd != NULL);
+	smtg = scsi_device_hba_private_get(sd);
+	VERIFY(smtg != NULL);
+	smrt = smtg->smtg_ctlr;
+	VERIFY(smrt != NULL);
+
 
 	if ((abort_smcm = smrt_command_alloc(smrt, SMRT_CMDTYPE_INTERNAL,
 	    KM_NOSLEEP)) == NULL) {
@@ -594,19 +845,7 @@ smrt_tran_abort(struct scsi_address *sa, struct scsi_pkt *pkt)
 		 * The framework wants us to abort every in flight command
 		 * for the target with this address.
 		 */
-		smrt_target_t *smtg = (smrt_target_t *)tran->
-		    tran_tgt_private;
-
-		if (smtg->smtg_volume == NULL) {
-			/*
-			 * We currently do not support sending an abort
-			 * to anything but a Logical Volume.
-			 */
-			goto fail;
-		}
-
-		smrt_write_message_abort_all(abort_smcm,
-		    &smtg->smtg_volume->smlv_addr);
+		smrt_write_message_abort_all(abort_smcm, smtg->smtg_addr);
 	}
 
 	/*
@@ -913,9 +1152,17 @@ smrt_getcap(struct scsi_address *sa, char *cap, int whom)
 {
 	_NOTE(ARGUNUSED(whom))
 
-	scsi_hba_tran_t *tran = sa->a_hba_tran;
-	smrt_t *smrt = (smrt_t *)tran->tran_hba_private;
+	struct scsi_device *sd;
+	smrt_target_t *smtg;
+	smrt_t *smrt;
 	int index;
+
+	sd = scsi_address_device(sa);
+	VERIFY(sd != NULL);
+	smtg = scsi_device_hba_private_get(sd);
+	VERIFY(smtg != NULL);
+	smrt = smtg->smtg_ctlr;
+	VERIFY(smrt != NULL);
 
 	if ((index = scsi_hba_lookup_capstr(cap)) == DDI_FAILURE) {
 		/*
@@ -945,8 +1192,21 @@ smrt_getcap(struct scsi_address *sa, char *cap, int whom)
 		}
 		return ((int)smrt->smrt_dma_attr.dma_attr_granular);
 
-	case SCSI_CAP_INITIATOR_ID:
-		return (SMRT_CONTROLLER_TARGET);
+	/*
+	 * If this target corresponds to a physical device, then we always
+	 * indicate that we're on a SAS interconnect.  Otherwise, we default to
+	 * saying that we're on a parallel bus.  We can't use SAS for
+	 * everything, unfortunately.  When you declare yourself to be a SAS
+	 * interconnect, it's expected that you have a full 16-byte WWN as the
+	 * target.  If not, devfsadm will not be able to enumerate the device
+	 * and create /dev/[r]dsk entries.
+	 */
+	case SCSI_CAP_INTERCONNECT_TYPE:
+		if (smtg->smtg_physical) {
+			return (INTERCONNECT_SAS);
+		} else {
+			return (INTERCONNECT_PARALLEL);
+		}
 
 	case SCSI_CAP_DISCONNECT:
 	case SCSI_CAP_SYNCHRONOUS:
@@ -960,9 +1220,10 @@ smrt_getcap(struct scsi_address *sa, char *cap, int whom)
 		 */
 		return (1);
 
+	case SCSI_CAP_INITIATOR_ID:
 	case SCSI_CAP_RESET_NOTIFICATION:
 		/*
-		 * This capability is not supported.
+		 * These capabilities are not supported.
 		 */
 		return (0);
 
@@ -1009,6 +1270,7 @@ smrt_setcap(struct scsi_address *sa, char *cap, int value, int whom)
 	case SCSI_CAP_UNTAGGED_QING:
 	case SCSI_CAP_TAGGED_QING:
 	case SCSI_CAP_RESET_NOTIFICATION:
+	case SCSI_CAP_INTERCONNECT_TYPE:
 		/*
 		 * We do not support changing any capabilities at this time.
 		 */
@@ -1023,8 +1285,9 @@ smrt_setcap(struct scsi_address *sa, char *cap, int value, int whom)
 }
 
 int
-smrt_hba_setup(smrt_t *smrt)
+smrt_ctrl_hba_setup(smrt_t *smrt)
 {
+	int flags;
 	dev_info_t *dip = smrt->smrt_dip;
 	scsi_hba_tran_t *tran;
 
@@ -1036,13 +1299,10 @@ smrt_hba_setup(smrt_t *smrt)
 	smrt->smrt_hba_tran = tran;
 	tran->tran_hba_private = smrt;
 
-	tran->tran_tgt_init = smrt_tran_tgt_init;
+	tran->tran_tgt_init = smrt_ctrl_tran_tgt_init;
 	tran->tran_tgt_probe = scsi_hba_probe;
-	tran->tran_tgt_free = smrt_tran_tgt_free;
 
-	tran->tran_start = smrt_tran_start;
-	tran->tran_reset = smrt_tran_reset;
-	tran->tran_abort = smrt_tran_abort;
+	tran->tran_start = smrt_ctrl_tran_start;
 
 	tran->tran_getcap = smrt_getcap;
 	tran->tran_setcap = smrt_setcap;
@@ -1050,9 +1310,11 @@ smrt_hba_setup(smrt_t *smrt)
 	tran->tran_setup_pkt = smrt_tran_setup_pkt;
 	tran->tran_teardown_pkt = smrt_tran_teardown_pkt;
 	tran->tran_hba_len = sizeof (smrt_command_scsa_t);
+	tran->tran_interconnect_type = INTERCONNECT_SAS;
 
-	if (scsi_hba_attach_setup(dip, &smrt->smrt_dma_attr, tran,
-	    SCSI_HBA_TRAN_CLONE | SCSI_HBA_TRAN_SCB) != DDI_SUCCESS) {
+	flags = SCSI_HBA_HBA | SCSI_HBA_TRAN_SCB | SCSI_HBA_ADDR_COMPLEX;
+	if (scsi_hba_attach_setup(dip, &smrt->smrt_dma_attr, tran, flags) !=
+	    DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "could not attach to SCSA framework");
 		scsi_hba_tran_free(tran);
 		return (DDI_FAILURE);
@@ -1063,11 +1325,133 @@ smrt_hba_setup(smrt_t *smrt)
 }
 
 void
-smrt_hba_teardown(smrt_t *smrt)
+smrt_ctrl_hba_teardown(smrt_t *smrt)
 {
 	if (smrt->smrt_init_level & SMRT_INITLEVEL_SCSA) {
 		VERIFY(scsi_hba_detach(smrt->smrt_dip) != DDI_FAILURE);
 		scsi_hba_tran_free(smrt->smrt_hba_tran);
 		smrt->smrt_init_level &= ~SMRT_INITLEVEL_SCSA;
 	}
+}
+
+int
+smrt_logvol_hba_setup(smrt_t *smrt, dev_info_t *iport)
+{
+	scsi_hba_tran_t *tran;
+
+	tran = ddi_get_driver_private(iport);
+	if (tran == NULL)
+		return (DDI_FAILURE);
+
+	tran->tran_tgt_init = smrt_logvol_tran_tgt_init;
+	tran->tran_tgt_free = smrt_logvol_tran_tgt_free;
+
+	tran->tran_start = smrt_tran_start;
+	tran->tran_reset = smrt_tran_reset;
+	tran->tran_abort = smrt_tran_abort;
+
+	tran->tran_hba_private = smrt;
+
+	mutex_enter(&smrt->smrt_mutex);
+	if (scsi_hba_tgtmap_create(iport, SCSI_TM_FULLSET, MICROSEC,
+	    2 * MICROSEC, smrt, smrt_logvol_tgtmap_activate,
+	    smrt_logvol_tgtmap_deactivate, &smrt->smrt_virt_tgtmap) !=
+	    DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	smrt_discover_request(smrt);
+	mutex_exit(&smrt->smrt_mutex);
+
+	return (DDI_SUCCESS);
+}
+
+void
+smrt_logvol_hba_teardown(smrt_t *smrt, dev_info_t *iport)
+{
+	ASSERT(smrt->smrt_virt_iport == iport);
+
+	mutex_enter(&smrt->smrt_mutex);
+
+	if (smrt->smrt_virt_tgtmap != NULL) {
+		scsi_hba_tgtmap_t *t;
+
+		/*
+		 * Ensure that we can't be racing with discovery.
+		 */
+		while (smrt->smrt_status & SMRT_CTLR_DISCOVERY_RUNNING) {
+			mutex_exit(&smrt->smrt_mutex);
+			ddi_taskq_wait(smrt->smrt_discover_taskq);
+			mutex_enter(&smrt->smrt_mutex);
+		}
+
+		t = smrt->smrt_virt_tgtmap;
+		smrt->smrt_virt_tgtmap = NULL;
+		mutex_exit(&smrt->smrt_mutex);
+		scsi_hba_tgtmap_destroy(t);
+		mutex_enter(&smrt->smrt_mutex);
+	}
+
+	mutex_exit(&smrt->smrt_mutex);
+}
+
+int
+smrt_phys_hba_setup(smrt_t *smrt, dev_info_t *iport)
+{
+	scsi_hba_tran_t *tran;
+
+	tran = ddi_get_driver_private(iport);
+	if (tran == NULL)
+		return (DDI_FAILURE);
+
+	tran->tran_tgt_init = smrt_phys_tran_tgt_init;
+	tran->tran_tgt_free = smrt_phys_tran_tgt_free;
+
+	tran->tran_start = smrt_tran_start;
+	tran->tran_reset = smrt_tran_reset;
+	tran->tran_abort = smrt_tran_abort;
+
+	tran->tran_hba_private = smrt;
+
+	mutex_enter(&smrt->smrt_mutex);
+	if (scsi_hba_tgtmap_create(iport, SCSI_TM_FULLSET, MICROSEC,
+	    2 * MICROSEC, smrt, smrt_phys_tgtmap_activate,
+	    smrt_phys_tgtmap_deactivate, &smrt->smrt_phys_tgtmap) !=
+	    DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	smrt_discover_request(smrt);
+	mutex_exit(&smrt->smrt_mutex);
+
+	return (DDI_SUCCESS);
+}
+
+void
+smrt_phys_hba_teardown(smrt_t *smrt, dev_info_t *iport)
+{
+	ASSERT(smrt->smrt_phys_iport == iport);
+
+	mutex_enter(&smrt->smrt_mutex);
+
+	if (smrt->smrt_phys_tgtmap != NULL) {
+		scsi_hba_tgtmap_t *t;
+
+		/*
+		 * Ensure that we can't be racing with discovery.
+		 */
+		while (smrt->smrt_status & SMRT_CTLR_DISCOVERY_RUNNING) {
+			mutex_exit(&smrt->smrt_mutex);
+			ddi_taskq_wait(smrt->smrt_discover_taskq);
+			mutex_enter(&smrt->smrt_mutex);
+		}
+
+		t = smrt->smrt_phys_tgtmap;
+		smrt->smrt_phys_tgtmap = NULL;
+		mutex_exit(&smrt->smrt_mutex);
+		scsi_hba_tgtmap_destroy(t);
+		mutex_enter(&smrt->smrt_mutex);
+	}
+
+	mutex_exit(&smrt->smrt_mutex);
 }

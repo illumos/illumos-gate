@@ -11,7 +11,7 @@
 
 /*
  * Copyright (C) 2013 Hewlett-Packard Development Company, L.P.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SMRT_CISS_H
@@ -196,6 +196,12 @@ extern "C" {
 #define	CISS_OPQ_READ_ERROR(x)			((x) & (1UL << 1))
 
 /*
+ * Physical devices that are reported may be marked as 'masked'. A masked device
+ * is one that the driver can see, but must not perform any I/O to.
+ */
+#define	SMRT_CISS_MODE_MASKED			3
+
+/*
  * The following packed structures are used to ease the manipulation of
  * requests and responses from the controller.
  */
@@ -210,20 +216,20 @@ typedef struct smrt_tag {
 
 typedef union SCSI3Addr {
 	struct {
+		uint8_t Dev;
 		uint8_t Bus:6;
 		uint8_t Mode:2;
-		uint8_t Dev;
 	} PeripDev;
 	struct {
+		uint8_t DevLSB;
 		uint8_t DevMSB:6;
 		uint8_t Mode:2;
-		uint8_t DevLSB;
 	} LogDev;
 	struct {
-		uint8_t Targ:6;
-		uint8_t Mode:2;
 		uint8_t Dev:5;
 		uint8_t Bus:3;
+		uint8_t Targ:6;
+		uint8_t Mode:2;
 	} LogUnit;
 } SCSI3Addr_t;
 
