@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017 RackTop Systems.
 #
 
 # 0a  Initialization.
@@ -73,17 +74,13 @@ function svccfg_apply {
 }
 
 #
-# If the smf/manifest table has file entries that are missing
+# If the smf repository has file entries that are missing
 # then there is work to be done by the cleanup process.
 #
 function cleanup_needwork {
-	if [ "$early" == true ]; then
-		smfmfiles=`/usr/bin/svcprop smf/manifest | \
-		    awk '(/^lib_/ && /\/manifestfile /) {print $3}'`
-	else
-		smfmfiles=`/usr/bin/svcprop smf/manifest | \
-		    awk '/\/manifestfile / {print $3}'`
-	fi
+	smfmfiles=`svcprop -p manifestfiles '*' 2>/dev/null |
+	    nawk -v early="$early" '$2 == "astring" &&
+	    (early != "true" || $3 ~ "^/lib/") { print $3 }'`
 
 	nw=`/lib/svc/bin/mfstscan $smfmfiles 2>&1 1>/dev/null`
 	[ "$nw" ] && return 1
