@@ -103,7 +103,9 @@ extern SVCXPRT_LIST *_svc_xprtlist;
 extern mutex_t xprtlist_lock;
 extern void __svc_rm_from_xlist();
 
+#if !defined(_LP64)
 extern fd_set _new_svc_fdset;
+#endif
 
 /*
  * If the allocated array of reactor is too small, this value is used as a
@@ -854,7 +856,7 @@ xprt_unregister(const SVCXPRT *xprt)
  */
 bool_t
 svc_reg(const SVCXPRT *xprt, const rpcprog_t prog, const rpcvers_t vers,
-			void (*dispatch)(), const struct netconfig *nconf)
+    void (*dispatch)(), const struct netconfig *nconf)
 {
 	struct svc_callout *prev;
 	struct svc_callout *s, **s2;
@@ -966,7 +968,7 @@ svc_unreg(const rpcprog_t prog, const rpcvers_t vers)
  */
 bool_t
 svc_register(SVCXPRT *xprt, rpcprog_t prog, rpcvers_t vers,
-					void (*dispatch)(), int protocol)
+    void (*dispatch)(), int protocol)
 {
 	struct svc_callout *prev;
 	struct svc_callout *s;
@@ -1092,7 +1094,7 @@ svc_find(rpcprog_t prog, rpcvers_t vers, struct svc_callout **prev, char *netid)
  */
 bool_t
 svc_sendreply(const SVCXPRT *xprt, const xdrproc_t xdr_results,
-						const caddr_t xdr_location)
+    const caddr_t xdr_location)
 {
 	struct rpc_msg rply;
 
@@ -1227,7 +1229,7 @@ svcerr_noprog(const SVCXPRT *xprt)
  */
 void
 svcerr_progvers(const SVCXPRT *xprt, const rpcvers_t low_vers,
-						const rpcvers_t high_vers)
+    const rpcvers_t high_vers)
 {
 	struct rpc_msg rply;
 
@@ -1764,7 +1766,7 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
  */
 int
 __svc_dup(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
-	char *xprt_cache)
+    char *xprt_cache)
 {
 	uint32_t drxid, drhash;
 	int rc;
@@ -1812,7 +1814,7 @@ __svc_dup(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
  */
 static int
 __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
-		struct dupcache *dc, uint32_t drxid, uint32_t drhash)
+    struct dupcache *dc, uint32_t drxid, uint32_t drhash)
 {
 	struct dupreq *dr = NULL;
 
@@ -1971,7 +1973,7 @@ __svc_dupcache_victim(struct dupcache *dc, time_t timenow)
  */
 static int
 __svc_dupcache_enter(struct svc_req *req, struct dupreq *dr,
-	struct dupcache *dc, uint32_t drxid, uint32_t drhash, time_t timenow)
+    struct dupcache *dc, uint32_t drxid, uint32_t drhash, time_t timenow)
 {
 	dr->dr_xid = drxid;
 	dr->dr_prog = req->rq_prog;
@@ -2014,7 +2016,7 @@ __svc_dupcache_enter(struct svc_req *req, struct dupreq *dr,
  */
 int
 __svc_dupdone(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
-		int status, char *xprt_cache)
+    int status, char *xprt_cache)
 {
 	uint32_t drxid, drhash;
 	int rc;
@@ -2060,7 +2062,7 @@ __svc_dupdone(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
  */
 static int
 __svc_dupcache_update(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
-	int status, struct dupcache *dc, uint32_t drxid, uint32_t drhash)
+    int status, struct dupcache *dc, uint32_t drxid, uint32_t drhash)
 {
 	struct dupreq *dr = NULL;
 	time_t timenow = time(NULL);
