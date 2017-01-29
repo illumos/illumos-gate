@@ -21,8 +21,6 @@
 \ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
-\
-\ $FreeBSD$
 
 \ Loader.rc support functions:
 \
@@ -512,6 +510,12 @@ also parser definitions
 
 : comma?  line_pointer c@ [char] , = ;
 
+: at?  line_pointer c@ [char] @ = ;
+
+: slash?  line_pointer c@ [char] / = ;
+
+: colon?  line_pointer c@ [char] : = ;
+
 \ manipulation of input line
 : skip_character line_pointer char+ to line_pointer ;
 
@@ -543,8 +547,8 @@ also parser definitions
   line_pointer
   begin
     end_of_line? if 0 else
-      letter? digit? underscore? dot? comma? dash?
-      or or or or or
+      letter? digit? underscore? dot? comma? dash? at? slash? colon?
+      or or or or or or or or
     then
   while
     skip_character
@@ -625,7 +629,7 @@ also parser definitions
 
 : white_space_3
   eat_space
-  letter? digit? "quote? 'quote? or or or if
+  slash? letter? digit? "quote? 'quote? or or or or if
     ['] variable_value to parsing_function exit
   then
   ESYNTAX throw
