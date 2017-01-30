@@ -1,249 +1,426 @@
-'\" te
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
 .\"
-.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2017 Nexenta Systems, Inc.
 .\"
-.TH DEVID_GET 3DEVID "Jan 12, 2015"
-.SH NAME
-devid_get, devid_compare, devid_deviceid_to_nmlist, devid_free,
-devid_free_nmlist, devid_get_minor_name, devid_sizeof, devid_str_decode,
-devid_str_free, devid_str_encode, devid_valid \- device ID interfaces for user
-applications
-.SH SYNOPSIS
-.LP
-.nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-ldevid\fR [ \fIlibrary\fR... ]
-#include <devid.h>
-
-\fBint\fR \fBdevid_get\fR(\fBint\fR \fIfd\fR, \fBddi_devid_t *\fR\fIretdevid\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBdevid_free\fR(\fBddi_devid_t\fR \fIdevid\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBdevid_get_minor_name\fR(\fBint\fR \fIfd\fR, \fBchar **\fR\fIretminor_name\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBdevid_deviceid_to_nmlist\fR(\fBchar *\fR\fIsearch_path\fR, \fBddi_devid_t\fR \fIdevid\fR,
-     \fBchar *\fR\fIminor_name\fR, \fBdevid_nmlist_t **\fR\fIretlist\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBdevid_free_nmlist\fR(\fBdevid_nmlist_t *\fR\fIlist\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBdevid_compare\fR(\fBddi_devid_t\fR \fIdevid1\fR, \fBddi_devid_t\fR \fIdevid2\fR);
-.fi
-
-.LP
-.nf
-\fBsize_t\fR \fBdevid_sizeof\fR(\fBddi_devid_t\fR \fIdevid\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBdevid_valid\fR(\fBddi_devid_t\fR \fIdevid\fR);
-.fi
-
-.LP
-.nf
-\fBchar *\fR\fBdevid_str_encode\fR(\fBddi_devid_t\fR \fIdevid\fR, \fBchar *\fR\fIminor_name\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBdevid_str_decode\fR(\fBchar *\fR\fIdevidstr\fR, \fBddi_devid_t *\fR\fIretdevid\fR,
-     \fBchar **\fR\fIretminor_name\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBdevid_str_free\fR(\fBchar *\fR\fIstr\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-These functions provide unique identifiers (device \fBID\fRs) for devices.
+.Dd January 25, 2017
+.Dt DEVID_GET 3DEVID
+.Os
+.Sh NAME
+.Nm devid_get ,
+.Nm devid_free ,
+.Nm devid_get_minor_name ,
+.Nm devid_deviceid_to_nmlist ,
+.Nm devid_free_nmlist ,
+.Nm devid_compare ,
+.Nm devid_sizeof ,
+.Nm devid_valid ,
+.Nm devid_str_encode ,
+.Nm devid_str_decode ,
+.Nm devid_str_from_path ,
+.Nm devid_str_free
+.Nd device ID interfaces for user applications
+.Sh SYNOPSIS
+.Lb libdevid
+.In devid.h
+.Ft int
+.Fo devid_get
+.Fa "int fd"
+.Fa "ddi_devid_t *retdevid"
+.Fc
+.Ft void
+.Fo devid_free
+.Fa "ddi_devid_t devid"
+.Fc
+.Ft int
+.Fo devid_get_minor_name
+.Fa "int fd"
+.Fa "char **retminor_name"
+.Fc
+.Ft int
+.Fo devid_deviceid_to_nmlist
+.Fa "char *search_path"
+.Fa "ddi_devid_t devid"
+.Fa "char *minor_name"
+.Fa "devid_nmlist_t **retlist"
+.Fc
+.Ft void
+.Fo devid_free_nmlist
+.Fa "devid_nmlist_t *list"
+.Fc
+.Ft int
+.Fo devid_compare
+.Fa "ddi_devid_t devid1"
+.Fa "ddi_devid_t devid2"
+.Fc
+.Ft size_t
+.Fo devid_sizeof
+.Fa "ddi_devid_t devid"
+.Fc
+.Ft int
+.Fo devid_valid
+.Fa "ddi_devid_t devid"
+.Fc
+.Ft char *
+.Fo devid_str_encode
+.Fa "ddi_devid_t devid"
+.Fa "char *minor_name"
+.Fc
+.Ft int
+.Fo devid_str_decode
+.Fa "char *devidstr"
+.Fa "ddi_devid_t *retdevid"
+.Fa "char **retminor_name"
+.Fc
+.Ft char *
+.Fo devid_str_from_path
+.Fa "const char *path"
+.Fc
+.Ft void
+.Fo devid_str_free
+.Fa "char *str"
+.Fc
+.Sh DESCRIPTION
+These functions provide unique identifiers
+.Pq device ID
+for devices.
 Applications and device drivers use these functions to identify and locate
 devices, independent of the device's physical connection or its logical device
 name or number.
-.sp
-.LP
-The \fBdevid_get()\fR function returns in \fIretdevid\fR the device \fBID\fR
-for the device associated with the open file descriptor \fIfd\fR, which refers
-to any device. It returns an error if the device does not have an associated
-device \fBID\fR. The caller must free the memory allocated for \fIretdevid\fR
-using the  \fBdevid_free()\fR function.
-.sp
-.LP
-The \fBdevid_free()\fR function frees the space that was allocated for the
-returned \fIdevid\fR by \fBdevid_get()\fR and \fBdevid_str_decode()\fR.
-.sp
-.LP
-The \fBdevid_get_minor_name()\fR function returns the minor name, in
-\fIretminor_name\fR, for the device associated with the open file descriptor
-\fIfd\fR. This name is specific to the particular minor number, but is
-"instance number" specific. The caller of this function must free the memory
-allocated for the returned \fIretminor_name\fR string using
-\fBdevid_str_free()\fR.
-.sp
-.LP
-The \fBdevid_deviceid_to_nmlist()\fR function returns an array of
-\fIdevid_nmlist\fR structures, where each entry matches the \fIdevid\fR and
-\fIminor_name\fR passed in. If the \fIminor_name\fR specified is one of the
-special values (\fBDEVID_MINOR_NAME_ALL\fR, \fBDEVID_MINOR_NAME_ALL_CHR\fR, or
-\fBDEVID_MINOR_NAME_ALL_BLK\fR), then all minor names associated with
-\fIdevid\fR which also meet the special \fIminor_name\fR filtering requirements
-are returned. The \fIdevid_nmlist\fR structure contains the device name and
-device number. The last entry of the array contains a null pointer for the
-\fIdevname\fR and  \fBNODEV\fR for the device number. This function traverses
-the file tree, starting at \fIsearch_path\fR. For each device with a matching
-device \fBID\fR and minor name tuple, a device name and device number are added
-to the \fIretlist\fR. If no matches are found, an error is returned. The caller
-of this function must free the memory allocated for the returned array with the
-\fBdevid_free_nmlist()\fR function. This function may take a long time to
-complete if called with the device ID of an unattached device.
-.sp
-.LP
-The \fBdevid_free_nmlist()\fR function frees the memory allocated by the
-\fBdevid_deviceid_to_nmlist()\fR function and returned in the \fIretlist\fR.
-.sp
-.LP
-The \fBdevid_compare()\fR function compares two device \fBID\fRs and determines
-both equality and sort order. The function returns an integer greater than 0 if
-the device \fBID\fR pointed to by \fIdevid1\fR is greater than the device
-\fBID\fR pointed to by \fIdevid2\fR. It returns 0 if the device \fBID\fR
-pointed to by  \fIdevid1\fR is equal to the device \fBID\fR pointed to by
-\fIdevid2\fR. It returns an integer less than 0 if the device \fBID\fR pointed
-to by  \fIdevid1\fR is less than the device \fBID\fR pointed to by
-\fIdevid2\fR. This function is the only valid mechanism to determine the
-equality of two devids. This function may indicate equality for arguments which
-by simple inspection appear different.
-.sp
-.LP
-The \fBdevid_sizeof()\fR function returns the size of \fIdevid\fR in bytes.
-.sp
-.LP
-The \fBdevid_valid()\fR function validates the format of a \fIdevid\fR. It
-returns 1 if the format is valid, and 0 if invalid. This check may not be as
-complete as the corresponding kernel function \fBddi_devid_valid()\fR (see
-\fBddi_devid_compare\fR(9F)).
-.sp
-.LP
-The \fBdevid_str_encode()\fR function encodes a \fIdevid\fR and
-\fIminor_name\fR into a null-terminated ASCII string, returning a pointer to
-that string. To avoid shell conflicts, the \fIdevid\fR portion of the string is
-limited to uppercase and lowercase letters, digits, and the plus (+), minus
-(-), period (.), equals (=), underscore (_), tilde (~), and comma (,)
-characters. If there is an \fBASCII\fR quote character in the binary form of a
-\fIdevid\fR, the string representation will be in \fBhex_id\fR form, not
-\fBascii_id\fR form. The comma (,) character is added for "id1," at the head of
-the string \fIdevid\fR. If both a \fIdevid\fR and a \fIminor_name\fR are
-non-null, a slash (/)is used to separate the \fIdevid\fR from the
-\fIminor_name\fR in the encoded string.  If \fIminor_name\fR is null, only the
-\fIdevid\fR is encoded. If the \fIdevid\fR is null then the special string
-"id0" is returned. Note that you cannot compare the returned string against
-another string with \fBstrcmp\fR(3C) to determine devid equality.  The string
-returned must be freed by calling \fBdevid_str_free()\fR.
-.sp
-.LP
-The \fBdevid_str_decode()\fR function takes a string previously produced by the
-\fBdevid_str_encode()\fR or \fBddi_devid_str_encode()\fR (see
-\fBddi_devid_compare\fR(9F)) function and decodes the contained device ID and
-minor name, allocating and returning pointers to the extracted parts via the
-\fIretdevid\fR and \fIretminor_name\fR arguments. If the special \fIdevidstr\fR
-"id0" was specified, the returned device ID and minor name will both be null. A
-non-null returned devid must be freed by the caller by the \fBdevid_free()\fR
-function. A non-null returned minor name must be freed by calling
-\fBdevid_str_free()\fR.
-.sp
-.LP
-The \fBdevid_str_free()\fR function frees the character string returned by
-\fBdevid_str_encode()\fR and the \fIretminor_name\fR argument returned by
-\fBdevid_str_decode()\fR and \fBdevid_get_minor_name()\fR.
-.SH RETURN VALUES
-.LP
-Upon successful completion, the \fBdevid_get()\fR,
-\fBdevid_get_minor_name()\fR, \fBdevid_str_decode()\fR, and
-\fBdevid_deviceid_to_nmlist()\fR functions return \fB0\fR. Otherwise, they
-return \fB\(mi1\fR\&.
-.sp
-.LP
-The \fBdevid_compare()\fR function returns the following values:
-.sp
-.ne 2
-.na
-\fB\fB\(mi1\fR\fR
-.ad
-.RS 9n
-The device ID pointed to by \fIdevid1\fR is less than the device ID pointed to
-by \fIdevid2\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 9n
-The device ID pointed to by \fIdevid1\fR is equal to  the device ID pointed to
-by \fIdevid2\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR\fR
-.ad
-.RS 9n
-The device ID pointed to by \fIdevid1\fR is greater than the device ID pointed
-to by \fIdevid2\fR.
-.RE
-
-.sp
-.LP
-The \fBdevid_sizeof()\fR function returns the size of \fIdevid\fR in bytes. If
-\fIdevid\fR is null, the number of bytes that must be allocated and initialized
-to determine the size of a complete device ID is returned.
-.sp
-.LP
-The \fBdevid_valid()\fR function returns 1 if the \fIdevid\fR is valid and 0 if
-the \fIdevid\fR is invalid.
-.sp
-.LP
-The \fBdevid_str_encode()\fR function returns \fINULL\fR to indicate failure.
-Failure may be caused by attempting to encode an invalid string.  If the return
-value is non-null, the caller must free the returned string by using the
-\fBdevid_str_free()\fR function.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRUsing \fBdevid_get()\fR, \fBdevid_get_minor_name()\fR, and
-\fBdevid_str_encode()\fR
-.sp
-.LP
-The following example shows the proper use of  \fBdevid_get()\fR,
-\fBdevid_get_minor_name()\fR, and \fBdevid_str_encode()\fR to free the space
-allocated for \fIdevid\fR,  \fIminor_name\fR and encoded \fIdevid\fR.
-
-.sp
-.in +2
-.nf
+.Pp
+The
+.Fn devid_get
+function returns in
+.Fa retdevid
+the device ID for the device associated with the open file descriptor
+.Fa fd ,
+which refers to any device.
+It returns an error if the device does not have an associated device ID.
+The caller must free the memory allocated for
+.Fa retdevid
+using the
+.Fn devid_free
+function.
+.Pp
+The
+.Fn devid_free
+function frees the space that was allocated for the returned
+.Fa devid
+by
+.Fn devid_get
+and
+.Fn devid_str_decode .
+.Pp
+The
+.Fn devid_get_minor_name
+function returns the minor name, in
+.Fa retminor_name ,
+for the device associated with the open file descriptor
+.Fa fd .
+This name is specific to the particular minor number, but is
+.Qq instance number
+specific.
+The caller of this function must free the memory allocated for the returned
+.Fa retminor_name
+string using
+.Fn devid_str_free .
+.Pp
+The
+.Fn devid_deviceid_to_nmlist
+function returns an array of
+.Fa devid_nmlist
+structures, where each entry matches the
+.Fa devid
+and
+.Fa minor_name
+passed in.
+If the
+.Fa minor_name
+specified is one of the special values
+.Po
+.Dv DEVID_MINOR_NAME_ALL ,
+.Dv DEVID_MINOR_NAME_ALL_CHR ,
+or
+.Dv DEVID_MINOR_NAME_ALL_BLK
+.Pc ,
+then all minor names associated with
+.Fa devid
+which also meet the special
+.Fa minor_name
+filtering requirements are returned.
+The
+.Fa devid_nmlist
+structure contains the device name and device number.
+The last entry of the array contains a null pointer for the
+.Fa devname
+and
+.Dv NODEV
+for the device number.
+This function traverses the file tree, starting at
+.Fa search_path .
+For each device with a matching device ID and minor name tuple, a device name
+and device number are added to the
+.Fa retlist .
+If no matches are found, an error is returned.
+The caller of this function must free the memory allocated for the returned
+array with the
+.Fn devid_free_nmlist
+function.
+This function may take a long time to complete if called with the device ID of
+an unattached device.
+.Pp
+The
+.Fn devid_free_nmlist
+function frees the memory allocated by the
+.Fn devid_deviceid_to_nmlist
+function and returned in the
+.Fa retlist .
+.Pp
+The
+.Fn devid_compare
+function compares two device IDs and determines both equality and sort order.
+The function returns an integer greater than 0 if the device ID pointed to by
+.Fa devid1
+is greater than the device ID pointed to by
+.Fa devid2 .
+It returns 0 if the device ID pointed to by
+.Fa devid1
+is equal to the device ID pointed to by
+.Fa devid2 .
+It returns an integer less than 0 if the device ID pointed to by
+.Fa devid1
+is less than the device ID pointed to by
+.Fa devid2 .
+This function is the only valid mechanism to determine the equality of two
+devids.
+This function may indicate equality for arguments which by simple inspection
+appear different.
+.Pp
+The
+.Fn devid_sizeof
+function returns the size of
+.Fa devid
+in bytes.
+.Pp
+The
+.Fn devid_valid
+function validates the format of a
+.Fa devid .
+It returns 1 if the format is valid, and 0 if invalid.
+This check may not be as complete as the corresponding kernel function
+.Fn ddi_devid_valid
+.Po see
+.Xr ddi_devid_compare 9F
+.Pc .
+.Pp
+The
+.Fn devid_str_encode
+function encodes a
+.Fa devid
+and
+.Fa minor_name
+into a null-terminated ASCII string, returning a pointer to that string.
+To avoid shell conflicts, the
+.Fa devid
+portion of the string is limited to uppercase and lowercase letters, digits, and
+the plus
+.Pq Qq Sy \&+ ,
+minus
+.Pq Qq Sy \&- ,
+period
+.Pq Qq Sy \&. ,
+equals
+.Pq Qq Sy \&= ,
+underscore
+.Pq Qq Sy \&_ ,
+tilde
+.Pq Qq Sy \&~ ,
+and comma
+.Pq Qq Sy \&,
+characters.
+If there is an ASCII quote character in the binary form of a
+.Fa devid ,
+the string representation will be in hex_id form, not ascii_id form.
+The comma
+.Pq Qq Sy \&,
+character is added for
+.Qq id1,
+at the head of the string
+.Fa devid .
+If both a
+.Fa devid
+and a
+.Fa minor_name
+are non-null, a slash
+.Pq Qq Sy \&/
+is used to separate the
+.Fa devid
+from the
+.Fa minor_name
+in the encoded string.
+If
+.Fa minor_name
+is null, only the
+.Fa devid
+is encoded.
+If the
+.Fa devid
+is null then the special string
+.Qq id0
+is returned.
+Note that you cannot compare the returned string against another string with
+.Xr strcmp 3C
+to determine devid equality.
+The string returned must be freed by calling
+.Fn devid_str_free .
+.Pp
+The
+.Fn devid_str_from_path
+is similar to
+.Fn devid_str_encode ,
+but takes a
+.Fa path
+argument instead.
+If
+.Fa path
+includes the minor name, it will be encoded as well.
+The string returned must be freed by calling
+.Fn devid_str_free .
+.Pp
+The
+.Fn devid_str_decode
+function takes a string previously produced by the
+.Fn devid_str_encode
+or
+.Fn ddi_devid_str_encode
+.Po see
+.Xr ddi_devid_compare 9F
+.Pc
+function and decodes the contained device ID and minor name, allocating and
+returning pointers to the extracted parts via the
+.Fa retdevid
+and
+.Fa retminor_name
+arguments.
+If the special
+.Fa devidstr
+.Qq id0
+was specified, the returned device ID and minor name will both be null.
+A non-null returned devid must be freed by the caller by the
+.Fn devid_free
+function.
+A non-null returned minor name must be freed by calling
+.Fn devid_str_free .
+.Pp
+The
+.Fn devid_str_free
+function frees the character string returned by
+.Fn devid_str_encode
+and the
+.Fa retminor_name
+argument returned by
+.Fn devid_str_decode
+and
+.Fn devid_get_minor_name .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn devid_get ,
+.Fn devid_get_minor_name ,
+.Fn devid_str_decode ,
+and
+.Fn devid_deviceid_to_nmlist
+functions return 0.
+Otherwise, they return -1.
+.Pp
+The
+.Fn devid_compare
+function returns the following values:
+.Bl -tag -width Ds
+.It Sy -1
+The device ID pointed to by
+.Fa devid1
+is less than the device ID pointed to by
+.Fa devid2 .
+.It Sy 0
+The device ID pointed to by
+.Fa devid1
+is equal to the device ID pointed to by
+.Fa devid2 .
+.It Sy 1
+The device ID pointed to by
+.Fa devid1
+is greater than the device ID pointed to by
+.Fa devid2 .
+.El
+.Pp
+The
+.Fn devid_sizeof
+function returns the size of
+.Fa devid
+in bytes.
+If
+.Fa devid
+is null, the number of bytes that must be allocated and initialized to determine
+the size of a complete device ID is returned.
+.Pp
+The
+.Fn devid_valid
+function returns 1 if the
+.Fa devid
+is valid and 0 if the
+.Fa devid
+is invalid.
+.Pp
+The
+.Fn devid_str_encode
+and
+.Fn devid_str_from_path
+functions return NULL to indicate failure.
+Failure may be caused by attempting to encode an invalid string.
+If the return value is non-null, the caller must free the returned string by
+using the
+.Fn devid_str_free
+function.
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Xo
+.Sy Example 1
+Using
+.Fn devid_get ,
+.Fn devid_get_minor_name ,
+and
+.Fn devid_str_encode
+.Xc
+The following example shows the proper use of
+.Fn devid_get ,
+.Fn devid_get_minor_name ,
+and
+.Fn devid_str_encode
+to free the space allocated for
+.Fa devid ,
+.Fa minor_name
+and encoded
+.Fa devid .
+.Bd -literal
 int fd;
-ddi_devid_t    devid;
-char        *minor_name, *devidstr;
+ddi_devid_t devid;
+char *minor_name, *devidstr;
+
 if ((fd = open("/dev/dsk/c0t3d0s0", O_RDONLY|O_NDELAY)) < 0) {
     ...
 }
@@ -260,48 +437,35 @@ printf("devid %s\en", devidstr);
 devid_str_free(devidstr);
 devid_free(devid);
 devid_str_free(minor_name);
-.fi
-.in -2
+.Ed
+.It Xo
+.Sy Example 2
+Using
+.Fn devid_deviceid_to_nmlist
+and
+.Fn devid_free_nmlist
+.Xc
+The following example shows the proper use of
+.Fn devid_deviceid_to_nmlist
+and
+.Fn devid_free_nmlist :
+.Bd -literal
+devid_nmlist_t *list = NULL;
+int err;
 
-.LP
-\fBExample 2 \fRUsing \fBdevid_deviceid_to_nmlist()\fR and
-\fBdevid_free_nmlist()\fR
-.sp
-.LP
-The following example shows the proper use of  \fBdevid_deviceid_to_nmlist()\fR
-and \fBdevid_free_nmlist()\fR:
-
-.sp
-.in +2
-.nf
-devid_nmlist_t  *list = NULL;
-int    err;
 if (devid_deviceid_to_nmlist("/dev/rdsk", devid,
     minor_name, &list))
-        return (-1);
+	return (-1);
 /* loop through list and process device names and numbers */
 devid_free_nmlist(list);
-.fi
-.in -2
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-MT-Level	MT\(miSafe
-_
-Interface Stability	Stable
-.TE
-
-.SH SEE ALSO
-.LP
-\fBfree\fR(3C), \fBlibdevid\fR(3LIB), \fBattributes\fR(5),
-\fBddi_devid_compare\fR(9F)
+.Ed
+.El
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh INTERFACE STABILITY
+.Sy Stable
+.Sh SEE ALSO
+.Xr free 3C ,
+.Xr libdevid 3LIB ,
+.Xr attributes 5 ,
+.Xr ddi_devid_compare 9F

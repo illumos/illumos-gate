@@ -292,7 +292,6 @@ void	tem_safe_pix_clear_entire_screen(struct tem_vt_state *,
 
 void	tem_safe_get_color(struct tem_vt_state *, text_color_t *,
 	    text_color_t *, uint8_t);
-void	set_font(struct font *, short *, short *, short, short);
 
 void	tem_safe_blank_screen(struct tem_vt_state *, cred_t *,
 	    enum called_from);
