@@ -23,7 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
- * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 RackTop Systems.
  */
@@ -1291,7 +1291,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		 * successful for later cleanup and addition to
 		 * the mount in progress table.
 		 */
-		if ((uap->flags & MS_GLOBAL) == 0 &&
+		if ((vswp->vsw_flag & VSW_MOUNTDEV) &&
+		    (uap->flags & MS_GLOBAL) == 0 &&
 		    lookupname(uap->spec, fromspace,
 		    FOLLOW, NULL, &bvp) == 0) {
 			addmip = 1;
@@ -1507,7 +1508,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	 * wlock above. This case is for a non-spliced, non-global filesystem.
 	 */
 	if (!addmip) {
-		if ((uap->flags & MS_GLOBAL) == 0 &&
+		if ((vswp->vsw_flag & VSW_MOUNTDEV) &&
+		    (uap->flags & MS_GLOBAL) == 0 &&
 		    lookupname(uap->spec, fromspace, FOLLOW, NULL, &bvp) == 0) {
 			addmip = 1;
 		}
