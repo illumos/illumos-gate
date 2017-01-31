@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Joyent, Inc.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 
@@ -3895,7 +3896,7 @@ commit:
  *
  */
 static int
-upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
+upgrade_manifestfiles(pgroup_t *pg, entity_t *ient,
     const scf_snaplevel_t *running, void *ent)
 {
 	scf_propertygroup_t *ud_mfsts_pg = NULL;
@@ -3965,13 +3966,9 @@ upgrade_manifestfiles(pgroup_t *pg, const entity_t *ient,
 	}
 
 	/* Fetch the new manifests property group */
-	for (mfst_pgroup = uu_list_first(ient->sc_pgroups);
-	    mfst_pgroup != NULL;
-	    mfst_pgroup = uu_list_next(ient->sc_pgroups, mfst_pgroup)) {
-		if (strcmp(mfst_pgroup->sc_pgroup_name,
-		    SCF_PG_MANIFESTFILES) == 0)
-			break;
-	}
+	mfst_pgroup = internal_pgroup_find_or_create(ient,
+	    SCF_PG_MANIFESTFILES, SCF_GROUP_FRAMEWORK);
+	assert(mfst_pgroup != NULL);
 
 	if ((r = scf_iter_pg_properties(ud_prop_iter, ud_mfsts_pg)) !=
 	    SCF_SUCCESS)
