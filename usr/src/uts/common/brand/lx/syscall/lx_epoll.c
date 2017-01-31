@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -114,6 +114,7 @@ lx_epoll_create(int size)
 #define	EPOLLIGNORED 	(EPOLLMSG | EPOLLWAKEUP)
 #define	EPOLLSWIZZLED	\
 	(EPOLLRDHUP | EPOLLONESHOT | EPOLLET | EPOLLWRBAND | EPOLLWRNORM)
+#define	EPOLL_TIMEOUT_CLAMP(t)	(((t) < -1) ? -1 : (t))
 
 long
 lx_epoll_ctl(int fd, int op, int pfd, void *event)
@@ -244,7 +245,7 @@ lx_epoll_wait(int fd, void *events, int maxevents, int timeout)
 	}
 
 	arg.dp_nfds = maxevents;
-	arg.dp_timeout = timeout;
+	arg.dp_timeout = EPOLL_TIMEOUT_CLAMP(timeout);
 	arg.dp_fds = (pollfd_t *)events;
 	flag = fp->f_flag | DATAMODEL_NATIVE | FKIOCTL;
 	error = VOP_IOCTL(fp->f_vnode, DP_POLL, (uintptr_t)&arg, flag,
@@ -288,7 +289,7 @@ lx_epoll_pwait(int fd, void *events, int maxevents, int timeout, void *sigmask)
 	}
 
 	arg.dp_nfds = maxevents;
-	arg.dp_timeout = timeout;
+	arg.dp_timeout = EPOLL_TIMEOUT_CLAMP(timeout);
 	arg.dp_fds = (pollfd_t *)events;
 	flag = fp->f_flag | DATAMODEL_NATIVE | FKIOCTL;
 	error = VOP_IOCTL(fp->f_vnode, DP_PPOLL, (uintptr_t)&arg, flag,
