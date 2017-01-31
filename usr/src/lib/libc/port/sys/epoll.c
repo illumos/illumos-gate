@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -63,6 +63,15 @@
  */
 #define	EPOLLSWIZZLED	\
 	(EPOLLRDHUP | EPOLLONESHOT | EPOLLET | EPOLLWRBAND | EPOLLWRNORM)
+
+/*
+ * The defined behavior for epoll_wait/epoll_pwait when using a timeout less
+ * than 0 is to wait for events until they arrive (or interrupted by a signal).
+ * While poll(7d) operates in this manner for a timeout of -1, using other
+ * negative values results in an immediate timeout, as if it had been set to 0.
+ * For that reason, negative values are clamped to -1.
+ */
+#define	EPOLL_TIMEOUT_CLAMP(t)	(((t) < -1) ? -1 : (t))
 
 int
 epoll_create(int size)
@@ -209,7 +218,7 @@ epoll_wait(int epfd, struct epoll_event *events,
 	}
 
 	arg.dp_nfds = maxevents;
-	arg.dp_timeout = timeout;
+	arg.dp_timeout = EPOLL_TIMEOUT_CLAMP(timeout);
 	arg.dp_fds = (pollfd_t *)events;
 
 	return (ioctl(epfd, DP_POLL, &arg));
@@ -227,7 +236,7 @@ epoll_pwait(int epfd, struct epoll_event *events,
 	}
 
 	arg.dp_nfds = maxevents;
-	arg.dp_timeout = timeout;
+	arg.dp_timeout = EPOLL_TIMEOUT_CLAMP(timeout);
 	arg.dp_fds = (pollfd_t *)events;
 	arg.dp_setp = (sigset_t *)sigmask;
 
