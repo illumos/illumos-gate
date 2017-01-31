@@ -1,0 +1,31 @@
+    libdis_test:      66 0f d0 c8        addsubpd %xmm0,%xmm1
+    libdis_test+0x4:  66 0f d0 12        addsubpd (%rdx),%xmm2
+    libdis_test+0x8:  66 0f d0 54 24 23  addsubpd 0x23(%rsp),%xmm2
+    libdis_test+0xe:  f2 0f d0 c8        addsubps %xmm0,%xmm1
+    libdis_test+0x12: f2 0f d0 12        addsubps (%rdx),%xmm2
+    libdis_test+0x16: f2 0f d0 54 24 23  addsubps 0x23(%rsp),%xmm2
+    libdis_test+0x1c: 66 0f 7c c8        haddpd %xmm0,%xmm1
+    libdis_test+0x20: 66 0f 7c 12        haddpd (%rdx),%xmm2
+    libdis_test+0x24: 66 0f 7c 54 24 23  haddpd 0x23(%rsp),%xmm2
+    libdis_test+0x2a: f2 0f 7c c8        haddps %xmm0,%xmm1
+    libdis_test+0x2e: f2 0f 7c 12        haddps (%rdx),%xmm2
+    libdis_test+0x32: f2 0f 7c 54 24 23  haddps 0x23(%rsp),%xmm2
+    libdis_test+0x38: 66 0f 7d c8        hsubpd %xmm0,%xmm1
+    libdis_test+0x3c: 66 0f 7d 12        hsubpd (%rdx),%xmm2
+    libdis_test+0x40: 66 0f 7d 54 24 23  hsubpd 0x23(%rsp),%xmm2
+    libdis_test+0x46: f2 0f 7d c8        hsubps %xmm0,%xmm1
+    libdis_test+0x4a: f2 0f 7d 12        hsubps (%rdx),%xmm2
+    libdis_test+0x4e: f2 0f 7d 54 24 23  hsubps 0x23(%rsp),%xmm2
+    libdis_test+0x54: f2 0f f0 18        lddqu  (%rax),%xmm3
+    libdis_test+0x58: f2 0f 12 ec        movddup %xmm4,%xmm5
+    libdis_test+0x5c: f2 0f 12 30        movddup (%rax),%xmm6
+    libdis_test+0x60: f2 0f 12 7b 42     movddup 0x42(%rbx),%xmm7
+    libdis_test+0x65: f3 0f 16 ec        movshdup %xmm4,%xmm5
+    libdis_test+0x69: f3 0f 16 30        movshdup (%rax),%xmm6
+    libdis_test+0x6d: f3 0f 16 7b 42     movshdup 0x42(%rbx),%xmm7
+    libdis_test+0x72: f3 0f 12 ec        movsldup %xmm4,%xmm5
+    libdis_test+0x76: f3 0f 12 30        movsldup (%rax),%xmm6
+    libdis_test+0x7a: f3 0f 12 7b 42     movsldup 0x42(%rbx),%xmm7
+    libdis_test+0x7f: df 88 34 12 00 00  fisttp 0x1234(%rax)
+    libdis_test+0x85: db 88 34 12 00 00  tisttpl 0x1234(%rax)
+    libdis_test+0x8b: dd 88 34 12 00 00  fisttpll 0x1234(%rax)

@@ -1,0 +1,48 @@
+    libdis_test:       c4 e2 f9 92 14 88  vgatherdpd %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0x6:   c4 e2 f9 92 14 8d  vgatherdpd %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0x10:  c4 e2 fd 92 14 88  vgatherdpd %ymm0,(%eax,%xmm1,4),%ymm2
+    libdis_test+0x16:  c4 e2 fd 92 14 8d  vgatherdpd %ymm0,0x42(,%xmm1,4),%ymm2
+                       42 00 00 00 
+    libdis_test+0x20:  c4 e2 79 92 14 88  vgatherdps %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0x26:  c4 e2 79 92 14 8d  vgatherdps %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0x30:  c4 e2 7d 92 14 88  vgatherdps %ymm0,(%eax,%ymm1,4),%ymm2
+    libdis_test+0x36:  c4 e2 7d 92 14 8d  vgatherdps %ymm0,0x42(,%ymm1,4),%ymm2
+                       42 00 00 00 
+    libdis_test+0x40:  c4 e2 f9 93 14 88  vgatherqpd %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0x46:  c4 e2 f9 93 14 8d  vgatherqpd %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0x50:  c4 e2 fd 93 14 88  vgatherqpd %ymm0,(%eax,%ymm1,4),%ymm2
+    libdis_test+0x56:  c4 e2 fd 93 14 8d  vgatherqpd %ymm0,0x42(,%ymm1,4),%ymm2
+                       42 00 00 00 
+    libdis_test+0x60:  c4 e2 79 93 14 88  vgatherqps %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0x66:  c4 e2 79 93 14 8d  vgatherqps %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0x70:  c4 e2 7d 93 14 88  vgatherqps %xmm0,(%eax,%ymm1,4),%xmm2
+    libdis_test+0x76:  c4 e2 7d 93 14 8d  vgatherqps %xmm0,0x42(,%ymm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0x80:  c4 e2 79 90 14 88  vpgatherdd %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0x86:  c4 e2 79 90 14 8d  vpgatherdd %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0x90:  c4 e2 7d 90 14 88  vpgatherdd %ymm0,(%eax,%ymm1,4),%ymm2
+    libdis_test+0x96:  c4 e2 7d 90 14 8d  vpgatherdd %ymm0,0x42(,%ymm1,4),%ymm2
+                       42 00 00 00 
+    libdis_test+0xa0:  c4 e2 f9 90 14 88  vpgatherdq %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0xa6:  c4 e2 f9 90 14 8d  vpgatherdq %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0xb0:  c4 e2 fd 90 14 88  vpgatherdq %ymm0,(%eax,%xmm1,4),%ymm2
+    libdis_test+0xb6:  c4 e2 fd 90 14 8d  vpgatherdq %ymm0,0x42(,%xmm1,4),%ymm2
+                       42 00 00 00 
+    libdis_test+0xc0:  c4 e2 79 91 14 88  vpgatherqd %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0xc6:  c4 e2 79 91 14 8d  vpgatherqd %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0xd0:  c4 e2 7d 91 14 88  vpgatherqd %xmm0,(%eax,%ymm1,4),%xmm2
+    libdis_test+0xd6:  c4 e2 7d 91 14 8d  vpgatherqd %xmm0,0x42(,%ymm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0xe0:  c4 e2 f9 91 14 88  vpgatherqq %xmm0,(%eax,%xmm1,4),%xmm2
+    libdis_test+0xe6:  c4 e2 f9 91 14 8d  vpgatherqq %xmm0,0x42(,%xmm1,4),%xmm2
+                       42 00 00 00 
+    libdis_test+0xf0:  c4 e2 fd 91 14 88  vpgatherqq %ymm0,(%eax,%ymm1,4),%ymm2
+    libdis_test+0xf6:  c4 e2 fd 91 14 8d  vpgatherqq %ymm0,0x42(,%ymm1,4),%ymm2
+                       42 00 00 00 
