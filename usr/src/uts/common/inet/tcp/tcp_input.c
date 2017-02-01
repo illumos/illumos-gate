@@ -2874,12 +2874,20 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		/*
 		 * RST segments must not be subject to PAWS and are not
 		 * required to have timestamps.
+		 * We do not drop keepalive segments without
+		 * timestamps, to maintain compatibility with legacy TCP stacks.
 		 */
-		if (tcp->tcp_snd_ts_ok && !(flags & TH_RST)) {
+		boolean_t keepalive = (seg_len == 0 || seg_len == 1) &&
+		    (seg_seq + 1 == tcp->tcp_rnxt);
+		if (tcp->tcp_snd_ts_ok && !(flags & TH_RST) && !keepalive) {
 			/*
 			 * Per RFC 7323 section 3.2., silently drop non-RST
 			 * segments without expected TSopt. This is a 'SHOULD'
 			 * requirement.
+			 * We accept keepalives without TSopt to maintain
+			 * interoperability with tcp implementations that omit
+			 * the TSopt on these. Keepalive data is discarded, so
+			 * there is no risk corrupting data by accepting these.
 			 */
 			if (!(options & TCP_OPT_TSTAMP_PRESENT)) {
 				/*
