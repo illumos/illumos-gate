@@ -26,9 +26,9 @@ MACHINE=	$(MACH64)
 
 # architecture-specific loader code
 SRCS=	autoload.c bootinfo.c conf.c copy.c devicename.c main.c self_reloc.c \
-	smbios.c biosacpi.c vers.c
+	smbios.c acpi.c vers.c
 OBJS= autoload.o bootinfo.o conf.o copy.o devicename.o main.o self_reloc.o \
-	smbios.o biosacpi.o vers.o
+	smbios.o acpi.o vers.o
 
 ASFLAGS=-m64 -fPIC
 CFLAGS=	-O2
