@@ -658,14 +658,10 @@ bcons_init_fb(void)
 			fb_info.inverse_screen = B_TRUE;
 	}
 
-#if defined(_BOOT) && defined(_NEWFONT)
+#if defined(_BOOT)
 	/*
 	 * Load cursor position from bootloader only in dboot,
 	 * dboot will pass cursor position to kernel via xboot info.
-	 */
-	/*
-	 * To keep consistent console, we reset boot screen till new fonts
-	 * are available.
 	 */
 	propval = find_boot_prop("tem.cursor.row");
 	if (propval != NULL) {

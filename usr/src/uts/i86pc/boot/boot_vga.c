@@ -32,6 +32,7 @@
 #include <sys/vgareg.h>
 #include <sys/framebuffer.h>
 #include <sys/boot_console.h>
+#include <sys/rgb.h>
 #include "boot_console_impl.h"
 
 #include "boot_console_impl.h"
@@ -83,9 +84,6 @@ get_vga_color(void)
 {
 	int color;
 	uint32_t fg, bg;
-	uint8_t solaris_color_to_pc_color[16] = {
-		15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
-	};
 
 	boot_get_color(&fg, &bg);
 	color = solaris_color_to_pc_color[bg] << 4;

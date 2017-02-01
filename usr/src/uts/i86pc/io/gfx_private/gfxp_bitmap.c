@@ -28,6 +28,7 @@
 #include <sys/ddi.h>
 #include <sys/kd.h>
 #include <sys/sunddi.h>
+#include <sys/rgb.h>
 #include <sys/gfx_private.h>
 #include "gfxp_fb.h"
 
@@ -267,19 +268,19 @@ bitmap_color_map(uint8_t index)
 	uint8_t c, mask;
 	uint32_t color = 0;
 
-	c = cmap_rgb16.red[index];
+	c = cmap4_to_24.red[index];
 	mask = (1 << fb_info.rgb.red.size) - 1;
 	c >>= 8 - fb_info.rgb.red.size;
 	c &= mask;
 	color |= c << fb_info.rgb.red.pos;
 
-	c = cmap_rgb16.green[index];
+	c = cmap4_to_24.green[index];
 	mask = (1 << fb_info.rgb.green.size) - 1;
 	c >>= 8 - fb_info.rgb.green.size;
 	c &= mask;
 	color |= c << fb_info.rgb.green.pos;
 
-	c = cmap_rgb16.blue[index];
+	c = cmap4_to_24.blue[index];
 	mask = (1 << fb_info.rgb.blue.size) - 1;
 	c >>= 8 - fb_info.rgb.blue.size;
 	c &= mask;

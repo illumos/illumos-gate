@@ -31,6 +31,7 @@
 #include <sys/bootinfo.h>
 #include <sys/boot_console.h>
 #include <sys/bootconf.h>
+#include <sys/rgb.h>
 #include "boot_console_impl.h"
 
 #define	P2ROUNDUP(x, align)	(-(-(x) & -(align)))
@@ -57,40 +58,82 @@ struct vis_conscopy {
 	uint16_t t_col;		/* Col to move to */
 };
 
-/* we have built in fonts 12x22, 6x10, 7x14 and depth 32. */
-#define	MAX_GLYPH	(12 * 22 * 4)
+/*
+ * We have largest font 16x32 with depth 32. This will allocate 2048
+ * bytes from BSS.
+ */
+#define	MAX_GLYPH	(16 * 32 * 4)
+
+struct fontlist		cf_fontlist;
+static bitmap_data_t	cf_data;
+static struct font	cf_font;
 
 static struct font	boot_fb_font; /* set by set_font() */
 static uint8_t		glyph[MAX_GLYPH];
-
-/* color translation */
-typedef struct {
-	uint8_t red[16];
-	uint8_t green[16];
-	uint8_t blue[16];
-} text_cmap_t;
-
-/* BEGIN CSTYLED */
-/*                             Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
-static uint8_t dim_xlate[] = {  1,  5,  3,  7,  2,  6,  4,  8 };
-static uint8_t brt_xlate[] = {  9, 13, 11, 15, 10, 14, 12,  0 };
-/* END CSTYLED */
-
-static text_cmap_t cmap4_to_24 = {
-/* BEGIN CSTYLED */
-/* 0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
-  Wh+  Bk   Bl   Gr   Cy   Rd   Mg   Br   Wh   Bk+  Bl+  Gr+  Cy+  Rd+  Mg+  Yw */
-  0xff,0x00,0x00,0x00,0x00,0x80,0x80,0x80,0x80,0x40,0x00,0x00,0x00,0xff,0xff,0xff,
-  0xff,0x00,0x00,0x80,0x80,0x00,0x00,0x80,0x80,0x40,0x00,0xff,0xff,0x00,0x00,0xff,
-  0xff,0x00,0x80,0x00,0x80,0x00,0x80,0x00,0x80,0x40,0xff,0x00,0xff,0x00,0xff,0x00
-/* END CSTYLED */
-};
 
 static void boot_fb_putchar(int);
 static void boot_fb_eraseline(void);
 static void boot_fb_setpos(int, int);
 static void boot_fb_shiftline(int);
 static void boot_fb_eraseline_impl(uint16_t, uint16_t);
+
+static void
+xbi_init_font(struct xboot_info *xbi)
+{
+	uint32_t i, checksum = 0;
+	struct boot_modules *modules;
+	struct font_info *fi;
+	uintptr_t ptr;
+
+	modules = (struct boot_modules *)(uintptr_t)xbi->bi_modules;
+	for (i = 0; i < xbi->bi_module_cnt; i++) {
+		if (modules[i].bm_type == BMT_FONT)
+			break;
+	}
+	if (i == xbi->bi_module_cnt)
+		return;
+
+	ptr = (uintptr_t)modules[i].bm_addr;
+	fi = (struct font_info *)ptr;
+
+	/*
+	 * Compute and verify checksum. The total sum of all the fields
+	 * must be 0. Note, the return from this point means we will
+	 * use default font.
+	 */
+	checksum += fi->fi_width;
+	checksum += fi->fi_height;
+	checksum += fi->fi_bitmap_size;
+	for (i = 0; i < VFNT_MAPS; i++)
+		checksum += fi->fi_map_count[i];
+	if (checksum + fi->fi_checksum != 0)
+		return;
+
+	cf_data.width = fi->fi_width;
+	cf_data.height = fi->fi_height;
+	cf_data.uncompressed_size = fi->fi_bitmap_size;
+	cf_data.font = &cf_font;
+
+	ptr += sizeof (struct font_info);
+	ptr = P2ROUNDUP(ptr, 8);
+
+	cf_font.vf_width = fi->fi_width;
+	cf_font.vf_height = fi->fi_height;
+	for (i = 0; i < VFNT_MAPS; i++) {
+		if (fi->fi_map_count[i] == 0)
+			continue;
+		cf_font.vf_map_count[i] = fi->fi_map_count[i];
+		cf_font.vf_map[i] = (struct font_map *)ptr;
+		ptr += (fi->fi_map_count[i] * sizeof (struct font_map));
+		ptr = P2ROUNDUP(ptr, 8);
+	}
+	cf_font.vf_bytes = (uint8_t *)ptr;
+	cf_fontlist.font_name = NULL;
+	cf_fontlist.font_flags = FONT_BOOT;
+	cf_fontlist.font_data = &cf_data;
+	cf_fontlist.font_load = NULL;
+	STAILQ_INSERT_HEAD(&fonts, &cf_fontlist, font_next);
+}
 
 /*
  * extract data from MB2 framebuffer tag and set up initial frame buffer.
@@ -118,6 +161,8 @@ xbi_fb_init(struct xboot_info *xbi, bcons_dev_t *bcons_dev)
 	if (tag == NULL) {
 		return (B_FALSE);
 	}
+
+	xbi_init_font(xbi);
 
 	fb_info.paddr = tag->framebuffer_common.framebuffer_addr;
 	fb_info.pitch = tag->framebuffer_common.framebuffer_pitch;
@@ -170,14 +215,25 @@ static void
 boot_fb_set_font(uint16_t height, uint16_t width)
 {
 	short h, w;
+	bitmap_data_t *bp;
+	int i;
 
 	h = MIN(height, 4096);
 	w = MIN(width, 4096);
 
-	set_font(&boot_fb_font, (short *)&fb_info.terminal.y,
+	bp = set_font((short *)&fb_info.terminal.y,
 	    (short *)&fb_info.terminal.x, h, w);
-	fb_info.font_width = boot_fb_font.width;
-	fb_info.font_height = boot_fb_font.height;
+
+	boot_fb_font.vf_bytes = bp->font->vf_bytes;
+	boot_fb_font.vf_width = bp->font->vf_width;
+	boot_fb_font.vf_height = bp->font->vf_height;
+	for (i = 0; i < VFNT_MAPS; i++) {
+		boot_fb_font.vf_map[i] = bp->font->vf_map[i];
+		boot_fb_font.vf_map_count[i] = bp->font->vf_map_count[i];
+	}
+
+	fb_info.font_width = boot_fb_font.vf_width;
+	fb_info.font_height = boot_fb_font.vf_height;
 }
 
 /* fill framebuffer */
@@ -355,10 +411,10 @@ boot_fb_init(int console)
 	fb_info.fb = (uint8_t *)(uintptr_t)fb_info.paddr;
 
 	boot_fb_set_font(fb_info.screen.y, fb_info.screen.x);
-	window.x =
-	    (fb_info.screen.x - fb_info.terminal.x * boot_fb_font.width) / 2;
-	window.y =
-	    (fb_info.screen.y - fb_info.terminal.y * boot_fb_font.height) / 2;
+	window.x = (fb_info.screen.x -
+	    fb_info.terminal.x * boot_fb_font.vf_width) / 2;
+	window.y = (fb_info.screen.y -
+	    fb_info.terminal.y * boot_fb_font.vf_height) / 2;
 	fb_info.terminal_origin.x = window.x;
 	fb_info.terminal_origin.y = window.y;
 
@@ -370,9 +426,9 @@ boot_fb_init(int console)
 	 */
 	if (fb_info.cursor.pos.x != 0 || fb_info.cursor.pos.y != 0) {
 		fb_info.cursor.origin.x = window.x +
-		    fb_info.cursor.pos.x * boot_fb_font.width;
+		    fb_info.cursor.pos.x * boot_fb_font.vf_width;
 		fb_info.cursor.origin.y = window.y +
-		    fb_info.cursor.pos.y * boot_fb_font.height;
+		    fb_info.cursor.pos.y * boot_fb_font.vf_height;
 	}
 #endif
 
@@ -488,13 +544,13 @@ boot_fb_eraseline_impl(uint16_t x, uint16_t y)
 	boot_get_color(&fg, &bg);
 	bg = boot_color_map(bg);
 
-	size = fb_info.terminal.x * boot_fb_font.width * fb_info.bpp;
+	size = fb_info.terminal.x * boot_fb_font.vf_width * fb_info.bpp;
 
 	toffset = x * fb_info.bpp + y * fb_info.pitch;
 	dst = fb_info.fb + toffset;
 	sdst = fb_info.shadow_fb + toffset;
 
-	for (i = 0; i < boot_fb_font.height; i++) {
+	for (i = 0; i < boot_fb_font.vf_height; i++) {
 		uint8_t *dest = dst + i * fb_info.pitch;
 		if (fb_info.fb + fb_info.fb_size >= dest + size)
 			boot_fb_fill(dest, bg, size);
@@ -565,11 +621,11 @@ boot_fb_shiftline(int chars)
 	c_copy.s_col = fb_info.cursor.origin.x;
 	c_copy.s_row = fb_info.cursor.origin.y;
 
-	c_copy.e_col = (fb_info.terminal.x - chars) * boot_fb_font.width;
+	c_copy.e_col = (fb_info.terminal.x - chars) * boot_fb_font.vf_width;
 	c_copy.e_col += fb_info.terminal_origin.x;
-	c_copy.e_row = c_copy.s_row + boot_fb_font.height;
+	c_copy.e_row = c_copy.s_row + boot_fb_font.vf_height;
 
-	c_copy.t_col = fb_info.cursor.origin.x + chars * boot_fb_font.width;
+	c_copy.t_col = fb_info.cursor.origin.x + chars * boot_fb_font.vf_width;
 	c_copy.t_row = fb_info.cursor.origin.y;
 
 	boot_fb_conscopy(&c_copy);
@@ -584,7 +640,7 @@ boot_fb_scroll(void)
 	struct vis_conscopy c_copy;
 
 	/* support for scrolling. set up the console copy data and last line */
-	c_copy.s_row = fb_info.terminal_origin.y + boot_fb_font.height;
+	c_copy.s_row = fb_info.terminal_origin.y + boot_fb_font.vf_height;
 	c_copy.s_col = fb_info.terminal_origin.x;
 	c_copy.e_row = fb_info.screen.y - fb_info.terminal_origin.y;
 	c_copy.e_col = fb_info.screen.x - fb_info.terminal_origin.x;
@@ -596,7 +652,7 @@ boot_fb_scroll(void)
 	/* now clean up the last line */
 	boot_fb_eraseline_impl(fb_info.terminal_origin.x,
 	    fb_info.terminal_origin.y +
-	    (fb_info.terminal.y - 1) * boot_fb_font.height);
+	    (fb_info.terminal.y - 1) * boot_fb_font.vf_height);
 }
 
 /*
@@ -606,7 +662,7 @@ boot_fb_scroll(void)
 void
 boot_fb_cursor(boolean_t visible)
 {
-	uint32_t offset, size;
+	uint32_t offset, size, j;
 	uint32_t *fb32, *sfb32 = NULL;
 	uint32_t fg, bg;
 	uint16_t *fb16, *sfb16 = NULL;
@@ -622,7 +678,7 @@ boot_fb_cursor(boolean_t visible)
 
 	fb_info.cursor.visible = visible;
 	pitch = fb_info.pitch;
-	size = boot_fb_font.width * fb_info.bpp;
+	size = boot_fb_font.vf_width * fb_info.bpp;
 
 	/*
 	 * Build cursor image. We are building mirror image of data on
@@ -632,11 +688,11 @@ boot_fb_cursor(boolean_t visible)
 	    fb_info.cursor.origin.y * pitch;
 	switch (fb_info.depth) {
 	case 8:
-		for (i = 0; i < boot_fb_font.height; i++) {
+		for (i = 0; i < boot_fb_font.vf_height; i++) {
 			fb8 = fb_info.fb + offset + i * pitch;
 			if (fb_info.shadow_fb != NULL)
 				sfb8 = fb_info.shadow_fb + offset + i * pitch;
-			for (uint32_t j = 0; j < size; j += 1) {
+			for (j = 0; j < size; j += 1) {
 				fb8[j] = (fb8[j] ^ (fg & 0xff)) ^ (bg & 0xff);
 
 				if (sfb8 == NULL)
@@ -648,12 +704,12 @@ boot_fb_cursor(boolean_t visible)
 		break;
 	case 15:
 	case 16:
-		for (i = 0; i < boot_fb_font.height; i++) {
+		for (i = 0; i < boot_fb_font.vf_height; i++) {
 			fb16 = (uint16_t *)(fb_info.fb + offset + i * pitch);
 			if (fb_info.shadow_fb != NULL)
 				sfb16 = (uint16_t *)
 				    (fb_info.shadow_fb + offset + i * pitch);
-			for (int j = 0; j < boot_fb_font.width; j++) {
+			for (j = 0; j < boot_fb_font.vf_width; j++) {
 				fb16[j] = (fb16[j] ^ (fg & 0xffff)) ^
 				    (bg & 0xffff);
 
@@ -666,11 +722,11 @@ boot_fb_cursor(boolean_t visible)
 		}
 		break;
 	case 24:
-		for (i = 0; i < boot_fb_font.height; i++) {
+		for (i = 0; i < boot_fb_font.vf_height; i++) {
 			fb8 = fb_info.fb + offset + i * pitch;
 			if (fb_info.shadow_fb != NULL)
 				sfb8 = fb_info.shadow_fb + offset + i * pitch;
-			for (uint32_t j = 0; j < size; j += 3) {
+			for (j = 0; j < size; j += 3) {
 				fb8[j] = (fb8[j] ^ ((fg >> 16) & 0xff)) ^
 				    ((bg >> 16) & 0xff);
 				fb8[j+1] = (fb8[j+1] ^ ((fg >> 8) & 0xff)) ^
@@ -691,13 +747,13 @@ boot_fb_cursor(boolean_t visible)
 		}
 		break;
 	case 32:
-		for (i = 0; i < boot_fb_font.height; i++) {
+		for (i = 0; i < boot_fb_font.vf_height; i++) {
 			fb32 = (uint32_t *)(fb_info.fb + offset + i * pitch);
 			if (fb_info.shadow_fb != NULL) {
 				sfb32 = (uint32_t *)
 				    (fb_info.shadow_fb + offset + i * pitch);
 			}
-			for (int j = 0; j < boot_fb_font.width; j++) {
+			for (j = 0; j < boot_fb_font.vf_width; j++) {
 				fb32[j] = (fb32[j] ^ fg) ^ bg;
 
 				if (sfb32 == NULL)
@@ -725,9 +781,9 @@ boot_fb_setpos(int row, int col)
 	fb_info.cursor.pos.x = col;
 	fb_info.cursor.pos.y = row;
 	fb_info.cursor.origin.x = fb_info.terminal_origin.x;
-	fb_info.cursor.origin.x += col * boot_fb_font.width;
+	fb_info.cursor.origin.x += col * boot_fb_font.vf_width;
 	fb_info.cursor.origin.y = fb_info.terminal_origin.y;
-	fb_info.cursor.origin.y += row * boot_fb_font.height;
+	fb_info.cursor.origin.y += row * boot_fb_font.vf_height;
 }
 
 static void
@@ -750,8 +806,8 @@ boot_fb_putchar(int c)
 	bit_to_pix(c);
 	display.col = fb_info.cursor.origin.x;
 	display.row = fb_info.cursor.origin.y;
-	display.width = boot_fb_font.width;
-	display.height = boot_fb_font.height;
+	display.width = boot_fb_font.vf_width;
+	display.height = boot_fb_font.vf_height;
 	display.data = glyph;
 
 	boot_fb_blit(&display);

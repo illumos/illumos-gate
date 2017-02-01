@@ -68,6 +68,7 @@
 #include <vm/hat_i86.h>
 #include <sys/x86_archext.h>
 #include <sys/avl.h>
+#include <sys/font.h>
 
 /*
  * DDI Boot Configuration
@@ -2032,6 +2033,55 @@ get_vga_properties(void)
 	kmem_free(bop_staging_area, MMU_PAGESIZE);
 }
 
+/*
+ * Copy console font to kernel memory. The temporary font setup
+ * to use font module was done in early console setup, using low
+ * memory and data from font module. Now we need to allocate
+ * kernel memory and copy data over, so the low memory can be freed.
+ * We can have at most one entry in font list from early boot.
+ */
+static void
+get_console_font(void)
+{
+	struct fontlist *fp, *fl;
+	bitmap_data_t *bd;
+	struct font *fd, *tmp;
+	int i;
+
+	if (STAILQ_EMPTY(&fonts))
+		return;
+
+	fl = STAILQ_FIRST(&fonts);
+	STAILQ_REMOVE_HEAD(&fonts, font_next);
+	fp = kmem_zalloc(sizeof (*fp), KM_SLEEP);
+	bd = kmem_zalloc(sizeof (*bd), KM_SLEEP);
+	fd = kmem_zalloc(sizeof (*fd), KM_SLEEP);
+
+	fp->font_name = NULL;
+	fp->font_flags = FONT_BOOT;
+	fp->font_data = bd;
+
+	bd->width = fl->font_data->width;
+	bd->height = fl->font_data->height;
+	bd->uncompressed_size = fl->font_data->uncompressed_size;
+	bd->font = fd;
+
+	tmp = fl->font_data->font;
+	fd->vf_width = tmp->vf_width;
+	fd->vf_height = tmp->vf_height;
+	for (i = 0; i < VFNT_MAPS; i++) {
+		if (tmp->vf_map_count[i] == 0)
+			continue;
+		fd->vf_map_count[i] = tmp->vf_map_count[i];
+		fd->vf_map[i] = kmem_alloc(fd->vf_map_count[i] *
+		    sizeof (*fd->vf_map[i]), KM_SLEEP);
+		bcopy(tmp->vf_map[i], fd->vf_map[i], fd->vf_map_count[i] *
+		    sizeof (*fd->vf_map[i]));
+	}
+	fd->vf_bytes = kmem_alloc(bd->uncompressed_size, KM_SLEEP);
+	bcopy(tmp->vf_bytes, fd->vf_bytes, bd->uncompressed_size);
+	STAILQ_INSERT_HEAD(&fonts, fp, font_next);
+}
 
 /*
  * This is temporary, but absolutely necessary.  If we are being
@@ -2583,6 +2633,9 @@ impl_setup_ddi(void)
 
 	/* not framebuffer should be enumerated, if present */
 	get_vga_properties();
+
+	/* Copy console font if provided by boot. */
+	get_console_font();
 
 	/*
 	 * Check for administratively disabled drivers.

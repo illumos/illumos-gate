@@ -32,14 +32,6 @@ extern "C" {
 #define	GFXP_FLAG_CONSOLE	0x00000001
 #define	GFXP_IS_CONSOLE(softc)	((softc)->flags & GFXP_FLAG_CONSOLE)
 
-typedef struct {
-	uint8_t red[16];
-	uint8_t green[16];
-	uint8_t blue[16];
-} text_cmap_t;
-
-extern text_cmap_t cmap_rgb16;
-
 struct gfxp_fb_softc;
 
 struct gfxp_ops {

@@ -1618,10 +1618,10 @@ TEM_OBJS += tem.o tem_safe.o
 #
 #	Font data for generated 8x16 font
 #
-VGATEXT_FONT	= 8x16
-VGATEXT_FONT_SRC= 8859-1
-VGATEXT_FONT_DIR= $(UTSBASE)/common/font
-FONT_OBJS += font.o 6x10.o 7x14.o 8x16.o 12x22.o
+FONT	= 8x16
+FONT_SRC= ter-u16n
+FONT_DIR= $(SRC)/data/consfonts
+FONT_OBJS += font.o $(FONT).o
 
 KBTRANS_OBJS +=				\
 		kbtrans.o		\

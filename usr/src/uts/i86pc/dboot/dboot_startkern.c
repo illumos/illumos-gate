@@ -1070,42 +1070,48 @@ dboot_multiboot_modcmdline(int index)
 }
 
 /*
- * Find the environment module for console setup.
+ * Find the modules used by console setup.
  * Since we need the console to print early boot messages, the console is set up
- * before anything else and therefore we need to pick up the environment module
- * early too.
+ * before anything else and therefore we need to pick up the needed modules.
  *
- * Note, we just will search for and if found, will pass the env
- * module to console setup, the proper module list processing will happen later.
+ * Note, we just will search for and if found, will pass the modules
+ * to console setup, the proper module list processing will happen later.
+ * Currently used modules are boot environment and console font.
  */
 static void
-dboot_find_env(void)
+dboot_find_console_modules(void)
 {
 	int i, modcount;
 	uint32_t mod_start, mod_end;
 	char *cmdline;
 
 	modcount = dboot_multiboot_modcount();
-
+	bi->bi_module_cnt = 0;
 	for (i = 0; i < modcount; ++i) {
 		cmdline = dboot_multiboot_modcmdline(i);
 		if (cmdline == NULL)
 			continue;
 
-		if (strstr(cmdline, "type=environment") == NULL)
+		if (strstr(cmdline, "type=console-font") != NULL)
+			modules[bi->bi_module_cnt].bm_type = BMT_FONT;
+		else if (strstr(cmdline, "type=environment") != NULL)
+			modules[bi->bi_module_cnt].bm_type = BMT_ENV;
+		else
 			continue;
 
 		mod_start = dboot_multiboot_modstart(i);
 		mod_end = dboot_multiboot_modend(i);
-		modules[0].bm_addr = (native_ptr_t)(uintptr_t)mod_start;
-		modules[0].bm_size = mod_end - mod_start;
-		modules[0].bm_name = (native_ptr_t)(uintptr_t)NULL;
-		modules[0].bm_hash = (native_ptr_t)(uintptr_t)NULL;
-		modules[0].bm_type = BMT_ENV;
-		bi->bi_modules = (native_ptr_t)(uintptr_t)modules;
-		bi->bi_module_cnt = 1;
-		return;
+		modules[bi->bi_module_cnt].bm_addr =
+		    (native_ptr_t)(uintptr_t)mod_start;
+		modules[bi->bi_module_cnt].bm_size = mod_end - mod_start;
+		modules[bi->bi_module_cnt].bm_name =
+		    (native_ptr_t)(uintptr_t)NULL;
+		modules[bi->bi_module_cnt].bm_hash =
+		    (native_ptr_t)(uintptr_t)NULL;
+		bi->bi_module_cnt++;
 	}
+	if (bi->bi_module_cnt != 0)
+		bi->bi_modules = (native_ptr_t)(uintptr_t)modules;
 }
 
 static boolean_t
@@ -1206,6 +1212,8 @@ type_to_str(boot_module_type_t type)
 		return ("hash");
 	case BMT_ENV:
 		return ("environment");
+	case BMT_FONT:
+		return ("console-font");
 	default:
 		return ("unknown");
 	}
@@ -1326,6 +1334,8 @@ process_module(int midx)
 				modules[midx].bm_type = BMT_HASH;
 			} else if (strcmp(q, "environment") == 0) {
 				modules[midx].bm_type = BMT_ENV;
+			} else if (strcmp(q, "console-font") == 0) {
+				modules[midx].bm_type = BMT_FONT;
 			} else if (strcmp(q, "file") != 0) {
 				dboot_printf("\tmodule #%d: unknown module "
 				    "type '%s'; defaulting to 'file'\n",
@@ -2090,11 +2100,7 @@ dboot_init_xboot_consinfo(void)
 		    multiboot_version);
 		break;
 	}
-	/*
-	 * Lookup environment module for the console. Complete module list
-	 * will be built after console setup.
-	 */
-	dboot_find_env();
+	dboot_find_console_modules();
 #endif
 }
 
