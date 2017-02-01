@@ -37,29 +37,29 @@
 
 : logo ( x y -- ) \ OmniOS dragon logo
 
-	s"      @[30;1m`                     " logo+
-	s"     ..  ``                 "        logo+
-	s"    `-  `-`   `             "        logo+
-	s"    --` .-`  `.             "        logo+
-	s"    .-. `--  .-             "        logo+
-	s"     .-.``.-` -.            "        logo+
-	s"       `.```..`..           "        logo+
-	s"             `...`          "        logo+
-	s"  `.`                       "        logo+
-	s"  -------.`   ..`           "        logo+
-	s" `------`      `..``        "        logo+
-	s" `-----`        `..--`      "        logo+
-	s"  .----`            .-      "        logo+
-	s"  +.----`            .      "        logo+
-	s"    :..--.```               "        logo+
-	s"       `.----`              "        logo+
-	s"         ``.---.`           "        logo+
-	s"         `.``.---.`         "        logo+
-	s"         `....``.--.`       "        logo+
-	s"            `...``---.`     "        logo+
-	s"            ......`.---`    "        logo+
-	s"            .......``.--.   "        logo+
-	s"            `........`.---`@[m "     logo+
+	s"     @[30;1m.:   ..                 " logo+
+	s"    .o,  .o.                 "        logo+
+	s"    :d.  ld.   .'            "        logo+
+	s"    cd;  cd;   l.            "        logo+
+	s"    .dd'  ld,  cc            "        logo+
+	s"     .;oc. 'l:. c;           "        logo+
+	s"        .''...;;.,c.         "        logo+
+	s"               'c:.'         "        logo+
+	s"  .c.                        "        logo+
+	s" .ddd::loo;.    ;:.          "        logo+
+	s" ;ddddddl.      .;;:.        "        logo+
+	s" :dddddl           lddo,     "        logo+
+	s" .ddddd;             .;do    "        logo+
+	s"  .odddo.              .o    "        logo+
+	s"    ;dddo,              .    "        logo+
+	s"      ,lddo,.;'              "        logo+
+	s"        .;oddd:.             "        logo+
+	s"         ...;oddl,           "        logo+
+	s"          ,l,.'cdddc.        "        logo+
+	s"         .cdddc..:dddc.      "        logo+
+	s"            .;odc..,oddl.    "        logo+
+	s"             .odddl'.;dddc.  "        logo+
+	s"             :ddddddl..cddo'@[m "     logo+
 
 	2drop
 ;

@@ -33,16 +33,16 @@
 	1+ \ increase y for next time we're called
 ;
 
-: brand ( x y -- ) \ "omnios" [wide] logo in B/W (8 rows x 35 columns)
+: brand ( x y -- ) \ "omnios" [wide] logo in B/W (8 rows x 36 columns)
 
-	s"    ____   __  __  _   _ ___       "         brand+
-	s"   / __ \ |  \/  || \ | || |       "         brand+
-	s"  | |  | || \  / ||  \| || |       "         brand+
-	s"  | |__| || |\/| || . `@[33m____   ____@[m " brand+
-	s"   \____/ |_|  |_||_| @[33m/ __ \ / __| "    brand+
-	s"                     | |  | |(___  "         brand+
-	s"                     | |__| |___)| "         brand+
-	s"                      \____/|____/@[m "      brand+
+	s"    ____   __  __  _   _  _         "                         brand+
+	s"   / __ \ |  \/  || \ | || |        "                         brand+
+	s"  | |  | ||      ||  \| || |        "                         brand+
+	s"  | |__| || |\/| || , `@[33m_@[m||@[33m_@[m|  @[33m____@[m  " brand+
+	s"   \____/ |_|  |_||_|\@[33m/ __ \ / ___| "                    brand+
+	s"                     | |  | ||(__   "                         brand+
+	s"                     | |__| | ___)| "                         brand+
+	s"                      \____/ |____/@[m "                      brand+
 
 	2drop
 ;
