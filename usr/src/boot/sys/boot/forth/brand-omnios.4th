@@ -28,20 +28,21 @@
 
 : brand+ ( x y c-addr/u -- x y' )
 	2swap 2dup at-xy 2swap \ position the cursor
+	[char] @ escc! \ replace @ with Esc
 	type \ print to the screen
 	1+ \ increase y for next time we're called
 ;
 
 : brand ( x y -- ) \ "omnios" [wide] logo in B/W (8 rows x 35 columns)
 
-	s"    ____   __  __  _   _ ___       " brand+
-	s"   / __ \ |  \/  || \ | || |       " brand+
-	s"  | |  | || \  / ||  \| || |       " brand+
-	s"  | |__| || |\/| || . `____   ____ " brand+
-	s"   \____/ |_|  |_||_| / __ \ / __| " brand+
-	s"                     | |  | |(___  " brand+
-	s"                     | |__| |___)| " brand+
-	s"                      \____/|____/ " brand+
+	s"    ____   __  __  _   _ ___       "         brand+
+	s"   / __ \ |  \/  || \ | || |       "         brand+
+	s"  | |  | || \  / ||  \| || |       "         brand+
+	s"  | |__| || |\/| || . `@[33m____   ____@[m " brand+
+	s"   \____/ |_|  |_||_| @[33m/ __ \ / __| "    brand+
+	s"                     | |  | |(___  "         brand+
+	s"                     | |__| |___)| "         brand+
+	s"                      \____/|____/@[m "      brand+
 
 	2drop
 ;
