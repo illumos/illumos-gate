@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
+ * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -682,6 +683,18 @@ icmp_inbound_too_big_v6(icmp6_t *icmp6, ip_recv_attr_t *ira)
 	ip6h = (ip6_t *)&icmp6[1];
 	final_dst = ip_get_dst_v6(ip6h, NULL, NULL);
 
+	mtu = ntohl(icmp6->icmp6_mtu);
+	if (mtu < IPV6_MIN_MTU) {
+		/*
+		 * RFC 8021 suggests to ignore messages where mtu is
+		 * less than the IPv6 minimum.
+		 */
+		ip1dbg(("Received mtu less than IPv6 "
+		    "min mtu %d: %d\n", IPV6_MIN_MTU, mtu));
+		DTRACE_PROBE1(icmp6__too__small__mtu, uint32_t, mtu);
+		return;
+	}
+
 	/*
 	 * For link local destinations matching simply on address is not
 	 * sufficient. Same link local addresses for different ILL's is
@@ -704,8 +717,6 @@ icmp_inbound_too_big_v6(icmp6_t *icmp6, ip_recv_attr_t *ira)
 		return;
 	}
 
-	mtu = ntohl(icmp6->icmp6_mtu);
-
 	mutex_enter(&dce->dce_lock);
 	if (dce->dce_flags & DCEF_PMTU)
 		old_max_frag = dce->dce_pmtu;
@@ -714,37 +725,15 @@ icmp_inbound_too_big_v6(icmp6_t *icmp6, ip_recv_attr_t *ira)
 	else
 		old_max_frag = ill->ill_mtu;
 
-	if (mtu < IPV6_MIN_MTU) {
-		ip1dbg(("Received mtu less than IPv6 "
-		    "min mtu %d: %d\n", IPV6_MIN_MTU, mtu));
-		mtu = IPV6_MIN_MTU;
-		/*
-		 * If an mtu less than IPv6 min mtu is received,
-		 * we must include a fragment header in
-		 * subsequent packets.
-		 */
-		dce->dce_flags |= DCEF_TOO_SMALL_PMTU;
-	} else {
-		dce->dce_flags &= ~DCEF_TOO_SMALL_PMTU;
-	}
 	ip1dbg(("Received mtu from router: %d\n", mtu));
+	DTRACE_PROBE1(icmp6__received__mtu, uint32_t, mtu);
 	dce->dce_pmtu = MIN(old_max_frag, mtu);
+	icmp6->icmp6_mtu = htonl(dce->dce_pmtu);
 
-	/* Prepare to send the new max frag size for the ULP. */
-	if (dce->dce_flags & DCEF_TOO_SMALL_PMTU) {
-		/*
-		 * If we need a fragment header in every packet
-		 * (above case or multirouting), make sure the
-		 * ULP takes it into account when computing the
-		 * payload size.
-		 */
-		icmp6->icmp6_mtu = htonl(dce->dce_pmtu - sizeof (ip6_frag_t));
-	} else {
-		icmp6->icmp6_mtu = htonl(dce->dce_pmtu);
-	}
 	/* We now have a PMTU for sure */
 	dce->dce_flags |= DCEF_PMTU;
 	dce->dce_last_change_time = TICK_TO_SEC(ddi_get_lbolt64());
+
 	mutex_exit(&dce->dce_lock);
 	/*
 	 * After dropping the lock the new value is visible to everyone.
