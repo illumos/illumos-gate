@@ -69,8 +69,6 @@ LINTTAGS +=	-erroff=E_STATIC_UNUSED
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 
-CLOBBERFILES	+= $(OBJS_DIR)/$(VGATEXT_FONT).c
-
 #
 #	Default build targets.
 #

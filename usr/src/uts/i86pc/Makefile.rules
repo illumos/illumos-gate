@@ -84,9 +84,6 @@ DRMACH_IO	= $(UTSBASE)/i86pc/io/acpi/drmach_acpi
 DRMACH_GENERR	= $(DRMACH_IO)/sbdgenerr
 DR_IO		= $(UTSBASE)/i86pc/io/dr
 DR_GENERR	= $(DR_IO)/sbdgenerr
-VGATEXT_FONT	= 8x16
-VGATEXT_FONT_SRC= 8859-1
-VGATEXT_FONT_DIR= $(UTSBASE)/common/font
 
 $(DRMACH_GENERR):	$(DR_IO)/sbdgenerr.pl
 	$(RM) $@
@@ -183,19 +180,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/vm/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/font/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf \
-	$(VGATEXT_FONT_DIR)/bdf_to_c.awk
-	$(AWK) -f $(VGATEXT_FONT_DIR)/bdf_to_c.awk	\
-		$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf > $@
-
-$(OBJS_DIR)/%.o:		$(OBJS_DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
