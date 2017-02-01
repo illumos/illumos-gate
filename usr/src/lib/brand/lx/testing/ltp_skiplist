@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 
 # Broken tests
 poll02		# OS-3997
@@ -177,6 +177,7 @@ lgetxattr02
 llistxattr01
 llistxattr02
 llistxattr03
+madvise08		# no MADV_DONTDUMP support (yet?)
 mmap13
 mq_notify01
 mq_notify02
