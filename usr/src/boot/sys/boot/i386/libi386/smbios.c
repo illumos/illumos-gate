@@ -45,6 +45,8 @@ __FBSDID("$FreeBSD$");
  *
  * System Management BIOS Reference Specification, v2.6 Final
  * http://www.dmtf.org/standards/published_documents/DSP0134_2.6.0.pdf
+ * System Management BIOS (SMBIOS) Reference Specification, v3.1.0
+ * http://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.1.0.pdf
  */
 
 /*
@@ -60,11 +62,16 @@ __FBSDID("$FreeBSD$");
 #define	SMBIOS_LENGTH		0x10000
 #define	SMBIOS_STEP		0x10
 #define	SMBIOS_SIG		"_SM_"
+#define	SMBIOS_SIG_LEN		(4)
+#define	SMBIOS3_SIG		"_SM3_"
+#define	SMBIOS3_SIG_LEN		(5)
 #define	SMBIOS_DMI_SIG		"_DMI_"
+#define	SMBIOS_DMI_SIG_LEN	(5)
 
 #define	SMBIOS_GET8(base, off)	(*(uint8_t *)((base) + (off)))
 #define	SMBIOS_GET16(base, off)	(*(uint16_t *)((base) + (off)))
 #define	SMBIOS_GET32(base, off)	(*(uint32_t *)((base) + (off)))
+#define	SMBIOS_GET64(base, off)	(*(uint64_t *)((base) + (off)))
 
 #define	SMBIOS_GETLEN(base)	SMBIOS_GET8(base, 0x01)
 #define	SMBIOS_GETSTR(base)	((base) + SMBIOS_GETLEN(base))
@@ -103,14 +110,71 @@ static caddr_t
 smbios_sigsearch(const caddr_t addr, const uint32_t len)
 {
 	caddr_t		cp;
+	uintptr_t	paddr;
 
 	/* Search on 16-byte boundaries. */
-	for (cp = addr; cp < addr + len; cp += SMBIOS_STEP)
-		if (strncmp(cp, SMBIOS_SIG, 4) == 0 &&
+	for (cp = addr; cp < addr + len; cp += SMBIOS_STEP) {
+		if (strncmp(cp, SMBIOS_SIG, SMBIOS_SIG_LEN) == 0 &&
 		    smbios_checksum(cp, SMBIOS_GET8(cp, 0x05)) == 0 &&
-		    strncmp(cp + 0x10, SMBIOS_DMI_SIG, 5) == 0 &&
-		    smbios_checksum(cp + 0x10, 0x0f) == 0)
+		    strncmp(cp + 0x10, SMBIOS_DMI_SIG, SMBIOS_DMI_SIG_LEN) == 0
+		    && smbios_checksum(cp + 0x10, 0x0f) == 0) {
+
+			/* Structure Table Length */
+			smbios.length = SMBIOS_GET16(cp, 0x16);
+			/* Structure Table Address */
+			paddr = SMBIOS_GET32(cp, 0x18);
+			/* No of SMBIOS Structures */
+			smbios.count = SMBIOS_GET16(cp, 0x1c);
+			/* SMBIOS BCD Revision */
+			smbios.ver = SMBIOS_GET8(cp, 0x1e);
+			if (smbios.ver != 0) {
+				smbios.major = smbios.ver >> 4;
+				smbios.minor = smbios.ver & 0x0f;
+				if (smbios.major > 9 || smbios.minor > 9)
+					smbios.ver = 0;
+			}
+			if (smbios.ver == 0) {
+				/* SMBIOS Major Version */
+				smbios.major = SMBIOS_GET8(cp, 0x06);
+				/* SMBIOS Minor Version */
+				smbios.minor = SMBIOS_GET8(cp, 0x07);
+			}
+			smbios.ver = (smbios.major << 8) | smbios.minor;
+			smbios.addr = PTOV(paddr);
 			return (cp);
+		}
+#ifdef _LP64
+		/*
+		 * Check for the SMBIOS 64-bit entry point introduced in
+		 * version 3.0.
+		 *
+		 * The table address is a 64-bit physical address that may
+		 * appear at any 64-bit address. We only search for
+		 * the 64-bit entry point when running a 64-bit application.
+		 */
+		if (strncmp(cp, SMBIOS3_SIG, SMBIOS3_SIG_LEN) == 0 &&
+		    smbios_checksum(cp, SMBIOS_GET8(cp, 0x06)) == 0) {
+
+			/* SMBIOS Major Version */
+			smbios.major = SMBIOS_GET8(cp, 0x07);
+			/* SMBIOS Minor Version */
+			smbios.minor = SMBIOS_GET8(cp, 0x08);
+			/* Entry Point Revision */
+			smbios.ver = SMBIOS_GET8(cp, 0x0a);
+			/* Structure Table maximum size */
+			smbios.length = SMBIOS_GET32(cp, 0x0c);
+			/* Structure Table Address */
+			paddr = SMBIOS_GET64(cp, 0x10);
+			smbios.addr = PTOV(paddr);
+			/*
+			 * Calculate upper limit for structure count,
+			 * use size of table header (4 bytes).
+			 */
+			smbios.count = smbios.length / 4;
+			return (cp);
+		}
+#endif
+	}
 	return (NULL);
 }
 
@@ -361,36 +425,16 @@ smbios_find_struct(int type)
 static void
 smbios_probe(const caddr_t addr)
 {
-	caddr_t		saddr, info;
-	uintptr_t	paddr;
+	caddr_t		info;
+	const caddr_t	paddr = addr != NULL ? addr : PTOV(SMBIOS_START);
 
 	if (smbios.probed)
 		return;
 	smbios.probed = 1;
 
 	/* Search signatures and validate checksums. */
-	saddr = smbios_sigsearch(addr ? addr : PTOV(SMBIOS_START),
-	    SMBIOS_LENGTH);
-	if (saddr == NULL)
+	if (smbios_sigsearch(paddr, SMBIOS_LENGTH) == NULL)
 		return;
-
-	smbios.length = SMBIOS_GET16(saddr, 0x16);	/* Structure Table Length */
-	paddr = SMBIOS_GET32(saddr, 0x18);		/* Structure Table Address */
-	smbios.count = SMBIOS_GET16(saddr, 0x1c);	/* No of SMBIOS Structures */
-	smbios.ver = SMBIOS_GET8(saddr, 0x1e);		/* SMBIOS BCD Revision */
-
-	if (smbios.ver != 0) {
-		smbios.major = smbios.ver >> 4;
-		smbios.minor = smbios.ver & 0x0f;
-		if (smbios.major > 9 || smbios.minor > 9)
-			smbios.ver = 0;
-	}
-	if (smbios.ver == 0) {
-		smbios.major = SMBIOS_GET8(saddr, 0x06);/* SMBIOS Major Version */
-		smbios.minor = SMBIOS_GET8(saddr, 0x07);/* SMBIOS Minor Version */
-	}
-	smbios.ver = (smbios.major << 8) | smbios.minor;
-	smbios.addr = PTOV(paddr);
 
 	/* Get system information from SMBIOS */
 	info = smbios_find_struct(0x00);
