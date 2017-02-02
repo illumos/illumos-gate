@@ -27,6 +27,7 @@
 # Copyright 2014 Bart Coddens <bart.coddens@gmail.com>
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2016 Joyent, Inc.
+# Copyright 2016 RackTop Systems.
 #
 
 #
@@ -2362,7 +2363,9 @@ elif [[ $SCM_MODE == "git" ]]; then
 		codemgr_ws="${PWD}/${codemgr_ws}"
 	fi
 
-	codemgr_ws=$(dirname $codemgr_ws) # Lose the '/.git'
+	if [[ "$codemgr_ws" = *"/.git" ]]; then
+		codemgr_ws=$(dirname $codemgr_ws) # Lose the '/.git'
+	fi
 	CWS="$codemgr_ws"
 elif [[ $SCM_MODE == "subversion" ]]; then
 	#

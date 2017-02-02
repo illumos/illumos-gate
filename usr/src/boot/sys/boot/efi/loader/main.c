@@ -71,7 +71,7 @@ EFI_GUID fdtdtb = FDT_TABLE_GUID;
 EFI_GUID inputid = SIMPLE_TEXT_INPUT_PROTOCOL;
 EFI_GUID serial_io = SERIAL_IO_PROTOCOL;
 
-extern void acpi_detect(const caddr_t);
+extern void acpi_detect(void);
 void efi_serial_init(void);
 #ifdef EFI_ZFS_BOOT
 static void efi_zfs_probe(void);
@@ -191,6 +191,7 @@ main(int argc, CHAR16 *argv[])
 	int i, j, vargood, unit, howto;
 	struct devsw *dev;
 	uint64_t pool_guid;
+	void *ptr;
 	UINTN k;
 	int has_kbd;
 
@@ -404,18 +405,11 @@ main(int argc, CHAR16 *argv[])
 	setenv("LINES", "24", 1);	/* optional */
 	setenv("COLUMNS", "80", 1);	/* optional */
 	setenv("ISADIR", "amd64", 1);	/* we only build 64bit */
+	acpi_detect();
 
-	for (k = 0; k < ST->NumberOfTableEntries; k++) {
-		guid = &ST->ConfigurationTable[k].VendorGuid;
-		if (!memcmp(guid, &smbios, sizeof(EFI_GUID)) ||
-		    !memcmp(guid, &smbios3, sizeof(EFI_GUID))) {
-			smbios_detect(ST->ConfigurationTable[k].VendorTable);
-			continue;
-		}
-		if (!memcmp(guid, &acpi20, sizeof(EFI_GUID))) {
-			acpi_detect(ST->ConfigurationTable[k].VendorTable);
-		}
-	}
+	if ((ptr = efi_get_table(&smbios3)) == NULL)
+		ptr = efi_get_table(&smbios);
+	smbios_detect(ptr);
 
 	efi_serial_init();		/* detect and set up serial ports */
 	interact(NULL);			/* doesn't return */

@@ -1182,7 +1182,6 @@ vgatext_init_graphics(struct vgatext_softc *softc)
 static void
 vgatext_setfont(struct vgatext_softc *softc)
 {
-	extern bitmap_data_t font_data_8x16;
 	unsigned char *from;
 	unsigned char *to;
 	int	i;

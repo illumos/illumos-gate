@@ -66,7 +66,8 @@ dir path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace \
 dir \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use \
     group=other
-dir path=usr/share/lib/java/javadoc/dtrace/api/resources group=other
+$(JAVA_7_ONLY)dir path=usr/share/lib/java/javadoc/dtrace/api/resources \
+    group=other
 dir path=usr/share/lib/java/javadoc/dtrace/examples group=other
 dir path=usr/share/lib/java/javadoc/dtrace/html group=other
 dir path=usr/share/lib/java/javadoc/dtrace/images group=other
@@ -624,12 +625,18 @@ file \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/overview-tree.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/package-list group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/resources/background.gif \
+$(JAVA_7_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/resources/background.gif \
     group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/resources/tab.gif group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar.gif \
+$(JAVA_7_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/resources/tab.gif group=other
+$(JAVA_7_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar.gif \
     group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar_end.gif \
+$(JAVA_7_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar_end.gif \
+    group=other
+$(JAVA_8_ONLY)file path=usr/share/lib/java/javadoc/dtrace/api/script.js \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/serialized-form.html \
     group=other

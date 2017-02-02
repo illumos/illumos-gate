@@ -39,11 +39,12 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= tem
-OBJECTS		= $(TEM_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS		= $(TEM_OBJS:%=$(OBJS_DIR)/%) $(FONT_OBJS:%=$(OBJS_DIR)/%)
 
 LINTS		= $(TEM_OBJS:%.o=$(LINTS_DIR)/%.ln)
+LINTS		+= $(FONT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OUT	= $(TEM_OBJS:%.o=%.ll)
+WARLOCK_OUT	= $(TEM_OBJS:%.o=%.ll) $(FONT_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
@@ -98,6 +99,26 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
+
+#
+#	Font data for generated 8x16 font
+#
+VGATEXT_FONT	= 8x16
+VGATEXT_FONT_SRC= 8859-1
+VGATEXT_FONT_DIR= $(UTSBASE)/common/font
+
+$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf \
+	$(VGATEXT_FONT_DIR)/bdf_to_c.awk
+	$(AWK) -f $(VGATEXT_FONT_DIR)/bdf_to_c.awk	\
+		$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf > $@
+
+$(OBJS_DIR)/$(VGATEXT_FONT).o:	$(OBJS_DIR)/$(VGATEXT_FONT).c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+CLOBBERFILES	+=	\
+	$(OBJS_DIR)/$(VGATEXT_FONT).o \
+	$(OBJS_DIR)/$(VGATEXT_FONT).c
 
 #
 #	Defines for local commands

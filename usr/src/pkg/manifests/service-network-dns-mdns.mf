@@ -52,7 +52,8 @@ dir path=usr/share/lib/java/javadoc/dnssd/api group=other
 dir path=usr/share/lib/java/javadoc/dnssd/api/com group=other
 dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple group=other
 dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd group=other
-dir path=usr/share/lib/java/javadoc/dnssd/api/resources group=other
+$(JAVA_7_ONLY)dir path=usr/share/lib/java/javadoc/dnssd/api/resources \
+    group=other
 dir path=usr/share/lib/java/javadoc/dnssd/examples group=other
 dir path=usr/share/man
 dir path=usr/share/man/man1m
@@ -133,12 +134,18 @@ file path=usr/share/lib/java/javadoc/dnssd/api/index-all.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/index.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/overview-tree.html group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/package-list group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/resources/background.gif \
+$(JAVA_7_ONLY)file \
+    path=usr/share/lib/java/javadoc/dnssd/api/resources/background.gif \
     group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/resources/tab.gif group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar.gif \
+$(JAVA_7_ONLY)file path=usr/share/lib/java/javadoc/dnssd/api/resources/tab.gif \
     group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar_end.gif \
+$(JAVA_7_ONLY)file \
+    path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar.gif \
+    group=other
+$(JAVA_7_ONLY)file \
+    path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar_end.gif \
+    group=other
+$(JAVA_8_ONLY)file path=usr/share/lib/java/javadoc/dnssd/api/script.js \
     group=other
 file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html \
     group=other

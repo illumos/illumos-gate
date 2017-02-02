@@ -118,7 +118,8 @@ BOOT_DRIVER_OBJS =		\
 	boot_keyboard_table.o	\
 	boot_mmu.o		\
 	boot_vga.o		\
-	boot_xconsole.o
+	boot_xconsole.o		\
+	$(FONT_OBJS)
 
 CORE_OBJS += $(BOOT_DRIVER_OBJS)
 

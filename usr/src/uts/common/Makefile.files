@@ -1633,7 +1633,8 @@ CONSCONFIG_OBJS += consconfig.o
 
 CONSCONFIG_DACF_OBJS  += consconfig_dacf.o consplat.o
 
-TEM_OBJS += tem.o tem_safe.o 6x10.o 7x14.o 12x22.o
+TEM_OBJS += tem.o tem_safe.o
+FONT_OBJS += font.o 6x10.o 7x14.o 8x16.o 12x22.o
 
 KBTRANS_OBJS +=				\
 		kbtrans.o		\

@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -42,6 +43,10 @@ tests = ['secflags_aslr',
 
 [/opt/os-tests/tests/sigqueue]
 tests = ['sigqueue_queue_size']
+
+[/opt/os-tests/tests/sdevfs]
+user = root
+tests = ['sdevfs_eisdir']
 
 [/opt/os-tests/tests/file-locking]
 tests = ['runtests.32', 'runtests.64']

@@ -18,8 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 #
@@ -37,6 +39,11 @@
 #
 
 $mapfile_version 2
+
+SYMBOL_VERSION ILLUMOS_0.1 {
+    global:
+	devid_str_from_path;
+} SUNW_1.2;
 
 SYMBOL_VERSION SUNW_1.2 {
     global:

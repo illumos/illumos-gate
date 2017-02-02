@@ -769,14 +769,37 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			if (*i1 == 0) {
 				return (EINVAL);
 			} else if (tcp->tcp_ka_rinterval == 0) {
-				if ((tcp->tcp_ka_abort_thres / *i1) <
-				    tcp->tcp_rto_min ||
-				    (tcp->tcp_ka_abort_thres / *i1) >
-				    tcp->tcp_rto_max)
-					return (EINVAL);
+				/*
+				 * When TCP_KEEPCNT is specified without first
+				 * specifying a TCP_KEEPINTVL, we infer an
+				 * interval based on a tunable specific to our
+				 * stack: the tcp_keepalive_abort_interval.
+				 * (Or the TCP_KEEPALIVE_ABORT_THRESHOLD, in
+				 * the unlikely event that that has been set.)
+				 * Given the abort interval's default value of
+				 * 480 seconds, low TCP_KEEPCNT values can
+				 * result in intervals that exceed the default
+				 * maximum RTO of 60 seconds.  Rather than
+				 * fail in these cases, we (implicitly) clamp
+				 * the interval at the maximum RTO; if the
+				 * TCP_KEEPCNT is shortly followed by a
+				 * TCP_KEEPINTVL (as we expect), the abort
+				 * threshold will be recalculated correctly --
+				 * and if a TCP_KEEPINTVL is not forthcoming,
+				 * keep-alive will at least operate reasonably
+				 * given the underconfigured state.
+				 */
+				uint32_t interval;
 
-				tcp->tcp_ka_rinterval =
-				    tcp->tcp_ka_abort_thres / *i1;
+				interval = tcp->tcp_ka_abort_thres / *i1;
+
+				if (interval < tcp->tcp_rto_min)
+					interval = tcp->tcp_rto_min;
+
+				if (interval > tcp->tcp_rto_max)
+					interval = tcp->tcp_rto_max;
+
+				tcp->tcp_ka_rinterval = interval;
 			} else {
 				if ((*i1 * tcp->tcp_ka_rinterval) <
 				    tcps->tcps_keepalive_abort_interval_low ||

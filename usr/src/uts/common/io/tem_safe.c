@@ -171,35 +171,10 @@ text_cmap_t cmap4_to_24 = {
 /* END CSTYLED */
 };
 
-#define	PIX4TO32(pix4) (pixel32_t)(  \
+#define	PIX4TO32(pix4) (uint32_t)(  \
     cmap4_to_24.red[pix4] << 16 |  \
     cmap4_to_24.green[pix4] << 8 | \
     cmap4_to_24.blue[pix4])
-
-/*
- * Fonts are statically linked with this module. At some point an
- * RFE might be desireable to allow dynamic font loading.  The
- * original intention to facilitate dynamic fonts can be seen
- * by examining the data structures and set_font().  As much of
- * the original code is retained but modified to be suited to
- * traversing a list of static fonts.
- */
-extern struct fontlist fonts[];
-
-#define	DEFAULT_FONT_DATA font_data_12x22
-
-extern bitmap_data_t font_data_12x22;
-extern bitmap_data_t font_data_7x14;
-extern bitmap_data_t font_data_6x10;
-/*
- * Must be sorted by font size in descending order
- */
-struct fontlist fonts[] = {
-	{  &font_data_12x22,	NULL  },
-	{  &font_data_7x14,	NULL  },
-	{  &font_data_6x10,	NULL  },
-	{  NULL, NULL  }
-};
 
 #define	INVERSE(ch) (ch ^ 0xff)
 
@@ -313,10 +288,8 @@ tem_safe_terminal_emulate(
  * from quiesced or normal (ie. use polled I/O vs. layered ioctls)
  */
 static void
-tems_safe_display(
-	struct vis_consdisplay *pda,
-	cred_t *credp,
-	enum called_from called_from)
+tems_safe_display(struct vis_consdisplay *pda, cred_t *credp,
+    enum called_from called_from)
 {
 	if (called_from == CALLED_FROM_STANDALONE)
 		tems.ts_fb_polledio->display(tems.ts_fb_polledio->arg, pda);
@@ -330,10 +303,8 @@ tems_safe_display(
  * from, quiesced or normal (ie. use polled I/O vs. layered ioctls)
  */
 void
-tems_safe_copy(
-	struct vis_conscopy *pca,
-	cred_t *credp,
-	enum called_from called_from)
+tems_safe_copy(struct vis_conscopy *pca, cred_t *credp,
+    enum called_from called_from)
 {
 	if (called_from == CALLED_FROM_STANDALONE)
 		tems.ts_fb_polledio->copy(tems.ts_fb_polledio->arg, pca);
@@ -348,10 +319,8 @@ tems_safe_copy(
  * normal (ie. use polled I/O vs. layered ioctls).
  */
 static void
-tems_safe_cursor(
-	struct vis_conscursor *pca,
-	cred_t *credp,
-	enum called_from called_from)
+tems_safe_cursor(struct vis_conscursor *pca, cred_t *credp,
+    enum called_from called_from)
 {
 	if (called_from == CALLED_FROM_STANDALONE)
 		tems.ts_fb_polledio->cursor(tems.ts_fb_polledio->arg, pca);
@@ -365,11 +334,8 @@ tems_safe_cursor(
  */
 
 static void
-tem_safe_control(
-	struct tem_vt_state *tem,
-	uchar_t ch,
-	cred_t *credp,
-	enum called_from called_from)
+tem_safe_control(struct tem_vt_state *tem, uchar_t ch, cred_t *credp,
+    enum called_from called_from)
 {
 	tem->tvs_state = A_STATE_START;
 	switch (ch) {
@@ -585,11 +551,8 @@ tem_safe_selgraph(struct tem_vt_state *tem)
  *                It assumes that the next lower level will do so.
  */
 static void
-tem_safe_chkparam(
-	struct tem_vt_state *tem,
-	uchar_t ch,
-	cred_t *credp,
-	enum called_from called_from)
+tem_safe_chkparam(struct tem_vt_state *tem, uchar_t ch, cred_t *credp,
+    enum called_from called_from)
 {
 	int	i;
 	int	row;
@@ -1420,8 +1383,6 @@ tem_safe_text_cls(struct tem_vt_state *tem,
 	tems_safe_display(&da, credp, called_from);
 }
 
-
-
 void
 tem_safe_pix_display(struct tem_vt_state *tem,
     uchar_t *string, int count,
@@ -1974,214 +1935,35 @@ tem_safe_pix_cursor(struct tem_vt_state *tem, short action,
 	tems_safe_cursor(&ca, credp, called_from);
 }
 
-#define	BORDER_PIXELS 10
-void
-set_font(struct font *f, short *rows, short *cols, short height, short width)
-{
-	bitmap_data_t	*font_selected = NULL;
-	struct fontlist	*fl;
-
-	/*
-	 * Find best font for these dimensions, or use default
-	 *
-	 * A 1 pixel border is the absolute minimum we could have
-	 * as a border around the text window (BORDER_PIXELS = 2),
-	 * however a slightly larger border not only looks better
-	 * but for the fonts currently statically built into the
-	 * emulator causes much better font selection for the
-	 * normal range of screen resolutions.
-	 */
-	for (fl = fonts; fl->data; fl++) {
-		if ((((*rows * fl->data->height) + BORDER_PIXELS) <= height) &&
-		    (((*cols * fl->data->width) + BORDER_PIXELS) <= width)) {
-			font_selected = fl->data;
-			break;
-		}
-	}
-	/*
-	 * The minus 2 is to make sure we have at least a 1 pixel
-	 * boarder around the entire screen.
-	 */
-	if (font_selected == NULL) {
-		if (((*rows * DEFAULT_FONT_DATA.height) > height) ||
-		    ((*cols * DEFAULT_FONT_DATA.width) > width)) {
-			*rows = (height - 2) / DEFAULT_FONT_DATA.height;
-			*cols = (width - 2) / DEFAULT_FONT_DATA.width;
-		}
-		font_selected = &DEFAULT_FONT_DATA;
-	}
-
-	f->width = font_selected->width;
-	f->height = font_selected->height;
-	bcopy((caddr_t)font_selected->encoding, (caddr_t)f->char_ptr,
-	    sizeof (f->char_ptr));
-	f->image_data = font_selected->image;
-
-}
-
-/*
- * bit_to_pix4 is for 4-bit frame buffers.  It will write one output byte
- * for each 2 bits of input bitmap.  It inverts the input bits before
- * doing the output translation, for reverse video.
- *
- * Assuming foreground is 0001 and background is 0000...
- * An input data byte of 0x53 will output the bit pattern
- * 00000001 00000001 00000000 00010001.
- */
-
 static void
-bit_to_pix4(
-    struct tem_vt_state *tem,
-    uchar_t c,
-    text_color_t fg_color,
+bit_to_pix4(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color,
     text_color_t bg_color)
 {
-	int	row;
-	int	byte;
-	int	i;
-	uint8_t	*cp;
-	uint8_t	data;
-	uint8_t	nibblett;
-	int	bytes_wide;
-	uint8_t *dest;
-
-	dest = (uint8_t *)tem->tvs_pix_data;
-
-	cp = tems.ts_font.char_ptr[c];
-	bytes_wide = (tems.ts_font.width + 7) / 8;
-
-	for (row = 0; row < tems.ts_font.height; row++) {
-		for (byte = 0; byte < bytes_wide; byte++) {
-			data = *cp++;
-			for (i = 0; i < 4; i++) {
-				nibblett = (data >> ((3-i) * 2)) & 0x3;
-				switch (nibblett) {
-				case 0x0:
-					*dest++ = bg_color << 4 | bg_color;
-					break;
-				case 0x1:
-					*dest++ = bg_color << 4 | fg_color;
-					break;
-				case 0x2:
-					*dest++ = fg_color << 4 | bg_color;
-					break;
-				case 0x3:
-					*dest++ = fg_color << 4 | fg_color;
-					break;
-				}
-			}
-		}
-	}
+	uint8_t *dest = (uint8_t *)tem->tvs_pix_data;
+	font_bit_to_pix4(&tems.ts_font, dest, c, fg_color, bg_color);
 }
 
-/*
- * bit_to_pix8 is for 8-bit frame buffers.  It will write one output byte
- * for each bit of input bitmap.  It inverts the input bits before
- * doing the output translation, for reverse video.
- *
- * Assuming foreground is 00000001 and background is 00000000...
- * An input data byte of 0x53 will output the bit pattern
- * 0000000 000000001 00000000 00000001 00000000 00000000 00000001 00000001.
- */
-
 static void
-bit_to_pix8(
-    struct tem_vt_state *tem,
-    uchar_t c,
-    text_color_t fg_color,
+bit_to_pix8(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color,
     text_color_t bg_color)
 {
-	int	row;
-	int	byte;
-	int	i;
-	uint8_t	*cp;
-	uint8_t	data;
-	int	bytes_wide;
-	uint8_t	mask;
-	int	bitsleft, nbits;
-	uint8_t *dest;
-
-	dest = (uint8_t *)tem->tvs_pix_data;
-
-	cp = tems.ts_font.char_ptr[c];
-	bytes_wide = (tems.ts_font.width + 7) / 8;
-
-	for (row = 0; row < tems.ts_font.height; row++) {
-		bitsleft = tems.ts_font.width;
-		for (byte = 0; byte < bytes_wide; byte++) {
-			data = *cp++;
-			mask = 0x80;
-			nbits = MIN(8, bitsleft);
-			bitsleft -= nbits;
-			for (i = 0; i < nbits; i++) {
-				*dest++ = (data & mask ? fg_color: bg_color);
-				mask = mask >> 1;
-			}
-		}
-	}
+	uint8_t *dest = (uint8_t *)tem->tvs_pix_data;
+	font_bit_to_pix8(&tems.ts_font, dest, c, fg_color, bg_color);
 }
 
-/*
- * bit_to_pix24 is for 24-bit frame buffers.  It will write four output bytes
- * for each bit of input bitmap.  It inverts the input bits before
- * doing the output translation, for reverse video.  Note that each
- * 24-bit RGB value is finally stored in a 32-bit unsigned int, with the
- * high-order byte set to zero.
- *
- * Assuming foreground is 00000000 11111111 11111111 11111111
- * and background is 00000000 00000000 00000000 00000000
- * An input data byte of 0x53 will output the bit pattern
- *
- * 00000000 00000000 00000000 00000000
- * 00000000 11111111 11111111 11111111
- * 00000000 00000000 00000000 00000000
- * 00000000 11111111 11111111 11111111
- * 00000000 00000000 00000000 00000000
- * 00000000 00000000 00000000 00000000
- * 00000000 11111111 11111111 11111111
- * 00000000 11111111 11111111 11111111
- *
- */
-typedef uint32_t pixel32_t;
-
 static void
-bit_to_pix24(
-	struct tem_vt_state *tem,
-	uchar_t c,
-	text_color_t fg_color4,
-	text_color_t bg_color4)
+bit_to_pix24(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color4,
+    text_color_t bg_color4)
 {
-	int	row;
-	int	byte;
-	int	i;
-	uint8_t	*cp;
-	uint8_t	data;
-	int	bytes_wide;
-	int	bitsleft, nbits;
-
-	pixel32_t fg_color32, bg_color32, *destp;
+	uint32_t fg_color32, bg_color32, *dest;
 
 	ASSERT(fg_color4 < 16 && bg_color4 < 16);
 
 	fg_color32 = PIX4TO32(fg_color4);
 	bg_color32 = PIX4TO32(bg_color4);
 
-	destp = (pixel32_t *)tem->tvs_pix_data;
-	cp = tems.ts_font.char_ptr[c];
-	bytes_wide = (tems.ts_font.width + 7) / 8;
-
-	for (row = 0; row < tems.ts_font.height; row++) {
-		bitsleft = tems.ts_font.width;
-		for (byte = 0; byte < bytes_wide; byte++) {
-			data = *cp++;
-			nbits = MIN(8, bitsleft);
-			bitsleft -= nbits;
-			for (i = 0; i < nbits; i++) {
-				*destp++ = ((data << i) & 0x80 ?
-				    fg_color32 : bg_color32);
-			}
-		}
-	}
+	dest = (uint32_t *)tem->tvs_pix_data;
+	font_bit_to_pix24(&tems.ts_font, dest, c, fg_color32, bg_color32);
 }
 
 static text_color_t
