@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -239,7 +239,7 @@ print_bios(smbios_hdl_t *shp, FILE *fp)
 	oprintf(fp, "  Version String: %s\n", b.smbb_version);
 	oprintf(fp, "  Release Date: %s\n", b.smbb_reldate);
 	oprintf(fp, "  Address Segment: 0x%x\n", b.smbb_segment);
-	oprintf(fp, "  ROM Size: %u bytes\n", b.smbb_romsize);
+	oprintf(fp, "  ROM Size: %" PRIu64 " bytes\n", b.smbb_extromsize);
 	oprintf(fp, "  Image Size: %u bytes\n", b.smbb_runsize);
 
 	flag64_printf(fp, "Characteristics",
@@ -508,12 +508,15 @@ print_cache(smbios_hdl_t *shp, id_t id, FILE *fp)
 	(void) smbios_info_cache(shp, id, &c);
 
 	oprintf(fp, "  Level: %u\n", c.smba_level);
-	oprintf(fp, "  Maximum Installed Size: %u bytes\n", c.smba_maxsize);
+	oprintf(fp, "  Maximum Installed Size: %" PRIu64 " bytes\n",
+	    c.smba_maxsize2);
 
-	if (c.smba_size != 0)
-		oprintf(fp, "  Installed Size: %u bytes\n", c.smba_size);
-	else
+	if (c.smba_size2 != 0) {
+		oprintf(fp, "  Installed Size: %" PRIu64 " bytes\n",
+		    c.smba_size2);
+	} else {
 		oprintf(fp, "  Installed Size: Not Installed\n");
+	}
 
 	if (c.smba_speed != 0)
 		oprintf(fp, "  Speed: %uns\n", c.smba_speed);
@@ -841,12 +844,12 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	    smbios_memdevice_flag_name, smbios_memdevice_flag_desc);
 
 	if (md.smbmd_speed != 0)
-		oprintf(fp, "  Speed: %u MHz\n", md.smbmd_speed);
+		oprintf(fp, "  Speed: %u MT/s\n", md.smbmd_speed);
 	else
 		oprintf(fp, "  Speed: Unknown\n");
 
 	if (md.smbmd_clkspeed != 0)
-		oprintf(fp, "  Configured Speed: %u MHz\n", md.smbmd_clkspeed);
+		oprintf(fp, "  Configured Speed: %u MT/s\n", md.smbmd_clkspeed);
 	else
 		oprintf(fp, "  Configured Speed: Unknown\n");
 

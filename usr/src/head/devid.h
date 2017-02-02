@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #ifndef	_DEVID_H
@@ -55,6 +56,7 @@ extern char	*devid_str_encode(ddi_devid_t devid, char *minor_name);
 extern int	devid_str_decode(char *devidstr,
 		    ddi_devid_t *retdevid, char **retminor_name);
 extern void	devid_str_free(char *devidstr);
+extern char	*devid_str_from_path(const char *path);
 
 #ifdef	__cplusplus
 }

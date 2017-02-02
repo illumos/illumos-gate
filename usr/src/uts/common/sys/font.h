@@ -27,16 +27,22 @@
 #ifndef _SYS_FONT_H
 #define	_SYS_FONT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/*
+ * Number of chars encoded in font data. Bundled fonts are generated
+ * from bdf files and this constant depends on the data in the bdf file.
+ * If more entries are added to the bdf files, then this number must be
+ * increased.
+ */
+#define	ENCODED_CHARS	256
+
 struct font {
 	short	width;
 	short	height;
-	uchar_t	*char_ptr[256];
+	uchar_t	*char_ptr[ENCODED_CHARS];
 	void	*image_data;
 };
 
@@ -51,6 +57,23 @@ struct fontlist {
 	bitmap_data_t	*data;
 	bitmap_data_t   *(*fontload)(char *);
 };
+
+extern struct fontlist fonts[];
+
+#define	DEFAULT_FONT_DATA	font_data_12x22
+#define	BORDER_PIXELS		10	/* space from screen border */
+/*
+ * Built in fonts.
+ */
+extern bitmap_data_t font_data_12x22;
+extern bitmap_data_t font_data_8x16;
+extern bitmap_data_t font_data_7x14;
+extern bitmap_data_t font_data_6x10;
+
+void set_font(struct font *, short *, short *, short, short);
+void font_bit_to_pix4(struct font *, uint8_t *, uchar_t, uint8_t, uint8_t);
+void font_bit_to_pix8(struct font *, uint8_t *, uchar_t, uint8_t, uint8_t);
+void font_bit_to_pix24(struct font *, uint32_t *, uchar_t, uint32_t, uint32_t);
 
 #ifdef __cplusplus
 }

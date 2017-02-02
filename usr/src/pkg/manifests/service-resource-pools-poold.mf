@@ -48,4 +48,3 @@ link path=usr/lib/pool/libjkstat.so target=./libjkstat.so.1
 link path=usr/lib/pool/libjlgrp.so target=./libjlgrp.so.1
 link path=usr/lib/pool/libjpool.so target=./libjpool.so.1
 link path=usr/lib/pool/libjsyslog.so target=./libjsyslog.so.1
-depend fmri=runtime/java type=require

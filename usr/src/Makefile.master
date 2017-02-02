@@ -120,6 +120,8 @@ ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 JAVA_HOME=	/usr/java
 # define buildtime JAVA_ROOT
 JAVA_ROOT=	/usr/java
+# define to build with JAVA 8
+BLD_JAVA_8=	$(POUND_SIGN)
 
 GCC_ROOT=	/opt/gcc/4.4.4
 GCCLIBDIR=	$(GCC_ROOT)/lib
