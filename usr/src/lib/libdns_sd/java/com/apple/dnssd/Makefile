@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.com
 
@@ -43,6 +42,7 @@ DOCAPIDIR = $(JAVASRCDIR)/docs/api
 DOCDESTDIR = $(ROOTDNSSDJAVAHOME)/javadoc/dnssd
 DOCAPIDESTDIR = $(DOCDESTDIR)/api
 DOCEXAMPLESDESTDIR = $(DOCDESTDIR)/examples
+$(BLD_JAVA_8)XDOCLINT_OPTION = -Xdoclint:none
 
 EXAMPLESDIR = $(JAVASRCDIR)/docs/examples
 EXAMPLESSRC = $(JAVASRCDIR)/docs/examples/src
@@ -140,11 +140,11 @@ $(DOCEXAMPLESDESTDIR)/%: %
 install_doc: $(CLASSES) $(DOCAPIDESTDIR)
 	-$(RM) -r $(DOCAPIDESTDIR)/*
 	cd $(TOP); umask 022; \
-	$(JAVADOC) $(JAVASRCDIR)/*.java -notimestamp -classpath \
+	$(JAVADOC) $(JAVASRCDIR)/*.java $(XDOCLINT_OPTION) -notimestamp -classpath \
 	$(CLASSPATH) -d $(DOCAPIDESTDIR) -public $(DNSSD_PKG)
 
 doc:
 	-@mkdir -p $(DOCAPIDIR)
 	cd $(TOP); umask 022; \
-	$(JAVADOC) $(JAVASRCDIR)/*.java -notimestamp -classpath \
+	$(JAVADOC) $(JAVASRCDIR)/*.java $(XDOCLINT_OPTION) -notimestamp -classpath \
      	$(CLASSPATH) -d $(DOCAPIDIR) -public $(DNSSD_PKG)

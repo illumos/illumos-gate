@@ -32,6 +32,7 @@ MANIFEST=	poold.xml
 SVCMETHOD=	svc-poold
 
 include $(SRC)/cmd/Makefile.cmd
+$(BLD_JAVA_8)include $(SRC)/cmd/Makefile.cmd.64
 
 JAVA_SUBDIRS =	com/sun/solaris/service/exception \
 		com/sun/solaris/service/kstat \
@@ -58,6 +59,11 @@ msg :=		TARGET = msg
 $(ROOTMANIFEST):=	FILEMODE= 444
 JARFILE =	JPool.jar
 
+JAVA_LIB_PATH =	$(JAVA_ROOT)/jre/lib/$(MACH)/client
+LIBPOOL_PATH = $(ROOTLIB)
+$(BLD_JAVA_8)JAVA_LIB_PATH =	$(JAVA_ROOT)/jre/lib/$(MACH64)/server
+$(BLD_JAVA_8)LIBPOOL_PATH = $(ROOTLIB64)
+
 # JAVA_SUBDIRS and PACKAGEDOCS must be synchronized to ensure 
 # javadoc documentation is generated for all packages.
 
@@ -73,11 +79,13 @@ ROOTUSRLIBDRP = $(ROOTLIB)/pool
 INCS =		-I../common \
 		-I$(JAVA_ROOT)/include \
 		-I$(JAVA_ROOT)/include/solaris
-LDLIBS +=	-lpool -L$(JAVA_ROOT)/jre/lib/$(MACH)/client -ljvm
+LDLIBS +=	-lpool -L$(JAVA_LIB_PATH) -ljvm
 # runpath should point to runtime JAVA_HOME
-LDFLAGS +=	-R$(JAVA_HOME)/jre/lib/$(MACH)/client
+LDFLAGS +=	-R$(JAVA_LIB_PATH)
+
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
-LINTLIBS +=	-L$(ROOTLIB) -lpool
+$(BLD_JAVA_8)LINTFLAGS64 += -erroff=E_NAME_USED_NOT_DEF2
+LINTLIBS +=	-L$(LIBPOOL_PATH) -lpool
 
 CPPFLAGS +=	$(INCS)
 ROOTCMDDIR =	$(ROOT)/usr/lib/pool
