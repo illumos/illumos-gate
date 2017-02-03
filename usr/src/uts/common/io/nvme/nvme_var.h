@@ -22,6 +22,7 @@
 #include <sys/sunddi.h>
 #include <sys/blkdev.h>
 #include <sys/taskq_impl.h>
+#include <sys/list.h>
 
 /*
  * NVMe driver state
@@ -71,6 +72,8 @@ struct nvme_dma {
 };
 
 struct nvme_cmd {
+	struct list_node nc_list;
+
 	nvme_sqe_t nc_sqe;
 	nvme_cqe_t nc_cqe;
 
@@ -160,7 +163,7 @@ struct nvme {
 	int n_pagesize;
 
 	int n_namespace_count;
-	int n_ioq_count;
+	uint16_t n_ioq_count;
 
 	nvme_identify_ctrl_t *n_idctl;
 
