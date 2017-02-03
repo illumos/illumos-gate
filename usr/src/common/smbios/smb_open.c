@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -89,6 +89,7 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 	case SMB_VERSION_27:
 	case SMB_VERSION_28:
 	case SMB_VERSION_30:
+	case SMB_VERSION_31:
 		break;
 	default:
 		return (smb_open_error(shp, errp, ESMB_VERSION));
@@ -395,6 +396,14 @@ smb_strptr(const smb_struct_t *stp, uint_t i)
 		return (_smb_emptystr);
 	else
 		return ((char *)stp->smbst_str + stp->smbst_strtab[i - 1]);
+}
+
+int
+smb_libgteq(smbios_hdl_t *shp, int version)
+{
+	return (SMB_MAJOR(shp->sh_libvers) > SMB_MAJOR(version) || (
+	    SMB_MAJOR(shp->sh_libvers) == SMB_MAJOR(version) &&
+	    SMB_MINOR(shp->sh_libvers) >= SMB_MINOR(version)));
 }
 
 int

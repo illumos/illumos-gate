@@ -49,6 +49,7 @@ FICL_INSTRUCTION_TOKEN(ficlInstructionExitParen, "(exit)",
 FICL_INSTRUCTION_TOKEN(ficlInstructionDup, "dup", FICL_WORD_DEFAULT)
 FICL_INSTRUCTION_TOKEN(ficlInstructionSwap, "swap", FICL_WORD_DEFAULT)
 FICL_INSTRUCTION_TOKEN(ficlInstructionGreaterThan, ">", FICL_WORD_DEFAULT)
+FICL_INSTRUCTION_TOKEN(ficlInstructionUGreaterThan, "u>", FICL_WORD_DEFAULT)
 FICL_INSTRUCTION_TOKEN(ficlInstructionBranchParenWithCheck, "(branch)",
     FICL_WORD_COMPILE_ONLY)
 FICL_INSTRUCTION_TOKEN(ficlInstructionBranchParen, "(branch-final)",

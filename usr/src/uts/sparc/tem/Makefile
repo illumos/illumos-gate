@@ -100,22 +100,6 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/sparc/Makefile.targ
 
-#
-#	Font data for generated 8x16 font
-#
-VGATEXT_FONT	= 8x16
-VGATEXT_FONT_SRC= 8859-1
-VGATEXT_FONT_DIR= $(UTSBASE)/common/font
-
-$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf \
-	$(VGATEXT_FONT_DIR)/bdf_to_c.awk
-	$(AWK) -f $(VGATEXT_FONT_DIR)/bdf_to_c.awk	\
-		$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf > $@
-
-$(OBJS_DIR)/$(VGATEXT_FONT).o:	$(OBJS_DIR)/$(VGATEXT_FONT).c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 CLOBBERFILES	+=	\
 	$(OBJS_DIR)/$(VGATEXT_FONT).o \
 	$(OBJS_DIR)/$(VGATEXT_FONT).c

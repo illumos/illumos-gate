@@ -205,6 +205,19 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/exec/java/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf \
+	$(VGATEXT_FONT_DIR)/bdf_to_c.awk
+	$(AWK) -f $(VGATEXT_FONT_DIR)/bdf_to_c.awk	\
+		$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf > $@
+
+$(OBJS_DIR)/$(VGATEXT_FONT).o:	$(OBJS_DIR)/$(VGATEXT_FONT).c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/font/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
