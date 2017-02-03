@@ -1356,6 +1356,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	cv_init(&mpt->m_fw_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&mpt->m_config_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&mpt->m_fw_diag_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&mpt->m_extreq_sense_refcount_cv, NULL, CV_DRIVER, NULL);
 	mutex_init_done++;
 
 	mutex_enter(&mpt->m_mutex);
@@ -1648,6 +1649,7 @@ fail:
 			cv_destroy(&mpt->m_fw_cv);
 			cv_destroy(&mpt->m_config_cv);
 			cv_destroy(&mpt->m_fw_diag_cv);
+			cv_destroy(&mpt->m_extreq_sense_refcount_cv);
 		}
 
 		if (map_setup) {
@@ -2065,7 +2067,7 @@ mptsas_do_detach(dev_info_t *dip)
 	cv_destroy(&mpt->m_fw_cv);
 	cv_destroy(&mpt->m_config_cv);
 	cv_destroy(&mpt->m_fw_diag_cv);
-
+	cv_destroy(&mpt->m_extreq_sense_refcount_cv);
 
 	mptsas_smp_teardown(mpt);
 	mptsas_enc_teardown(mpt);
@@ -2698,6 +2700,8 @@ mptsas_alloc_sense_bufs(mptsas_t *mpt)
 	ddi_dma_cookie_t	cookie;
 	size_t			mem_size;
 	int			num_extrqsense_bufs;
+
+	ASSERT(mpt->m_extreq_sense_refcount == 0);
 
 	/*
 	 * re-alloc when it has already alloced
@@ -3665,7 +3669,6 @@ mptsas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 {
 	mptsas_cmd_t		*cmd, *new_cmd;
 	mptsas_t		*mpt = ADDR2MPT(ap);
-	int			failure = 1;
 	uint_t			oldcookiec;
 	mptsas_target_t		*ptgt = NULL;
 	int			rval;
@@ -3703,44 +3706,79 @@ mptsas_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		ddi_dma_handle_t	save_dma_handle;
 
 		cmd = kmem_cache_alloc(mpt->m_kmem_cache, kf);
+		if (cmd == NULL)
+			return (NULL);
 
-		if (cmd) {
-			save_dma_handle = cmd->cmd_dmahandle;
-			bzero(cmd, sizeof (*cmd) + scsi_pkt_size());
-			cmd->cmd_dmahandle = save_dma_handle;
+		save_dma_handle = cmd->cmd_dmahandle;
+		bzero(cmd, sizeof (*cmd) + scsi_pkt_size());
+		cmd->cmd_dmahandle = save_dma_handle;
 
-			pkt = (void *)((uchar_t *)cmd +
-			    sizeof (struct mptsas_cmd));
-			pkt->pkt_ha_private = (opaque_t)cmd;
-			pkt->pkt_address = *ap;
-			pkt->pkt_private = (opaque_t)cmd->cmd_pkt_private;
-			pkt->pkt_scbp = (opaque_t)&cmd->cmd_scb;
-			pkt->pkt_cdbp = (opaque_t)&cmd->cmd_cdb;
-			cmd->cmd_pkt = (struct scsi_pkt *)pkt;
-			cmd->cmd_cdblen = (uchar_t)cmdlen;
-			cmd->cmd_scblen = statuslen;
-			cmd->cmd_rqslen = SENSE_LENGTH;
-			cmd->cmd_tgt_addr = ptgt;
-			failure = 0;
-		}
+		pkt = (void *)((uchar_t *)cmd +
+		    sizeof (struct mptsas_cmd));
+		pkt->pkt_ha_private = (opaque_t)cmd;
+		pkt->pkt_address = *ap;
+		pkt->pkt_private = (opaque_t)cmd->cmd_pkt_private;
+		pkt->pkt_scbp = (opaque_t)&cmd->cmd_scb;
+		pkt->pkt_cdbp = (opaque_t)&cmd->cmd_cdb;
+		cmd->cmd_pkt = (struct scsi_pkt *)pkt;
+		cmd->cmd_cdblen = (uchar_t)cmdlen;
+		cmd->cmd_scblen = statuslen;
+		cmd->cmd_rqslen = SENSE_LENGTH;
+		cmd->cmd_tgt_addr = ptgt;
 
-		if (failure || (cmdlen > sizeof (cmd->cmd_cdb)) ||
+		if ((cmdlen > sizeof (cmd->cmd_cdb)) ||
 		    (tgtlen > PKT_PRIV_LEN) ||
 		    (statuslen > EXTCMDS_STATUS_SIZE)) {
-			if (failure == 0) {
-				/*
-				 * if extern alloc fails, all will be
-				 * deallocated, including cmd
-				 */
-				failure = mptsas_pkt_alloc_extern(mpt, cmd,
-				    cmdlen, tgtlen, statuslen, kf);
-			}
-			if (failure) {
-				/*
-				 * if extern allocation fails, it will
-				 * deallocate the new pkt as well
-				 */
+			int failure;
+
+			/*
+			 * We are going to allocate external packet space which
+			 * might include the sense data buffer for DMA so we
+			 * need to increase the reference counter here.  In a
+			 * case the HBA is in reset we just simply free the
+			 * allocated packet and bail out.
+			 */
+			mutex_enter(&mpt->m_mutex);
+			if (mpt->m_in_reset) {
+				mutex_exit(&mpt->m_mutex);
+
+				cmd->cmd_flags = CFLAG_FREE;
+				kmem_cache_free(mpt->m_kmem_cache, cmd);
 				return (NULL);
+			}
+			mpt->m_extreq_sense_refcount++;
+			ASSERT(mpt->m_extreq_sense_refcount > 0);
+			mutex_exit(&mpt->m_mutex);
+
+			/*
+			 * if extern alloc fails, all will be
+			 * deallocated, including cmd
+			 */
+			failure = mptsas_pkt_alloc_extern(mpt, cmd,
+			    cmdlen, tgtlen, statuslen, kf);
+
+			if (failure != 0 || cmd->cmd_extrqslen == 0) {
+				/*
+				 * If the external packet space allocation
+				 * failed, or we didn't allocate the sense
+				 * data buffer for DMA we need to decrease the
+				 * reference counter.
+				 */
+				mutex_enter(&mpt->m_mutex);
+				ASSERT(mpt->m_extreq_sense_refcount > 0);
+				mpt->m_extreq_sense_refcount--;
+				if (mpt->m_extreq_sense_refcount == 0)
+					cv_broadcast(
+					    &mpt->m_extreq_sense_refcount_cv);
+				mutex_exit(&mpt->m_mutex);
+
+				if (failure != 0) {
+					/*
+					 * if extern allocation fails, it will
+					 * deallocate the new pkt as well
+					 */
+					return (NULL);
+				}
 			}
 		}
 		new_cmd = cmd;
@@ -4027,7 +4065,22 @@ mptsas_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 		cmd->cmd_flags = CFLAG_FREE;
 		kmem_cache_free(mpt->m_kmem_cache, (void *)cmd);
 	} else {
+		boolean_t extrqslen = cmd->cmd_extrqslen != 0;
+
 		mptsas_pkt_destroy_extern(mpt, cmd);
+
+		/*
+		 * If the packet had the sense data buffer for DMA allocated we
+		 * need to decrease the reference counter.
+		 */
+		if (extrqslen) {
+			mutex_enter(&mpt->m_mutex);
+			ASSERT(mpt->m_extreq_sense_refcount > 0);
+			mpt->m_extreq_sense_refcount--;
+			if (mpt->m_extreq_sense_refcount == 0)
+				cv_broadcast(&mpt->m_extreq_sense_refcount_cv);
+			mutex_exit(&mpt->m_mutex);
+		}
 	}
 }
 
@@ -12851,6 +12904,12 @@ mptsas_restart_ioc(mptsas_t *mpt)
 	 * so that they can be retried.
 	 */
 	mpt->m_in_reset = TRUE;
+
+	/*
+	 * Wait until all the allocated sense data buffers for DMA are freed.
+	 */
+	while (mpt->m_extreq_sense_refcount > 0)
+		cv_wait(&mpt->m_extreq_sense_refcount_cv, &mpt->m_mutex);
 
 	/*
 	 * Set all throttles to HOLD
