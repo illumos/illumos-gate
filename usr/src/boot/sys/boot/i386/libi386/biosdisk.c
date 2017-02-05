@@ -26,11 +26,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * BIOS disk device handling.
- * 
+ *
  * Ideas and algorithms from:
  *
  * - NetBSD libi386/biosdisk.c
@@ -479,9 +478,6 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
     return (0);
 }
 
-/* Max number of sectors to bounce-buffer if the request crosses a 64k boundary */
-#define FLOPPY_BOUNCEBUF	18
-
 static int
 bd_edd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
     int dowrite)
@@ -542,11 +538,12 @@ bd_chs_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 }
 
 static int
-bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest, int dowrite)
+bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
+    int dowrite)
 {
     u_int	x, sec, result, resid, retry, maxfer;
-    caddr_t	p, xp, bbuf, breg;
-    
+    caddr_t	p, xp, bbuf;
+
     /* Just in case some idiot actually tries to read/write -1 blocks... */
     if (blks < 0)
 	return (-1);
@@ -567,20 +564,17 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest, int dowrit
 	 * as we need to.  Use the bottom half unless there is a break
 	 * there, in which case we use the top half.
 	 */
-	x = min(FLOPPY_BOUNCEBUF, (unsigned)blks);
-	bbuf = alloca(x * 2 * BD(dev).bd_sectorsize);
-	if (((u_int32_t)VTOP(bbuf) & 0xffff0000) ==
-	    ((u_int32_t)VTOP(bbuf + x * BD(dev).bd_sectorsize) & 0xffff0000)) {
-	    breg = bbuf;
-	} else {
-	    breg = bbuf + x * BD(dev).bd_sectorsize;
-	}
+	x = V86_IO_BUFFER_SIZE / BD(dev).bd_sectorsize;
+	if (x == 0)
+		panic("BUG: Real mode buffer is too small\n");
+	x = min(x, (unsigned)blks);
+	bbuf = PTOV(V86_IO_BUFFER);
 	maxfer = x;		/* limit transfers to bounce region size */
     } else {
-	breg = bbuf = NULL;
+	bbuf = NULL;
 	maxfer = 0;
     }
-    
+
     while (resid > 0) {
 	/*
 	 * Play it safe and don't cross track boundaries.
@@ -592,14 +586,14 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest, int dowrit
 	    x = min(x, maxfer);		/* fit bounce buffer */
 
 	/* where do we transfer to? */
-	xp = bbuf == NULL ? p : breg;
+	xp = bbuf == NULL ? p : bbuf;
 
 	/*
 	 * Put your Data In, Put your Data out,
-	 * Put your Data In, and shake it all about 
+	 * Put your Data In, and shake it all about
 	 */
 	if (dowrite && bbuf != NULL)
-	    bcopy(p, breg, x * BD(dev).bd_sectorsize);
+	    bcopy(p, bbuf, x * BD(dev).bd_sectorsize);
 
 	/*
 	 * Loop retrying the operation a couple of times.  The BIOS
@@ -633,7 +627,7 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest, int dowrit
 	    return(-1);
 	}
 	if (!dowrite && bbuf != NULL)
-	    bcopy(breg, p, x * BD(dev).bd_sectorsize);
+	    bcopy(bbuf, p, x * BD(dev).bd_sectorsize);
 	p += (x * BD(dev).bd_sectorsize);
 	dblk += x;
 	resid -= x;
