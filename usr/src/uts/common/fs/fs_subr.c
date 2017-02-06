@@ -60,6 +60,9 @@
 #include <acl/acl_common.h>
 #include <sys/pathname.h>
 
+/* required for fs_reject_epoll */
+#include <sys/poll_impl.h>
+
 static callb_cpr_t *frlock_serialize_blocked(flk_cb_when_t, void *);
 
 /*
@@ -406,10 +409,20 @@ fs_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr, caller_context_t *ct)
 }
 
 /*
- * Return the answer requested to poll() for non-device files.
- * Only POLLIN, POLLRDNORM, and POLLOUT are recognized.
+ * Unlike poll(2), epoll should reject attempts to add normal files or
+ * directories to a given handle.  Most non-pseudo filesystems rely on
+ * fs_poll() as their implementation of polling behavior.  Exceptions to that
+ * rule (ufs) can use fs_reject_epoll(), so they don't require access to the
+ * inner details of poll.  Potential race conditions related to the poll module
+ * being loaded are avoided by implementing the check here in genunix.
  */
-struct pollhead fs_pollhd;
+boolean_t
+fs_reject_epoll()
+{
+	/* Check if the currently-active pollcache is epoll-enabled. */
+	return (curthread->t_pollcache != NULL &&
+	    (curthread->t_pollcache->pc_flag & PC_EPOLL) != 0);
+}
 
 /* ARGSUSED */
 int
@@ -417,13 +430,12 @@ fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
     struct pollhead **phpp, caller_context_t *ct)
 {
 	/*
-	 * Reject all attempts for edge-triggered polling.  These should only
-	 * occur when regular files are added to a /dev/poll handle which is in
-	 * epoll mode.  The Linux epoll does not allow epoll-ing on regular
-	 * files at all, so rejecting EPOLLET requests is congruent with those
-	 * expectations.
+	 * Regular filesystems should reject epollers.  On the off chance that
+	 * a non-epoll consumer expresses the desire for edge-triggered
+	 * polling, we reject them too.  Yes, the expected error for this
+	 * really is EPERM.
 	 */
-	if (events & POLLET) {
+	if (fs_reject_epoll() || (events & POLLET) != 0) {
 		return (EPERM);
 	}
 
@@ -438,15 +450,7 @@ fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 		*reventsp |= POLLOUT;
 	if (events & POLLWRBAND)
 		*reventsp |= POLLWRBAND;
-	/*
-	 * Emitting a pollhead without the intention of issuing pollwakeup()
-	 * calls against it is a recipe for trouble.  It's only acceptable in
-	 * this case since the above logic matches practically all useful
-	 * events.
-	 */
-	if (*reventsp == 0 && !anyyet) {
-		*phpp = &fs_pollhd;
-	}
+
 	return (0);
 }
 

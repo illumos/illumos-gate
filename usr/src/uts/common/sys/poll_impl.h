@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_POLL_IMPL_H
@@ -256,6 +256,7 @@ struct pollcache {
 
 /* pc_flag */
 #define	PC_POLLWAKE	0x02	/* pollwakeup() occurred */
+#define	PC_EPOLL	0x04	/* pollcache is epoll-enabled */
 
 #if defined(_KERNEL)
 /*

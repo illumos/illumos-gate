@@ -24,6 +24,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_SYS_FS_SUBR_H
@@ -94,6 +95,9 @@ extern int	fs_acl_nontrivial(struct vnode *vp, struct cred *cr);
 extern int	fs_need_estale_retry(int);
 extern void	fs_vscan_register(int (*av_scan)(vnode_t *, cred_t *, int));
 extern int	fs_vscan(vnode_t *, cred_t *, int);
+
+/* Helper function to detect when epoll checks VOP_POLL handlers */
+extern boolean_t fs_reject_epoll();
 
 #endif	/* _KERNEL */
 

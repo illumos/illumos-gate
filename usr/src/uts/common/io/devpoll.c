@@ -1170,8 +1170,13 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		 * to turn it off for a particular open.
 		 */
 		dpep->dpe_flag |= DP_ISEPOLLCOMPAT;
-		mutex_exit(&dpep->dpe_lock);
 
+		/* Record the epoll-enabled nature in the pollcache too */
+		mutex_enter(&pcp->pc_lock);
+		pcp->pc_flag |= PC_EPOLL;
+		mutex_exit(&pcp->pc_lock);
+
+		mutex_exit(&dpep->dpe_lock);
 		return (0);
 	}
 
