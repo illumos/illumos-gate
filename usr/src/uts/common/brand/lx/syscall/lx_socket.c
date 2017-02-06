@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -2479,6 +2479,9 @@ static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
 	{ OPTNOTSUP, 0 }			/* IP_UNICAST_IF	*/
 };
 
+/* Shorten name so the columns can line up */
+#define	IP6_MREQ_SZ	sizeof (struct ipv6_mreq)
+
 static const lx_sockopt_map_t ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },			/* IPV6_ADDRFORM	*/
@@ -2500,8 +2503,8 @@ static const lx_sockopt_map_t ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 	{ IPV6_MULTICAST_IF, sizeof (int) },	/* IPV6_MULTICAST_IF	*/
 	{ IPV6_MULTICAST_HOPS, sizeof (int) },	/* IPV6_MULTICAST_HOPS	*/
 	{ IPV6_MULTICAST_LOOP, sizeof (int) },	/* IPV6_MULTICAST_LOOP	*/
-	{ OPTNOTSUP, 0 },			/* IPV6_JOIN_GROUP	*/
-	{ OPTNOTSUP, 0 },			/* IPV6_LEAVE_GROUP	*/
+	{ IPV6_ADD_MEMBERSHIP, IP6_MREQ_SZ },	/* IPV6_JOIN_GROUP	*/
+	{ IPV6_DROP_MEMBERSHIP, IP6_MREQ_SZ },	/* IPV6_LEAVE_GROUP	*/
 	{ OPTNOTSUP, 0 },			/* IPV6_ROUTER_ALERT	*/
 	{ OPTNOTSUP, 0 },			/* IPV6_MTU_DISCOVER	*/
 	{ OPTNOTSUP, 0 },			/* IPV6_MTU		*/
@@ -2522,13 +2525,13 @@ static const lx_sockopt_map_t ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },
+	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_GROUP	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_BLOCK_SOURCE	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_UNBLOCK_SOURCE	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_GROUP	*/
+	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_SOURCE_GROUP */
+	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_SOURCE_GROUP */
+	{ OPTNOTSUP, 0 },			/* MCAST_MSFILTER	*/
 	{ IPV6_RECVPKTINFO, sizeof (int) },	/* IPV6_RECVPKTINFO	*/
 	{ IPV6_PKTINFO, 0 },			/* IPV6_PKTINFO		*/
 	{ IPV6_RECVHOPLIMIT, sizeof (int) },	/* IPV6_RECVHOPLIMIT	*/
