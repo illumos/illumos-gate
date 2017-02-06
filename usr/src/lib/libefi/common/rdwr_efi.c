@@ -211,6 +211,37 @@ efi_alloc_and_read(int fd, struct dk_gpt **vtoc)
 	int			rval;
 	uint32_t		nparts;
 	int			length;
+	struct mboot		*mbr;
+	struct ipart		*ipart;
+	diskaddr_t		capacity;
+	uint_t			lbsize;
+	int			i;
+
+	if (read_disk_info(fd, &capacity, &lbsize) != 0)
+		return (VT_ERROR);
+
+	if ((mbr = calloc(lbsize, 1)) == NULL)
+		return (VT_ERROR);
+
+	if ((ioctl(fd, DKIOCGMBOOT, (caddr_t)mbr)) == -1) {
+		free(mbr);
+		return (VT_ERROR);
+	}
+
+	if (mbr->signature != MBB_MAGIC) {
+		free(mbr);
+		return (VT_EINVAL);
+	}
+	ipart = (struct ipart *)(uintptr_t)mbr->parts;
+
+	/* Check if we have partition with ID EFI_PMBR */
+	for (i = 0; i < FD_NUMPART; i++) {
+		if (ipart[i].systid == EFI_PMBR)
+			break;
+	}
+	free(mbr);
+	if (i == FD_NUMPART)
+		return (VT_EINVAL);
 
 	/* figure out the number of entries that would fit into 16K */
 	nparts = EFI_MIN_ARRAY_SIZE / sizeof (efi_gpe_t);

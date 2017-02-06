@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -64,7 +64,7 @@
  *	bsize - block size
  *	fragsize - fragment size
  *	cgsize - The number of disk cylinders per cylinder group.
- * 	free - minimum free space
+ *	free - minimum free space
  *	rps - rotational speed (rev/sec).
  *	nbpi - number of data bytes per allocated inode
  *	opt - optimization (space, time)
@@ -248,7 +248,7 @@
 #include	<sys/statvfs.h>
 #include	<locale.h>
 #include	<fcntl.h>
-#include 	<sys/isa_defs.h>	/* for ENDIAN defines */
+#include	<sys/isa_defs.h>	/* for ENDIAN defines */
 #include	<sys/vtoc.h>
 
 #include	<sys/dkio.h>
@@ -508,9 +508,9 @@ long	ntrack = DFLNTRAK;		/* tracks per cylinder group */
 int	ntrack_flag = RC_DEFAULT;
 long	bsize = DESBLKSIZE;		/* filesystem block size */
 int	bsize_flag = RC_DEFAULT;
-long	fragsize = DESFRAGSIZE; 	/* filesystem fragment size */
+long	fragsize = DESFRAGSIZE;		/* filesystem fragment size */
 int	fragsize_flag = RC_DEFAULT;
-long	minfree = MINFREE; 		/* fs_minfree */
+long	minfree = MINFREE;		/* fs_minfree */
 int	minfree_flag = RC_DEFAULT;
 long	rps = DEFHZ;			/* revolutions/second of drive */
 int	rps_flag = RC_DEFAULT;
@@ -611,8 +611,8 @@ void		wlockfs(void);
 void		clockfs(void);
 void		wtsb(void);
 static int64_t	checkfragallocated(daddr32_t);
-static struct csum 	*read_summaryinfo(struct fs *);
-static diskaddr_t 	probe_summaryinfo();
+static struct csum	*read_summaryinfo(struct fs *);
+static diskaddr_t	probe_summaryinfo();
 
 int
 main(int argc, char *argv[])
@@ -765,7 +765,7 @@ main(int argc, char *argv[])
 		case 'G':	/* grow the file system */
 			grow = 1;
 			break;
-		case 'P':	/* probe the file system growing size 	*/
+		case 'P':	/* probe the file system growing size	*/
 			Pflag = 1;
 			grow = 1; /* probe mode implies fs growing	*/
 			break;
@@ -2379,6 +2379,17 @@ grow50:
 	return (0);
 }
 
+static diskaddr_t
+get_device_size(int fd)
+{
+	struct dk_minfo	disk_info;
+
+	if ((ioctl(fd, DKIOCGMEDIAINFO, (caddr_t)&disk_info)) == -1)
+		return (0);
+
+	return (disk_info.dki_capacity);
+}
+
 /*
  * Figure out how big the partition we're dealing with is.
  * The value returned is in disk blocks (sectors);
@@ -2403,23 +2414,32 @@ get_max_size(int fd)
 	}
 
 	if (index < 0) {
-		switch (index) {
-		case VT_ERROR:
-			break;
-		case VT_EIO:
-			errno = EIO;
-			break;
-		case VT_EINVAL:
-			errno = EINVAL;
+		/*
+		 * Since both attempts to read the label failed, we're
+		 * going to use DKIOCGMEDIAINFO to get device size.
+		 */
+
+		label_type = LABEL_TYPE_OTHER;
+		slicesize = get_device_size(fd);
+		if (slicesize == 0) {
+			switch (index) {
+			case VT_ERROR:
+				break;
+			case VT_EIO:
+				errno = EIO;
+				break;
+			case VT_EINVAL:
+				errno = EINVAL;
+			}
+			perror(gettext("Can not determine partition size"));
+			lockexit(32);
 		}
-		perror(gettext("Can not determine partition size"));
-		lockexit(32);
 	}
 
 	if (label_type == LABEL_TYPE_EFI) {
 		slicesize = efi_vtoc->efi_parts[index].p_size;
 		efi_free(efi_vtoc);
-	} else {
+	} else if (label_type == LABEL_TYPE_VTOC) {
 		/*
 		 * In the vtoc struct, p_size is a 32-bit signed quantity.
 		 * In the dk_gpt struct (efi's version of the vtoc), p_size
@@ -3265,8 +3285,8 @@ static void
 awtfs(diskaddr_t bno, int size, char *bf, int release)
 {
 	int n;
-	aio_trans 	*transp;
-	sigset_t 	old_mask;
+	aio_trans	*transp;
+	sigset_t	old_mask;
 
 	if (fso == -1)
 		return;
@@ -4452,9 +4472,9 @@ findcsfragino()
 		dp = gdinode((ino_t)i);
 		switch (dp->di_mode & IFMT) {
 			case IFSHAD	:
-			case IFLNK 	:
-			case IFDIR 	:
-			case IFREG 	: break;
+			case IFLNK	:
+			case IFDIR	:
+			case IFREG	: break;
 			default		: continue;
 		}
 
@@ -4537,7 +4557,7 @@ fixcsfragino()
 static struct csum *
 read_summaryinfo(struct	fs *fsp)
 {
-	struct csum 	*csp;
+	struct csum	*csp;
 	int		i;
 
 	if ((csp = malloc((size_t)fsp->fs_cssize)) == NULL) {
@@ -4565,7 +4585,7 @@ read_summaryinfo(struct	fs *fsp)
 int64_t
 checkfragallocated(daddr32_t frag)
 {
-	struct 	csfrag	*cfp;
+	struct	csfrag	*cfp;
 	/*
 	 * Since the lists are sorted we can break the search if the asked
 	 * frag is smaller then the one in the list.
@@ -4601,12 +4621,12 @@ diskaddr_t
 probe_summaryinfo()
 {
 	/* fragments by which the csum block can be extended. */
-	int64_t 	growth_csum_frags = 0;
+	int64_t		growth_csum_frags = 0;
 	/* fragments by which the filesystem can be extended. */
 	int64_t		growth_fs_frags = 0;
 	int64_t		new_fs_cssize;	/* size of csum blk in the new FS */
 	int64_t		new_fs_ncg;	/* number of cg in the new FS */
-	int64_t 	spare_csum;
+	int64_t		spare_csum;
 	daddr32_t	oldfrag_daddr;
 	daddr32_t	newfrag_daddr;
 	daddr32_t	daddr;
@@ -5690,7 +5710,7 @@ in_64bit_mode(void)
 static int
 validate_size(int fd, diskaddr_t size)
 {
-	char 		buf[DEV_BSIZE];
+	char	buf[DEV_BSIZE];
 	int rc;
 
 	if ((llseek(fd, (offset_t)((size - 1) * DEV_BSIZE), SEEK_SET) == -1) ||
