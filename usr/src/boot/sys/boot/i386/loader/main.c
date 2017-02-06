@@ -194,7 +194,7 @@ main(void)
     extract_currdev();				/* set $currdev and $loaddev */
     setenv("LINES", "24", 1);			/* optional */
     setenv("COLUMNS", "80", 1);			/* optional */
-    
+
     if (bi_checkcpu())
 	setenv("ISADIR", "amd64", 1);
     else
@@ -276,8 +276,6 @@ extract_currdev(void)
     } else {
 	new_currdev.d_kind.biosdisk.slice = B_SLICE(initial_bootdev) - 1;
 	new_currdev.d_kind.biosdisk.partition = B_PARTITION(initial_bootdev);
-	if (new_currdev.d_kind.biosdisk.partition == 0xff)
-	    new_currdev.d_kind.biosdisk.partition = -1;
 	biosdev = initial_bootinfo->bi_bios_dev;
 
 	/*
