@@ -527,6 +527,7 @@ dladm_str2bw(char *oarg, uint64_t *bw)
 	int64_t		n;
 	int		mult = 1;
 
+	errno = 0;
 	n = strtoull(oarg, &endp, 10);
 
 	if ((errno != 0) || (strlen(endp) > 1))
