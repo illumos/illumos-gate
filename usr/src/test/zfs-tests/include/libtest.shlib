@@ -2752,6 +2752,20 @@ function sync_all_pools #<force>
 }
 
 #
+# Wait for zpool 'freeing' property drops to zero.
+#
+# $1 pool name
+#
+function wait_freeing #pool
+{
+	typeset pool=${1:-$TESTPOOL}
+	while true; do
+		[[ "0" == "$(zpool list -Ho freeing $pool)" ]] && break
+		log_must $SLEEP 1
+	done
+}
+
+#
 # Prints the current time in seconds since UNIX Epoch.
 #
 function current_epoch

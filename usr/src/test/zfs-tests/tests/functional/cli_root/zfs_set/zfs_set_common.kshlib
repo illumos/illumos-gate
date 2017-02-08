@@ -93,6 +93,8 @@ function set_n_check_prop
 
 		[[ -n $prop ]] && cur_value=$(get_prop $prop $dataset)
 
+		wait_freeing
+
 		if [[ "$expect_value" != "" && "$cur_value" != "$old_value" ]];
 		then
 			log_fail "The '$dataset' '$prop' value '$cur_value' \

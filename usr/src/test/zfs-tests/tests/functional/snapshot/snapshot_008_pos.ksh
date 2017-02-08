@@ -47,9 +47,9 @@ verify_runnable "both"
 function cleanup
 {
 	typeset -i i=1
-	while [[ $i -lt $COUNT ]]; do
+	while (( i < COUNT )); do
 		snapexists $SNAPFS.$i
-		[[ $? -eq 0 ]] && \
+		(( $? == 0 )) && \
 			log_must zfs destroy $SNAPFS.$i
 
 		(( i = i + 1 ))
@@ -72,7 +72,7 @@ orig_size=`get_prop available $TESTPOOL`
 
 log_note "Populate the $TESTDIR directory"
 typeset -i i=1
-while [[ $i -lt $COUNT ]]; do
+while (( i < COUNT )); do
 	log_must file_write -o create -f $TESTDIR/file$i \
 	   -b $BLOCKSZ -c $NUM_WRITES -d $i
 
@@ -81,12 +81,14 @@ while [[ $i -lt $COUNT ]]; do
 done
 
 typeset -i i=1
-while [[ $i -lt $COUNT ]]; do
+while (( i < COUNT )); do
 	log_must rm -rf $TESTDIR/file$i > /dev/null 2>&1
 	log_must zfs destroy $SNAPFS.$i
 
 	(( i = i + 1 ))
 done
+
+wait_freeing $TESTPOOL
 
 new_size=`get_prop available $TESTPOOL`
 
