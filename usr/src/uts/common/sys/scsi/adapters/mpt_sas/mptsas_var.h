@@ -808,6 +808,8 @@ typedef struct mptsas {
 	uint64_t	m_req_frame_dma_addr;
 	caddr_t		m_req_sense;
 	caddr_t		m_extreq_sense;
+	uint_t		m_extreq_sense_refcount;
+	kcondvar_t	m_extreq_sense_refcount_cv;
 	uint64_t	m_req_sense_dma_addr;
 	caddr_t		m_reply_frame;
 	uint64_t	m_reply_frame_dma_addr;

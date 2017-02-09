@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <netinet/in.h>
@@ -101,7 +100,7 @@ efinet_match(struct netif *nif, void *machdep_hint)
 {
 	struct devdesc *dev = machdep_hint;
 
-	if (dev->d_unit - 1 == nif->nif_unit)
+	if (dev->d_unit == nif->nif_unit)
 		return (1);
 	return(0);
 }
@@ -122,6 +121,8 @@ efinet_put(struct iodesc *desc, void *pkt, size_t len)
 	void *buf;
 
 	net = nif->nif_devdata;
+	if (net == NULL)
+		return (-1);
 
 	status = net->Transmit(net, 0, len, pkt, 0, 0, 0);
 	if (status != EFI_SUCCESS)
@@ -152,6 +153,8 @@ efinet_get(struct iodesc *desc, void *pkt, size_t len, time_t timeout)
 	char buf[2048];
 
 	net = nif->nif_devdata;
+	if (net == NULL)
+		return (0);
 
 	t = time(0);
 	while ((time(0) - t) < timeout) {
@@ -192,7 +195,7 @@ efinet_init(struct iodesc *desc, void *machdep_hint)
 	h = nif->nif_driver->netif_ifs[nif->nif_unit].dif_private;
 	status = BS->HandleProtocol(h, &sn_guid, (VOID **)&nif->nif_devdata);
 	if (status != EFI_SUCCESS) {
-		printf("net%d: cannot start interface (status=%lu)\n",
+		printf("net%d: cannot fetch interface data (status=%lu)\n",
 		    nif->nif_unit, EFI_ERROR_CODE(status));
 		return;
 	}
@@ -241,6 +244,9 @@ efinet_end(struct netif *nif)
 {
 	EFI_SIMPLE_NETWORK *net = nif->nif_devdata; 
 
+	if (net == NULL)
+		return;
+
 	net->Shutdown(net);
 }
 
@@ -264,7 +270,9 @@ efinet_dev_init()
 {
 	struct netif_dif *dif;
 	struct netif_stats *stats;
-	EFI_HANDLE *handles;
+	EFI_DEVICE_PATH *devpath, *node;
+	EFI_SIMPLE_NETWORK *net;
+	EFI_HANDLE *handles, *handles2;
 	EFI_STATUS status;
 	UINTN sz;
 	int err, i, nifs;
@@ -281,51 +289,76 @@ efinet_dev_init()
 	}
 	if (EFI_ERROR(status))
 		return (efi_status_to_errno(status));
-	nifs = sz / sizeof(EFI_HANDLE);
-	err = efi_register_handles(&efinet_dev, handles, NULL, nifs);
-	free(handles);
-	if (err != 0)
-		return (err);
+	handles2 = (EFI_HANDLE *)malloc(sz);
+	if (handles2 == NULL) {
+		free(handles);
+		return (ENOMEM);
+	}
+	nifs = 0;
+	for (i = 0; i < sz / sizeof(EFI_HANDLE); i++) {
+		devpath = efi_lookup_devpath(handles[i]);
+		if (devpath == NULL)
+			continue;
+		if ((node = efi_devpath_last_node(devpath)) == NULL)
+			continue;
 
-	efinetif.netif_nifs = nifs;
-	efinetif.netif_ifs = calloc(nifs, sizeof(struct netif_dif));
-
-	stats = calloc(nifs, sizeof(struct netif_stats));
-
-	for (i = 0; i < nifs; i++) {
-		EFI_SIMPLE_NETWORK *net;
-		EFI_HANDLE h;
-
-		dif = &efinetif.netif_ifs[i];
-		dif->dif_unit = -1;
-
-		h = efi_find_handle(&efinet_dev, i);
+		if (DevicePathType(node) != MESSAGING_DEVICE_PATH ||
+		    DevicePathSubType(node) != MSG_MAC_ADDR_DP)
+			continue;
 
 		/*
 		 * Open the network device in exclusive mode. Without this
 		 * we will be racing with the UEFI network stack. It will
 		 * pull packets off the network leading to lost packets.
 		 */
-		status = BS->OpenProtocol(h, &sn_guid, (void **)&net,
+		status = BS->OpenProtocol(handles[i], &sn_guid, (void **)&net,
 		    IH, 0, EFI_OPEN_PROTOCOL_EXCLUSIVE);
 		if (status != EFI_SUCCESS) {
 			printf("Unable to open network interface %d for "
-			    "exclusive access\n", i);
+			    "exclusive access: %d\n", i, EFI_ERROR(status));
 		}
 
+		handles2[nifs] = handles[i];
+		nifs++;
+	}
+	free(handles);
+	if (nifs == 0) {
+		err = ENOENT;
+		goto done;
+	}
+
+	err = efi_register_handles(&efinet_dev, handles2, NULL, nifs);
+	if (err != 0)
+		goto done;
+
+	efinetif.netif_ifs = calloc(nifs, sizeof(struct netif_dif));
+	stats = calloc(nifs, sizeof(struct netif_stats));
+	if (efinetif.netif_ifs == NULL || stats == NULL) {
+		free(efinetif.netif_ifs);
+		free(stats);
+		efinetif.netif_ifs = NULL;
+		err = ENOMEM;
+		goto done;
+	}
+	efinetif.netif_nifs = nifs;
+
+	for (i = 0; i < nifs; i++) {
+
+		dif = &efinetif.netif_ifs[i];
 		dif->dif_unit = i;
 		dif->dif_nsel = 1;
 		dif->dif_stats = &stats[i];
-		dif->dif_private = h;
+		dif->dif_private = handles2[i];
 	}
-
-	return (0);
+done:
+	free(handles2);
+	return (err);
 }
 
 static int
 efinet_dev_print(int verbose)
 {
-	char line[80];
+	CHAR16 *text;
 	EFI_HANDLE h;
 	int unit, ret;
 
@@ -335,8 +368,13 @@ efinet_dev_print(int verbose)
 
 	for (unit = 0, h = efi_find_handle(&efinet_dev, 0);
 	    h != NULL; h = efi_find_handle(&efinet_dev, ++unit)) {
-		sprintf(line, "    %s%d:\n", efinet_dev.dv_name, unit);
-		ret = pager_output(line);
+		printf("    %s%d:", efinet_dev.dv_name, unit);
+		text = efi_devpath_name(efi_lookup_devpath(h));
+		if (text != NULL) {
+			printf("    %S", text);
+			efi_free_devpath_name(text);
+		}
+		ret = pager_output("\n");
 		if (ret)
 			break;
 	}

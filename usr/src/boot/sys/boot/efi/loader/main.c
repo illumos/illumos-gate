@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/reboot.h>
@@ -180,6 +179,46 @@ has_keyboard(void)
 out:
 	free(hin);
 	return retval;
+}
+
+static int
+find_currdev(EFI_LOADED_IMAGE *img, struct devsw **dev, int *unit,
+    uint64_t *extra)
+{
+	EFI_DEVICE_PATH *devpath, *copy;
+	EFI_HANDLE h;
+
+	/*
+	 * Try the device handle from our loaded image first.  If that
+	 * fails, use the device path from the loaded image and see if
+	 * any of the nodes in that path match one of the enumerated
+	 * handles.
+	 */
+	if (efi_handle_lookup(img->DeviceHandle, dev, unit, extra) == 0)
+		return (0);
+
+	copy = NULL;
+	devpath = efi_lookup_image_devpath(IH);
+	while (devpath != NULL) {
+		h = efi_devpath_handle(devpath);
+		if (h == NULL)
+			break;
+
+		free(copy);
+		copy = NULL;
+
+		if (efi_handle_lookup(h, dev, unit, extra) == 0)
+			return (0);
+
+		devpath = efi_lookup_devpath(h);
+		if (devpath != NULL) {
+			copy = efi_devpath_trim(devpath);
+			devpath = copy;
+		}
+	}
+	free(copy);
+
+	return (ENOENT);
 }
 
 EFI_STATUS
@@ -363,7 +402,7 @@ main(int argc, CHAR16 *argv[])
 	 */
 	BS->SetWatchdogTimer(0, 0, 0, NULL);
 
-	if (efi_handle_lookup(img->DeviceHandle, &dev, &unit, &pool_guid) != 0)
+	if (find_currdev(img, &dev, &unit, &pool_guid) != 0)
 		return (EFI_NOT_FOUND);
 
 	switch (dev->dv_type) {

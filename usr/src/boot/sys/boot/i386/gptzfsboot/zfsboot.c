@@ -127,115 +127,10 @@ struct fs_ops *file_system[] = {
 	NULL
 };
 
-/*
- * probe arguments for partition iterator (see below)
- */
-struct probe_args {
-	int		fd;
-	char		*devname;
-	u_int		secsz;
-	uint64_t	offset;
-};
-
-/*
- * simple wrapper around read() to avoid using device specific
- * strategy() directly.
- */
-static int
-parttblread(void *arg, void *buf, size_t blocks, uint64_t offset)
-{
-	struct probe_args *ppa = arg;
-	size_t size = ppa->secsz * blocks;
-
-	lseek(ppa->fd, offset * ppa->secsz, SEEK_SET);
-	if (read(ppa->fd, buf, size) == size)
-		return (0);
-	return (EIO);
-}
-
-/*
- * scan partition entries to find boot partition starting at start_sector.
- * in case of MBR partition type PART_SOLARIS2, read VTOC and recurse.
- */
-static int
-probe_partition(void *arg, const char *partname,
-    const struct ptable_entry *part)
-{
-	struct probe_args pa, *ppa = arg;
-	struct ptable *table;
-	char devname[32];
-	int ret = 0;
-
-	strncpy(devname, ppa->devname, strlen(ppa->devname) - 1);
-	devname[strlen(ppa->devname) - 1] = '\0';
-	sprintf(devname, "%s%s:", devname, partname);
-
-	if (part->type == PART_SOLARIS2) {
-		pa.offset = part->start;
-		pa.fd = open(devname, O_RDONLY);
-		if (pa.fd == -1)
-			return (ret);
-		pa.devname = devname;
-		pa.secsz = ppa->secsz;
-		table = ptable_open(&pa, part->end - part->start + 1,
-		    ppa->secsz, parttblread);
-		if (table != NULL) {
-			ret = ptable_iterate(table, &pa, probe_partition);
-			ptable_close(table);
-		}
-		close(pa.fd);
-		if (ret) {
-			strcpy(ppa->devname, devname);
-			return (ret);
-		}
-	}
-
-	if (ppa->offset + part->start == start_sector) {
-		ret = 1;	/* this is the end of the search */
-		strcpy(ppa->devname, devname);
-	}
-
-	return (ret);
-}
-
-/*
- * open partition table on disk and scan partition entries to find
- * boot partition starting at start_sector (recorded by installboot).
- */
-static int
-probe_disk(char *devname)
-{
-	struct ptable *table;
-	struct probe_args pa;
-	uint64_t mediasz;
-	int ret;
-
-	pa.offset = 0;
-	pa.devname = devname;
-	pa.fd = open(devname, O_RDONLY);
-	if (pa.fd == -1) {
-		return (ENXIO);
-	}
-
-	ret = ioctl(pa.fd, DIOCGMEDIASIZE, &mediasz);
-	if (ret == 0)
-		ret = ioctl(pa.fd, DIOCGSECTORSIZE, &pa.secsz);
-	if (ret == 0) {
-		table = ptable_open(&pa, mediasz / pa.secsz, pa.secsz,
-                    parttblread);
-		if (table != NULL) {
-			ret = ptable_iterate(table, &pa, probe_partition);
-			ptable_close(table);
-		}
-	}
-	close(pa.fd);
-	return (ret);
-}
-
 int
 main(void)
 {
-    int auto_boot, i, fd, ret;
+    int auto_boot, i, fd;
     struct disk_devdesc devdesc;
 
     bios_getmem();
@@ -264,14 +159,6 @@ main(void)
     archsw.arch_isaoutb = NULL;
     archsw.arch_zfs_probe = i386_zfs_probe;
 
-    /*
-     * dont init zfs yet, need to run through probe_disk(), then init
-     * zfs with probing boot device by name first.
-     */
-    for (i = 0; devsw[i] != NULL; i++)
-	if (devsw[i]->dv_init != NULL && strcmp(devsw[i]->dv_name, "zfs"))
-	    (devsw[i]->dv_init)();
-
     bootinfo.bi_version = BOOTINFO_VERSION;
     bootinfo.bi_size = sizeof(bootinfo);
     bootinfo.bi_basemem = bios_basemem / 1024;
@@ -279,15 +166,13 @@ main(void)
     bootinfo.bi_memsizes_valid++;
     bootinfo.bi_bios_dev = *(uint8_t *)PTOV(ARGS);
 
-    /*
-     * detect partition from boot disk and start_sector
-     * we need partition as devsw/fs switch is depending on it.
-     */
-    sprintf(boot_devname, "disk%d:", bd_bios2unit(bootinfo.bi_bios_dev));
-    ret = probe_disk(boot_devname);
-    if (!ret)
-	printf("start sector %llu does not match any partition on device: %s\n",
-	    start_sector, boot_devname);
+    /* Set up fall back device name. */
+    snprintf(boot_devname, sizeof (boot_devname), "disk%d:",
+	bd_bios2unit(bootinfo.bi_bios_dev));
+
+    for (i = 0; devsw[i] != NULL; i++)
+	if (devsw[i]->dv_init != NULL)
+	    (devsw[i]->dv_init)();
 
     disk_parsedev(&devdesc, boot_devname+4, NULL);
 
@@ -295,19 +180,11 @@ main(void)
 	devdesc.d_unit, devdesc.d_partition >= 0? devdesc.d_partition:0xff);
 
     /*
-     * check for zfs on boot partition, we need to make sure this is
-     * the first registered pool.
-     */
-    for (i = 0; devsw[i] != NULL; i++)
-	if (devsw[i]->dv_init != NULL && strcmp(devsw[i]->dv_name, "zfs") == 0)
-	    (devsw[i]->dv_init)();
-
-    /*
      * zfs_fmtdev() can be called only after dv_init
      */
     if (bdev != NULL && bdev->d_type == DEVT_ZFS) {
 	/* set up proper device name string for ZFS */
-	strcpy(boot_devname, zfs_fmtdev(bdev));
+	strncpy(boot_devname, zfs_fmtdev(bdev), sizeof (boot_devname));
     }
 
     /* now make sure we have bdev on all cases */
@@ -670,29 +547,174 @@ parse_cmd(void)
     return 0;
 }
 
+/*
+ * probe arguments for partition iterator (see below)
+ */
+struct probe_args {
+	int		fd;
+	char		*devname;
+	u_int		secsz;
+	uint64_t	offset;
+};
+
+/*
+ * simple wrapper around read() to avoid using device specific
+ * strategy() directly.
+ */
+static int
+parttblread(void *arg, void *buf, size_t blocks, uint64_t offset)
+{
+	struct probe_args *ppa = arg;
+	size_t size = ppa->secsz * blocks;
+
+	lseek(ppa->fd, offset * ppa->secsz, SEEK_SET);
+	if (read(ppa->fd, buf, size) == size)
+		return (0);
+	return (EIO);
+}
+
+/*
+ * scan partition entries to find boot partition starting at start_sector.
+ * in case of MBR partition type PART_SOLARIS2, read VTOC and recurse.
+ */
+static int
+probe_partition(void *arg, const char *partname,
+    const struct ptable_entry *part)
+{
+	struct probe_args pa, *ppa = arg;
+	struct ptable *table;
+	uint64_t *pool_guid_ptr = NULL;
+	uint64_t pool_guid = 0;
+	char devname[32];
+	int len, ret = 0;
+
+	len = strlen(ppa->devname);
+	if (len > sizeof (devname))
+		len = sizeof (devname);
+
+	strncpy(devname, ppa->devname, len - 1);
+	devname[len - 1] = '\0';
+	snprintf(devname, sizeof (devname), "%s%s:", devname, partname);
+
+	/* filter out partitions *not* used by zfs */
+	switch (part->type) {
+	case PART_RESERVED:	/* efi reserverd */
+	case PART_VTOC_BOOT:	/* vtoc boot area */
+	case PART_VTOC_SWAP:
+		return (ret);
+	default:
+		break;
+	}
+
+	if (part->type == PART_SOLARIS2) {
+		pa.offset = part->start;
+		pa.fd = open(devname, O_RDONLY);
+		if (pa.fd == -1)
+			return (ret);
+		pa.devname = devname;
+		pa.secsz = ppa->secsz;
+		table = ptable_open(&pa, part->end - part->start + 1,
+		    ppa->secsz, parttblread);
+		if (table != NULL) {
+			ret = ptable_iterate(table, &pa, probe_partition);
+			ptable_close(table);
+		}
+		close(pa.fd);
+		return (ret);
+	}
+
+	if (ppa->offset + part->start == start_sector) {
+		/* Ask zfs_probe_dev to provide guid. */
+		pool_guid_ptr = &pool_guid;
+		/* Set up boot device name for non-zfs case. */
+		strncpy(boot_devname, devname, sizeof (boot_devname));
+	}
+
+	ret = zfs_probe_dev(devname, pool_guid_ptr);
+	if (pool_guid != 0 && bdev == NULL) {
+		bdev = malloc(sizeof (struct i386_devdesc));
+		bzero(bdev, sizeof (struct i386_devdesc));
+		bdev->d_type = DEVT_ZFS;
+		bdev->d_dev = &zfs_dev;
+		bdev->d_kind.zfs.pool_guid = pool_guid;
+
+		/*
+		 * We can not set up zfs boot device name yet, as the
+		 * zfs dv_init() is not completed. We will set boot_devname
+		 * in main, after devsw setup.
+		 */
+	}
+
+	return (0);
+}
+
+/*
+ * open partition table on disk and scan partition entries to find
+ * boot partition starting at start_sector (recorded by installboot).
+ */
+static int
+probe_disk(char *devname)
+{
+	struct ptable *table;
+	struct probe_args pa;
+	uint64_t mediasz;
+	int ret;
+
+	pa.offset = 0;
+	pa.devname = devname;
+	pa.fd = open(devname, O_RDONLY);
+	if (pa.fd == -1) {
+		return (ENXIO);
+	}
+
+	ret = ioctl(pa.fd, DIOCGMEDIASIZE, &mediasz);
+	if (ret == 0)
+		ret = ioctl(pa.fd, DIOCGSECTORSIZE, &pa.secsz);
+	if (ret == 0) {
+		table = ptable_open(&pa, mediasz / pa.secsz, pa.secsz,
+                    parttblread);
+		if (table != NULL) {
+			ret = ptable_iterate(table, &pa, probe_partition);
+			ptable_close(table);
+		}
+	}
+	close(pa.fd);
+	return (ret);
+}
+
+/*
+ * Probe all disks to discover ZFS pools. The idea is to walk all possible
+ * disk devices, however, we also need to identify possible boot pool.
+ * For boot pool detection we have boot disk passed us from BIOS, recorded
+ * in bootinfo.bi_bios_dev, and start_sector LBA recorded by installboot.
+ *
+ * To detect boot pool, we can not use generic zfs_probe_dev() on boot disk,
+ * but we need to walk partitions, as we have no way to pass start_sector
+ * to zfs_probe_dev(). Note we do need to detect the partition correcponding
+ * to non-zfs case, so here we can set boot_devname for both cases.
+ */
 static void
 i386_zfs_probe(void)
 {
-    char devname[32];
-    uint64_t pool_guid = 0;
-    int unit;
+	char devname[32];
+	int boot_unit, unit;
 
-    /*
-     * Open all the disks we can find and see if we can reconstruct
-     * ZFS pools from them. We start from boot device to get boot pool_guid.
-     */
-    bdev = malloc(sizeof (struct i386_devdesc));
-    bzero(bdev, sizeof (struct i386_devdesc));
-    zfs_probe_dev(boot_devname, &pool_guid);
-    if (pool_guid) {
-	bdev->d_type = DEVT_ZFS;
-	bdev->d_dev = &zfs_dev;
-	bdev->d_kind.zfs.pool_guid = pool_guid;
-    }
-    for (unit = 0; unit < MAXBDDEV; unit++) {
-        if (bd_unit2bios(unit) == -1)
-            break;
-        sprintf(devname, "disk%d:", unit);
-        zfs_probe_dev(devname, NULL);
-    }
+	/* Translate bios dev to our unit number. */
+	boot_unit = bd_bios2unit(bootinfo.bi_bios_dev);
+
+	/*
+	 * Open all the disks we can find and see if we can reconstruct
+	 * ZFS pools from them.
+	 */
+	for (unit = 0; unit < MAXBDDEV; unit++) {
+		if (bd_unit2bios(unit) == -1)
+			break;
+
+		sprintf(devname, "disk%d:", unit);
+		/* If this is not boot disk, use generic probe. */
+		if (unit != boot_unit)
+			zfs_probe_dev(devname, NULL);
+		else
+			probe_disk(devname);
+	}
 }
