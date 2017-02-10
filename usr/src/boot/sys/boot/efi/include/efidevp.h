@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 #ifndef _DEVPATH_H
 #define _DEVPATH_H
 
@@ -72,8 +71,6 @@ typedef struct _EFI_DEVICE_PATH {
             (a)->Length[0] = sizeof(EFI_DEVICE_PATH);   \
             (a)->Length[1] = 0;                         \
             }
-
-
 
 /*
  *
@@ -424,5 +421,39 @@ typedef union {
 
 } EFI_DEV_PATH_PTR;
 
+#define	EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID	\
+    { 0xbc62157e, 0x3e33, 0x4fec, { 0x99, 0x20, 0x2d, 0x3b, 0x36, 0xd7, 0x50, 0xdf } }
+
+#define	EFI_DEVICE_PATH_FROM_TEXT_PROTOCOL_GUID		\
+    { 0x5c99a21, 0xc70f, 0x4ad2, { 0x8a, 0x5f, 0x35, 0xdf, 0x33, 0x43, 0xf5, 0x1e } }
+
+#define	EFI_DEVICE_PATH_TO_TEXT_PROTOCOL_GUID		\
+    { 0x8b843e20, 0x8132, 0x4852, { 0x90, 0xcc, 0x55, 0x1a, 0x4e, 0x4a, 0x7f, 0x1c } }
+
+#define	EFI_DEVICE_PATH_UTILITIES_PROTOCOL_GUID		\
+    { 0x379be4e, 0xd706, 0x437d, { 0xb0, 0x37, 0xed, 0xb8, 0x2f, 0xb7, 0x72, 0xa4 } }
+
+INTERFACE_DECL(_EFI_DEVICE_PATH_PROTOCOL);
+
+typedef
+CHAR16*
+(EFIAPI *EFI_DEVICE_PATH_TO_TEXT_NODE) (
+    IN struct _EFI_DEVICE_PATH *This,
+    IN BOOLEAN			DisplayOnly,
+    IN BOOLEAN			AllowShortCuts
+    );
+
+typedef
+CHAR16*
+(EFIAPI *EFI_DEVICE_PATH_TO_TEXT_PATH) (
+    IN struct _EFI_DEVICE_PATH *This,
+    IN BOOLEAN			DisplayOnly,
+    IN BOOLEAN			AllowShortCuts
+    );
+
+typedef struct _EFI_DEVICE_PATH_TO_TEXT_PROTOCOL {
+	EFI_DEVICE_PATH_TO_TEXT_NODE ConvertDeviceNodeToText;
+	EFI_DEVICE_PATH_TO_TEXT_PATH ConvertDevicePathToText;
+} EFI_DEVICE_PATH_TO_TEXT_PROTOCOL;
 
 #endif

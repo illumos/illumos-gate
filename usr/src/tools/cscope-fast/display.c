@@ -384,8 +384,8 @@ jumpback(int sig)
 BOOL
 search(void)
 {
-	char	*egreperror = NULL;	/* egrep error message */
-	FINDINIT rc = NOERROR;		/* findinit return code */
+	char	*volatile egreperror = NULL;	/* egrep error message */
+	FINDINIT volatile rc = NOERROR;		/* findinit return code */
 	SIGTYPE	(*volatile savesig)() = SIG_DFL; /* old value of signal */
 	FP	f;			/* searching function */
 	char	*s;

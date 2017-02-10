@@ -1123,6 +1123,13 @@ COMPARE:
 			x = dataTop->i;
 			dataTop->i = FICL_BOOL(x > y);
 		continue;
+
+		case ficlInstructionUGreaterThan:
+			CHECK_STACK(2, 1);
+			u = (dataTop--)->u;
+			dataTop->i = FICL_BOOL(dataTop->u > u);
+		continue;
+
 		}
 
 		/*
