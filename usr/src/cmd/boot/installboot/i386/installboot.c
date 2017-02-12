@@ -533,21 +533,42 @@ write_bootblock(ib_data_t *data)
 	return (BC_SUCCESS);
 }
 
+/*
+ * Partition boot block or volume boot record (VBR). The VBR is
+ * stored on partition relative sector 0 and allows chainloading
+ * to read boot program from partition.
+ *
+ * As the VBR will use the first sector of the partition,
+ * this means, we need to be sure the space is not used.
+ * We do support three partitioning chemes:
+ * 1. GPT: zfs and ufs have reserved space for first 8KB, but
+ *	only zfs does have space for boot2. The pcfs has support
+ *	for VBR, but no space for boot2. So with GPT, to support
+ *	ufs or pcfs boot, we must have separate dedicated boot
+ *	partition and we will store VBR on it.
+ * 2. MBR: we have almost the same situation as with GPT, except that
+ *	if the partitions start from cylinder 1, we will have space
+ *	between MBR and cylinder 0. If so, we do not require separate
+ *	boot partition.
+ * 3. MBR+VTOC: with this combination we store VBR in sector 0 of the
+ *	solaris2 MBR partition. The slice 0 will start from cylinder 1,
+ *	and we do have space for boot2, so we do not require separate
+ *	boot partition.
+ */
 static int
 write_stage1(ib_data_t *data)
 {
 	ib_device_t	*device = &data->device;
+	uint64_t	start = 0;
 
 	assert(data != NULL);
 
 	/*
-	 * Partition boot block or volume boot record.
-	 * This is essentially copy of MBR (1 sector) and we store it
-	 * to support multi boot setups.
-	 *
-	 * Not all combinations are supported; as pcfs does not leave
-	 * space, we will not write to pcfs target.
-	 * In addition, in VTOC setup, we will only write VBR to slice 2.
+	 * We have separate partition for boot programs and the stage1
+	 * location is not absolute sector 0.
+	 * We will write VBR and trigger MBR to read 1 sector from VBR.
+	 * This case does also cover MBR+VTOC case, as the solaris 2 partition
+	 * name and the root file system slice names are different.
 	 */
 	if (device->stage.start != 0 &&
 	    strcmp(device->target.path, device->stage.path)) {
@@ -564,12 +585,13 @@ write_stage1(ib_data_t *data)
 		    "%s %d sector 0 (abs %d)\n"),
 		    device->devtype == IG_DEV_MBR? "partition":"slice",
 		    device->stage.id, device->stage.start);
+		start = device->stage.start;
 	}
 
 	/*
-	 * both ufs and zfs have initial 8k reserved for VTOC/boot
-	 * so its safe to use this area. however, only
-	 * write to target if we have MBR/GPT.
+	 * We have either GPT or MBR (without VTOC) and if the root
+	 * file system is not pcfs, we can store VBR. Also trigger
+	 * MBR to read 1 sector from VBR.
 	 */
 	if (device->devtype != IG_DEV_VTOC &&
 	    device->target.fstype != IG_FS_PCFS) {
@@ -585,9 +607,19 @@ write_stage1(ib_data_t *data)
 		    "%s %d sector 0 (abs %d)\n"),
 		    device->devtype == IG_DEV_MBR? "partition":"slice",
 		    device->target.id, device->target.start);
+		start = device->target.start;
 	}
 
 	if (write_mbr) {
+		/*
+		 * If we did write partition boot block, update MBR to
+		 * read partition boot block, not boot2.
+		 */
+		if (start != 0) {
+			*((uint16_t *)(data->stage1 + STAGE1_STAGE2_SIZE)) = 1;
+			*((uint64_t *)(data->stage1 + STAGE1_STAGE2_LBA)) =
+			    start;
+		}
 		if (write_out(device->fd, data->stage1,
 		    sizeof (data->stage1), 0) != BC_SUCCESS) {
 			(void) fprintf(stdout,
