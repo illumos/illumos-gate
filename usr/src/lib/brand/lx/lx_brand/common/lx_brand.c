@@ -1020,7 +1020,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   7: poll */
 	NULL,				/*   8: lseek */
 	lx_mmap,			/*   9: mmap */
-	lx_mprotect,			/*  10: mprotect */
+	NULL,				/*  10: mprotect */
 	NULL,				/*  11: munmap */
 	NULL,				/*  12: brk */
 	lx_rt_sigaction,		/*  13: rt_sigaction */
@@ -1036,9 +1036,9 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  23: select */
 	NULL,				/*  24: sched_yield */
 	lx_remap,			/*  25: mremap */
-	lx_msync,			/*  26: msync */
+	NULL,				/*  26: msync */
 	NULL,				/*  27: mincore */
-	lx_madvise,			/*  28: madvise */
+	NULL,				/*  28: madvise */
 	lx_shmget,			/*  29: shmget */
 	lx_shmat,			/*  30: shmat */
 	lx_shmctl,			/*  31: shmctl */
@@ -1159,10 +1159,10 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 146: sched_get_priority_max */
 	NULL,				/* 147: sched_get_priority_min */
 	NULL,				/* 148: sched_rr_get_interval */
-	lx_mlock,			/* 149: mlock */
-	lx_munlock,			/* 150: munlock */
-	lx_mlockall,			/* 151: mlockall */
-	lx_munlockall,			/* 152: munlockall */
+	NULL,				/* 149: mlock */
+	NULL,				/* 150: munlock */
+	NULL,				/* 151: mlockall */
+	NULL,				/* 152: munlockall */
 	NULL,				/* 153: vhangup */
 	NULL,				/* 154: modify_ldt */
 	NULL,				/* 155: pivot_root */
@@ -1466,7 +1466,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 122: uname */
 	NULL,				/* 123: modify_ldt */
 	lx_adjtimex,			/* 124: adjtimex */
-	lx_mprotect,			/* 125: mprotect */
+	NULL,				/* 125: mprotect */
 	lx_sigprocmask,			/* 126: sigprocmask */
 	NULL,				/* 127: create_module */
 	NULL,				/* 128: init_module */
@@ -1485,16 +1485,16 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 141: getdents */
 	NULL,				/* 142: select */
 	lx_flock,			/* 143: flock */
-	lx_msync,			/* 144: msync */
+	NULL,				/* 144: msync */
 	NULL,				/* 145: readv */
 	NULL,				/* 146: writev */
 	NULL,				/* 147: getsid */
 	lx_fdatasync,			/* 148: fdatasync */
 	lx_sysctl,			/* 149: sysctl */
-	lx_mlock,			/* 150: mlock */
-	lx_munlock,			/* 151: munlock */
-	lx_mlockall,			/* 152: mlockall */
-	lx_munlockall,			/* 153: munlockall */
+	NULL,				/* 150: mlock */
+	NULL,				/* 151: munlock */
+	NULL,				/* 152: mlockall */
+	NULL,				/* 153: munlockall */
 	NULL,				/* 154: sched_setparam */
 	NULL,				/* 155: sched_getparam */
 	NULL,				/* 156: sched_setscheduler */
@@ -1560,7 +1560,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 216: setfsgid */
 	NULL,				/* 217: pivot_root */
 	NULL,				/* 218: mincore */
-	lx_madvise,			/* 219: madvise */
+	NULL,				/* 219: madvise */
 	NULL,				/* 220: getdents64 */
 	NULL,				/* 221: fcntl64 */
 	NULL,				/* 222: tux */
