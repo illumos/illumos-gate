@@ -109,6 +109,7 @@ struct nvme_qpair {
 	int nq_phase;
 
 	kmutex_t nq_mutex;
+	ksema_t nq_sema;
 };
 
 struct nvme {
@@ -186,11 +187,9 @@ struct nvme {
 	uint32_t n_abort_failed;
 	uint32_t n_cmd_timeout;
 	uint32_t n_cmd_aborted;
-	uint32_t n_async_resubmit_failed;
 	uint32_t n_wrong_logpage;
 	uint32_t n_unknown_logpage;
 	uint32_t n_too_many_cookies;
-	uint32_t n_admin_queue_full;
 
 	/* errors detected by hardware */
 	uint32_t n_data_xfr_err;

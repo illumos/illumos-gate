@@ -44,7 +44,7 @@
  *
  * Command Processing:
  *
- * NVMe devices can have up to 65536 I/O queue pairs, with each queue holding up
+ * NVMe devices can have up to 65535 I/O queue pairs, with each queue holding up
  * to 65536 I/O commands. The driver will configure one I/O queue pair per
  * available interrupt vector, with the queue length usually much smaller than
  * the maximum of 65536. If the hardware doesn't provide enough queues, fewer
@@ -69,7 +69,8 @@
  * wraps around in that time a submission may find the next array slot to still
  * be used by a long-running command. In this case the array is sequentially
  * searched for the next free slot. The length of the command array is the same
- * as the configured queue length.
+ * as the configured queue length. Queue overrun is prevented by the semaphore,
+ * so a command submission may block if the queue is full.
  *
  *
  * Namespace Support:
@@ -250,7 +251,7 @@ static void nvme_free_cmd(nvme_cmd_t *);
 static nvme_cmd_t *nvme_create_nvm_cmd(nvme_namespace_t *, uint8_t,
     bd_xfer_t *);
 static int nvme_admin_cmd(nvme_cmd_t *, int);
-static int nvme_submit_cmd(nvme_qpair_t *, nvme_cmd_t *);
+static void nvme_submit_cmd(nvme_qpair_t *, nvme_cmd_t *);
 static nvme_cmd_t *nvme_retrieve_cmd(nvme_t *, nvme_qpair_t *);
 static boolean_t nvme_wait_cmd(nvme_cmd_t *, uint_t);
 static void nvme_wakeup_cmd(void *);
@@ -264,7 +265,7 @@ static int nvme_check_generic_cmd_status(nvme_cmd_t *);
 static inline int nvme_check_cmd_status(nvme_cmd_t *);
 
 static void nvme_abort_cmd(nvme_cmd_t *);
-static int nvme_async_event(nvme_t *);
+static void nvme_async_event(nvme_t *);
 static int nvme_format_nvm(nvme_t *, uint32_t, uint8_t, boolean_t, uint8_t,
     boolean_t, uint8_t);
 static int nvme_get_logpage(nvme_t *, void **, size_t *, uint8_t, ...);
@@ -714,6 +715,7 @@ nvme_free_qpair(nvme_qpair_t *qp)
 	int i;
 
 	mutex_destroy(&qp->nq_mutex);
+	sema_destroy(&qp->nq_sema);
 
 	if (qp->nq_sqdma != NULL)
 		nvme_free_dma(qp->nq_sqdma);
@@ -739,6 +741,7 @@ nvme_alloc_qpair(nvme_t *nvme, uint32_t nentry, nvme_qpair_t **nqp,
 
 	mutex_init(&qp->nq_mutex, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(nvme->n_intr_pri));
+	sema_init(&qp->nq_sema, nentry, NULL, SEMA_DRIVER, NULL);
 
 	if (nvme_zalloc_queue_dma(nvme, nentry, sizeof (nvme_sqe_t),
 	    DDI_DMA_WRITE, &qp->nq_sqdma) != DDI_SUCCESS)
@@ -805,18 +808,13 @@ nvme_free_cmd(nvme_cmd_t *cmd)
 	kmem_cache_free(nvme_cmd_cache, cmd);
 }
 
-static int
+static void
 nvme_submit_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 {
 	nvme_reg_sqtdbl_t tail = { 0 };
 
+	sema_p(&qp->nq_sema);
 	mutex_enter(&qp->nq_mutex);
-
-	if (qp->nq_active_cmds == qp->nq_nentry) {
-		mutex_exit(&qp->nq_mutex);
-		return (DDI_FAILURE);
-	}
-
 	cmd->nc_completed = B_FALSE;
 
 	/*
@@ -842,7 +840,6 @@ nvme_submit_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 	nvme_put32(cmd->nc_nvme, qp->nq_sqtdbl, tail.r);
 
 	mutex_exit(&qp->nq_mutex);
-	return (DDI_SUCCESS);
 }
 
 static nvme_cmd_t *
@@ -888,6 +885,7 @@ nvme_retrieve_cmd(nvme_t *nvme, nvme_qpair_t *qp)
 
 	nvme_put32(cmd->nc_nvme, qp->nq_cqhdbl, head.r);
 	mutex_exit(&qp->nq_mutex);
+	sema_v(&qp->nq_sema);
 
 	return (cmd);
 }
@@ -1356,7 +1354,6 @@ nvme_async_event_task(void *arg)
 	nvme_health_log_t *health_log = NULL;
 	size_t logsize = 0;
 	nvme_async_event_t event;
-	int ret;
 
 	/*
 	 * Check for errors associated with the async request itself. The only
@@ -1390,14 +1387,7 @@ nvme_async_event_task(void *arg)
 
 	/* Clear CQE and re-submit the async request. */
 	bzero(&cmd->nc_cqe, sizeof (nvme_cqe_t));
-	ret = nvme_submit_cmd(nvme->n_adminq, cmd);
-
-	if (ret != DDI_SUCCESS) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!failed to resubmit async event request");
-		atomic_inc_32(&nvme->n_async_resubmit_failed);
-		nvme_free_cmd(cmd);
-	}
+	nvme_submit_cmd(nvme->n_adminq, cmd);
 
 	switch (event.b.ae_type) {
 	case NVME_ASYNC_TYPE_ERROR:
@@ -1510,19 +1500,8 @@ nvme_async_event_task(void *arg)
 static int
 nvme_admin_cmd(nvme_cmd_t *cmd, int sec)
 {
-	int ret;
-
 	mutex_enter(&cmd->nc_mutex);
-	ret = nvme_submit_cmd(cmd->nc_nvme->n_adminq, cmd);
-
-	if (ret != DDI_SUCCESS) {
-		mutex_exit(&cmd->nc_mutex);
-		dev_err(cmd->nc_nvme->n_dip, CE_WARN,
-		    "!nvme_submit_cmd failed");
-		atomic_inc_32(&cmd->nc_nvme->n_admin_queue_full);
-		nvme_free_cmd(cmd);
-		return (DDI_FAILURE);
-	}
+	nvme_submit_cmd(cmd->nc_nvme->n_adminq, cmd);
 
 	if (nvme_wait_cmd(cmd, sec) == B_FALSE) {
 		/*
@@ -1536,26 +1515,16 @@ nvme_admin_cmd(nvme_cmd_t *cmd, int sec)
 	return (DDI_SUCCESS);
 }
 
-static int
+static void
 nvme_async_event(nvme_t *nvme)
 {
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
-	int ret;
 
 	cmd->nc_sqid = 0;
 	cmd->nc_sqe.sqe_opc = NVME_OPC_ASYNC_EVENT;
 	cmd->nc_callback = nvme_async_event_task;
 
-	ret = nvme_submit_cmd(nvme->n_adminq, cmd);
-
-	if (ret != DDI_SUCCESS) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!nvme_submit_cmd failed for ASYNCHRONOUS EVENT");
-		nvme_free_cmd(cmd);
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_SUCCESS);
+	nvme_submit_cmd(nvme->n_adminq, cmd);
 }
 
 static int
@@ -2372,11 +2341,7 @@ nvme_init(nvme_t *nvme)
 	/*
 	 * Post an asynchronous event command to catch errors.
 	 */
-	if (nvme_async_event(nvme) != DDI_SUCCESS) {
-		dev_err(nvme->n_dip, CE_WARN,
-		    "!failed to post async event");
-		goto fail;
-	}
+	nvme_async_event(nvme);
 
 	/*
 	 * Identify Controller
@@ -2601,13 +2566,8 @@ nvme_init(nvme_t *nvme)
 	 * Post more asynchronous events commands to reduce event reporting
 	 * latency as suggested by the spec.
 	 */
-	for (i = 1; i != nvme->n_async_event_limit; i++) {
-		if (nvme_async_event(nvme) != DDI_SUCCESS) {
-			dev_err(nvme->n_dip, CE_WARN,
-			    "!failed to post async event %d", i);
-			goto fail;
-		}
-	}
+	for (i = 1; i != nvme->n_async_event_limit; i++)
+		nvme_async_event(nvme);
 
 	return (DDI_SUCCESS);
 
@@ -3293,8 +3253,7 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	 */
 	poll = (xfer->x_flags & BD_XFER_POLL) != 0;
 
-	if (nvme_submit_cmd(ioq, cmd) != DDI_SUCCESS)
-		return (EAGAIN);
+	nvme_submit_cmd(ioq, cmd);
 
 	if (!poll)
 		return (0);
