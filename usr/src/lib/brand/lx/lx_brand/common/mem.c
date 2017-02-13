@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <errno.h>
@@ -53,16 +53,6 @@ int pagesize;	/* needed for mmap2() */
 #define	LX_MAP_LOCKED		0x02000
 #define	LX_MAP_NORESERVE	0x04000
 #define	LX_MAP_32BIT		0x00040
-
-#define	LX_MADV_REMOVE		9
-#define	LX_MADV_DONTFORK	10
-#define	LX_MADV_DOFORK		11
-#define	LX_MADV_MERGEABLE	12
-#define	LX_MADV_UNMERGEABLE	13
-#define	LX_MADV_HUGEPAGE	14
-#define	LX_MADV_NOHUGEPAGE	15
-#define	LX_MADV_DONTDUMP	16
-#define	LX_MADV_DODUMP		17
 
 #define	TWO_GB			0x80000000
 
@@ -191,146 +181,6 @@ lx_mmap2(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	    (off64_t)p6 * pagesize));
 }
 
-
-/*
- * The locking family of system calls, as well as msync(), are identical.  On
- * Solaris, they are layered on top of the memcntl syscall, so they cannot be
- * pass-thru.
- */
-long
-lx_mlock(uintptr_t addr, uintptr_t len)
-{
-	uintptr_t addr1 = addr & PAGEMASK;
-	uintptr_t len1 = len + (addr & PAGEOFFSET);
-
-	return (mlock((void *)addr1, (size_t)len1) ? -errno : 0);
-}
-
-long
-lx_mlockall(uintptr_t flags)
-{
-	return (mlockall(flags) ? -errno : 0);
-}
-
-long
-lx_munlock(uintptr_t addr, uintptr_t len)
-{
-	uintptr_t addr1 = addr & PAGEMASK;
-	uintptr_t len1 = len + (addr & PAGEOFFSET);
-
-	return (munlock((void *)addr1, (size_t)len1) ? -errno : 0);
-}
-
-long
-lx_munlockall(void)
-{
-	return (munlockall() ? -errno : 0);
-}
-
-long
-lx_msync(uintptr_t addr, uintptr_t len, uintptr_t flags)
-{
-	return (msync((void *)addr, (size_t)len, flags) ? -errno : 0);
-}
-
-/*
- * Illumos and Linux overlap on the basic flags, and are disjoint on the rest.
- * Linux also allows the length to be zero, while Illumos does not.
- */
-long
-lx_madvise(uintptr_t start, uintptr_t len, uintptr_t advice)
-{
-	int ret;
-
-	if (len == 0)
-		return (0);
-
-	/* approximately similar */
-	if (advice == LX_MADV_REMOVE)
-		advice = MADV_FREE;
-
-	switch (advice) {
-	case MADV_NORMAL:
-	case MADV_RANDOM:
-	case MADV_SEQUENTIAL:
-	case MADV_WILLNEED:
-	case MADV_FREE:
-	case MADV_DONTNEED:
-		if (advice == MADV_DONTNEED) {
-			/*
-			 * On Linux, MADV_DONTNEED implies an immediate purge
-			 * of the specified region.  This is spuriously
-			 * different from (nearly) every other Unix, having
-			 * apparently been done to mimic the semantics on
-			 * Digital Unix (!).  This is bad enough (MADV_FREE
-			 * both has better semantics and results in better
-			 * performance), but it gets worse:  Linux applications
-			 * (and notably, jemalloc) have managed to depend on
-			 * the busted semantics of MADV_DONTNEED on Linux.  We
-			 * implement these semantics via MADV_PURGE -- and
-			 * we translate our advice accordingly.
-			 */
-			advice = MADV_PURGE;
-		}
-
-		ret = madvise((void *)start, len, advice);
-		if (ret == -1) {
-			if (errno == EBUSY) {
-				if (advice != MADV_PURGE)
-					return (-EINVAL);
-
-				/*
-				 * If we got an EBUSY from a MADV_PURGE, we
-				 * will now try again with a MADV_DONTNEED:
-				 * there are conditions (namely, with locked
-				 * mappings that haven't yet been faulted in)
-				 * where MADV_PURGE will fail but MADV_DONTNEED
-				 * will succeed.  If this succeeds, we'll call
-				 * the operation successful; if not, we'll kick
-				 * back EINVAL.
-				 */
-				advice = MADV_DONTNEED;
-
-				if (madvise((void *)start, len, advice) == 0)
-					return (0);
-
-				return (-EINVAL);
-			}
-
-			return (-errno);
-		} else {
-			return (0);
-		}
-
-	/* harmless to pretend these work */
-	case LX_MADV_DONTFORK:
-	case LX_MADV_DOFORK:
-	case LX_MADV_HUGEPAGE:
-	case LX_MADV_NOHUGEPAGE:
-	case LX_MADV_DONTDUMP:
-	case LX_MADV_DODUMP:
-		return (0);
-
-	/* we'll return an error for the rest of the Linux flags */
-	default:
-		return (-EINVAL);
-	}
-}
-
-/*
- * mprotect() is identical except that we ignore the Linux flags PROT_GROWSDOWN
- * and PROT_GROWSUP, which have no equivalent on Solaris.
- */
-#define	LX_PROT_GROWSDOWN	0x01000000
-#define	LX_PROT_GROWSUP		0x02000000
-
-long
-lx_mprotect(uintptr_t start, uintptr_t len, uintptr_t prot)
-{
-	prot &= ~(LX_PROT_GROWSUP | LX_PROT_GROWSDOWN);
-
-	return (mprotect((void *)start, len, prot) ? -errno : 0);
-}
 
 #define	LX_MREMAP_MAYMOVE	1	/* mapping can be moved */
 #define	LX_MREMAP_FIXED		2	/* address is fixed */

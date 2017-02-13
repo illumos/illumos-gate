@@ -104,13 +104,6 @@ extern long lx_clone(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 extern long lx_exit(uintptr_t);
 extern long lx_group_exit(uintptr_t);
 
-extern long lx_mlock(uintptr_t, uintptr_t);
-extern long lx_mlockall(uintptr_t);
-extern long lx_munlock(uintptr_t, uintptr_t);
-extern long lx_munlockall(void);
-extern long lx_msync(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_madvise(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_mprotect(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_mmap(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t, uintptr_t);
 extern long lx_mmap2(uintptr_t, uintptr_t, uintptr_t, uintptr_t,

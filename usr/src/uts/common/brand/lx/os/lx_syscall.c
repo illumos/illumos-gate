@@ -644,7 +644,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"uname",	lx_uname,		0,		1}, /* 122 */
 	{"modify_ldt",	lx_modify_ldt,		0,		3}, /* 123 */
 	{"adjtimex",	NULL,			0,		1}, /* 124 */
-	{"mprotect",	NULL,			0,		3}, /* 125 */
+	{"mprotect",	lx_mprotect,		0,		3}, /* 125 */
 	{"sigprocmask",	NULL,			0,		3}, /* 126 */
 	{"create_module", NULL,			NOSYS_KERNEL,	0}, /* 127 */
 	{"init_module",	NULL,			NOSYS_KERNEL,	0}, /* 128 */
@@ -663,16 +663,16 @@ lx_sysent_t lx_sysent32[] = {
 	{"getdents",	lx_getdents_32,		0,		3}, /* 141 */
 	{"select",	lx_select,		0,		5}, /* 142 */
 	{"flock",	NULL,			0,		2}, /* 143 */
-	{"msync",	NULL,			0,		3}, /* 144 */
+	{"msync",	lx_msync,		0,		3}, /* 144 */
 	{"readv",	lx_readv,		0,		3}, /* 145 */
 	{"writev",	lx_writev,		0,		3}, /* 146 */
 	{"getsid",	lx_getsid,		0,		1}, /* 147 */
 	{"fdatasync",	NULL,			0,		1}, /* 148 */
 	{"sysctl",	NULL,			0,		1}, /* 149 */
-	{"mlock",	NULL,			0,		2}, /* 150 */
-	{"munlock",	NULL,			0,		2}, /* 151 */
-	{"mlockall",	NULL,			0,		1}, /* 152 */
-	{"munlockall",	NULL,			0,		0}, /* 153 */
+	{"mlock",	lx_mlock,		0,		2}, /* 150 */
+	{"munlock",	lx_munlock,		0,		2}, /* 151 */
+	{"mlockall",	lx_mlockall,		0,		1}, /* 152 */
+	{"munlockall",	lx_munlockall,		0,		0}, /* 153 */
 	{"sched_setparam", lx_sched_setparam,	0,		2}, /* 154 */
 	{"sched_getparam", lx_sched_getparam,	0,		2}, /* 155 */
 	{"sched_setscheduler", lx_sched_setscheduler, 0,	3}, /* 156 */
@@ -738,7 +738,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"setfsgid",	lx_setfsgid,		0,		1}, /* 216 */
 	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 217 */
 	{"mincore",	lx_mincore,		0,		3}, /* 218 */
-	{"madvise",	NULL,			0,		3}, /* 219 */
+	{"madvise",	lx_madvise,		0,		3}, /* 219 */
 	{"getdents64",	lx_getdents64,		0,		3}, /* 220 */
 	{"fcntl64",	lx_fcntl64,		0,		3}, /* 221 */
 	{"tux",		NULL,			NOSYS_NO_EQUIV,	0}, /* 222 */
@@ -900,7 +900,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"poll",	lx_poll,		0,		3}, /* 7 */
 	{"lseek",	lx_lseek64,		0,		3}, /* 8 */
 	{"mmap",	NULL,			0,		6}, /* 9 */
-	{"mprotect",	NULL,			0,		3}, /* 10 */
+	{"mprotect",	lx_mprotect,		0,		3}, /* 10 */
 	{"munmap",	lx_munmap,		0,		2}, /* 11 */
 	{"brk",		lx_brk,			0,		1}, /* 12 */
 	{"rt_sigaction", NULL,			0,		4}, /* 13 */
@@ -916,9 +916,9 @@ lx_sysent_t lx_sysent64[] = {
 	{"select",	lx_select,		0,		5}, /* 23 */
 	{"sched_yield",	lx_sched_yield,		0,		0}, /* 24 */
 	{"mremap",	NULL,			0,		5}, /* 25 */
-	{"msync",	NULL,			0,		3}, /* 26 */
+	{"msync",	lx_msync,		0,		3}, /* 26 */
 	{"mincore",	lx_mincore,		0,		3}, /* 27 */
-	{"madvise",	NULL,			0,		3}, /* 28 */
+	{"madvise",	lx_madvise,		0,		3}, /* 28 */
 	{"shmget",	NULL,			0,		3}, /* 29 */
 	{"shmat",	NULL,			0,		4}, /* 30 */
 	{"shmctl",	NULL,			0,		3}, /* 31 */
@@ -1039,10 +1039,10 @@ lx_sysent_t lx_sysent64[] = {
 	{"sched_get_priority_max", lx_sched_get_priority_max, 0, 1}, /* 146 */
 	{"sched_get_priority_min", lx_sched_get_priority_min, 0, 1}, /* 147 */
 	{"sched_rr_get_interval", lx_sched_rr_get_interval, 0,	2}, /* 148 */
-	{"mlock",	NULL,			0,		2}, /* 149 */
-	{"munlock",	NULL,			0,		2}, /* 150 */
-	{"mlockall",	NULL,			0,		1}, /* 151 */
-	{"munlockall",	NULL,			0,		0}, /* 152 */
+	{"mlock",	lx_mlock,		0,		2}, /* 149 */
+	{"munlock",	lx_munlock,		0,		2}, /* 150 */
+	{"mlockall",	lx_mlockall,		0,		1}, /* 151 */
+	{"munlockall",	lx_munlockall,		0,		0}, /* 152 */
 	{"vhangup",	lx_vhangup,		0,		0}, /* 153 */
 	{"modify_ldt",	lx_modify_ldt,		0,		3}, /* 154 */
 	{"pivot_root",	NULL,			NOSYS_KERNEL,	0}, /* 155 */
