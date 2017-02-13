@@ -710,15 +710,31 @@ zfs_bootfs(void *zdev)
 	 * there has to be at least one healthy vdev, therefore vdev
 	 * can not be NULL.
 	 */
-	sprintf(buf, "zfs-bootfs=%s/%llu", spa->spa_name,
+	/* Set the environment. */
+	snprintf(buf, sizeof (buf), "%s/%llu", spa->spa_name,
+	    (unsigned long long)objnum);
+	setenv("zfs-bootfs", buf, 1);
+	if (vdev->v_phys_path != NULL)
+		setenv("bootpath", vdev->v_phys_path, 1);
+	if (vdev->v_devid != NULL)
+		setenv("diskdevid", vdev->v_devid, 1);
+
+	/*
+	 * Build the command line string. Once our kernel will read
+	 * the environment and we can stop caring about old kernels,
+	 * we can remove this part.
+	 */
+	snprintf(buf, sizeof(buf), "zfs-bootfs=%s/%llu", spa->spa_name,
 	    (unsigned long long)objnum);
 	n = strlen(buf);
 	if (vdev->v_phys_path != NULL) {
-		sprintf(buf+n, ",bootpath=\"%s\"", vdev->v_phys_path);
+		snprintf(buf+n, sizeof (buf) - n, ",bootpath=\"%s\"",
+		    vdev->v_phys_path);
 		n = strlen(buf);
 	}
 	if (vdev->v_devid != NULL) {
-		sprintf(buf+n, ",diskdevid=\"%s\"", vdev->v_devid);
+		snprintf(buf+n, sizeof (buf) - n, ",diskdevid=\"%s\"",
+		    vdev->v_devid);
 	}
 	return (buf);
 }

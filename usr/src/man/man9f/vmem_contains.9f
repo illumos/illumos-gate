@@ -1,0 +1,57 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2017, Richard Lowe.
+.\"
+.Dd Jan 18, 2017
+.Dt VMEM_CONTAINS 9F
+.Os
+.Sh NAME
+.Nm vmem_contains
+.Nd check for membership in a vmem arena
+.Sh SYNOPSIS
+.In sys/vmem.h
+.Ft int
+.Fo vmem_contains
+.Fa "vmem_t *vmp"
+.Fa "void *vaddr"
+.Fa "size_t *size"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa vmp
+The vmem arena
+.It Fa vaddr
+address of the segment to query.
+.It Fa size
+size of the segment to query
+.El
+.Sh DESCRIPTION
+The
+.Fn vmem_contains
+function checks whether a segment of
+.Fa size
+bytes at
+.Fa vaddr
+exists within the vmem arena
+.Fa vmp .
+.Sh CONTEXT
+This function may be called from user or kernel context.
+.Sh RETURN VALUES
+.Fn vmem_contains
+returns non\-0 if the segment exists, and 0 otherwise.
+.Sh SEE ALSO
+.Xr vmem 9 ,
+.Xr vmem_add 9F ,
+.Xr vmem_alloc 9F ,
+.Xr vmem_create 9F

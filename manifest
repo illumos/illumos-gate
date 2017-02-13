@@ -18943,8 +18943,9 @@ f usr/share/man/man7p/tcp.7p 0444 root bin
 f usr/share/man/man7p/udp.7p 0444 root bin
 f usr/share/man/man7p/vxlan.7p 0444 root bin
 d usr/share/man/man9 0755 root bin
-s usr/share/man/man9/Intro.9=../man9e/Intro.9e
-s usr/share/man/man9/intro.9=../man9e/Intro.9e
+f usr/share/man/man9/Intro.9 0444 root bin
+f usr/share/man/man9/vmem.9 0444 root bin
+s usr/share/man/man9/intro.9=Intro.9
 d usr/share/man/man9e 0755 root bin
 f usr/share/man/man9e/Intro.9e 0444 root bin
 f usr/share/man/man9e/_fini.9e 0444 root bin
@@ -20237,6 +20238,17 @@ s usr/share/man/man9f/va_copy.9f=va_arg.9f
 s usr/share/man/man9f/va_end.9f=va_arg.9f
 s usr/share/man/man9f/va_start.9f=va_arg.9f
 s usr/share/man/man9f/vcmn_err.9f=cmn_err.9f
+f usr/share/man/man9f/vmem_add.9f 0444 root bin
+f usr/share/man/man9f/vmem_alloc.9f 0444 root bin
+f usr/share/man/man9f/vmem_contains.9f 0444 root bin
+f usr/share/man/man9f/vmem_create.9f 0444 root bin
+s usr/share/man/man9f/vmem_destroy.9f=vmem_create.9f
+s usr/share/man/man9f/vmem_free.9f=vmem_alloc.9f
+s usr/share/man/man9f/vmem_size.9f=vmem_walk.9f
+f usr/share/man/man9f/vmem_walk.9f 0444 root bin
+s usr/share/man/man9f/vmem_xalloc.9f=vmem_alloc.9f
+s usr/share/man/man9f/vmem_xcreate.9f=vmem_create.9f
+s usr/share/man/man9f/vmem_xfree.9f=vmem_alloc.9f
 s usr/share/man/man9f/vzcmn_err.9f=cmn_err.9f
 s usr/share/man/man9f/vsnprintf.9f=sprintf.9f
 s usr/share/man/man9f/vsprintf.9f=sprintf.9f
