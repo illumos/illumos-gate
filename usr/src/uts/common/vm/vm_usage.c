@@ -1547,9 +1547,10 @@ vmu_calculate_proc(proc_t *p)
 static void
 vmu_clear_calc()
 {
-	if (vmu_data.vmu_system != NULL)
+	if (vmu_data.vmu_system != NULL) {
 		vmu_free_entity(vmu_data.vmu_system);
 		vmu_data.vmu_system = NULL;
+	}
 	if (vmu_data.vmu_zones_hash != NULL)
 		i_mod_hash_clear_nosync(vmu_data.vmu_zones_hash);
 	if (vmu_data.vmu_projects_col_hash != NULL)
