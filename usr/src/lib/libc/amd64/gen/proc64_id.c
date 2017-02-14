@@ -154,11 +154,12 @@ get_amd_cache_info(void)
 		 * L3 is a victim cache for L2
 		 */
 		largest_level_cache += l2_cache_size;
-	} else
+	} else {
 		largest_level_cache = l2_cache_size;
+	}
 
-		__set_cache_sizes(l1_cache_size, l2_cache_size,
-		    largest_level_cache);
+	__set_cache_sizes(l1_cache_size, l2_cache_size,
+	    largest_level_cache);
 }
 
 /*
