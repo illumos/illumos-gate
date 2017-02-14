@@ -29,15 +29,16 @@
  *
  * Interrupt Usage:
  *
- * The driver will use a FIXED interrupt while configuring the device as the
- * specification requires. Later in the attach process it will switch to MSI-X
- * or MSI if supported. The driver wants to have one interrupt vector per CPU,
- * but it will work correctly if less are available. Interrupts can be shared
- * by queues, the interrupt handler will iterate through the I/O queue array by
- * steps of n_intr_cnt. Usually only the admin queue will share an interrupt
- * with one I/O queue. The interrupt handler will retrieve completed commands
- * from all queues sharing an interrupt vector and will post them to a taskq
- * for completion processing.
+ * The driver will use a single interrupt while configuring the device as the
+ * specification requires, but contrary to the specification it will try to use
+ * a single-message MSI(-X) or FIXED interrupt. Later in the attach process it
+ * will switch to multiple-message MSI(-X) if supported. The driver wants to
+ * have one interrupt vector per CPU, but it will work correctly if less are
+ * available. Interrupts can be shared by queues, the interrupt handler will
+ * iterate through the I/O queue array by steps of n_intr_cnt. Usually only
+ * the admin queue will share an interrupt with one I/O queue. The interrupt
+ * handler will retrieve completed commands from all queues sharing an interrupt
+ * vector and will post them to a taskq for completion processing.
  *
  *
  * Command Processing:
