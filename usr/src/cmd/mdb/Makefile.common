@@ -45,8 +45,7 @@ COMMON_MODULES_PROC = \
 	libuutil \
 	libzpool \
 	mdb_ds \
-	mdb_test \
-	v8
+	mdb_test
 
 #
 # MDB modules used for debugging user processes which are only 32-bit
