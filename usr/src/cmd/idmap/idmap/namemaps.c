@@ -903,9 +903,10 @@ idmap_set_namemap(idmap_nm_handle_t *p, char *winname, char *unixname,
 
 		if (p->windomain == NULL) {
 			fullname = strdup(winname);
-			if (fullname == NULL)
+			if (fullname == NULL) {
 				rc = IDMAP_ERR_MEMORY;
 				goto cleanup;
+			}
 		} else {
 			fullname = malloc(strlen(winname) +
 			    strlen(p->windomain) + 2);
