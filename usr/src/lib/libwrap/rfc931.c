@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /*
   * rfc931() speaks a common subset of the RFC 931, AUTH, TAP, IDENT and RFC
   * 1413 protocols. It queries an RFC 931 etc. compatible daemon on a remote
@@ -15,10 +13,6 @@
   * 
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
-
-#ifndef lint
-static char sccsid[] = "@(#) rfc931.c 1.10 95/01/02 16:11:34";
-#endif
 
 /* System libraries. */
 
@@ -88,9 +82,9 @@ char   *dest;
     char    user[256];			/* XXX */
     char    buffer[512];		/* XXX */
     char   *cp;
-    char   *result = unknown;
+    char   *volatile result = unknown;
     FILE   *fp;
-    unsigned saved_timeout = 0;
+    volatile unsigned saved_timeout = 0;
     struct sigaction nact, oact;
 
     /*
@@ -104,7 +98,7 @@ char   *dest;
      */
 
     if ((fp = fsocket(SGFAM(rmt_sin), SOCK_STREAM, 0)) != 0) {
-	setbuf(fp, (char *) 0);
+	setbuf(fp, NULL);
 
 	/*
 	 * Set up a timer so we won't get stuck while waiting for the server.
