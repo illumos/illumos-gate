@@ -168,7 +168,7 @@ parse_addr_port_tpgt(char *in, char **addr, int *type, char **port, char **tpgt)
 		in = strchr(*addr, ']');
 		if (in == NULL)
 			return (B_FALSE);
-			*in++ = '\0';
+		*in++ = '\0';
 	} else {
 		/* IPV4 or domainname */
 		*type = AF_INET;
