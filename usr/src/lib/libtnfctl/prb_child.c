@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * interfaces to exec a command and run it till all loadobjects have
  * been loaded (rtld sync point).
@@ -62,13 +60,13 @@ static prb_status_t sync_child(int pid, volatile shmem_msg_t *smp,
  */
 prb_status_t
 prb_child_create(const char *cmdname, char * const *cmdargs,
-		const char *loption, const char *libtnfprobe_path,
-		char * const *envp, prb_proc_ctl_t **ret_val)
+    const char *loption, const char *libtnfprobe_path,
+    char * const *envp, prb_proc_ctl_t **ret_val)
 {
 	prb_status_t	prbstat;
 	pid_t		childpid;
 	char		executable_name[PATH_MAX + 2];
-	extern char 	**environ;
+	extern char	**environ;
 	char * const *	env_to_use;
 	size_t		loptlen, probepathlen;
 	volatile shmem_msg_t *smp;
@@ -80,7 +78,7 @@ prb_child_create(const char *cmdname, char * const *cmdargs,
 
 	/* fork to create the child process */
 	childpid = fork();
-	if (childpid == (pid_t) - 1) {
+	if (childpid == (pid_t)-1) {
 		DBG(perror("prb_child_create: fork failed"));
 		return (prb_status_map(errno));
 	}
@@ -91,8 +89,8 @@ prb_child_create(const char *cmdname, char * const *cmdargs,
 		/* ---- CHILD PROCESS ---- */
 
 		DBG_TNF_PROBE_1(prb_child_create_1, "libtnfctl",
-			"sunw%verbosity 1; sunw%debug 'child process created'",
-			tnf_long, pid, getpid());
+		    "sunw%verbosity 1; sunw%debug 'child process created'",
+		    tnf_long, pid, getpid());
 
 		if (envp) {
 			env_to_use = envp;
@@ -103,18 +101,18 @@ prb_child_create(const char *cmdname, char * const *cmdargs,
 		loptlen = (loption) ? strlen(loption) : 0;
 		/* probepathlen has a "/" added in ("+ 1") */
 		probepathlen = (libtnfprobe_path) ?
-				(strlen(libtnfprobe_path) + 1) : 0;
+		    (strlen(libtnfprobe_path) + 1) : 0;
 		oldenv = getenv(PRELOAD);
 		if (oldenv) {
-			newenv = (char *) malloc(strlen(PRELOAD) +
-				1 +	/* "=" */
-				strlen(oldenv) +
-				1 +	/* " " */
-				probepathlen +
-				strlen(LIBPROBE) +
-				1 +	/* " " */
-				loptlen +
-				1);	/* NULL */
+			newenv = (char *)malloc(strlen(PRELOAD) +
+			    1 +	/* "=" */
+			    strlen(oldenv) +
+			    1 +	/* " " */
+			    probepathlen +
+			    strlen(LIBPROBE) +
+			    1 +	/* " " */
+			    loptlen +
+			    1);	/* NULL */
 
 			if (!newenv)
 				goto ContChild;
@@ -132,13 +130,13 @@ prb_child_create(const char *cmdname, char * const *cmdargs,
 				(void) strcat(newenv, loption);
 			}
 		} else {
-			newenv = (char *) malloc(strlen(PRELOAD) +
-				1 +	/* "=" */
-				probepathlen +
-				strlen(LIBPROBE) +
-				1 +	/* " " */
-				loptlen +
-				1);	/* NULL */
+			newenv = (char *)malloc(strlen(PRELOAD) +
+			    1 +	/* "=" */
+			    probepathlen +
+			    strlen(LIBPROBE) +
+			    1 +	/* " " */
+			    loptlen +
+			    1);	/* NULL */
 			if (!newenv)
 				goto ContChild;
 			(void) strcpy(newenv, PRELOAD);
@@ -153,7 +151,7 @@ prb_child_create(const char *cmdname, char * const *cmdargs,
 				(void) strcat(newenv, loption);
 			}
 		}
-		(void) putenv((char *) newenv);
+		(void) putenv((char *)newenv);
 		env_to_use = environ;
 		/*
 		 * We don't check the return value of putenv because the
@@ -166,9 +164,9 @@ ContChild:
 		(void) prb_shmem_wait(smp);
 
 		DBG_TNF_PROBE_1(prb_child_create_2, "libtnfctl",
-			"sunw%verbosity 2; "
-			"sunw%debug 'child process about to exec'",
-			tnf_string, cmdname, cmdname);
+		    "sunw%verbosity 2; "
+		    "sunw%debug 'child process about to exec'",
+		    tnf_string, cmdname, cmdname);
 
 		/*
 		 * make the child it's own process group.
@@ -179,7 +177,7 @@ ContChild:
 		prbstat = find_executable(cmdname, executable_name);
 		if (prbstat) {
 			DBG((void) fprintf(stderr, "prb_child_create: %s\n",
-					prb_status_str(prbstat)));
+			    prb_status_str(prbstat)));
 			/* parent waits for exit */
 			_exit(1);
 		}
