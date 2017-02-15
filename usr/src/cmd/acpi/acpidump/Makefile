@@ -25,6 +25,8 @@ CERRWARN += -_gcc=-Wno-unused-function
 
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_DUMP_APP
 
+LDLIBS += -ldevinfo
+
 .KEEP_STATE:
 
 all: $(PROG)

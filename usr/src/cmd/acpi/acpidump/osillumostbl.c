@@ -50,6 +50,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <libdevinfo.h>
 #include "acpidump.h"
 
 #define	_COMPONENT	ACPI_OS_SERVICES
@@ -359,16 +360,48 @@ AcpiOsGetTableByIndex(UINT32 Index, ACPI_TABLE_HEADER **Table,
  * DESCRIPTION: Scan and load RSDP.
  * See the find_rsdp() function in usr/src/uts/i86pc/os/fakebop.c, which is how
  * the kernel finds the RSDP. That algorithm matches AcpiFindRootPointer().
- * The code here is derived from AcpiFindRootPointer, except that we will try
- * the BIOS if the EBDA fails, and we will copy the table if found.
+ *
+ * If the system is not using BIOS, and ACPI information was passed to the
+ * system from the boot loader, then the RSDP is recorded in the "acpi-root-tab"
+ * property.
+ *
+ * The code here is derived from AcpiFindRootPointer, except that we will
+ * try the "acpi-root-tab" property first. If the property does not exist or
+ * we do not find the root, then we scan the EBDA. Finally, we will search
+ * the BIOS and copy the table if found.
  */
 static ACPI_STATUS
 OslLoadRsdp(void)
 {
-	UINT8			*mapp;
+	UINT8			*mapp = NULL;
 	ACPI_TABLE_HEADER	*tblp;
-	ACPI_SIZE		mapsize;
+	ACPI_SIZE		mapsize = sizeof (ACPI_TABLE_RSDP);
 	ACPI_PHYSICAL_ADDRESS	physaddr;
+	di_node_t		root;
+	int64_t			*val64;
+
+	if ((root = di_init("/", DINFOPROP)) != DI_NODE_NIL) {
+		if (di_prop_lookup_int64(DDI_DEV_T_ANY, root,
+		    "acpi-root-tab", &val64) == 1) {
+			physaddr = (ACPI_PHYSICAL_ADDRESS)*val64;
+			mapp = AcpiOsMapMemory(physaddr, mapsize);
+		}
+		di_fini(root);
+	}
+
+	if (mapp != NULL) {
+		tblp = ACPI_CAST_PTR(ACPI_TABLE_HEADER,
+		    AcpiTbScanMemoryForRsdp(mapp, mapsize));
+		if (tblp != NULL) {
+			physaddr += (ACPI_PHYSICAL_ADDRESS)
+			    ACPI_PTR_DIFF(tblp, mapp);
+			Gbl_RsdpAddress = physaddr;
+			memcpy(&Gbl_Rsdp, tblp, sizeof (ACPI_TABLE_RSDP));
+			AcpiOsUnmapMemory(mapp, mapsize);
+			return (AE_OK);
+		}
+		AcpiOsUnmapMemory(mapp, mapsize);
+	}
 
 	/* 1a) Get the location of the Extended BIOS Data Area (EBDA) */
 	mapp = AcpiOsMapMemory((ACPI_PHYSICAL_ADDRESS)ACPI_EBDA_PTR_LOCATION,
