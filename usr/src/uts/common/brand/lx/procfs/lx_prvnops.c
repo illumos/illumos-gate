@@ -119,6 +119,8 @@ static int lxpr_readdir(vnode_t *, uio_t *, cred_t *, int *,
 static int lxpr_readlink(vnode_t *, uio_t *, cred_t *, caller_context_t *);
 static int lxpr_cmp(vnode_t *, vnode_t *, caller_context_t *);
 static int lxpr_realvp(vnode_t *, vnode_t **, caller_context_t *);
+static int lxpr_poll(vnode_t *, short, int, short *, pollhead_t **,
+    caller_context_t *);
 static int lxpr_sync(void);
 static void lxpr_inactive(vnode_t *, cred_t *, caller_context_t *);
 
@@ -321,6 +323,7 @@ const fs_operation_def_t lxpr_vnodeops_template[] = {
 	VOPNAME_INACTIVE,	{ .vop_inactive = lxpr_inactive },
 	VOPNAME_CMP,		{ .vop_cmp = lxpr_cmp },
 	VOPNAME_REALVP,		{ .vop_realvp = lxpr_realvp },
+	VOPNAME_POLL,		{ .vop_poll = lxpr_poll },
 	NULL,			NULL
 };
 
@@ -7304,6 +7307,45 @@ lxpr_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 	}
 
 	*vpp = vp;
+	return (0);
+}
+
+/* Pollhead for fake POLLET support below */
+static struct pollhead lxpr_pollhead;
+
+/* ARGSUSED */
+static int
+lxpr_poll(vnode_t *vp, short ev, int anyyet, short *reventsp,
+    pollhead_t **phpp, caller_context_t *ct)
+{
+	*reventsp = 0;
+	if (ev & POLLIN)
+		*reventsp |= POLLIN;
+	if (ev & POLLRDNORM)
+		*reventsp |= POLLRDNORM;
+	if (ev & POLLRDBAND)
+		*reventsp |= POLLRDBAND;
+	if (ev & POLLOUT)
+		*reventsp |= POLLOUT;
+	if (ev & POLLWRBAND)
+		*reventsp |= POLLWRBAND;
+
+	/*
+	 * Newer versions of systemd will monitor /proc/self/mountinfo with
+	 * edge-triggered epoll (via libmount).  If adding said resource to an
+	 * epoll descriptor fails, as would be the expectation for a call to
+	 * fs_poll when POLLET is present, then systemd will abort and the zone
+	 * will fail to properly boot.  Until proper pollwakeup() support is
+	 * wired into lx_proc, valid POLLET support must be faked.
+	 *
+	 * While the only known (at this time) lx_proc resource where POLLET
+	 * support is mandatory is LXPR_PID_MOUNTINFO, we cast a wide net to
+	 * avoid other unexpected trouble.  Normal devpoll caching (emitting a
+	 * pollhead when (*reventsp == 0 && !anyyet)) is not enabled.
+	 */
+	if ((ev & POLLET) != 0) {
+		*phpp = &lxpr_pollhead;
+	}
 	return (0);
 }
 
