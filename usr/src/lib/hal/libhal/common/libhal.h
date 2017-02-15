@@ -88,6 +88,9 @@ typedef enum {
 	/** Type for boolean property */
 	LIBHAL_PROPERTY_TYPE_BOOLEAN =    DBUS_TYPE_BOOLEAN,
 
+	/** Type code marking a D-Bus array type */
+	LIBHAL_PROPERTY_TYPE_ARRAY   =    DBUS_TYPE_ARRAY,
+
 	/** Type for UTF-8 string property */
 	LIBHAL_PROPERTY_TYPE_STRING  =    DBUS_TYPE_STRING,
 
