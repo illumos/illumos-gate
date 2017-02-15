@@ -286,7 +286,7 @@ sigHandler(int sig)
  */
 static int
 iPsAddRemoveGroupMember(char *pgName, char *groupName, char *memberName,
-int addRemoveFlag)
+    int addRemoveFlag)
 {
 	scf_handle_t *handle = NULL;
 	scf_service_t *svc = NULL;
@@ -2067,7 +2067,7 @@ psSetServicePersist(uint8_t persistType)
 
 static int
 iPsGetSetPersistType(uint8_t *persistType, scf_handle_t *handle,
-scf_service_t *svc, int getSet)
+    scf_service_t *svc, int getSet)
 {
 	scf_propertygroup_t	*pg = NULL;
 	scf_property_t	*prop = NULL;
@@ -2290,8 +2290,8 @@ iPsGetSetStmfProp(int propType, char *propVal, int getSet)
 	scf_transaction_t *tran = NULL;
 	scf_transaction_entry_t *entry = NULL;
 	scf_value_t	*value = NULL;
-	char *psStmfPropVal;
-	char *psStmfProp;
+	char *psStmfPropVal = NULL;
+	char *psStmfProp = NULL;
 	char stmfPropGet[MAXNAMELEN] = {0};
 	int ret = STMF_PS_SUCCESS;
 	int commitRet;
@@ -2639,7 +2639,7 @@ err:
  */
 static int
 iPsGetServiceVersion(uint64_t *version, scf_handle_t *handle,
-scf_service_t *svc)
+    scf_service_t *svc)
 {
 	scf_propertygroup_t	*pg = NULL;
 	scf_property_t	*prop = NULL;
