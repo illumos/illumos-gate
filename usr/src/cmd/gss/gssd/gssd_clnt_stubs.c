@@ -1064,12 +1064,11 @@ kgss_accept_sec_context(
 	} else
 		gssd_ver_cred_handle = GSSD_NO_CREDENTIAL;
 
-		err = kgss_accept_sec_context_wrapped(minor_status,
-		    &kctx->gssd_ctx,
-		    &kctx->gssd_ctx_verifier, gssd_ver_cred_handle,
-		    gssd_cred_verifier, input_token, input_chan_bindings,
-		    src_name, mech_type, output_token, ret_flags,
-		    time_rec, delegated_cred_handle, uid);
+	err = kgss_accept_sec_context_wrapped(minor_status, &kctx->gssd_ctx,
+	    &kctx->gssd_ctx_verifier, gssd_ver_cred_handle,
+	    gssd_cred_verifier, input_token, input_chan_bindings,
+	    src_name, mech_type, output_token, ret_flags,
+	    time_rec, delegated_cred_handle, uid);
 
 	if (GSS_ERROR(err)) {
 		KGSS_FREE(kctx);
