@@ -14,8 +14,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ls
  *
@@ -289,7 +287,7 @@ getdir(char *dir, struct afile **pfp0, struct afile **pfplast)
 			continue;
 		if (aflg == 0 && dp->d_name[0] == '.' &&
 		    (Aflg == 0 || dp->d_name[1] == 0 ||
-			dp->d_name[1] == '.' && dp->d_name[2] == 0))
+		    dp->d_name[1] == '.' && dp->d_name[2] == 0))
 			continue;
 		if (gstat(fp, cat(dir, dp->d_name), Fflg+Rflg, &nb) == 0)
 			continue;
@@ -338,7 +336,7 @@ gstat(struct afile *fp, char *file, int statarg, off_t *pnb)
 			if (statf == lstat || lstat(file, &stb) < 0) {
 				if (errno == ENOENT)
 					(void) fprintf(stderr,
-						"%s not found\n", file);
+					    "%s not found\n", file);
 				else {
 					(void) fprintf(stderr, "ls: ");
 					perror(file);
@@ -388,9 +386,9 @@ gstat(struct afile *fp, char *file, int statarg, off_t *pnb)
 							buf[cc++] = '=';
 							break;
 						default:
-						if ((stb1.st_mode & ~S_IFMT)
-						    & 0111)
-							buf[cc++] = '*';
+							if ((stb1.st_mode &
+							    ~S_IFMT) & 0111)
+								buf[cc++] = '*';
 							break;
 						}
 					buf[cc] = 0;
@@ -674,7 +672,7 @@ fmtsize(struct afile *p)
 	static char sizebuf[32];
 
 	(void) sprintf(sizebuf, (off_t)dbtokb(p->fblks) < 10000 ? "%4lld " : \
-		"%lld ", (off_t)dbtokb(p->fblks));
+	    "%lld ", (off_t)dbtokb(p->fblks));
 	return (sizebuf);
 }
 
@@ -704,7 +702,7 @@ fmtlstuff(struct afile *p)
 		(void) sprintf(fsize, "%8d", 0);
 	else
 		(void) sprintf(fsize, p->fsize < 100000000 ? "%8lld" : \
-				"%lld", p->fsize);
+		    "%lld", p->fsize);
 /* get ftime */
 	{
 		char *cp = ctime(&p->fmtime);
