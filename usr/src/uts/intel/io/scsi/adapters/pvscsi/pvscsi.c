@@ -1170,7 +1170,7 @@ pvscsi_cmd_ext_alloc(pvscsi_softc_t *pvs, pvscsi_cmd_t *cmd, int kf)
 
 	if (cmd->cmdlen > sizeof (cmd->cmd_cdb)) {
 		if ((buf = kmem_zalloc(cmd->cmdlen, kf)) == NULL)
-			return (NULL);
+			return (DDI_FAILURE);
 		pkt->pkt_cdbp = buf;
 		cmd->flags |= PVSCSI_FLAG_CDB_EXT;
 	}
@@ -1195,7 +1195,7 @@ pvscsi_cmd_ext_alloc(pvscsi_softc_t *pvs, pvscsi_cmd_t *cmd, int kf)
 out:
 	pvscsi_cmd_ext_free(cmd);
 
-	return (NULL);
+	return (DDI_FAILURE);
 }
 
 static int
