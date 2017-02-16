@@ -1,0 +1,88 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2017, Richard Lowe.
+.\"
+.Dd Jan 18, 2017
+.Dt VMEM_WALK 9F
+.Os
+.Sh NAME
+.Nm vmem_walk ,
+.Nm vmem_size
+.Nd walk a (sub\-)set of the segments in a vmem arena
+.Sh SYNOPSIS
+.In sys/vmem.h
+.Ft void
+.Fo vmem_walk
+.Fa "vmem_t *vmp"
+.Fa "int typemask"
+.Fa "void (*func)(void *, void *, size_t)"
+.Fa "void *arg"
+.Fc
+.Ft size_t
+.Fo vmem_size
+.Fa "vmem_t *vmp"
+.Fa "int typemask"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa vmp
+The vmem arena to walk.
+.It Fa typemask
+A bitmask indicating the types of segment to operate on.
+.Bl -tag -width Ds
+.It Dv VMEM_ALLOC
+Allocated segments.
+.It Dv VMEM_FREE
+Free segments.
+.El
+.It Fa func
+The function to apply to each segment matching
+.Fa typemask .
+.Fa func
+should accept 3 arguments and return void:
+.Bl -tag -width Ds
+.It Fa "void *arg"
+The
+.Fa arg
+passed to
+.Fn vmem_walk .
+.It Fa "void *vaddr"
+The base address of the segment.
+.It Fa "size_t size"
+The size of the segment.
+.El
+.It Fa arg
+An arbitrary argument passed to each call to
+.Fn func .
+.El
+.Sh DESCRIPTION
+.Fn vmem_walk
+walks each segment in the arena
+.Fa vmp
+and applies
+.Fa func
+to each which matches
+.Fa typemask .
+.Pp
+.Fn vmem_size
+walks each segment in the arena
+.Fa vmp
+and totals the size of each matching
+.Fa typemask .
+.Sh CONTEXT
+This function may be called from user or kernel context.
+.Sh SEE ALSO
+.Xr vmem 9 ,
+.Xr vmem_alloc 9F ,
+.Xr vmem_create 9F

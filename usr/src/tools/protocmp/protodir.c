@@ -573,7 +573,7 @@ second_pass_prototype(const char *protofile, const char *protodir,
 	 * second pass through prototype file - process the hard links
 	 * now.
 	 */
-	while (fgets(buf, BUFSIZ, proto_fp))
+	while (fgets(buf, BUFSIZ, proto_fp)) {
 		if (buf[0] == LINK_T) {
 			int	rc;
 
@@ -613,10 +613,10 @@ second_pass_prototype(const char *protofile, const char *protodir,
 				    "prototype %s : %s\n", protofile, buf);
 			}
 		}
+	}
+	(void) fclose(proto_fp);
 
-		(void) fclose(proto_fp);
-
-		return (elem_count);
+	return (elem_count);
 }
 
 /*

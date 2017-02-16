@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
  * Facility node support for SES enclosures.  We support the following facility
  * nodes, based on the node type:
  *
@@ -816,7 +820,7 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		    "fail", SES_PROP_FAIL, NULL) != 0 ||
 		    ses_add_sensor(mod, tn, nodeid, "speed", &sd) != 0 ||
 		    ses_add_discrete(mod, tn, nodeid, "fault",
-		    SES_PROP_OFF) != 0)
+		    SES_PROP_FAIL) != 0)
 			goto error;
 		break;
 

@@ -480,6 +480,7 @@ struct smbios_hdl {
 
 #define	SMB_RANGE_START	0xF0000		/* start of physical address range */
 #define	SMB_RANGE_LIMIT	0xFFFFF		/* limit of physical address range */
+#define	SMB_SCAN_STEP	16		/* stepping by paragraph */
 
 #define	SMB_MAJMIN(M, m)	((((M) & 0xFF) << 16) | ((m) & 0xFF))
 #define	SMB_MAJOR(v)		(((v) & 0xFF00) >> 8)
