@@ -521,12 +521,12 @@ arn_rc_valid_phyrate(uint32_t phy, uint32_t capflag, int ignore_cw)
 		return (0);
 	if (WLAN_RC_PHY_SGI(phy) && !(capflag & WLAN_RC_SGI_FLAG))
 		return (0);
-	if (!ignore_cw && WLAN_RC_PHY_HT(phy))
+	if (!ignore_cw && WLAN_RC_PHY_HT(phy)) {
 		if (WLAN_RC_PHY_40(phy) && !(capflag & WLAN_RC_40_FLAG))
 			return (0);
 		if (!WLAN_RC_PHY_40(phy) && (capflag & WLAN_RC_40_FLAG))
 			return (0);
-
+	}
 	return (1);
 }
 
@@ -947,7 +947,7 @@ arn_rc_update_per(struct arn_softc *sc,
     struct ath_rate_priv *ath_rc_priv,
     struct ath_tx_info_priv *tx_info_priv,
     int tx_rate, int xretries, int retries,
-	uint32_t now_msec)
+    uint32_t now_msec)
 {
 	boolean_t state_change = B_FALSE;
 	int count;
