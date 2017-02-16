@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -146,6 +146,7 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * - 0x0b: /sys/devices/system/cpu
  * - 0x0c: /sys/devices/system/cpu/kernel_max
  * - 0x0d: /sys/devices/system/node
+ * - 0x0e: /sys/bus
  *
  * Dynamic /sys/class/net/<interface> symlinks will use an INSTANCE derived
  * from the corresonding ifindex.
@@ -183,12 +184,14 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 #define	LXSYS_INST_DEVICES_SYSCPU		0xb
 #define	LXSYS_INST_DEV_SYSCPU_KMAX		0xc
 #define	LXSYS_INST_DEVICES_SYSNODE		0xd
+#define	LXSYS_INST_BUSDIR			0xe
 
 /*
  * file contents of an lx /sys directory.
  */
 static lxsys_dirent_t dirlist_root[] = {
 	{ LXSYS_INST_BLOCKDIR,		"block" },
+	{ LXSYS_INST_BUSDIR,		"bus" },
 	{ LXSYS_INST_CLASSDIR,		"class" },
 	{ LXSYS_INST_DEVICESDIR,	"devices" },
 	{ LXSYS_INST_FSDIR,		"fs" }
@@ -261,7 +264,8 @@ static lxsys_dirlookup_t lxsys_dirlookup[] = {
 	SYSDLENT(LXSYS_INST_DEVICESDIR, dirlist_devices),
 	SYSDLENT(LXSYS_INST_DEVICES_SYSTEMDIR, dirlist_devices_system),
 	SYSDLENT(LXSYS_INST_DEVICES_VIRTUALDIR, dirlist_devices_virtual),
-	SYSDLENT(LXSYS_INST_DEVICES_SYSNODE, dirlist_devices_sysnode)
+	SYSDLENT(LXSYS_INST_DEVICES_SYSNODE, dirlist_devices_sysnode),
+	{ LXSYS_INST_BUSDIR, NULL, 0 },
 };
 
 
