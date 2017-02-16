@@ -1775,13 +1775,13 @@ pcm_fix_bits(socket_enum_t src, socket_enum_t dst, int num, int dir)
 
 	if (dir == 0) {
 				/* LEFT */
-		for (i = 0; i <= (sizeof (dst) * PR_WORDSIZE) - num; i++) {
+		for (i = 0; i <= PCMCIA_MAX_SOCKETS - num; i++) {
 			if (PR_GET(src, i))
 				PR_SET(dst, i + num);
 		}
 	} else {
 				/* RIGHT */
-		for (i = num; i < sizeof (dst) * PR_WORDSIZE; i++) {
+		for (i = num; i < PCMCIA_MAX_SOCKETS; i++) {
 			if (PR_GET(src, i))
 				PR_SET(dst, i - num);
 		}
