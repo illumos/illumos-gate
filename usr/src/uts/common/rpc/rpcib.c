@@ -720,7 +720,7 @@ static rdma_stat rib_rm_conn(CONN *, rib_conn_list_t *);
  */
 static rdma_stat
 rib_create_cq(rib_hca_t *hca, uint32_t cq_size, ibt_cq_handler_t cq_handler,
-	rib_cq_t **cqp)
+    rib_cq_t **cqp)
 {
 	rib_cq_t	*cq;
 	ibt_cq_attr_t	cq_attr;
@@ -1460,7 +1460,7 @@ rib_attach_hca()
 /* ARGSUSED */
 static void
 rib_async_handler(void *clnt_private, ibt_hca_hdl_t hca_hdl,
-	ibt_async_code_t code, ibt_async_event_t *event)
+    ibt_async_code_t code, ibt_async_event_t *event)
 {
 	switch (code) {
 	case IBT_HCA_ATTACH_EVENT:
@@ -2057,7 +2057,7 @@ rib_disconnect_channel(CONN *conn, rib_conn_list_t *conn_list)
 		mutex_enter(&qp->send_rbufs_lock);
 		while (qp->n_send_rbufs)
 			cv_wait(&qp->send_rbufs_cv, &qp->send_rbufs_lock);
-			mutex_exit(&qp->send_rbufs_lock);
+		mutex_exit(&qp->send_rbufs_lock);
 
 		(void) ibt_free_channel(qp->qp_hdl);
 			qp->qp_hdl = NULL;
@@ -2303,7 +2303,7 @@ rib_rem_rep(rib_qp_t *qp, struct reply *rep)
  */
 rdma_stat
 rib_send_and_wait(CONN *conn, struct clist *cl, uint32_t msgid,
-	int send_sig, int cv_sig, caddr_t *swid)
+    int send_sig, int cv_sig, caddr_t *swid)
 {
 	struct send_wid	*wdesc;
 	struct clist	*clp;
@@ -2929,8 +2929,8 @@ rib_read(CONN *conn, struct clist *cl, int wait)
 /* ARGSUSED */
 static ibt_cm_status_t
 rib_srv_cm_handler(void *any, ibt_cm_event_t *event,
-	ibt_cm_return_args_t *ret_args, void *priv_data,
-	ibt_priv_data_len_t len)
+    ibt_cm_return_args_t *ret_args, void *priv_data,
+    ibt_priv_data_len_t len)
 {
 	queue_t		*q;
 	rib_qp_t	*qp;
@@ -3227,7 +3227,7 @@ rib_srv_cm_handler(void *any, ibt_cm_event_t *event,
 
 static rdma_stat
 rib_register_service(rib_hca_t *hca, int service_type,
-	uint8_t protocol_num, in_port_t dst_port)
+    uint8_t protocol_num, in_port_t dst_port)
 {
 	ibt_srv_desc_t		sdesc;
 	ibt_hca_portinfo_t	*port_infop;
@@ -3656,7 +3656,7 @@ rib_remreply(rib_qp_t *qp, struct reply *rep)
 
 rdma_stat
 rib_registermem(CONN *conn,  caddr_t adsp, caddr_t buf, uint_t buflen,
-	struct mrc *buf_handle)
+    struct mrc *buf_handle)
 {
 	ibt_mr_hdl_t	mr_hdl = NULL;	/* memory region handle */
 	ibt_mr_desc_t	mr_desc;	/* vaddr, lkey, rkey */
@@ -3681,8 +3681,8 @@ rib_registermem(CONN *conn,  caddr_t adsp, caddr_t buf, uint_t buflen,
 
 static rdma_stat
 rib_reg_mem(rib_hca_t *hca, caddr_t adsp, caddr_t buf, uint_t size,
-	ibt_mr_flags_t spec,
-	ibt_mr_hdl_t *mr_hdlp, ibt_mr_desc_t *mr_descp)
+    ibt_mr_flags_t spec,
+    ibt_mr_hdl_t *mr_hdlp, ibt_mr_desc_t *mr_descp)
 {
 	ibt_mr_attr_t	mem_attr;
 	ibt_status_t	ibt_status;
@@ -3711,7 +3711,7 @@ rib_reg_mem(rib_hca_t *hca, caddr_t adsp, caddr_t buf, uint_t size,
 
 rdma_stat
 rib_registermemsync(CONN *conn,  caddr_t adsp, caddr_t buf, uint_t buflen,
-	struct mrc *buf_handle, RIB_SYNCMEM_HANDLE *sync_handle, void *lrc)
+    struct mrc *buf_handle, RIB_SYNCMEM_HANDLE *sync_handle, void *lrc)
 {
 	ibt_mr_hdl_t	mr_hdl = NULL;	/* memory region handle */
 	rib_lrc_entry_t *l;
@@ -3780,7 +3780,7 @@ rib_deregistermem(CONN *conn, caddr_t buf, struct mrc buf_handle)
 /* ARGSUSED */
 rdma_stat
 rib_deregistermemsync(CONN *conn, caddr_t buf, struct mrc buf_handle,
-		RIB_SYNCMEM_HANDLE sync_handle, void *lrc)
+    RIB_SYNCMEM_HANDLE sync_handle, void *lrc)
 {
 	rib_lrc_entry_t *l;
 	l = (rib_lrc_entry_t *)lrc;
@@ -3796,7 +3796,7 @@ rib_deregistermemsync(CONN *conn, caddr_t buf, struct mrc buf_handle,
 /* ARGSUSED */
 rdma_stat
 rib_syncmem(CONN *conn, RIB_SYNCMEM_HANDLE shandle, caddr_t buf,
-		int len, int cpu)
+    int len, int cpu)
 {
 	ibt_status_t	status;
 	rib_hca_t *hca = (ctoqp(conn))->hca;
@@ -5189,7 +5189,7 @@ error_free:
 
 static rdma_stat
 rib_registermem_via_hca(rib_hca_t *hca, caddr_t adsp, caddr_t buf,
-	uint_t buflen, struct mrc *buf_handle)
+    uint_t buflen, struct mrc *buf_handle)
 {
 	ibt_mr_hdl_t	mr_hdl = NULL;	/* memory region handle */
 	ibt_mr_desc_t	mr_desc;	/* vaddr, lkey, rkey */
