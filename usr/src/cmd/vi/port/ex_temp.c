@@ -209,9 +209,7 @@ int	read();
 int	write();
 
 unsigned char *
-getblock(atl, iof)
-	line atl;
-	int iof;
+getblock(line atl, int iof)
 {
 	int bno, off;
 	unsigned char *p1, *p2;
@@ -250,10 +248,12 @@ getblock(atl, iof)
 	if (iof == READ) {
 		if (hitin2 == 0) {
 			if (ichang2) {
-				if (xtflag)
+				if (xtflag) {
 					if (run_crypt(0L, ibuff2,
-							CRSIZE, tperm) == -1)
+					    CRSIZE, tperm) == -1) {
 						filioerr(tfname);
+					}
+				}
 				blkio(iblock2, ibuff2, write);
 			}
 			ichang2 = 0;
@@ -395,8 +395,8 @@ synctmp(void)
 		n = CRSIZE;
 		while (n--)
 			*p2++ = *p1++;
-			if (run_crypt(0L, crbuf, CRSIZE, tperm) == -1)
-				filioerr(tfname);
+		if (run_crypt(0L, crbuf, CRSIZE, tperm) == -1)
+			filioerr(tfname);
 		blkio(oblock, crbuf, write);
 	} else
 		blkio(oblock, obuff, write);
@@ -531,9 +531,8 @@ REGblk(void)
 	return (0);
 }
 
-struct	strreg *
-mapreg(c)
-	int c;
+struct strreg *
+mapreg(int c)
 {
 
 	if (isupper(c))
@@ -753,10 +752,7 @@ rbflush(void)
 
 /* Register c to char buffer buf of size buflen */
 void
-regbuf(c, buf, buflen)
-unsigned char c;
-unsigned char *buf;
-int buflen;
+regbuf(unsigned char c, unsigned char *buf, int buflen)
 {
 	unsigned char *p, *lp;
 
