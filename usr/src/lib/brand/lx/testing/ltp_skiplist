@@ -85,6 +85,9 @@ ustat01
 ustat02
 
 # needs a config with a dev or mounting
+# As of February 2017, an increasing number of tests require device support
+# (often via a zeroed file mounted via loopback) to function properly.
+access04
 chmod06
 chown04
 chown04_16
@@ -97,10 +100,12 @@ lchown03
 lchown03_16
 linkat02
 link08
+madvise06
 mkdir03
 mkdirat02
 mknod07
 mknodat02
+mmap16
 mount01
 mount02
 mount04
@@ -109,6 +114,9 @@ renameat01
 rmdir02
 umount01
 umount02
+umount2_01
+umount2_02
+umount2_03
 umount03
 utime06
 utimes01
