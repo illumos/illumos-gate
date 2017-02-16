@@ -543,10 +543,11 @@ dologname(struct fn *fnp, struct opts *clopts)
 		char *buf;
 		(void) fprintf(stderr, "dologname: logfiles from cfopts:\n");
 		fn_list_rewind(logfiles);
-		while ((nextfnp = fn_list_next(logfiles)) != NULL)
+		while ((nextfnp = fn_list_next(logfiles)) != NULL) {
 			buf = fn_s(nextfnp);
 			if (buf != NULL)
 				(void) fprintf(stderr, "    <%s>\n", buf);
+		}
 	}
 	if (fn_list_empty(logfiles))
 		globbedfiles = glob_glob(fnp);
@@ -901,10 +902,11 @@ expirefiles(struct fn *fnp, struct opts *opts)
 			    buf);
 		}
 		fn_list_rewind(files);
-		while ((nextfnp = fn_list_next(files)) != NULL)
+		while ((nextfnp = fn_list_next(files)) != NULL) {
 			buf = fn_s(nextfnp);
 			if (buf != NULL)
 				(void) fprintf(stderr, "    <%s>\n", buf);
+		}
 	}
 
 	/* see if count causes expiration */
