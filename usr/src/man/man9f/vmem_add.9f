@@ -1,0 +1,75 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2017, Richard Lowe.
+.\"
+.Dd Jan 18, 2017
+.Dt VMEM_ADD 9F
+.Os
+.Sh NAME
+.Nm vmem_add
+.Nd add spans to a vmem arena
+.Sh SYNOPSIS
+.In sys/vmem.h
+.Ft void *
+.Fo vmem_add
+.Fa "vmem_t *vmp"
+.Fa "void *vaddr"
+.Fa "size_t size"
+.Fa "int vmflag"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa vmp
+The vmem arena to which the span should be added.
+.It Fa vaddr
+The base address of the span to add.
+.It Fa size
+The size of the span to add.
+.It Fa vmflag
+Flags affecting the allocation of the span to add.
+.El
+.Sh DESCRIPTION
+The
+.Fn vmem_add
+function adds
+.Fa size
+bytes starting at
+.Fa vaddr
+to a vmem arena from which future calls to
+.Fn vmem_alloc
+may allocate.
+.Pp
+.Dv VM_SLEEP
+or
+.Dv VM_NOSLEEP
+must be specified in
+.Fa vmflag ,
+and indicate whether the addition may block.
+.Sh CONTEXT
+This function can be called from either user or kernel context.
+If the
+.Dv VM_NOSLEEP
+flag is specified, it may also be called from interrupt context.
+.Sh RETURN VALUES
+Upon success
+.Fn vmem_add
+returns
+.Fa vaddr .
+On failure,
+.Dv NULL
+is returned.
+.Sh SEE ALSO
+.Xr vmem 9 ,
+.Xr vmem_alloc 9F ,
+.Xr vmem_create 9F

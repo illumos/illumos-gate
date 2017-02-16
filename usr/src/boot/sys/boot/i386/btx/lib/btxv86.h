@@ -13,15 +13,19 @@
  * purpose.
  */
 
-/*
- * $FreeBSD$
- */
-
 #ifndef _BTXV86_H_
 #define _BTXV86_H_
 
 #include <sys/types.h>
 #include <machine/psl.h>
+
+/*
+ * Real memory buffer space for real mode IO.
+ * Just one page is not much, but the space is rather limited.
+ * See ../btx/btx.S for details.
+ */
+#define	V86_IO_BUFFER		0x8000
+#define	V86_IO_BUFFER_SIZE	0x1000
 
 #define V86_ADDR   0x10000	/* Segment:offset address */
 #define V86_CALLF  0x20000	/* Emulate far call */

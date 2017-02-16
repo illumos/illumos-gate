@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 RackTop Systems.
+#
 
 MYPROG = svc.configd
 MYOBJS = \
@@ -58,8 +60,8 @@ CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-uninitialized
-MYLDLIBS = -lumem -luutil -lbsm
-LDLIBS	+= -lsecdb $(MYLDLIBS)
+MYLDLIBS = -lumem -luutil
+LDLIBS	+= -lsecdb -lbsm $(MYLDLIBS)
 LINTFLAGS += -errtags -erroff=E_BAD_FORMAT_ARG_TYPE2 -erroff=E_NAME_DEF_NOT_USED2
 
 CLOBBERFILES +=	$(MYPROG:%=%-native)

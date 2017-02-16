@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2011, Richard Lowe
+# Copyright 2017, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
@@ -492,6 +492,11 @@ file path=usr/share/man/man9f/untimeout.9f
 file path=usr/share/man/man9f/ureadc.9f
 file path=usr/share/man/man9f/uwritec.9f
 file path=usr/share/man/man9f/va_arg.9f
+file path=usr/share/man/man9f/vmem_add.9f
+file path=usr/share/man/man9f/vmem_alloc.9f
+file path=usr/share/man/man9f/vmem_contains.9f
+file path=usr/share/man/man9f/vmem_create.9f
+file path=usr/share/man/man9f/vmem_walk.9f
 link path=usr/share/man/man9f/AVL_NEXT.9f target=avl.9f
 link path=usr/share/man/man9f/AVL_PREV.9f target=avl.9f
 link path=usr/share/man/man9f/SIZEOF_PTR.9f target=STRUCT_DECL.9f
@@ -1303,6 +1308,12 @@ link path=usr/share/man/man9f/va_copy.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_end.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_start.9f target=va_arg.9f
 link path=usr/share/man/man9f/vcmn_err.9f target=cmn_err.9f
+link path=usr/share/man/man9f/vmem_xalloc.9f target=vmem_alloc.9f
+link path=usr/share/man/man9f/vmem_free.9f target=vmem_alloc.9f
+link path=usr/share/man/man9f/vmem_xfree.9f target=vmem_alloc.9f
+link path=usr/share/man/man9f/vmem_xcreate.9f target=vmem_create.9f
+link path=usr/share/man/man9f/vmem_destroy.9f target=vmem_create.9f
+link path=usr/share/man/man9f/vmem_size.9f target=vmem_walk.9f
 link path=usr/share/man/man9f/vsnprintf.9f target=sprintf.9f
 link path=usr/share/man/man9f/vsprintf.9f target=sprintf.9f
 link path=usr/share/man/man9f/vzcmn_err.9f target=cmn_err.9f

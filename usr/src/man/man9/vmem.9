@@ -1,0 +1,176 @@
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\"
+.\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+.\" Copyright (c) 2012, Joyent, Inc. All rights reserved.
+.\"
+.\" The text of this is derived from section 1 of the big theory statement in
+.\" usr/src/uts/common/os/vmem.c, the traditional location of this text.  They
+.\" should largely be updated in tandem.
+.Dd Jan 18, 2017
+.Dt VMEM 9
+.Os
+.Sh NAME
+.Nm vmem
+.Nd virtual memory allocator
+.Sh DESCRIPTION
+.Ss Overview
+An address space is divided into a number of logically distinct pieces, or
+.Em arenas :
+text, data, heap, stack, and so on.
+Within these
+arenas we often subdivide further; for example, we use heap addresses
+not only for the kernel heap
+.Po
+.Fn kmem_alloc
+space
+.Pc ,
+but also for DVMA,
+.Fn bp_mapin ,
+.Pa /dev/kmem ,
+and even some device mappings.
+.Pp
+The kernel address space, therefore, is most accurately described as
+a tree of arenas in which each node of the tree
+.Em imports
+some subset of its parent.
+The virtual memory allocator manages these arenas
+and supports their natural hierarchical structure.
+.Ss Arenas
+An arena is nothing more than a set of integers.  These integers most
+commonly represent virtual addresses, but in fact they can represent
+anything at all.  For example, we could use an arena containing the
+integers minpid through maxpid to allocate process IDs.  For uses of this
+nature, prefer
+.Xr id_space 9F
+instead.
+.Pp
+.Fn vmem_create
+and
+.Fn vmem_destroy
+create and destroy vmem arenas.  In order to differentiate between arenas used
+for addresses and arenas used for identifiers, the
+.Dv VMC_IDENTIFIER
+flag is passed to
+.Fn vmem_create .
+This prevents identifier exhaustion from being diagnosed as general memory
+failure.
+.Ss Spans
+We represent the integers in an arena as a collection of
+.Em spans ,
+or contiguous ranges of integers.  For example, the kernel heap consists of
+just one span:
+.Li "[kernelheap, ekernelheap)" .
+Spans can be added to an arena in two ways: explicitly, by
+.Fn vmem_add ;
+or implicitly, by importing, as described in
+.Sx Imported Memory
+below.
+.Ss Segments
+Spans are subdivided into
+.Em segments ,
+each of which is either allocated or free.  A segment, like a span, is a
+contiguous range of integers.  Each allocated segment
+.Li "[addr, addr + size)"
+represents exactly one
+.Li "vmem_alloc(size)"
+that returned
+.Sy addr .
+Free segments represent the space between allocated segments.  If two free
+segments are adjacent, we coalesce them into one larger segment; that is, if
+segments
+.Li "[a, b)"
+and
+.Li "[b, c)"
+are both free, we merge them into a single segment
+.Li "[a, c)" .
+The segments within a span are linked together in increasing\-address
+order so we can easily determine whether coalescing is possible.
+.Pp
+Segments never cross span boundaries.  When all segments within an imported
+span become free, we return the span to its source.
+.Ss Imported Memory
+As mentioned in the overview, some arenas are logical subsets of
+other arenas.  For example,
+.Sy kmem_va_arena
+(a virtual address cache
+that satisfies most
+.Fn kmem_slab_create
+requests) is just a subset of
+.Sy heap_arena
+(the kernel heap) that provides caching for the most common slab sizes.  When
+.Sy kmem_va_arena
+runs out of virtual memory, it
+.Em imports
+more from the heap; we say that
+.Sy heap_arena
+is the
+.Em "vmem source"
+for
+.Sy kmem_va_arena.
+.Fn vmem_create
+allows you to specify any existing vmem arena as the source for your new
+arena.  Topologically, since every arena is a child of at most one source, the
+set of all arenas forms a collection of trees.
+.Ss Constrained Allocations
+Some vmem clients are quite picky about the kind of address they want.
+For example, the DVMA code may need an address that is at a particular
+phase with respect to some alignment (to get good cache coloring), or
+that lies within certain limits (the addressable range of a device),
+or that doesn't cross some boundary (a DMA counter restriction) \(em
+or all of the above.
+.Fn vmem_xalloc
+allows the client to specify any or all of these constraints.
+.Ss The Vmem Quantum
+Every arena has a notion of
+.Sq quantum ,
+specified at
+.Fn vmem_create
+time, that defines the arena's minimum unit of currency.  Most commonly the
+quantum is either 1 or
+.Dv PAGESIZE ,
+but any power of 2 is legal.  All vmem allocations are guaranteed to be
+quantum\-aligned.
+.Ss Relationship to the Kernel Memory Allocator
+Every kmem cache has a vmem arena as its slab supplier.  The kernel memory
+allocator uses
+.Fn vmem_alloc
+and
+.Fn vmem_free
+to create and destroy slabs.
+.Sh SEE ALSO
+.Xr id_space 9F ,
+.Xr vmem_add 9F ,
+.Xr vmem_alloc 9F ,
+.Xr vmem_contains 9F ,
+.Xr vmem_create 9F ,
+.Xr vmem_walk 9F
+.Pp
+.Rs
+.%A Jeff Bonwick
+.%A Jonathan Adams
+.%T Magazines and vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources.
+.%J Proceedings of the 2001 Usenix Conference
+.%U http://www.usenix.org/event/usenix01/bonwick.html
+.Re

@@ -64,21 +64,47 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	smbios_hdl_t *shp = NULL;
 	smbios_entry_t *ep;
 	caddr_t stbuf, bios, p, q;
+	uint64_t startaddr, startoff = 0;
 	size_t bioslen;
 	int err;
 
 	if (file != NULL || (flags & ~SMB_O_MASK))
 		return (smb_open_error(shp, errp, ESMB_INVAL));
 
-	bioslen = SMB_RANGE_LIMIT - SMB_RANGE_START + 1;
-	bios = psm_map_phys(SMB_RANGE_START, bioslen, PSM_PROT_READ);
+	if ((startaddr = ddi_prop_get_int64(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "smbios-address", 0)) == 0) {
+		startaddr = SMB_RANGE_START;
+		bioslen = SMB_RANGE_LIMIT - SMB_RANGE_START + 1;
+	} else {
+		/* We have smbios address from boot loader, map one page. */
+		bioslen = MMU_PAGESIZE;
+		startoff = startaddr & MMU_PAGEOFFSET;
+		startaddr &= MMU_PAGEMASK;
+#if defined(__i386)
+		/* If the address is not good, use memory scan instead. */
+		if (startaddr > UINT32_MAX) {
+			startaddr = SMB_RANGE_START;
+			bioslen = SMB_RANGE_LIMIT - SMB_RANGE_START + 1;
+			startoff = 0;
+		}
+#endif
+	}
+
+	bios = psm_map_phys(startaddr, bioslen, PSM_PROT_READ);
 
 	if (bios == NULL)
 		return (smb_open_error(shp, errp, ESMB_MAPDEV));
 
-	for (p = bios, q = bios + bioslen; p < q; p += 16) {
+	/*
+	 * In case we did map one page, make sure we will not cross
+	 * the end of the page.
+	 */
+	p = bios + startoff;
+	q = bios + bioslen - startoff;
+	while (p < q) {
 		if (strncmp(p, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN) == 0)
 			break;
+		p += SMB_SCAN_STEP;
 	}
 
 	if (p >= q) {

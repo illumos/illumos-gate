@@ -41,6 +41,9 @@
  *	Proceedings of the 2001 Usenix Conference.
  *	Available as http://www.usenix.org/event/usenix01/bonwick.html
  *
+ * Section 1, below, is also the primary contents of vmem(9).  If for some
+ * reason you are updating this comment, you will also wish to update the
+ * manual.
  *
  * 1. General Concepts
  * -------------------
