@@ -3831,9 +3831,9 @@ aio_port_callback(void *arg, int *events, pid_t pid, int flag, void *evp)
 	iov = reqp->aio_req_uio.uio_iov;
 	bp = &reqp->aio_req_buf;
 	resultp = (void *)reqp->aio_req_resultp;
-	aio_req_free_port(aiop, reqp);	/* request struct back to free list */
-	mutex_exit(&aiop->aio_mutex);
 	if (flag == PORT_CALLBACK_DEFAULT)
 		aio_copyout_result_port(iov, bp, resultp);
+	aio_req_free_port(aiop, reqp);	/* request struct back to free list */
+	mutex_exit(&aiop->aio_mutex);
 	return (0);
 }
