@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -986,7 +987,7 @@ zsa_close(queue_t *q, int flag)
 	 * write queue and there's a timer running, so we don't have to worry
 	 * about them.  For the untimed case, though, the user obviously made a
 	 * mistake, because these are handled immediately.  We'll terminate the
-	 * break now and honor his implicit request by discarding the rest of
+	 * break now and honor their implicit request by discarding the rest of
 	 * the data.
 	 */
 	if (!(za->za_flags & ZAS_BREAK) && (zs->zs_wreg[5] & ZSWR5_BREAK))

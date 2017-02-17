@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/machsystm.h>
@@ -3017,7 +3018,7 @@ void
 install_va_to_tte(void)
 {
 	/*
-	 * advise prom that he can use unix-tte
+	 * advise prom that it can use unix-tte
 	 */
 	prom_interpret("' unix-tte is va>tte-data", 0, 0, 0, 0, 0);
 }

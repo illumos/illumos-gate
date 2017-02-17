@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1727,7 +1728,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			switch (token) {
 			case TOK_SPI:
 				/*
-				 * If some cretin types in "spi 0" then he/she
+				 * If some cretin types in "spi 0" then they
 				 * can type in another SPI.
 				 */
 				if (assoc->sadb_sa_spi != 0) {

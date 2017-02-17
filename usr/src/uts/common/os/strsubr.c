@@ -25,6 +25,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -6390,7 +6391,7 @@ drain_syncq(syncq_t *sq)
 		sq->sq_svcflags &= ~SQ_SERVICE;
 
 	/*
-	 * If SQ_EXCL is set, someone else is processing this syncq - let him
+	 * If SQ_EXCL is set, someone else is processing this syncq - let them
 	 * finish the job.
 	 */
 	if (flags & SQ_EXCL) {

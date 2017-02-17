@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1985, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -234,7 +235,7 @@ writeit:
 /*
  * Test if the passed line is a header line, RFC 822 style.
  */
-int 
+int
 headerp(register char *line)
 {
 	register char *cp = line;
@@ -275,7 +276,7 @@ statusput(
  * which does all the dirty work.
  */
 
-int 
+int
 mail(char **people)
 {
 	register char *cp2, *cp3;
@@ -309,7 +310,7 @@ mail(char **people)
 	return(0);
 }
 
-int 
+int
 sendm(char *str)
 {
 	if (value("flipm") != NOSTR)
@@ -317,7 +318,7 @@ sendm(char *str)
 	else return(sendmail(str));
 }
 
-int 
+int
 Sendm(char *str)
 {
 	if (value("flipm") != NOSTR)
@@ -329,7 +330,7 @@ Sendm(char *str)
  * Interface to the mail1 routine for the -t flag
  * (read headers from text).
  */
-int 
+int
 tmail(void)
 {
 	struct header head;
@@ -346,7 +347,7 @@ tmail(void)
  * Send mail to a bunch of user names.  The interface is through
  * the mail routine below.
  */
-static int 
+static int
 sendmail(char *str)
 {
 	struct header head;
@@ -367,7 +368,7 @@ sendmail(char *str)
  * the mail routine below.
  * save a copy of the letter
  */
-static int 
+static int
 Sendmail(char *str)
 {
 	struct header head;
@@ -398,7 +399,7 @@ closefd_walk(void *special_fd, int fd)
  * Mail a message on standard input to the people indicated
  * in the passed header.  (Internal interface).
  */
-void 
+void
 mail1(struct header *hp, int use_to, char *orig_to)
 {
 	pid_t p, pid;
@@ -508,7 +509,7 @@ mail1(struct header *hp, int use_to, char *orig_to)
 	 * Wait, to absorb a potential zombie, then
 	 * fork, set up the temporary mail file as standard
 	 * input for "mail" and exec with the user list we generated
-	 * far above. Return the process id to caller in case he
+	 * far above. Return the process id to caller in case it
 	 * wants to await the completion of mail.
 	 */
 

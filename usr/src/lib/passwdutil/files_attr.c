@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -810,7 +811,7 @@ files_update(attrlist *items, pwu_repository_t *rep, void *buf)
 				 * We take care not to update lstchg if the
 				 * user has no password, otherwise the user
 				 * might not be required to provide a password
-				 * the next time [s]he logs-in.
+				 * the next time they log-in.
 				 *
 				 * Also, if lstchg != -1 (i.e., not set in
 				 * /etc/shadow), we keep the old value.

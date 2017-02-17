@@ -20,6 +20,7 @@
  *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -730,7 +731,7 @@ delay_exit(int ecode)
 
 	/*
 	 * The most likely cause of an error here is that
-	 * someone has broadcast an RRQ packet because s/he's
+	 * something has broadcast an RRQ packet because it's
 	 * trying to boot and doesn't know who the server is.
 	 * Rather then sending an ERROR packet immediately, we
 	 * wait a while so that the real server has a better chance

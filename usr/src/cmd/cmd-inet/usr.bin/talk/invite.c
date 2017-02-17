@@ -36,6 +36,9 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -50,9 +53,9 @@
 #endif /* SYSV */
 
 	/*
-	 * there wasn't an invitation waiting, so send a request containing
-	 * our sockt address to the remote talk daemon so it can invite
-	 * him
+	 * There wasn't an invitation waiting, so send a request containing
+	 * our socket address to the remote talk daemon so it can invite
+	 * the remote.
 	 */
 
 static int local_id, remote_id;

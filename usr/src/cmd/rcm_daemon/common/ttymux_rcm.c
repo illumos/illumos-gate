@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -917,7 +918,7 @@ rsrc_unavailable(rsrc_t *rsrc)
  * greater than zero then a resource which uses rsrc will only be
  * returned if it is associated with >= redundancy dependents.
  *
- * Thus, provided that the caller keeps the list locked he can iterate
+ * Thus, provided that the caller keeps the list locked it can iterate
  * through all the resources in the cache that depend upon rsrc.
  */
 static rsrc_t *

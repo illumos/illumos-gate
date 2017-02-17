@@ -1,6 +1,7 @@
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -281,7 +282,7 @@ matcher(struct re_guts *g,
 		if (nmatch == 1 && !g->backrefs)
 			break;		/* no further info needed */
 
-		/* oh my, he wants the subexpressions... */
+		/* oh my, it wants the subexpressions... */
 		if (m->pmatch == NULL)
 			m->pmatch = (regmatch_t *)malloc((m->g->nsub + 1) *
 			    sizeof (regmatch_t));

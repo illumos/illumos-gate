@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -351,7 +352,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 
 		/*
 		 * If the user went through one of the RPC interfaces to create
-		 * this socket and RPC is MLP in this zone, then give him an
+		 * this socket and RPC is MLP in this zone, then give them an
 		 * anonymous MLP.
 		 */
 		if (connp->conn_anon_mlp && is_system_labeled()) {

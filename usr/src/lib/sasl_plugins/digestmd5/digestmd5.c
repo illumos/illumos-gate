@@ -1,15 +1,16 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /* DIGEST-MD5 SASL plugin
  * Rob Siemborski
  * Tim Martin
- * Alexey Melnikov 
+ * Alexey Melnikov
  * $Id: digestmd5.c,v 1.153 2003/03/30 22:17:06 leg Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -17,7 +18,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -27,7 +28,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -162,10 +163,10 @@ typedef int cipher_function_t(struct context *,
 			      unsigned *);
 
 #ifdef _SUN_SDK_
-typedef int cipher_init_t(struct context *, char [16], 
+typedef int cipher_init_t(struct context *, char [16],
                                             char [16]);
 #else
-typedef int cipher_init_t(struct context *, unsigned char [16], 
+typedef int cipher_init_t(struct context *, unsigned char [16],
                                             unsigned char [16]);
 #endif /* _SUN_SDK_ */
 
@@ -211,7 +212,7 @@ typedef struct reauth_cache {
 typedef struct context {
     int state;			/* state in the authentication we are in */
     enum Context_type i_am;	/* are we the client or server? */
-    
+
     reauth_cache_t *reauth;
 
     char *authid;
@@ -221,22 +222,22 @@ typedef struct context {
     unsigned char *cnonce;
 
     char *response_value;
-    
+
     unsigned int seqnum;
     unsigned int rec_seqnum;	/* for checking integrity */
-    
+
     HASH Ki_send;
     HASH Ki_receive;
-    
+
     HASH HA1;		/* Kcc or Kcs */
-    
+
     /* copy of utils from the params structures */
     const sasl_utils_t *utils;
-    
+
     /* For general use */
     char *out_buf;
     unsigned out_buf_len;
-    
+
     /* for encoding/decoding */
     buffer_info_t *enc_in_buf;
     char *encode_buf, *decode_buf, *decode_once_buf;
@@ -245,7 +246,7 @@ typedef struct context {
     unsigned decode_tmp_buf_len;
     char *MAC_buf;
     unsigned MAC_buf_len;
-    
+
     char *buffer;
     char sizebuf[4];
     int cursize;
@@ -253,11 +254,11 @@ typedef struct context {
     /* Layer info */
     unsigned int size; /* Absolute size of buffer */
     unsigned int needsize; /* How much of the size of the buffer is left */
-    
+
     /* Server MaxBuf for Client or Client MaxBuf For Server */
     /* INCOMING */
     unsigned int in_maxbuf;
-    
+
     /* if privacy mode is used use these functions for encode and decode */
     cipher_function_t *cipher_enc;
     cipher_function_t *cipher_dec;
@@ -272,7 +273,7 @@ struct digest_cipher {
     sasl_ssf_t ssf;
     int n; /* bits to make privacy key */
     int flag; /* a bitmask to make things easier for us */
-    
+
     cipher_function_t *cipher_enc;
     cipher_function_t *cipher_dec;
     cipher_init_t *cipher_init;
@@ -305,7 +306,7 @@ static void CvtHex(HASH Bin, HASHHEX Hex)
 {
     unsigned short  i;
     unsigned char   j;
-    
+
     for (i = 0; i < HASHLEN; i++) {
 	j = (Bin[i] >> 4) & 0xf;
 	if (j <= 9)
@@ -343,15 +344,15 @@ DigestCalcResponse(const sasl_utils_t * utils,
     HASH            RespHash;
     HASHHEX         HA2Hex;
     char ncvalue[10];
-    
+
     /* calculate H(A2) */
     utils->MD5Init(&Md5Ctx);
-    
+
     if (pszMethod != NULL) {
 	utils->MD5Update(&Md5Ctx, pszMethod, strlen((char *) pszMethod));
     }
     utils->MD5Update(&Md5Ctx, (unsigned char *) COLON, 1);
-    
+
     /* utils->MD5Update(&Md5Ctx, (unsigned char *) "AUTHENTICATE:", 13); */
     utils->MD5Update(&Md5Ctx, pszDigestUri, strlen((char *) pszDigestUri));
     if (strcasecmp((char *) pszQop, "auth") != 0) {
@@ -361,7 +362,7 @@ DigestCalcResponse(const sasl_utils_t * utils,
     }
     utils->MD5Final(HA2, &Md5Ctx);
     CvtHex(HA2, HA2Hex);
-    
+
     /* calculate response */
     utils->MD5Init(&Md5Ctx);
     utils->MD5Update(&Md5Ctx, HA1, HASHHEXLEN);
@@ -389,7 +390,7 @@ DigestCalcResponse(const sasl_utils_t * utils,
 static bool UTF8_In_8859_1(const unsigned char *base, int len)
 {
     const unsigned char *scan, *end;
-    
+
     end = base + len;
     for (scan = base; scan < end; ++scan) {
 	if (*scan > 0xC3)
@@ -399,7 +400,7 @@ static bool UTF8_In_8859_1(const unsigned char *base, int len)
 		break;
 	}
     }
-    
+
     /* if scan >= end, then this is a 8859-1 string. */
     return (scan >= end);
 }
@@ -416,9 +417,9 @@ void MD5_UTF8_8859_1(const sasl_utils_t * utils,
 {
     const unsigned char *scan, *end;
     unsigned char   cbuf;
-    
+
     end = base + len;
-    
+
     /* if we found a character outside 8859-1, don't alter string */
     if (!In_ISO_8859_1) {
 	utils->MD5Update(ctx, base, len);
@@ -446,34 +447,34 @@ static void DigestCalcSecret(const sasl_utils_t * utils,
 			     HASH HA1)
 {
     bool            In_8859_1;
-    
+
     MD5_CTX         Md5Ctx;
-    
+
     /* Chris Newman clarified that the following text in DIGEST-MD5 spec
        is bogus: "if name and password are both in ISO 8859-1 charset"
        We shoud use code example instead */
-    
+
     utils->MD5Init(&Md5Ctx);
-    
+
     /* We have to convert UTF-8 to ISO-8859-1 if possible */
     In_8859_1 = UTF8_In_8859_1(pszUserName, strlen((char *) pszUserName));
     MD5_UTF8_8859_1(utils, &Md5Ctx, In_8859_1,
 		    pszUserName, strlen((char *) pszUserName));
-    
+
     utils->MD5Update(&Md5Ctx, COLON, 1);
-    
+
     if (pszRealm != NULL && pszRealm[0] != '\0') {
 	/* a NULL realm is equivalent to the empty string */
 	utils->MD5Update(&Md5Ctx, pszRealm, strlen((char *) pszRealm));
-    }      
-    
+    }
+
     utils->MD5Update(&Md5Ctx, COLON, 1);
-    
+
     /* We have to convert UTF-8 to ISO-8859-1 if possible */
     In_8859_1 = UTF8_In_8859_1(Password, PasswordLen);
     MD5_UTF8_8859_1(utils, &Md5Ctx, In_8859_1,
 		    Password, PasswordLen);
-    
+
     utils->MD5Final(HA1, &Md5Ctx);
 }
 
@@ -481,30 +482,30 @@ static unsigned char *create_nonce(const sasl_utils_t * utils)
 {
     unsigned char  *base64buf;
     int             base64len;
-    
+
     char           *ret = (char *) utils->malloc(NONCE_SIZE);
     if (ret == NULL)
 	return NULL;
-    
+
 #if defined _DEV_URANDOM && defined _SUN_SDK_
     {
 	int fd = open(_DEV_URANDOM, O_RDONLY);
 	int nread = 0;
 
-  	if (fd != -1) { 
-		nread = read(fd, ret, NONCE_SIZE); 
-		close(fd); 
-	} 
+	if (fd != -1) {
+		nread = read(fd, ret, NONCE_SIZE);
+		close(fd);
+	}
 	if (nread != NONCE_SIZE)
 	    utils->rand(utils->rpool, (char *) ret, NONCE_SIZE);
     }
 #else
     utils->rand(utils->rpool, (char *) ret, NONCE_SIZE);
 #endif /* _DEV_URANDOM && _SUN_SDK_ */
-    
+
     /* base 64 encode it so it has valid chars */
     base64len = (NONCE_SIZE * 4 / 3) + (NONCE_SIZE % 3 ? 4 : 0);
-    
+
     base64buf = (unsigned char *) utils->malloc(base64len + 1);
     if (base64buf == NULL) {
 #ifdef _SUN_SDK_
@@ -515,7 +516,7 @@ static unsigned char *create_nonce(const sasl_utils_t * utils)
 #endif /* _SUN_SDK_ */
 	return NULL;
     }
-    
+
     /*
      * Returns SASL_OK on success, SASL_BUFOVER if result won't fit
      */
@@ -525,7 +526,7 @@ static unsigned char *create_nonce(const sasl_utils_t * utils)
 	return NULL;
     }
     utils->free(ret);
-    
+
     return base64buf;
 }
 
@@ -538,16 +539,16 @@ static int add_to_challenge(const sasl_utils_t *utils,
     int             namesize = strlen(name);
     int             valuesize = strlen((char *) value);
     int             ret;
-    
+
     ret = _plug_buf_alloc(utils, str, buflen,
 			  *curlen + 1 + namesize + 2 + valuesize + 2);
     if(ret != SASL_OK) return ret;
-    
+
     *curlen = *curlen + 1 + namesize + 2 + valuesize + 2;
-    
+
     strcat(*str, ",");
     strcat(*str, name);
-    
+
     if (need_quotes) {
 	strcat(*str, "=\"");
 	strcat(*str, (char *) value);	/* XXX. What about quoting??? */
@@ -556,20 +557,20 @@ static int add_to_challenge(const sasl_utils_t *utils,
 	strcat(*str, "=");
 	strcat(*str, (char *) value);
     }
-    
+
     return SASL_OK;
 }
 
 static char *skip_lws (char *s)
 {
     if(!s) return NULL;
-    
+
     /* skipping spaces: */
     while (s[0] == ' ' || s[0] == HT || s[0] == CR || s[0] == LF) {
 	if (s[0]=='\0') break;
 	s++;
-    }  
-    
+    }
+
     return s;
 }
 
@@ -580,7 +581,7 @@ static char *skip_token (char *s, int caseinsensitive)
 #endif /* _SUN_SDK_ */
 {
     if(!s) return NULL;
-    
+
 #ifdef __SUN_SDK_
     while (((unsigned char *)s)[0]>SP) {
 #else
@@ -603,24 +604,24 @@ static char *skip_token (char *s, int caseinsensitive)
 #endif /* _SUN_SDK_ */
 	}
 	s++;
-    }  
+    }
     return s;
 }
 
-/* NULL - error (unbalanced quotes), 
+/* NULL - error (unbalanced quotes),
    otherwise pointer to the first character after value */
 static char *unquote (char *qstr)
 {
     char *endvalue;
     int   escaped = 0;
     char *outptr;
-    
+
     if(!qstr) return NULL;
-    
+
     if (qstr[0] == '"') {
 	qstr++;
 	outptr = qstr;
-	
+
 	for (endvalue = qstr; endvalue[0] != '\0'; endvalue++, outptr++) {
 	    if (escaped) {
 		outptr[0] = endvalue[0];
@@ -632,16 +633,16 @@ static char *unquote (char *qstr)
 	    }
 	    else if (endvalue[0] == '"') {
 		break;
-	    }      
+	    }
 	    else {
-		outptr[0] = endvalue[0];      
+		outptr[0] = endvalue[0];
 	    }
 	}
-	
+
 	if (endvalue[0] != '"') {
 	    return NULL;
 	}
-	
+
 	while (outptr <= endvalue) {
 	    outptr[0] = '\0';
 	    outptr++;
@@ -651,9 +652,9 @@ static char *unquote (char *qstr)
     else { /* not qouted value (token) */
 	endvalue = skip_token(qstr,0);
     };
-    
-    return endvalue;  
-} 
+
+    return endvalue;
+}
 
 static void get_pair(char **in, char **name, char **value)
 {
@@ -662,58 +663,58 @@ static void get_pair(char **in, char **name, char **value)
     char  *curp = *in;
     *name = NULL;
     *value = NULL;
-    
+
     if (curp == NULL) return;
     if (curp[0] == '\0') return;
-    
+
     /* skipping spaces: */
     curp = skip_lws(curp);
-    
+
     *name = curp;
-    
+
     curp = skip_token(curp,1);
-    
+
     /* strip wierd chars */
     if (curp[0] != '=' && curp[0] != '\0') {
 	*curp++ = '\0';
     };
-    
+
     curp = skip_lws(curp);
-    
-    if (curp[0] != '=') { /* No '=' sign */ 
+
+    if (curp[0] != '=') { /* No '=' sign */
 	*name = NULL;
 	return;
     }
-    
+
     curp[0] = '\0';
     curp++;
-    
-    curp = skip_lws(curp);  
-    
+
+    curp = skip_lws(curp);
+
     *value = (curp[0] == '"') ? curp+1 : curp;
-    
+
     endpair = unquote (curp);
-    if (endpair == NULL) { /* Unbalanced quotes */ 
+    if (endpair == NULL) { /* Unbalanced quotes */
 	*name = NULL;
 	return;
     }
     if (endpair[0] != ',') {
 	if (endpair[0]!='\0') {
-	    *endpair++ = '\0'; 
+	    *endpair++ = '\0';
 	}
     }
-    
+
     endpair = skip_lws(endpair);
-    
-    /* syntax check: MUST be '\0' or ',' */  
+
+    /* syntax check: MUST be '\0' or ',' */
     if (endpair[0] == ',') {
 	endpair[0] = '\0';
 	endpair++; /* skipping <,> */
-    } else if (endpair[0] != '\0') { 
+    } else if (endpair[0] != '\0') {
 	*name = NULL;
 	return;
     }
-    
+
     *in = endpair;
 }
 
@@ -755,7 +756,7 @@ static int dec_3des(context_t *text,
 {
     des_context_t *c = (des_context_t *) text->cipher_dec_context;
     int padding, p;
-    
+
     des_ede2_cbc_encrypt((void *) input,
 			 (void *) output,
 			 inputlen,
@@ -763,7 +764,7 @@ static int dec_3des(context_t *text,
 			 c->keysched2,
 			 &c->ivec,
 			 DES_DECRYPT);
-    
+
     /* now chop off the padding */
     padding = output[inputlen - 11];
     if (padding < 1 || padding > 8) {
@@ -776,13 +777,13 @@ static int dec_3des(context_t *text,
 	    return SASL_FAIL;
 	}
     }
-    
+
     /* chop off the padding */
     *outputlen = inputlen - padding - 10;
-    
+
     /* copy in the HMAC to digest */
     memcpy(digest, output + inputlen - 10, 10);
-    
+
     return SASL_OK;
 }
 
@@ -796,17 +797,17 @@ static int enc_3des(context_t *text,
     des_context_t *c = (des_context_t *) text->cipher_enc_context;
     int len;
     int paddinglen;
-    
+
     /* determine padding length */
     paddinglen = 8 - ((inputlen + 10) % 8);
-    
+
     /* now construct the full stuff to be ciphered */
     memcpy(output, input, inputlen);                /* text */
     memset(output+inputlen, paddinglen, paddinglen);/* pad  */
     memcpy(output+inputlen+paddinglen, digest, 10); /* hmac */
-    
+
     len=inputlen+paddinglen+10;
-    
+
     des_ede2_cbc_encrypt((void *) output,
 			 (void *) output,
 			 len,
@@ -814,13 +815,13 @@ static int enc_3des(context_t *text,
 			 c->keysched2,
 			 &c->ivec,
 			 DES_ENCRYPT);
-    
+
     *outputlen=len;
-    
+
     return SASL_OK;
 }
 
-static int init_3des(context_t *text, 
+static int init_3des(context_t *text,
 		     unsigned char enckey[16],
 		     unsigned char deckey[16])
 {
@@ -848,15 +849,15 @@ static int init_3des(context_t *text,
     slidebits(keybuf, deckey);
     if (des_key_sched((des_cblock *) keybuf, c->keysched) < 0)
 	return SASL_FAIL;
-    
+
     slidebits(keybuf, deckey + 7);
     if (des_key_sched((des_cblock *) keybuf, c->keysched2) < 0)
 	return SASL_FAIL;
-    
+
     memcpy(c->ivec, ((char *) deckey) + 8, 8);
 
     text->cipher_dec_context = (cipher_context_t *) c;
-    
+
     return SASL_OK;
 }
 
@@ -867,7 +868,7 @@ static int init_3des(context_t *text,
  *
  *****************************/
 
-static int dec_des(context_t *text, 
+static int dec_des(context_t *text,
 		   const char *input,
 		   unsigned inputlen,
 		   unsigned char digest[16],
@@ -876,7 +877,7 @@ static int dec_des(context_t *text,
 {
     des_context_t *c = (des_context_t *) text->cipher_dec_context;
     int p, padding = 0;
-    
+
     des_cbc_encrypt((void *) input,
 		    (void *) output,
 		    inputlen,
@@ -887,7 +888,7 @@ static int dec_des(context_t *text,
     /* Update the ivec (des_cbc_encrypt implementations tend to be broken in
        this way) */
     memcpy(c->ivec, input + (inputlen - 8), 8);
-    
+
     /* now chop off the padding */
     padding = output[inputlen - 11];
     if (padding < 1 || padding > 8) {
@@ -900,13 +901,13 @@ static int dec_des(context_t *text,
 	    return SASL_FAIL;
 	}
     }
-    
+
     /* chop off the padding */
     *outputlen = inputlen - padding - 10;
-    
+
     /* copy in the HMAC to digest */
     memcpy(digest, output + inputlen - 10, 10);
-    
+
     return SASL_OK;
 }
 
@@ -920,7 +921,7 @@ static int enc_des(context_t *text,
     des_context_t *c = (des_context_t *) text->cipher_enc_context;
     int len;
     int paddinglen;
-  
+
     /* determine padding length */
     paddinglen = 8 - ((inputlen+10) % 8);
 
@@ -928,22 +929,22 @@ static int enc_des(context_t *text,
     memcpy(output, input, inputlen);                /* text */
     memset(output+inputlen, paddinglen, paddinglen);/* pad  */
     memcpy(output+inputlen+paddinglen, digest, 10); /* hmac */
-    
+
     len = inputlen + paddinglen + 10;
-    
+
     des_cbc_encrypt((void *) output,
                     (void *) output,
                     len,
                     c->keysched,
                     &c->ivec,
                     DES_ENCRYPT);
-    
+
     /* Update the ivec (des_cbc_encrypt implementations tend to be broken in
        this way) */
     memcpy(c->ivec, output + (len - 8), 8);
-    
+
     *outputlen = len;
-    
+
     return SASL_OK;
 }
 
@@ -957,13 +958,13 @@ static int init_des(context_t *text,
     /* allocate enc context */
     c = (des_context_t *) text->utils->malloc(2 * sizeof(des_context_t));
     if (c == NULL) return SASL_NOMEM;
-    
+
     /* setup enc context */
     slidebits(keybuf, enckey);
     des_key_sched((des_cblock *) keybuf, c->keysched);
 
     memcpy(c->ivec, ((char *) enckey) + 8, 8);
-    
+
     text->cipher_enc_context = (cipher_context_t *) c;
 
     /* setup dec context */
@@ -972,7 +973,7 @@ static int init_des(context_t *text,
     des_key_sched((des_cblock *) keybuf, c->keysched);
 
     memcpy(c->ivec, ((char *) deckey) + 8, 8);
-    
+
     text->cipher_dec_context = (cipher_context_t *) c;
 
     return SASL_OK;
@@ -1001,23 +1002,23 @@ static void rc4_init(rc4_context_t *text,
 		     unsigned keylen)
 {
     int i, j;
-    
+
     /* fill in linearly s0=0 s1=1... */
     for (i=0;i<256;i++)
 	text->sbox[i]=i;
-    
+
     j=0;
     for (i = 0; i < 256; i++) {
 	unsigned char tmp;
 	/* j = (j + Si + Ki) mod 256 */
 	j = (j + text->sbox[i] + key[i % keylen]) % 256;
-	
+
 	/* swap Si and Sj */
 	tmp = text->sbox[i];
 	text->sbox[i] = text->sbox[j];
 	text->sbox[j] = tmp;
     }
-    
+
     /* counters initialized to 0 */
     text->i = 0;
     text->j = 0;
@@ -1034,25 +1035,25 @@ static void rc4_encrypt(rc4_context_t *text,
     int t;
     int K;
     const char *input_end = input + len;
-    
+
     while (input < input_end) {
 	i = (i + 1) % 256;
-	
+
 	j = (j + text->sbox[i]) % 256;
-	
+
 	/* swap Si and Sj */
 	tmp = text->sbox[i];
 	text->sbox[i] = text->sbox[j];
 	text->sbox[j] = tmp;
-	
+
 	t = (text->sbox[i] + text->sbox[j]) % 256;
-	
+
 	K = text->sbox[t];
-	
+
 	/* byte K is Xor'ed with plaintext */
 	*output++ = *input++ ^ K;
     }
-    
+
     text->i = i;
     text->j = j;
 }
@@ -1068,25 +1069,25 @@ static void rc4_decrypt(rc4_context_t *text,
     int t;
     int K;
     const char *input_end = input + len;
-    
+
     while (input < input_end) {
 	i = (i + 1) % 256;
-	
+
 	j = (j + text->sbox[i]) % 256;
-	
+
 	/* swap Si and Sj */
 	tmp = text->sbox[i];
 	text->sbox[i] = text->sbox[j];
 	text->sbox[j] = tmp;
-	
+
 	t = (text->sbox[i] + text->sbox[j]) % 256;
-	
+
 	K = text->sbox[t];
-	
+
 	/* byte K is Xor'ed with plaintext */
 	*output++ = *input++ ^ K;
     }
-    
+
     text->i = i;
     text->j = j;
 }
@@ -1103,7 +1104,7 @@ static void free_rc4(context_t *text)
 #endif /* _SUN_SDK_ */
 }
 
-static int init_rc4(context_t *text, 
+static int init_rc4(context_t *text,
 #ifdef _SUN_SDK_
 		    char enckey[16],
 		    char deckey[16])
@@ -1116,7 +1117,7 @@ static int init_rc4(context_t *text,
     text->cipher_enc_context=
 	(cipher_context_t *) text->utils->malloc(sizeof(rc4_context_t));
     if (text->cipher_enc_context == NULL) return SASL_NOMEM;
-    
+
     text->cipher_dec_context=
 	(cipher_context_t *) text->utils->malloc(sizeof(rc4_context_t));
 #ifdef _SUN_SDK_
@@ -1128,13 +1129,13 @@ static int init_rc4(context_t *text,
 #else
     if (text->cipher_dec_context == NULL) return SASL_NOMEM;
 #endif /* _SUN_SDK_ */
-    
+
     /* initialize them */
     rc4_init((rc4_context_t *) text->cipher_enc_context,
              (const unsigned char *) enckey, 16);
     rc4_init((rc4_context_t *) text->cipher_dec_context,
              (const unsigned char *) deckey, 16);
-    
+
     return SASL_OK;
 }
 
@@ -1146,16 +1147,16 @@ static int dec_rc4(context_t *text,
 		   unsigned *outputlen)
 {
     /* decrypt the text part */
-    rc4_decrypt((rc4_context_t *) text->cipher_dec_context, 
+    rc4_decrypt((rc4_context_t *) text->cipher_dec_context,
                 input, output, inputlen-10);
-    
+
     /* decrypt the HMAC part */
-    rc4_decrypt((rc4_context_t *) text->cipher_dec_context, 
+    rc4_decrypt((rc4_context_t *) text->cipher_dec_context,
 		input+(inputlen-10), (char *) digest, 10);
-    
+
     /* no padding so we just subtract the HMAC to get the text length */
     *outputlen = inputlen - 10;
-    
+
     return SASL_OK;
 }
 
@@ -1168,18 +1169,18 @@ static int enc_rc4(context_t *text,
 {
     /* pad is zero */
     *outputlen = inputlen+10;
-    
+
     /* encrypt the text part */
     rc4_encrypt((rc4_context_t *) text->cipher_enc_context,
                 input,
                 output,
                 inputlen);
-    
+
     /* encrypt the HMAC part */
-    rc4_encrypt((rc4_context_t *) text->cipher_enc_context, 
-                (const char *) digest, 
+    rc4_encrypt((rc4_context_t *) text->cipher_enc_context,
+                (const char *) digest,
 		(output)+inputlen, 10);
-    
+
     return SASL_OK;
 }
 
@@ -1242,12 +1243,12 @@ static void slidebits(unsigned char *keybuf, unsigned char *inbuf)
 /*
  * Create encryption and decryption session handle handles for later use.
  * Returns SASL_OK on success - any other return indicates failure.
- * 
+ *
  * free_uef is called to release associated resources by
  *	digestmd5_common_mech_dispose
  */
 
-static int init_uef(context_t *text, 
+static int init_uef(context_t *text,
 		    CK_KEY_TYPE keyType,
 		    CK_MECHANISM_TYPE mech_type,
 		    CK_SLOT_ID slot_id,
@@ -1291,7 +1292,7 @@ static int init_uef(context_t *text,
     enc_context = text->utils->malloc(sizeof (uef_context_t));
     if (enc_context == NULL)
 	return SASL_NOMEM;
-    
+
     rv = C_OpenSession(slot_id, CKF_SERIAL_SESSION, NULL_PTR, NULL_PTR,
 		&enc_context->hSession);
     if (rv != CKR_OK) {
@@ -1380,21 +1381,21 @@ static int init_uef(context_t *text,
     return SASL_OK;
 }
 
-static int init_rc4_uef(context_t *text, 
+static int init_rc4_uef(context_t *text,
 		    char enckey[16],
 		    char deckey[16])
 {
     return init_uef(text, CKK_RC4, CKM_RC4, rc4_slot_id, enckey, deckey);
 }
 
-static int init_des_uef(context_t *text, 
+static int init_des_uef(context_t *text,
 		    char enckey[16],
 		    char deckey[16])
 {
     return init_uef(text, CKK_DES, CKM_DES_CBC, des_slot_id, enckey, deckey);
 }
 
-static int init_3des_uef(context_t *text, 
+static int init_3des_uef(context_t *text,
 		    char enckey[16],
 		    char deckey[16])
 {
@@ -1411,7 +1412,7 @@ free_uef(context_t *text)
     CK_RV		rv;
     unsigned char 	buf[1];
     CK_ULONG		ulLen = 0;
-    
+
 
     if (enc_context != NULL) {
 	rv = C_EncryptFinal(enc_context->hSession, buf, &ulLen);
@@ -1665,54 +1666,54 @@ static int create_layer_keys(context_t *text,
 			     char enckey[16], char deckey[16])
 {
     MD5_CTX Md5Ctx;
-    
+
     utils->MD5Init(&Md5Ctx);
     utils->MD5Update(&Md5Ctx, key, keylen);
     if (text->i_am == SERVER) {
-	utils->MD5Update(&Md5Ctx, (const unsigned char *) SEALING_SERVER_CLIENT, 
+	utils->MD5Update(&Md5Ctx, (const unsigned char *) SEALING_SERVER_CLIENT,
 			 strlen(SEALING_SERVER_CLIENT));
     } else {
 	utils->MD5Update(&Md5Ctx, (const unsigned char *) SEALING_CLIENT_SERVER,
 			 strlen(SEALING_CLIENT_SERVER));
     }
     utils->MD5Final((unsigned char *) enckey, &Md5Ctx);
-    
+
     utils->MD5Init(&Md5Ctx);
     utils->MD5Update(&Md5Ctx, key, keylen);
     if (text->i_am != SERVER) {
-	utils->MD5Update(&Md5Ctx, (const unsigned char *)SEALING_SERVER_CLIENT, 
+	utils->MD5Update(&Md5Ctx, (const unsigned char *)SEALING_SERVER_CLIENT,
 			 strlen(SEALING_SERVER_CLIENT));
     } else {
 	utils->MD5Update(&Md5Ctx, (const unsigned char *)SEALING_CLIENT_SERVER,
 			 strlen(SEALING_CLIENT_SERVER));
     }
     utils->MD5Final((unsigned char *) deckey, &Md5Ctx);
-    
+
     /* create integrity keys */
     /* sending */
     utils->MD5Init(&Md5Ctx);
     utils->MD5Update(&Md5Ctx, text->HA1, HASHLEN);
     if (text->i_am == SERVER) {
-	utils->MD5Update(&Md5Ctx, (const unsigned char *)SIGNING_SERVER_CLIENT, 
+	utils->MD5Update(&Md5Ctx, (const unsigned char *)SIGNING_SERVER_CLIENT,
 			 strlen(SIGNING_SERVER_CLIENT));
     } else {
 	utils->MD5Update(&Md5Ctx, (const unsigned char *)SIGNING_CLIENT_SERVER,
 			 strlen(SIGNING_CLIENT_SERVER));
     }
     utils->MD5Final(text->Ki_send, &Md5Ctx);
-    
+
     /* receiving */
     utils->MD5Init(&Md5Ctx);
     utils->MD5Update(&Md5Ctx, text->HA1, HASHLEN);
     if (text->i_am != SERVER) {
-	utils->MD5Update(&Md5Ctx, (const unsigned char *)SIGNING_SERVER_CLIENT, 
+	utils->MD5Update(&Md5Ctx, (const unsigned char *)SIGNING_SERVER_CLIENT,
 			 strlen(SIGNING_SERVER_CLIENT));
     } else {
 	utils->MD5Update(&Md5Ctx, (const unsigned char *)SIGNING_CLIENT_SERVER,
 			 strlen(SIGNING_CLIENT_SERVER));
     }
     utils->MD5Final(text->Ki_receive, &Md5Ctx);
-    
+
     return SASL_OK;
 }
 
@@ -1735,12 +1736,12 @@ digestmd5_privacy_encode(void *context,
     char *out;
     unsigned char digest[16];
     struct buffer_info *inblob, bufinfo;
-    
+
     if(!context || !invec || !numiov || !output || !outputlen) {
 	PARAMERROR(text->utils);
 	return SASL_BADPARAM;
     }
-    
+
     if (numiov > 1) {
 	ret = _plug_iovec_to_buf(text->utils, invec, numiov, &text->enc_in_buf);
 	if (ret != SASL_OK) return ret;
@@ -1751,7 +1752,7 @@ digestmd5_privacy_encode(void *context,
 	bufinfo.curlen = invec[0].iov_len;
 	inblob = &bufinfo;
     }
-    
+
     /* make sure the output buffer is big enough for this blob */
     ret = _plug_buf_alloc(text->utils, &(text->encode_buf),
 			  &(text->encode_buf_len),
@@ -1762,48 +1763,48 @@ digestmd5_privacy_encode(void *context,
 			   6 +                        /* for padding */
 			   1));                       /* trailing null */
     if(ret != SASL_OK) return ret;
-    
+
     /* skip by the length for now */
     out = (text->encode_buf)+4;
-    
+
     /* construct (seqnum, msg) */
     /* We can just use the output buffer because it's big enough */
     tmpnum = htonl(text->seqnum);
     memcpy(text->encode_buf, &tmpnum, 4);
     memcpy(text->encode_buf + 4, inblob->data, inblob->curlen);
-    
+
     /* HMAC(ki, (seqnum, msg) ) */
     text->utils->hmac_md5((const unsigned char *) text->encode_buf,
-			  inblob->curlen + 4, 
+			  inblob->curlen + 4,
 			  text->Ki_send, HASHLEN, digest);
-    
+
     /* calculate the encrypted part */
     text->cipher_enc(text, inblob->data, inblob->curlen,
 		     digest, out, outputlen);
     out+=(*outputlen);
-    
+
     /* copy in version */
     tmpshort = htons(version);
     memcpy(out, &tmpshort, 2);	/* 2 bytes = version */
-    
+
     out+=2;
     (*outputlen)+=2; /* for version */
-    
+
     /* put in seqnum */
     tmpnum = htonl(text->seqnum);
-    memcpy(out, &tmpnum, 4);	/* 4 bytes = seq # */  
-    
+    memcpy(out, &tmpnum, 4);	/* 4 bytes = seq # */
+
     (*outputlen)+=4; /* for seqnum */
-    
+
     /* put the 1st 4 bytes in */
-    tmp=htonl(*outputlen);  
+    tmp=htonl(*outputlen);
     memcpy(text->encode_buf, &tmp, 4);
-    
+
     (*outputlen)+=4;
-    
+
     *output = text->encode_buf;
     text->seqnum++;
-    
+
     return SASL_OK;
 }
 
@@ -1821,39 +1822,39 @@ digestmd5_privacy_decode_once(void *context,
     unsigned char digest[16];
     int tmpnum;
     int lup;
-    
+
     if (text->needsize>0) /* 4 bytes for how long message is */
 	{
 	    /* if less than 4 bytes just copy those we have into text->size */
-	    if (*inputlen<4) 
+	    if (*inputlen<4)
 		tocopy=*inputlen;
 	    else
 		tocopy=4;
-	    
+
 	    if (tocopy>text->needsize)
 		tocopy=text->needsize;
-	    
+
 	    memcpy(text->sizebuf+4-text->needsize, *input, tocopy);
 	    text->needsize-=tocopy;
-	    
+
 	    *input+=tocopy;
 	    *inputlen-=tocopy;
-	    
+
 	    if (text->needsize==0) /* got all of size */
 	    {
 		memcpy(&(text->size), text->sizebuf, 4);
 		text->cursize=0;
 		text->size=ntohl(text->size);
-		
+
 		if (text->size > text->in_maxbuf) {
 		    return SASL_FAIL; /* too big probably error */
 		}
-		
+
 		if(!text->buffer)
 		    text->buffer=text->utils->malloc(text->size+5);
 		else
 		    text->buffer=text->utils->realloc(text->buffer,
-						      text->size+5);	    
+						      text->size+5);
 		if (text->buffer == NULL) return SASL_NOMEM;
 	    }
 
@@ -1861,16 +1862,16 @@ digestmd5_privacy_decode_once(void *context,
 	    *output=NULL;
 	    if (*inputlen==0) /* have to wait until next time for data */
 		return SASL_OK;
-	    
+
 	    if (text->size==0)  /* should never happen */
 		return SASL_FAIL;
 	}
-    
+
     diff=text->size - text->cursize; /* bytes need for full message */
-    
+
     if (! text->buffer)
 	return SASL_FAIL;
-    
+
     if (*inputlen < diff) /* not enough for a decode */
     {
 	memcpy(text->buffer+text->cursize, *input, *inputlen);
@@ -1881,30 +1882,30 @@ digestmd5_privacy_decode_once(void *context,
 	return SASL_OK;
     } else {
 	memcpy(text->buffer+text->cursize, *input, diff);
-	*input+=diff;      
+	*input+=diff;
 	*inputlen-=diff;
     }
-    
+
     {
 	unsigned short ver;
 	unsigned int seqnum;
 	unsigned char checkdigest[16];
-	
+
 	result = _plug_buf_alloc(text->utils, &text->decode_once_buf,
 				 &text->decode_once_buf_len,
 				 text->size-6);
 	if (result != SASL_OK)
 	    return result;
-	
+
 	*output = text->decode_once_buf;
 	*outputlen = *inputlen;
-	
+
 	result=text->cipher_dec(text,text->buffer,text->size-6,digest,
 				*output, outputlen);
-	
+
 	if (result!=SASL_OK)
 	    return result;
-	
+
 	{
 	    int i;
 	    for(i=10; i; i--) {
@@ -1912,7 +1913,7 @@ digestmd5_privacy_decode_once(void *context,
 		ver=ntohs(ver);
 	    }
 	}
-	
+
 	/* check the version number */
 	memcpy(&ver, text->buffer+text->size-6, 2);
 	ver=ntohs(ver);
@@ -1926,23 +1927,23 @@ digestmd5_privacy_decode_once(void *context,
 #endif /* _INTEGRATED_SOLARIS_ */
 	    return SASL_FAIL;
 	}
-	
+
 	/* check the CMAC */
-	
+
 	/* construct (seqnum, msg) */
 	result = _plug_buf_alloc(text->utils, &text->decode_tmp_buf,
 				 &text->decode_tmp_buf_len, *outputlen + 4);
 	if(result != SASL_OK) return result;
-	
+
 	tmpnum = htonl(text->rec_seqnum);
 	memcpy(text->decode_tmp_buf, &tmpnum, 4);
 	memcpy(text->decode_tmp_buf + 4, *output, *outputlen);
-	
+
 	/* HMAC(ki, (seqnum, msg) ) */
 	text->utils->hmac_md5((const unsigned char *) text->decode_tmp_buf,
-			      (*outputlen) + 4, 
+			      (*outputlen) + 4,
 			      text->Ki_receive, HASHLEN, checkdigest);
-	
+
 	/* now check it */
 	for (lup=0;lup<10;lup++)
 	    if (checkdigest[lup]!=digest[lup])
@@ -1956,12 +1957,12 @@ digestmd5_privacy_decode_once(void *context,
 					  "CMAC doesn't match at byte %d!", lup);
 		    return SASL_FAIL;
 #endif /* _SUN_SDK_ */
-		} 
-	
+		}
+
 	/* check the sequence number */
 	memcpy(&seqnum, text->buffer+text->size-4,4);
 	seqnum=ntohl(seqnum);
-	
+
 	if (seqnum!=text->rec_seqnum)
 	    {
 #ifdef _SUN_SDK_
@@ -1973,12 +1974,12 @@ digestmd5_privacy_decode_once(void *context,
 #endif /* _SUN_SDK_ */
 		return SASL_FAIL;
 	    }
-	
+
 	text->rec_seqnum++; /* now increment it */
     }
-    
+
     text->needsize=4;
-    
+
     return SASL_OK;
 }
 
@@ -1988,13 +1989,13 @@ static int digestmd5_privacy_decode(void *context,
 {
     context_t *text = (context_t *) context;
     int ret;
-    
+
     ret = _plug_decode(text->utils, context, input, inputlen,
 		       &text->decode_buf, &text->decode_buf_len, outputlen,
 		       digestmd5_privacy_decode_once);
-    
+
     *output = text->decode_buf;
-    
+
     return ret;
 }
 
@@ -2011,12 +2012,12 @@ digestmd5_integrity_encode(void *context,
     unsigned short int tmpshort;
     struct buffer_info *inblob, bufinfo;
     int ret;
-    
+
     if(!context || !invec || !numiov || !output || !outputlen) {
 	PARAMERROR( text->utils );
 	return SASL_BADPARAM;
     }
-    
+
     if (numiov > 1) {
 	ret = _plug_iovec_to_buf(text->utils, invec, numiov,
 				 &text->enc_in_buf);
@@ -2028,51 +2029,51 @@ digestmd5_integrity_encode(void *context,
 	bufinfo.curlen = invec[0].iov_len;
 	inblob = &bufinfo;
     }
-    
+
     /* construct output */
     *outputlen = 4 + inblob->curlen + 16;
-    
+
     ret = _plug_buf_alloc(text->utils, &(text->encode_buf),
 			  &(text->encode_buf_len), *outputlen);
     if(ret != SASL_OK) return ret;
-    
+
     /* construct (seqnum, msg) */
     /* we can just use the output buffer */
     tmpnum = htonl(text->seqnum);
     memcpy(text->encode_buf, &tmpnum, 4);
     memcpy(text->encode_buf + 4, inblob->data, inblob->curlen);
-    
+
     /* HMAC(ki, (seqnum, msg) ) */
 #ifdef _SUN_SDK_
     text->utils->hmac_md5((unsigned char *)text->encode_buf,
-			  inblob->curlen + 4, 
+			  inblob->curlen + 4,
 			  text->Ki_send, HASHLEN, MAC);
 #else
-    text->utils->hmac_md5(text->encode_buf, inblob->curlen + 4, 
+    text->utils->hmac_md5(text->encode_buf, inblob->curlen + 4,
 			  text->Ki_send, HASHLEN, MAC);
 #endif /* _SUN_SDK_ */
-    
+
     /* create MAC */
     tmpshort = htons(version);
     memcpy(MAC + 10, &tmpshort, MAC_OFFS);	/* 2 bytes = version */
-    
+
     tmpnum = htonl(text->seqnum);
     memcpy(MAC + 12, &tmpnum, 4);	/* 4 bytes = sequence number */
-    
+
     /* copy into output */
     tmpnum = htonl((*outputlen) - 4);
-    
+
     /* length of message in network byte order */
     memcpy(text->encode_buf, &tmpnum, 4);
     /* the message text */
     memcpy(text->encode_buf + 4, inblob->data, inblob->curlen);
     /* the MAC */
     memcpy(text->encode_buf + 4 + inblob->curlen, MAC, 16);
-    
+
     text->seqnum++;		/* add one to sequence number */
-    
+
     *output = text->encode_buf;
-    
+
     return SASL_OK;
 }
 
@@ -2084,39 +2085,39 @@ create_MAC(context_t * text,
 	   unsigned char MAC[16])
 {
     unsigned int    tmpnum;
-    unsigned short int tmpshort;  
+    unsigned short int tmpshort;
     int ret;
-    
+
     if (inputlen < 0)
 	return SASL_FAIL;
-    
+
     ret = _plug_buf_alloc(text->utils, &(text->MAC_buf),
 			  &(text->MAC_buf_len), inputlen + 4);
     if(ret != SASL_OK) return ret;
-    
+
     /* construct (seqnum, msg) */
     tmpnum = htonl(seqnum);
     memcpy(text->MAC_buf, &tmpnum, 4);
     memcpy(text->MAC_buf + 4, input, inputlen);
-    
+
     /* HMAC(ki, (seqnum, msg) ) */
 #ifdef _SUN_SDK_
-    text->utils->hmac_md5((unsigned char *)text->MAC_buf, inputlen + 4, 
+    text->utils->hmac_md5((unsigned char *)text->MAC_buf, inputlen + 4,
 			  text->Ki_receive, HASHLEN,
 			  MAC);
 #else
-    text->utils->hmac_md5(text->MAC_buf, inputlen + 4, 
+    text->utils->hmac_md5(text->MAC_buf, inputlen + 4,
 			  text->Ki_receive, HASHLEN,
 			  MAC);
 #endif /* _SUN_SDK_ */
-    
+
     /* create MAC */
     tmpshort = htons(version);
     memcpy(MAC + 10, &tmpshort, 2);	/* 2 bytes = version */
-    
+
     tmpnum = htonl(seqnum);
     memcpy(MAC + 12, &tmpnum, 4);	/* 4 bytes = sequence number */
-    
+
     return SASL_OK;
 }
 
@@ -2127,11 +2128,11 @@ check_integrity(context_t * text,
 {
     unsigned char MAC[16];
     int result;
-    
+
     result = create_MAC(text, buf, bufsize - 16, text->rec_seqnum, MAC);
     if (result != SASL_OK)
 	return result;
-    
+
     /* make sure the MAC is right */
     if (strncmp((char *) MAC, buf + bufsize - 16, 16) != 0)
     {
@@ -2144,21 +2145,21 @@ check_integrity(context_t * text,
 	return SASL_FAIL;
 #endif /* _SUN_SDK_ */
     }
-    
+
     text->rec_seqnum++;
-    
+
     /* ok make output message */
     result = _plug_buf_alloc(text->utils, &text->decode_once_buf,
 			     &text->decode_once_buf_len,
 			     bufsize - 15);
     if (result != SASL_OK)
 	return result;
-    
+
     *output = text->decode_once_buf;
     memcpy(*output, buf, bufsize - 16);
     *outputlen = bufsize - 16;
     (*output)[*outputlen] = 0;
-    
+
     return SASL_OK;
 }
 
@@ -2173,7 +2174,7 @@ digestmd5_integrity_decode_once(void *context,
     unsigned int    tocopy;
     unsigned        diff;
     int             result;
-    
+
     if (text->needsize > 0) {	/* 4 bytes for how long message is */
 	/*
 	 * if less than 4 bytes just copy those we have into text->size
@@ -2182,24 +2183,24 @@ digestmd5_integrity_decode_once(void *context,
 	    tocopy = *inputlen;
 	else
 	    tocopy = 4;
-	
+
 	if (tocopy > text->needsize)
 	    tocopy = text->needsize;
-	
+
 	memcpy(text->sizebuf + 4 - text->needsize, *input, tocopy);
 	text->needsize -= tocopy;
-	
+
 	*input += tocopy;
 	*inputlen -= tocopy;
-	
+
 	if (text->needsize == 0) {	/* got all of size */
 	    memcpy(&(text->size), text->sizebuf, 4);
 	    text->cursize = 0;
 	    text->size = ntohl(text->size);
-	    
+
 	    if (text->size > text->in_maxbuf)
 		return SASL_FAIL;	/* too big probably error */
-	    
+
 	    if(!text->buffer)
 		text->buffer=text->utils->malloc(text->size+5);
 	    else
@@ -2210,15 +2211,15 @@ digestmd5_integrity_decode_once(void *context,
 	*output = NULL;
 	if (*inputlen == 0)		/* have to wait until next time for data */
 	    return SASL_OK;
-	
+
 	if (text->size == 0)	/* should never happen */
 	    return SASL_FAIL;
     }
     diff = text->size - text->cursize;	/* bytes need for full message */
-    
+
     if(! text->buffer)
 	return SASL_FAIL;
-    
+
     if (*inputlen < diff) {	/* not enough for a decode */
 	memcpy(text->buffer + text->cursize, *input, *inputlen);
 	text->cursize += *inputlen;
@@ -2231,7 +2232,7 @@ digestmd5_integrity_decode_once(void *context,
 	*input += diff;
 	*inputlen -= diff;
     }
-    
+
     result = check_integrity(text, text->buffer, text->size,
 			     output, outputlen);
     if (result != SASL_OK)
@@ -2239,7 +2240,7 @@ digestmd5_integrity_decode_once(void *context,
 
     /* Reset State */
     text->needsize = 4;
-    
+
     return SASL_OK;
 }
 
@@ -2249,13 +2250,13 @@ static int digestmd5_integrity_decode(void *context,
 {
     context_t *text = (context_t *) context;
     int ret;
-    
+
     ret = _plug_decode(text->utils, context, input, inputlen,
 		       &text->decode_buf, &text->decode_buf_len, outputlen,
 		       digestmd5_integrity_decode_once);
-    
+
     *output = text->decode_buf;
-    
+
     return ret;
 }
 
@@ -2263,19 +2264,19 @@ static void
 digestmd5_common_mech_dispose(void *conn_context, const sasl_utils_t *utils)
 {
     context_t *text = (context_t *) conn_context;
-    
+
     if (!text || !utils) return;
-    
+
     if (text->authid) utils->free(text->authid);
     if (text->realm) utils->free(text->realm);
     if (text->nonce) utils->free(text->nonce);
     if (text->cnonce) utils->free(text->cnonce);
 
     if (text->cipher_free) text->cipher_free(text);
-    
+
     /* free the stuff in the context */
     if (text->response_value) utils->free(text->response_value);
-    
+
     if (text->buffer) utils->free(text->buffer);
     if (text->encode_buf) utils->free(text->encode_buf);
     if (text->decode_buf) utils->free(text->decode_buf);
@@ -2283,12 +2284,12 @@ digestmd5_common_mech_dispose(void *conn_context, const sasl_utils_t *utils)
     if (text->decode_tmp_buf) utils->free(text->decode_tmp_buf);
     if (text->out_buf) utils->free(text->out_buf);
     if (text->MAC_buf) utils->free(text->MAC_buf);
-    
+
     if (text->enc_in_buf) {
 	if (text->enc_in_buf->data) utils->free(text->enc_in_buf->data);
 	utils->free(text->enc_in_buf);
     }
-    
+
     utils->free(conn_context);
 }
 
@@ -2315,7 +2316,7 @@ digestmd5_common_mech_free(void *glob_context, const sasl_utils_t *utils)
 {
     reauth_cache_t *reauth_cache = (reauth_cache_t *) glob_context;
     size_t n;
-    
+
     if (!reauth_cache) return;
 
     for (n = 0; n < reauth_cache->size; n++)
@@ -2347,7 +2348,7 @@ DigestCalcHA1FromSecret(context_t * text,
 			HASHHEX SessionKey)
 {
     MD5_CTX Md5Ctx;
-    
+
     /* calculate session key */
     utils->MD5Init(&Md5Ctx);
     utils->MD5Update(&Md5Ctx, HA1, HASHLEN);
@@ -2360,10 +2361,10 @@ DigestCalcHA1FromSecret(context_t * text,
 	utils->MD5Update(&Md5Ctx, authorization_id, strlen((char *) authorization_id));
     }
     utils->MD5Final(HA1, &Md5Ctx);
-    
+
     CvtHex(HA1, SessionKey);
-    
-    
+
+
     /* save HA1 because we need it to make the privacy and integrity keys */
     memcpy(text->HA1, HA1, sizeof(HASH));
 }
@@ -2383,10 +2384,10 @@ static char *create_response(context_t * text,
     HASHHEX         HEntity = "00000000000000000000000000000000";
     HASHHEX         Response;
     char           *result;
-    
+
     if (qop == NULL)
 	qop = "auth";
-    
+
     DigestCalcHA1FromSecret(text,
 			    utils,
 			    Secret,
@@ -2394,7 +2395,7 @@ static char *create_response(context_t * text,
 			    nonce,
 			    cnonce,
 			    SessionKey);
-    
+
     DigestCalcResponse(utils,
 		       SessionKey,/* H(A1) */
 		       nonce,	/* nonce from server */
@@ -2407,7 +2408,7 @@ static char *create_response(context_t * text,
 		       HEntity,	/* H(entity body) if qop="auth-int" */
 		       Response	/* request-digest or response-digest */
 	);
-    
+
     result = utils->malloc(HASHHEXLEN + 1);
 #ifdef _SUN_SDK_
     if (result == NULL)
@@ -2416,7 +2417,7 @@ static char *create_response(context_t * text,
 /* TODO */
     memcpy(result, Response, HASHHEXLEN);
     result[HASHHEXLEN] = 0;
-    
+
     /* response_value (used for reauth i think */
     if (response_value != NULL) {
 	DigestCalcResponse(utils,
@@ -2431,7 +2432,7 @@ static char *create_response(context_t * text,
 			   HEntity,	/* H(entity body) if qop="auth-int" */
 			   Response	/* request-digest or response-digest */
 	    );
-	
+
 	*response_value = utils->malloc(HASHHEXLEN + 1);
 	if (*response_value == NULL)
 	    return NULL;
@@ -2472,7 +2473,7 @@ get_server_realm(sasl_server_params_t * params,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
+
     return SASL_OK;
 }
 
@@ -2483,7 +2484,7 @@ static int htoi(unsigned char *hexin, unsigned int *res)
 {
     int             lup, inlen;
     inlen = strlen((char *) hexin);
-    
+
     *res = 0;
     for (lup = 0; lup < inlen; lup++) {
 	switch (hexin[lup]) {
@@ -2499,7 +2500,7 @@ static int htoi(unsigned char *hexin, unsigned int *res)
 	case '9':
 	    *res = (*res << 4) + (hexin[lup] - '0');
 	    break;
-	    
+
 	case 'a':
 	case 'b':
 	case 'c':
@@ -2508,7 +2509,7 @@ static int htoi(unsigned char *hexin, unsigned int *res)
 	case 'f':
 	    *res = (*res << 4) + (hexin[lup] - 'a' + 10);
 	    break;
-	    
+
 	case 'A':
 	case 'B':
 	case 'C':
@@ -2517,13 +2518,13 @@ static int htoi(unsigned char *hexin, unsigned int *res)
 	case 'F':
 	    *res = (*res << 4) + (hexin[lup] - 'A' + 10);
 	    break;
-	    
+
 	default:
 	    return SASL_BADPARAM;
 	}
-	
+
     }
-    
+
     return SASL_OK;
 }
 
@@ -2534,17 +2535,17 @@ static int digestmd5_server_mech_new(void *glob_context,
 				     void **conn_context)
 {
     context_t *text;
-    
+
     /* holds state are in -- allocate server size */
     text = sparams->utils->malloc(sizeof(server_context_t));
     if (text == NULL)
 	return SASL_NOMEM;
     memset(text, 0, sizeof(server_context_t));
-    
+
     text->state = 1;
     text->i_am = SERVER;
     text->reauth = glob_context;
-    
+
     *conn_context = text;
     return SASL_OK;
 }
@@ -2568,14 +2569,14 @@ digestmd5_server_mech_step1(server_context_t *stext,
     unsigned       resplen;
     int added_conf = 0;
     char maxbufstr[64];
-    
+
     sparams->utils->log(sparams->utils->conn, SASL_LOG_DEBUG,
 			"DIGEST-MD5 server step 1");
 
     /* get realm */
     result = get_server_realm(sparams, &realm);
     if(result != SASL_OK) return result;
-    
+
     /* what options should we offer the client? */
     qop[0] = '\0';
     cipheropts[0] = '\0';
@@ -2587,7 +2588,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 	if (*qop) strcat(qop, ",");
 	strcat(qop, "auth-int");
     }
-    
+
 #ifdef USE_UEF_SERVER
     cipher = available_ciphers1;
 #else
@@ -2615,18 +2616,18 @@ digestmd5_server_mech_step1(server_context_t *stext,
 	}
 	cipher++;
     }
-    
+
     if (*qop == '\0') {
 	/* we didn't allow anything?!? we'll return SASL_TOOWEAK, since
 	   that's close enough */
 	return SASL_TOOWEAK;
     }
-    
+
     /*
      * digest-challenge  = 1#( realm | nonce | qop-options | stale | maxbuf |
      * charset | cipher-opts | auth-param )
      */
-    
+
 #ifndef _SUN_SDK_
     /* FIXME: get nonce XXX have to clean up after self if fail */
 #endif /* !_SUN_SDK_ */
@@ -2641,7 +2642,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
+
 #ifdef _SUN_SDK_
     resplen = strlen((char *)nonce) + strlen("nonce") + 5;
 #else
@@ -2657,9 +2658,9 @@ digestmd5_server_mech_step1(server_context_t *stext,
 #else
     if(result != SASL_OK) return result;
 #endif /* _SUN_SDK_ */
-    
+
     sprintf(text->out_buf, "nonce=\"%s\"", nonce);
-    
+
     /* add to challenge; if we chose not to specify a realm, we won't
      * send one to the client */
     if (realm && add_to_challenge(sparams->utils,
@@ -2682,11 +2683,11 @@ digestmd5_server_mech_step1(server_context_t *stext,
      * authentication with integrity protection; the value "auth-conf"
      * indicates authentication with integrity protection and encryption.
      */
-    
+
     /* add qop to challenge */
     if (add_to_challenge(sparams->utils,
 			 &text->out_buf, &text->out_buf_len, &resplen,
-			 "qop", 
+			 "qop",
 			 (unsigned char *) qop, TRUE) != SASL_OK) {
 #ifdef _SUN_SDK_
 	sparams->utils->log(sparams->utils->conn, SASL_LOG_ERR,
@@ -2697,7 +2698,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
+
     /*
      *  Cipheropts - list of ciphers server supports
      */
@@ -2706,7 +2707,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 	{
 	    if (add_to_challenge(sparams->utils,
 				 &text->out_buf, &text->out_buf_len, &resplen,
-				 "cipher", (unsigned char *) cipheropts, 
+				 "cipher", (unsigned char *) cipheropts,
 				 TRUE) != SASL_OK) {
 #ifdef _SUN_SDK_
 		sparams->utils->log(sparams->utils->conn, SASL_LOG_ERR,
@@ -2719,7 +2720,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 		return SASL_FAIL;
 	    }
 	}
-    
+
     /* "stale" is true if a reauth failed because of a nonce timeout */
     if (stext->stale &&
 	add_to_challenge(sparams->utils,
@@ -2735,7 +2736,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
+
     /*
      * maxbuf A number indicating the size of the largest buffer the server
      * is able to receive when using "auth-int". If this directive is
@@ -2748,7 +2749,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 		 sparams->props.maxbufsize);
 	if (add_to_challenge(sparams->utils,
 			     &text->out_buf, &text->out_buf_len, &resplen,
-			     "maxbuf", 
+			     "maxbuf",
 			     (unsigned char *) maxbufstr, FALSE) != SASL_OK) {
 #ifdef _SUN_SDK_
 	    sparams->utils->log(sparams->utils->conn, SASL_LOG_ERR,
@@ -2760,11 +2761,11 @@ digestmd5_server_mech_step1(server_context_t *stext,
 	    return SASL_FAIL;
 	}
     }
-    
+
 
     if (add_to_challenge(sparams->utils,
 			 &text->out_buf, &text->out_buf_len, &resplen,
-			 "charset", 
+			 "charset",
 			 (unsigned char *) charset, FALSE) != SASL_OK) {
 #ifdef _SUN_SDK_
 	sparams->utils->log(sparams->utils->conn, SASL_LOG_ERR,
@@ -2775,19 +2776,19 @@ digestmd5_server_mech_step1(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
-    
+
+
     /*
-     * algorithm 
-     *  This directive is required for backwards compatibility with HTTP 
-     *  Digest., which supports other algorithms. . This directive is 
-     *  required and MUST appear exactly once; if not present, or if multiple 
-     *  instances are present, the client should abort the authentication 
-     *  exchange. 
+     * algorithm
+     *  This directive is required for backwards compatibility with HTTP
+     *  Digest., which supports other algorithms. . This directive is
+     *  required and MUST appear exactly once; if not present, or if multiple
+     *  instances are present, the client should abort the authentication
+     *  exchange.
      *
-     * algorithm         = "algorithm" "=" "md5-sess" 
+     * algorithm         = "algorithm" "=" "md5-sess"
      */
-    
+
     if (add_to_challenge(sparams->utils,
 			 &text->out_buf, &text->out_buf_len, &resplen,
 			 "algorithm",
@@ -2801,7 +2802,7 @@ digestmd5_server_mech_step1(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
+
     /*
      * The size of a digest-challenge MUST be less than 2048 bytes!!!
      */
@@ -2823,12 +2824,12 @@ digestmd5_server_mech_step1(server_context_t *stext,
     text->nonce_count = 1;
     text->cnonce = NULL;
     stext->timestamp = time(0);
-    
+
     *serveroutlen = strlen(text->out_buf);
     *serverout = text->out_buf;
-    
+
     text->state = 2;
-    
+
     return SASL_CONTINUE;
 }
 
@@ -2854,28 +2855,28 @@ digestmd5_server_mech_step2(server_context_t *stext,
     char           *qop = NULL;
     char           *digesturi = NULL;
     char           *response = NULL;
-    
+
     /* setting the default value (65536) */
     unsigned int    client_maxbuf = 65536;
     int             maxbuf_count = 0;  /* How many maxbuf instaces was found */
-    
+
     char           *charset = NULL;
     char           *cipher = NULL;
     unsigned int   n=0;
-    
+
     HASH            A1;
-    
+
     /* password prop_request */
     const char *password_request[] = { SASL_AUX_PASSWORD,
 				       "*cmusaslsecretDIGEST-MD5",
 				       NULL };
     unsigned len;
     struct propval auxprop_values[2];
-    
+
     /* can we mess with clientin? copy it to be safe */
     char           *in_start = NULL;
-    char           *in = NULL; 
-    
+    char           *in = NULL;
+
     sparams->utils->log(sparams->utils->conn, SASL_LOG_DEBUG,
 			"DIGEST-MD5 server step 2");
 
@@ -2883,29 +2884,29 @@ digestmd5_server_mech_step2(server_context_t *stext,
 #ifdef _SUN_SDK_
     if (!in) return SASL_NOMEM;
 #endif /* _SUN_SDK_ */
-    
+
     memcpy(in, clientin, clientinlen);
     in[clientinlen] = 0;
-    
+
     in_start = in;
-    
-    
+
+
     /* parse what we got */
     while (in[0] != '\0') {
 	char           *name = NULL, *value = NULL;
 	get_pair(&in, &name, &value);
-	
+
 	if (name == NULL)
 	    break;
-	
+
 	/* Extracting parameters */
-	
+
 	/*
 	 * digest-response  = 1#( username | realm | nonce | cnonce |
 	 * nonce-count | qop | digest-uri | response | maxbuf | charset |
 	 * cipher | auth-param )
 	 */
-	
+
 	if (strcasecmp(name, "username") == 0) {
 	    _plug_strdup(sparams->utils, value, &username, NULL);
 	} else if (strcasecmp(name, "authzid") == 0) {
@@ -2947,7 +2948,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	    /*
 	     * digest-uri-value  = serv-type "/" host [ "/" serv-name ]
 	     */
- 
+
 	    _plug_strdup(sparams->utils, value, &digesturi, NULL);
 
 	    /* verify digest-uri format */
@@ -2961,14 +2962,14 @@ digestmd5_server_mech_step2(server_context_t *stext,
 		sparams->utils->log(sparams->utils->conn, SASL_LOG_ERR,
 				    "bad digest-uri: doesn't match service");
 #else
-                SETERROR(sparams->utils, 
+                SETERROR(sparams->utils,
                          "bad digest-uri: doesn't match service");
 #endif /* _SUN_SDK_ */
                 goto FreeAllMem;
             }
 
             /* xxx we don't verify the hostname component */
-            
+
 	} else if (strcasecmp(name, "response") == 0) {
 	    _plug_strdup(sparams->utils, value, &response, NULL);
 	} else if (strcasecmp(name, "cipher") == 0) {
@@ -3025,7 +3026,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 				name, value);
 	}
     }
-    
+
     /*
      * username         = "username" "=" <"> username-value <">
      * username-value   = qdstr-val cnonce           = "cnonce" "=" <">
@@ -3144,7 +3145,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	result = SASL_BADAUTH;
 	goto FreeAllMem;
     }
-	    
+
     result = sparams->utils->prop_request(sparams->propctx, password_request);
     if(result != SASL_OK) {
 #ifdef _SUN_SDK_
@@ -3155,7 +3156,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	goto FreeAllMem;
     }
-    
+
     /* this will trigger the getting of the aux properties */
     /* Note that if we don't have an authorization id, we don't use it... */
     result = sparams->canon_user(sparams->utils->conn,
@@ -3169,7 +3170,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	goto FreeAllMem;
     }
-    
+
     if (!authorization_id || !*authorization_id) {
 	result = sparams->canon_user(sparams->utils->conn,
 				     username, 0, SASL_CU_AUTHZID, oparams);
@@ -3178,7 +3179,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 				     authorization_id, 0, SASL_CU_AUTHZID,
 				     oparams);
     }
-    
+
     if (result != SASL_OK) {
 #ifdef _SUN_SDK_
 	sparams->utils->log(sparams->utils->conn, SASL_LOG_ERR,
@@ -3188,7 +3189,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 #endif /* _SUN_SDK_ */
 	goto FreeAllMem;
     }
-    
+
     result = sparams->utils->prop_getnames(sparams->propctx, password_request,
 					   auxprop_values);
     if (result < 0 ||
@@ -3205,7 +3206,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	result = SASL_NOUSER;
 	goto FreeAllMem;
     }
-    
+
     if (auxprop_values[0].name && auxprop_values[0].values) {
 	len = strlen(auxprop_values[0].values[0]);
 	if (len == 0) {
@@ -3219,7 +3220,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	    result = SASL_FAIL;
 	    goto FreeAllMem;
 	}
-	
+
 	sec = sparams->utils->malloc(sizeof(sasl_secret_t) + len);
 	if (!sec) {
 #ifdef _SUN_SDK_
@@ -3231,25 +3232,25 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	    result = SASL_FAIL;
 	    goto FreeAllMem;
 	}
-	
+
 	sec->len = len;
 #ifdef _SUN_SDK_
-	strncpy((char *)sec->data, auxprop_values[0].values[0], len + 1); 
+	strncpy((char *)sec->data, auxprop_values[0].values[0], len + 1);
 #else
-	strncpy(sec->data, auxprop_values[0].values[0], len + 1); 
+	strncpy(sec->data, auxprop_values[0].values[0], len + 1);
 #endif /* _SUN_SDK_ */
-	
+
 	/*
 	 * Verifying response obtained from client
-	 * 
+	 *
 	 * H_URP = H({ username-value,":",realm-value,":",passwd}) sec->data
 	 * contains H_URP
 	 */
-	
+
 	/* Calculate the secret from the plaintext password */
 	{
 	    HASH HA1;
-	    
+
 #ifdef _SUN_SDK_
 	    DigestCalcSecret(sparams->utils, (unsigned char *)username,
 			     (unsigned char *)text->realm, sec->data,
@@ -3258,16 +3259,16 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	    DigestCalcSecret(sparams->utils, username,
 			     text->realm, sec->data, sec->len, HA1);
 #endif /* _SUN_SDK_ */
-	    
+
 	    /*
 	     * A1 = { H( { username-value, ":", realm-value, ":", passwd } ),
 	     * ":", nonce-value, ":", cnonce-value }
 	     */
-	    
+
 	    memcpy(A1, HA1, HASHLEN);
 	    A1[HASHLEN] = '\0';
 	}
-	
+
 	/* We're done with sec now. Let's get rid of it */
 	_plug_free_secret(sparams->utils, &sec);
     } else if (auxprop_values[1].name && auxprop_values[1].values) {
@@ -3287,18 +3288,18 @@ digestmd5_server_mech_step2(server_context_t *stext,
 #else
 	return SASL_FAIL;
 #endif /* _SUN_SDK_ */
-    } 
-    
+    }
+
     /* defaulting qop to "auth" if not specified */
     if (qop == NULL) {
-	_plug_strdup(sparams->utils, "auth", &qop, NULL);      
+	_plug_strdup(sparams->utils, "auth", &qop, NULL);
     }
-    
+
     /* check which layer/cipher to use */
     if ((!strcasecmp(qop, "auth-conf")) && (cipher != NULL)) {
 	/* see what cipher was requested */
 	struct digest_cipher *cptr;
-	
+
 #ifdef USE_UEF_SERVER
 	cptr = available_ciphers1;
 #else
@@ -3307,7 +3308,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	while (cptr->name) {
 	    /* find the cipher requested & make sure it's one we're happy
 	       with by policy */
-	    if (!strcasecmp(cipher, cptr->name) && 
+	    if (!strcasecmp(cipher, cptr->name) &&
 		stext->requiressf <= cptr->ssf &&
 		stext->limitssf >= cptr->ssf) {
 		/* found it! */
@@ -3315,7 +3316,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	    }
 	    cptr++;
 	}
-	
+
 	if (cptr->name) {
 	    text->cipher_enc = cptr->cipher_enc;
 	    text->cipher_dec = cptr->cipher_dec;
@@ -3335,7 +3336,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	    result = SASL_FAIL;
 	    goto FreeAllMem;
 	}
-	
+
 	oparams->encode=&digestmd5_privacy_encode;
 	oparams->decode=&digestmd5_privacy_decode;
     } else if (!strcasecmp(qop, "auth-int") &&
@@ -3358,7 +3359,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	result = SASL_FAIL;
 	goto FreeAllMem;
     }
-    
+
     serverresponse = create_response(text,
 				     sparams->utils,
 				     text->nonce,
@@ -3369,7 +3370,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 				     A1,
 				     authorization_id,
 				     &text->response_value);
-    
+
     if (serverresponse == NULL) {
 #ifndef _SUN_SDK_
 	SETERROR(sparams->utils, "internal error: unable to create response");
@@ -3377,7 +3378,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	result = SASL_NOMEM;
 	goto FreeAllMem;
     }
-    
+
     /* if ok verified */
     if (strcmp(serverresponse, response) != 0) {
 #ifdef _INTEGRATED_SOLARIS_
@@ -3388,7 +3389,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 		 "client response doesn't match what we generated");
 #endif /* _INTEGRATED_SOLARIS_ */
 	result = SASL_BADAUTH;
-	
+
 	goto FreeAllMem;
     }
 
@@ -3430,25 +3431,25 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	/* MAC block (integrity) */
 	oparams->maxoutbuf -= 16;
     }
-    
+
     oparams->param_version = 0;
-    
+
     text->seqnum = 0;		/* for integrity/privacy */
     text->rec_seqnum = 0;	/* for integrity/privacy */
     text->in_maxbuf =
        sparams->props.maxbufsize ? sparams->props.maxbufsize : DEFAULT_BUFSIZE;
     text->utils = sparams->utils;
-    
+
     /* used by layers */
     text->needsize = 4;
     text->buffer = NULL;
-    
+
     if (oparams->mech_ssf > 0) {
 	char enckey[16];
 	char deckey[16];
-	
+
 	create_layer_keys(text, sparams->utils,text->HA1,n,enckey,deckey);
-	
+
 	/* initialize cipher if need be */
 #ifdef _SUN_SDK_
 	if (text->cipher_init) {
@@ -3468,13 +3469,13 @@ digestmd5_server_mech_step2(server_context_t *stext,
 	    }
 #endif /* _SUN_SDK_ */
     }
-    
+
     /*
      * The server receives and validates the "digest-response". The server
      * checks that the nonce-count is "00000001". If it supports subsequent
      * authentication, it saves the value of the nonce and the nonce-count.
      */
-    
+
     /*
      * The "username-value", "realm-value" and "passwd" are encoded according
      * to the value of the "charset" directive. If "charset=UTF-8" is
@@ -3483,30 +3484,30 @@ digestmd5_server_mech_step2(server_context_t *stext,
      * UTF-8 before being hashed. A sample implementation of this conversion
      * is in section 8.
      */
-    
+
     /* add to challenge */
     {
 	unsigned resplen =
 	    strlen(text->response_value) + strlen("rspauth") + 3;
-	
+
 	result = _plug_buf_alloc(sparams->utils, &(text->out_buf),
 				 &(text->out_buf_len), resplen);
 	if(result != SASL_OK) {
 	    goto FreeAllMem;
 	}
-	
+
 	sprintf(text->out_buf, "rspauth=%s", text->response_value);
-	
+
 	/* self check */
 	if (strlen(text->out_buf) > 2048) {
 	    result = SASL_FAIL;
 	    goto FreeAllMem;
 	}
     }
-    
+
     *serveroutlen = strlen(text->out_buf);
     *serverout = text->out_buf;
-	
+
     result = SASL_OK;
 
   FreeAllMem:
@@ -3548,7 +3549,7 @@ digestmd5_server_mech_step2(server_context_t *stext,
 
     /* free everything */
     if (in_start) sparams->utils->free (in_start);
-    
+
     if (username != NULL)
 	sparams->utils->free (username);
 #ifdef _SUN_SDK_
@@ -3572,10 +3573,10 @@ digestmd5_server_mech_step2(server_context_t *stext,
     if (digesturi != NULL)
 	sparams->utils->free (digesturi);
     if (qop!=NULL)
-	sparams->utils->free (qop);  
+	sparams->utils->free (qop);
     if (sec)
 	_plug_free_secret(sparams->utils, &sec);
-    
+
     return result;
 }
 
@@ -3590,14 +3591,14 @@ digestmd5_server_mech_step(void *conn_context,
 {
     context_t *text = (context_t *) conn_context;
     server_context_t *stext = (server_context_t *) conn_context;
-    
+
     if (clientinlen > 4096) return SASL_BADPROT;
-    
+
     *serverout = NULL;
     *serveroutlen = 0;
-    
+
     switch (text->state) {
-	
+
     case 1:
 	/* setup SSF limits */
 	if (!sparams->props.maxbufsize) {
@@ -3644,12 +3645,12 @@ digestmd5_server_mech_step(void *conn_context,
 	return digestmd5_server_mech_step1(stext, sparams,
 					   clientin, clientinlen,
 					   serverout, serveroutlen, oparams);
-	
+
     case 2:
 	return digestmd5_server_mech_step2(stext, sparams,
 					   clientin, clientinlen,
 					   serverout, serveroutlen, oparams);
-	
+
     default:
 #ifdef _SUN_SDK_
 	sparams->utils->log(sparams->utils->conn, SASL_LOG_ERR,
@@ -3660,7 +3661,7 @@ digestmd5_server_mech_step(void *conn_context,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
+
 #ifndef _SUN_SDK_
     return SASL_FAIL; /* should never get here */
 #endif /* !_SUN_SDK_ */
@@ -3670,9 +3671,9 @@ static void
 digestmd5_server_mech_dispose(void *conn_context, const sasl_utils_t *utils)
 {
     server_context_t *stext = (server_context_t *) conn_context;
-    
+
     if (!stext || !utils) return;
-    
+
     digestmd5_common_mech_dispose(conn_context, utils);
 }
 
@@ -3684,7 +3685,7 @@ static sasl_server_plug_t digestmd5_server_plugins[] =
 	128,				/* max_ssf */
 #elif WITH_DES
 	112,
-#else 
+#else
 	0,
 #endif
 	SASL_SEC_NOPLAINTEXT
@@ -3708,7 +3709,7 @@ int digestmd5_server_plug_init(sasl_utils_t *utils,
 			       int maxversion,
 			       int *out_version,
 			       sasl_server_plug_t **pluglist,
-			       int *plugcount) 
+			       int *plugcount)
 {
     reauth_cache_t *reauth_cache;
     const char *timeout = NULL;
@@ -3778,7 +3779,7 @@ int digestmd5_server_plug_init(sasl_utils_t *utils,
     *out_version = SASL_SERVER_PLUG_VERSION;
     *pluglist = digestmd5_server_plugins;
     *plugcount = 1;
-    
+
     return SASL_OK;
 }
 
@@ -3812,14 +3813,14 @@ DigestCalcHA1(context_t * text,
 {
     MD5_CTX         Md5Ctx;
     HASH            HA1;
-    
+
     DigestCalcSecret(utils,
 		     pszUserName,
 		     pszRealm,
 		     (unsigned char *) pszPassword->data,
 		     pszPassword->len,
 		     HA1);
-    
+
     /* calculate the session key */
     utils->MD5Init(&Md5Ctx);
     utils->MD5Update(&Md5Ctx, HA1, HASHLEN);
@@ -3829,18 +3830,18 @@ DigestCalcHA1(context_t * text,
     utils->MD5Update(&Md5Ctx, pszCNonce, strlen((char *) pszCNonce));
     if (pszAuthorization_id != NULL) {
 	utils->MD5Update(&Md5Ctx, COLON, 1);
-	utils->MD5Update(&Md5Ctx, pszAuthorization_id, 
+	utils->MD5Update(&Md5Ctx, pszAuthorization_id,
 			 strlen((char *) pszAuthorization_id));
     }
     utils->MD5Final(HA1, &Md5Ctx);
-    
+
     CvtHex(HA1, SessionKey);
-    
+
     /* xxx rc-* use different n */
-    
+
     /* save HA1 because we'll need it for the privacy and integrity keys */
     memcpy(text->HA1, HA1, sizeof(HASH));
-    
+
 }
 
 static char *calculate_response(context_t * text,
@@ -3860,23 +3861,23 @@ static char *calculate_response(context_t * text,
     HASHHEX         HEntity = "00000000000000000000000000000000";
     HASHHEX         Response;
     char           *result;
-    
+
     /* Verifing that all parameters was defined */
     if(!username || !cnonce || !nonce || !ncvalue || !digesturi || !passwd) {
 	PARAMERROR( utils );
 	return NULL;
     }
-    
+
     if (realm == NULL) {
 	/* a NULL realm is equivalent to the empty string */
 	realm = (unsigned char *) "";
     }
-    
+
     if (qop == NULL) {
 	/* default to a qop of just authentication */
 	qop = "auth";
     }
-    
+
     DigestCalcHA1(text,
 		  utils,
 		  username,
@@ -3886,7 +3887,7 @@ static char *calculate_response(context_t * text,
 		  nonce,
 		  cnonce,
 		  SessionKey);
-    
+
     DigestCalcResponse(utils,
 		       SessionKey,/* H(A1) */
 		       nonce,	/* nonce from server */
@@ -3899,7 +3900,7 @@ static char *calculate_response(context_t * text,
 		       HEntity,	/* H(entity body) if qop="auth-int" */
 		       Response	/* request-digest or response-digest */
 	);
-    
+
     result = utils->malloc(HASHHEXLEN + 1);
 #ifdef _SUN_SDK_
     if (result == NULL)
@@ -3907,7 +3908,7 @@ static char *calculate_response(context_t * text,
 #endif /* _SUN_SDK_ */
     memcpy(result, Response, HASHHEXLEN);
     result[HASHHEXLEN] = 0;
-    
+
     if (response_value != NULL) {
 	DigestCalcResponse(utils,
 			   SessionKey,	/* H(A1) */
@@ -3921,7 +3922,7 @@ static char *calculate_response(context_t * text,
 			   HEntity,	/* H(entity body) if qop="auth-int" */
 			   Response	/* request-digest or response-digest */
 	    );
-	
+
 #ifdef _SUN_SDK_
 	if (*response_value != NULL)
 	    utils->free(*response_value);
@@ -3929,12 +3930,12 @@ static char *calculate_response(context_t * text,
 	*response_value = utils->malloc(HASHHEXLEN + 1);
 	if (*response_value == NULL)
 	    return NULL;
-	
+
 	memcpy(*response_value, Response, HASHHEXLEN);
 	(*response_value)[HASHHEXLEN] = 0;
-	
+
     }
-    
+
     return result;
 }
 
@@ -3957,7 +3958,7 @@ make_client_response(context_t *text,
     switch (ctext->protection) {
     case DIGEST_PRIVACY:
 	qop = "auth-conf";
-	oparams->encode = &digestmd5_privacy_encode; 
+	oparams->encode = &digestmd5_privacy_encode;
 	oparams->decode = &digestmd5_privacy_decode;
 	oparams->mech_ssf = ctext->cipher->ssf;
 
@@ -3988,7 +3989,7 @@ make_client_response(context_t *text,
 	result = SASL_NOMEM;
 	goto FreeAllocatedMem;
     };
-    
+
     /* allocated exactly this. safe */
     strcpy((char *) digesturi, params->service);
     strcat((char *) digesturi, "/");
@@ -4020,22 +4021,22 @@ make_client_response(context_t *text,
 			   (char *) oparams->user : NULL,
 #endif /* _SUN_SDK_ */
 			   &text->response_value);
-    
+
 #ifdef _SUN_SDK_
     if (response == NULL) {
 	result = SASL_NOMEM;
 	goto FreeAllocatedMem;
     }
 #endif /* _SUN_SDK_ */
-    
+
     resplen = strlen(oparams->authid) + strlen("username") + 5;
     result =_plug_buf_alloc(params->utils, &(text->out_buf),
 			    &(text->out_buf_len),
 			    resplen);
     if (result != SASL_OK) goto FreeAllocatedMem;
-    
+
     sprintf(text->out_buf, "username=\"%s\"", oparams->authid);
-    
+
     if (add_to_challenge(params->utils,
 			 &text->out_buf, &text->out_buf_len, &resplen,
 			 "realm", (unsigned char *) text->realm,
@@ -4084,7 +4085,7 @@ make_client_response(context_t *text,
     if (ctext->cipher != NULL) {
 	if (add_to_challenge(params->utils,
 			     &text->out_buf, &text->out_buf_len, &resplen,
-			     "cipher", 
+			     "cipher",
 			     (unsigned char *) ctext->cipher->name,
 			     TRUE) != SASL_OK) {
 	    result = SASL_FAIL;
@@ -4096,7 +4097,7 @@ make_client_response(context_t *text,
 	snprintf(maxbufstr, sizeof(maxbufstr), "%d", params->props.maxbufsize);
 	if (add_to_challenge(params->utils,
 			     &text->out_buf, &text->out_buf_len, &resplen,
-			     "maxbuf", (unsigned char *) maxbufstr, 
+			     "maxbuf", (unsigned char *) maxbufstr,
 			     FALSE) != SASL_OK) {
 #ifdef _SUN_SDK_
 	    params->utils->log(params->utils->conn, SASL_LOG_ERR,
@@ -4108,7 +4109,7 @@ make_client_response(context_t *text,
 	    goto FreeAllocatedMem;
 	}
     }
-    
+
     if (IsUTF8) {
 	if (add_to_challenge(params->utils,
 			     &text->out_buf, &text->out_buf_len, &resplen,
@@ -4128,11 +4129,11 @@ make_client_response(context_t *text,
 			 &text->out_buf, &text->out_buf_len, &resplen,
 			 "response", (unsigned char *) response,
 			 FALSE) != SASL_OK) {
-	
+
 	result = SASL_FAIL;
 	goto FreeAllocatedMem;
     }
-    
+
     /* self check */
     if (strlen(text->out_buf) > 2048) {
 	result = SASL_FAIL;
@@ -4160,25 +4161,25 @@ make_client_response(context_t *text,
 	/* MAC block (integrity) */
 	oparams->maxoutbuf -= 16;
     }
-    
+
     text->seqnum = 0;	/* for integrity/privacy */
     text->rec_seqnum = 0;	/* for integrity/privacy */
     text->utils = params->utils;
-    
+
     text->in_maxbuf =
 	params->props.maxbufsize ? params->props.maxbufsize : DEFAULT_BUFSIZE;
 
     /* used by layers */
     text->needsize = 4;
     text->buffer = NULL;
-    
+
     if (oparams->mech_ssf > 0) {
 	char enckey[16];
 	char deckey[16];
-	
+
 	create_layer_keys(text, params->utils, text->HA1, nbits,
 			  enckey, deckey);
-	
+
 	/* initialize cipher if need be */
 #ifdef _SUN_SDK_
 	if (text->cipher_init) {
@@ -4192,10 +4193,10 @@ make_client_response(context_t *text,
 	}
 #else
 	if (text->cipher_init)
-	    text->cipher_init(text, enckey, deckey);		       
+	    text->cipher_init(text, enckey, deckey);
 #endif /* _SUN_SDK_ */
     }
-    
+
     result = SASL_OK;
 
   FreeAllocatedMem:
@@ -4239,10 +4240,10 @@ static int parse_server_challenge(client_context_t *ctext,
 
     in_start = in = params->utils->malloc(serverinlen + 1);
     if (in == NULL) return SASL_NOMEM;
-    
+
     memcpy(in, serverin, serverinlen);
     in[serverinlen] = 0;
-    
+
     ctext->server_maxbuf = 65536; /* Default value for maxbuf */
 
     /* create a new cnonce */
@@ -4262,9 +4263,9 @@ static int parse_server_challenge(client_context_t *ctext,
     /* parse the challenge */
     while (in[0] != '\0') {
 	char *name, *value;
-	
+
 	get_pair(&in, &name, &value);
-	
+
 	/* if parse error */
 	if (name == NULL) {
 #ifdef _SUN_SDK_
@@ -4276,21 +4277,21 @@ static int parse_server_challenge(client_context_t *ctext,
 	    result = SASL_FAIL;
 	    goto FreeAllocatedMem;
 	}
-	
+
 	if (strcasecmp(name, "realm") == 0) {
 	    nrealm++;
-	    
+
 	    if(!realms)
 		realms = params->utils->malloc(sizeof(char *) * (nrealm + 1));
 	    else
-		realms = params->utils->realloc(realms, 
+		realms = params->utils->realloc(realms,
 						sizeof(char *) * (nrealm + 1));
-	    
+
 	    if (realms == NULL) {
 		result = SASL_NOMEM;
 		goto FreeAllocatedMem;
 	    }
-	    
+
 	    _plug_strdup(params->utils, value, &realms[nrealm-1], NULL);
 	    realms[nrealm] = NULL;
 	} else if (strcasecmp(name, "nonce") == 0) {
@@ -4303,7 +4304,7 @@ static int parse_server_challenge(client_context_t *ctext,
 		if (comma != NULL) {
 		    *comma++ = '\0';
 		}
-		
+
 		if (strcasecmp(value, "auth-conf") == 0) {
 		    protection |= DIGEST_PRIVACY;
 		} else if (strcasecmp(value, "auth-int") == 0) {
@@ -4315,10 +4316,10 @@ static int parse_server_challenge(client_context_t *ctext,
 				       "Server supports unknown layer: %s\n",
 				       value);
 		}
-		
+
 		value = comma;
 	    }
-	    
+
 	    if (protection == 0) {
 		result = SASL_BADAUTH;
 #ifdef _INTEGRATED_SOLARIS_
@@ -4338,11 +4339,11 @@ static int parse_server_challenge(client_context_t *ctext,
 #else
 		struct digest_cipher *cipher = available_ciphers;
 #endif
-		
+
 		if (comma != NULL) {
 		    *comma++ = '\0';
 		}
-		
+
 		/* do we support this cipher? */
 		while (cipher->name) {
 		    if (!strcasecmp(value, cipher->name)) break;
@@ -4355,7 +4356,7 @@ static int parse_server_challenge(client_context_t *ctext,
 				       "Server supports unknown cipher: %s\n",
 				       value);
 		}
-		
+
 		value = comma;
 	    }
 	} else if (strcasecmp(name, "stale") == 0 && ctext->password) {
@@ -4369,10 +4370,10 @@ static int parse_server_challenge(client_context_t *ctext,
 	     * "auth-int". If this directive is missing, the default
 	     * value is 65536. This directive may appear at most once;
 	     * if multiple instances are present, the client should
-	     * abort the authentication exchange.  
+	     * abort the authentication exchange.
 	     */
 	    maxbuf_count++;
-	    
+
 	    if (maxbuf_count != 1) {
 		result = SASL_BADAUTH;
 #ifdef _SUN_SDK_
@@ -4437,7 +4438,7 @@ static int parse_server_challenge(client_context_t *ctext,
 		    result = SASL_FAIL;
 		    goto FreeAllocatedMem;
 		}
-	    
+
 	    algorithm_count++;
 	    if (algorithm_count > 1)
 		{
@@ -4457,7 +4458,7 @@ static int parse_server_challenge(client_context_t *ctext,
 			       name, value);
 	}
     }
-    
+
     if (algorithm_count != 1) {
 #ifdef _SUN_SDK_
 	params->utils->log(params->utils->conn, SASL_LOG_ERR,
@@ -4485,7 +4486,7 @@ static int parse_server_challenge(client_context_t *ctext,
 
     /* get requested ssf */
     external = params->external_ssf;
-    
+
     /* what do we _need_?  how much is too much? */
     if (params->props.maxbufsize == 0) {
 	musthave = 0;
@@ -4502,12 +4503,12 @@ static int parse_server_challenge(client_context_t *ctext,
 	    musthave = 0;
 	}
     }
-    
+
     /* we now go searching for an option that gives us at least "musthave"
        and at most "limit" bits of ssf. */
     if ((limit > 1) && (protection & DIGEST_PRIVACY)) {
 	struct digest_cipher *cipher;
-	
+
 	/* let's find an encryption scheme that we like */
 #ifdef USE_UEF_CLIENT
 	cipher = available_ciphers1;
@@ -4525,7 +4526,7 @@ static int parse_server_challenge(client_context_t *ctext,
 	    }
 	    cipher++;
 	}
-	
+
 	if (ctext->cipher) {
 	    /* we found a cipher we like */
 	    ctext->protection = DIGEST_PRIVACY;
@@ -4540,12 +4541,12 @@ static int parse_server_challenge(client_context_t *ctext,
 #endif /* _INTEGRATED_SOLARIS_ */
 	}
     }
-    
+
     if (ctext->cipher == NULL) {
 	/* we failed to find an encryption layer we liked;
 	   can we use integrity or nothing? */
-	
-	if ((limit >= 1) && (musthave <= 1) 
+
+	if ((limit >= 1) && (musthave <= 1)
 	    && (protection & DIGEST_INTEGRITY)) {
 	    /* integrity */
 	    ctext->protection = DIGEST_INTEGRITY;
@@ -4560,10 +4561,10 @@ static int parse_server_challenge(client_context_t *ctext,
 	    /* See if server supports not having a layer */
 	    if ((protection & DIGEST_NOLAYER) != DIGEST_NOLAYER) {
 #ifdef _INTEGRATED_SOLARIS_
-		params->utils->seterror(params->utils->conn, 0, 
+		params->utils->seterror(params->utils->conn, 0,
 			gettext("Server doesn't support \"no layer\""));
 #else
-		params->utils->seterror(params->utils->conn, 0, 
+		params->utils->seterror(params->utils->conn, 0,
 					"Server doesn't support \"no layer\"");
 #endif /* _INTEGRATED_SOLARIS_ */
 		result = SASL_FAIL;
@@ -4590,11 +4591,11 @@ static int parse_server_challenge(client_context_t *ctext,
 
     if (result != SASL_OK && realms) {
 	int lup;
-	
+
 	/* need to free all the realms */
 	for (lup = 0;lup < nrealm; lup++)
 	    params->utils->free(realms[lup]);
-	
+
 	params->utils->free(realms);
     }
 
@@ -4619,21 +4620,21 @@ static int ask_user_info(client_context_t *ctext,
     /* try to get the authid */
     if (oparams->authid == NULL) {
 	auth_result = _plug_get_authid(params->utils, &authid, prompt_need);
-	
+
 	if ((auth_result != SASL_OK) && (auth_result != SASL_INTERACT)) {
 	    return auth_result;
 	}
     }
-    
+
     /* try to get the userid */
     if (oparams->user == NULL) {
 	user_result = _plug_get_userid(params->utils, &userid, prompt_need);
-	
+
 	if ((user_result != SASL_OK) && (user_result != SASL_INTERACT)) {
 	    return user_result;
 	}
     }
-    
+
     /* try to get the password */
     if (ctext->password == NULL) {
 	pass_result = _plug_get_password(params->utils, &ctext->password,
@@ -4666,15 +4667,15 @@ static int ask_user_info(client_context_t *ctext,
 	    } else {
 		return realm_result;
 	    }
-	}    
+	}
     }
-    
+
     /* free prompts we got */
     if (prompt_need && *prompt_need) {
 	params->utils->free(*prompt_need);
 	*prompt_need = NULL;
     }
-    
+
     /* if there are prompts not filled in */
     if ((user_result == SASL_INTERACT) || (auth_result == SASL_INTERACT) ||
 	(pass_result == SASL_INTERACT) || (realm_result == SASL_INTERACT)) {
@@ -4729,12 +4730,12 @@ static int ask_user_info(client_context_t *ctext,
 			       "Please enter your realm" : NULL,
 			       params->serverFQDN ? params->serverFQDN : NULL);
 #endif /* _INTEGRATED_SOLARIS_ */
-	
+
 	if (result == SASL_OK) return SASL_INTERACT;
 
 	return result;
     }
-    
+
     if (oparams->authid == NULL) {
 	if (!userid || !*userid) {
 	    result = params->canon_user(params->utils->conn, authid, 0,
@@ -4766,17 +4767,17 @@ digestmd5_client_mech_new(void *glob_context,
 			  void **conn_context)
 {
     context_t *text;
-    
+
     /* holds state are in -- allocate client size */
     text = params->utils->malloc(sizeof(client_context_t));
     if (text == NULL)
 	return SASL_NOMEM;
     memset(text, 0, sizeof(client_context_t));
-    
+
     text->state = 1;
     text->i_am = CLIENT;
     text->reauth = glob_context;
-    
+
     *conn_context = text;
 
     return SASL_OK;
@@ -4785,8 +4786,8 @@ digestmd5_client_mech_new(void *glob_context,
 static int
 digestmd5_client_mech_step1(client_context_t *ctext,
 			    sasl_client_params_t *params,
-			    const char *serverin __attribute__((unused)), 
-			    unsigned serverinlen __attribute__((unused)), 
+			    const char *serverin __attribute__((unused)),
+			    unsigned serverinlen __attribute__((unused)),
 			    sasl_interact_t **prompt_need,
 			    const char **clientout,
 			    unsigned *clientoutlen,
@@ -4851,7 +4852,7 @@ digestmd5_client_mech_step1(client_context_t *ctext,
      * (username | realm | nonce | cnonce | nonce-count | qop digest-uri |
      * response | maxbuf | charset | auth-param )
      */
-    
+
     result = make_client_response(text, params, oparams);
     if (result != SASL_OK) return result;
 
@@ -4889,7 +4890,7 @@ digestmd5_client_mech_step2(client_context_t *ctext,
 	result = parse_server_challenge(ctext, params, serverin, serverinlen,
 					&realms, &nrealm);
 	if (result != SASL_OK) goto FreeAllocatedMem;
-    
+
 	if (nrealm == 1) {
 	    /* only one choice! */
 	    text->realm = realms[0];
@@ -4908,7 +4909,7 @@ digestmd5_client_mech_step2(client_context_t *ctext,
      * (username | realm | nonce | cnonce | nonce-count | qop digest-uri |
      * response | maxbuf | charset | auth-param )
      */
-    
+
     result = make_client_response(text, params, oparams);
     if (result != SASL_OK) goto FreeAllocatedMem;
 
@@ -4916,17 +4917,17 @@ digestmd5_client_mech_step2(client_context_t *ctext,
     *clientout = text->out_buf;
 
     text->state = 3;
-    
+
     result = SASL_CONTINUE;
-    
+
   FreeAllocatedMem:
     if (realms) {
 	int lup;
-	
+
 	/* need to free all the realms */
 	for (lup = 0;lup < nrealm; lup++)
 	    params->utils->free(realms[lup]);
-	
+
 	params->utils->free(realms);
     }
 
@@ -4947,22 +4948,22 @@ digestmd5_client_mech_step3(client_context_t *ctext,
     char           *in = NULL;
     char           *in_start;
     int result = SASL_FAIL;
-    
+
     params->utils->log(params->utils->conn, SASL_LOG_DEBUG,
 		       "DIGEST-MD5 client step 3");
 
-    /* Verify that server is really what he claims to be */
+    /* Verify that server is really what they claim to be */
     in_start = in = params->utils->malloc(serverinlen + 1);
     if (in == NULL) return SASL_NOMEM;
 
     memcpy(in, serverin, serverinlen);
     in[serverinlen] = 0;
-    
+
     /* parse the response */
     while (in[0] != '\0') {
 	char *name, *value;
 	get_pair(&in, &name, &value);
-	
+
 	if (name == NULL) {
 #ifdef _SUN_SDK_
 	    params->utils->log(params->utils->conn, SASL_LOG_ERR,
@@ -4973,9 +4974,9 @@ digestmd5_client_mech_step3(client_context_t *ctext,
 #endif /* _SUN_SDK_ */
 	    break;
 	}
-	
+
 	if (strcasecmp(name, "rspauth") == 0) {
-	    
+
 	    if (strcmp(text->response_value, value) != 0) {
 #ifdef _INTEGRATED_SOLARIS_
 		params->utils->seterror(params->utils->conn, 0,
@@ -4988,7 +4989,7 @@ digestmd5_client_mech_step3(client_context_t *ctext,
 	    } else {
 		oparams->doneflag = 1;
 		oparams->param_version = 0;
-		
+
 		result = SASL_OK;
 	    }
 	    break;
@@ -4998,7 +4999,7 @@ digestmd5_client_mech_step3(client_context_t *ctext,
 			       name, value);
 	}
     }
-    
+
     params->utils->free(in_start);
 
     if (params->utils->mutex_lock(text->reauth->mutex) == SASL_OK) { /* LOCK */
@@ -5054,9 +5055,9 @@ digestmd5_client_mech_step(void *conn_context,
     context_t *text = (context_t *) conn_context;
     client_context_t *ctext = (client_context_t *) conn_context;
     unsigned val = hash(params->serverFQDN) % text->reauth->size;
-    
+
     if (serverinlen > 2048) return SASL_BADPROT;
-    
+
     *clientout = NULL;
     *clientoutlen = 0;
 
@@ -5088,9 +5089,9 @@ digestmd5_client_mech_step(void *conn_context,
 		return SASL_CONTINUE;
 	    }
 	}
-	
+
 	/* fall through and respond to challenge */
-	
+
     case 3:
 	if (serverin && !strncasecmp(serverin, "rspauth=", 8)) {
 	    return digestmd5_client_mech_step3(ctext, params,
@@ -5120,7 +5121,7 @@ digestmd5_client_mech_step(void *conn_context,
 	text->realm = text->nonce = text->cnonce = NULL;
 #endif /* _SUN_SDK_ */
 	ctext->cipher = NULL;
-    
+
     case 2:
 	return digestmd5_client_mech_step2(ctext, params,
 					   serverin, serverinlen,
@@ -5138,7 +5139,7 @@ digestmd5_client_mech_step(void *conn_context,
 #endif /* _SUN_SDK_ */
 	return SASL_FAIL;
     }
-    
+
     return SASL_FAIL; /* should never get here */
 }
 
@@ -5146,9 +5147,9 @@ static void
 digestmd5_client_mech_dispose(void *conn_context, const sasl_utils_t *utils)
 {
     client_context_t *ctext = (client_context_t *) conn_context;
-    
+
     if (!ctext || !utils) return;
-    
+
 #ifdef _INTEGRATED_SOLARIS_
     convert_prompt(utils, &ctext->h, NULL);
 #endif /* _INTEGRATED_SOLARIS_ */
@@ -5198,7 +5199,7 @@ int digestmd5_client_plug_init(sasl_utils_t *utils,
 
     if (maxversion < SASL_CLIENT_PLUG_VERSION)
 	return SASL_BADVERS;
-    
+
 #if defined _SUN_SDK_  && defined USE_UEF
     if ((ret = uef_init(utils)) != SASL_OK)
 	return ret;
@@ -5210,7 +5211,7 @@ int digestmd5_client_plug_init(sasl_utils_t *utils,
 	return SASL_NOMEM;
     memset(reauth_cache, 0, sizeof(reauth_cache_t));
     reauth_cache->i_am = CLIENT;
-    
+
     /* mutex */
     reauth_cache->mutex = utils->mutex_alloc();
     if (!reauth_cache->mutex)
@@ -5242,7 +5243,7 @@ int digestmd5_client_plug_init(sasl_utils_t *utils,
     *out_version = SASL_CLIENT_PLUG_VERSION;
     *pluglist = digestmd5_client_plugins;
     *plugcount = 1;
-    
+
     return SASL_OK;
 }
 

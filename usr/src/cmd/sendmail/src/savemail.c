@@ -10,7 +10,9 @@
  * the sendmail distribution.
  *
  */
-
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 #include <sendmail.h>
 
 SM_RCSID("@(#)$Id: savemail.c,v 8.314 2009/12/18 17:08:01 ca Exp $")
@@ -23,7 +25,7 @@ static bool	pruneroute __P((char *));
 **
 **	If mailing back errors, mail it back to the originator
 **	together with an error message; otherwise, just put it in
-**	dead.letter in the user's home directory (if he exists on
+**	dead.letter in the user's home directory (if they exist on
 **	this machine).
 **
 **	Parameters:
@@ -37,7 +39,7 @@ static bool	pruneroute __P((char *));
 **
 **	Side Effects:
 **		Saves the letter, by writing or mailing it back to the
-**		sender, or by putting it in dead.letter in her home
+**		sender, or by putting it in dead.letter in their home
 **		directory.
 */
 

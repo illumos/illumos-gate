@@ -26,7 +26,7 @@
  */
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
@@ -704,7 +704,7 @@ nlm_block(nlm4_lockargs *lockargs,
 		 * Sleeping lock request with given fl is already
 		 * registered by someone else. This means that
 		 * some other thread is handling the request, let
-		 * him to do its work.
+		 * it do its work.
 		 */
 		ASSERT(error == EEXIST);
 		return;

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1999,2000 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -307,8 +308,8 @@ seekCluster(int fd, int32_t clusterNum)
 /*
  *  getcluster
  *	Get cluster bytes off the disk.  We always read those bytes into
- *	the same static buffer.  If the caller wants his own copy of the
- *	data he'll have to make his own copy.  We'll return all the data
+ *	the same static buffer.  If the caller wants its own copy of the
+ *	data it'll have to make its own copy.  We'll return all the data
  *	read, even if it's short of a full cluster.  This is for future use
  *	when we might want to relocate any salvagable data from bad clusters.
  */

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -381,7 +382,7 @@ typedef struct error_sum_cb_arg {
 
 /*
  * Callback function for hp_traverse(), to add the error
- * message to he table.
+ * message to the table.
  */
 static int
 error_sumup_cb(hp_node_t node, void *arg)

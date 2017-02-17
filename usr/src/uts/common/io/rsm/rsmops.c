@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -291,7 +292,7 @@ rsm_get_controller(const char *name, uint_t number,
 		 * First check if the driver is registered
 		 */
 		if ((p_drv = find_rsmpi_driver(name)) == NULL) {
-			/* Cannot find the driver.  Try to load him */
+			/* Cannot find the driver.  Try to load it */
 			mutex_exit(&rsmops_lock);
 			if ((error = modload("drv", (char *)name)) == -1) {
 				return (RSMERR_CTLR_NOT_PRESENT);
@@ -462,7 +463,7 @@ rsm_register_controller(const char *name, uint_t number,
 /*
  * This is expected to be called from the driver's detach function
  * if this function returns EBUSY, the driver is supposed to fail
- * his own detach operation
+ * its own detach operation
  */
 int
 rsm_unregister_controller(const char *name, uint_t number)

@@ -22,6 +22,7 @@
 /*
  * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -123,7 +124,7 @@ bangequ (char *user1p, char *user2p)
 		(void) snprintf(sysname2, sizeof (sysname2), "%s", Nodenamep);
 		(void) snprintf(username2, sizeof (username2), "%s", user1p);
 	}
-	
+
 	sysname2_all = STREQU (NAME_ALL, sysname2);
 	username2_all = STREQU (NAME_ALL, username2);
 
@@ -193,16 +194,16 @@ bang_dellist(char ***plist, char *item)
 	 * ALL matching items in the list are deleted.
 	 *
 	 * Now suppose the list contains just the word ``all'', and
-	 * the item to be deleted is the name ``fred''. What will
+	 * the item to be deleted is the name ``foo''. What will
 	 * happen? The word ``all'' will be deleted, leaving the list
 	 * empty (null)! This may sound odd at first, but keep in mind
 	 * that this routine is paired with the regular "addlist()"
-	 * routine; the item (``fred'') is ADDED to an opposite list
+	 * routine; the item (``foo'') is ADDED to an opposite list
 	 * (we are either deleting from a deny list and adding to an allow
 	 * list or vice versa). So, to continue the example, if previously
-	 * ``all'' were allowed, removing ``fred'' from the allow list
-	 * does indeed empty that list, but then putting him in the deny
-	 * list means only ``fred'' is denied, which is the effect we
+	 * ``all'' were allowed, removing ``foo'' from the allow list
+	 * does indeed empty that list, but then putting it in the deny
+	 * list means only ``foo'' is denied, which is the effect we
 	 * want.
 	 */
 

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -585,11 +586,11 @@ static audit_special_prop_item_t special_props_list[] = {
  * Clients use their position in the list to track which notifications they
  * have not yet reported.  As they process notifications, they move forward
  * in the list past them.  There is always a client at the beginning of the
- * list -- as he moves past notifications, he removes them from the list and
+ * list -- as it moves past notifications, it removes them from the list and
  * cleans them up.
  *
  * The rc_pg_notify_lock protects all notification state.  The rc_pg_notify_cv
- * is used for global signalling, and each client has a cv which he waits for
+ * is used for global signalling, and each client has a cv which it waits for
  * events of interest on.
  *
  * rc_notify_in_use is used to protect rc_notify_list from deletions when

@@ -22,6 +22,7 @@
 /*
  * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -44,7 +45,7 @@
  * BUT we'll leave LP_SEP inside single quotes alone!
  *
  * This is to allow the following case (and the like) to work correctly:
- *	prtitle='standard input' 
+ *	prtitle='standard input'
  */
 
 void
@@ -329,7 +330,7 @@ pickfilter(RSTATUS *prs, CANDIDATE *pc, FSTATUS *pfs)
 
 	/*
 	 * Don't try using a filter if the user doesn't want
-	 * a filter to be used! He or she would rather see an
+	 * a filter to be used! They would rather see an
 	 * error message than (heaven forbid!) a filter being
 	 * used.
 	 */

@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -70,7 +71,7 @@
  * seconds will be closed by the housekeeper thread.
  *
  * When a scan engine is reconfigured to have less connections
- * (or is disabled) any of he superflous connections which are in
+ * (or is disabled) any of the superflous connections which are in
  * AVAILABLE state are closed (DISCONNECTED). Others are set to
  * CLOSE_PENDING to be closed (DISCONNECTED) when the engine is
  * released (when the current request completes).

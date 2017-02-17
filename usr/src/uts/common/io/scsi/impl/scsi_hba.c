@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -6973,7 +6974,7 @@ typedef struct scsi_lunrpt {
  * to allocate a buffer of sufficient size, and reissue the command. If the
  * first command succeeds, but the second fails, we return whatever we were
  * able to get the first time. We return enough information for the caller to
- * tell whether he got all the LUNs or only a subset.
+ * tell whether they got all the LUNs or only a subset.
  *
  * If successful, we allocate an array of scsi_lun_t to hold the results. The
  * caller must kmem_free(*lunarrayp, *sizep) when finished with it. Upon

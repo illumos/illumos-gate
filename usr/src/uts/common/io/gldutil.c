@@ -20,6 +20,7 @@
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1676,7 +1677,7 @@ gld_unitdata_tr(gld_t *gld, mblk_t *mp)
 
 /*
  * We cannot have our client sending us "fastpath" M_DATA messages,
- * because to do that we must provide to him a fixed MAC header to
+ * because to do that we must provide a fixed MAC header to
  * be prepended to each outgoing packet.  But with Source Routing
  * media, the length and content of the MAC header changes as the
  * routes change, so there is no fixed header we can provide.  So
@@ -2012,9 +2013,9 @@ gld_rcc_send(gld_mac_info_t *macinfo, queue_t *q, uchar_t *dhost,
 	/*
 	 * Our caller has to take the mutex because: to avoid an extra bcopy
 	 * of the RIF on every transmit, we pass back a pointer to our sr
-	 * table entry via rhp.  He has to keep the mutex until he has a
+	 * table entry via rhp.  The caller has to keep the mutex until it has a
 	 * chance to copy the RIF out into the outgoing packet, so that we
-	 * don't modify the entry while he's trying to copy it.  This is a
+	 * don't modify the entry while it's being copied.  This is a
 	 * little ugly, but saves the extra bcopy.
 	 */
 	ASSERT(mutex_owned(GLD_SR_MUTEX(macinfo)));
@@ -2298,11 +2299,11 @@ gld_rde_pdu_ind(gld_mac_info_t *macinfo, struct gld_ri *rh, struct rde_pdu *pdu,
 	ASSERT((rh->len & 1) == 0);
 
 	if (pdu->rde_ptype == RDE_RQR) {
-		/* A reply to our RQC has his address as target mac */
+		/* A reply to our RQC has its address as target mac */
 		otherhost = pdu->rde_target_mac;
 	} else {
 		ASSERT(pdu->rde_ptype == RDE_RS);
-		/* An RS has his address as orig mac */
+		/* An RS has its address as orig mac */
 		otherhost = pdu->rde_orig_mac;
 	}
 

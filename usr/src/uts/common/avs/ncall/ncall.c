@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -720,7 +721,7 @@ ncallgetnodes(intptr_t uaddr, int mode, int *rvalp)
 
 	/*
 	 * If the user passes up a null address argument, then
-	 * he/she doesn't want the actual nodes, but the configured
+	 * they don't want the actual nodes, but the configured
 	 * maximum, so space can be correctly allocated.
 	 */
 

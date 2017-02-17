@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -385,7 +386,7 @@ cms_load_specific(cmi_hdl_t hdl, void **datap)
 
 		/*
 		 * The module failed or declined to init, so release
-		 * it and potentially change i to be equal to he number
+		 * it and potentially change i to be equal to the number
 		 * of suffices actually used in the last module path.
 		 */
 		cms_rele(cms);

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -144,7 +145,7 @@ main(int argc, char ** argv)
 	}
 
 	/*
-	 *  Special case non-root user here - he can just print stats
+	 *  Special case non-root user here - they can only print stats
 	 */
 	if (geteuid()) {
 		if (argc != 2 ||

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent Inc. All rights reserved.
- * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -465,7 +465,7 @@ make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode,
 		/*
 		 * We don't check the file mode since presumably the zone
 		 * administrator may have had good reason to change the mode,
-		 * and we don't need to second guess him.
+		 * and we don't need to second guess them.
 		 */
 		if (!S_ISDIR(st.st_mode)) {
 			if (S_ISREG(st.st_mode)) {
@@ -1234,11 +1234,12 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath,
 	/*
 	 * In general the strategy here is to do just as much verification as
 	 * necessary to avoid crashing or otherwise doing something bad; if the
-	 * administrator initiated the operation via zoneadm(1m), he'll get
-	 * auto-verification which will let him know what's wrong.  If he
-	 * modifies the zone configuration of a running zone and doesn't attempt
-	 * to verify that it's OK we won't crash but won't bother trying to be
-	 * too helpful either.  zoneadm verify is only a couple keystrokes away.
+	 * administrator initiated the operation via zoneadm(1m), they'll get
+	 * auto-verification which will let them know what's wrong.  If they
+	 * modify the zone configuration of a running zone, and don't attempt
+	 * to verify that it's OK, then we won't crash but won't bother trying
+	 * to be too helpful either. zoneadm verify is only a couple keystrokes
+	 * away.
 	 */
 	if (!zonecfg_valid_fs_type(fsptr->zone_fs_type)) {
 		zerror(zlogp, B_FALSE, "cannot mount %s on %s: "

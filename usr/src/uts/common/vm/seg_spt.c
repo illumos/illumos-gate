@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1112,7 +1113,7 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	}
 	/*
 	 * We can now drop the sptd->spt_lock since the ppa[]
-	 * exists and he have incremented pacachecnt.
+	 * exists and we have incremented pacachecnt.
 	 */
 	mutex_exit(&sptd->spt_lock);
 
@@ -1374,7 +1375,7 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 
 	/*
 	 * We can now drop the sptd->spt_lock since the ppa[]
-	 * exists and he have incremented pacachecnt.
+	 * exists and we have incremented pacachecnt.
 	 */
 	mutex_exit(&sptd->spt_lock);
 

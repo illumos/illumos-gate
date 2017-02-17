@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -229,7 +230,7 @@ countfiles(uid_t *uidlist, int nuids)
 	 * For each file in the queue, see if the user(s) own the file. We
 	 * have to use "entryfound" (rather than simply incrementing "numfiles")
 	 * so that if a person's name appears twice on the command line we
-	 * don't double the number of files owned by him/her.
+	 * don't double the number of files owned by that user.
 	 */
 	for (i = 0; i < numentries; i++) {
 		if ((stat(queue[i]->d_name, &stbuf)) < 0) {
@@ -276,7 +277,7 @@ printqueue(uid_t *uidlist, int nuids)
 	 * belonging to that person(s), otherwise print the entire queue.
 	 * Once again, we have to use "entryfound" (rather than simply
 	 * comparing each command line argument) so that if a person's name
-	 * appears twice we don't print each file owned by him/her twice.
+	 * appears twice we don't print each of their files twice.
 	 *
 	 *
 	 * "printrank", "printdate", and "printjobname" all take existing
@@ -316,7 +317,7 @@ printqueue(uid_t *uidlist, int nuids)
 }
 
 /*
- * Get the uid of a person using his/her login name. Return -1 if no
+ * Get the uid of a person using their login name. Return -1 if no
  * such account name exists.
  */
 uid_t
@@ -333,7 +334,7 @@ getid(char *name)
 }
 
 /*
- * Get the full login name of a person using his/her user id.
+ * Get the full login name of a person using their user id.
  */
 char *
 getname(uid_t uid)

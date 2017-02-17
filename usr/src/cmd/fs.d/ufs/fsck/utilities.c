@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2314,7 +2315,7 @@ dirty(struct bufarea *bp)
 	if (fswritefd < 0) {
 		/*
 		 * No one should call dirty() in read only mode.
-		 * But if one does, it's not fatal issue. Just warn him.
+		 * But if one does, it's not fatal issue. Just warn them.
 		 */
 		pwarn("WON'T SET DIRTY FLAG IN READ_ONLY MODE\n");
 	} else {

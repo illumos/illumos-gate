@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -2733,7 +2734,7 @@ hci1394_ohci_resume(hci1394_ohci_handle_t ohci_hdl)
 	/*
 	 * re-setup OHCI bus options and config rom hdr registers. We need to
 	 * read from the config rom using ddi_rep_get8 since it is stored as
-	 * a byte stream. We need to swap he config rom header and bus options
+	 * a byte stream. We need to swap the config rom header and bus options
 	 * on an X86 machine since the data is a byte stream and the OHCI
 	 *  registers expect a big endian 32-bit number.
 	 */

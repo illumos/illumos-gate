@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -2507,7 +2508,7 @@ bridge_xmit_cb(mac_handle_t mh, mac_ring_handle_t rh, mblk_t *mpnext)
 
 		/*
 		 * We have to learn from our own transmitted packets, because
-		 * there may be a Solaris DLPI raw sender (who can specify his
+		 * there may be a Solaris DLPI raw sender (which can specify its
 		 * own source address) using promiscuous mode for receive.  The
 		 * mac layer information won't (and can't) tell us everything
 		 * we need to know.

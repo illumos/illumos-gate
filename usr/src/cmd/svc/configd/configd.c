@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <assert.h>
@@ -353,11 +354,11 @@ create_connection(ucred_t *uc, repository_door_request_t *rp,
 		    sizeof (info))
 			return (REPOSITORY_DOOR_FAIL_PERMISSION_DENIED);
 
-		privileged = 1;			/* he gets full privileges */
+		privileged = 1;			/* it gets full privileges */
 	} else if (privileged_user != 0) {
 		/*
 		 * in privileged user mode, only one particular user is
-		 * allowed to connect to us, and he can do anything.
+		 * allowed to connect to us, and they can do anything.
 		 */
 		if (ucred_geteuid(uc) != privileged_user)
 			return (REPOSITORY_DOOR_FAIL_PERMISSION_DENIED);

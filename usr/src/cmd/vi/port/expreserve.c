@@ -22,6 +22,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -392,7 +393,7 @@ mknext(unsigned char *dir, unsigned char *cp)
 }
 
 /*
- * Notify user uid that his file fname has been saved.
+ * Notify user uid that their file fname has been saved.
  */
 void
 notify(int uid, unsigned char *fname, int flag, int cryflag)
@@ -437,7 +438,7 @@ was killed or was unable to save your changes.\n", fname, (cryflag) ? "[ENCRYPTE
 	fprintf(mf,
 "This buffer can be retrieved using the \"recover\" command of the editor.\n");
 	fprintf(mf,
-"An easy way to do this is to give the command \"vi -r %s\".\n", 
+"An easy way to do this is to give the command \"vi -r %s\".\n",
 		(fname[0] == 0) ? "LOST" : (char *) fname);
 	fprintf(mf, "This works for \"edit\" and \"ex\" also.\n");
 	(void) pclose(mf);

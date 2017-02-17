@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2014, 2015 Shruti V Sampat <shrutisampat@gmail.com>
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -728,7 +729,7 @@ add_pid(pid_t pid)
 	 */
 	if (pid != 0 && (fd = proc_to_fd(pid)) == -1) {
 		/*
-		 * No so the process died before we got to watch for him
+		 * No, so the process died before we got to watch for it.
 		 */
 		return;
 	}

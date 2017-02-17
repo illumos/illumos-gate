@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -6168,7 +6169,7 @@ zone_enter(zoneid_t zoneid)
 		do {
 			thread_lock(t);
 			/*
-			 * Kick this thread so that he doesn't sit
+			 * Kick this thread so that it doesn't sit
 			 * on a wrong wait queue.
 			 */
 			if (ISWAITING(t))
@@ -6358,8 +6359,8 @@ zone_list(zoneid_t *zoneidlist, uint_t *numzones)
 
 	/*
 	 * If user has allocated space for fewer entries than we found, then
-	 * return only up to his limit.  Either way, tell him exactly how many
-	 * we found.
+	 * return only up to their limit.  Either way, tell them exactly how
+	 * many we found.
 	 */
 	if (domi_nzones < user_nzones)
 		user_nzones = domi_nzones;

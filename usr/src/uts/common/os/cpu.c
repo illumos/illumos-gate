@@ -879,7 +879,7 @@ cpu_pause_free(cpu_t *cp)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	/*
-	 * We have to get the thread and tell him to die.
+	 * We have to get the thread and tell it to die.
 	 */
 	if ((t = cp->cpu_pause_thread) == NULL) {
 		ASSERT(safe_list[cpun] == PAUSE_IDLE);

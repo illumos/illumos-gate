@@ -1421,7 +1421,7 @@ tcp_output_urgent(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 }
 
 /*
- * Called by streams close routine via squeues when our client blows off her
+ * Called by streams close routine via squeues when our client blows off its
  * descriptor, we take this to mean: "close the stream state NOW, close the tcp
  * connection politely" When SO_LINGER is set (with a non-zero linger time and
  * it is not a nonblocking socket) then this routine sleeps until the FIN is

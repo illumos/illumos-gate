@@ -25,7 +25,9 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -75,7 +77,7 @@ extern int dkminor();
 #define TRUE	1
 #define FALSE	0
 
-static 
+static
 int	_Status;		/* exit status of child */
 
 static
@@ -92,11 +94,11 @@ char
 	*_Num,			/* pointer to a phone number */
 	*_Flds[7];		/* Filled in as if finds() in uucp did it */
 
-static 
+static
 time_t	_Log_on,
 	_Log_elpsd;
 
-static 
+static
 FILE	*_Fdl;
 
 extern int  optind;
@@ -175,15 +177,15 @@ char   *argv[];
 
     while ((c = getopt (argc, argv, "hvw:s:x:")) != EOF) {
 	switch (c) {
-	    case 'h': 
+	    case 'h':
 		hangup = 0;
 		break;
 
-	    case 'v': 
+	    case 'v':
 		Verbose = 1;
 		break;
 
-	    case 'w': 
+	    case 'w':
 		minutes = atoi (optarg);
 		if (minutes < 1) {
 		    (void) fprintf(stderr,
@@ -194,7 +196,7 @@ char   *argv[];
 		}
 		break;
 
-	    case 's': 
+	    case 's':
 		_Flds[F_CLASS] = optarg;
 		break;
 
@@ -209,7 +211,7 @@ char   *argv[];
 		}
 		break;
 
-	    case '?': 
+	    case '?':
 		(void) fprintf(stderr, "\tusage: %s %s\n", Progname, USAGE);
 		cleanup(101);
 		/* NOTREACHED */
@@ -254,7 +256,7 @@ char   *argv[];
 		fdig(_Flds[F_CLASS]) );
     	    cleanup(101);
 	}
-	    
+
 	if (!first) { /* not the first time in loop */
 	    VERBOSE("%s busy", (found == -1) ? "Dialer is" : "Dialers are");
 	    VERBOSE(" (%d minute(s))\n", count);
@@ -283,7 +285,7 @@ char   *argv[];
 	    cleanup(101);
 	}
 
-	/* Ask user if she/he wants to wait */
+	/* Ask user if they want to wait */
 	(void) fputs("Do you want to wait for dialer? (y for yes): ", stdout);
 	if ((c = getchar ()) == EOF || tolower (c) != 'y')
 	    cleanup(101);

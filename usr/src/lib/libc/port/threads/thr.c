@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 /*
  * Copyright 2016 Joyent, Inc.
@@ -1786,17 +1787,17 @@ force_continue(ulwp_t *ulwp)
 		if (error != 0 && error != EINTR)
 			break;
 		error = 0;
-		if (ulwp->ul_stopping) {	/* he is stopping himself */
-			ts.tv_sec = 0;		/* give him a chance to run */
+		if (ulwp->ul_stopping) {	/* it is stopping itsself */
+			ts.tv_sec = 0;		/* give it a chance to run */
 			ts.tv_nsec = 100000;	/* 100 usecs or clock tick */
 			(void) __nanosleep(&ts, NULL);
 		}
-		if (!ulwp->ul_stopping)		/* he is running now */
+		if (!ulwp->ul_stopping)		/* it is running now */
 			break;			/* so we are done */
 		/*
-		 * He is marked as being in the process of stopping
-		 * himself.  Loop around and continue him again.
-		 * He may not have been stopped the first time.
+		 * It is marked as being in the process of stopping
+		 * itself.  Loop around and continue it again.
+		 * It may not have been stopped the first time.
 		 */
 	}
 }
@@ -2480,7 +2481,7 @@ getlwpstatus(thread_t tid, struct lwpstatus *sp)
 				(void) __close(fd);
 				return (0);
 			}
-			yield();	/* give him a chance to stop */
+			yield();	/* give it a chance to stop */
 		}
 		(void) __close(fd);
 	}

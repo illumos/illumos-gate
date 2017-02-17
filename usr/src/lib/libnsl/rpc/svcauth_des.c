@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -208,7 +209,7 @@ again:
 		if (!__getpublickey_cached(cred->adc_fullname.name,
 				pkey_data, &from_cache)) {
 			/*
-			 * if the user has no public key, treat him as the
+			 * if the user has no public key, treat them as the
 			 * unauthenticated identity - nobody. If this
 			 * works, it means the client didn't find the
 			 * user's keys and used nobody's secret key

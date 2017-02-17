@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1523,7 +1524,7 @@ client_init(clientopts_t *arglist)
 		cfg.SA_CRED = "proxy";
 		/*
 		 * We don't want to force users to always specify authentication
-		 * method when we can infer it. If users want SSL, he/she would
+		 * method when we can infer it. If users want SSL, they would
 		 * have to specify appropriate -a though.
 		 */
 		auth.type = NS_LDAP_AUTH_SIMPLE;
