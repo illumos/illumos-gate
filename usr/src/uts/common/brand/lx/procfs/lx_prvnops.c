@@ -89,7 +89,6 @@ extern int prreadbuf(proc_t *, uintptr_t, uint8_t *, size_t, size_t *);
 #include "lx_proc.h"
 
 extern pgcnt_t swapfs_minfree;
-extern time_t boot_time;
 
 /*
  * Pointer to the vnode ops vector for this fs.
@@ -4192,7 +4191,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    pgswapin_cum, pgswapout_cum,
 		    intr_cum,
 		    pswitch_cum,
-		    boot_time,
+		    zone->zone_boot_time,
 		    forks_cum,
 		    cpu_nrunnable_cum,
 		    w_io_cum);
@@ -4208,7 +4207,7 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    pgswapin_cum, pgswapout_cum,
 		    intr_cum,
 		    pswitch_cum,
-		    boot_time,
+		    zone->zone_boot_time,
 		    forks_cum);
 	}
 }
