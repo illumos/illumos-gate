@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SYS_PCIE_IMPL_H
@@ -417,11 +418,10 @@ typedef struct pf_impl {
 #define	PF_ERR_MATCHED_PARENT	(1 << 5) /* Error Handled By Parent */
 #define	PF_ERR_PANIC		(1 << 6) /* Error should panic system */
 #define	PF_ERR_PANIC_DEADLOCK	(1 << 7) /* deadlock detected */
-#define	PF_ERR_PANIC_BAD_RESPONSE (1 << 8) /* Device no response */
+#define	PF_ERR_BAD_RESPONSE	(1 << 8) /* Device bad/no response */
 #define	PF_ERR_MATCH_DOM	(1 << 9) /* Error Handled By IO domain */
 
-#define	PF_ERR_FATAL_FLAGS		\
-	(PF_ERR_PANIC | PF_ERR_PANIC_DEADLOCK | PF_ERR_PANIC_BAD_RESPONSE)
+#define	PF_ERR_FATAL_FLAGS		(PF_ERR_PANIC | PF_ERR_PANIC_DEADLOCK)
 
 #define	PF_HDL_FOUND		1
 #define	PF_HDL_NOTFOUND		2
