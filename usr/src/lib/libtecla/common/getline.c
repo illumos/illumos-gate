@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2000, 2001, 2002, 2003, 2004 by Martin C. Shepherd.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -12,7 +12,7 @@
  * copyright notice(s) and this permission notice appear in all copies of
  * the Software and that both the above copyright notice(s) and this
  * permission notice appear in supporting documentation.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
@@ -22,7 +22,7 @@
  * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
  * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- * 
+ *
  * Except as contained in this notice, the name of a copyright holder
  * shall not be used in advertising or otherwise to promote the sale, use
  * or other dealings in this Software without prior written authorization
@@ -32,6 +32,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -225,7 +226,7 @@ typedef struct {
   KtAction action;           /* The last action function that made a */
                              /*  change to the line. */
   int count;                 /* The repeat count that was passed to the */
-                             /*  above command. */  
+                             /*  above command. */
   int input_curpos;          /* Whenever vi command mode is entered, the */
                              /*  the position at which it was first left */
                              /*  is recorded here. */
@@ -421,7 +422,7 @@ struct GetLine {
                              /*  display the current input line. */
   int buff_mark;             /* A marker location in the buffer */
   int insert_curpos;         /* The cursor position at start of insert */
-  int insert;                /* True in insert mode */ 
+  int insert;                /* True in insert mode */
   int number;                /* If >= 0, a numeric argument is being read */
   int endline;               /* True to tell gl_get_input_line() to return */
                              /*  the current contents of gl->line[] */
@@ -976,7 +977,7 @@ static int _gl_bind_arrow_keys(GetLine *gl);
 
 /*
  * Copy the binding of the specified symbolic arrow-key binding to
- * the terminal specific, and default arrow-key key-sequences. 
+ * the terminal specific, and default arrow-key key-sequences.
  */
 static int _gl_rebind_arrow_key(GetLine *gl, const char *name,
 				const char *term_seq,
@@ -3200,7 +3201,7 @@ static int gl_read_terminal(GetLine *gl, int keep, char *c)
 
 /*.......................................................................
  * Read one or more keypresses from the terminal of an input stream.
- * 
+ *
  * Input:
  *  gl           GetLine *  The resource object of this module.
  *  c               char *  The character that was read is assigned to *c.
@@ -3282,7 +3283,7 @@ static GlReadStatus gl_read_input(GetLine *gl, char *c)
       gl_nonblocking_io(gl, fd);
 /*
  * Now respond to the signal that was caught.
- */      
+ */
     if(gl_check_caught_signal(gl))
       return GL_READ_ERROR;
   };
@@ -3333,7 +3334,7 @@ static int gl_read_unmasked(GetLine *gl, int fd, char *c)
 }
 
 /*.......................................................................
- * Remove a specified number of characters from the start of the 
+ * Remove a specified number of characters from the start of the
  * key-press lookahead buffer, gl->keybuf[], and arrange for the next
  * read to start from the character at the start of the shifted buffer.
  *
@@ -4069,7 +4070,7 @@ static int gl_terminal_move_cursor(GetLine *gl, int n)
  *                    following the one being written.
  * Output:
  *  return    int     0 - OK.
- */ 
+ */
 static int gl_print_char(GetLine *gl, char c, char pad)
 {
   char string[TAB_WIDTH + 4]; /* A work area for composing compound strings */
@@ -7074,7 +7075,7 @@ static KT_KEY_FN(gl_vi_insert_at_bol)
   gl_save_for_undo(gl);
   return gl_beginning_of_line(gl, 0, NULL) ||
          gl_vi_insert(gl, 0, NULL);
-         
+
 }
 
 /*.......................................................................
@@ -8855,7 +8856,7 @@ static int _gl_watch_fd(GetLine *gl, int fd, GlFdEvent event,
  * returns a code which tells gl_get_line() what to do next. Note that
  * each call to gl_inactivity_timeout() replaces any previously installed
  * timeout callback, and that specifying a callback of 0, turns off
- * inactivity timing. 
+ * inactivity timing.
  *
  * Beware that although the timeout argument includes a nano-second
  * component, few computer clocks presently have resolutions finer
@@ -8964,7 +8965,7 @@ static int gl_event_handler(GetLine *gl, int fd)
  */
     struct timeval dt = gl->timer.fn ? gl->timer.dt : zero;
 /*
- * Add the specified user-input file descriptor tot he set that is to
+ * Add the specified user-input file descriptor to the set that is to
  * be watched.
  */
     FD_SET(fd, &rfds);
@@ -9298,7 +9299,7 @@ int gl_show_history(GetLine *gl, FILE *fp, const char *fmt, int all_groups,
 /*
  * Display the specified history group(s) while signals are blocked.
  */
-  status = _glh_show_history(gl->glh, _io_write_stdio, fp, fmt, all_groups, 
+  status = _glh_show_history(gl->glh, _io_write_stdio, fp, fmt, all_groups,
 			     max_lines) || fflush(fp)==EOF;
   if(!status)
     _err_record_msg(gl->err, _glh_last_error(gl->glh), END_ERR_MSG);
@@ -9806,7 +9807,7 @@ static int gl_display_prompt(GetLine *gl)
 	switch(pptr[1]) {
 /*
  * Add or remove a text attribute from the new set of attributes.
- */ 
+ */
 	case 'B': case 'U': case 'S': case 'P': case 'F': case 'V':
 	case 'b': case 'u': case 's': case 'p': case 'f': case 'v':
 	  switch(*++pptr) {
@@ -10331,7 +10332,7 @@ int gl_last_signal(GetLine *gl)
     gl_mask_signals(gl, &oldset);
 /*
  * Access gl now that signals are blocked.
- */    
+ */
     signo = gl->last_signal;
 /*
  * Restore the process signal mask before returning.
@@ -10393,7 +10394,7 @@ static int gl_present_line(GetLine *gl, const char *prompt,
 	gl_truncate_buffer(gl, 0);
       };
       gl->preload_id = 0;
-    }; 
+    };
 /*
  * Present a specified initial line?
  */
@@ -10614,7 +10615,7 @@ GlReturnStatus gl_return_status(GetLine *gl)
     gl_mask_signals(gl, &oldset);
 /*
  * Access gl while signals are blocked.
- */    
+ */
     rtn_status = gl->rtn_status;
 /*
  * Restore the process signal mask before returning.
@@ -10646,7 +10647,7 @@ GlPendingIO gl_pending_io(GetLine *gl)
     gl_mask_signals(gl, &oldset);
 /*
  * Access gl while signals are blocked.
- */    
+ */
     pending_io = gl->pending_io;
 /*
  * Restore the process signal mask before returning.
@@ -10669,7 +10670,7 @@ GlPendingIO gl_pending_io(GetLine *gl)
  * call gl_raw_io() to redisplay the line and resume editing.
  *
  * This function is async signal safe.
- * 
+ *
  * Input:
  *  gl      GetLine *  The line editor resource object.
  * Output:
@@ -10735,7 +10736,7 @@ static int _gl_raw_io(GetLine *gl, int redisplay)
 /*
  * Switch to non-blocking I/O mode?
  */
-  if(gl->io_mode==GL_SERVER_MODE && 
+  if(gl->io_mode==GL_SERVER_MODE &&
      (gl_nonblocking_io(gl, gl->input_fd) ||
       gl_nonblocking_io(gl, gl->output_fd) ||
       (gl->file_fp && gl_nonblocking_io(gl, fileno(gl->file_fp))))) {
@@ -11203,7 +11204,7 @@ int gl_tty_signals(void (*term_handler)(int), void (*susp_handler)(int),
     } else if(sig->attr & GLSA_SIZE) {
       if(gl_set_tty_signal(sig->signo, size_handler))
 	return 1;
-    };      
+    };
   };
   return 0;
 }
@@ -11823,7 +11824,7 @@ static int gl_classify_signal(int signo)
 
 /*.......................................................................
  * When in non-blocking server mode, this function can be used to abandon
- * the current incompletely entered input line, and prepare to start 
+ * the current incompletely entered input line, and prepare to start
  * editing a new line on the next call to gl_get_line().
  *
  * Input:
@@ -12397,7 +12398,7 @@ static int gl_read_stream_char(GetLine *gl)
  *  return          int     0 - OK
  *                          1 - Error.
  */
-int gl_bind_keyseq(GetLine *gl, GlKeyOrigin origin, const char *keyseq, 
+int gl_bind_keyseq(GetLine *gl, GlKeyOrigin origin, const char *keyseq,
 		   const char *action)
 {
   KtBinder binder;  /* The private internal equivalent of 'origin' */

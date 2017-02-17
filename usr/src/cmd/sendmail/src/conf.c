@@ -14,6 +14,7 @@
 /*
  * Copyright 1999-2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sendmail.h>
@@ -1152,7 +1153,7 @@ username()
 **  TTYPATH -- Get the path of the user's tty
 **
 **	Returns the pathname of the user's tty.  Returns NULL if
-**	the user is not logged in or if s/he has write permission
+**	the user is not logged in or if they have write permission
 **	denied.
 **
 **	Parameters:

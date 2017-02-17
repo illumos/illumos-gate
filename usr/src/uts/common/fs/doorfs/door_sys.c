@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1496,7 +1497,7 @@ out:
 		mutex_enter(&door_knob);
 		DOOR_T_RELEASE(ct);
 
-		/* let the client know we have processed his message */
+		/* let the client know we have processed its message */
 		ct->d_args_done = 1;
 
 		if (error) {

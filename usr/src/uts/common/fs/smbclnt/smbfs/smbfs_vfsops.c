@@ -35,6 +35,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -989,7 +990,7 @@ smbfs_mount_label_policy(vfs_t *vfsp, void *ipaddr, int addr_type, cred_t *cr)
 	 * mounts into the global zone itself; restrict these to
 	 * read-only.)
 	 *
-	 * If the requestor is in some other zone, but his label
+	 * If the requestor is in some other zone, but their label
 	 * dominates the server, then allow read-down.
 	 *
 	 * Otherwise, access is denied.

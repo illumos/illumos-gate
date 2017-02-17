@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 1985, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -211,7 +212,7 @@ struct cmd {
 
 typedef struct headline {
 	custr_t	*hl_from;	/* The name of the sender */
-	custr_t	*hl_tty;	/* His tty string (if any) */
+	custr_t	*hl_tty;	/* Its tty string (if any) */
 	custr_t	*hl_date;	/* The entire date string */
 } headline_t;
 

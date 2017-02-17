@@ -22,6 +22,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1464,7 +1465,7 @@ dorep(char *argv[])
  *	endtape checks the entry in dblock.dbuf to see if its the
  *	special EOT entry.  Endtape is usually called after getdir().
  *
- *	endtape used to call backtape; it no longer does, he who
+ *	endtape used to call backtape; it no longer does, it who
  *	wants it backed up must call backtape himself
  *	RETURNS:	0 if not EOT, tape position unaffected
  *			1 if	 EOT, tape position unaffected

@@ -22,6 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * tcp.c, Code implementing the TCP protocol.
  */
@@ -729,7 +730,7 @@ tcp_close_detached(tcp_t *tcp)
 
 /*
  * If we are an eager connection hanging off a listener that hasn't
- * formally accepted the connection yet, get off his list and blow off
+ * formally accepted the connection yet, get off its list and blow off
  * any data that we have accumulated.
  */
 static void

@@ -22,6 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * A module that implements a dummy security mechanism.
  * It's mainly used to test GSS-API application. Multiple tokens
@@ -333,7 +334,7 @@ dummy_gss_init_sec_context(ct, minor_status, claimant_cred_handle,
 				 * information to perform per-message
 				 * processing. So if initiator previously
 				 * returned GSS_S_COMPLETE, and acceptor
-				 * says he needs more, then we have
+				 * says it needs more, then we have
 				 * a problem.
 				 */
 				ctx->last_stat = GSS_S_FAILURE;

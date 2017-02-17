@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2016 RackTop Systems.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -463,7 +464,7 @@ recheck_target:
 
 /*
  * after making the call to dynamic_dependecies unconditional we can handle
- * target names that are same as file name. In this case $$@ in the 
+ * target names that are same as file name. In this case $$@ in the
  * dependencies did not mean anything. WIth this change it expands it
  * as expected.
  */
@@ -619,7 +620,7 @@ recheck_target:
  * Regression! See BugId 1255360
  * If more than one percent rules are defined for the same target then
  * the behaviour of 'make' with my previous fix may be different from one
- * of the 'old make'. 
+ * of the 'old make'.
  * The global variable second_pass (maybe it should be an argument to doname())
  * is intended to avoid this regression. It is set in doname_check().
  * First, 'make' will work as it worked before. Only when it is
@@ -722,7 +723,7 @@ r_command:
 	if ((command != NULL) &&
 	    (command->body.line.command_template != NULL)) {
 		if (result != build_failed) {
-			result = run_command(command, 
+			result = run_command(command,
 					     (Boolean) ((parallel || save_parallel) && !silent));
 		}
 		switch (result) {
@@ -902,7 +903,7 @@ r_command:
  *
  *	Return value:
  *				True returned if some dependencies left running
- *				
+ *
  *	Parameters:
  *		result		Pointer to cell we update if build failed
  *		line		We get the dependencies from here
@@ -1081,7 +1082,7 @@ check_dependencies(Doname *result, Property line, Boolean do_get, Name target, N
 					true_target->stat.time = dependency->name->stat.time;
 					true_target->stat.time.tv_sec--;
 				} else {
-					/* Dina: 
+					/* Dina:
 					 * The next statement is commented
 					 * out as a fix for bug #1051032.
 					 * if dependency hasn't changed
@@ -1627,7 +1628,7 @@ run_command(register Property line, Boolean)
 	    keep_state &&
 	    !remember_only) {
 		(void) exists(make_state);
-		if((strlen(temp_file_directory) == 1) && 
+		if((strlen(temp_file_directory) == 1) &&
 			(temp_file_directory[0] == '/')) {
 		   tmp_file_path[0] = '\0';
 		} else {
@@ -1744,7 +1745,7 @@ run_command(register Property line, Boolean)
  *	Return value:
  *				The result of the command build
  *
- *	Parameters:	
+ *	Parameters:
  *		line		The command to execute
  *
  *	Static variables used:
@@ -1865,15 +1866,15 @@ execute_serial(Property line)
 	if(spro) {
 		char *val = spro->body.env_mem.value;
 		if(val != NULL) {
-			/* 
+			/*
 			 * Do not return memory allocated for SUNPRO_DEPENDENCIES
-			 * It will be returned in setvar_daemon() in macro.cc 
+			 * It will be returned in setvar_daemon() in macro.cc
 			 */
 			//	retmem_mb(val);
 			spro->body.env_mem.value = NULL;
 		}
 	}
-	
+
         return result;
 }
 
@@ -1953,14 +1954,14 @@ check_state(Name temp_file_name)
 	}
 
 	/*
-	 * Then read the temp file that now might 
-	 * contain dependency reports from utilities 
+	 * Then read the temp file that now might
+	 * contain dependency reports from utilities
 	 */
 	read_dependency_file(temp_file_name);
 
 	/*
 	 * And reread .make.state if it
-	 * changed (the command ran recursive makes) 
+	 * changed (the command ran recursive makes)
 	 */
 	check_read_state_file();
 	if (temp_file_name != NULL) {
@@ -2263,7 +2264,7 @@ build_command_strings(Name target, register Property line)
 	Chain hat_list = NULL;
 	Chain *hat_list_tail = &hat_list;
 
-	for (Dependency dependency = line->body.line.dependencies; 
+	for (Dependency dependency = line->body.line.dependencies;
 		dependency != NULL;
 		dependency = dependency->next) {
 		/* skip automatic dependencies */
@@ -2271,10 +2272,10 @@ build_command_strings(Name target, register Property line)
 			if ((dependency->name != force) &&
 				(dependency->stale == false)) {
 				*hat_list_tail = ALLOC(Chain);
-			
+
 				if (dependency->name->is_member &&
 					(get_prop(dependency->name->prop, member_prop) != NULL)) {
-					(*hat_list_tail)->name = 
+					(*hat_list_tail)->name =
 							get_prop(dependency->name->prop,
 								member_prop)->body.member.member;
 				} else {
@@ -2592,14 +2593,14 @@ update_target(Property line, Doname result)
 	/*
 	 * [tolik] Additional fix for bug 1063790. It was fixed
 	 * for serial make long ago, but DMake dumps core when
-	 * target is a symlink and sccs file is newer then target. 
+	 * target is a symlink and sccs file is newer then target.
 	 * In this case, finish_children() calls update_target()
 	 * with line==NULL.
 	 */
 	if(line == NULL) {
 		/* XXX. Should we do anything here? */
 		return;
-	}	
+	}
 
 	target = line->body.line.target;
 
@@ -2778,7 +2779,7 @@ sccs_get(register Name target, register Property *command)
 		      (target->prop->body.sccs.file) &&
 		      (target->prop->body.sccs.file->string_mb)) {
 		      if((strlen(target->prop->body.sccs.file->string_mb) ==
-			strlen(target->string_mb) + 2) && 
+			strlen(target->string_mb) + 2) &&
 		        (target->prop->body.sccs.file->string_mb[0] == 's') &&
 		        (target->prop->body.sccs.file->string_mb[1] == '.')) {
 
@@ -3164,7 +3165,7 @@ target_can_be_built(register Name target) {
 	if (result == build_dont_know) {
 		result = find_percent_rule(target, NULL, false);
 	}
-	
+
 	/* try to find double suffix rule */
 	if (result == build_dont_know) {
 		if (target->is_member) {
@@ -3178,17 +3179,17 @@ target_can_be_built(register Name target) {
 			result = find_double_suffix_rule(target, NULL, false);
 		}
 	}
-	
+
 	/* try to find suffix rule */
 	if ((result == build_dont_know) && second_pass) {
 		result = find_suffix_rule(target, target, empty_name, NULL, false);
 	}
-	
+
 	/* check for sccs */
 	if (result == build_dont_know) {
 		result = sccs_get(target, NULL);
 	}
-	
+
 	/* try to find dyn target */
 	if (result == build_dont_know) {
 		Name dtarg = find_dyntarget(target);
@@ -3196,7 +3197,7 @@ target_can_be_built(register Name target) {
 			result = target_can_be_built(dtarg);
 		}
 	}
-	
+
 	/* check whether target was mentioned in makefile */
 	if (result == build_dont_know) {
 		if (target->colons != no_colon) {

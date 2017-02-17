@@ -21,6 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -313,7 +314,7 @@ ejectit(char *name)
 	/*
 	 * If volume management is either not running or not being managed by
 	 * vold, and the device is mounted, we try to umount the device.  If we
-	 * fail, we give up, unless he used the -f flag.
+	 * fail, we give up, unless it used the -f flag.
 	 */
 
 	if (_dev_mounted(name)) {

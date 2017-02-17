@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1126,7 +1127,7 @@ compareLUName(MP_CHAR *cmpString, MP_CHAR *deviceProperty)
  *	Displays info about an LU
  *
  * luOid	- LU to list
- * luProps	- properties of he LU to list
+ * luProps	- properties of the LU to list
  *
  * ****************************************************************************
  */
@@ -1265,7 +1266,7 @@ showLogicalUnit(int operandLen, char *operand[])
  *	Displays info about an LU
  *
  * luOid	- LU to show
- * luProps	- properties of he LU to show
+ * luProps	- properties of the LU to show
  * pluginProps	- propertis of the plugin this LU belongs to
  *
  * ****************************************************************************

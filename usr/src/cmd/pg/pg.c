@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -516,7 +517,7 @@ char *filename;
 		/*
 		 * Wait for output to drain before going on.
 		 * This is done so that the user will not hit
-		 * break and quit before he has seen the prompt.
+		 * break and quit before they have seen the prompt.
 		 */
 		(void) ioctl(1, TCSBRK, 1);
 		if (setjmp(restore) > 0)

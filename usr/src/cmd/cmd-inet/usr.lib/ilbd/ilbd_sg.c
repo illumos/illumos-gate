@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -742,7 +743,7 @@ ilbd_add_server_to_group(ilb_sg_info_t *sg_info, int ev_port,
 			 * serverid  when processing the next add-server
 			 * command for this servergroup, while connection
 			 * draining is underway. We assume that the user
-			 * will read the man page after he/she encounters
+			 * will read the man page after they encounter
 			 * this failure, and learn to not add any server
 			 * to the servergroup until connection draining of
 			 * all servers in the  servergroup is complete.

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -400,8 +401,8 @@ do_core(char *fp, int sig, enum core_types core_type, struct core_globals *cg)
 	 * For security reasons, we don't want root processes
 	 * to dump core through a symlink because that would
 	 * allow a malicious user to clobber any file on
-	 * the system if s/he could convince a root process,
-	 * perhaps a set-uid root process that s/he started,
+	 * the system if they could convince a root process,
+	 * perhaps a set-uid root process that they started,
 	 * to dump core in a directory writable by that user.
 	 * Similar security reasons apply to hard links.
 	 * For symmetry we do this unconditionally, not

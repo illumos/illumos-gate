@@ -22,6 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -443,7 +444,7 @@ more:;
 /*
  * Execute a single command.  If the command executed
  * is "quit," then return non-zero so that the caller
- * will know to return back to main, if he cares.
+ * will know to return back to main, if it cares.
  * Contxt is non-zero if called while composing mail.
  */
 
@@ -529,7 +530,7 @@ execute(char linebuf[], int contxt)
 
 	/*
 	 * Process the arguments to the command, depending
-	 * on the type he expects.  Default to an error.
+	 * on the type it expects.  Default to an error.
 	 * If we are sourcing an interactive command, it's
 	 * an error.
 	 */

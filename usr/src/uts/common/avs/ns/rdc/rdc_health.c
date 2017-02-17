@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -413,7 +414,7 @@ rdc_lookup_host(char *host)
 
 /*
  * Handle the RDC_LINK_DOWN ioctl.
- * The user specifies which host he is interested in.
+ * The user specifies which host they're interested in.
  * This function is woken up when the link to that host goes down.
  */
 

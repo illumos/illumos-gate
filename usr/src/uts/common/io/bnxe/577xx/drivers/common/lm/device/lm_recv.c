@@ -82,7 +82,7 @@ static void FORCEINLINE lm_rx_set_prods( lm_device_t     *pdev,
 /*******************************************************************************
  * Description:
  *  rx_chain_bd always valid, rx_chain_sge valid only in case we are LAH enabled in this queue
- *  all if() checking will be always done on rx_chain_bd since he is always valid and sge should be consistent
+ *  all if() checking will be always done on rx_chain_bd since it is always valid and sge should be consistent
  *  We verify it in case sge is valid
  *  all bd_xxx operations will be done on both
  * Return:

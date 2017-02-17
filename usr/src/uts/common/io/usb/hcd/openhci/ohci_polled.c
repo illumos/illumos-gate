@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -326,7 +327,7 @@ ohci_hcdi_polled_read(
 
 	/*
 	 * To make sure after we get the done list from DoneHead,
-	 * every input device get his own TD's in the
+	 * every input device gets its own TD's in the
 	 * ohci_polled_done_list and then clear the interrupt status.
 	 */
 	if (intr & HCR_INTR_WDH) {

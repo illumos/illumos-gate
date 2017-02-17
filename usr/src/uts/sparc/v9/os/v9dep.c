@@ -25,6 +25,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -104,7 +105,7 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 		if (!(pfp->fpu_en) && (!(pfp->fpu_fprs & FPRS_FEF)) &&
 		    fpu_exists) {
 			/*
-			 * He's not currently using the FPU but wants to in his
+			 * It's not currently using the FPU but wants to in its
 			 * new context - arrange for this on return to userland.
 			 */
 			pfp->fpu_fprs = (uint32_t)fprs;
@@ -1124,7 +1125,7 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 
 
 	/*
-	 * Since we flushed the user's windows and we are changing his
+	 * Since we flushed the user's windows and we are changing their
 	 * stack pointer, the window that the user will return to will
 	 * be restored from the save area in the frame we are setting up.
 	 * We copy in save area for old stack pointer so that debuggers
@@ -1461,7 +1462,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 
 
 	/*
-	 * Since we flushed the user's windows and we are changing his
+	 * Since we flushed the user's windows and we are changing their
 	 * stack pointer, the window that the user will return to will
 	 * be restored from the save area in the frame we are setting up.
 	 * We copy in save area for old stack pointer so that debuggers

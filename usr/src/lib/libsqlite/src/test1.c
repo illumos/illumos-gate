@@ -34,7 +34,7 @@
 ** Decode a pointer to an sqlite object.
 */
 static int getDbPointer(Tcl_Interp *interp, const char *zA, sqlite **ppDb){
-  if( sscanf(zA, PTR_FMT, (void**)ppDb)!=1 && 
+  if( sscanf(zA, PTR_FMT, (void**)ppDb)!=1 &&
       (zA[0]!='0' || zA[1]!='x' || sscanf(&zA[2], PTR_FMT, (void**)ppDb)!=1)
   ){
     Tcl_AppendResult(interp, "\"", zA, "\" is not a valid pointer value", 0);
@@ -62,7 +62,7 @@ static int getVmPointer(Tcl_Interp *interp, const char *zArg, sqlite_vm **ppVm){
 ** "%p" you cannot turn around and do a scanf with the same "%p" and
 ** get your pointer back.  You have to prepend a "0x" before it will
 ** work.  Or at least that is what is reported to me (drh).  But this
-** behavior varies from machine to machine.  The solution used her is
+** behavior varies from machine to machine.  The solution used here is
 ** to test the string right after it is generated to see if it can be
 ** understood by scanf, and if not, try prepending an "0x" to see if
 ** that helps.  If nothing works, a fatal error is generated.
@@ -151,7 +151,7 @@ static int test_exec_printf(
   char *zErr = 0;
   char zBuf[30];
   if( argc!=4 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " DB FORMAT STRING", 0);
     return TCL_ERROR;
   }
@@ -169,7 +169,7 @@ static int test_exec_printf(
 /*
 ** Usage:  sqlite_mprintf_z_test  SEPARATOR  ARG0  ARG1 ...
 **
-** Test the %z format of mprintf().  Use multiple mprintf() calls to 
+** Test the %z format of mprintf().  Use multiple mprintf() calls to
 ** concatenate arg0 through argn using separator as the separator.
 ** Return the result.
 */
@@ -212,13 +212,13 @@ static int test_get_table_printf(
   int i;
   char zBuf[30];
   if( argc!=4 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " DB FORMAT STRING", 0);
     return TCL_ERROR;
   }
   if( getDbPointer(interp, argv[1], &db) ) return TCL_ERROR;
   Tcl_DStringInit(&str);
-  rc = sqlite_get_table_printf(db, argv[2], &aResult, &nRow, &nCol, 
+  rc = sqlite_get_table_printf(db, argv[2], &aResult, &nRow, &nCol,
                &zErr, argv[3]);
   sprintf(zBuf, "%d", rc);
   Tcl_AppendElement(interp, zBuf);
@@ -353,15 +353,15 @@ static int execFuncCallback(void *pData, int argc, char **argv, char **NotUsed){
 ** This is illegal and should set the SQLITE_MISUSE flag on the database.
 **
 ** 2004-Jan-07:  We have changed this to make it legal to call sqlite_exec()
-** from within a function call.  
-** 
+** from within a function call.
+**
 ** This routine simulates the effect of having two threads attempt to
 ** use the same database at the same time.
 */
 static void sqliteExecFunc(sqlite_func *context, int argc, const char **argv){
   struct dstr x;
   memset(&x, 0, sizeof(x));
-  sqlite_exec((sqlite*)sqlite_user_data(context), argv[0], 
+  sqlite_exec((sqlite*)sqlite_user_data(context), argv[0],
       execFuncCallback, &x, 0);
   sqlite_set_result_string(context, x.z, x.nUsed);
   sqliteFree(x.z);
@@ -414,7 +414,7 @@ static void countStep(sqlite_func *context, int argc, const char **argv){
   if( (argc==0 || argv[0]) && p ){
     p->n++;
   }
-}   
+}
 static void countFinalize(sqlite_func *context){
   CountCtx *p;
   p = sqlite_aggregate_context(context, sizeof(*p));
@@ -667,7 +667,7 @@ static int test_register_func(
   sqlite *db;
   int rc;
   if( argc!=3 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " DB FUNCTION-NAME", 0);
     return TCL_ERROR;
   }
@@ -720,7 +720,7 @@ static int sqlite_datatypes(
   sqlite *db;
   int rc;
   if( argc!=3 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " DB SQL", 0);
     return TCL_ERROR;
   }
@@ -753,7 +753,7 @@ static int test_compile(
   const char *zTail;
   char zBuf[50];
   if( argc!=3 && argc!=4 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " DB SQL TAILVAR", 0);
     return TCL_ERROR;
   }
@@ -794,7 +794,7 @@ static int test_step(
   char *zRc;
   char zBuf[50];
   if( argc<2 || argc>5 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " VM NVAR VALUEVAR COLNAMEVAR", 0);
     return TCL_ERROR;
   }
@@ -835,7 +835,7 @@ static int test_step(
 }
 
 /*
-** Usage:  sqlite_finalize  VM 
+** Usage:  sqlite_finalize  VM
 **
 ** Shutdown a virtual machine.
 */
@@ -849,7 +849,7 @@ static int test_finalize(
   int rc;
   char *zErrMsg = 0;
   if( argc!=2 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " VM\"", 0);
     return TCL_ERROR;
   }
@@ -866,7 +866,7 @@ static int test_finalize(
 }
 
 /*
-** Usage:  sqlite_reset   VM 
+** Usage:  sqlite_reset   VM
 **
 ** Reset a virtual machine and prepare it to be run again.
 */
@@ -880,7 +880,7 @@ static int test_reset(
   int rc;
   char *zErrMsg = 0;
   if( argc!=2 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " VM\"", 0);
     return TCL_ERROR;
   }
@@ -922,7 +922,7 @@ static int test_bind(
   int rc;
   int idx;
   if( argc!=5 ){
-    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0], 
+    Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
        " VM IDX VALUE (null|static|normal)\"", 0);
     return TCL_ERROR;
   }
@@ -1014,13 +1014,13 @@ int Sqlitetest1_Init(Tcl_Interp *interp){
   for(i=0; i<sizeof(aCmd)/sizeof(aCmd[0]); i++){
     Tcl_CreateCommand(interp, aCmd[i].zName, aCmd[i].xProc, 0, 0);
   }
-  Tcl_LinkVar(interp, "sqlite_search_count", 
+  Tcl_LinkVar(interp, "sqlite_search_count",
       (char*)&sqlite_search_count, TCL_LINK_INT);
-  Tcl_LinkVar(interp, "sqlite_interrupt_count", 
+  Tcl_LinkVar(interp, "sqlite_interrupt_count",
       (char*)&sqlite_interrupt_count, TCL_LINK_INT);
-  Tcl_LinkVar(interp, "sqlite_open_file_count", 
+  Tcl_LinkVar(interp, "sqlite_open_file_count",
       (char*)&sqlite_open_file_count, TCL_LINK_INT);
-  Tcl_LinkVar(interp, "sqlite_current_time", 
+  Tcl_LinkVar(interp, "sqlite_current_time",
       (char*)&sqlite_current_time, TCL_LINK_INT);
   Tcl_LinkVar(interp, "sqlite_static_bind_value",
       (char*)&sqlite_static_bind_value, TCL_LINK_STRING);

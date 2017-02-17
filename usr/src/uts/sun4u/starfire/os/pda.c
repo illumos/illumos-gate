@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -384,7 +385,7 @@ pda_is_valid(pda_handle_t ph)
  * p2o_update_checksum
  *
  * Calculate checksum for post2obp structure and insert it so
- * when POST reads it he'll be happy.
+ * when POST reads it it'll be happy.
  */
 static void
 p2o_update_checksum(post2obp_info_t *p2o)

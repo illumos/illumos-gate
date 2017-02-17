@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include "libdevinfo.h"
@@ -2000,7 +2001,7 @@ devlink_snapshot(const char *root_dir)
 
 	/*
 	 * We don't need to lock.  If a consumer wants the very latest db
-	 * then he must perform a di_devlink_init with the DI_MAKE_LINK
+	 * then it must perform a di_devlink_init with the DI_MAKE_LINK
 	 * flag to force a sync with devfsadm first.  Otherwise, the
 	 * current database file is opened and mmaped on demand: the rename
 	 * associated with a db update does not change the contents

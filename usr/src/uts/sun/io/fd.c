@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -147,7 +148,7 @@
  * doing dma in chunks of 2048 works OK.
  * The reason for making this a global variable is that there could be
  * situations under which the customer would like to get full performance
- * from floppy. He may not be having IFB boards that cause underrun errors.
+ * from floppy. They may not be having IFB boards that cause underrun errors.
  * Under those conditions we could set this value to a much higher value
  * by editing /etc/system file.
  */

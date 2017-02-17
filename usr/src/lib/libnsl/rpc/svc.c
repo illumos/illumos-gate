@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -886,7 +887,7 @@ svc_reg(const SVCXPRT *xprt, const rpcprog_t prog, const rpcvers_t vers,
 		if (netid)
 			free(netid);
 		if (s->sc_dispatch == dispatch)
-			goto rpcb_it; /* he is registering another xptr */
+			goto rpcb_it; /* it is registering another xptr */
 		(void) rw_unlock(&svc_lock);
 		return (FALSE);
 	}
@@ -995,7 +996,7 @@ svc_register(SVCXPRT *xprt, rpcprog_t prog, rpcvers_t vers,
 		if (netid)
 			free(netid);
 		if (s->sc_dispatch == dispatch)
-			goto pmap_it;  /* he is registering another xptr */
+			goto pmap_it;  /* it is registering another xptr */
 		(void) rw_unlock(&svc_lock);
 		return (FALSE);
 	}

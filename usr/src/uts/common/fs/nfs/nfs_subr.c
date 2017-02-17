@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -5129,7 +5130,7 @@ nfs_mount_label_policy(vfs_t *vfsp, struct netbuf *addr,
 	 * mounts into the global zone itself; restrict these to
 	 * read-only.)
 	 *
-	 * If the requestor is in some other zone, but his label
+	 * If the requestor is in some other zone, but their label
 	 * dominates the server, then allow read-down.
 	 *
 	 * Otherwise, access is denied.

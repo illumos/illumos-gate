@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -425,7 +426,7 @@ scsi_format(start, end, list)
 
 	/*
 	 * Construct the uscsi format ioctl.  The form depends
-	 * upon the defect list the user extracted.  If s/he
+	 * upon the defect list the user extracted.  If they
 	 * extracted the "original" list, we format with only
 	 * the P (manufacturer's defect) list.  Otherwise, we
 	 * format with both the P and the G (grown) list.

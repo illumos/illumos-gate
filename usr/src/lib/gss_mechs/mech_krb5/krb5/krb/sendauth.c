@@ -1,6 +1,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -14,7 +15,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +29,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * convenience sendauth/recvauth functions
  */
@@ -62,7 +63,7 @@ krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointe
 	 * First, send over the length of the sendauth version string;
 	 * then, we send over the sendauth version.  Next, we send
 	 * over the length of the application version strings followed
-	 * by the string itself.  
+	 * by the string itself.
 	 */
 	outbuf.length = strlen(sendauth_version) + 1;
 	outbuf.data = (char *) sendauth_version;
@@ -110,7 +111,7 @@ krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointe
 						  &creds.server)))
 			goto error_return;
 		if (client)
-			retval = krb5_copy_principal(context, client, 
+			retval = krb5_copy_principal(context, client,
 						     &creds.client);
 		else
 			retval = krb5_cc_get_principal(context, use_ccache,
@@ -147,14 +148,14 @@ krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointe
 	    d.length = sizeof (rnd_data);
 	    d.data = rnd_data;
 	    len2 = sizeof (rnd_data);
-	    if (getpeername (*(int*)fd, (GETPEERNAME_ARG2_TYPE *) rnd_data, 
+	    if (getpeername (*(int*)fd, (GETPEERNAME_ARG2_TYPE *) rnd_data,
 			     &len2) == 0) {
 		d.length = len2;
 		/* Solaris Kerberos */
 		(void) krb5_c_random_seed (context, &d);
 	    }
 	    len2 = sizeof (rnd_data);
-	    if (getsockname (*(int*)fd, (GETSOCKNAME_ARG2_TYPE *) rnd_data, 
+	    if (getsockname (*(int*)fd, (GETSOCKNAME_ARG2_TYPE *) rnd_data,
 			     &len2) == 0) {
 		d.length = len2;
 		/* Solaris Kerberos */
@@ -199,7 +200,7 @@ krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointe
 		krb5_xfree(inbuf.data);
 		goto error_return;
 	}
-	
+
 	/*
 	 * If we asked for mutual authentication, we should now get a
 	 * length field, followed by a AP_REP message
@@ -222,9 +223,9 @@ krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointe
 	    krb5_xfree(inbuf.data);
 	    /*
 	     * If the user wants to look at the AP_REP message,
-	     * copy it for him
+	     * copy it for them.
 	     */
-	    if (rep_result) 
+	    if (rep_result)
 		*rep_result = repl;
 	    else
 		krb5_free_ap_rep_enc_part(context, repl);
@@ -238,7 +239,7 @@ krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointe
 error_return:
     krb5_free_cred_contents(context, &creds);
     if (credspout != NULL)
-	krb5_free_creds(context, credspout); 
+	krb5_free_creds(context, credspout);
     /* Solaris Kerberos */
     if (!ccache && use_ccache)
 	(void) krb5_cc_close(context, use_ccache);

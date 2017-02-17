@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1195,7 +1196,7 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 	iomin = (attr->dma_attr_burstsizes & 0xffff) |
 	    ((attr->dma_attr_burstsizes >> 16) & 0xffff);
 	/*
-	 * If a driver set burtsizes to 0, we give him byte alignment.
+	 * If a driver set burtsizes to 0, we give it byte alignment.
 	 * Otherwise align at the burtsizes boundary.
 	 */
 	if (iomin == 0)

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -149,7 +150,7 @@
  *
  * In many ways (1) is the cleanest solution, but if a lock is moderately
  * contended it defeats the adaptive spin logic.  If we make some other
- * thread the owner, but he's not ONPROC yet, then all other threads on
+ * thread the owner, but it's not ONPROC yet, then all other threads on
  * other cpus that try to get the lock will conclude that the owner is
  * blocked, so they'll block too.  And so on -- it escalates quickly,
  * with every thread taking the blocking path rather than the spin path.

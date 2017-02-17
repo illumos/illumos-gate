@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -168,10 +169,10 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 	 * the Spooler's job is SPOOLING, not PRINTING. That's right,
 	 * except that the Spooler will be making a choice of printers
 	 * so it has to evaluate carefully: E.g. user wants ANY printer,
-	 * so we should pick one that can handle what he/she wants.
-	 * 
+	 * so we should pick one that can handle what they want.
+	 *
 	 * Parse out the important stuff here so we have it when we
-	 * need it. 
+	 * need it.
 	 */
 	{
 		register char		**list,
@@ -873,7 +874,7 @@ _chkopts(RSTATUS *prs, CANDIDATE *pc, FSTATUS *pfs)
 	 * character set. (Note: The check for the print wheel case
 	 * is done elsewhere.)
 	 */
-		
+
 	if (pc->pps->printer->daisy ||
 	    search_cslist(prs->request->charset, pc->pps->printer->char_sets))
 		charset = 0;

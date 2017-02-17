@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include "lint.h"
@@ -620,7 +621,7 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 			/*
 			 * Do a priority check on the queued waiter (the
 			 * highest priority thread on the queue) to see
-			 * if we should defer to him or just grab the lock.
+			 * if we should defer to it or just grab the lock.
 			 */
 			int our_pri = real_priority(self);
 			int his_pri = real_priority(ulwp);

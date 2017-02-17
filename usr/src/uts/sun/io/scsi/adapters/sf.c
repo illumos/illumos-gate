@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -3543,7 +3544,7 @@ sf_do_reportlun(struct sf *sf, struct sf_els_hdr *privp,
 	reportlun->fcp_cntl.cntl_qtype = FCP_QTYPE_SIMPLE;
 
 	(void) ddi_dma_sync(lun_dma_handle, 0, 0, DDI_DMA_SYNC_FORDEV);
-	/* We know he's there, so this should be fast */
+	/* We know it's there, so this should be fast */
 	privp->timeout = sf_watchdog_time + SF_FCP_TIMEOUT;
 	if (sf_els_transport(sf, privp) == 1)
 		return (1);

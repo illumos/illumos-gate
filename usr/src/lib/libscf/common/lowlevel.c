@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013, Joyent, Inc. All rights reserved.
  * Copyright 2016 RackTop Systems.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -110,7 +111,7 @@ static void scf_value_reset_locked(scf_value_t *val, int and_destroy);
 
 /*
  * Hold and release subhandles.  We only allow one thread access to the
- * subhandles at a time, and he can use any subset, grabbing and releasing
+ * subhandles at a time, and it can use any subset, grabbing and releasing
  * them in any order.  The only restrictions are that you cannot hold an
  * already-held subhandle, and all subhandles must be released before
  * returning to the original caller.

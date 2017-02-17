@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <libcpc.h>
@@ -44,7 +45,7 @@
 /*
  * The library uses the cpc_lock field of the cpc_t struct to protect access to
  * the linked lists inside the cpc_t, and only the linked lists. It is NOT used
- * to protect against a user shooting his/herself in the foot (such as, for
+ * to protect against users shooting themselves in the foot (such as, for
  * instance, destroying the same set at the same time from different threads.).
  *
  * SIGEMT needs to be blocked while holding the lock, to prevent deadlock among

@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include "lint.h"
@@ -79,7 +80,7 @@ daemon(int nochdir, int noclose)
 
 		/*
 		 * Also, if any of the descriptor redirects fails we should
-		 * return with error to signal to the caller that his request
+		 * return with error to signal to the caller that its request
 		 * cannot be fulfilled properly. It is up to the caller to
 		 * do the cleanup.
 		 */

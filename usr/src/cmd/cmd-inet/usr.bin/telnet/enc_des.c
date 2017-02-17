@@ -69,6 +69,9 @@
  */
 
 /* based on @(#)enc_des.c	8.1 (Berkeley) 6/4/93 */
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 
 #include <krb5.h>
 #include <stdio.h>
@@ -170,7 +173,7 @@ cfb64_start(int dir)
 	case TELNET_DIR_DECRYPT:
 		/*
 		 * This is simply a request to have the other side
-		 * start output (our input).  He will negotiate an
+		 * start output (our input).  The other side will negotiate an
 		 * IV so we need not look for it.
 		 */
 		state = fbp->state[dir];

@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * lib/libnsl/nss/netdir_inet_sundry.c
  *
@@ -960,7 +961,7 @@ bindresvport(struct netconfig *nconf, int fd, struct netbuf *addr)
 		return (-1);
 	}
 
-	tbindstr.qlen = 0; /* Always 0; user should change if he wants to */
+	tbindstr.qlen = 0; /* Always 0; user should change if they want to */
 	tbindstr.addr.buf = (char *)u.buf;
 	tbindstr.addr.len = tbindstr.addr.maxlen = __rpc_get_a_size(tinfo.addr);
 

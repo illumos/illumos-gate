@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef	_REPCACHE_PROTOCOL_H
@@ -113,8 +114,8 @@
  *
  * An idiom the protocol uses to lower the number of round trips is
  * client-controlled identifiers.  The basic idea is this:  whenever a
- * client wants to set up and use a piece of server state, he picks an
- * integer *which he knows is not in use* to identify it.  The server then
+ * client wants to set up and use a piece of server state, it picks an
+ * integer *which it knows is not in use* to identify it.  The server then
  * maintains per-client, per-resource id->resource maps.  This has a number
  * of advantages:
  *

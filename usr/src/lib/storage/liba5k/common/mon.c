@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -1303,7 +1304,7 @@ struct	device_element	*front_elem, *rear_elem;
  * The string can also be NULL. This is the way the user
  * chooses to not have a password.
  *
- * I then tell the photon by giving him 4 NULL bytes.
+ * I then tell the photon by giving it 4 NULL bytes.
  *
  * RETURNS:
  *	0	 O.K.

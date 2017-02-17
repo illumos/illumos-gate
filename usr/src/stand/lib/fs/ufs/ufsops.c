@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -719,7 +720,7 @@ boot_ufs_lseek(int fd, off_t addr, int whence)
 {
 	fileid_t *filep;
 
-	/* Make sure user knows what file he is talking to */
+	/* Make sure user knows what file they're talking to */
 	if (!(filep = find_fp(fd)))
 		return (-1);
 
@@ -792,7 +793,7 @@ boot_ufs_close(int fd)
 {
 	fileid_t *filep;
 
-	/* Make sure user knows what file he is talking to */
+	/* Make sure user knows what file they're talking to */
 	if (!(filep = find_fp(fd)))
 		return (-1);
 

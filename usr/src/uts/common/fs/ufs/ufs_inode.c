@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1688,7 +1689,7 @@ ufs_scan_inodes(int rwtry, int (*func)(struct inode *, void *), void *arg,
 			 * ufs_iget().  This works because ufs_iget()
 			 * acquires the contents lock before putting
 			 * the inode into the cache.  If we can lock
-			 * it, then he's done with it.
+			 * it, then ufs_iget() is done with it.
 			 */
 
 			if (rwtry) {

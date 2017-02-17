@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -59,7 +60,7 @@ extern char *strcpy();
 
 /*
  * The group list
- * Store username and groups to which he/she belongs
+ * Store username and groups to which they belong
  */
 struct group_list {
 	char *user;

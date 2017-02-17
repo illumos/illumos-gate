@@ -22,6 +22,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -403,7 +404,7 @@ modhash(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "permitted\n");
 			return (DCMD_USAGE);
 		}
-		/* we force short mode here, no matter what he says */
+		/* we force short mode here, no matter what it says */
 		new_argv[0].a_type = MDB_TYPE_STRING;
 		new_argv[0].a_un.a_str = opt_t ? "-st" : "-s";
 		if (mdb_walk_dcmd("modhash", "modhash", 1, new_argv) == -1) {

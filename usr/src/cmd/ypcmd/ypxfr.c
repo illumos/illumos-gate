@@ -21,6 +21,7 @@
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -37,7 +38,7 @@
  * server, and gets it to the local site by using the normal NIS client
  * enumeration functions.  The map is copied to a temp name, then the real
  * map is removed and the temp map is moved to the real name.  ypxfr then
- * sends a "YPPROC_CLEAR" message to the local server to insure that he will
+ * sends a "YPPROC_CLEAR" message to the local server to insure that it will
  * not hold a removed map open, so serving an obsolete version.
  *
  * ypxfr [ -h <host> ] [ -d <domainname> ]
@@ -1828,7 +1829,7 @@ xfr_exit(status)
 
 /*
  * This sets up a UDP connection to the yppush process which contacted our
- * parent ypserv, and sends him a status on the requested transfer.
+ * parent ypserv, and sends it a status on the requested transfer.
  */
 void
 send_callback(status)

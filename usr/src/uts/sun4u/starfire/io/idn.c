@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -3819,7 +3820,7 @@ idn_timer_stopall(idn_timer_t *tp)
 		 *
 		 * 1. We successfully aborted a timeout call.
 		 *
-		 * 2. We failed to find the given timer.  He
+		 * 2. We failed to find the given timer.  It
 		 *    probably just fired off.
 		 */
 		idn_timer_free(tp);
@@ -4268,7 +4269,7 @@ idn_mainmbox_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 	/*
 	 * Domain 0 never has a send/recv mainmbox so
-	 * don't bother printing him.
+	 * don't bother printing it.
 	 */
 	for (domid = 1; domid < MAX_DOMAINS; domid++) {
 		idn_domain_t	*dp;

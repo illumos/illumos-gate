@@ -11,6 +11,7 @@
 
 /*
  * Copyright (C) 2013 Hewlett-Packard Development Company, L.P.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/sdt.h>
@@ -767,7 +768,7 @@ cpqary3_synccmd_complete(cpqary3_cmdpvt_t *cpqary3_cmdpvtp)
 		cpqary3_synccmd_cleanup(cpqary3_cmdpvtp);
 		mutex_enter(&(cpqary3p->sw_mutex));
 	} else {
-		/* submitter is waiting; wake him up */
+		/* submitter is waiting; wake it up */
 		cpqary3_cmdpvtp->cmdpvt_flag = 0;
 
 		/*

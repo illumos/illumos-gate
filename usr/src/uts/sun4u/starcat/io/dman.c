@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -710,7 +711,7 @@ static struct streamtab man_maninfo = {
  *
  *	Anyone who needs exclusive outer perimeter permission (changing
  *	global data structures) does so via qwriter() calls. The
- *	background thread does all his work outside of perimeter and
+ *	background thread does all its work outside of perimeter and
  *	submits work via qtimeout() when data structures need to be
  *	modified.
  */
@@ -2852,7 +2853,7 @@ man_dlioc(manstr_t *msp, mblk_t *mp)
 
 /*
  * We catch all DLPI messages that we have to resend to a new AP'ed
- * device to put him in the right state.  We link these messages together
+ * device to put it in the right state.  We link these messages together
  * w/ their b_next fields and hang it off of msp->ms_dl_mp.  We
  * must be careful to restore b_next fields before doing dupmsg/freemsg!
  *
@@ -4168,7 +4169,7 @@ man_iwork()
 
 /*
  * man_dr_detach has submitted a request to DRSWITCH a path.
- * He is in cv_wait_sig(wp->mw_cv). We forward the work request on to
+ * It is in cv_wait_sig(wp->mw_cv). We forward the work request on to
  * man_bwork as a switch request. It should end up back at
  * man_iwork, who will cv_signal(wp->mw_cv) man_dr_detach.
  *
@@ -4318,7 +4319,7 @@ exit:
 
 /*
  * man_dr_detach has submitted a request to DRDETACH a path.
- * He is in cv_wait_sig(wp->mw_cv). We remove the path and
+ * It is in cv_wait_sig(wp->mw_cv). We remove the path and
  * cv_signal(wp->mw_cv) man_dr_detach.
  *
  * Called holding perimeter lock.

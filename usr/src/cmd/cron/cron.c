@@ -25,6 +25,7 @@
  * Copyright 2013 Joshua M. Clulow <josh@sysmgr.org>
  *
  * Copyright (c) 2014 Gary Mills
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1452,7 +1453,7 @@ next_field(int lower, int upper)
 	 *   if (numbers in this field are out of range (lower..upper),
 	 *	or there is a syntax error) then
 	 *	NULL is returned, and a mail message is sent to the
-	 *	user telling him which line the error was in.
+	 *	user telling them which line the error was in.
 	 */
 
 	char *s;
@@ -2391,7 +2392,7 @@ ex(struct event *e)
 	}
 
 	/*
-	 * set correct user identification and check his account
+	 * set correct user identification and check their account
 	 */
 	r = set_user_cred(e->u, pproj);
 	if (r == VUC_EXPIRED) {

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -787,7 +788,7 @@ changeproj(proc_t *p, kproject_t *kpj, zone_t *zone, void *projbuf,
 			oldkpj = ttoproj(t);
 
 			/*
-			 * Kick this thread so that he doesn't sit
+			 * Kick this thread so that it doesn't sit
 			 * on a wrong wait queue.
 			 */
 			if (ISWAITING(t))

@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1000,7 +1001,7 @@ rlwinctl(queue_t *q, mblk_t *mp)
 	TRACE_2(TR_FAC_RLOGINP, TR_RLOGINP_WINCTL_IN, "rlwinctl start: q %p, "
 	    "mp %p", q, mp);
 
-	rmip->oobdata[0] &= ~TIOCPKT_WINDOW; /* we know he heard */
+	rmip->oobdata[0] &= ~TIOCPKT_WINDOW; /* we know they heard */
 
 	if ((rl_msgp = mkiocb(TIOCSWINSZ)) == NULL) {
 		TRACE_2(TR_FAC_RLOGINP, TR_RLOGINP_WINCTL_OUT, "rlwinctl end: "
