@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2017 James S Blachly, MD <james.blachly@gmail.com>
  */
 
 /*
@@ -161,6 +162,7 @@ mm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		{ "allkmem",	M_ALLKMEM,	0,	"all",	"all",	0600 },
 		{ "null",	M_NULL,	PRIVONLY_DEV,	NULL,	NULL,	0666 },
 		{ "zero",	M_ZERO, PRIVONLY_DEV,	NULL,	NULL,	0666 },
+		{ "full",	M_FULL, PRIVONLY_DEV,	NULL,	NULL,	0666 },
 	};
 	kstat_t *ksp;
 
@@ -222,6 +224,7 @@ mmopen(dev_t *devp, int flag, int typ, struct cred *cred)
 	switch (getminor(*devp)) {
 	case M_NULL:
 	case M_ZERO:
+	case M_FULL:
 	case M_MEM:
 	case M_KMEM:
 	case M_ALLKMEM:
@@ -248,6 +251,7 @@ mmchpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	switch (getminor(dev)) {
 	case M_NULL:
 	case M_ZERO:
+	case M_FULL:
 	case M_MEM:
 	case M_KMEM:
 	case M_ALLKMEM:
@@ -438,6 +442,14 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw, cred_t *cred)
 			}
 
 			break;
+
+		case M_FULL:
+			if (rw == UIO_WRITE) {
+				error = ENOSPC;
+				break;
+			}
+			/* else it's a read, fall through to zero case */
+			/*FALLTHROUGH*/
 
 		case M_ZERO:
 			if (rw == UIO_READ) {
@@ -828,6 +840,7 @@ mmmmap(dev_t dev, off_t off, int prot)
 		/* no longer supported with KPR */
 		return (-1);
 
+	case M_FULL:
 	case M_ZERO:
 		/*
 		 * We shouldn't be mmap'ing to /dev/zero here as
