@@ -27,6 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_IXGBE_SW_H
@@ -505,15 +506,16 @@ typedef struct ixgbe_tx_ring {
 	uint32_t		recycle_fail;
 	uint32_t		stall_watchdog;
 
-#ifdef IXGBE_DEBUG
-	/*
-	 * Debug statistics
-	 */
 	uint32_t		stat_overload;
 	uint32_t		stat_fail_no_tbd;
 	uint32_t		stat_fail_no_tcb;
 	uint32_t		stat_fail_dma_bind;
 	uint32_t		stat_reschedule;
+
+#ifdef IXGBE_DEBUG
+	/*
+	 * Debug statistics
+	 */
 	uint32_t		stat_break_tbd_limit;
 	uint32_t		stat_lso_header_fail;
 #endif
@@ -580,14 +582,10 @@ typedef struct ixgbe_rx_ring {
 
 	kmutex_t		rx_lock;	/* Rx access lock */
 
-#ifdef IXGBE_DEBUG
-	/*
-	 * Debug statistics
-	 */
 	uint32_t		stat_frame_error;
 	uint32_t		stat_cksum_error;
 	uint32_t		stat_exceed_pkt;
-#endif
+
 	uint64_t		stat_rbytes;
 	uint64_t		stat_ipackets;
 

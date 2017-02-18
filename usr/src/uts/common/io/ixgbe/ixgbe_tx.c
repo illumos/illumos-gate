@@ -27,6 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include "ixgbe_sw.h"
@@ -163,7 +164,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	 */
 	if (tx_ring->tbd_free < ixgbe->tx_overload_thresh) {
 		tx_ring->reschedule = B_TRUE;
-		IXGBE_DEBUG_STAT(tx_ring->stat_overload);
+		tx_ring->stat_overload++;
 		return (mp);
 	}
 
@@ -295,7 +296,7 @@ adjust_threshold:
 			tcb = ixgbe_get_free_list(tx_ring);
 
 			if (tcb == NULL) {
-				IXGBE_DEBUG_STAT(tx_ring->stat_fail_no_tcb);
+				tx_ring->stat_fail_no_tcb++;
 				goto tx_failure;
 			}
 
@@ -447,7 +448,7 @@ adjust_threshold:
 
 			tcb = ixgbe_get_free_list(tx_ring);
 			if (tcb == NULL) {
-				IXGBE_DEBUG_STAT(tx_ring->stat_fail_no_tcb);
+				tx_ring->stat_fail_no_tcb++;
 				goto tx_failure;
 			}
 			desc_num = ixgbe_tx_copy(tx_ring, tcb, pull_mp,
@@ -460,7 +461,7 @@ adjust_threshold:
 
 		tcb = ixgbe_get_free_list(tx_ring);
 		if (tcb == NULL) {
-			IXGBE_DEBUG_STAT(tx_ring->stat_fail_no_tcb);
+			tx_ring->stat_fail_no_tcb++;
 			goto tx_failure;
 		}
 		if ((ctx != NULL) && ctx->lso_flag) {
@@ -500,7 +501,7 @@ adjust_threshold:
 	 * parallel.
 	 */
 	if (tx_ring->tbd_free <= (desc_total + 1)) {
-		IXGBE_DEBUG_STAT(tx_ring->stat_fail_no_tbd);
+		tx_ring->stat_fail_no_tbd++;
 		mutex_exit(&tx_ring->tx_lock);
 		goto tx_failure;
 	}
@@ -655,7 +656,7 @@ ixgbe_tx_bind(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 	    0, &dma_cookie, &ncookies);
 
 	if (status != DDI_DMA_MAPPED) {
-		IXGBE_DEBUG_STAT(tx_ring->stat_fail_dma_bind);
+		tx_ring->stat_fail_dma_bind++;
 		return (-1);
 	}
 

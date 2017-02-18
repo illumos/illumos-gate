@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include "ixgbe_sw.h"
@@ -601,13 +602,13 @@ ixgbe_ring_rx(ixgbe_rx_ring_t *rx_ring, int poll_bytes)
 		if ((status_error & IXGBE_RXDADV_ERR_FRAME_ERR_MASK) ||
 		    ((!ixgbe->lro_enable) &&
 		    (!(status_error & IXGBE_RXD_STAT_EOP)))) {
-			IXGBE_DEBUG_STAT(rx_ring->stat_frame_error);
+			rx_ring->stat_frame_error++;
 			goto rx_discard;
 		}
 
-		IXGBE_DEBUG_STAT_COND(rx_ring->stat_cksum_error,
-		    (status_error & IXGBE_RXDADV_ERR_TCPE) ||
-		    (status_error & IXGBE_RXDADV_ERR_IPE));
+		if ((status_error & IXGBE_RXDADV_ERR_TCPE) ||
+		    (status_error & IXGBE_RXDADV_ERR_IPE))
+			rx_ring->stat_cksum_error++;
 
 		if (ixgbe->lro_enable) {
 			rsc_cnt =  (current_rbd->wb.lower.lo_dword.data &
@@ -716,7 +717,7 @@ rx_discard:
 		 * per interrupt.
 		 */
 		if (++pkt_num > ixgbe->rx_limit_per_intr) {
-			IXGBE_DEBUG_STAT(rx_ring->stat_exceed_pkt);
+			rx_ring->stat_exceed_pkt++;
 			break;
 		}
 
