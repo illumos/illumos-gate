@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <efi.h>
 #include <eficonsctl.h>
@@ -89,6 +88,8 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 	EFI_LOADED_IMAGE *img;
 	CHAR16 *argp, *args, **argv;
 	EFI_STATUS status;
+	SIMPLE_TEXT_OUTPUT_INTERFACE *conout;
+	UINTN i, max_dim, best_mode, cols, rows;
 	int argc, addprog;
 
 	IH = image_handle;
@@ -102,6 +103,20 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 		(void)console_control->SetMode(console_control,
 		    EfiConsoleControlScreenText);
 
+	conout = ST->ConOut;
+	max_dim = best_mode = 0;
+	for (i = 0; i <= conout->Mode->MaxMode ; i++) {
+		status = conout->QueryMode(conout, i, &cols, &rows);
+		if (EFI_ERROR(status))
+			continue;
+		if (cols * rows > max_dim) {
+			max_dim = cols * rows;
+			best_mode = i;
+		}
+	}
+	if (max_dim > 0)
+		conout->SetMode(conout, best_mode);
+
 	heapsize = 64 * 1024 * 1024;
 	/* 4GB upper limit, try to leave some space from 1MB */
 	heap = 0x0000000100000000;
@@ -111,6 +126,18 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 		BS->Exit(IH, status, 0, NULL);
 
 	setheap((void *)(uintptr_t)heap, (void *)(uintptr_t)(heap + heapsize));
+
+	status = conout->QueryMode(conout, best_mode, &cols, &rows);
+	if (EFI_ERROR(status)) {
+		setenv("LINES", "24", 1);
+		setenv("COLUMNS", "80", 1);
+	} else {
+		char buf[8];
+		snprintf(buf, sizeof (buf), "%u", (unsigned)rows);
+		setenv("LINES", buf, 1);
+		snprintf(buf, sizeof (buf), "%u", (unsigned)cols);
+		setenv("COLUMNS", buf, 1);
+	}
 
 	/* Use exit() from here on... */
 
