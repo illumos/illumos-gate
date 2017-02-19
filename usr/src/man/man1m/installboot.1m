@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Toomas Soome <tsoome@me.com>
+.\" Copyright 2017 Toomas Soome <tsoome@me.com>
 .\"
-.Dd February 10, 2016
+.Dd February 19, 2017
 .Dt INSTALLBOOT 1M
 .Os
 .Sh NAME
@@ -28,7 +28,7 @@
 .Op Fl enV
 .Fl F Sy zfs
 .Fl i
-.Ar raw-device
+.Ar raw-device | Ar file
 .Nm
 .Op Fl n
 .Fl F Sy zfs
@@ -42,7 +42,7 @@
 .Nm
 .Op Fl enV
 .Fl i
-.Ar raw-device
+.Ar raw-device | Ar file
 .Nm
 .Op Fl n
 .Fl M
@@ -137,7 +137,7 @@ boot loader update.
 Specify custom version string. Can be used to add version on non-versioned
 boot loader or change built in version string.
 .It Fl i
-Print version string from installed boot loader.
+Print version string from installed boot loader or from indicated file.
 .It Fl e
 Print version string from installed boot loader without description.
 .It Fl V
