@@ -172,7 +172,7 @@ static void recov_openfiles(recov_info_t *, nfs4_server_t *);
 static void recov_stale(mntinfo4_t *, vnode_t *);
 static void nfs4_free_lost_rqst(nfs4_lost_rqst_t *, nfs4_server_t *);
 static void recov_throttle(recov_info_t *, vnode_t *);
-static void relock_skip_pid(locklist_t *, pid_t);
+static void relock_skip_pid(vnode_t *, locklist_t *, pid_t);
 static void resend_lock(nfs4_lost_rqst_t *, nfs4_error_t *);
 static void resend_one_op(nfs4_lost_rqst_t *, nfs4_error_t *, mntinfo4_t *,
 	nfs4_server_t *);
@@ -2279,7 +2279,7 @@ relock_file(vnode_t *vp, mntinfo4_t *mi, nfs4_error_t *ep,
 				    0, 0);
 			nfs4_send_siglost(llp->ll_flock.l_pid, mi, vp, TRUE,
 			    ep->error, ep->stat);
-			relock_skip_pid(llp, llp->ll_flock.l_pid);
+			relock_skip_pid(vp, llp, llp->ll_flock.l_pid);
 
 			/* Reinitialize the nfs4_error and continue */
 			nfs4_error_zinit(ep);
@@ -2292,8 +2292,6 @@ relock_file(vnode_t *vp, mntinfo4_t *mi, nfs4_error_t *ep,
 
 /*
  * Reclaim the given lock.
- * If the lock can't be reclaimed, the process is sent SIGLOST, but this is
- * not considered an error.
  *
  * Errors are returned via the nfs4_error_t parameter.
  */
@@ -2306,19 +2304,15 @@ reclaim_one_lock(vnode_t *vp, flock64_t *flk, nfs4_error_t *ep,
 
 	cr = pid_to_cr(flk->l_pid);
 	if (cr == NULL) {
-		nfs4_error_zinit(ep);
-		ep->error = ESRCH;
+		nfs4_error_init(ep, ESRCH);
 		return;
 	}
 
 	do {
 		mutex_enter(&rp->r_statelock);
 		if (rp->r_flags & R4RECOVERR) {
-			/*
-			 * This shouldn't affect other reclaims, so don't
-			 * return an error.
-			 */
 			mutex_exit(&rp->r_statelock);
+			nfs4_error_init(ep, ESTALE);
 			break;
 		}
 		mutex_exit(&rp->r_statelock);
@@ -3289,16 +3283,28 @@ nfs4_send_siglost(pid_t pid, mntinfo4_t *mi, vnode_t *vp, bool_t dump,
 }
 
 /*
- * Scan the lock list for entries that match the given pid.  Change the
- * pid in those that do to NOPID.
+ * Scan the lock list for entries that match the given pid.  Unregister those
+ * locks that do and change their pid to NOPID.
  */
 
 static void
-relock_skip_pid(locklist_t *llp, pid_t pid)
+relock_skip_pid(vnode_t *vp, locklist_t *llp, pid_t pid)
 {
 	for (; llp != NULL; llp = llp->ll_next) {
-		if (llp->ll_flock.l_pid == pid)
+		if (llp->ll_flock.l_pid == pid) {
+			int r;
+
+			/*
+			 * Unregister the lost lock.
+			 */
+			llp->ll_flock.l_type = F_UNLCK;
+			r = reclock(vp, &llp->ll_flock, SETFLCK, FREAD | FWRITE,
+			    0, NULL);
+			/* The unlock cannot fail */
+			ASSERT(r == 0);
+
 			llp->ll_flock.l_pid = NOPID;
+		}
 	}
 }
 
