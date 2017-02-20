@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -359,7 +360,6 @@
  * overview of expected work:
  *
  *  o TSO support
- *  o RSS / multiple ring support
  *  o Multiple group support
  *  o DMA binding and breaking up the locking in ring recycling.
  *  o Enhanced detection of device errors
@@ -371,7 +371,7 @@
 
 #include "i40e_sw.h"
 
-static char i40e_ident[] = "Intel 10/40Gb Ethernet v1.0.0";
+static char i40e_ident[] = "Intel 10/40Gb Ethernet v1.0.1";
 
 /*
  * The i40e_glock primarily protects the lists below and the i40e_device_t
@@ -1594,7 +1594,10 @@ i40e_init_properties(i40e_t *i40e)
 static boolean_t
 i40e_alloc_intr_handles(i40e_t *i40e, dev_info_t *devinfo, int intr_type)
 {
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
+	ddi_acc_handle_t rh = i40e->i40e_osdep_space.ios_reg_handle;
 	int request, count, actual, rc, min;
+	uint32_t reg;
 
 	switch (intr_type) {
 	case DDI_INTR_TYPE_FIXED:
@@ -1603,16 +1606,24 @@ i40e_alloc_intr_handles(i40e_t *i40e, dev_info_t *devinfo, int intr_type)
 		min = 1;
 		break;
 	case DDI_INTR_TYPE_MSIX:
-		/*
-		 * At the moment, we always request two MSI-X while we still
-		 * only support a single interrupt. The upper bound on what's
-		 * supported by a given device is defined by MSI_X_PF_N in
-		 * GLPCI_CNF2. When we evolve, we should read it to determine
-		 * what the real max is.
-		 */
-		ASSERT(i40e->i40e_num_trqpairs == 1);
-		request = 2;
 		min = 2;
+		if (!i40e->i40e_mr_enable) {
+			request = 2;
+			break;
+		}
+		reg = I40E_READ_REG(hw, I40E_GLPCI_CNF2);
+		/*
+		 * Should this read fail, we will drop back to using
+		 * MSI or fixed interrupts.
+		 */
+		if (i40e_check_acc_handle(rh) != DDI_FM_OK) {
+			ddi_fm_service_impact(i40e->i40e_dip,
+			    DDI_SERVICE_DEGRADED);
+			return (B_FALSE);
+		}
+		request = (reg & I40E_GLPCI_CNF2_MSI_X_PF_N_MASK) >>
+		    I40E_GLPCI_CNF2_MSI_X_PF_N_SHIFT;
+		request++;	/* the register value is n - 1 */
 		break;
 	default:
 		panic("bad interrupt type passed to i40e_alloc_intr_handles: "
@@ -1704,8 +1715,13 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 
 	if ((intr_types & DDI_INTR_TYPE_MSIX) &&
 	    i40e->i40e_intr_force <= I40E_INTR_MSIX) {
-		if (i40e_alloc_intr_handles(i40e, devinfo, DDI_INTR_TYPE_MSIX))
+		if (i40e_alloc_intr_handles(i40e, devinfo,
+		    DDI_INTR_TYPE_MSIX)) {
+			i40e->i40e_num_trqpairs =
+			    MIN(i40e->i40e_intr_count - 1,
+			    I40E_AQ_VSI_TC_QUE_SIZE_MAX);
 			return (B_TRUE);
+		}
 	}
 
 	/*
@@ -1736,23 +1752,25 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 static boolean_t
 i40e_map_intrs_to_vectors(i40e_t *i40e)
 {
+	int i;
+
 	if (i40e->i40e_intr_type != DDI_INTR_TYPE_MSIX) {
 		return (B_TRUE);
 	}
 
 	/*
-	 * At the moment, we only have one queue and one interrupt thus both are
-	 * on that one interrupt. However, longer term we need to go back to
-	 * using the ixgbe style map of queues to vectors or walk the linked
-	 * list from the device to know what to go handle. Therefore for the
-	 * moment, since we need to map our single set of rings to the one
-	 * I/O interrupt that exists for MSI-X.
+	 * Each queue pair is mapped to a single interrupt, so transmit
+	 * and receive interrupts for a given queue share the same vector.
+	 * The number of queue pairs is one less than the number of interrupt
+	 * vectors and is assigned the vector one higher than its index.
+	 * Vector zero is reserved for the admin queue.
 	 */
-	ASSERT(i40e->i40e_intr_count == 2);
-	ASSERT(i40e->i40e_num_trqpairs == 1);
+	ASSERT(i40e->i40e_intr_count == i40e->i40e_num_trqpairs + 1);
 
-	i40e->i40e_trqpairs[0].itrq_rx_intrvec = 1;
-	i40e->i40e_trqpairs[0].itrq_tx_intrvec = 1;
+	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		i40e->i40e_trqpairs[i].itrq_rx_intrvec = i + 1;
+		i40e->i40e_trqpairs[i].itrq_tx_intrvec = i + 1;
+	}
 
 	return (B_TRUE);
 }
@@ -1898,7 +1916,7 @@ static boolean_t
 i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 {
 	struct i40e_vsi_context	context;
-	int err;
+	int err, tc_queues;
 
 	bzero(&context, sizeof (struct i40e_vsi_context));
 	context.seid = i40e->i40e_vsi_id;
@@ -1909,13 +1927,32 @@ i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 		return (B_FALSE);
 	}
 
+	i40e->i40e_vsi_num = context.vsi_number;
+
 	/*
 	 * Set the queue and traffic class bits.  Keep it simple for now.
 	 */
 	context.info.valid_sections = I40E_AQ_VSI_PROP_QUEUE_MAP_VALID;
 	context.info.mapping_flags = I40E_AQ_VSI_QUE_MAP_CONTIG;
 	context.info.queue_mapping[0] = I40E_ASSIGN_ALL_QUEUES;
-	context.info.tc_mapping[0] = I40E_TRAFFIC_CLASS_NO_QUEUES;
+
+	/*
+	 * tc_queues determines the size of the traffic class, where the
+	 * size is 2^^tc_queues to a maximum of 64.
+	 * Some examples:
+	 * 	i40e_num_trqpairs == 1 =>  tc_queues = 0, 2^^0 = 1.
+	 * 	i40e_num_trqpairs == 7 =>  tc_queues = 3, 2^^3 = 8.
+	 * 	i40e_num_trqpairs == 8 =>  tc_queues = 3, 2^^3 = 8.
+	 * 	i40e_num_trqpairs == 9 =>  tc_queues = 4, 2^^4 = 16.
+	 * 	i40e_num_trqpairs == 17 => tc_queues = 5, 2^^5 = 32.
+	 * 	i40e_num_trqpairs == 64 => tc_queues = 6, 2^^6 = 64.
+	 */
+	tc_queues = ddi_fls(i40e->i40e_num_trqpairs - 1);
+
+	context.info.tc_mapping[0] = ((0 << I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT) &
+	    I40E_AQ_VSI_TC_QUE_OFFSET_MASK) |
+	    ((tc_queues << I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT) &
+	    I40E_AQ_VSI_TC_QUE_NUMBER_MASK);
 
 	context.info.valid_sections |= I40E_AQ_VSI_PROP_VLAN_VALID;
 	context.info.port_vlan_flags = I40E_AQ_VSI_PVLAN_MODE_ALL |
@@ -1935,6 +1972,76 @@ i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 
 
 	return (B_TRUE);
+}
+
+/*
+ * Set up RSS.
+ * 	1. Seed the hash key.
+ *	2. Enable PCTYPEs for the hash filter.
+ *	3. Populate the LUT.
+ *
+ * Note: When/if X722 support is added the hash key is seeded via a call
+ *	 to i40e_aq_set_rss_key(), and the LUT is populated using
+ *	 i40e_aq_set_rss_lut().
+ */
+static boolean_t
+i40e_config_rss(i40e_t *i40e, i40e_hw_t *hw)
+{
+	int i;
+	uint8_t lut_mask;
+	uint32_t *hlut;
+	uint64_t hena;
+	boolean_t rv = B_TRUE;
+	uint32_t seed[I40E_PFQF_HKEY_MAX_INDEX + 1];
+
+	/*
+	 * 1. Seed the hash key
+	 */
+	(void) random_get_pseudo_bytes((uint8_t *)seed, sizeof (seed));
+
+	for (i = 0; i <= I40E_PFQF_HKEY_MAX_INDEX; i++)
+		i40e_write_rx_ctl(hw, I40E_PFQF_HKEY(i), seed[i]);
+
+	/*
+	 * 2. Configure PCTYPES
+	 */
+	hena = (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_OTHER) |
+	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_TCP) |
+	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_UDP) |
+	    (1ULL << I40E_FILTER_PCTYPE_FRAG_IPV4) |
+	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_OTHER) |
+	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_TCP) |
+	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_UDP) |
+	    (1ULL << I40E_FILTER_PCTYPE_FRAG_IPV6) |
+	    (1ULL << I40E_FILTER_PCTYPE_L2_PAYLOAD);
+
+	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(0), (uint32_t)hena);
+	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(1), (uint32_t)(hena >> 32));
+
+	/*
+	 * 3. Populate LUT
+	 *
+	 * Each entry in the LUT is 8 bits and is used to index
+	 * the rx queue. Populate the LUT in a round robin fashion
+	 * with rx queue indices from 0 to i40e_num_trqpairs - 1.
+	 */
+	hlut = kmem_alloc(hw->func_caps.rss_table_size, KM_NOSLEEP);
+	if (hlut == NULL) {
+		i40e_error(i40e, "i40e_config_rss() buffer allocation failed");
+		return (B_FALSE);
+	}
+
+	lut_mask = (1 << hw->func_caps.rss_table_entry_width) - 1;
+
+	for (i = 0; i < hw->func_caps.rss_table_size; i++)
+		((uint8_t *)hlut)[i] = (i % i40e->i40e_num_trqpairs) & lut_mask;
+
+	for (i = 0; i < hw->func_caps.rss_table_size >> 2; i++)
+		I40E_WRITE_REG(hw, I40E_PFQF_HLUT(i), hlut[i]);
+
+	kmem_free(hlut, hw->func_caps.rss_table_size);
+
+	return (rv);
 }
 
 /*
@@ -1970,6 +2077,7 @@ i40e_chip_start(i40e_t *i40e)
 	bzero(&filter, sizeof (filter));
 	filter.enable_ethtype = TRUE;
 	filter.enable_macvlan = TRUE;
+	filter.hash_lut_size = I40E_HASH_LUT_SIZE_512;
 
 	rc = i40e_set_filter_control(hw, &filter);
 	if (rc != I40E_SUCCESS) {
@@ -1980,6 +2088,9 @@ i40e_chip_start(i40e_t *i40e)
 	i40e_intr_chip_init(i40e);
 
 	if (!i40e_config_vsi(i40e, hw))
+		return (B_FALSE);
+
+	if (!i40e_config_rss(i40e, hw))
 		return (B_FALSE);
 
 	i40e_flush(hw);
