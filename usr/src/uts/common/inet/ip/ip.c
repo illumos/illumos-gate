@@ -23,7 +23,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
- * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -3858,10 +3858,9 @@ ip_get_pmtu(ip_xmit_attr_t *ixa)
 	}
 
 	/*
-	 * After receiving an ICMPv6 "packet too big" message with a
-	 * MTU < 1280, and for multirouted IPv6 packets, the IP layer
-	 * will insert a 8-byte fragment header in every packet. We compensate
-	 * for those cases by returning a smaller path MTU to the ULP.
+	 * For multirouted IPv6 packets, the IP layer will insert a 8-byte
+	 * fragment header in every packet. We compensate for those cases by
+	 * returning a smaller path MTU to the ULP.
 	 *
 	 * In the case of CGTP then ip_output will add a fragment header.
 	 * Make sure there is room for it by telling a smaller number
@@ -3872,8 +3871,7 @@ ip_get_pmtu(ip_xmit_attr_t *ixa)
 	 * which is the size of the packets it can send.
 	 */
 	if (!(ixa->ixa_flags & IXAF_IS_IPV4)) {
-		if ((dce->dce_flags & DCEF_TOO_SMALL_PMTU) ||
-		    (ire->ire_flags & RTF_MULTIRT) ||
+		if ((ire->ire_flags & RTF_MULTIRT) ||
 		    (ixa->ixa_flags & IXAF_MULTIRT_MULTICAST)) {
 			pmtu -= sizeof (ip6_frag_t);
 			ixa->ixa_flags |= IXAF_IPV6_ADD_FRAGHDR;
