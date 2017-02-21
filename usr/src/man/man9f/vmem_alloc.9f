@@ -1,0 +1,168 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2017, Richard Lowe.
+.\"
+.Dd Jan 18, 2017
+.Dt VMEM_ALLOC 9F
+.Os
+.Sh NAME
+.Nm vmem_alloc ,
+.Nm vmem_xalloc ,
+.Nm vmem_free ,
+.Nm vmem_xfree
+.Nd allocate and free segments from a vmem arena
+.Sh SYNOPSIS
+.In sys/vmem.h
+.Ft void *
+.Fo vmem_alloc
+.Fa "vmem_t *vmp"
+.Fa "size_t size"
+.Fa "int vmflag"
+.Fc
+.Ft void *
+.Fo vmem_xalloc
+.Fa "vmem_t *vmp"
+.Fa "size_t size"
+.Fa "size_t align_arg"
+.Fa "size_t phase"
+.Fa "size_t nocross"
+.Fa "void *minaddr"
+.Fa "void *maxaddr"
+.Fa "int vmflag"
+.Fc
+.Ft void
+.Fo vmem_free
+.Fa "vmem_t *vmp"
+.Fa "void *vaddr"
+.Fa "size_t size"
+.Fc
+.Ft void
+.Fo vmem_xfree
+.Fa "vmem_t *vmp"
+.Fa "void *vaddr"
+.Fa "size_t size"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa vmp
+The vmem arena from which to allocate or free.
+.It Fa size
+The size of the segment to allocate or free.
+.It Fa vmflag
+A bitmask of flags controlling the behaviour of the allocation.
+There are two meaningful groups of flags.
+.Dv VM_SLEEP
+or
+.Dv VM_NOSLEEP
+must be specified, and indicate whether the allocation may block.  A
+.Dv VM_SLEEP
+allocation can never fail but may block indefinitely.
+.Pp
+The allocation policy may be specified by one of the following flags:
+.Bl -tag -width Ds
+.It Dv VM_BESTFIT
+Take the segment from the smallest free segment that could satisfy this allocation.
+.It Dv VM_FIRSTFIT
+Take the segment from the first free segment found that could satisfy this
+allocation.
+.It Dv VM_NEXTFIT
+Take the segment from the segment after the one previously allocated.  This
+provides sequential behaviour useful when allocating identifiers from a
+.Dv VMC_IDENTIFIER
+arena.
+.It Dv VM_ENDALLOC
+May be specified in combination with
+.Dv VM_BESTFIT ,
+.Dv VM_FIRSTFIT
+or the default policy to indicate that the higher addresses should be
+preferred.
+.El
+.Pp
+The default (unnamed) allocation policy is
+.Dq "instant fit" ,
+an approximation of
+.Dv VM_BESTFIT
+in guaranteed constant time.
+.It Fa align_arg
+The minimum alignment of the allocation.  If 0,
+the allocated segment will be aligned as the arena's quantum.
+.It Fa phase
+The allocated segment must be
+.Fa phase
+bytes from the alignment boundary.
+.It Fa nocross
+The allocated segment may not straddle a
+.Fa nocross
+alignment boundary.
+.It Fa minaddr
+The minimum address at which the segment may be allocated.
+.It Fa maxaddr
+The maximum address which may be included in the segment.
+.It Fa vaddr
+The address of the segment which
+.Fn vmem_free
+or
+.Fn vmem_xfree
+should free.
+.El
+.Sh DESCRIPTION
+The
+.Fn vmem_alloc
+and
+.Fn vmem_xalloc
+functions allocate a segment of
+.Fa size
+length from the vmem arena
+.Fa vmp .
+.Pp
+The
+.Fa vmflag
+argument controls the behaviour of the allocation, as described in
+.Sx PARAMETERS .
+.Pp
+For allocations with complex requirements, such as those used for DMA
+.Fn vmem_xalloc
+takes additional arguments allowing those requirements to be expressed.
+.Pp
+Segments allocated with
+.Fn vmem_xalloc
+must always be freed with
+.Fn vmem_xfree ,
+since these allocations are uncached.
+.Sh CONTEXT
+This function can be called from either user or kernel context.
+If the
+.Dv VM_NOSLEEP
+flag is specified, it may also be called from interrupt context.
+.Sh RETURN VALUES
+Upon successful completion the
+.Fn vmem_alloc
+and
+.Fn vmem_xalloc
+functions return a pointer to the beginning of the allocated segment.  In the
+case of a
+.Dv VMC_IDENTIFIER
+arena, the address of this pointer is the meaningful component, not the value
+to which it points.
+.Pp
+On failure,
+.Dv NULL
+is returned.
+When the
+.Dv VM_SLEEP
+flag is specified, these functions can never fail (but may block forever).
+.Sh SEE ALSO
+.Xr vmem 9 ,
+.Xr vmem_contains 9F ,
+.Xr vmem_create 9F

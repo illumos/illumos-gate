@@ -1,0 +1,210 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2017, Richard Lowe.
+.\"
+.Dd Jan 18, 2017
+.Dt VMEM_CREATE 9F
+.Os
+.Sh NAME
+.Nm vmem_create ,
+.Nm vmem_xcreate ,
+.Nm vmem_destroy
+.Nd create and destroy vmem arenas
+.Sh SYNOPSIS
+.In sys/vmem.h
+.Vt "typedef struct vmem vmem_t;"
+.Vt "typedef void *(vmem_alloc_t)(vmem_t *, size_t, int);"
+.Vt "typedef void (vmem_free_t)(vmem_t *, void *, size_t);"
+.Vt "typedef void *(vmem_ximport_t)(vmem_t *, size_t *, size_t, int);"
+.Ft vmem_t *
+.Fo vmem_create
+.Fa "const char *name"
+.Fa "void *base"
+.Fa "size_t size"
+.Fa "size_t quantum"
+.Fa "vmem_alloc_t *afunc"
+.Fa "vmem_free_t *ffunc"
+.Fa "vmem_t *source"
+.Fa "size_t qcache_max"
+.Fa "int vmflag"
+.Fc
+.Ft vmem_t *
+.Fo vmem_xcreate
+.Fa "const char *name"
+.Fa "void *base"
+.Fa "size_t size"
+.Fa "size_t quantum"
+.Fa "vmem_ximport_t *afunc"
+.Fa "vmem_free_t *ffunc"
+.Fa "vmem_t *source"
+.Fa "size_t qcache_max"
+.Fa "int vmflag"
+.Fc
+.Ft void
+.Fo vmem_destroy
+.Fa "vmem_t *vmp"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa name
+A character string giving a name to the vmem
+arena to be created.
+.It Fa base
+An address indicating the lowest possible value in the arena.
+.It Fa size
+The size of the arena to create.
+.It Fa quantum
+The arena's
+.Dq quantum .
+The granularity of the arena.  The amount allocated at minimum by each
+request.  Must be a power of 2.
+.It Fa afunc
+A function which is called to import new spans from
+.Fa source ,
+which may be
+.Dv NULL
+if this arena does not import from another.
+When calling
+.Fn vmem_create ,
+.Fa afunc
+is a
+.Vt vmem_alloc_t ,
+a function taking three parameters and returning a pointer to
+.Vt void
+(the imported space):
+.Bl -tag -width Ds
+.It Fa "vmem_t *"
+The source arena from which we'll import.  The
+.Fa source
+argument to
+.Fn vmem_create .
+.It Fa size_t
+The size to import.
+.It Fa int
+The
+.Fa vmflag
+argument used for the import.
+.El
+.Pp
+When calling
+.Fn vmem_xcreate ,
+.Fa afunc
+is a
+.Vt vmem_ximport_t ,
+a function taking four parameters and returning a pointer to
+.Vt void
+(the imported space):
+.Bl -tag -width Ds
+.It Fa "vmem_t *"
+The source arena from which we'll import.  The
+.Fa source
+argument to
+.Fn vmem_xcreate .
+.It Fa "size_t *"
+The size of the import.
+.Fa afunc
+may
+.Em increase
+this size if that is desirable, but must never decrease it.
+.It Fa size_t
+The desired alignment of the imported space.
+.It Fa int
+The
+.Fa vmflag
+argument used for the import.
+.El
+.It Fa ffunc
+A function which is called to return spans to
+.Fa source ,
+which may be
+.Dv NULL
+if this arena does not import from another.
+This is a
+.Vt vmem_free_t ,
+a function taking three parameters and returning void:
+.Bl -tag -width Ds
+.It Fa "vmem_t"
+The arena to which space is being returned.  The
+.Fa source
+argument to
+.Fn vmem_create
+or
+.Fn vmem_xcreate .
+.It Fa "void *"
+The span being returned to the source arena.
+.It Fa "size_t"
+The size of the span being returned to the source arena.
+.El
+.It Fa source
+An arena from which this arena will import,
+which may be
+.Dv NULL
+if this arena does not import from another.
+.It Fa qcache_max
+Each arena offers caching of integer multiples of
+.Fa quantum
+up to
+.Fa qcache_max ,
+which may be 0.
+.It Fa vmflag
+A bitmask of flags indicating the characteristics of this arena.
+.Bl -tag -width Ds
+.It Dv VMC_IDENTIFIER
+The arena represents arbitrary integer identifiers, rather than virtual
+memory.
+.El
+.It Fa vmp
+A pointer to the vmem arena to be destroyed.
+.El
+.Sh DESCRIPTION
+A
+.Em vmem arena
+is a section of an arbitrary address space (a range of integer addresses).
+This commonly represents virtual memory, but can in fact be an arbitrary set
+of integers. The
+.Dv VMC_IDENTIFIER
+flag set at arena creation time differentiates between these two cases.
+.Pp
+The
+.Fa afunc ,
+.Fa ffunc , and
+.Fa source
+arguments combine to support a hierarchical structure of arenas, each
+importing from a single parent (the
+.Fa source ) .
+The
+.Fn vmem_create
+and
+.Fn vmem_xcreate
+functions differ in that the latter provides an interface for
+.Fa afunc
+to alter the size of the span imported from
+.Fa source .
+It is only legal to
+.Em increase
+this size.
+.Sh CONTEXT
+These functions can be called from user or kernel context.
+.Sh RETURN VALUES
+Upon successful completion the
+.Fn vmem_create
+and
+.Fn vmem_xcreate
+functions return a pointer to a vmem arena.  Otherwise,
+.Dv NULL
+is returned to indicate the arena could not be created.
+.Sh SEE ALSO
+.Xr vmem 9 ,
+.Xr vmem_add 9F ,
+.Xr vmem_alloc 9F

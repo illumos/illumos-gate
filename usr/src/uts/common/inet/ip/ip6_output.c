@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -245,7 +246,7 @@ repeat_ire:
 			 * Older than 20 minutes. Drop the path MTU information.
 			 */
 			mutex_enter(&dce->dce_lock);
-			dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
+			dce->dce_flags &= ~DCEF_PMTU;
 			dce->dce_last_change_time = TICK_TO_SEC(now);
 			mutex_exit(&dce->dce_lock);
 			dce_increment_generation(dce);

@@ -25,6 +25,7 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #include <stdio.h>
@@ -336,11 +337,20 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path,
 	cutpath = path + strspn(path, "/");
 
 	assert(impl_handle->zfs_libhandle != NULL);
+	libzfs_print_on_error(impl_handle->zfs_libhandle, B_FALSE);
 	if ((handle_from_path = zfs_open(impl_handle->zfs_libhandle, cutpath,
-	    ZFS_TYPE_FILESYSTEM)) != NULL)
+	    ZFS_TYPE_FILESYSTEM)) != NULL) {
 		if ((ret = verify_zfs_handle(handle_from_path, path,
-		    search_mnttab)) != NULL)
+		    search_mnttab)) != NULL) {
+			zfs_close(handle_from_path);
+			libzfs_print_on_error(impl_handle->zfs_libhandle,
+			    B_TRUE);
 			return (ret);
+		}
+		zfs_close(handle_from_path);
+	}
+	libzfs_print_on_error(impl_handle->zfs_libhandle, B_TRUE);
+
 	/*
 	 * Couldn't find a filesystem optimistically, check all the handles we
 	 * can.
