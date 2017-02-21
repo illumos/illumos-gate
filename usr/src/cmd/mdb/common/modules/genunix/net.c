@@ -643,19 +643,20 @@ netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	udp_t udp;
 	conn_t *connp = &ncb->conn;
 	char *state;
+	uintptr_t udp_kaddr;
 
 	if (mdb_vread(connp, sizeof (conn_t), kaddr) == -1) {
 		mdb_warn("failed to read conn_t at %p", kaddr);
 		return (WALK_ERR);
 	}
 
-	if (mdb_vread(&udp, sizeof (udp_t),
-	    (uintptr_t)connp->conn_udp) == -1) {
-		mdb_warn("failed to read conn_udp at %p",
-		    (uintptr_t)connp->conn_udp);
+	udp_kaddr = (uintptr_t)connp->conn_udp;
+	if (mdb_vread(&udp, sizeof (udp_t), udp_kaddr) == -1) {
+		mdb_warn("failed to read conn_udp at %p", udp_kaddr);
 		return (WALK_ERR);
 	}
 
+	/* Need to do these reassignments for the net_udp_*() routines below. */
 	connp->conn_udp = &udp;
 	udp.udp_connp = connp;
 
@@ -674,7 +675,7 @@ netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	else
 		state = "UNKNOWN";
 
-	mdb_printf("%0?p %10s ", (uintptr_t)connp->conn_udp, state);
+	mdb_printf("%0?p %10s ", udp_kaddr, state);
 	if (af == AF_INET) {
 		net_ipv4addrport_pr(&connp->conn_laddr_v6, connp->conn_lport);
 		mdb_printf(" ");
