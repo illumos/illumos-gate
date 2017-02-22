@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
@@ -5562,10 +5562,12 @@ noticmpv4:
 		switch (icmph->icmph_code) {
 		case ICMP_FRAGMENTATION_NEEDED:
 			/*
-			 * Update Path MTU, then try to send something out.
+			 * Attempt to update path MTU and, if the MSS of the
+			 * connection is altered, retransmit outstanding data.
 			 */
-			tcp_update_pmtu(tcp, B_TRUE);
-			tcp_rexmit_after_error(tcp);
+			if (tcp_update_pmtu(tcp, B_TRUE)) {
+				tcp_rexmit_after_error(tcp);
+			}
 			break;
 		case ICMP_PORT_UNREACHABLE:
 		case ICMP_PROTOCOL_UNREACHABLE:
@@ -5608,7 +5610,7 @@ noticmpv4:
 			break;
 		}
 		break;
-	case ICMP_SOURCE_QUENCH: {
+	case ICMP_SOURCE_QUENCH:
 		/*
 		 * use a global boolean to control
 		 * whether TCP should respond to ICMP_SOURCE_QUENCH.
@@ -5628,7 +5630,6 @@ noticmpv4:
 			tcp->tcp_cwnd_cnt = 0;
 		}
 		break;
-	}
 	}
 	freemsg(mp);
 }
@@ -5682,10 +5683,12 @@ noticmpv6:
 	switch (icmp6->icmp6_type) {
 	case ICMP6_PACKET_TOO_BIG:
 		/*
-		 * Update Path MTU, then try to send something out.
+		 * Attempt to update path MTU and, if the MSS of the connection
+		 * is altered, retransmit outstanding data.
 		 */
-		tcp_update_pmtu(tcp, B_TRUE);
-		tcp_rexmit_after_error(tcp);
+		if (tcp_update_pmtu(tcp, B_TRUE)) {
+			tcp_rexmit_after_error(tcp);
+		}
 		break;
 	case ICMP6_DST_UNREACH:
 		switch (icmp6->icmp6_code) {

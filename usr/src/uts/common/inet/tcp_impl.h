@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
  */
@@ -648,7 +648,7 @@ extern int	tcp_rwnd_set(tcp_t *, uint32_t);
 extern int	tcp_set_destination(tcp_t *);
 extern void	tcp_set_ws_value(tcp_t *);
 extern void	tcp_stop_lingering(tcp_t *);
-extern void	tcp_update_pmtu(tcp_t *, boolean_t);
+extern boolean_t	tcp_update_pmtu(tcp_t *, boolean_t);
 extern mblk_t	*tcp_zcopy_backoff(tcp_t *, mblk_t *, boolean_t);
 extern boolean_t	tcp_zcopy_check(tcp_t *);
 extern void	tcp_zcopy_notify(tcp_t *);

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013,2014 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
@@ -967,8 +967,7 @@ void
 tcp_stop_lingering(tcp_t *tcp)
 {
 	clock_t	delta = 0;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	conn_t		*connp = tcp->tcp_connp;
+	conn_t	*connp = tcp->tcp_connp;
 
 	tcp->tcp_linger_tid = 0;
 	if (tcp->tcp_state > TCPS_LISTEN) {
@@ -996,7 +995,7 @@ tcp_stop_lingering(tcp_t *tcp)
 
 		if (tcp->tcp_state == TCPS_TIME_WAIT) {
 			tcp_time_wait_append(tcp);
-			TCP_DBGSTAT(tcps, tcp_detach_time_wait);
+			TCP_DBGSTAT(tcp->tcp_tcps, tcp_detach_time_wait);
 			goto finish;
 		}
 
@@ -2470,8 +2469,10 @@ tcp_init_values(tcp_t *tcp, tcp_t *parent)
  * Path MTU might have changed by either increase or decrease, so need to
  * adjust the MSS based on the value of ixa_pmtu. No need to handle tiny
  * or negative MSS, since tcp_mss_set() will do it.
+ *
+ * Returns B_TRUE when the connection PMTU changes, otherwise B_FALSE.
  */
-void
+boolean_t
 tcp_update_pmtu(tcp_t *tcp, boolean_t decrease_only)
 {
 	uint32_t	pmtu;
@@ -2481,10 +2482,10 @@ tcp_update_pmtu(tcp_t *tcp, boolean_t decrease_only)
 	iaflags_t	ixaflags;
 
 	if (tcp->tcp_tcps->tcps_ignore_path_mtu)
-		return;
+		return (B_FALSE);
 
 	if (tcp->tcp_state < TCPS_ESTABLISHED)
-		return;
+		return (B_FALSE);
 
 	/*
 	 * Always call ip_get_pmtu() to make sure that IP has updated
@@ -2504,13 +2505,13 @@ tcp_update_pmtu(tcp_t *tcp, boolean_t decrease_only)
 	 * Nothing to change, so just return.
 	 */
 	if (mss == tcp->tcp_mss)
-		return;
+		return (B_FALSE);
 
 	/*
 	 * Currently, for ICMP errors, only PMTU decrease is handled.
 	 */
 	if (mss > tcp->tcp_mss && decrease_only)
-		return;
+		return (B_FALSE);
 
 	DTRACE_PROBE2(tcp_update_pmtu, int32_t, tcp->tcp_mss, uint32_t, mss);
 
@@ -2545,6 +2546,7 @@ tcp_update_pmtu(tcp_t *tcp, boolean_t decrease_only)
 		tcp->tcp_ipha->ipha_fragment_offset_and_flags = 0;
 	}
 	ixa->ixa_flags = ixaflags;
+	return (B_TRUE);
 }
 
 int
@@ -3415,7 +3417,7 @@ tcp_notify(void *arg, ip_xmit_attr_t *ixa, ixa_notify_type_t ntype,
 		tcp_update_lso(tcp, connp->conn_ixa);
 		break;
 	case IXAN_PMTU:
-		tcp_update_pmtu(tcp, B_FALSE);
+		(void) tcp_update_pmtu(tcp, B_FALSE);
 		break;
 	case IXAN_ZCOPY:
 		tcp_update_zcopy(tcp);
@@ -3745,7 +3747,6 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	tcp_stack_t	*tcps;
 	int		i;
-	int		error = 0;
 	major_t		major;
 	size_t		arrsz;
 
@@ -3809,8 +3810,7 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	tcps->tcps_mibkp = tcp_kstat_init(stackid);
 
 	major = mod_name_to_major(INET_NAME);
-	error = ldi_ident_from_major(major, &tcps->tcps_ldi_ident);
-	ASSERT(error == 0);
+	VERIFY0(ldi_ident_from_major(major, &tcps->tcps_ldi_ident));
 	tcps->tcps_ixa_cleanup_mp = allocb_wait(0, BPRI_MED, STR_NOSIG, NULL);
 	ASSERT(tcps->tcps_ixa_cleanup_mp != NULL);
 	cv_init(&tcps->tcps_ixa_cleanup_ready_cv, NULL, CV_DEFAULT, NULL);
