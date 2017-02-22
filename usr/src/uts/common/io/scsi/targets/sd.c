@@ -25,8 +25,8 @@
 /*
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -928,6 +928,7 @@ static int sd_pm_idletime = 1;
 #define	sd_event_callback		ssd_event_callback
 #define	sd_cache_control		ssd_cache_control
 #define	sd_get_write_cache_enabled	ssd_get_write_cache_enabled
+#define	sd_get_write_cache_changeable	ssd_get_write_cache_changeable
 #define	sd_get_nv_sup			ssd_get_nv_sup
 #define	sd_make_device			ssd_make_device
 #define	sdopen				ssdopen
@@ -1294,6 +1295,7 @@ static void  sd_event_callback(dev_info_t *, ddi_eventcookie_t, void *, void *);
 
 static int   sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag);
 static int   sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled);
+static void  sd_get_write_cache_changeable(sd_ssc_t *ssc, int *is_changeable);
 static void  sd_get_nv_sup(sd_ssc_t *ssc);
 static dev_t sd_make_device(dev_info_t *devi);
 static void  sd_check_solid_state(sd_ssc_t *ssc);
@@ -7216,6 +7218,7 @@ sd_unit_attach(dev_info_t *devi)
 	int	instance;
 	int	rval;
 	int	wc_enabled;
+	int	wc_changeable;
 	int	tgt;
 	uint64_t	capacity;
 	uint_t		lbasize = 0;
@@ -8295,12 +8298,15 @@ sd_unit_attach(dev_info_t *devi)
 	}
 
 	/*
-	 * Check the value of the WCE bit now and
-	 * set un_f_write_cache_enabled accordingly.
+	 * Check the value of the WCE bit and if it's allowed to be changed,
+	 * set un_f_write_cache_enabled and un_f_cache_mode_changeable
+	 * accordingly.
 	 */
 	(void) sd_get_write_cache_enabled(ssc, &wc_enabled);
+	sd_get_write_cache_changeable(ssc, &wc_changeable);
 	mutex_enter(SD_MUTEX(un));
 	un->un_f_write_cache_enabled = (wc_enabled != 0);
+	un->un_f_cache_mode_changeable = (wc_changeable != 0);
 	mutex_exit(SD_MUTEX(un));
 
 	if ((un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR &&
@@ -9383,6 +9389,90 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
 #endif
 
 /*
+ * Values related to caching mode page depending on whether the unit is ATAPI.
+ */
+#define	SDC_CDB_GROUP(un) ((un->un_f_cfg_is_atapi == TRUE) ? \
+	CDB_GROUP1 : CDB_GROUP0)
+#define	SDC_HDRLEN(un) ((un->un_f_cfg_is_atapi == TRUE) ? \
+	MODE_HEADER_LENGTH_GRP2 : MODE_HEADER_LENGTH)
+/*
+ * Use mode_cache_scsi3 to ensure we get all of the mode sense data, otherwise
+ * the mode select will fail (mode_cache_scsi3 is a superset of mode_caching).
+ */
+#define	SDC_BUFLEN(un) (SDC_HDRLEN(un) + MODE_BLK_DESC_LENGTH + \
+	sizeof (struct mode_cache_scsi3))
+
+static int
+sd_get_caching_mode_page(sd_ssc_t *ssc, uchar_t page_control, uchar_t **header,
+    int *bdlen)
+{
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		rval;
+
+	/*
+	 * Do a test unit ready, otherwise a mode sense may not work if this
+	 * is the first command sent to the device after boot.
+	 */
+	if (sd_send_scsi_TEST_UNIT_READY(ssc, 0) != 0)
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+
+	/*
+	 * Allocate memory for the retrieved mode page and its headers.  Set
+	 * a pointer to the page itself.
+	 */
+	*header = kmem_zalloc(buflen, KM_SLEEP);
+
+	/* Get the information from the device */
+	rval = sd_send_scsi_MODE_SENSE(ssc, SDC_CDB_GROUP(un), *header, buflen,
+	    page_control | MODEPAGE_CACHING, SD_PATH_DIRECT);
+	if (rval != 0) {
+		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un, "%s: Mode Sense Failed\n",
+		    __func__);
+		goto mode_sense_failed;
+	}
+
+	/*
+	 * Determine size of Block Descriptors in order to locate
+	 * the mode page data. ATAPI devices return 0, SCSI devices
+	 * should return MODE_BLK_DESC_LENGTH.
+	 */
+	if (un->un_f_cfg_is_atapi == TRUE) {
+		struct mode_header_grp2 *mhp =
+		    (struct mode_header_grp2 *)(*header);
+		*bdlen = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
+	} else {
+		*bdlen = ((struct mode_header *)(*header))->bdesc_length;
+	}
+
+	if (*bdlen > MODE_BLK_DESC_LENGTH) {
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
+		    "%s: Mode Sense returned invalid block descriptor length\n",
+		    __func__);
+		rval = EIO;
+		goto mode_sense_failed;
+	}
+
+	mode_caching_page = (struct mode_caching *)(*header + hdrlen + *bdlen);
+	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "%s: Mode Sense caching page code mismatch %d\n",
+		    __func__, mode_caching_page->mode_page.code);
+		rval = EIO;
+	}
+
+mode_sense_failed:
+	if (rval != 0) {
+		kmem_free(*header, buflen);
+		*header = NULL;
+		*bdlen = 0;
+	}
+	return (rval);
+}
+
+/*
  *    Function: sd_cache_control()
  *
  * Description: This routine is the driver entry point for setting
@@ -9390,10 +9480,10 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
  *		enable) and RCD (read cache disable) bits of mode
  *		page 8 (MODEPAGE_CACHING).
  *
- *   Arguments: ssc   - ssc contains pointer to driver soft state (unit)
- *                      structure for this target.
- *		rcd_flag - flag for controlling the read cache
- *		wce_flag - flag for controlling the write cache
+ *   Arguments: ssc		- ssc contains pointer to driver soft state
+ *				  (unit) structure for this target.
+ *		rcd_flag	- flag for controlling the read cache
+ *		wce_flag	- flag for controlling the write cache
  *
  * Return Code: EIO
  *		code returned by sd_send_scsi_MODE_SENSE and
@@ -9405,167 +9495,87 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
 static int
 sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag)
 {
-	struct mode_caching	*mode_caching_page;
-	uchar_t			*header;
-	size_t			buflen;
-	int			hdrlen;
-	int			bd_len;
-	int			rval = 0;
-	struct mode_header_grp2	*mhp;
-	struct sd_lun		*un;
-	int			status;
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	uchar_t		*header;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		bdlen;
+	int		rval;
 
-	ASSERT(ssc != NULL);
-	un = ssc->ssc_un;
-	ASSERT(un != NULL);
+	rval = sd_get_caching_mode_page(ssc, MODEPAGE_CURRENT, &header, &bdlen);
+	switch (rval) {
+	case 0:
+		/* Check the relevant bits on successful mode sense */
+		mode_caching_page = (struct mode_caching *)(header + hdrlen +
+		    bdlen);
+		if ((mode_caching_page->rcd && rcd_flag == SD_CACHE_ENABLE) ||
+		    (!mode_caching_page->rcd && rcd_flag == SD_CACHE_DISABLE) ||
+		    (mode_caching_page->wce && wce_flag == SD_CACHE_DISABLE) ||
+		    (!mode_caching_page->wce && wce_flag == SD_CACHE_ENABLE)) {
+			size_t sbuflen;
+			uchar_t save_pg;
 
-	/*
-	 * Do a test unit ready, otherwise a mode sense may not work if this
-	 * is the first command sent to the device after boot.
-	 */
-	status = sd_send_scsi_TEST_UNIT_READY(ssc, 0);
-	if (status != 0)
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+			/*
+			 * Construct select buffer length based on the
+			 * length of the sense data returned.
+			 */
+			sbuflen = hdrlen + bdlen + sizeof (struct mode_page) +
+			    (int)mode_caching_page->mode_page.length;
 
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		hdrlen = MODE_HEADER_LENGTH_GRP2;
-	} else {
-		hdrlen = MODE_HEADER_LENGTH;
-	}
+			/* Set the caching bits as requested */
+			if (rcd_flag == SD_CACHE_ENABLE)
+				mode_caching_page->rcd = 0;
+			else if (rcd_flag == SD_CACHE_DISABLE)
+				mode_caching_page->rcd = 1;
 
-	/*
-	 * Allocate memory for the retrieved mode page and its headers.  Set
-	 * a pointer to the page itself.  Use mode_cache_scsi3 to insure
-	 * we get all of the mode sense data otherwise, the mode select
-	 * will fail.  mode_cache_scsi3 is a superset of mode_caching.
-	 */
-	buflen = hdrlen + MODE_BLK_DESC_LENGTH +
-	    sizeof (struct mode_cache_scsi3);
+			if (wce_flag == SD_CACHE_ENABLE)
+				mode_caching_page->wce = 1;
+			else if (wce_flag == SD_CACHE_DISABLE)
+				mode_caching_page->wce = 0;
 
-	header = kmem_zalloc(buflen, KM_SLEEP);
+			/*
+			 * Save the page if the mode sense says the
+			 * drive supports it.
+			 */
+			save_pg = mode_caching_page->mode_page.ps ?
+			    SD_SAVE_PAGE : SD_DONTSAVE_PAGE;
 
-	/* Get the information from the device. */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP1, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	} else {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP0, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	}
+			/* Clear reserved bits before mode select */
+			mode_caching_page->mode_page.ps = 0;
 
-	if (rval != 0) {
-		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un,
-		    "sd_cache_control: Mode Sense Failed\n");
-		goto mode_sense_failed;
-	}
+			/*
+			 * Clear out mode header for mode select.
+			 * The rest of the retrieved page will be reused.
+			 */
+			bzero(header, hdrlen);
 
-	/*
-	 * Determine size of Block Descriptors in order to locate
-	 * the mode page data. ATAPI devices return 0, SCSI devices
-	 * should return MODE_BLK_DESC_LENGTH.
-	 */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		mhp	= (struct mode_header_grp2 *)header;
-		bd_len  = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
-	} else {
-		bd_len  = ((struct mode_header *)header)->bdesc_length;
-	}
+			if (un->un_f_cfg_is_atapi == TRUE) {
+				struct mode_header_grp2 *mhp =
+				    (struct mode_header_grp2 *)header;
+				mhp->bdesc_length_hi = bdlen >> 8;
+				mhp->bdesc_length_lo = (uchar_t)bdlen & 0xff;
+			} else {
+				((struct mode_header *)header)->bdesc_length =
+				    bdlen;
+			}
 
-	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
-		    "sd_cache_control: Mode Sense returned invalid block "
-		    "descriptor length\n");
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-
-	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
-	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
-		    "sd_cache_control: Mode Sense caching page code mismatch "
-		    "%d\n", mode_caching_page->mode_page.code);
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-
-	/* Check the relevant bits on successful mode sense. */
-	if ((mode_caching_page->rcd && rcd_flag == SD_CACHE_ENABLE) ||
-	    (!mode_caching_page->rcd && rcd_flag == SD_CACHE_DISABLE) ||
-	    (mode_caching_page->wce && wce_flag == SD_CACHE_DISABLE) ||
-	    (!mode_caching_page->wce && wce_flag == SD_CACHE_ENABLE)) {
-
-		size_t sbuflen;
-		uchar_t save_pg;
-
-		/*
-		 * Construct select buffer length based on the
-		 * length of the sense data returned.
-		 */
-		sbuflen =  hdrlen + bd_len +
-		    sizeof (struct mode_page) +
-		    (int)mode_caching_page->mode_page.length;
-
-		/*
-		 * Set the caching bits as requested.
-		 */
-		if (rcd_flag == SD_CACHE_ENABLE)
-			mode_caching_page->rcd = 0;
-		else if (rcd_flag == SD_CACHE_DISABLE)
-			mode_caching_page->rcd = 1;
-
-		if (wce_flag == SD_CACHE_ENABLE)
-			mode_caching_page->wce = 1;
-		else if (wce_flag == SD_CACHE_DISABLE)
-			mode_caching_page->wce = 0;
-
-		/*
-		 * Save the page if the mode sense says the
-		 * drive supports it.
-		 */
-		save_pg = mode_caching_page->mode_page.ps ?
-		    SD_SAVE_PAGE : SD_DONTSAVE_PAGE;
-
-		/* Clear reserved bits before mode select. */
-		mode_caching_page->mode_page.ps = 0;
-
-		/*
-		 * Clear out mode header for mode select.
-		 * The rest of the retrieved page will be reused.
-		 */
-		bzero(header, hdrlen);
-
-		if (un->un_f_cfg_is_atapi == TRUE) {
-			mhp = (struct mode_header_grp2 *)header;
-			mhp->bdesc_length_hi = bd_len >> 8;
-			mhp->bdesc_length_lo = (uchar_t)bd_len & 0xff;
-		} else {
-			((struct mode_header *)header)->bdesc_length = bd_len;
-		}
-
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-
-		/* Issue mode select to change the cache settings */
-		if (un->un_f_cfg_is_atapi == TRUE) {
-			rval = sd_send_scsi_MODE_SELECT(ssc, CDB_GROUP1, header,
-			    sbuflen, save_pg, SD_PATH_DIRECT);
-		} else {
-			rval = sd_send_scsi_MODE_SELECT(ssc, CDB_GROUP0, header,
-			    sbuflen, save_pg, SD_PATH_DIRECT);
-		}
-
-	}
-
-
-mode_sense_failed:
-
-	kmem_free(header, buflen);
-
-	if (rval != 0) {
-		if (rval == EIO)
-			sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
-		else
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+
+			/* Issue mode select to change the cache settings */
+			rval = sd_send_scsi_MODE_SELECT(ssc, SDC_CDB_GROUP(un),
+			    header, sbuflen, save_pg, SD_PATH_DIRECT);
+		}
+		kmem_free(header, buflen);
+		break;
+	case EIO:
+		sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
+		break;
+	default:
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
 	}
+
 	return (rval);
 }
 
@@ -9573,15 +9583,15 @@ mode_sense_failed:
 /*
  *    Function: sd_get_write_cache_enabled()
  *
- * Description: This routine is the driver entry point for determining if
- *		write caching is enabled.  It examines the WCE (write cache
- *		enable) bits of mode page 8 (MODEPAGE_CACHING).
+ * Description: This routine is the driver entry point for determining if write
+ *		caching is enabled.  It examines the WCE (write cache enable)
+ *		bits of mode page 8 (MODEPAGE_CACHING) with Page Control field
+ *		bits set to MODEPAGE_CURRENT.
  *
- *   Arguments: ssc   - ssc contains pointer to driver soft state (unit)
- *                      structure for this target.
- *		is_enabled - pointer to int where write cache enabled state
- *		is returned (non-zero -> write cache enabled)
- *
+ *   Arguments: ssc		- ssc contains pointer to driver soft state
+ *				  (unit) structure for this target.
+ *		is_enabled	- pointer to int where write cache enabled state
+ *				  is returned (non-zero -> write cache enabled)
  *
  * Return Code: EIO
  *		code returned by sd_send_scsi_MODE_SENSE
@@ -9604,100 +9614,30 @@ mode_sense_failed:
 static int
 sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled)
 {
-	struct mode_caching	*mode_caching_page;
-	uchar_t			*header;
-	size_t			buflen;
-	int			hdrlen;
-	int			bd_len;
-	int			rval = 0;
-	struct sd_lun		*un;
-	int			status;
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	uchar_t		*header;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		bdlen;
+	int		rval;
 
-	ASSERT(ssc != NULL);
-	un = ssc->ssc_un;
-	ASSERT(un != NULL);
-	ASSERT(is_enabled != NULL);
-
-	/* in case of error, flag as enabled */
+	/* In case of error, flag as enabled */
 	*is_enabled = TRUE;
 
-	/*
-	 * Do a test unit ready, otherwise a mode sense may not work if this
-	 * is the first command sent to the device after boot.
-	 */
-	status = sd_send_scsi_TEST_UNIT_READY(ssc, 0);
-
-	if (status != 0)
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		hdrlen = MODE_HEADER_LENGTH_GRP2;
-	} else {
-		hdrlen = MODE_HEADER_LENGTH;
-	}
-
-	/*
-	 * Allocate memory for the retrieved mode page and its headers.  Set
-	 * a pointer to the page itself.
-	 */
-	buflen = hdrlen + MODE_BLK_DESC_LENGTH + sizeof (struct mode_caching);
-	header = kmem_zalloc(buflen, KM_SLEEP);
-
-	/* Get the information from the device. */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP1, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	} else {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP0, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	}
-
-	if (rval != 0) {
-		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un,
-		    "sd_get_write_cache_enabled: Mode Sense Failed\n");
-		goto mode_sense_failed;
-	}
-
-	/*
-	 * Determine size of Block Descriptors in order to locate
-	 * the mode page data. ATAPI devices return 0, SCSI devices
-	 * should return MODE_BLK_DESC_LENGTH.
-	 */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		struct mode_header_grp2	*mhp;
-		mhp	= (struct mode_header_grp2 *)header;
-		bd_len  = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
-	} else {
-		bd_len  = ((struct mode_header *)header)->bdesc_length;
-	}
-
-	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		/* FMA should make upset complain here */
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
-		    "sd_get_write_cache_enabled: Mode Sense returned invalid "
-		    "block descriptor length\n");
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-
-	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
-	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
-		/* FMA could make upset complain here */
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
-		    "sd_get_write_cache_enabled: Mode Sense caching page "
-		    "code mismatch %d\n", mode_caching_page->mode_page.code);
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-	*is_enabled = mode_caching_page->wce;
-
-mode_sense_failed:
-	if (rval == 0) {
+	rval = sd_get_caching_mode_page(ssc, MODEPAGE_CURRENT, &header, &bdlen);
+	switch (rval) {
+	case 0:
+		mode_caching_page = (struct mode_caching *)(header + hdrlen +
+		    bdlen);
+		*is_enabled = mode_caching_page->wce;
 		sd_ssc_assessment(ssc, SD_FMT_STANDARD);
-	} else if (rval == EIO) {
+		kmem_free(header, buflen);
+		break;
+	case EIO: {
 		/*
-		 * Some disks do not support mode sense(6), we
-		 * should ignore this kind of error(sense key is
+		 * Some disks do not support Mode Sense(6), we
+		 * should ignore this kind of error (sense key is
 		 * 0x5 - illegal request).
 		 */
 		uint8_t *sensep;
@@ -9713,11 +9653,64 @@ mode_sense_failed:
 		} else {
 			sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
 		}
-	} else {
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
 	}
-	kmem_free(header, buflen);
+	default:
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
+	}
+
 	return (rval);
+}
+
+/*
+ *    Function: sd_get_write_cache_changeable()
+ *
+ * Description: This routine is the driver entry point for determining if write
+ *		caching is changeable.  It examines the WCE (write cache enable)
+ *		bits of mode page 8 (MODEPAGE_CACHING) with Page Control field
+ *		bits set to MODEPAGE_CHANGEABLE.
+ *
+ *   Arguments: ssc		- ssc contains pointer to driver soft state
+ *				  (unit) structure for this target.
+ *		is_changeable	- pointer to int where write cache changeable
+ *				  state is returned (non-zero -> write cache
+ *				  changeable)
+ *
+ *     Context: Kernel Thread
+ */
+
+static void
+sd_get_write_cache_changeable(sd_ssc_t *ssc, int *is_changeable)
+{
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	uchar_t		*header;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		bdlen;
+	int		rval;
+
+	/* In case of error, flag as enabled */
+	*is_changeable = TRUE;
+
+	rval = sd_get_caching_mode_page(ssc, MODEPAGE_CHANGEABLE, &header,
+	    &bdlen);
+	switch (rval) {
+	case 0:
+		mode_caching_page = (struct mode_caching *)(header + hdrlen +
+		    bdlen);
+		*is_changeable = mode_caching_page->wce;
+		kmem_free(header, buflen);
+		sd_ssc_assessment(ssc, SD_FMT_STANDARD);
+		break;
+	case EIO:
+		sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
+		break;
+	default:
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
+	}
 }
 
 /*
@@ -23174,6 +23167,11 @@ skip_ready_valid:
 
 		int wce, sync_supported;
 		int cur_wce = 0;
+
+		if (!un->un_f_cache_mode_changeable) {
+			err = EINVAL;
+			break;
+		}
 
 		if (ddi_copyin((void *)arg, &wce, sizeof (wce), flag)) {
 			err = EFAULT;
