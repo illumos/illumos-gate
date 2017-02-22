@@ -116,7 +116,7 @@ umass_disk_open_sub(struct disk_devdesc *dev)
 	if (usb_msc_read_capacity(umass_uaa.device, 0, &nblock, &blocksize) != 0)
 		return (EINVAL);
 
-	return (disk_open(dev, ((uint64_t)nblock + 1) * (uint64_t)blocksize, blocksize, 0));
+	return (disk_open(dev, ((uint64_t)nblock + 1) * (uint64_t)blocksize, blocksize));
 }
 
 static int

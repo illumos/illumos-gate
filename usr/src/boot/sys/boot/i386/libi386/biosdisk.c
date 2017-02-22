@@ -108,7 +108,6 @@ static int bd_open(struct open_file *f, ...);
 static int bd_close(struct open_file *f);
 static int bd_ioctl(struct open_file *f, u_long cmd, void *data);
 static int bd_print(int verbose);
-static void bd_cleanup(void);
 
 struct devsw biosdisk = {
 	"disk",
@@ -119,7 +118,7 @@ struct devsw biosdisk = {
 	bd_close,
 	bd_ioctl,
 	bd_print,
-	bd_cleanup
+	NULL
 };
 
 /*
@@ -187,13 +186,6 @@ bd_init(void)
 	}
 	bcache_add_dev(nbdinfo);
 	return(0);
-}
-
-static void
-bd_cleanup(void)
-{
-
-	disk_cleanup(&biosdisk);
 }
 
 /*
@@ -324,9 +316,7 @@ bd_print(int verbose)
 		dev.d_partition = -1;
 		if (disk_open(&dev,
 		    bdinfo[i].bd_sectorsize * bdinfo[i].bd_sectors,
-		    bdinfo[i].bd_sectorsize,
-		    (bdinfo[i].bd_flags & BD_FLOPPY) ?
-		    DISK_F_NOCACHE: 0) == 0) {
+		    bdinfo[i].bd_sectorsize) == 0) {
 			sprintf(line, "    disk%d", i);
 			ret = disk_print(&dev, line, verbose);
 			disk_close(&dev);
@@ -381,8 +371,7 @@ bd_open(struct open_file *f, ...)
 	disk.d_offset = 0;
 
 	if (disk_open(&disk, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
-	    BD(dev).bd_sectorsize, (BD(dev).bd_flags & BD_FLOPPY) ?
-	    DISK_F_NOCACHE: 0) == 0) {
+	    BD(dev).bd_sectorsize) == 0) {
 
 		if (disk_ioctl(&disk, DIOCGMEDIASIZE, &size) == 0) {
 			size /= BD(dev).bd_sectorsize;
@@ -393,8 +382,7 @@ bd_open(struct open_file *f, ...)
 	}
 
 	return (disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
-	    BD(dev).bd_sectorsize, (BD(dev).bd_flags & BD_FLOPPY) ?
-	    DISK_F_NOCACHE: 0));
+	    BD(dev).bd_sectorsize));
 }
 
 static int
@@ -771,8 +759,7 @@ bd_getdev(struct i386_devdesc *d)
     if (biosdev == -1)				/* not a BIOS device */
 	return(-1);
     if (disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
-	BD(dev).bd_sectorsize,(BD(dev).bd_flags & BD_FLOPPY) ?
-	DISK_F_NOCACHE: 0) != 0)		/* oops, not a viable device */
+	BD(dev).bd_sectorsize) != 0)		/* oops, not a viable device */
 	    return (-1);
     else
 	disk_close(dev);
