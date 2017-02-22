@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -159,6 +159,11 @@ prchoose(proc_t *p)
 		if (VSTOPPED(t)) {	/* virtually stopped */
 			if (t_req == NULL)
 				t_req = t;
+			continue;
+		}
+
+		/* If this is a process kernel thread, ignore it. */
+		if ((t->t_proc_flag & TP_KTHREAD) != 0) {
 			continue;
 		}
 

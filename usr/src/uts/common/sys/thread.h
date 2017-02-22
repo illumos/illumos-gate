@@ -405,6 +405,7 @@ typedef struct _kthread {
 #define	TP_CHANGEBIND	0x1000	/* thread has a new cpu/cpupart binding */
 #define	TP_ZTHREAD	0x2000	/* this is a kernel thread for a zone */
 #define	TP_WATCHSTOP	0x4000	/* thread is stopping via holdwatch() */
+#define	TP_KTHREAD	0x8000	/* in-kernel worker thread for a process */
 
 /*
  * Thread scheduler flag (t_schedflag) definitions.
