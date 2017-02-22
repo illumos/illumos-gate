@@ -27,7 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
-/* Copyright 2015 Joyent, Inc. */
+/* Copyright 2017 Joyent, Inc. */
 
 #ifndef _SYS_FILE_H
 #define	_SYS_FILE_H
@@ -225,6 +225,7 @@ extern void fcnt_add(uf_info_t *, int);
 extern void close_exec(uf_info_t *);
 extern void clear_stale_fd(void);
 extern void clear_active_fd(int);
+extern void set_active_fd(int);
 extern void free_afd(afd_t *afd);
 extern int fgetstartvp(int, char *, struct vnode **);
 extern int fsetattrat(int, char *, int, struct vattr *);

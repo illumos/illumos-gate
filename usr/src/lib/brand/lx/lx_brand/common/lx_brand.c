@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -72,7 +72,6 @@
 #include <sys/lx_signal.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
-#include <sys/lx_aio.h>
 #include <lx_auxv.h>
 
 /*
@@ -1014,7 +1013,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   0: read */
 	NULL,				/*   1: write */
 	NULL,				/*   2: open */
-	lx_close,			/*   3: close */
+	NULL,				/*   3: close */
 	NULL,				/*   4: stat */
 	NULL,				/*   5: fstat */
 	NULL,				/*   6: lstat */
@@ -1217,11 +1216,11 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 203: sched_setaffinity */
 	NULL,				/* 204: sched_getaffinity */
 	NULL,				/* 205: set_thread_area */
-	lx_io_setup,			/* 206: io_setup */
-	lx_io_destroy,			/* 207: io_destroy */
-	lx_io_getevents,		/* 208: io_getevents */
-	lx_io_submit,			/* 209: io_submit */
-	lx_io_cancel,			/* 210: io_cancel */
+	NULL,				/* 206: io_setup */
+	NULL,				/* 207: io_destroy */
+	NULL,				/* 208: io_getevents */
+	NULL,				/* 209: io_submit */
+	NULL,				/* 210: io_cancel */
 	NULL,				/* 211: get_thread_area */
 	NULL,				/* 212: lookup_dcookie */
 	NULL,				/* 213: epoll_create */
@@ -1348,7 +1347,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   3: read */
 	NULL,				/*   4: write */
 	NULL,				/*   5: open */
-	lx_close,			/*   6: close */
+	NULL,				/*   6: close */
 	NULL,				/*   7: waitpid */
 	NULL,				/*   8: creat */
 	NULL,				/*   9: link */
@@ -1587,11 +1586,11 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 242: sched_getaffinity */
 	NULL,				/* 243: set_thread_area */
 	NULL,				/* 244: get_thread_area */
-	lx_io_setup,			/* 245: io_setup */
-	lx_io_destroy,			/* 246: io_destroy */
-	lx_io_getevents,		/* 247: io_getevents */
-	lx_io_submit,			/* 248: io_submit */
-	lx_io_cancel,			/* 249: io_cancel */
+	NULL,				/* 245: io_setup */
+	NULL,				/* 246: io_destroy */
+	NULL,				/* 247: io_getevents */
+	NULL,				/* 248: io_submit */
+	NULL,				/* 249: io_cancel */
 	NULL,				/* 250: fadvise64 */
 	NULL,				/* 251: nosys */
 	lx_group_exit,			/* 252: group_exit */

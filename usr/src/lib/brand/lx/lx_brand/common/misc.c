@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -292,15 +292,6 @@ lx_setgroups(uintptr_t p1, uintptr_t p2)
 	r = syscall(SYS_brand, B_HELPER_SETGROUPS, ng, glist);
 
 	free(glist);
-	return ((r == -1) ? -errno : r);
-}
-
-long
-lx_close(int fildes)
-{
-	int r;
-
-	r = close(fildes);
 	return ((r == -1) ? -errno : r);
 }
 

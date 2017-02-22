@@ -262,8 +262,7 @@ typedef enum lx_proc_flags {
 	LX_PROC_STRICT_MODE	= 0x02,
 	/* internal flags */
 	LX_PROC_CHILD_DEATHSIG	= 0x04,
-	LX_PROC_AIO_USED	= 0x08,
-	LX_PROC_NO_DUMP		= 0x10	/* for lx_prctl LX_PR_[GS]ET_DUMPABLE */
+	LX_PROC_NO_DUMP		= 0x08	/* for lx_prctl LX_PR_[GS]ET_DUMPABLE */
 } lx_proc_flags_t;
 
 #define	LX_PROC_ALL	(LX_PROC_INSTALL_MODE | LX_PROC_STRICT_MODE)
@@ -329,6 +328,11 @@ typedef struct lx_proc_data {
 
 	lx_rlimit64_t l_fake_limits[LX_RLFAKE_NLIMITS];
 
+	kmutex_t l_io_ctx_lock; /* protects the following members */
+	uintptr_t l_io_ctxpage;
+	kcondvar_t l_io_destroy_cv;
+	struct lx_io_ctx  **l_io_ctxs;
+
 	/* original start/end bounds of arg/env string data */
 	uintptr_t l_args_start;
 	uintptr_t l_envs_start;
@@ -365,6 +369,9 @@ typedef struct lx_proc_data {
 #define	LX_PER_LINUX	0x00
 #define	LX_PER_SUNOS	(0x06 | LX_PER_STICKY_TIMEOUTS)
 #define	LX_PER_MASK	0xff
+
+/* max. number of aio control blocks (see lx_io_setup) allowed across zone */
+#define	LX_AIO_MAX_NR	65536
 
 /*
  * A data type big enough to bitmap all Linux possible cpus.
@@ -611,9 +618,12 @@ typedef struct lx_zone_data {
 	vfs_t *lxzd_cgroup;			/* cgroup for this zone */
 	list_t *lxzd_vdisks;			/* virtual disks (zvols) */
 	dev_t lxzd_zfs_dev;			/* major num for zfs */
+	uint_t lxzd_aio_nr;			/* see lx_aio.c */
 } lx_zone_data_t;
 
+/* LWP br_lwp_flags values */
 #define	BR_CPU_BOUND	0x0001
+#define	BR_AIO_LWP	0x0002			/* aio kernel worker thread */
 
 #define	ttolxlwp(t)	((struct lx_lwp_data *)ttolwpbrand(t))
 #define	lwptolxlwp(l)	((struct lx_lwp_data *)lwptolwpbrand(l))

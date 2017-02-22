@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_LINUX_SYSCALLS_H
@@ -117,7 +117,11 @@ extern long lx_gettimeofday();
 extern long lx_getuid();
 extern long lx_getuid16();
 extern long lx_getxattr();
+extern long lx_io_cancel();
+extern long lx_io_destroy();
+extern long lx_io_getevents();
 extern long lx_io_setup();
+extern long lx_io_submit();
 extern long lx_ioctl();
 extern long lx_ioprio_get();
 extern long lx_ioprio_set();

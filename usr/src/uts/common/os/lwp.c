@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -1728,6 +1728,9 @@ exitlwps(int coredump)
 {
 	proc_t *p = curproc;
 	int heldcnt;
+
+	if (PROC_IS_BRANDED(p) && BROP(p)->b_exitlwps != NULL)
+		BROP(p)->b_exitlwps(p, coredump);
 
 	if (curthread->t_door)
 		door_slam();
