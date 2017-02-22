@@ -163,6 +163,14 @@ lx_cleanlwp(klwp_t *lwp, proc_t *p)
 	}
 
 	/*
+	 * While we have p_lock, clear the TP_KTHREAD flag. This is needed
+	 * to prevent races within lx procfs. It's fine for prchoose() to pick
+	 * this thread now since it is exiting and no longer blocked in the
+	 * kernel.
+	 */
+	lwptot(lwp)->t_proc_flag &= ~TP_KTHREAD;
+
+	/*
 	 * While we have p_lock, safely grab any robust_list references and
 	 * clear the lwp field.
 	 */

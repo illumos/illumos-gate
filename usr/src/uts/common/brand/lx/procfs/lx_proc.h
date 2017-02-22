@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_LX_PROC_H
@@ -199,6 +199,8 @@ typedef enum lxpr_nodetype {
 	LXPR_SWAPS,		/* /proc/swaps		*/
 	LXPR_SYSDIR,		/* /proc/sys/		*/
 	LXPR_SYS_FSDIR,		/* /proc/sys/fs/	*/
+	LXPR_SYS_FS_AIO_MAX_NR,	/* /proc/sys/fs/aio-max-nr */
+	LXPR_SYS_FS_AIO_NR,	/* /proc/sys/fs/aio-nr	*/
 	LXPR_SYS_FS_FILEMAX,	/* /proc/sys/fs/file-max */
 	LXPR_SYS_FS_INOTIFYDIR,	/* /proc/sys/fs/inotify	*/
 	LXPR_SYS_FS_INOTIFY_MAX_QUEUED_EVENTS,	/* inotify/max_queued_events */

@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/kmem.h>
@@ -765,10 +765,10 @@ lx_sysent_t lx_sysent32[] = {
 	{"set_thread_area", lx_set_thread_area,	0,		1}, /* 243 */
 	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 244 */
 	{"io_setup",	lx_io_setup,		0,		2}, /* 245 */
-	{"io_destroy",	NULL,			0,		1}, /* 246 */
-	{"io_getevents", NULL,			0,		5}, /* 247 */
-	{"io_submit",	NULL,			0,		3}, /* 248 */
-	{"io_cancel",	NULL,			0,		3}, /* 249 */
+	{"io_destroy",	lx_io_destroy,		0,		1}, /* 246 */
+	{"io_getevents", lx_io_getevents,	0,		5}, /* 247 */
+	{"io_submit",	lx_io_submit,		0,		3}, /* 248 */
+	{"io_cancel",	lx_io_cancel,		0,		3}, /* 249 */
 	{"fadvise64",	lx_fadvise64_32,	0,		5}, /* 250 */
 	{"nosys",	NULL,			0,		0}, /* 251 */
 	{"group_exit",	NULL,			0,		1}, /* 252 */
@@ -1097,10 +1097,10 @@ lx_sysent_t lx_sysent64[] = {
 	{"sched_getaffinity", lx_sched_getaffinity,	0,	3}, /* 204 */
 	{"set_thread_area", lx_set_thread_area, 0,		1}, /* 205 */
 	{"io_setup",	lx_io_setup,		0,		2}, /* 206 */
-	{"io_destroy",	NULL,			0,		1}, /* 207 */
-	{"io_getevents", NULL,			0,		5}, /* 208 */
-	{"io_submit",	NULL,			0,		3}, /* 209 */
-	{"io_cancel",	NULL,			0,		3}, /* 210 */
+	{"io_destroy",	lx_io_destroy,		0,		1}, /* 207 */
+	{"io_getevents", lx_io_getevents,	0,		5}, /* 208 */
+	{"io_submit",	lx_io_submit,		0,		3}, /* 209 */
+	{"io_cancel",	lx_io_cancel,		0,		3}, /* 210 */
 	{"get_thread_area", lx_get_thread_area,	0,		1}, /* 211 */
 	{"lookup_dcookie", NULL,		NOSYS_NO_EQUIV,	0}, /* 212 */
 	{"epoll_create", lx_epoll_create,	0,		1}, /* 213 */

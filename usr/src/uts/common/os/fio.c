@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent Inc.
+ * Copyright 2017, Joyent Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -487,7 +487,7 @@ free_afd(afd_t *afd)		/* called below and from thread_free() */
 		afd->a_fd[i] = -1;
 }
 
-static void
+void
 set_active_fd(int fd)
 {
 	afd_t *afd = &curthread->t_activefd;

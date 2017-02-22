@@ -216,6 +216,8 @@ static void lxpr_read_net_tcp6(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_udp(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_udp6(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_net_unix(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_fs_aiomax(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_fs_aionr(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_filemax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *,
     lxpr_uiobuf_t *);
@@ -495,6 +497,8 @@ static lxpr_dirent_t sysdir[] = {
  * contents of /proc/sys/fs directory
  */
 static lxpr_dirent_t sys_fsdir[] = {
+	{ LXPR_SYS_FS_AIO_MAX_NR,	"aio-max-nr" },
+	{ LXPR_SYS_FS_AIO_NR,		"aio-nr" },
 	{ LXPR_SYS_FS_FILEMAX,		"file-max" },
 	{ LXPR_SYS_FS_INOTIFYDIR,	"inotify" },
 };
@@ -826,6 +830,8 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_swaps,		/* /proc/swaps		*/
 	lxpr_read_invalid,		/* /proc/sys		*/
 	lxpr_read_invalid,		/* /proc/sys/fs		*/
+	lxpr_read_sys_fs_aiomax,	/* /proc/sys/fs/aio-max-nr */
+	lxpr_read_sys_fs_aionr,		/* /proc/sys/fs/aio-nr */
 	lxpr_read_sys_fs_filemax,	/* /proc/sys/fs/file-max */
 	lxpr_read_invalid,		/* /proc/sys/fs/inotify	*/
 	lxpr_read_sys_fs_inotify_max_queued_events, /* max_queued_events */
@@ -966,6 +972,8 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/swaps		*/
 	lxpr_lookup_sysdir,		/* /proc/sys		*/
 	lxpr_lookup_sys_fsdir,		/* /proc/sys/fs		*/
+	lxpr_lookup_not_a_dir,		/* /proc/sys/fs/aio-max-nr */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/fs/aio-nr */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/fs/file-max */
 	lxpr_lookup_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
 	lxpr_lookup_not_a_dir,		/* .../inotify/max_queued_events */
@@ -1106,6 +1114,8 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/swaps		*/
 	lxpr_readdir_sysdir,		/* /proc/sys		*/
 	lxpr_readdir_sys_fsdir,		/* /proc/sys/fs		*/
+	lxpr_readdir_not_a_dir,		/* /proc/sys/fs/aio-max-nr */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/fs/aio-nr */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/fs/file-max */
 	lxpr_readdir_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
 	lxpr_readdir_not_a_dir,		/* .../inotify/max_queued_events */
@@ -2094,6 +2104,40 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * Determine number of LWPs visible in the process. In particular we want to
+ * ignore aio in-kernel threads.
+ */
+static uint_t
+lxpr_count_tasks(proc_t *p)
+{
+	uint_t cnt = 0;
+	kthread_t *t;
+
+	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
+	    (p->p_as == &kas)) {
+		return (0);
+	}
+
+	if (p->p_brand != &lx_brand || (t = p->p_tlist) == NULL) {
+		cnt = p->p_lwpcnt;
+	} else {
+		do {
+			lx_lwp_data_t *lwpd = ttolxlwp(t);
+			/* Don't count aio kernel worker threads */
+			if ((t->t_proc_flag & TP_KTHREAD) != 0 &&
+			    lwpd != NULL &&
+			    (lwpd->br_lwp_flags & BR_AIO_LWP) == 0) {
+				cnt++;
+			}
+
+			t = t->t_forw;
+		} while (t != p->p_tlist);
+	}
+
+	return (cnt);
+}
+
+/*
  * pid/tid common code to read status file
  */
 static void
@@ -2173,7 +2217,7 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 
 	(void) strlcpy(buf_comm, up->u_comm, sizeof (buf_comm));
 	fdlim = p->p_fno_ctl;
-	lwpcnt = p->p_lwpcnt;
+	lwpcnt = lxpr_count_tasks(p);
 
 	/*
 	 * Gather memory information
@@ -2474,7 +2518,7 @@ lxpr_read_pid_tid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	}
 	cutime = p->p_cutime;
 	cstime = p->p_cstime;
-	lwpcnt = p->p_lwpcnt;
+	lwpcnt = lxpr_count_tasks(p);
 	vmem_ctl = p->p_vmem_ctl;
 	(void) strlcpy(buf_comm, p->p_user.u_comm, sizeof (buf_comm));
 	ticks = p->p_user.u_ticks;	/* lbolt at process start */
@@ -4246,6 +4290,32 @@ lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "/dev/swap", "partition", totswap, usedswap, -1);
 }
 
+/* ARGSUSED */
+static void
+lxpr_read_sys_fs_aiomax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_AIO_MAX_NR);
+	lxpr_uiobuf_printf(uiobuf, "%llu\n", LX_AIO_MAX_NR);
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_sys_fs_aionr(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	zone_t *zone = LXPTOZ(lxpnp);
+	lx_zone_data_t *lxzd = ztolxzd(zone);
+	uint64_t curr;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_AIO_NR);
+	ASSERT(zone->zone_brand == &lx_brand);
+	ASSERT(lxzd != NULL);
+
+	mutex_enter(&lxzd->lxzd_lock);
+	curr = (uint64_t)(lxzd->lxzd_aio_nr);
+	mutex_exit(&lxzd->lxzd_lock);
+	lxpr_uiobuf_printf(uiobuf, "%llu\n", curr);
+}
+
 /*
  * lxpr_read_sys_fs_filemax():
  *
@@ -5422,14 +5492,8 @@ lxpr_count_taskdir(lxpr_node_t *lxpnp)
 	if (p == NULL)
 		return (0);
 
-	/* Just count "." and ".." for system processes and zombies. */
-	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
-	    (p->p_as == &kas)) {
-		lxpr_unlock(p);
-		return (2);
-	}
+	cnt = lxpr_count_tasks(p);
 
-	cnt = p->p_lwpcnt;
 	lxpr_unlock(p);
 
 	/* Add the fixed entries ("." & "..") */
@@ -5791,7 +5855,24 @@ lxpr_lookup_taskdir(vnode_t *dp, char *comp)
 		if (tid != p->p_pid || t == NULL) {
 			t = NULL;
 		}
+	} else if (t != NULL) {
+		/*
+		 * Disallow any access to aio in-kernel worker threads.
+		 * To prevent a potential race while looking at the lwp data
+		 * for an exiting thread, we clear the TP_KTHREAD bit in
+		 * lx_cleanlwp() while the p_lock is held.
+		 */
+		if ((t->t_proc_flag & TP_KTHREAD) != 0) {
+			lx_lwp_data_t *lwpd;
+
+			VERIFY((lwpd = ttolxlwp(t)) != NULL);
+			if ((lwpd->br_lwp_flags & BR_AIO_LWP) != 0) {
+				lxpr_unlock(p);
+				return (NULL);
+			}
+		}
 	}
+
 	if (t == NULL) {
 		lxpr_unlock(p);
 		return (NULL);
@@ -6405,6 +6486,11 @@ lxpr_readdir_taskdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 			emul_tid = p->p_pid;
 		} else {
 			if ((lwpd = ttolxlwp(t)) == NULL) {
+				goto next;
+			}
+			/* Don't show aio kernel worker threads */
+			if ((t->t_proc_flag & TP_KTHREAD) != 0 &&
+			    (lwpd->br_lwp_flags & BR_AIO_LWP) != 0) {
 				goto next;
 			}
 			emul_tid = lwpd->br_pid;

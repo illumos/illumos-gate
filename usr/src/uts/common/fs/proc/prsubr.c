@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -145,6 +145,11 @@ prchoose(proc_t *p)
 		if (VSTOPPED(t)) {	/* virtually stopped */
 			if (t_req == NULL)
 				t_req = t;
+			continue;
+		}
+
+		/* If this is a process kernel thread, ignore it. */
+		if ((t->t_proc_flag & TP_KTHREAD) != 0) {
 			continue;
 		}
 

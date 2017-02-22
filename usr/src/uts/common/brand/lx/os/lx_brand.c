@@ -200,6 +200,10 @@ extern int zvol_create_minor(const char *);
 
 extern void lx_proc_exit(proc_t *);
 extern int lx_sched_affinity(int, uintptr_t, int, uintptr_t, int64_t *);
+extern void lx_exitlwps(proc_t *, int);
+
+extern void lx_io_clear(lx_proc_data_t *);
+extern void lx_io_cleanup();
 
 extern void lx_ioctl_init();
 extern void lx_ioctl_fini();
@@ -300,7 +304,8 @@ struct brand_ops lx_brops = {
 	NULL,
 #endif
 	B_FALSE,			/* b_intp_parse_arg */
-	lx_clearbrand			/* b_clearbrand */
+	lx_clearbrand,			/* b_clearbrand */
+	lx_exitlwps			/* b_exitlwps */
 };
 
 struct brand_mach_ops lx_mops = {
@@ -360,6 +365,16 @@ lx_proc_exit(proc_t *p)
 		mutex_exit(&cp->p_lock);
 	}
 	mutex_exit(&pidlock);
+}
+
+/* ARGSUSED */
+void
+lx_exitlwps(proc_t *p, int coredump)
+{
+	VERIFY(ptolxproc(p) != NULL);
+
+	/* Cleanup any outstanding aio contexts */
+	lx_io_cleanup();
 }
 
 void
@@ -1879,6 +1894,9 @@ lx_copy_procdata(proc_t *cp, proc_t *pp)
 
 	bcopy(ppd, cpd, sizeof (lx_proc_data_t));
 	mutex_exit(&pp->p_lock);
+
+	/* Clear any aio contexts from child */
+	lx_io_clear(cpd);
 
 	/*
 	 * The l_ptrace count is normally manipulated only while under holding

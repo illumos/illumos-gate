@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -103,7 +103,8 @@ struct brand_ops sn1_brops = {
 	NULL,				/* b_setid_clear */
 	NULL,				/* b_pagefault */
 	B_TRUE,				/* b_intp_parse_arg */
-	NULL				/* b_clearbrand */
+	NULL,				/* b_clearbrand */
+	NULL				/* b_exitlwps */
 };
 
 #ifdef	sparc

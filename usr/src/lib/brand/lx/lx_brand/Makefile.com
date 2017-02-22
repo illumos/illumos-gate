@@ -21,15 +21,14 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 LX_CMN  =	$(SRC)/common/brand/lx
 
 LIBRARY =	lx_brand.a
 VERS	=	.1
-COBJS	=	aio.o			\
-		capabilities.o		\
+COBJS	=	capabilities.o		\
 		clock.o			\
 		clone.o			\
 		debug.o			\

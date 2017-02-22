@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #ifndef _SYS_BRAND_H
@@ -150,6 +150,7 @@ struct execa;
  * b_pagefault - Trap pagefault events
  * b_intp_parse_arg - Controls interpreter argument handling (allow 1 or all)
  * b_clearbrand - Perform any actions necessary when clearing the brand.
+ * b_exitlwps - Perform any preliminary actions when all LWPs are exiting.
  */
 struct brand_ops {
 	void	(*b_init_brand_data)(zone_t *, kmutex_t *);
@@ -200,6 +201,7 @@ struct brand_ops {
 	    enum seg_rw);
 	boolean_t b_intp_parse_arg;
 	void	(*b_clearbrand)(proc_t *, boolean_t);
+	void	(*b_exitlwps)(proc_t *, int);
 };
 
 /*

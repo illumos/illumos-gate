@@ -564,19 +564,16 @@ out:
 }
 
 ssize_t
-lx_pread(int fdes, void *cbuf, size_t ccount, off64_t offset)
+lx_pread_fp(file_t *fp, void *cbuf, size_t ccount, off64_t offset)
 {
 	struct uio auio;
 	struct iovec aiov;
-	file_t *fp;
 	ssize_t count = (ssize_t)ccount;
 	size_t nread = 0;
 	int fflag, error = 0;
 
 	if (count < 0)
 		return (set_errno(EINVAL));
-	if ((fp = getf(fdes)) == NULL)
-		return (set_errno(EBADF));
 	if (((fflag = fp->f_flag) & FREAD) == 0) {
 		error = EBADF;
 		goto out;
@@ -624,7 +621,6 @@ lx_pread(int fdes, void *cbuf, size_t ccount, off64_t offset)
 		}
 	}
 out:
-	releasef(fdes);
 	if (error) {
 		return (set_errno(error));
 	}
@@ -633,19 +629,30 @@ out:
 }
 
 ssize_t
-lx_pwrite(int fdes, void *cbuf, size_t ccount, off64_t offset)
+lx_pread(int fdes, void *cbuf, size_t ccount, off64_t offset)
+{
+	file_t *fp;
+	size_t nread;
+
+	if ((fp = getf(fdes)) == NULL)
+		return (set_errno(EBADF));
+
+	nread = lx_pread_fp(fp, cbuf, ccount, offset);
+	releasef(fdes);
+	return (nread);
+}
+
+ssize_t
+lx_pwrite_fp(file_t *fp, void *cbuf, size_t ccount, off64_t offset)
 {
 	struct uio auio;
 	struct iovec aiov;
-	file_t *fp;
 	ssize_t count = (ssize_t)ccount;
 	size_t nwrite = 0;
 	int fflag, error = 0;
 
 	if (count < 0)
 		return (set_errno(EINVAL));
-	if ((fp = getf(fdes)) == NULL)
-		return (set_errno(EBADF));
 	if (((fflag = fp->f_flag) & (FWRITE)) == 0) {
 		error = EBADF;
 		goto out;
@@ -708,10 +715,23 @@ lx_pwrite(int fdes, void *cbuf, size_t ccount, off64_t offset)
 		}
 	}
 out:
-	releasef(fdes);
 	if (error) {
 		return (set_errno(error));
 	}
+	return (nwrite);
+}
+
+ssize_t
+lx_pwrite(int fdes, void *cbuf, size_t ccount, off64_t offset)
+{
+	file_t *fp;
+	size_t nwrite;
+
+	if ((fp = getf(fdes)) == NULL)
+		return (set_errno(EBADF));
+
+	nwrite = lx_pwrite_fp(fp, cbuf, ccount, offset);
+	releasef(fdes);
 	return (nwrite);
 }
 
