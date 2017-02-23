@@ -63,6 +63,7 @@ SYMBOL_SCOPE {
 	ddi_dma_nextcookie		{ FLAGS = EXTERN };
 	ddi_dma_sync			{ FLAGS = EXTERN };
 	ddi_dma_unbind_handle		{ FLAGS = EXTERN };
+	ddi_fls				{ FLAGS = EXTERN };
 	ddi_fm_acc_err_clear		{ FLAGS = EXTERN };
 	ddi_fm_acc_err_get		{ FLAGS = EXTERN };
 	ddi_fm_dma_err_get		{ FLAGS = EXTERN };

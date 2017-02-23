@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -305,6 +305,13 @@ typedef enum i40e_itr_index {
  */
 #define	I40E_PBANUM_LENGTH	12
 #define	I40E_PBANUM_STRLEN	13
+
+/*
+ * Define the maximum size of a number of queues for a traffic class. While this
+ * would ideally be a part of the common code parts, because it's not at this
+ * time, we define it here.
+ */
+#define	I40E_AQ_VSI_TC_QUE_SIZE_MAX	(1 << 0x6)
 
 /*
  * Bit flags for attach_progress

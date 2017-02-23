@@ -38,7 +38,7 @@ LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 LDFLAGS		+= -dy -N misc/mac
 
-MAPFILES	+= ddi mac
+MAPFILES	+= ddi mac random
 
 .KEEP_STATE:
 
