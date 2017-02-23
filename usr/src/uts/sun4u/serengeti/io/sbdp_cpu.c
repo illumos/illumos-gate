@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -325,9 +326,9 @@ sbdp_cpu_poweron(struct cpu *cp)
 
 	/*
 	 * Wait for the cpu to reach its idle thread before
-	 * we zap him with a request to blow away the mappings
-	 * he (might) have for the sbdp_shutdown_asm code
-	 * he may have executed on unconfigure.
+	 * we zap it with a request to blow away the mappings
+	 * it (might) have for the sbdp_shutdown_asm code
+	 * it may have executed on unconfigure.
 	 */
 	while ((cp->cpu_thread != cp->cpu_idle_thread) && (ntries > 0)) {
 		DELAY(sbdp_cpu_delay);

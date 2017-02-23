@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2016, Joyent, Inc.
  */
 
@@ -408,8 +408,8 @@ poll_common(pollstate_t *ps, pollfd_t *fds, nfds_t nfds, timespec_t *tsp,
 	}
 
 	/*
-	 * Check to see if the caller just wants to use poll() as a timeout.
-	 * If yes then bypass all the other stuff and make him sleep.
+	 * Check to see if this one just wants to use poll() as a timeout.
+	 * If yes then bypass all the other stuff and make it sleep.
 	 */
 	if (nfds == 0) {
 		*fdcnt = 0;

@@ -1,6 +1,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  *	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
  *	  All Rights Reserved
@@ -47,7 +48,7 @@ static char	SccsId[] = "%W%	%E% SMI";
  *	For best operation, this program should run setuid to
  *	root or uucp or someone else that sendmail will believe
  *	a -f flag from.  Otherwise, the user must be careful
- *	to include a header on his .vacation.msg file.
+ *	to include a header on their .vacation.msg file.
  *
  *	Positional Parameters:
  *		the user to collect the vacation message from.

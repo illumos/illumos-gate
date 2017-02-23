@@ -102,6 +102,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_extprocessor;
 	smbios_info_slot;
 	smbios_info_smbios;
+	smbios_info_smbios_version;
 	smbios_info_strtab;
 	smbios_info_system;
 	smbios_info_pciexrc;

@@ -223,10 +223,18 @@ smb_info_bcopy(const smb_header_t *hp, void *dst, size_t dstlen)
 		bcopy(hp, dst, dstlen);
 }
 
-void
+smbios_entry_point_t
 smbios_info_smbios(smbios_hdl_t *shp, smbios_entry_t *ep)
 {
 	bcopy(&shp->sh_ent, ep, sizeof (smbios_entry_t));
+	return (shp->sh_ent_type);
+}
+
+void
+smbios_info_smbios_version(smbios_hdl_t *shp, smbios_version_t *v)
+{
+	v->smbv_major = SMB_MAJOR(shp->sh_smbvers);
+	v->smbv_minor = SMB_MINOR(shp->sh_smbvers);
 }
 
 #ifndef _KERNEL

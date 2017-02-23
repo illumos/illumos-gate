@@ -1,6 +1,7 @@
 /*
  * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -307,7 +308,7 @@ split:
 		return (-1);
 	}
 	dbm_clrdirty(db); /*clear dirty*/
-	(void) lseek(db->dbm_pagf, 
+	(void) lseek(db->dbm_pagf,
 		(long)((db->dbm_blkno+db->dbm_hmask+1)*PBLKSIZ), L_SET);
 	if (write(db->dbm_pagf, ovfbuf, PBLKSIZ) != PBLKSIZ) {
 		db->dbm_flags |= _DBM_IOERR;
@@ -494,7 +495,7 @@ dbm_do_nextkey(DBM *db, datum inkey)
 		else key=nullkey;
 
 	/* the keyptr pagbuf have failed us, the user must
-	be an extra clever moron who depends on 
+	be an extra clever moron who depends on
 	these variables and their former meaning.
 	If we set the variables this would have got
 	us the key for sure! So give him the old algorithm.*/
@@ -517,7 +518,7 @@ dbm_do_nextkey(DBM *db, datum inkey)
 			item.dsize = 0;
 			break; /*from below*/
 		}
-		else { 
+		else {
 			if (i > 0) item.dsize = sp[i] - sp[i+1];
 			else item.dsize = PBLKSIZ - sp[i+1];
 			item.dptr = db->dbm_pagbuf+sp[i+1];
@@ -541,7 +542,7 @@ dbm_do_nextkey(DBM *db, datum inkey)
 			p2 = item.dptr;
 			do
 				if(*p1++ != *p2++)
-					if((*--p1 - *--p2) > 0) goto keep_going; 
+					if((*--p1 - *--p2) > 0) goto keep_going;
 					else continue;
 			while(--n);
 			continue;
@@ -554,7 +555,7 @@ keep_going:
 			continue;*/
 		if (f) {
 			bitem = item;
-			j=i;	
+			j=i;
 			f = 0;
 		}
 		else {
@@ -566,7 +567,7 @@ keep_going:
 			{
 			if((n - item.dsize) <0) {
 					bitem = item;
-					j=i;	
+					j=i;
 				}
 			}
 			else  if (n != 0) {
@@ -576,7 +577,7 @@ keep_going:
 				if(*p1++ != *p2++) {
 					if((*--p1 - *--p2) <0) {
 						bitem = item;
-						j=i;	
+						j=i;
 					}
 					break;
 				}
@@ -591,9 +592,9 @@ keep_going:
 		return (bitem);
 	}
 
-	/*really need hash at this point*/
-	/*if he gave us a key we have already calculated the hash*/
-	/*if not get it*/
+	/* really need hash at this point */
+	/* if it gave us a key we have already calculated the hash */
+	/* if not get the hash */
 	if (inkey.dptr == NULL) hash=dcalchash(key);
 	hash = dbm_hashinc(db,hash);
 
@@ -662,12 +663,12 @@ dbm_access(DBM *db, long hash)
 	}
 }
 
-static int 
+static int
 getbit(DBM *db)
 {
 	long bn;
 	int b, i, n;
-	
+
 
 	if (db->dbm_bitno > db->dbm_maxbno)
 		return (0);

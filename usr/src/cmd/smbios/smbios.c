@@ -175,38 +175,69 @@ check_oem(smbios_hdl_t *shp)
 }
 
 static void
-print_smbios(smbios_hdl_t *shp, FILE *fp)
+print_smbios_21(smbios_21_entry_t *ep, FILE *fp)
 {
-	smbios_entry_t ep;
 	int i;
 
-	smbios_info_smbios(shp, &ep);
-
 	oprintf(fp, "Entry Point Anchor Tag: %*.*s\n",
-	    (int)sizeof (ep.smbe_eanchor), (int)sizeof (ep.smbe_eanchor),
-	    ep.smbe_eanchor);
+	    (int)sizeof (ep->smbe_eanchor), (int)sizeof (ep->smbe_eanchor),
+	    ep->smbe_eanchor);
 
-	oprintf(fp, "Entry Point Checksum: 0x%x\n", ep.smbe_ecksum);
-	oprintf(fp, "Entry Point Length: %u\n", ep.smbe_elen);
+	oprintf(fp, "Entry Point Checksum: 0x%x\n", ep->smbe_ecksum);
+	oprintf(fp, "Entry Point Length: %u\n", ep->smbe_elen);
 	oprintf(fp, "Entry Point Version: %u.%u\n",
-	    ep.smbe_major, ep.smbe_minor);
-	oprintf(fp, "Max Structure Size: %u\n", ep.smbe_maxssize);
-	oprintf(fp, "Entry Point Revision: 0x%x\n", ep.smbe_revision);
+	    ep->smbe_major, ep->smbe_minor);
+	oprintf(fp, "Max Structure Size: %u\n", ep->smbe_maxssize);
+	oprintf(fp, "Entry Point Revision: 0x%x\n", ep->smbe_revision);
 
 	oprintf(fp, "Entry Point Revision Data:");
-	for (i = 0; i < sizeof (ep.smbe_format); i++)
-		oprintf(fp, " 0x%02x", ep.smbe_format[i]);
+	for (i = 0; i < sizeof (ep->smbe_format); i++)
+		oprintf(fp, " 0x%02x", ep->smbe_format[i]);
 	oprintf(fp, "\n");
 
 	oprintf(fp, "Intermediate Anchor Tag: %*.*s\n",
-	    (int)sizeof (ep.smbe_ianchor), (int)sizeof (ep.smbe_ianchor),
-	    ep.smbe_ianchor);
+	    (int)sizeof (ep->smbe_ianchor), (int)sizeof (ep->smbe_ianchor),
+	    ep->smbe_ianchor);
 
-	oprintf(fp, "Intermediate Checksum: 0x%x\n", ep.smbe_icksum);
-	oprintf(fp, "Structure Table Length: %u\n", ep.smbe_stlen);
-	oprintf(fp, "Structure Table Address: 0x%x\n", ep.smbe_staddr);
-	oprintf(fp, "Structure Table Entries: %u\n", ep.smbe_stnum);
-	oprintf(fp, "DMI BCD Revision: 0x%x\n", ep.smbe_bcdrev);
+	oprintf(fp, "Intermediate Checksum: 0x%x\n", ep->smbe_icksum);
+	oprintf(fp, "Structure Table Length: %u\n", ep->smbe_stlen);
+	oprintf(fp, "Structure Table Address: 0x%x\n", ep->smbe_staddr);
+	oprintf(fp, "Structure Table Entries: %u\n", ep->smbe_stnum);
+	oprintf(fp, "DMI BCD Revision: 0x%x\n", ep->smbe_bcdrev);
+}
+
+static void
+print_smbios_30(smbios_30_entry_t *ep, FILE *fp)
+{
+	oprintf(fp, "Entry Point Anchor Tag: %*.*s\n",
+	    (int)sizeof (ep->smbe_eanchor), (int)sizeof (ep->smbe_eanchor),
+	    ep->smbe_eanchor);
+
+	oprintf(fp, "Entry Point Checksum: 0x%x\n", ep->smbe_ecksum);
+	oprintf(fp, "Entry Point Length: %u\n", ep->smbe_elen);
+	oprintf(fp, "SMBIOS Version: %u.%u\n",
+	    ep->smbe_major, ep->smbe_minor);
+	oprintf(fp, "SMBIOS DocRev: 0x%x\n", ep->smbe_docrev);
+	oprintf(fp, "Entry Point Revision: 0x%x\n", ep->smbe_revision);
+
+	oprintf(fp, "Structure Table Length: %u\n", ep->smbe_stlen);
+	oprintf(fp, "Structure Table Address: 0x%" PRIx64 "\n",
+	    ep->smbe_staddr);
+}
+
+static void
+print_smbios(smbios_hdl_t *shp, FILE *fp)
+{
+	smbios_entry_t ep;
+
+	switch (smbios_info_smbios(shp, &ep)) {
+	case SMBIOS_ENTRY_POINT_21:
+		print_smbios_21(&ep.ep21, fp);
+		break;
+	case SMBIOS_ENTRY_POINT_30:
+		print_smbios_30(&ep.ep30, fp);
+		break;
+	}
 }
 
 static void
@@ -573,10 +604,10 @@ static void
 print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	smbios_slot_t s;
-	smbios_entry_t e;
+	smbios_version_t v;
 
 	(void) smbios_info_slot(shp, id, &s);
-	(void) smbios_info_smbios(shp, &e);
+	smbios_info_smbios_version(shp, &v);
 
 	oprintf(fp, "  Reference Designator: %s\n", s.smbl_name);
 	oprintf(fp, "  Slot ID: 0x%x\n", s.smbl_id);
@@ -601,7 +632,7 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 	    s.smbl_ch2, sizeof (s.smbl_ch2) * NBBY,
 	    smbios_slot_ch2_name, smbios_slot_ch2_desc);
 
-	if (check_oem(shp) != 0 && (e.smbe_major < 2 || e.smbe_minor < 6))
+	if (check_oem(shp) != 0 && (v.smbv_major < 2 || v.smbv_minor < 6))
 		return;
 
 	oprintf(fp, "  Segment Group: %u\n", s.smbl_sg);

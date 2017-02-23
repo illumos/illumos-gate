@@ -22,6 +22,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -301,7 +302,7 @@ _NOTE(ARGUNUSED(ctx))
 	if ((*minor = __get_sig_size(qop_req, &sigsize)) != DH_SUCCESS)
 		return (GSS_S_BAD_QOP | stat);
 
-	/* Just return if we can't give the caller what he ask for. */
+	/* Just return if we can't give the caller what it asked for. */
 	if (stat)
 		return (stat);
 

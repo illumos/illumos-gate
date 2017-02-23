@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
@@ -1621,7 +1622,7 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 
 			/*
 			 * If SGID and/or DGID is specified by user, make sure
-			 * he gets his primary-path on those node points.
+			 * they get their primary-path on those node points.
 			 */
 			for (i = 0; i < num_rec; i++, pr_resp++) {
 				IBTF_DPRINTF_L3(cmlog, "ibcm_get_multi_pathrec:"

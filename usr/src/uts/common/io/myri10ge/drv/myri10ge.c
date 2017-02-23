@@ -31,6 +31,7 @@
 
 /*
  * Copyright (c) 2014, Joyent, Inc.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef	lint
@@ -2138,11 +2139,11 @@ myri10ge_start_locked(struct myri10ge_priv *mgp)
 	}
 
 	/*
-	 * Tell the MCP how many buffers he has, and to
+	 * Tell the MCP how many buffers it has, and to
 	 *  bring the ethernet interface up
 	 *
 	 * Firmware needs the big buff size as a power of 2.  Lie and
-	 * tell him the buffer is larger, because we only use 1
+	 * tell it the buffer is larger, because we only use 1
 	 * buffer/pkt, and the mtu will prevent overruns
 	 */
 	big_pow2 = myri10ge_mtu + MXGEFW_PAD;
@@ -2563,7 +2564,7 @@ myri10ge_tx_done(struct myri10ge_slice_state *ss, uint32_t mcp_index)
 	}
 	if (tx->req == tx->done && tx->stop != NULL) {
 		/*
-		 * Nic has sent all pending requests, allow him
+		 * Nic has sent all pending requests, allow it
 		 * to stop polling this queue
 		 */
 		mutex_enter(&tx->lock);

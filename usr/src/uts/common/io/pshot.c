@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -38,7 +39,7 @@
  * The pshot driver is rooted at /devices/pshot.  The following commands
  * illustrate the operation of devfs together with pshot's bus_config.
  * The first command demonstrates that, like the magician showing there's
- * nothing up his sleeve, /devices/pshot is empty.  The second command
+ * nothing up their sleeve, /devices/pshot is empty.  The second command
  * conjures up a branch of pshot nodes.  Note that pshot's bus_config is
  * called sequentially by devfs for each node, as part of the pathname
  * resolution, and that each pshot node is fully configured and

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <unistd.h>
@@ -263,7 +264,7 @@ smb_token_destroy(smb_token_t *token)
  * Token owner should be set to local Administrators group
  * in two cases:
  *   1. The logged on user is a member of Domain Admins group
- *   2. he/she is a member of local Administrators group
+ *   2. They are a member of local Administrators group
  */
 static void
 smb_token_set_owner(smb_token_t *token)

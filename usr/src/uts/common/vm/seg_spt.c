@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -184,7 +185,7 @@ static int spt_anon_getpages(struct seg *seg, caddr_t addr, size_t len,
 /*ARGSUSED*/
 int
 sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
-	uint_t prot, uint_t flags, uint_t share_szc)
+    uint_t prot, uint_t flags, uint_t share_szc)
 {
 	int 	err;
 	struct  as	*newas;
@@ -248,10 +249,11 @@ segspt_free(struct seg	*seg)
 		if (sptd->spt_realsize)
 			segspt_free_pages(seg, seg->s_base, sptd->spt_realsize);
 
-	if (sptd->spt_ppa_lckcnt)
-		kmem_free(sptd->spt_ppa_lckcnt,
-		    sizeof (*sptd->spt_ppa_lckcnt)
-		    * btopr(sptd->spt_amp->size));
+		if (sptd->spt_ppa_lckcnt) {
+			kmem_free(sptd->spt_ppa_lckcnt,
+			    sizeof (*sptd->spt_ppa_lckcnt)
+			    * btopr(sptd->spt_amp->size));
+		}
 		kmem_free(sptd->spt_vp, sizeof (*sptd->spt_vp));
 		cv_destroy(&sptd->spt_cv);
 		mutex_destroy(&sptd->spt_lock);
@@ -262,7 +264,7 @@ segspt_free(struct seg	*seg)
 /*ARGSUSED*/
 static int
 segspt_shmsync(struct seg *seg, caddr_t addr, size_t len, int attr,
-	uint_t flags)
+    uint_t flags)
 {
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as));
 
@@ -1112,7 +1114,7 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 	}
 	/*
 	 * We can now drop the sptd->spt_lock since the ppa[]
-	 * exists and he have incremented pacachecnt.
+	 * exists and we have incremented pacachecnt.
 	 */
 	mutex_exit(&sptd->spt_lock);
 
@@ -1374,7 +1376,7 @@ segspt_shmpagelock(struct seg *seg, caddr_t addr, size_t len,
 
 	/*
 	 * We can now drop the sptd->spt_lock since the ppa[]
-	 * exists and he have incremented pacachecnt.
+	 * exists and we have incremented pacachecnt.
 	 */
 	mutex_exit(&sptd->spt_lock);
 
@@ -1433,7 +1435,7 @@ segspt_purge(struct seg *seg)
 
 static int
 segspt_reclaim(void *ptag, caddr_t addr, size_t len, struct page **pplist,
-	enum seg_rw rw, int async)
+    enum seg_rw rw, int async)
 {
 	struct seg *seg = (struct seg *)ptag;
 	struct	shm_data *shmd = (struct shm_data *)seg->s_data;
@@ -1572,7 +1574,7 @@ segspt_reclaim(void *ptag, caddr_t addr, size_t len, struct page **pplist,
  */
 static void
 segspt_softunlock(struct seg *seg, caddr_t sptseg_addr,
-	size_t len, enum seg_rw rw)
+    size_t len, enum seg_rw rw)
 {
 	struct shm_data *shmd = (struct shm_data *)seg->s_data;
 	struct seg	*sptseg;

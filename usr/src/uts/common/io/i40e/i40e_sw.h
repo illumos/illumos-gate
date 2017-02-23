@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -526,6 +527,7 @@ typedef struct i40e_trqpair {
 	uint64_t itrq_rxgen;		/* Generation number for mac/GLDv3. */
 	uint32_t itrq_index;		/* Queue index in the PF */
 	uint32_t itrq_rx_intrvec;	/* Receive interrupt vector. */
+	boolean_t itrq_intr_poll;	/* True when polling */
 
 	/* Receive-side stats. */
 	i40e_rxq_stat_t	itrq_rxstat;
@@ -768,6 +770,7 @@ typedef struct i40e {
 	 * Device state, switch information, and resources.
 	 */
 	int			i40e_vsi_id;
+	uint16_t		i40e_vsi_num;
 	struct i40e_device	*i40e_device;
 	i40e_func_rsrc_t	i40e_resources;
 	uint16_t		i40e_switch_rsrc_alloc;
@@ -811,11 +814,6 @@ typedef struct i40e {
 
 	/*
 	 * Interrupt state
-	 *
-	 * Note that the use of a single boolean_t for i40e_intr_poll isn't
-	 * really the best design. When we have more than a single ring on the
-	 * device working, we'll transition to using something more
-	 * sophisticated.
 	 */
 	uint_t		i40e_intr_pri;
 	uint_t		i40e_intr_force;
@@ -827,7 +825,6 @@ typedef struct i40e {
 	size_t		i40e_intr_size;
 	ddi_intr_handle_t *i40e_intr_handles;
 	ddi_cb_handle_t	i40e_callback_handle;
-	boolean_t	i40e_intr_poll;
 
 	/*
 	 * DMA attributes. See i40e_transceiver.c for why we have copies of them

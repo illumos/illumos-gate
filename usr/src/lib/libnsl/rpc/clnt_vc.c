@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -310,7 +311,7 @@ _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
 	/*
 	 * By default, closeit is always FALSE. It is users responsibility
 	 * to do a t_close on it, else the user may use clnt_control
-	 * to let clnt_destroy do it for him/her.
+	 * to let clnt_destroy do it for them.
 	 */
 	ct->ct_closeit = FALSE;
 

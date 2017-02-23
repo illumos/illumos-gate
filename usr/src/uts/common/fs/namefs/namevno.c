@@ -24,6 +24,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -304,7 +305,7 @@ nm_setattr(
 	 * bits.
 	 * If the system was configured with the "rstchown" option, the
 	 * owner is not permitted to give away the file, and can change
-	 * the group id only to a group of which he or she is a member.
+	 * the group id only to a group of which they are a member.
 	 */
 	if (mask & AT_UID)
 		nmvap->va_uid = vap->va_uid;

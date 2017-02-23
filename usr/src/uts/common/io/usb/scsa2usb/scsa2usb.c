@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -3889,7 +3890,7 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 	cmd->cmd_blksize = (int)blk_size;
 
 	/*
-	 * Having figure out the 'partial' xfer len based on he
+	 * Having figured out the 'partial' xfer len based on the
 	 * block size; fill it in to the cmd->cmd_cdb
 	 */
 	cmd->cmd_cdb[SCSA2USB_OPCODE] = (uchar_t)opcode;

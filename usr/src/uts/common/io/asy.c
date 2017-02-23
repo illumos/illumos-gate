@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -1802,7 +1803,7 @@ asyclose(queue_t *q, int flag, cred_t *credp)
 	 * write queue and there's a timer running, so we don't have to worry
 	 * about them.  For the untimed case, though, the user obviously made a
 	 * mistake, because these are handled immediately.  We'll terminate the
-	 * break now and honor his implicit request by discarding the rest of
+	 * break now and honor their implicit request by discarding the rest of
 	 * the data.
 	 */
 	if (async->async_flags & ASYNC_OUT_SUSPEND) {

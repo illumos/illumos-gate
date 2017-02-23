@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -5376,7 +5377,7 @@ ipsec_tun_outbound(mblk_t *mp, iptun_t *iptun, ipha_t *inner_ipv4,
 		 * NOTE2:  "negotiate transport" tunnels should match ALL
 		 * inbound packets, but we do not uncomment the ASSERT()
 		 * below because if/when we open PF_POLICY, a user can
-		 * shoot him/her-self in the foot with a 0 priority.
+		 * shoot themself in the foot with a 0 priority.
 		 */
 
 		/* ASSERT(itp->itp_flags & ITPF_P_TUNNEL); */

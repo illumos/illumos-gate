@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1974,7 +1975,7 @@ ipobs_register_hook(netstack_t *ns, pfv_t func)
 	VERIFY(hook != NULL);
 
 	/*
-	 * To register multiple hooks with he same callback function,
+	 * To register multiple hooks with the same callback function,
 	 * a unique name is needed.
 	 */
 	(void) snprintf(name, sizeof (name), "ipobserve_%p", (void *)hook);

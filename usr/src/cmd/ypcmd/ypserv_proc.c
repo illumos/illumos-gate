@@ -22,6 +22,7 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -171,7 +172,7 @@ ypdomain(SVCXPRT *transp, bool always_respond)
 		 * This case is the one in which the domain is not
 		 * supported, and in which we are not to respond in the
 		 * unsupported case.  We are going to make an error happen
-		 * to allow the portmapper to end his wait without the
+		 * to allow the portmapper to end its wait without the
 		 * normal timeout period.  The assumption here is that
 		 * the only process in the world which is using the function
 		 * in its no-answer-if-nack form is the portmapper, which is

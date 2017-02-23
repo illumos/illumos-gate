@@ -650,6 +650,7 @@ libshell:	libast libcmd libdll libsecdb
 libsip:		libmd5
 libsldap:	libldap5 libscf
 libsmbfs:	libkrb5 libsec libidmap pkcs11
+libsmbios:	libdevinfo
 libsrpt:	libstmf
 libstmf:	libscf
 libstmfproxy: 	libstmf libpthread

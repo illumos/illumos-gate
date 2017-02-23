@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -199,7 +200,7 @@ iser_ib_poll_send_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 
 			/*
 			 * Tell IDM that the channel has gone down,
-			 * unless he already knows.
+			 * unless it already knows.
 			 */
 			mutex_enter(&iser_conn->ic_lock);
 			switch (iser_conn->ic_stage) {
@@ -414,7 +415,7 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 	if (wc.wc_status != IBT_WC_SUCCESS) {
 		/*
 		 * Tell IDM that the channel has gone down,
-		 * unless he already knows.
+		 * unless it already knows.
 		 */
 		switch (iser_chan->ic_conn->ic_stage) {
 		case ISER_CONN_STAGE_IC_DISCONNECTED:

@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -903,7 +904,7 @@ mmsegmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 		 * Make /dev/mem mappings non-consistent since we can't
 		 * alias pages that don't have page structs behind them,
 		 * such as kernel stack pages. If someone mmap()s a kernel
-		 * stack page and if we give him a tte with cv, a line from
+		 * stack page and if we give them a tte with cv, a line from
 		 * that page can get into both pages of the spitfire d$.
 		 * But snoop from another processor will only invalidate
 		 * the first page. This later caused kernel (xc_attention)

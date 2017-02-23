@@ -21,7 +21,9 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -57,7 +59,7 @@ static void		writeback(int noremove);
  * Remove the system mailbox, if none saved there.
  */
 
-void 
+void
 quit(
     int noremove	/* don't remove system mailbox, trunc it instead */
 )
@@ -163,7 +165,7 @@ quit(
 	/*
 	 * Create another temporary file and copy user's mbox file
 	 * therein.  If there is no mbox, copy nothing.
-	 * If s/he has specified "append" don't copy the mailbox,
+	 * If they have specified "append" don't copy the mailbox,
 	 * just copy saveable entries at the end.
 	 */
 
@@ -267,7 +269,7 @@ quit(
  * mailbox, and print a nice message indicating how many were
  * saved.  Incorporate any new mail that we found.
  */
-static void 
+static void
 writeback(int noremove)
 {
 	register struct message *mp;
@@ -379,7 +381,7 @@ die:
 		fclose(rbuf);
 		PRIV(removefile(tempResid));
 	}
-	if (obuf)	
+	if (obuf)
 		fclose(obuf);
 	if (issysmbox)
 		unlockmail();
@@ -388,13 +390,13 @@ die:
 	sigset(SIGQUIT, fquit);
 }
 
-void 
+void
 lockmail(void)
 {
     PRIV(maillock(lockname,10));
 }
 
-void 
+void
 unlockmail(void)
 {
     PRIV(mailunlock());

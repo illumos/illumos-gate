@@ -66,6 +66,9 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	caddr_t stbuf, bios, p, q;
 	uint64_t startaddr, startoff = 0;
 	size_t bioslen;
+	uint_t smbe_stlen;
+	smbios_entry_point_t ep_type = SMBIOS_ENTRY_POINT_21;
+	uint8_t smbe_major, smbe_minor;
 	int err;
 
 	if (file != NULL || (flags & ~SMB_O_MASK))
@@ -102,6 +105,13 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	p = bios + startoff;
 	q = bios + bioslen - startoff;
 	while (p < q) {
+#if !defined(__i386)
+		err = strncmp(p, SMB3_ENTRY_EANCHOR, SMB3_ENTRY_EANCHORLEN);
+		if (err == 0) {
+			ep_type = SMBIOS_ENTRY_POINT_30;
+			break;
+		}
+#endif
 		if (strncmp(p, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN) == 0)
 			break;
 		p += SMB_SCAN_STEP;
@@ -114,31 +124,54 @@ smbios_open(const char *file, int version, int flags, int *errp)
 
 	ep = smb_alloc(SMB_ENTRY_MAXLEN);
 	bcopy(p, ep, sizeof (smbios_entry_t));
-	ep->smbe_elen = MIN(ep->smbe_elen, SMB_ENTRY_MAXLEN);
-	bcopy(p, ep, ep->smbe_elen);
+	if (ep_type == SMBIOS_ENTRY_POINT_21) {
+		ep->ep21.smbe_elen = MIN(ep->ep21.smbe_elen, SMB_ENTRY_MAXLEN);
+		bcopy(p, ep, ep->ep21.smbe_elen);
+	} else if (ep_type == SMBIOS_ENTRY_POINT_30) {
+		ep->ep30.smbe_elen = MIN(ep->ep30.smbe_elen, SMB_ENTRY_MAXLEN);
+		bcopy(p, ep, ep->ep30.smbe_elen);
+	}
 
 	psm_unmap_phys(bios, bioslen);
-	bios = psm_map_phys(ep->smbe_staddr, ep->smbe_stlen, PSM_PROT_READ);
+	switch (ep_type) {
+	case SMBIOS_ENTRY_POINT_21:
+		smbe_major = ep->ep21.smbe_major;
+		smbe_minor = ep->ep21.smbe_minor;
+		smbe_stlen = ep->ep21.smbe_stlen;
+		bios = psm_map_phys(ep->ep21.smbe_staddr, smbe_stlen,
+		    PSM_PROT_READ);
+		break;
+	case SMBIOS_ENTRY_POINT_30:
+		smbe_major = ep->ep30.smbe_major;
+		smbe_minor = ep->ep30.smbe_minor;
+		smbe_stlen = ep->ep30.smbe_stlen;
+		bios = psm_map_phys_new(ep->ep30.smbe_staddr, smbe_stlen,
+		    PSM_PROT_READ);
+		break;
+	default:
+		smb_free(ep, SMB_ENTRY_MAXLEN);
+		return (smb_open_error(shp, errp, ESMB_VERSION));
+	}
 
 	if (bios == NULL) {
 		smb_free(ep, SMB_ENTRY_MAXLEN);
 		return (smb_open_error(shp, errp, ESMB_MAPDEV));
 	}
 
-	stbuf = smb_alloc(ep->smbe_stlen);
-	bcopy(bios, stbuf, ep->smbe_stlen);
-	psm_unmap_phys(bios, ep->smbe_stlen);
-	shp = smbios_bufopen(ep, stbuf, ep->smbe_stlen, version, flags, &err);
+	stbuf = smb_alloc(smbe_stlen);
+	bcopy(bios, stbuf, smbe_stlen);
+	psm_unmap_phys(bios, smbe_stlen);
+	shp = smbios_bufopen(ep, stbuf, smbe_stlen, version, flags, &err);
 
 	if (shp == NULL) {
-		smb_free(stbuf, ep->smbe_stlen);
+		smb_free(stbuf, smbe_stlen);
 		smb_free(ep, SMB_ENTRY_MAXLEN);
 		return (smb_open_error(shp, errp, err));
 	}
 
 	if (ksmbios == NULL) {
 		cmn_err(CE_CONT, "?SMBIOS v%u.%u loaded (%u bytes)",
-		    ep->smbe_major, ep->smbe_minor, ep->smbe_stlen);
+		    smbe_major, smbe_minor, smbe_stlen);
 		if (shp->sh_flags & SMB_FL_TRUNC)
 			cmn_err(CE_CONT, "?SMBIOS table is truncated");
 	}

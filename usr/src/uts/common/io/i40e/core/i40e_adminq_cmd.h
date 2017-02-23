@@ -158,6 +158,9 @@ enum i40e_admin_queue_opc {
 	i40e_aqc_opc_set_port_parameters	= 0x0203,
 	i40e_aqc_opc_get_switch_resource_alloc	= 0x0204,
 
+	i40e_aqc_opc_rx_ctl_reg_read		= 0x0206,
+	i40e_aqc_opc_rx_ctl_reg_write		= 0x0207,
+
 	i40e_aqc_opc_add_vsi			= 0x0210,
 	i40e_aqc_opc_update_vsi_parameters	= 0x0211,
 	i40e_aqc_opc_get_vsi_parameters		= 0x0212,
@@ -694,6 +697,20 @@ struct i40e_aqc_switch_resource_alloc_element_resp {
 
 I40E_CHECK_STRUCT_LEN(0x10, i40e_aqc_switch_resource_alloc_element_resp);
 
+/* Read Receive control registers  (direct 0x0206)
+ * Write Receive control registers (direct 0x0207)
+ *     used for accessing Rx control registers that can be
+ *     slow and need special handling when under high Rx load
+ */
+struct i40e_aqc_rx_ctl_reg_read_write {
+	__le32 reserved1;
+	__le32 address;
+	__le32 reserved2;
+	__le32 value;
+};
+
+I40E_CHECK_CMD_LENGTH(i40e_aqc_rx_ctl_reg_read_write);
+
 /* Add VSI (indirect 0x0210)
  *    this indirect command uses struct i40e_aqc_vsi_properties_data
  *    as the indirect buffer (128 bytes)
@@ -838,6 +855,7 @@ struct i40e_aqc_vsi_properties_data {
 #define I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT	9
 #define I40E_AQ_VSI_TC_QUE_NUMBER_MASK	(0x7 << \
 					 I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT)
+#define	I40E_AQ_VSI_TC_QUE_SIZE_MAX	(1 << 0x6)
 	/* queueing option section */
 	u8	queueing_opt_flags;
 #ifdef X722_SUPPORT

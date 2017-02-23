@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -198,7 +199,7 @@ perform_passwd_aging_check(
 
 	/*
 	 * if (sp_lstchg == 0), the administrator has forced the
-	 * user to change his/her passwd
+	 * user to change their passwd
 	 */
 	if (shpwd->sp_lstchg == 0)
 		return (PAM_NEW_AUTHTOK_REQD);

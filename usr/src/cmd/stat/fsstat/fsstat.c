@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -1031,7 +1032,7 @@ main(int argc, char *argv[])
 			 * If we're only displaying FStypes (-F) then don't
 			 * complain about any file systems that might not
 			 * be loaded.  Otherwise, let the user know that
-			 * he chose poorly.
+			 * they chose poorly.
 			 */
 			if (fstypes_only == B_FALSE) {
 				(void) fprintf(stderr, gettext(

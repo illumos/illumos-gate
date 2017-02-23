@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/callo.h>
@@ -853,7 +854,7 @@ callout_heap_delete(callout_table_t *ct)
  * scanning the heap anyway.
  *
  * If the root gets changed and/or callout lists are expired, return the
- * new expiration to the caller so he can reprogram the cyclic accordingly.
+ * new expiration to the caller so it can reprogram the cyclic accordingly.
  */
 static hrtime_t
 callout_heap_process(callout_table_t *ct, hrtime_t delta, int timechange)

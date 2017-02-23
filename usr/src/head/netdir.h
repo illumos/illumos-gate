@@ -21,6 +21,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 /*	Copyright (c) 1992 Sun Microsystems, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -141,8 +142,8 @@ char *_netdir_mergeaddr(struct netconfig *, char *uaddr, char *ruaddr);
 /*
  * The following netdir_options commands can be given to the fd. These is
  * a way of providing for any transport specific action which the caller
- * may want to initiate on his transport. It is up to the trasport provider
- * to support the netdir_options he wants to support.
+ * may want to initiate on its transport. It is up to the trasport provider
+ * to support the netdir_options it wants to support.
  */
 
 #define	ND_SET_BROADCAST	1	/* Do t_optmgmt to support broadcast */

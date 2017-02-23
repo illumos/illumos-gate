@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1665,7 +1666,7 @@ idn_cpu_per_board(pda_handle_t ph, cpuset_t cset, struct hwconfig *hwp)
 	 * A NULL post2obp pointer indicates we're checking
 	 * the config of a remote domain.  Since we can't
 	 * look at the post2obp of the remote domain, we'll
-	 * have to trust what he passed us in his config.
+	 * have to trust what it passed us in its config.
 	 */
 	if (ph && !pda_is_valid(ph)) {
 		cmn_err(CE_WARN, "IDN: 508: post2obp checksum invalid");

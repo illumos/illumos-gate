@@ -1,6 +1,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -14,7 +15,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -28,7 +29,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  *
  * krb5_kuserok()
  */
@@ -288,8 +289,8 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 
     if (access(pbuf, F_OK)) {	 /* not accessible */
 	/*
-	 * if he's trying to log in as himself, and there is no .k5login file,
-	 * let him.  First, have krb5 check it's rules.  If no success,
+	 * if they're trying to log in as themself, and there is no .k5login file,
+	 * let them.  First, have krb5 check it's rules.  If no success,
 	 * search the gsscred table (the sequence here should be consistent
 	 * with the uid mappings done for gssd).
 	 */
@@ -385,10 +386,10 @@ krb5_gss_userok(OM_uint32 *minor,
 
 	*user_ok = 0;
 
-	kret = krb5_gss_init_context(&ctxt); 
-	if (kret) { 
-		*minor = kret; 
-		return (GSS_S_FAILURE); 
+	kret = krb5_gss_init_context(&ctxt);
+	if (kret) {
+		*minor = kret;
+		return (GSS_S_FAILURE);
 	}
 
 	if (! kg_validate_name(pname)) {

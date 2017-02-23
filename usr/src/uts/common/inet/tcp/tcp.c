@@ -1258,7 +1258,7 @@ tcp_closei_local(tcp_t *tcp)
 
 	/*
 	 * If we are an eager connection hanging off a listener that
-	 * hasn't formally accepted the connection yet, get off his
+	 * hasn't formally accepted the connection yet, get off its
 	 * list and blow off any data that we have accumulated.
 	 */
 	if (tcp->tcp_listener != NULL) {

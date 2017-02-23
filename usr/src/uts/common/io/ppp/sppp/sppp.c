@@ -3,6 +3,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation is hereby granted, provided that the above copyright
@@ -201,7 +202,7 @@ sppp_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 
 /*
  * Free storage used by a PPA.  This is not called until the last PPA
- * user closes his connection or reattaches to a different PPA.
+ * user closes their connection or reattaches to a different PPA.
  */
 static void
 sppp_free_ppa(sppa_t *ppa)

@@ -19,6 +19,9 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 
 #define RCSID	"$Id: ipcp.c,v 1.54 2000/04/15 01:27:11 masputra Exp $"
 
@@ -768,14 +771,14 @@ ipcp_nakci(f, p, len)
     }
 
     /*
-     * Accept the peer's idea of {our,his} address, if different
+     * Accept the peer's idea of {our,its} address, if different
      * from our idea, only if the accept_{local,remote} flag is set.
      */
     NAKCIADDRS(CI_ADDRS, !go->neg_addr && go->old_addrs,
 	      if (go->accept_local && ciaddr1) { /* Do we know our address? */
 		  try.ouraddr = ciaddr1;
 	      }
-	      if (go->accept_remote && ciaddr2) { /* Does he know his? */
+	      if (go->accept_remote && ciaddr2) { /* Does it know its? */
 		  try.hisaddr = ciaddr2;
 	      }
 	      );
@@ -1026,12 +1029,12 @@ ipcp_reqci(f, p, lenp, dont_nak)
     nakp = nak_buffer;
 
     /*
-     * Reset all his options.
+     * Reset all its options.
      */
     BZERO(ho, sizeof(*ho));
 
     /*
-     * Process all his options.
+     * Process all its options.
      */
     for (len = *lenp; len > 0; len -= cilen, p = prev + cilen) {
 	if ((len < 2) || p[1] > len) {
@@ -1065,10 +1068,10 @@ ipcp_reqci(f, p, lenp, dont_nak)
 	    } else {
 
 		/*
-		 * If he has no address, or if we both have his
+		 * If it has no address, or if we both have its
 		 * address but disagree about it, then NAK it with our
-		 * idea.  In particular, if we don't know his address,
-		 * but he does, then accept it.
+		 * idea. In particular, if we don't know its address,
+		 * but it does, then accept it.
 		 */
 		GETNLONG(ciaddr1, p);
 		if (ciaddr1 != wo->hisaddr &&
@@ -1146,7 +1149,7 @@ ipcp_reqci(f, p, lenp, dont_nak)
 		    newret = CODE_CONFNAK;
 		    /*
 		     * If this is a dialup line (default_route is
-		     * set), and neither side knows about his address,
+		     * set), and neither side knows about its address,
 		     * suggest an arbitrary rfc1918 address.
 		     */
 		    ciaddr1 = htonl(0xc0a80101 + ifunit);
@@ -1225,7 +1228,7 @@ ipcp_reqci(f, p, lenp, dont_nak)
 		PUTNLONG(ao->winsaddr[d], nakp);
 	    }
             break;
-	
+
 	case CI_COMPRESSTYPE:
 	    if (!ao->neg_vj) {
 		newret = CODE_CONFREJ;
@@ -1334,7 +1337,7 @@ ipcp_reqci(f, p, lenp, dont_nak)
     switch (ret) {
     case CODE_CONFACK:
 	*lenp = p - p0;
-	sys_block_proto(PPP_IP);	
+	sys_block_proto(PPP_IP);
 	break;
     case CODE_CONFNAK:
 	*lenp = nakp - nak_buffer;
@@ -1518,7 +1521,7 @@ ipcp_up(f)
 	    }
 
 	    /* assign a default route through the interface if required */
-	    if (wo->default_route) 
+	    if (wo->default_route)
 		if (sifdefaultroute(f->unit, go->ouraddr, ho->hisaddr))
 		    default_route_set[f->unit] = 1;
 
@@ -1570,7 +1573,7 @@ ipcp_up(f)
 	}
 
 	/* assign a default route through the interface if required */
-	if (wo->default_route) 
+	if (wo->default_route)
 	    if (sifdefaultroute(f->unit, go->ouraddr, ho->hisaddr))
 		default_route_set[f->unit] = 1;
 

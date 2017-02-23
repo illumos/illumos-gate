@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -190,7 +191,7 @@ smb_end_node_challenge(nbt_name_reply_t *reply_info)
 	/*
 	 * The response packet has in it the address of the presumed owner
 	 * of the name.  Challenge that owner.  If owner either does not
-	 * respond or indicates that he no longer owns the name, claim the
+	 * respond or indicates that they no longer own the name, claim the
 	 * name.  Otherwise, the name cannot be claimed.
 	 */
 
@@ -437,7 +438,7 @@ smb_netbios_process_response(uint16_t tid, addr_entry_t *addr,
 		 * address of the presumed owner of the
 		 * name.  Challenge that owner.  If
 		 * owner either does not respond or
-		 * indicates that he no longer owns the
+		 * indicates that they no longer own the
 		 * name, claim the name.  Otherwise,
 		 * the name cannot be claimed.
 		 */

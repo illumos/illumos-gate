@@ -3,6 +3,7 @@
  *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation is hereby granted, provided that the above copyright
@@ -1541,9 +1542,9 @@ ahdlc_decode(queue_t *q, mblk_t  *mp)
 			 * If the peer sends us a character that's in
 			 * our receive character map, then that's
 			 * junk.  Discard it without changing state.
-			 * If he previously sent us an escape
+			 * If they previously sent us an escape
 			 * character, then toggle this one and
-			 * continue.  Otherwise, if he's now sending
+			 * continue.  Otherwise, if they're now sending
 			 * escape, set the flag for next time.
 			 */
 			if (IN_RX_MAP(chr, state->sa_raccm)) {

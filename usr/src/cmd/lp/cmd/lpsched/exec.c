@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -328,7 +329,7 @@ exec(int type, ...)
 		request = printer->request;
 		ep = printer->exec;
 		break;
-		
+
 	case EX_FAULT_MESSAGE:
 		printer = va_arg(args, PSTATUS *);
 		request = va_arg(args, RSTATUS *);
@@ -336,7 +337,7 @@ exec(int type, ...)
 			return(0);
 		}
 		ep = printer->fault_exec;
-		printerName = (printer->printer && printer->printer->name 
+		printerName = (printer->printer && printer->printer->name
 				  ? printer->printer->name : "??");
 			snprintf(nameBuf, sizeof (nameBuf),
 				"%s (on %s)\n", printerName, Local_System);
@@ -474,7 +475,7 @@ exec(int type, ...)
 	 * Open the standard input, standard output, and standard error.
 	 */
 	switch (type) {
-		
+
 	case EX_SLOWF:
 	case EX_INTERF:
 		/*
@@ -584,7 +585,7 @@ exec(int type, ...)
 					 printer->printer->device);
 		if (ret != 0)
 			Done (ret, errno);
-			
+
 		if (!(request->request->outcome & RS_FILTERED))
 			file_list = request->request->file_list;
 
@@ -718,7 +719,7 @@ exec(int type, ...)
 		 */
 		cp = strchr(request->secure->user, '@');
 
-		allTraysWithForm(printer, request->form); 
+		allTraysWithForm(printer, request->form);
 
 		/*
 		 * Fix for 4137389
@@ -881,7 +882,7 @@ exec(int type, ...)
 		 */
 
 		argbuf[0] = '\0';
-				
+
 		if (printer->printer->options) {
 			char **tmp = printer->printer->options;
 			while(*tmp != NULL) {
@@ -959,8 +960,8 @@ exec(int type, ...)
 
 		/*
 		 * Do the ``raw'' bit last, to ensure it gets
-		 * done. If the user doesn't want this, then he or
-		 * she can do the correct thing using -o stty=
+		 * done. If the user doesn't want this, then they
+		 * can do the correct thing using -o stty=
 		 * and leaving out the -r option.
 		 */
 		if (request->request->actions & ACT_RAW) {
@@ -1179,7 +1180,7 @@ exec(int type, ...)
 	} else if (initgroups(pwp->pw_name, procgid) < 0) {
 		note("initgroups() call failed %d\n", errno);
 	}
-	
+
 	setgid (procgid);
 	setuid (procuid);
 
@@ -1245,7 +1246,7 @@ Fork1(EXEC *ep)
 		close(fds[1]);
 		ep->md = 0;
 		return (-1);
-	
+
 	case 0:
 		ChildMd = mconnect(NULL, fds[1], fds[1]);
 		return (0);
@@ -1268,10 +1269,10 @@ Fork2(void)
 	case -1:
 		Done (EXEC_EXIT_NFORK, errno);
 		/*NOTREACHED*/
-					
+
 	case 0:
 		return;
-					
+
 	default:
 		/*
 		 * Delay calling "ignore_fault_signals()" as long
@@ -1319,7 +1320,7 @@ cool_heels(void)
 	WaitedChildPid = 0;
 	while ((WaitedChildPid = wait(&status)) != ChildPid)
 		;
-			
+
 	if (
 		EXITED(status) > EXEC_EXIT_USER
 	     && EXITED(status) != EXEC_EXIT_FAULT

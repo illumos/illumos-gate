@@ -24,7 +24,7 @@
  */
 /*
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
- * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
@@ -27655,7 +27655,7 @@ sr_read_all_subcodes(dev_t dev, caddr_t data, int flag)
 		cdb[10] = 1;
 	} else {
 		/*
-		 * Note: A vendor specific command (0xDF) is being used her to
+		 * Note: A vendor specific command (0xDF) is being used here to
 		 * request a read of all subcodes.
 		 */
 		cdb[0] = (char)SCMD_READ_ALL_SUBCODES;

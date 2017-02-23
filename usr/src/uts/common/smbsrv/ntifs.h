@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef _SMBSRV_NTIFS_H
@@ -439,7 +440,7 @@ typedef struct smb_acl {
  * Security descriptors provide protection for objects, for example
  * files and directories. It identifies the owner and primary group
  * (SIDs) and contains an access control list. When a user tries to
- * access an object his SID is compared to the permissions in the
+ * access an object their SID is compared to the permissions in the
  * DACL to determine if access should be allowed or denied. Note that
  * this is a simplification because there are other factors, such as
  * default behavior and privileges to be taken into account (see also

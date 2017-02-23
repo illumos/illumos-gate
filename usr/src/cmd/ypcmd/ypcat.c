@@ -21,6 +21,7 @@
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -37,7 +38,7 @@
 /*
  * This is a user command which dumps each entry in a yp data base.  It gets
  * the stuff using the normal ypclnt package; the user doesn't get to choose
- * which server gives him the input.  Usage is:
+ * which server gives them the input.  Usage is:
  *	ypcat [-k] [-d domain] [-t] map
  *	ypcat -x
  * where the -k switch will dump keys followed by a single blank space

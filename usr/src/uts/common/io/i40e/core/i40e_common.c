@@ -5610,6 +5610,128 @@ enum i40e_status_code i40e_aq_configure_partition_bw(struct i40e_hw *hw,
 }
 
 /**
+ * i40e_aq_rx_ctl_read_register - use FW to read from an Rx control register
+ * @hw: pointer to the hw struct
+ * @reg_addr: register address
+ * @reg_val: ptr to register value
+ * @cmd_details: pointer to command details structure or NULL
+ *
+ * Use the firmware to read the Rx control register,
+ * especially useful if the Rx unit is under heavy pressure
+ **/
+enum i40e_status_code i40e_aq_rx_ctl_read_register(struct i40e_hw *hw,
+				u32 reg_addr, u32 *reg_val,
+				struct i40e_asq_cmd_details *cmd_details)
+{
+	struct i40e_aq_desc desc;
+	struct i40e_aqc_rx_ctl_reg_read_write *cmd_resp =
+		(struct i40e_aqc_rx_ctl_reg_read_write *)&desc.params.raw;
+	enum i40e_status_code status;
+
+	if (reg_val == NULL)
+		return I40E_ERR_PARAM;
+
+	i40e_fill_default_direct_cmd_desc(&desc, i40e_aqc_opc_rx_ctl_reg_read);
+
+	cmd_resp->address = CPU_TO_LE32(reg_addr);
+
+	status = i40e_asq_send_command(hw, &desc, NULL, 0, cmd_details);
+
+	if (status == I40E_SUCCESS)
+		*reg_val = LE32_TO_CPU(cmd_resp->value);
+
+	return status;
+}
+
+/**
+ * i40e_read_rx_ctl - read from an Rx control register
+ * @hw: pointer to the hw struct
+ * @reg_addr: register address
+ **/
+u32 i40e_read_rx_ctl(struct i40e_hw *hw, u32 reg_addr)
+{
+	enum i40e_status_code status = I40E_SUCCESS;
+	bool use_register;
+	int retry = 5;
+	u32 val = 0;
+
+	use_register = (hw->aq.api_maj_ver == 1) && (hw->aq.api_min_ver < 5);
+	if (!use_register) {
+do_retry:
+		status = i40e_aq_rx_ctl_read_register(hw, reg_addr, &val, NULL);
+		if (hw->aq.asq_last_status == I40E_AQ_RC_EAGAIN && retry) {
+			i40e_msec_delay(1);
+			retry--;
+			goto do_retry;
+		}
+	}
+
+	/* if the AQ access failed, try the old-fashioned way */
+	if (status || use_register)
+		val = rd32(hw, reg_addr);
+
+	return val;
+}
+
+/**
+ * i40e_aq_rx_ctl_write_register
+ * @hw: pointer to the hw struct
+ * @reg_addr: register address
+ * @reg_val: register value
+ * @cmd_details: pointer to command details structure or NULL
+ *
+ * Use the firmware to write to an Rx control register,
+ * especially useful if the Rx unit is under heavy pressure
+ **/
+enum i40e_status_code i40e_aq_rx_ctl_write_register(struct i40e_hw *hw,
+				u32 reg_addr, u32 reg_val,
+				struct i40e_asq_cmd_details *cmd_details)
+{
+	struct i40e_aq_desc desc;
+	struct i40e_aqc_rx_ctl_reg_read_write *cmd =
+		(struct i40e_aqc_rx_ctl_reg_read_write *)&desc.params.raw;
+	enum i40e_status_code status;
+
+	i40e_fill_default_direct_cmd_desc(&desc, i40e_aqc_opc_rx_ctl_reg_write);
+
+	cmd->address = CPU_TO_LE32(reg_addr);
+	cmd->value = CPU_TO_LE32(reg_val);
+
+	status = i40e_asq_send_command(hw, &desc, NULL, 0, cmd_details);
+
+	return status;
+}
+
+/**
+ * i40e_write_rx_ctl - write to an Rx control register
+ * @hw: pointer to the hw struct
+ * @reg_addr: register address
+ * @reg_val: register value
+ **/
+void i40e_write_rx_ctl(struct i40e_hw *hw, u32 reg_addr, u32 reg_val)
+{
+	enum i40e_status_code status = I40E_SUCCESS;
+	bool use_register;
+	int retry = 5;
+
+	use_register = (hw->aq.api_maj_ver == 1) && (hw->aq.api_min_ver < 5);
+	if (!use_register) {
+do_retry:
+		status = i40e_aq_rx_ctl_write_register(hw, reg_addr,
+						       reg_val, NULL);
+		if (hw->aq.asq_last_status == I40E_AQ_RC_EAGAIN && retry) {
+			i40e_msec_delay(1);
+			retry--;
+			goto do_retry;
+		}
+	}
+
+	/* if the AQ access failed, try the old-fashioned way */
+	if (status || use_register)
+		wr32(hw, reg_addr, reg_val);
+}
+
+/**
  * i40e_aq_send_msg_to_pf
  * @hw: pointer to the hardware structure
  * @v_opcode: opcodes for VF-PF communication

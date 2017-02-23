@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -690,7 +691,7 @@ page_retire_transient_ue(page_t *pp)
 	ASSERT(!hat_page_is_mapped(pp));
 
 	/*
-	 * If this page is a repeat offender, retire him under the
+	 * If this page is a repeat offender, retire it under the
 	 * "two strikes and you're out" rule. The caller is responsible
 	 * for scrubbing the page to try to clear the error.
 	 */

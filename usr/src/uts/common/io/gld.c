@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -3475,13 +3476,13 @@ gld_fastpath(gld_t *gld, queue_t *q, mblk_t *mp)
 	}
 
 	/*
-	 * We take his fastpath request as a declaration that he will accept
+	 * We take the fastpath request as a declaration that they will accept
 	 * M_DATA messages from us, whether or not we are willing to accept
-	 * them from him.  This allows us to have fastpath in one direction
+	 * M_DATA from them.  This allows us to have fastpath in one direction
 	 * (flow upstream) even on media with Source Routing, where we are
 	 * unable to provide a fixed MAC header to be prepended to downstream
 	 * flowing packets.  So we set GLD_FAST whether or not we decide to
-	 * allow him to send M_DATA down to us.
+	 * allow them to send M_DATA down to us.
 	 */
 	GLDM_LOCK(macinfo, RW_WRITER);
 	gld->gld_flags |= GLD_FAST;

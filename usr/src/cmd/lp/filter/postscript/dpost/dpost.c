@@ -22,6 +22,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -210,7 +211,7 @@
  * of page independence. If you don't approve append *drawfile to *prologue and
  * make sure *drawfile can't be read when DPOST runs.
  *
- * Many default values, like the magnification and orientation, are defined in 
+ * Many default values, like the magnification and orientation, are defined in
  * the prologue, which is where they belong. If they're changed (by options), an
  * appropriate definition is made after the prologue is added to the output file.
  * The -P option passes arbitrary PostScript through to the output file. Among
@@ -220,7 +221,7 @@
  *
  * output language from troff:
  * all numbers are character strings
- * 
+ *
  * sn	size in points
  * fn	font as number from 1-n
  * cx	ascii character x
@@ -254,7 +255,7 @@
  * 	x f n s	font position n contains font s
  * 	x H n	set character height to n
  * 	x S n	set slant to N
- * 
+ *
  * 	Subcommands like "i" are often spelled out like "init".
  *
  */
@@ -1352,7 +1353,7 @@ fontinit(void)
  * font position, just to be sure device emulation works reasonably well - there's
  * no guarantee *devname's special fonts match what's needed when *realdev's tables
  * are used.
- * 
+ *
  */
 
 
@@ -1708,7 +1709,7 @@ resetpos(void)
  * done something that may have wiped it out, and we want to force dpost to set
  * the printer's position before printing text or whatever. For example stroke or
  * fill implicitly do a newpath, and that wipes out the current point, unless the
- * calls were bracketed by a gsave/grestore pair. 
+ * calls were bracketed by a gsave/grestore pair.
  *
  */
 
@@ -1779,7 +1780,7 @@ t_page(int pg)
  * restore so it can be easily redefined to have side-effects in the printer's VM.
  * Although it seems reasonable I haven't implemented it, because it makes other
  * things, like selectively setting manual feed or choosing an alternate paper
- * tray, clumsy - at least on a per page basis. 
+ * tray, clumsy - at least on a per page basis.
  *
  */
 

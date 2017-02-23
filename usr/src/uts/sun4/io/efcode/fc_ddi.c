@@ -22,6 +22,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +39,7 @@
 #include <sys/fcode.h>
 
 /*
- * We want to call the attachment point's dma ctl op, not his parent's
+ * We want to call the attachment point's dma ctl op, not its parent's
  * dma ctl op, so we have to code this ourselves.
  */
 

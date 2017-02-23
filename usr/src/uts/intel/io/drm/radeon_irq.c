@@ -2,6 +2,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 /* radeon_irq.c -- IRQ handling for radeon -*- linux-c -*- */
 /*
@@ -181,7 +182,7 @@ static int radeon_driver_vblank_do_wait(struct drm_device *dev,
 
 	/*
 	 * Assume that the user has missed the current sequence number
-	 * by about a day rather than she wants to wait for years
+	 * by about a day rather than wanting to wait for years
 	 * using vertical blanks...
 	 */
 	DRM_WAIT_ON(ret, &dev->vbl_queue, 3 * DRM_HZ,

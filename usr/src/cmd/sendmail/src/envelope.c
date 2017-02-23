@@ -10,7 +10,9 @@
  * the sendmail distribution.
  *
  */
-
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 #include <sendmail.h>
 
 SM_RCSID("@(#)$Id: envelope.c,v 8.310 2009/12/18 17:08:01 ca Exp $")
@@ -930,7 +932,7 @@ closexscript(e)
 **  SETSENDER -- set the person who this message is from
 **
 **	Under certain circumstances allow the user to say who
-**	s/he is (using -f or -r).  These are:
+**	they are (using -f or -r).  These are:
 **	1.  The user's uid is zero (root).
 **	2.  The user's login name is in an approved list (typically
 **	    from a network server).

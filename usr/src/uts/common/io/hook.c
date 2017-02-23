@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 #include <sys/param.h>
 #include <sys/types.h>
@@ -345,7 +346,7 @@ hook_fini(void)
  * ability to run and return with an error.
  *
  * "wantedset" is used here to determine who has the right to clear the
- * wanted but from the fw_flags set: only he that sets the flag has the
+ * wanted bit from the fw_flags set: only whomever sets the flag has the
  * right to clear it at the bottom of the loop, even if someone else
  * wants to set it.
  *

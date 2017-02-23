@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -87,7 +88,7 @@ _dev_mounted(char *path)
 	}
 
 	if ((fp = fopen(MNTTAB, "rF")) == NULL) {
-		/* mtab is gone... let him go */
+		/* mtab is gone... let it go */
 		goto dun;
 	}
 
@@ -418,7 +419,7 @@ get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 	int		ret_val = FALSE;
 
 	if ((fp = fopen(MNTTAB, "rF")) == NULL) {
-		/* mtab is gone... let him go */
+		/* mtab is gone... let it go */
 		goto dun;
 	}
 

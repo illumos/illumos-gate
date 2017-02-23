@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -4939,7 +4940,7 @@ fcip_rt_flush(struct fcip *fptr)
  * fcip_global_mutex that protects fcip_port_head must be dropped,
  * our best solution is to return a value that indicates the next
  * port in the list.  This way the caller doesn't need to worry
- * about the race condition where he saves off a pointer to the
+ * about the race condition where it saves off a pointer to the
  * next structure in the list and by the time this routine returns,
  * that next structure has already been freed.
  */

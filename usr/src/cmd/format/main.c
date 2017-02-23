@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -444,7 +445,7 @@ init_globals(disk)
 		pattern_buf = (void *) zalloc(BUF_SECTS * cur_blksz);
 
 		/*
-		 * Tell the user which disk (s)he selected.
+		 * Tell the user which disk they selected.
 		 */
 		if (chk_volname(cur_disk)) {
 			fmt_print("selecting %s: ", cur_disk->disk_name);
@@ -490,7 +491,7 @@ init_globals(disk)
 			}
 			fmt_print("]");
 		/*
-		 * Drive wasn't formatted.  Tell the user in case he
+		 * Drive wasn't formatted.  Tell the user in case they
 		 * disagrees.
 		 */
 		} else if (EMBEDDED_SCSI) {

@@ -23,6 +23,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -2213,7 +2214,7 @@ launch_service(int tunfd, poep_t *poep, void *srvp, struct ppptun_control *ptc)
 
 		/*
 		 * Exec failure; attempt to log the problem and send a
-		 * PADT to the client so that he knows the session
+		 * PADT to the client so that it knows the session
 		 * went south.
 		 */
 	bail_out:

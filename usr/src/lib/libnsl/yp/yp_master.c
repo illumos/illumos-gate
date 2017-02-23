@@ -23,6 +23,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -201,7 +202,7 @@ domaster(char *domain, char *map, struct dom_binding *pdomb,
 	if (resp.status != YP_TRUE)
 		retval = ypprot_err(resp.status);
 
-	/* Get some memory which the user can get rid of as he likes */
+	/* Get some memory which the user can get rid of as they like */
 
 	if (!retval && ((*master = malloc(strlen(resp.master) + 1)) == NULL))
 		retval = YPERR_RESRC;

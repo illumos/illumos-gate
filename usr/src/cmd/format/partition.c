@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -197,7 +198,7 @@ change_partition(int num)
 	    return;
 	}
 	/*
-	 * Print out the given partition so the user knows what he/she's
+	 * Print out the given partition so the user knows what they're
 	 * getting into.
 	 */
 	print_partition(cur_parts, num, 1);

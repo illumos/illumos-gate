@@ -21,6 +21,7 @@
  */
 /*
  * Copyright (c) 1995 Sun Microsystems, Inc.  All Rights Reserved
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * module:
  *	action.c
@@ -625,7 +626,7 @@ do_copy(struct file *fp, side_t srcdst)
 		 * The first thing to do is ascertain whether or not
 		 * the alleged new copy might in fact be a new link.
 		 * We trust find_link to weigh all the various factors,
-		 * so if he says make a link, we'll do it.
+		 * so if it says make a link, we'll do it.
 		 */
 		lp = find_link(fp, srcdst);
 		if (lp) {
@@ -652,8 +653,8 @@ do_copy(struct file *fp, side_t srcdst)
 				/*
 				 * if we couldn't do the unlink, we must
 				 * mark the linkee in conflict as well
-				 * so his reference count remains the same
-				 * in the baseline and he continues to show
+				 * so its reference count remains the same
+				 * in the baseline and it continues to show
 				 * up on the change list.
 				 */
 				if (rc != 0) {
@@ -692,8 +693,8 @@ do_copy(struct file *fp, side_t srcdst)
 				/*
 				 * if we failed to make a link, we want to
 				 * mark the linkee in conflict too, so that
-				 * his reference count remains the same in
-				 * the baseline, and he shows up on the change
+				 * its reference count remains the same in
+				 * the baseline, and it shows up on the change
 				 * list again next time.
 				 */
 				lp->f_flags |= F_CONFLICT;

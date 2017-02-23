@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 
 #include <string.h>
 #include <unistd.h>
@@ -266,7 +269,7 @@ dhcp_ipc_recv_reply(int fd, dhcp_ipc_reply_t **reply, int32_t timeout)
 {
 	/*
 	 * If the caller doesn't want to wait forever, and the amount of time
-	 * he wants to wait is expressible as an integer number of milliseconds
+	 * it wants to wait is expressible as an integer number of milliseconds
 	 * (as needed by the msg function), then we wait that amount of time
 	 * plus an extra two seconds for the daemon to do its work.  The extra
 	 * two seconds is arbitrary; it should allow plenty of time for the

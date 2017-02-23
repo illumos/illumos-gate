@@ -475,4 +475,12 @@ enum i40e_status_code i40e_aq_debug_dump(struct i40e_hw *hw, u8 cluster_id,
 				void *buff, u16 *ret_buff_size,
 				u8 *ret_next_table, u32 *ret_next_index,
 				struct i40e_asq_cmd_details *cmd_details);
+enum i40e_status_code i40e_aq_rx_ctl_read_register(struct i40e_hw *hw,
+				u32 reg_addr, u32 *reg_val,
+				struct i40e_asq_cmd_details *cmd_details);
+u32 i40e_read_rx_ctl(struct i40e_hw *hw, u32 reg_addr);
+enum i40e_status_code i40e_aq_rx_ctl_write_register(struct i40e_hw *hw,
+				u32 reg_addr, u32 reg_val,
+				struct i40e_asq_cmd_details *cmd_details);
+void i40e_write_rx_ctl(struct i40e_hw *hw, u32 reg_addr, u32 reg_val);
 #endif /* _I40E_PROTOTYPE_H_ */

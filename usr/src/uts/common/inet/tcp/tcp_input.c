@@ -1062,7 +1062,7 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 
 /*
  * If we are an eager connection hanging off a listener that hasn't
- * formally accepted the connection yet, get off his list and blow off
+ * formally accepted the connection yet, get off its list and blow off
  * any data that we have accumulated.
  */
 void

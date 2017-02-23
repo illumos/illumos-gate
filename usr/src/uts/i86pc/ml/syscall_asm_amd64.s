@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -227,7 +228,7 @@
 	ORL_SYSCALLTRACE(rtmp);				\
 	orl	T_POST_SYS_AST(t), rtmp;		\
 	cmpl	$0, rtmp
-	
+
 /*
  * Fix up the lwp, thread, and eflags for a successful return
  *
@@ -318,8 +319,8 @@ __no_rupdate_msg:
  * Do the traptrace thing and restore any registers we used
  * in situ.  Assumes that %rsp is pointing at the base of
  * the struct regs, obviously ..
- */	
-#ifdef TRAPTRACE	
+ */
+#ifdef TRAPTRACE
 #define	SYSCALL_TRAPTRACE(ttype)				\
 	TRACE_PTR(%rdi, %rbx, %ebx, %rcx, ttype);		\
 	TRACE_REGS(%rdi, %rsp, %rbx, %rcx);			\
@@ -338,10 +339,10 @@ __no_rupdate_msg:
 	orl	%ebx, %ebx;					\
 	orl	%ecx, %ecx;					\
 	orl	%edx, %edx;					\
-	orl	%edi, %edi	
+	orl	%edi, %edi
 #else	/* TRAPTRACE */
 #define	SYSCALL_TRAPTRACE(ttype)
-#define	SYSCALL_TRAPTRACE32(ttype)	
+#define	SYSCALL_TRAPTRACE32(ttype)
 #endif	/* TRAPTRACE */
 
 /*
@@ -362,7 +363,7 @@ __no_rupdate_msg:
  *	%r12-%r15 contain caller state
  *
  * The syscall instruction arranges that:
- *	
+ *
  *	%rcx contains the return %rip
  *	%r11d contains bottom 32-bits of %rflags
  *	%rflags is masked (as determined by the SFMASK msr)
@@ -500,7 +501,7 @@ noprod_sys_syscall:
 	SYSCALL_TRAPTRACE($TT_SYSC64)
 
 	movq	%rsp, %rbp
-	
+
 	movq	T_LWP(%r15), %r14
 	ASSERT_NO_RUPDATE_PENDING(%r14)
 
@@ -563,7 +564,7 @@ _syscall_invoke:
 	movq	REGOFF_R9(%rbp), %r9
 
 	cmpl	$NSYSCALL, %eax
-	jae	_syscall_ill	
+	jae	_syscall_ill
 	shll	$SYSENT_SIZE_SHIFT, %eax
 	leaq	sysent(%rax), %rbx
 
@@ -609,7 +610,7 @@ _syscall_after_brand:
 	 * find a non-canonical %rip, we opt to go through the full
 	 * _syscall_post path which takes us into an iretq which is not
 	 * susceptible to the same problems sysret is.
-	 * 
+	 *
 	 * We're checking for a canonical address by first doing an arithmetic
 	 * shift. This will fill in the remaining bits with the value of bit 63.
 	 * If the address were canonical, the register would now have either all
@@ -647,7 +648,7 @@ _syscall_after_brand:
 	movq	REGOFF_RAX(%rsp), %rax
 	movq	REGOFF_RBX(%rsp), %rbx
 
-	movq	REGOFF_RBP(%rsp), %rbp	
+	movq	REGOFF_RBP(%rsp), %rbp
 	movq	REGOFF_R10(%rsp), %r10
 	/* %r11 used to restore %rfl value */
 	movq	REGOFF_R12(%rsp), %r12
@@ -656,7 +657,7 @@ _syscall_after_brand:
 	movq	REGOFF_R14(%rsp), %r14
 	movq	REGOFF_R15(%rsp), %r15
 
-	movq	REGOFF_RIP(%rsp), %rcx	
+	movq	REGOFF_RIP(%rsp), %rcx
 	movl	REGOFF_RFL(%rsp), %r11d
 
 #if defined(__xpv)
@@ -718,7 +719,7 @@ _syscall_pre:
 	/*
 	 * Didn't abort, so reload the syscall args and invoke the handler.
 	 */
-	movzwl	T_SYSNUM(%r15), %eax	
+	movzwl	T_SYSNUM(%r15), %eax
 	jmp	_syscall_invoke
 
 _syscall_ill:
@@ -1012,7 +1013,7 @@ _full_syscall_postsys32:
  * single-stepping in a debugger.  For most of the system call mechanisms,
  * the CPU automatically clears the single-step flag before we enter the
  * kernel.  The sysenter mechanism does not clear the flag, so a user
- * single-stepping through a libc routine may suddenly find him/herself
+ * single-stepping through a libc routine may suddenly find themself
  * single-stepping through the kernel.  To detect this, kmdb compares the
  * trap %pc to the [brand_]sys_enter addresses on each single-step trap.
  * If it finds that we have single-stepped to a sysenter entry point, it
@@ -1359,7 +1360,7 @@ nopop_syscall_int:
 	SET_SIZE(brand_sys_syscall_int)
 
 #endif	/* __lint */
-	
+
 /*
  * Legacy 32-bit applications and old libc implementations do lcalls;
  * we should never get here because the LDT entry containing the syscall
@@ -1393,7 +1394,7 @@ sys_lcall32()
 	call	panic
 	SET_SIZE(sys_lcall32)
 
-__lcall_panic_str:	
+__lcall_panic_str:
 	.string	"sys_lcall32: shouldn't be here!"
 
 /*

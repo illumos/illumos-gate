@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -380,7 +381,7 @@ static int idnxs_state_table[4][5][2] = {
  *	LOCAL		Local domain is winner.
  *	REMOTE		Remote domain is winner.
  *	WAIT		Wait for remote to connect to our
- *			master if his is different.
+ *			master if theirs is different.
  *	ERROR		An impossible condition.
  *
  * Index:

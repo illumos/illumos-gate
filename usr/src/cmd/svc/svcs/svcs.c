@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
- * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -2493,7 +2493,7 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 	/*
 	 * Property values may be longer than max_scf_fmri_length, but these
 	 * shouldn't be, so we'll just reuse buf.  The user can use svcprop if
-	 * he suspects something fishy.
+	 * they suspect something fishy.
 	 */
 	if (scf_instance_get_pg(wip->inst, SCF_PG_RESTARTER, rpg) != 0) {
 		if (scf_error() != SCF_ERROR_NOT_FOUND)
