@@ -728,7 +728,7 @@ loop:
 
 	/*
 	 * Come here in case of an internal error. At this point we couldn't
-	 * get a buffer, but he have to return one. Hence we allocate some
+	 * get a buffer, but we have to return one. Hence we allocate some
 	 * kind of error reply buffer on the fly. This buffer is marked as
 	 * B_NOCACHE | B_AGE | B_ERROR | B_DONE to assure the following:
 	 *	- B_ERROR will indicate error to the caller.

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -676,7 +677,7 @@ hermon_qp_modify(hermon_state_t *state, hermon_qphdl_t qp,
 			 * If still draining SQ, then fail transition attempt
 			 * to RTS, even though this is now done is two steps
 			 * (see below) if the consumer has tried this before
-			 * it's drained, let him fail and wait appropriately
+			 * it's drained, let it fail and wait appropriately
 			 */
 			if (qp->qp_sqd_still_draining) {
 				mutex_exit(&qp->qp_lock);

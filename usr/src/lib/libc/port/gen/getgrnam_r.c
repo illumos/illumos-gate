@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include "lint.h"
@@ -204,7 +205,7 @@ fgetgrent_r(FILE *f, struct group *result, char *buffer, int buflen)
 	extern void	_nss_XbyY_fgets(FILE *, nss_XbyY_args_t *);
 	nss_XbyY_args_t	arg;
 
-	/* ... but in fgetXXent_r, the caller deserves any +/- entry he gets */
+	/* ... but in fgetXXent_r, the caller deserves any +/- entry it gets */
 
 	/* No key to fill in */
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2group);

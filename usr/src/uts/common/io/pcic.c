@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -2646,7 +2647,7 @@ pcic_calc_speed(pcicdev_t *pcic, uint32_t speed)
  * Generally the larger value is taken if 2 are possible.
  */
 static struct pcic_card_times {
-	uint16_t cycle;	/* Speed as found in the atribute space of he card. */
+	uint16_t cycle;	/* Speed as found in the atribute space of the card. */
 	uint16_t setup;	/* Corresponding address setup time. */
 	uint16_t width;	/* Corresponding width, OE or WE. */
 	uint16_t hold;	/* Corresponding data or address hold time. */

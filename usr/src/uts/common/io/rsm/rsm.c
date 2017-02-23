@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 
@@ -6639,7 +6640,7 @@ rsm_closeconnection(rsmseg_t *seg, void **cookie)
 	 * Disconnect on adapter
 	 *
 	 * The current algorithm is stateless, I don't have to contact
-	 * server when I go away. He only gives me permissions. Of course,
+	 * server when I go away. It only gives me permissions. Of course,
 	 * the adapters will talk to terminate the connect.
 	 *
 	 * disconnect is needed only if we are CONNECTED not in CONN_QUIESCE

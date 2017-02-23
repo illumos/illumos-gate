@@ -22,6 +22,7 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -269,7 +270,7 @@ audit_crontab_not_allowed(uid_t ruid, char *user) {
 		if (getpwnam_r(user, &pwd, buffer, PWD_BUFFER_SIZE) == NULL) {
 			rc = 1;			/* deny access if invalid */
 		} else if (ruid == pwd.pw_uid)
-			rc = 0;			/* editing his own crontab */
+			rc = 0;			/* editing their own crontab */
 		else
 			rc = audit_crontab_process_not_audited();
 	}

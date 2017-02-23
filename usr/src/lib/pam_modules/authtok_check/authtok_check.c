@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -482,9 +483,9 @@ check_composition(char *pw, struct pwdefaults *pwdef, pam_handle_t *pamh,
 	 * characters) we give a modified error message. Otherwise, a
 	 * user entering FooBar1234 with PASSLENGTH=6, MINDIGIT=4, while
 	 * we're using the default UNIX crypt (8 chars significant),
-	 * would not understand what's going on when he's told that
+	 * would not understand what's going on when they're told that
 	 * "The password should contain at least 4 digits"...
-	 * Instead, we now well him
+	 * Instead, we now tell them
 	 * "The first 8 characters of the password should contain at least
 	 *  4 digits."
 	 */

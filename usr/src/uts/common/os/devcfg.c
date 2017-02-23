@@ -23,6 +23,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -7698,7 +7699,7 @@ mt_config_children(struct mt_config_handle *hdl)
 			brn = NULL;
 
 		/*
-		 * Hold the child that we are processing so he does not get
+		 * Hold the child that we are processing so it does not get
 		 * removed. The corrisponding ndi_rele_devi() for children
 		 * that are not being skipped is done at the end of
 		 * mt_config_thread().
@@ -7797,7 +7798,7 @@ mt_config_driver(struct mt_config_handle *hdl)
 	dip = devnamesp[par_major].dn_head;
 	while (dip) {
 		/*
-		 * Hold the child that we are processing so he does not get
+		 * Hold the child that we are processing so it does not get
 		 * removed. The corrisponding ndi_rele_devi() for children
 		 * that are not being skipped is done at the end of
 		 * mt_config_thread().

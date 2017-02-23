@@ -10,6 +10,7 @@
  *
  * Written by Barr3y Jaspan, Student Information Processing Board (SIPB)
  * and MIT-Project Athena, 1989.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -21,7 +22,7 @@
 /*
  * Checkers!  Get away from that "hard disk erase" button!
  *    (Stupid dog.  He almost did it to me again ...)
- */                                 
+ */
 int DynDelete(obj, idx)
    DynObjectP obj;
    int idx;
@@ -31,7 +32,7 @@ int DynDelete(obj, idx)
 	       fprintf(stderr, "dyn: delete: bad index %d\n", idx);
 	  return DYN_BADINDEX;
      }
-     
+
      if (idx >= obj->num_el) {
 	  if (obj->debug)
 	       fprintf(stderr, "dyn: delete: Highest index is %d.\n",
@@ -49,14 +50,14 @@ int DynDelete(obj, idx)
 	       if (obj->debug)
 		    fprintf(stderr, "dyn: delete: last element, punting.\n");
 	  }
-     }	  
+     }
      else {
 	  if (obj->debug)
 	       fprintf(stderr,
 		       "dyn: delete: copying %d bytes from %d + %d to + %d.\n",
 		       obj->el_size*(obj->num_el - idx), obj->array,
 		       (idx+1)*obj->el_size, idx*obj->el_size);
-	  
+
 #ifdef HAVE_MEMMOVE
 	  memmove(obj->array + idx*obj->el_size,
 		  obj->array + (idx+1)*obj->el_size,
@@ -76,9 +77,9 @@ int DynDelete(obj, idx)
 		     obj->el_size);
 	  }
      }
-     
+
      --obj->num_el;
-     
+
      if (obj->debug)
 	  fprintf(stderr, "dyn: delete: done.\n");
 

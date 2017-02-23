@@ -22,6 +22,7 @@
 /*
  * Copyright 1995-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -237,8 +238,8 @@ out:
 	/*
 	 * Return code from libgen regcomp with mods.  Note weird return
 	 * value - if space is malloc'd return pointer to start of space,
-	 * if user provided his own space, return pointer to 1+last byte
-	 * of his space.
+	 * if user provided their own space, return pointer to 1+last byte
+	 * of that space.
 	 */
 	if (regerrno != 0) {
 		if (alloc)

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1080,8 +1081,8 @@ dosource(tchar **t)
  * If we are a login shell, then we don't want to tell
  * about any mail file unless its been modified
  * after the time we started.
- * This prevents us from telling the user things he already
- * knows, since the login program insists on saying
+ * This prevents us from telling the user things they already
+ * know, since the login program insists on saying
  * "You have mail."
  */
 void

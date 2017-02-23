@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -185,7 +186,7 @@ main(int argc, char **argv)
 				continue;
 
 			/*
-			 * if argv is a username, compare his/her uid to
+			 * if argv is a username, compare their uid to
 			 * the uid of the owner of the file......
 			 */
 			if (pwd = getpwnam(*argv)) {
@@ -240,7 +241,7 @@ usage(void)
  * print the job number that we are removing and the result of the access
  * check (either "permission denied" or "removed"). If we are running
  * interactively (iflag), prompt the user before we unlink the file. If
- * the super-user is removing jobs, inform him/her who owns each file before
+ * the super-user is removing jobs, inform them who owns each file before
  * it is removed.  Return TRUE if file removed, else FALSE.
  */
 int
@@ -370,7 +371,7 @@ getjoblist(struct dirent ***namelistp, struct stat ***statlistp,
 }
 
 /*
- * Get the full login name of a person using his/her user id.
+ * Get the full login name of a person using their user id.
  */
 char *
 getname(uid_t uid)

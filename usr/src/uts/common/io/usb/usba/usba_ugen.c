@@ -20,6 +20,7 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -36,7 +37,7 @@
  * to  talk to	USB  devices.  This is	very  useful for  Point of Sale sale
  * devices and other simple  devices like  USB	scanner, USB palm  pilot.
  * The UGEN provides a system call interface to USB  devices  enabling
- * a USB device vendor to  write an  application for his
+ * a USB device vendor to write an application for their
  * device instead of  writing a driver. This facilitates the vendor to write
  * device management s/w quickly in userland.
  *

@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/debug.h>
@@ -2440,9 +2441,9 @@ drmach_cpu_start(struct cpu *cp)
 
 	/*
 	 * Wait for the cpu to reach its idle thread before
-	 * we zap him with a request to blow away the mappings
-	 * he (might) have for the drmach_shutdown_asm code
-	 * he may have executed on unconfigure.
+	 * we zap it with a request to blow away the mappings
+	 * it (might) have for the drmach_shutdown_asm code
+	 * it may have executed on unconfigure.
 	 */
 	while ((cp->cpu_thread != cp->cpu_idle_thread) && (ntries > 0)) {
 		DELAY(drmach_cpu_delay);
@@ -3692,7 +3693,7 @@ drmach_unconfigure(drmachid_t id, int flags)
 /*
  * Start up a cpu.  It is possible that we're attempting to restart
  * the cpu after an UNCONFIGURE in which case the cpu will be
- * spinning in its cache.  So, all we have to do is wakeup him up.
+ * spinning in its cache.  So, all we have to do is wake it up.
  * Under normal circumstances the cpu will be coming from a previous
  * CONNECT and thus will be spinning in OBP.  In both cases, the
  * startup sequence is the same.

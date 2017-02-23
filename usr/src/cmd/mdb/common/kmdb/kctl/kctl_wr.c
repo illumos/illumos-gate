@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,7 +73,7 @@ kctl_wr_process_cb(kmdb_wr_t *wn, void *arg)
 		if (unloading) {
 			/*
 			 * If the user didn't wait for all dmods to load before
-			 * she triggered the debugger unload, we may have some
+			 * they triggered the debugger unload, we may have some
 			 * dmod load requests on the queue in front of the
 			 * blizzard of dmod unload requests that the debugger
 			 * will generate as part of its unload.  The debugger

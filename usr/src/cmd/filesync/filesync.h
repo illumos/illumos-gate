@@ -21,6 +21,7 @@
  */
 /*
  * Copyright (c) 1996 Sun Microsystems, Inc.  All Rights Reserved
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * module:
  *	filesync.h
@@ -142,7 +143,7 @@ extern uid_t my_uid;	/* User ID for files I create			*/
 extern gid_t my_gid;	/* Group ID for files I create			*/
 
 /* error and warning routines						*/
-void confirm(char *);		/* ask user if he's sure		*/
+void confirm(char *);		/* ask user if they're sure		*/
 void nomem(char *);		/* die from malloc failure		*/
 
 /* routines for dealing with strings and file names			*/

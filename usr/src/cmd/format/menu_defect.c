@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -37,7 +38,7 @@
 /*
  * This is the working defect list.  All the commands here operate on
  * the working list, except for 'commit'.  This way the user can
- * change his mind at any time without having mangled the current defect
+ * change their mind at any time without having mangled the current defect
  * list.
  */
 struct	defect_list work_list;
@@ -199,7 +200,7 @@ d_extract()
 		return (-1);
 
 	/*
-	 * If this takes a long time, let's ask the user if he
+	 * If this takes a long time, let's ask the user if they
 	 * doesn't mind waiting.  Note, for SCSI disks
 	 * this operation is instantaneous so we won't ask for
 	 * for confirmation.
@@ -270,7 +271,7 @@ d_add()
 	assert(!EMBEDDED_SCSI);
 
 	/*
-	 * Ask the user which mode of input he'd like to use.
+	 * Ask the user which mode of input they'd like to use.
 	 */
 	fmt_print("        0. bytes-from-index\n");
 	fmt_print("        1. logical block\n");

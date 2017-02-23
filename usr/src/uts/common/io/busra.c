@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #if defined(DEBUG)
@@ -675,7 +676,7 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 			if (base >= mapp->ra_base &&
 			    ((base - mapp->ra_base) < mapp->ra_len)) {
 				/*
-				 * This is the node with he requested base in
+				 * This is the node with the requested base in
 				 * its range
 				 */
 				if ((len > mapp->ra_len) ||

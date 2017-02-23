@@ -21,6 +21,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef	_SYS_ESUNDDI_H
@@ -183,7 +184,7 @@ e_ddi_hold_devi(dev_info_t *);
 
 /*
  * Return the reference count on a devinfo node. The caller can determine,
- * with knowledge of his own holds, if the devinfo node is still in use.
+ * with knowledge of its own holds, if the devinfo node is still in use.
  */
 int
 e_ddi_devi_holdcnt(dev_info_t *dip);

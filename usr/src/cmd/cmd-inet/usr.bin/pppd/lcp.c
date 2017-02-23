@@ -7,6 +7,8 @@
  * Copyright (c) 1989 Carnegie Mellon University.
  * All rights reserved.
  *
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ *
  * Redistribution and use in source and binary forms are permitted
  * provided that the above copyright notice and this paragraph are
  * duplicated in all such forms and that any documentation,
@@ -218,12 +220,12 @@ static option_t lcp_option_list[] = {
       "Set FCS type(s) desired; crc16, crc32, null, or number" },
 #endif
 #ifdef MUX_FRAME
-    /* 
+    /*
      * if pppmux option is turned on, then the parameter to this
-     * is time value in microseconds 
+     * is time value in microseconds
      */
     { "pppmux", o_int, &lcp_wantoptions[0].pppmux,
-      "Set PPP Multiplexing option timer", OPT_LLIMIT | OPT_A2COPY, 
+      "Set PPP Multiplexing option timer", OPT_LLIMIT | OPT_A2COPY,
 	&lcp_allowoptions[0].pppmux, 0, 0 },
 #endif
     {NULL}
@@ -685,7 +687,7 @@ lcp_extcode(f, code, id, inp, len)
     case CODE_PROTREJ:
 	lcp_rprotrej(f, inp, len);
 	break;
-    
+
     case CODE_ECHOREQ:
 	if (f->state != OPENED)
 	    break;
@@ -693,7 +695,7 @@ lcp_extcode(f, code, id, inp, len)
 	PUTLONG(lcp_gotoptions[f->unit].magicnumber, magp);
 	fsm_sdata(f, CODE_ECHOREP, id, inp, len);
 	break;
-    
+
     case CODE_ECHOREP:
 	if (!lcp_received_echo_reply(f, id, inp, len)) {
 	    lcp_echo_badreplies++;
@@ -1162,7 +1164,7 @@ lcp_ackci(f, p, len)
 	      go->endpoint.value, go->endpoint.length);
 #ifdef MUX_FRAME
     ACKCIVOID(CI_MUXING, go->pppmux);
-    if (go->pppmux) 
+    if (go->pppmux)
     	go->pppmux = ao->pppmux;
 #endif
     ACKCISHORT(CI_MRRU, go->neg_mrru, go->mrru);
@@ -1356,7 +1358,7 @@ lcp_nakci(f, p, len)
 	    if ((cichar == CHAP_DIGEST_MD5 && wo->neg_chap) ||
 		(cichar == CHAP_MICROSOFT && wo->neg_mschap) ||
 		(cichar == CHAP_MICROSOFT_V2 && wo->neg_mschapv2)) {
-		/* Try his requested algorithm. */
+		/* Try its requested algorithm. */
 		try.chap_mdtype = cichar;
 	    } else {
 		goto try_another;
@@ -1399,11 +1401,11 @@ lcp_nakci(f, p, len)
      * to stop asking for LQR.  We haven't got any other protocol.  If
      * they Nak the reporting period, then the following logic
      * applies:
-     * If he suggests zero and go->neg_fcs is true and
-     * ao->lqr_period isn't zero, then take his suggestion.  If he
-     * suggests zero otherwise, ignore it.  If he suggests a nonzero
-     * value and wo->lqr_period is zero, then take his suggestion.  If
-     * he suggests a nonzero value otherwise that's less than
+     * If it suggests zero and go->neg_fcs is true and
+     * ao->lqr_period isn't zero, then take its suggestion.  If it
+     * suggests zero otherwise, ignore it.  If it suggests a nonzero
+     * value and wo->lqr_period is zero, then take its suggestion.  If
+     * it suggests a nonzero value otherwise that's less than
      * wo->lqr_period, then ignore it.
      */
     NAKCILQR(CI_QUALITY, neg_lqr,
@@ -1440,7 +1442,7 @@ lcp_nakci(f, p, len)
     NAKCIVOID(CI_ACCOMPRESSION, neg_accompression);
 
     /*
-     * Remove any FCS types he doesn't like from our (receive-side)
+     * Remove any FCS types it doesn't like from our (receive-side)
      * FCS list.
      */
     NAKCICHAR(CI_FCSALTERN, neg_fcs, try.fcs_type = go->fcs_type & cichar;);
@@ -1763,7 +1765,7 @@ lcp_rejci(f, p, len)
 	/* Check rejected value. */
 	if (cishort != PPP_CHAP || cichar != go->chap_mdtype)
 	    goto bad;
-	/* Disable the one that he rejected */
+	/* Disable the one that it rejected */
 	switch (cichar) {
 	case CHAP_DIGEST_MD5:
 	    try.neg_chap = 0;
@@ -1882,12 +1884,12 @@ lcp_reqci(f, p, lenp, dont_nak)
     nakp = nak_buffer;
 
     /*
-     * Reset all his options.
+     * Reset all its options.
      */
     BZERO(ho, sizeof(*ho));
 
     /*
-     * Process all his options.
+     * Process all its options.
      */
     for (len = *lenp; len > 0; len -= cilen, p = prev + cilen) {
 	newret = CODE_CONFACK;			/* Assume success */
@@ -1932,10 +1934,10 @@ lcp_reqci(f, p, lenp, dont_nak)
 	    if (newret == CODE_CONFNAK) {
 		PUTCHAR(CI_MRU, nakp);
 		PUTCHAR(CILEN_SHORT, nakp);
-		PUTSHORT(cishort, nakp);	/* Give him a hint */
+		PUTSHORT(cishort, nakp);	/* Give it a hint */
 	    }
 
-	    ho->neg_mru = 1;		/* Remember he sent MRU */
+	    ho->neg_mru = 1;		/* Remember that it sent MRU */
 	    ho->mru = cishort;		/* And remember value */
 	    break;
 
@@ -1961,8 +1963,8 @@ lcp_reqci(f, p, lenp, dont_nak)
 
 	    /*
 	     * Workaround for common broken Microsoft software -- if
-	     * the peer is sending us a nonzero ACCM, then he *needs*
-	     * us to send the same to him.  Adjust our Configure-
+	     * the peer is sending us a nonzero ACCM, then it *needs*
+	     * us to send the same to it.  Adjust our Configure-
 	     * Request message and restart LCP.
 	     */
 	    if (do_msft_workaround && (cilong & ~wo->asyncmap)) {
@@ -2133,10 +2135,10 @@ lcp_reqci(f, p, lenp, dont_nak)
 	    if (cilen < CILEN_LONG) {
 		/*
 		 * If we send Magic-Number, then we must not reject it
-		 * when the peer sends it to us, even if his version
-		 * looks odd to us.  Ack if the cilen is wrong in this
+		 * when the peer sends it to us, even if its version
+		 * looks odd to us.  Ack if the cilent is wrong in this
 		 * case.  If we're not sending Magic-Number, then we don't
-		 * much care what his value is anyway.
+		 * much care what its value is anyway.
 		 */
 		break;
 	    }
@@ -2147,8 +2149,8 @@ lcp_reqci(f, p, lenp, dont_nak)
 		break;
 
 	    /*
-	     * He must have a different magic number.  Make sure we
-	     * give him a good one to use.
+	     * It must have a different magic number.  Make sure we
+	     * give it a good one to use.
 	     */
 	    while (go->neg_magicnumber && cilong == go->magicnumber) {
 		newret = CODE_CONFNAK;
@@ -2204,7 +2206,7 @@ lcp_reqci(f, p, lenp, dont_nak)
 	    } else {
 
 		GETCHAR(cichar, p);
-		/* If he has bits we don't like, tell him to stop. */
+		/* If it has bits we don't like, tell it to stop. */
 		if (cichar & ~ao->fcs_type) {
 		    if ((cichar &= ao->fcs_type) == 0) {
 			newret = CODE_CONFREJ;
@@ -2295,7 +2297,7 @@ lcp_reqci(f, p, lenp, dont_nak)
                 newret = CODE_CONFREJ;
                 break;
             }
-            /* remember his option */
+            /* remember its option */
             ho->pppmux = ao->pppmux;
             break;
 #endif
@@ -2341,7 +2343,7 @@ lcp_reqci(f, p, lenp, dont_nak)
     }
 
     /*
-     * If the peer hasn't negotiated his MRU, and we'd like an MTU
+     * If the peer hasn't negotiated its MRU, and we'd like an MTU
      * that's larger than the default, try sending an unsolicited
      * Nak for what we want.
      */

@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <pthread.h>
@@ -1693,7 +1694,7 @@ token_specific_init_pin(TSS_HCONTEXT hContext,
 	 * Since the SO must log in before calling C_InitPIN, we will
 	 * be able to return (CKR_OK) automatically here.
 	 * This is because the USER key structure is created at the
-	 * time of her first login, not at C_InitPIN time.
+	 * time of their first login, not at C_InitPIN time.
 	 */
 	return (CKR_OK);
 }
@@ -1939,7 +1940,7 @@ token_specific_verify_so_pin(TSS_HCONTEXT hContext, CK_CHAR_PTR pPin,
 	if (local_uuid_is_null(&publicRootKeyUUID) &&
 	    find_uuid(TPMTOK_PUBLIC_ROOT_KEY_ID, &publicRootKeyUUID)) {
 		/*
-		 * The SO hasn't set her PIN yet, compare the
+		 * The SO hasn't set their PIN yet, compare the
 		 * login pin with the hard-coded value.
 		 */
 		if (memcmp(default_so_pin_sha, hash_sha,

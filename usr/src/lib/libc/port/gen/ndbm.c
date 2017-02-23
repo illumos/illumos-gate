@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -599,7 +600,7 @@ dbm_do_nextkey(DBM *db, datum inkey)
 		 * be an extra clever moron who depends on
 		 * these variables and their former meaning.
 		 * If we set the variables this would have got
-		 * us the key for sure! So give him the old algorithm.
+		 * us the key for sure! So give it the old algorithm.
 		 */
 		if (key.dptr == NULL)
 			return (dbm_slow_nextkey(db));
@@ -699,8 +700,8 @@ keep_going:
 	}
 
 	/* really need hash at this point */
-	/* if he gave us a key we have already calculated the hash */
-	/* if not get it */
+	/* if it gave us a key we have already calculated the hash */
+	/* if not get the hash */
 	if (inkey.dptr == NULL)
 		hash = dcalchash(key);
 	hash = dbm_hashinc(db, hash);

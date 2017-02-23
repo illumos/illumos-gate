@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -869,7 +870,7 @@ void ehci_insert_itd_on_itw(
  * ehci_insert_itd_into_active_list:
  *
  * Add current ITD into the active ITD list in reverse order.
- * When he done list is created, remove it in the reverse order.
+ * When the done list is created, remove it in the reverse order.
  */
 void
 ehci_insert_itd_into_active_list(

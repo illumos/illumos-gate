@@ -546,7 +546,7 @@ lm_status_t lm_tcp_init_resc(struct _lm_device_t *pdev, u8_t b_is_init )
         /* Assign the SCQ chain consumer pointer to the consumer index in the status block. */
         sb_id = RSS_ID_TO_SB_ID(i);
 #ifdef _VBD_
-	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED)) 
+	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED))
 	{
             sb_id = LM_NON_RSS_SB(pdev);
 	}
@@ -575,7 +575,7 @@ lm_status_t lm_tcp_init_resc(struct _lm_device_t *pdev, u8_t b_is_init )
 
 	sb_id = RSS_ID_TO_SB_ID(i);
 #ifdef _VBD_
-	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED)) 
+	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED))
 	{
 	    sb_id = LM_NON_RSS_SB(pdev);
 	}
@@ -695,10 +695,10 @@ static void _lm_tcp_init_cstorm_intmem(lm_device_t *pdev)
         //LM_INTMEM_WRITE8(pdev, CSTORM_TOE_STATUS_BLOCK_ID_OFFSET(LM_TOE_FW_RSS_ID(pdev,drv_toe_rss_id), port), LM_TOE_FW_RSS_ID(pdev,drv_toe_rss_id), BAR_CSTRORM_INTMEM);
 	fw_sb_id = LM_FW_SB_ID(pdev, RSS_ID_TO_SB_ID(drv_toe_rss_id));
 #ifdef _VBD_
-	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED)) 
+	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED))
 	{
 		fw_sb_id = LM_FW_SB_ID(pdev, RSS_ID_TO_SB_ID(LM_NON_RSS_SB(pdev)));
-		if (drv_toe_rss_id != LM_NON_RSS_CHAIN(pdev)) 
+		if (drv_toe_rss_id != LM_NON_RSS_CHAIN(pdev))
 		{
 			DbgBreak();
 		}
@@ -846,11 +846,11 @@ static void _lm_tcp_init_ustorm_intmem(lm_device_t *pdev)
             break;
         }
 #ifdef _VBD_
-	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED)) 
+	if (!CHIP_IS_E1x(pdev) && (pdev->params.l4_enable_rss == L4_RSS_DISABLED))
 	{
 		fw_sb_id = LM_FW_SB_ID(pdev, RSS_ID_TO_SB_ID(LM_NON_RSS_SB(pdev)));
 		sw_sb_id = LM_NON_RSS_SB(pdev);
-		if (drv_toe_rss_id != LM_NON_RSS_CHAIN(pdev)) 
+		if (drv_toe_rss_id != LM_NON_RSS_CHAIN(pdev))
 		{
 			DbgBreak();
 		}
@@ -1056,7 +1056,7 @@ lm_status_t lm_tcp_init_chip_common(lm_device_t *pdev)
     _lm_get_default_l4cli_params(pdev, &l4_params);
 
     pdev->ofld_info.l4_params = l4_params;
-    
+
     /* init common internal memory/hw for each storm
      * (c+u storms do not have common offload params) */
     _lm_set_ofld_params_xstorm_common(pdev, &l4_params);
@@ -1171,7 +1171,7 @@ lm_status_t lm_tcp_init(lm_device_t *pdev)
         DbgMessage(pdev, FATAL, "###lm_tcp_init is not supported for VF\n");
         return LM_STATUS_SUCCESS;
     }
-    
+
     toe_info = &pdev->toe_info;
     mm_memset(toe_info, 0 , sizeof(lm_toe_info_t));
     toe_info->pdev = pdev;
@@ -2586,7 +2586,7 @@ static lm_status_t _lm_tcp_init_xstorm_tcp_context(
         (0 != GET_FLAGS(xtcp_st->ethernet.vlan_params, XSTORM_ETH_CONTEXT_SECTION_CFI))     ||
         (0 != GET_FLAGS(xtcp_st->ethernet.vlan_params, XSTORM_ETH_CONTEXT_SECTION_PRIORITY)))
     {
-        // This fields should be set to 1 whenever an inner VLAN is provided by the OS. 
+        // This fields should be set to 1 whenever an inner VLAN is provided by the OS.
         // This flags is relevant for all function modes.
         SET_FLAGS( xtcp_st->flags, XSTORM_COMMON_CONTEXT_SECTION_VLAN_MODE);
     }
@@ -2612,7 +2612,7 @@ static lm_status_t _lm_tcp_init_xstorm_tcp_context(
 #endif
         src_ip[0] = HTON32(path->path_const.u.ipv4.src_ip);
         dst_ip[0] = HTON32(path->path_const.u.ipv4.dst_ip);
-        pseudo_cs = lm_tcp_calc_tcp_pseudo_checksum(pdev, src_ip, dst_ip, IP_VERSION_IPV4);       
+        pseudo_cs = lm_tcp_calc_tcp_pseudo_checksum(pdev, src_ip, dst_ip, IP_VERSION_IPV4);
     } else {
         /* IPv6*/
         xtcp_st->ip_union.ip_v6.ip_remote_addr_lo_lo = path->path_const.u.ipv6.dst_ip[0];
@@ -3875,7 +3875,7 @@ static lm_status_t lm_tcp_post_invalidate_request(
 /* Desciption:
  *  post slow path request of given type for given tcp state
  * Assumptions:
- *  - caller initialized request->type according to his specific request
+ *  - caller initialized request->type according to its specific request
  *  - caller allocated space for request->data, according to the specific request type
  *  - all previous slow path requests for given tcp state are already completed
  * Returns:
@@ -4395,8 +4395,8 @@ lm_tcp_set_ofld_params(
 
     /* <MichalK> Here we override the ofld info. This in theory effects iscsi as well, however, since ftsk
      * does not really use timers, and passes '0' for ka / rt in delegate/cached params its ok that
-     * we're overriding the parameters here. The correct solution is to maintain this per cli-idx, 
-     * but that will require major changes in l4 context initialization and not worth the effort. 
+     * we're overriding the parameters here. The correct solution is to maintain this per cli-idx,
+     * but that will require major changes in l4 context initialization and not worth the effort.
      */
     *curr_params = *params;
 

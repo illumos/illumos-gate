@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -8349,7 +8350,6 @@ vhci_uscsi_send_sense(struct scsi_pkt *pkt, mp_uscsi_cmd_t *mp_uscmdp)
 	if (scsi_pkt_allocated_correctly(rqpkt))
 		rqpkt->pkt_path_instance = 0;
 
-	/* get her done */
 	switch (scsi_transport(rqpkt)) {
 	case TRAN_ACCEPT:
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "vhci_uscsi_send_sense: "

@@ -23,6 +23,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -176,7 +177,7 @@ dofirst(domain, map, pdomb, timeout, key, keylen, val, vallen)
 		retval = ypprot_err(resp.status);
 	}
 
-	/* Get some memory which the user can get rid of as he likes */
+	/* Get some memory which the user can get rid of as they like */
 
 	if (!retval) {
 
@@ -349,7 +350,7 @@ donext(domain, map, inkey, inkeylen, pdomb, timeout, outkey, outkeylen,
 		retval = ypprot_err(resp.status);
 	}
 
-	/* Get some memory which the user can get rid of as he likes */
+	/* Get some memory which the user can get rid of as they like */
 
 	if (!retval) {
 		if ((*outkey = malloc((size_t)

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -477,14 +478,14 @@ pragged(bool kill)
 
 	if (!kill)
 		getDOT();
-	
+
 	/*
 	 * Copy "abcd" into genbuf.
 	 * Note that gp points to 'c'.
 	 */
 
 	strcpy(genbuf, linebuf);
-	
+
 	/*
 	 * Get last line of undo area ("3") into linebuf.
 	 */
@@ -492,7 +493,7 @@ pragged(bool kill)
 	getaline(*unddol);
 	if (kill)
 		*pkill[1] = 0;
-	
+
 
 	/*
 	 * Concatenate trailing end of current line
@@ -520,7 +521,7 @@ pragged(bool kill)
 	getaline(dol[1]);
 	if (kill)
 		strcLIN(pkill[0]);
-	
+
 	/*
 	 * Copy the first line of the undo save area
 	 * over what is pointed to by sp.
@@ -528,7 +529,7 @@ pragged(bool kill)
 	 */
 
 	strcpy(gp, linebuf);
-	
+
 	/*
 	 * Now copy genbuf back into linebuf.
 	 *	linebuf = "ab1"
@@ -662,8 +663,8 @@ badtag:
 
 	/*
 	 * Loop once for each file in tags "path".
-	 * 
-	 * System tags array limits to 4k (tags[ONMSZ]) long, 
+	 *
+	 * System tags array limits to 4k (tags[ONMSZ]) long,
 	 * therefore, tagfbuf should be able to hold all tags.
 	 */
 
@@ -780,7 +781,7 @@ badtags:
                         if (*savedfile) {
 				savetag((char *)savedfile);
                         }
-#endif 
+#endif
 			strcpy(cmdbuf, cp);
 			if (strcmp(filebuf, savedfile) || !edited) {
 				unsigned char cmdbuf2[sizeof filebuf + 10];
@@ -908,7 +909,7 @@ badtags2:
                         if (*savedfile) {
 				savetag((char *)savedfile);
                         }
-#endif 
+#endif
 			strcpy(cmdbuf, cp);
 			if (strcmp(filebuf, savedfile) || !edited) {
 				unsigned char cmdbuf2[sizeof filebuf + 10];
@@ -1209,7 +1210,7 @@ undo(bool c)
 	if (inglobal && inopen <= 0)
 		error(value(vi_TERSE) ? gettext("Can't undo in global") :
 			gettext("Can't undo in global commands"));
-	
+
 	/*
 	 * Unless flag indicates a forced undo, make sure
 	 * there really was a change before trying to undo it.
@@ -1217,7 +1218,7 @@ undo(bool c)
 
 	if (!c)
 		somechange();
-	
+
 	/*
 	 * Update change flags.
 	 */
@@ -1296,7 +1297,7 @@ undo(bool c)
 		 * then we must move the text between undap1 and undap2
 		 * and it must not be at the bottom of the file
 		 */
-		
+
 		if ((i = (kp = undap2) - (jp = undap1)) > 0) {
 			if (kp != dolp1) {
 
@@ -1330,18 +1331,18 @@ undo(bool c)
 			}
 			/*
 			 * Unddel, the line just before the spot where this
-			 * test was deleted, may have moved. Account for 
+			 * test was deleted, may have moved. Account for
 			 * this in restoration of saved deleted lines.
 			 */
 			if (unddel >= jp)
 				unddel -= i;
-			
+
 			/*
 			 * The last line (dol) may have changed,
 			 * account for this.
 			 */
 			 newdol -= i;
-			
+
 			/*
 			 * For the case where no lines are restored, dot
 			 * is the line before the first line deleted.
@@ -1356,25 +1357,25 @@ undo(bool c)
 			unddel = undap1 - 1;
 			squish();
 		}
-		
+
 		/*
 		 * Set jp to the line where deleted text is to be added.
 		 */
 		jp = unddel + 1;
-		
+
 		/*
 		 * Set kp to end of undo save area.
 		 *
 		 * If there is any deleted text to be added, do reverses.
 		 */
-		
+
 		if ((i = (kp = unddol) - dol) > 0) {
-			
+
 			/*
 			 * If deleted lines are not to be appended
 			 * to the bottom of the file...
 			 */
-			 
+
 			 if (jp != dolp1) {
 				/*
 				 * FILE:   LINE   START   REV1   REV2   REV3
@@ -1398,7 +1399,7 @@ undo(bool c)
 				 *         7)      mn      mn     kl     56
 				 * unddol: 8)      op      op     ij     78
 				 */
-				 
+
 				 reverse(jp, dolp1);
 				reverse(dolp1, ++kp);
 				reverse(jp, kp);
@@ -1414,11 +1415,11 @@ undo(bool c)
 			 * Dot is the first resurrected line.
 			 */
 			dot = jp;
-			
+
 			/*
 			 * Account for a shift in the last line (dol).
 			 */
-			 
+
 			 newdol += i;
 		}
 		/*
@@ -1434,17 +1435,17 @@ undo(bool c)
 			undadot = newadot;
 		} else
 			undkind = UNDCHANGE;
- 		/*
- 		 * Now relocate all marks for lines that were modified,
- 		 * since the marks point to lines whose address has 
- 		 * been modified from the save area to the current 
- 		 * area
- 		 */
- 			
- 		for (j=unddol; j> dol; j--) 
- 			for (k=0; k<=25; k++) 
- 				if (names[k] == *(j)) 
- 					names[k]= *((undap1+(j-dolp1)) );
+		/*
+		 * Now relocate all marks for lines that were modified,
+		 * since the marks point to lines whose address has
+		 * been modified from the save area to the current
+		 * area
+		 */
+
+		for (j=unddol; j> dol; j--)
+			for (k=0; k<=25; k++)
+				if (names[k] == *(j))
+					names[k]= *((undap1+(j-dolp1)) );
 	}
 	/*
 	 * Defensive programming - after a munged undadot.
@@ -1623,7 +1624,7 @@ addmac(unsigned char *src, unsigned char *dest, unsigned char *dname,
 		 * We don't let the user rob himself of ":", and making
 		 * multi char words is a bad idea so we don't allow it.
 		 * Note that if user sets mapinput and maps all of return,
-		 * linefeed, and escape, he can hurt himself. This is
+		 * linefeed, and escape, they can hurt themself. This is
 		 * so weird I don't bother to check for it.
 		 */
 		if (isalpha(src[0])  && isascii(src[0]) && src[1] || any(src[0],":"))
@@ -1651,7 +1652,7 @@ addmac(unsigned char *src, unsigned char *dest, unsigned char *dname,
 			zer = slot;	/* remember an empty slot */
 		}
 	}
-	
+
 	if (slot >= MAXNOMACS)
 		error(gettext("Too many macros"));
 
@@ -1805,7 +1806,7 @@ bool quick;
 	}
 	if (!tag_depth)
 		error(gettext("Tagstack empty."));
-	
+
 	/* change to old file */
 	if (strcmp(tagstack[tag_depth-1].tag_file, savedfile) ) {
 		if (!quick) {

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -5412,7 +5413,7 @@ ufs_putapage(struct vnode *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 		}
 		/*
 		 * If the pager is trying to push a page in the bad range
-		 * just tell him to try again later when things are better.
+		 * just tell it to try again later when things are better.
 		 */
 		if (flags & B_ASYNC) {
 			err = EAGAIN;

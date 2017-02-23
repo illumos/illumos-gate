@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -71,7 +72,7 @@
  * By default, an user-supplied health check probe process will
  * also run with the same set of privileges as ILB's built-in
  * probes.  If the administrator has an user-supplied health check
- * program that requires a larger privilege set, he/she will have
+ * program that requires a larger privilege set, they will have
  * to implement setuid program.
  *
  * Each health check will have a timeout, such that if the health

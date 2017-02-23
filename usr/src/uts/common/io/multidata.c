@@ -22,6 +22,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1291,7 +1292,7 @@ mmd_addpattr(multidata_t *mmd, pdesc_t *pd, pattrinfo_t *pai,
 		if (tbl == NULL)
 			return (NULL);
 
-		/* if someone got there first, use his table instead */
+		/* if someone got there first, use their table instead */
 		if ((o_tbl = atomic_cas_ptr(tbl_p, NULL, tbl)) != NULL) {
 			kmem_cache_free(pattbl_cache, tbl);
 			tbl = o_tbl;

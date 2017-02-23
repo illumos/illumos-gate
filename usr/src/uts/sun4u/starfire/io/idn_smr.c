@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * Inter-Domain Network
  *
@@ -378,7 +379,7 @@ smr_slab_alloc(int domid, smr_slab_t **spp)
 		/*
 		 * Have to make a remote request.
 		 * In order to prevent overwhelming the master
-		 * with a bunch of requests that he won't be able
+		 * with a bunch of requests that it won't be able
 		 * to handle we do a check to see if we're still
 		 * under quota.  Note that the limit is known
 		 * apriori based on the SMR/NWR size and
@@ -563,7 +564,7 @@ smr_slab_garbage_collection(smr_slab_t *sp)
  * IMPORTANT: This routine is going to drop the domain rwlock (drwlock)
  *	      for the domain on whose behalf the request is being
  *	      made.  This routine canNOT block on trying to
- *	      reacquire the drwlock.  If he does block then somebody
+ *	      reacquire the drwlock.  If it does block then somebody
  *	      must have the write lock on the domain which most likely
  *	      means the domain is going south anyway, so just bail on
  *	      this buffer.  Higher levels will retry if needed.
@@ -2161,7 +2162,7 @@ smr_remap(struct as *as, register caddr_t vaddr,
 	 * Map the SMR to the new physical address space,
 	 * presumably a remote pfn.  Cannot use hat_devload
 	 * because it will think pfn represents non-memory,
-	 * i.e. space since it may beyond his physmax.
+	 * since it may extend beyond its physmax.
 	 */
 	for (p = 0; p < npgs; p++) {
 		sfmmu_memtte(&tte, new_pfn, PROT_READ | PROT_WRITE | HAT_NOSYNC,

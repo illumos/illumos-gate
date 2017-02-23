@@ -666,6 +666,7 @@ libsip:		libmd5
 libsldap:	libldap5 libscf
 libsmartsshd:	libc libcontract
 libsmbfs:	libkrb5 libsec libidmap pkcs11
+libsmbios:	libdevinfo
 libsrpt:	libstmf
 libstmf:	libscf
 libstmfproxy: 	libstmf libpthread

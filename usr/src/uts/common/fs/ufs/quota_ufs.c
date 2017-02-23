@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -313,8 +314,8 @@ chkdq(struct inode *ip, long change, int force, struct cred *cr,
 
 	/*
 	 * Disallow allocation if it would bring the current usage over
-	 * the hard limit or if the user is over his soft limit and his time
-	 * has run out.
+	 * the hard limit or if the user is over their soft limit and their
+	 * time has run out.
 	 */
 	if (dqp->dq_bhardlimit && ncurblocks >= (uint64_t)dqp->dq_bhardlimit &&
 	    !force) {
@@ -512,8 +513,8 @@ chkiq(struct ufsvfs *ufsvfsp, int change, struct inode *ip, uid_t uid,
 
 	/*
 	 * Dissallow allocation if it would bring the current usage over
-	 * the hard limit or if the user is over his soft limit and his time
-	 * has run out.
+	 * the hard limit or if the user is over their soft limit and their
+	 * time has run out.
 	 */
 	if (change == 1 && ncurfiles >= dqp->dq_fhardlimit &&
 	    dqp->dq_fhardlimit && !force) {

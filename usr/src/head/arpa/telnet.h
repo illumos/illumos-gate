@@ -22,6 +22,7 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -245,10 +246,10 @@ extern char *slc_names[];
  * AUTHENTICATION suboptions
  */
 #define	AUTH_REJECT	0	/* Rejected */
-#define	AUTH_UNKNOWN	1	/* We don't know who he is, but he's okay */
-#define	AUTH_OTHER	2	/* We know him, but not his name */
-#define	AUTH_USER	3	/* We know his name */
-#define	AUTH_VALID	4	/* We know him, and he needs no password */
+#define	AUTH_UNKNOWN	1	/* We don't know who it is, but it's okay */
+#define	AUTH_OTHER	2	/* We know it, but not it's name */
+#define	AUTH_USER	3	/* We know it's name */
+#define	AUTH_VALID	4	/* We know it, and it needs no password */
 
 /*
  * Who is authenticating who ...

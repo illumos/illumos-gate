@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef _SMB_SHARE_H
@@ -181,7 +182,7 @@ extern "C" {
 #define	SMB_SHARE_PRINT_LEN	6
 /*
  * refcnt is currently only used for autohome.  autohome needs a refcnt
- * because a user can map his autohome share from more than one client
+ * because a user can map their autohome share from more than one client
  * at the same time and the share should only be removed when the last
  * one is disconnected
  */

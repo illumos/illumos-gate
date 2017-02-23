@@ -1,6 +1,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ *
  *
     ipv6cp.c - PPP IPV6 Control Protocol.
     Copyright (C) 1999  Tommi Komulainen <Tommi.Komulainen@iki.fi>
@@ -54,7 +56,7 @@
     between BULL S.A. and INRIA).
 
     This software is available with usual "research" terms
-    with the aim of retain credits of the software. 
+    with the aim of retain credits of the software.
     Permission to use, copy, modify and distribute this software for any
     purpose and without fee is hereby granted, provided that the above
     copyright notice and this permission notice appear in all copies,
@@ -93,13 +95,13 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $Id: ipv6cp.c,v 1.9 2000/04/15 01:27:11 masputra Exp $ 
+ * $Id: ipv6cp.c,v 1.9 2000/04/15 01:27:11 masputra Exp $
  */
 
 #define RCSID	"$Id: ipv6cp.c,v 1.9 2000/04/15 01:27:11 masputra Exp $"
 
 /*
- * TODO: 
+ * TODO:
  *
  * Proxy Neighbour Discovery.
  *
@@ -284,16 +286,16 @@ setifaceid(argv, opt)
     char *comma, *arg;
     ipv6cp_options *wo = &ipv6cp_wantoptions[0];
     struct in6_addr addr;
-    
+
 #define VALIDID(a) ( (((a).s6_addr32[0] == 0) && ((a).s6_addr32[1] == 0)) && \
 			(((a).s6_addr32[2] != 0) || ((a).s6_addr32[3] != 0)) )
-    
+
 
     arg = *argv;
 
     comma = strchr(arg, ',');
-    
-    /* 
+
+    /*
      * If comma first character, then no local identifier
      */
     if (comma != arg) {
@@ -304,11 +306,11 @@ setifaceid(argv, opt)
 	    option_error("Illegal interface identifier (local): %s", arg);
 	    return 0;
 	}
-	
+
 	eui64_copy(addr.s6_addr32[2], wo->ourid);
 	wo->opt_local = 1;
     }
-    
+
     /*
      * If comma last character, then no remote identifier
      */
@@ -459,11 +461,11 @@ ipv6cp_resetci(f)
     ipv6cp_options *go = &ipv6cp_gotoptions[f->unit];
 
     wo->req_ifaceid = wo->neg_ifaceid && ipv6cp_allowoptions[f->unit].neg_ifaceid;
-    
+
     if (!wo->opt_local) {
 	eui64_magic_nz(wo->ourid);
     }
-    
+
     *go = *wo;
     eui64_zero(go->hisid);	/* last proposed interface identifier */
 }
@@ -654,12 +656,12 @@ ipv6cp_nakci(f, p, len)
     }
 
     /*
-     * Accept the peer's idea of {our,his} interface identifier, if different
+     * Accept the peer's idea of {our,its} interface identifier, if different
      * from our idea, only if the accept_{local,remote} flag is set.
      */
     NAKCIIFACEID(CI_IFACEID, neg_ifaceid,
 	      if (go->accept_local) {
-		  while (eui64_iszero(ifaceid) || 
+		  while (eui64_iszero(ifaceid) ||
 			 eui64_equals(ifaceid, go->hisid)) /* bad luck */
 		      eui64_magic(ifaceid);
 		  try.ourid = ifaceid;
@@ -711,7 +713,7 @@ ipv6cp_nakci(f, p, len)
 	    try.neg_ifaceid = 1;
 	    eui64_get(ifaceid, p);
 	    if (go->accept_local) {
-		while (eui64_iszero(ifaceid) || 
+		while (eui64_iszero(ifaceid) ||
 		       eui64_equals(ifaceid, go->hisid)) /* bad luck */
 		    eui64_magic(ifaceid);
 		try.ourid = ifaceid;
@@ -840,12 +842,12 @@ ipv6cp_reqci(f, p, lenp, dont_nak)
     nakp = nak_buffer;
 
     /*
-     * Reset all his options.
+     * Reset all its options.
      */
     BZERO(ho, sizeof(*ho));
-    
+
     /*
-     * Process all his options.
+     * Process all its options.
      */
     for (len = *lenp; len > 0; len -= cilen, p = prev + cilen) {
 	newret = CODE_CONFACK;
@@ -881,10 +883,10 @@ ipv6cp_reqci(f, p, lenp, dont_nak)
 	    } else {
 
 		/*
-		 * If he has no interface identifier, or if we both
+		 * If it has no interface identifier, or if we both
 		 * have same identifier then NAK it with new idea.  In
-		 * particular, if we don't know his identifier, but he
-		 * does, then accept it.
+		 * particular, if we don't know his identifier, but it
+		 * does, then accept that identifier.
 		 */
 		eui64_get(ifaceid, p);
 		IPV6CPDEBUG(("(%s)", llv6_ntoa(ifaceid)));
@@ -892,9 +894,9 @@ ipv6cp_reqci(f, p, lenp, dont_nak)
 		    newret = CODE_CONFREJ;		/* Reject CI */
 		    break;
 		}
-		/* If we don't like his ID, then nak it. */
-		if (!eui64_iszero(wo->hisid) && 
-		    !eui64_equals(ifaceid, wo->hisid) && 
+		/* If we don't like its ID, then nak that ID. */
+		if (!eui64_iszero(wo->hisid) &&
+		    !eui64_equals(ifaceid, wo->hisid) &&
 		    eui64_iszero(go->hisid)) {
 		    newret = CODE_CONFNAK;
 		    eui64_copy(wo->hisid, ifaceid);
@@ -904,7 +906,7 @@ ipv6cp_reqci(f, p, lenp, dont_nak)
 		    /* first time, try option */
 		    if (eui64_iszero(go->hisid))
 			eui64_copy(wo->hisid, ifaceid);
-		    while (eui64_iszero(ifaceid) || 
+		    while (eui64_iszero(ifaceid) ||
 			eui64_equals(ifaceid, go->ourid)) /* bad luck */
 			eui64_magic(ifaceid);
 		}
@@ -1006,7 +1008,7 @@ ipv6cp_reqci(f, p, lenp, dont_nak)
     switch (ret) {
     case CODE_CONFACK:
 	*lenp = p - p0;
-	sys_block_proto(PPP_IPV6);	
+	sys_block_proto(PPP_IPV6);
 	break;
     case CODE_CONFNAK:
 	*lenp = nakp - nak_buffer;
@@ -1038,7 +1040,7 @@ ipv6_check_options()
      */
     if ((wo->use_persistent) && (!wo->opt_local) && (!wo->opt_remote)) {
 
-	/* 
+	/*
 	 * On systems where there are no Ethernet interfaces used, there
 	 * may be other ways to obtain a persistent id. Right now, it
 	 * will fall back to using magic [see eui64_magic] below when
@@ -1108,7 +1110,7 @@ ipv6_demand_conf(u)
 #if SIF6UPFIRST
     if (!sif6up(u))
 	return 0;
-#endif    
+#endif
     if (!sif6addr(u, wo->ourid, wo->hisid))
 	return 0;
 #if !SIF6UPFIRST
@@ -1432,7 +1434,7 @@ ipv6cp_printpkt(p, plen, printer, arg)
     if (len < HEADERLEN || len > plen)
 	return 0;
 
-    
+
     printer(arg, " %s id=0x%x", code_name(code, 1), id);
     len -= HEADERLEN;
     switch (code) {

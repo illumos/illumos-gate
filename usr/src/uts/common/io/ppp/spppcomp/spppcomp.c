@@ -3,6 +3,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation is hereby granted, provided that the above copyright
@@ -1186,7 +1187,7 @@ spppcomp_rput(queue_t *q, mblk_t *mp)
 				cp->cp_lastfinish = gethrtime();
 			}
 		} else {
-			/* Deferring; give him a clean slate */
+			/* Deferring; provide a clean slate */
 			cp->cp_fastin = 0;
 #ifdef SPC_DEBUG
 			cp->cp_in_queued++;

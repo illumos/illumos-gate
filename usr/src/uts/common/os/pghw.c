@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/systm.h>
@@ -577,8 +578,8 @@ pghw_cu_kstat_update(kstat_t *ksp, int rw)
 		return (EACCES);
 
 	/*
-	 * Check whether the caller has priv_cpc_cpu privilege. If he doesn't,
-	 * he will not get hardware utilization data.
+	 * Check whether the caller has priv_cpc_cpu privilege. If it doesn't,
+	 * it will not get hardware utilization data.
 	 */
 
 	has_cpc_privilege = (secpolicy_cpc_cpu(crgetcred()) == 0);

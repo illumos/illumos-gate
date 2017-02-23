@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -362,7 +363,7 @@ rdsv3_notify_queue_get(struct rdsv3_sock *rs, struct msghdr *msghdr)
 	 * in the user provided cmsg buffer. We don't try to copy more, to avoid
 	 * losing notifications - except when the buffer is so small that
 	 * it wouldn't
-	 * even hold a single notification. Then we give him as much of this
+	 * even hold a single notification. Then we give as much of this
 	 * single
 	 * msg as we can squeeze in, and set MSG_CTRUNC.
 	 */

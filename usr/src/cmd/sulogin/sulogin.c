@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -777,7 +778,7 @@ childcleanup(int sig)
 
 	/* Only need to kill the child that became the shell. */
 	for (i = 0; i < nchild; i++) {
-		/* Don't kill gramps before his time */
+		/* Don't kill grandparent before it's necessary */
 		if (pidlist[i] != getppid())
 			(void) sigsend(P_PID, pidlist[i], SIGHUP);
 	}

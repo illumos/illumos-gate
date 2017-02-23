@@ -22,6 +22,7 @@
 /*
  * Copyright 2000, 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,7 +95,7 @@ static struct fc_ops_v fov[] = {
 
 /*
  * Allocate a handle for the ops function .. our handle is a resource list
- * Return the handle to our caller, so he can call us with it when we need it.
+ * Return the handle to our caller, so it can call us with it when we need it.
  */
 /*ARGSUSED*/
 fco_handle_t

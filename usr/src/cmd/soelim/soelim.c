@@ -1,6 +1,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -24,7 +25,7 @@
  * This program eliminates .so's from a n/troff input stream.
  * It can be used to prepare safe input for submission to the
  * phototypesetter since the software supporting the operator
- * doesn't let him do chdir.
+ * doesn't let them do chdir.
  *
  * This is a kludge and the operator should be given the
  * ability to do chdir.

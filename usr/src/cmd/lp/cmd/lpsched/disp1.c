@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -547,7 +548,7 @@ s_end_change_request(char *m, MESG *md)
 				rp->request->outcome |= RS_HELD;
 				/*
 				 * To be here means either the user owns
-				 * the request or he or she is the
+				 * the request or they are the
 				 * administrator. Since we don't want to
 				 * set the RS_ADMINHELD flag if the user
 				 * is the administrator, the following

@@ -24,6 +24,7 @@
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  * Copyright (c) 2017 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -10567,7 +10568,7 @@ ip_snmp_get_mib2_ip_route_media(queue_t *q, mblk_t *mpctl, int level,
 
 	/*
 	 * make copies of the original message
-	 *	- mp2ctl is returned unchanged to the caller for his use
+	 *	- mp2ctl is returned unchanged to the caller for its use
 	 *	- mpctl is sent upstream as ipRouteEntryTable
 	 *	- mp3ctl is sent upstream as ipNetToMediaEntryTable
 	 *	- mp4ctl is sent upstream as ipRouteAttributeTable
@@ -10652,7 +10653,7 @@ ip_snmp_get_mib2_ip6_route_media(queue_t *q, mblk_t *mpctl, int level,
 
 	/*
 	 * make copies of the original message
-	 *	- mp2ctl is returned unchanged to the caller for his use
+	 *	- mp2ctl is returned unchanged to the caller for its use
 	 *	- mpctl is sent upstream as ipv6RouteEntryTable
 	 *	- mp3ctl is sent upstream as ipv6NetToMediaEntryTable
 	 *	- mp4ctl is sent upstream as ipv6RouteAttributeTable

@@ -1,6 +1,7 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -49,7 +50,7 @@ dinit(tchar *hp)
 	/*
 	 * If this is a login shell, we should have a home directory.  But,
 	 * if we got here via 'su - <user>' where the user has no directory
-	 * in his passwd file, then su has passed HOME=<nothing>, so hp is
+	 * in their passwd file, then su has passed HOME=<nothing>, so hp is
 	 * non-null, but has zero length.  Thus, we do not know the current
 	 * working directory based on the home directory.
 	 */

@@ -25,6 +25,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -185,7 +186,7 @@ void			do_printer ()
 	/*
 	 * Mount or unmount form, print-wheel.
 	 */
-	if (M) 
+	if (M)
 		do_mount(p, (f? f : (char *)0), (S? *S : (char *)0));
 	else if (t) do_max_trays(p);
 
@@ -312,7 +313,7 @@ Done:
 	if (r) {
 		if (STREQU(r, NAME_ALL) || STREQU(r, NAME_ANY))
 			fromallclasses(p);
-		else 
+		else
 			fromclass(p, r);
 	}
 
@@ -382,7 +383,7 @@ static void		configure_printer (list)
 		/*
 		 * If we are making this a local printer, make
 		 * sure that some local-only attributes are set.
-		 * (If the user has specified these as well, his/her
+		 * (If the user has specified these as well, their
 		 * values will overwrite what we set here.)
 		 */
 		} else if (oldp->remote) {
@@ -685,7 +686,7 @@ char			*nameit (cmd)
 {
 	register char		*nm = getname(),
 				*copy = malloc(
-					(unsigned) (strlen(cmd) + 1 + 
+					(unsigned) (strlen(cmd) + 1 +
 					strlen(nm) + 1)
 	);
 

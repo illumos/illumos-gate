@@ -8,21 +8,22 @@
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
  * the License at http://www.mozilla.org/NPL/
- *  
+ *
  * Software distributed under the License is distributed on an "AS
  * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
- *  
+ *
  * The Original Code is Mozilla Communicator client code, released
  * March 31, 1998.
- * 
+ *
  * The Initial Developer of the Original Code is Netscape
  * Communications Corporation. Portions created by Netscape are
  * Copyright (C) 1998-1999 Netscape Communications Corporation. All
  * Rights Reserved.
- * 
- * Contributor(s): 
+ *
+ * Contributor(s):
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -75,7 +76,7 @@ static int wait4result( LDAP *ld, int msgid, struct berval **servercredp,
 static int parse_result( LDAP *ld, LDAPMessage *res,
 	struct berval **servercredp, char *msg, int freeit );
 
-#ifdef LDAPTOOL_DEBUG_MEMORY   
+#ifdef LDAPTOOL_DEBUG_MEMORY
 static void *ldaptool_debug_malloc( size_t size );
 static void *ldaptool_debug_calloc( size_t nelem, size_t elsize );
 static void *ldaptool_debug_realloc( void *ptr, size_t size );
@@ -263,7 +264,7 @@ static char             *ssl_donglefile = NULL;
 #if 0
 static char             *pkcs_pin = NULL;
 #endif
-static struct ldapssl_pkcs_fns local_pkcs_fns = 
+static struct ldapssl_pkcs_fns local_pkcs_fns =
     {0,NULL,NULL,NULL,NULL,NULL,NULL,NULL, NULL };
 
 #ifdef FORTEZZA
@@ -582,15 +583,15 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
 	    /* This option removed to prevent interference
 	       with the getEffectiveRights option, also -X
 	       case 'X':	* path to FORTEZZA CKL file *
-	       
+
 	       fortezza_krlfile = strdup( optarg );
-	       
-	       
+
+
 	       break;
 	    */
 	case 'I':	/* FORTEZZA PIN (password file) */
 	    ssl_donglefile = strdup( optarg );
-	    
+
 	    break;
 #endif /* LDAP_TOOL_PKCS11 */
 
@@ -634,7 +635,7 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
 		perror( "malloc" );
 		exit( LDAP_NO_MEMORY );
 	    }
-		
+
 	    break;
 	case 'k':   /* conversion directory */
 	    ldaptool_convdir = strdup( optarg );
@@ -672,9 +673,9 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
 	    }
 	    ldctrl = calloc(1,sizeof(LDAPControl));
 	    if (ctrl_value) {
-		rc = ldaptool_berval_from_ldif_value( ctrl_value, 
+		rc = ldaptool_berval_from_ldif_value( ctrl_value,
 			vlen, &(ldctrl->ldctl_value),
-			1 /* recognize file URLs */, 
+			1 /* recognize file URLs */,
 			0 /* always try file */,
 			1 /* report errors */ );
 		if ((rc = ldaptool_fileurlerr2ldaperr( rc )) != LDAP_SUCCESS) {
@@ -704,7 +705,7 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
     /* If '-Z' is specified, check if '-P' is specified too. */
     if ( isN || isW ) {
 	if ( !isZ ) {
-		fprintf( stderr, gettext("%s: with -N, -W options, please specify -Z\n\n"), ldaptool_progname ); 
+		fprintf( stderr, gettext("%s: with -N, -W options, please specify -Z\n\n"), ldaptool_progname );
 		return (-1);
 	}
     }
@@ -815,14 +816,14 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
 
 #ifdef HAVE_SASL_OPTIONS
     if (ldapauth == LDAP_AUTH_SASL) {
-	/* BindDN not required for SASL */ 
+	/* BindDN not required for SASL */
 	ldaptool_require_binddn = 0;
     }
 #endif	/* HAVE_SASL_OPTIONS */
 
 #ifdef NET_SSL
     if (secure == 1) {
-	/* BindDN not required for SSL */ 
+	/* BindDN not required for SSL */
 	ldaptool_require_binddn = 0;
     }
 #endif	/* NET_SSL */
@@ -853,7 +854,7 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
 #ifdef LDAP_TOOL_PKCS11
     if ((NULL != pkcs_token) && (NULL != ssl_certname)) {
 	char *result;
-	
+
 	if ( (result = buildTokenCertName( pkcs_token, ssl_certname)) != NULL){
 	    free( ssl_certname );
 	    ssl_certname = result;
@@ -889,15 +890,15 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
 static void
 print_library_info( const LDAPAPIInfo *aip, FILE *fp )
 {
-    int                 i;                                                      
-    LDAPAPIFeatureInfo  fi;         
+    int                 i;
+    LDAPAPIFeatureInfo  fi;
 
     fprintf( fp, gettext("LDAP Library Information -\n"
 	    "    Highest supported protocol version: %d\n"
 	    "    LDAP API revision:                  %d\n"
 	    "    API vendor name:                    %s\n"
 	    "    Vendor-specific version:            %.2f\n"),
-	    aip->ldapai_protocol_version, aip->ldapai_api_version, 
+	    aip->ldapai_protocol_version, aip->ldapai_api_version,
 	    aip->ldapai_vendor_name,
 	    (float)aip->ldapai_vendor_version / 100.0 );
 
@@ -929,9 +930,9 @@ print_library_info( const LDAPAPIInfo *aip, FILE *fp )
 #ifdef LDAP_TOOL_ARGPIN
 static int PinArgRegistration( void )
 {
-    
+
     /* pkcs_init was successful  register the pin args */
-    
+
     SVRCOREArgPinObj *ArgPinObj;
     char *tokenName;
 #ifndef _WIN32
@@ -982,7 +983,7 @@ static int PinArgRegistration( void )
 
 	}
 	SVRCORE_RegisterPinObj((SVRCOREPinObj *)ArgPinObj);
-	
+
     }
     else
     {
@@ -1015,7 +1016,7 @@ static int PinArgRegistration( void )
     }
 #endif
     return LDAP_SUCCESS;
-    
+
 }
 #endif /* LDAP_TOOL_ARGPIN */
 
@@ -1034,7 +1035,7 @@ ldaptool_ldap_init( int second_host )
     if ( ldaptool_not ) {
 	return( NULL );
     }
-    
+
     if ( second_host ) {
 	host = ldaptool_host2;
 	port = ldaptool_port2;
@@ -1059,7 +1060,7 @@ ldaptool_ldap_init( int second_host )
 #ifdef LDAP_TOOL_PKCS11
     ldaptool_setcallbacks( &local_pkcs_fns );
 
-    if ( !second_host 	&& secure  
+    if ( !second_host 	&& secure
 	 &&(rc = ldapssl_pkcs_init( &local_pkcs_fns))  < 0) {
 	    /* secure connection requested -- fail if no SSL */
 #ifndef SOLARIS_LDAP_CMD
@@ -1079,7 +1080,7 @@ ldaptool_ldap_init( int second_host )
 #endif /* LDAP_TOOL_ARGPIN */
 
 #else /* LDAP_TOOL_PKCS11 */
-    if ( !second_host 	&& secure  
+    if ( !second_host 	&& secure
 	 &&(rc = ldapssl_client_init( ssl_certdbpath, NULL )) < 0) {
 	    /* secure connection requested -- fail if no SSL */
 #ifndef SOLARIS_LDAP_CMD
@@ -1102,7 +1103,7 @@ ldaptool_ldap_init( int second_host )
 	if ( !user_port ) {
 	    port = LDAPS_PORT;
 	}
-	
+
 	if (( ld = ldapssl_init( host, port,
 		secure )) != NULL && ssl_certname != NULL )
 	    if (ldapssl_enable_clientauth( ld, ssl_keydbpath, ssl_passwd,
@@ -1237,7 +1238,7 @@ ldaptool_bind( LDAP *ld )
               return;
            }
         }
-       
+
         defaults = ldaptool_set_sasl_defaults( ld, sasl_mech, sasl_authid, sasl_username, passwd, sasl_realm );
         if (defaults == NULL) {
 	   perror ("malloc");
@@ -1636,14 +1637,14 @@ parse_result( LDAP *ld, LDAPMessage *res, struct berval **servercredp,
 	    if ( 0 == strcmp( ctrls[i]->ldctl_oid,
 			LDAP_CONTROL_PWEXPIRING )) {
 
-		    /* Warn the user his passwd is to expire */
-		    errno = 0;	
+		    /* Warn the user that their passwd is to expire */
+		    errno = 0;
 		    pw_secs = atoi(ctrls[i]->ldctl_value.bv_val);
 		    if ( pw_secs > 0  && errno != ERANGE ) {
 			if ( pw_secs > 86400 ) {
 				pw_days = ( pw_secs / 86400 );
 				pw_secs = ( pw_secs % 86400 );
-			} 
+			}
 			if ( pw_secs > 3600 ) {
 				pw_hrs = ( pw_secs / 3600 );
 				pw_secs = ( pw_secs % 3600 );
@@ -1664,7 +1665,7 @@ parse_result( LDAP *ld, LDAPMessage *res, struct berval **servercredp,
 				printf (gettext("%d mins, "), pw_mins);
 			}
 			printf(gettext("%d seconds.\n"), pw_secs);
-			
+
 		   }
 		}
 	}
@@ -1727,7 +1728,7 @@ ldaptool_create_proxyauth_control( LDAP *ld )
 {
     LDAPControl	*ctl = NULL;
     int rc;
-    
+
 
     if ( !proxyauth_id)
 	return( NULL );
@@ -1737,7 +1738,7 @@ ldaptool_create_proxyauth_control( LDAP *ld )
     } else {
 	rc = ldap_create_proxyauth_control( ld, proxyauth_id, 1, &ctl);
     }
-    if ( rc != LDAP_SUCCESS) 
+    if ( rc != LDAP_SUCCESS)
     {
 	if (ctl)
 	    ldap_control_free( ctl);
@@ -1753,11 +1754,11 @@ ldaptool_create_geteffectiveRights_control ( LDAP *ld, const char *authzid,
 {
     LDAPControl	*ctl = NULL;
     int rc;
-    
+
 	rc = ldap_create_geteffectiveRights_control( ld, authzid, attrlist, 1,
 							&ctl);
- 
-    if ( rc != LDAP_SUCCESS) 
+
+    if ( rc != LDAP_SUCCESS)
     {
 		if (ctl)
 	    	ldap_control_free( ctl);
@@ -1771,7 +1772,7 @@ ldaptool_create_geteffectiveRights_control ( LDAP *ld, const char *authzid,
 void
 ldaptool_add_control_to_array( LDAPControl *ctrl, LDAPControl **array)
 {
-    
+
     int i;
     for (i=0; i< CONTROL_REQUESTS; i++)
     {
@@ -1822,7 +1823,7 @@ calculate_ctrl_value( const char *value,
     if ( b64 ) {
 	if (( *vlen = ldif_base64_decode( (char *)value,
 		(unsigned char *)value )) < 0 ) {
-	    fprintf( stderr, 
+	    fprintf( stderr,
 		gettext("Unable to decode base64 control value \"%s\"\n"), value);
 	    return( -1 );
 	}
@@ -1834,7 +1835,7 @@ calculate_ctrl_value( const char *value,
 
 /*
  * Parse the optarg from -J option of ldapsearch
- * and within LDIFfile for ldapmodify. Take ctrl_arg 
+ * and within LDIFfile for ldapmodify. Take ctrl_arg
  * (the whole string) and divide it into oid, criticality
  * and value. This function breaks down original ctrl_arg
  * with '\0' in places. Also, calculate length of valuestring.
@@ -1854,7 +1855,7 @@ ldaptool_parse_ctrl_arg(char *ctrl_arg, char sep,
 
     strict = (sep == ' ' ? 1 : 0);
     if(!(s=strchr(ctrl_arg, sep))) {
-	/* Possible values of ctrl_arg are 
+	/* Possible values of ctrl_arg are
 	 * oid[:value|::b64value|:<fileurl] within LDIF, i.e. sep=' '
 	 * oid from command line option, i.e. sep=':'
 	 */
@@ -1899,7 +1900,7 @@ ldaptool_parse_ctrl_arg(char *ctrl_arg, char sep,
 	    }
 	}
 	else {
-	    if (*(s+1) == '\0') { 
+	    if (*(s+1) == '\0') {
 	        fprintf( stderr, gettext("missing value\n") );
 	        return ( -1 );
 	    }
@@ -1996,7 +1997,7 @@ ldaptool_berval_is_ascii( const struct berval *bvp )
 }
 
 
-#ifdef LDAP_DEBUG_MEMORY   
+#ifdef LDAP_DEBUG_MEMORY
 #define LDAPTOOL_ALLOC_FREED	0xF001
 #define LDAPTOOL_ALLOC_INUSE	0xF002
 
@@ -2139,7 +2140,7 @@ certpath2keypath( char *certdbpath )
 	    strcasecmp( "cert.db", keydbpath + len - 7 ) == 0 ) {
 	striplen = 7;
 	appendstr = "key.db";
-	
+
     } else if ( len > 8 &&
 	    strcasecmp( "cert5.db", keydbpath + len - 8 ) == 0 ) {
 	striplen = 8;
@@ -2163,15 +2164,15 @@ certpath2keypath( char *certdbpath )
 }
 
 #ifdef LDAP_TOOL_PKCS11
-static 
-char * 
+static
+char *
 buildTokenCertName( const char *tokenName, const char *certName)
 {
-    
+
     int tokenlen = strlen(tokenName);
     int len = tokenlen + strlen(certName) +2;
     char *result;
-    
+
     if (( result = malloc( len )) != NULL) {
 	strcpy(result, tokenName);
 	*(result+tokenlen) = ':';
@@ -2190,7 +2191,7 @@ static
 int
 ldaptool_getcertpath( void *context, char **certlocp )
 {
-    
+
     *certlocp = ssl_certdbpath;
     if ( ldaptool_verbose ) {
 	if (ssl_certdbpath)
@@ -2201,15 +2202,15 @@ ldaptool_getcertpath( void *context, char **certlocp )
 	{
 	    printf(gettext("ldaptool_getcertpath -- (null)\n"));
 	}
-	
+
     }
     return LDAP_SUCCESS;
 }
 
 int
 ldaptool_getcertname( void *context, char **certnamep )
-{ 
-    
+{
+
    *certnamep = ssl_certname;
     if ( ldaptool_verbose ) {
 	if (ssl_certname)
@@ -2238,14 +2239,14 @@ ldaptool_getkeypath(void *context, char **keylocp )
 	    printf(gettext("ldaptool_getkeypath -- (null)\n"));
 	}
     }
-    
+
     return LDAP_SUCCESS;
 }
 
 int
 ldaptool_gettokenname( void *context, char **tokennamep )
 {
-    
+
     *tokennamep = pkcs_token;
     if ( ldaptool_verbose ) {
 	if (pkcs_token)
@@ -2263,19 +2264,19 @@ ldaptool_gettokenname( void *context, char **tokennamep )
 int
 ldaptool_gettokenpin( void *context, const char *tokennamep, char **tokenpinp)
 {
-  
+
 #if 0
   char *localtoken;
 #endif
 
-/* XXXceb this stuff is removed for the time being.  
+/* XXXceb this stuff is removed for the time being.
  * This function should return the pin from ssl_password
  */
 
 
   *tokenpinp = ssl_passwd;
   return LDAP_SUCCESS;
-  
+
 #if 0
 
   ldaptool_gettokenname( NULL, &localtoken);
@@ -2283,7 +2284,7 @@ ldaptool_gettokenpin( void *context, const char *tokennamep, char **tokenpinp)
   if (strcmp( localtoken, tokennamep))
 
       *tokenpinp = pkcs_pin;
-   else 
+   else
       *tokenpinp = NULL;
 
     if ( ldaptool_verbose ) {
@@ -2314,7 +2315,7 @@ ldaptool_getmodpath( void *context, char **modulep )
 	    printf(gettext("ldaptool_getmodpath -- (null)\n"));
 	}
     }
-    
+
     return LDAP_SUCCESS;
 }
 
@@ -2331,9 +2332,9 @@ ldaptool_getdonglefilename( void *context, char **filename )
 	{
 	    printf(gettext("ldaptool_getdonglefilename -- (null)\n"));
 	}
-	
+
     }
-    
+
     return LDAP_SUCCESS;
 }
 
@@ -2469,11 +2470,11 @@ ldaptool_boolean_str2value ( const char *ptr, int strict )
 	     !(strcmp(ptr, "0")) ) {
 	    	return (0);
 	}
-	else { 
+	else {
 	    return (-1);
-	}	
+	}
     }
-} 
+}
 
 FILE *
 ldaptool_open_file(const char *filename, const char *mode)
@@ -2559,7 +2560,7 @@ void L_Remove(Element *Node, Head *HeadNode)
 #endif
 
 #ifdef HAVE_SASL_OPTIONS
-/* 
+/*
  * Function checks for valid args, returns an error if not found
  * and sets SASL params from command line
  */
@@ -2576,7 +2577,7 @@ saslSetParam(char *saslarg)
 	}
 	*attr = '\0';
 	attr++;
-	    
+
 	if (!strcasecmp(saslarg, "secProp")) {
 	     if ( sasl_secprops != NULL ) {
                 fprintf( stderr, gettext("secProp previously specified\n"));
@@ -2625,7 +2626,7 @@ saslSetParam(char *saslarg)
 	} else {
 	     fprintf (stderr, gettext("Invalid attribute name %s\n"), saslarg);
 	     return (-1);
-	} 
+	}
 	return 0;
 }
 #endif	/* HAVE_SASL_OPTIONS */

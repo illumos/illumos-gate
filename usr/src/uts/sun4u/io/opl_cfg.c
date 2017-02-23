@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -678,7 +679,7 @@ opl_set_node(dev_info_t *node, void *arg, uint_t flags)
  * callbacks. The create() callback is used to set the properties of a
  * newly created node. The other callback is used to return a pointer
  * to the newly created node. The create() callback is passed by the
- * caller of this function based on the kind of node he wishes to
+ * caller of this function based on the kind of node it wishes to
  * create.
  *
  * e_ddi_branch_create() returns with the newly created node held. We

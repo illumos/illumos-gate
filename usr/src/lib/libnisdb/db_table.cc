@@ -26,6 +26,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 RackTop Systems.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -192,7 +193,7 @@ db_free_list::push(entryp tabloc)
  * n1 is the number of entries that should be in the freelist.
  * n2 is the number of entries actually found in the freelist.
  * [loc1...locn] are the entries.   n2 <= n1 because we never count beyond n1.
- * It is up to the caller to free the returned vector when he is through.
+ * It is up to the caller to free the returned vector when it is through.
 */
 long *
 db_free_list::stats(int nslots)
@@ -738,7 +739,7 @@ db_table::delete_entry(entryp where)
 /*
  * Returns statistics of table.
  * [vector_size][table_size][last_used][count][freelist].
- * It is up to the caller to free the returned vector when his is through.
+ * It is up to the caller to free the returned vector when it is through.
  * The free list is included if 'fl' is TRUE.
 */
 long *

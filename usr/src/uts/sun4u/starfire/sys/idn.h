@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  *
  * Inter-Domain Network
  */
@@ -1833,7 +1834,7 @@ typedef struct idn_timerq	idn_timerq_t;
  * A fixed-size circular buffer is maintained as a queue of
  * incoming interrupts.  The low-level idn_dmv_handler() waits
  * for an entry to become FREE and will atomically mark it INUSE.
- * Once he has filled in the appropriate fields it will be marked
+ * Once it has filled in the appropriate fields it will be marked
  * as READY.  The high-level idn_handler() will be invoked and will
  * process all messages in the queue that are READY.  Each message
  * is marked PROCESS, a protojob job created and filled in, and

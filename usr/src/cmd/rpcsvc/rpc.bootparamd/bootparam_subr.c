@@ -22,6 +22,7 @@
 /*
  * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -177,8 +178,8 @@ bootparamproc_getfile_1(bp_getfile_arg *argp, CLIENT *cl)
 	 *
 	 *	file_key=server_hostname:path_on_server
 	 *
-	 * In the getfile RPC call, the client gives us his hostname
-	 * and a file_key.  We lookup his client entry, then locate a
+	 * In the getfile RPC call, the client gives us its hostname
+	 * and a file_key.  We lookup its client entry, then locate a
 	 * file entry matching that file_key.  We then parse out the
 	 * server_hostname and path_on_server from the file entry, map
 	 * the server_hostname to an IP address, and return both the

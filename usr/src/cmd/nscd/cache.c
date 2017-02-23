@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -1276,7 +1277,7 @@ check_config(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 	}
 
 	/*
-	 * if caller requests lookup using his
+	 * if caller requests lookup using its
 	 * own nsswitch config, bypass cache
 	 */
 	if (nsw_config_in_phdr(largs->buffer))

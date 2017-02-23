@@ -24,6 +24,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -602,7 +603,7 @@ copy(char *jobfile, FILE *inputfile, int when)
 	/*
 	 * Fix for 1053807:
 	 * Determine what shell we should use to run the job. If the user
-	 * didn't explicitly request that his/her current shell be over-
+	 * didn't explicitly request that their current shell be over-
 	 * ridden (shflag or cshflag), then we use the current shell.
 	 */
 	if (cshflag)

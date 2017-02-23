@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -247,7 +248,7 @@ pg_lnk_tbl_delete(delete_info_t *dip, const delete_ent_t *ent)
 
 	/*
 	 * For non-persistent backends, we could only have one parent, and
-	 * he's already been deleted.
+	 * it's already been deleted.
 	 *
 	 * For normal backends, we need to check to see if we're in
 	 * a snapshot or are the active generation for the property

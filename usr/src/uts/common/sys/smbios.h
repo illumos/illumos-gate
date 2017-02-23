@@ -46,13 +46,18 @@
 extern "C" {
 #endif
 
+typedef enum smbios_entry_point_type {
+	SMBIOS_ENTRY_POINT_21,
+	SMBIOS_ENTRY_POINT_30
+} smbios_entry_point_t;
+
 /*
  * SMBIOS Structure Table Entry Point.  See DSP0134 5.2.1 for more information.
  * The structure table entry point is located by searching for the anchor.
  */
 #pragma pack(1)
 
-typedef struct smbios_entry {
+typedef struct smbios_21_entry {
 	char smbe_eanchor[4];		/* anchor tag (SMB_ENTRY_EANCHOR) */
 	uint8_t smbe_ecksum;		/* checksum of entry point structure */
 	uint8_t smbe_elen;		/* length in bytes of entry point */
@@ -67,12 +72,37 @@ typedef struct smbios_entry {
 	uint32_t smbe_staddr;		/* physical addr of structure table */
 	uint16_t smbe_stnum;		/* number of structure table entries */
 	uint8_t smbe_bcdrev;		/* BCD value representing DMI version */
+} smbios_21_entry_t;
+
+/*
+ * The 64-bit SMBIOS 3.0 Entry Point.  See DSP0134 5.2.2 for more information.
+ * The structure table entry point is located by searching for the anchor.
+ */
+
+typedef struct smbios_30_entry {
+	char smbe_eanchor[5];		/* anchor tag (SMB3_ENTRY_EANCHOR) */
+	uint8_t smbe_ecksum;		/* checksum of entry point structure */
+	uint8_t smbe_elen;		/* length in bytes of entry point */
+	uint8_t smbe_major;		/* major version of the SMBIOS spec */
+	uint8_t smbe_minor;		/* minor version of the SMBIOS spec */
+	uint8_t smbe_docrev;		/* specification docrev */
+	uint8_t smbe_revision;		/* entry point structure revision */
+	uint8_t smbe_reserved;
+	uint32_t smbe_stlen;		/* length in bytes of structure table */
+	uint64_t smbe_staddr;		/* physical addr of structure table */
+} smbios_30_entry_t;
+
+typedef union {
+	smbios_21_entry_t ep21;
+	smbios_30_entry_t ep30;
 } smbios_entry_t;
 
 #pragma pack()
 
 #define	SMB_ENTRY_EANCHOR	"_SM_"	/* structure table entry point anchor */
 #define	SMB_ENTRY_EANCHORLEN	4	/* length of entry point anchor */
+#define	SMB3_ENTRY_EANCHOR	"_SM3_"	/* structure table entry point anchor */
+#define	SMB3_ENTRY_EANCHORLEN	5	/* length of entry point anchor */
 #define	SMB_ENTRY_IANCHOR	"_DMI_"	/* intermediate anchor string */
 #define	SMB_ENTRY_IANCHORLEN	5	/* length of intermediate anchor */
 #define	SMB_ENTRY_MAXLEN	255	/* maximum length of entry point */
@@ -1443,7 +1473,9 @@ extern int smbios_lookup_id(smbios_hdl_t *, id_t, smbios_struct_t *);
 extern int smbios_lookup_type(smbios_hdl_t *, uint_t, smbios_struct_t *);
 extern int smbios_iter(smbios_hdl_t *, smbios_struct_f *, void *);
 
-extern void smbios_info_smbios(smbios_hdl_t *, smbios_entry_t *);
+extern smbios_entry_point_t smbios_info_smbios(smbios_hdl_t *,
+    smbios_entry_t *);
+extern void smbios_info_smbios_version(smbios_hdl_t *, smbios_version_t *);
 extern int smbios_info_common(smbios_hdl_t *, id_t, smbios_info_t *);
 extern int smbios_info_contains(smbios_hdl_t *, id_t, uint_t, id_t *);
 extern id_t smbios_info_bios(smbios_hdl_t *, smbios_bios_t *);

@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -690,7 +691,7 @@ inittab_encode_e(const dhcp_symbol_t *ie, const char *value, uint16_t *lengthp,
 						/*
 						 * User terminated \D or \DD
 						 * with non-digit.  An error,
-						 * but we can assume he means
+						 * but we can assume they mean
 						 * to treat as \00D or \0DD.
 						 */
 						*optstart++ = val;
