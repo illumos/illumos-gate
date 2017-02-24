@@ -177,8 +177,6 @@ extern long lx_shmget(key_t, size_t, int);
 extern long lx_shmat(int, void *, int);
 extern long lx_shmctl(int, int, void *);
 
-extern long lx_eventfd(unsigned int);
-extern long lx_eventfd2(unsigned int, int);
 extern long lx_getgroups(int, gid_t *);
 extern long lx_inotify_add_watch(int, const char *, uint32_t);
 extern long lx_inotify_init(void);

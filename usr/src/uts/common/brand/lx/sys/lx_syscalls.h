@@ -60,6 +60,8 @@ extern long lx_epoll_create1();
 extern long lx_epoll_ctl();
 extern long lx_epoll_pwait();
 extern long lx_epoll_wait();
+extern long lx_eventfd();
+extern long lx_eventfd2();
 extern long lx_faccessat();
 extern long lx_fadvise64();
 extern long lx_fadvise64_32();
