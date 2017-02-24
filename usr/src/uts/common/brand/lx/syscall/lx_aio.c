@@ -97,6 +97,7 @@
 
 #include <sys/lx_brand.h>
 #include <sys/lx_syscalls.h>
+#include <sys/lx_misc.h>
 #include <lx_errno.h>
 
 /* These constants match Linux */
@@ -188,8 +189,11 @@ typedef struct lx_iocb {
 typedef struct lx_io_elem {
 	list_node_t	lxioelem_link;
 	uint16_t	lxioelem_op;		/* operation */
-	uint32_t	lxioelem_fd;		/* file descriptor */
+	uint16_t	lxioelem_flags;		/* bits from lxiocb_flags */
+	int		lxioelem_fd;		/* file descriptor */
 	file_t		*lxioelem_fp;		/* getf() file pointer */
+	int		lxioelem_resfd;		/* RESFD file descriptor */
+	file_t		*lxioelem_resfp;	/* RESFD getf() file pointer */
 	void		*lxioelem_buf;		/* data buffer */
 	uint64_t	lxioelem_nbytes;	/* number of bytes */
 	int64_t		lxioelem_offset;	/* offset in file */
@@ -302,6 +306,12 @@ lx_io_cp_rele(lx_io_ctx_t *cp)
 	while ((ep = list_remove_head(&cp->lxioctx_pending)) != NULL) {
 		set_active_fd(ep->lxioelem_fd);
 		releasef(ep->lxioelem_fd);
+
+		if (ep->lxioelem_flags & LX_IOCB_FLAG_RESFD) {
+			set_active_fd(ep->lxioelem_resfd);
+			releasef(ep->lxioelem_resfd);
+		}
+
 		kmem_free(ep, sizeof (lx_io_elem_t));
 	}
 
@@ -407,13 +417,54 @@ lx_io_worker(void *a)
 		mutex_exit(&cp->lxioctx_p_lock);
 
 		while (ep != NULL) {
+			boolean_t do_resfd;
+			int resfd = 0;
+			file_t *resfp = NULL;
+
 			lx_io_do_op(ep);
+
+			if (ep->lxioelem_flags & LX_IOCB_FLAG_RESFD) {
+				do_resfd = B_TRUE;
+				resfd = ep->lxioelem_resfd;
+				resfp = ep->lxioelem_resfp;
+			} else {
+				do_resfd = B_FALSE;
+			}
+
+			ep->lxioelem_flags = 0;
+			ep->lxioelem_resfd = 0;
+			ep->lxioelem_resfp = NULL;
 
 			mutex_enter(&cp->lxioctx_d_lock);
 			list_insert_tail(&cp->lxioctx_done, ep);
 			cp->lxioctx_done_cnt++;
 			cv_signal(&cp->lxioctx_done_cv);
 			mutex_exit(&cp->lxioctx_d_lock);
+
+			/* Update the eventfd if necessary */
+			if (do_resfd) {
+				vnode_t *vp = resfp->f_vnode;
+				struct uio auio;
+				struct iovec aiov;
+				uint64_t val = 1;
+
+				aiov.iov_base = (caddr_t)&val;
+				aiov.iov_len = sizeof (val);
+				auio.uio_iov = &aiov;
+				auio.uio_iovcnt = 1;
+				auio.uio_loffset = 0;
+				auio.uio_offset = 0;
+				auio.uio_resid = sizeof (val);
+				auio.uio_segflg = UIO_SYSSPACE;
+				auio.uio_fmode = FWRITE | FNONBLOCK;
+
+				set_active_fd(resfd);
+
+				(void) VOP_WRITE(vp, &auio, FWRITE,
+				    resfp->f_cred, NULL);
+
+				releasef(resfd);
+			}
 
 			if (cp->lxioctx_shutdown)
 				break;
@@ -685,7 +736,7 @@ lx_io_submit(lx_aio_context_t cid, const long nr, uintptr_t **bpp)
 
 	for (i = 0; i < nr; i++) {
 		lx_iocb_t cb;
-		file_t *fp;
+		file_t *fp, *resfp = NULL;
 
 		if (cp->lxioctx_shutdown)
 			break;
@@ -695,8 +746,8 @@ lx_io_submit(lx_aio_context_t cid, const long nr, uintptr_t **bpp)
 			break;
 		}
 
-		/* We don't currently support eventfd-based notification. */
-		if (cb.lxiocb_flags & LX_IOCB_FLAG_RESFD) {
+		/* There is only one valid flag */
+		if (cb.lxiocb_flags & ~LX_IOCB_FLAG_RESFD) {
 			err = EINVAL;
 			break;
 		}
@@ -769,10 +820,24 @@ lx_io_submit(lx_aio_context_t cid, const long nr, uintptr_t **bpp)
 			break;
 		}
 
+		if (cb.lxiocb_flags & LX_IOCB_FLAG_RESFD) {
+			if ((resfp = getf(cb.lxiocb_resfd)) == NULL ||
+			    !lx_is_eventfd(resfp)) {
+				err = EINVAL;
+				releasef(cb.lxiocb_fd);
+				if (resfp != NULL)
+					releasef(cb.lxiocb_resfd);
+				break;
+			}
+		}
+
 		mutex_enter(&cp->lxioctx_f_lock);
 		if (cp->lxioctx_free_cnt == 0) {
 			mutex_exit(&cp->lxioctx_f_lock);
 			releasef(cb.lxiocb_fd);
+			if (cb.lxiocb_flags & LX_IOCB_FLAG_RESFD) {
+				releasef(cb.lxiocb_resfd);
+			}
 			if (i == 0) {
 				/*
 				 * Another thread used all of the free entries
@@ -799,6 +864,13 @@ lx_io_submit(lx_aio_context_t cid, const long nr, uintptr_t **bpp)
 
 		/* Hang on to the fp but setup to hand it off to a worker */
 		clear_active_fd(cb.lxiocb_fd);
+
+		if (cb.lxiocb_flags & LX_IOCB_FLAG_RESFD) {
+			ep->lxioelem_flags = LX_IOCB_FLAG_RESFD;
+			ep->lxioelem_resfd = cb.lxiocb_resfd;
+			ep->lxioelem_resfp = resfp;
+			clear_active_fd(cb.lxiocb_resfd);
+		}
 
 		mutex_enter(&cp->lxioctx_p_lock);
 		list_insert_tail(&cp->lxioctx_pending, ep);
@@ -1015,6 +1087,14 @@ lx_io_cancel(lx_aio_context_t cid, lx_iocb_t *iocbp, lx_io_event_t *result)
 	releasef(ep->lxioelem_fd);
 	ep->lxioelem_fd = 0;
 	ep->lxioelem_fp = NULL;
+
+	if (ep->lxioelem_flags & LX_IOCB_FLAG_RESFD) {
+		set_active_fd(ep->lxioelem_resfd);
+		releasef(ep->lxioelem_resfd);
+		ep->lxioelem_flags = 0;
+		ep->lxioelem_resfd = 0;
+		ep->lxioelem_resfp = NULL;
+	}
 
 	ev.lxioe_data = ep->lxioelem_cbp->lxiocb_data;
 	ev.lxioe_object = (uint64_t)(uintptr_t)ep->lxioelem_cbp;
