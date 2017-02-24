@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS__LX_MISC_H
@@ -118,6 +118,8 @@ extern boolean_t lx_vsyscall_iscall(klwp_t *, uintptr_t, int *);
 extern void lx_vsyscall_enter(proc_t *, klwp_t *, int);
 
 extern void lx_check_strict_failure(lx_lwp_data_t *);
+
+extern boolean_t lx_is_eventfd(file_t *);
 
 #endif
 

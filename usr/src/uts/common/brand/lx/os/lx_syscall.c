@@ -846,12 +846,12 @@ lx_sysent_t lx_sysent32[] = {
 	{"utimensat",	NULL,			0,		4}, /* 320 */
 	{"signalfd",	NULL,			0,		3}, /* 321 */
 	{"timerfd_create", NULL,		0,		2}, /* 322 */
-	{"eventfd",	NULL,			0,		1}, /* 323 */
+	{"eventfd",	lx_eventfd,		0,		1}, /* 323 */
 	{"fallocate",	lx_fallocate32,		LX_SYS_EBPARG6,	6}, /* 324 */
 	{"timerfd_settime", NULL,		0,		4}, /* 325 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 326 */
 	{"signalfd4",	NULL,			0,		4}, /* 327 */
-	{"eventfd2",	NULL,			0,		2}, /* 328 */
+	{"eventfd2",	lx_eventfd2,		0,		2}, /* 328 */
 	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 329 */
 	{"dup3",	lx_dup3,		0,		3}, /* 330 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 331 */
@@ -1174,13 +1174,13 @@ lx_sysent_t lx_sysent64[] = {
 	{"epoll_pwait",	lx_epoll_pwait,		0,		5}, /* 281 */
 	{"signalfd",	NULL,			0,		3}, /* 282 */
 	{"timerfd_create", NULL,		0,		2}, /* 283 */
-	{"eventfd",	NULL,			0,		1}, /* 284 */
+	{"eventfd",	lx_eventfd,		0,		1}, /* 284 */
 	{"fallocate",	lx_fallocate,		0,		4}, /* 285 */
 	{"timerfd_settime", NULL,		0,		4}, /* 286 */
 	{"timerfd_gettime", NULL,		0,		2}, /* 287 */
 	{"accept4",	lx_accept4,		0,		4}, /* 288 */
 	{"signalfd4",	NULL,			0,		4}, /* 289 */
-	{"eventfd2",	NULL,			0,		2}, /* 290 */
+	{"eventfd2",	lx_eventfd2,		0,		2}, /* 290 */
 	{"epoll_create1", lx_epoll_create1,	0,		1}, /* 291 */
 	{"dup3",	lx_dup3,		0,		3}, /* 292 */
 	{"pipe2",	lx_pipe2,		0,		2}, /* 293 */

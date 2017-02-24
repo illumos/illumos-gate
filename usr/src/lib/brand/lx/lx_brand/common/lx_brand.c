@@ -1294,13 +1294,13 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 281: epoll_pwait */
 	lx_signalfd,			/* 282: signalfd */
 	lx_timerfd_create,		/* 283: timerfd_create */
-	lx_eventfd,			/* 284: eventfd */
+	NULL,				/* 284: eventfd */
 	NULL,				/* 285: fallocate */
 	lx_timerfd_settime,		/* 286: timerfd_settime */
 	lx_timerfd_gettime,		/* 287: timerfd_gettime */
 	NULL,				/* 288: accept4 */
 	lx_signalfd4,			/* 289: signalfd4 */
-	lx_eventfd2,			/* 290: eventfd2 */
+	NULL,				/* 290: eventfd2 */
 	NULL,				/* 291: epoll_create1 */
 	NULL,				/* 292: dup3 */
 	NULL,				/* 293: pipe2 */
@@ -1664,12 +1664,12 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_utimensat,			/* 320: utimensat */
 	lx_signalfd,			/* 321: signalfd */
 	lx_timerfd_create,		/* 322: timerfd_create */
-	lx_eventfd,			/* 323: eventfd */
+	NULL,				/* 323: eventfd */
 	NULL,				/* 324: fallocate */
 	lx_timerfd_settime,		/* 325: timerfd_settime */
 	lx_timerfd_gettime,		/* 326: timerfd_gettime */
 	lx_signalfd4,			/* 327: signalfd4 */
-	lx_eventfd2,			/* 328: eventfd2 */
+	NULL,				/* 328: eventfd2 */
 	NULL,				/* 329: epoll_create1 */
 	NULL,				/* 330: dup3 */
 	NULL,				/* 331: pipe2 */

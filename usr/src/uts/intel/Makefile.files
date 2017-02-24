@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2016, Joyent, Inc.
+# Copyright 2017, Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
 #
 
@@ -320,6 +320,7 @@ LX_BRAND_OBJS  =		\
 	lx_dup.o		\
 	lx_errno.o		\
 	lx_epoll.o		\
+	lx_eventfd.o		\
 	lx_fadvise.o		\
 	lx_fallocate.o		\
 	lx_fcntl.o		\
