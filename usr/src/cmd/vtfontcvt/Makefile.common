@@ -10,30 +10,20 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 
-SUBDIRS=	consfonts \
-		hwdata \
-		locale \
-		terminfo \
-		zoneinfo
+PROG=	vtfontcvt
+OBJS=	vtfontcvt.o
 
-MSGSUBDIRS= 	zoneinfo
+LZ4COMMONDIR= $(SRC)/common/ficl/softcore
+LZ4_OBJS=	lz4.o
+OBJS	+=	$(LZ4_OBJS)
 
-all :=		TARGET=all
-clean :=	TARGET=clean
-clobber :=	TARGET=clobber
-install :=	TARGET=install
-_msg :=		TARGET=_msg
+LDLIBS += -lumem
 
-.KEEP_STATE:
+%.o:	$(LZ4COMMONDIR)/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
-all clean clobber install: $(SUBDIRS)
-
-_msg:		$(MSGSUBDIRS)
-
-$(SUBDIRS):	FRC
-		cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+C99MODE =	$(C99_ENABLE)

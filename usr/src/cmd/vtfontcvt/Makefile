@@ -10,30 +10,24 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 
-SUBDIRS=	consfonts \
-		hwdata \
-		locale \
-		terminfo \
-		zoneinfo
-
-MSGSUBDIRS= 	zoneinfo
-
-all :=		TARGET=all
-clean :=	TARGET=clean
-clobber :=	TARGET=clobber
-install :=	TARGET=install
-_msg :=		TARGET=_msg
+include ../Makefile.cmd
+include ../Makefile.ctf
+include Makefile.common
 
 .KEEP_STATE:
 
-all clean clobber install: $(SUBDIRS)
+all: $(PROG)
 
-_msg:		$(MSGSUBDIRS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-$(SUBDIRS):	FRC
-		cd $@; pwd; $(MAKE) $(TARGET)
+install: all $(ROOTPROG)
 
-FRC:
+clean:
+	$(RM) $(OBJS)
+
+include ../Makefile.targ

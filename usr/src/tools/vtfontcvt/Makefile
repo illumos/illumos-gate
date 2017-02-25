@@ -10,30 +10,28 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 
-SUBDIRS=	consfonts \
-		hwdata \
-		locale \
-		terminfo \
-		zoneinfo
+CMDDIR=		$(SRC)/cmd/vtfontcvt
 
-MSGSUBDIRS= 	zoneinfo
-
-all :=		TARGET=all
-clean :=	TARGET=clean
-clobber :=	TARGET=clobber
-install :=	TARGET=install
-_msg :=		TARGET=_msg
+include		../Makefile.tools
+include		$(CMDDIR)/Makefile.common
 
 .KEEP_STATE:
 
-all clean clobber install: $(SUBDIRS)
+all:		$(PROG)
 
-_msg:		$(MSGSUBDIRS)
+install:	all .WAIT $(ROOTONBLDMACHPROG)
 
-$(SUBDIRS):	FRC
-		cd $@; pwd; $(MAKE) $(TARGET)
+clean:
+		$(RM) $(PROG) $(OBJS)
 
-FRC:
+$(PROG):	$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+%.o:		$(CMDDIR)/%.c
+		$(COMPILE.c) -o $@ $<
+
+include		../Makefile.targ
