@@ -67,7 +67,6 @@ $(i386_ONLY)file path=usr/kernel/drv/pm group=sys
 file path=usr/kernel/drv/pm.conf group=sys
 file path=usr/lib/power/powerd mode=0555
 file path=usr/sbin/pmconfig mode=4555
-file path=usr/sbin/sysidpm group=sys mode=0755
 file path=usr/share/man/man1/sys-suspend.1
 file path=usr/share/man/man1m/pmconfig.1m
 file path=usr/share/man/man1m/powerd.1m

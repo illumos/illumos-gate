@@ -10542,7 +10542,6 @@ f usr/sbin/syncloop 0555 root bin
 f usr/sbin/syncstat 0555 root bin
 h usr/sbin/sysdef=usr/lib/isaexec
 f usr/sbin/syseventadm 0555 root sys
-f usr/sbin/sysidpm 0755 root sys
 f usr/sbin/syslogd 0555 root sys
 h usr/sbin/tapes=usr/sbin/devfsadm
 f usr/sbin/tar 0555 root bin
