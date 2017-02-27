@@ -331,6 +331,7 @@ typedef struct lx_proc_data {
 	kmutex_t l_io_ctx_lock; /* protects the following members */
 	uintptr_t l_io_ctxpage;
 	kcondvar_t l_io_destroy_cv;
+	uint_t l_io_ctx_cnt;
 	struct lx_io_ctx  **l_io_ctxs;
 
 	/* original start/end bounds of arg/env string data */
