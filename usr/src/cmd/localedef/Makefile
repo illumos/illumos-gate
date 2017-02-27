@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
 # Copyright 2013 DEY Storage Systems, Inc.
 # Copyright 2016 Joyent, Inc.
@@ -32,7 +32,7 @@ HDRS	= localedef.h
 SRCS   = $(OBJS:%.o=%.c)
 
 CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale
-NATIVE_CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale
+NATIVE_CPPFLAGS	+= -I $(SRC)/lib/libc/port/locale -DNATIVE
 CERRWARN	+= -_gcc=-Wno-char-subscripts
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-unused-label
@@ -376,7 +376,7 @@ locale/%/$(DTIME):	locale/%/stamp
 UTF-8.cm: data/UTF-8.cm
 	$(LN) -sf data/UTF-8.cm  $@
 
-UTF-8.ct: $(UTF8SRCS)
+UTF-8.ct: data/ctype.sh data/manual-input.UTF-8 $(UTF8SRCS)
 	$(SH) data/ctype.sh $(UTF8SRCS) > $@
 
 GB18030.cm: data/GB18030.cm
