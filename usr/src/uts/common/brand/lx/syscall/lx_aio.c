@@ -72,11 +72,18 @@
  * information.
  *
  * It is hard to make any generalized statements about how the aio syscalls
- * are used in production. mysql is one of the more popular consumers of aio
+ * are used in production. MySQL is one of the more popular consumers of aio
  * and in the default configuration it will create 10 contexts with a capacity
  * of 256 I/Os (io_setup nr_events) and 1 context with a capacity of 100 I/Os.
  * Another application we've seen will create 8 contexts, each with a capacity
  * of 128 I/Os. In practice 1-7 was the typical number of in-flight I/Os.
+ *
+ * The default configuration for MySQL uses 4 read and 4 write threads. Each
+ * thread has an associated context. MySQL also allocates 3 additional contexts,
+ * so in the default configuration it will only use 11, but the number of
+ * read and write threads can be tuned up to a maximum of 64. We can expand
+ * a process's number of contexts up to a maximum of LX_IOCTX_CNT_MAX, which
+ * is significantly more than we've ever seen in use.
  *
  * According to www.kernel.org/doc/Documentation/sysctl/fs.txt, the
  * /proc/sys/fs entries for aio are:
@@ -115,11 +122,13 @@
 #define	LX_KIOCB_KEY			0
 
 /*
- * Max. number of contexts/process. Note that we currently map one page to
- * manage the user-level context ID, so that code must be adjusted if this
- * value is ever enlarged to exceed a page.
+ * Base and max. number of contexts/process. Note that we currently map one
+ * page to manage the user-level context ID, so that code must be adjusted if
+ * LX_IOCTX_CNT_MAX is ever enlarged. Currently, this is the limit for the
+ * number of 64-bit pointers in one 4k page.
  */
-#define	LX_MAX_IO_CTX	32
+#define	LX_IOCTX_CNT_BASE	16
+#define	LX_IOCTX_CNT_MAX	512
 
 /*
  * Max number of control block pointers, or lx_io_event_t's, to allocate on the
@@ -225,12 +234,13 @@ lx_io_cp_hold(lx_aio_context_t cid)
 	mutex_enter(&lxpd->l_io_ctx_lock);
 
 	if (lxpd->l_io_ctxs == NULL) {
+		ASSERT(lxpd->l_io_ctx_cnt == 0);
 		ASSERT(lxpd->l_io_ctxpage == NULL);
 		goto bad;
 	}
 
 	id = PTR_TO_CTXID(lxpd, cid);
-	if (id < 0 || id >= LX_MAX_IO_CTX)
+	if (id < 0 || id >= lxpd->l_io_ctx_cnt)
 		goto bad;
 
 	if ((cp = lxpd->l_io_ctxs[id]) == NULL)
@@ -272,13 +282,13 @@ lx_io_cp_rele(lx_io_ctx_t *cp)
 	/*
 	 * We hold the last ref.
 	 */
-	for (i = 0; i < LX_MAX_IO_CTX; i++) {
+	for (i = 0; i < lxpd->l_io_ctx_cnt; i++) {
 		if (lxpd->l_io_ctxs[i] == cp) {
 			lxpd->l_io_ctxs[i] = NULL;
 			break;
 		}
 	}
-	ASSERT(i < LX_MAX_IO_CTX);
+	ASSERT(i < lxpd->l_io_ctx_cnt);
 	/* wake all threads waiting on context destruction */
 	cv_broadcast(&lxpd->l_io_destroy_cv);
 	mutex_exit(&lxpd->l_io_ctx_lock);
@@ -521,9 +531,9 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 		 */
 		uintptr_t ctxpage;
 
+		ASSERT(lxpd->l_io_ctx_cnt == 0);
 		ASSERT(lxpd->l_io_ctxpage == NULL);
-		/*CONSTCOND*/
-		VERIFY(PAGESIZE >= (LX_MAX_IO_CTX * sizeof (lx_io_ctx_t *)));
+
 		ttolwp(curthread)->lwp_errno = 0;
 		ctxpage = (uintptr_t)smmap64(0, PAGESIZE, PROT_READ,
 		    MAP_SHARED | MAP_ANON, -1, 0);
@@ -533,21 +543,43 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 		}
 
 		lxpd->l_io_ctxpage = ctxpage;
-		lxpd->l_io_ctxs = kmem_zalloc(LX_MAX_IO_CTX *
+		lxpd->l_io_ctx_cnt = LX_IOCTX_CNT_BASE;
+		lxpd->l_io_ctxs = kmem_zalloc(lxpd->l_io_ctx_cnt *
 		    sizeof (lx_io_ctx_t *), KM_SLEEP);
 		slot = 0;
 	} else {
-		for (slot = 0; slot < LX_MAX_IO_CTX; slot++) {
+		ASSERT(lxpd->l_io_ctx_cnt > 0);
+		for (slot = 0; slot < lxpd->l_io_ctx_cnt; slot++) {
 			if (lxpd->l_io_ctxs[slot] == NULL)
 				break;
 		}
 
-		if (slot == LX_MAX_IO_CTX) {
-			mutex_exit(&lxpd->l_io_ctx_lock);
-			mutex_enter(&lxzd->lxzd_lock);
-			lxzd->lxzd_aio_nr -= nr_events;
-			mutex_exit(&lxzd->lxzd_lock);
-			return (set_errno(ENOMEM));
+		if (slot == lxpd->l_io_ctx_cnt) {
+			/* Double our context array up to the max. */
+			const uint_t new_cnt = lxpd->l_io_ctx_cnt * 2;
+			const uint_t old_size = lxpd->l_io_ctx_cnt *
+			    sizeof (lx_io_ctx_t *);
+			const uint_t new_size = new_cnt *
+			    sizeof (lx_io_ctx_t *);
+			struct lx_io_ctx  **old_array = lxpd->l_io_ctxs;
+
+			if (new_cnt > LX_IOCTX_CNT_MAX) {
+				mutex_exit(&lxpd->l_io_ctx_lock);
+				mutex_enter(&lxzd->lxzd_lock);
+				lxzd->lxzd_aio_nr -= nr_events;
+				mutex_exit(&lxzd->lxzd_lock);
+				return (set_errno(ENOMEM));
+			}
+
+			/* See big theory comment explaining context ID. */
+			VERIFY(PAGESIZE >= new_size);
+			lxpd->l_io_ctxs = kmem_zalloc(new_size, KM_SLEEP);
+
+			bcopy(old_array, lxpd->l_io_ctxs, old_size);
+			kmem_free(old_array, old_size);
+			lxpd->l_io_ctx_cnt = new_cnt;
+
+			/* note: 'slot' is now valid in the new array */
 		}
 	}
 
@@ -1181,6 +1213,7 @@ void
 lx_io_clear(lx_proc_data_t *cpd)
 {
 	cpd->l_io_ctxs = NULL;
+	cpd->l_io_ctx_cnt = 0;
 	cpd->l_io_ctxpage = NULL;
 }
 
@@ -1205,11 +1238,13 @@ lx_io_cleanup()
 restart:
 	mutex_enter(&lxpd->l_io_ctx_lock);
 	if (lxpd->l_io_ctxs == NULL) {
+		ASSERT(lxpd->l_io_ctx_cnt == 0);
 		mutex_exit(&lxpd->l_io_ctx_lock);
 		return;
 	}
 
-	for (i = 0; i < LX_MAX_IO_CTX; i++) {
+	ASSERT(lxpd->l_io_ctx_cnt > 0);
+	for (i = 0; i < lxpd->l_io_ctx_cnt; i++) {
 		lx_io_ctx_t *cp;
 
 		if ((cp = lxpd->l_io_ctxs[i]) != NULL) {
@@ -1229,7 +1264,8 @@ restart:
 		}
 	}
 
-	kmem_free(lxpd->l_io_ctxs, LX_MAX_IO_CTX * sizeof (lx_io_ctx_t *));
+	kmem_free(lxpd->l_io_ctxs, lxpd->l_io_ctx_cnt * sizeof (lx_io_ctx_t *));
 	lxpd->l_io_ctxs = NULL;
+	lxpd->l_io_ctx_cnt = 0;
 	mutex_exit(&lxpd->l_io_ctx_lock);
 }
