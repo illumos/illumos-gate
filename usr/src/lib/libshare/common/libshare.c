@@ -44,6 +44,7 @@
 #include <libintl.h>
 #include <thread.h>
 #include <synch.h>
+#include <errno.h>
 
 #define	DFS_LOCK_FILE	"/etc/dfs/fstypes"
 #define	SA_STRSIZE	256	/* max string size for names */
@@ -879,7 +880,6 @@ sa_init(int init_service)
 				sablocksigs(&old);
 				lockfd = open(DFS_LOCK_FILE, O_RDWR);
 				if (lockfd >= 0) {
-					extern int errno;
 					errno = 0;
 					(void) lockf(lockfd, F_LOCK, 0);
 					(void) mutex_lock(&sa_dfstab_lock);
