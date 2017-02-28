@@ -20,7 +20,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH JSTYLE 1ONBLD "Nov 22, 2005"
+.TH JSTYLE 1ONBLD "Feb 22, 2017"
 .SH NAME
 .I jstyle
 \- check for some common stylistic errors in Java source files
@@ -33,24 +33,24 @@ inspects Java source files (*.java) for common stylistic errors.  It
 is similar to
 .BR cstyle (1ONBLD)
 in that it attempts to check for the style
-documented in \fI/shared/ON/general_docs/cstyle.ms.pdf\fP, although by
+documented in \fIcstyle.ms.pdf\fP, although by
 necessity is modified to work with Java-specific constructs.  Note that
 there is much in that document that
 .I cannot
 be checked for; just because your code is
 .BR jstyle (1ONBLD)
 clean does not
-mean that you've followed Sun's Java style.  \fICaveat emptor\fP.
+mean that you've followed illumos Java style.  \fICaveat emptor\fP.
 .SH OPTIONS
 .LP
 The following options are supported:
 .TP 4
 .B \-c
-Check continuation line indentation inside of functions.  Sun's C style
+Check continuation line indentation inside of functions.  illumos C style
 states that all statements must be indented to an appropriate tab stop,
 and any continuation lines after them must be indented \fIexactly\fP four
 spaces from the start line.  This option enables a series of checks
-designed to find contination line problems within functions only.
+designed to find continuation line problems within functions only.
 .TP 4
 .B \-h
 Performs heuristic checks that are sometimes wrong.  Not generally used.
@@ -76,7 +76,7 @@ Ignore errors in header comments (i.e., block comments starting in the
 first column).  Not generally used.
 .SH NOTES
 .LP
-The jstyle rule for the OS/Net consolidation is that all new files must
+The jstyle rule for the illumos gate is that all new files must
 be
 .B -p
 clean.  For existing files, the following invocations are

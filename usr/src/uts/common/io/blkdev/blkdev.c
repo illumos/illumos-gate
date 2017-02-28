@@ -23,6 +23,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com> All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 The MathWorks, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -171,6 +172,7 @@ static void bd_runq_exit(bd_xfer_impl_t *, int);
 static void bd_update_state(bd_t *);
 static int bd_check_state(bd_t *, enum dkio_state *);
 static int bd_flush_write_cache(bd_t *, struct dk_callback *);
+static int bd_check_uio(dev_t, struct uio *);
 
 struct cmlb_tg_ops bd_tg_ops = {
 	TG_DK_OPS_VERSION_1,
@@ -753,7 +755,7 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
 
 	xi->i_bp = bp;
 	xi->i_func = func;
-	xi->i_blkno = bp->b_lblkno;
+	xi->i_blkno = bp->b_lblkno >> (bd->d_blkshift - DEV_BSHIFT);
 
 	if (bp->b_bcount == 0) {
 		xi->i_len = 0;
@@ -818,7 +820,7 @@ bd_xfer_alloc(bd_t *bd, struct buf *bp, int (*func)(void *, bd_xfer_t *),
 			    (ddi_dma_getwin(xi->i_dmah, 0, &xi->i_offset,
 			    &len, &xi->i_dmac, &xi->i_ndmac) !=
 			    DDI_SUCCESS) ||
-			    (P2PHASE(len, shift) != 0)) {
+			    (P2PHASE(len, (1U << shift)) != 0)) {
 				(void) ddi_dma_unbind_handle(xi->i_dmah);
 				rv = EFAULT;
 				goto done;
@@ -1035,6 +1037,9 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 	bd_xfer_impl_t	*xi;
 	buf_t		*bp;
 	int		rv;
+	uint32_t	shift;
+	daddr_t		d_blkno;
+	int	d_nblk;
 
 	rw_enter(&bd_lock, RW_READER);
 
@@ -1045,6 +1050,9 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		rw_exit(&bd_lock);
 		return (ENXIO);
 	}
+	shift = bd->d_blkshift;
+	d_blkno = blkno >> (shift - DEV_BSHIFT);
+	d_nblk = nblk >> (shift - DEV_BSHIFT);
 	/*
 	 * do cmlb, but do it synchronously unless we already have the
 	 * partition (which we probably should.)
@@ -1055,7 +1063,7 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		return (ENXIO);
 	}
 
-	if ((blkno + nblk) > psize) {
+	if ((d_blkno + d_nblk) > psize) {
 		rw_exit(&bd_lock);
 		return (EINVAL);
 	}
@@ -1065,7 +1073,7 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		return (ENOMEM);
 	}
 
-	bp->b_bcount = nblk << bd->d_blkshift;
+	bp->b_bcount = nblk << DEV_BSHIFT;
 	bp->b_resid = bp->b_bcount;
 	bp->b_lblkno = blkno;
 	bp->b_un.b_addr = caddr;
@@ -1076,7 +1084,7 @@ bd_dump(dev_t dev, caddr_t caddr, daddr_t blkno, int nblk)
 		freerbuf(bp);
 		return (ENOMEM);
 	}
-	xi->i_blkno = blkno + pstart;
+	xi->i_blkno = d_blkno + pstart;
 	xi->i_flags = BD_XFER_POLL;
 	bd_submit(bd, xi);
 	rw_exit(&bd_lock);
@@ -1113,9 +1121,32 @@ bd_minphys(struct buf *bp)
 }
 
 static int
+bd_check_uio(dev_t dev, struct uio *uio)
+{
+	bd_t		*bd;
+	uint32_t	shift;
+
+	if ((bd = ddi_get_soft_state(bd_state, BDINST(dev))) == NULL) {
+		return (ENXIO);
+	}
+
+	shift = bd->d_blkshift;
+	if ((P2PHASE(uio->uio_loffset, (1U << shift)) != 0) ||
+	    (P2PHASE(uio->uio_iov->iov_len, (1U << shift)) != 0)) {
+		return (EINVAL);
+	}
+
+	return (0);
+}
+
+static int
 bd_read(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
+	int	ret = bd_check_uio(dev, uio);
+	if (ret != 0) {
+		return (ret);
+	}
 	return (physio(bd_strategy, NULL, dev, B_READ, bd_minphys, uio));
 }
 
@@ -1123,6 +1154,10 @@ static int
 bd_write(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
+	int	ret = bd_check_uio(dev, uio);
+	if (ret != 0) {
+		return (ret);
+	}
 	return (physio(bd_strategy, NULL, dev, B_WRITE, bd_minphys, uio));
 }
 
@@ -1130,6 +1165,10 @@ static int
 bd_aread(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
+	int	ret = bd_check_uio(dev, aio->aio_uio);
+	if (ret != 0) {
+		return (ret);
+	}
 	return (aphysio(bd_strategy, anocancel, dev, B_READ, bd_minphys, aio));
 }
 
@@ -1137,6 +1176,10 @@ static int
 bd_awrite(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(credp));
+	int	ret = bd_check_uio(dev, aio->aio_uio);
+	if (ret != 0) {
+		return (ret);
+	}
 	return (aphysio(bd_strategy, anocancel, dev, B_WRITE, bd_minphys, aio));
 }
 
@@ -1152,6 +1195,7 @@ bd_strategy(struct buf *bp)
 	bd_xfer_impl_t	*xi;
 	uint32_t	shift;
 	int		(*func)(void *, bd_xfer_t *);
+	diskaddr_t 	lblkno;
 
 	part = BDPART(bp->b_edev);
 	inst = BDINST(bp->b_edev);
@@ -1174,21 +1218,22 @@ bd_strategy(struct buf *bp)
 	}
 
 	shift = bd->d_blkshift;
-
-	if ((P2PHASE(bp->b_bcount, (1U << shift)) != 0) ||
-	    (bp->b_lblkno > p_nblks)) {
-		bioerror(bp, ENXIO);
+	lblkno = bp->b_lblkno >> (shift - DEV_BSHIFT);
+	if ((P2PHASE(bp->b_lblkno, (1U << (shift - DEV_BSHIFT))) != 0) ||
+	    (P2PHASE(bp->b_bcount, (1U << shift)) != 0) ||
+	    (lblkno > p_nblks)) {
+		bioerror(bp, EINVAL);
 		biodone(bp);
 		return (0);
 	}
 	b_nblks = bp->b_bcount >> shift;
-	if ((bp->b_lblkno == p_nblks) || (bp->b_bcount == 0)) {
+	if ((lblkno == p_nblks) || (bp->b_bcount == 0)) {
 		biodone(bp);
 		return (0);
 	}
 
-	if ((b_nblks + bp->b_lblkno) > p_nblks) {
-		bp->b_resid = ((bp->b_lblkno + b_nblks - p_nblks) << shift);
+	if ((b_nblks + lblkno) > p_nblks) {
+		bp->b_resid = ((lblkno + b_nblks - p_nblks) << shift);
 		bp->b_bcount -= bp->b_resid;
 	} else {
 		bp->b_resid = 0;
@@ -1204,7 +1249,7 @@ bd_strategy(struct buf *bp)
 		biodone(bp);
 		return (0);
 	}
-	xi->i_blkno = bp->b_lblkno + p_lba;
+	xi->i_blkno = lblkno + p_lba;
 
 	bd_submit(bd, xi);
 
@@ -1905,7 +1950,7 @@ bd_xfer_done(bd_xfer_t *xfer, int err)
 
 
 	if ((rv != DDI_SUCCESS) ||
-	    (P2PHASE(len, (1U << xi->i_blkshift) != 0))) {
+	    (P2PHASE(len, (1U << xi->i_blkshift)) != 0)) {
 		bd_runq_exit(xi, EFAULT);
 
 		bp->b_resid += xi->i_resid;

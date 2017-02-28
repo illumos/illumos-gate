@@ -344,6 +344,7 @@ bd_open(struct open_file *f, ...)
 	struct disk_devdesc disk;
 	va_list ap;
 	uint64_t size;
+	int rc;
 
 	va_start(ap, f);
 	dev = va_arg(ap, struct disk_devdesc *);
@@ -381,8 +382,16 @@ bd_open(struct open_file *f, ...)
 		disk_close(&disk);
 	}
 
-	return (disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
-	    BD(dev).bd_sectorsize));
+	rc = disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
+	    BD(dev).bd_sectorsize);
+	if (rc != 0) {
+		BD(dev).bd_open--;
+		if (BD(dev).bd_open == 0) {
+			bcache_free(BD(dev).bd_bcache);
+			BD(dev).bd_bcache = NULL;
+		}
+	}
+	return (rc);
 }
 
 static int
@@ -439,8 +448,8 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
     char *buf, size_t *rsize)
 {
     struct disk_devdesc *dev = (struct disk_devdesc *)devdata;
-    off_t		disk_blocks;
-    int			blks;
+    uint64_t		disk_blocks;
+    int			blks, rc;
 #ifdef BD_SUPPORT_FRAGS /* XXX: sector size */
     char		fragbuf[BIOSDISK_SECSIZE];
     size_t		fragsize;
@@ -497,8 +506,8 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
     case F_READ:
 	DEBUG("read %d from %lld to %p", blks, dblk, buf);
 
-	if (blks && bd_read(dev, dblk, blks, buf)) {
-	    DEBUG("read error");
+	if (blks && (rc = bd_read(dev, dblk, blks, buf))) {
+	    printf("read %d from %lld to %p, error: 0x%x", blks, dblk, buf, rc);
 	    return (EIO);
 	}
 #ifdef BD_SUPPORT_FRAGS /* XXX: sector size */
@@ -557,7 +566,9 @@ bd_edd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
     v86.ds = VTOPSEG(&packet);
     v86.esi = VTOPOFF(&packet);
     v86int();
-    return (V86_CY(v86.efl));
+    if (V86_CY(v86.efl))
+	return (v86.eax >> 8);
+    return (0);
 }
 
 static int
@@ -591,7 +602,9 @@ bd_chs_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
     v86.es = VTOPSEG(dest);
     v86.ebx = VTOPOFF(dest);
     v86int();
-    return (V86_CY(v86.efl));
+    if (V86_CY(v86.efl))
+	return (v86.eax >> 8);
+    return (0);
 }
 
 static int
@@ -681,7 +694,7 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 	    DEBUG("Read %d sector(s) from %lld to %p (0x%x) %s", x,
 		dblk, p, VTOP(p), result ? "failed" : "ok");
 	if (result) {
-	    return(-1);
+	    return(result);
 	}
 	if (!dowrite && bbuf != NULL)
 	    bcopy(bbuf, p, x * BD(dev).bd_sectorsize);
