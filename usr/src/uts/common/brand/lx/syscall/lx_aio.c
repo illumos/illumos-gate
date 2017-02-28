@@ -71,6 +71,17 @@
  * we hit the maximum at lx_aio_max_workers. See the code in io_setup for more
  * information.
  *
+ * Because the worker threads never leave the kernel, they are marked with the
+ * TP_KTHREAD bit so that /proc operations essentially ignore them. We also tag
+ * the brand lwp flags with the BR_AIO_LWP bit so that these threads never
+ * appear in the lx /proc. Aside from servicing aio submissions, the worker
+ * threads don't participate in most application-initiated operations. Forking
+ * is a special case for the workers. The Linux fork(2) and vfork(2) behavior
+ * always forks only a single thread; the caller. However, during cfork() the
+ * system attempts to quiesce all threads by calling holdlwps(). The workers
+ * check for SHOLDFORK and SHOLDFORK1 in their loops and suspend themselves ala
+ * holdlwp() if the process forks.
+ *
  * It is hard to make any generalized statements about how the aio syscalls
  * are used in production. MySQL is one of the more popular consumers of aio
  * and in the default configuration it will create 10 contexts with a capacity
@@ -101,6 +112,7 @@
 #include <sys/brand.h>
 #include <sys/sysmacros.h>
 #include <sys/sdt.h>
+#include <sys/procfs.h>
 
 #include <sys/lx_brand.h>
 #include <sys/lx_syscalls.h>
@@ -401,6 +413,23 @@ lx_io_do_op(lx_io_elem_t *ep)
 }
 
 /*
+ * If our process is forking, it expects all LWPs to be stopped first. For the
+ * worker threads, a stop equivalent to holdlwp() is necessary before the
+ * fork can proceed. The initial check is performed outside p_lock to avoid
+ * making that lock too hot.
+ */
+static void
+lx_io_worker_chk_status()
+{
+	if (curproc->p_flag & (SHOLDFORK | SHOLDFORK1)) {
+		mutex_enter(&curproc->p_lock);
+		if (curproc->p_flag & (SHOLDFORK | SHOLDFORK1))
+			stop(PR_SUSPENDED, SUSPEND_NORMAL);
+		mutex_exit(&curproc->p_lock);
+	}
+}
+
+/*
  * Worker thread - pull work off the pending queue, perform the operation and
  * place the result on the done queue. Do this as long as work is pending, then
  * wait for more.
@@ -416,7 +445,14 @@ lx_io_worker(void *a)
 	while (!cp->lxioctx_shutdown) {
 		mutex_enter(&cp->lxioctx_p_lock);
 		if (list_is_empty(&cp->lxioctx_pending)) {
-			cv_wait(&cp->lxioctx_pending_cv, &cp->lxioctx_p_lock);
+
+			/*
+			 * This must be cv_wait_sig, as opposed to cv_wait, so
+			 * that pokelwps works correctly on these threads.
+			 */
+			(void) cv_wait_sig(&cp->lxioctx_pending_cv,
+			    &cp->lxioctx_p_lock);
+
 			if (cp->lxioctx_shutdown) {
 				mutex_exit(&cp->lxioctx_p_lock);
 				break;
@@ -425,6 +461,8 @@ lx_io_worker(void *a)
 
 		ep = list_remove_head(&cp->lxioctx_pending);
 		mutex_exit(&cp->lxioctx_p_lock);
+
+		lx_io_worker_chk_status();
 
 		while (ep != NULL) {
 			boolean_t do_resfd;
@@ -479,6 +517,8 @@ lx_io_worker(void *a)
 			if (cp->lxioctx_shutdown)
 				break;
 
+			lx_io_worker_chk_status();
+
 			mutex_enter(&cp->lxioctx_p_lock);
 			ep = list_remove_head(&cp->lxioctx_pending);
 			mutex_exit(&cp->lxioctx_p_lock);
@@ -506,6 +546,7 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 	lx_io_elem_t *ep;
 	uintptr_t cid;
 	uint_t nworkers;
+	k_sigset_t hold_set;
 
 	if (copyin(ctxp, &cid, sizeof (cid)) != 0)
 		return (set_errno(EFAULT));
@@ -640,6 +681,7 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 			nworkers = lx_aio_max_workers;
 	}
 
+	sigfillset(&hold_set);
 	for (i = 0; i < nworkers; i++) {
 		klwp_t *l;
 		kthread_t *t;
@@ -694,6 +736,7 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 		mutex_enter(&curproc->p_lock);
 		t->t_proc_flag = (t->t_proc_flag & ~TP_HOLDLWP) | TP_KTHREAD;
 		lwptolxlwp(l)->br_lwp_flags |= BR_AIO_LWP;
+		curthread->t_hold = hold_set;
 		lwp_create_done(t);
 		mutex_exit(&curproc->p_lock);
 	}
