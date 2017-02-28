@@ -36,9 +36,7 @@ SUSPEND_OBJS =	$(SUSPEND_SRCS:%.c=%.o)
 SUSPEND = 	sys-suspend
 SRCS = 		$(DAEMON_SRCS) $(PMCFG_SRCS) $(SUSPEND_SRCS)
 OBJS = 		$(SRCS:%.c=%.o)
-SCRIPTS =	sysidpm.sh
-SYSIDPM = 	sysidpm
-PROG =		$(DAEMON) $(PMCFG) $(SYSIDPM) $(SUSPEND)
+PROG =		$(DAEMON) $(PMCFG) $(SUSPEND)
 POWERCONF=	power.conf
 ETCFILES =	$(POWERCONF)
 POWERPERM =	power
@@ -56,9 +54,6 @@ TEXT_DOMAIN=	SUNW_OST_OSCMD
 XGETFLAGS +=    -a -x power_all.xcl
 POFILE=		power_all.po
 POFILES=	$(PMCFG_SRCS:%.c=%.po) $(SUSPEND_SRCS:%.c=%.po)
-# needed because POFILES is deleted by clobber, but it's under
-# SCCS control here.
-OPOFILES=	sysidpm.po
 
 # pmconfig only needs libdevinfo on sparc
 sparc_LDEVINFO=	-ldevinfo -lefi -ladm -lzfs -lnvpair
@@ -83,9 +78,6 @@ $(ROOTLIBPOWERDAEMON) := FILEMODE= 555
 ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%) 
 $(ROOTETCFILES) := FILEMODE= 644 
 
-ROOTUSRSBINSYSIDPM= $(SYSIDPM:%=$(ROOTUSRSBIN)/%)
-$(ROOTUSRSBINSYSIDPM) := FILEMODE= 755
-
 #
 # lint pass one enforcement
 #
@@ -95,7 +87,7 @@ CFLAGS += $(CCVERBOSE)
 
 .KEEP_STATE:
 
-all: $(PROG) $(POWERPERM).dfl $(ETCFILES) $(SCRIPTS)
+all: $(PROG) $(POWERPERM).dfl $(ETCFILES)
 
 install clean:
 
@@ -120,7 +112,7 @@ $(SUSPEND): $(SUSPEND_OBJS)
 	$(POST_PROCESS)
 
 install: all $(ROOTUSRSBINPMCFG) $(ROOTLIBPOWERDAEMON) $(ROOTUSRBINSUSPEND) \
-	$(ROOTETCFILES) $(ROOTUSRSBINSYSIDPM) $(ROOTETCDEFAULTFILES) \
+	$(ROOTETCFILES) $(ROOTETCDEFAULTFILES) \
 	$(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 $(ROOTLIBPOWER):
@@ -131,17 +123,14 @@ $(ROOTLIBPOWER)/%:	%
 
 $(ROOTLIBPOWERDAEMON): $(ROOTLIBPOWER)
 
-$(OPOFILES):
-	@
-
-$(POFILE):	$(POFILES) $(OPOFILES)
+$(POFILE):	$(POFILES)
 	$(RM)	$@
-	cat	$(POFILES) $(OPOFILES)	> $@
+	cat	$(POFILES)	> $@
 
 check:	$(CHKMANIFEST)
 
 clean:
-	$(RM) $(OBJS) $(SYSIDPM) $(POWERCONF)
+	$(RM) $(OBJS) $(POWERCONF)
 	$(RM) $(POFILE) $(POFILES)
 
 lint := LINTFLAGS=-auxn

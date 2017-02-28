@@ -699,7 +699,7 @@ ptable_dklabelread(struct ptable *table, void *dev, diskread_t dread)
 			break;
 		entry->part.start = dv->v_part[i].p_start;
 		entry->part.end = dv->v_part[i].p_size +
-		    entry->part.start;
+		    entry->part.start - 1;
 		entry->part.type = vtoc_parttype(dv->v_part[i].p_tag);
 		entry->part.index = i; /* starts from zero */
 		entry->type.vtoc = dv->v_part[i].p_tag;

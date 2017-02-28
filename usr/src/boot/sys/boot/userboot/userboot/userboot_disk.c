@@ -132,7 +132,7 @@ userdisk_print(int verbose)
 		dev.d_slice = -1;
 		dev.d_partition = -1;
 		if (disk_open(&dev, ud_info[i].mediasize,
-		    ud_info[i].sectorsize, 0) == 0) {
+		    ud_info[i].sectorsize) == 0) {
 			sprintf(line, "    disk%d", i);
 			disk_print(&dev, line, verbose);
 			disk_close(&dev);
@@ -157,7 +157,7 @@ userdisk_open(struct open_file *f, ...)
 		return (EIO);
 
 	return (disk_open(dev, ud_info[dev->d_unit].mediasize,
-	    ud_info[dev->d_unit].sectorsize, 0));
+	    ud_info[dev->d_unit].sectorsize));
 }
 
 static int

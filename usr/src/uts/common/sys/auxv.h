@@ -207,6 +207,11 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_COMMPAGE		2026
 
 /*
+ * Aux vector for comm page
+ */
+#define	AT_SUN_COMMPAGE		2026
+
+/*
  * Note that 2023 is reserved for the AT_SUN_HWCAP2 word defined above.
  */
 

@@ -10386,6 +10386,7 @@ export_notify_params(scf_propertygroup_t *pg, struct entity_elts *elts)
 	xmlNodePtr n, event, *type;
 	struct params_elts *eelts;
 	int ret, err, i;
+	char *s;
 
 	n = xmlNewNode(NULL, (xmlChar *)"notification_parameters");
 	event = xmlNewNode(NULL, (xmlChar *)"event");
@@ -10395,6 +10396,9 @@ export_notify_params(scf_propertygroup_t *pg, struct entity_elts *elts)
 	/* event value */
 	if (scf_pg_get_name(pg, exp_str, max_scf_name_len + 1) < 0)
 		scfdie();
+	/* trim SCF_NOTIFY_PG_POSTFIX appended to name on import */
+	if ((s = strchr(exp_str, ',')) != NULL)
+		*s = '\0';
 	safe_setprop(event, value_attr, exp_str);
 
 	(void) xmlAddChild(n, event);

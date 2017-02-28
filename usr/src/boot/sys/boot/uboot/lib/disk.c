@@ -202,8 +202,7 @@ stor_opendev(struct disk_devdesc *dev)
 		}
 		SI(dev).opened++;
 	}
-	return (disk_open(dev, SI(dev).blocks * SI(dev).bsize,
-	    SI(dev).bsize, 0));
+	return (disk_open(dev, SI(dev).blocks * SI(dev).bsize, SI(dev).bsize));
 }
 
 static int

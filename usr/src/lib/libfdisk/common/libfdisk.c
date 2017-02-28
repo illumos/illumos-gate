@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 The MathWorks, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -768,25 +769,40 @@ fdisk_alloc_part_table()
 static int
 fdisk_read_master_part_table(ext_part_t *epp)
 {
-	uchar_t buf[512];
-	int sectsize = 512;
+	struct dk_minfo_ext dkmp_ext;
+	uchar_t *buf;
+	int sectsize;
 	int size = sizeof (struct ipart);
 	int cpcnt = FD_NUMPART * size;
 
 	if (lseek(epp->dev_fd, 0, SEEK_SET) < 0) {
 		return (EIO);
 	}
+	if (ioctl(epp->dev_fd, DKIOCGMEDIAINFOEXT, &dkmp_ext) < 0) {
+		return (EIO);
+	}
+	if (dkmp_ext.dki_lbsize < 512) {
+		return (EIO);
+	}
+	sectsize = dkmp_ext.dki_lbsize;
+	buf = calloc(sectsize, sizeof (uchar_t));
+	if (buf == NULL) {
+		return (ENOMEM);
+	}
 	if (read(epp->dev_fd, buf, sectsize) < sectsize) {
+		free(buf);
 		return (EIO);
 	}
 
 	/*LINTED*/
 	if (LE_16((*(uint16_t *)&buf[510])) != MBB_MAGIC) {
 		bzero(epp->mtable, cpcnt);
+		free(buf);
 		return (FDISK_EBADMAGIC);
 	}
 
 	bcopy(&buf[FDISK_PART_TABLE_START], epp->mtable, cpcnt);
+	free(buf);
 
 	return (FDISK_SUCCESS);
 }

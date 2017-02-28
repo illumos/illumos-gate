@@ -4984,8 +4984,19 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	 * and MODE SENSE page four are reserved (see SBC spec
 	 * and MMC spec). To prevent soft errors just return
 	 * using the default LBA size.
+	 *
+	 * Since SATA MODE SENSE function (sata_txlt_mode_sense()) does not
+	 * implement support for mode pages 3 and 4 return here to prevent
+	 * illegal requests on SATA drives.
+	 *
+	 * These pages are also reserved in SBC-2 and later.  We assume SBC-2
+	 * or later for a direct-attached block device if the SCSI version is
+	 * at least SPC-3.
 	 */
-	if (ISCD(un))
+
+	if (ISCD(un) ||
+	    un->un_interconnect_type == SD_INTERCONNECT_SATA ||
+	    (un->un_ctype == CTYPE_CCS && SD_INQUIRY(un)->inq_ansi >= 5))
 		return (ret);
 
 	cdbsize = (un->un_f_cfg_is_atapi == TRUE) ? CDB_GROUP2 : CDB_GROUP0;
