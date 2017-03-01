@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <string.h>
@@ -108,14 +107,17 @@ elf64_exec(struct preloaded_file *fp)
 	}
 
 	if ((md = file_findmetadata(fp, MODINFOMD_ELFHDR)) == NULL)
-        	return(EFTYPE);
+		return (EFTYPE);
 
 	ehdr = (Elf_Ehdr *)&(md->md_data);
 	entry = efi_translate(ehdr->e_entry);
 
+	efi_time_fini();
 	err = bi_load(fp->f_args, &modulep, &kernendp);
-	if (err != 0)
+	if (err != 0) {
+		efi_time_init();
 		return (err);
+	}
 
 	dev_cleanup();
 
