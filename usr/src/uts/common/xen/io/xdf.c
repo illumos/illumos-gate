@@ -596,8 +596,7 @@ xdf_cmlb_attach(xdf_t *vdp)
 	    B_TRUE,
 	    XD_IS_CD(vdp) ? DDI_NT_CD_XVMD : DDI_NT_BLOCK_XVMD,
 #if defined(XPV_HVM_DRIVER)
-	    (XD_IS_CD(vdp) ? 0 : CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT) |
-	    CMLB_INTERNAL_MINOR_NODES,
+	    (XD_IS_CD(vdp) ? 0 : CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT),
 #else /* !XPV_HVM_DRIVER */
 	    XD_IS_CD(vdp) ? 0 : CMLB_FAKE_LABEL_ONE_PARTITION,
 #endif /* !XPV_HVM_DRIVER */
