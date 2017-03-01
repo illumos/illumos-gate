@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 
@@ -47,7 +46,7 @@ time(time_t *tloc)
 	return (secs);
 }
 
-int
+time_t
 getsecs(void)
 {
 
