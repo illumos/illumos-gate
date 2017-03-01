@@ -464,7 +464,7 @@ towide_euc_impl(wchar_t *wc, const char *mb, unsigned n,
     uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width)
 {
 	int i;
-	int width;
+	int width = 2;
 	wchar_t	c;
 
 	c = *(uint8_t *)mb;
