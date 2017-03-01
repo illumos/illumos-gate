@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_PIPE_RESET 9F "Jan 5, 2004"
+.TH USB_PIPE_RESET 9F "Sep 16, 2016"
 .SH NAME
 usb_pipe_reset \- Abort queued requests from a USB pipe and reset the pipe
 .SH SYNOPSIS
@@ -19,11 +19,9 @@ usb_pipe_reset \- Abort queued requests from a USB pipe and reset the pipe
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -70,7 +68,6 @@ Second argument to callback function.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 Call \fBusb_pipe_reset()\fR to reset a pipe which is in an error state, or to
 abort a current request and clear the pipe. The \fBusb_pipe_reset()\fR function
@@ -161,7 +158,6 @@ USB_CB_ASYNC_REQ_FAILED \(em Error starting asynchronous request.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 Status is returned to the caller via the callback handler's rval argument.
 Possible callback hander rval argument values are:
@@ -239,7 +235,6 @@ Note that messages mirroring the above errors are logged to the console logfile
 on error. This provides status for calls which could not otherwise provide
 status.
 .SH CONTEXT
-.sp
 .LP
 May be called from user or kernel context regardless of arguments. May be
 called from any callback with the USB_FLAGS_SLEEP clear. May not be called from
@@ -251,7 +246,6 @@ supplied, can block because it is executing in kernel context. Otherwise the
 callback cannot block. Please see \fBusb_callback_flags\fR(9S) for more
 information on callbacks.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 void post_reset_handler(
@@ -270,7 +264,6 @@ usb_pipe_reset(dip, bulk_pipe, USB_FLAGS_SLEEP, NULL, NULL);
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -288,12 +281,11 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBusb_get_cfg\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
 \fBusb_pipe_close\fR(9F), \fBusb_get_status\fR(9F),
 \fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_drain_reqs\fR(9F),
 \fBusb_pipe_get_state\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
-\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_pipe_open\fR(9F),
+\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_pipe_xopen\fR(9F),
 \fBusb_pipe_stop_intr_polling\fR(9F), \fBusb_pipe_stop_isoc_polling\fR(9F),
 \fBusb_callback_flags\fR(9S)

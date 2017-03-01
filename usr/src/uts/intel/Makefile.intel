@@ -492,6 +492,7 @@ DRV_KMODS	+= usbskel
 DRV_KMODS	+= usbvc
 DRV_KMODS	+= usbftdi
 DRV_KMODS	+= usbecm
+DRV_KMODS	+= xhci
 
 #
 #	USBGEM modules

@@ -230,18 +230,18 @@ usba_bus_ctl(dev_info_t	*dip,
 				    usb_get_if_number(rdip));
 			}
 			switch (usba_device->usb_port_status) {
+			case USBA_SUPER_SPEED_DEV:
+				speed = "super speed (USB 3.x)";
+				break;
 			case USBA_HIGH_SPEED_DEV:
 				speed = "hi speed (USB 2.x)";
-
 				break;
 			case USBA_LOW_SPEED_DEV:
 				speed = "low speed (USB 1.x)";
-
 				break;
 			case USBA_FULL_SPEED_DEV:
 			default:
 				speed = "full speed (USB 1.x)";
-
 				break;
 			}
 
@@ -676,6 +676,16 @@ usba_free_usba_device(usba_device_t *usba_device)
 			    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED,
 			    NULL, NULL);
 		}
+	}
+
+	/*
+	 * Give the HCD a chance to clean up this child device before we finish
+	 * tearing things down.
+	 */
+	if (usba_device->usb_hcdi_ops->usba_hcdi_device_fini != NULL) {
+		usba_device->usb_hcdi_ops->usba_hcdi_device_fini(
+		    usba_device, usba_device->usb_hcd_private);
+		usba_device->usb_hcd_private = NULL;
 	}
 
 	mutex_enter(&usba_mutex);
@@ -2260,6 +2270,16 @@ usba_ready_device_node(dev_info_t *child_dip)
 			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: "
 			    "high speed prop update failed");
+		}
+	}
+
+	if (usba_device->usb_port_status == USBA_SUPER_SPEED_DEV) {
+		rval = ndi_prop_create_boolean(DDI_DEV_T_NONE, child_dip,
+		    "super-speed");
+		if (rval != DDI_PROP_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+			    "usba_ready_device_node: "
+			    "super speed prop update failed");
 		}
 	}
 

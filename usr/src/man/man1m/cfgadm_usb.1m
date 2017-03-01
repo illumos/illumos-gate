@@ -30,7 +30,6 @@ cfgadm_usb \- USB hardware-specific commands for cfgadm
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The Universal Serial Bus (\fBUSB\fR) hardware-specific library
 \fB/usr/lib/cfgadm/usb.so.1\fR provides the functionality for administering
@@ -124,14 +123,14 @@ usb0/1.4             USB-device   connected    configured   ok
 
 .sp
 .LP
-\fBUSB2.0\fR chips have one \fBEHCI\fR host \fBUSB2.0\fR host controller and a
+\fBUSB 2.0\fR chips have one \fBEHCI\fR host \fBUSB 2.0\fR host controller and a
 number of companion \fBUSB 1.\fR\fIx\fR host controllers (either \fBOHCI\fR or
 \fBUHCI\fR host controllers).
 .sp
 .LP
-When a \fBUSB2.0\fR device has been plugged in, it shows up on the \fBEHCI\fR
+When a \fBUSB 2.0\fR device has been plugged in, it shows up on the \fBEHCI\fR
 logical ports which might not have a \fB1\fR to \fB1\fR mapping to external
-physical port numbers on the system.  When a \fBUSB1.\fR\fIx\fR device is
+physical port numbers on the system.  When a \fBUSB 1.\fR\fIx\fR device is
 plugged in, the \fBEHCI\fR host controller reroutes the device to a companion
 host controller and the device shows up on  the companion's logical port
 number.
@@ -170,11 +169,11 @@ usb3/5               unknown      empty        unconfigured ok
 .sp
 .LP
 In this example \fBusb0\fR is the onboard USB 1.\fIx\fR host controller.
-\fBusb1\fR and \fBusb2\fR are companion \fBOHCI USB1.\fR\fIx\fR host
-controllers and \fBusb3\fR is an \fBEHCI USB2.0\fR host controller.
+\fBusb1\fR and \fBusb2\fR are companion \fBOHCI USB 1.\fR\fIx\fR host
+controllers and \fBusb3\fR is an \fBEHCI USB 2.0\fR host controller.
 .sp
 .LP
-The following table shows the somewhat confusing routing for this USB2.0 chip:
+The following table shows the somewhat confusing routing for this USB 2.0 chip:
 .sp
 .in +2
 .nf
@@ -333,7 +332,6 @@ before removing its device from the \fBUSB\fR. However, it is not recommended
 to hot-remove devices currently in use (such as removable disks currently
 opened by a volume manager or some other application).
 .SH OPTIONS
-.sp
 .LP
 \fBcfgadm\fR defines several types of operations. These operations include
 invoking configuration state changes (\fB-c\fR), invoking hardware-specific
@@ -957,7 +955,6 @@ are on the same bus. This information is available in the '\fBInformation\fR'
 field.
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/cfgadm/usb.so.1\fR\fR
@@ -968,7 +965,6 @@ Hardware specific library for generic USB device administration
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcfgadm\fR(1M), \fBconfig_admin\fR(3CFGADM), \fBattributes\fR(5),
 \fBscsa2usb\fR(7D), \fBusba\fR(7D)
@@ -979,7 +975,6 @@ Universal Serial Bus 1.1 Specification (\fBwww.usb.org\fR)
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 \fBcfgadm\fR(1M) can not unconfigure, disconnect, reset, or change the
 configuration of any \fBUSB\fR device currently opened by any application.

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_GET_CFG 9F "Jan 5, 2004"
+.TH USB_GET_CFG 9F "Sep 16, 2016"
 .SH NAME
 usb_get_cfg, usb_set_cfg \- Get and set current USB device configuration
 .SH SYNOPSIS
@@ -25,11 +25,9 @@ usb_get_cfg, usb_set_cfg \- Get and set current USB device configuration
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .LP
 For \fBusb_get_cfg()\fR:
 .sp
@@ -110,7 +108,6 @@ Second argument passed to callback handler.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_get_cfg()\fR function retrieves the current configuration. It
 ignores the flags argument and always blocks while contacting the device.
@@ -134,7 +131,6 @@ function is the only supported programmatic way to change device configuration.
 This call blocks if USB_FLAGS_SLEEP is set in flags.  It returns immediately
 and calls the callback on completion if USB_FLAGS_SLEEP is not set.
 .SH RETURN VALUES
-.sp
 .LP
 For \fBusb_get_cfg()\fR:
 .sp
@@ -235,7 +231,6 @@ One or more pipes other than the default control pipe are open on the device.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBusb_get_cfg()\fR function may be called from user or kernel context.
 .sp
@@ -250,7 +245,6 @@ supplied, can block because it is executing in kernel context. Otherwise the
 callback cannot block. Please see \fBusb_callback_flags\fR(9S) for more
 information on callbacks.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
  Setting the configuration to the one at index 1 (in the
@@ -287,7 +281,6 @@ information on callbacks.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -305,9 +298,8 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBusb_get_alt_if\fR(9F), \fBusb_get_dev_data\fR(9F),
-\fBusb_get_string_descr\fR(9F), \fBusb_pipe_open\fR(9F),
+\fBusb_get_string_descr\fR(9F), \fBusb_pipe_xopen\fR(9F),
 \fBusb_callback_flags\fR(9S), \fBusb_cfg_descr\fR(9S), \fBusb_ep_descr\fR(9S),
 \fBusb_if_descr\fR(9S)

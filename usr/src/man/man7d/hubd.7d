@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HUBD 7D "Jul 6, 2006"
+.TH HUBD 7D "Oct 4, 2016"
 .SH NAME
 hubd \- USB hub driver
 .SH SYNOPSIS
@@ -13,11 +13,10 @@ hubd \- USB hub driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBhubd\fR is a USBA (Solaris USB Architecture) compliant client driver
+The \fBhubd\fR is a USBA (illumos USB Architecture) compliant client driver
 that supports USB hubs conforming to the \fIUniversal Serial Bus Specification
-2.0\fR. The \fBhubd\fR driver supports bus-powered and self-powered hubs. The
+3.0\fR. The \fBhubd\fR driver supports bus-powered and self-powered hubs. The
 driver supports hubs with individual port power, ganged power and no power
 switching.
 .sp
@@ -30,7 +29,6 @@ attaches a driver to the device if one is available for the default or selected
 configuration. When the device is disconnected from the hub port, the
 \fBhubd\fR driver offlines any driver instance attached to the device.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/hubd\fR\fR
@@ -58,7 +56,6 @@ configuration. When the device is disconnected from the hub port, the
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -74,7 +71,6 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcfgadm_usb\fR(1M), \fBattributes\fR(5), \fBusba\fR(7D)
 .sp
@@ -90,7 +86,6 @@ Architecture	SPARC, x86, PCI-based systems
 .LP
 http://\fIwww.sun.com/io\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 In addition to being logged, the following messages may also appear on the
 system console. Messages are formatted in the following manner:
@@ -292,7 +287,7 @@ The device requires more power than is available on this port.
 .sp
 .ne 2
 .na
-\fBPort <\fIn\fR> in over current condition, please check the attached device
+\fBPort <\fIn\fR\fB> in over current condition, please check the attached device
 to clear the condition. The system will try to recover the port, but if not
 successful, you need to re-connect the hub or reboot the system to bring the
 port back to work.\fR
@@ -306,3 +301,17 @@ problem. If the port doesn't work after the overcurrent condition is cleared,
 please re-connect the hub or reboot the system to enable the port again.
 .RE
 
+.sp
+.ne 2
+.na
+\fBUnable to attach USB 3.x hub <vendor> <device>. A maximum of 5 hubs
+may be cascaded.\fR
+.ad
+.sp .6
+.RS 4n
+USB 3.0 has an upper bound on the number of hubs that may be chained
+together. If this limit is exceeded, a hub may not be detected or
+attached. The hub will be functional if plugged into a different part of
+the USB topology. To determine the depth of the hub, count the number of
+devices between it and the host controller.
+.RE

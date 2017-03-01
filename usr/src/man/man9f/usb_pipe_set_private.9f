@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_PIPE_SET_PRIVATE 9F "Jan 5, 2004"
+.TH USB_PIPE_SET_PRIVATE 9F "Sep 16, 2016"
 .SH NAME
 usb_pipe_set_private, usb_pipe_get_private \- USB user-defined pipe data-field
 facility
@@ -21,11 +21,9 @@ facility
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .LP
 For \fBusb_pipe_set_private()\fR:
 .sp
@@ -59,7 +57,6 @@ Pipe handle from which user-defined data is retrieved.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_set_driver_private()\fR function initializes the user-private data
 field of the pipe referred to by \fIpipe_handle\fR, using \fIdata\fR. The
@@ -72,7 +69,6 @@ The \fBusb_get_driver_private()\fR function retrieves the user-private data
 stored via \fBusb_set_driver_private()\fR, from the pipe referred to by
 \fIpipe_handle\fR.
 .SH RETURN VALUES
-.sp
 .LP
 For \fBusb_pipe_set_private()\fR:
 .sp
@@ -115,11 +111,9 @@ On success: usb_opaque_t pointer to data being retrieved.
 On failure: \fBNULL\fR. Fails if pipe handle is \fBNULL\fR or invalid. Fails if
 pipe handle is to a pipe which is closing or closed.
 .SH CONTEXT
-.sp
 .LP
 May be called from user, kernel or interrupt context.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
     usb_pipe_handle_t pipe;
@@ -137,7 +131,6 @@ May be called from user, kernel or interrupt context.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -155,6 +148,5 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBattributes\fR(5), \fBusb_pipe_open\fR(9F), \fBusb_alloc_request\fR(9F)
+\fBattributes\fR(5), \fBusb_pipe_xopen\fR(9F), \fBusb_alloc_request\fR(9F)

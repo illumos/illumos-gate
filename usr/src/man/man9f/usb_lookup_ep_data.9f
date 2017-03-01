@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_LOOKUP_EP_DATA 9F "Jan 5, 2004"
+.TH USB_LOOKUP_EP_DATA 9F "Sep 16, 2016"
 .SH NAME
 usb_lookup_ep_data \- Lookup endpoint information
 .SH SYNOPSIS
@@ -19,11 +19,9 @@ usb_lookup_ep_data \- Lookup endpoint information
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -76,7 +74,7 @@ finding one to retrieve.
 .ad
 .RS 13n
 Type of endpoint. This is one of: USB_EP_ATTR_CONTROL, USB_EP_ATTR_ISOCH,
-USB_EP_ATTR_BULK, or USB_EP_ATTR_INTR. Please see \fBusb_pipe_open\fR(9F) for
+USB_EP_ATTR_BULK, or USB_EP_ATTR_INTR. Please see \fBusb_pipe_xopen\fR(9F) for
 more information.
 .RE
 
@@ -91,7 +89,6 @@ ignored for bi-directional control endpoints.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_lookup_ep_data()\fR function returns endpoint information from the
 tree embedded in client data returned from \fBusb_get_dev_data\fR. It operates
@@ -101,7 +98,6 @@ endpoints it finds which match the specifications of the other arguments, and
 then retrieves information on the next matching endpoint it finds. Note that it
 does not make a copy of the data, but points to the tree itself.
 .SH RETURN VALUES
-.sp
 .LP
 On success: the tree node corresponding to the desired endpoint.
 .sp
@@ -110,11 +106,9 @@ On failure: returns NULL. Fails if \fIdip\fR or \fIdev_datap\fR are NULL, if
 the desired endpoint does not exist in the tree, or no tree is present in
 dev_datap.
 .SH CONTEXT
-.sp
 .LP
 May be called from user, kernel or interrupt context.
 .SH EXAMPLES
-.sp
 .LP
 Retrieve the polling interval for the second interrupt endpoint at interface 0,
 alt 3:
@@ -147,7 +141,6 @@ Retrieve the maximum packet size for the first control pipe at interface 0, alt
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -165,7 +158,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBusb_get_dev_data\fR(9F), \fBusb_pipe_open\fR(9F),
 \fBusb_cfg_descr\fR(9S), \fBusb_if_descr\fR(9S), \fBusb_ep_descr\fR(9S)

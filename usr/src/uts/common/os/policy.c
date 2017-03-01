@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -2406,6 +2406,18 @@ secpolicy_gart_map(const cred_t *cr)
 		return (PRIV_POLICY(cr, PRIV_GRAPHICS_MAP, B_FALSE, EPERM,
 		    NULL));
 	}
+}
+
+/*
+ * secpolicy_xhci
+ *
+ * Determine if the subject can observe and manipulate the xhci driver with a
+ * dangerous blunt hammer.  Requires all privileges.
+ */
+int
+secpolicy_xhci(const cred_t *cr)
+{
+	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL, KLPDARG_NONE));
 }
 
 /*

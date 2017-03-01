@@ -499,6 +499,7 @@ MANFILES=	ASSERT.9f				\
 		usb_client_attach.9f			\
 		usb_clr_feature.9f			\
 		usb_create_pm_components.9f		\
+		usb_ep_xdescr_fill.9f			\
 		usb_get_addr.9f				\
 		usb_get_alt_if.9f			\
 		usb_get_cfg.9f				\
@@ -518,9 +519,9 @@ MANFILES=	ASSERT.9f				\
 		usb_pipe_get_state.9f			\
 		usb_pipe_intr_xfer.9f			\
 		usb_pipe_isoc_xfer.9f			\
-		usb_pipe_open.9f			\
 		usb_pipe_reset.9f			\
 		usb_pipe_set_private.9f			\
+		usb_pipe_xopen.9f			\
 		usb_register_hotplug_cbs.9f		\
 		usb_reset_device.9f			\
 		uwritec.9f				\
@@ -1217,6 +1218,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		usb_owns_device.9f				\
 		usb_pipe_ctrl_xfer_wait.9f			\
 		usb_pipe_get_private.9f				\
+		usb_pipe_open.9f				\
 		usb_pipe_stop_intr_polling.9f			\
 		usb_pipe_stop_isoc_polling.9f			\
 		usb_print_descr_tree.9f				\
@@ -2097,6 +2099,8 @@ usb_pipe_stop_intr_polling.9f		:= LINKSRC = usb_pipe_intr_xfer.9f
 usb_pipe_stop_isoc_polling.9f		:= LINKSRC = usb_pipe_isoc_xfer.9f
 
 usb_pipe_get_private.9f			:= LINKSRC = usb_pipe_set_private.9f
+
+usb_pipe_open.9f			:= LINKSRC = usb_pipe_xopen.9f
 
 usb_unregister_hotplug_cbs.9f		:= LINKSRC = usb_register_hotplug_cbs.9f
 

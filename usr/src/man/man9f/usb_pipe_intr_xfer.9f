@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_PIPE_INTR_XFER 9F "Aug 3, 2006"
+.TH USB_PIPE_INTR_XFER 9F "Sep 16, 2016"
 .SH NAME
 usb_pipe_intr_xfer, usb_pipe_stop_intr_polling \- USB interrupt transfer and
 polling functions
@@ -24,11 +24,9 @@ polling functions
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .LP
 For \fBusb_pipe_intr_xfer()\fR:
 .sp
@@ -82,7 +80,6 @@ USB_FLAGS_SLEEP is the only flag recognized. Wait for polling to stop.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_pipe_intr_xfer()\fR function requests the USBA framework to perform
 a transfer through a USB interrupt pipe. The request is passed to the host
@@ -94,7 +91,6 @@ There are three categories of interrupt transfers: periodic or polled
 interrupt-IN, single-transfer interrupt-IN, and (single-transfer)
 interrupt-OUT.
 .SS "Periodic Interrupt-IN Transfers"
-.sp
 .LP
 Periodic or polled interrupt-IN transfers execute on input requests which do
 not have the USB_ATTRS_ONE_XFER attribute set. One request enables repetitive
@@ -126,7 +122,6 @@ set, the current (non-original) request is returned on error. Call
 this case. The USB_CR_STOPPED_POLLING flag is always set for callbacks where
 the original request is returned.
 .SS "Single-transfer Interrupt-IN Transfers"
-.sp
 .LP
 Interrupt-IN requests which have the USB_ATTRS_ONE_XFER attribute perform a
 single transfer. Such requests are synchronous when the USB_FLAGS_SLEEP flag is
@@ -135,7 +130,6 @@ is complete, and their callbacks are optional. The request is returned to the
 client through the normal or the exception completion callback to signal either
 normal completion or an error condition.
 .SS "Interrupt-OUT Transfers"
-.sp
 .LP
 Interrupt-OUT requests always set up for a single transfer. However, multiple
 requests can be queued and execute in periodic fashion until depleted.
@@ -196,7 +190,6 @@ Mblks for data for interrupt-OUT requests are allocated when a request is
 allocated via \fBusb_alloc_intr_req\fR(9F) by passing a non-negative value for
 the \fIlen\fR argument.
 .SH RETURN VALUES
-.sp
 .LP
 For \fBusb_pipe_intr_xfer()\fR
 .sp
@@ -320,13 +313,11 @@ logfile.
 Exception handlers' queued requests which are flushed by these commands before
 execution are returned with completion reason of USB_CR_FLUSHED.
 .SH CONTEXT
-.sp
 .LP
 Both of these functions can be called from kernel or user context without
 regard to arguments, and may be called from interrupt context only when the
 USB_FLAGS_SLEEP flag is clear.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
  /* Start polling on interrupt-IN pipe. */
@@ -389,7 +380,6 @@ USB_FLAGS_SLEEP flag is clear.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -407,12 +397,11 @@ Interface stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBusb_alloc_request\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_get_status\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
 \fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_get_state\fR(9F),
-\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_pipe_open\fR(9F),
+\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_pipe_xopen\fR(9F),
 \fBusb_pipe_reset\fR(9F), \fBusb_bulk_request\fR(9S),
 \fBusb_callback_flags\fR(9S), \fBusb_completion_reason\fR(9S),
 \fBusb_ctrl_request\fR(9S), \fBusb_ep_descr\fR(9S), \fBusb_intr_request\fR(9S),

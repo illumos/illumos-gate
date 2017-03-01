@@ -26,6 +26,7 @@ SUBDIRS = mdb_kb \
 	i40e \
 	generic_cpu \
 	amd_opteron \
-	sata
+	sata \
+	xhci
 
 include ../../Makefile.subdirs

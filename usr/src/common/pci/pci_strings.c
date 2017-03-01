@@ -160,6 +160,7 @@ const pci_class_strings_t class_pci[] = {
 	12, 3, 0,	"Universal Serial Bus UHCI compliant",	"usb",
 	12, 3, 0x10,	"Universal Serial Bus OHCI compliant",	"usb",
 	12, 3, 0x20,	"Universal Serial Bus EHCI compliant",	"usb",
+	12, 3, 0x30,	"Universal Serial Bus XHCI compliant",	"usb",
 	12, 3, 0x80,	"Universal Serial Bus generic HCD",	"usb",
 	12, 3, 0xFE,	"Universal Serial Bus device",		"usb",
 	12, 4, 0,	"Fibre Channel",			"fibre",

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_HCDI_H
@@ -50,7 +52,8 @@ extern "C" {
  */
 #define	HCDI_OPS_VERSION_0 0
 #define	HCDI_OPS_VERSION_1 1
-#define	HCDI_OPS_VERSION	HCDI_OPS_VERSION_1
+#define	HCDI_OPS_VERSION_2 2
+#define	HCDI_OPS_VERSION	HCDI_OPS_VERSION_2
 
 typedef struct usba_hcdi_ops {
 	int	usba_hcdi_ops_version;	/* implementation version */
@@ -207,6 +210,26 @@ typedef struct usba_hcdi_ops {
 
 	int	(*usba_hcdi_console_output_exit)(
 		usb_console_info_impl_t		*console_output_info);
+
+	/*
+	 * VERSION 2 ops: support for device initialization
+	 */
+	int	(*usba_hcdi_device_init)(
+		usba_device_t			*usba_device,
+		usb_port_t			port,
+		void				**);
+
+	void	(*usba_hcdi_device_fini)(
+		usba_device_t			*usba_device,
+		void				*);
+
+	int	(*usba_hcdi_device_address)(
+		usba_device_t			*usba_device);
+
+	int	(*usba_hcdi_hub_update)(
+		usba_device_t			*usba_device,
+		uint8_t				nports,
+		uint8_t				think_time);
 } usba_hcdi_ops_t;
 
 
@@ -224,8 +247,8 @@ typedef struct usba_hcdi_ops {
  */
 void
 usba_hcdi_cb(usba_pipe_handle_data_t	*ph,
-		usb_opaque_t		req,
-		usb_cr_t		completion_reason);
+    usb_opaque_t		req,
+    usb_cr_t		completion_reason);
 
 /*
  * function to duplicate a interrupt/isoc request (for HCD)
@@ -266,7 +289,6 @@ typedef struct usba_hcdi_register_args {
 	usba_hcdi_ops_t		*usba_hcdi_register_ops;
 	ddi_dma_attr_t		*usba_hcdi_register_dma_attr;
 	ddi_iblock_cookie_t	usba_hcdi_register_iblock_cookie;
-
 } usba_hcdi_register_args_t;
 
 #define	HCDI_REGISTER_VERS_0		0
@@ -284,6 +306,11 @@ int	usba_hcdi_register(usba_hcdi_register_args_t *, uint_t);
  * detach support
  */
 void	usba_hcdi_unregister(dev_info_t *);
+
+/*
+ * HCD device private storage
+ */
+void	*usba_hcdi_get_device_private(usba_device_t *);
 
 /*
  * Hotplug kstats named structure
@@ -339,6 +366,12 @@ typedef struct hcdi_error_stats {
 #define	HCDI_ERROR_STATS_DATA(hcdi)	\
 	((hcdi_error_stats_t *)HCDI_ERROR_STATS((hcdi))->ks_data)
 
+
+/*
+ * The default timeout that should occur for non-periodic transfers if a timeout
+ * is not requested by a client driver. This is a time in seconds.
+ */
+#define	HCDI_DEFAULT_TIMEOUT	5
 
 #ifdef __cplusplus
 }

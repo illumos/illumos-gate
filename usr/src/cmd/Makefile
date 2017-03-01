@@ -454,6 +454,7 @@ COMMON_SUBDIRS=		\
 	wracct		\
 	write		\
 	xargs		\
+	xhci		\
 	xstr		\
 	yes		\
 	ypcmd		\

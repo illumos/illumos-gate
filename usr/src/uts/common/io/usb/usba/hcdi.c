@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -115,6 +117,19 @@ usba_hcdi_register(usba_hcdi_register_args_t *args, uint_t flags)
 	}
 
 	hcdi->hcdi_dip = args->usba_hcdi_register_dip;
+
+	/*
+	 * The hcd driver cannot use private data as we're going to store our
+	 * data there. If it does, fail the registration immediately.
+	 */
+	if (ddi_get_driver_private(hcdi->hcdi_dip) != NULL) {
+		cmn_err(CE_WARN, "failed attempt to register USB hcd, "
+		    "detected private data!");
+		kmem_free(hcdi, sizeof (usba_hcdi_t));
+
+		return (USB_FAILURE);
+	}
+
 
 	/*
 	 * Create a log_handle
@@ -467,9 +482,8 @@ usba_hcdi_destroy_stats(usba_hcdi_t *hcdi)
  * HCD callback handling
  */
 void
-usba_hcdi_cb(usba_pipe_handle_data_t *ph_data,
-	usb_opaque_t	req,
-	usb_cr_t	completion_reason)
+usba_hcdi_cb(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
+    usb_cr_t completion_reason)
 {
 
 	usba_device_t		*usba_device = ph_data->p_usba_device;
@@ -953,8 +967,7 @@ usba_hcdi_get_req_private(usb_opaque_t req)
  *	hcd_private	- wr_hcd_private field from wrapper
  */
 void
-usba_hcdi_set_req_private(usb_opaque_t req,
-			usb_opaque_t	hcd_private)
+usba_hcdi_set_req_private(usb_opaque_t req, usb_opaque_t hcd_private)
 {
 	usba_req_wrapper_t *wrp = USBA_REQ2WRP(req);
 
@@ -1007,4 +1020,10 @@ usba_hcdi_get_ph_data(usba_device_t *usba_device, uint8_t ep_addr)
 {
 	return (usba_device->usb_ph_list[usb_get_ep_index(ep_addr)].
 	    usba_ph_data);
+}
+
+void *
+usba_hcdi_get_device_private(usba_device_t *usba_device)
+{
+	return (usba_device->usb_hcd_private);
 }

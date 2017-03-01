@@ -190,7 +190,7 @@ typedef struct hid_state {
 
 	usb_if_descr_t		hid_if_descr;		/* interface descr */
 	usb_hid_descr_t		hid_hid_descr;		/* hid descriptor */
-	usb_ep_descr_t		hid_ep_intr_descr;
+	usb_ep_xdescr_t		hid_ep_intr_xdescr;	/* ep extended desc */
 	hidparser_handle_t	hid_report_descr;	/* report descr */
 
 	usb_pipe_handle_t	hid_default_pipe;	/* default pipe */

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 
@@ -116,6 +118,15 @@ static usb_descr_item_t usb_ep_descr[] = {
 	{1, "bInterval"},
 };
 static uint_t usb_ep_item = 6;
+
+static usb_descr_item_t usb_ep_ss_comp_descr[] = {
+	{1, "bLength"},
+	{1, "bDescriptorType"},
+	{1, "bMaxBurst"},
+	{1, "bmAttributes"},
+	{2, "wBytesPerInterval"}
+};
+static uint_t usb_ep_ss_comp_item = 5;
 
 static usb_descr_item_t usb_qlf_descr[] = {
 	{1, "bLength"},
@@ -561,8 +572,9 @@ prtusb(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* for the first device, print head */
 	if (DCMD_HDRSPEC(flags)) {
 		count = 1;
-		mdb_printf("%<u>%-8s%-12s%-6s%-16s%-12s%-20s%</u>\n",
-		    "INDEX", "DRIVER", "INST", "NODE", "VID.PID", "PRODUCT");
+		mdb_printf("%<u>%-8s%-12s%-6s%-14s%-5s%-12s%-20s%</u>\n",
+		    "INDEX", "DRIVER", "INST", "NODE", "GEN", "VID.PID",
+		    "PRODUCT");
 	}
 
 	if (mdb_getopts(argc, argv,
@@ -604,16 +616,21 @@ prtusb(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_readstr(strbuf, STRLEN,
 	    (uintptr_t)usb_dip.devi_node_name) != -1) {
 
-		mdb_printf("%-16s", strbuf);
+		mdb_printf("%-14s", strbuf);
 	} else {
 
-		mdb_printf("%-16s", "No Node Name");
+		mdb_printf("%-14s", "No Node Name");
 	}
 
-	/* vid.pid */
+
 	if (mdb_vread(&dev_desc, sizeof (usb_dev_descr_t),
 	    (uintptr_t)usb_dev.usb_dev_descr) != -1) {
 
+		/* gen (note we read this from the bcd) */
+		mdb_printf("%01x.%01x  ", dev_desc.bcdUSB >> 8,
+		    (dev_desc.bcdUSB & 0xf0) >> 4);
+
+		/* vid.pid */
 		mdb_printf("%04x.%04x   ",
 		    dev_desc.idVendor, dev_desc.idProduct);
 	}
@@ -824,7 +841,7 @@ prt_usb_tree_node(uintptr_t paddr)
 	if (strcmp(driver_name, "hubd") == 0) {
 		mdb_arg_t argv[] = {
 		    {MDB_TYPE_STRING, {"hubd_t"}},
-		    {MDB_TYPE_STRING, {"h_hub_descr"}}
+		    {MDB_TYPE_STRING, {"h_ep1_xdescr.uex_ep"}}
 		};
 		mdb_call_dcmd("print", statep, DCMD_ADDRSPEC, 2, argv);
 	}
@@ -1072,6 +1089,16 @@ prt_usb_desc(uintptr_t usb_cfg, uint_t cfg_len)
 			mdb_inc_indent(indent);
 			mdb_printf("Endpoint Descriptor\n");
 			print_descr(paddr, nlen, usb_ep_descr, usb_ep_item);
+			mdb_dec_indent(indent);
+
+			break;
+		case USB_DESCR_TYPE_SS_EP_COMP:
+			indent = 12;
+			mdb_inc_indent(indent);
+			mdb_printf("SuperSpeed Endpoint Companion "
+			    "Descriptor\n");
+			print_descr(paddr, nlen, usb_ep_ss_comp_descr,
+			    usb_ep_ss_comp_item);
 			mdb_dec_indent(indent);
 
 			break;

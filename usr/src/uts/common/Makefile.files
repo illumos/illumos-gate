@@ -1768,6 +1768,10 @@ UHCI_OBJS += uhci.o uhciutil.o uhcitgt.o uhcihub.o uhcipolled.o
 
 EHCI_OBJS += ehci.o ehci_hub.o ehci_xfer.o ehci_intr.o ehci_util.o ehci_polled.o ehci_isoch.o ehci_isoch_util.o
 
+XHCI_OBJS += xhci.o xhci_quirks.o xhci_dma.o xhci_context.o xhci_intr.o \
+	     xhci_ring.o xhci_command.o xhci_event.o xhci_usba.o \
+	     xhci_endpoint.o xhci_hub.o
+
 HUBD_OBJS += hubd.o
 
 USB_MID_OBJS += usb_mid.o
