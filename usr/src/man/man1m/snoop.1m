@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SNOOP 1M "Feb 18, 2009"
+.TH SNOOP 1M "Feb 25, 2017"
 .SH NAME
 snoop \- capture and inspect network packets
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ snoop \- capture and inspect network packets
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 From a datalink or IP interface, \fBsnoop\fR captures packets and displays
 their contents. If the datalink or IP interface is not specified, \fBsnoop\fR
@@ -44,7 +43,6 @@ host names as numeric IP addresses.
 .LP
 \fBsnoop\fR requires an interactive interface.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-C\fR\fR
@@ -299,7 +297,6 @@ provided, the rest of the packet is displayed.
 .RE
 
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIexpression\fR\fR
@@ -1066,7 +1063,6 @@ example# \fBsnoop funky and pinky and (tcp or udp) and port 80\fR
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -1085,7 +1081,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/audio\fR\fR
@@ -1131,7 +1126,6 @@ Internet services and aliases.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdladm\fR(1M), \fBifconfig\fR(1M), \fBnetstat\fR(1M), \fBhosts\fR(4),
 \fBrpc\fR(4), \fBservices\fR(4), \fBattributes\fR(5), \fBaudio\fR(7I),
@@ -1141,7 +1135,6 @@ Internet services and aliases.
 Callaghan, B. and Gilligan, R. \fIRFC 1761, Snoop Version 2 Packet Capture File
 Format\fR. Network Working Group. February 1995.
 .SH WARNINGS
-.sp
 .LP
 The processing overhead is much higher for real-time packet interpretation.
 Consequently, the packet drop count may be higher. For more reliable capture,
@@ -1162,7 +1155,7 @@ level protocol halts at the end of the first \fBIP\fR fragment.
 .sp
 .LP
 \fBsnoop\fR may generate extra packets as a side-effect of its use. For example
-it may use a network name service (NIS or NIS+) to convert \fBIP\fR addresses
+it may use a network name service to convert \fBIP\fR addresses
 to host names for display. Capturing into a file for later display can be used
 to postpone the address-to-name mapping until after the capture session is
 complete. Capturing into an NFS-mounted file may also generate extra packets.

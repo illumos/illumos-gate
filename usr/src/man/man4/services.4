@@ -1,7 +1,7 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright (C) 2000, Sun Microsystems, Inc. All Rights Reserved
-.TH SERVICES 4 "Oct 12, 2000"
+.TH SERVICES 4 "Feb 25, 2017"
 .SH NAME
 services \- Internet services and aliases
 .SH SYNOPSIS
@@ -16,12 +16,11 @@ services \- Internet services and aliases
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBservices\fR file  is a local source of information regarding each
 service available through the Internet. The \fBservices\fR file can be used in
 conjunction with or instead of other services sources, including the \fBNIS\fR
-maps "services.byname" and the \fBNIS+\fR table "services."  Programs use the
+map "services.byname".  Programs use the
 \fBgetservbyname\fR(3SOCKET) routines to access this information.
 .sp
 .LP
@@ -77,7 +76,6 @@ a \fBNEWLINE\fR, or a comment character.
 Any changes to a port assignment do not affect the actual port registration of
 the service.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
@@ -87,11 +85,9 @@ configuration file for name-service switch
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetservbyname\fR(3SOCKET), \fBinetd.conf\fR(4), \fBnsswitch.conf\fR(4)
 .SH NOTES
-.sp
 .LP
 \fB/etc/inet/services\fR is the official SVR4 name of the \fBservices\fR file.
 The symbolic link \fB/etc/services\fR exists for \fBBSD\fR compatibility.

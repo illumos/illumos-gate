@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUTH_ATTR 4 "Jan 9, 2002"
+.TH AUTH_ATTR 4 "Feb 25, 2017"
 .SH NAME
 auth_attr \- authorization description database
 .SH SYNOPSIS
@@ -13,11 +13,10 @@ auth_attr \- authorization description database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB/etc/security/auth_attr\fR is a local source for authorization names and
 descriptions. The \fBauth_attr\fR file can be used with other authorization
-sources, including the \fBauth_attr\fR \fBNIS\fR map and \fBNIS+\fR table.
+sources, including the \fBauth_attr\fR \fBNIS\fR map.
 Programs use the \fBgetauthattr\fR(3SECDB) routines to access this information.
 .sp
 .LP
@@ -239,12 +238,11 @@ With the following entry from \fB/etc/nsswitch.conf\fR, the local
 .sp
 .in +2
 .nf
-auth_attr:files nisplus
+auth_attr:files nis
 .fi
 .in -2
 
 .SH FILES
-.sp
 .LP
 \fB/etc/nsswitch.conf\fR
 .sp
@@ -254,17 +252,11 @@ auth_attr:files nisplus
 .LP
 \fB/etc/security/auth_attr\fR
 .SH SEE ALSO
-.sp
 .LP
 \fBgetauthattr\fR(3SECDB), \fBgetexecattr\fR(3SECDB),
 \fBgetprofattr\fR(3SECDB), \fBgetuserattr\fR(3SECDB), \fBexec_attr\fR(4),
 \fBnsswitch.conf\fR(4), \fBuser_attr\fR(4)
 .SH NOTES
-.sp
-.LP
-When deciding which authorization source to use, keep in mind that \fBNIS+\fR
-provides stronger authentication than \fBNIS\fR.
-.sp
 .LP
 Because the list of legal keys is likely to expand, any code that parses this
 database must be written to ignore unknown key-value pairs without error. When

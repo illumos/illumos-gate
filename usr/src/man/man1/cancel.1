@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CANCEL 1 "May 26, 2006"
+.TH CANCEL 1 "Feb 25, 2017"
 .SH NAME
 cancel \- cancel print request
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ cancel \- cancel print request
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcancel\fR utility cancels print requests. There are two forms of the
 \fBcancel\fR command.
@@ -50,7 +49,6 @@ The print client commands locate destination information using the
 \fBprinters\fR database in the name service switch. See \fBnsswitch.conf\fR(4),
 \fBprinters\fR(4), and \fBprinters.conf\fR(4) for details.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -64,7 +62,6 @@ The name of the user for which print requests are to be cancelled. Specify
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -104,7 +101,6 @@ The name of the user for which the print requests are to be cancelled. Specify
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -126,7 +122,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -162,17 +157,7 @@ LDAP version of \fB/etc/printers.conf\fR
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBprinters.org_dir\fR\fR
-.ad
-.RS 24n
-\fBNIS+\fR version of \fB/etc/printers.conf\fR
-.RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -188,13 +173,11 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlp\fR(1), \fBlpq\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B), \fBlpstat\fR(1),
 \fBlpadmin\fR(1M), \fBnsswitch.conf\fR(4), \fBprinters\fR(4),
 \fBprinters.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 URI-style and POSIX-style destination names (\fIserver\fR:\fIdestination\fR)
 are treated as print requests if \fIdestination\fR has the same format as an
@@ -206,5 +189,5 @@ jobs have been cancelled. This notification usually comes in the form of an
 email message. Cancelation notices cannot be disabled on a Solaris server.
 .sp
 .LP
-When IPP is in use, the user is prompted for a passphsrase if the remote print
+When IPP is in use, the user is prompted for a passphrase if the remote print
 service is configured to require authentication.

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPSERV 4 "Aug 9, 2004"
+.TH YPSERV 4 "Feb 25, 2017"
 .SH NAME
 ypserv \- configuration file for NIS to LDAP transition daemons
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ ypserv \- configuration file for NIS to LDAP transition daemons
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBypserv\fR file specifies configuration information for the
 \fBypserv\fR(1M) daemon. Configuration information can come from LDAP or be
@@ -29,14 +28,12 @@ A related \fBNISLDAPmapping\fR file contains mapping information that converts
 NIS entries into LDAP entries. See the \fBNISLDAPmapping\fR(4) man page for an
 overview of the setup that is needed to map NIS data to or from LDAP.
 .SH EXTENDED DESCRIPTION
-.sp
 .LP
 The \fBypserv\fR(1M) server recognizes the attributes that follow. Values
 specified for these attributes in the \fBypserv\fR file, including any empty
 values, override values that are obtained from LDAP. However, the
 \fBnisLDAPconfig*\fR values are read from the \fBypserv\fR file only
 .SS "Attributes"
-.sp
 .LP
 The following are attributes that are used for initial configuration.
 .sp
@@ -508,7 +505,6 @@ default value for \fBnisLDAPstoreErrortimeout\fR is 15 seconds. The
 .RE
 
 .SS "Storing Configuration Attributes in LDAP"
-.sp
 .LP
 Most attributes described on this man page, as well as those described on
 \fBNISLDAPmapping\fR(4), can be stored in LDAP. In order to do so, you will
@@ -693,7 +689,6 @@ preferredServerList: 127.0.0.1:389
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -709,10 +704,9 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldapadd\fR(1), \fBldapmodify\fR(1), \fBinityp2l\fR(1M), \fByppasswdd\fR(1M),
-\fBypserv\fR(1M), \fBypxfrd\fR(1M), \fBNIS+LDAPmapping\fR(4),
+\fBypserv\fR(1M), \fBypxfrd\fR(1M), \fBNISLDAPmapping\fR(4),
 \fBattributes\fR(5)
 .sp
 .LP

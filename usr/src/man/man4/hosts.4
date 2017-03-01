@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HOSTS 4 "Feb 24, 2008"
+.TH HOSTS 4 "Feb 25, 2017"
 .SH NAME
 hosts \- host name database
 .SH SYNOPSIS
@@ -23,13 +23,12 @@ hosts \- host name database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBhosts\fR file is a local database that associates the names of hosts
 with their Internet Protocol (IP) addresses. An IP address can be in either
 IPv4 or IPv6 format. The \fBhosts\fR file can be used in conjunction with, or
 instead of, other hosts databases, including the Domain Name System (DNS), the
-NIS \fBhosts\fR map, the NIS+ \fBhosts\fR table, or information from an LDAP
+NIS \fBhosts\fR map, or information from an LDAP
 server. Programs use library interfaces to access information in the
 \fBhosts\fR file.
 .sp
@@ -149,7 +148,6 @@ The following is an example of an IPv6 \fBhosts\fR entry:
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgethostbyname\fR(3NSL), \fBgetipnodebyname\fR(3SOCKET), \fBinet\fR(3SOCKET),
 \fBnsswitch.conf\fR(4), \fBresolv.conf\fR(4)
@@ -170,7 +168,6 @@ Architecture\fR, Network Working Group, December, 1995.
 Postel, Jon, RFC 921, \fIDomain Name System Implementation Schedule
 (Revised)\fR, Network Working Group, October 1984.
 .SH NOTES
-.sp
 .LP
 \fB/etc/inet/hosts\fR is the official SVR4 name of the \fBhosts\fR file. The
 symbolic link \fB/etc/hosts\fR exists for \fBBSD\fR compatibility.

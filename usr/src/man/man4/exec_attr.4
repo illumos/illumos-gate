@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EXEC_ATTR 4 "Mar 30, 2006"
+.TH EXEC_ATTR 4 "Feb 25, 2017"
 .SH NAME
 exec_attr \- execution profiles database
 .SH SYNOPSIS
@@ -13,12 +13,11 @@ exec_attr \- execution profiles database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB/etc/security/exec_attr\fR is a local database that specifies the execution
 attributes associated with profiles. The \fBexec_attr\fR file can be used with
 other sources for execution profiles, including the \fBexec_attr\fR \fBNIS\fR
-map and \fBNIS+\fR table. Programs use the \fBgetexecattr\fR(3SECDB) routines
+map. Programs use the \fBgetexecattr\fR(3SECDB) routines
 to access this information.
 .sp
 .LP
@@ -230,7 +229,6 @@ Control profile to execute with an effective user \fBID\fR of root (\fB0\fR):
 .sp
 
 .SH FILES
-.sp
 .LP
 \fB/etc/nsswitch.conf\fR
 .sp
@@ -240,7 +238,6 @@ Control profile to execute with an effective user \fBID\fR of root (\fB0\fR):
 .LP
 \fB/etc/security/exec_attr\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -261,11 +258,6 @@ Interface Stability	See below.
 .LP
 The command-line syntax is Committed. The output is Uncommitted.
 .SH CAVEATS
-.sp
-.LP
-When deciding which authorization source to use (see DESCRIPTION), keep in mind
-that \fBNIS+\fR provides stronger authentication than \fBNIS\fR.
-.sp
 .LP
 Because the list of legal keys is likely to expand, any code that parses this
 database must be written to ignore unknown key-value pairs without error. When
@@ -278,7 +270,6 @@ The following characters are used in describing the database format and must be
 escaped with a backslash if used as data: colon (\fB:\fR), semicolon (\fB;\fR),
 equals (\fB=\fR), and backslash (\fB\\fR).
 .SH SEE ALSO
-.sp
 .LP
 \fBauths\fR(1), \fBdtaction\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
 \fBsh\fR(1), \fBmakedbm\fR(1M), \fBgetauthattr\fR(3SECDB),

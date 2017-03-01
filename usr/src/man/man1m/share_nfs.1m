@@ -23,7 +23,7 @@
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 2016 Jason King.
 .\"
-.Dd December 16, 2016
+.Dd February 25, 2017
 .Dt SHARE_NFS 1M
 .Os
 .Sh NAME
@@ -376,14 +376,12 @@ or
 .Sy ldap
 ahead of
 .Sy nis
-or
-.Sy nisplus ,
 since only DNS and LDAP return the full domain name of the host. Other name
-services like NIS or NIS+ cannot be used to resolve hostnames on the server
+services like NIS cannot be used to resolve hostnames on the server
 because when mapping an IP address to a hostname they do not return domain
 information. For example,
 .Bd -literal -offset indent
-NIS or NIS+   172.16.45.9 --> "myhost"
+NIS   172.16.45.9 --> "myhost"
 .Ed
 .Pp
 and
@@ -406,7 +404,7 @@ matches
 .Qq mydomain
 but not
 .Qq mydomain.mycompany.com .
-This feature can be used to match hosts resolved through NIS and NIS+ rather
+This feature can be used to match hosts resolved through NIS rather
 than DNS and LDAP.
 .It Sy network
 The network or subnet component is preceded by an at-sign (@). It can be either

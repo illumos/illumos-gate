@@ -4,13 +4,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PASSWD 1 "May 31, 2013"
+.TH PASSWD 1 "Feb 25, 2017"
 .SH NAME
 passwd \- change login password and password attributes
 .SH SYNOPSIS
 .LP
 .nf
-\fBpasswd\fR [\fB-r\fR files | \fB-r\fR ldap | \fB-r\fR nis | \fB-r\fR nisplus] [\fIname\fR]
+\fBpasswd\fR [\fB-r\fR files | \fB-r\fR ldap | \fB-r\fR nis] [\fIname\fR]
 .fi
 
 .LP
@@ -59,29 +59,7 @@ passwd \- change login password and password attributes
 \fBpasswd\fR \fB-r\fR nis [\fB-egh\fR] [\fIname\fR]
 .fi
 
-.LP
-.nf
-\fBpasswd\fR \fB-r\fR nisplus [\fB-egh\fR] [\fB-D\fR \fIdomainname\fR] [\fIname\fR]
-.fi
-
-.LP
-.nf
-\fBpasswd\fR \fB-r\fR nisplus \fB-s\fR [\fB-a\fR]
-.fi
-
-.LP
-.nf
-\fBpasswd\fR \fB-r\fR nisplus [\fB-D\fR \fIdomainname\fR] \fB-s\fR [\fIname\fR]
-.fi
-
-.LP
-.nf
-\fBpasswd\fR \fB-r\fR nisplus [\fB-l\fR | \fB-u\fR | \fB-N\fR] [\fB-f\fR] [\fB-n\fR \fImin\fR] [\fB-w\fR \fIwarn\fR]
-     [\fB-x\fR \fImax\fR] [\fB-D\fR \fIdomainname\fR] \fIname\fR
-.fi
-
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpasswd\fR command changes the password or lists password attributes
 associated with the user's login \fIname\fR. Additionally, privileged users can
@@ -92,13 +70,13 @@ any login \fIname\fR.
 When used to change a password, \fBpasswd\fR prompts everyone for their old
 password, if any. It then prompts for the new password twice. When the old
 password is entered, \fBpasswd\fR checks to see if it has aged sufficiently. If
-\fBaging\fR is insufficient, \fBpasswd\fR terminates; see \fBpwconv\fR(1M),
-\fBnistbladm\fR(1), and \fBshadow\fR(4) for additional information.
+\fBaging\fR is insufficient, \fBpasswd\fR terminates; see \fBpwconv\fR(1M)
+and \fBshadow\fR(4) for additional information.
 .sp
 .LP
 The \fBpwconv\fR command creates and updates \fB/etc/shadow\fR with information
 from \fB/etc/passwd\fR. \fBpwconv\fR relies on a special value of \fBx\fR in
-the password field of \fB/etc/passwd\fR. This value of \fBx\fRindicates that
+the password field of \fB/etc/passwd\fR. This value of \fBx\fR indicates that
 the password for the user is already in \fB/etc/shadow\fR and should not be
 modified.
 .sp
@@ -174,12 +152,6 @@ system. The password update configurations are:
 .TP
 .ie t \(bu
 .el o
-\fBpasswd: files nisplus\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
 \fBpasswd: compat\fR (==> files nis)
 .RE
 .RS +4
@@ -190,14 +162,6 @@ system. The password update configurations are:
 .sp
 \fBpasswd_compat: ldap\fR
 .RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBpasswd: compat\fR (==> files nisplus)
-.sp
-\fBpasswd_compat: nisplus\fR
-.RE
 .sp
 .LP
 You can add the \fBad\fR keyword to any of the \fBpasswd\fR configurations in
@@ -207,9 +171,8 @@ the \fBpasswd\fR entry during a password update operation, it is ignored. To
 update the password of an AD user, use the \fBkpasswd\fR(1) command.
 .sp
 .LP
-Network administrators, who own the NIS+ password table, can change any
-password attributes. The administrator configured for updating LDAP shadow
-information can also change any password attributes. See \fBldapclient\fR(1M).
+The administrator configured for updating LDAP shadow
+information can change any password attributes. See \fBldapclient\fR(1M).
 .sp
 .LP
 When a user has a password stored in one of the name services as well as a
@@ -242,8 +205,8 @@ not the password of the superuser or the new user.
 .sp
 .LP
 Any user can use the \fB-s\fR option to show password attributes for his or her
-own login \fIname\fR, provided they are using the \fB-r\fR \fBnisplus\fR
-argument. Otherwise, the \fB-s\fR argument is restricted to the superuser.
+own login \fIname\fR. Otherwise, the \fB-s\fR argument is restricted to the
+superuser.
 .sp
 .LP
 The format of the display is:
@@ -367,7 +330,6 @@ The number of days relative to \fImax\fR before the password expires and the
 .RE
 
 .SS "Security"
-.sp
 .LP
 \fBpasswd\fR uses \fBpam\fR(3PAM) for password change. It calls PAM with a
 service name \fBpasswd\fR and uses service module type \fBauth\fR for
@@ -379,7 +341,6 @@ login or delayed execution (such as \fBat\fR(1), \fBbatch\fR(1), or
 \fBcron\fR(1M)). The \fB-N\fR option can be used to disallow password based
 login, while continuing to allow delayed execution.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -389,22 +350,8 @@ The following options are supported:
 .ad
 .RS 17n
 Shows password attributes for all entries. Use only with the \fB-s\fR option.
-\fIname\fR must not be provided. For the \fBnisplus\fR repository, this shows
-only the entries in the NIS+ password table in the local domain that the
-invoker is authorized to read. For the \fBfiles\fR and \fBldap\fR repositories,
-this is restricted to the superuser.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-D\fR \fIdomainname\fR\fR
-.ad
-.RS 17n
-Consults the \fBpasswd.org_dir\fR table in \fBdomainname\fR. If this option is
-not specified, the default \fBdomainname\fR returned by
-\fBnis_local_directory\fR(3NSL) are used. This domain name is the same as that
-returned by \fBdomainname\fR(1M).
+\fIname\fR must not be provided. For the \fBfiles\fR and \fBldap\fR
+repositories, this is restricted to the superuser.
 .RE
 
 .sp
@@ -425,8 +372,8 @@ allowed by \fBgetusershell\fR, only root can change it.
 .ad
 .RS 17n
 Changes the gecos (finger) information. For the \fBfiles\fR repository, this
-only works for the superuser. Normal users can change the \fBldap\fR,
-\fBnis\fR, or \fBnisplus\fR repositories.
+only works for the superuser. Normal users can change the \fBldap\fR or
+\fBnis\fR repositories.
 .RE
 
 .sp
@@ -445,7 +392,7 @@ Changes the home directory.
 .ad
 .RS 17n
 Specifies the repository to which an operation is applied. The supported
-repositories are \fBfiles\fR, \fBldap\fR, \fBnis\fR, or \fBnisplus\fR.
+repositories are \fBfiles\fR, \fBldap\fR, or \fBnis\fR.
 .RE
 
 .sp
@@ -454,10 +401,9 @@ repositories are \fBfiles\fR, \fBldap\fR, \fBnis\fR, or \fBnisplus\fR.
 \fB\fB-s\fR \fIname\fR\fR
 .ad
 .RS 17n
-Shows password attributes for the login \fIname\fR. For the \fBnisplus\fR
-repository, this works for everyone. However for the \fBfiles\fR and \fBldap\fR
-repositories, this only works for the superuser. It does not work at all for
-the \fBnis\fR repository which does not support password aging.
+Shows password attributes for the login \fIname\fR. For the \fBfiles\fR and
+\fBldap\fR repositories, this only works for the superuser. It does not work
+at all for the \fBnis\fR repository which does not support password aging.
 .sp
 The output of this option, and only this option is Stable and parsable. The
 format is \fIusername\fR followed by white space followed by one of the
@@ -519,7 +465,6 @@ hashes.
 .RE
 
 .SS "Privileged User Options"
-.sp
 .LP
 Only a privileged user can use the following options:
 .sp
@@ -613,7 +558,6 @@ turned off immediately if \fImax\fR is set to \fB\(mi1\fR\&.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -626,7 +570,6 @@ User login name.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 If any of the \fBLC_*\fR variables, that is, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 \fBLC_TIME\fR, \fBLC_COLLATE\fR, \fBLC_NUMERIC\fR, and \fBLC_MONETARY\fR (see
@@ -664,7 +607,6 @@ default form found in the program itself (in most cases, U.S. English).
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The \fBpasswd\fR command exits with one of the following values:
 .sp
@@ -767,7 +709,6 @@ Account expired.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/default/passwd\fR\fR
@@ -1002,7 +943,6 @@ Shell database.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1023,21 +963,19 @@ Interface Stability	See below.
 .LP
 The human readable output is Uncommitted. The options are Committed.
 .SH SEE ALSO
-.sp
 .LP
 \fBat\fR(1), \fBbatch\fR(1), \fBfinger\fR(1), \fBkpasswd\fR(1), \fBlogin\fR(1),
-\fBnistbladm\fR(1), \fBcron\fR(1M), \fBdomainname\fR(1M), \fBeeprom\fR(1M),
+\fBcron\fR(1M), \fBdomainname\fR(1M), \fBeeprom\fR(1M),
 \fBid\fR(1M), \fBldapclient\fR(1M), \fBmkpwdict\fR(1M), \fBpassmgmt\fR(1M),
 \fBpwconv\fR(1M), \fBsu\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M),
 \fBusermod\fR(1M), \fBcrypt\fR(3C), \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C),
-\fBgetusershell\fR(3C), \fBnis_local_directory\fR(3NSL), \fBpam\fR(3PAM),
+\fBgetusershell\fR(3C), \fBpam\fR(3PAM),
 \fBloginlog\fR(4), \fBnsswitch.conf\fR(4), \fBpam.conf\fR(4), \fBpasswd\fR(4),
 \fBpolicy.conf\fR(4), \fBshadow\fR(4), \fBshells\fR(4), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
 \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_ldap\fR(5),
 \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBpam_unix\fR(5) module is no longer supported. Similar functionality is
 provided by \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
@@ -1046,15 +984,9 @@ provided by \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),
 \fBpam_passwd_auth\fR(5).
 .sp
 .LP
-The \fBnispasswd\fR and \fBypasswd\fR commands are wrappers around
-\fBpasswd\fR. Use of \fBnispasswd\fR and \fBypasswd\fR is discouraged. Use
-\fBpasswd\fR \fB-r\fR \fIrepository_name\fR instead.
-.sp
-.LP
-NIS+ might not be supported in future releases of the Solaris operating system.
-Tools to aid the migration from NIS+ to LDAP are available in the current
-Solaris release. For more information, visit
-http://www.sun.com/directory/nisplus/transition.html.
+The \fByppasswd\fR command is a wrapper around \fBpasswd\fR. Use of
+\fByppasswd\fR is discouraged. Use \fBpasswd\fR \fB-r\fR \fIrepository_name\fR
+instead.
 .sp
 .LP
 Changing a password in the \fBfiles\fR and \fBldap\fR repositories clears the

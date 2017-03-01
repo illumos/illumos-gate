@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPFILES 4 "Nov 24, 2003"
+.TH YPFILES 4 "Feb 25, 2017"
 .SH NAME
-ypfiles \- Network Information Service Version 2, formerly knows as YP
+ypfiles \- Network Information Service Version 2, formerly known as YP
 .SH DESCRIPTION
-.sp
 .LP
 The NIS network information service uses a distributed, replicated database of
 \fBdbm\fR files , in ASCII form, that are contained in the \fB/var/yp\fR
@@ -28,7 +27,6 @@ maps. Each line of the nickname file contains two fields separated by white
 space. The first field is the nickname, and the second field is the name of the
 map that it expands to. The nickname cannot contain a ".".
 .SS "NIS to LDAP (N2L)"
-.sp
 .LP
 If the \fB/var/yp/NISLDAPmapping\fR configuration file is present, the NIS
 server operates in NIS to LDAP (N2L) mode. In this mode, NIS maps are stored in
@@ -45,7 +43,6 @@ In N2L mode, the old style DBM files, NIS source files, and the
 \fBypmake\fR(1M) utility have to role. They are retained to enable easy
 conversion back to the traditional mode, if required.
 .SS "Converting from N2L to Traditional NIS"
-.sp
 .LP
 When NIS is operating in N2L mode, it uses a new set of NIS maps with an
 \fBLDAP_\fR prefix, based on the contents of the LDAP DIT. The NIS source files
@@ -58,15 +55,7 @@ files, \fB/var/yp/*/LDAP_*\fR can also be deleted.
 If you want to run the system in traditional mode with information based on the
 DIT, then the NIS source files must be regenerated based on the N2L maps. To
 regenerate the NIS source files based on the N2L maps, run \fBypmap2src\fR(1M).
-.SS "NIS+"
-.sp
-.LP
-NIS+ also provides a NIS service when it runs in YP-compatibility mode. See
-\fBNIS+\fR(1) and \fBrpc.nisd\fR(1M). NIS+, in any mode, cannot be run on the
-same system as \fBypserv\fR, whether \fBypserv\fR is in traditional or N2L
-mode.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/yp\fR\fR
@@ -159,256 +148,7 @@ NIS to LDAP mode map files
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBldap\fR(1), \fBNIS+\fR(1), \fBmakedbm\fR(1M), \fBnisaddent\fR(1M),
-\fBnissetup\fR(1M), \fBrpc.nisd\fR(1M), \fBypbind\fR(1M), \fBypinit\fR(1M),
+\fBldap\fR(1), \fBmakedbm\fR(1M), \fBypbind\fR(1M), \fBypinit\fR(1M),
 \fBypmake\fR(1M), \fBypmap2src\fR(1M), \fBypserv\fR(1M), \fBypxfrd\fR(1M),
 \fBndbm\fR(3C), \fBypclnt\fR(3NSL)
-.SH NOTES
-.sp
-.LP
-The NIS+ server, \fBrpc.nisd,\fR when run in "YP-compatibility mode", can
-support NIS clients only for the standard NIS maps listed below, provided that
-it has been set up to serve the corresponding NIS+ tables using
-\fBnissetup\fR(1M) and \fBnisaddent\fR(1M). The NIS+ server should serve the
-directory with the same name (case sensitive) as the domainname of the NIS
-client. NIS+ servers use secure RPC to verify client credentials but the NIS
-clients do not authenticate their requests using secure RPC. Therefore, NIS
-clients can look up the information stored by the NIS+ server only if the
-information has "read" access for an unauthenticated client, that is, one with
-\fBnobody\fR NIS+ credentials.
-.sp
-.ne 2
-.na
-\fB\fBNIS maps\fR\fR
-.ad
-.RS 26n
- \fBNIS+ tables\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpasswd.byname\fR\fR
-.ad
-.RS 26n
-\fBpasswd.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpasswd.byuid\fR\fR
-.ad
-.RS 26n
-\fBpasswd.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBgroup.byname\fR\fR
-.ad
-.RS 26n
-\fBgroup.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBgroup.bygid\fR\fR
-.ad
-.RS 26n
-\fBgroup.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBpublickey.byname\fR\fR
-.ad
-.RS 26n
-\fBcred.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBhosts.byaddr\fR\fR
-.ad
-.RS 26n
-\fBhosts.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBhosts.byname\fR\fR
-.ad
-.RS 26n
-\fBhosts.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBmail.byaddr\fR\fR
-.ad
-.RS 26n
-\fBmail_aliases.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBmail.aliases\fR\fR
-.ad
-.RS 26n
-\fBmail_aliases.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBservices.byname\fR\fR
-.ad
-.RS 26n
-\fBservices.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBservices.byservicename\fR\fR
-.ad
-.RS 26n
-\fBservices.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBrpc.bynumber\fR\fR
-.ad
-.RS 26n
-\fBrpc.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBrpc.byname\fR\fR
-.ad
-.RS 26n
-\fBrpc.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBprotocols.bynumber\fR\fR
-.ad
-.RS 26n
-\fBprotocols.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBprotocols.byname\fR\fR
-.ad
-.RS 26n
-\fBprotocols.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBnetworks.byaddr\fR\fR
-.ad
-.RS 26n
-\fBnetworks.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBnetworks.byname\fR\fR
-.ad
-.RS 26n
-\fBnetworks.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBnetmasks.byaddr\fR\fR
-.ad
-.RS 26n
-\fBnetmasks.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBethers.byname\fR\fR
-.ad
-.RS 26n
-\fBethers.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBethers.byaddr\fR\fR
-.ad
-.RS 26n
-\fBethers.byname\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBbootparams\fR\fR
-.ad
-.RS 26n
-\fBbootparams\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBauto.master\fR\fR
-.ad
-.RS 26n
-\fBauto_master.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBauto.home\fR\fR
-.ad
-.RS 26n
-\fBauto_home.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBauto.direct\fR\fR
-.ad
-.RS 26n
-\fBauto_direct.org_dir\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBauto.src\fR\fR
-.ad
-.RS 26n
-\fBauto_src.org_dir\fR
-.RE
-

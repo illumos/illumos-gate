@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETPWNAM 3C "Apr 5, 2004"
+.TH GETPWNAM 3C "Feb 25, 2017"
 .SH NAME
 getpwnam, getpwnam_r, getpwent, getpwent_r, getpwuid, getpwuid_r, setpwent,
 endpwent, fgetpwent, fgetpwent_r \- get password entry
@@ -87,7 +87,6 @@ cc [ \fIflag\fR...] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary\
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions are used to obtain password entries. Entries can come from any
 of the sources for \fBpasswd\fR specified in the \fB/etc/nsswitch.conf\fR file
@@ -124,7 +123,6 @@ The \fBfgetpwent()\fR function, unlike the other functions above, does not use
 which is assumed to have the format of the \fBpasswd\fR file.  See
 \fBpasswd\fR(4).
 .SS "Reentrant Interfaces"
-.sp
 .LP
 The \fBgetpwnam()\fR, \fBgetpwuid()\fR, \fBgetpwent()\fR, and \fBfgetpwent()\fR
 functions use thread-specific data storage that is reused in each call to one
@@ -174,7 +172,6 @@ password database.
 Like their non-reentrant counterparts, \fBgetpwnam_r()\fR and
 \fBgetpwuid_r()\fR leave the enumeration position in an indeterminate state.
 .SS "passwd Structure"
-.sp
 .LP
 Password entries are represented by the \fBstruct passwd\fR structure defined
 in <\fBpwd.h\fR>:
@@ -201,7 +198,6 @@ The \fBpw_passwd\fR member should not be used as the encrypted password for the
 user; use \fBgetspnam()\fR or \fBgetspnam_r()\fR instead. See
 \fBgetspnam\fR(3C).
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetpwnam()\fR, \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, and
 \fBgetpwuid_r()\fR functions each return a pointer to a \fBstruct passwd\fR if
@@ -243,7 +239,6 @@ When the pointer returned by the reentrant functions \fBgetpwnam_r()\fR,
 \fBgetpwuid_r()\fR, \fBgetpwent_r()\fR, and \fBfgetpwent_r()\fR is non-null, it
 is always equal to the \fIpwd\fR pointer that was supplied by the caller.
 .SH ERRORS
-.sp
 .LP
 The \fBgetpwent_r()\fR, \fBfgetpwent()\fR, and \fBfgetpwent_r()\fR functions
 will fail if:
@@ -351,7 +346,6 @@ the data to be referenced by the resulting \fBpasswd\fR structure.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Three names associated with the current process can be determined:
 \fBgetpwuid\fR(\fBgeteuid()\fR) returns the name associated with the effective
@@ -359,7 +353,6 @@ user ID of the process; \fBgetlogin()\fR returns the name associated with the
 current login activity; and \fBgetpwuid\fR(\fBgetuid()\fR) returns the name
 associated with the real user ID of the process.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -384,21 +377,19 @@ For \fBendpwent()\fR,  \fBgetpwent()\fR,  \fBgetpwnam()\fR,
 \fBgetpwnam_r()\fR, \fBgetpwuid()\fR, \fBgetpwuid_r()\fR, and \fBsetpwent()\fR,
 see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
-\fBnispasswd\fR(1), \fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(2),
+\fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(2),
 \fBIntro\fR(3), \fBcuserid\fR(3C), \fBgetgrnam\fR(3C), \fBgetlogin\fR(3C),
 \fBgetspnam\fR(3C), \fBnsswitch.conf\fR(4), \fBpasswd\fR(4), \fBshadow\fR(4),
 \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 When compiling multithreaded programs, see \fBIntro\fR(3).
 .sp
 .LP
 Use of the enumeration interfaces \fBgetpwent()\fR and \fBgetpwent_r()\fR is
-discouraged; enumeration is supported for the \fBpasswd\fR file, \fBNIS,\fR and
-\fBNIS+,\fR but in general is not efficient and might not be supported for all
+discouraged; enumeration is supported for the \fBpasswd\fR file and \fBNIS\fR
+but in general is not efficient and might not be supported for all
 database sources.  The semantics of enumeration are discussed further in
 \fBnsswitch.conf\fR(4).
 .sp
@@ -410,13 +401,8 @@ might not be supported in future releases.
 .sp
 .LP
 If required, the `+/-' functionality can still be obtained for \fBNIS\fR by
-specifying \fBcompat\fR as the source for \fBpasswd\fR.
-.sp
-.LP
-If the `+/-' functionality is required in conjunction with \fBNIS+,\fR specify
-both \fBcompat\fR as the source for \fBpasswd\fR and \fBnisplus\fR as the
-source for the pseudo-database \fBpasswd_compat\fR. See \fBpasswd\fR(4),
-\fBshadow\fR(4), and \fBnsswitch.conf\fR(4) for details.
+specifying \fBcompat\fR as the source for \fBpasswd\fR. See
+\fBnsswitch.conf\fR(4).
 .sp
 .LP
 If the `+/-' is used, both \fB/etc/shadow\fR and \fB/etc/passwd\fR should have
@@ -425,8 +411,8 @@ shadow databases.
 .sp
 .LP
 If a password entry from any of the sources contains an empty \fIuid\fR or
-\fIgid\fR field, that entry will be ignored by the files, \fBNIS\fR, and
-\fBNIS+\fR name service switch backends, causing the user to appear unknown to
+\fIgid\fR field, that entry will be ignored by the files and \fBNIS\fR
+name service switch backends, causing the user to appear unknown to
 the system.
 .sp
 .LP
