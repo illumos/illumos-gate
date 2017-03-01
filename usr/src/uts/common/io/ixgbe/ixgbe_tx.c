@@ -214,7 +214,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 		if ((hdr_nmp != mp) ||
 		    (P2NPHASE((uintptr_t)hdr_nmp->b_rptr, ixgbe->sys_page_size)
 		    < hdr_len)) {
-			IXGBE_DEBUG_STAT(tx_ring->stat_lso_header_fail);
+			tx_ring->stat_lso_header_fail++;
 			/*
 			 * reallocate the mblk for the last header fragment,
 			 * expect to bcopy into pre-allocated page-aligned
@@ -393,7 +393,7 @@ adjust_threshold:
 	 * descriptors is needed.
 	 */
 	if (desc_total + 1 > IXGBE_TX_DESC_LIMIT) {
-		IXGBE_DEBUG_STAT(tx_ring->stat_break_tbd_limit);
+		tx_ring->stat_break_tbd_limit++;
 
 		/*
 		 * Discard the mblk and free the used resources
