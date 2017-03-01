@@ -736,7 +736,7 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 		mutex_enter(&curproc->p_lock);
 		t->t_proc_flag = (t->t_proc_flag & ~TP_HOLDLWP) | TP_KTHREAD;
 		lwptolxlwp(l)->br_lwp_flags |= BR_AIO_LWP;
-		curthread->t_hold = hold_set;
+		t->t_hold = hold_set;
 		lwp_create_done(t);
 		mutex_exit(&curproc->p_lock);
 	}
