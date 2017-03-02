@@ -69,7 +69,7 @@ if [[ -f $TAR_SEED ]]; then
     mkdir -m 0755 dev
     chgrp sys dev
     mkdir -m 0755 root
-    chgrp root sys
+    chgrp sys root
     cd root
     gtar $args $TAR_SEED
     exit 0
