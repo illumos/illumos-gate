@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ALIASES 4 "May 8, 2006"
+.TH ALIASES 4 "Feb 25, 2017"
 .SH NAME
 aliases, addresses, forward \- addresses and aliases for sendmail
 .SH SYNOPSIS
@@ -33,7 +33,6 @@ aliases, addresses, forward \- addresses and aliases for sendmail
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These files contain mail addresses or aliases, recognized by \fBsendmail\fR(1M)
 for the local host:
@@ -101,15 +100,13 @@ Addresses to which a user's mail is forwarded (see \fBAutomatic Forwarding\fR).
 
 .sp
 .LP
-In addition, the \fBNIS\fR name services aliases map \fImail.aliases\fR, and
-the \fBNIS+\fR \fImail_aliases\fR table, both contain addresses and aliases
+In addition, the \fBNIS\fR name services aliases map \fImail.aliases\fR
+contains addresses and aliases
 available for use across the network.
 .SS "Addresses"
-.sp
 .LP
 As distributed, \fBsendmail\fR(1M) supports the following types of addresses:
 .SS "Local Usernames"
-.sp
 .in +2
 .nf
 \fIusername\fR
@@ -120,7 +117,6 @@ As distributed, \fBsendmail\fR(1M) supports the following types of addresses:
 .LP
 Each local \fIusername\fR is listed in the local host's \fB/etc/passwd\fR file.
 .SS "Local Filenames"
-.sp
 .in +2
 .nf
 \fIpathname\fR
@@ -132,7 +128,6 @@ Each local \fIusername\fR is listed in the local host's \fB/etc/passwd\fR file.
 Messages addressed to the absolute \fIpathname\fR of a file are appended to
 that file.
 .SS "Commands"
-.sp
 .in +2
 .nf
 \fB|\fR\fBcommand\fR
@@ -145,7 +140,6 @@ If the first character of the address is a vertical bar (\fB\||\|\fR),
 \fBsendmail\fR(1M) pipes the message to the standard input of the \fBcommand\fR
 the bar precedes.
 .SS "Internet-standard Addresses"
-.sp
 .in +2
 .nf
 \fIusername\fR\fB@\fR\fIdomain\fR
@@ -173,7 +167,6 @@ For example, the full address of John Smith could be:
 .LP
 if he uses the machine named \fBjsmachine\fR at Podunk University.
 .SS "\fBuucp\fR Addresses"
-.sp
 .in +2
 .nf
 \&.\|.\|. [\fIhost\fR\fB!\fR] \fIhost\fR\fB!\fR\fIusername\fR
@@ -192,7 +185,6 @@ Other site-specific forms of addressing can be added by customizing the
 Standard addresses are recommended.
 .SS "Aliases"
 .SS "Local Aliases"
-.sp
 .LP
 \fB/etc/mail/aliases\fR is formatted as a series of lines of the form
 .sp
@@ -215,7 +207,6 @@ upper-case letters.
 Lines beginning with white space are treated as continuation lines for the
 preceding alias. Lines beginning with \fB#\fR are comments.
 .SS "Special Aliases"
-.sp
 .LP
 An alias of the form:
 .sp
@@ -255,13 +246,11 @@ An alias of the form:
 with colons as shown, adds the recipients listed in the file \fIpathname\fR to
 the \fIaliasname\fR alias. This allows a private list to be maintained
 separately from the aliases file.
-.SS "NIS and NIS+ Domain Aliases"
-.sp
+.SS "NIS Domain Aliases"
 .LP
 The aliases file on the master \fBNIS\fR server is used for the
 \fImail.aliases\fR \fBNIS\fR map, which can be made available to every
-\fBNIS\fR client. The \fImail_aliases\fR table serves the same purpose on a
-\fBNIS+\fR server. Thus, the \fB/etc/mail/aliases*\fR files on the various
+\fBNIS\fR client. Thus, the \fB/etc/mail/aliases*\fR files on the various
 hosts in a network will one day be obsolete. Domain-wide aliases should
 ultimately be resolved into usernames on specific hosts. For example, if the
 following were in the domain-wide alias file:
@@ -274,12 +263,12 @@ jsmith:js@jsmachine
 
 .sp
 .LP
-then any \fBNIS\fR or \fBNIS+\fR client could just mail to \fBjsmith\fR and not
+then any \fBNIS\fR client could just mail to \fBjsmith\fR and not
 have to remember the machine and username for John Smith.
 .sp
 .LP
-If a \fBNIS\fR or \fBNIS+\fR alias does not resolve to an address with a
-specific host, then the name of the \fBNIS\fR or \fBNIS+\fR domain is used.
+If a \fBNIS\fR alias does not resolve to an address with a
+specific host, then the name of the \fBNIS\fR domain is used.
 There should be an alias of the domain name for a host in this case.
 .sp
 .LP
@@ -293,10 +282,9 @@ jsmith:root
 
 .sp
 .LP
-sends mail on a \fBNIS\fR or \fBNIS+\fR client to \fBroot@podunk-u\fR if the
-name of the \fBNIS\fR or \fBNIS+\fR domain is \fBpodunk-u\fR.
+sends mail on a \fBNIS\fR client to \fBroot@podunk-u\fR if the
+name of the \fBNIS\fR domain is \fBpodunk-u\fR.
 .SS "Automatic Forwarding"
-.sp
 .LP
 When an alias (or address) is resolved to the name of a user on the local host,
 \fBsendmail\fR(1M) checks for a ~/.forward file, owned by the intended
@@ -373,7 +361,6 @@ The first file that meets the conditions is used to forward the mail, that is,
 all the entries in that file receive a copy of the mail. The search is then
 stopped.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/passwd\fR\fR
@@ -446,13 +433,11 @@ Forwarding information file
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpasswd\fR(1), \fBuucp\fR(1C), \fBvacation\fR(1), \fBnewaliases\fR(1M),
 \fBsendmail\fR(1M), \fBndbm\fR(3C), \fBgetusershell\fR(3C), \fBpasswd\fR(4),
 \fBshells\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 Because of restrictions in \fBndbm\fR(3C), a single alias cannot contain more
 than about \fB1000\fR characters (if this format is used). The Berkeley

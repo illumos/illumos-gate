@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GROUPMOD 1M "Aug 27, 2008"
+.TH GROUPMOD 1M "Feb 25, 2017"
 .SH NAME
 groupmod \- modify a group definition on the system
 .SH SYNOPSIS
@@ -13,12 +13,10 @@ groupmod \- modify a group definition on the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgroupmod\fR command modifies the definition of the specified group by
 modifying the appropriate entry in the \fB/etc/group\fR file.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -59,7 +57,6 @@ Allow the \fIgid\fR to be duplicated (non-unique).
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -72,7 +69,6 @@ An existing group name to be modified.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The \fBgroupmod\fR utility exits with one of the following values:
 .sp
@@ -140,7 +136,6 @@ Cannot update the \fB/etc/group\fR file.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/group\fR\fR
@@ -150,17 +145,15 @@ group file
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBlogins\fR(1M),
 \fBuseradd\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M), \fBgroup\fR(4),
 \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBgroupmod\fR utility only modifies group definitions in the
-\fB/etc/group\fR file. If a network name service such as \fBNIS\fR or
-\fBNIS+\fR is being used to supplement the local \fB/etc/group\fR file with
+\fB/etc/group\fR file. If a network name service
+is being used to supplement the local \fB/etc/group\fR file with
 additional entries, \fBgroupmod\fR cannot change information supplied by the
 network name service. The \fBgroupmod\fR utility will, however, verify the
 uniqueness of group name and group \fBID\fR against the external name service.

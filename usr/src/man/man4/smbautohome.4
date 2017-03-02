@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMBAUTOHOME 4 "Jan 5, 2009"
+.TH SMBAUTOHOME 4 "Feb 25, 2017"
 .SH NAME
 smbautohome \- CIFS autohome configuration
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ smbautohome \- CIFS autohome configuration
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The Solaris CIFS service can automatically share home directories when a CIFS
 client connects. The autohome map file, \fB/etc/smbautohome\fR, uses the search
@@ -38,7 +37,6 @@ The \fBnsswitch\fR autohome entry uses the naming service to match users to
 home directories. The second autohome entry specifies that the home directory
 for user \fBjane\fR is \fB/home/j/jane\fR.
 .SS "autohome Map Entry Format"
-.sp
 .LP
 A map entry, which is also referred to as a mapping, uses the following format:
 .sp
@@ -106,7 +104,6 @@ The attribute type that is used to describe an object's RDN is called a
 \fBdc\fR for the \fBdomainDns\fR object class
 .RE
 .SS "autohome Map Key Substitution"
-.sp
 .LP
 The autohome feature supports the following wildcard substitutions for the
 value of the key field:
@@ -141,7 +138,6 @@ jane /home/?/&
 
 .RE
 .SS "Wildcard Rule"
-.sp
 .LP
 When supplied in the key field, the asterisk character (\fB*\fR) is recognized
 as the "catch-all" entry. Such an entry matches any key not previously matched.
@@ -161,10 +157,9 @@ For example, the following entry would map any user to a home directory in
 The wildcard rule is \fBonly\fR applied if an appropriate rule is not matched
 by another map entry.
 .SS "NSSwitch Map"
-.sp
 .LP
 The \fBnsswitch\fR map is used to request that the home directory be obtained
-from a password database, such as the local, NIS, NIS+, or LDAP databases. If
+from a password database, such as the local, NIS, or LDAP databases. If
 an AD path is appended, it is used to publish shares.
 .sp
 .in +2
@@ -182,11 +177,9 @@ appropriate rule is not matched by another map entry.
 The wildcard and \fBnsswitch\fR rules are mutually exclusive. Do not include an
 \fBnsswitch\fR rule if a wildcard rule has already been defined.
 .SH FILES
-.sp
 .LP
 \fB/etc/smbautohome\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See the \fBattributes\fR(5) man page for descriptions of the following
 attributes:
@@ -203,7 +196,6 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsharectl\fR(1M), \fBsharemgr\fR(1M), \fBsmbadm\fR(1M), \fBsmbd\fR(1M),
 \fBsmbstat\fR(1M), \fBsmb\fR(4), \fBattributes\fR(5)

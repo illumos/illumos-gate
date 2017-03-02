@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 # Combine LC_CTYPE classes from all .UTF-8.src files to be compiled by localedef
@@ -42,5 +42,9 @@ for i in upper lower alpha space cntrl graph print punct digit xdigit blank \
 	sort -u |\
 	sed "1 s,^,$i,;$ s,\([>)]\);/,\1,"
 done
+
+# Add the manually assembled definitions from FreeBSD
+# (originally tools/tools/locale/etc/manual-input.UTF-8).
+cat data/manual-input.UTF-8
 
 printf "\nEND LC_CTYPE\n"

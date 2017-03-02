@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USERADD 1M "Apr 16, 2013"
+.TH USERADD 1M "Feb 25, 2017"
 .SH NAME
 useradd \- administer a new user login on the system
 .SH SYNOPSIS
@@ -552,8 +552,8 @@ UX: useradd: ERROR: Cannot update system files - login cannot be created.
 .LP
 The \fBuseradd\fR utility adds definitions to only the local \fB/etc/group\fR,
 \fBetc/passwd\fR, \fB/etc/passwd\fR, \fB/etc/shadow\fR, \fB/etc/project\fR, and
-\fB/etc/user_attr\fR files. If a network name service such as \fBNIS\fR or
-\fBNIS+\fR is being used to supplement the local \fB/etc/passwd\fR file with
+\fB/etc/user_attr\fR files. If a network name service
+is being used to supplement the local \fB/etc/passwd\fR file with
 additional entries, \fBuseradd\fR cannot change information supplied by the
 network name service. However \fBuseradd\fR will verify the uniqueness of the
 user name (or role) and user id and the existence of any group names specified

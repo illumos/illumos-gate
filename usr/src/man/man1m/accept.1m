@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ACCEPT 1M "Jun 5, 2006"
+.TH ACCEPT 1M "Feb 25, 2017"
 .SH NAME
 accept, reject \- accept or reject print requests
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ accept, reject \- accept or reject print requests
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBaccept\fR allows the queueing of print requests for the named destinations.
 .sp
@@ -36,7 +35,6 @@ local print queues. Under some configurations, \fBaccept\fR and \fBreject\fR
 are run on client systems when IPP is being used to communicate between client
 and server.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported for \fBreject\fR:
 .sp
@@ -54,7 +52,6 @@ destinations added to the system but not yet accepting requests. Enclose
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -71,7 +68,6 @@ conventions for destinations.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -93,7 +89,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -129,17 +124,7 @@ LDAP version of \fB/etc/printers.conf\fR
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBprinters.org_dir\fR\fR
-.ad
-.RS 24n
-\fBNIS+\fR version of \fB/etc/printers.conf\fR
-.RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -157,12 +142,10 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBenable\fR(1), \fBlp\fR(1), \fBlpstat\fR(1), \fBlpadmin\fR(1M),
 \fBlpsched\fR(1M), \fBprinters.conf\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 \fBaccept\fR and \fBreject\fR affect only queueing on the print server's
 spooling system. Requests made from a client system remain queued in the client

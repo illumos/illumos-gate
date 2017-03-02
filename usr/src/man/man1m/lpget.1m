@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LPGET 1M "May 23, 2003"
+.TH LPGET 1M "Feb 25, 2017"
 .SH NAME
 lpget \- get printing configuration
 .SH SYNOPSIS
@@ -13,11 +13,10 @@ lpget \- get printing configuration
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlpget\fR utility reads printing configuration information from the
 configuration databases in \fB$HOME/.printers\fR, \fB/etc/printers.conf\fR,
-\fBprinters.conf.byname\fR, and \fBprinters.org_dir\fR printer. This
+and \fBprinters.conf.byname\fR. This
 information, called a \fIconfiguration report\fR, is displayed to the standard
 output. See \fBprinters\fR(4) and \fBprinters.conf\fR(4) for information about
 the printer configuration databases.
@@ -28,7 +27,6 @@ destination or destinations by default. Use the \fB-k\fR option  to display a
 configuration report for specific keys. Use the \fBlist\fR operand to display a
 configuration report for all configured destinations.
 .SH OPTIONS
-.sp
 .LP
 The following option is supported:
 .sp
@@ -42,7 +40,6 @@ information about specifying  \fIkey\fR.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -101,7 +98,6 @@ example% \fBlpget list\fR
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -123,7 +119,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -150,17 +145,7 @@ User-configurable printer database.
 \fBNIS\fR version of \fB/etc/printers.conf\fR.
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBprinters.org_dir\fR\fR
-.ad
-.RS 24n
-\fBNIS+\fR version of \fB/etc/printers.conf\fR.
-.RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -176,7 +161,6 @@ Stability Level	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(1), \fBlp\fR(1), \fBlpc\fR(1B), \fBlpq\fR(1B), \fBlpr\fR(1B),
 \fBlpstat\fR(1), \fBlpadmin \fR(1M), \fBlpset\fR(1M), \fBprinters\fR(4),
@@ -185,7 +169,6 @@ Stability Level	Stable
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 Be mindful of the following if the LDAP database is used as the name service.
 If the \fBldapclient\fR(1M) server is a replica LDAP server, LDAP printer

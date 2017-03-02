@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KEYSERV 1M "Jan 4, 2002"
+.TH KEYSERV 1M "Feb 25, 2017"
 .SH NAME
 keyserv \- server for storing private encryption keys
 .SH SYNOPSIS
@@ -14,11 +14,10 @@ keyserv \- server for storing private encryption keys
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBkeyserv\fR is a daemon that is used for storing the private encryption keys
 of each user logged into the system. These encryption keys are used for
-accessing secure network services such as secure \fBNFS\fR and NIS+.
+accessing secure network services such as secure \fBNFS\fR.
 .sp
 .LP
 Normally, root's key is read from the file \fB/etc/.rootkey\fR when the daemon
@@ -48,7 +47,6 @@ The default value for \fBENABLE_NOBODY_KEYS\fR is \fBYES\fR.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -129,12 +127,7 @@ size in MB.
 This form of \fIsizespec\fR applies to all caches.
 .RE
 
-See \fBnisauthconf\fR(1M) for mechanism types. Note that the \fBdes\fR
-mechanism, \fBAUTH_DES\fR, does not use a disk cache.
-.RE
-
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/.rootkey\fR\fR
@@ -154,21 +147,10 @@ settings.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBkeylogin\fR(1), \fBsvcs\fR(1), \fBkeylogout\fR(1), \fBnisauthconf\fR(1M),
+\fBkeylogin\fR(1), \fBsvcs\fR(1), \fBkeylogout\fR(1),
 \fBsvcadm\fR(1M), \fBpublickey\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
-.sp
-.LP
-http://www.sun.com/directory/nisplus/transition.html
 .SH NOTES
-.sp
-.LP
-NIS+ might not be supported in future releases of the Solaris operating system.
-Tools to aid the migration from NIS+ to LDAP are available in the current
-Solaris release. For more information, visit
-http://www.sun.com/directory/nisplus/transition.html.
-.sp
 .LP
 The \fBkeyserv\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

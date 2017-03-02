@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GROUPADD 1M "Aug 27, 2008"
+.TH GROUPADD 1M "Feb 25, 2017"
 .SH NAME
 groupadd \- add (create) a new group definition on the system
 .SH SYNOPSIS
@@ -13,12 +13,10 @@ groupadd \- add (create) a new group definition on the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgroupadd\fR command creates a new group definition on the system by
 adding the appropriate entry to the \fB/etc/group\fR file.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -46,7 +44,6 @@ Allows the \fIgid\fR to be duplicated (non-unique).
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -64,7 +61,6 @@ numeric characters or a combination of both, and must not contain a colon
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -136,16 +132,14 @@ The  \fB/etc/group\fR file cannot be updated.
 \fB/usr/include/userdefs.h\fR
 .RE
 .SH SEE ALSO
-.sp
 .LP
 \fBusers\fR(1B), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBgrpck\fR(1M),
 \fBlogins\fR(1M), \fBpwck\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M),
 \fBusermod\fR(1M), \fBgroup\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 \fBgroupadd\fR only adds a group definition to the local system. If a network
-name service such as \fBNIS\fR or \fBNIS+\fR is being used to supplement the
+name service is being used to supplement the
 local \fB/etc/group\fR file with additional entries, \fBgroupadd\fR cannot
 change information supplied by the network name service. However,
 \fBgroupadd\fR will verify the uniqueness of group name and group \fBID\fR

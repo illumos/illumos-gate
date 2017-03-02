@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USER_ATTR 4 "Dec 12, 2008"
+.TH USER_ATTR 4 "Feb 25, 2017"
 .SH NAME
 user_attr \- extended user attributes database
 .SH SYNOPSIS
@@ -13,12 +13,11 @@ user_attr \- extended user attributes database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB/etc/user_attr\fR is a local source of extended attributes associated with
 users and roles. \fBuser_attr\fR can be used with other user attribute sources,
-including the LDAP people container, the \fBuser_attr\fR \fBNIS\fR map, and the
-\fBuser_attr\fR \fBNIS+\fR table. Programs use the \fBgetuserattr\fR(3SECDB)
+including the LDAP people container and the \fBuser_attr\fR \fBNIS\fR map.
+Programs use the \fBgetuserattr\fR(3SECDB)
 routines to gain access to this information.
 .sp
 .LP
@@ -262,7 +261,6 @@ modify \fB\fIkey\fR=\fIvalue\fR\fR fields in \fB/etc/user_attr\fR. Modification
 of the \fBtype\fR key is restricted as described in \fBrolemod\fR and
 \fBusermod\fR.
 .SS "Privileges Keywords"
-.sp
 .LP
 The \fBdefaultpriv\fR and \fBlimitpriv\fR are the privileges-related keywords
 and are described above.
@@ -306,7 +304,6 @@ has. The combination of authorizations enables root to grant to others all the
 authorizations.
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
@@ -327,7 +324,6 @@ Described here.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -348,7 +344,6 @@ Interface Stability	See below
 .LP
 The command-line syntax is Committed. The output is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBauths\fR(1), \fBpfcsh\fR(1), \fBpfksh\fR(1), \fBpfsh\fR(1), \fBppriv\fR(1),
 \fBprofiles\fR(1), \fBroles\fR(1), \fBroleadd\fR(1M), \fBrolemod\fR(1M),
@@ -364,11 +359,6 @@ pages in the \fISolaris Trusted Extensions Reference Manual\fR.
 .LP
 \fISystem Administration Guide: Security Services\fR
 .SH NOTES
-.sp
-.LP
-When deciding which authorization source to use, if you are not using LDAP,
-keep in mind that \fBNIS+\fR provides stronger authentication than \fBNIS\fR.
-.sp
 .LP
 The root user is usually defined in local databases for a number of reasons,
 including the fact that root needs to be able to log in and do system

@@ -3,17 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ETHERS 4 "Jul 22, 2004"
+.TH ETHERS 4 "Feb 25, 2017"
 .SH NAME
 ethers \- Ethernet address to hostname database or domain
 .SH DESCRIPTION
-.sp
 .LP
 The \fBethers\fR file is a local source of information about the (48-bit)
 Ethernet addresses of hosts on the Internet. The \fBethers\fR file can be used
 in conjunction with or instead of other \fBethers\fR sources, including the
-\fBNIS\fR maps \fBethers.byname\fR and \fBethers.byaddr\fR, the \fBNIS+\fR
-table \fBethers\fR, or Ethernet address data stored on an LDAP server. Programs
+\fBNIS\fR maps \fBethers.byname\fR and \fBethers.byaddr\fR,
+or Ethernet address data stored on an LDAP server. Programs
 use the \fBethers\fR(3SOCKET) routines to access this information.
 .sp
 .LP
@@ -35,7 +34,6 @@ The address bytes are always in network order. Host names may contain any
 printable character other than \fBSPACE\fR, \fBTAB\fR, \fBNEWLINE\fR, or
 comment character.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/ethers\fR\fR
@@ -45,6 +43,5 @@ comment character.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBethers\fR(3SOCKET), \fBhosts\fR(4), \fBnsswitch.conf\fR(4)

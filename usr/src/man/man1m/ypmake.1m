@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPMAKE 1M "Aug 17, 2006"
+.TH YPMAKE 1M "Feb 25, 2017"
 .SH NAME
 ypmake \- rebuild NIS database
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ ypmake \- rebuild NIS database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The file called \fBMakefile\fR in \fB/var/yp\fR is used by \fBmake\fR(1S) to
 build the  Network Information Service (\fBNIS\fR) database. With no arguments,
@@ -52,7 +51,6 @@ used. If \fBypmake\fR is accidentally run, then the server components will
 detect this, and will log a warning message. For additional information, see
 \fBypfiles\fR(4).
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/yp\fR\fR
@@ -80,7 +78,6 @@ Default directory for source files.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -96,19 +93,11 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBmake\fR(1S), \fBnis+\fR(1), \fBmakedbm\fR(1M), \fBrpc.nisd\fR(1M),
+\fBmake\fR(1S), \fBmakedbm\fR(1M),
 \fBypbind\fR(1M), \fByppush\fR(1M), \fBypserv\fR(1M), \fBypclnt\fR(3NSL),
 \fBNISLDAPmapping\fR(4), \fBypfiles\fR(4), \fBypserv\fR(4)
 .SH NOTES
-.sp
-.LP
-The  \fBNIS\fR makefile is only used when running the  \fBypserv\fR(1M) server
-to provide  \fBNIS\fR services. If these are being provided by the  \fBNIS+\fR
-server running in \fBNIS\fR compatibility mode, see  \fBrpc.nisd\fR(1M); this
-makefile is not relevant.  See  \fBypfiles\fR(4) for more details.
-.sp
 .LP
 The Network Information Service (\fBNIS\fR) was formerly known as Sun Yellow
 Pages (\fBYP\fR).  The functionality of the two remains the same. Only the name

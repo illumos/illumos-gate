@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USERMOD 1M "Feb 22, 2008"
+.TH USERMOD 1M "Feb 25, 2017"
 .SH NAME
 usermod \- modify a user's login information on the system
 .SH SYNOPSIS
@@ -574,8 +574,8 @@ Interface Stability	Committed
 .SH NOTES
 .LP
 The \fBusermod\fR utility modifies \fBpasswd\fR definitions only in the local
-\fB/etc/passwd\fR and \fB/etc/shadow\fR files. If a network nameservice such as
-\fBNIS\fR or \fBNIS+\fR is being used to supplement the local files with
+\fB/etc/passwd\fR and \fB/etc/shadow\fR files. If a network nameservice
+is being used to supplement the local files with
 additional entries, \fBusermod\fR cannot change information supplied by the
 network nameservice. However \fBusermod\fR will verify the uniqueness of user
 name and user \fBID\fR against the external nameservice.

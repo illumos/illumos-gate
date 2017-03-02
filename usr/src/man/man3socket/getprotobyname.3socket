@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.  Copyright 1989 AT&T  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
-.TH GETPROTOBYNAME 3SOCKET "Apr 5, 2004"
+.TH GETPROTOBYNAME 3SOCKET "Feb 25, 2017"
 .SH NAME
 getprotobyname, getprotobyname_r, getprotobynumber, getprotobynumber_r,
 getprotoent, getprotoent_r, setprotoent, endprotoent \- get protocol entry
@@ -53,7 +53,6 @@ getprotoent, getprotoent_r, setprotoent, endprotoent \- get protocol entry
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions return a protocol entry. Two types of interfaces are supported:
 reentrant (\fBgetprotobyname_r()\fR, \fBgetprotobynumber_r()\fR, and
@@ -77,10 +76,10 @@ each return a protocol entry.
 .LP
 The entry may come from one of the following sources: the protocols file (see
 \fBprotocols\fR(4)), the \fBNIS\fR maps ``protocols.byname'' and
-``protocols.bynumber'', and the \fBNIS+\fR table ``protocols''. The sources and
+``protocols.bynumber''. The sources and
 their lookup order are specified in the \fB/etc/nsswitch.conf\fR file (see
 \fBnsswitch.conf\fR(4) for details). Some name services such as NIS will return
-only one name for a host, whereas others such as NIS+ or DNS will return all
+only one name for a host, whereas others such as DNS will return all
 aliases.
 .sp
 .LP
@@ -138,7 +137,6 @@ int   p_proto;
 .in -2
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetprotobyname_r()\fR, \fBgetprotobyname()\fR,
 \fBgetprotobynumber_r()\fR, and \fBgetprotobynumber()\fR functions return a
@@ -150,7 +148,6 @@ The \fBgetprotoent_r()\fR and \fBgetprotoent()\fR functions return a pointer to
 a \fBstruct protoent\fR if they successfully enumerate an entry; otherwise they
 return \fINULL\fR, indicating the end of the enumeration.
 .SH ERRORS
-.sp
 .LP
 The \fBgetprotobyname_r()\fR, \fBgetprotobynumber_r()\fR, and
 \fBgetprotoent_r()\fR functions will fail if:
@@ -165,14 +162,12 @@ the result.
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/etc/protocols\fR
 .sp
 .LP
 \fB/etc/nsswitch.conf\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -188,12 +183,10 @@ MT-Level	See \fBNOTES\fR below.
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBnsswitch.conf\fR(4), \fBprotocols\fR(4),
 \fBattributes\fR(5), \fBnetdb.h\fR(3HEAD)
 .SH NOTES
-.sp
 .LP
 Although \fBgetprotobyname_r()\fR, \fBgetprotobynumber_r()\fR, and
 \fBgetprotoent_r()\fR are not mentioned by POSIX 1003.1:2001, they were added
@@ -223,10 +216,9 @@ scope, and are therefore not safe in multi-threaded applications.
 .LP
 Use of \fBgetprotoent_r()\fR and \fBgetprotoent()\fR is discouraged;
 enumeration is well-defined for the protocols file and is supported (albeit
-inefficiently) for \fBNIS\fR and \fBNIS+,\fR but in general may not be
+inefficiently) for \fBNIS\fR but in general may not be
 well-defined.  The semantics of enumeration are discussed in
 \fBnsswitch.conf\fR(4).
 .SH BUGS
-.sp
 .LP
 Only the Internet protocols are currently understood.

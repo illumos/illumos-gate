@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC 4 "Dec 10, 1991"
+.TH RPC 4 "Feb 25, 2017"
 .SH NAME
 rpc \- rpc program number data base
 .SH SYNOPSIS
@@ -14,12 +14,11 @@ rpc \- rpc program number data base
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrpc\fR file is a local source containing user readable names that can be
 used in place of \fBRPC\fR program numbers.  The  \fBrpc\fR file can be used in
 conjunction with or instead of other rpc sources, including the \fBNIS\fR maps
-``rpc.byname'' and ``rpc.bynumber'' and the \fBNIS+\fR table ``rpc''.
+``rpc.byname'' and ``rpc.bynumber''.
 .sp
 .LP
 The rpc file has one line for each \fBRPC\fR program name. The line has the
@@ -65,7 +64,6 @@ keyserv	100029	keyserver
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
@@ -75,6 +73,5 @@ keyserv	100029	keyserver
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBnsswitch.conf\fR(4)

@@ -4,22 +4,21 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NEWKEY 1M "Nov 13, 2003"
+.TH NEWKEY 1M "Feb 25, 2017"
 .SH NAME
 newkey \- create a new Diffie-Hellman key pair in the publickey database
 .SH SYNOPSIS
 .LP
 .nf
-\fBnewkey\fR \fB-h\fR \fIhostname\fR [\fB-s\fR nisplus | nis | files | ldap]
+\fBnewkey\fR \fB-h\fR \fIhostname\fR [\fB-s\fR nis | files | ldap]
 .fi
 
 .LP
 .nf
-\fBnewkey\fR \fB-u\fR \fIusername\fR [\fB-s\fR nisplus | nis | files | ldap]
+\fBnewkey\fR \fB-u\fR \fIusername\fR [\fB-s\fR nis | files | ldap]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBnewkey\fR establishes new public keys for users and machines on the network.
 These keys are needed when using secure \fBRPC\fR or secure \fBNFS\fR service.
@@ -28,8 +27,8 @@ These keys are needed when using secure \fBRPC\fR or secure \fBNFS\fR service.
 \fBnewkey\fR prompts for a password for the given \fIusername\fR or
 \fBhostname\fR and then creates a new public/secret Diffie-Hellman 192 bit key
 pair for the user or host. The secret key is encrypted with the given password.
-The key pair can be stored in the \fB/etc/publickey\fR file, the NIS
-\fBpublickey\fR map, or the NIS+ \fBcred.org_dir\fR table.
+The key pair can be stored in the \fB/etc/publickey\fR file or the NIS
+\fBpublickey\fR map.
 .sp
 .LP
 \fBnewkey\fR consults the \fBpublickey\fR entry in the name service switch
@@ -43,20 +42,13 @@ message. The user is required to specify the source explicitly with the
 .sp
 .LP
 In the case of NIS, \fBnewkey\fR should be run by the superuser on the master
-NIS server for that domain. In the case of NIS+, \fBnewkey\fR should be run by
-the superuser on a machine which has permission to update the
-\fBcred.org_dir\fR table of the new user/host domain.
-.sp
-.LP
-In the case of NIS+, \fBnisaddcred\fR(1M) should be used to add new keys.
-\fBnewkey\fR cannot be used to create keys other than 192-bit Diffie-Hellman.
+NIS server for that domain.
 .sp
 .LP
 In the case of LDAP, \fBnewkey\fR should be run by the superuser on a machine
 that also recognizes the directory manager's bind distinguished name (DN) and
 password to perform an LDAP update for the host.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-h\fR \fIhostname\fR\fR
@@ -79,10 +71,6 @@ password for the given \fIusername\fR.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR \fBnisplus\fR\fR
-.ad
-.br
-.na
 \fB\fB-s\fR \fBnis\fR\fR
 .ad
 .br
@@ -94,20 +82,12 @@ password for the given \fIusername\fR.
 \fB\fB-s\fR \fBldap\fR\fR
 .ad
 .RS 15n
-Update the database in the specified source: \fBnisplus\fR (for NIS+),
+Update the database in the specified source:
 \fBnis\fR (for NIS), \fBfiles\fR, or \fBldap\fR (LDAP). Other sources may be
 available in the future.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBchkey\fR(1), \fBkeylogin\fR(1), \fBnisaddcred\fR(1M), \fBnisclient\fR(1M),
+\fBchkey\fR(1), \fBkeylogin\fR(1),
 \fBnsswitch.conf\fR(4), \fBpublickey\fR(4), \fBattributes\fR(5)
-.SH NOTES
-.sp
-.LP
-NIS+ might not be supported in future releases of the Solaris operating system.
-Tools to aid the migration from NIS+ to LDAP are available in the current
-Solaris release. For more information, visit
-http://www.sun.com/directory/nisplus/transition.html.

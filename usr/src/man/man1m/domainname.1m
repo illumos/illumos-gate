@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DOMAINNAME 1M "Mar 8, 2006"
+.TH DOMAINNAME 1M "Feb 25, 2017"
 .SH NAME
 domainname \- set or display name of the current domain
 .SH SYNOPSIS
@@ -14,15 +14,14 @@ domainname \- set or display name of the current domain
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Without an argument, \fBdomainname\fR displays the name of the current domain
-name used in RPC exchanges, usually referred to as the NIS or NIS+ domain name.
+name used in RPC exchanges, usually referred to as the NIS domain name.
 This name typically encompasses a group of \fBhosts\fR or \fBpasswd\fR entries
 under the same administration. The \fBdomainname\fR command is used by various
 components of Solaris to resolve names for entries such as are found in
 \fBpasswd\fR, \fBhosts\fR and \fBaliases\fR. By default, naming services such
-as \fBNIS\fR and \fBNIS+\fR use \fBdomainname\fR to resolve names.
+as \fBNIS\fR use \fBdomainname\fR to resolve names.
 .sp
 .LP
 With appropriate privileges (root or an equivalent role [see \fBrbac\fR(5)]),
@@ -69,7 +68,6 @@ If the Solaris \fBsendmail\fR cannot determine the fully qualified host name,
 use \fBcheck-hostname\fR(1M) as a troubleshooting aid. This script can offer
 guidance as to appropriate corrective action.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/defaultdomain\fR\fR
@@ -88,16 +86,14 @@ guidance as to appropriate corrective action.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBNIS+\fR(1), \fBnischown\fR(1), \fBnispasswd\fR(1), \fBsvcs\fR(1),
+\fBsvcs\fR(1),
 \fBcheck-hostname\fR(1M), \fBhostconfig\fR(1M), \fBnamed\fR(1M),
-\fBnisaddcred\fR(1M), \fBsendmail\fR(1M), \fBsvcadm\fR(1M), \fBypinit\fR(1M),
+\fBsendmail\fR(1M), \fBsvcadm\fR(1M), \fBypinit\fR(1M),
 \fBsys-unconfig\fR(1M), \fBaliases\fR(4), \fBdefaultdomain\fR(4),
 \fBhosts\fR(4), \fBnsswitch.conf\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5),
 \fBrbac\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBdomainname\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPCLNT 3NSL "Jan 23, 2004"
+.TH YPCLNT 3NSL "Feb 25, 2017"
 .SH NAME
 ypclnt, yp_get_default_domain, yp_bind, yp_unbind, yp_match, yp_first, yp_next,
 yp_all, yp_order, yp_master, yperr_string, ypprot_err \- NIS Version 2 client
@@ -76,20 +76,10 @@ interface
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This package of functions provides an interface to \fBNIS\fR, Network
-Information Service Version 2, formerly referred to as \fBYP\fR. In this
-version of SunOS, \fBNIS\fR version 2 is supported only for compatibility with
-previous versions. The recommended enterprise level information service is
-\fBNIS+\fR or \fBNIS\fR version 3. See \fBNIS+\fR(1). The current SunOS
-supports only the client interface to \fBNIS\fR version 2. This client
-interface will in turn be served either by an existing \fBypserv\fR process
-running on another machine on the network that has an earlier version of SunOS,
-or by a \fBNIS+\fR server running in "YP-compatibility mode". See
-\fBrpc.nisd\fR(1M). The \fBNOTES\fR section in \fBypfiles\fR(4) discusses the
-implications of being an \fBNIS\fR client of an \fBNIS+\fR server in
-\fBYP-compatibility mode\fR. For commands used to access \fBNIS\fR from a
+Information Service Version 2, formerly referred to as \fBYP\fR.
+For commands used to access \fBNIS\fR from a
 client machine, see \fBypbind\fR(1M), \fBypwhich\fR(1), \fBypmatch\fR(1), and
 \fBypcat\fR(1). The package can be loaded from the standard library,
 \fB/usr/lib/libnsl.so.1\fR.
@@ -112,7 +102,6 @@ All functions in this package of type \fIint\fR return \fB0\fR if they succeed.
 Otherwise, they return a failure code (\fBYPERR_\fR\fIxxxx\fR). Failure codes
 are described in the \fBERRORS\fR section.
 .SS "Routines"
-.sp
 .ne 2
 .na
 \fB\fByp_bind()\fR\fR
@@ -330,9 +319,7 @@ is then \fB0\fR.
 \fB\fByp_order()\fR\fR
 .ad
 .RS 27n
-The \fByp_order()\fR function returns the order number for a map. The function
-is not supported if the \fBypbind\fR process on the client's system is bound to
-an \fBNIS+\fR server running in "YP-compatibility mode".
+The \fByp_order()\fR function returns the order number for a map.
 .RE
 
 .sp
@@ -367,7 +354,6 @@ an input to \fByperr_string()\fR.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 All integer functions return \fB0\fR if the requested operation is successful,
 or one of the following errors if the operation fails:
@@ -516,11 +502,9 @@ Cannot communicate with \fBypserv\fR.
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/usr/lib/libnsl.so.1\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -536,8 +520,7 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBNIS+\fR(1), \fBypcat\fR(1), \fBypmatch\fR(1), \fBypwhich\fR(1),
-\fBrpc.nisd\fR(1M), \fBrpcbind\fR(1M), \fBypbind\fR(1M), \fBypserv\fR(1M),
+\fBypcat\fR(1), \fBypmatch\fR(1), \fBypwhich\fR(1),
+\fBrpcbind\fR(1M), \fBypbind\fR(1M), \fBypserv\fR(1M),
 \fBsysinfo\fR(2), \fBmalloc\fR(3C), \fBypfiles\fR(4), \fBattributes\fR(5)
