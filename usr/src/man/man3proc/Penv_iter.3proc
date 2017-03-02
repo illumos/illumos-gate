@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd March 2, 2017
 .Dt PENV_ITER 3PROC
 .Os
 .Sh NAME
@@ -45,7 +45,7 @@ The callback's return value controls whether or not iteration
 proceeds. If
 .Fa func
 returns zero, then iteration continues. Otherwise, iteration is
-terminated and the value if returned. It is recommend that callback
+terminated and the value is returned. It is recommended that callback
 functions do not return
 .Sy -1
 so as to distinguish between the failure of the
