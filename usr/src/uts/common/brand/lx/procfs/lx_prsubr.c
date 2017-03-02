@@ -199,29 +199,21 @@ lxpr_lock_pid(lxpr_node_t *lxpnp, pid_t pid, zombok_t zombie_ok,
 	zone_t *zone = LXPTOZ(lxpnp);
 	proc_t *p;
 	kthread_t *t;
+	lx_pid_flag_t flags = LXP_PRLOCK;
 
 	ASSERT(!MUTEX_HELD(&pidlock));
 
-retry:
-	if (pid == 0) {
-		/*
-		 * Present zsched as pid 0 for the zone.  There is no worry
-		 * about zsched disappearing during sprlock_proc() since the
-		 * zone (and zsched) will persist until all zone filesystems,
-		 * include this one, are unmounted.
-		 */
-		p = zone->zone_zsched;
-		mutex_enter(&p->p_lock);
-		sprlock_proc(p);
-	} else {
-		lx_pid_flag_t flags = LXP_PRLOCK;
+	/* Consider zsched to be invisible to LX */
+	if (pid == zone->zone_zsched->p_pid) {
+		return (NULL);
+	}
+	if (zombie_ok == ZOMB_OK) {
+		flags |= LXP_ZOMBOK;
+	}
 
-		if (zombie_ok == ZOMB_OK) {
-			flags |= LXP_ZOMBOK;
-		}
-		if (lx_lpid_lock(pid, zone, flags, &p, &t) != 0) {
-			return (NULL);
-		}
+retry:
+	if (lx_lpid_lock(pid, zone, flags, &p, &t) != 0) {
+		return (NULL);
 	}
 
 	/*
@@ -322,27 +314,25 @@ lxpr_fixpid(zone_t *zone, proc_t *p, pid_t *pidp, pid_t *ppidp)
 	ASSERT(p != NULL);
 	ASSERT(pidp != NULL);
 	ASSERT(zone->zone_brand == &lx_brand);
+	ASSERT(pid != zone->zone_zsched->p_pid);
 
 	if (pid == zone->zone_proc_initpid) {
 		pid = 1;
 		ppid = 0;	/* parent pid for init is 0 */
-	} else if (pid == zone->zone_zsched->p_pid) {
-		pid = 0;	/* zsched is pid 0 */
-		ppid = 0;	/* parent pid for zsched is itself */
 	} else {
-		/*
-		 * Make sure not to reference parent PIDs that reside outside
-		 * the zone
-		 */
-		if ((p->p_flag & SZONETOP) != 0) {
-			ppid = 0;
-		}
-
-		/*
-		 * Convert ppid to the Linux default of 1 if our parent is the
-		 * zone's init process
-		 */
 		if (ppid == zone->zone_proc_initpid) {
+			/*
+			 * Convert ppid to the Linux default of 1 if our parent
+			 * is the zone's init process
+			 */
+			ppid = 1;
+		} else if (ppid == zone->zone_zsched->p_pid ||
+		    (p->p_flag & SZONETOP) != 0) {
+			/*
+			 * Additionally, if the process has no valid parent
+			 * inside the zone (or its parent is zsched), lie and
+			 * claim init as the parent.
+			 */
 			ppid = 1;
 		}
 	}

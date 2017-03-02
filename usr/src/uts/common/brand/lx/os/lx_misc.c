@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2016, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -923,18 +923,17 @@ lx_stol_hwaddr(const struct sockaddr_dl *src, struct sockaddr *dst, int *size)
 void
 lx_sigfd_translate(k_siginfo_t *infop)
 {
+	zone_t *zone = curproc->p_zone;
+
 	infop->si_signo = lx_stol_signo(infop->si_signo, LX_SIGKILL);
-
 	infop->si_status = lx_stol_status(infop->si_status, LX_SIGKILL);
-
 	infop->si_code = lx_stol_sigcode(infop->si_code);
-
 	infop->si_errno = lx_errno(infop->si_errno, EINVAL);
 
-	if (infop->si_pid == curproc->p_zone->zone_proc_initpid) {
+	/* Map zsched and zone init to pid 1 */
+	if (infop->si_pid == zone->zone_proc_initpid ||
+	    infop->si_pid == zone->zone_zsched->p_pid) {
 		infop->si_pid = 1;
-	} else if (infop->si_pid == curproc->p_zone->zone_zsched->p_pid) {
-		infop->si_pid = 0;
 	}
 }
 

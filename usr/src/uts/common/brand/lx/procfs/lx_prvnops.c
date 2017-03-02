@@ -2167,10 +2167,7 @@ lxpr_read_status_common(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf,
 		return;
 	}
 
-	/*
-	 * Convert pid to the Linux default of 1 if we're the zone's init
-	 * process or if we're the zone's zsched the pid is 0.
-	 */
+	/* Translate the pid (e.g. initpid to 1) */
 	lxpr_fixpid(LXPTOZ(lxpnp), p, &pid, &ppid);
 
 	if (t != NULL) {
@@ -2384,19 +2381,11 @@ lxpr_read_pid_tid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		return;
 	}
 
-	/*
-	 * Set Linux defaults if we're the zone's init process
-	 */
+	/* Set Linux defaults if we're the zone's init process */
 	pid = p->p_pid;
 	lxpr_fixpid(zone, p, &pid, &ppid);
 	if (pid == 1) {
 		/* init process */
-		pgpid = 0;
-		psgid = (gid_t)-1;
-		spid = 0;
-		psdev = 0;
-	} else if (pid == 0) {
-		/* zsched process */
 		pgpid = 0;
 		psgid = (gid_t)-1;
 		spid = 0;
@@ -6305,22 +6294,19 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 
 		/*
 		 * Skip indices for which there is no pid_entry, PIDs for
-		 * which there is no corresponding process, a PID of 0,
-		 * and anything the security policy doesn't allow
-		 * us to look at.
+		 * which there is no corresponding process, a PID of 0, the
+		 * zsched process for the zone, and anything the security
+		 * policy doesn't allow us to look at.
 		 */
 		if ((p = pid_entry(i)) == NULL || p->p_stat == SIDL ||
 		    p->p_pid == 0 || p->p_zone != zone ||
+		    p == zone->zone_zsched ||
 		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0) {
 			mutex_exit(&pidlock);
 			goto next;
 		}
 
-		/*
-		 * Convert pid to the Linux default of 1 if we're the zone's
-		 * init process, or 0 if zsched, otherwise use the value from
-		 * the proc structure
-		 */
+		/* Translate the pid (e.g. initpid to 1) */
 		lxpr_fixpid(LXPTOZ(lxpnp), p, &pid, NULL);
 		raw_pid = p->p_pid;
 
@@ -7300,10 +7286,7 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 	} else {
 		switch (lxpnp->lxpr_type) {
 		case LXPR_SELF:
-			/*
-			 * Convert pid to the Linux default of 1 if we're the
-			 * zone's init process or 0 if zsched.
-			 */
+			/* Translate the pid (e.g. initpid to 1) */
 			lxpr_fixpid(LXPTOZ(lxpnp), curproc, &pid, NULL);
 
 			/*
