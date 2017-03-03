@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -355,7 +355,7 @@ main(int argc, char *argv[])
 	 * We support a subset of the old CTF merge flags, mostly for
 	 * compatability.
 	 */
-	while ((c = getopt(argc, argv, ":d:fgj:L:o:t")) != -1) {
+	while ((c = getopt(argc, argv, ":d:fgj:l:L:o:t")) != -1) {
 		switch (c) {
 		case 'd':
 			g_unique = optarg;
