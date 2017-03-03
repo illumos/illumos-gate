@@ -278,6 +278,7 @@ static void
 lx_io_cp_rele(lx_io_ctx_t *cp)
 {
 	lx_proc_data_t *lxpd = ptolxproc(curproc);
+	lx_zone_data_t *lxzd;
 	int i;
 	lx_io_elem_t *ep;
 
@@ -303,7 +304,16 @@ lx_io_cp_rele(lx_io_ctx_t *cp)
 	ASSERT(i < lxpd->l_io_ctx_cnt);
 	/* wake all threads waiting on context destruction */
 	cv_broadcast(&lxpd->l_io_destroy_cv);
+	ASSERT(cp->lxioctx_shutdown == B_TRUE);
+
 	mutex_exit(&lxpd->l_io_ctx_lock);
+
+	/* can now decrement the zone's overall aio counter */
+	lxzd = ztolxzd(curproc->p_zone);
+	mutex_enter(&lxzd->lxzd_lock);
+	VERIFY(cp->lxioctx_maxn <= lxzd->lxzd_aio_nr);
+	lxzd->lxzd_aio_nr -= cp->lxioctx_maxn;
+	mutex_exit(&lxzd->lxzd_lock);
 
 	/*
 	 * We have the only pointer to the context now. Free all
@@ -413,20 +423,43 @@ lx_io_do_op(lx_io_elem_t *ep)
 }
 
 /*
- * If our process is forking, it expects all LWPs to be stopped first. For the
- * worker threads, a stop equivalent to holdlwp() is necessary before the
- * fork can proceed. The initial check is performed outside p_lock to avoid
- * making that lock too hot.
+ * First check if this worker needs to quit due to shutdown or exit. Return
+ * true in this case.
+ *
+ * Then check if our process is forking. In this case it expects all LWPs to be
+ * stopped first. For the worker threads, a stop equivalent to holdlwp() is
+ * necessary before the fork can proceed.
+ *
+ * It is common to check p_flag outside of p_lock (see issig) and we want to
+ * avoid making p_lock any hotter since this is called in the worker main loops.
  */
-static void
-lx_io_worker_chk_status()
+static boolean_t
+lx_io_worker_chk_status(lx_io_ctx_t *cp, boolean_t locked)
 {
-	if (curproc->p_flag & (SHOLDFORK | SHOLDFORK1)) {
-		mutex_enter(&curproc->p_lock);
-		if (curproc->p_flag & (SHOLDFORK | SHOLDFORK1))
-			stop(PR_SUSPENDED, SUSPEND_NORMAL);
-		mutex_exit(&curproc->p_lock);
+	if (cp->lxioctx_shutdown)
+		return (B_TRUE);
+
+	if (curproc->p_flag & (SEXITLWPS | SKILLED)) {
+		cp->lxioctx_shutdown = B_TRUE;
+		return (B_TRUE);
 	}
+
+	if (curproc->p_flag & (SHOLDFORK | SHOLDFORK1)) {
+		if (locked)
+			mutex_exit(&cp->lxioctx_p_lock);
+
+		mutex_enter(&curproc->p_lock);
+		stop(PR_SUSPENDED, SUSPEND_NORMAL);
+		mutex_exit(&curproc->p_lock);
+
+		if (locked)
+			mutex_enter(&cp->lxioctx_p_lock);
+
+		if (cp->lxioctx_shutdown)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }
 
 /*
@@ -445,24 +478,26 @@ lx_io_worker(void *a)
 	while (!cp->lxioctx_shutdown) {
 		mutex_enter(&cp->lxioctx_p_lock);
 		if (list_is_empty(&cp->lxioctx_pending)) {
-
 			/*
 			 * This must be cv_wait_sig, as opposed to cv_wait, so
 			 * that pokelwps works correctly on these threads.
+			 *
+			 * The worker threads have all of their signals held,
+			 * so a cv_wait_sig return of 0 here only occurs while
+			 * we're shutting down.
 			 */
-			(void) cv_wait_sig(&cp->lxioctx_pending_cv,
-			    &cp->lxioctx_p_lock);
+			if (cv_wait_sig(&cp->lxioctx_pending_cv,
+			    &cp->lxioctx_p_lock) == 0)
+				cp->lxioctx_shutdown = B_TRUE;
+		}
 
-			if (cp->lxioctx_shutdown) {
-				mutex_exit(&cp->lxioctx_p_lock);
-				break;
-			}
+		if (lx_io_worker_chk_status(cp, B_TRUE)) {
+			mutex_exit(&cp->lxioctx_p_lock);
+			break;
 		}
 
 		ep = list_remove_head(&cp->lxioctx_pending);
 		mutex_exit(&cp->lxioctx_p_lock);
-
-		lx_io_worker_chk_status();
 
 		while (ep != NULL) {
 			boolean_t do_resfd;
@@ -514,10 +549,8 @@ lx_io_worker(void *a)
 				releasef(resfd);
 			}
 
-			if (cp->lxioctx_shutdown)
+			if (lx_io_worker_chk_status(cp, B_FALSE))
 				break;
-
-			lx_io_worker_chk_status();
 
 			mutex_enter(&cp->lxioctx_p_lock);
 			ep = list_remove_head(&cp->lxioctx_pending);
@@ -1191,23 +1224,6 @@ lx_io_cancel(lx_aio_context_t cid, lx_iocb_t *iocbp, lx_io_event_t *result)
 	return (0);
 }
 
-static void
-lx_io_destroy_common(lx_io_ctx_t *cp)
-{
-	lx_proc_data_t *lxpd = ptolxproc(curproc);
-	lx_zone_data_t *lxzd = ztolxzd(curproc->p_zone);
-
-	ASSERT(MUTEX_HELD(&lxpd->l_io_ctx_lock));
-	if (cp->lxioctx_shutdown == B_FALSE) {
-		cp->lxioctx_shutdown = B_TRUE;
-		/* decrement zone aio cnt */
-		mutex_enter(&lxzd->lxzd_lock);
-		VERIFY(cp->lxioctx_maxn <= lxzd->lxzd_aio_nr);
-		lxzd->lxzd_aio_nr -= cp->lxioctx_maxn;
-		mutex_exit(&lxzd->lxzd_lock);
-	}
-}
-
 long
 lx_io_destroy(lx_aio_context_t cid)
 {
@@ -1219,7 +1235,7 @@ lx_io_destroy(lx_aio_context_t cid)
 		return (set_errno(EINVAL));
 
 	mutex_enter(&lxpd->l_io_ctx_lock);
-	lx_io_destroy_common(cp);
+	cp->lxioctx_shutdown = B_TRUE;
 
 	/*
 	 * Wait for the worker threads and any blocked io_getevents threads to
@@ -1261,24 +1277,20 @@ lx_io_clear(lx_proc_data_t *cpd)
 }
 
 /*
- * Called via the lx_exit_all_lwps brand hook at proc exit to cleanup any
- * outstanding io context data and worker threads. This handles the case when
- * a process exits without calling io_destroy() on its open contexts. We need a
- * brand hook for this because exitlwps() will call pokelwps() which will loop
- * until we're the last thread in the process. The presence of any aio worker
- * threads will block pokelwps from completing and none of our other brand
- * hooks are called until later in the process exit path. There is no
- * guarantee that more than one thread won't call exitlwps(), so we start over
- * if we have to drop the l_io_ctx_lock mutex. Under normal conditions, the
- * l_io_ctxs array will be NULL or empty.
+ * Called via lx_proc_exit to cleanup any existing io context array. All
+ * worker threads should have already exited by this point, so all contexts
+ * should already be deleted.
  */
 void
-lx_io_cleanup()
+lx_io_cleanup(proc_t *p)
 {
-	lx_proc_data_t *lxpd = ptolxproc(curproc);
+	lx_proc_data_t *lxpd;
 	int i;
 
-restart:
+	mutex_enter(&p->p_lock);
+	VERIFY((lxpd = ptolxproc(p)) != NULL);
+	mutex_exit(&p->p_lock);
+
 	mutex_enter(&lxpd->l_io_ctx_lock);
 	if (lxpd->l_io_ctxs == NULL) {
 		ASSERT(lxpd->l_io_ctx_cnt == 0);
@@ -1288,23 +1300,7 @@ restart:
 
 	ASSERT(lxpd->l_io_ctx_cnt > 0);
 	for (i = 0; i < lxpd->l_io_ctx_cnt; i++) {
-		lx_io_ctx_t *cp;
-
-		if ((cp = lxpd->l_io_ctxs[i]) != NULL) {
-			lx_io_destroy_common(cp);
-
-			/*
-			 * We want the worker threads and any blocked
-			 * io_getevents threads to exit. We do not have a hold
-			 * so rele from the last thread will cleanup.
-			 */
-			cv_broadcast(&cp->lxioctx_pending_cv);
-			cv_broadcast(&cp->lxioctx_done_cv);
-
-			cv_wait(&lxpd->l_io_destroy_cv, &lxpd->l_io_ctx_lock);
-			mutex_exit(&lxpd->l_io_ctx_lock);
-			goto restart;
-		}
+		ASSERT(lxpd->l_io_ctxs[i] == NULL);
 	}
 
 	kmem_free(lxpd->l_io_ctxs, lxpd->l_io_ctx_cnt * sizeof (lx_io_ctx_t *));

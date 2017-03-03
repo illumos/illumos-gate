@@ -1729,9 +1729,6 @@ exitlwps(int coredump)
 	proc_t *p = curproc;
 	int heldcnt;
 
-	if (PROC_IS_BRANDED(p) && BROP(p)->b_exitlwps != NULL)
-		BROP(p)->b_exitlwps(p, coredump);
-
 	if (curthread->t_door)
 		door_slam();
 	if (p->p_door_list)

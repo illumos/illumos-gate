@@ -108,8 +108,7 @@ struct brand_ops s10_brops = {
 	NULL,				/* b_setid_clear */
 	NULL,				/* b_pagefault */
 	B_TRUE,				/* b_intp_parse_arg */
-	NULL,				/* b_clearbrand */
-	NULL				/* b_exitlwps */
+	NULL				/* b_clearbrand */
 };
 
 #ifdef	sparc
