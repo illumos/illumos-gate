@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #ifndef _ZONECFG_H
@@ -90,7 +91,8 @@ extern "C" {
 #define	RT_ADMIN	26
 #define	RT_FS_ALLOWED	27
 #define	RT_MAXPROCS	28	/* really a rctl alias property, but for info */
-#define	RT_SECFLAGS	29
+#define	RT_ZFSPRI	29	/* really a rctl alias property, but for info */
+#define	RT_SECFLAGS	30
 
 #define	RT_MIN		RT_UNKNOWN
 #define	RT_MAX		RT_SECFLAGS

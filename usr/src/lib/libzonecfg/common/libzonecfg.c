@@ -196,6 +196,7 @@ static struct alias {
 	{ALIAS_SHARES, "zone.cpu-shares", "privileged", "none", 0},
 	{ALIAS_CPUCAP, "zone.cpu-cap", "privileged", "deny", 0},
 	{ALIAS_MAXPROCS, "zone.max-processes", "privileged", "deny", 100},
+	{ALIAS_ZFSPRI, "zone.zfs-io-priority", "privileged", "none", 1},
 	{NULL, NULL, NULL, NULL, 0}
 };
 

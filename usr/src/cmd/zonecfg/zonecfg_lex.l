@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, Joyent Inc. All rights reserved.
  */
 
 #include <assert.h>
@@ -58,10 +59,10 @@ static char *create_token(char *s);
 %}
 
 %a 8000
-%p 5000
+%p 5500
 %e 2000
 %n 1000
-%o 13000
+%o 14000
 
 %{
 /*
@@ -331,6 +332,9 @@ static char *create_token(char *s);
 
 <TSTATE>upper { return UPPER; }
 <CSTATE>upper { return UPPER; }
+
+<TSTATE>zfs-io-priority	{ return ZFSPRI; }
+<CSTATE>zfs-io-priority	{ return ZFSPRI; }
 
 <TSTATE>=	{ return EQUAL; }
 <LSTATE>=	{ return EQUAL; }
