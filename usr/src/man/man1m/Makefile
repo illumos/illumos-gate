@@ -409,7 +409,6 @@ _MANFILES=	6to4relay.1m		\
 		route.1m		\
 		routeadm.1m		\
 		rpc.bootparamd.1m	\
-		rpc.rexd.1m		\
 		rpc.rstatd.1m		\
 		rpc.rusersd.1m		\
 		rpc.rwalld.1m		\
@@ -610,7 +609,6 @@ MANLINKS=	acctcon1.1m			\
 		rdisc.1m			\
 		reject.1m			\
 		restricted_shell.1m		\
-		rexd.1m				\
 		rexecd.1m			\
 		rlogind.1m			\
 		routed.1m			\
@@ -728,7 +726,6 @@ grpck.1m			:= LINKSRC = pwck.1m
 quotaoff.1m			:= LINKSRC = quotaon.1m
 
 bootparamd.1m			:= LINKSRC = rpc.bootparamd.1m
-rexd.1m				:= LINKSRC = rpc.rexd.1m
 rstatd.1m			:= LINKSRC = rpc.rstatd.1m
 rusersd.1m			:= LINKSRC = rpc.rusersd.1m
 rwalld.1m			:= LINKSRC = rpc.rwalld.1m
