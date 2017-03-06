@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016, Joyent, Inc.
+# Copyright 2017, Joyent, Inc.
 #
 
 I) Introduction
@@ -32,7 +32,7 @@ SmartOS global zone, where any user created is lost on reboot.
 
 II) Setup to Run the Tests
 
-1) The tests currently require python26 to run, so you need to install this in
+1) The tests currently require python27 to run, so you need to install this in
    the global zone. The easiest way to do this is with pkgsrc using the
    following procedure:
 
@@ -42,8 +42,8 @@ II) Setup to Run the Tests
    b) Install the bootstrap tarball:
       # gzcat bootstrap-2014Q4-multiarch.tar.gz | (cd /; tar -xpf -)
 
-   c) Install python26:
-      pkgin in python26
+   c) Install python27:
+      pkgin in python27
 
 2) You need to get the tests from your build machine onto the test machine's
    global zone. This can be done in whatever way is easiest for you. Here is

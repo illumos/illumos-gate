@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -22,7 +22,7 @@ timeout = 60
 post =
 outputdir = /var/tmp/test_results
 
-[/opt/os-tests/tests/poll_test]
+[/opt/os-tests/tests/poll]
 user = root
 tests = ['poll_test', 'epoll_test']
 

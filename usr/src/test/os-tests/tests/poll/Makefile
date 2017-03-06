@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -26,7 +26,7 @@ poll_test.ln := LDLIBS += -lsocket
 C99MODE = -xc99=%all
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
-TESTDIR = $(ROOTOPTPKG)/tests
+TESTDIR = $(ROOTOPTPKG)/tests/poll
 
 CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555

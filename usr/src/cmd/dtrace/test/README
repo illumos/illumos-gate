@@ -20,13 +20,10 @@ CDDL HEADER END
 
 Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
-
-ident	"%Z%%M%	%I%	%E% SMI"
+Copyright 2017 Joyent, Inc.
 
 DTrace Testing Suite
 
 The SUNWdtrt package delivers a set of test programs and D source
-files into the directory /opt/SUNWdtrt.  For more information see
-the following web site:
-
-	http://www.opensolaris.org/os/community/dtrace/dtest
+files into the directory /opt/SUNWdtrt. To run the tests:
+	/opt/SUNWdtrt/bin/dtest
