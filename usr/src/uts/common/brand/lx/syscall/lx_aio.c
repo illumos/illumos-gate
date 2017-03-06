@@ -720,43 +720,31 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 		kthread_t *t;
 
 		/*
-		 * Because lwp_create won't check the zone's max-lwp rctl
-		 * for a process in the system class, we do that here, but
-		 * we allow exceeding the rctl limit so that we can get at
-		 * least one worker thread.
+		 * Note that this lwp will not "stop at sys_rtt" as described
+		 * on lwp_create. This lwp will run entirely in the kernel as
+		 * a worker thread serving aio requests.
 		 */
-		if (i > 0) {
-			boolean_t too_many = B_FALSE;
-
-			mutex_enter(&p->p_lock);
-			mutex_enter(&p->p_zone->zone_nlwps_lock);
-			if (p->p_zone->zone_nlwps >=
-			    p->p_zone->zone_nlwps_ctl &&
-			    (rctl_test(rc_zone_nlwps, p->p_zone->zone_rctls, p,
-			    1, 0) & RCT_DENY)) {
-				too_many = B_TRUE;
-			}
-			mutex_exit(&p->p_zone->zone_nlwps_lock);
-			mutex_exit(&p->p_lock);
-			if (too_many)
+		l = lwp_create(lx_io_worker, (void *)cp, 0, p, TS_STOPPED,
+		    minclsyspri - 1, &hold_set, curthread->t_cid, 0);
+		if (l == NULL) {
+			if (i == 0) {
+				/*
+				 * Uh-oh - we can't create a single worker.
+				 * Release our hold which will cleanup.
+				 */
+				cp->lxioctx_shutdown = B_TRUE;
+				mutex_enter(&lxpd->l_io_ctx_lock);
+				cp->lxioctx_maxn = nr_events;
+				mutex_exit(&lxpd->l_io_ctx_lock);
+				lx_io_cp_rele(cp);
+				return (set_errno(ENOMEM));
+			} else {
+				/*
+				 * No new lwp but we already have at least 1
+				 * worker so don't fail entire syscall.
+				 */
 				break;
-		}
-
-		/*
-		 * This is equivalent to lwp_kernel_create() but only a system
-		 * process can call that function. Note that this lwp will
-		 * not "stop at sys_rtt" as described on lwp_create. This lwp
-		 * will run entirely in the kernel as a worker thread serving
-		 * aio requests.
-		 */
-		if ((l = lwp_create(lx_io_worker, (void *)cp, 0, p, TS_STOPPED,
-		    minclsyspri, &t0.t_hold, syscid, 0)) == NULL && i == 0) {
-			/*
-			 * Uh-oh - we can't create a single worker. Release
-			 * our hold which will cleanup.
-			 */
-			lx_io_cp_rele(cp);
-			return (set_errno(ENOMEM));
+			}
 		}
 
 		atomic_inc_32(&cp->lxioctx_in_use);
@@ -769,7 +757,6 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 		mutex_enter(&curproc->p_lock);
 		t->t_proc_flag = (t->t_proc_flag & ~TP_HOLDLWP) | TP_KTHREAD;
 		lwptolxlwp(l)->br_lwp_flags |= BR_AIO_LWP;
-		t->t_hold = hold_set;
 		lwp_create_done(t);
 		mutex_exit(&curproc->p_lock);
 	}
