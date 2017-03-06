@@ -123,6 +123,9 @@ static int lxpr_poll(vnode_t *, short, int, short *, pollhead_t **,
 static int lxpr_sync(void);
 static void lxpr_inactive(vnode_t *, cred_t *, caller_context_t *);
 
+static int lxpr_doaccess(lxpr_node_t *, boolean_t, int, int, cred_t *,
+    caller_context_t *);
+
 static vnode_t *lxpr_lookup_procdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_piddir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_not_a_dir(vnode_t *, char *);
@@ -5592,7 +5595,19 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 static int
 lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
-	lxpr_node_t *lxpnp = VTOLXP(vp);
+	return (lxpr_doaccess(VTOLXP(vp), B_FALSE, mode, flags, cr, ct));
+}
+
+/*
+ * This makes up the bulk of the logic for lxpr_access.  An extra parameter
+ * ('shallow') is present to differentiate checks that must pass muster against
+ * an underlying resource (lxpr_realvp) and those that are only concerned with
+ * permission to the process.
+ */
+static int
+lxpr_doaccess(lxpr_node_t *lxpnp, boolean_t shallow, int mode, int flags,
+    cred_t *cr, caller_context_t *ct)
+{
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
 	boolean_t allow_pid_access = B_FALSE;
 	int shift = 0;
@@ -5658,8 +5673,9 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 
 	/*
 	 * If this entry has an underlying vnode, rely upon its access checks.
+	 * Skip this if a shallow check has been requested.
 	 */
-	if (lxpnp->lxpr_realvp != NULL) {
+	if (lxpnp->lxpr_realvp != NULL && !shallow) {
 		return (VOP_ACCESS(lxpnp->lxpr_realvp, mode, flags, cr, ct));
 	}
 
@@ -7271,9 +7287,11 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 
 	/* Try to produce a symlink name for anything that has a realvp */
 	if (rvp != NULL) {
-		if ((error = lxpr_access(vp, VREAD, 0, CRED(), ct)) != 0)
+		error = lxpr_doaccess(lxpnp, B_TRUE, VREAD, 0, cr, ct);
+		if (error != 0)
 			return (error);
-		if ((error = vnodetopath(NULL, rvp, bp, buflen, CRED())) != 0) {
+
+		if ((error = vnodetopath(NULL, rvp, bp, buflen, cr)) != 0) {
 			/*
 			 * Special handling possible for /proc/<pid>/fd/<num>
 			 * Generate <type>:[<inode>] links, if allowed.
