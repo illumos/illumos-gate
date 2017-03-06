@@ -6705,7 +6705,7 @@ sdpower(dev_info_t *devi, int component, int level)
 	time_t		intvlp;
 	struct pm_trans_data	sd_pm_tran_data;
 	uchar_t		save_state = SD_STATE_NORMAL;
-	int		sval, tursval;
+	int		sval, tursval = 0;
 	uchar_t		state_before_pm;
 	int		got_semaphore_here;
 	sd_ssc_t	*ssc;
