@@ -1071,7 +1071,7 @@ BUILD.AR= $(RM) $@ ; \
 	$(AR) q $@ `$(LORDER) $(MOSTOBJS:%=$(DIR)/%) | $(GREP) -v ' L ' | $(TSORT)`
 
 # extra files for the clean target
-CLEANFILES+=			\
+CLEANFILES +=			\
 	$(LIBCDIR)/port/gen/errlst.c	\
 	$(LIBCDIR)/port/gen/new_list.c	\
 	assym.h			\
