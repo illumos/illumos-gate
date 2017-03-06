@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 /*
@@ -477,6 +477,7 @@ define_collsym(char *name)
 		 * This should never happen because we are only called
 		 * for undefined symbols.
 		 */
+		free(sym);
 		INTERR;
 		return;
 	}
@@ -514,6 +515,7 @@ get_collundef(char *name)
 		if (((ud = calloc(sizeof (*ud), 1)) == NULL) ||
 		    ((ud->name = strdup(name)) == NULL)) {
 			errf(_("out of memory"));
+			free(ud);
 			return (NULL);
 		}
 		for (i = 0; i < NUM_WT; i++) {
@@ -791,6 +793,7 @@ define_collelem(char *name, wchar_t *wcs)
 	if ((avl_find(&elem_by_symbol, e, &where1) != NULL) ||
 	    (avl_find(&elem_by_expand, e, &where2) != NULL)) {
 		errf(_("duplicate collating element definition"));
+		free(e);
 		return;
 	}
 	avl_insert(&elem_by_symbol, e, where1);
@@ -1241,21 +1244,25 @@ dump_collate(void)
 	if ((wr_category(vers, COLLATE_STR_LEN, f) < 0) ||
 	    (wr_category(&collinfo, sizeof (collinfo), f) < 0) ||
 	    (wr_category(&chars, sizeof (chars), f) < 0)) {
+		delete_category(f);
 		return;
 	}
 
 	for (i = 0; i < NUM_WT; i++) {
 		sz =  sizeof (collate_subst_t) * collinfo.subst_count[i];
 		if (wr_category(subst[i], sz, f) < 0) {
+			delete_category(f);
 			return;
 		}
 	}
 	sz = sizeof (collate_chain_t) * collinfo.chain_count;
 	if (wr_category(chain, sz, f) < 0) {
+		delete_category(f);
 		return;
 	}
 	sz = sizeof (collate_large_t) * collinfo.large_count;
 	if (wr_category(large, sz, f) < 0) {
+		delete_category(f);
 		return;
 	}
 
