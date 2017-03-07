@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RCAPADM 1M "Dec 18, 2006"
+.TH RCAPADM 1M "Mar 5, 2017"
 .SH NAME
 rcapadm \- configure resource capping daemon
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ rcapadm \- configure resource capping daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrcapadm\fR command allows a user with the privileges described below to
 configure various attributes of the resource capping daemon. If used without
@@ -33,7 +32,6 @@ available to users with all privileges and to users who have the Process
 Management profile in their list of profiles. The System Administrator role
 includes the Process Management profile.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-c\fR \fIpercent\fR\fR
@@ -106,7 +104,7 @@ is every 5 seconds. The minimum value is 1 second.
 .ad
 .RS 10n
 The interval at which various paging statistics are updated by \fBrcapd\fR, in
-seconds. These statistics can be viewed by using \fBrcapstat\fR(1SRM). The
+seconds. These statistics can be viewed by using \fBrcapstat\fR(1). The
 default reporting interval is every 5 seconds. When the interval is set to
 \fB0\fR, statistics will not be updated.
 .LP
@@ -203,7 +201,6 @@ reboot. To set a persistent cap, use \fBzonecfg\fR(1M).
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -236,7 +233,6 @@ Invalid command-line options were specified.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -255,7 +251,6 @@ Interface Stability	Evolving
 .LP
 The \fB-z\fR and \fB-m\fR options are committed interfaces.
 .SH SEE ALSO
-.sp
 .LP
 \fBrcapstat\fR(1), \fBrcapd\fR(1M), \fBzonecfg\fR(1M), \fBproject\fR(4),
 \fBattributes\fR(5), \fBzones\fR(5)
