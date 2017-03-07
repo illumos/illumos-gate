@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LPSTAT 1 "Aug 3, 2009"
+.TH LPSTAT 1 "Feb 25, 2017"
 .SH NAME
 lpstat \- print information about the status of the print service
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ lpstat \- print information about the status of the print service
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlpstat\fR utility displays information about the current status of the
 \fBLP\fR print service to standard output.
@@ -81,7 +80,6 @@ The print client commands locate destination information using the "printers"
 database in the name service switch. See \fBnsswitch.conf\fR(4),
 \fBprinters\fR(4), and \fBprinters.conf\fR(4) for details.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -324,7 +322,6 @@ printer names.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -346,7 +343,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -382,17 +378,7 @@ LDAP version of \fB/etc/printers.conf\fR
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBprinters.org_dir\fR\fR
-.ad
-.RS 24n
-\fBNIS+\fR version of \fB/etc/printers.conf\fR
-.RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -408,13 +394,11 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcancel\fR(1), \fBlp\fR(1), \fBlpq\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B),
 \fBnsswitch.conf\fR(4), \fBprinters\fR(4), \fBprinters.conf\fR(4),
 \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 For remote print queues, the BSD print protocol provides a very limited set of
 information. The Internet Print Protocol (IPP) is preferred.

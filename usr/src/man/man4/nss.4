@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NSS 4 "Nov 20, 2003"
+.TH NSS 4 "Feb 25, 2017"
 .SH NAME
 nss \- configuration file for initgroups
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ nss \- configuration file for initgroups
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fB/etc/default/nss\fR configuration file provides methods for
 \fBinitgroups\fR(3C) lookup method. The file also provides a method to disable
@@ -31,8 +30,7 @@ by the \fB/etc/nsswitch.conf\fR file.
 .ad
 .RS 23n
 Changes the behavior of the name service lookups to use the \fBnetid\fR table
-in response to the \fBinitgroups()\fR call. The \fBnetid\fR table is provided
-by the \fBLOCAL\fR entries of the NIS+ \fBcred.org_dir\fR table. By default,
+in response to the \fBinitgroups()\fR call. By default,
 \fBinitgroups()\fR uses the \fBgroup\fR table. When \fBNETID_AUTHORITATIVE\fR
 is set to TRUE, \fBinitgroups()\fR uses \fBnetid\fR as the source for
 supplementary groups rather than the \fBgroup\fR table.
@@ -61,7 +59,6 @@ By default, address sorting is enabled.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -77,7 +74,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL),
 \fBgetipnodebyname\fR(3SOCKET), \fBinitgroups\fR(3C),

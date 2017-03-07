@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LPQ 1B "Jun 2, 2006"
+.TH LPQ 1B "Feb 25, 2017"
 .SH NAME
 lpq \- display the content of a print queue
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ lpq \- display the content of a print queue
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlpq\fR utility displays the information about the contents of a print
 queue. A print queue is comprised of print requests that are waiting  in the
@@ -64,7 +63,6 @@ The print client commands locate destination information using the
 \fBprinters\fR database in the name service switch. See \fBnsswitch.conf\fR(4),
 \fBprinters\fR(4), and \fBprinters.conf\fR(4) for details.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -103,7 +101,6 @@ displays. If  \fIinterval\fR is not specified only executes once.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -126,7 +123,6 @@ The name of the user about whose jobs  \fBlpq\fR reports information. Specify
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -148,7 +144,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$HOME/.printers\fR\fR
@@ -178,15 +173,6 @@ NIS version of \fB/etc/printers.conf\fR
 .sp
 .ne 2
 .na
-\fB\fBprinters.org_dir\fR\fR
-.ad
-.RS 24n
-NIS+ version of \fB/etc/printers.conf\fR
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
@@ -194,7 +180,6 @@ LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -210,13 +195,11 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlp\fR(1), \fBlpc\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B), \fBlpstat\fR(1),
 \fBlpadmin\fR(1M), \fBnsswitch.conf\fR(4), \fBprinters\fR(4),
 \fBprinters.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 When IPP is in use, the user is prompted for a passphrase if the remote print
 service is configured to require authentication.

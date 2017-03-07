@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETPUBLICKEY 3NSL "Nov 10, 2005"
+.TH GETPUBLICKEY 3NSL "Feb 25, 2017"
 .SH NAME
 getpublickey, getsecretkey, publickey \- retrieve public or secret key
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ getpublickey, getsecretkey, publickey \- retrieve public or secret key
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetpublickey()\fR and \fBgetsecretkey()\fR functions get public and
 secret keys for \fInetname\fR. The key may come from one of the following
@@ -39,7 +38,7 @@ sources:
 .TP
 .ie t \(bu
 .el o
-\fBNIS\fR map ``publickey.byname'' or the \fBNIS+\fR table ``cred.org_dir''.
+\fBNIS\fR map ``publickey.byname''.
 The sources and their lookup order are specified in the
 \fB/etc/nsswitch.conf\fR file. See \fBnsswitch.conf\fR(4).
 .RE
@@ -48,7 +47,6 @@ The sources and their lookup order are specified in the
 \fBgetsecretkey()\fR has an extra argument, \fBpasswd\fR, which is used to
 decrypt the encrypted secret key stored in the database.
 .SH RETURN VALUES
-.sp
 .LP
 Both routines return \fB1\fR if they are successful in finding the key.
 Otherwise, the routines return \fB0\fR. The keys are returned as
@@ -56,7 +54,6 @@ null-terminated, hexadecimal strings. If the password supplied to
 \fBgetsecretkey()\fR fails to decrypt the secret key, the routine will return 1
 but the \fIsecretkey\fR [0] will be set to \fINULL\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -72,21 +69,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsecure_rpc\fR(3NSL), \fBnsswitch.conf\fR(4), \fBpublickey\fR(4),
 \fBattributes\fR(5)
-.SH WARNINGS
-.sp
-.LP
-If \fBgetpublickey()\fR gets the public key from any source other than NIS+,
-all authenticated NIS+ operations may fail. To ensure that this does not
-happen, edit the \fBnsswitch.conf\fR(4) file to make sure that the public key
-is obtained from NIS+.
-.SS "NOTES"
-.sp
-.LP
-NIS+ might not be supported in future releases of the Solaris operating system.
-Tools to aid the migration from NIS+ to LDAP are available in the current
-Solaris release. For more information, visit
-http://www.sun.com/directory/nisplus/transition.html.

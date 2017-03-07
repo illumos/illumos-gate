@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPPASSWD 1 "Nov 28, 2001"
+.TH YPPASSWD 1 "Feb 25, 2017"
 .SH NAME
 yppasswd \- change your network password in the NIS database
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ yppasswd \- change your network password in the NIS database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fByppasswd\fR utility changes the network password  associated with the
 user \fIusername\fR in the Network Information Service (\fBNIS\fR) database. If
@@ -39,28 +38,24 @@ construction requirements.
 The \fBNIS\fR password daemon, \fBrpc.yppasswdd\fR must be running on your
 \fBNIS\fR server in order for the new password to take effect.
 .SH SEE ALSO
-.sp
 .LP
-\fBkeylogin\fR(1), \fBlogin\fR(1), \fBNIS+\fR(1), \fBnispasswd\fR(1),
+\fBkeylogin\fR(1), \fBlogin\fR(1),
 \fBpasswd\fR(1), \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C),
 \fBsecure_rpc\fR(3NSL), \fBnsswitch.conf\fR(4), \fBattributes\fR(5)
 .SH WARNINGS
-.sp
 .LP
 Even after the user has successfully changed his or her password using this
 command, the subsequent \fBlogin\fR(1) using the new password will be
 successful only if the user's password and shadow information is obtained from
 NIS. See \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), and \fBnsswitch.conf\fR(4).
 .SH NOTES
-.sp
 .LP
 The use of \fByppasswd\fR is discouraged, as it is now only a wrapper around
 the \fBpasswd\fR(1) command, which should be used instead. Using
-\fBpasswd\fR(1) with the \fB-r\fR \fBnis\fR option (see \fBNIS+\fR(1)) will
+\fBpasswd\fR(1) with the \fB-r\fR \fBnis\fR option will
 achieve the same results, and will be consistent across all the different name
 services available.
 .SH BUGS
-.sp
 .LP
 The update protocol passes all the information to the server in one \fBRPC\fR
 call, without ever looking at it. Thus, if you type your old password

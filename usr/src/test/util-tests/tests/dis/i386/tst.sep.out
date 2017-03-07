@@ -1,0 +1,4 @@
+    libdis_test:     0f 34              sysenter 
+    libdis_test+0x2: 0f 35              sysexit 
+    libdis_test+0x4: 0f 05              syscall 
+    libdis_test+0x6: 0f 07              sysret 

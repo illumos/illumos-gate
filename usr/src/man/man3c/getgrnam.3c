@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETGRNAM 3C "Apr 5, 2004"
+.TH GETGRNAM 3C "Feb 25, 2017"
 .SH NAME
 getgrnam, getgrnam_r, getgrent, getgrent_r, getgrgid, getgrgid_r, setgrent,
 endgrent, fgetgrent, fgetgrent_r \- group database entry functions
@@ -69,7 +69,7 @@ endgrent, fgetgrent, fgetgrent_r \- group database entry functions
      \fBint\fR \fIbufsize\fR);
 .fi
 
-.SS "Standard comforming"
+.SS "Standard conforming"
 .LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary\fR... ]
@@ -85,7 +85,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions are used to obtain entries describing user groups. Entries can
 come from any of the sources for \fBgroup\fR specified in the
@@ -128,7 +127,6 @@ The \fBfgetgrent()\fR function, unlike the other functions above, does not use
 which is assumed to have the format of the \fBgroup\fR file (see
 \fBgroup\fR(4)).
 .SS "Reentrant Interfaces"
-.sp
 .LP
 The  \fBgetgrnam()\fR, \fBgetgrgid()\fR, \fBgetgrent()\fR, and
 \fBfgetgrent()\fR functions use thread-specific storage that is reused in each
@@ -170,7 +168,6 @@ to \fBgetgrent_r()\fR, the threads will enumerate disjoint subsets of the group
 database. Like their non-reentrant counterparts, \fBgetgrnam_r()\fR and
 \fBgetgrgid_r()\fR leave the enumeration position in an indeterminate state.
 .SS "group Structure"
-.sp
 .LP
 Group entries are represented by the \fBstruct group\fR structure defined in
 <\fBgrp.h\fR>:
@@ -188,7 +185,6 @@ struct group {
 .in -2
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetgrnam()\fR, \fBgetgrnam_r()\fR, \fBgetgrgid()\fR, and
 \fBgetgrgid_r()\fR functions each return a pointer to a \fBstruct group\fR if
@@ -221,7 +217,6 @@ before calling \fBgetgrnam()\fR, \fBgetgrnam_r()\fR, \fBgetgrent()\fR,
 \fBfgetgrent_r()\fR. If these functions return a null pointer and \fBerrno\fR
 is non-zero, an error occurred.
 .SH ERRORS
-.sp
 .LP
 The \fBgetgrent_r()\fR, \fBfgetgrent()\fR, and \fBfgetgrent_r()\fR functions
 will fail if:
@@ -321,7 +316,6 @@ the data to be referenced by the resulting \fBgroup\fR structure.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -344,19 +338,17 @@ The \fBendgrent()\fR, \fBgetgrent()\fR, \fBgetgrgid()\fR, \fBgetgrgid_r()\fR,
 \fBgetgrnam()\fR, \fBgetgrnam_r()\fR, and \fBsetgrent()\fR functions are
 Standard.
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBgetpwnam\fR(3C), \fBgroup\fR(4), \fBnsswitch.conf\fR(4),
 \fBpasswd\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 When compiling multithreaded programs, see \fBIntro\fR(3).
 .sp
 .LP
 Use of the enumeration interfaces \fBgetgrent()\fR and \fBgetgrent_r()\fR is
-discouraged; enumeration is supported for the group file, \fBNIS,\fR and
-\fBNIS+,\fR but in general is not efficient and might not be supported for all
+discouraged; enumeration is supported for the group file and \fBNIS\fR
+but in general is not efficient and might not be supported for all
 database sources.  The semantics of enumeration are discussed further in
 \fBnsswitch.conf\fR(4).
 .sp
@@ -371,8 +363,8 @@ If required, the ``+/-'' functionality can still be obtained for \fBNIS\fR by
 specifying \fBcompat\fR as the source for \fBgroup\fR.
 .sp
 .LP
-If the ``+/-'' functionality is required in conjunction with \fBNIS+,\fR
-specify both \fBcompat\fR as the source for \fBgroup\fR and \fBnisplus\fR as
+If the ``+/-'' functionality is required in conjunction with \fBLDAP,\fR
+specify both \fBcompat\fR as the source for \fBgroup\fR and \fBldap\fR as
 the source for the pseudo-database \fBgroup_compat\fR. See \fBgroup\fR(4), and
 \fBnsswitch.conf\fR(4) for details.
 .sp

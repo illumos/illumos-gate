@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PUBLICKEY 4 "Mar 6, 1992"
+.TH PUBLICKEY 4 "Feb 25, 2017"
 .SH NAME
 publickey \- public key database
 .SH SYNOPSIS
@@ -13,12 +13,11 @@ publickey \- public key database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB/etc/publickey\fR is  a local  public key database that is used for secure
 RPC. The  \fB/etc/publickey\fR file can be used in conjunction with or instead
-of other publickey databases, including the NIS publickey map and the NIS+
-publickey map.  Each entry in the database consists of a network user name
+of other publickey databases, including the NIS publickey map.
+Each entry in the database consists of a network user name
 (which may refer to either a user or a hostname), followed by the user's public
 key (in hex notation), a colon, and then the user's secret key encrypted with a
 password (also in hex notation).
@@ -26,7 +25,6 @@ password (also in hex notation).
 .LP
 The \fB/etc/publickey\fR file contains a default entry for \fBnobody\fR.
 .SH SEE ALSO
-.sp
 .LP
 \fBchkey\fR(1), \fBnewkey\fR(1M), \fBgetpublickey\fR(3NSL),
 \fBnsswitch.conf\fR(4)

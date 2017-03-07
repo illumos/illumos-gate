@@ -25,8 +25,8 @@
 /*
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -928,6 +928,7 @@ static int sd_pm_idletime = 1;
 #define	sd_event_callback		ssd_event_callback
 #define	sd_cache_control		ssd_cache_control
 #define	sd_get_write_cache_enabled	ssd_get_write_cache_enabled
+#define	sd_get_write_cache_changeable	ssd_get_write_cache_changeable
 #define	sd_get_nv_sup			ssd_get_nv_sup
 #define	sd_make_device			ssd_make_device
 #define	sdopen				ssdopen
@@ -1250,7 +1251,6 @@ static void sd_register_devid(sd_ssc_t *ssc, dev_info_t *devi,
 static int  sd_get_devid(sd_ssc_t *ssc);
 static ddi_devid_t sd_create_devid(sd_ssc_t *ssc);
 static int  sd_write_deviceid(sd_ssc_t *ssc);
-static int  sd_get_devid_page(struct sd_lun *un, uchar_t *wwn, int *len);
 static int  sd_check_vpd_page_support(sd_ssc_t *ssc);
 
 static void sd_setup_pm(sd_ssc_t *ssc, dev_info_t *devi);
@@ -1294,6 +1294,7 @@ static void  sd_event_callback(dev_info_t *, ddi_eventcookie_t, void *, void *);
 
 static int   sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag);
 static int   sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled);
+static void  sd_get_write_cache_changeable(sd_ssc_t *ssc, int *is_changeable);
 static void  sd_get_nv_sup(sd_ssc_t *ssc);
 static dev_t sd_make_device(dev_info_t *devi);
 static void  sd_check_solid_state(sd_ssc_t *ssc);
@@ -1635,15 +1636,15 @@ static void sd_check_for_writable_cd(sd_ssc_t *ssc, int path_flag);
 static int sd_wm_cache_constructor(void *wm, void *un, int flags);
 static void sd_wm_cache_destructor(void *wm, void *un);
 static struct sd_w_map *sd_range_lock(struct sd_lun *un, daddr_t startb,
-	daddr_t endb, ushort_t typ);
+    daddr_t endb, ushort_t typ);
 static struct sd_w_map *sd_get_range(struct sd_lun *un, daddr_t startb,
-	daddr_t endb);
+    daddr_t endb);
 static void sd_free_inlist_wmap(struct sd_lun *un, struct sd_w_map *wmp);
 static void sd_range_unlock(struct sd_lun *un, struct sd_w_map *wm);
 static void sd_read_modify_write_task(void * arg);
 static int
 sddump_do_read_of_rmw(struct sd_lun *un, uint64_t blkno, uint64_t nblk,
-	struct buf **bpp);
+    struct buf **bpp);
 
 
 /*
@@ -2882,7 +2883,7 @@ sdinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 static int
 sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
-	char *name, caddr_t valuep, int *lengthp)
+    char *name, caddr_t valuep, int *lengthp)
 {
 	struct sd_lun	*un;
 
@@ -4946,7 +4947,7 @@ sd_is_lsi(struct sd_lun *un)
 
 static int
 sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
-	diskaddr_t capacity, int lbasize, int path_flag)
+    diskaddr_t capacity, int lbasize, int path_flag)
 {
 	struct	mode_format	*page3p;
 	struct	mode_geometry	*page4p;
@@ -6639,12 +6640,12 @@ sdpower(dev_info_t *devi, int component, int level)
 	int		medium_present;
 	time_t		intvlp;
 	struct pm_trans_data	sd_pm_tran_data;
-	uchar_t		save_state;
+	uchar_t		save_state = SD_STATE_NORMAL;
 	int		sval;
 	uchar_t		state_before_pm;
 	int		got_semaphore_here;
 	sd_ssc_t	*ssc;
-	int	last_power_level;
+	int	last_power_level = SD_SPINDLE_UNINIT;
 
 	instance = ddi_get_instance(devi);
 
@@ -7216,6 +7217,7 @@ sd_unit_attach(dev_info_t *devi)
 	int	instance;
 	int	rval;
 	int	wc_enabled;
+	int	wc_changeable;
 	int	tgt;
 	uint64_t	capacity;
 	uint_t		lbasize = 0;
@@ -8295,12 +8297,15 @@ sd_unit_attach(dev_info_t *devi)
 	}
 
 	/*
-	 * Check the value of the WCE bit now and
-	 * set un_f_write_cache_enabled accordingly.
+	 * Check the value of the WCE bit and if it's allowed to be changed,
+	 * set un_f_write_cache_enabled and un_f_cache_mode_changeable
+	 * accordingly.
 	 */
 	(void) sd_get_write_cache_enabled(ssc, &wc_enabled);
+	sd_get_write_cache_changeable(ssc, &wc_changeable);
 	mutex_enter(SD_MUTEX(un));
 	un->un_f_write_cache_enabled = (wc_enabled != 0);
+	un->un_f_cache_mode_changeable = (wc_changeable != 0);
 	mutex_exit(SD_MUTEX(un));
 
 	if ((un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR &&
@@ -8412,8 +8417,6 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 wm_cache_failed:
 devid_failed:
-
-setup_pm_failed:
 	ddi_remove_minor_node(devi, NULL);
 
 cmlb_attach_failed:
@@ -8532,8 +8535,6 @@ create_errstats_failed:
 	sema_destroy(&un->un_semoclose);
 	cv_destroy(&un->un_state_cv);
 
-getrbuf_failed:
-
 	sd_free_rqs(un);
 
 alloc_rqs_failed:
@@ -8541,7 +8542,6 @@ alloc_rqs_failed:
 	devp->sd_private = NULL;
 	bzero(un, sizeof (struct sd_lun));	/* Clear any stale data! */
 
-get_softstate_failed:
 	/*
 	 * Note: the man pages are unclear as to whether or not doing a
 	 * ddi_soft_state_free(sd_state, instance) is the right way to
@@ -9383,6 +9383,90 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
 #endif
 
 /*
+ * Values related to caching mode page depending on whether the unit is ATAPI.
+ */
+#define	SDC_CDB_GROUP(un) ((un->un_f_cfg_is_atapi == TRUE) ? \
+	CDB_GROUP1 : CDB_GROUP0)
+#define	SDC_HDRLEN(un) ((un->un_f_cfg_is_atapi == TRUE) ? \
+	MODE_HEADER_LENGTH_GRP2 : MODE_HEADER_LENGTH)
+/*
+ * Use mode_cache_scsi3 to ensure we get all of the mode sense data, otherwise
+ * the mode select will fail (mode_cache_scsi3 is a superset of mode_caching).
+ */
+#define	SDC_BUFLEN(un) (SDC_HDRLEN(un) + MODE_BLK_DESC_LENGTH + \
+	sizeof (struct mode_cache_scsi3))
+
+static int
+sd_get_caching_mode_page(sd_ssc_t *ssc, uchar_t page_control, uchar_t **header,
+    int *bdlen)
+{
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		rval;
+
+	/*
+	 * Do a test unit ready, otherwise a mode sense may not work if this
+	 * is the first command sent to the device after boot.
+	 */
+	if (sd_send_scsi_TEST_UNIT_READY(ssc, 0) != 0)
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+
+	/*
+	 * Allocate memory for the retrieved mode page and its headers.  Set
+	 * a pointer to the page itself.
+	 */
+	*header = kmem_zalloc(buflen, KM_SLEEP);
+
+	/* Get the information from the device */
+	rval = sd_send_scsi_MODE_SENSE(ssc, SDC_CDB_GROUP(un), *header, buflen,
+	    page_control | MODEPAGE_CACHING, SD_PATH_DIRECT);
+	if (rval != 0) {
+		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un, "%s: Mode Sense Failed\n",
+		    __func__);
+		goto mode_sense_failed;
+	}
+
+	/*
+	 * Determine size of Block Descriptors in order to locate
+	 * the mode page data. ATAPI devices return 0, SCSI devices
+	 * should return MODE_BLK_DESC_LENGTH.
+	 */
+	if (un->un_f_cfg_is_atapi == TRUE) {
+		struct mode_header_grp2 *mhp =
+		    (struct mode_header_grp2 *)(*header);
+		*bdlen = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
+	} else {
+		*bdlen = ((struct mode_header *)(*header))->bdesc_length;
+	}
+
+	if (*bdlen > MODE_BLK_DESC_LENGTH) {
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
+		    "%s: Mode Sense returned invalid block descriptor length\n",
+		    __func__);
+		rval = EIO;
+		goto mode_sense_failed;
+	}
+
+	mode_caching_page = (struct mode_caching *)(*header + hdrlen + *bdlen);
+	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
+		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
+		    "%s: Mode Sense caching page code mismatch %d\n",
+		    __func__, mode_caching_page->mode_page.code);
+		rval = EIO;
+	}
+
+mode_sense_failed:
+	if (rval != 0) {
+		kmem_free(*header, buflen);
+		*header = NULL;
+		*bdlen = 0;
+	}
+	return (rval);
+}
+
+/*
  *    Function: sd_cache_control()
  *
  * Description: This routine is the driver entry point for setting
@@ -9390,10 +9474,10 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
  *		enable) and RCD (read cache disable) bits of mode
  *		page 8 (MODEPAGE_CACHING).
  *
- *   Arguments: ssc   - ssc contains pointer to driver soft state (unit)
- *                      structure for this target.
- *		rcd_flag - flag for controlling the read cache
- *		wce_flag - flag for controlling the write cache
+ *   Arguments: ssc		- ssc contains pointer to driver soft state
+ *				  (unit) structure for this target.
+ *		rcd_flag	- flag for controlling the read cache
+ *		wce_flag	- flag for controlling the write cache
  *
  * Return Code: EIO
  *		code returned by sd_send_scsi_MODE_SENSE and
@@ -9405,167 +9489,87 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
 static int
 sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag)
 {
-	struct mode_caching	*mode_caching_page;
-	uchar_t			*header;
-	size_t			buflen;
-	int			hdrlen;
-	int			bd_len;
-	int			rval = 0;
-	struct mode_header_grp2	*mhp;
-	struct sd_lun		*un;
-	int			status;
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	uchar_t		*header;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		bdlen;
+	int		rval;
 
-	ASSERT(ssc != NULL);
-	un = ssc->ssc_un;
-	ASSERT(un != NULL);
+	rval = sd_get_caching_mode_page(ssc, MODEPAGE_CURRENT, &header, &bdlen);
+	switch (rval) {
+	case 0:
+		/* Check the relevant bits on successful mode sense */
+		mode_caching_page = (struct mode_caching *)(header + hdrlen +
+		    bdlen);
+		if ((mode_caching_page->rcd && rcd_flag == SD_CACHE_ENABLE) ||
+		    (!mode_caching_page->rcd && rcd_flag == SD_CACHE_DISABLE) ||
+		    (mode_caching_page->wce && wce_flag == SD_CACHE_DISABLE) ||
+		    (!mode_caching_page->wce && wce_flag == SD_CACHE_ENABLE)) {
+			size_t sbuflen;
+			uchar_t save_pg;
 
-	/*
-	 * Do a test unit ready, otherwise a mode sense may not work if this
-	 * is the first command sent to the device after boot.
-	 */
-	status = sd_send_scsi_TEST_UNIT_READY(ssc, 0);
-	if (status != 0)
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+			/*
+			 * Construct select buffer length based on the
+			 * length of the sense data returned.
+			 */
+			sbuflen = hdrlen + bdlen + sizeof (struct mode_page) +
+			    (int)mode_caching_page->mode_page.length;
 
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		hdrlen = MODE_HEADER_LENGTH_GRP2;
-	} else {
-		hdrlen = MODE_HEADER_LENGTH;
-	}
+			/* Set the caching bits as requested */
+			if (rcd_flag == SD_CACHE_ENABLE)
+				mode_caching_page->rcd = 0;
+			else if (rcd_flag == SD_CACHE_DISABLE)
+				mode_caching_page->rcd = 1;
 
-	/*
-	 * Allocate memory for the retrieved mode page and its headers.  Set
-	 * a pointer to the page itself.  Use mode_cache_scsi3 to insure
-	 * we get all of the mode sense data otherwise, the mode select
-	 * will fail.  mode_cache_scsi3 is a superset of mode_caching.
-	 */
-	buflen = hdrlen + MODE_BLK_DESC_LENGTH +
-	    sizeof (struct mode_cache_scsi3);
+			if (wce_flag == SD_CACHE_ENABLE)
+				mode_caching_page->wce = 1;
+			else if (wce_flag == SD_CACHE_DISABLE)
+				mode_caching_page->wce = 0;
 
-	header = kmem_zalloc(buflen, KM_SLEEP);
+			/*
+			 * Save the page if the mode sense says the
+			 * drive supports it.
+			 */
+			save_pg = mode_caching_page->mode_page.ps ?
+			    SD_SAVE_PAGE : SD_DONTSAVE_PAGE;
 
-	/* Get the information from the device. */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP1, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	} else {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP0, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	}
+			/* Clear reserved bits before mode select */
+			mode_caching_page->mode_page.ps = 0;
 
-	if (rval != 0) {
-		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un,
-		    "sd_cache_control: Mode Sense Failed\n");
-		goto mode_sense_failed;
-	}
+			/*
+			 * Clear out mode header for mode select.
+			 * The rest of the retrieved page will be reused.
+			 */
+			bzero(header, hdrlen);
 
-	/*
-	 * Determine size of Block Descriptors in order to locate
-	 * the mode page data. ATAPI devices return 0, SCSI devices
-	 * should return MODE_BLK_DESC_LENGTH.
-	 */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		mhp	= (struct mode_header_grp2 *)header;
-		bd_len  = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
-	} else {
-		bd_len  = ((struct mode_header *)header)->bdesc_length;
-	}
+			if (un->un_f_cfg_is_atapi == TRUE) {
+				struct mode_header_grp2 *mhp =
+				    (struct mode_header_grp2 *)header;
+				mhp->bdesc_length_hi = bdlen >> 8;
+				mhp->bdesc_length_lo = (uchar_t)bdlen & 0xff;
+			} else {
+				((struct mode_header *)header)->bdesc_length =
+				    bdlen;
+			}
 
-	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
-		    "sd_cache_control: Mode Sense returned invalid block "
-		    "descriptor length\n");
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-
-	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
-	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
-		    "sd_cache_control: Mode Sense caching page code mismatch "
-		    "%d\n", mode_caching_page->mode_page.code);
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-
-	/* Check the relevant bits on successful mode sense. */
-	if ((mode_caching_page->rcd && rcd_flag == SD_CACHE_ENABLE) ||
-	    (!mode_caching_page->rcd && rcd_flag == SD_CACHE_DISABLE) ||
-	    (mode_caching_page->wce && wce_flag == SD_CACHE_DISABLE) ||
-	    (!mode_caching_page->wce && wce_flag == SD_CACHE_ENABLE)) {
-
-		size_t sbuflen;
-		uchar_t save_pg;
-
-		/*
-		 * Construct select buffer length based on the
-		 * length of the sense data returned.
-		 */
-		sbuflen =  hdrlen + bd_len +
-		    sizeof (struct mode_page) +
-		    (int)mode_caching_page->mode_page.length;
-
-		/*
-		 * Set the caching bits as requested.
-		 */
-		if (rcd_flag == SD_CACHE_ENABLE)
-			mode_caching_page->rcd = 0;
-		else if (rcd_flag == SD_CACHE_DISABLE)
-			mode_caching_page->rcd = 1;
-
-		if (wce_flag == SD_CACHE_ENABLE)
-			mode_caching_page->wce = 1;
-		else if (wce_flag == SD_CACHE_DISABLE)
-			mode_caching_page->wce = 0;
-
-		/*
-		 * Save the page if the mode sense says the
-		 * drive supports it.
-		 */
-		save_pg = mode_caching_page->mode_page.ps ?
-		    SD_SAVE_PAGE : SD_DONTSAVE_PAGE;
-
-		/* Clear reserved bits before mode select. */
-		mode_caching_page->mode_page.ps = 0;
-
-		/*
-		 * Clear out mode header for mode select.
-		 * The rest of the retrieved page will be reused.
-		 */
-		bzero(header, hdrlen);
-
-		if (un->un_f_cfg_is_atapi == TRUE) {
-			mhp = (struct mode_header_grp2 *)header;
-			mhp->bdesc_length_hi = bd_len >> 8;
-			mhp->bdesc_length_lo = (uchar_t)bd_len & 0xff;
-		} else {
-			((struct mode_header *)header)->bdesc_length = bd_len;
-		}
-
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-
-		/* Issue mode select to change the cache settings */
-		if (un->un_f_cfg_is_atapi == TRUE) {
-			rval = sd_send_scsi_MODE_SELECT(ssc, CDB_GROUP1, header,
-			    sbuflen, save_pg, SD_PATH_DIRECT);
-		} else {
-			rval = sd_send_scsi_MODE_SELECT(ssc, CDB_GROUP0, header,
-			    sbuflen, save_pg, SD_PATH_DIRECT);
-		}
-
-	}
-
-
-mode_sense_failed:
-
-	kmem_free(header, buflen);
-
-	if (rval != 0) {
-		if (rval == EIO)
-			sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
-		else
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+
+			/* Issue mode select to change the cache settings */
+			rval = sd_send_scsi_MODE_SELECT(ssc, SDC_CDB_GROUP(un),
+			    header, sbuflen, save_pg, SD_PATH_DIRECT);
+		}
+		kmem_free(header, buflen);
+		break;
+	case EIO:
+		sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
+		break;
+	default:
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
 	}
+
 	return (rval);
 }
 
@@ -9573,15 +9577,15 @@ mode_sense_failed:
 /*
  *    Function: sd_get_write_cache_enabled()
  *
- * Description: This routine is the driver entry point for determining if
- *		write caching is enabled.  It examines the WCE (write cache
- *		enable) bits of mode page 8 (MODEPAGE_CACHING).
+ * Description: This routine is the driver entry point for determining if write
+ *		caching is enabled.  It examines the WCE (write cache enable)
+ *		bits of mode page 8 (MODEPAGE_CACHING) with Page Control field
+ *		bits set to MODEPAGE_CURRENT.
  *
- *   Arguments: ssc   - ssc contains pointer to driver soft state (unit)
- *                      structure for this target.
- *		is_enabled - pointer to int where write cache enabled state
- *		is returned (non-zero -> write cache enabled)
- *
+ *   Arguments: ssc		- ssc contains pointer to driver soft state
+ *				  (unit) structure for this target.
+ *		is_enabled	- pointer to int where write cache enabled state
+ *				  is returned (non-zero -> write cache enabled)
  *
  * Return Code: EIO
  *		code returned by sd_send_scsi_MODE_SENSE
@@ -9604,100 +9608,30 @@ mode_sense_failed:
 static int
 sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled)
 {
-	struct mode_caching	*mode_caching_page;
-	uchar_t			*header;
-	size_t			buflen;
-	int			hdrlen;
-	int			bd_len;
-	int			rval = 0;
-	struct sd_lun		*un;
-	int			status;
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	uchar_t		*header;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		bdlen;
+	int		rval;
 
-	ASSERT(ssc != NULL);
-	un = ssc->ssc_un;
-	ASSERT(un != NULL);
-	ASSERT(is_enabled != NULL);
-
-	/* in case of error, flag as enabled */
+	/* In case of error, flag as enabled */
 	*is_enabled = TRUE;
 
-	/*
-	 * Do a test unit ready, otherwise a mode sense may not work if this
-	 * is the first command sent to the device after boot.
-	 */
-	status = sd_send_scsi_TEST_UNIT_READY(ssc, 0);
-
-	if (status != 0)
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		hdrlen = MODE_HEADER_LENGTH_GRP2;
-	} else {
-		hdrlen = MODE_HEADER_LENGTH;
-	}
-
-	/*
-	 * Allocate memory for the retrieved mode page and its headers.  Set
-	 * a pointer to the page itself.
-	 */
-	buflen = hdrlen + MODE_BLK_DESC_LENGTH + sizeof (struct mode_caching);
-	header = kmem_zalloc(buflen, KM_SLEEP);
-
-	/* Get the information from the device. */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP1, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	} else {
-		rval = sd_send_scsi_MODE_SENSE(ssc, CDB_GROUP0, header, buflen,
-		    MODEPAGE_CACHING, SD_PATH_DIRECT);
-	}
-
-	if (rval != 0) {
-		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un,
-		    "sd_get_write_cache_enabled: Mode Sense Failed\n");
-		goto mode_sense_failed;
-	}
-
-	/*
-	 * Determine size of Block Descriptors in order to locate
-	 * the mode page data. ATAPI devices return 0, SCSI devices
-	 * should return MODE_BLK_DESC_LENGTH.
-	 */
-	if (un->un_f_cfg_is_atapi == TRUE) {
-		struct mode_header_grp2	*mhp;
-		mhp	= (struct mode_header_grp2 *)header;
-		bd_len  = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
-	} else {
-		bd_len  = ((struct mode_header *)header)->bdesc_length;
-	}
-
-	if (bd_len > MODE_BLK_DESC_LENGTH) {
-		/* FMA should make upset complain here */
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, 0,
-		    "sd_get_write_cache_enabled: Mode Sense returned invalid "
-		    "block descriptor length\n");
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-
-	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
-	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
-		/* FMA could make upset complain here */
-		sd_ssc_set_info(ssc, SSC_FLAGS_INVALID_DATA, SD_LOG_COMMON,
-		    "sd_get_write_cache_enabled: Mode Sense caching page "
-		    "code mismatch %d\n", mode_caching_page->mode_page.code);
-		rval = EIO;
-		goto mode_sense_failed;
-	}
-	*is_enabled = mode_caching_page->wce;
-
-mode_sense_failed:
-	if (rval == 0) {
+	rval = sd_get_caching_mode_page(ssc, MODEPAGE_CURRENT, &header, &bdlen);
+	switch (rval) {
+	case 0:
+		mode_caching_page = (struct mode_caching *)(header + hdrlen +
+		    bdlen);
+		*is_enabled = mode_caching_page->wce;
 		sd_ssc_assessment(ssc, SD_FMT_STANDARD);
-	} else if (rval == EIO) {
+		kmem_free(header, buflen);
+		break;
+	case EIO: {
 		/*
-		 * Some disks do not support mode sense(6), we
-		 * should ignore this kind of error(sense key is
+		 * Some disks do not support Mode Sense(6), we
+		 * should ignore this kind of error (sense key is
 		 * 0x5 - illegal request).
 		 */
 		uint8_t *sensep;
@@ -9713,11 +9647,64 @@ mode_sense_failed:
 		} else {
 			sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
 		}
-	} else {
-		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
 	}
-	kmem_free(header, buflen);
+	default:
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
+	}
+
 	return (rval);
+}
+
+/*
+ *    Function: sd_get_write_cache_changeable()
+ *
+ * Description: This routine is the driver entry point for determining if write
+ *		caching is changeable.  It examines the WCE (write cache enable)
+ *		bits of mode page 8 (MODEPAGE_CACHING) with Page Control field
+ *		bits set to MODEPAGE_CHANGEABLE.
+ *
+ *   Arguments: ssc		- ssc contains pointer to driver soft state
+ *				  (unit) structure for this target.
+ *		is_changeable	- pointer to int where write cache changeable
+ *				  state is returned (non-zero -> write cache
+ *				  changeable)
+ *
+ *     Context: Kernel Thread
+ */
+
+static void
+sd_get_write_cache_changeable(sd_ssc_t *ssc, int *is_changeable)
+{
+	struct sd_lun	*un = ssc->ssc_un;
+	struct mode_caching *mode_caching_page;
+	uchar_t		*header;
+	size_t		buflen = SDC_BUFLEN(un);
+	int		hdrlen = SDC_HDRLEN(un);
+	int		bdlen;
+	int		rval;
+
+	/* In case of error, flag as enabled */
+	*is_changeable = TRUE;
+
+	rval = sd_get_caching_mode_page(ssc, MODEPAGE_CHANGEABLE, &header,
+	    &bdlen);
+	switch (rval) {
+	case 0:
+		mode_caching_page = (struct mode_caching *)(header + hdrlen +
+		    bdlen);
+		*is_changeable = mode_caching_page->wce;
+		kmem_free(header, buflen);
+		sd_ssc_assessment(ssc, SD_FMT_STANDARD);
+		break;
+	case EIO:
+		sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
+		break;
+	default:
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		break;
+	}
 }
 
 /*
@@ -11585,7 +11572,7 @@ sd_xbuf_strategy(struct buf *bp, ddi_xbuf_t xp, void *arg)
 
 static void
 sd_xbuf_init(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
-	uchar_t chain_type, void *pktinfop)
+    uchar_t chain_type, void *pktinfop)
 {
 	int index;
 
@@ -11819,7 +11806,7 @@ sd_uscsi_strategy(struct buf *bp)
 
 static int
 sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd, int flag,
-	enum uio_seg dataspace, int path_flag)
+    enum uio_seg dataspace, int path_flag)
 {
 	struct sd_lun	*un;
 	sd_ssc_t	*ssc;
@@ -11989,7 +11976,7 @@ sd_ssc_fini(sd_ssc_t *ssc)
  */
 static int
 sd_ssc_send(sd_ssc_t *ssc, struct uscsi_cmd *incmd, int flag,
-	enum uio_seg dataspace, int path_flag)
+    enum uio_seg dataspace, int path_flag)
 {
 	struct sd_uscsi_info	*uip;
 	struct uscsi_cmd	*uscmd;
@@ -14369,8 +14356,8 @@ sd_destroypkt_for_uscsi(struct buf *bp)
  */
 
 static struct buf *
-sd_bioclone_alloc(struct buf *bp, size_t datalen,
-	daddr_t blkno, int (*func)(struct buf *))
+sd_bioclone_alloc(struct buf *bp, size_t datalen, daddr_t blkno,
+    int (*func)(struct buf *))
 {
 	struct	sd_lun	*un;
 	struct	sd_xbuf	*xp;
@@ -14429,7 +14416,7 @@ sd_bioclone_alloc(struct buf *bp, size_t datalen,
 
 static struct buf *
 sd_shadow_buf_alloc(struct buf *bp, size_t datalen, uint_t bflags,
-	daddr_t blkno, int (*func)(struct buf *))
+    daddr_t blkno, int (*func)(struct buf *))
 {
 	struct	sd_lun	*un;
 	struct	sd_xbuf	*xp;
@@ -14586,7 +14573,7 @@ sd_shadow_buf_free(struct buf *bp)
 
 static void
 sd_print_transport_rejected_message(struct sd_lun *un, struct sd_xbuf *xp,
-	int code)
+    int code)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -15545,7 +15532,7 @@ sd_return_failed_command(struct sd_lun *un, struct buf *bp, int errcode)
 
 static void
 sd_return_failed_command_no_restart(struct sd_lun *un, struct buf *bp,
-	int errcode)
+    int errcode)
 {
 	struct sd_xbuf *xp;
 
@@ -15656,9 +15643,9 @@ sd_return_failed_command_no_restart(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
-	void (*user_funcp)(struct sd_lun *un, struct buf *bp, void *argp, int
-	code), void *user_arg, int failure_code,  clock_t retry_delay,
-	void (*statp)(kstat_io_t *))
+    void (*user_funcp)(struct sd_lun *un, struct buf *bp, void *argp, int code),
+    void *user_arg, int failure_code, clock_t retry_delay,
+    void (*statp)(kstat_io_t *))
 {
 	struct sd_xbuf	*xp;
 	struct scsi_pkt	*pktp;
@@ -16022,7 +16009,7 @@ fail_command_no_log:
 
 static void
 sd_set_retry_bp(struct sd_lun *un, struct buf *bp, clock_t retry_delay,
-	void (*statp)(kstat_io_t *))
+    void (*statp)(kstat_io_t *))
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -16273,7 +16260,7 @@ sd_start_direct_priority_command(void *arg)
 
 static void
 sd_send_request_sense_command(struct sd_lun *un, struct buf *bp,
-	struct scsi_pkt *pktp)
+    struct scsi_pkt *pktp)
 {
 	ASSERT(bp != NULL);
 	ASSERT(un != NULL);
@@ -17320,7 +17307,7 @@ sd_print_incomplete_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 
 static void
 sd_pkt_status_good(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	char	*cmdp;
 
@@ -17380,7 +17367,7 @@ sd_pkt_status_good(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_handle_request_sense(struct sd_lun *un, struct buf *sense_bp,
-	struct sd_xbuf *sense_xp, struct scsi_pkt *sense_pktp)
+    struct sd_xbuf *sense_xp, struct scsi_pkt *sense_pktp)
 {
 	struct buf	*cmd_bp;	/* buf for the original command */
 	struct sd_xbuf	*cmd_xp;	/* sd_xbuf for the original command */
@@ -17500,7 +17487,7 @@ sd_handle_request_sense(struct sd_lun *un, struct buf *sense_bp,
 
 static void
 sd_handle_auto_request_sense(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct scsi_arq_status *asp;
 	size_t actual_len;
@@ -17590,7 +17577,7 @@ sd_handle_auto_request_sense(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_print_sense_failed_msg(struct sd_lun *un, struct buf *bp, void *arg,
-	int code)
+    int code)
 {
 	char	*msgp = arg;
 
@@ -17619,7 +17606,7 @@ sd_print_sense_failed_msg(struct sd_lun *un, struct buf *bp, void *arg,
 
 static int
 sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
-	size_t actual_len)
+    size_t actual_len)
 {
 	struct scsi_extended_sense *esp;
 	struct	scsi_pkt *pktp;
@@ -17788,7 +17775,7 @@ sense_failed:
 
 static void
 sd_decode_sense(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
-	struct scsi_pkt *pktp)
+    struct scsi_pkt *pktp)
 {
 	uint8_t sense_key;
 
@@ -18090,8 +18077,8 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
  */
 
 static void
-sd_sense_key_no_sense(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_no_sense(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 
@@ -18120,9 +18107,8 @@ sd_sense_key_no_sense(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_sense_key_recoverable_error(struct sd_lun *un,
-	uint8_t *sense_datap,
-	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_recoverable_error(struct sd_lun *un, uint8_t *sense_datap,
+    struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 	uint8_t asc = scsi_sense_asc(sense_datap);
@@ -18178,9 +18164,8 @@ sd_sense_key_recoverable_error(struct sd_lun *un,
  */
 
 static void
-sd_sense_key_not_ready(struct sd_lun *un,
-	uint8_t *sense_datap,
-	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_not_ready(struct sd_lun *un, uint8_t *sense_datap, struct buf *bp,
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 	uint8_t asc = scsi_sense_asc(sense_datap);
@@ -18449,9 +18434,8 @@ fail_command:
  */
 
 static void
-sd_sense_key_medium_or_hardware_error(struct sd_lun *un,
-	uint8_t *sense_datap,
-	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_medium_or_hardware_error(struct sd_lun *un, uint8_t *sense_datap,
+    struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 	uint8_t sense_key = scsi_sense_key(sense_datap);
@@ -18547,7 +18531,7 @@ sd_sense_key_medium_or_hardware_error(struct sd_lun *un,
 
 static void
 sd_sense_key_illegal_request(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 
@@ -18579,9 +18563,8 @@ sd_sense_key_illegal_request(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_sense_key_unit_attention(struct sd_lun *un,
-	uint8_t *sense_datap,
-	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_unit_attention(struct sd_lun *un, 	uint8_t *sense_datap,
+    struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	/*
 	 * For UNIT ATTENTION we allow retries for one minute. Devices
@@ -18732,8 +18715,8 @@ do_retry:
  */
 
 static void
-sd_sense_key_fail_command(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_fail_command(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 
@@ -18762,8 +18745,8 @@ sd_sense_key_fail_command(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_sense_key_blank_check(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_blank_check(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 
@@ -18798,7 +18781,7 @@ sd_sense_key_blank_check(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_sense_key_aborted_command(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 
@@ -18833,9 +18816,8 @@ sd_sense_key_aborted_command(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_sense_key_default(struct sd_lun *un,
-	uint8_t *sense_datap,
-	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_sense_key_default(struct sd_lun *un, uint8_t *sense_datap, struct buf *bp,
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
 	uint8_t sense_key = scsi_sense_key(sense_datap);
@@ -18966,7 +18948,7 @@ update_pkt_reason:
 
 static void
 sd_print_cmd_incomplete_msg(struct sd_lun *un, struct buf *bp, void *arg,
-	int code)
+    int code)
 {
 	dev_info_t	*dip;
 
@@ -19014,7 +18996,7 @@ sd_print_cmd_incomplete_msg(struct sd_lun *un, struct buf *bp, void *arg,
 
 static void
 sd_pkt_reason_cmd_incomplete(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	int flag = SD_RETRIES_STANDARD | SD_RETRIES_ISOLATE;
 
@@ -19059,7 +19041,7 @@ sd_pkt_reason_cmd_incomplete(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_pkt_reason_cmd_tran_err(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19096,8 +19078,8 @@ sd_pkt_reason_cmd_tran_err(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_pkt_reason_cmd_reset(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_pkt_reason_cmd_reset(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19134,8 +19116,8 @@ sd_pkt_reason_cmd_reset(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_pkt_reason_cmd_aborted(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_pkt_reason_cmd_aborted(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19171,8 +19153,8 @@ sd_pkt_reason_cmd_aborted(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_pkt_reason_cmd_timeout(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_pkt_reason_cmd_timeout(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19208,7 +19190,7 @@ sd_pkt_reason_cmd_timeout(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_pkt_reason_cmd_unx_bus_free(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	void (*funcp)(struct sd_lun *un, struct buf *bp, void *arg, int code);
 
@@ -19239,7 +19221,7 @@ sd_pkt_reason_cmd_unx_bus_free(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_pkt_reason_cmd_tag_reject(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19277,8 +19259,8 @@ sd_pkt_reason_cmd_tag_reject(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_pkt_reason_default(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_pkt_reason_default(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19307,7 +19289,7 @@ sd_pkt_reason_default(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_pkt_status_check_condition(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19359,7 +19341,7 @@ sd_pkt_status_check_condition(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_pkt_status_busy(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
-	struct scsi_pkt *pktp)
+    struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19453,7 +19435,7 @@ sd_pkt_status_busy(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 
 static void
 sd_pkt_status_reservation_conflict(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+    struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19534,8 +19516,8 @@ sd_pkt_status_reservation_conflict(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_pkt_status_qfull(struct sd_lun *un, struct buf *bp,
-	struct sd_xbuf *xp, struct scsi_pkt *pktp)
+sd_pkt_status_qfull(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
+    struct scsi_pkt *pktp)
 {
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -20053,7 +20035,7 @@ sd_send_scsi_DOORLOCK(sd_ssc_t *ssc, int flag, int path_flag)
 
 static int
 sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
-	int path_flag)
+    int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
 	struct	uscsi_cmd	ucmd_buf;
@@ -20270,8 +20252,8 @@ rc16_done:
 #define	SD_CAPACITY_16_SIZE	sizeof (struct scsi_capacity_16)
 
 static int
-sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
-	uint32_t *lbap, uint32_t *psp, int path_flag)
+sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
+    uint32_t *psp, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
 	struct	uscsi_cmd	ucmd_buf;
@@ -20724,7 +20706,7 @@ sd_start_stop_unit_task(void *arg)
 
 static int
 sd_send_scsi_INQUIRY(sd_ssc_t *ssc, uchar_t *bufaddr, size_t buflen,
-	uchar_t evpd, uchar_t page_code, size_t *residp)
+    uchar_t evpd, uchar_t page_code, size_t *residp)
 {
 	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
@@ -20914,8 +20896,8 @@ sd_send_scsi_TEST_UNIT_READY(sd_ssc_t *ssc, int flag)
  */
 
 static int
-sd_send_scsi_PERSISTENT_RESERVE_IN(sd_ssc_t *ssc, uchar_t  usr_cmd,
-	uint16_t data_len, uchar_t *data_bufp)
+sd_send_scsi_PERSISTENT_RESERVE_IN(sd_ssc_t *ssc, uchar_t usr_cmd,
+    uint16_t data_len, uchar_t *data_bufp)
 {
 	struct scsi_extended_sense	sense_buf;
 	union scsi_cdb		cdb;
@@ -21022,7 +21004,7 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(sd_ssc_t *ssc, uchar_t  usr_cmd,
 
 static int
 sd_send_scsi_PERSISTENT_RESERVE_OUT(sd_ssc_t *ssc, uchar_t usr_cmd,
-	uchar_t	*usr_bufp)
+    uchar_t *usr_bufp)
 {
 	struct scsi_extended_sense	sense_buf;
 	union scsi_cdb		cdb;
@@ -21441,8 +21423,8 @@ done:
 
 static int
 sd_send_scsi_GET_CONFIGURATION(sd_ssc_t *ssc, struct uscsi_cmd *ucmdbuf,
-	uchar_t *rqbuf, uint_t rqbuflen, uchar_t *bufaddr, uint_t buflen,
-	int path_flag)
+    uchar_t *rqbuf, uint_t rqbuflen, uchar_t *bufaddr, uint_t buflen,
+    int path_flag)
 {
 	char	cdb[CDB_GROUP1];
 	int	status;
@@ -21532,9 +21514,9 @@ sd_send_scsi_GET_CONFIGURATION(sd_ssc_t *ssc, struct uscsi_cmd *ucmdbuf,
  *
  */
 static int
-sd_send_scsi_feature_GET_CONFIGURATION(sd_ssc_t *ssc,
-	struct uscsi_cmd *ucmdbuf, uchar_t *rqbuf, uint_t rqbuflen,
-	uchar_t *bufaddr, uint_t buflen, char feature, int path_flag)
+sd_send_scsi_feature_GET_CONFIGURATION(sd_ssc_t *ssc, struct uscsi_cmd *ucmdbuf,
+    uchar_t *rqbuf, uint_t rqbuflen, uchar_t *bufaddr, uint_t buflen,
+    char feature, int path_flag)
 {
 	char    cdb[CDB_GROUP1];
 	int	status;
@@ -21633,7 +21615,7 @@ sd_send_scsi_feature_GET_CONFIGURATION(sd_ssc_t *ssc,
 
 static int
 sd_send_scsi_MODE_SENSE(sd_ssc_t *ssc, int cdbsize, uchar_t *bufaddr,
-	size_t buflen,  uchar_t page_code, int path_flag)
+    size_t buflen,  uchar_t page_code, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
 	union scsi_cdb		cdb;
@@ -21751,7 +21733,7 @@ sd_send_scsi_MODE_SENSE(sd_ssc_t *ssc, int cdbsize, uchar_t *bufaddr,
 
 static int
 sd_send_scsi_MODE_SELECT(sd_ssc_t *ssc, int cdbsize, uchar_t *bufaddr,
-	size_t buflen,  uchar_t save_page, int path_flag)
+    size_t buflen,  uchar_t save_page, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
 	union scsi_cdb		cdb;
@@ -21858,7 +21840,7 @@ sd_send_scsi_MODE_SELECT(sd_ssc_t *ssc, int cdbsize, uchar_t *bufaddr,
 
 static int
 sd_send_scsi_RDWR(sd_ssc_t *ssc, uchar_t cmd, void *bufaddr,
-	size_t buflen, daddr_t start_block, int path_flag)
+    size_t buflen, daddr_t start_block, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
 	union scsi_cdb		cdb;
@@ -21985,9 +21967,7 @@ sd_send_scsi_RDWR(sd_ssc_t *ssc, uchar_t cmd, void *bufaddr,
 
 static int
 sd_send_scsi_LOG_SENSE(sd_ssc_t *ssc, uchar_t *bufaddr, uint16_t buflen,
-	uchar_t page_code, uchar_t page_control, uint16_t param_ptr,
-	int path_flag)
-
+    uchar_t page_code, uchar_t page_control, uint16_t param_ptr, int path_flag)
 {
 	struct scsi_extended_sense	sense_buf;
 	union scsi_cdb		cdb;
@@ -22035,7 +22015,7 @@ sd_send_scsi_LOG_SENSE(sd_ssc_t *ssc, uchar_t *bufaddr, uint16_t buflen,
 		case STATUS_CHECK:
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
 			    (scsi_sense_key((uint8_t *)&sense_buf) ==
-				KEY_ILLEGAL_REQUEST) &&
+			    KEY_ILLEGAL_REQUEST) &&
 			    (scsi_sense_asc((uint8_t *)&sense_buf) == 0x24)) {
 				/*
 				 * ASC 0x24: INVALID FIELD IN CDB
@@ -22119,7 +22099,7 @@ sd_send_scsi_LOG_SENSE(sd_ssc_t *ssc, uchar_t *bufaddr, uint16_t buflen,
 
 static int
 sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION(sd_ssc_t *ssc, uchar_t *bufaddr,
-	size_t buflen, uchar_t class_req)
+    size_t buflen, uchar_t class_req)
 {
 	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
@@ -22454,9 +22434,9 @@ skip_ready_valid:
 
 		if ((err == 0) &&
 		    ((cmd == DKIOCSETEFI) ||
-		    (un->un_f_pkstats_enabled) &&
+		    ((un->un_f_pkstats_enabled) &&
 		    (cmd == DKIOCSAPART || cmd == DKIOCSVTOC ||
-		    cmd == DKIOCSEXTVTOC))) {
+		    cmd == DKIOCSEXTVTOC)))) {
 
 			tmprval = cmlb_validate(un->un_cmlbhandle, CMLB_SILENT,
 			    (void *)SD_PATH_DIRECT);
@@ -23175,6 +23155,11 @@ skip_ready_valid:
 		int wce, sync_supported;
 		int cur_wce = 0;
 
+		if (!un->un_f_cache_mode_changeable) {
+			err = EINVAL;
+			break;
+		}
+
 		if (ddi_copyin((void *)arg, &wce, sizeof (wce), flag)) {
 			err = EFAULT;
 			break;
@@ -23420,7 +23405,7 @@ sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag)
  */
 static int
 sd_get_media_info_com(dev_t dev, uint_t *dki_media_type, uint_t *dki_lbsize,
-	diskaddr_t *dki_capacity, uint_t *dki_pbsize)
+    diskaddr_t *dki_capacity, uint_t *dki_pbsize)
 {
 	struct sd_lun		*un = NULL;
 	struct uscsi_cmd	com;
@@ -26001,8 +25986,7 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 			    ((uint64_t)(blkno * un->un_sys_blocksize)) -
 			    ((uint64_t)(tgt_blkno * un->un_tgt_blocksize));
 
-			ASSERT((io_start_offset >= 0) &&
-			    (io_start_offset < un->un_tgt_blocksize));
+			ASSERT(io_start_offset < un->un_tgt_blocksize);
 			/*
 			 * Do the modify portion of read modify write.
 			 */
@@ -26564,10 +26548,10 @@ sd_persistent_reservation_in_read_keys(struct sd_lun *un,
 	sd_prin_readkeys_t	*in;
 	mhioc_inkeys_t		*ptr;
 	mhioc_key_list_t	li;
-	uchar_t			*data_bufp;
-	int 			data_len;
+	uchar_t			*data_bufp = NULL;
+	int 			data_len = 0;
 	int			rval = 0;
-	size_t			copysz;
+	size_t			copysz = 0;
 	sd_ssc_t		*ssc;
 
 	if ((ptr = (mhioc_inkeys_t *)usrp) == NULL) {
@@ -26581,7 +26565,6 @@ sd_persistent_reservation_in_read_keys(struct sd_lun *un,
 	 * Get the listsize from user
 	 */
 #ifdef _MULTI_DATAMODEL
-
 	switch (ddi_model_convert_from(flag & FMODELS)) {
 	case DDI_MODEL_ILP32:
 		copysz = sizeof (struct mhioc_key_list32);
@@ -26731,7 +26714,7 @@ sd_persistent_reservation_in_read_resv(struct sd_lun *un,
 	int 			data_len;
 	int			rval = 0;
 	int			i;
-	size_t			copysz;
+	size_t			copysz = 0;
 	mhioc_resv_desc_t	*bufp;
 	sd_ssc_t		*ssc;
 
@@ -29443,8 +29426,9 @@ sd_range_lock(struct sd_lun *un, daddr_t startb, daddr_t endb, ushort_t typ)
 			 */
 			ASSERT(!(sl_wmp->wm_flags & SD_WM_BUSY));
 			if (sl_wmp->wm_wanted_count == 0) {
-				if (wmp != NULL)
+				if (wmp != NULL) {
 					CHK_N_FREEWMP(un, wmp);
+				}
 				wmp = sl_wmp;
 			}
 			sl_wmp = NULL;
@@ -29650,7 +29634,7 @@ sd_read_modify_write_task(void *arg)
 
 static int
 sddump_do_read_of_rmw(struct sd_lun *un, uint64_t blkno, uint64_t nblk,
-	struct buf **bpp)
+    struct buf **bpp)
 {
 	int err;
 	int i;
@@ -30081,8 +30065,8 @@ static uint_t   sd_fault_injection_on = 0;
  */
 
 static void
-sd_faultinjection_ioctl(int cmd, intptr_t arg,  struct sd_lun *un) {
-
+sd_faultinjection_ioctl(int cmd, intptr_t arg,  struct sd_lun *un)
+{
 	uint_t i = 0;
 	uint_t rval;
 
@@ -30349,8 +30333,7 @@ sd_faultinjection_ioctl(int cmd, intptr_t arg,  struct sd_lun *un) {
 	}
 
 	mutex_exit(SD_MUTEX(un));
-	SD_TRACE(SD_LOG_IOERR, un, "sd_faultinjection_ioctl:"
-			    " exit\n");
+	SD_TRACE(SD_LOG_IOERR, un, "sd_faultinjection_ioctl: exit\n");
 }
 
 

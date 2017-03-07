@@ -2570,26 +2570,27 @@ config_err(int errnum, int err_type, char **errstring)
  * do_list_common - list non-SHP attachment point
  */
 static int
-do_list_common(
-	di_node_t node,
-	di_minor_t minor,
-	void *arg)
+do_list_common(di_node_t node, di_minor_t minor, void *arg)
 {
 	di_node_t rnode;
 	di_hp_t hp;
 	char *minor_name;
+	char *phys_path;
 
-	minor_name = di_minor_name(minor);
+	if ((minor_name = di_minor_name(minor)) == NULL)
+		return (DI_WALK_CONTINUE);
 
 	/*
 	 * since PCIE/PCIHSHPC connectors have both hp nodes and minor nodes
 	 * created for now, we need to specifically exclude these connectors
 	 * during walking minor nodes.
 	 */
-	if ((rnode = di_init(di_devfs_path(node), DINFOSUBTREE | DINFOHP))
-	    == DI_NODE_NIL) {
+	if ((phys_path = di_devfs_path(node)) == NULL)
 		return (DI_WALK_CONTINUE);
-	}
+	rnode = di_init(phys_path, DINFOSUBTREE | DINFOHP);
+	di_devfs_path_free(phys_path);
+	if (rnode == DI_NODE_NIL)
+		return (DI_WALK_CONTINUE);
 
 	for (hp = DI_HP_NIL; (hp = di_hp_next(rnode, hp)) != DI_HP_NIL; ) {
 		if (strcmp(di_hp_name(hp), minor_name) == 0) {

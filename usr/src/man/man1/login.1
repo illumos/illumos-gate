@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOGIN 1 "Nov 9, 2015"
+.TH LOGIN 1 "Feb 25, 2017"
 .SH NAME
 login \- sign on to the system
 .SH SYNOPSIS
@@ -65,40 +65,9 @@ attempts, all five can be logged in \fB/var/adm/loginlog\fR, if it exists. The
 If password aging is turned on and the password has aged (see \fBpasswd\fR(1)
 for more information), the user is forced to changed the password. In this case
 the \fB/etc/nsswitch.conf\fR file is consulted to determine password
-repositories (see \fBnsswitch.conf\fR(4)). The password update configurations
-supported are limited to the following five cases.
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBpasswd: files\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBpasswd: files nis\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBpasswd: files nisplus\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBpasswd: compat\fR (==> files nis)
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBpasswd: compat\fR (==> files nisplus)
-.sp
-\fBpasswd_compat: nisplus\fR
-.RE
+repositories. See \fBnsswitch.conf\fR(4) for a list of valid nameservice
+configurations that are permitted for the \fBpasswd\fR: database if password
+aging is enabled.
 .sp
 .LP
 Failure to comply with the configurations prevents the user from logging onto

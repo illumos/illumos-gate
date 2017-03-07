@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
-.TH LPC 1B "Jun 2, 2006"
+.TH LPC 1B "Feb 25, 2017"
 .SH NAME
 lpc \- line printer control program
 .SH SYNOPSIS
@@ -11,7 +11,6 @@ lpc \- line printer control program
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlpc\fR utility controls the operation of local printers.
 .sp
@@ -51,7 +50,6 @@ arguments causes it to run interactively, prompting the user for \fBlpc\fR
 commands with \fBlpc>\fR. By redirecting the standard input, \fBlpc\fR can read
 commands from a file.
 .SH USAGE
-.sp
 .LP
 \fBlpc\fR commands can be typed in their entirety or abbreviated to an
 unambiguous substring. Some \fBlpc\fR commands are available to all users;
@@ -249,7 +247,6 @@ conventions for atomic names.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -271,7 +268,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -301,15 +297,6 @@ NIS version of \fB/etc/printers.conf\fR
 .sp
 .ne 2
 .na
-\fB\fBprinters.org_dir\fR\fR
-.ad
-.RS 24n
- NIS+ version of \fB/etc/printers.conf\fR
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBou=printers\fR\fR
 .ad
 .RS 24n
@@ -317,7 +304,6 @@ LDAP version of \fB/etc/printers.conf\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -333,19 +319,16 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlpq\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B), \fBlpstat\fR(1),
 \fBlpsched\fR(1M), \fBlpshut\fR(1M), \fBsvcadm\fR(1M), \fBprinters.conf\fR(4),
 \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 Use the \fBsvcs\fR(1) utility to check if \fBsvc:/application/print/server\fR
 is running. If it is not running, use \fBsvcadm enable
 svc:/application/print/server\fR to start \fBlpsched\fR. See \fBsvcadm\fR(1M).
 .SH NOTES
-.sp
 .LP
 When IPP is in use, the user is prompted for a passphrase if the remote print
 service is configured to require authentication.

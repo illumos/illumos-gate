@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NETGROUP 4 "Jul 22, 2004"
+.TH NETGROUP 4 "Feb 25, 2017"
 .SH NAME
 netgroup \- list of network groups
 .SH SYNOPSIS
@@ -13,20 +13,19 @@ netgroup \- list of network groups
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 A \fBnetgroup\fR defines a network-wide group of hosts and users. Use a
 \fBnetgroup\fR to restrict access to shared \fBNFS\fR filesystems and to
 restrict remote login and shell access.
 .sp
 .LP
-Network groups are stored in a network information services, such as
-\fBLDAP\fR, \fBNIS\fR, or NIS+, not in a local file.
+Network groups are stored in a network information service, such as
+\fBLDAP\fR or \fBNIS\fR, not in a local file.
 .sp
 .LP
 This manual page describes the format for a file that is used to supply input
-to a program such as \fBldapaddent\fR(1M) for LDAP, \fBmakedbm\fR(1M) for NIS,
-or \fBnisaddent\fR(1M) for NIS+. These programs build maps or tables used by
+to a program such as \fBldapaddent\fR(1M) for LDAP or \fBmakedbm\fR(1M) for
+NIS. These programs build maps or tables used by
 their corresponding network information services.
 .sp
 .LP
@@ -124,7 +123,6 @@ granted depending only on whether the requesting host is a member of the
 \fBnetgroup\fR. Remote login and shell access can be controlled both on the
 basis of host and user membership in separate netgroups.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/netgroup\fR\fR
@@ -138,20 +136,18 @@ uses \fB/etc/netgroup\fR to construct an LDAP container.
 .sp
 .LP
 Note that the netgroup information must always be stored in a network
-information service, such as \fBLDAP\fR, \fBNIS\fR, or NIS+. The local file is
+information service, such as \fBLDAP\fR or \fBNIS\fR. The local file is
 only used to construct a map or table for the network information service. It
 is never consulted directly.
 .SH SEE ALSO
-.sp
 .LP
-\fBNIS+\fR(1), \fBldapaddent\fR(1M), \fBmakedbm\fR(1M), \fBnisaddent\fR(1M),
+\fBldapaddent\fR(1M), \fBmakedbm\fR(1M),
 \fBshare_nfs\fR(1M), \fBinnetgr\fR(3C), \fBhosts\fR(4), \fBhosts.equiv\fR(4),
 \fBnsswitch.conf\fR(4), \fBpasswd\fR(4), \fBshadow\fR(4)
 .SH NOTES
-.sp
 .LP
-\fBnetgroup\fR requires a network information service such as \fBLDAP\fR,
-\fBNIS\fR, or NIS+.
+\fBnetgroup\fR requires a network information service such as \fBLDAP\fR
+or \fBNIS\fR.
 .sp
 .LP
 Applications may make general membership tests using the \fBinnetgr()\fR

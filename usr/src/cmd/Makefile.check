@@ -60,7 +60,6 @@ MANIFEST_TOPDIRS=			\
 	oplhpd				\
 	pools				\
 	power				\
-	rexd				\
 	rmvolmgr			\
 	rpcbind				\
 	rpcsvc				\

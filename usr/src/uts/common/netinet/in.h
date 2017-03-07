@@ -117,9 +117,11 @@ struct in6_addr {
 		 */
 #ifdef _KERNEL
 		uint32_t	_S6_u32[4];	/* IPv6 address */
+		uint16_t	_S6_u16[8];	/* IPv6 address */
 		uint8_t		_S6_u8[16];	/* IPv6 address */
 #else
 		uint8_t		_S6_u8[16];	/* IPv6 address */
+		uint16_t	_S6_u16[8];	/* IPv6 address */
 		uint32_t	_S6_u32[4];	/* IPv6 address */
 #endif
 		uint32_t	__S6_align;	/* Align on 32 bit boundary */
@@ -129,6 +131,7 @@ struct in6_addr {
 
 #ifdef _KERNEL
 #define	s6_addr8	_S6_un._S6_u8
+#define	s6_addr16	_S6_un._S6_u16
 #define	s6_addr32	_S6_un._S6_u32
 #endif
 

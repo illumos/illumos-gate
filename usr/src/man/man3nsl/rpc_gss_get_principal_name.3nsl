@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_GSS_GET_PRINCIPAL_NAME 3NSL "Jun 17, 2014"
+.TH RPC_GSS_GET_PRINCIPAL_NAME 3NSL "Feb 25, 2017"
 .SH NAME
 rpc_gss_get_principal_name \- Get principal names at server
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ rpc_gss_get_principal_name \- Get principal names at server
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Servers need to be able to operate on a client's principal name. Such a name is
 stored by the server as a  \fBrpc_gss_principal_t\fR structure, an opaque byte
@@ -34,7 +33,6 @@ and a domain name.  From these parameters it constructs a unique,
 mechanism-dependent principal name of the \fBrpc_gss_principal_t\fR structure
 type.
 .SH PARAMETERS
-.sp
 .LP
 How many of the identifying parameters  (\fIname \fR,  \fInode\fR, and \fI
 \fRdomain\fI)\fR are necessary to specify depends on the mechanism being used.
@@ -91,18 +89,16 @@ example, 'valleyforge').
 \fB\fIdomain\fR \fR
 .ad
 .RS 14n
-A security domain; for example, a DNS, NIS, or NIS+ domain name
+A security domain; for example, a DNS or NIS domain name
 ('eng.company.com').
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 \fBrpc_gss_get_principal_name()\fR returns  TRUE if it is successful;
 otherwise, use  \fBrpc_gss_get_error()\fR to get the error associated with the
 failure.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/gss/mech\fR \fR
@@ -112,7 +108,6 @@ File containing valid security mechanisms
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -128,14 +123,13 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBfree\fR(3C), \fBrpc\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL), \fBrpc_gss_set_svc_name\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBattributes\fR(5)
+\fBfree\fR(3C), \fBrpc\fR(3NSL), \fBrpc_gss_get_mechanisms\fR(3NSL),
+\fBrpc_gss_set_svc_name\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4),
+\fBattributes\fR(5)
 .sp
 .LP
 \fIONC+ Developer\&'s Guide\fR
 .sp
 .LP
 Linn, J. \fIRFC 2078, Generic Security Service Application Program Interface, Version 2\fR. Network Working Group. January 1997.
-.SH NOTES
-.sp

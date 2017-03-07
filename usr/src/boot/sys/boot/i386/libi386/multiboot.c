@@ -41,6 +41,7 @@
 #include <sys/linker.h>
 #include <sys/module.h>
 #include <sys/stdint.h>
+#include <stdbool.h>
 #define _MACHINE_ELF_WANT_32BIT
 #include <machine/elf.h>
 #include <machine/metadata.h>
@@ -365,28 +366,139 @@ update_cmdline(char *cl)
 	return (tmp);
 }
 
-static char *
-kernel_cmdline(struct preloaded_file *fp, struct i386_devdesc *rootdev)
+/*
+ * Search the command line for named property.
+ *
+ * Return codes:
+ *	0	The name is found, we return the data in value and len.
+ *	ENOENT	The name is not found.
+ *	EINVAL	The provided command line is badly formed.
+ */
+static int
+find_property_value(const char *cmd, const char *name, const char **value,
+    size_t *len)
 {
+	const char *namep, *valuep;
+	size_t name_len, value_len;
+	int quoted;
+
+	*value = NULL;
+	*len = 0;
+
+	if (cmd == NULL)
+		return (ENOENT);
+
+	while (*cmd != '\0') {
+		if (cmd[0] != '-' || cmd[1] != 'B') {
+			cmd++;
+			continue;
+		}
+		cmd += 2;	/* Skip -B */
+		while (cmd[0] == ' ' || cmd[0] == '\t')
+			cmd++;	/* Skip whitespaces. */
+		while (*cmd != '\0' && cmd[0] != ' ' && cmd[0] != '\t') {
+			namep = cmd;
+			valuep = strchr(cmd, '=');
+			if (valuep == NULL)
+				break;
+			name_len = valuep - namep;
+			valuep++;
+			value_len = 0;
+			quoted = 0;
+			for (; ; ++value_len) {
+				if (valuep[value_len] == '\0')
+					break;
+
+				/* Is this value quoted? */
+				if (value_len == 0 &&
+				    (valuep[0] == '\'' || valuep[0] == '"')) {
+					quoted = valuep[0];
+					++value_len;
+				}
+
+				/*
+				 * In the quote accept any character,
+				 * but look for ending quote.
+				 */
+				if (quoted != 0) {
+					if (valuep[value_len] == quoted)
+						quoted = 0;
+					continue;
+				}
+
+				/* A comma or white space ends the value. */
+				if (valuep[value_len] == ',' ||
+				    valuep[value_len] == ' ' ||
+				    valuep[value_len] == '\t')
+					break;
+			}
+			if (quoted != 0) {
+				printf("Missing closing '%c' in \"%s\"\n",
+				    quoted, valuep);
+				return (EINVAL);
+			}
+
+			if (value_len != 0) {
+				if (strncmp(namep, name, name_len) == 0) {
+					*value = valuep;
+					*len = value_len;
+					return (0);
+				}
+			}
+			cmd = valuep + value_len;
+			while (*cmd == ',')
+				cmd++;
+		}
+	}
+	return (ENOENT);
+}
+
+static int
+kernel_cmdline(struct preloaded_file *fp, struct i386_devdesc *rootdev,
+    char **line)
+{
+	const char *fs = getenv("fstype");
 	char *cmdline = NULL;
 	size_t len;
+	bool zfs_root = false;
+	int rv = 0;
 
-	if (fp->f_args == NULL)
-		fp->f_args = getenv("boot-args");
+	if (rootdev->d_type == DEVT_ZFS)
+		zfs_root = true;
+
+	/* If we have fstype set in env, reset zfs_root if needed. */
+	if (fs != NULL && strcmp(fs, "zfs") != 0)
+		zfs_root = false;
+
+	/*
+	 * If we have fstype set on the command line,
+	 * reset zfs_root if needed.
+	 */
+	rv = find_property_value(fp->f_args, "fstype", &fs, &len);
+	switch (rv) {
+	case EINVAL:		/* invalid command line */
+		return (rv);
+	case ENOENT:		/* fall through */
+	case 0:
+		break;
+	}
+
+	if (fs != NULL && strncmp(fs, "zfs", len) != 0)
+		zfs_root = false;
 
 	len = strlen(fp->f_name) + 1;
 
 	if (fp->f_args != NULL)
 		len += strlen(fp->f_args) + 1;
 
-	if (rootdev->d_type == DEVT_ZFS)
+	if (zfs_root == true)
 		len += 3 + strlen(zfs_bootfs(rootdev)) + 1;
 
 	cmdline = malloc(len);
 	if (cmdline == NULL)
-		return (cmdline);
+		return (ENOMEM);
 
-	if (rootdev->d_type == DEVT_ZFS) {
+	if (zfs_root == true) {
 		if (fp->f_args != NULL)
 			snprintf(cmdline, len, "%s %s -B %s", fp->f_name,
 			    fp->f_args, zfs_bootfs(rootdev));
@@ -398,7 +510,8 @@ kernel_cmdline(struct preloaded_file *fp, struct i386_devdesc *rootdev)
 	else
 		snprintf(cmdline, len, "%s", fp->f_name);
 
-	return (update_cmdline(cmdline));
+	*line = update_cmdline(cmdline);
+	return (0);
 }
 
 static int
@@ -489,11 +602,10 @@ multiboot_exec(struct preloaded_file *fp)
 		mb_mod[num].mod_end = mfp->f_addr + mfp->f_size;
 
 		if (strcmp(mfp->f_type, "kernel") == 0) {
-			cmdline = kernel_cmdline(mfp, rootdev);
-			if (cmdline == NULL) {
-				error = ENOMEM;
+			cmdline = NULL;
+			error = kernel_cmdline(mfp, rootdev, &cmdline);
+			if (error != 0)
 				goto error;
-			}
 		} else {
 			len = strlen(mfp->f_name) + 1;
 			len += strlen(mfp->f_type) + 5 + 1;
@@ -589,14 +701,15 @@ multiboot_exec(struct preloaded_file *fp)
 			snprintf(cmdline, len, "%s %s", fp->f_name, fp->f_args);
 		} else {
 			cmdline = strdup(fp->f_name);
+			if (cmdline == NULL) {
+				error = ENOMEM;
+				goto error;
+			}
 		}
 	} else {
-		cmdline = kernel_cmdline(fp, rootdev);
-	}
-
-	if (cmdline == NULL) {
-		error = ENOMEM;
-		goto error;
+		cmdline = NULL;
+		if ((error = kernel_cmdline(fp, rootdev, &cmdline)) != 0)
+			goto error;
 	}
 
 	mb_info->cmdline = mb_malloc(strlen(cmdline)+1);
@@ -612,6 +725,7 @@ multiboot_exec(struct preloaded_file *fp)
 	panic("exec returned");
 
 error:
+	free(cmdline);
 	return (error);
 }
 

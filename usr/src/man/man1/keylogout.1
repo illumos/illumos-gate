@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KEYLOGOUT 1 "Dec 2, 2005"
+.TH KEYLOGOUT 1 "Feb 25, 2017"
 .SH NAME
 keylogout \- delete stored secret key with keyserv
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ keylogout \- delete stored secret key with keyserv
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBkeylogout\fR deletes the key stored by the key server process
 \fBkeyserv\fR(1M). Further access to the key is revoked; however, current
@@ -25,13 +24,7 @@ scheduled \fBat\fR(1) jobs that need secure RPC services to fail. Since only
 one copy of the key is kept on a machine, it is a bad idea to place a call to
 this command in your  \fB\&.logout\fR file since it affects other sessions on
 the same machine.
-.sp
-.LP
-If multiple NIS+ authentication mechanisms are configured for the system, then
-all keys stored by the key server process is deleted, including  keys that are
-no longer configured.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -46,15 +39,7 @@ services, such as  \fBNFS,\fR that are started by the superuser.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBat\fR(1), \fBchkey\fR(1), \fBlogin\fR(1), \fBkeylogin\fR(1),
-\fBkeyserv\fR(1M), \fBnewkey\fR(1M), \fBnisauthconf\fR(1M), \fBpublickey\fR(4),
+\fBkeyserv\fR(1M), \fBnewkey\fR(1M), \fBpublickey\fR(4),
 \fBattributes\fR(5)
-.SH NOTES
-.sp
-.LP
-NIS+ might not be supported in future releases of the Solaris operating system.
-Tools to aid the migration from NIS+ to LDAP are available in the current
-Solaris release. For more information, visit
-http://www.sun.com/directory/nisplus/transition.html.

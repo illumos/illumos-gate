@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 /*
@@ -62,7 +62,7 @@ add_time_str(wchar_t *wcs)
 		break;
 	case T_DATE_FMT:
 		/*
-		 * This one is a Solaris extension, Too bad date just
+		 * This one is a Solaris extension. Too bad date just
 		 * doesn't use %c, which would be simpler.
 		 */
 		tm.date_fmt = str;
@@ -71,6 +71,7 @@ add_time_str(wchar_t *wcs)
 	case T_ERA_T_FMT:
 	case T_ERA_D_T_FMT:
 		/* Silently ignore it. */
+		free(str);
 		break;
 	default:
 		free(str);
@@ -123,6 +124,7 @@ add_time_list(wchar_t *wcs)
 			tm.pm = str;
 		} else {
 			errf(_("too many list elements"));
+			free(str);
 		}
 		break;
 	case T_ALT_DIGITS:

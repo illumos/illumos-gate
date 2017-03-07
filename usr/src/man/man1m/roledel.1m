@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROLEDEL 1M "Sep 8, 1999"
+.TH ROLEDEL 1M "Feb 25, 2017"
 .SH NAME
 roledel \- delete a role's login from the system
 .SH SYNOPSIS
@@ -13,13 +13,11 @@ roledel \- delete a role's login from the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBroledel\fR utility deletes a role account from the system and makes the
 appropriate account-related changes to the system file and file system.
 \fBroledel\fR also removes the role from each user's list of assumable roles.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -34,7 +32,6 @@ following successful execution of the command.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -47,7 +44,6 @@ An existing role name to be deleted.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -107,7 +103,6 @@ Cannot remove or otherwise modify the home directory.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/passwd\fR\fR
@@ -144,7 +139,6 @@ system file containing additional role attributes
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBauths\fR(1), \fBpasswd\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
 \fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
@@ -152,11 +146,10 @@ system file containing additional role attributes
 \fBuserdel\fR(1M), \fBusermod\fR(1M), \fBpasswd\fR(4), \fBprof_attr\fR(4),
 \fBuser_attr\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBroledel\fR utility only deletes an account definition that is in the
 local \fB/etc/group\fR, \fB/etc/passwd\fR, \fB/etc/shadow\fR, and
-\fB/etc/user_attr\fR file. file. If a network name service such as \fBNIS\fR or
-\fBNIS+\fR is being used to supplement the local \fB/etc/passwd\fR file with
+\fB/etc/user_attr\fR file. file. If a network name service
+is being used to supplement the local \fB/etc/passwd\fR file with
 additional entries, \fBroledel\fR cannot change information supplied by the
 network name service.

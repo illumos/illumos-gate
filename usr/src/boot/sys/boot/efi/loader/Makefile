@@ -51,6 +51,13 @@ CPPFLAGS +=	-I./../../../cddl/boot/zfs
 CPPFLAGS +=	-DEFI_ZFS_BOOT
 CPPFLAGS +=	-DNO_PCI -DEFI -DTERM_EMU
 
+# Export serial numbers, UUID, and asset tag from loader.
+CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
+# Use little-endian UUID format as defined in SMBIOS 2.6.
+CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
+# Use network-endian UUID format for backward compatibility.
+#CPPFLAGS += -DSMBIOS_NETWORK_ENDIAN_UUID
+
 LIBSTAND=	../../libstand/${MACHINE}/libstand.a
 
 BOOT_FORTH=	yes
