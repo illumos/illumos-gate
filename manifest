@@ -2224,7 +2224,6 @@ f usr/bin/nm 0555 root bin
 h usr/bin/nohup=usr/lib/isaexec
 f usr/bin/nroff 0555 root bin
 f usr/bin/od 0555 root bin
-f usr/bin/on 0555 root bin
 f usr/bin/optisa 0555 root bin
 f usr/bin/pack 0555 root bin
 h usr/bin/page=usr/bin/more
@@ -3193,8 +3192,6 @@ f usr/include/rpcsvc/nlm_prot.h 0644 root bin
 f usr/include/rpcsvc/nlm_prot.x 0644 root bin
 f usr/include/rpcsvc/nsm_addr.h 0644 root bin
 f usr/include/rpcsvc/nsm_addr.x 0644 root bin
-f usr/include/rpcsvc/rex.h 0644 root bin
-f usr/include/rpcsvc/rex.x 0644 root bin
 f usr/include/rpcsvc/rpc_sztypes.h 0644 root bin
 f usr/include/rpcsvc/rpc_sztypes.x 0644 root bin
 f usr/include/rpcsvc/rquota.h 0644 root bin
@@ -10504,7 +10501,6 @@ f usr/sbin/roledel 0555 root sys
 f usr/sbin/rolemod 0555 root sys
 s usr/sbin/route=../../sbin/route
 s usr/sbin/routeadm=../../sbin/routeadm
-f usr/sbin/rpc.rexd 0555 root bin
 f usr/sbin/rpcbind 0555 root bin
 f usr/sbin/rtc 0555 root bin
 f usr/sbin/rtquery 0555 root bin
@@ -11692,7 +11688,6 @@ f usr/share/man/man1/nm.1 0444 root bin
 f usr/share/man/man1/nohup.1 0444 root bin
 f usr/share/man/man1/nroff.1 0444 root bin
 f usr/share/man/man1/od.1 0444 root bin
-f usr/share/man/man1/on.1 0444 root bin
 f usr/share/man/man1/optisa.1 0444 root bin
 f usr/share/man/man1/pack.1 0444 root bin
 s usr/share/man/man1/page.1=more.1
@@ -12162,7 +12157,6 @@ f usr/share/man/man1m/rolemod.1m 0444 root bin
 f usr/share/man/man1m/route.1m 0444 root bin
 f usr/share/man/man1m/routeadm.1m 0444 root bin
 s usr/share/man/man1m/routed.1m=in.routed.1m
-f usr/share/man/man1m/rpc.rexd.1m 0444 root bin
 f usr/share/man/man1m/rpcbind.1m 0444 root bin
 f usr/share/man/man1m/rpcinfo.1m 0444 root bin
 f usr/share/man/man1m/rquotad.1m 0444 root bin

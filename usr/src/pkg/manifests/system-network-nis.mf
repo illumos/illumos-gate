@@ -58,7 +58,6 @@ dir path=var/yp/binding
 file path=etc/nsswitch.nis group=sys
 file path=etc/publickey original_name=SUNWnis:etc/publickey preserve=true
 file path=lib/svc/manifest/network/nis/client.xml group=sys mode=0444
-file path=lib/svc/manifest/network/rpc/rex.xml group=sys mode=0444
 file path=usr/bin/chkey group=sys mode=4555
 file path=usr/bin/ldaplist mode=0555
 file path=usr/bin/ypcat group=other mode=0555
@@ -75,7 +74,6 @@ file path=usr/lib/netsvc/yp/ypxfr mode=0555
 file path=usr/sbin/ldapaddent mode=0555
 file path=usr/sbin/ldapclient mode=0555
 file path=usr/sbin/newkey group=sys mode=0555
-file path=usr/sbin/rpc.rexd mode=0555
 file path=usr/sbin/ypalias mode=0555
 file path=usr/sbin/ypinit mode=0555
 file path=usr/sbin/yppoll mode=0555

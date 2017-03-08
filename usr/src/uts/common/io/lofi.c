@@ -2838,6 +2838,7 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	 * from this point lofi_destroy() is used to clean up on error
 	 * make sure the basic data is set
 	 */
+	list_insert_tail(&lofi_list, lsp);
 	lsp->ls_dev = makedevice(getmajor(dev), LOFI_ID2MINOR(id));
 
 	list_create(&lsp->ls_comp_cache, sizeof (struct lofi_comp_cache),
@@ -2910,7 +2911,6 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 		}
 	}
 
-	list_insert_tail(&lofi_list, lsp);
 	/*
 	 * Notify we are ready to rock.
 	 */

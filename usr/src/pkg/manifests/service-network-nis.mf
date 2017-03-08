@@ -71,7 +71,6 @@ file path=usr/lib/netsvc/yp/ypxfrd mode=0555
 file path=usr/sbin/mknetid mode=0555
 file path=usr/sbin/revnetgroup mode=0555
 file path=usr/share/man/man1m/inityp2l.1m
-file path=usr/share/man/man1m/rpc.rexd.1m
 file path=usr/share/man/man1m/rpc.yppasswdd.1m
 file path=usr/share/man/man1m/rpc.ypupdated.1m
 file path=usr/share/man/man1m/ypmake.1m
@@ -93,7 +92,6 @@ legacy pkg=SUNWypu desc="NIS Server for Solaris 2.6 and up" \
     name="NIS Server for Solaris (usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/share/man/man1m/rexd.1m target=rpc.rexd.1m
 link path=usr/share/man/man1m/yppasswdd.1m target=rpc.yppasswdd.1m
 link path=usr/share/man/man1m/ypupdated.1m target=rpc.ypupdated.1m
 link path=usr/share/man/man1m/ypxfrd.1m target=ypserv.1m
