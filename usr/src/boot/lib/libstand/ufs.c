@@ -68,7 +68,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  *	Stand-alone file reading package.
@@ -581,7 +580,7 @@ ufs_open(upath, f)
 
 			ncp = cp;
 			while ((c = *cp) != '\0' && c != '/') {
-				if (++len > MAXNAMLEN) {
+				if (++len > UFS_MAXNAMLEN) {
 					rc = ENOENT;
 					goto out;
 				}

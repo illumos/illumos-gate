@@ -25,7 +25,7 @@
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2012 Marcel Telka <marcel@telka.sk>
 # Copyright 2014 Bart Coddens <bart.coddens@gmail.com>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 RackTop Systems.
 #
@@ -1780,30 +1780,31 @@ function git_wxfile
 	$PERL -e 'my (%files, %realfiles, $msg);
 	my $parent = $ARGV[0];
 	my $child = $ARGV[1];
-	 
+
 	open(F, "git diff -M --name-status $parent..$child |");
 	while (<F>) {
 	    chomp;
 	    if (/^R(\d+)\s+([^ ]+)\s+([^ ]+)/) { # rename
-		if ($1 >= 75) {			 # Probably worth treating as a rename
+		if ($1 >= 75) {		 # Probably worth treating as a rename
 		    $realfiles{$3} = $2;
 		} else {
 		    $realfiles{$3} = $3;
 		    $realfiles{$2} = $2;
-	        }
+		}
 	    } else {
 		my $f = (split /\s+/, $_)[1];
 		$realfiles{$f} = $f;
 	    }
 	}
 	close(F);
-	 
+
 	my $state = 1;		    # 0|comments, 1|files
 	open(F, "git whatchanged --pretty=format:%B $parent..$child |");
 	while (<F>) {
 	    chomp;
 	    if (/^:[0-9]{6}/) {
-		my $fname = (split /\t/, $_)[1];
+		my ($unused, $fname, $fname2) = split(/\t/, $_);
+		$fname = $fname2 if defined($fname2);
 		next if !defined($realfiles{$fname}); # No real change
 		$state = 1;
 		chomp $msg;
