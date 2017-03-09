@@ -89,8 +89,13 @@ extern "C" {
 /*
  * Default number of rows and columns
  */
+#ifdef _HAVE_TEM_FIRMWARE
 #define	TEM_DEFAULT_ROWS	34
 #define	TEM_DEFAULT_COLS	80
+#else
+#define	TEM_DEFAULT_ROWS	25
+#define	TEM_DEFAULT_COLS	80
+#endif
 
 /*
  * Default foreground/background color
