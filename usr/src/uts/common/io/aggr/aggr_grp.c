@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -122,7 +122,6 @@ static void aggr_rem_pseudo_rx_group(aggr_port_t *, aggr_pseudo_rx_group_t *);
 static int aggr_pseudo_disable_intr(mac_intr_handle_t);
 static int aggr_pseudo_enable_intr(mac_intr_handle_t);
 static int aggr_pseudo_start_ring(mac_ring_driver_t, uint64_t);
-static void aggr_pseudo_stop_ring(mac_ring_driver_t);
 static int aggr_addmac(void *, const uint8_t *);
 static int aggr_remmac(void *, const uint8_t *);
 static mblk_t *aggr_rx_poll(void *, int);
@@ -1006,23 +1005,22 @@ aggr_pseudo_enable_intr(mac_intr_handle_t ih)
 	return (mac_hwring_enable_intr(rr_ring->arr_hw_rh));
 }
 
+/*
+ * Here we need to start the pseudo-ring. As MAC already ensures that the
+ * underlying device is set up, all we need to do is save the ring generation.
+ *
+ * Note, we don't end up wanting to use the underlying mac_hwring_start/stop
+ * functions here as those don't actually stop and start the ring, they just
+ * quiesce the ring. Regardless of whether the aggr is logically up or not, we
+ * want to make sure that we can receive traffic for LACP.
+ */
 static int
 aggr_pseudo_start_ring(mac_ring_driver_t arg, uint64_t mr_gen)
 {
 	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)arg;
-	int err;
 
-	err = mac_hwring_start(rr_ring->arr_hw_rh);
-	if (err == 0)
-		rr_ring->arr_gen = mr_gen;
-	return (err);
-}
-
-static void
-aggr_pseudo_stop_ring(mac_ring_driver_t arg)
-{
-	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)arg;
-	mac_hwring_stop(rr_ring->arr_hw_rh);
+	rr_ring->arr_gen = mr_gen;
+	return (0);
 }
 
 /*
@@ -2269,7 +2267,7 @@ aggr_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 
 		infop->mri_driver = (mac_ring_driver_t)rx_ring;
 		infop->mri_start = aggr_pseudo_start_ring;
-		infop->mri_stop = aggr_pseudo_stop_ring;
+		infop->mri_stop = NULL;
 
 		infop->mri_intr = aggr_mac_intr;
 		infop->mri_poll = aggr_rx_poll;

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -606,7 +607,7 @@ lacp_xmit_sm(aggr_port_t *portp)
 	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	/* LACP_OFF state not in specification so check here.  */
-	if (!pl->sm.lacp_on || !pl->NTT || !portp->lp_started)
+	if (!pl->sm.lacp_on || !pl->NTT)
 		return;
 
 	/*
