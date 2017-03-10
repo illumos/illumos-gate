@@ -16,7 +16,7 @@
 .Os
 .Sh NAME
 .Nm i40e
-.Nd Intel XL710 Ethernet Device Driver
+.Nd Intel 710 Ethernet Device Driver
 .Sh SYNOPSIS
 .Pa /dev/i40e*
 .Sh DESCRIPTION

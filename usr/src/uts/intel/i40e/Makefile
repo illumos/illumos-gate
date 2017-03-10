@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 UTSBASE = ../..
@@ -35,6 +35,13 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # of our objects. Therefore we don't try to lint for that.
 #
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
+
+#
+# The Intel common code defines some enums which are valid unsigned ints that
+# GCC is fine with, but not Studio.
+#
+CERRWARN   += -_cc=-erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
 
 LDFLAGS		+= -dy -N misc/mac
 

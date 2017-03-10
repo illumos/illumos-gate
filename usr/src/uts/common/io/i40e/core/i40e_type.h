@@ -49,7 +49,7 @@
 
 #ifndef I40E_MASK
 /* I40E_MASK is a macro used on 32 bit registers */
-#define I40E_MASK(mask, shift) (mask << shift)
+#define	I40E_MASK(mask, shift) (((uint32_t)(mask)) << ((uint32_t)(shift)))
 #endif
 
 #define I40E_MAX_PF			16

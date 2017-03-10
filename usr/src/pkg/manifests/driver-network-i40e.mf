@@ -15,8 +15,8 @@
 
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/i40e@$(PKGVERS)
-set name=pkg.description value="Intel XL710 10/25/40 Gb Ethernet Driver"
-set name=pkg.summary value="Intel XL710 10/25/40 Gb Ethernet Driver"
+set name=pkg.description value="Intel 710 Ethernet Driver"
+set name=pkg.summary value="Intel 710 Ethernet Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
