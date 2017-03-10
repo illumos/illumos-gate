@@ -1,0 +1,227 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Dec 20, 2016
+.Dt USBA_HCDI_CB_OPS 9E
+.Os
+.Sh NAME
+.Nm usba_hcdi_cb_ops ,
+.Nm usba_hcdi_cb_open ,
+.Nm usba_hcdi_cb_ioctl ,
+.Nm usba_hcdi_cb_close
+.Nd USBA HCD Character Device character functions
+.Sh SYNOPSIS
+.In sys/types.h
+.In sys/file.h
+.In sys/errno.h
+.In sys/open.h
+.In sys/cred.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Ft int
+.Fo prefix_open
+.Fa "dev_t *devp"
+.Fa "int flag"
+.Fa "int otyp"
+.Fa "cred_t *credp"
+.Fc
+.Ft int
+.Fo prefix_ioctl
+.Fa "dev_t dev"
+.Fa "int cmd"
+.Fa "intptr_t arg"
+.Fa "int mode"
+.Fa "cred_t *cred_p"
+.Fa "int *rval_p"
+.Fc
+.Ft int
+.Fo prefix_close
+.Fa "dev_t dev"
+.Fa "int flag"
+.Fa "int otyp"
+.Fa "cred_t *cred_p"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This describes private interfaces that are not part of the stable DDI.
+This may be removed or changed at any time.
+.Sh PARAMETERS
+For parameter descriptions, see
+.Xr open 9E ,
+.Xr ioctl 9E ,
+and
+.Xr close 9E .
+.Sh DESCRIPTION
+The entry points listed here are the traditional character device
+.Xr open 9E ,
+.Xr ioctl 9E ,
+and
+.Xr close 9E
+entry points. As discussed in
+.Xr usba_hcdi 9E
+all HCD drivers are required to implement these functions and vector
+them to
+.Xr usba_hubdi_open 9F ,
+.Xr usba_hubdi_ioctl 9F ,
+and
+.Xr usba_hubdi_close 9F
+respectively. For background information on these functions and how they
+interact in the broader operating system, please see the general manual pages
+.Xr open 9E ,
+.Xr ioctl 9E ,
+and
+.Xr close 9E .
+.Pp
+The arguments between the two types of functions are slightly different.
+The
+.Sx EXAMPLES
+section provides a sketch for how most HCD drivers should perform those
+transformations.
+.Pp
+One important distinction from the traditional character routines is
+that the USBA controls a bit more of the minor space. Therefore, the
+driver needs to take extra care around the values encoded in the
+.Sy dev_t
+and it should not perform any cloning or renumbering in its
+.Xr open 9E
+entry point.
+.Sh EXAMPLES
+The following example is adapated from the
+.Xr xhci 7D
+driver which shows how an HCD driver might arrange things. This assumes
+that a driver is following the recommendations in
+.Xr usba_hcdi 9E
+and has initialized a soft state structure through the
+.Xr ddi_soft_state_init 9F
+function. This design also requires that the soft state structure
+contains a pointer to the
+.Sy dev_info_t
+structure during its
+.Xr attach 9E callback.
+.Pp
+This example does not stand alone, it will need to be adapted for a
+driver:
+.Bd -literal
+#include <sys/types.h>
+#include <sys/file.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+static void *prefix_soft_state;
+
+/*
+ * Per-instance structure
+ */
+typedef struct prefix {
+	dev_info_t	*prefix_dev_info;
+	...
+} prefix_t;
+
+static dev_info_t *
+prefix_get_dip(dev_t dev)
+{
+	prefix_t *p;
+	int instance = getminor(dev) & ~HUBD_IS_ROOT_HUB;
+
+	p = ddi_get_soft_state(prefix_soft_state, instance);
+	if (p != NULL)
+		return (p->prefix_dip);
+	return (NULL);
+}
+
+static int
+prefix_open(dev_t *devp, int flags, int otyp, cred_t *credp)
+{
+	dev_info_t *dip = prefix_get_dip(*devp);
+
+	return (usba_hubdi_open(dip, devp, flags, otyp, credp));
+}
+
+static int
+prefix_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
+{
+	dev_info_t *dip = prefix_get_dip(dev);
+
+	/* Potentially handle private ioctls */
+
+	return (usba_hubdi_ioctl(dip, dev, cmd, arg, mode, credp, rvalp));
+}
+
+static int
+prefix_close(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+	dev_info_t *dip = prefix_get_dip(dev);
+
+	return (usba_hubdi_close(dip, dev, flag, otyp, credp));
+}
+
+static int
+prefix_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+	int instance;
+	prefix_t *p;
+
+	/* Perform normal checking of cmd */
+
+	instance = ddi_get_instance(dip);
+	if (ddi_soft_state_zalloc(prefix_soft_state, inst) != 0)
+		return (DDI_FAILURE);
+	p = ddi_get_soft_state(prefix_soft_state, instance);
+	p->prefix_dev_info = dip;
+
+	/* Continue with normal attach(9E) initialization */
+}
+
+int
+_init(void)
+{
+	int ret;
+
+	if ((ret = ddi_soft_state_init(&prefx_soft_state, sizeof (prefx_t),
+	    0)) != 0) {
+		return (ret);
+	}
+
+	/* Perform normal module initialization here */
+
+	return (ret);
+}
+
+int
+_fini(void)
+{
+
+	/* Perform normal module teardown first */
+
+	ddi_soft_state_fini(&prefix_soft_state);
+
+	return (0);
+}
+.Ed
+.Sh SEE ALSO
+.Xr xhci 7D ,
+.Xr attach 9E ,
+.Xr close 9E ,
+.Xr ioctl 9E ,
+.Xr open 9E ,
+.Xr usba_hcdi 9E ,
+.Xr ddi_soft_state_init 9F ,
+.Xr usba_hubdi_close 9F ,
+.Xr usba_hubdi_ioctl 9F ,
+.Xr usba_hubdi_open 9F

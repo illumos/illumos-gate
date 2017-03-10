@@ -1,0 +1,107 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd October 17, 2016
+.Dt XHCI 7D
+.Os
+.Sh NAME
+.Nm xhci
+.Nd Extensible Host Controller Interface Driver
+.Sh SYNOPSIS
+.Sy usb@unit-address
+.Sh DESCRIPTION
+The
+.Nm
+driver supports PCI devices that implement versions 1.0 and 1.1 of the
+Extensible Host Controller Inteface Specification. These devices provide
+support for USB 3.0, USB 2.x, and USB 1.x devices and is integrated into
+the broader illumos USB Architecture (USBA).
+.Pp
+The
+.Nm
+driver supports all four USB transfer types:
+.Sy bulk transfers ,
+.Sy control transfers ,
+.Sy interrupt transfers ,
+and
+.Sy isochronous transfers .
+.Pp
+Administrators do not interact with the
+.Nm
+driver directly. USB devices are managed with
+.Xr cfgadm 1M .
+See
+.Xr cfgadm_usb 1M
+for more information on how to specifically manage USB devices and how
+they are laid out in the system.
+.Xr cfgadm 1M
+is only used to manage devices at a USB level. For example, a USB NIC
+would still be managed with
+.Xr dladm 1M
+at a networking level.
+.Pp
+On some x86 systems USB ports may be routed to either an instance of the
+.Nm
+driver or an instance of the
+.Xr ehci 7D
+driver. By default, all such ports are routed to the
+.Nm
+driver, allowing those devices to operate at USB 3.x speed by default.
+This is most common on Intel platforms and chipsets. While this is
+controlled with the
+.Sy xhci-reroute
+property discussed below, changing it may not be sufficient to change
+the behavior. The BIOS or ACPI data for many x86 systems may toggle this
+automatically.
+.Sh PROPERTIES
+The
+.Nm
+driver supports the following properties which may be tuned in the
+.Nm
+driver's
+.Xr driver.conf 4
+file.
+.Bl -tag -width Sy
+.It Sy xhci-reroute
+The
+.Sy xhci-reroute
+property determines whether or not USB ports are re-routed to the
+.Nm
+driver. The default behavior is to route such ports.  To disable this,
+the property should be set to
+.Sy 0 .
+Any other value, or the lack of the property, cause the default behavior
+to take place.
+.El
+.Sh ARCHITECTURE
+The
+.Nm
+driver is only supported on
+.Sy x86
+systems at this time.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/xhci
+32-bit device driver (x86).
+.It Pa /kernel/drv/amd64/xhci
+64-bit device driver (x86).
+.It Pa /kernel/drv/xhci.conf
+Driver configuration file.
+.El
+.Sh SEE ALSO
+.Xr cfgadm 1M ,
+.Xr cfgadm_usb 1M ,
+.Xr dladm 1M ,
+.Xr driver.conf 4 ,
+.Xr ehci 7D ,
+.Xr usba 7D

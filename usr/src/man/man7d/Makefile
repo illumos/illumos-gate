@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2017, Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2016 Nexenta Systems, Inc.
 #
@@ -240,6 +240,7 @@ i386_MANFILES=	ahci.7d		\
 		ural.7d		\
 		urtw.7d		\
 		wpi.7d		\
+		xhci.7d		\
 		zyd.7d
 
 _MANLINKS=	1394.7d		\

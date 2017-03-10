@@ -1,0 +1,112 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Sep 16, 2016
+.Dt USBA_HCDI_REGISTER 9F
+.Os
+.Sh NAME
+.Nm usba_hcdi_register ,
+.Nm usba_hcdi_unregister
+.Nd register and unregister HCD driver
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Ft int
+.Fo usba_hcdi_register
+.Fa "usba_hcdi_register_args_t *args"
+.Fa "uint_t flags"
+.Fc
+.Ft void
+.Fo usba_hcdi_unregister
+.Fa "dev_info_t *dip"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa args
+A pointer to a filled out registration structure. See
+.Xr usba_hcdi_register_args_t 9S
+for the members to fill in.
+.It Fa flags
+Should be set to
+.Sy 0 .
+.It Fa dip
+Pointer to the device's
+.Sy dev_info
+structure.
+.El
+.Sh DESCRIPTION
+The
+.Fn usba_hcdi_register
+and
+.Fn usba_hcdi_unregister
+functions are used to register and unregister a USB HCDI driver from the
+USBA framework.
+.Pp
+The
+.Fn usba_hcdi_register
+function is called during a device driver's
+.Xr attach 9E
+entry point after it has finished initializing the device. After this
+function successfuly returns, device drivers should assume that the
+.Xr usba_hcdi_ops 9S
+functions may be called at any time.
+.Pp
+The
+.Fn usba_hcdi_unregister
+function should be called during a driver's
+.Xr detach 9E
+entry point after it has unbound its root hub, but before the remainder
+of the device's state is torn down. After calling the
+.Fn usba_hcdi_unregister
+function, the driver will receive no more function calls to its
+.Xr usba_hcdi_ops 9S
+entry points.
+.Pp
+For more information on the initialization and finalization path of a
+USB HCD driver, see
+.Xr usba_hcdi 9E .
+.Sh CONTEXT
+The
+.Fn usba_hcdi_register
+function should only be called from a driver's
+.Xr attach 9E
+entry point.
+.Pp
+The
+.Fn usba_hcdi_unregister
+function should only be called frm a driver's
+.Xr detach 9E
+entry point.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn usba_hcdi_register
+function returns
+.Sy USB_SUCCESS .
+Otherwise
+.Sy USB_FAILURE
+is returned to indicate that the device was not registered.
+.Pp
+The
+.Fn usba_hcdi_unregister
+function does not define any return values and always succeeds.
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr usba_hcdi 9E ,
+.Xr usba_hcdi_ops 9S ,
+.Xr usba_hcdi_register_args_t 9S

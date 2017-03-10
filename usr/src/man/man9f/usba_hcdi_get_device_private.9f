@@ -1,0 +1,66 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 7, 2016
+.Dt USBA_HCDI_GET_DEVICE_PRIVATE 9F
+.Os
+.Sh NAME
+.Nm usba_hcdi_get_device_private
+.Nd get HCD per-device private value
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Ft void *
+.Fo usba_hcdi_get_device_private
+.Fa "usba_device_t *usb_device"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa usb_device
+Pointer to a USB device.
+.El
+.Sh DESCRIPTION
+The
+.Fn usba_hcdi_get_device_private
+function obtains the private data set by a HCD driver. This private data
+is created by the HCD driver's optional entry point
+.Xr usba_hcdi_device_init 9E
+and is removed during the HCD driver's optional entry point
+.Xr usba_hcdi_device_fini 9E .
+If an HCD driver does not implement these entry points then the value
+obtained by a call will always be the null pointer,
+.Dv NULL .
+.Pp
+The framework provides no form of locking of this data and it is up to
+the HCD driver to use whatever synchronization primitives it requires if
+needed.
+.Sh CONTEXT
+The
+.Fn usba_hcdi_get_device_private
+function is generally called from the context of a
+.Xr usba_hcdi 9E
+entry point, but may be called from user, kernel, or interrupt context.
+.Sh RETURN VALUES
+The private data set by an HCD driver is always returned. If no such
+value has been set, then
+.Dv NULL
+is returned.
+.Sh SEE ALSO
+.Xr usba_hcdi 9E ,
+.Xr usba_hcdi_device_fini 9E ,
+.Xr usba_hcdi_device_init 9E

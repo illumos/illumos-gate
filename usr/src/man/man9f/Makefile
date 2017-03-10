@@ -12,7 +12,7 @@
 #
 # Copyright 2017, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore>
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2017, Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
@@ -524,13 +524,22 @@ MANFILES=	ASSERT.9f				\
 		usb_pipe_xopen.9f			\
 		usb_register_hotplug_cbs.9f		\
 		usb_reset_device.9f			\
+		usba_alloc_hcdi_ops.9f			\
+		usba_hcdi_cb.9f				\
+		usba_hcdi_dup_intr_req.9f		\
+		usba_hcdi_dup_isoc_req.9f		\
+		usba_hcdi_get_device_private.9f		\
+		usba_hcdi_register.9f			\
+		usba_hubdi_bind_root_hub.9f		\
+		usba_hubdi_cb_ops.9f			\
+		usba_hubdi_dev_ops.9f			\
 		uwritec.9f				\
 		va_arg.9f				\
 		vmem_add.9f				\
 		vmem_alloc.9f				\
 		vmem_contains.9f			\
 		vmem_create.9f				\
-		vmem_walk.9f				
+		vmem_walk.9f
 
 MANLINKS=	AVL_NEXT.9f					\
 		AVL_PREV.9f					\
@@ -1225,6 +1234,13 @@ MANLINKS=	AVL_NEXT.9f					\
 		usb_set_alt_if.9f				\
 		usb_set_cfg.9f					\
 		usb_unregister_hotplug_cbs.9f			\
+		usba_free_hcdi_ops.9f				\
+		usba_hcdi_unregister.9f				\
+		usba_hubdi_close.9f				\
+		usba_hubdi_ioctl.9f				\
+		usba_hubdi_open.9f				\
+		usba_hubdi_root_hub_power.9f			\
+		usba_hubdi_unbind_root_hub.9f			\
 		va_copy.9f					\
 		va_end.9f					\
 		va_start.9f					\
@@ -2104,12 +2120,25 @@ usb_pipe_open.9f			:= LINKSRC = usb_pipe_xopen.9f
 
 usb_unregister_hotplug_cbs.9f		:= LINKSRC = usb_register_hotplug_cbs.9f
 
+usba_free_hcdi_ops.9f			:= LINKSRC = usba_alloc_hcdi_ops.9f
+
+usba_hcdi_unregister.9f			:= LINKSRC = usba_hcdi_register.9f
+
+usba_hubdi_close.9f			:= LINKSRC = usba_hubdi_cb_ops.9f
+usba_hubdi_ioctl.9f			:= LINKSRC = usba_hubdi_cb_ops.9f
+usba_hubdi_open.9f			:= LINKSRC = usba_hubdi_cb_ops.9f
+
+usba_hubdi_root_hub_power.9f		:= LINKSRC = usba_hubdi_dev_ops.9f
+
+usba_hubdi_unbind_root_hub.9f		:= LINKSRC = usba_hubdi_bind_root_hub.9f
+
+
 va_copy.9f				:= LINKSRC = va_arg.9f
 va_end.9f				:= LINKSRC = va_arg.9f
 va_start.9f				:= LINKSRC = va_arg.9f
 
 vmem_xalloc.9f				:= LINKSRC = vmem_alloc.9f
-vmem_free.9f				:= LINKSRC = vmem_alloc.9f    
+vmem_free.9f				:= LINKSRC = vmem_alloc.9f
 vmem_xfree.9f				:= LINKSRC = vmem_alloc.9f
 
 vmem_xcreate.9f				:= LINKSRC = vmem_create.9f

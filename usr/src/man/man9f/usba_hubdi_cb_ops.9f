@@ -1,0 +1,109 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 7, 2016
+.Dt USBA_HCDI_CB_OPS 9F
+.Os
+.Sh NAME
+.Nm usba_hubdi_cb_ops ,
+.Nm usba_hubdi_open ,
+.Nm usba_hubdi_ioctl ,
+.Nm usba_hubdi_close
+.Nd character device utility functions for HCD drivers
+.Sh SYNOPSIS
+.In sys/usb/usba/hubdi.h
+.Ft int
+.Fo usba_hubdi_open
+.Fa "dev_info_t *dip"
+.Fa "dev_t *devp"
+.Fa "int flag"
+.Fa "int otyp"
+.Fa "cred_t *cred_p"
+.Fc
+.Ft int
+.Fo usba_hubdi_ioctl
+.Fa "dev_info_t *dip"
+.Fa "dev_t dev"
+.Fa "int flag"
+.Fa "intptr_t arg"
+.Fa "int mode"
+.Fa "cred_t *cred_pp"
+.Fa "int *rval_p"
+.Fc
+.Ft int
+.Fo usba_hubdi_close
+.Fa "dev_info_t *dip"
+.Fa "dev_t dev"
+.Fa "int flag"
+.Fa "int otyp"
+.Fa "cred_t *cred_p"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMATERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to the device's
+.Sy dev_info
+structure.
+.El
+.Pp
+All other parameters are the same as the ones described and discussed in
+.Xr open 9E ,
+.Xr ioctl 9E ,
+and
+.Xr close 9E .
+.Sh DESCRIPTION
+The
+.Fn usba_hubdi_open ,
+.Fn usba_hubdi_ioctl ,
+and
+.Fn usba_hubdi_close
+functions are functions provided for the implementation of USB HCD
+drivers. USB HCD drivers are required to implemnt the
+.Xr open 9E ,
+.Xr ioctl 9E ,
+and
+.Xr close 9E
+.Xr cb_ops 9S
+functions. In each of those functions, they should use the device number
+to determine number in
+.Fa devp
+or
+.Fa dev
+to determine the device's corresponding
+.Sy dev_info_t .
+The USB HCD driver's entry points should then call the corresponding
+function described above, passing all the arguments they received
+unmodified.
+.Pp
+The USB HCD driver's entry points should return the value returned by
+the call to the corresponding USBA function.
+.Sh CONTEXT
+These functions should only be called from the context of a USB HCD
+driver's
+.Xr open 9E ,
+.Xr ioctl 9E ,
+and
+.Xr close 9E
+entry points.
+.Sh SEE ALSO
+.Xr close 9E ,
+.Xr ioctl 9E ,
+.Xr open 9E ,
+.Xr usb_hcdi 9E ,
+.Xr cb_ops 9S
