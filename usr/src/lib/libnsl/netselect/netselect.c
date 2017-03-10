@@ -70,9 +70,6 @@ static struct netconfig *netconfig_dup(struct netconfig *);
 
 extern const char __nsl_dom[];
 
-static int (*brand_get_sz)(void) = NULL;
-static struct netconfig *(*brand_get_net_ent)(int) = NULL;
-
 /*
  *	Static global variables used by the library procedures:
  *
@@ -258,14 +255,6 @@ freenetconfigent(struct netconfig *netp)
 	netconfig_free(netp);
 }
 
-void
-_nsl_brand_set_hooks(int (*set_sz_func)(void),
-    struct netconfig *(*get_ent_func)(int))
-{
-	brand_get_sz = set_sz_func;
-	brand_get_net_ent = get_ent_func;
-}
-
 /*
  *	getnetlist() reads the netconfig file and creates a
  *	NULL-terminated list of entries.
@@ -282,6 +271,7 @@ getnetlist(void)
 	int count;		/* the number of entries in file */
 	char nc_path[MAXPATHLEN];
 	const char *zroot = zone_get_nroot();
+	char line[BUFSIZ];	/* holds each line of NETCONFIG */
 
 	/*
 	 * If we are running in a branded zone, ensure we use the "/native"
@@ -290,24 +280,18 @@ getnetlist(void)
 	(void) snprintf(nc_path, sizeof (nc_path), "%s%s", zroot != NULL ?
 	    zroot : "", NETCONFIG);
 
-	if (brand_get_sz != NULL) {
-		count = brand_get_sz();
-	} else {
-		char line[BUFSIZ];	/* holds each line of NETCONFIG */
-
-		if ((fp = fopen(nc_path, "rF")) == NULL) {
-			nc_error = NC_OPENFAIL;
-			return (NULL);
-		}
-
-		count = 0;
-		while (fgets(line, BUFSIZ, fp)) {
-			if (!(blank(line) || comment(line))) {
-				++count;
-			}
-		}
-		rewind(fp);
+	if ((fp = fopen(nc_path, "rF")) == NULL) {
+		nc_error = NC_OPENFAIL;
+		return (NULL);
 	}
+
+	count = 0;
+	while (fgets(line, BUFSIZ, fp)) {
+		if (!(blank(line) || comment(line))) {
+			++count;
+		}
+	}
+	rewind(fp);
 
 	if (count == 0) {
 		nc_error = NC_NOTFOUND;
@@ -324,33 +308,21 @@ getnetlist(void)
 		return (NULL);
 	}
 
-	if (brand_get_net_ent != NULL) {
-		int i;
+	/*
+	 *	The following loop fills in the list (loops until
+	 *	fgetnetconfig() returns a NULL) and counts the
+	 *	number of entries placed in the list.  Note that
+	 *	when the loop is completed, the last entry in the
+	 *	list will contain a NULL (signifying the end of
+	 *	the list).
+	 */
+	linenum = 0;
+	for (tpp = listpp; *tpp = fgetnetconfig(fp, NULL); tpp++)
+		;
+	(void) fclose(fp);
 
-		tpp = listpp;
-		for (i = 0; i < count; i++) {
-			*tpp = brand_get_net_ent(i);
-			tpp++;
-		}
-		*tpp = NULL;
-		nc_error = NC_NOMOREENTRIES;
-	} else {
-		/*
-		 *	The following loop fills in the list (loops until
-		 *	fgetnetconfig() returns a NULL) and counts the
-		 *	number of entries placed in the list.  Note that
-		 *	when the loop is completed, the last entry in the
-		 *	list will contain a NULL (signifying the end of
-		 *	the list).
-		 */
-		linenum = 0;
-		for (tpp = listpp; *tpp = fgetnetconfig(fp, NULL); tpp++)
-			;
-		(void) fclose(fp);
-
-		if (nc_error != NC_NOMOREENTRIES) /* Something is screwed up */
-			netlist_free(&listpp);
-	}
+	if (nc_error != NC_NOMOREENTRIES) /* Something is screwed up */
+		netlist_free(&listpp);
 
 	return (listpp);
 }
