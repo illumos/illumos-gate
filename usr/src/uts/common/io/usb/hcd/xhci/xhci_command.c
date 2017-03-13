@@ -211,7 +211,7 @@ xhci_command_timeout(void *arg)
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xcr->xcr_timeout = 0;
 		mutex_exit(&xcr->xcr_lock);
-		xhci_error(xhcip, "encountered fatal FM error reading command"
+		xhci_error(xhcip, "encountered fatal FM error reading command "
 		    "ring control register: resetting device");
 		xhci_fm_runtime_reset(xhcip);
 		return;
@@ -227,7 +227,7 @@ xhci_command_timeout(void *arg)
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xcr->xcr_timeout = 0;
 		mutex_exit(&xcr->xcr_lock);
-		xhci_error(xhcip, "encountered fatal FM error writing command"
+		xhci_error(xhcip, "encountered fatal FM error writing command "
 		    "ring control register: resetting device");
 		xhci_fm_runtime_reset(xhcip);
 		return;
@@ -243,7 +243,7 @@ xhci_command_timeout(void *arg)
 			/* Time out waiting for the abort */
 			xcr->xcr_timeout = 0;
 			mutex_exit(&xcr->xcr_lock);
-			xhci_error(xhcip, "abort command timed: resetting "
+			xhci_error(xhcip, "abort command timed out: resetting "
 			    "device");
 			xhci_fm_runtime_reset(xhcip);
 			return;
@@ -433,7 +433,7 @@ xhci_command_submit(xhci_t *xhcip, xhci_command_t *xco)
 	xhci_put32(xhcip, XHCI_R_DOOR, XHCI_DOORBELL(0), 0);
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		mutex_exit(&xcr->xcr_lock);
-		xhci_error(xhcip, "encountered fatal FM error ringing command"
+		xhci_error(xhcip, "encountered fatal FM error ringing command "
 		    "ring doorbell: resetting device");
 		xhci_fm_runtime_reset(xhcip);
 		return (USB_HC_HARDWARE_ERROR);
@@ -710,7 +710,7 @@ xhci_command_reset_endpoint(xhci_t *xhcip, xhci_device_t *xd,
 			xhci_endpoint_context_t *epctx;
 
 			epctx = xd->xd_endout[xep->xep_num];
-			xhci_log(xhcip, "!endpoint is in state %d\n",
+			xhci_log(xhcip, "!endpoint is in state %d",
 			    XHCI_EPCTX_STATE(epctx->xec_info));
 		}
 		ret = USB_INVALID_CONTEXT;
@@ -772,7 +772,7 @@ xhci_command_set_tr_dequeue(xhci_t *xhcip, xhci_device_t *xd,
 			xhci_endpoint_context_t *epctx;
 
 			epctx = xd->xd_endout[xep->xep_num];
-			xhci_log(xhcip, "!endpoint is in state %d\n",
+			xhci_log(xhcip, "!endpoint is in state %d",
 			    XHCI_EPCTX_STATE(epctx->xec_info));
 		}
 		ret = USB_INVALID_CONTEXT;
@@ -830,7 +830,7 @@ xhci_command_stop_endpoint(xhci_t *xhcip, xhci_device_t *xd,
 			xhci_endpoint_context_t *epctx;
 
 			epctx = xd->xd_endout[xep->xep_num];
-			xhci_log(xhcip, "!endpoint is in state %d\n",
+			xhci_log(xhcip, "!endpoint is in state %d",
 			    XHCI_EPCTX_STATE(epctx->xec_info));
 		}
 		ret = USB_INVALID_CONTEXT;

@@ -304,7 +304,7 @@ please re-connect the hub or reboot the system to enable the port again.
 .sp
 .ne 2
 .na
-\fBunable to attach USB 3.x hub <vendor> <device>. A maximum of 5 hubs
+\fBUnable to attach USB 3.x hub <vendor> <device>. A maximum of 5 hubs
 may be cascaded.\fR
 .ad
 .sp .6

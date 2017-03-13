@@ -349,10 +349,10 @@ xhci_ring_trb_produce(xhci_ring_t *xrp, uint_t ntrb)
 	for (i = 0; i < ntrb; i++) {
 		xrp->xr_head++;
 		/*
-		 * If we're updating the link TRB, we also need ot make sure
+		 * If we're updating the link TRB, we also need to make sure
 		 * that the Chain bit is set if we're in the middle of a TD
 		 * comprised of multiple TRDs. Thankfully the algorithmn here is
-		 * simple, set it to the value of the previous TRB.
+		 * simple: set it to the value of the previous TRB.
 		 */
 		if (xrp->xr_head == xrp->xr_ntrb - 1) {
 			trb = &xrp->xr_trb[xrp->xr_ntrb - 1];

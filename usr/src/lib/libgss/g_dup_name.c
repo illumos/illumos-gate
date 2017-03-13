@@ -68,15 +68,11 @@ val_dup_name_args(
 }
 
 OM_uint32
-gss_duplicate_name(minor_status,
-		src_name,
-		dest_name)
-OM_uint32 *minor_status;
-const gss_name_t src_name;
-gss_name_t *dest_name;
+gss_duplicate_name(OM_uint32 *minor_status, const gss_name_t src_name,
+    gss_name_t *dest_name)
 {
-		gss_union_name_t src_union, dest_union;
-		OM_uint32 major_status = GSS_S_FAILURE;
+	gss_union_name_t src_union, dest_union;
+	OM_uint32 major_status = GSS_S_FAILURE;
 
 	major_status = val_dup_name_args(minor_status, src_name, dest_name);
 	if (major_status != GSS_S_COMPLETE)
@@ -101,13 +97,12 @@ gss_name_t *dest_name;
 
 	/* Now copy the external representaion */
 	if (gssint_create_copy_buffer(src_union->external_name,
-				&dest_union->external_name, 0))
+	    &dest_union->external_name, 0))
 		goto allocation_failure;
 
 	if (src_union->name_type != GSS_C_NULL_OID) {
 		major_status = generic_gss_copy_oid(minor_status,
-						src_union->name_type,
-						&dest_union->name_type);
+		    src_union->name_type, &dest_union->name_type);
 		if (major_status != GSS_S_COMPLETE) {
 			map_errcode(minor_status);
 			goto allocation_failure;
@@ -119,17 +114,14 @@ gss_name_t *dest_name;
 	 */
 	if (src_union->mech_type) {
 		major_status = generic_gss_copy_oid(minor_status,
-							src_union->mech_type,
-							&dest_union->mech_type);
+		    src_union->mech_type, &dest_union->mech_type);
 		if (major_status != GSS_S_COMPLETE) {
 			map_errcode(minor_status);
 			goto allocation_failure;
 		}
 
 		major_status = __gss_import_internal_name(minor_status,
-							dest_union->mech_type,
-							dest_union,
-							&dest_union->mech_name);
+		    dest_union->mech_type, dest_union, &dest_union->mech_name);
 		if (major_status != GSS_S_COMPLETE)
 			goto allocation_failure;
 	}
@@ -141,20 +133,21 @@ gss_name_t *dest_name;
 allocation_failure:
 	if (dest_union) {
 		if (dest_union->external_name) {
-			if (dest_union->external_name->value)
-				free(dest_union->external_name->value);
-				free(dest_union->external_name);
+			free(dest_union->external_name->value);
+			free(dest_union->external_name);
 		}
-		if (dest_union->name_type)
+		if (dest_union->name_type) {
 			(void) generic_gss_release_oid(minor_status,
-							&dest_union->name_type);
-		if (dest_union->mech_name)
+			    &dest_union->name_type);
+		}
+		if (dest_union->mech_name) {
 			(void) __gss_release_internal_name(minor_status,
-						dest_union->mech_type,
-						&dest_union->mech_name);
-		if (dest_union->mech_type)
+			    dest_union->mech_type, &dest_union->mech_name);
+		}
+		if (dest_union->mech_type) {
 			(void) generic_gss_release_oid(minor_status,
-							&dest_union->mech_type);
+			    &dest_union->mech_type);
+		}
 		free(dest_union);
 	}
 	return (major_status);

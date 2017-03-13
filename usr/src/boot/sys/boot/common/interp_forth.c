@@ -32,7 +32,7 @@
 #include "bootstrap.h"
 #include "ficl.h"
 
-extern char bootprog_rev[];
+extern unsigned bootprog_rev;
 
 /* #define BFORTH_DEBUG */
 
@@ -307,8 +307,7 @@ bf_init(char *rc)
      * version
      */
     env = ficlSystemGetEnvironment(bf_sys);
-    ficlDictionarySetConstant(env, "loader_version",
-	       (bootprog_rev[0] - '0') * 10 + (bootprog_rev[2] - '0'));
+    ficlDictionarySetConstant(env, "loader_version", bootprog_rev);
 
     /* try to load and run init file if present */
     if (rc == NULL)

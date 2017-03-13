@@ -160,7 +160,7 @@ xhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 		if (ret == EIO) {
 			xhci_error(xhcip, "failed to initialize endpoint %d "
 			    "on device slot %d and port %d: encountered fatal "
-			    "FM error, reseting device", epid, xd->xd_slot,
+			    "FM error, resetting device", epid, xd->xd_slot,
 			    xd->xd_port);
 			xhci_fm_runtime_reset(xhcip);
 		}
@@ -193,7 +193,7 @@ xhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 		kmem_free(pipe, sizeof (xhci_pipe_t));
 		xhci_error(xhcip, "failed to open pipe on endpoint %d of "
 		    "device with slot %d and port %d: encountered fatal FM "
-		    "error syncing device input context, reseting device",
+		    "error syncing device input context, resetting device",
 		    epid, xd->xd_slot, xd->xd_port);
 		xhci_fm_runtime_reset(xhcip);
 		return (USB_HC_HARDWARE_ERROR);
@@ -314,7 +314,7 @@ xhci_hcdi_pipe_poll_fini(usba_pipe_handle_data_t *ph, boolean_t is_close)
 	epid = xhci_endpoint_pipe_to_epid(ph);
 	if (xd->xd_endpoints[epid] == NULL) {
 		mutex_exit(&xhcip->xhci_lock);
-		xhci_error(xhcip, "asked to stop intr pollin on slot %d, "
+		xhci_error(xhcip, "asked to stop intr polling on slot %d, "
 		    "port %d, endpoint: %d, but no endpoint structure",
 		    xd->xd_slot, xd->xd_port, epid);
 		return (USB_FAILURE);
@@ -389,7 +389,7 @@ xhci_hcdi_pipe_poll_fini(usba_pipe_handle_data_t *ph, boolean_t is_close)
 	mutex_exit(&xhcip->xhci_lock);
 
 	/*
-	 * It's possible that with a peristent pipe, we may not actually have
+	 * It's possible that with a persistent pipe, we may not actually have
 	 * anything left to call back on, because we already had.
 	 */
 	if (urp != NULL) {
@@ -630,7 +630,7 @@ xhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 /*
  * We're asked to reset or change the data toggle, which is used in a few cases.
  * However, there doesn't seem to be a good way to do this in xHCI as the data
- * toggle isn't exposed. It seems that droppping a reset endpoint would
+ * toggle isn't exposed. It seems that dropping a reset endpoint would
  * theoretically do this; however, that can only be used when in the HALTED
  * state. As such, for now we just return.
  */
@@ -709,7 +709,7 @@ xhci_hcdi_pipe_ctrl_xfer(usba_pipe_handle_data_t *ph, usb_ctrl_req_t *ucrp,
 	/*
 	 * There are several types of requests that we have to handle in special
 	 * ways in xHCI. If we have one of those requests, then we don't
-	 * necessairily go through the normal path. These special cases are all
+	 * necessarily go through the normal path. These special cases are all
 	 * documented in xHCI 1.1 / 4.5.4.
 	 *
 	 * Looking at that, you may ask why aren't SET_CONFIGURATION and SET_IF
@@ -720,7 +720,7 @@ xhci_hcdi_pipe_ctrl_xfer(usba_pipe_handle_data_t *ph, usb_ctrl_req_t *ucrp,
 	 * configuration context has changed. Because nothing in it should have
 	 * changed as part of this, we don't need to do anything and instead
 	 * just can issue the request normally. We're also assuming in the
-	 * USB_REQ_SET_IF case that if something's changing the interace, the
+	 * USB_REQ_SET_IF case that if something's changing the interface, the
 	 * non-default endpoint will have yet to be opened.
 	 */
 	if (ucrp->ctrl_bmRequestType == USB_DEV_REQ_HOST_TO_DEV &&
@@ -737,7 +737,7 @@ xhci_hcdi_pipe_ctrl_xfer(usba_pipe_handle_data_t *ph, usb_ctrl_req_t *ucrp,
 	mutex_exit(&xhcip->xhci_lock);
 
 	/*
-	 * Allcoate the transfer memory, etc.
+	 * Allocate the transfer memory, etc.
 	 */
 	xt = xhci_transfer_alloc(xhcip, xep, ucrp->ctrl_wLength, 2, usb_flags);
 	if (xt == NULL) {
@@ -766,7 +766,7 @@ xhci_hcdi_pipe_ctrl_xfer(usba_pipe_handle_data_t *ph, usb_ctrl_req_t *ucrp,
 				xhci_transfer_free(xhcip, xt);
 				xhci_error(xhcip, "failed to synchronize ctrl "
 				    "transfer DMA memory on endpoint %u of "
-				    "device on slot %d and port %d: resting "
+				    "device on slot %d and port %d: resetting "
 				    "device", xep->xep_num, xd->xd_slot,
 				    xd->xd_port);
 				xhci_fm_runtime_reset(xhcip);
@@ -892,7 +892,7 @@ xhci_hcdi_pipe_bulk_xfer(usba_pipe_handle_data_t *ph, usb_bulk_req_t *ubrp,
 			xhci_transfer_free(xhcip, xt);
 			xhci_error(xhcip, "failed to synchronize bulk "
 			    "transfer DMA memory on endpoint %u of "
-			    "device on slot %d and port %d: resting "
+			    "device on slot %d and port %d: resetting "
 			    "device", xep->xep_num, xd->xd_slot,
 			    xd->xd_port);
 			xhci_fm_runtime_reset(xhcip);
@@ -1183,7 +1183,7 @@ xhci_hcdi_intr_oneshot(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 			xhci_transfer_free(xhcip, xt);
 			xhci_error(xhcip, "failed to synchronize interrupt "
 			    "transfer DMA memory on endpoint %u of "
-			    "device on slot %d and port %d: resting "
+			    "device on slot %d and port %d: resetting "
 			    "device", xep->xep_num, xd->xd_slot,
 			    xd->xd_port);
 			xhci_fm_runtime_reset(xhcip);
@@ -1208,7 +1208,7 @@ xhci_hcdi_intr_oneshot(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 }
 
 /*
- * We've been asked to perform an interrupt transfer. When this is an interupt
+ * We've been asked to perform an interrupt transfer. When this is an interrupt
  * IN endpoint, that means that the hcd is being asked to start polling on the
  * endpoint. When the endpoint is the root hub, it effectively becomes synthetic
  * polling.
@@ -1269,7 +1269,7 @@ xhci_hcdi_isoc_periodic(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 }
 
 /*
- * This is used to create an isochronus request to send data out to the device.
+ * This is used to create an isochronous request to send data out to the device.
  * This is a single one shot request, it is not something that we'll have to
  * repeat over and over.
  */
@@ -1303,8 +1303,8 @@ xhci_hcdi_isoc_oneshot(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 	xd = usba_hcdi_get_device_private(ph->p_usba_device);
 	epid = xhci_endpoint_pipe_to_epid(ph);
 	if (xd->xd_endpoints[epid] == NULL) {
-		xhci_error(xhcip, "asked to do isochronus transfer on slot %d, "
-		    "port %d, endpoint: %d, but no endpoint structure",
+		xhci_error(xhcip, "asked to do isochronous transfer on slot "
+		    "%d, port %d, endpoint: %d, but no endpoint structure",
 		    xd->xd_slot, xd->xd_port, epid);
 		mutex_exit(&xhcip->xhci_lock);
 		return (USB_FAILURE);
@@ -1332,7 +1332,7 @@ xhci_hcdi_isoc_oneshot(xhci_t *xhcip, usba_pipe_handle_data_t *ph,
 		xhci_transfer_free(xhcip, xt);
 		xhci_error(xhcip, "failed to synchronize isochronous "
 		    "transfer DMA memory on endpoint %u of "
-		    "device on slot %d and port %d: resting "
+		    "device on slot %d and port %d: resetting "
 		    "device", xep->xep_num, xd->xd_slot,
 		    xd->xd_port);
 		xhci_fm_runtime_reset(xhcip);
@@ -1381,7 +1381,7 @@ xhci_hcdi_pipe_isoc_xfer(usba_pipe_handle_data_t *ph, usb_isoc_req_t *usrp,
 
 	if ((ph->p_ep.bEndpointAddress & USB_EP_DIR_MASK) == USB_EP_DIR_IN) {
 		/*
-		 * Note, there is no such thing as a non-periodic isochronus
+		 * Note, there is no such thing as a non-periodic isochronous
 		 * incoming transfer.
 		 */
 		ret = xhci_hcdi_isoc_periodic(xhcip, ph, usrp, usb_flags);
@@ -1793,7 +1793,7 @@ xhci_hcdi_device_fini(usba_device_t *ud, void *hcdp)
 	 */
 	ret = xhci_command_disable_slot(xhcip, xd->xd_slot);
 	if (ret != USB_SUCCESS) {
-		xhci_error(xhcip, "failed to disable slot %d: %d\n",
+		xhci_error(xhcip, "failed to disable slot %d: %d",
 		    xd->xd_slot, ret);
 		return;
 	}

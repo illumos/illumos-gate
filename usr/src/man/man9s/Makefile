@@ -51,60 +51,59 @@ MANFILES=	Intro.9s			\
 		linkblk.9s			\
 		mac_callbacks.9s		\
 		mac_register.9s			\
-		modldrv.9s			\
-		modlinkage.9s			\
-		modlmisc.9s			\
-		modlstrmod.9s			\
-		module_info.9s			\
-		msgb.9s				\
-		net_inject_t.9s			\
-		net_instance_t.9s		\
-		qband.9s			\
-		qinit.9s			\
-		queclass.9s			\
-		queue.9s			\
-		scsi_address.9s			\
-		scsi_arq_status.9s		\
-		scsi_asc_key_strings.9s		\
-		scsi_device.9s			\
-		scsi_extended_sense.9s		\
-		scsi_hba_tran.9s		\
-		scsi_inquiry.9s			\
-		scsi_pkt.9s			\
-		scsi_status.9s			\
-		streamtab.9s			\
-		stroptions.9s			\
-		tuple.9s			\
-		uio.9s				\
+	 	modldrv.9s			\
+	 	modlinkage.9s			\
+	 	modlmisc.9s			\
+	 	modlstrmod.9s			\
+	 	module_info.9s			\
+	 	msgb.9s				\
+	 	net_inject_t.9s			\
+	 	net_instance_t.9s		\
+	 	qband.9s			\
+	 	qinit.9s			\
+	 	queclass.9s			\
+	 	queue.9s			\
+	 	scsi_address.9s			\
+	 	scsi_arq_status.9s		\
+	 	scsi_asc_key_strings.9s		\
+	 	scsi_device.9s			\
+	 	scsi_extended_sense.9s		\
+	 	scsi_hba_tran.9s		\
+	 	scsi_inquiry.9s			\
+	 	scsi_pkt.9s			\
+	 	scsi_status.9s			\
+	 	streamtab.9s			\
+	 	stroptions.9s			\
+	 	tuple.9s			\
+	 	uio.9s				\
 		usb_bulk_req.9s			\
-		usb_callback_flags.9s		\
-		usb_cfg_descr.9s		\
-		usb_client_dev_data.9s		\
-		usb_completion_reason.9s	\
+	 	usb_callback_flags.9s		\
+	 	usb_cfg_descr.9s		\
+	 	usb_client_dev_data.9s		\
+	 	usb_completion_reason.9s	\
 		usb_ctrl_req.9s			\
-		usb_dev_descr.9s		\
-		usb_dev_qlf_descr.9s		\
-		usb_ep_descr.9s			\
+	 	usb_dev_descr.9s		\
+	 	usb_dev_qlf_descr.9s		\
+	 	usb_ep_descr.9s			\
 		usb_ep_ss_comp_descr.9s		\
 		usb_ep_xdescr.9s		\
-		usb_if_descr.9s			\
+	 	usb_if_descr.9s			\
 		usb_intr_req.9s			\
 		usb_isoc_req.9s			\
-		usb_other_speed_cfg_descr.9s	\
-		usb_request_attributes.9s	\
-		usb_string_descr.9s		\
+	 	usb_other_speed_cfg_descr.9s	\
+	 	usb_request_attributes.9s	\
+	 	usb_string_descr.9s		\
 		usba_device.9s			\
 		usba_hcdi_ops.9s		\
 		usba_hcdi_register_args.9s	\
 		usba_pipe_handle_data.9s
-
 
 MANLINKS=	dblk.9s				\
 		intro.9s			\
 		mac_callbacks_t.9s		\
 		mac_register_t.9s		\
 		mblk.9s				\
-		usb_ep_ss_comp_descr_t.9s	\
+		usb_ep_ss_comp_descr_t.9s 	\
 		usb_bulk_req_t.9s		\
 		usb_bulk_request.9s		\
 		usb_ctrl_req_t.9s		\
@@ -112,7 +111,7 @@ MANLINKS=	dblk.9s				\
 		usb_intr_req_t.9s		\
 		usb_intr_request.9s		\
 		usb_isoc_req_t.9s		\
-		usb_isoc_request.9s		\
+		usb_isoc_request.9s
 		usba_device_t.9s		\
 		usba_hcdi_ops_t.9s		\
 		usba_hcdi_register_args_t.9s	\

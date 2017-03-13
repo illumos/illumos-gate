@@ -37,7 +37,7 @@ static xhci_quirk_table_t xhci_quirks[] = {
 	{ 0x8086, 0x1e31, XHCI_QUIRK_INTC_EHCI },	/* Panther Point */
 	{ 0x8086, 0x8c31, XHCI_QUIRK_INTC_EHCI },	/* Lynx Point */
 	{ 0x8086, 0x8cb1, XHCI_QUIRK_INTC_EHCI },	/* Wildcat Point */
-	{ 0x8086, 0x9cb1, XHCI_QUIRK_INTC_EHCI },	/* Broadwell Mobile */
+	{ 0x8086, 0x9cb1, XHCI_QUIRK_INTC_EHCI },	/* Wildcat Point-LP */
 	{ 0xffff, 0xffff, 0 }
 };
 

@@ -502,7 +502,7 @@ xhci_transfer_trb_fill_data(xhci_endpoint_t *xep, xhci_transfer_t *xt, int off,
 /*
  * These are utility functions for isochronus transfers to help calculate the
  * transfer burst count (TBC) and transfer last burst packet count (TLPBC)
- * entries for an isochronus entry. See xHCI 1.1 / 4.11.2.3 for how to calcualte
+ * entries for an isochronus entry. See xHCI 1.1 / 4.11.2.3 for how to calculate
  * them.
  */
 void

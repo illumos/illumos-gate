@@ -257,7 +257,7 @@ xhci_root_hub_handle_port_clear_feature(xhci_t *xhcip, usb_ctrl_req_t *ucrp)
 	reg = xhci_get32(xhcip, XHCI_R_OPER, XHCI_PORTSC(port));
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to read port status register for "
-		    "port %d: encountered fatal FM error, reseting device",
+		    "port %d: encountered fatal FM error, resetting device",
 		    port);
 		xhci_fm_runtime_reset(xhcip);
 		return (USB_CR_HC_HARDWARE_ERR);
@@ -310,7 +310,7 @@ xhci_root_hub_handle_port_clear_feature(xhci_t *xhcip, usb_ctrl_req_t *ucrp)
 	xhci_put32(xhcip, XHCI_R_OPER, XHCI_PORTSC(port), reg);
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to write port status register for "
-		    "port %d: encountered fatal FM error, reseting device",
+		    "port %d: encountered fatal FM error, resetting device",
 		    port);
 		xhci_fm_runtime_reset(xhcip);
 		return (USB_CR_HC_HARDWARE_ERR);
@@ -339,7 +339,7 @@ xhci_root_hub_handle_port_set_feature(xhci_t *xhcip, usb_ctrl_req_t *ucrp)
 	reg = xhci_get32(xhcip, XHCI_R_OPER, index);
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to read port status register for "
-		    "port %d: encountered fatal FM error, reseting device",
+		    "port %d: encountered fatal FM error, resetting device",
 		    port);
 		xhci_fm_runtime_reset(xhcip);
 		return (USB_CR_HC_HARDWARE_ERR);
@@ -360,7 +360,7 @@ xhci_root_hub_handle_port_set_feature(xhci_t *xhcip, usb_ctrl_req_t *ucrp)
 		if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 			xhci_error(xhcip, "failed to read port power "
 			    "management register for port %d: encountered "
-			    "fatal FM error, reseting device", port);
+			    "fatal FM error, resetting device", port);
 			xhci_fm_runtime_reset(xhcip);
 			return (USB_CR_HC_HARDWARE_ERR);
 		}
@@ -373,7 +373,7 @@ xhci_root_hub_handle_port_set_feature(xhci_t *xhcip, usb_ctrl_req_t *ucrp)
 		if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 			xhci_error(xhcip, "failed to read port power "
 			    "management register for port %d: encountered "
-			    "fatal FM error, reseting device", port);
+			    "fatal FM error, resetting device", port);
 			xhci_fm_runtime_reset(xhcip);
 			return (USB_CR_HC_HARDWARE_ERR);
 		}
@@ -425,7 +425,7 @@ xhci_root_hub_handle_port_set_feature(xhci_t *xhcip, usb_ctrl_req_t *ucrp)
 	xhci_put32(xhcip, XHCI_R_OPER, index, reg);
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to write port status register for "
-		    "port %d: encountered fatal FM error, reseting device",
+		    "port %d: encountered fatal FM error, resetting device",
 		    port);
 		xhci_fm_runtime_reset(xhcip);
 		return (USB_CR_HC_HARDWARE_ERR);
@@ -464,7 +464,7 @@ xhci_root_hub_handle_port_get_status(xhci_t *xhcip, usb_ctrl_req_t *ucrp)
 	reg = xhci_get32(xhcip, XHCI_R_OPER, XHCI_PORTSC(port));
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to read port status register for "
-		    "port %d: encountered fatal FM error, reseting device",
+		    "port %d: encountered fatal FM error, resetting device",
 		    port);
 		xhci_fm_runtime_reset(xhcip);
 		return (USB_CR_HC_HARDWARE_ERR);
@@ -782,7 +782,7 @@ xhci_root_hub_fill_hub_desc(xhci_t *xhcip)
 		reg = xhci_get32(xhcip, XHCI_R_OPER, XHCI_PORTSC(i));
 		if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 			xhci_error(xhcip, "encountered fatal FM error while "
-			    "reading port status register %d\n", i);
+			    "reading port status register %d", i);
 			ddi_fm_service_impact(xhcip->xhci_dip,
 			    DDI_SERVICE_LOST);
 			return (EIO);

@@ -15,6 +15,7 @@
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/boot/Makefile.version
 
 CC=	$(GCC_ROOT)/bin/gcc
 LD=	$(GNU_ROOT)/bin/gld
@@ -23,10 +24,6 @@ OBJDUMP= $(GNU_ROOT)/bin/gobjdump
 
 PROG=		boot1.sym
 MACHINE=$(MACH64)
-
-# need to update this to trigger installboot updates.
-BUILDDATE :sh = TZ=UTC date +%Y%m%dT%H%M%SZ
-BOOT1_VERSION=	1.1:$(BUILDDATE)
 
 # architecture-specific loader code
 SRCS=	boot1.c self_reloc.c start.S ufs_module.c zfs_module.c devopen.c

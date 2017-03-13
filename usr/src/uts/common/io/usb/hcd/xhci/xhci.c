@@ -724,7 +724,7 @@
 #define	XHCI_REG_NUMBER	1
 
 /*
- * This task queue exists as a global taskq that is used for reseting the
+ * This task queue exists as a global taskq that is used for resetting the
  * device in the face of FM or runtime errors. Each instance of the device
  * (xhci_t) happens to have a single taskq_dispatch_ent already allocated so we
  * know that we should always be able to dispatch such an event.

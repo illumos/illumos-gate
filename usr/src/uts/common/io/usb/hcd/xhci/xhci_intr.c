@@ -138,7 +138,7 @@ xhci_intr(caddr_t arg1, caddr_t arg2)
 	status = xhci_get32(xhcip, XHCI_R_OPER, XHCI_USBSTS);
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to read USB status register: "
-		    "encountered fatal FM error, reseting device");
+		    "encountered fatal FM error, resetting device");
 		xhci_fm_runtime_reset(xhcip);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -150,7 +150,7 @@ xhci_intr(caddr_t arg1, caddr_t arg2)
 	 */
 	if ((status & (XHCI_STS_HSE | XHCI_STS_SRE | XHCI_STS_HCE)) != 0) {
 		xhci_error(xhcip, "found fatal error bit in status register, "
-		    "value: 0x%x: reseting device", status);
+		    "value: 0x%x: resetting device", status);
 		xhci_fm_runtime_reset(xhcip);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -158,7 +158,7 @@ xhci_intr(caddr_t arg1, caddr_t arg2)
 	iman = xhci_get32(xhcip, XHCI_R_RUN, XHCI_IMAN(0));
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to read interrupt register 0: "
-		    "encountered fatal FM error, reseting device");
+		    "encountered fatal FM error, resetting device");
 		xhci_fm_runtime_reset(xhcip);
 		return (DDI_INTR_CLAIMED);
 	}
@@ -185,7 +185,7 @@ xhci_intr(caddr_t arg1, caddr_t arg2)
 	xhci_put32(xhcip, XHCI_R_RUN, XHCI_IMAN(0), iman);
 	if (xhci_check_regs_acc(xhcip) != DDI_FM_OK) {
 		xhci_error(xhcip, "failed to write USB status register: "
-		    "encountered fatal FM error, reseting device");
+		    "encountered fatal FM error, resetting device");
 		xhci_fm_runtime_reset(xhcip);
 	}
 

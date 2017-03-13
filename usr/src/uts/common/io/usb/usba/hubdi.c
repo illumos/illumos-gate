@@ -3357,7 +3357,7 @@ hubd_set_hub_depth(hubd_t *hubd)
 		mfg = ud->usb_mfg_str;
 		if (mfg == NULL)
 			mfg = "Unknown Manufacturer";
-		cmn_err(CE_WARN, "unable to attach USB 3.x hub %s %s. A "
+		cmn_err(CE_WARN, "Unable to attach USB 3.x hub %s %s. A "
 		    "maximum of %d hubs may be cascaded", mfg, prod,
 		    HUBD_SS_MAX_DEPTH);
 		return (USB_FAILURE);

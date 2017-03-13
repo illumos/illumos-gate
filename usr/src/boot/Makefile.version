@@ -1,0 +1,32 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Toomas Soome <tsoome@me.com>
+#
+
+#
+# The version string is composed according to IPS version string rules:
+#	dotted verstion strings are consisting of numbers and dots,
+#	different strings are separated by comma or dash,
+#	at the end of the dotted version can be timestamp, separated by
+#	the colon.
+#
+# The dotted version part are compared by numbers, timestamps are
+# compared lexicographically, as strings.
+#
+# Here we define two version strings, for loader and boot program.
+# The BOOT_VERSION is used by installboot program to decide if the
+# boot program update is needed, and should be updated according to
+# boot loader code updates.
+
+LOADER_VERSION = 1.1
+BOOT_VERSION = $(LOADER_VERSION)-2017.0.0.1

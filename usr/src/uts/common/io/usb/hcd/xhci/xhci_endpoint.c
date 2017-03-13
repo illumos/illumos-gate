@@ -422,7 +422,7 @@ xhci_endpoint_avg_trb(xhci_t *xhcip, usb_ep_descr_t *ep, int mps)
 	case USB_EP_ATTR_BULK:
 		return (xhcip->xhci_caps.xcap_pagesize);
 	default:
-		panic("bad USB enpdoint type: %d", type);
+		panic("bad USB endpoint type: %d", type);
 	}
 
 	/* LINTED: E_FUNC_NO_RET_VAL */
@@ -453,7 +453,7 @@ xhci_endpoint_setup_context(xhci_t *xhcip, xhci_device_t *xd,
 
 		xhci_log(xhcip, "Encountered USB >=3.0 device without endpoint "
 		    "companion descriptor. Ensure driver %s is properly using "
-		    "usb_pipe_xopen() for device %s %s\n",
+		    "usb_pipe_xopen() for device %s %s",
 		    ddi_driver_name(xd->xd_usbdev->usb_dip), prod, mfg);
 		return (EINVAL);
 	}
@@ -832,7 +832,7 @@ xhci_endpoint_tick(void *arg)
 		xep->xep_state &= ~XHCI_ENDPOINT_TIMED_OUT;
 	} else {
 		xhci_error(xhcip, "failed to successfully set transfer ring "
-		    "dequeue pointer of timed out endpoint endpoint %u of "
+		    "dequeue pointer of timed out endpoint %u of "
 		    "device on slot %d and port %d: device remains timed out, "
 		    "please use cfgadm to recover", xep->xep_num, xd->xd_slot,
 		    xd->xd_port);
@@ -853,9 +853,9 @@ xhci_endpoint_tick(void *arg)
 
 /*
  * We've been asked to schedule a series of frames onto the specified endpoint.
- * We need to make sure that there is enough room, a which point we can queue it
- * and then ring the door bell. Note that we queue in reverse order to make sure
- * that if the ring moves on, it won't see the correct cycle bit.
+ * We need to make sure that there is enough room, at which point we can queue
+ * it and then ring the door bell. Note that we queue in reverse order to make
+ * sure that if the ring moves on, it won't see the correct cycle bit.
  */
 int
 xhci_endpoint_schedule(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
@@ -1059,7 +1059,7 @@ xhci_endpoint_control_callback(xhci_t *xhcip, xhci_device_t *xd,
 			xhci_error(xhcip, "failed to process control transfer "
 			    "callback for endpoint %u of device on slot %d and "
 			    "port %d: encountered fatal FM error synchronizing "
-			    "DMA memory, reseting device", xep->xep_num,
+			    "DMA memory, resetting device", xep->xep_num,
 			    xd->xd_slot, xd->xd_port);
 			xhci_fm_runtime_reset(xhcip);
 			mutex_exit(&xhcip->xhci_lock);
@@ -1225,7 +1225,7 @@ xhci_endpoint_norm_callback(xhci_t *xhcip, xhci_device_t *xd,
 			xhci_error(xhcip, "failed to process normal transfer "
 			    "callback for endpoint %u of device on slot %d and "
 			    "port %d: encountered fatal FM error synchronizing "
-			    "DMA memory, reseting device", xep->xep_num,
+			    "DMA memory, resetting device", xep->xep_num,
 			    xd->xd_slot, xd->xd_port);
 			xhci_fm_runtime_reset(xhcip);
 			mutex_exit(&xhcip->xhci_lock);
@@ -1269,8 +1269,8 @@ xhci_endpoint_isoch_callback(xhci_t *xhcip, xhci_device_t *xd,
 	code = XHCI_TRB_GET_CODE(LE_32(trb->trb_status));
 
 	/*
-	 * These descriptors that we copy the data are are set up to assume that
-	 * everything was OK and we transfered all the requested data.
+	 * The descriptors that we copy the data from are set up to assume that
+	 * everything was OK and we transferred all the requested data.
 	 */
 	desc = &xt->xt_isoc[off];
 	if (code == XHCI_CODE_SHORT_XFER) {
@@ -1309,7 +1309,8 @@ xhci_endpoint_isoch_callback(xhci_t *xhcip, xhci_device_t *xd,
 				    "isochronous transfer callback for "
 				    "endpoint %u of device on slot %d and port "
 				    "%d: encountered fatal FM error "
-				    "synchronizing DMA memory, reseting device",
+				    "synchronizing DMA memory, resetting "
+				    "device",
 				    xep->xep_num, xd->xd_slot, xd->xd_port);
 				xhci_fm_runtime_reset(xhcip);
 				mutex_exit(&xhcip->xhci_lock);
@@ -1358,7 +1359,7 @@ xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 	xd = xhci_device_lookup_by_slot(xhcip, slot);
 	if (xd == NULL) {
 		xhci_error(xhcip, "received transfer trb with code %d for "
-		    "unknown slot %d and endpoint %d: reseting device", code,
+		    "unknown slot %d and endpoint %d: resetting device", code,
 		    slot, endpoint);
 		mutex_exit(&xhcip->xhci_lock);
 		xhci_fm_runtime_reset(xhcip);
@@ -1372,7 +1373,7 @@ xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 	xep = xd->xd_endpoints[endpoint - 1];
 	if (xep == NULL) {
 		xhci_error(xhcip, "received transfer trb with code %d, slot "
-		    "%d, and unknown endpoint %d: reseting device", code,
+		    "%d, and unknown endpoint %d: resetting device", code,
 		    slot, endpoint);
 		mutex_exit(&xhcip->xhci_lock);
 		xhci_fm_runtime_reset(xhcip);
