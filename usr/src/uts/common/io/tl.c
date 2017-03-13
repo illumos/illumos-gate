@@ -1484,8 +1484,9 @@ tl_closeok(tl_endpt_t *tep)
 static int
 tl_open(queue_t	*rq, dev_t *devp, int oflag, int sflag,	cred_t	*credp)
 {
-	tl_endpt_t *tep;
-	minor_t	    minor = getminor(*devp);
+	tl_endpt_t	*tep;
+	minor_t		minor = getminor(*devp);
+	id_t		inst_minor;
 
 	/*
 	 * Driver is called directly. Both CLONEOPEN and MODOPEN
@@ -1505,6 +1506,14 @@ tl_open(queue_t	*rq, dev_t *devp, int oflag, int sflag,	cred_t	*credp)
 		minor |= TL_SOCKET;
 	}
 
+	/*
+	 * Attempt to allocate a unique minor number for this instance.
+	 * Avoid an uninterruptable sleep if none are available.
+	 */
+	if ((inst_minor = id_alloc_nosleep(tl_minors)) == -1) {
+		return (ENOMEM);
+	}
+
 	tep = kmem_cache_alloc(tl_cache, KM_SLEEP);
 	tep->te_refcnt = 1;
 	tep->te_cpid = curproc->p_pid;
@@ -1516,9 +1525,7 @@ tl_open(queue_t	*rq, dev_t *devp, int oflag, int sflag,	cred_t	*credp)
 
 	tep->te_flag = minor & TL_MINOR_MASK;
 	tep->te_transport = &tl_transports[minor];
-
-	/* Allocate a unique minor number for this instance. */
-	tep->te_minor = (minor_t)id_alloc(tl_minors);
+	tep->te_minor = (minor_t)inst_minor;
 
 	/* Reserve hash handle for bind(). */
 	(void) mod_hash_reserve(tep->te_addrhash, &tep->te_hash_hndl);
