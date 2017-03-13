@@ -76,6 +76,7 @@
 	<device match="dtrace/*" />
 	<device match="dtrace/provider/*" />
 	<device match="eventfd" />
+	<device match="full" />
 	<device match="inotify" />
 	<device match="ipnet" />
 	<device match="kstat" />
