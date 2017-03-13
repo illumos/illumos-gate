@@ -43,6 +43,8 @@ dir path=kernel/dacf group=sys
 dir path=kernel/dacf/$(ARCH64) group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/kmdb group=sys
+dir path=kernel/kmdb/$(ARCH64) group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 dir path=kernel/strmod group=sys
@@ -54,6 +56,11 @@ dir path=lib/svc/manifest/system group=sys
 dir path=lib/svc/method
 dir path=sbin group=sys
 dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/mdb group=sys
+dir path=usr/lib/mdb/kvm group=sys
+dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+$(i386_ONLY)dir path=usr/lib/xhci group=sys
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man7m
@@ -72,6 +79,7 @@ driver name=usb_as alias=usbif,class1.2 perms="* 0600 root sys"
 driver name=usb_ia alias=usb,ia
 driver name=usb_mid alias=usb,device
 driver name=usbprn alias=usbif,class7.1 perms="* 0666 root sys"
+$(i386_ONLY)driver name=xhci alias=pciclass,0c0330 perms="* 0644 root sys"
 file path=etc/usb/config_map.conf group=sys \
     original_name=SUNWusb:etc/usb/config_map.conf preserve=true
 file path=kernel/drv/$(ARCH64)/ehci group=sys
@@ -85,6 +93,7 @@ file path=kernel/drv/$(ARCH64)/usb_as group=sys
 file path=kernel/drv/$(ARCH64)/usb_ia group=sys
 file path=kernel/drv/$(ARCH64)/usb_mid group=sys
 file path=kernel/drv/$(ARCH64)/usbprn group=sys
+$(i386_ONLY)file path=kernel/drv/$(ARCH64)/xhci group=sys
 $(i386_ONLY)file path=kernel/drv/ehci group=sys
 file path=kernel/drv/ehci.conf group=sys
 $(i386_ONLY)file path=kernel/drv/hid group=sys
@@ -102,6 +111,10 @@ $(i386_ONLY)file path=kernel/drv/usb_as group=sys
 $(i386_ONLY)file path=kernel/drv/usb_ia group=sys
 $(i386_ONLY)file path=kernel/drv/usb_mid group=sys
 $(i386_ONLY)file path=kernel/drv/usbprn group=sys
+$(i386_ONLY)file path=kernel/drv/xhci group=sys
+$(i386_ONLY)file path=kernel/drv/xhci.conf group=sys
+$(i386_ONLY)file path=kernel/kmdb/$(ARCH64)/xhci group=sys mode=0555
+$(i386_ONLY)file path=kernel/kmdb/xhci group=sys mode=0555
 file path=kernel/misc/$(ARCH64)/hidparser group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/usba group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/usba10 group=sys mode=0755
@@ -116,6 +129,9 @@ $(i386_ONLY)file path=kernel/strmod/usb_ah group=sys mode=0755
 $(i386_ONLY)file path=kernel/strmod/usbkbm group=sys mode=0755
 $(i386_ONLY)file path=kernel/strmod/usbms group=sys mode=0755
 $(i386_ONLY)file path=kernel/strmod/usbwcm group=sys mode=0755
+$(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/xhci.so group=sys mode=0555
+$(i386_ONLY)file path=usr/lib/mdb/kvm/xhci.so group=sys mode=0555
+$(i386_ONLY)file path=usr/lib/xhci/xhci_portsc group=sys mode=0555
 file path=usr/share/man/man7d/ehci.7d
 file path=usr/share/man/man7d/hid.7d
 file path=usr/share/man/man7d/hubd.7d
@@ -135,6 +151,7 @@ file path=usr/share/man/man9f/usb_alloc_request.9f
 file path=usr/share/man/man9f/usb_client_attach.9f
 file path=usr/share/man/man9f/usb_clr_feature.9f
 file path=usr/share/man/man9f/usb_create_pm_components.9f
+file path=usr/share/man/man9f/usb_ep_xdescr_fill.9f
 file path=usr/share/man/man9f/usb_get_addr.9f
 file path=usr/share/man/man9f/usb_get_alt_if.9f
 file path=usr/share/man/man9f/usb_get_cfg.9f
@@ -154,23 +171,25 @@ file path=usr/share/man/man9f/usb_pipe_get_max_bulk_transfer_size.9f
 file path=usr/share/man/man9f/usb_pipe_get_state.9f
 file path=usr/share/man/man9f/usb_pipe_intr_xfer.9f
 file path=usr/share/man/man9f/usb_pipe_isoc_xfer.9f
-file path=usr/share/man/man9f/usb_pipe_open.9f
 file path=usr/share/man/man9f/usb_pipe_reset.9f
 file path=usr/share/man/man9f/usb_pipe_set_private.9f
+file path=usr/share/man/man9f/usb_pipe_xopen.9f
 file path=usr/share/man/man9f/usb_register_hotplug_cbs.9f
 file path=usr/share/man/man9f/usb_reset_device.9f
-file path=usr/share/man/man9s/usb_bulk_request.9s
+file path=usr/share/man/man9s/usb_bulk_req.9s
 file path=usr/share/man/man9s/usb_callback_flags.9s
 file path=usr/share/man/man9s/usb_cfg_descr.9s
 file path=usr/share/man/man9s/usb_client_dev_data.9s
 file path=usr/share/man/man9s/usb_completion_reason.9s
-file path=usr/share/man/man9s/usb_ctrl_request.9s
+file path=usr/share/man/man9s/usb_ctrl_req.9s
 file path=usr/share/man/man9s/usb_dev_descr.9s
 file path=usr/share/man/man9s/usb_dev_qlf_descr.9s
 file path=usr/share/man/man9s/usb_ep_descr.9s
+file path=usr/share/man/man9s/usb_ep_ss_comp_descr.9s
+file path=usr/share/man/man9s/usb_ep_xdescr.9s
 file path=usr/share/man/man9s/usb_if_descr.9s
-file path=usr/share/man/man9s/usb_intr_request.9s
-file path=usr/share/man/man9s/usb_isoc_request.9s
+file path=usr/share/man/man9s/usb_intr_req.9s
+file path=usr/share/man/man9s/usb_isoc_req.9s
 file path=usr/share/man/man9s/usb_other_speed_cfg_descr.9s
 file path=usr/share/man/man9s/usb_request_attributes.9s
 file path=usr/share/man/man9s/usb_string_descr.9s
@@ -179,6 +198,8 @@ legacy pkg=SUNWusb desc="USBA (USB framework) and USB Device Drivers" \
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license license_in_headers license=license_in_headers
+license usr/src/uts/common/sys/usb/hcd/xhci/THIRDPARTYLICENSE \
+    license=usr/src/uts/common/sys/usb/hcd/xhci/THIRDPARTYLICENSE
 link path=usr/share/man/man7d/usb.7d target=usba.7d
 link path=usr/share/man/man9f/usb_alloc_bulk_req.9f \
     target=usb_alloc_request.9f
@@ -202,6 +223,7 @@ link path=usr/share/man/man9f/usb_pipe_ctrl_xfer_wait.9f \
     target=usb_pipe_ctrl_xfer.9f
 link path=usr/share/man/man9f/usb_pipe_get_private.9f \
     target=usb_pipe_set_private.9f
+link path=usr/share/man/man9f/usb_pipe_open.9f target=usb_pipe_xopen.9f
 link path=usr/share/man/man9f/usb_pipe_stop_intr_polling.9f \
     target=usb_pipe_intr_xfer.9f
 link path=usr/share/man/man9f/usb_pipe_stop_isoc_polling.9f \
@@ -212,3 +234,13 @@ link path=usr/share/man/man9f/usb_set_alt_if.9f target=usb_get_alt_if.9f
 link path=usr/share/man/man9f/usb_set_cfg.9f target=usb_get_cfg.9f
 link path=usr/share/man/man9f/usb_unregister_hotplug_cbs.9f \
     target=usb_register_hotplug_cbs.9f
+link path=usr/share/man/man9s/usb_bulk_req_t.9s target=usb_bulk_req.9s
+link path=usr/share/man/man9s/usb_bulk_request.9s target=usb_bulk_req.9s
+link path=usr/share/man/man9s/usb_ctrl_req_t.9s target=usb_ctrl_req.9s
+link path=usr/share/man/man9s/usb_ctrl_request.9s target=usb_ctrl_req.9s
+link path=usr/share/man/man9s/usb_ep_ss_comp_descr_t.9s \
+    target=usb_ep_ss_comp_descr.9s
+link path=usr/share/man/man9s/usb_intr_req_t.9s target=usb_intr_req.9s
+link path=usr/share/man/man9s/usb_intr_request.9s target=usb_intr_req.9s
+link path=usr/share/man/man9s/usb_isoc_req_t.9s target=usb_isoc_req.9s
+link path=usr/share/man/man9s/usb_isoc_request.9s target=usb_isoc_req.9s

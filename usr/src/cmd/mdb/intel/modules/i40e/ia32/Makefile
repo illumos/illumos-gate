@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 MODULE = i40e.so
@@ -31,3 +31,10 @@ CPPFLAGS += -D_I40E_MDB_DMOD
 # i40e needs this due to the use of Intel provided headers.
 #
 LINTFLAGS += -erroff=E_STATIC_UNUSED
+
+#
+# The Intel common code defines some enums which are valid unsigned ints that
+# GCC is fine with, but not Studio.
+#
+CERRWARN	+= -_cc=-erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
+LINTTAGS	+= -erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX

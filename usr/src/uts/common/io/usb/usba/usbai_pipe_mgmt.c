@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  */
 
 
@@ -430,9 +431,11 @@ static int
 usba_init_pipe_handle(dev_info_t *dip,
 	usba_device_t		*usba_device,
 	usb_ep_descr_t		*ep,
+	usb_ep_xdescr_t		*ep_xdescr,
 	usb_pipe_policy_t	*pipe_policy,
 	usba_ph_impl_t		*ph_impl)
 {
+	usb_ep_xdescr_t xep;
 	int instance = ddi_get_instance(dip);
 	unsigned int def_instance = instance;
 	static unsigned int anon_instance = 0;
@@ -511,9 +514,25 @@ usba_init_pipe_handle(dev_info_t *dip,
 		usba_device->usb_shared_taskq_ref_count[iface]++;
 	}
 
+	/*
+	 * In the future, when we may have different versions of the extended
+	 * endpoint descriptor, they should be normalized to the current version
+	 * here such that all of the HCI drivers have a consistent view of the
+	 * world. The extended descriptor may be NULL if we are opening the
+	 * default control endpoint; however, we create a uniform view for the
+	 * HCI drivers.
+	 */
+	if (ep_xdescr == NULL) {
+		bzero(&xep, sizeof (usb_ep_xdescr_t));
+		xep.uex_version = USB_EP_XDESCR_CURRENT_VERSION;
+		xep.uex_ep = *ep;
+		ep_xdescr = &xep;
+	}
+
 	ph_data->p_dip		= dip;
 	ph_data->p_usba_device	= usba_device;
 	ph_data->p_ep		= *ep;
+	ph_data->p_xep		= *ep_xdescr;
 	ph_data->p_ph_impl	= ph_impl;
 	if ((ep->bmAttributes & USB_EP_ATTR_MASK) ==
 	    USB_EP_ATTR_ISOCH) {
@@ -761,13 +780,14 @@ usba_drain_cbs(usba_pipe_handle_data_t *ph_data, usb_cb_flags_t cb_flags,
  *	USB_*		 - refer to usbai.h
  */
 int
-usb_pipe_open(
+usb_pipe_xopen(
 	dev_info_t		*dip,
-	usb_ep_descr_t		*ep,
+	usb_ep_xdescr_t		*ep_xdesc,
 	usb_pipe_policy_t	*pipe_policy,
 	usb_flags_t		usb_flags,
 	usb_pipe_handle_t	*pipe_handle)
 {
+	usb_ep_descr_t		*ep;
 	usba_device_t		*usba_device;
 	int			rval;
 	usba_pipe_handle_data_t *ph_data;
@@ -778,11 +798,18 @@ usb_pipe_open(
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_open:\n\t"
-	    "dip=0x%p ep=0x%p pp=0x%p uf=0x%x ph=0x%p",
-	    (void *)dip, (void *)ep, (void *)pipe_policy, usb_flags,
+	    "dip=0x%p ep_xdesc=0x%p pp=0x%p uf=0x%x ph=0x%p",
+	    (void *)dip, (void *)ep_xdesc, (void *)pipe_policy, usb_flags,
 	    (void *)pipe_handle);
 
 	if ((dip == NULL) || (pipe_handle == NULL)) {
+
+		return (USB_INVALID_ARGS);
+	}
+
+	if ((ep_xdesc != NULL) &&
+	    ((ep_xdesc->uex_version != USB_EP_XDESCR_CURRENT_VERSION) ||
+	    ((ep_xdesc->uex_flags & ~USB_EP_XFLAGS_SS_COMP) != 0))) {
 
 		return (USB_INVALID_ARGS);
 	}
@@ -793,7 +820,40 @@ usb_pipe_open(
 	}
 	usba_device = usba_get_usba_device(dip);
 
-	if ((ep != NULL) && (pipe_policy == NULL)) {
+	/*
+	 * Check the device's speed. If we're being asked to open anything other
+	 * than the default endpoint and the device is superspeed or greater and
+	 * we only have a usb_ep_descr_t and not the full endpoint data, then
+	 * this was coming through usb_pipe_open() and we need to fail this
+	 * call.
+	 *
+	 * Some drivers technically cheat and open the default control endpoint
+	 * even though they're not supposed to. ugen appears to be the main
+	 * offender. To deal with this, we check to see if the endpoint
+	 * descriptor bcmps to our default and give them a break, since we don't
+	 * need extended info for default control endpoints.
+	 */
+	if (ep_xdesc != NULL && ep_xdesc->uex_flags == 0 &&
+	    bcmp(&ep_xdesc->uex_ep, &usba_default_ep_descr,
+	    sizeof (usb_ep_descr_t)) != 0 &&
+	    usba_device->usb_port_status >= USBA_SUPER_SPEED_DEV) {
+		const char *dname = ddi_driver_name(dip);
+		const char *prod, *mfg;
+
+		prod = usba_device->usb_product_str;
+		if (prod == NULL)
+			prod = "Unknown Device";
+		mfg = usba_device->usb_mfg_str;
+		if (mfg == NULL)
+			mfg = "Unknown Manufacturer";
+		cmn_err(CE_NOTE, "driver %s attempting to open non-default "
+		    "of a USB 3.0 or newer device through usb_pipe_open(). "
+		    "%s must be updated to use usb_pipe_xopen() to work with "
+		    "USB device %s %s.", dname, dname, mfg, prod);
+		return (USB_FAILURE);
+	}
+
+	if ((ep_xdesc != NULL) && (pipe_policy == NULL)) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usb_pipe_open: null pipe policy");
 
@@ -801,7 +861,7 @@ usb_pipe_open(
 	}
 
 	/* is the device still connected? */
-	if ((ep != NULL) & DEVI_IS_DEVICE_REMOVED(dip)) {
+	if ((ep_xdesc != NULL) & DEVI_IS_DEVICE_REMOVED(dip)) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usb_pipe_open: device has been removed");
 
@@ -813,7 +873,7 @@ usb_pipe_open(
 	 * if a null endpoint pointer was passed, use the default
 	 * endpoint descriptor
 	 */
-	if (ep == NULL) {
+	if (ep_xdesc == NULL) {
 		if ((usb_flags & USBA_FLAGS_PRIVILEGED) == 0) {
 			USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 			    "usb_pipe_open: not allowed to open def pipe");
@@ -823,6 +883,8 @@ usb_pipe_open(
 
 		ep = &usba_default_ep_descr;
 		pipe_policy = &usba_default_ep_pipe_policy;
+	} else {
+		ep = &ep_xdesc->uex_ep;
 	}
 
 	if (usb_flags & USB_FLAGS_SERIALIZED_CB) {
@@ -878,7 +940,7 @@ usb_pipe_open(
 	 * allocate and initialize the pipe handle
 	 */
 	if ((rval = usba_init_pipe_handle(dip, usba_device,
-	    ep, pipe_policy, ph_impl)) != USB_SUCCESS) {
+	    ep, ep_xdesc, pipe_policy, ph_impl)) != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usb_pipe_open: pipe init failed (%d)", rval);
 
@@ -910,6 +972,29 @@ usb_pipe_open(
 	return (rval);
 }
 
+int
+usb_pipe_open(
+	dev_info_t		*dip,
+	usb_ep_descr_t		*ep,
+	usb_pipe_policy_t	*pipe_policy,
+	usb_flags_t		usb_flags,
+	usb_pipe_handle_t	*pipe_handle)
+{
+	usb_ep_xdescr_t xdesc, *xp = NULL;
+
+	/*
+	 * ep may be NULL if trying to open the default control endpoint.
+	 */
+	if (ep != NULL) {
+		bzero(&xdesc, sizeof (usb_ep_xdescr_t));
+		xdesc.uex_version = USB_EP_XDESCR_CURRENT_VERSION;
+		xdesc.uex_ep = *ep;
+		xp = &xdesc;
+	}
+
+	return (usb_pipe_xopen(dip, xp, pipe_policy, usb_flags,
+	    pipe_handle));
+}
 
 /*
  * usb_pipe_close/sync_close:

@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -269,6 +270,13 @@ void
 vcmn_err(int ce, const char *fmt, va_list adx)
 {
 	vzdcmn_err(GLOBAL_ZONEID, caller(), ce, fmt, adx, NULL);
+}
+
+/*PRINTFLIKE3*/
+void
+vdev_err(dev_info_t *dip, int ce, const char *fmt, va_list adx)
+{
+	vzdcmn_err(GLOBAL_ZONEID, caller(), ce, fmt, adx, dip);
 }
 
 /*PRINTFLIKE2*/

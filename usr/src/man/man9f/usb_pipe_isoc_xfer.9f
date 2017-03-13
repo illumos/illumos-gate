@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_PIPE_ISOC_XFER 9F "Jan 5, 2004"
+.TH USB_PIPE_ISOC_XFER 9F "Sep 16, 2016"
 .SH NAME
 usb_pipe_isoc_xfer, usb_pipe_stop_isoc_polling \- USB isochronous transfer and
 polling functions
@@ -26,11 +26,9 @@ polling functions
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .LP
 For \fBusb_pipe_isoc_xfer()\fR:
 .sp
@@ -83,7 +81,6 @@ USB_FLAGS_SLEEP is the only flag recognized. Wait for polling to stop.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_pipe_isoc_xfer()\fR function requests the USBA framework to perform
 a transfer     through a USB isochronous pipe. The request is passed to the
@@ -115,7 +112,6 @@ exception callbacks. Such errors will instead be logged in the packet
 descriptor's isoc_pkt_status field. These errors can be examined when the
 completed request is returned through a normal callback.
 .SS "Isochronous-OUT TRANSFERS"
-.sp
 .LP
 Allocate room for data when allocating isochronous-OUT requests via
 usb_alloc_isoc_req(9F), by passing a positive value for     the \fIlen\fR
@@ -131,7 +127,6 @@ new request has its USB_ATTRS_ISOC_XFER_ASAP attribute set, the host controller
 driver will queue the request to start on a frame which immediately follows the
 last frame of the last queued request.
 .SS "Isochronous-IN TRANSFERS"
-.sp
 .LP
 All isochronous-IN transfers start background polling, and require only a
 single (original) request.  The USBA framework will allocate a new request each
@@ -145,7 +140,6 @@ The original request passed to \fBusb_pipe_isoc_xfer()\fR will be used to
 return status when polling termination is requested, or for error condition
 notification. There can be only one isochronous-IN request submitted at a time.
 .SS "CALLBACKS"
-.sp
 .LP
 Isochronous transfer normal-completion callbacks cannot block for any reason
 since they are called from interrupt context.  They will have
@@ -226,7 +220,6 @@ exception callback with a completion reason of
 USB_CR_STOPPED_POLLING.
 .RE
 .SH RETURN VALUES
-.sp
 .LP
 For \fBusb_pipe_isoc_xfer()\fR:
 .sp
@@ -374,13 +367,11 @@ context; the pipe handle is invalid, NULL or pertains to a closing or closed
 pipe; or the pipe is in an error state. Messages regarding these errors will be
 logged to the console logfile.
 .SH CONTEXT
-.sp
 .LP
 Both of these functions may be called from kernel or user context without
 regard to arguments. May be called from interrupt context only when the
 USB_FLAGS_SLEEP flag is clear.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 /* Start polling on an isochronous-IN pipe. */
@@ -430,7 +421,6 @@ USB_FLAGS_SLEEP flag is clear.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -448,14 +438,13 @@ Interface stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBusb_alloc_request\fR(9F),
 \fBusb_get_current_frame_number\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_get_max_pkts_per_isoc_request\fR(9F), \fBusb_get_status\fR(9F),
 \fBusb_pipe_bulk_xfer\fR(9F), \fBusb_pipe_ctrl_xfer\fR(9F),
 \fBusb_pipe_get_state\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
-\fBusb_pipe_open\fR(9F), \fBusb_pipe_reset\fR(9F), \fBusb_bulk_request\fR(9S),
+\fBusb_pipe_xopen\fR(9F), \fBusb_pipe_reset\fR(9F), \fBusb_bulk_request\fR(9S),
 \fBusb_callback_flags\fR(9S), \fBusb_completion_reason\fR(9S),
 \fBusb_ctrl_request\fR(9S), \fBusb_ep_descr\fR(9S), \fBusb_intr_request\fR(9S),
 \fBusb_isoc_request\fR(9S)

@@ -17,6 +17,7 @@
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/boot/Makefile.version
 
 AS=	$(GNU_ROOT)/bin/gas
 LD=	$(GNU_ROOT)/bin/gld
@@ -26,10 +27,6 @@ OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
 PROG=		gptzfsboot
 MAN=		gptzfsboot.8
 FILEMODE=0444
-
-# need to update this to trigger installboot updates.
-BUILDDATE :sh = TZ=UTC date +%Y%m%dT%H%M%SZ
-BOOT2_VERSION=	1.1:$(BUILDDATE)
 
 BOOT_COMCONSOLE_PORT= 0x3f8
 BOOT_COMCONSOLE_SPEED= 9600
@@ -85,7 +82,7 @@ OBJS =	multiboot.o zfsboot.o sio.o cons.o panic.o devopen.o \
 CLEANFILES=	gptzfsboot $(OBJS)
 
 gptzfsboot: gptldr.bin gptzfsboot.bin ${BTXKERN}
-	$(BTXLD) -E ${ORG2} -f bin -b ${BTXKERN} -V ${BOOT2_VERSION} -l \
+	$(BTXLD) -E ${ORG2} -f bin -b ${BTXKERN} -V ${BOOT_VERSION} -l \
 		gptldr.bin -o $@ gptzfsboot.bin
 
 CLEANFILES +=	gptldr.bin gptldr.out gptldr.o

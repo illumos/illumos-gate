@@ -27,7 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 
 #include <stand.h>
@@ -62,10 +61,7 @@ struct device_type {
 };
 
 extern char end[];
-extern char bootprog_name[];
-extern char bootprog_rev[];
-extern char bootprog_date[];
-extern char bootprog_maker[];
+extern char bootprog_info[];
 
 extern unsigned char _etext[];
 extern unsigned char _edata[];
@@ -428,9 +424,7 @@ main(void)
 	cons_probe();
 	printf("Compatible U-Boot API signature found @%p\n", sig);
 
-	printf("\n");
-	printf("%s, Revision %s\n", bootprog_name, bootprog_rev);
-	printf("(%s, %s)\n", bootprog_maker, bootprog_date);
+	printf("\n%s", bootprog_info);
 	printf("\n");
 
 	dump_sig(sig);

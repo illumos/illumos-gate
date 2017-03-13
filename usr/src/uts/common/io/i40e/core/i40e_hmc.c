@@ -30,16 +30,14 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD: head/sys/dev/ixl/i40e_hmc.c 284049 2015-06-05 22:52:42Z jfv $*/
+/*$FreeBSD$*/
 
 #include "i40e_osdep.h"
 #include "i40e_register.h"
 #include "i40e_status.h"
 #include "i40e_alloc.h"
 #include "i40e_hmc.h"
-#ifndef I40E_NO_TYPE_HEADER
 #include "i40e_type.h"
-#endif
 
 /**
  * i40e_add_sd_table_entry - Adds a segment descriptor to the table

@@ -30,8 +30,7 @@ and full device status.
 .LP
 \fBugen\fR supports control, bulk, isochronous and interrupt (in and  out)
 transfers. \fBlibusb\fR(3LIB) uses \fBugen\fR to access devices that do not
-contain drivers (such as digital cameras and PDAs). Refer to
-\fB/usr/sfw/share/doc/libusb/libusb.txt\fR for details.
+contain drivers (such as digital cameras and PDAs).
 .SH BINDING
 .LP
 In general, no explicit binding of the \fBugen\fR driver is necessary because
@@ -66,6 +65,7 @@ USB 2.0 device (usb<vid>,<pid>)...
 .LP
 where vid is the USB vendor identifier in hex and pid is the  product
 identifier in hex supplied by the device  descriptor \fBusb_dev_descr\fR(9S).
+Note, the USB device version may vary depending on the device.
 .sp
 .LP
 When using ugen for the first time, you must add the  driver utilizing

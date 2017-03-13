@@ -936,6 +936,9 @@ i40e_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case ETHER_STAT_CAP_10GFDX:
 		*val = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_10GB) != 0;
 		break;
+	case ETHER_STAT_CAP_25GFDX:
+		*val = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_25GB) != 0;
+		break;
 	case ETHER_STAT_CAP_40GFDX:
 		*val = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_40GB) != 0;
 		break;
@@ -954,6 +957,9 @@ i40e_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 	case ETHER_STAT_ADV_CAP_10GFDX:
 		*val = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_10GB) != 0;
+		break;
+	case ETHER_STAT_ADV_CAP_25GFDX:
+		*val = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_25GB) != 0;
 		break;
 	case ETHER_STAT_ADV_CAP_40GFDX:
 		*val = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_40GB) != 0;
@@ -975,6 +981,9 @@ i40e_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case ETHER_STAT_LP_CAP_10GFDX:
 		*val = i40e->i40e_link_speed == 10000;
 		break;
+	case ETHER_STAT_LP_CAP_25GFDX:
+		*val = i40e->i40e_link_speed == 25000;
+		break;
 	case ETHER_STAT_LP_CAP_40GFDX:
 		*val = i40e->i40e_link_speed == 40000;
 		break;
@@ -991,6 +1000,7 @@ i40e_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case ETHER_STAT_CAP_10HDX:
 	case ETHER_STAT_CAP_100T4:
 	case ETHER_STAT_CAP_100GFDX:
+	case ETHER_STAT_CAP_50GFDX:
 	case ETHER_STAT_CAP_2500FDX:
 	case ETHER_STAT_CAP_5000FDX:
 	case ETHER_STAT_ADV_CAP_1000HDX:
@@ -999,6 +1009,7 @@ i40e_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case ETHER_STAT_ADV_CAP_10HDX:
 	case ETHER_STAT_ADV_CAP_100T4:
 	case ETHER_STAT_ADV_CAP_100GFDX:
+	case ETHER_STAT_ADV_CAP_50GFDX:
 	case ETHER_STAT_ADV_CAP_2500FDX:
 	case ETHER_STAT_ADV_CAP_5000FDX:
 	case ETHER_STAT_LP_CAP_1000HDX:
@@ -1007,6 +1018,7 @@ i40e_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case ETHER_STAT_LP_CAP_10HDX:
 	case ETHER_STAT_LP_CAP_100T4:
 	case ETHER_STAT_LP_CAP_100GFDX:
+	case ETHER_STAT_LP_CAP_50GFDX:
 	case ETHER_STAT_LP_CAP_2500FDX:
 	case ETHER_STAT_LP_CAP_5000FDX:
 		*val = 0;

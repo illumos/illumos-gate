@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -271,9 +271,17 @@ static link_attr_t link_attr[] = {
 
 	{ MAC_PROP_EN_100GFDX_CAP, sizeof (uint8_t),	"en_100gfdx_cap"},
 
+	{ MAC_PROP_ADV_50GFDX_CAP, sizeof (uint8_t),	"adv_50gfdx_cap"},
+
+	{ MAC_PROP_EN_50GFDX_CAP, sizeof (uint8_t),	"en_50gfdx_cap"},
+
 	{ MAC_PROP_ADV_40GFDX_CAP, sizeof (uint8_t),	"adv_40gfdx_cap"},
 
 	{ MAC_PROP_EN_40GFDX_CAP, sizeof (uint8_t),	"en_40gfdx_cap"},
+
+	{ MAC_PROP_ADV_25GFDX_CAP, sizeof (uint8_t),	"adv_25gfdx_cap"},
+
+	{ MAC_PROP_EN_25GFDX_CAP, sizeof (uint8_t),	"en_25gfdx_cap"},
 
 	{ MAC_PROP_ADV_10GFDX_CAP, sizeof (uint8_t),	"adv_10gfdx_cap"},
 
@@ -558,12 +566,32 @@ static prop_desc_t	prop_table[] = {
 	    set_public_prop, NULL, get_binary, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
+	{ "adv_50gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_50gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
 	{ "adv_40gfdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    NULL, NULL, get_binary, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_40gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_public_prop, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "adv_25gfdx_cap", { "", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    NULL, NULL, get_binary, NULL,
+	    0, DATALINK_CLASS_PHYS, DL_ETHER },
+
+	{ "en_25gfdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    set_public_prop, NULL, get_binary, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },

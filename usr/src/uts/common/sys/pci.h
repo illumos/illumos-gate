@@ -1234,6 +1234,13 @@ typedef struct pci_phys_spec pci_regspec_t;
  */
 #define	PCI_BUS_CONF_MAP_PROP	"pci-conf-indirect"
 
+/*
+ * PCI returns all 1s for an invalid read.
+ */
+#define	PCI_EINVAL8	0xff
+#define	PCI_EINVAL16	0xffff
+#define	PCI_EINVAL32	0xffffffff
+
 #ifdef	__cplusplus
 }
 #endif

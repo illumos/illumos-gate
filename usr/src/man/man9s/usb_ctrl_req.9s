@@ -5,7 +5,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH USB_CTRL_REQUEST 9S "Jan 5, 2004"
 .SH NAME
-usb_ctrl_request \- USB control pipe request structure
+usb_ctrl_req, usb_ctrl_req_t, usb_ctrl_request \- USB control pipe request structure
 .SH SYNOPSIS
 .LP
 .nf
@@ -13,11 +13,9 @@ usb_ctrl_request \- USB control pipe request structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH DESCRIPTION
-.sp
 .LP
 A control request is used to send device commands (or requests) and to read
 status. Please refer to Section\fI 5.5\fR of the \fIUSB 2.0\fR specification
@@ -25,7 +23,6 @@ for information on control pipes. For information on formatting requests, see
 Section \fI9.3\fR of the \fIUSB 2.0\fR specification. The USB 2.0 specification
 is available at \fIwww.usb.org\fR.
 .SH STRUCTURE MEMBERS
-.sp
 .LP
 The fields in the usb_ctrl_req_t are used to format a control request:
 .sp
@@ -158,7 +155,6 @@ Unicode language ID, used as wIndex for USB_REQ_SET/GET_DESCRIPTOR
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See attributes(5) for descriptions of the following attributes:
 .sp
@@ -176,7 +172,6 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBusb_alloc_request\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
 \fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),

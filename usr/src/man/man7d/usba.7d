@@ -1,190 +1,183 @@
-'\" te
-.\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2016 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USBA 7D "April 9, 2016"
-.SH NAME
-usba, usb \- Solaris USB Architecture (USBA)
-.SH DESCRIPTION
-.LP
+.Dd October 4, 2016
+.Dt USBA 7D
+.Os
+.Sh NAME
+.Nm usba ,
+.Nm usb
+.Nd illumos USB Architecture (USBA)
+.Sh DESCRIPTION
 USB provides a low-cost means for attaching peripheral devices, including
 mass-storage devices, keyboards, mice, and printers, to a system. For complete
 information on the USB architecture, visit the USB website at
 http://www.usb.org.
-.sp
-.LP
+.Pp
 USBA supports 126 hot-pluggable USB devices per USB bus. The maximum data
-transfer rate is 1.5 Mbits (low speed USB 1.x) or 12 Mbits (full speed USB 1.x)
-or 480 MBits (high speed USB 2.0) Mbits per second (Mbps).
-.sp
-.LP
-USBA adheres to the \fIUniversal Serial Bus 2.0\fR specification and provides a
-transport layer abstraction to USB client drivers.
-.sp
-.LP
-For information on how to write USB client drivers, see \fIWriting Device
-Drivers\fR. For the latest information on writing USB drivers, visit
-\fIhttp://developers.sun.com/solaris/developer/support/driver/usb.html\fR. For
-a complete list of USBA interfaces, see \fBIntro\fR(9F) and \fBIntro\fR(9S).
-.sp
-.LP
-Devices without a driver may have a  \fBlibusb\fR(3LIB) application. For more
-information, see \fB/usr/sfw/share/doc/libusb/libusb.txt\fR.
-.SH FILES
-.LP
+transfer rate is 5 Gbits (SuperSpeed USB 3.0), 480 Mbits (high speed USB
+2.0), 12 Mbits (full speed USB 1.x), or 1.5 Mbits (low speed USB 1.x).
+.Pp
+USBA adheres to the
+.Em Universal Serial Bus 3.0
+specification and provides a transport layer abstraction to USB client
+drivers.
+.Pp
+For information on how to write USB client drivers, see
+.Em Writing Device Drivers .
+For the latest information on writing USB drivers, visit
+.Em http://illumos.org/books/wdd .
+For a complete list of USBA interfaces, see
+.Xr Intro 9F
+or
+.Xr Intro 9S .
+.Pp
+Devices without a driver may be able to leverage
+.Xr libusb 3LIB .
+.Sh FILES
 Listed below are drivers and modules which either utilize or are utilized by
-USBA. Drivers in \fB/kernel/drv\fR are 32 bit drivers (x86 only). Drivers in
-\fB/kernel/drv/sparcv9\fR or \fB/kernel/drv/amd64\fR are 64 bit drivers.
-.sp
-.in +2
-.nf
-\fIClient Driver                           Function/Device\fR
-
-kernel/drv/[sparcv9|amd64/]hid          HID class
-kernel/drv/[sparcv9|amd64/]hubd         hub class
-kernel/drv/[sparcv9|amd64/]hwahc        HWA Host Controller class
-kernel/drv/[sparcv9|amd64/]hwarc        HWA Radio Controller class
-kernel/drv/[sparcv9|amd64/]scsa2usb     mass storage class
-kernel/drv/[sparcv9|amd64/]usbprn       printer class
-kernel/drv/[sparcv9|amd64/]usb_as       audio streaming class
-kernel/drv/[sparcv9|amd64/]usb_ac       audio control class
-kernel/drv/[sparcv9|amd64/]usbvc        video class
-kernel/drv/[sparcv9|amd64/]usb_mid      multi-interface device
-kernel/drv/[sparcv9|amd64/]usb_ia       interface-association driver
-kernel/drv/[sparcv9|amd64/]usbser_edge  Edgeport USB to serial port
-kernel/drv/[sparcv9|amd64/]usbsksp      Keyspan USB to serial port
-kernel/drv/[sparcv9|amd64/]usbsprl      pl2303 USB to serial port
-kernel/drv/[sparcv9|amd64/]usbsacm      CDC ACM class to serial port
-kernel/drv/[sparcv9|amd64/]ugen         generic USB driver
-kernel/drv/[sparcv9|amd64/]wusb_ca      WUSB Cable Association class
-kernel/drv/[sparcv9|amd64/]ohci         open host controller driver
-kernel/drv/[sparcv9|amd64/]uhci         universal host controller driver
-kernel/drv/[sparcv9|amd64/]ehci         enhanced host controller driver
-.fi
-.in -2
-.sp
-
-.sp
-.in +2
-.nf
-\fIClient Streams Modules                   Function/Device\fR
-/kernel/strmod/[sparcv9|amd64]usbkbm     Keyboad
-/kernel/strmod/[sparcv9|amd64]usbms      Mouse
-/kernel/strmod/[sparcv9|amd64]usb_ah     Audio HID
-.fi
-.in -2
-.sp
-
-.sp
-.in +2
-.nf
-\fIHost Controller Interface Drivers   Device\fR
-
-/kernel/drv/[sparcv9|amd64]ehci     Enhanced HCI
-/kernel/drv/[sparcv9|amd64]ohci     Open HCI
-/kernel/drv/[sparcv|amd64/]uhci     Univeral HCI
-.fi
-.in -2
-.sp
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	PCI-based  systems
-.TE
-
-.SH SEE ALSO
-.LP
-\fBcfgadm_usb\fR(1M), \fBlibusb\fR(3LIB), \fBattributes\fR(5), \fBehci\fR(7D),
-\fBhid\fR(7D), \fBhubd\fR(7D), \fBohci\fR(7D), \fBscsa2usb\fR(7D),
-\fBuhci\fR(7D), \fBusb_ac\fR(7D), \fBusb_as\fR(7D), \fBusb_ia\fR(7D),
-\fBusb_mid\fR(7D), \fBusbprn\fR(7D), \fBusbsacm\fR(7D), \fBusbser_edge\fR(7D),
-\fBusbsksp\fR(7D), \fBusbsprl\fR(7D), \fBusbvc\fR(7D), \fBugen\fR(7D),
-\fBvirtualkm\fR(7D). \fBIntro\fR(9F), \fBIntro\fR(9S)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.sp
-.LP
-\fIUniversal Serial Bus Specification 2.0\fR.
-.sp
-.LP
-\fIInterface Association Descriptor Engineering Change Notice (ECN)\fR
-.sp
-.LP
-\fISystem Administration Guide: Basic Administration\fR
-.sp
-.LP
-http://www.sun.com
-.SH NOTES
-.LP
-Booting from USB mass-storage devices is not supported on SPARC, but is
-supported on X86.
-.SH DIAGNOSTICS
-.LP
+USBA. Drivers in
+.Pa /kernel/drv\
+are 32 bit drivers (x86 only). Drivers in
+.Pa /kernel/drv/sparcv9
+or
+.Pa kernel/drv/amd64
+are 64 bit drivers.
+.Bl -column -offset indent ".Pa kernel/drv/[sparcv9|amd64/]usbser_edge" "Edgeport USB to serial port"
+.It Em Client Driver
+.Ta Em Function/Device
+.It
+.Ta
+.It Pa kernel/drv/[sparcv9|amd64/]hid
+.Ta HID class
+.It Pa kernel/drv/[sparcv9|amd64/]hubd
+.Ta hub class
+.It Pa kernel/drv/[sparcv9|amd64/]scsa2usb
+.Ta mass storage class
+.It Pa kernel/drv/[sparcv9|amd64/]usbprn
+.Ta printer class
+.It Pa kernel/drv/[sparcv9|amd64/]usb_as
+.Ta audio streaming class
+.It Pa kernel/drv/[sparcv9|amd64/]usb_ac
+.Ta audio control class
+.It Pa kernel/drv/[sparcv9|amd64/]usbvc
+.Ta video class
+.It Pa kernel/drv/[sparcv9|amd64/]usb_mid
+.Ta multi-interface device
+.It Pa kernel/drv/[sparcv9|amd64/]usb_ia
+.Ta interface-association driver
+.It Pa kernel/drv/[sparcv9|amd64/]usbser_edge
+.Ta Edgeport USB to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]usbsksp
+.Ta Keyspan USB to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]usbsprl
+.Ta pl2303 USB to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]usbsacm
+.Ta CDC ACM class to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]ugen
+.Ta generic USB driver
+.It Pa kernel/drv/[sparcv9|amd64/]ohci
+.Ta open host controller driver
+.It Pa kernel/drv/[sparcv9|amd64/]uhci
+.Ta universal host controller driver
+.It Pa kernel/drv/[sparcv9|amd64/]ehci
+.Ta enhanced host controller driver
+.It Pa kernel/drv/[sparcv9|amd64/]xhci
+.Ta extensible host controller driver
+.El
+.Bl -column -offset indent ".Pa /kernel/strmod/[sparcv9|amd64/]usb_ah" "Function/Device"
+.It
+.Ta
+.It Em Client Streams Modules
+.Ta Em Function/Device
+.It
+.Ta
+.It Pa /kernel/strmod/[sparcv9|amd64/]usbkbm
+.Ta Keyboad
+.It Pa /kernel/strmod/[sparcv9|amd64/]usbms
+.Ta Mouse
+.It Pa /kernel/strmod/[sparcv9|amd64/]usb_ah
+.Ta Audio HID
+.El
+.Bl -column -offset indent ".Em Host Controller Interface Drivers" "Extensible HCI"
+.It Em Host Controller Interface Drivers
+.Ta Em Device
+.It
+.Ta
+.It Pa /kernel/drv/[amd64/]xhci
+.Ta Extensible HCI
+.It Pa /kernel/drv/[sparcv9|amd64/]ehci
+.Ta Enhanced HCI
+.It Pa /kernel/drv/[sparcv9|amd64/]ohci
+.Ta Open HCI
+.It Pa /kernel/drv/[sparcv|amd64/]uhci
+.Ta Universal HCI
+.El
+.Sh DIAGNOSTICS
 The messages described below may appear on the system console as well as being
 logged. All  messages are formatted in the following manner:
-.sp
-.in +2
-.nf
-WARNING: Error message...
-.fi
-.in -2
-.sp
-
-.sp
-.ne 2
-.na
-\fBNo driver found for device <device_name> (interface <number> node
-name=<node_name>)\fR
-.ad
-.sp .6
-.RS 4n
-The installed Solaris software does not contain a supported driver for this
-hardware. <number> is the interface number.  <name> is either the device path
-name or the device name.
-.RE
-
-.sp
-.ne 2
-.na
-\fBDraining callbacks timed out!\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width Sy -offset 2n
+.It WARNING: Error message...
+.El
+.Bl -tag -width Sy -offset 2n
+.It Sy no driver found for device <device_name> (interface <number> node
+name=<node_name>)
+The installed software does not contain a supported driver for this
+hardware. <number> is the interface number.  <name> is either the device path name or the device name.
+.It Sy Draining callbacks timed out!
 An internal error occurred.  Please reboot your system.  If this problem
 persists, contact your system vendor.
-.RE
-
-.sp
-.LP
+.El
+.Pp
 The following messages may be logged into the system log. They are formatted in
 the following manner:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 <device path><usba<instance number>): message...
-.fi
-.in -2
-.sp
-
-.sp
-.ne 2
-.na
-\fBIncorrect USB driver version for <n.m>.\fR
-.ad
-.sp .6
-.RS 4n
+.Ed
+.Bl -tag -width Sy -offset 2n
+.It Sy Incorrect USB driver version for <n.m>.
 Driver is incompatible with USBA framework.
-.RE
-
+.El
+.Sh SEE ALSO
+.Xr cfgadm_usb 1M ,
+.Xr libusb 3LIB ,
+.Xr attributes 5 ,
+.Xr ehci 7D ,
+.Xr hid 7D ,
+.Xr hubd 7D ,
+.Xr ohci 7D ,
+.Xr scsa2usb 7D ,
+.Xr ugen 7D ,
+.Xr uhci 7D ,
+.Xr usb_ac 7D ,
+.Xr usb_as 7D ,
+.Xr usb_ia 7D ,
+.Xr usb_mid 7D ,
+.Xr usbprn 7D ,
+.Xr usbsacm 7D ,
+.Xr usbser_edge 7D ,
+.Xr usbsksp 7D ,
+.Xr usbsprl 7D ,
+.Xr usbvc 7D ,
+.Xr virtualkm 7D ,
+.Xr xhci 7D ,
+.Xr Intro 9F ,
+.Xr Intro 9S)
+.Pp
+.Rs
+.%T Writing Device Drivers
+.Re
+.Rs
+.%T Universal Serial Bus Specification 3.0
+.Re
+.Rs
+.%T Interface Association Descriptor Engineering Change Notice (ECN)
+.Re
+.Rs
+.%T System Administration Guide: Basic Administration
+.Re
+.Sh NOTES
+Booting from USB mass-storage devices is not supported on SPARC, but is
+supported on X86.
