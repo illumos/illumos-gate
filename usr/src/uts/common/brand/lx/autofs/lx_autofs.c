@@ -2067,6 +2067,16 @@ lx_autofs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ctp)
 	return (0);
 }
 
+/*
+ * Internally, we have already converted our autofs vfs device number into a
+ * Linux-format device during lx_autofs_mount and stored that device number
+ * in data->lav_dev. However, our lx emulation for the various stat() syscalls
+ * also wants to convert the fsid the same way. That obviously will be
+ * incorrect if we pass along an fsid that is already converted, so we always
+ * pass along the original vfs fsid here. Both lav_dev and lav_ino are passed
+ * in messages to the automounter, and these must match the values obtained by
+ * stat().
+ */
 static int
 lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
     caller_context_t *ctp)
@@ -2075,6 +2085,7 @@ lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	vnode_t		*dvp;
 	int		error;
 	lx_autofs_vfs_t *data = (lx_autofs_vfs_t *)vp->v_vfsp->vfs_data;
+	dev_t		autofs_fsid = vp->v_vfsp->vfs_dev;
 
 	if ((dvp = lx_autofs_do_direct(vp)) != NULL) {
 		uvp = dvp;
@@ -2087,18 +2098,18 @@ lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		VN_RELE(dvp);
 		if (error == 0) {
 			/*
-			 * During automounter restart recovery the automounter
+			 * During automounter restart recovery, the automounter
 			 * will fstat the fd provided in the setpipe ioctl. It
 			 * uses the resulting inode & dev to correlate future
 			 * autofs fifo requests to the correct entry. Thus, we
-			 * have to update the attributes with our own id's.
+			 * have to update the attributes with the proper IDs.
 			 */
-			vap->va_fsid = data->lav_dev;
+			vap->va_fsid = autofs_fsid;
 			vap->va_nodeid = data->lav_ino;
 		}
 	} else if (error == 0) {
 		/* Update the attributes with our filesystem id. */
-		vap->va_fsid = data->lav_dev;
+		vap->va_fsid = autofs_fsid;
 	}
 
 	return (error);
