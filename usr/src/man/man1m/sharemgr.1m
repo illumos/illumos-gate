@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SHAREMGR 1M "Sep 21, 2009"
+.TH SHAREMGR 1M "Feb 25, 2017"
 .SH NAME
 sharemgr \- configure and manage file sharing
 .SH SYNOPSIS
@@ -88,7 +88,6 @@ sharemgr \- configure and manage file sharing
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsharemgr\fR command configures share groups and the shares contained
 within them.
@@ -123,7 +122,6 @@ The options shown in the SYNOPSIS section are described in the context of each
 subcommand. All subcommands except \fBlist\fR and \fBshow\fR require root
 privileges or that you assume the Primary Administrator role.
 .SS "Subcommands"
-.sp
 .LP
 With no subcommand entered, a \fBsharemgr\fR command with the \fB-h\fR option
 displays a usage message for all subcommands.
@@ -630,7 +628,6 @@ across reboots.
 .RE
 
 .SS "Supported Properties"
-.sp
 .LP
 Properties are protocol-specific. Currently, only the NFS and SMB protocols are
 supported. Properties have the following characteristics:
@@ -1105,7 +1102,6 @@ is when the access list is an asterisk (\fB*\fR), in which case \fBro\fR or
 .RE
 
 .SS "Access List Argument"
-.sp
 .LP
 The \fIaccess-list\fR argument is either the string \fB"*"\fR to represent all
 hosts or a colon-separated list whose components can be any number of the
@@ -1143,17 +1139,17 @@ name.
 .sp .6
 .RS 4n
 To use domain membership the server must use DNS or LDAP, rather than, for
-example, NIS or NIS+, to resolve hostnames to IP addresses. That is, the
+example, NIS, to resolve hostnames to IP addresses. That is, the
 \fBhosts\fR entry in the \fBnsswitch.conf\fR(4) must specify \fBdns\fR or
-\fBldap\fR ahead of \fBnis\fR or \fBnisplus\fR, because only DNS and LDAP
-return the full domain name of the host. Other name services, such as NIS or
-NIS+, cannot be used to resolve hostnames on the server because, when mapping
+\fBldap\fR ahead of \fBnis\fR, because only DNS and LDAP
+return the full domain name of the host. Other name services, such as NIS,
+cannot be used to resolve hostnames on the server because, when mapping
 an IP address to a hostname, they do not return domain information. For
 example, for the IP address 172.16.45.9:
 .sp
 .ne 2
 .na
-\fBNIS or NIS+\fR
+\fBNIS\fR
 .ad
 .sp .6
 .RS 4n
@@ -1189,7 +1185,7 @@ rw=.
 .in -2
 
 \&...matches \fBmydomain\fR but not \fBmydomain.mycompany.com\fR. This feature
-can be used to match hosts resolved through NIS and NIS+ rather than DNS and
+can be used to match hosts resolved through NIS rather than DNS and
 LDAP.
 .RE
 
@@ -1261,7 +1257,6 @@ rw=engineering:-terra
 .LP
 \&...grants access to \fBterra\fR.
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -1289,7 +1284,6 @@ Command failed.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/include/libshare.h\fR\fR
@@ -1299,7 +1293,6 @@ Error codes used for exit status.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1315,7 +1308,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBidmap\fR(1M), \fBsharectl\fR(1M), \fBzfs\fR(1M), \fBattributes\fR(5),
 \fBnfssec\fR(5), \fBsmf\fR(5), \fBstandards\fR(5)

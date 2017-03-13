@@ -44,7 +44,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <ufs/ufs/dinode.h>
 #include <ufs/ufs/dir.h>
@@ -133,7 +132,7 @@ fsfind(const char *name, ufs_ino_t * ino)
 static ufs_ino_t
 lookup(const char *path)
 {
-	static char name[MAXNAMLEN + 1];
+	static char name[UFS_MAXNAMLEN + 1];
 	const char *s;
 	ufs_ino_t ino;
 	ssize_t n;
@@ -147,7 +146,7 @@ lookup(const char *path)
 		if (!*path)
 			break;
 		for (s = path; *s && *s != '/'; s++);
-		if ((n = s - path) > MAXNAMLEN)
+		if ((n = s - path) > UFS_MAXNAMLEN)
 			return 0;
 		ls = *path == '?' && n == 1 && !*s;
 		memcpy(name, path, n);

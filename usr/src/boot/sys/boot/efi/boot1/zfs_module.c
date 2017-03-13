@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #include <stddef.h>
 #include <stdarg.h>
@@ -44,7 +42,7 @@ static int
 vdev_read(vdev_t *vdev, void *priv, off_t off, void *buf, size_t bytes)
 {
 	dev_info_t *devinfo;
-	off_t lba;
+	uint64_t lba;
 	EFI_STATUS status;
 
 	devinfo = (dev_info_t *)priv;
@@ -53,9 +51,9 @@ vdev_read(vdev_t *vdev, void *priv, off_t off, void *buf, size_t bytes)
 	status = devinfo->dev->ReadBlocks(devinfo->dev,
 	    devinfo->dev->Media->MediaId, lba, bytes, buf);
 	if (status != EFI_SUCCESS) {
-		DPRINTF("vdev_read: failed dev: %p, id: %u, lba: %zu, size: %zu,"
+		DPRINTF("vdev_read: failed dev: %p, id: %u, lba: %ju, size: %zu,"
                     " status: %lu\n", devinfo->dev,
-                    devinfo->dev->Media->MediaId, lba, bytes,
+                    devinfo->dev->Media->MediaId, (uintmax_t)lba, bytes,
                     EFI_ERROR_CODE(status));
 		return (-1);
 	}
@@ -154,7 +152,7 @@ load(const char *filepath, dev_info_t *devinfo, void **bufp, size_t *bufsize)
 }
 
 static void
-status()
+status(void)
 {
 	spa_t *spa;
 
@@ -172,14 +170,14 @@ status()
 }
 
 static void
-init()
+init(void)
 {
 
 	zfs_init();
 }
 
 static dev_info_t *
-_devices()
+_devices(void)
 {
 
 	return (devices);

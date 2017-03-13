@@ -55,7 +55,6 @@ extern "C" {
 #include <sys/conf.h>
 #include <sys/kmem.h>
 #include <sys/visual_io.h>
-#include <sys/font.h>
 #include <sys/fbio.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>

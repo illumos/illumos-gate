@@ -32,6 +32,7 @@
 
 
 #include <sys/byteorder.h>
+#include <sys/debug.h>
 #include <stdarg.h>
 
 #if !defined(DIS_STANDALONE)
@@ -647,7 +648,7 @@ static const char *prefetch_str[32] = {
 static void prt_field(const char *, uint32_t, int);
 
 static const char *get_regname(dis_handle_t *, int, uint32_t);
-static int32_t sign_extend(int32_t, int32_t);
+static int32_t sign_extend(int32_t, uint32_t);
 
 static void prt_name(dis_handle_t *, const char *, int);
 
@@ -2203,12 +2204,13 @@ prt_field(const char *field, uint32_t val, int len)
  * integer
  */
 static int32_t
-sign_extend(int32_t val, int32_t bits)
+sign_extend(int32_t val, uint32_t bits)
 {
-	if ((val & (1L << (bits - 1))) == 0)
-		return (val);
+	uint32_t mask;
 
-	return ((-1L << bits) | val);
+	ASSERT(bits > 0);
+	mask = 1L << (bits - 1);	/* 2**(bits - 1) */
+	return (-(val & mask) + (val & ~mask));
 }
 
 /*

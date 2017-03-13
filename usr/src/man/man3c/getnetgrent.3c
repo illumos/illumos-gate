@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETNETGRENT 3C "Apr 5, 2004"
+.TH GETNETGRENT 3C "Feb 25, 2017"
 .SH NAME
 getnetgrent, getnetgrent_r, setnetgrent, endnetgrent, innetgr \- get network
 group entry
@@ -38,7 +38,6 @@ group entry
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions are used to test membership in and enumerate members of
 ``netgroup'' network groups defined in a system database.  Netgroups are sets
@@ -123,7 +122,6 @@ multiple threads interleave calls to \fBgetnetgrent_r()\fR each will enumerate
 a disjoint subset of the netgroup. Thus the effective use of these functions in
 multi-threaded applications may require coordination by the caller.
 .SH ERRORS
-.sp
 .LP
 The function \fBgetnetgrent_r()\fR will return  \fB0\fR and set \fBerrno\fR to
 \fBERANGE\fR if the length of the buffer supplied by caller is not large enough
@@ -134,7 +132,6 @@ interpretation of \fBerrno\fR in multi-threaded applications.
 The functions \fBsetnetgrent()\fR and \fBendnetgrent()\fR return \fB0\fR upon
 success.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
@@ -144,7 +141,6 @@ success.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -160,21 +156,18 @@ MT-Level	See \fBDESCRIPTION\fR section.
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBIntro\fR(3), \fBnetgroup\fR(4), \fBnsswitch.conf\fR(4),
 \fBattributes\fR(5)
 .SH WARNINGS
-.sp
 .LP
 The function \fBgetnetgrent_r()\fR is included in this release on an
 uncommitted basis only, and is subject to change or removal in future minor
 releases.
 .SH NOTES
-.sp
 .LP
-Only the Network Information Services, \fBNIS\fR and \fBNIS+,\fR are supported
-as sources for the \fBnetgroup\fR database.
+Only the Network Information Services, \fBNIS\fR, is supported
+as a source for the \fBnetgroup\fR database.
 .sp
 .LP
 When compiling multi-threaded applications, see  \fBIntro\fR(3), \fINotes On

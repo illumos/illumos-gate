@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -150,6 +150,8 @@ typedef enum {
  * Note that there are 2 sets of parameters: the *_EN_* values are
  * those that the Administrator configures for autonegotiation. The
  * _ADV_* values are those that are currently exposed over the wire.
+ *
+ * Please append properties to the end of this list. Do not reorder the list.
  */
 typedef enum {
 	MAC_PROP_DUPLEX = 0x00000001,
@@ -224,6 +226,10 @@ typedef enum {
 	MAC_PROP_EN_2500FDX_CAP,
 	MAC_PROP_ADV_5000FDX_CAP,
 	MAC_PROP_EN_5000FDX_CAP,
+	MAC_PROP_ADV_25GFDX_CAP,
+	MAC_PROP_EN_25GFDX_CAP,
+	MAC_PROP_ADV_50GFDX_CAP,
+	MAC_PROP_EN_50GFDX_CAP,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 

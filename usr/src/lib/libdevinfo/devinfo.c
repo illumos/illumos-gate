@@ -1065,7 +1065,7 @@ di_driver_ops(di_node_t node)
 }
 
 /*
- * returns the length of the path, caller must free memory
+ * Returns pointer to the allocated string, which must be freed by the caller.
  */
 char *
 di_devfs_path(di_node_t node)

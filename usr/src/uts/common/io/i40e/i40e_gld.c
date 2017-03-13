@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -227,7 +228,7 @@ i40e_m_promisc(void *arg, boolean_t on)
 
 
 	ret = i40e_aq_set_vsi_unicast_promiscuous(hw, i40e->i40e_vsi_id,
-	    on, NULL);
+	    on, NULL, B_FALSE);
 	if (ret != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to %s unicast promiscuity on "
 		    "the default VSI: %d", on == B_TRUE ? "enable" : "disable",
@@ -257,7 +258,7 @@ i40e_m_promisc(void *arg, boolean_t on)
 		 * to be in.
 		 */
 		ret = i40e_aq_set_vsi_unicast_promiscuous(hw, i40e->i40e_vsi_id,
-		    !on, NULL);
+		    !on, NULL, B_FALSE);
 		if (ret != I40E_SUCCESS) {
 			i40e_error(i40e, "failed to %s unicast promiscuity on "
 			    "the default VSI after toggling multicast failed: "
@@ -453,11 +454,11 @@ i40e_rx_ring_intr_enable(mac_intr_handle_t intrh)
 	i40e_trqpair_t *itrq = (i40e_trqpair_t *)intrh;
 	i40e_t *i40e = itrq->itrq_i40e;
 
-	mutex_enter(&i40e->i40e_general_lock);
-	ASSERT(i40e->i40e_intr_poll == B_TRUE);
+	mutex_enter(&itrq->itrq_rx_lock);
+	ASSERT(itrq->itrq_intr_poll == B_TRUE);
 	i40e_intr_rx_queue_enable(i40e, itrq->itrq_index);
-	i40e->i40e_intr_poll = B_FALSE;
-	mutex_exit(&i40e->i40e_general_lock);
+	itrq->itrq_intr_poll = B_FALSE;
+	mutex_exit(&itrq->itrq_rx_lock);
 
 	return (0);
 }
@@ -469,10 +470,10 @@ i40e_rx_ring_intr_disable(mac_intr_handle_t intrh)
 	i40e_trqpair_t *itrq = (i40e_trqpair_t *)intrh;
 	i40e_t *i40e = itrq->itrq_i40e;
 
-	mutex_enter(&i40e->i40e_general_lock);
+	mutex_enter(&itrq->itrq_rx_lock);
 	i40e_intr_rx_queue_disable(i40e, itrq->itrq_index);
-	i40e->i40e_intr_poll = B_TRUE;
-	mutex_exit(&i40e->i40e_general_lock);
+	itrq->itrq_intr_poll = B_TRUE;
+	mutex_exit(&itrq->itrq_rx_lock);
 
 	return (0);
 }
@@ -792,6 +793,7 @@ i40e_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_ADV_1000FDX_CAP:
 	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_ADV_25GFDX_CAP:
 	case MAC_PROP_ADV_40GFDX_CAP:
 		ret = ENOTSUP;
 		break;
@@ -802,6 +804,7 @@ i40e_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_EN_100FDX_CAP:
 	case MAC_PROP_EN_1000FDX_CAP:
 	case MAC_PROP_EN_10GFDX_CAP:
+	case MAC_PROP_EN_25GFDX_CAP:
 	case MAC_PROP_EN_40GFDX_CAP:
 	case MAC_PROP_AUTONEG:
 	case MAC_PROP_FLOWCTRL:
@@ -937,6 +940,15 @@ i40e_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		u8 = pr_val;
 		*u8 = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_10GB) != 0;
 		break;
+	case MAC_PROP_ADV_25GFDX_CAP:
+	case MAC_PROP_EN_25GFDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		u8 = pr_val;
+		*u8 = (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_25GB) != 0;
+		break;
 	case MAC_PROP_ADV_40GFDX_CAP:
 	case MAC_PROP_EN_40GFDX_CAP:
 		if (pr_valsize < sizeof (uint8_t)) {
@@ -1024,6 +1036,16 @@ i40e_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
 		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_10GB) != 0);
+		break;
+	case MAC_PROP_ADV_25GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_25GB) != 0);
+		break;
+	case MAC_PROP_EN_25GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (i40e->i40e_phy.link_speed & I40E_LINK_SPEED_25GB) != 0);
 		break;
 	case MAC_PROP_ADV_40GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);

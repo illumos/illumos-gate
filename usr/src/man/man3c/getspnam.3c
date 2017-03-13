@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETSPNAM 3C "Jan 23, 2008"
+.TH GETSPNAM 3C "Feb 25, 2017"
 .SH NAME
 getspnam, getspnam_r, getspent, getspent_r, setspent, endspent, fgetspent,
 fgetspent_r \- get password entry
@@ -55,7 +55,6 @@ fgetspent_r \- get password entry
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions are used to obtain shadow password entries.  An entry may come
 from any of the sources for \fBshadow\fR specified in the
@@ -92,7 +91,6 @@ The \fBfgetspent()\fR function, unlike the other functions above, does not use
 \fIfp\fR, which is assumed to have the format of the \fBshadow\fR file (see
 \fBshadow\fR(4)).
 .SS "Reentrant Interfaces"
-.sp
 .LP
 The  \fBgetspnam()\fR, \fBgetspent()\fR, and \fBfgetspent()\fR functions use
 thread-specific data storage that is reused in each call to one of these
@@ -134,7 +132,6 @@ shadow password database.
 Like its non-reentrant counterpart, \fBgetspnam_r()\fR leaves the enumeration
 position in an indeterminate state.
 .SH RETURN VALUES
-.sp
 .LP
 Password entries are represented by the \fBstruct spwd\fR structure defined in
 \fB<shadow.h>\fR:
@@ -180,7 +177,6 @@ When the pointer returned by the reentrant functions \fBgetspnam_r()\fR,
 \fBgetspent_r()\fR, and \fBfgetspent_r()\fR is non-null, it is always equal to
 the \fIresult\fR pointer that was supplied by the caller.
 .SH ERRORS
-.sp
 .LP
 The reentrant functions  \fBgetspnam_r()\fR, \fBgetspent_r()\fR, and
 \fBfgetspent_r()\fR will return \fBNULL\fR and set \fBerrno\fR to \fBERANGE\fR
@@ -188,7 +184,6 @@ if the length of the buffer supplied by caller is not large enough to store the
 result.  See \fBIntro\fR(2) for the proper usage and interpretation of
 \fBerrno\fR in multithreaded applications.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -206,19 +201,16 @@ T}
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBnispasswd\fR(1), \fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(3),
+\fBpasswd\fR(1), \fByppasswd\fR(1), \fBIntro\fR(3),
 \fBgetlogin\fR(3C), \fBgetpwnam\fR(3C), \fBnsswitch.conf\fR(4),
 \fBpasswd\fR(4), \fBshadow\fR(4), \fBattributes\fR(5)
 .SH WARNINGS
-.sp
 .LP
 The reentrant interfaces \fBgetspnam_r()\fR, \fBgetspent_r()\fR, and
 \fBfgetspent_r()\fR are included in this release on an uncommitted basis only,
 and are subject to change or removal in future minor releases.
 .SH NOTES
-.sp
 .LP
 When compiling multithreaded applications, see \fBIntro\fR(3), \fINotes On
 Multithreaded Applications\fR, for information about the use of the
@@ -226,8 +218,8 @@ Multithreaded Applications\fR, for information about the use of the
 .sp
 .LP
 Use of the enumeration interfaces \fBgetspent()\fR and \fBgetspent_r()\fR is
-not recommended; enumeration is supported for the shadow file, \fBNIS,\fR and
-\fBNIS+,\fR but in general is not efficient and may not be supported for all
+not recommended; enumeration is supported for the shadow file and \fBNIS\fR
+but in general is not efficient and may not be supported for all
 database sources.  The semantics of enumeration are discussed further in
 \fBnsswitch.conf\fR(4).
 .sp
@@ -248,11 +240,3 @@ password entries is obtained from the ``passwd.byname'' map. This map stores
 only the information for the \fBsp_namp\fR and \fBsp_pwdp\fR fields of the
 \fBstruct spwd\fR structure. Shadow password entries obtained from \fBNIS\fR
 will contain the value \fB-1\fR in the remainder of the fields.
-.sp
-.LP
-When \fBNIS+\fR is used as the database source, and the caller lacks the
-permission needed to retrieve the encrypted password from the \fBNIS+\fR
-``passwd.org_dir'' table, the \fBNIS+\fR service returns the string ``*NP*''
-instead of the actual encrypted password string.  The functions described on
-this page will then return the string ``*NP*'' to the caller as the value of
-the member \fBsp_pwdp\fR in the returned shadow password structure.

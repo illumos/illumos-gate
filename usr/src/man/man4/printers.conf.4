@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRINTERS.CONF 4 "April 9, 2016"
+.TH PRINTERS.CONF 4 "Feb 25, 2017"
 .SH NAME
 printers.conf \- system printing configuration database
 .SH SYNOPSIS
@@ -24,12 +24,6 @@ printers.conf \- system printing configuration database
 \fBprinters.conf.byname\fR
 .fi
 
-.SS "NIS+"
-.LP
-.nf
-\fBprinters.org_dir\fR
-.fi
-
 .SH DESCRIPTION
 .LP
 The \fBprinters.conf\fR file is the system printing configuration database.
@@ -38,12 +32,6 @@ print client commands and the print protocol adaptor. A destination names a
 printer or class of printers. See \fBlpadmin\fR(1M). The \fBLP\fR print spooler
 uses private \fBLP\fR configuration data for represented in the
 \fBprinters.conf\fR database.
-.sp
-.LP
-The \fBlpset\fR command can be used to define the printer table in NIS+. It
-checks to see if the NIS+ table (\fBprinters.org_dir\fR) exists and if it does
-not it goes ahead and creates it in the correct format. See \fBlpset\fR(1M) for
-more information.
 .SS "Entries"
 .LP
 Each entry in \fBprinters.conf\fR describes one destination. Entries are one
@@ -425,15 +413,6 @@ LDAP version of \fB/etc/printers.conf\fR
 .ad
 .RS 30n
 \fBNIS\fR version of \fB/etc/printers.conf\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBprinters.org_dir\fR (\fBNIS+\fR)\fR
-.ad
-.RS 30n
-\fBNIS+\fR version of \fB/etc/printers.conf\fR
 .RE
 
 .SH ATTRIBUTES

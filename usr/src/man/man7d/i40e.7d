@@ -11,12 +11,12 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd March 25, 2016
+.Dd December 16, 2016
 .Dt I40E 7D
 .Os
 .Sh NAME
 .Nm i40e
-.Nd Intel XL710 10/40 Gigabit Ethernet Device Driver
+.Nd Intel 710 Ethernet Device Driver
 .Sh SYNOPSIS
 .Pa /dev/i40e*
 .Sh DESCRIPTION
@@ -28,7 +28,8 @@ supports the Data Link Provider Interface,
 The
 .Nm
 driver supports the Intel XL710 Ethernet Controller family of networking
-interface cards which come in both 10 GbE and 40 GbE variants.
+interface cards which come in 1 GbE, 10 GbE, 25 GbE, and 40 GbE
+variants.
 .Pp
 In addition to basic device initialization and the sending and receiving
 of frames, it supports the following features:
@@ -73,8 +74,8 @@ It exists in the file system at
 The
 .Nm i40e
 driver always performs auto-negotiation and depending on the model may
-negotiate to 40 Gbps, 10 Gbps, or 1 Gbps. At this time, there are no
-models that support 1000BASE-T and thus auto-negotiation is required.
+negotiate to 40 Gbps, 25 Gbps, 10 Gbps, or 1 Gbps. At this time, the
+driver requires the use of auto-negotiation.
 .Pp
 The
 .Nm

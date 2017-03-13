@@ -1,0 +1,299 @@
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" Copyright 2016 Joyent, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd Sep 16, 2016
+.Dt USB_PIPE_XOPEN 9F
+.Os
+.Sh NAME
+.Nm usb_pipe_open ,
+.Nm usb_pipe_xopen
+.Nd Open a USB pipe to a device
+.Sh SYNOPSIS
+.In sys/usb/usba.h
+.Ft int
+.Fo usb_pipe_open
+.Fa "dev_info_t *dip"
+.Fa "usb_ep_descr_t *endpoint"
+.Fa "usb_pipe_policy_t *pipe_policy"
+.Fa "usb_flags_t flags"
+.Fa "usb_pipe_handle_t *pipe_handle"
+.Fc
+.Ft int
+.Fo usb_pipe_xopen
+.Fa "dev_info_t *dip"
+.Fa "usb_ep_xdescr_t *extended_endpoint"
+.Fa "usb_pipe_policy_t *pipe_policy"
+.Fa "usb_flags_t flags"
+.Fa "usb_pipe_handle_t *pipe_handle"
+.Fc
+.Sh INTERFACE LEVEL
+Solaris DDI specific (Solaris DDI)
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to the device's
+.Sy dev_info
+structure.
+.It Fa endpoint
+Pointer to endpoint descriptor.
+.It Fa extended_endpoint
+Pointer to an extended endpoint descriptor retrieved from calling
+.Xr usb_ep_xdescr_fill 9F .
+.It Fa pipe_policy
+Pointer to
+.Em pipe_policy.
+.Em pipe_policy
+provides hints on pipe usage.
+.It Fa flags
+.Sy USB_FLAGS_SLEEP
+is only flag that is recognized. Wait for memory resources if
+not immediately available.
+.It Fa pipe_handle
+Address to where new pipe handle is returned. (The handle is opaque.)
+.El
+.Sh DESCRIPTION
+A pipe is a logical connection to an endpoint on a USB device. The
+.Fn usb_pipe_xopen
+function creates such a logical connection and returns an
+initialized handle which refers to that connection.
+.Pp
+The
+.Em USB 3.0
+specification defines four endpoint types, each with a
+corresponding type of pipe. Each of the four types of pipes uses its physical
+connection resource differently. They are:
+.Bl -tag -width Sy
+.It Sy Control Pipe
+Used for bursty, non-periodic, reliable, host-initiated request/response
+communication, such as for command/status operations. These are guaranteed to
+get approximately 10% of frame time and will get more if needed and if
+available, but there is no guarantee on transfer promptness. Bidirectional.
+.It Sy Bulk Pipe
+Used for large, reliable, non-time-critical data transfers. These get the bus
+on a bandwidth-available basis. Unidirectional. Sample uses include printer
+data.
+.It Sy Interrupt Pipe
+Used for sending or receiving small amounts of reliable data infrequently but
+with bounded service periods, as for interrupt handling. Unidirectional.
+.It Sy Isochronous Pipe
+Used for large, unreliable, time-critical data transfers. Boasts a guaranteed
+constant data rate as long as there is data, but there are no retries of failed
+transfers. Interrupt and isochronous data are together guaranteed 90% of frame
+time as needed. Unidirectional. Sample uses include audio.
+.El
+.Pp
+The type of endpoint to which a pipe connects (and therefore the pipe type) is
+defined by the
+.Sy bmAttributes
+field of that pipe's endpoint descriptor.
+.Po
+See
+.Xr usb_ep_descr 9S
+.Pc .
+.Pp
+Prior to the
+.Em USB 3.0
+specification, only the
+.Xr usb_ep_descr 9S
+was required to identify all of the attributes of a given pipe. Starting
+with
+.Em USB 3.0
+there are additional endpoint companion descriptors required to open a
+pipe. To support SuperSpeed devices, the new
+.Fn usb_pipe_xopen
+function must be used rather than the older
+.Fn usb_pipe_open
+function. The
+.Xr usb_ep_xdescr 9S
+structure can be automatically filled out and obtained by calling the
+.Xr usb_ep_xdescr_fill 9F
+function.
+.Pp
+Opens to interrupt and isochronous pipes can fail
+if the required bandwidth cannot be guaranteed.
+.Pp
+The polling interval for periodic (interrupt or isochronous) pipes, carried by
+the endpoint argument's bInterval field, must be within range. Valid ranges
+are:
+.Pp
+Full speed: range of 1-255 maps to 1-255 ms.
+.Pp
+Low speed: range of 10-255 maps to 10-255 ms.
+.Pp
+High speed: range of 1-16 maps to (2**(bInterval-1)) * 125us.
+.Pp
+Super speed: range of 1-16 maps to (2**(bInterval-1)) * 125us.
+.Pp
+Adequate bandwidth during transfers is guaranteed for all periodic pipes which
+are opened successfully. Interrupt and isochronous pipes have guaranteed
+latency times, so bandwidth for them is allocated when they are opened.
+.Po
+Please
+refer to Sections
+.Em 4.4.7
+and
+.Em 4.4.8
+of the
+.Em USB 3.1
+specification
+which address isochronous and interrupt transfers.
+.Pc
+Opens of interrupt and isochronous pipes fail if inadequate bandwidth is
+available to support their guaranteed latency time. Because periodic
+pipe bandwidth is allocated on pipe open, open periodic pipes only when
+needed.
+.Pp
+The bandwidth required by a device varies based on polling interval, the
+maximum packet size
+.Pq Sy wMaxPacketSize
+and the device speed. Unallocated
+bandwidth remaining for new devices depends on the bandwidth already allocated
+for previously opened periodic pipes.
+.Pp
+The
+.Em pipe_policy
+parameter provides a hint as to pipe usage and must be
+specified. It is a
+.Em usb_pipe_policy_t
+which contains the following fields:
+.Bd -literal -offset indent
+uchar_t         pp_max_async_reqs:
+.Ed
+.Pp
+The
+.Sy pp_max_async_reqs
+member is a hint indicating how many asynchronous operations requiring
+their own kernel thread will be concurrently in progress, the highest
+number of threads ever needed at one time.  Allow at least one for
+synchronous callback handling and as many as are needed to accommodate
+the anticipated parallelism of asynchronous* calls to the following
+functions:
+.Xr usb_pipe_close 9F ,
+.Xr usb_set_cfg 9F ,
+.Xr usb_set_alt_if 9F ,
+.Xr usb_clr_feature 9F ,
+.Xr usb_pipe_reset 9F ,
+.Xr usb_pipe_drain_reqs 9F ,
+.Xr usb_pipe_stop_intr_polling 9F ,
+and
+.Xr usb_pipe_stop_isoc_polling 9F .
+.Pp
+Setting to too small a value can deadlock the pipe.  Asynchronous calls
+are calls made without the
+.Sy USB_FLAGS_SLEEP
+flag being passed.  Note that
+a large number of callbacks becomes an issue mainly when blocking
+functions are called from callback handlers.
+.Pp
+The control pipe to the default endpoints (endpoints for both directions with
+addr 0, sometimes called the default control pipe or default pipe) comes
+pre-opened by the hub. A client driver receives the default control pipe handle
+through
+.Xr usb_get_dev_data 9F .
+A client driver cannot open the default
+control pipe manually. Note that the same control pipe may be shared among
+several drivers when a device has multiple interfaces and each interface is
+operated by its own driver.
+.Pp
+All explicit pipe opens are exclusive; attempts to open an opened pipe fail.
+.Pp
+On success, the pipe_handle argument points to an opaque handle of the opened
+pipe. On failure, it is set to NULL.
+.Sh CONTEXT
+May be called from user or kernel context regardless of arguments. May also be
+called from interrupt context if the
+.Sy USB_FLAGS_SLEEP
+option is not set.
+.Sh RETURN VALUES
+.Bl -tag -width Sy
+.It Sy USB_SUCCESS
+Open succeeded.
+.It Sy USB_NO_RESOURCES
+Insufficient resources were available.
+.It Sy USB_NO_BANDWIDTH
+Insufficient bandwidth available. (isochronous and interrupt pipes).
+.It Sy USB_INVALID_CONTEXT
+Called from interrupt handler with USB_FLAGS_SLEEP set.
+.It Sy USB_INVALID_ARGS
+dip and/or pipe_handle is NULL. Pipe_policy is NULL.
+.It Sy USB_INVALID_PERM
+Endpoint is NULL, signifying the default control pipe. A client driver cannot
+open the default control pipe.
+.It Sy USB_NOT_SUPPORTED
+Isochronous or interrupt endpoint with maximum packet size of zero is not
+supported.
+.It Sy USB_HC_HARDWARE_ERROR
+Host controller is in an error state.
+.It Sy USB_FAILURE
+Pipe is already open. Host controller not in an operational state. Polling
+interval
+.Pq Sy Bep_descr bInterval No field
+is out of range (intr or isoc pipes).
+.Pp
+The device referred to by
+.Fa dip
+is at least a SuperSpeed device and the older
+.Fn usb_pipe_open
+function was used.
+.El
+.Sh EXAMPLES
+.Bd -literal -offset indent
+usb_ep_data_t *ep_data;
+usb_ep_xdescr_t ep_xdescr;
+usb_pipe_policy_t policy;
+usb_pipe_handle_t pipe;
+usb_client_dev_data_t *reg_data;
+uint8_t interface = 1;
+uint8_t alternate = 1;
+uint8_t first_ep_number = 0;
+
+/* Initialize pipe policy. */
+bzero(policy, sizeof(usb_pipe_policy_t));
+policy.pp_max_async_requests = 2;
+
+/* Get tree of descriptors for device. */
+if (usb_get_dev_data(dip, USBDRV_VERSION, &reg_data,
+    USB_FLAGS_ALL_DESCR, 0) != USB_SUCCESS) {
+        ...
+}
+
+/* Get first interrupt-IN endpoint. */
+ep_data = usb_lookup_ep_data(dip, reg_data, interface, alternate,
+    first_ep_number, USB_EP_ATTR_INTR, USB_EP_DIR_IN);
+if (ep_data == NULL) {
+        ...
+}
+
+/* Translate the ep_data into the filled in usb_ep_xdescr_t */
+if (usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION, dip,
+    ep_data, &ep_xdescr) != USB_SUCCESS) {
+       ...
+}
+
+/* Open the pipe.  Get handle to pipe back in 5th argument. */
+if (usb_pipe_open(dip, &ep_data.ep_descr
+    &policy, USB_FLAGS_SLEEP, &pipe) != USB_SUCCESS) {
+        ...
+}
+.Ed
+.Sh SEE ALSO
+.Xr usb_get_alt_if 9F ,
+.Xr usb_get_cfg 9F ,
+.Xr usb_get_dev_data 9F ,
+.Xr usb_get_status 9F ,
+.Xr usb_pipe_bulk_xfer 9F ,
+.Xr usb_pipe_close 9F ,
+.Xr usb_pipe_ctrl_xfer 9F ,
+.Xr usb_pipe_get_state 9F ,
+.Xr usb_pipe_intr_xfer 9F ,
+.Xr usb_pipe_isoc_xfer 9F ,
+.Xr usb_pipe_reset 9F ,
+.Xr usb_pipe_set_private 9F ,
+.Xr usb_callback_flags 9S ,
+.Xr usb_ep_descr 9S
+.Rs
+.%T Universal Serial Bus 3.1 Specification
+.%U http://www.usb.org
+.Re

@@ -20,7 +20,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH CSTYLE 1ONBLD "Mar 28, 2005"
+.TH CSTYLE 1ONBLD "Feb 22, 2017"
 .SH NAME
 .I cstyle
 \- check for some common stylistic errors in C source files
@@ -29,23 +29,23 @@
 .SH DESCRIPTION
 .LP
 .I cstyle
-inspects C source files (*.c and *.h) for common sylistic errors.  It
+inspects C source files (*.c and *.h) for common stylistic errors.  It
 attempts to check for the cstyle documented in
-\fI/shared/ON/general_docs/cstyle.ms.pdf\fP.  Note that there is much
+\fIcstyle.ms.pdf\fP.  Note that there is much
 in that document that
 .I cannot
 be checked for; just because your code is \fBcstyle(1ONBLD)\fP clean does not
-mean that you've followed Sun's C style.  \fICaveat emptor\fP.
+mean that you've followed illumos C style.  \fICaveat emptor\fP.
 .SH OPTIONS
 .LP
 The following options are supported:
 .TP 4
 .B \-c
-Check continuation line indentation inside of functions.  Sun's C style
+Check continuation line indentation inside of functions.  illumos C style
 states that all statements must be indented to an appropriate tab stop,
 and any continuation lines after them must be indented \fIexactly\fP four
 spaces from the start line.  This option enables a series of checks
-designed to find contination line problems within functions only.  The
+designed to find continuation line problems within functions only.  The
 checks have some limitations;  see CONTINUATION CHECKING, below.
 .TP 4
 .B \-h
@@ -71,7 +71,7 @@ types uint_t, ulong_t, etc.  This detects any use of the deprecated
 types.  Used as part of the putback checks.
 .TP 4
 .B \-o \fIconstructs\fP
-Allow a comma-seperated list of additional constructs.  Available
+Allow a comma-separated list of additional constructs.  Available
 constructs include:
 .TP 10
 .B doxygen
@@ -81,7 +81,7 @@ Allow doxygen-style block comments (\fB/**\fP and \fB/*!\fP)
 Allow splint-style lint comments (\fB/*@...@*/\fP)
 .SH NOTES
 .LP
-The cstyle rule for the OS/Net consolidation is that all new files must
+The cstyle rule for the illumos gate is that all new files must
 be \fB-pP\fP clean.  For existing files, the following invocations are
 run against both the old and new files:
 .TP 4

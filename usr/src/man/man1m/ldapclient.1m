@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAPCLIENT 1M "Feb 14, 2009"
+.TH LDAPCLIENT 1M "Feb 25, 2017"
 .SH NAME
 ldapclient \- initialize LDAP client machine or output an LDAP client profile
 in LDIF format
@@ -49,7 +49,6 @@ in LDIF format
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBldapclient\fR utility can be used to:
 .RS +4
@@ -137,12 +136,6 @@ initialization are:
 .ie t \(bu
 .el o
 \fB/var/yp/binding/`domainname`\fR (for a NIS(YP) client)
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/var/nis/NIS_COLD_START\fR (for a NIS+ client)
 .RE
 .RS +4
 .TP
@@ -259,7 +252,6 @@ appropriate certificate databases to use TLS. Note that the \fBtls:none\fR
 authentication method requires a \fBcredentialLevel\fR of \fBproxy\fR to
 take effect.
 .SS "Commands"
-.sp
 .LP
 The following commands are supported:
 .sp
@@ -327,7 +319,6 @@ directory for clients to use, with the \fBinit\fR form of this command.
 .RE
 
 .SS "Attributes"
-.sp
 .LP
 The following attributes are supported:
 .sp
@@ -785,7 +776,6 @@ the LDAP client would do a one level search in
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -886,7 +876,6 @@ This option is mutually exclusive of the \fB-a\fR \fIadminPassword\fR option.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -1052,7 +1041,6 @@ example# \fBldapclient genprofile -a profileName=eng \e
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1084,7 +1072,6 @@ provided.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/ldap/ldap_client_cred\fR\fR
@@ -1133,7 +1120,6 @@ files.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1149,7 +1135,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchkey\fR(1), \fBldap\fR(1), \fBldapadd\fR(1), \fBldapdelete\fR(1),
 \fBldaplist\fR(1), \fBldapmodify\fR(1), \fBldapmodrdn\fR(1),
@@ -1157,7 +1142,6 @@ Interface Stability	Evolving
 \fBldap_cachemgr\fR(1M), \fBsuninstall\fR(1M), \fBdefaultdomain\fR(4),
 \fBnsswitch.conf\fR(4), \fBresolv.conf\fR(4), \fBattributes\fR(5)
 .SH CAUTION
-.sp
 .LP
 Currently \fBStartTLS\fR is not supported by \fBlibldap.so.5\fR, therefore the
 port number provided refers to the port used during a TLS open, rather than the

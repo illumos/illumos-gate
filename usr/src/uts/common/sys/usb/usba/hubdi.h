@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_HUBDI_H
@@ -45,6 +47,7 @@ int usba_hubdi_open(dev_info_t *, dev_t *, int, int, cred_t *);
 int usba_hubdi_close(dev_info_t *, dev_t, int, int, cred_t *);
 int usba_hubdi_ioctl(dev_info_t *, dev_t, int, intptr_t, int,
 						cred_t *, int *);
+int usba_hubdi_root_hub_power(dev_info_t *, int, int);
 
 extern struct bus_ops usba_hubdi_busops;
 

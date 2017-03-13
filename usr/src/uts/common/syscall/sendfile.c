@@ -345,7 +345,7 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 
 ssize32_t
 sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
-	size32_t *xferred, int fildes)
+    size32_t *xferred, int fildes)
 {
 	u_offset_t		fileoff;
 	int			copy_cnt;
@@ -1316,12 +1316,13 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 
 
 #ifdef _SYSCALL32_IMPL
-	if (get_udatamodel() == DATAMODEL_ILP32)
-		copy_vec = (const struct sendfilevec *)((char *)copy_vec +
-		    (copy_cnt * sizeof (ksendfilevec32_t)));
-	else
+		if (get_udatamodel() == DATAMODEL_ILP32) {
+			copy_vec = (const struct sendfilevec *)
+			    ((char *)copy_vec +
+			    (copy_cnt * sizeof (ksendfilevec32_t)));
+		} else
 #endif
-		copy_vec += copy_cnt;
+			copy_vec += copy_cnt;
 		sfvcnt -= copy_cnt;
 
 	/* Process all vector members up to first error */

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_GET_ADDR 9F "Feb 9, 2004"
+.TH USB_GET_ADDR 9F "Sep 16, 2016"
 .SH NAME
 usb_get_addr \- Retrieve device USB address
 .SH SYNOPSIS
@@ -15,11 +15,9 @@ usb_get_addr \- Retrieve device USB address
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -29,25 +27,21 @@ Pointer to the device's dev_info structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_get_addr()\fR function returns the current USB bus address for
 debugging  purposes. The returned address is unique for a specific USB bus, and
 may be replicated if multiple host controller instances are present on the
 system.
 .SH RETURN VALUES
-.sp
 .LP
 On success: USB device address.
 .sp
 .LP
 On failure: returns 0. Fails if dip is NULL.
 .SH CONTEXT
-.sp
 .LP
 May be called from user, kernel or interrupt context.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 int usb_addr;
@@ -57,7 +51,6 @@ usb_addr = usb_get_addr(dip);
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -75,6 +68,5 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBattributes\fR(5), \fBusb_pipe_open\fR(9F)
+\fBattributes\fR(5), \fBusb_pipe_xopen\fR(9F)

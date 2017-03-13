@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -75,11 +76,6 @@
  * first queue must be programmed in I40E_QINT_LNKLSTN(%vector) register. Each
  * queue defines the next one in either the I40E_QINT_RQCTL or I40E_QINT_TQCTL
  * register.
- *
- * Because we only have a single queue enabled at the moment and we always have
- * two interrupts, we do something pretty simple and just know that there's one
- * data queue in the interrupt handler. Longer term, we'll need to think harder
- * about this, but for the moment it'll have to suffice.
  *
  * Finally, the individual interrupt vector itself has the ability to be enabled
  * and disabled. The overall interrupt is controlled through the
@@ -199,8 +195,8 @@ i40e_intr_set_itr(i40e_t *i40e, i40e_itr_index_t itr, uint_t val)
 		return;
 	}
 
-	for (i = 1; i < i40e->i40e_intr_count; i++) {
-		I40E_WRITE_REG(hw, I40E_PFINT_ITRN(itr, i - 1), val);
+	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		I40E_WRITE_REG(hw, I40E_PFINT_ITRN(itr, i), val);
 	}
 }
 
@@ -331,18 +327,18 @@ i40e_intr_io_clear_cause(i40e_t *i40e)
 		return;
 	}
 
-	for (i = 1; i < i40e->i40e_intr_count; i++) {
+	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
 		uint32_t reg;
 #ifdef DEBUG
 		/*
 		 * Verify that the interrupt in question is disabled. This is a
 		 * prerequisite of modifying the data in question.
 		 */
-		reg = I40E_READ_REG(hw, I40E_PFINT_DYN_CTLN(i - 1));
+		reg = I40E_READ_REG(hw, I40E_PFINT_DYN_CTLN(i));
 		VERIFY0(reg & I40E_PFINT_DYN_CTLN_INTENA_MASK);
 #endif
 		reg = I40E_QUEUE_TYPE_EOL;
-		I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(i - 1), reg);
+		I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(i), reg);
 	}
 
 	i40e_flush(hw);
@@ -365,11 +361,11 @@ i40e_intr_chip_fini(i40e_t *i40e)
 	 * and the interrupt linked lists have been zeroed.
 	 */
 	if (i40e->i40e_intr_type == DDI_INTR_TYPE_MSIX) {
-		for (i = 1; i < i40e->i40e_intr_count; i++) {
-			reg = I40E_READ_REG(hw, I40E_PFINT_DYN_CTLN(i - 1));
+		for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+			reg = I40E_READ_REG(hw, I40E_PFINT_DYN_CTLN(i));
 			VERIFY0(reg & I40E_PFINT_DYN_CTLN_INTENA_MASK);
 
-			reg = I40E_READ_REG(hw, I40E_PFINT_LNKLSTN(i - 1));
+			reg = I40E_READ_REG(hw, I40E_PFINT_LNKLSTN(i));
 			VERIFY3U(reg, ==, I40E_QUEUE_TYPE_EOL);
 		}
 	}
@@ -388,32 +384,39 @@ i40e_intr_init_queue_msix(i40e_t *i40e)
 {
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	uint32_t reg;
+	int i;
 
 	/*
-	 * Because we only have a single queue, just do something simple now.
-	 * How this all works will need to really be properly redone based on
-	 * the bit maps, etc. Note that we skip the ITR logic for the moment,
-	 * just to make our lives as explicit and simple as possible.
+	 * Map queues to MSI-X interrupts. Queue i is mapped to vector i + 1.
+	 * Note that we skip the ITR logic for the moment, just to make our
+	 * lives as explicit and simple as possible.
 	 */
-	reg = (0 << I40E_PFINT_LNKLSTN_FIRSTQ_INDX_SHIFT) |
-	    (I40E_QUEUE_TYPE_RX << I40E_PFINT_LNKLSTN_FIRSTQ_TYPE_SHIFT);
-	I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(0), reg);
+	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
 
-	reg = (1 << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
-	    (I40E_ITR_INDEX_RX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
-	    (0 << I40E_QINT_RQCTL_NEXTQ_INDX_SHIFT) |
-	    (I40E_QUEUE_TYPE_TX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
-	    I40E_QINT_RQCTL_CAUSE_ENA_MASK;
+		reg = (i << I40E_PFINT_LNKLSTN_FIRSTQ_INDX_SHIFT) |
+		    (I40E_QUEUE_TYPE_RX <<
+		    I40E_PFINT_LNKLSTN_FIRSTQ_TYPE_SHIFT);
+		I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(i), reg);
 
-	I40E_WRITE_REG(hw, I40E_QINT_RQCTL(0), reg);
+		reg =
+		    (itrq->itrq_rx_intrvec << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
+		    (I40E_ITR_INDEX_RX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
+		    (i << I40E_QINT_RQCTL_NEXTQ_INDX_SHIFT) |
+		    (I40E_QUEUE_TYPE_TX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
+		    I40E_QINT_RQCTL_CAUSE_ENA_MASK;
 
-	reg = (1 << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
-	    (I40E_ITR_INDEX_TX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
-	    (I40E_QUEUE_TYPE_EOL << I40E_QINT_TQCTL_NEXTQ_INDX_SHIFT) |
-	    (I40E_QUEUE_TYPE_RX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
-	    I40E_QINT_TQCTL_CAUSE_ENA_MASK;
+		I40E_WRITE_REG(hw, I40E_QINT_RQCTL(i), reg);
 
-	I40E_WRITE_REG(hw, I40E_QINT_TQCTL(0), reg);
+		reg =
+		    (itrq->itrq_tx_intrvec << I40E_QINT_TQCTL_MSIX_INDX_SHIFT) |
+		    (I40E_ITR_INDEX_TX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
+		    (I40E_QUEUE_TYPE_EOL << I40E_QINT_TQCTL_NEXTQ_INDX_SHIFT) |
+		    (I40E_QUEUE_TYPE_RX << I40E_QINT_TQCTL_NEXTQ_TYPE_SHIFT) |
+		    I40E_QINT_TQCTL_CAUSE_ENA_MASK;
+
+		I40E_WRITE_REG(hw, I40E_QINT_TQCTL(i), reg);
+	}
 
 }
 
@@ -601,14 +604,15 @@ i40e_intr_adminq_work(i40e_t *i40e)
 static void
 i40e_intr_rx_work(i40e_t *i40e, int queue)
 {
-	mblk_t *mp;
+	mblk_t *mp = NULL;
 	i40e_trqpair_t *itrq;
 
 	ASSERT(queue < i40e->i40e_num_trqpairs);
 	itrq = &i40e->i40e_trqpairs[queue];
 
 	mutex_enter(&itrq->itrq_rx_lock);
-	mp = i40e_ring_rx(itrq, I40E_POLL_NULL);
+	if (!itrq->itrq_intr_poll)
+		mp = i40e_ring_rx(itrq, I40E_POLL_NULL);
 	mutex_exit(&itrq->itrq_rx_lock);
 
 	if (mp != NULL) {
@@ -675,20 +679,9 @@ i40e_intr_msix(void *arg1, void *arg2)
 		return (DDI_INTR_CLAIMED);
 	}
 
-	VERIFY(vector_idx == 1);
-
-	/*
-	 * Note that we explicitly do not check this value under the lock even
-	 * though assignments to it are done so. In this case, the cost of
-	 * getting this wrong is at worst a bit of additional contention and
-	 * even more rarely, a duplicated packet. However, the cost on the other
-	 * hand is a lot more. This is something that as we more generally
-	 * implement ring support we should revisit.
-	 */
-	if (i40e->i40e_intr_poll != B_TRUE)
-		i40e_intr_rx_work(i40e, 0);
-	i40e_intr_tx_work(i40e, 0);
-	i40e_intr_io_enable(i40e, 1);
+	i40e_intr_rx_work(i40e, vector_idx - 1);
+	i40e_intr_tx_work(i40e, vector_idx - 1);
+	i40e_intr_io_enable(i40e, vector_idx);
 
 	return (DDI_INTR_CLAIMED);
 }

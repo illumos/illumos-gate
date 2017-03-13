@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 
@@ -298,8 +299,7 @@ _info(struct modinfo *modinfop)
  */
 /*ARGSUSED*/
 static int
-hid_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
-			void *arg, void **result)
+hid_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
 	hid_state_t	*hidp = NULL;
 	int		error = DDI_FAILURE;
@@ -432,7 +432,11 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_enter(&hidp->hid_mutex);
-	hidp->hid_ep_intr_descr = ep_data->ep_descr;
+	if (usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION, dip, ep_data,
+	    &hidp->hid_ep_intr_xdescr) != USB_SUCCESS) {
+
+		goto fail;
+	}
 
 	/*
 	 * Attempt to find the hid descriptor, it could be after interface
@@ -732,7 +736,7 @@ fail:
  *	Gets called at the time of detach.
  */
 static int
-hid_detach(dev_info_t *dip, ddi_detach_cmd_t	cmd)
+hid_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	int instance = ddi_get_instance(dip);
 	hid_state_t	*hidp;
@@ -862,8 +866,8 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	/* Check if interrupt endpoint exists */
 	if (no_of_ep > 0) {
 		/* Open the interrupt pipe */
-		if (usb_pipe_open(hidp->hid_dip,
-		    &hidp->hid_ep_intr_descr,
+		if (usb_pipe_xopen(hidp->hid_dip,
+		    &hidp->hid_ep_intr_xdescr,
 		    &hidp->hid_intr_pipe_policy, USB_FLAGS_SLEEP,
 		    &hidp->hid_interrupt_pipe) !=
 		    USB_SUCCESS) {
@@ -1801,11 +1805,8 @@ hid_power_change_callback(void *arg, int rval)
  *	endpoint descriptor
  */
 static size_t
-hid_parse_hid_descr(
-	usb_hid_descr_t		*ret_descr,
-	size_t			ret_buf_len,
-	usb_alt_if_data_t	*altif_data,
-	usb_ep_data_t		*ep_data)
+hid_parse_hid_descr(usb_hid_descr_t *ret_descr,	size_t ret_buf_len,
+    usb_alt_if_data_t *altif_data, usb_ep_data_t *ep_data)
 {
 	usb_cvs_data_t *cvs;
 	int		which_cvs;
@@ -1896,8 +1897,7 @@ hid_parse_hid_descr_failure(hid_state_t	*hidp)
  *	it and query the hidparser tree to get the packet size
  */
 static int
-hid_handle_report_descriptor(hid_state_t	*hidp,
-				int		interface)
+hid_handle_report_descriptor(hid_state_t *hidp, int interface)
 {
 	usb_cr_t		completion_reason;
 	usb_cb_flags_t		cb_flags;
@@ -1983,7 +1983,7 @@ hid_handle_report_descriptor(hid_state_t	*hidp,
  */
 /*ARGSUSED*/
 static void
-hid_set_idle(hid_state_t	*hidp)
+hid_set_idle(hid_state_t *hidp)
 {
 	usb_cr_t	completion_reason;
 	usb_cb_flags_t	cb_flags;
@@ -2527,9 +2527,8 @@ hid_mctl_execute_cmd(queue_t *q, int request_type, hid_req_t *hid_req_data,
  */
 static int
 hid_send_async_ctrl_request(hid_default_pipe_arg_t *hid_default_pipe_arg,
-			hid_req_t *hid_request,
-			uchar_t request_type, int request_request,
-			ushort_t request_index)
+    hid_req_t *hid_request, uchar_t request_type, int request_request,
+    ushort_t request_index)
 {
 	queue_t		*q = hid_default_pipe_arg->hid_default_pipe_arg_queue;
 	hid_state_t	*hidp = (hid_state_t *)q->q_ptr;

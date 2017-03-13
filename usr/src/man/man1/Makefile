@@ -260,7 +260,6 @@ MANFILES=	acctcom.1			\
 	 	nohup.1				\
 	 	nroff.1				\
 	 	od.1				\
-	 	on.1				\
 	 	optisa.1			\
 	 	pack.1				\
 	 	pagesize.1			\

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRINTERS 4 "Jun 5, 2006"
+.TH PRINTERS 4 "Feb 25, 2017"
 .SH NAME
 printers \- user-configurable printer alias database
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ $HOME/.printers
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fB$HOME/.printers\fR file is a simplified version of the system
 \fB/etc/printers.conf\fR file. See \fBprinters.conf\fR(4). Users create the
@@ -41,7 +40,6 @@ Sets the default printer for the \fBlp\fR, \fBlpr\fR, \fBlpq\fR, and
 \fBlprm\fR(1B).
 .RE
 .SS "Entries"
-.sp
 .LP
 Use a line or full screen editor to create or modify the \fB$HOME/.printers\fR
 file.
@@ -59,7 +57,6 @@ the line. The \fB$HOME/.printers\fR file can include comments. Comments have a
 pound sign (`\fB#\fR') as the first character in the line, and are terminated
 by a NEWLINE.
 .SS "Setting Personal Aliases"
-.sp
 .LP
 Specify the alias or aliases in the first field. Separate multiple aliases by a
 pipe sign (`\fB|\fR'). Specify the destination in the second field. A
@@ -69,7 +66,6 @@ Specify the destination using atomic, URI-style
 (\fIserver\fR\fB:\fR\fIdestination\fR) names. See \fBprinters.conf\fR(4) for
 information regarding the naming conventions for destination names.
 .SS "Setting the Interest List for lpget, lpstat and cancel"
-.sp
 .LP
 Specify \fB_all\fR in the first field. Specify the list of destinations for the
 interest list in the second field. Separate each destinations by a comma
@@ -79,7 +75,6 @@ interest list in the second field. Separate each destinations by a comma
 information regarding the naming conventions for destination names. This list
 of destinations can refer to an alias defined in \fB$HOME/.printers\fR.
 .SS "Setting the Default Destination"
-.sp
 .LP
 Specify \fB_default\fR in the first field. Specify the default destination in
 the second field. Specify the default destination using atomic, URI-style
@@ -88,13 +83,11 @@ the second field. Specify the default destination using atomic, URI-style
 information regarding the naming conventions for destination names. The default
 destination can refer to an alias defined in \fB$HOME/.printers\fR.
 .SS "Locating Destination Information"
-.sp
 .LP
 The print client commands locate destination information based on the
 "printers" database entry in the \fB/etc/nsswitch.conf\fR file. See
 \fBnsswitch.conf\fR(4).
 .SS "Locating the Personal Default Destination"
-.sp
 .LP
 The default destination is located differently depending on the command.
 .sp
@@ -155,7 +148,6 @@ destination in the following order:
 \fB_default\fR destination in \fB/etc/printers.conf\fR.
 .RE
 .SS "Locating the Interest List for lpget, lpstat, and cancel"
-.sp
 .LP
 The \fBlpget\fR, \fBlpstat\fR, and \fBcancel\fR commands locate the interest
 list in the following order:
@@ -246,7 +238,6 @@ using IPP:
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -282,17 +273,7 @@ LDAP version of \fB/etc/printers.conf\fR
 \fBNIS\fR version of \fB/etc/printers.conf\fR
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBprinters.org_dir\fR\fR
-.ad
-.RS 24n
-\fBNIS+\fR version of \fB/etc/printers.conf\fR
-.RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -308,7 +289,6 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcancel\fR(1), \fBlp\fR(1), \fBlpq\fR(1B), \fBlpr\fR(1B), \fBlprm\fR(1B),
 \fBlpstat\fR(1), \fBlpadmin\fR(1M), \fBlpget\fR(1M), \fBnsswitch.conf\fR(4),
@@ -317,7 +297,6 @@ Interface Stability	Stable
 .LP
 \fISystem Administration Guide: Basic Administration\fR
 .SH NOTES
-.sp
 .LP
 \fB$HOME/.printers\fR is referenced by the printing commands before further
 name resolution is made in \fB/etc/printers.conf\fR or the name service. If the

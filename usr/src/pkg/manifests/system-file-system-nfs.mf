@@ -82,7 +82,6 @@ file path=lib/svc/manifest/network/nfs/status.xml group=sys mode=0444
 file path=lib/svc/method/nfs-client mode=0555
 file path=lib/svc/method/nlockmgr mode=0555
 file path=usr/bin/nfsstat mode=0555
-file path=usr/bin/on mode=0555
 file path=usr/lib/fs/nfs/dfmounts mode=0555
 file path=usr/lib/fs/nfs/dfshares mode=0555
 file path=usr/lib/fs/nfs/nfsfind group=sys mode=0555
@@ -95,7 +94,6 @@ file path=usr/lib/nfs/lockd mode=0555
 file path=usr/lib/nfs/nfs4cbd mode=0555
 file path=usr/lib/nfs/nfsmapid mode=0555
 file path=usr/lib/nfs/statd mode=0555
-file path=usr/share/man/man1/on.1
 file path=usr/share/man/man1m/mount_nfs.1m
 file path=usr/share/man/man1m/nfs4cbd.1m
 file path=usr/share/man/man1m/nfsmapid.1m

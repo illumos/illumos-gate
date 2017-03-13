@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NSSWITCH.CONF 4 "Nov 6, 2008"
+.TH NSSWITCH.CONF 4 "Feb 25, 2017"
 .SH NAME
 nsswitch.conf \- configuration file for the name service switch
 .SH SYNOPSIS
@@ -13,13 +13,12 @@ nsswitch.conf \- configuration file for the name service switch
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The operating system uses a number of databases of information about hosts,
 ipnodes, users (\fBpasswd\fR(4), \fBshadow\fR(4), and \fBuser_attr\fR(4)), and
 groups. Data for these can come from a variety of sources: hostnames and host
 addresses, for example, can be found in \fB/etc/hosts\fR, \fBNIS\fR,
-\fBNIS+\fR, \fBLDAP\fR, \fBDNS\fR or Multicast \fBDNS\fR. Zero or more sources
+\fBLDAP\fR, \fBDNS\fR or Multicast \fBDNS\fR. Zero or more sources
 can be used for each database; the sources and their lookup order are specified
 in the \fB/etc/nsswitch.conf\fR file.
 .sp
@@ -77,7 +76,6 @@ Source	Uses
 \fB/etc/hosts\fR, \fB/etc/passwd\fR, \fB/etc/inet/ipnodes\fR, \fB/etc/shadow\fR, \fB/etc/security/auth_attr\fR, \fB/etc/user_attr\fR
 T}
 \fBnis\fR	\fBNIS\fR(\fBYP\fR)
-\fBnisplus\fR	\fBNIS+\fR
 \fBldap\fR	\fBLDAP\fR
 \fBad\fR	Active Directory
 \fBdns\fR	T{
@@ -100,10 +98,10 @@ Note that \fB/etc/inet/ipnodes\fR is a symbolic link to \fB/etc/hosts\fR.
 .sp
 .LP
 There is an entry in \fB/etc/nsswitch.conf\fR for each database. Typically
-these entries are simple, such as \fBprotocols: files\fR or \fBnetworks: files
-nisplus\fR. However, when multiple sources are specified, it is sometimes
-necessary to define precisely the circumstances under which each source is
-tried. A source can return one of the following codes:
+these entries are simple, such as \fBprotocols: files\fR. However, when
+multiple sources are specified, it is sometimes necessary to define precisely
+the circumstances under which each source is tried. A source can return one
+of the following codes:
 .sp
 
 .sp
@@ -211,7 +209,6 @@ The default, or explicitly specified, criteria are meaningless following the
 last source in an entry; and they are ignored, since the action is always to
 return to the caller irrespective of the status code the source returns.
 .SS "Interaction with \fBnetconfig\fR"
-.sp
 .LP
 In order to ensure that they all return consistent results,
 \fBgethostbyname\fR(3NSL), \fBgetaddrinfo\fR(3SOCKET),
@@ -223,31 +220,14 @@ and uses the switch entries only if the \fBnetconfig\fR entries have a \fB-\fR
 (hyphen) in the last column for \fBnametoaddr\fR libraries. See the Notes
 section in \fBgethostbyname\fR(3NSL) and \fBgetservbyname\fR(3SOCKET) for
 details.
-.SS "YP-compatibility Mode"
-.sp
-.LP
-The \fBNIS+\fR server can be run in YP-compatibility mode, where it handles
-\fBNIS (YP)\fR requests as well as \fBNIS+\fR requests. In this case, the
-clients get much the same results (except for \fBgetspnam\fR(3C)) from the
-\fBnis\fR source as from \fBnisplus\fR; however, \fBnisplus\fR is recommended
-instead of \fBnis\fR.
 .SS "Interaction with server in DNS-forwarding Mode"
-.sp
 .LP
 The \fBNIS\fR (\fBYP\fR) server can be run in DNS-forwarding mode, where it
 forwards lookup requests to \fBDNS\fR for host-names and -addresses that do not
 exist in its database. In this case, specifying \fBnis\fR as a source for
 \fBhosts\fR is sufficient to get \fBDNS\fR lookups; \fBdns\fR need not be
 specified explicitly as a source.
-.sp
-.LP
-In SunOS 5.3 (Solaris 2.3) and compatible versions, the \fBNIS+\fR server in
-NIS/YP-compatibility mode can also be run in DNS-forwarding mode (see
-\fBrpc.nisd\fR(1M)). Forwarding is effective only for requests originating from
-its YP clients; \fBhosts\fR policy on these clients should be configured
-appropriately.
 .SS "Interaction with Password Aging"
-.sp
 .LP
 When password aging is turned on, only a limited set of possible name services
 are permitted for the \fBpasswd\fR: database in the \fB/etc/nsswitch.conf\fR
@@ -276,15 +256,6 @@ files nis
 \fBpasswd:\fR
 .ad
 .RS 18n
-files nisplus
-.RE
-
-.sp
-.ne 2
-.na
-\fBpasswd:\fR
-.ad
-.RS 18n
 files ldap
 .RE
 
@@ -295,15 +266,6 @@ files ldap
 .ad
 .RS 18n
 compat
-.RE
-
-.sp
-.ne 2
-.na
-\fBpasswd_compat:\fR
-.ad
-.RS 18n
-nisplus
 .RE
 
 .sp
@@ -332,7 +294,6 @@ on. Otherwise, you can work around incorrect \fBpasswd\fR: lines by using the
 -r repository\fR to override the \fBnsswitch.conf\fR settings and specify in
 which name service you want to modify your password.
 .SS "Interaction with +/- syntax"
-.sp
 .LP
 Releases prior to SunOS 5.0 did not have the name service switch but did allow
 the user some policy control. In \fB/etc/passwd\fR one could have entries of
@@ -350,7 +311,7 @@ If this is not sufficient, the \fBNIS/YP\fR compatibility source provides full
 +/- semantics. It reads \fB/etc/passwd\fR for \fBgetpwnam\fR(3C) functions and
 \fB/etc/shadow\fR for \fBgetspnam\fR(3C) functions and, if it finds +/-
 entries, invokes an appropriate source. By default, the source is \fBnis\fR,
-but this can be overridden by specifying \fBnisplus\fR or \fBldap\fR as the
+but this can be overridden by specifying \fBldap\fR as the
 source for the pseudo-database \fBpasswd_compat\fR.
 .sp
 .LP
@@ -361,7 +322,6 @@ corresponding entry in the \fB/etc/shadow\fR file.
 The NIS/YP compatibility source also provides full +/- semantics for
 \fBgroup\fR; the relevant pseudo-database is \fBgroup_compat\fR.
 .SS "Useful Configurations"
-.sp
 .LP
 The compiled-in default entries for all databases use \fBNIS (YP)\fR as the
 enterprise level name service and are identical to those in the default
@@ -507,7 +467,7 @@ files nis
 \fBprinters:\fR
 .ad
 .RS 15n
-user files nis nisplus
+user files nis
 .RE
 
 .sp
@@ -576,13 +536,6 @@ compat
 
 .sp
 .LP
-If \fBNIS+\fR is the enterprise level name service, the default configuration
-should be modified to use \fBnisplus\fR instead of \fBnis\fR for every database
-on client machines. The file \fB/etc/nsswitch.nisplus\fR contains a sample
-configuration that can be copied to \fB/etc/nsswitch.conf\fR to set this
-policy.
-.sp
-.LP
 If \fBLDAP\fR is the enterprise level name service, the default configuration
 should be modified to use \fBldap\fR instead of \fBnis\fR for every database on
 client machines. The file \fB/etc/nsswitch.ldap\fR contains a sample
@@ -593,7 +546,7 @@ policy.
 When using Active Directory, \fBdns\fR is required to perform hosts resolution.
 .sp
 .LP
-If the use of +/- syntax is desired in conjunction with \fBnisplus\fR, use the
+If the use of +/- syntax is desired in conjunction with \fBLDAP\fR, use the
 following four entries:
 .sp
 .ne 2
@@ -610,7 +563,7 @@ compat
 \fBpasswd_compat:\fR
 .ad
 .RS 18n
-nisplus OR ldap
+ldap
 .RE
 
 .sp
@@ -628,27 +581,15 @@ compat
 \fBgroup_compat:\fR
 .ad
 .RS 18n
-nisplus OR ldap
+ldap
 .RE
 
 .sp
 .LP
 In order to get information from the Internet Domain Name Service for hosts
-that are not listed in the enterprise level name service, \fBNIS+\fR or
+that are not listed in the enterprise level name service, such as
 \fBLDAP\fR, use the following configuration and set up the
 \fB/etc/resolv.conf\fR file (see \fBresolv.conf\fR(4) for more details):
-.sp
-.ne 2
-.na
-\fBhosts:\fR
-.ad
-.RS 10n
-nisplus dns [NOTFOUND=return] files
-.RE
-
-.sp
-.LP
-or
 .sp
 .ne 2
 .na
@@ -659,7 +600,6 @@ ldap dns [NOTFOUND=return] files
 .RE
 
 .SS "Enumeration - \fBgetXXXent()\fR"
-.sp
 .LP
 Many of the databases have enumeration functions: \fBpasswd\fR has
 \fBgetpwent()\fR, \fBhosts\fR has \fBgethostent()\fR, and so on. These were
@@ -669,8 +609,7 @@ less for multiple sources. The interfaces are still provided and the
 implementations strive to provide reasonable results, but the data returned can
 be incomplete (enumeration for \fBhosts\fR is simply not supported by the
 \fBdns\fR source), inconsistent (if multiple sources are used), formatted in an
-unexpected fashion (for a host with a canonical name and three aliases, the
-\fBnisplus\fR source returns four hostents, and they might not be consecutive),
+unexpected fashion,
 or very expensive (enumerating a \fBpasswd\fR database of 5,000 users is
 probably a bad idea). Furthermore, multiple threads in the same process using
 the same reentrant enumeration function (\fBgetXXXent_r()\fR are supported
@@ -684,7 +623,6 @@ to use \fBfgetgrent()\fR, \fBfgetpwent()\fR, and \fBfgetspent()\fR (see
 \fBgetgrnam\fR(3C), \fBgetpwnam\fR(3C), and \fBgetspnam\fR(3C), respectively),
 which use only the \fBfiles\fR source.
 .SH FILES
-.sp
 .LP
 A source named SSS is implemented by a shared object named \fBnss_SSS.so.1\fR
 that resides in \fB/usr/lib\fR.
@@ -745,15 +683,6 @@ Implements \fBnis\fR source.
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/nss_nisplus.so.1\fR\fR
-.ad
-.RS 29n
-Implements \fBnisplus\fR source.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/lib/nss_ldap.so.1\fR\fR
 .ad
 .RS 29n
@@ -809,15 +738,6 @@ Sample configuration file that uses \fBfiles\fR and \fBnis\fR.
 .sp
 .ne 2
 .na
-\fB\fB/etc/nsswitch.nisplus\fR\fR
-.ad
-.RS 29n
-Sample configuration file that uses \fBfiles\fR and \fBnisplus\fR.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/etc/nsswitch.ldap\fR\fR
 .ad
 .RS 29n
@@ -844,11 +764,10 @@ Sample configuration file that uses \fBfiles\fR, \fBdns\fR and \fBmdns\fR
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBkpasswd\fR(1), \fBldap\fR(1), \fBnewtask\fR(1), \fBNIS+\fR(1),
+\fBkpasswd\fR(1), \fBldap\fR(1), \fBnewtask\fR(1),
 \fBpasswd\fR(1), \fBautomount\fR(1M), \fBifconfig\fR(1M), \fBmdnsd\fR(1M),
-\fBrpc.bootparamd\fR(1M), \fBrpc.nisd\fR(1M), \fBsendmail\fR(1M),
+\fBrpc.bootparamd\fR(1M), \fBsendmail\fR(1M),
 \fBgetauusernam\fR(3BSM), \fBgetgrnam\fR(3C), \fBgetnetgrent\fR(3C),
 \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBgethostbyname\fR(3NSL),
 \fBgetpublickey\fR(3NSL), \fBgetrpcbyname\fR(3NSL), \fBnetdir\fR(3NSL),
@@ -862,18 +781,10 @@ Sample configuration file that uses \fBfiles\fR, \fBdns\fR and \fBmdns\fR
 \fBnetconfig\fR(4), \fBproject\fR(4), \fBresolv.conf\fR(4), \fBuser_attr\fR(4),
 \fBypfiles\fR(4), \fBad\fR(5)
 .SH NOTES
-.sp
 .LP
 Within each process that uses \fBnsswitch.conf\fR, the entire file is read only
 once; if the file is later changed, the process continues using the old
 configuration.
-.sp
-.LP
-The use of both \fBnis\fR and \fBnisplus\fR as sources for the same database is
-strongly discouraged since both the name services are expected to store similar
-information and the lookups on the database can yield different results
-depending on which name service is operational at the time of the request. The
-same applies for using \fBldap\fR along with \fBnis\fR or \fBnisplus\fR.
 .sp
 .LP
 Do not use the \fBldap\fR and \fBad\fR keywords together when the Solaris LDAP

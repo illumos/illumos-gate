@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROLEADD 1M "Feb 21, 2006"
+.TH ROLEADD 1M "Feb 25, 2017"
 .SH NAME
 roleadd \- administer a new role account on the system
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ roleadd \- administer a new role account on the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBroleadd\fR adds a role entry to the \fB/etc/passwd\fR and \fB/etc/shadow\fR
 and \fB/etc/user_attr\fR files. The \fB-A\fR and \fB-P\fR options respectively
@@ -62,7 +61,6 @@ fields that do not meet these requirements.
 The \fBrole\fR field must contain at least one character and must not contain a
 colon (\fB:\fR) or a newline (\fB\en\fR).
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -344,7 +342,6 @@ reserved for possible use in future applications.)
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/etc/datemsk\fR
 .sp
@@ -366,7 +363,6 @@ reserved for possible use in future applications.)
 .LP
 \fB/etc/user_attr\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -382,7 +378,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpasswd\fR(1), \fBpfsh\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
 \fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
@@ -390,7 +385,6 @@ Interface Stability	Evolving
 \fBusermod\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4),
 \fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 In case of an error, \fBroleadd\fR prints an error message and exits with a
 non-zero status.
@@ -466,8 +460,7 @@ UX: roleadd: ERROR: Cannot update system files - login cannot be created.
 .sp
 
 .SH NOTES
-.sp
 .LP
-If a network nameservice such as \fBNIS\fR or \fBNIS+\fR is being used to
-supplement the local \fB/etc/passwd\fR file with additional entries,
-\fBroleadd\fR cannot change information supplied by the network nameservice.
+If a network nameservice is being used to supplement the local
+\fB/etc/passwd\fR file with additional entries, \fBroleadd\fR cannot change
+information supplied by the network nameservice.

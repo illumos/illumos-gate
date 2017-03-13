@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NISLDAPMAPPING 4 "April 9, 2016"
+.TH NISLDAPMAPPING 4 "Feb 25, 2017"
 .SH NAME
 NISLDAPmapping \- mapping file used by the NIS server components
 .SH SYNOPSIS
@@ -15,8 +15,7 @@ NISLDAPmapping \- mapping file used by the NIS server components
 .SH DESCRIPTION
 .LP
 The \fBNISLDAPmapping\fR file specifies the mapping between NIS map entries and
-equivalent Directory Information Tree (DIT) entries. The syntax of this file is
-based on the equivalent NIS+ to LDAP mapping file, \fBNIS+LDAPmapping\fR(4).
+equivalent Directory Information Tree (DIT) entries.
 .sp
 .LP
 The presence of \fB/var/yp/NISLDAPmapping\fR on a NIS master server causes that
@@ -423,7 +422,7 @@ passwd:ou=People,?one?\e
 .sp .6
 .RS 4n
 Specifies the content of entries in a NIS map and how they should be broken
-into named fields. \fBnisLDAPnameFields\fR is required because unlike NIS+, NIS
+into named fields. \fBnisLDAPnameFields\fR is required because NIS
 maps do not store information in named fields.
 .sp
 The syntax for the \fBnisLDAPnameFields\fR attribute is as follows:
@@ -1496,7 +1495,7 @@ Interface Stability 	Obsolete
 .LP
 \fBinityp2l\fR(1M), \fBmakedbm\fR(1M), \fBypserv\fR(1M),
 \fBber_printf\fR(3LDAP), \fBsprintf\fR(3C), \fBsscanf\fR(3C),
-\fBNIS+LDAPmapping\fR(4), \fBypserv\fR(4), \fBattributes\fR(5)
+\fBypserv\fR(4), \fBattributes\fR(5)
 .sp
 .LP
 \fISystem Administration Guide: Naming and Directory Services (DNS, NIS, and

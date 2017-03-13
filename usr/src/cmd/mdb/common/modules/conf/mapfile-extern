@@ -102,6 +102,7 @@ SYMBOL_SCOPE {
 		mdb_get_lbolt			{ FLAGS = EXTERN };
 		mdb_get_pipe			{ FLAGS = EXTERN };
 		mdb_get_soft_state_byaddr	{ FLAGS = EXTERN };
+		mdb_get_soft_state_byname	{ FLAGS = EXTERN };
 		mdb_get_state			{ FLAGS = EXTERN };
 		mdb_get_xdata			{ FLAGS = EXTERN };
 		mdb_gethrtime			{ FLAGS = EXTERN };

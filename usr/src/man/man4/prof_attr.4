@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROF_ATTR 4 "Apr 3, 2008"
+.TH PROF_ATTR 4 "Feb 25, 2017"
 .SH NAME
 prof_attr \- profile description database
 .SH SYNOPSIS
@@ -13,12 +13,11 @@ prof_attr \- profile description database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB/etc/security/prof_attr\fR is a local source for execution profile names,
 descriptions, and other attributes of execution profiles. The \fBprof_attr\fR
 file can be used with other profile sources, including the \fBprof_attr\fR
-\fBNIS\fR map and \fBNIS+\fR table. Programs use the \fBgetprofattr\fR(3SECDB)
+\fBNIS\fR map. Programs use the \fBgetprofattr\fR(3SECDB)
 routines to gain access to this information.
 .sp
 .LP
@@ -122,29 +121,23 @@ The following entry allows the user to execute all commands:
 .sp
 .LP
 With the following \fBnsswitch.conf\fR entry, the local \fBprof_attr\fR file is
-consulted before the \fBNIS+\fR table:
+consulted before the \fBNIS\fR map:
 
 .sp
 .in +2
 .nf
-\fBprof_attr: files nisplus\fR
+\fBprof_attr: files nis\fR
 .fi
 .in -2
 .sp
 
 .SH FILES
-.sp
 .LP
 \fB/etc/nsswitch.conf\fR
 .sp
 .LP
 \fB/etc/security/prof_attr\fR
 .SH NOTES
-.sp
-.LP
-When deciding which authorization source to use (see \fBDESCRIPTION\fR), keep
-in mind that \fBNIS+\fR provides stronger authentication than \fBNIS\fR.
-.sp
 .LP
 The root user is usually defined in local databases because root needs to be
 able to log in and do system maintenance in single-user mode and at other times
@@ -170,7 +163,6 @@ The following characters are used in describing the database format and must be
 escaped with a backslash if used as data: colon (\fB:\fR), semicolon (\fB;\fR),
 equals (\fB=\fR), and backslash (\fB\e\fR).
 .SH SEE ALSO
-.sp
 .LP
 \fBauths\fR(1), \fBpfexec\fR(1), \fBprofiles\fR(1), \fBgetauthattr\fR(3SECDB),
 \fBgetprofattr\fR(3SECDB), \fBgetuserattr\fR(3SECDB), \fBauth_attr\fR(4),

@@ -3,44 +3,40 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LPSET 1M "May 23, 2003"
+.TH LPSET 1M "Feb 25, 2017"
 .SH NAME
 lpset \- set printing configuration in /etc/printers.conf or other supported
 databases
 .SH SYNOPSIS
 .LP
 .nf
-\fBlpset\fR [\fB-n\fR system | nisplus | fnsldap] [\fB-x\fR]
+\fBlpset\fR [\fB-n\fR system | fnsldap] [\fB-x\fR]
      [ [\fB-D\fR binddn] [\fB-w\fR passwd] [\fB-h\fR ldaphost]]
      [\fB-a\fR \fIkey=value\fR] [\fB-d\fR \fIkey\fR] \fIdestination\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlpset\fR utility sets printing configuration information in  the system
 configuration databases. Use \fBlpset\fR to create and update printing
-configuration in \fB/etc/printers.conf\fR, or \fBprinters.org_dir\fR (NIS+).
+configuration in \fB/etc/printers.conf\fR.
 See \fBnsswitch.conf\fR(4) and \fBprinters.conf\fR(4).
 .sp
 .LP
 Only a superuser or a member of Group 14 may execute \fBlpset\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-n\fR \fBsystem\fR|\fBnisplus\fR|\fBldap\fR\fR
+\fB\fB-n\fR \fBsystem\fR|\fBldap\fR\fR
 .ad
 .RS 26n
-Create or update the configuration information  for the \fIdestination\fR entry
-in \fB/etc/printers.conf\fR, \fBprinters.org_dir\fR (NIS+), or LDAP printer
-contexts. \fBsystem\fR specifies that the information is created or updated in
-\fB/etc/printers.conf\fR. \fBnisplus\fR specifies that the information is
-created or updated in the \fBprinters.org_dir\fR NIS+ table. \fBldap\fR
-specifies that the information is written to an LDAP server. See .
+Create or update the configuration information for the \fIdestination\fR entry
+in \fB/etc/printers.conf\fR or LDAP printer contexts. \fBsystem\fR specifies
+that the information is created or updated in \fB/etc/printers.conf\fR.
+\fBldap\fR specifies that the information is written to an LDAP server.
 .sp
 If  \fB-n\fR is not specified, \fBsystem\fR is the default.
 .RE
@@ -109,7 +105,6 @@ not specified, the default is the current host system.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -118,7 +113,7 @@ The following operand is supported:
 \fB\fIdestination\fR\fR
 .ad
 .RS 15n
-Specifies the entry in  \fB/etc/printers.conf\fR, \fBprinters.org_dir\fR, or
+Specifies the entry in  \fB/etc/printers.conf\fR or
 LDAP, in which to create or modify information. \fIdestination\fR names a
 printer of class of printers. See  \fBlpadmin\fR(1M). Each entry in
 \fBprinters.conf\fR describes one destination. Specify \fIdestination\fR using
@@ -144,23 +139,7 @@ example% \fBlpset -x dogs\fR
 .sp
 
 .LP
-\fBExample 2 \fRSetting a \fBkey=value\fR Pair
-.sp
-.LP
-The following example sets the \fBuser-equivalence\fR \fB=true\fR
-\fIkey\fR\fB=\fR\fIvalue\fR pair for destination  \fBtabloid\fR in the NIS+
-context:
-
-.sp
-.in +2
-.nf
-example% \fBlpset -n nisplus -a user-equivalence=true tabloid\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRSetting a \fBkey=value\fR Pair in LDAP
+\fBExample 2 \fRSetting a \fBkey=value\fR Pair in LDAP
 .sp
 .in +2
 .nf
@@ -171,7 +150,6 @@ example% \fBlpset -n ldap -h ldapl.xyz.com -D "cn=Directory Manager" \e
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -193,7 +171,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/printers.conf\fR\fR
@@ -202,17 +179,7 @@ An error occurred.
 System configuration database.
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBprinter.org_dir\fR (NIS+)\fR
-.ad
-.RS 26n
-\fBNIS+\fR version of \fB/etc/printers.conf\fR.
-.RE
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -228,7 +195,6 @@ Stability Level	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(1), \fBlp\fR(1), \fBlpc\fR(1B), \fBlpq\fR(1B), \fBlpr\fR(1B),
 \fBlpstat\fR(1), \fBldapclient\fR(1M), \fBlpadmin\fR(1M), \fBlpget\fR(1M),
@@ -238,7 +204,6 @@ Stability Level	Stable
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 If the \fBldap\fR database is used, the printer administrator should be mindful
 of the following when updating printer information.

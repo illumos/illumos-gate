@@ -1,0 +1,266 @@
+'\" te
+.\" Copyright (c) 2004, Sun Microsystems, Inc., All Rights Reserved
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH USB_BULK_REQUEST 9S "Jan 5, 2004"
+.SH NAME
+usb_bulk_req, usb_bulk_req_t, usb_bulk_request \- USB bulk request structure
+.SH SYNOPSIS
+.LP
+.nf
+#include  <sys/usb/usba.h>
+.fi
+
+.SH INTERFACE LEVEL
+.LP
+Solaris DDI specific (Solaris DDI)
+.SH DESCRIPTION
+.LP
+A bulk request (that is, a request sent through a bulk pipe) is used to
+transfer large amounts of data in reliable but non-time-critical fashion.
+Please refer to Section \fI5.8\fR of the \fIUSB 2.0\fR specification for
+information on bulk transfers. (The \fIUSB 2.0\fR specification is available at
+\fIwww.usb.org\fR.)
+.sp
+.LP
+The fields in the usb_bulk_req_t are used to format a bulk request. Please see
+below for acceptable combinations of flags and attributes.
+.sp
+.LP
+The usb_bulk_req_t fields are:
+.sp
+.in +2
+.nf
+uint_t          bulk_len;       /* number of bytes to xfer      */
+                                /* Please see */
+                                /* usb_pipe_get_max_bulk_xfer_size(9F) */
+                                /* for maximum size */
+mblk_t          *bulk_data;     /* the data for the data phase  */
+                                /* IN or OUT: allocated by client */
+uint_t          bulk_timeout;   /* xfer timeout value in secs   */
+                                /* If set to zero, defaults to 5 sec */
+usb_opaque_t    bulk_client_private; /* Client specific information */
+usb_req_attrs_t bulk_attributes; /* xfer-attributes     */
+
+/* Normal callback function, called upon completion. */
+void            (*bulk_cb)(
+                    usb_pipe_handle_t ph, struct usb_bulk_req *req);
+
+/* Exception callback function, for error handling. */
+void            (*bulk_exc_cb)(
+                    usb_pipe_handle_t ph, struct usb_bulk_req *req);
+
+/* set by USBA/HCD framework on completion */
+usb_cr_t        bulk_completion_reason; /* overall success status */
+                                   /* See usb_completion_reason(9S) */
+usb_cb_flags_t  bulk_cb_flags; /* recovery done by callback hndlr */
+                                   /* See usb_callback_flags(9S) */
+.fi
+.in -2
+
+.sp
+.LP
+Request attributes define special handling for transfers. The following
+attributes are valid for bulk requests:
+.sp
+.ne 2
+.na
+\fBUSB_ATTRS_SHORT_XFER_OK\fR
+.ad
+.RS 27n
+USB framework accepts transfers where less data is received than expected.
+.RE
+
+.sp
+.ne 2
+.na
+\fBUSB_ATTRS_AUTOCLEARING\fR
+.ad
+.RS 27n
+USB framework resets pipe and clears functional stalls automatically on
+exception.
+.RE
+
+.sp
+.ne 2
+.na
+\fBUSB_ATTRS_PIPE_RESET\fR
+.ad
+.RS 27n
+USB framework resets pipe automatically on exception.
+.RE
+
+.sp
+.LP
+Please see \fBusb_request_attributes\fR(9S) for more information.
+.sp
+.LP
+Bulk transfers/requests are subject to the following constraints and caveats:
+.sp
+.LP
+1) The following table indicates combinations of \fBusb_pipe_bulk_xfer()\fR
+flags argument and fields of the usb_bulk_req_t request argument (X = don't
+care).
+.br
+.in +2
+
+.in -2
+.sp
+.in +2
+.nf
+Flags     Type  Attributes       Data   Timeout Semantics
+---------------------------------------------------------------
+ X         X     X                ==NULL X      illegal
+
+ X         X     ONE_XFER         X      X      illegal
+
+ no sleep  IN    !SHORT_XFER_OK   !=NULL 0      See  note (A)
+
+ no sleep  IN    !SHORT_XFER_OK   !=NULL > 0    See  note (B)
+
+ sleep     IN    !SHORT_XFER_OK   !=NULL 0      See  note (C)
+
+ sleep     IN    !SHORT_XFER_OK   !=NULL > 0    See  note (D)
+
+ no sleep  IN    SHORT_XFER_OK    !=NULL 0      See  note (E)
+
+ no sleep  IN    SHORT_XFER_OK    !=NULL > 0    See  note (F)
+
+ sleep     IN    SHORT_XFER_OK    !=NULL 0      See  note (G)
+
+ sleep     IN    SHORT_XFER_OK    !=NULL > 0    See  note (H)
+
+ X         OUT   SHORT_XFER_OK   X       X      illegal
+
+ no sleep  OUT   X               !=NULL  0      See  note (I)
+
+ no sleep  OUT   X               !=NULL  > 0    See  note (J)
+
+ sleep     OUT   X               !=NULL  0      See  note (K)
+
+ sleep     OUT   X               !=NULL  > 0    See  note (L)
+.fi
+.in -2
+
+.sp
+.LP
+Table notes:
+.br
+.in +2
+A). Fill buffer, no timeout, callback when bulk_len is transferred.
+.in -2
+.br
+.in +2
+B). Fill buffer, with timeout; callback when bulk_len is transferred.
+.in -2
+.br
+.in +2
+C). Fill buffer, no timeout, unblock when bulk_len is transferred; no callback.
+.in -2
+.br
+.in +2
+D). Fill buffer, with timeout; unblock when bulk_len is transferred or a
+timeout occurs; no callback.
+.in -2
+.br
+.in +2
+E) Fill buffer, no timeout, callback when bulk_len is transferred or first
+short packet is received.
+.in -2
+.br
+.in +2
+F). Fill buffer, with timeout; callback when bulk_len is transferred or first
+short packet is received.
+.in -2
+.br
+.in +2
+G). Fill buffer, no timeout, unblock when bulk_len is transferred or first
+short packet is received; no callback.
+.in -2
+.br
+.in +2
+H). Fill buffer, with timeout; unblock when bulk_len is transferred, first
+short packet is received, or a timeout occurs; no callback.
+.in -2
+.br
+.in +2
+I). Empty buffer, no timeout; callback when bulk_len is transferred.
+.in -2
+.br
+.in +2
+J) Empty buffer, with timeout; callback when bulk_len is transferred or a
+timeout occurs.
+.in -2
+.br
+.in +2
+K). Empty buffer, no timeout; unblock when bulk_len is transferred; no
+callback.
+.in -2
+.br
+.in +2
+L). Empty buffer, with timeout; unblock when bulk_len is transferred or a
+timeout occurs; no callback.
+.in -2
+.sp
+.LP
+2) bulk_len must be > 0. bulk_data must not be NULL.
+.sp
+.LP
+3) Bulk_residue is set for both READ and WRITE. If it is set to 0, it means
+that all of the data was transferred successfully.  In case of WRITE it
+contains data not written and in case of READ it contains the data NOT read so
+far. A residue can only occur because of timeout or bus/device error. (Note
+that a short transfer for a request where the USB_ATTRS_SHORT_XFER_OK attribute
+is not set is considered a device error.)  An exception callback is made and
+completion_reason will be non-zero.
+.sp
+.LP
+4) Splitting large Bulk xfers: Due to internal constraints, the USBA framework
+can only do a limited size bulk data xfer per request.  A client driver may
+first determine this limitation by calling the USBA interface
+(usb_pipe_get_max_bulk_xfer_size(9F)) and then restrict itself to doing
+transfers in multiples of this fixed size. This forces a client driver to do
+data xfers in a loop for a large request, splitting it into multiple chunks of
+fixed size.
+.sp
+.LP
+The bulk_completion_reason indicates the status of the transfer.  See
+\fBusb_completion_reason\fR(9S) for usb_cr_t definitions.
+.sp
+.LP
+The bulk_cb_flags are set prior to calling the exception callback handler to
+summarize recovery actions taken and errors encountered during recovery. See
+\fBusb_callback_flags\fR(9S) for usb_cb_flags_t definitions.
+.sp
+.LP
+--- Callback handling ---
+.sp
+.LP
+All usb request types share the same callback handling. See
+\fBusb_callback_flags\fR(9S) for details.
+.SH ATTRIBUTES
+.LP
+See attributes(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+box;
+c | c
+l | l .
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+Architecture	PCI-based systems
+_
+Interface stability	Committed
+.TE
+
+.SH SEE ALSO
+.LP
+\fBusb_alloc_request\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
+\fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_get_max_bulk_transfer_size\fR(9F),
+\fBusb_pipe_intr_xfer\fR(9F), \fBusb_pipe_isoc_xfer\fR(9F),
+\fBusb_callback_flags\fR(9S), \fBusb_completion_reason\fR(9S),
+\fBusb_ctrl_request\fR(9S), \fBusb_intr_request\fR(9S),
+\fBusb_isoc_request\fR(9S), \fBusb_request_attributes\fR(9S)

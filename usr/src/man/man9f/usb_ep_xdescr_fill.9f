@@ -1,0 +1,106 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Aug 7, 2016
+.Dt USB_EP_XDESCR_FILL 9F
+.Os
+.Sh NAME
+.Nm usb_ep_xdescr_fill
+.Nd fill extended endpoint description from endpoint data
+.Sh SYNOPSIS
+.In sys/usb/usba.h
+.Ft int
+.Fo usb_ep_xdescr_fill
+.Fa "uint_t version"
+.Fa "dev_info_t *dip"
+.Fa "usb_ep_data_t *ep_data"
+.Fa "usb_ep_xdescr_t *ep_xdescr"
+.Fc
+.Sh INTERFACE STABILITY
+illumos DDI specific
+.Sh PARAMETESR
+.Bl -tag -width Fa
+.It Fa version
+Indicates the current version of the
+.Ft usb_ep_xdescr_t
+structure the driver is using. Callers should always specify
+.Sy USB_EP_XDESCR_CURRENT_VERSION .
+.It Fa dip
+Pointer to the device's
+.Sy dev_info
+structure.
+.It Fa ep_data
+Pointer to endpoint data retrieved by calling
+.Xr usb_lookup_ep_data 9F .
+.It Fa ep_xdescr
+Pointer to the extended endpoint descriptor that will be filled out.
+.El
+.Sh DESCRIPTION
+The
+.Fn usb_ep_xdescr_fill
+function is used to fill in the members of the extended endpoint
+descriptor
+.Fa ep_xdescr
+based on the endpoint descriptor data in
+.Fa ep_data .
+Once filled in,
+.Fa ep_xdescr
+can be used to open a pipe by calling
+.Xr usb_pipe_xopen 9F .
+.Pp
+Prior to USB 3.0, only one descriptor, the
+.Xr usb_ep_descr 9S ,
+was needed to describe an endpoint. However, with USB 3.0, additional
+companion descriptors have been added and are required to successfully
+open an endpoint. After calling this, all descriptors needed
+to successfully open a pipe will be placed into
+.Fa ep_xdescr
+and the endpoint data,
+.Fa ep_data ,
+is no longer required.
+.Sh CONTEXT
+The
+.Fn usb_ep_xdescr_fill
+is generally only called from a drivers
+.Xr attach 9E
+entry point; however, it may be called from either
+.Sy user
+or
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn usb_ep_xdescr_fill
+function returns
+.Sy USB_SUCCESS .
+Otherwise an error number is returned.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er USB_INVALID_ARGS
+The value of
+.Fa version
+is unknown, or one of
+.Fa dip ,
+.Fa ep_data ,
+and
+.Fa ep_xdescr
+was an invalid pointer.
+.It Er USB_FAILURE
+An unknown error occurred.
+.El
+.Sh SEE ALSO
+.Xr usb_lookup_ep_data 9F ,
+.Xr usb_pipe_xopen 9F ,
+.Xr usb_ep_descr 9S ,
+.Xr usb_ep_ss_comp_descr 9S ,
+.Xr usb_ep_xdescr 9S

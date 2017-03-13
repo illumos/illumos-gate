@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -101,6 +101,8 @@
 @ MSG_AUXV_AT_SUN_BRAND_AUX2		"SUN_BRAND_AUX2"
 @ MSG_AUXV_AT_SUN_BRAND_AUX3		"SUN_BRAND_AUX3"
 @ MSG_AUXV_AT_SUN_HWCAP2		"SUN_HWCAP2"
+@ MSG_AUXV_AT_SUN_COMMPAGE		"SUN_COMMPAGE"
+
 
 @ MSG_CC_CONTENT_STACK		"STACK"
 @ MSG_CC_CONTENT_HEAP		"HEAP"

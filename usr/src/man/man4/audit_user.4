@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT_USER 4 "Jun 26, 2008"
+.TH AUDIT_USER 4 "Feb 25, 2017"
 .SH NAME
 audit_user \- per-user auditing data file
 .SH SYNOPSIS
@@ -13,13 +13,11 @@ audit_user \- per-user auditing data file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBaudit_user\fR is a database that stores per-user auditing preselection data.
 You can use the \fBaudit_user\fR file with other authorization sources,
-including the \fBNIS\fR map \fBaudit_user.byname\fR and the \fBNIS+\fR table
-\fBaudit_user\fR. Programs use the \fBgetauusernam\fR(3BSM) routines to access
-this information.
+including the \fBNIS\fR map \fBaudit_user.byname\fR. Programs use the
+\fBgetauusernam\fR(3BSM) routines to access this information.
 .sp
 .LP
 The search order for multiple user audit information sources is specified in
@@ -86,7 +84,6 @@ ethyl:lo,ex,nt:io,cl
 .sp
 
 .SH FILES
-.sp
 .LP
 \fB/etc/nsswitch.conf\fR
 .sp
@@ -96,7 +93,6 @@ ethyl:lo,ex,nt:io,cl
 .LP
 \fB/etc/security/audit_user\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -115,7 +111,6 @@ Interface Stability 	 See below.
 .LP
 The file format stability is Committed. The file content is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBbsmconv\fR(1M), \fBgetauusernam\fR(3BSM), \fBaudit_control\fR(4),
 \fBnsswitch.conf\fR(4), \fBpasswd\fR(4)
@@ -124,7 +119,6 @@ The file format stability is Committed. The file content is Uncommitted.
 Part\ VII, \fISolaris Auditing,\fR in \fISystem Administration Guide: Security
 Services\fR
 .SH NOTES
-.sp
 .LP
 This functionality is available only if the Basic Security Module (\fBBSM\fR)
 has been enabled. See \fBbsmconv\fR(1M) for more information.

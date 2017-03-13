@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2017 Toomas Soome <tsoome@me.com>
  */
 
 #include <stdio.h>
@@ -117,10 +117,9 @@ char			mboot_scan[MBOOT_SCAN_SIZE];
 static void check_options(char *);
 static int get_start_sector(ib_device_t *);
 
-static int read_stage1_from_file(char *, ib_data_t *data);
-static int read_bootblock_from_file(char *, ib_data_t *data);
-static int read_bootblock_from_disk(ib_device_t *device, ib_bootblock_t *,
-    char **);
+static int read_stage1_from_file(char *, ib_data_t *);
+static int read_bootblock_from_file(char *, ib_bootblock_t *);
+static int read_bootblock_from_disk(ib_device_t *, ib_bootblock_t *, char **);
 static void add_bootblock_einfo(ib_bootblock_t *, char *);
 static int prepare_stage1(ib_data_t *);
 static int prepare_bootblock(ib_data_t *, char *);
@@ -156,16 +155,15 @@ read_stage1_from_file(char *path, ib_data_t *dest)
 }
 
 static int
-read_bootblock_from_file(char *file, ib_data_t *data)
+read_bootblock_from_file(char *file, ib_bootblock_t *bblock)
 {
-	ib_bootblock_t	*bblock = &data->bootblock;
 	struct stat	sb;
 	uint32_t	buf_size;
 	uint32_t	mboot_off;
 	int		fd = -1;
 	int		retval = BC_ERROR;
 
-	assert(data != NULL);
+	assert(bblock != NULL);
 	assert(file != NULL);
 
 	fd = open(file, O_RDONLY);
@@ -533,21 +531,42 @@ write_bootblock(ib_data_t *data)
 	return (BC_SUCCESS);
 }
 
+/*
+ * Partition boot block or volume boot record (VBR). The VBR is
+ * stored on partition relative sector 0 and allows chainloading
+ * to read boot program from partition.
+ *
+ * As the VBR will use the first sector of the partition,
+ * this means, we need to be sure the space is not used.
+ * We do support three partitioning chemes:
+ * 1. GPT: zfs and ufs have reserved space for first 8KB, but
+ *	only zfs does have space for boot2. The pcfs has support
+ *	for VBR, but no space for boot2. So with GPT, to support
+ *	ufs or pcfs boot, we must have separate dedicated boot
+ *	partition and we will store VBR on it.
+ * 2. MBR: we have almost the same situation as with GPT, except that
+ *	if the partitions start from cylinder 1, we will have space
+ *	between MBR and cylinder 0. If so, we do not require separate
+ *	boot partition.
+ * 3. MBR+VTOC: with this combination we store VBR in sector 0 of the
+ *	solaris2 MBR partition. The slice 0 will start from cylinder 1,
+ *	and we do have space for boot2, so we do not require separate
+ *	boot partition.
+ */
 static int
 write_stage1(ib_data_t *data)
 {
 	ib_device_t	*device = &data->device;
+	uint64_t	start = 0;
 
 	assert(data != NULL);
 
 	/*
-	 * Partition boot block or volume boot record.
-	 * This is essentially copy of MBR (1 sector) and we store it
-	 * to support multi boot setups.
-	 *
-	 * Not all combinations are supported; as pcfs does not leave
-	 * space, we will not write to pcfs target.
-	 * In addition, in VTOC setup, we will only write VBR to slice 2.
+	 * We have separate partition for boot programs and the stage1
+	 * location is not absolute sector 0.
+	 * We will write VBR and trigger MBR to read 1 sector from VBR.
+	 * This case does also cover MBR+VTOC case, as the solaris 2 partition
+	 * name and the root file system slice names are different.
 	 */
 	if (device->stage.start != 0 &&
 	    strcmp(device->target.path, device->stage.path)) {
@@ -564,12 +583,13 @@ write_stage1(ib_data_t *data)
 		    "%s %d sector 0 (abs %d)\n"),
 		    device->devtype == IG_DEV_MBR? "partition":"slice",
 		    device->stage.id, device->stage.start);
+		start = device->stage.start;
 	}
 
 	/*
-	 * both ufs and zfs have initial 8k reserved for VTOC/boot
-	 * so its safe to use this area. however, only
-	 * write to target if we have MBR/GPT.
+	 * We have either GPT or MBR (without VTOC) and if the root
+	 * file system is not pcfs, we can store VBR. Also trigger
+	 * MBR to read 1 sector from VBR.
 	 */
 	if (device->devtype != IG_DEV_VTOC &&
 	    device->target.fstype != IG_FS_PCFS) {
@@ -585,9 +605,19 @@ write_stage1(ib_data_t *data)
 		    "%s %d sector 0 (abs %d)\n"),
 		    device->devtype == IG_DEV_MBR? "partition":"slice",
 		    device->target.id, device->target.start);
+		start = device->target.start;
 	}
 
 	if (write_mbr) {
+		/*
+		 * If we did write partition boot block, update MBR to
+		 * read partition boot block, not boot2.
+		 */
+		if (start != 0) {
+			*((uint16_t *)(data->stage1 + STAGE1_STAGE2_SIZE)) = 1;
+			*((uint64_t *)(data->stage1 + STAGE1_STAGE2_LBA)) =
+			    start;
+		}
 		if (write_out(device->fd, data->stage1,
 		    sizeof (data->stage1), 0) != BC_SUCCESS) {
 			(void) fprintf(stdout,
@@ -1221,6 +1251,7 @@ static int
 handle_install(char *progname, char **argv)
 {
 	ib_data_t	install_data;
+	ib_bootblock_t	*bblock = &install_data.bootblock;
 	char		*stage1 = NULL;
 	char		*bootblock = NULL;
 	char		*device_path = NULL;
@@ -1251,7 +1282,7 @@ handle_install(char *progname, char **argv)
 		goto out_dev;
 	}
 
-	if (read_bootblock_from_file(bootblock, &install_data) != BC_SUCCESS) {
+	if (read_bootblock_from_file(bootblock, bblock) != BC_SUCCESS) {
 		(void) fprintf(stderr, gettext("Error reading %s\n"),
 		    bootblock);
 		goto out_dev;
@@ -1285,8 +1316,9 @@ out:
 
 /*
  * Retrieves from a device the extended information (einfo) associated to the
- * installed stage2.
- * Expects one parameter, the device path, in the form: /dev/rdsk/c?[t?]d?s0.
+ * file or installed stage2.
+ * Expects one parameter, the device path, in the form: /dev/rdsk/c?[t?]d?s0
+ * or file name.
  * Returns:
  *        - BC_SUCCESS (and prints out einfo contents depending on 'flags')
  *	  - BC_ERROR (on error)
@@ -1295,10 +1327,9 @@ out:
 static int
 handle_getinfo(char *progname, char **argv)
 {
-
-	ib_data_t	data;
-	ib_bootblock_t	*bblock = &data.bootblock;
-	ib_device_t	*device = &data.device;
+	struct stat	sb;
+	ib_bootblock_t	bblock;
+	ib_device_t	device;
 	bblk_einfo_t	*einfo;
 	uint8_t		flags = 0;
 	char		*device_path, *path;
@@ -1312,16 +1343,27 @@ handle_getinfo(char *progname, char **argv)
 		goto out;
 	}
 
-	bzero(&data, sizeof (ib_data_t));
-	BOOT_DEBUG("device path: %s\n", device_path);
-
-	if (init_device(device, device_path) != BC_SUCCESS) {
-		(void) fprintf(stderr, gettext("Unable to gather device "
-		    "information from %s\n"), device_path);
-		goto out_dev;
+	if (stat(device_path, &sb) == -1) {
+		perror("stat");
+		goto out;
 	}
 
-	ret = read_bootblock_from_disk(device, bblock, &path);
+	bzero(&bblock, sizeof (bblock));
+	bzero(&device, sizeof (device));
+	BOOT_DEBUG("device path: %s\n", device_path);
+
+	if (S_ISREG(sb.st_mode) != 0) {
+		path = device_path;
+		ret = read_bootblock_from_file(device_path, &bblock);
+	} else {
+		if (init_device(&device, device_path) != BC_SUCCESS) {
+			(void) fprintf(stderr, gettext("Unable to gather "
+			    "device information from %s\n"), device_path);
+			goto out_dev;
+		}
+		ret = read_bootblock_from_disk(&device, &bblock, &path);
+	}
+
 	if (ret == BC_ERROR) {
 		(void) fprintf(stderr, gettext("Error reading bootblock from "
 		    "%s\n"), path);
@@ -1338,7 +1380,7 @@ handle_getinfo(char *progname, char **argv)
 		goto out_dev;
 	}
 
-	einfo = find_einfo(bblock->extra, bblock->extra_size);
+	einfo = find_einfo(bblock.extra, bblock.extra_size);
 	if (einfo == NULL) {
 		retval = BC_NOEINFO;
 		(void) fprintf(stderr, gettext("No extended information "
@@ -1352,11 +1394,12 @@ handle_getinfo(char *progname, char **argv)
 	if (verbose_dump)
 		flags |= EINFO_PRINT_HEADER;
 
-	print_einfo(flags, einfo, bblock->extra_size);
+	print_einfo(flags, einfo, bblock.extra_size);
 	retval = BC_SUCCESS;
 
 out_dev:
-	cleanup_device(&data.device);
+	if (S_ISREG(sb.st_mode) == 0)
+		cleanup_device(&device);
 out:
 	free(device_path);
 	return (retval);
@@ -1452,7 +1495,7 @@ out:
 #define	USAGE_STRING	"Usage:\t%s [-h|-m|-f|-n|-F|-u verstr] stage1 stage2 " \
 			"raw-device\n"					\
 			"\t%s -M [-n] raw-device attach-raw-device\n"	\
-			"\t%s [-e|-V] -i raw-device\n"
+			"\t%s [-e|-V] -i raw-device | file\n"
 
 #define	CANON_USAGE_STR	gettext(USAGE_STRING)
 

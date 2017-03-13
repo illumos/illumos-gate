@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 Garrett D'Amore <garret@damore.org>
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -152,6 +153,14 @@ static i_softmac_stat_info_t	i_softmac_ether_si[] = {
 	{ ETHER_STAT_CAP_5000FDX,	"cap_5000fdx",		NULL },
 	{ ETHER_STAT_ADV_CAP_5000FDX,	"adv_cap_5000fdx",	NULL },
 	{ ETHER_STAT_LP_CAP_5000FDX,	"lp_cap_5000fdx",	NULL },
+
+	{ ETHER_STAT_CAP_25GFDX,	"cap_25gfdx",		NULL },
+	{ ETHER_STAT_ADV_CAP_25GFDX,	"adv_cap_25gfdx",	NULL },
+	{ ETHER_STAT_LP_CAP_25GFDX,	"lp_cap_25gfdx",	NULL },
+
+	{ ETHER_STAT_CAP_50GFDX,	"cap_50gfdx",		NULL },
+	{ ETHER_STAT_ADV_CAP_50GFDX,	"adv_cap_50gfdx",	NULL },
+	{ ETHER_STAT_LP_CAP_50GFDX,	"lp_cap_50gfdx",	NULL },
 };
 
 #define	SOFTMAC_ETHER_SI_SZ						\

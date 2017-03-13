@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_USBAI_H
@@ -33,9 +34,9 @@
 extern "C" {
 #endif
 
-/* This header file is for USBA2.0 */
+/* This header file is for USBA2.1 */
 #define	USBA_MAJOR_VER 2
-#define	USBA_MINOR_VER 0
+#define	USBA_MINOR_VER 1
 
 /*
  * USBAI: Interfaces Between USBA and Client Driver
@@ -194,7 +195,7 @@ typedef enum {
 
 /*
  * ***************************************************************************
- * Descriptor definitions (from USB 2.0 specification, chapter 9)
+ * Descriptor definitions (USB version and section noted with structure)
  * ***************************************************************************
  */
 
@@ -400,9 +401,9 @@ typedef struct usb_ep_descr {
 /*
  * wMaxPacketSize values for endpoints (isoch and interrupt, high speed only)
  */
-#define	USB_EP_MAX_PKTSZ_MASK	0x03FF		/* Mask for packetsize bits */
-#define	USB_EP_MAX_XACTS_MASK	0x0C00		/* Max Transactns/microframe */
-#define	USB_EP_MAX_XACTS_SHIFT	10		/* Above is 10 bits from end */
+#define	USB_EP_MAX_PKTSZ_MASK	0x07FF		/* Mask for packetsize bits */
+#define	USB_EP_MAX_XACTS_MASK	0x1800		/* Max Transactns/microframe */
+#define	USB_EP_MAX_XACTS_SHIFT	11		/* Above is 10 bits from end */
 
 /*
  * Ranges for endpoint parameter values.
@@ -446,6 +447,21 @@ typedef struct usb_string_descr {
 } usb_string_descr_t;
 
 #define	USB_MAXSTRINGLEN	255		/* max string descr length */
+
+/*
+ * usb_ep_ss_comp_descr:
+ * 	USB SuperSpeed endpoints are required to return this descriptor along
+ * 	with the general endpoint descriptor. Refer to USB 3.1/9.6.7.
+ */
+typedef struct usb_ep_ss_comp_descr {
+	uint8_t		bLength;		/* descriptor size */
+	uint8_t		bDescriptorType;	/* USB_DESCR_TYPE_SS_EP_COMP */
+	uint8_t		bMaxBurst;		/* max packets per burst */
+	uint8_t		bmAttributes;		/* more endpoint attributes */
+	uint16_t	wBytesPerInterval;	/* bytes per service interval */
+} usb_ep_ss_comp_descr_t;
+
+#define	USB_EP_SS_COMP_ISOC_MULT_MASK	0x03
 
 /*
  * ***************************************************************************
@@ -519,6 +535,8 @@ typedef struct usb_ep_data {
 	usb_ep_descr_t		ep_descr;	/* endpoint descriptor */
 	struct usb_cvs_data	*ep_cvs;	/* cv mod/extending this ep */
 	uint_t			ep_n_cvs;	/* #elements in ep_cvs[] */
+	boolean_t		ep_ss_valid;
+	usb_ep_ss_comp_descr_t	ep_ss_comp;	/* superspeed ep desc */
 } usb_ep_data_t;
 
 
@@ -830,6 +848,57 @@ int usb_get_string_descr(
 	char			*buf,
 	size_t			buflen);
 
+/*
+ * With the advent of USB 3.x, several endpoint compantion descriptors have been
+ * added. These provide additional information required by HCI drivers to
+ * properly open and configure the pipes.
+ */
+
+/*
+ * usb_ep_xdescr
+ *
+ * 	Versioned data structure that's used for usb_pipe_xopen() and should be
+ * 	filled in by a call to usb_ep_xdescr_fill(). Drivers should always use
+ * 	USB_EP_XDESCR_CURRENT_VERSION.
+ */
+
+#define	USB_EP_XDESCR_VERSION_ONE	1
+#define	USB_EP_XDESCR_CURRENT_VERSION	USB_EP_XDESCR_VERSION_ONE
+
+typedef enum usb_ep_xdescr_flags {
+	USB_EP_XFLAGS_SS_COMP	= (1 << 0)
+} usb_ep_xdescr_flags_t;
+
+typedef struct usb_ep_xdescr {
+	uint_t			uex_version;
+	usb_ep_xdescr_flags_t	uex_flags;
+	usb_ep_descr_t		uex_ep;
+	usb_ep_ss_comp_descr_t	uex_ep_ss;
+} usb_ep_xdescr_t;
+
+/*
+ * usb_ep_xdescr_fill:
+ *
+ * Fills in the extended endpoint descriptor based on data from the
+ * configuration tree.
+ *
+ * Arguments:
+ * 	version		- Should be USB_EP_XDESCR_CURRENT_VERSION
+ * 	dip		- devinfo pointer
+ * 	ep_data		- endpoint data pointer
+ * 	ep_xdesc	- An extended descriptor structure, filled upon
+ *                        successful completion.
+ *
+ * Return values:
+ *	USB_SUCCESS	 - filling data succeeded
+ *	USB_INVALID_ARGS - invalid arguments
+ */
+int usb_ep_xdescr_fill(
+	uint_t 		version,
+	dev_info_t	*dip,
+	usb_ep_data_t	*ep_data,
+	usb_ep_xdescr_t	*ep_xdesc);
+
 
 /*
  * ***************************************************************************
@@ -972,7 +1041,6 @@ int usb_pipe_get_state(
 	usb_pipe_state_t	*pipe_state,
 	usb_flags_t		flags);
 
-
 /*
  * usb_pipe_policy
  *
@@ -991,7 +1059,7 @@ typedef struct usb_pipe_policy {
 
 
 /*
- * usb_pipe_open():
+ * usb_pipe_open() and usb_pipe_xopen():
  *
  * Before using any pipe including the default pipe, it must be opened.
  * On success, a pipe handle is returned for use in other usb_pipe_*()
@@ -1005,6 +1073,9 @@ typedef struct usb_pipe_policy {
  * Only the default pipe can be shared.  All other control pipes are
  * excusively opened by default.  A pipe policy and endpoint descriptor
  * must always be provided except for default pipe.
+ *
+ * usb_pipe_open() only functions for USB 2.0 and older devices. For USB 3.0
+ * "SuperSpeed" devices, usb_pipe_xopen() must be used.
  *
  * Arguments:
  *	dip		- devinfo ptr.
@@ -1021,12 +1092,20 @@ typedef struct usb_pipe_policy {
  *	USB_FAILURE	 - unspecified open failure or pipe is already open.
  *	USB_NO_RESOURCES - no resources were available to complete the open.
  *	USB_NO_BANDWIDTH - no bandwidth available (isoc/intr pipes).
+ *	USB_NOT_SUPPORTED - USB 3.0 or greater device
  *	USB_*		 - refer to list of all possible return values in
  *			   this file
  */
 int usb_pipe_open(
 	dev_info_t		*dip,
 	usb_ep_descr_t		*ep,
+	usb_pipe_policy_t	*pipe_policy,
+	usb_flags_t		flags,
+	usb_pipe_handle_t	*pipe_handle);
+
+int usb_pipe_xopen(
+	dev_info_t		*dip,
+	usb_ep_xdescr_t		*ep_xdesc,
 	usb_pipe_policy_t	*pipe_policy,
 	usb_flags_t		flags,
 	usb_pipe_handle_t	*pipe_handle);
@@ -1346,6 +1425,7 @@ typedef struct usb_ctrl_req {
 
 #define	USB_DESCR_TYPE_WA			0x21
 #define	USB_DESCR_TYPE_RPIPE			0x22
+#define	USB_DESCR_TYPE_HUB			0x29
 
 /* Wireless USB extension, refer to WUSB 1.0/7.4 */
 #define	USB_DESCR_TYPE_SECURITY			0x0c
@@ -1357,6 +1437,13 @@ typedef struct usb_ctrl_req {
 
 #define	USB_WA_DESCR_SIZE			14
 #define	USB_RPIPE_DESCR_SIZE			28
+
+/*
+ * USB 3.0 Super Speed specifics. See USB 3.1/9.4.
+ */
+#define	USB_DESCR_TYPE_SS_HUB			0x2A
+#define	USB_DESCR_TYPE_SS_EP_COMP		0x30
+#define	USB_DESCR_TYPE_SS_ISO_EP_COMP		0x31
 
 /*
  * device request type
@@ -1543,17 +1630,22 @@ int usb_pipe_ctrl_xfer_wait(
  */
 
 /*
- *
- * Status bits returned by a usb_get_status().
+ * USB STATUS request types and sizes.
+ */
+#define	USB_GET_STATUS_STANDARD		0
+#define	USB_GET_STATUS_PTM		1
+
+#define	USB_GET_STATUS_LEN		2
+#define	USB_GET_STATUS_PTM_LEN		4
+
+/*
+ * Status bits returned by a usb_get_status() for a STATUS_STANDARD request.
  */
 #define	USB_DEV_SLF_PWRD_STATUS	1	/* Supports Self Power	 */
 #define	USB_DEV_RWAKEUP_STATUS	2	/* Remote Wakeup Enabled */
 #define	USB_DEV_BAT_PWRD_STATUS	4	/* Battery Powered */
 #define	USB_EP_HALT_STATUS	1	/* Endpoint is Halted	 */
 #define	USB_IF_STATUS		0	/* Interface Status is 0 */
-
-/* length of data returned by USB_REQ_GET_STATUS */
-#define	USB_GET_STATUS_LEN		2
 
 /*
  * wrapper function returning status of device, interface, or endpoint
@@ -2567,6 +2659,12 @@ void usb_unregister_dev_driver(dev_info_t *dip);
 #define	USB_PROTO_MS_CBI		0x01    /* USB CBI Protocol */
 #define	USB_PROTO_MS_ISD_1999_SILICN	0x02    /* ZIP Protocol */
 #define	USB_PROTO_MS_BULK_ONLY		0x50    /* USB Bulk Only Protocol */
+
+/* Hub subclass and protocols */
+#define	USB_PROTO_HUB_FULL		0x00	/* Full Speed Protocol */
+#define	USB_PROTO_HUB_HIGH_STT		0x01	/* High Speed with STT */
+#define	USB_PROTO_HUB_HIGH_MTT		0x02	/* High Speed with MTT */
+#define	USB_PROTO_HUB_SUPER		0x03	/* SuperSpeed Protocol */
 
 /* Application subclasses. */
 #define	USB_SUBCLS_APP_FIRMWARE		0x01	/* app spec f/w subclass */

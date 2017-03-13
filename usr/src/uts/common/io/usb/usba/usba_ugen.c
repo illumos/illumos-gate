@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -1486,7 +1486,7 @@ ugen_epxs_init(ugen_state_t *ugenp)
  */
 static int
 ugen_epxs_data_init(ugen_state_t *ugenp, usb_ep_data_t *ep_data,
-	uchar_t cfgval, uchar_t cfgidx, uchar_t iface, uchar_t alt)
+    uchar_t cfgval, uchar_t cfgidx, uchar_t iface, uchar_t alt)
 {
 	int			ep_index;
 	ugen_ep_t		*epp;
@@ -1519,6 +1519,21 @@ ugen_epxs_data_init(ugen_state_t *ugenp, usb_ep_data_t *ep_data,
 		epp->ep_state		= UGEN_EP_STATE_ACTIVE;
 		epp->ep_lcmd_status	= USB_LC_STAT_NOERROR;
 		epp->ep_pipe_policy.pp_max_async_reqs = 1;
+
+		if (ep_data == NULL) {
+			bzero(&epp->ep_xdescr, sizeof (usb_ep_xdescr_t));
+			epp->ep_xdescr.uex_version =
+			    USB_EP_XDESCR_CURRENT_VERSION;
+			epp->ep_xdescr.uex_ep = *ep_descr;
+		} else {
+			/*
+			 * The only way this could fail is we have a bad
+			 * version, which shouldn't be possible inside of the
+			 * usba module itself.
+			 */
+			(void) usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION,
+			    ugenp->ug_dip, ep_data, &epp->ep_xdescr);
+		}
 
 		cv_init(&epp->ep_wait_cv, NULL, CV_DRIVER, NULL);
 		epp->ep_ser_cookie	= usb_init_serialization(
@@ -1985,6 +2000,8 @@ ugen_update_ep_descr(ugen_state_t *ugenp, ugen_ep_t *epp)
 		    usb_get_ep_index(epp->ep_descr.
 		    bEndpointAddress)) {
 			epp->ep_descr = ep_data->ep_descr;
+			(void) usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION,
+			    ugenp->ug_dip, ep_data, &epp->ep_xdescr);
 
 			break;
 		}
@@ -2085,9 +2102,8 @@ ugen_epx_open_pipe(ugen_state_t *ugenp, ugen_ep_t *epp, int flag)
 	} else {
 		mutex_exit(&epp->ep_mutex);
 
-		/* open pipe */
-		rval = usb_pipe_open(ugenp->ug_dip,
-		    &epp->ep_descr, &epp->ep_pipe_policy,
+		rval = usb_pipe_xopen(ugenp->ug_dip,
+		    &epp->ep_xdescr, &epp->ep_pipe_policy,
 		    USB_FLAGS_SLEEP, &epp->ep_ph);
 
 		mutex_enter(&epp->ep_mutex);
