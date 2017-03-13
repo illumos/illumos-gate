@@ -519,7 +519,6 @@ MANFILES=	ASSERT.9f				\
 		usb_pipe_get_state.9f			\
 		usb_pipe_intr_xfer.9f			\
 		usb_pipe_isoc_xfer.9f			\
-		usb_pipe_xopen.9f			\
 		usb_pipe_reset.9f			\
 		usb_pipe_set_private.9f			\
 		usb_pipe_xopen.9f			\

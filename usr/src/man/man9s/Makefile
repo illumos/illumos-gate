@@ -111,7 +111,7 @@ MANLINKS=	dblk.9s				\
 		usb_intr_req_t.9s		\
 		usb_intr_request.9s		\
 		usb_isoc_req_t.9s		\
-		usb_isoc_request.9s
+		usb_isoc_request.9s		\
 		usba_device_t.9s		\
 		usba_hcdi_ops_t.9s		\
 		usba_hcdi_register_args_t.9s	\
