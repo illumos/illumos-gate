@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -38,8 +42,6 @@
 #include <locale.h>
 #include <libintl.h>
 #include <pkglib.h>
-#include <pkgerr.h>
-#include <pkgweb.h>
 #include <install.h>
 #include <libinst.h>
 #include <libadm.h>
@@ -55,17 +57,12 @@ static struct {
 	char	*tag;
 } admlist[] = {
 	&adm.action,		"action",
-	&adm.authentication,	"authentication",
 	&adm.basedir,		"basedir",
 	&adm.conflict,		"conflict",
 	&adm.idepend,		"idepend",
 	&adm.instance,		"instance",
-	&adm.keystore,		"keystore",
 	&adm.mail,		"mail",
-	&adm.networkretries,	"networkretries",
-	&adm.networktimeout,	"networktimeout",
 	&adm.partial,		"partial",
-	&adm.proxy,		"proxy",
 	&adm.rdepend,		"rdepend",
 	&adm.RSCRIPTALT,	RSCRIPTALT_KEYWORD,
 	&adm.runlevel,		"runlevel",
@@ -183,154 +180,4 @@ setadminFile(char *file)
 	if (!mail) {
 		adm.mail = DEFMAIL; 	/* if we don't assign anything to it */
 	}
-}
-
-
-/*
- * Function:	web_ck_retries
- * Description:	Reads admin file setting for networkretries, or uses default
- * Parameters:	None
- * Returns:	admin file setting for networkretries, or the default if no
- *		admin file setting exists or if it is outside the
- *		allowable range.
- */
-int
-web_ck_retries(void)
-{
-	int retries = NET_RETRIES_DEFAULT;
-
-	if (ADMSET(networkretries)) {
-		/* Make sure value is within valid range */
-		if ((retries = atoi(adm.networkretries)) == 0) {
-			return (NET_RETRIES_DEFAULT);
-		} else if (retries <= NET_RETRIES_MIN ||
-			retries > NET_RETRIES_MAX) {
-			return (NET_RETRIES_DEFAULT);
-		}
-	}
-	return (retries);
-}
-
-/*
- * Function:	web_ck_authentication
- * Description:	Retrieves admin file setting for authentication
- * Parameters:	None
- * Returns:	admin file policy for authentication - AUTH_QUIT
- *		or AUTH_NOCHECK.
- *		non-zero failure
- */
-int
-web_ck_authentication(void)
-{
-	if (ADM(authentication, "nocheck"))
-		return (AUTH_NOCHECK);
-
-	return (AUTH_QUIT);
-}
-
-/*
- * Function:	web_ck_timeout
- * Description:	Retrieves admin file policy for networktimeout's
- * Parameters:	NONE
- * Returns:	Admin file setting for networktimeout, or default
- *		timeout value if admin file does not specify one,
- *		or specifies one that is out of the allowable range.
- */
-int
-web_ck_timeout(void)
-{
-	int timeout = NET_TIMEOUT_DEFAULT;
-
-	if (ADMSET(networktimeout)) {
-		/* Make sure value is within valid range */
-		if ((timeout = atoi(adm.networktimeout)) == 0) {
-			return (NET_TIMEOUT_DEFAULT);
-		} else if (timeout <= NET_TIMEOUT_MIN ||
-			timeout > NET_TIMEOUT_MAX) {
-			return (NET_TIMEOUT_DEFAULT);
-		}
-	}
-	return (timeout);
-}
-
-/*
- * Function:	check_keystore_admin
- * Description:	Retrieves security keystore setting from admin file,
- *		or validates user-supplied keystore policy.
- * Parameters:	keystore - Where to store resulting keystore policy
- * Returns:	B_TRUE - admin file contained valid keystore, or
- *		user-supplied keystore passed in "keystore" was
- *		valid.  Resulting keystore stored in "keystore"
- *
- *		B_FALSE - No location supplied to store result,
- *		or user-supplied keystore was not valid.
- */
-boolean_t
-check_keystore_admin(char **keystore)
-{
-
-	if (!keystore) {
-		/* no location to store keystore */
-		return (B_FALSE);
-	}
-
-	if (*keystore != NULL) {
-	    if (!path_valid(*keystore)) {
-		    /* the given keystore is invalid */
-		    return (B_FALSE);
-	    }
-
-	    /* the user-supplied keystore was valid */
-	    return (B_TRUE);
-	}
-
-	/* no user-supplied, so use default */
-	if ((*keystore = set_keystore_admin()) == NULL) {
-		*keystore = PKGSEC;
-	}
-	return (B_TRUE);
-}
-
-/*
- * Function:	get_proxy_port_admin
- * Description:	Retrieves proxy setting from admin file
- * Parameters:	proxy - where to store resulting proxy (host:port or URL)
- *		port - Where to store resulting proxy port
- * Returns:	B_TRUE - admin file had a valid proxy setting,
- *		and it is stored in "proxy".
- *		B_FALSE - no proxy setting in admin file, or
- *		invalid setting in admin file.
- */
-boolean_t
-get_proxy_port_admin(char **proxy, ushort_t *port)
-{
-	if (ADMSET(proxy) && !path_valid(adm.proxy)) {
-		/* admin file has bad keystore */
-		return (B_FALSE);
-	} else if (ADMSET(proxy)) {
-		*proxy = strdup(adm.proxy);
-		*port = strip_port(adm.proxy);
-	}
-	return (B_TRUE);
-}
-
-/*
- * Function:	set_keystore_admin
- * Description:	Retrieves security keystore setting from admin file,
- * Parameters:	NONE
- * Returns:	Keystore file policy from admin file, if set
- *		and valid.  NULL otherwise.
- */
-char *
-set_keystore_admin(void)
-{
-	if (ADMSET(keystore) && !path_valid(adm.keystore)) {
-		return (NULL);
-	}
-
-	if (!ADMSET(keystore)) {
-		return (NULL);
-	}
-
-	return (adm.keystore);
 }

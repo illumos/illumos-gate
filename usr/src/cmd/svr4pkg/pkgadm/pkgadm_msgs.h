@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -47,24 +51,6 @@ extern "C" {
 
 #define	MSG_USAGE		gettext(\
 "usage:\n" \
-"\n" \
-"pkgadm addcert  [-ty] [-a app] [-k keystore] [-e keyfile]\n" \
-"\t[-f format] [-n name] [-P passarg] [-p input_passarg]\n" \
-"\t[-R rootpath] certfile\n" \
-"\n" \
-"\t- Adds a trusted CA certificate or user certificate\n" \
-"\tand private key\n" \
-"\n" \
-"pkgadm removecert [-a app] [-k keystore] -n name [-P passarg]\n" \
-"\t[-R rootpath]\n" \
-"\n" \
-"\t- Removes a trusted CA certificate or user certificate\n" \
-"\tand private key\n" \
-"\n" \
-"pkgadm listcert  [-a app] [-f format] [-k keystore] -n name\n" \
-"\t[-P passarg] [-o outfile] [-R rootpath]\n" \
-"\n" \
-"\t- Prints trusted CA certificates or user certificates\n" \
 "\n" \
 "pkgadm dbstatus [-R rootpath]\n" \
 "\n" \
@@ -97,16 +83,6 @@ extern "C" {
 #define	MSG_T_RESULT_THREE	gettext(\
 	"required <%d> actual <%d> <%30s> ~- <%30s>\n")
 
-#define	MSG_KEYSTORE_PASSPROMPT	gettext(\
-	"Enter Keystore Password: ")
-
-#define	MSG_KEYSTORE_PASSOUTPROMPT	gettext(\
-	"Type a Keystore protection Password.\n" \
-	"Press ENTER for no protection password (not recommended): ")
-
-#define	MSG_PEM_PASSPROMPT	gettext(\
-	"Enter PEM Passphrase: ")
-
 #define	MSG_ERROR		gettext(\
 	"ERROR")
 
@@ -115,19 +91,10 @@ extern "C" {
 #define	CREATE_PKGDIR_WARN	gettext(\
 	"Creating directory <%s>\n")
 
-#define	MSG_WRN_UNKNOWN	gettext(\
-	"Signer <%s> has unsupported signature, ignoring")
-
 #define	MSG_VALID_STALE		gettext(\
 	"Removing stale lock on <%s> pid <%ld> zid <%ld>")
 
 /* errors */
-
-#define	MSG_FATAL			gettext(\
-	"Fatal Error")
-
-#define	MSG_TOO_LONG			gettext(\
-	"Length of <%s> exceeds maximum allowed length")
 
 #define	MSG_INTERNAL			gettext(\
 	"Intenal Error <%s>")
@@ -138,120 +105,8 @@ extern "C" {
 #define	MSG_OPEN_WRITE			gettext(\
 	"Cannot open <%s> for writing")
 
-#define	MSG_BAD_PASSARG			gettext(\
-	"Invalid password retrieval method <%s>")
-
-#define	MSG_BAD_PASS			gettext(\
-	"Invalid password")
-
 #define	ERR_LOG_FAIL			gettext(\
 	"Failed to log message using format <%s>")
-
-#define	MSG_BAD_FORMAT			gettext(\
-	"Invalid format: <%s>")
-
-#define	MSG_USER_NAME			gettext(\
-	"An alias is required when adding user certificates")
-
-#define	MSG_TRUSTED_NAME		gettext(\
-	"Trusted certificates cannot have an explicit alias")
-
-#define	MSG_MULTIPLE_TRUST		gettext(\
-	"Found multiple certificates in <%s>.  You must explicitly trust " \
-	"them using <%s>")
-
-#define	MSG_NO_MULTIPLE_TRUST		gettext(\
-	"Found multiple certificates in <%s>.  You must explicitly trust " \
-	"them using <%s>")
-
-#define	MSG_TRUSTED_KEY			gettext(\
-	"Cannot supply private key when adding trusted certificates")
-
-#define	MSG_TRUST_KEY_FOUND		gettext(\
-	"One or more private keys were found in trusted certificate file <%s>")
-
-#define	MSG_ADDCERT_ABORT		gettext(\
-	"Addition of trusted certificate aborted by user request")
-
-
-#define	MSG_NEED_KEY			gettext(\
-	"No private key found in <%s>, must specify one with -e")
-
-#define	MSG_NO_PRIVKEY		gettext(\
-	"No private key found in <%s>")
-
-#define	MSG_NO_CERTS		gettext(\
-	"No certificates found in <%s>")
-
-#define	MSG_MULTIPLE_CERTS	gettext(\
-	"Multiple certificates found in <%s>")
-
-#define	MSG_NO_ADDCERT	gettext(\
-	"Cannot add certificate(s) from <%s>.  No changes have been made.")
-
-#define	MSG_NO_ADDKEY	gettext(\
-	"Cannot add private key from <%s>.  No changes have been made.")
-
-#define	MSG_NO_REMOVECERT	gettext(\
-	"Cannot remove certificate with alias <%s>")
-
-#define	MSG_VERIFY_TRUST	gettext(\
-	"Are you sure you want to trust this certificate? ")
-
-#define	MSG_VERIFY_NOT_CA	gettext(\
-	"\n" \
-	"This certificate does not appear to be issued and signed\n" \
-	"by a certificate authority (CA). CA Certificates are normally\n" \
-	"self-signed and have CA Basic Constraints.\n" \
-	"Are you sure you want to trust this certificate? ")
-
-#define	MSG_PARSE	gettext(\
-	"Parsing error")
-
-#define	MSG_TRUSTED	gettext(\
-	"Certificate(s) from <%s> are now trusted")
-
-#define	MSG_TRUSTING	gettext(\
-	"Trusting certificate <%s>")
-
-#define	MSG_ADDED	gettext(\
-	"Successfully added Certificate <%s> with alias <%s>")
-
-#define	MSG_REMOVED	gettext(\
-	"Successfully removed Certificate(s) with alias <%s>")
-
-#define	MSG_MEM		gettext(\
-	"Out of memory")
-
-#define	MSG_PRINT		gettext(\
-	"Cannot print certificates to <%s>")
-
-#define	MSG_PROBLEM_CONVERT	gettext(\
-	"Does %s/var/sadm exist?  Can the user write to it? (%s)")
-
-#define	MSG_CONTENTS_FORMAT	gettext(\
-	"Operation failed due to corrupted install contents data file.")
-
-#define	MSG_MKDIR_FAILED	gettext(\
-	"Could not mkdir for path %s.  %s.")
-
-#define	MSG_RENAME_FAILED	gettext(\
-	"Could not rename %s to %s\n%s")
-
-#define	MSG_REMOVE_FAILED	gettext(\
-	"Could not remove %s\n%s")
-
-#define	MSG_FILE_ACCESS		gettext(\
-	"Operation failed: unable to access file %s: %s")
-
-#define	MSG_NOT_READABLE	gettext(\
-	"Operation failed: unable to read file %s")
-
-#define	MSG_BUILD_INDEXES gettext(\
-	"Operation failed: unable to build indexes\n")
-
-#define	MSG_FILE_NAME_TOO_LONG gettext(\
-	"Operation failed: file name too long: %s\n")
 
 #define	MSG_ZONES_MISSING_REQUEST	gettext(\
 	"Must specify operation to perform\n")

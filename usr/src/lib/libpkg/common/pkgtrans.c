@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -46,11 +50,6 @@
 #include <dirent.h>
 #include <signal.h>
 #include <devmgmt.h>
-#include <openssl/pkcs12.h>
-#include <openssl/x509.h>
-#include <openssl/pkcs7.h>
-#include <openssl/err.h>
-#include <openssl/pem.h>
 #include <note.h>
 #include "pkginfo.h"
 #include "pkgstrct.h"
@@ -58,9 +57,7 @@
 #include "pkgdev.h"
 #include "pkglib.h"
 #include "pkglibmsgs.h"
-#include "keystore.h"
 #include "pkglocale.h"
-#include "pkgerr.h"
 
 extern char	*pkgdir; 		/* pkgparam.c */
 
@@ -113,11 +110,8 @@ static int	cat_and_count(struct dm_buf *, char *);
 
 static int	ckoverwrite(char *dir, char *inst, int options);
 static int	pkgxfer(char *srcinst, int options);
-static int	wdsheader(struct dm_buf *, char *src, char *device,
-    char **pkg, PKCS7 *);
+static int	wdsheader(struct dm_buf *, char *device, char **pkg);
 static struct dm_buf	*genheader(char *, char **);
-
-static int	dump_hdr_and_pkgs(BIO *, struct dm_buf *, char **);
 
 extern int	ds_fd;	/* open file descriptor for data stream WHERE? */
 
@@ -170,8 +164,7 @@ pkghead(char *device)
 	}
 
 	/* check for datastream */
-	if (n = pkgtrans(device, (char *)0, allpkg, PT_SILENT|PT_INFO_ONLY,
-	    NULL, NULL)) {
+	if (n = pkgtrans(device, (char *)0, allpkg, PT_SILENT|PT_INFO_ONLY)) {
 		cleanup();
 		return (n);
 	}
@@ -239,89 +232,11 @@ rd_map_size(FILE *fp, int *npts, int *maxpsz, int *cmpsize)
 
 /* will return 0, 1, 3, or 99 */
 static int
-_pkgtrans(char *device1, char *device2, char **pkg, int options,
-    keystore_handle_t keystore, char *keystore_alias)
+_pkgtrans(char *device1, char *device2, char **pkg, int options)
 {
-	BIO			*p7_bio = NULL;
-	EVP_PKEY		*privkey = NULL;
-	PKCS7			*sec_pkcs7 = NULL;
-	PKCS7_SIGNER_INFO	*sec_signerinfo = NULL;
-	PKG_ERR			*err;
-	STACK_OF(X509)		*cacerts = NULL;
-	STACK_OF(X509)		*clcerts = NULL;
-	STACK_OF(X509)		*sec_chain = NULL;
-	X509			*pubcert = NULL;
-	boolean_t		making_sig = B_FALSE;
 	char			*src, *dst;
 	int			errflg, i, n;
 	struct			dm_buf *hdr;
-
-	making_sig = (keystore != NULL) ? B_TRUE : B_FALSE;
-
-	if (making_sig) {
-
-		/* new error object */
-		err = pkgerr_new();
-
-		/* find matching cert and key */
-		if (find_key_cert_pair(err, keystore,
-		    keystore_alias, &privkey, &pubcert) != 0) {
-			pkgerr(err);
-			pkgerr_free(err);
-			return (1);
-		}
-
-		/* get CA certificates */
-		if (find_ca_certs(err, keystore, &cacerts) != 0) {
-			pkgerr(err);
-			pkgerr_free(err);
-			return (1);
-		}
-
-		/* get CL (aka "chain") certificates */
-		if (find_cl_certs(err, keystore, &clcerts) != 0) {
-			pkgerr(err);
-			pkgerr_free(err);
-			return (1);
-		}
-
-		/* initialize PKCS7 object to be filled in later */
-		sec_pkcs7 = PKCS7_new();
-		(void) PKCS7_set_type(sec_pkcs7, NID_pkcs7_signed);
-		sec_signerinfo = PKCS7_add_signature(sec_pkcs7,
-		    pubcert, privkey, EVP_sha1());
-
-		if (sec_signerinfo == NULL) {
-			progerr(gettext(ERR_SEC), keystore_alias);
-			ERR_print_errors_fp(stderr);
-			pkgerr_free(err);
-			return (1);
-		}
-
-		/* add signer cert into signature */
-		(void) PKCS7_add_certificate(sec_pkcs7, pubcert);
-
-		/* attempt to resolve cert chain starting at the signer cert */
-		if (get_cert_chain(err, pubcert, clcerts, cacerts,
-		    &sec_chain) != 0) {
-			pkgerr(err);
-			pkgerr_free(err);
-			return (1);
-		}
-
-		/*
-		 * add the verification chain of certs into the signature.
-		 * The first cert is the user cert, which we don't need,
-		 * since it's baked in already, so skip it
-		 */
-		for (i = 1; i < sk_X509_num(sec_chain); i++) {
-			(void) PKCS7_add_certificate(sec_pkcs7,
-			    sk_X509_value(sec_chain, i));
-		}
-
-		pkgerr_free(err);
-		err = NULL;
-	}
 
 	if (signal_received > 0) {
 		return (1);
@@ -415,17 +330,6 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 		if (ids_name) {
 			progerr(pkg_gt(ERR_TRANSFER));
 			logerr(pkg_gt(MSG_TWODSTREAM));
-			return (1);
-		}
-	} else {
-		/*
-		 * output device isn't a stream.  If we're making a signed
-		 * package, then fail, since we can't make signed,
-		 * non-stream pkgs
-		 */
-		if (making_sig) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(ERR_CANTSIGN));
 			return (1);
 		}
 	}
@@ -531,57 +435,11 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 			cleanup();
 			return (1);
 		}
-		if (making_sig) {
-			/* start up signature data stream */
-			(void) PKCS7_content_new(sec_pkcs7, NID_pkcs7_data);
-			(void) PKCS7_set_detached(sec_pkcs7, 1);
-			p7_bio = PKCS7_dataInit(sec_pkcs7, NULL);
 
-			/*
-			 * Here we generate all the data that will go into
-			 * the package, and send it through the signature
-			 * generator, essentially calculating the signature
-			 * of the entire package so we can place it in the
-			 * header.  Otherwise we'd have to place it at the end
-			 * of the pkg, which would break the ABI
-			 */
-			if (!(options & PT_SILENT)) {
-				(void) fprintf(stderr, pkg_gt(MSG_SIGNING),
-				    get_subject_display_name(pubcert));
-			}
-			if (dump_hdr_and_pkgs(p7_bio, hdr, pkg) != 0) {
-			    progerr(gettext(ERR_NOGEN));
-			    logerr(pkg_gt(MSG_GETVOL));
-			    cleanup();
-			    return (1);
-
-			}
-
-			BIO_flush(p7_bio);
-
-			/*
-			 * now generate PKCS7 signature
-			 */
-			if (!PKCS7_dataFinal(sec_pkcs7, p7_bio)) {
-			    progerr(gettext(ERR_NOGEN));
-			    logerr(pkg_gt(MSG_GETVOL));
-			    cleanup();
-			    return (1);
-			}
-
-			(void) BIO_free(p7_bio);
-		}
-
-		/* write out header to stream, which includes signature */
-		if (wdsheader(hdr, src, ods_name, pkg, sec_pkcs7)) {
+		/* write out header to stream */
+		if (wdsheader(hdr, ods_name, pkg)) {
 			cleanup();
 			return (1);
-		}
-
-		if (sec_pkcs7 != NULL) {
-			/* nuke in-memory signature for safety */
-			PKCS7_free(sec_pkcs7);
-			sec_pkcs7 = NULL;
 		}
 
 		ds_volno = 1; /* number of volumes in datastream */
@@ -630,8 +488,7 @@ _pkgtrans(char *device1, char *device2, char **pkg, int options,
 }
 
 int
-pkgtrans(char *device1, char *device2, char **pkg, int options,
-    keystore_handle_t keystore, char *keystore_alias)
+pkgtrans(char *device1, char *device2, char **pkg, int options)
 {
 	int			r;
 	struct sigaction	nact;
@@ -683,7 +540,7 @@ pkgtrans(char *device1, char *device2, char **pkg, int options,
 	 * perform the package translation
 	 */
 
-	r = _pkgtrans(device1, device2, pkg, options, keystore, keystore_alias);
+	r = _pkgtrans(device1, device2, pkg, options);
 
 	/*
 	 * reset signal handlers
@@ -922,20 +779,12 @@ genheader(char *src, char **pkg)
 }
 
 static int
-wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
+wdsheader(struct dm_buf *hdr, char *device, char **pkg)
 {
-	FILE	*fp;
-	char	path[PATH_MAX], tmp_entry[ENTRY_MAX],
-	    tmp_file[L_tmpnam+1];
-	char	srcpath[PATH_MAX];
+	char	tmp_entry[ENTRY_MAX], tmp_file[L_tmpnam+1];
 	int	i, n;
 	int	list_fd;
 	int	block_cnt;
-	int 	len;
-	char	cwd[MAXPATHLEN + 1];
-	boolean_t	making_sig = B_FALSE;
-
-	making_sig = (sig != NULL) ? B_TRUE : B_FALSE;
 
 	(void) ds_close(0);
 	if (dstdev.pathname)
@@ -982,161 +831,32 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 	 * Create a cpio-compatible list of the requisite files in
 	 * the temporary file.
 	 */
-	if (!making_sig) {
-		for (i = 0; pkg[i]; i++) {
-			register ssize_t entry_size;
-
-			/*
-			 * Copy pkginfo and pkgmap filenames into the
-			 * temporary string allowing for the first line
-			 * as a special case.
-			 */
-			entry_size = sprintf(tmp_entry,
-			    (i == 0) ? "%s/%s\n%s/%s" : "\n%s/%s\n%s/%s",
-			    pkg[i], PKGINFO, pkg[i], PKGMAP);
-
-			if (write(list_fd, tmp_entry,
-			    entry_size) != entry_size) {
-				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_NOTMPFIL), tmp_file);
-				(void) close(list_fd);
-				ecleanup();
-				return (1);
-			}
-		}
-
-	} else {
+	for (i = 0; pkg[i]; i++) {
 		register ssize_t entry_size;
 
 		/*
-		 * if we're making a signature, we must make a
-		 * temporary area full of symlinks to the requisite
-		 * files, plus an extra entry for the signature, so
-		 * that cpio will put all files and signature in the
-		 * same archive in a single invocation of cpio.
+		 * Copy pkginfo and pkgmap filenames into the
+		 * temporary string allowing for the first line
+		 * as a special case.
 		 */
-		tmpsymdir = xstrdup(tmpnam(NULL));
+		entry_size = sprintf(tmp_entry,
+		    (i == 0) ? "%s/%s\n%s/%s" : "\n%s/%s\n%s/%s",
+		    pkg[i], PKGINFO, pkg[i], PKGMAP);
 
-		if (mkdir(tmpsymdir,  S_IRWXU)) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_MKDIR), tmpsymdir);
-			return (1);
-		}
-
-		/* generate the signature */
-		if (((len = snprintf(path, PATH_MAX, "%s/%s",
-		    tmpsymdir, SIGNATURE_FILENAME)) >= PATH_MAX) ||
-		    len < 0) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_NOTMPFIL), tmpsymdir);
-			cleanup();
-			return (1);
-		}
-
-		if ((fp = fopen(path, "w")) == NULL) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_NOTMPFIL), path);
-			cleanup();
-			return (1);
-		}
-		(void) PEM_write_PKCS7(fp, sig);
-		(void) fclose(fp);
-
-		for (i = 0; pkg[i]; i++) {
-			(void) snprintf(path, sizeof (path),
-			    "%s/%s", tmpsymdir, pkg[i]);
-			if (mkdir(path, 0755)) {
-				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_MKDIR), path);
-				cleanup();
-				return (1);
-			}
-			(void) snprintf(path, sizeof (path),
-			    "%s/%s/%s", tmpsymdir, pkg[i], PKGINFO);
-			(void) snprintf(srcpath, sizeof (srcpath),
-			    "%s/%s/%s", src, pkg[i], PKGINFO);
-			if (symlink(srcpath, path) != 0) {
-				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_SYMLINK), path, srcpath);
-				cleanup();
-				return (1);
-			}
-
-			(void) snprintf(path, sizeof (path),
-			    "%s/%s/%s", tmpsymdir, pkg[i], PKGMAP);
-			(void) snprintf(srcpath, sizeof (srcpath),
-			    "%s/%s/%s", src, pkg[i], PKGMAP);
-			if (symlink(srcpath, path) != 0) {
-				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_SYMLINK), path, srcpath);
-				cleanup();
-				return (1);
-			}
-
-			/*
-			 * Copy pkginfo and pkgmap filenames into the
-			 * temporary string allowing for the first line
-			 * as a special case.
-			 */
-			entry_size = snprintf(tmp_entry, sizeof (tmp_entry),
-			    (i == 0) ? "%s/%s\n%s/%s" : "\n%s/%s\n%s/%s",
-			    pkg[i], PKGINFO, pkg[i], PKGMAP);
-
-			if (write(list_fd, tmp_entry,
-			    entry_size) != entry_size) {
-				progerr(pkg_gt(ERR_TRANSFER));
-				logerr(pkg_gt(MSG_NOTMPFIL), tmp_file);
-				(void) close(list_fd);
-				ecleanup();
-				cleanup();
-				return (1);
-			}
-		}
-
-		/* add signature to list of files */
-		entry_size = snprintf(tmp_entry, sizeof (tmp_entry), "\n%s",
-		    SIGNATURE_FILENAME);
-		if (write(list_fd, tmp_entry, entry_size) != entry_size) {
+		if (write(list_fd, tmp_entry,
+		    entry_size) != entry_size) {
 			progerr(pkg_gt(ERR_TRANSFER));
 			logerr(pkg_gt(MSG_NOTMPFIL), tmp_file);
 			(void) close(list_fd);
 			ecleanup();
-			cleanup();
 			return (1);
 		}
 	}
 
 	(void) lseek(list_fd, 0, SEEK_SET);
 
-	if (!making_sig) {
-		(void) snprintf(tmp_entry, sizeof (tmp_entry),
-		    "%s -ocD -C %d", CPIOPROC, (int)BLK_SIZE);
-	} else {
-		/*
-		 * when making a signature, we must make sure to follow
-		 * symlinks during the cpio so that we don't archive
-		 * the links themselves
-		 */
-		(void) snprintf(tmp_entry, sizeof (tmp_entry),
-		    "%s -ocDL -C %d", CPIOPROC, (int)BLK_SIZE);
-	}
-
-	if (making_sig) {
-		/* save cwd and change to symlink dir for cpio invocation */
-		if (getcwd(cwd, MAXPATHLEN + 1) == NULL) {
-			logerr(pkg_gt(ERR_GETWD));
-			progerr(pkg_gt(ERR_TRANSFER));
-			cleanup();
-			return (1);
-		}
-
-		if (chdir(tmpsymdir)) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_CHDIR), tmpsymdir);
-			cleanup();
-			return (1);
-		}
-	}
+	(void) snprintf(tmp_entry, sizeof (tmp_entry),
+	    "%s -ocD -C %d", CPIOPROC, (int)BLK_SIZE);
 
 	if (n = esystem(tmp_entry, list_fd, ds_fd)) {
 		rpterr();
@@ -1151,15 +871,6 @@ wdsheader(struct dm_buf *hdr, char *src, char *device, char **pkg, PKCS7 *sig)
 	(void) close(list_fd);
 	(void) unlink(tmp_file);
 
-	if (making_sig) {
-		/* change to back to src dir for subsequent operations */
-		if (chdir(cwd)) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_CHDIR), cwd);
-			cleanup();
-			return (1);
-		}
-	}
 	return (0);
 }
 
@@ -1679,135 +1390,6 @@ pkgxfer(char *srcinst, int options)
 	return (0);
 }
 
-/*
- * Name:		pkgdump
- * Description:	Dump a cpio archive of a package's contents to a BIO.
- *
- * Arguments:	srcinst - Name of package, which resides on the
- *		device pointed to by the static 'srcdev' variable,
- *		to dump.
- *		bio - BIO object to dump data to
- *
- * Returns :   	0 - success
- *		nonzero - failure.  errors printed to screen.
- */
-static int
-pkgdump(char *srcinst, BIO *bio)
-{
-	FILE	*fp;
-	char	*src;
-	char	temp[MAXPATHLEN],
-		srcdir[MAXPATHLEN],
-		cmd[CMDSIZE];
-	int	i, n, part, nparts, maxpartsize, iscomp;
-
-	/*
-	 * when this routine is entered, the entire package
-	 * is already available at 'src' - including the
-	 * pkginfo/pkgmap files and the objects as well.
-	 */
-
-	/* read the pkgmap to get it's size information */
-	if ((fp = fopen(PKGMAP, "r")) == NULL) {
-		progerr(pkg_gt(ERR_TRANSFER));
-		logerr(pkg_gt(MSG_NOPKGMAP), srcinst);
-		return (1);
-	}
-
-	nparts = 1;
-	if (!rd_map_size(fp, &nparts, &maxpartsize, &compressedsize))
-		return (1);
-	else
-		(void) fclose(fp);
-
-	/* make sure the first volume is available */
-	if (srcdev.mount) {
-		src = srcdev.dirname;
-		(void) snprintf(srcdir, MAXPATHLEN, "%s/%s", src, srcinst);
-		if (ckvolseq(srcdir, 1, nparts)) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_SEQUENCE));
-			return (1);
-		}
-	}
-
-	/*
-	 * form cpio command that will output the contents of all of
-	 * this package's parts
-	 */
-	for (part = 1; part <= nparts; /* void */) {
-
-		if (part == 1) {
-			(void) snprintf(cmd, CMDSIZE, "find %s %s",
-			    PKGINFO, PKGMAP);
-			if (nparts && (isdir(INSTALL) == 0)) {
-				(void) strlcat(cmd, " ", sizeof (cmd));
-				(void) strlcat(cmd, INSTALL, sizeof (cmd));
-			}
-		} else
-			(void) snprintf(cmd, CMDSIZE, "find %s", PKGINFO);
-
-		if (nparts > 1) {
-			(void) snprintf(temp, MAXPATHLEN, "%s.%d", RELOC, part);
-			if (iscpio(temp, &iscomp) || isdir(temp) == 0) {
-				(void) strlcat(cmd, " ", CMDSIZE);
-				(void) strlcat(cmd, temp, CMDSIZE);
-			}
-			(void) snprintf(temp, MAXPATHLEN, "%s.%d", ROOT, part);
-			if (iscpio(temp, &iscomp) || isdir(temp) == 0) {
-				(void) strlcat(cmd, " ", CMDSIZE);
-				(void) strlcat(cmd, temp, CMDSIZE);
-			}
-			(void) snprintf(temp, MAXPATHLEN, "%s.%d",
-			    ARCHIVE, part);
-			if (isdir(temp) == 0) {
-				(void) strlcat(cmd, " ", CMDSIZE);
-				(void) strlcat(cmd, temp, CMDSIZE);
-			}
-		} else if (nparts) {
-			for (i = 0; reloc_names[i] != NULL; i++) {
-				if (iscpio(reloc_names[i], &iscomp) ||
-				    isdir(reloc_names[i]) == 0) {
-					(void) strlcat(cmd, " ", CMDSIZE);
-					(void) strlcat(cmd, reloc_names[i],
-					    CMDSIZE);
-				}
-			}
-			for (i = 0; root_names[i] != NULL; i++) {
-				if (iscpio(root_names[i], &iscomp) ||
-				    isdir(root_names[i]) == 0) {
-					(void) strlcat(cmd, " ", CMDSIZE);
-					(void) strlcat(cmd, root_names[i],
-					    CMDSIZE);
-				}
-			}
-			if (isdir(ARCHIVE) == 0) {
-				(void) strlcat(cmd, " ", CMDSIZE);
-				(void) strlcat(cmd, ARCHIVE, CMDSIZE);
-			}
-		}
-
-		(void) snprintf(cmd + strlen(cmd),
-		    sizeof (cmd) - strlen(cmd),
-		    " -print | %s -ocD -C %d",
-		    CPIOPROC, (int)BLK_SIZE);
-		/*
-		 * execute the command, dumping all standard output
-		 * to the BIO.
-		 */
-		n = BIO_dump_cmd(cmd, bio);
-		if (n != 0) {
-			rpterr();
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_CMDFAIL), cmd, n);
-			return (1);
-		}
-
-		part++;
-	}
-	return (0);
-}
-
 static void
 sigtrap(int signo)
 {
@@ -1844,130 +1426,4 @@ cleanup(void)
 	if (dstdev.mount && !ods_name)
 		(void) pkgumount(&dstdev);
 	(void) ds_close(1);
-}
-
-/*
- * Name:		dump_hdr_and_pkgs
- * Description:	Dumps datastream header and each package's contents
- *		to the supplied BIO
- *
- * Arguments:	bio - BIO object to dump data to
- *		hdr - Header for the datastream being dumped
- *		pkglist - NULL-terminated list of packages
- *		to dump.  The location of the packages are stored
- *		in the static 'srcdev' variable.
- *
- * Returns :   	0 - success
- *		nonzero - failure.  errors printed to screen.
- */
-static int
-dump_hdr_and_pkgs(BIO *bio, struct dm_buf *hdr, char **pkglist)
-{
-	int	block_cnt, i;
-	char	srcdir[MAXPATHLEN];
-	char	cwd[MAXPATHLEN + 1];
-	char	*src;
-
-	/* write out the header to the signature stream */
-	for (block_cnt = 0; block_cnt < hdr->allocation;
-		block_cnt += BLK_SIZE) {
-		(void) BIO_write(bio, (hdr->text_buffer + block_cnt), BLK_SIZE);
-	}
-
-	/* save current directory */
-	if (getcwd(cwd, MAXPATHLEN + 1) == NULL) {
-		logerr(pkg_gt(ERR_GETWD));
-		progerr(pkg_gt(ERR_TRANSFER));
-		return (1);
-	}
-
-	/* now write out each package's contents */
-	for (i = 0; pkglist[i]; i++) {
-		/*
-		 * change to the source dir, so we can find and dump
-		 * the package(s) bits into the BIO
-		 *
-		 */
-		src = srcdev.dirname;
-
-		/* change to the package source directory */
-		(void) snprintf(srcdir, MAXPATHLEN, "%s/%s", src, pkglist[i]);
-		if (chdir(srcdir)) {
-			progerr(pkg_gt(ERR_TRANSFER));
-			logerr(pkg_gt(MSG_CHDIR), srcdir);
-			return (1);
-		}
-
-		if (pkgdump(pkglist[i], bio)) {
-			pkglist[i] = NULL;
-			return (1);
-		}
-	}
-
-	/* change back to directory we were in upon entering this routine */
-	if (chdir(cwd)) {
-		progerr(pkg_gt(ERR_TRANSFER));
-		logerr(pkg_gt(MSG_CHDIR), cwd);
-		return (1);
-	}
-
-	return (0);
-}
-
-/*
- * Name:		BIO_dump_cmd
- * Description:	Dump the output of invoking a command
- *		to a BIO.
- *
- * Arguments:	cmd - Command to invoke
- *		bio - BIO to dump output of command to
- *		only 'stdout' is dumped.
- * Returns :   	0 - success
- *		nonzero - failure.  errors printed to screen.
- */
-int
-BIO_dump_cmd(char *cmd, BIO *bio)
-{
-	char	buf[BLK_SIZE];
-	FILE	*fp;
-	int	rc;
-
-	/* start up the process */
-	if ((fp = epopen(cmd, "r")) == NULL) {
-		rpterr();
-		return (1);
-	}
-
-	/* read output in chunks, transfer to BIO */
-	while (fread(buf, BLK_SIZE, 1, fp) == 1) {
-		if (BIO_write(bio, buf, BLK_SIZE) != BLK_SIZE) {
-			(void) sighold(SIGINT);
-			(void) sighold(SIGHUP);
-			(void) epclose(fp);
-			(void) sigrelse(SIGINT);
-			(void) sigrelse(SIGHUP);
-			rpterr();
-			return (1);
-		}
-	}
-
-	/* done with stream, make sure no errors were encountered */
-	if (ferror(fp)) {
-		(void) epclose(fp);
-		rpterr();
-		return (1);
-	}
-
-	/* done, close stream, report any errors */
-	(void) sighold(SIGINT);
-	(void) sighold(SIGHUP);
-	rc = epclose(fp);
-	(void) sigrelse(SIGINT);
-	(void) sigrelse(SIGHUP);
-	if (rc != 0) {
-		rpterr();
-		return (1);
-	}
-
-	return (rc);
 }

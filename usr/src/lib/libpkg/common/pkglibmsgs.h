@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -54,8 +58,6 @@ extern "C" {
 
 /* pkgtrans messages */
 #define	MSG_TRANSFER	"Transferring <%s> package instance\n"
-#define	MSG_STORE_ACC	"Retrieving signature certificates from <%s>\n"
-#define	MSG_SIGNING	"Generating digital signature for signer <%s>\n"
 #define	MSG_RENAME 	"\t... instance renamed <%s> on destination\n"
 
 #define	ERR_TRANSFER	"unable to complete package transfer"
@@ -89,124 +91,6 @@ extern "C" {
 			"datastream"
 #define	MSG_OPEN	"- open of <%s> failed, errno=%d"
 #define	MSG_STATVFS	"- statvfs(%s) failed, errno=%d"
-
-/* security problems */
-#define	ERR_PARSE		"unable to parse keystore <%s>, invalid " \
-				"format or corrupt"
-#define	ERR_BADPASS		"Invalid password.  Password does not " \
-				"decrypt keystore"
-
-#define	MSG_PASSWD_FILE		"Password file <%s> cannot be read"
-#define	MSG_PASSWD_AGAIN	"For Verification"
-#define	MSG_PASSWD_NOMATCH	"Passwords do not match"
-#define	MSG_BADPASSARG		"Password retrieval method <%s> invalid"
-#define	MSG_NOPASS		"Cannot get passphrase using " \
-				"retrieval method <%s>"
-
-#define	ERR_MISMATCHPASS	"<%s> encrypted with different password " \
-				" than <%s>, keystore <%s> corrupt"
-
-#define	MSG_CHSIGDIR	"- unable to change directory to <%s/%s>"
-#define	MSG_MKSIGDIR	"- unable to make directory <%s/%s>"
-#define	ERR_CANTSIGN	"- destination device must be datastream in order to" \
-			" sign contents"
-#define	ERR_STORE	"unable to find or use store <%s> from application " \
-			"<%s>:<%s>"
-
-#define	ERR_NO_KEYSTORE	"unable to open keystore <%s> for reading"
-#define	ERR_NOT_REG	"<%s> is not a regular file"
-#define	ERR_KEYSTORE_CORRUPT	"Keystore file <%s> is corrupt or unparseable"
-#define	ERR_KEYSTORE_REPAIR	"unable to repair keystore <%s>"
-#define	ERR_KEYSTORE_LOCKED_READ	"unable to lock keystore file <%s> " \
-					"for reading, try again later"
-#define	ERR_KEYSTORE_LOCKED	"unable to lock keystore <%s> for exclusive " \
-				"access"
-#define	ERR_KEYSTORE_UNLOCK	"unable to unlock keystore <%s> for " \
-				"application <%s>"
-#define	ERR_KEYSTORE_WRITE	"unable to open keystore <%s> for writing"
-#define	ERR_KEYSTORE_REMOVE	"unable to delete keystore file <%s>"
-#define	ERR_KEYSTORE_READ	"unable to open keystore <%s> for reading"
-#define	ERR_KEYSTORE_OPEN	"unable to open keystore <%s>:<%s>"
-#define	ERR_KEYSTORE_FORM	"unable to form PKCS12 keystore file for " \
-				"writing to <%s>"
-
-#define	ERR_KEYSTORE_NOPUBCERTS	"unable to find any public key certificates " \
-				"in keystore file <%s>"
-
-#define	ERR_KEYSTORE_NOPRIVKEYS	"unable to find any private keys in keystore "\
-				"file <%s>"
-
-#define	ERR_KEYSTORE_NOCACERTS	"unable to find any trusted certificates in "\
-				"file <%s>"
-
-#define	ERR_KEYSTORE_NOTRUST	"unable to find any trusted certificates in "\
-				"keystore"
-
-#define	ERR_KEYSTORE_NOMATCH	"unable to find certificate and key pair " \
-				"with alias <%s> in keystore"
-
-#define	ERR_KEYSTORE_DUPLICATECERT	"Certificate with alias <%s> " \
-					"already exists in keystore"
-#define	ERR_KEYSTORE_DUPLICATEKEY	"Private key with alias <%s> already" \
-					" exists in keystore"
-#define	ERR_KEYSTORE_NO_ALIAS	"Keystore certificate <%s> has no recorded " \
-				"alias, must be deleted from keystore"
-#define	ERR_KEYSTORE_NOCERT	"No certificate with alias <%s> found in " \
-				"keystore <%s>"
-#define	ERR_KEYSTORE_NOCERTKEY	"No certificates or private keys with alias " \
-				"<%s> found in keystore <%s>"
-
-#define	ERR_KEYSTORE_INTERNAL	"Internal Error file %s line %d"
-
-#define	ERR_CURR_TIME	"Cannot determine current time from system"
-#define	ERR_CERT_TIME	"Certificate <%s> has expired or is not yet valid.\n" \
-			"Current time: <%s>\n  Certificate valid: <%s> - <%s>"
-#define	ERR_MISMATCHED_KEYS	"Private key does not match public key in " \
-			"certificate <%s>"
-#define	ERR_CERT_TIME_BAD	"Certificate has corrupt validity dates, " \
-				"cannot process"
-#define	ERR_TRUSTSTORE	"unable to find or use trusted certificate " \
-			"store <%s> from application <%s>:<%s>"
-
-#define	ERR_STORE_PW	"unable to read password from <%s>"
-
-#define	ERR_SEC		"unable to sign package contents using <%s> " \
-			"private key"
-
-#define	ERR_NOGEN	"unable to generate digital signature"
-
-#define	ERR_STORE_PW	"unable to read password from <%s>"
-#define	ERR_CORRUPTSIG  "Invalid or corrupt signature in datastream <%s>"
-#define	ERR_CORRUPTSIG_TYPE  "Wrong PKCS7 signature type in datastream <%s>"
-#define	ERR_CORRUPTSIG_DT   "Signature found but not detached in " \
-	"datastream <%s>"
-#define	ERR_KEYSTORE	"invalid or corrupt PKCS12 file <%s>."
-#define	ERR_KEYSTORE_NOCERTS "Store <%s> contains no certificates"
-#define	ERR_KEYSTORE_NOKEYS "Store <%s> contains no private keys"
-#define	ERR_SIG_INT "Internal error during signature verification."
-#define	MSG_VERIFY  "## Verifying signature for signer <%s>"
-#define	MSG_VERIFY_OK  "## Signature for signer <%s> verified."
-#define	ERR_VERIFY  "Signature verification failed."
-#define	ERR_VERIFY_SIG  "Signature verification failed while verifying " \
-			"certificate <subject=%s, issuer=%s>:<%s>."
-#define	ERR_VERIFY_ISSUER  "Could not find issuer certificate for signer <%s>"
-#define	ERR_OPENSIG	"Signature found in datastream but cannot be " \
-			" opened: <%s>"
-
-#define	ERR_SIGFOUND	"signature found in datastream <%s>, you must " \
-	"specify a keystore with -k"
-#define	ERR_DSINIT  "could not process datastream from <%s>"
-
-#define	MSG_KEYSTORE_AL	"Keystore Alias"
-#define	MSG_KEYSTORE_SN	"Serial Number"
-#define	MSG_KEYSTORE_FP	"Fingerprint"
-#define	MSG_KEYSTORE_CN	"Common Name"
-#define	MSG_KEYSTORE_IN "Issuer Common Name"
-#define	MSG_KEYSTORE_VD	"Validity Dates"
-#define	MSG_KEYSTORE_TY	"Certificate Type"
-#define	MSG_KEYSTORE_TRUSTED	"Trusted Certificate"
-#define	MSG_KEYSTORE_UNTRUSTED	"Signing Certificate"
-#define	MSG_KEYSTORE_UNKNOWN	"Unknown"
 
 /* parameter errors */
 #define	ERR_LEN		"length of parameter <%s> value exceeds limit"
@@ -337,92 +221,7 @@ extern "C" {
 #define	ERR_SETUID	"setuid(%d) failed."
 #define	ERR_EX_FAIL	"exec of %s failed, errno=%d"
 
-/* pkgweb errors */
-#define	MSG_DWNLD "\n## Downloading..."
-#define	ERR_DWNLD_FAILED "\n## After %d retries, unable to complete transfer"
-#define	MSG_DWNLD_TIMEOUT "\n## Timed out, retrying..."
-#define	MSG_DWNLD_CONNREF "\n## Connection to <%s> refused, retrying..."
-#define	MSG_DWNLD_HOSTDWN "\n## <%s> not responding, retrying..."
-#define	MSG_DWNLD_PART "\n## Found partially downloaded file <%s> of " \
-			"size <%ld> bytes.  To force a complete " \
-			"re-download, delete this file and try again"
-#define	MSG_DWNLD_PREV "\n## Using previously spooled package datastream <%s>"
-#define	MSG_DWNLD_CONT "\n## Continuing previously attempted download..."
-#define	MSG_DWNLD_COMPLETE "## Download Complete\n"
-
-#define	ERR_DWNLD_NO_CONT "unable to open partially downloaded file <%s> " \
-				"for appending"
-#define	ERR_BAD_PATH "unable to locate keystore."
-#define	ERR_EMPTYPATH "No valid path exists for the keystore file."
-#define	ERR_RETRIES "The number of server retries is not a valid " \
-	"value. Please specify a value within the range of %d - %d."
-#define	ERR_TIMEOUT "The network timeout value is not a valid " \
-	"value. Please specify a value within the range of %d - %d."
-#define	ERR_PARSE_URL "unable to parse the url <%s>."
 #define	ERR_MEM "unable to allocate memory."
-#define	ERR_HTTPS_PASSWD "unable set password for HTTPS connection."
-#define	ERR_HTTPS_CA "unable to set CA file for HTTPS connection."
-#define	ERR_HTTP "Failure occurred with http(s) negotiation: <%s>"
-#define	ERR_WRITE "Cannot write to file <%s> : <%s>"
-#define	ERR_READ "Cannot read from file <%s> : <%s>"
-#define	ERR_SVR_RESP "unable to establish a connection with the http(s) server."
-#define	ERR_INIT_CONN "unable to establish a connection with <%s>."
-#define	ERR_INIT_SESS "unable to intialize download session for <%s>."
-#define	ERR_INIT_CONN_PROXY "unable to establish a connection with <%s> " \
-	"using <%s> as the proxy"
-#define	ERR_CLOSE_CONN "unable to close the connection with <%s>."
-#define	ERR_NO_HEAD_VAL "HTTP Response did not include header <%s>."
-/* CSTYLED */
-#define	ERR_BAD_HEAD_VAL "HTTP Header value \"<%s>: <%s>\" unusable or " \
-			"unparseable."
-#define	ERR_BAD_CONTENT "The package <%s> attempting to be installed " \
-	"is illegal."
-#define	ERR_DWNLD "unable to download package datastream from <%s>."
-#define	ERR_OPEN_TMP "unable to open temporary file for writing."
-#define	ERR_WRITE_TMP "unable to write to temporary file."
-#define	ERR_DISK_SPACE "Not enough disk space is available to download " \
-	"package to\n%s. %llukb needed, %llukb available."
-#define	ERR_CERTS "unable to find a valid certificate in <%s>."
-#define	ERR_CERTCHAIN "unable to build certificate chain for subject <%s>:<%s>."
-#define	ERR_ILL_ENV "The environment variable <%s=%s> is illegal"
-#define	ERR_BAD_PROXY "Invalid proxy specification: <%s>"
-#define	ERR_TMPDIR "unable to find temporary directory <%s>"
-#define	ERR_MEM "unable to allocate memory."
-#define	ERR_NO_DWNLD_DIR "No download directory available."
-#define	MSG_OCSP_VERIFY "## Contacting OCSP Responder <%s> for " \
-			"certificate <%s> status"
-#define	MSG_OCSP_VERIFY_PROXY "## Contacting OCSP Responder <%s> through " \
-				"proxy <%s:%d> for certificate <%s> status"
-#define	ERR_OCSP_PARSE "OCSP Responder URL <%s> invalid or unparseable"
-#define	ERR_OCSP_RESP_PARSE "OCSP Response <%s> unparseable or empty"
-#define	ERR_OCSP_RESP_NOTOK "OCSP Request failed.  Expected status " \
-			"<%d>, got <%d>, Reason=<%s>"
-#define	WRN_OCSP_RESP_NONCE "WARNING: Invalid or no nonce found in " \
-			"OCSP response."
-#define	ERR_OCSP_RESP_TYPE "OCSP response message type invalid: <%s>, " \
-			"expecting <%s>"
-#define	ERR_OCSP_CONNECT "Cannot connect to OCSP Responder <%s> port <%d>"
-#define	ERR_OCSP_SEND "Cannot send OCSP request to OCSP Responder <%s>"
-#define	ERR_OCSP_READ "Cannot read OCSP response from OCSP Responder <%s>"
-#define	ERR_OCSP_RESPONDER "OCSP Responder cannot process OCSP Request"
-#define	ERR_OCSP_UNSUP "Unsupported OCSP Option <%s>"
-#define	ERR_OCSP_VERIFY_NOTIME "Cannot access system time() to determine " \
-				"OCSP Response validity"
-#define	ERR_OCSP_VERIFY_SIG "OCSP Response, signed by <%s>, cannot be " \
-			"verified: <%s>"
-#define	ERR_OCSP_VERIFY_FAIL "unable to validate response from OCSP " \
-			"Responder <%s>"
-#define	ERR_OCSP_VERIFY_NO_STATUS "OCSP Responder did not supply validity " \
-				"of certificate <%s> "
-#define	ERR_OCSP_VERIFY_VALIDITY_NOTBEFORE "OCSP Response is only valid " \
-			"after <%s>.  Current time is <%s>."
-#define	ERR_OCSP_VERIFY_VALIDITY "OCSP Response is only valid from <%s> " \
-			"to <%s>.  Current time is <%s>."
-#define	ERR_OCSP_VERIFY_STATUS "OCSP Responder indicates certificate <%s> " \
-			"status is <%s>"
-#define	ERR_OCSP_VERIFY "OCSP Responder rejected certificate, or did not " \
-			"recognize"
-#define	ERR_OCSP_NO_URI "No OCSP Responder URL"
 
 #define	MSG_BASE_USED   "Using <%s> as the package base directory."
 

@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -335,7 +339,6 @@ extern "C" {
 #define	DBG_REMOVE_PKG_FROM_ZONE	gettext("removing package <%s> from zone <%s>")
 #define	DBG_REMOVING_DSTREAM_PKGDIR	gettext("removing temporary stream <%s> for package <%s>")
 #define	DBG_REMOVING_DSTREAM_TMPDIR	gettext("removing package datastream temporary directory <%s>")
-#define	DBG_REMOVING_DWNLD_TMPDIR	gettext("removing download temporary directory <%s>")
 #define	DBG_REMOVING_PKG_TMPDIR		gettext("removing temporary directory <%s> for package <%s>")
 #define	DBG_REMOVING_ZONE_TMPDIR	gettext("removing zones temporary directory <%s>")
 #define	DBG_RESTORE_ZONE_STATE		gettext("restoring state of zone <%s>")
@@ -405,8 +408,6 @@ extern "C" {
 
 #define	ERR_ACCRESP			gettext("unable to access response file <%s>")
 #define	ERR_ADMBD			gettext("%s is already installed at %s. Admin file will force a duplicate installation at %s.")
-#define	ERR_ADM_KEYSTORE		gettext("unable to determine keystore location")
-#define	ERR_ADM_PROXY			gettext("Admin file proxy setting invalid")
 #define	ERR_ALLZONES_AND_G_USED		gettext("The -G option (install packages in the global zone only)\nmay not be used with package <%s> because the package must be\ninstalled in all zones.")
 #define	ERR_ALLZONES_AND_IN_LZ		gettext("The package <%s> may only be installed by the global zone administrator")
 #define	ERR_ALLZONES_AND_IN_LZ_PKGRM	gettext("The package <%s> may only be removed by the global zone administrator")
@@ -468,7 +469,6 @@ extern "C" {
 #define	ERR_DSINIT			gettext("could not process datastream from <%s>")
 #define	ERR_DSTREAM			gettext("unable to unpack datastream")
 #define	ERR_DSTREAMCNT 			gettext("datastream early termination problem")
-#define	ERR_DWNLDTEMPDIR		gettext("unable to make temporary directory for download operations in directory <%s>: %s")
 #define	ERR_FCHMOD			gettext("unable to change mode of file <%s> to <0x%04lx>: (%d) %s")
 #define	ERR_FINALCK_ATTR		gettext("ERROR: attribute verification of <%s> failed")
 #define	ERR_FINALCK_CONT		gettext("ERROR: content verification of <%s> failed")
@@ -477,8 +477,6 @@ extern "C" {
 #define	ERR_FSTAT			gettext("unable to fstat fd <%d> pathname <%s>: (%d) %s")
 #define	ERR_GPKGLIST_ERROR		gettext("unable to determine list of packages to operate on (internal error in gpkglist)")
 #define	ERR_GZ_USED_TOGETHER		gettext("the -G and zonelist options cannot be used together")
-#define	ERR_ILL_HTTP_OPTS		gettext("The -i and (-k or -P) options are mutually exclusive.")
-#define	ERR_ILL_PASSWD			gettext("A password is required to retrieve the public certificate from the keystore.")
 #define	ERR_INCOMP_VERS			gettext("A version of <%s> package \"%s\" (which is incompatible with the package that is being installed) is currently installed and must be removed.")
 #define	ERR_INPUT			gettext("error while reading file <%s>: (%d) %s")
 #define	ERR_INSTALL_ZONES_SKIPPED	gettext("unable to boot <%d> zones that are not currently running - no packages installed on those zones")
@@ -544,12 +542,8 @@ extern "C" {
 #define	ERR_PKGADDCHK_MKPKGDIR		gettext("Unable to make required packaging directory")
 #define	ERR_PKGADDCHK_PRIVFAILED	gettext("Privilege checking failed.")
 #define	ERR_PKGADDCHK_SPCFAILED		gettext("Space checking failed.")
-#define	ERR_PKGASK_AND_IGNORE_SIG	gettext("cannot use the -i option with pkgask")
-#define	ERR_PKGASK_AND_KEYSTORE_FILE	gettext("cannot use the -k option with pkgask")
 #define	ERR_PKGASK_AND_NOINTERACT	gettext("cannot use the -n option with pkgask")
-#define	ERR_PKGASK_AND_PROXY		gettext("cannot use the -x option with pkgask")
 #define	ERR_PKGASK_AND_SPOOLDIR		gettext("cannot use the -s option with pkgask")
-#define	ERR_PKGASK_AND_URI		gettext("cannot use web based sources via -d with pkgask")
 #define	ERR_PKGBINCP			gettext("unable to copy <%s>\n\tto <%s>")
 #define	ERR_PKGBINREN  			gettext("unable to rename <%s>\n\tto <%s>")
 #define	ERR_PKGINFO			gettext("unable to open pkginfo file <%s>")
@@ -586,7 +580,6 @@ extern "C" {
 #define	ERR_PRERVFY_NOFILE		gettext("unable to perform preremoval check of package <%s> in zone <%s>")
 #define	ERR_PRERVFY_OPEN_FILE		gettext("unable to examine preremoval check file <%s> for package <%s> in zone <%s>: %s")
 #define	ERR_PRERVFY_UNKNOWN_LINE	gettext("unknown preremoval dependency check line <%s> for package <%s> zone <%s>: ignored")
-#define	ERR_PROXY			gettext("Proxy specification <%s> invalid")
 #define	ERR_RDONLY			gettext("read-only parameter <%s> cannot be assigned a value")
 #define	ERR_READ			gettext("unable to read <%s>: (%d) %s")
 #define	ERR_REMOVE			gettext("unable to remove file <%s>: %s")
@@ -594,7 +587,6 @@ extern "C" {
 #define	ERR_REQUEST			gettext("request script did not complete successfully")
 #define	ERR_RESOLVEPATH			gettext("unable to resolve path <%s>: %s")
 #define	ERR_RESPFILE			gettext("response file is invalid for pre-SVR4 package")
-#define	ERR_RESPFILE_AND_URI		gettext("cannot use -r option with web based sources via -d")
 #define	ERR_RESPONSE			gettext("unable to open response file <%s>")
 #define	ERR_RMDIR			gettext("unable to remove existing directory at <%s>")
 #define	ERR_RMPATH			gettext("unable to remove <%s>")
@@ -651,12 +643,12 @@ extern "C" {
 #define	ERR_UNSUCC			gettext("(A previous attempt may have been unsuccessful.)")
 
 #ifdef Z_OPTION_IS_SUPPORTED
-#define	ERR_USAGE_PKGADD_GLOBALZONE	gettext("usage:\n\t%s [-nvi] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-x proxy] [-k keystore] [-G|-Z] [-P passwd] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-x proxy] [-k keystore] [-G|-Z] [-P passwd] [-Y category[,category ...] | pkg [pkg ...]]\n")
+#define	ERR_USAGE_PKGADD_GLOBALZONE	gettext("usage:\n\t%s [-nv] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-G|-Z] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-G|-Z] [-Y category[,category ...] | pkg [pkg ...]]\n")
 #else
-#define	ERR_USAGE_PKGADD_GLOBALZONE	gettext("usage:\n\t%s [-nvi] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-x proxy] [-k keystore] [-G] [-P passwd] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-x proxy] [-k keystore] [-G] [-P passwd] [-Y category[,category ...] | pkg [pkg ...]]\n")
+#define	ERR_USAGE_PKGADD_GLOBALZONE	gettext("usage:\n\t%s [-nv] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-G] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-G] [-Y category[,category ...] | pkg [pkg ...]]\n")
 #endif
 
-#define	ERR_USAGE_PKGADD_NONGLOBALZONE	gettext("usage:\n\t%s [-nvi] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-x proxy] [-k keystore] [-P passwd] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-x proxy] [-k keystore] [-P passwd] [-Y category[,category ...] | pkg [pkg ...]]\n")
+#define	ERR_USAGE_PKGADD_NONGLOBALZONE	gettext("usage:\n\t%s [-nv] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-Y category[,category ...] | pkg [pkg ...]]\n")
 #define	ERR_USAGE_PKGASK		gettext("usage: %s -r response [-d device]  [-R host_path] [-Y category[,category ...]] | [pkg [pkg ...]]\n")
 #define	ERR_USAGE_PKGINSTALL  		gettext("usage:\n\tpkginstall [-o] [-n] [-d device] [-m mountpt [-f fstype]] [-v] [[-M] -R host_path] [-V fs_file] [-b bindir] [-a admin_file] [-r resp_file] [-N calling_prog] directory pkginst\n")
 #define	ERR_USAGE_PKGREMOVE		gettext("usage:\n\tpkgremove [-a admin_file] [-n] [-V ...] [[-M|-A] -R host_path] [-v] [-o] [-N calling_prog] pkginst\n")
@@ -738,7 +730,6 @@ extern "C" {
 #define	MSG_NODENAME			gettext("(unknown)")
 #define	MSG_NOTEMPTY			gettext("%s <non-empty directory not removed>")
 #define	MSG_N_PKGS_NOT_PROCESSED	gettext("\n%d packages were not processed!\n")
-#define	MSG_PASSPROMPT			gettext("Enter keystore password:")
 #define	MSG_PKGADDCHK_ABADFILE		gettext("\\nPackaging file <%s> is corrupt for %s <%s> on %s <%s>")
 #define	MSG_PKGADDCHK_BADFILE		gettext("\\nPackaging files are corrupt for %s <%s> on %s <%s>.")
 #define	MSG_PKGADDCHK_CFCONTENT		gettext("\\nThe file <%s> is already installed and in use by %s <%s> on %s <%s>.")
@@ -816,7 +807,6 @@ extern "C" {
 #define	MSG_VERIFYING			gettext("Verifying signer <%s>")
 #define	MSG_VERIFYING_CLASS		gettext("[ verifying class <%s> ]")
 
-#define	PASSWD_CMDLINE			gettext("## WARNING: USING \"%s\" MAKES PASSWORD VISIBLE TO ALL USERS.")
 #define	SPECIAL_ACCESS			gettext("unable to maintain package contents text due to an access failure: %s")
 #define	SPECIAL_INPUT			gettext("unable to maintain package contents text: alternate root path too long")
 #define	SPECIAL_MALLOC			gettext("unable to maintain package contents text due to insufficient memory: %s")

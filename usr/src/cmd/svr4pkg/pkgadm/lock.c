@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -58,7 +62,6 @@
 #include <locale.h>
 #include <libgen.h>
 #include <sys/param.h>
-#include <openssl/bio.h>
 #include <errno.h>
 #include <assert.h>
 #include <time.h>
@@ -69,8 +72,6 @@
 
 #include <libinst.h>
 #include <pkglib.h>
-#include <pkgerr.h>
-#include <keystore.h>
 #include "pkgadm.h"
 #include "pkgadm_msgs.h"
 

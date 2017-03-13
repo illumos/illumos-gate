@@ -20,22 +20,19 @@
 #
 
 #
+# Copyright (c) 2017 Peter Tribble.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG=           pkgadm
 
-OBJS=           addcert.o	\
-		certs.o		\
-		listcert.o	\
-		lock.o		\
-		main.o		\
-		removecert.o
+OBJS=           lock.o		\
+		main.o
 
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg
 
-LDLIBS	+=	-lpkg -ladm -lcrypto -lgen
+LDLIBS	+=	-lpkg -ladm -lgen
 
 .KEEP_STATE:
 all:            $(PROG)

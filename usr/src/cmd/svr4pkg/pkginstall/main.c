@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -51,7 +55,6 @@
 #include <assert.h>
 #include <instzones_api.h>
 #include <pkglib.h>
-#include <pkgweb.h>
 #include <install.h>
 #include <libinst.h>
 #include <libadm.h>
