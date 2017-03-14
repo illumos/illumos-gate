@@ -59,6 +59,7 @@ s dev/dump=../devices/pseudo/dump@0:dump
 d dev/fd 0555 root root
 s dev/fm=../devices/pseudo/fm@0:fm
 s dev/fssnapctl=../devices/pseudo/fssnap@0:ctl
+s dev/full=../devices/pseudo/mm@0:full
 s dev/icmp6=../devices/pseudo/icmp6@0:icmp6
 s dev/icmp=../devices/pseudo/icmp@0:icmp
 s dev/igb=../devices/pseudo/clone@0:igb
@@ -18725,6 +18726,7 @@ f usr/share/man/man7d/fctl.7d 0444 root bin
 f usr/share/man/man7d/fd.7d 0444 root bin
 s usr/share/man/man7d/fdc.7d=fd.7d
 s usr/share/man/man7d/firewire.7d=ieee1394.7d
+f usr/share/man/man7d/full.7d 0444 root bin
 f usr/share/man/man7d/gld.7d 0444 root bin
 f usr/share/man/man7d/hci1394.7d 0444 root bin
 f usr/share/man/man7d/heci.7d 0444 root bin

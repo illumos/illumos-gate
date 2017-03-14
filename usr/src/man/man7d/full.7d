@@ -1,0 +1,46 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2017 James S Blachly, MD <james.blachly@gmail.com>
+.
+.Dd "Feb 7, 2017"
+.Dt FULL 7D
+.Os
+.Sh NAME
+.Nm full
+.Nd always-full device
+.Sh SYNOPSIS
+.Pa /dev/full
+.Sh DESCRIPTION
+The
+.Nm
+device is used to test program behavior in out-of-space conditions.
+.Lp
+Writes always yield the error
+.Er ENOSPC.
+.Lp
+Reads supply an endless stream of zeros, identical to
+.Xr zero 7D
+.Lp
+.Xr lseek 2
+will always return successfully.
+.Lp
+.Xr mmap 2
+is not implemented.
+.Sh FILES
+.
+.Bl -tag -width Pa
+.It Pa /dev/full
+.El
+.
+.Sh SEE ALSO
+.Xr mem 7D ,
+.Xr null 7D ,
+.Xr zero 7D
