@@ -30,7 +30,7 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD: head/sys/dev/ixl/i40e_lan_hmc.c 284049 2015-06-05 22:52:42Z jfv $*/
+/*$FreeBSD$*/
 
 #include "i40e_osdep.h"
 #include "i40e_register.h"
@@ -770,7 +770,7 @@ static void i40e_write_byte(u8 *hmc_bits,
 
 	/* prepare the bits and mask */
 	shift_width = ce_info->lsb % 8;
-	mask = BIT(ce_info->width) - 1;
+	mask = (u8)(BIT(ce_info->width) - 1);
 
 	src_byte = *from;
 	src_byte &= mask;
@@ -955,7 +955,7 @@ static void i40e_read_byte(u8 *hmc_bits,
 
 	/* prepare the bits and mask */
 	shift_width = ce_info->lsb % 8;
-	mask = BIT(ce_info->width) - 1;
+	mask = (u8)(BIT(ce_info->width) - 1);
 
 	/* shift to correct alignment */
 	mask <<= shift_width;
@@ -1240,11 +1240,6 @@ enum i40e_status_code i40e_hmc_get_object_va(struct i40e_hw *hw,
 	u64 obj_offset_in_fpm;
 	u32 sd_idx, sd_lmt;
 
-	if (NULL == hmc_info) {
-		ret_code = I40E_ERR_BAD_PTR;
-		DEBUGOUT("i40e_hmc_get_object_va: bad hmc_info ptr\n");
-		goto exit;
-	}
 	if (NULL == hmc_info->hmc_obj) {
 		ret_code = I40E_ERR_BAD_PTR;
 		DEBUGOUT("i40e_hmc_get_object_va: bad hmc_info->hmc_obj ptr\n");

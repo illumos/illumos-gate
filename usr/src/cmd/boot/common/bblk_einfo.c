@@ -136,6 +136,17 @@ einfo_compare_timestamps(const char *str1, const char *str2)
  *              0   - if the two versions coincide
  *              1   - if the version in str1 is more recent
  *              2   - if the version in str2 is more recent
+ *
+ * The version string generally uses following form:
+ *     self_release,build_release:timestamp
+ * The release numbers are compared as dotted versions.
+ *
+ * While comparing, if the self releases are identical but the build
+ * release is missing, this version string is considered older.
+ *
+ * If the release strings are identical, and one of the timestamps is missing,
+ * we return an error. Otherwise, return the result from comparing the
+ * timestamps.
  */
 static int
 einfo_compare_version(const char *str1, const char *str2)
@@ -143,6 +154,7 @@ einfo_compare_version(const char *str1, const char *str2)
 	int	retval = 0;
 	char	*verstr1, *verstr2, *freeptr1, *freeptr2;
 	char	*parsep1, *parsep2;
+	char	*timep1, *timep2;
 
 	freeptr1 = verstr1 = strdup(str1);
 	freeptr2 = verstr2 = strdup(str2);
@@ -151,16 +163,26 @@ einfo_compare_version(const char *str1, const char *str2)
 		goto out;
 	}
 
-	parsep1 = verstr1;
-	parsep2 = verstr2;
+	/* Extract the time part from the version string. */
+	timep1 = verstr1;
+	timep2 = verstr2;
+	parsep1 = strsep(&timep1, ":");
+	parsep2 = strsep(&timep2, ":");
 
 	while (parsep1 != NULL && parsep2 != NULL) {
-		parsep1 = strsep(&verstr1, ",:-");
-		parsep2 = strsep(&verstr2, ",:-");
+		parsep1 = strsep(&verstr1, ",-");
+		parsep2 = strsep(&verstr2, ",-");
 
-		/* verstr1 or verstr2 will be NULL before parsep1 or parsep2. */
-		if (verstr1 == NULL || verstr2 == NULL) {
-			retval = einfo_compare_timestamps(parsep1, parsep2);
+		/* If both are NULL, compare timestamps */
+		if (parsep1 == NULL && parsep2 == NULL)
+			break;
+
+		if (parsep1 == NULL) {
+			retval = 2;
+			goto out;
+		}
+		if (parsep2 == NULL) {
+			retval = 1;
 			goto out;
 		}
 
@@ -170,6 +192,13 @@ einfo_compare_version(const char *str1, const char *str2)
 		else
 			goto out;
 	}
+
+	/* The dotted versions are identical, check timestamps. */
+	if (timep1 == NULL || timep2 == NULL) {
+		retval = -1;
+		goto out;
+	}
+	retval = einfo_compare_timestamps(timep1, timep2);
 out:
 	free(freeptr1);
 	free(freeptr2);

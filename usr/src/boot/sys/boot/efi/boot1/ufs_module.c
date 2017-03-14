@@ -28,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <stdarg.h>
@@ -56,9 +54,9 @@ dskread(void *buf, u_int64_t lba, int nblk)
 	    devinfo->dev->Media->MediaId, lba, size, buf);
 
 	if (status != EFI_SUCCESS) {
-		DPRINTF("dskread: failed dev: %p, id: %u, lba: %lu, size: %d, "
+		DPRINTF("dskread: failed dev: %p, id: %u, lba: %ju, size: %d, "
 		    "status: %lu\n", devinfo->dev,
-		    devinfo->dev->Media->MediaId, lba, size,
+		    devinfo->dev->Media->MediaId, (uintmax_t)lba, size,
 		    EFI_ERROR_CODE(status));
 		return (-1);
 	}
@@ -142,7 +140,7 @@ load(const char *filepath, dev_info_t *dev, void **bufp, size_t *bufsize)
 }
 
 static void
-status()
+status(void)
 {
 	int i;
 	dev_info_t *dev;
@@ -164,7 +162,7 @@ status()
 }
 
 static dev_info_t *
-_devices()
+_devices(void)
 {
 
 	return (devices);

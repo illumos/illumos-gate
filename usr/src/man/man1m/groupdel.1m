@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GROUPDEL 1M "Aug 27, 2008"
+.TH GROUPDEL 1M "Feb 25, 2017"
 .SH NAME
 groupdel \- delete a group definition from the system
 .SH SYNOPSIS
@@ -13,12 +13,10 @@ groupdel \- delete a group definition from the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgroupdel\fR utility deletes a group definition from the system. It
 deletes the appropriate entry from the \fB/etc/group\fR file.
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIgroup\fR\fR
@@ -28,7 +26,6 @@ An existing group name to be deleted.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -69,7 +66,6 @@ Cannot update the \fB/etc/group\fR file.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/group\fR\fR
@@ -79,15 +75,13 @@ system file containing group definitions
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupmod\fR(1M), \fBlogins\fR(1M),
 \fBuseradd\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBgroupdel\fR utility only deletes a group definition that is in the local
-\fB/etc/group\fR file. If a network nameservice such as \fBNIS\fR or \fBNIS+\fR
+\fB/etc/group\fR file. If a network nameservice
 is being used to supplement the local \fB/etc/group\fR file with additional
 entries, \fBgroupdel\fR cannot change information supplied by the network
 nameservice.

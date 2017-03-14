@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * MD bootstrap main() and assorted miscellaneous
@@ -73,7 +72,7 @@ static void		i386_zfs_probe(void);
 #endif
 
 /* from vers.c */
-extern	char bootprog_name[], bootprog_rev[], bootprog_date[], bootprog_maker[];
+extern	char bootprog_info[];
 
 /* XXX debugging */
 extern char end[];
@@ -96,7 +95,7 @@ main(void)
     bzero(&v86, sizeof(v86));
     v86.efl = PSL_RESERVED_DEFAULT | PSL_I;
 
-    /* 
+    /*
      * Initialise the heap as early as possible.  Once this is done, malloc() is usable.
      */
     bios_getmem();
@@ -187,9 +186,7 @@ main(void)
     /* detect PCI BIOS for future reference */
     biospci_detect();
 
-    printf("\n");
-    printf("%s, Revision %s\n", bootprog_name, bootprog_rev);
-    printf("(%s, %s)\n", bootprog_maker, bootprog_date);
+    printf("\n%s", bootprog_info);
 
     extract_currdev();				/* set $currdev and $loaddev */
     setenv("LINES", "24", 1);			/* optional */
@@ -209,7 +206,7 @@ main(void)
 }
 
 /*
- * Set the 'current device' by (if possible) recovering the boot device as 
+ * Set the 'current device' by (if possible) recovering the boot device as
  * supplied by the initial bootstrap.
  *
  * XXX should be extended for netbooting.
@@ -281,7 +278,7 @@ extract_currdev(void)
 	/*
 	 * If we are booted by an old bootstrap, we have to guess at the BIOS
 	 * unit number.  We will lose if there is more than one disk type
-	 * and we are not booting from the lowest-numbered disk type 
+	 * and we are not booting from the lowest-numbered disk type
 	 * (ie. SCSI when IDE also exists).
 	 */
 	if ((biosdev == 0) && (B_TYPE(initial_bootdev) != 2))	/* biosdev doesn't match major */

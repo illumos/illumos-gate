@@ -1,0 +1,35 @@
+\
+\ This file and its contents are supplied under the terms of the
+\ Common Development and Distribution License ("CDDL"), version 1.0.
+\ You may only use this file in accordance with the terms of version
+\ 1.0 of the CDDL.
+\
+\ A full copy of the text of the CDDL should have accompanied this
+\ source.  A copy of the CDDL is also available via the Internet at
+\ http://www.illumos.org/license/CDDL.
+\
+\
+\ Copyright 2016 Joyent, Inc.
+\
+
+
+\
+\ offsets.in: input file to produce assym.h using the ctfstabs program
+\
+
+#include <sys/comm_page.h>
+
+
+comm_page_s	COMM_PAGE_S_SIZE
+	cp_tsc_last
+	cp_tsc_hrtime_base
+	cp_tsc_resume_cap
+	cp_tsc_type
+	cp_tsc_max_delta
+	cp_hres_lock
+	cp_nsec_scale
+	cp_hrestime_adj
+	cp_hres_last_tick
+	cp_tsc_ncpu
+	cp_hrestime
+	cp_tsc_sync_tick_delta

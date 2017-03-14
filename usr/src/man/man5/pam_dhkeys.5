@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PAM_DHKEYS 5 "Jan 21, 2003"
+.TH PAM_DHKEYS 5 "Feb 25, 2017"
 .SH NAME
 pam_dhkeys \- authentication Diffie-Hellman keys management module
 .SH SYNOPSIS
@@ -13,15 +13,14 @@ pam_dhkeys \- authentication Diffie-Hellman keys management module
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpam_dhkeys.so.1\fR service module provides functionality to two
 \fBPAM\fR services: Secure \fBRPC\fR authentication and Secure \fBRPC\fR
 authentication token management.
 .sp
 .LP
-Secure RPC authentication differs from regular unix authentication because NIS+
-and other \fBONC RPC\fRs use Secure RPC as the underlying security mechanism.
+Secure RPC authentication differs from regular unix authentication because
+some \fBONC RPC\fRs use Secure RPC as the underlying security mechanism.
 .sp
 .LP
 The following options may be passed to the module:
@@ -44,15 +43,11 @@ Turn off warning messages
 .RE
 
 .SS "Authentication Services"
-.sp
 .LP
 If the user has Diffie-Hellman keys, \fBpam_sm_authenticate()\fR establishes
 secret keys for the user specified by the \fBPAM_USER\fR (equivalent to running
 \fBkeylogin\fR(1)), using the authentication token found in the
-\fBPAM_AUTHTOK\fR item. Not being able to establish the secret keys results in
-an authentication error if the NIS+ repository is used to authenticate the user
-and the NIS+ table permissions require secure RPC credentials to access the
-password field. If \fBpam_sm_setcred()\fR is called with
+\fBPAM_AUTHTOK\fR item. If \fBpam_sm_setcred()\fR is called with
 \fBPAM_ESTABLISH_CRED\fR and the user's secure \fBRPC\fR credentials need to be
 established, these credentials are set. This is equivalent to running
 \fBkeylogin\fR(1).
@@ -67,7 +62,6 @@ is equivalent to running \fBkeylogout\fR(1).
 \fBPAM_REINITIALIZE_CRED\fR and \fBPAM_REFRESH_CRED\fR are not supported and
 return \fBPAM_IGNORE\fR.
 .SS "Authentication Token Management"
-.sp
 .LP
 The \fBpam_sm_chauthtok()\fR implementation checks whether the old login
 password decrypts the users secret keys. If it doesn't this module prompts the
@@ -75,7 +69,6 @@ user for an old Secure \fBRPC\fR password and stores it in a pam data item
 called \fBSUNW_OLDRPCPASS\fR. This data item can be used by the store module to
 effectively update the users secret keys.
 .SH ERRORS
-.sp
 .LP
 The authentication service returns the following error codes:
 .sp
@@ -130,7 +123,7 @@ Module ran out of memory.
 \fB\fBPAM_SYSTEM_ERR\fR\fR
 .ad
 .RS 20n
-The NIS\(ma+ subsystem failed .
+Credentials could not be stored, or netname could not be created.
 .RE
 
 .sp
@@ -173,7 +166,6 @@ Module ran out of memory.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -191,7 +183,6 @@ MT Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkeylogin\fR(1), \fBkeylogout\fR(1), \fBpam\fR(3PAM),
 \fBpam_authenticate\fR(3PAM), \fBpam_chauthtok\fR(3PAM),
@@ -201,7 +192,6 @@ MT Level	MT-Safe with exceptions
 \fBpam_authtok_get\fR(5), \fBpam_authtok_store\fR(5), \fBpam_passwd_auth\fR(5),
 \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5), \fBpam_unix_session\fR(5)
 .SH NOTES
-.sp
 .LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own PAM handle.

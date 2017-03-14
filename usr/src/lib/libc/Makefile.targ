@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Joyent, Inc.
 #
 #
 
@@ -91,6 +92,10 @@ pics/%.o: $(LIBCBASE)/sys/%.s
 
 pics/%.o: $(LIBCBASE)/../$(MACH)/sys/%.s
 	$(BUILD.s)
+	$(POST_PROCESS_O)
+
+pics/%.o: $(LIBCBASE)/../$(MACH)/sys/%.c
+	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
 pics/%.o: $(LIBCBASE)/../$(TARGET_ARCH)/sys/%.c

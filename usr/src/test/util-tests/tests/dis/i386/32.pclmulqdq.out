@@ -1,0 +1,20 @@
+    libdis_test:      66 0f 3a 44 c8 02  pclmulqdq $0x2,%xmm0,%xmm1
+    libdis_test+0x6:  66 0f 3a 44 10 02  pclmulqdq $0x2,(%eax),%xmm2
+    libdis_test+0xc:  66 0f 3a 44 5b 10  pclmulqdq $0x2,0x10(%ebx),%xmm3
+                      02 
+    libdis_test+0x13: 66 0f 3a 44 c8 00  pclmullqlqdq %xmm0,%xmm1
+    libdis_test+0x19: 66 0f 3a 44 10 00  pclmullqlqdq (%eax),%xmm2
+    libdis_test+0x1f: 66 0f 3a 44 53 04  pclmullqlqdq 0x4(%ebx),%xmm2
+                      00 
+    libdis_test+0x26: 66 0f 3a 44 c8 01  pclmulhqlqdq %xmm0,%xmm1
+    libdis_test+0x2c: 66 0f 3a 44 10 01  pclmulhqlqdq (%eax),%xmm2
+    libdis_test+0x32: 66 0f 3a 44 53 04  pclmulhqlqdq 0x4(%ebx),%xmm2
+                      01 
+    libdis_test+0x39: 66 0f 3a 44 c8 10  pclmullqhqdq %xmm0,%xmm1
+    libdis_test+0x3f: 66 0f 3a 44 10 10  pclmullqhqdq (%eax),%xmm2
+    libdis_test+0x45: 66 0f 3a 44 53 04  pclmullqhqdq 0x4(%ebx),%xmm2
+                      10 
+    libdis_test+0x4c: 66 0f 3a 44 c8 11  pclmulhqhqdq %xmm0,%xmm1
+    libdis_test+0x52: 66 0f 3a 44 10 11  pclmulhqhqdq (%eax),%xmm2
+    libdis_test+0x58: 66 0f 3a 44 53 04  pclmulhqhqdq 0x4(%ebx),%xmm2
+                      11 

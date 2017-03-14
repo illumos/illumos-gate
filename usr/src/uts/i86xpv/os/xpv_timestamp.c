@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -70,6 +71,11 @@ int hrtime_fake_mt = 1;
 static volatile hrtime_t hrtime_last;
 static hrtime_t hrtime_suspend_time;
 static hrtime_t hrtime_addend;
+
+volatile uint32_t hres_lock;
+hrtime_t hres_last_tick;
+int64_t hrestime_adj;
+volatile timestruc_t hrestime;
 
 /*
  * These functions are used in DTrace probe context, and must be removed from

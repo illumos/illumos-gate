@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -514,6 +515,18 @@ mac_unregister(mac_handle_t mh)
 	 */
 	i_mac_notify_exit(mip);
 
+	/*
+	 * Prior to acquiring the MAC perimeter, remove the MAC instance from
+	 * the internal hash table. Such removal means table-walkers that
+	 * acquire the perimeter will not do so on behalf of what we are
+	 * unregistering, which prevents a deadlock.
+	 */
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	(void) mod_hash_remove(i_mac_impl_hash,
+	    (mod_hash_key_t)mip->mi_name, &val);
+	rw_exit(&i_mac_impl_lock);
+	ASSERT(mip == (mac_impl_t *)val);
+
 	i_mac_perim_enter(mip);
 
 	/*
@@ -532,10 +545,6 @@ mac_unregister(mac_handle_t mh)
 	    MIS_EXCLUSIVE));
 
 	mac_driver_stat_delete(mip);
-
-	(void) mod_hash_remove(i_mac_impl_hash,
-	    (mod_hash_key_t)mip->mi_name, &val);
-	ASSERT(mip == (mac_impl_t *)val);
 
 	ASSERT(i_mac_impl_count > 0);
 	atomic_dec_32(&i_mac_impl_count);

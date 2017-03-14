@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DEFAULTDOMAIN 4 "Feb 22, 2000"
+.TH DEFAULTDOMAIN 4 "Feb 25, 2017"
 .SH NAME
 defaultdomain \- specify host's domain name
 .SH SYNOPSIS
@@ -13,10 +13,9 @@ defaultdomain \- specify host's domain name
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The file \fB/etc/defaultdomain\fR determines a host's domain name for direct
-use by the \fBNIS\fR and \fBNIS+\fR name services. The \fBdefaultdomain\fR file
+use by the \fBNIS\fR name service. The \fBdefaultdomain\fR file
 is read at boot time and its contents used by the \fBdomainname\fR(1M) command.
 Because of its use by \fBdomainname\fR, \fBdefaultdomain\fR is also used by the
 \fBLDAP\fR service (see \fBldap\fR(1)). Under certain, narrow circumstances
@@ -27,12 +26,10 @@ a \fBDNS\fR client can use the contents of \fBdefaultdomain\fR.
 The contents of \fBdefaultdomain\fR consists of a single line containing a
 host's domain name.
 .SH SEE ALSO
-.sp
 .LP
-\fBNIS+\fR(1), \fBuname\fR(1), \fBldapclient\fR(1M), \fBnisclient\fR(1M),
+\fBuname\fR(1), \fBldapclient\fR(1M),
 \fBypbind\fR(1M), \fBypinit\fR(1M), \fBresolv.conf\fR(4)
 .SH NOTES
-.sp
 .LP
 The \fBdefaultdomain\fR file is created and modified by Solaris installation
 and configuration scripts. Only users knowledgeable of name service

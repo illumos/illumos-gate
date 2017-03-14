@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2013 DEY Storage Systems, Inc.
  */
 
@@ -104,16 +104,19 @@ open_category(void)
 }
 
 void
+delete_category(FILE *f)
+{
+	(void) fclose(f);
+	(void) unlink(category_file());
+}
+
+void
 close_category(FILE *f)
 {
-	if (fchmod(fileno(f), 0644) < 0) {
-		(void) fclose(f);
-		(void) unlink(category_file());
+	if (fchmod(fileno(f), 0644) < 0 ||
+	    fclose(f) != 0) {
 		errf(strerror(errno));
-	}
-	if (fclose(f) < 0) {
-		(void) unlink(category_file());
-		errf(strerror(errno));
+		delete_category(f);
 	}
 	if (verbose) {
 		(void) fprintf(stdout, _("done.\n"));
@@ -169,15 +172,13 @@ int
 putl_category(const char *s, FILE *f)
 {
 	if (s && fputs(s, f) == EOF) {
-		(void) fclose(f);
-		(void) unlink(category_file());
 		errf(strerror(errno));
+		delete_category(f);
 		return (EOF);
 	}
 	if (fputc('\n', f) == EOF) {
-		(void) fclose(f);
-		(void) unlink(category_file());
 		errf(strerror(errno));
+		delete_category(f);
 		return (EOF);
 	}
 	return (0);
@@ -190,8 +191,6 @@ wr_category(void *buf, size_t sz, FILE *f)
 		return (0);
 	}
 	if (fwrite(buf, sz, 1, f) < 1) {
-		(void) fclose(f);
-		(void) unlink(category_file());
 		errf(strerror(errno));
 		return (EOF);
 	}

@@ -475,10 +475,10 @@ itoa(int i, char *ptr)
 
 static int
 srch_dir(const entry_t path,	/* current path */
-	int match_mask,		/* flags mask */
-	int depth,		/* current depth (/dev = 0) */
-	const entry_t skip_dirs[], /* directories not needing searching */
-	struct stat64 *fsb)	/* the file being searched for */
+    int match_mask,		/* flags mask */
+    int depth,			/* current depth (/dev = 0) */
+    const entry_t skip_dirs[],	/* directories not needing searching */
+    struct stat64 *fsb)		/* the file being searched for */
 {
 	DIR *dirp;
 	struct dirent64 *direntp;
@@ -692,10 +692,11 @@ get_pri_dirs(void)
 				state = COMMENT_STATE;
 				break;
 			}
-			if (!isspace(*buf))	/* skip leading white space */
+			if (!isspace(*buf)) {	/* skip leading white space */
 				state = DIRNAME_STATE;
 				vec->name = buf;
 				vec->flags = 0;
+			}
 			break;
 
 		case COMMENT_STATE:

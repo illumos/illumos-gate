@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -67,6 +67,11 @@
 #include <sys/sdt.h>
 #include <sys/siginfo.h>
 #include <sys/random.h>
+
+#if defined(__x86)
+#include <sys/comm_page_util.h>
+#endif /* defined(__x86) */
+
 
 extern int at_flags;
 extern volatile size_t aslr_max_brk_skew;
@@ -513,6 +518,15 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if (args->emulator != NULL)
 		args->auxsize += sizeof (aux_entry_t);
 
+	/*
+	 * On supported kernels (x86_64) make room in the auxv for the
+	 * AT_SUN_COMMPAGE entry.  This will go unpopulated on i86xpv systems
+	 * which do not provide such functionality.
+	 */
+#if defined(__amd64)
+	args->auxsize += sizeof (aux_entry_t);
+#endif /* defined(__amd64) */
+
 	if ((brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
@@ -819,6 +833,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 	if (hasauxv) {
 		int auxf = AF_SUN_HWCAPVERIFY;
+
 		/*
 		 * Note: AT_SUN_PLATFORM and AT_SUN_EXECNAME were filled in via
 		 * exec_args()
@@ -894,6 +909,22 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			ADDAUX(aux, AT_SUN_BRAND_AUX3, 0)
 		}
 
+		/*
+		 * Add the comm page auxv entry, mapping it in if needed.
+		 */
+#if defined(__amd64)
+		if (args->commpage != NULL ||
+		    (args->commpage = (uintptr_t)comm_page_mapin()) != NULL) {
+			ADDAUX(aux, AT_SUN_COMMPAGE, args->commpage)
+		} else {
+			/*
+			 * If the comm page cannot be mapped, pad out the auxv
+			 * to satisfy later size checks.
+			 */
+			ADDAUX(aux, AT_NULL, 0)
+		}
+#endif /* defined(__amd64) */
+
 		ADDAUX(aux, AT_NULL, 0)
 		postfixsize = (char *)aux - (char *)bigwad->elfargs;
 
@@ -933,6 +964,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	}
 
 	bzero(up->u_auxv, sizeof (up->u_auxv));
+	up->u_commpagep = args->commpage;
 	if (postfixsize) {
 		int num_auxv;
 

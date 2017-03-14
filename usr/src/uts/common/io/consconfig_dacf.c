@@ -270,7 +270,8 @@ static struct modlinkage modlinkage = {
 };
 
 int
-_init(void) {
+_init(void)
+{
 	return (mod_install(&modlinkage));
 }
 
@@ -958,7 +959,12 @@ consconfig_load_drivers(cons_state_t *sp)
 	 * Regardless of platform, ehci needs to initialize first to avoid
 	 * unnecessary connects and disconnects on the companion controller
 	 * when ehci sets up the routing.
+	 *
+	 * The same is generally true of xhci. Many platforms have routing
+	 * between the xhci controller and the ehci controller. To avoid those
+	 * same disconnects, we load xhci before ehci.
 	 */
+	(void) ddi_hold_installed_driver(ddi_name_to_major("xhci"));
 	(void) ddi_hold_installed_driver(ddi_name_to_major("ehci"));
 	(void) ddi_hold_installed_driver(ddi_name_to_major("uhci"));
 	(void) ddi_hold_installed_driver(ddi_name_to_major("ohci"));

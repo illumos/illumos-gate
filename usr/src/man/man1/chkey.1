@@ -4,18 +4,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CHKEY 1 "Nov 29, 2005"
+.TH CHKEY 1 "Feb 25, 2017"
 .SH NAME
 chkey \- change user's secure RPC key pair
 .SH SYNOPSIS
 .LP
 .nf
-\fBchkey\fR [\fB-p\fR] [\fB-s\fR nisplus | nis | files | ldap]
+\fBchkey\fR [\fB-p\fR] [\fB-s\fR nis | files | ldap]
      [\fB-m\fR \fI<mechanism>\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBchkey\fR is used to change a user's secure \fBRPC\fR public key and secret
 key pair. \fBchkey\fR prompts for the old secure-rpc password and verifies that
@@ -24,9 +23,7 @@ it is correct by decrypting the secret key. If the user has not already used
 \fBchkey\fR registers the secret key with the local \fBkeyserv\fR(1M) daemon.
 If the secure-rpc password does not match the login password, \fBchkey\fR
 prompts for the login password. \fBchkey\fR uses the login password to encrypt
-the user's secret Diffie-Hellman (192 bit) cryptographic key. \fBchkey\fR can
-also encrypt other Diffie-Hellman keys for authentication mechanisms configured
-using \fBnisauthconf\fR(1M).
+the user's secret Diffie-Hellman (192 bit) cryptographic key.
 .sp
 .LP
 \fBchkey\fR ensures that the login password and the secure-rpc  password(s) are
@@ -34,16 +31,14 @@ kept the same, thus enabling password shadowing. See \fBshadow\fR(4).
 .sp
 .LP
 The key pair can be stored in the  \fB/etc/publickey\fR file (see
-\fBpublickey\fR(4)), the \fBNIS\fR \fBpublickey\fR map, or the \fBNIS+\fR
-\fBcred.org_dir\fR table. If a new secret key is generated, it will be
-registered with the local \fBkeyserv\fR(1M) daemon. However, only \fBNIS+\fR
-can store Diffie-Hellman keys other than 192-bits.
+\fBpublickey\fR(4)) or the \fBNIS\fR \fBpublickey\fR map.
+If a new secret key is generated, it will be
+registered with the local \fBkeyserv\fR(1M) daemon.
 .sp
 .LP
 Keys for specific mechanisms can be changed or reencrypted using the \fB-m\fR
 option followed by the authentication mechanism name. Multiple  \fB-m\fR
-options can be used to change one or more keys. However, only mechanisms
-configured using \fBnisauthconf\fR(1M) can be changed with  \fBchkey\fR.
+options can be used to change one or more keys.
 .sp
 .LP
 If the source of the  \fBpublickey\fR is not specified with the \fB-s\fR
@@ -59,7 +54,6 @@ option.
 Non root users are not allowed to change their key pair in the \fBfiles\fR
 database.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -69,15 +63,6 @@ The following options are supported:
 .ad
 .RS 18n
 Re-encrypt the existing secret key with the user's login password.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fBnisplus\fR\fR
-.ad
-.RS 18n
-Update the  \fBNIS+\fR database.
 .RE
 
 .sp
@@ -117,7 +102,6 @@ Changes or re-encrypt the secret key for the specified mechanism.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
@@ -136,15 +120,7 @@ Changes or re-encrypt the secret key for the specified mechanism.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkeylogin\fR(1), \fBkeylogout\fR(1), \fBkeyserv\fR(1M), \fBnewkey\fR(1M),
-\fBnisaddcred\fR(1M), \fBnisauthconf\fR(1M), \fBnsswitch.conf\fR(4),
+\fBnsswitch.conf\fR(4),
 \fBpublickey\fR(4), \fBshadow\fR(4), \fBattributes\fR(5)
-.SH NOTES
-.sp
-.LP
-NIS+ might not be supported in future releases of the Solaris operating system.
-Tools to aid the migration from NIS+ to LDAP are available in the current
-Solaris release. For more information, visit
-http://www.sun.com/directory/nisplus/transition.html.

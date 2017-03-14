@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -739,15 +741,36 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* figure out the endpoints and copy the descr */
 	if ((ep_data = usb_lookup_ep_data(dip, dev_data, interface, 0, 0,
 	    USB_EP_ATTR_BULK, USB_EP_DIR_OUT)) != NULL) {
-		scsa2usbp->scsa2usb_bulkout_ept = ep_data->ep_descr;
+		if (usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION,
+		    dip, ep_data, &scsa2usbp->scsa2usb_bulkout_xept) !=
+		    USB_SUCCESS) {
+
+			mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+			goto fail;
+		}
 	}
 	if ((ep_data = usb_lookup_ep_data(dip, dev_data, interface, 0, 0,
 	    USB_EP_ATTR_BULK, USB_EP_DIR_IN)) != NULL) {
-		scsa2usbp->scsa2usb_bulkin_ept = ep_data->ep_descr;
+		if (usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION,
+		    dip, ep_data, &scsa2usbp->scsa2usb_bulkin_xept) !=
+		    USB_SUCCESS) {
+
+			mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+			goto fail;
+		}
 	}
 	if ((ep_data = usb_lookup_ep_data(dip, dev_data, interface, 0, 0,
 	    USB_EP_ATTR_INTR, USB_EP_DIR_IN)) != NULL) {
-		scsa2usbp->scsa2usb_intr_ept = ep_data->ep_descr;
+		if (usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION,
+		    dip, ep_data, &scsa2usbp->scsa2usb_intr_xept) !=
+		    USB_SUCCESS) {
+
+			mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+			goto fail;
+		}
 	}
 
 	/*
@@ -2352,7 +2375,7 @@ scsa2usb_scsi_tgt_init(dev_info_t *dip, dev_info_t *cdip,
 /* ARGSUSED */
 static void
 scsa2usb_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *cdip,
-	scsi_hba_tran_t *tran, struct scsi_device *sd)
+    scsi_hba_tran_t *tran, struct scsi_device *sd)
 {
 	scsa2usb_state_t *scsa2usbp = (scsa2usb_state_t *)
 	    tran->tran_hba_private;
@@ -4520,8 +4543,8 @@ scsa2usb_open_usb_pipes(scsa2usb_state_t *scsa2usbp)
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 		/* Open the USB bulk-in pipe */
-		if ((rval = usb_pipe_open(scsa2usbp->scsa2usb_dip,
-		    &scsa2usbp->scsa2usb_bulkin_ept, &policy, USB_FLAGS_SLEEP,
+		if ((rval = usb_pipe_xopen(scsa2usbp->scsa2usb_dip,
+		    &scsa2usbp->scsa2usb_bulkin_xept, &policy, USB_FLAGS_SLEEP,
 		    &scsa2usbp->scsa2usb_bulkin_pipe)) != USB_SUCCESS) {
 			mutex_enter(&scsa2usbp->scsa2usb_mutex);
 			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
@@ -4533,8 +4556,8 @@ scsa2usb_open_usb_pipes(scsa2usb_state_t *scsa2usbp)
 		}
 
 		/* Open the bulk-out pipe  using the same policy */
-		if ((rval = usb_pipe_open(scsa2usbp->scsa2usb_dip,
-		    &scsa2usbp->scsa2usb_bulkout_ept, &policy, USB_FLAGS_SLEEP,
+		if ((rval = usb_pipe_xopen(scsa2usbp->scsa2usb_dip,
+		    &scsa2usbp->scsa2usb_bulkout_xept, &policy, USB_FLAGS_SLEEP,
 		    &scsa2usbp->scsa2usb_bulkout_pipe)) != USB_SUCCESS) {
 			usb_pipe_close(scsa2usbp->scsa2usb_dip,
 			    scsa2usbp->scsa2usb_bulkin_pipe,
@@ -4557,8 +4580,8 @@ scsa2usb_open_usb_pipes(scsa2usb_state_t *scsa2usbp)
 		if (SCSA2USB_IS_CBI(scsa2usbp)) {
 			mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
-			if ((rval = usb_pipe_open(scsa2usbp->scsa2usb_dip,
-			    &scsa2usbp->scsa2usb_intr_ept, &policy,
+			if ((rval = usb_pipe_xopen(scsa2usbp->scsa2usb_dip,
+			    &scsa2usbp->scsa2usb_intr_xept, &policy,
 			    USB_FLAGS_SLEEP, &scsa2usbp->scsa2usb_intr_pipe)) !=
 			    USB_SUCCESS) {
 				usb_pipe_close(scsa2usbp->scsa2usb_dip,

@@ -254,9 +254,13 @@ check_usb(dev_info_t *dip, void *arg)
 	immu_devi_t *immu_devi;
 
 
+	/*
+	 * It's not clear if xHCI really needs these quirks; however, to be on
+	 * the safe side until we know for certain we add it to the list below.
+	 */
 	if (drv == NULL ||
 	    (strcmp(drv, "uhci") != 0 && strcmp(drv, "ohci") != 0 &&
-	    strcmp(drv, "ehci") != 0)) {
+	    strcmp(drv, "ehci") != 0 && strcmp(drv, "xhci") != 0)) {
 		return;
 	}
 

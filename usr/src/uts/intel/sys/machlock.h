@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_MACHLOCK_H
@@ -74,7 +75,7 @@ typedef	lock_t	disp_lock_t;		/* dispatcher lock type */
 /*
  * Externs for CLOCK_LOCK and clock resolution
  */
-extern volatile int hres_lock;
+extern volatile uint32_t hres_lock;
 extern hrtime_t hrtime_base;
 extern int clock_res;
 

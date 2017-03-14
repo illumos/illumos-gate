@@ -28,7 +28,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
@@ -376,14 +376,6 @@ extern "C" {
 #define	X86FSET_SMAP		46
 #define	X86FSET_ADX		47
 #define	X86FSET_RDSEED		48
-
-/*
- * flags to patch tsc_read routine.
- */
-#define	X86_NO_TSC		0x0
-#define	X86_HAVE_TSCP		0x1
-#define	X86_TSC_MFENCE		0x2
-#define	X86_TSC_LFENCE		0x4
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.

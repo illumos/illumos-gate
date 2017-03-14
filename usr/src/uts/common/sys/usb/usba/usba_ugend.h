@@ -181,6 +181,7 @@ typedef struct ugen_isoc_pkt_info {
 typedef struct ugen_ep {
 	uint_t		ep_state;	/* Endpoint state, see below */
 	usb_ep_descr_t	ep_descr;	/* Endpoint descriptor */
+	usb_ep_xdescr_t	ep_xdescr;	/* Extended endpoint descriptor */
 	uchar_t		ep_cfgidx;	/* cfg index */
 	uchar_t		ep_if;		/* Interface # */
 	uchar_t		ep_alt;		/* alternate # */

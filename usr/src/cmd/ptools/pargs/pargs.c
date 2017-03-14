@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -818,7 +818,8 @@ static struct aux_id aux_arr[] = {
 	{ AT_SUN_BRANDNAME,	"AT_SUN_BRANDNAME",	at_str	},
 	{ AT_SUN_BRAND_AUX1,	"AT_SUN_BRAND_AUX1",	at_null	},
 	{ AT_SUN_BRAND_AUX2,	"AT_SUN_BRAND_AUX2",	at_null	},
-	{ AT_SUN_BRAND_AUX3,	"AT_SUN_BRAND_AUX3",	at_null	}
+	{ AT_SUN_BRAND_AUX3,	"AT_SUN_BRAND_AUX3",	at_null	},
+	{ AT_SUN_COMMPAGE,	"AT_SUN_COMMPAGE",	at_null	}
 };
 
 #define	N_AT_ENTS (sizeof (aux_arr) / sizeof (struct aux_id))

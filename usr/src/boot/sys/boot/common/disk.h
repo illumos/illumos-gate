@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -83,6 +81,9 @@
  * the device's strategy method.
  */
 
+#ifndef	_DISK_H
+#define	_DISK_H
+
 struct disk_devdesc
 {
 	struct devsw	*d_dev;
@@ -102,21 +103,17 @@ enum disk_ioctl {
 /*
  * Parse disk metadata and initialise dev->d_offset.
  */
-extern int disk_open(struct disk_devdesc *dev, uint64_t mediasize,
-    u_int sectorsize, u_int flags);
-#define	DISK_F_NOCACHE	0x0001		/* Do not use metadata caching */
-extern int disk_close(struct disk_devdesc *dev);
-extern void disk_cleanup(const struct devsw *d_dev);
-extern int disk_ioctl(struct disk_devdesc *dev, u_long cmd, void *buf);
-extern int disk_read(struct disk_devdesc *dev, void *buf, uint64_t offset,
-    u_int blocks);
-extern int disk_write(struct disk_devdesc *dev, void *buf, uint64_t offset,
-    u_int blocks);
+extern int disk_open(struct disk_devdesc *, uint64_t, u_int);
+extern int disk_close(struct disk_devdesc *);
+extern int disk_ioctl(struct disk_devdesc *, u_long, void *);
+extern int disk_read(struct disk_devdesc *, void *, uint64_t, u_int);
+extern int disk_write(struct disk_devdesc *, void *, uint64_t, u_int);
 
 /*
  * Print information about slices on a disk.
  */
-extern int disk_print(struct disk_devdesc *dev, char *prefix, int verbose);
-extern char* disk_fmtdev(struct disk_devdesc *dev);
-extern int disk_parsedev(struct disk_devdesc *dev, const char *devspec,
-    const char **path);
+extern int disk_print(struct disk_devdesc *, char *, int);
+extern char* disk_fmtdev(struct disk_devdesc *);
+extern int disk_parsedev(struct disk_devdesc *, const char *, const char **);
+
+#endif	/* _DISK_H */

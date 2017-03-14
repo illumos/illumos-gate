@@ -53,12 +53,14 @@
 extern int pseudo_isa;
 
 int
-plat_use_polled_debug() {
+plat_use_polled_debug()
+{
 	return (0);
 }
 
 int
-plat_support_serial_kbd_and_ms() {
+plat_support_serial_kbd_and_ms()
+{
 	return (0);
 }
 
@@ -119,6 +121,7 @@ console_type(int *tnum)
 			boot_console = CONS_TTY;
 			tty_num = cons[3] - 'a';
 		} else if (strcmp(cons, "usb-serial") == 0) {
+			(void) i_ddi_attach_hw_nodes("xhci");
 			(void) i_ddi_attach_hw_nodes("ehci");
 			(void) i_ddi_attach_hw_nodes("uhci");
 			(void) i_ddi_attach_hw_nodes("ohci");

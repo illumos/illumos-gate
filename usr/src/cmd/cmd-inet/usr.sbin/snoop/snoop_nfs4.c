@@ -686,7 +686,7 @@ static char *acemask4_names[] = {
 /*ARGSUSED*/
 void
 interpret_nfs4_cb(int flags, int type, int xid, int vers, int proc,
-		char *data, int len)
+    char *data, int len)
 {
 	char *line = NULL;
 
@@ -752,7 +752,7 @@ interpret_nfs4_cb(int flags, int type, int xid, int vers, int proc,
 /*ARGSUSED*/
 void
 interpret_nfs4(int flags, int type, int xid, int vers, int proc,
-		char *data, int len)
+    char *data, int len)
 {
 	char *line = NULL;
 
@@ -1318,7 +1318,7 @@ sum_lock_denied(LOCK4denied *denied)
 {
 	static char buf[64];
 
-	sprintf(buf, "%s %llu %llu LO=%04X",
+	sprintf(buf, "%s %llu:%llu LO=%04X",
 	    sum_lock_type_name(denied->locktype),
 	    denied->offset, denied->length,
 	    owner_hash(&denied->owner.owner));
@@ -1832,7 +1832,8 @@ sumarg_lockt(char *buf, size_t buflen, void *obj)
 {
 	LOCKT4args *args = (LOCKT4args *)obj;
 
-	snprintf(buf, buflen, "R=%llu:%llu",
+	snprintf(buf, buflen, "%s %llu:%llu",
+	    sum_lock_type_name(args->locktype),
 	    args->offset, args->length);
 }
 
@@ -1852,7 +1853,7 @@ sumarg_locku(char *buf, size_t buflen, void *obj)
 {
 	LOCKU4args *args = (LOCKU4args *)obj;
 
-	snprintf(buf, buflen, "R=%llu:%llu LSQ=%u %s",
+	snprintf(buf, buflen, "%llu:%llu LSQ=%u %s",
 	    args->offset, args->length, args->seqid,
 	    sum_lock_stateid(&args->lock_stateid));
 }
@@ -1938,7 +1939,6 @@ dtlarg_release_lkown(void *obj)
 
 static void
 sumarg_release_lkown(char *buf, size_t buflen, void *obj)
-
 {
 	RELEASE_LOCKOWNER4args *args = (RELEASE_LOCKOWNER4args *)obj;
 
@@ -3675,7 +3675,7 @@ sum_type_name(nfs_ftype4 type)
 
 static char *
 get_flags(uint_t flag, ftype_names_t *names, uint_t num_flags, int shortname,
-	char *prefix)
+    char *prefix)
 {
 	static char buf[200];
 	char *bp = buf, *str;

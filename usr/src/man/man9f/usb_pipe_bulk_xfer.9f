@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_PIPE_BULK_XFER 9F "Aug 3, 2006"
+.TH USB_PIPE_BULK_XFER 9F "Sep 16, 2016"
 .SH NAME
 usb_pipe_bulk_xfer \- USB bulk transfer function
 .SH SYNOPSIS
@@ -18,11 +18,9 @@ usb_pipe_bulk_xfer \- USB bulk transfer function
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpipe_handle\fR\fR
@@ -50,7 +48,6 @@ USB_FLAGS_SLEEP is the only flag recognized. Wait for request to complete.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_pipe_bulk_xfer()\fR function requests the USBA framework to perform
 a transfer through a USB bulk pipe. The request is passed to the host
@@ -66,7 +63,6 @@ Requests for bulk transfers must have mblks attached to store data. Allocate an
 mblk for data when a request is allocated via \fBusb_alloc_bulk_req\fR(9F) by
 passing a non-negative value for the \fIlen\fR argument.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fBUSB_SUCCESS\fR
@@ -179,12 +175,10 @@ and bulk_cb_flags fields of the request. Please see
 \fBusb_completion_reason\fR(9S) and \fBusb_callback_flags\fR(9S) for more
 information.
 .SH CONTEXT
-.sp
 .LP
 May be called from kernel or user context without regard to arguments. May be
 called from interrupt context only when the USB_FLAGS_SLEEP flag is clear.
 .SH EXAMPLES
-.sp
 .in +2
 .nf
    /* Allocate, initialize and issue a synchronous bulk request. */
@@ -209,7 +203,6 @@ called from interrupt context only when the USB_FLAGS_SLEEP flag is clear.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -227,12 +220,11 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBusb_alloc_request\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_get_status\fR(9F), \fBusb_pipe_ctrl_xfer\fR(9F),
 \fBusb_pipe_get_state\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
-\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_pipe_open\fR(9F),
+\fBusb_pipe_isoc_xfer\fR(9F), \fBusb_pipe_xopen\fR(9F),
 \fBusb_pipe_reset\fR(9F), \fBusb_bulk_request\fR(9S),
 \fBusb_callback_flags\fR(9S), \fBusb_completion_reason\fR(9S),
 \fBusb_ctrl_request\fR(9S), \fBusb_intr_request\fR(9S),

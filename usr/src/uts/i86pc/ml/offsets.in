@@ -1,6 +1,7 @@
 \
 \ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 \ Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+\ Copyright 2016 Joyent, Inc.
 \
 \ CDDL HEADER START
 \
@@ -61,6 +62,7 @@
 #include <sys/brand.h>
 #include <sys/fastboot.h>
 #include <sys/cpr_wakecode.h>
+#include <sys/comm_page.h>
 
 proc		PROCSIZE
 	p_link
@@ -467,3 +469,5 @@ wc_cpu	WC_CPU_SIZE
 
 wc_wakecode
 	wc_cpu
+
+comm_page_s	COMM_PAGE_S_SIZE

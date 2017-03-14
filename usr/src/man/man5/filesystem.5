@@ -19,7 +19,7 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\"
-.TH FILESYSTEM 5 "Oct 7, 2016"
+.TH FILESYSTEM 5 "Feb 25, 2017"
 .SH NAME
 filesystem \- File system organization
 .SH SYNOPSIS
@@ -781,16 +781,6 @@ Scripts for bringing the system up in single user mode.
 .sp .6
 .RS 4n
 Directory for reconfiguration manager (RCM) custom scripts.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/rpcsec\fR\fR
-.ad
-.sp .6
-.RS 4n
-This directory might contain an \fBNIS+\fR authentication configuration file.
 .RE
 
 .sp
@@ -1558,16 +1548,6 @@ NFS server log files.
 .sp
 .ne 2
 .na
-\fB\fB/var/nis\fR\fR
-.ad
-.sp .6
-.RS 4n
-NIS+ databases.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/var/ntp\fR\fR
 .ad
 .sp .6
@@ -1879,8 +1859,7 @@ property.
 .ad
 .sp .6
 .RS 4n
-Databases needed for backwards compatibility with \fBNIS\fR and
-\fBypbind\fR(1M); unnecessary after full transition to \fBNIS+\fR.
+Databases used by \fBNIS\fR and \fBypbind\fR(1M).
 .RE
 
 .SS "\fB/usr\fR File System"
@@ -2598,16 +2577,6 @@ Internet network services.
 .sp .6
 .RS 4n
 Auxiliary NFS-related programs and daemons.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/nis\fR\fR
-.ad
-.sp .6
-.RS 4n
-Contains NIS+ administrative commands.
 .RE
 
 .sp

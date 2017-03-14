@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -773,7 +774,7 @@ segkmem_capable(struct seg *seg, segcapability_t capability)
 	return (0);
 }
 
-static struct seg_ops segkmem_ops = {
+struct seg_ops segkmem_ops = {
 	SEGKMEM_BADOP(int),		/* dup */
 	SEGKMEM_BADOP(int),		/* unmap */
 	SEGKMEM_BADOP(void),		/* free */

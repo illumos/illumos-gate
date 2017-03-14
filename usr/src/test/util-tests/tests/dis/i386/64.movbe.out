@@ -1,0 +1,6 @@
+    libdis_test:      66 0f 38 f1 03     movbew %ax,(%rbx)
+    libdis_test+0x5:  0f 38 f1 03        movbel %eax,(%rbx)
+    libdis_test+0x9:  48 0f 38 f1 03     movbeq %rax,(%rbx)
+    libdis_test+0xe:  66 0f 38 f0 18     movbew (%rax),%bx
+    libdis_test+0x13: 0f 38 f0 18        movbel (%rax),%ebx
+    libdis_test+0x17: 48 0f 38 f0 18     movbeq (%rax),%rbx

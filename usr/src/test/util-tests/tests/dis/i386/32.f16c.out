@@ -1,0 +1,14 @@
+    libdis_test:      c4 e2 79 13 c8     vcvtph2ps %xmm0,%xmm1
+    libdis_test+0x5:  c4 e2 79 13 08     vcvtph2ps (%eax),%xmm1
+    libdis_test+0xa:  c4 e2 79 13 48 24  vcvtph2ps 0x24(%eax),%xmm1
+    libdis_test+0x10: c4 e2 7d 13 c8     vcvtph2ps %xmm0,%ymm1
+    libdis_test+0x15: c4 e2 7d 13 08     vcvtph2ps (%eax),%ymm1
+    libdis_test+0x1a: c4 e2 7d 13 48 24  vcvtph2ps 0x24(%eax),%ymm1
+    libdis_test+0x20: c4 e3 79 1d c1 10  vcvtps2ph $0x10,%xmm0,%xmm1
+    libdis_test+0x26: c4 e3 79 1d 1b 10  vcvtps2ph $0x10,%xmm3,(%ebx)
+    libdis_test+0x2c: c4 e3 79 1d 61 10  vcvtps2ph $0x10,%xmm4,0x10(%ecx)
+                      10 
+    libdis_test+0x33: c4 e3 7d 1d c1 10  vcvtps2ph $0x10,%ymm0,%xmm1
+    libdis_test+0x39: c4 e3 7d 1d 1b 10  vcvtps2ph $0x10,%ymm3,(%ebx)
+    libdis_test+0x3f: c4 e3 7d 1d 61 10  vcvtps2ph $0x10,%ymm4,0x10(%ecx)
+                      10 

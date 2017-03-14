@@ -58,6 +58,7 @@ SYMBOL_SCOPE {
 		islower;
 		ispunct;
 		isspace;
+		strlcpy;
 
 		mdb_tgt_aread;
 		mdb_dis_create;

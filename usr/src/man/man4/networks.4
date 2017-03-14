@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NETWORKS 4 "Jan 17, 2002"
+.TH NETWORKS 4 "Feb 25, 2017"
 .SH NAME
 networks \- network name database
 .SH SYNOPSIS
@@ -19,13 +19,12 @@ networks \- network name database
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnetworks\fR file is a local source of information regarding the networks
-which comprise the Internet. The networks  file can be used in conjunction
+which comprise the Internet. The networks file can be used in conjunction
 with, or instead of, other networks sources, including the NIS maps
-\fBnetworks.byname\fR and  \fBnetworks.byaddr\fR and the NIS+ table
-\fBnetworks\fR. Programs use the \fBgetnetbyname\fR(3SOCKET) routines to access
+\fBnetworks.byname\fR and \fBnetworks.byaddr\fR.
+Programs use the \fBgetnetbyname\fR(3SOCKET) routines to access
 this information.
 .sp
 .LP
@@ -53,12 +52,10 @@ using the \fBinet_network\fR routine from the Internet address manipulation
 library, \fBinet\fR(7P). Network names may contain any printable character
 other than a field delimiter, \fBNEWLINE\fR, or comment character.
 .SH SEE ALSO
-.sp
 .LP
 \fBgetnetbyaddr\fR(3SOCKET), \fBgetnetbyname\fR(3SOCKET), \fBinet\fR(3SOCKET),
 \fBnsswitch.conf\fR(4), \fBinet\fR(7P)
 .SH NOTES
-.sp
 .LP
 The official SVR4 name of the \fBnetworks\fR file is \fB/etc/inet/networks\fR.
 The symbolic link \fB/etc/networks\fR exists for \fBBSD\fR compatibility.

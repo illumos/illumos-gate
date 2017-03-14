@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PASSWD 4 "Apr 16, 2013"
+.TH PASSWD 4 "Feb 25, 2017"
 .SH NAME
 passwd \- password file
 .SH SYNOPSIS
@@ -19,7 +19,7 @@ passwd \- password file
 The file \fB/etc/passwd\fR is a local source of information about users'
 accounts. The password file can be used in conjunction with other naming
 sources, such as the \fBNIS\fR maps \fBpasswd.byname\fR and \fBpasswd.bygid\fR,
-data from the \fBNIS+\fR \fBpasswd\fR table, or password data stored on an LDAP
+or password data stored on an LDAP
 server. Programs use the \fBgetpwnam\fR(3C) routines to access this
 information.
 .sp
@@ -145,7 +145,7 @@ consumers of the file , such as \fBgetpwnam\fR(3C), to fail.
 .LP
 The password file can contain entries beginning with a `+' (plus sign) or '-'
 (minus sign) to selectively incorporate entries from another naming service
-source, such as NIS, NIS+, or LDAP.
+source, such as NIS or LDAP.
 .sp
 .LP
 A line beginning with a '+' means to incorporate entries from the naming
@@ -334,7 +334,7 @@ but with a \fIgcos\fR field of \fBGuest\fR
 .SH SEE ALSO
 .LP
 \fBchgrp\fR(1), \fBchown\fR(1), \fBfinger\fR(1), \fBgroups\fR(1),
-\fBlogin\fR(1), \fBnewgrp\fR(1), \fBnispasswd\fR(1), \fBpasswd\fR(1),
+\fBlogin\fR(1), \fBnewgrp\fR(1), \fBpasswd\fR(1),
 \fBsh\fR(1), \fBsort\fR(1), \fBdomainname\fR(1M), \fBgetent\fR(1M),
 \fBpassmgmt\fR(1M), \fBpwck\fR(1M), \fBpwconv\fR(1M),
 \fBsu\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M),

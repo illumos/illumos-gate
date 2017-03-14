@@ -25,6 +25,7 @@
  *
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -47,6 +48,7 @@
 #include <sys/panic.h>
 #include <sys/cpu.h>
 #include <sys/sdt.h>
+#include <sys/comm_page.h>
 
 /*
  * Using the Pentium's TSC register for gethrtime()
@@ -99,7 +101,6 @@
 
 #define	NSEC_SHIFT 5
 
-static uint_t nsec_scale;
 static uint_t nsec_unscale;
 
 /*
@@ -140,8 +141,6 @@ static volatile int tsc_sync_go;
 
 int tsc_master_slave_sync_needed = 1;
 
-static int	tsc_max_delta;
-static hrtime_t tsc_sync_tick_delta[NCPU];
 typedef struct tsc_sync {
 	volatile hrtime_t master_tsc, slave_tsc;
 } tsc_sync_t;
@@ -149,9 +148,7 @@ static tsc_sync_t *tscp;
 static hrtime_t largest_tsc_delta = 0;
 static ulong_t shortest_write_time = ~0UL;
 
-static hrtime_t	tsc_last = 0;
 static hrtime_t	tsc_last_jumped = 0;
-static hrtime_t	tsc_hrtime_base = 0;
 static int	tsc_jumped = 0;
 static uint32_t	tsc_wayback = 0;
 /*
@@ -159,7 +156,6 @@ static uint32_t	tsc_wayback = 0;
  * tsc_tick() function runs which means that when gethrtime() is called it
  * should never be more than 1 second since tsc_last was updated.
  */
-static hrtime_t tsc_resume_cap;
 static hrtime_t tsc_resume_cap_ns = NANOSEC;	 /* 1s */
 
 static hrtime_t	shadow_tsc_hrtime_base;
@@ -546,6 +542,7 @@ tsc_sync_master(processorid_t slave)
 	if (largest_tsc_delta > shortest_write_time) {
 		gethrtimef = tsc_gethrtime_delta;
 		gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
+		tsc_ncpu = NCPU;
 	}
 	restore_int_flag(flags);
 }
@@ -688,6 +685,12 @@ tsc_hrtimeinit(uint64_t cpu_freq_hz)
 	hrtime_tick = tsc_tick;
 	gethrtime_hires = 1;
 	/*
+	 * Being part of the comm page, tsc_ncpu communicates the published
+	 * length of the tsc_sync_tick_delta array.  This is kept zeroed to
+	 * ignore the absent delta data while the TSCs are synced.
+	 */
+	tsc_ncpu = 0;
+	/*
 	 * Allocate memory for the structure used in the tsc sync logic.
 	 * This structure should be aligned on a multiple of cache line size.
 	 */
@@ -726,6 +729,7 @@ tsc_adjust_delta(hrtime_t tdelta)
 
 	gethrtimef = tsc_gethrtime_delta;
 	gethrtimeunscaledf = tsc_gethrtimeunscaled_delta;
+	tsc_ncpu = NCPU;
 }
 
 /*
