@@ -895,6 +895,17 @@ get_mountd_client(char *fshost, nfs_mnt_data_t *nmdp, int *fdp)
 	cl = clnt_tli_create(fd, nconf, &tbind->addr, MOUNTPROG, vers, 0, 0);
 	if (cl == NULL) {
 		(void) t_close(fd);
+		/*
+		 * Unfortunately, a failure in the:
+		 *    clnt_tli_create -> set_up_connection -> t_connect
+		 * call path doesn't return any useful information about why we
+		 * had an error. We basically see the following rpc_createerr
+		 * status for a variety of conditions (e.g. invalid port, no
+		 * service at IP, timeout, etc.):
+		 *    rpc_createerr.cf_stat == RPC_TLIERROR
+		 *    rpc_createerr.cf_error.re_terrno == 9 (TLOOK)
+		 *    rpc_createerr.cf_error.re_errno == 0
+		 */
 	} else {
 		*fdp = fd;
 	}
@@ -951,8 +962,15 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, nfs_mnt_data_t *nmdp)
 	}
 
 	cl = get_mountd_client(fshost, nmdp, &fd);
-	if (cl == NULL)
-		return (-EAGAIN);
+	if (cl == NULL) {
+		/*
+		 * As noted in get_mountd_client, we don't get a good indication
+		 * as to why the connection failed. Linux returns ETIMEDOUT
+		 * under many of the same conditions, and our native code notes
+		 * that this is a common reason, so we do that here too.
+		 */
+		return (-ETIMEDOUT);
+	}
 
 	if ((cl->cl_auth = authsys_create_default()) == NULL) {
 		return (get_fh_cleanup(cl, fd, -EAGAIN));
@@ -1036,8 +1054,7 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, nfs_mnt_data_t *nmdp)
 		 * If "sec=flavor" is a mount option, check if the server
 		 * supports the "flavor". If the server does not support the
 		 * flavor, return error. It is unlikely that the server will
-		 * not support "none" or "sys", which are the only two flavors
-		 * we currently allow.
+		 * not support "sys", although "none" may not be allowed.
 		 */
 		auths =
 		    mountres3.mountres3_u.mountinfo.auth_flavors
@@ -1056,9 +1073,9 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, nfs_mnt_data_t *nmdp)
 					break;
 			}
 			if (i == count)
-				return (get_fh_cleanup(cl, fd, -EAGAIN));
+				return (get_fh_cleanup(cl, fd, -EACCES));
 		} else {
-			/* AUTH_UNIX is the default. */
+			/* AUTH_SYS is our default. */
 			(void) strlcpy(nmdp->nmd_nfs_sec.sc_name, "sys",
 			    MAX_NAME_LEN);
 			nmdp->nmd_nfs_sec.sc_nfsnum =
@@ -1277,6 +1294,21 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 					return (r);
 
 			} else if (strcmp(key, "sec") == 0) {
+				/*
+				 * Linux supports: none, sys, krb5, krb5i, and
+				 * krb5p. Of these, only none and sys overlap
+				 * with our current support. Anything else is
+				 * an error.
+				 */
+				int r;
+
+				if (strcmp(val, "none") != 0 &&
+				    strcmp(val, "sys") != 0)
+					return (-EINVAL);
+				r = append_opt(mntopts, MAX_MNTOPT_STR, key,
+				    val);
+				if (r != 0)
+					return (r);
 				no_sec = B_FALSE;
 			} else {
 				int r;
