@@ -170,7 +170,11 @@ get_mempolicy01
 getxattr01
 getxattr02
 getxattr03
+getxattr04
 ioctl03
+ioctl04
+ioctl05
+ioctl06
 io_cancel01
 io_destroy01
 io_getevents01
