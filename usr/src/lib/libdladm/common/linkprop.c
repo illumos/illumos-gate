@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -881,7 +881,8 @@ static dladm_status_t	i_dladm_set_single_prop(dladm_handle_t, datalink_id_t,
 			    datalink_class_t, uint32_t, prop_desc_t *, char **,
 			    uint_t, uint_t);
 static dladm_status_t	i_dladm_set_linkprop(dladm_handle_t, datalink_id_t,
-			    const char *, char **, uint_t, uint_t);
+			    const char *, char **, uint_t, uint_t,
+			    datalink_class_t, uint32_t);
 static dladm_status_t	i_dladm_getset_defval(dladm_handle_t, prop_desc_t *,
 			    datalink_id_t, datalink_media_t, uint_t);
 
@@ -1013,18 +1014,12 @@ done:
 
 static dladm_status_t
 i_dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
-    const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags)
+    const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags,
+    datalink_class_t class, uint32_t media)
 {
 	int			i;
 	boolean_t		found = B_FALSE;
-	datalink_class_t	class;
-	uint32_t		media;
 	dladm_status_t		status = DLADM_STATUS_OK;
-
-	status = dladm_datalink_id2info(handle, linkid, NULL, &class, &media,
-	    NULL, 0);
-	if (status != DLADM_STATUS_OK)
-		return (status);
 
 	for (i = 0; i < DLADM_MAX_PROPS; i++) {
 		prop_desc_t	*pdp = &prop_table[i];
@@ -1041,6 +1036,19 @@ i_dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 			status = s;
 			break;
 		} else {
+			/*
+			 * Some consumers of this function pass a
+			 * prop_name of NULL to indicate that all
+			 * properties should reset to their default
+			 * value. Some properties don't support a
+			 * default value and will return NOTSUP -- for
+			 * the purpose of resetting property values we
+			 * treat it the same as success. We need the
+			 * separate status variable 's' so that we can
+			 * record any failed calls in 'status' and
+			 * continue resetting the rest of the
+			 * properties.
+			 */
 			if (s != DLADM_STATUS_OK &&
 			    s != DLADM_STATUS_NOTSUP)
 				status = s;
@@ -1066,6 +1074,9 @@ dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
     const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags)
 {
 	dladm_status_t	status = DLADM_STATUS_OK;
+	datalink_class_t	class;
+	uint32_t		media;
+	uint32_t		link_flags;
 
 	if ((linkid == DATALINK_INVALID_LINKID) || (flags == 0) ||
 	    (prop_val == NULL && val_cnt > 0) ||
@@ -1078,12 +1089,21 @@ dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 	 * Check for valid link property against the flags passed
 	 * and set the link property when active flag is passed.
 	 */
+	status = dladm_datalink_id2info(handle, linkid, &link_flags, &class,
+	    &media, NULL, 0);
+	if (status != DLADM_STATUS_OK)
+		return (status);
 	status = i_dladm_set_linkprop(handle, linkid, prop_name, prop_val,
-	    val_cnt, flags);
+	    val_cnt, flags, class, media);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
-	if (flags & DLADM_OPT_PERSIST) {
+	/*
+	 * Write an entry to the persistent configuration database if
+	 * and only if the user has requested the property to be
+	 * persistent and the link is a persistent link.
+	 */
+	if ((flags & DLADM_OPT_PERSIST) && (link_flags & DLMGMT_PERSIST)) {
 		status = i_dladm_set_linkprop_db(handle, linkid, prop_name,
 		    prop_val, val_cnt);
 

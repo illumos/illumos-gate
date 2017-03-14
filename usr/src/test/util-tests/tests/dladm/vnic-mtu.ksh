@@ -81,7 +81,7 @@ test_vnic_pass()
 
 	[[ -z "$mtu" ]] && fatal "missing required mtu"
 	dladm create-vnic $flags -l $vm_stub -p mtu=$mtu $vm_vnic || fatal \
-	    "failed tocreate vnic: $vm_vnic"
+	    "failed to create vnic: $vm_vnic"
 	validate_mtu "$vm_vnic" "$mtu"
 	delete_vnic
 }
