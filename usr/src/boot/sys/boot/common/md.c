@@ -106,7 +106,7 @@ md_strategy(void *devdata, int rw, daddr_t blk, size_t size, char *buf,
 	if (rsize != 0)
 		*rsize = size;
 
-	switch (rw) {
+	switch (rw & F_MASK) {
 	case F_READ:
 		bcopy(md_image.start + ofs, buf, size);
 		return (0);
