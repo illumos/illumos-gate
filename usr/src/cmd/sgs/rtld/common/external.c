@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -723,9 +723,9 @@ isalnum(int c)
 
 #if defined(__i386) || defined(__amd64)
 /*
- * Instead of utilizing the comm page for clock_gettime, rtld uses the raw
- * syscall instead.  Doing so decreases the surface of symbols needed from libc
- * for a modest performance cost.
+ * Instead of utilizing the comm page for clock_gettime and gettimeofday, rtld
+ * uses the raw syscall instead.  Doing so decreases the surface of symbols
+ * needed from libc for a modest performance cost.
  */
 extern int __clock_gettime_sys(clockid_t, struct timespec *);
 
@@ -733,6 +733,22 @@ int
 __clock_gettime(clockid_t clock_id, struct timespec *tp)
 {
 	return (__clock_gettime_sys(clock_id, tp));
+}
+
+int
+gettimeofday(struct timeval *tv, void *tz)
+{
+	if (tv != NULL) {
+		/*
+		 * Perform the same logic as the libc gettimeofday() when it
+		 * lacks comm page support: Make the clock_gettime syscall and
+		 * divide out the tv_usec field as required.
+		 */
+		__clock_gettime_sys(CLOCK_REALTIME, (timespec_t *)tv);
+		tv->tv_usec /= 1000;
+	}
+
+	return (0);
 }
 #endif /* defined(__i386) || defined(__amd64) */
 
