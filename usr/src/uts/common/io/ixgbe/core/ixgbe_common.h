@@ -41,7 +41,6 @@
 		IXGBE_WRITE_REG(hw, reg, (u32) value); \
 		IXGBE_WRITE_REG(hw, reg + 4, (u32) (value >> 32)); \
 	} while (0)
-#define IXGBE_REMOVED(a) (0)
 #if !defined(NO_READ_PBA_RAW) || !defined(NO_WRITE_PBA_RAW)
 struct ixgbe_pba {
 	u16 word[2];

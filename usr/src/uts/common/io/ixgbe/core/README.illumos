@@ -1,0 +1,14 @@
+This directory contains the 'common code' to the ixgbe driver. This code
+comes from FreeBSD.
+
+The following are a subset of the current modifications that are being
+made to this common code to facilitate illumos specific features:
+
+o IXGBE_REMOVED
+
+The IXGBE_REMOVED macro normally taks a pointer to the hardware address.
+However, that does not allow us to go through and actually do a useful
+check. Instead we modify all users of this macro to pass the struct
+ixgbe_hw of the ixgbe_t. Importantly, we also remove the current
+definition of IXGBE_REMOVED in ixbe_common.h and instead use the
+definition in ixgbe_osdep.h.
