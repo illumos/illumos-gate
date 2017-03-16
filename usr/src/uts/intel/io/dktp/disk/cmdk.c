@@ -1578,6 +1578,7 @@ cmdk_lb_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 			tgattribute->media_is_writable = FALSE;
 		else
 			tgattribute->media_is_writable = TRUE;
+		tgattribute->media_is_rotational = TRUE;
 
 		return (0);
 	}

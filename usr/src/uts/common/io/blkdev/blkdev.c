@@ -1510,6 +1510,7 @@ bd_tg_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 		((tg_attribute_t *)arg)->media_is_writable =
 		    bd->d_rdonly ? B_FALSE : B_TRUE;
 		((tg_attribute_t *)arg)->media_is_solid_state = bd->d_ssd;
+		((tg_attribute_t *)arg)->media_is_rotational = B_FALSE;
 		return (0);
 
 	default:

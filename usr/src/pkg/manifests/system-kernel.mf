@@ -24,6 +24,7 @@
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2017 James S Blachly, MD <james.blachly@gmail.com>
 #
 
 #
@@ -182,9 +183,9 @@ $(i386_ONLY)driver name=mc-amd \
     alias=pci1022,1100 \
     alias=pci1022,1101 \
     alias=pci1022,1102
-driver name=mm perms="allkmem 0600 root sys" perms="kmem 0640 root sys" \
-    perms="mem 0640 root sys" perms="null 0666 root sys" \
-    perms="zero 0666 root sys" \
+driver name=mm perms="allkmem 0600 root sys" perms="full 0666 root sys" \
+    perms="kmem 0640 root sys" perms="mem 0640 root sys" \
+    perms="null 0666 root sys" perms="zero 0666 root sys" \
     policy="allkmem read_priv_set=all write_priv_set=all" \
     policy="kmem read_priv_set=none write_priv_set=all" \
     policy="mem read_priv_set=none write_priv_set=all"

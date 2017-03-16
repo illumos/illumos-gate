@@ -84,43 +84,40 @@ static const double
 /* INDENT ON */
 
 void
-sincospi(double x, double *s, double *c) {
+sincospi(double x, double *s, double *c)
+{
 	double y, z, t;
 	int n, ix, k;
-	int hx = ((int *) &x)[HIWORD];
-	unsigned h, lx = ((unsigned *) &x)[LOWORD];
+	int hx = ((int *)&x)[HIWORD];
+	unsigned h, lx = ((unsigned *)&x)[LOWORD];
 
 	ix = hx & ~0x80000000;
 	n = (ix >> 20) - 0x3ff;
 	if (n >= 51) {			/* |x| >= 2**51 */
-		if (n >= 1024)
+		if (n >= 1024) {
 #if defined(FPADD_TRAPS_INCOMPLETE_ON_NAN)
 			*s = *c = ix >= 0x7ff80000 ? x : x - x;
 			/* assumes sparc-like QNaN */
 #else
 			*s = *c = x - x;
 #endif
-		else {
-			if (n >= 53)  {
+		} else {
+			if (n >= 53) {
 				*s = 0.0;
 				*c = 1.0;
-			}
-			else if (n == 52)  {
+			} else if (n == 52) {
 				if ((lx & 1) == 0) {
 					*s = 0.0;
 					*c = 1.0;
-				}
-				else {
+				} else {
 					*s = -0.0;
 					*c = -1.0;
 				}
-			}
-			else {	/* n == 51 */
+			} else {	/* n == 51 */
 				if ((lx & 1) == 0) {
 					*s = 0.0;
 					*c = 1.0;
-				}
-				else {
+				} else {
 					*s = 1.0;
 					*c = 0.0;
 				}
@@ -130,57 +127,53 @@ sincospi(double x, double *s, double *c) {
 				}
 			}
 		}
-	}
-	else if (n < -2) 	/* |x| < 0.25 */
+	} else if (n < -2)	/* |x| < 0.25 */
 		*s = __k_sincos(pi * fabs(x), 0.0, c);
 	else {
 		/* y = |4x|, z = floor(y), and n = (int)(z mod 8.0) */
 		if (ix < 0x41C00000) {		/* |x| < 2**29 */
 			y = 4.0 * fabs(x);
-			n = (int) y;		/* exact */
-			z = (double) n;
+			n = (int)y;		/* exact */
+			z = (double)n;
 			k = z == y;
 			t = (y - z) * 0.25;
-		}
-		else {				/* 2**29 <= |x| < 2**51 */
+		} else {			/* 2**29 <= |x| < 2**51 */
 			y = fabs(x);
 			k = 50 - n;
 			n = lx >> k;
 			h = n << k;
-			((unsigned *) &z)[LOWORD] = h;
-			((int *) &z)[HIWORD] = ix;
+			((unsigned *)&z)[LOWORD] = h;
+			((int *)&z)[HIWORD] = ix;
 			k = h == lx;
 			t = y - z;
 		}
 		if (k) {			/* x = N/4 */
-			if ((n & 1) != 0)
+			if ((n & 1) != 0) {
 				*s = *c = sqrth_h + sqrth_l;
-			else
+			} else {
 				if ((n & 2) == 0) {
 					*s = 0.0;
 					*c = 1.0;
-				}
-				else {
+				} else {
 					*s = 1.0;
 					*c = 0.0;
 				}
-				y = (n & 2) == 0 ? 0.0 : 1.0;
-				if ((n & 4) != 0)
-					*s = -*s;
-				if (((n + 1) & 4) != 0)
-					*c = -*c;
-		}
-		else {
+			}
+			if ((n & 4) != 0)
+				*s = -*s;
+			if (((n + 1) & 4) != 0)
+				*c = -*c;
+		} else {
 			if ((n & 1) != 0)
 				t = 0.25 - t;
 			if (((n + (n & 1)) & 2) == 0)
 				*s = __k_sincos(pi * t, 0.0, c);
 			else
 				*c = __k_sincos(pi * t, 0.0, s);
-				if ((n & 4) != 0)
-					*s = -*s;
-				if (((n + 2) & 4) != 0)
-					*c = -*c;
+			if ((n & 4) != 0)
+				*s = -*s;
+			if (((n + 2) & 4) != 0)
+				*c = -*c;
 		}
 	}
 	if (hx < 0)

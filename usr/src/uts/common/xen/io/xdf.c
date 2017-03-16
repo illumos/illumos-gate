@@ -2373,6 +2373,7 @@ xdf_lb_getattribute(dev_info_t *dip, tg_attribute_t *tgattributep)
 		tgattributep->media_is_writable = 0;
 	else
 		tgattributep->media_is_writable = 1;
+	tgattributep->media_is_rotational = 0;
 	return (0);
 }
 
@@ -3115,7 +3116,7 @@ xdf_watch_hp_status_cb(dev_info_t *dip, const char *path, void *arg)
 
 static int
 xdf_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int flags,
-	char *name, caddr_t valuep, int *lengthp)
+    char *name, caddr_t valuep, int *lengthp)
 {
 	xdf_t	*vdp = ddi_get_soft_state(xdf_ssp, ddi_get_instance(dip));
 

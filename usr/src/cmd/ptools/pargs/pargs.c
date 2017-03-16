@@ -84,7 +84,7 @@ typedef struct pargs_data {
 	uintptr_t *pd_argv;
 	char **pd_argv_strs;
 	size_t pd_envc;
-	size_t pd_envc_curr;
+	size_t pd_env_space;
 	uintptr_t *pd_envp;
 	char **pd_envp_strs;
 	size_t pd_auxc;
@@ -635,9 +635,25 @@ build_env(void *data, struct ps_prochandle *pr, uintptr_t addr, const char *str)
 	pargs_data_t *datap = data;
 
 	if (datap->pd_envp != NULL) {
-		/* env has more items than last time, skip the newer ones */
-		if (datap->pd_envc > datap->pd_envc_curr)
-			return (0);
+		if (datap->pd_envc == datap->pd_env_space) {
+			/*
+			 * Not enough space for storing the env (it has more
+			 * items than before).  Try to grow both arrays.
+			 */
+			void *new = realloc(datap->pd_envp,
+			    sizeof (uintptr_t) * datap->pd_env_space * 2);
+			if (new == NULL)
+				return (1);
+			datap->pd_envp = new;
+
+			new = realloc(datap->pd_envp_strs,
+			    sizeof (char *) * datap->pd_env_space * 2);
+			if (new == NULL)
+				return (1);
+			datap->pd_envp_strs = new;
+
+			datap->pd_env_space *= 2;
+		}
 
 		datap->pd_envp[datap->pd_envc] = addr;
 		if (str == NULL)
@@ -658,10 +674,12 @@ get_env(pargs_data_t *datap)
 
 	datap->pd_envc = 0;
 	(void) Penv_iter(pr, build_env, datap);
-	datap->pd_envc_curr = datap->pd_envc;
 
-	datap->pd_envp = safe_zalloc(sizeof (uintptr_t) * datap->pd_envc);
-	datap->pd_envp_strs = safe_zalloc(sizeof (char *) * datap->pd_envc);
+	/* We must allocate space for at least one entry */
+	datap->pd_env_space = datap->pd_envc != 0 ? datap->pd_envc : 1;
+	datap->pd_envp = safe_zalloc(sizeof (uintptr_t) * datap->pd_env_space);
+	datap->pd_envp_strs =
+	    safe_zalloc(sizeof (char *) * datap->pd_env_space);
 
 	datap->pd_envc = 0;
 	(void) Penv_iter(pr, build_env, datap);
@@ -1122,32 +1140,20 @@ free_data(pargs_data_t *datap)
 {
 	int i;
 
-	if (datap->pd_argv) {
-		for (i = 0; i < datap->pd_argc; i++) {
-			if (datap->pd_argv_strs[i] != NULL)
-				free(datap->pd_argv_strs[i]);
-		}
-		free(datap->pd_argv);
-		free(datap->pd_argv_strs);
-	}
+	for (i = 0; i < datap->pd_argc; i++)
+		free(datap->pd_argv_strs[i]);
+	free(datap->pd_argv);
+	free(datap->pd_argv_strs);
 
-	if (datap->pd_envp) {
-		for (i = 0; i < datap->pd_envc; i++) {
-			if (datap->pd_envp_strs[i] != NULL)
-				free(datap->pd_envp_strs[i]);
-		}
-		free(datap->pd_envp);
-		free(datap->pd_envp_strs);
-	}
+	for (i = 0; i < datap->pd_envc; i++)
+		free(datap->pd_envp_strs[i]);
+	free(datap->pd_envp);
+	free(datap->pd_envp_strs);
 
-	if (datap->pd_auxv) {
-		for (i = 0; i < datap->pd_auxc; i++) {
-			if (datap->pd_auxv_strs[i] != NULL)
-				free(datap->pd_auxv_strs[i]);
-		}
-		free(datap->pd_auxv);
-		free(datap->pd_auxv_strs);
-	}
+	for (i = 0; i < datap->pd_auxc; i++)
+		free(datap->pd_auxv_strs[i]);
+	free(datap->pd_auxv);
+	free(datap->pd_auxv_strs);
 }
 
 static void
