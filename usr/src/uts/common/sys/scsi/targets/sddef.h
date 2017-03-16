@@ -460,12 +460,13 @@ struct sd_lun {
 	    un_f_pm_log_sense_smart	:1,	/* log sense support SMART */
 						/* feature attribute */
 	    un_f_is_solid_state		:1,	/* has solid state media */
+	    un_f_is_rotational		:1,	/* spinning rust */
 	    un_f_mmc_gesn_polling	:1,	/* use GET EVENT STATUS */
 						/* NOTIFICATION for polling */
 	    un_f_enable_rmw		:1,	/* Force RMW in sd driver */
 	    un_f_expnevent		:1,
 	    un_f_cache_mode_changeable	:1,	/* can change cache mode */
-	    un_f_reserved		:2;
+	    un_f_reserved		:1;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;

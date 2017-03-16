@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -26,11 +27,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * du -- summarize disk usage
- *	du [-dorx] [-a|-s] [-h|-k|-m] [-H|-L] [file...]
+ *	du [-Adorx] [-a|-s] [-h|-k|-m] [-H|-L] [file...]
  */
 
 #include <sys/types.h>
@@ -55,6 +54,7 @@ static int		mflg = 0;
 static int		oflg = 0;
 static int		dflg = 0;
 static int		hflg = 0;
+static int		Aflg = 0;
 static int		Hflg = 0;
 static int		Lflg = 0;
 static int		cmdarg = 0;	/* Command line argument */
@@ -70,7 +70,7 @@ static size_t		name_len = PATH_MAX + 1;    /* # of chars for name */
 typedef char		numbuf_t[NUMBER_WIDTH];
 
 /*
- * Output formats.  Solaris uses a tab as separator, XPG4 a space.
+ * Output formats. illumos uses a tab as separator, XPG4 a space.
  */
 #ifdef XPG4
 #define	FORMAT1	"%s %s\n"
@@ -117,7 +117,7 @@ main(int argc, char **argv)
 	rflg++;		/* "-r" is not an option but ON always */
 #endif
 
-	while ((c = getopt(argc, argv, "adhHkLmorsx")) != EOF)
+	while ((c = getopt(argc, argv, "aAdhHkLmorsx")) != EOF)
 		switch (c) {
 
 		case 'a':
@@ -162,6 +162,10 @@ main(int argc, char **argv)
 			dflg++;
 			continue;
 
+		case 'A':
+			Aflg++;
+			continue;
+
 		case 'H':
 			Hflg++;
 			/* -H and -L are mutually exclusive */
@@ -177,7 +181,7 @@ main(int argc, char **argv)
 			continue;
 		case '?':
 			(void) fprintf(stderr, gettext(
-			    "usage: du [-dorx] [-a|-s] [-h|-k|-m] [-H|-L] "
+			    "usage: du [-Adorx] [-a|-s] [-h|-k|-m] [-H|-L] "
 			    "[file...]\n"));
 			exit(2);
 		}
@@ -379,7 +383,8 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 			}
 		}
 	}
-	blocks = stb.st_blocks;
+	blocks = Aflg ? stb.st_size : stb.st_blocks;
+
 	/*
 	 * If there are extended attributes on the current file, add their
 	 * block usage onto the block count.  Note: Since pathconf() always
@@ -595,11 +600,15 @@ number_to_scaled_string(
 static void
 printsize(blkcnt_t blocks, char *path)
 {
+	u_longlong_t bsize;
+
+	bsize = Aflg ? 1 : DEV_BSIZE;
+
 	if (hflg) {
 		numbuf_t numbuf;
 		unsigned long long scale = 1024L;
 		(void) printf(FORMAT1,
-		    number_to_scaled_string(numbuf, blocks, DEV_BSIZE, scale),
+		    number_to_scaled_string(numbuf, blocks, bsize, scale),
 		    path);
 	} else if (kflg) {
 		(void) printf(FORMAT2, (long long)kb(blocks), path);
