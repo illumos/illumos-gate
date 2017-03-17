@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -452,11 +452,10 @@ static int
 i40e_rx_ring_intr_enable(mac_intr_handle_t intrh)
 {
 	i40e_trqpair_t *itrq = (i40e_trqpair_t *)intrh;
-	i40e_t *i40e = itrq->itrq_i40e;
 
 	mutex_enter(&itrq->itrq_rx_lock);
 	ASSERT(itrq->itrq_intr_poll == B_TRUE);
-	i40e_intr_rx_queue_enable(i40e, itrq->itrq_index);
+	i40e_intr_rx_queue_enable(itrq);
 	itrq->itrq_intr_poll = B_FALSE;
 	mutex_exit(&itrq->itrq_rx_lock);
 
@@ -468,10 +467,9 @@ static int
 i40e_rx_ring_intr_disable(mac_intr_handle_t intrh)
 {
 	i40e_trqpair_t *itrq = (i40e_trqpair_t *)intrh;
-	i40e_t *i40e = itrq->itrq_i40e;
 
 	mutex_enter(&itrq->itrq_rx_lock);
-	i40e_intr_rx_queue_disable(i40e, itrq->itrq_index);
+	i40e_intr_rx_queue_disable(itrq);
 	itrq->itrq_intr_poll = B_TRUE;
 	mutex_exit(&itrq->itrq_rx_lock);
 
