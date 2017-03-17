@@ -140,6 +140,7 @@ struct pollstate {
 	pollstate_t	*ps_contend_nextp;	/* next in contender list */
 	pollstate_t	**ps_contend_pnextp;	/* pointer-to-previous-next */
 	int		ps_flags;	/* state flags */
+	short		ps_implicit_ev;	/* implicit poll event interest */
 };
 
 /* pollstate flags */

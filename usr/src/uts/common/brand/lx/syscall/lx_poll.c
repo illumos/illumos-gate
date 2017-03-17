@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -199,12 +199,28 @@ lx_poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		if ((error = lx_poll_copyin(ps, fds, nfds, oldevt)) != 0)
 			goto pollout;
 		pollfdp = ps->ps_pollfd;
+
+		/*
+		 * The Linux poll(2) implicitly polls for POLLERR and POLLHUP
+		 * in addition to any other events specified for the file
+		 * descriptors in question.  It does not modify pollfd_t`events
+		 * to reflect that fact when performing a later copyout.
+		 */
+		ps->ps_implicit_ev = POLLERR | POLLHUP;
 	}
 
 	/*
 	 * Perform the actual poll.
 	 */
 	error = poll_common(ps, fds, nfds, tsp, &fdcnt);
+
+	/*
+	 * Clear implicit event interest, if needed.
+	 */
+	if (ps != NULL) {
+		ps->ps_implicit_ev = 0;
+	}
+
 
 pollout:
 	/*
