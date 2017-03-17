@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -935,8 +935,8 @@ extern uint_t i40e_intr_legacy(void *, void *);
 extern void i40e_intr_io_enable_all(i40e_t *);
 extern void i40e_intr_io_disable_all(i40e_t *);
 extern void i40e_intr_io_clear_cause(i40e_t *);
-extern void i40e_intr_rx_queue_disable(i40e_t *, uint_t);
-extern void i40e_intr_rx_queue_enable(i40e_t *, uint_t);
+extern void i40e_intr_rx_queue_disable(i40e_trqpair_t *);
+extern void i40e_intr_rx_queue_enable(i40e_trqpair_t *);
 extern void i40e_intr_set_itr(i40e_t *, i40e_itr_index_t, uint_t);
 
 /*
