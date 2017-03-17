@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2017, Joyent, Inc.
 #
 
 #
@@ -49,6 +49,8 @@ SYMBOL_SCOPE {
 	mac_register				{ FLAGS = EXTERN };
 	mac_rx					{ FLAGS = EXTERN };
 	mac_rx_ring				{ FLAGS = EXTERN };
+	mac_transceiver_info_set_present	{ FLAGS = EXTERN };
+	mac_transceiver_info_set_usable		{ FLAGS = EXTERN };
 	mac_tx_ring_update			{ FLAGS = EXTERN };
 	mac_tx_update				{ FLAGS = EXTERN };
 	mac_unregister				{ FLAGS = EXTERN };

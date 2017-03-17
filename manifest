@@ -5176,6 +5176,8 @@ f usr/lib/devfsadm/linkmod/SUNW_zfs_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_zut_link.so 0755 root sys
 f usr/lib/diff3prog 0555 root bin
 f usr/lib/diffh 0555 root bin
+d usr/lib/dl 0755 root sys
+f usr/lib/dl/dltraninfo 0555 root bin
 f usr/lib/dscfglockd 0555 root bin
 d usr/lib/dtrace 0755 root bin
 d usr/lib/dtrace/64 0755 root bin
@@ -18955,6 +18957,7 @@ f usr/share/man/man9e/ks_snapshot.9e 0444 root bin
 f usr/share/man/man9e/ks_update.9e 0444 root bin
 s usr/share/man/man9e/MAC.9e=mac.9e
 f usr/share/man/man9e/mac.9e 0444 root bin
+f usr/share/man/man9e/mac_capab_transceiver.9e 0444 root bin
 s usr/share/man/man9e/mc_close.9e=mc_open.9e
 f usr/share/man/man9e/mc_getcapab.9e 0444 root bin
 f usr/share/man/man9e/mc_getprop.9e 0444 root bin
@@ -18969,6 +18972,8 @@ f usr/share/man/man9e/mc_start.9e 0444 root bin
 s usr/share/man/man9e/mc_stop.9e=mc_start.9e
 f usr/share/man/man9e/mc_tx.9e 0444 root bin
 f usr/share/man/man9e/mc_unicst.9e 0444 root bin
+s usr/share/man/man9e/mct_info.9e=mac_capab_transceiver.9e
+s usr/share/man/man9e/mct_read.9e=mac_capab_transceiver.9e
 f usr/share/man/man9e/mmap.9e 0444 root bin
 f usr/share/man/man9e/open.9e 0444 root bin
 f usr/share/man/man9e/power.9e 0444 root bin
@@ -19797,6 +19802,9 @@ s usr/share/man/man9f/mac_prop_info_set_perm.9f=mac_prop_info.9f
 s usr/share/man/man9f/mac_prop_info_set_range_uint32.9f=mac_prop_info.9f
 f usr/share/man/man9f/mac_register.9f 0444 root bin
 f usr/share/man/man9f/mac_rx.9f 0444 root bin
+f usr/share/man/man9f/mac_transceiver_info.9f 0444 root bin
+s usr/share/man/man9f/mac_transceiver_info_set_present.9f=mac_transceiver_info.9f
+s usr/share/man/man9f/mac_transceiver_info_set_usable.9f=mac_transceiver_info.9f
 f usr/share/man/man9f/mac_tx_update.9f 0444 root bin
 s usr/share/man/man9f/mac_unregister.9f=mac_register.9f
 f usr/share/man/man9f/max.9f 0444 root bin
