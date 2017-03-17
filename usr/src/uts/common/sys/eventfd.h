@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -47,6 +47,13 @@ typedef uint64_t eventfd_t;
 #define	EVENTFDIOC		(('e' << 24) | ('f' << 16) | ('d' << 8))
 #define	EVENTFDIOC_SEMAPHORE	(EVENTFDIOC | 1)	/* toggle sem state */
 
+/*
+ * Kernel-internal method to write to eventfd while bypassing overflow limits,
+ * therefore avoiding potential to block as well.  This is used to fulfill AIO
+ * behavior in LX related to eventfd notification.
+ */
+#define	EVENTFDIOC_POST		(EVENTFDIOC | 2)
+
 #ifndef _KERNEL
 
 extern int eventfd(unsigned int, int);
@@ -58,6 +65,7 @@ extern int eventfd_write(int, eventfd_t);
 #define	EVENTFDMNRN_EVENTFD	0
 #define	EVENTFDMNRN_CLONE	1
 #define	EVENTFD_VALMAX		(ULLONG_MAX - 1ULL)
+#define	EVENTFD_VALOVERFLOW	ULLONG_MAX
 
 #endif /* _KERNEL */
 
