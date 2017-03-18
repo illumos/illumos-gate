@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAPADDENT 1M "May 4, 2009"
+.TH LDAPADDENT 1M "Mar 6, 2017"
 .SH NAME
 ldapaddent \- create LDAP entries from corresponding /etc files
 .SH SYNOPSIS
@@ -50,7 +50,6 @@ ldapaddent \- create LDAP entries from corresponding /etc files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBldapaddent\fR creates entries in LDAP containers from their corresponding
 \fB/etc\fR files. This operation is customized for each of the standard
@@ -121,7 +120,7 @@ stored in the \fBpeople\fR container itself. Similarly, data from
 container.
 .sp
 .LP
-The \fBuser_attr\fR and \fBaudit_user\fR data is stored by default in the
+The \fBuser_attr\fR data is stored by default in the
 \fBpeople\fR container. The \fBprof_attr\fR and \fBexec_attr\fR data is stored
 by default in the \fBSolarisProfAttr\fR container.
 .sp
@@ -131,8 +130,7 @@ entries from the \fBshadow\fR database. The addition of a \fBshadow\fR entry
 that does not have a corresponding \fBpasswd\fR entry will fail.
 .sp
 .LP
-The \fBpasswd\fR database must precede both the \fBuser_attr\fR and
-\fBaudit_user\fR databases.
+The \fBpasswd\fR database must precede the \fBuser_attr\fR database.
 .sp
 .LP
 For better performance, the recommended order in which the databases should be
@@ -160,7 +158,6 @@ loaded is as follows:
 Only the first entry of a given type that is encountered will be added to the
 LDAP server. The \fBldapaddent\fR command skips any duplicate entries.
 .SH OPTIONS
-.sp
 .LP
 The \fBldapaddent\fR command supports the following options:
 .sp
@@ -397,7 +394,6 @@ Verbose.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -498,7 +494,6 @@ example# \fBldapaddent -h 10.10.10.10:3890 \e
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -522,7 +517,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/ldap/ldap_client_file\fR\fR
@@ -539,7 +533,6 @@ be modified manually. Their content is not guaranteed to be human readable. Use
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -555,7 +548,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(1), \fBldaplist\fR(1), \fBldapmodify\fR(1), \fBldapmodrdn\fR(1),
 \fBldapsearch\fR(1), \fBidsconfig\fR(1M), \fBldapclient\fR(1M),
@@ -564,7 +556,6 @@ Interface Stability	Committed
 .LP
 \fI\fR
 .SH CAUTION
-.sp
 .LP
 Currently StartTLS is not supported by \fBlibldap.so.5\fR, therefore the port
 number provided refers to the port used during a TLS open, rather than the port

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDITREDUCE 1M "Apr 10, 2006"
+.TH AUDITREDUCE 1M "Mar 6, 2017"
 .SH NAME
 auditreduce \- merge and select audit records from audit trail files
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ auditreduce \- merge and select audit records from audit trail files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBauditreduce\fR allows you to select or merge records from audit trail files.
 Audit files can be from one or more machines.
@@ -27,8 +26,7 @@ maintained by \fBauditreduce\fR in the output file.
 .LP
 Unless instructed otherwise, \fBauditreduce\fR will merge the entire audit
 trail, which consists of all the audit trail files in the directory structure
-\fIaudit_root_dir\fR/*/files (see \fBaudit_control\fR(4) for details of the
-structure of the audit root). Unless specified with the -\fBR\fR or -\fBS\fR
+\fIaudit_root_dir\fR/*/files. Unless specified with the -\fBR\fR or -\fBS\fR
 option, \fIaudit_root_dir\fR defaults to \fB/etc/security/audit\fR. By using
 the file selection options it is possible to select some subset of these files,
 or files from another directory, or files named explicitly on the command line.
@@ -39,7 +37,6 @@ numerous criteria relating to the record's content (see \fBaudit.log\fR(4) for
 details of record content). A record must meet all of the
 \fIrecord-selection-option\fR criteria to be selected.
 .SS "Audit Trail Filename Format"
-.sp
 .LP
 Any audit trail file not named on the command line must conform to the audit
 trail filename format. Files produced by the audit system already have this
@@ -66,7 +63,6 @@ form \fIyyyymmddhhmmss\fR (year, month, day, hour, minute, second). The
 timestamps are in Greenwich Mean Time (GMT).
 .SH OPTIONS
 .SS "File Selection Options"
-.sp
 .LP
 The file selection options indicate which files are to be processed and certain
 types of special treatment.
@@ -225,7 +221,6 @@ total were written to the output stream.
 .RE
 
 .SS "Record Selection Options"
-.sp
 .LP
 The record selection options listed below are used to indicate which records
 are written to the output file produced by \fBauditreduce\fR.
@@ -264,10 +259,8 @@ Select records that occurred before \fIdate-time\fR.
 .RS 4n
 Select records by audit class. Records with events that are mapped to the audit
 classes specified by \fIaudit-classes\fR are selected. Audit class names are
-defined in \fBaudit_class\fR(4). The \fIaudit-classes\fR can be a comma
-separated list of \fBaudit\fR \fIflags\fR like those described in
-\fBaudit_control\fR(4). Using the \fBaudit\fR \fIflags,\fR one can select
-records based upon success and failure criteria.
+defined in \fBaudit_class\fR(4). Using the \fBaudit\fR \fIflags,\fR one can
+select records based upon success and failure criteria.
 .RE
 
 .sp
@@ -611,7 +604,6 @@ audit trail filename format. However, \fB-M\fR, \fB-S\fR, and \fB-R\fR must not
 be used when processing named files. If the \fIfilename\fR is ``\(mi'' then the
 input is taken from the standard input.
 .SS "Option Arguments"
-.sp
 .ne 2
 .na
 \fB\fIaudit-trail-file\fR\fR
@@ -857,7 +849,6 @@ To get an audit log of only the global zone:
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit/\fR\fIserver\fR\fB/files/*\fR\fR
@@ -868,7 +859,6 @@ location of audit trails, when stored
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -888,17 +878,11 @@ Interface Stability	See below.
 The command invocation is Stable. The binary file format is Stable. The binary
 file contents is Unstable.
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBpraudit\fR(1M), \fBaudit.log\fR(4), \fBaudit_class\fR(4),
-\fBaudit_control\fR(4), \fBgroup\fR(4), \fBhosts\fR(4), \fBpasswd\fR(4),
+\fBpraudit\fR(1M), \fBaudit.log\fR(4), \fBaudit_class\fR(4),
+\fBgroup\fR(4), \fBhosts\fR(4), \fBpasswd\fR(4),
 \fBattributes\fR(5), \fBsmf\fR(5)
-.sp
-.LP
-See the section on Solaris Auditing in \fISystem Administration Guide: Security
-Services\fR.
 .SH DIAGNOSTICS
-.sp
 .LP
 \fBauditreduce\fR displays error messages if there are command line errors and
 then exits. If there are fatal errors during the run, \fBauditreduce\fR
@@ -918,16 +902,10 @@ If \fBauditreduce\fR displays a record's timestamp in a diagnostic message,
 that time is in local time. However, when filenames are displayed, their
 timestamps are in \fBGMT\fR.
 .SH BUGS
-.sp
 .LP
 Conjunction, disjunction, negation, and grouping of record selection options
 should be allowed.
 .SH NOTES
-.sp
-.LP
-The functionality described in this man page is available only if the Solaris
-Auditing has been enabled. See \fBbsmconv\fR(1M) for more information.
-.sp
 .LP
 The \fB-z\fR option should be used only if the audit policy \fBzonename\fR is
 set. If there is no zonename token, then no records will be selected.

@@ -3,9 +3,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDITRECORD 1M "May 13, 2009"
+.TH AUDITRECORD 1M "Mar 6, 2017"
 .SH NAME
-auditrecord \- display Solaris audit record formats
+auditrecord \- display audit record formats
 .SH SYNOPSIS
 .LP
 .nf
@@ -14,7 +14,6 @@ auditrecord \- display Solaris audit record formats
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBauditrecord\fR utility displays the event ID, audit class and selection
 mask, and record format for audit record event types defined in
@@ -31,7 +30,6 @@ browser.
 Tokens contained in square brackets ( \fB[ ]\fR ) are optional and might not be
 present in every record.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -187,7 +185,6 @@ rlogin
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -208,7 +205,6 @@ Error
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_class\fR\fR
@@ -230,7 +226,6 @@ associated system call or program.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -248,16 +243,10 @@ Interface Stability	Obsolete Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBauditconfig\fR(1M), \fBpraudit\fR(1M), \fBaudit.log\fR(4),
 \fBaudit_class\fR(4), \fBaudit_event\fR(4), \fBattributes\fR(5)
-.sp
-.LP
-See the section on Solaris Auditing in \fISystem Administration Guide: Security
-Services\fR.
 .SH DIAGNOSTICS
-.sp
 .LP
 If unable to read either of its input files or to write its output file,
 \fBauditrecord\fR shows the name of the file on which it failed and exits with
@@ -268,18 +257,16 @@ If no options are provided, if an invalid option is provided, or if both
 \fB-s\fR and \fB-p\fR are provided, an error message is displayed and
 \fBauditrecord\fR displays a usage message then exits with a non-zero return.
 .SH NOTES
-.sp
 .LP
 This command is Obsolete and may be removed and replaced with equivalent
-functionality in a future release of Solaris. This command was formerly known
-as \fBbsmrecord\fR.
+functionality in the future. This command was formerly known as \fBbsmrecord\fR.
 .sp
 .LP
 If \fB/etc/security/audit_event\fR has been modified to add user-defined audit
 events, \fBauditrecord\fR displays the record format as \fBundefined\fR.
 .sp
 .LP
-The audit records displayed by \fBbsmrecord\fR are the core of the record that
+The audit records displayed by \fBauditrecord\fR are the core of the record that
 can be produced. Various audit policies and optional tokens, such as those
 shown below, might also be present.
 .sp

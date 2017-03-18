@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETAUID 2 "Apr 16, 2008"
+.TH GETAUID 2 "Mar 6, 2017"
 .SH NAME
 getauid, setauid \- get or set user audit identity
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lbsm\fR \fB -lsocket \fR \fB -lnsl \fR 
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetauid()\fR function returns the audit user \fBID\fR for the current
 process. This value is initially set at login time and inherited by all child
@@ -34,7 +33,6 @@ setuid program. The audit user \fBID\fR governs audit decisions for a process.
 The \fBsetauid()\fR function sets the audit user \fBID\fR for the current
 process.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the \fBgetauid()\fR function returns the audit user
 \fBID\fR of the current process on success. Otherwise, it returns \fB\(mi1\fR
@@ -45,7 +43,6 @@ Upon successful completion the \fBsetauid()\fR function returns \fB0\fR.
 Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
 The \fBgetauid()\fR and \fBsetauid()\fR functions will fail if:
 .sp
@@ -81,19 +78,12 @@ the calling process.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Only a process with appropriate privileges can successfully execute these
 calls.
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBaudit\fR(2), \fBgetaudit\fR(2), \fBprivileges\fR(5)
+\fBaudit\fR(2), \fBgetaudit\fR(2), \fBprivileges\fR(5)
 .SH NOTES
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.
-.sp
 .LP
 These functions have been superseded by \fBgetaudit\fR(2) and \fBsetaudit()\fR.

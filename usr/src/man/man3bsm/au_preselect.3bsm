@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AU_PRESELECT 3BSM "Mar 31, 2005"
+.TH AU_PRESELECT 3BSM "Mar 6, 2017"
 .SH NAME
 au_preselect \- preselect an audit event
 .SH SYNOPSIS
@@ -16,7 +16,6 @@ au_preselect \- preselect an audit event
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBau_preselect()\fR function determines whether the audit event
 \fIevent\fR is preselected  against the binary preselection mask pointed to by
@@ -90,14 +89,12 @@ invocation. This option is much faster.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion,\fBau_preselect()\fR returns 0 if \fIevent\fR is not
 preselected or 1 if \fIevent\fR is preselected. If \fBau_preselect()\fR could
 not allocate memory or could not find  \fIevent\fR in the \fBaudit_event\fR(4)
 database, \(mi1 is returned.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_class\fR\fR
@@ -112,11 +109,11 @@ file mapping audit class number to audit class names and descriptions
 \fB\fB/etc/security/audit_event\fR\fR
 .ad
 .RS 29n
-file mappint audit even number to audit event names and associates
+file mapping audit event number to audit event names, descriptions and
+associated audit classes
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -134,18 +131,12 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBgetaudit\fR(2), \fBau_open\fR(3BSM),
+\fBgetaudit\fR(2), \fBau_open\fR(3BSM),
 \fBgetauclassent\fR(3BSM), \fBgetauevent\fR(3BSM), \fBmalloc\fR(3C),
 \fBaudit_class\fR(4), \fBaudit_event\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBau_preselect()\fR function is normally called prior to constructing and
 writing an audit record. If the event is not preselected, the overhead of
-constructing and writing the  record can be saved.
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.
+constructing and writing the record can be saved.

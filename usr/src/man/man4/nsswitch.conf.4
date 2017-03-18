@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NSSWITCH.CONF 4 "Feb 25, 2017"
+.TH NSSWITCH.CONF 4 "Mar 6, 2017"
 .SH NAME
 nsswitch.conf \- configuration file for the name service switch
 .SH SYNOPSIS
@@ -45,7 +45,7 @@ T}
 \fBnetmasks\fR	\fBifconfig\fR(1M)
 \fBnetworks\fR	\fBgetnetbyname\fR(3SOCKET)
 \fBpasswd\fR	T{
-\fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBgetauusernam\fR(3BSM), \fBgetusernam\fR(3SECDB)
+\fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBgetusernam\fR(3SECDB)
 T}
 \fBprinters\fR	T{
 \fBlp\fR(1), \fBlpstat\fR(1), \fBcancel\fR(1), \fBlpr\fR(1B), \fBlpq\fR(1B), \fBlprm\fR(1B), \fBin.lpd\fR(1M), \fBlpadmin\fR(1M), \fBlpget\fR(1M), \fBlpset\fR(1M)
@@ -768,7 +768,7 @@ Sample configuration file that uses \fBfiles\fR, \fBdns\fR and \fBmdns\fR
 \fBkpasswd\fR(1), \fBldap\fR(1), \fBnewtask\fR(1),
 \fBpasswd\fR(1), \fBautomount\fR(1M), \fBifconfig\fR(1M), \fBmdnsd\fR(1M),
 \fBrpc.bootparamd\fR(1M), \fBsendmail\fR(1M),
-\fBgetauusernam\fR(3BSM), \fBgetgrnam\fR(3C), \fBgetnetgrent\fR(3C),
+\fBgetgrnam\fR(3C), \fBgetnetgrent\fR(3C),
 \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBgethostbyname\fR(3NSL),
 \fBgetpublickey\fR(3NSL), \fBgetrpcbyname\fR(3NSL), \fBnetdir\fR(3NSL),
 \fBsecure_rpc\fR(3NSL), \fBgetprojent\fR(3PROJECT),

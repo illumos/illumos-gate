@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETAUDITFLAGS 3BSM "Mar 31, 2005"
+.TH GETAUDITFLAGS 3BSM "Mar 6, 2017"
 .SH NAME
 getauditflags, getauditflagsbin, getauditflagschar \- convert audit flag
 specifications
@@ -23,13 +23,11 @@ specifications
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetauditflagsbin()\fR function converts the character representation of
 audit values pointed to by \fIauditstring\fR into \fBau_mask_t\fR fields
 pointed to by \fImasks\fR. These fields indicate which events are to be audited
-when they succeed and which are to be audited when they fail. The character
-string syntax is described in \fBaudit_control\fR(4).
+when they succeed and which are to be audited when they fail.
 .sp
 .LP
 The \fBgetauditflagschar()\fR function converts the \fBau_mask_t\fR fields
@@ -45,12 +43,10 @@ identifying a single audit class, separated by commas.  The \fBau_mask_t\fR
 fields pointed to by \fImasks\fR correspond to binary values defined in
 <\fBbsm/audit.h\fR>, which is read by  <\fBbsm/libbsm.h\fR>.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBgetauditflagsbin()\fR and
 \fBgetauditflagschar()\fR return 0. Otherwise they return \(mi1.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -66,16 +62,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBaudit.log\fR(4), \fBaudit_control\fR(4),
-\fBattributes\fR(5)
+\fBaudit.log\fR(4), \fBattributes\fR(5)
 .SH BUGS
-.sp
 .LP
 This is not a very extensible interface.
-.SH NOTES
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.

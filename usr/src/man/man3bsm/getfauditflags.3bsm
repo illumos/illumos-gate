@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETFAUDITFLAGS 3BSM "Mar 31, 2005"
+.TH GETFAUDITFLAGS 3BSM "Mar 6, 2017"
 .SH NAME
 getfauditflags \- generate process audit state
 .SH SYNOPSIS
@@ -18,13 +18,9 @@ getfauditflags \- generate process audit state
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetfauditflags()\fR function generates a process audit state by
-combining the audit masks  passed as parameters with the system audit masks
-specified in the \fBaudit_control\fR(4) file. The \fBgetfauditflags()\fR
-function obtains the system audit value by calling \fBgetacflg()\fR (see
-\fBgetacinfo\fR(3BSM)).
+combining the audit masks passed as parameters with the system audit masks.
 .sp
 .LP
 The \fIusremasks\fR argument points to \fBau_mask_t\fR fields that contains two
@@ -39,12 +35,6 @@ succeed. The second value defines which events are never to be audited when
 they fail.
 .sp
 .LP
-The structures pointed to by \fIusremasks\fR and \fIusrdmasks\fR can be
-obtained from the \fBaudit_user\fR(4) file by calling \fBgetauusernam\fR(3BSM),
-which returns a pointer to a strucure containing all \fBaudit_user\fR(4) fields
-for a user.
-.sp
-.LP
 The output of this function is stored in \fIlastmasks\fR, a pointer of type
 \fBau_mask_t\fR as well. The first value defines which events are to be audited
 when they succeed and the second defines which events are to be audited when
@@ -54,12 +44,10 @@ they fail.
 Both \fIusremasks\fR and \fIusrdmasks\fR override the values in the system
 audit values.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBgetfauditflags()\fR returns 0. Otherwise it
 returns \fB\(mi1\fR\&.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -75,13 +63,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBgetacinfo\fR(3BSM), \fBgetauditflags\fR(3BSM),
-\fBgetauusernam\fR(3BSM), \fBaudit.log\fR(4), \fBaudit_control\fR(4),
-\fBaudit_user\fR(4), \fBattributes\fR(5)
-.SH NOTES
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.
+\fBgetauditflags\fR(3BSM), \fBaudit.log\fR(4), \fBattributes\fR(5)

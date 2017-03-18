@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRAUDIT 1M "Jul 26, 2009"
+.TH PRAUDIT 1M "Mar 6, 2017"
 .SH NAME
 praudit \- print contents of an audit trail file
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ praudit \- print contents of an audit trail file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBpraudit\fR reads the listed \fIfilename\fRs (or standard input, if no
 \fIfilename\fR is specified) and interprets the data as audit trail records as
@@ -23,7 +22,6 @@ representation. Record type and event fields are converted to their \fBASCII\fR
 representation. A maximum of 100 audit files can be specified on the command
 line.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -90,7 +88,6 @@ identification of the DTD which can be used to parse the XML.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_event\fR\fR
@@ -117,7 +114,7 @@ Audit class definitions.
 .ad
 .sp .6
 .RS 4n
-Directory containing the verisioned DTD file referenced in XML output, for
+Directory containing the versioned DTD file referenced in XML output, for
 example, \fBadt_record.dtd.1\fR.
 .RE
 
@@ -133,7 +130,6 @@ example, \fBadt_record.xsl.1\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -152,19 +148,9 @@ Interface Stability	See below
 .LP
 The command stability is evolving. The output format is unstable.
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBgetent\fR(1M), \fBaudit\fR(2), \fBgetauditflags\fR(3BSM),
+\fBgetent\fR(1M), \fBaudit\fR(2), \fBgetauditflags\fR(3BSM),
 \fBgetpwuid\fR(3C), \fBgethostbyaddr\fR(3NSL), \fBethers\fR(3SOCKET),
 \fBgetipnodebyaddr\fR(3SOCKET), \fBaudit.log\fR(4), \fBaudit_class\fR(4),
 \fBaudit_event\fR(4), \fBgroup\fR(4), \fBnsswitch.conf\fR(4), \fBpasswd\fR(4),
 \fBattributes\fR(5)
-.sp
-.LP
-See the section on Solaris Auditing in \fISystem Administration Guide: Security
-Services\fR.
-.SH NOTES
-.sp
-.LP
-This functionality is available only if the Solaris Auditing feature has been
-enabled. See \fBbsmconv\fR(1M) for more information.

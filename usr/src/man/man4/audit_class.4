@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT_CLASS 4 "Jun 26, 2008"
+.TH AUDIT_CLASS 4 "Mar 6, 2017"
 .SH NAME
 audit_class \- audit class definitions
 .SH SYNOPSIS
@@ -13,15 +13,13 @@ audit_class \- audit class definitions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB/etc/security/audit_class\fR is a user-configurable ASCII system file that
 stores class definitions used in the audit system. Audit events in
 \fBaudit_event\fR(4) are mapped to one or more of the defined audit classes.
 \fBaudit_event\fR can be updated in conjunction with changes to
-\fBaudit_class\fR. See \fBaudit_control\fR(4) and \fBaudit_user\fR(4) for
-information about changing the preselection of audit classes in the audit
-system. Programs can use the \fBgetauclassent\fR(3BSM) routines to access audit
+\fBaudit_class\fR.
+Programs can use the \fBgetauclassent\fR(3BSM) routines to access audit
 class information.
 .sp
 .LP
@@ -138,7 +136,6 @@ The following is an example of an \fBaudit_class\fR file:
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_class\fR\fR
@@ -148,7 +145,6 @@ The following is an example of an \fBaudit_class\fR file:
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -167,22 +163,11 @@ Interface Stability 	 See below.
 .LP
 The file format stability is Committed. The file content is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBau_preselect\fR(3BSM), \fBgetauclassent\fR(3BSM),
-\fBaudit_control\fR(4), \fBaudit_event\fR(4), \fBaudit_user\fR(4),
-\fBattributes\fR(5)
-.sp
-.LP
-Part\ VII, \fISolaris Auditing,\fR in \fISystem Administration Guide: Security
-Services\fR
+\fBau_preselect\fR(3BSM), \fBgetauclassent\fR(3BSM),
+\fBaudit_event\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 It is possible to deliberately turn on the \fBno\fR class in the kernel, in
 which case the audit trail will be flooded with records for the audit event
 \fBAUE_NULL\fR.
-.sp
-.LP
-This functionality is available only if  Solaris Auditing has been enabled. See
-\fBbsmconv\fR(1M) for more information.

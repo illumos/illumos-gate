@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDITD 1M "Apr 29, 2008"
+.TH AUDITD 1M "Mar 6, 2017"
 .SH NAME
 auditd \- audit daemon
 .SH SYNOPSIS
@@ -13,38 +14,10 @@ auditd \- audit daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The audit daemon, \fBauditd\fR, controls the generation and location of audit
-trail files and the generation of syslog messages based on the definitions in
-\fBaudit_control\fR(4). If auditing is enabled, \fBauditd\fR reads the
-\fBaudit_control\fR file to do the following:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-reads the path to a library module for realtime conversion of audit data into
-syslog messages;
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-reads other parameters specific to the selected plugin or plugins;
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-obtains a list of directories into which audit files can be written;
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-obtains the percentage limit for how much space to reserve on each filesystem
-before changing to the next directory.
-.RE
+trail files and the generation of syslog messages based on its configuration,
+stored in \fBsmf\fR(5) and managed using the \fBauditconfig\fR(1M) command.
 .sp
 .LP
 \fBaudit\fR(1M) is used to control \fBauditd\fR. It can cause \fBauditd\fR to:
@@ -58,7 +31,7 @@ close the current audit file and open a new one;
 .TP
 .ie t \(bu
 .el o
-close the current audit file, re-read \fB/etc/security/audit_control\fR and
+close the current audit file, reread its configuration and
 open a new audit file;
 .RE
 .RS +4
@@ -68,7 +41,6 @@ open a new audit file;
 close the audit trail and terminate auditing.
 .RE
 .SS "Auditing Conditions"
-.sp
 .LP
 The audit daemon invokes the program \fBaudit_warn\fR(1M) under the following
 conditions with the indicated options:
@@ -80,8 +52,8 @@ conditions with the indicated options:
 .sp .6
 .RS 4n
 The file system upon which \fIpathname\fR resides has exceeded the minimum free
-space limit defined in \fBaudit_control\fR(4). A new audit trail has been
-opened on another file system.
+space limit defined by the \fBp_minfree\fR attribute of the \fbaudit_binfile\fR
+plugin. A new audit trail has been opened on another file system.
 .RE
 
 .sp
@@ -123,21 +95,12 @@ arose.
 .sp
 .ne 2
 .na
-\fB\fBaudit_warn ebusy\fR\fR
-.ad
-.sp .6
-.RS 4n
-There is already an audit daemon running.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBaudit_warn tmpfile\fR\fR
 .ad
 .sp .6
 .RS 4n
-The file \fB/etc/security/audit/audit_tmp\fR exists, indicating a fatal error.
+There was a problem creating a symlink from \fB/var/run/.audit.log\fR to the
+current audit log file.
 .RE
 
 .sp
@@ -147,8 +110,7 @@ The file \fB/etc/security/audit/audit_tmp\fR exists, indicating a fatal error.
 .ad
 .sp .6
 .RS 4n
-The internal system audit condition is \fBAUC_FCHDONE\fR. Auditing cannot be
-started without rebooting the system.
+There was an internal error starting auditing.
 .RE
 
 .sp
@@ -163,35 +125,7 @@ The internal system audit condition has been changed to not be
 audit daemon to exit.
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBaudit_warn postsigterm\fR\fR
-.ad
-.sp .6
-.RS 4n
-An error occurred during the orderly shutdown of the auditing system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBaudit_warn getacdir\fR\fR
-.ad
-.sp .6
-.RS 4n
-There is a problem getting the directory list from
-\fB/etc/security/audit/audit_control\fR.
-.sp
-The audit daemon will hang in a sleep loop until this file is fixed.
-.RE
-
-.SH FILES
-.sp
-.LP
-\fB/etc/security/audit/audit_control\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -207,25 +141,11 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBaudit\fR(1M), \fBaudit_warn\fR(1M), \fBbsmconv\fR(1M), \fBpraudit\fR(1M),
-\fBauditon\fR(2), \fBaudit.log\fR(4), \fBaudit_control\fR(4),
+\fBaudit\fR(1M), \fBauditconfig\fR(1M), \fBaudit_binfile\fR(5),
+\fBaudit_warn\fR(1M), \fBpraudit\fR(1M), \fBauditon\fR(2), \fBaudit.log\fR(4),
 \fBattributes\fR(5)
-.sp
-.LP
-See the section on Solaris Auditing in \fISystem Administration Guide: Security
-Services\fR.
 .SH NOTES
-.sp
-.LP
-The functionality described in this man page is available only if the Solaris
-Auditing feature has been enabled. See \fBbsmconv\fR(1M) for more information.
-.sp
-.LP
-\fBauditd\fR is loaded in the global zone at boot time if auditing is enabled.
-See \fBbsmconv\fR(1M).
-.sp
 .LP
 If the audit policy \fBperzone\fR is set, \fBauditd\fR runs in each zone,
 starting automatically when the local zone boots. If a zone is running when the
@@ -236,9 +156,8 @@ and will start automatically with future boots of the zone.
 .sp
 .LP
 When \fBauditd\fR runs in a local zone, the configuration is taken from the
-local zone's \fB/etc/security\fR directory's files: \fBaudit_control\fR,
-\fBaudit_class\fR, \fBaudit_user\fR, \fBaudit_startup\fR, and
-\fBaudit_event\fR.
+local zone's \fB/etc/security\fR directory's files:
+\fBaudit_class\fR, and \fBaudit_event\fR.
 .sp
 .LP
 Configuration changes do not affect audit sessions that are currently running,
@@ -247,3 +166,21 @@ preselection mask on a running process, use the \fB-setpmask\fR option of the
 \fBauditconfig\fR command (see \fBauditconfig\fR(1M)). If the user logs out and
 logs back in, the new configuration changes will be reflected in the next audit
 session.
+.sp
+.LP
+The \fBauditd\fR service is managed by the service management facility,
+\fBsmf\fR(5), under the service identifier:
+.sp
+.in +2
+.nf
+svc:/system/auditd
+.fi
+.in -2
+.sp
+
+.sp
+.LP
+The service's status can be queried using the \fBsvcs\fR(1) command. While
+administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using \fBsvcadm\fR(1M), the \fBaudit\fR(1M)
+command is the preferred administrative interface.
