@@ -895,7 +895,7 @@ static int sd_pm_idletime = 1;
 #define	sd_blank_cmp			ssd_blank_cmp
 #define	sd_chk_vers1_data		ssd_chk_vers1_data
 #define	sd_set_vers1_properties		ssd_set_vers1_properties
-#define	sd_check_solid_state		ssd_check_solid_state
+#define	sd_check_bdc_vpd		ssd_check_bdc_vpd
 #define	sd_check_emulation_mode		ssd_check_emulation_mode
 
 #define	sd_get_physical_geometry	ssd_get_physical_geometry
@@ -1297,7 +1297,7 @@ static int   sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled);
 static void  sd_get_write_cache_changeable(sd_ssc_t *ssc, int *is_changeable);
 static void  sd_get_nv_sup(sd_ssc_t *ssc);
 static dev_t sd_make_device(dev_info_t *devi);
-static void  sd_check_solid_state(sd_ssc_t *ssc);
+static void  sd_check_bdc_vpd(sd_ssc_t *ssc);
 static void  sd_check_emulation_mode(sd_ssc_t *ssc);
 static void  sd_update_block_info(struct sd_lun *un, uint32_t lbasize,
 	uint64_t capacity);
@@ -8217,9 +8217,9 @@ sd_unit_attach(dev_info_t *devi)
 	un->un_mediastate = DKIO_NONE;
 
 	/*
-	 * Check if this is a SSD(Solid State Drive).
+	 * Check Block Device Characteristics VPD.
 	 */
-	sd_check_solid_state(ssc);
+	sd_check_bdc_vpd(ssc);
 
 	/*
 	 * Check whether the drive is in emulation mode.
@@ -31188,6 +31188,8 @@ sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie)
 		    un->un_f_mmc_writable_media;
 		((tg_attribute_t *)arg)->media_is_solid_state =
 		    un->un_f_is_solid_state;
+		((tg_attribute_t *)arg)->media_is_rotational =
+		    un->un_f_is_rotational;
 		mutex_exit(SD_MUTEX(un));
 		return (0);
 	default:
@@ -31676,18 +31678,22 @@ sd_ssc_extract_info(sd_ssc_t *ssc, struct sd_lun *un, struct scsi_pkt *pktp,
 
 
 /*
- *     Function: sd_check_solid_state
+ *     Function: sd_check_bdc_vpd
  *
  * Description: Query the optional INQUIRY VPD page 0xb1. If the device
  *              supports VPD page 0xb1, sd examines the MEDIUM ROTATION
- *              RATE. If the MEDIUM ROTATION RATE is 1, sd assumes the
- *              device is a solid state drive.
+ *              RATE.
+ *
+ *		Set the following based on RPM value:
+ *		= 0	device is not solid state, non-rotational
+ *		= 1	device is solid state, non-rotational
+ *		> 1	device is not solid state, rotational
  *
  *     Context: Kernel thread or interrupt context.
  */
 
 static void
-sd_check_solid_state(sd_ssc_t *ssc)
+sd_check_bdc_vpd(sd_ssc_t *ssc)
 {
 	int		rval		= 0;
 	uchar_t		*inqb1		= NULL;
@@ -31701,6 +31707,7 @@ sd_check_solid_state(sd_ssc_t *ssc)
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
 	mutex_enter(SD_MUTEX(un));
+	un->un_f_is_rotational = TRUE;
 	un->un_f_is_solid_state = FALSE;
 
 	if (ISCD(un)) {
@@ -31719,7 +31726,7 @@ sd_check_solid_state(sd_ssc_t *ssc)
 
 		if (rval == 0 && (inqb1_len - inqb1_resid > 5)) {
 			SD_TRACE(SD_LOG_COMMON, un,
-			    "sd_check_solid_state: \
+			    "sd_check_bdc_vpd: \
 			    successfully get VPD page: %x \
 			    PAGE LENGTH: %x BYTE 4: %x \
 			    BYTE 5: %x", inqb1[1], inqb1[3], inqb1[4],
@@ -31727,13 +31734,20 @@ sd_check_solid_state(sd_ssc_t *ssc)
 
 			mutex_enter(SD_MUTEX(un));
 			/*
-			 * Check the MEDIUM ROTATION RATE. If it is set
-			 * to 1, the device is a solid state drive.
+			 * Check the MEDIUM ROTATION RATE.
 			 */
-			if (inqb1[4] == 0 && inqb1[5] == 1) {
-				un->un_f_is_solid_state = TRUE;
-				/* solid state drives don't need disksort */
-				un->un_f_disksort_disabled = TRUE;
+			if (inqb1[4] == 0) {
+				if (inqb1[5] == 0) {
+					un->un_f_is_rotational = FALSE;
+				} else if (inqb1[5] == 1) {
+					un->un_f_is_rotational = FALSE;
+					un->un_f_is_solid_state = TRUE;
+					/*
+					 * Solid state drives don't need
+					 * disksort.
+					 */
+					un->un_f_disksort_disabled = TRUE;
+				}
 			}
 			mutex_exit(SD_MUTEX(un));
 		} else if (rval != 0) {

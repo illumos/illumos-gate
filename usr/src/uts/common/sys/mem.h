@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017 James S Blachly, MD <james.blachly@gmail.com>
  */
 
 #ifndef _SYS_MEM_H
@@ -45,6 +46,7 @@ extern "C" {
 #define	M_NULL		2	/* /dev/null - EOF & Rathole */
 #define	M_ALLKMEM	3	/* /dev/allkmem - virtual kernel memory & I/O */
 #define	M_ZERO		12	/* /dev/zero - source of private memory */
+#define	M_FULL		13	/* /dev/full - write always ret ENOSPC */
 
 /*
  * Private ioctl for libkvm: translate virtual address to physical address.

@@ -67,6 +67,7 @@
 	<device match="dtrace/*" />
 	<device match="dtrace/provider/*" />
 	<device match="fd" />
+	<device match="full" />
 	<device match="ipnet" />
 	<device match="kstat" />
 	<device match="lo0" />
