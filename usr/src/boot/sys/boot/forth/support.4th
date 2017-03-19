@@ -1151,10 +1151,8 @@ string current_file_name_ref	\ used to print the file name
 
 : scan_conf_dir ( -- addr len -1 | 0 )
   s" currdev" getenv -1 <> if
-    dup 3			\ we only need first 3 chars
-    s" pxe" compare 0=
-    swap 3
-    s" net" compare 0= or if
+    3				\ we only need first 3 chars
+    s" net" compare 0= if
 	s" boot.tftproot.server" getenv? if
 	    0 exit		\ readdir does not work on tftp
 	then
