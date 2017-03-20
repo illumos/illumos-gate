@@ -2,7 +2,7 @@
  * $NetBSD: ls.c,v 1.3 1997/06/13 13:48:47 drochner Exp $
  */
 
-/*-
+/*
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1996
@@ -38,7 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <ufs/ufs/dinode.h>
@@ -60,26 +59,26 @@ command_ls(int argc, char *argv[])
 {
     int		fd;
     struct stat	sb;
-    struct 	dirent *d;
+    struct	dirent *d;
     char	*buf, *path;
     char	lbuf[128];		/* one line */
     int		result, ch;
     int		verbose;
-	
+
     result = CMD_OK;
     fd = -1;
     verbose = 0;
     optind = 1;
     optreset = 1;
     while ((ch = getopt(argc, argv, "l")) != -1) {
-	switch(ch) {
+	switch (ch) {
 	case 'l':
 	    verbose = 1;
 	    break;
 	case '?':
 	default:
 	    /* getopt has already reported an error */
-	    return(CMD_OK);
+	    return (CMD_OK);
 	}
     }
     argv += (optind - 1);
@@ -119,18 +118,22 @@ command_ls(int argc, char *argv[])
 		sb.st_size = 0;
 		sb.st_mode = 0;
 		buf = malloc(strlen(path) + strlen(d->d_name) + 2);
-		sprintf(buf, "%s/%s", path, d->d_name);
-		/* ignore return, could be symlink, etc. */
-		if (stat(buf, &sb))
-		    sb.st_size = 0;
-		free(buf);
+		if (buf != NULL) {
+		    sprintf(buf, "%s/%s", path, d->d_name);
+		    /* ignore return, could be symlink, etc. */
+		    if (stat(buf, &sb)) {
+			sb.st_size = 0;
+			sb.st_mode = 0;
+		    }
+		    free(buf);
+		}
 	    }
 	    if (verbose) {
-		sprintf(lbuf, " %c %8d %s\n",
+		snprintf(lbuf, sizeof (lbuf), " %c %8d %s\n",
 		    typestr[d->d_type? d->d_type:sb.st_mode >> 12],
 		    (int)sb.st_size, d->d_name);
 	    } else {
-		sprintf(lbuf, " %c  %s\n",
+		snprintf(lbuf, sizeof (lbuf), " %c  %s\n",
 		    typestr[d->d_type? d->d_type:sb.st_mode >> 12], d->d_name);
 	    }
 	    if (pager_output(lbuf))
@@ -141,9 +144,8 @@ command_ls(int argc, char *argv[])
     pager_close();
     if (fd != -1)
 	close(fd);
-    if (path != NULL)
-	free(path);
-    return(result);
+    free(path);		/* ls_getdir() did allocate path */
+    return (result);
 }
 
 /*
@@ -157,11 +159,17 @@ ls_getdir(char **pathp)
     int		fd;
     const char	*cp;
     char	*path;
-    
+
     fd = -1;
 
     /* one extra byte for a possible trailing slash required */
     path = malloc(strlen(*pathp) + 2);
+    if (path == NULL) {
+	snprintf(command_errbuf, sizeof (command_errbuf),
+	    "out of memory");
+	goto out;
+    }
+
     strcpy(path, *pathp);
 
     /* Make sure the path is respectable to begin with */
@@ -170,7 +178,7 @@ ls_getdir(char **pathp)
 	    "bad path '%s'", path);
 	goto out;
     }
-    
+
     /* If there's no path on the device, assume '/' */
     if (*cp == 0)
 	strcat(path, "/");
@@ -193,12 +201,12 @@ ls_getdir(char **pathp)
     }
 
     *pathp = path;
-    return(fd);
+    return (fd);
 
  out:
     free(path);
     *pathp = NULL;
     if (fd != -1)
 	close(fd);
-    return(-1);
+    return (-1);
 }
