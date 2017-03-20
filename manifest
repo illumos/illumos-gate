@@ -12552,16 +12552,8 @@ s usr/share/man/man3bsm/au_to_subject_ex.3bsm=au_to.3bsm
 s usr/share/man/man3bsm/au_to_text.3bsm=au_to.3bsm
 f usr/share/man/man3bsm/au_user_mask.3bsm 0444 root bin
 s usr/share/man/man3bsm/au_write.3bsm=au_open.3bsm
-s usr/share/man/man3bsm/endac.3bsm=getacinfo.3bsm
 s usr/share/man/man3bsm/endauclass.3bsm=getauclassent.3bsm
 s usr/share/man/man3bsm/endauevent.3bsm=getauevent.3bsm
-s usr/share/man/man3bsm/endauuser.3bsm=getauusernam.3bsm
-s usr/share/man/man3bsm/endddent.3bsm=getddent.3bsm
-s usr/share/man/man3bsm/getacdir.3bsm=getacinfo.3bsm
-s usr/share/man/man3bsm/getacflg.3bsm=getacinfo.3bsm
-f usr/share/man/man3bsm/getacinfo.3bsm 0444 root bin
-s usr/share/man/man3bsm/getacmin.3bsm=getacinfo.3bsm
-s usr/share/man/man3bsm/getacna.3bsm=getacinfo.3bsm
 f usr/share/man/man3bsm/getauclassent.3bsm 0444 root bin
 s usr/share/man/man3bsm/getauclassent_r.3bsm=getauclassent.3bsm
 s usr/share/man/man3bsm/getauclassnam.3bsm=getauclassent.3bsm
@@ -12576,19 +12568,9 @@ s usr/share/man/man3bsm/getauevnam_r.3bsm=getauevent.3bsm
 s usr/share/man/man3bsm/getauevnonam.3bsm=getauevent.3bsm
 s usr/share/man/man3bsm/getauevnum.3bsm=getauevent.3bsm
 s usr/share/man/man3bsm/getauevnum_r.3bsm=getauevent.3bsm
-s usr/share/man/man3bsm/getauuserent.3bsm=getauusernam.3bsm
-s usr/share/man/man3bsm/getauuserent_r.3bsm=getauusernam.3bsm
-f usr/share/man/man3bsm/getauusernam.3bsm 0444 root bin
-s usr/share/man/man3bsm/getauusernam_r.3bsm=getauusernam.3bsm
-f usr/share/man/man3bsm/getddent.3bsm 0444 root bin
-s usr/share/man/man3bsm/getddnam.3bsm=getddent.3bsm
 f usr/share/man/man3bsm/getfauditflags.3bsm 0444 root bin
-s usr/share/man/man3bsm/setac.3bsm=getacinfo.3bsm
 s usr/share/man/man3bsm/setauclass.3bsm=getauclassent.3bsm
 s usr/share/man/man3bsm/setauevent.3bsm=getauevent.3bsm
-s usr/share/man/man3bsm/setauuser.3bsm=getauusernam.3bsm
-s usr/share/man/man3bsm/setddent.3bsm=getddent.3bsm
-s usr/share/man/man3bsm/setddfile.3bsm=getddent.3bsm
 d usr/share/man/man3c 0755 root bin
 s usr/share/man/man3c/FD_CLR.3c=select.3c
 s usr/share/man/man3c/FD_ISSET.3c=select.3c
@@ -18341,9 +18323,7 @@ f usr/share/man/man4/aliases.4 0444 root bin
 f usr/share/man/man4/au.4 0444 root bin
 f usr/share/man/man4/audit.log.4 0444 root bin
 f usr/share/man/man4/audit_class.4 0444 root bin
-f usr/share/man/man4/audit_control.4 0444 root bin
 f usr/share/man/man4/audit_event.4 0444 root bin
-f usr/share/man/man4/audit_user.4 0444 root bin
 f usr/share/man/man4/auth_attr.4 0444 root bin
 f usr/share/man/man4/autofs.4 0444 root bin
 f usr/share/man/man4/bart_manifest.4 0444 root bin

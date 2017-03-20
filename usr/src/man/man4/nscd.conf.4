@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NSCD.CONF 4 "Aug 21, 2006"
+.TH NSCD.CONF 4 "Mar 6, 2017"
 .SH NAME
 nscd.conf \- name service cache daemon configuration
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ nscd.conf \- name service cache daemon configuration
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnscd.conf\fR file contains the configuration information for
 \fBnscd\fR(1M). Each line specifies either an \fIattribute\fR and a
@@ -25,7 +24,7 @@ not interpreted by \fBnscd\fR.
 .LP
 \fIcachename\fR is represented by \fBhosts\fR, \fBipnodes\fR, \fBpasswd\fR,
 \fBgroup\fR, \fBexec_attr\fR, \fBprof_attr\fR, \fBuser_attr\fR, \fBethers\fR,
-\fBrpc\fR, \fBprotocols\fR, \fBnetworks\fR, \fBbootparams\fR, \fBaudit_user\fR,
+\fBrpc\fR, \fBprotocols\fR, \fBnetworks\fR, \fBbootparams\fR,
 \fBauth_attr\fR, \fBservices\fR, \fBnetmasks\fR, \fBprinters\fR, or
 \fBproject\fR.
 .sp
@@ -178,7 +177,6 @@ automatically adjusts the hash table size.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -196,9 +194,8 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBnscd\fR(1M), \fBaudit_user\fR(4), \fBauth_attr\fR(4), \fBbootparams\fR(4),
+\fBnscd\fR(1M), \fBauth_attr\fR(4), \fBbootparams\fR(4),
 \fBethers\fR(4), \fBexec_attr\fR(4), \fBgroup\fR(4), \fBhosts\fR(4),
 \fBnetmasks\fR(4), \fBnetworks\fR(4), \fBpasswd\fR(4), \fBprinters\fR(4),
 \fBprof_attr\fR(4), \fBproject\fR(4), \fBprotocols\fR(4), \fBrpc\fR(4),

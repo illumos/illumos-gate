@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AU_TO 3BSM "Mar 31, 2005"
+.TH AU_TO 3BSM "Mar 6, 2017"
 .SH NAME
 au_to, au_to_arg, au_to_arg32, au_to_arg64, au_to_attr, au_to_cmd, au_to_data,
 au_to_groups, au_to_in_addr, au_to_ipc, au_to_iport, au_to_me, au_to_newgroups,
@@ -138,7 +138,6 @@ au_to_text \- create audit record tokens
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBau_to_arg()\fR, \fBau_to_arg32()\fR, and \fBau_to_arg64()\fR functions
 format the data in \fIv\fR into an "argument token". The \fIn\fR argument
@@ -251,12 +250,10 @@ address),\fR into a "subject token". This function should be used in place of
 The \fBau_to_text()\fR function formats the null-terminated string pointed to
 by \fItext\fR into a "text token".
 .SH RETURN VALUES
-.sp
 .LP
 These functions return \fINULL\fR if memory cannot be allocated to put the
 resultant token into, or if an error in the input is detected.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -274,11 +271,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBau_open\fR(3BSM), \fBattributes\fR(5)
-.SH NOTES
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.
+\fBau_open\fR(3BSM), \fBattributes\fR(5)

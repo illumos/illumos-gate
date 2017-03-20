@@ -28,9 +28,7 @@ _MANFILES=	Intro.4				\
 		au.4				\
 		audit.log.4			\
 		audit_class.4			\
-		audit_control.4			\
 		audit_event.4			\
-		audit_user.4			\
 		auth_attr.4			\
 		autofs.4			\
 		bart_manifest.4			\

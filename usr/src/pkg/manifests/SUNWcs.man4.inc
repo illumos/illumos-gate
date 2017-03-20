@@ -17,9 +17,7 @@
 file path=usr/share/man/man4/Intro.4
 file path=usr/share/man/man4/audit.log.4
 file path=usr/share/man/man4/audit_class.4
-file path=usr/share/man/man4/audit_control.4
 file path=usr/share/man/man4/audit_event.4
-file path=usr/share/man/man4/audit_user.4
 file path=usr/share/man/man4/auth_attr.4
 file path=usr/share/man/man4/contract.4
 file path=usr/share/man/man4/core.4

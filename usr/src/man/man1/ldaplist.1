@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAPLIST 1 "Jun 7, 2008"
+.TH LDAPLIST 1 "Mar 6, 2017"
 .SH NAME
 ldaplist \- search and list naming information from an LDAP directory using the
 configured profile
@@ -27,7 +27,6 @@ configured profile
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 If the \fB-h\fR \fILDAP_server\fR\fB[:\fR\fIserverPort\fR\fB]\fR option is
 specified, \fBldaplist\fR establishes a connection to the server pointed to by
@@ -100,7 +99,6 @@ auth_attr    SolarisAuthAttr  nameT             ou=SolarisAuthAttr
 prof_attr    SolarisProfAttr  nameT             ou=SolarisProfAttr
 exec_attr    SolarisExecAttr  nameT             ou=SolarisProfAttr
 user_attr    SolarisUserAttr  uidT              ou=people
-audit_user   SolarisAuditUser uidT              ou=people
 projects     SolarisProject   SolarisProjectID  ou=projects
 .fi
 .in -2
@@ -145,7 +143,6 @@ need to be quoted.
 If the key is not specified, all the containers in the current search
 \fBbaseDN\fR is listed.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -434,7 +431,6 @@ example% \fBldaplist -H 10.10.10.10:3890 \e
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -465,7 +461,6 @@ An error occurred. An error message is output.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/ldap/ldap_client_file\fR\fR
@@ -481,7 +476,6 @@ these files, use \fBldapclient\fR(1M)
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -497,14 +491,12 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(1), \fBldapadd\fR(1), \fBldapdelete\fR(1), \fBldapmodify\fR(1),
 \fBldapmodrdn\fR(1), \fBldapsearch\fR(1), \fBidsconfig\fR(1M),
 \fBldap_cachemgr\fR(1M), \fBldapaddent\fR(1M), \fBldapclient\fR(1M),
 \fBsuninstall\fR(1M), \fBresolv.conf\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 \fIRFC 2307bis\fR is an IETF informational document in draft stage that defines
 an approach for using \fBLDAP\fR as a naming service.
