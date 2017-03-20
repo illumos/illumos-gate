@@ -1757,7 +1757,7 @@ vioif_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	sc->sc_tx_vq = virtio_alloc_vq(&sc->sc_virtio, 1,
 	    VIOIF_TX_QLEN, VIOIF_INDIRECT_MAX, "tx");
-	if (!sc->sc_rx_vq)
+	if (!sc->sc_tx_vq)
 		goto exit_alloc2;
 	virtio_stop_vq_intr(sc->sc_tx_vq);
 
