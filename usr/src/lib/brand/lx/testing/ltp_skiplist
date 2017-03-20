@@ -175,11 +175,6 @@ ioctl03
 ioctl04
 ioctl05
 ioctl06
-io_cancel01
-io_destroy01
-io_getevents01
-io_setup01
-io_submit01
 keyctl01
 kcmp01
 kcmp02
