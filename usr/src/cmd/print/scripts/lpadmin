@@ -70,7 +70,6 @@ lp_config_filters() {
 lp_config_service() {	# (enable | disable)
 	svcadm ${1} -s svc:/application/print/server:default
 	# svcadm ${1} -s svc:/application/print/rfc1179:default
-	# svcadm ${1} -s svc:/application/print/ipp-listener:default
 }
 
 # synchronize printers.conf with LP configuration changes

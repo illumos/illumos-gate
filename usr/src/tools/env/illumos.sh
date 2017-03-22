@@ -214,10 +214,6 @@ export CW_NO_SHADOW='1'
 # nightly(1) for interactions between environment variables and this command.
 #POST_NIGHTLY=
 
-# Comment this out to disable support for IPP printing, i.e. if you
-# don't want to bother providing the Apache headers this needs.
-export ENABLE_IPP_PRINTING=
-
 # Comment this out to disable support for SMB printing, i.e. if you
 # don't want to bother providing the CUPS headers this needs.
 export ENABLE_SMB_PRINTING=
