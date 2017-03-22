@@ -25,13 +25,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <btxv86.h>
 #include "bootstrap.h"
 #include "libi386.h"
 
+time_t		getsecs(void);
 static int	bios_seconds(void);
 
 /*
@@ -89,6 +89,14 @@ time(time_t *t)
     if (t != NULL)
 	*t = now;
     return(now);
+}
+
+time_t
+getsecs(void)
+{
+	time_t n = 0;
+	time(&n);
+	return n;
 }
 
 /*

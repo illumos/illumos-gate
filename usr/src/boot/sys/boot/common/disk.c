@@ -93,6 +93,7 @@ ptblread(void *d, void *buf, size_t blocks, uint64_t offset)
 static int
 ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 {
+	struct disk_devdesc dev;
 	struct print_args *pa, bsd;
 	struct open_disk *od;
 	struct ptable *table;
@@ -113,17 +114,24 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 		return (ret);
 	if (part->type == PART_FREEBSD || part->type == PART_SOLARIS2) {
 		/* Open slice with BSD or VTOC label */
-		pa->dev->d_offset = part->start;
-		table = ptable_open(pa->dev, part->end - part->start + 1,
-		    od->sectorsize, ptblread);
-		if (table == NULL)
-			return (ret);
-		sprintf(line, "  %s%s", pa->prefix, pname);
-		bsd.dev = pa->dev;
-		bsd.prefix = line;
-		bsd.verbose = pa->verbose;
-		ret = ptable_iterate(table, &bsd, ptable_print);
-		ptable_close(table);
+		dev.d_dev = pa->dev->d_dev;
+		dev.d_unit = pa->dev->d_unit;
+		dev.d_slice = part->index;
+		dev.d_partition = -1;
+		if (disk_open(&dev, part->end - part->start + 1,
+		    od->sectorsize) == 0) {
+			table = ptable_open(&dev, part->end - part->start + 1,
+			    od->sectorsize, ptblread);
+			if (table != NULL) {
+				sprintf(line, "  %s%s", pa->prefix, pname);
+				bsd.dev = &dev;
+				bsd.prefix = line;
+				bsd.verbose = pa->verbose;
+				ret = ptable_iterate(table, &bsd, ptable_print);
+				ptable_close(table);
+			}
+			disk_close(&dev);
+		}
 	}
 	return (ret);
 }

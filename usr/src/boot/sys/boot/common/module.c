@@ -322,6 +322,9 @@ file_load(char *filename, vm_offset_t dest, struct preloaded_file **result)
     int error;
     int i;
 
+    if (preloaded_files == NULL)
+	last_file_format = 0;
+
     if (archsw.arch_loadaddr != NULL)
 	dest = archsw.arch_loadaddr(LOAD_RAW, filename, dest);
 

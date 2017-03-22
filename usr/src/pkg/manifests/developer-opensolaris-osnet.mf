@@ -54,7 +54,6 @@ depend fmri=system/library/dbus@0.5.11-0.133 type=require
 depend fmri=system/library/install@0.5.11-0.133 type=require
 depend fmri=system/library/libdbus-glib@0.5.11-0.133 type=require
 depend fmri=system/library/libdbus@0.5.11-0.133 type=require
-depend fmri=system/library/math/header-math@0.5.11-0.133 type=require
 depend fmri=system/library/mozilla-nss/header-nss@0.5.11-0.133 type=require
 depend fmri=system/management/snmp/net-snmp@5.4.1-0.133 type=require
 depend fmri=text/gnu-gettext@0.16.1-0.133 type=require
