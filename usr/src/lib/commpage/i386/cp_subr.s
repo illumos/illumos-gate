@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/asm_linkage.h>
@@ -21,20 +21,33 @@
 
 #define	GETCPU_GDT_OFFSET	SEL_GDT(GDT_CPUID, SEL_UPL)
 
+/*
+ * For __cp_tsc_read calls which incur looping retries due to CPU migration,
+ * this represents the maximum number of tries before bailing out.
+ */
+#define	TSC_READ_MAXLOOP	0x4
+
 	.file	"cp_subr.s"
 
 /*
  * hrtime_t
- * __cp_tsc_read(uint_t cp_tsc_type)
+ * __cp_tsc_read(comm_page_t *cp)
  *
  * Stack usage: 0x18 bytes
+ *
+ * %ebp-0x00 - frame pointer
+ * %ebp-0x04 - saved %edi
+ * %ebp-0x08 - saved %esi
+ * %ebp-0x0c - CPU ID
+ * %ebp-0x10 - loop count
+ * %ebp-0x14 - saved %ebx (during cpuid)
  */
 	ENTRY_NP(__cp_tsc_read)
 	pushl	%ebp
 	movl	%esp, %ebp
 	pushl	%edi
 	pushl	%esi
-	subl	$0x4, %esp
+	subl	$0x8, %esp
 
 	movl	0x8(%ebp), %edi
 	movl	CP_TSC_TYPE(%edi), %eax
@@ -45,7 +58,7 @@
 	cmpl	$0, %esi
 	jne	2f
 1:
-	addl	$0x4, %esp
+	addl	$0x8, %esp
 	popl	%esi
 	popl	%edi
 	leave
@@ -65,11 +78,13 @@
 	jmp	1b
 
 3:
-	cmpl	$0, %esi
-	je	4f
+	testl	%esi, %esi
+	jz	4f
+
+	movl	$0, (%esp)
 	mov	$GETCPU_GDT_OFFSET, %eax
 	lsl	%ax, %eax
-	movl	%eax, (%esp)
+	movl	%eax, 0x4(%esp)
 	movl	CP_TSC_TYPE(%edi), %eax
 
 4:
@@ -99,10 +114,12 @@
 7:
 	/*
 	 * Other protections should have prevented this function from being
-	 * called in the first place.  The only sane action is to abort.
-	 * The easiest means in this context is via SIGILL.
+	 * called in the first place.  Since callers must handle a failure from
+	 * CPU migration looping, yield the same result as a bail-out: 0
 	 */
-	ud2a
+	xorl	%eax, %eax
+	xorl	%edx, %edx
+	jmp	1b
 
 8:
 
@@ -114,25 +131,51 @@
 	 */
 	movl	$GETCPU_GDT_OFFSET, %ecx
 	lsl	%cx, %ecx
-	movl	(%esp), %esi
+	movl	0x4(%esp), %esi
 	cmpl	%ecx, %esi
-	je	9f
-	/*
-	 * There was a CPU migration, perform another reading.
-	 */
-	movl	%eax, (%esp)
-	movl	CP_TSC_NCPU(%edi), %esi
-	movl	CP_TSC_TYPE(%edi), %eax
-	jmp	4b
+	jne	9f
 
-9:
 	/* Grab the per-cpu offset and add it to the TSC result */
 	leal	CP_TSC_SYNC_TICK_DELTA(%edi), %esi
 	leal	(%esi, %ecx, 8), %ecx
 	addl	(%ecx), %eax
 	adcl	0x4(%ecx), %edx
 	jmp	1b
+
+9:
+	/*
+	 * It appears that a migration has occurred between the first CPU ID
+	 * query and now.  Check if the loop limit has been broken and retry if
+	 * that's not the case.
+	 */
+	movl	(%esp), %eax
+	cmpl	$TSC_READ_MAXLOOP, %eax
+	jge	10f
+
+	incl	%eax
+	movl	%eax, (%esp)
+	movl	%ecx, 0x4(%esp)
+	movl	CP_TSC_NCPU(%edi), %esi
+	movl	CP_TSC_TYPE(%edi), %eax
+	jmp	4b
+
+10:
+	/* Loop limit was reached. Return bail-out value of 0. */
+	xorl	%eax, %eax
+	xorl	%edx, %edx
+	jmp	1b
+
 	SET_SIZE(__cp_tsc_read)
+
+/*
+ * hrtime_t
+ * __cp_gethrtime_fasttrap()
+ */
+	ENTRY_NP(__cp_gethrtime_fasttrap)
+	movl	$T_GETHRTIME, %eax
+	int	$T_FASTTRAP
+	ret
+	SET_SIZE(__cp_gethrtime_fasttrap)
 
 /*
  * uint_t
