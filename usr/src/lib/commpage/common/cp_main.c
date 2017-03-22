@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/comm_page.h>
@@ -48,6 +48,7 @@ __cp_can_gettime(comm_page_t *cp)
  * ASM-defined functions.
  */
 extern hrtime_t __cp_tsc_read(comm_page_t *);
+extern hrtime_t __cp_gethrtime_fasttrap();
 
 /*
  * These are cloned from TSC and time related code in the kernel.  The should
@@ -58,7 +59,7 @@ extern hrtime_t __cp_tsc_read(comm_page_t *);
 #define	NANOSEC		1000000000LL
 
 #define	TSC_CONVERT_AND_ADD(tsc, hrt, scale) do {		\
-	uint32_t *_l = (uint32_t *)&(tsc); 			\
+	uint32_t *_l = (uint32_t *)&(tsc);			\
 	uint64_t sc = (uint32_t)(scale);			\
 	(hrt) += (uint64_t)(_l[1] * sc) << NSEC_SHIFT;		\
 	(hrt) += (uint64_t)(_l[0] * sc) >> (32 - NSEC_SHIFT);	\
@@ -95,6 +96,14 @@ __cp_gethrtime(comm_page_t *cp)
 		tsc_last = cp->cp_tsc_last;
 		hrt = cp->cp_tsc_hrtime_base;
 		tsc = __cp_tsc_read(cp);
+
+		/*
+		 * A TSC reading of 0 indicates the special case of an error
+		 * bail-out.  Rely on the fasttrap to supply an hrtime value.
+		 */
+		if (tsc == 0) {
+			return (__cp_gethrtime_fasttrap());
+		}
 	} while ((old_hres_lock & ~1) != cp->cp_hres_lock);
 
 	if (tsc >= tsc_last) {

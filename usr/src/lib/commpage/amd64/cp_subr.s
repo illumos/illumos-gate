@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/asm_linkage.h>
@@ -33,6 +33,12 @@
 #define	NANOSEC		0x3b9aca00
 
 /*
+ * For __cp_tsc_read calls which incur looping retries due to CPU migration,
+ * this represents the maximum number of tries before bailing out.
+ */
+#define	TSC_READ_MAXLOOP	0x4
+
+/*
  * hrtime_t
  * __cp_tsc_read(comm_page_t *cp)
  *
@@ -41,7 +47,6 @@
 	ENTRY_NP(__cp_tsc_read)
 	movl	CP_TSC_TYPE(%rdi), %esi
 	movl	CP_TSC_NCPU(%rdi), %r8d
-	leaq	CP_TSC_SYNC_TICK_DELTA(%rdi), %r9
 
 	cmpl	$TSC_TSCP, %esi
 	jne	2f
@@ -53,40 +58,58 @@
 	 */
 	shlq	$0x20, %rdx
 	orq	%rdx, %rax
-	cmpl	$0, %esi
-	jne	1f
+
+	/*
+	 * A zeroed cp_tsc_ncpu (currently held in r8d) indicates that no
+	 * per-CPU TSC offsets are required.
+	 */
+	testl	%r8d, %r8d
+	jnz	1f
 	ret
+
 1:
 	/*
-	 * When cp_tsc_ncpu is non-zero, it indicates the length of the
-	 * cp_tsc_sync_tick_delta array, which contains per-CPU offsets for the
-	 * TSC.  The CPU ID furnished by the IA32_TSC_AUX register via rdtscp
-	 * is used to look up an offset value in that array and apply it to the
-	 * TSC reading.
+	 * A non-zero cp_tsc_ncpu indicates the array length of
+	 * cp_tsc_sync_tick_delta containing per-CPU offsets which are applied
+	 * to TSC readings.  The CPU ID furnished by the IA32_TSC_AUX register
+	 * via rdtscp (placed in rcx) is used to look up an offset value in
+	 * that array and apply it to the TSC value.
 	 */
+	leaq	CP_TSC_SYNC_TICK_DELTA(%rdi), %r9
 	movq	(%r9, %rcx, 8), %rdx
 	addq	%rdx, %rax
 	ret
 
 2:
 	/*
-	 * Without rdtscp, there is no way to perform a TSC reading and
-	 * simultaneously query the current CPU.  If tsc_ncpu indicates that
-	 * per-CPU TSC offsets are present, the ID of the current CPU is
-	 * queried before performing a TSC reading.  It will be later compared
-	 * to a second CPU ID lookup to catch CPU migrations.
+	 * TSC reading without RDTSCP
 	 *
-	 * This method will catch all but the most pathological scheduling.
+	 * Check if handling for per-CPU TSC offsets is required.  If not,
+	 * immediately skip to the the appropriate steps to perform a rdtsc.
+	 *
+	 * If per-CPU offsets are present, the TSC reading process is more
+	 * complicated.  Without rdtscp, there is no way to simultaneously read
+	 * the TSC and query the current CPU.  In order to "catch" migrations
+	 * during execution, the CPU ID is queried before and after rdtsc.  The
+	 * execution is repeated if results differ, subject to a loop limit.
 	 */
-	cmpl	$0, %r8d
-	je	3f
+	xorq	%r9, %r9
+	testl	%r8d, %r8d
+	jz	3f
+
+	/*
+	 * Load the address of the per-CPU offset array, since it is needed.
+	 * The attempted loop count is kept in r8.
+	 */
+	leaq	CP_TSC_SYNC_TICK_DELTA(%rdi), %r9
+	xorl	%r8d, %r8d
+
+	/* Query the CPU ID and stash it in r10 for later comparison */
 	movl	$GETCPU_GDT_OFFSET, %edx
 	lsl	%dx, %edx
-
-3:
-	/* Save the most recently queried CPU ID for later comparison. */
 	movl	%edx, %r10d
 
+3:
 	cmpl	$TSC_RDTSC_MFENCE, %esi
 	jne	4f
 	mfence
@@ -118,30 +141,51 @@
 6:
 	/*
 	 * Other protections should have prevented this function from being
-	 * called in the first place.  The only sane action is to abort.
-	 * The easiest means in this context is via SIGILL.
+	 * called in the first place.  Since callers must handle a failure from
+	 * CPU migration looping, yield the same result as a bail-out: 0
 	 */
-	ud2a
+	xorl	%eax, %eax
+	ret
 
 7:
 	shlq	$0x20, %rdx
 	orq	%rdx, %rax
 
 	/*
-	 * Query the current CPU again if a per-CPU offset is being applied to
-	 * the TSC reading.  If the result differs from the earlier reading,
-	 * then a migration has occured and the TSC must be read again.
+	 * With the TSC reading in-hand, check if any per-CPU offset handling
+	 * is required.  The address to the array of deltas (r9) will not have
+	 * been populated if offset handling is unecessary.
 	 */
-	cmpl	$0, %r8d
-	je	8f
+	testq	%r9, %r9
+	jnz	8f
+	ret
+
+8:
 	movl	$GETCPU_GDT_OFFSET, %edx
 	lsl	%dx, %edx
 	cmpl	%edx, %r10d
-	jne	3b
+	jne	9f
 	movq	(%r9, %rdx, 8), %rdx
 	addq	%rdx, %rax
-8:
 	ret
+
+9:
+	/*
+	 * It appears that a migration has occurred between the first CPU ID
+	 * query and now.  Check if the loop limit has been broken and retry if
+	 * that's not the case.
+	 */
+	cmpl	$TSC_READ_MAXLOOP, %r8d
+	jge	10f
+	incl	%r8d
+	movl	%edx, %r10d
+	jmp	3b
+
+10:
+	/* Loop limit was reached. Return bail-out value of 0. */
+	xorl	%eax, %eax
+	ret
+
 	SET_SIZE(__cp_tsc_read)
 
 
@@ -192,8 +236,15 @@
 	movq	%rdx, 0x8(%rsp)
 
 	call	__cp_tsc_read
-	movq	0x10(%rsp), %rdi
 
+	/*
+	 * Failure is inferred from a TSC reading of 0.  The normal fasttrap
+	 * mechanism can be used as a fallback in such cases.
+	 */
+	testq	%rax, %rax
+	jz	6f
+
+	movq	0x10(%rsp), %rdi
 	movl	0x18(%rsp), %r9d
 	movl	CP_HRES_LOCK(%rdi), %edx
 	andl	$0xfffffffe, %r9d
@@ -269,6 +320,12 @@
 	movq	%rcx, %rax
 5:
 	jmp	2b
+
+6:
+	movl	$T_GETHRTIME, %eax
+	int	$T_FASTTRAP
+	addq	$0x20, %rsp
+	ret
 
 	SET_SIZE(__cp_gethrtime)
 
