@@ -23,7 +23,7 @@
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright 2016 Jason King.
 .\"
-.Dd February 25, 2017
+.Dd March 23, 2017
 .Dt SHARE_NFS 1M
 .Os
 .Sh NAME
@@ -713,21 +713,9 @@ file system read-only at boot time:
 share -F nfs -o ro /disk
 .Ed
 .Pp
-The same command entered from the command line does not share the
-.Pa /disk
-file system unless there is at least one file system entry in the
-.Pa /etc/dfs/dfstab
-file. The
-.Xr mountd 1M
-and
-.Xr nfsd 1M
-daemons only run if there is a file system entry in
-.Pa /etc/dfs/dfstab
-when starting or rebooting the system.
-.Pp
 The
 .Xr mountd 1M
-process allows the processing of a path name the contains a symbolic link.
+process allows the processing of a path name that contains a symbolic link.
 This allows the processing of paths that are not themselves explicitly shared
 with
 .Nm .
