@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DEVICE_ALLOCATE 4 "May 12, 2008"
+.TH DEVICE_ALLOCATE 4 "Mar 6, 2017"
 .SH NAME
 device_allocate \- device_allocate file
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ device_allocate \- device_allocate file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdevice_allocate\fR file is an \fBASCII\fR file that resides in the
 \fB/etc/security\fR directory. It contains mandatory access control information
@@ -159,7 +158,6 @@ the system administrator.
 .RE
 
 .SS "Notes on \fBdevice_allocate\fR"
-.sp
 .LP
 The \fBdevice_allocate\fR file is an ASCII file that resides in the
 \fB/etc/security\fR directory.
@@ -235,7 +233,6 @@ to use it (with \fBallocate\fR(1) and \fBdeallocate\fR(1)). If a device is not
 allocatable, there is an asterisk (\fB*\fR) in the \fIauths\fR field, and no
 one can use the device.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/device_allocate\fR\fR
@@ -246,7 +243,6 @@ Contains list of allocatable devices
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -262,16 +258,10 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBauths\fR(1), \fBallocate\fR(1), \fBbsmconv\fR(1M), \fBdeallocate\fR(1),
+\fBauths\fR(1), \fBallocate\fR(1), \fBdeallocate\fR(1),
 \fBlist_devices\fR(1), \fBauth_attr\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
-The functionality described in this man page is available only if  Solaris
-Auditing has been enabled. See \fBbsmconv\fR(1M) for more information.
-.sp
 .LP
 On systems configured with Trusted Extensions, the functionality is enabled by
 default. On such systems, the \fBdevice_allocate\fR file is updated

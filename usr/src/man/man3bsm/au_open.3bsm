@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AU_OPEN 3BSM "Mar 31, 2005"
+.TH AU_OPEN 3BSM "Mar 6, 2017"
 .SH NAME
 au_open, au_close, au_write \- construct and write audit records
 .SH SYNOPSIS
@@ -26,7 +26,6 @@ au_open, au_close, au_write \- construct and write audit records
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBau_open()\fR function returns an audit record descriptor to which audit
 tokens can be written using \fBau_write()\fR. The audit record descriptor is an
@@ -49,7 +48,6 @@ The \fBau_write()\fR function adds the audit token pointed to by \fIm\fR to the
 audit record identified by the descriptor \fId\fR. After this call is made the
 audit token is no longer available to the caller.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBau_open()\fR returns an audit record descriptor.
 If a descriptor could not be allocated, \fBau_open()\fR returns \fB\(mi1\fR and
@@ -68,7 +66,6 @@ invalid descriptor or \fIm\fR is an invalid token, or if \fBaudit()\fR fails,
 fails, \fBerrno\fR is set to one of the error values described on the
 \fBaudit\fR(2) manual page.
 .SH ERRORS
-.sp
 .LP
 The \fBau_open()\fR function will fail if:
 .sp
@@ -92,7 +89,6 @@ later.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -110,12 +106,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBaudit\fR(2), \fBauditon\fR(2), \fBau_preselect\fR(3BSM),
+\fBaudit\fR(2), \fBauditon\fR(2), \fBau_preselect\fR(3BSM),
 \fBau_to\fR(3BSM), \fBfree\fR(3C), \fBattributes\fR(5)
-.SH NOTES
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETAUEVENT 3BSM "Jun 25, 2008"
+.TH GETAUEVENT 3BSM "Mar 6, 2017"
 .SH NAME
 getauevent, getauevnam, getauevnum, getauevnonam, setauevent, endauevent,
 getauevent_r, getauevnam_r, getauevnum_r \- get audit_event entry
@@ -59,7 +59,6 @@ getauevent_r, getauevnam_r, getauevnum_r \- get audit_event entry
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions document the programming interface for obtaining entries from
 the \fBaudit_event\fR(4) file. The \fBgetauevent()\fR, \fBgetauevnam()\fR,
@@ -121,7 +120,6 @@ au_class_t      ae_class;
 .in -2
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetauevent()\fR, \fBgetauevnam()\fR, \fBgetauevnum()\fR,
 \fBgetauevent_r()\fR, \fBgetauevnam_r()\fR, and \fBgetauevnum_r()\fR functions
@@ -133,7 +131,6 @@ The \fBgetauevnonam()\fR function returns an event number of type
 \fBau_event_t\fR if it successfully enumerates an entry. Otherwise it returns
 \fINULL\fR, indicating it could not find the requested event name.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_event\fR\fR
@@ -152,7 +149,6 @@ file that stores user-ID to username mappings
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -174,18 +170,12 @@ are Unsafe. The equivalent functions \fBgetauevent_r()\fR,
 \fBgetauevnam_r()\fR, and \fBgetauevnum_r()\fR provide the same functionality
 and an MT-Safe function call interface.
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBgetauclassent\fR(3BSM), \fBgetpwnam\fR(3C),
+\fBgetauclassent\fR(3BSM), \fBgetpwnam\fR(3C),
 \fBaudit_class\fR(4), \fBaudit_event\fR(4), \fBpasswd\fR(4),
 \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 All information for the \fBgetauevent()\fR, \fBgetauevnam()\fR, and
 \fBgetauevnum()\fR functions is contained in a static area, so it must be
 copied if it is to be saved.
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.

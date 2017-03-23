@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDITON 2 "Apr 6, 2009"
+.TH AUDITON 2 "Mar 6, 2017"
 .SH NAME
 auditon \- manipulate auditing
 .SH SYNOPSIS
@@ -17,7 +18,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lbsm\fR \fB -lsocket \fR \fB -lnsl \fR [ 
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBauditon()\fR function performs various audit subsystem control
 operations. The \fIcmd\fR argument designates the particular audit control
@@ -33,7 +33,7 @@ The following commands are supported:
 .ad
 .sp .6
 .RS 4n
-Return the system audit on/off/disabled condition in the integer pointed to by
+Return the system audit condition in the integer pointed to by
 \fIdata\fR. The following values can be returned:
 .sp
 .ne 2
@@ -41,16 +41,16 @@ Return the system audit on/off/disabled condition in the integer pointed to by
 \fB\fBAUC_AUDITING\fR\fR
 .ad
 .RS 16n
-Auditing has been turned on.
+Audit daemon is active.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBAUC_DISABLED\fR\fR
+\fB\fBAUC_INIT_AUDIT\fR\fR
 .ad
 .RS 16n
-Auditing system has not been enabled.
+Audit is ready but auditd has not run.
 .RE
 
 .sp
@@ -59,7 +59,7 @@ Auditing system has not been enabled.
 \fB\fBAUC_NOAUDIT\fR\fR
 .ad
 .RS 16n
-Auditing has been turned off.
+Audit daemon is not active.
 .RE
 
 .sp
@@ -81,8 +81,7 @@ Auditing has blocked due to lack of space in audit partition.
 .sp .6
 .RS 4n
 Set the system's audit on/off condition to the value in the integer pointed to
-by \fIdata\fR. The Solaris Audit subsystem must be enabled by \fBbsmconv\fR(1M)
-before auditing can be turned on. The following audit states can be set:
+by \fIdata\fR. The following audit states can be set:
 .sp
 .ne 2
 .na
@@ -161,7 +160,7 @@ preselect non-attributable audit events.
 Return the audit ID, preselection mask, terminal ID and audit session ID of the
 specified process in the \fBauditpinfo\fR structure pointed to by \fIdata\fR.
 .sp
-Note that \fBA_GETPINFO\fR can fail if the termial ID contains a network
+Note that \fBA_GETPINFO\fR can fail if the terminal ID contains a network
 address longer than 32 bits. In this case, the \fBA_GETPINFO_ADDR\fR command
 should be used.
 .RE
@@ -492,12 +491,10 @@ Generate a zone ID token with each audit record.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBauditon()\fR returns \fB0\fR. Otherwise, \(mi1
 is returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBauditon()\fR function will fail if:
 .sp
@@ -525,7 +522,7 @@ The copy of data to/from the kernel failed.
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-One of the arguments was illegal, Solaris Audit has not been installed, or the
+One of the arguments was illegal, Audit has not been installed, or the
 operation is not valid from a local zone.
 .RE
 
@@ -545,7 +542,6 @@ asserted in the effective set of the calling process and the command is one of
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBauditon()\fR function can be invoked only by processes with appropriate
 privileges.
@@ -558,7 +554,6 @@ permitted only in the global zone: \fBA_SETCOND\fR, \fBA_SETCLASS\fR,
 \fBA_SETKMASK\fR, \fBA_SETQCTRL\fR, \fBA_SETSTAT\fR, \fBA_SETFSIZE\fR, and
 \fBA_SETPOLICY\fR. All other \fBauditon()\fR commands are valid from any zone.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -576,16 +571,10 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBauditconfig\fR(1M), \fBauditd\fR(1M), \fBbsmconv\fR(1M), \fBaudit\fR(2),
+\fBauditconfig\fR(1M), \fBauditd\fR(1M), \fBaudit\fR(2),
 \fBexec\fR(2), \fBaudit.log\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5)
 .SH NOTES
-.sp
-.LP
-The functionality described in this man page is available only if the Solaris
-Auditing has been enabled. See \fBbsmconv\fR(1M) for more information.
-.sp
 .LP
 The auditon options that modify or display process-based information are not
 affected by the "perzone" audit policy. Those that modify system audit data

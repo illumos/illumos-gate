@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT_WARN 1M "Apr 16, 2008"
+.TH AUDIT_WARN 1M "Mar 6, 2017"
 .SH NAME
 audit_warn \- audit daemon warning script
 .SH SYNOPSIS
@@ -13,7 +14,6 @@ audit_warn \- audit daemon warning script
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBaudit_warn\fR utility processes warning or error messages from the audit
 daemon. When a problem is encountered, the audit daemon, \fBauditd\fR(1M) calls
@@ -26,7 +26,6 @@ when an audit_warn situation arises by defining a mail alias called
 \fBaudit_warn\fR in \fBaliases\fR(4). The users that make up the
 \fBaudit_warn\fR alias are typically the \fBaudit\fR and \fBroot\fR users.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -68,34 +67,6 @@ state to something other than \fB\fR\fBAUC_AUDITING\fR\fB\&. \fR The audit
 daemon will have exited in this case. The default action for this option is to
 send mail to the \fBaudit_warn\fR alias and to write a message to the machine
 console.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBebusy\fR\fR
-.ad
-.sp .6
-.RS 4n
-Indicates that the audit daemon is already running. The default action for this
-option is to send mail to the \fBaudit_warn\fR alias and to write a message to
-the machine console.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBgetacdir\fR \fIcount\fR\fR
-.ad
-.sp .6
-.RS 4n
-Indicates that there is a problem getting the directory list or plugin list
-from \fBaudit_control\fR(4). The audit daemon will hang in a sleep loop until
-the file is fixed. The default action for this option is to send mail to the
-\fBaudit_warn\fR alias only if \fIcount\fR is \fB1\fR, and to write a message
-to the machine console every time. It is recommended that mail \fInot\fR be
-sent every time as this could result in a the saturation of the file system
-that contains the mail spool directory.
 .RE
 
 .sp
@@ -164,7 +135,7 @@ resources.
 .ad
 .RS 16n
 No plugins loaded (including the binary file plugin, \fBaudit_binfile\fR(5))
-due to configuration errors in \fBaudit_control\fR(4). The name string is
+due to configuration errors. The name string is
 \fB--\fR to indicate that no plugin name applies.
 .RE
 
@@ -174,9 +145,7 @@ due to configuration errors in \fBaudit_control\fR(4). The name string is
 \fB\fBretry\fR\fR
 .ad
 .RS 16n
-The plugin \fIname\fR reports it has encountered a temporary failure. For
-example, the \fBaudit_binfree.so\fR plugin uses \fBretry\fR to indicate that
-all directories are full.
+The plugin \fIname\fR reports it has encountered a temporary failure.
 .RE
 
 .sp
@@ -211,18 +180,6 @@ The plugin \fIname\fR has reported an error as described in \fItext\fR.
 .sp
 .ne 2
 .na
-\fB\fBpostsigterm\fR\fR
-.ad
-.sp .6
-.RS 4n
-Indicates that an error occurred during the orderly shutdown of the audit
-daemon. The default action for this option is to send mail to the
-\fBaudit_warn\fR alias and to write a message to the machine console.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBsoft\fR \fIfilename\fR\fR
 .ad
 .sp .6
@@ -239,13 +196,11 @@ write a message to the machine console.
 .ad
 .sp .6
 .RS 4n
-Indicates that the temporary audit file already exists indicating a fatal
-error. The default action for this option is to send mail to the
-\fBaudit_warn\fR alias and to write a message to the machine console.
+Indicates that there was a problem creating a symlink from
+\fB/var/run/.audit.log\fR to the current audit log file..
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -264,20 +219,10 @@ Interface Stability	Evolving
 .LP
 The interface stability is evolving. The file content is unstable.
 .SH SEE ALSO
-.sp
 .LP
-\fBaudit\fR(1M), \fBauditd\fR(1M), \fBbsmconv\fR(1M), \fBaliases\fR(4),
-\fBaudit.log\fR(4), \fBaudit_control\fR(4), \fBattributes\fR(5)
-.sp
-.LP
-See the section on Solaris Auditing in \fISystem Administration Guide: Security
-Services\fR.
+\fBaudit\fR(1M), \fBauditd\fR(1M), \fBaliases\fR(4),
+\fBaudit.log\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
-This functionality is available only if the Solaris Auditing feature has been
-enabled. See \fBbsmconv\fR(1M) for more information.
-.sp
 .LP
 If the audit policy \fBperzone\fR is set, the \fB/etc/security/audit_warn\fR
 script for the local zone is used for notifications from the local zone's
