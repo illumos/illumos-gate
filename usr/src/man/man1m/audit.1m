@@ -1,31 +1,25 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\" Copyright (c) 1993, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT 1M "Apr 16, 2008"
+.TH AUDIT 1M "Mar 6, 2017"
 .SH NAME
 audit \- control the behavior of the audit daemon
 .SH SYNOPSIS
 .LP
 .nf
-\fBaudit\fR \fB-n\fR | \fB-s\fR | \fB-t\fR | \fB-v\fR [\fIpath\fR]
+\fBaudit\fR \fB-n\fR | \fB-s\fR | \fB-t\fR | \fB-v\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBaudit\fR command is the system administrator's interface to maintaining
-the audit trail. The audit daemon can be notified to read the contents of the
-\fBaudit_control\fR(4) file and re-initialize the current audit directory to
-the first directory listed in the \fBaudit_control\fR file or to open a new
-audit file in the current audit directory specified in the \fBaudit_control\fR
-file, as last read by the audit daemon. Reading \fBaudit_control\fR also causes
-the \fBminfree\fR and \fBplugin\fR configuration lines to be re-read and reset
-within \fBauditd\fR. The audit daemon can also be signaled to close the audit
-trail and disable auditing.
+the audit daemon \fBauditd\fR(1M). The audit daemon can be stopped, started, or
+notified to reread the configuration, stored in \fBsmf\fR(5) and managed using
+the \fBauditconfig\fR(1M) command.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-n\fR\fR
@@ -41,9 +35,9 @@ file in the current audit directory.
 \fB\fB-s\fR\fR
 .ad
 .RS 11n
-Notify the audit daemon to read the audit control file. The audit daemon stores
-the information internally. If the audit daemon is not running but audit has
-been enabled by means of \fBbsmconv\fR(1M), the audit daemon is started.
+Validates the audit service configuration and, if correct, notify the audit
+daemon to reread the audit configuration. If the audit daemon is not running,
+the audit daemon is started.
 .RE
 
 .sp
@@ -59,34 +53,21 @@ auditing, and die. Use \fB-s\fR to restart auditing.
 .sp
 .ne 2
 .na
-\fB\fB-v\fR \fIpath\fR\fR
+\fB\fB-v\fR
 .ad
 .RS 11n
-Verify the syntax for the audit control file stored in \fIpath\fR. The
-\fBaudit\fR command displays an approval message or outputs specific error
-messages for each error found.
+Validate the audit service configuration. At least one plugin must be active;
+if that plugin is \fBaudit_binfile\fR then its \fBp_dir\fR attribute must
+contain at least one valid directory, and its \fBp_minfree\fR attribute must
+be between 0 and 100.
 .RE
 
 .SH DIAGNOSTICS
-.sp
 .LP
 The \fBaudit\fR command will exit with \fB0\fR upon success and a positive
 integer upon failure.
-.SH FILES
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/etc/security/audit_user\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fB/etc/security/audit_control\fR
-.RE
+
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -102,51 +83,10 @@ Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBpraudit\fR(1M), \fBaudit\fR(2), \fBaudit_control\fR(4),
-\fBaudit_user\fR(4), \fBattributes\fR(5)
-.sp
-.LP
-See the section on Solaris Auditing in \fISystem Administration Guide: Security
-Services\fR.
+\fBpraudit\fR(1M), \fBauditconfig\fR(1M), \fBaudit\fR(2), \fBsmf\fR(5),
+\fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
-The functionality described in this man page is available only if the Solaris
-Auditing feature has been enabled. See \fBbsmconv\fR(1M) for more information.
-.sp
-.LP
-The \fBaudit\fR command does not modify a process's preselection mask. It
-functions are limited to the following:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-affects which audit directories are used for audit data storage;
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-specifies the minimum free space setting;
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-resets the parameters supplied by means of the plugin directive.
-.RE
-.sp
-.LP
-For the \fB-s\fR option, \fBaudit\fR validates the \fBaudit_control\fR syntax
-and displays an error message if a syntax error is found. If a syntax error
-message is displayed, the audit daemon does not re-read \fBaudit_control\fR.
-Because \fBaudit_control\fR is processed at boot time, the \fB-v\fR option is
-provided to allow syntax checking of an edited copy of \fBaudit_control\fR.
-Using \fB-v\fR, \fBaudit\fR exits with 0 if the syntax is correct; otherwise,
-it returns a positive integer.
-.sp
 .LP
 The \fB-v\fR option can be used in any zone, but the \fB-t\fR, \fB-s\fR, and
 \fB-n\fR options are valid only in local zones and, then, only if the

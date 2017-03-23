@@ -507,7 +507,11 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 	DEBUG("read %d from %lld to %p", blks, dblk, buf);
 
 	if (blks && (rc = bd_read(dev, dblk, blks, buf))) {
-	    printf("read %d from %lld to %p, error: 0x%x", blks, dblk, buf, rc);
+	    /* Filter out floppy controller errors */
+	    if (BD(dev).bd_flags != BD_FLOPPY || rc != 0x20) {
+		printf("read %d from %lld to %p, error: 0x%x\n", blks, dblk,
+		    buf, rc);
+	    }
 	    return (EIO);
 	}
 #ifdef BD_SUPPORT_FRAGS /* XXX: sector size */

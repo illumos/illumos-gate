@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETAUCLASSENT 3BSM "Mar 31, 2005"
+.TH GETAUCLASSENT 3BSM "Mar 6, 2017"
 .SH NAME
 getauclassent, getauclassnam, setauclass, endauclass, getauclassnam_r,
 getauclassent_r \- get audit_class entry
@@ -44,7 +44,6 @@ getauclassent_r \- get audit_class entry
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetauclassent()\fR function and \fBgetauclassnam()\fR each return an
 \fBaudit_class\fR entry.
@@ -80,7 +79,7 @@ bytes for the \fBac_name\fR and \fBac_desc\fR members of the
 \fBau_class_ent_t\fR data structure.
 .sp
 .LP
-The internal representation of an \fBaudit_user\fR entry is an
+The internal representation of an \fBaudit_class\fR entry is an
 \fBau_class_ent\fR structure defined in  <\fBbsm/libbsm.h\fR> with the
 following members:
 .sp
@@ -93,7 +92,6 @@ char       *ac_desc;
 .in -2
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetauclassnam()\fR and \fBgetauclassnam_r()\fR functions return a
 pointer to a \fBau_class_ent\fR structure if they successfully locate the
@@ -104,7 +102,6 @@ The \fBgetauclassent()\fR and \fBgetauclassent_r()\fR functions return a
 pointer to a \fBau_class_ent\fR structure if they successfully enumerate an
 entry. Otherwise they return \fINULL\fR, indicating the end of the enumeration.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/audit_class\fR\fR
@@ -114,7 +111,6 @@ file that aps audit class numbers to audit class names
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -137,16 +133,10 @@ All of the functions described on this man-page are MT-Safe except
 functionality as the Unsafe functions, but have a slightly different function
 call interface to make them MT-Safe.
 .SH SEE ALSO
-.sp
 .LP
-\fBbsmconv\fR(1M), \fBaudit_class\fR(4), \fBaudit_event\fR(4),
+\fBaudit_class\fR(4), \fBaudit_event\fR(4),
 \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 All information is contained in a static area, so it must be copied if it is to
 be saved.
-.sp
-.LP
-The functionality described on this manual page is available only if the
-Solaris Auditing has been enabled.  See \fBbsmconv\fR(1M) for more information.

@@ -439,7 +439,7 @@ hp_sibling(hp_node_t node)
 int
 hp_path(hp_node_t node, char *path, char *connection)
 {
-	hp_node_t	root;
+	hp_node_t	root = NULL;
 	hp_node_t	parent;
 	int		i;
 	char		*s;

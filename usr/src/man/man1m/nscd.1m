@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NSCD 1M "Sep 14, 2006"
+.TH NSCD 1M "Mar 6, 2017"
 .SH NAME
 nscd \- name service cache daemon
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ nscd \- name service cache daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnscd\fR daemon is a process that provides a cache for most name service
 requests. The default \fIconfiguration-file\fR \fB/etc/nscd.conf\fR determines
@@ -24,7 +23,7 @@ the behavior of the cache daemon. See \fBnscd.conf\fR(4).
 \fBnscd\fR provides caching for the \fBpasswd\fR(4), \fBgroup\fR(4),
 \fBhosts\fR(4), \fBipnodes\fR(4), \fBexec_attr\fR(4), \fBprof_attr\fR(4),
 \fBuser_attr\fR(4), \fBethers\fR(4), \fBrpc\fR(4), \fBprotocols\fR(4),
-\fBnetworks\fR(4), \fBbootparams\fR(4), \fBaudit_user\fR(4),
+\fBnetworks\fR(4), \fBbootparams\fR(4),
 \fBauth_attr\fR(4), \fBservices\fR(4), \fBnetmasks\fR(4), \fBprinters\fR(4),
 \fBproject\fR(4) databases through standard \fBlibc\fR interfaces, such as
 \fBgethostbyname\fR(3NSL), \fBgetipnodebyname\fR(3SOCKET),
@@ -72,13 +71,12 @@ read and use the same default configuration file or the one specified with the
 \fB-f\fR command line option. Once the configuration is read, the per-user
 \fBnscd\fR will use it for its entire lifetime.
 .SH OPTIONS
-.sp
 .LP
 Several of the options described below require a \fIcachename\fR specification.
 Supported values for \fIcachename\fR are: \fBpasswd\fR, \fBgroup\fR,
 \fBhosts\fR, \fBipnodes\fR, \fBexec_attr\fR, \fBprof_attr\fR, \fBuser_attr\fR,
 \fBethers\fR, \fBrpc\fR, \fBprotocols\fR, \fBnetworks\fR, \fBbootparams\fR,
-\fBaudit_user\fR, \fBauth_attr\fR, \fBservices\fR, \fBnetmasks\fR,
+\fBauth_attr\fR, \fBservices\fR, \fBnetmasks\fR,
 \fBprinters\fR, and \fBproject\fR.
 .sp
 .ne 2
@@ -135,7 +133,6 @@ example# svcadm enable system/name-service-cache
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nscd.conf\fR\fR
@@ -145,17 +142,15 @@ Determines athe behavior of the cache daemon
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBsvcadm\fR(1M), \fBgetspnam\fR(3C), \fBgethostbyname\fR(3NSL),
-\fBgetipnodebyname\fR(3SOCKET), \fBaudit_user\fR(4), \fBauth_attr\fR(4),
+\fBgetipnodebyname\fR(3SOCKET), \fBauth_attr\fR(4),
 \fBbootparams\fR(4), \fBethers\fR(4), \fBexec_attr\fR(4), \fBgroup\fR(4),
 \fBhosts\fR(4), \fBnetmasks\fR(4), \fBnetworks\fR(4), \fBnscd.conf\fR(4),
 \fBnsswitch.conf\fR(4), \fBpasswd\fR(4), \fBprinters\fR(4), \fBprof_attr\fR(4),
 \fBproject\fR(4), \fBprotocols\fR(4), \fBrpc\fR(4), \fBservices\fR(4),
 \fBuser_attr\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The output from the \fB-g\fR option to \fBnscd\fR is subject to change. Do not
 rely upon it as a programming interface.

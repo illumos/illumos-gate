@@ -450,9 +450,6 @@ _MANFILES=	6to4relay.1m		\
 		smbios.1m		\
 		smbstat.1m		\
 		smrsh.1m		\
-		smtnrhdb.1m		\
-		smtnrhtp.1m		\
-		smtnzonecfg.1m		\
 		sndradm.1m		\
 		sndrd.1m		\
 		sndrsyncd.1m		\

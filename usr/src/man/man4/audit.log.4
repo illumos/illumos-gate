@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT.LOG 4 "May 29, 2009"
+.TH AUDIT.LOG 4 "Mar 6, 2017"
 .SH NAME
 audit.log \- audit trail file
 .SH SYNOPSIS
@@ -18,19 +19,18 @@ audit.log \- audit trail file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBaudit.log\fR files are the depository for audit records stored locally or on
-an on an NFS-mounted audit server. These files are kept in directories named in
-the file \fBaudit_control\fR(4) using the \fBdir\fR option. They are named to
-reflect the time they are created and are, when possible, renamed to reflect
-the time they are closed as well. The name takes the form
+an NFS-mounted audit server. These files are kept in directories as specified
+by the \fBp_dir\fR attribute of the \fBaudit_binfile\fR(5) plugin. They are
+named to reflect the time they are created and are, when possible, renamed to
+reflect the time they are closed as well. The name takes the form
 .sp
 .LP
 \fIyyyymmddhhmmss\fR\fB\&.not_terminated.\fR\fIhostname\fR
 .sp
 .LP
-when open or if the \fBauditd\fR(1M) terminated ungracefully, and the form
+when open or if \fBauditd\fR(1M) terminated ungracefully, and the form
 .sp
 .LP
 \fIyyyymmddhhmmss\fR\fB\&.\fR\fIyyyymmddhhmmss\fR\fB\&.\fR\fIhostname\fR
@@ -42,7 +42,7 @@ in the month, \fBhh\fR hour in the day, \fBmm\fR minute in the hour, and
 .sp
 .LP
 Audit data is generated in the binary format described below; the default for
-Solaris audit is binary format. See \fBaudit_syslog\fR(5) for an alternate data
+audit is binary format. See \fBaudit_syslog\fR(5) for an alternate data
 format.
 .sp
 .LP
@@ -767,7 +767,6 @@ creator UID             4 bytes
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -786,17 +785,11 @@ Interface Stability	See below.
 .LP
 The binary file format is Committed. The binary file contents is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
-\fBaudit\fR(1M), \fBauditd\fR(1M), \fBbsmconv\fR(1M), \fBaudit\fR(2),
-\fBauditon\fR(2), \fBau_to\fR(3BSM), \fBaudit_control\fR(4),
-\fBaudit_syslog\fR(5)
-.sp
-.LP
-Part\ VII, \fISolaris Auditing,\fR in \fISystem Administration Guide: Security
-Services\fR
+\fBaudit\fR(1M), \fBauditd\fR(1M), \fBaudit\fR(2),
+\fBauditon\fR(2), \fBau_to\fR(3BSM),
+\fBaudit_binfile\fR(5), \fBaudit_remote\fR(5), \fBaudit_syslog\fR(5)
 .SH NOTES
-.sp
 .LP
 Each token is generally written using the \fBau_to\fR(3BSM) family of function
 calls.

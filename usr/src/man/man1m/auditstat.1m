@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDITSTAT 1M "Jun 16, 2009"
+.TH AUDITSTAT 1M "Mar 6, 2017"
 .SH NAME
 auditstat \- display kernel audit statistics
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ auditstat \- display kernel audit statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBauditstat\fR displays kernel audit statistics. The fields displayed are as
 follows:
@@ -137,7 +136,6 @@ have not been written.
 .RE
 
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-c\fR \fIcount\fR\fR
@@ -200,16 +198,9 @@ Display the version number of the kernel audit module software.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 \fBauditstat\fR returns \fB0\fR upon success and \fB1\fR upon failure.
 .SH SEE ALSO
-.sp
 .LP
-\fBauditconfig\fR(1M), \fBpraudit\fR(1M), \fBbsmconv\fR(1M), \fBaudit\fR(2),
+\fBauditconfig\fR(1M), \fBpraudit\fR(1M), \fBaudit\fR(2),
 \fBauditon\fR(2), \fBattributes\fR(5)
-.SH NOTES
-.sp
-.LP
-The functionality described in this man page is available only if Solaris
-Auditing has been enabled. See \fBbsmconv\fR(1M) for more information.
