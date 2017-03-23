@@ -376,6 +376,7 @@ function unit_writeacl
 function test_readonly
 {
 	typeset object=$1
+	typeset exp
 
 	if [[ -z $object ]]; then
 		log_fail "Object($object) not defined."
@@ -394,14 +395,21 @@ function test_readonly
 
 		log_must set_attribute $object "R"
 
-		unit_writefile $object $user 1
+		# As with mode bits, root can bypass.
+		if [[ "$user" == "root" ]]; then
+			exp=0
+		else
+			exp=1
+		fi
+
+		unit_writefile $object $user $exp
 		unit_writedir $object $user
-		unit_appenddata $object $user 1
+		unit_appenddata $object $user $exp
 
 		if [[ -d $object ]]; then
 			unit_writexattr $object $user
 		else
-			unit_writexattr $object $user 1
+			unit_writexattr $object $user $exp
 		fi
 
 		unit_accesstime $object $user
