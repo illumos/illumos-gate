@@ -295,6 +295,17 @@ tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		mode_arg = B_TRUE;
 	}
 
+	/*
+	 * The "mode" mount argument allows the operator to override the
+	 * permissions of the root of the tmpfs mount.
+	 */
+	if (vfs_optionisset(vfsp, "mode", &argstr)) {
+		if ((error = tmp_convmode(argstr, &root_mode)) != 0) {
+			goto out;
+		}
+		mode_arg = B_TRUE;
+	}
+
 	if (error = pn_get(uap->dir,
 	    (uap->flags & MS_SYSSPACE) ? UIO_SYSSPACE : UIO_USERSPACE, &dpn))
 		goto out;

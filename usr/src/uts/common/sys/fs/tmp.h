@@ -109,7 +109,7 @@ extern	int	tmp_resv(struct tmount *, struct tmpnode *, size_t, int);
 extern	int	tmp_taccess(void *, int, struct cred *);
 extern	int	tmp_sticky_remove_access(struct tmpnode *, struct tmpnode *,
 	struct cred *);
-extern	int	tmp_convnum(char *, size_t *);
+extern	int	tmp_convnum(char *, pgcnt_t *);
 extern	int	tmp_convmode(char *, mode_t *);
 extern	int	tdirenter(struct tmount *, struct tmpnode *, char *,
 	enum de_op, struct tmpnode *, struct tmpnode *, struct vattr *,
