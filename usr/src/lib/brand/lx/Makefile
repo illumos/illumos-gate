@@ -22,7 +22,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 default: all
@@ -32,7 +32,7 @@ include Makefile.lx
 # Build everything in parallel; use .WAIT for dependencies
 .PARALLEL:
 
-SUBDIRS=	librtld_db lx_support lx_init lx_brand netfiles \
+SUBDIRS=	librtld_db lx_support lx_init lx_lockd lx_brand netfiles \
 		zone lx_vdso testing .WAIT
 MSGSUBDIRS=	lx_brand lx_support zone
 

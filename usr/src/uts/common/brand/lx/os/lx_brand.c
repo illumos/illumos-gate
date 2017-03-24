@@ -209,6 +209,8 @@ extern void lx_ioctl_fini();
 extern void lx_socket_init();
 extern void lx_socket_fini();
 
+extern int lx_start_nfs_lockd();
+
 lx_systrace_f *lx_systrace_entry_ptr;
 lx_systrace_f *lx_systrace_return_ptr;
 
@@ -1800,6 +1802,10 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		mutex_exit(&p->p_lock);
 		return (result);
 	}
+
+	case B_START_NFS_LOCKD:
+		(void) lx_start_nfs_lockd();
+		return (0);
 
 	}
 

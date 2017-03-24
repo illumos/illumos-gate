@@ -90,6 +90,7 @@
 	<device match="signalfd" />
 	<device match="tcp" />
 	<device match="tcp6" />
+	<device match="ticotsord" />
 	<device match="timerfd" />
 	<device match="tty" />
 	<device match="udp" />
