@@ -335,29 +335,3 @@ tmp_convmode(char *str, mode_t *mode)
 	*mode = VALIDMODEBITS & num;
 	return (0);
 }
-
-/*
- * Parse an octal mode string for use as the permissions set for the root
- * of the tmpfs mount.
- */
-int
-tmp_convmode(char *str, mode_t *mode)
-{
-	ulong_t num;
-	char *c;
-
-	if (str == NULL) {
-		return (EINVAL);
-	}
-
-	if (ddi_strtoul(str, &c, 8, &num) != 0) {
-		return (EINVAL);
-	}
-
-	if ((num & ~VALIDMODEBITS) != 0) {
-		return (EINVAL);
-	}
-
-	*mode = VALIDMODEBITS & num;
-	return (0);
-}
