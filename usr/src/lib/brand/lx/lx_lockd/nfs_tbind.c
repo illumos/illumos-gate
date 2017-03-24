@@ -594,7 +594,6 @@ void
 nlm_do_one(char *provider, int (*svc)(int, struct netbuf, struct netconfig *))
 {
 	register int sock;
-	struct protob *protobp;
 	struct netbuf *retaddr;
 	struct netconfig *retnconf;
 	struct netbuf addrmask;
