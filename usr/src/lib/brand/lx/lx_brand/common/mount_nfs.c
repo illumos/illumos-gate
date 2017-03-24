@@ -98,6 +98,7 @@
 #include <assert.h>
 #include <sys/lx_mount.h>
 #include <sys/lx_misc.h>
+#include <sys/syscall.h>
 
 #ifndef	NFS_VERSMAX
 #define	NFS_VERSMAX	4
@@ -238,6 +239,7 @@ typedef struct nfs_mnt_data {
 	char		*nmd_fstype;
 	seconfig_t	nmd_nfs_sec;
 	int		nmd_sec_opt;	/* any security option ? */
+	int		nmd_nolock_opt;	/* 'nolock' specified */
 	rpcvers_t	nmd_mnt_vers;
 	rpcvers_t	nmd_nfsvers;
 } nfs_mnt_data_t;
@@ -1233,7 +1235,7 @@ get_nfs_kv(char *vs, char **kp, char **vp)
  *	mountvers=3,mountproto=tcp,mountport=63484
  */
 static int
-convert_nfs_arg_str(char *srcp, char *mntopts)
+convert_nfs_arg_str(char *srcp, char *mntopts, nfs_mnt_data_t *nmdp)
 {
 	char *key, *val, *p;
 	char tmpbuf[MAX_MNTOPT_STR];
@@ -1310,6 +1312,13 @@ convert_nfs_arg_str(char *srcp, char *mntopts)
 				if (r != 0)
 					return (r);
 				no_sec = B_FALSE;
+			} else if (strcmp(key, "nolock") == 0) {
+				int r;
+				nmdp->nmd_nolock_opt = 1;
+				r = append_opt(mntopts, MAX_MNTOPT_STR, key,
+				    val);
+				if (r != 0)
+					return (r);
 			} else {
 				int r;
 
@@ -1378,7 +1387,7 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 	 * looked up. This also converts the opts string so that we'll be
 	 * dealing with illumos options after this.
 	 */
-	if ((r = convert_nfs_arg_str(srcp, opts)) < 0) {
+	if ((r = convert_nfs_arg_str(srcp, opts, nmdp)) < 0) {
 		return (r);
 	}
 
@@ -1460,8 +1469,12 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 
 	r = mount(srcp, mntp, il_flags, nmdp->nmd_fstype, argp, sizeof (*argp),
 	    opts, MAX_MNTOPT_STR);
-	if (r != 0)
+	if (r != 0) {
 		r = -errno;
+	} else if (nmdp->nmd_nolock_opt == 0) {
+		(void) syscall(SYS_brand, B_START_NFS_LOCKD);
+	}
+
 out:
 	if (nconf != NULL)
 		freenetconfigent(nconf);

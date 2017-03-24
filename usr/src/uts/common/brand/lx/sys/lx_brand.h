@@ -93,7 +93,7 @@ extern "C" {
 #define	B_LPID_TO_SPAIR		128
 #define	B_GET_CURRENT_CONTEXT	129
 #define	B_EMULATION_DONE	130
-/* formerly B_PTRACE_KERNEL	131 */
+#define	B_START_NFS_LOCKD	131
 /* formerly B_SET_AFFINITY_MASK	132 */
 /* formerly B_GET_AFFINITY_MASK	133 */
 #define	B_PTRACE_CLONE_BEGIN	134
@@ -617,6 +617,7 @@ typedef struct lx_zone_data {
 	char lxzd_bootid[LX_BOOTID_LEN];	/* procfs boot_id */
 	gid_t lxzd_ttygrp;			/* tty gid for pty chown */
 	vfs_t *lxzd_cgroup;			/* cgroup for this zone */
+	pid_t lxzd_lockd_pid;			/* pid of NFS lockd */
 	list_t *lxzd_vdisks;			/* virtual disks (zvols) */
 	dev_t lxzd_zfs_dev;			/* major num for zfs */
 	uint_t lxzd_aio_nr;			/* see lx_aio.c */
