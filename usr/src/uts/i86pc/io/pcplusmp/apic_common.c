@@ -24,7 +24,7 @@
  */
 /*
  * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
- * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -1059,19 +1059,20 @@ apic_cpu_remove(psm_cpu_request_t *reqp)
 }
 
 /*
- * Return the number of APIC clock ticks elapsed for 8245 to decrement
- * (APIC_TIME_COUNT + pit_ticks_adj) ticks.
+ * Return the number of ticks the APIC decrements in SF nanoseconds.
+ * The fixed-frequency PIT (aka 8254) is used for the measurement.
  */
-uint_t
-apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
+static uint64_t
+apic_calibrate_impl()
 {
 	uint8_t		pit_tick_lo;
-	uint16_t	pit_tick, target_pit_tick;
-	uint32_t	start_apic_tick, end_apic_tick;
+	uint16_t	pit_tick, target_pit_tick, pit_ticks_adj;
+	uint32_t	pit_ticks;
+	uint32_t	start_apic_tick, end_apic_tick, apic_ticks;
 	ulong_t		iflag;
-	uint32_t	reg;
 
-	reg = addr + APIC_CURR_COUNT - apicadr;
+	apic_reg_ops->apic_write(APIC_DIVIDE_REG, apic_divide_reg_init);
+	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
 
 	iflag = intr_clear();
 
@@ -1082,7 +1083,7 @@ apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
 	    pit_tick_lo <= APIC_LB_MIN || pit_tick_lo >= APIC_LB_MAX);
 
 	/*
-	 * Wait for the 8254 to decrement by 5 ticks to ensure
+	 * Wait for the PIT to decrement by 5 ticks to ensure
 	 * we didn't start in the middle of a tick.
 	 * Compare with 0x10 for the wrap around case.
 	 */
@@ -1092,11 +1093,10 @@ apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
 		pit_tick = (inb(PITCTR0_PORT) << 8) | pit_tick_lo;
 	} while (pit_tick > target_pit_tick || pit_tick_lo < 0x10);
 
-	start_apic_tick = apic_reg_ops->apic_read(reg);
+	start_apic_tick = apic_reg_ops->apic_read(APIC_CURR_COUNT);
 
 	/*
-	 * Wait for the 8254 to decrement by
-	 * (APIC_TIME_COUNT + pit_ticks_adj) ticks
+	 * Wait for the PIT to decrement by APIC_TIME_COUNT ticks
 	 */
 	target_pit_tick = pit_tick - APIC_TIME_COUNT;
 	do {
@@ -1104,13 +1104,95 @@ apic_calibrate(volatile uint32_t *addr, uint16_t *pit_ticks_adj)
 		pit_tick = (inb(PITCTR0_PORT) << 8) | pit_tick_lo;
 	} while (pit_tick > target_pit_tick || pit_tick_lo < 0x10);
 
-	end_apic_tick = apic_reg_ops->apic_read(reg);
-
-	*pit_ticks_adj = target_pit_tick - pit_tick;
+	end_apic_tick = apic_reg_ops->apic_read(APIC_CURR_COUNT);
 
 	intr_restore(iflag);
 
-	return (start_apic_tick - end_apic_tick);
+	apic_ticks = start_apic_tick - end_apic_tick;
+
+	/* The PIT might have decremented by more ticks than planned */
+	pit_ticks_adj = target_pit_tick - pit_tick;
+	/* total number of PIT ticks corresponding to apic_ticks */
+	pit_ticks = APIC_TIME_COUNT + pit_ticks_adj;
+
+	/*
+	 * Determine the number of nanoseconds per APIC clock tick
+	 * and then determine how many APIC ticks to interrupt at the
+	 * desired frequency
+	 * apic_ticks / (pitticks / PIT_HZ) = apic_ticks_per_s
+	 * (apic_ticks * PIT_HZ) / pitticks = apic_ticks_per_s
+	 * apic_ticks_per_ns = (apic_ticks * PIT_HZ) / (pitticks * 10^9)
+	 * apic_ticks_per_SFns =
+	 * (SF * apic_ticks * PIT_HZ) / (pitticks * 10^9)
+	 */
+	return ((SF * apic_ticks * PIT_HZ) / ((uint64_t)pit_ticks * NANOSEC));
+}
+
+/*
+ * It was found empirically that 5 measurements seem sufficient to give a good
+ * accuracy. Most spurious measurements are higher than the target value thus
+ * we eliminate up to 2/5 spurious measurements.
+ */
+#define	APIC_CALIBRATE_MEASUREMENTS		5
+
+#define	APIC_CALIBRATE_PERCENT_OFF_WARNING	10
+
+/*
+ * Return the number of ticks the APIC decrements in SF nanoseconds.
+ * Several measurements are taken to filter out outliers.
+ */
+uint64_t
+apic_calibrate()
+{
+	uint64_t	measurements[APIC_CALIBRATE_MEASUREMENTS];
+	int		median_idx;
+	uint64_t	median;
+
+	/*
+	 * When running under a virtual machine, the emulated PIT and APIC
+	 * counters do not always return the right values and can roll over.
+	 * Those spurious measurements are relatively rare but could
+	 * significantly affect the calibration.
+	 * Therefore we take several measurements and then keep the median.
+	 * The median is preferred to the average here as we only want to
+	 * discard outliers.
+	 */
+	for (int i = 0; i < APIC_CALIBRATE_MEASUREMENTS; i++)
+		measurements[i] = apic_calibrate_impl();
+
+	/*
+	 * sort results and retrieve median.
+	 */
+	for (int i = 0; i < APIC_CALIBRATE_MEASUREMENTS; i++) {
+		for (int j = i + 1; j < APIC_CALIBRATE_MEASUREMENTS; j++) {
+			if (measurements[j] < measurements[i]) {
+				uint64_t tmp = measurements[i];
+				measurements[i] = measurements[j];
+				measurements[j] = tmp;
+			}
+		}
+	}
+	median_idx = APIC_CALIBRATE_MEASUREMENTS / 2;
+	median = measurements[median_idx];
+
+#if (APIC_CALIBRATE_MEASUREMENTS >= 3)
+	/*
+	 * Check that measurements are consistent. Post a warning
+	 * if the three middle values are not close to each other.
+	 */
+	uint64_t delta_warn = median *
+	    APIC_CALIBRATE_PERCENT_OFF_WARNING / 100;
+	if ((median - measurements[median_idx - 1]) > delta_warn ||
+	    (measurements[median_idx + 1] - median) > delta_warn) {
+		cmn_err(CE_WARN, "apic_calibrate measurements lack "
+		    "precision: %llu, %llu, %llu.",
+		    (u_longlong_t)measurements[median_idx - 1],
+		    (u_longlong_t)median,
+		    (u_longlong_t)measurements[median_idx + 1]);
+	}
+#endif
+
+	return (median);
 }
 
 /*
