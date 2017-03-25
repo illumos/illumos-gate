@@ -35,6 +35,7 @@ LDLIBS +=	-lnsl -lsocket
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += -_gcc=-Wno-unused-function
 
 .KEEP_STATE:
 
