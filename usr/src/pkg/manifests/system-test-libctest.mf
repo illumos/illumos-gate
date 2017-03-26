@@ -122,6 +122,8 @@ file path=opt/libc-tests/tests/random/inz_split_vpp mode=0555
 file path=opt/libc-tests/tests/random/inz_vpp mode=0555
 file path=opt/libc-tests/tests/select/select.sh mode=0555
 file path=opt/libc-tests/tests/select/select_test mode=0555
+file path=opt/libc-tests/tests/strcoll-strxfrm-6907.32 mode=0555
+file path=opt/libc-tests/tests/strcoll-strxfrm-6907.64 mode=0555
 file path=opt/libc-tests/tests/strerror mode=0555
 file path=opt/libc-tests/tests/symbols/setup mode=0555
 file path=opt/libc-tests/tests/symbols/symbols_test.$(ARCH) mode=0555
