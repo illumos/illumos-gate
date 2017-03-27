@@ -178,6 +178,7 @@ $(sparc_ONLY)dir path=usr/platform/sun4v/include/sys
 $(sparc_ONLY)dir path=usr/platform/sun4v/include/vm
 dir path=usr/share
 dir path=usr/share/man
+dir path=usr/share/man/man3
 dir path=usr/share/man/man3head
 dir path=usr/share/man/man4
 dir path=usr/share/man/man5
@@ -1872,6 +1873,7 @@ file path=usr/share/man/man3head/nl_types.h.3head
 file path=usr/share/man/man3head/poll.h.3head
 file path=usr/share/man/man3head/pthread.h.3head
 file path=usr/share/man/man3head/pwd.h.3head
+file path=usr/share/man/man3head/queue.h.3head
 file path=usr/share/man/man3head/regex.h.3head
 file path=usr/share/man/man3head/resource.h.3head
 file path=usr/share/man/man3head/sched.h.3head
@@ -2013,6 +2015,111 @@ $(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIi-Netract/include \
     target=../sun4u/include
+link path=usr/share/man/man3head/LIST_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH_FROM.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/LIST_FOREACH_SAFE.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INSERT_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INSERT_BEFORE.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_PREV.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/LIST_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH_FROM.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_FOREACH_SAFE.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_INSERT_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_REMOVE_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_REMOVE_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/SLIST_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH_FROM.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_FOREACH_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INSERT_AFTER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_INSERT_TAIL.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_LAST.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_REMOVE_AFTER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_REMOVE_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/STAILQ_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_CLASS_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_CLASS_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_CONCAT.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_EMPTY.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_ENTRY.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FIRST.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_FROM.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE_FROM.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE_FROM_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_REVERSE_SAFE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_FOREACH_SAFE.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_HEAD_INITIALIZER.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INIT.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_AFTER.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_BEFORE.3head \
+    target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_HEAD.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_INSERT_TAIL.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_LAST.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_NEXT.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_PREV.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_REMOVE.3head target=queue.h.3head
+link path=usr/share/man/man3head/TAILQ_SWAP.3head target=queue.h.3head
 link path=usr/share/man/man3head/acct.3head target=acct.h.3head
 link path=usr/share/man/man3head/aio.3head target=aio.h.3head
 link path=usr/share/man/man3head/ar.3head target=ar.h.3head
