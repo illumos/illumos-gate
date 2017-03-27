@@ -233,10 +233,6 @@ ONLY_LINT_DEFS=-I${SPRO_ROOT}/sunstudio12.1/prod/include/lint; export ONLY_LINT_
 # nightly(1) for interactions between environment variables and this command.
 #POST_NIGHTLY=
 
-# Comment this out to disable support for IPP printing, i.e. if you
-# don't want to bother providing the Apache headers this needs.
-#export ENABLE_IPP_PRINTING=
-
 # Comment this out to disable support for SMB printing, i.e. if you
 # don't want to bother providing the CUPS headers this needs.
 #export ENABLE_SMB_PRINTING=
