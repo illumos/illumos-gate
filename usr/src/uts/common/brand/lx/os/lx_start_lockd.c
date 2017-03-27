@@ -71,6 +71,7 @@ lx_lockd_alive(pid_t lockd_pid)
 	return (ret);
 }
 
+/* ARGSUSED */
 static void
 lx_run_lockd(void *a)
 {
