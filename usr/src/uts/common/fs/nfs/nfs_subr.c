@@ -4760,7 +4760,7 @@ nfs_rw_enter_sig(nfs_rwlock_t *l, krw_t rw, int intr)
 
 				if (lwp != NULL)
 					lwp->lwp_nostop++;
-				if (cv_wait_sig(&l->cv, &l->lock) == 0) {
+				if (cv_wait_sig(&l->cv_rd, &l->lock) == 0) {
 					if (lwp != NULL)
 						lwp->lwp_nostop--;
 					mutex_exit(&l->lock);
@@ -4769,26 +4769,7 @@ nfs_rw_enter_sig(nfs_rwlock_t *l, krw_t rw, int intr)
 				if (lwp != NULL)
 					lwp->lwp_nostop--;
 			} else
-				cv_wait(&l->cv, &l->lock);
-
-			/*
-			 * If there are no readers active nor a writer active
-			 * we need to wake up the next waiter.  If there is a
-			 * writer waiting we will wait again so we need to wake
-			 * up the next waiter (possible writer).  If there is
-			 * no writer waiting we need to wake up the next
-			 * waiting reader (if any) so it is invited to the
-			 * party.
-			 */
-			if (l->count == 0)
-				cv_signal(&l->cv);
-
-			/*
-			 * If there are readers active and no writers waiting
-			 * then wake up the next waiting reader (if any).
-			 */
-			if (l->count > 0 && l->waiters == 0)
-				cv_signal(&l->cv);
+				cv_wait(&l->cv_rd, &l->lock);
 		}
 		ASSERT(l->count < INT_MAX);
 #ifdef	DEBUG
@@ -4820,11 +4801,11 @@ nfs_rw_enter_sig(nfs_rwlock_t *l, krw_t rw, int intr)
 					l->waiters--;
 					/*
 					 * If there are readers active and no
-					 * writers waiting then wake up the
-					 * next waiting reader (if any).
+					 * writers waiting then wake up all of
+					 * the waiting readers (if any).
 					 */
 					if (l->count > 0 && l->waiters == 0)
-						cv_signal(&l->cv);
+						cv_broadcast(&l->cv_rd);
 					mutex_exit(&l->lock);
 					return (EINTR);
 				}
@@ -4898,31 +4879,43 @@ nfs_rw_exit(nfs_rwlock_t *l)
 {
 
 	mutex_enter(&l->lock);
-	/*
-	 * If this is releasing a writer lock, then increment count to
-	 * indicate that there is one less writer active.  If this was
-	 * the last of possibly nested writer locks, then clear the owner
-	 * field as well to indicate that there is no writer active
-	 * and wakeup the first waiting writer or reader.
-	 *
-	 * If releasing a reader lock, then just decrement count to
-	 * indicate that there is one less reader active.  If this was
-	 * the last active reader and there are writer(s) waiting,
-	 * then wake up the first.
-	 */
+
 	if (l->owner != NULL) {
 		ASSERT(l->owner == curthread);
+
+		/*
+		 * To release a writer lock increment count to indicate that
+		 * there is one less writer active.  If this was the last of
+		 * possibly nested writer locks, then clear the owner field as
+		 * well to indicate that there is no writer active.
+		 */
+		ASSERT(l->count < 0);
 		l->count++;
 		if (l->count == 0) {
 			l->owner = NULL;
-			cv_signal(&l->cv);
+
+			/*
+			 * If there are no writers waiting then wakeup all of
+			 * the waiting readers (if any).
+			 */
+			if (l->waiters == 0)
+				cv_broadcast(&l->cv_rd);
 		}
 	} else {
+		/*
+		 * To release a reader lock just decrement count to indicate
+		 * that there is one less reader active.
+		 */
 		ASSERT(l->count > 0);
 		l->count--;
-		if (l->count == 0 && l->waiters > 0)
-			cv_signal(&l->cv);
 	}
+
+	/*
+	 * If there are no readers active nor a writer active and there is a
+	 * writer waiting we need to wake up it.
+	 */
+	if (l->count == 0 && l->waiters > 0)
+		cv_signal(&l->cv);
 	mutex_exit(&l->lock);
 }
 
@@ -4946,6 +4939,7 @@ nfs_rw_init(nfs_rwlock_t *l, char *name, krw_type_t type, void *arg)
 	l->owner = NULL;
 	mutex_init(&l->lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&l->cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&l->cv_rd, NULL, CV_DEFAULT, NULL);
 }
 
 void
@@ -4954,6 +4948,7 @@ nfs_rw_destroy(nfs_rwlock_t *l)
 
 	mutex_destroy(&l->lock);
 	cv_destroy(&l->cv);
+	cv_destroy(&l->cv_rd);
 }
 
 int

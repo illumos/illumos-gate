@@ -1,11 +1,12 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\"  Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT_SYSLOG 5 "Sep 25, 2008"
+.TH AUDIT_SYSLOG 5 "Mar 6, 2017"
 .SH NAME
-audit_syslog \- realtime conversion of Solaris audit data to syslog messages
+audit_syslog \- realtime conversion of audit data to syslog messages
 .SH SYNOPSIS
 .LP
 .nf
@@ -13,17 +14,18 @@ audit_syslog \- realtime conversion of Solaris audit data to syslog messages
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBaudit_syslog\fR plugin module for Solaris audit,
+The \fBaudit_syslog\fR plugin module for audit,
 \fB/usr/lib/security/audit_syslog.so\fR, provides realtime conversion of
-Solaris audit data to syslog-formatted (text) data and sends it to a syslog
-daemon as configured in \fBsyslog.conf\fR(4). The plugin's path is specified in
-the audit configuration file, \fBaudit_control\fR(4).
+audit data to syslog-formatted (text) data and sends it to a syslog
+daemon as configured in \fBsyslog.conf\fR(4).
 .sp
 .LP
-Messages to \fBsyslog\fR are written if selected via the \fBplugin\fR option in
-\fBaudit_control\fR. Syslog messages are generated with the facility code of
+Messages to \fBsyslog\fR are written if the \fBaudit_syslog\fR plugin is
+activated and configured using \fBauditconfig\fR(1M).
+.sp
+.LP
+Syslog messages are generated with the facility code of
 \fBLOG_AUDIT\fR (\fBaudit\fR in \fBsyslog.conf\fR(4)) and severity of
 \fBLOG_NOTICE\fR. Audit \fBsyslog\fR messages contain data selected from the
 tokens described for the binary audit log. (See \fBaudit.log\fR(4)). As with
@@ -163,62 +165,50 @@ access(2) ok session 255 by janeuser as janeuser:staff from  \e
 .sp
 
 .SH OBJECT ATTRIBUTES
-.sp
 .LP
-The \fBp_flag\fR attribute, specified by means of the \fBplugin\fR directive
-(see \fBaudit_control\fR(4)), is used to further filter audit data being sent
-to the \fBsyslog\fR daemon beyond the classes specified through the \fBflags\fR
-and \fBnaflags\fR lines of \fBaudit_control\fR and through the user-specific
-lines of \fBaudit_user\fR(4). The parameter is a comma-separated list; each
+The \fBp_flags\fR attribute is used to further filter audit data being sent
+to the \fBsyslog\fR daemon beyond the default and non-attributable
+audit flags. The parameter is a comma-separated list; each
 item represents an audit class (see \fBaudit_class\fR(4)) and is specified
-using the same syntax used in \fBaudit_control\fR for the \fBflags\fR and
-\fBnaflags\fR lines. The default (no \fBp_flags\fR listed) is that no audit
-records are generated.
+using the same syntax used by \fBauditconfig\fR for the \fB-setflags\fR and
+\fB-setnaflags\fR options. The default (no \fBp_flags\fR set) is that no
+audit records are generated.
 .SH EXAMPLES
 .LP
-\fBExample 1 \fROne Use of the \fBplugin\fR Line
+\fBExample 1 \fREnabling the plugin and selecting events
 .sp
 .LP
-In the specification shown below, the \fBplugin\fR line (in conjunction with
-\fBflags\fR and \fBnaflags\fR) is used to allow class records for \fBlo\fR but
-allows class records for \fBam\fR for failures only. Omission of the \fBfm\fR
-class records results in no \fBfm\fR class records being output. The \fBpc\fR
-parameter has no effect because you cannot add classes to those defined by
-means of \fBflags\fR and \fBnaflags\fR and by \fBaudit_user\fR(4). You can only
-remove them.
+The command below enables the \fBaudit_syslog\fR plugin and sets the
+\fBp_flags\fR filter to allow class records for \fBlo\fR but
+allows class records for \fBam\fR for failures only. Because no other
+classes are listed, not other audit records will be sent to
+syslog. You cannot add classes to those defined by means of
+\fBflags\fR and \fBnaflags\fR. You can only remove them.
 
 .sp
 .in +2
 .nf
-flags: lo,am,fm
-naflags: lo
-plugin: name=audit_syslog.so; p_flags=lo,-am
+# autditconf -setplugin audit_syslog active p_flags=lo,-am
 .fi
 .in -2
 .sp
 
-.LP
-\fBExample 2 \fRUse of \fBall\fR
+\fBExample 2 \fRViewing the plugin configuration
 .sp
 .LP
-In the specification shown below, with one exception, \fBall\fR allows all
-flags defined by means of \fBflags\fR and \fBnaflags\fR (and
-\fBaudit_user\fR(4)). The exception the \fBam\fR metaclass, which is equivalent
-to \fBss,as,ua\fR, which is modified to output all \fBua\fR events but only
-failure events for \fBss\fR and \fBas\fR.
+The command below enables shows the \fBaudit_syslog\fR plugin configuration.
 
 .sp
 .in +2
 .nf
-flags: lo,am
-naflags: lo
-plugin: name=audit_syslog.so; p_flags=all,^+ss,^+as
+# auditconfig -getplugin audit_syslog
+Plugin: audit_syslog (active)
+	Attributes: p_flags=lo,-am;
 .fi
 .in -2
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -240,20 +230,15 @@ Interface Stability	See below.
 The message format and message content are Uncommitted. The configuration
 parameters are Committed.
 .SH SEE ALSO
-.sp
 .LP
-\fBauditd\fR(1M), \fBaudit_class\fR(4), \fBaudit_control\fR(4),
+\fBauditd\fR(1M), \fBauditconfig\fR(1M), \fBaudit_class\fR(4),
 \fBsyslog.conf\fR(4), \fBattributes\fR(5)
-.sp
-.LP
-\fISystem Administration Guide: Security Services\fR
 .SH NOTES
-.sp
 .LP
 Use of the \fBplugin\fR configuration line to include \fBaudit_syslog.so\fR
 requires that \fB/etc/syslog.conf\fR is configured to store \fBsyslog\fR
 messages of facility \fBaudit\fR and severity \fBnotice\fR or above in a file
-intended for Solaris audit records. An example of such a line in
+intended for audit records. An example of such a line in
 \fBsyslog.conf\fR is:
 .sp
 .in +2
@@ -270,7 +255,7 @@ UDP, which does not guarantee delivery or ensure the correct order of arrival
 of messages.
 .sp
 .LP
-If the parameters specified for the \fBplugin\fR line result in no classes
+If the \fBp_flags\fR attribute results in no classes
 being preselected, an error is reported by means of a \fBsyslog\fR alert with
 the \fBLOG_DAEMON\fR facility code.
 .sp

@@ -1,11 +1,12 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIT_BINFILE 5 "Jun 24, 2009"
+.TH AUDIT_BINFILE 5 "Mar 6, 2017"
 .SH NAME
-audit_binfile \- generation of Solaris audit logs
+audit_binfile \- generation of audit logs
 .SH SYNOPSIS
 .LP
 .nf
@@ -13,27 +14,21 @@ audit_binfile \- generation of Solaris audit logs
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBaudit_binfile\fR plugin module for Solaris audit,
+The \fBaudit_binfile\fR plugin module for audit,
 \fB/usr/lib/security/audit_binfile.so\fR, writes binary audit data to files as
-configured in \fBaudit_control\fR(4); it is the default plugin for the Solaris
-audit daemon \fBauditd\fR(1M). Its output is described by \fBaudit.log\fR(4).
-.sp
-.LP
-The \fBaudit_binfile\fR plugin is loaded by \fBauditd\fR if \fBaudit_control\fR
-contains one or more lines defining audit directories by means of the
-\fBdir:\fR specification or if \fBaudit_control\fR has a \fBplugin:\fR
-specification of \fBname=audit_binfile.so\fR.
+specified in the plugin's attributes configured by \fBauditconfig\fR(1M); it
+is the default plugin for the audit daemon \fBauditd\fR(1M). Its output is
+described by \fBaudit.log\fR(4).
 .SH OBJECT ATTRIBUTES
+.LP
+The \fBp_dir\fR attribute specifies a comma-separated list of
+directories to be used for storing audit files.
 .sp
 .LP
-The \fBp_dir\fR and \fBp_minfree\fR attributes are equivalent to the \fBdir:\fR
-and \fBminfree:\fR lines described in \fBaudit_control\fR. If both the
-\fBdir:\fR line and the \fBp_dir\fR attribute are used, the plugin combines all
-directories into a single list with those specified by means of \fBdir:\fR at
-the front of the list. If both the \fBminfree\fR and the \fBp_minfree\fR
-attributes are given, the \fBp_minfree\fR value is used.
+The \fBp_minfree\fR attribute specifies the percentage of free space required.
+If free space falls below this threshold, the audit daemon \fBauditd\fR(1M)
+invokes the shell script \fBaudit_warn\fR(1M). The default threshold is 0%.
 .sp
 .LP
 The \fBp_fsize\fR attribute defines the maximum size in bytes that an audit
@@ -43,18 +38,16 @@ when the audit file contains the specified number of bytes. The default size is
 zero (0), which allows the file to grow without bound. The value specified must
 be within the range of [512,000, 2,147,483,647].
 .SH EXAMPLES
-.sp
 .LP
-The following directives cause \fBaudit_binfile.so\fR to be loaded, specify the
+The following commands cause \fBaudit_binfile.so\fR to be activated, specify the
 directories for writing audit logs, and specify the percentage of required free
-space per directory.
+space per directory. Note that using \fBauditconfig\fR(1M) only allows one
+attribute to be set at a time.
 .sp
 .in +2
 .nf
-flags: lo,ad,-fm
-naflags: lo,ad
-plugin: name=audit_binfile.so;\e
-p_minfree=20;\e
+# auditconfig -setplugin audit_binfile active p_minfree=20
+# auditconfig -setplugin audit_binfile active \e
 p_dir=/var/audit/jedgar/eggplant,\e
 /var/audit/jedgar.aux/eggplant,\e
 /var/audit/global/eggplant
@@ -63,7 +56,6 @@ p_dir=/var/audit/jedgar/eggplant,\e
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -81,10 +73,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBauditd\fR(1M), \fBaudit_control\fR(4), \fBsyslog.conf\fR(4),
-\fBattributes\fR(5)
-.sp
-.LP
-\fISystem Administration Guide: Security Services\fR
+\fBauditd\fR(1M), \fBauditconfig\fR(1M), \fBaudit.log\fR(4), \fBattributes\fR(5)

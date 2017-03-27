@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 RackTop Systems.
  */
 
 
@@ -137,6 +139,13 @@ gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
 		    "%s.\n", v->gv_name);
 
 		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
+
+		/*
+		 * The maintenance transition may satisfy optional_all/restart
+		 * dependencies and should be propagated to determine
+		 * whether new dependents are satisfiable.
+		 */
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	} else {
 		log_framework(LOG_DEBUG, "Propagating maintenance of %s.\n",
 		    v->gv_name);
@@ -154,6 +163,7 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
 	int to_offline = v->gv_flags & GV_TOOFFLINE;
+	int to_disable = v->gv_flags & GV_TODISABLE;
 
 	v->gv_flags &= ~GV_TOOFFLINE;
 
@@ -164,7 +174,7 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 	 * remains offline until the disable process completes.
 	 */
 	if (v->gv_flags & GV_ENABLED) {
-		if (to_offline == 0)
+		if (to_offline == 0 && to_disable == 0)
 			graph_start_if_satisfied(v);
 	} else {
 		if (gt_running(old_state) && v->gv_post_disable_f)
@@ -267,6 +277,12 @@ gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
 
 		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
 
+		/*
+		 * The disable transition may satisfy optional_all/restart
+		 * dependencies and should be propagated to determine
+		 * whether new dependents are satisfiable.
+		 */
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	} else {
 		log_framework(LOG_DEBUG, "Propagating disable of %s.\n",
 		    v->gv_name);

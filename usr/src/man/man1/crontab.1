@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CRONTAB 1 "Apr 6, 2009"
+.TH CRONTAB 1 "Mar 6, 2017"
 .SH NAME
 crontab \- user crontab file
 .SH SYNOPSIS
@@ -75,7 +75,6 @@ crontab \- user crontab file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcrontab\fR utility manages a user's access with \fBcron\fR (see
 \fBcron\fR(1M)) by copying, creating, listing, and removing \fBcrontab\fR
@@ -87,7 +86,6 @@ users' crontabs.
 If \fBcrontab\fR is invoked with \fIfilename\fR, this overwrites an existing
 \fBcrontab\fR entry for the user that invokes it.
 .SS "\fBcrontab\fR Access Control"
-.sp
 .LP
 Users: Access to \fBcrontab\fR is allowed:
 .RS +4
@@ -130,7 +128,7 @@ authorization is allowed to submit a job.
 .TP
 .ie t \(bu
 .el o
-if Solaris Auditing is enabled, the user's shell is not audited and the user is
+if Auditing is enabled, the user's shell is not audited and the user is
 not the \fBcrontab\fR owner. This can occur if the user logs in by way of a
 program, such as some versions of \fBSSH\fR, which does not set audit
 parameters.
@@ -143,7 +141,6 @@ The rules for \fBallow\fR and \fBdeny\fR apply to \fBroot\fR only if the
 .LP
 The \fBallow\fR/\fBdeny\fR files consist of one user name per line.
 .SS "\fBcrontab\fR Entry Format"
-.sp
 .LP
 A \fBcrontab\fR file consists of lines of six fields each. The fields are
 separated by spaces or tabs. The first five are integer patterns that specify
@@ -234,7 +231,6 @@ environment variables are set to match those that are in effect in the
 If you do not redirect the standard output and standard error of your commands,
 any generated output or errors are mailed to you.
 .SS "\fBcrontab\fR Environment Variables"
-.sp
 .LP
 The following variables are supported:
 .sp
@@ -307,7 +303,6 @@ The lines that are not setting these environment variables are  the same as
 crontab entries that conform to the UNIX standard and are described elsewhere
 in this man page.
 .SS "Setting \fBcron\fR Jobs Across Timezones"
-.sp
 .LP
 The default timezone of the \fBcron\fR daemon sets the system-wide timezone for
 \fBcron\fR entries. This, in turn, is by set by default system-wide using
@@ -318,7 +313,6 @@ If some form of \fBdaylight savings\fR or \fBsummer/winter time\fR is in
 effect, then jobs scheduled during the switchover period could be executed
 once, twice, or not at all.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -461,13 +455,11 @@ Korn shell. The file concludes with \fBTZ\fR, \fBHOME\fR, and \fBSHELL\fR
 entries that return those variable to their default values.
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBcrontab\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SS "\fB/usr/bin/crontab\fR"
-.sp
 .ne 2
 .na
 \fB\fBEDITOR\fR\fR
@@ -500,7 +492,6 @@ specified. If \fBVISUAL\fR is not specified, then the environment variable
 .RE
 
 .SS "\fB/usr/xpg4/bin/crontab\fR"
-.sp
 .ne 2
 .na
 \fB\fBEDITOR\fR\fR
@@ -511,7 +502,6 @@ default editor is \fB/usr/xpg4/bin/vi\fR.
 .RE
 
 .SS "\fB/usr/xpg6/bin/crontab\fR"
-.sp
 .ne 2
 .na
 \fB\fBEDITOR\fR\fR
@@ -522,7 +512,6 @@ default editor is \fB/usr/xpg6/bin/vi\fR.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -544,7 +533,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/cron.d\fR\fR
@@ -599,13 +587,10 @@ spool area for \fBcrontab\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "\fB/usr/bin/crontab\fR"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -616,9 +601,7 @@ Interface Stability	Standard
 .TE
 
 .SS "\fB/usr/xpg4/bin/crontab\fR"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -629,9 +612,7 @@ Interface Stability	Standard
 .TE
 
 .SS "\fB/usr/xpg6/bin/crontab\fR"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -642,13 +623,11 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBatq\fR(1), \fBatrm\fR(1), \fBauths\fR(1), \fBed\fR(1), \fBsh\fR(1),
 \fBvi\fR(1), \fBcron\fR(1M), \fBsu\fR(1M), \fBauth_attr\fR(4),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 If you inadvertently enter the \fBcrontab\fR command with no arguments, do not
 attempt to get out with Control-d. This removes all entries in your

@@ -28,7 +28,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*LINTLIBRARY*/
 
 /*
@@ -464,20 +463,23 @@ writelks(int tblcnt)
 	noerr = TRUE;
 
 	/* Rewind the OA&M Device Lock File */
-	if (lseek(lkfilefd, 0L, 0) >= 0L)
+	if (lseek(lkfilefd, 0L, 0) >= 0L) {
 
 	    /* Write the number of locks that will (eventually) exist */
 	    if (write(lkfilefd, &lockcount, sizeof (int)) == sizeof (int)) {
 
 		/* Write the table as we currently know it */
 		tblsz = tblcnt * sizeof (struct devlks);
-		if (tblsz)
-		    if (!write(lkfilefd, locklist, tblsz) == (ssize_t)tblsz)
+		if (tblsz) {
+		    if (write(lkfilefd, locklist, tblsz) != (ssize_t)tblsz)
 			noerr = FALSE;  /* Write of locks failed */
-
-	    } else noerr = FALSE;  /* write() of count failed */
-
-	else noerr = FALSE;  /* Rewind failed */
+		}
+	    } else {
+		noerr = FALSE;  /* write() of count failed */
+	    }
+	} else {
+		noerr = FALSE;  /* Rewind failed */
+	}
 
 	/* Return an indicator of our success */
 	return (noerr);

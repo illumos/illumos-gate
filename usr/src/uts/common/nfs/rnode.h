@@ -172,6 +172,7 @@ typedef struct nfs_rwlock {
 	kthread_t *owner;
 	kmutex_t lock;
 	kcondvar_t cv;
+	kcondvar_t cv_rd;
 } nfs_rwlock_t;
 
 /*

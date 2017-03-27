@@ -80,9 +80,6 @@ file path=lib/svc/manifest/system/labeld.xml group=sys mode=0444
 file path=lib/svc/method/svc-labeld mode=0555
 file path=lib/svc/method/svc-tnctl mode=0555
 file path=lib/svc/method/svc-tnd mode=0555
-file path=usr/share/man/man1m/smtnrhdb.1m
-file path=usr/share/man/man1m/smtnrhtp.1m
-file path=usr/share/man/man1m/smtnzonecfg.1m
 legacy pkg=SUNWtsg desc="Solaris Trusted Extensions, globalzone-only files" \
     name="Trusted Extensions global"
 license cr_Sun license=cr_Sun

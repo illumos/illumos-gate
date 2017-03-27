@@ -509,6 +509,7 @@ lofi_tg_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 
 		tgattr->media_is_writable = !lsp->ls_readonly;
 		tgattr->media_is_solid_state = B_FALSE;
+		tgattr->media_is_rotational = B_FALSE;
 		return (0);
 	}
 

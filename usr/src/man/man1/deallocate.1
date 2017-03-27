@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DEALLOCATE 1 "Apr 30, 2008"
+.TH DEALLOCATE 1 "Mar 6, 2017"
 .SH NAME
 deallocate \- device deallocation
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ deallocate \- device deallocation
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdeallocate\fR command frees an allocated device. It resets the ownership
 and permissions on all device special files associated with the device,
@@ -30,7 +29,6 @@ program for that device as specified in \fBdevice_allocate\fR(4).
 The default \fBdeallocate\fR operation deallocates devices allocated to the
 user.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -107,7 +105,6 @@ Deallocates device from the zone specified by \fIzonename\fR.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -120,7 +117,6 @@ Deallocates the specified \fIdevice\fR.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -151,7 +147,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/etc/security/device_allocate\fR
 .sp
@@ -164,7 +159,6 @@ An error occurred.
 .LP
 \fB/etc/security/lib/*\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -184,20 +178,11 @@ Interface Stability	See below.
 The invocation is Uncommitted. The options are Uncommitted. The output is
 Not-an-Interface.
 .SH SEE ALSO
-.sp
 .LP
-\fBallocate\fR(1), \fBlist_devices\fR(1), \fBbsmconv\fR(1M), \fBdminfo\fR(1M),
+\fBallocate\fR(1), \fBlist_devices\fR(1), \fBdminfo\fR(1M),
 \fBmkdevalloc\fR(1M), \fBmkdevmaps\fR(1M), \fBdevice_allocate\fR(4),
 \fBdevice_maps\fR(4), \fBattributes\fR(5)
-.sp
-.LP
-\fIControlling Access to Devices\fR
 .SH NOTES
-.sp
-.LP
-The functionality described in this man page is available only if  Solaris
-Auditing has been enabled. See \fBbsmconv\fR(1M) for more information.
-.sp
 .LP
 On systems configured with Trusted Extensions, the functionality is enabled by
 default.

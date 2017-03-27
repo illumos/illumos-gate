@@ -84,7 +84,7 @@ tmp_taccess(void *vtp, int mode, struct cred *cred)
  */
 int
 tmp_sticky_remove_access(struct tmpnode *dir, struct tmpnode *entry,
-	struct cred *cr)
+    struct cred *cr)
 {
 	uid_t uid = crgetuid(cr);
 
