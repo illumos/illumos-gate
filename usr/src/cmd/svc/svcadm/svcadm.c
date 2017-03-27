@@ -519,7 +519,7 @@ restarter_setup(const char *fmri, const scf_instance_t *inst)
 		b = B_TRUE;
 
 	/* Create and set state to disabled */
-	switch (set_bool_prop(pg, SCF_PROPERTY_AUX_TTY, b) != 0) {
+	switch (set_bool_prop(pg, SCF_PROPERTY_AUX_TTY, b)) {
 	case 0:
 		break;
 
@@ -601,7 +601,7 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 
 	if (get_bool_prop(pg, SCF_PROPERTY_ENABLED, &b) != 0) {
 		/* Create and set state to disabled */
-		switch (set_bool_prop(pg, SCF_PROPERTY_ENABLED, B_FALSE) != 0) {
+		switch (set_bool_prop(pg, SCF_PROPERTY_ENABLED, B_FALSE)) {
 		case 0:
 			break;
 
@@ -632,7 +632,7 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 		    SCF_PG_GENERAL_OVR_FLAGS, pg) != 0)
 			goto eperm;
 
-		switch (set_bool_prop(pg, SCF_PROPERTY_ENABLED, enable) != 0) {
+		switch (set_bool_prop(pg, SCF_PROPERTY_ENABLED, enable)) {
 		case 0:
 			break;
 

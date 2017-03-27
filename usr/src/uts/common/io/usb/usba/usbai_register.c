@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -1142,6 +1142,7 @@ usba_process_cv_descr(usba_reg_state_t *state)
 		break;
 
 	case USB_DESCR_TYPE_EP:
+	case USB_DESCR_TYPE_SS_EP_COMP:
 		n_cvs_ptr = &state->st_curr_ep->ep_n_cvs;
 		cvs_ptr = &state->st_curr_ep->ep_cvs;
 		break;

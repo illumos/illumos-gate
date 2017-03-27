@@ -107,7 +107,6 @@ _MANFILES=	Intro.4				\
 		mailer.conf.4			\
 		mech.4				\
 		mnttab.4			\
-		mod_ipp.4			\
 		mpapi.conf.4			\
 		nca.if.4			\
 		ncad_addr.4			\

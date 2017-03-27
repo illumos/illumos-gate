@@ -18421,7 +18421,6 @@ s usr/share/man/man4/mdi_ib_cache.4=devices.4
 s usr/share/man/man4/mdi_scsi_vhci_cache.4=devices.4
 f usr/share/man/man4/mech.4 0444 root bin
 f usr/share/man/man4/mnttab.4 0444 root bin
-f usr/share/man/man4/mod_ipp.4 0444 root bin
 f usr/share/man/man4/mpapi.conf.4 0444 root bin
 f usr/share/man/man4/nca.if.4 0444 root bin
 f usr/share/man/man4/ncad_addr.4 0444 root bin
