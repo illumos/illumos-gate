@@ -86,8 +86,13 @@ function verify_id
 function verify_disks
 {
 	typeset disk
+	typeset path
 	for disk in $DISKS; do
-		sudo -k prtvtoc /dev/rdsk/${disk}s0 >/dev/null 2>&1
+		case $disk in
+		/*) path=$disk;;
+		*) path=/dev/rdsk/${disk}s0
+		esac
+		sudo -k prtvtoc $path >/dev/null 2>&1
 		[[ $? -eq 0 ]] || return 1
 	done
 	return 0
