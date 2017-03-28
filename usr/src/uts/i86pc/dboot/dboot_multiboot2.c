@@ -24,17 +24,6 @@
 #include <sys/multiboot2.h>
 #include <sys/multiboot2_impl.h>
 
-/*
- * Remove offsetof definition when we have usable sys/stddef.h
- */
-#if !defined(offsetof)
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
-#define	offsetof(s, m)	__builtin_offsetof(s, m)
-#else
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
-#endif
-#endif /* !offsetof */
-
 struct dboot_multiboot2_iterate_ctx;
 
 typedef boolean_t (*dboot_multiboot2_iterate_cb_t)

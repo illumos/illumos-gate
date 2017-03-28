@@ -1433,6 +1433,7 @@ file path=usr/include/sys/stat_impl.h
 file path=usr/include/sys/statfs.h
 file path=usr/include/sys/statvfs.h
 file path=usr/include/sys/stdbool.h
+file path=usr/include/sys/stddef.h
 file path=usr/include/sys/stdint.h
 file path=usr/include/sys/stermio.h
 file path=usr/include/sys/stream.h
