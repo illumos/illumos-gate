@@ -1,0 +1,115 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2017 Nexenta Systems, Inc.
+.\"
+.Dd March 28, 2017
+.Dt MBSTOWCS 3C
+.Os
+.Sh NAME
+.Nm mbstowcs ,
+.Nm mbstowcs_l
+.Nd convert a multibyte character string to a wide-character string
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft size_t
+.Fo mbstowcs
+.Fa "wchar_t *restrict pwcs"
+.Fa "const char *restrict s"
+.Fa "size_t n"
+.Fc
+.In stdlib.h
+.In xlocale.h
+.Ft size_t
+.Fo mbstowcs_l
+.Fa "wchar_t *restrict pwcs"
+.Fa "const char *restrict s"
+.Fa "size_t n"
+.Fa "locale_t loc"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn mbstowcs
+function converts a multibyte character string
+.Fa s
+beginning in the initial conversion state into a wide-character string.
+If
+.Fa pwcs
+is not
+.Dv NULL ,
+the converted characters are stored into array pointed to by
+.Fa pwcs .
+.Pp
+Conversion continues up to and including a terminating null character, which is
+also stored, or until
+.Fa n
+wide-characters have been stored into the array pointed to by
+.Fa pwcs .
+.Pp
+The behavior of
+.Fn mbstowcs
+function is affected by the
+.Ev LC_CTYPE
+category of the current locale.
+.Pp
+The
+.Fn mbstowcs_l
+function behaves identically to
+.Fn mbstowcs ,
+except instead of using the current locale, it uses the locale as specified by
+.Fa loc .
+.Sh RETURN VALUES
+The
+.Fn mbstowcs
+and
+.Fn mbstowcs_l
+functions return the number of wide-characters successfully converted, not
+including the terminating null
+.Pq if any ,
+or
+.Li \-1
+if conversion encounters a sequence of bytes that does not form a valid
+character.
+.Sh ERRORS
+The
+.Fn mbstowcs
+and
+.Fn mbstowcs_l
+functions will fail if:
+.Bl -tag -width Er
+.It Er EILSEQ
+An invalid multibyte sequence was detected.
+.It Er EINVAL
+The conversion state is invalid.
+.El
+.Sh INTERFACE STABILITY
+The
+.Fn mbstowcs
+function is
+.Sy Standard .
+The
+.Fn mbstowcs_l
+function is
+.Sy Uncommited .
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr mbsnrtowcs 3C ,
+.Xr mbtowc 3C ,
+.Xr newlocale 3C ,
+.Xr setlocale 3C ,
+.Xr uselocale 3C ,
+.Xr wcstombs 3C ,
+.Xr attributes 5 ,
+.Xr environ 5 ,
+.Xr standards 5

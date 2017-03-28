@@ -234,6 +234,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	mbrtowc.3c					\
 	 	mbsinit.3c					\
 	 	mbsrtowcs.3c					\
+		mbstowcs.3c					\
 	 	mbtowc.3c					\
 	 	membar_ops.3c					\
 	 	memory.3c					\
@@ -536,6 +537,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	wcstod.3c					\
 	 	wcstoimax.3c					\
 	 	wcstol.3c					\
+		wcstombs.3c					\
 	 	wcstoul.3c					\
 	 	wcstring.3c					\
 	 	wcswidth.3c					\
@@ -969,7 +971,6 @@ MANLINKS=	FD_CLR.3c				\
 	 	mbsnrtowcs.3c				\
 	 	mbsnrtowcs_l.3c				\
 	 	mbsrtowcs_l.3c				\
-	 	mbstowcs.3c				\
 	 	mbstowcs_l.3c				\
 	 	mbtowc_l.3c				\
 	 	memalign.3c				\
@@ -1359,6 +1360,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	wcstok.3c				\
 	 	wcstold.3c				\
 	 	wcstoll.3c				\
+		wcstombs_l.3c				\
 	 	wcstoull.3c				\
 	 	wcstoumax.3c				\
 	 	wcswcs.3c				\
@@ -1936,8 +1938,8 @@ mbsinit_l.3c				:= LINKSRC = mbsinit.3c
 mbsnrtowcs.3c				:= LINKSRC = mbsrtowcs.3c
 mbsnrtowcs_l.3c				:= LINKSRC = mbsrtowcs.3c
 mbsrtowcs_l.3c				:= LINKSRC = mbsrtowcs.3c
-mbstowcs.3c				:= LINKSRC = mbsrtowcs.3c
-mbstowcs_l.3c				:= LINKSRC = mbsrtowcs.3c
+
+mbstowcs_l.3c				:= LINKSRC = mbstowcs.3c
 
 mbtowc_l.3c				:= LINKSRC = mbtowc.3c
 
@@ -2442,6 +2444,8 @@ watol.3c				:= LINKSRC = wcstol.3c
 watoll.3c				:= LINKSRC = wcstol.3c
 wcstoll.3c				:= LINKSRC = wcstol.3c
 wstol.3c				:= LINKSRC = wcstol.3c
+
+wcstombs_l.3c				:= LINKSRC = wcstombs.3c
 
 wcstoull.3c				:= LINKSRC = wcstoul.3c
 
