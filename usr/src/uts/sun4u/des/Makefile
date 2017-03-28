@@ -21,6 +21,8 @@
 #
 # uts/sun4u/des/Makefile
 #
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -53,9 +55,6 @@ LINK_TARGET	= $(TARGET_$(CLASS))
 #	Include common rules.
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
-
-#	set signing mode
-ELFSIGN_MOD	= $(ELFSIGN_CRYPTO)
 
 #
 #	Define targets

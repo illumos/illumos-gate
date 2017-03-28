@@ -927,8 +927,6 @@ usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
 #
 # This is only used during the -t tools build
 #
-opt/onbld/bin/i386/elfsign	i386
-opt/onbld/bin/sparc/elfsign	sparc
 opt/onbld/bin/i386/mandoc	i386
 opt/onbld/bin/sparc/mandoc	sparc
 

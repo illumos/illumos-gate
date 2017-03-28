@@ -186,7 +186,6 @@ TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
 XARGS=		/usr/bin/xargs
 ELFEDIT=	/usr/bin/elfedit
-ELFSIGN=	/usr/bin/elfsign
 DTRACE=		/usr/sbin/dtrace -xnolibs
 UNIQ=		/usr/bin/uniq
 TAR=		/usr/bin/tar
@@ -916,10 +915,6 @@ CTFCVTFLAGS=		-i -L VERSION
 CTFMRGFLAGS=
 
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
-
-ELFSIGN_O=	$(TRUE)
-ELFSIGN_CRYPTO=	$(ELFSIGN_O)
-ELFSIGN_OBJECT=	$(ELFSIGN_O)
 
 # Rules (normally from make.rules) and macros which are used for post
 # processing files. Normally, these do stripping of the comment section
