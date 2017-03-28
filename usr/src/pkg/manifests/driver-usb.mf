@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2017, Joyent, Inc.
 #
 
 #
@@ -64,6 +65,7 @@ $(i386_ONLY)dir path=usr/lib/xhci group=sys
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man7m
+dir path=usr/share/man/man9e
 dir path=usr/share/man/man9f
 dir path=usr/share/man/man9s
 driver name=ehci alias=pciclass,0c0320 perms="* 0644 root sys"
@@ -144,9 +146,22 @@ file path=usr/share/man/man7d/usb_ia.7d
 file path=usr/share/man/man7d/usb_mid.7d
 file path=usr/share/man/man7d/usba.7d
 file path=usr/share/man/man7d/usbprn.7d
+$(i386_ONLY)file path=usr/share/man/man7d/xhci.7d
 file path=usr/share/man/man7m/usb_ah.7m
 file path=usr/share/man/man7m/usbkbm.7m
 file path=usr/share/man/man7m/usbms.7m
+file path=usr/share/man/man9e/usba_hcdi.9e
+file path=usr/share/man/man9e/usba_hcdi_cb_ops.9e
+file path=usr/share/man/man9e/usba_hcdi_device_address.9e
+file path=usr/share/man/man9e/usba_hcdi_device_init.9e
+file path=usr/share/man/man9e/usba_hcdi_hub_update.9e
+file path=usr/share/man/man9e/usba_hcdi_pipe_bulk_xfer.9e
+file path=usr/share/man/man9e/usba_hcdi_pipe_ctrl_xfer.9e
+file path=usr/share/man/man9e/usba_hcdi_pipe_intr_xfer.9e
+file path=usr/share/man/man9e/usba_hcdi_pipe_isoc_xfer.9e
+file path=usr/share/man/man9e/usba_hcdi_pipe_open.9e
+file path=usr/share/man/man9e/usba_hcdi_pipe_reset.9e
+file path=usr/share/man/man9e/usba_hcdi_pipe_stop_intr_polling.9e
 file path=usr/share/man/man9f/usb_alloc_request.9f
 file path=usr/share/man/man9f/usb_client_attach.9f
 file path=usr/share/man/man9f/usb_clr_feature.9f
@@ -176,6 +191,15 @@ file path=usr/share/man/man9f/usb_pipe_set_private.9f
 file path=usr/share/man/man9f/usb_pipe_xopen.9f
 file path=usr/share/man/man9f/usb_register_hotplug_cbs.9f
 file path=usr/share/man/man9f/usb_reset_device.9f
+file path=usr/share/man/man9f/usba_alloc_hcdi_ops.9f
+file path=usr/share/man/man9f/usba_hcdi_cb.9f
+file path=usr/share/man/man9f/usba_hcdi_dup_intr_req.9f
+file path=usr/share/man/man9f/usba_hcdi_dup_isoc_req.9f
+file path=usr/share/man/man9f/usba_hcdi_get_device_private.9f
+file path=usr/share/man/man9f/usba_hcdi_register.9f
+file path=usr/share/man/man9f/usba_hubdi_bind_root_hub.9f
+file path=usr/share/man/man9f/usba_hubdi_cb_ops.9f
+file path=usr/share/man/man9f/usba_hubdi_dev_ops.9f
 file path=usr/share/man/man9s/usb_bulk_req.9s
 file path=usr/share/man/man9s/usb_callback_flags.9s
 file path=usr/share/man/man9s/usb_cfg_descr.9s
@@ -193,6 +217,10 @@ file path=usr/share/man/man9s/usb_isoc_req.9s
 file path=usr/share/man/man9s/usb_other_speed_cfg_descr.9s
 file path=usr/share/man/man9s/usb_request_attributes.9s
 file path=usr/share/man/man9s/usb_string_descr.9s
+file path=usr/share/man/man9s/usba_device.9s
+file path=usr/share/man/man9s/usba_hcdi_ops.9s
+file path=usr/share/man/man9s/usba_hcdi_register_args.9s
+file path=usr/share/man/man9s/usba_pipe_handle_data.9s
 legacy pkg=SUNWusb desc="USBA (USB framework) and USB Device Drivers" \
     name="USB Device Drivers"
 license cr_Sun license=cr_Sun
@@ -201,6 +229,15 @@ license license_in_headers license=license_in_headers
 license usr/src/uts/common/sys/usb/hcd/xhci/THIRDPARTYLICENSE \
     license=usr/src/uts/common/sys/usb/hcd/xhci/THIRDPARTYLICENSE
 link path=usr/share/man/man7d/usb.7d target=usba.7d
+link path=usr/share/man/man9e/usba_hcdi_cb_close.9e target=usba_hcdi_cb_ops.9e
+link path=usr/share/man/man9e/usba_hcdi_cb_ioctl.9e target=usba_hcdi_cb_ops.9e
+link path=usr/share/man/man9e/usba_hcdi_cb_open.9e target=usba_hcdi_cb_ops.9e
+link path=usr/share/man/man9e/usba_hcdi_device_fini.9e \
+    target=usba_hcdi_device_init.9e
+link path=usr/share/man/man9e/usba_hcdi_pipe_close.9e \
+    target=usba_hcdi_pipe_open.9e
+link path=usr/share/man/man9e/usba_hcdi_pipe_stop_isoc_polling.9e \
+    target=usba_hcdi_pipe_stop_intr_polling.9e
 link path=usr/share/man/man9f/usb_alloc_bulk_req.9f \
     target=usb_alloc_request.9f
 link path=usr/share/man/man9f/usb_alloc_ctrl_req.9f \
@@ -234,6 +271,17 @@ link path=usr/share/man/man9f/usb_set_alt_if.9f target=usb_get_alt_if.9f
 link path=usr/share/man/man9f/usb_set_cfg.9f target=usb_get_cfg.9f
 link path=usr/share/man/man9f/usb_unregister_hotplug_cbs.9f \
     target=usb_register_hotplug_cbs.9f
+link path=usr/share/man/man9f/usba_free_hcdi_ops.9f \
+    target=usba_alloc_hcdi_ops.9f
+link path=usr/share/man/man9f/usba_hcdi_unregister.9f \
+    target=usba_hcdi_register.9f
+link path=usr/share/man/man9f/usba_hubdi_close.9f target=usba_hubdi_cb_ops.9f
+link path=usr/share/man/man9f/usba_hubdi_ioctl.9f target=usba_hubdi_cb_ops.9f
+link path=usr/share/man/man9f/usba_hubdi_open.9f target=usba_hubdi_cb_ops.9f
+link path=usr/share/man/man9f/usba_hubdi_root_hub_power.9f \
+    target=usba_hubdi_dev_ops.9f
+link path=usr/share/man/man9f/usba_hubdi_unbind_root_hub.9f \
+    target=usba_hubdi_bind_root_hub.9f
 link path=usr/share/man/man9s/usb_bulk_req_t.9s target=usb_bulk_req.9s
 link path=usr/share/man/man9s/usb_bulk_request.9s target=usb_bulk_req.9s
 link path=usr/share/man/man9s/usb_ctrl_req_t.9s target=usb_ctrl_req.9s
@@ -244,3 +292,9 @@ link path=usr/share/man/man9s/usb_intr_req_t.9s target=usb_intr_req.9s
 link path=usr/share/man/man9s/usb_intr_request.9s target=usb_intr_req.9s
 link path=usr/share/man/man9s/usb_isoc_req_t.9s target=usb_isoc_req.9s
 link path=usr/share/man/man9s/usb_isoc_request.9s target=usb_isoc_req.9s
+link path=usr/share/man/man9s/usba_device_t.9s target=usba_device.9s
+link path=usr/share/man/man9s/usba_hcdi_ops_t.9s target=usba_hcdi_ops.9s
+link path=usr/share/man/man9s/usba_hcdi_register_args_t.9s \
+    target=usba_hcdi_register_args.9s
+link path=usr/share/man/man9s/usba_pipe_handle_data_t.9s \
+    target=usba_pipe_handle_data.9s
