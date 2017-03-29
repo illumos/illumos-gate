@@ -149,9 +149,8 @@ sub mb_str
 
 $mf = shift(@ARGV);
 
-load_utf8_cm("UTF-8.cm");
+load_utf8_cm("data/UTF-8.cm");
 load_map($mf);
-
 
 print("CHARMAP\n");
 foreach $val (sort (keys (%map))) {

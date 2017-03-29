@@ -15,14 +15,14 @@
 
 CMDDIR=		$(SRC)/cmd/mandoc
 
-include		../Makefile.tools
+include		$(SRC)/tools/Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
 .KEEP_STATE:
 
 all:		$(PROG)
 
-install:	all .WAIT $(ROOTONBLDMACHPROG)
+install:	all $(ROOTONBLDMACHPROG)
 
 clean:
 		$(RM) $(PROG) $(OBJS)
@@ -34,4 +34,4 @@ $(PROG):	$(OBJS)
 %.o:		$(CMDDIR)/%.c
 		$(COMPILE.c) -o $@ $<
 
-include		../Makefile.targ
+include		$(SRC)/tools/Makefile.targ

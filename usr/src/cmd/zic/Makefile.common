@@ -1,0 +1,14 @@
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PROG=		zic
+
+OBJS=		ialloc.o \
+		scheck.o \
+		zic.o
+SRCS=		$(OBJS:%.o=%.c)
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-uninitialized

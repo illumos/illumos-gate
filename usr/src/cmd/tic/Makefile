@@ -18,54 +18,34 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
-PROG= tic
-
-OBJS= \
-	tic_captab.o \
-	tic_error.o \
-	tic_hash.o \
-	tic_main.o \
-	tic_parse.o \
-	tic_read.o \
-	tic_scan.o
-
-SRCS= $(OBJS:%.o=%.c)
-
-include ../Makefile.cmd
-
-LDLIBS += -lcurses
-CPPFLAGS += -I../../lib/libcurses/screen
-MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
-LDFLAGS += $(MAPFILES:%=-M%)
-
-CERRWARN += -_gcc=-Wno-char-subscripts
-CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/Makefile.ctf
+include		$(SRC)/cmd/tic/Makefile.common
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all:		$(PROG)
 
-$(PROG): $(OBJS) $(MAPFILES)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
+$(PROG):	$(OBJS) $(MAPFILES)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
 
-$(POFILE): $(POFILES)
-	$(RM) $@
-	cat $(POFILES) > $@
+$(POFILE):	$(POFILES)
+		$(RM) $@
+		cat $(POFILES) > $@
 
-
-install: all $(ROOTPROG)
+install:	all $(ROOTPROG)
 
 clean:
-	$(RM) $(OBJS)
+		$(RM) $(OBJS)
 
-lint: lint_SRCS
+lint:		lint_SRCS
 
-include ../Makefile.targ
+include		$(SRC)/cmd/Makefile.targ
