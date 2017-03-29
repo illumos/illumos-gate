@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2015, Joyent, Inc. All Rights Reserved.
 .\"
-.Dd April 9, 2016
+.Dd March 26, 2017
 .Dt TIMERFD 3C
 .Os
 .Sh NAME
@@ -129,7 +129,7 @@ If the buffer specified to
 .Xr read 2
 is less than
 eight bytes in length,
-.Sy EINAVL
+.Sy EINVAL
 will be returned.
 .Ed
 .It Sy poll(2), port_get(3C), epoll_wait(3C)
