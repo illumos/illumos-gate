@@ -23,57 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-#
-# The default for payload-bearing actions in this package is to appear in the
-# global zone only.  See the include file for greater detail, as well as
-# information about overriding the defaults.
-#
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/system/management/intel-amt@$(PKGVERS)
-set name=pkg.description \
-    value="Solaris support for Intel Active Management Technology"
-set name=pkg.summary value="Solaris support for Intel AMT"
-set name=info.classification \
-    value="org.opensolaris.category.2008:System/Enterprise Management"
+set name=pkg.obsolete value=true
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=kernel/drv/$(ARCH64) group=sys
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/network group=sys
-dir path=lib/svc/method
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/share/man
-dir path=usr/share/man/man1m
-dir path=usr/share/man/man7d
-driver name=heci perms="* 0644 root sys" \
-    alias=pci8086,2974 \
-    alias=pci8086,2984 \
-    alias=pci8086,2994 \
-    alias=pci8086,29a4 \
-    alias=pci8086,29b4 \
-    alias=pci8086,29c4 \
-    alias=pci8086,2e04 \
-    alias=pci8086,2e14
-file path=kernel/drv/$(ARCH64)/heci group=sys
-file path=kernel/drv/heci group=sys
-file path=lib/svc/manifest/network/lms.xml group=sys mode=0444
-file path=lib/svc/method/svc-lms mode=0555
-file path=usr/lib/lms mode=0555
-file path=usr/share/man/man1m/lms.1m
-file path=usr/share/man/man7d/heci.7d
-legacy pkg=SUNWamt \
-    desc="Solaris support for Intel Active Management Technology" \
-    name="Solaris support for Intel AMT"
-legacy pkg=SUNWamt-lms \
-    desc="Solaris support for Intel Active Management Technology - LMS daemon" \
-    name="Solaris support for Intel AMT - LMS daemon"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-license usr/src/cmd/lms/THIRDPARTYLICENSE \
-    license=usr/src/cmd/lms/THIRDPARTYLICENSE
-license usr/src/uts/intel/io/heci/THIRDPARTYLICENSE \
-    license=usr/src/uts/intel/io/heci/THIRDPARTYLICENSE
