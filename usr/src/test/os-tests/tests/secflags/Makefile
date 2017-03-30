@@ -36,6 +36,8 @@ TESTDIR = $(ROOTOPTPKG)/tests/secflags
 CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
+CLEANFILES= stacky.o
+
 addrs-32: addrs.c
 	$(LINK.c) addrs.c -o $@ $(LDLIBS)
 	$(POST_PROCESS)
@@ -57,12 +59,13 @@ all: $(PROG)
 
 install: all $(CMDS)
 
-lint: 
+lint:
 
 clobber: clean
 	-$(RM) $(PROG)
 
 clean:
+	-$(RM) $(CLEANFILES)
 
 $(CMDS): $(TESTDIR) $(PROG)
 
