@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -190,7 +194,6 @@ static boolean_t	check_applicability(char *a_packageDir,
 				char *a_pkgInst, char *a_rootPath,
 				CAF_T a_flags);
 static boolean_t	check_packages(char **a_pkgList, char *a_packageDir);
-static boolean_t	path_valid(char *path);
 static boolean_t	remove_packages(char **a_pkgList, int a_nodelete,
 				int a_longestPkg, int a_repeat,
 				char *a_altBinDir, char *a_pkgdir,
@@ -2640,31 +2643,6 @@ remove_packages(char **a_pkgList, int a_nodelete, int a_longestPkg,
 	(void) z_unlock_this_zone(ZLOCKS_ALL);
 
 	return (B_FALSE);
-}
-
-/*
- * Name:		path_valid
- * Description:	Checks a string for being a valid path
- *
- * Arguments:	path - path to validate
- *
- * Returns :	B_TRUE - success, B_FALSE otherwise.
- *		B_FALSE means path was null, too long (>PATH_MAX),
- *		or too short (<1)
- */
-static boolean_t
-path_valid(char *path)
-{
-	if (path == NULL) {
-		return (B_FALSE);
-	} else if (strlen(path) > PATH_MAX) {
-		return (B_FALSE);
-	} else if (strlen(path) >= 1) {
-		return (B_TRUE);
-	} else {
-		/* path < 1 */
-		return (B_FALSE);
-	}
 }
 
 /*

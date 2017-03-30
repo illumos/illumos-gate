@@ -24,41 +24,38 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
  */
 
-/*
- * Header:	pkgadd: quit.c
- *
- * Function:	external definitions for references to the quit.c module
- *
- */
+/* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/* All Rights Reserved */
 
-#ifndef	__PKGADD_QUIT_H__
-#define	__PKGADD_QUIT_H__
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <instzones_api.h>
-#include <libinst.h>
+#include <limits.h>
+#include <string.h>
+#include <sys/types.h>
 
 /*
- * exported (global) functions
+ * Name:		path_valid
+ * Description:	Checks a string for being a valid path
+ *
+ * Arguments:	path - path to validate
+ *
+ * Returns :	B_TRUE - success, B_FALSE otherwise.
+ *		B_FALSE means path was null, too long (>PATH_MAX),
+ *		or too short (<1)
  */
-
-extern sighdlrFunc_t *quitGetTrapHandler(void);
-extern void	quit(int retcode);
-extern void	quitSetCkreturnFunc(ckreturnFunc_t *a_ckreturnFunc);
-extern void	quitSetIdsName(char *a_idsName);
-extern void	quitSetZoneName(char *a_zoneName);
-extern void	quitSetZoneTmpdir(char *z_zoneTempDir);
-extern void	quitSetZonelist(zoneList_t a_zlst);
-#ifdef __cplusplus
+boolean_t
+path_valid(char *path)
+{
+	if (path == NULL) {
+		return (B_FALSE);
+	} else if (strlen(path) > PATH_MAX) {
+		return (B_FALSE);
+	} else if (strlen(path) >= 1) {
+		return (B_TRUE);
+	} else {
+		/* path < 1 */
+		return (B_FALSE);
+	}
 }
-#endif
-
-#endif	/* __PKGADD_QUIT_H__ */

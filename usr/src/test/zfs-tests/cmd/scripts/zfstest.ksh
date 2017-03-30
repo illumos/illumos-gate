@@ -40,7 +40,8 @@ function find_disks
 	typeset all_disks=$(echo '' | sudo -k format | awk \
 	    '/c[0-9]/ {print $2}')
 	typeset used_disks=$(zpool status | awk \
-	    '/c[0-9]*t[0-9a-f]*d[0-9]/ {print $1}' | sed 's/s[0-9]//g')
+	    '/c[0-9]+(t[0-9a-f]+)?d[0-9]+/ {print $1}' | sed -E \
+	    's/(s|p)[0-9]+//g')
 
 	typeset disk used avail_disks
 	for disk in $all_disks; do

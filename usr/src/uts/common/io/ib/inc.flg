@@ -73,8 +73,6 @@ find_files "s.*"	\
 
 # packaging files
 find_files "s.*" usr/src/pkg/license_files
-echo_file usr/src/pkg/manifests/SUNWib.mf
-echo_file usr/src/pkg/manifests/SUNWtavor.mf
 
 # extra files needed
 find_files "s.*"	\

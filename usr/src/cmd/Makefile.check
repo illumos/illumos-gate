@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 include ../Makefile.master
@@ -53,7 +53,6 @@ MANIFEST_TOPDIRS=			\
 	keyserv				\
 	ldapcachemgr			\
 	ldmad				\
-	lms				\
 	dlmgmtd				\
 	ndmpd				\
 	nscd				\

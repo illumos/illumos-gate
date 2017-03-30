@@ -61,9 +61,6 @@ find_files "s.*"	\
 
 # packaging files
 find_files "s.*" usr/src/pkg/license_files
-echo_file usr/src/pkg/manifests/SUNWckr.mf
-echo_file usr/src/pkg/manifests/SUNWcakr.mf
-echo_file usr/src/pkg/manifests/SUNWcs.mf
 
 # extra files needed
 find_files "s.*"	\

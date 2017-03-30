@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -58,7 +62,6 @@
 #include <locale.h>
 #include <libgen.h>
 #include <sys/param.h>
-#include <openssl/bio.h>
 #include <errno.h>
 #include <assert.h>
 #include <time.h>
@@ -69,8 +72,6 @@
 
 #include <libinst.h>
 #include <pkglib.h>
-#include <pkgerr.h>
-#include <keystore.h>
 #include "pkgadm.h"
 #include "pkgadm_msgs.h"
 
@@ -260,8 +261,8 @@ admin_lock(int argc, char **argv)
 			kFlag = optarg;
 			if (strlen(optarg) > LOCK_KEY_MAXLEN) {
 				log_msg(LOG_MSG_ERR,
-					MSG_LOCK_kARG_TOOLONG,
-					strlen(optarg), LOCK_KEY_MAXLEN);
+				    MSG_LOCK_kARG_TOOLONG,
+				    strlen(optarg), LOCK_KEY_MAXLEN);
 				return (1);
 			}
 			break;
@@ -270,8 +271,8 @@ admin_lock(int argc, char **argv)
 			oFlag = optarg;
 			if (strlen(optarg) > LOCK_OBJECT_MAXLEN) {
 				log_msg(LOG_MSG_ERR,
-					MSG_LOCK_oARG_TOOLONG,
-					strlen(optarg), LOCK_OBJECT_MAXLEN);
+				    MSG_LOCK_oARG_TOOLONG,
+				    strlen(optarg), LOCK_OBJECT_MAXLEN);
 				return (1);
 			}
 			break;
@@ -282,13 +283,13 @@ admin_lock(int argc, char **argv)
 			pFlag = strtol(optarg, &endptr, 10);
 			if ((endptr != (char *)NULL) && (*endptr != '\0')) {
 				log_msg(LOG_MSG_ERR, MSG_LOCK_pFLAG_BADINT,
-							optarg, *endptr);
+				    optarg, *endptr);
 				return (1);
 			}
 			if ((pFlag == 0) && (errno != 0)) {
 				log_msg(LOG_MSG_ERR,
-					MSG_LOCK_pFLAG_ERROR,
-					optarg,  strerror(errno));
+				    MSG_LOCK_pFLAG_ERROR,
+				    optarg,  strerror(errno));
 				return (1);
 			}
 			break;
@@ -305,7 +306,7 @@ admin_lock(int argc, char **argv)
 			/* if root directory is not absolute path, error */
 			if (*optarg != '/') {
 				log_msg(LOG_MSG_ERR,
-					MSG_LOCK_RARG_NOT_ABSOLUTE, optarg);
+				    MSG_LOCK_RARG_NOT_ABSOLUTE, optarg);
 				return (1);
 			}
 
@@ -315,8 +316,8 @@ admin_lock(int argc, char **argv)
 				/* create top level root directory */
 				if (mkdirp(optarg, 0755) != 0) {
 					log_msg(LOG_MSG_ERR,
-						MSG_LOCK_ALTROOT_CANTCREATE,
-						optarg, strerror(errno));
+					    MSG_LOCK_ALTROOT_CANTCREATE,
+					    optarg, strerror(errno));
 					return (1);
 				}
 			}
@@ -328,8 +329,8 @@ admin_lock(int argc, char **argv)
 				/* create $ALTROOT/tmp directory */
 				if (mkdirp(p, 0777) != 0) {
 					log_msg(LOG_MSG_ERR,
-						MSG_LOCK_ALTROOT_CANTCREATE,
-						p, strerror(errno));
+					    MSG_LOCK_ALTROOT_CANTCREATE,
+					    p, strerror(errno));
 					return (1);
 				}
 			}
@@ -337,7 +338,7 @@ admin_lock(int argc, char **argv)
 			/* if $ALTROOT/tmp directory cannot be created, exit */
 			if (access(p, F_OK) != 0) {
 				log_msg(LOG_MSG_ERR, MSG_LOCK_ALTROOT_NONEXIST,
-					optarg, strerror(errno));
+				    optarg, strerror(errno));
 				return (1);
 			}
 
@@ -364,13 +365,13 @@ admin_lock(int argc, char **argv)
 			WFlag = strtol(optarg, &endptr, 10);
 			if ((endptr != (char *)NULL) && (*endptr != '\0')) {
 				log_msg(LOG_MSG_ERR, MSG_LOCK_WFLAG_BADINT,
-							optarg, *endptr);
+				    optarg, *endptr);
 				return (1);
 			}
 			if ((WFlag == 0) && (errno != 0)) {
 				log_msg(LOG_MSG_ERR,
-					MSG_LOCK_WFLAG_ERROR,
-					optarg,  strerror(errno));
+				    MSG_LOCK_WFLAG_ERROR,
+				    optarg,  strerror(errno));
 				return (1);
 			}
 			wFlag++;
@@ -382,13 +383,13 @@ admin_lock(int argc, char **argv)
 			zFlag = strtol(optarg, &endptr, 10);
 			if ((endptr != (char *)NULL) && (*endptr != '\0')) {
 				log_msg(LOG_MSG_ERR, MSG_LOCK_zFLAG_BADINT,
-							optarg, *endptr);
+				    optarg, *endptr);
 				return (1);
 			}
 			if ((zFlag == 0) && (errno != 0)) {
 				log_msg(LOG_MSG_ERR,
-					MSG_LOCK_zFLAG_ERROR,
-					optarg,  strerror(errno));
+				    MSG_LOCK_zFLAG_ERROR,
+				    optarg,  strerror(errno));
 				return (1);
 			}
 			break;
@@ -440,13 +441,13 @@ admin_lock(int argc, char **argv)
 
 		if (a == 2) {
 			(void) fprintf(stderr, MSG_T_RESULT_TWO,
-				rx, argv[optind+0], argv[optind+1]);
+			    rx, argv[optind+0], argv[optind+1]);
 			return (rx);
 		}
 
 		if (rx != rs) {
 			(void) fprintf(stderr, MSG_T_RESULT_THREE,
-				rs, rx, argv[optind+0], argv[optind+1]);
+			    rs, rx, argv[optind+0], argv[optind+1]);
 		}
 
 		/* always successful */
@@ -550,17 +551,17 @@ admin_lock(int argc, char **argv)
 		/* acquire lock */
 
 		tResult = lock_acquire(&theLock, &fd, RFlag, kFlag, oFlag,
-			qFlag, wFlag, WFlag, exclusive, RFlag, pFlag, zFlag);
+		    qFlag, wFlag, WFlag, exclusive, RFlag, pFlag, zFlag);
 
 		switch (tResult) {
 		case FINDLOCK_LOCKACQUIRED:
 			(void) fprintf(stdout, "%s\n",
-				theLock._lrLock.lockKey);
+			    theLock._lrLock.lockKey);
 			result = 0;
 			break;
 		case FINDLOCK_LOCKED:
 			(void) fprintf(stdout, "%s\n",
-				theLock._lrLock.lockObject);
+			    theLock._lrLock.lockObject);
 			result = 1;
 			break;
 		default:
@@ -616,8 +617,8 @@ admin_lock(int argc, char **argv)
 
 static FINDLOCK_T
 lock_acquire(LOCK_T *a_theLock, int *a_fd, char *a_root, char *a_key,
-	char *a_object, int a_quiet, int a_wait, long a_timeout,
-	int a_exclusive, char *a_altRoot, pid_t a_pid, zoneid_t a_zid)
+    char *a_object, int a_quiet, int a_wait, long a_timeout,
+    int a_exclusive, char *a_altRoot, pid_t a_pid, zoneid_t a_zid)
 {
 	int		notified = 0;
 	FINDLOCK_T	result;
@@ -648,7 +649,7 @@ lock_acquire(LOCK_T *a_theLock, int *a_fd, char *a_root, char *a_key,
 		/* attempt to aquire the lock */
 
 		result = _lock_acquire(a_theLock, *a_fd, a_key, a_object,
-				a_quiet, a_exclusive, a_pid, a_zid);
+		    a_quiet, a_exclusive, a_pid, a_zid);
 
 		/* return result if any result other than object is locked */
 
@@ -691,15 +692,15 @@ lock_acquire(LOCK_T *a_theLock, int *a_fd, char *a_root, char *a_key,
 
 		if ((a_wait == 0) || (signal_received != 0)) {
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_ACQUIRE_BUSY_FIRST,
-				a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-				a_object, a_key,
-				a_theLock->_lrLock.lockObject,
-				a_theLock->_lrLock.lockExclusive ?
-						MSG_LOCK_EXC : MSG_LOCK_SHR,
-				a_theLock->_lrLock.lockExclusive !=
-					a_exclusive ? "" :
-					MSG_LOCK_ACQUIRE_BUSY_ADDITIONAL);
+			    MSG_LOCK_ACQUIRE_BUSY_FIRST,
+			    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+			    a_object, a_key,
+			    a_theLock->_lrLock.lockObject,
+			    a_theLock->_lrLock.lockExclusive ?
+			    MSG_LOCK_EXC : MSG_LOCK_SHR,
+			    a_theLock->_lrLock.lockExclusive !=
+			    a_exclusive ? "" :
+			    MSG_LOCK_ACQUIRE_BUSY_ADDITIONAL);
 
 			/* close lock file if opened in this function */
 
@@ -717,10 +718,10 @@ lock_acquire(LOCK_T *a_theLock, int *a_fd, char *a_root, char *a_key,
 			curtime = time((time_t *)NULL);
 			if (curtime > timeout) {
 				log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-					MSG_LOCK_ACQUIRE_TIMEDOUT,
-					a_exclusive ?
-						MSG_LOCK_EXC : MSG_LOCK_SHR,
-					a_object, a_key);
+				    MSG_LOCK_ACQUIRE_TIMEDOUT,
+				    a_exclusive ?
+				    MSG_LOCK_EXC : MSG_LOCK_SHR,
+				    a_object, a_key);
 
 				/* close lock file if opened in this function */
 
@@ -746,8 +747,8 @@ lock_acquire(LOCK_T *a_theLock, int *a_fd, char *a_root, char *a_key,
 
 		if (notified++ == 0) {
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_WRN,
-				MSG_LOCK_ACQUIRE_WAITING,
-				a_object);
+			    MSG_LOCK_ACQUIRE_WAITING,
+			    a_object);
 		}
 
 		/* close lock file */
@@ -763,7 +764,7 @@ lock_acquire(LOCK_T *a_theLock, int *a_fd, char *a_root, char *a_key,
 		*a_fd = _openLockFile(a_root);
 		if (*a_fd < 0) {
 			log_msg(LOG_MSG_ERR, MSG_LOCK_ACQUIRE_REOPEN_FAILED,
-				a_object);
+			    a_object);
 
 			/* close lock file if opened in this function */
 
@@ -800,14 +801,14 @@ lock_release(int a_fd, char *a_key, char *a_object, int a_quiet)
 	/* entry debugging info */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_RELEASE_ENTRY,
-		a_key, a_object, a_quiet);
+	    a_key, a_object, a_quiet);
 
 	/* find the lock to be released */
 
 	result = _findLock(&theLock, &recordNum, a_fd, a_object, a_key);
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_RELEASE_FINDRESULT,
-		result, recordNum);
+	    result, recordNum);
 
 	/* determine how to release the lock if found */
 
@@ -817,8 +818,8 @@ lock_release(int a_fd, char *a_key, char *a_object, int a_quiet)
 		 */
 		case FINDLOCK_NOTLOCKED:
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_RELEASE_NOTLOCKED,
-				a_object, a_key);
+			    MSG_LOCK_RELEASE_NOTLOCKED,
+			    a_object, a_key);
 			return (result);
 
 		/*
@@ -826,8 +827,8 @@ lock_release(int a_fd, char *a_key, char *a_object, int a_quiet)
 		 */
 		case FINDLOCK_LOCKED:
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_RELEASE_LOCKED,
-				a_object, a_key);
+			    MSG_LOCK_RELEASE_LOCKED,
+			    a_object, a_key);
 			return (result);
 
 		/*
@@ -835,8 +836,8 @@ lock_release(int a_fd, char *a_key, char *a_object, int a_quiet)
 		 */
 		case FINDLOCK_NOTFOUND:
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_RELEASE_NOTFOUND,
-				a_object, a_key);
+			    MSG_LOCK_RELEASE_NOTFOUND,
+			    a_object, a_key);
 			return (result);
 
 		/*
@@ -844,8 +845,8 @@ lock_release(int a_fd, char *a_key, char *a_object, int a_quiet)
 		 */
 		case FINDLOCK_KEYMISMATCH:
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_RELEASE_KEYMISMATCH,
-				a_object);
+			    MSG_LOCK_RELEASE_KEYMISMATCH,
+			    a_object);
 			return (result);
 
 		/*
@@ -853,8 +854,8 @@ lock_release(int a_fd, char *a_key, char *a_object, int a_quiet)
 		 */
 		case FINDLOCK_ERROR:
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_RELEASE_ERROR,
-				a_object, a_key);
+			    MSG_LOCK_RELEASE_ERROR,
+			    a_object, a_key);
 			perror(LOCK_FILENAME);
 			return (result);
 
@@ -863,7 +864,7 @@ lock_release(int a_fd, char *a_key, char *a_object, int a_quiet)
 		 */
 		case FINDLOCK_FOUND:
 			log_msg(LOG_MSG_DEBUG, MSG_LOCK_RELEASE_FOUND,
-				a_object, a_key);
+			    a_object, a_key);
 			(void) _decrementLockCount(a_fd, &theLock);
 			break;
 
@@ -904,7 +905,7 @@ lock_status(int a_fd, char *a_key, char *a_object, int a_quiet)
 	/* entry debugging info */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_STATUS_ENTRY,
-		a_key, a_object);
+	    a_key, a_object);
 
 	/* localize references to lock object */
 
@@ -920,21 +921,21 @@ lock_status(int a_fd, char *a_key, char *a_object, int a_quiet)
 		/* debug info on this lock */
 
 		log_msg(LOG_MSG_DEBUG, MSG_LOCK_STATUS_READRECORD,
-			recordNum, pll->lockCount,
-			pll->lockObject, pll->lockKey, pll->lockPid,
-			pll->lockZoneId);
+		    recordNum, pll->lockCount,
+		    pll->lockObject, pll->lockKey, pll->lockPid,
+		    pll->lockZoneId);
 
 		/* ignore if key specified and key does not match */
 
 		if ((*a_key != '\0') &&
-			(strcmp(pll->lockKey, a_key) != 0)) {
+		    (strcmp(pll->lockKey, a_key) != 0)) {
 			continue;
 		}
 
 		/* ignore if object specified and object does not match */
 
 		if ((*a_object != '\0') &&
-			(strcmp(pll->lockObject, a_object) != 0)) {
+		    (strcmp(pll->lockObject, a_object) != 0)) {
 			continue;
 		}
 
@@ -950,21 +951,21 @@ lock_status(int a_fd, char *a_key, char *a_object, int a_quiet)
 
 		if (found == 1) {
 			(void) fprintf(stdout,
-				"%2s %2s %3s %8s %3s %9s %37s %s\n",
-				"i#", "l#", "cnt", "pid", "zid", "lock-type",
-				"---------------lock-key-------------",
-				"lock-object");
+			    "%2s %2s %3s %8s %3s %9s %37s %s\n",
+			    "i#", "l#", "cnt", "pid", "zid", "lock-type",
+			    "---------------lock-key-------------",
+			    "lock-object");
 		}
 
 		/* output status line for this lock object */
 
 		(void) fprintf(stdout,
-			"%2ld %2ld %3ld %8ld %3d %9s %37s %s\n",
-			recordNum, pll->lockRecordNum, pll->lockCount,
-			pll->lockPid, pll->lockZoneId,
-			pll->lockExclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-			pll->lockKey,
-			*pll->lockObject == '\0' ? "*" : pll->lockObject);
+		    "%2ld %2ld %3ld %8ld %3d %9s %37s %s\n",
+		    recordNum, pll->lockRecordNum, pll->lockCount,
+		    pll->lockPid, pll->lockZoneId,
+		    pll->lockExclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    pll->lockKey,
+		    *pll->lockObject == '\0' ? "*" : pll->lockObject);
 	}
 
 	/* return == 0 if found, != 0 if not found */
@@ -993,8 +994,8 @@ lock_status(int a_fd, char *a_key, char *a_object, int a_quiet)
 
 static FINDLOCK_T
 _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
-	char *a_object, int a_quiet, int a_exclusive, pid_t a_pid,
-	zoneid_t a_zid)
+    char *a_object, int a_quiet, int a_exclusive, pid_t a_pid,
+    zoneid_t a_zid)
 {
 	RECORDNUM_T	recordNum;
 	FINDLOCK_T	result;
@@ -1003,13 +1004,13 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 	/* entry debugging info */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_ACQUIRE_ENTRY,
-		a_key, a_object, a_quiet, a_exclusive);
+	    a_key, a_object, a_quiet, a_exclusive);
 
 	/* is the specified object already locked? */
 
 	for (;;) {
 		result = _findLock(a_theLock, &recordNum, a_fd, a_object,
-			a_key);
+		    a_key);
 
 		if (result != FINDLOCK_LOCKED) {
 			break;
@@ -1024,8 +1025,8 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 	/* debug info on result of find of lock */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_ACQUIRE_FINDRESULT,
-		a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-		result, recordNum);
+	    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+	    result, recordNum);
 
 	/* determine how to acquire the lock */
 
@@ -1035,9 +1036,9 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 		 */
 		case FINDLOCK_NOTLOCKED:
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_ACQUIRE_NOTLOCKED,
-				a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-				a_object, a_key);
+			    MSG_LOCK_ACQUIRE_NOTLOCKED,
+			    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+			    a_object, a_key);
 			break;
 
 		/*
@@ -1063,8 +1064,8 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 			/* shared requesting shared - add to shared lock */
 
 			log_msg(LOG_MSG_DEBUG,
-				MSG_LOCK_ACQUIRE_LOCKED_SHARED,
-				a_object, a_key);
+			    MSG_LOCK_ACQUIRE_LOCKED_SHARED,
+			    a_object, a_key);
 
 			/* increment shared lock count */
 
@@ -1081,14 +1082,14 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 		 */
 		case FINDLOCK_NOTFOUND:
 			log_msg(LOG_MSG_DEBUG,
-				MSG_LOCK_ACQUIRE_NOTFOUND,
-				a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-				a_object);
+			    MSG_LOCK_ACQUIRE_NOTFOUND,
+			    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+			    a_object);
 
 			if (_addLock(key, a_fd, a_object, a_exclusive,
-							a_pid, a_zid) == 0) {
+			    a_pid, a_zid) == 0) {
 				(void) strncpy(a_theLock->_lrLock.lockKey, key,
-					sizeof (a_theLock->_lrLock.lockKey));
+				    sizeof (a_theLock->_lrLock.lockKey));
 				result = FINDLOCK_LOCKACQUIRED;
 			} else {
 				result = FINDLOCK_ERROR;
@@ -1100,9 +1101,9 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 		 */
 		case FINDLOCK_KEYMISMATCH:
 			log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_ERR,
-				MSG_LOCK_ACQUIRE_KEYMISMATCH,
-				a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-				a_object);
+			    MSG_LOCK_ACQUIRE_KEYMISMATCH,
+			    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+			    a_object);
 			break;
 
 		/*
@@ -1110,7 +1111,7 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 		 */
 		case FINDLOCK_ERROR:
 			log_msg(LOG_MSG_ERR, MSG_LOCK_ACQUIRE_ERROR,
-				a_object, a_key, strerror(errno));
+			    a_object, a_key, strerror(errno));
 			break;
 
 		/*
@@ -1124,8 +1125,8 @@ _lock_acquire(LOCK_T *a_theLock, int a_fd, char *a_key,
 			}
 
 			log_msg(LOG_MSG_DEBUG, MSG_LOCK_ACQUIRE_FOUND_INC,
-				a_object, a_key,
-				a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR);
+			    a_object, a_key,
+			    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR);
 
 			/* increment shared lock */
 
@@ -1168,29 +1169,29 @@ _openLockFile(char *a_root)
 	/* entry debugging info */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_OPENFILE_ENTRY,
-		a_root, LOCK_FILENAME);
+	    a_root, LOCK_FILENAME);
 
 	/* generate path to lock directory */
 
 	(void) snprintf(lockpath, sizeof (lockpath), "%s/%s",
-		a_root, LOCK_DIRECTORY);
+	    a_root, LOCK_DIRECTORY);
 
 	if (access(lockpath, F_OK) != 0) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_ROOTDIR_INVALID,
-			lockpath, strerror(errno));
+		    lockpath, strerror(errno));
 		return (-1);
 	}
 
 	/* generate path to lock file */
 
 	(void) snprintf(lockpath, sizeof (lockpath),
-		"%s/%s", a_root, LOCK_FILENAME);
+	    "%s/%s", a_root, LOCK_FILENAME);
 
 	/* wait for open to succeed up to limits */
 
 	for (waiter = WAITER_INITIAL;
-		waiter < WAITER_MAX;
-		waiter = WAITER_NEXT(waiter)) {
+	    waiter < WAITER_MAX;
+	    waiter = WAITER_NEXT(waiter)) {
 
 		/* LINTED O_CREAT without O_EXCL specified in call to open() */
 		fd = open(lockpath, O_CREAT|O_RDWR, LOCK_FILEMODE);
@@ -1211,8 +1212,8 @@ _openLockFile(char *a_root)
 
 		if (waiter == WAITER_INITIAL) {
 			log_msg(LOG_MSG_DEBUG,
-				MSG_LOCK_OPENFILE_SLEEPING,
-				strerror(errno), waiter);
+			    MSG_LOCK_OPENFILE_SLEEPING,
+			    strerror(errno), waiter);
 		}
 
 		(void) sleep(waiter);
@@ -1222,7 +1223,7 @@ _openLockFile(char *a_root)
 
 	if (fd < 0) {
 		log_msg(LOG_MSG_DEBUG, MSG_LOCK_OPENFILE_FAILURE,
-			strerror(errno));
+		    strerror(errno));
 		perror(lockpath);
 		return (-1);
 	}
@@ -1233,8 +1234,8 @@ _openLockFile(char *a_root)
 	 */
 
 	for (waiter = WAITER_INITIAL;
-		waiter < WAITER_MAX;
-		waiter = WAITER_NEXT(waiter)) {
+	    waiter < WAITER_MAX;
+	    waiter = WAITER_NEXT(waiter)) {
 
 		/* acquire exclusive section lock on entire file */
 
@@ -1250,7 +1251,7 @@ _openLockFile(char *a_root)
 
 		if (waiter == WAITER_INITIAL) {
 			log_msg(LOG_MSG_DEBUG, MSG_LOCK_OPENFILE_SLEEP2,
-				strerror(errno), waiter);
+			    strerror(errno), waiter);
 		}
 
 		(void) sleep(waiter);
@@ -1260,7 +1261,7 @@ _openLockFile(char *a_root)
 
 	if (result < 0) {
 		log_msg(LOG_MSG_DEBUG, MSG_LOCK_OPENFILE_FAIL2,
-			strerror(errno));
+		    strerror(errno));
 		perror(lockpath);
 		(void) close(fd);
 		return (-1);
@@ -1323,7 +1324,7 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 		/* get next first lock node */
 
 		pkgstrGetToken_r((char *)NULL, a_s1Lock, s1Cnt, "/",
-			s1Buf, sizeof (s1Buf));
+		    s1Buf, sizeof (s1Buf));
 
 		log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_FSTNODE, s1Cnt, s1Buf);
 
@@ -1336,7 +1337,7 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 		/* discover "." prefix for this node */
 
 		pkgstrGetToken_r((char *)NULL, s1Buf, 0, ".", s1Prefix,
-			sizeof (s1Prefix));
+		    sizeof (s1Prefix));
 
 		s1Sfx = (strlen(s1Prefix) == strlen(s1Buf) ? B_FALSE : B_TRUE);
 
@@ -1346,10 +1347,10 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 			/* get next second lock node */
 
 			pkgstrGetToken_r((char *)NULL, a_s2Lock, s2Cnt, "/",
-				s2Buf, sizeof (s2Buf));
+			    s2Buf, sizeof (s2Buf));
 
 			log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_SCNDNODE, s2Cnt,
-				s2Buf);
+			    s2Buf);
 
 			/* exit if no nodes left */
 
@@ -1360,10 +1361,10 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 			/* discover "." prefix for this node */
 
 			pkgstrGetToken_r((char *)NULL, s2Buf, 0, ".", s2Prefix,
-				sizeof (s2Prefix));
+			    sizeof (s2Prefix));
 
 			s2Sfx = (strlen(s2Prefix) ==
-					strlen(s2Buf) ? B_FALSE : B_TRUE);
+			    strlen(s2Buf) ? B_FALSE : B_TRUE);
 
 			/*
 			 * process this pair of nodes:
@@ -1377,22 +1378,22 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 			 */
 
 			log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_NODES, s1Buf,
-				s1Prefix, s1Sfx, s2Buf, s2Prefix, s2Sfx);
+			    s1Prefix, s1Sfx, s2Buf, s2Prefix, s2Sfx);
 
 			if ((s1Sfx == B_FALSE) || (s2Sfx == B_FALSE)) {
 				/* one doesnt have a prefix direct comparison */
 
 				if (strcmp(s1Buf, s2Buf) == 0) {
 					log_msg(LOG_MSG_DEBUG,
-						MSG_LCKMCH_DIRMCH,
-						s1Buf, s2Buf);
+					    MSG_LCKMCH_DIRMCH,
+					    s1Buf, s2Buf);
 					break;
 				}
 
 				/* nodes do not directly match, continue */
 
 				log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_DIRNOMCH,
-						s1Buf, s2Buf);
+				    s1Buf, s2Buf);
 				continue;
 			}
 
@@ -1400,14 +1401,14 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 
 			if (strcmp(s1Prefix, s2Prefix) == 0) {
 				log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_PFXMCH,
-					s1Prefix, s2Prefix);
+				    s1Prefix, s2Prefix);
 				break;
 			}
 
 			/* prefixes do not match, continue */
 
 			log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_PFXNOMCH, s1Prefix,
-				s2Prefix);
+			    s2Prefix);
 		}
 
 		/*
@@ -1452,9 +1453,9 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 	 */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_FSTLCK, s1Cnt, s1Buf,
-		s1Prefix, s1Sfx);
+	    s1Prefix, s1Sfx);
 	log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_SCNDLCK, s2Cnt, s2Buf,
-		s2Prefix, s2Sfx);
+	    s2Prefix, s2Sfx);
 
 	/* process any direct comparisons that might be possible */
 
@@ -1462,10 +1463,10 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 		/* nothing in first matches anything in second lock */
 
 		if (((s1Cnt == 1) || (s2Cnt == 1)) &&
-			((s1Sfx == B_FALSE) || (s2Sfx == B_FALSE))) {
+		    ((s1Sfx == B_FALSE) || (s2Sfx == B_FALSE))) {
 			/* two absolute locks match (e.g. 'file' and 'dir') */
 			log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_ABSNOMCH, a_s1Lock,
-				a_s2Lock);
+			    a_s2Lock);
 			return (1);
 		}
 
@@ -1477,11 +1478,11 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 	}
 
 	if ((s2Buf[0] != '\0') && (s1Buf[0] != '\0') &&
-						(s1Cnt > 0) && (s2Cnt > 0)) {
+	    (s1Cnt > 0) && (s2Cnt > 0)) {
 		/* incompatible overlapping objects */
 
 		log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_OVLPNOMCH, a_s1Lock, a_s2Lock,
-			s1Cnt+1, s1Buf);
+		    s1Cnt+1, s1Buf);
 
 		return (1);
 	}
@@ -1498,19 +1499,19 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 		/* both have first match - start comparison from the begining */
 
 		log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_SAME, a_s1Lock, a_s2Lock,
-			s1Buf);
+		    s1Buf);
 
 	} else if ((s1Cnt != 0) && (s2Cnt == 0) && (s2Buf[0] != '\0')) {
 		/* second lock begins somewhere inside of the first lock */
 
 		log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_SCNDSUB, a_s2Lock, a_s1Lock,
-			s1Cnt+1, s1Buf);
+		    s1Cnt+1, s1Buf);
 
 		/* advance first lock to matching node in second lock */
 
 		if (strchr(a_s1Lock, '/') != (char *)NULL) {
 			for (; s1Cnt > 0 && (*final1Lock != '\0');
-				final1Lock++) {
+			    final1Lock++) {
 				if (*final1Lock == '/') {
 					s1Cnt--;
 				}
@@ -1520,13 +1521,13 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 		/* first lock begins somewhere inside of the second lock */
 
 		log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_FRSTSUB, a_s1Lock, a_s2Lock,
-			s2Cnt+1, s2Buf);
+		    s2Cnt+1, s2Buf);
 
 		/* advance second lock to matching node in first lock */
 
 		if (strchr(a_s2Lock, '/') != (char *)NULL) {
 			for (; s2Cnt > 0 && (*final2Lock != '\0');
-				final2Lock++) {
+			    final2Lock++) {
 				if (*final2Lock == '/') {
 					s2Cnt--;
 				}
@@ -1550,7 +1551,7 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 		/* get next node from first lock */
 
 		pkgstrGetToken_r((char *)NULL, final1Lock, s1Cnt, "/", s1Buf,
-			sizeof (s1Buf));
+		    sizeof (s1Buf));
 
 		/* success if at end of lock */
 
@@ -1561,7 +1562,7 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 		/* get next node from second lock */
 
 		pkgstrGetToken_r((char *)NULL, final2Lock, s1Cnt, "/", s2Buf,
-			sizeof (s2Buf));
+		    sizeof (s2Buf));
 
 		/* success if at end of lock */
 
@@ -1580,7 +1581,7 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 
 		if (result != 0) {
 			log_msg(LOG_MSG_DEBUG, MSG_LCKMCH_NODEFAIL,
-				s1Cnt, s1Buf, s2Buf);
+			    s1Cnt, s1Buf, s2Buf);
 			return (1);
 		}
 
@@ -1618,7 +1619,7 @@ _lockMatch(char *a_s1Lock, char *a_s2Lock)
 
 static FINDLOCK_T
 _findLock(LOCK_T *a_theLock, RECORDNUM_T *r_recordNum,
-	int a_fd, char *a_object, char *a_key)
+    int a_fd, char *a_object, char *a_key)
 {
 	ADMINLOCK_T	*pll;
 	char		*pld;
@@ -1643,14 +1644,14 @@ _findLock(LOCK_T *a_theLock, RECORDNUM_T *r_recordNum,
 	/* debug info before processing lock file */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_FINDLOCK_ENTRY,
-		a_object, a_key);
+	    a_object, a_key);
 
 	/* rewind to beginning of lock file */
 
 	pos = lseek(a_fd, 0L, SEEK_SET);
 	if (pos == (off_t)-1) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_FINDLOCK_LSEEK_FAILURE,
-			a_object, a_key, strerror(errno));
+		    a_object, a_key, strerror(errno));
 		return (FINDLOCK_ERROR);
 	}
 
@@ -1660,9 +1661,9 @@ _findLock(LOCK_T *a_theLock, RECORDNUM_T *r_recordNum,
 		/* debug info on this lock */
 
 		log_msg(LOG_MSG_DEBUG, MSG_LOCK_FINDLOCK_READRECORD,
-			recordNum, pll->lockCount,
-			pll->lockObject, pll->lockKey, pll->lockPid,
-			pll->lockZoneId);
+		    recordNum, pll->lockCount,
+		    pll->lockObject, pll->lockKey, pll->lockPid,
+		    pll->lockZoneId);
 
 		/* continue if object is not the one we are looking for */
 
@@ -1730,7 +1731,7 @@ _findLock(LOCK_T *a_theLock, RECORDNUM_T *r_recordNum,
 
 static int
 _addLock(char *r_key, int a_fd, char *a_object, int a_exclusive, pid_t a_pid,
-	zoneid_t a_zid)
+    zoneid_t a_zid)
 {
 	LOCK_T	theLock;
 	char	*key;
@@ -1746,8 +1747,8 @@ _addLock(char *r_key, int a_fd, char *a_object, int a_exclusive, pid_t a_pid,
 	pos = lseek(a_fd, 0L, SEEK_END);
 	if (pos == (off_t)-1) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_ADDLOCK_LSEEK_FAILURE,
-			a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-			a_object, strerror(errno));
+		    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    a_object, strerror(errno));
 		return (1);
 	}
 
@@ -1758,7 +1759,7 @@ _addLock(char *r_key, int a_fd, char *a_object, int a_exclusive, pid_t a_pid,
 	/* fill in components of the lock */
 
 	(void) strlcpy(theLock._lrLock.lockObject, a_object,
-							LOCK_OBJECT_MAXLEN);
+	    LOCK_OBJECT_MAXLEN);
 	(void) strlcpy(theLock._lrLock.lockKey, key, LOCK_KEY_MAXLEN);
 	theLock._lrLock.lockCount = 1;
 	theLock._lrLock.lockPid = (a_pid > 0 ? a_pid : 0);
@@ -1769,17 +1770,17 @@ _addLock(char *r_key, int a_fd, char *a_object, int a_exclusive, pid_t a_pid,
 	/* debug info on new lock */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_ADDLOCK_ADDING,
-		a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-		pos, theLock._lrLock.lockObject, theLock._lrLock.lockKey,
-		theLock._lrLock.lockPid, theLock._lrLock.lockZoneId);
+	    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+	    pos, theLock._lrLock.lockObject, theLock._lrLock.lockKey,
+	    theLock._lrLock.lockPid, theLock._lrLock.lockZoneId);
 
 	/* write the new lock record to the end of the lock file */
 
 	result = pwrite(a_fd, &theLock, LOCK_SIZE, pos);
 	if (result != LOCK_SIZE) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_ADDLOCK_PWRITE_FAILURE,
-			a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
-			a_object, strerror(errno));
+		    a_exclusive ? MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    a_object, strerror(errno));
 		return (1);
 	}
 
@@ -1807,9 +1808,9 @@ _incrementLockCount(int a_fd, LOCK_T *a_theLock)
 	/* debug info on incrementing lock */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_INCLOCK_ENTRY,
-		a_theLock->_lrLock.lockExclusive ?
-				MSG_LOCK_EXC : MSG_LOCK_SHR,
-		pll->lockRecordNum, pll->lockCount);
+	    a_theLock->_lrLock.lockExclusive ?
+	    MSG_LOCK_EXC : MSG_LOCK_SHR,
+	    pll->lockRecordNum, pll->lockCount);
 
 	/* increment lock count */
 
@@ -1820,18 +1821,18 @@ _incrementLockCount(int a_fd, LOCK_T *a_theLock)
 	result = pwrite(a_fd, pld, pls, pll->lockRecordNum*pls);
 	if (result != pls) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_INCLOCK_PWRITE_FAILURE,
-			a_theLock->_lrLock.lockExclusive ?
-					MSG_LOCK_EXC : MSG_LOCK_SHR,
-			a_theLock->_lrLock.lockObject,
-			strerror(errno));
+		    a_theLock->_lrLock.lockExclusive ?
+		    MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    a_theLock->_lrLock.lockObject,
+		    strerror(errno));
 		return (1);
 	}
 
 	/* debug info lock incremented */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_INCLOCK_DONE,
-		pll->lockRecordNum, pll->lockCount,
-		pll->lockObject, pll->lockKey);
+	    pll->lockRecordNum, pll->lockCount,
+	    pll->lockObject, pll->lockKey);
 
 	return (0);
 }
@@ -1872,11 +1873,11 @@ _validateLock(int a_fd, LOCK_T *a_theLock, int a_quiet)
 
 	if (pll->lockZoneId != getzoneid()) {
 		log_msg(LOG_MSG_DEBUG, MSG_VALID_BADZID, pll->lockObject,
-		pll->lockZoneId, getzoneid());
+		    pll->lockZoneId, getzoneid());
 		return (B_TRUE);
 	} else {
 		log_msg(LOG_MSG_DEBUG, MSG_VALID_ZIDOK, pll->lockObject,
-		pll->lockZoneId, getzoneid());
+		    pll->lockZoneId, getzoneid());
 	}
 
 	/* see if the process is still active */
@@ -1884,18 +1885,18 @@ _validateLock(int a_fd, LOCK_T *a_theLock, int a_quiet)
 	pkgstrPrintf_r(path, sizeof (path), "/proc/%d", pll->lockPid);
 	if (access(path, F_OK) == 0) {
 		log_msg(LOG_MSG_DEBUG, MSG_VALID_OK, pll->lockObject,
-			pll->lockPid, path);
+		    pll->lockPid, path);
 		return (B_TRUE);
 	}
 
 	log_msg(LOG_MSG_DEBUG, MSG_VALID_NOTOK, pll->lockObject, pll->lockPid,
-		path);
+	    path);
 
 	/* delete this lock */
 
 	log_msg(a_quiet ? LOG_MSG_DEBUG : LOG_MSG_WRN,
-		MSG_VALID_STALE, pll->lockObject, pll->lockPid,
-		pll->lockZoneId);
+	    MSG_VALID_STALE, pll->lockObject, pll->lockPid,
+	    pll->lockZoneId);
 
 	_decrementLockCount(a_fd, a_theLock);
 
@@ -1928,23 +1929,23 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
 
 	if (pll->lockCount > 0) {
 		log_msg(LOG_MSG_DEBUG, MSG_LOCK_DECLOCK_DECING,
-			a_theLock->_lrLock.lockExclusive ?
-				MSG_LOCK_EXC : MSG_LOCK_SHR,
-			pll->lockRecordNum, pll->lockCount);
+		    a_theLock->_lrLock.lockExclusive ?
+		    MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    pll->lockRecordNum, pll->lockCount);
 
 		result = pwrite(a_fd, pld, pls, pll->lockRecordNum*pls);
 		if (result != pls) {
 			log_msg(LOG_MSG_ERR, MSG_LOCK_DECLOCK_PWRITE_FAILURE,
-				a_theLock->_lrLock.lockExclusive ?
-						MSG_LOCK_EXC : MSG_LOCK_SHR,
-				a_theLock->_lrLock.lockObject,
-				strerror(errno));
+			    a_theLock->_lrLock.lockExclusive ?
+			    MSG_LOCK_EXC : MSG_LOCK_SHR,
+			    a_theLock->_lrLock.lockObject,
+			    strerror(errno));
 			return (1);
 		}
 
 		log_msg(LOG_MSG_DEBUG, MSG_LOCK_DECLOCK_DONE,
-			pll->lockRecordNum, pll->lockCount,
-			pll->lockObject, pll->lockKey);
+		    pll->lockRecordNum, pll->lockCount,
+		    pll->lockObject, pll->lockKey);
 
 		return (0);
 	}
@@ -1958,17 +1959,17 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
 	lastPos = lseek(a_fd, 0L, SEEK_END);	/* get size of lock file */
 	if (lastPos == (off_t)-1) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_DECLOCK_LSEEK_FAILURE,
-			a_theLock->_lrLock.lockExclusive ?
-					MSG_LOCK_EXC : MSG_LOCK_SHR,
-			a_theLock->_lrLock.lockObject,
-			strerror(errno));
+		    a_theLock->_lrLock.lockExclusive ?
+		    MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    a_theLock->_lrLock.lockObject,
+		    strerror(errno));
 		return (1);
 	}
 
 	lastRecord = (lastPos/pls)-1;	/* convert size to record # */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_DECLOCK_REMOVE,
-		lastPos, lastRecord, pll->lockRecordNum);
+	    lastPos, lastRecord, pll->lockRecordNum);
 
 	/* see if removing last record of file */
 
@@ -1976,20 +1977,20 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
 		/* debug info removing last record */
 
 		log_msg(LOG_MSG_DEBUG, MSG_LOCK_DECLOCK_LASTONE,
-			a_theLock->_lrLock.lockExclusive ?
-				MSG_LOCK_EXC : MSG_LOCK_SHR,
-			lastRecord, lastPos-pls);
+		    a_theLock->_lrLock.lockExclusive ?
+		    MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    lastRecord, lastPos-pls);
 
 		/* removing last record of file, truncate */
 
 		res = ftruncate(a_fd, lastPos-pls);
 		if (res == -1) {
 			log_msg(LOG_MSG_ERR, MSG_LOCK_DECLOCK_FTRUNCATE_FAILURE,
-				a_theLock->_lrLock.lockExclusive ?
-						MSG_LOCK_EXC : MSG_LOCK_SHR,
-				a_theLock->_lrLock.lockObject,
-				strerror(errno));
-				return (1);
+			    a_theLock->_lrLock.lockExclusive ?
+			    MSG_LOCK_EXC : MSG_LOCK_SHR,
+			    a_theLock->_lrLock.lockObject,
+			    strerror(errno));
+			return (1);
 		}
 		return (0);
 	}
@@ -2001,17 +2002,17 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
 	 */
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_DECLOCK_REMOVING,
-		pll->lockRecordNum, lastRecord, lastPos-pls);
+	    pll->lockRecordNum, lastRecord, lastPos-pls);
 
 	/* read in the last record */
 
 	result = pread(a_fd, tmpLock._lrLockData, pls, lastRecord*pls);
 	if (result != pls) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_DECLOCK_PREAD_FAILURE,
-			a_theLock->_lrLock.lockExclusive ?
-					MSG_LOCK_EXC : MSG_LOCK_SHR,
-			a_theLock->_lrLock.lockObject,
-			strerror(errno));
+		    a_theLock->_lrLock.lockExclusive ?
+		    MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    a_theLock->_lrLock.lockObject,
+		    strerror(errno));
 		return (1);
 
 	}
@@ -2021,10 +2022,10 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
 	res = ftruncate(a_fd, lastPos-pls);
 	if (res == -1) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_DECLOCK_FTRUNCATE_FAILURE,
-			a_theLock->_lrLock.lockExclusive ?
-					MSG_LOCK_EXC : MSG_LOCK_SHR,
-			a_theLock->_lrLock.lockObject,
-			strerror(errno));
+		    a_theLock->_lrLock.lockExclusive ?
+		    MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    a_theLock->_lrLock.lockObject,
+		    strerror(errno));
 			return (1);
 	}
 
@@ -2037,10 +2038,10 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
 	result = pwrite(a_fd, tmpLock._lrLockData, pls, pll->lockRecordNum*pls);
 	if (result != pls) {
 		log_msg(LOG_MSG_ERR, MSG_LOCK_DECLOCK_PWRITE_FAILURE,
-			a_theLock->_lrLock.lockExclusive ?
-					MSG_LOCK_EXC : MSG_LOCK_SHR,
-			a_theLock->_lrLock.lockObject,
-			strerror(errno));
+		    a_theLock->_lrLock.lockExclusive ?
+		    MSG_LOCK_EXC : MSG_LOCK_SHR,
+		    a_theLock->_lrLock.lockObject,
+		    strerror(errno));
 		return (1);
 	}
 
@@ -2062,8 +2063,6 @@ _decrementLockCount(int a_fd, LOCK_T *a_theLock)
 static char *
 _getUniqueId(void)
 {
-	char		*args[10];
-	char		*execResults;
 	char		newkey[LOCK_KEY_MAXLEN];
 	hrtime_t	hretime;
 	int		b;
@@ -2072,34 +2071,11 @@ _getUniqueId(void)
 	time_t		thetime;
 
 	/*
-	 * try and use makeuuid to generate a unique i.d. Such a unique i.d.
-	 * will look like:
-	 *		7814e3c1-1dd2-11b2-9fe8-000d560ddc82
-	 */
-
-	args[0] = "makeuuid";
-	args[1] = (char *)NULL;
-
-	b = e_ExecCmdList(&execStatus, &execResults, (char *)NULL,
-		"/usr/bin/makeuuid", (char *)NULL);
-
-	if ((b == 0) && (execStatus == 0) && (*execResults != '\0')) {
-		char	*p;
-		p = strpbrk(execResults, " \t\n");
-		if (p != (char *)NULL) {
-			*p = '\0';
-		}
-		log_msg(LOG_MSG_DEBUG, MSG_LOCK_GENUID_MAKEUUID,
-			execResults);
-		return (execResults);
-	}
-
-	/*
-	 * cannot run makeuuid - generate own unique key - the key is the
+	 * generate own unique key - the key is the
 	 * same length as unique uid but contains different information that
 	 * is as unique as can be made - include current hires time (nanosecond
-	 * real timer. Such a unique i.d. will look like:
-	 *		0203104092-1145345-0004e94d6af481a0
+	 * real timer). Such a unique i.d. will look like:
+	 * 	0203104092-1145345-0004e94d6af481a0
 	 */
 
 	hretime = gethrtime();
@@ -2108,10 +2084,10 @@ _getUniqueId(void)
 	(void) localtime_r(&thetime, &tstruct);
 
 	(void) snprintf(newkey, sizeof (newkey),
-		"%02d%02d%02d%03d-%02d%02d%02d%d-%016llx", tstruct.tm_mday,
-		tstruct.tm_mon, tstruct.tm_year, tstruct.tm_yday,
-		tstruct.tm_hour, tstruct.tm_min, tstruct.tm_sec,
-		tstruct.tm_wday, hretime);
+	    "%02d%02d%02d%03d-%02d%02d%02d%d-%016llx", tstruct.tm_mday,
+	    tstruct.tm_mon, tstruct.tm_year, tstruct.tm_yday,
+	    tstruct.tm_hour, tstruct.tm_min, tstruct.tm_sec,
+	    tstruct.tm_wday, hretime);
 
 	log_msg(LOG_MSG_DEBUG, MSG_LOCK_GENUID_INTERNAL, newkey);
 	return (strdup(newkey));

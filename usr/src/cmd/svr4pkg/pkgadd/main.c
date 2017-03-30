@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -55,15 +59,12 @@
 #include <locale.h>
 #include <libintl.h>
 #include <pkgtrans.h>
-#include <boot_http.h>
 #include <assert.h>
 
 /*
  * consolidation pkg command library includes
  */
 #include <pkglib.h>
-#include <pkgerr.h>
-#include <pkgweb.h>
 
 #include <instzones_api.h>
 
@@ -236,30 +237,26 @@ static int		pkgZoneInstall(char *a_zoneName,
 				char *a_adminFile, boolean_t a_tmpzn);
 static void		resetreturn();
 static void		usage(void);
-static boolean_t	add_packages(char **a_pkgList, char *a_uri,
+static boolean_t	add_packages(char **a_pkgList,
 				char *a_idsName, int a_repeat,
 				char *a_altBinDir, char *a_device,
 				boolean_t a_noZones);
 static boolean_t	add_packages_in_global_no_zones(char **a_pkgList,
-				char *a_uri, char *a_idsName, int a_repeat,
+				char *a_idsName, int a_repeat,
 				char *a_altBinDir, char *a_device);
 static boolean_t	add_packages_in_global_with_zones(char **a_pkgList,
-				char *a_uri, char *a_idsName, int a_repeat,
+				char *a_idsName, int a_repeat,
 				char *a_altBinDir, char *a_device,
 				zoneList_t a_zlst);
 static boolean_t	add_packages_in_nonglobal_zone(char **a_pkgList,
-				char *a_uri, char *a_idsName, int a_repeat,
+				char *a_idsName, int a_repeat,
 				char *a_altBinDir, char *a_device);
 static boolean_t	check_applicability(char *a_packageDir,
 				char *a_pkgInst, char *a_rootPath,
 				CAF_T a_flags);
 static boolean_t	get_package_list(char ***r_pkgList, char **a_argv,
 				char *a_categories, char **a_categoryList,
-				int a_ignoreSignatures, PKG_ERR *a_err,
-				ushort_t a_httpProxyPort, char *a_httpProxyName,
-				keystore_handle_t a_keystore,
-				char *a_keystoreFile, char *a_idsName,
-				int *r_repeat);
+				char *a_idsName, int *r_repeat);
 static boolean_t	continue_installation(void);
 static boolean_t	unpack_and_check_packages(char **a_pkgList,
 				char *a_idsName, char *a_packageDir);
@@ -290,33 +287,22 @@ static boolean_t	unpack_and_check_packages(char **a_pkgList,
 int
 main(int argc, char **argv)
 {
-	PKG_ERR			*err = NULL;
-	WebScheme		scheme = none;
 	char			**category = NULL;
 	char			*abiPtr;
 	char			*altBinDir = (char *)NULL;
 	char			*catg_arg = NULL;
 	char			*device = NULL;		/* dev pkg stored on */
-	char			*dwnld_dir = NULL;
-	char			*keystore_file = NULL;
 	char			*p;
 	char			*q;
 	char			*prog;
 	char			*prog_full_name = NULL;
-	char			*proxy = NULL;
 	char			*spoolDir = NULL;	/* specified with -s */
-	char			*uri = NULL;
 	char			Rpath[PATH_MAX+1] = {'\0'};
 	int			c;
-	int			ignore_sig = 0;
 	int			n;
 	int			repeat;
-	int			retries = NET_RETRIES_DEFAULT;
-	int			timeout = NET_TIMEOUT_DEFAULT;
-	keystore_handle_t	keystore = NULL;
 	struct sigaction	nact;
 	struct sigaction	oact;
-	ushort_t		proxy_port = 0;
 
 	/* initialize locale environment */
 
@@ -350,14 +336,6 @@ main(int argc, char **argv)
 
 	npkgs = 0;
 
-	/* set default password prompt for encrypted packages */
-
-	set_passphrase_prompt(MSG_PASSPROMPT);
-
-	/* initialize security operations structures and libraries */
-
-	sec_init();
-
 	if (z_running_in_global_zone() && !enable_local_fs()) {
 		progerr(ERR_CANNOT_ENABLE_LOCAL_FS);
 	}
@@ -371,7 +349,7 @@ main(int argc, char **argv)
 	 */
 
 	while ((c = getopt(argc, argv,
-		"?Aa:b:B:Cc:D:d:GhIik:MnO:P:R:r:Ss:tV:vx:Y:zZ")) != EOF) {
+		"?Aa:b:B:Cc:D:d:GhIMnO:R:r:Ss:tV:vY:zZ")) != EOF) {
 		switch (c) {
 
 		/*
@@ -481,22 +459,7 @@ main(int argc, char **argv)
 				/* NOTREACHED */
 			}
 
-			if (strncmp(optarg, HTTP, 7) == 0) {
-				scheme = web_http;
-			} else if (strncmp(optarg, HTTPS, 8) == 0) {
-				scheme = web_https;
-			}
-
-			if (scheme == web_https || scheme == web_http) {
-				uri = optarg;
-				if ((device = malloc(PATH_MAX)) == NULL) {
-					progerr(ERR_MEM);
-					exit(1);
-				}
-				(void) memset(device, '\0', PATH_MAX);
-			} else {
-				device = flex_device(optarg, 1);
-			}
+			device = flex_device(optarg, 1);
 			break;
 
 		/*
@@ -529,29 +492,6 @@ main(int argc, char **argv)
 		 */
 		case 'I':
 			init_install++;
-			break;
-
-		/*
-		 * Not a public interface: ignore signatures.
-		 */
-		case 'i':
-			ignore_sig++;
-			break;
-
-		/*
-		 * Public interface: Use keystore as the location from which to
-		 * get trusted certificate authority certificates when verifying
-		 * digital signatures found in packages. If no keystore is
-		 * specified, then the default keystore locations are searched
-		 * for valid trusted certificates.
-		 */
-		case 'k':
-			if (!path_valid(optarg)) {
-				progerr(ERR_PATH, optarg);
-				quit(1);
-				/* NOTREACHED */
-			}
-			keystore_file = optarg;
 			break;
 
 		/*
@@ -655,27 +595,6 @@ main(int argc, char **argv)
 			break;
 
 		/*
-		 * Public interface: Password to use to decrypt keystore
-		 * specified with -k, if required. See PASS PHRASE
-		 * ARGUMENTS for more information about the format of this
-		 * option's argument.
-		 */
-		case 'P':
-			if (optarg[0] == '-') {
-				usage();
-				quit(1);
-			}
-			set_passphrase_passarg(optarg);
-			if (ci_strneq(optarg, "pass:", 5)) {
-				/*
-				 * passwords on the command line are highly
-				 * insecure.  complain.
-				 */
-				logerr(PASSWD_CMDLINE, "pass:<pass>");
-			}
-			break;
-
-		/*
 		 * Public interface: Define the full path name of a
 		 * directory to use as the root_path.  All files,
 		 * including package system information files, are
@@ -774,24 +693,6 @@ main(int argc, char **argv)
 		 */
 		case 'v':
 			pkgverbose++;
-			break;
-
-		/*
-		 * Public interface: Specify a HTTP[S] proxy to use when
-		 * downloading packages The format of proxy is host:port,
-		 * where host is the hostname of the HTTP[S] proxy, and
-		 * port is the port number associated with the proxy. This
-		 * switch overrides all other methods of specifying a
-		 * proxy. See ENVIRONMENT VARIABLES for more information
-		 * on alternate methods of specifying a default proxy.
-		 */
-		case 'x':
-			if (!path_valid(optarg)) {
-				progerr(ERR_PATH, optarg);
-				quit(1);
-				/* NOTREACHED */
-			}
-			proxy = optarg;
 			break;
 
 		/*
@@ -925,30 +826,6 @@ main(int argc, char **argv)
 
 	/* pkgask does not support the same options as pkgadd */
 
-	if (askflag && proxy) {
-		progerr(ERR_PKGASK_AND_PROXY);
-		usage();
-		return (1);
-	}
-
-	if (askflag && uri) {
-		progerr(ERR_PKGASK_AND_URI);
-		usage();
-		return (1);
-	}
-
-	if (askflag && keystore_file) {
-		progerr(ERR_PKGASK_AND_KEYSTORE_FILE);
-		usage();
-		return (1);
-	}
-
-	if (askflag && ignore_sig) {
-		progerr(ERR_PKGASK_AND_IGNORE_SIG);
-		usage();
-		return (1);
-	}
-
 	if (askflag && spoolDir) {
 		progerr(ERR_PKGASK_AND_SPOOLDIR);
 		usage();
@@ -957,14 +834,6 @@ main(int argc, char **argv)
 
 	if (askflag && nointeract) {
 		progerr(ERR_PKGASK_AND_NOINTERACT);
-		usage();
-		return (1);
-	}
-
-	/* cannot use response file and web address together */
-
-	if (respfile && uri) {
-		progerr(ERR_RESPFILE_AND_URI);
 		usage();
 		return (1);
 	}
@@ -1063,9 +932,9 @@ main(int argc, char **argv)
 		set_depend_pkginfo_DB(B_TRUE);
 	}
 
-	/* if no device and no url, get and validate default device */
+	/* if no device, get and validate default device */
 
-	if ((device == NULL) && (uri == NULL)) {
+	if (device == NULL) {
 		device = devattr("spool", "pathname");
 		if (device == NULL) {
 			progerr(ERR_NODEVICE);
@@ -1122,106 +991,6 @@ main(int argc, char **argv)
 	}
 
 	echoDebug(DBG_PKGADD_TMPDIR, tmpdir);
-
-	/*
-	 * setup and prepare secure package operations
-	 */
-
-	/* initialize error object used by security functions */
-
-	err = pkgerr_new();
-
-	/* validate keystore file */
-
-	if (!check_keystore_admin(&keystore_file)) {
-		progerr(ERR_ADM_KEYSTORE);
-		quit(1);
-		/* NOTREACHED */
-	}
-
-	/* if uri provided, establish session */
-
-	if (uri != NULL) {
-		boolean_t	b;
-		int		len;
-		char		*bname = (char *)NULL;
-
-		set_web_install();
-
-		if (!get_proxy_port(err, &proxy, &proxy_port)) {
-			pkgerr(err);
-			quit(1);
-			/* NOTREACHED */
-		}
-
-		if (proxy == NULL) {
-			if (!get_proxy_port_admin(&proxy, &proxy_port)) {
-				progerr(ERR_ADM_PROXY);
-				quit(1);
-				/* NOTREACHED */
-			}
-		}
-
-		if ((retries = web_ck_retries()) == 0) {
-			pkgerr(err);
-			quit(1);
-			/* NOTREACHED */
-		}
-
-		if ((timeout = web_ck_timeout()) == 0) {
-			pkgerr(err);
-			quit(1);
-			/* NOTREACHED */
-		}
-
-		/* create temporary directory */
-
-		b = setup_temporary_directory(&dwnld_dir, tmpdir, "dwnld");
-		if (b != B_TRUE) {
-			progerr(ERR_DWNLDTEMPDIR, tmpdir, strerror(errno));
-			quit(1);
-			/* NOTREACHED */
-		}
-		canonize_slashes(dwnld_dir);
-
-		/* register with quit() so directory is removed on exit */
-
-		quitSetDwnldTmpdir(dwnld_dir);	/* DO NOT FREE() */
-
-		/* open keystore if this is a secure download */
-		if (scheme == web_https) {
-			if (open_keystore(err, keystore_file,
-			    get_prog_name(),  pkg_passphrase_cb,
-			    KEYSTORE_DFLT_FLAGS, &keystore) != 0) {
-				pkgerr(err);
-				web_cleanup();
-				quit(1);
-				/* NOTREACHED */
-			}
-		}
-
-		if (!web_session_control(err, uri, dwnld_dir, keystore, proxy,
-			proxy_port, retries, timeout, nointeract, &bname)) {
-			pkgerr(err);
-			web_cleanup();
-			quit(1);
-			/* NOTREACHED */
-		}
-
-		/*
-		 * reset device to point to newly-downloaded file; note
-		 * when (scheme == web_https || scheme == web_http) that
-		 * device gets preloaded with a pointer to PATH_MAX bytes
-		 * allocated via malloc().
-		 */
-
-		len = snprintf(device, PATH_MAX, "%s/%s", dwnld_dir, bname);
-		if ((len < 0) || (len >= PATH_MAX)) {
-			progerr(ERR_DIR_CONST, tmpdir);
-			quit(1);
-			/* NOTREACHED */
-		}
-	}
 
 	/*
 	 * See if user wants this to be handled as an old style pkg.
@@ -1286,8 +1055,7 @@ main(int argc, char **argv)
 			quit(1);
 		}
 
-		n = pkgtrans(device, spoolDir, &argv[optind],
-				0, NULL, NULL);
+		n = pkgtrans(device, spoolDir, &argv[optind], 0);
 		quit(n);
 		/* NOTREACHED */
 	}
@@ -1337,8 +1105,7 @@ main(int argc, char **argv)
 		 */
 
 		b = get_package_list(&pkglist, argv, catg_arg, category,
-			ignore_sig, err, proxy_port, proxy, keystore,
-			keystore_file, ids_name, &repeat);
+			ids_name, &repeat);
 
 		if (b == B_FALSE) {
 			char	path[PATH_MAX];
@@ -1384,7 +1151,7 @@ main(int argc, char **argv)
 		 * package list generated - add packages
 		 */
 
-		b = add_packages(pkglist, uri, ids_name, repeat,
+		b = add_packages(pkglist, ids_name, repeat,
 					altBinDir, device, noZones);
 
 		/*
@@ -3125,13 +2892,9 @@ unpack_and_check_packages(char **a_pkgList, char *a_idsName, char *a_packageDir)
 
 static boolean_t
 get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
-	char **a_categoryList, int a_ignoreSignatures, PKG_ERR *a_err,
-	ushort_t a_httpProxyPort, char *a_httpProxyName,
-	keystore_handle_t a_keystore, char *a_keystoreFile,
-	char *a_idsName, int *r_repeat)
+	char **a_categoryList, char *a_idsName, int *r_repeat)
 {
 	int		n;
-	url_hport_t	*proxytmp = NULL;
 
 	/* entry assertions */
 
@@ -3164,83 +2927,6 @@ get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
 				pkgdev.dirname, n);
 			quit(n);
 			/* NOTREACHED */
-	}
-
-	/*
-	 * If we are not ignoring signatures, check the package's
-	 * signature if one exists.  pkgask doesn't care about
-	 * signatures though.
-	 */
-	if (!askflag && !a_ignoreSignatures && a_idsName &&
-		(web_ck_authentication() == AUTH_QUIT)) {
-
-		PKCS7		*sig = NULL;
-		STACK_OF(X509)	*cas = NULL;
-
-		/* Retrieve signature */
-		if (!get_signature(a_err, a_idsName, &pkgdev, &sig)) {
-			pkgerr(a_err);
-			web_cleanup();
-			quit(1);
-			/* NOTREACHED */
-		}
-
-		if (sig != NULL) {
-			/* Found signature.  Verify. */
-			if (a_httpProxyName != NULL) {
-				/* Proxy will be needed for OCSP */
-				proxytmp = malloc(sizeof (url_hport_t));
-				if (url_parse_hostport(a_httpProxyName,
-					proxytmp, a_httpProxyPort)
-					!= URL_PARSE_SUCCESS) {
-					progerr(ERR_PROXY,
-						a_httpProxyName);
-					PKCS7_free(sig);
-					quit(99);
-					/* NOTREACHED */
-				}
-			}
-
-			/* Start with fresh error stack */
-			pkgerr_clear(a_err);
-
-			if (a_keystore == NULL) {
-				/* keystore not opened - open it */
-				if (open_keystore(a_err, a_keystoreFile,
-					get_prog_name(), pkg_passphrase_cb,
-					KEYSTORE_DFLT_FLAGS,
-					&a_keystore) != 0) {
-					pkgerr(a_err);
-					web_cleanup();
-					PKCS7_free(sig);
-					quit(1);
-					/* NOTREACHED */
-				}
-			}
-
-			/* get trusted CA certs */
-			if (find_ca_certs(a_err, a_keystore, &cas) != 0) {
-				pkgerr(a_err);
-				PKCS7_free(sig);
-				web_cleanup();
-				quit(1);
-				/* NOTREACHED */
-			}
-
-			/* Verify signature */
-			if (!ds_validate_signature(a_err, &pkgdev,
-				&a_argv[optind], a_idsName, sig,
-				cas, proxytmp, nointeract)) {
-				pkgerr(a_err);
-				quit(99);
-				/* NOTREACHED */
-			}
-
-			/* cleanup */
-			PKCS7_free(sig);
-			web_cleanup();
-			pkgerr_free(a_err);
-		}
 	}
 
 	/* order package list if input data stream specified */
@@ -3732,7 +3418,7 @@ boot_and_pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName,
  */
 
 static boolean_t
-add_packages_in_global_with_zones(char **a_pkgList, char *a_uri,
+add_packages_in_global_with_zones(char **a_pkgList,
 	char *a_idsName, int a_repeat, char *a_altBinDir,
 	char *a_device, zoneList_t a_zlst)
 {
@@ -3756,7 +3442,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 	assert(a_zlst != (zoneList_t)NULL);
 
 	echoDebug(DBG_ADDPACKAGES_GZ_W_LZ_ENTRY);
-	echoDebug(DBG_ADDPACKAGES_GZ_W_LZ_ARGS, npkgs, PSTR(a_uri),
+	echoDebug(DBG_ADDPACKAGES_GZ_W_LZ_ARGS, npkgs,
 			PSTR(a_idsName), a_repeat, PSTR(a_device));
 
 	/* create temporary directory for use by zone operations */
@@ -3812,7 +3498,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 			pkgs[1] = (char *)NULL;
 
 			n = pkgtrans(packageDir, zoneStreamName, pkgs,
-					PT_SILENT|PT_ODTSTREAM, NULL, NULL);
+					PT_SILENT|PT_ODTSTREAM);
 			if (n != 0) {
 				progerr(ERR_CANNOT_CONVERT_PKGSTRM,
 					pkginst, packageDir, zoneStreamName);
@@ -3963,8 +3649,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 			respfile = respfile_path;
 		}
 
-		echo(MSG_PROC_INST, pkginst,
-			(a_uri && a_idsName) ? a_uri : a_device);
+		echo(MSG_PROC_INST, pkginst, a_device);
 
 		/*
 		 * If we're installing another package in the same
@@ -4118,7 +3803,7 @@ static	char		*zoneAdminFile = (char *)NULL;
  */
 
 static boolean_t
-add_packages_in_nonglobal_zone(char **a_pkgList, char *a_uri,
+add_packages_in_nonglobal_zone(char **a_pkgList,
 	char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device)
 {
 static	char		*zoneTempDir = (char *)NULL;
@@ -4137,7 +3822,7 @@ static	char		*zoneTempDir = (char *)NULL;
 	/* entry debugging info */
 
 	echoDebug(DBG_ADDPACKAGES_LZ_ENTRY);
-	echoDebug(DBG_ADDPACKAGES_LZ_ARGS, npkgs, PSTR(a_uri), PSTR(a_idsName),
+	echoDebug(DBG_ADDPACKAGES_LZ_ARGS, npkgs, PSTR(a_idsName),
 		a_repeat, PSTR(a_device));
 
 	/* create temporary directory for use by zone operations */
@@ -4221,8 +3906,7 @@ static	char		*zoneTempDir = (char *)NULL;
 			respfile = respfile_path;
 		}
 
-		echo(MSG_PROC_INST, pkginst,
-			(a_uri && a_idsName) ? a_uri : a_device);
+		echo(MSG_PROC_INST, pkginst, a_device);
 
 		/*
 		 * If we're installing another package in the same
@@ -4296,7 +3980,7 @@ static	char		*zoneTempDir = (char *)NULL;
  */
 
 static boolean_t
-add_packages_in_global_no_zones(char **a_pkgList, char *a_uri,
+add_packages_in_global_no_zones(char **a_pkgList,
 	char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device)
 {
 	int		n;
@@ -4309,7 +3993,7 @@ add_packages_in_global_no_zones(char **a_pkgList, char *a_uri,
 	assert(a_pkgList != (char **)NULL);
 
 	echoDebug(DBG_ADDPACKAGES_GZ_NO_LZ_ENTRY);
-	echoDebug(DBG_ADDPACKAGES_GZ_NO_LZ_ARGS, npkgs, PSTR(a_uri),
+	echoDebug(DBG_ADDPACKAGES_GZ_NO_LZ_ARGS, npkgs,
 		PSTR(a_idsName), a_repeat, PSTR(a_device));
 
 	/*
@@ -4374,8 +4058,7 @@ add_packages_in_global_no_zones(char **a_pkgList, char *a_uri,
 			respfile = respfile_path;
 		}
 
-		echo(MSG_PROC_INST, pkginst,
-			(a_uri && a_idsName) ? a_uri : a_device);
+		echo(MSG_PROC_INST, pkginst, a_device);
 
 		/*
 		 * If we're installing another package in the same
@@ -4446,7 +4129,7 @@ add_packages_in_global_no_zones(char **a_pkgList, char *a_uri,
  */
 
 static boolean_t
-add_packages(char **a_pkgList, char *a_uri,
+add_packages(char **a_pkgList,
 	char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device,
 	boolean_t a_noZones)
 {
@@ -4458,7 +4141,7 @@ add_packages(char **a_pkgList, char *a_uri,
 	assert(a_pkgList != (char **)NULL);
 
 	echoDebug(DBG_ADDPACKAGES_ENTRY);
-	echoDebug(DBG_ADDPACKAGES_ARGS, npkgs, PSTR(a_uri), PSTR(a_idsName),
+	echoDebug(DBG_ADDPACKAGES_ARGS, npkgs, PSTR(a_idsName),
 		a_repeat, PSTR(a_altBinDir), PSTR(a_device));
 
 	/*
@@ -4480,7 +4163,7 @@ add_packages(char **a_pkgList, char *a_uri,
 			return (B_FALSE);
 		}
 
-		b = add_packages_in_nonglobal_zone(a_pkgList, a_uri, a_idsName,
+		b = add_packages_in_nonglobal_zone(a_pkgList, a_idsName,
 			a_repeat, a_altBinDir, a_device);
 
 		(void) z_unlock_this_zone(ZLOCKS_ALL);
@@ -4524,7 +4207,7 @@ add_packages(char **a_pkgList, char *a_uri,
 
 		/* add packages to all zones */
 
-		b = add_packages_in_global_with_zones(a_pkgList, a_uri,
+		b = add_packages_in_global_with_zones(a_pkgList,
 			a_idsName, a_repeat, a_altBinDir, a_device, zlst);
 
 		/* unlock all zones */
@@ -4551,7 +4234,7 @@ add_packages(char **a_pkgList, char *a_uri,
 		return (B_FALSE);
 	}
 
-	b = add_packages_in_global_no_zones(a_pkgList, a_uri, a_idsName,
+	b = add_packages_in_global_no_zones(a_pkgList, a_idsName,
 		a_repeat, a_altBinDir, a_device);
 
 	(void) z_unlock_this_zone(ZLOCKS_ALL);

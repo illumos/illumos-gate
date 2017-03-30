@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -93,11 +97,6 @@ struct admin {
 	char	*setuid;
 	char	*conflict;
 	char	*action;
-	char	*networktimeout;
-	char	*networkretries;
-	char	*authentication;
-	char	*keystore;
-	char	*proxy;
 	char	*basedir;
 	char	*rscriptalt;
 };
