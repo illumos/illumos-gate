@@ -118,6 +118,4 @@ legacy pkg=SUNWpkgcmdsu \
 license cr_ATT license=cr_ATT
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license usr/src/lib/libpkg/THIRDPARTYLICENSE \
-    license=usr/src/lib/libpkg/THIRDPARTYLICENSE
 link path=usr/lib/libpkg.so target=./libpkg.so.1

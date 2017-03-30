@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -506,6 +510,7 @@ pkgcmd(PKGserver srv, void *cmd, size_t len, char **result, size_t *rlen,
 	}
 	/* Error return */
 	if (da.data_size == sizeof (int)) {
+		/* LINTED */
 		int x = *(int *)da.data_ptr;
 		if (x != 0) {
 			if (result == NULL || da.rbuf != *result)

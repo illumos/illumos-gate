@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -121,7 +125,6 @@ static char	pkgbin[PATH_MAX],
 		*admnfile, 		/* file to use for installation admin */
 		*tmpdir; 		/* location to place temporary files */
 
-static boolean_t	path_valid(char *path);
 static void		ckreturn(int retcode, char *msg);
 static void		rmclass(char *aclass, int rm_remote, char *a_zoneName);
 static void		usage(void);
@@ -1351,29 +1354,4 @@ usage(void)
 	(void) fprintf(stderr, ERR_USAGE_PKGREMOVE);
 
 	exit(1);
-}
-
-/*
- * Name:		path_valid
- * Description:	Checks a string for being a valid path
- *
- * Arguments:	path - path to validate
- *
- * Returns :	B_TRUE - success, B_FALSE otherwise.
- *		B_FALSE means path was null, too long (>PATH_MAX),
- *		or too short (<1)
- */
-static boolean_t
-path_valid(char *path)
-{
-	if (path == NULL) {
-		return (B_FALSE);
-	} else if (strlen(path) > PATH_MAX) {
-		return (B_FALSE);
-	} else if (strlen(path) >= 1) {
-		return (B_TRUE);
-	} else {
-		/* path < 1 */
-		return (B_FALSE);
-	}
 }

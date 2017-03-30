@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,7 +40,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include "pkglocale.h"
-#include "pkgerr.h"
 
 static char	*ProgName = NULL; 	/* Set via set_prog_name() */
 
@@ -93,17 +96,6 @@ progerr(char *fmt, ...)
 
 	(void) fprintf(stderr, "\n");
 }
-
-void
-pkgerr(PKG_ERR *err)
-{
-	int i;
-
-	for (i = 0; i < pkgerr_num(err); i++) {
-		progerr("%s", pkgerr_get(err, i));
-	}
-}
-
 
 /*
  * set_memalloc_failure_func()

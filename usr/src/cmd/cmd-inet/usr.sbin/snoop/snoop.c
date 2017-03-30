@@ -531,8 +531,7 @@ static int tone[] = {
  * an 8k read sounds like a "WHAAAARP".
  */
 void
-click(len)
-	int len;
+click(int len)
 {
 	len /= 8;
 	len = len ? len : 4;
@@ -563,10 +562,8 @@ show_count()
  * line display.
  */
 void
-show_pktinfo(flags, num, src, dst, ptvp, tvp, drops, len)
-	int flags, num, drops, len;
-	char *src, *dst;
-	struct timeval *ptvp, *tvp;
+show_pktinfo(int flags, int num, char *src, char *dst, struct timeval *ptvp,
+    struct timeval *tvp, int drops, int len)
 {
 	struct tm *tm;
 	static struct timeval tvp0;
@@ -582,9 +579,9 @@ show_pktinfo(flags, num, src, dst, ptvp, tvp, drops, len)
 
 	if (flags & F_TIME) {
 		if (flags & F_ATIME) {
-			(void) sprintf(lp, "%d:%02d:%d.%05d ",
-				tm->tm_hour, tm->tm_min, tm->tm_sec,
-				(int)tvp->tv_usec / 10);
+			(void) sprintf(lp, "%02d:%02d:%02d.%05d ",
+			    tm->tm_hour, tm->tm_min, tm->tm_sec,
+			    (int)tvp->tv_usec / 10);
 			lp += strlen(lp);
 		} else {
 			if (flags & F_RTIME) {
@@ -633,7 +630,7 @@ show_pktinfo(flags, num, src, dst, ptvp, tvp, drops, len)
 		(void) sprintf(encap, "  (%d encap)", total_encap_levels - 1);
 		(void) printf("%s%s%s\n", line, sumline[start],
 		    ((flags & F_ALLSUM) || (total_encap_levels == 1)) ? "" :
-			encap);
+		    encap);
 
 		for (i = start + 1; i < sumcount; i++)
 			(void) printf("%s%s\n", line, sumline[i]);
@@ -673,8 +670,7 @@ get_sum_line()
 
 /*ARGSUSED*/
 char *
-get_detail_line(off, len)
-	int off, len;
+get_detail_line(int off, int len)
 {
 	if (detail_line[0]) {
 		(void) printf("%s\n", detail_line);

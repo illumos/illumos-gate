@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -35,18 +39,11 @@
 #include <unistd.h>
 #include <locale.h>
 #include <sys/param.h>
-#include <openssl/bio.h>
 
 #include <pkglib.h>
-#include <pkgerr.h>
-#include <keystore.h>
 #include "pkgadm.h"
 #include "pkgadm_msgs.h"
 #include "libadm.h"
-
-/* initial error message buffer size */
-
-#define	ERR_BUFSIZE		2048
 
 /* Local Function Prototypes */
 
@@ -67,15 +64,6 @@ struct cmd  cmds[] = {
 	/* last one must be all NULLs */
 	{ NULL, NULL }
 };
-
-struct cmd cert_cmds[] = {
-	{ "addcert",		addcert},
-	{ "listcert",		listcert},
-	{ "removecert",		removecert},
-	/* last one must be all NULLs */
-	{ NULL, NULL }
-};
-
 
 /*
  * Function:	main
@@ -137,20 +125,6 @@ main(int argc, char **argv)
 		}
 	}
 
-	/* initialize security library */
-	sec_init();
-
-	/* OK, hand it off to the subcommand processors */
-	for (cur_cmd = 0; cert_cmds[cur_cmd].c_name != NULL; cur_cmd++) {
-		if (ci_streq(argv[optind], cert_cmds[cur_cmd].c_name)) {
-			/* make subcommand the first option */
-			newargc = argc - optind;
-			newargv = argv + optind;
-			opterr = optind = 1; optopt = 0;
-			return (cert_cmds[cur_cmd].c_func(newargc, newargv));
-		}
-	}
-
 	/* bad subcommand */
 	log_msg(LOG_MSG_ERR, MSG_BAD_SUB, argv[optind]);
 	log_msg(LOG_MSG_INFO, MSG_USAGE);
@@ -181,23 +155,6 @@ boolean_t
 get_verbose()
 {
 	return (log_get_verbose());
-}
-
-/*
- * Name:	log_pkgerr
- * Description:	Outputs pkgerr messages to logging facility.
- * Scope:	public
- * Arguments:	type - the severity of the message
- *		err - error stack to dump to facility
- * Returns:	none
- */
-void
-log_pkgerr(LogMsgType type, PKG_ERR *err)
-{
-	int i;
-	for (i = 0; i < pkgerr_num(err); i++) {
-		log_msg(type, "%s", pkgerr_get(err, i));
-	}
 }
 
 /*
