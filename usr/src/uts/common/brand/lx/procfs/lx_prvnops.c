@@ -79,6 +79,7 @@
 #include <inet/ipclassifier.h>
 #include <sys/socketvar.h>
 #include <fs/sockfs/socktpi.h>
+#include <sys/random.h>
 
 /* Dependent on procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -222,6 +223,7 @@ static void lxpr_read_net_unix(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_aiomax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_aionr(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_filemax(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_fs_filenr(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_inotify_max_queued_events(lxpr_node_t *,
     lxpr_uiobuf_t *);
 static void lxpr_read_sys_fs_inotify_max_user_instances(lxpr_node_t *,
@@ -236,6 +238,7 @@ static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_osrel(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_pid_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_rand_entavl(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_sem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmall(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -296,6 +299,10 @@ extern rctl_hndl_t rc_zone_semmni;
 extern rctl_hndl_t rc_zone_msgmni;
 extern rctl_hndl_t rc_zone_shmmax;
 extern rctl_hndl_t rc_zone_shmmni;
+
+/* From uts/common/crypto/io/swrand.c */
+extern swrand_stats_t swrand_stats;
+
 #define	ONEGB	1073741824ULL
 #define	FOURGB	4294967295ULL
 
@@ -503,6 +510,7 @@ static lxpr_dirent_t sys_fsdir[] = {
 	{ LXPR_SYS_FS_AIO_MAX_NR,	"aio-max-nr" },
 	{ LXPR_SYS_FS_AIO_NR,		"aio-nr" },
 	{ LXPR_SYS_FS_FILEMAX,		"file-max" },
+	{ LXPR_SYS_FS_FILENR,		"file-nr" },
 	{ LXPR_SYS_FS_INOTIFYDIR,	"inotify" },
 };
 
@@ -546,6 +554,7 @@ static lxpr_dirent_t sys_kerneldir[] = {
  */
 static lxpr_dirent_t sys_randdir[] = {
 	{ LXPR_SYS_KERNEL_RAND_BOOTID,	"boot_id" },
+	{ LXPR_SYS_KERNEL_RAND_ENTAVL,	"entropy_avail" },
 };
 
 #define	SYS_RANDDIRFILES (sizeof (sys_randdir) / sizeof (sys_randdir[0]))
@@ -836,6 +845,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_fs_aiomax,	/* /proc/sys/fs/aio-max-nr */
 	lxpr_read_sys_fs_aionr,		/* /proc/sys/fs/aio-nr */
 	lxpr_read_sys_fs_filemax,	/* /proc/sys/fs/file-max */
+	lxpr_read_sys_fs_filenr,	/* /proc/sys/fs/file-nr	*/
 	lxpr_read_invalid,		/* /proc/sys/fs/inotify	*/
 	lxpr_read_sys_fs_inotify_max_queued_events, /* max_queued_events */
 	lxpr_read_sys_fs_inotify_max_user_instances, /* max_user_instances */
@@ -850,6 +860,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_kernel_pid_max,	/* /proc/sys/kernel/pid_max */
 	lxpr_read_invalid,		/* /proc/sys/kernel/random */
 	lxpr_read_sys_kernel_rand_bootid, /* /proc/sys/kernel/random/boot_id */
+	lxpr_read_sys_kernel_rand_entavl, /* .../kernel/random/entropy_avail */
 	lxpr_read_sys_kernel_sem,	/* /proc/sys/kernel/sem */
 	lxpr_read_sys_kernel_shmall,	/* /proc/sys/kernel/shmall */
 	lxpr_read_sys_kernel_shmmax,	/* /proc/sys/kernel/shmmax */
@@ -978,6 +989,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/fs/aio-max-nr */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/fs/aio-nr */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/fs/file-max */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/fs/file-nr */
 	lxpr_lookup_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
 	lxpr_lookup_not_a_dir,		/* .../inotify/max_queued_events */
 	lxpr_lookup_not_a_dir,		/* .../inotify/max_user_instances */
@@ -992,6 +1004,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/pid_max */
 	lxpr_lookup_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
+	lxpr_lookup_not_a_dir,		/* .../kernel/random/entropy_avail */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/sem */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmall */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/shmmax */
@@ -1120,6 +1133,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/fs/aio-max-nr */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/fs/aio-nr */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/fs/file-max */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/fs/file-nr */
 	lxpr_readdir_sys_fs_inotifydir,	/* /proc/sys/fs/inotify	*/
 	lxpr_readdir_not_a_dir,		/* .../inotify/max_queued_events */
 	lxpr_readdir_not_a_dir,		/* .../inotify/max_user_instances */
@@ -1134,6 +1148,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/pid_max */
 	lxpr_readdir_sys_kdir_randdir,	/* /proc/sys/kernel/random */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/random/boot_id */
+	lxpr_readdir_not_a_dir,		/* .../kernel/random/entropy_avail */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/sem */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmall */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/shmmax */
@@ -4331,6 +4346,57 @@ lxpr_read_sys_fs_filemax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * lxpr_read_sys_fs_filenr():
+ *
+ * Contains 3 numbers: current number of allocated file handles (open files),
+ * number of free file handles, and max. number of file handles (same value as
+ * we use in lxpr_read_sys_fs_filemax). Note that since Linux 2.6 the "free"
+ * value is always 0, so we just do the same here. We don't keep track of the
+ * number of files in use within a zone, so we approximate that value by
+ * looking at the current "fi_nfiles" value for each process in the zone.
+ */
+/* ARGSUSED */
+static void
+lxpr_read_sys_fs_filenr(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	zone_t *zone = LXPTOZ(lxpnp);
+	uint64_t max_fh, proc_lim, curr_files = 0;
+	int i;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_FS_FILENR);
+	proc_lim = (uint64_t)(zone->zone_nprocs_ctl == INT_MAX ?
+	    maxpid : zone->zone_nprocs_ctl);
+	max_fh = proc_lim * (uint64_t)rlim_fd_max;
+
+	for (i = 1; i < v.v_proc; i++) {
+		uint_t nfiles;
+		proc_t *p;
+		uf_info_t *fip;
+
+		mutex_enter(&pidlock);
+
+		if ((p = pid_entry(i)) == NULL || p->p_stat == SIDL ||
+		    p->p_pid == 0 || p->p_zone != zone ||
+		    p == zone->zone_zsched ||
+		    secpolicy_basic_procinfo(CRED(), p, curproc) != 0) {
+			mutex_exit(&pidlock);
+			continue;
+		}
+
+		fip = P_FINFO(p);
+		mutex_enter(&fip->fi_lock);
+		nfiles = fip->fi_nfiles;
+		mutex_exit(&fip->fi_lock);
+
+		mutex_exit(&pidlock);
+
+		curr_files += nfiles;
+	}
+
+	lxpr_uiobuf_printf(uiobuf, "%llu\t0\t%llu\n", curr_files, max_fh);
+}
+
+/*
  * inotify tunables exported via /proc.
  */
 extern int inotify_maxevents;
@@ -4530,6 +4596,19 @@ lxpr_read_sys_kernel_rand_bootid(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_exit(&lxzd->lxzd_lock);
 
 	lxpr_uiobuf_printf(uiobuf, "%s\n", bootid);
+}
+
+/*
+ * The amount of entropy available (in bits).
+ */
+/* ARGSUSED */
+static void
+lxpr_read_sys_kernel_rand_entavl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_RAND_ENTAVL);
+	ASSERT(LXPTOZ(lxpnp)->zone_brand == &lx_brand);
+
+	lxpr_uiobuf_printf(uiobuf, "%d\n", swrand_stats.ss_entEst);
 }
 
 /* ARGSUSED */
