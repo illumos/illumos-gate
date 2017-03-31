@@ -12049,7 +12049,6 @@ f usr/share/man/man1m/ldapclient.1m 0444 root bin
 f usr/share/man/man1m/link.1m 0444 root bin
 f usr/share/man/man1m/listdgrp.1m 0444 root bin
 f usr/share/man/man1m/listen.1m 0444 root bin
-f usr/share/man/man1m/lms.1m 0444 root bin
 f usr/share/man/man1m/locator.1m 0444 root bin
 f usr/share/man/man1m/lockfs.1m 0444 root bin
 f usr/share/man/man1m/lockstat.1m 0444 root bin
