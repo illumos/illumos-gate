@@ -590,7 +590,6 @@ f kernel/drv/amd64/eibnx 0755 root sys
 f kernel/drv/amd64/fasttrap 0755 root sys
 f kernel/drv/amd64/fbt 0755 root sys
 f kernel/drv/amd64/fm 0755 root sys
-f kernel/drv/amd64/heci 0755 root sys
 f kernel/drv/amd64/hid 0755 root sys
 f kernel/drv/amd64/hubd 0755 root sys
 f kernel/drv/amd64/hxge 0755 root sys
@@ -18709,7 +18708,6 @@ s usr/share/man/man7d/firewire.7d=ieee1394.7d
 f usr/share/man/man7d/full.7d 0444 root bin
 f usr/share/man/man7d/gld.7d 0444 root bin
 f usr/share/man/man7d/hci1394.7d 0444 root bin
-f usr/share/man/man7d/heci.7d 0444 root bin
 f usr/share/man/man7d/hid.7d 0444 root bin
 f usr/share/man/man7d/hubd.7d 0444 root bin
 f usr/share/man/man7d/hxge.7d 0444 root bin
