@@ -202,6 +202,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_FS_AIO_MAX_NR,	/* /proc/sys/fs/aio-max-nr */
 	LXPR_SYS_FS_AIO_NR,	/* /proc/sys/fs/aio-nr	*/
 	LXPR_SYS_FS_FILEMAX,	/* /proc/sys/fs/file-max */
+	LXPR_SYS_FS_FILENR,	/* /proc/sys/fs/file-nr */
 	LXPR_SYS_FS_INOTIFYDIR,	/* /proc/sys/fs/inotify	*/
 	LXPR_SYS_FS_INOTIFY_MAX_QUEUED_EVENTS,	/* inotify/max_queued_events */
 	LXPR_SYS_FS_INOTIFY_MAX_USER_INSTANCES,	/* inotify/max_user_instances */
@@ -216,6 +217,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_KERNEL_PID_MAX,	/* /proc/sys/kernel/pid_max */
 	LXPR_SYS_KERNEL_RANDDIR,	/* /proc/sys/kernel/random */
 	LXPR_SYS_KERNEL_RAND_BOOTID, /* /proc/sys/kernel/random/boot_id */
+	LXPR_SYS_KERNEL_RAND_ENTAVL, /* /proc/sys/kernel/random/entropy_avail */
 	LXPR_SYS_KERNEL_SEM,		/* /proc/sys/kernel/sem		*/
 	LXPR_SYS_KERNEL_SHMALL,		/* /proc/sys/kernel/shmall	*/
 	LXPR_SYS_KERNEL_SHMMAX,		/* /proc/sys/kernel/shmmax	*/
