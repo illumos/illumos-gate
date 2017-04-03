@@ -168,11 +168,11 @@ OBJS +=	closeall.o dev.o ioctl.o nullfs.o stat.o fstat.o close.o lseek.o \
 	open.o read.o write.o readdir.o
 
 # network routines
-SRCS +=	$(LIBSTAND_SRC)/arp.c $(LIBSTAND_SRC)/ether.c \
+SRCS +=	$(LIBSTAND_SRC)/arp.c $(LIBSTAND_SRC)/ether.c $(LIBSTAND_SRC)/ip.c \
 	$(LIBSTAND_SRC)/inet_ntoa.c $(LIBSTAND_SRC)/in_cksum.c \
 	$(LIBSTAND_SRC)/net.c $(LIBSTAND_SRC)/udp.c $(LIBSTAND_SRC)/netif.c \
 	$(LIBSTAND_SRC)/rpc.c
-OBJS +=	arp.o ether.o inet_ntoa.o in_cksum.o net.o udp.o netif.o rpc.o
+OBJS +=	arp.o ether.o ip.o inet_ntoa.o in_cksum.o net.o udp.o netif.o rpc.o
 
 # network info services:
 SRCS +=	$(LIBSTAND_SRC)/bootp.c $(LIBSTAND_SRC)/rarp.c \
