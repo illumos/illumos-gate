@@ -18,9 +18,9 @@
 /*
  * blkdev driver for NVMe compliant storage devices
  *
- * This driver was written to conform to version 1.1b of the NVMe specification.
- * It may work with newer versions, but that is completely untested and disabled
- * by default.
+ * This driver was written to conform to version 1.2.1 of the NVMe
+ * specification.  It may work with newer versions, but that is completely
+ * untested and disabled by default.
  *
  * The driver has only been tested on x86 systems and will not work on big-
  * endian systems without changes to the code accessing registers and data
@@ -207,7 +207,7 @@
 
 /* NVMe spec version supported */
 static const int nvme_version_major = 1;
-static const int nvme_version_minor = 1;
+static const int nvme_version_minor = 2;
 
 /* tunable for admin command timeout in seconds, default is 1s */
 static volatile int nvme_admin_cmd_timeout = 1;
