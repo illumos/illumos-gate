@@ -87,11 +87,7 @@ static int	pxe_netif_get(struct iodesc *desc, void *pkt, size_t len,
 static int	pxe_netif_put(struct iodesc *desc, void *pkt, size_t len);
 static void	pxe_netif_end(struct netif *nif);
 
-#ifdef OLD_NFSV2
-int nfs_getrootfh(struct iodesc*, char*, u_char*);
-#else
 int nfs_getrootfh(struct iodesc*, char*, uint32_t*, u_char*);
-#endif
 
 extern struct netif_stats	pxe_st[];
 extern u_int16_t		__bangpxeseg;
@@ -100,6 +96,7 @@ extern void			__bangpxeentry(void);
 extern u_int16_t		__pxenvseg;
 extern u_int16_t		__pxenvoff;
 extern void			__pxenventry(void);
+extern struct in_addr		servip;
 
 struct netif_dif pxe_ifs[] = {
 /*      dif_unit        dif_nsel        dif_stats       dif_private     */
@@ -260,7 +257,7 @@ pxe_open(struct open_file *f, ...)
     char temp[FNAME_SIZE];
     int error = 0;
     int i;
-	
+
     va_start(args, f);
     devname = va_arg(args, char*);
     va_end(args);
@@ -276,17 +273,35 @@ pxe_open(struct open_file *f, ...)
 	    }
 	    if (pxe_debug)
 		printf("pxe_open: netif_open() succeeded\n");
+	    if (socktodesc(pxe_sock) == NULL) {
+		printf("pxe_open: bad socket %d\n", pxe_sock);
+		return (ENXIO);
+	    }
 	}
 	if (rootip.s_addr == 0) {
 		/*
-		 * Do a bootp/dhcp request to find out where our
+		 * Try to extract the RFC1048 data from PXE.
+		 * Otherwise do a bootp/dhcp request to find out where our
 		 * NFS/TFTP server is.  Even if we dont get back
 		 * the proper information, fall back to the server
 		 * which brought us to life and a default rootpath.
 		 */
-		bootp(pxe_sock, BOOTP_PXE);
+		if (dhcp_try_rfc1048(bootplayer.vendor.d, BOOTP_DHCPVEND) < 0) {
+		    if (pxe_debug)
+			printf("pxe_open: no RFC1048 data in PXE Cache\n");
+		    bootp(pxe_sock, BOOTP_PXE);
+		} else if (pxe_debug) {
+		    printf("pxe_open: loaded RFC1048 data from PXE Cache\n");
+		}
+
 		if (rootip.s_addr == 0)
 			rootip.s_addr = bootplayer.sip;
+		if (gateip.s_addr == 0)
+			gateip.s_addr = bootplayer.gip;
+		if (myip.s_addr == 0)
+			myip.s_addr = bootplayer.yip;
+		if (servip.s_addr == 0)
+			servip = rootip;
 
 		netproto = NET_NFS;
 		if (tftpip.s_addr != 0) {
@@ -324,6 +339,9 @@ pxe_open(struct open_file *f, ...)
 		printf("pxe_open: server addr: %s\n", inet_ntoa(rootip));
 		printf("pxe_open: server path: %s\n", rootpath);
 		printf("pxe_open: gateway ip:  %s\n", inet_ntoa(gateip));
+		printf("pxe_open: my ip:       %s\n", inet_ntoa(myip));
+		printf("pxe_open: netmask:     %s\n", intoa(netmask));
+		printf("pxe_open: servip:      %s\n", inet_ntoa(servip));
 
 		if (netproto == NET_TFTP) {
 		    setenv("boot.tftproot.server", inet_ntoa(rootip), 1);
@@ -437,55 +455,6 @@ pxe_perror(int err)
  * Reach inside the libstand NFS code and dig out an NFS handle
  * for the root filesystem.
  */
-#ifdef OLD_NFSV2
-struct nfs_iodesc {
-	struct	iodesc	*iodesc;
-	off_t	off;
-	u_char	fh[NFS_FHSIZE];
-	/* structure truncated here */
-};
-extern struct	nfs_iodesc nfs_root_node;
-extern int      rpc_port;
-
-static void
-pxe_rpcmountcall()
-{
-	struct	iodesc *d;
-	int     error;
-
-	if (!(d = socktodesc(pxe_sock)))
-		return;
-        d->myport = htons(--rpc_port);
-        d->destip = rootip;
-	if ((error = nfs_getrootfh(d, rootpath, nfs_root_node.fh)) != 0) 
-		printf("NFS MOUNT RPC error: %d\n", error);
-	nfs_root_node.iodesc = d;
-}
-
-static void
-pxe_setnfshandle(char *rootpath)
-{
-	int	i;
-	u_char	*fh;
-	char	buf[2 * NFS_FHSIZE + 3], *cp;
-
-	/*
-	 * If NFS files were never opened, we need to do mount call
-	 * ourselves. Use nfs_root_node.iodesc as flag indicating
-	 * previous NFS usage.
-	 */
-	if (nfs_root_node.iodesc == NULL)
-		pxe_rpcmountcall();
-
-	fh = &nfs_root_node.fh[0];
-	buf[0] = 'X';
-	cp = &buf[1];
-	for (i = 0; i < NFS_FHSIZE; i++, cp += 2)
-		sprintf(cp, "%02x", fh[i]);
-	sprintf(cp, "X");
-	setenv("boot.nfsroot.nfshandle", buf, 1);
-}
-#else	/* !OLD_NFSV2 */
 
 #define	NFS_V3MAXFHSIZE		64
 
@@ -542,7 +511,6 @@ pxe_setnfshandle(char *rootpath)
 	sprintf(buf, "%d", nfs_root_node.fhsize);
 	setenv("boot.nfsroot.nfshandlelen", buf, 1);
 }
-#endif	/* OLD_NFSV2 */
 
 void
 pxenv_call(int func)
