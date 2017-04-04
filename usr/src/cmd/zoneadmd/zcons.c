@@ -420,7 +420,13 @@ devlinks:
 	 */
 	(void) snprintf(conspath, sizeof (conspath), "/dev/zcons/%s/%s",
 	    zone_name, ZCONS_MASTER_NAME);
-	if ((masterfd = open(conspath, O_RDWR | O_NOCTTY)) == -1) {
+	for (i = 0; i < ZCONS_RETRY; i++) {
+		masterfd = open(conspath, O_RDWR | O_NOCTTY);
+		if (masterfd >= 0 || errno != ENOENT)
+			break;
+		(void) sleep(1);
+	}
+	if (masterfd == -1) {
 		zerror(zlogp, B_TRUE, "ERROR: could not open master side of "
 		    "zone console for %s to acquire slave handle", zone_name);
 		master_zcons_failed = B_TRUE;
