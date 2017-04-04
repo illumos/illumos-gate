@@ -38,7 +38,6 @@ dir path=usr/share/man
 dir path=usr/share/man/man4
 file path=usr/lib/print/libhttp-core.so.1
 file path=usr/lib/print/psm-ipp.so.1
-file path=usr/share/man/man4/mod_ipp.4
 legacy pkg=SUNWpsm-ipp \
     desc="Client side support for communicating with IPP based print servers" \
     name="FSG Open Printing API IPP Print Service Module" \

@@ -1,21 +1,20 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright (c) 2017 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PKGTRANS 1 "Oct 30, 2007"
+.TH PKGTRANS 1 "Mar 2, 2017"
 .SH NAME
 pkgtrans \- translate package format
 .SH SYNOPSIS
 .LP
 .nf
-\fBpkgtrans\fR [\fB-inosg\fR] [\fB-k\fR \fIkeystore\fR] [\fB-a\fR \fIalias\fR] [\fB-P\fR \fIpasswd\fR] \fIdevice1\fR \fIdevice2\fR
-     [\fIpkginst\fR]...
+\fBpkgtrans\fR [\fB-inos\fR] \fIdevice1\fR \fIdevice2\fR [\fIpkginst\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpkgtrans\fR utility translates an installable package from one format to
 another. It translates:
@@ -24,12 +23,6 @@ another. It translates:
 .ie t \(bu
 .el o
 a file system format to a datastream
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-a file system format to a signed datastream
 .RE
 .RS +4
 .TP
@@ -44,29 +37,8 @@ a datastream to a file system format
 one file system format to another file system format
 .RE
 .SH OPTIONS
-.sp
 .LP
 The options and arguments for this command are:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR \fIalias\fR\fR
-.ad
-.RS 15n
-Use public key certificate associated with friendlyName alias, and the
-corresponding private key. See \fBKEYSTORE LOCATIONS\fR and \fBKEYSTORE AND
-CERTIFICATE FORMATS\fR in \fBpkgadd\fR(1M) for more information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-g\fR\fR
-.ad
-.RS 15n
-Sign resulting datastream.
-.RE
-
 .sp
 .ne 2
 .na
@@ -74,24 +46,6 @@ Sign resulting datastream.
 .ad
 .RS 15n
 Copies only the \fBpkginfo\fR(4) and \fBpkgmap\fR(4) files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-k\fR \fIkeystore\fR\fR
-.ad
-.RS 15n
-Use keystore to retrieve private key used to generate signature. If it not
-specified, default locations are searched to find the specified private key
-specified by \fB-a\fR. If no alias is given, and multiple keys exist in the key
-store, \fBpkgtrans\fR will abort. See \fBKEYSTORE LOCATIONS\fR and \fBKEYSTORE
-AND CERTIFICATE FORMATS\fR in \fBpkgadd\fR(1M) for more information on search
-locations and formats.
-.sp
-When running as a user other than root, the default base directory for
-certificate searching is \fB~/.pkg/security\fR, where \fB~\fR is the home
-directory of the user invoking \fBpkgtrans\fR.
 .RE
 
 .sp
@@ -118,16 +72,6 @@ be overwritten if it already exists.
 .sp
 .ne 2
 .na
-\fB\fB-P\fR \fIpasswd\fR\fR
-.ad
-.RS 15n
-Supply password used to decrypt the keystore. See \fBPASS PHRASE ARGUMENTS\fR
-in \fBpkgadd\fR(1M) for details on the syntax of the argument to this option.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB-s\fR\fR
 .ad
 .RS 15n
@@ -137,7 +81,6 @@ format on devices that support both formats.
 .RE
 
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIdevice1\fR\fR
@@ -175,7 +118,6 @@ quotes (\fB\&'\fR) or preceded by a backslash (\fB\e\fR).
 .RE
 
 .SH DEVICE SPECIFIERS
-.sp
 .LP
 Packaging tools, including \fBpkgtrans\fR, \fBpkgadd\fR(1M), and
 \fBpkgchk\fR(1M), have options for specifying a package location by specifying
@@ -270,23 +212,7 @@ example% pkgtrans -s /tmp /dev/diskette pkg1 pkg2
 .sp
 
 .LP
-\fBExample 4 \fRCreating a Signed Package
-.sp
-.LP
-The following example creates a signed package from \fBpkg1\fR and \fBpkg2\fR,
-and reads the password from the \fB$PASS\fR environment variable:
-
-.sp
-.in +2
-.nf
-example% pkgtrans -sg -k /tmp/keystore.p12 -a foo \e
-    -p env:PASS /tmp /tmp/signedpkg pkg1 pkg2
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 5 \fRTranslating a Package Datastream
+\fBExample 4 \fRTranslating a Package Datastream
 .sp
 .LP
 The following example translates a package datastream into a file system format
@@ -301,12 +227,10 @@ example%  pkgtrans /tmp/pkg1.pkg ~/tmp pkg1
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 The \fBMAXINST\fR variable is set in the \fBpkginfo\fR(4) file and declares the
 maximum number of package instances.
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -325,7 +249,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -342,10 +265,8 @@ Interface Stability	See below.
 
 .sp
 .LP
-The command-line syntax is Evolving. The digitally-signed stream package is
-Evolving.
+The command-line syntax is Evolving.
 .SH SEE ALSO
-.sp
 .LP
 \fBpkginfo\fR(1), \fBpkgmk\fR(1), \fBpkgparam\fR(1), \fBpkgproto\fR(1),
 \fBinstallf\fR(1M), \fBpkgadd\fR(1M), \fBpkgask\fR(1M), \fBpkgrm\fR(1M),
@@ -355,7 +276,6 @@ Evolving.
 .LP
 \fIApplication Packaging Developer\&'s Guide\fR
 .SH NOTES
-.sp
 .LP
 By default, \fBpkgtrans\fR does not translate any instance of a package if any
 instance of that package already exists on the destination device. Using the

@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright (c) 2017 Peter Tribble.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -35,7 +36,6 @@ ROOTLINKS=   $(ROOTUSRSBIN)/pkgask
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg
 
 LDLIBS	+=	-lpkg -linstzones -ladm
-LDLIBS	+=	-lcrypto -lwanboot
 
 .KEEP_STATE:
 

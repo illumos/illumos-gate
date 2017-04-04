@@ -119,9 +119,7 @@ fi
 
 'ipfilter')
 	FMRI=$2
-	IPP_FMRI="svc:/application/print/ipp-listener:default"
 	RFC1179_FMRI="svc:/application/print/rfc1179:default"
-	IPP_CONF=/etc/lp/ipp/httpd-standalone-ipp.conf
 
 	policy=`get_policy $FMRI`
 
@@ -138,30 +136,6 @@ fi
 		generate_rules $FMRI $policy $rfc_proto $rfc_port $file
 		generate_rules $FMRI $policy $rfc_proto $rfc_port $file6 _6
         fi
-
-	file=`fmri_to_file $IPP_FMRI $IPF_SUFFIX`
-	file6=`fmri_to_file $IPP_FMRI $IPF6_SUFFIX`
-	echo "# $IPP_FMRI" >$file
-	echo "# $IPP_FMRI" >$file6
-        service_is_enabled ${IPP_FMRI}
-        if [ $? -eq 0 ]; then
-		#
-		# If Listen directives are used, it's possibie to listen on 
-		# more than one ports. Process the Port directives only when Listen
-		# directives don't exist.
-		#
-		ipp_ports=`grep '^[ \t]*[^# ]*Listen' ${IPP_CONF} | awk '{print $2}'`
-
-		if [ -z "$ipp_ports" ]; then
-			ipp_ports=`grep '^[ \t]*[^# ]*Port' ${IPP_CONF} | \
-			    awk '{print $2}' | tail -1`
-		fi
-
-		for port in $ipp_ports; do
-			generate_rules $FMRI $policy "tcp" $port $file
-			generate_rules $FMRI $policy "tcp" $port $file6 _6
-		done
-	fi
 
 	;;
 

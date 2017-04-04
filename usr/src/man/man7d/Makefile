@@ -12,9 +12,9 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2017, Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -209,7 +209,6 @@ i386_MANFILES=	ahci.7d		\
 		dnet.7d		\
 		ecpp.7d		\
 		elxl.7d		\
-		heci.7d		\
 		i40e.7d		\
 		i915.7d		\
 		ipmi.7d		\
@@ -240,20 +239,21 @@ i386_MANFILES=	ahci.7d		\
 		ural.7d		\
 		urtw.7d		\
 		wpi.7d		\
+		xhci.7d		\
 		zyd.7d
 
 _MANLINKS=	1394.7d		\
-	 	allkmem.7d	\
-	 	bscbus.7d	\
-	 	fdc.7d		\
-	 	firewire.7d	\
-	 	i2bsc.7d	\
-	 	kmem.7d		\
-	 	lo0.7d		\
-	 	ticots.7d	\
-	 	ticotsord.7d	\
-	 	urandom.7d	\
-	 	usb.7d
+		allkmem.7d	\
+		bscbus.7d	\
+		fdc.7d		\
+		firewire.7d	\
+		i2bsc.7d	\
+		kmem.7d		\
+		lo0.7d		\
+		ticots.7d	\
+		ticotsord.7d	\
+		urandom.7d	\
+		usb.7d
 
 sparc_MANLINKS=	drmach.7d	\
 		ngdr.7d		\

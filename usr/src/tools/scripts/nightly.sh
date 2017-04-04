@@ -522,13 +522,6 @@ function use_tools {
 	CTFMERGE=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfmerge
 	export CTFMERGE
 
-	if [ "$VERIFY_ELFSIGN" = "y" ]; then
-		ELFSIGN=${TOOLSROOT}/opt/onbld/bin/elfsigncmp
-	else
-		ELFSIGN=${TOOLSROOT}/opt/onbld/bin/${MACH}/elfsign
-	fi
-	export ELFSIGN
-
 	PATH="${TOOLSROOT}/opt/onbld/bin/${MACH}:${PATH}"
 	PATH="${TOOLSROOT}/opt/onbld/bin:${PATH}"
 	export PATH
@@ -543,7 +536,6 @@ function use_tools {
 	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
 	echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
 	echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
-	echo "ELFSIGN=${ELFSIGN}" >> $LOGFILE
 	echo "PATH=${PATH}" >> $LOGFILE
 	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
 }
@@ -566,7 +558,7 @@ function staffer {
 # Verify that the closed bins are present
 #
 function check_closed_bins {
-	if [[ ! -d "$ON_CLOSED_BINS" ]]; then
+	if [[ -n "$ON_CLOSED_BINS" && ! -d "$ON_CLOSED_BINS" ]]; then
 		echo "ON_CLOSED_BINS must point to the closed binaries tree."
 		build_ok=n
 		exit 1
@@ -1016,14 +1008,6 @@ mkdir -p $TMPDIR || exit 1
 chmod 777 $TMPDIR
 
 #
-# Keep elfsign's use of pkcs11_softtoken from looking in the user home
-# directory, which doesn't always work.   Needed until all build machines
-# have the fix for 6271754
-#
-SOFTTOKEN_DIR=$TMPDIR
-export SOFTTOKEN_DIR
-
-#
 # Tools should only be built non-DEBUG.  Keep track of the tools proto
 # area path relative to $TOOLS, because the latter changes in an
 # export build.
@@ -1363,27 +1347,6 @@ if [ "$w_FLAG" = "y" -a ! -d $ROOT ]; then
 	echo "WARNING: -w specified, but $ROOT does not exist;" \
 	    "ignoring -w\n" | tee -a $mail_msg_file >> $LOGFILE
 	w_FLAG=n
-fi
-
-if [ "$t_FLAG" = "n" ]; then
-	#
-	# We're not doing a tools build, so make sure elfsign(1) is
-	# new enough to safely sign non-crypto binaries.  We test
-	# debugging output from elfsign to detect the old version.
-	#
-	newelfsigntest=`SUNW_CRYPTO_DEBUG=stderr /usr/bin/elfsign verify \
-	    -e /usr/lib/security/pkcs11_softtoken.so.1 2>&1 \
-	    | egrep algorithmOID`
-	if [ -z "$newelfsigntest" ]; then
-		echo "WARNING: /usr/bin/elfsign out of date;" \
-		    "will only sign crypto modules\n" | \
-		    tee -a $mail_msg_file >> $LOGFILE
-		export ELFSIGN_OBJECT=true
-	elif [ "$VERIFY_ELFSIGN" = "y" ]; then
-		echo "WARNING: VERIFY_ELFSIGN=y requires" \
-		    "the -t flag; ignoring VERIFY_ELFSIGN\n" | \
-		    tee -a $mail_msg_file >> $LOGFILE
-	fi
 fi
 
 case $MULTI_PROTO in

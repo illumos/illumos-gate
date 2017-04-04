@@ -1,0 +1,66 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Sep 16, 2016
+.Dt USBA_HCDI_DEV_OPS 9F
+.Os
+.Sh NAME
+.Nm usba_hubdi_bus_ops
+.Nm usba_hubdi_root_hub_power
+.Nd device operations utility functions for HCD drivers
+.Sh SYNOPSIS
+.Ft int
+.Fo usba_hubdi_root_hub_power
+.Fa "dev_info_t *dip"
+.Fa "int component"
+.Fa "int level"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMETERS
+For the parameters of the
+.Fn usba_hubdi_root_hub_power
+function, see
+.Xr power 9E .
+.Sh DESCRIPTION
+The
+.Fn usba_hubdi_root_hub_power
+function is a utility function for the implementation of USB HCD
+drivers. USB HCD drivers that support power management, should use set
+the
+.Sy devo_power
+member of their
+.Xr dev_ops 9S
+structure to the
+.Fn usba_hubdi_root_hub_power
+function. They should not implement their own
+.Xr power 9E
+function.
+.Pp
+In addition, drivers should pass the symbol
+.Sy usba_hubdi_busops
+as the
+.Sy devo_bus_ops
+member. It contains a properly formatted bus operations structure.
+.Sh CONTEXT
+This function should not be called directly, it should only be used as a
+member of a device's
+.Xr dev_ops 9S
+structure.
+.Sh SEE ALSO
+.Xr power 9E ,
+.Xr dev_ops 9S

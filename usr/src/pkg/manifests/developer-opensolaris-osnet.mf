@@ -57,4 +57,3 @@ depend fmri=system/library/libdbus@0.5.11-0.133 type=require
 depend fmri=system/library/mozilla-nss/header-nss@0.5.11-0.133 type=require
 depend fmri=system/management/snmp/net-snmp@5.4.1-0.133 type=require
 depend fmri=text/gnu-gettext@0.16.1-0.133 type=require
-depend fmri=web/server/apache-22 type=require

@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -42,7 +46,6 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <fcntl.h>
-#include <openssl/err.h>
 #include "pkglib.h"
 #include "pkglibmsgs.h"
 #include "pkglocale.h"
@@ -135,7 +138,6 @@ ds_order(char *list[])
 
 static char *pds_header;
 static char *ds_header;
-static char *ds_header_raw;
 static int ds_headsize;
 
 static char *
@@ -421,15 +423,6 @@ ds_init(char *device, char **pkg, char *norewind)
 
 	pds_header = ds_header;
 
-	/* save raw copy of header for later use in BIO_dump_header */
-	if ((ds_header_raw = (char *)malloc(header_size)) == NULL) {
-		progerr(pkg_gt(ERR_UNPACK));
-		logerr(pkg_gt(MSG_MEM));
-		(void) ds_close(0);
-		return (1);
-	}
-	(void) memcpy(ds_header_raw, ds_header, header_size);
-
 	/* read datastream table of contents */
 	ds_head = tail = (struct dstoc *)0;
 	ds_volcnt = 1;
@@ -491,16 +484,9 @@ ds_init(char *device, char **pkg, char *norewind)
 		}
 		(void) strlcat(cmd, pkg[i], CMDSIZ);
 		(void) strlcat(cmd, "'/*' ", CMDSIZ);
-
-		/* extract signature too, if present. */
-		(void) strlcat(cmd, SIGNATURE_FILENAME, CMDSIZ);
 		(void) strlcat(cmd, " ", CMDSIZ);
 	}
 
-	/*
-	 * if we are extracting all packages (pkgs == NULL),
-	 * signature will automatically be extracted
-	 */
 	if (n = esystem(cmd, ds_fd, -1)) {
 		rpterr();
 		progerr(pkg_gt(ERR_UNPACK));
@@ -715,73 +701,6 @@ ds_next(char *device, char *instdir)
 		return (0);
 	}
 	/*NOTREACHED*/
-}
-
-/*
- * Name:		BIO_ds_dump
- * Description:	Dumps all data from the static 'ds_fd' file handle into
- *		the supplied BIO.
- *
- * Arguments:	err - where to record any errors.
- *		device - Description of device being dumped into,
- *			for error reporting
- *		bio - BIO object to dump data into
- *
- * Returns :	zero - successfully dumped all data to EOF
- *		non-zero - some failure occurred.
- */
-int
-BIO_ds_dump(PKG_ERR *err, char *device, BIO *bio)
-{
-	int	amtread;
-	char	readbuf[BLK_SIZE];
-
-	/*
-	 * note this will read to the end of the device, so it won't
-	 * work for character devices since we don't know when the
-	 * end of the CPIO archive is
-	 */
-	while ((amtread = read(ds_fd, readbuf, BLK_SIZE)) != 0) {
-		if (BIO_write(bio, readbuf, amtread) != amtread) {
-			pkgerr_add(err, PKGERR_WRITE, ERR_WRITE, device,
-			    ERR_error_string(ERR_get_error(), NULL));
-			return (1);
-		}
-	}
-
-	return (0);
-	/*NOTREACHED*/
-}
-
-
-/*
- * Name:		BIO_ds_dump_header
- * Description:	Dumps all ds_headsize bytes from the
- *		static 'ds_header_raw' character array
- *		to the supplied BIO.
- *
- * Arguments:	err - where to record any errors.
- *		bio - BIO object to dump data into
- *
- * Returns :	zero - successfully dumped all raw
- *		header characters
- *		non-zero - some failure occurred.
- */
-int
-BIO_ds_dump_header(PKG_ERR *err, BIO *bio)
-{
-
-	char	zeros[BLK_SIZE];
-
-	(void) memset(zeros, 0, BLK_SIZE);
-
-	if (BIO_write(bio, ds_header_raw, ds_headsize) != ds_headsize) {
-		pkgerr_add(err, PKGERR_WRITE, ERR_WRITE, "bio",
-		    ERR_error_string(ERR_get_error(), NULL));
-		return (1);
-	}
-
-	return (0);
 }
 
 /*

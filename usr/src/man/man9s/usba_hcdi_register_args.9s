@@ -1,0 +1,112 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Sep 20, 2016
+.Dt USBA_HCDI_REGISTER_ARGS 9S
+.Os
+.Sh NAME
+.Nm usba_hcdi_register_args ,
+.Nm usba_hcdi_register_args_t
+.Nd USB HCD driver registeration
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private
+.Pp
+This is a private data structure that is not part of the stable DDI. It
+may be removed or changed at any time.
+.Sh DESCRIPTION
+The
+.Sy usba_hcdi_register_args_t
+structure is used by USB HCD device drivers to register with the USBA
+framework.
+.Pp
+The structure is used with the
+.Xr usba_hcdi_register 9F
+function. Device drivers may statically allocate this structure on the
+stack. It does not need to be allocated on the heap or used beyond the
+call to
+.Xr usba_hcdi_register 9F .
+.Pp
+For more information on the HCD device driver initialization process,
+see
+.Xr usba_hcdi 9E .
+.Sh STRUCTURE MEMBERS
+The
+.Sy usba_hcdi_register_args_t
+structure has the following members:
+.Bd -literal -offset indent
+uint_t			usba_hcdi_register_version;
+dev_info_t		*usba_hcdi_register_dip;
+usba_hcdi_ops_t		*usba_hcdi_register_ops;
+ddi_dma_attr_t		*usba_hcdi_register_dma_attr;
+ddi_iblock_cookie_t	usba_hcdi_register_iblock_cookie;
+.Ed
+.Pp
+The
+.Sy usba_hcdi_register_version
+function should be set to the value of the pre-processor macro
+.Sy HCDI_REGISTER_VERSION .
+This ensures that if future revisions to this structure are made,
+existing drivers should continue to function. Note, that this structure
+is
+.Sy Volatile .
+Support for older versions or drastic changes may occur at any time and
+this should not be relied on nor construed as a guarantee against such
+changes.
+.Pp
+The
+.Sy usba_hcdi_register_dip
+should be set to the
+.Sy dev_info_t
+of the device driver instance that is registering with the USBA.
+.Pp
+The
+.Sy usba_hcdi_register_ops
+member is a structure of entry points for the USBA framework to call
+into the USB framework. It should be allocated with a call to
+.Xr usba_alloc_hcdi_ops 9F
+and released with a call to
+.Xr usba_free_hcdi_ops 9F ,
+after the drive has called
+.Xr usba_hcdi_register 9F .
+.Pp
+Please see
+.Xr usba_hcdi_ops 9S
+for more information on the members of the structure and for more
+information on how they should be filled in.
+.Pp
+The
+.Sy usba_hcdi_register_dma_attr
+member should be a pointer to a set of DMA attributes. These DMA
+attributes will be used by a subset of client device drivers to perform
+allocations, in particular scsa2usb. In general, try to make sure that
+these DMA attributes are valid for more transforms, though these will
+generally be used for bulk transfers.
+.Pp
+The
+.Sy usba_hcdi_register_iblock_cookie
+members should be filed in with the general interrupt priority of the
+device driver after it has allocated interrupts. Device drivers may
+obtain the priority by calling
+.Xr ddi_intr_get_pri 9F
+and then casting the obtained interrupt priority to the
+.Sy ddi_iblock_cookie_t .
+.Sh SEE ALSO
+.Xr usba_hcdi 9E ,
+.Xr ddi_intr_get_pri 9F ,
+.Xr usba_alloc_hcdi_ops 9F ,
+.Xr usba_free_hcdi_ops 9F ,
+.Xr usba_hcdi_register 9F ,
+.Xr usba_hcdi_ops 9S

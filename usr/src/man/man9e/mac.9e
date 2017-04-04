@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd March 26, 2017
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -483,7 +483,7 @@ the device is required to fill in. Note, the set of capabilities changes
 over time and there are also private capabilities in the system. Several
 of the capabilities are used in the implementation of the MAC framework.
 Others, like
-.Sy MAC_CAPAB_RIGNS ,
+.Sy MAC_CAPAB_RINGS ,
 represent feature that have not been stabilized and thus both API and
 binary compatibility for them is not guaranteed. It is important that
 the device driver handles unknown capabilities correctly.  For more
@@ -633,7 +633,7 @@ entry point updates the property to a new value.
 .Pp
 Many of the properties listed below are read-only. Each property
 indicates whether it's read-only or it's read/write. However, driver
-writers may not implement the ability to set all writeable properties.
+writers may not implement the ability to set all writable properties.
 Many of these depend on the card itself. In particular, all properties
 that relate to auto-negotiation and are read/write may not be updated
 if the hardware in question does not support toggling what link speeds
@@ -1489,7 +1489,7 @@ as report other errors that exist. While a device driver does not need to
 indicate that it is capable of all such capabilities described in
 .Xr ddi_fm_init 9F ,
 we suggest that device drivers at least register the
-.Sy DDI_FM_EREPORT_CAPABILITY
+.Sy DDI_FM_EREPORT_CAPABLE
 so as to allow the driver to report issues that it detects.
 .Pp
 If the driver registers with the fault management framework during its

@@ -1,0 +1,77 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd May 7, 2016
+.Dt USBA_ALLOC_HCDI_OPS 9F
+.Os
+.Sh NAME
+.Nm usba_alloc_hcdi_ops ,
+.Nm usba_free_hcdi_ops
+.Nd allocate and free USB HCD interface operations structure
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Ft "usba_hcdi_ops_t *"
+.Fo usba_alloc_hcdi_ops
+.Fa void
+.Fc
+.Ft void
+.Fo usba_free_hcdi_ops
+.Fa "usba_hcdi_ops_t *ops"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMATERS
+.Bl -tag -width Fa
+.It Fa ops
+Pointer to an allocated HCD interface operations structure.
+.El
+.Sh DESCRIPTION
+The
+.Fn usba_alloc_hcdi_ops
+function allocates a
+.Xr usba_hcdi_ops_t 9S
+structure for use for a USB HCD driver. As part of initialization, a USB
+HCD driver will allocate this and fill it in. For more information on
+the full lifetime of the object and when a USB HCD driver should release
+the structure, see
+.Xr usba_hcdi 9E .
+.Pp
+The
+.Fn usba_free_hcdi_ops
+function release the memory associated with the
+.Xr usba_hcdi_ops_t 9S
+structure pointed to by
+.Fa ops .
+Only pointers received from a call to the
+.Fn usba_alloc_hcdi_ops
+function should be passed to this function.
+.Sh CONTEXT
+These functions are generally called from kernel context during a USB
+HCD driver's
+.Xr attach 9E
+and
+.Xr detach 9E
+entry points. While it is safe to call this function from user context,
+it would be quite unusal to do so.
+.Sh RETURN VALUES
+The
+.Fn usba_alloc_hcdi_ops
+function always succeeds and returns a pointer to an allocation
+operations structure.
+.Sh SEE ALSO
+.Xr usba_hcdi 9E ,
+.Xr usba_hcdi_ops_t 9S

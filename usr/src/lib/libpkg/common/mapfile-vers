@@ -20,6 +20,10 @@
 #
 
 #
+# Copyright (c) 2017 Peter Tribble.
+#
+
+#
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -45,28 +49,23 @@ SYMBOL_VERSION SUNWprivate {
 	attrdefault;
 	attrpreset;
 	averify;
-	backoff;
 	basepath;
 	canonize;
 	canonize_slashes;
 	cgrgid;
 	cgrnam;
-	check_cert;
-	check_cert_and_key;
 	checksum_off;
 	checksum_on;
 	ckparam;
 	ckvolseq;
 	clgrgid;
 	clgrnam;
-	close_keystore;
 	clpwnam;
 	clpwuid;
 	compute_checksum;
 	cpwnam;
 	cpwuid;
 	cverify;
-	delete_cert_and_keys;
 	devtype;
 	disable_attribute_check;
 	ds_close;
@@ -81,32 +80,21 @@ SYMBOL_VERSION SUNWprivate {
 	ds_putinfo;
 	ds_readbuf;
 	ds_skiptoend;
-	ds_validate_signature;
 	e_ExecCmdArray;
 	e_ExecCmdList;
-	echo_out;
 	ecleanup;
 	enable_local_fs;
 	epclose;
 	epopen;
 	esystem;
-	find_ca_certs;
-	find_cl_certs;
-	find_key_cert_pair;
 	fmkdir;
 	fverify;
 	getErrbufAddr;
 	getErrbufSize;
 	getErrstr;
 	get_categories;
-	get_cert_chain;
 	get_disable_attribute_check;
-	get_endof_string;
 	get_prog_name;
-	get_proxy_port;
-	get_signature;
-	get_startof_string;
-	get_subject_display_name;
 	getmapmode;
 	gpkglist;
 	gpkgmap;
@@ -118,7 +106,6 @@ SYMBOL_VERSION SUNWprivate {
 	isPathRemote;
 	is_not_valid_category;
 	is_not_valid_length;
-	is_web_install;
 	iscpio;
 	isdir;
 	isfile;
@@ -126,22 +113,11 @@ SYMBOL_VERSION SUNWprivate {
 	lookup_cache;
 	mappath;
 	mapvar;
-	merge_ca_cert;
-	merge_cert_and_key;
 	nonABI_symlinks;
-	open_keystore;
 	path_valid;
-	pkg_passphrase_cb;
 	pkgclosefilter;
 	pkgcloseserver;
 	pkgcmd;
-	pkgerr;
-	pkgerr_add;
-	pkgerr_clear;
-	pkgerr_free;
-	pkgerr_get;
-	pkgerr_new;
-	pkgerr_num;
 	pkgexecl;
 	pkgexecv;
 	pkggetentry;
@@ -176,42 +152,19 @@ SYMBOL_VERSION SUNWprivate {
 	pkgtrans;
 	pkgumount;
 	ppkgmap;
-	print_cert;
-	print_certs;
 	progerr;
 	putcfile;
 	putcvfpfile;
-	reset_backoff;
 	restore_local_fs;
 	rpterr;
 	rrmdir;
-	sec_init;
 	setErrstr;
 	set_memalloc_failure_func;
 	set_nonABI_symlinks;
-	set_passphrase_passarg;
-	set_passphrase_prompt;
 	set_prog_name;
-	set_web_install;
 	setmapmode;
 	srchcfile;
-	strip_port;
-	sunw_PKCS12_contents;
-	sunw_PKCS12_create;
-	sunw_check_cert_times;
-	sunw_check_keys;
-	sunw_evp_pkey_free;
-	sunw_find_fname;
-	sunw_find_localkeyid;
-	sunw_get_cert_fname;
-	sunw_get_pkey_fname;
-	sunw_get_pkey_localkeyid;
-	sunw_set_fname;
-	sunw_set_localkeyid;
-	sunw_split_certs;
-	sunw_PEM_contents;
 	tputcfent;
-	validate_signature;
 	vfpCheckpointFile;
 	vfpCheckpointOpen;
 	vfpClearModified;
@@ -226,8 +179,6 @@ SYMBOL_VERSION SUNWprivate {
 	vfpSetSize;
 	vfpTruncate;
 	vfpWriteToFile;
-	web_cleanup;
-	web_session_control;
 	xmalloc;
 	xrealloc;
 	xstrdup;

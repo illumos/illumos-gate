@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -40,8 +41,18 @@
 #include <sys/policy.h>
 #include <sys/fs/tmp.h>
 #include <sys/fs/tmpnode.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+#define	KILOBYTE	1024
+#define	MEGABYTE	(1024 * KILOBYTE)
+#define	GIGABYTE	(1024 * MEGABYTE)
 
 #define	MODESHIFT	3
+
+#define	VALIDMODEBITS	07777
+
+extern pgcnt_t swapfs_minfree;
 
 int
 tmp_taccess(void *vtp, int mode, struct cred *cred)
@@ -71,10 +82,9 @@ tmp_taccess(void *vtp, int mode, struct cred *cred)
  * a plain file and you have write access to that file.
  * Function returns 0 if remove access is granted.
  */
-
 int
 tmp_sticky_remove_access(struct tmpnode *dir, struct tmpnode *entry,
-	struct cred *cr)
+    struct cred *cr)
 {
 	uid_t uid = crgetuid(cr);
 
@@ -128,72 +138,117 @@ tmp_memfree(void *cp, size_t size)
  * maximum value encoded in 'str' is PAGESIZE * ULONG_MAX, while the value
  * returned in 'maxpg' is at most ULONG_MAX.
  *
- * If the number is followed by a "k" or "K", the value is converted from
- * kilobytes to bytes.  If it is followed by an "m" or "M" it is converted
- * from megabytes to bytes.  If it is not followed by a character it is
- * assumed to be in bytes. Multiple letter options are allowed, so for instance
- * '2mk' is interpreted as 2gb.
+ * The number may be followed by a magnitude suffix: "k" or "K" for kilobytes;
+ * "m" or "M" for megabytes; "g" or "G" for gigabytes.  This interface allows
+ * for an arguably esoteric interpretation of multiple suffix characters:
+ * namely, they cascade.  For example, the caller may specify "2mk", which is
+ * interpreted as 2 gigabytes.  It would seem, at this late stage, that the
+ * horse has left not only the barn but indeed the country, and possibly the
+ * entire planetary system. Alternatively, the number may be followed by a
+ * single '%' sign, indicating the size is a percentage of either the zone's
+ * swap limit or the system's overall swap size.
  *
  * Parse and overflow errors are detected and a non-zero number returned on
  * error.
  */
-
 int
 tmp_convnum(char *str, pgcnt_t *maxpg)
 {
-	uint64_t num = 0, oldnum;
+	u_longlong_t num = 0;
 #ifdef _LP64
-	uint64_t max_bytes = ULONG_MAX;
+	u_longlong_t max_bytes = ULONG_MAX;
 #else
-	uint64_t max_bytes = PAGESIZE * (uint64_t)ULONG_MAX;
+	u_longlong_t max_bytes = PAGESIZE * (uint64_t)ULONG_MAX;
 #endif
 	char *c;
+	const struct convchar {
+		char *cc_char;
+		uint64_t cc_factor;
+	} convchars[] = {
+		{ "kK", KILOBYTE },
+		{ "mM", MEGABYTE },
+		{ "gG", GIGABYTE },
+		{ NULL, 0 }
+	};
 
-	if (str == NULL)
+	if (str == NULL) {
 		return (EINVAL);
+	}
 	c = str;
 
 	/*
-	 * Convert str to number
+	 * Convert the initial numeric portion of the input string.
 	 */
-	while ((*c >= '0') && (*c <= '9')) {
-		oldnum = num;
-		num = num * 10 + (*c++ - '0');
-		if (oldnum > num) /* overflow */
-			return (EINVAL);
+	if (ddi_strtoull(str, &c, 10, &num) != 0) {
+		return (EINVAL);
 	}
 
 	/*
-	 * Terminate on null
+	 * Handle a size in percent. Anything other than a single percent
+	 * modifier is invalid. We use either the zone's swap limit or the
+	 * system's total available swap size as the initial value. Perform the
+	 * intermediate calculation in pages to avoid overflow.
 	 */
-	while (*c != '\0') {
-		switch (*c++) {
+	if (*c == '%') {
+		u_longlong_t cap;
 
-		/*
-		 * convert from kilobytes
-		 */
-		case 'k':
-		case 'K':
-			if (num > max_bytes / 1024) /* will overflow */
-				return (EINVAL);
-			num *= 1024;
-			break;
-
-		/*
-		 * convert from megabytes
-		 */
-		case 'm':
-		case 'M':
-			if (num > max_bytes / (1024 * 1024)) /* will overflow */
-				return (EINVAL);
-			num *= 1024 * 1024;
-			break;
-
-		default:
+		if (*(c + 1) != '\0')
 			return (EINVAL);
+
+		if (num > 100)
+			return (EINVAL);
+
+		cap = (u_longlong_t)curproc->p_zone->zone_max_swap_ctl;
+		if (cap == UINT64_MAX) {
+			/*
+			 * Use the amount of available physical and memory swap
+			 */
+			mutex_enter(&anoninfo_lock);
+			cap = TOTAL_AVAILABLE_SWAP;
+			mutex_exit(&anoninfo_lock);
+		} else {
+			cap = btop(cap);
 		}
+
+		num = ptob(cap * num / 100);
+		goto done;
 	}
 
+	/*
+	 * Apply the (potentially cascading) magnitude suffixes until an
+	 * invalid character is found, or the string comes to an end.
+	 */
+	for (; *c != '\0'; c++) {
+		int i;
+
+		for (i = 0; convchars[i].cc_char != NULL; i++) {
+			/*
+			 * Check if this character matches this multiplier
+			 * class:
+			 */
+			if (strchr(convchars[i].cc_char, *c) != NULL) {
+				/*
+				 * Check for overflow:
+				 */
+				if (num > max_bytes / convchars[i].cc_factor) {
+					return (EINVAL);
+				}
+
+				num *= convchars[i].cc_factor;
+				goto valid_char;
+			}
+		}
+
+		/*
+		 * This was not a valid multiplier suffix character.
+		 */
+		return (EINVAL);
+
+valid_char:
+		continue;
+	}
+
+done:
 	/*
 	 * Since btopr() rounds up to page granularity, this round-up can
 	 * cause an overflow only if 'num' is between (max_bytes - PAGESIZE)
@@ -202,5 +257,31 @@ tmp_convnum(char *str, pgcnt_t *maxpg)
 	 */
 	if ((*maxpg = (pgcnt_t)btopr(num)) == 0 && num != 0)
 		return (EINVAL);
+	return (0);
+}
+
+/*
+ * Parse an octal mode string for use as the permissions set for the root
+ * of the tmpfs mount.
+ */
+int
+tmp_convmode(char *str, mode_t *mode)
+{
+	ulong_t num;
+	char *c;
+
+	if (str == NULL) {
+		return (EINVAL);
+	}
+
+	if (ddi_strtoul(str, &c, 8, &num) != 0) {
+		return (EINVAL);
+	}
+
+	if ((num & ~VALIDMODEBITS) != 0) {
+		return (EINVAL);
+	}
+
+	*mode = VALIDMODEBITS & num;
 	return (0);
 }

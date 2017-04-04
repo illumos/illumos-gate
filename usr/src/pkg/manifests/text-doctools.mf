@@ -309,6 +309,7 @@ file path=usr/share/man/man1/troff.1
 file path=usr/share/man/man1/ul.1
 file path=usr/share/man/man1/vgrind.1
 file path=usr/share/man/man5/eqnchar.5
+file path=usr/share/man/man5/mansun.5
 file path=usr/share/man/man5/me.5
 file path=usr/share/man/man5/mm.5
 file path=usr/share/man/man5/ms.5
