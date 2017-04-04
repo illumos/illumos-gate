@@ -1,24 +1,24 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble.
 .\" Copyright (c) 1992, Sun Microsystems, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MANSUN 5 "Jun 11, 1992"
+.TH MANSUN 5 "Apr 2, 2017"
 .SH NAME
 mansun \- macros to format Reference Manual pages
 .SH SYNOPSIS
 .LP
 .nf
-\fBnroff\fR  \fB-mansun\fR \fIfilename\fR...
+\fBnroff\fR \fB-mansun\fR \fIfilename\fR...
 .fi
 
 .LP
 .nf
-\fBtroff\fR  \fB-mansun\fR \fIfilename\fR...
+\fBtroff\fR \fB-mansun\fR \fIfilename\fR...
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These macros are used to lay out the reference pages in this manual. Note: if
 \fIfilename\fR contains format input for a preprocessor, the commands shown
@@ -27,7 +27,7 @@ automatically by \fBman\fR(1). See the ``Conventions'' section.
 .sp
 .LP
 Any text argument \fIt\fR may be zero to six words. Quotes may be used to
-include SPACE characters in a "word".  If \fItext\fR is empty, the special
+include SPACE characters in a "word". If \fItext\fR is empty, the special
 treatment is applied to the next input line with text to be printed. In this
 way \fB\&.I\fR may be used to italicize a whole line, or \fB\&.SB\fR may be
 used to make small bold letters.
@@ -35,7 +35,7 @@ used to make small bold letters.
 .LP
 A prevailing indent distance is remembered between successive indented
 paragraphs, and is reset to default value upon reaching a non-indented
-paragraph.  Default units for indents \fIi\fR are ens.
+paragraph. Default units for indents \fIi\fR are ens.
 .sp
 .LP
 Type font and size are reset to default values before each paragraph, and after
@@ -62,7 +62,6 @@ Change to default type size.
 .RE
 
 .SS "Requests"
-.sp
 .LP
 * n.t.l. = next text line; p.i. = prevailing indent
 .sp
@@ -113,7 +112,7 @@ T}
 \fB\&.SS \fR\fIt\fR	yes	\fIt\fR=n.t.l.	Section Subheading.
 \fB\&.TH \FR\FIN S "f d, m\fR"
 \fB\&.TH \fR\fIn s d f m\fR	yes	-	T{
-Begin reference page \fIn\fR, of of section \fIs\fR; \fId\fR is the date of the most recent change.  If present, \fIf\fR is the left page footer; \fIm\fR is the main page (center) header.  Sets prevailing indent and tabs to .5i.
+Begin reference page \fIn\fR, of of section \fIs\fR; \fId\fR is the date of the most recent change. If present, \fIf\fR is the left page footer; \fIm\fR is the main page (center) header. Sets prevailing indent and tabs to .5i.
 T}
 \fB\&.TP \fR\fIi\fR	yes	\fIi\fR=p.i.	T{
 Begin indented paragraph, with the tag given on the next text line. Set prevailing indent to \fIi\fR.
@@ -124,7 +123,6 @@ T}
 .TE
 
 .SS "Conventions"
-.sp
 .LP
 When formatting a manual page, \fBmansun\fR examines the first line to
 determine whether it requires special processing. For example a first line
@@ -158,8 +156,8 @@ page. This is followed by the number of the section in which it appears.
 The name, or list of names, by which the command is called, followed by a dash
 and then a one-line summary of the action performed. All in Roman font, this
 section contains no \fBtroff\fR(1) commands or escapes, and no macro requests.
-It is used to generate the \fBwindex\fR database, which is used by the
-\fBwhatis\fR(1) command.
+It is used to generate the \fBwhatis\fR database, which is used by the
+\fBwhatis\fR(1) and \fBapropos\fR(1) commands.
 .RE
 
 .sp
@@ -175,7 +173,7 @@ It is used to generate the \fBwindex\fR database, which is used by the
 .ad
 .RS 13n
 The syntax of the command and its arguments, as typed on the command line.
-When in boldface, a word must be typed exactly as printed.  When in italics, a
+When in boldface, a word must be typed exactly as printed. When in italics, a
 word can be replaced with an argument that you supply. References to bold or
 italicized items are not capitalized in other sections, even when they begin a
 sentence.
@@ -219,7 +217,7 @@ bracketed set, the expression within the brackets can be repeated.
 .ad
 .RS 14n
 If required, the data declaration, or \fB#include\fR directive, is shown first,
-followed by the  function declaration. Otherwise, the function declaration is
+followed by the function declaration. Otherwise, the function declaration is
 shown.
 .RE
 
@@ -238,12 +236,12 @@ are normally omitted. This section attempts to provide a succinct overview in
 answer to the question, "what does it do?"
 .sp
 Literal text from the synopsis appears in constant width, as do literal
-filenames and references to items that appear elsewhere in the  reference
+filenames and references to items that appear elsewhere in the reference
 manuals. Arguments are italicized.
 .sp
 If a command interprets either subcommands or an input grammar, its command
 interface or input grammar is normally described in a \fBUSAGE\fR section,
-which follows the \fBOPTIONS\fR section.  The  \fBDESCRIPTION\fR section only
+which follows the \fBOPTIONS\fR section. The \fBDESCRIPTION\fR section only
 describes the behavior of the command itself, not that of subcommands.
 .RE
 
@@ -296,7 +294,6 @@ with the command or function.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/share/lib/tmac/ansun\fR\fR
@@ -305,19 +302,13 @@ with the command or function.
 
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/man/windex\fR\fR
-.ad
-.RS 29n
-
-.RE
-
 .SH SEE ALSO
-.sp
 .LP
-\fBman\fR(1), \fBnroff\fR(1), \fBtroff\fR(1), \fBwhatis\fR(1)
+\fBman\fR(1), \fBnroff\fR(1), \fBtroff\fR(1)
 .sp
 .LP
 Dale Dougherty and Tim O'Reilly, \fIUnix\fR \fIText\fR \fIProcessing\fR
+
+.SH NOTES
+.LP
+New manual pages should be coded in the \fBmdoc\fR(5) format.

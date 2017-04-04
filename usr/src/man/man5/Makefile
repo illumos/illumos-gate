@@ -74,6 +74,7 @@ MANFILES=	Intro.5			\
 		man.5			\
 		mandoc_char.5		\
 		mandoc_roff.5		\
+		mansun.5		\
 		mdoc.5			\
 		me.5			\
 		mech_spnego.5		\

@@ -18604,6 +18604,7 @@ f usr/share/man/man5/lx.5 0444 root bin
 f usr/share/man/man5/man.5 0444 root bin
 f usr/share/man/man5/mandoc_char.5 0444 root bin
 f usr/share/man/man5/mandoc_roff.5 0444 root bin
+f usr/share/man/man5/mansun.5 0444 root bin
 f usr/share/man/man5/mdoc.5 0444 root bin
 f usr/share/man/man5/me.5 0444 root bin
 f usr/share/man/man5/mech_spnego.5 0444 root bin

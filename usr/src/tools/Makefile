@@ -56,8 +56,6 @@ COMMON_SUBDIRS= \
 #  special versions of commands for use only in build
 #
 UNSHIPPED_SUBDIRS = \
-	elfsign \
-	man \
 	mandoc
 
 sparc_SUBDIRS= \

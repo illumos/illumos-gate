@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CRON 1M "Feb 4, 2009"
+.TH CRON 1M "Mar 30, 2017"
 .SH NAME
 cron \- clock daemon
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ cron \- clock daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBcron\fR starts a process that executes commands at specified dates and
 times.
@@ -45,11 +44,10 @@ an \fBat\fR(1) job and the \fB-m\fR option was specified when the job was
 submitted.
 .sp
 .LP
-\fBcron\fR and \fBat\fR jobs are not executed if your account is locked. Jobs
-and processses execute. The \fBshadow\fR(4) file defines which accounts are not
-locked and will have their jobs and processes executed.
+\fBcron\fR and \fBat\fR jobs are not executed if your account is locked.
+The \fBshadow\fR(4) file defines which accounts are not
+locked and will have their jobs executed.
 .SS "Setting cron Jobs Across Timezones"
-.sp
 .LP
 The timezone of the \fBcron\fR daemon sets the system-wide timezone for
 \fBcron\fR entries. This, in turn, is by set by default system-wide using
@@ -61,7 +59,6 @@ If some form of \fBdaylight savings\fR or \fBsummer/winter time\fR is in
 effect, then jobs scheduled during the switchover period could be executed
 once, twice, or not at all.
 .SS "Setting cron Defaults"
-.sp
 .LP
 To keep a log of all actions taken by \fBcron\fR, you must specify
 \fBCRONLOG=YES\fR in the \fB/etc/default/cron\fR file. If you specify
@@ -95,7 +92,6 @@ jobs to \fB/usr/bin:/usr/ucb:\fR. Root jobs continue to use
 .LP
 The \fBcron\fR log file is periodically rotated by \fBlogadm\fR(1M).
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/cron.d\fR\fR
@@ -159,13 +155,11 @@ Configuration file for \fBlogadm\fR
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBat\fR(1), \fBcrontab\fR(1), \fBsh\fR(1), \fBlogadm\fR(1M),
 \fBsvcadm\fR(1M), \fBqueuedefs\fR(4), \fBshadow\fR(4), \fBattributes\fR(5),
 \fBrbac\fR(5), \fBsmf\fR(5), \fBsmf_security\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBcron\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
@@ -185,7 +179,6 @@ status can be queried using the \fBsvcs\fR(1) command. Most administrative
 actions may be delegated to users with the \fBsolaris.smf.manage.cron\fR
 authorization (see \fBrbac\fR(5) and \fBsmf_security\fR(5)).
 .SH DIAGNOSTICS
-.sp
 .LP
 A history of all actions taken by \fBcron\fR is stored in \fB/var/cron/log\fR
 and possibly in \fB/var/cron/olog\fR.
