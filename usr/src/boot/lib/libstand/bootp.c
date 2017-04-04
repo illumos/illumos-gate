@@ -36,7 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/limits.h>
@@ -333,6 +332,17 @@ bootprecv(struct iodesc *d, void *pkt, size_t len, time_t tleft)
 	return(n);
 bad:
 	errno = 0;
+	return (-1);
+}
+
+int
+dhcp_try_rfc1048(uint8_t *cp, size_t len)
+{
+
+	expected_dhcpmsgtype = DHCPACK;
+	if (bcmp(vm_rfc1048, cp, sizeof (vm_rfc1048)) == 0) {
+		return (vend_rfc1048(cp, len));
+	}
 	return (-1);
 }
 

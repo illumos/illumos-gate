@@ -157,18 +157,6 @@ elfcmp
 	is used to test whether two binaries are the same except for
 	the elfsign signature.
 
-elfsign
-	Built from the same sources as the shipped elfsign(1), this
-	version is used in nightly -t builds to assure that the signing
-	process and format is the same as will be used on the target
-	system.
-
-elfsigncmp
-	This script can be used in lieu of elfsign during a build.
-	It uses elfsign to sign a copy of the object and elfcmp -S to
-	verify that the signing caused no damage before updating
-	the object to be signed.
-	
 find_elf
 	Search a directory tree for ELF objects, and produce one line of
 	output per object. Used by check_rtime and interface_check to locate

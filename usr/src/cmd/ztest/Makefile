@@ -29,6 +29,8 @@ PROG:sh=	basename `pwd`
 BASHPROG=	zloop
 ROOTBASHPROG=	$(ROOTBIN)/$(BASHPROG)
 
+CLOBBERFILES=	$(BASHPROG)
+
 include ../Makefile.cmd
 
 $(INTEL_BLD)SUBDIRS	= $(MACH)
