@@ -25,7 +25,9 @@
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
 
-
+#
+# Copyright 2017, OmniTI Computer Consulting, Inc. All rights reserved.
+#
 
 #	Sequence performed to change the init state of a machine.  Only allows
 #	transitions to states 0,1,5,6,s,S (i.e.: down or administrative states).
@@ -44,16 +46,9 @@ notify() {
 	/usr/sbin/wall -a <<-!
 	$*
 	!
-	if [ -x /usr/sbin/showmount -a -x /usr/sbin/rwall ]
-	then
-		remotes=`/usr/sbin/showmount`
-		if [ "X${remotes}" != "X" ]
-		then
-			/usr/sbin/rwall -q ${remotes} <<-!
-			$*
-			!
-		fi
-	fi
+	# We used to do rwall here if showmounts had any output, but
+	# rwall is a potential security hole, and it could block this, so
+	# we don't bother with it anymore.
 }
 
 nologin=/etc/nologin
@@ -228,7 +223,30 @@ echo "Changing to init state $initstate - please wait"
 
 if [ "$pid1" ] || [ "$pid2" ]
 then
-	/usr/bin/kill $pid1 $pid2 > /dev/null 2>&1
+	if [ `zonename` == "global" ]; then
+		# In a global zone, just kill them (even if they don't die).
+		/usr/bin/kill $pid1 $pid2 > /dev/null 2>&1
+	else
+		# In a nonglobal zone, wait for backgrounded processes,
+		# so a backgrounded process does not lose a race to zoneadmd
+		# shutting down.
+		/usr/bin/pwait $pid1 $pid2
+	fi
+fi
+
+# Before starting init, check to see if smf(5) is running.  The easiest way
+# to do this is to check for the existence of the repository service door.
+
+i=0
+# Try three times, sleeping one second each time...
+while [ ! -e /etc/svc/volatile/repository_door -a $i -lt 3 ]; do
+	sleep 1
+	i=`/usr/bin/expr $i + 1`
+done
+
+if [ ! -e /etc/svc/volatile/repository_door ]; then
+	# run "notify" in the foreground this time.
+	notify "Could not find repository door, init-state change may fail!"
 fi
 
 /sbin/init ${initstate}
