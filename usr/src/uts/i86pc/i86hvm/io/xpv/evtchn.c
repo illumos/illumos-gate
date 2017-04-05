@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014 by Delphix. All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/xpv_support.h>
 #include <sys/hypervisor.h>
@@ -268,7 +272,7 @@ again:
 		while (pending_word != 0) {
 			j = lowbit(pending_word) - 1;
 			port = (i << EVTCHN_SHIFT) + j;
-			pending_word = pending_word & ~(1 << j);
+			pending_word = pending_word & ~(1UL << j);
 
 			/*
 			 * If there is a handler registered for this event,
