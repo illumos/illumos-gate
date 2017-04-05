@@ -156,7 +156,9 @@ extern "C" {
  * Fundamental constants of the implementation--cannot be changed easily.
  */
 
+#if !defined(_ASM)
 #define	NBPW	sizeof (int)	/* number of bytes in an integer */
+#endif	/* _ASM */
 
 #define	CMASK	022		/* default mask for file creation */
 #define	CDLIMIT	(1L<<11)	/* default max write address */
@@ -329,7 +331,7 @@ extern void drv_usecwait(clock_t);
  * an architecture. Must be included after definition of DEV_BSIZE.
  */
 
-#if (defined(_KERNEL) || defined(_KMEMUSER))
+#if defined(_KERNEL) || defined(_KMEMUSER) || defined(_BOOT)
 
 #if defined(_MACHDEP)
 #include <sys/machparam.h>
@@ -476,7 +478,7 @@ extern const int _clsize;
 }
 #endif
 
-#else	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
+#else	/* defined(_KERNEL) || defined(_KMEMUSER) || defined(_BOOT) */
 
 /*
  * The following are assorted machine dependent values which can be
@@ -508,6 +510,6 @@ extern long _sysconf(int);	/* System Private interface to sysconf() */
 }
 #endif
 
-#endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) &&  defined(_MACHDEP) */
+#endif	/* defined(_KERNEL) || defined(_KMEMUSER) || defined(_BOOT) */
 
 #endif	/* _SYS_PARAM_H */
