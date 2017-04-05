@@ -11,6 +11,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Joyent, Inc.
 #
 
 
@@ -49,6 +50,11 @@ SYMBOL_SCOPE {
 		nlm_frlock;
 		nlm_register_lock_locally;
 		nlm_shrlock;
+# These four functions are available for use within a branded zone.
+		nlm_nsm_clnt_init;
+		nlm_netbuf_to_netobj;
+		sm_mon_1;
+		sm_unmon_1;
 
 	local:
 		*;

@@ -210,6 +210,7 @@ extern void lx_socket_init();
 extern void lx_socket_fini();
 
 extern int lx_start_nfs_lockd();
+extern void lx_upcall_statd();
 
 lx_systrace_f *lx_systrace_entry_ptr;
 lx_systrace_f *lx_systrace_return_ptr;
@@ -305,7 +306,8 @@ struct brand_ops lx_brops = {
 	NULL,
 #endif
 	B_FALSE,			/* b_intp_parse_arg */
-	lx_clearbrand			/* b_clearbrand */
+	lx_clearbrand,			/* b_clearbrand */
+	lx_upcall_statd			/* b_rpc_statd */
 };
 
 struct brand_mach_ops lx_mops = {
