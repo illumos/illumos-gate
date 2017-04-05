@@ -240,7 +240,7 @@ ONLY_LINT_DEFS=-I${SPRO_ROOT}/sunstudio12.1/prod/include/lint; export ONLY_LINT_
 # If your distro uses certain versions of Perl, make sure either
 # Makefile.master contains your new defaults OR your .env file sets them.
 # Stock illumos-gate does not have these set already.
-export PERL_VERSION=5.16.1
+export PERL_VERSION=5.24.1
 export PERL_ARCH=i86pc-solaris-thread-multi-64int
 export PERL_PKGVERS=
 
