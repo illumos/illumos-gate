@@ -14,8 +14,18 @@
  */
 
 /*
- * Start an NFS lockd (lx_lockd) process inside the zone. This uses the same
- * technique as used in our lx cgroupfs to launch a release agent process.
+ * lx_start_nfs_lockd() starts an NFS lockd (lx_lockd) process inside the zone.
+ * This uses the same technique as used in our lx cgroupfs to launch a release
+ * agent process. This is called implicitly when an NFS mount syscall occurs
+ * within the zone. See the user-level lx_lockd source for the "big theory"
+ * comment behind this.
+ *
+ * lx_upcall_statd() is a brand hook that interposes on the rpc.statd RPC
+ * handling so that we can interface to a Linux rpc.statd that must run
+ * when NFSv3 locking is in use. The rpc.statd handles server or client reboots
+ * and interacts with the lockd to reclaim locks after the server reboots. The
+ * rcp.statd also informs the server when we reboot, so the server can release
+ * the locks we held.
  */
 
 #include <sys/types.h>
@@ -35,8 +45,18 @@
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 #include <sys/pathname.h>
+#include <rpcsvc/nlm_prot.h>
+#include <rpcsvc/sm_inter.h>
+#include <klm/nlm_impl.h>
 
 #define	LX_LOCKD_PATH	"/native/usr/lib/brand/lx/lx_lockd"
+
+/* Linux lockd RPC called by statd when it detects an NFS server reboot */
+#define	LX_NLMPROC_NSM_NOTIFY	16
+
+/* From uts/common/klm/nlm_impl.c */
+extern void nlm_netbuf_to_netobj(struct netbuf *, int *, netobj *);
+extern void nlm_nsm_clnt_init(CLIENT *, struct nlm_nsm *);
 
 /*
  * Check if the current lockd is still running.
@@ -227,4 +247,87 @@ lx_start_nfs_lockd()
 	 * return the result to make it obvious while DTracing.
 	 */
 	return (newproc(lx_run_lockd, NULL, cid, minclsyspri - 1, NULL, -1));
+}
+
+void
+lx_upcall_statd(int op, struct nlm_globals *g, struct nlm_host *host)
+{
+	struct nlm_nsm *nsm;
+	struct mon args;
+	struct mon_id *mip = &args.mon_id;
+	int family;
+	netobj obj;
+	enum clnt_stat stat;
+
+	/*
+	 * For Linux rpc.statd monitor registration, the Linux NSMPROC_MON and
+	 * NSMPROC_UNMON RPC upcalls correspond almost directly to the native
+	 * SM_MON and SM_UNMON RPC upcalls. The key differences with the native
+	 * registration is that in our nlm_host_monitor function we make two
+	 * RPC calls:
+	 *    - the first RPC (nsmaddrproc1_reg_1) uses our private 'nsm_addr'
+	 *	RPC protocol to register the lockd RPC information that statd
+	 *	should call when it detects that the remote server rebooted
+	 *    - the second RPC (sm_mon_1) tells statd the information about the
+	 *	remote server to be monitored
+	 * For Linux, there is only a single RPC from the kernel to the local
+	 * statd. This RPC is equivalent to our sm_mon_1 code, but it uses the
+	 * Linux-private NLMPROC_NSM_NOTIFY lockd procedure in the 'my_proc'
+	 * RPC parameter. This corresponds to our private 'nsm_addr' code, and
+	 * tells statd which lockd RPC to call when it detects a server reboot.
+	 *
+	 * Because our sm_mon_1 RPC is so similar to the Linux RPC, we can use
+	 * that directly and simply set the expected value in the 'my_proc'
+	 * argument.
+	 *
+	 * Within the kernel lockd RPC handling, the nlm_prog_3_dtable dispatch
+	 * table has an entry for each lockd RPC function. Thus, this table also
+	 * contains an entry for the Linux NLMPROC_NSM_NOTIFY procedure. That
+	 * procedure number is unused by the native lockd code, so there is no
+	 * conflict with dispatching that procedure. The implementation of the
+	 * procedure corresponds to the native, private NLM_SM_NOTIFY1
+	 * procedure which is called by the native rpc.statd.
+	 *
+	 * The Linux RPC call to "unmonitor" a host expects the same arguments
+	 * as we pass to monitor, so that is also handled here by this same
+	 * brand hook.
+	 */
+	nlm_netbuf_to_netobj(&host->nh_addr, &family, &obj);
+	nsm = &g->nlm_nsm;
+
+	bzero(&args, sizeof (args));
+
+	mip->mon_name = host->nh_name;
+	mip->my_id.my_name = uts_nodename();
+	mip->my_id.my_prog = NLM_PROG;
+	mip->my_id.my_vers = NLM_SM;
+	mip->my_id.my_proc = LX_NLMPROC_NSM_NOTIFY;
+	if (op == SM_MON) {
+		bcopy(&host->nh_sysid, args.priv, sizeof (uint16_t));
+	}
+
+	sema_p(&nsm->ns_sem);
+	nlm_nsm_clnt_init(nsm->ns_handle, nsm);
+	if (op == SM_MON) {
+		struct sm_stat_res mres;
+
+		bzero(&mres, sizeof (mres));
+		stat = sm_mon_1(&args, &mres, nsm->ns_handle);
+	} else {
+		struct sm_stat ures;
+
+		ASSERT(op == SM_UNMON);
+		bzero(&ures, sizeof (ures));
+		stat = sm_unmon_1(mip, &ures, nsm->ns_handle);
+	}
+	sema_v(&nsm->ns_sem);
+
+	if (stat != RPC_SUCCESS) {
+		NLM_WARN("Failed to contact local statd, stat=%d", stat);
+		if (op == SM_MON) {
+			mutex_enter(&g->lock);
+			host->nh_flags &= ~NLM_NH_MONITORED;
+			mutex_exit(&g->lock);
+		}
+	}
 }

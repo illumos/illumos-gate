@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -412,13 +413,13 @@ nlm_prog_3_dtable[] = {
 	0,
 	0 },
 
-	{ /* 16: not used */
-	NLM_SVC_FUNC(0),
-	(xdrproc_t)0,
-	(xdrproc_t)0,
+	{ /* 16: Linux NLMPROC_NSM_NOTIFY (same handling as NLM_SM_NOTIFY1) */
+	NLM_SVC_FUNC(nlm_sm_notify1_2_svc),
+	(xdrproc_t)xdr_nlm_sm_status,
+	(xdrproc_t)xdr_void,
 	NULL,
 	0,
-	0 },
+	NLM_DISP_NOREMOTE },
 
 	{ /* 17: NLM_SM_NOTIFY1 */
 	NLM_SVC_FUNC(nlm_sm_notify1_2_svc),
