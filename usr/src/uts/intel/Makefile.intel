@@ -23,7 +23,7 @@
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 #
@@ -356,7 +356,6 @@ DRV_KMODS	+= ural
 DRV_KMODS	+= uath
 DRV_KMODS	+= urtw
 DRV_KMODS	+= vgatext
-DRV_KMODS	+= heci
 DRV_KMODS	+= vnic
 DRV_KMODS	+= vscan
 DRV_KMODS	+= wc

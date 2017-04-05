@@ -103,7 +103,6 @@ __GNUC64=		$(__GNUC)
 # The default is POUND_SIGN, meaning "not enabled". If the environment
 # passes in an override like ENABLE_SMB_PRINTING= (empty) that will
 # uncomment things in the lower Makefiles to enable the feature.
-ENABLE_IPP_PRINTING=	$(POUND_SIGN)
 ENABLE_SMB_PRINTING=	$(POUND_SIGN)
 
 # CLOSED is the root of the tree that contains source which isn't released
@@ -187,7 +186,6 @@ TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
 XARGS=		/usr/bin/xargs
 ELFEDIT=	/usr/bin/elfedit
-ELFSIGN=	/usr/bin/elfsign
 DTRACE=		/usr/sbin/dtrace -xnolibs
 UNIQ=		/usr/bin/uniq
 TAR=		/usr/bin/tar
@@ -917,10 +915,6 @@ CTFCVTFLAGS=		-i -L VERSION
 CTFMRGFLAGS=
 
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
-
-ELFSIGN_O=	$(TRUE)
-ELFSIGN_CRYPTO=	$(ELFSIGN_O)
-ELFSIGN_OBJECT=	$(ELFSIGN_O)
 
 # Rules (normally from make.rules) and macros which are used for post
 # processing files. Normally, these do stripping of the comment section

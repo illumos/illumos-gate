@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -40,12 +44,6 @@ extern "C" {
 #include <stdio.h>
 #include <pkgdev.h>
 #include <pkgstrct.h>
-#include <openssl/bio.h>
-#include <openssl/x509.h>
-#include <netdb.h>
-#include <boot_http.h>
-#include "pkgerr.h"
-#include "keystore.h"
 #include "cfext.h"
 
 /*
@@ -355,32 +353,12 @@ struct dstr {
 #define	SMALL_DIVISOR		4
 #define	MED_DIVISOR		5
 #define	LARGE_DIVISOR		10
-#define	MED_DWNLD		(10 * 1024 * 1024) /* 10 MB */
-#define	LARGE_DWNLD		(5 * MED_DWNLD) /* 50 MB */
-
-#define	HTTP			"http://"
-#define	HTTPS			"https://"
 
 #define	PKGADD			"pkgadd"
-
-/* Settings for network admin defaults */
-
-#define	NET_TIMEOUT_DEFAULT 	60
-#define	NET_RETRIES_DEFAULT 	3
-#define	NET_TIMEOUT_MIN		1		/* 1 second */
-#define	NET_TIMEOUT_MAX		(5 * 60)	/* 5 minutes */
-#define	NET_RETRIES_MIN		1
-#define	NET_RETRIES_MAX		10
-#define	AUTH_NOCHECK		0
-#define	AUTH_QUIT		1
 
 /* package header magic tokens */
 #define	HDR_PREFIX	"# PaCkAgE DaTaStReAm"
 #define	HDR_SUFFIX	"# end of header"
-
-/* name of security files */
-#define	PKGSEC		"/var/sadm/security"
-#define	SIGNATURE_FILENAME	"signature"
 
 #define	GROUP	"/etc/group"
 #define	PASSWD	"/etc/passwd"
@@ -435,9 +413,6 @@ extern int	ds_getpkg(char *device, int n, char *dstdir);
 extern int	ds_ginit(char *device);
 extern boolean_t	ds_fd_open(void);
 extern int	ds_init(char *device, char **pkg, char *norewind);
-extern int	BIO_ds_dump_header(PKG_ERR *, BIO *);
-extern int	BIO_ds_dump(PKG_ERR *, char *, BIO *);
-extern int	BIO_dump_cmd(char *cmd, BIO *bio);
 extern int	ds_next(char *, char *);
 extern int	ds_readbuf(char *device);
 extern int	epclose(FILE *pp);
@@ -464,7 +439,7 @@ extern int	pkghead(char *device);
 extern int	pkgmount(struct pkgdev *devp, char *pkg, int part, int nparts,
 			int getvolflg);
 extern int	pkgtrans(char *device1, char *device2, char **pkg,
-			int options, keystore_handle_t, char *);
+			int options);
 extern int	pkgumount(struct pkgdev *devp);
 extern int	ppkgmap(struct cfent *ept, FILE *fp);
 extern int	putcfile(struct cfent *ept, FILE *fp);
@@ -474,9 +449,6 @@ extern void	set_memalloc_failure_func(void (*)(int));
 extern void	*xmalloc(size_t size);
 extern void	*xrealloc(void *ptr, size_t size);
 extern char	*xstrdup(char *str);
-extern void	set_passphrase_prompt(char *);
-extern void	set_passphrase_passarg(char *);
-extern int	pkg_passphrase_cb(char *, int, int, void *);
 
 extern int	srchcfile(struct cfent *ept, char *path, PKGserver server);
 extern struct	group *cgrgid(gid_t gid);
@@ -503,22 +475,12 @@ extern int	mappath(int flag, char *path);
 extern int	mapvar(int flag, char *varname);
 /*PRINTFLIKE1*/
 extern void	progerr(char *fmt, ...);
-extern void	pkgerr(PKG_ERR *);
 extern void	rpterr(void);
 extern void	tputcfent(struct cfent *ept, FILE *fp);
 extern void	set_nonABI_symlinks(void);
 extern int	nonABI_symlinks(void);
 extern void	disable_attribute_check(void);
 extern int	get_disable_attribute_check(void);
-
-/* security.c */
-extern void	sec_init(void);
-extern char	*get_subject_display_name(X509 *);
-extern char	*get_issuer_display_name(X509 *);
-extern char	*get_serial_num(X509 *);
-extern char	*get_fingerprint(X509 *, const EVP_MD *);
-extern int	get_cert_chain(PKG_ERR *, X509 *, STACK_OF(X509) *,
-    STACK_OF(X509) *, STACK_OF(X509) **);
 
 /* pkgstr.c */
 void		pkgstrConvertUllToTimeString_r(unsigned long long a_time,
@@ -566,6 +528,9 @@ extern int	vfpWriteToFile(VFP_T *a_vfp, char *a_path);
 /* handlelocalfs.c */
 boolean_t	enable_local_fs(void);
 boolean_t	restore_local_fs(void);
+
+/* path_valid.c */
+extern boolean_t	path_valid(char *);
 
 /* pkgserv.c */
 extern PKGserver	pkgopenserver(const char *, const char *, boolean_t);

@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,7 +40,6 @@
 #include <libintl.h>
 
 #include <pkglib.h>
-#include <pkgweb.h>
 #include <messages.h>
 
 #include <libadm.h>
@@ -65,7 +68,6 @@ extern int	warnflag;	/* != 0 if non-fatal error has occurred (2) */
  * forward declarations
  */
 
-static char		*dwnldTempDir = (char *)NULL;
 static char		*idsName = (char *)NULL;
 static char		*zoneTempDir = (char *)NULL;
 static ckreturnFunc_t	*ckreturnFunc = (ckreturnFunc_t *)NULL;
@@ -79,7 +81,6 @@ static zoneList_t	zoneList = (zoneList_t)NULL;
 
 void		quit(int retcode);
 void		quitSetCkreturnFunc(ckreturnFunc_t *a_ckreturnFunc);
-void		quitSetDwnldTmpdir(char *a_dwnldTempDir);
 void		quitSetIdsName(char *a_idsName);
 void		quitSetZoneName(char *a_zoneName);
 void		quitSetZoneTmpdir(char *z_zoneTempDir);
@@ -201,23 +202,6 @@ quitSetZoneTmpdir(char *a_zoneTempDir)
 }
 
 /*
- * Name:	quitSetDwnldTmpdir
- * Description:	set the path to the "download temporary directory" in use
- * Arguments:	a_dwnldTempDir - pointer to string representing the full path to
- *			the temporary directory used to hold files used during
- *			download operations
- * Returns:	void
- * NOTE:	If a download temporary directory is set when quit() is called,
- *		the directory is recursively removed before quit() calls exit
- */
-
-void
-quitSetDwnldTmpdir(char *a_dwnldTempDir)
-{
-	dwnldTempDir = a_dwnldTempDir;
-}
-
-/*
  * Name:	quit
  * Description:	cleanup and exit
  * Arguments:	a_retcode - the code to use to determine final exit status;
@@ -282,14 +266,6 @@ quit(int a_retcode)
 
 	(void) chdir("/");
 
-	/* if set remove download temporary directory */
-
-	if (dwnldTempDir != (char *)NULL) {
-		echoDebug(DBG_REMOVING_DWNLD_TMPDIR, dwnldTempDir);
-		(void) rrmdir(dwnldTempDir);
-		dwnldTempDir = (char *)NULL;
-	}
-
 	/* if set remove zone temporary directory */
 
 	if (zoneTempDir != (char *)NULL) {
@@ -304,17 +280,6 @@ quit(int a_retcode)
 		if (pkgdev.dirname != NULL) {
 			echoDebug(DBG_REMOVING_DSTREAM_TMPDIR, pkgdev.dirname);
 			(void) rrmdir(pkgdev.dirname);  /* from tempnam */
-		}
-		/*
-		 * cleanup after a web-based install.
-		 * web-based install failures
-		 * are indicated by exit codes 10-98
-		 * exit code 99 is fatal error exit.
-		 */
-		if (pkgdev.pathname != NULL && is_web_install() &&
-			(a_retcode == 0 ||
-				(a_retcode >= 10 && a_retcode < 99))) {
-			(void) web_cleanup();
 		}
 		(void) ds_close(1);
 	} else if (pkgdev.mount) {

@@ -1,0 +1,111 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Sep 16, 2016
+.Dt USBA_HCDI_DUP_ISOC_REQ 9F
+.Os
+.Sh NAME
+.Nm usba_hcdi_dup_isoc_req
+.Nd duplicate an isochronous request
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Ft "usb_isoc_req_t *"
+.Fo usba_hcdi_dup_isoc_req
+.Fa "dev_info_t *dip"
+.Fa "usb_isoc_req_t *usrp"
+.Fa "usb_flags_t flags"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+A pointer to the HCD driver's
+.Sy dev_info
+structure.
+.It Fa usrp
+A pointer to the USB isochronous request which will be duplicated.
+.It Fa flags
+.Bl -tag -width Sy
+.It Sy USB_FLAGS_NOSLEEP
+Do not block waiting for memory. If memory is not available the allocation
+will fail.
+.It Sy USB_FLAGS_SLEEP
+Perform a blocking allocation. If memory is not available, the function
+will wait until memory is made available.
+.Pp
+Note, the request may still fail even if
+.Sy USB_FLAGS_SLEEP
+is specified.
+.El
+.El
+.Sh DESCRIPTION
+The
+.Fn usba_hcdi_dup_isoc_req
+function is used to duplicate an existing isochronous request,
+.Fa usrp .
+.Pp
+When the USBA framework initiates an isochronous in transfer with the
+.Xr usba_hcdi_pipe_isoc_xfer 9E
+entry point, it is the HCD driver's responsibility to receive the
+periodic data from the pipe. When there is data available, the HCD must
+duplicate the original isochronous request and copy the available data
+into the request structure's
+.Fa isoc_data
+member, before handing over the request structure to the USBA framework
+by calling the
+.Xr usba_hcdi_cb 9F
+function.
+.Pp
+In addition to duplicating the request, it is the callers responsibility
+to increase the pipe handle's request count. For more information, see
+.Xr usba_hcdi_pipe_isoc_xfer 9E .
+.Pp
+The
+.Fa dip
+argument should correspond to the HCD driver's
+.Sy dev_info_t
+structure. The
+.Fa usrp
+pointer should correspond to the initial isochronous request. The
+.Fa flags
+member must be appropriate for the context. If
+.Dv USB_FLAGS_SLEEP
+is passed while in interrupt context, then this function may fail.
+.Sh CONTEXT
+The
+.Fn usba_hcdi_dup_isoc_req
+function may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context; however, when in interrupt context, the value of
+.Fa flags
+must be
+.Sy USB_FLAGS_NOSLEEP .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn usba_hcdi_dup_isoc_req
+function returns a pointer to a duplicate isochronous request.
+Otherwise,
+.Sy NULL
+is returned to indicate that the request could not be duplicated.
+.Sh SEE ALSO
+.Xr usba_hcdi 9E ,
+.Xr usba_hcdi_pipe_isoc_xfer 9E ,
+.Xr usba_hcdi_cb 9F

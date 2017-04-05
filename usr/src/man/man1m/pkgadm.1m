@@ -1,31 +1,13 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble.
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PKGADM 1M "Mar 20, 2009"
+.TH PKGADM 1M "Mar 2, 2017"
 .SH NAME
-pkgadm \- manage packaging and patching system
+pkgadm \- manage packaging system
 .SH SYNOPSIS
-.LP
-.nf
-\fBpkgadm addcert\fR [\fB-ty\fR] [\fB-a\fR \fIapp\fR] [\fB-k\fR \fIkeystore\fR] [\fB-e\fR \fIkeyfile\fR]
-     [\fB-f\fR \fIformat\fR] [\fB-n\fR \fIname\fR] [\fB-P\fR \fIpassarg\fR]
-     [\fB-p\fR \fIimport_passarg\fR] [\fB-R\fR \fIrootpath\fR] certfile
-.fi
-
-.LP
-.nf
-\fBpkgadm removecert\fR [\fB-a\fR \fIapp\fR] [\fB-k\fR \fIkeystore\fR] \fB-n\fR \fIname\fR
-     [\fB-P\fR \fIpassarg\fR] [\fB-R\fR \fIrootpath\fR]
-.fi
-
-.LP
-.nf
-\fBpkgadm listcert\fR [\fB-a\fR \fIapp\fR] [\fB-f\fR \fIformat\fR] [\fB-k\fR \fIkeystore\fR] \fB-n\fR \fIname\fR
-     [\fB-P\fR \fIpassarg\fR] [\fB-o\fR \fIoutfile\fR] [\fB-R\fR \fIrootpath\fR]
-.fi
-
 .LP
 .nf
 \fBpkgadm dbstatus\fR [\fB-R\fR \fIrootpath\fR]
@@ -47,55 +29,10 @@ pkgadm \- manage packaging and patching system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBpkgadm\fR utility is used for managing the packaging and patching
+The \fBpkgadm\fR utility is used for managing the packaging
 system. It has several subcommands that perform various operations relating to
-packaging. The \fBpkgadm\fR command includes subcommands for managing
-certificates and keys used.
-.SS "Managing Keys and Certificates"
-.sp
-.LP
-\fBpkgadm\fR maintains the packaging-system-wide keystore in
-\fB/var/sadm/security\fR, and individual user's certificates in
-\fB~/.pkg/security\fR. The following subcommands operate on the package
-keystore database:
-.sp
-.ne 2
-.na
-\fB\fBaddcert\fR\fR
-.ad
-.sp .6
-.RS 4n
-Add (import) a certificate into the database, with optional trust. Once added,
-trusted certificates can be used to verify signed packages and patches.
-Non-trusted user certificates and their associated keys can be used to sign
-packages and patches. Added user certificates are \fBnot\fR used to build
-certificate chains during certificate verification.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBremovecert\fR\fR
-.ad
-.sp .6
-.RS 4n
-Removes a user certificate/private key pair, or a trusted certificate authority
-certificate from the keystore. Once removed, the certificate and keys cannot be
-used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBlistcert\fR\fR
-.ad
-.sp .6
-.RS 4n
-Print details of one or more certificates in the keystore.
-.RE
-
+packaging.
 .sp
 .ne 2
 .na
@@ -108,7 +45,6 @@ Writes the contents file and rolls the contents log file. With use of the
 .RE
 
 .SS "Internal Install Database"
-.sp
 .LP
 The Solaris operating system relies upon enhanced System V revision 4 (SVr4)
 packages as the basis for its software installation and revision management.
@@ -118,158 +54,11 @@ determine how the package internal database is implemented. The \fBdbstatus\fR
 command returns a string that indicates the type of internal database in use.
 In the current implementation, the \fBdbstatus\fR command always returns the
 string \fBtext\fR, which indicates that the \fBcontents\fR(4) package database
-is inuse. Future releases of Solaris might supply alternative database
+is in use. Future releases of Solaris might supply alternative database
 implementations.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR \fIapp\fR\fR
-.ad
-.sp .6
-.RS 4n
-If this option is used, then the command only affects the keystore associated
-with a particular application. Otherwise, the global keystore is affected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-e\fR \fIkeyfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-When adding a non-trusted certificate/key combination, this option can be used
-to specify the file that contains the private key. If this option is not used,
-the private key must be in the same file as the certificate being added.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-f\fR \fIformat\fR\fR
-.ad
-.sp .6
-.RS 4n
-When adding certificates, this specifies the format to expect certificates and
-private keys in. Possible values when adding are:
-.sp
-.ne 2
-.na
-\fB\fBpem\fR\fR
-.ad
-.sp .6
-.RS 4n
-Certificate and any private key uses PEM encoding.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBder\fR\fR
-.ad
-.sp .6
-.RS 4n
-Certificate and any private key uses DER encoding.
-.RE
-
-When printing certificates, this specifies the output format used when
-printing. Acceptable values for format are:
-.sp
-.ne 2
-.na
-\fB\fBpem\fR\fR
-.ad
-.sp .6
-.RS 4n
-Output each certificate using PEM encoding.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBder\fR\fR
-.ad
-.sp .6
-.RS 4n
-Output each certificate using DER encoding.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBtext\fR\fR
-.ad
-.sp .6
-.RS 4n
-Output each certificate in human-readable format.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-k\fR \fIkeystore\fR\fR
-.ad
-.sp .6
-.RS 4n
-Overrides the default location used when accessing the keystore.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR \fIname\fR\fR
-.ad
-.sp .6
-.RS 4n
-Identifies the entity in the store on which you want to operate. When adding a
-user certificate, or removing certificates, this name is required. The name is
-associated with the certificate/key combination, and when adding, can be used
-later to reference the entity. When printing certificates, if no alias is
-supplied, then all keystore entities are printed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-o\fR \fIoutfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-Output the result of the command to \fIoutfile\fR. Only used when examining
-(printing) certificates from the key store. Standard out is the default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-P\fR \fIpassarg\fR\fR
-.ad
-.sp .6
-.RS 4n
-Password retrieval method to use to decrypt keystore specified with \fB-k\fR,
-if required. See \fBPASS PHRASE ARGUMENTS\fR in \fBpkgadd\fR(1M) for more
-information about the format of this option's argument. \fBconsole\fR is the
-default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR \fIimport_passarg\fR\fR
-.ad
-.sp .6
-.RS 4n
-This option's argument is identical to \fB-P\fR, but is used for supplying the
-password used to decrypt the certificate and/or private key being added.
-\fBconsole\fR is the default.
-.RE
-
 .sp
 .ne 2
 .na
@@ -287,13 +76,7 @@ password used to decrypt the certificate and/or private key being added.
 .ad
 .sp .6
 .RS 4n
-Defines the full name of a directory to use as the root (\fB/\fR) path. The
-default user location of the certificate operations is \fB${HOME}/.pkg\fR. If
-the \fB-R\fR option is supplied, the certificates and keys will be stored under
-\fB\fI<altroot>\fR/var/sadm/security\fR. Note that this operation fails if the
-user does not have sufficient permissions to access this directory. The
-\fBlistcert\fR command requires read permission, while \fBaddcert\fR and
-\fBremovecert\fR require both read and write permission.
+Defines the full name of a directory to use as the root (\fB/\fR) path.
 .LP
 Note -
 .sp
@@ -303,22 +86,6 @@ The root file system of any non-global zones must not be referenced with the
 compromise the security of the global zone, and might damage the non-global
 zone's file system. See \fBzones\fR(5).
 .RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR\fR
-.ad
-.sp .6
-.RS 4n
-Indicates the certificate being added is a trusted CA certificate. The details
-of the certificate (including the Subject Name, Validity Dates, and
-Fingerprints) are printed and the user is asked to verify the data. This
-verification step can be skipped with \fB-y\fR. When importing a trusted
-certificate, a private key should not be supplied, and will be rejected if
-supplied. Once a certificate is trusted, it can be used as a trust anchor when
-verifying future untrusted certificates.
 .RE
 
 .sp
@@ -334,19 +101,6 @@ Print version associated with packaging tools.
 .sp
 .ne 2
 .na
-\fB\fB-y\fR\fR
-.ad
-.sp .6
-.RS 4n
-When adding a trusted certificate, the details of the certificate (Subject
-name, Issuer name, Validity dates, Fingerprints) are shown to the user and the
-user is asked to verify the correctness before proceeding. With \fB-y\fR, this
-additional verification step is skipped.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB-?\fR\fR
 .ad
 .sp .6
@@ -354,88 +108,22 @@ additional verification step is skipped.
 Print help message.
 .RE
 
-.SH OPERANDS
-.sp
-.LP
-The following operand is supported:
-.sp
-.ne 2
-.na
-\fB\fBcertfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-File containing the certificate and optional private key, used when adding a
-trust anchor or certificate/key combination. Certificates must be encoded using
-PEM or binary DER.
-.RE
-
-.SH KEYSTORE ALIASES
-.sp
-.LP
-All keystore entries (user cert/key and trusted certificate entries) are
-accessed via unique aliases. Aliases are case-sensitive.
-.sp
-.LP
-An alias is specified when you add an entity to a keystore using the
-\fBaddcert\fR or \fBtrustcert\fR subcommand. If an alias is not supplied for a
-trust anchor, the trust anchor's Common Name is used as the alias. An alias is
-required when adding a signing certificate or chain certificate. Subsequent
-\fBpkgcert\fR or other package tool commands must use this same alias to refer
-to the entity.
-.SH KEYSTORE PASSWORDS
-.sp
-.LP
-See the \fBpkgadd\fR(1M) man page for a description of the passwords supplied
-to the \fBpkgadm\fR utility.
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRAdding a Trust Anchor
+\fBExample 1 \fRSynchronizing the contents file
 .sp
 .LP
-The following example adds a well-known and trusted certificate to be used when
-verifying signatures on packages.
+The following example forces any pending changes to the contents(4) file to be flushed and the pkgserv daemon to shut down.
 
 .sp
 .in +2
 .nf
-example% pkgadm addcert -t /tmp/certfile.pem
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRAdding a Signing Certificate
-.sp
-.LP
-The following example adds a signing certificate and associated private key,
-each of which is in a separate file, which can then be used to sign packages.
-
-.sp
-.in +2
-.nf
-example% pkgadm addcert -a pkgtrans -e /tmp/keyfile.pem \e
-/tmp/certfile.pem
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRPrinting Certificates
-.sp
-.LP
-The following example prints all certificates in the root keystore.
-
-.sp
-.in +2
-.nf
-example% pkgadm listcert
+example% pkgadm sync -q
 .fi
 .in -2
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -456,7 +144,6 @@ fatal error
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -472,7 +159,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpkginfo\fR(1), \fBpkgmk\fR(1), \fBpkgparam\fR(1), \fBpkgproto\fR(1),
 \fBpkgtrans\fR(1), \fBsvcs\fR(1), \fBinstallf\fR(1M), \fBpkgadd\fR(1M),
@@ -483,7 +169,6 @@ Interface Stability	Evolving
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 The service for \fBpkgadm\fR is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

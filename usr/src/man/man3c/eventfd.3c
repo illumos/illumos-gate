@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
 .\"
-.Dd April 9, 2016
+.Dd March 26, 2017
 .Dt EVENTFD 3C
 .Os
 .Sh NAME
@@ -96,7 +96,7 @@ depend on the disposition of
 .Sy EFD_SEMAPHORE
 with
 respect to the instance: if
-.Sy EFD_SEMAPTHORE
+.Sy EFD_SEMAPHORE
 was set when the instance was created,
 .Xr read 2
 will

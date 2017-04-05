@@ -36,7 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/limits.h>
@@ -62,8 +61,6 @@ __FBSDID("$FreeBSD$");
 
 
 struct in_addr servip;
-
-static n_long	nmask, smask;
 
 static time_t	bot;
 
@@ -222,30 +219,19 @@ bootp(int sock, int flag)
 	bcopy(rbuf.rbootp.bp_file, bootfile, sizeof(bootfile));
 	bootfile[sizeof(bootfile) - 1] = '\0';
 
-	if (IN_CLASSA(ntohl(myip.s_addr)))
-		nmask = htonl(IN_CLASSA_NET);
-	else if (IN_CLASSB(ntohl(myip.s_addr)))
-		nmask = htonl(IN_CLASSB_NET);
-	else
-		nmask = htonl(IN_CLASSC_NET);
-#ifdef BOOTP_DEBUG
-	if (debug)
-		printf("'native netmask' is %s\n", intoa(nmask));
-#endif
-
-	/* Check subnet mask against net mask; toss if bogus */
-	if ((nmask & smask) != nmask) {
+	if (!netmask) {
+		if (IN_CLASSA(ntohl(myip.s_addr)))
+			netmask = htonl(IN_CLASSA_NET);
+		else if (IN_CLASSB(ntohl(myip.s_addr)))
+			netmask = htonl(IN_CLASSB_NET);
+		else
+			netmask = htonl(IN_CLASSC_NET);
 #ifdef BOOTP_DEBUG
 		if (debug)
-			printf("subnet mask (%s) bad\n", intoa(smask));
+			printf("'native netmask' is %s\n", intoa(netmask));
 #endif
-		smask = 0;
 	}
 
-	/* Get subnet (or natural net) mask */
-	netmask = nmask;
-	if (smask)
-		netmask = smask;
 #ifdef BOOTP_DEBUG
 	if (debug)
 		printf("mask: %s\n", intoa(netmask));
@@ -349,6 +335,17 @@ bad:
 	return (-1);
 }
 
+int
+dhcp_try_rfc1048(uint8_t *cp, size_t len)
+{
+
+	expected_dhcpmsgtype = DHCPACK;
+	if (bcmp(vm_rfc1048, cp, sizeof (vm_rfc1048)) == 0) {
+		return (vend_rfc1048(cp, len));
+	}
+	return (-1);
+}
+
 static int
 vend_rfc1048(u_char *cp, u_int len)
 {
@@ -375,7 +372,7 @@ vend_rfc1048(u_char *cp, u_int len)
 			break;
 
 		if (tag == TAG_SUBNET_MASK) {
-			bcopy(cp, &smask, sizeof(smask));
+			bcopy(cp, &netmask, sizeof(netmask));
 		}
 		if (tag == TAG_GATEWAY) {
 			bcopy(cp, &gateip.s_addr, sizeof(gateip.s_addr));
@@ -452,7 +449,7 @@ vend_cmu(u_char *cp)
 	vp = (struct cmu_vend *)cp;
 
 	if (vp->v_smask.s_addr != 0) {
-		smask = vp->v_smask.s_addr;
+		netmask = vp->v_smask.s_addr;
 	}
 	if (vp->v_dgate.s_addr != 0) {
 		gateip = vp->v_dgate;

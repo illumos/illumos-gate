@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -91,7 +91,8 @@ static mntopt_t tmpfs_options[] = {
 	/* Option name		Cancel Opt	Arg	Flags		Data */
 	{ MNTOPT_XATTR,		xattr_cancel,	NULL,	MO_DEFAULT,	NULL},
 	{ MNTOPT_NOXATTR,	noxattr_cancel,	NULL,	NULL,		NULL},
-	{ "size",		NULL,		"0",	MO_HASVALUE,	NULL}
+	{ "size",		NULL,		"0",	MO_HASVALUE,	NULL},
+	{ "mode",		NULL,		NULL,	MO_HASVALUE,	NULL}
 };
 
 
@@ -227,11 +228,7 @@ tmpfsinit(int fstype, char *name)
 }
 
 static int
-tmp_mount(
-	struct vfs *vfsp,
-	struct vnode *mvp,
-	struct mounta *uap,
-	struct cred *cr)
+tmp_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 {
 	struct tmount *tm = NULL;
 	struct tmpnode *tp;
@@ -240,8 +237,9 @@ tmp_mount(
 	pgcnt_t anonmax;
 	struct vattr rattr;
 	int got_attrs;
-
-	char *sizestr;
+	boolean_t mode_arg = B_FALSE;
+	mode_t root_mode = 0777;
+	char *argstr;
 
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
 		return (error);
@@ -276,11 +274,22 @@ tmp_mount(
 	 * tm_anonmax is set according to the mount arguments
 	 * if any.  Otherwise, it is set to a maximum value.
 	 */
-	if (vfs_optionisset(vfsp, "size", &sizestr)) {
-		if ((error = tmp_convnum(sizestr, &anonmax)) != 0)
+	if (vfs_optionisset(vfsp, "size", &argstr)) {
+		if ((error = tmp_convnum(argstr, &anonmax)) != 0)
 			goto out;
 	} else {
 		anonmax = ULONG_MAX;
+	}
+
+	/*
+	 * The "mode" mount argument allows the operator to override the
+	 * permissions of the root of the tmpfs mount.
+	 */
+	if (vfs_optionisset(vfsp, "mode", &argstr)) {
+		if ((error = tmp_convmode(argstr, &root_mode)) != 0) {
+			goto out;
+		}
+		mode_arg = B_TRUE;
 	}
 
 	if (error = pn_get(uap->dir,
@@ -341,7 +350,7 @@ tmp_mount(
 	 * allocate and initialize root tmpnode structure
 	 */
 	bzero(&rattr, sizeof (struct vattr));
-	rattr.va_mode = (mode_t)(S_IFDIR | 0777);	/* XXX modes */
+	rattr.va_mode = (mode_t)(S_IFDIR | root_mode);
 	rattr.va_type = VDIR;
 	rattr.va_rdev = 0;
 	tp = tmp_memalloc(sizeof (struct tmpnode), TMP_MUSTHAVE);
@@ -361,7 +370,14 @@ tmp_mount(
 	 * the previously set hardwired defaults to prevail.
 	 */
 	if (got_attrs == 0) {
-		tp->tn_mode = rattr.va_mode;
+		if (!mode_arg) {
+			/*
+			 * Only use the underlying mount point for the
+			 * mode if the "mode" mount argument was not
+			 * provided.
+			 */
+			tp->tn_mode = rattr.va_mode;
+		}
 		tp->tn_uid = rattr.va_uid;
 		tp->tn_gid = rattr.va_gid;
 	}

@@ -153,7 +153,7 @@ _EUC_CN_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
 
 static size_t
 _EUC_CN_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
-	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_CN_wcrtomb));
 }
@@ -191,14 +191,14 @@ _EUC_KR_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
 
 static size_t
 _EUC_KR_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
-	mbstate_t *_RESTRICT_KYWD ps)
+    mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_wcrtomb_impl(s, wc, ps, 0, 0, 0, 0));
 }
 
 static size_t
 _EUC_KR_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
-	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_KR_wcrtomb));
 }
@@ -243,7 +243,7 @@ _EUC_JP_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
 
 static size_t
 _EUC_JP_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
-	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_JP_wcrtomb));
 }
@@ -266,29 +266,29 @@ _EUC_TW_init(struct lc_ctype *lct)
 
 static size_t
 _EUC_TW_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-	size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 4, 0, 0));
 }
 
 static size_t
 _EUC_TW_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst,
-	const char **_RESTRICT_KYWD src,
-	size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+    const char **_RESTRICT_KYWD src,
+    size_t nms, size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (__mbsnrtowcs_std(dst, src, nms, len, ps, _EUC_TW_mbrtowc));
 }
 
 static size_t
 _EUC_TW_wcrtomb(char *_RESTRICT_KYWD s, wchar_t wc,
-	mbstate_t *_RESTRICT_KYWD ps)
+    mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (_EUC_wcrtomb_impl(s, wc, ps, SS2, 4, 0, 0));
 }
 
 static size_t
 _EUC_TW_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
-	size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
+    size_t nwc, size_t len, mbstate_t *_RESTRICT_KYWD ps)
 {
 	return (__wcsnrtombs_std(dst, src, nwc, len, ps, _EUC_TW_wcrtomb));
 }
@@ -299,13 +299,13 @@ _EUC_TW_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
 
 static size_t
 _EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-	size_t n, mbstate_t *_RESTRICT_KYWD ps,
-	uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps,
+    uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width)
 {
 	_EucState *es;
 	int i, want;
-	wchar_t wc;
-	unsigned char ch;
+	wchar_t wc = 0;
+	unsigned char ch, chs;
 
 	es = (_EucState *)ps;
 
@@ -354,7 +354,8 @@ _EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 
 	for (i = 0; i < MIN(want, n); i++) {
 		wc <<= 8;
-		wc |= *s;
+		chs = *s;
+		wc |= chs;
 		s++;
 	}
 	if (i < want) {

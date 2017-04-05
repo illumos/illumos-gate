@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -56,7 +60,6 @@
  */
 
 #include <pkglib.h>
-#include <pkgweb.h>
 
 /*
  * local pkg command library includes
@@ -159,7 +162,7 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 
 	/*
 	 * r_updated is an optional parameter that can be passed in
-	 * by the caller if the caller wants to know if any objects are 
+	 * by the caller if the caller wants to know if any objects are
 	 * updated. Do not initialize r_updated; the call to instvol
 	 * could be cumulative and any previous update indication must not
 	 * be disturbed - this flag is only set, it must never be reset.

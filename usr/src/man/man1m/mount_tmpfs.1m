@@ -1,10 +1,10 @@
 '\" te
 .\"  Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.\"  Copyright (c) 2011, Joyent, Inc.  All Rights Reserved
+.\"  Copyright 2015 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MOUNT_TMPFS 1M "Dec 2, 2011"
+.TH MOUNT_TMPFS 1M "Mar 18, 2015"
 .SH NAME
 mount_tmpfs \- mount tmpfs file systems
 .SH SYNOPSIS
@@ -26,7 +26,8 @@ remain hidden until the file system is once again unmounted. The attributes
 (mode, owner, and group) of the root of the \fBtmpfs\fR filesystem are
 inherited from the underlying \fImount_point\fR, provided that those attributes
 are determinable. If not, the root's attributes are set to their default
-values.
+values. The mode may also be overriden by the \fBmode\fR mount option, which
+takes precedence if set.
 .sp
 .LP
 The \fIspecial\fR argument is usually specified as \fBswap\fR but is in fact
@@ -55,13 +56,29 @@ set with \fBremount\fR reverts to no limit.
 .sp
 .ne 2
 .na
+\fBmode=\fIoctalmode\fR\fR
+.ad
+.RS 19n
+The \fImode\fR argument controls the permissions of the \fBtmpfs\fR mount
+point.  The argument must be an octal number, of the form passed to
+\fBchmod\fR(1).  Only the access mode, setuid, setgid, and sticky bits (a mask
+of \fB07777\fR) may be set.  If this option is not provided then the default
+mode behaviour, as described above, applies.
+.RE
+
+.sp
+.sp
+.ne 2
+.na
 \fBsize=\fIsz\fR\fR
 .ad
 .RS 19n
 The \fIsz\fR argument controls the size of this particular \fBtmpfs\fR file
 system. If the argument is has a `k' suffix, the number will be interpreted as
 a number of kilobytes. An `m' suffix will be interpreted as a number of
-megabytes. No suffix is interpreted as bytes. In all cases, the actual size of
+megabytes. A `g' suffix will be interpreted as a number of gigabytes. A `%'
+suffix will be interpreted as a percentage of the swap space available to the
+zone. No suffix is interpreted as bytes. In all cases, the actual size of
 the file system is the number of bytes specified, rounded up to the physical
 pagesize of the system.
 .RE

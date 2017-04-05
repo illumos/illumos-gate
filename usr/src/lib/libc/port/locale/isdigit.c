@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 /*
@@ -28,26 +28,16 @@
 #include "lctype.h"
 
 /*
- * We are supplying functional forms, so make sure to suppress any macros
- * we might have imported.
+ * As far as we know, *every* encoding we support is a strict superset of ASCII,
+ * so we can make things faster by trying ASCII first.  Next check if argument
+ * can be represented as unsigned char, and that locale is not multibyte - every
+ * multibyte encoding we support has non-ASCII code points undefined.  Finally,
+ * lookup the result in locale specific table.
  */
-
-/*
- * Performance note: ASCII test is *much* faster, as we can avoid expensive
- * function call overhead.  This is the hot case, so we try to do that
- * whenever possible.  As far as we know, *every* encoding we support
- * is a strict superset of ASCII.  So we can make things faster by trying
- * ASCII first, and only then falling to locale specific checks.
- */
-
-static int
-isctype_l(int c, int mask, locale_t loc)
-{
-	return ((unsigned)c > 255 ? 0 : (loc->ctype->lc_ctype_mask[c] & mask));
-}
-
 #define	ISTYPE_L(c, mask, loc)	\
-	(isascii(c) ? (__ctype_mask[c] & (mask)) : isctype_l(c, mask, loc))
+	(isascii(c) ? (__ctype_mask[c] & (mask)) : \
+	((unsigned)c > 255 || loc->ctype->lc_max_mblen > 1) ? 0 : \
+	(loc->ctype->lc_ctype_mask[c] & mask))
 
 #define	ISTYPE(c, mask)	ISTYPE_L(c, mask, uselocale(NULL))
 
@@ -64,6 +54,10 @@ is##type(int c)				\
 	return (ISTYPE(c, mask));	\
 }
 
+/*
+ * We are supplying functional forms, so make sure to suppress any macros
+ * we might have imported.
+ */
 #undef	isblank
 #undef	isupper
 #undef	islower

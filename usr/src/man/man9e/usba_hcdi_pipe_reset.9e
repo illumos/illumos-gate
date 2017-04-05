@@ -1,0 +1,97 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Joyent, Inc.
+.\"
+.Dd Dec 22, 2016
+.Dt USBA_HCDI_PIPE_RESET 9E
+.Os
+.Sh NAME
+.Nm usba_hcdi_pipe_rest
+.Nd reset an open USB pipe
+.Sh SYNOPSIS
+.In sys/usb/usba/hcdi.h
+.Ft int
+.Fo prefix_hcdi_pipe_reset
+.Fa "usba_pipe_handle_data_t *ph"
+.Fa "usb_flags_t usb_flags"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+illumos USB HCD private function
+.Pp
+This is a private function that is not part of the stable DDI. It may be
+removed or changed at any time.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa ph
+A pointer to a USB pipe handle as defined in
+.Xr usba_pipe_handle_data 9S .
+.It Fa usb_flags
+Flags which describe how allocations should be performed. Valid flags
+are:
+.Bl -tag -width Sy
+.It Sy USB_FLAGS_NOSLEEP
+Do not block waiting for memory. If memory is not available the allocation
+will fail.
+.It Sy USB_FLAGS_SLEEP
+Perform a blocking allocation. If memory is not available, the function
+will wait until memory is made available.
+.Pp
+Note, the request may still fail even if
+.Sy USB_FLAGS_SLEEP
+is specified.
+.El
+.El
+.Sh DESCRIPTION
+The
+.Fn usba_hcdi_pipe_reset
+entry point is designed to take a pipe in an arbitrary state and return
+it to the same state it was in after a call to
+.Xr usba_hcdi_pipe_open 9E .
+While this entry point does some similar things to the
+.Xr usba_hcdi_stop_intr_polling 9E
+and
+.Xr usba_hcdi_stop_isoc_polling 9E
+entry points, there are some notable differences.
+.Pp
+This entry point is synchronous. The host controller driver should take
+the following steps on the pipe before returning:
+.Bl -enum
+.It
+Quiesce and stop the endpoint.
+.It
+If the endpoint has any errors they should be cleared at this time.
+.It
+Remove any remaining, scheduled or queued transfers. For each one call
+.Xr usba_hcdi_cb 9F
+with the code
+.Sy USB_CR_PIPE_RESET .
+.It
+Perform any other necessary steps on the controller to have the endpoint
+be ready to perform I/O.
+.El
+.Pp
+This entry point is called by the broader USBA framework as part of
+closing a pipe or in response to a device stall.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn usba_hcdi_pipe_reset
+function should return
+.Sy USB_SUCCESS .
+Otherwise, it should return the appropriate USB error. If uncertain, use
+.Sy USB_FAILURE .
+.Sh SEE ALSO
+.Xr usba_hcdi_pipe_open 9E ,
+.Xr usba_hcdi_stop_intr_polling 9E ,
+.Xr usba_hcdi_stop_isoc_polling 9E ,
+.Xr usba_hcdi_cb 9F ,
+.Xr usba_pipe_handle_data 9S

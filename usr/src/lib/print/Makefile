@@ -35,8 +35,6 @@ SUBDIRS = \
 	libpapi-ipp \
 	libipp-listener
 
-$(ENABLE_IPP_PRINTING) SUBDIRS += mod_ipp
-
 all :=                  TARGET = all
 clean :=                TARGET = clean
 clobber :=              TARGET = clobber
@@ -89,4 +87,3 @@ libpapi-lpd:		libpapi-dynamic
 libipp-core:		libpapi-common
 libpapi-ipp:		libpapi-common libipp-core libhttp-core
 libipp-listener:	libpapi-dynamic libipp-core
-mod_ipp:		libipp-listener

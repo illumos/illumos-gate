@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,6 +35,7 @@
 
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include "pkglib.h"
 #include "pkglibmsgs.h"

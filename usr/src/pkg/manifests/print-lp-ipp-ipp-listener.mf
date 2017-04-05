@@ -24,39 +24,5 @@
 #
 
 set name=pkg.fmri value=pkg:/print/lp/ipp/ipp-listener@$(PKGVERS)
-set name=pkg.description \
-    value="Internet Printing Protocol(IPP) Apache module for listening service"
-set name=pkg.summary value="Internet Printing Protocol(IPP) listener module"
-set name=info.classification \
-    value=org.opensolaris.category.2008:System/Printing
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys
-dir path=etc/lp group=lp mode=0775 owner=lp
-dir path=etc/lp/ipp group=lp mode=0755 owner=lp
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/application group=sys
-dir path=lib/svc/manifest/application/print group=sys
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/lp group=lp
-dir path=usr/lib/lp/ipp group=lp
-dir path=var group=sys
-dir path=var/lp group=lp mode=0775 owner=lp
-dir path=var/lp/ipp-listener
-file path=etc/lp/ipp/httpd-standalone-ipp.conf preserve=true
-file path=lib/svc/manifest/application/print/ipp-listener.xml group=sys \
-    mode=0444
-file path=usr/lib/lp/ipp/mod_ipp.so mode=0555
-file path=var/lp/ipp-listener/index.html mode=0444
-legacy pkg=SUNWipplr \
-    desc="Internet Printing Protocol(IPP) Apache configuration for service module" \
-    name="Internet Printing Protocol(IPP) listener, (root)" \
-    version=13.1,REV=2009.11.11
-legacy pkg=SUNWipplu \
-    desc="Internet Printing Protocol(IPP) Apache module for listening service" \
-    name="Internet Printing Protocol(IPP) listener module (/usr)" \
-    version=13.1,REV=2009.11.11
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
