@@ -44,3 +44,6 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=usr/lib/$(ARCH64)/libipd.so target=libipd.so.1
 link path=usr/lib/libipd.so target=libipd.so.1
+# ipd needs to match running kernel
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal

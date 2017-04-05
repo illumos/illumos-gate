@@ -118,5 +118,9 @@ link path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so \
     target=pam_smbfs_login.so.1
 link path=usr/lib/security/pam_smbfs_login.so target=pam_smbfs_login.so.1
 link path=usr/share/man/man1m/umount_smbfs.1m target=mount_smbfs.1m
+# cross zone dependency on linked image metadata
+# needs to match running kernel
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal
 # libsmbfs uses iconv_open() which requires this at run-time.
 depend fmri=system/library/iconv/utf-8 type=require

@@ -214,3 +214,6 @@ link path=usr/share/man/man3pool/pool_walk_properties.3pool \
     target=pool_get_property.3pool
 link path=usr/share/man/man3pool/pool_walk_resources.3pool \
     target=pool_walk_components.3pool
+# pools need to match running kernel
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal

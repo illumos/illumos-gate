@@ -116,3 +116,6 @@ link path=usr/lib/smbsrv/libmlrpc.so target=libmlrpc.so.1
 link path=usr/lib/smbsrv/libmlsvc.so target=libmlsvc.so.1
 link path=usr/lib/smbsrv/libsmb.so target=libsmb.so.1
 link path=usr/lib/smbsrv/libsmbns.so target=libsmbns.so.1
+# smb server needs to match running kernel
+depend fmri=feature/package/dependency/self type=parent \
+    variant.opensolaris.zone=nonglobal
