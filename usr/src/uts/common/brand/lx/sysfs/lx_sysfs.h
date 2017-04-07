@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_LXSYSFS_H
@@ -165,6 +165,8 @@ extern void lxsys_freenode(lxsys_node_t *);
 
 extern netstack_t *lxsys_netstack(lxsys_node_t *);
 extern ill_t *lxsys_find_ill(ip_stack_t *, uint_t);
+
+extern int lxsys_ino_get_type(ino_t);
 
 typedef struct lxpr_uiobuf {
 	uio_t *uiop;
