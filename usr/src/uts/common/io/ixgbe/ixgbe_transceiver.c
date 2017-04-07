@@ -66,7 +66,7 @@ ixgbe_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
 {
 	ixgbe_t *ixgbe = arg;
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	boolean_t present, usable, is8472;
+	boolean_t present, usable;
 
 	if (id != 0 || infop == NULL)
 		return (EINVAL);
