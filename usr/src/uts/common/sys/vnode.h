@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -400,6 +400,14 @@ typedef struct vn_vfslocks_entry {
 #define	IS_SWAPFSVP(vp)	(((vp)->v_flag & VISSWAPFS) != 0)
 
 #define	V_SYSATTR	0x40000	/* vnode is a GFS system attribute */
+
+/*
+ * Indication that VOP_LOOKUP operations on this vnode may yield results from a
+ * different VFS instance.  The main use of this is to suppress v_path
+ * calculation logic when filesystems such as procfs emit results which defy
+ * expectations about normal VFS behavior.
+ */
+#define	VTRAVERSE	0x80000
 
 /*
  * Vnode attributes.  A bit-mask is supplied as part of the

@@ -3055,6 +3055,23 @@ vn_setpath_common(vnode_t *pvp, vnode_t *vp, const char *name, size_t len,
 
 	/* Take snapshot of parent dir */
 	mutex_enter(&pvp->v_lock);
+
+	if ((pvp->v_flag & VTRAVERSE) != 0) {
+		/*
+		 * When the parent vnode has VTRAVERSE set in its flags, normal
+		 * assumptions about v_path calculation no longer apply.  The
+		 * primary situation where this occurs is via the VFS tricks
+		 * which procfs plays in order to allow /proc/PID/(root|cwd) to
+		 * yield meaningful results.
+		 *
+		 * When this flag is set, v_path on the child must not be
+		 * updated since the calculated value is likely to be
+		 * incorrect, given the current context.
+		 */
+		mutex_exit(&pvp->v_lock);
+		return;
+	}
+
 retrybuf:
 	if (pvp->v_path == vn_vpath_empty) {
 		/*
