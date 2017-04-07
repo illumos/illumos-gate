@@ -169,6 +169,9 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * symlinks, and perhaps other static files. By only providing 'node0' we
  * pretend that there is only a single NUMA node available to a zone (trying to
  * be NUMA-aware inside a zone is generally not going to work anyway).
+ *
+ * The dyn_ino_type table must be updated whenever a new static instance is
+ * defined.
  */
 
 #define	LXSYS_INST_CLASSDIR			0x1
@@ -185,6 +188,31 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 #define	LXSYS_INST_DEV_SYSCPU_KMAX		0xc
 #define	LXSYS_INST_DEVICES_SYSNODE		0xd
 #define	LXSYS_INST_BUSDIR			0xe
+#define	LXSYS_INST_MAX				LXSYS_INST_BUSDIR /* limit */
+
+/*
+ * This array is used for directory inode correction in lxsys_readdir_common
+ * when a directory's static-type entry is actually a dynamic-type.
+ */
+static int dyn_ino_type [] = {
+	0,				/* invalid */
+	0,				/* LXSYS_INST_CLASSDIR */
+	0,				/* LXSYS_INST_DEVICESDIR */
+	0,				/* LXSYS_INST_FSDIR */
+	LXSYS_CLASS_NET,		/* LXSYS_INST_CLASS_NETDIR */
+	0,				/* LXSYS_INST_DEVICES_VIRTUALDIR */
+	0,				/* LXSYS_INST_DEVICES_SYSTEMDIR */
+	0,				/* LXSYS_INST_FS_CGROUPDIR */
+	LXSYS_DEV_NET,			/* LXSYS_INST_DEV_VIRTUAL_NETDIR */
+	LXSYS_BLOCK,			/* LXSYS_INST_BLOCKDIR */
+	LXSYS_DEV_ZFS,			/* LXSYS_INST_DEVICES_ZFSDIR */
+	LXSYS_DEV_SYS_CPU,		/* LXSYS_INST_DEVICES_SYSCPU */
+	0,				/* LXSYS_INST_DEV_SYSCPU_KMAX */
+	LXSYS_DEV_SYS_NODE,		/* LXSYS_INST_DEV_SYSNODE */
+	0,				/* LXSYS_INST_BUSDIR */
+};
+#define	DYN_INO_LEN \
+	(sizeof (dyn_ino_type) / sizeof ((dyn_ino_type)[0]))
 
 /*
  * file contents of an lx /sys directory.
@@ -333,6 +361,99 @@ typedef struct lxsys_cpu_info {
 	processorid_t	cpu_id;
 	processorid_t	cpu_seqid;
 } lxsys_cpu_info_t;
+
+/*
+ * Given one of our inodes, return the vnode type.
+ *
+ * lxsys_getnode will always set the vnode type to VDIR. It expects the
+ * caller (normally the lookup functions) to fix the type. Those same rules are
+ * encoded here for our inode-to-type translation.
+ */
+int
+lxsys_ino_get_type(ino_t ino)
+{
+	lxsys_nodetype_t type;
+	unsigned int instance;
+	unsigned int endpoint;
+
+	type = (ino & 0xff000000) >> 24;
+	instance = (ino & 0xffff00) >> 8;
+	endpoint = (ino & 0xff);
+
+	if (instance > LXSYS_INST_MAX)
+		return (VNON);
+
+	/* Validate non-static node types */
+	if (type != LXSYS_STATIC &&
+	    (type <= LXSYS_STATIC || type >= LXSYS_MAXTYPE)) {
+		return (VNON);
+	}
+
+	if (type == LXSYS_STATIC) {
+		switch (instance) {
+		case LXSYS_INST_DEV_SYSCPU_KMAX:
+			return (VREG);
+		}
+	} else {
+		/* Non-static node types */
+		switch (type) {
+		case LXSYS_CLASS_NET:
+			if (instance != 0) {
+				return (VLNK);
+			}
+			break;
+		case LXSYS_DEV_NET:
+			/*
+			 * /sys/devices/virtual/net usually has the eth0 and
+			 * lo directories. Each network device directory is an
+			 * instances with a 0 endpoint. The files within
+			 * that directory have a non-0 endpoint.
+			 */
+			if (endpoint != 0) {
+				return (VREG);
+			}
+			break;
+		case LXSYS_BLOCK:
+			if (instance != 0) {
+				return (VLNK);
+			}
+			break;
+		case LXSYS_DEV_ZFS:
+			/*
+			 * /sys/devices/zfs usually has the zfsds0 directory
+			 * instance with a 0 endpoint. The device file within
+			 * that directory has a non-0 endpoint.
+			 */
+			if (endpoint != 0) {
+				return (VREG);
+			}
+			break;
+		case LXSYS_DEV_SYS_CPU:
+			if (instance != 0) {
+				return (VREG);
+			}
+			break;
+		case LXSYS_DEV_SYS_CPUINFO:
+			if (instance != 0) {
+				return (VREG);
+			}
+			break;
+		case LXSYS_DEV_SYS_NODE:
+			/*
+			 * /sys/devices/system/node has the node0 directory
+			 * instance with a 0 endpoint. The cpulist file within
+			 * that directory has a non-0 endpoint.
+			 */
+			if (endpoint != 0) {
+				return (VREG);
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	return (VDIR);
+}
 
 /*
  * lxsys_open(): Vnode operation for VOP_OPEN()
@@ -1094,9 +1215,26 @@ lxsys_readdir_common(lxsys_node_t *lxsnp, uio_t *uiop, int *eofp,
 		} else if (dirindex >= 0 && dirindex < dirtablen) {
 
 			int slen = strlen(dirtab[dirindex].d_name);
+			int idnum, ino_type = 0;
 
-			dirent->d_ino = lxsys_inode(LXSYS_STATIC,
-			    dirtab[dirindex].d_idnum, 0);
+			idnum = dirtab[dirindex].d_idnum;
+			if (idnum > 0 && idnum < DYN_INO_LEN)
+				ino_type = dyn_ino_type[idnum];
+
+			if (ino_type != 0) {
+				/*
+				 * Correct the inode for static directories
+				 * which contain non-static lxsys_nodetype_t's.
+				 */
+				dirent->d_ino = lxsys_inode(ino_type, 0, 0);
+				DTRACE_PROBE3(lxsys__fix__inode,
+				    char *, dirtab[dirindex].d_name,
+				    int, ino_type, int, dirent->d_ino);
+			} else {
+				dirent->d_ino = lxsys_inode(LXSYS_STATIC,
+				    idnum, 0);
+			}
+
 			(void) strcpy(dirent->d_name, dirtab[dirindex].d_name);
 			reclen = DIRENT64_RECLEN(slen);
 

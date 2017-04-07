@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -44,6 +44,27 @@
 #define	LX_GETDENTS_MAX_BUFSZ	65536
 
 /*
+ * See the comment in our lx_sysfs VFS code for a detailed explanation around
+ * the handling of 'd_type' here.
+ */
+#define	LX_DT_UNKNOWN	0
+#define	LX_DT_FIFO	1
+#define	LX_DT_CHR	2
+#define	LX_DT_DIR	4
+#define	LX_DT_BLK	6
+#define	LX_DT_REG	8
+#define	LX_DT_LNK	10
+#define	LX_DT_SOCK	12
+
+/*
+ * Set by lx_sysfs when it loads. lx_sysfs depends on the lx_brand module,
+ * so our module has to load first and define the variables that lx_sysfs will
+ * set when it loads.
+ */
+int lx_sysfs_vfs_type;
+int (*lx_sysfs_vtype)(ino_t);
+
+/*
  * Because the Linux dirent has an extra field (d_type), it's possible that
  * each entry will be 8 bytes larger (and aligned to 8 bytes) due to padding.
  * To prevent overrun during translation, the illumos-native buffer is sized
@@ -51,6 +72,12 @@
  */
 #define	LTOS_GETDENTS_BUFSZ(bufsz, datasz)	\
 	(((bufsz) / (((datasz) + 15) & ~7)) * sizeof (struct dirent))
+
+/*
+ * Linux d_type offset is at (d_reclen - 1). See the Linux getdents(2) man page.
+ * This macro assumes d_reclen is already set correctly.
+ */
+#define	LX_DTYPE(l) *(((char *)l) + (l->d_reclen - 1))
 
 /*
  * Record must be long enough to house d_name string, null terminator and
@@ -86,9 +113,10 @@ struct lx_dirent_64 {
 
 static long
 lx_getdents_common(int fd, caddr_t uptr, size_t count,
-    unsigned int lx_size, int (*outcb)(caddr_t, caddr_t, int))
+    unsigned int lx_size, int (*outcb)(caddr_t, caddr_t, int, boolean_t))
 {
 	vnode_t *vp;
+	boolean_t is_sysfs = B_FALSE;
 	file_t *fp;
 	struct uio auio;
 	struct iovec aiov;
@@ -111,6 +139,10 @@ lx_getdents_common(int fd, caddr_t uptr, size_t count,
 	if (!(fp->f_flag & FREAD)) {
 		releasef(fd);
 		return (set_errno(EBADF));
+	}
+
+	if (vp->v_vfsp->vfs_fstype == lx_sysfs_vfs_type) {
+		is_sysfs = B_TRUE;
 	}
 
 	if (count > LX_GETDENTS_MAX_BUFSZ) {
@@ -167,7 +199,7 @@ lx_getdents_common(int fd, caddr_t uptr, size_t count,
 		if (error != 0 || auio.uio_resid == sbufsz) {
 			break;
 		}
-		res = outcb(sbuf, lbuf, bufsz - auio.uio_resid);
+		res = outcb(sbuf, lbuf, bufsz - auio.uio_resid, is_sysfs);
 		VERIFY(res <= lbufsz);
 		if (res == 0) {
 			/* no records to copyout from this batch */
@@ -217,9 +249,27 @@ lx_getdents_common(int fd, caddr_t uptr, size_t count,
 	return (outb);
 }
 
+static int
+lx_get_sysfs_dtype(ino_t ino)
+{
+	vtype_t vt;
+
+	vt = lx_sysfs_vtype(ino);
+
+	switch (vt) {
+	case VREG:	return (LX_DT_REG);
+	case VDIR:	return (LX_DT_DIR);
+	case VBLK:	return (LX_DT_BLK);
+	case VCHR:	return (LX_DT_CHR);
+	case VLNK:	return (LX_DT_LNK);
+	case VFIFO:	return (LX_DT_FIFO);
+	case VSOCK:	return (LX_DT_SOCK);
+	default:	return (LX_DT_UNKNOWN);
+	}
+}
 
 static int
-lx_getdents_format32(caddr_t sbuf, caddr_t lbuf, int len)
+lx_getdents_format32(caddr_t sbuf, caddr_t lbuf, int len, boolean_t is_sysfs)
 {
 	struct dirent *sd;
 	struct lx_dirent_32 *ld;
@@ -243,6 +293,10 @@ lx_getdents_format32(caddr_t sbuf, caddr_t lbuf, int len)
 		bzero(ld->d_name + namelen,
 		    LX_ZEROLEN(namelen, struct lx_dirent_32));
 
+		if (is_sysfs) {
+			LX_DTYPE(ld) = lx_get_sysfs_dtype(ld->d_ino);
+		}
+
 		len -= sd->d_reclen;
 		size += ld->d_reclen;
 		sbuf += sd->d_reclen;
@@ -252,7 +306,7 @@ lx_getdents_format32(caddr_t sbuf, caddr_t lbuf, int len)
 }
 
 static int
-lx_getdents_format64(caddr_t sbuf, caddr_t lbuf, int len)
+lx_getdents_format64(caddr_t sbuf, caddr_t lbuf, int len, boolean_t is_sysfs)
 {
 	struct dirent *sd;
 	struct lx_dirent_64 *ld;
@@ -275,6 +329,10 @@ lx_getdents_format64(caddr_t sbuf, caddr_t lbuf, int len)
 		/* Zero out any alignment padding and d_type */
 		bzero(ld->d_name + namelen,
 		    LX_ZEROLEN(namelen, struct lx_dirent_64));
+
+		if (is_sysfs) {
+			LX_DTYPE(ld) = lx_get_sysfs_dtype(ld->d_ino);
+		}
 
 		len -= sd->d_reclen;
 		size += ld->d_reclen;
@@ -314,7 +372,7 @@ struct lx_dirent64 {
 	((offsetof(struct lx_dirent64, d_name) + (namelen))))
 
 static int
-lx_getdents64_format(caddr_t sbuf, caddr_t lbuf, int len)
+lx_getdents64_format(caddr_t sbuf, caddr_t lbuf, int len, boolean_t is_sysfs)
 {
 	struct dirent *sd;
 	struct lx_dirent64 *ld;
@@ -330,12 +388,16 @@ lx_getdents64_format(caddr_t sbuf, caddr_t lbuf, int len)
 
 		ld->d_ino = sd->d_ino;
 		ld->d_off = sd->d_off;
-		ld->d_type = 0;
+		ld->d_type = LX_DT_UNKNOWN;
 		(void) strncpy(ld->d_name, sd->d_name, namelen);
 		ld->d_name[namelen] = 0;
 		ld->d_reclen = (ushort_t)LX_RECLEN64(namelen);
 		/* Zero out any alignment padding */
 		bzero(ld->d_name + namelen, LX_ZEROLEN64(namelen));
+
+		if (is_sysfs) {
+			ld->d_type = lx_get_sysfs_dtype(ld->d_ino);
+		}
 
 		len -= sd->d_reclen;
 		size += ld->d_reclen;

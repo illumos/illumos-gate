@@ -10,11 +10,21 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
  * lxsysvfsops.c: vfs operations for lx sysfs.
+ *
+ * sysfs has a close relationship with the lx getdents(2) syscall. This is
+ * necessary so that the getdents code can populate the 'd_type' entries
+ * during a sysfs readdir operation. The glibc code which accesses sysfs
+ * (specifically the 'cpu' subtree) expects dirents to have the d_type field
+ * populated. One problematic consumer is java, which becomes unstable if it
+ * gets the incorrect data from glibc. When sysfs loads, it populates the
+ * lx_sysfs_vfs_type and lx_sysfs_vtype variables defined in lx_getdents.c.
+ * The getdents code can then call into sysfs to determine the d_type for any
+ * given inode directory entry.
  */
 
 #include <sys/types.h>
@@ -50,6 +60,9 @@
 static int	lxsysfstype;
 static dev_t	lxsysdev;
 static kmutex_t	lxsys_mount_lock;
+
+extern int	lx_sysfs_vfs_type;
+extern int	(*lx_sysfs_vtype)(ino_t);
 
 static int lxsys_mount(vfs_t *, vnode_t *, mounta_t *, cred_t *);
 static int lxsys_unmount(vfs_t *, int, cred_t *);
@@ -101,6 +114,9 @@ _fini(void)
 	if ((retval = mod_remove(&modlinkage)) != 0)
 		goto done;
 
+	lx_sysfs_vfs_type = 0;
+	lx_sysfs_vtype = NULL;
+
 	/*
 	 * destroy lxsys_node cache
 	 */
@@ -131,7 +147,8 @@ lxsys_init(int fstype, char *name)
 	int error;
 	major_t dev;
 
-	lxsysfstype = fstype;
+	lx_sysfs_vtype = lxsys_ino_get_type;
+	lx_sysfs_vfs_type = lxsysfstype = fstype;
 	ASSERT(lxsysfstype != 0);
 
 	mutex_init(&lxsys_mount_lock, NULL, MUTEX_DEFAULT, NULL);
