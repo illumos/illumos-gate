@@ -27,6 +27,7 @@
 
 #include <sys/cdefs.h>
 
+#include <sys/disk.h>
 #include <sys/param.h>
 #include <sys/reboot.h>
 #include <sys/boot.h>
@@ -1077,5 +1078,15 @@ efi_zfs_probe(void)
 		if (zfs_probe_dev(dname, &guid) == 0)
 			(void)efi_handle_update_dev(h, &zfs_dev, unit++, guid);
 	}
+}
+
+uint64_t
+ldi_get_size(void *priv)
+{
+	int fd = (uintptr_t) priv;
+	uint64_t size;
+
+	ioctl(fd, DIOCGMEDIASIZE, &size);
+	return (size);
 }
 #endif

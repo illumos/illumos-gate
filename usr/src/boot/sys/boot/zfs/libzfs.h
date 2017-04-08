@@ -63,6 +63,7 @@ char	*zfs_bootfs(void *vdev);
 char	*zfs_fmtdev(void *vdev);
 int	zfs_probe_dev(const char *devname, uint64_t *pool_guid);
 int	zfs_list(const char *name);
+uint64_t ldi_get_size(void *);
 #ifdef __FreeBSD__
 void	init_zfs_bootenv(char *currdev);
 int	zfs_bootenv(const char *name);
