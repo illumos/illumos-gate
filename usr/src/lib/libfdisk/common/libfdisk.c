@@ -770,6 +770,7 @@ static int
 fdisk_read_master_part_table(ext_part_t *epp)
 {
 	struct dk_minfo_ext dkmp_ext;
+	struct dk_minfo dkmp;
 	uchar_t *buf;
 	int sectsize;
 	int size = sizeof (struct ipart);
@@ -779,12 +780,16 @@ fdisk_read_master_part_table(ext_part_t *epp)
 		return (EIO);
 	}
 	if (ioctl(epp->dev_fd, DKIOCGMEDIAINFOEXT, &dkmp_ext) < 0) {
+		if (ioctl(epp->dev_fd, DKIOCGMEDIAINFO, &dkmp) < 0) {
+			return (EIO);
+		}
+		sectsize = dkmp.dki_lbsize;
+	} else {
+		sectsize = dkmp_ext.dki_lbsize;
+	}
+	if (sectsize < 512) {
 		return (EIO);
 	}
-	if (dkmp_ext.dki_lbsize < 512) {
-		return (EIO);
-	}
-	sectsize = dkmp_ext.dki_lbsize;
 	buf = calloc(sectsize, sizeof (uchar_t));
 	if (buf == NULL) {
 		return (ENOMEM);
