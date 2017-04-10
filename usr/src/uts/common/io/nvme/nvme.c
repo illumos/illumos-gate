@@ -2198,14 +2198,6 @@ nvme_init(nvme_t *nvme)
 		/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 		if (*(uint64_t *)nvme->n_ns[i].ns_eui64 == 0) {
 			nvme_prepare_devid(nvme, nvme->n_ns[i].ns_id);
-		} else {
-			/*
-			 * Until EUI64 support is tested on real hardware we
-			 * will ignore namespaces with an EUI64. This can
-			 * be overriden by setting strict-version=0 in nvme.conf
-			 */
-			if (nvme->n_strict_version)
-				nvme->n_ns[i].ns_ignore = B_TRUE;
 		}
 
 		/*
