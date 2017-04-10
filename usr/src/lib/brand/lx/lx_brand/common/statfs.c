@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -105,6 +105,8 @@ static struct lx_ftype_name {
 	{ "lofs",	LX_EXT2_SUPER_MAGIC,	"LX_EXT2_SUPER_MAGIC"	},
 	{ "zfs",	LX_EXT2_SUPER_MAGIC,	"LX_EXT2_SUPER_MAGIC"	},
 	{ "lxautofs",	LX_AUTOFS_SUPER_MAGIC,	"LX_AUTOFS_SUPER_MAGIC"	},
+	{ "lx_cgroup",	LX_CGROUP_SUPER_MAGIC,	"LX_CGROUP_SUPER_MAGIC"	},
+	{ "lx_sysfs",	LX_SYSFS_SUPER_MAGIC,	"LX_SYSFS_SUPER_MAGIC"	},
 	{ NULL,		0,			NULL	}
 };
 
