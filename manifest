@@ -20359,7 +20359,7 @@ f usr/share/man/man9s/usb_dev_qlf_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_ep_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_ep_xdescr.9s 0444 root bin
 f usr/share/man/man9s/usb_ep_ss_comp_descr.9s 0444 root bin
-s usr/share/man/man9s/usb_ep_ss_comp_descr_t.9s=usb_ep_ss_comp_descr
+s usr/share/man/man9s/usb_ep_ss_comp_descr_t.9s=usb_ep_ss_comp_descr.9s
 f usr/share/man/man9s/usb_if_descr.9s 0444 root bin
 s usr/share/man/man9s/usb_intr_req_t.9s=usb_intr_req.9s
 f usr/share/man/man9s/usb_intr_req.9s 0444 root bin
