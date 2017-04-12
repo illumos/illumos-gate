@@ -344,17 +344,25 @@ drv_ioc_attr(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	    zone_check_datalink(&zoneid, diap->dia_linkid) != 0)
 		return (ENOENT);
 
-	if ((err = mac_perim_enter_by_linkid(diap->dia_linkid, &mph)) != 0)
+	if ((err = dls_devnet_hold_tmp(diap->dia_linkid, &dlh)) != 0)
 		return (err);
 
-	if ((err = dls_devnet_hold_link(diap->dia_linkid, &dlh, &dlp)) != 0) {
+	if ((err = mac_perim_enter_by_macname(dls_devnet_mac(dlh),
+	    &mph)) != 0) {
+		dls_devnet_rele_tmp(dlh);
+		return (err);
+	}
+
+	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0) {
 		mac_perim_exit(mph);
+		dls_devnet_rele_tmp(dlh);
 		return (err);
 	}
 
 	mac_sdu_get(dlp->dl_mh, NULL, &diap->dia_max_sdu);
-	dls_devnet_rele_link(dlh, dlp);
+	dls_link_rele(dlp);
 	mac_perim_exit(mph);
+	dls_devnet_rele_tmp(dlh);
 
 	return (0);
 }
@@ -662,10 +670,11 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 			goto done;
 	}
 
-	if ((err = mac_perim_enter_by_linkid(linkid, &mph)) != 0)
+	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
 		goto done;
-
-	if ((err = dls_devnet_hold_link(linkid, &dlh, &dlp)) != 0)
+	if ((err = mac_perim_enter_by_macname(dls_devnet_mac(dlh), &mph)) != 0)
+		goto done;
+	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
 		goto done;
 
 	/*
@@ -796,8 +805,8 @@ done:
 	if (!set && ddi_copyout(kprop, (void *)arg, dsize, mode) != 0)
 		err = EFAULT;
 
-	if (dlh != NULL && dlp != NULL)
-		dls_devnet_rele_link(dlh, dlp);
+	if (dlp != NULL)
+		dls_link_rele(dlp);
 
 	if (mph != NULL) {
 		int32_t	cpuid;
@@ -813,6 +822,9 @@ done:
 		if (mdip != NULL && cpuid != -1)
 			mac_client_set_intr_cpu(mdip, dlp->dl_mch, cpuid);
 	}
+
+	if (dlh != NULL)
+		dls_devnet_rele_tmp(dlh);
 
 	if (kprop != NULL)
 		kmem_free(kprop, dsize);
@@ -1319,10 +1331,13 @@ drv_ioc_gettran(void *karg, intptr_t arg, int mode, cred_t *cred,
 	dls_link_t		*dlp = NULL;
 	dld_ioc_gettran_t	*dgt = karg;
 
-	if ((ret = mac_perim_enter_by_linkid(dgt->dgt_linkid, &mph)) != 0)
+	if ((ret = dls_devnet_hold_tmp(dgt->dgt_linkid, &dlh)) != 0)
 		goto done;
 
-	if ((ret = dls_devnet_hold_link(dgt->dgt_linkid, &dlh, &dlp)) != 0)
+	if ((ret = mac_perim_enter_by_macname(dls_devnet_mac(dlh), &mph)) != 0)
+		goto done;
+
+	if ((ret = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
 		goto done;
 
 	/*
@@ -1341,13 +1356,14 @@ drv_ioc_gettran(void *karg, intptr_t arg, int mode, cred_t *cred,
 	}
 
 done:
-	if (dlh != NULL && dlp != NULL) {
-		dls_devnet_rele_link(dlh, dlp);
-	}
+	if (dlp != NULL)
+		dls_link_rele(dlp);
 
-	if (mph != NULL) {
+	if (mph != NULL)
 		mac_perim_exit(mph);
-	}
+
+	if (dlh != NULL)
+		dls_devnet_rele_tmp(dlh);
 
 	return (ret);
 }
@@ -1371,10 +1387,13 @@ drv_ioc_readtran(void *karg, intptr_t arg, int mode, cred_t *cred,
 	if (dti->dti_nbytes != 256 || dti->dti_off != 0)
 		return (EINVAL);
 
-	if ((ret = mac_perim_enter_by_linkid(dti->dti_linkid, &mph)) != 0)
+	if ((ret = dls_devnet_hold_tmp(dti->dti_linkid, &dlh)) != 0)
 		goto done;
 
-	if ((ret = dls_devnet_hold_link(dti->dti_linkid, &dlh, &dlp)) != 0)
+	if ((ret = mac_perim_enter_by_macname(dls_devnet_mac(dlh), &mph)) != 0)
+		goto done;
+
+	if ((ret = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
 		goto done;
 
 	/*
@@ -1394,13 +1413,14 @@ drv_ioc_readtran(void *karg, intptr_t arg, int mode, cred_t *cred,
 	}
 
 done:
-	if (dlh != NULL && dlp != NULL) {
-		dls_devnet_rele_link(dlh, dlp);
-	}
+	if (dlp != NULL)
+		dls_link_rele(dlp);
 
-	if (mph != NULL) {
+	if (mph != NULL)
 		mac_perim_exit(mph);
-	}
+
+	if (dlh != NULL)
+		dls_devnet_rele_tmp(dlh);
 
 	return (ret);
 }
