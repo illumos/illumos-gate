@@ -123,7 +123,7 @@ do
 		;;
 	esac
 done
-shift `expr $OPTIND - 1`
+shift $(($OPTIND - 1))
 
 echo '\nShutdown started.    \c'
 /usr/bin/date
@@ -140,9 +140,9 @@ trap "rm $nologin >/dev/null 2>&1 ;exit 1"  1 2 15
 for i in 7200 3600 1800 1200 600 300 120 60 30 10; do
 	if [ ${grace} -gt $i ]
 	then
-		hours=`/usr/bin/expr ${grace} / 3600`
-		minutes=`/usr/bin/expr ${grace} % 3600 / 60`
-		seconds=`/usr/bin/expr ${grace} % 60`
+		hours=$((${grace} / 3600))
+		minutes=$((${grace} % 3600 / 60))
+		seconds=$((${grace} % 60))
 		time=""
 		if [ ${hours} -gt 1 ]
 		then
@@ -170,9 +170,7 @@ for i in 7200 3600 1800 1200 600 300 120 60 30 10; do
 
 		(notify \
 "The system ${NODENAME} will be shut down in ${time}
-$*") &
-
-pid1=$!
+$*")
 
 		rm $nologin >/dev/null 2>&1
 		cat > $nologin <<-!
@@ -182,7 +180,7 @@ pid1=$!
 
 		!
 
-		/usr/bin/sleep `/usr/bin/expr ${grace} - $i`
+		/usr/bin/sleep $((${grace} - $i))
 		grace=$i
 	fi
 done
@@ -207,9 +205,7 @@ fi
 (notify \
 "THE SYSTEM ${NODENAME} IS BEING SHUT DOWN NOW ! ! !
 Log off now or risk your files being damaged
-$*") &
-
-pid2=$!
+$*")
 
 if [ ${grace} -gt 0 ]
 then
@@ -221,19 +217,7 @@ fi
 
 echo "Changing to init state $initstate - please wait"
 
-if [ "$pid1" ] || [ "$pid2" ]
-then
-	if [ `zonename` == "global" ]; then
-		# In a global zone, just kill them (even if they don't die).
-		/usr/bin/kill $pid1 $pid2 > /dev/null 2>&1
-	else
-		# In a nonglobal zone, wait for backgrounded processes,
-		# so a backgrounded process does not lose a race to zoneadmd
-		# shutting down.
-		/usr/bin/pwait $pid1 $pid2
-	fi
-fi
-
+# We might be racing with a system that's still booting.
 # Before starting init, check to see if smf(5) is running.  The easiest way
 # to do this is to check for the existence of the repository service door.
 
@@ -241,11 +225,10 @@ i=0
 # Try three times, sleeping one second each time...
 while [ ! -e /etc/svc/volatile/repository_door -a $i -lt 3 ]; do
 	sleep 1
-	i=`/usr/bin/expr $i + 1`
+	i=$(($i + 1))
 done
 
 if [ ! -e /etc/svc/volatile/repository_door ]; then
-	# run "notify" in the foreground this time.
 	notify "Could not find repository door, init-state change may fail!"
 fi
 
