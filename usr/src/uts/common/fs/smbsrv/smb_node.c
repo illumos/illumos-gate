@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB Node State Machine
@@ -596,8 +596,8 @@ smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
 /*
  * Helper function for smb_node_set_delete_on_close(). Assumes node is a dir.
  * Return 0 if this is an empty dir. Otherwise return a NT_STATUS code.
- * We distinguish between readdir failure and non-empty dir by returning
- * different values.
+ * Unfortunately, to find out if a directory is empty, we have to read it
+ * and check for anything other than "." or ".." in the readdir buf.
  */
 static uint32_t
 smb_rmdir_possible(smb_node_t *n, uint32_t flags)
@@ -618,9 +618,9 @@ smb_rmdir_possible(smb_node_t *n, uint32_t flags)
 #define	dp	u.u_dp
 
 	if (smb_vop_readdir(n->vp, 0, buf, &bsize, &eof, flags, zone_kcred()))
-		return (NT_STATUS_CANNOT_DELETE);
+		return (NT_STATUS_INTERNAL_ERROR);
 	if (bsize == 0)
-		return (NT_STATUS_CANNOT_DELETE);
+		return (0); /* empty dir */
 	bufptr = buf;
 	while ((bufptr += reclen) < buf + bsize) {
 		if (edp) {
@@ -647,23 +647,13 @@ smb_rmdir_possible(smb_node_t *n, uint32_t flags)
  * whichever the first file handle is closed will trigger the node to be
  * marked as delete-on-close. The credentials of that ofile will be used
  * as the delete-on-close credentials of the node.
+ *
+ * Note that "read-only" tests have already happened before this call.
  */
 uint32_t
 smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 {
-	int rc = 0;
 	uint32_t status;
-	smb_attr_t attr;
-
-	if (node->n_pending_dosattr & FILE_ATTRIBUTE_READONLY)
-		return (NT_STATUS_CANNOT_DELETE);
-
-	bzero(&attr, sizeof (smb_attr_t));
-	attr.sa_mask = SMB_AT_DOSATTR;
-	rc = smb_fsop_getattr(NULL, zone_kcred(), node, &attr);
-	if ((rc != 0) || (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
-		return (NT_STATUS_CANNOT_DELETE);
-	}
 
 	/*
 	 * If the directory is not empty we should fail setting del-on-close
@@ -679,8 +669,9 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 
 	mutex_enter(&node->n_mutex);
 	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
+		/* It was already marked.  We're done. */
 		mutex_exit(&node->n_mutex);
-		return (NT_STATUS_CANNOT_DELETE);
+		return (NT_STATUS_SUCCESS);
 	}
 
 	crhold(cr);
