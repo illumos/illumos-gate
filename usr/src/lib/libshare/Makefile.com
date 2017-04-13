@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
 LIBRARY =	libshare.a
 VERS =		.1
@@ -42,6 +43,7 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 #add nfs/lib directory as part of the include path
 CFLAGS +=	$(CCVERBOSE)
+C99MODE +=	$(C99_ENABLE)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-switch
