@@ -23,7 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef _DISK_H
@@ -106,6 +106,8 @@ extern int disk_declare_non_enumerated(topo_mod_t *, tnode_t *, tnode_t **);
 extern int disk_declare_path(topo_mod_t *, tnode_t *,
     struct topo_list *, const char *);
 extern int disk_declare_addr(topo_mod_t *, tnode_t *,
+    struct topo_list *, const char *, tnode_t **);
+extern int disk_declare_bridge(topo_mod_t *, tnode_t *,
     struct topo_list *, const char *, tnode_t **);
 extern char *disk_auth_clean(topo_mod_t *, const char *);
 
