@@ -13,6 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -2964,13 +2965,10 @@ static int
 nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 {
 	nvme_t *nvme = ns->ns_nvme;
-	nvme_cmd_t *cmd;
+	nvme_cmd_t *cmd, *ret;
+	nvme_qpair_t *ioq;
 
 	if (nvme->n_dead)
-		return (EIO);
-
-	/* No polling for now */
-	if (xfer->x_flags & BD_XFER_POLL)
 		return (EIO);
 
 	cmd = nvme_create_nvm_cmd(ns, opc, xfer);
@@ -2979,10 +2977,21 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 
 	cmd->nc_sqid = (CPU->cpu_id % nvme->n_ioq_count) + 1;
 	ASSERT(cmd->nc_sqid <= nvme->n_ioq_count);
+	ioq = nvme->n_ioq[cmd->nc_sqid];
 
-	if (nvme_submit_cmd(nvme->n_ioq[cmd->nc_sqid], cmd)
-	    != DDI_SUCCESS)
+	if (nvme_submit_cmd(ioq, cmd) != DDI_SUCCESS)
 		return (EAGAIN);
+
+	if ((xfer->x_flags & BD_XFER_POLL) == 0)
+		return (0);
+
+	do {
+		ret = nvme_retrieve_cmd(nvme, ioq);
+		if (ret != NULL)
+			nvme_bd_xfer_done(ret);
+		else
+			drv_usecwait(10);
+	} while (ioq->nq_active_cmds != 0);
 
 	return (0);
 }
