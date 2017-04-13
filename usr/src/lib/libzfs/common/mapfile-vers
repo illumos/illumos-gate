@@ -88,6 +88,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_handle_dup;
 	zfs_history_event_names;
 	zfs_hold;
+	zfs_init_libshare_arg;
 	zfs_is_mounted;
 	zfs_is_shared;
 	zfs_is_shared_nfs;
@@ -161,6 +162,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_spa_version_map;
 	zfs_standard_error;
 	zfs_type_to_name;
+	zfs_uninit_libshare;
 	zfs_unmount;
 	zfs_unmountall;
 	zfs_unshare;

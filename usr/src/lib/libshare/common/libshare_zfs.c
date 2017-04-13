@@ -264,6 +264,10 @@ get_legacy_mountpoint(const char *path, char *dataset, size_t dlen,
 }
 
 
+/*
+ * Verifies that a specific zfs filesystem handle meets the criteria necessary
+ * to be used by libshare operations. See get_zfs_dataset.
+ */
 static char *
 verify_zfs_handle(zfs_handle_t *hdl, const char *path, boolean_t search_mnttab)
 {
@@ -338,19 +342,16 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path,
 
 	assert(impl_handle->zfs_libhandle != NULL);
 	libzfs_print_on_error(impl_handle->zfs_libhandle, B_FALSE);
-	if ((handle_from_path = zfs_open(impl_handle->zfs_libhandle, cutpath,
-	    ZFS_TYPE_FILESYSTEM)) != NULL) {
-		if ((ret = verify_zfs_handle(handle_from_path, path,
-		    search_mnttab)) != NULL) {
-			zfs_close(handle_from_path);
-			libzfs_print_on_error(impl_handle->zfs_libhandle,
-			    B_TRUE);
+	handle_from_path = zfs_open(impl_handle->zfs_libhandle, cutpath,
+	    ZFS_TYPE_FILESYSTEM);
+	libzfs_print_on_error(impl_handle->zfs_libhandle, B_TRUE);
+	if (handle_from_path != NULL) {
+		ret = verify_zfs_handle(handle_from_path, path, search_mnttab);
+		zfs_close(handle_from_path);
+		if (ret != NULL) {
 			return (ret);
 		}
-		zfs_close(handle_from_path);
 	}
-	libzfs_print_on_error(impl_handle->zfs_libhandle, B_TRUE);
-
 	/*
 	 * Couldn't find a filesystem optimistically, check all the handles we
 	 * can.
@@ -764,8 +765,6 @@ sa_zfs_process_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
 }
 
 /*
- * sa_get_zfs_shares(handle, groupname)
- *
  * Walk the mnttab for all zfs mounts and determine which are
  * shared. Find or create the appropriate group/sub-group to contain
  * the shares.
@@ -778,35 +777,183 @@ sa_zfs_process_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
  * a sub-group must be formed at the lower level for both
  * protocols. That is the nature of the problem in CR 6667349.
  */
+static int
+sa_get_zfs_share_common(sa_handle_t handle, zfs_handle_t *fs_handle, char *path,
+    sa_group_t zfsgroup)
+{
+	boolean_t smb, nfs;
+	boolean_t smb_inherited, nfs_inherited;
+	char nfsshareopts[ZFS_MAXPROPLEN];
+	char smbshareopts[ZFS_MAXPROPLEN];
+	char nfssourcestr[ZFS_MAXPROPLEN];
+	char smbsourcestr[ZFS_MAXPROPLEN];
+	char mountpoint[ZFS_MAXPROPLEN];
+	int err = SA_OK;
+	zprop_source_t source;
+	sa_share_t share;
+	char *dataset;
 
+	source = ZPROP_SRC_ALL;
+	/* If no mountpoint, skip. */
+	if (zfs_prop_get(fs_handle, ZFS_PROP_MOUNTPOINT,
+	    mountpoint, sizeof (mountpoint), NULL, NULL, 0,
+	    B_FALSE) != 0)
+		return (SA_SYSTEM_ERR);
+
+	if (path != NULL)
+		(void) strncpy(path, mountpoint, sizeof (mountpoint));
+	/*
+	 * zfs_get_name value must not be freed. It is just a
+	 * pointer to a value in the handle.
+	 */
+	if ((dataset = (char *)zfs_get_name(fs_handle)) == NULL)
+		return (SA_SYSTEM_ERR);
+
+	/*
+	 * only deal with "mounted" file systems since
+	 * unmounted file systems can't actually be shared.
+	 */
+
+	if (!zfs_is_mounted(fs_handle, NULL))
+		return (SA_SYSTEM_ERR);
+
+	nfs = nfs_inherited = B_FALSE;
+
+	if (zfs_prop_get(fs_handle, ZFS_PROP_SHARENFS, nfsshareopts,
+	    sizeof (nfsshareopts), &source, nfssourcestr,
+	    ZFS_MAXPROPLEN, B_FALSE) == 0 &&
+	    strcmp(nfsshareopts, "off") != 0) {
+		if (source & ZPROP_SRC_INHERITED)
+			nfs_inherited = B_TRUE;
+		else
+			nfs = B_TRUE;
+	}
+
+	smb = smb_inherited = B_FALSE;
+	if (zfs_prop_get(fs_handle, ZFS_PROP_SHARESMB, smbshareopts,
+	    sizeof (smbshareopts), &source, smbsourcestr,
+	    ZFS_MAXPROPLEN, B_FALSE) == 0 &&
+	    strcmp(smbshareopts, "off") != 0) {
+		if (source & ZPROP_SRC_INHERITED)
+			smb_inherited = B_TRUE;
+		else
+			smb = B_TRUE;
+	}
+
+	/*
+	 * If the mountpoint is already shared, it must be a
+	 * non-ZFS share. We want to remove the share from its
+	 * parent group and reshare it under ZFS.
+	 */
+	share = sa_find_share(handle, mountpoint);
+	if (share != NULL &&
+	    (nfs || smb || nfs_inherited || smb_inherited)) {
+		err = sa_remove_share(share);
+		share = NULL;
+	}
+
+	/*
+	 * At this point, we have the information needed to
+	 * determine what to do with the share.
+	 *
+	 * If smb or nfs is set, we have a new sub-group.
+	 * If smb_inherit and/or nfs_inherit is set, then
+	 * place on an existing sub-group. If both are set,
+	 * the existing sub-group is the closest up the tree.
+	 */
+	if (nfs || smb) {
+		/*
+		 * Non-inherited is the straightforward
+		 * case. sa_zfs_process_share handles it
+		 * directly. Make sure that if the "other"
+		 * protocol is inherited, that we treat it as
+		 * non-inherited as well.
+		 */
+		if (nfs || nfs_inherited) {
+			err = sa_zfs_process_share(handle, zfsgroup,
+			    share, mountpoint, "nfs",
+			    0, nfsshareopts,
+			    nfssourcestr, dataset);
+			share = sa_find_share(handle, mountpoint);
+		}
+		if (smb || smb_inherited) {
+			err = sa_zfs_process_share(handle, zfsgroup,
+			    share, mountpoint, "smb",
+			    0, smbshareopts,
+			    smbsourcestr, dataset);
+		}
+	} else if (nfs_inherited || smb_inherited) {
+		char *grpdataset;
+		/*
+		 * If we only have inherited groups, it is
+		 * important to find the closer of the two if
+		 * the protocols are set at different
+		 * levels. The closest sub-group is the one we
+		 * want to work with.
+		 */
+		if (nfs_inherited && smb_inherited) {
+			if (strcmp(nfssourcestr, smbsourcestr) <= 0)
+				grpdataset = nfssourcestr;
+			else
+				grpdataset = smbsourcestr;
+		} else if (nfs_inherited) {
+			grpdataset = nfssourcestr;
+		} else if (smb_inherited) {
+			grpdataset = smbsourcestr;
+		}
+		if (nfs_inherited) {
+			err = sa_zfs_process_share(handle, zfsgroup,
+			    share, mountpoint, "nfs",
+			    ZPROP_SRC_INHERITED, nfsshareopts,
+			    grpdataset, dataset);
+			share = sa_find_share(handle, mountpoint);
+		}
+		if (smb_inherited) {
+			err = sa_zfs_process_share(handle, zfsgroup,
+			    share, mountpoint, "smb",
+			    ZPROP_SRC_INHERITED, smbshareopts,
+			    grpdataset, dataset);
+		}
+	}
+	return (err);
+}
+
+/*
+ * Handles preparing generic objects such as the libzfs handle and group for
+ * sa_get_one_zfs_share, sa_get_zfs_share_for_name, and sa_get_zfs_shares.
+ */
+static int
+prep_zfs_handle_and_group(sa_handle_t handle, char *groupname,
+    libzfs_handle_t **zfs_libhandle, sa_group_t *zfsgroup, int *err)
+{
+	/*
+	 * If we can't access libzfs, don't bother doing anything.
+	 */
+	*zfs_libhandle = ((sa_handle_impl_t)handle)->zfs_libhandle;
+	if (*zfs_libhandle == NULL)
+		return (SA_SYSTEM_ERR);
+
+	*zfsgroup = find_or_create_group(handle, groupname, NULL, err);
+	return (SA_OK);
+}
+
+/*
+ * The O.G. zfs share preparation function. This initializes all zfs shares for
+ * use with libshare.
+ */
 int
 sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 {
 	sa_group_t zfsgroup;
-	boolean_t nfs;
-	boolean_t nfs_inherited;
-	boolean_t smb;
-	boolean_t smb_inherited;
 	zfs_handle_t **zlist;
-	char nfsshareopts[ZFS_MAXPROPLEN];
-	char smbshareopts[ZFS_MAXPROPLEN];
-	sa_share_t share;
-	zprop_source_t source;
-	char nfssourcestr[ZFS_MAXPROPLEN];
-	char smbsourcestr[ZFS_MAXPROPLEN];
-	char mountpoint[ZFS_MAXPROPLEN];
-	size_t count = 0, i;
+	size_t count = 0;
 	libzfs_handle_t *zfs_libhandle;
-	int err = SA_OK;
+	int err;
 
-	/*
-	 * If we can't access libzfs, don't bother doing anything.
-	 */
-	zfs_libhandle = ((sa_handle_impl_t)handle)->zfs_libhandle;
-	if (zfs_libhandle == NULL)
-		return (SA_SYSTEM_ERR);
-
-	zfsgroup = find_or_create_group(handle, groupname, NULL, &err);
+	if ((err = prep_zfs_handle_and_group(handle, groupname, &zfs_libhandle,
+	    &zfsgroup, &err)) != SA_OK) {
+		return (err);
+	}
 	/* Not an error, this could be a legacy condition */
 	if (zfsgroup == NULL)
 		return (SA_OK);
@@ -818,129 +965,8 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 	get_all_filesystems((sa_handle_impl_t)handle, &zlist, &count);
 	qsort(zlist, count, sizeof (void *), mountpoint_compare);
 
-	for (i = 0; i < count; i++) {
-		char *dataset;
-
-		source = ZPROP_SRC_ALL;
-		/* If no mountpoint, skip. */
-		if (zfs_prop_get(zlist[i], ZFS_PROP_MOUNTPOINT,
-		    mountpoint, sizeof (mountpoint), NULL, NULL, 0,
-		    B_FALSE) != 0)
-			continue;
-
-		/*
-		 * zfs_get_name value must not be freed. It is just a
-		 * pointer to a value in the handle.
-		 */
-		if ((dataset = (char *)zfs_get_name(zlist[i])) == NULL)
-			continue;
-
-		/*
-		 * only deal with "mounted" file systems since
-		 * unmounted file systems can't actually be shared.
-		 */
-
-		if (!zfs_is_mounted(zlist[i], NULL))
-			continue;
-
-		nfs = nfs_inherited = B_FALSE;
-
-		if (zfs_prop_get(zlist[i], ZFS_PROP_SHARENFS, nfsshareopts,
-		    sizeof (nfsshareopts), &source, nfssourcestr,
-		    ZFS_MAXPROPLEN, B_FALSE) == 0 &&
-		    strcmp(nfsshareopts, "off") != 0) {
-			if (source & ZPROP_SRC_INHERITED)
-				nfs_inherited = B_TRUE;
-			else
-				nfs = B_TRUE;
-		}
-
-		smb = smb_inherited = B_FALSE;
-		if (zfs_prop_get(zlist[i], ZFS_PROP_SHARESMB, smbshareopts,
-		    sizeof (smbshareopts), &source, smbsourcestr,
-		    ZFS_MAXPROPLEN, B_FALSE) == 0 &&
-		    strcmp(smbshareopts, "off") != 0) {
-			if (source & ZPROP_SRC_INHERITED)
-				smb_inherited = B_TRUE;
-			else
-				smb = B_TRUE;
-		}
-
-		/*
-		 * If the mountpoint is already shared, it must be a
-		 * non-ZFS share. We want to remove the share from its
-		 * parent group and reshare it under ZFS.
-		 */
-		share = sa_find_share(handle, mountpoint);
-		if (share != NULL &&
-		    (nfs || smb || nfs_inherited || smb_inherited)) {
-			err = sa_remove_share(share);
-			share = NULL;
-		}
-
-		/*
-		 * At this point, we have the information needed to
-		 * determine what to do with the share.
-		 *
-		 * If smb or nfs is set, we have a new sub-group.
-		 * If smb_inherit and/or nfs_inherit is set, then
-		 * place on an existing sub-group. If both are set,
-		 * the existing sub-group is the closest up the tree.
-		 */
-		if (nfs || smb) {
-			/*
-			 * Non-inherited is the straightforward
-			 * case. sa_zfs_process_share handles it
-			 * directly. Make sure that if the "other"
-			 * protocol is inherited, that we treat it as
-			 * non-inherited as well.
-			 */
-			if (nfs || nfs_inherited) {
-				err = sa_zfs_process_share(handle, zfsgroup,
-				    share, mountpoint, "nfs",
-				    0, nfsshareopts,
-				    nfssourcestr, dataset);
-				share = sa_find_share(handle, mountpoint);
-			}
-			if (smb || smb_inherited) {
-				err = sa_zfs_process_share(handle, zfsgroup,
-				    share, mountpoint, "smb",
-				    0, smbshareopts,
-				    smbsourcestr, dataset);
-			}
-		} else if (nfs_inherited || smb_inherited) {
-			char *grpdataset;
-			/*
-			 * If we only have inherited groups, it is
-			 * important to find the closer of the two if
-			 * the protocols are set at different
-			 * levels. The closest sub-group is the one we
-			 * want to work with.
-			 */
-			if (nfs_inherited && smb_inherited) {
-				if (strcmp(nfssourcestr, smbsourcestr) <= 0)
-					grpdataset = nfssourcestr;
-				else
-					grpdataset = smbsourcestr;
-			} else if (nfs_inherited) {
-				grpdataset = nfssourcestr;
-			} else if (smb_inherited) {
-				grpdataset = smbsourcestr;
-			}
-			if (nfs_inherited) {
-				err = sa_zfs_process_share(handle, zfsgroup,
-				    share, mountpoint, "nfs",
-				    ZPROP_SRC_INHERITED, nfsshareopts,
-				    grpdataset, dataset);
-				share = sa_find_share(handle, mountpoint);
-			}
-			if (smb_inherited) {
-				err = sa_zfs_process_share(handle, zfsgroup,
-				    share, mountpoint, "smb",
-				    ZPROP_SRC_INHERITED, smbshareopts,
-				    grpdataset, dataset);
-			}
-		}
+	for (int i = 0; i < count; i++) {
+		err = sa_get_zfs_share_common(handle, zlist[i], NULL, zfsgroup);
 	}
 	/*
 	 * Don't need to free the "zlist" variable since it is only a
@@ -949,6 +975,73 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 	 */
 	return (err);
 }
+
+/*
+ * Initializes only the handles specified in the sharearg for use with libshare.
+ * This is used as a performance optimization relative to sa_get_zfs_shares.
+ */
+int
+sa_get_one_zfs_share(sa_handle_t handle, char *groupname,
+    sa_init_selective_arg_t *sharearg, char ***paths, size_t *paths_len)
+{
+	sa_group_t zfsgroup;
+	libzfs_handle_t *zfs_libhandle;
+	int err;
+
+	if ((err = prep_zfs_handle_and_group(handle, groupname, &zfs_libhandle,
+	    &zfsgroup, &err)) != SA_OK) {
+		return (err);
+	}
+	/* Not an error, this could be a legacy condition */
+	if (zfsgroup == NULL)
+		return (SA_OK);
+
+	*paths_len = sharearg->zhandle_len;
+	*paths = malloc(sizeof (char *) * (*paths_len));
+	for (int i = 0; i < sharearg->zhandle_len; ++i) {
+		zfs_handle_t *fs_handle =
+		    ((zfs_handle_t **)(sharearg->zhandle_arr))[i];
+		if (fs_handle == NULL) {
+			return (SA_SYSTEM_ERR);
+		}
+		(*paths)[i] = malloc(sizeof (char) * ZFS_MAXPROPLEN);
+		err |= sa_get_zfs_share_common(handle, fs_handle, (*paths)[i],
+		    zfsgroup);
+	}
+	return (err);
+}
+
+/*
+ * Initializes only the share with the specified sharename for use with
+ * libshare.
+ */
+int
+sa_get_zfs_share_for_name(sa_handle_t handle, char *groupname,
+    const char *sharename, char *outpath)
+{
+	sa_group_t zfsgroup;
+	libzfs_handle_t *zfs_libhandle;
+	int err;
+
+	if ((err = prep_zfs_handle_and_group(handle, groupname, &zfs_libhandle,
+	    &zfsgroup, &err)) != SA_OK) {
+		return (err);
+	}
+	/* Not an error, this could be a legacy condition */
+	if (zfsgroup == NULL)
+		return (SA_OK);
+
+	zfs_handle_t *fs_handle = zfs_open(zfs_libhandle,
+	    sharename + strspn(sharename, "/"), ZFS_TYPE_DATASET);
+	if (fs_handle == NULL)
+		return (SA_SYSTEM_ERR);
+
+	err = sa_get_zfs_share_common(handle, fs_handle, outpath, zfsgroup);
+	zfs_close(fs_handle);
+	return (err);
+}
+
+
 
 #define	COMMAND		"/usr/sbin/zfs"
 
