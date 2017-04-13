@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -491,6 +492,43 @@ disk_declare_addr(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
 
 	topo_mod_dprintf(mod, "disk_declare_addr: "
 	    "failed to find disk matching addr %s", addr);
+
+	return (1);
+}
+
+/*
+ * Try to find a disk based on the bridge-port property. This is most often used
+ * for SATA devices which are attached to a SAS controller and are therefore
+ * behind a SATL bridge port. SES only knows of devices based on this SAS WWN,
+ * not based on any SATA GUIDs.
+ */
+int
+disk_declare_bridge(topo_mod_t *mod, tnode_t *parent, topo_list_t *listp,
+    const char *addr, tnode_t **childp)
+{
+	dev_di_node_t *dnode;
+	int i;
+
+	/* Check for match using addr. */
+	for (dnode = topo_list_next(listp); dnode != NULL;
+	    dnode = topo_list_next(dnode)) {
+		if (dnode->ddn_bridge_port == NULL)
+			continue;
+
+		for (i = 0; i < dnode->ddn_ppath_count; i++) {
+			if ((dnode->ddn_bridge_port[i] != NULL) &&
+			    (strncmp(dnode->ddn_bridge_port[i], addr,
+			    strcspn(dnode->ddn_bridge_port[i], ":"))) == 0) {
+				topo_mod_dprintf(mod, "disk_declare_bridge: "
+				    "found disk matching bridge %s", addr);
+				return (disk_declare(mod, parent, dnode,
+				    childp));
+			}
+		}
+	}
+
+	topo_mod_dprintf(mod, "disk_declare_bridge: "
+	    "failed to find disk matching bridge %s", addr);
 
 	return (1);
 }
