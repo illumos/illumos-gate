@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -362,6 +363,7 @@ smb_server_g_fini(void)
 
 	smb_node_fini();
 	smb_mbc_fini();
+	smb_codepage_fini();
 	smb_kshare_g_fini();
 
 	smb_fem_fini();

@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
 
 #
@@ -112,6 +113,7 @@ SYMBOL_VERSION SUNWprivate {
 	sa_get_next_security;
 	sa_get_protocol_status;
 	sa_init;
+	sa_init_arg;
 	sa_find_share;
 	sa_set_protocol_property;
 	sa_fini;

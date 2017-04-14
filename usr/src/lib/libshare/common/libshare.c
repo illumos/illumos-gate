@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -68,6 +69,7 @@ extern struct sa_proto_plugin *sap_proto_list;
 /* current SMF/SVC repository handle */
 extern void getlegacyconfig(sa_handle_t, char *, xmlNodePtr *);
 extern int gettransients(sa_handle_impl_t, xmlNodePtr *);
+extern int get_one_transient(sa_handle_impl_t, xmlNodePtr *, char **, size_t);
 extern char *sa_fstype(char *);
 extern int sa_is_share(void *);
 extern int sa_is_resource(void *);
@@ -814,21 +816,23 @@ verifydefgroupopts(sa_handle_t handle)
 }
 
 /*
- * sa_init(init_service)
+ * sa_init_impl(init_service, arg)
  *	Initialize the API
  *	find all the shared objects
  *	init the tables with all objects
  *	read in the current configuration
+ *
+ *	arg is a parameter passed in whose meaning is based on the init_service.
+ *	See libshare.h under API initialization.
  */
-
 #define	GETPROP(prop)	scf_simple_prop_next_astring(prop)
 #define	CHECKTSTAMP(st, tval)	stat(SA_LEGACY_DFSTAB, &st) >= 0 && \
 	tval != TSTAMP(st.st_ctim)
-
-sa_handle_t
-sa_init(int init_service)
+static sa_handle_t
+sa_init_impl(int init_service, void *arg)
 {
 	struct stat st;
+	/* legacy is used for debugging only as far as I can tell */
 	int legacy = 0;
 	uint64_t tval = 0;
 	int lockfd;
@@ -841,6 +845,7 @@ sa_init(int init_service)
 	handle = calloc(sizeof (struct sa_handle_impl), 1);
 
 	if (handle != NULL) {
+		handle->sa_service = init_service;
 		/*
 		 * Get protocol specific structures, but only if this
 		 * is the only handle.
@@ -849,7 +854,9 @@ sa_init(int init_service)
 		if (sa_global_handles == NULL)
 			(void) proto_plugin_init();
 		(void) mutex_unlock(&sa_global_lock);
-		if (init_service & SA_INIT_SHARE_API) {
+		if (init_service & (SA_INIT_SHARE_API |
+		    SA_INIT_SHARE_API_SELECTIVE | SA_INIT_ONE_SHARE_FROM_NAME |
+		    SA_INIT_ONE_SHARE_FROM_HANDLE)) {
 			/*
 			 * initialize access into libzfs. We use this
 			 * when collecting info about ZFS datasets and
@@ -1025,12 +1032,83 @@ sa_init(int init_service)
 						handle->tstrans = 0;
 					scf_simple_prop_free(prop);
 				}
-				legacy |= sa_get_zfs_shares(handle, "zfs");
-				legacy |= gettransients(handle, &handle->tree);
+				/*
+				 * In this conditional the library reads from
+				 * zfs and /etc/dfs/sharetab to find datasets
+				 * that must be shared. The result is a tree of
+				 * groups that are stored in the handle for
+				 * libshare to utilize later when asked to share
+				 * or unshare datasets.
+				 */
+				if (init_service &
+				    SA_INIT_SHARE_API_SELECTIVE) {
+					char **paths;
+					size_t paths_len, i;
+
+					legacy |= sa_get_one_zfs_share(handle,
+					    "zfs",
+					    (sa_init_selective_arg_t *)arg,
+					    &paths, &paths_len);
+					legacy |= get_one_transient(handle,
+					    &handle->tree, paths, paths_len);
+					for (i = 0; i < paths_len; ++i) {
+						free(paths[i]);
+					}
+					free(paths);
+				} else if (init_service &
+				    SA_INIT_ONE_SHARE_FROM_NAME) {
+					char path[ZFS_MAXPROPLEN];
+					char *ptr = path;
+					char **ptr_to_path = &ptr;
+
+					legacy |=
+					    sa_get_zfs_share_for_name(handle,
+					    "zfs", (char *)arg, path);
+					legacy |= get_one_transient(handle,
+					    &handle->tree, ptr_to_path, 1);
+				} else if (init_service &
+				    SA_INIT_ONE_SHARE_FROM_HANDLE) {
+					char path[ZFS_MAXPROPLEN];
+					char *ptr = path;
+					char **ptr_to_path = &ptr;
+
+					legacy |=
+					    sa_get_zfs_share_for_name(handle,
+					    "zfs",
+					    zfs_get_name(
+					    (zfs_handle_t *)arg),
+					    path);
+					legacy |= get_one_transient(handle,
+					    &handle->tree, ptr_to_path, 1);
+				} else {
+					legacy |= sa_get_zfs_shares(handle,
+					    "zfs");
+					legacy |= gettransients(handle,
+					    &handle->tree);
+				}
 			}
 		}
 	}
 	return ((sa_handle_t)handle);
+}
+
+/*
+ * sa_init exists as a legacy interface, new consumers should use sa_init_arg.
+ */
+sa_handle_t
+sa_init(int init_service)
+{
+	return (sa_init_impl(init_service, NULL));
+}
+
+/*
+ * See libshare.h "API Initialization" section for valid values of init_service
+ * as well as the appropriate argument type for a given init_service.
+ */
+sa_handle_t
+sa_init_arg(int init_service, void *arg)
+{
+	return (sa_init_impl(init_service, arg));
 }
 
 /*
@@ -3066,7 +3144,7 @@ add_or_update(scfutilhandle_t *scf_handle, int type, scf_value_t *value,
 
 static int
 sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
-			sa_property_t prop, int type)
+    sa_property_t prop, int type)
 {
 	char *name;
 	char *valstr;

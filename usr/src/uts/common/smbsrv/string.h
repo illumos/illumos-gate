@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #ifndef	_SMBSRV_STRING_H
@@ -113,6 +114,7 @@ typedef struct smb_codepage {
 } smb_codepage_t;
 
 void smb_codepage_init(void);
+void smb_codepage_fini(void);
 
 int smb_isupper(int);
 int smb_islower(int);

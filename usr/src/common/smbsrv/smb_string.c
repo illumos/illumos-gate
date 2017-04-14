@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
@@ -49,6 +50,8 @@
  */
 static const smb_codepage_t *current_codepage = usascii_codepage;
 static boolean_t is_unicode = B_FALSE;
+
+static smb_codepage_t *unicode_codepage = NULL;
 
 static smb_codepage_t *smb_unicode_init(void);
 
@@ -115,17 +118,28 @@ strcanon(char *buf, const char *class)
 void
 smb_codepage_init(void)
 {
-	const smb_codepage_t *cp;
+	smb_codepage_t *cp;
 
 	if (is_unicode)
 		return;
 
 	if ((cp = smb_unicode_init()) != NULL) {
 		current_codepage = cp;
+		unicode_codepage = cp;
 		is_unicode = B_TRUE;
 	} else {
 		current_codepage = usascii_codepage;
 		is_unicode = B_FALSE;
+	}
+}
+
+void
+smb_codepage_fini(void)
+{
+	if (unicode_codepage != NULL) {
+		MEM_FREE("unicode", unicode_codepage);
+		unicode_codepage = NULL;
+		current_codepage = NULL;
 	}
 }
 
