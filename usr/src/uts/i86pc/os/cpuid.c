@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
  */
@@ -423,9 +423,8 @@ static struct cpuid_info cpuid_info0;
  * (loosely defined as "pre-Pentium-4"):
  * P6, PII, Mobile PII, PII Xeon, PIII, Mobile PIII, PIII Xeon
  */
-
 #define	IS_LEGACY_P6(cpi) (			\
-	cpi->cpi_family == 6 && 		\
+	cpi->cpi_family == 6 &&			\
 		(cpi->cpi_model == 1 ||		\
 		cpi->cpi_model == 3 ||		\
 		cpi->cpi_model == 5 ||		\
@@ -1465,7 +1464,13 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	xcpuid = 0;
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
-		if (IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf)
+		/*
+		 * On KVM we know we will have proper support for extended
+		 * cpuid.
+		 */
+		if (IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf ||
+		    (get_hwenv() == HW_KVM && cpi->cpi_family == 6 &&
+		    (cpi->cpi_model == 6 || cpi->cpi_model == 2)))
 			xcpuid++;
 		break;
 	case X86_VENDOR_AMD:

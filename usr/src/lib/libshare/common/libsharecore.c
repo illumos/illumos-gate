@@ -1433,25 +1433,176 @@ err:
 }
 
 /*
- * parse_sharetab(handle)
+ * parse_sharetab_impl(handle, tmplist, lgroup)
  *
  * Read the /etc/dfs/sharetab file and see which entries don't exist
  * in the repository. These shares are marked transient.  We also need
  * to see if they are ZFS shares since ZFS bypasses the SMF
  * repository.
+ *
+ * The return value is used to contribute to values indicating if it is a legacy
+ * share. Right now this is 0 or 1, but as multiple systems become legacy that
+ * could change.
  */
 
-int
-parse_sharetab(sa_handle_t handle)
+static int
+parse_sharetab_impl(sa_handle_t handle, xfs_sharelist_t *tmplist,
+    sa_group_t lgroup)
 {
-	xfs_sharelist_t *list, *tmplist;
 	int err = 0;
 	sa_share_t share;
 	sa_group_t group;
-	sa_group_t lgroup;
 	char *groupname;
 	int legacy = 0;
 	char shareopts[MAXNAMLEN];
+
+	group = NULL;
+	share = sa_find_share(handle, tmplist->path);
+	if (share != NULL) {
+		/*
+		 * If this is a legacy share, mark as shared so we only update
+		 * sharetab appropriately. We also keep the sharetab options in
+		 * order to display for legacy share with no arguments.
+		 */
+		set_node_attr(share, "shared", "true");
+		(void) snprintf(shareopts, MAXNAMLEN, "shareopts-%s",
+		    tmplist->fstype);
+		set_node_attr(share, shareopts, tmplist->options);
+		return (1);
+	}
+
+	/*
+	 * This share is transient so needs to be added. Initially, this will be
+	 * under default(legacy) unless it is a ZFS share. If zfs, we need a zfs
+	 * group.
+	 */
+	if (tmplist->resource != NULL &&
+	    (groupname = strchr(tmplist->resource, '@')) != NULL) {
+		/* There is a defined group */
+		*groupname++ = '\0';
+		group = sa_get_group(handle, groupname);
+		if (group != NULL) {
+			share = _sa_add_share(group, tmplist->path,
+			    SA_SHARE_TRANSIENT, &err,
+			    (uint64_t)SA_FEATURE_NONE);
+		} else {
+			/*
+			 * While this case shouldn't occur very often, it does
+			 * occur out of a "zfs set sharenfs=off" when the
+			 * dataset is also set to canmount=off. A warning will
+			 * then cause the zfs command to abort. Since we add it
+			 * to the default list, everything works properly anyway
+			 * and the library doesn't need to give a warning.
+			 */
+			share = _sa_add_share(lgroup,
+			    tmplist->path, SA_SHARE_TRANSIENT,
+			    &err, (uint64_t)SA_FEATURE_NONE);
+		}
+	} else {
+		if (sa_zfs_is_shared(handle, tmplist->path)) {
+			group = sa_get_group(handle, "zfs");
+			if (group == NULL) {
+				group = sa_create_group(handle,
+				    "zfs", &err);
+				if (group == NULL &&
+				    err == SA_NO_PERMISSION) {
+					group = _sa_create_group(
+					    (sa_handle_impl_t)
+					    handle,
+					    "zfs");
+				}
+				if (group != NULL) {
+					(void) sa_create_optionset(
+					    group, tmplist->fstype);
+					(void) sa_set_group_attr(group,
+					    "zfs", "true");
+				}
+			}
+			if (group != NULL) {
+				share = _sa_add_share(group,
+				    tmplist->path, SA_SHARE_TRANSIENT,
+				    &err, (uint64_t)SA_FEATURE_NONE);
+			}
+		} else {
+			share = _sa_add_share(lgroup, tmplist->path,
+			    SA_SHARE_TRANSIENT, &err,
+			    (uint64_t)SA_FEATURE_NONE);
+		}
+	}
+	if (share == NULL)
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "Problem with transient: %s\n"), sa_errorstr(err));
+	if (share != NULL)
+		set_node_attr(share, "shared", "true");
+	if (err == SA_OK) {
+		if (tmplist->options != NULL &&
+		    strlen(tmplist->options) > 0) {
+			(void) sa_parse_legacy_options(share,
+			    tmplist->options, tmplist->fstype);
+		}
+		if (tmplist->resource != NULL &&
+		    strcmp(tmplist->resource, "-") != 0)
+			set_node_attr(share, "resource",
+			    tmplist->resource);
+		if (tmplist->description != NULL) {
+			xmlNodePtr node;
+			node = xmlNewChild((xmlNodePtr)share, NULL,
+			    (xmlChar *)"description", NULL);
+			xmlNodeSetContent(node,
+			    (xmlChar *)tmplist->description);
+		}
+		legacy = 1;
+	}
+	return (legacy);
+}
+
+/*
+ * Given an array of paths, parses the sharetab in /etc/dfs/sharetab looking for
+ * matches to each path that could be transients from that file.
+ *
+ * parse_sharetab_impl has more information on what exactly it is looking for.
+ */
+int
+parse_sharetab_for_paths(sa_handle_t handle, char **paths, size_t paths_len)
+{
+	int err = 0;
+	int legacy = 0;
+	sa_group_t lgroup;
+	xfs_sharelist_t *list = get_share_list(&err);
+
+	if (list == NULL)
+		return (legacy);
+
+	lgroup = sa_get_group(handle, "default");
+	for (int i = 0; i < paths_len; ++i) {
+		xfs_sharelist_t *tmplist;
+
+		for (tmplist = list; tmplist != NULL; tmplist = tmplist->next) {
+			if (strcmp(tmplist->path, paths[i]) == 0) {
+				break;
+			}
+		}
+		if (tmplist == NULL) {
+			continue;
+		}
+
+		legacy = parse_sharetab_impl(handle, tmplist, lgroup);
+
+	}
+	dfs_free_list(list);
+	return (legacy);
+}
+
+/*
+ * Runs parse_sharetab_impl on all the different share lists on the system.
+ */
+int
+parse_sharetab(sa_handle_t handle)
+{
+	int err = 0;
+	int legacy = 0;
+	sa_group_t lgroup;
+	xfs_sharelist_t *list = get_share_list(&err);
 
 	list = get_share_list(&err);
 	if (list == NULL)
@@ -1459,120 +1610,44 @@ parse_sharetab(sa_handle_t handle)
 
 	lgroup = sa_get_group(handle, "default");
 
-	for (tmplist = list; tmplist != NULL; tmplist = tmplist->next) {
-		group = NULL;
-		share = sa_find_share(handle, tmplist->path);
-		if (share != NULL) {
-			/*
-			 * If this is a legacy share, mark as shared so we
-			 * only update sharetab appropriately. We also keep
-			 * the sharetab options in order to display for legacy
-			 * share with no arguments.
-			 */
-			set_node_attr(share, "shared", "true");
-			(void) snprintf(shareopts, MAXNAMLEN, "shareopts-%s",
-			    tmplist->fstype);
-			set_node_attr(share, shareopts, tmplist->options);
-			continue;
-		}
-
-		/*
-		 * This share is transient so needs to be
-		 * added. Initially, this will be under
-		 * default(legacy) unless it is a ZFS
-		 * share. If zfs, we need a zfs group.
-		 */
-		if (tmplist->resource != NULL &&
-		    (groupname = strchr(tmplist->resource, '@')) != NULL) {
-			/* There is a defined group */
-			*groupname++ = '\0';
-			group = sa_get_group(handle, groupname);
-			if (group != NULL) {
-				share = _sa_add_share(group, tmplist->path,
-				    SA_SHARE_TRANSIENT, &err,
-				    (uint64_t)SA_FEATURE_NONE);
-			} else {
-				/*
-				 * While this case shouldn't
-				 * occur very often, it does
-				 * occur out of a "zfs set
-				 * sharenfs=off" when the
-				 * dataset is also set to
-				 * canmount=off. A warning
-				 * will then cause the zfs
-				 * command to abort. Since we
-				 * add it to the default list,
-				 * everything works properly
-				 * anyway and the library
-				 * doesn't need to give a
-				 * warning.
-				 */
-				share = _sa_add_share(lgroup,
-				    tmplist->path, SA_SHARE_TRANSIENT,
-				    &err, (uint64_t)SA_FEATURE_NONE);
-			}
-		} else {
-			if (sa_zfs_is_shared(handle, tmplist->path)) {
-				group = sa_get_group(handle, "zfs");
-				if (group == NULL) {
-					group = sa_create_group(handle,
-					    "zfs", &err);
-					if (group == NULL &&
-					    err == SA_NO_PERMISSION) {
-						group = _sa_create_group(
-						    (sa_handle_impl_t)
-						    handle,
-						    "zfs");
-					}
-					if (group != NULL) {
-						(void) sa_create_optionset(
-						    group, tmplist->fstype);
-						(void) sa_set_group_attr(group,
-						    "zfs", "true");
-					}
-				}
-				if (group != NULL) {
-					share = _sa_add_share(group,
-					    tmplist->path, SA_SHARE_TRANSIENT,
-					    &err, (uint64_t)SA_FEATURE_NONE);
-				}
-			} else {
-				share = _sa_add_share(lgroup, tmplist->path,
-				    SA_SHARE_TRANSIENT, &err,
-				    (uint64_t)SA_FEATURE_NONE);
-			}
-		}
-		if (share == NULL)
-			(void) printf(dgettext(TEXT_DOMAIN,
-			    "Problem with transient: %s\n"), sa_errorstr(err));
-		if (share != NULL)
-			set_node_attr(share, "shared", "true");
-		if (err == SA_OK) {
-			if (tmplist->options != NULL &&
-			    strlen(tmplist->options) > 0) {
-				(void) sa_parse_legacy_options(share,
-				    tmplist->options, tmplist->fstype);
-			}
-			if (tmplist->resource != NULL &&
-			    strcmp(tmplist->resource, "-") != 0)
-				set_node_attr(share, "resource",
-				    tmplist->resource);
-			if (tmplist->description != NULL) {
-				xmlNodePtr node;
-				node = xmlNewChild((xmlNodePtr)share, NULL,
-				    (xmlChar *)"description", NULL);
-				xmlNodeSetContent(node,
-				    (xmlChar *)tmplist->description);
-			}
-			legacy = 1;
-		}
+	for (xfs_sharelist_t *tmplist = list; tmplist != NULL;
+	    tmplist = tmplist->next) {
+		legacy |= parse_sharetab_impl(handle, tmplist, lgroup);
 	}
 	dfs_free_list(list);
 	return (legacy);
 }
 
 /*
- * Get the transient shares from the sharetab (or other) file.  since
+ * This is the same as gettransients except when parsing sharetab the entries
+ * are only processed if the path matches an element of paths.
+ */
+int
+get_one_transient(sa_handle_impl_t ihandle, xmlNodePtr *root, char **paths,
+    size_t paths_len)
+{
+	int legacy = 0;
+	char **protocols = NULL;
+
+	if (root != NULL) {
+		if (*root == NULL)
+			*root = xmlNewNode(NULL, (xmlChar *)"sharecfg");
+		if (*root != NULL) {
+			legacy = parse_sharetab_for_paths(ihandle, paths,
+			    paths_len);
+			int numproto = sa_get_protocols(&protocols);
+			for (int i = 0; i < numproto; i++)
+				legacy |= sa_proto_get_transients(
+				    (sa_handle_t)ihandle, protocols[i]);
+			if (protocols != NULL)
+				free(protocols);
+		}
+	}
+	return (legacy);
+}
+
+/*
+ * Get the transient shares from the sharetab (or other) file. Since
  * these are transient, they only appear in the working file and not
  * in a repository.
  */
@@ -2183,7 +2258,8 @@ sa_needs_refresh(sa_handle_t handle)
 	uint64_t tstamp;
 	scf_simple_prop_t *prop;
 
-	if (handle == NULL)
+	if (handle == NULL || implhandle->sa_service &
+	    (SA_INIT_ONE_SHARE_FROM_NAME | SA_INIT_ONE_SHARE_FROM_HANDLE))
 		return (B_TRUE);
 
 	/*

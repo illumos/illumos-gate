@@ -570,8 +570,6 @@ int add_properties(LibHalContext *hal_ctx, new_dev_t *nd, lh_prop_t *prop)
 		}
 
 		switch (p->type) {
-			case LIBHAL_PROPERTY_TYPE_INVALID:
-				break;
 			case LIBHAL_PROPERTY_TYPE_BOOLEAN:
 				if (!libhal_device_set_property_bool(hal_ctx, nd->real_udi, p->key, p->v.bool_value, &error)) {
 					fprintf(stderr, "%s: %s\n", error.name, error.message);
@@ -616,6 +614,8 @@ int add_properties(LibHalContext *hal_ctx, new_dev_t *nd, lh_prop_t *prop)
 						return 42;
 					}
 				}
+				break;
+			default:
 				break;
 		}
 	}

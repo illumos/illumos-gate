@@ -73,7 +73,7 @@ def git(command):
                              stdout=tmpfile,
                              stderr=subprocess.PIPE)
     except OSError, e:
-        raise GitError("could not execute %s: %s\n" (command, e))
+        raise GitError("could not execute %s: %s\n" % (command, e))
 
     err = p.wait()
     if err != 0:

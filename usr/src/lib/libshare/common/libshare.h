@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -37,6 +38,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/nvpair.h>
+#include <libzfs.h>
 
 /*
  * Basic datatypes for most functions
@@ -91,8 +93,30 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_SHARE_EXISTS		33	/* path or file is already shared */
 
 /* API Initialization */
+/* Both of these do not care about the value of arg in sa_init_arg */
 #define	SA_INIT_SHARE_API	0x0001	/* init share specific interface */
 #define	SA_INIT_CONTROL_API	0x0002	/* init control specific interface */
+
+/* expects an sa_init_selective_arg_t as an argument */
+#define	SA_INIT_SHARE_API_SELECTIVE	0x0004	/* only some shares */
+struct sa_init_selective_arg {
+	zfs_handle_t **zhandle_arr;
+	size_t zhandle_len;
+};
+typedef struct sa_init_selective_arg sa_init_selective_arg_t;
+
+
+/*
+ * The SA_INIT_ONE_SHARE* initialization options to sa_init* will cause
+ * sa_needs_refrsh() to return true even if nothing else in the system has
+ * changed. If writing code that could possibly need to share/unshare multiple
+ * shares, it is recommended to use SA_INIT_SHARE_API_SELECTIVE.
+ */
+/* Expects a single char * as input, the name of the share. */
+#define	SA_INIT_ONE_SHARE_FROM_NAME	0x0008
+
+/* Expects a single zfs_handle_t as input, the handle of the share. */
+#define	SA_INIT_ONE_SHARE_FROM_HANDLE	0x0010
 
 /* not part of API returns */
 #define	SA_LEGACY_ERR		32	/* share/unshare error return */
@@ -145,6 +169,7 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 
 /* initialization */
 extern sa_handle_t sa_init(int);
+extern sa_handle_t sa_init_arg(int, void *);
 extern void sa_fini(sa_handle_t);
 extern int sa_update_config(sa_handle_t);
 extern boolean_t sa_needs_refresh(sa_handle_t);

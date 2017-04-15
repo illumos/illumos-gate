@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -110,6 +111,7 @@ typedef struct sa_handle_impl {
 	xmlDocPtr	doc;
 	uint64_t	tssharetab;
 	uint64_t	tstrans;
+	int		sa_service;
 } *sa_handle_impl_t;
 
 extern int sa_proto_share(char *, sa_share_t);
@@ -142,7 +144,10 @@ extern void sa_fillshare(sa_share_t share, char *proto, struct share *sh);
 extern void sa_emptyshare(struct share *sh);
 
 /* ZFS functions */
+extern int sa_get_one_zfs_share(sa_handle_t, char *, sa_init_selective_arg_t *,
+    char ***, size_t *);
 extern int sa_get_zfs_shares(sa_handle_t, char *);
+extern int sa_get_zfs_share_for_name(sa_handle_t, char *, const char *, char *);
 extern int sa_zfs_update(sa_share_t);
 extern int sa_share_zfs(sa_share_t, sa_resource_t, char *, share_t *,
     void *, zfs_share_op_t);

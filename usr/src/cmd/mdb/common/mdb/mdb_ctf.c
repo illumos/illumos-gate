@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
 
@@ -1265,7 +1265,7 @@ vread_helper(mdb_ctf_id_t modid, char *modbuf,
     mdb_ctf_id_t tgtid, char *tgtbuf, const char *tgtname, uint_t flags)
 {
 	size_t modsz, tgtsz;
-	int modkind, tgtkind;
+	int modkind, tgtkind, mod_members;
 	member_t mbr;
 	enum_value_t ev;
 	int ret;
@@ -1468,28 +1468,51 @@ vread_helper(mdb_ctf_id_t modid, char *modbuf,
 		return (mdb_ctf_member_iter(modid, member_cb, &mbr));
 
 	case CTF_K_UNION:
+		mbr.m_modbuf = modbuf;
+		mbr.m_tgtbuf = tgtbuf;
+		mbr.m_tgtid = tgtid;
+		mbr.m_flags = flags;
+		mbr.m_tgtname = typename;
 
 		/*
-		 * Unions are a little tricky. The only time it's truly
-		 * safe to read in a union is if no part of the union or
-		 * any of its component types have changed.  The correct
-		 * use of this feature is to read the containing structure,
-		 * figure out which component of the union is valid, compute
-		 * the location of that in the target and then read in
-		 * that part of the structure.
+		 * Not all target union members need to be present in the
+		 * mdb type. If there is only a single union member in the
+		 * mdb type, its actual type does not need to match with
+		 * its target's type. On the other hand, if more than one
+		 * union members are specified in the mdb type, their types
+		 * must match with the types of their relevant union members
+		 * of the target union.
 		 */
+		mod_members = mdb_ctf_num_members(modid);
+		if (mod_members == 1) {
+			return (mdb_ctf_member_iter(modid, member_cb, &mbr));
+		} else if (mod_members > 1) {
+			if (mdb_ctf_member_iter(modid, type_equals_cb,
+			    &tgtid)) {
+				mdb_ctf_warn(flags,
+				    "inexact match for union %s (%s)\n",
+				    typename, tgtname);
+				return (set_errno(EMDB_INCOMPAT));
+			}
 
-		if (!type_equals(modid, tgtid)) {
-			mdb_ctf_warn(flags, "inexact match for union %s (%s)\n",
-			    typename, tgtname);
-			return (set_errno(EMDB_INCOMPAT));
+			/*
+			 * From the check above we know that the members
+			 * which are present in the mdb type are equal to
+			 * the types in the target. Thus, the member_cb
+			 * callback below will not move anything around and
+			 * it is equivalent to:
+			 *
+			 * bcopy(tgtbuf, modbuf, MAX(module member's sizes))
+			 */
+			return (mdb_ctf_member_iter(modid, member_cb, &mbr));
+		} else {
+			/*
+			 * We either got 0 or -1. In any case that number
+			 * should be returned right away. For the error
+			 * case of -1, errno has been set for us.
+			 */
+			return (mod_members);
 		}
-
-		ASSERT(modsz == tgtsz);
-
-		bcopy(tgtbuf, modbuf, modsz);
-
-		return (0);
 
 	case CTF_K_ARRAY:
 		if (mdb_ctf_array_info(tgtid, &tar) != 0) {
