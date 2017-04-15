@@ -258,6 +258,15 @@ apix_probe()
 	if (apix_enable == 0)
 		return (PSM_FAILURE);
 
+	/*
+	 * FIXME Temporarily disable apix module on Xen HVM platform due to
+	 * known hang during boot (see #3605).
+	 *
+	 * Please remove when/if the issue is resolved.
+	 */
+	if (get_hwenv() == HW_XEN_HVM)
+		return (PSM_FAILURE);
+
 	/* check for hw features if specified  */
 	if (apix_hw_chk_enable) {
 		/* check if x2APIC mode is supported */
