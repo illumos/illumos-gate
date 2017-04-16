@@ -39,7 +39,6 @@ dir path=usr/lib/$(ARCH64)
 dir path=usr/share/man
 dir path=usr/share/man/man1
 dir path=usr/share/man/man3lib
-dir path=usr/share/man/man3sysevent
 dir path=usr/share/man/man3tecla
 dir path=usr/share/man/man5
 file path=usr/bin/enhance mode=0555
@@ -51,13 +50,6 @@ file path=usr/lib/llib-ltecla
 file path=usr/lib/llib-ltecla.ln
 file path=usr/share/man/man1/enhance.1
 file path=usr/share/man/man3lib/libtecla.3lib
-file path=usr/share/man/man3sysevent/sysevent_bind_handle.3sysevent
-file path=usr/share/man/man3sysevent/sysevent_free.3sysevent
-file path=usr/share/man/man3sysevent/sysevent_get_attr_list.3sysevent
-file path=usr/share/man/man3sysevent/sysevent_get_class_name.3sysevent
-file path=usr/share/man/man3sysevent/sysevent_get_vendor_name.3sysevent
-file path=usr/share/man/man3sysevent/sysevent_post_event.3sysevent
-file path=usr/share/man/man3sysevent/sysevent_subscribe_event.3sysevent
 file path=usr/share/man/man3tecla/cpl_complete_word.3tecla
 file path=usr/share/man/man3tecla/ef_expand_file.3tecla
 file path=usr/share/man/man3tecla/gl_get_line.3tecla
@@ -71,22 +63,6 @@ license usr/src/lib/libtecla/THIRDPARTYLICENSE \
     license=usr/src/lib/libtecla/THIRDPARTYLICENSE
 link path=usr/lib/$(ARCH64)/libtecla.so target=libtecla.so.1
 link path=usr/lib/libtecla.so target=libtecla.so.1
-link path=usr/share/man/man3sysevent/sysevent_get_pid.3sysevent \
-    target=sysevent_get_vendor_name.3sysevent
-link path=usr/share/man/man3sysevent/sysevent_get_pub_name.3sysevent \
-    target=sysevent_get_vendor_name.3sysevent
-link path=usr/share/man/man3sysevent/sysevent_get_seq.3sysevent \
-    target=sysevent_get_class_name.3sysevent
-link path=usr/share/man/man3sysevent/sysevent_get_size.3sysevent \
-    target=sysevent_get_class_name.3sysevent
-link path=usr/share/man/man3sysevent/sysevent_get_subclass_name.3sysevent \
-    target=sysevent_get_class_name.3sysevent
-link path=usr/share/man/man3sysevent/sysevent_get_time.3sysevent \
-    target=sysevent_get_class_name.3sysevent
-link path=usr/share/man/man3sysevent/sysevent_unbind_handle.3sysevent \
-    target=sysevent_bind_handle.3sysevent
-link path=usr/share/man/man3sysevent/sysevent_unsubscribe_event.3sysevent \
-    target=sysevent_subscribe_event.3sysevent
 link path=usr/share/man/man3tecla/cfc_file_start.3tecla \
     target=cpl_complete_word.3tecla
 link path=usr/share/man/man3tecla/cfc_literal_escapes.3tecla \
