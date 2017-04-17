@@ -1349,6 +1349,7 @@ SMBFS_OBJS +=	smbfs_vfsops.o	smbfs_vnops.o	smbfs_node.o	\
 BOOTFS_OBJS +=	bootfs_construct.o bootfs_vfsops.o bootfs_vnops.o
 
 ZFS_COMMON_OBJS +=		\
+	abd.o			\
 	arc.o			\
 	blkptr.o		\
 	bplist.o		\
