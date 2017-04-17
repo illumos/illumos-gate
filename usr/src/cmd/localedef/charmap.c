@@ -43,7 +43,7 @@ typedef struct charmap {
  * Array of POSIX specific portable characters.
  */
 static const struct {
-	char	*name;
+	const char *name;
 	int	ch;
 } portable_chars[] = {
 	{ "NUL",		 '\0' },
@@ -191,7 +191,7 @@ init_charmap(void)
 }
 
 static void
-add_charmap_impl(char *sym, wchar_t wc, int nodups)
+add_charmap_impl(const char *sym, wchar_t wc, int nodups)
 {
 	charmap_t	srch;
 	charmap_t	*n = NULL;
@@ -204,7 +204,8 @@ add_charmap_impl(char *sym, wchar_t wc, int nodups)
 	 * also possibly insert the wide mapping, although note that there
 	 * can only be one of these per wide character code.
 	 */
-	if ((wc != -1) && ((avl_find(&cmap_wc, &srch, &where)) == NULL)) {
+	if ((wc != (wchar_t)-1) &&
+	    ((avl_find(&cmap_wc, &srch, &where)) == NULL)) {
 		if ((n = calloc(1, sizeof (*n))) == NULL) {
 			errf(_("out of memory"));
 			return;
@@ -232,7 +233,7 @@ add_charmap_impl(char *sym, wchar_t wc, int nodups)
 }
 
 void
-add_charmap(char *sym, int c)
+add_charmap(const char *sym, int c)
 {
 	add_charmap_impl(sym, c, 1);
 }
@@ -246,7 +247,7 @@ add_charmap_undefined(char *sym)
 	srch.name = sym;
 	cm = avl_find(&cmap_sym, &srch, NULL);
 
-	if ((undefok == 0) && ((cm == NULL) || (cm->wc == -1))) {
+	if ((undefok == 0) && ((cm == NULL) || (cm->wc == (wchar_t)-1))) {
 		warn(_("undefined symbol <%s>"), sym);
 		add_charmap_impl(sym, -1, 0);
 	} else {
@@ -294,19 +295,19 @@ add_charmap_range(char *s, char *e, int wc)
 }
 
 void
-add_charmap_char(char *name, int val)
+add_charmap_char(const char *name, int val)
 {
 	add_charmap_impl(name, val, 0);
 }
 
 /*
  * POSIX insists that certain entries be present, even when not in the
- * orginal charmap file.
+ * original charmap file.
  */
 void
 add_charmap_posix(void)
 {
-	char	i;
+	int	i;
 
 	for (i = 0; portable_chars[i].name; i++) {
 		add_charmap_char(portable_chars[i].name, portable_chars[i].ch);
@@ -321,7 +322,7 @@ lookup_charmap(const char *sym, wchar_t *wc)
 
 	srch.name = sym;
 	n = avl_find(&cmap_sym, &srch, NULL);
-	if (n && n->wc != -1) {
+	if (n && n->wc != (wchar_t)-1) {
 		if (wc)
 			*wc = n->wc;
 		return (0);
