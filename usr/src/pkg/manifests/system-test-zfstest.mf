@@ -158,6 +158,7 @@ file path=opt/zfs-tests/bin/file_trunc mode=0555
 file path=opt/zfs-tests/bin/file_write mode=0555
 file path=opt/zfs-tests/bin/getholes mode=0555
 file path=opt/zfs-tests/bin/largest_file mode=0555
+file path=opt/zfs-tests/bin/memory_balloon mode=0555
 file path=opt/zfs-tests/bin/mkbusy mode=0555
 file path=opt/zfs-tests/bin/mkfiles mode=0555
 file path=opt/zfs-tests/bin/mkholes mode=0555
@@ -2302,14 +2303,18 @@ file path=opt/zfs-tests/tests/perf/regression/random_reads mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_readwrite mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_writes mode=0555
 file path=opt/zfs-tests/tests/perf/regression/sequential_reads mode=0555
-file path=opt/zfs-tests/tests/perf/regression/sequential_reads_cached \
+file path=opt/zfs-tests/tests/perf/regression/sequential_reads_arc_cached \
     mode=0555
-file path=opt/zfs-tests/tests/perf/regression/sequential_reads_cached_clone \
+file \
+    path=opt/zfs-tests/tests/perf/regression/sequential_reads_arc_cached_clone \
+    mode=0555
+file path=opt/zfs-tests/tests/perf/regression/sequential_reads_dbuf_cached \
     mode=0555
 file path=opt/zfs-tests/tests/perf/regression/sequential_writes mode=0555
 file path=opt/zfs-tests/tests/perf/regression/setup mode=0555
 file path=opt/zfs-tests/tests/perf/scripts/io.d mode=0444
 file path=opt/zfs-tests/tests/perf/scripts/prefetch_io.d mode=0444
+file path=opt/zfs-tests/tests/perf/scripts/profile.d mode=0444
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 depend fmri=system/file-system/zfs/tests type=require
