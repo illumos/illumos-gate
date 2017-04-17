@@ -3553,7 +3553,6 @@ typedef struct mdb_arc_buf_hdr_t {
 	struct {
 		uint32_t	b_bufcnt;
 		uintptr_t	b_state;
-		uintptr_t	b_pdata;
 	} b_l1hdr;
 } mdb_arc_buf_hdr_t;
 
