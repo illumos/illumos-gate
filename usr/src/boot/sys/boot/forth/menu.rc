@@ -18,9 +18,9 @@ menu-init     \ initialize the menu area (see `menu.4th')
 \ NOTE: To use `non-ansi' variants, add `loader_color=0' to loader.conf(5)
 \ NOTE: ANSI variants can use `^' in place of literal `Esc' (ASCII 27)
 
-\ 
+\
 \ MAIN MENU
-\ 
+\
 
 set menuset_name1="main"
 
@@ -62,12 +62,12 @@ set mainansi_caption[3]="^[1mEsc^[mape to loader prompt"
 
 \ Enable built-in "Reboot" trailing menuitem
 \ NOTE: appears before menu_options if configured
-\ 
+\
 set mainmenu_reboot
 
 \ Enable "Options:" separator. When set to a numerical value (1-8), a visual
 \ separator is inserted before that menuitem number.
-\ 
+\
 set mainmenu_options=5
 
 \ illumos does not have multiple kernels
@@ -102,9 +102,9 @@ set mainansi_caption[6]="Select Boot ^[1mE^[mnvironment..."
   [then]
 [then]
 
-\ 
+\
 \ BOOT OPTIONS MENU
-\ 
+\
 
 set menuset_name2="options"
 
@@ -138,7 +138,7 @@ set optionsansi_caption[4]="^[1mS^[mingle User. ^[34;1mOff^[m"
 set optionstoggled_ansi[4]="^[1mS^[mingle User. ^[32;7mOn^[m"
 
 set optionsmenu_init[5]="init_verbose"
-set optionsmenu_caption[5]="[V]erbose..... off"
+set optionsmenu_caption[5]="[V]erbose..... Off"
 set optionstoggled_text[5]="[V]erbose..... On"
 set optionsmenu_command[5]="toggle_verbose"
 set optionsmenu_keycode[5]=118
@@ -154,8 +154,8 @@ set optionsansi_caption[6]="^[1mR^[meconfigure. ^[34;1mOff^[m"
 set optionstoggled_ansi[6]="^[1mR^[meconfigure. ^[32;7mOn^[m"
 
 set optionsmenu_init[7]="init_kmdb"
-set optionsmenu_caption[7]="k[M]db........ Off"
-set optionstoggled_text[7]="k[M]db........ On"
+set optionsmenu_caption[7]="k[m]db........ Off"
+set optionstoggled_text[7]="k[m]db........ On"
 set optionsmenu_command[7]="toggle_kmdb"
 set optionsmenu_keycode[7]=109
 set optionsansi_caption[7]="k^[1mm^[mdb........ ^[34;1mOff^[m"
@@ -209,11 +209,11 @@ s" currdev" getenv drop 4 s" zfs:" compare 0= be-pages and [if]
 
 \ Enable automatic booting (add ``autoboot_delay=N'' to loader.conf(5) to
 \ customize the timeout; default is 10-seconds)
-\ 
+\
 set menu_timeout_command="boot"
 
 \ Include optional elements defined in a local file
-\ 
+\
 try-include /boot/menu.rc.local
 
 \ Display the main menu (see `menu.4th')
