@@ -300,6 +300,7 @@ SN1_BRAND_OBJS	=	sn1_brand.o sn1_brand_asm.o
 S10_BRAND_OBJS	=	s10_brand.o s10_brand_asm.o
 LX_BRAND_OBJS  =		\
 	lx_access.o		\
+	lx_acl.o		\
 	lx_aio.o		\
 	lx_archdep.o		\
 	lx_auxv.o		\
