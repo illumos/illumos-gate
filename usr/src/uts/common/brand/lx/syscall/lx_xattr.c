@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -18,6 +18,7 @@
 #include <sys/file.h>
 #include <sys/vnode.h>
 #include <sys/pathname.h>
+#include <sys/lx_acl.h>
 
 
 #define	LX_XATTR_NAME_MAX	255
@@ -28,7 +29,49 @@
 #define	LX_XATTR_FLAG_REPLACE	0x2
 #define	LX_XATTR_FLAGS_VALID	(LX_XATTR_FLAG_CREATE | LX_XATTR_FLAG_REPLACE)
 
-#define	LX_CAP_XATTR_NAME	"security.capability"
+enum lx_xattr_ns {
+	LX_XATTR_NS_SECURITY,
+	LX_XATTR_NS_SYSTEM,
+	LX_XATTR_NS_TRUSTED,
+	LX_XATTR_NS_USER,
+	LX_XATTR_NS_INVALID	/* Catch-all for invalid namespaces */
+};
+
+/* Present under the 'security.' namespace */
+#define	LX_XATTR_CAPABILITY	"capability"
+
+typedef struct lx_xattr_ns_list {
+	const char *lxnl_name;
+	unsigned lxnl_len;
+	enum lx_xattr_ns lxnl_ns;
+} lx_xattr_ns_list_t;
+
+static lx_xattr_ns_list_t lx_xattr_namespaces[] = {
+	{ "user.", 5, LX_XATTR_NS_USER },
+	{ "system.", 7, LX_XATTR_NS_SYSTEM },
+	{ "trusted.", 8, LX_XATTR_NS_TRUSTED },
+	{ "security.", 9, LX_XATTR_NS_SECURITY },
+	{ NULL, 0, LX_XATTR_NS_INVALID }
+};
+
+static int
+lx_xattr_parse(const char *name, size_t nlen, const char **key)
+{
+	lx_xattr_ns_list_t *lxn = lx_xattr_namespaces;
+
+	for (; lxn->lxnl_name != NULL; lxn++) {
+		if (nlen < lxn->lxnl_len) {
+			continue;
+		}
+		if (strncmp(lxn->lxnl_name, name, lxn->lxnl_len) == 0) {
+			*key = name + (lxn->lxnl_len);
+			return (lxn->lxnl_ns);
+		}
+	}
+
+	*key = name;
+	return (LX_XATTR_NS_INVALID);
+}
 
 /*
  * *xattr() family of functions.
@@ -42,12 +85,13 @@
 
 /* ARGSUSED */
 static int
-lx_setxattr_common(vnode_t *vp, char *name, void *value, size_t size,
-    int flags)
+lx_setxattr_common(vnode_t *vp, char *name, void *value, size_t sz, int flags)
 {
-	int error;
+	int error, type;
 	char name_buf[LX_XATTR_NAME_MAX + 1];
+	const char *key;
 	size_t name_len;
+	void *buf = NULL;
 
 	if ((flags & ~LX_XATTR_FLAGS_VALID) != 0) {
 		return (EINVAL);
@@ -58,32 +102,60 @@ lx_setxattr_common(vnode_t *vp, char *name, void *value, size_t size,
 	} else if (error != 0) {
 		return (EFAULT);
 	}
-	if (size > LX_XATTR_SIZE_MAX) {
-		return (E2BIG);
+
+	type = lx_xattr_parse(name_buf, name_len, &key);
+
+	if (sz != 0) {
+		if (sz > LX_XATTR_SIZE_MAX) {
+			return (E2BIG);
+		}
+		buf = kmem_alloc(sz, KM_SLEEP);
+		if (copyin(value, buf, sz) != 0) {
+			kmem_free(buf, sz);
+			return (EFAULT);
+		}
 	}
 
-	/*
-	 * In order to keep package management software happy, despite lacking
-	 * support for file-based Linux capabilities via xattrs, we fake
-	 * success when root attempts a setxattr on that attribute.
-	 */
-	if (crgetuid(CRED()) == 0 &&
-	    strcmp(name_buf, LX_CAP_XATTR_NAME) == 0) {
-		return (0);
+	error = EOPNOTSUPP;
+	switch (type) {
+	case LX_XATTR_NS_SECURITY:
+		/*
+		 * In order to keep package management software happy, despite
+		 * lacking support for file-based Linux capabilities via
+		 * xattrs, we fake success when root attempts a setxattr on
+		 * that attribute.
+		 */
+		if (crgetuid(CRED()) == 0 &&
+		    strcmp(key, LX_XATTR_CAPABILITY) == 0) {
+			error = 0;
+		}
+		break;
+	case LX_XATTR_NS_SYSTEM:
+		if (strcmp(key, LX_XATTR_POSIX_ACL_ACCESS) == 0) {
+			error = lx_acl_setxattr(vp, LX_ACL_ACCESS, value, sz);
+		} else if (strcmp(key, LX_XATTR_POSIX_ACL_DEFAULT) == 0) {
+			error = lx_acl_setxattr(vp, LX_ACL_DEFAULT, value, sz);
+		}
+	default:
+		break;
 	}
 
-
-	return (EOPNOTSUPP);
+	if (buf != NULL) {
+		kmem_free(buf, sz);
+	}
+	return (error);
 }
 
 /* ARGSUSED */
 static int
-lx_getxattr_common(vnode_t *vp, char *name, char *value, size_t size,
-    ssize_t *osize)
+lx_getxattr_common(vnode_t *vp, char *name, char *value, size_t sz,
+    ssize_t *osz)
 {
-	int error;
+	int error, type;
 	char name_buf[LX_XATTR_NAME_MAX + 1];
+	const char *key;
 	size_t name_len;
+	void *buf = NULL;
 
 	error = copyinstr(name, name_buf, sizeof (name_buf), &name_len);
 	if (error == ENAMETOOLONG || name_len == sizeof (name_buf)) {
@@ -91,26 +163,81 @@ lx_getxattr_common(vnode_t *vp, char *name, char *value, size_t size,
 	} else if (error != 0) {
 		return (EFAULT);
 	}
+	if (sz != 0) {
+		if (sz > LX_XATTR_SIZE_MAX) {
+			sz = LX_XATTR_SIZE_MAX;
+		}
+		buf = kmem_alloc(sz, KM_SLEEP);
+	}
 
-	/*
-	 * Only parameter validation is attempted for now.
-	 */
-	return (EOPNOTSUPP);
+	type = lx_xattr_parse(name_buf, name_len, &key);
+
+	error = EOPNOTSUPP;
+	switch (type) {
+	case LX_XATTR_NS_SYSTEM:
+		if (strcmp(key, LX_XATTR_POSIX_ACL_ACCESS) == 0) {
+			error = lx_acl_getxattr(vp, LX_ACL_ACCESS, buf, sz,
+			    osz);
+		} else if (strcmp(key, LX_XATTR_POSIX_ACL_DEFAULT) == 0) {
+			error = lx_acl_getxattr(vp, LX_ACL_DEFAULT, buf, sz,
+			    osz);
+		}
+		break;
+	default:
+		break;
+	}
+
+	if (error == 0 && buf != NULL) {
+		VERIFY(*osz <= sz);
+
+		if (copyout(buf, value, *osz) != 0) {
+			error = EFAULT;
+		}
+	}
+	if (buf != NULL) {
+		kmem_free(buf, sz);
+	}
+	return (error);
 }
 
 /* ARGSUSED */
 static int
-lx_listxattr_common(vnode_t *vp, char *list, size_t size, ssize_t *osize)
+lx_listxattr_common(vnode_t *vp, void *value, size_t size, ssize_t *osize)
 {
-	return (EOPNOTSUPP);
+	struct uio auio;
+	struct iovec aiov;
+	int err = 0;
+
+	aiov.iov_base = value;
+	aiov.iov_len = size;
+	auio.uio_iov = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_loffset = 0;
+	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_resid = size;
+	auio.uio_fmode = 0;
+	auio.uio_extflg = UIO_COPY_CACHED;
+
+	/*
+	 * Call into all the listxattr routines (which may be no-ops) which are
+	 * currently implemented.
+	 */
+	err = lx_acl_listxattr(vp, &auio);
+
+	if (err == 0) {
+		*osize = size - auio.uio_resid;
+	}
+
+	return (err);
 }
 
 /* ARGSUSED */
 static int
 lx_removexattr_common(vnode_t *vp, char *name)
 {
-	int error;
+	int error, type;
 	char name_buf[LX_XATTR_NAME_MAX + 1];
+	const char *key;
 	size_t name_len;
 
 	error = copyinstr(name, name_buf, sizeof (name_buf), &name_len);
@@ -120,9 +247,21 @@ lx_removexattr_common(vnode_t *vp, char *name)
 		return (EFAULT);
 	}
 
-	/*
-	 * Only parameter validation is attempted for now.
-	 */
+
+	type = lx_xattr_parse(name_buf, name_len, &key);
+
+	error = EOPNOTSUPP;
+	switch (type) {
+	case LX_XATTR_NS_SYSTEM:
+		if (strcmp(key, LX_XATTR_POSIX_ACL_ACCESS) == 0) {
+			error = lx_acl_removexattr(vp, LX_ACL_ACCESS);
+		} else if (strcmp(key, LX_XATTR_POSIX_ACL_DEFAULT) == 0) {
+			error = lx_acl_removexattr(vp, LX_ACL_DEFAULT);
+		}
+	default:
+		break;
+	}
+
 	return (EOPNOTSUPP);
 }
 
