@@ -229,6 +229,8 @@ file.
 			value='true' override='true'/>
 		<propval name='max_protocol' type='astring'
 			value='' override='true'/>
+		<propval name='min_protocol' type='astring'
+			value='' override='true'/>
 		<propval name='encrypt' type='astring'
 			value='disabled' override='true'/>
 		<propval name='initial_credits' type='integer'

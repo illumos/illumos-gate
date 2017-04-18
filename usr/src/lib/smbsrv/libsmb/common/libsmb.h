@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBSMB_H
@@ -158,6 +158,7 @@ typedef enum {
 	SMB_CI_MAXIMUM_CREDITS,
 	SMB_CI_MAX_PROTOCOL,
 	SMB_CI_ENCRYPT,
+	SMB_CI_MIN_PROTOCOL,
 
 	SMB_CI_MAX
 } smb_cfg_id_t;
@@ -216,6 +217,7 @@ extern void smb_config_get_negtok(uchar_t *, uint32_t *);
 
 extern int smb_config_check_protocol(char *);
 extern uint32_t smb_config_get_max_protocol(void);
+extern uint32_t smb_config_get_min_protocol(void);
 extern void smb_config_upgrade(void);
 
 extern smb_cfg_val_t smb_config_get_require(smb_cfg_id_t);
