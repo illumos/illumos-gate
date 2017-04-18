@@ -366,6 +366,7 @@ enum {
 #define	TNSZ(name, amode, sz)	{TERM, amode,  0, 0, 0, 0}
 #define	TNSZy(name, amode, sz)	{TERM, amode,  0, 1, 0, 0}
 #define	TNSZvr(name, amode, sz)	{TERM, amode,  0, 0, 0, 0, 1}
+#define	TSvo(name, amode)	{TERM, amode,  0, 0, 0, 0, 0, 0, 1}
 #define	TS(name, amode)		{TERM, amode,  0, 0, 0, 0}
 #define	TSx(name, amode)	{TERM, amode,  1, 0, 0, 0}
 #define	TSy(name, amode)	{TERM, amode,  0, 1, 0, 0}
