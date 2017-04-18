@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -38,6 +38,7 @@ I386_TESTS =		\
 	32.fma-ss 	\
 	32.lzcnt 	\
 	32.movbe	\
+	32.opmask	\
 	32.pclmulqdq	\
 	32.popcnt 	\
 	32.sha		\
@@ -60,6 +61,7 @@ I386_TESTS =		\
 	64.fma-ss 	\
 	64.lzcnt 	\
 	64.movbe	\
+	64.opmask	\
 	64.pclmulqdq	\
 	64.popcnt 	\
 	64.random 	\

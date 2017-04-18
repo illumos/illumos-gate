@@ -60,6 +60,8 @@ file path=opt/util-tests/tests/dis/i386/32.lzcnt.out mode=0555
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.s mode=0555
 file path=opt/util-tests/tests/dis/i386/32.movbe.out mode=0555
 file path=opt/util-tests/tests/dis/i386/32.movbe.s mode=0555
+file path=opt/util-tests/tests/dis/i386/32.opmask.out mode=0555
+file path=opt/util-tests/tests/dis/i386/32.opmask.s mode=0555
 file path=opt/util-tests/tests/dis/i386/32.pclmulqdq.out mode=0555
 file path=opt/util-tests/tests/dis/i386/32.pclmulqdq.s mode=0555
 file path=opt/util-tests/tests/dis/i386/32.popcnt.out mode=0555
@@ -104,6 +106,8 @@ file path=opt/util-tests/tests/dis/i386/64.lzcnt.out mode=0555
 file path=opt/util-tests/tests/dis/i386/64.lzcnt.s mode=0555
 file path=opt/util-tests/tests/dis/i386/64.movbe.out mode=0555
 file path=opt/util-tests/tests/dis/i386/64.movbe.s mode=0555
+file path=opt/util-tests/tests/dis/i386/64.opmask.out mode=0555
+file path=opt/util-tests/tests/dis/i386/64.opmask.s mode=0555
 file path=opt/util-tests/tests/dis/i386/64.pclmulqdq.out mode=0555
 file path=opt/util-tests/tests/dis/i386/64.pclmulqdq.s mode=0555
 file path=opt/util-tests/tests/dis/i386/64.popcnt.out mode=0555
