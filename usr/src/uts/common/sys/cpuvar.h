@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_CPUVAR_H
@@ -513,6 +513,7 @@ extern struct cpu	**cpu_seq;	/* indexed by sequential CPU id */
 extern cpu_t		*cpu_list;	/* list of CPUs */
 extern cpu_t		*cpu_active;	/* list of active CPUs */
 extern cpuset_t		cpu_active_set;	/* cached set of active CPUs */
+extern cpuset_t		cpu_available;	/* cached set of available CPUs */
 extern int		ncpus;		/* number of CPUs present */
 extern int		ncpus_online;	/* number of CPUs not quiesced */
 extern int		max_ncpus;	/* max present before ncpus is known */
