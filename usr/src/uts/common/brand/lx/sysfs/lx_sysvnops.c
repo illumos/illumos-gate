@@ -113,6 +113,14 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 	NULL,			NULL
 };
 
+typedef enum lxsys_cpu_state {
+	LXSYS_CPU_ON,		/* online */
+	LXSYS_CPU_OFF,		/* offline */
+	LXSYS_CPU_ANY,		/* don't care */
+} lxsys_cpu_state_t;
+
+static void lxsys_format_cpu(char *, int, lxsys_cpu_state_t);
+
 /*
  * Sysfs Inode format:
  * 0000AABBBBCC
@@ -145,8 +153,12 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * - 0x0a: /sys/devices/zfs
  * - 0x0b: /sys/devices/system/cpu
  * - 0x0c: /sys/devices/system/cpu/kernel_max
- * - 0x0d: /sys/devices/system/node
- * - 0x0e: /sys/bus
+ * - 0x0d: /sys/devices/system/cpu/offline
+ * - 0x0e: /sys/devices/system/cpu/online
+ * - 0x0f: /sys/devices/system/cpu/possible
+ * - 0x10: /sys/devices/system/cpu/present
+ * - 0x11: /sys/devices/system/node
+ * - 0x12: /sys/bus
  *
  * Dynamic /sys/class/net/<interface> symlinks will use an INSTANCE derived
  * from the corresonding ifindex.
@@ -161,8 +173,9 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
  * Dynamic /sys/devices/zfs/<dev> directories will use an INSTANCE derived from
  * the emulated minor number.
  *
- * Static/Dynamic /sys/devices/system/cpu contains a static kernel_max file
- * and a dynamic set of cpuN subdirectories.
+ * Static/Dynamic /sys/devices/system/cpu contains the static 'kernel_max',
+ * 'offline', 'online', 'possible', and 'present' files, and a dynamic set of
+ * cpuN subdirectories.
  *
  * Static/Dynamic /sys/devices/system/node/node0 currently only contains a
  * static cpulist file, but will likely need future dynamic entries for cpuN
@@ -186,8 +199,12 @@ const fs_operation_def_t lxsys_vnodeops_template[] = {
 #define	LXSYS_INST_DEVICES_ZFSDIR		0xa
 #define	LXSYS_INST_DEVICES_SYSCPU		0xb
 #define	LXSYS_INST_DEV_SYSCPU_KMAX		0xc
-#define	LXSYS_INST_DEVICES_SYSNODE		0xd
-#define	LXSYS_INST_BUSDIR			0xe
+#define	LXSYS_INST_DEV_SYSCPU_OFFLINE		0xd
+#define	LXSYS_INST_DEV_SYSCPU_ONLINE		0xe
+#define	LXSYS_INST_DEV_SYSCPU_POSSIBLE		0xf
+#define	LXSYS_INST_DEV_SYSCPU_PRESENT		0x10
+#define	LXSYS_INST_DEVICES_SYSNODE		0x11
+#define	LXSYS_INST_BUSDIR			0x12
 #define	LXSYS_INST_MAX				LXSYS_INST_BUSDIR /* limit */
 
 /*
@@ -208,6 +225,10 @@ static int dyn_ino_type [] = {
 	LXSYS_DEV_ZFS,			/* LXSYS_INST_DEVICES_ZFSDIR */
 	LXSYS_DEV_SYS_CPU,		/* LXSYS_INST_DEVICES_SYSCPU */
 	0,				/* LXSYS_INST_DEV_SYSCPU_KMAX */
+	0,				/* LXSYS_INST_DEV_SYSCPU_OFFLINE */
+	0,				/* LXSYS_INST_DEV_SYSCPU_ONLINE */
+	0,				/* LXSYS_INST_DEV_SYSCPU_POSSIBLE */
+	0,				/* LXSYS_INST_DEV_SYSCPU_PRESENT */
 	LXSYS_DEV_SYS_NODE,		/* LXSYS_INST_DEV_SYSNODE */
 	0,				/* LXSYS_INST_BUSDIR */
 };
@@ -239,15 +260,8 @@ static lxsys_dirent_t dirlist_devices_virtual[] = {
 	{ LXSYS_INST_DEVICES_VIRTUAL_NETDIR,	"net" }
 };
 
-/*
- * XXX: The presence of the cpu tree in sysfs triggers new behavior in various
- * applications. The glibc code which accesses this part of the tree expects
- * dirents to have the d_type field populated. We cannot implement the 'cpu'
- * hierarchy until that is addressed. One such application is java, which
- * becomes unstable due to the incorrect data from glibc.
- */
 static lxsys_dirent_t dirlist_devices_system[] = {
-	/* { LXSYS_INST_DEVICES_SYSCPU,	"cpu" }, */
+	{ LXSYS_INST_DEVICES_SYSCPU,	"cpu" },
 	{ LXSYS_INST_DEVICES_SYSNODE,	"node" }
 };
 
@@ -357,11 +371,6 @@ static int (*lxsys_readlink_function[LXSYS_MAXTYPE])() = {
 	NULL,					/* LXSYS_DEV_SYS_NODE	*/
 };
 
-typedef struct lxsys_cpu_info {
-	processorid_t	cpu_id;
-	processorid_t	cpu_seqid;
-} lxsys_cpu_info_t;
-
 /*
  * Given one of our inodes, return the vnode type.
  *
@@ -392,6 +401,10 @@ lxsys_ino_get_type(ino_t ino)
 	if (type == LXSYS_STATIC) {
 		switch (instance) {
 		case LXSYS_INST_DEV_SYSCPU_KMAX:
+		case LXSYS_INST_DEV_SYSCPU_OFFLINE:
+		case LXSYS_INST_DEV_SYSCPU_ONLINE:
+		case LXSYS_INST_DEV_SYSCPU_POSSIBLE:
+		case LXSYS_INST_DEV_SYSCPU_PRESENT:
 			return (VREG);
 		}
 	} else {
@@ -434,7 +447,19 @@ lxsys_ino_get_type(ino_t ino)
 			}
 			break;
 		case LXSYS_DEV_SYS_CPUINFO:
-			if (instance != 0) {
+			/*
+			 * The /sys/devices/system/cpu directory contains the
+			 * 'kernel_max', 'possible', and 'present' regular
+			 * files, but those are of static type with the proper
+			 * instance.
+			 *
+			 * The /sys/devices/system/cpu directory also contains a
+			 * subdirectory for each CPU. These have an instance
+			 * per CPU and currently the endpoint is 0 since there
+			 * is nothing underneath the cpuN subdirectories. Future
+			 * regular file entries are likely to be added there.
+			 */
+			if (endpoint != 0) {
 				return (VREG);
 			}
 			break;
@@ -884,35 +909,57 @@ lxsys_lookup_devices_syscpu(lxsys_node_t *ldp, char *comp)
 			    LXSYS_INST_DEV_SYSCPU_KMAX);
 			lnp->lxsys_vnode->v_type = VREG;
 			lnp->lxsys_mode = 0444;
+		} else if (strcmp(comp, "offline") == 0) {
+			lnp = lxsys_getnode_static(ldp->lxsys_vnode,
+			    LXSYS_INST_DEV_SYSCPU_OFFLINE);
+			lnp->lxsys_vnode->v_type = VREG;
+			lnp->lxsys_mode = 0444;
+		} else if (strcmp(comp, "online") == 0) {
+			lnp = lxsys_getnode_static(ldp->lxsys_vnode,
+			    LXSYS_INST_DEV_SYSCPU_ONLINE);
+			lnp->lxsys_vnode->v_type = VREG;
+			lnp->lxsys_mode = 0444;
+		} else if (strcmp(comp, "possible") == 0) {
+			lnp = lxsys_getnode_static(ldp->lxsys_vnode,
+			    LXSYS_INST_DEV_SYSCPU_POSSIBLE);
+			lnp->lxsys_vnode->v_type = VREG;
+			lnp->lxsys_mode = 0444;
+		} else if (strcmp(comp, "present") == 0) {
+			lnp = lxsys_getnode_static(ldp->lxsys_vnode,
+			    LXSYS_INST_DEV_SYSCPU_PRESENT);
+			lnp->lxsys_vnode->v_type = VREG;
+			lnp->lxsys_mode = 0444;
 		} else {
 			/* Else dynamic cpuN entry */
-			cpu_t *cp, *cpstart;
-			int pools_enabled;
+			cpuset_t *avail;	/* all installed CPUs */
+			uint_t i, avlo, avhi;
 
+			avail = cpuset_alloc(KM_SLEEP);
+			cpuset_all(avail);
+
+			/* Take a snapshot of the available set */
 			mutex_enter(&cpu_lock);
-			pools_enabled = pool_pset_enabled();
+			cpuset_and(avail, &cpu_available);
+			mutex_exit(&cpu_lock);
 
-			cp = cpstart = CPU->cpu_part->cp_cpulist;
-			do {
+			cpuset_bounds(avail, &avlo, &avhi);
+
+			for (i = avlo; i <= avhi; i++) {
 				char cpunm[16];
 
-				(void) snprintf(cpunm, sizeof (cpunm), "cpu%d",
-				    cp->cpu_seqid);
+				if (!cpu_in_set(avail, i))
+					continue;
+
+				(void) snprintf(cpunm, sizeof (cpunm), "cpu%u",
+				    i);
 
 				if (strcmp(comp, cpunm) == 0) {
 					lnp = lxsys_getnode(ldp->lxsys_vnode,
-					    LXSYS_DEV_SYS_CPUINFO,
-					    cp->cpu_id + 1, 0);
+					    LXSYS_DEV_SYS_CPUINFO, i + 1, 0);
 					break;
 				}
-				if (pools_enabled) {
-					cp = cp->cpu_next_part;
-				} else {
-					cp = cp->cpu_next;
-				}
-			} while (cp != cpstart);
-
-			mutex_exit(&cpu_lock);
+			}
+			cpuset_free(avail);
 		}
 
 		if (lnp != NULL) {
@@ -1064,40 +1111,143 @@ lxsys_read_devices_sysnode(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 	if (lnp->lxsys_instance == 1 &&
 	    lnp->lxsys_endpoint == LXSYS_ENDP_NODE_CPULIST) {
 		/* Show the range of CPUs */
-		cpu_t *cp, *cpstart;
-		int pools_enabled, maxid = -1;
+		char outbuf[256];
 
-		mutex_enter(&cpu_lock);
-		pools_enabled = pool_pset_enabled();
-
-		cp = cpstart = CPU->cpu_part->cp_cpulist;
-		do {
-			if (cp->cpu_seqid > maxid)
-				maxid = cp->cpu_seqid;
-
-			if (pools_enabled) {
-				cp = cp->cpu_next_part;
-			} else {
-				cp = cp->cpu_next;
-			}
-		} while (cp != cpstart);
-
-		mutex_exit(&cpu_lock);
-
-		lxsys_uiobuf_printf(luio, "0-%d\n", maxid);
+		lxsys_format_cpu(outbuf, sizeof (outbuf), LXSYS_CPU_ANY);
+		lxsys_uiobuf_printf(luio, "%s\n", outbuf);
 		return (0);
 	}
 	return (EISDIR);
 
 }
 
+static void
+lxsys_format_range(char *buf, int blen, boolean_t *first, uint_t start,
+    uint_t cnt)
+{
+	char tmp[256];
+	char *delim;
+
+	if (cnt == 0)
+		return;
+
+	if (*first) {
+		*first = B_FALSE;
+		delim = "";
+	} else {
+		delim = ",";
+	}
+	if (cnt > 1) {
+		(void) snprintf(tmp, sizeof (tmp), "%s%u-%u", delim, start,
+		    start + cnt - 1);
+	} else {
+		(void) snprintf(tmp, sizeof (tmp), "%s%u", delim, start);
+	}
+	(void) strlcat(buf, tmp, blen);
+}
+
+/*
+ * Format a string of which CPUs are online, offline, or don't care (depending
+ * on chk_state), and which would be formatted like this:
+ *    0-31
+ * or
+ *    0-12,14,20-31
+ */
+static void
+lxsys_format_cpu(char *buf, int blen, lxsys_cpu_state_t chk_state)
+{
+	uint_t start, cnt, avlo, avhi;
+	boolean_t first = B_TRUE;
+	cpuset_t *active;	/* CPUs online */
+	cpuset_t *avail;	/* all installed CPUs */
+
+	active = cpuset_alloc(KM_SLEEP);
+	avail = cpuset_alloc(KM_SLEEP);
+	cpuset_all(active);
+	cpuset_all(avail);
+
+	/* Take a snapshot of the available and active sets */
+	mutex_enter(&cpu_lock);
+	cpuset_and(avail, &cpu_available);
+	cpuset_and(active, &cpu_active_set);
+	mutex_exit(&cpu_lock);
+
+	cpuset_bounds(avail, &avlo, &avhi);
+
+	buf[0] = '\0';
+	if (chk_state == LXSYS_CPU_ANY) {
+		start = avlo;
+		cnt = avhi + 1;
+	} else {
+		uint_t i;
+		boolean_t incl_cpu = B_TRUE;
+
+		start = 0;
+		cnt = 0;
+		for (i = avlo; i <= avhi; i++) {
+			if (chk_state == LXSYS_CPU_ON) {
+				if (!cpu_in_set(active, i))
+					incl_cpu = B_FALSE;
+			} else {
+				if (cpu_in_set(active, i))
+					incl_cpu = B_FALSE;
+			}
+
+			if (incl_cpu && cpu_in_set(avail, i)) {
+				cnt++;
+			} else {
+				/*
+				 * Note: this may print nothing if our 'cnt'
+				 * is 0, but we advance 'start' properly so we
+				 * handle the next range of elements we're
+				 * looking for.
+				 */
+				lxsys_format_range(buf, blen, &first, start,
+				    cnt);
+				start += cnt + 1;
+				cnt = 0;
+				incl_cpu = B_TRUE;
+			}
+		}
+	}
+
+	cpuset_free(avail);
+	cpuset_free(active);
+
+	lxsys_format_range(buf, blen, &first, start, cnt);
+}
+
 static int
 lxsys_read_static(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 {
 	uint_t inst = lnp->lxsys_instance;
+	char outbuf[256];
 
+	/*
+	 * For 'kernel_max', 'offline', 'online', 'possible', and 'present',
+	 * see the Documentaion/cputopology.txt file in the Linux src tree.
+	 */
 	if (inst == LXSYS_INST_DEV_SYSCPU_KMAX) {
 		lxsys_uiobuf_printf(luio, "%d\n", NCPU);
+		return (0);
+	}
+
+	if (inst == LXSYS_INST_DEV_SYSCPU_OFFLINE) {
+		lxsys_format_cpu(outbuf, sizeof (outbuf), LXSYS_CPU_OFF);
+		lxsys_uiobuf_printf(luio, "%s\n", outbuf);
+		return (0);
+	}
+
+	if (inst == LXSYS_INST_DEV_SYSCPU_ONLINE) {
+		lxsys_format_cpu(outbuf, sizeof (outbuf), LXSYS_CPU_ON);
+		lxsys_uiobuf_printf(luio, "%s\n", outbuf);
+		return (0);
+	}
+
+	if (inst == LXSYS_INST_DEV_SYSCPU_POSSIBLE ||
+	    inst == LXSYS_INST_DEV_SYSCPU_PRESENT) {
+		lxsys_format_cpu(outbuf, sizeof (outbuf), LXSYS_CPU_ANY);
+		lxsys_uiobuf_printf(luio, "%s\n", outbuf);
 		return (0);
 	}
 
@@ -1597,6 +1747,34 @@ lxsys_readdir_devices_zfsdir(lxsys_node_t *lnp, uio_t *uiop, int *eofp)
 	return (error);
 }
 
+/* Handle 'static' entry below a 'dynamic' entry. */
+static int
+lxsys_do_sub_static(struct uio *uiop, ssize_t oresid, dirent64_t *dirent,
+    char *nm, int inst, int *errp)
+{
+	int reclen;
+	ssize_t uresid;
+
+	(void) strncpy(dirent->d_name, nm, LXSNSIZ);
+
+	dirent->d_ino = lxsys_inode(LXSYS_STATIC, inst, 0);
+	reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
+
+	uresid = uiop->uio_resid;
+	if (reclen > uresid) {
+		if (uresid == oresid) {
+			/* Not enough space for one record */
+			*errp = EINVAL;
+		}
+		return (-1);
+	}
+	if ((*errp = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
+		return (-1);
+	}
+
+	return (0);
+}
+
 static int
 lxsys_readdir_cpu(lxsys_node_t *ldp, struct uio *uiop, int *eofp)
 {
@@ -1605,10 +1783,8 @@ lxsys_readdir_cpu(lxsys_node_t *ldp, struct uio *uiop, int *eofp)
 	ssize_t oresid, uresid;
 	int skip, error;
 	int reclen;
-	cpu_t *cp, *cpstart;
-	int pools_enabled;
-	int i, cpucnt;
-	lxsys_cpu_info_t cpu_info[NCPU];
+	cpuset_t *avail;
+	uint_t i, avlo, avhi;
 
 	/* Emit "." and ".." entries */
 	oresid = uiop->uio_resid;
@@ -1623,46 +1799,39 @@ lxsys_readdir_cpu(lxsys_node_t *ldp, struct uio *uiop, int *eofp)
 	if (skip > 0) {
 		skip--;
 	} else {
-		(void) strncpy(dirent->d_name, "kernel_max", LXSNSIZ);
-
-		dirent->d_ino = lxsys_inode(LXSYS_STATIC,
-		    LXSYS_INST_DEV_SYSCPU_KMAX, 0);
-		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
-
-		uresid = uiop->uio_resid;
-		if (reclen > uresid) {
-			if (uresid == oresid) {
-				/* Not enough space for one record */
-				error = EINVAL;
-			}
+		if (lxsys_do_sub_static(uiop, oresid, dirent, "kernel_max",
+		    LXSYS_INST_DEV_SYSCPU_KMAX, &error) != 0)
 			goto done;
-		}
-		if ((error = lxsys_dirent_out(dirent, reclen, uiop)) != 0) {
+
+		if (lxsys_do_sub_static(uiop, oresid, dirent, "offline",
+		    LXSYS_INST_DEV_SYSCPU_OFFLINE, &error) != 0)
 			goto done;
-		}
+
+		if (lxsys_do_sub_static(uiop, oresid, dirent, "online",
+		    LXSYS_INST_DEV_SYSCPU_ONLINE, &error) != 0)
+			goto done;
+
+		if (lxsys_do_sub_static(uiop, oresid, dirent, "possible",
+		    LXSYS_INST_DEV_SYSCPU_POSSIBLE, &error) != 0)
+			goto done;
+
+		if (lxsys_do_sub_static(uiop, oresid, dirent, "present",
+		    LXSYS_INST_DEV_SYSCPU_PRESENT, &error) != 0)
+			goto done;
 	}
 
-	/* Collect a list of CPU info */
+	avail = cpuset_alloc(KM_SLEEP);
+	cpuset_all(avail);
+
+	/* Take a snapshot of the available set */
 	mutex_enter(&cpu_lock);
-	pools_enabled = pool_pset_enabled();
-
-	cpucnt = 0;
-	cp = cpstart = CPU->cpu_part->cp_cpulist;
-	do {
-		cpu_info[cpucnt].cpu_id = cp->cpu_id;
-		cpu_info[cpucnt++].cpu_seqid = cp->cpu_seqid;
-		ASSERT(cpucnt < NCPU);
-		if (pools_enabled) {
-			cp = cp->cpu_next_part;
-		} else {
-			cp = cp->cpu_next;
-		}
-	} while (cp != cpstart);
-
+	cpuset_and(avail, &cpu_available);
 	mutex_exit(&cpu_lock);
 
+	cpuset_bounds(avail, &avlo, &avhi);
+
 	/* Output dynamic CPU info */
-	for (i = 0; i < cpucnt; i++) {
+	for (i = avlo; i <= avhi; i++) {
 		char cpunm[16];
 
 		if (skip > 0) {
@@ -1670,12 +1839,13 @@ lxsys_readdir_cpu(lxsys_node_t *ldp, struct uio *uiop, int *eofp)
 			continue;
 		}
 
-		(void) snprintf(cpunm, sizeof (cpunm), "cpu%d",
-		    cpu_info[i].cpu_seqid);
+		if (!cpu_in_set(avail, i))
+			continue;
+
+		(void) snprintf(cpunm, sizeof (cpunm), "cpu%u", i);
 		(void) strncpy(dirent->d_name, cpunm, LXSNSIZ);
 
-		dirent->d_ino = lxsys_inode(LXSYS_DEV_SYS_CPU,
-		    cpu_info[i].cpu_id + 1, 0);
+		dirent->d_ino = lxsys_inode(LXSYS_DEV_SYS_CPUINFO, i + 1, 0);
 		reclen = DIRENT64_RECLEN(strlen(dirent->d_name));
 
 		uresid = uiop->uio_resid;
@@ -1690,9 +1860,10 @@ lxsys_readdir_cpu(lxsys_node_t *ldp, struct uio *uiop, int *eofp)
 			break;
 		}
 	}
+	cpuset_free(avail);
 
 	/* Indicate EOF if we reached the end of the CPU list. */
-	if (i == cpucnt) {
+	if (i == avhi) {
 		*eofp = 1;
 	}
 
