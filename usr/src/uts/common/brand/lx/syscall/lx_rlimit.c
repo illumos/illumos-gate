@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -55,9 +55,9 @@ typedef struct {
 } lx_rlimit32_t;
 
 /*
- * Linux supports many of the same resources that we do, but on Illumos these
+ * Linux supports many of the same resources that we do, but on illumos these
  * are rctls. Instead of using rlimit, we use rctls for all of the limits.
- * This table is used to translate Linux rlimit keys into the Illumos legacy
+ * This table is used to translate Linux rlimit keys into the illumos legacy
  * rlimit. We then primarily use the rctl/rlimit compatability code to
  * manage these.
  */
@@ -167,9 +167,13 @@ lx_getrlimit_common(int lx_resource, uint64_t *rlim_curp, uint64_t *rlim_maxp)
 		break;
 
 	case LX_RLIMIT_MEMLOCK:
-		/* zone.max-locked-memory */
-		rlim64.rlim_cur = rlim64.rlim_max =
-		    curzone->zone_locked_mem_ctl;
+		lx_get_rctl("process.max-locked-memory", &rlim64);
+
+		/* If unlimited, use zone.max-locked-memory */
+		if (rlim64.rlim_max == RLIM64_INFINITY)
+			rlim64.rlim_max = curzone->zone_locked_mem_ctl;
+		if (rlim64.rlim_cur == RLIM64_INFINITY)
+			rlim64.rlim_cur = curzone->zone_locked_mem_ctl;
 		break;
 
 	case LX_RLIMIT_SIGPENDING:
@@ -414,18 +418,23 @@ lx_setrlimit_common(int lx_resource, uint64_t rlim_cur, uint64_t rlim_max)
 		break;
 
 	case LX_RLIMIT_MEMLOCK:
-		/*
-		 * zone.max-locked-memory
-		 * Since we're emulating the value via a zone rctl, we can't
-		 * set that from within the zone. Lie and say we set the value.
-		 */
+		/* Do not exceed zone.max-locked-memory */
+		if (rlim_max > curzone->zone_locked_mem_ctl ||
+		    rlim_cur > curzone->zone_locked_mem_ctl)
+			return (set_errno(EINVAL));
+
+		rl64.rlim_cur = rlim_cur;
+		rl64.rlim_max = rlim_max;
+		err = lx_set_rctl("process.max-locked-memory", &rl64);
+		if (err != 0)
+			return (set_errno(err));
 		break;
 
 	case LX_RLIMIT_SIGPENDING:
 		/*
 		 * On Ubuntu at least, the login and sshd processes expect to
 		 * set this limit to 16k and login will fail if this fails. On
-		 * Illumos we have a system limit of 8k and normally the
+		 * illumos we have a system limit of 8k and normally the
 		 * privileged limit is 512. We simply pretend this works to
 		 * allow login to work.
 		 */

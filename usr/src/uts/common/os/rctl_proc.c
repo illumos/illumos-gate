@@ -21,6 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -66,6 +67,7 @@ rctl_hndl_t rc_process_semmsl;
 rctl_hndl_t rc_process_semopm;
 rctl_hndl_t rc_process_portev;
 rctl_hndl_t rc_process_sigqueue;
+rctl_hndl_t rc_process_maxlockedmem;
 
 /*
  * process.max-cpu-time / RLIMIT_CPU
@@ -382,6 +384,11 @@ rctlproc_init(void)
 	    _SIGQUEUE_SIZE_BASIC, RCPRIV_BASIC, RCTL_LOCAL_DENY);
 	rctl_add_default_limit("process.max-sigqueue-size",
 	    _SIGQUEUE_SIZE_PRIVILEGED, RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
+
+	rc_process_maxlockedmem = rctl_register("process.max-locked-memory",
+	    RCENTITY_PROCESS, RCTL_GLOBAL_LOWERABLE | RCTL_GLOBAL_DENY_ALWAYS |
+	    RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_BYTES,
+	    ULONG_MAX, UINT32_MAX, &rctl_default_ops);
 
 	/*
 	 * Place minimal set of controls on "sched" process for inheritance by
