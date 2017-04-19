@@ -46,7 +46,11 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS) -DDEBUG
 
-CERRWARN += -_gcc=-Wno-uninitialized
+# re-enable warnings that we can tolerate, which are disabled by default
+# in Makefile.master
+CERRWARN += -_gcc=-Wmissing-braces
+CERRWARN += -_gcc=-Wsign-compare
+CERRWARN += -_gcc=-Wmissing-field-initializers
 
 # lint complains about unused _umem_* functions
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
