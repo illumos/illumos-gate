@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #include <sys/atomic.h>
@@ -193,6 +194,8 @@ mod_hash_t *rctl_dict_by_name;
 id_space_t *rctl_ids;
 kmem_cache_t *rctl_cache;	/* kmem cache for rctl structures */
 kmem_cache_t *rctl_val_cache;	/* kmem cache for rctl values */
+
+extern rctl_hndl_t rc_process_maxlockedmem;
 
 kmutex_t rctl_lists_lock;
 rctl_dict_entry_t *rctl_lists[RC_MAX_ENTITY + 1];
@@ -2872,12 +2875,12 @@ rctl_init(void)
  * rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
  *     int chargeproc)
  *
- * Increments the amount of locked memory on a project, and
- * zone. If proj is non-NULL the project must be held by the
- * caller; if it is NULL the proj and zone of proc_t p are used.
- * If chargeproc is non-zero, then the charged amount is cached
- * on p->p_locked_mem so that the charge can be migrated when a
- * process changes projects.
+ * Increments the amount of locked memory on a process, project, and
+ * zone. If 'proj' is non-NULL, the project must be held by the
+ * caller; if it is NULL, the project and zone of process 'p' are used.
+ * If 'chargeproc' is non-zero, then the charged amount is added
+ * to p->p_locked_mem. This is also used so that the charge can be
+ * migrated when a process changes projects.
  *
  * Return values
  *    0 - success
@@ -2895,6 +2898,7 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 
 	ASSERT(p != NULL);
 	ASSERT(MUTEX_HELD(&p->p_lock));
+
 	if (proj != NULL) {
 		projp = proj;
 		zonep = proj->kpj_zone;
@@ -2938,11 +2942,30 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 		}
 	}
 
-	zonep->zone_locked_mem += inc;
-	projp->kpj_data.kpd_locked_mem += inc;
 	if (chargeproc != 0) {
+		rlim64_t p_max;
+
+		p_max = rctl_enforced_value(rc_process_maxlockedmem, p->p_rctls,
+		    p);
+
+		/* Check for overflow */
+		if ((p->p_locked_mem + inc) < p->p_locked_mem) {
+			ret = EAGAIN;
+			goto out;
+		}
+		if ((p->p_locked_mem + inc) > p_max) {
+			if (rctl_test_entity(rc_process_maxlockedmem,
+			    p->p_rctls, p, &e, inc, 0) & RCT_DENY) {
+				ret = EAGAIN;
+				goto out;
+			}
+		}
+
 		p->p_locked_mem += inc;
 	}
+
+	zonep->zone_locked_mem += inc;
+	projp->kpj_data.kpd_locked_mem += inc;
 out:
 	mutex_exit(&zonep->zone_mem_lock);
 	return (ret);
