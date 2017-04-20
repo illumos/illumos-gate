@@ -22,6 +22,7 @@
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com>
+ * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -644,7 +645,7 @@ virtio_ve_set(struct vq_entry *qe, uint64_t paddr, uint32_t len,
 unsigned int
 virtio_ve_indirect_available(struct vq_entry *qe)
 {
-	return (qe->qe_queue->vq_indirect_num - (qe->qe_indirect_next - 1));
+	return (qe->qe_queue->vq_indirect_num - qe->qe_indirect_next);
 }
 
 void
