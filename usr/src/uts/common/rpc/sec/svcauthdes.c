@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Joyent Inc
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -59,6 +60,7 @@
 #include <sys/kmem.h>
 #include <sys/time.h>
 #include <sys/cmn_err.h>
+#include <sys/debug.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -159,6 +161,7 @@ _svcauth_des(struct svc_req *rqst, struct rpc_msg *msg)
 	}
 	mutex_exit(&authdes_lock);
 
+	CTASSERT(sizeof (struct area) <= RQCRED_SIZE);
 	/* LINTED pointer alignment */
 	area = (struct area *)rqst->rq_clntcred;
 	cred = (struct authdes_cred *)&area->area_cred;

@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Joyent Inc
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,6 +38,7 @@
 #include <sys/signal.h>
 #include <sys/stat.h>
 #include <sys/termio.h>
+#include <sys/debug.h>
 #include <strings.h>
 #include <rpcsvc/ypclnt.h>
 #include <rpcsvc/yp_prot.h>
@@ -226,6 +228,10 @@ ypupdate_prog(rqstp, transp)
 		svcerr_noproc(transp);
 		return;
 	}
+
+	CTASSERT(sizeof (struct authdes_cred) <= RQCRED_SIZE);
+	CTASSERT(sizeof (struct authunix_parms) <= RQCRED_SIZE);
+
 	switch (rqstp->rq_cred.oa_flavor) {
 	case AUTH_DES:
 		netname = ((struct authdes_cred *)
