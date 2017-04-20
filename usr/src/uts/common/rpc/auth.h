@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent Inc
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -53,8 +54,21 @@
 extern "C" {
 #endif
 
-#define	MAX_AUTH_BYTES	400
+#define	MAX_AUTH_BYTES	400	/* maximum length of an auth type, from RFC */
 #define	MAXNETNAMELEN	255	/* maximum length of network user's name */
+
+/*
+ * NOTE: this value *must* be kept larger than the maximum size of all the
+ * structs that rq_clntcred is cast to in the different authentication types.
+ * If changes are made to any of these *_area structs, double-check they all
+ * still fit. If any new authentication mechanisms are added, add a note here.
+ *
+ * Currently these structs can be found in:
+ *  - __svcauth_sys (svc_auth_sys.c)
+ *  - __svcauth_des (svcauth_des.c)
+ *  - __svcauth_loopback (svc_auth_loopb.c)
+ */
+#define	RQCRED_SIZE	700	/* size allocated for rq_clntcred */
 
 /*
  *  Client side authentication/security data

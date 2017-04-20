@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2017 Joyent Inc
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -66,6 +67,7 @@
 #include <rpcsvc/nis_dhext.h>
 #include <syslog.h>
 #include <libscf.h>
+#include <sys/debug.h>
 
 #include "debug.h"
 #include "keyserv_cache.h"
@@ -1334,6 +1336,7 @@ get_auth(trans, rqstp, uid)
 		fprintf(stderr, "local_uid  %d\n", cred.euid);
 	if (rqstp->rq_cred.oa_flavor == AUTH_SYS ||
 	    rqstp->rq_cred.oa_flavor == AUTH_LOOPBACK) {
+		CTASSERT(sizeof (struct authunix_parms) <= RQCRED_SIZE);
 /* LINTED pointer alignment */
 		*uid = ((struct authunix_parms *)rqstp->rq_clntcred)->aup_uid;
 		return (*uid == cred.euid || cred.euid == 0);
