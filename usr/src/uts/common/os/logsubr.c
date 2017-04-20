@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2013 Gary Mills
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2016, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -250,7 +250,7 @@ log_init(void)
 	 */
 	printf("\rSunOS Release %s Version %s %u-bit\n",
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
-	printf("Copyright (c) 2010-2016, Joyent Inc. All rights reserved.\n");
+	printf("Copyright (c) 2010-2017, Joyent Inc. All rights reserved.\n");
 #ifdef DEBUG
 	printf("DEBUG enabled\n");
 #endif
@@ -491,7 +491,7 @@ log_console(log_t *lp, log_ctl_t *lc)
 
 mblk_t *
 log_makemsg(int mid, int sid, int level, int sl, int pri, void *msg,
-	size_t size, int on_intr)
+    size_t size, int on_intr)
 {
 	mblk_t *mp = NULL;
 	mblk_t *mp2;
