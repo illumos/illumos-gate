@@ -22,10 +22,8 @@
 .\" OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 .\" EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd September 12, 1998
-.Dt BTXLD 8
+.Dd Apr 20, 2017
+.Dt BTXLD 1ONBLD
 .Os
 .Sh NAME
 .Nm btxld
@@ -93,6 +91,4 @@ combined .text and .data segments of the client image.
 .Ex -std
 .Sh SEE ALSO
 .Xr ld 1 ,
-.Xr boot 8
-.Sh AUTHORS
-.An Robert Nordier Aq Mt rnordier@FreeBSD.org
+.Xr boot 1M

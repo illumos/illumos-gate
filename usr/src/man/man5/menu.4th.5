@@ -22,14 +22,12 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd August 6, 2013
-.Dt MENU.4TH 8
+.Dd Apr 22, 2017
+.Dt MENU.4TH 5
 .Os
 .Sh NAME
 .Nm menu.4th
-.Nd FreeBSD dynamic menu boot module
+.Nd loader dynamic menu boot module
 .Sh DESCRIPTION
 The file that goes by the name of
 .Nm
@@ -40,7 +38,7 @@ The commands of
 by themselves are not enough for most uses.
 Please refer to the
 examples below for the most common situations, and to
-.Xr loader 8
+.Xr loader 5
 for additional commands.
 .Pp
 Before using any of the commands provided in
@@ -51,7 +49,7 @@ through the command:
 .Dl include menu.4th
 .Pp
 This line is present in the default
-.Pa /boot/menu.rc
+.Pa /boot/forth/menu.rc
 file, so it is not needed (and should not be re-issued) in a normal setup.
 .Pp
 The commands provided by it are:
@@ -211,43 +209,9 @@ is enabled
 .It Va menu_acpi
 When set to a number
 .Dq Li x
-associated with a given menuitem, that menuitem will only appear when
-running on i386-compatible hardware,
-.Va hint.acpi.0.rsdp
-is set (indicating the presence of hardware ACPI support as detected by
-.Xr loader 8 ) ,
-and
-.Va hint.acpi.0.disabled
-is not set.
-On non-i386 hardware, menuitems configured after the
-.Dq Li menu_acpi
-menuitem will use a lower number (to compensate for the missing ACPI menuitem)
-but continue to function as expected.
-On i386-compatible hardware lacking ACPI support (as detected by
-.Xr loader 8 ) ,
-subsequent menuitems will retain their associated numbers.
-.It Va hint.acpi.0.rsdp
-Set automatically by
-.Xr loader 8
-on i386-compatible hardware when ACPI support is detected at boot time.
-Effects the display of the
-.Dq Li menu_acpi
-menuitem (if configured).
-.It Va hint.acpi.0.disabled
-Effects the display of the
-.Va menu_acpi
-menuitem.
-If set, the menuitem will display
-.Va toggled_text[x]
-.Va ( toggled_ansi[x]
-if
-.Va loader_color
-is set), otherwise
-.Va menu_caption[x]
-.Va ( ansi_caption[x]
-if
-.Va loader_color
-is set).
+associated with a given menuitem, that menuitem will allow to select
+acpi-user-options
+.Pq see Xr eeprom 1M .
 .It Va menu_options
 When set to a number
 .Dq Li x ,
@@ -307,22 +271,22 @@ For all values of
 above, use any number between 1 through 9. Sorry, double-digits are not
 currently supported.
 .Sh FILES
-.Bl -tag -width /boot/loader.4th -compact
-.It Pa /boot/loader
+.Bl -tag -width /boot/forth/loader.4th -compact
+.It Pa /boot/zfsloader
 The
-.Xr loader 8 .
-.It Pa /boot/menu.4th
+.Xr zfsloader 5 .
+.It Pa /boot/forth/menu.4th
 .Nm
 itself.
 .It Pa /boot/loader.rc
-.Xr loader 8
+.Xr loader 5
 bootstrapping script.
 .El
 .Sh EXAMPLES
 A simple boot menu:
 .Pp
 .Bd -literal -offset indent -compact
-include /boot/menu.4th
+include /boot/forth/menu.4th
 menu-init
 set menu_caption[1]="Boot"
 set menu_command[1]="boot"
@@ -335,18 +299,8 @@ set menu_reboot
 menu-display
 .Ed
 .Sh SEE ALSO
-.Xr loader.conf 5 ,
-.Xr beastie.4th 8 ,
-.Xr loader 8 ,
-.Xr loader.4th 8
-.Sh HISTORY
-The
-.Nm
-set of commands first appeared in
-.Fx 9.0 .
-.Sh AUTHORS
-The
-.Nm
-set of commands was written by
-.An -nosplit
-.An Devin Teske Aq dteske@FreeBSD.org .
+.Xr eeprom 1M ,
+.Xr loader.conf 4 ,
+.Xr beastie.4th 5 ,
+.Xr loader 5 ,
+.Xr loader.4th 5

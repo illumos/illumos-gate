@@ -22,26 +22,24 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd November 5, 2012
-.Dt MENUSETS.4TH 8
+.Dd Apr 22, 2017
+.Dt MENUSETS.4TH 5
 .Os
 .Sh NAME
 .Nm menusets.4th
-.Nd FreeBSD dynamic submenu boot module
+.Nd loader dynamic submenu boot module
 .Sh DESCRIPTION
 The file that goes by the name of
 .Nm
 is a set of commands designed to add submenu functionality to the dynamic menu
 system provided by
-.Xr menu.4th 8 .
+.Xr menu.4th 5 .
 Submenus are managed through a system of carefully named environment variables.
 The commands of
 .Nm
 by themselves are not enough for most uses.
 Please refer to the examples below for the most common situations, and to
-.Xr menu.4th 8
+.Xr menu.4th 5
 for additional commands.
 .Pp
 Before using any of the commands provided in
@@ -52,7 +50,7 @@ through the command:
 .Dl include menusets.4th
 .Pp
 This line is present in the default
-.Pa /boot/menu-commands.4th
+.Pa /boot/forth/menu-commands.4th
 file, so it is not needed (and should not be re-issued) in a normal setup.
 .Pp
 The commands provided by it are:
@@ -306,26 +304,26 @@ For all values of
 above, use any number between 1 and 65535.
 .Sh FILES
 .Bl -tag -width /boot/menu-commands.4th -compact
-.It Pa /boot/loader
+.It Pa /boot/zfsloader
 The
-.Xr loader 8 .
-.It Pa /boot/menu.4th
+.Xr zfsloader 5 .
+.It Pa /boot/forth/menu.4th
 Dynamic menu module.
-.It Pa /boot/menu-commands.4th
+.It Pa /boot/forth/menu-commands.4th
 Contains the goto_menu command.
-.It Pa /boot/menusets.4th
+.It Pa /boot/forth/menusets.4th
 .Nm
 itself.
 .It Pa /boot/loader.rc
-.Xr loader 8
+.Xr loader 5
 bootstrapping script.
 .El
 .Sh EXAMPLES
 A simple boot menu with a submenu:
 .Pp
 .Bd -literal -offset indent -compact
-include /boot/menu.4th
-include /boot/menu-commands.4th
+include /boot/forth/menu.4th
+include /boot/forth/menu-commands.4th
 menu-init
 set menuset1_caption[1]="Boot"
 set menuset1_command[1]="boot"
@@ -341,8 +339,8 @@ menu-display
 The same boot menu with named menusets:
 .Pp
 .Bd -literal -offset indent -compact
-include /boot/menu.4th
-include /boot/menu-commands.4th
+include /boot/forth/menu.4th
+include /boot/forth/menu-commands.4th
 menu-init
 set menuset_name1=main
 set mainmenu_caption[1]="Boot"
@@ -354,19 +352,8 @@ set submenu_caption[1]="Back"
 set submenu_command[1]="1 goto_menu"
 .Ed
 .Sh SEE ALSO
-.Xr loader.conf 5 ,
-.Xr beastie.4th 8 ,
-.Xr loader 8 ,
-.Xr loader.4th 8 ,
-.Xr menu.4th 8
-.Sh HISTORY
-The
-.Nm
-set of commands first appeared in
-.Fx 10.0 .
-.Sh AUTHORS
-The
-.Nm
-set of commands was written by
-.An -nosplit
-.An Devin Teske Aq dteske@FreeBSD.org .
+.Xr loader.conf 4 ,
+.Xr beastie.4th 5 ,
+.Xr loader 5 ,
+.Xr loader.4th 5 ,
+.Xr menu.4th 5
