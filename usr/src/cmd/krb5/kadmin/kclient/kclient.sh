@@ -1386,7 +1386,7 @@ EOF
         i=0
 
 	# first check to see if /dev/random exists to generate a new password
-	if [[ ! -h /dev/random ]]; then
+	if [[ ! -e /dev/random ]]; then
 		printf "$(gettext "/dev/random does not exist").\n" >&2
 		error_message
 	fi

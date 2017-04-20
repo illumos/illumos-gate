@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2017, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -90,6 +91,10 @@
  *
  * Note that for IPv6 link-local addresses we record the ifindex since the
  * link-locals are not globally unique.
+ *
+ * DCEs can remain for an arbitrarily long time, until memory pressure or
+ * too-deep hash buckets (see dce_lookup_and_add*()) enable the reclaim thread
+ * to actually remove DCEs from the cache.
  */
 
 /*
@@ -326,12 +331,37 @@ dce_stack_init(ip_stack_t *ipst)
 	}
 }
 
+/*
+ * Given a DCE hash bucket, unlink DCE entries from it. Some callers need
+ * ifindex-specific matching, others don't. Don't overload ifindex to indicate
+ * specificity, just indicate so explicitly.
+ */
+static void
+dce_bucket_clean(dcb_t *dcb, boolean_t specific_ifindex, uint_t ifindex)
+{
+	dce_t	*dce, *nextdce;
+
+	rw_enter(&dcb->dcb_lock, RW_WRITER);
+
+	for (dce = dcb->dcb_dce; dce != NULL; dce = nextdce) {
+		nextdce = dce->dce_next;
+		if ((!specific_ifindex) || dce->dce_ifindex == ifindex) {
+			dce_delete_locked(dcb, dce);
+			dce_refrele(dce);
+		}
+	}
+
+	rw_exit(&dcb->dcb_lock);
+}
+
 void
 dce_stack_destroy(ip_stack_t *ipst)
 {
 	int i;
 	for (i = 0; i < ipst->ips_dce_hashsize; i++) {
+		dce_bucket_clean(&ipst->ips_dce_hash_v4[i], B_FALSE, 0);
 		rw_destroy(&ipst->ips_dce_hash_v4[i].dcb_lock);
+		dce_bucket_clean(&ipst->ips_dce_hash_v6[i], B_FALSE, 0);
 		rw_destroy(&ipst->ips_dce_hash_v6[i].dcb_lock);
 	}
 	kmem_free(ipst->ips_dce_hash_v4,
@@ -955,20 +985,7 @@ void
 dce_cleanup(uint_t ifindex, ip_stack_t *ipst)
 {
 	uint_t	i;
-	dcb_t	*dcb;
-	dce_t	*dce, *nextdce;
 
-	for (i = 0; i < ipst->ips_dce_hashsize; i++) {
-		dcb = &ipst->ips_dce_hash_v6[i];
-		rw_enter(&dcb->dcb_lock, RW_WRITER);
-
-		for (dce = dcb->dcb_dce; dce != NULL; dce = nextdce) {
-			nextdce = dce->dce_next;
-			if (dce->dce_ifindex == ifindex) {
-				dce_delete_locked(dcb, dce);
-				dce_refrele(dce);
-			}
-		}
-		rw_exit(&dcb->dcb_lock);
-	}
+	for (i = 0; i < ipst->ips_dce_hashsize; i++)
+		dce_bucket_clean(&ipst->ips_dce_hash_v6[i], B_TRUE, ifindex);
 }

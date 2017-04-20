@@ -197,13 +197,13 @@ variable page_remainder
 	else
 		dup 16 + allocate if ENOMEM throw then
 		swap 2dup 2>R	\ copy of new addr len to return stack
-		move 2R>		\ copy dev name and concat file name
+		move 2R>	\ copy dev name and concat file name
 		s" :/boot/menu.lst" strcat 2dup \ leave copy to stack
 		beadm_bootfs if ( dev_addr dev_len addr len )
 			2swap		\ addr len dev_addr dev_len
 			drop
 			free-memory
-				\ have dataset and need to get zfs:pool/ROOT/be:
+				\ have dataset and need to get zfs:pool/ROOT/be:
 			dup 5 + allocate if ENOMEM throw then
 			0 s" zfs:" strcat
 			2swap strcat
@@ -219,7 +219,15 @@ variable page_remainder
 	\ need to do:
 	0 unload drop
 	free-module-options
-	\ unset kernel env?
+	\ unset the env variables with kernel arguments
+	s" acpi-user-options" unsetenv
+	s" boot-args" unsetenv
+	s" boot_ask" unsetenv
+	s" boot_single" unsetenv
+	s" boot_verbose" unsetenv
+	s" boot_kmdb" unsetenv
+	s" boot_debug" unsetenv
+	s" boot_reconfigure" unsetenv
 	start			\ load config, kernel and modules
 	." Current boot device: " s" currdev" getenv type cr
 ;
@@ -381,7 +389,7 @@ builtin: beadm
 			n 1+ to n
 		else
 			\ Use reverse loop to display descending order
-			\ for BE list.
+			\ for BE list.
 			0 count 1- do
 				read_line		\ read title line
 				get_name_value
