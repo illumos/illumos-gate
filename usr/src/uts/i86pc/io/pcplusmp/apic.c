@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -248,8 +248,16 @@ apic_probe(void)
 	/* check if apix is initialized */
 	if (apix_enable && apix_loaded())
 		return (PSM_FAILURE);
-	else
-		apix_enable = 0; /* continue using pcplusmp PSM */
+
+	/*
+	 * Check whether x2APIC mode was activated by BIOS. We don't support
+	 * that in pcplusmp as apix normally handles that.
+	 */
+	if (apic_local_mode() == LOCAL_X2APIC)
+		return (PSM_FAILURE);
+
+	/* continue using pcplusmp PSM */
+	apix_enable = 0;
 
 	return (apic_probe_common(apic_psm_info.p_mach_idstring));
 }
