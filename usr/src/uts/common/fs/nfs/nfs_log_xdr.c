@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Joyent Inc
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -31,6 +30,7 @@
 #include <sys/kmem.h>
 #include <sys/cred.h>
 #include <sys/dirent.h>
+#include <sys/debug.h>
 #include <rpc/types.h>
 #include <nfs/nfs.h>
 #include <nfs/export.h>
@@ -61,6 +61,7 @@ nfsl_principal_name_get(struct svc_req *req)
 
 	case AUTH_DES:
 		adc = (struct authdes_cred *)req->rq_clntcred;
+		CTASSERT(sizeof (struct authdes_cred) <= RQCRED_SIZE);
 		principal_name = adc->adc_fullname.name;
 		break;
 

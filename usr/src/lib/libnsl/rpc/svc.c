@@ -23,6 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2017 Joyent Inc
  */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -52,6 +53,7 @@
 #include <stropts.h>
 #include <sys/conf.h>
 #include <rpc/rpc.h>
+#include <rpc/auth.h>
 #ifdef PORTMAP
 #include <rpc/pmap_clnt.h>
 #endif
@@ -75,7 +77,6 @@ int nsvc_xdrs;		/* total number of svc_xdrs allocated */
 int __rpc_use_pollfd_done;	/* to unlimit the number of connections */
 
 #define	NULL_SVC ((struct svc_callout *)0)
-#define	RQCRED_SIZE	400		/* this size is excessive */
 
 /*
  * The services list

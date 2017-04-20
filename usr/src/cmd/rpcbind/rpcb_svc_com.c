@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent Inc
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -81,6 +82,7 @@
 #include <assert.h>
 #include <synch.h>
 #include "rpcbind.h"
+#include <sys/debug.h>
 
 static struct finfo *forward_register(ulong_t, struct netbuf *, int, char *);
 static void forward_destroy(struct finfo *);
@@ -1038,6 +1040,7 @@ rpcbproc_callit_com(struct svc_req *rqstp, SVCXPRT *transp, ulong_t reply_type,
 	} else if (rqstp->rq_cred.oa_flavor == AUTH_SYS) {
 		struct authsys_parms *au;
 
+		CTASSERT(sizeof (struct authsys_parms) <= RQCRED_SIZE);
 		au = (struct authsys_parms *)rqstp->rq_clntcred;
 		auth = authsys_create(au->aup_machname, au->aup_uid,
 		    au->aup_gid, au->aup_len, au->aup_gids);

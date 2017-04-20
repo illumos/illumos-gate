@@ -21,6 +21,7 @@
  */
 /*
  * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent Inc
  * Use is subject to license terms.
  */
 
@@ -31,8 +32,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svc_auth_unix.c
@@ -54,6 +53,7 @@
 #include <sys/tihdr.h>
 #include <sys/t_kuser.h>
 #include <sys/cmn_err.h>
+#include <sys/debug.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -84,6 +84,7 @@ _svcauth_unix(struct svc_req *rqst, struct rpc_msg *msg)
 	u_int str_len, gid_len;
 	int i;
 
+	CTASSERT(sizeof (struct area) <= RQCRED_SIZE);
 	/* LINTED pointer alignment */
 	area = (struct area *) rqst->rq_clntcred;
 	aup = &area->area_aup;

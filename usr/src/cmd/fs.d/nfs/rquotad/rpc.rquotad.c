@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Joyent Inc
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -37,6 +38,7 @@
 #include <sys/mnttab.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#include <sys/debug.h>
 #ifdef notdef
 #include <netconfig.h>
 #endif
@@ -327,6 +329,7 @@ getquota(rqstp, transp)
 	 * This authentication is really bogus with the current rpc
 	 * authentication scheme. One day we will have something for real.
 	 */
+	CTASSERT(sizeof (authp) <= RQCRED_SIZE);
 	if (rqstp->rq_cred.oa_flavor != AUTH_UNIX ||
 	    (((authp) rqstp->rq_clntcred)->aup_uid != 0 &&
 		((authp) rqstp->rq_clntcred)->aup_uid != (uid_t)gqa.gqa_uid)) {

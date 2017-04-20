@@ -207,8 +207,6 @@
 #include <nfs/nfs.h>
 #include <sys/tsol/label_macro.h>
 
-#define	RQCRED_SIZE	400	/* this size is excessive */
-
 /*
  * Defines for svc_poll()
  */
