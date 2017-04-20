@@ -424,19 +424,19 @@ extern void	cpuset_free(cpuset_t *);
  * They are now acceptable to use in non-_MACHDEP code.
  */
 extern	void	cpuset_all(cpuset_t *);
-extern	void	cpuset_all_but(cpuset_t *, uint_t);
+extern	void	cpuset_all_but(cpuset_t *, const uint_t);
 extern	int	cpuset_isnull(cpuset_t *);
 extern	int	cpuset_isequal(cpuset_t *, cpuset_t *);
-extern	void	cpuset_only(cpuset_t *, uint_t);
-extern	long	cpu_in_set(cpuset_t *, uint_t);
-extern	void	cpuset_add(cpuset_t *, uint_t);
-extern	void	cpuset_del(cpuset_t *, uint_t);
+extern	void	cpuset_only(cpuset_t *, const uint_t);
+extern	long	cpu_in_set(cpuset_t *, const uint_t);
+extern	void	cpuset_add(cpuset_t *, const uint_t);
+extern	void	cpuset_del(cpuset_t *, const uint_t);
 extern	uint_t	cpuset_find(cpuset_t *);
 extern	void	cpuset_bounds(cpuset_t *, uint_t *, uint_t *);
-extern	void	cpuset_atomic_del(cpuset_t *, uint_t);
-extern	void	cpuset_atomic_add(cpuset_t *, uint_t);
-extern	long	cpuset_atomic_xadd(cpuset_t *, uint_t);
-extern	long	cpuset_atomic_xdel(cpuset_t *, uint_t);
+extern	void	cpuset_atomic_del(cpuset_t *, const uint_t);
+extern	void	cpuset_atomic_add(cpuset_t *, const uint_t);
+extern	long	cpuset_atomic_xadd(cpuset_t *, const uint_t);
+extern	long	cpuset_atomic_xdel(cpuset_t *, const uint_t);
 extern	void	cpuset_or(cpuset_t *, cpuset_t *);
 extern	void	cpuset_xor(cpuset_t *, cpuset_t *);
 extern	void	cpuset_and(cpuset_t *, cpuset_t *);
