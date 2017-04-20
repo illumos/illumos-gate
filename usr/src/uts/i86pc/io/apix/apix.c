@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -272,8 +272,11 @@ apix_probe()
 		/* check if x2APIC mode is supported */
 		if ((apix_supported_hw & APIX_SUPPORT_X2APIC) ==
 		    APIX_SUPPORT_X2APIC) {
-			if (!((apic_local_mode() == LOCAL_X2APIC) ||
-			    apic_detect_x2apic())) {
+			if (apic_local_mode() == LOCAL_X2APIC) {
+				/* x2APIC mode activated by BIOS, switch ops */
+				apic_mode = LOCAL_X2APIC;
+				apic_change_ops();
+			} else if (!apic_detect_x2apic()) {
 				/* x2APIC mode is not supported in the hw */
 				apix_enable = 0;
 			}
