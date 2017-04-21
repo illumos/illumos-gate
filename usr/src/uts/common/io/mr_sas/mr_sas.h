@@ -62,8 +62,8 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"6.503.00.00ILLUMOS-20170421"
-#define	MRSAS_RELDATE				"April 21, 2017"
+#define	MRSAS_VERSION				"6.503.00.00ILLUMOS-20170524"
+#define	MRSAS_RELDATE				"May 24, 2017"
 
 #define	MRSAS_TRUE				1
 #define	MRSAS_FALSE				0
