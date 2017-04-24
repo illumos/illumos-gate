@@ -33,7 +33,6 @@
 #define	_SYS_SYSMACROS_H
 
 #include <sys/param.h>
-#include <sys/stddef.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -370,8 +369,18 @@ extern unsigned char bcd_to_byte[256];
 /* avoid any possibility of clashing with <stddef.h> version */
 #if (defined(_KERNEL) || defined(_FAKE_KERNEL)) && !defined(_KMEMUSER)
 
-#define	ARRAY_SIZE(x)	(sizeof (x) / sizeof (x[0]))
+#if !defined(offsetof)
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#define	offsetof(s, m) __builtin_offsetof(s, m)
+#else
+#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
+#endif
+#endif /* !offsetof */
 
+#define	container_of(m, s, name)			\
+	(void *)((uintptr_t)(m) - (uintptr_t)offsetof(s, name))
+
+#define	ARRAY_SIZE(x)	(sizeof (x) / sizeof (x[0]))
 #endif /* _KERNEL, !_KMEMUSER */
 
 #ifdef	__cplusplus
