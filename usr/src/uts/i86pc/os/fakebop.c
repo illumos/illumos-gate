@@ -40,6 +40,8 @@
 #include <sys/bootsvcs.h>
 #include <sys/bootinfo.h>
 #include <sys/multiboot.h>
+#include <sys/multiboot2.h>
+#include <sys/multiboot2_impl.h>
 #include <sys/bootvfs.h>
 #include <sys/bootprops.h>
 #include <sys/varargs.h>
@@ -132,7 +134,7 @@ shared_info_t *HYPERVISOR_shared_info;
 static ulong_t total_bop_alloc_scratch = 0;
 static ulong_t total_bop_alloc_kernel = 0;
 
-static void build_firmware_properties(void);
+static void build_firmware_properties(struct xboot_info *);
 
 static int early_allocation = 1;
 
@@ -791,7 +793,7 @@ done:
 		bcons_init2(inputdev, outputdev, consoledev);
 	}
 
-	if (strstr((char *)xbootp->bi_cmdline, "prom_debug") || kbm_debug)
+	if (find_boot_prop("prom_debug") || kbm_debug)
 		boot_prop_display(line);
 }
 
@@ -1130,7 +1132,8 @@ build_panic_cmdline(const char *cmd, int cmdlen)
 
 #ifndef	__xpv
 /*
- * Construct boot command line for Fast Reboot
+ * Construct boot command line for Fast Reboot. The saved_cmdline
+ * is also reported by "eeprom bootcmd".
  */
 static void
 build_fastboot_cmdline(struct xboot_info *xbp)
@@ -1199,6 +1202,125 @@ save_boot_info(struct xboot_info *xbi)
 }
 #endif	/* __xpv */
 
+/*
+ * Import boot environment module variables as properties, applying
+ * blacklist filter for variables we know we will not use.
+ *
+ * Since the environment can be relatively large, containing many variables
+ * used only for boot loader purposes, we will use a blacklist based filter.
+ * To keep the blacklist from growing too large, we use prefix based filtering.
+ * This is possible because in many cases, the loader variable names are
+ * using a structured layout.
+ *
+ * We will not overwrite already set properties.
+ */
+static struct bop_blacklist {
+	const char *bl_name;
+	int bl_name_len;
+} bop_prop_blacklist[] = {
+	{ "ISADIR", sizeof ("ISADIR") },
+	{ "acpi", sizeof ("acpi") },
+	{ "autoboot_delay", sizeof ("autoboot_delay") },
+	{ "autoboot_delay", sizeof ("autoboot_delay") },
+	{ "beansi_", sizeof ("beansi_") },
+	{ "beastie", sizeof ("beastie") },
+	{ "bemenu", sizeof ("bemenu") },
+	{ "boot.", sizeof ("boot.") },
+	{ "bootenv", sizeof ("bootenv") },
+	{ "currdev", sizeof ("currdev") },
+	{ "dhcp.", sizeof ("dhcp.") },
+	{ "interpret", sizeof ("interpret") },
+	{ "kernel", sizeof ("kernel") },
+	{ "loaddev", sizeof ("loaddev") },
+	{ "loader_", sizeof ("loader_") },
+	{ "module_path", sizeof ("module_path") },
+	{ "nfs.", sizeof ("nfs.") },
+	{ "pcibios", sizeof ("pcibios") },
+	{ "prompt", sizeof ("prompt") },
+	{ "smbios", sizeof ("smbios") },
+	{ "tem", sizeof ("tem") },
+	{ "twiddle_divisor", sizeof ("twiddle_divisor") },
+	{ "zfs_be", sizeof ("zfs_be") },
+};
+
+/*
+ * Match the name against prefixes in above blacklist. If the match was
+ * found, this name is blacklisted.
+ */
+static boolean_t
+name_is_blacklisted(const char *name)
+{
+	int i, n;
+
+	n = sizeof (bop_prop_blacklist) / sizeof (bop_prop_blacklist[0]);
+	for (i = 0; i < n; i++) {
+		if (strncmp(bop_prop_blacklist[i].bl_name, name,
+		    bop_prop_blacklist[i].bl_name_len - 1) == 0) {
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+static void
+process_boot_environment(struct boot_modules *benv)
+{
+	char *env, *ptr, *name, *value;
+	uint32_t size, name_len, value_len;
+
+	if (benv == NULL || benv->bm_type != BMT_ENV)
+		return;
+	ptr = env = benv->bm_addr;
+	size = benv->bm_size;
+	do {
+		name = ptr;
+		/* find '=' */
+		while (*ptr != '=') {
+			ptr++;
+			if (ptr > env + size) /* Something is very wrong. */
+				return;
+		}
+		name_len = ptr - name;
+		if (sizeof (buffer) <= name_len)
+			continue;
+
+		(void) strncpy(buffer, name, sizeof (buffer));
+		buffer[name_len] = '\0';
+		name = buffer;
+
+		value_len = 0;
+		value = ++ptr;
+		while ((uintptr_t)ptr - (uintptr_t)env < size) {
+			if (*ptr == '\0') {
+				ptr++;
+				value_len = (uintptr_t)ptr - (uintptr_t)env;
+				break;
+			}
+			ptr++;
+		}
+
+		/* Did we reach the end of the module? */
+		if (value_len == 0)
+			return;
+
+		if (*value == '\0')
+			continue;
+
+		/* Is this property already set? */
+		if (do_bsys_getproplen(NULL, name) >= 0)
+			continue;
+
+		if (name_is_blacklisted(name) == B_TRUE)
+			continue;
+
+		/* Create new property. */
+		bsetprops(name, value);
+
+		/* Avoid reading past the module end. */
+		if (size <= (uintptr_t)ptr - (uintptr_t)env)
+			return;
+	} while (*ptr != '\0');
+}
 
 /*
  * 1st pass at building the table of boot properties. This includes:
@@ -1218,7 +1340,7 @@ build_boot_properties(struct xboot_info *xbp)
 	int name_len;
 	char *value;
 	int value_len;
-	struct boot_modules *bm, *rdbm;
+	struct boot_modules *bm, *rdbm, *benv = NULL;
 	char *propbuf;
 	int quoted = 0;
 	int boot_arg_len;
@@ -1228,9 +1350,6 @@ build_boot_properties(struct xboot_info *xbp)
 	static int stdout_val = 0;
 	uchar_t boot_device;
 	char str[3];
-	multiboot_info_t *mbi;
-	int netboot;
-	struct sol_netinfo *sip;
 #endif
 
 	/*
@@ -1249,6 +1368,13 @@ build_boot_properties(struct xboot_info *xbp)
 			}
 			if (bm[i].bm_type == BMT_HASH || bm[i].bm_name == NULL)
 				continue;
+
+			if (bm[i].bm_type == BMT_ENV) {
+				if (benv == NULL)
+					benv = &bm[i];
+				else
+					continue;
+			}
 
 			(void) snprintf(modid, sizeof (modid),
 			    "module-name-%u", midx);
@@ -1276,6 +1402,19 @@ build_boot_properties(struct xboot_info *xbp)
 	if (xbp->bi_module_cnt > 1) {
 		fastreboot_disable(FBNS_BOOTMOD);
 	}
+
+#ifndef __xpv
+	/*
+	 * Disable fast reboot if we're using the Multiboot 2 boot protocol,
+	 * since we don't currently support MB2 info and module relocation.
+	 * Note that fast reboot will have already been disabled if multiple
+	 * modules are present, since the current implementation assumes that
+	 * we only have a single module, the boot_archive.
+	 */
+	if (xbp->bi_mb_version != 1) {
+		fastreboot_disable(FBNS_MULTIBOOT2);
+	}
+#endif
 
 	DBG_MSG("Parsing command line for boot properties\n");
 	value = xbp->bi_cmdline;
@@ -1470,48 +1609,83 @@ build_boot_properties(struct xboot_info *xbp)
 	bsetprops("boot-args", boot_args);
 	bsetprops("bootargs", boot_args);
 
-#ifndef __xpv
-	/*
-	 * set the BIOS boot device from GRUB
-	 */
-	netboot = 0;
-	mbi = xbp->bi_mb_info;
+	process_boot_environment(benv);
 
+#ifndef __xpv
 	/*
 	 * Build boot command line for Fast Reboot
 	 */
 	build_fastboot_cmdline(xbp);
 
-	/*
-	 * Save various boot information for Fast Reboot
-	 */
-	save_boot_info(xbp);
+	if (xbp->bi_mb_version == 1) {
+		multiboot_info_t *mbi = xbp->bi_mb_info;
+		int netboot;
+		struct sol_netinfo *sip;
 
-	if (mbi != NULL && mbi->flags & MB_INFO_BOOTDEV) {
-		boot_device = mbi->boot_device >> 24;
-		if (boot_device == 0x20)
-			netboot++;
-		str[0] = (boot_device >> 4) + '0';
-		str[1] = (boot_device & 0xf) + '0';
-		str[2] = 0;
-		bsetprops("bios-boot-device", str);
+		/*
+		 * set the BIOS boot device from GRUB
+		 */
+		netboot = 0;
+
+		/*
+		 * Save various boot information for Fast Reboot
+		 */
+		save_boot_info(xbp);
+
+		if (mbi != NULL && mbi->flags & MB_INFO_BOOTDEV) {
+			boot_device = mbi->boot_device >> 24;
+			if (boot_device == 0x20)
+				netboot++;
+			str[0] = (boot_device >> 4) + '0';
+			str[1] = (boot_device & 0xf) + '0';
+			str[2] = 0;
+			bsetprops("bios-boot-device", str);
+		} else {
+			netboot = 1;
+		}
+
+		/*
+		 * In the netboot case, drives_info is overloaded with the
+		 * dhcp ack. This is not multiboot compliant and requires
+		 * special pxegrub!
+		 */
+		if (netboot && mbi->drives_length != 0) {
+			sip = (struct sol_netinfo *)(uintptr_t)mbi->drives_addr;
+			if (sip->sn_infotype == SN_TYPE_BOOTP)
+				bsetprop("bootp-response",
+				    sizeof ("bootp-response"),
+				    (void *)(uintptr_t)mbi->drives_addr,
+				    mbi->drives_length);
+			else if (sip->sn_infotype == SN_TYPE_RARP)
+				setup_rarp_props(sip);
+		}
 	} else {
-		netboot = 1;
+		multiboot2_info_header_t *mbi = xbp->bi_mb_info;
+		multiboot_tag_bootdev_t *bootdev = NULL;
+		multiboot_tag_network_t *netdev = NULL;
+
+		if (mbi != NULL) {
+			bootdev = dboot_multiboot2_find_tag(mbi,
+			    MULTIBOOT_TAG_TYPE_BOOTDEV);
+			netdev = dboot_multiboot2_find_tag(mbi,
+			    MULTIBOOT_TAG_TYPE_NETWORK);
+		}
+		if (bootdev != NULL) {
+			DBG(bootdev->mb_biosdev);
+			boot_device = bootdev->mb_biosdev;
+			str[0] = (boot_device >> 4) + '0';
+			str[1] = (boot_device & 0xf) + '0';
+			str[2] = 0;
+			bsetprops("bios-boot-device", str);
+		}
+		if (netdev != NULL) {
+			bsetprop("bootp-response", sizeof ("bootp-response"),
+			    (void *)(uintptr_t)netdev->mb_dhcpack,
+			    netdev->mb_size -
+			    sizeof (multiboot_tag_network_t));
+		}
 	}
 
-	/*
-	 * In the netboot case, drives_info is overloaded with the dhcp ack.
-	 * This is not multiboot compliant and requires special pxegrub!
-	 */
-	if (netboot && mbi->drives_length != 0) {
-		sip = (struct sol_netinfo *)(uintptr_t)mbi->drives_addr;
-		if (sip->sn_infotype == SN_TYPE_BOOTP)
-			bsetprop("bootp-response", sizeof ("bootp-response"),
-			    (void *)(uintptr_t)mbi->drives_addr,
-			    mbi->drives_length);
-		else if (sip->sn_infotype == SN_TYPE_RARP)
-			setup_rarp_props(sip);
-	}
 	bsetprop("stdout", strlen("stdout"),
 	    &stdout_val, sizeof (stdout_val));
 #endif /* __xpv */
@@ -1530,7 +1704,7 @@ build_boot_properties(struct xboot_info *xbp)
 	/*
 	 * Build firmware-provided system properties
 	 */
-	build_firmware_properties();
+	build_firmware_properties(xbp);
 
 	/*
 	 * XXPV
@@ -1812,13 +1986,13 @@ _start(struct xboot_info *xbp)
 	}
 #endif
 
-	bcons_init((void *)xbp->bi_cmdline);
+	bcons_init(xbp);
 	have_console = 1;
 
 	/*
 	 * enable debugging
 	 */
-	if (strstr((char *)xbp->bi_cmdline, "kbm_debug"))
+	if (find_boot_prop("kbm_debug") != NULL)
 		kbm_debug = 1;
 
 	DBG_MSG("\n\n*** Entered Solaris in _start() cmdline is: ");
@@ -1897,7 +2071,7 @@ _start(struct xboot_info *xbp)
 	DBG_MSG("Initializing boot properties:\n");
 	build_boot_properties(xbp);
 
-	if (strstr((char *)xbp->bi_cmdline, "prom_debug") || kbm_debug) {
+	if (find_boot_prop("prom_debug") || kbm_debug) {
 		char *value;
 
 		value = do_bsys_alloc(NULL, NULL, MMU_PAGESIZE, MMU_PAGESIZE);
@@ -2019,8 +2193,25 @@ static ACPI_TABLE_RSDP *
 find_rsdp()
 {
 	ACPI_TABLE_RSDP *rsdp;
+	uint64_t rsdp_val = 0;
 	uint16_t *ebda_seg;
 	paddr_t  ebda_addr;
+
+	/* check for "acpi-root-tab" property */
+	if (do_bsys_getproplen(NULL, "acpi-root-tab") == sizeof (uint64_t)) {
+		(void) do_bsys_getprop(NULL, "acpi-root-tab", &rsdp_val);
+		if (rsdp_val != 0) {
+			rsdp = scan_rsdp(rsdp_val, rsdp_val + sizeof (*rsdp));
+			if (rsdp != NULL) {
+				if (kbm_debug) {
+					bop_printf(NULL,
+					    "Using RSDP from bootloader: "
+					    "0x%p\n", (void *)rsdp);
+				}
+				return (rsdp);
+			}
+		}
+	}
 
 	/*
 	 * Get the EBDA segment and scan the first 1K
@@ -2536,12 +2727,18 @@ enumerate_xen_cpus()
 }
 #endif /* __xpv */
 
+/*ARGSUSED*/
 static void
-build_firmware_properties(void)
+build_firmware_properties(struct xboot_info *xbp)
 {
 	ACPI_TABLE_HEADER *tp = NULL;
 
 #ifndef __xpv
+	if (xbp->bi_acpi_rsdp) {
+		bsetprop64("acpi-root-tab",
+		    (uint64_t)(uintptr_t)xbp->bi_acpi_rsdp);
+	}
+
 	if ((tp = find_fw_table(ACPI_SIG_MSCT)) != NULL)
 		msct_ptr = process_msct((ACPI_TABLE_MSCT *)tp);
 	else
