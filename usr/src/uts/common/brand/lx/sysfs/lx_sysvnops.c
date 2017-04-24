@@ -277,6 +277,7 @@ static lxsys_dirent_t dirlist_devices_system[] = {
 #define	LXSYS_ENDP_BLOCK_DEVICE	1
 
 #define	LXSYS_ENDP_NODE_CPULIST	1
+#define	LXSYS_ENDP_NODE_CPUMAP	2
 
 static lxsys_dirent_t dirlist_devices_virtual_net[] = {
 	{ LXSYS_ENDP_NET_ADDRESS,	"address" },
@@ -293,7 +294,8 @@ static lxsys_dirent_t dirlist_devices_zfs_block[] = {
 };
 
 static lxsys_dirent_t dirlist_devices_sysnode[] = {
-	{ LXSYS_ENDP_NODE_CPULIST,	"cpulist" }
+	{ LXSYS_ENDP_NODE_CPULIST,	"cpulist" },
+	{ LXSYS_ENDP_NODE_CPUMAP,	"cpumap" }
 };
 
 #define	SYSDIRLISTSZ(l)	(sizeof (l) / sizeof ((l)[0]))
@@ -1092,20 +1094,71 @@ lxsys_read_devices_zfs_block(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 	return (EIO);
 }
 
+/*
+ * In the Linux src tree, see ABI/stable/sysfs-devices-node.
+ *
+ * For the 'cpumap' file, each CPU is treated as a bit, then those are
+ * accumulated and printed as a hex digit, with CPU0 as the rightmost bit.
+ * Each set of 8 digits (i.e. 32 CPUs) is then delimited with a comma.
+ * Since we are emulating a single NUMA group, all of our CPUs will be listed
+ * in this file. For example, a 48 CPU system would look like:
+ *     00000000,00000000,00000000,00000000,00000000,00000000,0000ffff,ffffffff
+ * It comes out this way because 'kernel_max' is NCPU, which is currently
+ * defined to be 256.
+ */
 static int
 lxsys_read_devices_sysnode(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 {
-	if (lnp->lxsys_instance == 1 &&
-	    lnp->lxsys_endpoint == LXSYS_ENDP_NODE_CPULIST) {
-		/* Show the range of CPUs */
+	if (lnp->lxsys_instance == 1) {
 		char outbuf[256];
 
-		lxsys_format_cpu(outbuf, sizeof (outbuf), LXSYS_CPU_ANY);
+		if (lnp->lxsys_endpoint == LXSYS_ENDP_NODE_CPULIST) {
+			/* Show the range of CPUs */
+			lxsys_format_cpu(outbuf, sizeof (outbuf),
+			    LXSYS_CPU_ANY);
+		} else if (lnp->lxsys_endpoint == LXSYS_ENDP_NODE_CPUMAP) {
+			int i;
+			uint_t j, ndigits;
+			cpuset_t *avail;	/* all installed CPUs */
+
+			avail = cpuset_alloc(KM_SLEEP);
+			cpuset_all(avail);
+
+			/* Take a snapshot of the available set */
+			mutex_enter(&cpu_lock);
+			cpuset_and(avail, &cpu_available);
+			mutex_exit(&cpu_lock);
+
+			outbuf[0] = '\0';
+			ndigits = 0;
+			for (i = NCPU - 1; i >= 0; i -= 4) {
+				char buf[8];
+				int cnt = 3;
+				uint_t digit = 0;
+
+				for (j = i; cnt >= 0; j--, cnt--) {
+					if (cpu_in_set(avail, j))
+						digit |= 1 << cnt;
+				}
+				(void) snprintf(buf, sizeof (buf), "%x", digit);
+				if (ndigits == 8) {
+					(void) strlcat(outbuf, ",",
+					    sizeof (outbuf));
+					ndigits = 0;
+				}
+				(void) strlcat(outbuf, buf, sizeof (outbuf));
+				ndigits++;
+			}
+
+			cpuset_free(avail);
+		} else {
+			return (EISDIR);
+		}
+
 		lxsys_uiobuf_printf(luio, "%s\n", outbuf);
 		return (0);
 	}
 	return (EISDIR);
-
 }
 
 static void
@@ -1242,6 +1295,7 @@ lxsys_read_devices_syscpu(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 	return (EISDIR);
 }
 
+/* ARGSUSED */
 static int
 lxsys_read_static(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 {
