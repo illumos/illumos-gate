@@ -1268,7 +1268,7 @@ lxsys_read_devices_syscpu(lxsys_node_t *lnp, lxsys_uiobuf_t *luio)
 	 * see the Documentaion/cputopology.txt file in the Linux src tree.
 	 */
 	if (inst == LXSYS_INST_DEV_SYSCPU_KMAX) {
-		lxsys_uiobuf_printf(luio, "%d\n", NCPU);
+		lxsys_uiobuf_printf(luio, "%d\n", NCPU - 1);
 		return (0);
 	}
 
