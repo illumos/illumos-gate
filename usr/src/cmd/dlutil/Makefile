@@ -13,7 +13,7 @@
 # Copyright (c) 2017, Joyent, Inc.
 #
 
-PROG= dltraninfo dlsend dlrecv
+PROG= dltraninfo dlsend dlrecv dlled
 
 include ../Makefile.cmd
 
@@ -21,6 +21,7 @@ ROOTCMDDIR = $(ROOTLIB)/dl
 CFLAGS += $(CCVERBOSE)
 
 dltraninfo :=	LDLIBS += -ldladm
+dlled :=	LDLIBS += -ldladm
 dlsend :=	LDLIBS += -ldlpi -lsocket -lmd
 dlrecv :=	LDLIBS += -ldlpi
 
