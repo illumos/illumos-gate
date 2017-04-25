@@ -25,13 +25,11 @@
  */
 /*
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
- * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_ZIO_COMPRESS_H
 #define	_SYS_ZIO_COMPRESS_H
-
-#include <sys/abd.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -63,22 +61,15 @@ typedef size_t zio_compress_func_t(void *src, void *dst,
 /* Common signature for all zio decompress functions. */
 typedef int zio_decompress_func_t(void *src, void *dst,
     size_t s_len, size_t d_len, int);
-/*
- * Common signature for all zio decompress functions using an ABD as input.
- * This is helpful if you have both compressed ARC and scatter ABDs enabled,
- * but is not a requirement for all compression algorithms.
- */
-typedef int zio_decompress_abd_func_t(abd_t *src, void *dst,
-    size_t s_len, size_t d_len, int);
 
 /*
  * Information about each compression function.
  */
 typedef struct zio_compress_info {
-	char				*ci_name;
-	int				ci_level;
-	zio_compress_func_t		*ci_compress;
-	zio_decompress_func_t		*ci_decompress;
+	zio_compress_func_t	*ci_compress;	/* compression function */
+	zio_decompress_func_t	*ci_decompress;	/* decompression function */
+	int			ci_level;	/* level parameter */
+	char			*ci_name;	/* algorithm name */
 } zio_compress_info_t;
 
 extern zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS];
@@ -106,11 +97,9 @@ extern int lz4_decompress(void *src, void *dst, size_t s_len, size_t d_len,
 /*
  * Compress and decompress data if necessary.
  */
-extern size_t zio_compress_data(enum zio_compress c, abd_t *src, void *dst,
+extern size_t zio_compress_data(enum zio_compress c, void *src, void *dst,
     size_t s_len);
-extern int zio_decompress_data(enum zio_compress c, abd_t *src, void *dst,
-    size_t s_len, size_t d_len);
-extern int zio_decompress_data_buf(enum zio_compress c, void *src, void *dst,
+extern int zio_decompress_data(enum zio_compress c, void *src, void *dst,
     size_t s_len, size_t d_len);
 
 #ifdef	__cplusplus

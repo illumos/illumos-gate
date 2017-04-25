@@ -145,7 +145,6 @@
 #include <sys/metaslab.h>
 #include <sys/zio.h>
 #include <sys/dsl_scan.h>
-#include <sys/abd.h>
 #include <sys/fs/zfs.h>
 
 /*
@@ -179,7 +178,7 @@ vdev_label_number(uint64_t psize, uint64_t offset)
 }
 
 static void
-vdev_label_read(zio_t *zio, vdev_t *vd, int l, abd_t *buf, uint64_t offset,
+vdev_label_read(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
     uint64_t size, zio_done_func_t *done, void *private, int flags)
 {
 	ASSERT(spa_config_held(zio->io_spa, SCL_STATE_ALL, RW_WRITER) ==
@@ -193,7 +192,7 @@ vdev_label_read(zio_t *zio, vdev_t *vd, int l, abd_t *buf, uint64_t offset,
 }
 
 static void
-vdev_label_write(zio_t *zio, vdev_t *vd, int l, abd_t *buf, uint64_t offset,
+vdev_label_write(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
     uint64_t size, zio_done_func_t *done, void *private, int flags)
 {
 	ASSERT(spa_config_held(zio->io_spa, SCL_ALL, RW_WRITER) == SCL_ALL ||
@@ -445,7 +444,6 @@ vdev_label_read_config(vdev_t *vd, uint64_t txg)
 	spa_t *spa = vd->vdev_spa;
 	nvlist_t *config = NULL;
 	vdev_phys_t *vp;
-	abd_t *vp_abd;
 	zio_t *zio;
 	uint64_t best_txg = 0;
 	int error = 0;
@@ -457,8 +455,7 @@ vdev_label_read_config(vdev_t *vd, uint64_t txg)
 	if (!vdev_readable(vd))
 		return (NULL);
 
-	vp_abd = abd_alloc_linear(sizeof (vdev_phys_t), B_TRUE);
-	vp = abd_to_buf(vp_abd);
+	vp = zio_buf_alloc(sizeof (vdev_phys_t));
 
 retry:
 	for (int l = 0; l < VDEV_LABELS; l++) {
@@ -466,7 +463,7 @@ retry:
 
 		zio = zio_root(spa, NULL, NULL, flags);
 
-		vdev_label_read(zio, vd, l, vp_abd,
+		vdev_label_read(zio, vd, l, vp,
 		    offsetof(vdev_label_t, vl_vdev_phys),
 		    sizeof (vdev_phys_t), NULL, NULL, flags);
 
@@ -505,7 +502,7 @@ retry:
 		goto retry;
 	}
 
-	abd_free(vp_abd);
+	zio_buf_free(vp, sizeof (vdev_phys_t));
 
 	return (config);
 }
@@ -639,10 +636,8 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	spa_t *spa = vd->vdev_spa;
 	nvlist_t *label;
 	vdev_phys_t *vp;
-	abd_t *vp_abd;
-	abd_t *pad2;
+	char *pad2;
 	uberblock_t *ub;
-	abd_t *ub_abd;
 	zio_t *zio;
 	char *buf;
 	size_t buflen;
@@ -724,9 +719,8 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	/*
 	 * Initialize its label.
 	 */
-	vp_abd = abd_alloc_linear(sizeof (vdev_phys_t), B_TRUE);
-	abd_zero(vp_abd, sizeof (vdev_phys_t));
-	vp = abd_to_buf(vp_abd);
+	vp = zio_buf_alloc(sizeof (vdev_phys_t));
+	bzero(vp, sizeof (vdev_phys_t));
 
 	/*
 	 * Generate a label describing the pool and our top-level vdev.
@@ -786,7 +780,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	error = nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP);
 	if (error != 0) {
 		nvlist_free(label);
-		abd_free(vp_abd);
+		zio_buf_free(vp, sizeof (vdev_phys_t));
 		/* EFAULT means nvlist_pack ran out of room */
 		return (error == EFAULT ? ENAMETOOLONG : EINVAL);
 	}
@@ -794,15 +788,14 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	/*
 	 * Initialize uberblock template.
 	 */
-	ub_abd = abd_alloc_linear(VDEV_UBERBLOCK_RING, B_TRUE);
-	abd_zero(ub_abd, VDEV_UBERBLOCK_RING);
-	abd_copy_from_buf(ub_abd, &spa->spa_uberblock, sizeof (uberblock_t));
-	ub = abd_to_buf(ub_abd);
+	ub = zio_buf_alloc(VDEV_UBERBLOCK_RING);
+	bzero(ub, VDEV_UBERBLOCK_RING);
+	*ub = spa->spa_uberblock;
 	ub->ub_txg = 0;
 
 	/* Initialize the 2nd padding area. */
-	pad2 = abd_alloc_for_io(VDEV_PAD_SIZE, B_TRUE);
-	abd_zero(pad2, VDEV_PAD_SIZE);
+	pad2 = zio_buf_alloc(VDEV_PAD_SIZE);
+	bzero(pad2, VDEV_PAD_SIZE);
 
 	/*
 	 * Write everything in parallel.
@@ -812,7 +805,7 @@ retry:
 
 	for (int l = 0; l < VDEV_LABELS; l++) {
 
-		vdev_label_write(zio, vd, l, vp_abd,
+		vdev_label_write(zio, vd, l, vp,
 		    offsetof(vdev_label_t, vl_vdev_phys),
 		    sizeof (vdev_phys_t), NULL, NULL, flags);
 
@@ -825,7 +818,7 @@ retry:
 		    offsetof(vdev_label_t, vl_pad2),
 		    VDEV_PAD_SIZE, NULL, NULL, flags);
 
-		vdev_label_write(zio, vd, l, ub_abd,
+		vdev_label_write(zio, vd, l, ub,
 		    offsetof(vdev_label_t, vl_uberblock),
 		    VDEV_UBERBLOCK_RING, NULL, NULL, flags);
 	}
@@ -838,9 +831,9 @@ retry:
 	}
 
 	nvlist_free(label);
-	abd_free(pad2);
-	abd_free(ub_abd);
-	abd_free(vp_abd);
+	zio_buf_free(pad2, VDEV_PAD_SIZE);
+	zio_buf_free(ub, VDEV_UBERBLOCK_RING);
+	zio_buf_free(vp, sizeof (vdev_phys_t));
 
 	/*
 	 * If this vdev hasn't been previously identified as a spare, then we
@@ -904,7 +897,7 @@ vdev_uberblock_load_done(zio_t *zio)
 	vdev_t *vd = zio->io_vd;
 	spa_t *spa = zio->io_spa;
 	zio_t *rio = zio->io_private;
-	uberblock_t *ub = abd_to_buf(zio->io_abd);
+	uberblock_t *ub = zio->io_data;
 	struct ubl_cbdata *cbp = rio->io_private;
 
 	ASSERT3U(zio->io_size, ==, VDEV_UBERBLOCK_SIZE(vd));
@@ -925,7 +918,7 @@ vdev_uberblock_load_done(zio_t *zio)
 		mutex_exit(&rio->io_lock);
 	}
 
-	abd_free(zio->io_abd);
+	zio_buf_free(zio->io_data, zio->io_size);
 }
 
 static void
@@ -939,8 +932,8 @@ vdev_uberblock_load_impl(zio_t *zio, vdev_t *vd, int flags,
 		for (int l = 0; l < VDEV_LABELS; l++) {
 			for (int n = 0; n < VDEV_UBERBLOCK_COUNT(vd); n++) {
 				vdev_label_read(zio, vd, l,
-				    abd_alloc_linear(VDEV_UBERBLOCK_SIZE(vd),
-				    B_TRUE), VDEV_UBERBLOCK_OFFSET(vd, n),
+				    zio_buf_alloc(VDEV_UBERBLOCK_SIZE(vd)),
+				    VDEV_UBERBLOCK_OFFSET(vd, n),
 				    VDEV_UBERBLOCK_SIZE(vd),
 				    vdev_uberblock_load_done, zio, flags);
 			}
@@ -1007,6 +1000,9 @@ vdev_uberblock_sync_done(zio_t *zio)
 static void
 vdev_uberblock_sync(zio_t *zio, uberblock_t *ub, vdev_t *vd, int flags)
 {
+	uberblock_t *ubbuf;
+	int n;
+
 	for (int c = 0; c < vd->vdev_children; c++)
 		vdev_uberblock_sync(zio, ub, vd->vdev_child[c], flags);
 
@@ -1016,20 +1012,19 @@ vdev_uberblock_sync(zio_t *zio, uberblock_t *ub, vdev_t *vd, int flags)
 	if (!vdev_writeable(vd))
 		return;
 
-	int n = ub->ub_txg & (VDEV_UBERBLOCK_COUNT(vd) - 1);
+	n = ub->ub_txg & (VDEV_UBERBLOCK_COUNT(vd) - 1);
 
-	/* Copy the uberblock_t into the ABD */
-	abd_t *ub_abd = abd_alloc_for_io(VDEV_UBERBLOCK_SIZE(vd), B_TRUE);
-	abd_zero(ub_abd, VDEV_UBERBLOCK_SIZE(vd));
-	abd_copy_from_buf(ub_abd, ub, sizeof (uberblock_t));
+	ubbuf = zio_buf_alloc(VDEV_UBERBLOCK_SIZE(vd));
+	bzero(ubbuf, VDEV_UBERBLOCK_SIZE(vd));
+	*ubbuf = *ub;
 
 	for (int l = 0; l < VDEV_LABELS; l++)
-		vdev_label_write(zio, vd, l, ub_abd,
+		vdev_label_write(zio, vd, l, ubbuf,
 		    VDEV_UBERBLOCK_OFFSET(vd, n), VDEV_UBERBLOCK_SIZE(vd),
 		    vdev_uberblock_sync_done, zio->io_private,
 		    flags | ZIO_FLAG_DONT_PROPAGATE);
 
-	abd_free(ub_abd);
+	zio_buf_free(ubbuf, VDEV_UBERBLOCK_SIZE(vd));
 }
 
 /* Sync the uberblocks to all vdevs in svd[] */
@@ -1105,7 +1100,6 @@ vdev_label_sync(zio_t *zio, vdev_t *vd, int l, uint64_t txg, int flags)
 {
 	nvlist_t *label;
 	vdev_phys_t *vp;
-	abd_t *vp_abd;
 	char *buf;
 	size_t buflen;
 
@@ -1123,16 +1117,15 @@ vdev_label_sync(zio_t *zio, vdev_t *vd, int l, uint64_t txg, int flags)
 	 */
 	label = spa_config_generate(vd->vdev_spa, vd, txg, B_FALSE);
 
-	vp_abd = abd_alloc_linear(sizeof (vdev_phys_t), B_TRUE);
-	abd_zero(vp_abd, sizeof (vdev_phys_t));
-	vp = abd_to_buf(vp_abd);
+	vp = zio_buf_alloc(sizeof (vdev_phys_t));
+	bzero(vp, sizeof (vdev_phys_t));
 
 	buf = vp->vp_nvlist;
 	buflen = sizeof (vp->vp_nvlist);
 
 	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP) == 0) {
 		for (; l < VDEV_LABELS; l += 2) {
-			vdev_label_write(zio, vd, l, vp_abd,
+			vdev_label_write(zio, vd, l, vp,
 			    offsetof(vdev_label_t, vl_vdev_phys),
 			    sizeof (vdev_phys_t),
 			    vdev_label_sync_done, zio->io_private,
@@ -1140,7 +1133,7 @@ vdev_label_sync(zio_t *zio, vdev_t *vd, int l, uint64_t txg, int flags)
 		}
 	}
 
-	abd_free(vp_abd);
+	zio_buf_free(vp, sizeof (vdev_phys_t));
 	nvlist_free(label);
 }
 

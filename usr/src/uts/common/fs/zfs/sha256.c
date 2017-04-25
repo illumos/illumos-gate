@@ -24,39 +24,29 @@
  */
 /*
  * Copyright 2013 Saso Kiselkov. All rights reserved.
- * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 #include <sys/zfs_context.h>
 #include <sys/zio.h>
 #include <sys/sha2.h>
-#include <sys/abd.h>
-
-static int
-sha_incremental(void *buf, size_t size, void *arg)
-{
-	SHA2_CTX *ctx = arg;
-	SHA2Update(ctx, buf, size);
-	return (0);
-}
 
 /*ARGSUSED*/
 void
-abd_checksum_SHA256(abd_t *abd, uint64_t size,
+zio_checksum_SHA256(const void *buf, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
 	SHA2_CTX ctx;
 	zio_cksum_t tmp;
 
 	SHA2Init(SHA256, &ctx);
-	(void) abd_iterate_func(abd, 0, size, sha_incremental, &ctx);
+	SHA2Update(&ctx, buf, size);
 	SHA2Final(&tmp, &ctx);
 
 	/*
 	 * A prior implementation of this function had a
 	 * private SHA256 implementation always wrote things out in
 	 * Big Endian and there wasn't a byteswap variant of it.
-	 * To preserve on disk compatibility we need to force that
-	 * behavior.
+	 * To preseve on disk compatibility we need to force that
+	 * behaviour.
 	 */
 	zcp->zc_word[0] = BE_64(tmp.zc_word[0]);
 	zcp->zc_word[1] = BE_64(tmp.zc_word[1]);
@@ -66,24 +56,24 @@ abd_checksum_SHA256(abd_t *abd, uint64_t size,
 
 /*ARGSUSED*/
 void
-abd_checksum_SHA512_native(abd_t *abd, uint64_t size,
+zio_checksum_SHA512_native(const void *buf, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
 	SHA2_CTX	ctx;
 
 	SHA2Init(SHA512_256, &ctx);
-	(void) abd_iterate_func(abd, 0, size, sha_incremental, &ctx);
+	SHA2Update(&ctx, buf, size);
 	SHA2Final(zcp, &ctx);
 }
 
 /*ARGSUSED*/
 void
-abd_checksum_SHA512_byteswap(abd_t *abd, uint64_t size,
+zio_checksum_SHA512_byteswap(const void *buf, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
 	zio_cksum_t	tmp;
 
-	abd_checksum_SHA512_native(abd, size, ctx_template, &tmp);
+	zio_checksum_SHA512_native(buf, size, ctx_template, &tmp);
 	zcp->zc_word[0] = BSWAP_64(tmp.zc_word[0]);
 	zcp->zc_word[1] = BSWAP_64(tmp.zc_word[1]);
 	zcp->zc_word[2] = BSWAP_64(tmp.zc_word[2]);

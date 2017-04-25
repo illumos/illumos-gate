@@ -111,7 +111,6 @@
 #include <sys/refcount.h>
 #include <sys/zfeature.h>
 #include <sys/dsl_userhold.h>
-#include <sys/abd.h>
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -189,7 +188,6 @@ extern uint64_t metaslab_df_alloc_threshold;
 extern uint64_t zfs_deadman_synctime_ms;
 extern int metaslab_preload_limit;
 extern boolean_t zfs_compressed_arc_enabled;
-extern boolean_t zfs_abd_scatter_enabled;
 
 static ztest_shared_opts_t *ztest_shared_opts;
 static ztest_shared_opts_t ztest_opts;
@@ -5053,7 +5051,7 @@ ztest_ddt_repair(ztest_ds_t *zd, uint64_t id)
 	enum zio_checksum checksum = spa_dedup_checksum(spa);
 	dmu_buf_t *db;
 	dmu_tx_t *tx;
-	abd_t *abd;
+	void *buf;
 	blkptr_t blk;
 	int copies = 2 * ZIO_DEDUPDITTO_MIN;
 
@@ -5133,14 +5131,14 @@ ztest_ddt_repair(ztest_ds_t *zd, uint64_t id)
 	 * Damage the block.  Dedup-ditto will save us when we read it later.
 	 */
 	psize = BP_GET_PSIZE(&blk);
-	abd = abd_alloc_linear(psize, B_TRUE);
-	ztest_pattern_set(abd_to_buf(abd), psize, ~pattern);
+	buf = zio_buf_alloc(psize);
+	ztest_pattern_set(buf, psize, ~pattern);
 
 	(void) zio_wait(zio_rewrite(NULL, spa, 0, &blk,
-	    abd, psize, NULL, NULL, ZIO_PRIORITY_SYNC_WRITE,
+	    buf, psize, NULL, NULL, ZIO_PRIORITY_SYNC_WRITE,
 	    ZIO_FLAG_CANFAIL | ZIO_FLAG_INDUCE_DAMAGE, NULL));
 
-	abd_free(abd);
+	zio_buf_free(buf, psize);
 
 	(void) rw_unlock(&ztest_name_lock);
 }
@@ -5423,12 +5421,6 @@ ztest_resume_thread(void *arg)
 		 */
 		if (ztest_random(10) == 0)
 			zfs_compressed_arc_enabled = ztest_random(2);
-
-		/*
-		 * Periodically change the zfs_abd_scatter_enabled setting.
-		 */
-		if (ztest_random(10) == 0)
-			zfs_abd_scatter_enabled = ztest_random(2);
 	}
 	return (NULL);
 }

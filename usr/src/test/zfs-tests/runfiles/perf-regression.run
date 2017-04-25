@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2015 by Delphix. All rights reserved.
 #
 
 [DEFAULT]
@@ -24,7 +24,7 @@ post = cleanup
 outputdir = /var/tmp/test_results
 
 [/opt/zfs-tests/tests/perf/regression]
-tests = ['sequential_writes', 'sequential_reads', 'sequential_reads_arc_cached',
-    'sequential_reads_arc_cached_clone', 'sequential_reads_dbuf_cached',
-    'random_reads', 'random_writes', 'random_readwrite']
+tests = ['sequential_writes', 'sequential_reads', 'sequential_reads_cached',
+    'sequential_reads_cached_clone', 'random_reads', 'random_writes',
+    'random_readwrite']
 post =

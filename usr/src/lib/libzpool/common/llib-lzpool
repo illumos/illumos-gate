@@ -61,7 +61,6 @@
 #include <sys/dsl_destroy.h>
 #include <sys/dsl_userhold.h>
 #include <sys/blkptr.h>
-#include <sys/abd.h>
 
 extern uint64_t metaslab_gang_bang;
 extern uint64_t metaslab_df_alloc_threshold;
@@ -69,4 +68,3 @@ extern boolean_t zfeature_checks_disable;
 extern uint64_t zfs_deadman_synctime_ms;
 extern int metaslab_preload_limit;
 extern boolean_t zfs_compressed_arc_enabled;
-extern boolean_t zfs_abd_scatter_enabled;
