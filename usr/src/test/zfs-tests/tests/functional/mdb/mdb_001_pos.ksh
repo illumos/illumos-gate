@@ -49,51 +49,26 @@ function cleanup
 verify_runnable "global"
 log_onexit cleanup
 
-tmpfile=$(mktemp)
-log_must zpool scrub $TESTPOOL
-
-typeset spa=$(mdb -ke "::spa" | awk "/$TESTPOOL/ {print \$1}")
-typeset off_ub=$(mdb -ke "::offsetof spa_t spa_uberblock | =J")
-typeset off_rbp=$(mdb -ke "::offsetof uberblock_t ub_rootbp | =J")
-typeset bp=$(mdb -ke "$spa + $off_ub + $off_rbp =J")
-
-# dcmds and walkers skipped due to being DEBUG only or difficult to run:
-# ::zfs_params
-# ::refcount
-
-set -A dcmds "::abuf_find 1 2" \
-	"::arc" \
-	"::arc -b" \
-	"::arc_compression_stats" \
-	"$bp ::blkptr" \
-	"$bp ::dva" \
-	"::walk spa" \
-	"::spa" \
-	"$spa ::spa " \
-	"$spa ::spa -c" \
-	"$spa ::spa -h" \
-	"$spa ::spa -v" \
-	"$spa ::spa -Mmh" \
-	"$spa ::spa_config" \
-	"$spa ::spa_space" \
-	"$spa ::spa_space -b" \
-	"$spa ::spa_vdevs" \
-	"$spa ::print spa_t spa_root_vdev | ::vdev" \
-	"$spa ::print spa_t spa_root_vdev | ::vdev -re" \
-	"$spa ::print -a spa_t spa_dsl_pool->dp_dirty_datasets | ::walk txg_list" \
-	"$spa ::print -a spa_t spa_uberblock.ub_rootbp | ::blkptr" \
-	"$spa ::walk metaslab" \
-	"$spa ::walk metaslab | ::head -1 | ::metaslab_weight" \
-	"$spa ::walk metaslab | ::head -1 | ::metaslab_trace" \
-	"$spa ::walk zio_root | ::zio -c" \
-	"$spa ::walk zio_root | ::zio -r" \
-	"$spa ::walk zms_freelist"
-	"$spa ::zfs_blkstats -v" \
+OUTFILE='/var/tmp/mdb-outfile'
+set -A dcmds "::walk spa" \
+	"::walk spa | ::spa " \
+	"::walk spa | ::spa -c" \
+	"::walk spa | ::spa -v" \
+	"::walk spa | ::spa_config" \
+	"::walk spa | ::spa_space" \
+	"::walk spa | ::spa_space -b" \
+	"::walk spa | ::spa_vdevs" \
+	"::walk spa | ::walk metaslab" \
+	"::walk spa | ::print struct spa spa_root_vdev | ::vdev" \
+	"::walk spa | ::print struct spa spa_root_vdev | ::vdev -re" \
 	"::dbufs" \
 	"::dbufs -n mos -o mdn -l 0 -b 0" \
 	"::dbufs | ::dbuf" \
 	"::dbuf_stats" \
-	"dbuf_cache ::walk multilist"
+	"::abuf_find 1 2" \
+        "::walk spa | ::print -a struct spa spa_uberblock.ub_rootbp | ::blkptr" \
+        "::walk spa | ::print -a struct spa spa_dsl_pool->dp_dirty_datasets | ::walk txg_list" \
+        "::walk spa | ::walk zms_freelist"
 #
 # The commands above were supplied by the ZFS development team. The idea is to
 # do as much checking as possible without the need to hardcode addresses.

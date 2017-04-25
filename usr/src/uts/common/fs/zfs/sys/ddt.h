@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_DDT_H
@@ -35,8 +34,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-struct abd;
 
 /*
  * On-disk DDT formats, in the desired search order (newest version first).
@@ -111,7 +108,7 @@ struct ddt_entry {
 	ddt_key_t	dde_key;
 	ddt_phys_t	dde_phys[DDT_PHYS_TYPES];
 	zio_t		*dde_lead_zio[DDT_PHYS_TYPES];
-	struct abd	*dde_repair_abd;
+	void		*dde_repair_data;
 	enum ddt_type	dde_type;
 	enum ddt_class	dde_class;
 	uint8_t		dde_loading;

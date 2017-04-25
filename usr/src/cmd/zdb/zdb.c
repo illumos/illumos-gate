@@ -60,7 +60,6 @@
 #include <sys/arc.h>
 #include <sys/ddt.h>
 #include <sys/zfeature.h>
-#include <sys/abd.h>
 #include <zfs_comutil.h>
 #undef verify
 #include <libzfs.h>
@@ -2538,7 +2537,7 @@ zdb_blkptr_done(zio_t *zio)
 	zdb_cb_t *zcb = zio->io_private;
 	zbookmark_phys_t *zb = &zio->io_bookmark;
 
-	abd_free(zio->io_abd);
+	zio_data_buf_free(zio->io_data, zio->io_size);
 
 	mutex_enter(&spa->spa_scrub_lock);
 	spa->spa_scrub_inflight--;
@@ -2604,7 +2603,7 @@ zdb_blkptr_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	if (!BP_IS_EMBEDDED(bp) &&
 	    (dump_opt['c'] > 1 || (dump_opt['c'] && is_metadata))) {
 		size_t size = BP_GET_PSIZE(bp);
-		abd_t *abd = abd_alloc(size, B_FALSE);
+		void *data = zio_data_buf_alloc(size);
 		int flags = ZIO_FLAG_CANFAIL | ZIO_FLAG_SCRUB | ZIO_FLAG_RAW;
 
 		/* If it's an intent log block, failure is expected. */
@@ -2617,7 +2616,7 @@ zdb_blkptr_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		spa->spa_scrub_inflight++;
 		mutex_exit(&spa->spa_scrub_lock);
 
-		zio_nowait(zio_read(NULL, spa, bp, abd, size,
+		zio_nowait(zio_read(NULL, spa, bp, data, size,
 		    zdb_blkptr_done, zcb, ZIO_PRIORITY_ASYNC_READ, flags, zb));
 	}
 
@@ -3398,13 +3397,6 @@ name:
 	return (NULL);
 }
 
-/* ARGSUSED */
-static int
-random_get_pseudo_bytes_cb(void *buf, size_t len, void *unused)
-{
-	return (random_get_pseudo_bytes(buf, len));
-}
-
 /*
  * Read a block from a pool and print it out.  The syntax of the
  * block descriptor is:
@@ -3436,8 +3428,7 @@ zdb_read_block(char *thing, spa_t *spa)
 	uint64_t offset = 0, size = 0, psize = 0, lsize = 0, blkptr_offset = 0;
 	zio_t *zio;
 	vdev_t *vd;
-	abd_t *pabd;
-	void *lbuf, *buf;
+	void *pbuf, *lbuf, *buf;
 	char *s, *p, *dup, *vdev, *flagstr;
 	int i, error;
 
@@ -3508,7 +3499,7 @@ zdb_read_block(char *thing, spa_t *spa)
 	psize = size;
 	lsize = size;
 
-	pabd = abd_alloc_linear(SPA_MAXBLOCKSIZE, B_FALSE);
+	pbuf = umem_alloc(SPA_MAXBLOCKSIZE, UMEM_NOFAIL);
 	lbuf = umem_alloc(SPA_MAXBLOCKSIZE, UMEM_NOFAIL);
 
 	BP_ZERO(bp);
@@ -3536,15 +3527,15 @@ zdb_read_block(char *thing, spa_t *spa)
 		/*
 		 * Treat this as a normal block read.
 		 */
-		zio_nowait(zio_read(zio, spa, bp, pabd, psize, NULL, NULL,
+		zio_nowait(zio_read(zio, spa, bp, pbuf, psize, NULL, NULL,
 		    ZIO_PRIORITY_SYNC_READ,
 		    ZIO_FLAG_CANFAIL | ZIO_FLAG_RAW, NULL));
 	} else {
 		/*
 		 * Treat this as a vdev child I/O.
 		 */
-		zio_nowait(zio_vdev_child_io(zio, bp, vd, offset, pabd,
-		    psize, ZIO_TYPE_READ, ZIO_PRIORITY_SYNC_READ,
+		zio_nowait(zio_vdev_child_io(zio, bp, vd, offset, pbuf, psize,
+		    ZIO_TYPE_READ, ZIO_PRIORITY_SYNC_READ,
 		    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_QUEUE |
 		    ZIO_FLAG_DONT_PROPAGATE | ZIO_FLAG_DONT_RETRY |
 		    ZIO_FLAG_CANFAIL | ZIO_FLAG_RAW, NULL, NULL));
@@ -3567,21 +3558,21 @@ zdb_read_block(char *thing, spa_t *spa)
 		void *pbuf2 = umem_alloc(SPA_MAXBLOCKSIZE, UMEM_NOFAIL);
 		void *lbuf2 = umem_alloc(SPA_MAXBLOCKSIZE, UMEM_NOFAIL);
 
-		abd_copy_to_buf(pbuf2, pabd, psize);
+		bcopy(pbuf, pbuf2, psize);
 
-		VERIFY0(abd_iterate_func(pabd, psize, SPA_MAXBLOCKSIZE - psize,
-		    random_get_pseudo_bytes_cb, NULL));
+		VERIFY(random_get_pseudo_bytes((uint8_t *)pbuf + psize,
+		    SPA_MAXBLOCKSIZE - psize) == 0);
 
-		VERIFY0(random_get_pseudo_bytes((uint8_t *)pbuf2 + psize,
-		    SPA_MAXBLOCKSIZE - psize));
+		VERIFY(random_get_pseudo_bytes((uint8_t *)pbuf2 + psize,
+		    SPA_MAXBLOCKSIZE - psize) == 0);
 
 		for (lsize = SPA_MAXBLOCKSIZE; lsize > psize;
 		    lsize -= SPA_MINBLOCKSIZE) {
 			for (c = 0; c < ZIO_COMPRESS_FUNCTIONS; c++) {
-				if (zio_decompress_data(c, pabd,
-				    lbuf, psize, lsize) == 0 &&
-				    zio_decompress_data_buf(c, pbuf2,
-				    lbuf2, psize, lsize) == 0 &&
+				if (zio_decompress_data(c, pbuf, lbuf,
+				    psize, lsize) == 0 &&
+				    zio_decompress_data(c, pbuf2, lbuf2,
+				    psize, lsize) == 0 &&
 				    bcmp(lbuf, lbuf2, lsize) == 0)
 					break;
 			}
@@ -3600,7 +3591,7 @@ zdb_read_block(char *thing, spa_t *spa)
 		buf = lbuf;
 		size = lsize;
 	} else {
-		buf = abd_to_buf(pabd);
+		buf = pbuf;
 		size = psize;
 	}
 
@@ -3618,7 +3609,7 @@ zdb_read_block(char *thing, spa_t *spa)
 		zdb_dump_block(thing, buf, size, flags);
 
 out:
-	abd_free(pabd);
+	umem_free(pbuf, SPA_MAXBLOCKSIZE);
 	umem_free(lbuf, SPA_MAXBLOCKSIZE);
 	free(dup);
 }

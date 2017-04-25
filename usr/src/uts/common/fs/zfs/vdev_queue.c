@@ -35,7 +35,6 @@
 #include <sys/avl.h>
 #include <sys/dsl_pool.h>
 #include <sys/metaslab_impl.h>
-#include <sys/abd.h>
 
 /*
  * ZFS I/O Scheduler
@@ -372,12 +371,12 @@ vdev_queue_agg_io_done(zio_t *aio)
 		zio_t *pio;
 		zio_link_t *zl = NULL;
 		while ((pio = zio_walk_parents(aio, &zl)) != NULL) {
-			abd_copy_off(pio->io_abd, aio->io_abd,
-			    0, pio->io_offset - aio->io_offset, pio->io_size);
+			bcopy((char *)aio->io_data + (pio->io_offset -
+			    aio->io_offset), pio->io_data, pio->io_size);
 		}
 	}
 
-	abd_free(aio->io_abd);
+	zio_buf_free(aio->io_data, aio->io_size);
 }
 
 static int
@@ -612,8 +611,8 @@ vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 	ASSERT3U(size, <=, zfs_vdev_aggregation_limit);
 
 	aio = zio_vdev_delegated_io(first->io_vd, first->io_offset,
-	    abd_alloc_for_io(size, B_TRUE), size, first->io_type,
-	    zio->io_priority, flags | ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_QUEUE,
+	    zio_buf_alloc(size), size, first->io_type, zio->io_priority,
+	    flags | ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_QUEUE,
 	    vdev_queue_agg_io_done, NULL);
 	aio->io_timestamp = first->io_timestamp;
 
@@ -625,11 +624,12 @@ vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 
 		if (dio->io_flags & ZIO_FLAG_NODATA) {
 			ASSERT3U(dio->io_type, ==, ZIO_TYPE_WRITE);
-			abd_zero_off(aio->io_abd,
-			    dio->io_offset - aio->io_offset, dio->io_size);
+			bzero((char *)aio->io_data + (dio->io_offset -
+			    aio->io_offset), dio->io_size);
 		} else if (dio->io_type == ZIO_TYPE_WRITE) {
-			abd_copy_off(aio->io_abd, dio->io_abd,
-			    dio->io_offset - aio->io_offset, 0, dio->io_size);
+			bcopy(dio->io_data, (char *)aio->io_data +
+			    (dio->io_offset - aio->io_offset),
+			    dio->io_size);
 		}
 
 		zio_add_child(dio, aio);

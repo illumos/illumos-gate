@@ -69,9 +69,8 @@ log_must fio $FIO_SCRIPTS/mkfiles.fio
 # Set up the scripts and output files that will log performance data.
 lun_list=$(pool_to_lun_list $PERFPOOL)
 log_note "Collecting backend IO stats with lun list $lun_list"
-export collect_scripts=("dtrace -s $PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1"
-    "io" "vmstat 1" "vmstat" "mpstat 1" "mpstat" "iostat -xcnz 1" "iostat"
-    "dtrace -s $PERF_SCRIPTS/profile.d" "profile" "kstat zfs:0 1" "kstat")
+export collect_scripts=("$PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1" "io"
+    "vmstat 1" "vmstat" "mpstat 1" "mpstat" "iostat -xcnz 1" "iostat")
 
 log_note "Random reads and writes with $PERF_RUNTYPE settings"
 do_fio_run random_readwrite.fio false true

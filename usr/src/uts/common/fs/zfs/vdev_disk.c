@@ -30,7 +30,6 @@
 #include <sys/refcount.h>
 #include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
-#include <sys/abd.h>
 #include <sys/fs/zfs.h>
 #include <sys/zio.h>
 #include <sys/sunldi.h>
@@ -659,12 +658,6 @@ vdev_disk_io_intr(buf_t *bp)
 	if (zio->io_error == 0 && bp->b_resid != 0)
 		zio->io_error = SET_ERROR(EIO);
 
-	if (zio->io_type == ZIO_TYPE_READ) {
-		abd_return_buf_copy(zio->io_abd, bp->b_un.b_addr, zio->io_size);
-	} else {
-		abd_return_buf(zio->io_abd, bp->b_un.b_addr, zio->io_size);
-	}
-
 	kmem_free(vb, sizeof (vdev_buf_t));
 
 	zio_delay_interrupt(zio);
@@ -776,15 +769,7 @@ vdev_disk_io_start(zio_t *zio)
 	if (!(zio->io_flags & (ZIO_FLAG_IO_RETRY | ZIO_FLAG_TRYHARD)))
 		bp->b_flags |= B_FAILFAST;
 	bp->b_bcount = zio->io_size;
-
-	if (zio->io_type == ZIO_TYPE_READ) {
-		bp->b_un.b_addr =
-		    abd_borrow_buf(zio->io_abd, zio->io_size);
-	} else {
-		bp->b_un.b_addr =
-		    abd_borrow_buf_copy(zio->io_abd, zio->io_size);
-	}
-
+	bp->b_un.b_addr = zio->io_data;
 	bp->b_lblkno = lbtodb(zio->io_offset);
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = (int (*)())vdev_disk_io_intr;
