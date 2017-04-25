@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 /*
@@ -374,10 +375,14 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port)
 	/* link speed changes? */
 	ifspeed = aggr_port_stat(port, MAC_STAT_IFSPEED);
 	if (port->lp_ifspeed != ifspeed) {
+		mutex_enter(&grp->lg_stat_lock);
+
 		if (port->lp_state == AGGR_PORT_STATE_ATTACHED)
 			do_detach |= (ifspeed != grp->lg_ifspeed);
 		else
 			do_attach |= (ifspeed == grp->lg_ifspeed);
+
+		mutex_exit(&grp->lg_stat_lock);
 	}
 	port->lp_ifspeed = ifspeed;
 
@@ -529,7 +534,9 @@ aggr_port_promisc(aggr_port_t *port, boolean_t on)
 
 	if (on) {
 		mac_rx_clear(port->lp_mch);
-		/* We use the promisc callback because without hardware
+
+		/*
+		 * We use the promisc callback because without hardware
 		 * rings, we deliver through flows that will cause duplicate
 		 * delivery of packets when we've flipped into this mode
 		 * to compensate for the lack of hardware MAC matching

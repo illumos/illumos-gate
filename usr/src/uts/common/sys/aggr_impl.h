@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 #ifndef	_SYS_AGGR_IMPL_H
@@ -187,11 +188,18 @@ typedef struct aggr_grp_s {
 	uint_t		lg_tx_ports_size;	/* size of lg_tx_ports */
 	uint32_t	lg_tx_policy;		/* outbound policy */
 	uint8_t		lg_mac_tx_policy;
-	uint64_t	lg_ifspeed;
 	link_state_t	lg_link_state;
+
+
+	/*
+	 * The lg_stat_lock must be held when accessing these fields.
+	 */
+	kmutex_t	lg_stat_lock;
+	uint64_t	lg_ifspeed;
 	link_duplex_t	lg_link_duplex;
 	uint64_t	lg_stat[MAC_NSTAT];
 	uint64_t	lg_ether_stat[ETHER_NSTAT];
+
 	aggr_lacp_mode_t lg_lacp_mode;		/* off, active, or passive */
 	Agg_t		aggr;			/* 802.3ad data */
 	uint32_t	lg_hcksum_txflags;

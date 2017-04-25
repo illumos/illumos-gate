@@ -324,6 +324,7 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 		return (B_FALSE);
 	}
 
+	mutex_enter(&grp->lg_stat_lock);
 	if (grp->lg_ifspeed == 0) {
 		/*
 		 * The group inherits the speed of the first link being
@@ -337,8 +338,10 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 		 * the group link speed, as per 802.3ad. Since it is
 		 * not, the attach is cancelled.
 		 */
+		mutex_exit(&grp->lg_stat_lock);
 		return (B_FALSE);
 	}
+	mutex_exit(&grp->lg_stat_lock);
 
 	grp->lg_nattached_ports++;
 
@@ -347,7 +350,9 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 	 */
 	if (grp->lg_link_state != LINK_STATE_UP) {
 		grp->lg_link_state = LINK_STATE_UP;
+		mutex_enter(&grp->lg_stat_lock);
 		grp->lg_link_duplex = LINK_DUPLEX_FULL;
+		mutex_exit(&grp->lg_stat_lock);
 		link_state_changed = B_TRUE;
 	}
 
@@ -405,9 +410,11 @@ aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
 	grp->lg_nattached_ports--;
 	if (grp->lg_nattached_ports == 0) {
 		/* the last attached MAC port of the group is being detached */
-		grp->lg_ifspeed = 0;
 		grp->lg_link_state = LINK_STATE_DOWN;
+		mutex_enter(&grp->lg_stat_lock);
+		grp->lg_ifspeed = 0;
 		grp->lg_link_duplex = LINK_DUPLEX_UNKNOWN;
+		mutex_exit(&grp->lg_stat_lock);
 		link_state_changed = B_TRUE;
 	}
 
@@ -1545,7 +1552,9 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 			continue;
 		val = aggr_port_stat(port, stat);
 		val -= port->lp_stat[i];
+		mutex_enter(&grp->lg_stat_lock);
 		grp->lg_stat[i] += val;
+		mutex_exit(&grp->lg_stat_lock);
 	}
 	for (i = 0; i < ETHER_NSTAT; i++) {
 		stat = i + MACTYPE_STAT_MIN;
@@ -1553,7 +1562,9 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 			continue;
 		val = aggr_port_stat(port, stat);
 		val -= port->lp_ether_stat[i];
+		mutex_enter(&grp->lg_stat_lock);
 		grp->lg_ether_stat[i] += val;
+		mutex_exit(&grp->lg_stat_lock);
 	}
 
 	grp->lg_nports--;
@@ -1884,6 +1895,8 @@ aggr_grp_stat(aggr_grp_t *grp, uint_t stat, uint64_t *val)
 	aggr_port_t	*port;
 	uint_t		stat_index;
 
+	ASSERT(MUTEX_HELD(&grp->lg_stat_lock));
+
 	/* We only aggregate counter statistics. */
 	if (IS_MAC_STAT(stat) && !MAC_STAT_ISACOUNTER(stat) ||
 	    IS_MACTYPE_STAT(stat) && !ETHER_STAT_ISACOUNTER(stat)) {
@@ -1952,10 +1965,9 @@ static int
 aggr_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	aggr_grp_t		*grp = arg;
-	mac_perim_handle_t	mph;
 	int			rval = 0;
 
-	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+	mutex_enter(&grp->lg_stat_lock);
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
@@ -1975,7 +1987,7 @@ aggr_m_stat(void *arg, uint_t stat, uint64_t *val)
 		rval = aggr_grp_stat(grp, stat, val);
 	}
 
-	mac_perim_exit(mph);
+	mutex_exit(&grp->lg_stat_lock);
 	return (rval);
 }
 
