@@ -22,12 +22,12 @@
 # uts/i86pc/apix/Makefile
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2016, Joyent, Inc.
+# Copyright 2017, Joyent, Inc.
 #
-#	This makefile drives the production of the pcplusmp "mach"
+#	This makefile drives the production of the apix "mach"
 #	kernel module.
 #
-#	pcplusmp implementation architecture dependent
+#	apix implementation architecture dependent
 #
 
 #
