@@ -132,9 +132,9 @@ lx_setxattr_common(vnode_t *vp, char *name, void *value, size_t sz, int flags)
 		break;
 	case LX_XATTR_NS_SYSTEM:
 		if (strcmp(key, LX_XATTR_POSIX_ACL_ACCESS) == 0) {
-			error = lx_acl_setxattr(vp, LX_ACL_ACCESS, value, sz);
+			error = lx_acl_setxattr(vp, LX_ACL_ACCESS, buf, sz);
 		} else if (strcmp(key, LX_XATTR_POSIX_ACL_DEFAULT) == 0) {
-			error = lx_acl_setxattr(vp, LX_ACL_DEFAULT, value, sz);
+			error = lx_acl_setxattr(vp, LX_ACL_DEFAULT, buf, sz);
 		}
 	default:
 		break;
