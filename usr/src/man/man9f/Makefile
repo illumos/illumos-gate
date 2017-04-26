@@ -1832,8 +1832,8 @@ mac_prop_info_set_default_uint64.9f	:= LINKSRC = mac_prop_info.9f
 mac_prop_info_set_perm.9f		:= LINKSRC = mac_prop_info.9f
 mac_prop_info_set_range_uint32.9f	:= LINKSRC = mac_prop_info.9f
 
-mac_transceiver_info_set_present.9f	:= LINKSRC = mac_transceiver.info.9f
-mac_transceiver_info_set_usable.9f	:= LINKSRC = mac_transceiver.info.9f
+mac_transceiver_info_set_present.9f	:= LINKSRC = mac_transceiver_info.9f
+mac_transceiver_info_set_usable.9f	:= LINKSRC = mac_transceiver_info.9f
 
 mac_unregister.9f			:= LINKSRC = mac_register.9f
 
