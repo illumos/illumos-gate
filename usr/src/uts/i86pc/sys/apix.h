@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef __SYS_APIX_APIX_H
@@ -287,11 +288,12 @@ extern struct apix_rebind_info apix_rebindinfo;
 
 #define	APIX_DO_FAKE_INTR(_cpu, _vector)\
 	if (APIX_IS_FAKE_INTR(_vector)) {\
-		struct autovec *tp;\
+		struct autovec *tp = NULL;\
 		if ((_cpu) == apix_rebindinfo.i_old_cpuid)\
 			tp = apix_rebindinfo.i_old_av;\
 		else if ((_cpu) == apix_rebindinfo.i_new_cpuid)\
 			tp = apix_rebindinfo.i_new_av;\
+		ASSERT(tp != NULL);\
 		if (tp->av_vector != NULL &&\
 		    (tp->av_flags & AV_PENTRY_PEND) == 0) {\
 			tp->av_flags |= AV_PENTRY_PEND;\

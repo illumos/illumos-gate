@@ -24,7 +24,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2016, Joyent, Inc.
+# Copyright 2017, Joyent, Inc.
 #
 
 #
@@ -66,20 +66,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 # Depends on ACPI CA interpreter
 #
 LDFLAGS		+= -dy -N misc/acpica
-
-CERRWARN	+= -_gcc=-Wno-unused-function
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
-CERRWARN	+= -_gcc=-Wno-uninitialized
 
 #
 #	Default build targets.

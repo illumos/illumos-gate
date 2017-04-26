@@ -23,7 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -848,7 +848,7 @@ apic_cpu_add(psm_cpu_request_t *reqp)
 	int i, rv = 0;
 	ulong_t iflag;
 	boolean_t first = B_TRUE;
-	uchar_t localver;
+	uchar_t localver = 0;
 	uint32_t localid, procid;
 	processorid_t cpuid = (processorid_t)-1;
 	mach_cpu_add_arg_t *ap;

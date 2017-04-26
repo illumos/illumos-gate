@@ -1606,8 +1606,8 @@ apix_set_cpu(apix_vector_t *vecp, int new_cpu, int *result)
 	ddi_acc_handle_t handle;
 	ddi_intr_msix_t *msix_p = NULL;
 	ushort_t msix_ctrl;
-	uintptr_t off;
-	uint32_t mask;
+	uintptr_t off = 0;
+	uint32_t mask = 0;
 
 	ASSERT(LOCK_HELD(&apix_lock));
 	*result = ENXIO;
@@ -1665,8 +1665,8 @@ apix_grp_set_cpu(apix_vector_t *vecp, int new_cpu, int *result)
 	apix_vector_t *newp, *vp;
 	uint32_t orig_cpu = vecp->v_cpuid;
 	int orig_vect = vecp->v_vector;
-	int i, num_vectors, cap_ptr, msi_mask_off;
-	uint32_t msi_pvm;
+	int i, num_vectors, cap_ptr, msi_mask_off = 0;
+	uint32_t msi_pvm = 0;
 	ushort_t msi_ctrl;
 	ddi_acc_handle_t handle;
 	dev_info_t *dip;
