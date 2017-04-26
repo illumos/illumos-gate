@@ -107,6 +107,8 @@ static void	apic_enable_intr(processorid_t cpun);
 static int		apic_get_ipivect(int ipl, int type);
 static void	apic_post_cyclic_setup(void *arg);
 
+#define	UCHAR_MAX	UINT8_MAX
+
 /*
  * The following vector assignments influence the value of ipltopri and
  * vectortoipl. Note that vectors 0 - 0x1f are not used. We can program
@@ -995,7 +997,7 @@ apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
 {
 	int	rcount, i;
 	uchar_t	start, irqno;
-	uint32_t cpu;
+	uint32_t cpu = 0;
 	major_t	major;
 	apic_irq_t	*irqptr;
 
@@ -1067,7 +1069,8 @@ apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
 		irqptr->airq_vector = (uchar_t)(start + i);
 		irqptr->airq_ioapicindex = (uchar_t)inum;	/* start */
 		irqptr->airq_intin_no = (uchar_t)rcount;
-		irqptr->airq_ipl = pri;
+		ASSERT(pri >= 0 && pri <= UCHAR_MAX);
+		irqptr->airq_ipl = (uchar_t)pri;
 		irqptr->airq_vector = start + i;
 		irqptr->airq_origirq = (uchar_t)(inum + i);
 		irqptr->airq_share_id = 0;
@@ -1144,7 +1147,8 @@ apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
 		apic_min_device_irq = min(irqno, apic_min_device_irq);
 		irqptr = apic_irq_table[irqno];
 		irqptr->airq_vector = (uchar_t)vector;
-		irqptr->airq_ipl = pri;
+		ASSERT(pri >= 0 && pri <= UCHAR_MAX);
+		irqptr->airq_ipl = (uchar_t)pri;
 		irqptr->airq_origirq = (uchar_t)(inum + i);
 		irqptr->airq_share_id = 0;
 		irqptr->airq_mps_intr_index = MSIX_INDEX;
@@ -1186,7 +1190,8 @@ apic_allocate_vector(int ipl, int irq, int pri)
 			continue;
 		if (apic_vector_to_irq[i] == APIC_RESV_IRQ) {
 			apic_vector_to_irq[i] = (uchar_t)irq;
-			return (i);
+			ASSERT(i >= 0 && i <= UCHAR_MAX);
+			return ((uchar_t)i);
 		}
 	}
 
