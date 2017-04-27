@@ -13896,6 +13896,8 @@ s usr/share/man/man3c/wcstok.3c=wcstring.3c
 f usr/share/man/man3c/wcstol.3c 0444 root bin
 s usr/share/man/man3c/wcstold.3c=wcstod.3c
 s usr/share/man/man3c/wcstoll.3c=wcstol.3c
+f usr/share/man/man3c/wcstombs.3c 0444 root bin
+s usr/share/man/man3c/wcstombs_l.3c=wcstombs.3c
 f usr/share/man/man3c/wcstoul.3c 0444 root bin
 s usr/share/man/man3c/wcstoull.3c=wcstoul.3c
 s usr/share/man/man3c/wcstoumax.3c=wcstoimax.3c
