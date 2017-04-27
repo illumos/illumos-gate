@@ -718,6 +718,8 @@ grow:
 	lep->le_start = t->t_start;
 	lwp_hash_in(p, lep, p->p_tidhash, p->p_tidhash_sz, 1);
 
+	lwp_fp_init(lwp);
+
 	if (state == TS_RUN) {
 		/*
 		 * We set the new lwp running immediately.

@@ -21,12 +21,11 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_ASM_MISC_H
 #define	_SYS_ASM_MISC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -83,23 +82,6 @@ extern "C" {
 	pop	%ebp
 
 #endif	/* __i386 */
-
-#if defined(__amd64)
-
-/*
- * While as doesn't support fxsaveq/fxrstorq (fxsave/fxrstor with REX.W = 1)
- * we will use the FXSAVEQ/FXRSTORQ macro
- */
-
-#define	FXSAVEQ(x)	\
-	.byte	0x48;	\
-	fxsave	x
-
-#define	FXRSTORQ(x)	\
-	.byte	0x48;	\
-	fxrstor	x
-
-#endif	/* __amd64 */
 
 #endif /* _ASM */
 

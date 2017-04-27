@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -36,6 +37,18 @@
 #include <sys/cmn_err.h>
 
 #define	XMM_ALIGN	16
+
+/*
+ * See section 10.5.1 in the Intel 64 and IA-32 Architectures Software
+ * Developer’s Manual, Volume 1.
+ */
+#define	FXSAVE_ALIGN	16
+
+/*
+ * See section 13.4 in the Intel 64 and IA-32 Architectures Software
+ * Developer’s Manual, Volume 1.
+ */
+#define	XSAVE_ALIGN	64
 
 /*
  * If fpu_exists is non-zero, fpu_probe will attempt to use any
@@ -140,6 +153,10 @@ fpu_probe(void)
 #endif
 
 #if defined(__amd64)
+		/* Use the more complex exception clearing code if necessary */
+		if (cpuid_need_fp_excp_handling())
+			fpsave_ctxt = fpxsave_excp_clr_ctxt;
+
 		/*
 		 * SSE and SSE2 are required for the 64-bit ABI.
 		 *
@@ -161,8 +178,41 @@ fpu_probe(void)
 
 			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
 				fp_save_mech = FP_XSAVE;
-				fpsave_ctxt = xsave_ctxt;
+				if (is_x86_feature(x86_featureset,
+				    X86FSET_XSAVEOPT)) {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsaveopt_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsaveopt_ctxt;
+					}
+					xsavep = xsaveopt;
+				} else {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsave_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsave_ctxt;
+					}
+				}
 				patch_xsave();
+				fpsave_cachep = kmem_cache_create("xsave_cache",
+				    cpuid_get_xsave_size(), XSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
+			} else {
+				/* fp_save_mech defaults to FP_FXSAVE */
+				fpsave_cachep =
+				    kmem_cache_create("fxsave_cache",
+				    sizeof (struct fxsave_state), FXSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
 			}
 		}
 #elif defined(__i386)
@@ -174,7 +224,15 @@ fpu_probe(void)
 			fp_kind |= __FP_SSE;
 			ENABLE_SSE();
 			fp_save_mech = FP_FXSAVE;
-			fpsave_ctxt = fpxsave_ctxt;
+			/*
+			 * Use the more complex exception clearing code if
+			 * necessary.
+			 */
+			if (cpuid_need_fp_excp_handling()) {
+				fpsave_ctxt = fpxsave_excp_clr_ctxt;
+			} else {
+				fpsave_ctxt = fpxsave_ctxt;
+			}
 
 			if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
 				patch_sse2();
@@ -188,10 +246,41 @@ fpu_probe(void)
 
 			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
 				fp_save_mech = FP_XSAVE;
-				fpsave_ctxt = xsave_ctxt;
+				if (is_x86_feature(x86_featureset,
+				    X86FSET_XSAVEOPT)) {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsaveopt_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsaveopt_ctxt;
+					}
+					xsavep = xsaveopt;
+				} else {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsave_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsave_ctxt;
+					}
+				}
 				patch_xsave();
+				fpsave_cachep = kmem_cache_create("xsave_cache",
+				    cpuid_get_xsave_size(), XSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
 			} else {
 				patch_sse();	/* use fxrstor */
+				fpsave_cachep =
+				    kmem_cache_create("fxsave_cache",
+				    sizeof (struct fxsave_state), FXSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
 			}
 		} else {
 			remove_x86_feature(x86_featureset, X86FSET_SSE2);
@@ -206,6 +295,15 @@ fpu_probe(void)
 			 * enabled when we didn't. See 4965674.)
 			 */
 			DISABLE_SSE();
+
+			/*
+			 * fp_save_mech defaults to FP_FNSAVE. Use the same
+			 * alignment as used for fxsave (preserves legacy
+			 * behavior).
+			 */
+			fpsave_cachep = kmem_cache_create("fnsave_cache",
+			    sizeof (struct fnsave_state), FXSAVE_ALIGN,
+			    NULL, NULL, NULL, NULL, NULL, 0);
 		}
 #endif
 		if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {

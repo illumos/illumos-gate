@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -402,6 +403,8 @@ lwp_forkregs(klwp_t *lwp, klwp_t *clwp)
 	}
 	ASSERT(lwptot(clwp)->t_post_sys);
 #endif
+
+	fp_lwp_dup(clwp);
 
 	bcopy(lwp->lwp_regs, clwp->lwp_regs, sizeof (struct regs));
 }
