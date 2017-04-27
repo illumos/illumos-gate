@@ -924,7 +924,7 @@ vdev_probe(vdev_phys_read_t *phys_read, void *read_priv, spa_t **spap)
 {
 	vdev_t vtmp;
 	vdev_phys_t *vdev_label = (vdev_phys_t *) zap_scratch;
-	vdev_phys_t *tmp_label = zfs_alloc(sizeof(vdev_phys_t));
+	vdev_phys_t *tmp_label;
 	spa_t *spa;
 	vdev_t *vdev, *top_vdev, *pool_vdev;
 	off_t off;
@@ -951,6 +951,12 @@ vdev_probe(vdev_phys_read_t *phys_read, void *read_priv, spa_t **spap)
 	vtmp.v_read_priv = read_priv;
 	psize = P2ALIGN(ldi_get_size(read_priv),
 	    (uint64_t)sizeof (vdev_label_t));
+
+	/* Test for minimum device size. */
+	if (psize < SPA_MINDEVSIZE)
+		return (EIO);
+
+	tmp_label = zfs_alloc(sizeof (vdev_phys_t));
 
 	for (l = 0; l < VDEV_LABELS; l++) {
 		off = vdev_label_offset(psize, l,
@@ -982,6 +988,9 @@ vdev_probe(vdev_phys_read_t *phys_read, void *read_priv, spa_t **spap)
 	}
 
 	zfs_free(tmp_label, sizeof (vdev_phys_t));
+
+	if (best_txg == 0)
+		return (EIO);
 
 	if (vdev_label->vp_nvlist[0] != NV_ENCODE_XDR)
 		return (EIO);

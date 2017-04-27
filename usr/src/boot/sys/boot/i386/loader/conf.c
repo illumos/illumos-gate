@@ -101,10 +101,12 @@ extern struct file_format	amd64_elf;
 extern struct file_format	amd64_elf_obj;
 extern struct file_format	multiboot;
 extern struct file_format	multiboot_obj;
+extern struct file_format	multiboot2;
 extern struct file_format	linux;
 extern struct file_format	linux_initrd;
 
 struct file_format *file_formats[] = {
+	&multiboot2,
 	&multiboot,
 	&multiboot_obj,
 	&amd64_elf,

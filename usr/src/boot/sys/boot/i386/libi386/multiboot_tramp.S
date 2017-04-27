@@ -26,9 +26,6 @@
  * $FreeBSD$
  */
 
-#define ASM_FILE
-#include "multiboot.h"
-
 /*
  * The multiboot specification requires the executable to be launched
  * with %cs set to a flat read/execute segment with offset 0 and limit
@@ -43,9 +40,9 @@ multiboot_tramp:
 	/* Be sure that interrupts are disabled. */
 	cli
 
-	movl    $MULTIBOOT_BOOTLOADER_MAGIC, %eax
+	movl    4(%esp), %eax		/* bootloader magic */
 	/* Get the entry point and address of the multiboot_info parameter. */
-	movl	8(%esp), %ebx
-	movl	4(%esp), %ecx
+	movl	12(%esp), %ebx		/* multiboot_info */
+	movl	8(%esp), %ecx		/* entry */
 
 	call    *%ecx

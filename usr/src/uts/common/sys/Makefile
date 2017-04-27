@@ -541,6 +541,7 @@ CHKHDRS=			\
 	statfs.h		\
 	statvfs.h		\
 	stdbool.h		\
+	stddef.h		\
 	stdint.h		\
 	stermio.h		\
 	stmf.h			\
