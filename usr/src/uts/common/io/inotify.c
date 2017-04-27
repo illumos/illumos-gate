@@ -555,6 +555,41 @@ inotify_watch_destroy(inotify_watch_t *watch)
 	kmem_free(watch, sizeof (inotify_watch_t));
 }
 
+static int
+inotify_fem_install(vnode_t *vp, inotify_watch_t *watch)
+{
+	/*
+	 * For vnodes that are devices (of type VCHR or VBLK), we silently
+	 * refuse to actually install any event monitor.  This is to avoid
+	 * single-thread deadlock when both a special device vnode and its
+	 * underlying real vnode are being watched:  releasing the device
+	 * vnode upon watch removal can induce an attribute update on the
+	 * underlying vnode, which will bring us into inotify_watch_event()
+	 * with our lock already held.  While we could fail earlier and more
+	 * explicitly in this case, we choose to keep with the Linux behavior
+	 * on unwatchable entities and allow the watch but not generate any
+	 * events for it.
+	 */
+	if (vp->v_type == VCHR || vp->v_type == VBLK)
+		return (0);
+
+	return (fem_install(vp, inotify_femp, watch, OPARGUNIQ,
+	    (void (*)(void *))inotify_watch_hold,
+	    (void (*)(void *))inotify_watch_release));
+}
+
+static int
+inotify_fem_uninstall(vnode_t *vp, inotify_watch_t *watch)
+{
+	/*
+	 * See inotify_fem_install(), above, for our rationale here.
+	 */
+	if (vp->v_type == VCHR || vp->v_type == VBLK)
+		return (0);
+
+	return (fem_uninstall(vp, inotify_femp, watch));
+}
+
 /*
  * Zombify a watch.  By the time we come in here, it must be true that the
  * watch has already been fem_uninstall()'d -- the only reference should be
@@ -649,9 +684,7 @@ inotify_watch_add(inotify_state_t *state, inotify_watch_t *parent,
 	 * Add our monitor to the vnode.  We must not have the watch lock held
 	 * when we do this, as it will immediately hold our watch.
 	 */
-	err = fem_install(vp, inotify_femp, watch, OPARGUNIQ,
-	    (void (*)(void *))inotify_watch_hold,
-	    (void (*)(void *))inotify_watch_release);
+	err = inotify_fem_install(vp, watch);
 
 	VERIFY(err == 0);
 
@@ -672,7 +705,7 @@ inotify_watch_remove(inotify_state_t *state, inotify_watch_t *watch)
 	VERIFY(MUTEX_HELD(&state->ins_lock));
 	VERIFY(watch->inw_parent == NULL);
 
-	err = fem_uninstall(watch->inw_vp, inotify_femp, watch);
+	err = inotify_fem_uninstall(watch->inw_vp, watch);
 	VERIFY(err == 0);
 
 	/*
@@ -683,7 +716,7 @@ inotify_watch_remove(inotify_state_t *state, inotify_watch_t *watch)
 		VERIFY(child->inw_parent == watch);
 		avl_remove(&watch->inw_children, child);
 
-		err = fem_uninstall(child->inw_vp, inotify_femp, child);
+		err = inotify_fem_uninstall(child->inw_vp, child);
 		VERIFY(err == 0);
 
 		/*
@@ -794,7 +827,7 @@ inotify_watch_delete(inotify_watch_t *watch, uint32_t event)
 	}
 
 	avl_remove(&parent->inw_children, watch);
-	err = fem_uninstall(watch->inw_vp, inotify_femp, watch);
+	err = inotify_fem_uninstall(watch->inw_vp, watch);
 	VERIFY(err == 0);
 
 	VN_RELE(watch->inw_vp);
@@ -1020,7 +1053,7 @@ inotify_clean(void *arg)
 			continue;
 
 		avl_remove(&parent->inw_children, watch);
-		err = fem_uninstall(watch->inw_vp, inotify_femp, watch);
+		err = inotify_fem_uninstall(watch->inw_vp, watch);
 		VERIFY(err == 0);
 
 		list_remove(&state->ins_orphans, watch);
