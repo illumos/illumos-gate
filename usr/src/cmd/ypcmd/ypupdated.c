@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Joyent Inc
  * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,12 +32,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifndef lint
-static char sccsid[] = "@(#)rpc.ypupdated.c 1.9 87/10/30 Copyr 1986 Sun Micro";
-#endif
 
 /*
  * YP update service
@@ -51,6 +46,7 @@ static char sccsid[] = "@(#)rpc.ypupdated.c 1.9 87/10/30 Copyr 1986 Sun Micro";
 #include <rpc/nettype.h>
 #include <rpcsvc/ypupd.h>
 #include <rpcsvc/ypclnt.h>
+#include <sys/debug.h>
 #include <netdir.h>
 #include <stropts.h>
 #ifdef SYSLOG
@@ -239,11 +235,13 @@ ypupdate_prog(rqstp, transp)
 #endif
 	switch (rqstp->rq_cred.oa_flavor) {
 	case AUTH_DES:
+		CTASSERT(sizeof (struct authdes_cred) <= RQCRED_SIZE);
 		netname = ((struct authdes_cred *)
 			rqstp->rq_clntcred)->adc_fullname.name;
 		break;
 	case AUTH_UNIX:
 		if (insecure) {
+			CTASSERT(sizeof (struct authunix_parms) <= RQCRED_SIZE);
 			aup = (struct authunix_parms *)rqstp->rq_clntcred;
 			if (aup->aup_uid == 0) {
 				if (addr2netname(namebuf, transp) != 0) {

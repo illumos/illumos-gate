@@ -61,7 +61,8 @@ typedef void *native_ptr_t;
 typedef enum boot_module_type {
 	BMT_ROOTFS,
 	BMT_FILE,
-	BMT_HASH
+	BMT_HASH,
+	BMT_ENV
 } boot_module_type_t;
 
 struct boot_memlist {
@@ -107,7 +108,9 @@ struct xboot_info {
 	native_ptr_t	bi_xen_start_info;
 	native_ptr_t	bi_shared_info;		/* VA for shared_info */
 #else
-	native_ptr_t	bi_mb_info;
+	native_ptr_t	bi_mb_info;		/* multiboot 1 or 2 info */
+	int		bi_mb_version;		/* multiboot version */
+	native_ptr_t	bi_acpi_rsdp;
 #endif
 };
 #pragma pack()

@@ -45,6 +45,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2017 Citrus IT Limited. All rights reserved.
  */
 
 #ifndef	_MR_SAS_H_
@@ -61,8 +62,8 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"6.503.00.00ILLUMOS"
-#define	MRSAS_RELDATE				"July 30, 2012"
+#define	MRSAS_VERSION				"6.503.00.00ILLUMOS-20170421"
+#define	MRSAS_RELDATE				"April 21, 2017"
 
 #define	MRSAS_TRUE				1
 #define	MRSAS_FALSE				0
@@ -90,13 +91,23 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 supported controllers
  */
-#define	PCI_DEVICE_ID_LSI_2108VDE		0x0078
-#define	PCI_DEVICE_ID_LSI_2108V			0x0079
+
+/* Skinny */
 #define	PCI_DEVICE_ID_LSI_SKINNY		0x0071
 #define	PCI_DEVICE_ID_LSI_SKINNY_NEW		0x0073
+/* Liberator series (Gen2) */
+#define	PCI_DEVICE_ID_LSI_2108VDE		0x0078
+#define	PCI_DEVICE_ID_LSI_2108V			0x0079
+/* Thunderbolt series */
 #define	PCI_DEVICE_ID_LSI_TBOLT			0x005b
+/* Invader series (Gen3) */
 #define	PCI_DEVICE_ID_LSI_INVADER		0x005d
 #define	PCI_DEVICE_ID_LSI_FURY			0x005f
+#define	PCI_DEVICE_ID_LSI_INTRUDER		0x00ce
+#define	PCI_DEVICE_ID_LSI_INTRUDER_24		0x00cf
+#define	PCI_DEVICE_ID_LSI_CUTLASS_52		0x0052
+#define	PCI_DEVICE_ID_LSI_CUTLASS_53		0x0053
+/* Ventura series not yet supported */
 
 /*
  * Register Index for 2108 Controllers.
@@ -602,6 +613,7 @@ typedef struct mrsas_instance {
 
 	uint8_t		skinny;
 	uint8_t		tbolt;
+	uint8_t		gen3;
 	uint16_t	reply_read_index;
 	uint16_t	reply_size; 		/* Single Reply struct size */
 	uint16_t	raid_io_msg_size; 	/* Single message size */

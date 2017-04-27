@@ -21,6 +21,7 @@
 
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent Inc
  */
 
 /*
@@ -65,9 +66,6 @@ extern "C" {
 /* gids compose part of a credential; there may not be more than 16 of them */
 #define	 NGRPS 16
 
-/* gids compose part of a credential */
-#define	 NGRPS_LOOPBACK NGROUPS_UMAX
-
 /*
  * "sys" (Old UNIX) style credentials.
  */
@@ -81,6 +79,17 @@ struct authsys_parms {
 };
 /* For backward compatibility */
 #define	 authunix_parms authsys_parms
+
+/*
+ * Ideally, we would like this to be NGROUPS_UMAX, but the RFC mandates that
+ * auth sections must not exceed 400 bytes. For AUTH_LOOPBACK, that means the
+ * largest number of groups we can have without breaking RFC compat is 92
+ * groups.
+ *
+ * NOTE: changing this value changes the size of authlpbk_area in
+ * svc_auth_loopb.c, which means RQCRED_SIZE *must* be updated!
+ */
+#define	 NGRPS_LOOPBACK 92
 
 #ifdef __STDC__
 extern bool_t xdr_authsys_parms(XDR *, struct authsys_parms *);

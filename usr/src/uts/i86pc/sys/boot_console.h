@@ -36,6 +36,8 @@
 extern "C" {
 #endif
 
+#include <sys/bootinfo.h>
+
 #define	CONS_INVALID		-1
 #define	CONS_SCREEN_TEXT	0
 #define	CONS_TTY		1
@@ -53,9 +55,12 @@ extern void kb_init(void);
 extern int kb_getchar(void);
 extern int kb_ischar(void);
 
+/* Read property from command line or environment. */
+extern const char *find_boot_prop(const char *);
+
 extern int boot_console_type(int *);
 
-extern void bcons_init(char *);
+extern void bcons_init(struct xboot_info *);
 extern void bcons_putchar(int);
 extern int bcons_getchar(void);
 extern int bcons_ischar(void);
