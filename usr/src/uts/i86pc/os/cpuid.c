@@ -32,7 +32,7 @@
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 /*
  * Various routines to handle identification
@@ -175,7 +175,26 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"smep",
 	"smap",
 	"adx",
-	"rdseed"
+	"rdseed",
+	"mpx",
+	"avx512f",
+	"avx512dq",
+	"avx512pf",
+	"avx512er",
+	"avx512cd",
+	"avx512bw",
+	"avx512fma",
+	"avx512vbmi",
+	"avx512vpcdq",
+	"avx512nniw",
+	"avx512fmaps",
+	"xsaveopt",
+	"xsavec",
+	"xsaves",
+	"sha",
+	"umip",
+	"pku",
+	"ospke",
 };
 
 boolean_t
@@ -225,6 +244,7 @@ print_x86_featureset(void *featureset)
 	}
 }
 
+/* Note: This is the maximum size for the CPU, not the size of the structure. */
 static size_t xsave_state_size = 0;
 uint64_t xsave_bv_all = (XFEATURE_LEGACY_FP | XFEATURE_SSE);
 boolean_t xsave_force_disable = B_FALSE;
@@ -263,9 +283,10 @@ struct mwait_info {
  * xsave/xrestor info.
  *
  * This structure contains HW feature bits and size of the xsave save area.
- * Note: the kernel will use the maximum size required for all hardware
- * features. It is not optimize for potential memory savings if features at
- * the end of the save area are not enabled.
+ * Note: the kernel uses a fixed size (AVX_XSAVE_SIZE) to store supported
+ * hardware features. Our xsave area does not handle new features beyond AVX
+ * and it does not optimize for potential memory savings if features in the
+ * middle or end of the save area are not enabled.
  */
 struct xsave_info {
 	uint32_t	xsav_hw_features_low;   /* Supported HW features */
@@ -273,6 +294,16 @@ struct xsave_info {
 	size_t		xsav_max_size;  /* max size save area for HW features */
 	size_t		ymm_size;	/* AVX: size of ymm save area */
 	size_t		ymm_offset;	/* AVX: offset for ymm save area */
+	size_t		bndregs_size;	/* MPX: size of bndregs save area */
+	size_t		bndregs_offset;	/* MPX: offset for bndregs save area */
+	size_t		bndcsr_size;	/* MPX: size of bndcsr save area */
+	size_t		bndcsr_offset;	/* MPX: offset for bndcsr save area */
+	size_t		opmask_size;	/* AVX512: size of opmask save */
+	size_t		opmask_offset;	/* AVX512: offset for opmask save */
+	size_t		zmmlo_size;	/* AVX512: size of zmm 256 save */
+	size_t		zmmlo_offset;	/* AVX512: offset for zmm 256 save */
+	size_t		zmmhi_size;	/* AVX512: size of zmm hi reg save */
+	size_t		zmmhi_offset;	/* AVX512: offset for zmm hi reg save */
 };
 
 
@@ -385,6 +416,8 @@ static struct cpuid_info cpuid_info0;
 #define	CPI_FEATURES_XTD_EDX(cpi)	((cpi)->cpi_extd[1].cp_edx)
 #define	CPI_FEATURES_XTD_ECX(cpi)	((cpi)->cpi_extd[1].cp_ecx)
 #define	CPI_FEATURES_7_0_EBX(cpi)	((cpi)->cpi_std[7].cp_ebx)
+#define	CPI_FEATURES_7_0_ECX(cpi)	((cpi)->cpi_std[7].cp_ecx)
+#define	CPI_FEATURES_7_0_EDX(cpi)	((cpi)->cpi_std[7].cp_edx)
 
 #define	CPI_BRANDID(cpi)	BITX((cpi)->cpi_std[1].cp_ebx, 7, 0)
 #define	CPI_CHUNKS(cpi)		BITX((cpi)->cpi_std[1].cp_ebx, 15, 7)
@@ -939,6 +972,19 @@ setup_xfem(void)
 	if (is_x86_feature(x86_featureset, X86FSET_AVX))
 		flags |= XFEATURE_AVX;
 
+	/*
+	 * TBD:
+	 * Enabling MPX and AVX512 implies that xsave_state is large enough
+	 * to hold the MPX state and the full AVX512 state, or that we're
+	 * supporting xsavec or xsaveopt.
+	 *
+	 * if (is_x86_feature(x86_featureset, X86FSET_MPX))
+	 *	flags |= XFEATURE_MPX;
+	 *
+	 * if (is_x86_feature(x86_featureset, X86FSET_AVX512F))
+	 *	flags |= XFEATURE_AVX512;
+	 */
+
 	set_xcr(XFEATURE_ENABLED_MASK, flags);
 
 	xsave_bv_all = flags;
@@ -1234,7 +1280,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 	/*
 	 * In addition to ecx and edx, Intel is storing a bunch of instruction
-	 * set extensions in leaf 7's ebx.
+	 * set extensions in leaf 7's ebx, ecx, and edx.
 	 */
 	if (cpi->cpi_vendor == X86_VENDOR_Intel && cpi->cpi_maxeax >= 7) {
 		struct cpuid_regs *ecp;
@@ -1243,13 +1289,17 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		ecp->cp_ecx = 0;
 		(void) __cpuid_insn(ecp);
 		/*
-		 * If XSAVE has been disabled, just ignore all of the AVX
-		 * dependent flags here.
+		 * If XSAVE has been disabled, just ignore all of the
+		 * extended-save-area dependent flags here.
 		 */
 		if (xsave_force_disable) {
 			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_BMI1;
 			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_BMI2;
 			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_AVX2;
+			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_MPX;
+			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_ALL_AVX512;
+			ecp->cp_ecx &= ~CPUID_INTC_ECX_7_0_ALL_AVX512;
+			ecp->cp_edx &= ~CPUID_INTC_EDX_7_0_ALL_AVX512;
 		}
 
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMEP)
@@ -1267,6 +1317,9 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		    disable_smap == 0)
 			add_x86_feature(featureset, X86FSET_SMAP);
 #endif
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_MPX)
+			add_x86_feature(featureset, X86FSET_MPX);
+
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_RDSEED)
 			add_x86_feature(featureset, X86FSET_RDSEED);
 
@@ -1354,10 +1407,21 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			add_x86_feature(featureset, X86FSET_PCLMULQDQ);
 		}
 
+		if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_SHA)
+			add_x86_feature(featureset, X86FSET_SHA);
+
+		if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_UMIP)
+			add_x86_feature(featureset, X86FSET_UMIP);
+		if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_PKU)
+			add_x86_feature(featureset, X86FSET_PKU);
+		if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_OSPKE)
+			add_x86_feature(featureset, X86FSET_OSPKE);
+
 		if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
 			add_x86_feature(featureset, X86FSET_XSAVE);
 
-			/* We only test AVX when there is XSAVE */
+			/* We only test AVX & AVX512 when there is XSAVE */
+
 			if (cp->cp_ecx & CPUID_INTC_ECX_AVX) {
 				add_x86_feature(featureset,
 				    X86FSET_AVX);
@@ -1388,6 +1452,54 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 				    CPUID_INTC_EBX_7_0_AVX2)
 					add_x86_feature(featureset,
 					    X86FSET_AVX2);
+			}
+
+			if (cpi->cpi_std[7].cp_ebx &
+			    CPUID_INTC_EBX_7_0_AVX512F) {
+				add_x86_feature(featureset, X86FSET_AVX512F);
+
+				if (cpi->cpi_std[7].cp_ebx &
+				    CPUID_INTC_EBX_7_0_AVX512DQ)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512DQ);
+				if (cpi->cpi_std[7].cp_ebx &
+				    CPUID_INTC_EBX_7_0_AVX512IFMA)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512FMA);
+				if (cpi->cpi_std[7].cp_ebx &
+				    CPUID_INTC_EBX_7_0_AVX512PF)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512PF);
+				if (cpi->cpi_std[7].cp_ebx &
+				    CPUID_INTC_EBX_7_0_AVX512ER)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512ER);
+				if (cpi->cpi_std[7].cp_ebx &
+				    CPUID_INTC_EBX_7_0_AVX512CD)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512CD);
+				if (cpi->cpi_std[7].cp_ebx &
+				    CPUID_INTC_EBX_7_0_AVX512BW)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512BW);
+
+				if (cpi->cpi_std[7].cp_ecx &
+				    CPUID_INTC_ECX_7_0_AVX512VBMI)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512VBMI);
+				if (cpi->cpi_std[7].cp_ecx &
+				    CPUID_INTC_ECX_7_0_AVX512VPCDQ)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512VPCDQ);
+
+				if (cpi->cpi_std[7].cp_edx &
+				    CPUID_INTC_EDX_7_0_AVX5124NNIW)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512NNIW);
+				if (cpi->cpi_std[7].cp_edx &
+				    CPUID_INTC_EDX_7_0_AVX5124FMAPS)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512FMAPS);
 			}
 		}
 	}
@@ -1455,6 +1567,24 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			add_x86_feature(featureset, X86FSET_HTT);
 	} else {
 		cpi->cpi_ncpu_per_chip = 1;
+	}
+
+	if (cpi->cpi_vendor == X86_VENDOR_Intel && cpi->cpi_maxeax >= 0xD &&
+	    !xsave_force_disable) {
+		struct cpuid_regs r, *ecp;
+
+		ecp = &r;
+		ecp->cp_eax = 0xD;
+		ecp->cp_ecx = 1;
+		ecp->cp_edx = ecp->cp_ebx = 0;
+		(void) __cpuid_insn(ecp);
+
+		if (ecp->cp_eax & CPUID_INTC_EAX_D_1_XSAVEOPT)
+			add_x86_feature(featureset, X86FSET_XSAVEOPT);
+		if (ecp->cp_eax & CPUID_INTC_EAX_D_1_XSAVEC)
+			add_x86_feature(featureset, X86FSET_XSAVEC);
+		if (ecp->cp_eax & CPUID_INTC_EAX_D_1_XSAVES)
+			add_x86_feature(featureset, X86FSET_XSAVES);
 	}
 
 	/*
@@ -2005,6 +2135,63 @@ cpuid_pass2(cpu_t *cpu)
 			cpi->cpi_xsave.ymm_offset = cp->cp_ebx;
 		}
 
+		/*
+		 * If the hw supports MPX, get the size and offset in the
+		 * save area for BNDREGS and BNDCSR.
+		 */
+		if (cpi->cpi_xsave.xsav_hw_features_low & XFEATURE_MPX) {
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 3;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			cpi->cpi_xsave.bndregs_size = cp->cp_eax;
+			cpi->cpi_xsave.bndregs_offset = cp->cp_ebx;
+
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 4;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			cpi->cpi_xsave.bndcsr_size = cp->cp_eax;
+			cpi->cpi_xsave.bndcsr_offset = cp->cp_ebx;
+		}
+
+		/*
+		 * If the hw supports AVX512, get the size and offset in the
+		 * save area for the opmask registers and zmm state.
+		 */
+		if (cpi->cpi_xsave.xsav_hw_features_low & XFEATURE_AVX512) {
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 5;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			cpi->cpi_xsave.opmask_size = cp->cp_eax;
+			cpi->cpi_xsave.opmask_offset = cp->cp_ebx;
+
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 6;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			cpi->cpi_xsave.zmmlo_size = cp->cp_eax;
+			cpi->cpi_xsave.zmmlo_offset = cp->cp_ebx;
+
+			cp->cp_eax = 0xD;
+			cp->cp_ecx = 7;
+			cp->cp_edx = cp->cp_ebx = 0;
+
+			(void) __cpuid_insn(cp);
+
+			cpi->cpi_xsave.zmmhi_size = cp->cp_eax;
+			cpi->cpi_xsave.zmmhi_offset = cp->cp_ebx;
+		}
+
 		if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
 			xsave_state_size = 0;
 		} else if (cpuid_d_valid) {
@@ -2053,6 +2240,31 @@ cpuid_pass2(cpu_t *cpu)
 					    X86FSET_FMA);
 					remove_x86_feature(x86_featureset,
 					    X86FSET_AVX2);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_MPX);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512F);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512DQ);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512PF);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512ER);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512CD);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512BW);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512FMA);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512VBMI);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512VPCDQ);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512NNIW);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512FMAPS);
+
 					CPI_FEATURES_ECX(cpi) &=
 					    ~CPUID_INTC_ECX_XSAVE;
 					CPI_FEATURES_ECX(cpi) &=
@@ -2067,6 +2279,17 @@ cpuid_pass2(cpu_t *cpu)
 					    ~CPUID_INTC_EBX_7_0_BMI2;
 					CPI_FEATURES_7_0_EBX(cpi) &=
 					    ~CPUID_INTC_EBX_7_0_AVX2;
+					CPI_FEATURES_7_0_EBX(cpi) &=
+					    ~CPUID_INTC_EBX_7_0_MPX;
+					CPI_FEATURES_7_0_EBX(cpi) &=
+					    ~CPUID_INTC_EBX_7_0_ALL_AVX512;
+
+					CPI_FEATURES_7_0_ECX(cpi) &=
+					    ~CPUID_INTC_ECX_7_0_ALL_AVX512;
+
+					CPI_FEATURES_7_0_EDX(cpi) &=
+					    ~CPUID_INTC_EDX_7_0_ALL_AVX512;
+
 					xsave_force_disable = B_TRUE;
 				} else {
 					VERIFY(is_x86_feature(x86_featureset,

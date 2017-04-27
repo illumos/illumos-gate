@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -231,6 +232,11 @@ struct fxsave_state {
 /*
  * This structure is written to memory by an 'xsave' instruction.
  * First 512 byte is compatible with the format of an 'fxsave' area.
+ *
+ * The current size is AVX_XSAVE_SIZE (832 bytes), asserted in fpnoextflt().
+ * Enabling MPX and AVX512 requires a total size of 2696 bytes. The locations
+ * and size of new, extended components are determined dynamically by
+ * querying the CPU. See the xsave_info structure in cpuid.c.
  */
 struct xsave_state {
 	struct fxsave_state	xs_fxsave;
@@ -238,7 +244,7 @@ struct xsave_state {
 	uint64_t		xs_rsv_mbz[2];
 	uint64_t		xs_reserved[5];
 	upad128_t		xs_ymm[16];	/* avx - 576 */
-};	/* 832 bytes, asserted in fpnoextflt() */
+};
 
 /*
  * Kernel's FPU save area
