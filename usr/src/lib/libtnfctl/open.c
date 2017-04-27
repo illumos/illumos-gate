@@ -50,9 +50,9 @@ static tnfctl_errcode_t step_to_end_of_exec(tnfctl_handle_t *hndl);
  */
 tnfctl_errcode_t
 tnfctl_exec_open(const char *pgm_name, char * const *args,  char * const *envp,
-		const char *ld_preload,
-		const char *libtnfprobe_path,
-		tnfctl_handle_t **ret_val)
+    const char *ld_preload,
+    const char *libtnfprobe_path,
+    tnfctl_handle_t **ret_val)
 {
 	tnfctl_handle_t	*hdl;
 	prb_proc_ctl_t	*proc_p = NULL;
@@ -213,7 +213,7 @@ failure_ret:
  */
 tnfctl_errcode_t
 tnfctl_indirect_open(void *prochandle, tnfctl_ind_config_t *config,
-		tnfctl_handle_t **ret_val)
+    tnfctl_handle_t **ret_val)
 {
 	tnfctl_handle_t	*hdl;
 	tnfctl_errcode_t	prexstat;
@@ -323,7 +323,7 @@ tnfctl_trace_attrs_get(tnfctl_handle_t *hdl, tnfctl_trace_attrs_t *attrs)
  */
 tnfctl_errcode_t
 tnfctl_buffer_alloc(tnfctl_handle_t *hdl, const char *trace_file_name,
-			uint_t trace_file_size)
+    uint_t trace_file_size)
 {
 	tnfctl_errcode_t prexstat;
 
@@ -454,7 +454,7 @@ step_to_end_of_exec(tnfctl_handle_t *hndl)
 	switch (prbstat) {
 	case PRB_STATUS_OK:
 		break;
-	case EAGAIN:
+	case PRB_STATUS_EAGAIN:
 		/*
 		 * If we had exec'ed a setuid/setgid program PIOCWSTOP
 		 * will return EAGAIN.  Reopen the 'fd' and try again.

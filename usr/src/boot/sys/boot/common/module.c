@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * file/module function dispatcher, support, etc.
@@ -403,6 +402,88 @@ file_load_dependencies(struct preloaded_file *base_file)
 }
 
 /*
+ * Calculate the size of the environment module.
+ * The environment is list of name=value C strings, ending with a '\0' byte.
+ */
+static size_t
+env_get_size(void)
+{
+	size_t size = 0;
+	struct env_var *ep;
+
+	/* Traverse the environment. */
+	for (ep = environ; ep != NULL; ep = ep->ev_next) {
+		size += strlen(ep->ev_name);
+		size++;		/* "=" */
+		if (ep->ev_value != NULL)
+			size += strlen(ep->ev_value);
+		size++;		/* nul byte */
+	}
+	size++;			/* nul byte */
+	return (size);
+}
+
+/*
+ * Create virtual module for environment variables.
+ * This module should be created as late as possible before executing
+ * the OS kernel, or we may miss some environment variable updates.
+ */
+void
+build_environment_module(void)
+{
+	struct preloaded_file *fp;
+	size_t size;
+	char *name = "environment";
+	vm_offset_t laddr;
+
+	/* We can't load first */
+	if ((file_findfile(NULL, NULL)) == NULL) {
+		printf("Can not load environment module: %s\n",
+		    "the kernel is not loaded");
+		return;
+	}
+
+	size = env_get_size();
+
+	fp = file_alloc();
+	if (fp != NULL) {
+		fp->f_name = strdup(name);
+		fp->f_type = strdup(name);
+	}
+
+	if (fp == NULL || fp->f_name == NULL || fp->f_type == NULL) {
+		printf("Can not load environment module: %s\n",
+		    "out of memory");
+		if (fp != NULL)
+			file_discard(fp);
+		return;
+	}
+
+
+	if (archsw.arch_loadaddr != NULL)
+		loadaddr = archsw.arch_loadaddr(LOAD_MEM, &size, loadaddr);
+
+	if (loadaddr == 0) {
+		printf("Can not load environment module: %s\n",
+		    "out of memory");
+		file_discard(fp);
+		return;
+	}
+
+	laddr = bi_copyenv(loadaddr);
+
+	/* Looks OK so far; populate control structure */
+	fp->f_loader = -1;
+	fp->f_addr = loadaddr;
+	fp->f_size = laddr - loadaddr;
+
+	/* recognise space consumption */
+	loadaddr = laddr;
+
+	file_insert_tail(fp);
+}
+
+/*
  * We've been asked to load (fname) as (type), so just suck it in,
  * no arguments or anything.
  */
@@ -413,6 +494,7 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
     char			*name;
     int				fd, got;
     vm_offset_t			laddr;
+    struct stat			st;
 
     /* We can't load first */
     if ((file_findfile(NULL, NULL)) == NULL) {
@@ -434,12 +516,25 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 	free(name);
 	return(NULL);
     }
+    if (fstat(fd, &st) < 0) {
+	close(fd);
+	snprintf(command_errbuf, sizeof (command_errbuf),
+	    "stat error '%s': %s", name, strerror(errno));
+	free(name);
+	return(NULL);
+    }
 
     if (archsw.arch_loadaddr != NULL)
 	loadaddr = archsw.arch_loadaddr(LOAD_RAW, name, loadaddr);
+    if (loadaddr == 0) {
+	close(fd);
+	snprintf(command_errbuf, sizeof (command_errbuf),
+	    "no memory to load %s", name);
+	free(name);
+	return(NULL);
+    }
 
-    laddr = roundup(loadaddr, PAGE_SIZE);
-    loadaddr = laddr;
+    laddr = loadaddr;
     for (;;) {
 	/* read in 4k chunks; size is not really important */
 	got = archsw.arch_readin(fd, laddr, 4096);
@@ -450,6 +545,9 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 		"error reading '%s': %s", name, strerror(errno));
 	    free(name);
 	    close(fd);
+	    if (archsw.arch_free_loadaddr != NULL)
+		archsw.arch_free_loadaddr(loadaddr,
+		    (uint64_t)(roundup2(st.st_size, PAGE_SIZE) >> 12));
 	    return(NULL);
 	}
 	laddr += got;
@@ -893,6 +991,11 @@ file_discard(struct preloaded_file *fp)
     struct kernel_module	*mp, *mp1;
     if (fp == NULL)
 	return;
+
+    if (archsw.arch_free_loadaddr != NULL && fp->f_addr)
+	archsw.arch_free_loadaddr(fp->f_addr,
+	    (uint64_t)(roundup2(fp->f_size, PAGE_SIZE) >> 12));
+
     md = fp->f_metadata;
     while (md) {
 	md1 = md;
@@ -906,13 +1009,10 @@ file_discard(struct preloaded_file *fp)
 	mp1 = mp;
 	mp = mp->m_next;
 	free(mp1);
-    }	
-    if (fp->f_name != NULL)
-	free(fp->f_name);
-    if (fp->f_type != NULL)
-        free(fp->f_type);
-    if (fp->f_args != NULL)
-        free(fp->f_args);
+    }
+    free(fp->f_name);
+    free(fp->f_type);
+    free(fp->f_args);
     free(fp);
 }
 

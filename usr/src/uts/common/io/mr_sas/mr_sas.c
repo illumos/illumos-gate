@@ -45,7 +45,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Citrus IT Limited. All rights reserved.
+ * Copyright 2015, 2017 Citrus IT Limited. All rights reserved.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -565,9 +565,16 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* initialize function pointers */
 		switch (device_id) {
-		case PCI_DEVICE_ID_LSI_TBOLT:
 		case PCI_DEVICE_ID_LSI_INVADER:
 		case PCI_DEVICE_ID_LSI_FURY:
+		case PCI_DEVICE_ID_LSI_INTRUDER:
+		case PCI_DEVICE_ID_LSI_INTRUDER_24:
+		case PCI_DEVICE_ID_LSI_CUTLASS_52:
+		case PCI_DEVICE_ID_LSI_CUTLASS_53:
+			dev_err(dip, CE_CONT, "?Gen3 device detected\n");
+			instance->gen3 = 1;
+			/* FALLTHROUGH */
+		case PCI_DEVICE_ID_LSI_TBOLT:
 			dev_err(dip, CE_CONT, "?TBOLT device detected\n");
 
 			instance->func_ptr =
@@ -584,6 +591,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * certain other features are available to a Skinny
 			 * HBA.
 			 */
+			dev_err(dip, CE_CONT, "?Skinny device detected\n");
 			instance->skinny = 1;
 			/* FALLTHRU */
 
@@ -1596,7 +1604,7 @@ mrsas_quiesce(dev_info_t *dip)
 /*ARGSUSED*/
 static int
 mrsas_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
-		scsi_hba_tran_t *tran, struct scsi_device *sd)
+    scsi_hba_tran_t *tran, struct scsi_device *sd)
 {
 	struct mrsas_instance *instance;
 	uint16_t tgt = sd->sd_address.a_target;
@@ -1772,8 +1780,8 @@ mrsas_name_node(dev_info_t *dip, char *name, int len)
  */
 static struct scsi_pkt *
 mrsas_tran_init_pkt(struct scsi_address *ap, register struct scsi_pkt *pkt,
-	struct buf *bp, int cmdlen, int statuslen, int tgtlen,
-	int flags, int (*callback)(), caddr_t arg)
+    struct buf *bp, int cmdlen, int statuslen, int tgtlen,
+    int flags, int (*callback)(), caddr_t arg)
 {
 	struct scsa_cmd	*acmd;
 	struct mrsas_instance	*instance;

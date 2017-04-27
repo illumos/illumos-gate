@@ -61,7 +61,6 @@ file path=usr/share/man/man1/rusers.1
 file path=usr/share/man/man1/whois.1
 file path=usr/share/man/man1m/rdate.1m
 file path=usr/share/man/man1m/rmt.1m
-file path=usr/share/man/man1m/rsh.1m
 file path=usr/share/man/man1m/rwall.1m
 file path=usr/share/man/man1m/snoop.1m
 file path=usr/share/man/man1m/spray.1m
@@ -84,4 +83,3 @@ link path=usr/bin/remsh target=./rsh
 link path=usr/lib/sunw,rcp target=../bin/rcp
 link path=usr/share/man/man1/remote_shell.1 target=rsh.1
 link path=usr/share/man/man1/remsh.1 target=rsh.1
-link path=usr/share/man/man1m/restricted_shell.1m target=rsh.1m

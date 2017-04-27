@@ -1,7 +1,4 @@
 /*
- * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- */
-/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -20,6 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
+ */
+/*
+ * Copyright 2017 Joyent Inc
+ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*
@@ -41,6 +42,7 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <sys/resource.h>
+#include <sys/debug.h>
 
 #define	SRVTAB	""
 #define	FDCACHE_PERCENTAGE	.75	/* Percentage of total FD limit */
@@ -2647,6 +2649,7 @@ uid_t *uidp;
 		syslog(LOG_ERR, gettext("checkfrom: not UNIX credentials"));
 			goto weakauth;
 		}
+		CTASSERT(sizeof (struct authunix_parms) <= RQCRED_SIZE);
 		/*LINTED*/
 		aup = (struct authunix_parms *)rqstp->rq_clntcred;
 		*uidp = aup->aup_uid;

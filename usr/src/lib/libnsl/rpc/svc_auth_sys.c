@@ -22,6 +22,7 @@
 
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent Inc
  * Use is subject to license terms.
  */
 
@@ -32,8 +33,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Handles UNIX flavor authentication parameters on the service side of rpc.
@@ -50,7 +49,19 @@
 #include <rpc/rpc.h>
 #include <syslog.h>
 #include <sys/types.h>
+#include <sys/debug.h>
 #include <string.h>
+
+/*
+ * NOTE: this has to fit inside RQCRED_SIZE bytes. If you update this struct,
+ * double-check it still fits.
+ */
+struct authsys_area {
+	struct authsys_parms area_aup;
+	char area_machname[MAX_MACHINE_NAME+1];
+	gid_t area_gids[NGRPS];
+};
+CTASSERT(sizeof (struct authsys_area) <= RQCRED_SIZE);
 
 /*
  * System (Unix) longhand authenticator
@@ -62,17 +73,13 @@ __svcauth_sys(struct svc_req *rqst, struct rpc_msg *msg)
 	XDR xdrs;
 	struct authsys_parms *aup;
 	rpc_inline_t *buf;
-	struct area {
-		struct authsys_parms area_aup;
-		char area_machname[MAX_MACHINE_NAME+1];
-		gid_t area_gids[NGRPS];
-	} *area;
+	struct authsys_area *area;
 	uint_t auth_len;
 	uint_t str_len, gid_len;
 	int i;
 
 	/* LINTED pointer cast */
-	area = (struct area *)rqst->rq_clntcred;
+	area = (struct authsys_area *)rqst->rq_clntcred;
 	aup = &area->area_aup;
 	aup->aup_machname = area->area_machname;
 	aup->aup_gids = area->area_gids;

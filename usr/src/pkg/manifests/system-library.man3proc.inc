@@ -13,7 +13,30 @@
 # Copyright 2015 Joyent, Inc.
 #
 
-
+file path=usr/share/man/man3proc/proc_service.3proc
+file path=usr/share/man/man3proc/ps_lgetregs.3proc
+file path=usr/share/man/man3proc/ps_pglobal_lookup.3proc
+file path=usr/share/man/man3proc/ps_pread.3proc
+file path=usr/share/man/man3proc/ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_kill.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_lcontinue.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_lgetfpregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lgetxregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lgetxregsize.3proc \
+    target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lrolltoaddr.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_lsetfpregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lsetregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lsetxregs.3proc target=ps_lgetregs.3proc
+link path=usr/share/man/man3proc/ps_lstop.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_pcontinue.3proc target=ps_pstop.3proc
+link path=usr/share/man/man3proc/ps_pdread.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_pdwrite.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_pglobal_sym.3proc \
+    target=ps_pglobal_lookup.3proc
+link path=usr/share/man/man3proc/ps_ptread.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_ptwrite.3proc target=ps_pread.3proc
+link path=usr/share/man/man3proc/ps_pwrite.3proc target=ps_pread.3proc
 file path=usr/share/man/man3proc/Lctlfd.3proc
 file path=usr/share/man/man3proc/Lfree.3proc
 file path=usr/share/man/man3proc/Lgrab_error.3proc

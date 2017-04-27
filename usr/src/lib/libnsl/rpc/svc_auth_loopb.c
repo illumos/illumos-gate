@@ -22,10 +22,9 @@
 
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent Inc
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Handles the loopback UNIX flavor authentication parameters on the
@@ -37,6 +36,18 @@
 #include <rpc/rpc.h>
 #include <syslog.h>
 #include <sys/types.h>
+#include <sys/debug.h>
+
+/*
+ * NOTE: this has to fit inside RQCRED_SIZE bytes. If you update this struct,
+ * double-check it still fits.
+ */
+struct authlpbk_area {
+	struct authsys_parms area_aup;
+	char area_machname[MAX_MACHINE_NAME+1];
+	gid_t area_gids[NGRPS_LOOPBACK];
+};
+CTASSERT(sizeof (struct authlpbk_area) <= RQCRED_SIZE);
 
 /*
  * Loopback system (Unix) longhand authenticator
@@ -48,17 +59,13 @@ __svcauth_loopback(struct svc_req *rqst, struct rpc_msg *msg)
 	XDR xdrs;
 	struct authsys_parms *aup;
 	rpc_inline_t *buf;
-	struct area {
-		struct authsys_parms area_aup;
-		char area_machname[MAX_MACHINE_NAME+1];
-		gid_t area_gids[NGRPS_LOOPBACK];
-	} *area;
+	struct authlpbk_area *area;
 	size_t auth_len;
 	size_t str_len, gid_len;
 	int i;
 
 	/* LINTED pointer cast */
-	area = (struct area *)rqst->rq_clntcred;
+	area = (struct authlpbk_area *)rqst->rq_clntcred;
 	aup = &area->area_aup;
 	aup->aup_machname = area->area_machname;
 	aup->aup_gids = area->area_gids;
@@ -75,6 +82,10 @@ __svcauth_loopback(struct svc_req *rqst, struct rpc_msg *msg)
 			stat = AUTH_BADCRED;
 			goto done;
 		}
+		if (str_len > auth_len) {
+			stat = AUTH_BADCRED;
+			goto done;
+		}
 		(void) memcpy(aup->aup_machname, buf, str_len);
 		aup->aup_machname[str_len] = 0;
 		str_len = RNDUP(str_len);
@@ -86,10 +97,6 @@ __svcauth_loopback(struct svc_req *rqst, struct rpc_msg *msg)
 			stat = AUTH_BADCRED;
 			goto done;
 		}
-		aup->aup_len = gid_len;
-		for (i = 0; i < gid_len; i++) {
-			aup->aup_gids[i] = (gid_t)IXDR_GET_INT32(buf);
-		}
 		/*
 		 * five is the smallest unix credentials structure -
 		 * timestamp, hostname len (0), uid, gid, and gids len (0).
@@ -100,6 +107,10 @@ __svcauth_loopback(struct svc_req *rqst, struct rpc_msg *msg)
 			    gid_len, str_len, auth_len);
 			stat = AUTH_BADCRED;
 			goto done;
+		}
+		aup->aup_len = gid_len;
+		for (i = 0; i < gid_len; i++) {
+			aup->aup_gids[i] = (gid_t)IXDR_GET_INT32(buf);
 		}
 	} else if (!xdr_authloopback_parms(&xdrs, aup)) {
 		xdrs.x_op = XDR_FREE;

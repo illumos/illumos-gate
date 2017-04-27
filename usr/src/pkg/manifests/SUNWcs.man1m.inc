@@ -211,6 +211,7 @@ file path=usr/share/man/man1m/route.1m
 file path=usr/share/man/man1m/routeadm.1m
 file path=usr/share/man/man1m/rpcbind.1m
 file path=usr/share/man/man1m/rpcinfo.1m
+file path=usr/share/man/man1m/rsh.1m
 file path=usr/share/man/man1m/rtc.1m
 file path=usr/share/man/man1m/sac.1m
 file path=usr/share/man/man1m/sacadm.1m
@@ -281,6 +282,7 @@ link path=usr/share/man/man1m/grpck.1m target=pwck.1m
 link path=usr/share/man/man1m/intro.1m target=Intro.1m
 link path=usr/share/man/man1m/poweroff.1m target=halt.1m
 link path=usr/share/man/man1m/quotaoff.1m target=quotaon.1m
+link path=usr/share/man/man1m/restricted_shell.1m target=rsh.1m
 link path=usr/share/man/man1m/telinit.1m target=init.1m
 link path=usr/share/man/man1m/umount.1m target=mount.1m
 link path=usr/share/man/man1m/umountall.1m target=mountall.1m
