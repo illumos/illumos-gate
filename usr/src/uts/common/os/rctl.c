@@ -2943,22 +2943,15 @@ rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
 	}
 
 	if (chargeproc != 0) {
-		rlim64_t p_max;
-
-		p_max = rctl_enforced_value(rc_process_maxlockedmem, p->p_rctls,
-		    p);
-
 		/* Check for overflow */
 		if ((p->p_locked_mem + inc) < p->p_locked_mem) {
 			ret = EAGAIN;
 			goto out;
 		}
-		if ((p->p_locked_mem + inc) > p_max) {
-			if (rctl_test_entity(rc_process_maxlockedmem,
-			    p->p_rctls, p, &e, inc, 0) & RCT_DENY) {
-				ret = EAGAIN;
-				goto out;
-			}
+		if (rctl_test_entity(rc_process_maxlockedmem, p->p_rctls, p,
+		    &e, inc, 0) & RCT_DENY) {
+			ret = EAGAIN;
+			goto out;
 		}
 
 		p->p_locked_mem += inc;

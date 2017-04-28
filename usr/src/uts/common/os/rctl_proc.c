@@ -33,6 +33,7 @@
 #include <sys/port_kernel.h>
 #include <sys/signal.h>
 #include <sys/var.h>
+#include <sys/policy.h>
 
 #include <sys/vmparam.h>
 #include <sys/machparam.h>
@@ -214,6 +215,26 @@ static rctl_ops_t proc_vmem_ops = {
 };
 
 /*
+ * process.max-locked-memory
+ */
+/*ARGSUSED*/
+static int
+proc_maxlockedmem_test(struct rctl *r, struct proc *p, rctl_entity_p_t *e,
+    struct rctl_val *rv, rctl_qty_t i, uint_t f)
+{
+	if (secpolicy_lock_memory(CRED()) == 0)
+		return (0);
+	return ((p->p_locked_mem + i) > rv->rcv_value);
+}
+
+static rctl_ops_t proc_maxlockedmem_ops = {
+	rcop_no_action,
+	rcop_no_usage,
+	rcop_no_set,
+	proc_maxlockedmem_test
+};
+
+/*
  * void rctlproc_default_init()
  *
  * Overview
@@ -388,7 +409,7 @@ rctlproc_init(void)
 	rc_process_maxlockedmem = rctl_register("process.max-locked-memory",
 	    RCENTITY_PROCESS, RCTL_GLOBAL_LOWERABLE | RCTL_GLOBAL_DENY_ALWAYS |
 	    RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_BYTES,
-	    ULONG_MAX, UINT32_MAX, &rctl_default_ops);
+	    ULONG_MAX, UINT32_MAX, &proc_maxlockedmem_ops);
 
 	/*
 	 * Place minimal set of controls on "sched" process for inheritance by

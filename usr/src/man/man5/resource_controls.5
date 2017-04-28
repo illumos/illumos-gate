@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RESOURCE_CONTROLS 5 "April 18, 2017"
+.TH RESOURCE_CONTROLS 5 "April 28, 2017"
 .SH NAME
 resource_controls \- resource controls available through project database
 .SH DESCRIPTION
@@ -121,7 +121,11 @@ number of bytes.
 .sp .6
 .RS 4n
 Total amount of physical memory that can be locked by this process, expressed
-as a number of bytes.
+as a number of bytes. This limit is not enforced for a process with the
+\fB\fBPRIV_PROC_LOCK_MEMORY\fR\fR privilege. Because the ability to lock memory
+is controlled by the \fB\fBPRIV_PROC_LOCK_MEMORY\fR\fR privilege within native
+zones, this resource control is only useful within branded zones which might
+support a different policy for locking memory.
 .RE
 
 .sp
@@ -997,7 +1001,7 @@ Interface Stability	Evolving
 \fBprctl\fR(1), \fBpooladm\fR(1M), \fBpoolcfg\fR(1M), \fBprojadd\fR(1M),
 \fBprojmod\fR(1M), \fBrctladm\fR(1M), \fBsetrctl\fR(2),
 \fBrctlblk_set_value\fR(3C), \fBlibpool\fR(3LIB), \fBproject\fR(4),
-\fBattributes\fR(5), \fBFSS\fR(7)
+\fBattributes\fR(5), \fBprivileges\fR(5), \fBzones\fR(5), \fBFSS\fR(7)
 .sp
 .LP
 \fISystem Administration Guide:  Virtualization Using the Solaris Operating
