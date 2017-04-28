@@ -1,0 +1,8 @@
+::set +o autowrap
+::typedef -c lp32
+0::printf "Pack my box with five dozen liquor jugs. How razorback-jumping frogs can level six piqued gymnasts! Amazingly few discotheques provide jukeboxes.%d" int .
+
+::set -o autowrap
+0::printf "Pack my box with five dozen liquor jugs. How razorback-jumping frogs can level six piqued gymnasts! Amazingly few discotheques provide jukeboxes.%d" int .
+
+

@@ -1,10 +1,10 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved.
+.\" Copyright (c) 2017, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MDB 1 "Oct 05, 2012"
+.TH MDB 1 "Apr 28, 2017"
 .SH NAME
 mdb \- modular debugger
 .SH SYNOPSIS
@@ -3946,6 +3946,17 @@ Sets the default limit on the number of characters that \fB::print\fR attempts
 to display as an ASCII string when printing a char array. If \fIlimit\fR is the
 special token \fBnone\fR, the entire char array is displayed as a string by
 default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBautowrap\fR\fR
+.ad
+.RS 25n
+Forces output to be autowrapped at the terminal width. When this option
+is enabled, \fBmdb\fR will autowrap output, making some attempt to inject
+newlines at word boundaries. This option is disabled by default.
 .RE
 
 .sp
