@@ -2635,7 +2635,7 @@ iwn_rx_phy(struct iwn_softc *sc, struct iwn_rx_desc *desc,
 	DTRACE_PROBE1(rx__phy, struct iwn_rx_stat *, stat);
 
 	/* Save RX statistics, they will be used on MPDU_RX_DONE. */
-	memcpy(&sc->last_rx_stat, stat, sizeof (*stat));
+	(void) memcpy(&sc->last_rx_stat, stat, sizeof (*stat));
 	sc->last_rx_valid = 1;
 }
 
@@ -2818,7 +2818,7 @@ iwn5000_rx_calib_results(struct iwn_softc *sc, struct iwn_rx_desc *desc,
 		return;
 	}
 	sc->calibcmd[idx].len = len;
-	memcpy(sc->calibcmd[idx].buf, calib, len);
+	(void) memcpy(sc->calibcmd[idx].buf, calib, len);
 }
 
 /*
@@ -3088,7 +3088,7 @@ iwn_notif_intr(struct iwn_softc *sc)
 			}
 			if (uc->subtype == IWN_UCODE_INIT) {
 				/* Save microcontroller report. */
-				memcpy(&sc->ucode_info, uc, sizeof (*uc));
+				(void) memcpy(&sc->ucode_info, uc, sizeof (*uc));
 			}
 			/* Save the address of the error log in SRAM. */
 			sc->errptr = le32toh(uc->errptr);
@@ -3930,7 +3930,7 @@ iwn_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	/* Copy 802.11 header in TX command. */
 	/* XXX NetBSD changed this in rev 1.20 */
-	memcpy(((uint8_t *)tx) + sizeof(*tx), wh, hdrlen);
+	(void) memcpy(((uint8_t *)tx) + sizeof(*tx), wh, hdrlen);
 	mp->b_rptr += hdrlen;
 
 	bcopy(mp->b_rptr, data->dma_data.vaddr, totlen - hdrlen);
@@ -4431,7 +4431,7 @@ iwn_cmd(struct iwn_softc *sc, uint8_t code, void *buf, int size, int async)
 	cmd->qid = ring->qid;
 	cmd->idx = ring->cur;
 	bzero(cmd->data, size);
-	memcpy(cmd->data, buf, size);
+	(void) memcpy(cmd->data, buf, size);
 
 	bzero(desc, sizeof(*desc));
 	desc->nsegs = 1;
@@ -4485,9 +4485,9 @@ iwn4965_add_node(struct iwn_softc *sc, struct iwn_node_info *node, int async)
 	 */
 	src = (char *)node;
 	dst = (char *)&hnode;
-	memcpy(dst, src, 48);
+	(void) memcpy(dst, src, 48);
 	/* Skip TSC, RX MIC and TX MIC fields from ``src''. */
-	memcpy(dst + 48, src + 72, 20);
+	(void) memcpy(dst + 48, src + 72, 20);
 	return iwn_cmd(sc, IWN_CMD_ADD_NODE, &hnode, sizeof hnode, async);
 }
 
@@ -4629,7 +4629,7 @@ iwn_set_timing(struct iwn_softc *sc, struct ieee80211_node *ni)
 	uint64_t val, mod;
 
 	memset(&cmd, 0, sizeof cmd);
-	memcpy(&cmd.tstamp, ni->in_tstamp.data, sizeof (uint64_t));
+	(void) memcpy(&cmd.tstamp, ni->in_tstamp.data, sizeof (uint64_t));
 	cmd.bintval = htole16(ni->in_intval);
 	cmd.lintval = htole16(10);
 
@@ -5758,14 +5758,14 @@ iwn_scan(struct iwn_softc *sc, uint16_t flags)
 	essid = (struct iwn_scan_essid *)(tx + 1);
 	if (ic->ic_des_esslen != 0) {
 		char essidstr[IEEE80211_NWID_LEN+1];
-		memcpy(essidstr, ic->ic_des_essid, ic->ic_des_esslen);
+		(void) memcpy(essidstr, ic->ic_des_essid, ic->ic_des_esslen);
 		essidstr[ic->ic_des_esslen] = '\0';
 
 		DTRACE_PROBE1(scan__direct, char *, essidstr);
 
 		essid[0].id = IEEE80211_ELEMID_SSID;
 		essid[0].len = ic->ic_des_esslen;
-		memcpy(essid[0].data, ic->ic_des_essid, ic->ic_des_esslen);
+		(void) memcpy(essid[0].data, ic->ic_des_essid, ic->ic_des_esslen);
 
 		is_active = 1;
 		/* hdr->crc_threshold = 0x1; */
@@ -6111,7 +6111,7 @@ iwn_set_key(struct ieee80211com *ic, struct ieee80211_node *ni,
 	node.flags = IWN_FLAG_SET_KEY;
 	node.kflags = htole16(kflags);
 	node.kid = k->k_id;
-	memcpy(node.key, k->k_key, k->k_len);
+	(void) memcpy(node.key, k->k_key, k->k_len);
 	DTRACE_PROBE2(set__key, int, k->k_id, int, node.id);
 	return ops->add_node(sc, &node, 1);
 }
@@ -6427,7 +6427,7 @@ iwn5000_send_wimax_coex(struct iwn_softc *sc)
 		    IWN_WIMAX_COEX_UNASSOC_WA_UNMASK |
 		    IWN_WIMAX_COEX_STA_TABLE_VALID |
 		    IWN_WIMAX_COEX_ENABLE;
-		memcpy(wimax.events, iwn6050_wimax_events,
+		(void) memcpy(wimax.events, iwn6050_wimax_events,
 		    sizeof iwn6050_wimax_events);
 	} else
 #endif
@@ -6689,8 +6689,8 @@ iwn4965_load_firmware(struct iwn_softc *sc)
 	ASSERT(mutex_owned(&sc->sc_mtx));
 
 	/* Copy initialization sections into pre-allocated DMA-safe memory. */
-	memcpy(dma->vaddr, fw->init.data, fw->init.datasz);
-	memcpy((char *)dma->vaddr + IWN4965_FW_DATA_MAXSZ,
+	(void) memcpy(dma->vaddr, fw->init.data, fw->init.datasz);
+	(void) memcpy((char *)dma->vaddr + IWN4965_FW_DATA_MAXSZ,
 	    fw->init.text, fw->init.textsz);
 	(void) ddi_dma_sync(dma->dma_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
 
@@ -6730,8 +6730,8 @@ iwn4965_load_firmware(struct iwn_softc *sc)
 	sc->sc_misc->temp.value.ul = sc->temp;
 
 	/* Copy runtime sections into pre-allocated DMA-safe memory. */
-	memcpy(dma->vaddr, fw->main.data, fw->main.datasz);
-	memcpy((char *)dma->vaddr + IWN4965_FW_DATA_MAXSZ,
+	(void) memcpy(dma->vaddr, fw->main.data, fw->main.datasz);
+	(void) memcpy((char *)dma->vaddr + IWN4965_FW_DATA_MAXSZ,
 	    fw->main.text, fw->main.textsz);
 	(void) ddi_dma_sync(dma->dma_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
 
@@ -6760,7 +6760,7 @@ iwn5000_load_firmware_section(struct iwn_softc *sc, uint32_t dst,
 	ASSERT(mutex_owned(&sc->sc_mtx));
 
 	/* Copy firmware section into pre-allocated DMA-safe memory. */
-	memcpy(dma->vaddr, section, size);
+	(void) memcpy(dma->vaddr, section, size);
 	(void) ddi_dma_sync(dma->dma_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
 
 	if ((error = iwn_nic_lock(sc)) != 0)
