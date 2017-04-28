@@ -71,73 +71,58 @@
 enum auth_stat
 _svcauth_unix(struct svc_req *rqst, struct rpc_msg *msg)
 {
-	enum auth_stat stat;
-	XDR xdrs;
 	struct authunix_parms *aup;
 	int32_t *buf;
 	struct area {
 		struct authunix_parms area_aup;
 		char area_machname[MAX_MACHINE_NAME+1];
-		u_int area_gids[NGRPS];
+		gid_t area_gids[NGRPS];
 	} *area;
-	u_int auth_len;
-	u_int str_len, gid_len;
+	uint_t auth_len;
+	uint_t str_len, gid_len;
 	int i;
 
 	CTASSERT(sizeof (struct area) <= RQCRED_SIZE);
 	/* LINTED pointer alignment */
-	area = (struct area *) rqst->rq_clntcred;
+	area = (struct area *)rqst->rq_clntcred;
 	aup = &area->area_aup;
 	aup->aup_machname = area->area_machname;
-	aup->aup_gids = (gid_t *)area->area_gids;
-	auth_len = (u_int)msg->rm_call.cb_cred.oa_length;
-	xdrmem_create(&xdrs, msg->rm_call.cb_cred.oa_base, auth_len,
-	    XDR_DECODE);
-	buf = XDR_INLINE(&xdrs, auth_len);
-	if (buf != NULL) {
-		aup->aup_time = IXDR_GET_INT32(buf);
-		str_len = IXDR_GET_U_INT32(buf);
-		if (str_len > MAX_MACHINE_NAME) {
-			stat = AUTH_BADCRED;
-			goto done;
-		}
-		bcopy((caddr_t)buf, aup->aup_machname, (u_int)str_len);
-		aup->aup_machname[str_len] = 0;
-		str_len = RNDUP(str_len);
-		buf += str_len / sizeof (int32_t);
-		aup->aup_uid = IXDR_GET_INT32(buf);
-		aup->aup_gid = IXDR_GET_INT32(buf);
-		gid_len = IXDR_GET_U_INT32(buf);
-		if (gid_len > NGRPS) {
-			stat = AUTH_BADCRED;
-			goto done;
-		}
-		aup->aup_len = gid_len;
-		for (i = 0; i < gid_len; i++) {
-			aup->aup_gids[i] = IXDR_GET_INT32(buf);
-		}
-		/*
-		 * five is the smallest unix credentials structure -
-		 * timestamp, hostname len (0), uid, gid, and gids len (0).
-		 */
-		if ((5 + gid_len) * BYTES_PER_XDR_UNIT + str_len > auth_len) {
-			printf("bad auth_len gid %d str %d auth %d",
-			    gid_len, str_len, auth_len);
-			stat = AUTH_BADCRED;
-			goto done;
-		}
-	} else if (! xdr_authunix_parms(&xdrs, aup)) {
-		xdrs.x_op = XDR_FREE;
-		(void) xdr_authunix_parms(&xdrs, aup);
-		stat = AUTH_BADCRED;
-		goto done;
+	aup->aup_gids = area->area_gids;
+	auth_len = msg->rm_call.cb_cred.oa_length;
+	if (auth_len == 0)
+		return (AUTH_BADCRED);
+
+	/* LINTED pointer cast */
+	buf = (int32_t *)msg->rm_call.cb_cred.oa_base;
+
+	aup->aup_time = IXDR_GET_INT32(buf);
+	str_len = IXDR_GET_U_INT32(buf);
+	if (str_len > MAX_MACHINE_NAME)
+		return (AUTH_BADCRED);
+	bcopy((caddr_t)buf, aup->aup_machname, str_len);
+	aup->aup_machname[str_len] = 0;
+	str_len = RNDUP(str_len);
+	buf += str_len / sizeof (int32_t);
+	aup->aup_uid = IXDR_GET_INT32(buf);
+	aup->aup_gid = IXDR_GET_INT32(buf);
+	gid_len = IXDR_GET_U_INT32(buf);
+	if (gid_len > NGRPS)
+		return (AUTH_BADCRED);
+	aup->aup_len = gid_len;
+	for (i = 0; i < gid_len; i++) {
+		aup->aup_gids[i] = IXDR_GET_INT32(buf);
 	}
+	/*
+	 * five is the smallest unix credentials structure -
+	 * timestamp, hostname len (0), uid, gid, and gids len (0).
+	 */
+	if ((5 + gid_len) * BYTES_PER_XDR_UNIT + str_len > auth_len)
+		return (AUTH_BADCRED);
+
 	rqst->rq_xprt->xp_verf.oa_flavor = AUTH_NULL;
 	rqst->rq_xprt->xp_verf.oa_length = 0;
-	stat = AUTH_OK;
-done:
-	XDR_DESTROY(&xdrs);
-	return (stat);
+
+	return (AUTH_OK);
 }
 
 
