@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -505,7 +506,7 @@ sdev_find_mntinfo(char *mntpt)
 	mntinfo = sdev_mntinfo;
 	while (mntinfo) {
 		if (strcmp(mntpt, mntinfo->sdev_root->sdev_name) == 0) {
-			SDEVTOV(mntinfo->sdev_root)->v_count++;
+			VN_HOLD(SDEVTOV(mntinfo->sdev_root));
 			break;
 		}
 		mntinfo = mntinfo->sdev_next;
@@ -517,7 +518,11 @@ sdev_find_mntinfo(char *mntpt)
 void
 sdev_mntinfo_rele(struct sdev_data *mntinfo)
 {
+	vnode_t *vp = SDEVTOV(mntinfo->sdev_root);
+
 	mutex_enter(&sdev_lock);
-	SDEVTOV(mntinfo->sdev_root)->v_count--;
+	mutex_enter(&vp->v_lock);
+	VN_RELE_LOCKED(vp);
+	mutex_exit(&vp->v_lock);
 	mutex_exit(&sdev_lock);
 }

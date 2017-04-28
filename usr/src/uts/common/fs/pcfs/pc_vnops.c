@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -945,7 +946,7 @@ pcfs_inactive(
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
 	if (vp->v_count > 1) {
-		vp->v_count--;  /* release our hold from vn_rele */
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		pc_unlockfs(fsp);
 		return;

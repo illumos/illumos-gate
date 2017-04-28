@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 
 #include <sys/systm.h>
@@ -303,7 +306,7 @@ sv_inactive(vnode_t *vp)
 	mutex_enter(&vp->v_lock);
 	/* check if someone slipped in while locks were dropped */
 	if (vp->v_count > 1) {
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&rp->r_svlock);
 		return;

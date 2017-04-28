@@ -23,6 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -434,10 +437,8 @@ socket_vop_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 	if (vp->v_count < 1)
 		cmn_err(CE_PANIC, "socket_inactive: Bad v_count");
 
-	/*
-	 * Drop the temporary hold by vn_rele now
-	 */
-	if (--vp->v_count != 0) {
+	VN_RELE_LOCKED(vp);
+	if (vp->v_count != 0) {
 		mutex_exit(&vp->v_lock);
 		return;
 	}

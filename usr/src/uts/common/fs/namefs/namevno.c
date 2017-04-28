@@ -24,7 +24,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -162,7 +162,7 @@ gotit:
  */
 static int
 nm_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
 	int error = 0;
@@ -191,21 +191,21 @@ nm_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
 
 static int
 nm_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *crp,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (VOP_READ(VTONM(vp)->nm_filevp, uiop, ioflag, crp, ct));
 }
 
 static int
 nm_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *crp,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (VOP_WRITE(VTONM(vp)->nm_filevp, uiop, ioflag, crp, ct));
 }
 
 static int
 nm_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr, int *rvalp,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (VOP_IOCTL(VTONM(vp)->nm_filevp, cmd, arg, mode, cr, rvalp, ct));
 }
@@ -217,7 +217,7 @@ nm_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr, int *rvalp,
 /* ARGSUSED */
 static int
 nm_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
 	struct vattr va;
@@ -261,12 +261,8 @@ nm_access_unlocked(void *vnp, int mode, cred_t *crp)
  */
 /* ARGSUSED */
 static int
-nm_setattr(
-	vnode_t *vp,
-	vattr_t *vap,
-	int flags,
-	cred_t *crp,
-	caller_context_t *ctp)
+nm_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp,
+    caller_context_t *ctp)
 {
 	struct namenode *nodep = VTONM(vp);
 	struct vattr *nmvap = &nodep->nm_vattr;
@@ -334,8 +330,7 @@ out:
  */
 /* ARGSUSED */
 static int
-nm_access(vnode_t *vp, int mode, int flags, cred_t *crp,
-	caller_context_t *ct)
+nm_access(vnode_t *vp, int mode, int flags, cred_t *crp, caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
 	int error;
@@ -356,9 +351,9 @@ nm_access(vnode_t *vp, int mode, int flags, cred_t *crp,
  */
 /*ARGSUSED*/
 static int
-nm_create(vnode_t *dvp, char *name, vattr_t *vap, enum vcexcl excl,
-	int mode, vnode_t **vpp, cred_t *cr, int flag,
-	caller_context_t *ct, vsecattr_t *vsecp)
+nm_create(vnode_t *dvp, char *name, vattr_t *vap, enum vcexcl excl, int mode,
+    vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
+    vsecattr_t *vsecp)
 {
 	int error;
 
@@ -378,7 +373,7 @@ nm_create(vnode_t *dvp, char *name, vattr_t *vap, enum vcexcl excl,
 /*ARGSUSED*/
 static int
 nm_link(vnode_t *tdvp, vnode_t *vp, char *tnm, cred_t *crp,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	return (EXDEV);
 }
@@ -399,7 +394,8 @@ nm_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct)
 
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
-	if (--vp->v_count != 0) {
+	VN_RELE_LOCKED(vp);
+	if (vp->v_count != 0) {
 		mutex_exit(&vp->v_lock);
 		return;
 	}
@@ -457,7 +453,7 @@ nm_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 
 static int
 nm_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
-	pollhead_t **phpp, caller_context_t *ct)
+    pollhead_t **phpp, caller_context_t *ct)
 {
 	return (VOP_POLL(VTONM(vp)->nm_filevp, events, anyyet, reventsp,
 	    phpp, ct));

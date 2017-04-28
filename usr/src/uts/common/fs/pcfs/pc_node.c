@@ -22,6 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -259,7 +262,7 @@ retry:
 	}
 	ASSERT(!vn_has_cached_data(vp));
 
-	vp->v_count--;  /* release our hold from vn_rele */
+	VN_RELE_LOCKED(vp);
 	if (vp->v_count > 0) { /* Is this check still needed? */
 		PC_DPRINTF1(3, "pc_rele: pcp=0x%p HELD AGAIN!\n", (void *)pcp);
 		mutex_exit(&vp->v_lock);

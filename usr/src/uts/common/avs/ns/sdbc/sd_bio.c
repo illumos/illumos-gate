@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -180,9 +183,9 @@ _sdbc_iobuf_load(void)
 void
 _sdbc_iobuf_unload(void)
 {
-	/* Undo our VN_HOLD hack, by putting ref count back to normal state */
 	mutex_enter(&kvp.v_lock);
-	kvp.v_count = 0;
+	ASSERT(kvp.v_count == 1);
+	VN_RELE_LOCKED(&kvp);
 	mutex_exit(&kvp.v_lock);
 
 	mutex_destroy(&sdbc_bio_mutex);
@@ -706,7 +709,7 @@ _sd_pack_pages(struct buf *bp, struct buf *list, sd_addr_t *addr,
  */
 static void
 _sd_pack_pages_nopageio(struct buf *bp, struct buf *list, sd_addr_t *addr,
-	nsc_off_t offset, nsc_size_t size)
+    nsc_off_t offset, nsc_size_t size)
 {
 	uintptr_t start_addr;
 #ifdef _SD_BIO_STATS
@@ -924,7 +927,7 @@ sd_add_mem(struct buf *bp, char *buf, nsc_size_t len)
  */
 int
 sd_start_io(struct buf *bp, strategy_fn_t strategy, sdbc_ea_fn_t fn,
-		blind_t arg)
+    blind_t arg)
 {
 	int err;
 	iob_hook_t *hook = (iob_hook_t *)bp->b_private;

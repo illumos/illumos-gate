@@ -21,6 +21,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -261,7 +262,7 @@ dc_close(struct vnode *vp, int flag, int count, offset_t off,
 /*ARGSUSED*/
 static int
 dc_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
-	struct caller_context *ct)
+    struct caller_context *ct)
 {
 	struct dcnode *dp = VTODC(vp);
 	size_t rdsize = MAX(MAXBSIZE, dp->dc_hdr->ch_blksize);
@@ -355,7 +356,8 @@ dc_inactive(struct vnode *vp, cred_t *cr, caller_context_t *ctp)
 	mutex_enter(&dctable_lock);
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
-	if (--vp->v_count != 0) {
+	VN_RELE_LOCKED(vp);
+	if (vp->v_count != 0) {
 		/*
 		 * Somebody accessed the dcnode before we got a chance to
 		 * remove it.  They will remove it when they do a vn_rele.
