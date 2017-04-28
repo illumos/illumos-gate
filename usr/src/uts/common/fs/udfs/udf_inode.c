@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -158,8 +159,8 @@ ud_search_icache(struct vfs *vfsp, uint16_t prn, uint32_t ploc)
 
 /* ARGSUSED */
 int
-ud_iget(struct vfs *vfsp, uint16_t prn, uint32_t ploc,
-	struct ud_inode **ipp, struct buf *pbp, struct cred *cred)
+ud_iget(struct vfs *vfsp, uint16_t prn, uint32_t ploc, struct ud_inode **ipp,
+    struct buf *pbp, struct cred *cred)
 {
 	int32_t hno, nomem = 0, icb_tag_flags;
 	union ihead *ih;
@@ -476,7 +477,7 @@ error_ret:
 		 * It remains in the cache. Put it back on the freelist.
 		 */
 		mutex_enter(&vp->v_lock);
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		ip->i_icb_lbano = 0;
 
@@ -962,7 +963,7 @@ ud_iinactive(struct ud_inode *ip, struct cred *cr)
 		return;
 	}
 	if ((vp->v_count > 1) || ((ip->i_flag & IREF) == 0)) {
-		vp->v_count--;		/* release our hold from vn_rele */
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		rw_exit(&ip->i_contents);
 		return;
@@ -1029,7 +1030,7 @@ ud_iinactive(struct ud_inode *ip, struct cred *cr)
 			 */
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
-				vp->v_count--;
+				VN_RELE_LOCKED(vp);
 				mutex_exit(&vp->v_lock);
 				rw_exit(&ip->i_contents);
 				return;
@@ -1064,7 +1065,7 @@ tryagain:
 	if (vn_has_cached_data(vp)) {
 		mutex_exit(&ud_nino_lock);
 		mutex_enter(&vp->v_lock);
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		mutex_enter(&ip->i_tlock);
 		mutex_enter(&udf_ifree_lock);
@@ -1084,7 +1085,7 @@ tryagain:
 		if (vn_has_cached_data(vp)) {
 			cmn_err(CE_WARN, "ud_iinactive: v_pages not NULL\n");
 		}
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 
 	mutex_enter(&ip->i_tlock);
@@ -2036,14 +2037,12 @@ ud_idrop(struct ud_inode *ip)
 	ud_printf("ud_idrop\n");
 
 	mutex_enter(&vp->v_lock);
-	if (vp->v_count > 1) {
-		vp->v_count--;
+	VN_RELE_LOCKED(vp);
+	if (vp->v_count > 0) {
 		mutex_exit(&vp->v_lock);
 		return;
 	}
-	vp->v_count = 0;
 	mutex_exit(&vp->v_lock);
-
 
 	/*
 	 *  if inode is invalid or there is no page associated with

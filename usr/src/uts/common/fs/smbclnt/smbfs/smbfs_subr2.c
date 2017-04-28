@@ -25,6 +25,9 @@
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 /*
  * Node hash implementation initially borrowed from NFS (nfs_subr.c)
@@ -354,7 +357,7 @@ start:
 			rw_enter(&tmp_mi->smi_hash_lk, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
-				vp->v_count--;
+				VN_RELE_LOCKED(vp);
 				mutex_exit(&vp->v_lock);
 				rw_exit(&tmp_mi->smi_hash_lk);
 				/* start over */
@@ -370,7 +373,7 @@ start:
 
 		mutex_enter(&vp->v_lock);
 		if (vp->v_count > 1) {
-			vp->v_count--;
+			VN_RELE_LOCKED(vp);
 			mutex_exit(&vp->v_lock);
 			rw_enter(&mi->smi_hash_lk, RW_READER);
 			goto start;
@@ -533,7 +536,7 @@ smbfs_addfree(smbnode_t *np)
 			rw_enter(&mi->smi_hash_lk, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
-				vp->v_count--;
+				VN_RELE_LOCKED(vp);
 				mutex_exit(&vp->v_lock);
 				rw_exit(&mi->smi_hash_lk);
 				return;
@@ -570,7 +573,7 @@ smbfs_addfree(smbnode_t *np)
 		 */
 		mutex_enter(&vp->v_lock);
 		if (vp->v_count > 1) {
-			vp->v_count--;
+			VN_RELE_LOCKED(vp);
 			mutex_exit(&vp->v_lock);
 			return;
 		}
@@ -592,7 +595,7 @@ smbfs_addfree(smbnode_t *np)
 
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count > 1) {
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		rw_exit(&mi->smi_hash_lk);
 		return;
@@ -1137,7 +1140,7 @@ smbfs_node_reclaim(void)
 			rw_enter(&mi->smi_hash_lk, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
-				vp->v_count--;
+				VN_RELE_LOCKED(vp);
 				mutex_exit(&vp->v_lock);
 				rw_exit(&mi->smi_hash_lk);
 				mutex_enter(&smbfreelist_lock);

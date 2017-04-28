@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 /*
  * Contracts
@@ -891,7 +894,7 @@ contract_vnode_clear(contract_t *ct, contract_vnode_t *ctv)
 		list_remove(&ct->ct_vnodes, ctv);
 		result = 1;
 	} else {
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		result = 0;
 	}
 	mutex_exit(&vp->v_lock);

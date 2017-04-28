@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -105,7 +106,7 @@ devfs_close(struct vnode *vp, int flag, int count,
 /*ARGSUSED*/
 static int
 devfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
-	struct caller_context *ct)
+    struct caller_context *ct)
 {
 	dcmn_err2(("devfs_read %s\n", VTODV(vp)->dv_name));
 	ASSERT(vp->v_type == VDIR);
@@ -120,7 +121,7 @@ devfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 /*ARGSUSED*/
 static int
 devfs_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
-	struct caller_context *ct)
+    struct caller_context *ct)
 {
 	dcmn_err2(("devfs_write %s\n", VTODV(vp)->dv_name));
 	ASSERT(vp->v_type == VDIR);
@@ -1053,7 +1054,7 @@ devfs_inactive(struct vnode *vp, struct cred *cred, caller_context_t *ct)
 	dcmn_err2(("devfs_inactive: %s\n", dv->dv_name));
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
-	--vp->v_count;
+	VN_RELE_LOCKED(vp);
 	destroy = (DV_STALE(dv) && vp->v_count == 0);
 	mutex_exit(&vp->v_lock);
 

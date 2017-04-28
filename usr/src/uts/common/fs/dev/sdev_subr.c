@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, 2016 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -2810,8 +2811,8 @@ checkforroot:
 }
 
 int
-sdev_modctl_readdir(const char *dir, char ***dirlistp,
-	int *npathsp, int *npathsp_alloc, int checking_empty)
+sdev_modctl_readdir(const char *dir, char ***dirlistp, int *npathsp,
+    int *npathsp_alloc, int checking_empty)
 {
 	char	**pathlist = NULL;
 	char	**newlist = NULL;
@@ -3132,12 +3133,12 @@ devname_inactive_func(struct vnode *vp, struct cred *cred,
 		}
 		VERIFY(dv->sdev_nlink == 1);
 		decr_link(dv);
-		--vp->v_count;
+		VN_RELE_LOCKED(vp);
 		rw_exit(&dv->sdev_contents);
 		mutex_exit(&vp->v_lock);
 		sdev_nodedestroy(dv, 0);
 	} else {
-		--vp->v_count;
+		VN_RELE_LOCKED(vp);
 		rw_exit(&dv->sdev_contents);
 		mutex_exit(&vp->v_lock);
 	}
