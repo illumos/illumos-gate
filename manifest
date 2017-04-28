@@ -5177,6 +5177,8 @@ f usr/lib/devfsadm/linkmod/SUNW_zut_link.so 0755 root sys
 f usr/lib/diff3prog 0555 root bin
 f usr/lib/diffh 0555 root bin
 d usr/lib/dl 0755 root sys
+f usr/lib/dl/dlrecv 0555 root bin
+f usr/lib/dl/dlsend 0555 root bin
 f usr/lib/dl/dltraninfo 0555 root bin
 f usr/lib/dscfglockd 0555 root bin
 d usr/lib/dtrace 0755 root bin

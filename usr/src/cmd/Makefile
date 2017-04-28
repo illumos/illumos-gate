@@ -136,7 +136,7 @@ COMMON_SUBDIRS=		\
 	dispadmin	\
 	dladm		\
 	dlstat		\
-	dltraninfo	\
+	dlutil		\
 	dmesg		\
 	dodatadm	\
 	dtrace		\
