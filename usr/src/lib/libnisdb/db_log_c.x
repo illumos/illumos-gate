@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if RPC_HDR
 %#ifndef _DB_LOG_H
 %#define _DB_LOG_H
@@ -100,7 +98,7 @@
 %/*  bool_t dump( pptr ) {return TRUE;}*/     // does nothing.
 %
 %/* Open log file */
-%  int	open(void);
+%  bool_t open(void);
 %/* Close log file */
 %  int	close();
 %/* Do we need to copy the log file */
