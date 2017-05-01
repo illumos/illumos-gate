@@ -72,16 +72,16 @@ smb_com_trans2_get_dfs_referral(smb_request_t *sr, smb_xa_t *xa)
 
 	status = smb_dfs_get_referrals(sr, &fsctl);
 
-	/* Out param is the API-level return code. */
+	/*
+	 * Out param is the API-level return code.
+	 * Out data (rep_data_mb) is the referral.
+	 */
 	doserr = smb_status2doserr(status);
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "w", doserr);
-
-#if 0	/* XXX - Is API-level return code enough? */
-	if (status) {
-		smbsr_error(sr, NT_STATUS_NO_SUCH_DEVICE, 0, 0);
+	if (status != 0) {
+		smbsr_error(sr, status, ERRDOS, doserr);
 		return (SDRC_ERROR);
 	}
-#endif
 
 	return (SDRC_SUCCESS);
 }
