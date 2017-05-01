@@ -125,7 +125,7 @@ may exist on the
 .Fa PATH .
 To determine the full path of the executable pass a non-NULL
 .Fa path
-pointer. Upon succesful completion of
+pointer. Upon successful completion of
 .Fn Pcreate
 or
 .Fn Pxcreate

@@ -14,7 +14,6 @@ rmt \- remote magtape protocol module
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBrmt\fR is a program used by the remote dump and restore programs in
 manipulating a magnetic tape drive through an interprocess communication
@@ -54,7 +53,7 @@ Unsuccessful commands are responded to with:
 .sp .6
 .RS 4n
 where \fIerror-number\fR is one of the possible error numbers described in
-\fBintro\fR(3), and \fIerror-message\fR is the corresponding error string as
+\fBIntro\fR(3), and \fIerror-message\fR is the corresponding error string as
 printed from a call to \fBperror\fR(3C).
 .RE
 
@@ -143,17 +142,14 @@ value is returned from the \fBwrite\fR(9E) call.
 .LP
 Any other command causes \fBrmt\fR to exit.
 .SH SEE ALSO
-.sp
 .LP
-\fBufsdump\fR(1M), \fBufsrestore\fR(1M), \fBintro\fR(3), \fBioctl\fR(2),
+\fBufsdump\fR(1M), \fBufsrestore\fR(1M), \fBIntro\fR(3), \fBioctl\fR(2),
 \fBlseek\fR(2), \fBperror \fR(3C), \fBrcmd\fR(3SOCKET), \fBrexec\fR(3SOCKET),
 \fBattributes\fR(5), \fBmtio\fR(7I), \fBopen\fR(9E), \fBread\fR(9E),
 \fBwrite\fR(9E)
 .SH DIAGNOSTICS
-.sp
 .LP
 All responses are of the form described above.
 .SH BUGS
-.sp
 .LP
 Do not use this for a remote file access protocol.

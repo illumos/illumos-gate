@@ -52,7 +52,7 @@ The
 .Fn tss_create
 function creates a new thread-specific data key. The key space is opaque
 and global to all threads in the process. Each thread has its own
-value-space which can be mainpulated with the
+value-space which can be manipulated with the
 .Fn tss_get
 and
 .Fn tss_set

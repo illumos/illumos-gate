@@ -14,7 +14,6 @@ unifdef \- resolve and remove ifdef'ed lines from C program source
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBunifdef\fR removes \fBifdef\fRed lines from a file while otherwise leaving
 the file alone. It is smart enough to deal with the nested \fBifdef\fRs,
@@ -28,7 +27,7 @@ removed, as appropriate. Any \fBifdef\fR, \fBifndef\fR, \fBelse\fR, and
 .sp
 .LP
 \fBifdef\fRs involving symbols you do not specify are untouched and copied out
-along with their associated \fBifdef\fR, \fBelse\fR, and \fBendiff1\fR lines.
+along with their associated \fBifdef\fR, \fBelse\fR, and \fBendif\fR lines.
 .sp
 .LP
 If an \fBifdef\fR\fIX\fR occurs nested inside another \fBifdef\fR\fIX\fR, then
@@ -40,7 +39,6 @@ significant.
 \fBunifdef\fR copies its output to the standard output and will take its input
 from the standard input if no \fIfilename\fR argument is given.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -113,7 +111,6 @@ Ignore, but print out, lines associated with the undefined symbol \fIname\fR.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -135,11 +132,9 @@ Operation failed.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdiff\fR(1), \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBPremature\fR \fBEOF\fR\fR

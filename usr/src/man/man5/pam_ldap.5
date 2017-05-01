@@ -13,7 +13,6 @@ pam_ldap \- authentication and account management PAM module for LDAP
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpam_ldap\fR module implements \fBpam_sm_authenticate\fR(3PAM) and
 \fBpam_sm_acct_mgmt\fR(3PAM), the functions that provide functionality for the
@@ -44,7 +43,6 @@ is, LDAP users. For the stacks to work, \fBpam_unix_auth\fR,
 \fBbinding\fR control flag and the \fBserver_policy\fR option. This
 configuration allows local account override of a network account.
 .SS "LDAP Authentication Module"
-.sp
 .LP
 The LDAP authentication module verifies the identity of a user. The
 \fBpam_sm_authenticate\fR(3PAM) function uses the password entered by the user
@@ -86,7 +84,6 @@ Turn off warning messages.
 .LP
 These options are case sensitive and must be used exactly as presented here.
 .SS "LDAP Account Management Module"
-.sp
 .LP
 The LDAP account management module validates the user's account. The
 \fBpam_sm_acct_mgmt\fR(3PAM) function authenticates to the LDAP server to
@@ -120,14 +117,12 @@ Turn off warning messages.
 These options are case sensitive, and the options must be used exactly as
 presented here.
 .SS "LDAP Password Management Module"
-.sp
 .LP
 LDAP password management is no longer supported by \fBpam_ldap\fR. Use
 \fBpam_authtok_store\fR(5) instead of \fBpam_ldap\fR for password change.
 \fBpam_authtok_store\fR(5) handles both the local and LDAP accounts and updates
 the passwords in all the repositories configured by \fBnsswitch.conf\fR(4).
 .SH ERRORS
-.sp
 .LP
 The authentication service returns the following error codes:
 .sp
@@ -136,7 +131,7 @@ The authentication service returns the following error codes:
 \fB\fBPAM_SUCCESS\fR\fR
 .ad
 .RS 20n
-The uthentication was successful.
+The authentication was successful.
 .RE
 
 .sp
@@ -344,7 +339,6 @@ other password required   pam_authtok_store.so.1 server_policy
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/ldap/ldap_client_file\fR\fR
@@ -369,7 +363,6 @@ PAM configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -387,7 +380,6 @@ MT-Level	MT-Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(1), \fBidsconfig\fR(1M), \fBldap_cachemgr\fR(1M),
 \fBldapclient\fR(1M), \fBlibpam\fR(3LIB), \fBpam\fR(3PAM),
@@ -398,7 +390,6 @@ MT-Level	MT-Safe with exceptions
 \fBpam_authtok_get\fR(5), \fBpam_authtok_store\fR(5), \fBpam_passwd_auth\fR(5),
 \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5)
 .SH NOTES
-.sp
 .LP
 The interfaces in \fBlibpam\fR(3LIB) are MT-Safe only if each thread within the
 multi-threaded application uses its own \fBPAM\fR handle.
