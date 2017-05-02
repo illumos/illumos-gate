@@ -16,7 +16,7 @@
 
 CMDDIR=		$(SRC)/cmd/mandoc
 
-include		../Makefile.tools
+include		$(SRC)/tools/Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
 CPPFLAGS += -_gcc=-nostdinc -I/usr/include -I$(NATIVE_ADJUNCT)/include
@@ -26,7 +26,7 @@ LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
 
 all:		$(PROG)
 
-install:	all .WAIT $(ROOTONBLDMACHPROG)
+install:	all $(ROOTONBLDMACHPROG)
 
 clean:
 		$(RM) $(PROG) $(OBJS)
@@ -38,4 +38,4 @@ $(PROG):	$(OBJS)
 %.o:		$(CMDDIR)/%.c
 		$(COMPILE.c) -o $@ $<
 
-include		../Makefile.targ
+include		$(SRC)/tools/Makefile.targ

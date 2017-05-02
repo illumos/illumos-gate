@@ -462,13 +462,12 @@ command_reboot(int argc __attribute((unused)),
     char *argv[] __attribute((unused)))
 {
 	int i;
-	const CHAR16 *msg = L"Reboot from the loader";
 
 	for (i = 0; devsw[i] != NULL; ++i)
 		if (devsw[i]->dv_cleanup != NULL)
 			(devsw[i]->dv_cleanup)();
 
-	RS->ResetSystem(EfiResetCold, EFI_SUCCESS, 23, (CHAR16 *)msg);
+	RS->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
 
 	/* NOTREACHED */
 	return (CMD_ERROR);

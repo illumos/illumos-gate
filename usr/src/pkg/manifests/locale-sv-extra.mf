@@ -66,5 +66,5 @@ file path=usr/lib/locale/sv_SE.ISO8859-15/LC_MONETARY/LCL_DATA mode=0444
 file path=usr/lib/locale/sv_SE.ISO8859-15/LC_NUMERIC/LCL_DATA mode=0444
 file path=usr/lib/locale/sv_SE.ISO8859-15/LC_TIME/LCL_DATA mode=0444
 license lic_CDDL license=lic_CDDL
-license usr/src/cmd/localedef/data/THIRDPARTYLICENSE \
-    license=usr/src/cmd/localedef/data/THIRDPARTYLICENSE
+license usr/src/data/locale/data/THIRDPARTYLICENSE \
+    license=usr/src/data/locale/data/THIRDPARTYLICENSE
