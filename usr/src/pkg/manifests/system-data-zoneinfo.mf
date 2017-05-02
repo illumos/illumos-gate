@@ -12,11 +12,11 @@
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
-# Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2016.8,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2017.2,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -180,6 +180,7 @@ file path=usr/share/lib/zoneinfo/America/Port-au-Prince
 file path=usr/share/lib/zoneinfo/America/Port_of_Spain
 file path=usr/share/lib/zoneinfo/America/Porto_Velho
 file path=usr/share/lib/zoneinfo/America/Puerto_Rico
+file path=usr/share/lib/zoneinfo/America/Punta_Arenas
 file path=usr/share/lib/zoneinfo/America/Rainy_River
 file path=usr/share/lib/zoneinfo/America/Rankin_Inlet
 file path=usr/share/lib/zoneinfo/America/Recife
@@ -226,6 +227,7 @@ file path=usr/share/lib/zoneinfo/Asia/Anadyr
 file path=usr/share/lib/zoneinfo/Asia/Aqtau
 file path=usr/share/lib/zoneinfo/Asia/Aqtobe
 file path=usr/share/lib/zoneinfo/Asia/Ashgabat
+file path=usr/share/lib/zoneinfo/Asia/Atyrau
 file path=usr/share/lib/zoneinfo/Asia/Baghdad
 file path=usr/share/lib/zoneinfo/Asia/Baku
 file path=usr/share/lib/zoneinfo/Asia/Bangkok
@@ -241,6 +243,7 @@ file path=usr/share/lib/zoneinfo/Asia/Dhaka
 file path=usr/share/lib/zoneinfo/Asia/Dili
 file path=usr/share/lib/zoneinfo/Asia/Dubai
 file path=usr/share/lib/zoneinfo/Asia/Dushanbe
+file path=usr/share/lib/zoneinfo/Asia/Famagusta
 file path=usr/share/lib/zoneinfo/Asia/Gaza
 file path=usr/share/lib/zoneinfo/Asia/Hebron
 file path=usr/share/lib/zoneinfo/Asia/Ho_Chi_Minh
@@ -384,6 +387,7 @@ file path=usr/share/lib/zoneinfo/Europe/Prague
 file path=usr/share/lib/zoneinfo/Europe/Riga
 file path=usr/share/lib/zoneinfo/Europe/Rome
 file path=usr/share/lib/zoneinfo/Europe/Samara
+file path=usr/share/lib/zoneinfo/Europe/Saratov
 file path=usr/share/lib/zoneinfo/Europe/Simferopol
 file path=usr/share/lib/zoneinfo/Europe/Sofia
 file path=usr/share/lib/zoneinfo/Europe/Stockholm
@@ -429,7 +433,6 @@ file path=usr/share/lib/zoneinfo/Pacific/Gambier
 file path=usr/share/lib/zoneinfo/Pacific/Guadalcanal
 file path=usr/share/lib/zoneinfo/Pacific/Guam
 file path=usr/share/lib/zoneinfo/Pacific/Honolulu
-file path=usr/share/lib/zoneinfo/Pacific/Johnston
 file path=usr/share/lib/zoneinfo/Pacific/Kiritimati
 file path=usr/share/lib/zoneinfo/Pacific/Kosrae
 file path=usr/share/lib/zoneinfo/Pacific/Kwajalein
@@ -689,6 +692,8 @@ hardlink path=usr/share/lib/zoneinfo/NZ target=Pacific/Auckland
 hardlink path=usr/share/lib/zoneinfo/NZ-CHAT target=Pacific/Chatham
 hardlink path=usr/share/lib/zoneinfo/Navajo target=America/Denver
 hardlink path=usr/share/lib/zoneinfo/PRC target=Asia/Shanghai
+hardlink path=usr/share/lib/zoneinfo/Pacific/Johnston \
+    target=../Pacific/Honolulu
 hardlink path=usr/share/lib/zoneinfo/Pacific/Midway \
     target=../Pacific/Pago_Pago
 hardlink path=usr/share/lib/zoneinfo/Pacific/Ponape target=../Pacific/Pohnpei
