@@ -85,7 +85,7 @@ static int l_to_r[LX_RLIMIT_NLIMITS] = {
  */
 #define	LX_RLIM_INFINITY_N	ULONG_MAX
 
-static void
+void
 lx_get_rctl(char *nm, struct rlimit64 *rlp64)
 {
 	rctl_hndl_t hndl;
@@ -418,11 +418,10 @@ lx_setrlimit_common(int lx_resource, uint64_t rlim_cur, uint64_t rlim_max)
 		break;
 
 	case LX_RLIMIT_MEMLOCK:
-		/* Do not exceed zone.max-locked-memory */
-		if (rlim_max > curzone->zone_locked_mem_ctl ||
-		    rlim_cur > curzone->zone_locked_mem_ctl)
-			return (set_errno(EINVAL));
-
+		/*
+		 * We allow setting to unlimited (LX_RLIM_INFINITY_N). The zone
+		 * limit will always apply.
+		 */
 		rl64.rlim_cur = rlim_cur;
 		rl64.rlim_max = rlim_max;
 		err = lx_set_rctl("process.max-locked-memory", &rl64);

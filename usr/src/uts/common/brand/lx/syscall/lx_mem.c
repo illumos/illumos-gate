@@ -64,6 +64,9 @@ extern int memcntl(caddr_t, size_t, int, caddr_t, int, int);
 /* For convenience */
 #define	LX_PROT_GROWMASK	(LX_PROT_GROWSUP|LX_PROT_GROWSDOWN)
 
+/* From lx_rlimit.c */
+extern void lx_get_rctl(char *, struct rlimit64 *);
+
 static int
 lx_mlock_common(int op, uintptr_t addr, size_t len)
 {
@@ -80,18 +83,31 @@ lx_mlock_common(int op, uintptr_t addr, size_t len)
 		return (set_errno(EINVAL));
 	}
 
-	if (lx_kern_release_cmp(curzone, "2.6.9") < 0) {
-		if ((err = secpolicy_lock_memory(CRED())) != 0)
-			return (set_errno(err));
-	}
-
 	err = as_ctl(as, (caddr_t)align_addr, align_len, op, 0, 0, NULL, 0);
+	if (err == EAGAIN)
+		err = ENOMEM;
 	return (err == 0 ? 0 : set_errno(err));
 }
 
 int
 lx_mlock(uintptr_t addr, size_t len)
 {
+	int err;
+
+	/*
+	 * If the the caller is not privileged and either the limit is 0, or
+	 * the kernel version is earlier than 2.6.9, then fail with EPERM. See
+	 * LTP mlock2.c.
+	 */
+	if ((err = secpolicy_lock_memory(CRED())) != 0) {
+		struct rlimit64 rlim64;
+
+		lx_get_rctl("process.max-locked-memory", &rlim64);
+		if (rlim64.rlim_cur == 0 ||
+		    lx_kern_release_cmp(curzone, "2.6.9") < 0)
+			return (set_errno(err));
+	}
+
 	return (lx_mlock_common(MC_LOCK, addr, len));
 }
 
@@ -107,8 +123,17 @@ lx_mlockall(int flags)
 	int err;
 	struct as *as = curproc->p_as;
 
-	if (lx_kern_release_cmp(curzone, "2.6.9") < 0) {
-		if ((err = secpolicy_lock_memory(CRED())) != 0)
+	/*
+	 * If the the caller is not privileged and either the limit is 0, or
+	 * the kernel version is earlier than 2.6.9, then fail with EPERM. See
+	 * LTP mlockall2.c.
+	 */
+	if ((err = secpolicy_lock_memory(CRED())) != 0) {
+		struct rlimit64 rlim64;
+
+		lx_get_rctl("process.max-locked-memory", &rlim64);
+		if (rlim64.rlim_cur == 0 ||
+		    lx_kern_release_cmp(curzone, "2.6.9") < 0)
 			return (set_errno(err));
 	}
 
@@ -116,6 +141,8 @@ lx_mlockall(int flags)
 		return (set_errno(EINVAL));
 
 	err = as_ctl(as, 0, 0, MC_LOCKAS, 0, (uintptr_t)flags, NULL, 0);
+	if (err == EAGAIN)
+		err = ENOMEM;
 	return (err == 0 ? 0 : set_errno(err));
 }
 

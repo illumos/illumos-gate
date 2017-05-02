@@ -39,9 +39,6 @@ mem01
 migrate_pages01
 migrate_pages02
 mknod01
-mlockall02
-mlockall03
-mlock02
 mmap12
 mount03
 mount05
