@@ -1108,30 +1108,26 @@ lx_zone_cleanup_vdisks(lx_zone_data_t *lxzd)
 }
 
 /*
- * See mod_set_extra_privports. By default illumos restricts access to
- * ULP_DEF_EPRIV_PORT1 and ULP_DEF_EPRIV_PORT2 for TCP and UDP, even though
- * these ports are outside of the privileged port range. Linux does not do
- * this, so we need to remove these defaults.
+ * By default illumos restricts access to ULP_DEF_EPRIV_PORT1 and
+ * ULP_DEF_EPRIV_PORT2 for TCP and UDP, even though these ports are outside of
+ * the privileged port range. Linux does not do this, so we need to remove
+ * these defaults.
+ *
+ * See also: mod_set_extra_privports
  */
 static void
-lx_fix_netstack()
+lx_fix_ns_eports(netstack_t *ns)
 {
-	netstack_t	*ns;
 	tcp_stack_t	*tcps;
 	udp_stack_t	*udps;
 	in_port_t	*ports;
 	uint_t		i, nports;
 	kmutex_t	*lock;
 
-	ns = netstack_get_current();
-	if (ns == NULL)
-		return;
-
 	tcps = ns->netstack_tcp;
 	ports = tcps->tcps_g_epriv_ports;
 	nports = tcps->tcps_g_num_epriv_ports;
 	lock = &tcps->tcps_epriv_port_lock;
-
 	mutex_enter(lock);
 	for (i = 0; i < nports; i++)
 		ports[i] = 0;
@@ -1141,11 +1137,60 @@ lx_fix_netstack()
 	ports = udps->us_epriv_ports;
 	nports = udps->us_num_epriv_ports;
 	lock = &udps->us_epriv_port_lock;
-
 	mutex_enter(lock);
 	for (i = 0; i < nports; i++)
 		ports[i] = 0;
 	mutex_exit(lock);
+}
+
+/*
+ * The default limit for TCP buffer sizing on illumos is smaller than its
+ * counterparts on Linux.  Adjust it to meet minimum expectations.
+ */
+static void
+lx_fix_ns_buffers(netstack_t *ns)
+{
+	mod_prop_info_t *pinfo;
+	ulong_t target, parsed;
+	char buf[16];
+
+	/*
+	 * Prior to kernel 3.4, Linux defaulted to a max of 4MB for both the
+	 * tcp_rmem and tcp_wmem tunables.  Kernels since then increase the
+	 * tcp_rmem default max to 6MB.  Since illumos lacks separate tunables
+	 * to cap sizing for read and write buffers, the higher value is
+	 * selected for compatibility.
+	 */
+	if (lx_kern_release_cmp(curzone, "3.4.0") < 0) {
+		target = 4*1024*1024;
+	} else {
+		target = 6*1024*1024;
+	}
+
+	pinfo = mod_prop_lookup(ns->netstack_tcp->tcps_propinfo_tbl,
+	    "max_buf", MOD_PROTO_TCP);
+	if (pinfo == NULL ||
+	    pinfo->mpi_getf(ns, pinfo, NULL, buf, sizeof (buf), 0) != 0 ||
+	    ddi_strtoul(buf, NULL, 10, &parsed) != 0 ||
+	    parsed >= target) {
+		return;
+	}
+
+	(void) snprintf(buf, sizeof (buf), "%lu", target);
+	(void) pinfo->mpi_setf(ns, CRED(), pinfo, NULL, buf, 0);
+}
+
+static void
+lx_bootup_hooks()
+{
+	netstack_t *ns;
+
+	ns = netstack_get_current();
+	if (ns == NULL)
+		return;
+
+	lx_fix_ns_eports(ns);
+	lx_fix_ns_buffers(ns);
 
 	netstack_rele(ns);
 }
@@ -1393,18 +1438,14 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		pd->l_flags = reg.lxbr_flags & LX_PROC_ALL;
 
 		/*
-		 * We can't fix up our netstack from the lx_init_brand_data
-		 * hook since that hook is run by zoneadmd (which has the GZ's
-		 * stack). Instead, we fix it up when the init process starts
-		 * inside the zone since it will have the proper stack.
-		 * Note that it is conceivable that a Linux init could be
-		 * illumos-aware and re-enable additional privileged ports,
-		 * then exec(2) over itself. This would cause those settings to
-		 * be lost, but this scenario is considered unlikely so we
-		 * don't worry about it.
+		 * There are certain setup tasks which cannot be performed
+		 * during the lx_init_brand_data hook due to the calling
+		 * context from zoneadmd (in the GZ).  This work is instead
+		 * delayed until the init process starts inside the zone.
 		 */
-		if (p->p_pid == p->p_zone->zone_proc_initpid)
-			lx_fix_netstack();
+		if (p->p_pid == p->p_zone->zone_proc_initpid) {
+			lx_bootup_hooks();
+		}
 
 		return (0);
 
