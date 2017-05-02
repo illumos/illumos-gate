@@ -4243,6 +4243,7 @@ f usr/include/sys/stat_impl.h 0644 root bin
 f usr/include/sys/statfs.h 0644 root bin
 f usr/include/sys/statvfs.h 0644 root bin
 f usr/include/sys/stdbool.h 0644 root bin
+f usr/include/sys/stddef.h 0644 root bin
 f usr/include/sys/stdint.h 0644 root bin
 f usr/include/sys/stermio.h 0644 root bin
 f usr/include/sys/stmf.h 0644 root bin
