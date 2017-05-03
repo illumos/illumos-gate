@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2014, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -1088,10 +1088,12 @@ i_dlpi_open(const char *provider, const char *zonename, int *fd, uint_t flags,
 			(void) snprintf(path, sizeof (path), "/dev/ipnet/%s",
 			    provider);
 		}
-		if ((*fd = open(path, oflags)) != -1)
+		if ((*fd = open(path, oflags)) != -1) {
 			return (DLPI_SUCCESS);
-		else
-			return (errno == ENOENT ? DLPI_ENOLINK : DL_SYSERR);
+		} else {
+			return (errno == ENOENT || errno == EISDIR ?
+			    DLPI_ENOLINK : DL_SYSERR);
+		}
 	} else if (style1 && !(flags & DLPI_DEVONLY)) {
 		char		driver[DLPI_LINKNAME_MAX];
 		char		device[DLPI_LINKNAME_MAX];
@@ -1160,7 +1162,7 @@ fallback:
 	if ((*fd = open(path, oflags)) != -1)
 		return (DLPI_SUCCESS);
 
-	return (errno == ENOENT ? DLPI_ENOLINK : DL_SYSERR);
+	return (errno == ENOENT || errno == EISDIR ? DLPI_ENOLINK : DL_SYSERR);
 }
 
 /*

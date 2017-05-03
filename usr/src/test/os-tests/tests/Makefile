@@ -16,4 +16,59 @@
 
 SUBDIRS = poll secflags sigqueue spoof-ras sdevfs timer tmpfs file-locking
 
-include $(SRC)/test/Makefile.com
+PROGS = \
+	OS-6097
+
+PROGS32 = $(PROGS:%=%.32)
+PROGS64 = $(PROGS:%=%.64)
+
+OS-6097.32 :=	LDLIBS += -ldlpi
+OS-6097.64 :=	LDLIBS64 += -ldlpi
+
+ROOTOPTDIR = $(ROOT)/opt/os-tests/tests
+ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
+	$(PROGS64:%=$(ROOTOPTDIR)/%) \
+	$(SCRIPTS:%=$(ROOTOPTDIR)/%)
+
+include $(SRC)/cmd/Makefile.cmd
+
+all     :=      TARGET = all
+install :=      TARGET = install
+clean   :=      TARGET = clean
+clobber :=      TARGET = clobber
+lint    :=      TARGET = lint
+
+.KEEP_STATE:
+
+install: $(SUBDIRS) $(ROOTOPTPROGS)
+
+all: $(SUBDIRS) $(PROGS32) $(PROGS64)
+
+clean lint: $(SUBDIRS)
+
+$(ROOTOPTPROGS): $(PROGS32) $(PROGS64) $(ROOTOPTDIR)
+
+$(ROOTOPTDIR):
+	$(INS.dir)
+
+$(ROOTOPTDIR)/%: %
+	$(INS.file)
+
+$(ROOTOPTDIR)/%: %.ksh
+	$(INS.rename)
+
+%.64: %.c
+	$(LINK64.c) -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.32: %.c
+	$(LINK.c) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS)
+
+clobber: $(SUBDIRS)
+	$(RM) $(PROGS32) $(PROGS64)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

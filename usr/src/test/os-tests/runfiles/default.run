@@ -58,3 +58,6 @@ tests = ['tmpfs_badmount', 'tmpfs_enospc']
 
 [/opt/os-tests/tests/file-locking]
 tests = ['runtests.32', 'runtests.64']
+
+[/opt/os-tests/tests/OS-6097.32]
+[/opt/os-tests/tests/OS-6097.64]
