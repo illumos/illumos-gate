@@ -518,9 +518,10 @@ sdev_find_mntinfo(char *mntpt)
 void
 sdev_mntinfo_rele(struct sdev_data *mntinfo)
 {
-	vnode_t *vp = SDEVTOV(mntinfo->sdev_root);
+	vnode_t *vp;
 
 	mutex_enter(&sdev_lock);
+	vp = SDEVTOV(mntinfo->sdev_root);
 	mutex_enter(&vp->v_lock);
 	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);

@@ -689,10 +689,7 @@ ufs_idle_free(struct inode *ip)
 	 */
 	mutex_enter(&vp->v_lock);
 
-	if (vp->v_count < 2) {
-		cmn_err(CE_PANIC,
-		    "ufs_idle_free: vnode ref count is less than 2");
-	}
+	VERIFY3U(vp->v_count, >=, 2);
 
 	VN_RELE_LOCKED(vp);
 
