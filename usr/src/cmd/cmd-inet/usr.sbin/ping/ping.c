@@ -38,7 +38,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -187,7 +187,6 @@ static boolean_t ns_active = _B_FALSE;	/* Lookup is going on */
 static hrtime_t ns_starttime;		/* Time the lookup started */
 static int ns_sleeptime = 2;		/* Time in seconds between checks */
 static int ns_warntime = 2;		/* Time in seconds before warning */
-static int ns_warninter = 60;		/* Time in seconds between warnings */
 
 /*
  * This buffer stores the received packets. Currently it needs to be 32 bit
@@ -1927,7 +1926,7 @@ send_scheduled_probe()
  */
 static void
 recv_icmp_packet(struct addrinfo *ai_dst, int recv_sock6, int recv_sock,
-ushort_t udp_src_port6, ushort_t udp_src_port)
+    ushort_t udp_src_port6, ushort_t udp_src_port)
 {
 	struct msghdr in_msg;
 	struct iovec iov;
@@ -2591,7 +2590,6 @@ ping_gettime(struct msghdr *msg, struct timeval *tv)
 static void *
 ns_warning_thr(void *unused)
 {
-	hrtime_t last_warn = 0;
 	for (;;) {
 		hrtime_t now;
 
@@ -2600,15 +2598,13 @@ ns_warning_thr(void *unused)
 		mutex_enter(&ns_lock);
 		if (ns_active == _B_TRUE &&
 		    now - ns_starttime >= ns_warntime * NANOSEC) {
-			if (now - last_warn >=
-			    ns_warninter * NANOSEC) {
-				last_warn = now;
-				Fprintf(stderr, "%s: warning: ICMP responses "
-				    "received, but name service lookups are "
-				    "taking a while. Use ping -n to disable "
-				    "name service lookups.\n",
-				    progname);
-			}
+			Fprintf(stderr, "%s: warning: ICMP responses "
+			    "received, but name service lookups are "
+			    "taking a while. Use ping -n to disable "
+			    "name service lookups.\n",
+			    progname);
+			mutex_exit(&ns_lock);
+			return (NULL);
 		}
 		mutex_exit(&ns_lock);
 	}
