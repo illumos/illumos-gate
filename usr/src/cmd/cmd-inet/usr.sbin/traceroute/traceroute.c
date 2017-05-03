@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -61,6 +62,8 @@
 #include <setjmp.h>
 #include <limits.h>
 #include <zone.h>
+#include <thread.h>
+#include <synch.h>
 
 #include <priv_utils.h>
 
@@ -184,6 +187,15 @@ ushort_t off = 0;		/* set DF bit */
 static jmp_buf env;		/* stack environment for longjmp() */
 boolean_t raw_req;		/* if sndsock for IPv4 must be raw */
 
+/*
+ * Name service lookup related data.
+ */
+static mutex_t tr_nslock = ERRORCHECKMUTEX;
+static boolean_t tr_nsactive = _B_FALSE;	/* Lookup ongoing */
+static hrtime_t tr_nsstarttime;			/* Start time */
+static int tr_nssleeptime = 2;			/* Interval between checks */
+static int tr_nswarntime = 2;			/* Interval to warn after */
+
 /* Forwards */
 static uint_t calc_packetlen(int, struct pr_set *);
 extern int check_reply(struct msghdr *, int, int, uchar_t *, uchar_t *);
@@ -237,6 +249,7 @@ static void tv_sub(struct timeval *, struct timeval *);
 static void usage(void);
 static int wait_for_reply(int, struct msghdr *, struct timeval *);
 static double xsqrt(double);
+static void *ns_warning_thr(void *);
 
 /*
  * main
@@ -514,6 +527,17 @@ main(int argc, char **argv)
 		    prog, first_ttl, max_ttl);
 		exit(EXIT_FAILURE);
 	}
+
+	/*
+	 * Start up the name services warning thread.
+	 */
+	if (thr_create(NULL, 0, ns_warning_thr, NULL,
+	    THR_DETACHED | THR_DAEMON, NULL) != 0) {
+		Fprintf(stderr, "%s: failed to create name services "
+		    "thread: %s\n", prog, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
 
 	/* resolve hostnames */
 	resolve_nodes(&family_input, &ai_dst);
@@ -1980,6 +2004,10 @@ inet_name(union any_in_addr *in, int family)
 	if (first && !nflag) {
 		/* find out the domain name */
 		first = _B_FALSE;
+		mutex_enter(&tr_nslock);
+		tr_nsactive = _B_TRUE;
+		tr_nsstarttime = gethrtime();
+		mutex_exit(&tr_nslock);
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
 		    (cp = strchr(domain, '.')) != NULL) {
 			(void) strncpy(domain, cp + 1, sizeof (domain) - 1);
@@ -1987,9 +2015,16 @@ inet_name(union any_in_addr *in, int family)
 		} else {
 			domain[0] = '\0';
 		}
+		mutex_enter(&tr_nslock);
+		tr_nsactive = _B_FALSE;
+		mutex_exit(&tr_nslock);
 	}
 
 	flags = (nflag) ? NI_NUMERICHOST : NI_NAMEREQD;
+	mutex_enter(&tr_nslock);
+	tr_nsactive = _B_TRUE;
+	tr_nsstarttime = gethrtime();
+	mutex_exit(&tr_nslock);
 	if (getnameinfo(sa, slen, hbuf, sizeof (hbuf), NULL, 0, flags) != 0) {
 		if (inet_ntop(family, (const void *)&in->addr6,
 		    hbuf, sizeof (hbuf)) == NULL)
@@ -1998,6 +2033,9 @@ inet_name(union any_in_addr *in, int family)
 	    strcmp(cp + 1, domain) == 0) {
 		*cp = '\0';
 	}
+	mutex_enter(&tr_nslock);
+	tr_nsactive = _B_FALSE;
+	mutex_exit(&tr_nslock);
 	(void) strlcpy(line, hbuf, sizeof (line));
 
 	return (line);
@@ -2204,4 +2242,32 @@ usage(void)
 	    "\t[-q nqueries] [-s src_addr] [-t tos] [-w wait_time] host "
 	    "[packetlen]\n", prog);
 	exit(EXIT_FAILURE);
+}
+
+/* ARGSUSED */
+static void *
+ns_warning_thr(void *unused)
+{
+	for (;;) {
+		hrtime_t now;
+
+		(void) sleep(tr_nssleeptime);
+
+		now = gethrtime();
+		mutex_enter(&tr_nslock);
+		if (tr_nsactive && now - tr_nsstarttime >=
+		    tr_nswarntime * NANOSEC) {
+			Fprintf(stderr, "%s: warning: responses "
+			    "received, but name service lookups are "
+			    "taking a while. Use %s -n to disable "
+			    "name service lookups.\n",
+			    prog, prog);
+			mutex_exit(&tr_nslock);
+			return (NULL);
+		}
+		mutex_exit(&tr_nslock);
+	}
+
+	/* LINTED: E_STMT_NOT_REACHED */
+	return (NULL);
 }
