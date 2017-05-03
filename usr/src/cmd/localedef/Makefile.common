@@ -1,0 +1,45 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2011 EveryCity Ltd. All rights reserved.
+# Copyright 2013 DEY Storage Systems, Inc.
+# Copyright 2016 Joyent, Inc.
+#
+
+PROG=		localedef
+
+OBJS=		charmap.o \
+		collate.o \
+		ctype.o \
+		messages.o \
+		monetary.o \
+		numeric.o \
+		time.o \
+		scanner.o \
+		localedef.o \
+		wide.o \
+		parser.tab.o
+SRCS=		$(OBJS:%.o=%.c)
+
+CPPFLAGS +=	-I$(SRC)/lib/libc/port/locale
+
+CERRWARN +=	-_gcc=-Wno-char-subscripts
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-unused-label
+
+YFLAGS=		-d -b parser
+
+CLEANFILES=	$(OBJS) parser.tab.c parser.tab.h
+
+PIFILES=	$(OBJS:%.o=%.i)
+POFILE=		localedef_cmd.po

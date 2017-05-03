@@ -852,19 +852,19 @@ multiboot2_exec(struct preloaded_file *fp)
 	if (rsdp != NULL) {
 		multiboot_tag_new_acpi_t *ntag;
 		multiboot_tag_old_acpi_t *otag;
-		int size;
+		uint32_t tsize;
 
 		if (rsdp->Revision == 0) {
-			size = sizeof (*otag) + rsdp->Length;
-			otag = (multiboot_tag_old_acpi_t *)mb_malloc(size);
+			tsize = sizeof (*otag) + sizeof (ACPI_RSDP_COMMON);
+			otag = (multiboot_tag_old_acpi_t *)mb_malloc(tsize);
 			otag->mb_type = MULTIBOOT_TAG_TYPE_ACPI_OLD;
-			otag->mb_size = size;
+			otag->mb_size = tsize;
 			memcpy(otag->mb_rsdp, rsdp, sizeof (ACPI_RSDP_COMMON));
 		} else {
-			size = sizeof (*ntag) + rsdp->Length;
-			ntag = (multiboot_tag_new_acpi_t *)mb_malloc(size);
+			tsize = sizeof (*ntag) + rsdp->Length;
+			ntag = (multiboot_tag_new_acpi_t *)mb_malloc(tsize);
 			ntag->mb_type = MULTIBOOT_TAG_TYPE_ACPI_NEW;
-			ntag->mb_size = size;
+			ntag->mb_size = tsize;
 			memcpy(ntag->mb_rsdp, rsdp, rsdp->Length);
 		}
 	}

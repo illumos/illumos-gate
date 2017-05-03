@@ -24,50 +24,48 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
-include ../Makefile.cmd
+include		$(SRC)/data/Makefile.data
 
-HWDATA =	pci.ids usb.ids
-HWDATADIR =	$(ROOT)/usr/share/hwdata
-ROOTHWDATA =	$(HWDATA:%=$(HWDATADIR)/%)
+HWDATA=		pci.ids usb.ids
+HWDATADIR=	$(ROOT)/usr/share/hwdata
+ROOTHWDATA=	$(HWDATA:%=$(HWDATADIR)/%)
 
-$(ROOTHWDATA) :=	FILEMODE = 444
+CLOBBERFILES=	THIRDPARTYLICENSE.pciids
 
-CLOBBERFILES += THIRDPARTYLICENSE.pciids
+$(ROOTHWDATA):=	FILEMODE = 444
 
-all install: THIRDPARTYLICENSE.pciids
+all install:	THIRDPARTYLICENSE.pciids
 
 THIRDPARTYLICENSE.pciids: pci.ids THIRDPARTYLICENSE.pciids.tmpl
-	$(RM) $@
-	$(SED) -e '/^$$/,$$ d' < pci.ids > $@
-	$(CAT) THIRDPARTYLICENSE.pciids.tmpl >> $@
+		$(RM) $@
+		$(SED) -e '/^$$/,$$ d' < pci.ids > $@
+		$(CAT) THIRDPARTYLICENSE.pciids.tmpl >> $@
 
-install: $(ROOTHWDATA)
+install:	$(ROOTHWDATA)
 
 $(HWDATADIR)/%: %
-	$(INS.file)
+		$(INS.file)
 
-lint check clean clobber:
+clean:
 
 # The "update" target family allows a simple pull-from-the-source update.
 # One can then use revision-control diffs to see what actually changed.
-update: usb.update pci.update
+update:		usb.update pci.update
 
 # URLs for PCI IDs and USB IDs
-PCIURL=http://pci-ids.ucw.cz/v2.2/pci.ids
-USBURL=http://www.linux-usb.org/usb.ids
+PCIURL=		http://pci-ids.ucw.cz/v2.2/pci.ids
+USBURL=		http://www.linux-usb.org/usb.ids
 
 # These could move into Makefile.master
-URL_FETCH=wget
+URL_FETCH=	wget
 URL_FETCHARGS=
 
 pci.update:
-	$(RM) pci.ids
-	$(URL_FETCH) $(URL_FETCHARGS) $(PCIURL)
+		$(RM) pci.ids
+		$(URL_FETCH) $(URL_FETCHARGS) $(PCIURL)
 
 usb.update:
-	$(RM) usb.ids
-	$(URL_FETCH) $(URL_FETCHARGS) $(USBURL)
+		$(RM) usb.ids
+		$(URL_FETCH) $(URL_FETCHARGS) $(USBURL)
 
-FRC:
-
-include ../Makefile.targ
+include		$(SRC)/data/Makefile.targ

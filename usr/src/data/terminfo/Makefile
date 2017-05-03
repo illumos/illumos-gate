@@ -18,36 +18,42 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
-PROG=		terminfo
-TABSETSRC=	3101 beehive hds hds3 std stdcrt teleray vt100 wyse-adds xerox1720
+TABSETSRC=	3101 \
+		beehive \
+		hds \
+		hds3 \
+		std \
+		stdcrt \
+		teleray \
+		vt100 \
+		wyse-adds \
+		xerox1720
 TERMCAPSRC=	termcap.src
 TERMINFOSRC=	terminfo.src
 
-include		../Makefile.cmd
+include		$(SRC)/data/Makefile.data
 
 FILEMODE=	0644
 
-TIC=		/usr/bin/tic
+ROOTTABDIR=	$(ROOTSHLIB)/tabset
+ROOTTERMDIR=	$(ROOTSHLIB)/terminfo
+DIRS=		$(ROOTTERMDIR) $(ROOTTABDIR)
 
-ROOTSHARELIBDIR	= $(ROOT)/usr/share/lib
-ROOTTABDIR	= $(ROOTSHARELIBDIR)/tabset
-ROOTTERMDIR	= $(ROOTSHARELIBDIR)/terminfo
-DIRS		= $(ROOTTERMDIR) $(ROOTTABDIR)
+ROOTSYMLINK=	$(ROOTETC)/termcap
+RELROOTETC=	../usr/share/lib
+ROOTLIBSYMLINK=	$(ROOTLIB)/tabset
+RELROOTLIB=	../share/lib
 
-ROOTSYMLINK	= $(ROOTETC)/termcap
-RELROOTETC	= ../usr/share/lib
-ROOTLIBSYMLINK	= $(ROOTLIB)/tabset
-RELROOTLIB	= ../share/lib
+ROOTTABSET=	$(TABSETSRC:%=$(ROOTTABDIR)/%)
 
-ROOTTABSET	= $(TABSETSRC:%=$(ROOTTABDIR)/%)
-
-$(ROOTTABDIR)/%:	tabset/%
+$(ROOTTABDIR)/%: tabset/%
 		$(INS.file)
 
 .KEEP_STATE:
@@ -60,11 +66,11 @@ $(DIRS):
 $(ROOTTERMDIR)/s/sun: $(TERMINFOSRC)
 		TERMINFO=$(ROOTTERMDIR) $(TIC) $(TERMINFOSRC) 2>/dev/null
 
-$(ROOTSHARELIBDIR)/termcap:
+$(ROOTSHLIB)/termcap:
 		$(EGREP) -v '^(#|$$)' $(TERMCAPSRC) > $@
 
 install:	all $(ROOTTERMDIR) $(ROOTTERMDIR)/s/sun $(ROOTTABDIR) \
-		$(ROOTTABSET) $(ROOTSHARELIBDIR)/termcap  $(ROOTSYMLINK) \
+		$(ROOTTABSET) $(ROOTSHLIB)/termcap  $(ROOTSYMLINK) \
 		$(ROOTLIBSYMLINK)
 
 $(ROOTSYMLINK):
@@ -73,8 +79,4 @@ $(ROOTSYMLINK):
 $(ROOTLIBSYMLINK):
 		$(RM) $@; $(SYMLINK) $(RELROOTLIB)/tabset $@
 
-lint:
-
-clean:
-
-clobber:
+clean clobber:
