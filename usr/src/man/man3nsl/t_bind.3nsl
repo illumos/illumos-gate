@@ -1,4 +1,3 @@
-'\" te
 .\"  Copyright 1994, The X/Open Company Ltd., All Rights Reserved. Portions Copyright 1989 AT&T. Portions Copyright (c) 1998, Sun Microsystems, Inc. , All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
@@ -7,308 +6,405 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH T_BIND 3NSL "Dec 27, 2013"
-.SH NAME
-t_bind \- bind an address to a transport endpoint
-.SH SYNOPSIS
-.LP
-.nf
-#include <xti.h>
-
-
-
-
-\fBint\fR \fBt_bind\fR(\fBint\fR \fIfd\fR, \fBconst struct t_bind *\fR\fIreq\fR, \fBstruct t_bind *\fR\fIret\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-This routine is part of the \fBXTI\fR interfaces that evolved from the
-\fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
-interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
-using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
-\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
-\fBCOMPATIBILITY\fR section for a description of differences between the two
+.\"
+.\" Copyright 2017 Joyent, Inc.
+.\"
+.Dd Sep 28, 2017
+.Dt T_BIND 3NSL
+.Os
+.Sh NAME
+.Nm t_bind
+.Nd bind an address to a tansport endpoint
+.Sh SYNOPSIS
+.Lb libnsl
+.In xti.h
+.Ft int
+.Fo t_bind
+.Fa "int fd"
+.Fa "const struct t_bind *req"
+.Fa "stuct t_bind *ret"
+.Fc
+.Sh DESCRIPTION
+This routine is part of the
+.Sy XTI
+interfaces that evolved from the
+.Sy TLI
 interfaces.
-.sp
-.LP
+.Sy XTI
+represents the future evolution of these
+interfaces.
+However,
+.Sy TLI
+interfaces are supported for compatibility.
+When using a
+.Sy TLI
+routine that has the same name as an
+.Sy XTI
+routine, the
+.In tiuser.h
+header file must be used.
+Refer to the
+.Sx "TLI COMPATIBILITY"
+section for a description of differences between the two interfaces.
+.Pp
 This function associates a protocol address with the transport endpoint
-specified by \fIfd\fR and activates that transport endpoint. In connection
-mode, the transport provider may begin enqueuing incoming connect indications,
-or servicing a connection request on the transport endpoint. In
-connectionless-mode, the transport user may send or receive data units through
+specified by
+.Fa fd
+and activates that transport endpoint.
+In connection mode, the transport provider may begin enqueuing incoming
+connect indications, or servicing a connection request on the transport
+endpoint.
+In connectionless-mode, the transport user may send or receive data units
+through the transport endpoint.
+.Pp
+The
+.Fa req
+and
+.Fa ret
+arguments point to a
+.Vt t_bind
+structure containing the following members:
+.Pp
+.Bl -item -offset indent -compact
+.It
+struct netbuf addr;
+.It
+unsigned qlen;
+.El
+.Pp
+The
+.Sy addr
+field of the
+.Vt t_bind
+structure specifies a protocol address, and the
+.Sy qlen
+field is used to indicate the maximum number of outstanding connection
+indications.
+.Pp
+The parameter
+.Fa req
+is used to request that an address, represented by the
+.Vt netbuf
+structure, be bound to the given transport endpoint.
+The parameter
+.Sy len
+specifies the number of bytes in the address, and
+.Sy buf
+points to the address buffer.
+For
+.Xr tcp 7P
+and
+.Xr udp 7P
+transports,
+.Sy buf
+points to a
+.Xr sockaddr 3SOCKET
+buffer \(em either
+.Vt "struct sockaddr_in"
+or
+.Vt "struct sockaddr_in6"
+(depending on if IPv4 or IPv6 is being used).
+The parameter
+.Sy maxlen
+has no meaning for the
+.Fa req
+argument.
+.Pp
+On return,
+.Fa ret
+contains an encoding for the address that the transport provider actually
+bound to the transport endpoint; if an address was specified in
+.Fa req ,
+this will be an encoding of the same address.
+In
+.Fa ret ,
+the user specifies
+.Sy maxlen ,
+which is the maximum size of the address buffer, and
+.Sy buf
+which points to the buffer where the address is to be placed.
+On return,
+.Sy len
+specifies the number of bytes in the bound address, and
+.Sy buf
+points to the bound address.
+If
+.Sy maxlen
+equals zero, no address is returned.
+If
+.Sy maxlen
+is greater than zero and less than the length of the address,
+.Fn t_bind
+fails with
+.Va t_errno
+set to
+.Er TBUFOVFLW .
+.Pp
+If the requested address is not available,
+.Fn t_bind
+will return  -1 with
+.Va t_errno
+set as appropriate.
+If no address is specified in
+.Fa req
+(the
+.Sy len
+field of
+.Sy addr
+in
+.Fa req
+is zero or
+.Fa req
+is
+.Sy NULL ) ,
+the transport provider will assign an appropriate address to be
+bound, and will return that address in the
+.Sy addr
+field of
+.Fa ret .
+If the transport provider could not allocate an address,
+.Fn t_bind
+will fail
+with
+.Va t_errno
+set to
+.Er TNOADDR .
+.Pp
+The parameter
+.Fa req
+may be a null pointer if the user does not wish to
+specify an address to be bound.
+Here, the value of
+.Sy qlen
+is assumed to be zero, and the transport provider will assign an address to
 the transport endpoint.
-.sp
-.LP
-The \fIreq\fR and \fIret\fR arguments point to a \fBt_bind\fR structure
-containing the following members:
-.sp
-.in +2
-.nf
-struct netbuf	addr;
-unsigned	qlen;
-.fi
-.in -2
-
-.sp
-.LP
-The \fIaddr\fR field of the \fBt_bind\fR structure specifies a protocol
-address, and the \fIqlen\fR field is used to indicate the maximum number of
-outstanding connection indications.
-.sp
-.LP
-The parameter \fIreq\fR is used to request that an address, represented by the
-\fBnetbuf\fR structure, be bound to the given transport endpoint. The parameter
-\fIlen\fR specifies the number of bytes in the address, and \fIbuf\fR points to
-the address buffer. The parameter \fImaxlen\fR has no meaning for the \fIreq\fR
-argument. On return, \fIret\fR contains an encoding for the address that the
-transport provider actually bound to the transport endpoint; if an address was
-specified in  \fIreq\fR, this will be an encoding of the same address. In
-\fIret\fR, the user specifies \fImaxlen,\fR which is the maximum size of the
-address buffer, and \fIbuf\fR which points to the buffer where the address is
-to be placed. On return, \fIlen\fR specifies the number of bytes in the bound
-address, and \fIbuf\fR points to the bound address. If \fImaxlen\fR equals
-zero, no address is returned. If  \fImaxlen\fR is greater than zero and less
-than the length of the address,  \fBt_bind()\fR fails with \fBt_errno\fR set to
-\fBTBUFOVFLW\fR.
-.sp
-.LP
-If the requested address is not available, \fBt_bind()\fR will return  -1 with
-\fBt_errno\fR set as appropriate. If no address is specified in \fIreq\fR (the
-\fIlen\fR field of \fIaddr\fR in \fIreq\fR is zero or \fIreq\fR is
-\fBNULL),\fR the transport provider will assign an appropriate address to be
-bound, and will return that address in the \fIaddr\fR field of \fIret\fR. If
-the transport provider could not allocate an address, \fBt_bind()\fR will fail
-with \fBt_errno\fR set to \fBTNOADDR\fR.
-.sp
-.LP
-The parameter \fIreq\fR may be a null pointer if the user does not wish to
-specify an address to be bound. Here, the value of \fIqlen\fR is assumed to be
-zero, and the transport provider will assign an address to the transport
-endpoint. Similarly, \fIret\fR may be a null pointer if the user does not care
+Similarly,
+.Fa ret
+may be a null pointer if the user does not care
 what address was bound by the provider and is not interested in the negotiated
-value of \fIqlen\fR. It is valid to set \fIreq\fR and \fIret\fR to the null
-pointer for the same call, in which case the provider chooses the address to
-bind to the transport endpoint and does not return that information to the
-user.
-.sp
-.LP
-The \fIqlen\fR field has meaning only when initializing a connection-mode
-service. It specifies the number of outstanding connection indications that the
-transport provider should support for the given transport endpoint. An
-outstanding connection indication is one that has been passed to the transport
-user by the transport provider but which has not been accepted or rejected. A
-value of \fIqlen\fR greater than zero is only meaningful when issued by a
-passive transport user that expects other users to call it. The value of
-\fIqlen\fR will be negotiated by the transport provider and may be changed if
+value of
+.Sy qlen .
+It is valid to set
+.Fa req
+and
+.Fa ret
+to the null pointer for the same call, in which case the provider chooses the
+address to bind to the transport endpoint and does not return that information
+to the user.
+.Pp
+The
+.Sy qlen
+field has meaning only when initializing a connection-mode
+service.
+It specifies the number of outstanding connection indications that the
+transport provider should support for the given transport endpoint.
+An outstanding connection indication is one that has been passed to the
+transport user by the transport provider but which has not been accepted or
+rejected.
+A value of
+.Sy qlen
+greater than zero is only meaningful when issued by a
+passive transport user that expects other users to call it.
+The value of
+.Sy qlen
+will be negotiated by the transport provider and may be changed if
 the transport provider cannot support the specified number of outstanding
-connection indications. However, this value of \fIqlen\fR will never be
-negotiated from a requested value greater than zero to zero. This is a
-requirement on transport providers; see \fBWARNINGS\fR below. On return, the
-\fIqlen\fR field in \fIret\fR will contain the negotiated value.
-.sp
-.LP
-If \fIfd\fR refers to a connection-mode service, this function allows more than
-one transport endpoint to be bound to the same protocol address.  It is not
+connection indications.
+However, this value of
+.Sy qlen
+will never be negotiated from a requested value greater than zero to zero.
+This is a requirement on transport providers; see
+.Sx WARNINGS
+below.
+On return, the
+.Sy qlen
+field in
+.Fa ret
+will contain the negotiated value.
+.Pp
+If
+.Fa fd
+refers to a connection-mode service, this function allows more than
+one transport endpoint to be bound to the same protocol address.
+It is not
 possible to bind more than one protocol address to the same transport endpoint.
-However, the transport provider must also support this capability. If a user
-binds more than one transport endpoint to the same protocol address, only one
-endpoint can be used to listen for connection indications associated with that
-protocol address. In other words, only one \fBt_bind()\fR for a given protocol
-address may specify a value of \fIqlen\fR greater than zero. In this way, the
+However, the transport provider must also support this capability.
+If a user binds more than one transport endpoint to the same protocol address,
+only one endpoint can be used to listen for connection indications associated
+with that protocol address.
+In other words, only one
+.Fn t_bind
+for a given protocol address may specify a value of
+.Sy qlen
+greater than zero.
+In this way, the
 transport provider can identify which transport endpoint should be notified of
-an incoming connection indication. If a user attempts to bind a protocol
-address to a second transport endpoint with a value of \fIqlen\fR greater than
-zero, \fBt_bind()\fR will return  -1 and set \fBt_errno\fR to \fBTADDRBUSY\fR.
+an incoming connection indication.
+If a user attempts to bind a protocol address to a second transport endpoint
+with a value of
+.Sy qlen
+greater than zero,
+.Fn t_bind
+will return  -1 and set
+.Va t_errno
+to
+.Er TADDRBUSY .
 When a user accepts a connection on the transport endpoint that is being used
 as the listening endpoint, the bound protocol address will be found to be busy
-for the duration of the connection, until a \fBt_unbind\fR(3NSL) or
-\fBt_close\fR(3NSL) call has been issued. No other transport endpoints may be
-bound for listening on that same protocol address while that initial listening
-endpoint is active (in the data transfer phase or in the  \fBT_IDLE\fR state).
-This will prevent more than one transport endpoint bound to the same protocol
-address from accepting connection indications.
-.sp
-.LP
-If  \fIfd\fR refers to connectionless mode service, this function allows for
+for the duration of the connection, until a
+.Xr t_unbind 3NSL
+or
+.Xr t_close 3NSL
+call has been issued.
+No other transport endpoints may be bound for listening on that same protocol
+address while that initial listening endpoint is active (in the data transfer
+phase or in the
+.Sy T_IDLE
+state).
+This will prevent more than one transport endpoint bound to the same
+protocol address from accepting connection indications.
+.Pp
+If
+.Fa fd
+refers to connectionless mode service, this function allows for
 more than one transport endpoint to be associated with a protocol address,
 where the underlying transport provider supports this capability (often in
-conjunction with value of a protocol-specific option). If a user attempts to
-bind a second transport endpoint to an already bound protocol address when such
-capability is not supported for a transport provider, \fBt_bind()\fR will
-return  -1 and set \fBt_errno\fR to \fBTADDRBUSY\fR.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, a value of 0 is returned.  Otherwise, a value of
--1 is returned and \fBt_errno\fR is set to indicate an error.
-.SH VALID STATES
-.sp
-.LP
-\fBT_UNBND\fR
-.SH ERRORS
-.sp
-.LP
-On failure, \fBt_errno\fR is set to one of the following:
-.sp
-.ne 2
-.na
-\fB\fBTACCES\fR\fR
-.ad
-.RS 13n
+conjunction with value of a protocol-specific option).
+If a user attempts to bind a second transport endpoint to an already bound
+protocol address when such capability is not supported for a transport provider,
+.Fn t_bind
+will
+return  -1 and set
+.Va t_errno
+to
+.Er TADDRBUSY .
+.Sh RETURN VALUES
+Upon successful completion, a value of 0 is returned.
+Otherwise, a value of
+-1 is returned and
+.Va t_errno
+is set to indicate an error.
+.Sh VALID STATES
+.Sy T_UNBND
+.Sh ERRORS
+On failure,
+.Va t_errno
+is set to one of the following:
+.Bl -tag -width Er
+.It Er TACCES
 The user does not have permission to use the specified address.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTADDRBUSY\fR\fR
-.ad
-.RS 13n
+.It Er TADDRBUSY
 The requested address is in use.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTBADADDR\fR\fR
-.ad
-.RS 13n
+.It Er TBADADDR
 The specified protocol address was in an incorrect format or contained illegal
 information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTBADF\fR\fR
-.ad
-.RS 13n
+.It Er TBADF
 The specified file descriptor does not refer to a transport endpoint.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTBUFOVFLW\fR\fR
-.ad
-.RS 13n
-The number of bytes allowed for an incoming argument \fI(maxlen)\fR is greater
-than 0 but not sufficient to store the value of that argument. The provider's
-state will change to  \fBT_IDLE\fR and the information to be returned in
-\fIret\fR will be discarded.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTOUTSTATE\fR\fR
-.ad
-.RS 13n
-The communications endpoint referenced by  \fIfd\fR is not in one of the states
-in which a call to this function is valid.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTNOADDR\fR\fR
-.ad
-.RS 13n
+.It Er TBUFOVFLW
+The number of bytes allowed for an incoming argument
+.Pa Sy maxlen
+is greater than 0 but not sufficient to store the value of that argument.
+The provider's state will change to
+.Sy T_IDLE
+and the information to be returned in
+.Fa ret
+will be discarded.
+.It Er TOUTSTATE
+The communications endpoint referenced by
+.Fa fd
+is not in one of the states in which a call to this function is valid.
+.It Er TNOADDR
 The transport provider could not allocate an address.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTPROTO\fR\fR
-.ad
-.RS 13n
+.It Er TPROTO
 This error indicates that a communication problem has been detected between XTI
 and the transport provider for which there is no other suitable XTI error
-\fB(t_errno)\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTSYSERR\fR\fR
-.ad
-.RS 13n
+.Pq Va t_errno .
+.It Er TSYSERR
 A system error has occurred during execution of this function.
-.RE
-
-.SH TLI COMPATIBILITY
-.sp
-.LP
-The \fBXTI\fR and \fBTLI\fR interface definitions have common names but use
-different header files. This, and other semantic differences between the two
-interfaces are described in the subsections below.
-.SS "Interface Header"
-.sp
-.LP
-The \fBXTI\fR interfaces use the header file, \fBxti.h\fR. \fBTLI\fR interfaces
-should \fInot\fR use this header.  They should use the header:
-.sp
-.LP
-\fB#include\fR \fB<tiuser.h>\fR
-.SS "Address Bound"
-.sp
-.LP
-The user can compare the addresses in \fIreq\fR and \fIret\fR to determine
-whether the transport provider bound the transport endpoint to a different
-address than that requested.
-.SS "Error Description Values"
-.sp
-.LP
-The \fBt_errno\fR values \fBTPROTO\fR and \fBTADDRBUSY\fR can be set by the
-\fBXTI\fR interface but cannot be set by the \fBTLI\fR interface.
-.sp
-.LP
-A \fBt_errno\fR value that this routine can return under different
-circumstances than its \fBXTI\fR counterpart is \fBTBUFOVFLW\fR. It can be
-returned even when the \fBmaxlen\fR field of the corresponding buffer has been
-set to zero.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5)  for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-MT Level	Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBt_accept\fR(3NSL), \fBt_alloc\fR(3NSL), \fBt_close\fR(3NSL),
-\fBt_connect\fR(3NSL), \fBt_unbind\fR(3NSL), \fBattributes\fR(5)
-.SH WARNINGS
-.sp
-.LP
-The requirement that the value of \fIqlen\fR never be negotiated from a
-requested value greater than zero to zero implies that transport providers,
-rather than the XTI implementation itself, accept this restriction.
-.sp
-.LP
+.El
+.Sh TLI COMPATIBILITY
+The
+.Sy XTI
+and
+.Sy TLI
+interface definitions have common names but use different header files.
+This, and other semantic differences between the two interfaces are described
+in the subsections below.
+.Ss "Interface Header"
+The
+.Sy XTI
+interfaces use the header file,
+.In xti.h .
+.Sy TLI
+interfaces should
+.Em not
+use this header.
+They should use the header:
+.In tiuser.h
+.Ss "Address Bound"
+The user can compare the addresses in
+.Fa req
+and
+.Fa ret
+to determine whether the transport provider bound the transport endpoint to a
+different address than that requested.
+.Ss "Error Description Values"
+The
+.Va t_errno
+values
+.Er TPROTO
+and
+.Er TADDRBUSY
+can be set by the
+.Sy XTI
+interface but cannot be set by the
+.Sy TLI
+interface.
+.Pp
+A
+.Va t_errno
+value that this routine can return under different circumstances than its
+.Sy XTI
+counterpart is
+.Er TBUFOVFLW .
+It can be returned even when the
+.Sy maxlen
+field of the corresponding buffer has been set to zero.
+.Sh MT-LEVEL
+Safe
+.Sh SEE ALSO
+.Xr t_accept 3NSL ,
+.Xr t_alloc 3NSL ,
+.Xr t_close 3NSL ,
+.Xr t_connect 3NSL ,
+.Xr t_unbind 3NSL ,
+.Xr sockaddr 3SOCKET ,
+.Xr attributes 5
+.Sh WARNINGS
+The requirement that the value of
+.Sy qlen
+never be negotiated from a requested value greater than zero to zero implies
+that transport providers, rather than the XTI implementation itself, accept
+this restriction.
+.Pp
 An implementation need not allow an application explicitly to bind more than
 one communications endpoint to a single protocol address, while permitting more
-than one connection to be accepted to the same protocol address. That means
-that although an attempt to bind a communications endpoint to some address with
-\fIqlen=0\fR might be rejected with \fBTADDRBUSY\fR, the user may nevertheless
+than one connection to be accepted to the same protocol address.
+That means that although an attempt to bind a communications endpoint to some
+address with
+.Sy qlen=0
+might be rejected with
+.Er TADDRBUSY ,
+the user may nevertheless
 use this (unbound) endpoint as a responding endpoint in a call to
-\fBt_accept\fR(3NSL). To become independent of such implementation differences,
-the user should supply unbound responding endpoints to  \fBt_accept\fR(3NSL).
-.sp
-.LP
+.Xr t_accept 3NSL .
+To become independent of such implementation differences,
+the user should supply unbound responding endpoints to
+.Xr t_accept 3NSL .
+.Pp
 The local address bound to an endpoint may change as result of a
-\fBt_accept\fR(3NSL) or  \fBt_connect\fR(3NSL) call. Such changes are not
-necessarily reversed when the connection is released.
+.Xr t_accept 3NSL
+or
+.Xr t_connect 3NSL
+call.
+Such changes are not necessarily reversed when the connection is released.
