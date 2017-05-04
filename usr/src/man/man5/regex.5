@@ -12,7 +12,6 @@
 .SH NAME
 regex \- internationalized basic and extended regular expression matching
 .SH DESCRIPTION
-.sp
 .LP
 Regular Expressions (REs) provide a mechanism to select specific strings from a
 set of character strings. The Internationalized Regular Expressions described
@@ -43,14 +42,12 @@ EREs are supported by the Regular Expression Matching interfaces
 \fBregcomp\fR(3C) and \fBregexec\fR(3C).
 .SH BASIC REGULAR EXPRESSIONS
 .SS "BREs Matching a Single Character"
-.sp
 .LP
 A BRE ordinary character, a special character preceded by a backslash, or a
 period matches a single character. A bracket expression matches a single
 character or a single collating element. See \fBRE Bracket Expression\fR,
 below.
 .SS "BRE Ordinary Characters"
-.sp
 .LP
 An ordinary character is a BRE that matches itself: any character in the
 supported character set, except for the BRE special characters listed in \fBBRE
@@ -76,7 +73,6 @@ below)
 a character inside a bracket expression.
 .RE
 .SS "BRE Special Characters"
-.sp
 .LP
 A BRE \fIspecial\fR \fIcharacter\fR has special properties in certain contexts.
 Outside those contexts, or when preceded by a backslash, such a character will
@@ -154,12 +150,10 @@ The dollar sign is special when used as an anchor.
 .RE
 
 .SS "Periods in BREs"
-.sp
 .LP
 A period (\fB\&.\fR), when used outside a bracket expression, is a BRE that
 matches any character in the supported character set except NUL.
 .SS "RE Bracket Expression"
-.sp
 .LP
 A bracket expression (an expression enclosed in square brackets, [\|]) is an RE
 that matches a single collating element contained in the non-empty set of
@@ -349,7 +343,6 @@ first (after the ^, if any) and the \(mi last within the bracket expression.
 Note: Latin-1 characters such as \(ga or ^ are not printable in some locales,
 for example, the \fBja\fR locale.
 .SS "BREs Matching Multiple Characters"
-.sp
 .LP
 The following rules can be used to construct BREs matching multiple characters
 from BREs matching a single character:
@@ -425,7 +418,6 @@ the BRE c\e{1,3\e}d is matched by characters ten to thirteen.
 The behavior of multiple adjacent duplication symbols \fB(\fR \fB*\fR \fB\fR
 and intervals) produces undefined results.
 .SS "BRE Precedence"
-.sp
 .LP
 The order of precedence is as shown in the following table:
 .sp
@@ -454,7 +446,6 @@ anchoring	^  $
 .TE
 
 .SS "BRE Expression Anchoring"
-.sp
 .LP
 A BRE can be limited to matching strings that begin or end a line; this is
 called \fIanchoring\fR. The circumflex and dollar sign special characters will
@@ -497,9 +488,8 @@ For example, the BRE \fB^abcdef$\fR matches strings consisting only of
 Note: The Solaris implementation does not support anchoring in BRE
 subexpressions.
 .SH EXTENDED REGULAR EXPRESSIONS
-.sp
 .LP
-The rules specififed for BREs apply to Extended Regular Expressions (EREs) with
+The rules specified for BREs apply to Extended Regular Expressions (EREs) with
 the following exceptions:
 .RS +4
 .TP
@@ -529,7 +519,6 @@ The back reference operator is not supported.
 Anchoring (\fB^$\fR) is supported in subexpressions.
 .RE
 .SS "EREs Matching a Single Character"
-.sp
 .LP
 An ERE ordinary character, a special character preceded by a backslash, or a
 period matches a single character. A bracket expression matches a single
@@ -537,7 +526,6 @@ character or a single collating element. An \fIERE\fR \fImatching\fR \fIa\fR
 \fIsingle\fR \fIcharacter\fR enclosed in parentheses matches the same as the
 ERE without parentheses would have matched.
 .SS "ERE Ordinary Characters"
-.sp
 .LP
 An \fIordinary character\fR is an ERE that matches itself. An ordinary
 character is any character in the supported character set, except for the ERE
@@ -545,7 +533,6 @@ special characters listed in \fBERE\fR \fBSpecial\fR \fBCharacters\fR below.
 The interpretation of an ordinary character preceded by a backslash (\fB\e\fR)
 is undefined.
 .SS "ERE Special Characters"
-.sp
 .LP
 An \fIERE\fR \fIspecial\fR \fIcharacter\fR has special properties in certain
 contexts. Outside those contexts, or when preceded by a backslash, such a
@@ -642,17 +629,14 @@ The dollar sign is special when used as an anchor.
 .RE
 
 .SS "Periods in EREs"
-.sp
 .LP
 A period (\fB\&.\fR), when used outside a bracket expression, is an ERE that
 matches any character in the supported character set except NUL.
 .SS "ERE Bracket Expression"
-.sp
 .LP
 The rules for ERE Bracket Expressions are the same as for Basic Regular
 Expressions; see \fBRE Bracket Expression\fR, above).
 .SS "EREs Matching Multiple Characters"
-.sp
 .LP
 The following rules will be used to construct EREs matching multiple characters
 from EREs matching a single character:
@@ -719,7 +703,6 @@ six.
 The behavior of multiple adjacent duplication symbols \fB(\fR+\fB,\fR \fB*\fR,
 \fB?\fR and intervals) produces undefined results.
 .SS "ERE Alternation"
-.sp
 .LP
 Two EREs separated by the special character vertical-line (|) match a string
 that is matched by either. For example, the ERE a((bc)|d) matches the string
@@ -727,7 +710,6 @@ abc and the string ad. Single characters, or expressions matching single
 characters, separated by the vertical bar and enclosed in parentheses, will be
 treated as an ERE matching a single character.
 .SS "ERE Precedence"
-.sp
 .LP
 The order of precedence will be as shown in the following table:
 .sp
@@ -754,7 +736,6 @@ For example, the ERE \fBabba\||\|cde\fR matches either the string \fBabba\fR or
 the string \fBcde\fR (rather than the string \fBabbade\fR or \fBabbcde\fR,
 because concatenation has a higher order of precedence than alternation).
 .SS "ERE Expression Anchoring"
-.sp
 .LP
 An ERE can be limited to matching strings that begin or end a line; this is
 called \fIanchoring\fR. The circumflex and dollar sign special characters are
@@ -783,7 +764,6 @@ valid, but can never match because the \fBf\fR prevents the expression e$ from
 matching ending at the last character.
 .RE
 .SH SEE ALSO
-.sp
 .LP
 \fBlocaledef\fR(1), \fBregcomp\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBlocale\fR(5), \fBregexp\fR(5)

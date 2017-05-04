@@ -14,12 +14,10 @@ projdel \- delete a project from the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprojdel\fR utility deletes a project from the system and makes the
 appropriate changes to the system file.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -33,7 +31,6 @@ system project file, \fB/etc/project\fR, is modified.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -46,7 +43,6 @@ The name of the project to be deleted.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -122,7 +118,6 @@ Cannot update the \fB/etc/project\fR file.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/project\fR\fR
@@ -141,7 +136,6 @@ System project file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -153,26 +147,23 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stabilty	See below.
+Interface Stability	See below.
 .TE
 
 .sp
 .LP
 Invocation is evolving. Human readable output is unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBprojects\fR(1), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
 \fBgrpck\fR(1M), \fBlogins\fR(1M), \fBprojadd\fR(1M), \fBprojmod\fR(1M),
 \fBuseradd\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M), \fBproject\fR(4),
 \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 In case of an error, \fBprojdel\fR prints an error message and exits with a
 non-zero status.
 .SH NOTES
-.sp
 .LP
 \fBprojdel\fR deletes a project definition only on the local system. If a
 network name service such as \fBNIS\fR or \fBLDAP\fR is being used to

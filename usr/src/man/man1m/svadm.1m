@@ -44,13 +44,11 @@ operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsvadm\fR command controls the Storage Volume (SV) driver by providing
 facilities to enable and disable the SV driver for specified volumes, and to
 dynamically reconfigure the system.
 .SH OPTIONS
-.sp
 .LP
 If you specify no arguments to an \fBsvadm\fR command, the utility displays the
 list of volumes currently under SV control. \fBsvadm\fR supports the following
@@ -153,10 +151,9 @@ Displays the SV version number.
 .RE
 
 .SH USAGE
-.sp
 .LP
 When an SV volume is enabled, normal system call access to the device (see
-\fBintro\fR(2)) is redirected into the StoreEdge architecture software. This
+\fBIntro\fR(2)) is redirected into the StoreEdge architecture software. This
 allows standard applications to use StorageTek features such as Sun StorageTek
 Point-in-Time Copy and Remote Mirror Software.
 .sp
@@ -165,7 +162,6 @@ The \fBsvadm\fR command generates an entry in the Availability Suite log file,
 \fB/var/adm/ds.log\fR (see \fBds.log\fR(4)), when performing enable (\fB-e\fR)
 and disable (\fB-d\fR) operations.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -181,6 +177,5 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdscfg\fR(1M), \fBds.log\fR(4), \fBattributes\fR(5), \fBsv\fR(7D)

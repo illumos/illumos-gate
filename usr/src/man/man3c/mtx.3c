@@ -179,7 +179,7 @@ If they were unable to successfully complete the operation, they instead
 return
 .Sy thrd_error .
 .Pp
-Upon sucessful completion, the
+Upon successful completion, the
 .Fn mtx_timedlock
 function returns
 .Sy thrd_success .

@@ -15,7 +15,6 @@ in.telnetd, telnetd \- DARPA TELNET protocol server
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBin.telnetd\fR is a server that supports the \fBDARPA\fR standard
 \fBTELNET\fR virtual terminal protocol. \fBin.telnetd\fR is normally invoked in
@@ -94,7 +93,6 @@ BANNER=""
 .in -2
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -218,11 +216,9 @@ Disables Kerberos V5 authentication support negotiation.
 .RE
 
 .SH USAGE
-.sp
 .LP
 \fBtelnetd\fR and \fBin.telnetd\fR are IPv6-enabled. See \fBip6\fR(7P).
 .SH SECURITY
-.sp
 .LP
 \fBin.telnetd\fR can authenticate using Kerberos V5 authentication,
 \fBpam\fR(3PAM), or both. By default, the telnet server will accept valid
@@ -263,8 +259,8 @@ session management, and password management modules.
 .in +2
 .nf
 telnet  auth requisite          pam_authtok_get.so.1
-telent  auth required           pam_dhkeys.so.1
-telent  auth required           pam_unix_auth.so.1
+telnet  auth required           pam_dhkeys.so.1
+telnet  auth required           pam_unix_auth.so.1
 
 telnet  account requisite       pam_roles.so.1
 telnet  account required        pam_projects.so.1
@@ -273,7 +269,7 @@ telnet  account required        pam_unix_account.so.1
 telnet  session required        pam_unix_session.so.1
 
 telnet  password required       pam_dhkeys.so.1
-telent  password requisite      pam_authtok_get.so.1
+telnet  password requisite      pam_authtok_get.so.1
 telnet  password requisite      pam_authtok_check.so.1
 telnet  password required       pam_authtok_store.so.1
 .fi
@@ -289,7 +285,6 @@ then the user may be prompted for multiple passwords.
 For a Kerberized telnet service, the correct \fBPAM\fR service name is
 \fBktelnet\fR.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/default/telnetd\fR\fR
@@ -299,7 +294,6 @@ For a Kerberized telnet service, the correct \fBPAM\fR service name is
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlogin\fR(1), \fBsvcs\fR(1), \fBtelnet\fR(1),
 \fBinetadm\fR(1M), \fBinetd\fR(1M), \fBkadmin\fR(1M), \fBsvcadm\fR(1M),
@@ -361,7 +355,6 @@ Ts'o, T., \fITelnet Data Encryption Option, RFC 2946\fR. September 2000.
 Ts'o, T., \fITelnet Encryption: DES 64 bit Cipher Feedback, RFC 2952\fR.
 September 2000.
 .SH NOTES
-.sp
 .LP
 Some \fBTELNET\fR commands are only partially implemented.
 .sp

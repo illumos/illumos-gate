@@ -100,7 +100,7 @@ function is
 The
 .Fn mbstowcs_l
 function is
-.Sy Uncommited .
+.Sy Uncommitted .
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO

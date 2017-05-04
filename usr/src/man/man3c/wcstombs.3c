@@ -101,7 +101,7 @@ function is
 The
 .Fn wcstombs_l
 function is
-.Sy Uncommited .
+.Sy Uncommitted .
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO
