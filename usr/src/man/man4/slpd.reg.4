@@ -14,7 +14,6 @@ daemon (slpd)
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The serialized registration file contains a group of registrations that
 \fBslpd\fR(1M) registers when it starts. These registrations are primarily for
@@ -81,7 +80,7 @@ registration is taken to be permanent, and it is continually refreshed by the
 Scopes can be included in a registration by including an attribute definition
 with tag \fBscopes\fR followed by a comma-separated list of scope names
 immediately after the \fBurl-props\fR production. If the optional
-\fBscope-list\fR is present, the registations are made in the indicated scopes;
+\fBscope-list\fR is present, the registrations are made in the indicated scopes;
 otherwise, they are registered in the scopes with which the \fBDA\fR or
 \fBSA\fR server was configured through the \fBnet.slp.useScopes\fR property. If
 any conflicts occur between the scope list and the \fBnet.slp.useScopes\fR
@@ -115,7 +114,6 @@ location=headquarters
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -133,7 +131,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBslpd\fR(1M), \fBslp_api\fR(3SLP), \fBsyslog\fR(3C), \fBslp.conf\fR(4),
 \fBattributes\fR(5)

@@ -35,7 +35,7 @@ Due to the nature of the PAM Password Management stack traversal mechanism, the
 .LP
 In the first (\fBPRELIM\fR) invocation, the implementation of
 \fBpam_sm_chauthtok\fR(3PAM) moves the contents of the \fBPAM_AUTHTOK\fR
-(current authentication token) to \fBPAM_OLDAUTHTOK\fR, and subsequentially
+(current authentication token) to \fBPAM_OLDAUTHTOK\fR, and subsequently
 prompts the user for a new password. This new password is stored in
 \fBPAM_AUTHTOK\fR.
 .sp

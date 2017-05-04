@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2017 Toomas Soome <tsoome@me.com>
  */
 
 #include <stdio.h>
@@ -109,6 +109,7 @@ get_boot_cap(const char *osroot)
 	char		fname[PATH_MAX];
 	char		*image;
 	uchar_t		*ident;
+	uchar_t		class;
 	int		fd;
 	int		m;
 	multiboot_header_t *mbh;
@@ -123,9 +124,25 @@ get_boot_cap(const char *osroot)
 		return (BAM_SUCCESS);
 	}
 
+	/*
+	 * The install media can support both 64 and 32 bit boot
+	 * by using boot archive as ramdisk image. However, to save
+	 * the memory, the ramdisk may only have either 32 or 64
+	 * bit kernel files. To avoid error message about missing unix,
+	 * we should try both variants here and only complain if neither
+	 * is found. Since the 64-bit systems are more common, we start
+	 * from amd64.
+	 */
+	class = ELFCLASS64;
 	(void) snprintf(fname, PATH_MAX, "%s/%s", osroot,
-	    "platform/i86pc/kernel/unix");
+	    "platform/i86pc/kernel/amd64/unix");
 	fd = open(fname, O_RDONLY);
+	if (fd < 0) {
+		class = ELFCLASS32;
+		(void) snprintf(fname, PATH_MAX, "%s/%s", osroot,
+		    "platform/i86pc/kernel/unix");
+		fd = open(fname, O_RDONLY);
+	}
 	error = errno;
 	INJECT_ERROR1("GET_CAP_UNIX_OPEN", fd = -1);
 	if (fd < 0) {
@@ -161,7 +178,7 @@ get_boot_cap(const char *osroot)
 		bam_error(_("%s is not an ELF file.\n"), fname);
 		return (BAM_ERROR);
 	}
-	if (ident[EI_CLASS] != ELFCLASS32) {
+	if (ident[EI_CLASS] != class) {
 		bam_error(_("%s is wrong ELF class 0x%x\n"), fname,
 		    ident[EI_CLASS]);
 		return (BAM_ERROR);

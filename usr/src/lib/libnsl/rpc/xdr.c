@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Generic XDR routines implementation.
  *
@@ -383,12 +381,6 @@ xdr_opaque(XDR *xdrs, caddr_t cp, const uint_t cnt)
 	char crud[BYTES_PER_XDR_UNIT];
 
 	/*
-	 * if no data we are done
-	 */
-	if (cnt == 0)
-		return (TRUE);
-
-	/*
 	 * round byte count to full xdr units
 	 */
 	rndup = cnt % BYTES_PER_XDR_UNIT;
@@ -488,7 +480,7 @@ xdr_netobj(XDR *xdrs, struct netobj *np)
  */
 bool_t
 xdr_union(XDR *xdrs, enum_t *dscmp, char *unp,
-		const struct xdr_discrim *choices, const xdrproc_t dfault)
+    const struct xdr_discrim *choices, const xdrproc_t dfault)
 {
 	enum_t dscm;
 
@@ -617,38 +609,39 @@ xdr_string(XDR *xdrs, char **cpp, const uint_t maxsize)
 bool_t
 xdr_hyper(XDR *xdrs, longlong_t *hp)
 {
-	if (xdrs->x_op == XDR_ENCODE) {
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 #if defined(_LONG_LONG_HTOL)
 		if (XDR_PUTINT32(xdrs, (int *)hp) == TRUE)
 			/* LINTED pointer cast */
 			return (XDR_PUTINT32(xdrs, (int *)((char *)hp +
-				BYTES_PER_XDR_UNIT)));
+			    BYTES_PER_XDR_UNIT)));
 #else
 		/* LINTED pointer cast */
 		if (XDR_PUTINT32(xdrs, (int *)((char *)hp +
-				BYTES_PER_XDR_UNIT)) == TRUE)
+		    BYTES_PER_XDR_UNIT)) == TRUE)
 			return (XDR_PUTINT32(xdrs, (int32_t *)hp));
 #endif
 		return (FALSE);
-	}
-
-	if (xdrs->x_op == XDR_DECODE) {
+	case XDR_DECODE:
 #if defined(_LONG_LONG_HTOL)
 		if (XDR_GETINT32(xdrs, (int *)hp) == FALSE ||
 		    /* LINTED pointer cast */
 		    (XDR_GETINT32(xdrs, (int *)((char *)hp +
-				BYTES_PER_XDR_UNIT)) == FALSE))
+		    BYTES_PER_XDR_UNIT)) == FALSE))
 			return (FALSE);
 #else
 		/* LINTED pointer cast */
 		if ((XDR_GETINT32(xdrs, (int *)((char *)hp +
-				BYTES_PER_XDR_UNIT)) == FALSE) ||
-				(XDR_GETINT32(xdrs, (int *)hp) == FALSE))
+		    BYTES_PER_XDR_UNIT)) == FALSE) ||
+		    (XDR_GETINT32(xdrs, (int *)hp) == FALSE))
 			return (FALSE);
 #endif
 		return (TRUE);
+	case XDR_FREE:
+		return (TRUE);
 	}
-	return (TRUE);
+	return (FALSE);
 }
 
 bool_t

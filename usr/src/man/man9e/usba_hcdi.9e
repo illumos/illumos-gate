@@ -276,7 +276,7 @@ from the USBA.
 To unbind the root hub, the instance of the driver should call
 .Xr usba_hubdi_unbind_root_hub 9F .
 If for some reason that function does not return
-.Sy USB_SUCESS ,
+.Sy USB_SUCCESS ,
 then the device driver should fail the call to
 .Xr detach 9E
 and return
@@ -288,7 +288,7 @@ call
 .Xr usba_hcdi_unregister 9F .
 As this call always succeeds, at this point, it is safe for the driver
 to tear down all the rest of its resources and successfully detach.
-.Ss State Tracking and Minors Numbers
+.Ss State Tracking and Minor Numbers
 Because a host controller driver is also a root hub, there are a few
 constraints around how the device must store its per-instance state and
 how its minor numbers are used.

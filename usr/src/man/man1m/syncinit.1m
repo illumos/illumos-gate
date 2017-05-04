@@ -14,7 +14,6 @@ syncinit \- set serial line interface operating parameters
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsyncinit\fR utility allows the user to modify some of the hardware
 operating modes common to synchronous serial lines. This can be useful in
@@ -26,7 +25,6 @@ If run without options, \fBsyncinit\fR reports the options as presently set on
 the port. If options are specified, the new settings are reported after they
 have been made.
 .SH OPTIONS
-.sp
 .LP
 Options to \fBsyncinit\fR normally take the form of a keyword, followed by an
 equal sign and a value. The exception is that a baud rate may be specified as a
@@ -139,12 +137,10 @@ speed=0, loopback=no, echo=no, nrzi=no, txc=txc, rxc=rxc
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
-\fBsyncloop\fR(1M), \fBsyncstat\fR(1M), \fBintro\fR(2), \fBioctl\fR(2),
+\fBsyncloop\fR(1M), \fBsyncstat\fR(1M), \fBIntro\fR(2), \fBioctl\fR(2),
 \fBattributes\fR(5), \fB zsh\fR(7D)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fIdevice\fR\fB missing minor device number\fR\fR
@@ -184,11 +180,10 @@ The string  \fIarg\fR did not make sense as an option.
 .sp .6
 .RS 4n
 An \fBioctl\fR(2) system called failed. The meaning of the value of
-\fIerrno\fR may be found in \fBintro\fR(2).
+\fIerrno\fR may be found in \fBIntro\fR(2).
 .RE
 
 .SH WARNINGS
-.sp
 .LP
 Do not use \fBsyncinit\fR on an active serial link, unless needed to resolve
 an error condition. Do not use this command casually or without being aware of

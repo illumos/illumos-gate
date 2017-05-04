@@ -8,7 +8,6 @@
 attributes, architecture, availability, CSI, stability, MT-Level, standard \-
 attributes of interfaces
 .SH DESCRIPTION
-.sp
 .LP
 The \fBATTRIBUTES\fR section of a manual page contains a table defining
 attribute types and their corresponding values. The following is an example of
@@ -35,13 +34,11 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "Architecture"
-.sp
 .LP
 Architecture defines processor or specific hardware. See \fB-p\fR option of
 \fBuname\fR(1). In some cases, it may indicate required adapters or
 peripherals.
 .SS "Code Set Independence (CSI)"
-.sp
 .LP
 \fBOS\fR utilities and libraries free of dependencies on the properties of any
 code sets are said to have Code Set Independence (CSI). They have the attribute
@@ -182,7 +179,6 @@ applied. Statically bound programs will only get support for C and POSIX
 locales.
 .RE
 .SS "Interface Stability"
-.sp
 .LP
 Sun often provides developers with early access to new technologies, which
 allows developers to evaluate with them as soon as possible. Unfortunately, new
@@ -213,7 +209,6 @@ structures and some symbols in system header files) may be implementation
 artifacts. Such internal interfaces are not only subject to incompatible change
 or removal, but we are unlikely to mention such a change in release notes.
 .SS "Release Levels"
-.sp
 .LP
 Products are given release levels, as well as names, to aid compatibility
 discussions. Each release level may also include changes suitable for lower
@@ -244,7 +239,6 @@ T}
 In the context of interface stability, update releases (occasionally referred
 to as patch releases) should be considered equivalent to Micro Releases.
 .SS "Classifications"
-.sp
 .LP
 The following table summarizes how stability level  classifications relate to
 release level. The first column lists the Stability Level. The second column
@@ -327,7 +321,7 @@ general expectation should be that Uncommitted interfaces are not likely to
 change incompatibly and if such changes occur they will be small in impact and
 may often have a mitigation plan.
 .sp
-Uncommitted interfaces generally fall into one of the following subcategorizes:
+Uncommitted interfaces generally fall into one of the following subcategories:
 .RS +4
 .TP
 1.
@@ -450,7 +444,6 @@ support. Use of an Obsolete interface may produce warning messages.
 .RE
 
 .SS "Exceptions"
-.sp
 .LP
 There are rare instances when it is in the best interest of both Sun and the
 customer to break the interface stability commitment. The following list
@@ -493,7 +486,6 @@ major" release vehicle possible.  However, often the consequences of the
 vulnerabilities or contractual branding requirements will force delivery in a
 patch.
 .SS "Compatibility with Earlier Interface Classification Schemes"
-.sp
 .LP
 In releases up to and including Solaris 10, a different interface
 classification scheme was used. The following table summarizes the mapping
@@ -530,7 +522,6 @@ interpretation. As part of the migration to the new classification scheme, many
 formerly Evolving interfaces were upgraded to Committed. However, upon
 encountering the term Evolving, Uncommitted should be inferred.
 .SS "MT-Level"
-.sp
 .LP
 Libraries are classified into categories that define their ability to support
 multiple threads. Manual pages containing functions that are of multiple or
@@ -706,7 +697,6 @@ also, by definition, Deferred-Cancel-Safe.
 .RE
 
 .SS "Standard"
-.sp
 .LP
 Many interfaces are defined and controlled as industry standards. When this is
 the case, the controlling body and/or public, versioned document is noted in
@@ -728,6 +718,5 @@ very formal organization, as in ISO or ANSII, a less formal, but generally
 accepted organization such as IETF, or as informal as the sole contributor in
 the case of FOSS (Free or Open Source Software).
 .SH SEE ALSO
-.sp
 .LP
 \fBuname\fR(1), \fBpkgadd\fR(1M), \fBIntro\fR(3), \fBstandards\fR(5)

@@ -19,7 +19,6 @@ freopen \- open a stream
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfreopen()\fR function first attempts to flush the stream and close any
 file descriptor associated with \fIstream\fR. Failure to flush or close the
@@ -33,7 +32,7 @@ pointed to by \fIfilename\fR and associates the stream pointed to by
 \fBfopen\fR(3C).
 .sp
 .LP
-If \fIfilename\fR is a null pointer and the application comforms to SUSv3 (see
+If \fIfilename\fR is a null pointer and the application conforms to SUSv3 (see
 \fBstandards\fR(5)), the \fBfreopen()\fR function attempts to change the mode
 of the stream to that specified by \fImode\fR, as though the name of the file
 currently associated with the \fIstream\fR had been used.  The following
@@ -61,7 +60,7 @@ When \fBa\fR or \fBw\fR is specified, the file descriptor mode must be
 .RE
 .sp
 .LP
-If the filename is a null pointer and the application does not comform to
+If the filename is a null pointer and the application does not conform to
 SUSv3, \fBfreopen()\fR returns a null pointer.
 .sp
 .LP
@@ -78,13 +77,11 @@ The largest value that can be represented correctly in an object of type
 \fBoff_t\fR will be established as the offset maximum in the open file
 description.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBfreopen()\fR returns the value of \fIstream\fR.
 Otherwise, a null pointer is returned and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
 The \fBfreopen()\fR function will fail if:
 .sp
@@ -105,7 +102,7 @@ to be created.
 \fB\fBEBADF\fR\fR
 .ad
 .RS 16n
-The application comforms to SUSv3, the \fIfilename\fR argument is a null
+The application conforms to SUSv3, the \fIfilename\fR argument is a null
 pointer, and either the underlying file descriptor is not valid or the mode
 specified when the underlying file descriptor was opened does not support the
 file access modes requested by the \fImode\fR argument.
@@ -117,7 +114,7 @@ file access modes requested by the \fImode\fR argument.
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-The application does not comform to SUSv3 and the \fIfilename\fR argument is a
+The application does not conform to SUSv3 and the \fIfilename\fR argument is a
 null pointer.
 .RE
 
@@ -288,7 +285,6 @@ The file is a pure procedure (shared text) file that is being executed and
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBfreopen()\fR function is typically used to attach the preopened
 \fIstreams\fR associated with \fBstdin\fR, \fBstdout\fR and \fBstderr\fR to
@@ -299,7 +295,6 @@ other files. By default \fBstderr\fR is unbuffered, but the use of
 The \fBfreopen()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -317,7 +312,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfclose\fR(3C), \fBfdopen\fR(3C), \fBfopen\fR(3C), \fBstdio\fR(3C),
 \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)

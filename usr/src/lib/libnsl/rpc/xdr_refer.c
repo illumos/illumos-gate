@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Generic XDR routines impelmentation.
  *
@@ -67,6 +65,12 @@ xdr_reference(XDR *xdrs, caddr_t *pp, uint_t size, const xdrproc_t proc)
 {
 	caddr_t loc = *pp;
 	bool_t stat;
+
+	/* Make sure x_op contains a valid value */
+	if (xdrs->x_op != XDR_ENCODE &&
+	    xdrs->x_op != XDR_DECODE &&
+	    xdrs->x_op != XDR_FREE)
+		return (FALSE);
 
 	if (loc == NULL)
 		switch (xdrs->x_op) {

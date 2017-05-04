@@ -23,7 +23,6 @@ usbskpsp@unit
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusbsksp\fR driver is a loadable \fBSTREAMS\fR and \fBUSBA\fR (Solaris
 USB architecture) compliant client driver that provides basic asynchronous
@@ -31,7 +30,7 @@ communication support for Keyspan USB-to-serial converters. The \fBusbsksp\fR
 driver supports the Keyspan USA19HS, USA49WG and USA49WLC models. By default,
 the USA19HS and USA49WG models are compatible with the \fBusbsksp\fR driver and
 no configuration or installation steps are required.  (The USA49WG model is a
-USB 2.0 device comforming to \fIUniversal Serial Bus Specification 2.0\fR and
+USB 2.0 device conforming to \fIUniversal Serial Bus Specification 2.0\fR and
 the USB 2.0 host controller is required to support the USA49WG model. Note that
 the USA49WG is not compatible with USB 1.1 host controllers). If you use the
 Keyspan USA49WLC model, you must download and install a firmware package to
@@ -67,7 +66,6 @@ commonly known as  'dial-out' lines.
 Unlike onboard serial ports, the \fBusbsksp\fR ports  cannot serve as a local
 serial console.
 .SH APPLICATION PROGRAMMING INTERFACE
-.sp
 .LP
 A dial-in line can be opened only if the corresponding dial-out line is closed.
 A blocking \fB/dev/term\fR open waits until the \fB/dev/cua\fR line is closed
@@ -86,7 +84,6 @@ enabling the line for login in \fB/etc/inittab\fR) or dial-out (by
 Device hot-removal  is functionally equivalent to a modem disconnect event, as
 defined in \fBtermio\fR(7I).
 .SH IOCTLS
-.sp
 .LP
 The  \fBusbsksp\fR driver supports the  standard set of \fBtermio\fR(7I) ioctl
 calls.
@@ -98,7 +95,6 @@ Input and output line speeds can be set to the following baud rates:  0, 50,
 independently. For example, when the output speed is set, the input speed is
 automatically set to the same speed.
 .SH ERRORS
-.sp
 .LP
 An \fBopen()\fR fails under the following conditions:
 .sp
@@ -141,7 +137,6 @@ USB device I/O error.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/usbsksp\fR\fR
@@ -192,7 +187,6 @@ dial-in tty lines.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -208,13 +202,11 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBstrconf\fR(1), \fBtip\fR(1), \fBuucp\fR(1C), \fBautopush\fR(1M),
 \fBioctl\fR(2), \fBopen\fR(2), \fBtermios\fR(3C), \fBattributes\fR(5),
 \fBusba\fR(7D), \fBtermio\fR(7I), \fBldterm\fR(7M), \fBttcompat\fR(7M)
 .SH DIAGNOSTICS
-.sp
 .LP
 In addition to being logged, the following messages may appear on the system
 console. All messages are formatted in the following manner:

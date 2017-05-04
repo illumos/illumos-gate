@@ -50,12 +50,11 @@ getopt \- command option parsing
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetopt()\fR function is a command line parser that can be used by
 applications that follow Basic Utility Syntax Guidelines 3, 4, 5, 6, 7, 9, and
 10 which parallel those defined by application portability standards (see
-intro(1)). It can also be used by applications which additionally follow the
+Intro(1)). It can also be used by applications which additionally follow the
 Command Line Interface Paradigm (CLIP) syntax extension guidelines 15, 16, and
 17. It partially enforces guideline 18 by requiring that every option has a
 short-name, but it allows multiple long-names to be associated with an option.
@@ -143,7 +142,6 @@ through \fIargv\fR[\fIoptind\fR-1]. If the application has not set the variable
 \fIopterr\fR to 0 and the first character of \fIoptstring\fR is not a colon
 (:), \fBgetopt()\fR also prints a diagnostic message to \fBstderr\fR.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetopt()\fR function returns the short-option character associated with
 the option recognized.
@@ -160,7 +158,6 @@ character of \fIoptstring\fR was not a colon (:).
 .LP
 Otherwise, \fBgetopt()\fR returns -1 when all command line options are parsed.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH EXAMPLES
@@ -358,7 +355,6 @@ can also be assigned as shown in the following example:
 .in -2
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBgetopt()\fR: \fBLANG\fR, \fBLC_ALL\fR, and
@@ -374,7 +370,6 @@ in \fIoptstring\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBgetopt()\fR function does not fully check for mandatory arguments
 because there is no unambiguous algorithm to do so. Given an option string
@@ -401,7 +396,6 @@ cmd \(miab \(mio filename
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -424,7 +418,6 @@ Standard	See below.
 .LP
 For the Basic Utility Command syntax is Standard, see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(1), \fBgetopt\fR(1), \fBgetopts\fR(1), \fBgetsubopt\fR(3C),
 \fBgettext\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),

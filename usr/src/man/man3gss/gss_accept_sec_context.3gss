@@ -24,7 +24,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lgss\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH PARAMETERS
-.sp
 .LP
 The parameter descriptions for \fBgss_accept_sec_context()\fR follow:
 .sp
@@ -263,7 +262,6 @@ that is, if the \fIret_flag\fR argument resolves to \fBGSS_C_DELEG_FLAG\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgss_accept_sec_context()\fR function allows a remotely initiated
 security context between the application and a remote peer to be established.
@@ -325,7 +323,7 @@ All other bits within the \fIret_flags\fR argument are set to zero.
 .sp
 .LP
 While \fBgss_accept_sec_context()\fR returns \fBGSS_S_CONTINUE_NEEDED\fR, the
-values returned by means of the the \fIret_flags\fR argument indicate the
+values returned by means of the \fIret_flags\fR argument indicate the
 services available from the established context. If the initial call of
 \fBgss_accept_sec_context()\fR fails, no context object is created, and the
 value of the \fIcontext_handle\fR parameter is set to \fBGSS_C_NO_CONTEXT\fR.
@@ -339,7 +337,6 @@ requirement did not exist in version 1 of the \fBGSS-API\fR specification, so
 applications that wish to run over version 1 implementations must special-case
 these codes.
 .SH ERRORS
-.sp
 .LP
 \fBgss_accept_sec_context()\fR may return the following status codes:
 .sp
@@ -522,7 +519,6 @@ do {
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -538,7 +534,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgss_delete_sec_context\fR(3GSS), \fBgss_export_sec_context\fR(3GSS),
 \fBgss_get_mic\fR(3GSS), \fBgss_init_sec_context\fR(3GSS),
