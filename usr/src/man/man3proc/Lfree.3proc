@@ -27,11 +27,11 @@
 .Sh DESCRIPTION
 The
 .Fn Lfree
-function releases all control resources associated with the the handle
+function releases all control resources associated with the handle
 .Fa L .
 After
-.Fn Lfree
-, calls to other
+.Fn Lfree ,
+calls to other
 .Sy libproc
 routines which leverage information from the handle
 .Fa L

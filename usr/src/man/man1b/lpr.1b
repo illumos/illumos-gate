@@ -358,7 +358,7 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stabilitly	Standard
+Interface Stability	Standard
 _
 CSI	Enabled. See NOTES
 .TE

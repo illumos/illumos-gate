@@ -51,11 +51,10 @@ cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions are used to perform LDAP user friendly search operations.
 \fBldap_ufn_search_s()\fR is the simplest form.  It does the search
-synchronously.  It takes \fIld\fR to identify the the LDAP connection. The
+synchronously.  It takes \fIld\fR to identify the LDAP connection. The
 \fIufn\fR parameter is the user friendly name for which to search. The
 \fIattrs\fR, \fIattrsonly\fR and \fIres\fR parameters are the same as for
 \fBldap_search\fR(3LDAP).
@@ -63,8 +62,8 @@ synchronously.  It takes \fIld\fR to identify the the LDAP connection. The
 .LP
 The \fBldap_ufn_search_c()\fR function functions the same as
 \fBldap_ufn_search_s()\fR, except that it takes \fIcancelproc\fR, a function to
-call periodicly during the search.  It should be a function taking a single
-void * argument, given by \fIcalcelparm\fR.  If \fIcancelproc\fR returns a
+call periodically during the search.  It should be a function taking a single
+void * argument, given by \fIcancelparm\fR.  If \fIcancelproc\fR returns a
 non-zero result, the search will be abandoned and no results returned. The
 purpose of this function is to provide a way for the search to be cancelled,
 for example, by a user or because some other condition occurs.
@@ -98,7 +97,6 @@ with \fBldap_ufn_search_s()\fR searches.  The \fItimeout\fR parameter should
 actually be a pointer to a struct timeval. This is so \fBldap_ufn_timeout()\fR
 can be used as a cancelproc in the above functions.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -113,13 +111,11 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgettimeofday\fR(3C), \fBldap\fR(3LDAP), \fBldap_search\fR(3LDAP),
 \fBldap_getfilter\fR(3LDAP), \fBldapfilter.conf\fR(4), \fBldap_error\fR(3LDAP),
 \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 These functions may allocates memory.  Return values are contained in
 <\fBldap.h\fR>.

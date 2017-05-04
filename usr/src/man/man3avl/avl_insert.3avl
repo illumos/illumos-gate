@@ -51,7 +51,7 @@ function uses the
 value, obtained from a call to
 .Xr avl_find 3AVL ,
 to determine where to insert the new entry into the tree. The tree must
-not have been modified inbetween the call to
+not have been modified in between the call to
 .Xr avl_find 3AVL
 and the call to
 .Fn avl_insert .

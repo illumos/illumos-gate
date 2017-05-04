@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Generic XDR routines impelmentation.
  *
@@ -65,7 +63,7 @@ char mem_err_msg_arr[] = "xdr_array: out of memory";
  */
 bool_t
 xdr_array(XDR *xdrs, caddr_t *addrp, uint_t *sizep, const uint_t maxsize,
-	const uint_t elsize, const xdrproc_t elproc)
+    const uint_t elsize, const xdrproc_t elproc)
 {
 	uint_t i;
 	caddr_t target = *addrp;
@@ -133,10 +131,16 @@ xdr_array(XDR *xdrs, caddr_t *addrp, uint_t *sizep, const uint_t maxsize,
  */
 bool_t
 xdr_vector(XDR *xdrs, char *basep, const uint_t nelem,
-	const uint_t elemsize, const xdrproc_t xdr_elem)
+    const uint_t elemsize, const xdrproc_t xdr_elem)
 {
 	uint_t i;
 	char *elptr;
+
+	/* Make sure x_op contains a valid value */
+	if (xdrs->x_op != XDR_ENCODE &&
+	    xdrs->x_op != XDR_DECODE &&
+	    xdrs->x_op != XDR_FREE)
+		return (FALSE);
 
 	elptr = basep;
 	for (i = 0; i < nelem; i++) {

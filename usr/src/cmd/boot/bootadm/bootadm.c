@@ -113,7 +113,7 @@ typedef enum {
 #define	GRUB_MENU		"/boot/grub/menu.lst"
 #define	MENU_TMP		"/boot/grub/menu.lst.tmp"
 #define	GRUB_BACKUP_MENU	"/etc/lu/GRUB_backup_menu"
-#define	RAMDISK_SPECIAL		"/dev/ramdisk/"
+#define	RAMDISK_SPECIAL		"/devices/ramdisk"
 #define	STUBBOOT		"/stubboot"
 #define	MULTIBOOT		"/platform/i86pc/multiboot"
 #define	GRUBSIGN_DIR		"/boot/grub/bootsign"

@@ -98,7 +98,7 @@ This flag indicates that a property is
 This flag indicates that a property is both
 .Sy readable
 and
-.Sy writeable .
+.Sy writable .
 This is equivalent to specifying both
 .Sy MAC_PROP_PERM_READ
 and

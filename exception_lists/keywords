@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
@@ -28,14 +28,14 @@ syntax: glob
 usr/src/boot/*
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c
 usr/src/cmd/boot/common/bblk_einfo.c
-usr/src/cmd/localedef/data/zh_CN.UTF-8.src
-usr/src/cmd/localedef/data/zh_HK.UTF-8.src
-usr/src/cmd/localedef/data/zh_MO.UTF-8.src
-usr/src/cmd/localedef/data/zh_SG.UTF-8.src
-usr/src/cmd/localedef/data/zh_TW.UTF-8.src
-usr/src/cmd/terminfo/termcap.src
-usr/src/cmd/terminfo/terminfo.src
 usr/src/cmd/zonestat/zonestat/zonestat.c
+usr/src/data/locale/data/zh_CN.UTF-8.src
+usr/src/data/locale/data/zh_HK.UTF-8.src
+usr/src/data/locale/data/zh_MO.UTF-8.src
+usr/src/data/locale/data/zh_SG.UTF-8.src
+usr/src/data/locale/data/zh_TW.UTF-8.src
+usr/src/data/terminfo/termcap.src
+usr/src/data/terminfo/terminfo.src
 usr/src/test/zfs-tests/tests/functional/cli_root/zpool_upgrade/blockfiles/zfs-pool-v15.dat.bz2
 usr/src/test/zfs-tests/tests/functional/delegate/delegate_common.kshlib
 usr/src/test/test-runner/cmd/run

@@ -27,13 +27,13 @@ commands assume that you're inside of the directory you extracted the
 time zone files.
 
 $ cp africa antarctica asia australasia backward etcetera europe \
-northamerica pacificnew southamerica systemv $CODEMGR_WS/usr/src/cmd/zic
+  northamerica pacificnew southamerica systemv $CODEMGR_WS/usr/src/data/zoneinfo
 
 Next you need to copy the country tab and the zone tab files. These have
 different names in our source tree.
 
-$ cp iso3166.tab $CODEMGR_WS/usr/src/cmd/zic/country.tab
-$ cp zone.tab $CODEMGR_WS/usr/src/cmd/zic/zone.tab.txt
+$ cp iso3166.tab $CODEMGR_WS/usr/src/data/zoneinfo/country.tab
+$ cp zone.tab $CODEMGR_WS/usr/src/data/zoneinfo/zone.tab.txt
 
 Now, you need to manaully fix up the zone_sun.tab. zone_sun.tab has
 additional different zone names that the original does not. As things
@@ -41,7 +41,7 @@ are changed and removed, or coordinates updated, the same should be done
 in zone_sun.tab. The simplest way known to deal with it today is
 something like the following:
 
-$ cd $CODEMGR_WS/usr/src/cmd/zic
+$ cd $CODEMGR_WS/usr/src/data/zoneinfo
 $ vimdiff zone.tab.txt zone_sun.tab
 
 And as you see things that show up as egregiously different, do a 'git

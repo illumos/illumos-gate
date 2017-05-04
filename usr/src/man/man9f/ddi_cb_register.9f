@@ -23,11 +23,9 @@ callback handler
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .LP
 \fBddi_cb_register()\fR
 .sp
@@ -97,7 +95,6 @@ Handle to the registered callback handler that is to be unregistered.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBddi_cb_register()\fR function installs a callback handler which
 processes various actions that require the driver's attention while it is
@@ -195,7 +192,6 @@ functions to respond accordingly. A driver is not required to allocate all
 interrupts that are available to it, but it is required to manage its
 allocations so that it never uses more interrupts than are currently available.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBddi_cb_register()\fR and \fBddi_cb_unregister()\fR functions return:
 .sp
@@ -258,7 +254,6 @@ Implementation specific failure
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 These functions can be called from kernel, non-interrupt context.
 .SH EXAMPLES
@@ -364,7 +359,7 @@ These functions can be called from kernel, non-interrupt context.
                 break;
         }
 
-        return (DDI_SUCESS);
+        return (DDI_SUCCESS);
     }
 
     /*
@@ -510,7 +505,6 @@ These functions can be called from kernel, non-interrupt context.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -528,12 +522,10 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBddi_intr_alloc\fR(9F), \fBddi_intr_free\fR(9F),
 \fBddi_intr_set_nreq\fR(9F)
 .SH NOTES
-.sp
 .LP
 Users of these interfaces that register for \fBDDI_CB_FLAG_INTR\fR become
 participants in interrupt resource management. With that participation comes a

@@ -77,6 +77,7 @@ $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
 file path=opt/onbld/bin/$(ARCH)/install mode=0555
 file path=opt/onbld/bin/$(ARCH)/lintdump mode=0555
+file path=opt/onbld/bin/$(ARCH)/localedef mode=0555
 file path=opt/onbld/bin/$(ARCH)/make mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/mbh_patch mode=0555
 file path=opt/onbld/bin/$(ARCH)/ndrgen mode=0555
@@ -85,8 +86,10 @@ file path=opt/onbld/bin/$(ARCH)/pmodes mode=0555
 file path=opt/onbld/bin/$(ARCH)/protocmp mode=0555
 file path=opt/onbld/bin/$(ARCH)/protolist mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/stabs mode=0555
+file path=opt/onbld/bin/$(ARCH)/tic mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/tokenize.exe mode=0555
+file path=opt/onbld/bin/$(ARCH)/zic mode=0555
 file path=opt/onbld/bin/Install mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
 file path=opt/onbld/bin/bringovercheck mode=0555

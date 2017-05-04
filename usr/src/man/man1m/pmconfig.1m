@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble
 .\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PMCONFIG 1M "Aug 12, 2004"
+.TH PMCONFIG 1M "May 1, 2017"
 .SH NAME
 pmconfig \- Configure the Power Management system
 .SH SYNOPSIS
@@ -13,33 +14,27 @@ pmconfig \- Configure the Power Management system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBpmconfig\fR utility sets the Power Management and  suspend-resume
+The \fBpmconfig\fR utility sets the Power Management and suspend-resume
 configuration. User has permission to change Power Management configuration
 using \fBpmconfig\fR only if he is allowed to do so according to
-\fBPMCHANGEPERM \fRkeyword of \fB/etc/default/power\fR. User has permission to
-change  the suspend-resume  configuration using \fBpmconfig\fR only if he is
-allowed to do so according to the \fBCPRCHANGEPERM \fRkeyword of
+\fBPMCHANGEPERM\fR keyword of \fB/etc/default/power\fR. User has permission to
+change the suspend-resume configuration using \fBpmconfig\fR only if he is
+allowed to do so according to the \fBCPRCHANGEPERM\fR keyword of
 \fB/etc/default/power\fR. See FILES section below for a description of the
-\fBPMCHANGEPERM \fRand \fBCPRCHANGEPERM \fR keywords of
+\fBPMCHANGEPERM\fR and \fBCPRCHANGEPERM\fR keywords of
 \fB/etc/default/power\fR.
 .sp
 .LP
-Based on user permissions, \fBpmconfig\fR first resets the  Power Management
-and/or   suspend-resume  state back to its default and then reads the new
-Power Management and/or   suspend-resume  configuration from
-\fB/etc/power.conf\fR and issues the commands to activiate the new
+Based on user permissions, \fBpmconfig\fR first resets the Power Management
+and/or suspend-resume state back to its default and then reads the new
+Power Management and/or suspend-resume configuration from
+\fB/etc/power.conf\fR and issues the commands to activate the new
 configuration. The \fBpmconfig\fR utility is run at system boot. This utility
 can also be run from the command line after manual changes have been made to
-the \fB/etc/power.conf\fR file. For editing changes made to the
+the \fB/etc/power.conf\fR file. For changes made to the
 \fB/etc/power.conf\fR file to take effect, users must run \fBpmconfig\fR.
-.sp
-.LP
-The preferred interface for changing  Power Management and suspend-resume
-configuration is \fBdtpower\fR(1M).
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -48,13 +43,12 @@ The following options are supported:
 \fB\fB-r\fR\fR
 .ad
 .RS 6n
- Reset  Power Management and suspend-resume  state to default and exit. User
-must have both  Power Management and suspend-resume  configuration permission
+Reset Power Management and suspend-resume state to default and exit. User
+must have both Power Management and suspend-resume configuration permission
 for this option.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -76,13 +70,12 @@ An error occurred
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/power.conf\fR\fR
 .ad
 .RS 22n
-System  Power Management configuration file
+System Power Management configuration file.
 .RE
 
 .sp
@@ -91,10 +84,10 @@ System  Power Management configuration file
 \fB\fB/etc/default/power\fR\fR
 .ad
 .RS 22n
-File that controls permissions for system's  Power Management and
-suspend-resume  features. The \fBPMCHANGEPERM\fR keyboard controls the Power
-Management configuration permissions, while the \fBCPRCHANGEPERM \fRkeyword
-controls the  suspend-resume  configuration permissions.
+File that controls permissions for system's Power Management and
+suspend-resume features. The \fBPMCHANGEPERM\fR keyboard controls the Power
+Management configuration permissions, while the \fBCPRCHANGEPERM\fR keyword
+controls the suspend-resume configuration permissions.
 .RE
 
 .sp
@@ -124,7 +117,7 @@ No one except super-user can change the configuration.
 \fB\fB<user1, user2,...>\fR\fR
 .ad
 .RS 22n
-A  user in this user list or a super-user can change the configuration. The
+A user in this user list or a super-user can change the configuration. The
 user list is a space and/or comma (,) separated list. You must enclose the list
 in < and > characters.
 .RE
@@ -135,7 +128,7 @@ in < and > characters.
 \fB\fBconsole-owner\fR\fR
 .ad
 .RS 22n
-A  user who owns the system console device node or a super-user can change the
+A user who owns the system console device node or a super-user can change the
 configuration.
 .RE
 
@@ -144,7 +137,6 @@ configuration.
 The default values are \fBPMCHANGEPERM=console-owner\fR and
 \fBCPRCHANGEPERM=console-owner\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -156,11 +148,10 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface stability 	Unstable
+Interface Stability 	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBpowerd\fR(1M), \fBpower.conf\fR(4), \fBsvcadm\fR(1M),
 \fBattributes\fR(5), \fBsmf\fR(5), \fBcpr\fR(7), \fBpm\fR(7D)
@@ -168,7 +159,6 @@ Interface stability 	Unstable
 .LP
 \fIUsing Power Management\fR
 .SH NOTES
-.sp
 .LP
 The \fBpmconfig\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
@@ -186,14 +176,13 @@ Administrative actions on this service, such as enabling, disabling, or
 requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
 status can be queried using the \fBsvcs\fR(1) command.
 .SH DIAGNOSTICS
-.sp
 .LP
 If the program cannot open the configuration file, it prints an error message
 to standard error. If the program encounters a syntax error in the
 configuration file, it prints an error message and the line number of the error
-in the  configuration file. It then skips the rest of the information on that
+in the configuration file. It then skips the rest of the information on that
 line and processes the next line. Any configuration information already
 processed on the line containing the error is used. If user does not have
-permission to change Power Management and/or  suspend-resume configuration, and
+permission to change Power Management and/or suspend-resume configuration, and
 configuration file has entries for which user doesn't have permission, it
 process the entries for which user has permissions and prints error on rest.

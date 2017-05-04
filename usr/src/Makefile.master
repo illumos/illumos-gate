@@ -192,6 +192,9 @@ TAR=		/usr/bin/tar
 ASTBINDIR=	/usr/ast/bin
 MSGCC=		$(ASTBINDIR)/msgcc
 MSGFMT=		/usr/bin/msgfmt -s
+LCDEF=		$(ONBLD_TOOLS)/bin/$(MACH)/localedef
+TIC=		$(ONBLD_TOOLS)/bin/$(MACH)/tic
+ZIC=		$(ONBLD_TOOLS)/bin/$(MACH)/zic
 
 FILEMODE=	644
 DIRMODE=	755

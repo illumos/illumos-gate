@@ -26,7 +26,7 @@
 import re, sys
 
 spellMsg = '%s: Line %d contains "%s", a common misspelling of "%s"\n'
-altMsg = '%s: Lined %d contains "%s"; please use "%s" instead for consistency with other documentation\n'
+altMsg = '%s: Line %d contains "%s"; please use "%s" instead for consistency with other documentation\n'
 
 misspellings = {
 	'absense': 'absence',
@@ -230,6 +230,7 @@ misspellings = {
 	'transfered': 'transferred',
 	'truely': 'truly',
 	'trustworthyness': 'trustworthiness',
+	'uncommited': 'uncommitted',
 	'unforseen': 'unforeseen',
 	'unfortunatly': 'unfortunately',
 	'unsuccessfull': 'unsuccessful',
