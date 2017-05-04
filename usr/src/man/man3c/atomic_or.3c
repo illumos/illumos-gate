@@ -93,21 +93,17 @@ atomic_or_uint_nv, atomic_or_ulong_nv, atomic_or_64_nv \- atomic OR operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-These functions enable the the bitwise OR of \fIbits\fR to the value stored in
+These functions enable the bitwise OR of \fIbits\fR to the value stored in
 \fItarget\fR to occur in an atomic manner.
 .SH RETURN VALUES
-.sp
 .LP
 The *\fB_nv()\fR variants of these functions return the new value of
 \fItarget\fR.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -125,14 +121,12 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBatomic_add\fR(3C), \fBatomic_and\fR(3C), \fBatomic_bits\fR(3C),
 \fBatomic_cas\fR(3C), \fBatomic_dec\fR(3C), \fBatomic_inc\fR(3C),
 \fBatomic_swap\fR(3C), \fBmembar_ops\fR(3C), \fBattributes\fR(5),
 \fBatomic_ops\fR(9F)
 .SH NOTES
-.sp
 .LP
 The *\fB_nv()\fR variants are substantially more expensive on some platforms
 than the versions that do not return values. Do not use them unless you need to

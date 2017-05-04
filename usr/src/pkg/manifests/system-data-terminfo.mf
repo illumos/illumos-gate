@@ -2750,6 +2750,6 @@ legacy pkg=SUNWter \
     name="Terminal Information"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license usr/src/cmd/terminfo/THIRDPARTYLICENSE \
-    license=usr/src/cmd/terminfo/THIRDPARTYLICENSE
+license usr/src/data/terminfo/THIRDPARTYLICENSE \
+    license=usr/src/data/terminfo/THIRDPARTYLICENSE
 link path=usr/lib/tabset target=../share/lib/tabset

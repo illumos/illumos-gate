@@ -38,5 +38,5 @@ file path=usr/share/hwdata/usb.ids
 legacy pkg=SUNWhwdata \
     desc="ASCII databases describing various PCI, USB and other hardware" \
     name="Hardware data files"
-license usr/src/cmd/hwdata/THIRDPARTYLICENSE.pciids \
-    license=usr/src/cmd/hwdata/THIRDPARTYLICENSE.pciids
+license usr/src/data/hwdata/THIRDPARTYLICENSE.pciids \
+    license=usr/src/data/hwdata/THIRDPARTYLICENSE.pciids

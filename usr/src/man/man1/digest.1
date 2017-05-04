@@ -13,13 +13,11 @@ digest \- calculate a message digest
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdigest\fR utility calculates the message digest of the given files or
 \fBstdin\fR using the algorithm specified. If more than one file is given, each
 line of output is the digest of a single file.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -53,7 +51,6 @@ Verbose output. Includes the algorithm name and filename in the output.
 
 .SH USAGE
 .SS "Algorithms"
-.sp
 .LP
 These algorithms are provided by the Cryptographic Framework. Each algorithm
 supported by the command is an alias of the PKCS #11 mechanism for easier
@@ -128,7 +125,7 @@ sha1 (/usr/lib/inet/ntpd) = 5b4aff102372cea801e7d08acde9655fec81f07c
 \fBExample 4 \fRDisplaying a List of Available Algorithms
 .sp
 .LP
-The following example displays a list of available algortithms to digest:
+The following example displays a list of available algorithms to digest:
 
 .sp
 .in +2
@@ -144,7 +141,6 @@ sha512
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -166,7 +162,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -182,7 +177,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcksum\fR(1), \fBencrypt\fR(1), \fBmac\fR(1), \fBbart\fR(1M),
 \fBcryptoadm\fR(1M), \fBlibpkcs11\fR(3LIB), \fBattributes\fR(5),

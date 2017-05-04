@@ -13,7 +13,6 @@ rsh, restricted_shell \- restricted shell command interpreter
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBrsh\fR is a limiting version of the standard command interpreter \fBsh\fR,
 used to restrict logins to execution environments whose capabilities are more
@@ -44,7 +43,7 @@ setting the value of $\fBPATH\fR,
 .TP
 .ie t \(bu
 .el o
-pecifying path or command names containing \fB/\fR,
+specifying path or command names containing \fB/\fR,
 .RE
 .RS +4
 .TP
@@ -79,7 +78,7 @@ the shell is invoked and \fBrsh\fR is the file name part of argument 0;
 .RS +4
 .TP
 4.
-the shell is invoke with the \fB-r\fR option.
+the shell is invoked with the \fB-r\fR option.
 .RE
 .sp
 .LP
@@ -100,19 +99,16 @@ The system administrator often sets up a directory of commands (that is,
 \fB/usr/rbin\fR) that can be safely invoked by a restricted shell. Some systems
 also provide a restricted editor, \fBred\fR.
 .SH EXIT STATUS
-.sp
 .LP
 Errors detected by the shell, such as syntax errors, cause the shell to return
 a non-zero exit status. If the shell is being used non-interactively execution
 of the shell file is abandoned. Otherwise, the shell returns the exit status of
 the last command executed.
 .SH SEE ALSO
-.sp
 .LP
-\fBintro\fR(1), \fBcd\fR(1), \fBlogin\fR(1), \fBrsh\fR(1), \fBsh\fR(1), \fB
-exec\fR(2), \fBpasswd\fR(4), \fBprofile\fR(4), \fBattributes\fR(5)
+\fBIntro\fR(1), \fBcd\fR(1), \fBlogin\fR(1), \fBrsh\fR(1), \fBsh\fR(1),
+\fBexec\fR(2), \fBpasswd\fR(4), \fBprofile\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The restricted shell, \fB/usr/lib/rsh\fR, should not be confused with the
 remote shell, \fB/usr/bin/rsh\fR, which is documented in \fBrsh\fR(1).

@@ -56,7 +56,10 @@ COMMON_SUBDIRS= \
 #  special versions of commands for use only in build
 #
 UNSHIPPED_SUBDIRS = \
-	mandoc
+	localedef \
+	mandoc \
+	tic \
+	zic
 
 sparc_SUBDIRS= \
 	chk4ubin \

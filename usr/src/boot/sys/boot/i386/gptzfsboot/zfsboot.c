@@ -508,9 +508,6 @@ parse_cmd(void)
 		pager_open();
 		for (i = 0; devsw[i] != NULL; i++) {
 		    if (devsw[i]->dv_print != NULL) {
-			sprintf(line, "\n%s devices:\n", devsw[i]->dv_name);
-			if (pager_output(line))
-			    break;
 			if (devsw[i]->dv_print(1))
 			    break;
 		    } else {
