@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -139,6 +139,9 @@ extern "C" {
 /* barriers */
 #define	PTHREAD_BARRIER_SERIAL_THREAD	-2
 
+/* For pthread_{get,set}name_np(). */
+#define	PTHREAD_MAX_NAMELEN_NP (32)
+
 #ifndef	_ASM
 
 /*
@@ -209,6 +212,10 @@ extern int pthread_attr_setschedparam(pthread_attr_t *_RESTRICT_KYWD,
 		const struct sched_param *_RESTRICT_KYWD);
 extern int pthread_attr_getschedparam(const pthread_attr_t *_RESTRICT_KYWD,
 		struct sched_param *_RESTRICT_KYWD);
+extern int pthread_attr_setname_np(pthread_attr_t *_RESTRICT_KYWD,
+    const char *_RESTRICT_KYWD);
+extern int pthread_attr_getname_np(pthread_attr_t *_RESTRICT_KYWD,
+    char *_RESTRICT_KYWD, size_t);
 extern int pthread_create(pthread_t *_RESTRICT_KYWD,
 		const pthread_attr_t *_RESTRICT_KYWD, void * (*)(void *),
 		void *_RESTRICT_KYWD);
@@ -231,6 +238,8 @@ extern int pthread_key_delete(pthread_key_t);
 extern int pthread_setspecific(pthread_key_t, const void *);
 extern void *pthread_getspecific(pthread_key_t);
 extern pthread_t pthread_self(void);
+extern int pthread_setname_np(pthread_t, const char *);
+extern int pthread_getname_np(pthread_t, char *, size_t);
 
 /*
  * function prototypes - synchronization related calls

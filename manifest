@@ -11573,7 +11573,7 @@ f usr/share/lib/zoneinfo/Pacific/Gambier 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Guadalcanal 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Guam 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Honolulu 0644 root bin
-h usr/share/lib/zoneinfo/Pacific/Johnston=usr/share/lib/zoneinfo/Pacific/Honolulu 
+h usr/share/lib/zoneinfo/Pacific/Johnston=usr/share/lib/zoneinfo/Pacific/Honolulu
 f usr/share/lib/zoneinfo/Pacific/Kiritimati 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Kosrae 0644 root bin
 f usr/share/lib/zoneinfo/Pacific/Kwajalein 0644 root bin
@@ -13590,6 +13590,7 @@ f usr/share/man/man3c/pthread_attr_get_np.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getdetachstate.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getguardsize.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getinheritsched.3c 0444 root bin
+f usr/share/man/man3c/pthread_attr_getname_np.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getschedparam.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getschedpolicy.3c 0444 root bin
 f usr/share/man/man3c/pthread_attr_getscope.3c 0444 root bin
@@ -13600,6 +13601,7 @@ f usr/share/man/man3c/pthread_attr_init.3c 0444 root bin
 s usr/share/man/man3c/pthread_attr_setdetachstate.3c=pthread_attr_getdetachstate.3c
 s usr/share/man/man3c/pthread_attr_setguardsize.3c=pthread_attr_getguardsize.3c
 s usr/share/man/man3c/pthread_attr_setinheritsched.3c=pthread_attr_getinheritsched.3c
+s usr/share/man/man3c/pthread_attr_setname_np.3c=pthread_attr_getname_np.3c
 s usr/share/man/man3c/pthread_attr_setschedparam.3c=pthread_attr_getschedparam.3c
 s usr/share/man/man3c/pthread_attr_setschedpolicy.3c=pthread_attr_getschedpolicy.3c
 s usr/share/man/man3c/pthread_attr_setscope.3c=pthread_attr_getscope.3c
@@ -13634,6 +13636,7 @@ f usr/share/man/man3c/pthread_detach.3c 0444 root bin
 f usr/share/man/man3c/pthread_equal.3c 0444 root bin
 f usr/share/man/man3c/pthread_exit.3c 0444 root bin
 f usr/share/man/man3c/pthread_getconcurrency.3c 0444 root bin
+f usr/share/man/man3c/pthread_getname_np.3c 0444 root bin
 f usr/share/man/man3c/pthread_getschedparam.3c 0444 root bin
 f usr/share/man/man3c/pthread_getspecific.3c 0444 root bin
 f usr/share/man/man3c/pthread_join.3c 0444 root bin
@@ -13683,6 +13686,7 @@ f usr/share/man/man3c/pthread_self.3c 0444 root bin
 f usr/share/man/man3c/pthread_setcancelstate.3c 0444 root bin
 f usr/share/man/man3c/pthread_setcanceltype.3c 0444 root bin
 s usr/share/man/man3c/pthread_setconcurrency.3c=pthread_getconcurrency.3c
+s usr/share/man/man3c/pthread_setname_np.3c=pthread_getname_np.3c
 s usr/share/man/man3c/pthread_setschedparam.3c=pthread_getschedparam.3c
 f usr/share/man/man3c/pthread_setschedprio.3c 0444 root bin
 s usr/share/man/man3c/pthread_setspecific.3c=pthread_getspecific.3c
@@ -13959,6 +13963,7 @@ s usr/share/man/man3c/thr_continue.3c=thr_suspend.3c
 f usr/share/man/man3c/thr_create.3c 0444 root bin
 f usr/share/man/man3c/thr_exit.3c 0444 root bin
 f usr/share/man/man3c/thr_getconcurrency.3c 0444 root bin
+f usr/share/man/man3c/thr_getname.3c 0444 root bin
 f usr/share/man/man3c/thr_getprio.3c 0444 root bin
 s usr/share/man/man3c/thr_getspecific.3c=thr_keycreate.3c
 f usr/share/man/man3c/thr_join.3c 0444 root bin
@@ -13969,6 +13974,7 @@ f usr/share/man/man3c/thr_main.3c 0444 root bin
 f usr/share/man/man3c/thr_min_stack.3c 0444 root bin
 f usr/share/man/man3c/thr_self.3c 0444 root bin
 s usr/share/man/man3c/thr_setconcurrency.3c=thr_getconcurrency.3c
+s usr/share/man/man3c/thr_setname.3c=thr_getname.3c
 s usr/share/man/man3c/thr_setprio.3c=thr_getprio.3c
 s usr/share/man/man3c/thr_setspecific.3c=thr_keycreate.3c
 f usr/share/man/man3c/thr_sigsetmask.3c 0444 root bin
@@ -15211,7 +15217,7 @@ f usr/share/man/man3dlpi/dlpi_info.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_linkname.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_mactype.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_open.3dlpi 0444 root bin
-s usr/share/man/man3dlpi/dlpi_open_zone.3dlpi=dlpi_open.3dlpi 
+s usr/share/man/man3dlpi/dlpi_open_zone.3dlpi=dlpi_open.3dlpi
 s usr/share/man/man3dlpi/dlpi_promiscoff.3dlpi=dlpi_promiscon.3dlpi
 f usr/share/man/man3dlpi/dlpi_promiscon.3dlpi 0444 root bin
 f usr/share/man/man3dlpi/dlpi_recv.3dlpi 0444 root bin
@@ -16958,6 +16964,7 @@ s usr/share/man/man3proc/Plwp_alt_stack.3proc=Plwp_stack.3proc
 f usr/share/man/man3proc/Plwp_getasrs.3proc 0444 root bin
 s usr/share/man/man3proc/Plwp_getfpregs.3proc=Plwp_getregs.3proc
 f usr/share/man/man3proc/Plwp_getgwindows.3proc 0444 root bin
+f usr/share/man/man3proc/Plwp_getname.3proc 0444 root bin
 f usr/share/man/man3proc/Plwp_getpsinfo.3proc 0444 root bin
 f usr/share/man/man3proc/Plwp_getregs.3proc 0444 root bin
 f usr/share/man/man3proc/Plwp_getspymaster.3proc 0444 root bin

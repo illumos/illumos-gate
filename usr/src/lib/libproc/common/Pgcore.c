@@ -25,7 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -509,6 +509,7 @@ new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 {
 	pgcore_t *pgc = data;
 	struct ps_prochandle *P = pgc->P;
+	prlwpname_t name = { 0, "" };
 	psinfo_t ps;
 
 	/*
@@ -576,6 +577,14 @@ new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 	}
 #endif	/* __sparcv9 */
 #endif	/* sparc */
+
+	if (Plwp_getname(P, lsp->pr_lwpid, name.pr_lwpname,
+	    sizeof (name.pr_lwpname)) == 0) {
+		name.pr_lwpid = lsp->pr_lwpid;
+		if (write_note(pgc->pgc_fd, NT_LWPNAME, &name,
+		    sizeof (name), pgc->pgc_doff) != 0)
+			return (1);
+	}
 
 	if (!(lsp->pr_flags & PR_AGENT))
 		return (0);

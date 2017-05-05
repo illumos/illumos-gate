@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -106,6 +108,8 @@ set_smf_state(void *arg)
 
 	int	i;
 	int	st;
+
+	(void) thr_setname(thr_self(), "set_smf_state");
 
 	/*
 	 * the forker nscd needs not monitor the state

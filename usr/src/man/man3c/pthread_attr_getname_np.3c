@@ -1,0 +1,105 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Joyent, Inc.
+.\"
+.Dd "August 22, 2018"
+.Dt PTHREAD_ATTR_GETNAME_NP 3C
+.Os
+.Sh NAME
+.Nm pthread_attr_getname_np ,
+.Nm pthread_attr_setname_np
+.Nd get or set thread name attribute
+.Sh SYNOPSIS
+.In pthread.h
+.
+.Ft int
+.Fo pthread_attr_getname_np
+.Fa "pthread_attr_t *restrict attr"
+.Fa "char *name"
+.Fa "size_t len"
+.Fc
+.
+.Ft int
+.Fo pthread_attr_setname_np
+.Fa "pthread_attr_t *restrict attr"
+.Fa "const char *name"
+.Fc
+.
+.Sh DESCRIPTION
+The
+.Fn pthread_attr_setname_np
+and
+.Fn pthread_attr_getname_np
+functions, respectively, set and get the thread name attribute in
+.Fa attr
+to
+.Fa name .
+For
+.Fn pthread_attr_getname_np ,
+.Fa len
+is the size of
+.Fa name .
+Any threads created with
+.Xr pthread_create 3c
+using
+.Fa attr
+will have their name set to
+.Fa name
+upon creation.
+.Pp
+Thread names are limited to
+.Dv PTHREAD_MAX_NAMELEN_NP
+including the terminating NUL.
+They may only contain printable ASCII characters.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn pthread_attr_getname_np
+and
+.Fn pthread_attr_setname_np
+functions return
+.Sy 0 .
+Otherwise, an error number is returned to indicate the error.
+.Sh ERRORS
+The
+.Fn pthread_attr_getname_np
+function may fail with:
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Fa name
+argument is
+.Sy NULL .
+.It Er ERANGE
+The size of
+.Fa name
+as indicated by
+.Fa len
+is too small to contain the thread name.
+The buffer may be over-written with partial contents of the thread name.
+.El
+.Pp
+The
+.Fn pthread_attr_setname_np
+function may fail with:
+.Bl -tag -width Er
+.It Er ERANGE
+The length of name given in
+.Fa name
+exceeds the maximum size allowed.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_create 3c ,
+.Xr pthread_getname_np 3c

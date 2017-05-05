@@ -26,7 +26,7 @@
 
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -94,7 +94,7 @@ setup_note_header(Phdr *v, proc_t *p)
 
 	v[0].p_type = PT_NOTE;
 	v[0].p_flags = PF_R;
-	v[0].p_filesz = (sizeof (Note) * (10 + 2 * nlwp + nzomb + nfd))
+	v[0].p_filesz = (sizeof (Note) * (10 + 3 * nlwp + nzomb + nfd))
 	    + roundup(sizeof (psinfo_t), sizeof (Word))
 	    + roundup(sizeof (pstatus_t), sizeof (Word))
 	    + roundup(prgetprivsize(), sizeof (Word))
@@ -107,6 +107,7 @@ setup_note_header(Phdr *v, proc_t *p)
 	    + roundup(sizeof (prsecflags_t), sizeof (Word))
 	    + (nlwp + nzomb) * roundup(sizeof (lwpsinfo_t), sizeof (Word))
 	    + nlwp * roundup(sizeof (lwpstatus_t), sizeof (Word))
+	    + nlwp * roundup(sizeof (prlwpname_t), sizeof (Word))
 	    + nfd * roundup(sizeof (prfdinfo_t), sizeof (Word));
 
 	if (curproc->p_agenttp != NULL) {
@@ -458,6 +459,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 	nzomb = p->p_zombcnt;
 	/* for each entry in the lwp directory ... */
 	for (ldp = p->p_lwpdir; nlwp + nzomb != 0; ldp++) {
+		prlwpname_t name = { 0, };
 
 		if ((lep = ldp->ld_entry) == NULL)	/* empty slot */
 			continue;
@@ -468,6 +470,10 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 			lwp = ttolwp(t);
 			mutex_enter(&p->p_lock);
 			prgetlwpsinfo(t, &bigwad->lwpsinfo);
+			if (t->t_name != NULL) {
+				(void) strlcpy(name.pr_lwpname, t->t_name,
+				    sizeof (name.pr_lwpname));
+			}
 			mutex_exit(&p->p_lock);
 		} else {				/* zombie lwp */
 			ASSERT(nzomb != 0);
@@ -478,11 +484,15 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 			bigwad->lwpsinfo.pr_sname = 'Z';
 			bigwad->lwpsinfo.pr_start.tv_sec = lep->le_start;
 		}
+
+		name.pr_lwpid = bigwad->lwpsinfo.pr_lwpid;
+
 		error = elfnote(vp, &offset, NT_LWPSINFO,
 		    sizeof (bigwad->lwpsinfo), (caddr_t)&bigwad->lwpsinfo,
 		    rlimit, credp);
 		if (error)
 			goto done;
+
 		if (t == NULL)		/* nothing more to do for a zombie */
 			continue;
 
@@ -515,6 +525,11 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		    rlimit, credp);
 		if (error)
 			goto done;
+
+		if ((error = elfnote(vp, &offset, NT_LWPNAME, sizeof (name),
+		    (caddr_t)&name, rlimit, credp)) != 0)
+			goto done;
+
 
 #if defined(__sparc)
 		/*

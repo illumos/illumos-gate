@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 
@@ -564,6 +564,89 @@ thread_help(void)
 }
 
 /*
+ * Return a string description of the thread, including the ID and the thread
+ * name.
+ *
+ * If ->t_name is NULL, and we're a system thread, we'll do a little more
+ * spelunking to find a useful string to return.
+ */
+int
+thread_getdesc(uintptr_t addr, boolean_t include_comm,
+    char *buf, size_t bufsize)
+{
+	char name[THREAD_NAME_MAX] = "";
+	kthread_t t;
+	proc_t p;
+
+	bzero(buf, bufsize);
+
+	if (mdb_vread(&t, sizeof (kthread_t), addr) == -1) {
+		mdb_warn("failed to read kthread_t at %p", addr);
+		return (-1);
+	}
+
+	if (t.t_tid == 0) {
+		taskq_t tq;
+
+		if (mdb_vread(&tq, sizeof (taskq_t),
+		    (uintptr_t)t.t_taskq) == -1)
+			tq.tq_name[0] = '\0';
+
+		if (t.t_name != NULL) {
+			if (mdb_readstr(buf, bufsize,
+			    (uintptr_t)t.t_name) == -1) {
+				mdb_warn("error reading thread name");
+			}
+		} else if (tq.tq_name[0] != '\0') {
+			(void) mdb_snprintf(buf, bufsize, "tq:%s", tq.tq_name);
+		} else {
+			mdb_snprintf(buf, bufsize, "%a()", t.t_startpc);
+		}
+
+		return (buf[0] == '\0' ? -1 : 0);
+	}
+
+	if (include_comm && mdb_vread(&p, sizeof (proc_t),
+	    (uintptr_t)t.t_procp) == -1) {
+		mdb_warn("failed to read proc at %p", t.t_procp);
+		return (-1);
+	}
+
+	if (t.t_name != NULL) {
+		if (mdb_readstr(name, sizeof (name), (uintptr_t)t.t_name) == -1)
+			mdb_warn("error reading thread name");
+
+		/*
+		 * Just to be safe -- if mdb_readstr() succeeds, it always NUL
+		 * terminates the output, but is unclear what it does on
+		 * failure.  In that case we attempt to show any partial content
+		 * w/ the warning in case it's useful, but explicitly
+		 * NUL-terminate to be safe.
+		 */
+		buf[bufsize - 1] = '\0';
+	}
+
+	if (name[0] != '\0') {
+		if (include_comm) {
+			(void) mdb_snprintf(buf, bufsize, "%s/%u [%s]",
+			    p.p_user.u_comm, t.t_tid, name);
+		} else {
+			(void) mdb_snprintf(buf, bufsize, "%u [%s]",
+			    t.t_tid, name);
+		}
+	} else {
+		if (include_comm) {
+			(void) mdb_snprintf(buf, bufsize, "%s/%u",
+			    p.p_user.u_comm, t.t_tid);
+		} else {
+			(void) mdb_snprintf(buf, bufsize, "%u", t.t_tid);
+		}
+	}
+
+	return (buf[0] == '\0' ? -1 : 0);
+}
+
+/*
  * List a combination of kthread_t and proc_t. Add stack traces in verbose mode.
  */
 int
@@ -574,8 +657,6 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t verbose = FALSE;
 	uint_t notaskq = FALSE;
 	kthread_t t;
-	taskq_t tq;
-	proc_t p;
 	char cmd[80];
 	mdb_arg_t cmdarg;
 
@@ -621,55 +702,32 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (t.t_state == TS_FREE)
 		return (DCMD_OK);
 
-	if (mdb_vread(&p, sizeof (proc_t), (uintptr_t)t.t_procp) == -1) {
-		mdb_warn("failed to read proc at %p", t.t_procp);
-		return (DCMD_ERR);
+	if (!verbose) {
+		char desc[128];
+
+		if (thread_getdesc(addr, B_TRUE, desc, sizeof (desc)) == -1)
+			return (DCMD_ERR);
+
+		mdb_printf("%0?p %?p %?p %s\n", addr, t.t_procp, t.t_lwp, desc);
+		return (DCMD_OK);
 	}
 
-	if (mdb_vread(&tq, sizeof (taskq_t), (uintptr_t)t.t_taskq) == -1)
-		tq.tq_name[0] = '\0';
+	mdb_printf("%0?p %?p %?p %3u %3d %?p\n",
+	    addr, t.t_procp, t.t_lwp, t.t_cid, t.t_pri, t.t_wchan);
 
-	if (verbose) {
-		mdb_printf("%0?p %?p %?p %3u %3d %?p\n",
-		    addr, t.t_procp, t.t_lwp, t.t_cid, t.t_pri, t.t_wchan);
+	mdb_inc_indent(2);
 
-		mdb_inc_indent(2);
+	mdb_printf("PC: %a\n", t.t_pc);
 
-		mdb_printf("PC: %a", t.t_pc);
-		if (t.t_tid == 0) {
-			if (tq.tq_name[0] != '\0')
-				mdb_printf("    TASKQ: %s\n", tq.tq_name);
-			else
-				mdb_printf("    THREAD: %a()\n", t.t_startpc);
-		} else {
-			mdb_printf("    CMD: %s\n", p.p_user.u_psargs);
-		}
+	mdb_snprintf(cmd, sizeof (cmd), "<.$c%d", count);
+	cmdarg.a_type = MDB_TYPE_STRING;
+	cmdarg.a_un.a_str = cmd;
 
-		mdb_snprintf(cmd, sizeof (cmd), "<.$c%d", count);
-		cmdarg.a_type = MDB_TYPE_STRING;
-		cmdarg.a_un.a_str = cmd;
+	(void) mdb_call_dcmd("findstack", addr, flags, 1, &cmdarg);
 
-		(void) mdb_call_dcmd("findstack", addr, flags, 1, &cmdarg);
+	mdb_dec_indent(2);
 
-		mdb_dec_indent(2);
-
-		mdb_printf("\n");
-	} else {
-		mdb_printf("%0?p %?p %?p", addr, t.t_procp, t.t_lwp);
-		if (t.t_tid == 0) {
-			if (tq.tq_name[0] != '\0')
-				mdb_printf(" tq:%s\n", tq.tq_name);
-			else
-				mdb_printf(" %a()\n", t.t_startpc);
-		} else {
-			char name[THREAD_NAME_MAX];
-
-			mdb_printf(" %s/%u", p.p_user.u_comm, t.t_tid);
-			if (thread_getname(addr, name, sizeof (name)))
-				mdb_printf(" [%s]", name);
-			mdb_printf("\n");
-		}
-	}
+	mdb_printf("\n");
 
 	return (DCMD_OK);
 }
@@ -724,7 +782,6 @@ int
 stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	kthread_t t;
-	proc_t p;
 	uint64_t *ptr;  /* pattern pointer */
 	caddr_t	start;	/* kernel stack start */
 	caddr_t end;	/* kernel stack end */
@@ -738,6 +795,7 @@ stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int i = 0;
 	unsigned int ukmem_stackinfo;
 	uintptr_t allthreads;
+	char tdesc[128] = "";
 
 	/* handle options */
 	if (mdb_getopts(argc, argv,
@@ -783,7 +841,7 @@ stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		mdb_printf("%<u>%?s%</u>", "THREAD");
 		mdb_printf(" %<u>%?s%</u>", "STACK");
-		mdb_printf("%<u>%s%</u>", "   SIZE  MAX CMD/LWPID or STARTPC");
+		mdb_printf("%<u>%s%</u>", "   SIZE  MAX LWP");
 		mdb_printf("\n");
 		usize = KMEM_STKINFO_LOG_SIZE * sizeof (kmem_stkinfo_t);
 		log = (kmem_stkinfo_t *)mdb_alloc(usize, UM_SLEEP);
@@ -806,18 +864,15 @@ stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (log[i].kthread == NULL) {
 				continue;
 			}
-			mdb_printf("%0?p %0?p %6x %3d%%",
+
+			(void) thread_getdesc((uintptr_t)log[i].kthread,
+			    B_TRUE, tdesc, sizeof (tdesc));
+
+			mdb_printf("%0?p %0?p %6x %3d%% %s\n",
 			    log[i].kthread,
 			    log[i].start,
 			    (uint_t)log[i].stksz,
-			    (int)log[i].percent);
-			if (log[i].t_tid != 0) {
-				mdb_printf(" %s/%u\n",
-				    log[i].cmd, log[i].t_tid);
-			} else {
-				mdb_printf(" %p (%a)\n", log[i].t_startpc,
-				    log[i].t_startpc);
-			}
+			    (int)log[i].percent, tdesc);
 		}
 		mdb_free((void *)log, usize);
 		return (DCMD_OK);
@@ -832,7 +887,7 @@ stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 		mdb_printf("%<u>%?s%</u>", "THREAD");
 		mdb_printf(" %<u>%?s%</u>", "STACK");
-		mdb_printf("%<u>%s%</u>", "   SIZE  CUR  MAX CMD/LWPID");
+		mdb_printf("%<u>%s%</u>", "   SIZE  CUR  MAX LWP");
 		mdb_printf("\n");
 	}
 
@@ -844,12 +899,6 @@ stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (t.t_state == TS_FREE && all == FALSE) {
 		return (DCMD_OK);
-	}
-
-	/* read proc */
-	if (mdb_vread(&p, sizeof (proc_t), (uintptr_t)t.t_procp) == -1) {
-		mdb_warn("failed to read proc at %p\n", t.t_procp);
-		return (DCMD_ERR);
 	}
 
 	/*
@@ -886,14 +935,10 @@ stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf(" %3d%%", percent);
 	percent = 0;
 
+	(void) thread_getdesc(addr, B_TRUE, tdesc, sizeof (tdesc));
+
 	if (ukmem_stackinfo == 0) {
-		mdb_printf("  n/a");
-		if (t.t_tid == 0) {
-			mdb_printf(" %a()", t.t_startpc);
-		} else {
-			mdb_printf(" %s/%u", p.p_user.u_comm, t.t_tid);
-		}
-		mdb_printf("\n");
+		mdb_printf("  n/a %s\n", tdesc);
 		return (DCMD_OK);
 	}
 
@@ -966,12 +1011,9 @@ stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	} else {
 		mdb_printf("  n/a");
 	}
-	if (t.t_tid == 0) {
-		mdb_printf(" %a()", t.t_startpc);
-	} else {
-		mdb_printf(" %s/%u", p.p_user.u_comm, t.t_tid);
-	}
-	mdb_printf("\n");
+
+	mdb_printf(" %s\n", tdesc);
+
 	mdb_free((void *)ustack, usize + 8);
 	return (DCMD_OK);
 }
@@ -986,7 +1028,7 @@ stackinfo_help(void)
 	    "(an unsigned integer) is non zero at kthread creation time. ");
 	mdb_printf("For example:\n");
 	mdb_printf(
-	    "          THREAD            STACK   SIZE  CUR  MAX CMD/LWPID\n");
+	    "          THREAD            STACK   SIZE  CUR  MAX LWP\n");
 	mdb_printf(
 	    "ffffff014f5f2c20 ffffff0004153000   4f00   4%%  43%% init/1\n");
 	mdb_printf(
@@ -1012,47 +1054,4 @@ stackinfo_help(void)
 	mdb_printf(
 	    "\nSee illumos Modular Debugger Guide for detailed usage.\n");
 	mdb_flush();
-}
-
-/* If the field is not present in the target, return an empty (0 length) name */
-boolean_t
-thread_getname(uintptr_t addr, char *namep, size_t namelen)
-{
-	mdb_ctf_id_t id;
-	ulong_t offset;
-	uintptr_t nameaddr;
-
-	bzero(namep, namelen);
-
-	if (mdb_ctf_lookup_by_name("kthread_t", &id) == -1)
-		return (B_FALSE);
-
-	if (mdb_ctf_offsetof(id, "t_name", &offset) == -1)
-		return (B_FALSE);
-
-	if (offset % 8 != 0) {
-		mdb_warn("kthread_t.t_name is not on a byte boundary");
-		return (B_FALSE);
-	}
-	offset /= 8;
-
-	if (mdb_vread(&nameaddr, sizeof (nameaddr), addr + offset) !=
-	    sizeof (nameaddr)) {
-		mdb_warn("could not read address of thread name buffer");
-		return (B_FALSE);
-	}
-
-	if (nameaddr != 0 && mdb_readstr(namep, namelen, addr + offset) == -1) {
-		mdb_warn("error reading thread name");
-		/*
-		 * Just to be safe -- if mdb_readstr() succeeds, it always
-		 * NUL terminates the output, but is unclear what it does
-		 * on failure.  In that case we attempt to show any partial
-		 * content w/ the warning in case it's useful, but explicity
-		 * NUL terminate to be safe.
-		 */
-		namep[namelen - 1] = '\0';
-	}
-
-	return (strlen(namep) > 0 ? B_TRUE : B_FALSE);
 }

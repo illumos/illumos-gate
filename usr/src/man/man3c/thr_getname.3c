@@ -1,0 +1,124 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Joyent, Inc.
+.\"
+.Dd "August 22, 2018"
+.Dt THR_GETNAME 3C
+.Os
+.Sh NAME
+.Nm thr_getname ,
+.Nm thr_setname
+.Nd get or set the name of a thread
+.Sh SYNOPSIS
+.In thread.h
+.
+.Ft int
+.Fo thr_getname
+.Fa "thread_t tid"
+.Fa "char *name"
+.Fa "size_t len"
+.Fc
+.
+.Ft int
+.Fo thr_setname
+.Fa "thread_t tid"
+.Fa "const char *name"
+.Fc
+.
+.Sh DESCRIPTION
+The
+.Fn thr_getname
+and
+.Fn thr_setname
+functions, respectively, get and set the names of the thread whose id is given
+by the
+.Fa tid
+parameter.
+For
+.Fn thr_getname ,
+.Fa len
+indicates the size of
+.Fa name .
+.Pp
+Thread names are limited to
+.Dv THREAD_NAME_MAX
+including the terminating NUL.
+They may only contain printable ASCII characters.
+.Pp
+To clear a thread name, call
+.Fn thr_setname
+with
+.Sy NULL .
+.Pp
+Unlike some other systems, threads do not inherit the process name by default.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn thr_getname
+and
+.Fn thr_setname
+functions return
+.Sy 0 .
+Otherwise, an error number is returned to indicate the error.
+If the thread identified by
+.Fa tid
+does not have a name set,
+.Fa thr_getname
+will be set to an empty string (length = 0).
+.Sh ERRORS
+On failure, the contents of the buffer are undefined.
+Errors from
+.Xr open 2 ,
+.Xr read 2 ,
+or
+.Xr write 2
+are possible.
+In addition, the
+.Fn thr_getname
+function will fail with:
+.Bl -tag -width Er
+.It Er EINVAL
+The
+.Fa name
+argument is
+.Sy NULL .
+.It Er ERANGE
+The size of
+.Fa name
+as given by
+.Fa len
+was not large enough to contain the name of the thread.
+.It Er ESRCH
+The thread
+.Fa tid
+was not found.
+.El
+.Pp
+The
+.Fn thr_setname
+function will fail with:
+.Bl -tag -width Er
+.It Er ERANGE
+The length of
+.Fa name
+exceeds the maximum allowed size.
+.It Er ESRCH
+The thread
+.Fa tid
+was not found.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr pthread_setname_np 3c ,
+.Xr thr_create 3c

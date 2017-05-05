@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/dtrace/tests@$(PKGVERS)
@@ -115,6 +116,7 @@ dir path=opt/SUNWdtrt/tst/common/struct
 dir path=opt/SUNWdtrt/tst/common/sugar
 dir path=opt/SUNWdtrt/tst/common/syscall
 dir path=opt/SUNWdtrt/tst/common/sysevent
+dir path=opt/SUNWdtrt/tst/common/threadname
 dir path=opt/SUNWdtrt/tst/common/tick-n
 dir path=opt/SUNWdtrt/tst/common/trace
 dir path=opt/SUNWdtrt/tst/common/tracemem
@@ -1848,6 +1850,8 @@ file path=opt/SUNWdtrt/tst/common/sysevent/tst.post.d mode=0444
 file path=opt/SUNWdtrt/tst/common/sysevent/tst.post.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/sysevent/tst.post_chan.d mode=0444
 file path=opt/SUNWdtrt/tst/common/sysevent/tst.post_chan.exe mode=0555
+file path=opt/SUNWdtrt/tst/common/threadname/tst.threadname.d mode=0444
+file path=opt/SUNWdtrt/tst/common/threadname/tst.threadname.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZERO.tick.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROonens.d mode=0444
 file path=opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROonensec.d mode=0444

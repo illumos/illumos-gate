@@ -243,7 +243,7 @@
 #define	VIONA_NAME		"Virtio Network Accelerator"
 #define	VIONA_CTL_MINOR		0
 #define	VIONA_CLI_NAME		"viona"		/* MAC client name */
-#define VIONA_MAX_HDRS_LEN	(sizeof (struct ether_vlan_header) + \
+#define	VIONA_MAX_HDRS_LEN	(sizeof (struct ether_vlan_header) + \
 	IP_MAX_HDR_LENGTH + TCP_MAX_HDR_LENGTH)
 
 #define	VTNET_MAXSEGS		32
@@ -1338,6 +1338,8 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 {
 	proc_t *p = ttoproc(curthread);
 
+	thread_vsetname(curthread, "viona_rx_%p", ring);
+
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3U(ring->vr_state, ==, VRS_RUN);
 
@@ -1370,6 +1372,8 @@ static void
 viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 {
 	proc_t *p = ttoproc(curthread);
+
+	thread_vsetname(curthread, "viona_tx_%p", ring);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3U(ring->vr_state, ==, VRS_RUN);

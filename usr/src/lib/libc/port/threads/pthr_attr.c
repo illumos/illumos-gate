@@ -25,11 +25,13 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include <sys/ctype.h>
+#include <strings.h>
 #include <sched.h>
 
 /*
@@ -48,7 +50,8 @@ def_thrattr(void)
 		0,				/* prio */
 		SCHED_OTHER,			/* policy */
 		PTHREAD_INHERIT_SCHED,		/* inherit */
-		0				/* guardsize */
+		0,				/* guardsize */
+		{ 0 }				/* name */
 	};
 	if (thrattr.guardsize == 0)
 		thrattr.guardsize = _sysconf(_SC_PAGESIZE);
@@ -95,7 +98,7 @@ pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
 {
 	thrattr_t *ap;
 	const thrattr_t *old_ap =
-	    old_attr? old_attr->__pthread_attrp : def_thrattr();
+	    old_attr ? old_attr->__pthread_attrp : def_thrattr();
 
 	if (old_ap == NULL)
 		return (EINVAL);
@@ -114,8 +117,8 @@ pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
 int
 pthread_attr_equal(const pthread_attr_t *attr1, const pthread_attr_t *attr2)
 {
-	const thrattr_t *ap1 = attr1? attr1->__pthread_attrp : def_thrattr();
-	const thrattr_t *ap2 = attr2? attr2->__pthread_attrp : def_thrattr();
+	const thrattr_t *ap1 = attr1 ? attr1->__pthread_attrp : def_thrattr();
+	const thrattr_t *ap2 = attr2 ? attr2->__pthread_attrp : def_thrattr();
 
 	if (ap1 == NULL || ap2 == NULL)
 		return (0);
@@ -476,6 +479,53 @@ pthread_attr_getstack(const pthread_attr_t *attr,
 	return (EINVAL);
 }
 
+int
+pthread_attr_setname_np(pthread_attr_t *attr, const char *name)
+{
+	thrattr_t *ap;
+
+	if (attr == NULL || (ap = attr->__pthread_attrp) == NULL)
+		return (EINVAL);
+
+	if (name == NULL) {
+		bzero(ap->name, sizeof (ap->name));
+		return (0);
+	}
+
+	if (strlen(name) >= sizeof (ap->name))
+		return (ERANGE);
+
+	/*
+	 * We really want the ASCII version of isprint() here...
+	 */
+	for (size_t i = 0; name[i] != '\0'; i++) {
+		if (!ISPRINT(name[i]))
+			return (EINVAL);
+	}
+
+	/*
+	 * not having garbage after the end of the string simplifies attr
+	 * comparison
+	 */
+	bzero(ap->name, sizeof (ap->name));
+	(void) strlcpy(ap->name, name, sizeof (ap->name));
+	return (0);
+}
+
+int
+pthread_attr_getname_np(pthread_attr_t *attr, char *buf, size_t len)
+{
+	thrattr_t *ap;
+
+	if (buf == NULL || attr == NULL ||
+	    (ap = attr->__pthread_attrp) == NULL)
+		return (EINVAL);
+
+	if (strlcpy(buf, ap->name, len) > len)
+		return (ERANGE);
+	return (0);
+}
+
 /*
  * This function is a common BSD extension to pthread which is used to obtain
  * the attributes of a thread that might have changed after its creation, for
@@ -551,6 +601,7 @@ pthread_attr_get_np(pthread_t tid, pthread_attr_t *attr)
 	ap->policy = target->ul_policy;
 	ap->inherit = target->ul_ptinherit;
 	ap->guardsize = target->ul_guardsize;
+	(void) pthread_getname_np(tid, ap->name, sizeof (ap->name));
 
 	ret = 0;
 out:
