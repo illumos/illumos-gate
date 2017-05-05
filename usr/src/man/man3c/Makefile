@@ -310,6 +310,7 @@ MANFILES=	__fbufsize.3c					\
 		pthread_attr_getdetachstate.3c			\
 		pthread_attr_getguardsize.3c			\
 		pthread_attr_getinheritsched.3c			\
+		pthread_attr_getname_np.3c			\
 		pthread_attr_getschedparam.3c			\
 		pthread_attr_getschedpolicy.3c			\
 		pthread_attr_getscope.3c			\
@@ -335,6 +336,7 @@ MANFILES=	__fbufsize.3c					\
 		pthread_equal.3c				\
 		pthread_exit.3c					\
 		pthread_getconcurrency.3c			\
+		pthread_getname_np.3c				\
 		pthread_getschedparam.3c			\
 		pthread_getspecific.3c				\
 		pthread_join.3c					\
@@ -478,6 +480,7 @@ MANFILES=	__fbufsize.3c					\
 		termios.3c					\
 		thr_create.3c					\
 		thr_exit.3c					\
+		thr_getname.3c					\
 		thr_getconcurrency.3c				\
 		thr_getprio.3c					\
 		thr_join.3c					\
@@ -1095,6 +1098,7 @@ MANLINKS=	FD_CLR.3c				\
 		pthread_attr_setdetachstate.3c		\
 		pthread_attr_setguardsize.3c		\
 		pthread_attr_setinheritsched.3c		\
+		pthread_attr_setname_np.3c		\
 		pthread_attr_setschedparam.3c		\
 		pthread_attr_setschedpolicy.3c		\
 		pthread_attr_setscope.3c		\
@@ -1131,6 +1135,7 @@ MANLINKS=	FD_CLR.3c				\
 		pthread_rwlockattr_destroy.3c		\
 		pthread_rwlockattr_setpshared.3c	\
 		pthread_setconcurrency.3c		\
+		pthread_setname_np.3c			\
 		pthread_setschedparam.3c		\
 		pthread_setspecific.3c			\
 		pthread_spin_init.3c			\
@@ -1294,6 +1299,7 @@ MANLINKS=	FD_CLR.3c				\
 		thr_continue.3c				\
 		thr_getspecific.3c			\
 		thr_keycreate_once.3c			\
+		thr_setname.3c				\
 		thr_setconcurrency.3c			\
 		thr_setprio.3c				\
 		thr_setspecific.3c			\
@@ -2143,6 +2149,8 @@ pthread_attr_setguardsize.3c		:= LINKSRC = pthread_attr_getguardsize.3c
 
 pthread_attr_setinheritsched.3c		:= LINKSRC = pthread_attr_getinheritsched.3c
 
+pthread_attr_setname_np.3c		:= LINKSRC = pthread_attr_getname_np.3c
+
 pthread_attr_setschedparam.3c		:= LINKSRC = pthread_attr_getschedparam.3c
 
 pthread_attr_setschedpolicy.3c		:= LINKSRC = pthread_attr_getschedpolicy.3c
@@ -2176,6 +2184,8 @@ pthread_condattr_setpshared.3c		:= LINKSRC = pthread_condattr_getpshared.3c
 pthread_condattr_destroy.3c		:= LINKSRC = pthread_condattr_init.3c
 
 pthread_setconcurrency.3c		:= LINKSRC = pthread_getconcurrency.3c
+
+pthread_setname_np.3c			:= LINKSRC = pthread_getname_np.3c
 
 pthread_setschedparam.3c		:= LINKSRC = pthread_getschedparam.3c
 
@@ -2410,6 +2420,8 @@ thr_keycreate_once.3c			:= LINKSRC = thr_keycreate.3c
 thr_setspecific.3c			:= LINKSRC = thr_keycreate.3c
 
 thr_continue.3c				:= LINKSRC = thr_suspend.3c
+
+thr_setname.3c				:= LINKSRC = thr_getname.3c
 
 timegm.3c				:= LINKSRC = mktime.3c
 

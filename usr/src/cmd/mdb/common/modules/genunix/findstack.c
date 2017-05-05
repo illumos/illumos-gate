@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -38,6 +39,12 @@
 #include "thread.h"
 #include "sobj.h"
 
+/*
+ * Parts of this file are shared between targets, but this section is only
+ * used for KVM and KMDB.
+ */
+#ifdef _KERNEL
+
 int findstack_debug_on = 0;
 
 /*
@@ -48,6 +55,7 @@ print_stack(uintptr_t sp, uintptr_t pc, uintptr_t addr,
     int argc, const mdb_arg_t *argv, int free_state)
 {
 	int showargs = 0, count, err;
+	char tdesc[128] = "";
 
 	count = mdb_getopts(argc, argv,
 	    'v', MDB_OPT_SETBITS, TRUE, &showargs, NULL);
@@ -57,8 +65,10 @@ print_stack(uintptr_t sp, uintptr_t pc, uintptr_t addr,
 	if (argc > 1 || (argc == 1 && argv->a_type != MDB_TYPE_STRING))
 		return (DCMD_USAGE);
 
-	mdb_printf("stack pointer for thread %p%s: %p\n",
-	    addr, (free_state ? " (TS_FREE)" : ""), sp);
+	(void) thread_getdesc(addr, B_TRUE, tdesc, sizeof (tdesc));
+
+	mdb_printf("stack pointer for thread %p%s (%s): %p\n",
+	    addr, (free_state ? " (TS_FREE)" : ""), tdesc, sp);
 	if (pc != 0)
 		mdb_printf("[ %0?lr %a() ]\n", sp, pc);
 
@@ -107,6 +117,8 @@ findstack_debug(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *av)
 
 	return (DCMD_OK);
 }
+
+#endif /* _KERNEL */
 
 static void
 uppercase(char *p)
@@ -197,7 +209,7 @@ static stacks_entry_t **stacks_hash;
 static stacks_entry_t **stacks_array;
 static size_t stacks_array_size;
 
-size_t
+static size_t
 stacks_hash_entry(stacks_entry_t *sep)
 {
 	size_t depth = sep->se_depth;
@@ -224,7 +236,7 @@ stacks_hash_entry(stacks_entry_t *sep)
  * relative ordering, so we don't do the extra work of looking up symbols
  * for the stack addresses.
  */
-int
+static int
 stacks_entry_comp_impl(stacks_entry_t *l, stacks_entry_t *r,
     uint_t forsort)
 {
@@ -298,7 +310,7 @@ stacks_entry_comp_impl(stacks_entry_t *l, stacks_entry_t *r,
 	return (0);
 }
 
-int
+static int
 stacks_entry_comp(const void *l_arg, const void *r_arg)
 {
 	stacks_entry_t * const *lp = l_arg;
@@ -368,7 +380,7 @@ stacks_cleanup(int force)
 }
 
 /*ARGSUSED*/
-int
+static int
 stacks_thread_cb(uintptr_t addr, const void *ignored, void *cbarg)
 {
 	stacks_info_t *sip = cbarg;
@@ -421,7 +433,7 @@ stacks_thread_cb(uintptr_t addr, const void *ignored, void *cbarg)
 	return (WALK_NEXT);
 }
 
-int
+static int
 stacks_run_tlist(mdb_pipe_t *tlist, stacks_info_t *si)
 {
 	size_t idx;
@@ -445,7 +457,7 @@ stacks_run_tlist(mdb_pipe_t *tlist, stacks_info_t *si)
 	return (-1);
 }
 
-int
+static int
 stacks_run(int verbose, mdb_pipe_t *tlist)
 {
 	stacks_info_t si;

@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_THREAD_H
@@ -82,6 +83,7 @@ extern	kthread_t	*_curthread(void);	/* returns thread pointer */
 
 #define	_KTHREAD_INVALID	((void *)(uintptr_t)-1)
 
+#define	THREAD_NAME_MAX	(32)
 
 struct proc;
 extern struct proc	*_curproc(void);

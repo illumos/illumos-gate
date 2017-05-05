@@ -24,8 +24,8 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -350,6 +350,38 @@ Plwp_getpsinfo(struct ps_prochandle *P, lwpid_t lwpid, lwpsinfo_t *lps)
 	}
 
 	return (-1);
+}
+
+int
+Plwp_getname(struct ps_prochandle *P, lwpid_t lwpid,
+    char *buf, size_t bufsize)
+{
+	char lwpname[THREAD_NAME_MAX];
+	char *from = NULL;
+	lwp_info_t *lwp;
+
+	if (P->state == PS_IDLE) {
+		errno = ENODATA;
+		return (-1);
+	}
+
+	if (P->state != PS_DEAD) {
+		if (getlwpfile(P, lwpid, "lwpname",
+		    lwpname, sizeof (lwpname)) != 0)
+			return (-1);
+		from = lwpname;
+	} else {
+		if ((lwp = getlwpcore(P, lwpid)) == NULL)
+			return (-1);
+		from = lwp->lwp_name;
+	}
+
+	if (strlcpy(buf, from, bufsize) >= bufsize) {
+		errno = ENAMETOOLONG;
+		return (-1);
+	}
+
+	return (0);
 }
 
 int

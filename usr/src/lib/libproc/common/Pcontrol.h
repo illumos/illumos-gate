@@ -24,8 +24,8 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_PCONTROL_H
@@ -45,6 +45,7 @@
 #include <libctf.h>
 #include <limits.h>
 #include <libproc.h>
+#include <thread.h>
 #include <sys/secflags.h>
 
 #ifdef	__cplusplus
@@ -139,6 +140,7 @@ typedef struct lwp_info {	/* per-lwp information from core file */
 	lwpid_t	lwp_id;		/* lwp identifier */
 	lwpsinfo_t lwp_psinfo;	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo data */
 	lwpstatus_t lwp_status;	/* /proc/<pid>/lwp/<lwpid>/lwpstatus data */
+	char lwp_name[THREAD_NAME_MAX];
 #if defined(sparc) || defined(__sparc)
 	gwindows_t *lwp_gwins;	/* /proc/<pid>/lwp/<lwpid>/gwindows data */
 	prxregset_t *lwp_xregs;	/* /proc/<pid>/lwp/<lwpid>/xregs data */
@@ -276,7 +278,7 @@ extern	void	optimize_symtab(sym_tbl_t *);
 extern	void	Pbuild_file_symtab(struct ps_prochandle *, file_info_t *);
 extern	ctf_file_t *Pbuild_file_ctf(struct ps_prochandle *, file_info_t *);
 extern	map_info_t *Paddr2mptr(struct ps_prochandle *, uintptr_t);
-extern	char 	*Pfindexec(struct ps_prochandle *, const char *,
+extern	char	*Pfindexec(struct ps_prochandle *, const char *,
 	int (*)(const char *, void *), void *);
 extern	int	getlwpstatus(struct ps_prochandle *, lwpid_t, lwpstatus_t *);
 int	Pstopstatus(struct ps_prochandle *, long, uint32_t);

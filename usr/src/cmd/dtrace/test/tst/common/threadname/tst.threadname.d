@@ -10,21 +10,17 @@
  */
 
 /*
- * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
  */
 
-#ifndef _COMPAT_FREEBSD_PTHREAD_NP_H_
-#define	_COMPAT_FREEBSD_PTHREAD_NP_H_
+#pragma D option quiet
 
-#include <sys/param.h>
-#include <sys/cpuset.h>
+profile-10ms /pid == $1 && threadname == "unlikely"/
+{
+	surprising++;
+}
 
-#include <synch.h>
-#include <pthread.h>
-
-#define	pthread_set_name_np pthread_setname_np
-
-#define	pthread_mutex_isowned_np(x)	_mutex_held(x)
-
-#endif	/* _COMPAT_FREEBSD_PTHREAD_NP_H_ */
+syscall::rexit:entry /pid == $1/
+{
+	exit(arg0);
+}

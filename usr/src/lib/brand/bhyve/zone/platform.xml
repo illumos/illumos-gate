@@ -29,6 +29,7 @@
 	    opt="ro,nodevices,nosub" type="lofs" />
 
 	<!-- Local filesystems to mount when booting the zone -->
+	<mount special="/proc" directory="/proc" type="proc" />
 	<mount special="swap" directory="/var/run" type="tmpfs"
 	    opt="size=50m"/>
 

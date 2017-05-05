@@ -21,11 +21,14 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <stdlib.h>
 #include <libscf.h>
 #include <string.h>
+#include <pthread.h>
 #include "nscd_switch.h"
 #include "nscd_log.h"
 #include "nscd_door.h"
@@ -106,6 +109,8 @@ set_smf_state(void *arg)
 
 	int	i;
 	int	st;
+
+	(void) pthread_setname_np(pthread_self(), "set_smf_state");
 
 	/*
 	 * the forker nscd needs not monitor the state

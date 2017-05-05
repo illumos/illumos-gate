@@ -1,11 +1,11 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2017, Joyent, Inc.
+.\" Copyright 2018, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd Jun 24, 2016
+.Dd "August 22, 2018"
 .Dt PROC 4
 .Os
 .Sh NAME
@@ -982,12 +982,12 @@ typedef struct psinfo {
     uintptr_t pr_argv;       /* address of initial argument vector */
     uintptr_t pr_envp;       /* address of initial environment vector */
     char pr_dmodel;          /* data model of the process */
-    lwpsinfo_t pr_lwp;       /* information for representative lwp */
     taskid_t pr_taskid;      /* task id */
     projid_t pr_projid;      /* project id */
     poolid_t pr_poolid;      /* pool id */
     zoneid_t pr_zoneid;      /* zone id */
     ctid_t pr_contract;      /* process contract id */
+    lwpsinfo_t pr_lwp;       /* information for representative lwp */
 } psinfo_t;
 .Ed
 .Pp
@@ -1647,6 +1647,20 @@ The messages written to this file affect the specific
 lwp rather than the representative lwp, as is the case for the process's
 .Pa ctl
 file.
+.Ss lwpname
+A buffer of
+.Dv THREAD_NAME_MAX
+bytes representing the LWP name; the buffer is
+zero-filled if the thread name is shorter than the buffer.
+If no thread name is set, the buffer contains the empty string.
+A read with a buffer shorter than
+.Dv THREAD_NAME_MAX
+bytes is not guaranteed
+to be NUL-terminated.
+Writing to this file will set the LWP name for the specific lwp.
+This file may not be present in older operating system versions.
+.Dv THREAD_NAME_MAX
+may increase in the future; clients should be prepared for this.
 .Ss lwpstatus
 lwp-specific state information.
 This file contains the

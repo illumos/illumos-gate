@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015 Gary Mills
  */
@@ -726,6 +726,32 @@ err:
 }
 
 static int
+note_lwpname(struct ps_prochandle *P, size_t nbytes)
+{
+	prlwpname_t name;
+	lwp_info_t *lwp;
+
+	if (nbytes != sizeof (name) ||
+	    read(P->asfd, &name, sizeof (name)) != sizeof (name))
+		goto err;
+
+	if ((lwp = lwpid2info(P, name.pr_lwpid)) == NULL)
+		goto err;
+
+	if (strlcpy(lwp->lwp_name, name.pr_lwpname,
+	    sizeof (lwp->lwp_name)) >= sizeof (lwp->lwp_name)) {
+		errno = ENAMETOOLONG;
+		goto err;
+	}
+
+	return (0);
+
+err:
+	dprintf("Pgrab_core: failed to read NT_LWPNAME\n");
+	return (-1);
+}
+
+static int
 note_fdinfo(struct ps_prochandle *P, size_t nbytes)
 {
 	prfdinfo_t prfd;
@@ -1231,6 +1257,7 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_fdinfo,		/* 22	NT_FDINFO		*/
 	note_spymaster,		/* 23	NT_SPYMASTER		*/
 	note_secflags,		/* 24	NT_SECFLAGS		*/
+	note_lwpname,		/* 25	NT_LWPNAME		*/
 };
 
 static void

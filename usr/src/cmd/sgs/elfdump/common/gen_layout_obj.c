@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -58,3 +59,4 @@ timestruc_t ts;
 struct utsname uts;
 prfdinfo_t ptfd;
 prsecflags_t psf;
+prlwpname_t psn;

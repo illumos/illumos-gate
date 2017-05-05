@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2018 Joyent, Inc.
 .\"
-.Dd June 06, 2016
+.Dd August 31, 2018
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -217,34 +217,34 @@ manipulation of the process itself.
 .It Sy Plmid_to_loadobj Ta Sy Plmid_to_map
 .It Sy Plookup_by_addr Ta Sy Plookup_by_name
 .It Sy Plwp_alt_stack Ta Sy Plwp_getfpregs
-.It Sy Plwp_getpsinfo Ta Sy Plwp_getregs
-.It Sy Plwp_getspymaster Ta Sy Plwp_main_stack
-.It Sy Plwp_setfpregs Ta Sy Plwp_setregs
-.It Sy Plwp_stack Ta Sy Pname_to_ctf
-.It Sy Pname_to_loadobj Ta Sy Pname_to_map
-.It Sy Pobjname Ta Sy Pobjname_resolved
-.It Sy Pplatform Ta Sy Ppltdest
-.It Sy Ppriv Ta Sy Ppsinfo
-.It Sy Pputareg Ta Sy Prd_agent
-.It Sy Pread Ta Sy Pread_string
-.It Sy Preset_maps Ta Sy Psetbkpt
-.It Sy Psecflags Ta Sy Psetcred
-.It Sy Psetfault Ta Sy Psetflags
-.It Sy Psetpriv Ta Sy Psetrun
-.It Sy Psetsignal Ta Sy Psetsysentry
-.It Sy Psetsysexit Ta Sy Psetwapt
-.It Sy Psetzoneid Ta Sy Psignal
-.It Sy Pstate Ta Sy Pstatus
-.It Sy Pstop Ta Sy Pstopstatus
-.It Sy Psync Ta Sy Psysentry
-.It Sy Psysexit Ta Sy Puname
-.It Sy Punsetflags Ta Sy Pupdate_maps
-.It Sy Pupdate_syms Ta Sy Pwait
-.It Sy Pwrite Ta Sy Pxecbkpt
-.It Sy Pxecwapt Ta Sy Pxlookup_by_addr
-.It Sy Pxlookup_by_addr_resolved Ta Sy Pxlookup_by_name
-.It Sy Pzonename Ta Sy Pzonepath
-.It Sy Pzoneroot Ta
+.It Sy Plwp_getname Ta Sy Plwp_getpsinfo
+.It Sy Plwp_getregs Ta Sy Plwp_getspymaster
+.It Sy Plwp_main_stack Ta Sy Plwp_setfpregs
+.It Sy Plwp_setregs Ta Sy Plwp_stack
+.It Sy Pname_to_ctf Ta Sy Pname_to_loadobj
+.It Sy Pname_to_map Ta Sy Pobjname
+.It Sy Pobjname_resolved Ta Sy Pplatform
+.It Sy Ppltdest Ta Sy Ppriv
+.It Sy Ppsinfo Ta Sy Pputareg
+.It Sy Prd_agent Ta Sy Pread
+.It Sy Pread_string Ta Sy Preset_maps
+.It Sy Psetbkpt Ta Sy Psecflags
+.It Sy Psetcred Ta Sy Psetfault
+.It Sy Psetflags Ta Sy Psetpriv
+.It Sy Psetrun Ta Sy Psetsignal
+.It Sy Psetsysentry Ta Sy Psetsysexit
+.It Sy Psetwapt Ta Sy Psetzoneid
+.It Sy Psignal Ta Sy Pstate
+.It Sy Pstatus Ta Sy Pstop
+.It Sy Pstopstatus Ta Sy Psync
+.It Sy Psysentry Ta Sy Psysexit
+.It Sy Puname Ta Sy Punsetflags
+.It Sy Pupdate_maps Ta Sy Pupdate_syms
+.It Sy Pwait Ta Sy Pwrite
+.It Sy Pxecbkpt Ta Sy Pxecwapt
+.It Sy Pxlookup_by_addr Ta Sy Pxlookup_by_addr_resolved
+.It Sy Pxlookup_by_name Ta Sy Pzonename
+.It Sy Pzonepath Ta Sy Pzoneroot Ta
 .El
 .Ss Thread interrogation and manipulation
 The following routines obtain information about a thread and allow

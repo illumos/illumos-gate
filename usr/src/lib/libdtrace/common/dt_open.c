@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  */
 
@@ -117,8 +117,9 @@
 #define	DT_VERS_1_12	DT_VERSION_NUMBER(1, 12, 0)
 #define	DT_VERS_1_12_1	DT_VERSION_NUMBER(1, 12, 1)
 #define	DT_VERS_1_13	DT_VERSION_NUMBER(1, 13, 0)
-#define	DT_VERS_LATEST	DT_VERS_1_13
-#define	DT_VERS_STRING	"Sun D 1.13"
+#define	DT_VERS_1_14	DT_VERSION_NUMBER(1, 14, 0)
+#define	DT_VERS_LATEST	DT_VERS_1_14
+#define	DT_VERS_STRING	"Sun D 1.14"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -145,6 +146,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_12,	/* D API 1.12 */
 	DT_VERS_1_12_1,	/* D API 1.12.1 */
 	DT_VERS_1_13,	/* D API 1.13 */
+	DT_VERS_1_14,	/* D API 1.14 */
 	0
 };
 
@@ -402,6 +404,8 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_func, "void(@, ...)" },
 { "this", DT_IDENT_PTR, 0, 0, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "void" },
+{ "threadname", DT_IDENT_SCALAR, 0, DIF_VAR_THREADNAME,
+	DT_ATTR_STABCMN, DT_VERS_1_14, &dt_idops_type, "string" },
 { "tid", DT_IDENT_SCALAR, 0, DIF_VAR_TID, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "id_t" },
 { "timestamp", DT_IDENT_SCALAR, 0, DIF_VAR_TIMESTAMP,

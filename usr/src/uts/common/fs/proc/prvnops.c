@@ -21,12 +21,12 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984,	 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -64,6 +64,7 @@
 #include <sys/contract_impl.h>
 #include <sys/ctfs.h>
 #include <sys/avl.h>
+#include <sys/ctype.h>
 #include <fs/fs_subr.h>
 #include <vm/rm.h>
 #include <vm/as.h>
@@ -190,22 +191,24 @@ static prdirent_t lwpiddir[] = {
 		".." },
 	{ PR_LWPCTL,	 3 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"lwpctl" },
-	{ PR_LWPSTATUS,	 4 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_LWPNAME,	 4 * sizeof (prdirent_t), sizeof (prdirent_t),
+		"lwpname" },
+	{ PR_LWPSTATUS,	 5 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"lwpstatus" },
-	{ PR_LWPSINFO,	 5 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_LWPSINFO,	 6 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"lwpsinfo" },
-	{ PR_LWPUSAGE,	 6 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_LWPUSAGE,	 7 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"lwpusage" },
-	{ PR_XREGS,	 7 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_XREGS,	 8 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"xregs" },
-	{ PR_TMPLDIR,	 8 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_TMPLDIR,	 9 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"templates" },
-	{ PR_SPYMASTER,	 9 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_SPYMASTER,	 10 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"spymaster" },
 #if defined(__sparc)
-	{ PR_GWINDOWS,	10 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_GWINDOWS,	11 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"gwindows" },
-	{ PR_ASRS,	11 * sizeof (prdirent_t), sizeof (prdirent_t),
+	{ PR_ASRS,	12 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"asrs" },
 #endif
 };
@@ -595,7 +598,8 @@ static int pr_read_inval(), pr_read_as(), pr_read_status(),
 	pr_read_argv(),
 	pr_read_usage(), pr_read_lusage(), pr_read_pagedata(),
 	pr_read_watch(), pr_read_lwpstatus(), pr_read_lwpsinfo(),
-	pr_read_lwpusage(), pr_read_xregs(), pr_read_priv(),
+	pr_read_lwpusage(), pr_read_lwpname(),
+	pr_read_xregs(), pr_read_priv(),
 	pr_read_spymaster(), pr_read_secflags(),
 #if defined(__sparc)
 	pr_read_gwindows(), pr_read_asrs(),
@@ -635,6 +639,7 @@ static int (*pr_read_function[PR_NFILES])() = {
 	pr_read_inval,		/* /proc/<pid>/lwp			*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>		*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>/lwpctl	*/
+	pr_read_lwpname,	/* /proc/<pid>/lwp/<lwpid>/lwpname	*/
 	pr_read_lwpstatus,	/* /proc/<pid>/lwp/<lwpid>/lwpstatus	*/
 	pr_read_lwpsinfo,	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo	*/
 	pr_read_lwpusage,	/* /proc/<pid>/lwp/<lwpid>/lwpusage	*/
@@ -1117,7 +1122,7 @@ pr_read_auxv(prnode_t *pnp, uio_t *uiop)
  *	we have two kinds of LDT structures to export -- one for compatibility
  *	mode, and one for long mode, sigh.
  *
- * 	For now lets just have a ldt of size 0 for 64-bit processes.
+ *	For now let's just have a ldt of size 0 for 64-bit processes.
  */
 static int
 pr_read_ldt(prnode_t *pnp, uio_t *uiop)
@@ -1582,6 +1587,33 @@ out:
 	return (error);
 }
 
+static int
+pr_read_lwpname(prnode_t *pnp, uio_t *uiop)
+{
+	char lwpname[THREAD_NAME_MAX];
+	kthread_t *t;
+	int error;
+
+	ASSERT(pnp->pr_type == PR_LWPNAME);
+
+	if (uiop->uio_offset >= THREAD_NAME_MAX)
+		return (0);
+
+	if ((error = prlock(pnp, ZNO)) != 0)
+		return (error);
+
+	bzero(lwpname, sizeof (lwpname));
+
+	t = pnp->pr_common->prc_thread;
+
+	if (t->t_name != NULL)
+		(void) strlcpy(lwpname, t->t_name, sizeof (lwpname));
+
+	prunlock(pnp);
+
+	return (pr_uioread(lwpname, sizeof (lwpname), uiop));
+}
+
 /* ARGSUSED */
 static int
 pr_read_xregs(prnode_t *pnp, uio_t *uiop)
@@ -1853,6 +1885,7 @@ static int (*pr_read_function_32[PR_NFILES])() = {
 	pr_read_inval,		/* /proc/<pid>/lwp			*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>		*/
 	pr_read_inval,		/* /proc/<pid>/lwp/<lwpid>/lwpctl	*/
+	pr_read_lwpname,	/* /proc/<pid>/lwp/<lwpid>/lwpname	*/
 	pr_read_lwpstatus_32,	/* /proc/<pid>/lwp/<lwpid>/lwpstatus	*/
 	pr_read_lwpsinfo_32,	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo	*/
 	pr_read_lwpusage_32,	/* /proc/<pid>/lwp/<lwpid>/lwpusage	*/
@@ -2862,6 +2895,54 @@ pr_write_psinfo(prnode_t *pnp, uio_t *uiop)
 }
 
 
+/* Note we intentionally don't handle partial writes/updates. */
+static int
+pr_write_lwpname(prnode_t *pnp, uio_t *uiop)
+{
+	kthread_t *t = NULL;
+	char *lwpname;
+	int error;
+
+	lwpname = kmem_zalloc(THREAD_NAME_MAX, KM_SLEEP);
+
+	if ((error = uiomove(lwpname, THREAD_NAME_MAX, UIO_WRITE, uiop)) != 0) {
+		kmem_free(lwpname, THREAD_NAME_MAX);
+		return (error);
+	}
+
+	/* Somebody tried to write too long a thread name... */
+	if (lwpname[THREAD_NAME_MAX - 1] != '\0' || uiop->uio_resid > 0) {
+		kmem_free(lwpname, THREAD_NAME_MAX);
+		return (EIO);
+	}
+
+	VERIFY3U(lwpname[THREAD_NAME_MAX - 1], ==, '\0');
+
+	for (size_t i = 0; lwpname[i] != '\0'; i++) {
+		if (!isprint(lwpname[i])) {
+			kmem_free(lwpname, THREAD_NAME_MAX);
+			return (EINVAL);
+		}
+	}
+
+	/* Equivalent of thread_setname(), but with the ZNO magic. */
+	if ((error = prlock(pnp, ZNO)) != 0) {
+		kmem_free(lwpname, THREAD_NAME_MAX);
+		return (error);
+	}
+
+	t = pnp->pr_common->prc_thread;
+	if (t->t_name == NULL) {
+		t->t_name = lwpname;
+	} else {
+		(void) strlcpy(t->t_name, lwpname, THREAD_NAME_MAX);
+		kmem_free(lwpname, THREAD_NAME_MAX);
+	}
+
+	prunlock(pnp);
+	return (0);
+}
+
 /* ARGSUSED */
 static int
 prwrite(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
@@ -2942,6 +3023,9 @@ prwrite(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 
 	case PR_PSINFO:
 		return (pr_write_psinfo(pnp, uiop));
+
+	case PR_LWPNAME:
+		return (pr_write_lwpname(pnp, uiop));
 
 	default:
 		return ((vp->v_type == VDIR)? EISDIR : EBADF);
@@ -3512,6 +3596,7 @@ static vnode_t *(*pr_lookup_function[PR_NFILES])() = {
 	pr_lookup_lwpdir,	/* /proc/<pid>/lwp			*/
 	pr_lookup_lwpiddir,	/* /proc/<pid>/lwp/<lwpid>		*/
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpctl	*/
+	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpname	*/
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpstatus	*/
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo	*/
 	pr_lookup_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpusage	*/
@@ -4776,6 +4861,7 @@ prgetnode(vnode_t *dp, prnodetype_t type)
 		break;
 
 	case PR_PSINFO:
+	case PR_LWPNAME:
 		pnp->pr_mode = 0644;	/* readable by all + owner can write */
 		break;
 
@@ -4904,6 +4990,7 @@ static int (*pr_readdir_function[PR_NFILES])() = {
 	pr_readdir_lwpdir,	/* /proc/<pid>/lwp			*/
 	pr_readdir_lwpiddir,	/* /proc/<pid>/lwp/<lwpid>		*/
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpctl	*/
+	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpname	*/
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpstatus	*/
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo	*/
 	pr_readdir_notdir,	/* /proc/<pid>/lwp/<lwpid>/lwpusage	*/
