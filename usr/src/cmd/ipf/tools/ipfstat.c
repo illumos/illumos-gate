@@ -57,7 +57,7 @@
 #ifdef STATETOP
 # include <ctype.h>
 # include <signal.h>
-# if SOLARIS || defined(__NetBSD__) || defined(_BSDI_VERSION) || \
+# if defined(SOLARIS) || defined(__NetBSD__) || defined(_BSDI_VERSION) || \
      defined(__sgi)
 #  ifdef ERR
 #   undef ERR
