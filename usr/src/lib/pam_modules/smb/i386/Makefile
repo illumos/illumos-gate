@@ -28,7 +28,6 @@
 
 include ../Makefile.com
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv
 DYNFLAGS += -R/usr/lib/smbsrv
 DYNFLAGS += $(ROOT)/usr/lib/passwdutil.so.1
 
