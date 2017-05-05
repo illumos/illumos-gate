@@ -285,6 +285,7 @@ filter(int pipein, int pipeout)
 		break;
 	case -1:
 		perror("fork");
+		exit(1);
 	default:
 		return (pid);
 	}
@@ -410,6 +411,7 @@ invoke(char **argv, int pipein, int pipeout)
 		break;
 	case -1:
 		perror("fork");
+		exit(1);
 	default:
 		return (pid);
 	}
