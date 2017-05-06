@@ -357,12 +357,11 @@ dump_ctype(void)
 		if ((wc == ' ') && (ctn->ctype & (_ISPUNCT|_ISGRAPH)))
 			conflict++;
 
-#ifndef NATIVE
 		if (conflict) {
 			warn("conflicting classes for character 0x%x (%x)",
 			    wc, ctn->ctype);
 		}
-#endif
+
 		/*
 		 * Handle the lower 256 characters using the simple
 		 * optimization.  Note that if we have not defined the

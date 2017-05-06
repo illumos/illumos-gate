@@ -7,7 +7,7 @@ escape_char /
 * see http://www.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap07.html                    *
 * Locale Name : ka_GE   Codeset : UTF-8
 *************************************************************************************************
-* Copyright 1991-2011 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
+* Copyright 1991-2013 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
 * http://www.unicode.org/copyright.html.                                                        *
 *                                                                                               *
 * Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode   *
@@ -98,7 +98,9 @@ upper	<A>;/
 	<GEORGIAN_CAPITAL_LETTER_HIE>;/
 	<GEORGIAN_CAPITAL_LETTER_WE>;/
 	<GEORGIAN_CAPITAL_LETTER_HAR>;/
-	<GEORGIAN_CAPITAL_LETTER_HOE>
+	<GEORGIAN_CAPITAL_LETTER_HOE>;/
+	<GEORGIAN_CAPITAL_LETTER_YN>;/
+	<GEORGIAN_CAPITAL_LETTER_AEN>
 
 lower	<a>;/
 	<b>;/
@@ -163,7 +165,9 @@ lower	<a>;/
 	<GEORGIAN_SMALL_LETTER_HIE>;/
 	<GEORGIAN_SMALL_LETTER_WE>;/
 	<GEORGIAN_SMALL_LETTER_HAR>;/
-	<GEORGIAN_SMALL_LETTER_HOE>
+	<GEORGIAN_SMALL_LETTER_HOE>;/
+	<GEORGIAN_SMALL_LETTER_YN>;/
+	<GEORGIAN_SMALL_LETTER_AEN>
 
 alpha	<GEORGIAN_LETTER_AN>;/
 	<GEORGIAN_LETTER_BAN>;/
@@ -208,7 +212,10 @@ alpha	<GEORGIAN_LETTER_AN>;/
 	<GEORGIAN_LETTER_ELIFI>;/
 	<GEORGIAN_LETTER_TURNED_GAN>;/
 	<GEORGIAN_LETTER_AIN>;/
-	<MODIFIER_LETTER_GEORGIAN_NAR>
+	<MODIFIER_LETTER_GEORGIAN_NAR>;/
+	<GEORGIAN_LETTER_AEN>;/
+	<GEORGIAN_LETTER_HARD_SIGN>;/
+	<GEORGIAN_LETTER_LABIAL_SIGN>
 
 space	<tab>;/
 	<newline>;/
@@ -224,7 +231,7 @@ cntrl	<NULL>;/
 	<END_OF_TRANSMISSION>;/
 	<ENQUIRY>;/
 	<ACKNOWLEDGE>;/
-	<BELL>;/
+	<ALERT>;/
 	<BACKSPACE>;/
 	<tab>;/
 	<newline>;/
@@ -383,6 +390,8 @@ graph	<EXCLAMATION_MARK>;/
 	<GEORGIAN_CAPITAL_LETTER_WE>;/
 	<GEORGIAN_CAPITAL_LETTER_HAR>;/
 	<GEORGIAN_CAPITAL_LETTER_HOE>;/
+	<GEORGIAN_CAPITAL_LETTER_YN>;/
+	<GEORGIAN_CAPITAL_LETTER_AEN>;/
 	<GEORGIAN_LETTER_AN>;/
 	<GEORGIAN_LETTER_BAN>;/
 	<GEORGIAN_LETTER_GAN>;/
@@ -427,6 +436,9 @@ graph	<EXCLAMATION_MARK>;/
 	<GEORGIAN_LETTER_TURNED_GAN>;/
 	<GEORGIAN_LETTER_AIN>;/
 	<MODIFIER_LETTER_GEORGIAN_NAR>;/
+	<GEORGIAN_LETTER_AEN>;/
+	<GEORGIAN_LETTER_HARD_SIGN>;/
+	<GEORGIAN_LETTER_LABIAL_SIGN>;/
 	<GEORGIAN_SMALL_LETTER_AN>;/
 	<GEORGIAN_SMALL_LETTER_BAN>;/
 	<GEORGIAN_SMALL_LETTER_GAN>;/
@@ -464,7 +476,9 @@ graph	<EXCLAMATION_MARK>;/
 	<GEORGIAN_SMALL_LETTER_HIE>;/
 	<GEORGIAN_SMALL_LETTER_WE>;/
 	<GEORGIAN_SMALL_LETTER_HAR>;/
-	<GEORGIAN_SMALL_LETTER_HOE>
+	<GEORGIAN_SMALL_LETTER_HOE>;/
+	<GEORGIAN_SMALL_LETTER_YN>;/
+	<GEORGIAN_SMALL_LETTER_AEN>
 
 print	<space>;/
 	<EXCLAMATION_MARK>;/
@@ -599,6 +613,8 @@ print	<space>;/
 	<GEORGIAN_CAPITAL_LETTER_WE>;/
 	<GEORGIAN_CAPITAL_LETTER_HAR>;/
 	<GEORGIAN_CAPITAL_LETTER_HOE>;/
+	<GEORGIAN_CAPITAL_LETTER_YN>;/
+	<GEORGIAN_CAPITAL_LETTER_AEN>;/
 	<GEORGIAN_LETTER_AN>;/
 	<GEORGIAN_LETTER_BAN>;/
 	<GEORGIAN_LETTER_GAN>;/
@@ -643,6 +659,9 @@ print	<space>;/
 	<GEORGIAN_LETTER_TURNED_GAN>;/
 	<GEORGIAN_LETTER_AIN>;/
 	<MODIFIER_LETTER_GEORGIAN_NAR>;/
+	<GEORGIAN_LETTER_AEN>;/
+	<GEORGIAN_LETTER_HARD_SIGN>;/
+	<GEORGIAN_LETTER_LABIAL_SIGN>;/
 	<GEORGIAN_SMALL_LETTER_AN>;/
 	<GEORGIAN_SMALL_LETTER_BAN>;/
 	<GEORGIAN_SMALL_LETTER_GAN>;/
@@ -680,7 +699,9 @@ print	<space>;/
 	<GEORGIAN_SMALL_LETTER_HIE>;/
 	<GEORGIAN_SMALL_LETTER_WE>;/
 	<GEORGIAN_SMALL_LETTER_HAR>;/
-	<GEORGIAN_SMALL_LETTER_HOE>
+	<GEORGIAN_SMALL_LETTER_HOE>;/
+	<GEORGIAN_SMALL_LETTER_YN>;/
+	<GEORGIAN_SMALL_LETTER_AEN>
 
 punct	<EXCLAMATION_MARK>;/
 	<QUOTATION_MARK>;/
@@ -806,7 +827,9 @@ toupper	(<a>,<A>);/
 	(<GEORGIAN_SMALL_LETTER_HIE>,<GEORGIAN_CAPITAL_LETTER_HIE>);/
 	(<GEORGIAN_SMALL_LETTER_WE>,<GEORGIAN_CAPITAL_LETTER_WE>);/
 	(<GEORGIAN_SMALL_LETTER_HAR>,<GEORGIAN_CAPITAL_LETTER_HAR>);/
-	(<GEORGIAN_SMALL_LETTER_HOE>,<GEORGIAN_CAPITAL_LETTER_HOE>)
+	(<GEORGIAN_SMALL_LETTER_HOE>,<GEORGIAN_CAPITAL_LETTER_HOE>);/
+	(<GEORGIAN_SMALL_LETTER_YN>,<GEORGIAN_CAPITAL_LETTER_YN>);/
+	(<GEORGIAN_SMALL_LETTER_AEN>,<GEORGIAN_CAPITAL_LETTER_AEN>)
 
 tolower	(<A>,<a>);/
 	(<B>,<b>);/
@@ -871,7 +894,9 @@ tolower	(<A>,<a>);/
 	(<GEORGIAN_CAPITAL_LETTER_HIE>,<GEORGIAN_SMALL_LETTER_HIE>);/
 	(<GEORGIAN_CAPITAL_LETTER_WE>,<GEORGIAN_SMALL_LETTER_WE>);/
 	(<GEORGIAN_CAPITAL_LETTER_HAR>,<GEORGIAN_SMALL_LETTER_HAR>);/
-	(<GEORGIAN_CAPITAL_LETTER_HOE>,<GEORGIAN_SMALL_LETTER_HOE>)
+	(<GEORGIAN_CAPITAL_LETTER_HOE>,<GEORGIAN_SMALL_LETTER_HOE>);/
+	(<GEORGIAN_CAPITAL_LETTER_YN>,<GEORGIAN_SMALL_LETTER_YN>);/
+	(<GEORGIAN_CAPITAL_LETTER_AEN>,<GEORGIAN_SMALL_LETTER_AEN>)
 
 END LC_CTYPE
 
@@ -886,46 +911,47 @@ LC_COLLATE
 
 collating-symbol <X01>
 collating-symbol <X05>
-collating-symbol <X27>
-collating-symbol <X8F>
-collating-symbol <X0340>
-collating-symbol <X0342>
-collating-symbol <X0344>
-collating-symbol <X0346>
-collating-symbol <X0348>
+collating-symbol <X20>
+collating-symbol <X9C>
+collating-symbol <XA0>
+collating-symbol <X0304>
+collating-symbol <X0306>
+collating-symbol <X0308>
+collating-symbol <X030A>
+collating-symbol <X030C>
 collating-symbol <X0400>
-collating-symbol <X060C>
-collating-symbol <X0610>
-collating-symbol <X0700>
-collating-symbol <X0854>
-collating-symbol <X085B>
-collating-symbol <X0879>
-collating-symbol <X0880>
-collating-symbol <X0900>
-collating-symbol <X0A8D>
-collating-symbol <X0A9B>
-collating-symbol <X0AAF>
-collating-symbol <X0AB1>
-collating-symbol <X0AB3>
-collating-symbol <X0AB5>
-collating-symbol <X0AB7>
-collating-symbol <X0AB9>
-collating-symbol <X0B5B>
-collating-symbol <X0B5D>
-collating-symbol <X0B67>
-collating-symbol <X0B69>
-collating-symbol <X0B6B>
-collating-symbol <X0B6F>
-collating-symbol <X0B71>
-collating-symbol <X0D0A>
-collating-symbol <X0D0F>
-collating-symbol <X0D69>
-collating-symbol <X0D71>
-collating-symbol <X0D73>
-collating-symbol <X0D75>
-collating-symbol <X0D79>
-collating-symbol <X0D7D>
-collating-symbol <X0F0E>
+collating-symbol <X050A>
+collating-symbol <X050E>
+collating-symbol <X0600>
+collating-symbol <X0722>
+collating-symbol <X072C>
+collating-symbol <X0750>
+collating-symbol <X0758>
+collating-symbol <X0800>
+collating-symbol <X0969>
+collating-symbol <X0977>
+collating-symbol <X098D>
+collating-symbol <X098F>
+collating-symbol <X0991>
+collating-symbol <X0993>
+collating-symbol <X0995>
+collating-symbol <X0997>
+collating-symbol <X0A7B>
+collating-symbol <X0A7D>
+collating-symbol <X0A87>
+collating-symbol <X0A89>
+collating-symbol <X0A8B>
+collating-symbol <X0A8F>
+collating-symbol <X0A91>
+collating-symbol <X0C04>
+collating-symbol <X0C0A>
+collating-symbol <X0C76>
+collating-symbol <X0C7E>
+collating-symbol <X0C80>
+collating-symbol <X0C82>
+collating-symbol <X0C86>
+collating-symbol <X0C8A>
+collating-symbol <X0D6A>
 collating-symbol <X1200>
 collating-symbol <X1400>
 collating-symbol <X1600>
@@ -936,7 +962,6 @@ collating-symbol <X1E00>
 collating-symbol <X2000>
 collating-symbol <X2200>
 collating-symbol <X2400>
-collating-symbol <X2700>
 collating-symbol <X2900>
 collating-symbol <X2B00>
 collating-symbol <X2D00>
@@ -962,87 +987,93 @@ collating-symbol <X5300>
 collating-symbol <X5500>
 collating-symbol <X5700>
 collating-symbol <X5900>
-collating-symbol <X5E0A>
-collating-symbol <X5E0C>
-collating-symbol <X5E0E>
-collating-symbol <X5E10>
-collating-symbol <X5E12>
-collating-symbol <X5E14>
-collating-symbol <X5E16>
-collating-symbol <X5E18>
-collating-symbol <X5E1A>
-collating-symbol <X5E1C>
-collating-symbol <X5E1E>
-collating-symbol <X5E20>
-collating-symbol <X5E22>
-collating-symbol <X5E24>
-collating-symbol <X5E26>
-collating-symbol <X5E28>
-collating-symbol <X5E2A>
-collating-symbol <X5E2C>
-collating-symbol <X5E2E>
-collating-symbol <X5E30>
-collating-symbol <X5E32>
-collating-symbol <X5E34>
-collating-symbol <X5E36>
-collating-symbol <X5E38>
-collating-symbol <X5E3A>
-collating-symbol <X5E3C>
-collating-symbol <X5E3E>
-collating-symbol <X5E40>
-collating-symbol <X5E42>
-collating-symbol <X5E44>
-collating-symbol <X5E46>
-collating-symbol <X5E48>
-collating-symbol <X5E4A>
-collating-symbol <X5E4C>
-collating-symbol <X5E4E>
-collating-symbol <X5E50>
-collating-symbol <X5E52>
-collating-symbol <X5E54>
-collating-symbol <X5E56>
-collating-symbol <X5E58>
-collating-symbol <X5E5A>
-collating-symbol <X5E5C>
-collating-symbol <X5E5E>
-collating-symbol <X5E60>
-collating-symbol <X5E62>
-collating-symbol <X5E64>
-collating-symbol <X5E66>
-collating-symbol <X5E68>
-collating-symbol <X5E6A>
-collating-symbol <X5E6C>
-collating-symbol <X5E6E>
-collating-symbol <X5E70>
-collating-symbol <X5E72>
-collating-symbol <X5E74>
-collating-symbol <X5E76>
-collating-symbol <X5E78>
-collating-symbol <X5E7A>
-collating-symbol <X5E7C>
-collating-symbol <X5E7E>
-collating-symbol <X5E80>
-collating-symbol <X5E82>
-collating-symbol <X5E84>
-collating-symbol <X5E86>
-collating-symbol <X5E88>
-collating-symbol <X5E8A>
-collating-symbol <X5E8C>
-collating-symbol <X5E8E>
-collating-symbol <X5E90>
-collating-symbol <X5E92>
-collating-symbol <X5E94>
-collating-symbol <X5E96>
-collating-symbol <X5E98>
-collating-symbol <X5E9A>
-collating-symbol <X5E9C>
-collating-symbol <X5E9E>
-collating-symbol <X5EA0>
-collating-symbol <X5EA2>
-collating-symbol <X5EA4>
-collating-symbol <X5EA6>
-collating-symbol <X5EA8>
-collating-symbol <X5EAA>
+collating-symbol <X5B00>
+collating-symbol <X6206>
+collating-symbol <X6208>
+collating-symbol <X620A>
+collating-symbol <X620C>
+collating-symbol <X620E>
+collating-symbol <X6210>
+collating-symbol <X6212>
+collating-symbol <X6214>
+collating-symbol <X6216>
+collating-symbol <X6218>
+collating-symbol <X621A>
+collating-symbol <X621C>
+collating-symbol <X621E>
+collating-symbol <X6220>
+collating-symbol <X6222>
+collating-symbol <X6224>
+collating-symbol <X6226>
+collating-symbol <X6228>
+collating-symbol <X622A>
+collating-symbol <X622C>
+collating-symbol <X622E>
+collating-symbol <X6230>
+collating-symbol <X6232>
+collating-symbol <X6234>
+collating-symbol <X6236>
+collating-symbol <X6238>
+collating-symbol <X623A>
+collating-symbol <X623C>
+collating-symbol <X623E>
+collating-symbol <X6240>
+collating-symbol <X6242>
+collating-symbol <X6244>
+collating-symbol <X6246>
+collating-symbol <X6248>
+collating-symbol <X624A>
+collating-symbol <X624C>
+collating-symbol <X624E>
+collating-symbol <X6250>
+collating-symbol <X6252>
+collating-symbol <X6254>
+collating-symbol <X6256>
+collating-symbol <X6258>
+collating-symbol <X625A>
+collating-symbol <X625C>
+collating-symbol <X625E>
+collating-symbol <X6260>
+collating-symbol <X6262>
+collating-symbol <X6264>
+collating-symbol <X6266>
+collating-symbol <X6268>
+collating-symbol <X626A>
+collating-symbol <X626C>
+collating-symbol <X626E>
+collating-symbol <X6270>
+collating-symbol <X6272>
+collating-symbol <X6274>
+collating-symbol <X6276>
+collating-symbol <X6278>
+collating-symbol <X627A>
+collating-symbol <X627C>
+collating-symbol <X627E>
+collating-symbol <X6280>
+collating-symbol <X6282>
+collating-symbol <X6284>
+collating-symbol <X6286>
+collating-symbol <X6288>
+collating-symbol <X628A>
+collating-symbol <X628C>
+collating-symbol <X628E>
+collating-symbol <X6290>
+collating-symbol <X6292>
+collating-symbol <X6294>
+collating-symbol <X6296>
+collating-symbol <X6298>
+collating-symbol <X629A>
+collating-symbol <X629C>
+collating-symbol <X629E>
+collating-symbol <X62A0>
+collating-symbol <X62A2>
+collating-symbol <X62A4>
+collating-symbol <X62A6>
+collating-symbol <X62A8>
+collating-symbol <X62AA>
+collating-symbol <X62AC>
+collating-symbol <X62AE>
+collating-symbol <X62B0>
 
 order_start forward;forward;forward;forward
 
@@ -1051,46 +1082,47 @@ order_start forward;forward;forward;forward
 
 <X01>
 <X05>
-<X27>
-<X8F>
-<X0340>
-<X0342>
-<X0344>
-<X0346>
-<X0348>
+<X20>
+<X9C>
+<XA0>
+<X0304>
+<X0306>
+<X0308>
+<X030A>
+<X030C>
 <X0400>
-<X060C>
-<X0610>
-<X0700>
-<X0854>
-<X085B>
-<X0879>
-<X0880>
-<X0900>
-<X0A8D>
-<X0A9B>
-<X0AAF>
-<X0AB1>
-<X0AB3>
-<X0AB5>
-<X0AB7>
-<X0AB9>
-<X0B5B>
-<X0B5D>
-<X0B67>
-<X0B69>
-<X0B6B>
-<X0B6F>
-<X0B71>
-<X0D0A>
-<X0D0F>
-<X0D69>
-<X0D71>
-<X0D73>
-<X0D75>
-<X0D79>
-<X0D7D>
-<X0F0E>
+<X050A>
+<X050E>
+<X0600>
+<X0722>
+<X072C>
+<X0750>
+<X0758>
+<X0800>
+<X0969>
+<X0977>
+<X098D>
+<X098F>
+<X0991>
+<X0993>
+<X0995>
+<X0997>
+<X0A7B>
+<X0A7D>
+<X0A87>
+<X0A89>
+<X0A8B>
+<X0A8F>
+<X0A91>
+<X0C04>
+<X0C0A>
+<X0C76>
+<X0C7E>
+<X0C80>
+<X0C82>
+<X0C86>
+<X0C8A>
+<X0D6A>
 <X1200>
 <X1400>
 <X1600>
@@ -1101,7 +1133,6 @@ order_start forward;forward;forward;forward
 <X2000>
 <X2200>
 <X2400>
-<X2700>
 <X2900>
 <X2B00>
 <X2D00>
@@ -1127,87 +1158,93 @@ order_start forward;forward;forward;forward
 <X5500>
 <X5700>
 <X5900>
-<X5E0A>
-<X5E0C>
-<X5E0E>
-<X5E10>
-<X5E12>
-<X5E14>
-<X5E16>
-<X5E18>
-<X5E1A>
-<X5E1C>
-<X5E1E>
-<X5E20>
-<X5E22>
-<X5E24>
-<X5E26>
-<X5E28>
-<X5E2A>
-<X5E2C>
-<X5E2E>
-<X5E30>
-<X5E32>
-<X5E34>
-<X5E36>
-<X5E38>
-<X5E3A>
-<X5E3C>
-<X5E3E>
-<X5E40>
-<X5E42>
-<X5E44>
-<X5E46>
-<X5E48>
-<X5E4A>
-<X5E4C>
-<X5E4E>
-<X5E50>
-<X5E52>
-<X5E54>
-<X5E56>
-<X5E58>
-<X5E5A>
-<X5E5C>
-<X5E5E>
-<X5E60>
-<X5E62>
-<X5E64>
-<X5E66>
-<X5E68>
-<X5E6A>
-<X5E6C>
-<X5E6E>
-<X5E70>
-<X5E72>
-<X5E74>
-<X5E76>
-<X5E78>
-<X5E7A>
-<X5E7C>
-<X5E7E>
-<X5E80>
-<X5E82>
-<X5E84>
-<X5E86>
-<X5E88>
-<X5E8A>
-<X5E8C>
-<X5E8E>
-<X5E90>
-<X5E92>
-<X5E94>
-<X5E96>
-<X5E98>
-<X5E9A>
-<X5E9C>
-<X5E9E>
-<X5EA0>
-<X5EA2>
-<X5EA4>
-<X5EA6>
-<X5EA8>
-<X5EAA>
+<X5B00>
+<X6206>
+<X6208>
+<X620A>
+<X620C>
+<X620E>
+<X6210>
+<X6212>
+<X6214>
+<X6216>
+<X6218>
+<X621A>
+<X621C>
+<X621E>
+<X6220>
+<X6222>
+<X6224>
+<X6226>
+<X6228>
+<X622A>
+<X622C>
+<X622E>
+<X6230>
+<X6232>
+<X6234>
+<X6236>
+<X6238>
+<X623A>
+<X623C>
+<X623E>
+<X6240>
+<X6242>
+<X6244>
+<X6246>
+<X6248>
+<X624A>
+<X624C>
+<X624E>
+<X6250>
+<X6252>
+<X6254>
+<X6256>
+<X6258>
+<X625A>
+<X625C>
+<X625E>
+<X6260>
+<X6262>
+<X6264>
+<X6266>
+<X6268>
+<X626A>
+<X626C>
+<X626E>
+<X6270>
+<X6272>
+<X6274>
+<X6276>
+<X6278>
+<X627A>
+<X627C>
+<X627E>
+<X6280>
+<X6282>
+<X6284>
+<X6286>
+<X6288>
+<X628A>
+<X628C>
+<X628E>
+<X6290>
+<X6292>
+<X6294>
+<X6296>
+<X6298>
+<X629A>
+<X629C>
+<X629E>
+<X62A0>
+<X62A2>
+<X62A4>
+<X62A6>
+<X62A8>
+<X62AA>
+<X62AC>
+<X62AE>
+<X62B0>
 
 * assignment of characters to weights
 
@@ -1218,7 +1255,7 @@ order_start forward;forward;forward;forward
 <END_OF_TRANSMISSION>          IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION>
 <ENQUIRY>                      IGNORE;IGNORE;IGNORE;<ENQUIRY>
 <ACKNOWLEDGE>                  IGNORE;IGNORE;IGNORE;<ACKNOWLEDGE>
-<BELL>                         IGNORE;IGNORE;IGNORE;<BELL>
+<ALERT>                        IGNORE;IGNORE;IGNORE;<ALERT>
 <BACKSPACE>                    IGNORE;IGNORE;IGNORE;<BACKSPACE>
 <SHIFT_OUT>                    IGNORE;IGNORE;IGNORE;<SHIFT_OUT>
 <SHIFT_IN>                     IGNORE;IGNORE;IGNORE;<SHIFT_IN>
@@ -1239,44 +1276,44 @@ order_start forward;forward;forward;forward
 <INFORMATION_SEPARATOR_TWO>    IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_TWO>
 <INFORMATION_SEPARATOR_ONE>    IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_ONE>
 <DELETE>                       IGNORE;IGNORE;IGNORE;<DELETE>
-<tab>                          <X0340>;<X05>;<X05>;<tab>
-<newline>                      <X0342>;<X05>;<X05>;<newline>
-<vertical-tab>                 <X0344>;<X05>;<X05>;<vertical-tab>
-<form-feed>                    <X0346>;<X05>;<X05>;<form-feed>
-<carriage-return>              <X0348>;<X05>;<X05>;<carriage-return>
+<tab>                          <X0304>;<X05>;<X05>;<tab>
+<newline>                      <X0306>;<X05>;<X05>;<newline>
+<vertical-tab>                 <X0308>;<X05>;<X05>;<vertical-tab>
+<form-feed>                    <X030A>;<X05>;<X05>;<form-feed>
+<carriage-return>              <X030C>;<X05>;<X05>;<carriage-return>
 <space>                        <X0400>;<X05>;<X05>;<space>
-<LOW_LINE>                     <X060C>;<X05>;<X05>;<LOW_LINE>
-<HYPHEN-MINUS>                 <X0610>;<X05>;<X05>;<HYPHEN-MINUS>
-<COMMA>                        <X0700>;<X05>;<X05>;<COMMA>
-<SEMICOLON>                    <X0854>;<X05>;<X05>;<SEMICOLON>
-<COLON>                        <X085B>;<X05>;<X05>;<COLON>
-<EXCLAMATION_MARK>             <X0879>;<X05>;<X05>;<EXCLAMATION_MARK>
-<QUESTION_MARK>                <X0880>;<X05>;<X05>;<QUESTION_MARK>
-<FULL_STOP>                    <X0900>;<X05>;<X05>;<FULL_STOP>
-<APOSTROPHE>                   <X0A8D>;<X05>;<X05>;<APOSTROPHE>
-<QUOTATION_MARK>               <X0A9B>;<X05>;<X05>;<QUOTATION_MARK>
-<LEFT_PARENTHESIS>             <X0AAF>;<X05>;<X05>;<LEFT_PARENTHESIS>
-<RIGHT_PARENTHESIS>            <X0AB1>;<X05>;<X05>;<RIGHT_PARENTHESIS>
-<LEFT_SQUARE_BRACKET>          <X0AB3>;<X05>;<X05>;<LEFT_SQUARE_BRACKET>
-<RIGHT_SQUARE_BRACKET>         <X0AB5>;<X05>;<X05>;<RIGHT_SQUARE_BRACKET>
-<LEFT_CURLY_BRACKET>           <X0AB7>;<X05>;<X05>;<LEFT_CURLY_BRACKET>
-<RIGHT_CURLY_BRACKET>          <X0AB9>;<X05>;<X05>;<RIGHT_CURLY_BRACKET>
-<COMMERCIAL_AT>                <X0B5B>;<X05>;<X05>;<COMMERCIAL_AT>
-<ASTERISK>                     <X0B5D>;<X05>;<X05>;<ASTERISK>
-<SOLIDUS>                      <X0B67>;<X05>;<X05>;<SOLIDUS>
-<REVERSE_SOLIDUS>              <X0B69>;<X05>;<X05>;<REVERSE_SOLIDUS>
-<AMPERSAND>                    <X0B6B>;<X05>;<X05>;<AMPERSAND>
-<NUMBER_SIGN>                  <X0B6F>;<X05>;<X05>;<NUMBER_SIGN>
-<PERCENT_SIGN>                 <X0B71>;<X05>;<X05>;<PERCENT_SIGN>
-<GRAVE_ACCENT>                 <X0D0A>;<X05>;<X05>;<GRAVE_ACCENT>
-<CIRCUMFLEX_ACCENT>            <X0D0F>;<X05>;<X05>;<CIRCUMFLEX_ACCENT>
-<PLUS_SIGN>                    <X0D69>;<X05>;<X05>;<PLUS_SIGN>
-<LESS-THAN_SIGN>               <X0D71>;<X05>;<X05>;<LESS-THAN_SIGN>
-<EQUALS_SIGN>                  <X0D73>;<X05>;<X05>;<EQUALS_SIGN>
-<GREATER-THAN_SIGN>            <X0D75>;<X05>;<X05>;<GREATER-THAN_SIGN>
-<VERTICAL_LINE>                <X0D79>;<X05>;<X05>;<VERTICAL_LINE>
-<TILDE>                        <X0D7D>;<X05>;<X05>;<TILDE>
-<DOLLAR_SIGN>                  <X0F0E>;<X05>;<X05>;<DOLLAR_SIGN>
+<LOW_LINE>                     <X050A>;<X05>;<X05>;<LOW_LINE>
+<HYPHEN-MINUS>                 <X050E>;<X05>;<X05>;<HYPHEN-MINUS>
+<COMMA>                        <X0600>;<X05>;<X05>;<COMMA>
+<SEMICOLON>                    <X0722>;<X05>;<X05>;<SEMICOLON>
+<COLON>                        <X072C>;<X05>;<X05>;<COLON>
+<EXCLAMATION_MARK>             <X0750>;<X05>;<X05>;<EXCLAMATION_MARK>
+<QUESTION_MARK>                <X0758>;<X05>;<X05>;<QUESTION_MARK>
+<FULL_STOP>                    <X0800>;<X05>;<X05>;<FULL_STOP>
+<APOSTROPHE>                   <X0969>;<X05>;<X05>;<APOSTROPHE>
+<QUOTATION_MARK>               <X0977>;<X05>;<X05>;<QUOTATION_MARK>
+<LEFT_PARENTHESIS>             <X098D>;<X05>;<X05>;<LEFT_PARENTHESIS>
+<RIGHT_PARENTHESIS>            <X098F>;<X05>;<X05>;<RIGHT_PARENTHESIS>
+<LEFT_SQUARE_BRACKET>          <X0991>;<X05>;<X05>;<LEFT_SQUARE_BRACKET>
+<RIGHT_SQUARE_BRACKET>         <X0993>;<X05>;<X05>;<RIGHT_SQUARE_BRACKET>
+<LEFT_CURLY_BRACKET>           <X0995>;<X05>;<X05>;<LEFT_CURLY_BRACKET>
+<RIGHT_CURLY_BRACKET>          <X0997>;<X05>;<X05>;<RIGHT_CURLY_BRACKET>
+<COMMERCIAL_AT>                <X0A7B>;<X05>;<X05>;<COMMERCIAL_AT>
+<ASTERISK>                     <X0A7D>;<X05>;<X05>;<ASTERISK>
+<SOLIDUS>                      <X0A87>;<X05>;<X05>;<SOLIDUS>
+<REVERSE_SOLIDUS>              <X0A89>;<X05>;<X05>;<REVERSE_SOLIDUS>
+<AMPERSAND>                    <X0A8B>;<X05>;<X05>;<AMPERSAND>
+<NUMBER_SIGN>                  <X0A8F>;<X05>;<X05>;<NUMBER_SIGN>
+<PERCENT_SIGN>                 <X0A91>;<X05>;<X05>;<PERCENT_SIGN>
+<GRAVE_ACCENT>                 <X0C04>;<X05>;<X05>;<GRAVE_ACCENT>
+<CIRCUMFLEX_ACCENT>            <X0C0A>;<X05>;<X05>;<CIRCUMFLEX_ACCENT>
+<PLUS_SIGN>                    <X0C76>;<X05>;<X05>;<PLUS_SIGN>
+<LESS-THAN_SIGN>               <X0C7E>;<X05>;<X05>;<LESS-THAN_SIGN>
+<EQUALS_SIGN>                  <X0C80>;<X05>;<X05>;<EQUALS_SIGN>
+<GREATER-THAN_SIGN>            <X0C82>;<X05>;<X05>;<GREATER-THAN_SIGN>
+<VERTICAL_LINE>                <X0C86>;<X05>;<X05>;<VERTICAL_LINE>
+<TILDE>                        <X0C8A>;<X05>;<X05>;<TILDE>
+<DOLLAR_SIGN>                  <X0D6A>;<X05>;<X05>;<DOLLAR_SIGN>
 <zero>                         <X1200>;<X05>;<X05>;<zero>
 <one>                          <X1400>;<X05>;<X05>;<one>
 <two>                          <X1600>;<X05>;<X05>;<two>
@@ -1287,178 +1324,185 @@ order_start forward;forward;forward;forward
 <seven>                        <X2000>;<X05>;<X05>;<seven>
 <eight>                        <X2200>;<X05>;<X05>;<eight>
 <nine>                         <X2400>;<X05>;<X05>;<nine>
-<a>                            <X2700>;<X05>;<X05>;<a>
-<A>                            <X2700>;<X05>;<X8F>;<A>
-<b>                            <X2900>;<X05>;<X05>;<b>
-<B>                            <X2900>;<X05>;<X8F>;<B>
-<c>                            <X2B00>;<X05>;<X05>;<c>
-<C>                            <X2B00>;<X05>;<X8F>;<C>
-<d>                            <X2D00>;<X05>;<X05>;<d>
-<D>                            <X2D00>;<X05>;<X8F>;<D>
-<e>                            <X2F00>;<X05>;<X05>;<e>
-<E>                            <X2F00>;<X05>;<X8F>;<E>
-<f>                            <X3100>;<X05>;<X05>;<f>
-<F>                            <X3100>;<X05>;<X8F>;<F>
-<g>                            <X3300>;<X05>;<X05>;<g>
-<G>                            <X3300>;<X05>;<X8F>;<G>
-<h>                            <X3500>;<X05>;<X05>;<h>
-<H>                            <X3500>;<X05>;<X8F>;<H>
-<i>                            <X3700>;<X05>;<X05>;<i>
-<I>                            <X3700>;<X05>;<X8F>;<I>
-<j>                            <X3900>;<X05>;<X05>;<j>
-<J>                            <X3900>;<X05>;<X8F>;<J>
-<k>                            <X3B00>;<X05>;<X05>;<k>
-<K>                            <X3B00>;<X05>;<X8F>;<K>
-<l>                            <X3D00>;<X05>;<X05>;<l>
-<L>                            <X3D00>;<X05>;<X8F>;<L>
-<m>                            <X3F00>;<X05>;<X05>;<m>
-<M>                            <X3F00>;<X05>;<X8F>;<M>
-<n>                            <X4100>;<X05>;<X05>;<n>
-<N>                            <X4100>;<X05>;<X8F>;<N>
-<o>                            <X4300>;<X05>;<X05>;<o>
-<O>                            <X4300>;<X05>;<X8F>;<O>
-<p>                            <X4500>;<X05>;<X05>;<p>
-<P>                            <X4500>;<X05>;<X8F>;<P>
-<q>                            <X4700>;<X05>;<X05>;<q>
-<Q>                            <X4700>;<X05>;<X8F>;<Q>
-<r>                            <X4900>;<X05>;<X05>;<r>
-<R>                            <X4900>;<X05>;<X8F>;<R>
-<s>                            <X4B00>;<X05>;<X05>;<s>
-<S>                            <X4B00>;<X05>;<X8F>;<S>
-<t>                            <X4D00>;<X05>;<X05>;<t>
-<T>                            <X4D00>;<X05>;<X8F>;<T>
-<u>                            <X4F00>;<X05>;<X05>;<u>
-<U>                            <X4F00>;<X05>;<X8F>;<U>
-<v>                            <X5100>;<X05>;<X05>;<v>
-<V>                            <X5100>;<X05>;<X8F>;<V>
-<w>                            <X5300>;<X05>;<X05>;<w>
-<W>                            <X5300>;<X05>;<X8F>;<W>
-<x>                            <X5500>;<X05>;<X05>;<x>
-<X>                            <X5500>;<X05>;<X8F>;<X>
-<y>                            <X5700>;<X05>;<X05>;<y>
-<Y>                            <X5700>;<X05>;<X8F>;<Y>
-<z>                            <X5900>;<X05>;<X05>;<z>
-<Z>                            <X5900>;<X05>;<X8F>;<Z>
-<GEORGIAN_LETTER_AN>           <X5E0A>;<X05>;<X05>;<GEORGIAN_LETTER_AN>
-<GEORGIAN_SMALL_LETTER_AN>     <X5E0C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_AN>
-<GEORGIAN_CAPITAL_LETTER_AN>   <X5E0C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_AN>
-<GEORGIAN_LETTER_BAN>          <X5E0E>;<X05>;<X05>;<GEORGIAN_LETTER_BAN>
-<GEORGIAN_SMALL_LETTER_BAN>    <X5E10>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_BAN>
-<GEORGIAN_CAPITAL_LETTER_BAN>  <X5E10>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_BAN>
-<GEORGIAN_LETTER_GAN>          <X5E12>;<X05>;<X05>;<GEORGIAN_LETTER_GAN>
-<GEORGIAN_SMALL_LETTER_GAN>    <X5E14>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_GAN>
-<GEORGIAN_CAPITAL_LETTER_GAN>  <X5E14>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_GAN>
-<GEORGIAN_LETTER_DON>          <X5E16>;<X05>;<X05>;<GEORGIAN_LETTER_DON>
-<GEORGIAN_SMALL_LETTER_DON>    <X5E18>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_DON>
-<GEORGIAN_CAPITAL_LETTER_DON>  <X5E18>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_DON>
-<GEORGIAN_LETTER_EN>           <X5E1A>;<X05>;<X05>;<GEORGIAN_LETTER_EN>
-<GEORGIAN_SMALL_LETTER_EN>     <X5E1C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_EN>
-<GEORGIAN_CAPITAL_LETTER_EN>   <X5E1C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_EN>
-<GEORGIAN_LETTER_VIN>          <X5E1E>;<X05>;<X05>;<GEORGIAN_LETTER_VIN>
-<GEORGIAN_SMALL_LETTER_VIN>    <X5E20>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_VIN>
-<GEORGIAN_CAPITAL_LETTER_VIN>  <X5E20>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_VIN>
-<GEORGIAN_LETTER_ZEN>          <X5E22>;<X05>;<X05>;<GEORGIAN_LETTER_ZEN>
-<GEORGIAN_SMALL_LETTER_ZEN>    <X5E24>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_ZEN>
-<GEORGIAN_CAPITAL_LETTER_ZEN>  <X5E24>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_ZEN>
-<GEORGIAN_LETTER_HE>           <X5E26>;<X05>;<X05>;<GEORGIAN_LETTER_HE>
-<GEORGIAN_SMALL_LETTER_HE>     <X5E28>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HE>
-<GEORGIAN_CAPITAL_LETTER_HE>   <X5E28>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_HE>
-<GEORGIAN_LETTER_TAN>          <X5E2A>;<X05>;<X05>;<GEORGIAN_LETTER_TAN>
-<GEORGIAN_SMALL_LETTER_TAN>    <X5E2C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_TAN>
-<GEORGIAN_CAPITAL_LETTER_TAN>  <X5E2C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_TAN>
-<GEORGIAN_LETTER_IN>           <X5E2E>;<X05>;<X05>;<GEORGIAN_LETTER_IN>
-<GEORGIAN_SMALL_LETTER_IN>     <X5E30>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_IN>
-<GEORGIAN_CAPITAL_LETTER_IN>   <X5E30>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_IN>
-<GEORGIAN_LETTER_KAN>          <X5E32>;<X05>;<X05>;<GEORGIAN_LETTER_KAN>
-<GEORGIAN_SMALL_LETTER_KAN>    <X5E34>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_KAN>
-<GEORGIAN_CAPITAL_LETTER_KAN>  <X5E34>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_KAN>
-<GEORGIAN_LETTER_LAS>          <X5E36>;<X05>;<X05>;<GEORGIAN_LETTER_LAS>
-<GEORGIAN_SMALL_LETTER_LAS>    <X5E38>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_LAS>
-<GEORGIAN_CAPITAL_LETTER_LAS>  <X5E38>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_LAS>
-<GEORGIAN_LETTER_MAN>          <X5E3A>;<X05>;<X05>;<GEORGIAN_LETTER_MAN>
-<GEORGIAN_SMALL_LETTER_MAN>    <X5E3C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_MAN>
-<GEORGIAN_CAPITAL_LETTER_MAN>  <X5E3C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_MAN>
-<GEORGIAN_LETTER_NAR>          <X5E3E>;<X05>;<X05>;<GEORGIAN_LETTER_NAR>
-<MODIFIER_LETTER_GEORGIAN_NAR> <X5E3E>;<X05>;<X27>;<MODIFIER_LETTER_GEORGIAN_NAR>
-<GEORGIAN_SMALL_LETTER_NAR>    <X5E40>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_NAR>
-<GEORGIAN_CAPITAL_LETTER_NAR>  <X5E40>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_NAR>
-<GEORGIAN_LETTER_HIE>          <X5E42>;<X05>;<X05>;<GEORGIAN_LETTER_HIE>
-<GEORGIAN_SMALL_LETTER_HIE>    <X5E44>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HIE>
-<GEORGIAN_CAPITAL_LETTER_HIE>  <X5E44>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_HIE>
-<GEORGIAN_LETTER_ON>           <X5E46>;<X05>;<X05>;<GEORGIAN_LETTER_ON>
-<GEORGIAN_SMALL_LETTER_ON>     <X5E48>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_ON>
-<GEORGIAN_CAPITAL_LETTER_ON>   <X5E48>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_ON>
-<GEORGIAN_LETTER_PAR>          <X5E4A>;<X05>;<X05>;<GEORGIAN_LETTER_PAR>
-<GEORGIAN_SMALL_LETTER_PAR>    <X5E4C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_PAR>
-<GEORGIAN_CAPITAL_LETTER_PAR>  <X5E4C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_PAR>
-<GEORGIAN_LETTER_ZHAR>         <X5E4E>;<X05>;<X05>;<GEORGIAN_LETTER_ZHAR>
-<GEORGIAN_SMALL_LETTER_ZHAR>   <X5E50>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_ZHAR>
-<GEORGIAN_CAPITAL_LETTER_ZHAR> <X5E50>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_ZHAR>
-<GEORGIAN_LETTER_RAE>          <X5E52>;<X05>;<X05>;<GEORGIAN_LETTER_RAE>
-<GEORGIAN_SMALL_LETTER_RAE>    <X5E54>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_RAE>
-<GEORGIAN_CAPITAL_LETTER_RAE>  <X5E54>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_RAE>
-<GEORGIAN_LETTER_SAN>          <X5E56>;<X05>;<X05>;<GEORGIAN_LETTER_SAN>
-<GEORGIAN_SMALL_LETTER_SAN>    <X5E58>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_SAN>
-<GEORGIAN_CAPITAL_LETTER_SAN>  <X5E58>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_SAN>
-<GEORGIAN_LETTER_TAR>          <X5E5A>;<X05>;<X05>;<GEORGIAN_LETTER_TAR>
-<GEORGIAN_SMALL_LETTER_TAR>    <X5E5C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_TAR>
-<GEORGIAN_CAPITAL_LETTER_TAR>  <X5E5C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_TAR>
-<GEORGIAN_LETTER_WE>           <X5E5E>;<X05>;<X05>;<GEORGIAN_LETTER_WE>
-<GEORGIAN_SMALL_LETTER_WE>     <X5E60>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_WE>
-<GEORGIAN_CAPITAL_LETTER_WE>   <X5E60>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_WE>
-<GEORGIAN_LETTER_UN>           <X5E62>;<X05>;<X05>;<GEORGIAN_LETTER_UN>
-<GEORGIAN_SMALL_LETTER_UN>     <X5E64>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_UN>
-<GEORGIAN_CAPITAL_LETTER_UN>   <X5E64>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_UN>
-<GEORGIAN_LETTER_PHAR>         <X5E66>;<X05>;<X05>;<GEORGIAN_LETTER_PHAR>
-<GEORGIAN_SMALL_LETTER_PHAR>   <X5E68>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_PHAR>
-<GEORGIAN_CAPITAL_LETTER_PHAR> <X5E68>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_PHAR>
-<GEORGIAN_LETTER_KHAR>         <X5E6A>;<X05>;<X05>;<GEORGIAN_LETTER_KHAR>
-<GEORGIAN_SMALL_LETTER_KHAR>   <X5E6C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_KHAR>
-<GEORGIAN_CAPITAL_LETTER_KHAR> <X5E6C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_KHAR>
-<GEORGIAN_LETTER_GHAN>         <X5E6E>;<X05>;<X05>;<GEORGIAN_LETTER_GHAN>
-<GEORGIAN_SMALL_LETTER_GHAN>   <X5E70>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_GHAN>
-<GEORGIAN_CAPITAL_LETTER_GHAN> <X5E70>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_GHAN>
-<GEORGIAN_LETTER_QAR>          <X5E72>;<X05>;<X05>;<GEORGIAN_LETTER_QAR>
-<GEORGIAN_SMALL_LETTER_QAR>    <X5E74>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_QAR>
-<GEORGIAN_CAPITAL_LETTER_QAR>  <X5E74>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_QAR>
-<GEORGIAN_LETTER_SHIN>         <X5E76>;<X05>;<X05>;<GEORGIAN_LETTER_SHIN>
-<GEORGIAN_SMALL_LETTER_SHIN>   <X5E78>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_SHIN>
-<GEORGIAN_CAPITAL_LETTER_SHIN> <X5E78>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_SHIN>
-<GEORGIAN_LETTER_CHIN>         <X5E7A>;<X05>;<X05>;<GEORGIAN_LETTER_CHIN>
-<GEORGIAN_SMALL_LETTER_CHIN>   <X5E7C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CHIN>
-<GEORGIAN_CAPITAL_LETTER_CHIN> <X5E7C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_CHIN>
-<GEORGIAN_LETTER_CAN>          <X5E7E>;<X05>;<X05>;<GEORGIAN_LETTER_CAN>
-<GEORGIAN_SMALL_LETTER_CAN>    <X5E80>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CAN>
-<GEORGIAN_CAPITAL_LETTER_CAN>  <X5E80>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_CAN>
-<GEORGIAN_LETTER_JIL>          <X5E82>;<X05>;<X05>;<GEORGIAN_LETTER_JIL>
-<GEORGIAN_SMALL_LETTER_JIL>    <X5E84>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_JIL>
-<GEORGIAN_CAPITAL_LETTER_JIL>  <X5E84>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_JIL>
-<GEORGIAN_LETTER_CIL>          <X5E86>;<X05>;<X05>;<GEORGIAN_LETTER_CIL>
-<GEORGIAN_SMALL_LETTER_CIL>    <X5E88>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CIL>
-<GEORGIAN_CAPITAL_LETTER_CIL>  <X5E88>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_CIL>
-<GEORGIAN_LETTER_CHAR>         <X5E8A>;<X05>;<X05>;<GEORGIAN_LETTER_CHAR>
-<GEORGIAN_SMALL_LETTER_CHAR>   <X5E8C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CHAR>
-<GEORGIAN_CAPITAL_LETTER_CHAR> <X5E8C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_CHAR>
-<GEORGIAN_LETTER_XAN>          <X5E8E>;<X05>;<X05>;<GEORGIAN_LETTER_XAN>
-<GEORGIAN_SMALL_LETTER_XAN>    <X5E90>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_XAN>
-<GEORGIAN_CAPITAL_LETTER_XAN>  <X5E90>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_XAN>
-<GEORGIAN_LETTER_HAR>          <X5E92>;<X05>;<X05>;<GEORGIAN_LETTER_HAR>
-<GEORGIAN_SMALL_LETTER_HAR>    <X5E94>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HAR>
-<GEORGIAN_CAPITAL_LETTER_HAR>  <X5E94>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_HAR>
-<GEORGIAN_LETTER_JHAN>         <X5E96>;<X05>;<X05>;<GEORGIAN_LETTER_JHAN>
-<GEORGIAN_SMALL_LETTER_JHAN>   <X5E98>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_JHAN>
-<GEORGIAN_CAPITAL_LETTER_JHAN> <X5E98>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_JHAN>
-<GEORGIAN_LETTER_HAE>          <X5E9A>;<X05>;<X05>;<GEORGIAN_LETTER_HAE>
-<GEORGIAN_SMALL_LETTER_HAE>    <X5E9C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HAE>
-<GEORGIAN_CAPITAL_LETTER_HAE>  <X5E9C>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_HAE>
-<GEORGIAN_LETTER_HOE>          <X5E9E>;<X05>;<X05>;<GEORGIAN_LETTER_HOE>
-<GEORGIAN_SMALL_LETTER_HOE>    <X5EA0>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HOE>
-<GEORGIAN_CAPITAL_LETTER_HOE>  <X5EA0>;<X05>;<X8F>;<GEORGIAN_CAPITAL_LETTER_HOE>
-<GEORGIAN_LETTER_FI>           <X5EA2>;<X05>;<X05>;<GEORGIAN_LETTER_FI>
-<GEORGIAN_LETTER_YN>           <X5EA4>;<X05>;<X05>;<GEORGIAN_LETTER_YN>
-<GEORGIAN_LETTER_ELIFI>        <X5EA6>;<X05>;<X05>;<GEORGIAN_LETTER_ELIFI>
-<GEORGIAN_LETTER_TURNED_GAN>   <X5EA8>;<X05>;<X05>;<GEORGIAN_LETTER_TURNED_GAN>
-<GEORGIAN_LETTER_AIN>          <X5EAA>;<X05>;<X05>;<GEORGIAN_LETTER_AIN>
+<GEORGIAN_LETTER_AN>           <X6206>;<X05>;<X05>;<GEORGIAN_LETTER_AN>
+<GEORGIAN_SMALL_LETTER_AN>     <X6208>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_AN>
+<GEORGIAN_CAPITAL_LETTER_AN>   <X6208>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_AN>
+<GEORGIAN_LETTER_BAN>          <X620A>;<X05>;<X05>;<GEORGIAN_LETTER_BAN>
+<GEORGIAN_SMALL_LETTER_BAN>    <X620C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_BAN>
+<GEORGIAN_CAPITAL_LETTER_BAN>  <X620C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_BAN>
+<GEORGIAN_LETTER_GAN>          <X620E>;<X05>;<X05>;<GEORGIAN_LETTER_GAN>
+<GEORGIAN_SMALL_LETTER_GAN>    <X6210>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_GAN>
+<GEORGIAN_CAPITAL_LETTER_GAN>  <X6210>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_GAN>
+<GEORGIAN_LETTER_DON>          <X6212>;<X05>;<X05>;<GEORGIAN_LETTER_DON>
+<GEORGIAN_SMALL_LETTER_DON>    <X6214>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_DON>
+<GEORGIAN_CAPITAL_LETTER_DON>  <X6214>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_DON>
+<GEORGIAN_LETTER_EN>           <X6216>;<X05>;<X05>;<GEORGIAN_LETTER_EN>
+<GEORGIAN_SMALL_LETTER_EN>     <X6218>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_EN>
+<GEORGIAN_CAPITAL_LETTER_EN>   <X6218>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_EN>
+<GEORGIAN_LETTER_VIN>          <X621A>;<X05>;<X05>;<GEORGIAN_LETTER_VIN>
+<GEORGIAN_SMALL_LETTER_VIN>    <X621C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_VIN>
+<GEORGIAN_CAPITAL_LETTER_VIN>  <X621C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_VIN>
+<GEORGIAN_LETTER_ZEN>          <X621E>;<X05>;<X05>;<GEORGIAN_LETTER_ZEN>
+<GEORGIAN_SMALL_LETTER_ZEN>    <X6220>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_ZEN>
+<GEORGIAN_CAPITAL_LETTER_ZEN>  <X6220>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_ZEN>
+<GEORGIAN_LETTER_HE>           <X6222>;<X05>;<X05>;<GEORGIAN_LETTER_HE>
+<GEORGIAN_SMALL_LETTER_HE>     <X6224>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HE>
+<GEORGIAN_CAPITAL_LETTER_HE>   <X6224>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_HE>
+<GEORGIAN_LETTER_TAN>          <X6226>;<X05>;<X05>;<GEORGIAN_LETTER_TAN>
+<GEORGIAN_SMALL_LETTER_TAN>    <X6228>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_TAN>
+<GEORGIAN_CAPITAL_LETTER_TAN>  <X6228>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_TAN>
+<GEORGIAN_LETTER_IN>           <X622A>;<X05>;<X05>;<GEORGIAN_LETTER_IN>
+<GEORGIAN_SMALL_LETTER_IN>     <X622C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_IN>
+<GEORGIAN_CAPITAL_LETTER_IN>   <X622C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_IN>
+<GEORGIAN_LETTER_KAN>          <X622E>;<X05>;<X05>;<GEORGIAN_LETTER_KAN>
+<GEORGIAN_SMALL_LETTER_KAN>    <X6230>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_KAN>
+<GEORGIAN_CAPITAL_LETTER_KAN>  <X6230>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_KAN>
+<GEORGIAN_LETTER_LAS>          <X6232>;<X05>;<X05>;<GEORGIAN_LETTER_LAS>
+<GEORGIAN_SMALL_LETTER_LAS>    <X6234>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_LAS>
+<GEORGIAN_CAPITAL_LETTER_LAS>  <X6234>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_LAS>
+<GEORGIAN_LETTER_MAN>          <X6236>;<X05>;<X05>;<GEORGIAN_LETTER_MAN>
+<GEORGIAN_SMALL_LETTER_MAN>    <X6238>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_MAN>
+<GEORGIAN_CAPITAL_LETTER_MAN>  <X6238>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_MAN>
+<GEORGIAN_LETTER_NAR>          <X623A>;<X05>;<X05>;<GEORGIAN_LETTER_NAR>
+<MODIFIER_LETTER_GEORGIAN_NAR> <X623A>;<X05>;<X20>;<MODIFIER_LETTER_GEORGIAN_NAR>
+<GEORGIAN_SMALL_LETTER_NAR>    <X623C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_NAR>
+<GEORGIAN_CAPITAL_LETTER_NAR>  <X623C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_NAR>
+<GEORGIAN_LETTER_HIE>          <X623E>;<X05>;<X05>;<GEORGIAN_LETTER_HIE>
+<GEORGIAN_SMALL_LETTER_HIE>    <X6240>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HIE>
+<GEORGIAN_CAPITAL_LETTER_HIE>  <X6240>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_HIE>
+<GEORGIAN_LETTER_ON>           <X6242>;<X05>;<X05>;<GEORGIAN_LETTER_ON>
+<GEORGIAN_SMALL_LETTER_ON>     <X6244>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_ON>
+<GEORGIAN_CAPITAL_LETTER_ON>   <X6244>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_ON>
+<GEORGIAN_LETTER_PAR>          <X6246>;<X05>;<X05>;<GEORGIAN_LETTER_PAR>
+<GEORGIAN_SMALL_LETTER_PAR>    <X6248>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_PAR>
+<GEORGIAN_CAPITAL_LETTER_PAR>  <X6248>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_PAR>
+<GEORGIAN_LETTER_ZHAR>         <X624A>;<X05>;<X05>;<GEORGIAN_LETTER_ZHAR>
+<GEORGIAN_SMALL_LETTER_ZHAR>   <X624C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_ZHAR>
+<GEORGIAN_CAPITAL_LETTER_ZHAR> <X624C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_ZHAR>
+<GEORGIAN_LETTER_RAE>          <X624E>;<X05>;<X05>;<GEORGIAN_LETTER_RAE>
+<GEORGIAN_SMALL_LETTER_RAE>    <X6250>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_RAE>
+<GEORGIAN_CAPITAL_LETTER_RAE>  <X6250>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_RAE>
+<GEORGIAN_LETTER_SAN>          <X6252>;<X05>;<X05>;<GEORGIAN_LETTER_SAN>
+<GEORGIAN_SMALL_LETTER_SAN>    <X6254>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_SAN>
+<GEORGIAN_CAPITAL_LETTER_SAN>  <X6254>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_SAN>
+<GEORGIAN_LETTER_TAR>          <X6256>;<X05>;<X05>;<GEORGIAN_LETTER_TAR>
+<GEORGIAN_SMALL_LETTER_TAR>    <X6258>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_TAR>
+<GEORGIAN_CAPITAL_LETTER_TAR>  <X6258>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_TAR>
+<GEORGIAN_LETTER_WE>           <X625A>;<X05>;<X05>;<GEORGIAN_LETTER_WE>
+<GEORGIAN_SMALL_LETTER_WE>     <X625C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_WE>
+<GEORGIAN_CAPITAL_LETTER_WE>   <X625C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_WE>
+<GEORGIAN_LETTER_UN>           <X625E>;<X05>;<X05>;<GEORGIAN_LETTER_UN>
+<GEORGIAN_SMALL_LETTER_UN>     <X6260>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_UN>
+<GEORGIAN_CAPITAL_LETTER_UN>   <X6260>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_UN>
+<GEORGIAN_LETTER_PHAR>         <X6262>;<X05>;<X05>;<GEORGIAN_LETTER_PHAR>
+<GEORGIAN_SMALL_LETTER_PHAR>   <X6264>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_PHAR>
+<GEORGIAN_CAPITAL_LETTER_PHAR> <X6264>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_PHAR>
+<GEORGIAN_LETTER_KHAR>         <X6266>;<X05>;<X05>;<GEORGIAN_LETTER_KHAR>
+<GEORGIAN_SMALL_LETTER_KHAR>   <X6268>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_KHAR>
+<GEORGIAN_CAPITAL_LETTER_KHAR> <X6268>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_KHAR>
+<GEORGIAN_LETTER_GHAN>         <X626A>;<X05>;<X05>;<GEORGIAN_LETTER_GHAN>
+<GEORGIAN_SMALL_LETTER_GHAN>   <X626C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_GHAN>
+<GEORGIAN_CAPITAL_LETTER_GHAN> <X626C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_GHAN>
+<GEORGIAN_LETTER_QAR>          <X626E>;<X05>;<X05>;<GEORGIAN_LETTER_QAR>
+<GEORGIAN_SMALL_LETTER_QAR>    <X6270>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_QAR>
+<GEORGIAN_CAPITAL_LETTER_QAR>  <X6270>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_QAR>
+<GEORGIAN_LETTER_SHIN>         <X6272>;<X05>;<X05>;<GEORGIAN_LETTER_SHIN>
+<GEORGIAN_SMALL_LETTER_SHIN>   <X6274>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_SHIN>
+<GEORGIAN_CAPITAL_LETTER_SHIN> <X6274>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_SHIN>
+<GEORGIAN_LETTER_CHIN>         <X6276>;<X05>;<X05>;<GEORGIAN_LETTER_CHIN>
+<GEORGIAN_SMALL_LETTER_CHIN>   <X6278>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CHIN>
+<GEORGIAN_CAPITAL_LETTER_CHIN> <X6278>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_CHIN>
+<GEORGIAN_LETTER_CAN>          <X627A>;<X05>;<X05>;<GEORGIAN_LETTER_CAN>
+<GEORGIAN_SMALL_LETTER_CAN>    <X627C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CAN>
+<GEORGIAN_CAPITAL_LETTER_CAN>  <X627C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_CAN>
+<GEORGIAN_LETTER_JIL>          <X627E>;<X05>;<X05>;<GEORGIAN_LETTER_JIL>
+<GEORGIAN_SMALL_LETTER_JIL>    <X6280>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_JIL>
+<GEORGIAN_CAPITAL_LETTER_JIL>  <X6280>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_JIL>
+<GEORGIAN_LETTER_CIL>          <X6282>;<X05>;<X05>;<GEORGIAN_LETTER_CIL>
+<GEORGIAN_SMALL_LETTER_CIL>    <X6284>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CIL>
+<GEORGIAN_CAPITAL_LETTER_CIL>  <X6284>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_CIL>
+<GEORGIAN_LETTER_CHAR>         <X6286>;<X05>;<X05>;<GEORGIAN_LETTER_CHAR>
+<GEORGIAN_SMALL_LETTER_CHAR>   <X6288>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_CHAR>
+<GEORGIAN_CAPITAL_LETTER_CHAR> <X6288>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_CHAR>
+<GEORGIAN_LETTER_XAN>          <X628A>;<X05>;<X05>;<GEORGIAN_LETTER_XAN>
+<GEORGIAN_SMALL_LETTER_XAN>    <X628C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_XAN>
+<GEORGIAN_CAPITAL_LETTER_XAN>  <X628C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_XAN>
+<GEORGIAN_LETTER_HAR>          <X628E>;<X05>;<X05>;<GEORGIAN_LETTER_HAR>
+<GEORGIAN_SMALL_LETTER_HAR>    <X6290>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HAR>
+<GEORGIAN_CAPITAL_LETTER_HAR>  <X6290>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_HAR>
+<GEORGIAN_LETTER_JHAN>         <X6292>;<X05>;<X05>;<GEORGIAN_LETTER_JHAN>
+<GEORGIAN_SMALL_LETTER_JHAN>   <X6294>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_JHAN>
+<GEORGIAN_CAPITAL_LETTER_JHAN> <X6294>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_JHAN>
+<GEORGIAN_LETTER_HAE>          <X6296>;<X05>;<X05>;<GEORGIAN_LETTER_HAE>
+<GEORGIAN_SMALL_LETTER_HAE>    <X6298>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HAE>
+<GEORGIAN_CAPITAL_LETTER_HAE>  <X6298>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_HAE>
+<GEORGIAN_LETTER_HOE>          <X629A>;<X05>;<X05>;<GEORGIAN_LETTER_HOE>
+<GEORGIAN_SMALL_LETTER_HOE>    <X629C>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_HOE>
+<GEORGIAN_CAPITAL_LETTER_HOE>  <X629C>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_HOE>
+<GEORGIAN_LETTER_FI>           <X629E>;<X05>;<X05>;<GEORGIAN_LETTER_FI>
+<GEORGIAN_LETTER_YN>           <X62A0>;<X05>;<X05>;<GEORGIAN_LETTER_YN>
+<GEORGIAN_SMALL_LETTER_YN>     <X62A2>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_YN>
+<GEORGIAN_CAPITAL_LETTER_YN>   <X62A2>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_YN>
+<GEORGIAN_LETTER_ELIFI>        <X62A4>;<X05>;<X05>;<GEORGIAN_LETTER_ELIFI>
+<GEORGIAN_LETTER_TURNED_GAN>   <X62A6>;<X05>;<X05>;<GEORGIAN_LETTER_TURNED_GAN>
+<GEORGIAN_LETTER_AIN>          <X62A8>;<X05>;<X05>;<GEORGIAN_LETTER_AIN>
+<GEORGIAN_LETTER_AEN>          <X62AA>;<X05>;<X05>;<GEORGIAN_LETTER_AEN>
+<GEORGIAN_SMALL_LETTER_AEN>    <X62AC>;<X05>;<X05>;<GEORGIAN_SMALL_LETTER_AEN>
+<GEORGIAN_CAPITAL_LETTER_AEN>  <X62AC>;<X05>;<XA0>;<GEORGIAN_CAPITAL_LETTER_AEN>
+<GEORGIAN_LETTER_HARD_SIGN>    <X62AE>;<X05>;<X05>;<GEORGIAN_LETTER_HARD_SIGN>
+<GEORGIAN_LETTER_LABIAL_SIGN>  <X62B0>;<X05>;<X05>;<GEORGIAN_LETTER_LABIAL_SIGN>
+<a>                            <X2900>;<X05>;<X05>;<a>
+<A>                            <X2900>;<X05>;<X9C>;<A>
+<b>                            <X2B00>;<X05>;<X05>;<b>
+<B>                            <X2B00>;<X05>;<X9C>;<B>
+<c>                            <X2D00>;<X05>;<X05>;<c>
+<C>                            <X2D00>;<X05>;<X9C>;<C>
+<d>                            <X2F00>;<X05>;<X05>;<d>
+<D>                            <X2F00>;<X05>;<X9C>;<D>
+<e>                            <X3100>;<X05>;<X05>;<e>
+<E>                            <X3100>;<X05>;<X9C>;<E>
+<f>                            <X3300>;<X05>;<X05>;<f>
+<F>                            <X3300>;<X05>;<X9C>;<F>
+<g>                            <X3500>;<X05>;<X05>;<g>
+<G>                            <X3500>;<X05>;<X9C>;<G>
+<h>                            <X3700>;<X05>;<X05>;<h>
+<H>                            <X3700>;<X05>;<X9C>;<H>
+<i>                            <X3900>;<X05>;<X05>;<i>
+<I>                            <X3900>;<X05>;<X9C>;<I>
+<j>                            <X3B00>;<X05>;<X05>;<j>
+<J>                            <X3B00>;<X05>;<X9C>;<J>
+<k>                            <X3D00>;<X05>;<X05>;<k>
+<K>                            <X3D00>;<X05>;<X9C>;<K>
+<l>                            <X3F00>;<X05>;<X05>;<l>
+<L>                            <X3F00>;<X05>;<X9C>;<L>
+<m>                            <X4100>;<X05>;<X05>;<m>
+<M>                            <X4100>;<X05>;<X9C>;<M>
+<n>                            <X4300>;<X05>;<X05>;<n>
+<N>                            <X4300>;<X05>;<X9C>;<N>
+<o>                            <X4500>;<X05>;<X05>;<o>
+<O>                            <X4500>;<X05>;<X9C>;<O>
+<p>                            <X4700>;<X05>;<X05>;<p>
+<P>                            <X4700>;<X05>;<X9C>;<P>
+<q>                            <X4900>;<X05>;<X05>;<q>
+<Q>                            <X4900>;<X05>;<XA0>;<Q>
+<r>                            <X4B00>;<X05>;<X05>;<r>
+<R>                            <X4B00>;<X05>;<X9C>;<R>
+<s>                            <X4D00>;<X05>;<X05>;<s>
+<S>                            <X4D00>;<X05>;<X9C>;<S>
+<t>                            <X4F00>;<X05>;<X05>;<t>
+<T>                            <X4F00>;<X05>;<X9C>;<T>
+<u>                            <X5100>;<X05>;<X05>;<u>
+<U>                            <X5100>;<X05>;<X9C>;<U>
+<v>                            <X5300>;<X05>;<X05>;<v>
+<V>                            <X5300>;<X05>;<X9C>;<V>
+<w>                            <X5500>;<X05>;<X05>;<w>
+<W>                            <X5500>;<X05>;<XA0>;<W>
+<x>                            <X5700>;<X05>;<X05>;<x>
+<X>                            <X5700>;<X05>;<X9C>;<X>
+<y>                            <X5900>;<X05>;<X05>;<y>
+<Y>                            <X5900>;<X05>;<X9C>;<Y>
+<z>                            <X5B00>;<X05>;<X05>;<z>
+<Z>                            <X5B00>;<X05>;<X9C>;<Z>
 UNDEFINED                      IGNORE;IGNORE;IGNORE;...
 
 order_end
@@ -1469,7 +1513,7 @@ LC_NUMERIC
 *************
 
 decimal_point     "<COMMA>"
-thousands_sep     "<FULL_STOP>"
+thousands_sep     "<NO-BREAK_SPACE>"
 grouping          3
 
 END LC_NUMERIC
@@ -1480,9 +1524,9 @@ LC_MONETARY
 *************
 
 int_curr_symbol       "<G><E><L><space>"
-currency_symbol       "<G><E><L>"
+currency_symbol       "<LARI_SIGN>"
 mon_decimal_point     "<COMMA>"
-mon_thousands_sep     "<FULL_STOP>"
+mon_thousands_sep     "<NO-BREAK_SPACE>"
 mon_grouping          3
 positive_sign         ""
 negative_sign         "<HYPHEN-MINUS>"
@@ -1543,20 +1587,20 @@ mon     "<GEORGIAN_LETTER_IN><GEORGIAN_LETTER_AN><GEORGIAN_LETTER_NAR><GEORGIAN_
         "<GEORGIAN_LETTER_AN><GEORGIAN_LETTER_PAR><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_LAS><GEORGIAN_LETTER_IN>";/
         "<GEORGIAN_LETTER_MAN><GEORGIAN_LETTER_AN><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_SAN><GEORGIAN_LETTER_IN>";/
         "<GEORGIAN_LETTER_IN><GEORGIAN_LETTER_VIN><GEORGIAN_LETTER_NAR><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_SAN><GEORGIAN_LETTER_IN>";/
-        "<GEORGIAN_LETTER_IN><GEORGIAN_LETTER_VIN><GEORGIAN_LETTER_LAS><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_SAN>";/
+        "<GEORGIAN_LETTER_IN><GEORGIAN_LETTER_VIN><GEORGIAN_LETTER_LAS><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_SAN><GEORGIAN_LETTER_IN>";/
         "<GEORGIAN_LETTER_AN><GEORGIAN_LETTER_GAN><GEORGIAN_LETTER_VIN><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_SAN><GEORGIAN_LETTER_TAR><GEORGIAN_LETTER_ON>";/
         "<GEORGIAN_LETTER_SAN><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_KHAR><GEORGIAN_LETTER_TAR><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_MAN><GEORGIAN_LETTER_BAN><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_IN>";/
         "<GEORGIAN_LETTER_ON><GEORGIAN_LETTER_KHAR><GEORGIAN_LETTER_TAR><GEORGIAN_LETTER_ON><GEORGIAN_LETTER_MAN><GEORGIAN_LETTER_BAN><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_IN>";/
         "<GEORGIAN_LETTER_NAR><GEORGIAN_LETTER_ON><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_MAN><GEORGIAN_LETTER_BAN><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_IN>";/
         "<GEORGIAN_LETTER_DON><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_KAN><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_MAN><GEORGIAN_LETTER_BAN><GEORGIAN_LETTER_EN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_IN>"
 
-d_fmt    "%y<SOLIDUS>%m<SOLIDUS>%d"
+d_fmt    "%d.%m.%y"
 
 t_fmt    "%H:%M:%S"
 
-d_t_fmt  "%Y %B %e %H:%M:%S %Z"
+d_t_fmt  "%e %B, %Y, %H:%M:%S %Z"
 
-am_pm    "<GEORGIAN_LETTER_DON><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_LAS><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_SAN>";"<GEORGIAN_LETTER_SAN><GEORGIAN_LETTER_AN><GEORGIAN_LETTER_GHAN><GEORGIAN_LETTER_AN><GEORGIAN_LETTER_MAN><GEORGIAN_LETTER_ON><GEORGIAN_LETTER_SAN>"
+am_pm    "<A><M>";"<P><M>"
 
 t_fmt_ampm  "%I:%M:%S %p"
 
@@ -1565,13 +1609,13 @@ END LC_TIME
 LC_MESSAGES
 *************
 
-yesstr   "<GEORGIAN_LETTER_DON><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_AN><GEORGIAN_LETTER_XAN>:yes:y:YES:Y"
+yesstr   "<GEORGIAN_LETTER_KAN><GEORGIAN_LETTER_IN>:<GEORGIAN_LETTER_KAN>:yes:y:YES:Y"
 
-nostr    "<GEORGIAN_LETTER_AN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_AN>:no:n:NO:N"
+nostr    "<GEORGIAN_LETTER_AN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_AN>:<GEORGIAN_LETTER_AN>:no:n:NO:N"
 
-yesexpr  "^((<GEORGIAN_LETTER_DON><GEORGIAN_LETTER_IN><GEORGIAN_LETTER_AN><GEORGIAN_LETTER_XAN>)|([yY]([eE][sS])?))"
+yesexpr  "^((<GEORGIAN_LETTER_KAN><GEORGIAN_LETTER_IN>)|(<GEORGIAN_LETTER_KAN>)|([yY]([eE][sS])?)|([yY]))"
 
-noexpr   "^((<GEORGIAN_LETTER_AN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_AN>)|([nN]([oO])?))"
+noexpr   "^((<GEORGIAN_LETTER_AN><GEORGIAN_LETTER_RAE><GEORGIAN_LETTER_AN>)|(<GEORGIAN_LETTER_AN>)|([nN]([oO])?)|([nN]))"
 
 
 END LC_MESSAGES
