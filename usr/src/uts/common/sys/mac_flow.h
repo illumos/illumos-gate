@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/param.h>		/* for MAXPATHLEN */
 #include <netinet/in.h>		/* for IPPROTO_* constants */
 #include <sys/ethernet.h>
 

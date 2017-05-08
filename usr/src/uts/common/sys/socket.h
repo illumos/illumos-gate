@@ -50,6 +50,16 @@
 #ifndef	_KERNEL
 #include <sys/netconfig.h>
 #endif	/* !_KERNEL */
+/*
+ * Historically, netinet/in.h included sys/stream.h, which pulled in
+ * several things.  The more troublesome namespace pollution was from
+ * sys/stream.h so that was removed.  To avoid having to fix lots of
+ * programs, pull in a few things that are now (for better or worse)
+ * expected by programs that include sys/socket.h
+ */
+#include <sys/param.h>
+#include <sys/cred.h>
+#include <sys/poll.h>
 #include <netinet/in.h>
 #endif	/* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 

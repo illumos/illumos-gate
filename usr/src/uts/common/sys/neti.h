@@ -36,6 +36,8 @@
 extern "C" {
 #endif
 
+struct msgb;	/* avoiding sys/stream.h here */
+
 #define	NETINFO_VERSION 1
 
 /*
@@ -109,7 +111,7 @@ typedef enum inject {
 typedef struct net_inject {
 	int			ni_version;
 	netid_t			ni_netid;
-	mblk_t			*ni_packet;
+	struct msgb		*ni_packet;
 	struct sockaddr_storage	ni_addr;
 	phy_if_t		ni_physical;
 } net_inject_t;
@@ -138,8 +140,8 @@ struct net_protocol_s {
 	int		(*netp_inject)(net_handle_t, inject_t, net_inject_t *);
 	phy_if_t	(*netp_routeto)(net_handle_t, struct sockaddr *,
 			    struct sockaddr *);
-	int		(*netp_ispartialchecksum)(net_handle_t, mblk_t *);
-	int		(*netp_isvalidchecksum)(net_handle_t, mblk_t *);
+	int		(*netp_ispartialchecksum)(net_handle_t, struct msgb *);
+	int		(*netp_isvalidchecksum)(net_handle_t, struct msgb *);
 };
 typedef struct net_protocol_s net_protocol_t;
 
@@ -286,8 +288,8 @@ extern phy_if_t net_phylookup(net_handle_t, const char *);
 extern lif_if_t net_lifgetnext(net_handle_t, phy_if_t, lif_if_t);
 extern phy_if_t net_routeto(net_handle_t, struct sockaddr *,
     struct sockaddr *);
-extern int net_ispartialchecksum(net_handle_t, mblk_t *);
-extern int net_isvalidchecksum(net_handle_t, mblk_t *);
+extern int net_ispartialchecksum(net_handle_t, struct msgb *);
+extern int net_isvalidchecksum(net_handle_t, struct msgb *);
 
 #ifdef	__cplusplus
 }

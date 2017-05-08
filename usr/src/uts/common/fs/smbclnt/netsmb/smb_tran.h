@@ -41,6 +41,7 @@
 #define	_NETSMB_SMB_TRAN_H_
 
 #include <sys/socket.h>
+#include <sys/stream.h>
 
 /*
  * Known transports
