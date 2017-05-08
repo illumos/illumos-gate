@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
 # undef _KERNEL
@@ -100,7 +98,8 @@ struct file;
 #include "netinet/ip_compat.h"
 #ifdef	USE_INET6
 # include <netinet/icmp6.h>
-# if !SOLARIS && defined(_KERNEL) && !defined(__osf__) && !defined(__hpux)
+# if !defined(SOLARIS) && defined(_KERNEL) && !defined(__osf__) && \
+	!defined(__hpux)
 #  include <netinet6/in6_var.h>
 # endif
 #endif

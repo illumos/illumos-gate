@@ -909,7 +909,7 @@ typedef	struct	ipflog	{
  * ipl is already a name used by something else.
  */
 #ifndef	IPL_NAME
-# if	SOLARIS
+# ifdef	SOLARIS
 #  define	IPL_NAME	"/dev/ipf"
 # else
 #  define	IPL_NAME	"/dev/ipl"

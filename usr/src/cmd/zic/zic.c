@@ -439,6 +439,7 @@ usage(void)
 	    "\n\t[ -p posixrules ] [ -d directory ] [ -y yearistype ] "
 	    "[ filename ... ]\n"), progname, progname);
 #endif /* LEAPSECOND_SUPPORT */
+	exit(EXIT_FAILURE);
 }
 
 static const char	*psxrules;
@@ -480,6 +481,7 @@ char	*argv[];
 		switch (c) {
 			default:
 				usage();
+				break;
 			case 'd':
 				if (directory == NULL)
 					directory = optarg;
