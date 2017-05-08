@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ipf.h"
 #include "kmem.h"
 
@@ -23,7 +21,7 @@
 char *getifname(ptr)
 struct ifnet *ptr;
 {
-# if SOLARIS
+# ifdef SOLARIS
 #  include <sys/mutex.h>
 #  include <sys/condvar.h>
 # endif

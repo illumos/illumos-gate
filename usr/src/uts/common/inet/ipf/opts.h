@@ -9,8 +9,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	__OPTS_H__
 #define	__OPTS_H__
 
@@ -59,7 +57,7 @@
 # endif
 #endif
 
-#if defined(sun) && !SOLARIS
+#if defined(sun) && !defined(SOLARIS)
 # define	STRERROR(x)	sys_errlist[x]
 extern	char	*sys_errlist[];
 #else

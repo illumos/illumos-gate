@@ -200,6 +200,7 @@ nextchar:
 	case '\n' :
 		lnext = 0;
 		nokey = 0;
+		/* FALLTHROUGH */
 	case '\t' :
 	case '\r' :
 	case ' ' :

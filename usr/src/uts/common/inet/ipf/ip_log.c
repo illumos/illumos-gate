@@ -64,7 +64,7 @@ struct file;
 #  include <sys/proc.h>
 # endif
 #endif /* _KERNEL */
-#if !SOLARIS && !defined(__hpux) && !defined(linux)
+#if !defined(SOLARIS) && !defined(__hpux) && !defined(linux)
 # if (NetBSD > 199609) || (OpenBSD > 199603) || (__FreeBSD_version >= 300000)
 #  include <sys/dirent.h>
 # else
@@ -180,7 +180,7 @@ ipf_stack_t *ifs;
 # endif
 	}
 
-# if SOLARIS && defined(_KERNEL)
+# if defined(SOLARIS) && defined(_KERNEL)
 	cv_init(&ifs->ifs_iplwait, "ipl condvar", CV_DRIVER, NULL);
 # endif
 	MUTEX_INIT(&ifs->ifs_ipl_mutex, "ipf log mutex");
@@ -209,7 +209,7 @@ ipf_stack_t *ifs;
 	for (i = IPL_LOGMAX; i >= 0; i--)
 		(void) ipflog_clear(i, ifs);
 
-# if SOLARIS && defined(_KERNEL)
+# if defined(SOLARIS) && defined(_KERNEL)
 	cv_destroy(&ifs->ifs_iplwait);
 # endif
 	MUTEX_DESTROY(&ifs->ifs_ipl_mutex);
@@ -241,7 +241,7 @@ u_int flags;
 	ipflog_t ipfl;
 	u_char p;
 	mb_t *m;
-# if SOLARIS && defined(_KERNEL)
+# if defined(SOLARIS) && defined(_KERNEL)
 	net_handle_t nif;
 	void *ifp;
 # else
@@ -317,7 +317,7 @@ u_int flags;
 	 * Get the interface number and name to which this packet is
 	 * currently associated.
 	 */
-# if SOLARIS && defined(_KERNEL)
+# if defined(SOLARIS) && defined(_KERNEL)
 	ipfl.fl_unit = (u_int)0;
 	nif = NULL;
 	if (fin->fin_fi.fi_v == 4)
@@ -516,7 +516,7 @@ ipf_stack_t *ifs;
 	 * Now that the log record has been completed and added to the queue,
 	 * wake up any listeners who may want to read it.
 	 */
-# if SOLARIS && defined(_KERNEL)
+# if defined(SOLARIS) && defined(_KERNEL)
 	cv_signal(&ifs->ifs_iplwait);
 	MUTEX_EXIT(&ifs->ifs_ipl_mutex);
 # else
@@ -573,7 +573,7 @@ ipf_stack_t *ifs;
 	MUTEX_ENTER(&ifs->ifs_ipl_mutex);
 
 	while (ifs->ifs_iplt[unit] == NULL) {
-# if SOLARIS && defined(_KERNEL)
+# if defined(SOLARIS) && defined(_KERNEL)
 		/*
 		 * Prevent a deadlock with ipldetach() - see the "ipfilter
 		 * kernel module mutexes and locking" comment block in solaris.c
