@@ -1448,9 +1448,16 @@ i_dls_devnet_setzid(dls_devnet_t *ddp, zoneid_t new_zoneid, boolean_t setprop)
 		setzid.ld_zoneid = new_zoneid;
 		err = i_dls_mgmt_upcall(&setzid, sizeof (setzid), &retval,
 		    sizeof (retval));
-		upcall_done = B_TRUE;
 		if (err != 0)
 			goto done;
+
+		/*
+		 * We set upcall_done only if the upcall is
+		 * successful. This way, if dls_link_setzid() fails,
+		 * we know another upcall must be done to reset the
+		 * dlmgmtd state.
+		 */
+		upcall_done = B_TRUE;
 	}
 	if ((err = dls_link_setzid(ddp->dd_mac, new_zoneid)) == 0) {
 		ddp->dd_zid = new_zoneid;
