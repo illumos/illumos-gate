@@ -2820,7 +2820,7 @@ data_in(int proc_mode)
  */
 static off_t
 read_file(char *nam_p, off_t file_size, off_t *real_filesz,
-	boolean_t read_exact)
+    boolean_t read_exact)
 {
 	int	amount_read;
 	off_t	amt_to_read;
@@ -6809,9 +6809,8 @@ sigint(int sig)
 				}
 			}
 		} else if (unlink(nam_p))
-			msg(ERRN,
-			    "Cannot remove incomplete \"%s\"", nam_p);
-			*Over_p = '\0';
+			msg(ERRN, "Cannot remove incomplete \"%s\"", nam_p);
+		*Over_p = '\0';
 	}
 	exit(EXIT_CODE);
 }
@@ -8159,9 +8158,9 @@ remove_dir(char *path)
 		    strcmp(direct->d_name, "..") == 0)
 			continue;
 
-			if (lstat(direct->d_name, &sbuf) == -1) {
-				msg(ERRN, MSG1, direct->d_name);
-				(void) closedir(name);
+		if (lstat(direct->d_name, &sbuf) == -1) {
+			msg(ERRN, MSG1, direct->d_name);
+			(void) closedir(name);
 			return (-1);
 		}
 
