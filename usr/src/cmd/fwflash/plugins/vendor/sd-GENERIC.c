@@ -1,89 +1,150 @@
 /*
- * CDDL HEADER START
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
  *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
  */
+
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
+/*
+ * This is a general firmware flash plugin that does basic verification for
+ * devices backed by sd(7D).
+ *
+ * The sd(7D) target for firmware flashing uses the general SCSI WRITE BUFFER
+ * options with various modes to instruct the drive to download and install
+ * microcode (what SPC-3 calls firmware). To verify that something fits, we can
+ * use the READ BUFFER command with mode 03h to indicate that we want to
+ * buffer's descriptor. This gives us both the buffer's total size and the
+ * required alignment for writes.
+ *
+ * Unfortunately, it's impossible to know for certain if that size is supposed
+ * to be equivalent to the microcode's. While a READ BUFFER is supposed to
+ * return the same data as with a WRITE BUFFER command, experimental evidence
+ * has shown that this isn't always the case. Especially as the firmware buffer
+ * usually leverages buffer zero, but has custom modes to access it.
+ */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/sysmacros.h>
-#include <fcntl.h>
-#include <sys/condvar.h>
-#include <string.h>
-#include <strings.h>
-
-#include <sys/byteorder.h>
-
-#include <libintl.h> /* for gettext(3c) */
+#include <libintl.h>
 #include <fwflash/fwflash.h>
+#include <scsi/libscsi.h>
 
-char vendor[] = "GENERIC \0";
-
-/* MAXIMGSIZE = 1.4 * 1024 * 1024 bytes */
-/* Currently the largest firmware image size is 1.4 MB */
-/* 1468006 = 1.4 * 1024 * 1024 */
-#define	MAXIMGSIZE	((unsigned int)(1468006))
-
+/*
+ * The fwflash plugin interface is a bit odd for a modern committed interface
+ * and requires us to refer to data objects in the parent explicitly to get
+ * access to and set various information. It also doesn't allow us a means of
+ * setting data for our transport layer.
+ */
 extern struct vrfyplugin *verifier;
 
-/* required functions for this plugin */
-int vendorvrfy(struct devicelist *devicenode);
-
 /*
- * Important information about how this verification plugin works
- *
- * Direct-attached disks (sd instances) which support firmware
- * download accept image files up to 1.4 * 1024 * 1024 bytes in
- * size, and do their own verification of the image, rejecting the
- * file if it is not appropriate for them.
- *
- * All that we need to do here is set the various verifier fields
- * correctly, and check that the filesize as read from the filesystem
- * is less than 1.4 * 1024 * 1024 bytes.
+ * Declare the name of our vendor. This is required by the fwflash
+ * plugin interface. Note it must be a character array. Using a pointer may
+ * confuse the framework and its use of dlsym.
  */
+char vendor[] = "GENERIC";
 
 int
-vendorvrfy(struct devicelist *devicenode)
+vendorvrfy(struct devicelist *dvp)
 {
-	if (verifier->imgsize > MAXIMGSIZE) {
-		logmsg(MSG_ERROR,
-		    gettext("\nsd-GENERIC firmware image verifier: "
-		    "supplied filename %s exceeds maximum allowable "
-		    "size of %d bytes\n"),
-		    verifier->imgfile, MAXIMGSIZE);
+	libscsi_hdl_t *hdl = NULL;
+	libscsi_target_t *targ = NULL;
+	libscsi_action_t *act = NULL;
+	libscsi_errno_t serr;
+	spc3_read_buffer_cdb_t *rb_cdb;
+	uint8_t descbuf[4];
+	uint32_t size;
+
+	int ret = FWFLASH_FAILURE;
+
+	if ((hdl = libscsi_init(LIBSCSI_VERSION, &serr)) == NULL) {
+		logmsg(MSG_ERROR, gettext("%s: failed to initialize "
+		    "libscsi: %s\n"),
+		    verifier->vendor, libscsi_strerror(serr));
 		return (FWFLASH_FAILURE);
 	}
 
-	logmsg(MSG_INFO,
-	    "sd-GENERIC verifier for device\n"
-	    "vid %s, pid %s, rev %s\npath %s\n",
-	    devicenode->ident->vid,
-	    devicenode->ident->pid,
-	    devicenode->ident->revid,
-	    devicenode->addresses[0]);
-	verifier->flashbuf = 0;
+	if ((targ = libscsi_open(hdl, NULL, dvp->access_devname)) ==
+	    NULL) {
+		logmsg(MSG_ERROR,
+		    gettext("%s: unable to open device %s\n"),
+		    verifier->vendor, dvp->access_devname);
+		goto cleanup;
+	}
 
-	return (FWFLASH_SUCCESS);
+	if ((act = libscsi_action_alloc(hdl, SPC3_CMD_READ_BUFFER,
+	    LIBSCSI_AF_READ, descbuf, sizeof (descbuf))) == NULL) {
+		logmsg(MSG_ERROR, "%s: failed to alloc scsi action: %s\n",
+		    verifier->vendor, libscsi_errmsg(hdl));
+		goto cleanup;
+	}
+
+	rb_cdb = (spc3_read_buffer_cdb_t *)libscsi_action_get_cdb(act);
+
+	rb_cdb->rbc_mode = SPC3_RB_MODE_DESCRIPTOR;
+
+	/*
+	 * Microcode upgrade usually only uses the first buffer ID which are
+	 * sequentially indexed from zero. Strictly speaking these are all
+	 * vendor defined, but so far most vendors we've seen use index zero
+	 * for this.
+	 */
+	rb_cdb->rbc_bufferid = 0;
+
+	rb_cdb->rbc_allocation_len[0] = 0;
+	rb_cdb->rbc_allocation_len[1] = 0;
+	rb_cdb->rbc_allocation_len[2] = sizeof (descbuf);
+
+	if (libscsi_exec(act, targ) != 0) {
+		logmsg(MSG_ERROR, gettext("%s: failed to execute SCSI buffer "
+		    "descriptor read: %s\n"), verifier->vendor,
+		    libscsi_errmsg(hdl));
+		goto cleanup;
+	}
+
+	if (libscsi_action_get_status(act) != SAM4_STATUS_GOOD) {
+		logmsg(MSG_ERROR, gettext("%s: SCSI READ BUFFER command to "
+		    "determine maximum image size failed\n"), verifier->vendor);
+		goto cleanup;
+	}
+
+	if (descbuf[0] == 0 && descbuf[1] == 0 && descbuf[2] == 0 &&
+	    descbuf[3] == 0) {
+		logmsg(MSG_ERROR, gettext("%s: devices %s does not support "
+		    "firmware upgrade\n"), verifier->vendor,
+		    dvp->access_devname);
+		goto cleanup;
+	}
+
+	size = (descbuf[1] << 16) | (descbuf[2] << 8) | descbuf[3];
+	logmsg(MSG_INFO, gettext("%s: checking maximum image size %u against "
+	    "actual image size: %u\n"), verifier->vendor, size,
+	    verifier->imgsize);
+	if (size < verifier->imgsize) {
+		logmsg(MSG_ERROR, gettext("%s: supplied firmware image %s "
+		    "exceeds maximum image size of %u\n"),
+		    verifier->vendor, verifier->imgfile, size);
+		goto cleanup;
+	}
+
+	logmsg(MSG_INFO, gettext("%s: successfully validated images %s\n"),
+	    verifier->vendor, verifier->imgfile);
+
+	verifier->flashbuf = 0;
+	ret = FWFLASH_SUCCESS;
+cleanup:
+	if (act != NULL)
+		libscsi_action_free(act);
+	if (targ != NULL)
+		libscsi_close(hdl, targ);
+	if (hdl != NULL)
+		libscsi_fini(hdl);
+
+	return (ret);
 }

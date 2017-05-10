@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SPC3_TYPES_H
@@ -810,6 +811,30 @@ typedef struct spc3_persistent_reserve_in_cdb {
 	uint16_t pric_allocation_length;
 	spc3_control_t pric_control;
 } spc3_persistent_reserve_in_cdb_t;
+
+/*
+ * SPC-3 6.15 READ BUFFER
+ */
+typedef struct spc3_read_buffer_cdb {
+	uint8_t rbc_opcode;
+	DECL_BITFIELD2(
+	    rbc_mode		:5,
+	    _reserved		:3);
+	uint8_t	rbc_bufferid;
+	uint8_t rbc_buffer_offset[3];
+	uint8_t rbc_allocation_len[3];
+	spc3_control_t rbc_control;
+} spc3_read_buffer_cdb_t;
+
+typedef enum spc3_read_buffer_mode {
+	SPC3_RB_MODE_COMB_HDR_DATA = 0x00,
+	SPC3_RB_MODE_VENDOR_SPECIFIC = 0x01,
+	SPC3_RB_MODE_DATA = 0x02,
+	SPC3_RB_MODE_DESCRIPTOR = 0x03,
+	SPC3_RB_MODE_ECHO_BUF = 0x0a,
+	SPC3_RB_MODE_ECHO_BUF_DESC = 0x0b,
+	SPC3_RB_MODE_ENABLE_EXPANDER_ECHO_BUF = 0x1a
+} spc3_read_buffer_mode_t;
 
 /*
  * SPC-3 6.16 READ MEDIA SERIAL NUMBER

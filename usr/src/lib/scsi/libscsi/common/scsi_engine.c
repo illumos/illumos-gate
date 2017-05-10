@@ -648,3 +648,16 @@ libscsi_exec(libscsi_action_t *ap, libscsi_target_t *tp)
 
 	return (ret);
 }
+
+int
+libscsi_max_transfer(libscsi_target_t *tp, size_t *sizep)
+{
+	libscsi_hdl_t *hp = tp->lst_hdl;
+	if (tp->lst_engine->lse_ops->lseo_max_transfer == NULL) {
+		return (libscsi_error(hp, ESCSI_NOTSUP, "max transfer "
+		    "request not supported by engine"));
+	}
+
+	return (tp->lst_engine->lse_ops->lseo_max_transfer(hp, tp->lst_priv,
+	    sizep));
+}

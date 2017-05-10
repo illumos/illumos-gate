@@ -28,6 +28,7 @@
 
 include $(SRC)/Makefile.master
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.ctf
 
 SRCS=		fwflash.c
 HDRS=		fwflash.h
@@ -56,7 +57,7 @@ CFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 LDLIBS += -ldevinfo -lumem -lscf
 
 
-$(ROOTUSRINCLDFWFLASH)/%:  $(HDRDIR)/% 
+$(ROOTUSRINCLDFWFLASH)/%:  $(HDRDIR)/%
 	$(INS.file)
 
 
@@ -66,11 +67,12 @@ $(PROG): install_h $(OBJS)
 
 %.o: $(SRCDIR)/%.c
 	$(COMPILE.c) $(CFLAGS) -o $@ $<
+	$(CTFCONVERT_O)
 
 
 all:	$(PROG)
 
-clean: 
+clean:
 	$(RM) $(POFILE) $(POFILES) $(LINTFILE) $(PROG)
 
 clobber: clean
