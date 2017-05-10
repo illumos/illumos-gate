@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #ifdef TDRPC
@@ -487,7 +485,7 @@ db::open_log(bool_t copylog)
 
 	logfile->copylog = copylog;
 
-	if ((logfile->open()) == NULL){
+	if ((logfile->open()) == FALSE){
 		WARNING_M("db::open_log: could not open log file: ");
 		delete logfile;
 		logfile = NULL;
