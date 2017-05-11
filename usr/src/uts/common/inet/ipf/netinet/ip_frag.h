@@ -73,8 +73,9 @@ extern	void	fr_fragexpire __P((ipf_stack_t *));
 extern	int	fr_nextfrag __P((ipftoken_t *, ipfgeniter_t *, ipfr_t **, \
 				 ipfr_t ***, ipfrwlock_t *, ipf_stack_t *));
 
-#if     defined(_KERNEL) && ((BSD >= 199306) || SOLARIS || defined(__sgi) \
-	        || defined(__osf__) || (defined(__sgi) && (IRIX >= 60500)))
+#if     defined(_KERNEL) && ((BSD >= 199306) || defined(SOLARIS) || \
+	defined(__sgi) || defined(__osf__) || \
+	(defined(__sgi) && (IRIX >= 60500)))
 # if defined(SOLARIS2) && (SOLARIS2 < 7)
 extern	void	fr_slowtimer __P((void *));
 # else

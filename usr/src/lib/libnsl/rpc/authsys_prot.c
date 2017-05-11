@@ -65,23 +65,6 @@ xdr_authsys_parms(XDR *xdrs, struct authsys_parms *p)
 }
 
 /*
- * XDR for loopback unix authentication parameters.
- */
-bool_t
-xdr_authloopback_parms(XDR *xdrs, struct authsys_parms *p)
-{
-	if (xdr_u_int(xdrs, &(p->aup_time)) &&
-	    xdr_string(xdrs, &(p->aup_machname), MAX_MACHINE_NAME) &&
-	    xdr_uid_t(xdrs, (uid_t *)&(p->aup_uid)) &&
-	    xdr_gid_t(xdrs, (gid_t *)&(p->aup_gid)) &&
-	    xdr_array(xdrs, (caddr_t *)&(p->aup_gids),
-	    &(p->aup_len), NGRPS_LOOPBACK, (uint_t)sizeof (gid_t),
-	    (xdrproc_t)xdr_gid_t))
-		return (TRUE);
-	return (FALSE);
-}
-
-/*
  * XDR user id types (uid_t)
  */
 bool_t

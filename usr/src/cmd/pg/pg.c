@@ -360,8 +360,7 @@ main(int argc, char **argv)
 }
 
 static	char *
-setprompt(s)
-char *s;
+setprompt(char *s)
 {
 	int i = 0;
 	int pct_d = 0;
@@ -393,8 +392,7 @@ char *s;
  */
 
 static int
-screen(file_name)
-char *file_name;
+screen(char *file_name)
 {
 	int cmd_ret = 0;
 	off_t start;
@@ -499,8 +497,7 @@ static	char	cmdbuf[LINSIZ], *cmdptr;
  */
 
 static int
-command(filename)
-char *filename;
+command(char *filename)
 {
 	off_t nlines;
 	FILE *sf;
@@ -755,7 +752,7 @@ char *filename;
 			if (cmdend > cmdptr + 1) {
 				if ((wc_e1 == *cmdptr) &&
 				    ((wc_e == L't') ||
-					(wc_e == L'm') || (wc_e == L'b'))) {
+				    (wc_e == L'm') || (wc_e == L'b'))) {
 					leave_search = wc_e;
 					wc_e = wc_e1;
 					cmdend--;
@@ -802,8 +799,7 @@ char *filename;
 			(void) signal(SIGQUIT, SIG_IGN);
 			if (catch_susp)
 				(void) signal(SIGTSTP, SIG_DFL);
-			while (wait((int *)0) != id);
-			{
+			while (wait(NULL) != id) {
 				if (errno == ECHILD)
 					break;
 				else
@@ -849,7 +845,7 @@ number()
 }
 
 static int
-ttyin()
+ttyin(void)
 {
 	char *sptr, *p;
 	wchar_t ch;
@@ -954,10 +950,7 @@ ttyin()
 }
 
 static	int
-set_state(pstate, c, pc)
-int *pstate;
-wchar_t c;
-char *pc;
+set_state(int *pstate, wchar_t c, char *pc)
 {
 	static char *psign;
 	static char *pnumber;
@@ -1048,14 +1041,14 @@ char *pc;
 	return (0);
 }
 
-static	int
-readch()
+static int
+readch(void)
 {
 	return (fgetwc(pg_stdin));
 }
 
 static void
-help()
+help(void)
 {
 	if (clropt)
 		doclear();
@@ -1093,8 +1086,7 @@ help()
  */
 
 static int
-skipf(nskip)
-int nskip;
+skipf(int nskip)
 {
 	if (fnum + nskip < 0) {
 		nskip = -fnum;
@@ -1116,8 +1108,7 @@ int nskip;
  */
 
 static FILE *
-checkf(fs)
-char *fs;
+checkf(char *fs)
 {
 	struct stat stbuf;
 	FILE *f;
@@ -1168,8 +1159,8 @@ char *fs;
 			return ((FILE *)NULL);
 		} else {
 			if ((fd = mkstemp(tmp_name)) < 0) {
-			    (void) perror(tmp_name);
-			    return ((FILE *)NULL);
+				(void) perror(tmp_name);
+				return ((FILE *)NULL);
 			}
 			(void) close(fd);
 			if ((tmp_fou = fopen(tmp_name, "w")) == NULL) {
@@ -1188,8 +1179,7 @@ char *fs;
 }
 
 static void
-copy_file(f, out)
-FILE *f, *out;
+copy_file(FILE *f, FILE *out)
 {
 	int c;
 
@@ -1199,8 +1189,7 @@ FILE *f, *out;
 }
 
 static void
-re_error(i)
-int i;
+re_error(int i)
 {
 	int j;
 	static struct messages {
@@ -1235,12 +1224,8 @@ int i;
  *	negative n implies backward search
  *	n 'guaranteed' non-zero
  */
-
-
 static int
-search(buf, n)
-char buf[];
-off_t n;
+search(char *buf, off_t n)
 {
 	int direction;
 	static char *expbuf;
@@ -1338,9 +1323,7 @@ off_t n;
  */
 
 static off_t
-find(how, line)	/* find the line and seek there */
-int how;
-off_t line;
+find(int how, off_t line)
 {
 	/* no compacted memory yet */
 	FILE *f = in_file;
@@ -1414,10 +1397,8 @@ mrdchar()
 /*
  * Get a logical line
  */
-
 static off_t
-getaline(f)
-FILE *f;
+getaline(FILE *f)
 {
 	char	*p;
 	int	column;
@@ -1506,8 +1487,7 @@ FILE *f;
 }
 
 static void
-save_input(f)
-FILE *f;
+save_input(FILE *f)
 {
 	if (pipe_in) {
 		save_pipe();
@@ -1519,7 +1499,7 @@ FILE *f;
 }
 
 static void
-save_pipe()
+save_pipe(void)
 {
 	if (!doliseof)
 		while (fgetputc(stdin) != EOF)
@@ -1531,9 +1511,11 @@ save_pipe()
 	(void) fclose(tmp_fou);
 }
 
+/*
+ * copy anything read from a pipe to tmp_fou
+ */
 static int
-fgetputc(f)	/* copy anything read from a pipe to tmp_fou */
-FILE *f;
+fgetputc(FILE *f)
 {
 	int c;
 
@@ -1542,9 +1524,11 @@ FILE *f;
 	return (c);
 }
 
-static	void
-lineset(how)	/* initialize line memory */
-int how;
+/*
+ * initialize line memory
+ */
+static void
+lineset(int how)
 {
 	if (zero == NULL) {
 		nlall = 128;
@@ -1566,11 +1550,13 @@ int how;
 	}
 }
 
+/*
+ *  add address of new 'dol'
+ * assumes that f is currently at beginning of said line
+ * updates dol
+ */
 static void
-newdol(f)	/* add address of new 'dol' */
-		/* assumes that f is currently at beginning of said line */
-		/* updates dol */
-FILE *f;
+newdol(FILE *f)
 {
 	int diff;
 
@@ -1599,7 +1585,7 @@ FILE *f;
 }
 
 static void
-compact()
+compact(void)
 {
 	(void) perror("realloc");
 	end_it();
@@ -1607,7 +1593,7 @@ compact()
 }
 
 static void
-terminit()	/* set up terminal dependencies from termlib */
+terminit(void)	/* set up terminal dependencies from termlib */
 {
 	int err_ret;
 	struct termio ntty;
@@ -1649,8 +1635,7 @@ terminit()	/* set up terminal dependencies from termlib */
 }
 
 static void
-error(mess)
-char *mess;
+error(char *mess)
 {
 	kill_line();
 	sopr(gettext(mess), 1);
@@ -1659,8 +1644,7 @@ char *mess;
 }
 
 static void
-prompt(filename)
-char *filename;
+prompt(char *filename)
 {
 	char outstr[PROMPTSIZE+6];
 	int pagenum;
@@ -1671,9 +1655,10 @@ char *filename;
 		 */
 		(void) sprintf(outstr, gettext("(Next file: %s)"), filename);
 	} else {
-		if ((pagenum = (int)((new_ss.last_line-2)/(window-1)+1))
-						> 999999)
+		if ((pagenum = (int)((new_ss.last_line-2)/(window-1)+1)) >
+		    999999) {
 			pagenum = 999999;
+		}
 		(void) sprintf(outstr, promptstr, pagenum);
 	}
 	sopr(outstr, 1);
@@ -1686,9 +1671,7 @@ char *filename;
  */
 
 static void
-sopr(m, count)
-	char *m;
-	int count;
+sopr(char *m, int count)
 {
 	wchar_t	wc;
 	int	len, n;
@@ -1715,7 +1698,7 @@ sopr(m, count)
 }
 
 static void
-doclear()
+doclear(void)
 {
 	if (clear_screen)
 		(void) putp(clear_screen);
@@ -1725,7 +1708,7 @@ doclear()
 }
 
 static void
-kill_line()
+kill_line(void)
 {
 	erase_line(0);
 	if (!clr_eol) (void) putchar('\r');
@@ -1734,8 +1717,7 @@ kill_line()
 
 /* erase from after col to end of prompt */
 static void
-erase_line(col)
-int col;
+erase_line(int col)
 {
 
 	if (promptlen == 0)
@@ -1762,8 +1744,7 @@ int col;
  */
 
 static void
-on_brk(sno)
-	int sno;	/* signal number generated */
+on_brk(int sno)
 {
 	(void) signal(sno, on_brk);
 	if (!inwait) {
@@ -1780,7 +1761,7 @@ on_brk(sno)
  */
 
 void
-end_it()
+end_it(void)
 {
 
 	if (out_is_tty) {
@@ -1799,7 +1780,7 @@ end_it()
 }
 
 void
-onsusp()
+onsusp(void)
 {
 	int ttou_is_dfl;
 
@@ -1827,9 +1808,7 @@ onsusp()
 }
 
 static char *
-pg_strchr(str, c)
-char	*str;
-wchar_t	c;
+pg_strchr(char *str, wchar_t c)
 {
 	while (*str) {
 		if (c == *str)
@@ -1840,7 +1819,7 @@ wchar_t	c;
 }
 
 void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr, gettext(
 "Usage: pg [-number] [-p string] [-cefnrs] [+line] [+/pattern/] files\n"));

@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <spawn.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 void
 go(void)

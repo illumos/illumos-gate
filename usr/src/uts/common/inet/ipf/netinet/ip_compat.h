@@ -134,7 +134,7 @@ struct file;
 /* ----------------------------------------------------------------------- */
 /*                                  S O L A R I S                          */
 /* ----------------------------------------------------------------------- */
-#if SOLARIS
+#ifdef SOLARIS
 # define	MENTAT	1
 # include	<sys/cmn_err.h>
 # include	<sys/isa_defs.h>

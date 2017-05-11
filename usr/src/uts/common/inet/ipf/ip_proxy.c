@@ -471,7 +471,8 @@ int appr_check(fin, nat)
 fr_info_t *fin;
 nat_t *nat;
 {
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
+#if defined(SOLARIS) && defined(_KERNEL) && (SOLARIS2 >= 6) && \
+	defined(ICK_VALID)
 	mb_t *m;
 	int dosum = 1;
 #endif
@@ -489,7 +490,7 @@ nat_t *nat;
 #endif
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
+#if defined(SOLARIS) && defined(_KERNEL) && (SOLARIS2 >= 6)
 	net_handle_t net_data_p;
 	if (fin->fin_v == 4)
 		net_data_p = ifs->ifs_ipf_ipv4;
@@ -535,7 +536,8 @@ nat_t *nat;
 		case IPPROTO_TCP :
 			tcp = (tcphdr_t *)fin->fin_dp;
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
+#if defined(SOLARIS) && defined(_KERNEL) && (SOLARIS2 >= 6) && \
+	defined(ICK_VALID)
 			m = fin->fin_qfm;
 			if (dohwcksum && (m->b_ick_flag == ICK_VALID))
 				dosum = 0;
@@ -617,7 +619,7 @@ nat_t *nat;
 		}
 
 		if (tcpudp) {
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(MENTAT)
+#if defined(SOLARIS) && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(MENTAT)
 			if (!fin->fin_out) {
 				/*
 				 * We are incapable of adjusting partial hcksum

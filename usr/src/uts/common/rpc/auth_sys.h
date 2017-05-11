@@ -93,10 +93,8 @@ struct authsys_parms {
 
 #ifdef __STDC__
 extern bool_t xdr_authsys_parms(XDR *, struct authsys_parms *);
-extern bool_t xdr_authloopback_parms(XDR *, struct authsys_parms *);
 #else
 extern bool_t xdr_authsys_parms();
-extern bool_t xdr_authloopback_parms();
 #endif
 
 

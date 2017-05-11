@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  *	Converts binary log files to CLF (Common Log Format).
@@ -275,12 +273,12 @@ http_clf_date(char *buf, int bufsize, time_t t)
 	}
 
 	(void) snprintf(buf, bufsize,
-		"[%02d/%s/%04d:%02d:%02d:%02d %c%02ld%02ld]",
-		local_time.tm_mday, sMonth(local_time.tm_mon),
-		1900 + local_time.tm_year, local_time.tm_hour,
-		local_time.tm_min, local_time.tm_sec,
-		sign, time_zone_info / SEC_PER_HOUR,
-		time_zone_info % SEC_PER_HOUR);
+	    "[%02d/%s/%04d:%02d:%02d:%02d %c%02ld%02ld]",
+	    local_time.tm_mday, sMonth(local_time.tm_mon),
+	    1900 + local_time.tm_year, local_time.tm_hour,
+	    local_time.tm_min, local_time.tm_sec,
+	    sign, time_zone_info / SEC_PER_HOUR,
+	    time_zone_info % SEC_PER_HOUR);
 
 	return (0);
 }
@@ -327,34 +325,34 @@ xstrdup(const char *string)
 }
 
 static void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr, gettext(
 	    "\nncab2clf [-Dhv] [-b <block-size>] [-i <binary-log-file>] "
-			"[-n <n>]\n"
-		"    [-o <output-file>] [-s <date/time>]\n"
+	    "[-n <n>]\n"
+	    "    [-o <output-file>] [-s <date/time>]\n"
 	    "\tconverts a NCA binary log file to HTTP CLF"
-		" (Common Log Format)\n\n"
+	    " (Common Log Format)\n\n"
 	    "\t-b <block-size>\n"
-		"\t\tinput file blocking size in KB\n"
-		"\t\t- default is 64K bytes\n"
+	    "\t\tinput file blocking size in KB\n"
+	    "\t\t- default is 64K bytes\n"
 	    "\t-D\tdisable directio on <output-file-name>\n"
 	    "\t-h\tthis usage message\n"
 	    "\t-i <binary-log-file>\n"
-		"\t\tspecify input file\n"
+	    "\t\tspecify input file\n"
 	    "\t-n <n>\n"
-		"\t\toutput <n> CLF records\n"
+	    "\t\toutput <n> CLF records\n"
 	    "\t-o <output-file>\n"
-		"\t\tspecify output file\n"
+	    "\t\tspecify output file\n"
 	    "\t-s <date/time>\n"
-		"\t\tskip any records before <date/time>\n"
-		"\t\t- <date/time> may be in CLF format\n"
-		"\t\t- <date/time> may be in time format as specified "
-			"by touch(1)\n"
+	    "\t\tskip any records before <date/time>\n"
+	    "\t\t- <date/time> may be in CLF format\n"
+	    "\t\t- <date/time> may be in time format as specified "
+	    "by touch(1)\n"
 	    "\t-v\tverbose output\n"
 	    "\tNote: if no <output-file> - output goes to standard output\n"
 	    "\tNote: if no <binary-log-file> - input is taken from standard "
-			"input\n"));
+	    "input\n"));
 
 	exit(3);
 }
@@ -366,7 +364,8 @@ usage()
  */
 
 static int
-atoi_for2(char *p, int *value) {
+atoi_for2(char *p, int *value)
+{
 
 	*value = (*p - '0') * 10 + *(p+1) - '0';
 	if ((*value < 0) || (*value > 99))
@@ -479,7 +478,7 @@ read_n_bytes(int fd, char *buf, ssize_t bufsize)
 				    "Error: ncab2clf: "
 				    "reading input file: %s\n"),
 				    strerror(errno));
-				return (-1);	/* some wierd interrupt */
+			return (-1);	/* some wierd interrupt */
 		}
 
 		if (i == 0)
@@ -514,7 +513,7 @@ write_n_bytes(int fd, char *buf, ssize_t bufsize)
 				    "Error: ncab2clf: "
 				    "writing output file: %s\n"),
 				    strerror(errno));
-				return (-1);	/* some wierd interrupt */
+			return (-1);	/* some wierd interrupt */
 		}
 
 		num_written += i;
@@ -548,11 +547,11 @@ is_valid_header(void *ibuf)
 	} else {
 		if ((++g_n_log_upcall) != (ssize_t)s->n_log_upcall) {
 			(void) fprintf(stderr, gettext(
-				"Warning: ncab2clf:"
-				" expected record number (%d) is"
-				" different from the one seen (%d)\n."
-				" Resetting the expected record"
-				" number.\n"), g_n_log_upcall, s->n_log_upcall);
+			    "Warning: ncab2clf:"
+			    " expected record number (%d) is"
+			    " different from the one seen (%d)\n."
+			    " Resetting the expected record"
+			    " number.\n"), g_n_log_upcall, s->n_log_upcall);
 
 			g_n_log_upcall = s->n_log_upcall;
 		}
@@ -606,7 +605,7 @@ b2clf_buf(
 		/* Make sure there is enough space in the output buffer */
 
 		if ((*out_size >= osize) ||
-				(num_bytes_read >= max_input_size)) {
+		    (num_bytes_read >= max_input_size)) {
 			error_seen = true;
 			break;
 		}
@@ -621,7 +620,7 @@ b2clf_buf(
 		/* Only logs valid HTTP ops */
 
 		if ((! valid_method((int)r->method)) ||
-				(! valid_version((int)r->version))) {
+		    (! valid_version((int)r->version))) {
 			++g_invalid_count;
 			goto skip;
 		}
@@ -643,17 +642,17 @@ b2clf_buf(
 		}
 
 		count = (ssize_t)snprintf(&(obuf[*out_size]), osize - *out_size,
-				"%s %s %s %s \"%s %s %s\" %d %d\n",
-				((remote_ip) ? remote_ip : "-"),
-				/* should be remote_log_name */
-				"-",
-				ruser,
-				clf_timebuf,
-				method,
-				req_url,
-				http_version_string,
-				r->response_status,
-				r->response_len);
+		    "%s %s %s %s \"%s %s %s\" %d %d\n",
+		    ((remote_ip) ? remote_ip : "-"),
+		    /* should be remote_log_name */
+		    "-",
+		    ruser,
+		    clf_timebuf,
+		    method,
+		    req_url,
+		    http_version_string,
+		    r->response_status,
+		    r->response_len);
 
 		*out_size += count;
 	skip:
@@ -669,14 +668,13 @@ b2clf_buf(
 
 	if (error_seen) {
 		(void) fprintf(stderr, gettext(
-			"Error: ncab2clf: "
-			"Input buffer not fully converted.\n"));
+		    "Error: ncab2clf: Input buffer not fully converted.\n"));
 
 		if (n_recs != s->n_log_recs)
 			(void) fprintf(stderr, gettext(
-				"Warning: ncab2clf: "
-				"Converted only %d of %d records\n"),
-				n_recs, s->n_log_recs);
+			    "Warning: ncab2clf: "
+			    "Converted only %d of %d records\n"),
+			    n_recs, s->n_log_recs);
 	}
 
 	return (0);
@@ -852,9 +850,9 @@ main(int argc, char **argv)
 
 		if ((ifd = open(infile, O_RDONLY)) < 0) {
 			(void) fprintf(stderr,
-				gettext("Error: ncab2clf: "
-				"Failure to open binary log file %s: %s\n"),
-				infile, strerror(errno));
+			    gettext("Error: ncab2clf: "
+			    "Failure to open binary log file %s: %s\n"),
+			    infile, strerror(errno));
 			exit(1);
 		}
 
