@@ -25,7 +25,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -2339,7 +2339,7 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	rootnex_teardown_windows(dma);
 
 #if defined(__amd64) && !defined(__xpv)
-	if (IOMMU_USED(rdip))
+	if (IOMMU_USED(rdip) && dma->dp_dvma_used)
 		(void) iommulib_nexdma_unmapobject(dip, rdip, handle,
 		    &dma->dp_dvma);
 #endif
