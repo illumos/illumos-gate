@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -266,6 +266,18 @@ libscsi_action_get_flags(const libscsi_action_t *ap)
 }
 
 /*
+ * Return the length of the CDB buffer associated with this action.  Never
+ * fails.
+ */
+size_t
+libscsi_action_get_cdblen(const libscsi_action_t *ap)
+{
+	const libscsi_action_impl_t *aip = (const libscsi_action_impl_t *)ap;
+
+	return (aip->lsai_cdb_len);
+}
+
+/*
  * Returns the address of the action's CDB.  The CDB buffer is guaranteed to
  * be large enough to hold the complete CDB for the command specified when the
  * action was allocated.  Therefore, changing the command/opcode portion of
@@ -470,11 +482,11 @@ libscsi_action_set_senselen(libscsi_action_t *ap, size_t len)
  * If cmd is SPC3_CMD_REQUEST_SENSE, this flag must be clear.
  */
 libscsi_action_t *
-libscsi_action_alloc(libscsi_hdl_t *hp, spc3_cmd_t cmd, uint_t flags,
-    void *buf, size_t buflen)
+libscsi_action_alloc_vendor(libscsi_hdl_t *hp, spc3_cmd_t cmd, size_t cdbsz,
+    uint_t flags, void *buf, size_t buflen)
 {
 	libscsi_action_impl_t *aip;
-	size_t cdbsz, sz;
+	size_t sz;
 	ptrdiff_t off;
 
 	/*
@@ -493,14 +505,14 @@ libscsi_action_alloc(libscsi_hdl_t *hp, spc3_cmd_t cmd, uint_t flags,
 		    "in order to use a buffer");
 		return (NULL);
 	}
-	if (cmd == SPC3_CMD_REQUEST_SENSE && (flags & LIBSCSI_AF_RQSENSE)) {
-		(void) libscsi_error(hp, ESCSI_BADFLAGS, "request sense "
-		    "flag not allowed for request sense command");
+
+	if (cdbsz == 0) {
+		(void) libscsi_error(hp, ESCSI_BADLENGTH, "the supplied CDB "
+		    "buffer size has an invalid length, it must be non-zero.");
 		return (NULL);
 	}
 
-	if ((sz = cdbsz = libscsi_cmd_cdblen(hp, cmd)) == 0)
-		return (NULL);
+	sz = cdbsz;
 
 	/*
 	 * If the caller has asked for a buffer but has not provided one, we
@@ -548,6 +560,25 @@ libscsi_action_alloc(libscsi_hdl_t *hp, spc3_cmd_t cmd, uint_t flags,
 	aip->lsai_status = LIBSCSI_STATUS_INVALID;
 
 	return ((libscsi_action_t *)aip);
+}
+
+libscsi_action_t *
+libscsi_action_alloc(libscsi_hdl_t *hp, spc3_cmd_t cmd, uint_t flags,
+    void *buf, size_t buflen)
+{
+	size_t cdbsz;
+
+	if (cmd == SPC3_CMD_REQUEST_SENSE && (flags & LIBSCSI_AF_RQSENSE)) {
+		(void) libscsi_error(hp, ESCSI_BADFLAGS, "request sense "
+		    "flag not allowed for request sense command");
+		return (NULL);
+	}
+
+	if ((cdbsz = libscsi_cmd_cdblen(hp, cmd)) == 0)
+		return (NULL);
+
+	return (libscsi_action_alloc_vendor(hp, cmd, cdbsz, flags, buf,
+	    buflen));
 }
 
 void
