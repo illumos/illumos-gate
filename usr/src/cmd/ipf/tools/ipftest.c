@@ -12,11 +12,6 @@
 #include <sys/ioctl.h>
 #include <sys/file.h>
 
-#if !defined(lint)
-static const char sccsid[] = "@(#)ipt.c	1.19 6/3/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipftest.c,v 1.44.2.4 2005/07/16 06:05:28 darrenr Exp $";
-#endif
-
 extern	char	*optarg;
 extern	struct frentry	*ipfilter[2][2];
 extern	struct ipread	snoop, etherf, tcpd, pcap, iptext, iphex;
@@ -40,7 +35,7 @@ ipf_stack_t *get_ifs __P((void));
 ipf_stack_t *create_ifs __P((void));
 
 
-#if defined(__NetBSD__) || defined(__OpenBSD__) || SOLARIS || \
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(SOLARIS) || \
 	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
 	defined(__osf__) || defined(linux)
 int ipftestioctl __P((int, ioctlcmd_t, ...));
@@ -321,7 +316,7 @@ char *argv[];
 }
 
 
-#if defined(__NetBSD__) || defined(__OpenBSD__) || SOLARIS || \
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(SOLARIS) || \
 	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
 	defined(__osf__) || defined(linux)
 int ipftestioctl(int dev, ioctlcmd_t cmd, ...)

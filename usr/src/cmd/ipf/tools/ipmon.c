@@ -130,10 +130,10 @@ struct	flags	tcpfl[] = {
 	{ 0, '\0' }
 };
 
-#if defined(__hpux) || (SOLARIS && (SOLARIS2 < 10))
+#if defined(__hpux) || (defined(SOLARIS) && (SOLARIS2 < 10))
 static	char	*pidfile = "/etc/ipf/ipmon.pid";
 #else
-# if (BSD >= 199306) || SOLARIS
+# if (BSD >= 199306) || defined(SOLARIS)
 static	char	*pidfile = "/var/run/ipmon.pid";
 # else
 static	char	*pidfile = "/etc/ipmon.pid";

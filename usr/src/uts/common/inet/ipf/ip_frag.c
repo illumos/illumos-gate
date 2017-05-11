@@ -894,8 +894,8 @@ ipf_stack_t *ifs;
 /* Slowly expire held state for fragments.  Timeouts are set * in           */
 /* expectation of this being called twice per second.                       */
 /* ------------------------------------------------------------------------ */
-#if !defined(_KERNEL) || (!SOLARIS && !defined(__hpux) && !defined(__sgi) && \
-			  !defined(__osf__) && !defined(linux))
+#if !defined(_KERNEL) || (!defined(SOLARIS) && !defined(__hpux) && \
+	!defined(__sgi) && !defined(__osf__) && !defined(linux))
 # if defined(_KERNEL) && ((BSD >= 199103) || defined(__sgi))
 void fr_slowtimer __P((void *arg))
 # else

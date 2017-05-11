@@ -157,8 +157,9 @@ typedef	struct	{
 
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || \
-        (_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
-	SOLARIS || defined(__sgi) || defined(__osf__) || defined(linux)
+	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
+	defined(SOLARIS) || defined(__sgi) || defined(__osf__) || \
+	defined(linux)
 # include <stdarg.h>
 typedef	int	(* ioctlfunc_t) __P((int, ioctlcmd_t, ...));
 #else
@@ -305,7 +306,7 @@ extern void set_variable __P((char *, char *));
 extern char *get_variable __P((char *, char **, int));
 extern void resetlexer __P((void));
 
-#if SOLARIS
+#ifdef SOLARIS
 extern int gethostname __P((char *, int ));
 extern void sync __P((void));
 #endif

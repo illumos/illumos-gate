@@ -103,7 +103,8 @@ struct file;
 #include "netinet/ip_compat.h"
 #ifdef	USE_INET6
 # include <netinet/icmp6.h>
-# if !SOLARIS && defined(_KERNEL) && !defined(__osf__) && !defined(__hpux)
+# if !defined(SOLARIS) && defined(_KERNEL) && !defined(__osf__) && \
+	!defined(__hpux)
 #  include <netinet6/in6_var.h>
 # endif
 #endif
@@ -4077,7 +4078,7 @@ size_t size;
 	caddr_t ca;
 	int err;
 
-# if SOLARIS
+# ifdef SOLARIS
 	err = COPYIN(src, (caddr_t)&ca, sizeof(ca));
 	if (err != 0)
 		return err;
@@ -4107,7 +4108,7 @@ size_t size;
 	caddr_t ca;
 	int err;
 
-# if SOLARIS
+# ifdef SOLARIS
 	err = COPYIN(dst, (caddr_t)&ca, sizeof(ca));
 	if (err != 0)
 		return err;
@@ -5977,7 +5978,7 @@ fr_info_t *fin;
 	int dosum;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
+#if defined(SOLARIS) && defined(_KERNEL) && (SOLARIS2 >= 6)
 	net_handle_t net_data_p;
 	if (fin->fin_v == 4)
 		net_data_p = ifs->ifs_ipf_ipv4;
@@ -6001,7 +6002,7 @@ fr_info_t *fin;
 	dosum = 0;
 	sum = 0;
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
+#if defined(SOLARIS) && defined(_KERNEL) && (SOLARIS2 >= 6)
 	ASSERT(fin->fin_m != NULL);
 	if (NET_IS_HCK_L4_FULL(net_data_p, fin->fin_m) ||
 	    NET_IS_HCK_L4_PART(net_data_p, fin->fin_m)) {
@@ -6040,7 +6041,7 @@ fr_info_t *fin;
 		if (dosum)
 			sum = fr_cksum(fin->fin_m, fin->fin_ip,
 				       fin->fin_p, fin->fin_dp);
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
+#if defined(SOLARIS) && defined(_KERNEL) && (SOLARIS2 >= 6)
 	}
 #endif
 #if !defined(_KERNEL)

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <stdio.h>
 
@@ -171,7 +169,7 @@ Str::tokenize(Str& token, const Str& separators, Str& remainder)
 	remainder = nextTok_;
 	// remainder = *this;
 	// did not find it!
-	return (NULL);
+	return ('\0');
 }
 
 void

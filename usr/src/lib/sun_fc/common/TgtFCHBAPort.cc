@@ -433,7 +433,7 @@ void TgtFCHBAPort::sendRLS(uint64_t destWWN,
 	fctio.fctio_obuf = (uint64_t)(uintptr_t)new uchar_t[*pRspBufferSize];
 	fctio.fctio_olen = *pRspBufferSize;
 
-	if (fctio.fctio_obuf == NULL) {
+	if (fctio.fctio_obuf == 0) {
 	    log.noMemory();
 	    throw InternalError();
 	}
@@ -441,7 +441,7 @@ void TgtFCHBAPort::sendRLS(uint64_t destWWN,
 	fct_ioctl(FCTIO_CMD, &fctio);
 	memcpy(pRspBuffer, (uchar_t *)(uintptr_t)fctio.fctio_obuf, 
 	       *pRspBufferSize);
-	if (fctio.fctio_obuf != NULL) {
+	if (fctio.fctio_obuf != 0) {
 	    delete((uchar_t *)(uintptr_t)fctio.fctio_obuf);
 	}
 }
