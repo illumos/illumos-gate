@@ -2337,7 +2337,7 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	rootnex_teardown_windows(dma);
 
 #if defined(__amd64) && !defined(__xpv)
-	if (IOMMU_USED(rdip))
+	if (IOMMU_USED(rdip) && dma->dp_dvma_used)
 		(void) iommulib_nexdma_unmapobject(dip, rdip, handle,
 		    &dma->dp_dvma);
 #endif
