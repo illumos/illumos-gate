@@ -22,7 +22,6 @@ server pool
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdoor_bind()\fR function associates the current thread with a door server
 pool. A door server pool is a private pool of server threads that is available
@@ -34,22 +33,22 @@ removing any private door pool binding that is associated with the current
 thread.
 .sp
 .LP
-Normally, door server threads are placed in a global pool of available  threads
+Normally, door server threads are placed in a global pool of available threads
 that invocations on any door can use to dispatch a door invocation. A door that
 has been created with \fBDOOR_PRIVATE\fR only uses server threads that have
 been associated with the door by \fBdoor_bind()\fR. It is therefore necessary
-to bind at least one server thread  to doors created with \fBDOOR_PRIVATE\fR.
+to bind at least one server thread to doors created with \fBDOOR_PRIVATE\fR.
 .sp
 .LP
 The server thread create function, \fBdoor_server_create()\fR, is initially
 called by the system during a \fBdoor_create()\fR operation. See
-\fBdoor_server_create\fR(3C) and  \fBdoor_create\fR(3C).
+\fBdoor_server_create\fR(3C) and \fBdoor_create\fR(3C).
 .sp
 .LP
-The current thread is added to the private pool of server  threads associated
+The current thread is added to the private pool of server threads associated
 with a door during the next \fBdoor_return()\fR (that has been issued by the
-current thread after an associated  \fBdoor_bind()\fR). See
-\fBdoor_return\fR(3C). A server thread performing a  \fBdoor_bind()\fR on a
+current thread after an associated \fBdoor_bind()\fR). See
+\fBdoor_return\fR(3C). A server thread performing a \fBdoor_bind()\fR on a
 door that is already bound to a different door performs an implicit
 \fBdoor_unbind()\fR of the previous door.
 .sp
@@ -58,14 +57,12 @@ If a process containing threads that have been bound to a door calls
 \fBfork\fR(2), the threads in the child process will be bound to an invalid
 door, and any calls to \fBdoor_return\fR(3C) will result in an error.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, a \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The  \fBdoor_bind()\fR and  \fBdoor_unbind()\fR functions fail if:
+The \fBdoor_bind()\fR and \fBdoor_unbind()\fR functions fail if:
 .sp
 .ne 2
 .na
@@ -174,7 +171,6 @@ main()
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -194,7 +190,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfork\fR(2),\fBdoor_create\fR(3C), \fBdoor_return\fR(3C),
 \fBdoor_server_create\fR(3C), \fBattributes\fR(5)

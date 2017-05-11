@@ -16,26 +16,23 @@ door_revoke \- revoke access to a door descriptor
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdoor_revoke()\fR function revokes access to a door descriptor. Door
-descriptors are created with  \fBdoor_create\fR(3C). The \fBdoor_revoke()\fR
-function performs an implicit call to  \fBclose\fR(2), marking the door
+descriptors are created with \fBdoor_create\fR(3C). The \fBdoor_revoke()\fR
+function performs an implicit call to \fBclose\fR(2), marking the door
 descriptor \fId\fR as invalid.
 .sp
 .LP
-A door descriptor can be revoked only by the process that created it.  Door
+A door descriptor can be revoked only by the process that created it. Door
 invocations that are in progress during a \fBdoor_revoke()\fR invocation are
 allowed to complete normally.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBdoor_revoke()\fR returns \fB0\fR. Otherwise,
 \fBdoor_revoke()\fR returns \(mi1 and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The  \fBdoor_revoke()\fR function will fail if:
+The \fBdoor_revoke()\fR function will fail if:
 .sp
 .ne 2
 .na
@@ -56,7 +53,6 @@ The door descriptor was not created by this process (with
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -76,6 +72,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBclose\fR(2), \fBdoor_create\fR(3C), \fBattributes\fR(5)

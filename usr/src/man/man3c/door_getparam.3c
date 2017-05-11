@@ -78,7 +78,7 @@ The \fBdoor_setparam()\fR function can only affect doors that were created by
 the current process.
 .SH RETURN VALUES
 .LP
-Upon successful completion, 0 is returned.  Otherwise, -1 is returned and
+Upon successful completion, 0 is returned. Otherwise, -1 is returned and
 \fBerrno\fR is set to indicate the error.
 .SH ERRORS
 .LP

@@ -18,18 +18,17 @@ door_create \- create a door descriptor
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdoor_create()\fR function creates a door descriptor that describes the
-procedure specified by  the function \fIserver_procedure\fR. The data item,
-\fIcookie\fR, is associated with the door descriptor,  and is passed as an
+procedure specified by the function \fIserver_procedure\fR. The data item,
+\fIcookie\fR, is associated with the door descriptor, and is passed as an
 argument to the invoked function \fIserver_procedure\fR during
-\fBdoor_call\fR(3C) invocations.  Other arguments passed to
+\fBdoor_call\fR(3C) invocations. Other arguments passed to
 \fIserver_procedure\fR from an associated \fBdoor_call()\fR are placed on the
 stack and include \fIargp\fR and \fIdp\fR. The \fIargp\fR argument points to
 \fIarg_size\fR bytes of data and the \fIdp\fR argument points to \fIn_desc\fR
 \fBdoor_desc_t\fR structures. The \fIattributes\fR argument specifies
-attributes  associated with the newly created door. Valid values for
+attributes associated with the newly created door. Valid values for
 \fIattributes\fR are constructed by OR-ing one or more of the following values:
 .sp
 .ne 2
@@ -39,11 +38,11 @@ attributes  associated with the newly created door. Valid values for
 .sp .6
 .RS 4n
 Delivers a special invocation on the door when the number of descriptors that
-refer to  this door drops to one.  In order to trigger this condition, more
+refer to this door drops to one. In order to trigger this condition, more
 than one descriptor must have referred to this door at some time.
 \fBDOOR_UNREF_DATA\fR designates an unreferenced invocation, as the \fIargp\fR
 argument passed to \fIserver_procedure\fR. In the case of an unreferenced
-invocation, the values for  \fIarg_size\fR, \fIdp\fR and \fIn_did\fR are
+invocation, the values for \fIarg_size\fR, \fIdp\fR and \fIn_did\fR are
 \fB0\fR. Only one unreferenced invocation is delivered on behalf of a door.
 .RE
 
@@ -56,7 +55,7 @@ invocation, the values for  \fIarg_size\fR, \fIdp\fR and \fIn_did\fR are
 .RS 4n
 Similar to \fBDOOR_UNREF\fR, except multiple unreferenced invocations can be
 delivered on the same door if the number of descriptors referring to the door
-drops to one more than once.  Since an additional reference may have been
+drops to one more than once. Since an additional reference may have been
 passed by the time an unreferenced invocation arrives, the \fBDOOR_IS_UNREF\fR
 attribute returned by the \fBdoor_info\fR(3C) call can be used to determine if
 the door is still unreferenced.
@@ -69,8 +68,8 @@ the door is still unreferenced.
 .ad
 .sp .6
 .RS 4n
-Maintains a separate pool of server threads on behalf  of the door. Server
-threads are associated with a door's  private server pool using
+Maintains a separate pool of server threads on behalf of the door. Server
+threads are associated with a door's private server pool using
 \fBdoor_bind\fR(3C).
 .RE
 
@@ -94,7 +93,7 @@ procedure will always be invoked with an \fIn_desc\fR argument of 0.
 .sp .6
 .RS 4n
 Clients which abort calls to \fBdoor_call()\fR on this door will not cause the
-cancellation of the server thread handling the request.  See
+cancellation of the server thread handling the request. See
 \fBcancellation\fR(5).
 .RE
 
@@ -109,7 +108,7 @@ item \fIcookie\fR.
 .sp
 .LP
 By default, additional threads are created as needed to handle concurrent
-\fBdoor_call()\fR invocations.   See \fBdoor_server_create\fR(3C) for
+\fBdoor_call()\fR invocations.  See \fBdoor_server_create\fR(3C) for
 information on how to change this behavior.
 .sp
 .LP
@@ -120,13 +119,11 @@ A process can advertise a door in the file system name space using
 After creation, \fBdoor_setparam\fR(3C) can be used to set limits on the amount
 of data and descriptors clients can send over the door.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBdoor_create()\fR returns a non-negative value.
 Otherwise, \fBdoor_create\fR returns \fB\(mi1\fR and sets \fBerrno\fR to
 indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBdoor_create()\fR function will fail if:
 .sp
@@ -202,7 +199,6 @@ main(int argc, char *argv[])
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -222,7 +218,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdoor_bind\fR(3C), \fBdoor_call\fR(3C), \fBdoor_info\fR(3C),
 \fBdoor_revoke\fR(3C), \fBdoor_setparam\fR(3C), \fBdoor_server_create\fR(3C),
