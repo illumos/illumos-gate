@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,10 +33,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#ifndef lint
-static char sccsid[] = "@(#)commands.c	8.1 (Berkeley) 6/6/93";
-#endif /* not lint */
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -2445,7 +2439,7 @@ status(int argc, char *argv[])
 				(void) printf("%s flow control\n",
 				    (mode&MODE_FLOW) ? "Local" : "No");
 
-				encrypt_display();
+			encrypt_display();
 		}
 	} else {
 		(void) printf("No connection.\n");
