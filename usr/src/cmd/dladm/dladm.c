@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.
  */
 
@@ -199,7 +199,6 @@ static ofmt_cb_t print_xaggr_cb, print_aggr_stats_cb;
 static ofmt_cb_t print_phys_one_hwgrp_cb, print_wlan_attr_cb;
 static ofmt_cb_t print_wifi_status_cb, print_link_attr_cb;
 static ofmt_cb_t print_overlay_cb, print_overlay_fma_cb, print_overlay_targ_cb;
-static void dladm_ofmt_check(ofmt_status_t, boolean_t, ofmt_handle_t);
 
 typedef void cmdfunc_t(int, char **, const char *);
 
@@ -1864,7 +1863,7 @@ do_show_usage(int argc, char *argv[], const char *use)
 		    &ofmt);
 
 	}
-	dladm_ofmt_check(oferr, state.us_parsable, ofmt);
+	ofmt_check(oferr, state.us_parsable, ofmt, die, warn);
 	state.us_ofmt = ofmt;
 
 	if (d_arg) {
@@ -3625,7 +3624,7 @@ do_show_link(int argc, char *argv[], const char *use)
 		ofmtflags |= OFMT_WRAP;
 
 	oferr = ofmt_open(fields_str, link_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	if (linkid == DATALINK_ALL_LINKID) {
@@ -3791,7 +3790,7 @@ do_show_aggr(int argc, char *argv[], const char *use)
 	if (state.gs_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, pf, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.gs_parsable, ofmt);
+	ofmt_check(oferr, state.gs_parsable, ofmt, die, warn);
 	state.gs_ofmt = ofmt;
 
 	if (s_arg) {
@@ -4261,7 +4260,7 @@ do_show_iptun(int argc, char *argv[], const char *use)
 
 	oferr = ofmt_open(fields_str, iptun_fields, ofmtflags,
 	    DLADM_DEFAULT_COL, &ofmt);
-	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 
 	state.ls_ofmt = ofmt;
 	state.ls_flags = flags;
@@ -4626,7 +4625,7 @@ do_show_phys(int argc, char *argv[], const char *use)
 	if (state.ls_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, pf, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	if (linkid == DATALINK_ALL_LINKID) {
@@ -4705,7 +4704,7 @@ do_show_vlan(int argc, char *argv[], const char *use)
 	if (state.ls_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, vlan_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	if (linkid == DATALINK_ALL_LINKID) {
@@ -5360,7 +5359,7 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	if (state.vs_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, pf, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.vs_parsable, ofmt);
+	ofmt_check(oferr, state.vs_parsable, ofmt, die, warn);
 	state.vs_ofmt = ofmt;
 
 	if (s_arg) {
@@ -5745,7 +5744,7 @@ do_show_simnet(int argc, char *argv[], const char *use)
 	if (state.ls_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, simnet_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	if (linkid == DATALINK_ALL_LINKID) {
@@ -5773,7 +5772,7 @@ link_stats(datalink_id_t linkid, uint_t interval, char *fields_str,
 	if (state->ls_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, link_s_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state->ls_parsable, ofmt);
+	ofmt_check(oferr, state->ls_parsable, ofmt, die, warn);
 	state->ls_ofmt = ofmt;
 
 	/*
@@ -6084,7 +6083,7 @@ parse_wifi_fields(char *str, ofmt_handle_t *ofmt, uint_t cmdtype,
 
 	oferr = ofmt_open(str, template, (parsable ? OFMT_PARSABLE : 0),
 	    0, ofmt);
-	dladm_ofmt_check(oferr, parsable, *ofmt);
+	ofmt_check(oferr, parsable, *ofmt, die, warn);
 	return (0);
 }
 
@@ -6899,7 +6898,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 		ofmtflags |= OFMT_WRAP;
 
 	oferr = ofmt_open(fields_str, linkprop_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	if (linkid == DATALINK_ALL_LINKID) {
@@ -7685,7 +7684,7 @@ do_show_secobj(int argc, char **argv, const char *use)
 	if (state.ss_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, secobj_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.ss_parsable, ofmt);
+	ofmt_check(oferr, state.ss_parsable, ofmt, die, warn);
 	state.ss_ofmt = ofmt;
 
 	flags = state.ss_persist ? DLADM_OPT_PERSIST : 0;
@@ -7817,7 +7816,7 @@ do_show_ether(int argc, char **argv, const char *use)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, ether_fields, ofmtflags,
 	    DLADM_DEFAULT_COL, &ofmt);
-	dladm_ofmt_check(oferr, state.es_parsable, ofmt);
+	ofmt_check(oferr, state.es_parsable, ofmt, die, warn);
 	state.es_ofmt = ofmt;
 
 	if (state.es_link == NULL) {
@@ -8891,7 +8890,7 @@ do_show_bridge(int argc, char **argv, const char *use)
 	if (parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, field_arr, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, brstate.state.ls_parsable, ofmt);
+	ofmt_check(oferr, brstate.state.ls_parsable, ofmt, die, warn);
 	brstate.state.ls_ofmt = ofmt;
 
 	for (;;) {
@@ -9262,29 +9261,6 @@ print_default_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	return (B_TRUE);
 }
 
-static void
-dladm_ofmt_check(ofmt_status_t oferr, boolean_t parsable,
-    ofmt_handle_t ofmt)
-{
-	char buf[OFMT_BUFSIZE];
-
-	if (oferr == OFMT_SUCCESS)
-		return;
-	(void) ofmt_strerror(ofmt, oferr, buf, sizeof (buf));
-	/*
-	 * All errors are considered fatal in parsable mode.
-	 * NOMEM errors are always fatal, regardless of mode.
-	 * For other errors, we print diagnostics in human-readable
-	 * mode and processs what we can.
-	 */
-	if (parsable || oferr == OFMT_ENOFIELDS) {
-		ofmt_close(ofmt);
-		die(buf);
-	} else {
-		warn(buf);
-	}
-}
-
 /*
  * Called from the walker dladm_walk_datalink_id() for each IB partition to
  * display IB partition specific information.
@@ -9482,7 +9458,7 @@ do_show_part(int argc, char *argv[], const char *use)
 	if (state.ps_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, part_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.ps_parsable, ofmt);
+	ofmt_check(oferr, state.ps_parsable, ofmt, die, warn);
 	state.ps_ofmt = ofmt;
 
 	/*
@@ -9654,7 +9630,7 @@ do_show_ib(int argc, char *argv[], const char *use)
 	if (state.is_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, ib_fields, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, state.is_parsable, ofmt);
+	ofmt_check(oferr, state.is_parsable, ofmt, die, warn);
 	state.is_ofmt = ofmt;
 
 	/*
@@ -10455,7 +10431,7 @@ do_show_overlay(int argc, char *argv[], const char *use)
 		fields_str = NULL;
 
 	oferr = ofmt_open(fields_str, fieldsp, ofmtflags, 0, &ofmt);
-	dladm_ofmt_check(oferr, parse, ofmt);
+	ofmt_check(oferr, parse, ofmt, die, warn);
 
 	err = 0;
 	if (argc > optind) {

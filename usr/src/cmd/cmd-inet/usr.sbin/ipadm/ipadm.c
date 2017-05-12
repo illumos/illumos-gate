@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <arpa/inet.h>
@@ -62,6 +63,9 @@ static cmdfunc_t do_show_addrprop, do_set_addrprop, do_reset_addrprop;
 static cmdfunc_t do_create_addr, do_delete_addr, do_show_addr;
 static cmdfunc_t do_enable_addr, do_disable_addr;
 static cmdfunc_t do_up_addr, do_down_addr, do_refresh_addr;
+
+static void warn(const char *, ...);
+static void die(const char *, ...);
 
 typedef struct	cmd {
 	char		*c_name;
@@ -334,7 +338,6 @@ static char *progname;
 static void	die(const char *, ...);
 static void	die_opterr(int, int, const char *);
 static void	warn_ipadmerr(ipadm_status_t, const char *, ...);
-static void 	ipadm_ofmt_check(ofmt_status_t, boolean_t, ofmt_handle_t);
 static void 	ipadm_check_propstr(const char *, boolean_t, const char *);
 static void 	process_misc_addrargs(int, char **, const char *, int *,
 		    uint32_t *);
@@ -726,7 +729,7 @@ do_show_ifprop(int argc, char **argv, const char *use)
 	if (state.sps_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, intfprop_fields, ofmtflags, 0, &ofmt);
-	ipadm_ofmt_check(oferr, state.sps_parsable, ofmt);
+	ofmt_check(oferr, state.sps_parsable, ofmt, die, warn);
 	state.sps_ofmt = ofmt;
 
 	/* retrieve interface(s) and print the properties */
@@ -905,7 +908,7 @@ do_show_prop(int argc, char **argv, const char *use)
 	else
 		ofmtflags |= OFMT_WRAP;
 	oferr = ofmt_open(fields_str, modprop_fields, ofmtflags, 0, &ofmt);
-	ipadm_ofmt_check(oferr, state.sps_parsable, ofmt);
+	ofmt_check(oferr, state.sps_parsable, ofmt, die, warn);
 	state.sps_ofmt = ofmt;
 
 	/* handles all the errors */
@@ -1827,7 +1830,7 @@ do_show_addr(int argc, char *argv[], const char *use)
 		fields_str = def_fields_str;
 	oferr = ofmt_open(fields_str, show_addr_fields, ofmtflags, 0, &ofmt);
 
-	ipadm_ofmt_check(oferr, state.sa_parsable, ofmt);
+	ofmt_check(oferr, state.sa_parsable, ofmt, die, warn);
 	state.sa_ofmt = ofmt;
 
 	status = ipadm_addr_info(iph, ifname, &ainfo, 0, LIFC_DEFAULT);
@@ -1962,7 +1965,7 @@ do_show_if(int argc, char *argv[], const char *use)
 	if (state.si_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, show_if_fields, ofmtflags, 0, &ofmt);
-	ipadm_ofmt_check(oferr, state.si_parsable, ofmt);
+	ofmt_check(oferr, state.si_parsable, ofmt, die, warn);
 	state.si_ofmt = ofmt;
 	bzero(&sargs, sizeof (sargs));
 	sargs.si_state = &state;
@@ -2120,7 +2123,7 @@ do_show_addrprop(int argc, char *argv[], const char *use)
 	if (state.sps_parsable)
 		ofmtflags |= OFMT_PARSABLE;
 	oferr = ofmt_open(fields_str, addrprop_fields, ofmtflags, 0, &ofmt);
-	ipadm_ofmt_check(oferr, state.sps_parsable, ofmt);
+	ofmt_check(oferr, state.sps_parsable, ofmt, die, warn);
 	state.sps_ofmt = ofmt;
 
 	status = ipadm_addr_info(iph, ifname, &ainfop, 0, LIFC_DEFAULT);
@@ -2163,29 +2166,6 @@ do_show_addrprop(int argc, char *argv[], const char *use)
 	if (state.sps_retstatus != IPADM_SUCCESS) {
 		ipadm_close(iph);
 		exit(EXIT_FAILURE);
-	}
-}
-
-static void
-ipadm_ofmt_check(ofmt_status_t oferr, boolean_t parsable,
-    ofmt_handle_t ofmt)
-{
-	char buf[OFMT_BUFSIZE];
-
-	if (oferr == OFMT_SUCCESS)
-		return;
-	(void) ofmt_strerror(ofmt, oferr, buf, sizeof (buf));
-	/*
-	 * All errors are considered fatal in parsable mode.
-	 * NOMEM errors are always fatal, regardless of mode.
-	 * For other errors, we print diagnostics in human-readable
-	 * mode and processs what we can.
-	 */
-	if (parsable || oferr == OFMT_ENOFIELDS) {
-		ofmt_close(ofmt);
-		die(buf);
-	} else {
-		warn(buf);
 	}
 }
 

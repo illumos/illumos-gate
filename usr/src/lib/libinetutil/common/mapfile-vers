@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017 Joyent, Inc.
 #
 
 #
@@ -68,6 +69,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ofmt_print;
 	ofmt_update_winsize;
 	ofmt_strerror;
+	ofmt_check;
 	mask2plen;
 	plen2mask;
 	sockaddrcmp;
