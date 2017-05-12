@@ -118,6 +118,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_CURDIR,	/* /proc/<pid>/cwd	*/
 	LXPR_PID_ENV,		/* /proc/<pid>/environ	*/
 	LXPR_PID_EXE,		/* /proc/<pid>/exe	*/
+	LXPR_PID_GIDMAP,	/* /proc/<pid>/gid_map	*/
 	LXPR_PID_LIMITS,	/* /proc/<pid>/limits	*/
 	LXPR_PID_LOGINUID,	/* /proc/<pid>/loginuid	*/
 	LXPR_PID_MAPS,		/* /proc/<pid>/maps	*/
@@ -134,6 +135,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_TASK_IDDIR,	/* /proc/<pid>/task/<tid>		*/
 	LXPR_PID_FDDIR,		/* /proc/<pid>/fd	*/
 	LXPR_PID_FD_FD,		/* /proc/<pid>/fd/nn	*/
+	LXPR_PID_UIDMAP,	/* /proc/<pid>/uid_map	*/
 	LXPR_PID_TID_AUXV,	/* /proc/<pid>/task/<tid>/auxv		*/
 	LXPR_PID_TID_CGROUP,	/* /proc/<pid>/task/<tid>/cgroup	*/
 	LXPR_PID_TID_CMDLINE,	/* /proc/<pid>/task/<tid>/cmdline	*/
@@ -142,6 +144,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_TID_CURDIR,	/* /proc/<pid>/task/<tid>/cwd		*/
 	LXPR_PID_TID_ENV,	/* /proc/<pid>/task/<tid>/environ	*/
 	LXPR_PID_TID_EXE,	/* /proc/<pid>/task/<tid>/exe		*/
+	LXPR_PID_TID_GIDMAP,	/* /proc/<pid>/task/<tid>/gid_map	*/
 	LXPR_PID_TID_LIMITS,	/* /proc/<pid>/task/<tid>/limits	*/
 	LXPR_PID_TID_LOGINUID,	/* /proc/<pid>/task/<tid>/loginuid	*/
 	LXPR_PID_TID_MAPS,	/* /proc/<pid>/task/<tid>/maps		*/
@@ -155,6 +158,7 @@ typedef enum lxpr_nodetype {
 	LXPR_PID_TID_STATUS,	/* /proc/<pid>/task/<tid>/status	*/
 	LXPR_PID_TID_FDDIR,	/* /proc/<pid>/task/<tid>/fd		*/
 	LXPR_PID_TID_FD_FD,	/* /proc/<pid>/task/<tid>/fd/nn		*/
+	LXPR_PID_TID_UIDMAP,	/* /proc/<pid>/task/<tid>/uid_map	*/
 	LXPR_CGROUPS,		/* /proc/cgroups	*/
 	LXPR_CMDLINE,		/* /proc/cmdline	*/
 	LXPR_CPUINFO,		/* /proc/cpuinfo	*/
