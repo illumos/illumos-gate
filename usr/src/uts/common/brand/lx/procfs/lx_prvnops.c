@@ -187,6 +187,7 @@ static void lxpr_read_pid_cgroup(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_comm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_env(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_pid_id_map(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_limits(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_loginuid(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_maps(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -383,6 +384,7 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_CURDIR,	"cwd" },
 	{ LXPR_PID_ENV,		"environ" },
 	{ LXPR_PID_EXE,		"exe" },
+	{ LXPR_PID_GIDMAP,	"gid_map" },
 	{ LXPR_PID_LIMITS,	"limits" },
 	{ LXPR_PID_LOGINUID,	"loginuid" },
 	{ LXPR_PID_MAPS,	"maps" },
@@ -396,7 +398,8 @@ static lxpr_dirent_t piddir[] = {
 	{ LXPR_PID_STATM,	"statm" },
 	{ LXPR_PID_STATUS,	"status" },
 	{ LXPR_PID_TASKDIR,	"task" },
-	{ LXPR_PID_FDDIR,	"fd" }
+	{ LXPR_PID_FDDIR,	"fd" },
+	{ LXPR_PID_UIDMAP,	"uid_map" }
 };
 
 #define	PIDDIRFILES	(sizeof (piddir) / sizeof (piddir[0]))
@@ -413,6 +416,7 @@ static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_CURDIR,	"cwd" },
 	{ LXPR_PID_ENV,		"environ" },
 	{ LXPR_PID_EXE,		"exe" },
+	{ LXPR_PID_GIDMAP,	"gid_map" },
 	{ LXPR_PID_LIMITS,	"limits" },
 	{ LXPR_PID_LOGINUID,	"loginuid" },
 	{ LXPR_PID_MAPS,	"maps" },
@@ -424,7 +428,8 @@ static lxpr_dirent_t tiddir[] = {
 	{ LXPR_PID_TID_STAT,	"stat" },
 	{ LXPR_PID_STATM,	"statm" },
 	{ LXPR_PID_TID_STATUS,	"status" },
-	{ LXPR_PID_FDDIR,	"fd" }
+	{ LXPR_PID_FDDIR,	"fd" },
+	{ LXPR_PID_UIDMAP,	"uid_map" }
 };
 
 #define	TIDDIRFILES	(sizeof (tiddir) / sizeof (tiddir[0]))
@@ -761,6 +766,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/<pid>/cwd	*/
 	lxpr_read_pid_env,		/* /proc/<pid>/environ	*/
 	lxpr_read_invalid,		/* /proc/<pid>/exe	*/
+	lxpr_read_pid_id_map,		/* /proc/<pid>/gid_map	*/
 	lxpr_read_pid_limits,		/* /proc/<pid>/limits	*/
 	lxpr_read_pid_loginuid,		/* /proc/<pid>/loginuid	*/
 	lxpr_read_pid_maps,		/* /proc/<pid>/maps	*/
@@ -777,6 +783,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_isdir,		/* /proc/<pid>/task/nn	*/
 	lxpr_read_isdir,		/* /proc/<pid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/fd/nn	*/
+	lxpr_read_pid_id_map,		/* /proc/<pid>/uid_map	*/
 	lxpr_read_pid_auxv,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_read_pid_cgroup,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/task/<tid>/cmdline */
@@ -785,6 +792,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/cwd	*/
 	lxpr_read_pid_env,		/* /proc/<pid>/task/<tid>/environ */
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/exe	*/
+	lxpr_read_pid_id_map,		/* /proc/<pid>/task/<tid>/gid_map */
 	lxpr_read_pid_limits,		/* /proc/<pid>/task/<tid>/limits */
 	lxpr_read_pid_loginuid,		/* /proc/<pid>/task/<tid>/loginuid */
 	lxpr_read_pid_maps,		/* /proc/<pid>/task/<tid>/maps	*/
@@ -798,6 +806,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_tid_status,	/* /proc/<pid>/task/<tid>/status */
 	lxpr_read_isdir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_read_fd,			/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_read_pid_id_map,		/* /proc/<pid>/task/<tid>/uid_map */
 	lxpr_read_cgroups,		/* /proc/cgroups	*/
 	lxpr_read_cmdline,		/* /proc/cmdline	*/
 	lxpr_read_cpuinfo,		/* /proc/cpuinfo	*/
@@ -905,6 +914,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/cwd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/environ	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/exe	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/gid_map	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/limits	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/loginuid	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/maps	*/
@@ -921,6 +931,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_lookup_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/uid_map	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
@@ -929,6 +940,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/cwd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/exe	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/gid_map */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/limits */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/loginuid */
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
@@ -942,6 +954,7 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
 	lxpr_lookup_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_lookup_not_a_dir,		/* /proc/<pid>/task/<tid>/uid_map */
 	lxpr_lookup_not_a_dir,		/* /proc/cgroups	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_lookup_not_a_dir,		/* /proc/cpuinfo	*/
@@ -1049,6 +1062,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/cwd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/environ	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/exe	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/gid_map	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/limits	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/loginuid	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/maps	*/
@@ -1065,6 +1079,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_task_tid_dir,	/* /proc/<pid>/task/nn	*/
 	lxpr_readdir_fddir,		/* /proc/<pid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/fd/nn	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/uid_map	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cmdline */
@@ -1073,6 +1088,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/cwd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/environ */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/exe	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/gid_map */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/limits */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/loginuid */
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/maps	*/
@@ -1086,6 +1102,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/status */
 	lxpr_readdir_fddir,		/* /proc/<pid>/task/<tid>/fd	*/
 	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/fd/nn	*/
+	lxpr_readdir_not_a_dir,		/* /proc/<pid>/task/<tid>/uid_map */
 	lxpr_readdir_not_a_dir,		/* /proc/cgroups	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cmdline	*/
 	lxpr_readdir_not_a_dir,		/* /proc/cpuinfo	*/
@@ -1598,6 +1615,17 @@ lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		lxpr_uiobuf_printf(uiobuf, " %-10s\n",
 		    lxpr_rlimtab[i].rlim_unit);
 	}
+}
+/*
+ * lxpr_read_pid_id_map(): gid_map and uid_map file
+ */
+static void
+lxpr_read_pid_id_map(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_GIDMAP ||
+	    lxpnp->lxpr_type == LXPR_PID_UIDMAP);
+
+	lxpr_uiobuf_printf(uiobuf, "%10u %10u %10u\n", 0, 0, MAXUID);
 }
 
 /*
