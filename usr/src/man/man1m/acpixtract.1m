@@ -8,9 +8,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.Dd Aug 2, 2016
+.Dd May 12, 2017
 .Dt ACPIXTRACT 1M
 .Os
 .Sh NAME
@@ -60,5 +60,54 @@ Get the table with the specified signature.
 .It Fl v
 Print the version.
 .El
+.Sh EXAMPLES
+.Sy Example 1
+Extract all ACPI tables
+.Pp
+The following example extracts all of the individual ACPI tables from a
+previously created dump of the ACPI tables from a running system.
+Such a dump can be created with the
+.Xr acpidump 1M
+utility.
+Extracted tables can then be inspected or disassembled by the
+iasl utility on any platform.
+.Bd -literal -offset width
+# acpixtract -a acpi.dat
+
+Intel ACPI Component Architecture
+ACPI Binary Table Extraction Utility version 20160527-32
+Copyright (c) 2000 - 2016 Intel Corporation
+
+Acpi table [RSDP] -      36 bytes written to rsdp.dat
+Acpi table [RSDT] -     128 bytes written to rsdt.dat
+Acpi table [XSDT] -     220 bytes written to xsdt.dat
+Acpi table [DSDT] -  213221 bytes written to dsdt.dat
+Acpi table [FACS] -      64 bytes written to facs.dat
+Acpi table [FACP] -     268 bytes written to facp.dat
+Acpi table [APIC] -     884 bytes written to apic.dat
+Acpi table [FPDT] -      68 bytes written to fpdt.dat
+Acpi table [FIDT] -     156 bytes written to fidt.dat
+Acpi table [SPMI] -      65 bytes written to spmi.dat
+Acpi table [MCFG] -      60 bytes written to mcfg.dat
+Acpi table [UEFI] -      66 bytes written to uefi.dat
+Acpi table [MCEJ] -     304 bytes written to mcej.dat
+Acpi table [HPET] -      56 bytes written to hpet.dat
+Acpi table [MSCT] -     144 bytes written to msct.dat
+Acpi table [SLIT] -      48 bytes written to slit.dat
+Acpi table [SRAT] -    4440 bytes written to srat.dat
+Acpi table [WDDT] -      64 bytes written to wddt.dat
+Acpi table [SSDT] -   94529 bytes written to ssdt1.dat
+Acpi table [NITR] -     113 bytes written to nitr.dat
+Acpi table [SSDT] -    9802 bytes written to ssdt2.dat
+Acpi table [SSDT] -     100 bytes written to ssdt3.dat
+Acpi table [PRAD] -     191 bytes written to prad.dat
+Acpi table [DMAR] -     328 bytes written to dmar.dat
+Acpi table [HEST] -     168 bytes written to hest.dat
+Acpi table [BERT] -      48 bytes written to bert.dat
+Acpi table [ERST] -     560 bytes written to erst.dat
+Acpi table [EINJ] -     336 bytes written to einj.dat
+
+28 binary ACPI tables extracted
+.Ed
 .Sh SEE ALSO
 .Xr acpidump 1M
