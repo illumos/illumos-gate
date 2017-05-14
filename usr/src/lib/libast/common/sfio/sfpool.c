@@ -288,7 +288,8 @@ reg int		mode;
 
 	/* f already in the same pool with pf */
 	if(f == pf || (pf && f->pool == pf->pool && f->pool != &_Sfpool) )
-	{	if(f)
+	{
+		if(f)
 			SFMTXUNLOCK(f);
 		if(pf)
 			SFMTXUNLOCK(pf);
