@@ -37,13 +37,6 @@
  * XDR routines for the rpcbinder version 3.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint) && defined(SCCSIDS)
-static char sccsid[] = "@(#)rpcb_prot.c 1.9 89/04/21 Copyr 1984 Sun Micro";
-#endif
-
-
 #include <rpc/rpc.h>
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -73,7 +66,7 @@ xdr_rpcb(XDR *xdrs, RPCB *objp)
 bool_t
 xdr_rpcb_rmtcallargs(XDR *xdrs, struct rpcb_rmtcallargs *objp)
 {
-	u_int lenposition, argposition, position;
+	uint_t lenposition, argposition, position;
 
 	if (!xdr_rpcprog(xdrs, &objp->prog))
 		return (FALSE);
@@ -86,15 +79,15 @@ xdr_rpcb_rmtcallargs(XDR *xdrs, struct rpcb_rmtcallargs *objp)
 	 */
 	lenposition = XDR_GETPOS(xdrs);
 	if (!xdr_u_int(xdrs, &(objp->arglen)))
-	    return (FALSE);
+		return (FALSE);
 	argposition = XDR_GETPOS(xdrs);
 	if (!(*(objp->xdr_args))(xdrs, objp->args_ptr))
-	    return (FALSE);
+		return (FALSE);
 	position = XDR_GETPOS(xdrs);
-	objp->arglen = (u_int)position - (u_int)argposition;
+	objp->arglen = position - argposition;
 	XDR_SETPOS(xdrs, lenposition);
 	if (!xdr_u_int(xdrs, &(objp->arglen)))
-	    return (FALSE);
+		return (FALSE);
 	XDR_SETPOS(xdrs, position);
 	return (TRUE);
 }
@@ -116,21 +109,43 @@ xdr_rpcb_rmtcallres(XDR *xdrs, struct rpcb_rmtcallres *objp)
 bool_t
 xdr_netbuf(XDR *xdrs, struct netbuf *objp)
 {
-	/*
-	 * If we're decoding and the caller has already allocated a buffer,
-	 * throw away maxlen, since it doesn't apply to the caller's
-	 * buffer.  xdr_bytes will return an error if the buffer isn't big
-	 * enough.
-	 */
-	if (xdrs->x_op == XDR_DECODE && objp->buf != NULL) {
-		u_int maxlen;
+	bool_t res;
 
-		if (!xdr_u_int(xdrs, &maxlen))
-			return (FALSE);
-	} else {
-		if (!xdr_u_int(xdrs, (u_int *)&objp->maxlen))
-			return (FALSE);
-	}
-	return (xdr_bytes(xdrs, (char **)&(objp->buf),
-	    (u_int *)&(objp->len), objp->maxlen));
+	/*
+	 * Save the passed in maxlen value and buf pointer.  We might
+	 * need them later.
+	 */
+	uint_t maxlen_save = objp->maxlen;
+	void *buf_save = objp->buf;
+
+	if (!xdr_u_int(xdrs, &objp->maxlen))
+		return (FALSE);
+
+	/*
+	 * We need to free maxlen, not len, so do it explicitly now.
+	 */
+	if (xdrs->x_op == XDR_FREE)
+		return (xdr_bytes(xdrs, &objp->buf, &objp->maxlen,
+		    objp->maxlen));
+
+	/*
+	 * If we're decoding and the caller has already allocated a
+	 * buffer restore the maxlen value since the decoded value
+	 * doesn't apply to the caller's buffer.  xdr_bytes() will
+	 * return an error if the buffer isn't big enough.
+	 */
+	if (xdrs->x_op == XDR_DECODE && objp->buf != NULL)
+		objp->maxlen = maxlen_save;
+
+	res = xdr_bytes(xdrs, &objp->buf, &objp->len, objp->maxlen);
+
+	/*
+	 * If we are decoding and the buffer was allocated in the
+	 * xdr_bytes() function we need to set maxlen properly to
+	 * follow the netbuf semantics.
+	 */
+	if (xdrs->x_op == XDR_DECODE && objp->buf != buf_save)
+		objp->maxlen = objp->len;
+
+	return (res);
 }

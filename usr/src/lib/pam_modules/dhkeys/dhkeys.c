@@ -249,7 +249,7 @@ establish_key(pam_handle_t *pamh, int flags, int debug, char *netname)
 	if (err != 1) {
 		if (debug)
 			syslog(LOG_DEBUG, "pam_dhkeys: user2netname failed");
-			result = PAM_SYSTEM_ERR;
+		result = PAM_SYSTEM_ERR;
 		goto out;
 	}
 
