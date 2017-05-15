@@ -3,13 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH XDR_ADMIN 3NSL "Dec 30, 1996"
+.TH XDR_ADMIN 3NSL "May 15, 2017"
 .SH NAME
 xdr_admin, xdr_control, xdr_getpos, xdr_inline, xdrrec_endofrecord, xdrrec_eof,
 xdrrec_readbytes, xdrrec_skiprecord, xdr_setpos, xdr_sizeof \- library routines
 for external data representation
 .SH DESCRIPTION
-.sp
 .LP
 \fBXDR\fR library routines allow C programmers to describe arbitrary data
 structures in a machine-independent fashion. Protocols such as remote procedure
@@ -18,7 +17,6 @@ calls (RPC) use these routines to describe the format of the data.
 .LP
 These routines deal specifically with the management of the \fBXDR\fR stream.
 .SS "Routines"
-.sp
 .LP
 See \fBrpc\fR(3NSL) for the definition of the \fBXDR\fR data structure. Note
 that any buffers passed to the \fBXDR\fR routines must be properly aligned.  It
@@ -62,16 +60,15 @@ written for portability should not depend on this feature.
 .sp
 .ne 2
 .na
-\fB\fBlong *xdr_inline(XDR *\fR\fIxdrs\fR\fB, const int \fR\fIlen\fR\fB);\fR\fR
+\fB\fBrpc_inline_t *xdr_inline(XDR *\fR\fIxdrs\fR\fB, int \fR\fIlen\fR\fB);\fR\fR
 .ad
 .sp .6
 .RS 4n
 A macro that invokes the in-line routine associated with the \fBXDR\fR stream,
 \fIxdrs\fR. The routine returns a pointer to a contiguous piece of the stream's
-buffer; \fIlen\fR is the byte length of the desired buffer. Note: pointer is
-cast to \fBlong *\fR.
+buffer; \fIlen\fR is the byte length of the desired buffer.
 .sp
-Warning: \fBxdr_inline()\fR may return \fINULL\fR (\fB0\fR) if it cannot
+Warning: \fBxdr_inline()\fR may return \fINULL\fR if it cannot
 allocate a contiguous piece of a buffer. Therefore the behavior may vary among
 stream instances; it exists for the sake of efficiency, and applications
 written for portability should not depend on this feature.
@@ -80,14 +77,14 @@ written for portability should not depend on this feature.
 .sp
 .ne 2
 .na
-\fB\fBbool_t xdrrec_endofrecord(XDR *xdrs, int \fR\fIsendnow\fR\fB);\fR\fR
+\fB\fBbool_t xdrrec_endofrecord(XDR *\fR\fIxdrs\fR\fB, bool_t \fR\fIsendnow\fR\fB);\fR\fR
 .ad
 .sp .6
 .RS 4n
 This routine can be invoked only on streams created by \fBxdrrec_create()\fR.
 See \fBxdr_create\fR(3NSL). The data in the output buffer is marked as a
 completed record, and the output buffer is optionally written out if
-\fIsendnow\fR is non-zero. This routine returns \fBTRUE\fR if it succeeds,
+\fIsendnow\fR is \fBTRUE\fR. This routine returns \fBTRUE\fR if it succeeds,
 \fBFALSE\fR otherwise.
 .RE
 
@@ -107,7 +104,7 @@ returns  \fBFALSE\fR if there is additional data in the stream's input buffer.
 .sp
 .ne 2
 .na
-\fB\fBint xdrrec_readbytes(XDR *\fR\fIxdrs\fR\fB, caddr_t\fR\fI addr\fR\fB,
+\fB\fBuint_t xdrrec_readbytes(XDR *\fR\fIxdrs\fR\fB, caddr_t\fR\fI addr\fR\fB,
 uint_t\fR\fI nbytes\fR\fB);\fR\fR
 .ad
 .sp .6
@@ -153,7 +150,7 @@ applications written for portability should not depend on this feature.
 .sp
 .ne 2
 .na
-\fB\fBunsigned long xdr_sizeof(xdrproc_t \fR\fIfunc\fR\fB, void
+\fB\fBuint_t xdr_sizeof(xdrproc_t \fR\fIfunc\fR\fB, void
 *\fR\fIdata\fR\fB);\fR\fR
 .ad
 .sp .6
@@ -168,7 +165,6 @@ outside of the \fBRPC\fR subsystem.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -184,7 +180,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmalloc\fR(3C), \fBrpc\fR(3NSL), \fBxdr_complex\fR(3NSL),
 \fBxdr_create\fR(3NSL), \fBxdr_simple\fR(3NSL), \fBattributes\fR(5)
