@@ -10,9 +10,33 @@
 #
 
 #
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
 
-SUBDIRS = poll secflags sigqueue spoof-ras sdevfs stress file-locking
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+PROG = dladm-kstat
+
+ROOTOPTPKG = $(ROOT)/opt/os-tests
+TESTDIR = $(ROOTOPTPKG)/tests/stress
+
+CMDS = $(PROG:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all: $(PROG)
+
+install: all $(CMDS)
+
+clobber: clean
+
+clean:
+	-$(RM) $(PROG)
+
+$(CMDS): $(TESTDIR) $(PROG)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)
