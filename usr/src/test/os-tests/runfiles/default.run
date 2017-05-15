@@ -48,5 +48,9 @@ tests = ['sigqueue_queue_size']
 user = root
 tests = ['sdevfs_eisdir']
 
+[/opt/os-tests/tests/stress]
+user = root
+tests = ['dladm-kstat']
+
 [/opt/os-tests/tests/file-locking]
 tests = ['runtests.32', 'runtests.64']
