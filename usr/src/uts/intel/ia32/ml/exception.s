@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 /*
@@ -667,6 +668,9 @@ _emul_done:
 	ALTENTRY(ndptrap_frstor)
 	.globl  _patch_xrstorq_rbx
 _patch_xrstorq_rbx:
+	nop
+	nop
+	nop
 	FXRSTORQ	((%rbx))
 	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
 	je	.return_to_kernel
@@ -742,6 +746,9 @@ _patch_xrstorq_rbx:
 	ALTENTRY(ndptrap_frstor)
 	.globl  _patch_xrstorq_rbx
 _patch_xrstorq_rbx:
+	nop
+	nop
+	nop
 	FXRSTORQ	((%rbx))
 	popq	%rdx
 	popq	%rbx
@@ -808,8 +815,10 @@ _patch_xrstorq_rbx:
 _patch_fxrstor_ebx:
 	.globl  _patch_xrstor_ebx
 _patch_xrstor_ebx:
-	frstor	(%ebx)		/* may be patched to fxrstor */
-	nop			/* (including this byte) */
+	frstor	(%ebx)		/* may be patched to fxrstor or xrstor */
+	nop			/* (including these bytes) */
+	nop
+	nop
 	popl	%gs
 	popl	%ds
 	popl	%edx

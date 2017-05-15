@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -36,6 +37,12 @@
 #include <sys/cmn_err.h>
 
 #define	XMM_ALIGN	16
+
+/*
+ * See section 13.4 in the Intel 64 and IA-32 Architectures Software
+ * Developer’s Manual, Volume 1.
+ */
+#define	XSAVE_ALIGN	64
 
 /*
  * If fpu_exists is non-zero, fpu_probe will attempt to use any
@@ -163,6 +170,9 @@ fpu_probe(void)
 				fp_save_mech = FP_XSAVE;
 				fpsave_ctxt = xsave_ctxt;
 				patch_xsave();
+				xsave_cachep = kmem_cache_create("xsave_cache",
+				    cpuid_get_xsave_size(), XSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
 			}
 		}
 #elif defined(__i386)
@@ -190,6 +200,9 @@ fpu_probe(void)
 				fp_save_mech = FP_XSAVE;
 				fpsave_ctxt = xsave_ctxt;
 				patch_xsave();
+				xsave_cachep = kmem_cache_create("xsave_cache",
+				    cpuid_get_xsave_size(), XSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
 			} else {
 				patch_sse();	/* use fxrstor */
 			}

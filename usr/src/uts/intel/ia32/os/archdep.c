@@ -25,7 +25,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -307,10 +307,10 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 
 	case FP_XSAVE:
 		fpregset_to_fxsave(fp,
-		    &fpu->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave);
+		    &fpu->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave);
 		fpu->fpu_regs.kfpu_xstatus =
 		    fp->fp_reg_set.fpchip_state.xstatus;
-		fpu->fpu_regs.kfpu_u.kfpu_xs.xs_xstate_bv |=
+		fpu->fpu_regs.kfpu_u.kfpu_xs->xs_xstate_bv |=
 		    (XFEATURE_LEGACY_FP | XFEATURE_SSE);
 		break;
 	default:
@@ -370,7 +370,7 @@ getfpregs(klwp_t *lwp, fpregset_t *fp)
 			break;
 		case FP_XSAVE:
 			fxsave_to_fpregset(
-			    &fpu->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave, fp);
+			    &fpu->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave, fp);
 			fp->fp_reg_set.fpchip_state.xstatus =
 			    fpu->fpu_regs.kfpu_xstatus;
 			break;

@@ -746,6 +746,8 @@ grow:
 		BROP(p)->b_initlwp_post(lwp);
 	}
 
+	lwp_fp_init(lwp);
+
 	if (state == TS_RUN) {
 		/*
 		 * We set the new lwp running immediately.

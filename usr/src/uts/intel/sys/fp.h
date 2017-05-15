@@ -233,10 +233,13 @@ struct fxsave_state {
  * This structure is written to memory by an 'xsave' instruction.
  * First 512 byte is compatible with the format of an 'fxsave' area.
  *
- * The current size is AVX_XSAVE_SIZE (832 bytes), asserted in fpnoextflt().
- * Enabling MPX and AVX512 requires a total size of 2696 bytes. The locations
- * and size of new, extended components are determined dynamically by
- * querying the CPU. See the xsave_info structure in cpuid.c.
+ * The size is at least AVX_XSAVE_SIZE (832 bytes), asserted in fpnoextflt().
+ * Enabling additional xsave-related CPU features increases the size.
+ * We dynamically allocate the per-lwp xsave area at runtime, based on the
+ * size needed for the CPU-specific features. The xsave_state structure simply
+ * defines the legacy layout of the beginning of the xsave area. The locations
+ * and size of new, extended components are determined dynamically by querying
+ * the CPU. See the xsave_info structure in cpuid.c.
  */
 struct xsave_state {
 	struct fxsave_state	xs_fxsave;
@@ -255,7 +258,7 @@ typedef struct {
 #if defined(__i386)
 		struct fnsave_state kfpu_fn;
 #endif
-		struct xsave_state kfpu_xs;
+		struct xsave_state *kfpu_xs;
 	} kfpu_u;
 	uint32_t kfpu_status;		/* saved at #mf exception */
 	uint32_t kfpu_xstatus;		/* saved at #xm exception */
@@ -305,6 +308,10 @@ extern int fpextovrflt(struct regs *);
 extern int fpexterrflt(struct regs *);
 extern int fpsimderrflt(struct regs *);
 extern void fpsetcw(uint16_t, uint32_t);
+struct _klwp;
+extern void fp_lwp_init(struct _klwp *);
+extern void fp_lwp_cleanup(struct _klwp *);
+extern void fp_lwp_dup(struct _klwp *);
 
 #endif	/* _KERNEL */
 

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*      Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -203,10 +204,11 @@ _lfence_ret_insn:			/ see membar_consumer()
 	/
 	/	frstor (%ebx); nop	-> xrstor (%ebx)
 	/
-	_HOT_PATCH(_xrstor_ebx_insn, _patch_xrstor_ebx, 3)
+	_HOT_PATCH(_xrstor_ebx_insn, _patch_xrstor_ebx, 5)
 	_HOT_PATCH_EPILOG
 	ret
 _xrstor_ebx_insn:			/ see ndptrap_frstor()
+	movl	(%ebx), %ebx
 	#xrstor (%ebx)
 	.byte	0x0f, 0xae, 0x2b
 	SET_SIZE(patch_xsave)
@@ -232,12 +234,14 @@ patch_xsave(void)
 	pushq	%rbp
 	pushq	%r15
 	/
+	/	nop; nop; nop;		-> movq(%rbx), %rbx
 	/	FXRSTORQ (%rbx);	-> xrstor (%rbx)
-	/ hot_patch(_xrstor_rbx_insn, _patch_xrstorq_rbx, 4)
+	/ loop doing the following for 7 bytes:
+	/     hot_patch_kernel_text(_patch_xrstorq_rbx, _xrstor_rbx_insn, 1)
 	/
 	leaq	_patch_xrstorq_rbx(%rip), %rbx
 	leaq	_xrstor_rbx_insn(%rip), %rbp
-	movq	$4, %r15
+	movq	$7, %r15
 1:
 	movq	%rbx, %rdi			/* patch address */
 	movzbq	(%rbp), %rsi			/* instruction byte */
@@ -254,6 +258,7 @@ patch_xsave(void)
 	ret
 
 _xrstor_rbx_insn:			/ see ndptrap_frstor()
+	movq	(%rbx), %rbx
 	#rex.W=1 (.byte 0x48)
 	#xrstor (%rbx)
 	.byte	0x48, 0x0f, 0xae, 0x2b
@@ -327,6 +332,7 @@ fpnsave_ctxt(void *arg)
 	movl	FPU_CTX_FPU_XSAVE_MASK(%rdi), %eax
 	movl	FPU_CTX_FPU_XSAVE_MASK+4(%rdi), %edx
 	leaq	FPU_CTX_FPU_REGS(%rdi), %rsi
+	movq	(%rsi), %rsi	/* load fpu_regs.kfpu_u.kfpu_xs pointer */
 	#xsave	(%rsi)
 	.byte	0x0f, 0xae, 0x26
 	
@@ -387,6 +393,7 @@ fpnsave_ctxt(void *arg)
 	movl	FPU_CTX_FPU_XSAVE_MASK(%ecx), %eax
 	movl	FPU_CTX_FPU_XSAVE_MASK+4(%ecx), %edx
 	leal	FPU_CTX_FPU_REGS(%ecx), %ecx
+	movl	(%ecx), %ecx	/* load fpu_regs.kfpu_u.kfpu_xs pointer */
 	#xsave	(%ecx)
 	.byte	0x0f, 0xae, 0x21
 	

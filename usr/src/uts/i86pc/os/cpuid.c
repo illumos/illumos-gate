@@ -282,11 +282,12 @@ struct mwait_info {
 /*
  * xsave/xrestor info.
  *
- * This structure contains HW feature bits and size of the xsave save area.
- * Note: the kernel uses a fixed size (AVX_XSAVE_SIZE) to store supported
- * hardware features. Our xsave area does not handle new features beyond AVX
- * and it does not optimize for potential memory savings if features in the
- * middle or end of the save area are not enabled.
+ * This structure contains HW feature bits and the size of the xsave save area.
+ * Note: the kernel declares a fixed size (AVX_XSAVE_SIZE) structure
+ * (xsave_state) to describe the xsave layout. However, at runtime the
+ * per-lwp xsave area is dynamically allocated based on xsav_max_size. The
+ * xsave_state structure simply represents the legacy layout of the beginning
+ * of the xsave area.
  */
 struct xsave_info {
 	uint32_t	xsav_hw_features_low;   /* Supported HW features */
@@ -3529,6 +3530,13 @@ cpuid_get_addrsize(cpu_t *cpu, uint_t *pabits, uint_t *vabits)
 		*pabits = cpi->cpi_pabits;
 	if (vabits)
 		*vabits = cpi->cpi_vabits;
+}
+
+size_t
+cpuid_get_xsave_size()
+{
+	return (MAX(cpuid_info0.cpi_xsave.xsav_max_size,
+	    sizeof (struct xsave_state)));
 }
 
 /*

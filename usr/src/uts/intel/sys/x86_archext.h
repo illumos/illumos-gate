@@ -787,6 +787,7 @@ extern uint_t cpuid_get_procnodeid(struct cpu *cpu);
 extern uint_t cpuid_get_procnodes_per_pkg(struct cpu *cpu);
 extern uint_t cpuid_get_compunitid(struct cpu *cpu);
 extern uint_t cpuid_get_cores_per_compunit(struct cpu *cpu);
+extern size_t cpuid_get_xsave_size();
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);
