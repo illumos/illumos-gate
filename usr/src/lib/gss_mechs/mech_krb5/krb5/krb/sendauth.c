@@ -77,14 +77,15 @@ krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointe
 	 * Now, read back a byte: 0 means no error, 1 means bad sendauth
 	 * version, 2 means bad application version
 	 */
-    if ((len = krb5_net_read(context, *((int *) fd), (char *)&result, 1)) != 1)
-	return((len < 0) ? errno : ECONNABORTED);
-    if (result == 1)
-	return(KRB5_SENDAUTH_BADAUTHVERS);
-    else if (result == 2)
-	return(KRB5_SENDAUTH_BADAPPLVERS);
-    else if (result != 0)
-	return(KRB5_SENDAUTH_BADRESPONSE);
+	len = krb5_net_read(context, *((int *) fd), (char *)&result, 1);
+	if (len != 1)
+		return((len < 0) ? errno : ECONNABORTED);
+	if (result == 1)
+		return(KRB5_SENDAUTH_BADAUTHVERS);
+	else if (result == 2)
+		return(KRB5_SENDAUTH_BADAPPLVERS);
+	else if (result != 0)
+		return(KRB5_SENDAUTH_BADRESPONSE);
 	/*
 	 * We're finished with the initial negotiations; let's get and
 	 * send over the authentication header.  (The AP_REQ message)

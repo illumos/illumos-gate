@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -155,9 +153,9 @@ ldap_sort_strcasecmp(
     /* XXXceb
      * I am not 100% sure this is the way this should be handled.  
      * For now we will return a 0 on invalid.
-     */    
-    if (NULL == a || NULL == b)
-        return (0);
+     */
+	if (NULL == a || NULL == b)
+		return (0);
 	return( strcasecmp( (char *)*a, (char *)*b ) );
 }
 

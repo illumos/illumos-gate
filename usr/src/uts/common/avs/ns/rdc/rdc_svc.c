@@ -3077,25 +3077,3 @@ static rdcsrv_t rdc_srvtab[] = {
 	{ rdc_disptab6, sizeof (rdc_disptab6) / sizeof (*rdc_disptab6) },
 	{ rdc_disptab7, sizeof (rdc_disptab7) / sizeof (*rdc_disptab7) }
 };
-
-bool_t
-rdc_xdr_netbuf(XDR *xdrs, struct netbuf *objp)
-{
-	/*
-	 * If we're decoding and the caller has already allocated a buffer,
-	 * throw away maxlen, since it doesn't apply to the caller's
-	 * buffer.  xdr_bytes will return an error if the buffer isn't big
-	 * enough.
-	 */
-	if (xdrs->x_op == XDR_DECODE && objp->buf != NULL) {
-		uint_t maxlen;
-
-		if (!xdr_u_int(xdrs, &maxlen))
-			return (FALSE);
-	} else {
-		if (!xdr_u_int(xdrs, (uint_t *)&objp->maxlen))
-			return (FALSE);
-	}
-	return (xdr_bytes(xdrs, (char **)&(objp->buf),
-	    (uint_t *)&(objp->len), objp->maxlen));
-}
