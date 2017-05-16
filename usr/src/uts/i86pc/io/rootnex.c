@@ -2174,7 +2174,7 @@ out:
 	 */
 	if ((sinfo->si_copybuf_req == 0) &&
 	    (sinfo->si_sgl_size <= (unsigned)attr->dma_attr_sgllen) &&
-	    (dmao->dmao_size < dma->dp_maxxfer)) {
+	    (dmao->dmao_size <= dma->dp_maxxfer)) {
 fast:
 		/*
 		 * If the driver supports FMA, insert the handle in the FMA DMA
