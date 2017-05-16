@@ -316,9 +316,10 @@ ndmp_smf_create_service_pgroup(ndmp_scfhandle_t *handle, const char *pgroup)
 	 */
 	if (handle->scf_pg == NULL) {
 		if ((handle->scf_pg =
-		    scf_pg_create(handle->scf_handle)) == NULL)
+		    scf_pg_create(handle->scf_handle)) == NULL) {
 			ndmp_errno = ENDMP_SMF_INTERNAL;
 			return (-1);
+		}
 	}
 
 	/*

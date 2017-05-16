@@ -38,9 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * Routines to handle insertion, deletion, etc on the table
  * of requests kept by the daemon. Nothing fancy here, linear
@@ -249,7 +246,7 @@ delete_invite(int id_num)
 	while (ptr != NULL && ptr->request.id_num != id_num) {
 		if (debug)
 			print_request(&ptr->request);
-			ptr = ptr->next;
+		ptr = ptr->next;
 	}
 
 	if (ptr != NULL) {

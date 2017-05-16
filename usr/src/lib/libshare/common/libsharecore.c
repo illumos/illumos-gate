@@ -436,7 +436,7 @@ adddfsentry(xfs_sharelist_t *list, sa_share_t share, char *proto)
 		} else {
 			for (tmp = list; tmp->next != NULL; tmp = tmp->next)
 				/* do nothing */;
-				tmp->next = item;
+			tmp->next = item;
 		}
 	}
 	return (list);

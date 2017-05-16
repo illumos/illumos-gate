@@ -107,21 +107,21 @@ dump_status(cfp_t *cfp, char *str)
 {
 	printf("called from %s\n", str);
 	printf(gettext("Header info:\n"
-		"\tmagic: %x\tstate: %x\n"),
-		cfp->cf_head->h_magic, cfp->cf_head->h_state);
+	    "\tmagic: %x\tstate: %x\n"),
+	    cfp->cf_head->h_magic, cfp->cf_head->h_state);
 	printf(gettext("Parser section:\n"
-		"Start: %x\tsize: %d\toffset: %d\n"),
-		cfp->cf_mapped, cfp->cf_head->h_parsesize,
-		cfp->cf_head->h_parseoff);
+	    "Start: %x\tsize: %d\toffset: %d\n"),
+	    cfp->cf_mapped, cfp->cf_head->h_parsesize,
+	    cfp->cf_head->h_parseoff);
 	printf(gettext("Config section:\n"
-		"Start: %x\tsize:%d\tacsize: %d\n"),
-		cfp->cf_head->h_cparse, cfp->cf_head->h_csize,
-		cfp->cf_head->h_acsize);
+	    "Start: %x\tsize:%d\tacsize: %d\n"),
+	    cfp->cf_head->h_cparse, cfp->cf_head->h_csize,
+	    cfp->cf_head->h_acsize);
 	printf("\n\tccopy1: %x\tccopy2: %x\n",
-		cfp->cf_head->h_ccopy1, cfp->cf_head->h_ccopy2);
+	    cfp->cf_head->h_ccopy1, cfp->cf_head->h_ccopy2);
 	printf(gettext("Sequence:\n"
-		"\tseq1: %d\t\tseq2: %d\n"),
-		cfp->cf_head->h_seq1, cfp->cf_head->h_seq2);
+	    "\tseq1: %d\t\tseq2: %d\n"),
+	    cfp->cf_head->h_seq1, cfp->cf_head->h_seq2);
 }
 #endif /* DEBUG */
 
@@ -247,7 +247,7 @@ cfg_get_parser_offset(const char *section)
 
 	/* Handle failure */
 	cfg_perror_str = dgettext("cfg",
-		"cfg_get_parser_offset: section not found");
+	    "cfg_get_parser_offset: section not found");
 	cfg_severity = CFG_EFATAL;
 	errno = ESRCH;
 	return (-1);
@@ -503,19 +503,18 @@ cfg_get_cstring(CFGFILE *cfg, const char *key, void *value, int value_len)
 					if (*p == '-') {
 						strcpy(value, "");
 						return (0);
-					}
-					else
+					} else {
 						if (strlen(p) > value_len) {
 							errno = E2BIG;
 							cfg_perror_str =
-							dgettext("cfg",
-							strerror(errno));
+							    dgettext("cfg",
+							    strerror(errno));
 							cfg_severity =
-							CFG_ENONFATAL;
+							    CFG_ENONFATAL;
 							return (-1);
 						}
-
-						strncpy(value, p, value_len);
+					}
+					strncpy(value, p, value_len);
 
 					return (pos);
 				}
@@ -546,7 +545,8 @@ cfg_get_cstring(CFGFILE *cfg, const char *key, void *value, int value_len)
  */
 int
 cfg_find_cstring(CFGFILE *cfg, const char *target,
-    const char *section, int numflds, ...) {
+    const char *section, int numflds, ...)
+{
 
 	char **list = NULL;
 	va_list ap;
@@ -770,7 +770,7 @@ cfg_put_cstring(CFGFILE *cfg, const char *key,  void *value, int val_len)
 			if (cfp->cf_head->h_state & CFG_HDR_INVALID) {
 				if (!cfg_read(cfp)) {
 					cfg_perror_str =
-						dgettext("cfg", CFG_RDFAILED);
+					    dgettext("cfg", CFG_RDFAILED);
 					cfg_severity = CFG_EFATAL;
 					return (-1);
 				}
@@ -783,7 +783,7 @@ cfg_put_cstring(CFGFILE *cfg, const char *key,  void *value, int val_len)
 					break;
 				}
 				if (cfg_filter_node(cfg, &chead[0], tmpbuf,
-					section))
+				    section))
 					numfound++;
 
 				if (numfound == setnum)
@@ -808,8 +808,9 @@ cfg_put_cstring(CFGFILE *cfg, const char *key,  void *value, int val_len)
 		if (value == NULL) {
 			/* Remove entry completely */
 
-			if ((rc = ((*cfp->cf_pp->remcf)
-				    (cfp, table_index, relnum - secnum))) < 0)
+			rc = (*cfp->cf_pp->remcf)(cfp, table_index,
+			    relnum - secnum);
+			if (rc < 0)
 				return (rc);
 			return (0);
 		}
@@ -840,8 +841,8 @@ cfg_put_cstring(CFGFILE *cfg, const char *key,  void *value, int val_len)
 			cfg_insert_node(cfg, &chead[0], buf, section);
 		}
 
-		(*cfp->cf_pp->replacecf)
-			(cfp, bufp, table_index, relnum - secnum);
+		(*cfp->cf_pp->replacecf)(cfp, bufp, table_index,
+		    relnum - secnum);
 
 		return (TRUE);
 	}
@@ -863,7 +864,7 @@ cfg_put_cstring(CFGFILE *cfg, const char *key,  void *value, int val_len)
 			if (cfp->cf_head->h_state & CFG_HDR_INVALID) {
 				if (!cfg_read(cfp)) {
 					cfg_perror_str =
-						dgettext("cfg", CFG_RDFAILED);
+					    dgettext("cfg", CFG_RDFAILED);
 					cfg_severity = CFG_EFATAL;
 					return (-1);
 				}
@@ -876,7 +877,7 @@ cfg_put_cstring(CFGFILE *cfg, const char *key,  void *value, int val_len)
 					break;
 				}
 				if (cfg_filter_node(cfg, &chead[0], buf,
-					section))
+				    section))
 					numfound++;
 
 				if (numfound == setnum)
@@ -922,8 +923,8 @@ cfg_put_cstring(CFGFILE *cfg, const char *key,  void *value, int val_len)
 			    newbuf, section);
 		}
 
-		(*cfp->cf_pp->replacecf)
-			(cfp, newbuf, table_index, relnum - secnum);
+		(*cfp->cf_pp->replacecf)(cfp, newbuf, table_index,
+		    relnum - secnum);
 
 		return (TRUE);
 	}
@@ -1428,9 +1429,10 @@ cfg_del_option(CFGFILE *cfg, int section, const char *basekey, char *tag)
 	if (strncmp(buf, &encode_buf[1], enclen) == 0) {
 		p = strchr(buf, ';');
 		if (p && (*(p + 1) != '\0')) {
-		    rc = cfg_put_cstring(cfg, basekey, p + 1, strlen(p + 1));
+			rc = cfg_put_cstring(cfg, basekey, p + 1,
+			    strlen(p + 1));
 		} else {
-		    rc = cfg_put_cstring(cfg, basekey, "-", 1);
+			rc = cfg_put_cstring(cfg, basekey, "-", 1);
 		}
 		/* severity & perror_str are set by cfg_put_cstring */
 		return (rc);
@@ -1559,7 +1561,7 @@ cfg_read(cfp_t *cfp)
 	if (cfp->cf_head->h_magic != CFG_NEW_MAGIC) {
 #ifdef DEBUG_LIB
 		(void) fprintf(stderr, "cfg_read: wrong MAGIC number %x\n",
-			cfp->cf_head->h_magic);
+		    cfp->cf_head->h_magic);
 #endif
 		return (FALSE);
 	}
@@ -1569,8 +1571,8 @@ cfg_read(cfp_t *cfp)
 #ifdef DEBUG_CFGLIST
 	(void) fprintf(stderr, "reading parser\n");
 #endif
-	rc = (*cfp->cf_pp->read)
-		(cfp, (char *)cfp->cf_mapped, CFG_DEFAULT_PARSE_SIZE);
+	rc = (*cfp->cf_pp->read)(cfp, (char *)cfp->cf_mapped,
+	    CFG_DEFAULT_PARSE_SIZE);
 	if (rc < sizeof (*hd)) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "cfg: read parse config failed\n");
@@ -1583,8 +1585,8 @@ cfg_read(cfp_t *cfp)
 #ifdef DEBUG_CFGLIST
 	(void) fprintf(stderr, "reading copy1 readsize = %d\n", readsize);
 #endif
-	rc = (*cfp->cf_pp->read)
-		(cfp, (char *)cfp->cf_head->h_ccopy1, readsize);
+	rc = (*cfp->cf_pp->read)(cfp, (char *)cfp->cf_head->h_ccopy1,
+	    readsize);
 	if (rc < 0) {
 		/* don't fail just return */
 #ifdef DEBUG
@@ -1594,7 +1596,7 @@ cfg_read(cfp_t *cfp)
 	}
 
 	if ((*cfp->cf_pp->seek)
-		(cfp, CFG_DEFAULT_SSIZE - rc, SEEK_CUR) < 0) {
+	    (cfp, CFG_DEFAULT_SSIZE - rc, SEEK_CUR) < 0) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "cfg: seek (SEEK_CUR) failed\n");
 #endif
@@ -1605,8 +1607,8 @@ cfg_read(cfp_t *cfp)
 	(void) fprintf(stderr, "reading copy2 readsize = %d\n", readsize);
 #endif
 
-	rc = (*cfp->cf_pp->read)
-		(cfp, (char *)cfp->cf_head->h_ccopy2, readsize);
+	rc = (*cfp->cf_pp->read)(cfp, (char *)cfp->cf_head->h_ccopy2,
+	    readsize);
 	if (rc < 0) {
 		/* don't fail just return */
 #ifdef DEBUG
@@ -1617,7 +1619,7 @@ cfg_read(cfp_t *cfp)
 
 	/* read the sizes of the lists from disk  */
 	if ((*cfp->cf_pp->seek)
-		(cfp, CFG_DEFAULT_SSIZE - rc, SEEK_CUR) < 0) {
+	    (cfp, CFG_DEFAULT_SSIZE - rc, SEEK_CUR) < 0) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "cfg: seek (SEEK_CUR) failed\n");
 #endif
@@ -1627,8 +1629,8 @@ cfg_read(cfp_t *cfp)
 #ifdef DEBUG_CFGLIST
 	(void) fprintf(stderr, "reading sizes\n");
 #endif
-	rc = (*cfp->cf_pp->read)
-		(cfp, (int *)cfp->cf_head->h_sizes1, CFG_DEFAULT_PSIZE);
+	rc = (*cfp->cf_pp->read)(cfp, (int *)cfp->cf_head->h_sizes1,
+	    CFG_DEFAULT_PSIZE);
 	if (rc < 0) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "cfg: read h_sizes1 failed\n");
@@ -1636,8 +1638,8 @@ cfg_read(cfp_t *cfp)
 		return (FALSE);
 	}
 
-	rc = (*cfp->cf_pp->read)
-		(cfp, (int *)cfp->cf_head->h_sizes2, CFG_DEFAULT_PSIZE);
+	rc = (*cfp->cf_pp->read)(cfp, (int *)cfp->cf_head->h_sizes2,
+	    CFG_DEFAULT_PSIZE);
 	if (rc < 0) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "cfg: read h_sizes2 failed\n");
@@ -1718,7 +1720,7 @@ cfg_lock(CFGFILE *cfg, CFGLOCK mode)
 		cfg->cf[1].cf_lock = cfg->cf[0].cf_lock = cfg->cf[0].cf_fd;
 
 		if (!((cfg->cf[0].cf_flag & CFG_RDONLY) &&
-			(mode == CFG_RDLOCK))) {
+		    (mode == CFG_RDLOCK))) {
 
 			struct flock lk = {0};
 			lk.l_type = (mode == CFG_RDLOCK ? F_RDLCK : F_WRLCK);
@@ -1739,7 +1741,7 @@ cfg_lock(CFGFILE *cfg, CFGLOCK mode)
 			if ((rc = cfg_hdrcmp(cfp)) == 0) {
 #ifdef DEBUG_HDR
 		(void) fprintf(stderr,
-			"cfg header match, skipping re-read\n");
+		    "cfg header match, skipping re-read\n");
 #endif
 				cfp->cf_head->h_state |= CFG_HDR_RDLOCK;
 				if (mode == CFG_WRLOCK)
@@ -1800,28 +1802,28 @@ cfg_lock(CFGFILE *cfg, CFGLOCK mode)
 			if (cfp->cf_head->h_seq1 >= cfp->cf_head->h_seq2) {
 #ifdef DEBUG_LIB
 				(void) fprintf(stderr,
-					"cfg_lock: WRLOCK copying 1 to 2\n");
+				    "cfg_lock: WRLOCK copying 1 to 2\n");
 #endif
 				memcpy(cfp->cf_head->h_ccopy2,
-					cfp->cf_head->h_ccopy1,
-					cfp->cf_head->h_csize);
+				    cfp->cf_head->h_ccopy1,
+				    cfp->cf_head->h_csize);
 				memcpy(cfp->cf_head->h_sizes2,
-					cfp->cf_head->h_sizes1,
-					CFG_DEFAULT_PSIZE);
+				    cfp->cf_head->h_sizes1,
+				    CFG_DEFAULT_PSIZE);
 
 				cfp->cf_head->h_cparse = cfp->cf_head->h_ccopy2;
 				cfp->cf_head->h_sizes = cfp->cf_head->h_sizes2;
 			} else {
 #ifdef DEBUG_LIB
 				(void) fprintf(stderr,
-					"cfg_lock: WRLOCK copying 2 to 1\n");
+				    "cfg_lock: WRLOCK copying 2 to 1\n");
 #endif
 				memcpy(cfp->cf_head->h_ccopy1,
-					cfp->cf_head->h_ccopy2,
-					cfp->cf_head->h_csize);
+				    cfp->cf_head->h_ccopy2,
+				    cfp->cf_head->h_csize);
 				memcpy(cfp->cf_head->h_sizes1,
-					cfp->cf_head->h_sizes2,
-					CFG_DEFAULT_PSIZE);
+				    cfp->cf_head->h_sizes2,
+				    CFG_DEFAULT_PSIZE);
 
 				cfp->cf_head->h_cparse = cfp->cf_head->h_ccopy1;
 				cfp->cf_head->h_sizes = cfp->cf_head->h_sizes1;
@@ -1909,33 +1911,34 @@ cfg_rdlock(CFGFILE *cfg)
 
 	/* Determine number of files open */
 	for (cfp = &cfg->cf[0]; cfp <= &cfg->cf[1]; cfp++) {
-		if (!cfp->cf_fd) continue;
+		if (!cfp->cf_fd)
+			continue;
 		if (cfp->cf_head == NULL) {
 #ifdef DEBUG_LIB
-		    (void) fprintf(stderr, "cfg_rdlock: cf_head == NULL\n");
+			(void) fprintf(stderr, "cfg_rdlock: cf_head == NULL\n");
 #endif
-		/*
-		 * 6335583, if header == NULL,
-		 * we can't call cfg_read to fill the header again
-		 * since it will change the lock state to
-		 * CFG_HDR_WRLOCK and dscfg will be the processer
-		 * that hold the lock,
-		 * just returning a FALSE if the case,
-		 * then retrieve the lock state from flock structure.
-		 */
-		    rc = FALSE;
-		    break;
-		} else {
-#ifdef DEBUG_LIB
-		    (void) fprintf(stderr, "cfg_rdlock: cf_head != NULL\n");
-#endif
-		    if ((cfp->cf_head->h_state & CFG_HDR_RDLOCK)
-			== CFG_HDR_RDLOCK)
-			rc = TRUE;
-		    else {
+			/*
+			 * 6335583, if header == NULL,
+			 * we can't call cfg_read to fill the header again
+			 * since it will change the lock state to
+			 * CFG_HDR_WRLOCK and dscfg will be the processer
+			 * that hold the lock,
+			 * just returning a FALSE if the case,
+			 * then retrieve the lock state from flock structure.
+			 */
 			rc = FALSE;
 			break;
-		    }
+		} else {
+#ifdef DEBUG_LIB
+			(void) fprintf(stderr, "cfg_rdlock: cf_head != NULL\n");
+#endif
+			if ((cfp->cf_head->h_state & CFG_HDR_RDLOCK)
+			    == CFG_HDR_RDLOCK) {
+				rc = TRUE;
+			} else {
+				rc = FALSE;
+				break;
+			}
 		}
 	}
 
@@ -1962,27 +1965,28 @@ cfg_wrlock(CFGFILE *cfg)
 
 	/* Determine number of files open */
 	for (cfp = &cfg->cf[0]; cfp <= &cfg->cf[1]; cfp++) {
-		if (!cfp->cf_fd) continue;
+		if (!cfp->cf_fd)
+			continue;
 		if (cfp->cf_head == NULL) {
 #ifdef DEBUG_LIB
-		    (void) fprintf(stderr, "cfg wrlock: cf_head == NULL\n");
+			(void) fprintf(stderr, "cfg wrlock: cf_head == NULL\n");
 #endif
-		/*
-		 * 6335583, see comments on cfg_rdlock
-		 */
-		    rc = FALSE;
-		    break;
-		} else {
-#ifdef DEBUG_LIB
-		    (void) fprintf(stderr, "cfg wrlock: cf_head != NULL\n");
-#endif
-		    if ((cfp->cf_head->h_state & CFG_HDR_WRLOCK)
-			== CFG_HDR_WRLOCK)
-			rc = TRUE;
-		    else {
+			/*
+			 * 6335583, see comments on cfg_rdlock
+			 */
 			rc = FALSE;
 			break;
-		    }
+		} else {
+#ifdef DEBUG_LIB
+			(void) fprintf(stderr, "cfg wrlock: cf_head != NULL\n");
+#endif
+			if ((cfp->cf_head->h_state & CFG_HDR_WRLOCK)
+			    == CFG_HDR_WRLOCK) {
+				rc = TRUE;
+			} else {
+				rc = FALSE;
+				break;
+			}
 		}
 	}
 
@@ -2023,15 +2027,15 @@ cfg_get_lock(CFGFILE *cfg, CFGLOCK *lock, pid_t *pid)
 		}
 	} else {
 		if (cfg_wrlock(cfg)) {
-		    *lock = CFG_WRLOCK;
-		    *pid = getpid();
-		    return (TRUE);
+			*lock = CFG_WRLOCK;
+			*pid = getpid();
+			return (TRUE);
 		}
 
 		if (cfg_rdlock(cfg)) {
-		    *lock = CFG_RDLOCK;
-		    *pid = getpid();
-		    return (TRUE);
+			*lock = CFG_RDLOCK;
+			*pid = getpid();
+			return (TRUE);
 		}
 	}
 	/* Lock is always based on local file pointer */
@@ -2091,7 +2095,8 @@ cfg_commit(CFGFILE *cfg)
 
 	/* Determine number of files open */
 	for (cfp = &cfg->cf[0]; cfp <= &cfg->cf[1]; cfp++) {
-		if (!cfp->cf_fd) continue;
+		if (!cfp->cf_fd)
+			continue;
 
 		/*
 		 * lets put everything back into one char *
@@ -2100,18 +2105,18 @@ cfg_commit(CFGFILE *cfg)
 
 		if ((*cfp->cf_pp->seek)(cfp, 0, SEEK_SET) < 0) {
 #ifdef DEBUG_LIB
-		(void) fprintf(stderr, "cfg: seek header failed\n");
+			(void) fprintf(stderr, "cfg: seek header failed\n");
 #endif
 			return (FALSE);
 		}
 
 		cfp->cf_head->h_size = cfp->cf_head->h_parsesize
-			+ cfp->cf_head->h_csize + cfp->cf_head->h_psize;
+		    + cfp->cf_head->h_csize + cfp->cf_head->h_psize;
 		cfp->cf_head->h_stamp = time(&tloc);
 
 		/* seeking into database */
-		if ((*cfp->cf_pp->seek)
-			(cfp, sizeof (cfgheader_t), SEEK_CUR) < 0)
+		if ((*cfp->cf_pp->seek)(cfp, sizeof (cfgheader_t),
+		    SEEK_CUR) < 0)
 			return (FALSE);
 
 		if (cfp->cf_head->h_ccopy1 == cfp->cf_head->h_cparse) {
@@ -2130,24 +2135,23 @@ cfg_commit(CFGFILE *cfg)
 #ifdef DEBUG_LIB
 		dump_status(cfp, "cfg_commit");
 #endif
-		rc = (*cfp->cf_pp->write)
-			(cfp, cfp->cf_mapped, CFG_DEFAULT_PARSE_SIZE);
+		rc = (*cfp->cf_pp->write)(cfp, cfp->cf_mapped,
+		    CFG_DEFAULT_PARSE_SIZE);
 #ifdef DEBUG
 		if (rc < 0) {
 			(void) fprintf(stderr,
-				"parse commit: rc %d h_parsesize %d\n",
-				rc, cfp->cf_head->h_parsesize);
+			    "parse commit: rc %d h_parsesize %d\n",
+			    rc, cfp->cf_head->h_parsesize);
 		}
 #endif
 		if (section == 1) {
-			rc = (*cfp->cf_pp->write)
-				(cfp, cfp->cf_head->h_ccopy1,
-				cfp->cf_head->h_csize);
+			rc = (*cfp->cf_pp->write) (cfp, cfp->cf_head->h_ccopy1,
+			    cfp->cf_head->h_csize);
 #ifdef DEBUG
 			if (rc < 0) {
 				(void) fprintf(stderr,
-					"csection commit 1: rc %d h_csize %d\n",
-					rc, cfp->cf_head->h_csize);
+				    "csection commit 1: rc %d h_csize %d\n",
+				    rc, cfp->cf_head->h_csize);
 			}
 #endif
 			if ((*cfp->cf_pp->seek)
@@ -2161,26 +2165,26 @@ cfg_commit(CFGFILE *cfg)
 			for (wrsize = 0; *ip; ip += *ip + 1)
 				wrsize += *ip + 1;
 
-			rc = (*cfp->cf_pp->write)(cfp,
-				cfp->cf_head->h_sizes1, wrsize * sizeof (int));
+			rc = (*cfp->cf_pp->write)(cfp, cfp->cf_head->h_sizes1,
+			    wrsize * sizeof (int));
 #ifdef DEBUG
 			if (rc < 0) {
 				(void) fprintf(stderr,
-					"cfg: write list sizes1 failed rc\n");
+				    "cfg: write list sizes1 failed rc\n");
 			}
 #endif
 		} else {
-			if ((*cfp->cf_pp->seek)(cfp,
-				CFG_DEFAULT_SSIZE, SEEK_CUR) < 0)
+			if ((*cfp->cf_pp->seek)(cfp, CFG_DEFAULT_SSIZE,
+			    SEEK_CUR) < 0)
 				return (FALSE);
 
-			rc = (*cfp->cf_pp->write)(cfp,
-				cfp->cf_head->h_ccopy2, cfp->cf_head->h_csize);
+			rc = (*cfp->cf_pp->write)(cfp, cfp->cf_head->h_ccopy2,
+			    cfp->cf_head->h_csize);
 #ifdef DEBUG
 			if (rc < 0) {
 				(void) fprintf(stderr,
-					"csection commit 2: rc %d h_csize %d\n",
-					rc, cfp->cf_head->h_csize);
+				    "csection commit 2: rc %d h_csize %d\n",
+				    rc, cfp->cf_head->h_csize);
 			}
 #endif
 			if ((*cfp->cf_pp->seek)
@@ -2196,11 +2200,11 @@ cfg_commit(CFGFILE *cfg)
 				wrsize += *ip + 1;
 
 			rc = (*cfp->cf_pp->write)(cfp, cfp->cf_head->h_sizes2,
-				wrsize * sizeof (int));
+			    wrsize * sizeof (int));
 #ifdef DEBUG
 			if (rc < 0) {
 				(void) fprintf(stderr,
-					"cfg: write list sizes2 failed\n");
+				    "cfg: write list sizes2 failed\n");
 			}
 #endif
 
@@ -2215,13 +2219,13 @@ cfg_commit(CFGFILE *cfg)
 			return (FALSE);
 
 		cfp->cf_head->h_size = cfp->cf_head->h_parsesize +
-			cfp->cf_head->h_csize +	cfp->cf_head->h_psize;
+		    cfp->cf_head->h_csize + cfp->cf_head->h_psize;
 
-		rc = (*cfp->cf_pp->write)
-			(cfp, cfp->cf_head, sizeof (cfgheader_t));
+		rc = (*cfp->cf_pp->write)(cfp, cfp->cf_head,
+		    sizeof (cfgheader_t));
 		if (rc < 0) {
 			cfg_perror_str = dgettext("cfg",
-				"cfg_commit: header write failed");
+			    "cfg_commit: header write failed");
 			cfg_severity = CFG_EFATAL;
 			return (FALSE);
 		}
@@ -2492,7 +2496,7 @@ cfg_read_parser_config(cfp_t *cfp)
 			p = thead[n].fld;
 			if (p == NULL) {
 				q = thead[n].fld = calloc(1,
-						sizeof (struct lookup));
+				    sizeof (struct lookup));
 			} else {
 				for (q = thead[n].fld; q; q = q->l_next)
 					p = q;
@@ -2539,7 +2543,7 @@ cfg_read_parser_config(cfp_t *cfp)
 	(void) fprintf(stderr, "alloced %d cfg lists \n", n + 1);
 #endif
 		for (cfp->cf_head->h_ncfgs = n + 1;
-			i < min(cfp->cf_head->h_ncfgs, MAX_CFG); i++) {
+		    i < min(cfp->cf_head->h_ncfgs, MAX_CFG); i++) {
 			cfp->cf_head->h_cfgs[i].l_name = '\0';
 			cfp->cf_head->h_cfgs[i].l_name =
 			    strdup(chead[i].tag.l_word);
@@ -2922,7 +2926,7 @@ cfg_open(char *name)
 	cfg_severity = 0;
 	if ((cfg = (CFGFILE *)calloc(1, sizeof (*cfg))) == NULL) {
 		cfg_perror_str = dgettext("cfg",
-			"cfg_open: malloc failed");
+		    "cfg_open: malloc failed");
 		cfg_severity = CFG_EFATAL;
 		return (NULL);
 	}
@@ -2933,9 +2937,8 @@ cfg_open(char *name)
 		(void) fprintf(stderr, "cfg_open: Using non-standard name\n");
 #endif
 		cfp->cf_name = name;
-		cfp->cf_pp = (strstr(cfp->cf_name, "/rdsk/") == NULL)
-			? cfg_block_io_provider()
-			: cfg_raw_io_provider();
+		cfp->cf_pp = (strstr(cfp->cf_name, "/rdsk/") == NULL) ?
+		    cfg_block_io_provider() : cfg_raw_io_provider();
 	} else {
 		cfp->cf_name = cfg_location(NULL, CFG_LOC_GET_LOCAL, NULL);
 		cfp->cf_pp = cfg_block_io_provider();
@@ -2946,7 +2949,7 @@ cfg_open(char *name)
 		if (cfg_iscluster() > 0) {
 			cfp = &cfg->cf[1];
 			cfp->cf_name =
-				cfg_location(NULL, CFG_LOC_GET_CLUSTER, NULL);
+			    cfg_location(NULL, CFG_LOC_GET_CLUSTER, NULL);
 			if (cfp->cf_name) {
 				cfp->cf_pp = cfg_raw_io_provider();
 			}
@@ -2986,7 +2989,7 @@ cfg_open(char *name)
 		 */
 		if (magic == CFG_NEW_MAGIC) {
 			needed = FBA_NUM(FBA_SIZE(1) - 1 +
-			(sizeof (struct cfgheader) + CFG_CONFIG_SIZE));
+			    (sizeof (struct cfgheader) + CFG_CONFIG_SIZE));
 		} else {
 			needed = 0;
 		}
@@ -3002,7 +3005,7 @@ cfg_open(char *name)
 		cfp->cf_mapped = (char *)malloc(CFG_DEFAULT_PARSE_SIZE);
 		if (cfp->cf_mapped == NULL) {
 			cfg_perror_str = dgettext("cfg",
-				"cfg_open: malloc failed");
+			    "cfg_open: malloc failed");
 			cfg_severity = CFG_EFATAL;
 			break;
 		}
@@ -3033,7 +3036,8 @@ cfg_open(char *name)
 }
 
 void
-cfg_invalidate_hsizes(int fd, const char *loc) {
+cfg_invalidate_hsizes(int fd, const char *loc)
+{
 	int offset;
 	int rc = -1;
 	int hdrsz;
@@ -3165,7 +3169,7 @@ cfg_get_section(CFGFILE *cfg, char ***list, const char *section)
 			buf = (char **)malloc(cfl->l_nentry * sizeof (char *));
 		else
 			buf = (char **)realloc(buf, (cfl->l_nentry + count) *
-						sizeof (char *));
+			    sizeof (char *));
 		if (buf == NULL) {
 			errno = ENOMEM;
 			return (-1);
@@ -3261,7 +3265,7 @@ cfg_is_cfg(CFGFILE *cfg)
 		return (1);
 
 	cfg_perror_str = dgettext("cfg",
-		"configuration not initialized, bad magic");
+	    "configuration not initialized, bad magic");
 	cfg_severity = CFG_EFATAL;
 
 	return (0);
@@ -3329,7 +3333,7 @@ compare(const void* a, const void *b)
  */
 int
 cfg_get_srtdsec(CFGFILE *cfg, char ***list, const char *section,
-	const char *field)
+    const char *field)
 {
 	cfglist_t *cfl;
 	cfp_t *cfp;
@@ -3375,7 +3379,7 @@ cfg_get_srtdsec(CFGFILE *cfg, char ***list, const char *section,
 			buf = (char **)malloc(cfl->l_nentry * sizeof (char *));
 		else
 			buf = (char **)realloc(buf, (cfl->l_nentry + count) *
-						sizeof (char *));
+			    sizeof (char *));
 		if (buf == NULL) {
 			errno = ENOMEM;
 			cfg_perror_str = dgettext("cfg", "cfg_get_srtdsec: "
@@ -3402,7 +3406,7 @@ cfg_get_srtdsec(CFGFILE *cfg, char ***list, const char *section,
 			tmplst = (char *)malloc(cfl->l_nentry * CFG_MAX_BUF);
 		else
 			tmplst = (char *)realloc(tmplst,
-					(cfl->l_nentry + count) * CFG_MAX_BUF);
+			    (cfl->l_nentry + count) * CFG_MAX_BUF);
 		if (tmplst == NULL) {
 			cfg_perror_str = dgettext("cfg", "cfg_get_srtdsec: "
 			    "malloc failed");

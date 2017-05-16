@@ -425,8 +425,11 @@ struct msghdr32 {
 #ifdef _KERNEL
 
 /*
- * for kernel socket only
+ * Internal-only MSG_... flags
  */
+
+#define	MSG_SENDTO_NOXLATE	0x08000000	/* Skip so_ux_addr_xlate */
+
 #define	MSG_MBLK_QUICKRELE	0x10000000	/* free mblk chain */
 						/* in timely manner */
 #define	MSG_USERSPACE		0x20000000	/* buffer from user space */

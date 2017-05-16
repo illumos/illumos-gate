@@ -14,13 +14,14 @@
 # Copyright 2011 EveryCity Ltd. All rights reserved.
 # Copyright 2013 DEY Storage Systems, Inc.
 # Copyright 2016 Joyent, Inc.
+# Copyright 2017 RackTop Systems.
 #
 
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/Makefile.ctf
 include		$(SRC)/cmd/localedef/Makefile.common
 
-LDLIBS=		-lavl -lgen
+LDLIBS +=	-lavl -lgen
 
 .KEEP_STATE:
 

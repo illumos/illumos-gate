@@ -1419,7 +1419,7 @@ krb5int_sendto (krb5_context context, const krb5_data *message,
     if (localaddr != 0 && localaddrlen != 0 && *localaddrlen > 0)
 	(void) getsockname(conns[winning_conn].fd, localaddr, localaddrlen);
 
-	if (remoteaddr != 0 && remoteaddrlen != 0 && *remoteaddrlen > 0)
+     if (remoteaddr != 0 && remoteaddrlen != 0 && *remoteaddrlen > 0)
 	(void) getpeername(conns[winning_conn].fd, remoteaddr, remoteaddrlen);
 
 egress:
