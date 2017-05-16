@@ -1174,16 +1174,25 @@ xattr_dir_access(vnode_t *vp, int mode, int flags, cred_t *cr,
 		return (EACCES);
 	}
 
-	/*
-	 * If there is a real xattr directory, check access there;
-	 * otherwise just return success.
-	 */
 	error = xattr_dir_realdir(vp, &realvp, LOOKUP_XATTR, cr, ct);
-	if (error == 0) {
-		error = VOP_ACCESS(realvp, mode, flags, cr, ct);
-	} else {
-		error = 0;
+	if ((error == ENOENT || error == EINVAL)) {
+		/*
+		 * These errors mean there's no "real" xattr dir.
+		 * The GFS xattr dir always allows access.
+		 */
+		return (0);
 	}
+	if (error != 0) {
+		/*
+		 * The "real" xattr dir was not accessible.
+		 */
+		return (error);
+	}
+	/*
+	 * We got the "real" xattr dir.
+	 * Pass through the access call.
+	 */
+	error = VOP_ACCESS(realvp, mode, flags, cr, ct);
 
 	return (error);
 }

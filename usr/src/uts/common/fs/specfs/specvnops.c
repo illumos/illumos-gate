@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1581,10 +1582,8 @@ spec_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 	mutex_enter(&stable_lock);
 
 	mutex_enter(&vp->v_lock);
-	/*
-	 * Drop the temporary hold by vn_rele now
-	 */
-	if (--vp->v_count != 0) {
+	VN_RELE_LOCKED(vp);
+	if (vp->v_count != 0) {
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&stable_lock);
 		return;

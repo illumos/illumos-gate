@@ -10,11 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Joyent, Inc.
 #
 
-SUBDIRS = poll secflags sigqueue spoof-ras sdevfs timer tmpfs file-locking
+SUBDIRS = poll secflags sigqueue spoof-ras sdevfs stress timer tmpfs \
+	file-locking
 
 PROGS = \
 	OS-6097

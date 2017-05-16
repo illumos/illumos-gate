@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -196,8 +197,10 @@ autofs_zone_destructor(zoneid_t zoneid, void *arg)
 	 * make this 0 to placate auto_freefnnode().
 	 */
 	vp = fntovn(fngp->fng_rootfnnodep);
+	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count == 1);
-	vp->v_count--;
+	VN_RELE_LOCKED(vp);
+	mutex_exit(&vp->v_lock);
 	auto_freefnnode(fngp->fng_rootfnnodep);
 	mutex_destroy(&fngp->fng_unmount_threads_lock);
 	kmem_free(fngp, sizeof (*fngp));

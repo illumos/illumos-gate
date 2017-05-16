@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -92,7 +93,7 @@ fdopen(vnode_t **vpp, int mode, cred_t *cr, caller_context_t *ct)
 /* ARGSUSED */
 static int
 fdclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (0);
 }
@@ -162,7 +163,7 @@ fdread(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 /* ARGSUSED */
 static int
 fdgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	vfs_t *vfsp = vp->v_vfsp;
 	timestruc_t now;
@@ -201,9 +202,9 @@ fdaccess(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 
 /* ARGSUSED */
 static int
-fdlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pnp,
-	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
-	int *direntflags, pathname_t *realpnp)
+fdlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pnp, int flags,
+    vnode_t *rdir, cred_t *cr, caller_context_t *ct, int *direntflags,
+    pathname_t *realpnp)
 {
 	if (comp[0] == 0 || strcmp(comp, ".") == 0 || strcmp(comp, "..") == 0) {
 		VN_HOLD(dp);
@@ -215,9 +216,9 @@ fdlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pnp,
 
 /* ARGSUSED */
 static int
-fdcreate(vnode_t *dvp, char *comp, vattr_t *vap, enum vcexcl excl,
-	int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
-	vsecattr_t *vsecp)
+fdcreate(vnode_t *dvp, char *comp, vattr_t *vap, enum vcexcl excl, int mode,
+    vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
+    vsecattr_t *vsecp)
 {
 	return (fdget(dvp, comp, vpp));
 }
@@ -225,7 +226,7 @@ fdcreate(vnode_t *dvp, char *comp, vattr_t *vap, enum vcexcl excl,
 /* ARGSUSED */
 static int
 fdreaddir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp, caller_context_t *ct,
-	int flags)
+    int flags)
 {
 	/* bp holds one dirent structure */
 	u_offset_t bp[DIRENT64_RECLEN(FDNSIZE) / sizeof (u_offset_t)];
@@ -306,7 +307,8 @@ fdinactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
-	if (--vp->v_count != 0) {
+	VN_RELE_LOCKED(vp);
+	if (vp->v_count != 0) {
 		mutex_exit(&vp->v_lock);
 		return;
 	}

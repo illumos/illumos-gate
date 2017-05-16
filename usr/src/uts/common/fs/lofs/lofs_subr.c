@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 /*
  * The idea behind composition-based stacked filesystems is to add a
@@ -656,7 +659,7 @@ freelonode(lnode_t *lp)
 
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count > 1) {
-		vp->v_count--;	/* release our hold from vn_rele */
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		TABLE_LOCK_EXIT(lp->lo_vp, li);
 		return;
@@ -759,10 +762,8 @@ static int lofsdebug;
 
 #ifdef LODEBUG
 /*VARARGS2*/
-lo_dprint(level, str, a1, a2, a3, a4, a5, a6, a7, a8, a9)
-	int level;
-	char *str;
-	int a1, a2, a3, a4, a5, a6, a7, a8, a9;
+lo_dprint(int level, char *str, int a1, int a2, int a3, int a4, int a5, int a6,
+    int a7, int a8, int a9)
 {
 
 	if (lofsdebug == level || (lofsdebug > 10 && (lofsdebug - 10) >= level))

@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
  */
+/*
+ * Copyright (c) 2016 by Delphix. All rights reserved.
+ */
 
 /*
  * Datalink management routines.
@@ -80,9 +83,9 @@ boolean_t		devnet_need_rebuild;
 /* Upcall door handle */
 static door_handle_t	dls_mgmt_dh = NULL;
 
+/* dls_devnet_t dd_flags */
 #define	DD_CONDEMNED		0x1
-#define	DD_KSTAT_CHANGING	0x2
-#define	DD_IMPLICIT_IPTUN	0x4 /* Implicitly-created ip*.*tun* tunnel */
+#define	DD_IMPLICIT_IPTUN	0x2 /* Implicitly-created ip*.*tun* tunnel */
 
 /*
  * This structure is used to keep the <linkid, macname> mapping.
@@ -731,27 +734,20 @@ dls_devnet_rele_link(dls_dl_handle_t dlh, dls_link_t *dlp)
 static int
 dls_devnet_stat_update(kstat_t *ksp, int rw)
 {
-	dls_devnet_t	*ddp = ksp->ks_private;
+	datalink_id_t	linkid = (datalink_id_t)(uintptr_t)ksp->ks_private;
+	dls_devnet_t	*ddp;
 	dls_link_t	*dlp;
 	int		err;
 
-	/*
-	 * Check the link is being renamed or if the link is going away
-	 * before incrementing dd_tref which in turn prevents the link
-	 * from being renamed or deleted until we finish.
-	 */
-	mutex_enter(&ddp->dd_mutex);
-	if (ddp->dd_flags & (DD_CONDEMNED | DD_KSTAT_CHANGING)) {
-		mutex_exit(&ddp->dd_mutex);
-		return (ENOENT);
+	if ((err = dls_devnet_hold_tmp(linkid, &ddp)) != 0) {
+		return (err);
 	}
-	ddp->dd_tref++;
-	mutex_exit(&ddp->dd_mutex);
 
 	/*
 	 * If a device detach happens at this time, it will block in
-	 * dls_devnet_unset since the dd_tref has been bumped up above. So the
-	 * access to 'dlp' is safe even though we don't hold the mac perimeter.
+	 * dls_devnet_unset since the dd_tref has been bumped in
+	 * dls_devnet_hold_tmp(). So the access to 'dlp' is safe even though
+	 * we don't hold the mac perimeter.
 	 */
 	if (mod_hash_find(i_dls_link_hash, (mod_hash_key_t)ddp->dd_mac,
 	    (mod_hash_val_t *)&dlp) != 0) {
@@ -784,8 +780,9 @@ dls_devnet_stat_create(dls_devnet_t *ddp, zoneid_t zoneid, zoneid_t newzoneid)
 		nm = ddp->dd_linkname;
 	}
 
-	if (dls_stat_create("link", 0, nm, zoneid,
-	    dls_devnet_stat_update, ddp, &ksp, newzoneid) == 0) {
+	if (dls_stat_create("link", 0, ddp->dd_linkname, zoneid,
+	    dls_devnet_stat_update, (void *)(uintptr_t)ddp->dd_linkid,
+	    &ksp, newzoneid) == 0) {
 		ASSERT(ksp != NULL);
 		if (zoneid == ddp->dd_owner_zid) {
 			ASSERT(ddp->dd_ksp == NULL);
@@ -1140,7 +1137,7 @@ dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
 	if (dls_mgmt_get_phydev(linkid, &phydev) == 0)
 		(void) softmac_hold_device(phydev, &ddh);
 
-	rw_enter(&i_dls_devnet_lock, RW_WRITER);
+	rw_enter(&i_dls_devnet_lock, RW_READER);
 	if ((err = mod_hash_find(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)linkid, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
@@ -1221,7 +1218,7 @@ dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 	if (DLS_MINOR2INST(getminor(dev)) <= DLS_MAX_PPA)
 		(void) softmac_hold_device(dev, &ddh);
 
-	rw_enter(&i_dls_devnet_lock, RW_WRITER);
+	rw_enter(&i_dls_devnet_lock, RW_READER);
 	if ((err = mod_hash_find(i_dls_devnet_hash,
 	    (mod_hash_key_t)name, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
@@ -1430,7 +1427,6 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link,
 	mac_perim_handle_t	mph = NULL;
 	mac_handle_t		mh;
 	mod_hash_val_t		val;
-	boolean_t		clear_dd_flag = B_FALSE;
 
 	/*
 	 * In the second case, id2 must be a REMOVED physical link.
@@ -1466,14 +1462,6 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link,
 		goto done;
 	}
 
-	/*
-	 * Return EBUSY if any applications have this link open, if any thread
-	 * is currently accessing the link kstats, or if the link is on-loan
-	 * to a non-global zone. Then set the DD_KSTAT_CHANGING flag to
-	 * prevent any access to the kstats while we delete and recreate
-	 * kstats below.  However, we skip this check if we're renaming the
-	 * vnic as part of bringing it up for a zone.
-	 */
 	mutex_enter(&ddp->dd_mutex);
 	if (!zoneinit) {
 		if (ddp->dd_ref > 1) {
@@ -1482,9 +1470,6 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link,
 			goto done;
 		}
 	}
-
-	ddp->dd_flags |= DD_KSTAT_CHANGING;
-	clear_dd_flag = B_TRUE;
 	mutex_exit(&ddp->dd_mutex);
 
 	if (id2 == DATALINK_INVALID_LINKID) {
@@ -1566,22 +1551,10 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link,
 	mutex_exit(&ddp->dd_mutex);
 
 done:
-	/*
-	 * Change the name of the kstat based on the new link name.
-	 * We can't hold the i_dls_devnet_lock across calls to the kstat
-	 * subsystem. Instead the DD_KSTAT_CHANGING flag set above in this
-	 * function prevents any access to the dd_ksp while we delete and
-	 * recreate it below.
-	 */
 	rw_exit(&i_dls_devnet_lock);
+
 	if (err == 0)
 		dls_devnet_stat_rename(ddp, zoneinit);
-
-	if (clear_dd_flag) {
-		mutex_enter(&ddp->dd_mutex);
-		ddp->dd_flags &= ~DD_KSTAT_CHANGING;
-		mutex_exit(&ddp->dd_mutex);
-	}
 
 	if (mph != NULL)
 		mac_perim_exit(mph);
