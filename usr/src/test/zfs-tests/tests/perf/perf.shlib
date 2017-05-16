@@ -90,7 +90,7 @@ function do_fio_run
 				typeset suffix="$sync_str.$iosize-ios.$threads-threads"
 
 				# Define output file
-				typeset logbase="$(get_perf_output_dir)/$($BASENAME \
+				typeset logbase="$(get_perf_output_dir)/$(basename \
 				    $SUDO_COMMAND)"
 				typeset outfile="$logbase.fio.$suffix"
 
