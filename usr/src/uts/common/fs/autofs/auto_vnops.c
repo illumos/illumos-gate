@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -1316,7 +1317,8 @@ auto_inactive(vnode_t *vp, cred_t *cred, caller_context_t *ct)
 	rw_enter(&dfnp->fn_rwlock, RW_WRITER);
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count > 0);
-	count = --vp->v_count;
+	VN_RELE_LOCKED(vp);
+	count = vp->v_count;
 	mutex_exit(&vp->v_lock);
 	if (count == 0) {
 		/*

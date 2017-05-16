@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -581,7 +582,8 @@ nm_unmount(vfs_t *vfsp, int flag, cred_t *crp)
 	nameremove(nodep);
 	thisvp = NMTOV(nodep);
 	mutex_enter(&thisvp->v_lock);
-	if (thisvp->v_count-- == 1) {
+	VN_RELE_LOCKED(thisvp);
+	if (thisvp->v_count == 0) {
 		fp = nodep->nm_filep;
 		mutex_exit(&thisvp->v_lock);
 		vn_invalid(thisvp);

@@ -25,7 +25,7 @@
 
 /*
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -2490,7 +2490,7 @@ start:
 			rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
-				vp->v_count--;
+				VN_RELE_LOCKED(vp);
 				mutex_exit(&vp->v_lock);
 				rw_exit(&rp->r_hashq->r_lock);
 				rw_enter(&rhtp->r_lock, RW_READER);
@@ -2505,7 +2505,7 @@ start:
 
 		mutex_enter(&vp->v_lock);
 		if (vp->v_count > 1) {
-			vp->v_count--;
+			VN_RELE_LOCKED(vp);
 			mutex_exit(&vp->v_lock);
 			rw_enter(&rhtp->r_lock, RW_READER);
 			goto start;
@@ -2698,7 +2698,7 @@ rp_addfree(rnode_t *rp, cred_t *cr)
 			rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
-				vp->v_count--;
+				VN_RELE_LOCKED(vp);
 				mutex_exit(&vp->v_lock);
 				rw_exit(&rp->r_hashq->r_lock);
 				return;
@@ -2731,7 +2731,7 @@ rp_addfree(rnode_t *rp, cred_t *cr)
 		 */
 		mutex_enter(&vp->v_lock);
 		if (vp->v_count > 1) {
-			vp->v_count--;
+			VN_RELE_LOCKED(vp);
 			mutex_exit(&vp->v_lock);
 			return;
 		}
@@ -2753,7 +2753,7 @@ rp_addfree(rnode_t *rp, cred_t *cr)
 
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count > 1) {
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		rw_exit(&rp->r_hashq->r_lock);
 		return;
@@ -4081,7 +4081,7 @@ nfs_rnode_reclaim(void)
 			rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 1) {
-				vp->v_count--;
+				VN_RELE_LOCKED(vp);
 				mutex_exit(&vp->v_lock);
 				rw_exit(&rp->r_hashq->r_lock);
 				mutex_enter(&rpfreelist_lock);

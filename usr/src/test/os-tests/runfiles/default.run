@@ -52,5 +52,13 @@ tests = ['sdevfs_eisdir']
 user = root
 tests = ['timer_limit']
 
+[/opt/os-tests/tests/stress]
+user = root
+tests = ['dladm-kstat']
+
 [/opt/os-tests/tests/file-locking]
 tests = ['runtests.32', 'runtests.64']
+
+[/opt/os-tests/tests/sockfs]
+user = root
+tests = ['conn', 'dgram', 'drop_priv', 'sockpair']

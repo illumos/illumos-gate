@@ -23,6 +23,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -841,7 +842,7 @@ vn_rele(vnode_t *vp)
 		VOP_INACTIVE(vp, CRED(), NULL);
 		return;
 	}
-	vp->v_count--;
+	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
 }
 
@@ -862,15 +863,15 @@ vn_rele_dnlc(vnode_t *vp)
 			VOP_INACTIVE(vp, CRED(), NULL);
 			return;
 		}
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 	}
 	mutex_exit(&vp->v_lock);
 }
 
 /*
  * Like vn_rele() except that it clears v_stream under v_lock.
- * This is used by sockfs when it dismantels the association between
- * the sockfs node and the vnode in the underlaying file system.
+ * This is used by sockfs when it dismantles the association between
+ * the sockfs node and the vnode in the underlying file system.
  * v_lock has to be held to prevent a thread coming through the lookupname
  * path from accessing a stream head that is going away.
  */
@@ -885,7 +886,7 @@ vn_rele_stream(vnode_t *vp)
 		VOP_INACTIVE(vp, CRED(), NULL);
 		return;
 	}
-	vp->v_count--;
+	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
 }
 
@@ -916,7 +917,7 @@ vn_rele_async(vnode_t *vp, taskq_t *taskq)
 		    vp, TQ_SLEEP) != NULL);
 		return;
 	}
-	vp->v_count--;
+	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
 }
 

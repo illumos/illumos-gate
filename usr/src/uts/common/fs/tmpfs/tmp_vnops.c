@@ -28,6 +28,7 @@
  * Copyright 2016, Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 RackTop Systems.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1679,7 +1680,7 @@ top:
 	 * there's little to do -- just drop our hold.
 	 */
 	if (vp->v_count > 1 || tp->tn_nlink != 0) {
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&tp->tn_tlock);
 		rw_exit(&tp->tn_rwlock);

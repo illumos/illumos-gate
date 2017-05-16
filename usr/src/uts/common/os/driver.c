@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -363,7 +366,7 @@ dev_lclose(dev_t dev, int flag, int otype, struct cred *cred)
 	mutex_enter(&cvp->v_lock);
 	switch (cvp->v_count) {
 	default:
-		cvp->v_count--;
+		VN_RELE_LOCKED(cvp);
 		break;
 
 	case 0:
@@ -570,7 +573,7 @@ cdev_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, struct cred *cred,
 
 int
 cdev_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
-	size_t *maplen, uint_t mode)
+    size_t *maplen, uint_t mode)
 {
 	struct cb_ops	*cb;
 
@@ -586,7 +589,7 @@ cdev_mmap(int (*mapfunc)(dev_t, off_t, int), dev_t dev, off_t off, int prot)
 
 int
 cdev_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
-	    uint_t prot, uint_t maxprot, uint_t flags, cred_t *credp)
+    uint_t prot, uint_t maxprot, uint_t flags, cred_t *credp)
 {
 	struct cb_ops	*cb;
 
@@ -597,7 +600,7 @@ cdev_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 
 int
 cdev_poll(dev_t dev, short events, int anyyet, short *reventsp,
-	struct pollhead **pollhdrp)
+    struct pollhead **pollhdrp)
 {
 	struct cb_ops	*cb;
 

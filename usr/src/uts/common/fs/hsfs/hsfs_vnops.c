@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -157,10 +158,7 @@ int hsched_invoke_strategy(struct hsfs *fsp);
 
 /* ARGSUSED */
 static int
-hsfs_fsync(vnode_t *cp,
-	int syncflag,
-	cred_t *cred,
-	caller_context_t *ct)
+hsfs_fsync(vnode_t *cp, int syncflag, cred_t *cred, caller_context_t *ct)
 {
 	return (0);
 }
@@ -168,11 +166,8 @@ hsfs_fsync(vnode_t *cp,
 
 /*ARGSUSED*/
 static int
-hsfs_read(struct vnode *vp,
-	struct uio *uiop,
-	int ioflag,
-	struct cred *cred,
-	struct caller_context *ct)
+hsfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
+    struct caller_context *ct)
 {
 	caddr_t base;
 	offset_t diff;
@@ -301,12 +296,8 @@ hsfs_read(struct vnode *vp,
 
 /*ARGSUSED2*/
 static int
-hsfs_getattr(
-	struct vnode *vp,
-	struct vattr *vap,
-	int flags,
-	struct cred *cred,
-	caller_context_t *ct)
+hsfs_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred,
+    caller_context_t *ct)
 {
 	struct hsnode *hp;
 	struct vfs *vfsp;
@@ -349,10 +340,8 @@ hsfs_getattr(
 
 /*ARGSUSED*/
 static int
-hsfs_readlink(struct vnode *vp,
-	struct uio *uiop,
-	struct cred *cred,
-	caller_context_t *ct)
+hsfs_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred,
+    caller_context_t *ct)
 {
 	struct hsnode *hp;
 
@@ -371,9 +360,7 @@ hsfs_readlink(struct vnode *vp,
 
 /*ARGSUSED*/
 static void
-hsfs_inactive(struct vnode *vp,
-	struct cred *cred,
-	caller_context_t *ct)
+hsfs_inactive(struct vnode *vp, struct cred *cred, caller_context_t *ct)
 {
 	struct hsnode *hp;
 	struct hsfs *fsp;
@@ -397,14 +384,13 @@ hsfs_inactive(struct vnode *vp,
 		/*NOTREACHED*/
 	}
 
-	if (vp->v_count > 1 || (hp->hs_flags & HREF) == 0) {
-		vp->v_count--;	/* release hold from vn_rele */
+	VN_RELE_LOCKED(vp);
+	if (vp->v_count > 0 || (hp->hs_flags & HREF) == 0) {
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&hp->hs_contents_lock);
 		rw_exit(&fsp->hsfs_hash_lock);
 		return;
 	}
-	vp->v_count--;	/* release hold from vn_rele */
 	if (vp->v_count == 0) {
 		/*
 		 * Free the hsnode.
@@ -432,17 +418,9 @@ hsfs_inactive(struct vnode *vp,
 
 /*ARGSUSED*/
 static int
-hsfs_lookup(
-	struct vnode *dvp,
-	char *nm,
-	struct vnode **vpp,
-	struct pathname *pnp,
-	int flags,
-	struct vnode *rdir,
-	struct cred *cred,
-	caller_context_t *ct,
-	int *direntflags,
-	pathname_t *realpnp)
+hsfs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
+    struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred,
+    caller_context_t *ct, int *direntflags, pathname_t *realpnp)
 {
 	int error;
 	int namelen = (int)strlen(nm);
@@ -470,13 +448,8 @@ hsfs_lookup(
 
 /*ARGSUSED*/
 static int
-hsfs_readdir(
-	struct vnode		*vp,
-	struct uio		*uiop,
-	struct cred		*cred,
-	int			*eofp,
-	caller_context_t	*ct,
-	int			flags)
+hsfs_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
+    caller_context_t *ct, int flags)
 {
 	struct hsnode	*dhp;
 	struct hsfs	*fsp;
@@ -676,23 +649,15 @@ hsfs_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 
 /*ARGSUSED*/
 static int
-hsfs_open(struct vnode **vpp,
-	int flag,
-	struct cred *cred,
-	caller_context_t *ct)
+hsfs_open(struct vnode **vpp, int flag, struct cred *cred, caller_context_t *ct)
 {
 	return (0);
 }
 
 /*ARGSUSED*/
 static int
-hsfs_close(
-	struct vnode *vp,
-	int flag,
-	int count,
-	offset_t offset,
-	struct cred *cred,
-	caller_context_t *ct)
+hsfs_close(struct vnode *vp, int flag, int count, offset_t offset,
+    struct cred *cred, caller_context_t *ct)
 {
 	(void) cleanlocks(vp, ttoproc(curthread)->p_pid, 0);
 	cleanshares(vp, ttoproc(curthread)->p_pid);
@@ -701,11 +666,8 @@ hsfs_close(
 
 /*ARGSUSED2*/
 static int
-hsfs_access(struct vnode *vp,
-	int mode,
-	int flags,
-	cred_t *cred,
-	caller_context_t *ct)
+hsfs_access(struct vnode *vp, int mode, int flags, cred_t *cred,
+    caller_context_t *ct)
 {
 	return (hs_access(vp, (mode_t)mode, cred));
 }
@@ -794,17 +756,9 @@ hsfs_ra_task(void *arg)
  */
 /*ARGSUSED*/
 static int
-hsfs_getpage_ra(
-	struct vnode *vp,
-	u_offset_t off,
-	struct seg *seg,
-	caddr_t addr,
-	struct hsnode *hp,
-	struct hsfs *fsp,
-	int	xarsiz,
-	offset_t	bof,
-	int	chunk_lbn_count,
-	int	chunk_data_bytes)
+hsfs_getpage_ra(struct vnode *vp, u_offset_t off, struct seg *seg,
+    caddr_t addr, struct hsnode *hp, struct hsfs *fsp, int xarsiz,
+    offset_t bof, int chunk_lbn_count, int chunk_data_bytes)
 {
 	struct buf *bufs;
 	caddr_t *vas;
@@ -1082,17 +1036,9 @@ hsfs_getpage_ra(
  */
 /*ARGSUSED*/
 static int
-hsfs_getapage(
-	struct vnode *vp,
-	u_offset_t off,
-	size_t len,
-	uint_t *protp,
-	struct page *pl[],
-	size_t plsz,
-	struct seg *seg,
-	caddr_t addr,
-	enum seg_rw rw,
-	struct cred *cred)
+hsfs_getapage(struct vnode *vp, u_offset_t off, size_t len, uint_t *protp,
+    struct page *pl[], size_t plsz, struct seg *seg, caddr_t addr,
+    enum seg_rw rw, struct cred *cred)
 {
 	struct hsnode *hp;
 	struct hsfs *fsp;
@@ -1563,18 +1509,9 @@ again:
 
 /*ARGSUSED*/
 static int
-hsfs_getpage(
-	struct vnode *vp,
-	offset_t off,
-	size_t len,
-	uint_t *protp,
-	struct page *pl[],
-	size_t plsz,
-	struct seg *seg,
-	caddr_t addr,
-	enum seg_rw rw,
-	struct cred *cred,
-	caller_context_t *ct)
+hsfs_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
+    struct page *pl[], size_t plsz, struct seg *seg, caddr_t addr,
+    enum seg_rw rw, struct cred *cred, caller_context_t *ct)
 {
 	uint_t filsiz;
 	struct hsfs *fsp;
@@ -1665,13 +1602,8 @@ hsfs_getpage(
  */
 /*ARGSUSED*/
 int
-hsfs_putapage(
-	vnode_t		*vp,
-	page_t		*pp,
-	u_offset_t	*offp,
-	size_t		*lenp,
-	int		flags,
-	cred_t		*cr)
+hsfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
+    int flags, cred_t *cr)
 {
 	/* should never happen - just destroy it */
 	cmn_err(CE_NOTE, "hsfs_putapage: dirty HSFS page");
@@ -1694,13 +1626,8 @@ hsfs_putapage(
  */
 /*ARGSUSED*/
 static int
-hsfs_putpage(
-	struct vnode		*vp,
-	offset_t		off,
-	size_t			len,
-	int			flags,
-	struct cred		*cr,
-	caller_context_t	*ct)
+hsfs_putpage(struct vnode *vp, offset_t off, size_t len, int flags,
+    struct cred *cr, caller_context_t *ct)
 {
 	int error = 0;
 
@@ -1771,17 +1698,9 @@ hsfs_putpage(
 
 /*ARGSUSED*/
 static int
-hsfs_map(
-	struct vnode *vp,
-	offset_t off,
-	struct as *as,
-	caddr_t *addrp,
-	size_t len,
-	uchar_t prot,
-	uchar_t maxprot,
-	uint_t flags,
-	struct cred *cred,
-	caller_context_t *ct)
+hsfs_map(struct vnode *vp, offset_t off, struct as *as, caddr_t *addrp,
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, struct cred *cred,
+    caller_context_t *ct)
 {
 	struct segvn_crargs vn_a;
 	int error;
@@ -1833,17 +1752,9 @@ hsfs_map(
 
 /* ARGSUSED */
 static int
-hsfs_addmap(
-	struct vnode *vp,
-	offset_t off,
-	struct as *as,
-	caddr_t addr,
-	size_t len,
-	uchar_t prot,
-	uchar_t maxprot,
-	uint_t flags,
-	struct cred *cr,
-	caller_context_t *ct)
+hsfs_addmap(struct vnode *vp, offset_t off, struct as *as, caddr_t addr,
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct hsnode *hp;
 
@@ -1859,17 +1770,9 @@ hsfs_addmap(
 
 /*ARGSUSED*/
 static int
-hsfs_delmap(
-	struct vnode *vp,
-	offset_t off,
-	struct as *as,
-	caddr_t addr,
-	size_t len,
-	uint_t prot,
-	uint_t maxprot,
-	uint_t flags,
-	struct cred *cr,
-	caller_context_t *ct)
+hsfs_delmap(struct vnode *vp, offset_t off, struct as *as, caddr_t addr,
+    size_t len, uint_t prot, uint_t maxprot, uint_t flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct hsnode *hp;
 
@@ -1886,26 +1789,17 @@ hsfs_delmap(
 
 /* ARGSUSED */
 static int
-hsfs_seek(
-	struct vnode *vp,
-	offset_t ooff,
-	offset_t *noffp,
-	caller_context_t *ct)
+hsfs_seek(struct vnode *vp, offset_t ooff, offset_t *noffp,
+    caller_context_t *ct)
 {
 	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
 }
 
 /* ARGSUSED */
 static int
-hsfs_frlock(
-	struct vnode *vp,
-	int cmd,
-	struct flock64 *bfp,
-	int flag,
-	offset_t offset,
-	struct flk_callback *flk_cbp,
-	cred_t *cr,
-	caller_context_t *ct)
+hsfs_frlock(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
+    offset_t offset, struct flk_callback *flk_cbp, cred_t *cr,
+    caller_context_t *ct)
 {
 	struct hsnode *hp = VTOH(vp);
 
@@ -2391,11 +2285,8 @@ hsched_enqueue_io(struct hsfs *fsp, struct hio *hsio, int ra)
 
 /* ARGSUSED */
 static int
-hsfs_pathconf(struct vnode *vp,
-	int cmd,
-	ulong_t *valp,
-	struct cred *cr,
-	caller_context_t *ct)
+hsfs_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct hsfs	*fsp;
 

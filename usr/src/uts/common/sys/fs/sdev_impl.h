@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, 2016 Joyent, Inc.  All rights reserved.
- * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  */
 
 #ifndef _SYS_SDEV_IMPL_H
@@ -239,9 +239,10 @@ typedef enum {
 #define	SDEV_HOLD(dv)	VN_HOLD(SDEVTOV(dv))
 #define	SDEV_RELE(dv)	VN_RELE(SDEVTOV(dv))
 #define	SDEV_SIMPLE_RELE(dv)	{	\
-	mutex_enter(&SDEVTOV(dv)->v_lock);	\
-	SDEVTOV(dv)->v_count--;	\
-	mutex_exit(&SDEVTOV(dv)->v_lock);	\
+	struct vnode *vp = SDEVTOV(dv);	\
+	mutex_enter(&vp->v_lock);	\
+	VN_RELE_LOCKED(vp);		\
+	mutex_exit(&vp->v_lock);	\
 }
 
 #define	SDEV_ACL_FLAVOR(vp)	(VFSTOSDEVFS(vp->v_vfsp)->sdev_acl_flavor)

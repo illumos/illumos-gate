@@ -27,6 +27,10 @@
 /*	  All Rights Reserved  	*/
 
 /*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
+
+/*
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
@@ -52,7 +56,7 @@
 #include <sys/sysmacros.h>
 #include <vm/pvn.h>
 
-extern pri_t 			minclsyspri;
+extern pri_t			minclsyspri;
 extern int			hash2ints();
 extern struct kmem_cache	*inode_cache;	/* cache of free inodes */
 extern int			ufs_idle_waiters;
@@ -679,17 +683,18 @@ ufs_idle_free(struct inode *ip)
 	/*
 	 * It must be guaranteed that v_count >= 2, otherwise
 	 * something must be wrong with this vnode already.
-	 * That is why we use v_count-- instead of VN_RELE().
+	 * That is why we use VN_RELE_LOCKED() instead of VN_RELE().
 	 * Acquire the vnode lock in case another thread is in
 	 * VN_RELE().
 	 */
 	mutex_enter(&vp->v_lock);
 
-	if (vp->v_count < 2)
+	if (vp->v_count < 2) {
 		cmn_err(CE_PANIC,
 		    "ufs_idle_free: vnode ref count is less than 2");
+	}
 
-	vp->v_count--;
+	VN_RELE_LOCKED(vp);
 
 	vn_has_data = (vp->v_type != VCHR && vn_has_cached_data(vp));
 	vn_modified = (ip->i_flag & (IMOD|IMODACC|IACC|ICHG|IUPD|IATTCHG));

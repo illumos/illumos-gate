@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 #include <sys/types.h>
 #include <sys/vnode.h>
@@ -100,14 +101,8 @@ door_open(struct vnode **vpp, int flag, struct cred *cr, caller_context_t *ct)
 
 /* ARGSUSED */
 static int
-door_close(
-	struct vnode *vp,
-	int flag,
-	int count,
-	offset_t offset,
-	struct cred *cr,
-	caller_context_t *ct
-)
+door_close(struct vnode *vp, int flag, int count, offset_t offset,
+    struct cred *cr, caller_context_t *ct)
 {
 	door_node_t	*dp = VTOD(vp);
 
@@ -146,7 +141,7 @@ door_close(
 /* ARGSUSED */
 static int
 door_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	static timestruc_t tzero = {0, 0};
 	extern dev_t doordev;
@@ -185,7 +180,7 @@ door_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 	 */
 	ASSERT(vp->v_count == 1);
 	if (dp->door_bound_threads > 0) {
-		vp->v_count--;
+		VN_RELE_LOCKED(vp);
 		mutex_exit(&vp->v_lock);
 		return;
 	}
@@ -229,7 +224,7 @@ door_unbind_thread(door_node_t *dp)
 	ASSERT(dp->door_bound_threads > 0);
 	if (--dp->door_bound_threads == 0 && vp->v_count == 0) {
 		/* set up for inactive handling */
-		vp->v_count++;
+		VN_HOLD_LOCKED(vp);
 		do_inactive = 1;
 	}
 	mutex_exit(&vp->v_lock);
@@ -241,7 +236,7 @@ door_unbind_thread(door_node_t *dp)
 /* ARGSUSED */
 static int
 door_access(struct vnode *vp, int mode, int flags, struct cred *cr,
-	caller_context_t *ct)
+    caller_context_t *ct)
 {
 	return (0);
 }

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -76,8 +77,9 @@
 #define	VN_HOLD_CALLER	VN_HOLD
 #define	VN_HOLD_DNLC(vp)	{	\
 	mutex_enter(&(vp)->v_lock);	\
-	if ((vp)->v_count_dnlc == 0)	\
-		(vp)->v_count++;	\
+	if ((vp)->v_count_dnlc == 0) {	\
+		VN_HOLD_LOCKED(vp);	\
+	}				\
 	(vp)->v_count_dnlc++;		\
 	mutex_exit(&(vp)->v_lock);	\
 }
@@ -404,11 +406,16 @@ dnlc_init()
 	dc_head.dch_prev = (dircache_t *)&dc_head;
 
 	/*
-	 * Initialise the reference count of the negative cache vnode to 1
-	 * so that it never goes away (VOP_INACTIVE isn't called on it).
+	 * Put a hold on the negative cache vnode so that it never goes away
+	 * (VOP_INACTIVE isn't called on it). The mutex_enter() isn't necessary
+	 * for correctness, but VN_HOLD_LOCKED() asserts that it's held, so
+	 * we oblige.
 	 */
-	negative_cache_vnode.v_count = 1;
+	mutex_enter(&negative_cache_vnode.v_lock);
+	negative_cache_vnode.v_count = 0;
+	VN_HOLD_LOCKED(&negative_cache_vnode);
 	negative_cache_vnode.v_count_dnlc = 0;
+	mutex_exit(&negative_cache_vnode.v_lock);
 
 	/*
 	 * Initialise kstats - both the old compatability raw kind and
