@@ -48,7 +48,6 @@ summary = {
 #
 known = {
     'acl/nontrivial/zfs_acl_chmod_inherit_003_pos': 'FAIL',
-    'acl/nontrivial/zfs_acl_chmod_xattr_001_pos': 'FAIL',
     'bootfs/bootfs_006_pos': 'FAIL',
     'bootfs/bootfs_008_neg': 'FAIL',
     'cache/cache_010_neg': 'FAIL',
