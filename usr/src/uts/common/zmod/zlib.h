@@ -31,8 +31,6 @@
 #ifndef _ZLIB_H
 #define _ZLIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "zconf.h"
 
 #ifdef __cplusplus

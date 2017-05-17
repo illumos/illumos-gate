@@ -16,8 +16,6 @@
 #ifndef _ZUTIL_H
 #define _ZUTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define ZLIB_INTERNAL
 #include "zlib.h"
 
