@@ -780,7 +780,7 @@ dls_devnet_stat_create(dls_devnet_t *ddp, zoneid_t zoneid, zoneid_t newzoneid)
 		nm = ddp->dd_linkname;
 	}
 
-	if (dls_stat_create("link", 0, ddp->dd_linkname, zoneid,
+	if (dls_stat_create("link", 0, nm, zoneid,
 	    dls_devnet_stat_update, (void *)(uintptr_t)ddp->dd_linkid,
 	    &ksp, newzoneid) == 0) {
 		ASSERT(ksp != NULL);
