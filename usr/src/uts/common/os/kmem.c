@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
- * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -1080,10 +1080,10 @@ size_t kmem_reclaim_max_slabs = 1;
 size_t kmem_reclaim_scan_range = 12;
 
 /* consolidator knobs */
-static boolean_t kmem_move_noreap;
-static boolean_t kmem_move_blocked;
-static boolean_t kmem_move_fulltilt;
-static boolean_t kmem_move_any_partial;
+boolean_t kmem_move_noreap;
+boolean_t kmem_move_blocked;
+boolean_t kmem_move_fulltilt;
+boolean_t kmem_move_any_partial;
 
 #ifdef	DEBUG
 /*

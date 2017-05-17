@@ -3200,14 +3200,9 @@ nfs4_clnt_init(void)
 
 	/*
 	 * Initialize the reference count of the notsupp xattr cache vnode to 1
-	 * so that it never goes away (VOP_INACTIVE isn't called on it). The
-	 * mutex_enter() isn't necessary for correctness, but VN_HOLD_LOCK()
-	 * asserts that it's held, so we oblige.
+	 * so that it never goes away (VOP_INACTIVE isn't called on it).
 	 */
-	mutex_enter(&nfs4_xattr_notsupp_vnode.v_lock);
-	nfs4_xattr_notsupp_vnode.v_count = 0;
-	VN_HOLD_LOCKED(&nfs4_xattr_notsupp_vnode);
-	mutex_exit(&nfs4_xattr_notsupp_vnode.v_lock);
+	vn_reinit(&nfs4_xattr_notsupp_vnode);
 }
 
 void

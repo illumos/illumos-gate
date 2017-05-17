@@ -2734,9 +2734,14 @@ build_firmware_properties(struct xboot_info *xbp)
 	ACPI_TABLE_HEADER *tp = NULL;
 
 #ifndef __xpv
-	if (xbp->bi_acpi_rsdp) {
+	if (xbp->bi_acpi_rsdp != NULL) {
 		bsetprop64("acpi-root-tab",
 		    (uint64_t)(uintptr_t)xbp->bi_acpi_rsdp);
+	}
+
+	if (xbp->bi_smbios != NULL) {
+		bsetprop64("smbios-address",
+		    (uint64_t)(uintptr_t)xbp->bi_smbios);
 	}
 
 	if ((tp = find_fw_table(ACPI_SIG_MSCT)) != NULL)

@@ -14,7 +14,7 @@
 # Copyright 2016 Joyent, Inc.
 #
 
-SUBDIRS = poll secflags sigqueue spoof-ras sdevfs stress timer tmpfs \
+SUBDIRS = poll secflags sigqueue spoof-ras sdevfs sockfs stress timer tmpfs \
 	file-locking
 
 PROGS = \

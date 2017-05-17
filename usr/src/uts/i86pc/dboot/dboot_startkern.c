@@ -1643,6 +1643,9 @@ dboot_multiboot_get_fwtables(void)
 	if (multiboot_version != 2)
 		return;
 
+	/* only provide SMBIOS pointer in case of UEFI */
+	bi->bi_smbios = NULL;
+
 	nacpitagp = (multiboot_tag_new_acpi_t *)
 	    dboot_multiboot2_find_tag(mb2_info,
 	    MULTIBOOT_TAG_TYPE_ACPI_NEW);
@@ -2050,6 +2053,7 @@ startup_kernel(void)
 	if (mb2_info != NULL)
 		DBG(mb2_info->mbi_total_size);
 	DBG(bi->bi_acpi_rsdp);
+	DBG(bi->bi_smbios);
 #endif
 
 	/*

@@ -407,15 +407,9 @@ dnlc_init()
 
 	/*
 	 * Put a hold on the negative cache vnode so that it never goes away
-	 * (VOP_INACTIVE isn't called on it). The mutex_enter() isn't necessary
-	 * for correctness, but VN_HOLD_LOCKED() asserts that it's held, so
-	 * we oblige.
+	 * (VOP_INACTIVE isn't called on it).
 	 */
-	mutex_enter(&negative_cache_vnode.v_lock);
-	negative_cache_vnode.v_count = 0;
-	VN_HOLD_LOCKED(&negative_cache_vnode);
-	negative_cache_vnode.v_count_dnlc = 0;
-	mutex_exit(&negative_cache_vnode.v_lock);
+	vn_reinit(&negative_cache_vnode);
 
 	/*
 	 * Initialise kstats - both the old compatability raw kind and
