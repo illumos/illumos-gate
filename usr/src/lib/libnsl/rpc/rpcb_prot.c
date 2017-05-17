@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * XDR routines for the rpcbinder version 3.
  */
@@ -180,7 +178,7 @@ xdr_rpcb_entry_list_ptr(XDR *xdrs, rpcb_entry_list_ptr *rp)
 			next = (*rp)->rpcb_entry_next;
 		if (!xdr_reference(xdrs, (caddr_t *)rp,
 		    (uint_t)sizeof (rpcb_entry_list),
-				    (xdrproc_t)xdr_rpcb_entry))
+		    (xdrproc_t)xdr_rpcb_entry))
 			return (FALSE);
 		if (freeing) {
 			next_copy = next;
@@ -256,8 +254,43 @@ xdr_rpcb_rmtcallres(XDR *xdrs, struct r_rpcb_rmtcallres *objp)
 bool_t
 xdr_netbuf(XDR *xdrs, struct netbuf *objp)
 {
-	if (!xdr_u_int(xdrs, (uint_t *)&objp->maxlen))
+	bool_t res;
+
+	/*
+	 * Save the passed in maxlen value and buf pointer.  We might
+	 * need them later.
+	 */
+	uint_t maxlen_save = objp->maxlen;
+	void *buf_save = objp->buf;
+
+	if (!xdr_u_int(xdrs, &objp->maxlen))
 		return (FALSE);
-	return (xdr_bytes(xdrs, (char **)&(objp->buf),
-			(uint_t *)&(objp->len), objp->maxlen));
+
+	/*
+	 * We need to free maxlen, not len, so do it explicitly now.
+	 */
+	if (xdrs->x_op == XDR_FREE)
+		return (xdr_bytes(xdrs, &objp->buf, &objp->maxlen,
+		    objp->maxlen));
+
+	/*
+	 * If we're decoding and the caller has already allocated a
+	 * buffer restore the maxlen value since the decoded value
+	 * doesn't apply to the caller's buffer.  xdr_bytes() will
+	 * return an error if the buffer isn't big enough.
+	 */
+	if (xdrs->x_op == XDR_DECODE && objp->buf != NULL)
+		objp->maxlen = maxlen_save;
+
+	res = xdr_bytes(xdrs, &objp->buf, &objp->len, objp->maxlen);
+
+	/*
+	 * If we are decoding and the buffer was allocated in the
+	 * xdr_bytes() function we need to set maxlen properly to
+	 * follow the netbuf semantics.
+	 */
+	if (xdrs->x_op == XDR_DECODE && objp->buf != buf_save)
+		objp->maxlen = objp->len;
+
+	return (res);
 }

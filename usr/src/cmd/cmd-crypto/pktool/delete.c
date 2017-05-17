@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2017 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -132,7 +133,7 @@ pk_destroy_keys(void *handle, KMF_ATTRIBUTE *attrlist, int numattr)
 
 static KMF_RETURN
 pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr,
-	char *desc, int *keysdeleted)
+    char *desc, int *keysdeleted)
 {
 	KMF_RETURN rv = KMF_OK;
 	uint32_t numkeys = 0;
@@ -222,8 +223,8 @@ pk_delete_certs(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr)
 
 static KMF_RETURN
 delete_nss_keys(KMF_HANDLE_T kmfhandle, char *dir, char *prefix,
-	char *token, int oclass, char *objlabel,
-	KMF_CREDENTIAL *tokencred)
+    char *token, int oclass, char *objlabel,
+    KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN rv = KMF_OK;
 	char *keytype = NULL;
@@ -312,10 +313,10 @@ delete_nss_keys(KMF_HANDLE_T kmfhandle, char *dir, char *prefix,
 
 static KMF_RETURN
 delete_nss_certs(KMF_HANDLE_T kmfhandle,
-	char *dir, char *prefix,
-	char *token, char *objlabel,
-	KMF_BIGINT *serno, char *issuer, char *subject,
-	KMF_CERT_VALIDITY find_criteria_flag)
+    char *dir, char *prefix,
+    char *token, char *objlabel,
+    KMF_BIGINT *serno, char *issuer, char *subject,
+    KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
@@ -326,49 +327,49 @@ delete_nss_certs(KMF_HANDLE_T kmfhandle,
 	if (rv != KMF_OK)
 		return (rv);
 
-		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
-		    &kstype, sizeof (kstype));
-		numattr++;
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	numattr++;
 
-		if (objlabel != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_CERT_LABEL_ATTR, objlabel,
-			    strlen(objlabel));
-			numattr++;
-		}
-
-		if (issuer != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_ISSUER_NAME_ATTR, issuer,
-			    strlen(issuer));
-			numattr++;
-		}
-
-		if (subject != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_SUBJECT_NAME_ATTR, subject,
-			    strlen(subject));
-			numattr++;
-		}
-
-		if (serno != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_BIGINT_ATTR, serno,
-			    sizeof (KMF_BIGINT));
-			numattr++;
-		}
-
+	if (objlabel != NULL) {
 		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_CERT_VALIDITY_ATTR, &find_criteria_flag,
-		    sizeof (KMF_CERT_VALIDITY));
+		    KMF_CERT_LABEL_ATTR, objlabel,
+		    strlen(objlabel));
 		numattr++;
+	}
 
-		if (token != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_TOKEN_LABEL_ATTR, token,
-			    strlen(token));
-			numattr++;
-		}
+	if (issuer != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_ISSUER_NAME_ATTR, issuer,
+		    strlen(issuer));
+		numattr++;
+	}
+
+	if (subject != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_SUBJECT_NAME_ATTR, subject,
+		    strlen(subject));
+		numattr++;
+	}
+
+	if (serno != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_BIGINT_ATTR, serno,
+		    sizeof (KMF_BIGINT));
+		numattr++;
+	}
+
+	kmf_set_attr_at_index(attrlist, numattr,
+	    KMF_CERT_VALIDITY_ATTR, &find_criteria_flag,
+	    sizeof (KMF_CERT_VALIDITY));
+	numattr++;
+
+	if (token != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_TOKEN_LABEL_ATTR, token,
+		    strlen(token));
+		numattr++;
+	}
 
 	rv = pk_delete_certs(kmfhandle, attrlist, numattr);
 
@@ -377,8 +378,8 @@ delete_nss_certs(KMF_HANDLE_T kmfhandle,
 
 static KMF_RETURN
 delete_nss_crl(void *kmfhandle,
-	char *dir, char *prefix, char *token,
-	char *issuer, char *subject)
+    char *dir, char *prefix, char *token,
+    char *issuer, char *subject)
 {
 	KMF_RETURN rv = KMF_OK;
 	int numattr = 0;
@@ -416,8 +417,8 @@ delete_nss_crl(void *kmfhandle,
 
 static KMF_RETURN
 delete_pk11_keys(KMF_HANDLE_T kmfhandle,
-	char *token, int oclass, char *objlabel,
-	KMF_CREDENTIAL *tokencred)
+    char *token, int oclass, char *objlabel,
+    KMF_CREDENTIAL *tokencred)
 {
 	KMF_RETURN rv = KMF_OK;
 	int nk, numkeys = 0;
@@ -519,9 +520,9 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 
 static KMF_RETURN
 delete_pk11_certs(KMF_HANDLE_T kmfhandle,
-	char *token, char *objlabel,
-	KMF_BIGINT *serno, char *issuer, char *subject,
-	KMF_CERT_VALIDITY find_criteria_flag)
+    char *token, char *objlabel,
+    KMF_BIGINT *serno, char *issuer, char *subject,
+    KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN kmfrv;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
@@ -573,8 +574,8 @@ delete_pk11_certs(KMF_HANDLE_T kmfhandle,
 
 static KMF_RETURN
 delete_file_certs(KMF_HANDLE_T kmfhandle,
-	char *dir, char *filename, KMF_BIGINT *serial, char *issuer,
-	char *subject, KMF_CERT_VALIDITY find_criteria_flag)
+    char *dir, char *filename, KMF_BIGINT *serial, char *issuer,
+    char *subject, KMF_CERT_VALIDITY find_criteria_flag)
 {
 	KMF_RETURN rv;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
@@ -625,8 +626,7 @@ delete_file_certs(KMF_HANDLE_T kmfhandle,
 }
 
 static KMF_RETURN
-delete_file_keys(KMF_HANDLE_T kmfhandle, int oclass,
-	char *dir, char *infile)
+delete_file_keys(KMF_HANDLE_T kmfhandle, int oclass, char *dir, char *infile)
 {
 	KMF_RETURN rv = KMF_OK;
 	char *keytype = "";

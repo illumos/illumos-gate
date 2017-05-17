@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -2180,11 +2180,11 @@ e_bad:
  */
 int
 sotpi_connect(struct sonode *so,
-	struct sockaddr *name,
-	socklen_t namelen,
-	int fflag,
-	int flags,
-	struct cred *cr)
+    struct sockaddr *name,
+    socklen_t namelen,
+    int fflag,
+    int flags,
+    struct cred *cr)
 {
 	struct T_conn_req	conn_req;
 	int			error = 0;
@@ -2406,12 +2406,21 @@ sotpi_connect(struct sonode *so,
 			dprintso(so, 1,
 			    ("sotpi_connect UNIX: srclen %d, src %p\n",
 			    srclen, src));
+			/*
+			 * Translate the destination address into our
+			 * internal form, and save it in sti_ux_faddr.
+			 * After this call, addr==&sti->sti_ux_taddr,
+			 * and we copy that to sti->sti_ux_faddr so
+			 * we save the connected peer address.
+			 */
 			error = so_ux_addr_xlate(so,
 			    sti->sti_faddr_sa, (socklen_t)sti->sti_faddr_len,
 			    (flags & _SOCONNECT_XPG4_2),
 			    &addr, &addrlen);
 			if (error)
 				goto bad;
+			bcopy(&sti->sti_ux_taddr, &sti->sti_ux_faddr,
+			    sizeof (sti->sti_ux_faddr));
 		}
 	} else {
 		addr = sti->sti_faddr_sa;
@@ -2805,7 +2814,6 @@ done:
 void
 so_unix_close(struct sonode *so)
 {
-	int		error;
 	struct T_opthdr	toh;
 	mblk_t		*mp;
 	sotpi_info_t	*sti = SOTOTPI(so);
@@ -2849,22 +2857,13 @@ so_unix_close(struct sonode *so)
 		struct T_opthdr		toh2;
 		t_scalar_t		size;
 
-		/* Connecteded DGRAM socket */
-
 		/*
-		 * For AF_UNIX the destination address is translated to
-		 * an internal name and the source address is passed as
-		 * an option.
+		 * We know this is an AF_UNIX connected DGRAM socket.
+		 * We therefore already have the destination address
+		 * in the internal form needed for this send.  This is
+		 * similar to the sosend_dgram call later in this file
+		 * when there's no user-specified destination address.
 		 */
-		/*
-		 * Length and family checks.
-		 */
-		error = so_addr_verify(so, sti->sti_faddr_sa,
-		    (t_uscalar_t)sti->sti_faddr_len);
-		if (error) {
-			eprintsoline(so, error);
-			return;
-		}
 		if (sti->sti_faddr_noxlate) {
 			/*
 			 * Already have a transport internal address. Do not
@@ -2885,14 +2884,11 @@ so_unix_close(struct sonode *so)
 			dprintso(so, 1,
 			    ("so_ux_close: srclen %d, src %p\n",
 			    srclen, src));
-			error = so_ux_addr_xlate(so,
-			    sti->sti_faddr_sa,
-			    (socklen_t)sti->sti_faddr_len, 0,
-			    &addr, &addrlen);
-			if (error) {
-				eprintsoline(so, error);
-				return;
-			}
+			/*
+			 * Use the destination address saved in connect.
+			 */
+			addr = &sti->sti_ux_faddr;
+			addrlen = sizeof (sti->sti_ux_faddr);
 		}
 		tudr.PRIM_type = T_UNITDATA_REQ;
 		tudr.DEST_length = addrlen;
@@ -2938,7 +2934,7 @@ so_unix_close(struct sonode *so)
 		ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
 	}
 	mutex_exit(&so->so_lock);
-	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
+	(void) kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
 	mutex_enter(&so->so_lock);
 }
@@ -3648,6 +3644,15 @@ out_locked:
 /*
  * Sending data with options on a datagram socket.
  * Assumes caller has verified that SS_ISBOUND etc. are set.
+ *
+ * For AF_UNIX the destination address may be already in
+ * internal form, as indicated by sti->sti_faddr_noxlate
+ * or the MSG_SENDTO_NOXLATE flag.  Otherwise we need to
+ * translate the destination address to internal form.
+ *
+ * The source address is passed as an option.  If passing
+ * file descriptors, those are passed as file pointers in
+ * another option.
  */
 static int
 sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
@@ -3677,21 +3682,19 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		return (EMSGSIZE);
 	}
 
-	/*
-	 * For AF_UNIX the destination address is translated to an internal
-	 * name and the source address is passed as an option.
-	 * Also, file descriptors are passed as file pointers in an
-	 * option.
-	 */
-
-	/*
-	 * Length and family checks.
-	 */
-	error = so_addr_verify(so, name, namelen);
-	if (error) {
-		eprintsoline(so, error);
-		return (error);
+	if (sti->sti_faddr_noxlate == 0 &&
+	    (flags & MSG_SENDTO_NOXLATE) == 0) {
+		/*
+		 * Length and family checks.
+		 * Don't verify internal form.
+		 */
+		error = so_addr_verify(so, name, namelen);
+		if (error) {
+			eprintsoline(so, error);
+			return (error);
+		}
 	}
+
 	if (so->so_family == AF_UNIX) {
 		if (sti->sti_faddr_noxlate) {
 			/*
@@ -3702,6 +3705,15 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 			addrlen = namelen;
 			src = NULL;
 			srclen = 0;
+		} else if (flags & MSG_SENDTO_NOXLATE) {
+			/*
+			 * Have an internal form dest. address.
+			 * Pass the source address as usual.
+			 */
+			addr = name;
+			addrlen = namelen;
+			src = sti->sti_laddr_sa;
+			srclen = (socklen_t)sti->sti_laddr_len;
 		} else {
 			/*
 			 * Pass the sockaddr_un source address as an option
@@ -3714,10 +3726,15 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 			 * partially old "from" address.
 			 */
 			src = sti->sti_laddr_sa;
-			srclen = (t_uscalar_t)sti->sti_laddr_len;
+			srclen = (socklen_t)sti->sti_laddr_len;
 			dprintso(so, 1,
 			    ("sosend_dgramcmsg UNIX: srclen %d, src %p\n",
 			    srclen, src));
+			/*
+			 * The sendmsg caller specified a destination
+			 * address, which we must translate into our
+			 * internal form.  addr = &sti->sti_ux_taddr
+			 */
 			error = so_ux_addr_xlate(so, name, namelen,
 			    (flags & MSG_XPG4_2),
 			    &addr, &addrlen);
@@ -3979,8 +3996,12 @@ sosend_svccmsg(struct sonode *so, struct uio *uiop, int more, void *control,
  * Sending data on a datagram socket.
  * Assumes caller has verified that SS_ISBOUND etc. are set.
  *
- * For AF_UNIX the destination address is translated to an internal
- * name and the source address is passed as an option.
+ * For AF_UNIX the destination address may be already in
+ * internal form, as indicated by sti->sti_faddr_noxlate
+ * or the MSG_SENDTO_NOXLATE flag.  Otherwise we need to
+ * translate the destination address to internal form.
+ *
+ * The source address is passed as an option.
  */
 int
 sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
@@ -4004,12 +4025,18 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 		goto done;
 	}
 
-	/* Length and family checks */
-	error = so_addr_verify(so, name, namelen);
-	if (error != 0)
-		goto done;
+	if (sti->sti_faddr_noxlate == 0 &&
+	    (flags & MSG_SENDTO_NOXLATE) == 0) {
+		/*
+		 * Length and family checks.
+		 * Don't verify internal form.
+		 */
+		error = so_addr_verify(so, name, namelen);
+		if (error != 0)
+			goto done;
+	}
 
-	if (sti->sti_direct)
+	if (sti->sti_direct)	/* Never on AF_UNIX */
 		return (sodgram_direct(so, name, namelen, uiop, flags));
 
 	if (so->so_family == AF_UNIX) {
@@ -4022,6 +4049,15 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 			addrlen = namelen;
 			src = NULL;
 			srclen = 0;
+		} else if (flags & MSG_SENDTO_NOXLATE) {
+			/*
+			 * Have an internal form dest. address.
+			 * Pass the source address as usual.
+			 */
+			addr = name;
+			addrlen = namelen;
+			src = sti->sti_laddr_sa;
+			srclen = (socklen_t)sti->sti_laddr_len;
 		} else {
 			/*
 			 * Pass the sockaddr_un source address as an option
@@ -4038,6 +4074,11 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 			dprintso(so, 1,
 			    ("sosend_dgram UNIX: srclen %d, src %p\n",
 			    srclen, src));
+			/*
+			 * The sendmsg caller specified a destination
+			 * address, which we must translate into our
+			 * internal form.  addr = &sti->sti_ux_taddr
+			 */
 			error = so_ux_addr_xlate(so, name, namelen,
 			    (flags & MSG_XPG4_2),
 			    &addr, &addrlen);
@@ -4208,6 +4249,44 @@ sosend_svc(struct sonode *so, struct uio *uiop, t_scalar_t prim, int more,
  * If MSG_DONTROUTE is set (and SO_DONTROUTE isn't already set)
  * this function issues a setsockopt to toggle SO_DONTROUTE before and
  * after sending the message.
+ *
+ * The caller may optionally specify a destination address, for either
+ * stream or datagram sockets.  This table summarizes the cases:
+ *
+ *    Socket type    Dest. given    Connected    Result
+ *    -----------    -----------    ---------    --------------
+ *    Stream         *              Yes	         send to conn. addr.
+ *    Stream         *              No           error ENOTCONN
+ *    Dgram          yes            *            send to given addr.
+ *    Dgram          no             yes          send to conn. addr.
+ *    Dgram          no             no	         error EDESTADDRREQ
+ *
+ * There are subtleties around the destination address when using
+ * AF_UNIX datagram sockets.  When the sendmsg call specifies the
+ * destination address, it's in (struct sockaddr_un) form and we
+ * need to translate it to our internal form (struct so_ux_addr).
+ *
+ * When the sendmsg call does not specify a destination address
+ * we're using the peer address saved during sotpi_connect, and
+ * that address is already in internal form.  In this case, the
+ * (internal only) flag MSG_SENDTO_NOXLATE is set in the flags
+ * passed to sosend_dgram or sosend_dgramcmsg to indicate that
+ * those functions should skip translation to internal form.
+ * Avoiding that translation is not only more efficient, but it's
+ * also necessary when a process does a connect on an AF_UNIX
+ * datagram socket and then drops privileges.  After the process
+ * has dropped privileges, it may no longer be able to lookup the
+ * the external name in the filesystem, but it should still be
+ * able to send messages on the connected socket by leaving the
+ * destination name unspecified.
+ *
+ * Yet more subtleties arise with sockets connected by socketpair(),
+ * which puts internal form addresses in the fields where normally
+ * the external form is found, and sets sti_faddr_noxlate=1, which
+ * (like flag MSG_SENDTO_NOXLATE) causes the sosend_dgram functions
+ * to skip translation of destination addresses to internal form.
+ * However, beware that the flag sti_faddr_noxlate=1 also triggers
+ * different behaviour almost everywhere AF_UNIX addresses appear.
  */
 static int
 sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
@@ -4250,6 +4329,16 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 
 	name = (struct sockaddr *)msg->msg_name;
 	namelen = msg->msg_namelen;
+	flags = msg->msg_flags;
+
+	/*
+	 * Historically, this function does not validate the flags
+	 * passed in, and any errant bits are ignored.  However,
+	 * we would not want any such errant flag bits accidently
+	 * being treated as one of the internal-only flags, so
+	 * clear the internal-only flag bits.
+	 */
+	flags &= ~MSG_SENDTO_NOXLATE;
 
 	so_mode = so->so_mode;
 
@@ -4261,25 +4350,43 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 			else
 				return (EDESTADDRREQ);
 		}
+		/*
+		 * This is a connected socket.
+		 */
 		if (so_mode & SM_CONNREQUIRED) {
+			/*
+			 * This is a connected STREAM socket,
+			 * destination not specified.
+			 */
 			name = NULL;
 			namelen = 0;
 		} else {
 			/*
-			 * Note that this code does not prevent sti_faddr_sa
-			 * from changing while it is being used. Thus
-			 * if an "unconnect"+connect occurs concurrently with
-			 * this send the datagram might be delivered to a
-			 * garbaled address.
+			 * Datagram send on connected socket with
+			 * the destination name not specified.
+			 * Use the peer address from connect.
 			 */
-			ASSERT(sti->sti_faddr_sa);
-			name = sti->sti_faddr_sa;
-			namelen = (t_uscalar_t)sti->sti_faddr_len;
+			if (so->so_family == AF_UNIX) {
+				/*
+				 * Use the (internal form) address saved
+				 * in sotpi_connect.  See above.
+				 */
+				name = (void *)&sti->sti_ux_faddr;
+				namelen = sizeof (sti->sti_ux_faddr);
+				flags |= MSG_SENDTO_NOXLATE;
+			} else {
+				ASSERT(sti->sti_faddr_sa);
+				name = sti->sti_faddr_sa;
+				namelen = (t_uscalar_t)sti->sti_faddr_len;
+			}
 		}
 	} else {
+		/*
+		 * Sendmsg specifies a destination name
+		 */
 		if (!(so_state & SS_ISCONNECTED) &&
 		    (so_mode & SM_CONNREQUIRED)) {
-			/* Required but not connected */
+			/* i.e. TCP not connected */
 			mutex_exit(&so->so_lock);
 			return (ENOTCONN);
 		}
@@ -4381,7 +4488,6 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	}
 	mutex_exit(&so->so_lock);
 
-	flags = msg->msg_flags;
 	dontroute = 0;
 	if ((flags & MSG_DONTROUTE) && !(so->so_options & SO_DONTROUTE)) {
 		uint32_t	val;
@@ -5114,7 +5220,7 @@ done:
 /* ARGSUSED */
 int
 sotpi_getsockopt(struct sonode *so, int level, int option_name,
-		void *optval, socklen_t *optlenp, int flags, struct cred *cr)
+    void *optval, socklen_t *optlenp, int flags, struct cred *cr)
 {
 	struct T_optmgmt_req	optmgmt_req;
 	struct T_optmgmt_ack	*optmgmt_ack;
@@ -5469,7 +5575,7 @@ done2:
 /* ARGSUSED */
 int
 sotpi_setsockopt(struct sonode *so, int level, int option_name,
-	const void *optval, t_uscalar_t optlen, struct cred *cr)
+    const void *optval, t_uscalar_t optlen, struct cred *cr)
 {
 	struct T_optmgmt_req	optmgmt_req;
 	struct opthdr		oh;

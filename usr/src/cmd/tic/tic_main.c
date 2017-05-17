@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 *************************************************************************
 *			COPYRIGHT NOTICE				*
@@ -220,7 +218,7 @@ check_dir(char dirletter)
 	    if (stat64(dir, &statbuf) < 0) {
 		if (mkdir(dir, 0755) < 0)
 			syserr_abort("mkdir %s returned bad status", dir);
-			dirnames[dirletter] = 1;
+		dirnames[dirletter] = 1;
 	    } else if (access(dir, 7) < 0) {
 			fprintf(stderr, "%s: %s/%s: Permission denied\n",
 			    progname, destination, dir);

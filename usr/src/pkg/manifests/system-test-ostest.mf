@@ -29,6 +29,7 @@ dir path=opt/os-tests/tests/file-locking
 dir path=opt/os-tests/tests/sdevfs
 dir path=opt/os-tests/tests/secflags
 dir path=opt/os-tests/tests/sigqueue
+dir path=opt/os-tests/tests/sockfs
 dir path=opt/os-tests/tests/stress
 file path=opt/os-tests/README mode=0444
 file path=opt/os-tests/bin/ostest mode=0555
@@ -56,6 +57,10 @@ file path=opt/os-tests/tests/secflags/secflags_truss mode=0555
 file path=opt/os-tests/tests/secflags/secflags_zonecfg mode=0555
 file path=opt/os-tests/tests/secflags/stacky mode=0555
 file path=opt/os-tests/tests/sigqueue/sigqueue_queue_size mode=0555
+file path=opt/os-tests/tests/sockfs/conn mode=0555
+file path=opt/os-tests/tests/sockfs/dgram mode=0555
+file path=opt/os-tests/tests/sockfs/drop_priv mode=0555
+file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
 license cr_Sun license=cr_Sun

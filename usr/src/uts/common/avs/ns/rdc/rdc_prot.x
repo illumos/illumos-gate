@@ -40,7 +40,6 @@
 % * <tiuser.h>.  Instead we merely declare the XDR routine xdr_netbuf() here,
 % * and implement it ourselves in rpc/rpcb_prot.c.
 % */
-%#define xdr_netbuf	rdc_xdr_netbuf
 %#ifdef __cplusplus
 %extern "C" bool_t xdr_netbuf(XDR *, struct netbuf *);
 %

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <libintl.h>
@@ -76,14 +74,14 @@ net_open(char *host, int timeout)
 	void (*old_handler)();
 	static struct utsname uts;
 
-	int	s,
-		lport,
-		err,
-		error_num;
+	int s;
+	int lport;
+	int err;
+	int error_num;
 	unsigned timo = 1;
 
 	syslog(LOG_DEBUG, "net_open(%s, %d)", (host != NULL ? host : "NULL"),
-		timeout);
+	    timeout);
 	/*
 	 * Get the host address and port number to connect to.
 	 */
@@ -93,7 +91,7 @@ net_open(char *host, int timeout)
 
 	(void) memset((char *)&sin, NULL, sizeof (sin));
 	if ((hp = getipnodebyname(host, AF_INET6, AI_DEFAULT,
-		    &error_num)) == NULL) {
+	    &error_num)) == NULL) {
 		syslog(LOG_DEBUG|LOG_ERR, "unknown host %s "
 		    "getipnodebyname() returned %d", host, error_num);
 		return (NETWORK_ERROR_HOST);
@@ -205,27 +203,23 @@ main(int argc, char *argv[])
 		case 'I': /* foo-49 */
 			job_data->request_id = alloc_str((char *)optarg);
 			syslog(LOG_DEBUG, "request_id: %s",
-				job_data->request_id);
+			    job_data->request_id);
 			break;
 		case 'U': /* awe172-126!wendyp */
 			job_data->username = alloc_str((char *)optarg);
-			syslog(LOG_DEBUG, "username: %s",
-				job_data->username);
+			syslog(LOG_DEBUG, "username: %s", job_data->username);
 			break;
 		case 'p': /* foo */
 			job_data->printer = alloc_str((char *)optarg);
-			syslog(LOG_DEBUG, "printer: %s",
-				job_data->printer);
+			syslog(LOG_DEBUG, "printer: %s", job_data->printer);
 			break;
 		case 'd': /* server for printer */
 			job_data->dest = alloc_str((char *)optarg);
-			syslog(LOG_DEBUG, "dest: %s",
-				job_data->dest);
+			syslog(LOG_DEBUG, "dest: %s", job_data->dest);
 			break;
 		case 'T': /* /tmp/file2 */
 			job_data->title = alloc_str((char *)optarg);
-			syslog(LOG_DEBUG, "title: %s",
-				job_data->title);
+			syslog(LOG_DEBUG, "title: %s", job_data->title);
 			break;
 		case 'P':
 			if ((strcmp(optarg, "bsd")) == 0)
@@ -235,8 +229,7 @@ main(int argc, char *argv[])
 			else
 				usage_exit();
 
-			syslog(LOG_DEBUG, "protocol: %d",
-				job_data->protocol);
+			syslog(LOG_DEBUG, "protocol: %d", job_data->protocol);
 			break;
 		case 't':
 			job_data->timeout = atoi(optarg);
@@ -255,8 +248,7 @@ main(int argc, char *argv[])
 			break;
 		case 'b':
 			job_data->banner = NOBANNER;
-			syslog(LOG_DEBUG, "banner : %d",
-				job_data->banner);
+			syslog(LOG_DEBUG, "banner : %d", job_data->banner);
 			break;
 		case '?':
 			usage_exit();
@@ -264,7 +256,7 @@ main(int argc, char *argv[])
 
 
 	if ((job_data->dest == NULL) || (job_data->request_id == NULL) ||
-		(job_data->printer == NULL) || (job_data->username == NULL))
+	    (job_data->printer == NULL) || (job_data->username == NULL))
 		usage_exit();
 
 	/*
@@ -285,26 +277,30 @@ main(int argc, char *argv[])
 
 	if ((filesize = check_file(job_data->filename)) == -1) {
 		syslog(LOG_DEBUG, "Skipping file %s",
-		job_data->filename ? job_data->filename : "Error NULL file");
+		    job_data->filename ?
+		    job_data->filename : "Error NULL file");
 
 		switch (errno) {
 		case EISDIR:
 			(void) fprintf(stderr,
-			gettext("Netpr: %s: Not a regular file\n"),
-			(job_data->filename ? job_data->filename : "Noname"));
+			    gettext("Netpr: %s: Not a regular file\n"),
+			    job_data->filename ?
+			    job_data->filename : "Noname");
 			syslog(LOG_DEBUG, "Not a regular file");
 			break;
 		case ESRCH:
 			(void) fprintf(stderr,
-			gettext("Netpr: %s: Empty file\n"),
-			(job_data->filename ? job_data->filename : "Noname"));
+			    gettext("Netpr: %s: Empty file\n"),
+			    job_data->filename ?
+			    job_data->filename : "Noname");
 			syslog(LOG_DEBUG, "Empty file");
 			break;
 		default:
 			perror(job_data->filename);
 			(void) fprintf(stderr,
-			gettext("Netpr: Cannot access file %s\n"),
-			(job_data->filename ? job_data->filename : "Noname"));
+			    gettext("Netpr: Cannot access file %s\n"),
+			    job_data->filename ?
+			    job_data->filename : "Noname");
 			syslog(LOG_DEBUG, "Cannot access file.");
 			break;
 
@@ -322,21 +318,25 @@ main(int argc, char *argv[])
 	 */
 	if ((fd = open(job_data->filename, O_RDONLY)) < 0) {
 		(void) fprintf(stderr, gettext("Netpr: Cannot open file %s\n"),
-		(job_data->filename ? job_data->filename : "Error: NULL file"));
+		    job_data->filename ?
+		    job_data->filename : "Error: NULL file");
 		syslog(LOG_DEBUG, "Cannot open file: %s",
-		job_data->filename ? job_data->filename : "Error NULL file");
+		    job_data->filename ?
+		    job_data->filename : "Error NULL file");
 		exit(E_BAD_FILE);
 	}
 
 	if ((pa = mmap((caddr_t)0, filesize, PROT_READ,
-		(MAP_SHARED | MAP_NORESERVE), fd, (off_t)0)) == MAP_FAILED) {
+	    (MAP_SHARED | MAP_NORESERVE), fd, (off_t)0)) == MAP_FAILED) {
 
 		(void) close(fd);
 		(void) fprintf(stderr, gettext("Netpr: Cannot mmap file %s"),
-		(job_data->filename ? job_data->filename : "Error: NULL file"));
+		    job_data->filename ?
+		    job_data->filename : "Error: NULL file");
 
 		syslog(LOG_DEBUG, "Cannot mmap file: %s",
-		job_data->filename ? job_data->filename : "Error NULL file");
+		    job_data->filename ?
+		    job_data->filename : "Error NULL file");
 
 		exit(E_RETRY);
 	}
@@ -344,7 +344,7 @@ main(int argc, char *argv[])
 
 	if (job_data->protocol == BSD) {
 		bsdjob = (np_bsdjob_t *)
-			create_bsd_job(job_data, pr_order, filesize);
+		    create_bsd_job(job_data, pr_order, filesize);
 		if (bsdjob == NULL)
 			exit(E_FAILURE);
 	} else {
@@ -360,29 +360,27 @@ main(int argc, char *argv[])
 	if ((strpbrk(job_data->dest, DEST_SEP)) != NULL) {
 		if (job_data->protocol == BSD) {
 			parse_dest(job_data->dest, &destination,
-				&vendor_pr_name, DEST_SEP);
+			    &vendor_pr_name, DEST_SEP);
 			if (vendor_pr_name != NULL) {
 				bsdjob->np_printer = vendor_pr_name;
 				syslog(LOG_DEBUG, "bsd vendor name: %s",
-					bsdjob->np_printer);
+				    bsdjob->np_printer);
 			}
 		} else {
 			parse_dest(job_data->dest, &destination, &tcp_port,
-				DEST_SEP);
+			    DEST_SEP);
 			if (tcp_port != NULL)
 				tcpjob->np_port = tcp_port;
-				syslog(LOG_DEBUG, "tcp_port %s",
-					tcpjob->np_port);
+			syslog(LOG_DEBUG, "tcp_port %s", tcpjob->np_port);
 		}
 		if (destination == NULL ||
-			(job_data->protocol == TCP && tcp_port == NULL)) {
-		    (void) fprintf(stderr,
-		    gettext("Netpr: system error parsing destination %s\n"),
-		    job_data->dest);
-		    syslog(LOG_DEBUG, "system error parsing destination %s",
-			job_data->dest);
+		    (job_data->protocol == TCP && tcp_port == NULL)) {
+			(void) fprintf(stderr, gettext("Netpr: system error "
+			    "parsing destination %s\n"), job_data->dest);
+			syslog(LOG_DEBUG, "system error parsing destination %s",
+			    job_data->dest);
 
-		    exit(E_FAILURE);
+			exit(E_FAILURE);
 		}
 
 	} else {
@@ -406,9 +404,9 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr,
 			    gettext("Netpr: Cannot open connection to <%s>\n"),
 			    destination);
-			    syslog(LOG_DEBUG,
-				"Cannot open connection to %s: retrying",
-				destination);
+			syslog(LOG_DEBUG,
+			    "Cannot open connection to %s: retrying",
+			    destination);
 			exit(E_RETRY);
 		}
 	} else {
@@ -426,27 +424,25 @@ main(int argc, char *argv[])
 
 	/* Set SO_KEEPALIVE on socket to keep open */
 	if ((setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE,
-			(char *)&on, sizeof (on))) < 0) {
+	    (char *)&on, sizeof (on))) < 0) {
 		syslog(LOG_DEBUG, "setsocket (SO_KEEPALIVE): %m");
 	}
 
 	if (job_data->protocol == BSD) {
 		if ((jobstatus = bsd_print(sockfd, pa,  bsdjob)) != 0) {
-			(void) fprintf(stderr,
-			gettext("Netpr: Error return from bsd_print <%d>\n"),
-			jobstatus);
+			(void) fprintf(stderr, gettext("Netpr: Error return "
+			    "from bsd_print <%d>\n"), jobstatus);
 			syslog(LOG_DEBUG,
-				"Error return from bsd_print <%d>", jobstatus);
+			    "Error return from bsd_print <%d>", jobstatus);
 			exit_status = E_RETRY;
 		}
 	} else {
 		if ((jobstatus =
-			tcp_print(sockfd, pa, tcpjob)) != 0) {
-			(void) fprintf(stderr,
-			gettext("Netpr: Error return from tcp_print <%d>\n"),
-			jobstatus);
+		    tcp_print(sockfd, pa, tcpjob)) != 0) {
+			(void) fprintf(stderr, gettext("Netpr: Error return "
+			    "from tcp_print <%d>\n"), jobstatus);
 			syslog(LOG_DEBUG,
-				"Error return from tcp_print <%d>", jobstatus);
+			    "Error return from tcp_print <%d>", jobstatus);
 			exit_status = E_RETRY;
 		}
 	}
