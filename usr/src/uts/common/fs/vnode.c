@@ -2416,6 +2416,15 @@ vn_reinit(vnode_t *vp)
 	vp->v_locality = NULL;
 	vp->v_xattrdir = NULL;
 
+	/*
+	 * In a few specific instances, vn_reinit() is used to initialize
+	 * locally defined vnode_t instances.  Lacking the construction offered
+	 * by vn_alloc(), these vnodes require v_path initialization.
+	 */
+	if (vp->v_path == NULL) {
+		vp->v_path = vn_vpath_empty;
+	}
+
 	/* Handles v_femhead, v_path, and the r/w/map counts */
 	vn_recycle(vp);
 }
