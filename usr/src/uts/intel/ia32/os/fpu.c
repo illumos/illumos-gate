@@ -61,7 +61,7 @@
 #include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 
-kmem_cache_t *xsave_cachep;
+kmem_cache_t *fpsave_cachep;
 
 /* Legacy fxsave layout + xsave header + ymm */
 #define	AVX_XSAVE_SIZE		(512 + 64 + 256)
@@ -205,15 +205,15 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fn = &fp->fpu_regs.kfpu_u.kfpu_fn;
-		cfn = &cfp->fpu_regs.kfpu_u.kfpu_fn;
+		fn = fp->fpu_regs.kfpu_u.kfpu_fn;
+		cfn = cfp->fpu_regs.kfpu_u.kfpu_fn;
 		bcopy(&x87_initial, cfn, sizeof (*cfn));
 		cfn->f_fcw = fn->f_fcw;
 		break;
 #endif
 	case FP_FXSAVE:
-		fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
-		cfx = &cfp->fpu_regs.kfpu_u.kfpu_fx;
+		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
+		cfx = cfp->fpu_regs.kfpu_u.kfpu_fx;
 		bcopy(&sse_initial, cfx, sizeof (*cfx));
 		cfx->fx_mxcsr = fx->fx_mxcsr & ~SSE_MXCSR_EFLAGS;
 		cfx->fx_fcw = fx->fx_fcw;
@@ -310,11 +310,11 @@ fp_save(struct fpu_ctx *fp)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fpsave(&fp->fpu_regs.kfpu_u.kfpu_fn);
+		fpsave(fp->fpu_regs.kfpu_u.kfpu_fn);
 		break;
 #endif
 	case FP_FXSAVE:
-		fpxsave(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		fpxsave(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
 
 	case FP_XSAVE:
@@ -341,11 +341,11 @@ fp_restore(struct fpu_ctx *fp)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fprestore(&fp->fpu_regs.kfpu_u.kfpu_fn);
+		fprestore(fp->fpu_regs.kfpu_u.kfpu_fn);
 		break;
 #endif
 	case FP_FXSAVE:
-		fpxrestore(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		fpxrestore(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
 
 	case FP_XSAVE:
@@ -404,21 +404,22 @@ fp_seed(void)
 void
 fp_lwp_init(struct _klwp *lwp)
 {
+	struct fpu_ctx *fp = &lwp->lwp_pcb.pcb_fpu;
+
+	/*
+	 * We keep a copy of the pointer in lwp_fpu so that we can restore the
+	 * value in forklwp() after we duplicate the parent's LWP state.
+	 */
+	lwp->lwp_fpu = fp->fpu_regs.kfpu_u.kfpu_generic =
+	    kmem_cache_alloc(fpsave_cachep, KM_SLEEP);
+
 	if (fp_save_mech == FP_XSAVE) {
-		struct fpu_ctx *fp = &lwp->lwp_pcb.pcb_fpu;
-
-		ASSERT(cpuid_get_xsave_size() >= sizeof (struct xsave_state));
-
 		/*
-		 * We keep a copy of the pointer in lwp_fpu so that we can
-		 * restore the value in forklwp() after we duplicate the
-		 * parent's LWP state.
 		 *
 		 * We bzero since the fpinit() code path will only
 		 * partially initialize the xsave area using avx_inital.
 		 */
-		lwp->lwp_fpu = fp->fpu_regs.kfpu_u.kfpu_xs =
-		    kmem_cache_alloc(xsave_cachep, KM_SLEEP);
+		ASSERT(cpuid_get_xsave_size() >= sizeof (struct xsave_state));
 		bzero(fp->fpu_regs.kfpu_u.kfpu_xs, cpuid_get_xsave_size());
 	}
 }
@@ -428,29 +429,45 @@ fp_lwp_cleanup(struct _klwp *lwp)
 {
 	struct fpu_ctx *fp = &lwp->lwp_pcb.pcb_fpu;
 
-	if (fp_save_mech == FP_XSAVE && fp->fpu_regs.kfpu_u.kfpu_xs != NULL) {
-		kmem_cache_free(xsave_cachep, fp->fpu_regs.kfpu_u.kfpu_xs);
-		lwp->lwp_fpu = fp->fpu_regs.kfpu_u.kfpu_xs = NULL;
+	if (fp->fpu_regs.kfpu_u.kfpu_generic != NULL) {
+		kmem_cache_free(fpsave_cachep,
+		    fp->fpu_regs.kfpu_u.kfpu_generic);
+		lwp->lwp_fpu = fp->fpu_regs.kfpu_u.kfpu_generic = NULL;
 	}
 }
 
 /*
- * Called during the process of forklwp(). The xsave pointer may have been
+ * Called during the process of forklwp(). The kfpu_u pointer will have been
  * overwritten while copying the parent's LWP structure. We have a valid copy
  * stashed in the child's lwp_fpu which we use to restore the correct value.
  */
 void
 fp_lwp_dup(struct _klwp *lwp)
 {
-	if (fp_save_mech == FP_XSAVE) {
-		struct xsave_state *xp = (struct xsave_state *)lwp->lwp_fpu;
+	void *xp = lwp->lwp_fpu;
+	size_t sz;
 
-		/* copy the parent's values into the new lwp's struct */
-		bcopy(lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_xs,
-		    xp, cpuid_get_xsave_size());
-		/* now restore the pointer */
-		lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_xs = xp;
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
+		sz = sizeof (struct fnsave_state);
+		break;
+#endif
+	case FP_FXSAVE:
+		sz = sizeof (struct fxsave_state);
+		break;
+	case FP_XSAVE:
+		sz = cpuid_get_xsave_size();
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
 	}
+
+	/* copy the parent's values into the new lwp's struct */
+	bcopy(lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_generic, xp, sz);
+	/* now restore the pointer */
+	lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_generic = xp;
 }
 
 
@@ -603,16 +620,16 @@ fpexterrflt(struct regs *rp)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fpsw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw;
-		fpcw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw;
-		fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw &= ~FPS_SW_EFLAGS;
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_fn->f_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_fn->f_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fn->f_fsw &= ~FPS_SW_EFLAGS;
 		break;
 #endif
 
 	case FP_FXSAVE:
-		fpsw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
-		fpcw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fcw;
-		fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fx->fx_fsw &= ~FPS_SW_EFLAGS;
 		break;
 
 	case FP_XSAVE:
@@ -682,8 +699,8 @@ fpsimderrflt(struct regs *rp)
 		fp->fpu_regs.kfpu_status =
 		    fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave.fx_fsw;
 	} else {
-		mxcsr = fp->fpu_regs.kfpu_u.kfpu_fx.fx_mxcsr;
-		fp->fpu_regs.kfpu_status = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
+		mxcsr = fp->fpu_regs.kfpu_u.kfpu_fx->fx_mxcsr;
+		fp->fpu_regs.kfpu_status = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fsw;
 	}
 	fp->fpu_regs.kfpu_xstatus = mxcsr;
 
@@ -792,11 +809,11 @@ fpsetcw(uint16_t fcw, uint32_t mxcsr)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw = fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fn->f_fcw = fcw;
 		break;
 #endif
 	case FP_FXSAVE:
-		fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
+		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
 		fx->fx_fcw = fcw;
 		fx->fx_mxcsr = sse_mxcsr_mask & mxcsr;
 		break;

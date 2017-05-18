@@ -295,12 +295,12 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		bcopy(fp, &fpu->fpu_regs.kfpu_u.kfpu_fn,
-		    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
+		bcopy(fp, fpu->fpu_regs.kfpu_u.kfpu_fn,
+		    sizeof (*fpu->fpu_regs.kfpu_u.kfpu_fn));
 		break;
 #endif
 	case FP_FXSAVE:
-		fpregset_to_fxsave(fp, &fpu->fpu_regs.kfpu_u.kfpu_fx);
+		fpregset_to_fxsave(fp, fpu->fpu_regs.kfpu_u.kfpu_fx);
 		fpu->fpu_regs.kfpu_xstatus =
 		    fp->fp_reg_set.fpchip_state.xstatus;
 		break;
@@ -359,12 +359,12 @@ getfpregs(klwp_t *lwp, fpregset_t *fp)
 		switch (fp_save_mech) {
 #if defined(__i386)
 		case FP_FNSAVE:
-			bcopy(&fpu->fpu_regs.kfpu_u.kfpu_fn, fp,
-			    sizeof (fpu->fpu_regs.kfpu_u.kfpu_fn));
+			bcopy(fpu->fpu_regs.kfpu_u.kfpu_fn, fp,
+			    sizeof (*fpu->fpu_regs.kfpu_u.kfpu_fn));
 			break;
 #endif
 		case FP_FXSAVE:
-			fxsave_to_fpregset(&fpu->fpu_regs.kfpu_u.kfpu_fx, fp);
+			fxsave_to_fpregset(fpu->fpu_regs.kfpu_u.kfpu_fx, fp);
 			fp->fp_reg_set.fpchip_state.xstatus =
 			    fpu->fpu_regs.kfpu_xstatus;
 			break;

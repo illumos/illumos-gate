@@ -666,11 +666,9 @@ _emul_done:
 	 * kernel due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
+	movq (%rbx), %rbx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
 	.globl  _patch_xrstorq_rbx
 _patch_xrstorq_rbx:
-	nop
-	nop
-	nop
 	FXRSTORQ	((%rbx))
 	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
 	je	.return_to_kernel
@@ -744,11 +742,9 @@ _patch_xrstorq_rbx:
 	 * kernel due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
+	movq (%rbx), %rbx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
 	.globl  _patch_xrstorq_rbx
 _patch_xrstorq_rbx:
-	nop
-	nop
-	nop
 	FXRSTORQ	((%rbx))
 	popq	%rdx
 	popq	%rbx
@@ -811,14 +807,12 @@ _patch_xrstorq_rbx:
 	 * due to user fault.
 	 */
 	ALTENTRY(ndptrap_frstor)
+	movl	(%ebx), %ebx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
 	.globl  _patch_fxrstor_ebx
 _patch_fxrstor_ebx:
 	.globl  _patch_xrstor_ebx
 _patch_xrstor_ebx:
 	frstor	(%ebx)		/* may be patched to fxrstor or xrstor */
-	nop			/* (including these bytes) */
-	nop
-	nop
 	popl	%gs
 	popl	%ds
 	popl	%edx

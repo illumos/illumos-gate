@@ -178,7 +178,7 @@ _fxrstor_ebx_insn:			/ see ndptrap_frstor()
 _ldmxcsr_ebx_insn:			/ see resume_from_zombie()
 	ldmxcsr	(%ebx)
 _sfence_ret_insn:			/ see membar_producer()
-	.byte	0xf, 0xae, 0xf8		/ [sfence instruction]
+	sfence
 	ret
 	SET_SIZE(patch_sse)
 
@@ -191,7 +191,7 @@ _sfence_ret_insn:			/ see membar_producer()
 	_HOT_PATCH_EPILOG
 	ret
 _lfence_ret_insn:			/ see membar_consumer()
-	.byte	0xf, 0xae, 0xe8		/ [lfence instruction]	
+	lfence
 	ret
 	SET_SIZE(patch_sse2)
 
@@ -204,13 +204,11 @@ _lfence_ret_insn:			/ see membar_consumer()
 	/
 	/	frstor (%ebx); nop	-> xrstor (%ebx)
 	/
-	_HOT_PATCH(_xrstor_ebx_insn, _patch_xrstor_ebx, 5)
+	_HOT_PATCH(_xrstor_ebx_insn, _patch_xrstor_ebx, 3)
 	_HOT_PATCH_EPILOG
 	ret
 _xrstor_ebx_insn:			/ see ndptrap_frstor()
-	movl	(%ebx), %ebx
-	#xrstor (%ebx)
-	.byte	0x0f, 0xae, 0x2b
+	xrstor (%ebx)
 	SET_SIZE(patch_xsave)
 
 #endif	/* __lint */
@@ -234,14 +232,13 @@ patch_xsave(void)
 	pushq	%rbp
 	pushq	%r15
 	/
-	/	nop; nop; nop;		-> movq(%rbx), %rbx
-	/	FXRSTORQ (%rbx);	-> xrstor (%rbx)
-	/ loop doing the following for 7 bytes:
+	/	FXRSTORQ (%rbx);	-> nop; xrstor (%rbx)
+	/ loop doing the following for 4 bytes:
 	/     hot_patch_kernel_text(_patch_xrstorq_rbx, _xrstor_rbx_insn, 1)
 	/
 	leaq	_patch_xrstorq_rbx(%rip), %rbx
 	leaq	_xrstor_rbx_insn(%rip), %rbp
-	movq	$7, %r15
+	movq	$4, %r15
 1:
 	movq	%rbx, %rdi			/* patch address */
 	movzbq	(%rbp), %rsi			/* instruction byte */
@@ -251,17 +248,18 @@ patch_xsave(void)
 	addq	$1, %rbp
 	subq	$1, %r15
 	jnz	1b
-	
+
 	popq	%r15
 	popq	%rbp
 	popq	%rbx
 	ret
 
 _xrstor_rbx_insn:			/ see ndptrap_frstor()
-	movq	(%rbx), %rbx
-	#rex.W=1 (.byte 0x48)
-	#xrstor (%rbx)
-	.byte	0x48, 0x0f, 0xae, 0x2b
+	# Because the FXRSTORQ macro we're patching is 4 bytes long, due
+	# to the 0x48 prefix (indicating 64-bit operand size), we patch 4 bytes
+	# too.
+	nop
+	xrstor (%rbx)
 	SET_SIZE(patch_xsave)
 
 #endif	/* __lint */
@@ -293,12 +291,13 @@ fpnsave_ctxt(void *arg)
 
 #if defined(__amd64)
 
-	ENTRY_NP(fpxsave_ctxt)
+	ENTRY_NP(fpxsave_ctxt)	/* %rdi is a struct fpu_ctx */
 	cmpl	$FPU_EN, FPU_CTX_FPU_FLAGS(%rdi)
 	jne	1f
 
 	movl	$_CONST(FPU_VALID|FPU_EN), FPU_CTX_FPU_FLAGS(%rdi)
-	FXSAVEQ	(FPU_CTX_FPU_REGS(%rdi))
+	movq	FPU_CTX_FPU_REGS(%rdi), %rdi /* fpu_regs.kfpu_u.kfpu_fn ptr */
+	FXSAVEQ	((%rdi))
 
 	/*
 	 * On certain AMD processors, the "exception pointers" i.e. the last
@@ -331,11 +330,9 @@ fpnsave_ctxt(void *arg)
 	 */
 	movl	FPU_CTX_FPU_XSAVE_MASK(%rdi), %eax
 	movl	FPU_CTX_FPU_XSAVE_MASK+4(%rdi), %edx
-	leaq	FPU_CTX_FPU_REGS(%rdi), %rsi
-	movq	(%rsi), %rsi	/* load fpu_regs.kfpu_u.kfpu_xs pointer */
-	#xsave	(%rsi)
-	.byte	0x0f, 0xae, 0x26
-	
+	movq	FPU_CTX_FPU_REGS(%rdi), %rsi /* fpu_regs.kfpu_u.kfpu_xs ptr */
+	xsave	(%rsi)
+
 	/*
 	 * (see notes above about "exception pointers")
 	 * TODO: does it apply to any machine that uses xsave?
@@ -358,7 +355,8 @@ fpnsave_ctxt(void *arg)
 	jne	1f
 
 	movl	$_CONST(FPU_VALID|FPU_EN), FPU_CTX_FPU_FLAGS(%eax)
-	fnsave	FPU_CTX_FPU_REGS(%eax)
+	movl	FPU_CTX_FPU_REGS(%eax), %eax /* fpu_regs.kfpu_u.kfpu_fx ptr */
+	fnsave	(%eax)
 			/* (fnsave also reinitializes x87 state) */
 	STTS(%edx)	/* trap on next fpu touch */
 1:	rep;	ret	/* use 2 byte return instruction when branch target */
@@ -371,7 +369,8 @@ fpnsave_ctxt(void *arg)
 	jne	1f
 
 	movl	$_CONST(FPU_VALID|FPU_EN), FPU_CTX_FPU_FLAGS(%eax)
-	fxsave	FPU_CTX_FPU_REGS(%eax)
+	movl	FPU_CTX_FPU_REGS(%eax), %eax /* fpu_regs.kfpu_u.kfpu_fn ptr */
+	fxsave	(%eax)
 			/* (see notes above about "exception pointers") */
 	btw	$7, FXSAVE_STATE_FSW(%eax)	/* Test saved ES bit */
 	jnc	0f				/* jump if ES = 0 */
@@ -388,15 +387,13 @@ fpnsave_ctxt(void *arg)
 	movl	4(%esp), %ecx		/* a struct fpu_ctx */
 	cmpl	$FPU_EN, FPU_CTX_FPU_FLAGS(%ecx)
 	jne	1f
-	
+
 	movl	$_CONST(FPU_VALID|FPU_EN), FPU_CTX_FPU_FLAGS(%ecx)
 	movl	FPU_CTX_FPU_XSAVE_MASK(%ecx), %eax
 	movl	FPU_CTX_FPU_XSAVE_MASK+4(%ecx), %edx
-	leal	FPU_CTX_FPU_REGS(%ecx), %ecx
-	movl	(%ecx), %ecx	/* load fpu_regs.kfpu_u.kfpu_xs pointer */
-	#xsave	(%ecx)
-	.byte	0x0f, 0xae, 0x21
-	
+	movl	FPU_CTX_FPU_REGS(%ecx), %ecx /* fpu_regs.kfpu_u.kfpu_xs ptr */
+	xsave	(%ecx)
+
 	/*
 	 * (see notes above about "exception pointers")
 	 * TODO: does it apply to any machine that uses xsave?
@@ -455,9 +452,8 @@ xsave(struct xsave_state *f, uint64_t m)
 	movl	%esi, %eax		/* bv mask */
 	movq	%rsi, %rdx
 	shrq	$32, %rdx
-	#xsave	(%rdi)
-	.byte	0x0f, 0xae, 0x27
-	
+	xsave	(%rdi)
+
 	fninit				/* clear exceptions, init x87 tags */
 	STTS(%rdi)			/* set TS bit in %cr0 (disable FPU) */
 	ret
@@ -487,9 +483,8 @@ xsave(struct xsave_state *f, uint64_t m)
 	movl	4(%esp), %ecx
 	movl	8(%esp), %eax
 	movl	12(%esp), %edx
-	#xsave	(%ecx)
-	.byte	0x0f, 0xae, 0x21
-	
+	xsave	(%ecx)
+
 	fninit				/* clear exceptions, init x87 tags */
 	STTS(%eax)			/* set TS bit in %cr0 (disable FPU) */
 	ret
@@ -530,8 +525,7 @@ xrestore(struct xsave_state *f, uint64_t m)
 	movl	%esi, %eax		/* bv mask */
 	movq	%rsi, %rdx
 	shrq	$32, %rdx
-	#xrstor	(%rdi)
-	.byte	0x0f, 0xae, 0x2f
+	xrstor	(%rdi)
 	ret
 	SET_SIZE(xrestore)
 
@@ -556,8 +550,7 @@ xrestore(struct xsave_state *f, uint64_t m)
 	movl	4(%esp), %ecx
 	movl	8(%esp), %eax
 	movl	12(%esp), %edx
-	#xrstor	(%ecx)
-	.byte	0x0f, 0xae, 0x29
+	xrstor	(%ecx)
 	ret
 	SET_SIZE(xrestore)
 
@@ -624,8 +617,7 @@ fpinit(void)
 	bt	$X86FSET_AVX, x86_featureset
 	cmovael	%edx, %eax
 	orl	$(XFEATURE_LEGACY_FP | XFEATURE_SSE), %eax
-	/* xrstor (%rcx) */
-	.byte	0x0f, 0xae, 0x29		/* load clean initial state */
+	xrstor (%rcx)
 	ret
 	SET_SIZE(fpinit)
 
@@ -656,8 +648,7 @@ fpinit(void)
 	bt	$X86FSET_AVX, x86_featureset
 	cmovael	%edx, %eax
 	orl	$(XFEATURE_LEGACY_FP | XFEATURE_SSE), %eax
-	/* xrstor (%ecx) */
-	.byte	0x0f, 0xae, 0x29	/* load clean initial state */
+	xrstor (%ecx)
 	ret
 	SET_SIZE(fpinit)
 

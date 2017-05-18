@@ -60,7 +60,7 @@ extern void patch_sse2(void);
 #endif
 
 extern void patch_xsave(void);
-extern kmem_cache_t *xsave_cachep;
+extern kmem_cache_t *fpsave_cachep;
 
 extern void cli(void);
 extern void sti(void);

@@ -254,9 +254,10 @@ struct xsave_state {
  */
 typedef struct {
 	union _kfpu_u {
-		struct fxsave_state kfpu_fx;
+		void *kfpu_generic;
+		struct fxsave_state *kfpu_fx;
 #if defined(__i386)
-		struct fnsave_state kfpu_fn;
+		struct fnsave_state *kfpu_fn;
 #endif
 		struct xsave_state *kfpu_xs;
 	} kfpu_u;

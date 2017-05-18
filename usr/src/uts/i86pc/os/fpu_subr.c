@@ -39,6 +39,12 @@
 #define	XMM_ALIGN	16
 
 /*
+ * See section 10.5.1 in the Intel 64 and IA-32 Architectures Software
+ * Developer’s Manual, Volume 1.
+ */
+#define	FXSAVE_ALIGN	16
+
+/*
  * See section 13.4 in the Intel 64 and IA-32 Architectures Software
  * Developer’s Manual, Volume 1.
  */
@@ -170,8 +176,14 @@ fpu_probe(void)
 				fp_save_mech = FP_XSAVE;
 				fpsave_ctxt = xsave_ctxt;
 				patch_xsave();
-				xsave_cachep = kmem_cache_create("xsave_cache",
+				fpsave_cachep = kmem_cache_create("xsave_cache",
 				    cpuid_get_xsave_size(), XSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
+			} else {
+				/* fp_save_mech defaults to FP_FXSAVE */
+				fpsave_cachep =
+				    kmem_cache_create("fxsave_cache",
+				    sizeof (struct fxsave_state), FXSAVE_ALIGN,
 				    NULL, NULL, NULL, NULL, NULL, 0);
 			}
 		}
@@ -200,11 +212,15 @@ fpu_probe(void)
 				fp_save_mech = FP_XSAVE;
 				fpsave_ctxt = xsave_ctxt;
 				patch_xsave();
-				xsave_cachep = kmem_cache_create("xsave_cache",
+				fpsave_cachep = kmem_cache_create("xsave_cache",
 				    cpuid_get_xsave_size(), XSAVE_ALIGN,
 				    NULL, NULL, NULL, NULL, NULL, 0);
 			} else {
 				patch_sse();	/* use fxrstor */
+				fpsave_cachep =
+				    kmem_cache_create("fxsave_cache",
+				    sizeof (struct fxsave_state), FXSAVE_ALIGN,
+				    NULL, NULL, NULL, NULL, NULL, 0);
 			}
 		} else {
 			remove_x86_feature(x86_featureset, X86FSET_SSE2);
@@ -219,6 +235,15 @@ fpu_probe(void)
 			 * enabled when we didn't. See 4965674.)
 			 */
 			DISABLE_SSE();
+
+			/*
+			 * fp_save_mech defaults to FP_FNSAVE. Use the same
+			 * alignment as used for fxsave (preserves legacy
+			 * behavior).
+			 */
+			fpsave_cachep = kmem_cache_create("fnsave_cache",
+			    sizeof (struct fnsave_state), FXSAVE_ALIGN,
+			    NULL, NULL, NULL, NULL, NULL, 0);
 		}
 #endif
 		if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
