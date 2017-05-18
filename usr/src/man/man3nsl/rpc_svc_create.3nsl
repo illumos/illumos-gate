@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_SVC_CREATE 3NSL "Nov 24, 2014"
+.TH RPC_SVC_CREATE 3NSL "May 18, 2017"
 .SH NAME
 rpc_svc_create, svc_control, svc_create, svc_destroy, svc_dg_create,
 svc_fd_create, svc_raw_create, svc_tli_create, svc_tp_create, svc_vc_create,
@@ -44,7 +44,7 @@ svc_door_create \- server handle creation routines
 
 .LP
 .nf
-\fBSVCXPRT *\fR\fBsvc_raw_create\fR(void)
+\fBSVCXPRT *\fR\fBsvc_raw_create\fR(void);
 .fi
 
 .LP
@@ -350,9 +350,10 @@ bound. The server is not registered with the \fBrpcbind\fR(1M) service.
 \fB\fBsvc_door_create()\fR\fR
 .ad
 .RS 21n
-This routine creates an RPC server handle over doors and returns a pointer to
+This routine creates an RPC server handle over doors for the given program
+\fIprognum\fR and version \fIversnum\fR and returns a pointer to
 it. Doors is a transport mechanism that facilitates fast data transfer between
-processes on the same machine. for the given program The user may set the size
+processes on the same machine. The user may set the size
 of the send buffer with the parameter \fIsendsz\fR. If \fIsendsz\fR is 0, the
 corresponding default buffer size is 16 Kbyte. If successful, the
 \fBsvc_door_create()\fR routine returns the service handle. Otherwise it
