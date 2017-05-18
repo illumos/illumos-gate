@@ -143,6 +143,7 @@ dir path=opt/zfs-tests/tests/functional/xattr
 dir path=opt/zfs-tests/tests/functional/zvol
 dir path=opt/zfs-tests/tests/functional/zvol/zvol_ENOSPC
 dir path=opt/zfs-tests/tests/functional/zvol/zvol_cli
+dir path=opt/zfs-tests/tests/functional/zvol/zvol_dump
 dir path=opt/zfs-tests/tests/functional/zvol/zvol_misc
 dir path=opt/zfs-tests/tests/functional/zvol/zvol_swap
 dir path=opt/zfs-tests/tests/perf
@@ -2262,6 +2263,8 @@ file path=opt/zfs-tests/tests/functional/zvol/zvol_cli/zvol_cli_002_pos \
 file path=opt/zfs-tests/tests/functional/zvol/zvol_cli/zvol_cli_003_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_common.shlib mode=0444
+file path=opt/zfs-tests/tests/functional/zvol/zvol_dump/zvol_dump_raidz \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/setup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/zvol_misc_001_neg \

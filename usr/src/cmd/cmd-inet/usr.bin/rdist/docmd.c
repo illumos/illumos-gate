@@ -16,7 +16,6 @@
  * University may not be used to endorse or promote products derived
  * from this software without specific prior written permission.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include <string.h>
@@ -60,7 +59,7 @@ static void closeconn(void);
 static void doarrow(char **filev, struct namelist *files, char *rhost,
     struct subcmd *cmds);
 static int makeconn(char *rhost);
-static int okname(register char *name);
+static int okname(char *name);
 
 #ifdef SYSV
 #include <libgen.h>
@@ -69,8 +68,7 @@ static char *recomp;
 static char *errstring = "regcmp failed for some unknown reason";
 
 char *
-re_comp(s)
-char *s;
+re_comp(char *s)
 {
 	if ((int)recomp != 0)
 		free(recomp);
@@ -83,8 +81,7 @@ char *s;
 
 
 static int
-re_exec(s)
-char *s;
+re_exec(char *s)
 {
 	if ((int)recomp == 0)
 		return (-1);
@@ -99,14 +96,11 @@ char *s;
  * Do the commands in cmds (initialized by yyparse).
  */
 void
-docmds(dhosts, argc, argv)
-	char **dhosts;
-	int argc;
-	char **argv;
+docmds(char **dhosts, int argc, char **argv)
 {
-	register struct cmd *c;
-	register struct namelist *f;
-	register char **cpp;
+	struct cmd *c;
+	struct namelist *f;
+	char **cpp;
 	extern struct cmd *cmds;
 
 	/* protect backgrounded rdist */
@@ -121,12 +115,13 @@ docmds(dhosts, argc, argv)
 
 	(void) signal(SIGTERM, cleanup);
 
-if (debug)
-	if (!cmds)
-		printf("docmds:  cmds == NULL\n");
-	else {
-		printf("docmds:  cmds ");
-		prcmd(cmds);
+	if (debug) {
+		if (!cmds)
+			printf("docmds:  cmds == NULL\n");
+		else {
+			printf("docmds:  cmds ");
+			prcmd(cmds);
+		}
 	}
 	for (c = cmds; c != NULL; c = c->c_next) {
 		if (dhosts != NULL && *dhosts != NULL) {
@@ -169,15 +164,11 @@ if (debug)
  * Process commands for sending files to other machines.
  */
 static void
-doarrow(filev, files, rhost, cmds)
-	char **filev;
-	struct namelist *files;
-	char *rhost;
-	struct subcmd *cmds;
+doarrow(char **filev, struct namelist *files, char *rhost, struct subcmd *cmds)
 {
-	register struct namelist *f;
-	register struct subcmd *sc;
-	register char **cpp;
+	struct namelist *f;
+	struct subcmd *sc;
+	char **cpp;
 	int n, ddir, opts = options;
 
 	if (debug)
@@ -218,7 +209,7 @@ doarrow(filev, files, rhost, cmds)
 				continue;
 			n++;
 			install(f->n_name, sc->sc_name,
-				sc->sc_name == NULL ? 0 : ddir, sc->sc_options);
+			    sc->sc_name == NULL ? 0 : ddir, sc->sc_options);
 			opts = sc->sc_options;
 		}
 		if (n == 0)
@@ -240,7 +231,7 @@ done:
 			if ((opts & IGNLNKS) || ihead->count == 0)
 				continue;
 			log(lfp, "%s: Warning: missing links\n",
-				ihead->pathname);
+			    ihead->pathname);
 		}
 	}
 }
@@ -254,7 +245,7 @@ init_service(int krb5flag)
 		if ((sp = getservbyname("kshell", "tcp")) == NULL) {
 			fatal("kshell/tcp: unknown service");
 			(void) fprintf(stderr,
-				gettext("trying shell/tcp service...\n"));
+			    gettext("trying shell/tcp service...\n"));
 		} else {
 			success = B_TRUE;
 		}
@@ -272,10 +263,9 @@ init_service(int krb5flag)
  * Create a connection to the rdist server on the machine rhost.
  */
 static int
-makeconn(rhost)
-	char *rhost;
+makeconn(char *rhost)
 {
-	register char *ruser, *cp;
+	char *ruser, *cp;
 	static char *cur_host = NULL;
 	static int port = -1;
 	char tuser[20];
@@ -309,7 +299,7 @@ makeconn(rhost)
 	if (!qflag)
 		printf("updating host %s\n", rhost);
 	(void) snprintf(buf, RDIST_BUFSIZ, "%s%s -Server%s",
-			encrypt_flag ? "-x " : "", RDIST, qflag ? " -q" : "");
+	    encrypt_flag ? "-x " : "", RDIST, qflag ? " -q" : "");
 	if (port < 0) {
 		if (debug_port == 0) {
 			if ((retval = (int)init_service(krb5auth_flag)) == 0) {
@@ -325,7 +315,7 @@ makeconn(rhost)
 
 	if (debug) {
 		printf("port = %d, luser = %s, ruser = %s\n", ntohs(port),
-			user, ruser);
+		    user, ruser);
 		printf("buf = %s\n", buf);
 	}
 
@@ -334,23 +324,20 @@ makeconn(rhost)
 	if (krb5auth_flag > 0) {
 		if ((encrypt_flag > 0) && (!krb5_privacy_allowed())) {
 			(void) fprintf(stderr, gettext("rdist: Encryption "
-					" not supported.\n"));
+			    " not supported.\n"));
 			exit(1);
 		}
 
 		authopts = AP_OPTS_MUTUAL_REQUIRED;
 
-		status = kcmd(&rem, &rhost, port,
-				user, ruser,
-				buf, 0, "host", krb_realm,
-				bsd_context,
-				&auth_context,
-				&cred,
-				0,	/* No need for sequence number */
-				0,	/* No need for server seq # */
-				authopts,
-				1,	/* Always set anyport */
-				&kcmd_proto);
+		status = kcmd(&rem, &rhost, port, user, ruser,
+		    buf, 0, "host", krb_realm, bsd_context, &auth_context,
+		    &cred,
+		    0,	/* No need for sequence number */
+		    0,	/* No need for server seq # */
+		    authopts,
+		    1,	/* Always set anyport */
+		    &kcmd_proto);
 		if (status) {
 			/*
 			 * If new protocol requested, we dont
@@ -358,20 +345,20 @@ makeconn(rhost)
 			 */
 			if (kcmd_proto == KCMD_NEW_PROTOCOL) {
 				(void) fprintf(stderr, gettext("rdist: kcmdv2 "
-					"to host %s failed - %s\n"
-					"Fallback to normal rdist denied."),
-					host, error_message(status));
+				    "to host %s failed - %s\n"
+				    "Fallback to normal rdist denied."),
+				    host, error_message(status));
 				exit(1);
 			}
 			/* check NO_TKT_FILE or equivalent... */
 			if (status != -1) {
 				(void) fprintf(stderr, gettext("rdist: "
-				"kcmd to host %s failed - %s\n"
-				"trying normal rdist...\n\n"),
-				host, error_message(status));
+				    "kcmd to host %s failed - %s\n"
+				    "trying normal rdist...\n\n"),
+				    host, error_message(status));
 			} else {
 				(void) fprintf(stderr,
-					gettext("trying normal rdist...\n"));
+				    gettext("trying normal rdist...\n"));
 			}
 			/*
 			 * kcmd() failed, so we now fallback to normal rdist
@@ -384,29 +371,28 @@ makeconn(rhost)
 #ifdef DEBUG
 		else {
 			(void) fprintf(stderr, gettext("Kerberized rdist "
-					"session, port %d in use "), port);
+			    "session, port %d in use "), port);
 			if (kcmd_proto == KCMD_OLD_PROTOCOL)
 				(void) fprintf(stderr,
-						gettext("[kcmd ver.1].\n"));
+				    gettext("[kcmd ver.1].\n"));
 			else
 				(void) fprintf(stderr,
-						gettext("[kcmd ver.2].\n"));
+				    gettext("[kcmd ver.2].\n"));
 		}
 #endif /* DEBUG */
 		session_key = &cred->keyblock;
 
 		if (kcmd_proto == KCMD_NEW_PROTOCOL) {
 			status = krb5_auth_con_getlocalsubkey(bsd_context,
-							    auth_context,
-							    &session_key);
+			    auth_context, &session_key);
 			if (status) {
 				com_err("rdist", status,
-					"determining subkey for session");
+				    "determining subkey for session");
 				exit(1);
 			}
 			if (!session_key) {
 				com_err("rdist", 0,
-				"no subkey negotiated for connection");
+				    "no subkey negotiated for connection");
 				exit(1);
 			}
 		}
@@ -415,12 +401,12 @@ makeconn(rhost)
 		eblock.key = (krb5_keyblock *)session_key;
 
 		init_encrypt(encrypt_flag, bsd_context, kcmd_proto, &desinbuf,
-				&desoutbuf, CLIENT, &eblock);
+		    &desoutbuf, CLIENT, &eblock);
 
 
 		if (encrypt_flag > 0) {
 			char *s = gettext("This rdist session is using "
-				"encryption for all data transmissions.\r\n");
+			    "encryption for all data transmissions.\r\n");
 			(void) write(2, s, strlen(s));
 		}
 
@@ -475,7 +461,7 @@ closeconn(void)
 }
 
 void
-lostconn()
+lostconn(void)
 {
 	if (iamremote)
 		cleanup();
@@ -484,11 +470,10 @@ lostconn()
 }
 
 static int
-okname(name)
-	register char *name;
+okname(char *name)
 {
-	register char *cp = name;
-	register int c;
+	char *cp = name;
+	int c;
 
 	do {
 		c = *cp;
@@ -512,15 +497,11 @@ extern	char target[], *tp;
  * Process commands for comparing files to time stamp files.
  */
 static void
-dodcolon(filev, files, stamp, cmds)
-	char **filev;
-	struct namelist *files;
-	char *stamp;
-	struct subcmd *cmds;
+dodcolon(char **filev, struct namelist *files, char *stamp, struct subcmd *cmds)
 {
-	register struct subcmd *sc;
-	register struct namelist *f;
-	register char **cpp;
+	struct subcmd *sc;
+	struct namelist *f;
+	char **cpp;
 	struct timeval tv[2];
 	struct stat stb;
 
@@ -577,8 +558,7 @@ dodcolon(filev, files, stamp, cmds)
  * Compare the mtime of file to the list of time stamps.
  */
 static void
-cmptime(name)
-	char *name;
+cmptime(char *name)
 {
 	struct stat stb;
 
@@ -626,12 +606,11 @@ cmptime(name)
 }
 
 static void
-rcmptime(st)
-	struct stat *st;
+rcmptime(struct stat *st)
 {
-	register DIR *d;
-	register struct dirent *dp;
-	register char *cp;
+	DIR *d;
+	struct dirent *dp;
+	char *cp;
 	char *otp;
 	int len;
 
@@ -671,12 +650,9 @@ rcmptime(st)
  * stamp file.
  */
 static void
-notify(file, rhost, to, lmod)
-	char *file, *rhost;
-	register struct namelist *to;
-	time_t lmod;
+notify(char *file, char *rhost, struct namelist *to, time_t lmod)
 {
-	register int fd, len;
+	int fd, len;
 	FILE *pf, *popen();
 	struct stat stb;
 
@@ -733,7 +709,7 @@ notify(file, rhost, to, lmod)
 	putc('\n', pf);
 	if (rhost != NULL)
 		fprintf(pf, "Subject: files updated by rdist from %s to %s\n",
-			host, rhost);
+		    host, rhost);
 	else
 		fprintf(pf, "Subject: files updated after %s\n", ctime(&lmod));
 	putc('\n', pf);
@@ -748,11 +724,9 @@ notify(file, rhost, to, lmod)
  * Return true if name is in the list.
  */
 int
-inlist(list, file)
-	struct namelist *list;
-	char *file;
+inlist(struct namelist *list, char *file)
 {
-	register struct namelist *nl;
+	struct namelist *nl;
 
 	for (nl = list; nl != NULL; nl = nl->n_next)
 		if (strcmp(file, nl->n_name) == 0)
@@ -764,11 +738,10 @@ inlist(list, file)
  * Return TRUE if file is in the exception list.
  */
 int
-except(file)
-	char *file;
+except(char *file)
 {
-	register struct	subcmd *sc;
-	register struct	namelist *nl;
+	struct	subcmd *sc;
+	struct	namelist *nl;
 
 	if (debug)
 		printf("except(%s)\n", file);
@@ -791,10 +764,8 @@ except(file)
 }
 
 char *
-colon(cp)
-	register char *cp;
+colon(char *cp)
 {
-
 	while (*cp) {
 		if (*cp == ':')
 			return (cp);

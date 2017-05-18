@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  */
@@ -706,7 +706,6 @@ vdev_raidz_generate_parity_pq(raidz_map_t *rm)
 
 		ccnt = rm->rm_col[c].rc_size / sizeof (p[0]);
 
-
 		if (c == rm->rm_firstdatacol) {
 			abd_copy_to_buf(p, src, rm->rm_col[c].rc_size);
 			(void) memcpy(q, p, rm->rm_col[c].rc_size);
@@ -938,7 +937,7 @@ vdev_raidz_reconstruct_p(raidz_map_t *rm, int *tgts, int ntgts)
 	src = rm->rm_col[VDEV_RAIDZ_P].rc_abd;
 	dst = rm->rm_col[x].rc_abd;
 
-	abd_copy_from_buf(dst, abd_to_buf(src), rm->rm_col[x].rc_size);
+	abd_copy(dst, src, rm->rm_col[x].rc_size);
 
 	for (c = rm->rm_firstdatacol; c < rm->rm_cols; c++) {
 		uint64_t size = MIN(rm->rm_col[x].rc_size,
@@ -1847,7 +1846,7 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 		 * example of why this calculation is needed.
 		 */
 		if ((err = vdev_disk_physio(cvd,
-		    ((char *)rc->rc_abd) + colskip, colsize,
+		    ((char *)abd_to_buf(rc->rc_abd)) + colskip, colsize,
 		    VDEV_LABEL_OFFSET(rc->rc_offset) + colskip,
 		    flags, isdump)) != 0)
 			break;
@@ -2074,7 +2073,7 @@ raidz_parity_verify(zio_t *zio, raidz_map_t *rm)
 		rc = &rm->rm_col[c];
 		if (!rc->rc_tried || rc->rc_error != 0)
 			continue;
-		if (bcmp(orig[c], abd_to_buf(rc->rc_abd), rc->rc_size) != 0) {
+		if (abd_cmp_buf(rc->rc_abd, orig[c], rc->rc_size) != 0) {
 			raidz_checksum_error(zio, rc, orig[c]);
 			rc->rc_error = SET_ERROR(ECKSUM);
 			ret++;
