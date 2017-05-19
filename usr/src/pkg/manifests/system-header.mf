@@ -657,7 +657,6 @@ file path=usr/include/rpc/pmap_clnt.h
 file path=usr/include/rpc/pmap_prot.h
 file path=usr/include/rpc/pmap_prot.x
 file path=usr/include/rpc/pmap_rmt.h
-file path=usr/include/rpc/raw.h
 file path=usr/include/rpc/rpc.h
 file path=usr/include/rpc/rpc_com.h
 file path=usr/include/rpc/rpc_msg.h
