@@ -22,9 +22,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:gnxseq.c 2.5 */
-
 #include "uucp.h"
 
 /*
@@ -35,8 +32,7 @@
  *	1	-> 0 sequence number
  */
 int
-gnxseq(rmtname)
-char *rmtname;
+gnxseq(char *rmtname)
 {
 	register FILE *fp0, *fp1;
 	register struct tm *tp;
@@ -45,25 +41,25 @@ char *rmtname;
 	time_t clock;
 
 	if (access(SQFILE, 0) != 0)
-		return(0);
+		return (0);
 
 	{
-		register int i;
-	for (i = 0; i < 5; i++) 
-		if ( (ret = mklock(SQLOCK)) == SUCCESS )
-			break;
+		int i;
+		for (i = 0; i < 5; i++)
+			if ((ret = mklock(SQLOCK)) == SUCCESS)
+				break;
 		sleep(5);
 	}
 	if (ret != SUCCESS) {
 		logent("CAN'T LOCK", SQLOCK);
 		DEBUG(4, "can't lock %s\n", SQLOCK);
-		return(0);
+		return (0);
 	}
 	if ((fp0 = fopen(SQFILE, "r")) == NULL)
-		return(0);
+		return (0);
 	if ((fp1 = fopen(SQTMP, "w")) == NULL) {
 		fclose(fp0);
-		return(0);
+		return (0);
 	}
 	chmod(SQTMP, DFILEMODE);
 
@@ -86,8 +82,8 @@ char *rmtname;
 		time(&clock);
 		tp = localtime(&clock);
 		fprintf(fp1, "%s %d %d/%d-%d:%2.2d\n", name, ct,
-		tp->tm_mon + 1, tp->tm_mday, tp->tm_hour,
-		tp->tm_min);
+		    tp->tm_mon + 1, tp->tm_mday, tp->tm_hour,
+		    tp->tm_min);
 
 		/*
 		 * write should be checked
@@ -101,7 +97,7 @@ char *rmtname;
 		rmlock(SQLOCK);
 		unlink(SQTMP);
 	}
-	return(count);
+	return (count);
 }
 
 /*
@@ -111,28 +107,27 @@ char *rmtname;
  *	other	-> link failed
  */
 int
-cmtseq()
+cmtseq(void)
 {
-	register int ret;
+	int ret;
 
 	if ((ret = access(SQTMP, 0)) != 0) {
 		rmlock(SQLOCK);
-		return(0);
+		return (0);
 	}
 	unlink(SQFILE);
 	ret = link(SQTMP, SQFILE);
 	unlink(SQTMP);
 	rmlock(SQLOCK);
-	return(ret);
+	return (ret);
 }
 
 /*
  * unlock sequence file
  */
 void
-ulkseq()
+ulkseq(void)
 {
 	unlink(SQTMP);
 	rmlock(SQLOCK);
-	return;
 }

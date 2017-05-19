@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 #include "log.h"
 
@@ -1152,9 +1150,9 @@ process:
 			    putinpub(filename, Dfile, W_USER);
 			}
 			pfEndfile("");	/* "" indicates the file transfer completely */
-		if ( W_FILE2[1] == '.'  &&
-		    (W_FILE2[0] == XQTPRE || W_FILE2[0] == DATAPRE) )
-			uuxqtflag = 1;
+			if ( W_FILE2[1] == '.'  &&
+			    (W_FILE2[0] == XQTPRE || W_FILE2[0] == DATAPRE) )
+				uuxqtflag = 1;
 			goto top;
 		}
 

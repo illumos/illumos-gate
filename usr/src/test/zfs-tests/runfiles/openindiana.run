@@ -554,6 +554,11 @@ tests = ['zvol_ENOSPC_001_pos']
 [/opt/zfs-tests/tests/functional/zvol/zvol_cli]
 tests = ['zvol_cli_001_pos', 'zvol_cli_002_pos', 'zvol_cli_003_neg']
 
+[/opt/zfs-tests/tests/functional/zvol/zvol_dump]
+tests = ['zvol_dump_raidz']
+pre =
+post =
+
 [/opt/zfs-tests/tests/functional/zvol/zvol_misc]
 tests = ['zvol_misc_001_neg', 'zvol_misc_002_pos', 'zvol_misc_003_neg',
     'zvol_misc_004_pos', 'zvol_misc_005_neg', 'zvol_misc_006_pos']
