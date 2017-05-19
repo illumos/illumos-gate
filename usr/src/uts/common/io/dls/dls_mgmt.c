@@ -1105,21 +1105,7 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 	 * safely call dls_devnet_unset() outside the MAC perim.
 	 */
 	if (ddp->dd_zid != GLOBAL_ZONEID) {
-		/*
-		 * We need to release the dd_mutex before we try and destroy the
-		 * stat. When we destroy it, we'll need to grab the lock for the
-		 * kstat but if there's a concurrent reader of the kstat, we'll
-		 * be blocked on it. This will lead to deadlock because these
-		 * kstats employ a ks_update function (dls_devnet_stat_update)
-		 * which needs the dd_mutex that we currently hold.
-		 *
-		 * Because we've already flagged the dls_devnet_t as
-		 * DD_CONDEMNED and we still have a write lock on
-		 * i_dls_devnet_lock, we should be able to release the dd_mutex.
-		 */
-		mutex_exit(&ddp->dd_mutex);
 		dls_devnet_stat_destroy(ddp, ddp->dd_zid);
-		mutex_enter(&ddp->dd_mutex);
 		(void) i_dls_devnet_setzid(ddp, GLOBAL_ZONEID, B_FALSE,
 		    B_FALSE);
 	}
@@ -1140,14 +1126,8 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 	}
 
 	if (ddp->dd_linkid != DATALINK_INVALID_LINKID) {
-		/*
-		 * See the earlier call in this function for an explanation.
-		 */
-		mutex_exit(&ddp->dd_mutex);
 		dls_devnet_stat_destroy(ddp, ddp->dd_owner_zid);
-		mutex_enter(&ddp->dd_mutex);
 	}
-
 
 	ddp->dd_prop_loaded = B_FALSE;
 	ddp->dd_linkid = DATALINK_INVALID_LINKID;
