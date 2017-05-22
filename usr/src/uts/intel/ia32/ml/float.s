@@ -337,7 +337,7 @@ fpnsave_ctxt(void *arg)
 	 * (see notes above about "exception pointers")
 	 * TODO: does it apply to any machine that uses xsave?
 	 */
-	btw	$7, FXSAVE_STATE_FSW(%rdi)	/* Test saved ES bit */
+	btw	$7, FXSAVE_STATE_FSW(%rsi)	/* Test saved ES bit */
 	jnc	0f				/* jump if ES = 0 */
 	fnclex		/* clear pending x87 exceptions */
 0:	ffree	%st(7)	/* clear tag bit to remove possible stack overflow */
