@@ -800,20 +800,21 @@ nvme_retrieve_cmd(nvme_t *nvme, nvme_qpair_t *qp)
 	(void) ddi_dma_sync(qp->nq_cqdma->nd_dmah, 0,
 	    sizeof (nvme_cqe_t) * qp->nq_nentry, DDI_DMA_SYNC_FORKERNEL);
 
+	mutex_enter(&qp->nq_mutex);
 	cqe = &qp->nq_cq[qp->nq_cqhead];
 
 	/* Check phase tag of CQE. Hardware inverts it for new entries. */
-	if (cqe->cqe_sf.sf_p == qp->nq_phase)
+	if (cqe->cqe_sf.sf_p == qp->nq_phase) {
+		mutex_exit(&qp->nq_mutex);
 		return (NULL);
+	}
 
 	ASSERT(nvme->n_ioq[cqe->cqe_sqid] == qp);
 	ASSERT(cqe->cqe_cid < qp->nq_nentry);
 
-	mutex_enter(&qp->nq_mutex);
 	cmd = qp->nq_cmd[cqe->cqe_cid];
 	qp->nq_cmd[cqe->cqe_cid] = NULL;
 	qp->nq_active_cmds--;
-	mutex_exit(&qp->nq_mutex);
 
 	ASSERT(cmd != NULL);
 	ASSERT(cmd->nc_nvme == nvme);
@@ -830,6 +831,7 @@ nvme_retrieve_cmd(nvme_t *nvme, nvme_qpair_t *qp)
 		qp->nq_phase = qp->nq_phase ? 0 : 1;
 
 	nvme_put32(cmd->nc_nvme, qp->nq_cqhdbl, head.r);
+	mutex_exit(&qp->nq_mutex);
 
 	return (cmd);
 }
@@ -2967,6 +2969,7 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	nvme_t *nvme = ns->ns_nvme;
 	nvme_cmd_t *cmd, *ret;
 	nvme_qpair_t *ioq;
+	boolean_t poll;
 
 	if (nvme->n_dead)
 		return (EIO);
@@ -2979,10 +2982,17 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	ASSERT(cmd->nc_sqid <= nvme->n_ioq_count);
 	ioq = nvme->n_ioq[cmd->nc_sqid];
 
+	/*
+	 * Get the polling flag before submitting the command. The command may
+	 * complete immediately after it was submitted, which means we must
+	 * treat both cmd and xfer as if they have been freed already.
+	 */
+	poll = (xfer->x_flags & BD_XFER_POLL) != 0;
+
 	if (nvme_submit_cmd(ioq, cmd) != DDI_SUCCESS)
 		return (EAGAIN);
 
-	if ((xfer->x_flags & BD_XFER_POLL) == 0)
+	if (!poll)
 		return (0);
 
 	do {
