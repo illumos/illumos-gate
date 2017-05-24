@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * auth_loopb.c, implements UNIX style authentication parameters in the
  * kernel.  Interfaces with svc_auth_loopback on the server.  See
@@ -124,77 +122,120 @@ authloopback_marshal(AUTH *auth, XDR *xdrs, struct cred *cr)
 {
 	char *sercred;
 	XDR xdrm;
-	struct opaque_auth *cred;
-	bool_t ret = FALSE;
-	const gid_t *gp, *gpend;
-	int gidlen, credsize, namelen, rounded_namelen;
+	bool_t ret;
+	uint32_t gidlen, credsize, namelen, rounded_namelen;
 	int32_t *ptr;
+	char *nodename = uts_nodename();
+	uint32_t maxgidlen;
+	uint_t startpos;
+
+	ASSERT(xdrs->x_op == XDR_ENCODE);
+	ASSERT(auth->ah_cred.oa_flavor == AUTH_LOOPBACK);
+	ASSERT(auth->ah_verf.oa_flavor == AUTH_NONE);
+	ASSERT(auth->ah_verf.oa_length == 0);
 
 	/*
 	 * First we try a fast path to get through
 	 * this very common operation.
 	 */
-	gp = crgetgroups(cr);
-	gidlen = crgetngroups(cr);
-	if (gidlen > NGRPS_LOOPBACK)
+	namelen = (uint32_t)strlen(nodename);
+	if (namelen > MAX_MACHINE_NAME)
 		return (FALSE);
-	gpend = &gp[gidlen-1];
-
-	namelen = (int)strlen(uts_nodename());
 	rounded_namelen = RNDUP(namelen);
-	credsize = 4 + 4 + rounded_namelen + 4 + 4 + 4 + gidlen * 4;
-	ptr = XDR_INLINE(xdrs, 4 + 4 + credsize + 4 + 4);
-	if (ptr) {
+
+	/*
+	 * NFIELDS is a number of the following fields we are going to encode:
+	 *   - stamp
+	 *   - strlen(machinename)
+	 *   - uid
+	 *   - gid
+	 *   - the number of gids
+	 */
+#define	NFIELDS	5
+	CTASSERT(NFIELDS * BYTES_PER_XDR_UNIT + RNDUP(MAX_MACHINE_NAME) <=
+	    MAX_AUTH_BYTES);
+	maxgidlen = (MAX_AUTH_BYTES - NFIELDS * BYTES_PER_XDR_UNIT -
+	    rounded_namelen) / BYTES_PER_XDR_UNIT;
+
+	gidlen = crgetngroups(cr);
+	if (gidlen > maxgidlen)
+		return (FALSE);
+
+	credsize = NFIELDS * BYTES_PER_XDR_UNIT + rounded_namelen +
+	    gidlen * BYTES_PER_XDR_UNIT;
+	ASSERT(credsize <= MAX_AUTH_BYTES);
+#undef	NFIELDS
+
+	/*
+	 * We need to marshal both cred and verf parts of the rpc_msg body
+	 * (call_body).  For the cred part we need to inline the auth_flavor
+	 * and the opaque auth body size.  Then we inline the credsize bytes of
+	 * the opaque auth body for the cred part.  Finally we add the
+	 * AUTH_NONE verifier (its auth_flavor and the opaque auth body size).
+	 */
+	ptr = XDR_INLINE(xdrs, 2 * BYTES_PER_XDR_UNIT + credsize +
+	    2 * BYTES_PER_XDR_UNIT);
+	if (ptr != NULL) {
 		/*
 		 * We can do the fast path.
 		 */
-		IXDR_PUT_INT32(ptr, AUTH_LOOPBACK);	/* cred flavor */
-		IXDR_PUT_INT32(ptr, credsize);	/* cred len */
+		const gid_t *gp = crgetgroups(cr);
+
+		IXDR_PUT_U_INT32(ptr, AUTH_LOOPBACK);	/* cred flavor */
+		IXDR_PUT_U_INT32(ptr, credsize);	/* cred len */
+
 		IXDR_PUT_INT32(ptr, gethrestime_sec());
-		IXDR_PUT_INT32(ptr, namelen);
-		bcopy(uts_nodename(), ptr, namelen);
-		if (rounded_namelen - namelen)
-			bzero(((caddr_t)ptr) + namelen,
-				rounded_namelen - namelen);
+		IXDR_PUT_U_INT32(ptr, namelen);
+		bcopy(nodename, ptr, namelen);
+		if ((rounded_namelen - namelen) > 0)
+			bzero((char *)ptr + namelen, rounded_namelen - namelen);
 		ptr += rounded_namelen / BYTES_PER_XDR_UNIT;
-		IXDR_PUT_INT32(ptr, crgetuid(cr));
-		IXDR_PUT_INT32(ptr, crgetgid(cr));
-		IXDR_PUT_INT32(ptr, gidlen);
-		while (gp <= gpend) {
-			IXDR_PUT_INT32(ptr, *gp++);
-		}
-		IXDR_PUT_INT32(ptr, AUTH_NULL);	/* verf flavor */
-		IXDR_PUT_INT32(ptr, 0);	/* verf len */
+		IXDR_PUT_U_INT32(ptr, crgetuid(cr));
+		IXDR_PUT_U_INT32(ptr, crgetgid(cr));
+		IXDR_PUT_U_INT32(ptr, gidlen);
+		while (gidlen-- > 0)
+			IXDR_PUT_U_INT32(ptr, *gp++);
+
+		IXDR_PUT_U_INT32(ptr, AUTH_NONE);	/* verf flavor */
+		IXDR_PUT_U_INT32(ptr, 0);		/* verf len */
+
 		return (TRUE);
 	}
+
 	sercred = kmem_alloc(MAX_AUTH_BYTES, KM_SLEEP);
+
 	/*
-	 * serialize u struct stuff into sercred
+	 * Serialize the auth body data into sercred.
 	 */
 	xdrmem_create(&xdrm, sercred, MAX_AUTH_BYTES, XDR_ENCODE);
-	if (!xdr_authloopback(&xdrm)) {
+	startpos = XDR_GETPOS(&xdrm);
+	if (!xdr_authloopback(&xdrm, cr)) {
 		printf("authloopback_marshal: xdr_authloopback failed\n");
 		ret = FALSE;
 		goto done;
 	}
 
 	/*
-	 * Make opaque auth credentials that point at serialized u struct
+	 * Make opaque auth credentials to point at the serialized auth body
+	 * data.
 	 */
-	cred = &(auth->ah_cred);
-	cred->oa_length = XDR_GETPOS(&xdrm);
-	cred->oa_base = sercred;
+	auth->ah_cred.oa_base = sercred;
+	auth->ah_cred.oa_length = XDR_GETPOS(&xdrm) - startpos;
+	ASSERT(auth->ah_cred.oa_length <= MAX_AUTH_BYTES);
 
 	/*
-	 * serialize credentials and verifiers (null)
+	 * serialize credentials and verifier (null)
 	 */
 	if ((xdr_opaque_auth(xdrs, &(auth->ah_cred))) &&
 	    (xdr_opaque_auth(xdrs, &(auth->ah_verf))))
 		ret = TRUE;
 	else
 		ret = FALSE;
+
 done:
+	XDR_DESTROY(&xdrm);
 	kmem_free(sercred, MAX_AUTH_BYTES);
+
 	return (ret);
 }
 
