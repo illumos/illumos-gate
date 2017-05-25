@@ -669,7 +669,7 @@ _emul_done:
 	movq (%rbx), %rbx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
 	.globl  _patch_xrstorq_rbx
 _patch_xrstorq_rbx:
-	FXRSTORQ	((%rbx))
+	fxrstorq (%rbx)
 	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
 	je	.return_to_kernel
 
@@ -745,7 +745,7 @@ _patch_xrstorq_rbx:
 	movq (%rbx), %rbx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
 	.globl  _patch_xrstorq_rbx
 _patch_xrstorq_rbx:
-	FXRSTORQ	((%rbx))
+	fxrstorq (%rbx)
 	popq	%rdx
 	popq	%rbx
 	popq	%rax

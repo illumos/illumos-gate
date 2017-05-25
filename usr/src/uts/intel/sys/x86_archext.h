@@ -185,6 +185,11 @@ extern "C" {
 #define	CPUID_AMD_ECX_TOPOEXT	0x00400000	/* AMD: Topology Extensions */
 
 /*
+ * AMD uses %ebx for some of their features (extended function 0x80000008).
+ */
+#define	CPUID_AMD_EBX_ERR_PTR_ZERO	0x00000004 /* AMD: FP Err. Ptr. Zero */
+
+/*
  * Intel now seems to have claimed part of the "extended" function
  * space that we previously for non-Intel implementors to use.
  * More excitingly still, they've claimed bit 20 to mean LAHF/SAHF
@@ -788,6 +793,7 @@ extern uint_t cpuid_get_procnodes_per_pkg(struct cpu *cpu);
 extern uint_t cpuid_get_compunitid(struct cpu *cpu);
 extern uint_t cpuid_get_cores_per_compunit(struct cpu *cpu);
 extern size_t cpuid_get_xsave_size();
+extern boolean_t cpuid_need_fp_excp_handling();
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);

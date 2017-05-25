@@ -127,7 +127,7 @@ const struct xsave_state avx_initial = {
 	 * and CPU should initialize XMM/YMM.
 	 */
 	1,
-	{0, 0}	/* These 2 bytes must be zero */
+	0	/* xs_xcomp_bv */
 	/* rest of structure is zero */
 };
 
@@ -164,6 +164,11 @@ void (*fpsave_ctxt)(void *) = fpxsave_ctxt;
  */
 void (*fpsave_ctxt)(void *) = fpnsave_ctxt;
 #endif
+
+/*
+ * This function pointer is changed to xsaveopt if the CPU is xsaveopt capable.
+ */
+void (*xsavep)(struct xsave_state *, uint64_t) = xsave;
 
 static int fpe_sicode(uint_t);
 static int fpe_simd_sicode(uint_t);
@@ -318,7 +323,7 @@ fp_save(struct fpu_ctx *fp)
 		break;
 
 	case FP_XSAVE:
-		xsave(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
+		xsavep(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
 		break;
 	default:
 		panic("Invalid fp_save_mech");

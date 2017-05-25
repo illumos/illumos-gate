@@ -153,6 +153,10 @@ fpu_probe(void)
 #endif
 
 #if defined(__amd64)
+		/* Use the more complex exception clearing code if necessary */
+		if (cpuid_need_fp_excp_handling())
+			fpsave_ctxt = fpxsave_excp_clr_ctxt;
+
 		/*
 		 * SSE and SSE2 are required for the 64-bit ABI.
 		 *
@@ -174,7 +178,31 @@ fpu_probe(void)
 
 			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
 				fp_save_mech = FP_XSAVE;
-				fpsave_ctxt = xsave_ctxt;
+				if (is_x86_feature(x86_featureset,
+				    X86FSET_XSAVEOPT)) {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsaveopt_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsaveopt_ctxt;
+					}
+					xsavep = xsaveopt;
+				} else {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsave_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsave_ctxt;
+					}
+				}
 				patch_xsave();
 				fpsave_cachep = kmem_cache_create("xsave_cache",
 				    cpuid_get_xsave_size(), XSAVE_ALIGN,
@@ -196,7 +224,15 @@ fpu_probe(void)
 			fp_kind |= __FP_SSE;
 			ENABLE_SSE();
 			fp_save_mech = FP_FXSAVE;
-			fpsave_ctxt = fpxsave_ctxt;
+			/*
+			 * Use the more complex exception clearing code if
+			 * necessary.
+			 */
+			if (cpuid_need_fp_excp_handling()) {
+				fpsave_ctxt = fpxsave_excp_clr_ctxt;
+			} else {
+				fpsave_ctxt = fpxsave_ctxt;
+			}
 
 			if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
 				patch_sse2();
@@ -210,7 +246,31 @@ fpu_probe(void)
 
 			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
 				fp_save_mech = FP_XSAVE;
-				fpsave_ctxt = xsave_ctxt;
+				if (is_x86_feature(x86_featureset,
+				    X86FSET_XSAVEOPT)) {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsaveopt_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsaveopt_ctxt;
+					}
+					xsavep = xsaveopt;
+				} else {
+					/*
+					 * Use the more complex exception
+					 * clearing code if necessary.
+					 */
+					if (cpuid_need_fp_excp_handling()) {
+						fpsave_ctxt =
+						    xsave_excp_clr_ctxt;
+					} else {
+						fpsave_ctxt = xsave_ctxt;
+					}
+				}
 				patch_xsave();
 				fpsave_cachep = kmem_cache_create("xsave_cache",
 				    cpuid_get_xsave_size(), XSAVE_ALIGN,

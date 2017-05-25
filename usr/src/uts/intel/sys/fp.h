@@ -230,23 +230,46 @@ struct fxsave_state {
 };	/* 512 bytes */
 
 /*
- * This structure is written to memory by an 'xsave' instruction.
- * First 512 byte is compatible with the format of an 'fxsave' area.
+ * This structure is written to memory by one of the 'xsave' instruction
+ * variants. The first 512 bytes are compatible with the format of the 'fxsave'
+ * area. The header portion of the xsave layout is documented in section
+ * 13.4.2 of the Intel 64 and IA-32 Architectures Software Developer’s Manual,
+ * Volume 1 (IASDv1). The extended portion is documented in section 13.4.3.
  *
- * The size is at least AVX_XSAVE_SIZE (832 bytes), asserted in fpnoextflt().
- * Enabling additional xsave-related CPU features increases the size.
- * We dynamically allocate the per-lwp xsave area at runtime, based on the
- * size needed for the CPU-specific features. The xsave_state structure simply
- * defines the legacy layout of the beginning of the xsave area. The locations
- * and size of new, extended components are determined dynamically by querying
- * the CPU. See the xsave_info structure in cpuid.c.
+ * Our size is at least AVX_XSAVE_SIZE (832 bytes), asserted in fpnoextflt().
+ * Enabling additional xsave-related CPU features requires an increase in the
+ * size. We dynamically allocate the per-lwp xsave area at runtime, based on
+ * the size needed for the CPU-specific features. This xsave_state structure
+ * simply defines our historical layout for the beginning of the xsave area. The
+ * locations and size of new, extended, components is determined dynamically by
+ * querying the CPU. See the xsave_info structure in cpuid.c.
+ *
+ * xsave component usage is tracked using bits in the xs_xstate_bv field. The
+ * components are documented in section 13.1 of IASDv1. For easy reference,
+ * this is a summary of the currently defined component bit definitions:
+ *	x87			0x0001
+ *	SSE			0x0002
+ *	AVX			0x0004
+ *	bndreg (MPX)		0x0008
+ *	bndcsr (MPX)		0x0010
+ *	opmask (AVX512)		0x0020
+ *	zmm hi256 (AVX512)	0x0040
+ *	zmm hi16 (AVX512)	0x0080
+ *	PT			0x0100
+ *	PKRU			0x0200
+ * When xsaveopt_ctxt is being used to save into the xsave_state area, the
+ * xs_xstate_bv field is updated by the xsaveopt instruction to indicate which
+ * elements of the xsave area are active.
+ *
+ * xs_xcomp_bv should always be 0, since we do not currently use the compressed
+ * form of xsave (xsavec).
  */
 struct xsave_state {
-	struct fxsave_state	xs_fxsave;
-	uint64_t		xs_xstate_bv;	/* 512 */
-	uint64_t		xs_rsv_mbz[2];
-	uint64_t		xs_reserved[5];
-	upad128_t		xs_ymm[16];	/* avx - 576 */
+	struct fxsave_state	xs_fxsave;	/* 0-511 legacy region */
+	uint64_t		xs_xstate_bv;	/* 512-519 start xsave header */
+	uint64_t		xs_xcomp_bv;	/* 520-527 */
+	uint64_t		xs_reserved[6];	/* 528-575 end xsave header */
+	upad128_t		xs_ymm[16];	/* 576 AVX component */
 };
 
 /*
@@ -283,7 +306,12 @@ extern int fpu_probe_pentium_fdivbug(void);
 extern void fpnsave_ctxt(void *);
 extern void fpxsave_ctxt(void *);
 extern void xsave_ctxt(void *);
+extern void xsaveopt_ctxt(void *);
+extern void fpxsave_excp_clr_ctxt(void *);
+extern void xsave_excp_clr_ctxt(void *);
+extern void xsaveopt_excp_clr_ctxt(void *);
 extern void (*fpsave_ctxt)(void *);
+extern void (*xsavep)(struct xsave_state *, uint64_t);
 
 extern void fxsave_insn(struct fxsave_state *);
 extern void fpsave(struct fnsave_state *);
@@ -291,6 +319,7 @@ extern void fprestore(struct fnsave_state *);
 extern void fpxsave(struct fxsave_state *);
 extern void fpxrestore(struct fxsave_state *);
 extern void xsave(struct xsave_state *, uint64_t);
+extern void xsaveopt(struct xsave_state *, uint64_t);
 extern void xrestore(struct xsave_state *, uint64_t);
 
 extern void fpenable(void);

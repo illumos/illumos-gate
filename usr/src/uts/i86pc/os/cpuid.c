@@ -364,6 +364,7 @@ struct cpuid_info {
 	char cpi_brandstr[49];		/* fn 0x8000000[234] */
 	uint8_t cpi_pabits;		/* fn 0x80000006: %eax */
 	uint8_t	cpi_vabits;		/* fn 0x80000006: %eax */
+	uint8_t cpi_fp_amd_save;	/* AMD: FP error pointer save rqd. */
 	struct	cpuid_regs cpi_extd[NMAX_CPI_EXTD];	/* 0x800000XX */
 
 	id_t cpi_coreid;		/* same coreid => strands share core */
@@ -1880,6 +1881,21 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	    cpi->cpi_family, cpi->cpi_model, cpi->cpi_step);
 	cpi->cpi_socket = _cpuid_skt(cpi->cpi_vendor, cpi->cpi_family,
 	    cpi->cpi_model, cpi->cpi_step);
+
+	/*
+	 * While we're here, check for the AMD "Error Pointer Zero/Restore"
+	 * feature. This can be used to setup the FP save handlers
+	 * appropriately.
+	 */
+	if (cpi->cpi_vendor == X86_VENDOR_AMD) {
+		if (cpi->cpi_xmaxeax >= 0x80000008 &&
+		    cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_ERR_PTR_ZERO) {
+			/* Special handling for AMD FP not necessary. */
+			cpi->cpi_fp_amd_save = 0;
+		} else {
+			cpi->cpi_fp_amd_save = 1;
+		}
+	}
 
 pass1_done:
 	cpi->cpi_pass = 1;
@@ -3537,6 +3553,22 @@ cpuid_get_xsave_size()
 {
 	return (MAX(cpuid_info0.cpi_xsave.xsav_max_size,
 	    sizeof (struct xsave_state)));
+}
+
+/*
+ * Return true if the CPUs on this system require 'pointer clearing' for the
+ * floating point error pointer exception handling. In the past, this has been
+ * true for all AMD K7 & K8 CPUs, although newer AMD CPUs have been changed to
+ * behave the same as Intel. This is checked via the CPUID_AMD_EBX_ERR_PTR_ZERO
+ * feature bit and is reflected in the cpi_fp_amd_save member. Once this has
+ * been confirmed on hardware which supports that feature, this test should be
+ * narrowed. In the meantime, we always follow the existing behavior on any AMD
+ * CPU.
+ */
+boolean_t
+cpuid_need_fp_excp_handling()
+{
+	return (cpuid_info0.cpi_vendor == X86_VENDOR_AMD);
 }
 
 /*
