@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2017 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 #
 
@@ -146,6 +146,8 @@ legacy pkg=SUNWzfsr desc="ZFS root components" name="ZFS (Root)"
 legacy pkg=SUNWzfsu desc="ZFS libraries and commands" name="ZFS (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.cityhash \
+    license=usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.cityhash
 license usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4 \
     license=usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4
 link path=etc/fs/zfs/mount target=../../../sbin/zfs
