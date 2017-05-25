@@ -3088,7 +3088,7 @@ configinfo(char *null, int64_t param)
 	}
 	if (((flags & (IFF_VIRTUAL|IFF_LOOPBACK)) != IFF_VIRTUAL) &&
 	    ioctl(s, SIOCGLIFMTU, (caddr_t)&lifr) >= 0)
-		(void) printf(" mtu %d", lifr.lifr_metric);
+		(void) printf(" mtu %u", lifr.lifr_mtu);
 
 	/* Index only applies to the zeroth interface */
 	if (lifnum(name) == 0) {
