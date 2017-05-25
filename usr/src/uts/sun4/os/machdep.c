@@ -176,7 +176,7 @@ lwp_stk_fini(klwp_t *lwp)
 
 /*ARGSUSED*/
 void
-lwp_stk_fini(klwp_t *lwp)
+lwp_fp_init(klwp_t *lwp)
 {
 }
 
