@@ -22,29 +22,49 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd November 18, 2015
-.Dt LOADER 8
+.Dd Apr 20, 2017
+.Dt LOADER 5
 .Os
 .Sh NAME
 .Nm loader
 .Nd kernel bootstrapping final stage
 .Sh DESCRIPTION
-The program called
+The
 .Nm
 is the final stage of
-.Fx Ns 's
-kernel bootstrapping process.
-On IA32 (i386) architectures, it is a
+.Nm illumos Ns 's
+kernel bootstrapping process. The actual name for the stage depends on
+the platform. On IA32 (i386) architectures with BIOS firmware, it is a
 .Pa BTX
-client.
-It is linked statically to
-.Xr libstand 3
-and usually located in the directory
+client and named
+.Nm zfsloader .
+It is linked statically to libstand and usually located in the directory
 .Pa /boot .
 .Pp
-It provides a scripting language that can be used to
+.Nm
+supports booting from
+.Cm ZFS ,
+.Cm UFS ,
+.Cm PCFS ,
+.Cm HSFS
+and
+.Cm NFS
+file systems. Additionally,
+.Nm
+can load files from the
+.Cm TFTP
+file service. The NFS and TFTP based boot is enabled via
+.Xr pxeboot 5 .
+The
+.Nm
+also does support uncompressing gzip files while reading. The uncompression
+will happen automatically if the compressed file is stored without .gz
+suffix or if the file is accessed by leaving out the .gz suffix from the name.
+If the file is referred by full name, including .gz suffix, then the file
+content is read as is and the uncompression is not performed.
+.Pp
+.Nm
+provides a scripting language that can be used to
 automate tasks, do pre-configuration or assist in recovery
 procedures.
 This scripting language is roughly divided in
@@ -63,22 +83,22 @@ During initialization,
 will probe for a console and set the
 .Va console
 variable, or set it to serial console
-.Pq Dq Li comconsole
+.Pq Do Li ttya Dc - Dq Li ttyd
 if the previous boot stage used that.
-If multiple consoles are selected, they will be listed separated by spaces.
+If multiple consoles are selected, they will be listed separated by commas.
 Then, devices are probed,
 .Va currdev
 and
 .Va loaddev
 are set, and
-.Va LINES
-is set to 24.
+.Va COLUMNS ,
+.Va LINES ,
+and
+.Va ISADIR
+are set.
 Next,
 .Tn FICL
-is initialized, the builtin words are added to its vocabulary, and
-.Pa /boot/boot.4th
-is processed if it exists.
-No disk switching is possible while that file is being read.
+is initialized, the builtin words are added to its vocabulary.
 The inner interpreter
 .Nm
 will use with
@@ -126,14 +146,10 @@ in this case
 will engage interactive mode only if
 .Ic autoboot
 has failed.
-.Sh BUILTIN COMMANDS
+.Ss Builtin Commands
 In
 .Nm ,
 builtin commands take parameters from the command line.
-Presently,
-the only way to call them from a script is by using
-.Pa evaluate
-on a string.
 If an error condition occurs, an exception will be generated,
 which can be intercepted using
 .Tn ANS
@@ -169,8 +185,12 @@ must precede the kernel name, if a kernel name is provided.
 .Pp
 .Em WARNING :
 The behavior of this builtin is changed if
-.Xr loader.4th 8
+.Xr loader.4th 5
 is loaded.
+.Pp
+.It Ic chain Ar device
+Chain load another boot loader from the specified device. Device can be either
+disk name or partition.
 .Pp
 .It Ic echo Xo
 .Op Fl n
@@ -205,30 +225,11 @@ returns an error itself (see
 .Op Fl t Ar type
 .Ar file Cm ...
 .Xc
-Loads a kernel, kernel loadable module (kld), disk image,
-or file of opaque contents tagged as being of the type
+Loads a kernel or file of opaque contents tagged as being of the type
 .Ar type .
 Kernel and modules can be either in a.out or ELF format.
 Any arguments passed after the name of the file to be loaded
 will be passed as arguments to that file.
-Use the
-.Li md_image
-type to make the kernel create a file-backed
-.Xr md 4
-disk.
-This is useful for booting from a temporary rootfs.
-Currently, argument passing does not work for the kernel.
-.Pp
-.It Ic load_geli Xo
-.Op Fl n Ar keyno
-.Ar prov Ar file
-.Xc
-Loads a
-.Xr geli 8
-encryption keyfile for the given provider name.
-The key index can be specified via
-.Ar keyno
-or will default to zero.
 .Pp
 .It Ic ls Xo
 .Op Fl l
@@ -259,10 +260,6 @@ is specified, more details are shown.
 Display the files specified, with a pause at each
 .Va LINES
 displayed.
-.Pp
-.It Ic pnpscan Op Fl v
-Scans for Plug-and-Play devices.
-This is not functional at present.
 .Pp
 .It Ic read Xo
 .Op Fl t Ar seconds
@@ -303,7 +300,7 @@ from the environment.
 .It Ic \&?
 Lists available commands.
 .El
-.Ss BUILTIN ENVIRONMENT VARIABLES
+.Ss Builtin Environment Variables
 The
 .Nm
 has actually two different kinds of
@@ -371,172 +368,59 @@ no delay will be inserted and
 will engage interactive mode only if
 .Ic autoboot
 has failed for some reason.
-.It Va boot_askname
-Instructs the kernel to prompt the user for the name of the root device
-when the kernel is booted.
-.It Va boot_cdrom
-Instructs the kernel to try to mount the root file system from CD-ROM.
-.It Va boot_ddb
-Instructs the kernel to start in the DDB debugger, rather than
-proceeding to initialize when booted.
-.It Va boot_dfltroot
-Instructs the kernel to mount the statically compiled-in root file system.
-.It Va boot_gdb
-Selects gdb-remote mode for the kernel debugger by default.
-.It Va boot_multicons
-Enables multiple console support in the kernel early on boot.
-In a running system, console configuration can be manipulated
-by the
-.Xr conscontrol 8
-utility.
-.It Va boot_mute
-All console output is suppressed when console is muted.
-In a running system, the state of console muting can be manipulated by the
-.Xr conscontrol 8
-utility.
-.It Va boot_pause
-During the device probe, pause after each line is printed.
-.It Va boot_serial
-Force the use of a serial console even when an internal console
-is present.
+.It Va boot_ask
+Will set
+.Xr kernel 1M
+.Fl a
+option.
+.It Va boot_debug
+Will set
+.Xr kernel 1M
+.Fl d
+option.
+.It Va boot_kmdb
+Will set
+.Xr kernel 1M
+.Fl k
+option.
+.It Va boot_reconfigure
+Will set
+.Xr kernel 1M
+.Fl r
+option.
 .It Va boot_single
-Prevents the kernel from initiating a multi-user startup; instead,
-a single-user mode will be entered when the kernel has finished
-device probing.
+Will set
+.Xr kernel 1M
+.Fl s
+option.
 .It Va boot_verbose
-Setting this variable causes extra debugging information to be printed
-by the kernel during the boot phase.
-.It Va bootfile
-List of semicolon-separated search path for bootable kernels.
-The default is
-.Dq Li kernel .
-.It Va comconsole_speed
-Defines the speed of the serial console (i386 and amd64 only).
-If the previous boot stage indicated that a serial console is in use
-then this variable is initialized to the current speed of the console
-serial port.
-Otherwise it is set to 9600 unless this was overridden using the
-.Va BOOT_COMCONSOLE_SPEED
-variable when
+Will set
+.Xr kernel 1M
+.Fl v
+option.
+.It Va boot-args
+Will set custom arguments for the kernel. If set in
 .Nm
-was compiled.
-Changes to the
-.Va comconsole_speed
-variable take effect immediately.
-.It Va comconsole_port
-Defines the base i/o port used to access console UART
-(i386 and amd64 only).
-If the variable is not set, its assumed value is 0x3F8, which
-corresponds to PC port COM1, unless overridden by
-.Va BOOT_COMCONSOLE_PORT
-variable during the compilation of
-.Nm .
-Setting the
-.Va comconsole_port
-variable automatically set
-.Va hw.uart.console
-environment variable to provide a hint to kernel for location of the console.
-Loader console is changed immediately after variable
-.Va comconsole_port
-is set.
-.It Va comconsole_pcidev
-Defines the location of a PCI device of the 'simple communication'
-class to be used as the serial console UART (i386 and amd64 only).
-The syntax of the variable is
-.Li 'bus:device:function[:bar]' ,
-where all members must be numeric, with possible
-.Li 0x
-prefix to indicate a hexadecimal value.
-The
-.Va bar
-member is optional and assumed to be 0x10 if omitted.
-The bar must decode i/o space.
-Setting the variable
-.Va comconsole_pcidev
-automatically sets the variable
-.Va comconsole_port
-to the base of the selected bar, and hint
-.Va hw.uart.console .
-Loader console is changed immediately after variable
-.Va comconsole_pcidev
-is set.
+configuration, the
+.Nm
+startup will parse the
+.Va boot-args
+value to set boot prefixed variables listed above, any unrecognized options
+are added to kernel command line verbatim.
+.It Va bootfile
+The name of the kernel.
 .It Va console
 Defines the current console or consoles.
 Multiple consoles may be specified.
 In that case, the first listed console will become the default console for
-userland output (e.g.\& from
-.Xr init 8 ) .
+the
+.Xr kernel 1M .
 .It Va currdev
 Selects the default device.
 Syntax for devices is odd.
-.It Va dumpdev
-Sets the device for kernel dumps.
-This can be used to ensure that a device is configured before the corresponding
-.Va dumpdev
-directive from
-.Xr rc.conf 5
-has been processed, allowing kernel panics that happen during the early stages
-of boot to be captured.
-.It Va init_chroot
-If set to a valid directory in the root file system, it causes
-.Xr init 8
-to perform a
-.Xr chroot 2
-operation on that directory, making it the new root directory.
-That happens before entering single-user mode or multi-user
-mode (but after executing the
-.Va init_script
-if enabled).
-.It Va init_path
-Sets the list of binaries which the kernel will try to run as the initial
-process.
-The first matching binary is used.
-The default list is
-.Dq Li /sbin/init:/sbin/oinit:/sbin/init.bak:\:/rescue/init .
-.It Va init_script
-If set to a valid file name in the root file system,
-instructs
-.Xr init 8
-to run that script as the very first action,
-before doing anything else.
-Signal handling and exit code interpretation is similar to
-running the
-.Pa /etc/rc
-script.
-In particular, single-user operation is enforced
-if the script terminates with a non-zero exit code,
-or if a SIGTERM is delivered to the
-.Xr init 8
-process (PID 1).
-.It Va init_shell
-Defines the shell binary to be used for executing the various shell scripts.
-The default is
-.Dq Li /bin/sh .
-It is used for running the
-.Va init_script
-if set, as well as for the
-.Pa /etc/rc
-and
-.Pa /etc/rc.shutdown
-scripts.
-The value of the corresponding
-.Xr kenv 2
-variable is evaluated every time
-.Xr init 8
-calls a shell script, so it can be changed later on using the
-.Xr kenv 1
-utility.
-In particular, if a non-default shell is used for running an
-.Va init_script ,
-it might be desirable to have that script reset the value of
-.Va init_shell
-back to the default, so that the
-.Pa /etc/rc
-script is executed with the standard shell
-.Pa /bin/sh .
 .It Va interpret
 Has the value
-.Dq Li OK
+.Dq Li ok
 if the Forth's current state is interpreting.
 .It Va LINES
 Define the number of lines on the screen, to be used by the pager.
@@ -544,12 +428,7 @@ Define the number of lines on the screen, to be used by the pager.
 Sets the list of directories which will be searched for modules
 named in a load command or implicitly required by a dependency.
 The default value for this variable is
-.Dq Li /boot/kernel;/boot/modules .
-.It Va num_ide_disks
-Sets the number of IDE disks as a workaround for some problems in
-finding the root disk at boot.
-This has been deprecated in favor of
-.Va root_disk_unit .
+.Dq Li /platform/i86pc/${ISADIR}
 .It Va prompt
 Value of
 .Nm Ns 's
@@ -560,151 +439,16 @@ If variable
 .Va prompt
 is unset, the default prompt is
 .Ql > .
-.It Va root_disk_unit
-If the code which detects the disk unit number for the root disk is
-confused, e.g.\& by a mix of SCSI and IDE disks, or IDE disks with
-gaps in the sequence (e.g.\& no primary slave), the unit number can
-be forced by setting this variable.
-.It Va rootdev
-By default the value of
-.Va currdev
-is used to set the root file system
-when the kernel is booted.
-This can be overridden by setting
-.Va rootdev
-explicitly.
+.It Va os_console
+If set, the value is used to set
+.Xr kernel 1M
+.Va console
+property.
 .El
 .Pp
-Other variables are used to override kernel tunable parameters.
-The following tunables are available:
-.Bl -tag -width Va
-.It Va hw.physmem
-Limit the amount of physical memory the system will use.
-By default the size is in bytes, but the
-.Cm k , K , m , M , g
-and
-.Cm G
-suffixes
-are also accepted and indicate kilobytes, megabytes and gigabytes
-respectively.
-An invalid suffix will result in the variable being ignored by the
-kernel.
-.It Va hw.pci.host_start_mem , hw.acpi.host_start_mem
-When not otherwise constrained, this limits the memory start
-address.
-The default is 0x80000000 and should be set to at least size of the
-memory and not conflict with other resources.
-Typically, only systems without PCI bridges need to set this variable
-since PCI bridges typically constrain the memory starting address
-(and the variable is only used when bridges do not constrain this
-address).
-.It Va hw.pci.enable_io_modes
-Enable PCI resources which are left off by some BIOSes or are not
-enabled correctly by the device driver.
-Tunable value set to ON (1) by default, but this may cause problems
-with some peripherals.
-.It Va kern.maxusers
-Set the size of a number of statically allocated system tables; see
-.Xr tuning 7
-for a description of how to select an appropriate value for this
-tunable.
-When set, this tunable replaces the value declared in the kernel
-compile-time configuration file.
-.It Va kern.ipc.nmbclusters
-Set the number of mbuf clusters to be allocated.
-The value cannot be set below the default
-determined when the kernel was compiled.
-.It Va kern.ipc.nsfbufs
-Set the number of
-.Xr sendfile 2
-buffers to be allocated.
-Overrides
-.Dv NSFBUFS .
-Not all architectures use such buffers; see
-.Xr sendfile 2
-for details.
-.It Va kern.maxswzone
-Limits the amount of KVM to be used to hold swap
-metadata, which directly governs the
-maximum amount of swap the system can support,
-at the rate of approximately 200 MB of swap space
-per 1 MB of metadata.
-This value is specified in bytes of KVA space.
-If no value is provided, the system allocates
-enough memory to handle an amount of swap
-that corresponds to eight times the amount of
-physical memory present in the system.
-.Pp
-Note that swap metadata can be fragmented,
-which means that the system can run out of
-space before it reaches the theoretical limit.
-Therefore, care should be taken to not configure
-more swap than approximately half of the
-theoretical maximum.
-.Pp
-Running out of space for swap metadata can leave
-the system in an unrecoverable state.
-Therefore, you should only change
-this parameter if you need to greatly extend the
-KVM reservation for other resources such as the
-buffer cache or
-.Va kern.ipc.nmbclusters .
-Modifies kernel option
-.Dv VM_SWZONE_SIZE_MAX .
-.It Va kern.maxbcache
-Limits the amount of KVM reserved for use by the
-buffer cache, specified in bytes.
-The default maximum is 200MB on i386,
-and 400MB on amd64 and sparc64.
-This parameter is used to
-prevent the buffer cache from eating too much
-KVM in large-memory machine configurations.
-Only mess around with this parameter if you need to
-greatly extend the KVM reservation for other resources
-such as the swap zone or
-.Va kern.ipc.nmbclusters .
-Note that
-the NBUF parameter will override this limit.
-Modifies
-.Dv VM_BCACHE_SIZE_MAX .
-.It Va kern.msgbufsize
-Sets the size of the kernel message buffer.
-The default limit of 64KB is usually sufficient unless
-large amounts of trace data need to be collected
-between opportunities to examine the buffer or
-dump it to a file.
-Overrides kernel option
-.Dv MSGBUF_SIZE .
-.It Va machdep.disable_mtrrs
-Disable the use of i686 MTRRs (x86 only).
-.It Va net.inet.tcp.tcbhashsize
-Overrides the compile-time set value of
-.Dv TCBHASHSIZE
-or the preset default of 512.
-Must be a power of 2.
-.It Va twiddle_divisor
-Throttles the output of the
-.Sq twiddle
-I/O progress indicator displayed while loading the kernel and modules.
-This is useful on slow serial consoles where the time spent waiting for
-these characters to be written can add up to many seconds.
-The default is 1 (full speed); a value of 2 spins half as fast, and so on.
-.It Va vm.kmem_size
-Sets the size of kernel memory (bytes).
-This overrides the value determined when the kernel was compiled.
-Modifies
-.Dv VM_KMEM_SIZE .
-.It Va vm.kmem_size_min
-.It Va vm.kmem_size_max
-Sets the minimum and maximum (respectively) amount of kernel memory
-that will be automatically allocated by the kernel.
-These override the values determined when the kernel was compiled.
-Modifies
-.Dv VM_KMEM_SIZE_MIN
-and
-.Dv VM_KMEM_SIZE_MAX .
-.El
-.Ss BUILTIN PARSER
+Other variables are used for loader or to set kernel properties or for
+informational purposes.
+.Ss Builtin Parser
 When a builtin command is executed, the rest of the line is taken
 by it as arguments, and it is processed by a special parser which
 is not used for regular Forth commands.
@@ -756,8 +500,8 @@ Spaces can also be escaped through the use of \e\e .
 .El
 .Pp
 An exception to this parsing rule exists, and is described in
-.Sx BUILTINS AND FORTH .
-.Ss BUILTINS AND FORTH
+.Sx Builtins And FORTH .
+.Ss Builtins And FORTH
 All builtin words are state-smart, immediate words.
 If interpreted, they behave exactly as described previously.
 If they are compiled, though,
@@ -799,7 +543,7 @@ handle exceptions.
 In this case, the use of a proxy is recommended.
 For example:
 .Dl : (boot) boot ;
-.Sh FICL
+.Ss FICL
 .Tn FICL
 is a Forth interpreter written in C, in the form of a forth
 virtual machine library that can be called by C functions and vice
@@ -836,7 +580,7 @@ Forth standard words are listed in the
 section.
 The words falling in the two other groups are described in the
 following subsections.
-.Ss FICL EXTRA WORDS
+.Ss FICL Extra Words
 .Bl -tag -width wid-set-super
 .It Ic .env
 .It Ic .ver
@@ -862,7 +606,7 @@ This is the STRING word set's
 .It Ic cell-
 .It Ic -rot
 .El
-.Ss FREEBSD EXTRA WORDS
+.Ss Loader Extra Words
 .Bl -tag -width XXXXXXXX
 .It Ic \&$ Pq --
 Evaluates the remainder of the input buffer, after having printed it first.
@@ -893,7 +637,7 @@ The constants
 and
 .Dv O_RDWR
 are defined in
-.Pa /boot/support.4th ,
+.Pa /boot/forth/support.4th ,
 indicating read only, write only, and read-write access, respectively.
 .It Xo
 .Ic fread
@@ -928,82 +672,17 @@ Writes a byte to a port.
 Returns the number of seconds since midnight.
 .It Ic tib> Pq -- Ar addr len
 Returns the remainder of the input buffer as a string on the stack.
-.It Ic trace! Pq Ar flag --
-Activates or deactivates tracing.
-Does not work with
-.Ic catch .
 .El
-.Ss FREEBSD DEFINED ENVIRONMENTAL QUERIES
+.Ss Loader Defined Environmental Queries
 .Bl -tag -width Ds
 .It arch-i386
 .Ic TRUE
 if the architecture is IA32.
-.It FreeBSD_version
-.Fx
-version at compile time.
 .It loader_version
 .Nm
 version.
 .El
-.Ss SYSTEM DOCUMENTATION
-.Sh FILES
-.Bl -tag -width /boot/defaults/loader.conf -compact
-.It Pa /boot/loader
-.Nm
-itself.
-.It Pa /boot/boot.4th
-Additional
-.Tn FICL
-initialization.
-.It Pa /boot/defaults/loader.conf
-.It Pa /boot/loader.conf
-.It Pa /boot/loader.conf.local
-.Nm
-configuration files, as described in
-.Xr loader.conf 5 .
-.It Pa /boot/loader.rc
-.Nm
-bootstrapping script.
-.It Pa /boot/loader.help
-Loaded by
-.Ic help .
-Contains the help messages.
-.El
-.Sh EXAMPLES
-Boot in single user mode:
-.Pp
-.Dl boot -s
-.Pp
-Load the kernel, a splash screen, and then autoboot in five seconds.
-Notice that a kernel must be loaded before any other
-.Ic load
-command is attempted.
-.Bd -literal -offset indent
-load kernel
-load splash_bmp
-load -t splash_image_data /boot/chuckrulez.bmp
-autoboot 5
-.Ed
-.Pp
-Set the disk unit of the root device to 2, and then boot.
-This would be needed in a system with two IDE disks,
-with the second IDE disk hardwired to ada2 instead of ada1.
-.Bd -literal -offset indent
-set root_disk_unit=2
-boot /boot/kernel/kernel
-.Ed
-.Pp
-See also:
-.Bl -tag -width /usr/share/examples/bootforth/X
-.It Pa /boot/loader.4th
-Extra builtin-like words.
-.It Pa /boot/support.4th
-.Pa loader.conf
-processing words.
-.It Pa /usr/share/examples/bootforth/
-Assorted examples.
-.El
-.Sh ERRORS
+.Ss Errors
 The following values are thrown by
 .Nm :
 .Bl -tag -width XXXXX -offset indent
@@ -1028,12 +707,49 @@ executed.
 .It -259
 Unspecified error.
 .El
+.Sh FILES
+.Bl -tag -width /boot/defaults/loader.conf -compact
+.It Pa /boot/defaults/loader.conf
+.It Pa /boot/conf.d/*
+.It Pa /boot/loader.conf
+.It Pa /boot/loader.conf.local
+.Nm
+configuration files, as described in
+.Xr loader.conf 5 .
+.It Pa /boot/loader.help
+Loaded by
+.Ic help .
+Contains the help messages.
+.It Pa /boot/loader.rc
+.Nm
+bootstrapping script.
+.It Pa /boot/forth/loader.4th
+Extra builtin-like words.
+.It Pa /boot/forth/support.4th
+.Pa loader.conf
+processing words.
+.It Pa /boot/zfsloader
+.Nm
+itself.
+.El
+.Sh EXAMPLES
+Boot in single user mode:
+.Pp
+.Dl boot -s
+.Pp
+Load the kernel, a boot_archive, and then autoboot in five seconds.
+Notice that a kernel must be loaded before any other
+.Ic load
+command is attempted.
+.Bd -literal -offset indent
+load /platform/i86pc/kernel/amd64/unix
+load -t rootfs /platform/i86pc/amd64/boot_archive
+autoboot 5
+.Ed
 .Sh SEE ALSO
-.Xr libstand 3 ,
-.Xr loader.conf 5 ,
-.Xr tuning 7 ,
-.Xr boot 8 ,
-.Xr btxld 8
+.Xr boot 1M ,
+.Xr btxld 1onbld ,
+.Xr loader.conf 5
 .Sh STANDARDS
 For the purposes of ANS Forth compliance, loader is an
 .Bf Em
@@ -1067,25 +783,3 @@ bye, forget, see, words,
 from the Programming-Tools extension word set, Providing the
 Search-Order extensions word set.
 .Ef
-.Sh HISTORY
-The
-.Nm
-first appeared in
-.Fx 3.1 .
-.Sh AUTHORS
-.An -nosplit
-The
-.Nm
-was written by
-.An Michael Smith Aq msmith@FreeBSD.org .
-.Pp
-.Tn FICL
-was written by
-.An John Sadler Aq john_sadler@alum.mit.edu .
-.Sh BUGS
-The
-.Ic expect
-and
-.Ic accept
-words will read from the input buffer instead of the console.
-The latter will be fixed, but the former will not.

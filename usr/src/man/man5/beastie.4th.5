@@ -22,27 +22,26 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd January 6, 2016
-.Dt BEASTIE.4TH 8
+.Dd Apr 22, 2017
+.Dt BEASTIE.4TH 5
 .Os
 .Sh NAME
 .Nm beastie.4th
-.Nd FreeBSD ASCII art boot module
+.Nd loader ASCII art boot module
 .Sh DESCRIPTION
 The file that goes by the name of
 .Nm
 is a set of commands designed to draw the ASCII art FreeBSD mascot
 .Nd known simply as
 .Ic beastie
-.Nd to the right of the boot loader menu.
+.Nd to the right of the boot loader menu. In illumos based systems, the
+distribution specific logo is used.
 The commands of
 .Nm
 by themselves are not enough for most uses.
 Please refer to the
 examples below for the most common situations, and to
-.Xr loader 8
+.Xr loader 5
 for additional commands.
 .Pp
 Before using any of the commands provided in
@@ -60,27 +59,19 @@ The commands provided by it are:
 .Pp
 .Bl -tag -width disable-module_module -compact -offset indent
 .It Ic draw-beastie
-Draws the FreeBSD logo.
+Draws the logo.
 .Pp
 The logo that is drawn is configured by setting the
 .Ic loader_logo
 variable in
-.Xr loader.conf 5
-to one of
-.Dq Li beastie ,
-.Dq Li beastiebw ,
-.Dq Li fbsdbw ,
-.Dq Li orb ,
-and
-.Dq Li orbbw
-(the default).
+.Xr loader.conf 4 .
 .Pp
 The position of the logo can be configured by setting the
 .Ic loader_logo_x
 and
 .Ic loader_logo_y
 variables in
-.Xr loader.conf 5 .
+.Xr loader.conf 4 .
 The default values are 46 (x) and 4 (y).
 .Pp
 .It Ic clear-beastie
@@ -92,7 +83,7 @@ Initializes the interactive boot loader menu.
 The
 .Ic loader_delay
 variable can be configured in
-.Xr loader.conf 5
+.Xr loader.conf 4
 to the number of seconds you would like to delay loading the boot menu.
 During the delay the user can press Ctrl-C to fall back to
 .Ic autoboot
@@ -103,14 +94,7 @@ The default behavior is to not delay.
 The environment variables that effect its behavior are:
 .Bl -tag -width bootfile -offset indent
 .It Va loader_logo
-Selects the desired logo in the beastie boot menu. Possible values are:
-.Dq Li fbsdbw ,
-.Dq Li beastie ,
-.Dq Li beastiebw ,
-.Dq Li orb ,
-.Dq Li orbbw
-(default), and
-.Dq Li none .
+Selects the desired logo in the beastie boot menu.
 .It Va loader_logo_x
 Sets the desired column position of the logo. Default is 46.
 .It Va loader_logo_y
@@ -127,15 +111,15 @@ the menu or ENTER to proceed to the menu. The default is to not delay when
 loading the menu.
 .El
 .Sh FILES
-.Bl -tag -width /boot/loader.4th -compact
-.It Pa /boot/loader
+.Bl -tag -width /boot/forth/loader.4th -compact
+.It Pa /boot/zfsloader
 The
-.Xr loader 8 .
-.It Pa /boot/beastie.4th
+.Xr zfsloader 5 .
+.It Pa /boot/forth/beastie.4th
 .Nm
 itself.
 .It Pa /boot/loader.rc
-.Xr loader 8
+.Xr loader 5
 bootstrapping script.
 .El
 .Sh EXAMPLES
@@ -143,31 +127,17 @@ Standard i386
 .Pa /boot/loader.rc :
 .Pp
 .Bd -literal -offset indent -compact
-include /boot/beastie.4th
+include /boot/forth/beastie.4th
 beastie-start
 .Ed
 .Pp
 Set a different logo in
-.Xr loader.conf 5 :
+.Xr loader.conf 4 :
 .Pp
 .Bd -literal -offset indent -compact
 loader_logo="beastie"
 .Ed
 .Sh SEE ALSO
-.Xr loader.conf 5 ,
-.Xr loader 8 ,
-.Xr loader.4th 8
-.Sh HISTORY
-The
-.Nm
-set of commands first appeared in
-.Fx 5.1 .
-.Sh AUTHORS
-The
-.Nm
-set of commands was written by
-.An -nosplit
-.An Scott Long Aq scottl@FreeBSD.org ,
-.An Aleksander Fafula Aq alex@fafula.com
-and
-.An Devin Teske Aq dteske@FreeBSD.org .
+.Xr loader.conf 4 ,
+.Xr loader 5 ,
+.Xr loader.4th 5

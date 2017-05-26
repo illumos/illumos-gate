@@ -22,10 +22,8 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd November 13, 2013
-.Dt LOADER.4TH 8
+.Dd Apr 22, 2017
+.Dt LOADER.4TH 5
 .Os
 .Sh NAME
 .Nm loader.4th
@@ -34,7 +32,7 @@
 The file that goes by the name of
 .Nm
 is a set of commands designed to manipulate
-.Xr loader.conf 5
+.Xr loader.conf 4
 files.
 The default
 .Pa /boot/loader.rc
@@ -42,7 +40,7 @@ includes
 .Nm
 and uses one of its commands to automatically read and process
 the standard
-.Xr loader.conf 5
+.Xr loader.conf 4
 files.
 Other commands exists to help the user specify alternate
 configurations.
@@ -52,7 +50,7 @@ The commands of
 by themselves are not enough for most uses.
 Please refer to the
 examples below for the most common situations, and to
-.Xr loader 8
+.Xr loader 5
 for additional commands.
 .Pp
 Before using any of the commands provided in
@@ -73,7 +71,7 @@ The commands provided by it are:
 .It Ic boot Ar directory Op Cm ...
 .It Ic boot Fl flag Cm ...
 Boot as specified by the
-.Xr loader.conf 5
+.Xr loader.conf 4
 files read.
 .Pp
 Depending on the arguments passed, it can override boot flags and
@@ -93,7 +91,7 @@ so it can be stopped.
 Reads
 .Pa /boot/defaults/loader.conf ,
 all other
-.Xr loader.conf 5
+.Xr loader.conf 4
 files specified in it, then loads the desired kernel and modules
 .Pq if not already loaded .
 After which you can use the
@@ -107,7 +105,7 @@ is not set to NO) to boot the system.
 is the command used in the default
 .Pa /boot/loader.rc
 file
-.Pq see Xr loader 8 .
+.Pq see Xr loader 5 .
 .Pp
 .It Ic initialize
 Initialize the support library so commands can be used without executing
@@ -118,7 +116,7 @@ Like
 it reads
 .Pa /boot/defaults/loader.conf
 and all other
-.Xr loader.conf 5
+.Xr loader.conf 4
 files specified in it
 .Pq but does not load kernel or modules .
 Returns a flag on the stack to indicate
@@ -126,7 +124,7 @@ if any configuration files were successfully loaded.
 .Pp
 .It Ic read-conf Ar filename
 Reads and processes a
-.Xr loader.conf 5
+.Xr loader.conf 4
 file.
 Does not proceed to boot.
 .Pp
@@ -145,18 +143,23 @@ on and off.
 .Pp
 .It Ic show-module Ar module
 Shows the information gathered in the
-.Xr loader.conf 5
+.Xr loader.conf 4
 files about the module
 .Ar module .
 .Pp
+.It Ic show-module-options
+Shows all modules defined in current
+.Xr loader.conf 4
+configuration.
+.Pp
 .It Ic retry
 Used inside
-.Xr loader.conf 5
+.Xr loader.conf 4
 files to specify the action after a module loading fails.
 .Pp
 .It Ic ignore
 Used inside
-.Xr loader.conf 5
+.Xr loader.conf 4
 files to specify the action after a module loading fails.
 .It Ic try-include Ar file Op Ar
 Process script files if they exist.
@@ -167,15 +170,15 @@ command aborts immediately, without reading any other files, and
 silently returns without error.
 .El
 .Sh FILES
-.Bl -tag -width /boot/loader.4th -compact
-.It Pa /boot/loader
+.Bl -tag -width /boot/forth/loader.4th -compact
+.It Pa /boot/zfsloader
 The
-.Xr loader 8 .
-.It Pa /boot/loader.4th
+.Xr zfsloader 5 .
+.It Pa /boot/forth/loader.4th
 .Nm
 itself.
 .It Pa /boot/loader.rc
-.Xr loader 8
+.Xr loader 5
 bootstrapping script.
 .It Pa /boot/defaults/loader.conf
 File loaded by the
@@ -187,16 +190,8 @@ Standard
 .Pa /boot/loader.rc :
 .Pp
 .Bd -literal -offset indent -compact
-include /boot/loader.4th
+include /boot/forth/loader.4th
 start
-.Ed
-.Pp
-Load a different kernel with the standard configuration:
-.Pp
-.Bd -literal -offset indent -compact
-set kernel="kernel.old"
-unload
-boot-conf
 .Ed
 .Pp
 Read an additional configuration file and then proceed to boot:
@@ -206,28 +201,6 @@ unload
 read-conf /boot/special.conf
 boot-conf
 .Ed
-.Pp
-Disable the loading of the splash screen module and bitmap and then
-proceed to boot:
-.Pp
-.Bd -literal -offset indent -compact
-unload
-disable-module splash_bmp
-disable-module bitmap
-boot-conf
-.Ed
 .Sh SEE ALSO
-.Xr loader.conf 5 ,
-.Xr loader 8
-.Sh HISTORY
-The
-.Nm
-set of commands first appeared in
-.Fx 3.2 .
-.Sh AUTHORS
-The
-.Nm
-set of commands was written by
-.An Daniel C. Sobral Aq dcs@FreeBSD.org .
-.Sh BUGS
-A British espionage series.
+.Xr loader.conf 4 ,
+.Xr loader 5

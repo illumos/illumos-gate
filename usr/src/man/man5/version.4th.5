@@ -1,4 +1,4 @@
-.\" Copyright (c) 2011 Devin Teske
+.\" Copyright (c) 2011-2013 Devin Teske
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -22,25 +22,23 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd May 18, 2011
-.Dt BRAND.4TH 8
+.Dd Apr 22, 2017
+.Dt VERSION.4TH 5
 .Os
 .Sh NAME
-.Nm brand.4th
-.Nd FreeBSD ASCII art boot module
+.Nm version.4th
+.Nd loader version string boot module
 .Sh DESCRIPTION
 The file that goes by the name of
 .Nm
-is a set of commands designed to draw the ASCII art BSD brand above the boot
-loader menu.
+is a set of commands designed to draw the boot loader
+version at the bottom-right of the screen.
 The commands of
 .Nm
 by themselves are not enough for most uses.
 Please refer to the
 examples below for the most common situations, and to
-.Xr loader 8
+.Xr loader 5
 for additional commands.
 .Pp
 Before using any of the commands provided in
@@ -48,78 +46,70 @@ Before using any of the commands provided in
 it must be included
 through the command:
 .Pp
-.Dl include brand.4th
+.Dl include version.4th
 .Pp
 This line is present in the default
-.Pa /boot/menu.rc
+.Pa /boot/forth/menu.rc
 file, so it is not needed (and should not be re-issued) in a normal setup.
 .Pp
 The commands provided by it are:
 .Pp
 .Bl -tag -width disable-module_module -compact -offset indent
-.It Ic draw-brand
-Draws the BSD brand.
-.Pp
-The brand that is drawn is configured by setting the
-.Ic loader_brand
-variable in
-.Xr loader.conf 5
-to one of
-.Dq Li fbsd
-(the default) or
-.Dq Li none .
-.Pp
-The position of the logo can be configured by setting the
-.Ic loader_brand_x
-and
-.Ic loader_brand_y
-variables in
-.Xr loader.conf 5 .
-The default values are 2 (x) and 1 (y).
+.It Ic print_version
+Prints the contents of the
+.Va loader_version
+environment variable right-justified at the column
+.Va loader_version_x
+and row
+.Va loader_version_y .
 .El
 .Pp
 The environment variables that effect its behavior are:
 .Bl -tag -width bootfile -offset indent
-.It Va loader_brand
-Selects the desired brand in the beastie boot menu. Possible values are:
-.Dq Li fbsd
-(default) or
-.Dq Li none .
-.It Va loader_brand_x
-Sets the desired column position of the brand. Default is 2.
-.It Va loader_brand_y
-Sets the desired row position of the brand. Default is 1.
+.It Va loader_version
+Set automatically by
+.Xr loader 5 ,
+but you can override it by setting in
+.Xr loader.conf 4 .
+This should be the version of boot loader used.
+.It Va loader_version_x
+Sets the desired ending column position of
+.Va loader_version .
+Default is 80.
+.It Va loader_version_y
+Sets the desired ending row position of
+.Va loader_version .
+Default is 24.
+.It Va loader_color
+If set to
+.Dq Li NO
+(case-insensitive) or
+.Dq Li 0 ,
+causes the version to be printed without color
+.Pq default is ANSI Cyan .
 .El
 .Sh FILES
-.Bl -tag -width /boot/loader.4th -compact
-.It Pa /boot/loader
+.Bl -tag -width /boot/version.4th -compact
+.It Pa /boot/zfsloader
 The
-.Xr loader 8 .
-.It Pa /boot/brand.4th
+.Xr zfsloader 5 .
+.It Pa /boot/forth/version.4th
 .Nm
 itself.
 .It Pa /boot/loader.rc
-.Xr loader 8
+.Xr loader 5
 bootstrapping script.
 .El
 .Sh EXAMPLES
-Set FreeBSD brand in
+Override
+.Xr loader 5
+version in
 .Xr loader.conf 5 :
 .Pp
 .Bd -literal -offset indent -compact
-loader_brand="fbsd"
+loader_version="loader 1.1"
 .Ed
 .Sh SEE ALSO
-.Xr loader.conf 5 ,
-.Xr loader 8
-.Sh HISTORY
-The
-.Nm
-set of commands first appeared in
-.Fx 9.0 .
-.Sh AUTHORS
-The
-.Nm
-set of commands was written by
-.An -nosplit
-.An Devin Teske Aq dteske@FreeBSD.org .
+.Xr loader.conf 4 ,
+.Xr color.4th 5 ,
+.Xr loader 5

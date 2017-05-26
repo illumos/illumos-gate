@@ -19,6 +19,7 @@
  * not support xen.
  */
 #include <sys/cdefs.h>
+#include <sys/stddef.h>
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -303,122 +304,6 @@ out:
 }
 
 /*
- * Since for now we have no way to pass the environment to the kernel other than
- * through arguments, we need to take care of console setup.
- *
- * If the console is in mirror mode, set the kernel console from $os_console.
- * If it's unset, use first item from $console.
- * If $console is "ttyX", also pass $ttyX-mode, since it may have been set by
- * the user.
- *
- * In case of memory allocation errors, just return the original command line
- * so we have a chance of booting.
- *
- * On success, cl will be freed and a new, allocated command line string is
- * returned.
- */
-static char *
-update_cmdline(char *cl)
-{
-	char *os_console = getenv("os_console");
-	char *ttymode = NULL;
-	char mode[10];
-	char *tmp;
-	int len;
-
-	if (os_console == NULL) {
-		tmp = strdup(getenv("console"));
-		os_console = strsep(&tmp, ", ");
-	} else {
-		os_console = strdup(os_console);
-	}
-
-	if (os_console == NULL)
-		return (cl);
-
-	if (strncmp(os_console, "tty", 3) == 0) {
-		snprintf(mode, sizeof (mode), "%s-mode", os_console);
-		ttymode = getenv(mode);	/* We will never get NULL. */
-	}
-
-	if (strstr(cl, "-B") != NULL) {
-		len = strlen(cl) + 1;
-		/*
-		 * If console is not present, add it.
-		 * If console is ttyX, add ttymode.
-		 */
-		tmp = strstr(cl, "console");
-		if (tmp == NULL) {
-			len += 12;	/* " -B console=" */
-			len += strlen(os_console);
-			if (ttymode != NULL) {
-				len += 13;	/* ",ttyX-mode=\"\"" */
-				len += strlen(ttymode);
-			}
-			tmp = malloc(len);
-			if (tmp == NULL) {
-				free(os_console);
-				return (cl);
-			}
-			if (ttymode != NULL) {
-				snprintf(tmp, len,
-				    "%s -B console=%s,%s-mode=\"%s\"",
-				    cl, os_console, os_console, ttymode);
-			} else {
-				snprintf(tmp, len, "%s -B console=%s",
-				    cl, os_console);
-			}
-		} else {
-			/* console is set, do we need tty mode? */
-			tmp += 8;
-			if (strstr(tmp, "tty") == tmp) {
-				strncpy(mode, tmp, 4);
-				mode[4] = '\0';
-				strncat(mode, "-mode", 5);
-				ttymode = getenv(mode);
-			} else { /* nope */
-				free(os_console);
-				return (cl);
-			}
-			len = strlen(cl) + 1;
-			len += 13;	/* ",ttyX-mode=\"\"" */
-			len += strlen(ttymode);
-			tmp = malloc(len);
-			if (tmp == NULL) {
-				free(os_console);
-				return (cl);
-			}
-			snprintf(tmp, len, "%s,%s=\"%s\"", cl, mode, ttymode);
-		}
-	} else {
-		/*
-		 * no -B, so we need to add " -B console=%s[,ttyX-mode=\"%s\"]"
-		 */
-		len = strlen(cl) + 1;
-		len += 12;		/* " -B console=" */
-		len += strlen(os_console);
-		if (ttymode != NULL) {
-			len += 13;	/* ",ttyX-mode=\"\"" */
-			len += strlen(ttymode);
-		}
-		tmp = malloc(len);
-		if (tmp == NULL) {
-			free(os_console);
-			return (cl);
-		}
-		if (ttymode != NULL) {
-			snprintf(tmp, len, "%s -B console=%s,%s-mode=\"%s\"",
-			    cl, os_console, os_console, ttymode);
-		} else {
-			snprintf(tmp, len, "%s -B console=%s", cl, os_console);
-		}
-	}
-	free(os_console);
-	free(cl);
-	return (tmp);
-}
-
-/*
  * Search the command line for named property.
  *
  * Return codes:
@@ -505,17 +390,194 @@ find_property_value(const char *cmd, const char *name, const char **value,
 }
 
 /*
+ * If command line has " -B ", insert property after "-B ", otherwise
+ * append to command line.
+ */
+static char *
+insert_cmdline(const char *head, const char *prop)
+{
+	const char *prop_opt = " -B ";
+	char *cmdline, *tail;
+	int len = 0;
+
+	tail = strstr(head, prop_opt);
+	if (tail != NULL) {
+		ptrdiff_t diff;
+		tail += strlen(prop_opt);
+		diff = tail - head;
+		if (diff >= INT_MAX)
+			return (NULL);
+		len = (int)diff;
+	}
+
+	if (tail == NULL)
+		asprintf(&cmdline, "%s%s%s", head, prop_opt, prop);
+	else
+		asprintf(&cmdline, "%.*s%s,%s", len, head, prop, tail);
+
+	return (cmdline);
+}
+
+/*
+ * Since we have no way to pass the environment to the mb1 kernel other than
+ * through arguments, we need to take care of console setup.
+ *
+ * If the console is in mirror mode, set the kernel console from $os_console.
+ * If it's unset, use first item from $console.
+ * If $console is "ttyX", also pass $ttyX-mode, since it may have been set by
+ * the user.
+ *
+ * In case of memory allocation errors, just return the original command line
+ * so we have a chance of booting.
+ *
+ * On success, cl will be freed and a new, allocated command line string is
+ * returned.
+ *
+ * For the mb2 kernel, we only set command line console if os_console is set.
+ * We can not overwrite console in the environment, as it can disrupt the
+ * loader console messages, and we do not want to deal with the os_console
+ * in the kernel.
+ */
+static char *
+update_cmdline(char *cl, bool mb2)
+{
+	char *os_console = getenv("os_console");
+	char *ttymode = NULL;
+	char mode[10];
+	char *tmp;
+	const char *prop;
+	size_t plen;
+	int rv;
+
+	if (mb2 == true && os_console == NULL)
+		return (cl);
+
+	if (os_console == NULL) {
+		tmp = strdup(getenv("console"));
+		os_console = strsep(&tmp, ", ");
+	} else {
+		os_console = strdup(os_console);
+	}
+
+	if (os_console == NULL)
+		return (cl);
+
+	if (mb2 == false && strncmp(os_console, "tty", 3) == 0) {
+		snprintf(mode, sizeof (mode), "%s-mode", os_console);
+		/*
+		 * The ttyX-mode variable is set by our serial console
+		 * driver for ttya-ttyd. However, since the os_console
+		 * values are not verified, it is possible we get bogus
+		 * name and no mode variable. If so, we do not set console
+		 * property and let the kernel use defaults.
+		 */
+		if ((ttymode = getenv(mode)) == NULL)
+			return (cl);
+	}
+
+	rv = find_property_value(cl, "console", &prop, &plen);
+	if (rv != 0 && rv != ENOENT) {
+		free(os_console);
+		return (cl);
+	}
+
+	/* If console is set and this is MB2 boot, we are done. */
+	if (rv == 0 && mb2 == true) {
+		free(os_console);
+		return (cl);
+	}
+
+	/* If console is set, do we need to set tty mode? */
+	if (rv == 0) {
+		const char *ttyp = NULL;
+		size_t ttylen;
+
+		free(os_console);
+		os_console = NULL;
+		*mode = '\0';
+		if (strncmp(prop, "tty", 3) == 0 && plen == 4) {
+			strncpy(mode, prop, plen);
+			mode[plen] = '\0';
+			strncat(mode, "-mode", 5);
+			find_property_value(cl, mode, &ttyp, &ttylen);
+		}
+
+		if (*mode != '\0' && ttyp == NULL)
+			ttymode = getenv(mode);
+		else
+			return (cl);
+	}
+
+	/* Build updated command line. */
+	if (os_console != NULL) {
+		char *propstr;
+
+		asprintf(&propstr, "console=%s", os_console);
+		free(os_console);
+		if (propstr == NULL) {
+			return (cl);
+		}
+
+		tmp = insert_cmdline(cl, propstr);
+                free(propstr);
+                if (tmp == NULL)
+			return (cl);
+
+                free(cl);
+                cl = tmp;
+	}
+	if (ttymode != NULL) {
+		char *propstr;
+
+		asprintf(&propstr, "%s=\"%s\"", mode, ttymode);
+		if (propstr == NULL)
+			return (cl);
+
+		tmp = insert_cmdline(cl, propstr);
+                free(propstr);
+                if (tmp == NULL)
+			return (cl);
+                free(cl);
+                cl = tmp;
+	}
+
+	return (cl);
+}
+
+/*
  * Build the kernel command line. Shared function between MB1 and MB2.
+ *
+ * In both cases, if fstype is set and is not zfs, we do not set up
+ * zfs-bootfs property. But we set kernel file name and options.
+ *
+ * For the MB1, we only can pass properties on command line, so
+ * we will set console, ttyX-mode (for serial console) and zfs-bootfs.
+ *
+ * For the MB2, we can pass properties in environment, but if os_console
+ * is set in environment, we need to add console property on the kernel
+ * command line.
+ *
+ * The console properties are managed in update_cmdline().
  */
 int
 mb_kernel_cmdline(struct preloaded_file *fp, struct devdesc *rootdev,
     char **line)
 {
 	const char *fs = getenv("fstype");
-	char *cmdline = NULL;
+	char *cmdline;
 	size_t len;
 	bool zfs_root = false;
-	int rv = 0;
+	bool mb2;
+	int rv;
+
+	/*
+	 * 64-bit kernel has aout header, 32-bit kernel is elf, and the
+	 * type strings are different. Lets just search for "multiboot2".
+	 */
+	if (strstr(fp->f_type, "multiboot2") == NULL)
+		mb2 = false;
+	else
+		mb2 = true;
 
 	if (rootdev->d_type == DEVT_ZFS)
 		zfs_root = true;
@@ -529,44 +591,36 @@ mb_kernel_cmdline(struct preloaded_file *fp, struct devdesc *rootdev,
 	 * reset zfs_root if needed.
 	 */
 	rv = find_property_value(fp->f_args, "fstype", &fs, &len);
-	switch (rv) {
-	case EINVAL:		/* invalid command line */
-	default:
+	if (rv != 0 && rv != ENOENT)
 		return (rv);
-	case ENOENT:		/* fall through */
-	case 0:
-		break;
-	}
 
 	if (fs != NULL && strncmp(fs, "zfs", len) != 0)
 		zfs_root = false;
 
-	len = strlen(fp->f_name) + 1;
-
-	if (fp->f_args != NULL)
-		len += strlen(fp->f_args) + 1;
-
+	/* zfs_bootfs() will set the environment, it must be called. */
 	if (zfs_root == true)
-		len += 3 + strlen(zfs_bootfs(rootdev)) + 1;
+		fs = zfs_bootfs(rootdev);
 
-	cmdline = malloc(len);
+	if (fp->f_args == NULL)
+		cmdline = strdup(fp->f_name);
+	else
+		asprintf(&cmdline, "%s %s", fp->f_name, fp->f_args);
+
 	if (cmdline == NULL)
 		return (ENOMEM);
 
-	if (zfs_root == true) {
-		if (fp->f_args != NULL) {
-			snprintf(cmdline, len, "%s %s -B %s", fp->f_name,
-			    fp->f_args, zfs_bootfs(rootdev));
-		} else {
-			snprintf(cmdline, len, "%s -B %s", fp->f_name,
-			    zfs_bootfs(rootdev));
-		}
-	} else if (fp->f_args != NULL)
-		snprintf(cmdline, len, "%s %s", fp->f_name, fp->f_args);
-	else
-		snprintf(cmdline, len, "%s", fp->f_name);
+	/* Append zfs-bootfs for MB1 command line. */
+	if (mb2 == false && zfs_root == true) {
+		char *tmp;
 
-	*line =  update_cmdline(cmdline);
+		tmp = insert_cmdline(cmdline, fs);
+		free(cmdline);
+		if (tmp == NULL)
+			return (ENOMEM);
+		cmdline = tmp;
+	}
+
+	*line = update_cmdline(cmdline, mb2);
 	return (0);
 }
 

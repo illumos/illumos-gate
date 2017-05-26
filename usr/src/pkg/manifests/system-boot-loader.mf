@@ -39,6 +39,10 @@ $(i386_ONLY)dir path=boot group=sys
 $(i386_ONLY)dir path=boot/conf.d group=sys
 $(i386_ONLY)dir path=boot/defaults group=sys
 $(i386_ONLY)dir path=boot/forth group=sys
+$(i386_ONLY)dir path=usr/share/man
+$(i386_ONLY)dir path=usr/share/man/man3
+$(i386_ONLY)dir path=usr/share/man/man4
+$(i386_ONLY)dir path=usr/share/man/man5
 $(i386_ONLY)file path=boot/cdboot group=sys mode=0444
 $(i386_ONLY)file path=boot/defaults/loader.conf group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/beadm.4th group=sys mode=0444
@@ -72,6 +76,19 @@ $(i386_ONLY)file path=boot/loader.rc group=sys mode=0444
 $(i386_ONLY)file path=boot/pmbr group=sys mode=0444
 $(i386_ONLY)file path=boot/pxeboot group=sys mode=0444
 $(i386_ONLY)file path=boot/zfsloader group=sys mode=0444
+$(i386_ONLY)file path=usr/share/man/man4/loader.conf.4
+$(i386_ONLY)file path=usr/share/man/man5/brand.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/check-password.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/color.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/delay.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/gptzfsboot.5
+$(i386_ONLY)file path=usr/share/man/man5/loader.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/loader.5
+$(i386_ONLY)file path=usr/share/man/man5/menu.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/menusets.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/pxeboot.5
+$(i386_ONLY)file path=usr/share/man/man5/version.4th.5
+$(i386_ONLY)file path=usr/share/man/man5/zfsloader.5
 license lic_CDDL license=lic_CDDL
 license usr/src/boot/COPYRIGHT license=usr/src/boot/COPYRIGHT
 license usr/src/boot/sys/boot/common/linenoise/LICENSE \

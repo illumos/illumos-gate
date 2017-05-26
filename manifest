@@ -18419,6 +18419,7 @@ f usr/share/man/man4/krb5.conf.4 0444 root bin
 f usr/share/man/man4/ldapfilter.conf.4 0444 root bin
 f usr/share/man/man4/ldapsearchprefs.conf.4 0444 root bin
 f usr/share/man/man4/ldaptemplates.conf.4 0444 root bin
+f usr/share/man/man4/loader.conf.4 0444 root bin
 f usr/share/man/man4/logadm.conf.4 0444 root bin
 f usr/share/man/man4/logindevperm.4 0444 root bin
 f usr/share/man/man4/loginlog.4 0444 root bin
@@ -18569,10 +18570,13 @@ f usr/share/man/man5/audit_binfile.5 0444 root bin
 f usr/share/man/man5/audit_remote.5 0444 root bin
 f usr/share/man/man5/audit_syslog.5 0444 root bin
 s usr/share/man/man5/availability.5=attributes.5
+f usr/share/man/man5/brand.4th.5 0444 root bin
 f usr/share/man/man5/brands.5 0444 root bin
 f usr/share/man/man5/byteorder.5 0444 root bin
 f usr/share/man/man5/cancellation.5 0444 root bin
 f usr/share/man/man5/charmap.5 0444 root bin
+f usr/share/man/man5/check-password.4th.5 0444 root bin
+f usr/share/man/man5/color.4th.5 0444 root bin
 s usr/share/man/man5/compile.5=regexp.5
 f usr/share/man/man5/condition.5 0444 root bin
 f usr/share/man/man5/crypt_bsdbf.5 0444 root bin
@@ -18581,6 +18585,7 @@ f usr/share/man/man5/crypt_sha256.5 0444 root bin
 f usr/share/man/man5/crypt_sha512.5 0444 root bin
 f usr/share/man/man5/crypt_sunmd5.5 0444 root bin
 f usr/share/man/man5/crypt_unix.5 0444 root bin
+f usr/share/man/man5/delay.4th.5 0444 root bin
 f usr/share/man/man5/device_clean.5 0444 root bin
 f usr/share/man/man5/dhcp.5 0444 root bin
 s usr/share/man/man5/endian.5=byteorder.5
@@ -18594,6 +18599,7 @@ f usr/share/man/man5/filesystem.5 0444 root bin
 f usr/share/man/man5/fnmatch.5 0444 root bin
 f usr/share/man/man5/formats.5 0444 root bin
 f usr/share/man/man5/fsattr.5 0444 root bin
+f usr/share/man/man5/gptzfsboot.5 0444 root bin
 f usr/share/man/man5/grub.5 0444 root bin
 f usr/share/man/man5/gss_auth_rules.5 0444 root bin
 f usr/share/man/man5/iconv.5 0444 root bin
@@ -18608,6 +18614,8 @@ f usr/share/man/man5/kerberos.5 0444 root bin
 f usr/share/man/man5/krb5_auth_rules.5 0444 root bin
 f usr/share/man/man5/krb5envvar.5 0444 root bin
 f usr/share/man/man5/largefile.5 0444 root bin
+f usr/share/man/man5/loader.4th.5 0444 root bin
+f usr/share/man/man5/loader.5 0444 root bin
 f usr/share/man/man5/lf64.5 0444 root bin
 f usr/share/man/man5/lfcompile.5 0444 root bin
 f usr/share/man/man5/lfcompile64.5 0444 root bin
@@ -18620,6 +18628,8 @@ f usr/share/man/man5/mansun.5 0444 root bin
 f usr/share/man/man5/mdoc.5 0444 root bin
 f usr/share/man/man5/me.5 0444 root bin
 f usr/share/man/man5/mech_spnego.5 0444 root bin
+f usr/share/man/man5/menu.4th.5 0444 root bin
+f usr/share/man/man5/menusets.4th.5 0444 root bin
 f usr/share/man/man5/mm.5 0444 root bin
 f usr/share/man/man5/ms.5 0444 root bin
 f usr/share/man/man5/mutex.5 0444 root bin
@@ -18652,6 +18662,7 @@ f usr/share/man/man5/pkcs11_softtoken.5 0444 root bin
 f usr/share/man/man5/privileges.5 0444 root bin
 f usr/share/man/man5/prof.5 0444 root bin
 s usr/share/man/man5/pthreads.5=threads.5
+f usr/share/man/man5/pxeboot.5 0444 root bin
 f usr/share/man/man5/rbac.5 0444 root bin
 f usr/share/man/man5/regex.5 0444 root bin
 f usr/share/man/man5/regexp.5 0444 root bin
@@ -18674,7 +18685,9 @@ s usr/share/man/man5/teclarc.5=tecla.5
 f usr/share/man/man5/term.5 0444 root bin
 f usr/share/man/man5/threads.5 0444 root bin
 f usr/share/man/man5/timerfd.5 0444 root bin
+f usr/share/man/man5/version.4th.5 0444 root bin
 f usr/share/man/man5/vgrindefs.5 0444 root bin
+f usr/share/man/man5/zfsloader.5 0444 root bin
 f usr/share/man/man5/zones.5 0444 root bin
 f usr/share/man/man5/zpool-features.5 0444 root bin
 d usr/share/man/man7 0755 root bin
