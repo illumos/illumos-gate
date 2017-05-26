@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -179,6 +180,7 @@ static const hcc_t hc_canon[] = {
 	{ PCIEX_ROOT, TOPO_STABILITY_PRIVATE },
 	{ PCIEX_SWUP, TOPO_STABILITY_PRIVATE },
 	{ PCIEX_SWDWN, TOPO_STABILITY_PRIVATE },
+	{ PORT, TOPO_STABILITY_PRIVATE },
 	{ POWERBOARD, TOPO_STABILITY_PRIVATE },
 	{ POWERMODULE, TOPO_STABILITY_PRIVATE },
 	{ PSU, TOPO_STABILITY_PRIVATE },
@@ -194,6 +196,7 @@ static const hcc_t hc_canon[] = {
 	{ STRAND, TOPO_STABILITY_PRIVATE },
 	{ SUBCHASSIS, TOPO_STABILITY_PRIVATE },
 	{ SYSTEMBOARD, TOPO_STABILITY_PRIVATE },
+	{ TRANSCEIVER, TOPO_STABILITY_PRIVATE },
 	{ XAUI, TOPO_STABILITY_PRIVATE },
 	{ XFP, TOPO_STABILITY_PRIVATE }
 };
@@ -799,7 +802,7 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 
 int
 make_hc_auth(topo_mod_t *mod, char *fmri, char **serial, char **part,
-char **rev, nvlist_t **auth)
+    char **rev, nvlist_t **auth)
 {
 	char *starti, *startn, *endi, *copy;
 	char *aname = NULL, *aid = NULL, *fs;

@@ -203,6 +203,7 @@ SUBDIRS +=				\
 	libsec		\
 	libsecdb	\
 	libsendfile	\
+	libsff		\
 	libshare	\
 	libshell	\
 	libsip		\
@@ -459,6 +460,7 @@ HDRSUBDIRS=				\
 	libsasl		\
 	libscf		\
 	libsec		\
+	libsff		\
 	libshare	\
 	libshell	\
 	libsip		\
@@ -586,7 +588,7 @@ auditd_plugins: libbsm libsecdb libgss libmtmalloc
 brand:		libzonecfg libmapmalloc libipadm libcmdutils libproc librpcsvc
 cfgadm_plugins:	libdevice libdevinfo libhotplug librcm hbaapi libkstat libscf
 fm:		libexacct libipmi libzfs scsi libdevinfo libdevid libcfgadm \
-		libcontract libsysevent ../cmd/sgs/libelf
+		libcontract libsysevent ../cmd/sgs/libelf libdladm
 $(SPARC_BLD)fm:	libpri
 gss_mechs/mech_dh: libgss
 gss_mechs/mech_dummy: libgss
@@ -662,6 +664,7 @@ libsasl:	libgss pkcs11
 libsaveargs:	libdisasm
 libscf:		libuutil libgen libsmbios
 libsec:		libavl libidmap
+libsff:		libnvpair
 libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
 libshell:	libast libcmd libdll libsecdb
 libsip:		libmd5

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/fm/protocol.h>
@@ -43,6 +44,7 @@
 #include <did.h>
 #include <did_props.h>
 #include <util.h>
+#include <topo_nic.h>
 
 extern txprop_t Bus_common_props[];
 extern txprop_t Dev_common_props[];
@@ -489,40 +491,52 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	 */
 	else if (class == PCI_CLASS_NET &&
 	    di_uintprop_get(mod, din, DI_VENDIDPROP, &vid) >= 0 &&
-	    di_uintprop_get(mod, din, DI_DEVIDPROP, &did) >= 0) {
-		if (vid == SUN_VENDOR_ID && did == NEPTUNE_DEVICE_ID) {
-			/*
-			 * Is this an adapter card? Check the bus's physlot
-			 */
-			dp = did_find(mod, topo_node_getspecific(bus));
-			if (did_physlot(dp) >= 0) {
-				topo_mod_dprintf(mod, "Found Neptune slot\n");
-				(void) topo_mod_enummap(mod, fn,
-				    "xfp", FM_FMRI_SCHEME_HC);
+	    di_uintprop_get(mod, din, DI_DEVIDPROP, &did) >= 0 &&
+	    vid == SUN_VENDOR_ID && did == NEPTUNE_DEVICE_ID) {
+		/*
+		 * Is this an adapter card? Check the bus's physlot
+		 */
+		dp = did_find(mod, topo_node_getspecific(bus));
+		if (did_physlot(dp) >= 0) {
+			topo_mod_dprintf(mod, "Found Neptune slot\n");
+			(void) topo_mod_enummap(mod, fn,
+			    "xfp", FM_FMRI_SCHEME_HC);
+		} else {
+			topo_mod_dprintf(mod, "Found Neptune ASIC\n");
+			if (topo_mod_load(mod, XAUI, TOPO_VERSION) == NULL) {
+				topo_mod_dprintf(mod, "pcibus enum "
+				    "could not load xaui enum\n");
+				(void) topo_mod_seterrno(mod,
+				    EMOD_PARTIAL_ENUM);
+				return;
 			} else {
-				topo_mod_dprintf(mod, "Found Neptune ASIC\n");
-				if (topo_mod_load(mod, XAUI, TOPO_VERSION) ==
-				    NULL) {
-					topo_mod_dprintf(mod, "pcibus enum "
-					    "could not load xaui enum\n");
-					(void) topo_mod_seterrno(mod,
-					    EMOD_PARTIAL_ENUM);
+				if (topo_node_range_create(mod, fn,
+				    XAUI, 0, 1) < 0) {
+					topo_mod_dprintf(mod,
+					    "child_range_add for "
+					    "XAUI failed: %s\n",
+					    topo_strerror(
+					    topo_mod_errno(mod)));
 					return;
-				} else {
-					if (topo_node_range_create(mod, fn,
-					    XAUI, 0, 1) < 0) {
-						topo_mod_dprintf(mod,
-						    "child_range_add for "
-						    "XAUI failed: %s\n",
-						    topo_strerror(
-						    topo_mod_errno(mod)));
-						return;
-					}
-					(void) topo_mod_enumerate(mod, fn,
-					    XAUI, XAUI, fnno, fnno, fn);
 				}
+				(void) topo_mod_enumerate(mod, fn,
+				    XAUI, XAUI, fnno, fnno, fn);
 			}
 		}
+	} else if (class == PCI_CLASS_NET) {
+		/*
+		 * Ask the nic module if there are any nodes that need to be
+		 * enumerated under this device. This might include things like
+		 * transceivers or some day, LEDs.
+		 */
+		if (topo_mod_load(mod, NIC, NIC_VERSION) == NULL) {
+			topo_mod_dprintf(mod, "pcibus enum could not load "
+			    "nic enum\n");
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			return;
+		}
+
+		(void) topo_mod_enumerate(mod, fn, NIC, NIC, 0, 0, din);
 	} else if (class == PCI_CLASS_MASS) {
 		di_node_t cn;
 		int niports = 0;

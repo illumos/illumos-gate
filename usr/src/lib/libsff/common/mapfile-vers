@@ -13,28 +13,25 @@
 # Copyright (c) 2017, Joyent, Inc.
 #
 
-PROG= dltraninfo dlsend dlrecv dlled
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
 
-include ../Makefile.cmd
+$mapfile_version 2
 
-ROOTCMDDIR = $(ROOTLIB)/dl
-CFLAGS += $(CCVERBOSE)
-
-dltraninfo :=	LDLIBS += -ldladm -lsff -lnvpair
-dlled :=	LDLIBS += -ldladm
-dlsend :=	LDLIBS += -ldlpi -lsocket -lmd
-dlrecv :=	LDLIBS += -ldlpi
-
-ROOTLIBDLFILES = $(PROG:%=$(ROOTLIB)/dl/%)
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-install: all $(ROOTCMD)
-
-clean:
-
-lint:	lint_PROG
-
-include ../Makefile.targ
+SYMBOL_VERSION SUNWprivate {
+    global:
+	libsff_parse;
+    local:
+	*;
+};

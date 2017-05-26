@@ -10,31 +10,25 @@
 #
 
 #
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2017 Joyent, Inc.  All rights reserved.
 #
 
-PROG= dltraninfo dlsend dlrecv dlled
+LIBRARY =	libsff.a
+VERS =		.1
+OBJECTS =	libsff.o
 
-include ../Makefile.cmd
+include ../../Makefile.lib
 
-ROOTCMDDIR = $(ROOTLIB)/dl
-CFLAGS += $(CCVERBOSE)
+LIBS =		$(DYNLIB) $(LINTLIB)
+LDLIBS +=	-lc -lnvpair
+CPPFLAGS +=	-I../common
 
-dltraninfo :=	LDLIBS += -ldladm -lsff -lnvpair
-dlled :=	LDLIBS += -ldladm
-dlsend :=	LDLIBS += -ldlpi -lsocket -lmd
-dlrecv :=	LDLIBS += -ldlpi
-
-ROOTLIBDLFILES = $(PROG:%=$(ROOTLIB)/dl/%)
+SRCDIR =	../common
 
 .KEEP_STATE:
 
-all: $(PROG)
+all:	$(LIBS)
 
-install: all $(ROOTCMD)
+lint:	lintcheck
 
-clean:
-
-lint:	lint_PROG
-
-include ../Makefile.targ
+include ../../Makefile.targ

@@ -4947,6 +4947,7 @@ s usr/lib/amd64/libsecdb.so.1=../../../lib/amd64/libsecdb.so.1
 s usr/lib/amd64/libsecdb.so=../../../lib/amd64/libsecdb.so.1
 s usr/lib/amd64/libsendfile.so.1=../../../lib/amd64/libsendfile.so.1
 s usr/lib/amd64/libsendfile.so=../../../lib/amd64/libsendfile.so.1
+f usr/lib/amd64/libsff.so.1 0755 root bin
 f usr/lib/amd64/libshare.so.1 0755 root bin
 s usr/lib/amd64/libshare.so=libshare.so.1
 f usr/lib/amd64/libshell.so.1 0755 root bin
@@ -5390,6 +5391,7 @@ f usr/lib/fm/topo/plugins/disk.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_ipmi.so 0555 root bin
 f usr/lib/fm/topo/plugins/fac_prov_mptsas.so 0555 root bin
 f usr/lib/fm/topo/plugins/ipmi.so 0555 root bin
+f usr/lib/fm/topo/plugins/nic.so 0555 root bin
 f usr/lib/fm/topo/plugins/ses.so 0555 root bin
 f usr/lib/fm/topo/plugins/xfp.so 0555 root bin
 d usr/lib/fs 0755 root sys
@@ -6392,6 +6394,7 @@ s usr/lib/libsecdb.so.1=../../lib/libsecdb.so.1
 s usr/lib/libsecdb.so=../../lib/libsecdb.so.1
 s usr/lib/libsendfile.so.1=../../lib/libsendfile.so.1
 s usr/lib/libsendfile.so=../../lib/libsendfile.so.1
+f usr/lib/libsff.so.1 0755 root bin
 f usr/lib/libshare.so.1 0755 root bin
 s usr/lib/libshare.so=libshare.so.1
 f usr/lib/libshell.so.1 0755 root bin

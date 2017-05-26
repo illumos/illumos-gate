@@ -10,10 +10,9 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2017 Joyent, Inc.
 #
 
-SUBDIRS = dis dladm iconv libnvpair_json libsff printf xargs bunyan mergeq workq
+include ../Makefile.com
 
-include $(SRC)/test/Makefile.com
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

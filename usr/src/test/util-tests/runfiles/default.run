@@ -28,6 +28,7 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/show-overlay-exit]
 [/opt/util-tests/tests/vnic-mtu]
 [/opt/util-tests/tests/bunyan/bunyan]
+[/opt/util-tests/tests/libsff/libsff]
 
 [/opt/util-tests/tests/xargs_test]
 

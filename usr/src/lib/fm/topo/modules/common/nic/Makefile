@@ -13,28 +13,14 @@
 # Copyright (c) 2017, Joyent, Inc.
 #
 
-PROG= dltraninfo dlsend dlrecv dlled
+MODULE		= nic
+CLASS		= common
+SHAREDMODULE	= shared
 
-include ../Makefile.cmd
+MODULESRCS	= topo_nic.c
+SHAREDSRCS	= topo_port.c topo_transceiver.c
 
-ROOTCMDDIR = $(ROOTLIB)/dl
-CFLAGS += $(CCVERBOSE)
+include ../../Makefile.plugin
 
-dltraninfo :=	LDLIBS += -ldladm -lsff -lnvpair
-dlled :=	LDLIBS += -ldladm
-dlsend :=	LDLIBS += -ldlpi -lsocket -lmd
-dlrecv :=	LDLIBS += -ldlpi
-
-ROOTLIBDLFILES = $(PROG:%=$(ROOTLIB)/dl/%)
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-install: all $(ROOTCMD)
-
-clean:
-
-lint:	lint_PROG
-
-include ../Makefile.targ
+CPPFLAGS	+= -I../shared
+LDLIBS		+= -ldevinfo -ldladm -lsff
