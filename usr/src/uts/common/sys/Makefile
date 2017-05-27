@@ -42,12 +42,6 @@ FILEMODE=644
 #
 
 i386_HDRS=			\
-	agp/agpamd64gart_io.h	\
-	agp/agpdefs.h		\
-	agp/agpgart_impl.h	\
-	agp/agpmaster_io.h	\
-	agp/agptarget_io.h	\
-	agpgart.h		\
 	asy.h			\
 	fd_debug.h		\
 	fdc.h			\

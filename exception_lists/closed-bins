@@ -63,6 +63,7 @@
 ./usr/has
 ./usr/has/bin
 ./usr/has/bin/patch
+./usr/include/sys/agp
 ./usr/include/sys/lvm
 ./usr/include/sys/pcmcia
 ./usr/include/sys/usb/clients/hwarc

@@ -174,8 +174,9 @@ ROOTDKTPDIR=	$(ROOTDIR)/dktp
 sparc_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters \
 		$(ROOTDIR)/scsi/targets
 
-i386_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters $(ROOTDIR)/scsi/targets \
-		$(ROOTDIR)/agp $(ROOTDIR)/sata
+i386_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters \
+		$(ROOTDIR)/scsi/targets \
+		$(ROOTDIR)/sata
 
 ROOTDIRS=			\
 	$(ROOTDIR)		\
