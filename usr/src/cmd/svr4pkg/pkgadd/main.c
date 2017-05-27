@@ -349,7 +349,7 @@ main(int argc, char **argv)
 	 */
 
 	while ((c = getopt(argc, argv,
-		"?Aa:b:B:Cc:D:d:GhIMnO:R:r:Ss:tV:vY:zZ")) != EOF) {
+	    "?Aa:b:B:Cc:D:d:GhIMnO:R:r:Ss:tV:vY:zZ")) != EOF) {
 		switch (c) {
 
 		/*
@@ -529,7 +529,7 @@ main(int argc, char **argv)
 
 		case 'O':
 			for (p = strtok(optarg, ","); p != (char *)NULL;
-				p = strtok(NULL, ",")) {
+			    p = strtok(NULL, ",")) {
 
 				if (strcmp(p, "debug") == 0) {
 					/* set debug flag/enable debug output */
@@ -545,7 +545,7 @@ main(int argc, char **argv)
 				}
 
 				if (strcmp(p,
-					"enable-hollow-package-support") == 0) {
+				    "enable-hollow-package-support") == 0) {
 					set_depend_pkginfo_DB(B_TRUE);
 					continue;
 				}
@@ -768,7 +768,7 @@ main(int argc, char **argv)
 		echoDebug(DBG_ENTRY_IN_GZ, prog_full_name);
 	} else {
 		echoDebug(DBG_ENTRY_IN_LZ, prog_full_name, getzoneid(),
-			z_get_zonename());
+		    z_get_zonename());
 	}
 
 	/*
@@ -905,8 +905,8 @@ main(int argc, char **argv)
 
 	set_PKGpaths(get_inst_root());
 	echoDebug(DBG_PKGADD_PKGPATHS,
-		get_PKGLOC() ? get_PKGLOC() : "",
-		get_PKGADM() ? get_PKGADM() : "");
+	    get_PKGLOC() ? get_PKGLOC() : "",
+	    get_PKGADM() ? get_PKGADM() : "");
 
 	/*
 	 * This function is in the libinst library; it reads the specified
@@ -927,7 +927,7 @@ main(int argc, char **argv)
 	if (is_depend_pkginfo_DB()) {
 		echoDebug(DBG_PKGADD_HOLLOW_ENABLED);
 	} else if ((z_running_in_global_zone() == B_TRUE) &&
-		(z_non_global_zones_exist() == B_TRUE)) {
+	    (z_non_global_zones_exist() == B_TRUE)) {
 		echoDebug(DBG_PKGADD_ENABLING_HOLLOW);
 		set_depend_pkginfo_DB(B_TRUE);
 	}
@@ -956,7 +956,7 @@ main(int argc, char **argv)
 
 	if (respfile) {
 		echoDebug(DBG_PKGADD_RESPFILE,
-			respfile, respdir ? respdir : "");
+		    respfile, respdir ? respdir : "");
 
 		if (respfile[0] != '/') {
 			progerr(ERR_RSP_FILE_NOTFULLPATH, respfile);
@@ -1045,8 +1045,8 @@ main(int argc, char **argv)
 		echoDebug(DBG_INSTALLING_TO_SPOOL, spoolDir);
 
 		b = open_package_datastream(argc, argv, spoolDir, device,
-						&repeat, &ids_name, tmpdir,
-						&pkgdev, optind);
+		    &repeat, &ids_name, tmpdir,
+		    &pkgdev, optind);
 
 		quitSetIdsName(ids_name);
 
@@ -1090,8 +1090,8 @@ main(int argc, char **argv)
 		 */
 
 		b = open_package_datastream(argc, argv, spoolDir, device,
-						&repeat, &ids_name, tmpdir,
-						&pkgdev, optind);
+		    &repeat, &ids_name, tmpdir,
+		    &pkgdev, optind);
 
 		quitSetIdsName(ids_name);
 
@@ -1105,11 +1105,9 @@ main(int argc, char **argv)
 		 */
 
 		b = get_package_list(&pkglist, argv, catg_arg, category,
-			ids_name, &repeat);
+		    ids_name, &repeat);
 
 		if (b == B_FALSE) {
-			char	path[PATH_MAX];
-
 			echoDebug(DBG_CANNOT_GET_PKGLIST);
 
 			progerr(ERR_NOPKGS, pkgdev.dirname);
@@ -1141,7 +1139,7 @@ main(int argc, char **argv)
 		 */
 
 		if ((askflag != 0) && (respdir == (char *)NULL) &&
-			(npkgs > 1)) {
+		    (npkgs > 1)) {
 			progerr(ERR_TOO_MANY_PKGS);
 			quit(1);
 			/* NOTREACHED */
@@ -1152,7 +1150,7 @@ main(int argc, char **argv)
 		 */
 
 		b = add_packages(pkglist, ids_name, repeat,
-					altBinDir, device, noZones);
+		    altBinDir, device, noZones);
 
 		/*
 		 * close open input data stream (source package) if left open.
@@ -1160,7 +1158,7 @@ main(int argc, char **argv)
 
 		if (ids_name) {
 			echoDebug(DBG_CLOSING_STREAM, ids_name,
-					PSTR(pkgdev.dirname));
+			    PSTR(pkgdev.dirname));
 			(void) ds_close(1);
 			rrmdir(pkgdev.dirname);
 			ids_name = NULL;
@@ -1229,8 +1227,8 @@ main(int argc, char **argv)
 
 static int
 pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
-	char *a_idsName, char *a_altBinDir, char *a_adminFile,
-	char *a_stdoutPath, boolean_t a_tmpzn)
+    char *a_idsName, char *a_altBinDir, char *a_adminFile,
+    char *a_stdoutPath, boolean_t a_tmpzn)
 {
 	char	*arg[MAXARGS];
 	char	*p;
@@ -1251,14 +1249,14 @@ pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
 
 	echoDebug(DBG_PKGZONECHECKINSTALL_ENTRY);
 	echoDebug(DBG_PKGZONECHECKINSTALL_ARGS, a_zoneName, PSTR(pkginst),
-		PSTR(pkgdev.dirname), PSTR(pkgdev.mount), PSTR(pkgdev.bdevice),
-		a_zoneState == ZONE_STATE_MOUNTED ? "/a" : "/",
-		PSTR(a_idsName), PSTR(a_adminFile), PSTR(a_stdoutPath));
+	    PSTR(pkgdev.dirname), PSTR(pkgdev.mount), PSTR(pkgdev.bdevice),
+	    a_zoneState == ZONE_STATE_MOUNTED ? "/a" : "/",
+	    PSTR(a_idsName), PSTR(a_adminFile), PSTR(a_stdoutPath));
 
 	/* generate full path to 'phatinstall' to run in zone */
 
 	(void) snprintf(path, sizeof (path), "%s/pkginstall",
-			"/usr/sadm/install/bin");
+	    "/usr/sadm/install/bin");
 
 	/* start at first file descriptor */
 
@@ -1371,11 +1369,11 @@ pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
 		fd = openLocal(a_adminFile, O_RDONLY, tmpdir);
 		if (fd < 0) {
 			progerr(ERR_CANNOT_COPY_LOCAL, a_adminFile,
-				errno, strerror(errno));
+			    errno, strerror(errno));
 			return (1);
 		}
 		(void) snprintf(adminfd_path, sizeof (adminfd_path),
-			"/proc/self/fd/%d", fd);
+		    "/proc/self/fd/%d", fd);
 		fds[maxfds++] = fd;
 		arg[nargs++] = "-a";
 		arg[nargs++] = adminfd_path;
@@ -1411,7 +1409,7 @@ pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
 	if ((p != NULL) && (*p != '\0')) {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-name=%s", p);
+			    "parent-zone-name=%s", p);
 			arg[nargs++] = "-O";
 			arg[nargs++] = strdup(zn);
 	}
@@ -1422,14 +1420,14 @@ pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
 	if (z_running_in_global_zone() == B_TRUE) {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-type=%s",
-				TAG_VALUE_GLOBAL_ZONE);
+			    "parent-zone-type=%s",
+			    TAG_VALUE_GLOBAL_ZONE);
 			arg[nargs++] = strdup(zn);
 	} else {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-type=%s",
-				TAG_VALUE_NONGLOBAL_ZONE);
+			    "parent-zone-type=%s",
+			    TAG_VALUE_NONGLOBAL_ZONE);
 			arg[nargs++] = strdup(zn);
 	}
 
@@ -1444,11 +1442,11 @@ pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
 		fd = openLocal(a_idsName, O_RDONLY, tmpdir);
 		if (fd < 0) {
 			progerr(ERR_STREAM_UNAVAILABLE, a_idsName,
-				pkginst, strerror(errno));
+			    pkginst, strerror(errno));
 			quit(1);
 		}
 		(void) snprintf(pkgstreamfd_path, sizeof (pkgstreamfd_path),
-			"/proc/self/fd/%d", fd);
+		    "/proc/self/fd/%d", fd);
 		fds[maxfds++] = fd;
 		arg[nargs++] = pkgstreamfd_path;
 	} else {
@@ -1484,7 +1482,7 @@ pkgZoneCheckInstall(char *a_zoneName, zone_state_t a_zoneState,
 	n = z_zone_exec(a_zoneName, path, arg, a_stdoutPath, (char *)NULL, fds);
 
 	echoDebug(DBG_ZONE_EXEC_EXIT, a_zoneName, arg[0], n,
-			PSTR(a_stdoutPath));
+	    PSTR(a_stdoutPath));
 
 	/*
 	 * close any files that were opened for use by the
@@ -1560,9 +1558,9 @@ pkgZoneInstall(char *a_zoneName, zone_state_t a_zoneState, char *a_idsName,
 
 	echoDebug(DBG_PKGZONEINSTALL_ENTRY);
 	echoDebug(DBG_PKGZONEINSTALL_ARGS, a_zoneName, PSTR(pkginst),
-		PSTR(pkgdev.dirname), PSTR(pkgdev.mount), PSTR(pkgdev.bdevice),
-		a_zoneState == ZONE_STATE_MOUNTED ? "/a" : "", PSTR(a_idsName),
-		a_adminFile);
+	    PSTR(pkgdev.dirname), PSTR(pkgdev.mount), PSTR(pkgdev.bdevice),
+	    a_zoneState == ZONE_STATE_MOUNTED ? "/a" : "", PSTR(a_idsName),
+	    a_adminFile);
 
 	/* generate path to pkginstall */
 
@@ -1684,11 +1682,11 @@ pkgZoneInstall(char *a_zoneName, zone_state_t a_zoneState, char *a_idsName,
 		fd = openLocal(a_adminFile, O_RDONLY, tmpdir);
 		if (fd < 0) {
 			progerr(ERR_CANNOT_COPY_LOCAL, a_adminFile,
-				errno, strerror(errno));
+			    errno, strerror(errno));
 			return (1);
 		}
 		(void) snprintf(adminfd_path, sizeof (adminfd_path),
-			"/proc/self/fd/%d", fd);
+		    "/proc/self/fd/%d", fd);
 		fds[maxfds++] = fd;
 		arg[nargs++] = "-a";
 		arg[nargs++] = adminfd_path;
@@ -1725,12 +1723,12 @@ pkgZoneInstall(char *a_zoneName, zone_state_t a_zoneState, char *a_idsName,
 		fd = openLocal(respfile, O_RDONLY, tmpdir);
 		if (fd < 0) {
 			progerr(ERR_CANNOT_COPY_LOCAL, a_adminFile,
-				errno, strerror(errno));
+			    errno, strerror(errno));
 			return (1);
 		}
 		(void) snprintf(respfilefd_path,
-			sizeof (respfilefd_path),
-			"/proc/self/fd/%d", fd);
+		    sizeof (respfilefd_path),
+		    "/proc/self/fd/%d", fd);
 		fds[maxfds++] = fd;
 		arg[nargs++] = "-r";
 		arg[nargs++] = respfilefd_path;
@@ -1749,7 +1747,7 @@ pkgZoneInstall(char *a_zoneName, zone_state_t a_zoneState, char *a_idsName,
 	if ((p != NULL) && (*p != '\0')) {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-name=%s", p);
+			    "parent-zone-name=%s", p);
 			arg[nargs++] = "-O";
 			arg[nargs++] = strdup(zn);
 	}
@@ -1760,14 +1758,14 @@ pkgZoneInstall(char *a_zoneName, zone_state_t a_zoneState, char *a_idsName,
 	if (z_running_in_global_zone() == B_TRUE) {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-type=%s",
-				TAG_VALUE_GLOBAL_ZONE);
+			    "parent-zone-type=%s",
+			    TAG_VALUE_GLOBAL_ZONE);
 			arg[nargs++] = strdup(zn);
 	} else {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-type=%s",
-				TAG_VALUE_NONGLOBAL_ZONE);
+			    "parent-zone-type=%s",
+			    TAG_VALUE_NONGLOBAL_ZONE);
 			arg[nargs++] = strdup(zn);
 	}
 
@@ -1782,11 +1780,11 @@ pkgZoneInstall(char *a_zoneName, zone_state_t a_zoneState, char *a_idsName,
 		fd = openLocal(a_idsName, O_RDONLY, tmpdir);
 		if (fd < 0) {
 			progerr(ERR_STREAM_UNAVAILABLE, a_idsName,
-				pkginst, strerror(errno));
+			    pkginst, strerror(errno));
 			quit(1);
 		}
 		(void) snprintf(pkgstreamfd_path, sizeof (pkgstreamfd_path),
-			"/proc/self/fd/%d", fd);
+		    "/proc/self/fd/%d", fd);
 		fds[maxfds++] = fd;
 		arg[nargs++] = pkgstreamfd_path;
 	} else {
@@ -1882,13 +1880,13 @@ pkgInstall(char *a_altRoot, char *a_idsName, char *a_pkgDir, char *a_altBinDir)
 
 	echoDebug(DBG_PKGINSTALL_ENTRY);
 	echoDebug(DBG_PKGINSTALL_ARGS, PSTR(pkginst), PSTR(pkgdev.dirname),
-		PSTR(pkgdev.mount), PSTR(pkgdev.bdevice), PSTR(a_altRoot),
-		PSTR(a_idsName), PSTR(a_pkgDir));
+	    PSTR(pkgdev.mount), PSTR(pkgdev.bdevice), PSTR(a_altRoot),
+	    PSTR(a_idsName), PSTR(a_pkgDir));
 
 	/* generate full path to 'pkginstall' to run in zone */
 
 	(void) snprintf(path, sizeof (path), "%s/pkginstall",
-		a_altBinDir == (char *)NULL ? PKGBIN : a_altBinDir);
+	    a_altBinDir == (char *)NULL ? PKGBIN : a_altBinDir);
 	/*
 	 * generate argument list for call to pkginstall
 	 */
@@ -2117,7 +2115,7 @@ pkgInstall(char *a_altRoot, char *a_idsName, char *a_pkgDir, char *a_altBinDir)
 	if ((p != NULL) && (*p != '\0')) {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-name=%s", p);
+			    "parent-zone-name=%s", p);
 			arg[nargs++] = "-O";
 			arg[nargs++] = strdup(zn);
 	}
@@ -2128,14 +2126,14 @@ pkgInstall(char *a_altRoot, char *a_idsName, char *a_pkgDir, char *a_altBinDir)
 	if (z_running_in_global_zone() == B_TRUE) {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-type=%s",
-				TAG_VALUE_GLOBAL_ZONE);
+			    "parent-zone-type=%s",
+			    TAG_VALUE_GLOBAL_ZONE);
 			arg[nargs++] = strdup(zn);
 	} else {
 			char	zn[MAXPATHLEN];
 			(void) snprintf(zn, sizeof (zn),
-				"parent-zone-type=%s",
-				TAG_VALUE_NONGLOBAL_ZONE);
+			    "parent-zone-type=%s",
+			    TAG_VALUE_NONGLOBAL_ZONE);
 			arg[nargs++] = strdup(zn);
 	}
 
@@ -2211,51 +2209,51 @@ ckreturn(int retcode)
 	needconsult = 0;
 
 	switch (retcode) {
-	    case  0:		/* successful */
-	    case 10:
-	    case 20:
+	case  0:	/* successful */
+	case 10:
+	case 20:
 		break; /* empty case */
 
-	    case  1:		/* package operation failed (fatal error) */
-	    case 11:
-	    case 21:
+	case  1:	/* package operation failed (fatal error) */
+	case 11:
+	case 21:
 		failflag++;
 		interrupted++;
 		needconsult++;
 		break;
 
-	    case  2:		/* non-fatal error (warning) */
-	    case 12:
-	    case 22:
+	case  2:	/* non-fatal error (warning) */
+	case 12:
+	case 22:
 		warnflag++;
 		interrupted++;
 		needconsult++;
 		break;
 
-	    case  3:		/* user selected quit; operation interrupted */
-	    case 13:
-	    case 23:
+	case  3:	/* user selected quit; operation interrupted */
+	case 13:
+	case 23:
 		intrflag++;
 		interrupted++;
 		needconsult++;
 		break;
 
-	    case  4:		/* admin settings prevented operation */
-	    case 14:
-	    case 24:
+	case  4:	/* admin settings prevented operation */
+	case 14:
+	case 24:
 		admnflag++;
 		interrupted++;
 		break;
 
-	    case  5:		/* administration: interaction req (no -n) */
-	    case 15:
-	    case 25:
+	case  5:	/* administration: interaction req (no -n) */
+	case 15:
+	case 25:
 		nullflag++;
 		interrupted++;
 		needconsult++;
 		break;
 
-	    default:
+	default:
 		failflag++;
 		interrupted++;
 		needconsult++;
@@ -2278,10 +2276,10 @@ usage(void)
 		(void) fprintf(stderr, ERR_USAGE_PKGASK, prog);
 	} else if (z_running_in_global_zone() == B_FALSE) {
 		(void) fprintf(stderr, ERR_USAGE_PKGADD_NONGLOBALZONE,
-			prog, prog);
+		    prog, prog);
 	} else {
 		(void) fprintf(stderr, ERR_USAGE_PKGADD_GLOBALZONE,
-			prog, prog);
+		    prog, prog);
 	}
 }
 
@@ -2313,7 +2311,7 @@ usage(void)
 
 static boolean_t
 check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
-	CAF_T a_flags)
+    CAF_T a_flags)
 {
 	FILE		*pkginfoFP;
 	FILE		*pkgmapFP;
@@ -2356,7 +2354,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 	/* path to package to be installed top level (main) directory */
 
 	len = snprintf(pkgpath, sizeof (pkgpath), "%s/%s", a_packageDir,
-			a_pkgInst);
+	    a_pkgInst);
 	if (len > sizeof (pkgpath)) {
 		progerr(ERR_CREATE_PATH_2, a_packageDir, a_pkgInst);
 		return (B_FALSE);
@@ -2372,7 +2370,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 	/* path to pkginfo file within the package to be installed */
 
 	len = snprintf(pkginfoPath, sizeof (pkginfoPath), "%s/pkginfo",
-			pkgpath);
+	    pkgpath);
 	if (len > sizeof (pkginfoPath)) {
 		progerr(ERR_CREATE_PATH_2, pkgpath, "pkginfo");
 		return (B_FALSE);
@@ -2381,7 +2379,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 	/* path to highest instance of package currently installed */
 
 	pkgLocateHighestInst(instPkgPath, sizeof (instPkgPath),
-		instPkg, sizeof (instPkg), a_rootPath, a_pkgInst);
+	    instPkg, sizeof (instPkg), a_rootPath, a_pkgInst);
 
 	/*
 	 * gather information from this package's pkginfo file
@@ -2391,24 +2389,24 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 
 	if (pkginfoFP == (FILE *)NULL) {
 		progerr(ERR_NO_PKG_INFOFILE, a_pkgInst, pkginfoPath,
-							strerror(errno));
+		    strerror(errno));
 		return (B_FALSE);
 	}
 
 	/* determine "HOLLOW" setting for this package */
 
 	is_hollow = pkginfoParamTruth(pkginfoFP, PKG_HOLLOW_VARIABLE,
-			"true", B_FALSE);
+	    "true", B_FALSE);
 
 	/* determine "ALLZONES" setting for this package */
 
 	all_zones = pkginfoParamTruth(pkginfoFP, PKG_ALLZONES_VARIABLE,
-			"true", B_FALSE);
+	    "true", B_FALSE);
 
 	/* determine "THISZONE" setting for this package */
 
 	this_zone = pkginfoParamTruth(pkginfoFP, PKG_THISZONE_VARIABLE,
-			"true", B_FALSE);
+	    "true", B_FALSE);
 
 	/* close pkginfo file */
 
@@ -2469,10 +2467,10 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 	 */
 
 	if ((!this_zone) && (instPkgPath[0] != '\0') &&
-		(isfile(instPkgPath, REQUEST_FILE) == 0)) {
+	    (isfile(instPkgPath, REQUEST_FILE) == 0)) {
 		if (a_flags & CAF_IN_GLOBAL_ZONE) {
 			echoDebug(DBG_CHECKAPP_THISZONE_INSTREQ,
-				a_pkgInst, instPkg);
+			    a_pkgInst, instPkg);
 		}
 		this_zone = B_TRUE;
 	}
@@ -2487,7 +2485,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 	/* determine if this package is currently installed */
 
 	pkg_installed = pkginfoIsPkgInstalled((struct pkginfo **)NULL,
-								a_pkgInst);
+	    a_pkgInst);
 
 	/*
 	 * verify package applicability based on information gathered,
@@ -2527,7 +2525,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 
 	if (all_zones && this_zone) {
 		progerr(ERR_ALLZONES_AND_THISZONE, a_pkgInst,
-			PKG_ALLZONES_VARIABLE, PKG_THISZONE_VARIABLE);
+		    PKG_ALLZONES_VARIABLE, PKG_THISZONE_VARIABLE);
 		return (B_FALSE);
 	}
 
@@ -2535,7 +2533,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 
 	if ((!all_zones) && is_hollow) {
 		progerr(ERR_NOW_ALLZONES_AND_HOLLOW, a_pkgInst,
-			PKG_ALLZONES_VARIABLE, PKG_HOLLOW_VARIABLE);
+		    PKG_ALLZONES_VARIABLE, PKG_HOLLOW_VARIABLE);
 		return (B_FALSE);
 	}
 
@@ -2558,7 +2556,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 	if (in_gz_only && (!pkg_installed)) {
 		/* MAKE A WARNING */
 		echo(ERR_IN_GZ_AND_NOT_INSTALLED, a_pkgInst,
-			pkgGetGzOnlyPath());
+		    pkgGetGzOnlyPath());
 	}
 
 	/* pkg ALLZONES=true & pkg "in gz only" & pkg "is installed" */
@@ -2593,7 +2591,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 
 	if (this_zone && (a_flags & CAF_SCOPE_NONGLOBAL)) {
 		progerr(ERR_THISZONE_AND_Z_USED, PKG_THISZONE_VARIABLE,
-			a_pkgInst);
+		    a_pkgInst);
 		return (B_FALSE);
 	}
 
@@ -2643,7 +2641,7 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 
 static void
 create_zone_adminfile(char **r_zoneAdminFile, char *a_zoneTempDir,
-	char *a_admnfile)
+    char *a_admnfile)
 {
 	boolean_t	b;
 
@@ -2669,7 +2667,7 @@ create_zone_adminfile(char **r_zoneAdminFile, char *a_zoneTempDir,
 	b = z_create_zone_admin_file(*r_zoneAdminFile, a_admnfile);
 	if (b == B_FALSE) {
 		progerr(ERR_CREATE_TMPADMIN, *r_zoneAdminFile,
-			strerror(errno));
+		    strerror(errno));
 		quit(1);
 		/* NOTREACHED */
 	}
@@ -2857,10 +2855,10 @@ unpack_and_check_packages(char **a_pkgList, char *a_idsName, char *a_packageDir)
 		if (a_idsName != (char *)NULL) {
 			/* create stream out of package if not already one */
 			if (unpack_package_from_stream(a_idsName, pkginst,
-				a_packageDir) == B_FALSE) {
+			    a_packageDir) == B_FALSE) {
 				progerr(ERR_CANNOT_UNPACK_PKGSTRM,
-					PSTR(pkginst), PSTR(a_idsName),
-					PSTR(a_packageDir));
+				    PSTR(pkginst), PSTR(a_idsName),
+				    PSTR(a_packageDir));
 
 				npkgs = savenpkgs;
 				return (B_FALSE);
@@ -2871,7 +2869,7 @@ unpack_and_check_packages(char **a_pkgList, char *a_idsName, char *a_packageDir)
 
 		/* check package applicability */
 		if (check_applicability(a_packageDir,
-			pkginst, get_inst_root(), flags) == B_FALSE) {
+		    pkginst, get_inst_root(), flags) == B_FALSE) {
 			progerr(ERR_PKG_NOT_INSTALLABLE, pkginst);
 			npkgs = savenpkgs;
 			return (B_FALSE);
@@ -2892,7 +2890,7 @@ unpack_and_check_packages(char **a_pkgList, char *a_idsName, char *a_packageDir)
 
 static boolean_t
 get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
-	char **a_categoryList, char *a_idsName, int *r_repeat)
+    char **a_categoryList, char *a_idsName, int *r_repeat)
 {
 	int		n;
 
@@ -2904,19 +2902,19 @@ get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
 
 	echoDebug(DBG_GETPKGLIST_ENTRY);
 	echoDebug(DBG_GETPKGLIST_ARGS, PSTR(a_idsName), PSTR(pkgdev.dirname),
-			*r_repeat);
+	    *r_repeat);
 
 	/*
 	 * get the list of the packages to add
 	 */
 
 	n = pkgGetPackageList(r_pkgList, a_argv, optind, a_categories,
-				a_categoryList, &pkgdev);
+	    a_categoryList, &pkgdev);
 
 	switch (n) {
 		case -1:	/* no packages found */
 			echoDebug(DBG_PKGLIST_NONFOUND, PSTR(a_idsName),
-					pkgdev.dirname);
+			    pkgdev.dirname);
 			return (B_FALSE);
 
 		case 0:		/* packages found */
@@ -2924,7 +2922,7 @@ get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
 
 		default:	/* "quit" error */
 			echoDebug(DBG_PKGLIST_ERROR, PSTR(a_idsName),
-				pkgdev.dirname, n);
+			    pkgdev.dirname, n);
 			quit(n);
 			/* NOTREACHED */
 	}
@@ -2972,8 +2970,8 @@ get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
 
 static void
 install_in_one_zone(char *a_zoneName, char *a_idsName,
-	char *a_zoneAdminFile, char *a_zoneTempDir,
-	char *a_altBinDir, zone_state_t a_zoneState, boolean_t a_tmpzn)
+    char *a_zoneAdminFile, char *a_zoneTempDir,
+    char *a_altBinDir, zone_state_t a_zoneState, boolean_t a_tmpzn)
 {
 	char	zoneStreamName[PATH_MAX] = {'\0'};
 	int	n;
@@ -2987,8 +2985,8 @@ install_in_one_zone(char *a_zoneName, char *a_idsName,
 
 	echoDebug(DBG_INSTINONEZONE_ENTRY);
 	echoDebug(DBG_INSTINONEZONE_ARGS, a_zoneName, PSTR(a_idsName),
-			PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir),
-			PSTR(a_altBinDir));
+	    PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir),
+	    PSTR(a_altBinDir));
 
 	/* echo operation to perform to stdout */
 
@@ -2999,11 +2997,11 @@ install_in_one_zone(char *a_zoneName, char *a_idsName,
 	if (a_idsName == (char *)NULL) {
 		/* locate temp stream created earlier */
 		(void) snprintf(zoneStreamName, sizeof (zoneStreamName),
-			"%s/%s.dstream", a_zoneTempDir, pkginst);
+		    "%s/%s.dstream", a_zoneTempDir, pkginst);
 	} else {
 		/* use stream passed in on command line */
 		(void) snprintf(zoneStreamName, sizeof (zoneStreamName),
-			"%s", a_idsName);
+		    "%s", a_idsName);
 	}
 
 	echoDebug(DBG_INSTALL_IN_ZONE, pkginst, a_zoneName, zoneStreamName);
@@ -3018,8 +3016,8 @@ install_in_one_zone(char *a_zoneName, char *a_idsName,
 	/* exit debugging info */
 
 	echoDebug(DBG_INSTALL_FLAG_VALUES, "after install", admnflag, doreboot,
-		failflag, interrupted, intrflag, ireboot, needconsult,
-		nullflag, warnflag);
+	    failflag, interrupted, intrflag, ireboot, needconsult,
+	    nullflag, warnflag);
 }
 
 /*
@@ -3046,7 +3044,7 @@ install_in_one_zone(char *a_zoneName, char *a_idsName,
 
 static int
 install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
-	char *a_zoneAdminFile, char *a_zoneTempDir)
+    char *a_zoneAdminFile, char *a_zoneTempDir)
 {
 	char		*zoneName;
 	int		zoneIndex;
@@ -3061,13 +3059,13 @@ install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 
 	echoDebug(DBG_INSTALLINZONES_ENTRY);
 	echoDebug(DBG_INSTALLINZONES_ARGS, PSTR(a_idsName),
-			PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir));
+	    PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir));
 
 	/* process each zone in the list */
 
 	for (zoneIndex = 0;
-		(zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
-		zoneIndex++) {
+	    (zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
+	    zoneIndex++) {
 
 		/* skip the zone if it is NOT running */
 
@@ -3113,7 +3111,7 @@ install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 
 static int
 boot_and_install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
-	char *a_zoneAdminFile, char *a_zoneTempDir)
+    char *a_zoneAdminFile, char *a_zoneTempDir)
 {
 	boolean_t	b;
 	char		*zoneName;
@@ -3129,13 +3127,13 @@ boot_and_install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 
 	echoDebug(DBG_BOOTINSTALLINZONES_ENTRY);
 	echoDebug(DBG_BOOTINSTALLINZONES_ARGS, PSTR(a_idsName),
-			PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir));
+	    PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir));
 
 	/* process each zone in the list */
 
 	for (zoneIndex = 0;
-		(zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
-		zoneIndex++) {
+	    (zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
+	    zoneIndex++) {
 
 		/* skip the zone if it IS running */
 
@@ -3159,7 +3157,7 @@ boot_and_install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 		echoDebug(DBG_BOOTING_ZONE, zoneName);
 
 		b = z_zlist_change_zone_state(a_zlst, zoneIndex,
-					ZONE_STATE_MOUNTED);
+		    ZONE_STATE_MOUNTED);
 		if (b == B_FALSE) {
 			progerr(ERR_CANNOT_BOOT_ZONE, zoneName);
 			/* set fatal error return condition */
@@ -3219,9 +3217,9 @@ boot_and_install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 
 static void
 pkginstall_check_in_one_zone(char *a_zoneName,
-	char *a_idsName, char *a_zoneAdminFile, char *a_zoneTempDir,
-	char *a_altBinDir, char *a_scratchName, zone_state_t a_zoneState,
-	boolean_t a_tmpzn)
+    char *a_idsName, char *a_zoneAdminFile, char *a_zoneTempDir,
+    char *a_altBinDir, char *a_scratchName, zone_state_t a_zoneState,
+    boolean_t a_tmpzn)
 {
 	char	preinstallcheckPath[PATH_MAX+1];
 	char	zoneStreamName[PATH_MAX] = {'\0'};
@@ -3231,20 +3229,20 @@ pkginstall_check_in_one_zone(char *a_zoneName,
 	echoDebug(MSG_CHECKINSTALL_PKG_IN_ZONE, pkginst, a_zoneName);
 
 	(void) snprintf(preinstallcheckPath, sizeof (preinstallcheckPath),
-		"%s/%s.%s.preinstallcheck.txt", a_zoneTempDir, pkginst,
-		a_zoneName);
+	    "%s/%s.%s.preinstallcheck.txt", a_zoneTempDir, pkginst,
+	    a_zoneName);
 
 	if (a_idsName == (char *)NULL) {
 		/* locate temporary stream created earlier */
 		(void) snprintf(zoneStreamName, sizeof (zoneStreamName),
-			"%s/%s.dstream", a_zoneTempDir, pkginst);
+		    "%s/%s.dstream", a_zoneTempDir, pkginst);
 	} else {
 		(void) snprintf(zoneStreamName, sizeof (zoneStreamName),
-			"%s", a_idsName);
+		    "%s", a_idsName);
 	}
 
 	echoDebug(DBG_CHECKINSTALL_IN_ZONE, pkginst, a_zoneName,
-						zoneStreamName);
+	    zoneStreamName);
 
 	n = pkgZoneCheckInstall(a_scratchName, a_zoneState, zoneStreamName,
 	    a_altBinDir, a_zoneAdminFile, preinstallcheckPath, a_tmpzn);
@@ -3254,8 +3252,8 @@ pkginstall_check_in_one_zone(char *a_zoneName,
 	ckreturn(n);
 
 	echoDebug(DBG_INSTALL_FLAG_VALUES, "after preinstall check",
-		admnflag, doreboot, failflag, interrupted, intrflag,
-		ireboot, needconsult, nullflag, warnflag);
+	    admnflag, doreboot, failflag, interrupted, intrflag,
+	    ireboot, needconsult, nullflag, warnflag);
 }
 
 /*
@@ -3283,7 +3281,7 @@ pkginstall_check_in_one_zone(char *a_zoneName,
 
 static int
 pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
-	char *a_zoneAdminFile, char *a_zoneTempDir)
+    char *a_zoneAdminFile, char *a_zoneTempDir)
 {
 	char		*zoneName;
 	int		zoneIndex;
@@ -3291,8 +3289,8 @@ pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 	zone_state_t	zst;
 
 	for (zoneIndex = 0;
-		(zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
-		zoneIndex++) {
+	    (zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
+	    zoneIndex++) {
 
 		zst = z_zlist_get_current_state(a_zlst, zoneIndex);
 		if (zst != ZONE_STATE_RUNNING && zst != ZONE_STATE_MOUNTED) {
@@ -3335,7 +3333,7 @@ pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 
 static int
 boot_and_pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName,
-	char *a_altBinDir, char *a_zoneAdminFile, char *a_zoneTempDir)
+    char *a_altBinDir, char *a_zoneAdminFile, char *a_zoneTempDir)
 {
 	int		zoneIndex;
 	int		zonesSkipped = 0;
@@ -3351,13 +3349,13 @@ boot_and_pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName,
 
 	echoDebug(DBG_BOOTCHECKINSTALLINZONES_ENTRY);
 	echoDebug(DBG_BOOTCHECKINSTALLINZONES_ARGS, PSTR(a_idsName),
-			PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir));
+	    PSTR(a_zoneAdminFile), PSTR(a_zoneTempDir));
 
 	/* process each zone in the list */
 
 	for (zoneIndex = 0;
-		(zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
-		zoneIndex++) {
+	    (zoneName = z_zlist_get_zonename(a_zlst, zoneIndex)) != NULL;
+	    zoneIndex++) {
 
 		/* skip the zone if it IS running */
 
@@ -3419,8 +3417,8 @@ boot_and_pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName,
 
 static boolean_t
 add_packages_in_global_with_zones(char **a_pkgList,
-	char *a_idsName, int a_repeat, char *a_altBinDir,
-	char *a_device, zoneList_t a_zlst)
+    char *a_idsName, int a_repeat, char *a_altBinDir,
+    char *a_device, zoneList_t a_zlst)
 {
 static	char		*zoneTempDir = (char *)NULL;
 static	char		*zoneAdminFile = (char *)NULL;
@@ -3443,7 +3441,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 
 	echoDebug(DBG_ADDPACKAGES_GZ_W_LZ_ENTRY);
 	echoDebug(DBG_ADDPACKAGES_GZ_W_LZ_ARGS, npkgs,
-			PSTR(a_idsName), a_repeat, PSTR(a_device));
+	    PSTR(a_idsName), a_repeat, PSTR(a_device));
 
 	/* create temporary directory for use by zone operations */
 
@@ -3487,10 +3485,10 @@ static	char		*zoneAdminFile = (char *)NULL;
 			/* package is not a stream - create one */
 
 			(void) snprintf(zoneStreamName, sizeof (zoneStreamName),
-				"%s/%s.dstream", zoneTempDir, pkginst);
+			    "%s/%s.dstream", zoneTempDir, pkginst);
 
 			echoDebug(DBG_CONVERTING_PKG, packageDir, pkginst,
-				zoneStreamName);
+			    zoneStreamName);
 
 			/* set up list of packages to be this package only */
 
@@ -3498,10 +3496,10 @@ static	char		*zoneAdminFile = (char *)NULL;
 			pkgs[1] = (char *)NULL;
 
 			n = pkgtrans(packageDir, zoneStreamName, pkgs,
-					PT_SILENT|PT_ODTSTREAM);
+			    PT_SILENT|PT_ODTSTREAM);
 			if (n != 0) {
 				progerr(ERR_CANNOT_CONVERT_PKGSTRM,
-					pkginst, packageDir, zoneStreamName);
+				    pkginst, packageDir, zoneStreamName);
 				quit(1);
 			}
 			npkgs--;
@@ -3548,8 +3546,8 @@ static	char		*zoneAdminFile = (char *)NULL;
 		}
 
 		echoDebug(DBG_INSTALL_FLAG_VALUES, "after pkginstall",
-			admnflag, doreboot, failflag, interrupted, intrflag,
-			ireboot, needconsult, nullflag, warnflag);
+		    admnflag, doreboot, failflag, interrupted, intrflag,
+		    ireboot, needconsult, nullflag, warnflag);
 
 		/*
 		 * call pkginstall to verify this package for all non-global
@@ -3557,7 +3555,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 		 */
 
 		zonesSkipped = pkginstall_check_in_zones(a_zlst, a_idsName,
-				a_altBinDir, admnfile, zoneTempDir);
+		    a_altBinDir, admnfile, zoneTempDir);
 
 		/*
 		 * if any zones were skipped (becuase they are not currently
@@ -3569,13 +3567,13 @@ static	char		*zoneAdminFile = (char *)NULL;
 			echoDebug(DBG_ZONES_SKIPPED, zonesSkipped);
 
 			zonesSkipped =
-				boot_and_pkginstall_check_in_zones(a_zlst,
-				a_idsName, a_altBinDir, admnfile,
-				zoneTempDir);
+			    boot_and_pkginstall_check_in_zones(a_zlst,
+			    a_idsName, a_altBinDir, admnfile,
+			    zoneTempDir);
 
 			if (zonesSkipped > 0) {
 				progerr(ERR_INSTALL_ZONES_SKIPPED,
-							zonesSkipped);
+				    zonesSkipped);
 			}
 		}
 
@@ -3645,7 +3643,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 
 		if ((askflag != 0) && (respdir != (char *)NULL)) {
 			(void) snprintf(respfile_path, sizeof (respfile_path),
-					"%s/%s", respdir, pkginst);
+			    "%s/%s", respdir, pkginst);
 			respfile = respfile_path;
 		}
 
@@ -3708,13 +3706,13 @@ static	char		*zoneAdminFile = (char *)NULL;
 		}
 
 		echoDebug(DBG_INSTALL_FLAG_VALUES, "install in running zones",
-			admnflag, doreboot, failflag, interrupted, intrflag,
-			ireboot, needconsult, nullflag, warnflag);
+		    admnflag, doreboot, failflag, interrupted, intrflag,
+		    ireboot, needconsult, nullflag, warnflag);
 
 		/* install package in currently booted zones */
 
 		zonesSkipped = install_in_zones(a_zlst, a_idsName, a_altBinDir,
-					zoneAdminFile, zoneTempDir);
+		    zoneAdminFile, zoneTempDir);
 
 		/* install package in zones that are not currently booted */
 
@@ -3722,12 +3720,12 @@ static	char		*zoneAdminFile = (char *)NULL;
 			echoDebug(DBG_ZONES_SKIPPED, zonesSkipped);
 
 			zonesSkipped = boot_and_install_in_zones(a_zlst,
-				a_idsName, a_altBinDir, zoneAdminFile,
-				zoneTempDir);
+			    a_idsName, a_altBinDir, zoneAdminFile,
+			    zoneTempDir);
 
 			if (zonesSkipped > 0) {
 				progerr(ERR_INSTALL_ZONES_SKIPPED,
-							zonesSkipped);
+				    zonesSkipped);
 			}
 		}
 
@@ -3739,15 +3737,15 @@ static	char		*zoneAdminFile = (char *)NULL;
 		if (a_idsName == (char *)NULL) {
 			/* locate temporary stream created earlier */
 			(void) snprintf(zoneStreamName, sizeof (zoneStreamName),
-				"%s/%s.dstream", zoneTempDir, pkginst);
+			    "%s/%s.dstream", zoneTempDir, pkginst);
 			/* remove stream - no longer needed */
 			echoDebug(DBG_REMOVING_DSTREAM_PKGDIR, zoneStreamName,
-					pkginst);
+			    pkginst);
 			(void) remove(zoneStreamName);
 		} else {
 			/* remove package - no longer needed */
 			if (snprintf(instdir, sizeof (instdir), "%s/%s",
-					zoneTempDir, pkginst) >= PATH_MAX) {
+			    zoneTempDir, pkginst) >= PATH_MAX) {
 				progerr(ERR_CANNOT_CREATE_PKGPATH, tmpdir);
 				quit(1);
 			}
@@ -3768,7 +3766,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 			(void) chdir("/");
 			if (!a_idsName) {
 				echoDebug(DBG_UNMOUNTING_DEV,
-							PSTR(pkgdev.mount));
+				    PSTR(pkgdev.mount));
 				(void) pkgumount(&pkgdev);
 			}
 		}
@@ -3784,7 +3782,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 	 */
 
 	if ((ireboot == 0) && (a_repeat != 0) &&
-		(pkgdev.pathname == (char *)NULL)) {
+	    (pkgdev.pathname == (char *)NULL)) {
 		return (B_TRUE);
 	}
 
@@ -3804,7 +3802,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 
 static boolean_t
 add_packages_in_nonglobal_zone(char **a_pkgList,
-	char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device)
+    char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device)
 {
 static	char		*zoneTempDir = (char *)NULL;
 
@@ -3823,7 +3821,7 @@ static	char		*zoneTempDir = (char *)NULL;
 
 	echoDebug(DBG_ADDPACKAGES_LZ_ENTRY);
 	echoDebug(DBG_ADDPACKAGES_LZ_ARGS, npkgs, PSTR(a_idsName),
-		a_repeat, PSTR(a_device));
+	    a_repeat, PSTR(a_device));
 
 	/* create temporary directory for use by zone operations */
 
@@ -3902,7 +3900,7 @@ static	char		*zoneTempDir = (char *)NULL;
 
 		if ((askflag != 0) && (respdir != (char *)NULL)) {
 			(void) snprintf(respfile_path, sizeof (respfile_path),
-					"%s/%s", respdir, pkginst);
+			    "%s/%s", respdir, pkginst);
 			respfile = respfile_path;
 		}
 
@@ -3928,7 +3926,7 @@ static	char		*zoneTempDir = (char *)NULL;
 		/* call pkginstall for this package */
 
 		n = pkgInstall(get_inst_root(), NULL,
-				packageDir, a_altBinDir);
+		    packageDir, a_altBinDir);
 
 		/* set success/fail condition variables */
 
@@ -3961,7 +3959,7 @@ static	char		*zoneTempDir = (char *)NULL;
 	 */
 
 	if ((ireboot == 0) && (a_repeat != 0) &&
-		(pkgdev.pathname == (char *)NULL)) {
+	    (pkgdev.pathname == (char *)NULL)) {
 		return (B_TRUE);
 	}
 
@@ -3981,7 +3979,7 @@ static	char		*zoneTempDir = (char *)NULL;
 
 static boolean_t
 add_packages_in_global_no_zones(char **a_pkgList,
-	char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device)
+    char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device)
 {
 	int		n;
 	int		i;
@@ -3994,7 +3992,7 @@ add_packages_in_global_no_zones(char **a_pkgList,
 
 	echoDebug(DBG_ADDPACKAGES_GZ_NO_LZ_ENTRY);
 	echoDebug(DBG_ADDPACKAGES_GZ_NO_LZ_ARGS, npkgs,
-		PSTR(a_idsName), a_repeat, PSTR(a_device));
+	    PSTR(a_idsName), a_repeat, PSTR(a_device));
 
 	/*
 	 * set flags for applicability check
@@ -4039,7 +4037,7 @@ add_packages_in_global_no_zones(char **a_pkgList,
 		 */
 
 		if (check_applicability(pkgdev.dirname,
-			pkginst, get_inst_root(), flags) == B_FALSE) {
+		    pkginst, get_inst_root(), flags) == B_FALSE) {
 			progerr(ERR_PKG_NOT_APPLICABLE, pkginst);
 			quit(1);
 		}
@@ -4054,7 +4052,7 @@ add_packages_in_global_no_zones(char **a_pkgList,
 
 		if ((askflag != 0) && (respdir != (char *)NULL)) {
 			(void) snprintf(respfile_path, sizeof (respfile_path),
-					"%s/%s", respdir, pkginst);
+			    "%s/%s", respdir, pkginst);
 			respfile = respfile_path;
 		}
 
@@ -4080,7 +4078,7 @@ add_packages_in_global_no_zones(char **a_pkgList,
 		/* call pkginstall for this package */
 
 		n = pkgInstall(get_inst_root(), a_idsName,
-				pkgdev.dirname, a_altBinDir);
+		    pkgdev.dirname, a_altBinDir);
 
 		/* set success/fail condition variables */
 
@@ -4113,7 +4111,7 @@ add_packages_in_global_no_zones(char **a_pkgList,
 	 */
 
 	if ((ireboot == 0) && (a_repeat != 0) &&
-		(pkgdev.pathname == (char *)NULL)) {
+	    (pkgdev.pathname == (char *)NULL)) {
 		return (B_TRUE);
 	}
 
@@ -4130,8 +4128,8 @@ add_packages_in_global_no_zones(char **a_pkgList,
 
 static boolean_t
 add_packages(char **a_pkgList,
-	char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device,
-	boolean_t a_noZones)
+    char *a_idsName, int a_repeat, char *a_altBinDir, char *a_device,
+    boolean_t a_noZones)
 {
 	zoneList_t	zlst;
 	boolean_t	b;
@@ -4142,7 +4140,7 @@ add_packages(char **a_pkgList,
 
 	echoDebug(DBG_ADDPACKAGES_ENTRY);
 	echoDebug(DBG_ADDPACKAGES_ARGS, npkgs, PSTR(a_idsName),
-		a_repeat, PSTR(a_altBinDir), PSTR(a_device));
+	    a_repeat, PSTR(a_altBinDir), PSTR(a_device));
 
 	/*
 	 * if running in the global zone AND one or more non-global
@@ -4164,7 +4162,7 @@ add_packages(char **a_pkgList,
 		}
 
 		b = add_packages_in_nonglobal_zone(a_pkgList, a_idsName,
-			a_repeat, a_altBinDir, a_device);
+		    a_repeat, a_altBinDir, a_device);
 
 		(void) z_unlock_this_zone(ZLOCKS_ALL);
 
@@ -4175,7 +4173,7 @@ add_packages(char **a_pkgList,
 
 	b = z_non_global_zones_exist();
 	if ((a_noZones == B_FALSE) && (b == B_TRUE) &&
-					(globalZoneOnly == B_FALSE)) {
+	    (globalZoneOnly == B_FALSE)) {
 
 		echoDebug(DBG_IN_GZ_WITH_LZ);
 
@@ -4208,7 +4206,7 @@ add_packages(char **a_pkgList,
 		/* add packages to all zones */
 
 		b = add_packages_in_global_with_zones(a_pkgList,
-			a_idsName, a_repeat, a_altBinDir, a_device, zlst);
+		    a_idsName, a_repeat, a_altBinDir, a_device, zlst);
 
 		/* unlock all zones */
 
@@ -4235,7 +4233,7 @@ add_packages(char **a_pkgList,
 	}
 
 	b = add_packages_in_global_no_zones(a_pkgList, a_idsName,
-		a_repeat, a_altBinDir, a_device);
+	    a_repeat, a_altBinDir, a_device);
 
 	(void) z_unlock_this_zone(ZLOCKS_ALL);
 
