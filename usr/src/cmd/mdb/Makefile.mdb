@@ -27,6 +27,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2012 Joyent, Inc. All rights reserved.
+# Copyright 2018 Jason King
 #
 
 .KEEP_STATE:
@@ -99,6 +100,7 @@ CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 LDLIBS += -lcurses -lkvm -lproc -lrtld_db -lctf -lumem -ldisasm -lscf
+LDLIBS += -ldemangle-sys
 
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-char-subscripts

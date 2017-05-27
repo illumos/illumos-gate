@@ -22,9 +22,9 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Jason King.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_demangle.h>
@@ -32,7 +32,7 @@
 
 /*ARGSUSED*/
 mdb_demangler_t *
-mdb_dem_load(const char *path)
+mdb_dem_load(void)
 {
 	(void) set_errno(ENOTSUP);
 	return (NULL);

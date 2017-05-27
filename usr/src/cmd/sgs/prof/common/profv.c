@@ -22,9 +22,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * All routines in this file are for processing new-style, *versioned*
@@ -74,7 +74,8 @@ setup_demangled_names(void)
 	nbe = namebuf + namebuf_sz;
 
 	for (i = 0; i < total_funcs; i++) {
-		if ((p = conv_demangle_name(profsym[i].name)) == NULL)
+		p = conv_demangle_name(profsym[i].name);
+		if (p == profsym[i].name)
 			continue;
 
 		namelen = strlen(p);
@@ -97,6 +98,7 @@ setup_demangled_names(void)
 
 		nbp += namelen + 1;
 		cur_len += namelen + 1;
+		free((void *)p);
 	}
 }
 

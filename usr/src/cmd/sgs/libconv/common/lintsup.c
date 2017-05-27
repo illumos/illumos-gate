@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 /* LINTLIBRARY */
 /* PROTOLIB1 */
@@ -39,7 +40,6 @@
 #include <sys/auxv.h>
 #include <libelf.h>
 #include <link.h>
-#include <demangle.h>
 #include <elfcap.h>
 #include <dwarf.h>
 #include "sgs.h"

@@ -21,10 +21,11 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include	<stdio.h>
-#include	<demangle.h>
+#include	<demangle-sys.h>
 #include	"_conv.h"
 #include	"demangle_msg.h"
 
@@ -59,13 +60,11 @@
 const char *
 conv_demangle_name(const char *name)
 {
-	static char	_str[SYM_MAX], *str = _str;
-	static size_t	size = SYM_MAX;
-	static int	again = 1;
-	static int	(*fptr)() = 0;
-	int		error;
+	static char	*(*fptr)() = 0;
+	static volatile int loading = 0;
+	char *d;
 
-	if (str == 0)
+	if (loading)
 		return (name);
 
 	/*
@@ -78,38 +77,15 @@ conv_demangle_name(const char *name)
 	if (fptr == 0) {
 		void	*hdl;
 
-		str = 0;
+		loading = 1;
 		if (!(hdl = dlopen(MSG_ORIG(MSG_DEM_LIB), RTLD_LAZY)) ||
-		    !(fptr = (int (*)())dlsym(hdl, MSG_ORIG(MSG_DEM_SYM))))
+		    !(fptr = (char *(*)())dlsym(hdl, MSG_ORIG(MSG_DEM_SYM))))
 			return (name);
-		str = _str;
+		loading = 0;
 	}
 
-	if ((error = (*fptr)(name, str, size)) == 0)
-		return ((const char *)str);
+	if ((d = fptr(name, SYSDEM_LANG_AUTO, NULL)) == NULL)
+		return (name);
 
-	while ((error == DEMANGLE_ESPACE) && again) {
-		char	*_str;
-		size_t	_size = size;
-
-		/*
-		 * If we haven't allocated our maximum try incrementing the
-		 * present buffer size. Use malloc() rather than realloc() so
-		 * that we at least have the old buffer on failure.
-		 */
-		if (((_size += SYM_MAX) > (SYM_MAX * 4)) ||
-		    ((_str = malloc(_size)) == 0)) {
-			again = 0;
-			break;
-		}
-		if (size != SYM_MAX) {
-			free(str);
-		}
-		str = _str;
-		size = _size;
-
-		if ((error = (*fptr)(name, str, size)) == 0)
-			return ((const char *)str);
-	}
-	return (name);
+	return (d);
 }

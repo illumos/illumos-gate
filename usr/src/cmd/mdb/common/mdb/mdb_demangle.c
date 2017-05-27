@@ -22,55 +22,48 @@
 /*
  * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Jason King
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_demangle.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb.h>
 
-#include <demangle.h>
 #include <strings.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <link.h>
 
-#ifdef _LP64
-static const char LIB_DEMANGLE[] = "/usr/lib/64/libdemangle.so.1";
-#else
-static const char LIB_DEMANGLE[] = "/usr/lib/libdemangle.so.1";
-#endif
+static void *
+mdb_dem_alloc(size_t len)
+{
+	return (mdb_alloc(len, UM_SLEEP));
+}
+
+static void
+mdb_dem_free(void *p, size_t len)
+{
+	mdb_free(p, len);
+}
+
+static sysdem_ops_t mdb_dem_demops = {
+	.alloc = mdb_dem_alloc,
+	.free = mdb_dem_free
+};
 
 mdb_demangler_t *
-mdb_dem_load(const char *path)
+mdb_dem_load(void)
 {
 	mdb_demangler_t *dmp;
-	void *hdl, *func;
-
-	if (access(path, F_OK) == -1)
-		return (NULL);
-
-	if ((hdl = dlmopen(LM_ID_BASE, path, RTLD_LAZY | RTLD_LOCAL)) == NULL) {
-		(void) set_errno(EMDB_RTLD);
-		return (NULL);
-	}
-
-	if ((func = dlsym(hdl, "cplus_demangle")) == NULL) {
-		(void) dlclose(hdl);
-		(void) set_errno(EMDB_NODEM);
-		return (NULL);
-	}
 
 	dmp = mdb_alloc(sizeof (mdb_demangler_t), UM_SLEEP);
-	(void) strncpy(dmp->dm_pathname, path, MAXPATHLEN);
-	dmp->dm_pathname[MAXPATHLEN - 1] = '\0';
-	dmp->dm_handle = hdl;
-	dmp->dm_convert = (int (*)())func;
-	dmp->dm_len = MDB_SYM_NAMLEN * 2;
-	dmp->dm_buf = mdb_alloc(dmp->dm_len, UM_SLEEP);
+	dmp->dm_len = 0;
+	dmp->dm_buf = NULL;
 	dmp->dm_flags = MDB_DM_SCOPE;
+	/* stick with C++ for now to match old behavior */
+	dmp->dm_lang = SYSDEM_LANG_CPP;
 
 	return (dmp);
 }
@@ -78,7 +71,6 @@ mdb_dem_load(const char *path)
 void
 mdb_dem_unload(mdb_demangler_t *dmp)
 {
-	(void) dlclose(dmp->dm_handle);
 	mdb_free(dmp->dm_buf, dmp->dm_len);
 	mdb_free(dmp, sizeof (mdb_demangler_t));
 }
@@ -202,58 +194,65 @@ mdb_dem_filter(mdb_demangler_t *dmp, const char *name)
 static int
 mdb_dem_process(mdb_demangler_t *dmp, const char *name)
 {
-	char *buf = dmp->dm_buf;
-	size_t len = dmp->dm_len;
+	char *res = NULL;
+	size_t reslen = 0;
 
 	char *prefix = strrchr(name, '`');
-	size_t prefixlen;
+	size_t prefixlen = 0;
 
 	if (prefix) {
 		prefix++;		/* the ` is part of the prefix */
 		prefixlen = prefix - name;
+	}
 
-		if (prefixlen >= len)
-			return (DEMANGLE_ESPACE);
+	res = sysdemangle(name + prefixlen, dmp->dm_lang, &mdb_dem_demops);
+	if (res == NULL) {
+		if (errno != EINVAL)
+			mdb_warn("Error while demangling");
+		return (-1);
+	}
 
-		(void) strncpy(buf, name, prefixlen);
+	reslen = (res != NULL) ? strlen(res) : 0;
+	reslen += prefixlen;
+	reslen += 1;
 
-		/*
-		 * Fix up the arguments to dmp->dm_convert()
-		 */
-		name += prefixlen;
-		buf += prefixlen;
-		len -= prefixlen;
+	if (reslen > dmp->dm_len) {
+		mdb_free(dmp->dm_buf, dmp->dm_len);
+
+		dmp->dm_buf = mdb_zalloc(reslen, UM_SLEEP);
+		if (dmp->dm_buf == NULL) {
+			dmp->dm_len = 0;
+			mdb_warn("Unable to allocate memory for demangling");
+			return (-1);
+		}
+		dmp->dm_len = reslen;
+	}
+
+	if (prefixlen > 0)
+		(void) strlcpy(dmp->dm_buf, name, prefixlen + 1);
+	else
+		*dmp->dm_buf = '\0';
+
+	if (res != NULL) {
+		(void) strlcat(dmp->dm_buf, res, dmp->dm_len);
+		mdb_dem_free(res, strlen(res) + 1);
 	}
 
 	/*
 	 * Save the position of the demangled string for mdb_dem_filter()
 	 */
-	dmp->dm_dem = buf;
+	dmp->dm_dem = dmp->dm_buf + prefixlen;
 
-	return (dmp->dm_convert(name, buf, len));
+	return (0);
 }
 
+/* used by mdb_io.c:iob_addr2str */
 const char *
 mdb_dem_convert(mdb_demangler_t *dmp, const char *name)
 {
-	int err;
-
-	while ((err = mdb_dem_process(dmp, name)) == DEMANGLE_ESPACE) {
-		size_t len = dmp->dm_len * 2;
-		char *buf = mdb_alloc(len, UM_NOSLEEP);
-
-		if (buf == NULL) {
-			mdb_warn("failed to allocate memory for demangling");
-			return (name); /* just return original name */
-		}
-
-		mdb_free(dmp->dm_buf, dmp->dm_len);
-		dmp->dm_buf = buf;
-		dmp->dm_len = len;
-	}
-
-	if (err != 0 || strcmp(dmp->dm_buf, name) == 0)
-		return (name); /* return original name if not mangled */
+	if (mdb_dem_process(dmp, name) != 0 ||
+	    strcmp(dmp->dm_buf, name) == 0)
+		return (name);
 
 	return (mdb_dem_filter(dmp, name));
 }
@@ -263,27 +262,20 @@ int
 cmd_demangle(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_demangler_t *dmp = mdb.m_demangler;
-	const char *path = LIB_DEMANGLE;
 
-	if (argc > 1 || (argc > 0 && argv->a_type != MDB_TYPE_STRING))
+	if (argc > 0)
 		return (DCMD_USAGE);
 
-	if (argc > 0) {
-		if (dmp != NULL)
-			mdb_dem_unload(mdb.m_demangler);
-		path = argv->a_un.a_str;
-	}
-
-	if (dmp != NULL && argc == 0 && !(mdb.m_flags & MDB_FL_DEMANGLE)) {
+	if (dmp != NULL && !(mdb.m_flags & MDB_FL_DEMANGLE)) {
 		mdb_printf("C++ symbol demangling enabled\n");
 		mdb.m_flags |= MDB_FL_DEMANGLE;
 
-	} else if (dmp == NULL || argc > 0) {
-		if ((mdb.m_demangler = mdb_dem_load(path)) != NULL) {
+	} else if (dmp == NULL) {
+		if ((mdb.m_demangler = mdb_dem_load()) != NULL) {
 			mdb_printf("C++ symbol demangling enabled\n");
 			mdb.m_flags |= MDB_FL_DEMANGLE;
 		} else {
-			mdb_warn("failed to load C++ demangler %s", path);
+			mdb_warn("no memory to load C++ demangler");
 			mdb.m_flags &= ~MDB_FL_DEMANGLE;
 		}
 
@@ -338,8 +330,8 @@ cmd_demstr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (mdb.m_demangler == NULL && (mdb.m_demangler =
-	    mdb_dem_load(LIB_DEMANGLE)) == NULL) {
-		mdb_warn("failed to load C++ demangler %s", LIB_DEMANGLE);
+	    mdb_dem_load()) == NULL) {
+		mdb_warn("failed to load demangler");
 		return (DCMD_ERR);
 	}
 

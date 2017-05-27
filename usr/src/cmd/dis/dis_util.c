@@ -22,15 +22,15 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Jason King.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <dlfcn.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <demangle.h>
+#include <demangle-sys.h>
 
 #include "dis_util.h"
 
@@ -92,56 +92,20 @@ safe_malloc(size_t size)
 
 
 /*
- * Generic interface to demangle C++ names.  Calls cplus_demangle to do the
- * necessary translation.  If the translation fails, the argument is returned
- * unchanged.  The memory returned is only valid until the next call to
- * demangle().
- *
- * We dlopen() libdemangle.so rather than linking directly against it in case it
- * is not installed on the system.
+ * Since the -C flag explicitly says C++, for now at least, force language to
+ * C++
  */
 const char *
 dis_demangle(const char *name)
 {
-	static char *demangled_name;
-	static int (*demangle_func)() = NULL;
-	static int size = BUFSIZE;
-	static int first_flag = 0;
-	int ret;
+	static char *demangled_name = NULL;
 
 	/*
-	 * If this is the first call, allocate storage
-	 * for the buffer.
+	 * Since demangled_name is static, it may be preserved across
+	 * invocations.  As such, make sure any memory that might be present
+	 * from previous invocations is freed.
 	 */
-	if (first_flag == 0) {
-		void *demangle_hand;
-
-		demangle_hand = dlopen("libdemangle.so.1", RTLD_LAZY);
-		if (demangle_hand != NULL)
-			demangle_func = (int (*)(int))dlsym(
-				demangle_hand, "cplus_demangle");
-
-		demangled_name = safe_malloc(size);
-		first_flag = 1;
-	}
-
-	/*
-	 * If libdemangle is not present, pass through unchanged.
-	 */
-	if (demangle_func == NULL)
-		return (name);
-
-	/*
-	 * The function returns -1 when the buffer size is not sufficient.
-	 */
-	while ((ret = (*demangle_func)(name, demangled_name, size)) == -1) {
-		free(demangled_name);
-		size = size + BUFSIZE;
-		demangled_name = safe_malloc(size);
-	}
-
-	if (ret != 0)
-		return (name);
-
-	return (demangled_name);
+	free(demangled_name);
+	demangled_name = sysdemangle(name, SYSDEM_LANG_CPP, NULL);
+	return ((demangled_name != NULL) ? demangled_name : name);
 }

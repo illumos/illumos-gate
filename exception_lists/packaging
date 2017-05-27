@@ -28,6 +28,7 @@
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2017 RackTop Systems.
 # Copyright 2018, Joyent, Inc.
+# Copyright 2018 Jason King
 #
 
 #
@@ -42,6 +43,7 @@ usr/include/auth_list.h
 usr/include/bsm/audit_door_infc.h
 usr/include/bsm/audit_private.h
 usr/include/bsm/devalloc.h
+usr/include/demangle-sys.h
 usr/include/getxby_door.h
 usr/include/passwdutil.h
 usr/include/priv_utils.h
