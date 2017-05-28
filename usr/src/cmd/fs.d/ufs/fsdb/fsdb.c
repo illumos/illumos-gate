@@ -31,10 +31,6 @@ char copyright[] =
 All rights reserved.\n";
 #endif /* not lint */
 
-#ifndef lint
-static char sccsid[] = "@(#)fsdb.c	5.8 (Berkeley) 6/1/90";
-#endif /* not lint */
-
 /*
  *  fsdb - file system debugger
  *
@@ -2566,8 +2562,8 @@ follow_path(long level, long inum)
 					top = NULL;
 				    else
 					top--;
-					nfiles--;
-					goto duplicate;
+				    nfiles--;
+				    goto duplicate;
 				}
 			    }
 			}

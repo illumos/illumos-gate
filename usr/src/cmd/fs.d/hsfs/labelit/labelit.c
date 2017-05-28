@@ -145,7 +145,7 @@ main(int argc, char **argv)
 		if (argc > 1)
 			fprintf(stderr, "%s: Illegal option %s in input\n",
 			    callname, string);
-			usage();
+		usage();
 	}
 
 	/* open image file in read write only if necessary */
