@@ -2388,13 +2388,16 @@ sotpi_connect(struct sonode *so,
 	if (so->so_family == AF_UNIX) {
 		if (sti->sti_faddr_noxlate) {
 			/*
-			 * Already have a transport internal address. Do not
-			 * pass any (transport internal) source address.
+			 * sti_faddr is a transport-level address, so
+			 * don't pass it as an option.  Do save it in
+			 * sti_ux_faddr, used for connected DG send.
 			 */
-			addr = sti->sti_faddr_sa;
-			addrlen = (t_uscalar_t)sti->sti_faddr_len;
 			src = NULL;
 			srclen = 0;
+			addr = sti->sti_faddr_sa;
+			addrlen = (t_uscalar_t)sti->sti_faddr_len;
+			bcopy(addr, &sti->sti_ux_faddr,
+			    sizeof (sti->sti_ux_faddr));
 		} else {
 			/*
 			 * Pass the sockaddr_un source address as an option
