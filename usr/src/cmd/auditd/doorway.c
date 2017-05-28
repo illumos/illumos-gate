@@ -149,7 +149,7 @@ warn_or_fatal(int fatal, char *parting_shot)
  * otherwise it is a doorway.c code about a plugin.
  */
 static void
-report_error(auditd_rc_t rc, char *error_text, char *plugin_path)
+report_error(int rc, char *error_text, char *plugin_path)
 {
 	int		warn = 0;
 	char		rcbuf[100]; /* short error name string */
@@ -635,7 +635,8 @@ bpool_init()
  * be called as auditd is going down.
  */
 static void
-qpool_close(plugin_t *p) {
+qpool_close(plugin_t *p)
+{
 	audit_q_t	*q_node;
 	audit_rec_t	*b_node;
 
