@@ -112,6 +112,8 @@ static char *option_types[] = {
 "Client Identifier =",			/* 61 */
 "Netware IP Domain =",			/* 62 */
 "Netware IP Options =",			/* 63 */
+"NIS+ v3 Client Domain Name =",		/* 64 */
+"NIS+ v3 Server Addresses =",		/* 65 */
 "TFTP Server Name",			/* 66 */
 "Option BootFile Name",			/* 67 */
 "Mobile IP Agents",			/* 68 */
