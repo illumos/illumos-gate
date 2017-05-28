@@ -144,6 +144,4 @@ struct cmu_vend {
 extern struct bootp *bootp_response;
 extern size_t bootp_response_size;
 
-int	dhcp_try_rfc1048(uint8_t *cp, size_t len);
-
 #endif /* _BOOTP_H_ */
