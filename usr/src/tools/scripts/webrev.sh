@@ -147,59 +147,114 @@ span.new {
 </style>
 '
 
-#
 # CSS for the HTML version of the man pages.
-#
+# Current version is from mdocml-1.14.1.
 MANCSS='
-html { max-width: 880px; margin-left: 1em; }
-body { font-size: smaller; font-family: Helvetica,Arial,sans-serif; }
-h1 { margin-bottom: 1ex; font-size: 110%; margin-left: -4ex; }
-h2 { margin-bottom: 1ex; font-size: 105%; margin-left: -2ex; }
-table { width: 100%; margin-top: 0ex; margin-bottom: 0ex; }
+html { max-width: 100ex; }
+body { font-family: Helvetica,Arial,sans-serif; }
+table { margin-top: 0em; margin-bottom: 0em; }
 td { vertical-align: top; }
-blockquote { margin-left: 5ex; margin-top: 0ex; margin-bottom: 0ex; }
-div.section { margin-bottom: 2ex; margin-left: 5ex; }
-table.foot { font-size: smaller; margin-top: 1em;
-    border-top: 1px dotted #dddddd; }
-td.foot-date { width: 50%; }
-td.foot-os { width: 50%; text-align: right; }
-table.head { font-size: smaller; margin-bottom: 1em;
-    border-bottom: 1px dotted #dddddd; }
-td.head-ltitle { width: 10%; }
-td.head-vol { width: 80%; text-align: center; }
-td.head-rtitle { width: 10%; text-align: right; }
-.emph { font-style: italic; font-weight: normal; }
-.symb { font-style: normal; font-weight: bold; }
-.lit { font-style: normal; font-weight: normal; font-family: monospace; }
-i.addr { font-weight: normal; }
-i.arg { font-weight: normal; }
-b.cmd { font-style: normal; }
-b.config { font-style: normal; }
-b.diag { font-style: normal; }
-i.farg { font-weight: normal; }
-i.file { font-weight: normal; }
-b.flag { font-style: normal; }
-b.fname { font-style: normal; }
-i.ftype { font-weight: normal; }
-b.includes { font-style: normal; }
-i.link-sec { font-weight: normal; }
-b.macro { font-style: normal; }
-b.name { font-style: normal; }
-i.ref-book { font-weight: normal; }
-i.ref-issue { font-weight: normal; }
-i.ref-jrnl { font-weight: normal; }
-span.ref-title { text-decoration: underline; }
-span.type { font-style: italic; font-weight: normal; }
-b.utility { font-style: normal; }
-b.var { font-style: normal; }
-dd.list-ohang { margin-left: 0ex; }
-ul.list-bul { list-style-type: disc; padding-left: 1em; }
-ul.list-dash { list-style-type: none; padding-left: 0em; }
-li.list-dash:before { content: "\2014  "; }
-ul.list-hyph { list-style-type: none; padding-left: 0em; }
-li.list-hyph:before { content: "\2013  "; }
-ul.list-item { list-style-type: none; padding-left: 0em; }
-ol.list-enum { padding-left: 2em; }
+ul, ol, dl { margin-top: 0em; margin-bottom: 0em; }
+li, dt { margin-top: 1em; }
+fieldset { border: thin solid silver; border-radius: 1em; text-align: center; }
+input[name=expr] { width: 25%; }
+table.results { margin-top: 1em; margin-left: 2em; font-size: smaller; }
+table.head { width: 100%; border-bottom: 1px dotted #808080; margin-bottom: 1em;
+    font-size: smaller; }
+td.head-vol { text-align: center; }
+td.head-rtitle { text-align: right; }
+span.Nd { }
+table.foot { width: 100%; border-top: 1px dotted #808080; margin-top: 1em;
+    font-size: smaller; }
+td.foot-os { text-align: right; }
+div.manual-text { margin-left: 5ex; }
+h1.Sh { margin-top: 2ex; margin-bottom: 1ex; margin-left: -4ex;
+    font-size: 110%; }
+h2.Ss { margin-top: 2ex; margin-bottom: 1ex; margin-left: -2ex;
+    font-size: 105%; }
+div.Pp { margin: 1ex 0ex; }
+a.Sx { }
+a.Xr { }
+div.Bd { }
+div.D1 { margin-left: 5ex; }
+ul.Bl-bullet { list-style-type: disc; padding-left: 1em; }
+li.It-bullet { }
+ul.Bl-dash { list-style-type: none; padding-left: 0em; }
+li.It-dash:before { content: "\2014  "; }
+ul.Bl-item { list-style-type: none; padding-left: 0em; }
+li.It-item { }
+ol.Bl-enum { padding-left: 2em; }
+li.It-enum { }
+dl.Bl-diag { }
+dt.It-diag { }
+dd.It-diag { }
+b.It-diag { font-style: normal; }
+dl.Bl-hang { }
+dt.It-hang { }
+dd.It-hang { }
+dl.Bl-inset { }
+dt.It-inset { }
+dd.It-inset { }
+dl.Bl-ohang { }
+dt.It-ohang { }
+dd.It-ohang { margin-left: 0ex; }
+dl.Bl-tag { margin-left: 8ex; }
+dt.It-tag { float: left; clear: both; margin-top: 0ex; margin-left: -8ex;
+    padding-right: 2ex; vertical-align: top; }
+dd.It-tag { width: 100%; margin-top: 0ex; margin-left: 0ex; vertical-align: top;
+    overflow: auto; }
+table.Bl-column { }
+tr.It-column { }
+td.It-column { margin-top: 1em; }
+cite.Rs { font-style: normal; font-weight: normal; }
+span.RsA { }
+i.RsB { font-weight: normal; }
+span.RsC { }
+span.RsD { }
+i.RsI { font-weight: normal; }
+i.RsJ { font-weight: normal; }
+span.RsN { }
+span.RsO { }
+span.RsP { }
+span.RsQ { }
+span.RsR { }
+span.RsT { text-decoration: underline; }
+a.RsU { }
+span.RsV { }
+span.eqn { }
+table.tbl { }
+table.Nm { }
+b.Nm { font-style: normal; }
+b.Fl { font-style: normal; }
+b.Cm { font-style: normal; }
+var.Ar { font-style: italic; font-weight: normal; }
+span.Op { }
+b.Ic { font-style: normal; }
+code.Ev { font-style: normal; font-weight: normal; font-family: monospace; }
+i.Pa { font-weight: normal; }
+span.Lb { }
+b.In { font-style: normal; }
+a.In { }
+b.Fd { font-style: normal; }
+var.Ft { font-style: italic; font-weight: normal; }
+b.Fn { font-style: normal; }
+var.Fa { font-style: italic; font-weight: normal; }
+var.Vt { font-style: italic; font-weight: normal; }
+var.Va { font-style: italic; font-weight: normal; }
+code.Dv { font-style: normal; font-weight: normal; font-family: monospace; }
+code.Er { font-style: normal; font-weight: normal; font-family: monospace; }
+span.An { }
+a.Lk { }
+a.Mt { }
+b.Cd { font-style: normal; }
+i.Ad { font-weight: normal; }
+b.Ms { font-style: normal; }
+span.St { }
+a.Ux { }
+.No { font-style: normal; font-weight: normal; }
+.Em { font-style: italic; font-weight: normal; }
+.Sy { font-style: normal; font-weight: bold; }
+.Li { font-style: normal; font-weight: normal; font-family: monospace; }
 '
 
 #

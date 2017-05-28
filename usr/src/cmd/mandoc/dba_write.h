@@ -1,7 +1,6 @@
-/*	$Id: mandoc_aux.h,v 1.6 2017/02/17 14:31:52 schwarze Exp $ */
+/*	$Id: dba_write.h,v 1.1 2016/07/19 21:31:55 schwarze Exp $ */
 /*
- * Copyright (c) 2009, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2014 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,13 +13,18 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Internal interface to low-level functions
+ * for serializing allocation-based data to disk.
+ * For use by dba_array.c and dba.c only.
  */
 
-int		  mandoc_asprintf(char **, const char *, ...)
-			__attribute__((__format__ (__printf__, 2, 3)));
-void		 *mandoc_calloc(size_t, size_t);
-void		 *mandoc_malloc(size_t);
-void		 *mandoc_realloc(void *, size_t);
-void		 *mandoc_reallocarray(void *, size_t, size_t);
-char		 *mandoc_strdup(const char *);
-char		 *mandoc_strndup(const char *, size_t);
+int	 dba_open(const char *);
+int	 dba_close(void);
+int32_t	 dba_tell(void);
+void	 dba_seek(int32_t);
+int32_t	 dba_align(void);
+int32_t	 dba_skip(int32_t, int32_t);
+void	 dba_char_write(int);
+void	 dba_str_write(const char *);
+void	 dba_int_write(int32_t);

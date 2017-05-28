@@ -1,7 +1,7 @@
-/*	$Id: man_term.c,v 1.187 2016/01/08 17:48:09 schwarze Exp $ */
+/*	$Id: man_term.c,v 1.191 2017/02/15 14:10:08 schwarze Exp $ */
 /*
  * Copyright (c) 2008-2012 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2010-2015 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2010-2015, 2017 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -143,6 +143,7 @@ terminal_man(void *arg, const struct roff_man *man)
 	struct termp		*p;
 	struct roff_node	*n;
 	struct mtermp		 mt;
+	size_t			 save_defindent;
 
 	p = (struct termp *)arg;
 	p->overstep = 0;
@@ -170,6 +171,7 @@ terminal_man(void *arg, const struct roff_man *man)
 			n = n->next;
 		}
 	} else {
+		save_defindent = p->defindent;
 		if (p->defindent == 0)
 			p->defindent = 7;
 		term_begin(p, print_man_head, print_man_foot, &man->meta);
@@ -177,6 +179,7 @@ terminal_man(void *arg, const struct roff_man *man)
 		if (n != NULL)
 			print_man_nodelist(p, &mt, n, &man->meta);
 		term_end(p);
+		p->defindent = save_defindent;
 	}
 }
 
@@ -319,7 +322,7 @@ pre_alternate(DECL_ARGS)
 			mt->fl |= MANT_LITERAL;
 		assert(nn->type == ROFFT_TEXT);
 		term_word(p, nn->string);
-		if (nn->flags & MAN_EOS)
+		if (nn->flags & NODE_EOS)
                 	p->flags |= TERMP_SENTENCE;
 		if (nn->next)
 			p->flags |= TERMP_NOSPACE;
@@ -677,7 +680,7 @@ pre_TP(DECL_ARGS)
 	/* Calculate offset. */
 
 	if ((nn = n->parent->head->child) != NULL &&
-	    nn->string != NULL && ! (MAN_LINE & nn->flags) &&
+	    nn->string != NULL && ! (NODE_LINE & nn->flags) &&
 	    a2roffsu(nn->string, &su, SCALE_EN)) {
 		len = term_hspan(p, &su) / 24;
 		if (len < 0 && (size_t)(-len) > mt->offset)
@@ -698,7 +701,7 @@ pre_TP(DECL_ARGS)
 
 		/* Don't print same-line elements. */
 		nn = n->child;
-		while (NULL != nn && 0 == (MAN_LINE & nn->flags))
+		while (NULL != nn && 0 == (NODE_LINE & nn->flags))
 			nn = nn->next;
 
 		while (NULL != nn) {
@@ -819,7 +822,8 @@ pre_SH(DECL_ARGS)
 
 		do {
 			n = n->prev;
-		} while (n != NULL && termacts[n->tok].flags & MAN_NOTEXT);
+		} while (n != NULL && n->tok != TOKEN_NONE &&
+		    termacts[n->tok].flags & MAN_NOTEXT);
 		if (n == NULL || (n->tok == MAN_SH && n->body->child == NULL))
 			break;
 
@@ -960,17 +964,17 @@ print_man_node(DECL_ARGS)
 		if ('\0' == *n->string) {
 			term_vspace(p);
 			return;
-		} else if (' ' == *n->string && MAN_LINE & n->flags)
+		} else if (' ' == *n->string && NODE_LINE & n->flags)
 			term_newln(p);
 
 		term_word(p, n->string);
 		goto out;
 
 	case ROFFT_EQN:
-		if ( ! (n->flags & MAN_LINE))
+		if ( ! (n->flags & NODE_LINE))
 			p->flags |= TERMP_NOSPACE;
 		term_eqn(p, n->eqn);
-		if (n->next != NULL && ! (n->next->flags & MAN_LINE))
+		if (n->next != NULL && ! (n->next->flags & NODE_LINE))
 			p->flags |= TERMP_NOSPACE;
 		return;
 	case ROFFT_TBL:
@@ -1007,7 +1011,7 @@ out:
 	 */
 	if (mt->fl & MANT_LITERAL &&
 	    ! (p->flags & (TERMP_NOBREAK | TERMP_NONEWLINE)) &&
-	    (n->next == NULL || n->next->flags & MAN_LINE)) {
+	    (n->next == NULL || n->next->flags & NODE_LINE)) {
 		rm = p->rmargin;
 		rmax = p->maxrmargin;
 		p->rmargin = p->maxrmargin = TERM_MAXMARGIN;
@@ -1023,7 +1027,7 @@ out:
 			p->rmargin = rm;
 		p->maxrmargin = rmax;
 	}
-	if (MAN_EOS & n->flags)
+	if (NODE_EOS & n->flags)
 		p->flags |= TERMP_SENTENCE;
 }
 
