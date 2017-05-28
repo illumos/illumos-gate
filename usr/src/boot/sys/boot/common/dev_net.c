@@ -1,6 +1,4 @@
-/*	$NetBSD: dev_net.c,v 1.23 2008/04/28 20:24:06 martin Exp $	*/
-
-/*-
+/*
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -31,7 +29,7 @@
 
 #include <sys/cdefs.h>
 
-/*-
+/*
  * This module implements a "raw device" interface suitable for
  * use by the stand-alone I/O library NFS code.  This interface
  * does not support any "block" access, and exists only for the
@@ -79,7 +77,7 @@ static int	net_init(void);
 static int	net_open(struct open_file *, ...);
 static int	net_close(struct open_file *);
 static void	net_cleanup(void);
-static int	net_strategy();
+static int	net_strategy(void *, int, daddr_t, size_t, char *, size_t *);
 static int	net_print(int);
 
 static int net_getparams(int sock);
@@ -94,6 +92,14 @@ struct devsw netdev = {
 	noioctl,
 	net_print,
 	net_cleanup
+};
+
+static struct uri_scheme {
+	const char *scheme;
+	int proto;
+} uri_schemes[] = {
+	{ "tftp:/", NET_TFTP },
+	{ "nfs:/", NET_NFS },
 };
 
 static int
@@ -117,7 +123,7 @@ net_open(struct open_file *f, ...)
 	int error = 0;
 
 	va_start(args, f);
-	devname = va_arg(args, char*);
+	devname = va_arg(args, char *);
 	va_end(args);
 
 	/* Before opening another interface, close the previous one first. */
@@ -175,7 +181,7 @@ net_open(struct open_file *f, ...)
 		}
 		if (intf_mtu != 0) {
 			char mtu[16];
-			snprintf(mtu, sizeof(mtu), "%u", intf_mtu);
+			snprintf(mtu, sizeof (mtu), "%u", intf_mtu);
 			setenv("boot.netif.mtu", mtu, 1);
 		}
 	}
@@ -215,13 +221,14 @@ net_cleanup(void)
 }
 
 static int
-net_strategy()
+net_strategy(void *devdata, int rw, daddr_t blk, size_t size, char *buf,
+    size_t *rsize)
 {
 
 	return (EIO);
 }
 
-#define SUPPORT_BOOTP
+#define	SUPPORT_BOOTP
 
 /*
  * Get info for NFS boot: our IP address, our hostname,
@@ -331,11 +338,8 @@ net_getparams(int sock)
 		return (EIO);
 	}
 exit:
-	netproto = NET_TFTP;
-	if ((rootaddr = net_parse_rootpath()) != INADDR_NONE) {
-		netproto = NET_NFS;
+	if ((rootaddr = net_parse_rootpath()) != INADDR_NONE)
 		rootip.s_addr = rootaddr;
-	}
 
 #ifdef	NETIF_DEBUG
 	if (debug) {
@@ -378,20 +382,77 @@ net_print(int verbose)
 }
 
 /*
- * Strip the server's address off of the rootpath if present and return it in
- * network byte order, leaving just the pathname part in the global rootpath.
+ * Parses the rootpath if present
+ *
+ * The rootpath format can be in the form
+ * <scheme>://IPv4/path
+ * <scheme>:/path
+ *
+ * For compatibility with previous behaviour it also accepts as an NFS scheme
+ * IPv4:/path
+ * /path
+ *
+ * If an IPv4 address has been specified, it will be stripped out and passed
+ * out as the return value of this function in network byte order.
+ *
+ * If no global default scheme has been specified and no scheme has been
+ * specified, we will assume that this is an NFS URL.
+ *
+ * The pathname will be stored in the global variable rootpath.
  */
 uint32_t
-net_parse_rootpath()
+net_parse_rootpath(void)
 {
-	n_long addr = INADDR_NONE;
-	char *ptr;
+	n_long addr = htonl(INADDR_NONE);
+	size_t i;
+	char ip[FNAME_SIZE];
+	char *ptr, *val;
 
-	ptr = rootpath;
-	(void)strsep(&ptr, ":");
-	if (ptr != NULL) {
-		addr = inet_addr(rootpath);
-		bcopy(ptr, rootpath, strlen(ptr) + 1);
+	netproto = NET_NONE;
+
+	for (i = 0; i < nitems(uri_schemes); i++) {
+		if (strncmp(rootpath, uri_schemes[i].scheme,
+		    strlen(uri_schemes[i].scheme)) != 0)
+			continue;
+
+		netproto = uri_schemes[i].proto;
+		break;
 	}
+	ptr = rootpath;
+	/* Fallback for compatibility mode */
+	if (netproto == NET_NONE) {
+		netproto = NET_NFS;
+		(void) strsep(&ptr, ":");
+		if (ptr != NULL) {
+			addr = inet_addr(rootpath);
+			bcopy(ptr, rootpath, strlen(ptr) + 1);
+		}
+	} else {
+		ptr += strlen(uri_schemes[i].scheme);
+		if (*ptr == '/') {
+			/* we are in the form <scheme>://, we do expect an ip */
+			ptr++;
+			/*
+			 * XXX when http will be there we will need to check for
+			 * a port, but right now we do not need it yet.
+			 * Also will need rework for IPv6.
+			 */
+			val = strchr(ptr, '/');
+			if (val != NULL) {
+				snprintf(ip, sizeof (ip), "%.*s",
+				    (int)((uintptr_t)val - (uintptr_t)ptr),
+				    ptr);
+				addr = inet_addr(ip);
+				if (addr == htonl(INADDR_NONE)) {
+					printf("Bad IP address: %s\n", ip);
+				}
+				bcopy(val, rootpath, strlen(val) + 1);
+			}
+		} else {
+			ptr--;
+			bcopy(ptr, rootpath, strlen(ptr) + 1);
+		}
+	}
+
 	return (addr);
 }
