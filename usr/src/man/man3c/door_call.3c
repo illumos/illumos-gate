@@ -19,10 +19,10 @@ door_call \- invoke the function associated with a door descriptor
 .SH DESCRIPTION
 .LP
 The \fBdoor_call()\fR function invokes the function associated with the door
-descriptor  \fId\fR, and passes the arguments (if any) specified in
-\fIparams\fR. All of the \fIparams\fR members are treated as in/out  parameters
-during a door invocation and may be updated  upon returning from a door call.
-Passing \fINULL\fR for \fIparams\fR indicates there  are no arguments to be
+descriptor \fId\fR, and passes the arguments (if any) specified in
+\fIparams\fR. All of the \fIparams\fR members are treated as in/out parameters
+during a door invocation and may be updated upon returning from a door call.
+Passing \fINULL\fR for \fIparams\fR indicates there are no arguments to be
 passed and no results expected.
 .sp
 .LP
@@ -34,7 +34,7 @@ typedef struct {
         char            *data_ptr;      /* Argument/result data */
         size_t          data_size;      /* Argument/result data size */
         door_desc_t     *desc_ptr;      /* Argument/result descriptors */
-        uint_t          desc_num;       /* Argument/result num discriptors */
+        uint_t          desc_num;       /* Argument/result num descriptors */
         char            *rbuf;          /* Result area */
         size_t          rsize;          /* Result size */
 } door_arg_t;
@@ -61,26 +61,26 @@ typedef struct {
 
 .sp
 .LP
-Arguments are specified using the  \fBdata_ptr\fR and \fBdesc_ptr\fR members of
+Arguments are specified using the \fBdata_ptr\fR and \fBdesc_ptr\fR members of
 \fIparams\fR. The size of the argument data in bytes is passed in
 \fBdata_size\fR and the number of argument descriptors is passed in
 \fBdesc_num\fR.
 .sp
 .LP
 Results from the door invocation are placed in the buffer, \fBrbuf\fR. See
-\fBdoor_return\fR(3C). The \fBdata_ptr\fR and  \fBdesc_ptr\fR members of
+\fBdoor_return\fR(3C). The \fBdata_ptr\fR and \fBdesc_ptr\fR members of
 \fIparams\fR are updated to reflect the location of the results within the
 \fBrbuf\fR buffer. The size of the data results and number of descriptors
 returned are updated in the \fBdata_size\fR and \fBdesc_num\fR members. It is
-acceptable to use the same buffer for  input argument data and results, so
+acceptable to use the same buffer for input argument data and results, so
 \fBdoor_call()\fR may be called with \fBdata_ptr\fR and \fBdesc_ptr\fR pointing
 to the buffer \fBrbuf\fR.
 .sp
 .LP
 If the results of a door invocation exceed the size of the buffer specified by
-\fBrsize\fR, the system automatically allocates  a new buffer in the caller's
-address space  and updates the \fBrbuf\fR and \fBrsize\fR members to reflect
-this location. In this case, the caller is  responsible for reclaiming this
+\fBrsize\fR, the system automatically allocates a new buffer in the caller's
+address space and updates the \fBrbuf\fR and \fBrsize\fR members to reflect
+this location. In this case, the caller is responsible for reclaiming this
 area using \fBmunmap(rbuf, rsize)\fR when the buffer is no longer required.
 See \fBmunmap\fR(2).
 .sp
@@ -89,14 +89,14 @@ Descriptors passed in a \fBdoor_desc_t\fR structure are identified by the
 \fBd_attributes\fR member. The client marks the \fBd_attributes\fR member with
 the type of object being passed by logically OR-ing the value of object type.
 Currently, the only object type that can be passed or returned is a file
-descriptor, denoted by the  \fBDOOR_DESCRIPTOR\fR attribute. Additionally, the
-\fBDOOR_RELEASE\fR attribute can be set, causing  the descriptor to be closed
+descriptor, denoted by the \fBDOOR_DESCRIPTOR\fR attribute. Additionally, the
+\fBDOOR_RELEASE\fR attribute can be set, causing the descriptor to be closed
 in the caller's address space after it is passed to the target. The descriptor
-will be  closed even if \fBdoor_call()\fR returns an error, unless that error
+will be closed even if \fBdoor_call()\fR returns an error, unless that error
 is \fBEFAULT\fR or \fBEBADF\fR.
 .sp
 .LP
-When file descriptors are passed or returned,  a new descriptor is created in
+When file descriptors are passed or returned, a new descriptor is created in
 the target address space and the \fBd_descriptor\fR member in the target
 argument is updated to reflect the new descriptor. In addition, the system
 passes a system-wide unique number associated with each door in the
@@ -108,7 +108,7 @@ attributes associated with a door including the following:
 \fB\fBDOOR_LOCAL\fR\fR
 .ad
 .RS 20n
-The door received was created  by this process using \fBdoor_create()\fR. See
+The door received was created by this process using \fBdoor_create()\fR. See
 \fBdoor_create\fR(3C).
 .RE
 
@@ -137,7 +137,7 @@ The door received is expecting an unreferenced notification.
 \fB\fBDOOR_UNREF_MULTI\fR\fR
 .ad
 .RS 20n
-Similar to \fBDOOR_UNREF\fR,  except multiple unreferenced notifications may be
+Similar to \fBDOOR_UNREF\fR, except multiple unreferenced notifications may be
 delivered for the same door.
 .RE
 
@@ -183,7 +183,7 @@ Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
 .LP
-The  \fBdoor_call()\fR function will fail if:
+The \fBdoor_call()\fR function will fail if:
 .sp
 .ne 2
 .na

@@ -1,0 +1,82 @@
+<!--
+	This is a stripped down version of tools/java/build.xml
+	from CLDR.  Generally, CLDR tools require Java 1.8, but
+	POSIX conversion tool that we need can be run using older
+	versions.
+-->
+
+<project name="cldr" default="posix" basedir=".">
+	<target name="init">
+		<tstamp />
+		<property name="src.dir" value="cldr/tools/java" />
+		<property name="build.dir" value="cldr/tools/java/classes" />
+		<property name="libs.dir" value="cldr/tools/java/libs" />
+		<property name="jar.file" value="posix.jar" />
+		<property environment="env" />
+		<property file="cldr/tools/java/cldr-tools.properties" />
+		<path id="project.class.path">
+			<pathelement path="${java.class.path}/" />
+			<pathelement path="${build.dir}" />
+			<fileset dir="${libs.dir}" includes="*.jar" />
+		</path>
+	</target>
+
+	<target name="posix" depends="init" description="posix conversion tool">
+		<property name="CLDR_DIR" value="cldr"/>
+		<property name="CLDR_TOOLS" value="cldr/tools/java"/>
+		<property file="${CLDR_DIR}/cldr-tools.properties" />
+		<path id="build.classpath">
+			<pathelement path="${build.dir}" />
+			<pathelement path="${libs.dir}" />
+		</path>
+		<property name="jvm_options"
+			value="-DCLDR_DIR=cldr -DDEBUG=false -Dverbose=false" />
+		<echo message="java home: ${java.home}" />
+		<echo message="java version: ${java.version}" />
+		<echo message="ant java version: ${ant.java.version}" />
+		<echo message="${ant.version}" />
+
+		<mkdir dir="${build.dir}" />
+		<javac includeantruntime="false"
+			includes="org/unicode/cldr/posix/GenerateCharmap.java
+			org/unicode/cldr/posix/GeneratePOSIX.java
+			org/unicode/cldr/tool/Main.java"
+			srcdir="${src.dir}" destdir="${build.dir}"
+			classpathref="project.class.path"
+			source="1.7" target="1.7" debug="on"
+			deprecation="off" encoding="UTF-8" />
+		<mkdir dir="${build.dir}/org/unicode/cldr/util/data" />
+		<copy todir="${build.dir}/org/unicode/cldr/util/data">
+			<fileset dir="${src.dir}/org/unicode/cldr/util/data" />
+		</copy>
+		<jar jarfile="${jar.file}" compress="true"
+			includes="org/unicode/cldr/draft/**/*
+			org/unicode/cldr/icu/**/*
+			org/unicode/cldr/posix/**/*
+			org/unicode/cldr/test/**/*
+			org/unicode/cldr/tool/**/*
+			org/unicode/cldr/util/**/*
+			com/ibm/icu/**/*"
+			basedir="${build.dir}">
+			<manifest>
+				<attribute name="Main-Class"
+					value="org.unicode.cldr.tool.Main" />
+				<attribute name="Class-Path"
+					value="${libs.dir}/${cldr.libs.icu4j}
+					${libs.dir}/${cldr.libs.utilities}
+					${libs.dir}/${cldr.libs.xerces}
+					${libs.dir}/${cldr.libs.guava}
+					${libs.dir}/${cldr.libs.gson}
+					${cldr.libs.icu4j}
+					${cldr.libs.utilities}
+					${cldr.libs.xerces}
+					${cldr.libs.gson}" />
+			</manifest>
+		</jar>
+	</target>
+
+	<target name="clean" depends="init" description="remove build targets">
+		<delete dir="${build.dir}" />
+		<delete file="${jar.file}" />
+	</target>
+</project>

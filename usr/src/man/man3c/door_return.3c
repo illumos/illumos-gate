@@ -17,26 +17,23 @@ door_return \- return from a door invocation
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdoor_return()\fR function returns from a door invocation. It returns
 control to the thread that issued the associated \fBdoor_call()\fR and blocks
 waiting for the next door invocation. See \fBdoor_call\fR(3C). Results, if any,
-from the door invocation are passed back  to the client in the buffers pointed
+from the door invocation are passed back to the client in the buffers pointed
 to by \fIdata_ptr\fR and \fIdesc_ptr\fR. If there is not a client associated
 with the \fBdoor_return()\fR, the calling thread discards the results, releases
 any passed descriptors with the \fBDOOR_RELEASE\fR attribute, and blocks
 waiting for the next door invocation.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBdoor_return()\fR does not return to the calling
 process. Otherwise, \fBdoor_return()\fR returns \fB\(mi1\fR to the calling
 process and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The  \fBdoor_return()\fR function fails and returns to the calling process if:
+The \fBdoor_return()\fR function fails and returns to the calling process if:
 .sp
 .ne 2
 .na
@@ -75,7 +72,6 @@ The client has too many open descriptors.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -95,6 +91,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdoor_call\fR(3C),\fBattributes\fR(5)

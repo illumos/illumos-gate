@@ -1869,7 +1869,7 @@ check_if_removed(struct phyint *pi)
 			next_pr = pr->pr_next;
 			if (pr->pr_state & PR_AUTO)
 				prefix_update_ipadm_addrobj(pr, _B_FALSE);
-				prefix_delete(pr);
+			prefix_delete(pr);
 		}
 
 		/*

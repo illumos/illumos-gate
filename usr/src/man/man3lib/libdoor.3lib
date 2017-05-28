@@ -9,12 +9,11 @@ libdoor \- doors library
 .SH SYNOPSIS
 .LP
 .nf
-cc [ \fIflag\fR... ] \fIfile\fR...  [ \fIlibrary\fR... ]
+cc [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 #include <\fBdoor.h\fR>
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Historically, functions in this library provided programmatic access to doors,
 including the ability to create and call them. This functionality now resides
@@ -24,7 +23,7 @@ in \fBlibc\fR(3LIB).
 Doors are a fast light-weight RPC mechanism for secure control transfer between
 processes on the same machine. Conceptually, a thread in one process can issue
 a call using a door descriptor that causes code to be executed in another
-process and then returns using the traditional synchronous RPC model.  Doors
+process and then returns using the traditional synchronous RPC model. Doors
 can also be used to pass data and file descriptors between processes.
 .sp
 .LP
@@ -32,7 +31,6 @@ This library is maintained to provide backward compatibility for both runtime
 and compilation environments. The shared object is implemented as a filter on
 \fBlibc.so.1\fR. New application development need not specify \fB-ldoor\fR.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibdoor.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -51,7 +49,6 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libdoor.so.1\fR\fR
@@ -70,7 +67,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -85,7 +81,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBlibc\fR(3LIB), \fBattributes\fR(5)
 .sp
