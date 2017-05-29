@@ -42,16 +42,17 @@ A boolean value that indicates whether the device driver should add the
 specified address to its filter list or remove it.
 .It Fa mac
 A pointer to an array of bytes that contains the new multicast address being
-added or removed. It is guaranteed to be at least a number of bytes long equal
-to the length of the MAC plugin's address length. For Ethernet devices that
-length is six bytes,
+added or removed.
+It is guaranteed to be at least a number of bytes long equal to the length of
+the MAC plugin's address length.
+For Ethernet devices that length is six bytes,
 .Sy ETHERADDRL .
 .El
 .Sh DESCRIPTION
 The
 .Fn mc_multicst
-entry point is used to program a device driver's multicast filters. For
-more background on filter management, see the
+entry point is used to program a device driver's multicast filters.
+For more background on filter management, see the
 .Sx MAC Address Filter Management
 section in
 .Xr mac 9E .
@@ -59,19 +60,21 @@ section in
 The device driver can optionally sanity check
 .Fa mac
 by making sure that it's both a valid multicast address and by checking
-whether or not it's already programmed the address. Based on the value of
+whether or not it's already programmed the address.
+Based on the value of
 .Fa add ,
 the driver should either add the specified address,
 .Fa mac ,
-or remove it from its filter tables. The device driver is not
-responsible for any form of reference counting on these requests: that
-is maintained by the broader framework.
+or remove it from its filter tables.
+The device driver is not responsible for any form of reference counting on these
+requests: that is maintained by the broader framework.
 .Pp
 The device driver can access its own device soft state by casting the
 .Fa device
-pointer. The device driver should employ the appropriate locking while
-updating and manipulating its filter tables and its own records. It is
-recommended that device drivers always maintain a copy of the addresses
+pointer.
+The device driver should employ the appropriate locking while updating and
+manipulating its filter tables and its own records.
+It is recommended that device drivers always maintain a copy of the addresses
 programmed into the device's filter tables so that they can more easily
 recover from various device resets and errors, or handle requests to
 suspend and resume the device that may result in the device registers
@@ -205,9 +208,9 @@ example_m_multicst(void *arg, boolean_t add, const uint8_t *mac_addr)
 }
 .Ed
 .Sh ERRORS
-The device driver may return one of the following errors. While this list
-is not intended to be exhaustive, it is recommended to use one of these
-if possible.
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommended to use one
+of these if possible.
 .Bl -tag -width Er
 .It Er EINVAL
 The address

@@ -26,20 +26,23 @@ slots.
 .Lp
 The
 .Nm
-library provides a special slot called the meta slot. The
-meta slot provides a virtual union of capabilities of all other slots. When
-available, the meta slot is always the first slot provided by
+library provides a special slot called the meta slot.
+The meta slot provides a virtual union of capabilities of all other slots.
+When available, the meta slot is always the first slot provided by
 .Nm .
 .Lp
 The meta slot feature can be configured either system-wide or by individual
-users. System-wide configuration for meta slot features is done with the
+users.
+System-wide configuration for meta slot features is done with the
 .Xr cryptoadm 1M
-utility. User configuration for meta slot features is
-performed with environment variables.
+utility.
+User configuration for meta slot features is performed with environment
+variables.
 .Lp
-By default, the following is the system-wide configuration for meta slot. Meta
-slot is enabled. Meta slot provides token-based object support with the
-Software RSA PKCS#11 softtoken
+By default, the following is the system-wide configuration for meta slot.
+Meta slot is enabled.
+Meta slot provides token-based object support with the Software RSA PKCS#11
+softtoken
 .Pf ( Xr pkcs11_softtoken 5 ) .
 Meta slot is
 allowed to move sensitive token objects to other slots if that is necessary to
@@ -52,12 +55,13 @@ The
 .Ev ${METASLOT_OBJECTSTORE_SLOT}
 and
 .Ev ${METASLOT_OBJECTSTORE_TOKEN}
-environment variables are used to specify an alternate token object store. A
-user can specify either slot-description in
+environment variables are used to specify an alternate token object store.
+A user can specify either slot-description in
 .Ev ${METASLOT_OBJECTSTORE_SLOT}
 or token-label in
-.Ev ${METASLOT_OBJECTSTORE_TOKEN} , or both. Valid values
-for slot-description and token-label are available from output of the command:
+.Ev ${METASLOT_OBJECTSTORE_TOKEN} , or both.
+Valid values for slot-description and token-label are available from output of
+the command:
 .Bd -literal -offset indent
 # cryptoadm list -v
 .Ed
@@ -65,29 +69,32 @@ for slot-description and token-label are available from output of the command:
 The
 .Ev ${METASLOT_ENABLED}
 environment variable is used to specify whether
-the user wants to turn the metaslot feature on or off. Only two values are
-recognized. The value "true" means meta slot will be on. The value "false"
-means meta slot will be off.
+the user wants to turn the metaslot feature on or off.
+Only two values are recognized.
+The value "true" means meta slot will be on.
+The value "false" means meta slot will be off.
 .Lp
 The
 .Ev ${METASLOT_AUTO_KEY_MIGRATE}
 environment variable is used to specify
 whether the user wants sensitive token objects to move to other slots for
-cryptographic operations. Only two values are recognized. The value "true"
-means meta slot will migrate sensitive token objects to other slots if
-necessary. The value "false" means meta slot will not migrate sensitive token
-objects to other slots even if it is necessary.
+cryptographic operations.
+Only two values are recognized.
+The value "true" means meta slot will migrate sensitive token objects to other
+slots if necessary.
+The value "false" means meta slot will not migrate sensitive token objects to
+other slots even if it is necessary.
 .Lp
 When the meta slot feature is enabled, the slot that provides token-based
-object support is not shown as one of the available slots. All of its
-functionality can be used with the meta slot.
+object support is not shown as one of the available slots.
+All of its functionality can be used with the meta slot.
 .Lp
 This library filters the list of mechanisms available from plug-ins based on
 the policy set by
 .Xr cryptoadm 1M .
 .Lp
-This library provides entry points for all PKCS#11 v2.40 functions. See the
-PKCS#11 v2.40 specifications at
+This library provides entry points for all PKCS#11 v2.40 functions.
+See the PKCS#11 v2.40 specifications at
 .Lk http://www.oasis-open.org.
 .Lp
 Plug-ins are added to
@@ -123,16 +130,18 @@ utility.
 .Lp
 The
 .In security/pkcs11f.h
-header contains function definitions. The
+header contains function definitions.
+The
 .In security/pkcs11t.h
-header contains type definitions. Applications can
-include either of these headers in place of
+header contains type definitions.
+Applications can include either of these headers in place of
 .In security/pkcs11.h ,
 which contains both function and type definitions.
 .Sh INTERFACES
 The shared object
 .Lb libpkcs11.so.1
-provides the public interfaces defined below. See
+provides the public interfaces defined below.
+See
 .Xr Intro 3
 for additional information on shared object interfaces.
 .Ss "PKCS#11 Standard"
@@ -193,10 +202,10 @@ for descriptions of the following attributes:
 .Sh INTERFACE STABILITY
 .Sy Committed
 .Sh MT-LEVEL
-The SUNW Extension functions are MT-Safe. The PKCS#11 Standard functions are
-MT-Safe with exceptions. See Section 2.5.3 of PKCS#11 Cryptographic Token Usage
-Guide v2.40 and Section 5.1.5 of PKCS#11 Cryptographic Token Interface Base
-Standard v2.40
+The SUNW Extension functions are MT-Safe.
+The PKCS#11 Standard functions are MT-Safe with exceptions.
+See Section 2.5.3 of PKCS#11 Cryptographic Token Usage Guide v2.40 and
+Section 5.1.5 of PKCS#11 Cryptographic Token Interface Base Standard v2.40
 .Sh STANDARD
 The PKCS#11 Standard functions conform to PKCS#11 Cryptographic Token
 Interface Profiles v2.40 Extended Provider.
@@ -228,7 +237,8 @@ without the
 .Dv CKF_DONT_BLOCK
 flag set,
 .Nm
-must create threads internally.  If, however,
+must create threads internally.
+If, however,
 .Dv CKF_LIBRARY_CANT_CREATE_OS_THREADS
 is set,
 .Fn C_WaitForSlotEvent

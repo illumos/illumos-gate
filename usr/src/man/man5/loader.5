@@ -33,8 +33,9 @@ The
 .Nm
 is the final stage of
 .Nm illumos Ns 's
-kernel bootstrapping process. The actual name for the stage depends on
-the platform. On IA32 (i386) architectures with BIOS firmware, it is a
+kernel bootstrapping process.
+The actual name for the stage depends on the platform.
+On IA32 (i386) architectures with BIOS firmware, it is a
 .Pa BTX
 client and named
 .Nm zfsloader .
@@ -49,17 +50,20 @@ supports booting from
 .Cm HSFS
 and
 .Cm NFS
-file systems. Additionally,
+file systems.
+Additionally,
 .Nm
 can load files from the
 .Cm TFTP
-file service. The NFS and TFTP based boot is enabled via
+file service.
+The NFS and TFTP based boot is enabled via
 .Xr pxeboot 5 .
 The
 .Nm
-also does support uncompressing gzip files while reading. The uncompression
-will happen automatically if the compressed file is stored without .gz
-suffix or if the file is accessed by leaving out the .gz suffix from the name.
+also does support uncompressing gzip files while reading.
+The uncompression will happen automatically if the compressed file is stored
+without .gz suffix or if the file is accessed by leaving out the .gz suffix from
+the name.
 If the file is referred by full name, including .gz suffix, then the file
 content is read as is and the uncompression is not performed.
 .Pp
@@ -189,8 +193,8 @@ The behavior of this builtin is changed if
 is loaded.
 .Pp
 .It Ic chain Ar device
-Chain load another boot loader from the specified device. Device can be either
-disk name or partition.
+Chain load another boot loader from the specified device.
+Device can be either disk name or partition.
 .Pp
 .It Ic echo Xo
 .Op Fl n
@@ -399,7 +403,8 @@ Will set
 .Fl v
 option.
 .It Va boot-args
-Will set custom arguments for the kernel. If set in
+Will set custom arguments for the kernel.
+If set in
 .Nm
 configuration, the
 .Nm

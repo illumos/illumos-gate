@@ -35,7 +35,8 @@ residing under the process
 .Fa P .
 This handle is then passed as argument to other
 .Sy libproc
-routines. The
+routines.
+The
 .Fa lwpid
 can be obtained from the
 .Sy pr_lwpid
@@ -48,31 +49,33 @@ The
 argument must point to a valid pointer that will be used to store an
 error code in the event that
 .Fn Lgrab
-is unable to successfully obtain a handle to the process. The possible
-errors are defined below in the
+is unable to successfully obtain a handle to the process.
+The possible errors are defined below in the
 .Sx ERRORS
-section. The code may be transformed into a human readable string
-through the use of
+section.
+The code may be transformed into a human readable string through the use of
 .Xr Lgrab_error 3PROC .
 .Pp
 The handle to the thread is valid until the
 .Xr Lfree 3PROC
-function is called, which also releases associated resources from the
-handle. Only a single handle to a specific thread may exist at any
-time. If the handle already exists and another caller attempts to grab
-that thread, it will result in an error. The caller must call
+function is called, which also releases associated resources from the handle.
+Only a single handle to a specific thread may exist at any time.
+If the handle already exists and another caller attempts to grab
+that thread, it will result in an error.
+The caller must call
 .Fn Lfree
 before releasing the handle associated with
 .Fa P .
 .Pp
 Unlike grabbing a process, grabbing a thread does not change the current
-state of the thread. If it is running, it will remain running. If it is
-stopped, it will remain stopped.
+state of the thread.
+If it is running, it will remain running.
+If it is stopped, it will remain stopped.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Lgrab
-function returns a pointer to the control handle for the specified
-thread. Otherwise, the
+function returns a pointer to the control handle for the specified thread.
+Otherwise, the
 .Dv NULL
 pointer is returned and
 .Fa perr
@@ -92,10 +95,11 @@ The thread identified by
 .Fa lwpid
 does not exist or has already become a zombie.
 .It Er G_STRANGE
-An unanticipated system error occurred while trying to create the
-handle. When this occurs, then the value of
+An unanticipated system error occurred while trying to create the handle.
+When this occurs, then the value of
 .Sy errno
-is meaningful. See
+is meaningful.
+See
 .Xr errno 3C
 for more information and
 .Xr Intro 2

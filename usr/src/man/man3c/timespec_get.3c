@@ -27,15 +27,16 @@
 .Sh DESCRIPTION
 The
 .Fn timespec_get
-function provides access nanosecond resolution time. The
-meaning and source of time is defined by the
+function provides access nanosecond resolution time.
+The meaning and source of time is defined by the
 .Fa base
-argument. The following values are defined for
+argument.
+The following values are defined for
 .Fa base :
 .Bl -tag -width Ds
 .It Sy TIME_UTC
-Obtain the current time of day from the realtime clock on the system. It
-represents the amount of time in second and nanoseconds since the Epoch.
+Obtain the current time of day from the realtime clock on the system.
+It represents the amount of time in second and nanoseconds since the Epoch.
 This is logically equivalent to calling
 .Xr clock_gettime 3C
 with

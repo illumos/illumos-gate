@@ -31,22 +31,26 @@
 .Sh DESCRIPTION
 .Nm
 is an RPC server that answers requests for NFS access information and file
-system mount requests. It reads the file
+system mount requests.
+It reads the file
 .Pa /etc/dfs/sharetab
 to determine which file systems are available for mounting by which remote
-machines. See
+machines.
+See
 .Xr sharetab 4 .
 .Nm nfsd
 running on the local server will contact
 .Nm
 the first time an NFS client tries to access the file system to determine
-whether the client should get read-write, read-only, or no access. This access
-can be dependent on the security mode used in the remoted procedure call from
-the client. See
+whether the client should get read-write, read-only, or no access.
+This access can be dependent on the security mode used in the remoted procedure
+call from the client.
+See
 .Xr share_nfs 1M .
 .Pp
 The command also provides information as to what file systems are mounted by
-which clients. This information can be printed using the
+which clients.
+This information can be printed using the
 .Xr showmount 1M
 command.
 .Pp
@@ -62,14 +66,15 @@ See
 for available configuration properties for
 .Nm .
 .Ss Options
-The options shown below are supported for NFSv2/v3 clients. They are not
-supported for NFSv4 clients.
+The options shown below are supported for NFSv2/v3 clients.
+They are not supported for NFSv4 clients.
 .Bl -tag -width Ds
 .It Fl r
-Reject mount requests from clients. Clients that have file systems mounted will
-not be affected.
+Reject mount requests from clients.
+Clients that have file systems mounted will not be affected.
 .It Fl v
-Run the command in verbose mode. Each time
+Run the command in verbose mode.
+Each time
 .Nm
 determines what access a client should get, it will log the result to the
 console, as well as how it got that result.
@@ -97,10 +102,12 @@ to function properly,
 .Nm
 is automatically started by the
 .Sy svc:/network/nfs/server
-service. See
+service.
+See
 .Xr nfs 4 .
 .Pp
 Some routines that compare hostnames use case-sensitive string comparisons;
-some do not. If an incoming request fails, verify that the case of the hostname
-in the file to be parsed matches the case of the hostname called for, and
-attempt the request again.
+some do not.
+If an incoming request fails, verify that the case of the hostname in the file
+to be parsed matches the case of the hostname called for, and attempt the
+request again.

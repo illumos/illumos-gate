@@ -36,10 +36,12 @@ for that thread in
 .Fa res ,
 if
 .Fa res
-is non-null. The
+is non-null.
+The
 .Fa thrd
 argument must be a member of the current process and it cannot be
-detached. If
+detached.
+If
 .Fa thrd
 has already terminated and another caller has not called
 .Fn thrd_join
@@ -65,7 +67,7 @@ function returns
 and if
 .Fa res
 is a non-null pointer, it will be filled in with the exit status of
-.Xr thrd .
+.Xr thrd 3C .
 If an error occurs,
 .Sy thrd_error
 will be returned.

@@ -52,9 +52,9 @@ tables used by the Neighbor Discovery Protocol
 .Pp
 Given just a hostname,
 .Nm
-will display the current entry. Note that when getting, setting or deleting,
-if a hostname refers to multiple IPv6 addresses, the operation will apply to
-all of them.
+will display the current entry.
+Note that when getting, setting or deleting, if a hostname refers to multiple
+IPv6 addresses, the operation will apply to all of them.
 .Pp
 The NDP translation tables can be modified with
 .Fl d ,
@@ -65,7 +65,8 @@ These flags can only be used when
 .Nm
 is given the
 .Sy PRIV_SYS_NET_CONFIG
-privilege. See
+privilege.
+See
 .Xr privileges 5
 for further information.
 .Pp
@@ -75,11 +76,13 @@ modified or deleted.
 .Sh OPTIONS
 .Bl -tag -width 6m
 .It Fl a
-Display all NDP entries. Entries can be one of several types:
+Display all NDP entries.
+Entries can be one of several types:
 .Bl -tag -offset indent -width 7n
 .It Sy dynamic
-This is a normal NDP mapping and will eventually expire. This is the most
-common type of mapping for non-local addresses that will be displayed.
+This is a normal NDP mapping and will eventually expire.
+This is the most common type of mapping for non-local addresses that will be
+displayed.
 .It Sy local
 The IPv6 address is local to the machine.
 .It Sy other
@@ -129,15 +132,16 @@ Delete NDP mappings for the host called
 .It Fl f
 Read in the lines from
 .Ar filename
-and use each one to set a mapping. The syntax of each line is the
-same as the arguments to
+and use each one to set a mapping.
+The syntax of each line is the same as the arguments to
 .Fl s .
 Lines beginning with `#' will be ignored.
 .It Fl i
 By default,
 .Nm
 will use the routing table to determine the appropriate interface to place the
-mapping on. This flag allows forcing a specific interface
+mapping on.
+This flag allows forcing a specific interface
 .Ar iface .
 This argument will be ignored when using the
 .Fl a
@@ -148,25 +152,27 @@ flags.
 Disable the default translation of numeric IP addresses to host names when
 printing.
 .It Fl s
-Add or update an NDP mapping, and set the desired properties for the entry. The
-list of flags should be the full set of flags desired on the entry, i.e., not
-listing a flag will remove it if it already exists. The following flags can be
-used:
+Add or update an NDP mapping, and set the desired properties for the entry.
+The list of flags should be the full set of flags desired on the entry, i.e.,
+not listing a flag will remove it if it already exists.
+The following flags can be used:
 .Bl -tag -offset indent -width Ds
 .It Cm temp
 The entry should be temporary and eventually expire like a normal NDP
-entry. By default, all entries created with the
+entry.
+By default, all entries created with the
 .Nm
-command are static, and will not be deleted. To make a static entry temporary,
-it should be deleted and recreated with the
+command are static, and will not be deleted.
+To make a static entry temporary, it should be deleted and recreated with the
 .Cm temp
 flag.
 .It Cm any
-The address should be treated like an anycast address. This will prevent the
-system from sending Neighbor Advertisements with the Override flag.
+The address should be treated like an anycast address.
+This will prevent the system from sending Neighbor Advertisements with the
+Override flag.
 .It Cm router
-The address should be treated like a router address. This cause the system to
-send Neighbor Advertisements with the Router flag.
+The address should be treated like a router address.
+This cause the system to send Neighbor Advertisements with the Router flag.
 .El
 .El
 .Sh EXAMPLES

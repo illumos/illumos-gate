@@ -22,12 +22,13 @@ The
 function suspends the caller from execution for the number
 of microseconds specified by the
 .Fa useconds
-argument. The actual suspension
-time might be less than requested because any caught signal will terminate
+argument.
+The actual suspension time might be less than requested because any caught
+signal will terminate
 .Fn usleep
-following execution of that signal's catching routine. The
-suspension time might be longer than requested by an arbitrary amount because
-of the scheduling of other activity in the system.
+following execution of that signal's catching routine.
+The suspension time might be longer than requested by an arbitrary amount
+because of the scheduling of other activity in the system.
 .Lp
 If the value of
 .Fa useconds
@@ -36,18 +37,21 @@ is 0, then the call has no effect.
 The use of the
 usleep
 function has no effect on the action or blockage
-of any signal. In a multithreaded process, only the invoking thread is
-suspended from execution.
+of any signal.
+In a multithreaded process, only the invoking thread is suspended from
+execution.
 .Sh RETURN VALUES
 On completion,
 .Fn usleep
-returns 0. There are no error returns.
+returns 0.
+There are no error returns.
 .Sh ERRORS
 No errors are returned.
 .Sh USAGE
 The
 .Fn usleep
-function is included for its historical usage and is Obsolete.  The
+function is included for its historical usage and is Obsolete.
+The
 .Xr nanosleep 3C
 function is preferred over this function.
 .Sh INTERFACE STABILITY
@@ -62,7 +66,8 @@ function is preferred over this function.
 .Sh STANDARDS
 The
 .Fn usleep
-function is available in the following compilation environments.  See
+function is available in the following compilation environments.
+See
 .Xr standards 5 .
 .Lp
 .Bl -bullet -compact

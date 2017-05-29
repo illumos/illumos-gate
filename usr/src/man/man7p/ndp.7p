@@ -32,20 +32,24 @@ ioctl(s, SIOCLIFSETND, &lifr);
 ioctl(s, SIOCLIFDELND, &lifr);
 .Ed
 .Sh DESCRIPTION
-The Neighbor Discovery Protocol (NDP) is a protocol used to distribute and request
-information about neighboring IPv6 systems on the local network, much like
+The Neighbor Discovery Protocol (NDP) is a protocol used to distribute and
+request information about neighboring IPv6 systems on the local network, much
+like
 .Xr ARP 7P
-for IPv4. NDP is also responsible for spreading information about the network
-gateway and how hosts should configure themselves
+for IPv4.
+NDP is also responsible for spreading information about the network gateway and
+how hosts should configure themselves
 .Pq see Xr in.ndpd 1M for more on how this happens .
 .Sh APPLICATION PROGRAMMING INTERFACE
 The operating system provides several ioctls to help manipulate the mappings
-obtained through NDP. They are
+obtained through NDP.
+They are
 .Sy SIOCLIFGETND ,
 .Sy SIOCLIFSETND ,
 and
 .Sy SIOCLIFDELND ,
-for getting, setting, and deleting respectively. Each of these ioctls takes a
+for getting, setting, and deleting respectively.
+Each of these ioctls takes a
 .Vt struct lifreq
 .Pq see Xr if 7P for details ,
 where the
@@ -120,13 +124,14 @@ Flags that can be placed in
 are:
 .Bl -tag -offset indent -width 16m
 .It Sy NDF_ISROUTER_ON
-Mark this entry as being a router. This will cause Neighbor Advertisements for
-this address to be sent with the R-bit (Router).
+Mark this entry as being a router.
+This will cause Neighbor Advertisements for this address to be sent with the
+R-bit (Router).
 .It Sy NDF_ISROUTER_OFF
 If this entry was flagged as being a router, remove the flag.
 .It Sy NDF_ANYCAST_ON
-Mark this entry as being for an anycast address. This prevents sending Neighbor
-Advertisements with the O-bit (Override).
+Mark this entry as being for an anycast address.
+This prevents sending Neighbor Advertisements with the O-bit (Override).
 .It Sy NDF_ANYCAST_OFF
 If this entry was flagged as an anycast address, remove the flag.
 .It Sy NDF_STATIC
@@ -136,7 +141,8 @@ Prevent this entry from being deleted by the system.
 When using
 .Sy SIOCLIFGETND ,
 these flags represent the current state of the corresponding Neighbor Cache
-Entry. When using
+Entry.
+When using
 .Sy SIOCLIFSETND ,
 these flags represent what changes should be applied to the underlying entry.
 .Pp
@@ -148,8 +154,9 @@ ioctls are
 .Fa lifr_name
 and
 .Fa lnr_addr .
-All other fields should be zeroed out. After successfully getting an entry, the
-other fields will be filled in. When using
+All other fields should be zeroed out.
+After successfully getting an entry, the other fields will be filled in.
+When using
 .Sy SIOCLIFSETND ,
 all fields should be set to an appropriate value, as described above, with the
 exception of
@@ -164,15 +171,17 @@ variable:
 .It Sy EAFNOSUPPORT
 A non-IPv6 socket was used to perform the ioctl.
 .It Sy EINVAL
-The request contents were bad. This could be because conflicting flags were
-used, the specified interface wasn't logical unit zero, or another reason.
+The request contents were bad.
+This could be because conflicting flags were used, the specified interface
+wasn't logical unit zero, or another reason.
 .It Sy ENOMEM
 The system ran out of memory for internal data structures.
 .It Sy ENXIO
 The specified interface does not exist.
 .It Sy EPERM
 The caller does not have permission to modify the Neighbor Cache Entries
-associated with this interface. They may be lacking the
+associated with this interface.
+They may be lacking the
 .Sy PRIV_SYS_NET_CONFIG
 privilege
 .Po see Xr privileges 5 Pc ,
@@ -182,8 +191,9 @@ There is no entry matching the specified address.
 .El
 .Sh EXAMPLES
 The following examples demonstrate how to get and set NDP mappings using the
-provided ioctls. They can be compiled by using a C compiler and linking against
-the sockets library.
+provided ioctls.
+They can be compiled by using a C compiler and linking against the sockets
+library.
 .Ss Example 1: Getting a mapping
 .Bd -literal -offset indent
 $ gcc -Wall -lsocket -o get get.c

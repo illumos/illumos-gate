@@ -66,7 +66,7 @@ section of
 When the driver is done with the
 .Xr mac_register 9S
 structure, it must call the
-.Xr mac_free
+.Xr mac_free 9F
 function to release any associated memory.
 .Sh CONTEXT
 The
@@ -85,10 +85,11 @@ Upon successful completion, the
 .Fn mac_register
 function will return a pointer to an allocated
 .Sy mac_register_t
-structure that can be filled in by the driver. Otherwise,
+structure that can be filled in by the driver.
+Otherwise,
 .Dv NULL
-is returned to indicate that the structure could not be allocated. The
-most common cause for this is that the value of
+is returned to indicate that the structure could not be allocated.
+The most common cause for this is that the value of
 .Fa mac_version
 is not supported by the kernel.
 .Sh SEE ALSO

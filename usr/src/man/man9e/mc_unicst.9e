@@ -38,20 +38,23 @@ structure to the
 function.
 .It Fa mac
 A pointer to an array of bytes that contains the new unicast address of
-the device. It is guaranteed to be at least a number of bytes long equal
-to the length of the MAC plugin's address length. For Ethernet devices that
-length is six bytes,
+the device.
+It is guaranteed to be at least a number of bytes long equal to the length of
+the MAC plugin's address length.
+For Ethernet devices that length is six bytes,
 .Sy ETHERADDRL .
 .El
 .Sh DESCRIPTION
 The
 .Fn mc_unicst
 entry point is used by the GLDv3 to indicate that the device driver
-should update the primary MAC address of the device. In the basic mode
-of operation, this entry point is required and the device has a single
-primary MAC address. If multiple MAC addresses are required, the
-device will be placed into promiscuous mode. This call should overwrite
-the existing MAC address that is programmed into the device.
+should update the primary MAC address of the device.
+In the basic mode of operation, this entry point is required and the device has
+a single primary MAC address.
+If multiple MAC addresses are required, the device will be placed into
+promiscuous mode.
+This call should overwrite the existing MAC address that is programmed into the
+device.
 .Pp
 As noted in the
 .Sx PARAMETERS
@@ -62,22 +65,24 @@ specify an address; however, it should be assumed to be no longer than
 that value.
 .Pp
 The device driver can optionally assert that the address is in the
-valid form for a unicast address and then program the device. The device
-driver can access its device soft state by casting the
+valid form for a unicast address and then program the device.
+The device driver can access its device soft state by casting the
 .Fa device
-pointer to the appropriate structure. As this may be called while other
-operations are ongoing, the device driver should employ the appropriate
-locking while updating the data.
+pointer to the appropriate structure.
+As this may be called while other operations are ongoing, the device driver
+should employ the appropriate locking while updating the data.
 .Pp
 It is recommended that device drivers always maintain a copy of the
 current unicast address in its soft state so that way it can recover
 from various device reset and errors or handle requests to suspend and
 resume the device that may result in device registers being cleared.
 .Pp
-Some devices support multiple MAC address filters. The
+Some devices support multiple MAC address filters.
+The
 .Fn mc_unicst
-entry point only supports a single MAC address. In this case, devices
-should only use a single MAC address and replace that MAC address.
+entry point only supports a single MAC address.
+In this case, devices should only use a single MAC address and replace that MAC
+address.
 Support for using more than a single MAC address filter will be provided
 by future interfaces.
 .Sh RETURN VALUES
@@ -87,9 +92,9 @@ unicast filter and return
 Otherwise, the MAC address should remain unchanged and the driver should
 return an appropriate error number.
 .Sh ERRORS
-The device driver may return one of the following errors. While this list
-is not intended to be exhaustive, it is recommended to use one of these
-if possible.
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommended to use one
+of these if possible.
 .Bl -tag -width Er
 .It Er EINVAL
 The address

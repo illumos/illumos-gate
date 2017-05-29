@@ -28,7 +28,8 @@
 The
 .Fn Lgrab_error
 function returns a pointer to a human-readable character string
-describing the error that occurred. The
+describing the error that occurred.
+The
 .Fn Lgrab_error
 function only knows how to translate error codes that were stored in
 the third argument

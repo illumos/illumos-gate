@@ -33,9 +33,11 @@ function duplicates a wide-character
 allocating sufficient memory to store the copy, and then
 copying from
 .Fa string .
-The resulting copy is returned.  It may be deallocated with
+The resulting copy is returned.
+It may be deallocated with
 .Xr free 3C
-when it is no longer needed.  The
+when it is no longer needed.
+The
 .Fn wcsdup
 function is the wide-character equivalent of
 .Xr strdup 3C .

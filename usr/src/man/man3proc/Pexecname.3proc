@@ -41,9 +41,9 @@ bytes, including the null terminator.
 .Pp
 For a handle grabbed with
 .Xr Pgrab_file 3PROC ,
-the executable refers to the path of the file itself. For a core file,
-the system attempts to determine the original path of the executable
-and return that.
+the executable refers to the path of the file itself.
+For a core file, the system attempts to determine the original path of the
+executable and return that.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pexecname

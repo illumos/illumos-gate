@@ -34,8 +34,9 @@ with those in
 .Fa tree2 .
 The two trees must have hold identical kinds of data, the arguments
 passed to
-.Xr avl_create
-must be identical. The behavior when they are not is undefined.
+.Xr avl_create 3AVL
+must be identical.
+The behavior when they are not is undefined.
 .Sh EXAMPLES
 See the
 .Sy EXAMPLES

@@ -46,23 +46,24 @@ include:
 .It Sy PTHREAD_MUTEX_STALLED
 The mutex referred to by
 .Va attr
-is a traditional mutex. When a thread holding an intra-process lock or a
-process holding an inter-process lock crashes or terminates without
-unlocking the mutex, then the lock will be
+is a traditional mutex.
+When a thread holding an intra-process lock or a process holding an
+inter-process lock crashes or terminates without unlocking the mutex, then the
+lock will be
 .Sy stalled .
 For another thread or process to obtain the lock, something else must
 unlock it.
 .It Sy PTHREAD_MUTEX_ROBUST
 The mutex referred to by
 .Va attr
-is considered a robust mutex. When a process holding an inter-process
-lock crashes or terminates without unlocking the mutex, the attempt to
-lock it will return
+is considered a robust mutex.
+When a process holding an inter-process lock crashes or terminates without
+unlocking the mutex, the attempt to lock it will return
 .Er EOWNERDEAD .
 This allows the new owner the chance to fix the internal state and call
 .Xr pthread_mutex_consistent 3C
-prior to unlocking the lock, allowing normal operation to proceed. Any
-crashes while in this state cause the next owner to obtain
+prior to unlocking the lock, allowing normal operation to proceed.
+Any crashes while in this state cause the next owner to obtain
 .Er EOWNERDEAD .
 .El
 .Sh RETURN VALUES
@@ -72,8 +73,8 @@ function will return
 .Sy 0
 and update
 .Fa robust
-with the current value of the robust attribute. Upon successful
-completion, the
+with the current value of the robust attribute.
+Upon successful completion, the
 .Fn pthread_mutexattr_setrobust
 function will return
 .Sy 0
@@ -82,7 +83,8 @@ and update the robust property of the attributes pointed to by
 to
 .Va robust .
 If either function fails, an error code will be returned to indicate the
-error. Valid errors are defined below.
+error.
+Valid errors are defined below.
 .Sh ERRORS
 The
 .Fn pthread_mutexattr_getrobust

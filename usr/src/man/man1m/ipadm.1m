@@ -145,19 +145,22 @@ command is a stable replacement for the
 .Xr ifconfig 1M
 and
 .Xr ndd 1M
-commands. It is used to create IP interfaces and to configure IP addresses on
-those interfaces. It is also used to get, set or reset properties on interfaces,
-addresses and protocols.
+commands.
+It is used to create IP interfaces and to configure IP addresses on those
+interfaces.
+It is also used to get, set or reset properties on interfaces, addresses and
+protocols.
 .Pp
 For subcommands that take an
 .Em addrobj ,
 the
 .Em addrobj
-specifies a unique address on the system. It is made up of two parts, delimited
-by a
+specifies a unique address on the system.
+It is made up of two parts, delimited by a
 .Sq / .
 The first part is the name of the interface and the second part is a string up
-to 32 characters long. For example,
+to 32 characters long.
+For example,
 .Qq lo0/v4
 is a loopback interface
 .Em addrobj
@@ -183,9 +186,10 @@ The following subcommands are supported:
 .Op Fl t
 .Ar interface
 .Xc
-Create an IP interface that will handle both IPv4 and IPv6 packets. The
-interface will be enabled as part of the creation process. The IPv4 interface
-will have the address 0.0.0.0. The IPv6 interface will have the address ::.
+Create an IP interface that will handle both IPv4 and IPv6 packets.
+The interface will be enabled as part of the creation process.
+The IPv4 interface will have the address 0.0.0.0.
+The IPv6 interface will have the address ::.
 .Bl -tag -width ""
 .It Fl t Ns , Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -227,8 +231,8 @@ Permanently delete an IP interface.
 Show the current IP interface configuration.
 .Bl -tag -width ""
 .It Fl o Ns , Ns Fl -output
-Select which fields will be shown. The field value can be one of the following
-names:
+Select which fields will be shown.
+The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
 .It Cm ALL
 Display all fields.
@@ -304,8 +308,8 @@ Set a property's value(s) on the IP interface.
 .It Fl m Ns , Ns Fl -module
 Specify which protocol the setting applies to.
 .It Fl p Ns , Ns Fl -prop
-Specify the property name and value(s). The property name can be one of the
-following:
+Specify the property name and value(s).
+The property name can be one of the following:
 .Bl -tag -compact -width "exchange_routes"
 .It Cm arp
 Address resolution protocol
@@ -317,15 +321,16 @@ Exchange of routing data
 IP Forwarding
 .Pq Cm on Ns / Ns Cm off
 .It Cm metric
-Set the routing metric to the numeric value. The value is treated as extra
-hops to the destination.
+Set the routing metric to the numeric value.
+The value is treated as extra hops to the destination.
 .It Cm mtu
 Set the maximum transmission unit to the numeric value.
 .It Cm nud
 Neighbor unreachability detection
 .Pq Cm on Ns / Ns Cm off
 .It Cm usesrc
-Indicates which interface to use for source address selection. A value
+Indicates which interface to use for source address selection.
+A value
 .Cm none
 may also be used.
 .El
@@ -345,7 +350,8 @@ Reset an IP interface's property value to the default.
 .It Fl m Ns , Ns Fl -module
 Specify which protocol the setting applies to.
 .It Fl p Ns , Ns Fl -prop
-Specify the property name. See the
+Specify the property name.
+See the
 .Nm ipadm Ic set-ifprop
 subcommand for the list of property names.
 .It Fl t Ns , Ns Fl -temporary
@@ -366,8 +372,8 @@ Print the output in a parsable format.
 .It Fl m Ns , Ns Fl -module
 Specify which protocol to display.
 .It Fl o Ns , Ns Fl -output
-Select which fields will be shown. The field value can be one of the following
-names:
+Select which fields will be shown.
+The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
 .It Cm ALL
 Display all fields.
@@ -392,7 +398,8 @@ The default value of the property.
 The possible values for the property.
 .El
 .It Fl p Ns , Ns Fl -prop
-Specify which properties to display. See the
+Specify which properties to display.
+See the
 .Nm ipadm Ic set-ifprop
 subcommand for the list of property names.
 .El
@@ -422,28 +429,32 @@ subcommand for the list of property names.
 .Bro Cm yes Ns | Ns Cm no Brc Oc Ns ...
 .Ar addrobj
 .Xc
-Create an address on an IP interface. The address will be enabled but can
-disabled using the
+Create an address on an IP interface.
+The address will be enabled but can disabled using the
 .Nm ipadm Ic disable-addr
-subcommand. This subcommand has three different forms, depending on the
-value of the
+subcommand.
+This subcommand has three different forms, depending on the value of the
 .Fl T
 option.
 .Bl -tag -width ""
 .It Fl T Cm static
-Create a static addrobj. Note that
+Create a static addrobj.
+Note that
 .Cm addrconf
 address configured on an interface is required to configure
 .Cm static
-IPv6 address on the same interface. This takes the following options:
+IPv6 address on the same interface.
+This takes the following options:
 .Bl -tag -width ""
 .It Fl a Ns , Ns Fl -address
-Specify the address. The
+Specify the address.
+The
 .Cm local
 or
 .Cm remote
-prefix can be used for a point-to-point interface. In this case, both addresses
-must be given. Otherwise, the equal sign
+prefix can be used for a point-to-point interface.
+In this case, both addresses must be given.
+Otherwise, the equal sign
 .Pq Qq =
 should be omitted and the address should be provided by itself without second
 address.
@@ -451,13 +462,15 @@ address.
 The address is down.
 .El
 .It Fl T Cm dhcp
-Obtain the address via DHCP. This takes the following options:
+Obtain the address via DHCP.
+This takes the following options:
 .Bl -tag -width ""
 .It Fl w Ns , Ns Fl -wait
 Specify the time, in seconds, that the command should wait to obtain an address.
 .El
 .It Fl T Cm addrconf
-Create an auto-configured address. This takes the following options:
+Create an auto-configured address.
+This takes the following options:
 .Bl -tag -width ""
 .It Fl i Ns , Ns Fl -interface-id
 Specify the interface ID to be used.
@@ -473,7 +486,8 @@ Temporary, not persistent across reboots.
 .Op Fl t
 .Ar addrobj
 .Xc
-Down the address. This will stop packets from being sent or received.
+Down the address.
+This will stop packets from being sent or received.
 .Bl -tag -width ""
 .It Fl t Ns , Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -484,7 +498,8 @@ Temporary, not persistent across reboots.
 .Op Fl t
 .Ar addrobj
 .Xc
-Up the address. This will enable packets to be sent and received.
+Up the address.
+This will enable packets to be sent and received.
 .Bl -tag -width ""
 .It Fl t Ns , Ns Fl -temporary
 Temporary, not persistent across reboots.
@@ -519,8 +534,8 @@ Temporary, not persistent across reboots.
 .Xc
 Extend the lease for
 .Sy DHCP
-addresses. It also restarts duplicate address
-detection for
+addresses.
+It also restarts duplicate address detection for
 .Cm static
 addresses.
 .Bl -tag -width ""
@@ -547,8 +562,8 @@ Indicate that the DHCP-assigned address should be released.
 Show the current address properties.
 .Bl -tag -width ""
 .It Fl o Ns , Ns Fl -output
-Select which fields will be shown. The field value can be one of the following
-names:
+Select which fields will be shown.
+The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
 .It Cm ALL
 Display all fields.
@@ -558,7 +573,8 @@ The name of the address.
 The type of the address
 .Pq Sy static Ns / Ns Sy dhcp Ns / Ns Sy addrconf .
 .It Cm STATE
-The state of the address. It can be one of the following values:
+The state of the address.
+It can be one of the following values:
 .Bl -tag -compact -width "inaccessible"
 .It Sy disabled
 see the
@@ -621,8 +637,8 @@ Print the output in a parsable format.
 Set a property's value(s) on the addrobj.
 .Bl -tag -width ""
 .It Fl p Ns , Ns Fl -prop
-Specify the property name and value(s). The property name can be one of the
-following:
+Specify the property name and value(s).
+The property name can be one of the following:
 .Bl -tag -compact -width "deprecated"
 .It Cm broadcast
 The broadcast address (read-only).
@@ -653,7 +669,8 @@ Temporary, not persistent across reboots.
 Reset an addrobj's property value to the default.
 .Bl -tag -width ""
 .It Fl p Ns , Ns Fl -prop
-Specify the property name. See the
+Specify the property name.
+See the
 .Nm ipadm Ic set-addrprop
 subcommand for the list of property names.
 .It Fl t Ns , Ns Fl -temporary
@@ -671,8 +688,8 @@ Display the property values for one or all of the addrobjs.
 .It Fl c Ns , Ns Fl -parsable
 Print the output in a parsable format.
 .It Fl o Ns , Ns Fl -output
-Select which fields will be shown. The field value can be one of the following
-names:
+Select which fields will be shown.
+The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
 .It Cm ALL
 Display all fields.
@@ -695,7 +712,8 @@ The default value of the property.
 The possible values for the property.
 .El
 .It Fl p Ns , Ns Fl -prop
-Specify which properties to display. See the
+Specify which properties to display.
+See the
 .Nm ipadm Ic set-addrprop
 subcommand for the list of property names.
 .El
@@ -709,10 +727,12 @@ subcommand for the list of property names.
 Set a property's value(s) on the protocol.
 .Bl -tag -width ""
 .It Fl p Ns , Ns Fl -prop
-Specify the property name and value(s). The optional
+Specify the property name and value(s).
+The optional
 .Sy + Ns | Ns Sy -
 syntax can be used to add/remove values from the current list of values on the
-property. The property name can be one of the following:
+property.
+The property name can be one of the following:
 .Bl -tag -compact -width "smallest_nonpriv_port"
 .It Cm ecn
 Explicit congestion control
@@ -775,7 +795,8 @@ Temporary, not persistent across reboots.
 Reset a protocol's property value to the default.
 .Bl -tag -width ""
 .It Fl p Ns , Ns Fl -prop
-Specify the property name. See the
+Specify the property name.
+See the
 .Nm ipadm Ic set-prop
 subcommand for the list of property names.
 .It Fl t Ns , Ns Fl -temporary
@@ -793,8 +814,8 @@ Display the property values for one or all of the protocols.
 .It Fl c Ns , Ns Fl -parsable
 Print the output in a parsable format.
 .It Fl o Ns , Ns Fl -output
-Select which fields will be shown. The field value can be one of the following
-names:
+Select which fields will be shown.
+The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
 .It Cm ALL
 Display all fields.
@@ -817,7 +838,8 @@ The default value of the property.
 The possible values for the property.
 .El
 .It Fl p Ns , Ns Fl -prop
-Specify which properties to display. See the
+Specify which properties to display.
+See the
 .Nm ipadm Ic set-prop
 subcommand for the list of property names.
 .El

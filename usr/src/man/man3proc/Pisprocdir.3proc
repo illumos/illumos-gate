@@ -30,8 +30,8 @@ The
 .Fn Pisprocdir
 function determines whether or not the directory
 .Fa dir
-is the root of the /proc file-system. This works across loopback file
-system (lofs) mounts and chroots.
+is the root of the /proc file-system.
+This works across loopback file system (lofs) mounts and chroots.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pisprocdir

@@ -35,7 +35,8 @@
 .Op Ar nservers
 .Sh DESCRIPTION
 .Nm
-is the daemon that handles client file system requests. Only users with
+is the daemon that handles client file system requests.
+Only users with
 .Brq Sy PRIV_SYS_NFS
 and sufficient privileges to write to
 .Pa /var/run
@@ -51,9 +52,9 @@ option.
 .Pp
 By default,
 .Nm
-starts over the TCP and UDP transports for versions 2 and 3. By default, it
-starts over the TCP for version 4. You can change this
-with the
+starts over the TCP and UDP transports for versions 2 and 3.
+By default, it starts over the TCP for version 4.
+You can change this with the
 .Fl p
 option.
 .Pp
@@ -72,28 +73,33 @@ The following options are supported:
 .Bl -tag -width Ds
 .It Fl a
 Start a NFS daemon over all available connectionless and connection-oriented
-transports, including UDP and TCP. Equivalent of setting the
+transports, including UDP and TCP.
+Equivalent of setting the
 .Sy protocol
 property to
 .Sy all .
 .It Fl c Ar max_conn
 Set the maximum number of connections allowed to the NFS server over
-connection-oriented transports. By default, the number of connections is
-unlimited. Equivalent of the
+connection-oriented transports.
+By default, the number of connections is unlimited.
+Equivalent of the
 .Sy max_connections
 property.
 .It Fl l
 Set connection queue length for the NFS server over a connection-oriented
-transport. The default value is 32 entries. Equivalent of the
+transport.
+The default value is 32 entries.
+Equivalent of the
 .Sy listen_backlog
 property.
 .It Fl p Ar protocol
-Start a NFS daemon over the specified protocol. Equivalent of the
+Start a NFS daemon over the specified protocol.
+Equivalent of the
 .Sy protocol
 property.
 .It Fl t Ar device
-Start a NFS daemon for the transport specified by the given device. Equivalent
-of the
+Start a NFS daemon for the transport specified by the given device.
+Equivalent of the
 .Sy device
 property.
 .El
@@ -102,16 +108,19 @@ The following operands are supported:
 .Bl -tag -width Ds
 .It Ar nservers
 This sets the maximum number of concurrent NFS requests that the server can
-handle. This concurrency is achieved by up to
+handle.
+This concurrency is achieved by up to
 .Ar nservers
 threads created as needed in the kernel.
 .Ar nservers
-should be based on the load expected on this server. 16 is the usual number of
+should be based on the load expected on this server.
+16 is the usual number of
 .Ar nservers .
 If
 .Ar nservers
 is not specified, the maximum number of concurrent NFS requests will default to
-1. Equivalent of the
+1.
+Equivalent of the
 .Sy servers
 property.
 .El
@@ -124,12 +133,14 @@ then clients are required to use privileged ports
 .Po ports <
 .Dv IPPORT_RESERVED
 .Pc
-to get NFS services. This variable is equal to zero by default. This variable
-has been moved from the
+to get NFS services.
+This variable is equal to zero by default.
+This variable has been moved from the
 .Qq nfs
 module to the
 .Qq nfssrv
-module. To set the variable, edit the
+module.
+To set the variable, edit the
 .Pa /etc/system
 file and add this entry:
 .Bd -literal -offset indent
@@ -146,8 +157,8 @@ System configuration information file.
 .br
 .Pa /var/nfs/v4_oldstate
 .Xc
-Directories used by the server to manage client state information. These
-directories should not be removed.
+Directories used by the server to manage client state information.
+These directories should not be removed.
 .El
 .Sh EXIT STATUS
 .Bl -tag -width Ds
@@ -171,7 +182,8 @@ Daemon failed to start.
 .Sh NOTES
 Manually starting and restarting
 .Nm
-is not recommended. If it is necessary to do so, use
+is not recommended.
+If it is necessary to do so, use
 .Nm svcadm
 to enable or disable the nfs service
 .Pq svc:/network/nfs/server .
@@ -205,7 +217,8 @@ If
 .Nm
 is killed with
 .Sy SIGTERM ,
-it will not be restarted by the service management facility. Instead,
+it will not be restarted by the service management facility.
+Instead,
 .Nm
 can be restarted by other signals, such as
 .Sy SIGINT .

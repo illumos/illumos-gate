@@ -37,22 +37,25 @@ The
 header defines the following macros:
 .Bl -tag -width Ds
 .It Sy LITTLE_ENDIAN
-A constant used to indicate a little-endian integer. It is always
-defined, regardless of the actual endianess of the underlying platform.
+A constant used to indicate a little-endian integer.
+It is always defined, regardless of the actual endianess of the underlying
+platform.
 This macro should be used to compare against the
 .Sy BYTE_ORDER
 macro.
 .It Sy BIG_ENDIAN
-A constant used to indicate a big-endian integer. It is always defined,
-regardless of the actual endianess of the underlying platform. This
-macro should be used to compare against the
+A constant used to indicate a big-endian integer.
+It is always defined, regardless of the actual endianess of the underlying
+platform.
+This macro should be used to compare against the
 .Sy BYTE_ORDER
 macro.
 .It Sy PDP_ENDIAN
 A constant used to indicate the endianness used for four byte values on
-the PDP-11. It is always defined, regardless of the actual endianess of
-the underlying platform. This macro should be used to compare against
-the
+the PDP-11.
+It is always defined, regardless of the actual endianess of the underlying
+platform.
+This macro should be used to compare against the
 .Sy BYTE_ORDER
 macro.
 .It Sy BYTE_ORDER

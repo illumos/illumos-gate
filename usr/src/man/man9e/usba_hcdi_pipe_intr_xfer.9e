@@ -29,27 +29,28 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ph
 A pointer to a USB pipe handle as defined in
 .Xr usba_pipe_handle_data 9S .
 .It Fa uirp
-A pointer to a USB interrupt transfer request. The structure's members
-are documented in
+A pointer to a USB interrupt transfer request.
+The structure's members are documented in
 .Xr usb_intr_req 9S .
 .It Fa usb_flags
-Flags which describe how allocations should be performed. Valid flags
-are:
+Flags which describe how allocations should be performed.
+Valid flags are:
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -69,24 +70,27 @@ For more background on transfer types, see
 .Xr usba_hcdi 9E .
 .Pp
 The host controller driver should first check the USB address of the
-pipe handle. It may correspond to the root hub. If it does, rather than
-initiating an I/O transfer, the driver may need to emulate it.
+pipe handle.
+It may correspond to the root hub.
+If it does, rather than initiating an I/O transfer, the driver may need to
+emulate it.
 .Pp
-Unlike other transfers, interrupt transfers may be periodic. If the
-transfer is meant to be a one-shot, then the
+Unlike other transfers, interrupt transfers may be periodic.
+If the transfer is meant to be a one-shot, then the
 .Sy USB_ATTRS_ONE_XFER
 flag will be set in the
 .Sy intr_attributes
 member of the
 .Fa uirp
-structure. If the
+structure.
+If the
 .Sy USB_ATTRS_ONE_XFER
-flag is not set, then the transfer begins a periodic transfer. Periodic
-transfers have different handling and behavior.
+flag is not set, then the transfer begins a periodic transfer.
+Periodic transfers have different handling and behavior.
 .Pp
-Interrupt transfers may send data to the device or receive data from the
-device. A given interrupt endpoint is uni-directional. The direction can
-be determined from the endpoint address based on the
+Interrupt transfers may send data to the device or receive data from the device.
+A given interrupt endpoint is uni-directional.
+The direction can be determined from the endpoint address based on the
 .Sy p_ep
 member of
 .Fa ubrp .
@@ -95,8 +99,8 @@ See
 for more information on how to determine the direction of the endpoint.
 .Pp
 The device driver should allocate memory, whether memory suitable for a
-DMA transfer or otherwise, to perform the transfer. For all memory
-allocated, it should honor the values in
+DMA transfer or otherwise, to perform the transfer.
+For all memory allocated, it should honor the values in
 .Fa usb_flags
 to determine whether or not it should block for allocations.
 .Pp
@@ -114,9 +118,9 @@ or from the data buffer that will go the controller.
 .Pp
 Unlike bulk and control transfers, the
 .Fa intr_data
-member may not be allocated for interrupt-IN transfers. In such cases,
-the device driver is required to allocate the message block through
-something like
+member may not be allocated for interrupt-IN transfers.
+In such cases, the device driver is required to allocate the message block
+through something like
 .Xr allocb 9F
 and assign it to the
 .Sy intr_data
@@ -135,7 +139,8 @@ it still must call
 and should specify an error there.
 .Pp
 It is the driver's responsibility to time out one-shot interrupt transfer
-requests. If the timeout in the request as indicated in the
+requests.
+If the timeout in the request as indicated in the
 .Sy intr_timeout
 member of
 .Fa uirp
@@ -147,16 +152,18 @@ All timeout values are in
 When the
 .Sy USB_ATTRS_ONE_XFER
 flag is not present, it indicates that a periodic interrupt transfer is
-being initiated. Once a periodic interrupt transfer is initiated, every
-time data is received the driver should call
+being initiated.
+Once a periodic interrupt transfer is initiated, every time data is received the
+driver should call
 .Xr usba_hcdi_cb 9F
 with the updated data.
 .Pp
 When a periodic transfer is initiated, many controller drivers will
-allocate multiple transfers up front and schedule them all. Many drivers
-do this to ensure that data isn't lost between servicing the first
-transfer and scheduling the next. The number of such transfers used
-depends on the polling frequency specified in the endpoint descriptor.
+allocate multiple transfers up front and schedule them all.
+Many drivers do this to ensure that data isn't lost between servicing the first
+transfer and scheduling the next.
+The number of such transfers used depends on the polling frequency specified in
+the endpoint descriptor.
 .Pp
 Unless an error occurs, the driver must not use the original interrupt
 request,
@@ -182,7 +189,8 @@ A request to close the pipe came in from the
 .Xr usba_hcdi_pipe_close 9E
 entry point.
 .It
-An out of memory condition occurred. The caller should call
+An out of memory condition occurred.
+The caller should call
 .Xr usba_hcdi_cb 9F
 with the code
 .Sy USB_CR_NO_RESOURCES .
@@ -192,7 +200,8 @@ Some other transfer error occurred.
 .Pp
 If the periodic interrupt transfer is for the root hub, the driver will
 need to emulate the behavior of a hub as specified in the USB
-specification. For more information, see the
+specification.
+For more information, see the
 .Sx Root Hub Management
 section in
 .Xr usba_hcdi 9E .
@@ -201,7 +210,8 @@ When the interrupt transfer completes, the driver should consider the
 following items to determine what actions it should take on the
 callback:
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Bl -bullet
 .It
@@ -247,7 +257,8 @@ Upon successful completion, the
 function should return
 function should return
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi 9E ,

@@ -33,12 +33,13 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa args
-A pointer to a filled out registration structure. See
+A pointer to a filled out registration structure.
+See
 .Xr usba_hcdi_register_args_t 9S
 for the members to fill in.
 .It Fa flags
@@ -61,8 +62,8 @@ The
 .Fn usba_hcdi_register
 function is called during a device driver's
 .Xr attach 9E
-entry point after it has finished initializing the device. After this
-function successfuly returns, device drivers should assume that the
+entry point after it has finished initializing the device.
+After this function successfuly returns, device drivers should assume that the
 .Xr usba_hcdi_ops 9S
 functions may be called at any time.
 .Pp
@@ -71,7 +72,8 @@ The
 function should be called during a driver's
 .Xr detach 9E
 entry point after it has unbound its root hub, but before the remainder
-of the device's state is torn down. After calling the
+of the device's state is torn down.
+After calling the
 .Fn usba_hcdi_unregister
 function, the driver will receive no more function calls to its
 .Xr usba_hcdi_ops 9S

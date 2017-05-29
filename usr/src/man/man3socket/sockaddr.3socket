@@ -65,7 +65,8 @@
 The
 .Nm
 family of structures are designed to represent network addresses for
-different networking protocols. The structure
+different networking protocols.
+The structure
 .Sy struct sockaddr
 is a generic structure that is used across calls to various socket
 library routines
@@ -98,13 +99,15 @@ char		sa_data[]	/* socket address (variable-length data) */
 .Lp
 The member
 .Em sa_family
-corresponds to the socket family that's actually in use. The following
-table describes the mapping between the address family and the
-corresponding socket structure that's used. Note that both the generic
+corresponds to the socket family that's actually in use.
+The following table describes the mapping between the address family and the
+corresponding socket structure that's used.
+Note that both the generic
 .Sy struct sockaddr
 and the
 .Sy struct sockaddr_storage
-are not included, because these are both generic structures. More on the
+are not included, because these are both generic structures.
+More on the
 .Sy struct sockaddr_storage
 can be found in the next section.
 .Bl -column -offset indent ".Sy Socket Structure" ".Sy Address Family"
@@ -120,18 +123,19 @@ The
 .Sy sockaddr_storage
 structure is a
 .Nm
-that is not associated with an address family. Instead, it is large
-enough to hold the contents of any of the other
+that is not associated with an address family.
+Instead, it is large enough to hold the contents of any of the other
 .Nm
-structures. It can be used to embed sufficient storage for a
+structures.
+It can be used to embed sufficient storage for a
 .Sy sockaddr
 of any type within a larger structure.
 .Lp
-The structure only has a single member defined. While there are other
-members that are used to pad out the size of the
+The structure only has a single member defined.
+While there are other members that are used to pad out the size of the
 .Sy struct sockaddr_storage ,
-they are not defined and must not be consumed. The only valid
-member is:
+they are not defined and must not be consumed.
+The only valid member is:
 .Bd -literal -offset indent
 sa_family_t	ss_family	/* address family */
 .Ed
@@ -142,8 +146,8 @@ is useful when running a service that accepts traffic over both
 .Sy IPv4
 and
 .Sy IPv6
-where it is common to use a single socket for both address families. In that
-case, rather than guessing whether a
+where it is common to use a single socket for both address families.
+In that case, rather than guessing whether a
 .Sy struct sockaddr_in
 or a
 .Sy struct sockaddr_in6
@@ -156,7 +160,8 @@ value of the member
 The
 .Sy sockaddr_in
 is the socket type which is used for for the Internet Protocol version
-four (IPv4). It has the following members defined:
+four (IPv4).
+It has the following members defined:
 .Bd -literal -offset indent
 sa_family_t	sin_family	/* address family */
 in_port_t	sin_port	/* IP port */
@@ -173,13 +178,16 @@ The members
 .Em sin_port
 and
 .Em sin_addr
-describe the IP address and IP port to use. In the case of a call to
+describe the IP address and IP port to use.
+In the case of a call to
 .Xr connect 3SOCKET
 these represent the remote IP address and port to which the connection
-is being made. In the case of
+is being made.
+In the case of
 .Xr bind 3SOCKET
 these represent the IP address and port on the local host to which the socket
-is to be bound. In the case of
+is to be bound.
+In the case of
 .Xr accept 3SOCKET
 these represent the remote IP address and port of the machine whose
 connection was accepted.
@@ -195,14 +203,16 @@ and write to the member with the function
 .Xr htons 3SOCKET .
 The member
 .Em sin_addr
-is the four byte IPv4 address. It is also stored in network byte order.
+is the four byte IPv4 address.
+It is also stored in network byte order.
 The common way to write out the address is to use the function
 .Xr inet_pton 3SOCKET
 which converts between a human readable IP address such as "10.1.2.3"
 and the corresponding representation.
 .Lp
 Example 1 shows how to prepare an IPv4 socket and deal with
-network byte-order. See
+network byte-order.
+See
 .Xr inet 7P
 and
 .Xr ip 7P
@@ -212,7 +222,8 @@ The
 .Sy sockaddr_in6
 structure is the
 .Nm
-for the Internet Protocol version six (IPv6). Unlike the
+for the Internet Protocol version six (IPv6).
+Unlike the
 .Sy struct sockaddr_in ,
 the
 .Sy struct sockaddr_in6
@@ -223,7 +234,8 @@ or
 .Xr memset 3C .
 If the entire
 .Sy struct sockaddr_in6
-is not zeroed before use, applications will experience undefined behavior. The
+is not zeroed before use, applications will experience undefined behavior.
+The
 .Sy struct sockaddr_in6
 has the following public members:
 .Bd -literal -offset indent
@@ -248,7 +260,8 @@ are the IPv6 equivalents of the
 and
 .Em sin_addr .
 Like their IPv4 counterparts, both of these members must be in network
-byte order. The member
+byte order.
+The member
 .Em sin6_port
 describes the IPv6 port and should be manipulated with the functions
 .Xr ntohs 3SOCKET
@@ -256,7 +269,8 @@ and
 .Xr htons 3SOCKET .
 The member
 .Em sin6_addr
-describes the 16-byte IPv6 address. In addition to the function
+describes the 16-byte IPv6 address.
+In addition to the function
 .Xr inet_pton 3SOCKET ,
 the header file
 .In netinet/in.h
@@ -265,7 +279,8 @@ defines many macros for manipulating and testing IPv6 addresses.
 The member
 .Em sin6_flowinfo
 contains the traffic class and flow label associated with the IPv6
-header. The member
+header.
+The member
 .Em sin6_scope_id
 may contain an identifier which varies based on the scope of the address
 in
@@ -275,7 +290,8 @@ Applications do not need to initialize
 it will be populated by the operating system as a result of various library
 calls.
 .Lp
-Example 2 shows how to prepare an IPv6 socket. For more information on
+Example 2 shows how to prepare an IPv6 socket.
+For more information on
 IPv6, please see
 .Xr inet6 7P
 and
@@ -286,7 +302,8 @@ The
 structure specifies the address of a socket used to communicate between
 processes running on a single system, commonly known as a
 .Em UNIX domain socket .
-Sockets of this type are identified by a path in the file system. The
+Sockets of this type are identified by a path in the file system.
+The
 .Sy struct sockaddr_un
 has the following members:
 .Bd -literal -offset indent
@@ -302,15 +319,15 @@ The member
 .Em sun_path
 is populated with a
 .Sy NUL
-terminated array of characters that specify a file system path. The maximum
-length of any such path, including the
+terminated array of characters that specify a file system path.
+The maximum length of any such path, including the
 .Sy NUL
 terminator, is 108 bytes.
 .Ss struct sockaddr_dl
 The
 .Sy sockaddr_dl
-structure is used to describe a layer 2 link-level address. This is used
-as part of various socket ioctls, such as those for
+structure is used to describe a layer 2 link-level address.
+This is used as part of various socket ioctls, such as those for
 .Xr arp 7P .
 The structure has the following members:
 .Bd -literal -offset indent
@@ -334,17 +351,20 @@ the
 .Sy struct sockaddr_dl .
 This identifier is the same identifier that's shown by tools like
 .Xr ifconfig 1M
-and used in the SIOC* set of socket ioctls. The member
+and used in the SIOC* set of socket ioctls.
+The member
 .Em sdl_type
-refers to the media that is used for the socket. The most common case is
-that the medium for the interface is Ethernet which has the value
+refers to the media that is used for the socket.
+The most common case is that the medium for the interface is Ethernet which has
+the value
 .Sy IFT_ETHER .
 The full set of types is derived from RFC1573 and recorded in the file
 .In net/if_types.h .
 The member
 .Em sdl_slen
 describes the length of a selector, if it exists, for the specified
-medium. This is used in protocols such as Trill.
+medium.
+This is used in protocols such as Trill.
 .Lp
 The
 .Em sdl_data ,
@@ -352,7 +372,8 @@ The
 and
 .Em sdl_alen
 members together describe a character string containing the interface name and
-the link-layer network address. The name starts at the beginning of
+the link-layer network address.
+The name starts at the beginning of
 .Em sdl_data ,
 i.e. at
 .Em sdl_data[0] .
@@ -360,10 +381,12 @@ The name of the interface occupies the next
 .Em sdl_nlen
 bytes and is not
 .Sy NUL
-terminated. The link-layer network address begins immediately after the
-interface name, and is
+terminated.
+The link-layer network address begins immediately after the interface name,
+and is
 .Em sdl_alen
-bytes long. The macro
+bytes long.
+The macro
 .Sy LLADDR(struct sockaddr_dl *)
 returns the start of the link-layer network address.
 The interpretation of the link-layer address depends on the value of
@@ -377,8 +400,9 @@ The
 is used as part of a socket type which is responsible for packet
 capture:
 .Sy AF_PACKET
-sockets. It is generally designed for use with Ethernet networks. The members
-of the
+sockets.
+It is generally designed for use with Ethernet networks.
+The members of the
 .Sy struct sockaddr_ll
 are:
 .Bd -literal -offset indent
@@ -397,11 +421,11 @@ must be
 .Sy AF_PACKET .
 The member
 .Em sll_protocol
-refers to a link-layer protocol. For example, when capturing Ethernet frames
-the value of
+refers to a link-layer protocol.
+For example, when capturing Ethernet frames the value of
 .Em sll_protocol
-is the Ethertype. This member is written in network byte order and
-applications should use
+is the Ethertype.
+This member is written in network byte order and applications should use
 .Xr htons 3SOCKET
 and
 .Xr ntohs 3SOCKET
@@ -409,8 +433,8 @@ to read and write the member.
 .Lp
 The member
 .Em sll_ifindex
-is the interface's index. It is used as an identifier in various ioctls
-and included in the output of
+is the interface's index.
+It is used as an identifier in various ioctls and included in the output of
 .Xr ifconfig 1M .
 When calling
 .Xr bind 3SOCKET
@@ -454,10 +478,11 @@ to connect to a remote host
 .Lp
 The following example shows how one would open a socket and prepare it
 to connect to the remote host whose address is the IP address 127.0.0.1
-on port 80. This program should be compiled with the C compiler
+on port 80.
+This program should be compiled with the C compiler
 .Sy cc
-and linked against the libraries libsocket and libnsl. If this example
-was named ip4.c, then the full link line would be
+and linked against the libraries libsocket and libnsl.
+If this example was named ip4.c, then the full link line would be
 .Ic cc ip4.c -lsocket -lnsl .
 .Bd -literal
 #include <sys/types.h>
@@ -504,11 +529,11 @@ Preparing an IPv6
 to bind to a local address
 .Lp
 The following example shows how one would open a socket and prepare it
-to bind to the local IPv6 address ::1 port on port 12345. This program
-should be compiled with the C compiler
+to bind to the local IPv6 address ::1 port on port 12345.
+This program should be compiled with the C compiler
 .Sy cc
-and linked against the libraries libsocket and libnsl. If this example
-was named ip6.c, then the full compiler line would be
+and linked against the libraries libsocket and libnsl.
+If this example was named ip6.c, then the full compiler line would be
 .Ic cc ip6.c -lsocket -lnsl .
 .Bd -literal
 #include <sys/types.h>

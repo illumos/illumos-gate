@@ -45,11 +45,11 @@ function.
 The
 .Fn mc_start
 entry point for a driver indicates that it should initialize the chip
-to be ready to send or receive data. This entry point is guaranteed to
-be called before any entry points that are expected to be able to send
-and receive data. During this entry point, most devices will allocate
-DMA resources, enable the link, and finish performing any necessary
-device programming.
+to be ready to send or receive data.
+This entry point is guaranteed to be called before any entry points that are
+expected to be able to send and receive data.
+During this entry point, most devices will allocate DMA resources, enable the
+link, and finish performing any necessary device programming.
 .Pp
 The
 .Fn mc_stop
@@ -60,7 +60,8 @@ not expected to perform any additional I/O.
 The driver has access to its private data in the
 .Fa driver
 argument to either function, which it should cast to the
-appropriate structure. The system guarantees that only one of the
+appropriate structure.
+The system guarantees that only one of the
 .Fn mc_start
 and
 .Fn mc_stop
@@ -69,17 +70,19 @@ Similarly, these should not be called at the same time as a device's
 .Xr attach 9E
 or
 .Xr detach 9E
-routine. However, the driver may have other ongoing routines that it
-needs to protect against.  The device driver should always apply the
-appropriate locking techniques needed to ensure that access to the data
-in its soft state is protected.
+routine.
+However, the driver may have other ongoing routines that it needs to protect
+against.
+The device driver should always apply the appropriate locking techniques needed
+to ensure that access to the data in its soft state is protected.
 .Sh RETURN VALUES
 Upon successful completion, device drivers should return
 .Sy 0
 for the
 .Fn mc_start
-entry point. Otherwise, they should return a non-zero positive error
-number to indicate the error that occurred.
+entry point.
+Otherwise, they should return a non-zero positive error number to indicate the
+error that occurred.
 .Sh SEE ALSO
 .Xr mac 9E ,
 .Xr mac_register 9F ,

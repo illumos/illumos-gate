@@ -47,22 +47,24 @@ The
 and
 .Fn mc_close
 entry points are called when the file system node corresponding to the
-device is opened. Standard device drivers do not need to implement this
-function and should not define the callback.
+device is opened.
+Standard device drivers do not need to implement this function and should not
+define the callback.
 .Pp
 The GLDv3 guarantees that calls to the
 .Fn mc_open
 and
 .Fn mc_close
-entry points are serialized. Only one such call will be issued to the
-device driver at any time.
+entry points are serialized.
+Only one such call will be issued to the device driver at any time.
 .Sh RETURN VALUES
 Upon successful completion, the device driver should return
 .Sy 0
 for its
 .Fn mc_open
-entry point. Otherwise, it should return a non-zero error number to
-indicate an error occurred.
+entry point.
+Otherwise, it should return a non-zero error number to indicate an error
+occurred.
 .Sh SEE ALSO
 .Xr mac 9E ,
 .Xr mac_register 9F ,

@@ -32,16 +32,17 @@
 The
 .Nm
 driver provides support for the 3Com Etherlink XL
-family of Ethernet and Fast Ethernet PCI controllers. These are often known
-by their part numbers, most often 3c905 or 3c900 variants.
+family of Ethernet and Fast Ethernet PCI controllers.
+These are often known by their part numbers, most often 3c905 or 3c900 variants.
 .Lp
 The 3c905 devices generally support some form of 100 Mbps Ethernet,
-whereas the 3c900 devices usually only support 10 Mbps.  Some devices
-support legacy media such as 10BASE-15, 10BASE-2, and even 10BASE-FL.
+whereas the 3c900 devices usually only support 10 Mbps.
+Some devices support legacy media such as 10BASE-15, 10BASE-2, and even
+10BASE-FL.
 .
 Where applicable, the devices support auto-negotiation, both full and
-half duplex, etc.  They also support full size MTUs (1500 bytes),
-even when used with VLANs.
+half duplex, etc.
+They also support full size MTUs (1500 bytes), even when used with VLANs.
 .
 .Lp
 The device driver supports the

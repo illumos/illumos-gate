@@ -47,8 +47,8 @@ file to direct how it performs the mappings.
 .Pp
 The
 .Nm
-daemon has no external, customer-accessible interfaces. You can, however,
-administratively configure
+daemon has no external, customer-accessible interfaces.
+You can, however, administratively configure
 .Nm
 in one of the following ways:
 .Bl -bullet
@@ -107,12 +107,14 @@ property is set to
 .Sy false .
 .Pp
 .Nm
-caches a user's UID and GID. If a user subsequently changes a UID or GID, using
-one of the utilities listed below, the
+caches a user's UID and GID.
+If a user subsequently changes a UID or GID, using one of the utilities listed
+below, the
 .Nm
-cache becomes stale. At this point, any NFS operation that gets or set
-attributes will result in the exchange of this stale information. To resolve
-this situation, restart
+cache becomes stale.
+At this point, any NFS operation that gets or set attributes will result in the
+exchange of this stale information.
+To resolve this situation, restart
 .Nm ,
 as follows:
 .Bd -literal -offset indent

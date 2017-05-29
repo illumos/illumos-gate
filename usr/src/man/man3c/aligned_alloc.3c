@@ -40,7 +40,8 @@ Upon successful completion, the
 .Fn aligned_alloc
 function returns a pointer to suitably aligned memory at least
 .Fa size
-bytes large. Otherwise, a
+bytes large.
+Otherwise, a
 .Sy NULL
 pointer is returned and
 .Sy errno
@@ -61,7 +62,8 @@ bytes of memory; but the application could try again later.
 .It Er EINVAL
 An invalid value for
 .Fa alignment
-was passed in. It is not a power of two multiple of the word size.
+was passed in.
+It is not a power of two multiple of the word size.
 .El
 .Sh INTERFACE STABILITY
 .Sy STANDARD

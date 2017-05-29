@@ -15,8 +15,7 @@
 .Os
 .Sh NAME
 .Nm pam_timestamp
-.Nd PAM authentication module using cached successful
-authentication attempts
+.Nd PAM authentication module using cached successful authentication attempts
 .Sh SYNOPSIS
 .Nm pam_timestamp.so.1
 .Op Ar debug
@@ -50,7 +49,7 @@ and
 Proper authentication operation requires
 .Xr pam_unix_cred 5
 be stacked above
-.Xr pam_timestamp .
+.Nm .
 .Sh OPTIONS
 .Bl -tag -width Ds
 .It Dv debug
@@ -60,8 +59,8 @@ debugging information at the
 .Sy LOG_AUTH | LOG_DEBUG
 level.
 .It Dv timeout
-Specifies the period (in miniutes) for which the timestamp
-file is valid. The default value is 5 minutes.
+Specifies the period (in miniutes) for which the timestamp file is valid.
+The default value is 5 minutes.
 .El
 .Sh FILES
 .Bl -tag -width indent

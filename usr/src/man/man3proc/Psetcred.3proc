@@ -33,13 +33,14 @@ function updates the credentials of the process handle
 to the values set in
 .Fa credp .
 .Fa credp
-must be fully initialized. The definition of the
+must be fully initialized.
+The definition of the
 .Sy prcred_t
 structure may be found in
 .Xr proc 4 .
 .Pp
-Note, the credentials may only be updated for an active process. If the
-process handle refers to a zombie process, core file, or a file, then
+Note, the credentials may only be updated for an active process.
+If the process handle refers to a zombie process, core file, or a file, then
 .Fn Psetcred
 will fail.
 .Sh RETURN VALUES

@@ -67,8 +67,9 @@ The size of the arena to create.
 .It Fa quantum
 The arena's
 .Dq quantum .
-The granularity of the arena.  The amount allocated at minimum by each
-request.  Must be a power of 2.
+The granularity of the arena.
+The amount allocated at minimum by each request.
+Must be a power of 2.
 .It Fa afunc
 A function which is called to import new spans from
 .Fa source ,
@@ -85,7 +86,8 @@ a function taking three parameters and returning a pointer to
 (the imported space):
 .Bl -tag -width Ds
 .It Fa "vmem_t *"
-The source arena from which we'll import.  The
+The source arena from which we'll import.
+The
 .Fa source
 argument to
 .Fn vmem_create .
@@ -107,7 +109,8 @@ a function taking four parameters and returning a pointer to
 (the imported space):
 .Bl -tag -width Ds
 .It Fa "vmem_t *"
-The source arena from which we'll import.  The
+The source arena from which we'll import.
+The
 .Fa source
 argument to
 .Fn vmem_xcreate .
@@ -135,7 +138,8 @@ This is a
 a function taking three parameters and returning void:
 .Bl -tag -width Ds
 .It Fa "vmem_t"
-The arena to which space is being returned.  The
+The arena to which space is being returned.
+The
 .Fa source
 argument to
 .Fn vmem_create
@@ -172,7 +176,8 @@ A
 .Em vmem arena
 is a section of an arbitrary address space (a range of integer addresses).
 This commonly represents virtual memory, but can in fact be an arbitrary set
-of integers. The
+of integers.
+The
 .Dv VMC_IDENTIFIER
 flag set at arena creation time differentiates between these two cases.
 .Pp
@@ -201,7 +206,8 @@ Upon successful completion the
 .Fn vmem_create
 and
 .Fn vmem_xcreate
-functions return a pointer to a vmem arena.  Otherwise,
+functions return a pointer to a vmem arena.
+Otherwise,
 .Dv NULL
 is returned to indicate the arena could not be created.
 .Sh SEE ALSO

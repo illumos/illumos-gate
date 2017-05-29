@@ -54,7 +54,8 @@ Upon successful completion, the
 .Fn Psetpriv
 function returns
 .Sy 0
-and updates the privilege sets of the process. Otherwise,
+and updates the privilege sets of the process.
+Otherwise,
 .Sy -1
 is returned and
 .Sy errno

@@ -34,13 +34,14 @@ holding a robust lock exits, such as by calling
 .Xr exit 2
 or
 .Xr thr_exit 3C ,
-or crashes without unlocking the lock. At that point, if another process
-or thread is currently in a call, or calls
+or crashes without unlocking the lock.
+At that point, if another process or thread is currently in a call, or calls
 .Xr pthread_mutex_lock 3C ,
 it will obtain the lock; however, the error code
 .Er EOWNERDEAD
-will be returned. In such cases, that thread will own the lock and must
-check and clean up any inconsistent state that is protected by the lock.
+will be returned.
+In such cases, that thread will own the lock and must check and clean up any
+inconsistent state that is protected by the lock.
 When finished, it must call
 .Fn pthread_mutex_consistent
 to indicate that it is in a consistent state again.
@@ -55,13 +56,14 @@ Upon successful completion, the
 .Fn pthread_mutex_consistent
 returns zero and marks
 .Va mutex
-as consistent. Callers of
+as consistent.
+Callers of
 .Fn pthread_mutex_lock
 will not have
 .Er EOWNERDEAD
-returned until another process or thread exits without unlocking. Upon
-failure, an error will be returned which corresponds to one of the
-errors listed below.
+returned until another process or thread exits without unlocking.
+Upon failure, an error will be returned which corresponds to one of the errors
+listed below.
 .Sh ERRORS
 The
 .Fn pthread_mutex_consistent

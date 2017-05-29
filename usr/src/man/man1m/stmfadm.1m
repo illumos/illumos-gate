@@ -121,7 +121,8 @@ The
 .Nm
 command configures logical units within the SCSI Target Mode Framework
 .Pq STMF
-framework. The framework and this man page use the following terminology:
+framework.
+The framework and this man page use the following terminology:
 .Bl -tag -width Ds
 .It Sy initiator
 A device responsible for issuing SCSI I/O commands to a SCSI target and logical
@@ -147,15 +148,16 @@ The set of logical units that a particular SCSI initiator can see is determined
 by the combined set of views.
 .Pp
 Each logical unit has a set of view entries, and each view entry specifies a
-target group, host group, and a LUN. An initiator from that host group, when
-connecting through that target group, is able to identify and connect to that
-logical unit using the specified LUN. You can use views to restrict the set of
-logical units that a specific initiator can see, and assign the set of LUNs
-that will be used.
+target group, host group, and a LUN.
+An initiator from that host group, when connecting through that target group, is
+able to identify and connect to that logical unit using the specified LUN.
+You can use views to restrict the set of logical units that a specific initiator
+can see, and assign the set of LUNs that will be used.
 .It Sy view
 A view defines the association of a host group, a target group, and a logical
-unit number with a specified logical unit. Any view entry added to a logical
-unit must not be in conflict with existing view entries for that logical unit.
+unit number with a specified logical unit.
+Any view entry added to a logical unit must not be in conflict with existing
+view entries for that logical unit.
 A view entry is considered to be in conflict when an attempt is made to
 duplicate the association of any given host, target and logical unit number.
 .El
@@ -165,31 +167,41 @@ The following logical unit properties can be set only when creating LU using
 subcommand:
 .Bl -tag -width Ds
 .It Sy blk Ns = Ns Ar num
-Specifies the block size for the device. The default is 512.
+Specifies the block size for the device.
+The default is 512.
 .It Sy guid Ns = Ns Ar string
 32 hexadecimal ASCII characters representing a valid NAA Registered Extended
-Identifier. The default is set by the STMF to a generated value.
+Identifier.
+The default is set by the STMF to a generated value.
 .It Sy meta Ns = Ns Ar path
-Metadata file name. When specified, will be used to hold the SCSI metadata for
-the logical unit. There is no default.
+Metadata file name.
+When specified, will be used to hold the SCSI metadata for the logical unit.
+There is no default.
 .It Sy oui Ns = Ns Ar string
-Organizational Unique Identifier. Six hexadecimal ASCII characters representing
-the IEEE OUI company ID assignment. This will be used to generate the device
-identifier
+Organizational Unique Identifier.
+Six hexadecimal ASCII characters representing the IEEE OUI company ID
+assignment.
+This will be used to generate the device identifier
 .Pq GUID .
 The default is
 .Sy 00144F .
 .It Sy pid Ns = Ns Ar string
-16 bytes ASCII string defining Product ID per SCSI SPC-3. This value will be
-reflected in the Standard INQUIRY data returned for the device. The default is
+16 bytes ASCII string defining Product ID per SCSI SPC-3.
+This value will be reflected in the Standard INQUIRY data returned for the
+device.
+The default is
 .Sy COMSTAR .
 .It Sy serial Ns = Ns Ar string
-Serial Number. Specifies the SCSI Vital Product Data Serial Number
+Serial Number.
+Specifies the SCSI Vital Product Data Serial Number
 .Pq page 80h .
-It is a character value up to 252 bytes in length. There is no default value.
+It is a character value up to 252 bytes in length.
+There is no default value.
 .It Sy vid Ns = Ns Ar string
-8 bytes ASCII string defining Vendor ID per SCSI SPC-3. This value will be
-reflected in the Standard INQUIRY data returned for the device. The default is
+8 bytes ASCII string defining Vendor ID per SCSI SPC-3.
+This value will be reflected in the Standard INQUIRY data returned for the
+device.
+The default is
 .Sy SUN .
 .El
 .Pp
@@ -200,22 +212,24 @@ subcommand or modified using
 subcommand:
 .Bl -tag -width Ds
 .It Sy alias Ns = Ns Ar string
-Up to 255 characters, representing a user-defined name for the device. The
-default is the name of the backing store.
+Up to 255 characters, representing a user-defined name for the device.
+The default is the name of the backing store.
 .It Sy mgmt-url Ns = Ns Ar string
-Up to 1024 characters representing a Management Network Address URL. More than
-one URL can be passed as a single parameter by using space-delimited URLs
-enclosed inside a single pair of quotation marks
+Up to 1024 characters representing a Management Network Address URL.
+More than one URL can be passed as a single parameter by using space-delimited
+URLs enclosed inside a single pair of quotation marks
 .Pq Sy \(dq .
 .It Sy wcd Ns = Ns Sy true Ns | Ns Sy false
-Write-back cache disable. Determines write-back cache disable behavior. The
-default is the write-back cache setting of the backing store device specified by
-the
+Write-back cache disable.
+Determines write-back cache disable behavior.
+The default is the write-back cache setting of the backing store device
+specified by the
 .Ar lu-file
 argument.
 .It Sy wp Ns = Ns Sy true Ns | Ns Sy false
-Write-protect bit. Determines whether the device reports as write-protected. The
-default is
+Write-protect bit.
+Determines whether the device reports as write-protected.
+The default is
 .Sy false .
 .El
 .Ss Subcommands
@@ -271,14 +285,16 @@ where
 .Ar lu-name
 is the STMF name for the logical unit as displayed by the
 .Cm list-lu
-subcommand. The
+subcommand.
+The
 .Cm add-view
 subcommand provides the user with a mechanism to implement access control for a
 logical unit and also provides a means of assigning a logical unit number to a
-logical unit for a given set of initiators and targets. A logical unit will not
-be available to any initiators until at least one view is applied. Each view
-entry gets assigned an entry name, which can be used to reference the entry in
-the
+logical unit for a given set of initiators and targets.
+A logical unit will not be available to any initiators until at least one view
+is applied.
+Each view entry gets assigned an entry name, which can be used to reference the
+entry in the
 .Cm list-view
 and
 .Cm remove-view
@@ -288,19 +304,22 @@ subcommands.
 .Ar host-group
 is the name of an host group previously created using
 .Cm create-hg
-subcommand. If this option is not specified, the logical unit will be available
-to all initiators that log in to the STMF framework.
+subcommand.
+If this option is not specified, the logical unit will be available to all
+initiators that log in to the STMF framework.
 .It Fl n Ns , Ns Fl -lun Ar lu-number
 .Ar lu-number
 is an integer in the range 0-16383 to be assigned to the logical unit for this
-view entry. If this option is not specified, a logical unit number will be
-assigned by the STMF framework.
+view entry.
+If this option is not specified, a logical unit number will be assigned by the
+STMF framework.
 .It Fl t Ns , Ns Fl -target-group Ar target-group
 .Ar target-group
 is the name of a target group previously created using
 .Cm create-tg
-subcommand. If this option is not specified, the logical unit will be available
-through all targets.
+subcommand.
+If this option is not specified, the logical unit will be available through all
+targets.
 .El
 .It Xo
 .Nm
@@ -310,8 +329,8 @@ through all targets.
 Create a host group with the name
 .Ar group-name .
 .Ar group-name
-is a string of Unicode characters with a maximum length of 255. The group name
-must be unique within the STMF system.
+is a string of Unicode characters with a maximum length of 255.
+The group name must be unique within the STMF system.
 .It Xo
 .Nm
 .Cm create-lu
@@ -321,29 +340,34 @@ must be unique within the STMF system.
 .Xc
 Create a logical unit that can be registered with STMF.
 .Ar lu-file
-is the file to be used as the backing store for the logical unit. If the
+is the file to be used as the backing store for the logical unit.
+If the
 .Fl s
 option is not specified, the size of the specified
 .Ar lu-file
 will be used as the size of the logical unit.
 .Pp
 Logical units registered with the STMF require space for the metadata to be
-stored. When a
+stored.
+When a
 .Sy zvol
 is specified as the backing store device, the default will be to use a special
 property of the
 .Sy zvol
-to contain the metadata. For all other devices, the default behavior will be to
-use the first 64k of the device. An alternative approach would be to use the
+to contain the metadata.
+For all other devices, the default behavior will be to use the first 64k of the
+device.
+An alternative approach would be to use the
 .Sy meta
 property in a
 .Cm create-lu
-subcommand to specify an alternate file to contain the metadata. It is advisable
-to use a file that can provide sufficient storage of the logical unit metadata,
-preferably 64k.
+subcommand to specify an alternate file to contain the metadata.
+It is advisable to use a file that can provide sufficient storage of the logical
+unit metadata, preferably 64k.
 .Bl -tag -width Ds
 .It Fl p Ns , Ns Fl -lu-prop Ar property Ns = Ns Ar value
-Set specified logical unit property. Check
+Set specified logical unit property.
+Check
 .Sx Logical Unit Properties
 for the list of available properties.
 .It Fl s Ns , Ns Fl -size Ar size
@@ -362,8 +386,8 @@ respectively.
 Create a target group with the name
 .Ar group-name .
 .Ar group-name
-is a string of Unicode characters with a maximum length of 255. The group name
-must be unique within the STMF system.
+is a string of Unicode characters with a maximum length of 255.
+The group name must be unique within the STMF system.
 .It Xo
 .Nm
 .Cm delete-hg
@@ -379,7 +403,8 @@ Delete the host group identified by
 .Xc
 Delete an existing logical unit that was created using
 .Cm create-lu
-subcommand. This effectively unloads the logical unit from the STMF framework.
+subcommand.
+This effectively unloads the logical unit from the STMF framework.
 Any existing data on the logical unit remains intact.
 .Bl -tag -width Ds
 .It Fl k Ns , Ns Fl -keep-views
@@ -401,12 +426,13 @@ Import and load a logical unit into the STMF that was previously created using
 .Cm create-lu
 subcommand and was then deleted from the STMF using
 .Cm delete-lu
-subcommand. On success, the logical unit is again made available to the STMF.
+subcommand.
+On success, the logical unit is again made available to the STMF.
 .Ar lu-file
 is the filename used in the
 .Cm create-lu
-subcommand. If this logical unit is using a separate metadata file, the filename
-in the
+subcommand.
+If this logical unit is using a separate metadata file, the filename in the
 .Sy meta
 property value that was used in the
 .Cm create-lu
@@ -501,7 +527,8 @@ Specify logical unit.
 .Xc
 Modify attributes of a logical unit created using the
 .Cm create-lu
-subcommand. If
+subcommand.
+If
 .Fl f
 is not specified,
 .Ar lu-arg
@@ -511,10 +538,12 @@ is interpreted as
 .It Fl f Ns , Ns Fl -file
 If specified,
 .Ar lu-arg
-is interpreted as file name. This provides the ability to modify a logical unit
-that is not currently imported into the STMF.
+is interpreted as file name.
+This provides the ability to modify a logical unit that is not currently
+imported into the STMF.
 .It Fl p Ns , Ns Fl -lu-prop Ar property
-Modify specified logical unit property. See
+Modify specified logical unit property.
+See
 .Sx Logical Unit Properties
 for the list of available properties.
 .It Fl s Ns , Ns Fl -size Ar size

@@ -39,8 +39,9 @@ The
 type is defined in
 .Xr proc 4 .
 It contains information about the current effective, saved, and real
-user and group IDs. It also allows for supplemental groups to be
-obtained. The
+user and group IDs.
+It also allows for supplemental groups to be obtained.
+The
 .Fn Pcred
 function will read a number of supplemental groups based on the value of
 .Fa ngroups .
@@ -54,7 +55,7 @@ groups that are desired.
 .Pp
 Not all process handles have credential information available to them.
 For example, the handles that come from
-.Xr Pgrab_file
+.Xr Pgrab_file 3PROC
 have no processes associated with them and thus have no credentials
 associated with them.
 .Sh RETURN VALUES
@@ -64,7 +65,8 @@ function returns
 .Sy 0
 and updates the memory at
 .Fa pcrp
-with the credentials. Otherwise,
+with the credentials.
+Otherwise,
 .Sy -1
 is returned to indicate an error.
 .Sh INTERFACE STABILITY

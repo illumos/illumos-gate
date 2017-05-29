@@ -20,17 +20,17 @@
 The
 .Nm
 driver supports generic block-oriented devices, such as non-volatile
-memory storage devices. It provides a hardware independent layer
-for such storage devices, allowing them to concentrate on the
-hardware-specific details, while
+memory storage devices.
+It provides a hardware independent layer for such storage devices, allowing them
+to concentrate on the hardware-specific details, while
 .Nm
 takes care of all the other details, such as
 .Xr dkio 7I .
 .Lp
 The
 .Nm
-driver only supports block-oriented, random-access devices.  It does
-not support traditional rotational media and does not support
+driver only supports block-oriented, random-access devices.
+It does not support traditional rotational media and does not support
 SCSI commands.
 .Lp
 The most typical use case for
@@ -65,7 +65,8 @@ logical unit number as well.
 .It Va sn
 This is the
 .Em slice
-number, representing a subset of the disk.  See
+number, representing a subset of the disk.
+See
 .Xr dkio 7I .
 .El
 .

@@ -26,10 +26,10 @@
 .Sh DESCRIPTION
 The
 .Fn smt_pause
-function performs a busy-wait for an implementation defined period of
-time. On hardware platforms that support it, it notifies the hardware
-that this is occurring in an effort to minimize resource usage. This is
-commonly used in the implementation of spin loops.
+function performs a busy-wait for an implementation defined period of time.
+On hardware platforms that support it, it notifies the hardware that this is
+occurring in an effort to minimize resource usage.
+This is commonly used in the implementation of spin loops.
 .Sh INTERFACE STABILITY
 .Sy Committed
 .Sh MT-LEVEL

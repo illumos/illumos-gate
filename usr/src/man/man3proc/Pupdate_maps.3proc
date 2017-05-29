@@ -32,16 +32,17 @@ process
 .Fa P
 are still valid and update the cached data with any new information.
 This is generally called in response to activity by the run-time
-link-editor. In general, the
+link-editor.
+In general, the
 .Sy libproc
 library takes care of managing the need to call this function; however,
 debuggers, introspection tools, and others that are interposing on rtld
 activity or other actions, may need to call this function.
 Note that the
 .Fn Pupdate_maps
-function is only meaningful for active processes. It will do nothing on
-process handles that refer to core files, zombie processes, and ELF
-objects.
+function is only meaningful for active processes.
+It will do nothing on process handles that refer to core files, zombie
+processes, and ELF objects.
 .Sh INTERFACE STABILITY
 .Sy Uncommitted
 .Sh MT-LEVEL

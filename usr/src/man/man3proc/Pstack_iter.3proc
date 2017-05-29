@@ -39,20 +39,23 @@ For each valid stack frame encountered, the callback function
 .Fa func
 is invoked with
 .Fa data
-passed as argument. The full signature of
+passed as argument.
+The full signature of
 .Ft proc_stack_f
 is defined in
 .Xr libproc 3LIB .
 With each callback, a register set, argument set, and argument count
-will be provided. In that register set, only a subset of the registers
-will be valid, which include the frame pointer, program counter, and on
-SPARC systems, the next program counter. These registers can be accessed
-with the constants
+will be provided.
+In that register set, only a subset of the registers will be valid, which
+include the frame pointer, program counter, and on SPARC systems, the next
+program counter.
+These registers can be accessed with the constants
 .Sy R_FP ,
 .Sy R_PC ,
 and
 .Sy R_nPC
-respectively. These correspond to the registers
+respectively.
+These correspond to the registers
 .Em %ebp
 and
 .Em %eip
@@ -70,36 +73,40 @@ on both SPARC and SPARCv9.
 Callers will receive a callback for the first stack frame indicated by
 .Fa regs
 and then will receive a subsequent callback for each caller of that
-frame until no such frame can be found. Stack frames that logically come
-after the frame indicated by
+frame until no such frame can be found.
+Stack frames that logically come after the frame indicated by
 .Fa regs
 will not receive callbacks.
 .Pp
-The compiler can either facilitate or stymie the iteration of the
-stack. Programs that have been compiled in such a way as to omit the
-frame pointer will result in truncated stacks. Similarly, if the initial
-set of registers passed in via
+The compiler can either facilitate or stymie the iteration of the stack.
+Programs that have been compiled in such a way as to omit the frame pointer will
+result in truncated stacks.
+Similarly, if the initial set of registers passed in via
 .Fa regs
 is invalid, then the ability to iterate the stack will be limited.
 The return value of
 .Fa func
-controls whether or not iteration continues. If
+controls whether or not iteration continues.
+If
 .Fa func
 returns
 .Sy 0
-then iteration continues. However, if
+then iteration continues.
+However, if
 .Fa func
 returns non-zero, then iteration will halt and that value will be used
 as the return value of the
 .Fn Pstack_iter
-function. Because
+function.
+Because
 .Fn Pstack_iter
 returns
 .Sy -1
 on internal failure it is recommended the callback function not return
 .Sy -1
-to indicate an error. Thus the caller may distinguish between the
-failure of the callback function and the failure of the
+to indicate an error.
+Thus the caller may distinguish between the failure of the callback function and
+the failure of the
 .Fn Pstack_iter
 function.
 .Sh RETURN VALUES
@@ -109,7 +116,8 @@ function returns
 .Sy 0.
 If there was an internal error then
 .Sy -1
-is returned. Otherwise, if the callback function
+is returned.
+Otherwise, if the callback function
 .Fa func
 returns non-zero, then its return value will be returned instead.
 .Sh INTERFACE STABILITY

@@ -38,14 +38,14 @@ structure to the
 .Xr mac_register 9F
 function.
 .It Fa capab
-A value which indicates the capability being asked about. For a full
-list of capabilities, see the
+A value which indicates the capability being asked about.
+For a full list of capabilities, see the
 .Sx CAPABILITIES
 section of
 .Xr mac 9E .
 .It Fa cap_data
-Capability specific data that may need to be filled in. The type of data
-used is listed in the
+Capability specific data that may need to be filled in.
+The type of data used is listed in the
 .Sx CAPABILITIES
 section of
 .Xr mac 9E .
@@ -54,32 +54,33 @@ section of
 The
 .Fn mc_getcapab
 entry point is called to determine whether or not a device supports a
-specific capability. The capability in question is specified in
+specific capability.
+The capability in question is specified in
 .Fa capab
 and the list of possible capabilities is listed in the
 .Sx CAPABILITIES
 section of
 .Xr mac 9E .
 .Pp
-Capabilities are generally only queried once for a given device. An
-instance of a device cannot change whether or not it supports a given
+Capabilities are generally only queried once for a given device.
+An instance of a device cannot change whether or not it supports a given
 capability after it has been queried by the system.
 .Pp
 Each capability has its own specific kind of data that a device driver
-needs to fill in as part of declaring that it supports a given
-capability. That data is present in
+needs to fill in as part of declaring that it supports a given capability.
+That data is present in
 .Fa cap_data .
 The device driver should cast
 .Fa cap_data
-to the appropriate structure and fill it in. The structures to use for a
-given capability are all listed in the
+to the appropriate structure and fill it in.
+The structures to use for a given capability are all listed in the
 .Sx CAPABILITIES
 section of
 .Xr mac 9E .
 .Pp
 The return value is used to indicate whether or not a device driver
-supports the given capability. If it does, then the device driver should
-return
+supports the given capability.
+If it does, then the device driver should return
 .Sy B_TRUE
 after filling in
 .Fa cap_data .
@@ -90,25 +91,26 @@ Many device drivers employ
 .Sy switch
 statements and return
 .Sy B_FALSE
-from their default case statement. The system will present unknown
-capabilities to device drivers and they must properly return
+from their default case statement.
+The system will present unknown capabilities to device drivers and they must
+properly return
 .Sy B_FALSE .
 .Pp
 The driver has access to its soft state by casting the
 .Fa driver
-argument to the specific structure. The device driver is responsible for
-any necessary locking.
+argument to the specific structure.
+The device driver is responsible for any necessary locking.
 .Pp
-Many capabilities are related to features of hardware. However, all
-hardware and firmware has the possibility of having bugs. It is
-recommended that any capability that is supported have some form of
+Many capabilities are related to features of hardware.
+However, all hardware and firmware has the possibility of having bugs.
+It is recommended that any capability that is supported have some form of
 tunable, whether in the form of a
 .Sy MAC_PROP_PRIVATE
 driver-specific property and/or a
 .Xr driver.conf 5
-property to disable it. This way when problems are discovered in the
-field, they can be worked around without requiring initial changes to
-the device driver.
+property to disable it.
+This way when problems are discovered in the field, they can be worked around
+without requiring initial changes to the device driver.
 .Sh CONTEXT
 This function is generally only called from
 .Sy kernel

@@ -44,7 +44,8 @@ wide variety of tools and libraries including
 .Xr mdb 1 ,
 .Xr pargs 1 ,
 .Xr pstack 1 ,
-and more. For details on the core file format, see
+and more.
+For details on the core file format, see
 .Xr core 4 .
 .Pp
 .Fn Pfgcore
@@ -57,8 +58,8 @@ writes the core to the file path
 .Pp
 The content of the core is controlled by the
 .Fa content
-argument. It's the inclusive-bitwise-OR of the various content types
-listed under the
+argument.
+It's the inclusive-bitwise-OR of the various content types listed under the
 .Sy core_content_t
 heading in the
 .Sy TYPES
@@ -75,7 +76,8 @@ or
 functions stop the handle
 .Fa P .
 It is up to the caller to stop the process; which is recommended for
-obtaining a consistent view of the process. See the
+obtaining a consistent view of the process.
+See the
 .Xr Pstop 3PROC
 function for a means to stop a handle.
 .Sh RETURN VALUES
@@ -85,9 +87,11 @@ and
 .Fn Pgcore
 functions return
 .Sy 0
-and write out a core file to specified location. Otherwise,
+and write out a core file to specified location.
+Otherwise,
 .Sy -1
-is returned. The
+is returned.
+The
 .Fn Pfgcore
 function will truncate
 .Fa fd

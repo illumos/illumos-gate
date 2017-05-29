@@ -23,11 +23,15 @@ function causes the
 signal to be generated for
 the calling process after the number of real-time microseconds specified by the
 .Fa useconds
-argument has elapsed.  When the
+argument has elapsed.
+When the
 .Fa interval
 argument is
 non-zero, repeated timeout notification occurs with a period in microseconds
-specified by the \fIinterval\fR argument. If the notification signal,
+specified by the
+.Fa interval
+argument.
+If the notification signal,
 .Dv SIGALRM ,
 is not caught or ignored, the calling process is terminated.
 .Lp
@@ -47,7 +51,8 @@ The
 function returns the number of microseconds remaining from
 the previous
 .Fn ualarm
-call.  If no timeouts are pending or if
+call.
+If no timeouts are pending or if
 .Fn ualarm
 has not previously been called,
 .Fn ualarm
@@ -61,7 +66,8 @@ function is a simplified interface to
 .Xr setitimer 2 ,
 and uses the
 .Dv ITIMER_REAL
-interval timer. It's use has been deprecated in favor of the
+interval timer.
+It's use has been deprecated in favor of the
 .Xr timer_create 3C
 family of functions.
 .Sh INTERFACE STABILITY
@@ -79,7 +85,8 @@ family of functions.
 .Sh STANDARDS
 The
 .Fn ualarm
-function is available in the following compilation environments.  See
+function is available in the following compilation environments.
+See
 .Xr standards 5 .
 .Lp
 .Bl -bullet -compact

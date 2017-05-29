@@ -35,8 +35,8 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa dip
@@ -59,7 +59,8 @@ The
 and
 .Fn usba_hubdi_unbind_root_hub
 functions are used to bind and unbind the root USB hub that is a part of
-every HCD driver. See
+every HCD driver.
+See
 .Xr usba_hcdi 9E
 for more information on this relationship.
 .Pp
@@ -76,19 +77,19 @@ responsible for making it appear to the system as a normal USB hub.
 .Pp
 The contents of the
 .Fa hub_descr
-should be the standard USB Hub class-specific descriptor. This hub
-descriptor should match a hub of a similar class of speed. For example,
-with the xhci controller, a USB 3.x Hub class-specific descriptor is
-used, where as for the ehci controller, a USB 2.x Hub class-specific
-descriptor is used. For more information, see the USB 3.1
-specification, section 10.15.2
+should be the standard USB Hub class-specific descriptor.
+This hub descriptor should match a hub of a similar class of speed.
+For example, with the xhci controller, a USB 3.x Hub class-specific descriptor
+is used, where as for the ehci controller, a USB 2.x Hub class-specific
+descriptor is used.
+For more information, see the USB 3.1 specification, section 10.15.2
 .Em Class-specific Descriptors .
 .Pp
 Similarly, the contents of the
 .Fa dev_descr
 need to be a filled in USB device descriptor that indicates that the
-root hub corresponds to the appropriate USB generation. For more
-information on the contents, see
+root hub corresponds to the appropriate USB generation.
+For more information on the contents, see
 .Xr usb_dev_descr 9S
 and the USB 3.1 specification, section 10.15.1
 .Em Standard Descriptors for Hub Class .
@@ -99,7 +100,7 @@ function is used to detach the root hub associated with the HCD driver.
 This should be called during a device's
 .Xr detach 9E
 routine before calling
-.Xr usba_hcdi_unregister .
+.Xr usba_hcdi_unregister 9F .
 .Pp
 If a call to the
 .Fn usba_hubdi_unbind_root_hub

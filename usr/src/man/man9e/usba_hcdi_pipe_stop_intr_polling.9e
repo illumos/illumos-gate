@@ -34,23 +34,24 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ph
 A pointer to a USB pipe handle as defined in
 .Xr usba_pipe_handle_data 9S .
 .It Fa usb_flags
-Flags which describe how allocations should be performed. Valid flags
-are:
+Flags which describe how allocations should be performed.
+Valid flags are:
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -77,15 +78,16 @@ there are outstanding transfers.
 For interrupt transfers,
 .Fa ph ,
 may refer to the root hub and so the driver may need to cease any
-synthetic polling it is performing. Isochronous transfers are forbidden
-on the root hub, so the
+synthetic polling it is performing.
+Isochronous transfers are forbidden on the root hub, so the
 .Fn usba_hcdi_pipe_stop_isoc_polling
 will only be called on a pipe that corresponds to an actual device.
 .Pp
 These functions are
 .Em synchronous
-requests. In all cases, the driver should take the following steps
-before returning from these entry points:
+requests.
+In all cases, the driver should take the following steps before returning from
+these entry points:
 .Bl -enum
 .It
 Quiesce and stop the endpoint.
@@ -97,8 +99,8 @@ Call
 on the original interrupt or isochronous request with the code
 .Sy USB_CR_STOPPED_POLLING .
 .It
-Optionally, free all associated resources. If resources aren't freed
-at this time, they must be freed when
+Optionally, free all associated resources.
+If resources aren't freed at this time, they must be freed when
 .Xr usba_hcdi_pipe_close 9E
 is called.
 .It
@@ -109,8 +111,9 @@ transfers on this endpoint again may be enabled.
 It is possible that this function may be called concurrently with a call
 to the
 .Xr usba_hcdi_pipe_reset 9E
-entry point. In such cases, the host controller driver is required to
-perform synchronization on its data structures.
+entry point.
+In such cases, the host controller driver is required to perform synchronization
+on its data structures.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn usba_hcdi_pipe_stop_intr_polling
@@ -118,7 +121,8 @@ and
 .Fn uba_hcdi_pipe_stop_isoc_polling
 functions should return
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi_pipe_close 9E ,

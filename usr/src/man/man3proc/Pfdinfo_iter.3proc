@@ -47,16 +47,19 @@ see
 .Pp
 The return value of
 .Fa func
-controls whether or not iteration continues. If
+controls whether or not iteration continues.
+If
 .Fa func
 returns
 .Sy 0 ,
-then iteration will continue. However, if
+then iteration will continue.
+However, if
 .Fa func
 instead returns a non-zero value, then iteration will halt and that
 value will be used as the return value of the
 .Fn Pfdinfo_iter
-function. Because the
+function.
+Because the
 .Fn Pfdinfo_iter
 function returns
 .Sy -1
@@ -74,7 +77,8 @@ returns
 .Sy 0 .
 Otherwise, if there was an internal error then
 .Sy -1
-is returned. Otherwise, if the callback function
+is returned.
+Otherwise, if the callback function
 .Fa func
 returns non-zero, then its return value will be returned instead.
 .Sh INTERFACE STABILITY

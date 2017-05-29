@@ -30,14 +30,15 @@
 The
 .Fn signalfd
 function returns a file descriptor that can be used
-for synchronous consumption of signals. The file descriptor can be operated
-upon via
+for synchronous consumption of signals.
+The file descriptor can be operated upon via
 .Xr read 2
 and the facilities that notify of file descriptor activity (e.g.
 .Xr poll 2 ,
 .Xr port_get 3C ,
 .Xr epoll_wait 3C
-). To dispose of the instance
+).
+To dispose of the instance
 .Xr close 2
 should be called on the file descriptor.
 .Pp
@@ -72,7 +73,8 @@ see description for
 in
 .Xr open 2 .
 .It Sy SFD_NONBLOCK
-Instance will be set to be non-blocking. A
+Instance will be set to be non-blocking.
+A
 .Xr read 2
 on a signalfd instance that has been initialized with
 .Fa SFD_NONBLOCK ,
@@ -85,10 +87,10 @@ that are pending.
 .Pp
 As with
 .Xr sigwait 2 ,
-reading a signal from the file descriptor will consume the signal. The signals
-used with signalfd file descriptors are normally first blocked so that their
-handler does not run when a signal arrives. If the signal is not blocked the
-behavior matches that of
+reading a signal from the file descriptor will consume the signal.
+The signals used with signalfd file descriptors are normally first blocked so
+that their handler does not run when a signal arrives.
+If the signal is not blocked the behavior matches that of
 .Xr sigwait 2 ;
 if a
 .Xr read 2
@@ -154,19 +156,21 @@ typedef struct signalfd_siginfo {
 File descriptor duplication during fork presents a challenge to the
 .Sy signalfd
 facility since signal data and events are dependent on the process from which
-they are queried.  Its use with caching event systems such as
+they are queried.
+Its use with caching event systems such as
 .Xr epoll 5 ,
-.Sy /dev/poll ,
+.Pa /dev/poll ,
 or
 .Xr port_create 3C
 can result in undefined behavior if signalfd and polling descriptors are used
-together after being shared across a fork.  Such restrictions do not apply if
-the child only calls
+together after being shared across a fork.
+Such restrictions do not apply if the child only calls
 .Xr close 2
 on the descriptors.
 .Sh RETURN VALUES
 Upon successful completion, a file descriptor associated with the instance
-is returned. Otherwise, -1 is returned and errno is set to indicate the error.
+is returned.
+Otherwise, -1 is returned and errno is set to indicate the error.
 When
 .Va fd
 is not -1 and there is no error, the value of

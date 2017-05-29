@@ -24,10 +24,10 @@
 The
 .Nm
 library provides a generic implementation of AVL trees, a form of
-self-balancing binary tree. The interfaces provided allow for an
-efficient way of implementing an ordered set of data structures and, due
-to its embeddable nature, allow for a single instance of a data
-structure to belong to multiple AVL trees.
+self-balancing binary tree.
+The interfaces provided allow for an efficient way of implementing an ordered
+set of data structures and, due to its embeddable nature, allow for a single
+instance of a data structure to belong to multiple AVL trees.
 .Lp
 Each AVL tree contains entries of a single type of data structure.
 Rather than allocating memory for pointers for those data structures,
@@ -38,17 +38,18 @@ When an AVL tree is created, through the use of
 .Fn avl_create ,
 it encodes the size of the data structure, the offset of the data
 structure, and a comparator function which is used to compare two
-instances of a data structure. A data structure may be a member of
-multiple AVL trees by creating AVL trees which use different
-offsets (different members) into the data structure.
+instances of a data structure.
+A data structure may be a member of multiple AVL trees by creating AVL trees
+which use different offsets (different members) into the data structure.
 .Lp
 AVL trees support both look up of an arbitrary item and ordered
-iteration over the contents of the entire tree. In addition, from any
-node, you can find the previous and next entries in the tree, if they
-exist. In addition, AVL trees support arbitrary insertion and deletion.
+iteration over the contents of the entire tree.
+In addition, from any node, you can find the previous and next entries in the
+tree, if they exist.
+In addition, AVL trees support arbitrary insertion and deletion.
 .Ss Performance
-AVL trees are often used in place of linked lists. Compared to the
-standard, intrusive, doubly linked list, it has the following
+AVL trees are often used in place of linked lists.
+Compared to the standard, intrusive, doubly linked list, it has the following
 performance characteristics:
 .Bl -hang -width Ds
 .It Sy Lookup One Node
@@ -66,10 +67,10 @@ Inserting a single node into an AVL tree is
 .Sy O(log(n)) .
 .Pp
 Note, insertions into an AVL tree always result in an ordered tree.
-Insertions into a linked list do not guarantee order. If order is
-required, then the time to do the insertion into a linked list will
-depend on the time of the search algorithm being employed to find the
-place to insert at.
+Insertions into a linked list do not guarantee order.
+If order is required, then the time to do the insertion into a linked list will
+depend on the time of the search algorithm being employed to find the place to
+insert at.
 .Ed
 .It Sy Delete One Node
 .Bd -filled -compact
@@ -114,10 +115,11 @@ present.
 .Sh INTERFACES
 The shared object
 .Sy libavl.so.1
-provides the public interfaces defined below. See
-.Xr Intro(3)
-for additional information on shared object interfaces. Individual
-functions are documented in their own manual pages.
+provides the public interfaces defined below.
+See
+.Xr Intro 3
+for additional information on shared object interfaces.
+Individual functions are documented in their own manual pages.
 .Bl -column -offset indent ".Sy avl_is_empty" ".Sy avl_destroy_nodes"
 .It Sy avl_add Ta Sy avl_create
 .It Sy avl_destroy Ta Sy avl_destroy_nodes
@@ -144,29 +146,34 @@ library defines the following types:
 .Lp
 .Sy avl_tree_t
 .Lp
-Type used for the root of the AVL tree. Consumers define one of these
-for each of the different trees that they want to have.
+Type used for the root of the AVL tree.
+Consumers define one of these for each of the different trees that they want to
+have.
 .Lp
 .Sy avl_node_t
 .Lp
-Type used as the data node for an AVL tree. One of these is embedded in
-each data structure that is the member of an AVL tree.
+Type used as the data node for an AVL tree.
+One of these is embedded in each data structure that is the member of an AVL
+tree.
 .Lp
 .Sy avl_index_t
 .Lp
-Type used to locate a position in a tree. This is used with
+Type used to locate a position in a tree.
+This is used with
 .Xr avl_find 3AVL
 and
 .Xr avl_insert 3AVL .
 .Sh LOCKING
 The
 .Nm
-library provides no locking. Callers that are using the same AVL tree
-from multiple threads need to provide their own synchronization. If only
-one thread is ever accessing or modifying the AVL tree, then there are
-no synchronization concerns. If multiple AVL trees exist, then they may
-all be used simultaneously; however, they are subject to the same rules
-around simultaneous access from a single thread.
+library provides no locking.
+Callers that are using the same AVL tree from multiple threads need to provide
+their own synchronization.
+If only one thread is ever accessing or modifying the AVL tree, then there are
+no synchronization concerns.
+If multiple AVL trees exist, then they may all be used simultaneously; however,
+they are subject to the same rules around simultaneous access from a single
+thread.
 .Lp
 All routines are both
 .Sy Fork-safe

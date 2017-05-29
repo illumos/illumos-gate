@@ -32,7 +32,8 @@ process handle
 .Fa P .
 If the process handle does not represent an actively running process or
 the auxiliary vector could not be found, then it instead returns an
-empty auxiliary vector. The definitions of the
+empty auxiliary vector.
+The definitions of the
 .Sy auxv_t
 may be found in
 .In sys/auxv.h .

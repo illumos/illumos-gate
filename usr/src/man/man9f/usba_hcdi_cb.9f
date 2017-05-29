@@ -29,14 +29,14 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ph
 A pointer to the USBA pipe handle that was passed to the HCD driver
 during a call to the
-.Xr usba_hcdi_pipe_open
+.Xr usba_hcdi_pipe_open 9E
 entry point.
 .It Fa req
 A pointer to the request structure that is being completed.
@@ -63,14 +63,15 @@ performed over the life of the transfer.
 This function must not be used if the HCD driver returned a value
 other than
 .Sy USB_SUCCESS
-to one of the transfer initialization functions listed above. For more
-information on transfer request handling, see
+to one of the transfer initialization functions listed above.
+For more information on transfer request handling, see
 .Xr usba_hcdi 9E .
 .Pp
 The
 .Fa ph
 argument corresponds to the USBA framework's pipe handle that was given
-to the HCDI when the pipe was opened. See
+to the HCDI when the pipe was opened.
+See
 .Xr usba_hcdi_pipe_open 9E
 and
 .Xr usba_hcdi 9E
@@ -87,9 +88,9 @@ or
 which have been cast to the type
 .Ft usb_oapque_t .
 The caller should ensure that all appropriate members of the request
-structure have been filled in. For example, if expecting data from the
-device and the request has completed successfully, then  that data
-should be copied into the request structure's
+structure have been filled in.
+For example, if expecting data from the device and the request has completed
+successfully, then that data should be copied into the request structure's
 .Xr mblk 9S
 prior to handing the request structure to the
 .Fn usb_hcdi_cb
@@ -102,8 +103,8 @@ member should be filled in with the appropriate data.
 .Pp
 Once the request structure has been passed to the
 .Fn usba_hcdi_cb
-function, the HCD driver must not access the structure ever again. It
-should be treated as freed memory.
+function, the HCD driver must not access the structure ever again.
+It should be treated as freed memory.
 .Pp
 The
 .Fa cr
@@ -112,14 +113,15 @@ If
 .Fa cr
 is set to
 .Sy USB_CR_OK
-that indicates that the transfer completed successfully. This should
-also be used when a permitted short transfer has occurred. Otherwise, it
-should be set to one of the completion reasons.
+that indicates that the transfer completed successfully.
+This should also be used when a permitted short transfer has occurred.
+Otherwise, it should be set to one of the completion reasons.
 .Ss Locking
 The HCD driver should not hold its own internal locks across a call to
 the
 .Fn usba_hcdi_cb
-function. It is possible that the driver will have once of its
+function.
+It is possible that the driver will have once of its
 .Xr usba_hcdi 9E
 entry points called based on the return value specified.
 .Sh CONTEXT

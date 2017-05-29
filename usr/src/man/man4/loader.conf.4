@@ -41,8 +41,8 @@ described in
 .Xr loader 5 .
 .Pp
 Loader implements set of builtin commands and functions and script
-interpreter as standalone binary program. When starting, the loader will
-read the file
+interpreter as standalone binary program.
+When starting, the loader will read the file
 .Pa /boot/loader.rc
 as initialization and startup script, to include other support files
 and to read the configuration, describing current boot environment.
@@ -62,7 +62,8 @@ to be automatically processed:
 The default
 .Pa /boot/loader.rc
 is provided by the operating system and may be replaced on operating
-system update. The local updates are advised to be added into the
+system update.
+The local updates are advised to be added into the
 .Pa /boot/loader.rc.local
 .Pp
 The configuration variables are read from the following files:
@@ -74,15 +75,18 @@ command.
 .It Ar /boot/defaults/loader.conf
 Loader defaults provided by the operating system.
 .It Ar /boot/loader.conf
-System specific loader configuration. May be provided by the operating system.
+System specific loader configuration.
+May be provided by the operating system.
 .It Ar /boot/loader.conf.local
 User editable loader configuration.
 .It Ar /boot/conf.d/*
-User editable loader configuration snippets. The files are proccessed in
-lexicographical order. The configuration snippets mechanism is not
-available in case of TFTP boot as TFTP does not provide the directory list.
+User editable loader configuration snippets.
+The files are proccessed in lexicographical order.
+The configuration snippets mechanism is not available in case of TFTP boot as
+TFTP does not provide the directory list.
 .It Ar /boot/transient.conf
-Configuration file for transient boot. This file is created by the
+Configuration file for transient boot.
+This file is created by the
 .Xr reboot 1M
 command and is automatically removed when system is reaching the multi-user
 run level.

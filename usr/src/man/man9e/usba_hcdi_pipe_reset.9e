@@ -28,23 +28,24 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ph
 A pointer to a USB pipe handle as defined in
 .Xr usba_pipe_handle_data 9S .
 .It Fa usb_flags
-Flags which describe how allocations should be performed. Valid flags
-are:
+Flags which describe how allocations should be performed.
+Valid flags are:
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -63,15 +64,17 @@ and
 .Xr usba_hcdi_stop_isoc_polling 9E
 entry points, there are some notable differences.
 .Pp
-This entry point is synchronous. The host controller driver should take
-the following steps on the pipe before returning:
+This entry point is synchronous.
+The host controller driver should take the following steps on the pipe before
+returning:
 .Bl -enum
 .It
 Quiesce and stop the endpoint.
 .It
 If the endpoint has any errors they should be cleared at this time.
 .It
-Remove any remaining, scheduled or queued transfers. For each one call
+Remove any remaining, scheduled or queued transfers.
+For each one call
 .Xr usba_hcdi_cb 9F
 with the code
 .Sy USB_CR_PIPE_RESET .
@@ -87,7 +90,8 @@ Upon successful completion, the
 .Fn usba_hcdi_pipe_reset
 function should return
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi_pipe_open 9E ,

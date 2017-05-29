@@ -57,8 +57,8 @@ to by
 .Fa P .
 .Pp
 The getting and setting of registers of the process operates on the
-representative thread (LWP). For more information on how the
-representative is chosen, see
+representative thread (LWP).
+For more information on how the representative is chosen, see
 .Xr proc 4 .
 To change the registers of a specific thread, use the
 .Xr Lgetareg 3PROC
@@ -66,17 +66,19 @@ and
 .Xr Lsetareg 3PROC
 functions.
 .Pp
-The getting and setting of registers only applies to stopped
-processes. In addition, one may obtain registers from core files, but
-not set them. To stop a process, see the
+The getting and setting of registers only applies to stopped processes.
+In addition, one may obtain registers from core files, but not set them.
+To stop a process, see the
 .Xr Pstop 3PROC
 function.
 .Pp
 The register to get or set is indicated by the
 .Fa regno
-argument. For a list of registers, see
+argument.
+For a list of registers, see
 .In sys/regset.h .
-The set of registers is specific to each architecture of the system. The
+The set of registers is specific to each architecture of the system.
+The
 .Fn Pgetareg
 function will fill in the value of
 .Fa preg
@@ -123,7 +125,8 @@ functions will fail if:
 .It Er EINVAL
 The value of
 .Fa regno
-is invalid. This means it is less than
+is invalid.
+This means it is less than
 .Sy 0
 and greater than
 .Sy NPRGREG .
@@ -150,7 +153,8 @@ functions will fail if:
 .It Er EINVAL
 The value of
 .Fa regno
-is invalid. This means it is less than
+is invalid.
+This means it is less than
 .Sy 0
 and greater than
 .Sy NPRGREG .

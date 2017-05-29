@@ -33,7 +33,8 @@ including the null byte,
 fails and returns a null pointer.
 .Sh RETURN VALUES
 Upon successful completion, a pointer to the string containing the absolute
-pathname of the current working directory is returned.  Otherwise,
+pathname of the current working directory is returned.
+Otherwise,
 .Fn getwd
 returns a null pointer and the contents of the array pointed to by
 .Fa path_name
@@ -43,7 +44,8 @@ No errors are defined.
 .Sh USAGE
 The
 .Fn getwd
-function is supplied for backwards compatibility.  The
+function is supplied for backwards compatibility.
+The
 .Xr getcwd 3C
 should be used instead.
 .Sh INTERFACE STABILITY
@@ -54,7 +56,8 @@ should be used instead.
 .Sh STANDARDS
 The
 .Fn getwd
-function is available in the following compilation environments. See
+function is available in the following compilation environments.
+See
 .Xr standards 5 .
 .Lp
 .Bl -bullet -compact

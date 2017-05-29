@@ -60,7 +60,8 @@ and
 is filled in with the
 thread-specific
 .Xr ps 1
-information. Otherwise,
+information.
+Otherwise,
 .Sy -1
 is returned and
 .Sy errno

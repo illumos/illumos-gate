@@ -28,8 +28,8 @@
 The
 .Fn Pgrab_error
 function returns a pointer to a human-readable character string
-describing the error that occurred. This function only knows how to
-translate errors that are stored in
+describing the error that occurred.
+This function only knows how to translate errors that are stored in
 .Fa perr
 during a failed call to
 .Xr Pgrab 3PROC ,

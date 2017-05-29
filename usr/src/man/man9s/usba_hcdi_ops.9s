@@ -24,13 +24,14 @@
 .Sy Volatile -
 illumos USB HCD private
 .Pp
-This is a private data structure that is not part of the stable DDI. It
-may be removed or changed at any time.
+This is a private data structure that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh DESCRIPTION
 The
 .Sy usba_hcdi_ops
 structure is usbed HCD drivers to register operations vectors and
-callbacks from the USBA HCD interface. See
+callbacks from the USBA HCD interface.
+See
 .Xr usba_hcdi 9E
 for more information on USB HCD device drivers.
 .Pp
@@ -100,8 +101,8 @@ int	(*usba_hcdi_hub_update)(usba_device_t *, uint8_t, uint8_t);
 .Pp
 The
 .Sy usba_hcdi_ops_version
-member is used to indicate the revision of the operations vector. HCD
-drivers should generally set this to
+member is used to indicate the revision of the operations vector.
+HCD drivers should generally set this to
 .Dv HCDI_OPS_VERSION .
 .Pp
 The
@@ -113,7 +114,8 @@ structure of the HCD driver that was received in
 .Pp
 The
 .Sy usba_hcdi_pm_support
-member is vestigial. If may be set to
+member is vestigial.
+If may be set to
 .Dv NULL
 or to a function which only returns
 .Sy USB_FAILURE .
@@ -122,7 +124,8 @@ The
 .Sy usba_hcdi_pipe_open
 member should be set to a function which takes care of the all of the
 controller-specific actions of opening up an endpoint on a device and
-associating it with the pipe. See
+associating it with the pipe.
+See
 .Xr usba_hcdi_pipe_open 9E
 for more information.
 .Pp
@@ -130,8 +133,10 @@ The
 .Sy usba_hcdi_pipe_close
 member should be set to a function which takes care of releasing all of
 the controller-specific resources and actions taken when the pipe was
-opened. This function also has the responsibility to clean up any
-outstanding polling on the endpoint. See
+opened.
+This function also has the responsibility to clean up any outstanding polling on
+the endpoint.
+See
 .Xr usba_hcdi_pipe_close 9E
 for more information.
 .Pp
@@ -139,7 +144,8 @@ The
 .Sy usba_hcdi_pipe_reset
 member should be set to a function that takes care of resetting a pipe.
 A pipe reset not only performs controller-specific functionality, but it
-also cleans up any outstanding requests and terminates polling. See
+also cleans up any outstanding requests and terminates polling.
+See
 .Xr usba_hcdi_pipe_reset 9E
 for more information.
 .Pp
@@ -151,7 +157,8 @@ toggle, if the controller exposes this functionality to the host.
 The
 .Sy usba_hcdi_pipe_ctrl_xfer
 member should be set to a function that handles control transfers for any
-device, including the root hub. See
+device, including the root hub.
+See
 .Xr usba_hcdi_pipe_ctrl_xfer 9E
 for more information.
 .Pp
@@ -171,38 +178,42 @@ for more information.
 The
 .Sy usba_hcdi_pipe_intr_xfer
 member should be set to a function which performs interrupt transfers.
-These may be both periodic and one-shot transfers. In addition, this may
-need to handle requests for the root hub. See
+These may be both periodic and one-shot transfers.
+In addition, this may need to handle requests for the root hub.
+See
 .Xr usba_hcdi_pipe_intr_xfer 9E
 for more information.
 .Pp
 The
 .Sy usba_hcdi_pipe_stop_intr_polling
 member should be set to a function which is used to terminate interrupt
-polling and return the original interrupt request. See
+polling and return the original interrupt request.
+See
 .Xr usba_hcdi_pipe_stop_intr_polling 9E
 for more information.
 .Pp
 The
 .Sy usba_hcdi_pipe_isoc_xfer
 member should be set to a function which performs isochronous transfers.
-These may be both periodic and one-shot transfers. See
+These may be both periodic and one-shot transfers.
+See
 .Xr usba_hcdi_pipe_isoc_xfer 9E
 for more information.
 .Pp
 The
 .Sy usba_hcdi_pipe_stop_isoc_polling
 member should be set to a function which is used to terminate isochronous
-polling and return the original isochronous request. See
+polling and return the original isochronous request.
+See
 .Xr usba_hcdi_pipe_stop_isoc_polling 9E
 for more information.
 .Pp
 The
 .Sy usba_hcdi_get_current_frame_number
 member should be set to a function which returns the current virtual
-frame number. While this entry point is required, at this time, nothing
-uses this functionality in illumos, so having a dummy function which
-just returns
+frame number.
+While this entry point is required, at this time, nothing uses this
+functionality in illumos, so having a dummy function which just returns
 .Sy USB_FAILURE
 is acceptable.
 .Pp
@@ -219,9 +230,10 @@ The
 and
 .Sy usba_hcdi_console_input_exit
 members are used to facilitate a USB device acting as the system console
-and reading input from it. Support for this is optional in an HCD
-driver. HCD drivers which do not support this functionality should have
-functions which return
+and reading input from it.
+Support for this is optional in an HCD driver.
+HCD drivers which do not support this functionality should have functions which
+return
 .Sy USB_FAILURE .
 .Pp
 The
@@ -232,9 +244,10 @@ The
 and
 .Sy usba_hcdi_console_output_exit
 members are used to facilitate a USB device acting as the system console
-and outputting data to it. Support for this is optional in an HCD
-driver. HCD drivers which do not support this functionality should have
-functions which return
+and outputting data to it.
+Support for this is optional in an HCD driver.
+HCD drivers which do not support this functionality should have functions which
+return
 .Sy USB_FAILURE .
 .Pp
 The
@@ -242,8 +255,8 @@ The
 member is an
 .Em optional
 entry point that will be called every time a new device is initialized
-and detected by the system. If an HCD does not need this functionality,
-the member should be set to
+and detected by the system.
+If an HCD does not need this functionality, the member should be set to
 .Dv NULL .
 See
 .Xr usba_hcdi_device_init 9E
@@ -256,8 +269,8 @@ member is an
 entry point that will be called every time a device is removed from the
 system, whether through it being unplugged or a
 .Xr cfgadm 1M
-action. If an HCD does not need this functionality,
-the member should be set to
+action.
+If an HCD does not need this functionality, the member should be set to
 .Dv NULL .
 See
 .Xr usba_hcdi_device_fini 9E
@@ -268,8 +281,8 @@ The
 member is an
 .Em optional
 entry point that will be called every time a USB device needs to be
-addressed. If an HCD driver does not need this functionality, the member
-should be set to
+addressed.
+If an HCD driver does not need this functionality, the member should be set to
 .Dv NULL .
 See
 .Xr usba_hcdi_device_address 9E
@@ -280,10 +293,10 @@ The
 member is an
 .Em optional
 entry point that will be called every time a device descriptor is read
-that turns out to be a hub. This gives HCD drivers a chance to perform
-any needed controller-specific functionality before the device is
-used. If an HCD driver does not need this functionality, the member
-should be set to
+that turns out to be a hub.
+This gives HCD drivers a chance to perform any needed controller-specific
+functionality before the device is used.
+If an HCD driver does not need this functionality, the member should be set to
 .Dv NULL .
 See
 .Xr usba_hcdi_hub_update 9E
