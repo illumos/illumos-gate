@@ -27,8 +27,6 @@
 #ifndef	_ZCONF_H
 #define	_ZCONF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>

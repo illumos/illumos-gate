@@ -33,8 +33,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <stdlib.h>
 #include <sys/param.h>
@@ -54,14 +52,17 @@ xdr_callmsg(XDR *xdrs, struct rpc_msg *cmsg)
 	struct opaque_auth *oa;
 
 	if (xdrs->x_op == XDR_ENCODE) {
+		uint_t credrndup;
+		uint_t verfrndup;
+
 		if (cmsg->rm_call.cb_cred.oa_length > MAX_AUTH_BYTES)
 			return (FALSE);
 		if (cmsg->rm_call.cb_verf.oa_length > MAX_AUTH_BYTES)
 			return (FALSE);
-		buf = XDR_INLINE(xdrs, 8 * BYTES_PER_XDR_UNIT
-			+ RNDUP(cmsg->rm_call.cb_cred.oa_length)
-			+ 2 * BYTES_PER_XDR_UNIT
-			+ RNDUP(cmsg->rm_call.cb_verf.oa_length));
+		credrndup = RNDUP(cmsg->rm_call.cb_cred.oa_length);
+		verfrndup = RNDUP(cmsg->rm_call.cb_verf.oa_length);
+		buf = XDR_INLINE(xdrs, 8 * BYTES_PER_XDR_UNIT +
+		    credrndup + 2 * BYTES_PER_XDR_UNIT + verfrndup);
 		if (buf != NULL) {
 			IXDR_PUT_INT32(buf, cmsg->rm_xid);
 			IXDR_PUT_ENUM(buf, cmsg->rm_direction);
@@ -78,18 +79,20 @@ xdr_callmsg(XDR *xdrs, struct rpc_msg *cmsg)
 			IXDR_PUT_INT32(buf, oa->oa_length);
 			if (oa->oa_length) {
 				(void) memcpy(buf, oa->oa_base, oa->oa_length);
-				buf += RNDUP(oa->oa_length) / sizeof (int32_t);
+				buf += credrndup / BYTES_PER_XDR_UNIT;
+				if ((credrndup -= oa->oa_length) > 0)
+					(void) memset((char *)buf - credrndup,
+					    0, credrndup);
 			}
 			oa = &cmsg->rm_call.cb_verf;
 			IXDR_PUT_ENUM(buf, oa->oa_flavor);
 			IXDR_PUT_INT32(buf, oa->oa_length);
 			if (oa->oa_length) {
 				(void) memcpy(buf, oa->oa_base, oa->oa_length);
-				/*
-				 * no real need....
-				 * buf += RNDUP(oa->oa_length) / sizeof
-				 * (int32_t);
-				 */
+				buf += verfrndup / BYTES_PER_XDR_UNIT;
+				if ((verfrndup -= oa->oa_length) > 0)
+					(void) memset((char *)buf - verfrndup,
+					    0, verfrndup);
 			}
 			return (TRUE);
 		}
@@ -116,9 +119,8 @@ xdr_callmsg(XDR *xdrs, struct rpc_msg *cmsg)
 				if (oa->oa_base == NULL) {
 					oa->oa_base = malloc(oa->oa_length);
 					if (oa->oa_base == NULL) {
-						syslog(LOG_ERR,
-							"xdr_callmsg : "
-							"out of memory.");
+						syslog(LOG_ERR, "xdr_callmsg : "
+						    "out of memory.");
 						return (FALSE);
 					}
 				}
@@ -153,9 +155,8 @@ xdr_callmsg(XDR *xdrs, struct rpc_msg *cmsg)
 				if (oa->oa_base == NULL) {
 					oa->oa_base = malloc(oa->oa_length);
 					if (oa->oa_base == NULL) {
-						syslog(LOG_ERR,
-							"xdr_callmsg : "
-							"out of memory.");
+						syslog(LOG_ERR, "xdr_callmsg : "
+						    "out of memory.");
 						return (FALSE);
 					}
 				}

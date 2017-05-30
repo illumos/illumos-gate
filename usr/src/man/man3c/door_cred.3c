@@ -16,10 +16,9 @@ door_cred \- return credential information associated with the client
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-The  \fBdoor_cred()\fR function returns credential information associated with
-the  client (if any) of the current door invocation.
+The \fBdoor_cred()\fR function returns credential information associated with
+the client (if any) of the current door invocation.
 .sp
 .LP
 The contents of the \fIinfo\fR argument include the following fields:
@@ -40,15 +39,13 @@ The credential information associated with the client refers to the information
 from the immediate caller; not necessarily from the first thread in a chain of
 door calls.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBdoor_cred()\fR returns \fB0\fR. Otherwise,
 \fBdoor_cred()\fR returns \fB\(mi1\fR and sets \fBerrno\fR to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
-The  \fBdoor_cred()\fR function will fail if:
+The \fBdoor_cred()\fR function will fail if:
 .sp
 .ne 2
 .na
@@ -68,12 +65,10 @@ There is no associated door client.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBdoor_cred()\fR function is obsolete. Applications should use the
 \fBdoor_ucred\fR(3C) function in place of \fBdoor_cred()\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -93,7 +88,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdoor_call\fR(3C), \fBdoor_create\fR(3C), \fBdoor_ucred\fR(3C),
 \fBattributes\fR(5)

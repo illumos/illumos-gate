@@ -144,17 +144,16 @@ main(int argc, char *argv[])
 	int	pkgfmt = 0;	/* Makes more sense as a pointer, but */
 				/*	18N is compromised. */
 	char	file[PATH_MAX+1],
-		*abi_sym_ptr,
-		*vfstab_file = NULL;
+	    *abi_sym_ptr,
+	    *vfstab_file = NULL;
 	char *all_pkgs[4] = {"all", NULL};
 	char **category = NULL;
 	char *catg_arg = NULL;
 	int	c;
 	int	n = 0;
 	char	*prog,
-		*Rvalue,
-		*dvalue;
-	int dbcreate = 0;
+	    *Rvalue,
+	    *dvalue;
 	int pathtype;
 
 	/* initialize locale mechanism */
@@ -187,8 +186,8 @@ main(int argc, char *argv[])
 	if ((uniTmp = getenv("PKG_NO_UNIFIED")) != NULL)
 		map_client = 0;
 
-	while ((c = getopt(argc, argv, "Y:R:e:p:d:nLli:vaV:Mm:cqxfQP:?"))
-			!= EOF) {
+	while ((c = getopt(argc, argv, "Y:R:e:p:d:nLli:vaV:Mm:cqxfP:?"))
+	    != EOF) {
 		switch (c) {
 		case 'p':
 			pathlist[npaths] = strtok(optarg, " , ");
@@ -199,7 +198,7 @@ main(int argc, char *argv[])
 			while (pathlist[npaths] = strtok(NULL, " , ")) {
 				if (npaths++ >= MAXPATHS) {
 					progerr(gettext(ERR_MAXPATHS),
-						MAXPATHS);
+					    MAXPATHS);
 					quit(1);
 				}
 			}
@@ -300,10 +299,6 @@ main(int argc, char *argv[])
 			}
 			break;
 
-		case 'Q':
-			dbcreate++;
-			break;
-
 		case 'P':
 			ppathlist[npaths] = strtok(optarg, " , ");
 			if ((ppathlist[npaths] == NULL) ||
@@ -315,7 +310,7 @@ main(int argc, char *argv[])
 			while (ppathlist[npaths] = strtok(NULL, " , ")) {
 				if (npaths++ >= MAXPATHS) {
 					progerr(gettext(ERR_MAXPATHS),
-						MAXPATHS);
+					    MAXPATHS);
 					quit(1);
 				}
 			}
@@ -352,7 +347,7 @@ main(int argc, char *argv[])
 	if (lflag || Lflag) {
 		/* we're only supposed to list information */
 		if ((cflag >= 0) || (aflag >= 0) ||
-		qflag || xflag || fflag || nflag || vflag)
+		    qflag || xflag || fflag || nflag || vflag)
 			usage();
 	}
 
@@ -367,7 +362,8 @@ main(int argc, char *argv[])
 			progerr(gettext(ERR_CAT_FND), catg_arg);
 			quit(1);
 		} else {
-			for (pkgcnt = 0; pkg[pkgcnt] != NULL; pkgcnt++);
+			for (pkgcnt = 0; pkg[pkgcnt] != NULL; pkgcnt++)
+				;
 		}
 	} else if (catg_arg != NULL && optind < argc) {
 		usage();
@@ -426,10 +422,10 @@ main(int argc, char *argv[])
 		} else {
 			if (catg_arg != NULL)
 				pkg = gpkglist(spooldir,
-					pkgcnt ? pkg : all_pkgs, category);
+				    pkgcnt ? pkg : all_pkgs, category);
 			else
 				pkg = gpkglist(spooldir,
-					pkgcnt ? pkg : all_pkgs, NULL);
+				    pkgcnt ? pkg : all_pkgs, NULL);
 			pkgfmt = 1;
 		}
 
@@ -454,26 +450,26 @@ main(int argc, char *argv[])
 
 			if (pkgfmt)
 				(void) printf(
-					gettext(MSG_CHK_DIR), pkg[n], device);
+				    gettext(MSG_CHK_DIR), pkg[n], device);
 			else
 				(void) printf(
-					gettext(MSG_CHK_STRM), pkg[n], device);
+				    gettext(MSG_CHK_STRM), pkg[n], device);
 
 			(void) snprintf(pkgspool, sizeof (pkgspool),
-				"%s/%s", spooldir, pkg[n]);
+			    "%s/%s", spooldir, pkg[n]);
 			(void) snprintf(file, sizeof (file),
-				"%s/install", pkgspool);
+			    "%s/install", pkgspool);
 			/* Here we check the install scripts. */
 			(void) printf(
-				gettext("## Checking control scripts.\n"));
+			    gettext("## Checking control scripts.\n"));
 			(void) checkscripts(file, 0);
 			/* Verify consistency with the pkgmap. */
 			(void) printf(
-				gettext("## Checking package objects.\n"));
+			    gettext("## Checking package objects.\n"));
 			(void) snprintf(file, sizeof (file),
-				"%s/pkgmap", pkgspool);
+			    "%s/pkgmap", pkgspool);
 			(void) snprintf(locenv, sizeof (locenv),
-				"%s/pkginfo", pkgspool);
+			    "%s/pkginfo", pkgspool);
 			envfile = locenv;
 
 			/*
@@ -481,10 +477,10 @@ main(int argc, char *argv[])
 			 * pointer when it's through with them.
 			 */
 			if (checkmap(0, (device != NULL), file, envfile,
-					pkg[n], NULL, 0))
+			    pkg[n], NULL, 0))
 				errflg++;
 			(void) printf(
-				gettext("## Checking is complete.\n"));
+			    gettext("## Checking is complete.\n"));
 		}
 	} else {
 		if (envfile)
@@ -510,21 +506,21 @@ main(int argc, char *argv[])
 		}
 
 		(void) snprintf(file, sizeof (file),
-			"%s/contents", get_PKGADM());
+		    "%s/contents", get_PKGADM());
 		if (ppathlist[0] != NULL) {
 			for (n = 0; ppathlist[n]; n++) {
 				if (checkmap(1, (device != NULL), file, NULL,
-						NULL, ppathlist[n], 1))
+				    NULL, ppathlist[n], 1))
 					errflg++;
 			}
 		} else if (pkg[0] != NULL) {
 				if (checkmap(1, (device != NULL), file, NULL,
-					pkg[0], NULL, 0)) {
+				    pkg[0], NULL, 0)) {
 					errflg++;
 				}
 		} else {
 			if (checkmap(1, (device != NULL), file, NULL,
-					NULL, NULL, 0)) {
+			    NULL, NULL, 0)) {
 				errflg++;
 			}
 		}

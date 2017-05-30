@@ -48,9 +48,6 @@
 #include <sys/kd.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/sunldi.h>
-#include <sys/agpgart.h>
-#include <sys/agp/agpdefs.h>
-#include <sys/agp/agpmaster_io.h>
 
 #define	MYNAME	"vgatext"
 
@@ -161,8 +158,6 @@ struct vgatext_softc {
 		unsigned char blue;
 	}			colormap[VGA8_CMAP_ENTRIES];
 	unsigned char attrib_palette[VGA_ATR_NUM_PLT];
-	agp_master_softc_t	*agp_master; /* NULL means not PCI, for AGP */
-	ddi_acc_handle_t	*pci_cfg_hdlp;	/* PCI conf handle */
 	unsigned int flags;
 	kmutex_t lock;
 };
@@ -437,7 +432,6 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	int	error;
 	char	*parent_type = NULL;
 	int	reg_rnumber;
-	int	agpm = 0;
 	off_t	reg_offset;
 	off_t	mem_offset;
 	char	buf[80], *cons;
@@ -525,7 +519,6 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			error = DDI_FAILURE;
 			goto fail;
 		}
-		agpm = 1;	/* should have AGP master support */
 	} else {
 		cmn_err(CE_WARN, MYNAME ": unknown parent type \"%s\".",
 		    parent_type);
@@ -591,21 +584,6 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		vgatext_save_colormap(softc);
 	}
 
-	if (agpm != 0) { /* try AGP master attach */
-		/* setup mapping for PCI config space access */
-		softc->pci_cfg_hdlp = (ddi_acc_handle_t *)
-		    kmem_zalloc(sizeof (ddi_acc_handle_t), KM_SLEEP);
-		error = pci_config_setup(devi, softc->pci_cfg_hdlp);
-		if (error != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "vgatext_attach: "
-			    "PCI configuration space setup failed");
-			goto fail;
-		}
-
-		(void) agpmaster_attach(softc->devi, &softc->agp_master,
-		    *softc->pci_cfg_hdlp, INST2NODE2(unit));
-	}
-
 	return (DDI_SUCCESS);
 
 fail:
@@ -624,11 +602,6 @@ vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
-		if (softc->agp_master != NULL) { /* agp initiated */
-			agpmaster_detach(&softc->agp_master);
-			pci_config_teardown(softc->pci_cfg_hdlp);
-		}
-
 		if (softc->fb.mapped)
 			ddi_regs_map_free(&softc->fb.handle);
 		if (softc->regs.mapped)
@@ -851,9 +824,16 @@ vgatext_ioctl(
 		break;
 
 	case AGPMASTER_MINOR:
-		err = agpmaster_ioctl(dev, cmd, data, mode, cred, rval,
-		    softc->agp_master);
-		break;
+		/*
+		 * This is apparently not used anymore.  Let's log a
+		 * message so we'll know if some consumer shows up.
+		 * If it turns out that we actually do need to keep
+		 * support for this pass-through to agpmaster, it
+		 * would probably be better to use "layered" access
+		 * to the AGP device (ldi_open, ldi_ioctl, ldi_close)
+		 */
+		cmn_err(CE_NOTE, "!vgatext wants agpmaster");
+		return (EBADF);
 
 	default:
 		/* not a valid minor node */

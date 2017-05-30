@@ -3,8 +3,6 @@
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  ALGORITHM
  *
@@ -1147,7 +1145,7 @@ local unsigned bi_reverse(code, len)
     unsigned code; /* the value to invert */
     int len;       /* its bit length */
 {
-    register unsigned res = 0;
+    unsigned res = 0;
     do {
         res |= code & 1;
         code >>= 1, res <<= 1;

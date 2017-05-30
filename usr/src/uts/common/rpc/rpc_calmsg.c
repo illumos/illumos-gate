@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * rpc_calmsg.c
  */
@@ -55,18 +53,21 @@
 bool_t
 xdr_callmsg(XDR *xdrs, struct rpc_msg *cmsg)
 {
-	int32_t *buf;
+	rpc_inline_t *buf;
 	struct opaque_auth *oa;
 
 	if (xdrs->x_op == XDR_ENCODE) {
+		uint_t credrndup;
+		uint_t verfrndup;
+
 		if (cmsg->rm_call.cb_cred.oa_length > MAX_AUTH_BYTES)
 			return (FALSE);
 		if (cmsg->rm_call.cb_verf.oa_length > MAX_AUTH_BYTES)
 			return (FALSE);
+		credrndup = RNDUP(cmsg->rm_call.cb_cred.oa_length);
+		verfrndup = RNDUP(cmsg->rm_call.cb_verf.oa_length);
 		buf = XDR_INLINE(xdrs, 8 * BYTES_PER_XDR_UNIT +
-		    RNDUP(cmsg->rm_call.cb_cred.oa_length) +
-		    2 * BYTES_PER_XDR_UNIT +
-		    RNDUP(cmsg->rm_call.cb_verf.oa_length));
+		    credrndup + 2 * BYTES_PER_XDR_UNIT + verfrndup);
 		if (buf != NULL) {
 			IXDR_PUT_INT32(buf, cmsg->rm_xid);
 			IXDR_PUT_ENUM(buf, cmsg->rm_direction);
@@ -83,13 +84,21 @@ xdr_callmsg(XDR *xdrs, struct rpc_msg *cmsg)
 			IXDR_PUT_INT32(buf, oa->oa_length);
 			if (oa->oa_length) {
 				bcopy(oa->oa_base, buf, oa->oa_length);
-				buf += RNDUP(oa->oa_length) / sizeof (int32_t);
+				buf += credrndup / BYTES_PER_XDR_UNIT;
+				if ((credrndup -= oa->oa_length) > 0)
+					bzero((char *)buf - credrndup,
+					    credrndup);
 			}
 			oa = &cmsg->rm_call.cb_verf;
 			IXDR_PUT_ENUM(buf, oa->oa_flavor);
 			IXDR_PUT_INT32(buf, oa->oa_length);
-			if (oa->oa_length)
+			if (oa->oa_length) {
 				bcopy(oa->oa_base, buf, oa->oa_length);
+				buf += verfrndup / BYTES_PER_XDR_UNIT;
+				if ((verfrndup -= oa->oa_length) > 0)
+					bzero((char *)buf - verfrndup,
+					    verfrndup);
+			}
 			return (TRUE);
 		}
 	}

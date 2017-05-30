@@ -14,8 +14,6 @@
  * factor of two increase in speed on a Power PC G4 (PPC7455) using gcc -O3.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
   Note on the use of DYNAMIC_CRC_TABLE: there is no mutex or semaphore
   protection on the static variables used to control the first-use generation
@@ -269,8 +267,8 @@ local unsigned long crc32_little(crc, buf, len)
     const unsigned char FAR *buf;
     unsigned len;
 {
-    register u4 c;
-    register const u4 FAR *buf4;
+    u4 c;
+    const u4 FAR *buf4;
 
     c = (u4)crc;
     c = ~c;
@@ -309,8 +307,8 @@ local unsigned long crc32_big(crc, buf, len)
     const unsigned char FAR *buf;
     unsigned len;
 {
-    register u4 c;
-    register const u4 FAR *buf4;
+    u4 c;
+    const u4 FAR *buf4;
 
     c = REV((u4)crc);
     c = ~c;

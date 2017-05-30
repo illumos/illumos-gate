@@ -178,7 +178,7 @@ kc_help()
 int
 main(int argc, char *argv[])
 {
-	KMF_RETURN ret;
+	int ret;
 	int found;
 	int i;
 
@@ -220,6 +220,11 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	/*
+	 * Note the action functions can return values from
+	 * the key management framework, and those values can conflict
+	 * with the utility error codes.
+	 */
 	ret = (*cmds[found].action)(argc, argv);
 
 	switch (ret) {

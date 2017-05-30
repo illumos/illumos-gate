@@ -7,7 +7,7 @@ escape_char /
 * see http://www.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap07.html                    *
 * Locale Name : ml_IN   Codeset : UTF-8
 *************************************************************************************************
-* Copyright 1991-2011 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
+* Copyright 1991-2013 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
 * http://www.unicode.org/copyright.html.                                                        *
 *                                                                                               *
 * Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode   *
@@ -89,7 +89,8 @@ lower	<a>;/
 	<y>;/
 	<z>
 
-alpha	<MALAYALAM_SIGN_ANUSVARA>;/
+alpha	<MALAYALAM_SIGN_CANDRABINDU>;/
+	<MALAYALAM_SIGN_ANUSVARA>;/
 	<MALAYALAM_SIGN_VISARGA>;/
 	<MALAYALAM_LETTER_A>;/
 	<MALAYALAM_LETTER_AA>;/
@@ -158,7 +159,11 @@ alpha	<MALAYALAM_SIGN_ANUSVARA>;/
 	<MALAYALAM_VOWEL_SIGN_OO>;/
 	<MALAYALAM_VOWEL_SIGN_AU>;/
 	<MALAYALAM_LETTER_DOT_REPH>;/
+	<MALAYALAM_LETTER_CHILLU_M>;/
+	<MALAYALAM_LETTER_CHILLU_Y>;/
+	<MALAYALAM_LETTER_CHILLU_LLL>;/
 	<MALAYALAM_AU_LENGTH_MARK>;/
+	<MALAYALAM_LETTER_ARCHAIC_II>;/
 	<MALAYALAM_LETTER_VOCALIC_RR>;/
 	<MALAYALAM_LETTER_VOCALIC_LL>;/
 	<MALAYALAM_VOWEL_SIGN_VOCALIC_L>;/
@@ -184,7 +189,7 @@ cntrl	<NULL>;/
 	<END_OF_TRANSMISSION>;/
 	<ENQUIRY>;/
 	<ACKNOWLEDGE>;/
-	<BELL>;/
+	<ALERT>;/
 	<BACKSPACE>;/
 	<tab>;/
 	<newline>;/
@@ -305,6 +310,7 @@ graph	<EXCLAMATION_MARK>;/
 	<VERTICAL_LINE>;/
 	<RIGHT_CURLY_BRACKET>;/
 	<TILDE>;/
+	<MALAYALAM_SIGN_CANDRABINDU>;/
 	<MALAYALAM_SIGN_ANUSVARA>;/
 	<MALAYALAM_SIGN_VISARGA>;/
 	<MALAYALAM_LETTER_A>;/
@@ -375,7 +381,19 @@ graph	<EXCLAMATION_MARK>;/
 	<MALAYALAM_VOWEL_SIGN_AU>;/
 	<MALAYALAM_SIGN_VIRAMA>;/
 	<MALAYALAM_LETTER_DOT_REPH>;/
+	<MALAYALAM_SIGN_PARA>;/
+	<MALAYALAM_LETTER_CHILLU_M>;/
+	<MALAYALAM_LETTER_CHILLU_Y>;/
+	<MALAYALAM_LETTER_CHILLU_LLL>;/
 	<MALAYALAM_AU_LENGTH_MARK>;/
+	<MALAYALAM_FRACTION_ONE_ONE-HUNDRED-AND-SIXTIETH>;/
+	<MALAYALAM_FRACTION_ONE_FORTIETH>;/
+	<MALAYALAM_FRACTION_THREE_EIGHTIETHS>;/
+	<MALAYALAM_FRACTION_ONE_TWENTIETH>;/
+	<MALAYALAM_FRACTION_ONE_TENTH>;/
+	<MALAYALAM_FRACTION_THREE_TWENTIETHS>;/
+	<MALAYALAM_FRACTION_ONE_FIFTH>;/
+	<MALAYALAM_LETTER_ARCHAIC_II>;/
 	<MALAYALAM_LETTER_VOCALIC_RR>;/
 	<MALAYALAM_LETTER_VOCALIC_LL>;/
 	<MALAYALAM_VOWEL_SIGN_VOCALIC_L>;/
@@ -396,6 +414,9 @@ graph	<EXCLAMATION_MARK>;/
 	<MALAYALAM_FRACTION_ONE_QUARTER>;/
 	<MALAYALAM_FRACTION_ONE_HALF>;/
 	<MALAYALAM_FRACTION_THREE_QUARTERS>;/
+	<MALAYALAM_FRACTION_ONE_SIXTEENTH>;/
+	<MALAYALAM_FRACTION_ONE_EIGHTH>;/
+	<MALAYALAM_FRACTION_THREE_SIXTEENTHS>;/
 	<MALAYALAM_DATE_MARK>;/
 	<MALAYALAM_LETTER_CHILLU_NN>;/
 	<MALAYALAM_LETTER_CHILLU_N>;/
@@ -499,6 +520,7 @@ print	<space>;/
 	<VERTICAL_LINE>;/
 	<RIGHT_CURLY_BRACKET>;/
 	<TILDE>;/
+	<MALAYALAM_SIGN_CANDRABINDU>;/
 	<MALAYALAM_SIGN_ANUSVARA>;/
 	<MALAYALAM_SIGN_VISARGA>;/
 	<MALAYALAM_LETTER_A>;/
@@ -569,7 +591,19 @@ print	<space>;/
 	<MALAYALAM_VOWEL_SIGN_AU>;/
 	<MALAYALAM_SIGN_VIRAMA>;/
 	<MALAYALAM_LETTER_DOT_REPH>;/
+	<MALAYALAM_SIGN_PARA>;/
+	<MALAYALAM_LETTER_CHILLU_M>;/
+	<MALAYALAM_LETTER_CHILLU_Y>;/
+	<MALAYALAM_LETTER_CHILLU_LLL>;/
 	<MALAYALAM_AU_LENGTH_MARK>;/
+	<MALAYALAM_FRACTION_ONE_ONE-HUNDRED-AND-SIXTIETH>;/
+	<MALAYALAM_FRACTION_ONE_FORTIETH>;/
+	<MALAYALAM_FRACTION_THREE_EIGHTIETHS>;/
+	<MALAYALAM_FRACTION_ONE_TWENTIETH>;/
+	<MALAYALAM_FRACTION_ONE_TENTH>;/
+	<MALAYALAM_FRACTION_THREE_TWENTIETHS>;/
+	<MALAYALAM_FRACTION_ONE_FIFTH>;/
+	<MALAYALAM_LETTER_ARCHAIC_II>;/
 	<MALAYALAM_LETTER_VOCALIC_RR>;/
 	<MALAYALAM_LETTER_VOCALIC_LL>;/
 	<MALAYALAM_VOWEL_SIGN_VOCALIC_L>;/
@@ -590,6 +624,9 @@ print	<space>;/
 	<MALAYALAM_FRACTION_ONE_QUARTER>;/
 	<MALAYALAM_FRACTION_ONE_HALF>;/
 	<MALAYALAM_FRACTION_THREE_QUARTERS>;/
+	<MALAYALAM_FRACTION_ONE_SIXTEENTH>;/
+	<MALAYALAM_FRACTION_ONE_EIGHTH>;/
+	<MALAYALAM_FRACTION_THREE_SIXTEENTHS>;/
 	<MALAYALAM_DATE_MARK>;/
 	<MALAYALAM_LETTER_CHILLU_NN>;/
 	<MALAYALAM_LETTER_CHILLU_N>;/
@@ -720,13 +757,14 @@ END LC_CTYPE
 LC_COLLATE
 *************
 
-collating-element <MALAYALAM_LETTER_KA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> from "<MALAYALAM_LETTER_KA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>"
-collating-element <MALAYALAM_LETTER_NNA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER-REVERSE_SOLIDUS> from "<MALAYALAM_LETTER_NNA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER><REVERSE_SOLIDUS>"
+collating-element <MALAYALAM_LETTER_KA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> from "<MALAYALAM_LETTER_KA><MALAYALAM_SIGN_VIRAMA><u><two><zero><zero><D>"
+collating-element <MALAYALAM_LETTER_NNA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> from "<MALAYALAM_LETTER_NNA><MALAYALAM_SIGN_VIRAMA><u><two><zero><zero><D>"
 collating-element <MALAYALAM_LETTER_CHILLU_N-MALAYALAM_SIGN_VIRAMA> from "<MALAYALAM_LETTER_CHILLU_N><MALAYALAM_SIGN_VIRAMA>"
-collating-element <MALAYALAM_LETTER_NA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> from "<MALAYALAM_LETTER_NA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>"
-collating-element <MALAYALAM_LETTER_RA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> from "<MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>"
-collating-element <MALAYALAM_LETTER_LA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> from "<MALAYALAM_LETTER_LA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>"
-collating-element <MALAYALAM_LETTER_LLA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> from "<MALAYALAM_LETTER_LLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>"
+collating-element <MALAYALAM_LETTER_NA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> from "<MALAYALAM_LETTER_NA><MALAYALAM_SIGN_VIRAMA><u><two><zero><zero><D>"
+collating-element <MALAYALAM_LETTER_RA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> from "<MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><u><two><zero><zero><D>"
+collating-element <MALAYALAM_LETTER_LA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> from "<MALAYALAM_LETTER_LA><MALAYALAM_SIGN_VIRAMA><u><two><zero><zero><D>"
+collating-element <MALAYALAM_LETTER_LLA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> from "<MALAYALAM_LETTER_LLA><MALAYALAM_SIGN_VIRAMA><u><two><zero><zero><D>"
+collating-element <u-zero-D-five-seven> from "<u><zero><D><five><seven>"
 
 
 * Define collation weights as symbols
@@ -734,62 +772,81 @@ collating-element <MALAYALAM_LETTER_LLA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER>
 collating-symbol <X01>
 collating-symbol <X05>
 collating-symbol <X06>
-collating-symbol <X09>
-collating-symbol <X87>
-collating-symbol <X8F>
-collating-symbol <XB9>
-collating-symbol <XBA>
+collating-symbol <X20>
+collating-symbol <X44>
+collating-symbol <X45>
+collating-symbol <X46>
+collating-symbol <X47>
+collating-symbol <X48>
+collating-symbol <X49>
+collating-symbol <X4A>
+collating-symbol <X4B>
+collating-symbol <X4C>
+collating-symbol <X88>
+collating-symbol <X89>
+collating-symbol <X9C>
+collating-symbol <XA0>
 collating-symbol <XC0>
-collating-symbol <XD1>
-collating-symbol <XD7>
-collating-symbol <XE1>
-collating-symbol <X0340>
-collating-symbol <X0342>
-collating-symbol <X0344>
-collating-symbol <X0346>
-collating-symbol <X0348>
+collating-symbol <XF1>
+collating-symbol <X0304>
+collating-symbol <X0306>
+collating-symbol <X0308>
+collating-symbol <X030A>
+collating-symbol <X030C>
 collating-symbol <X0400>
-collating-symbol <X060C>
-collating-symbol <X0610>
-collating-symbol <X0700>
-collating-symbol <X0854>
-collating-symbol <X085B>
-collating-symbol <X0879>
-collating-symbol <X0880>
-collating-symbol <X0900>
-collating-symbol <X0A8D>
-collating-symbol <X0A9B>
-collating-symbol <X0AAF>
-collating-symbol <X0AB1>
-collating-symbol <X0AB3>
-collating-symbol <X0AB5>
-collating-symbol <X0AB7>
-collating-symbol <X0AB9>
-collating-symbol <X0B5B>
-collating-symbol <X0B5D>
-collating-symbol <X0B67>
-collating-symbol <X0B69>
-collating-symbol <X0B6B>
-collating-symbol <X0B6F>
-collating-symbol <X0B71>
-collating-symbol <X0D0A>
-collating-symbol <X0D0F>
-collating-symbol <X0D5C>
-collating-symbol <X0D69>
-collating-symbol <X0D71>
-collating-symbol <X0D73>
-collating-symbol <X0D75>
-collating-symbol <X0D79>
-collating-symbol <X0D7D>
-collating-symbol <X0F0E>
+collating-symbol <X050A>
+collating-symbol <X050E>
+collating-symbol <X0600>
+collating-symbol <X0722>
+collating-symbol <X072C>
+collating-symbol <X0750>
+collating-symbol <X0758>
+collating-symbol <X0800>
+collating-symbol <X0969>
+collating-symbol <X0977>
+collating-symbol <X098D>
+collating-symbol <X098F>
+collating-symbol <X0991>
+collating-symbol <X0993>
+collating-symbol <X0995>
+collating-symbol <X0997>
+collating-symbol <X0A7B>
+collating-symbol <X0A7D>
+collating-symbol <X0A87>
+collating-symbol <X0A89>
+collating-symbol <X0A8B>
+collating-symbol <X0A8F>
+collating-symbol <X0A91>
+collating-symbol <X0C04>
+collating-symbol <X0C0A>
+collating-symbol <X0C56>
+collating-symbol <X0C76>
+collating-symbol <X0C7E>
+collating-symbol <X0C80>
+collating-symbol <X0C82>
+collating-symbol <X0C86>
+collating-symbol <X0C8A>
+collating-symbol <X0D6A>
+collating-symbol <X0E00>
+collating-symbol <X1030>
+collating-symbol <X1032>
 collating-symbol <X1034>
 collating-symbol <X1036>
 collating-symbol <X1038>
 collating-symbol <X103A>
 collating-symbol <X103C>
 collating-symbol <X103E>
+collating-symbol <X1040>
+collating-symbol <X1042>
+collating-symbol <X1044>
+collating-symbol <X1046>
+collating-symbol <X1048>
+collating-symbol <X104A>
+collating-symbol <X104C>
+collating-symbol <X104E>
 collating-symbol <X1200>
 collating-symbol <X1400>
+collating-symbol <X1500>
 collating-symbol <X1600>
 collating-symbol <X1800>
 collating-symbol <X1A00>
@@ -798,7 +855,6 @@ collating-symbol <X1E00>
 collating-symbol <X2000>
 collating-symbol <X2200>
 collating-symbol <X2400>
-collating-symbol <X2700>
 collating-symbol <X2900>
 collating-symbol <X2B00>
 collating-symbol <X2D00>
@@ -824,77 +880,79 @@ collating-symbol <X5300>
 collating-symbol <X5500>
 collating-symbol <X5700>
 collating-symbol <X5900>
-collating-symbol <X700A>
-collating-symbol <X700C>
-collating-symbol <X700E>
-collating-symbol <X7010>
-collating-symbol <X7012>
-collating-symbol <X7014>
-collating-symbol <X7016>
-collating-symbol <X7018>
-collating-symbol <X701A>
-collating-symbol <X701C>
-collating-symbol <X701E>
-collating-symbol <X7020>
-collating-symbol <X7022>
-collating-symbol <X7024>
-collating-symbol <X7026>
-collating-symbol <X7028>
-collating-symbol <X702A>
-collating-symbol <X702C>
-collating-symbol <X702E>
-collating-symbol <X7030>
-collating-symbol <X7032>
-collating-symbol <X7034>
-collating-symbol <X7036>
-collating-symbol <X7038>
-collating-symbol <X703A>
-collating-symbol <X703C>
-collating-symbol <X703E>
-collating-symbol <X7040>
-collating-symbol <X7042>
-collating-symbol <X7044>
-collating-symbol <X7046>
-collating-symbol <X7048>
-collating-symbol <X704A>
-collating-symbol <X704C>
-collating-symbol <X704E>
-collating-symbol <X7050>
-collating-symbol <X7052>
-collating-symbol <X7054>
-collating-symbol <X7056>
-collating-symbol <X7058>
-collating-symbol <X705A>
-collating-symbol <X705C>
-collating-symbol <X705E>
-collating-symbol <X7060>
-collating-symbol <X7062>
-collating-symbol <X7064>
-collating-symbol <X7066>
-collating-symbol <X7068>
-collating-symbol <X706A>
-collating-symbol <X706C>
-collating-symbol <X706E>
-collating-symbol <X7070>
-collating-symbol <X7072>
-collating-symbol <X7074>
-collating-symbol <X7078>
-collating-symbol <X707A>
-collating-symbol <X707C>
-collating-symbol <X707E>
-collating-symbol <X7080>
-collating-symbol <X7082>
-collating-symbol <X7084>
-collating-symbol <X7086>
-collating-symbol <X7088>
-collating-symbol <X708A>
-collating-symbol <X708C>
-collating-symbol <X708E>
-collating-symbol <X7090>
-collating-symbol <X7092>
-collating-symbol <X7093>
-collating-symbol <X7098>
-collating-symbol <X9400>
+collating-symbol <X5B00>
+collating-symbol <X6F06>
+collating-symbol <X6F08>
+collating-symbol <X6F0A>
+collating-symbol <X6F0C>
+collating-symbol <X6F0E>
+collating-symbol <X6F10>
+collating-symbol <X6F12>
+collating-symbol <X6F14>
+collating-symbol <X6F16>
+collating-symbol <X6F18>
+collating-symbol <X6F1A>
+collating-symbol <X6F1C>
+collating-symbol <X6F1E>
+collating-symbol <X6F20>
+collating-symbol <X6F22>
+collating-symbol <X6F24>
+collating-symbol <X6F26>
+collating-symbol <X6F28>
+collating-symbol <X6F2A>
+collating-symbol <X6F2C>
+collating-symbol <X6F2E>
+collating-symbol <X6F30>
+collating-symbol <X6F32>
+collating-symbol <X6F34>
+collating-symbol <X6F36>
+collating-symbol <X6F38>
+collating-symbol <X6F3A>
+collating-symbol <X6F3C>
+collating-symbol <X6F3E>
+collating-symbol <X6F40>
+collating-symbol <X6F42>
+collating-symbol <X6F44>
+collating-symbol <X6F46>
+collating-symbol <X6F48>
+collating-symbol <X6F4A>
+collating-symbol <X6F4C>
+collating-symbol <X6F4E>
+collating-symbol <X6F50>
+collating-symbol <X6F52>
+collating-symbol <X6F54>
+collating-symbol <X6F56>
+collating-symbol <X6F58>
+collating-symbol <X6F5A>
+collating-symbol <X6F5C>
+collating-symbol <X6F5E>
+collating-symbol <X6F60>
+collating-symbol <X6F62>
+collating-symbol <X6F64>
+collating-symbol <X6F66>
+collating-symbol <X6F68>
+collating-symbol <X6F6A>
+collating-symbol <X6F6C>
+collating-symbol <X6F6E>
+collating-symbol <X6F70>
+collating-symbol <X6F72>
+collating-symbol <X6F76>
+collating-symbol <X6F78>
+collating-symbol <X6F7A>
+collating-symbol <X6F7C>
+collating-symbol <X6F7E>
+collating-symbol <X6F80>
+collating-symbol <X6F82>
+collating-symbol <X6F84>
+collating-symbol <X6F86>
+collating-symbol <X6F88>
+collating-symbol <X6F8A>
+collating-symbol <X6F8C>
+collating-symbol <X6F8E>
+collating-symbol <X6F90>
+collating-symbol <X6F92>
+collating-symbol <X6F94>
+collating-symbol <X6F96>
 
 order_start forward;forward;forward;forward
 
@@ -904,62 +962,81 @@ order_start forward;forward;forward;forward
 <X01>
 <X05>
 <X06>
-<X09>
-<X87>
-<X8F>
-<XB9>
-<XBA>
+<X20>
+<X44>
+<X45>
+<X46>
+<X47>
+<X48>
+<X49>
+<X4A>
+<X4B>
+<X4C>
+<X88>
+<X89>
+<X9C>
+<XA0>
 <XC0>
-<XD1>
-<XD7>
-<XE1>
-<X0340>
-<X0342>
-<X0344>
-<X0346>
-<X0348>
+<XF1>
+<X0304>
+<X0306>
+<X0308>
+<X030A>
+<X030C>
 <X0400>
-<X060C>
-<X0610>
-<X0700>
-<X0854>
-<X085B>
-<X0879>
-<X0880>
-<X0900>
-<X0A8D>
-<X0A9B>
-<X0AAF>
-<X0AB1>
-<X0AB3>
-<X0AB5>
-<X0AB7>
-<X0AB9>
-<X0B5B>
-<X0B5D>
-<X0B67>
-<X0B69>
-<X0B6B>
-<X0B6F>
-<X0B71>
-<X0D0A>
-<X0D0F>
-<X0D5C>
-<X0D69>
-<X0D71>
-<X0D73>
-<X0D75>
-<X0D79>
-<X0D7D>
-<X0F0E>
+<X050A>
+<X050E>
+<X0600>
+<X0722>
+<X072C>
+<X0750>
+<X0758>
+<X0800>
+<X0969>
+<X0977>
+<X098D>
+<X098F>
+<X0991>
+<X0993>
+<X0995>
+<X0997>
+<X0A7B>
+<X0A7D>
+<X0A87>
+<X0A89>
+<X0A8B>
+<X0A8F>
+<X0A91>
+<X0C04>
+<X0C0A>
+<X0C56>
+<X0C76>
+<X0C7E>
+<X0C80>
+<X0C82>
+<X0C86>
+<X0C8A>
+<X0D6A>
+<X0E00>
+<X1030>
+<X1032>
 <X1034>
 <X1036>
 <X1038>
 <X103A>
 <X103C>
 <X103E>
+<X1040>
+<X1042>
+<X1044>
+<X1046>
+<X1048>
+<X104A>
+<X104C>
+<X104E>
 <X1200>
 <X1400>
+<X1500>
 <X1600>
 <X1800>
 <X1A00>
@@ -968,7 +1045,6 @@ order_start forward;forward;forward;forward
 <X2000>
 <X2200>
 <X2400>
-<X2700>
 <X2900>
 <X2B00>
 <X2D00>
@@ -994,316 +1070,335 @@ order_start forward;forward;forward;forward
 <X5500>
 <X5700>
 <X5900>
-<X700A>
-<X700C>
-<X700E>
-<X7010>
-<X7012>
-<X7014>
-<X7016>
-<X7018>
-<X701A>
-<X701C>
-<X701E>
-<X7020>
-<X7022>
-<X7024>
-<X7026>
-<X7028>
-<X702A>
-<X702C>
-<X702E>
-<X7030>
-<X7032>
-<X7034>
-<X7036>
-<X7038>
-<X703A>
-<X703C>
-<X703E>
-<X7040>
-<X7042>
-<X7044>
-<X7046>
-<X7048>
-<X704A>
-<X704C>
-<X704E>
-<X7050>
-<X7052>
-<X7054>
-<X7056>
-<X7058>
-<X705A>
-<X705C>
-<X705E>
-<X7060>
-<X7062>
-<X7064>
-<X7066>
-<X7068>
-<X706A>
-<X706C>
-<X706E>
-<X7070>
-<X7072>
-<X7074>
-<X7078>
-<X707A>
-<X707C>
-<X707E>
-<X7080>
-<X7082>
-<X7084>
-<X7086>
-<X7088>
-<X708A>
-<X708C>
-<X708E>
-<X7090>
-<X7092>
-<X7093>
-<X7098>
-<X9400>
+<X5B00>
+<X6F06>
+<X6F08>
+<X6F0A>
+<X6F0C>
+<X6F0E>
+<X6F10>
+<X6F12>
+<X6F14>
+<X6F16>
+<X6F18>
+<X6F1A>
+<X6F1C>
+<X6F1E>
+<X6F20>
+<X6F22>
+<X6F24>
+<X6F26>
+<X6F28>
+<X6F2A>
+<X6F2C>
+<X6F2E>
+<X6F30>
+<X6F32>
+<X6F34>
+<X6F36>
+<X6F38>
+<X6F3A>
+<X6F3C>
+<X6F3E>
+<X6F40>
+<X6F42>
+<X6F44>
+<X6F46>
+<X6F48>
+<X6F4A>
+<X6F4C>
+<X6F4E>
+<X6F50>
+<X6F52>
+<X6F54>
+<X6F56>
+<X6F58>
+<X6F5A>
+<X6F5C>
+<X6F5E>
+<X6F60>
+<X6F62>
+<X6F64>
+<X6F66>
+<X6F68>
+<X6F6A>
+<X6F6C>
+<X6F6E>
+<X6F70>
+<X6F72>
+<X6F76>
+<X6F78>
+<X6F7A>
+<X6F7C>
+<X6F7E>
+<X6F80>
+<X6F82>
+<X6F84>
+<X6F86>
+<X6F88>
+<X6F8A>
+<X6F8C>
+<X6F8E>
+<X6F90>
+<X6F92>
+<X6F94>
+<X6F96>
 
 * assignment of characters to weights
 
-<NULL>                              IGNORE;IGNORE;IGNORE;<NULL>
-<START_OF_HEADING>                  IGNORE;IGNORE;IGNORE;<START_OF_HEADING>
-<START_OF_TEXT>                     IGNORE;IGNORE;IGNORE;<START_OF_TEXT>
-<END_OF_TEXT>                       IGNORE;IGNORE;IGNORE;<END_OF_TEXT>
-<END_OF_TRANSMISSION>               IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION>
-<ENQUIRY>                           IGNORE;IGNORE;IGNORE;<ENQUIRY>
-<ACKNOWLEDGE>                       IGNORE;IGNORE;IGNORE;<ACKNOWLEDGE>
-<BELL>                              IGNORE;IGNORE;IGNORE;<BELL>
-<BACKSPACE>                         IGNORE;IGNORE;IGNORE;<BACKSPACE>
-<SHIFT_OUT>                         IGNORE;IGNORE;IGNORE;<SHIFT_OUT>
-<SHIFT_IN>                          IGNORE;IGNORE;IGNORE;<SHIFT_IN>
-<DATA_LINK_ESCAPE>                  IGNORE;IGNORE;IGNORE;<DATA_LINK_ESCAPE>
-<DEVICE_CONTROL_ONE>                IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_ONE>
-<DEVICE_CONTROL_TWO>                IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_TWO>
-<DEVICE_CONTROL_THREE>              IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_THREE>
-<DEVICE_CONTROL_FOUR>               IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_FOUR>
-<NEGATIVE_ACKNOWLEDGE>              IGNORE;IGNORE;IGNORE;<NEGATIVE_ACKNOWLEDGE>
-<SYNCHRONOUS_IDLE>                  IGNORE;IGNORE;IGNORE;<SYNCHRONOUS_IDLE>
-<END_OF_TRANSMISSION_BLOCK>         IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION_BLOCK>
-<CANCEL>                            IGNORE;IGNORE;IGNORE;<CANCEL>
-<END_OF_MEDIUM>                     IGNORE;IGNORE;IGNORE;<END_OF_MEDIUM>
-<SUBSTITUTE>                        IGNORE;IGNORE;IGNORE;<SUBSTITUTE>
-<ESCAPE>                            IGNORE;IGNORE;IGNORE;<ESCAPE>
-<INFORMATION_SEPARATOR_FOUR>        IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_FOUR>
-<INFORMATION_SEPARATOR_THREE>       IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_THREE>
-<INFORMATION_SEPARATOR_TWO>         IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_TWO>
-<INFORMATION_SEPARATOR_ONE>         IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_ONE>
-<DELETE>                            IGNORE;IGNORE;IGNORE;<DELETE>
-<ZERO_WIDTH_NON-JOINER>             IGNORE;IGNORE;IGNORE;<ZERO_WIDTH_NON-JOINER>
-<ZERO_WIDTH_JOINER>                 IGNORE;IGNORE;IGNORE;<ZERO_WIDTH_JOINER>
-<MALAYALAM_SIGN_VISARGA>            IGNORE;"<XD7><XB9>";"<X05><XC0>";<MALAYALAM_SIGN_VISARGA>
-<MALAYALAM_SIGN_AVAGRAHA>           IGNORE;"<XD7><XBA>";"<X05><XC0>";<MALAYALAM_SIGN_AVAGRAHA>
-<tab>                               <X0340>;<X05>;<X05>;<tab>
-<newline>                           <X0342>;<X05>;<X05>;<newline>
-<vertical-tab>                      <X0344>;<X05>;<X05>;<vertical-tab>
-<form-feed>                         <X0346>;<X05>;<X05>;<form-feed>
-<carriage-return>                   <X0348>;<X05>;<X05>;<carriage-return>
-<space>                             <X0400>;<X05>;<X05>;<space>
-<LOW_LINE>                          <X060C>;<X05>;<X05>;<LOW_LINE>
-<HYPHEN-MINUS>                      <X0610>;<X05>;<X05>;<HYPHEN-MINUS>
-<COMMA>                             <X0700>;<X05>;<X05>;<COMMA>
-<SEMICOLON>                         <X0854>;<X05>;<X05>;<SEMICOLON>
-<COLON>                             <X085B>;<X05>;<X05>;<COLON>
-<EXCLAMATION_MARK>                  <X0879>;<X05>;<X05>;<EXCLAMATION_MARK>
-<QUESTION_MARK>                     <X0880>;<X05>;<X05>;<QUESTION_MARK>
-<FULL_STOP>                         <X0900>;<X05>;<X05>;<FULL_STOP>
-<APOSTROPHE>                        <X0A8D>;<X05>;<X05>;<APOSTROPHE>
-<QUOTATION_MARK>                    <X0A9B>;<X05>;<X05>;<QUOTATION_MARK>
-<LEFT_PARENTHESIS>                  <X0AAF>;<X05>;<X05>;<LEFT_PARENTHESIS>
-<RIGHT_PARENTHESIS>                 <X0AB1>;<X05>;<X05>;<RIGHT_PARENTHESIS>
-<LEFT_SQUARE_BRACKET>               <X0AB3>;<X05>;<X05>;<LEFT_SQUARE_BRACKET>
-<RIGHT_SQUARE_BRACKET>              <X0AB5>;<X05>;<X05>;<RIGHT_SQUARE_BRACKET>
-<LEFT_CURLY_BRACKET>                <X0AB7>;<X05>;<X05>;<LEFT_CURLY_BRACKET>
-<RIGHT_CURLY_BRACKET>               <X0AB9>;<X05>;<X05>;<RIGHT_CURLY_BRACKET>
-<COMMERCIAL_AT>                     <X0B5B>;<X05>;<X05>;<COMMERCIAL_AT>
-<ASTERISK>                          <X0B5D>;<X05>;<X05>;<ASTERISK>
-<SOLIDUS>                           <X0B67>;<X05>;<X05>;<SOLIDUS>
-<REVERSE_SOLIDUS>                   <X0B69>;<X05>;<X05>;<REVERSE_SOLIDUS>
-<AMPERSAND>                         <X0B6B>;<X05>;<X05>;<AMPERSAND>
-<NUMBER_SIGN>                       <X0B6F>;<X05>;<X05>;<NUMBER_SIGN>
-<PERCENT_SIGN>                      <X0B71>;<X05>;<X05>;<PERCENT_SIGN>
-<GRAVE_ACCENT>                      <X0D0A>;<X05>;<X05>;<GRAVE_ACCENT>
-<CIRCUMFLEX_ACCENT>                 <X0D0F>;<X05>;<X05>;<CIRCUMFLEX_ACCENT>
-<MALAYALAM_DATE_MARK>               "<X0D5C><X9400>";<X05>;"<X05><XC0>";<MALAYALAM_DATE_MARK>
-<PLUS_SIGN>                         <X0D69>;<X05>;<X05>;<PLUS_SIGN>
-<LESS-THAN_SIGN>                    <X0D71>;<X05>;<X05>;<LESS-THAN_SIGN>
-<EQUALS_SIGN>                       <X0D73>;<X05>;<X05>;<EQUALS_SIGN>
-<GREATER-THAN_SIGN>                 <X0D75>;<X05>;<X05>;<GREATER-THAN_SIGN>
-<VERTICAL_LINE>                     <X0D79>;<X05>;<X05>;<VERTICAL_LINE>
-<TILDE>                             <X0D7D>;<X05>;<X05>;<TILDE>
-<DOLLAR_SIGN>                       <X0F0E>;<X05>;<X05>;<DOLLAR_SIGN>
-<MALAYALAM_NUMBER_TEN>              <X1034>;<X05>;<X05>;<MALAYALAM_NUMBER_TEN>
-<MALAYALAM_NUMBER_ONE_HUNDRED>      <X1036>;<X05>;<X05>;<MALAYALAM_NUMBER_ONE_HUNDRED>
-<MALAYALAM_NUMBER_ONE_THOUSAND>     <X1038>;<X05>;<X05>;<MALAYALAM_NUMBER_ONE_THOUSAND>
-<MALAYALAM_FRACTION_ONE_QUARTER>    <X103A>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_QUARTER>
-<MALAYALAM_FRACTION_ONE_HALF>       <X103C>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_HALF>
-<MALAYALAM_FRACTION_THREE_QUARTERS> <X103E>;<X05>;<X05>;<MALAYALAM_FRACTION_THREE_QUARTERS>
-<zero>                              <X1200>;<X05>;<X05>;<zero>
-<MALAYALAM_DIGIT_ZERO>              <X1200>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_ZERO>
-<one>                               <X1400>;<X05>;<X05>;<one>
-<MALAYALAM_DIGIT_ONE>               <X1400>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_ONE>
-<two>                               <X1600>;<X05>;<X05>;<two>
-<MALAYALAM_DIGIT_TWO>               <X1600>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_TWO>
-<three>                             <X1800>;<X05>;<X05>;<three>
-<MALAYALAM_DIGIT_THREE>             <X1800>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_THREE>
-<four>                              <X1A00>;<X05>;<X05>;<four>
-<MALAYALAM_DIGIT_FOUR>              <X1A00>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_FOUR>
-<five>                              <X1C00>;<X05>;<X05>;<five>
-<MALAYALAM_DIGIT_FIVE>              <X1C00>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_FIVE>
-<six>                               <X1E00>;<X05>;<X05>;<six>
-<MALAYALAM_DIGIT_SIX>               <X1E00>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_SIX>
-<seven>                             <X2000>;<X05>;<X05>;<seven>
-<MALAYALAM_DIGIT_SEVEN>             <X2000>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_SEVEN>
-<eight>                             <X2200>;<X05>;<X05>;<eight>
-<MALAYALAM_DIGIT_EIGHT>             <X2200>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_EIGHT>
-<nine>                              <X2400>;<X05>;<X05>;<nine>
-<MALAYALAM_DIGIT_NINE>              <X2400>;"<X05><XE1><XD1>";"<X05><X05><XC0>";<MALAYALAM_DIGIT_NINE>
-<a>                                 <X2700>;<X05>;<X05>;<a>
-<A>                                 <X2700>;<X05>;<X8F>;<A>
-<b>                                 <X2900>;<X05>;<X05>;<b>
-<B>                                 <X2900>;<X05>;<X8F>;<B>
-<c>                                 <X2B00>;<X05>;<X05>;<c>
-<C>                                 <X2B00>;<X05>;<X8F>;<C>
-<d>                                 <X2D00>;<X05>;<X05>;<d>
-<D>                                 <X2D00>;<X05>;<X8F>;<D>
-<e>                                 <X2F00>;<X05>;<X05>;<e>
-<E>                                 <X2F00>;<X05>;<X8F>;<E>
-<f>                                 <X3100>;<X05>;<X05>;<f>
-<F>                                 <X3100>;<X05>;<X8F>;<F>
-<g>                                 <X3300>;<X05>;<X05>;<g>
-<G>                                 <X3300>;<X05>;<X8F>;<G>
-<h>                                 <X3500>;<X05>;<X05>;<h>
-<H>                                 <X3500>;<X05>;<X8F>;<H>
-<i>                                 <X3700>;<X05>;<X05>;<i>
-<I>                                 <X3700>;<X05>;<X8F>;<I>
-<j>                                 <X3900>;<X05>;<X05>;<j>
-<J>                                 <X3900>;<X05>;<X8F>;<J>
-<k>                                 <X3B00>;<X05>;<X05>;<k>
-<K>                                 <X3B00>;<X05>;<X8F>;<K>
-<l>                                 <X3D00>;<X05>;<X05>;<l>
-<L>                                 <X3D00>;<X05>;<X8F>;<L>
-<m>                                 <X3F00>;<X05>;<X05>;<m>
-<M>                                 <X3F00>;<X05>;<X8F>;<M>
-<n>                                 <X4100>;<X05>;<X05>;<n>
-<N>                                 <X4100>;<X05>;<X8F>;<N>
-<o>                                 <X4300>;<X05>;<X05>;<o>
-<O>                                 <X4300>;<X05>;<X8F>;<O>
-<p>                                 <X4500>;<X05>;<X05>;<p>
-<P>                                 <X4500>;<X05>;<X8F>;<P>
-<q>                                 <X4700>;<X05>;<X05>;<q>
-<Q>                                 <X4700>;<X05>;<X8F>;<Q>
-<r>                                 <X4900>;<X05>;<X05>;<r>
-<R>                                 <X4900>;<X05>;<X8F>;<R>
-<s>                                 <X4B00>;<X05>;<X05>;<s>
-<S>                                 <X4B00>;<X05>;<X8F>;<S>
-<t>                                 <X4D00>;<X05>;<X05>;<t>
-<T>                                 <X4D00>;<X05>;<X8F>;<T>
-<u>                                 <X4F00>;<X05>;<X05>;<u>
-<U>                                 <X4F00>;<X05>;<X8F>;<U>
-<v>                                 <X5100>;<X05>;<X05>;<v>
-<V>                                 <X5100>;<X05>;<X8F>;<V>
-<w>                                 <X5300>;<X05>;<X05>;<w>
-<W>                                 <X5300>;<X05>;<X8F>;<W>
-<x>                                 <X5500>;<X05>;<X05>;<x>
-<X>                                 <X5500>;<X05>;<X8F>;<X>
-<y>                                 <X5700>;<X05>;<X05>;<y>
-<Y>                                 <X5700>;<X05>;<X8F>;<Y>
-<z>                                 <X5900>;<X05>;<X05>;<z>
-<Z>                                 <X5900>;<X05>;<X8F>;<Z>
-<MALAYALAM_LETTER_A>                <X700A>;<X05>;<X05>;<MALAYALAM_LETTER_A>
-<MALAYALAM_LETTER_AA>               <X700C>;<X05>;<X05>;<MALAYALAM_LETTER_AA>
-<MALAYALAM_LETTER_I>                <X700E>;<X05>;<X05>;<MALAYALAM_LETTER_I>
-<MALAYALAM_LETTER_II>               <X7010>;<X05>;<X05>;<MALAYALAM_LETTER_II>
-<MALAYALAM_LETTER_U>                <X7012>;<X05>;<X05>;<MALAYALAM_LETTER_U>
-<MALAYALAM_LETTER_UU>               <X7014>;<X05>;<X05>;<MALAYALAM_LETTER_UU>
-<MALAYALAM_LETTER_VOCALIC_R>        <X7016>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_R>
-<MALAYALAM_LETTER_VOCALIC_RR>       <X7018>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_RR>
-<MALAYALAM_LETTER_VOCALIC_L>        <X701A>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_L>
-<MALAYALAM_LETTER_VOCALIC_LL>       <X701C>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_LL>
-<MALAYALAM_LETTER_E>                <X701E>;<X05>;<X05>;<MALAYALAM_LETTER_E>
-<MALAYALAM_LETTER_EE>               <X7020>;<X05>;<X05>;<MALAYALAM_LETTER_EE>
-<MALAYALAM_LETTER_AI>               <X7022>;<X05>;<X05>;<MALAYALAM_LETTER_AI>
-<MALAYALAM_LETTER_O>                <X7024>;<X05>;<X05>;<MALAYALAM_LETTER_O>
-<MALAYALAM_LETTER_OO>               <X7026>;<X05>;<X05>;<MALAYALAM_LETTER_OO>
-<MALAYALAM_LETTER_AU>               <X7028>;<X05>;<X05>;<MALAYALAM_LETTER_AU>
-<MALAYALAM_LETTER_KA>               <X702A>;<X05>;<X05>;<MALAYALAM_LETTER_KA>
-<MALAYALAM_LETTER_KA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> "<X702A><X7098>";"<X87><X05>";"<X05><X05>";<MALAYALAM_LETTER_KA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER>
-<MALAYALAM_LETTER_CHILLU_K>         "<X702A><X7098>";"<X87><X05>";"<X06><X05>";<MALAYALAM_LETTER_CHILLU_K>
-<MALAYALAM_LETTER_KHA>              <X702C>;<X05>;<X05>;<MALAYALAM_LETTER_KHA>
-<MALAYALAM_LETTER_GA>               <X702E>;<X05>;<X05>;<MALAYALAM_LETTER_GA>
-<MALAYALAM_LETTER_GHA>              <X7030>;<X05>;<X05>;<MALAYALAM_LETTER_GHA>
-<MALAYALAM_LETTER_NGA>              <X7032>;<X05>;<X05>;<MALAYALAM_LETTER_NGA>
-<MALAYALAM_LETTER_CA>               <X7034>;<X05>;<X05>;<MALAYALAM_LETTER_CA>
-<MALAYALAM_LETTER_CHA>              <X7036>;<X05>;<X05>;<MALAYALAM_LETTER_CHA>
-<MALAYALAM_LETTER_JA>               <X7038>;<X05>;<X05>;<MALAYALAM_LETTER_JA>
-<MALAYALAM_LETTER_JHA>              <X703A>;<X05>;<X05>;<MALAYALAM_LETTER_JHA>
-<MALAYALAM_LETTER_NYA>              <X703C>;<X05>;<X05>;<MALAYALAM_LETTER_NYA>
-<MALAYALAM_LETTER_TTA>              <X703E>;<X05>;<X05>;<MALAYALAM_LETTER_TTA>
-<MALAYALAM_LETTER_TTHA>             <X7040>;<X05>;<X05>;<MALAYALAM_LETTER_TTHA>
-<MALAYALAM_LETTER_DDA>              <X7042>;<X05>;<X05>;<MALAYALAM_LETTER_DDA>
-<MALAYALAM_LETTER_DDHA>             <X7044>;<X05>;<X05>;<MALAYALAM_LETTER_DDHA>
-<MALAYALAM_LETTER_NNA>              <X7046>;<X05>;<X05>;<MALAYALAM_LETTER_NNA>
-<MALAYALAM_LETTER_NNA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER-REVERSE_SOLIDUS> "<X7046><X7098>";"<X87><X05>";"<X05><X05>";<MALAYALAM_LETTER_NNA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER-REVERSE_SOLIDUS>
-<MALAYALAM_LETTER_CHILLU_NN>        "<X7046><X7098>";"<X87><X05>";"<X06><X05>";<MALAYALAM_LETTER_CHILLU_NN>
-<MALAYALAM_LETTER_TA>               <X7048>;<X05>;<X05>;<MALAYALAM_LETTER_TA>
-<MALAYALAM_LETTER_THA>              <X704A>;<X05>;<X05>;<MALAYALAM_LETTER_THA>
-<MALAYALAM_LETTER_DA>               <X704C>;<X05>;<X05>;<MALAYALAM_LETTER_DA>
-<MALAYALAM_LETTER_DHA>              <X704E>;<X05>;<X05>;<MALAYALAM_LETTER_DHA>
-<MALAYALAM_LETTER_NA>               <X7050>;<X05>;<X05>;<MALAYALAM_LETTER_NA>
-<MALAYALAM_LETTER_CHILLU_N-MALAYALAM_SIGN_VIRAMA> "<X7050><X7098>";"<X05><X05>";"<X06><X05>";<MALAYALAM_LETTER_CHILLU_N-MALAYALAM_SIGN_VIRAMA>
-<MALAYALAM_LETTER_NA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> "<X7050><X7098>";"<X87><X05>";"<X05><X05>";<MALAYALAM_LETTER_NA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER>
-<MALAYALAM_LETTER_CHILLU_N>         "<X7050><X7098>";"<X87><X05>";"<X06><X05>";<MALAYALAM_LETTER_CHILLU_N>
-<MALAYALAM_LETTER_NNNA>             <X7052>;<X05>;<X05>;<MALAYALAM_LETTER_NNNA>
-<MALAYALAM_LETTER_PA>               <X7054>;<X05>;<X05>;<MALAYALAM_LETTER_PA>
-<MALAYALAM_LETTER_PHA>              <X7056>;<X05>;<X05>;<MALAYALAM_LETTER_PHA>
-<MALAYALAM_LETTER_BA>               <X7058>;<X05>;<X05>;<MALAYALAM_LETTER_BA>
-<MALAYALAM_LETTER_BHA>              <X705A>;<X05>;<X05>;<MALAYALAM_LETTER_BHA>
-<MALAYALAM_LETTER_MA>               <X705C>;<X05>;<X05>;<MALAYALAM_LETTER_MA>
-<MALAYALAM_SIGN_ANUSVARA>           "<X705C><X7098>";"<X87><X05>";"<X05><X05>";<MALAYALAM_SIGN_ANUSVARA>
-<MALAYALAM_LETTER_YA>               <X705E>;<X05>;<X05>;<MALAYALAM_LETTER_YA>
-<MALAYALAM_LETTER_RA>               <X7060>;<X05>;<X05>;<MALAYALAM_LETTER_RA>
-<MALAYALAM_LETTER_DOT_REPH>         "<X7060><X7098>";"<X05><X05>";"<X09><X09>";<MALAYALAM_LETTER_DOT_REPH>
-<MALAYALAM_LETTER_RA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> "<X7060><X7098>";"<X87><X05>";"<X05><X05>";<MALAYALAM_LETTER_RA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER>
-<MALAYALAM_LETTER_CHILLU_RR>        "<X7060><X7098>";"<X87><X05>";"<X06><X05>";<MALAYALAM_LETTER_CHILLU_RR>
-<MALAYALAM_LETTER_LA>               <X7062>;<X05>;<X05>;<MALAYALAM_LETTER_LA>
-<MALAYALAM_LETTER_LA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> "<X7062><X7098>";"<X87><X05>";"<X05><X05>";<MALAYALAM_LETTER_LA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER>
-<MALAYALAM_LETTER_CHILLU_L>         "<X7062><X7098>";"<X87><X05>";"<X06><X05>";<MALAYALAM_LETTER_CHILLU_L>
-<MALAYALAM_LETTER_VA>               <X7064>;<X05>;<X05>;<MALAYALAM_LETTER_VA>
-<MALAYALAM_LETTER_SHA>              <X7066>;<X05>;<X05>;<MALAYALAM_LETTER_SHA>
-<MALAYALAM_LETTER_SSA>              <X7068>;<X05>;<X05>;<MALAYALAM_LETTER_SSA>
-<MALAYALAM_LETTER_SA>               <X706A>;<X05>;<X05>;<MALAYALAM_LETTER_SA>
-<MALAYALAM_LETTER_HA>               <X706C>;<X05>;<X05>;<MALAYALAM_LETTER_HA>
-<MALAYALAM_LETTER_LLA>              <X706E>;<X05>;<X05>;<MALAYALAM_LETTER_LLA>
-<MALAYALAM_LETTER_LLA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER> "<X706E><X7098>";"<X87><X05>";"<X05><X05>";<MALAYALAM_LETTER_LLA-MALAYALAM_SIGN_VIRAMA-ZERO_WIDTH_JOINER>
-<MALAYALAM_LETTER_CHILLU_LL>        "<X706E><X7098>";"<X87><X05>";"<X06><X05>";<MALAYALAM_LETTER_CHILLU_LL>
-<MALAYALAM_LETTER_LLLA>             <X7070>;<X05>;<X05>;<MALAYALAM_LETTER_LLLA>
-<MALAYALAM_LETTER_RRA>              <X7072>;<X05>;<X05>;<MALAYALAM_LETTER_RRA>
-<MALAYALAM_LETTER_TTTA>             <X7074>;<X05>;<X05>;<MALAYALAM_LETTER_TTTA>
-<MALAYALAM_VOWEL_SIGN_AA>           <X7078>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_AA>
-<MALAYALAM_VOWEL_SIGN_I>            <X707A>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_I>
-<MALAYALAM_VOWEL_SIGN_II>           <X707C>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_II>
-<MALAYALAM_VOWEL_SIGN_U>            <X707E>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_U>
-<MALAYALAM_VOWEL_SIGN_UU>           <X7080>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_UU>
-<MALAYALAM_VOWEL_SIGN_VOCALIC_R>    <X7082>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_R>
-<MALAYALAM_VOWEL_SIGN_VOCALIC_RR>   <X7084>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_RR>
-<MALAYALAM_VOWEL_SIGN_VOCALIC_L>    <X7086>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_L>
-<MALAYALAM_VOWEL_SIGN_VOCALIC_LL>   <X7088>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_LL>
-<MALAYALAM_VOWEL_SIGN_E>            <X708A>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_E>
-<MALAYALAM_VOWEL_SIGN_EE>           <X708C>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_EE>
-<MALAYALAM_VOWEL_SIGN_AI>           <X708E>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_AI>
-<MALAYALAM_VOWEL_SIGN_O>            <X7090>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_O>
-<MALAYALAM_VOWEL_SIGN_OO>           <X7092>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_OO>
-<MALAYALAM_AU_LENGTH_MARK>          <X7093>;<X05>;<X05>;<MALAYALAM_AU_LENGTH_MARK>
-<MALAYALAM_VOWEL_SIGN_AU>           <X7093>;<X05>;<X06>;<MALAYALAM_VOWEL_SIGN_AU>
-<MALAYALAM_SIGN_VIRAMA>             <X7098>;<X05>;<X05>;<MALAYALAM_SIGN_VIRAMA>
-UNDEFINED                           IGNORE;IGNORE;IGNORE;...
+<NULL>                                            IGNORE;IGNORE;IGNORE;<NULL>
+<START_OF_HEADING>                                IGNORE;IGNORE;IGNORE;<START_OF_HEADING>
+<START_OF_TEXT>                                   IGNORE;IGNORE;IGNORE;<START_OF_TEXT>
+<END_OF_TEXT>                                     IGNORE;IGNORE;IGNORE;<END_OF_TEXT>
+<END_OF_TRANSMISSION>                             IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION>
+<ENQUIRY>                                         IGNORE;IGNORE;IGNORE;<ENQUIRY>
+<ACKNOWLEDGE>                                     IGNORE;IGNORE;IGNORE;<ACKNOWLEDGE>
+<ALERT>                                           IGNORE;IGNORE;IGNORE;<ALERT>
+<BACKSPACE>                                       IGNORE;IGNORE;IGNORE;<BACKSPACE>
+<SHIFT_OUT>                                       IGNORE;IGNORE;IGNORE;<SHIFT_OUT>
+<SHIFT_IN>                                        IGNORE;IGNORE;IGNORE;<SHIFT_IN>
+<DATA_LINK_ESCAPE>                                IGNORE;IGNORE;IGNORE;<DATA_LINK_ESCAPE>
+<DEVICE_CONTROL_ONE>                              IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_ONE>
+<DEVICE_CONTROL_TWO>                              IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_TWO>
+<DEVICE_CONTROL_THREE>                            IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_THREE>
+<DEVICE_CONTROL_FOUR>                             IGNORE;IGNORE;IGNORE;<DEVICE_CONTROL_FOUR>
+<NEGATIVE_ACKNOWLEDGE>                            IGNORE;IGNORE;IGNORE;<NEGATIVE_ACKNOWLEDGE>
+<SYNCHRONOUS_IDLE>                                IGNORE;IGNORE;IGNORE;<SYNCHRONOUS_IDLE>
+<END_OF_TRANSMISSION_BLOCK>                       IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION_BLOCK>
+<CANCEL>                                          IGNORE;IGNORE;IGNORE;<CANCEL>
+<END_OF_MEDIUM>                                   IGNORE;IGNORE;IGNORE;<END_OF_MEDIUM>
+<SUBSTITUTE>                                      IGNORE;IGNORE;IGNORE;<SUBSTITUTE>
+<ESCAPE>                                          IGNORE;IGNORE;IGNORE;<ESCAPE>
+<INFORMATION_SEPARATOR_FOUR>                      IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_FOUR>
+<INFORMATION_SEPARATOR_THREE>                     IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_THREE>
+<INFORMATION_SEPARATOR_TWO>                       IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_TWO>
+<INFORMATION_SEPARATOR_ONE>                       IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_ONE>
+<DELETE>                                          IGNORE;IGNORE;IGNORE;<DELETE>
+<ZERO_WIDTH_NON-JOINER>                           IGNORE;IGNORE;IGNORE;<ZERO_WIDTH_NON-JOINER>
+<ZERO_WIDTH_JOINER>                               IGNORE;IGNORE;IGNORE;<ZERO_WIDTH_JOINER>
+<MALAYALAM_SIGN_CANDRABINDU>                      IGNORE;"<XF1><X44>";"<X05><XC0>";<MALAYALAM_SIGN_CANDRABINDU>
+<MALAYALAM_SIGN_VISARGA>                          IGNORE;"<XF1><X88>";"<X05><XC0>";<MALAYALAM_SIGN_VISARGA>
+<MALAYALAM_SIGN_AVAGRAHA>                         IGNORE;"<XF1><X89>";"<X05><XC0>";<MALAYALAM_SIGN_AVAGRAHA>
+<tab>                                             <X0304>;<X05>;<X05>;<tab>
+<newline>                                         <X0306>;<X05>;<X05>;<newline>
+<vertical-tab>                                    <X0308>;<X05>;<X05>;<vertical-tab>
+<form-feed>                                       <X030A>;<X05>;<X05>;<form-feed>
+<carriage-return>                                 <X030C>;<X05>;<X05>;<carriage-return>
+<space>                                           <X0400>;<X05>;<X05>;<space>
+<LOW_LINE>                                        <X050A>;<X05>;<X05>;<LOW_LINE>
+<HYPHEN-MINUS>                                    <X050E>;<X05>;<X05>;<HYPHEN-MINUS>
+<COMMA>                                           <X0600>;<X05>;<X05>;<COMMA>
+<SEMICOLON>                                       <X0722>;<X05>;<X05>;<SEMICOLON>
+<COLON>                                           <X072C>;<X05>;<X05>;<COLON>
+<EXCLAMATION_MARK>                                <X0750>;<X05>;<X05>;<EXCLAMATION_MARK>
+<QUESTION_MARK>                                   <X0758>;<X05>;<X05>;<QUESTION_MARK>
+<FULL_STOP>                                       <X0800>;<X05>;<X05>;<FULL_STOP>
+<APOSTROPHE>                                      <X0969>;<X05>;<X05>;<APOSTROPHE>
+<QUOTATION_MARK>                                  <X0977>;<X05>;<X05>;<QUOTATION_MARK>
+<LEFT_PARENTHESIS>                                <X098D>;<X05>;<X05>;<LEFT_PARENTHESIS>
+<RIGHT_PARENTHESIS>                               <X098F>;<X05>;<X05>;<RIGHT_PARENTHESIS>
+<LEFT_SQUARE_BRACKET>                             <X0991>;<X05>;<X05>;<LEFT_SQUARE_BRACKET>
+<RIGHT_SQUARE_BRACKET>                            <X0993>;<X05>;<X05>;<RIGHT_SQUARE_BRACKET>
+<LEFT_CURLY_BRACKET>                              <X0995>;<X05>;<X05>;<LEFT_CURLY_BRACKET>
+<RIGHT_CURLY_BRACKET>                             <X0997>;<X05>;<X05>;<RIGHT_CURLY_BRACKET>
+<COMMERCIAL_AT>                                   <X0A7B>;<X05>;<X05>;<COMMERCIAL_AT>
+<ASTERISK>                                        <X0A7D>;<X05>;<X05>;<ASTERISK>
+<SOLIDUS>                                         <X0A87>;<X05>;<X05>;<SOLIDUS>
+<REVERSE_SOLIDUS>                                 <X0A89>;<X05>;<X05>;<REVERSE_SOLIDUS>
+<AMPERSAND>                                       <X0A8B>;<X05>;<X05>;<AMPERSAND>
+<NUMBER_SIGN>                                     <X0A8F>;<X05>;<X05>;<NUMBER_SIGN>
+<PERCENT_SIGN>                                    <X0A91>;<X05>;<X05>;<PERCENT_SIGN>
+<GRAVE_ACCENT>                                    <X0C04>;<X05>;<X05>;<GRAVE_ACCENT>
+<CIRCUMFLEX_ACCENT>                               <X0C0A>;<X05>;<X05>;<CIRCUMFLEX_ACCENT>
+<MALAYALAM_SIGN_PARA>                             "<X0C56><X0E00>";<X05>;"<X05><XC0>";<MALAYALAM_SIGN_PARA>
+<MALAYALAM_DATE_MARK>                             "<X0C56><X1500>";<X05>;"<X05><XC0>";<MALAYALAM_DATE_MARK>
+<PLUS_SIGN>                                       <X0C76>;<X05>;<X05>;<PLUS_SIGN>
+<LESS-THAN_SIGN>                                  <X0C7E>;<X05>;<X05>;<LESS-THAN_SIGN>
+<EQUALS_SIGN>                                     <X0C80>;<X05>;<X05>;<EQUALS_SIGN>
+<GREATER-THAN_SIGN>                               <X0C82>;<X05>;<X05>;<GREATER-THAN_SIGN>
+<VERTICAL_LINE>                                   <X0C86>;<X05>;<X05>;<VERTICAL_LINE>
+<TILDE>                                           <X0C8A>;<X05>;<X05>;<TILDE>
+<DOLLAR_SIGN>                                     <X0D6A>;<X05>;<X05>;<DOLLAR_SIGN>
+<MALAYALAM_FRACTION_ONE_ONE-HUNDRED-AND-SIXTIETH> <X1030>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_ONE-HUNDRED-AND-SIXTIETH>
+<MALAYALAM_FRACTION_ONE_FORTIETH>                 <X1032>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_FORTIETH>
+<MALAYALAM_FRACTION_THREE_EIGHTIETHS>             <X1034>;<X05>;<X05>;<MALAYALAM_FRACTION_THREE_EIGHTIETHS>
+<MALAYALAM_FRACTION_ONE_TWENTIETH>                <X1036>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_TWENTIETH>
+<MALAYALAM_FRACTION_ONE_TENTH>                    <X1038>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_TENTH>
+<MALAYALAM_FRACTION_THREE_TWENTIETHS>             <X103A>;<X05>;<X05>;<MALAYALAM_FRACTION_THREE_TWENTIETHS>
+<MALAYALAM_FRACTION_ONE_FIFTH>                    <X103C>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_FIFTH>
+<MALAYALAM_NUMBER_TEN>                            <X103E>;<X05>;<X05>;<MALAYALAM_NUMBER_TEN>
+<MALAYALAM_NUMBER_ONE_HUNDRED>                    <X1040>;<X05>;<X05>;<MALAYALAM_NUMBER_ONE_HUNDRED>
+<MALAYALAM_NUMBER_ONE_THOUSAND>                   <X1042>;<X05>;<X05>;<MALAYALAM_NUMBER_ONE_THOUSAND>
+<MALAYALAM_FRACTION_ONE_QUARTER>                  <X1044>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_QUARTER>
+<MALAYALAM_FRACTION_ONE_HALF>                     <X1046>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_HALF>
+<MALAYALAM_FRACTION_THREE_QUARTERS>               <X1048>;<X05>;<X05>;<MALAYALAM_FRACTION_THREE_QUARTERS>
+<MALAYALAM_FRACTION_ONE_SIXTEENTH>                <X104A>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_SIXTEENTH>
+<MALAYALAM_FRACTION_ONE_EIGHTH>                   <X104C>;<X05>;<X05>;<MALAYALAM_FRACTION_ONE_EIGHTH>
+<MALAYALAM_FRACTION_THREE_SIXTEENTHS>             <X104E>;<X05>;<X05>;<MALAYALAM_FRACTION_THREE_SIXTEENTHS>
+<zero>                                            <X1200>;<X05>;<X05>;<zero>
+<MALAYALAM_DIGIT_ZERO>                            <X1200>;<X05>;<X05>;<MALAYALAM_DIGIT_ZERO>
+<one>                                             <X1400>;<X05>;<X05>;<one>
+<MALAYALAM_DIGIT_ONE>                             <X1400>;<X05>;<X05>;<MALAYALAM_DIGIT_ONE>
+<two>                                             <X1600>;<X05>;<X05>;<two>
+<MALAYALAM_DIGIT_TWO>                             <X1600>;<X05>;<X05>;<MALAYALAM_DIGIT_TWO>
+<three>                                           <X1800>;<X05>;<X05>;<three>
+<MALAYALAM_DIGIT_THREE>                           <X1800>;<X05>;<X05>;<MALAYALAM_DIGIT_THREE>
+<four>                                            <X1A00>;<X05>;<X05>;<four>
+<MALAYALAM_DIGIT_FOUR>                            <X1A00>;<X05>;<X05>;<MALAYALAM_DIGIT_FOUR>
+<five>                                            <X1C00>;<X05>;<X05>;<five>
+<MALAYALAM_DIGIT_FIVE>                            <X1C00>;<X05>;<X05>;<MALAYALAM_DIGIT_FIVE>
+<six>                                             <X1E00>;<X05>;<X05>;<six>
+<MALAYALAM_DIGIT_SIX>                             <X1E00>;<X05>;<X05>;<MALAYALAM_DIGIT_SIX>
+<seven>                                           <X2000>;<X05>;<X05>;<seven>
+<MALAYALAM_DIGIT_SEVEN>                           <X2000>;<X05>;<X05>;<MALAYALAM_DIGIT_SEVEN>
+<eight>                                           <X2200>;<X05>;<X05>;<eight>
+<MALAYALAM_DIGIT_EIGHT>                           <X2200>;<X05>;<X05>;<MALAYALAM_DIGIT_EIGHT>
+<nine>                                            <X2400>;<X05>;<X05>;<nine>
+<MALAYALAM_DIGIT_NINE>                            <X2400>;<X05>;<X05>;<MALAYALAM_DIGIT_NINE>
+<MALAYALAM_LETTER_A>                              <X6F06>;<X05>;<X05>;<MALAYALAM_LETTER_A>
+<MALAYALAM_LETTER_AA>                             <X6F08>;<X05>;<X05>;<MALAYALAM_LETTER_AA>
+<MALAYALAM_LETTER_I>                              <X6F0A>;<X05>;<X05>;<MALAYALAM_LETTER_I>
+<MALAYALAM_LETTER_II>                             <X6F0C>;<X05>;<X05>;<MALAYALAM_LETTER_II>
+<MALAYALAM_LETTER_ARCHAIC_II>                     <X6F0E>;<X05>;<X05>;<MALAYALAM_LETTER_ARCHAIC_II>
+<MALAYALAM_LETTER_U>                              <X6F10>;<X05>;<X05>;<MALAYALAM_LETTER_U>
+<MALAYALAM_LETTER_UU>                             <X6F12>;<X05>;<X05>;<MALAYALAM_LETTER_UU>
+<MALAYALAM_LETTER_VOCALIC_R>                      <X6F14>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_R>
+<MALAYALAM_LETTER_VOCALIC_RR>                     <X6F16>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_RR>
+<MALAYALAM_LETTER_VOCALIC_L>                      <X6F18>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_L>
+<MALAYALAM_LETTER_VOCALIC_LL>                     <X6F1A>;<X05>;<X05>;<MALAYALAM_LETTER_VOCALIC_LL>
+<MALAYALAM_LETTER_E>                              <X6F1C>;<X05>;<X05>;<MALAYALAM_LETTER_E>
+<MALAYALAM_LETTER_EE>                             <X6F1E>;<X05>;<X05>;<MALAYALAM_LETTER_EE>
+<MALAYALAM_LETTER_AI>                             <X6F20>;<X05>;<X05>;<MALAYALAM_LETTER_AI>
+<MALAYALAM_LETTER_O>                              <X6F22>;<X05>;<X05>;<MALAYALAM_LETTER_O>
+<MALAYALAM_LETTER_OO>                             <X6F24>;<X05>;<X05>;<MALAYALAM_LETTER_OO>
+<MALAYALAM_LETTER_AU>                             <X6F26>;<X05>;<X05>;<MALAYALAM_LETTER_AU>
+<MALAYALAM_LETTER_KA>                             <X6F28>;<X05>;<X05>;<MALAYALAM_LETTER_KA>
+<MALAYALAM_LETTER_KA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> "<X6F28><X6F96>";"<X05><X4C>";"<X05><X45>";<MALAYALAM_LETTER_KA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D>
+<MALAYALAM_LETTER_CHILLU_K>                       "<X6F28><X6F96>";"<X05><X4C>";"<X05><X06>";<MALAYALAM_LETTER_CHILLU_K>
+<MALAYALAM_LETTER_KHA>                            <X6F2A>;<X05>;<X05>;<MALAYALAM_LETTER_KHA>
+<MALAYALAM_LETTER_GA>                             <X6F2C>;<X05>;<X05>;<MALAYALAM_LETTER_GA>
+<MALAYALAM_LETTER_GHA>                            <X6F2E>;<X05>;<X05>;<MALAYALAM_LETTER_GHA>
+<MALAYALAM_LETTER_NGA>                            <X6F30>;<X05>;<X05>;<MALAYALAM_LETTER_NGA>
+<MALAYALAM_LETTER_CA>                             <X6F32>;<X05>;<X05>;<MALAYALAM_LETTER_CA>
+<MALAYALAM_LETTER_CHA>                            <X6F34>;<X05>;<X05>;<MALAYALAM_LETTER_CHA>
+<MALAYALAM_LETTER_JA>                             <X6F36>;<X05>;<X05>;<MALAYALAM_LETTER_JA>
+<MALAYALAM_LETTER_JHA>                            <X6F38>;<X05>;<X05>;<MALAYALAM_LETTER_JHA>
+<MALAYALAM_LETTER_NYA>                            <X6F3A>;<X05>;<X05>;<MALAYALAM_LETTER_NYA>
+<MALAYALAM_LETTER_TTA>                            <X6F3C>;<X05>;<X05>;<MALAYALAM_LETTER_TTA>
+<MALAYALAM_LETTER_TTHA>                           <X6F3E>;<X05>;<X05>;<MALAYALAM_LETTER_TTHA>
+<MALAYALAM_LETTER_DDA>                            <X6F40>;<X05>;<X05>;<MALAYALAM_LETTER_DDA>
+<MALAYALAM_LETTER_DDHA>                           <X6F42>;<X05>;<X05>;<MALAYALAM_LETTER_DDHA>
+<MALAYALAM_LETTER_NNA>                            <X6F44>;<X05>;<X05>;<MALAYALAM_LETTER_NNA>
+<MALAYALAM_LETTER_NNA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> "<X6F44><X6F96>";"<X05><X4B>";"<X05><X45>";<MALAYALAM_LETTER_NNA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D>
+<MALAYALAM_LETTER_CHILLU_NN>                      "<X6F44><X6F96>";"<X05><X4B>";"<X05><X06>";<MALAYALAM_LETTER_CHILLU_NN>
+<MALAYALAM_LETTER_TA>                             <X6F46>;<X05>;<X05>;<MALAYALAM_LETTER_TA>
+<MALAYALAM_LETTER_THA>                            <X6F48>;<X05>;<X05>;<MALAYALAM_LETTER_THA>
+<MALAYALAM_LETTER_DA>                             <X6F4A>;<X05>;<X05>;<MALAYALAM_LETTER_DA>
+<MALAYALAM_LETTER_DHA>                            <X6F4C>;<X05>;<X05>;<MALAYALAM_LETTER_DHA>
+<MALAYALAM_LETTER_NA>                             <X6F4E>;<X05>;<X05>;<MALAYALAM_LETTER_NA>
+<MALAYALAM_LETTER_CHILLU_N-MALAYALAM_SIGN_VIRAMA> "<X6F4E><X6F96>";"<X05><X05>";"<X05><X06>";<MALAYALAM_LETTER_CHILLU_N-MALAYALAM_SIGN_VIRAMA>
+<MALAYALAM_LETTER_NA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> "<X6F4E><X6F96>";"<X05><X4A>";"<X05><X45>";<MALAYALAM_LETTER_NA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D>
+<MALAYALAM_LETTER_CHILLU_N>                       "<X6F4E><X6F96>";"<X05><X4A>";"<X05><X06>";<MALAYALAM_LETTER_CHILLU_N>
+<MALAYALAM_LETTER_NNNA>                           <X6F50>;<X05>;<X05>;<MALAYALAM_LETTER_NNNA>
+<MALAYALAM_LETTER_PA>                             <X6F52>;<X05>;<X05>;<MALAYALAM_LETTER_PA>
+<MALAYALAM_LETTER_PHA>                            <X6F54>;<X05>;<X05>;<MALAYALAM_LETTER_PHA>
+<MALAYALAM_LETTER_BA>                             <X6F56>;<X05>;<X05>;<MALAYALAM_LETTER_BA>
+<MALAYALAM_LETTER_BHA>                            <X6F58>;<X05>;<X05>;<MALAYALAM_LETTER_BHA>
+<MALAYALAM_LETTER_MA>                             <X6F5A>;<X05>;<X05>;<MALAYALAM_LETTER_MA>
+<MALAYALAM_LETTER_CHILLU_M>                       "<X6F5A><X6F96>";"<X05><X05>";"<X20><X20>";<MALAYALAM_LETTER_CHILLU_M>
+<MALAYALAM_SIGN_ANUSVARA>                         "<X6F5A><X6F96>";"<X05><X46>";"<X05><X05>";<MALAYALAM_SIGN_ANUSVARA>
+<MALAYALAM_LETTER_YA>                             <X6F5C>;<X05>;<X05>;<MALAYALAM_LETTER_YA>
+<MALAYALAM_LETTER_CHILLU_Y>                       "<X6F5C><X6F96>";"<X05><X05>";"<X20><X20>";<MALAYALAM_LETTER_CHILLU_Y>
+<MALAYALAM_LETTER_RA>                             <X6F5E>;<X05>;<X05>;<MALAYALAM_LETTER_RA>
+<MALAYALAM_LETTER_DOT_REPH>                       "<X6F5E><X6F96>";"<X05><X05>";"<X20><X20>";<MALAYALAM_LETTER_DOT_REPH>
+<MALAYALAM_LETTER_RA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> "<X6F5E><X6F96>";"<X05><X49>";"<X05><X45>";<MALAYALAM_LETTER_RA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D>
+<MALAYALAM_LETTER_CHILLU_RR>                      "<X6F5E><X6F96>";"<X05><X49>";"<X05><X06>";<MALAYALAM_LETTER_CHILLU_RR>
+<MALAYALAM_LETTER_LA>                             <X6F60>;<X05>;<X05>;<MALAYALAM_LETTER_LA>
+<MALAYALAM_LETTER_LA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> "<X6F60><X6F96>";"<X05><X48>";"<X05><X45>";<MALAYALAM_LETTER_LA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D>
+<MALAYALAM_LETTER_CHILLU_L>                       "<X6F60><X6F96>";"<X05><X48>";"<X05><X06>";<MALAYALAM_LETTER_CHILLU_L>
+<MALAYALAM_LETTER_VA>                             <X6F62>;<X05>;<X05>;<MALAYALAM_LETTER_VA>
+<MALAYALAM_LETTER_SHA>                            <X6F64>;<X05>;<X05>;<MALAYALAM_LETTER_SHA>
+<MALAYALAM_LETTER_SSA>                            <X6F66>;<X05>;<X05>;<MALAYALAM_LETTER_SSA>
+<MALAYALAM_LETTER_SA>                             <X6F68>;<X05>;<X05>;<MALAYALAM_LETTER_SA>
+<MALAYALAM_LETTER_HA>                             <X6F6A>;<X05>;<X05>;<MALAYALAM_LETTER_HA>
+<MALAYALAM_LETTER_LLA>                            <X6F6C>;<X05>;<X05>;<MALAYALAM_LETTER_LLA>
+<MALAYALAM_LETTER_LLA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D> "<X6F6C><X6F96>";"<X05><X47>";"<X05><X45>";<MALAYALAM_LETTER_LLA-MALAYALAM_SIGN_VIRAMA-u-two-zero-zero-D>
+<MALAYALAM_LETTER_CHILLU_LL>                      "<X6F6C><X6F96>";"<X05><X47>";"<X05><X06>";<MALAYALAM_LETTER_CHILLU_LL>
+<MALAYALAM_LETTER_LLLA>                           <X6F6E>;<X05>;<X05>;<MALAYALAM_LETTER_LLLA>
+<MALAYALAM_LETTER_CHILLU_LLL>                     "<X6F6E><X6F96>";"<X05><X05>";"<X20><X20>";<MALAYALAM_LETTER_CHILLU_LLL>
+<MALAYALAM_LETTER_RRA>                            <X6F70>;<X05>;<X05>;<MALAYALAM_LETTER_RRA>
+<MALAYALAM_LETTER_TTTA>                           <X6F72>;<X05>;<X05>;<MALAYALAM_LETTER_TTTA>
+<MALAYALAM_VOWEL_SIGN_AA>                         <X6F76>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_AA>
+<MALAYALAM_VOWEL_SIGN_I>                          <X6F78>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_I>
+<MALAYALAM_VOWEL_SIGN_II>                         <X6F7A>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_II>
+<MALAYALAM_VOWEL_SIGN_U>                          <X6F7C>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_U>
+<MALAYALAM_VOWEL_SIGN_UU>                         <X6F7E>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_UU>
+<MALAYALAM_VOWEL_SIGN_VOCALIC_R>                  <X6F80>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_R>
+<MALAYALAM_VOWEL_SIGN_VOCALIC_RR>                 <X6F82>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_RR>
+<MALAYALAM_VOWEL_SIGN_VOCALIC_L>                  <X6F84>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_L>
+<MALAYALAM_VOWEL_SIGN_VOCALIC_LL>                 <X6F86>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_VOCALIC_LL>
+<MALAYALAM_VOWEL_SIGN_E>                          <X6F88>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_E>
+<MALAYALAM_VOWEL_SIGN_EE>                         <X6F8A>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_EE>
+<MALAYALAM_VOWEL_SIGN_AI>                         <X6F8C>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_AI>
+<MALAYALAM_VOWEL_SIGN_O>                          <X6F8E>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_O>
+<MALAYALAM_VOWEL_SIGN_OO>                         <X6F90>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_OO>
+<MALAYALAM_VOWEL_SIGN_AU>                         <X6F92>;<X05>;<X05>;<MALAYALAM_VOWEL_SIGN_AU>
+<MALAYALAM_AU_LENGTH_MARK>                        <X6F94>;<X05>;<X05>;<MALAYALAM_AU_LENGTH_MARK>
+<MALAYALAM_SIGN_VIRAMA>                           <X6F96>;<X05>;<X05>;<MALAYALAM_SIGN_VIRAMA>
+<a>                                               <X2900>;<X05>;<X05>;<a>
+<A>                                               <X2900>;<X05>;<X9C>;<A>
+<b>                                               <X2B00>;<X05>;<X05>;<b>
+<B>                                               <X2B00>;<X05>;<X9C>;<B>
+<c>                                               <X2D00>;<X05>;<X05>;<c>
+<C>                                               <X2D00>;<X05>;<X9C>;<C>
+<d>                                               <X2F00>;<X05>;<X05>;<d>
+<D>                                               <X2F00>;<X05>;<X9C>;<D>
+<e>                                               <X3100>;<X05>;<X05>;<e>
+<E>                                               <X3100>;<X05>;<X9C>;<E>
+<f>                                               <X3300>;<X05>;<X05>;<f>
+<F>                                               <X3300>;<X05>;<X9C>;<F>
+<g>                                               <X3500>;<X05>;<X05>;<g>
+<G>                                               <X3500>;<X05>;<X9C>;<G>
+<h>                                               <X3700>;<X05>;<X05>;<h>
+<H>                                               <X3700>;<X05>;<X9C>;<H>
+<i>                                               <X3900>;<X05>;<X05>;<i>
+<I>                                               <X3900>;<X05>;<X9C>;<I>
+<j>                                               <X3B00>;<X05>;<X05>;<j>
+<J>                                               <X3B00>;<X05>;<X9C>;<J>
+<k>                                               <X3D00>;<X05>;<X05>;<k>
+<K>                                               <X3D00>;<X05>;<X9C>;<K>
+<l>                                               <X3F00>;<X05>;<X05>;<l>
+<L>                                               <X3F00>;<X05>;<X9C>;<L>
+<m>                                               <X4100>;<X05>;<X05>;<m>
+<M>                                               <X4100>;<X05>;<X9C>;<M>
+<n>                                               <X4300>;<X05>;<X05>;<n>
+<N>                                               <X4300>;<X05>;<X9C>;<N>
+<o>                                               <X4500>;<X05>;<X05>;<o>
+<O>                                               <X4500>;<X05>;<X9C>;<O>
+<p>                                               <X4700>;<X05>;<X05>;<p>
+<P>                                               <X4700>;<X05>;<X9C>;<P>
+<q>                                               <X4900>;<X05>;<X05>;<q>
+<Q>                                               <X4900>;<X05>;<XA0>;<Q>
+<r>                                               <X4B00>;<X05>;<X05>;<r>
+<R>                                               <X4B00>;<X05>;<X9C>;<R>
+<s>                                               <X4D00>;<X05>;<X05>;<s>
+<S>                                               <X4D00>;<X05>;<X9C>;<S>
+<t>                                               <X4F00>;<X05>;<X05>;<t>
+<T>                                               <X4F00>;<X05>;<X9C>;<T>
+<u>                                               <X5100>;<X05>;<X05>;<u>
+<U>                                               <X5100>;<X05>;<X9C>;<U>
+<u-zero-D-five-seven>                             "<X5100><X1200><X2F00><X1A00><X2D00>";"<X05><X05><X05><X05><X46>";"<X05><X05><X9C><X05><X05>";<u-zero-D-five-seven>
+<v>                                               <X5300>;<X05>;<X05>;<v>
+<V>                                               <X5300>;<X05>;<X9C>;<V>
+<w>                                               <X5500>;<X05>;<X05>;<w>
+<W>                                               <X5500>;<X05>;<XA0>;<W>
+<x>                                               <X5700>;<X05>;<X05>;<x>
+<X>                                               <X5700>;<X05>;<X9C>;<X>
+<y>                                               <X5900>;<X05>;<X05>;<y>
+<Y>                                               <X5900>;<X05>;<X9C>;<Y>
+<z>                                               <X5B00>;<X05>;<X05>;<z>
+<Z>                                               <X5B00>;<X05>;<X9C>;<Z>
+UNDEFINED                                         IGNORE;IGNORE;IGNORE;...
 
 order_end
 
@@ -1327,20 +1422,20 @@ int_curr_symbol       "<I><N><R><space>"
 currency_symbol       "<INDIAN_RUPEE_SIGN>"
 mon_decimal_point     "<FULL_STOP>"
 mon_thousands_sep     "<COMMA>"
-mon_grouping          3;2
+mon_grouping          3
 positive_sign         ""
 negative_sign         "<HYPHEN-MINUS>"
 int_frac_digits       2
 frac_digits           2
-p_cs_precedes         0
+p_cs_precedes         1
 p_sep_by_space        0
-n_cs_precedes         0
+n_cs_precedes         1
 n_sep_by_space        0
 p_sign_posn           1
 n_sign_posn           1
-int_p_cs_precedes     0
+int_p_cs_precedes     1
 int_p_sep_by_space    0
-int_n_cs_precedes     0
+int_n_cs_precedes     1
 int_n_sep_by_space    0
 int_p_sign_posn       1
 int_n_sign_posn       1
@@ -1352,28 +1447,28 @@ END LC_MONETARY
 LC_TIME
 *************
 
-abday   "<MALAYALAM_LETTER_NYA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_YA><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
-        "<MALAYALAM_LETTER_TA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_NGA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_KA><MALAYALAM_LETTER_LLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
+abday   "<MALAYALAM_LETTER_NYA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_YA><MALAYALAM_LETTER_CHILLU_RR>";/
+        "<MALAYALAM_LETTER_TA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_NGA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_KA><MALAYALAM_LETTER_CHILLU_LL>";/
         "<MALAYALAM_LETTER_CA><MALAYALAM_VOWEL_SIGN_O><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_VA>";/
-        "<MALAYALAM_LETTER_BA><MALAYALAM_VOWEL_SIGN_U><MALAYALAM_LETTER_DHA><MALAYALAM_LETTER_NA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
+        "<MALAYALAM_LETTER_BA><MALAYALAM_VOWEL_SIGN_U><MALAYALAM_LETTER_DHA><MALAYALAM_LETTER_CHILLU_N>";/
         "<MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_YA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_ANUSVARA>";/
         "<MALAYALAM_LETTER_VA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_LLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_LLA><MALAYALAM_VOWEL_SIGN_I>";/
         "<MALAYALAM_LETTER_SHA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_I>"
 
-day     "<MALAYALAM_LETTER_NYA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_YA><MALAYALAM_LETTER_RRA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA>";/
-        "<MALAYALAM_LETTER_TA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_NGA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_KA><MALAYALAM_LETTER_LLA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA>";/
+day     "<MALAYALAM_LETTER_NYA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_YA><MALAYALAM_LETTER_RRA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_NON-JOINER><MALAYALAM_LETTER_CA>";/
+        "<MALAYALAM_LETTER_TA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_NGA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_KA><MALAYALAM_LETTER_LLA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_NON-JOINER><MALAYALAM_LETTER_CA>";/
         "<MALAYALAM_LETTER_CA><MALAYALAM_VOWEL_SIGN_O><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_VA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA>";/
-        "<MALAYALAM_LETTER_BA><MALAYALAM_VOWEL_SIGN_U><MALAYALAM_LETTER_DHA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA>";/
-        "<MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_YA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA>";/
-        "<MALAYALAM_LETTER_VA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_LLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_LLA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_YA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA>";/
-        "<MALAYALAM_LETTER_SHA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_YA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA>"
+        "<MALAYALAM_LETTER_BA><MALAYALAM_VOWEL_SIGN_U><MALAYALAM_LETTER_DHA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_NON-JOINER><MALAYALAM_LETTER_CA>";/
+        "<MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_YA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_NON-JOINER><MALAYALAM_LETTER_CA>";/
+        "<MALAYALAM_LETTER_VA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_LLA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_LLA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_YA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_NON-JOINER><MALAYALAM_LETTER_CA>";/
+        "<MALAYALAM_LETTER_SHA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_YA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_LLLA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_NON-JOINER><MALAYALAM_LETTER_CA>"
 
 abmon   "<MALAYALAM_LETTER_JA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_U>";/
         "<MALAYALAM_LETTER_PHA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_BA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_U>";/
-        "<MALAYALAM_LETTER_MA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
+        "<MALAYALAM_LETTER_MA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_CHILLU_RR>";/
         "<MALAYALAM_LETTER_EE><MALAYALAM_LETTER_PA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_I>";/
         "<MALAYALAM_LETTER_MA><MALAYALAM_VOWEL_SIGN_EE><MALAYALAM_LETTER_YA><MALAYALAM_SIGN_VIRAMA>";/
-        "<MALAYALAM_LETTER_JA><MALAYALAM_VOWEL_SIGN_UU><MALAYALAM_LETTER_NNA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
+        "<MALAYALAM_LETTER_JA><MALAYALAM_VOWEL_SIGN_UU><MALAYALAM_LETTER_CHILLU_NN>";/
         "<MALAYALAM_LETTER_JA><MALAYALAM_VOWEL_SIGN_UU><MALAYALAM_LETTER_LA><MALAYALAM_VOWEL_SIGN_AI>";/
         "<MALAYALAM_LETTER_OO><MALAYALAM_LETTER_GA>";/
         "<MALAYALAM_LETTER_SA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_PA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_ANUSVARA>";/
@@ -1383,139 +1478,39 @@ abmon   "<MALAYALAM_LETTER_JA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_U>";/
 
 mon     "<MALAYALAM_LETTER_JA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_U><MALAYALAM_LETTER_VA><MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_I>";/
         "<MALAYALAM_LETTER_PHA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_BA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_U><MALAYALAM_LETTER_VA><MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_I>";/
-        "<MALAYALAM_LETTER_MA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER><MALAYALAM_LETTER_CA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA><MALAYALAM_SIGN_VIRAMA>";/
-        "<MALAYALAM_LETTER_EE><MALAYALAM_LETTER_PA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_LA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
+        "<MALAYALAM_LETTER_MA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_CHILLU_RR><MALAYALAM_LETTER_CA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_CA><MALAYALAM_SIGN_VIRAMA>";/
+        "<MALAYALAM_LETTER_EE><MALAYALAM_LETTER_PA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_CHILLU_L>";/
         "<MALAYALAM_LETTER_MA><MALAYALAM_VOWEL_SIGN_EE><MALAYALAM_LETTER_YA><MALAYALAM_SIGN_VIRAMA>";/
-        "<MALAYALAM_LETTER_JA><MALAYALAM_VOWEL_SIGN_UU><MALAYALAM_LETTER_NNA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
+        "<MALAYALAM_LETTER_JA><MALAYALAM_VOWEL_SIGN_UU><MALAYALAM_LETTER_CHILLU_NN>";/
         "<MALAYALAM_LETTER_JA><MALAYALAM_VOWEL_SIGN_UU><MALAYALAM_LETTER_LA><MALAYALAM_VOWEL_SIGN_AI>";/
-        "<MALAYALAM_LETTER_AA><MALAYALAM_LETTER_GA><MALAYALAM_LETTER_SA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_VIRAMA>";/
-        "<MALAYALAM_LETTER_SA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_PA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_ANUSVARA><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
-        "<MALAYALAM_LETTER_O><MALAYALAM_LETTER_KA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_TTA><MALAYALAM_VOWEL_SIGN_OO><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
-        "<MALAYALAM_LETTER_NA><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_ANUSVARA><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>";/
-        "<MALAYALAM_LETTER_DDA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_SA><MALAYALAM_SIGN_ANUSVARA><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_JOINER>"
+        "<MALAYALAM_LETTER_OO><MALAYALAM_LETTER_GA><MALAYALAM_LETTER_SA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_VIRAMA>";/
+        "<MALAYALAM_LETTER_SA><MALAYALAM_VOWEL_SIGN_E><MALAYALAM_LETTER_PA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_RRA><MALAYALAM_SIGN_ANUSVARA><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_CHILLU_RR>";/
+        "<MALAYALAM_LETTER_O><MALAYALAM_LETTER_KA><MALAYALAM_SIGN_VIRAMA><ZERO_WIDTH_NON-JOINER><MALAYALAM_LETTER_TTA><MALAYALAM_VOWEL_SIGN_OO><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_CHILLU_RR>";/
+        "<MALAYALAM_LETTER_NA><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_ANUSVARA><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_CHILLU_RR>";/
+        "<MALAYALAM_LETTER_DDA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_SA><MALAYALAM_SIGN_ANUSVARA><MALAYALAM_LETTER_BA><MALAYALAM_LETTER_CHILLU_RR>"
 
-d_fmt    "%Od<SOLIDUS>%Om<SOLIDUS>%Oy"
+d_fmt    "%e<SOLIDUS>%m<SOLIDUS>%y"
 
-t_fmt    "%OI:%OM:%OS %p"
+t_fmt    "%I:%M:%S %p"
 
-d_t_fmt  "%Oy, %B %Oe %OI:%OM:%OS %p %Z"
+d_t_fmt  "%Y, %B %e %I:%M:%S %p %Z"
 
-am_pm    "<MALAYALAM_LETTER_RA><MALAYALAM_VOWEL_SIGN_AA><MALAYALAM_LETTER_VA><MALAYALAM_VOWEL_SIGN_I><MALAYALAM_LETTER_LA><MALAYALAM_VOWEL_SIGN_E>";"<MALAYALAM_LETTER_VA><MALAYALAM_VOWEL_SIGN_AI><MALAYALAM_LETTER_KA><MALAYALAM_VOWEL_SIGN_U><MALAYALAM_LETTER_NA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_NA><MALAYALAM_VOWEL_SIGN_EE><MALAYALAM_LETTER_RA><MALAYALAM_SIGN_ANUSVARA>"
+am_pm    "<A><M>";"<P><M>"
 
-t_fmt_ampm  "%OI:%OM:%OS %p"
+t_fmt_ampm  "%I:%M:%S %p"
 
-alt_digits "<MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_ONE><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_TWO><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_THREE><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_FOUR><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_FIVE><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_SIX><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_SEVEN><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_EIGHT><MALAYALAM_DIGIT_NINE>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_ZERO>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_ONE>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_TWO>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_THREE>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_FOUR>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_FIVE>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_SIX>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_SEVEN>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_EIGHT>";/
-           "<MALAYALAM_DIGIT_NINE><MALAYALAM_DIGIT_NINE>"
 END LC_TIME
 *************
 LC_MESSAGES
 *************
 
-yesstr   "<MALAYALAM_LETTER_A><MALAYALAM_LETTER_TA><MALAYALAM_VOWEL_SIGN_E>:yes:y:YES:Y"
+yesstr   "<MALAYALAM_LETTER_U><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA>:yes:y:YES:Y"
 
 nostr    "<MALAYALAM_LETTER_A><MALAYALAM_LETTER_LA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_LA>:no:n:NO:N"
 
-yesexpr  "^((<MALAYALAM_LETTER_A><MALAYALAM_LETTER_TA><MALAYALAM_VOWEL_SIGN_E>)|([yY]([eE][sS])?))"
+yesexpr  "^((<MALAYALAM_LETTER_U><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_VA><MALAYALAM_SIGN_VIRAMA>)|([yY]([eE][sS])?)|([yY]))"
 
-noexpr   "^((<MALAYALAM_LETTER_A><MALAYALAM_LETTER_LA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_LA>)|([nN]([oO])?))"
+noexpr   "^((<MALAYALAM_LETTER_A><MALAYALAM_LETTER_LA><MALAYALAM_SIGN_VIRAMA><MALAYALAM_LETTER_LA>)|([nN]([oO])?)|([nN]))"
 
 
 END LC_MESSAGES

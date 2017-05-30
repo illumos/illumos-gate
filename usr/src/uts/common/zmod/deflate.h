@@ -11,8 +11,6 @@
 #ifndef _DEFLATE_H
 #define _DEFLATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "zutil.h"
 
 /* define NO_GZIP when compiling if you want to disable gzip header and
