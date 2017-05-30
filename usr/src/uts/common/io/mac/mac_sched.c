@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -1413,12 +1413,12 @@ mac_srs_fire(void *arg)
 	mac_soft_ring_set_t *mac_srs = (mac_soft_ring_set_t *)arg;
 
 	mutex_enter(&mac_srs->srs_lock);
-	if (mac_srs->srs_tid == 0) {
+	if (mac_srs->srs_tid == NULL) {
 		mutex_exit(&mac_srs->srs_lock);
 		return;
 	}
 
-	mac_srs->srs_tid = 0;
+	mac_srs->srs_tid = NULL;
 	if (!(mac_srs->srs_state & SRS_PROC))
 		cv_signal(&mac_srs->srs_async);
 
@@ -2613,8 +2613,8 @@ again:
 	ASSERT(head != NULL);
 	ASSERT(tail != NULL);
 
-	if ((tid = mac_srs->srs_tid) != 0)
-		mac_srs->srs_tid = 0;
+	if ((tid = mac_srs->srs_tid) != NULL)
+		mac_srs->srs_tid = NULL;
 
 	mac_srs->srs_state |= (SRS_PROC|proc_type);
 
@@ -2660,9 +2660,9 @@ again:
 
 		mac_srs->srs_state |= SRS_CLIENT_PROC;
 		mutex_exit(&mac_srs->srs_lock);
-		if (tid != 0) {
+		if (tid != NULL) {
 			(void) untimeout(tid);
-			tid = 0;
+			tid = NULL;
 		}
 
 		proc(arg1, arg2, head, NULL);
@@ -2678,9 +2678,9 @@ again:
 	} else {
 		/* Some kind of softrings based fanout is required */
 		mutex_exit(&mac_srs->srs_lock);
-		if (tid != 0) {
+		if (tid != NULL) {
 			(void) untimeout(tid);
-			tid = 0;
+			tid = NULL;
 		}
 
 		/*
@@ -2891,8 +2891,8 @@ again:
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
 	}
 
-	if ((tid = mac_srs->srs_tid) != 0)
-		mac_srs->srs_tid = 0;
+	if ((tid = mac_srs->srs_tid) != NULL)
+		mac_srs->srs_tid = NULL;
 
 	mac_srs->srs_state |= (SRS_PROC|proc_type);
 	MAC_SRS_WORKER_POLLING_ON(mac_srs);
@@ -2938,9 +2938,9 @@ again:
 
 		mac_srs->srs_state |= SRS_CLIENT_PROC;
 		mutex_exit(&mac_srs->srs_lock);
-		if (tid != 0) {
+		if (tid != NULL) {
 			(void) untimeout(tid);
-			tid = 0;
+			tid = NULL;
 		}
 
 		proc(arg1, arg2, head, NULL);
@@ -2958,9 +2958,9 @@ again:
 	} else {
 		/* Some kind of softrings based fanout is required */
 		mutex_exit(&mac_srs->srs_lock);
-		if (tid != 0) {
+		if (tid != NULL) {
 			(void) untimeout(tid);
-			tid = 0;
+			tid = NULL;
 		}
 
 		/*
