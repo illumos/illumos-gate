@@ -31,8 +31,6 @@
 #ifndef	_PRINT_H
 #define	_PRINT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
-
 #include "file64.h"
 #include <floatingpoint.h>
 #include <thread.h>
@@ -63,7 +61,7 @@ __qaconvert(long double *arg, int ndigits, int *exp, int *sign, char *buf);
 #define	MAXDIGS 11
 
 /* Maximum number of digits in any long long representation */
-#define	MAXLLDIGS 21
+#define	MAXLLDIGS 22
 
 /* Maximum total number of digits in E format */
 #define	MAXECVT (DECIMAL_STRING_LENGTH-1)

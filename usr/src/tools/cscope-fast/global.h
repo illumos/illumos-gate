@@ -283,7 +283,7 @@ int	hash(char *s);
 void	rebuild(void);
 void	entercurses(void);
 void	exitcurses(void);
-void	myexit(int sig);
+void	myexit(int sig) __NORETURN;
 void	cannotopen(char *file);
 void	cannotwrite(char *file);
 
