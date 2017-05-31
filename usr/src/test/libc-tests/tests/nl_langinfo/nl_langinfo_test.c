@@ -76,7 +76,7 @@ struct langinfo_test C_data[] = {
 
 struct langinfo_test en_us_utf8_data[] = {
 	{ CODESET,	"UTF-8" },
-	{ D_T_FMT,	"%B %e, %Y %I:%M:%S %p %Z" },
+	{ D_T_FMT,	"%B %e, %Y at %I:%M:%S %p %Z" },
 	{ D_FMT,	"%m/%e/%y" },
 	{ T_FMT,	"%I:%M:%S %p" },
 	{ T_FMT_AMPM,	"%I:%M:%S %p" },
@@ -98,20 +98,20 @@ struct langinfo_test en_us_utf8_data[] = {
 	{ THOUSEP,	"," },
 	{ YESSTR,	"yes" },
 	{ NOSTR,	"no" },
-	{ YESEXPR,	"^(([yY]([eE][sS])?))" },
-	{ NOEXPR,	"^(([nN]([oO])?))" },
+	{ YESEXPR,	"^(([yY]([eE][sS])?)|([yY]))" },
+	{ NOEXPR,	"^(([nN]([oO])?)|([nN]))" },
 	{ CRNCYSTR,	"-$" },
 	{ -1,		NULL }
 };
 
 struct langinfo_test en_gb_latin15_data[] = {
 	{ CODESET,	"ISO8859-15" },
-	{ D_T_FMT,	"%e %B %Y %H:%M:%S %Z" },
+	{ D_T_FMT,	"%e %B %Y at %H:%M:%S %Z" },
 	{ D_FMT,	"%d/%m/%Y" },
 	{ T_FMT,	"%H:%M:%S" },
 	{ T_FMT_AMPM,	"%I:%M:%S %p" },
-	{ AM_STR,	"AM" },
-	{ PM_STR,	"PM" },
+	{ AM_STR,	"am" },
+	{ PM_STR,	"pm" },
 	{ ERA,		"" },
 	{ ERA_D_FMT,	"" },
 	{ ERA_D_T_FMT,	"" },
@@ -128,20 +128,20 @@ struct langinfo_test en_gb_latin15_data[] = {
 	{ THOUSEP,	"," },
 	{ YESSTR,	"yes" },
 	{ NOSTR,	"no" },
-	{ YESEXPR,	"^(([yY]([eE][sS])?))" },
-	{ NOEXPR,	"^(([nN]([oO])?))" },
+	{ YESEXPR,	"^(([yY]([eE][sS])?)|([yY]))" },
+	{ NOEXPR,	"^(([nN]([oO])?)|([nN]))" },
 	{ CRNCYSTR,	"-\243" },
 	{ -1,		NULL }
 };
 
 struct langinfo_test ru_ru_utf8_data[] = {
 	{ CODESET,	"UTF-8" },
-	{ D_T_FMT,	"%e %B %Y г. %H:%M:%S %Z"},
-	{ D_FMT,	"%d.%m.%y" },
+	{ D_T_FMT,	"%e %B %Y г., %H:%M:%S %Z"},
+	{ D_FMT,	"%d.%m.%Y" },
 	{ T_FMT,	"%H:%M:%S" },
 	{ T_FMT_AMPM,	"%I:%M:%S %p" },
-	{ AM_STR,	"до полудня" },
-	{ PM_STR,	"после полудня" },
+	{ AM_STR,	"ДП" },
+	{ PM_STR,	"ПП" },
 	{ ERA,		"" },
 	{ ERA_D_FMT,	"" },
 	{ ERA_D_T_FMT,	"" },
@@ -152,15 +152,15 @@ struct langinfo_test ru_ru_utf8_data[] = {
 	{ ABDAY_7,	"сб" },
 	{ MON_1,	"января" },
 	{ MON_12,	"декабря" },
-	{ ABMON_1,	"янв" },
-	{ ABMON_12,	"дек" },
+	{ ABMON_1,	"янв." },
+	{ ABMON_12,	"дек." },
 	{ RADIXCHAR,	"," },
 	{ THOUSEP,	" " },
 	{ YESSTR,	"да" },
 	{ NOSTR,	"нет" },
-	{ YESEXPR,	"^(([дД]([аА])?)|([yY]([eE][sS])?))" },
-	{ NOEXPR,	"^(([нН]([еЕ][тТ])?)|([nN]([oO])?))" },
-	{ CRNCYSTR,	"+руб." },
+	{ YESEXPR,	"^(([дД]([аА])?)|([дД])|([yY]([eE][sS])?)|([yY]))" },
+	{ NOEXPR,	"^(([нН]([еЕ][тТ])?)|([нН])|([nN]([oO])?)|([nN]))" },
+	{ CRNCYSTR,	"+₽" },
 	{ -1,		NULL }
 };
 

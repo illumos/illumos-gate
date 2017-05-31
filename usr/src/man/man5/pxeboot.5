@@ -1,0 +1,110 @@
+.\" Copyright (c) 1999 Doug White
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Apr 21, 2017
+.Dt PXEBOOT 5
+.Os
+.Sh NAME
+.Nm pxeboot
+.Nd Preboot Execution Environment (PXE) bootloader
+.Sh DESCRIPTION
+The
+.Nm
+bootloader is a modified version of the system third-stage bootstrap
+.Xr loader 5
+configured to run under Intel's Preboot Execution Environment (PXE) system.
+PXE is a form of smart boot ROM, built into Ethernet cards, and
+Ethernet-equipped motherboards.
+PXE supports DHCP configuration and provides low-level NIC access services.
+The
+.Nm
+bootloader retrieves the kernel, modules,
+and other files either via NFS over UDP or by TFTP,
+selectable through DHCP options.
+.Pp
+The
+.Nm
+binary is loaded just like any other boot file,
+by specifying it in the DHCP server's configuration file.
+Below is a sample configuration for the ISC DHCP v2 server:
+.Bd -literal -offset indent
+option domain-name "example.com";
+option routers 10.0.0.1;
+option subnet-mask 255.255.255.0;
+option broadcast-address 10.0.0.255;
+option domain-name-servers 10.0.0.1;
+server-name "DHCPserver";
+server-identifier 10.0.0.1;
+
+default-lease-time 120;
+max-lease-time 120;
+
+subnet 10.0.0.0 netmask 255.255.255.0 {
+       filename "pxeboot";
+       range 10.0.0.10 10.0.0.254;
+}
+
+.Ed
+.Pp
+.Nm
+recognizes
+.Va next-server
+and
+.Va option root-path
+directives as the server and path to NFS mount for file requests,
+respectively, or the server to make TFTP requests to.
+Note that
+.Nm
+expects to fetch
+.Pa /boot/loader.rc
+from the specified server before loading any other files.
+.Pp
+.Nm
+defaults to a conservative 1024 byte NFS data packet size.
+This may be changed by setting the
+.Va nfs.read_size
+variable in
+.Pa /boot/loader.conf .
+Valid values range from 1024 to 4096 bytes.
+.Pp
+.Nm
+defaults to use NFS, to use TFTP loading, DHCP server must provide
+option
+.Va 150 .
+TFTP block size can be controlled by setting the
+.Va tftp.blksize
+variable in
+.Pa /boot/loader.conf .
+Valid values range from 8 to 9008 bytes.
+.Pp
+In all other respects,
+.Nm
+acts just like
+.Xr loader 5 .
+.Pp
+For further information on Intel's PXE specifications and Wired for
+Management (WfM) systems, see
+.Li http://www.intel.com/design/archives/wfm/ .
+.Sh SEE ALSO
+.Xr loader 5

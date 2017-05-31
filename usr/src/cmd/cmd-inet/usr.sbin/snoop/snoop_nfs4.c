@@ -2981,9 +2981,11 @@ static void
 sumres_setattr(char *buf, size_t buflen, void *obj)
 {
 	SETATTR4res *res = (SETATTR4res *)obj;
+	size_t len;
 
-	strncpy(buf, status_name(res->status), buflen);
-	sum_attr_bitmap(buf, buflen, &res->attrsset);
+	(void) snprintf(buf, buflen, "%s ", status_name(res->status));
+	len = strlen(buf);
+	sum_attr_bitmap(buf + len, buflen - len, &res->attrsset);
 }
 
 static void

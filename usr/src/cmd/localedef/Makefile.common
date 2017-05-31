@@ -33,8 +33,6 @@ SRCS=		$(OBJS:%.o=%.c)
 
 CPPFLAGS +=	-I$(SRC)/lib/libc/port/locale
 
-CERRWARN +=	-_gcc=-Wno-char-subscripts
-CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-label
 
 YFLAGS=		-d -b parser

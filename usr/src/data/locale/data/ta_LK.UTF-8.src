@@ -7,7 +7,7 @@ escape_char /
 * see http://www.opengroup.org/onlinepubs/009695399/basedefs/xbd_chap07.html                    *
 * Locale Name : ta_LK   Codeset : UTF-8
 *************************************************************************************************
-* Copyright 1991-2011 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
+* Copyright 1991-2013 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in  *
 * http://www.unicode.org/copyright.html.                                                        *
 *                                                                                               *
 * Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode   *
@@ -154,7 +154,7 @@ cntrl	<NULL>;/
 	<END_OF_TRANSMISSION>;/
 	<ENQUIRY>;/
 	<ACKNOWLEDGE>;/
-	<BELL>;/
+	<ALERT>;/
 	<BACKSPACE>;/
 	<tab>;/
 	<newline>;/
@@ -669,54 +669,54 @@ collating-element <TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA> from "<TA
 
 collating-symbol <X01>
 collating-symbol <X05>
-collating-symbol <X8F>
-collating-symbol <XA1>
+collating-symbol <X9C>
+collating-symbol <XA0>
 collating-symbol <XC0>
-collating-symbol <XE1>
-collating-symbol <X0340>
-collating-symbol <X0342>
-collating-symbol <X0344>
-collating-symbol <X0346>
-collating-symbol <X0348>
+collating-symbol <X0200>
+collating-symbol <X0300>
+collating-symbol <X0304>
+collating-symbol <X0306>
+collating-symbol <X0308>
+collating-symbol <X030A>
+collating-symbol <X030C>
 collating-symbol <X0400>
-collating-symbol <X0500>
-collating-symbol <X060C>
-collating-symbol <X0610>
-collating-symbol <X0700>
-collating-symbol <X0854>
-collating-symbol <X085B>
-collating-symbol <X0879>
-collating-symbol <X0880>
-collating-symbol <X0900>
-collating-symbol <X0A8D>
-collating-symbol <X0A9B>
-collating-symbol <X0AAF>
-collating-symbol <X0AB1>
-collating-symbol <X0AB3>
-collating-symbol <X0AB5>
-collating-symbol <X0AB7>
-collating-symbol <X0AB9>
-collating-symbol <X0B5B>
-collating-symbol <X0B5D>
-collating-symbol <X0B67>
-collating-symbol <X0B69>
-collating-symbol <X0B6B>
-collating-symbol <X0B6F>
-collating-symbol <X0B71>
-collating-symbol <X0D0A>
-collating-symbol <X0D0F>
-collating-symbol <X0D5C>
-collating-symbol <X0D69>
-collating-symbol <X0D71>
-collating-symbol <X0D73>
-collating-symbol <X0D75>
-collating-symbol <X0D79>
-collating-symbol <X0D7D>
-collating-symbol <X0F0E>
-collating-symbol <X0F20>
+collating-symbol <X050A>
+collating-symbol <X050E>
+collating-symbol <X0600>
+collating-symbol <X0722>
+collating-symbol <X072C>
+collating-symbol <X0750>
+collating-symbol <X0758>
+collating-symbol <X0800>
+collating-symbol <X0969>
+collating-symbol <X0977>
+collating-symbol <X098D>
+collating-symbol <X098F>
+collating-symbol <X0991>
+collating-symbol <X0993>
+collating-symbol <X0995>
+collating-symbol <X0997>
+collating-symbol <X0A7B>
+collating-symbol <X0A7D>
+collating-symbol <X0A87>
+collating-symbol <X0A89>
+collating-symbol <X0A8B>
+collating-symbol <X0A8F>
+collating-symbol <X0A91>
+collating-symbol <X0C04>
+collating-symbol <X0C0A>
+collating-symbol <X0C55>
+collating-symbol <X0C76>
+collating-symbol <X0C7E>
+collating-symbol <X0C80>
+collating-symbol <X0C82>
+collating-symbol <X0C86>
+collating-symbol <X0C8A>
+collating-symbol <X0D6A>
+collating-symbol <X0D7E>
+collating-symbol <X102A>
+collating-symbol <X102C>
 collating-symbol <X102E>
-collating-symbol <X1030>
-collating-symbol <X1032>
 collating-symbol <X1200>
 collating-symbol <X1400>
 collating-symbol <X1600>
@@ -727,7 +727,6 @@ collating-symbol <X1E00>
 collating-symbol <X2000>
 collating-symbol <X2200>
 collating-symbol <X2400>
-collating-symbol <X2700>
 collating-symbol <X2900>
 collating-symbol <X2B00>
 collating-symbol <X2D00>
@@ -750,90 +749,91 @@ collating-symbol <X4D00>
 collating-symbol <X4F00>
 collating-symbol <X5100>
 collating-symbol <X5300>
-collating-symbol <X5400>
 collating-symbol <X5500>
 collating-symbol <X5700>
 collating-symbol <X5900>
-collating-symbol <X5C00>
-collating-symbol <X6400>
-collating-symbol <X6C00>
-collating-symbol <X6D0A>
-collating-symbol <X6D0C>
-collating-symbol <X6D0E>
-collating-symbol <X6D10>
-collating-symbol <X6D12>
-collating-symbol <X6D14>
-collating-symbol <X6D16>
-collating-symbol <X6D18>
-collating-symbol <X6D1A>
-collating-symbol <X6D1C>
-collating-symbol <X6D1E>
-collating-symbol <X6D20>
-collating-symbol <X6D22>
-collating-symbol <X6D23>
-collating-symbol <X6D25>
-collating-symbol <X6D26>
-collating-symbol <X6D27>
-collating-symbol <X6D28>
-collating-symbol <X6D29>
-collating-symbol <X6D2A>
-collating-symbol <X6D2B>
-collating-symbol <X6D2C>
-collating-symbol <X6D2D>
-collating-symbol <X6D2E>
-collating-symbol <X6D2F>
-collating-symbol <X6D30>
-collating-symbol <X6D31>
-collating-symbol <X6D32>
-collating-symbol <X6D33>
-collating-symbol <X6D34>
-collating-symbol <X6D35>
-collating-symbol <X6D36>
-collating-symbol <X6D37>
-collating-symbol <X6D38>
-collating-symbol <X6D39>
-collating-symbol <X6D3A>
-collating-symbol <X6D3B>
-collating-symbol <X6D3C>
-collating-symbol <X6D3D>
-collating-symbol <X6D3E>
-collating-symbol <X6D3F>
-collating-symbol <X6D40>
-collating-symbol <X6D41>
-collating-symbol <X6D42>
-collating-symbol <X6D43>
-collating-symbol <X6D44>
-collating-symbol <X6D45>
-collating-symbol <X6D46>
-collating-symbol <X6D47>
-collating-symbol <X6D48>
-collating-symbol <X6D49>
-collating-symbol <X6D4A>
-collating-symbol <X6D4B>
-collating-symbol <X6D4C>
-collating-symbol <X6D4D>
-collating-symbol <X6D4E>
-collating-symbol <X6D4F>
-collating-symbol <X6D50>
-collating-symbol <X6D51>
-collating-symbol <X6D52>
-collating-symbol <X6D53>
-collating-symbol <X6D54>
-collating-symbol <X6D56>
-collating-symbol <X6D58>
-collating-symbol <X6D5A>
-collating-symbol <X6D5C>
-collating-symbol <X6D5E>
-collating-symbol <X6D60>
-collating-symbol <X6D62>
-collating-symbol <X6D64>
-collating-symbol <X6D66>
-collating-symbol <X6D68>
-collating-symbol <X6D6A>
-collating-symbol <X6D6C>
-collating-symbol <X7400>
-collating-symbol <X7C00>
-collating-symbol <X8400>
+collating-symbol <X5B00>
+collating-symbol <X6C06>
+collating-symbol <X6C08>
+collating-symbol <X6C0A>
+collating-symbol <X6C0C>
+collating-symbol <X6C0E>
+collating-symbol <X6C10>
+collating-symbol <X6C12>
+collating-symbol <X6C14>
+collating-symbol <X6C16>
+collating-symbol <X6C18>
+collating-symbol <X6C1A>
+collating-symbol <X6C1C>
+collating-symbol <X6C1E>
+collating-symbol <X6C1F>
+collating-symbol <X6C21>
+collating-symbol <X6C22>
+collating-symbol <X6C23>
+collating-symbol <X6C24>
+collating-symbol <X6C25>
+collating-symbol <X6C26>
+collating-symbol <X6C27>
+collating-symbol <X6C28>
+collating-symbol <X6C29>
+collating-symbol <X6C2A>
+collating-symbol <X6C2B>
+collating-symbol <X6C2C>
+collating-symbol <X6C2D>
+collating-symbol <X6C2E>
+collating-symbol <X6C2F>
+collating-symbol <X6C30>
+collating-symbol <X6C31>
+collating-symbol <X6C32>
+collating-symbol <X6C33>
+collating-symbol <X6C34>
+collating-symbol <X6C35>
+collating-symbol <X6C36>
+collating-symbol <X6C37>
+collating-symbol <X6C38>
+collating-symbol <X6C39>
+collating-symbol <X6C3A>
+collating-symbol <X6C3B>
+collating-symbol <X6C3C>
+collating-symbol <X6C3D>
+collating-symbol <X6C3E>
+collating-symbol <X6C3F>
+collating-symbol <X6C40>
+collating-symbol <X6C41>
+collating-symbol <X6C42>
+collating-symbol <X6C43>
+collating-symbol <X6C44>
+collating-symbol <X6C45>
+collating-symbol <X6C46>
+collating-symbol <X6C47>
+collating-symbol <X6C48>
+collating-symbol <X6C49>
+collating-symbol <X6C4A>
+collating-symbol <X6C4B>
+collating-symbol <X6C4C>
+collating-symbol <X6C4D>
+collating-symbol <X6C4E>
+collating-symbol <X6C4F>
+collating-symbol <X6C50>
+collating-symbol <X6C52>
+collating-symbol <X6C54>
+collating-symbol <X6C56>
+collating-symbol <X6C58>
+collating-symbol <X6C5A>
+collating-symbol <X6C5C>
+collating-symbol <X6C5E>
+collating-symbol <X6C60>
+collating-symbol <X6C62>
+collating-symbol <X6C64>
+collating-symbol <X6C66>
+collating-symbol <X6C68>
+collating-symbol <XD400>
+collating-symbol <XDB00>
+collating-symbol <XE200>
+collating-symbol <XE900>
+collating-symbol <XF000>
+collating-symbol <XF700>
+collating-symbol <XFE00>
 
 order_start forward;forward;forward;forward
 
@@ -842,54 +842,54 @@ order_start forward;forward;forward;forward
 
 <X01>
 <X05>
-<X8F>
-<XA1>
+<X9C>
+<XA0>
 <XC0>
-<XE1>
-<X0340>
-<X0342>
-<X0344>
-<X0346>
-<X0348>
+<X0200>
+<X0300>
+<X0304>
+<X0306>
+<X0308>
+<X030A>
+<X030C>
 <X0400>
-<X0500>
-<X060C>
-<X0610>
-<X0700>
-<X0854>
-<X085B>
-<X0879>
-<X0880>
-<X0900>
-<X0A8D>
-<X0A9B>
-<X0AAF>
-<X0AB1>
-<X0AB3>
-<X0AB5>
-<X0AB7>
-<X0AB9>
-<X0B5B>
-<X0B5D>
-<X0B67>
-<X0B69>
-<X0B6B>
-<X0B6F>
-<X0B71>
-<X0D0A>
-<X0D0F>
-<X0D5C>
-<X0D69>
-<X0D71>
-<X0D73>
-<X0D75>
-<X0D79>
-<X0D7D>
-<X0F0E>
-<X0F20>
+<X050A>
+<X050E>
+<X0600>
+<X0722>
+<X072C>
+<X0750>
+<X0758>
+<X0800>
+<X0969>
+<X0977>
+<X098D>
+<X098F>
+<X0991>
+<X0993>
+<X0995>
+<X0997>
+<X0A7B>
+<X0A7D>
+<X0A87>
+<X0A89>
+<X0A8B>
+<X0A8F>
+<X0A91>
+<X0C04>
+<X0C0A>
+<X0C55>
+<X0C76>
+<X0C7E>
+<X0C80>
+<X0C82>
+<X0C86>
+<X0C8A>
+<X0D6A>
+<X0D7E>
+<X102A>
+<X102C>
 <X102E>
-<X1030>
-<X1032>
 <X1200>
 <X1400>
 <X1600>
@@ -900,7 +900,6 @@ order_start forward;forward;forward;forward
 <X2000>
 <X2200>
 <X2400>
-<X2700>
 <X2900>
 <X2B00>
 <X2D00>
@@ -923,90 +922,91 @@ order_start forward;forward;forward;forward
 <X4F00>
 <X5100>
 <X5300>
-<X5400>
 <X5500>
 <X5700>
 <X5900>
-<X5C00>
-<X6400>
-<X6C00>
-<X6D0A>
-<X6D0C>
-<X6D0E>
-<X6D10>
-<X6D12>
-<X6D14>
-<X6D16>
-<X6D18>
-<X6D1A>
-<X6D1C>
-<X6D1E>
-<X6D20>
-<X6D22>
-<X6D23>
-<X6D25>
-<X6D26>
-<X6D27>
-<X6D28>
-<X6D29>
-<X6D2A>
-<X6D2B>
-<X6D2C>
-<X6D2D>
-<X6D2E>
-<X6D2F>
-<X6D30>
-<X6D31>
-<X6D32>
-<X6D33>
-<X6D34>
-<X6D35>
-<X6D36>
-<X6D37>
-<X6D38>
-<X6D39>
-<X6D3A>
-<X6D3B>
-<X6D3C>
-<X6D3D>
-<X6D3E>
-<X6D3F>
-<X6D40>
-<X6D41>
-<X6D42>
-<X6D43>
-<X6D44>
-<X6D45>
-<X6D46>
-<X6D47>
-<X6D48>
-<X6D49>
-<X6D4A>
-<X6D4B>
-<X6D4C>
-<X6D4D>
-<X6D4E>
-<X6D4F>
-<X6D50>
-<X6D51>
-<X6D52>
-<X6D53>
-<X6D54>
-<X6D56>
-<X6D58>
-<X6D5A>
-<X6D5C>
-<X6D5E>
-<X6D60>
-<X6D62>
-<X6D64>
-<X6D66>
-<X6D68>
-<X6D6A>
-<X6D6C>
-<X7400>
-<X7C00>
-<X8400>
+<X5B00>
+<X6C06>
+<X6C08>
+<X6C0A>
+<X6C0C>
+<X6C0E>
+<X6C10>
+<X6C12>
+<X6C14>
+<X6C16>
+<X6C18>
+<X6C1A>
+<X6C1C>
+<X6C1E>
+<X6C1F>
+<X6C21>
+<X6C22>
+<X6C23>
+<X6C24>
+<X6C25>
+<X6C26>
+<X6C27>
+<X6C28>
+<X6C29>
+<X6C2A>
+<X6C2B>
+<X6C2C>
+<X6C2D>
+<X6C2E>
+<X6C2F>
+<X6C30>
+<X6C31>
+<X6C32>
+<X6C33>
+<X6C34>
+<X6C35>
+<X6C36>
+<X6C37>
+<X6C38>
+<X6C39>
+<X6C3A>
+<X6C3B>
+<X6C3C>
+<X6C3D>
+<X6C3E>
+<X6C3F>
+<X6C40>
+<X6C41>
+<X6C42>
+<X6C43>
+<X6C44>
+<X6C45>
+<X6C46>
+<X6C47>
+<X6C48>
+<X6C49>
+<X6C4A>
+<X6C4B>
+<X6C4C>
+<X6C4D>
+<X6C4E>
+<X6C4F>
+<X6C50>
+<X6C52>
+<X6C54>
+<X6C56>
+<X6C58>
+<X6C5A>
+<X6C5C>
+<X6C5E>
+<X6C60>
+<X6C62>
+<X6C64>
+<X6C66>
+<X6C68>
+<XD400>
+<XDB00>
+<XE200>
+<XE900>
+<XF000>
+<XF700>
+<XFE00>
 
 * assignment of characters to weights
 
@@ -1017,7 +1017,7 @@ order_start forward;forward;forward;forward
 <END_OF_TRANSMISSION>         IGNORE;IGNORE;IGNORE;<END_OF_TRANSMISSION>
 <ENQUIRY>                     IGNORE;IGNORE;IGNORE;<ENQUIRY>
 <ACKNOWLEDGE>                 IGNORE;IGNORE;IGNORE;<ACKNOWLEDGE>
-<BELL>                        IGNORE;IGNORE;IGNORE;<BELL>
+<ALERT>                       IGNORE;IGNORE;IGNORE;<ALERT>
 <BACKSPACE>                   IGNORE;IGNORE;IGNORE;<BACKSPACE>
 <SHIFT_OUT>                   IGNORE;IGNORE;IGNORE;<SHIFT_OUT>
 <SHIFT_IN>                    IGNORE;IGNORE;IGNORE;<SHIFT_IN>
@@ -1038,203 +1038,203 @@ order_start forward;forward;forward;forward
 <INFORMATION_SEPARATOR_TWO>   IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_TWO>
 <INFORMATION_SEPARATOR_ONE>   IGNORE;IGNORE;IGNORE;<INFORMATION_SEPARATOR_ONE>
 <DELETE>                      IGNORE;IGNORE;IGNORE;<DELETE>
-<tab>                         <X0340>;<X05>;<X05>;<tab>
-<newline>                     <X0342>;<X05>;<X05>;<newline>
-<vertical-tab>                <X0344>;<X05>;<X05>;<vertical-tab>
-<form-feed>                   <X0346>;<X05>;<X05>;<form-feed>
-<carriage-return>             <X0348>;<X05>;<X05>;<carriage-return>
+<tab>                         <X0304>;<X05>;<X05>;<tab>
+<newline>                     <X0306>;<X05>;<X05>;<newline>
+<vertical-tab>                <X0308>;<X05>;<X05>;<vertical-tab>
+<form-feed>                   <X030A>;<X05>;<X05>;<form-feed>
+<carriage-return>             <X030C>;<X05>;<X05>;<carriage-return>
 <space>                       <X0400>;<X05>;<X05>;<space>
-<LOW_LINE>                    <X060C>;<X05>;<X05>;<LOW_LINE>
-<HYPHEN-MINUS>                <X0610>;<X05>;<X05>;<HYPHEN-MINUS>
-<COMMA>                       <X0700>;<X05>;<X05>;<COMMA>
-<SEMICOLON>                   <X0854>;<X05>;<X05>;<SEMICOLON>
-<COLON>                       <X085B>;<X05>;<X05>;<COLON>
-<EXCLAMATION_MARK>            <X0879>;<X05>;<X05>;<EXCLAMATION_MARK>
-<QUESTION_MARK>               <X0880>;<X05>;<X05>;<QUESTION_MARK>
-<FULL_STOP>                   <X0900>;<X05>;<X05>;<FULL_STOP>
-<APOSTROPHE>                  <X0A8D>;<X05>;<X05>;<APOSTROPHE>
-<QUOTATION_MARK>              <X0A9B>;<X05>;<X05>;<QUOTATION_MARK>
-<LEFT_PARENTHESIS>            <X0AAF>;<X05>;<X05>;<LEFT_PARENTHESIS>
-<RIGHT_PARENTHESIS>           <X0AB1>;<X05>;<X05>;<RIGHT_PARENTHESIS>
-<LEFT_SQUARE_BRACKET>         <X0AB3>;<X05>;<X05>;<LEFT_SQUARE_BRACKET>
-<RIGHT_SQUARE_BRACKET>        <X0AB5>;<X05>;<X05>;<RIGHT_SQUARE_BRACKET>
-<LEFT_CURLY_BRACKET>          <X0AB7>;<X05>;<X05>;<LEFT_CURLY_BRACKET>
-<RIGHT_CURLY_BRACKET>         <X0AB9>;<X05>;<X05>;<RIGHT_CURLY_BRACKET>
-<COMMERCIAL_AT>               <X0B5B>;<X05>;<X05>;<COMMERCIAL_AT>
-<ASTERISK>                    <X0B5D>;<X05>;<X05>;<ASTERISK>
-<SOLIDUS>                     <X0B67>;<X05>;<X05>;<SOLIDUS>
-<REVERSE_SOLIDUS>             <X0B69>;<X05>;<X05>;<REVERSE_SOLIDUS>
-<AMPERSAND>                   <X0B6B>;<X05>;<X05>;<AMPERSAND>
-<NUMBER_SIGN>                 <X0B6F>;<X05>;<X05>;<NUMBER_SIGN>
-<PERCENT_SIGN>                <X0B71>;<X05>;<X05>;<PERCENT_SIGN>
-<GRAVE_ACCENT>                <X0D0A>;<X05>;<X05>;<GRAVE_ACCENT>
-<CIRCUMFLEX_ACCENT>           <X0D0F>;<X05>;<X05>;<CIRCUMFLEX_ACCENT>
-<TAMIL_DAY_SIGN>              "<X0D5C><X5400>";<X05>;"<X05><XC0>";<TAMIL_DAY_SIGN>
-<TAMIL_MONTH_SIGN>            "<X0D5C><X5C00>";<X05>;"<X05><XC0>";<TAMIL_MONTH_SIGN>
-<TAMIL_YEAR_SIGN>             "<X0D5C><X6400>";<X05>;"<X05><XC0>";<TAMIL_YEAR_SIGN>
-<TAMIL_DEBIT_SIGN>            "<X0D5C><X6C00>";<X05>;"<X05><XC0>";<TAMIL_DEBIT_SIGN>
-<TAMIL_CREDIT_SIGN>           "<X0D5C><X7400>";<X05>;"<X05><XC0>";<TAMIL_CREDIT_SIGN>
-<TAMIL_AS_ABOVE_SIGN>         "<X0D5C><X7C00>";<X05>;"<X05><XC0>";<TAMIL_AS_ABOVE_SIGN>
-<TAMIL_NUMBER_SIGN>           "<X0D5C><X8400>";<X05>;"<X05><XC0>";<TAMIL_NUMBER_SIGN>
-<PLUS_SIGN>                   <X0D69>;<X05>;<X05>;<PLUS_SIGN>
-<LESS-THAN_SIGN>              <X0D71>;<X05>;<X05>;<LESS-THAN_SIGN>
-<EQUALS_SIGN>                 <X0D73>;<X05>;<X05>;<EQUALS_SIGN>
-<GREATER-THAN_SIGN>           <X0D75>;<X05>;<X05>;<GREATER-THAN_SIGN>
-<VERTICAL_LINE>               <X0D79>;<X05>;<X05>;<VERTICAL_LINE>
-<TILDE>                       <X0D7D>;<X05>;<X05>;<TILDE>
-<DOLLAR_SIGN>                 <X0F0E>;<X05>;<X05>;<DOLLAR_SIGN>
-<TAMIL_RUPEE_SIGN>            <X0F20>;<X05>;<X05>;<TAMIL_RUPEE_SIGN>
-<TAMIL_NUMBER_TEN>            <X102E>;<X05>;<X05>;<TAMIL_NUMBER_TEN>
-<TAMIL_NUMBER_ONE_HUNDRED>    <X1030>;<X05>;<X05>;<TAMIL_NUMBER_ONE_HUNDRED>
-<TAMIL_NUMBER_ONE_THOUSAND>   <X1032>;<X05>;<X05>;<TAMIL_NUMBER_ONE_THOUSAND>
+<LOW_LINE>                    <X050A>;<X05>;<X05>;<LOW_LINE>
+<HYPHEN-MINUS>                <X050E>;<X05>;<X05>;<HYPHEN-MINUS>
+<COMMA>                       <X0600>;<X05>;<X05>;<COMMA>
+<SEMICOLON>                   <X0722>;<X05>;<X05>;<SEMICOLON>
+<COLON>                       <X072C>;<X05>;<X05>;<COLON>
+<EXCLAMATION_MARK>            <X0750>;<X05>;<X05>;<EXCLAMATION_MARK>
+<QUESTION_MARK>               <X0758>;<X05>;<X05>;<QUESTION_MARK>
+<FULL_STOP>                   <X0800>;<X05>;<X05>;<FULL_STOP>
+<APOSTROPHE>                  <X0969>;<X05>;<X05>;<APOSTROPHE>
+<QUOTATION_MARK>              <X0977>;<X05>;<X05>;<QUOTATION_MARK>
+<LEFT_PARENTHESIS>            <X098D>;<X05>;<X05>;<LEFT_PARENTHESIS>
+<RIGHT_PARENTHESIS>           <X098F>;<X05>;<X05>;<RIGHT_PARENTHESIS>
+<LEFT_SQUARE_BRACKET>         <X0991>;<X05>;<X05>;<LEFT_SQUARE_BRACKET>
+<RIGHT_SQUARE_BRACKET>        <X0993>;<X05>;<X05>;<RIGHT_SQUARE_BRACKET>
+<LEFT_CURLY_BRACKET>          <X0995>;<X05>;<X05>;<LEFT_CURLY_BRACKET>
+<RIGHT_CURLY_BRACKET>         <X0997>;<X05>;<X05>;<RIGHT_CURLY_BRACKET>
+<COMMERCIAL_AT>               <X0A7B>;<X05>;<X05>;<COMMERCIAL_AT>
+<ASTERISK>                    <X0A7D>;<X05>;<X05>;<ASTERISK>
+<SOLIDUS>                     <X0A87>;<X05>;<X05>;<SOLIDUS>
+<REVERSE_SOLIDUS>             <X0A89>;<X05>;<X05>;<REVERSE_SOLIDUS>
+<AMPERSAND>                   <X0A8B>;<X05>;<X05>;<AMPERSAND>
+<NUMBER_SIGN>                 <X0A8F>;<X05>;<X05>;<NUMBER_SIGN>
+<PERCENT_SIGN>                <X0A91>;<X05>;<X05>;<PERCENT_SIGN>
+<GRAVE_ACCENT>                <X0C04>;<X05>;<X05>;<GRAVE_ACCENT>
+<CIRCUMFLEX_ACCENT>           <X0C0A>;<X05>;<X05>;<CIRCUMFLEX_ACCENT>
+<TAMIL_DAY_SIGN>              "<X0C55><XD400>";<X05>;"<X05><XC0>";<TAMIL_DAY_SIGN>
+<TAMIL_MONTH_SIGN>            "<X0C55><XDB00>";<X05>;"<X05><XC0>";<TAMIL_MONTH_SIGN>
+<TAMIL_YEAR_SIGN>             "<X0C55><XE200>";<X05>;"<X05><XC0>";<TAMIL_YEAR_SIGN>
+<TAMIL_DEBIT_SIGN>            "<X0C55><XE900>";<X05>;"<X05><XC0>";<TAMIL_DEBIT_SIGN>
+<TAMIL_CREDIT_SIGN>           "<X0C55><XF000>";<X05>;"<X05><XC0>";<TAMIL_CREDIT_SIGN>
+<TAMIL_AS_ABOVE_SIGN>         "<X0C55><XF700>";<X05>;"<X05><XC0>";<TAMIL_AS_ABOVE_SIGN>
+<TAMIL_NUMBER_SIGN>           "<X0C55><XFE00>";<X05>;"<X05><XC0>";<TAMIL_NUMBER_SIGN>
+<PLUS_SIGN>                   <X0C76>;<X05>;<X05>;<PLUS_SIGN>
+<LESS-THAN_SIGN>              <X0C7E>;<X05>;<X05>;<LESS-THAN_SIGN>
+<EQUALS_SIGN>                 <X0C80>;<X05>;<X05>;<EQUALS_SIGN>
+<GREATER-THAN_SIGN>           <X0C82>;<X05>;<X05>;<GREATER-THAN_SIGN>
+<VERTICAL_LINE>               <X0C86>;<X05>;<X05>;<VERTICAL_LINE>
+<TILDE>                       <X0C8A>;<X05>;<X05>;<TILDE>
+<DOLLAR_SIGN>                 <X0D6A>;<X05>;<X05>;<DOLLAR_SIGN>
+<TAMIL_RUPEE_SIGN>            <X0D7E>;<X05>;<X05>;<TAMIL_RUPEE_SIGN>
+<TAMIL_NUMBER_TEN>            <X102A>;<X05>;<X05>;<TAMIL_NUMBER_TEN>
+<TAMIL_NUMBER_ONE_HUNDRED>    <X102C>;<X05>;<X05>;<TAMIL_NUMBER_ONE_HUNDRED>
+<TAMIL_NUMBER_ONE_THOUSAND>   <X102E>;<X05>;<X05>;<TAMIL_NUMBER_ONE_THOUSAND>
 <zero>                        <X1200>;<X05>;<X05>;<zero>
-<TAMIL_DIGIT_ZERO>            <X1200>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_ZERO>
+<TAMIL_DIGIT_ZERO>            <X1200>;<X05>;<X05>;<TAMIL_DIGIT_ZERO>
 <one>                         <X1400>;<X05>;<X05>;<one>
-<TAMIL_DIGIT_ONE>             <X1400>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_ONE>
+<TAMIL_DIGIT_ONE>             <X1400>;<X05>;<X05>;<TAMIL_DIGIT_ONE>
 <two>                         <X1600>;<X05>;<X05>;<two>
-<TAMIL_DIGIT_TWO>             <X1600>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_TWO>
+<TAMIL_DIGIT_TWO>             <X1600>;<X05>;<X05>;<TAMIL_DIGIT_TWO>
 <three>                       <X1800>;<X05>;<X05>;<three>
-<TAMIL_DIGIT_THREE>           <X1800>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_THREE>
+<TAMIL_DIGIT_THREE>           <X1800>;<X05>;<X05>;<TAMIL_DIGIT_THREE>
 <four>                        <X1A00>;<X05>;<X05>;<four>
-<TAMIL_DIGIT_FOUR>            <X1A00>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_FOUR>
+<TAMIL_DIGIT_FOUR>            <X1A00>;<X05>;<X05>;<TAMIL_DIGIT_FOUR>
 <five>                        <X1C00>;<X05>;<X05>;<five>
-<TAMIL_DIGIT_FIVE>            <X1C00>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_FIVE>
+<TAMIL_DIGIT_FIVE>            <X1C00>;<X05>;<X05>;<TAMIL_DIGIT_FIVE>
 <six>                         <X1E00>;<X05>;<X05>;<six>
-<TAMIL_DIGIT_SIX>             <X1E00>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_SIX>
+<TAMIL_DIGIT_SIX>             <X1E00>;<X05>;<X05>;<TAMIL_DIGIT_SIX>
 <seven>                       <X2000>;<X05>;<X05>;<seven>
-<TAMIL_DIGIT_SEVEN>           <X2000>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_SEVEN>
+<TAMIL_DIGIT_SEVEN>           <X2000>;<X05>;<X05>;<TAMIL_DIGIT_SEVEN>
 <eight>                       <X2200>;<X05>;<X05>;<eight>
-<TAMIL_DIGIT_EIGHT>           <X2200>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_EIGHT>
+<TAMIL_DIGIT_EIGHT>           <X2200>;<X05>;<X05>;<TAMIL_DIGIT_EIGHT>
 <nine>                        <X2400>;<X05>;<X05>;<nine>
-<TAMIL_DIGIT_NINE>            <X2400>;"<X05><XE1><XA1>";"<X05><X05><XC0>";<TAMIL_DIGIT_NINE>
-<a>                           <X2700>;<X05>;<X05>;<a>
-<A>                           <X2700>;<X05>;<X8F>;<A>
-<b>                           <X2900>;<X05>;<X05>;<b>
-<B>                           <X2900>;<X05>;<X8F>;<B>
-<c>                           <X2B00>;<X05>;<X05>;<c>
-<C>                           <X2B00>;<X05>;<X8F>;<C>
-<d>                           <X2D00>;<X05>;<X05>;<d>
-<D>                           <X2D00>;<X05>;<X8F>;<D>
-<e>                           <X2F00>;<X05>;<X05>;<e>
-<E>                           <X2F00>;<X05>;<X8F>;<E>
-<f>                           <X3100>;<X05>;<X05>;<f>
-<F>                           <X3100>;<X05>;<X8F>;<F>
-<g>                           <X3300>;<X05>;<X05>;<g>
-<G>                           <X3300>;<X05>;<X8F>;<G>
-<h>                           <X3500>;<X05>;<X05>;<h>
-<H>                           <X3500>;<X05>;<X8F>;<H>
-<i>                           <X3700>;<X05>;<X05>;<i>
-<I>                           <X3700>;<X05>;<X8F>;<I>
-<j>                           <X3900>;<X05>;<X05>;<j>
-<J>                           <X3900>;<X05>;<X8F>;<J>
-<k>                           <X3B00>;<X05>;<X05>;<k>
-<K>                           <X3B00>;<X05>;<X8F>;<K>
-<l>                           <X3D00>;<X05>;<X05>;<l>
-<L>                           <X3D00>;<X05>;<X8F>;<L>
-<m>                           <X3F00>;<X05>;<X05>;<m>
-<M>                           <X3F00>;<X05>;<X8F>;<M>
-<n>                           <X4100>;<X05>;<X05>;<n>
-<N>                           <X4100>;<X05>;<X8F>;<N>
-<o>                           <X4300>;<X05>;<X05>;<o>
-<O>                           <X4300>;<X05>;<X8F>;<O>
-<p>                           <X4500>;<X05>;<X05>;<p>
-<P>                           <X4500>;<X05>;<X8F>;<P>
-<q>                           <X4700>;<X05>;<X05>;<q>
-<Q>                           <X4700>;<X05>;<X8F>;<Q>
-<r>                           <X4900>;<X05>;<X05>;<r>
-<R>                           <X4900>;<X05>;<X8F>;<R>
-<s>                           <X4B00>;<X05>;<X05>;<s>
-<S>                           <X4B00>;<X05>;<X8F>;<S>
-<t>                           <X4D00>;<X05>;<X05>;<t>
-<T>                           <X4D00>;<X05>;<X8F>;<T>
-<u>                           <X4F00>;<X05>;<X05>;<u>
-<U>                           <X4F00>;<X05>;<X8F>;<U>
-<v>                           <X5100>;<X05>;<X05>;<v>
-<V>                           <X5100>;<X05>;<X8F>;<V>
-<w>                           <X5300>;<X05>;<X05>;<w>
-<W>                           <X5300>;<X05>;<X8F>;<W>
-<x>                           <X5500>;<X05>;<X05>;<x>
-<X>                           <X5500>;<X05>;<X8F>;<X>
-<y>                           <X5700>;<X05>;<X05>;<y>
-<Y>                           <X5700>;<X05>;<X8F>;<Y>
-<z>                           <X5900>;<X05>;<X05>;<z>
-<Z>                           <X5900>;<X05>;<X8F>;<Z>
-<TAMIL_OM>                    <X6D0A>;<X05>;<X05>;<TAMIL_OM>
-<TAMIL_LETTER_A>              <X6D0C>;<X05>;<X05>;<TAMIL_LETTER_A>
-<TAMIL_LETTER_AA>             <X6D0E>;<X05>;<X05>;<TAMIL_LETTER_AA>
-<TAMIL_LETTER_I>              <X6D10>;<X05>;<X05>;<TAMIL_LETTER_I>
-<TAMIL_LETTER_II>             <X6D12>;<X05>;<X05>;<TAMIL_LETTER_II>
-<TAMIL_LETTER_U>              <X6D14>;<X05>;<X05>;<TAMIL_LETTER_U>
-<TAMIL_LETTER_UU>             <X6D16>;<X05>;<X05>;<TAMIL_LETTER_UU>
-<TAMIL_LETTER_E>              <X6D18>;<X05>;<X05>;<TAMIL_LETTER_E>
-<TAMIL_LETTER_EE>             <X6D1A>;<X05>;<X05>;<TAMIL_LETTER_EE>
-<TAMIL_LETTER_AI>             <X6D1C>;<X05>;<X05>;<TAMIL_LETTER_AI>
-<TAMIL_LETTER_O>              <X6D1E>;<X05>;<X05>;<TAMIL_LETTER_O>
-<TAMIL_LETTER_OO>             <X6D20>;<X05>;<X05>;<TAMIL_LETTER_OO>
-<TAMIL_LETTER_AU>             <X6D22>;<X05>;<X05>;<TAMIL_LETTER_AU>
-<TAMIL_SIGN_ANUSVARA>         "<X6D23><X0400>";<X05>;"<X05><XC0>";<TAMIL_SIGN_ANUSVARA>
-<TAMIL_SIGN_VISARGA>          "<X6D23><X0500>";<X05>;"<X05><XC0>";<TAMIL_SIGN_VISARGA>
-<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA> <X6D25>;<X05>;<X05>;<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_KA>             <X6D26>;<X05>;<X05>;<TAMIL_LETTER_KA>
-<TAMIL_LETTER_NGA-TAMIL_SIGN_VIRAMA> <X6D27>;<X05>;<X05>;<TAMIL_LETTER_NGA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_NGA>            <X6D28>;<X05>;<X05>;<TAMIL_LETTER_NGA>
-<TAMIL_LETTER_CA-TAMIL_SIGN_VIRAMA> <X6D29>;<X05>;<X05>;<TAMIL_LETTER_CA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_CA>             <X6D2A>;<X05>;<X05>;<TAMIL_LETTER_CA>
-<TAMIL_LETTER_NYA-TAMIL_SIGN_VIRAMA> <X6D2B>;<X05>;<X05>;<TAMIL_LETTER_NYA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_NYA>            <X6D2C>;<X05>;<X05>;<TAMIL_LETTER_NYA>
-<TAMIL_LETTER_TTA-TAMIL_SIGN_VIRAMA> <X6D2D>;<X05>;<X05>;<TAMIL_LETTER_TTA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_TTA>            <X6D2E>;<X05>;<X05>;<TAMIL_LETTER_TTA>
-<TAMIL_LETTER_NNA-TAMIL_SIGN_VIRAMA> <X6D2F>;<X05>;<X05>;<TAMIL_LETTER_NNA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_NNA>            <X6D30>;<X05>;<X05>;<TAMIL_LETTER_NNA>
-<TAMIL_LETTER_TA-TAMIL_SIGN_VIRAMA> <X6D31>;<X05>;<X05>;<TAMIL_LETTER_TA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_TA>             <X6D32>;<X05>;<X05>;<TAMIL_LETTER_TA>
-<TAMIL_LETTER_NA-TAMIL_SIGN_VIRAMA> <X6D33>;<X05>;<X05>;<TAMIL_LETTER_NA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_NA>             <X6D34>;<X05>;<X05>;<TAMIL_LETTER_NA>
-<TAMIL_LETTER_PA-TAMIL_SIGN_VIRAMA> <X6D35>;<X05>;<X05>;<TAMIL_LETTER_PA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_PA>             <X6D36>;<X05>;<X05>;<TAMIL_LETTER_PA>
-<TAMIL_LETTER_MA-TAMIL_SIGN_VIRAMA> <X6D37>;<X05>;<X05>;<TAMIL_LETTER_MA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_MA>             <X6D38>;<X05>;<X05>;<TAMIL_LETTER_MA>
-<TAMIL_LETTER_YA-TAMIL_SIGN_VIRAMA> <X6D39>;<X05>;<X05>;<TAMIL_LETTER_YA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_YA>             <X6D3A>;<X05>;<X05>;<TAMIL_LETTER_YA>
-<TAMIL_LETTER_RA-TAMIL_SIGN_VIRAMA> <X6D3B>;<X05>;<X05>;<TAMIL_LETTER_RA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_RA>             <X6D3C>;<X05>;<X05>;<TAMIL_LETTER_RA>
-<TAMIL_LETTER_LA-TAMIL_SIGN_VIRAMA> <X6D3D>;<X05>;<X05>;<TAMIL_LETTER_LA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_LA>             <X6D3E>;<X05>;<X05>;<TAMIL_LETTER_LA>
-<TAMIL_LETTER_VA-TAMIL_SIGN_VIRAMA> <X6D3F>;<X05>;<X05>;<TAMIL_LETTER_VA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_VA>             <X6D40>;<X05>;<X05>;<TAMIL_LETTER_VA>
-<TAMIL_LETTER_LLLA-TAMIL_SIGN_VIRAMA> <X6D41>;<X05>;<X05>;<TAMIL_LETTER_LLLA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_LLLA>           <X6D42>;<X05>;<X05>;<TAMIL_LETTER_LLLA>
-<TAMIL_LETTER_LLA-TAMIL_SIGN_VIRAMA> <X6D43>;<X05>;<X05>;<TAMIL_LETTER_LLA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_LLA>            <X6D44>;<X05>;<X05>;<TAMIL_LETTER_LLA>
-<TAMIL_LETTER_RRA-TAMIL_SIGN_VIRAMA> <X6D45>;<X05>;<X05>;<TAMIL_LETTER_RRA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_RRA>            <X6D46>;<X05>;<X05>;<TAMIL_LETTER_RRA>
-<TAMIL_LETTER_NNNA-TAMIL_SIGN_VIRAMA> <X6D47>;<X05>;<X05>;<TAMIL_LETTER_NNNA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_NNNA>           <X6D48>;<X05>;<X05>;<TAMIL_LETTER_NNNA>
-<TAMIL_LETTER_JA-TAMIL_SIGN_VIRAMA> <X6D49>;<X05>;<X05>;<TAMIL_LETTER_JA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_JA>             <X6D4A>;<X05>;<X05>;<TAMIL_LETTER_JA>
-<TAMIL_LETTER_SHA-TAMIL_SIGN_VIRAMA> <X6D4B>;<X05>;<X05>;<TAMIL_LETTER_SHA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_SHA>            <X6D4C>;<X05>;<X05>;<TAMIL_LETTER_SHA>
-<TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA> <X6D4D>;<X05>;<X05>;<TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_SSA>            <X6D4E>;<X05>;<X05>;<TAMIL_LETTER_SSA>
-<TAMIL_LETTER_SA-TAMIL_SIGN_VIRAMA> <X6D4F>;<X05>;<X05>;<TAMIL_LETTER_SA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_SA>             <X6D50>;<X05>;<X05>;<TAMIL_LETTER_SA>
-<TAMIL_LETTER_HA-TAMIL_SIGN_VIRAMA> <X6D51>;<X05>;<X05>;<TAMIL_LETTER_HA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_HA>             <X6D52>;<X05>;<X05>;<TAMIL_LETTER_HA>
-<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA> "<X6D53><X0400>";<X05>;"<X05><XC0>";<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA>
-<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA> "<X6D53><X0500>";<X05>;"<X05><XC0>";<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA>
-<TAMIL_VOWEL_SIGN_AA>         <X6D54>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_AA>
-<TAMIL_VOWEL_SIGN_I>          <X6D56>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_I>
-<TAMIL_VOWEL_SIGN_II>         <X6D58>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_II>
-<TAMIL_VOWEL_SIGN_U>          <X6D5A>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_U>
-<TAMIL_VOWEL_SIGN_UU>         <X6D5C>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_UU>
-<TAMIL_VOWEL_SIGN_E>          <X6D5E>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_E>
-<TAMIL_VOWEL_SIGN_EE>         <X6D60>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_EE>
-<TAMIL_VOWEL_SIGN_AI>         <X6D62>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_AI>
-<TAMIL_VOWEL_SIGN_O>          <X6D64>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_O>
-<TAMIL_VOWEL_SIGN_OO>         <X6D66>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_OO>
-<TAMIL_VOWEL_SIGN_AU>         <X6D68>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_AU>
-<TAMIL_SIGN_VIRAMA>           <X6D6A>;<X05>;<X05>;<TAMIL_SIGN_VIRAMA>
-<TAMIL_AU_LENGTH_MARK>        <X6D6C>;<X05>;<X05>;<TAMIL_AU_LENGTH_MARK>
+<TAMIL_DIGIT_NINE>            <X2400>;<X05>;<X05>;<TAMIL_DIGIT_NINE>
+<TAMIL_OM>                    <X6C06>;<X05>;<X05>;<TAMIL_OM>
+<TAMIL_LETTER_A>              <X6C08>;<X05>;<X05>;<TAMIL_LETTER_A>
+<TAMIL_LETTER_AA>             <X6C0A>;<X05>;<X05>;<TAMIL_LETTER_AA>
+<TAMIL_LETTER_I>              <X6C0C>;<X05>;<X05>;<TAMIL_LETTER_I>
+<TAMIL_LETTER_II>             <X6C0E>;<X05>;<X05>;<TAMIL_LETTER_II>
+<TAMIL_LETTER_U>              <X6C10>;<X05>;<X05>;<TAMIL_LETTER_U>
+<TAMIL_LETTER_UU>             <X6C12>;<X05>;<X05>;<TAMIL_LETTER_UU>
+<TAMIL_LETTER_E>              <X6C14>;<X05>;<X05>;<TAMIL_LETTER_E>
+<TAMIL_LETTER_EE>             <X6C16>;<X05>;<X05>;<TAMIL_LETTER_EE>
+<TAMIL_LETTER_AI>             <X6C18>;<X05>;<X05>;<TAMIL_LETTER_AI>
+<TAMIL_LETTER_O>              <X6C1A>;<X05>;<X05>;<TAMIL_LETTER_O>
+<TAMIL_LETTER_OO>             <X6C1C>;<X05>;<X05>;<TAMIL_LETTER_OO>
+<TAMIL_LETTER_AU>             <X6C1E>;<X05>;<X05>;<TAMIL_LETTER_AU>
+<TAMIL_SIGN_ANUSVARA>         "<X6C1F><X0200>";<X05>;"<X05><XC0>";<TAMIL_SIGN_ANUSVARA>
+<TAMIL_SIGN_VISARGA>          "<X6C1F><X0300>";<X05>;"<X05><XC0>";<TAMIL_SIGN_VISARGA>
+<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA> <X6C21>;<X05>;<X05>;<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_KA>             <X6C22>;<X05>;<X05>;<TAMIL_LETTER_KA>
+<TAMIL_LETTER_NGA-TAMIL_SIGN_VIRAMA> <X6C23>;<X05>;<X05>;<TAMIL_LETTER_NGA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_NGA>            <X6C24>;<X05>;<X05>;<TAMIL_LETTER_NGA>
+<TAMIL_LETTER_CA-TAMIL_SIGN_VIRAMA> <X6C25>;<X05>;<X05>;<TAMIL_LETTER_CA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_CA>             <X6C26>;<X05>;<X05>;<TAMIL_LETTER_CA>
+<TAMIL_LETTER_NYA-TAMIL_SIGN_VIRAMA> <X6C27>;<X05>;<X05>;<TAMIL_LETTER_NYA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_NYA>            <X6C28>;<X05>;<X05>;<TAMIL_LETTER_NYA>
+<TAMIL_LETTER_TTA-TAMIL_SIGN_VIRAMA> <X6C29>;<X05>;<X05>;<TAMIL_LETTER_TTA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_TTA>            <X6C2A>;<X05>;<X05>;<TAMIL_LETTER_TTA>
+<TAMIL_LETTER_NNA-TAMIL_SIGN_VIRAMA> <X6C2B>;<X05>;<X05>;<TAMIL_LETTER_NNA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_NNA>            <X6C2C>;<X05>;<X05>;<TAMIL_LETTER_NNA>
+<TAMIL_LETTER_TA-TAMIL_SIGN_VIRAMA> <X6C2D>;<X05>;<X05>;<TAMIL_LETTER_TA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_TA>             <X6C2E>;<X05>;<X05>;<TAMIL_LETTER_TA>
+<TAMIL_LETTER_NA-TAMIL_SIGN_VIRAMA> <X6C2F>;<X05>;<X05>;<TAMIL_LETTER_NA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_NA>             <X6C30>;<X05>;<X05>;<TAMIL_LETTER_NA>
+<TAMIL_LETTER_PA-TAMIL_SIGN_VIRAMA> <X6C31>;<X05>;<X05>;<TAMIL_LETTER_PA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_PA>             <X6C32>;<X05>;<X05>;<TAMIL_LETTER_PA>
+<TAMIL_LETTER_MA-TAMIL_SIGN_VIRAMA> <X6C33>;<X05>;<X05>;<TAMIL_LETTER_MA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_MA>             <X6C34>;<X05>;<X05>;<TAMIL_LETTER_MA>
+<TAMIL_LETTER_YA-TAMIL_SIGN_VIRAMA> <X6C35>;<X05>;<X05>;<TAMIL_LETTER_YA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_YA>             <X6C36>;<X05>;<X05>;<TAMIL_LETTER_YA>
+<TAMIL_LETTER_RA-TAMIL_SIGN_VIRAMA> <X6C37>;<X05>;<X05>;<TAMIL_LETTER_RA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_RA>             <X6C38>;<X05>;<X05>;<TAMIL_LETTER_RA>
+<TAMIL_LETTER_LA-TAMIL_SIGN_VIRAMA> <X6C39>;<X05>;<X05>;<TAMIL_LETTER_LA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_LA>             <X6C3A>;<X05>;<X05>;<TAMIL_LETTER_LA>
+<TAMIL_LETTER_VA-TAMIL_SIGN_VIRAMA> <X6C3B>;<X05>;<X05>;<TAMIL_LETTER_VA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_VA>             <X6C3C>;<X05>;<X05>;<TAMIL_LETTER_VA>
+<TAMIL_LETTER_LLLA-TAMIL_SIGN_VIRAMA> <X6C3D>;<X05>;<X05>;<TAMIL_LETTER_LLLA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_LLLA>           <X6C3E>;<X05>;<X05>;<TAMIL_LETTER_LLLA>
+<TAMIL_LETTER_LLA-TAMIL_SIGN_VIRAMA> <X6C3F>;<X05>;<X05>;<TAMIL_LETTER_LLA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_LLA>            <X6C40>;<X05>;<X05>;<TAMIL_LETTER_LLA>
+<TAMIL_LETTER_RRA-TAMIL_SIGN_VIRAMA> <X6C41>;<X05>;<X05>;<TAMIL_LETTER_RRA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_RRA>            <X6C42>;<X05>;<X05>;<TAMIL_LETTER_RRA>
+<TAMIL_LETTER_NNNA-TAMIL_SIGN_VIRAMA> <X6C43>;<X05>;<X05>;<TAMIL_LETTER_NNNA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_NNNA>           <X6C44>;<X05>;<X05>;<TAMIL_LETTER_NNNA>
+<TAMIL_LETTER_JA-TAMIL_SIGN_VIRAMA> <X6C45>;<X05>;<X05>;<TAMIL_LETTER_JA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_JA>             <X6C46>;<X05>;<X05>;<TAMIL_LETTER_JA>
+<TAMIL_LETTER_SHA-TAMIL_SIGN_VIRAMA> <X6C47>;<X05>;<X05>;<TAMIL_LETTER_SHA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_SHA>            <X6C48>;<X05>;<X05>;<TAMIL_LETTER_SHA>
+<TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA> <X6C49>;<X05>;<X05>;<TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_SSA>            <X6C4A>;<X05>;<X05>;<TAMIL_LETTER_SSA>
+<TAMIL_LETTER_SA-TAMIL_SIGN_VIRAMA> <X6C4B>;<X05>;<X05>;<TAMIL_LETTER_SA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_SA>             <X6C4C>;<X05>;<X05>;<TAMIL_LETTER_SA>
+<TAMIL_LETTER_HA-TAMIL_SIGN_VIRAMA> <X6C4D>;<X05>;<X05>;<TAMIL_LETTER_HA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_HA>             <X6C4E>;<X05>;<X05>;<TAMIL_LETTER_HA>
+<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA> "<X6C4F><X0200>";<X05>;"<X05><XC0>";<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA-TAMIL_SIGN_VIRAMA>
+<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA> "<X6C4F><X0300>";<X05>;"<X05><XC0>";<TAMIL_LETTER_KA-TAMIL_SIGN_VIRAMA-TAMIL_LETTER_SSA>
+<TAMIL_VOWEL_SIGN_AA>         <X6C50>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_AA>
+<TAMIL_VOWEL_SIGN_I>          <X6C52>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_I>
+<TAMIL_VOWEL_SIGN_II>         <X6C54>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_II>
+<TAMIL_VOWEL_SIGN_U>          <X6C56>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_U>
+<TAMIL_VOWEL_SIGN_UU>         <X6C58>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_UU>
+<TAMIL_VOWEL_SIGN_E>          <X6C5A>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_E>
+<TAMIL_VOWEL_SIGN_EE>         <X6C5C>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_EE>
+<TAMIL_VOWEL_SIGN_AI>         <X6C5E>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_AI>
+<TAMIL_VOWEL_SIGN_O>          <X6C60>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_O>
+<TAMIL_VOWEL_SIGN_OO>         <X6C62>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_OO>
+<TAMIL_VOWEL_SIGN_AU>         <X6C64>;<X05>;<X05>;<TAMIL_VOWEL_SIGN_AU>
+<TAMIL_SIGN_VIRAMA>           <X6C66>;<X05>;<X05>;<TAMIL_SIGN_VIRAMA>
+<TAMIL_AU_LENGTH_MARK>        <X6C68>;<X05>;<X05>;<TAMIL_AU_LENGTH_MARK>
+<a>                           <X2900>;<X05>;<X05>;<a>
+<A>                           <X2900>;<X05>;<X9C>;<A>
+<b>                           <X2B00>;<X05>;<X05>;<b>
+<B>                           <X2B00>;<X05>;<X9C>;<B>
+<c>                           <X2D00>;<X05>;<X05>;<c>
+<C>                           <X2D00>;<X05>;<X9C>;<C>
+<d>                           <X2F00>;<X05>;<X05>;<d>
+<D>                           <X2F00>;<X05>;<X9C>;<D>
+<e>                           <X3100>;<X05>;<X05>;<e>
+<E>                           <X3100>;<X05>;<X9C>;<E>
+<f>                           <X3300>;<X05>;<X05>;<f>
+<F>                           <X3300>;<X05>;<X9C>;<F>
+<g>                           <X3500>;<X05>;<X05>;<g>
+<G>                           <X3500>;<X05>;<X9C>;<G>
+<h>                           <X3700>;<X05>;<X05>;<h>
+<H>                           <X3700>;<X05>;<X9C>;<H>
+<i>                           <X3900>;<X05>;<X05>;<i>
+<I>                           <X3900>;<X05>;<X9C>;<I>
+<j>                           <X3B00>;<X05>;<X05>;<j>
+<J>                           <X3B00>;<X05>;<X9C>;<J>
+<k>                           <X3D00>;<X05>;<X05>;<k>
+<K>                           <X3D00>;<X05>;<X9C>;<K>
+<l>                           <X3F00>;<X05>;<X05>;<l>
+<L>                           <X3F00>;<X05>;<X9C>;<L>
+<m>                           <X4100>;<X05>;<X05>;<m>
+<M>                           <X4100>;<X05>;<X9C>;<M>
+<n>                           <X4300>;<X05>;<X05>;<n>
+<N>                           <X4300>;<X05>;<X9C>;<N>
+<o>                           <X4500>;<X05>;<X05>;<o>
+<O>                           <X4500>;<X05>;<X9C>;<O>
+<p>                           <X4700>;<X05>;<X05>;<p>
+<P>                           <X4700>;<X05>;<X9C>;<P>
+<q>                           <X4900>;<X05>;<X05>;<q>
+<Q>                           <X4900>;<X05>;<XA0>;<Q>
+<r>                           <X4B00>;<X05>;<X05>;<r>
+<R>                           <X4B00>;<X05>;<X9C>;<R>
+<s>                           <X4D00>;<X05>;<X05>;<s>
+<S>                           <X4D00>;<X05>;<X9C>;<S>
+<t>                           <X4F00>;<X05>;<X05>;<t>
+<T>                           <X4F00>;<X05>;<X9C>;<T>
+<u>                           <X5100>;<X05>;<X05>;<u>
+<U>                           <X5100>;<X05>;<X9C>;<U>
+<v>                           <X5300>;<X05>;<X05>;<v>
+<V>                           <X5300>;<X05>;<X9C>;<V>
+<w>                           <X5500>;<X05>;<X05>;<w>
+<W>                           <X5500>;<X05>;<XA0>;<W>
+<x>                           <X5700>;<X05>;<X05>;<x>
+<X>                           <X5700>;<X05>;<X9C>;<X>
+<y>                           <X5900>;<X05>;<X05>;<y>
+<Y>                           <X5900>;<X05>;<X9C>;<Y>
+<z>                           <X5B00>;<X05>;<X05>;<z>
+<Z>                           <X5B00>;<X05>;<X9C>;<Z>
 UNDEFINED                     IGNORE;IGNORE;IGNORE;...
 
 order_end
@@ -1284,13 +1284,13 @@ END LC_MONETARY
 LC_TIME
 *************
 
-abday   "<TAMIL_LETTER_NYA><TAMIL_VOWEL_SIGN_AA>";/
-        "<TAMIL_LETTER_TA><TAMIL_VOWEL_SIGN_I>";/
-        "<TAMIL_LETTER_CA><TAMIL_VOWEL_SIGN_E>";/
-        "<TAMIL_LETTER_PA><TAMIL_VOWEL_SIGN_U>";/
-        "<TAMIL_LETTER_VA><TAMIL_VOWEL_SIGN_I>";/
-        "<TAMIL_LETTER_VA><TAMIL_VOWEL_SIGN_E>";/
-        "<TAMIL_LETTER_CA>"
+abday   "<TAMIL_LETTER_NYA><TAMIL_VOWEL_SIGN_AA><TAMIL_LETTER_YA><TAMIL_VOWEL_SIGN_I><FULL_STOP>";/
+        "<TAMIL_LETTER_TA><TAMIL_VOWEL_SIGN_I><TAMIL_LETTER_NGA><TAMIL_SIGN_VIRAMA><FULL_STOP>";/
+        "<TAMIL_LETTER_CA><TAMIL_VOWEL_SIGN_E><TAMIL_LETTER_VA><TAMIL_SIGN_VIRAMA><FULL_STOP>";/
+        "<TAMIL_LETTER_PA><TAMIL_VOWEL_SIGN_U><TAMIL_LETTER_TA><FULL_STOP>";/
+        "<TAMIL_LETTER_VA><TAMIL_VOWEL_SIGN_I><TAMIL_LETTER_YA><TAMIL_VOWEL_SIGN_AA><FULL_STOP>";/
+        "<TAMIL_LETTER_VA><TAMIL_VOWEL_SIGN_E><TAMIL_LETTER_LLA><TAMIL_SIGN_VIRAMA><FULL_STOP>";/
+        "<TAMIL_LETTER_CA><TAMIL_LETTER_NNNA><TAMIL_VOWEL_SIGN_I>"
 
 day     "<TAMIL_LETTER_NYA><TAMIL_VOWEL_SIGN_AA><TAMIL_LETTER_YA><TAMIL_VOWEL_SIGN_I><TAMIL_LETTER_RRA><TAMIL_VOWEL_SIGN_U>";/
         "<TAMIL_LETTER_TA><TAMIL_VOWEL_SIGN_I><TAMIL_LETTER_NGA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_KA><TAMIL_LETTER_LLA><TAMIL_SIGN_VIRAMA>";/
@@ -1326,116 +1326,16 @@ mon     "<TAMIL_LETTER_JA><TAMIL_LETTER_NNNA><TAMIL_LETTER_VA><TAMIL_LETTER_RA><
         "<TAMIL_LETTER_NA><TAMIL_LETTER_VA><TAMIL_LETTER_MA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_PA><TAMIL_LETTER_RA><TAMIL_SIGN_VIRAMA>";/
         "<TAMIL_LETTER_TTA><TAMIL_VOWEL_SIGN_I><TAMIL_LETTER_CA><TAMIL_LETTER_MA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_PA><TAMIL_LETTER_RA><TAMIL_SIGN_VIRAMA>"
 
-d_fmt    "%Oe-%Om-%Oy"
+d_fmt    "%e<SOLIDUS>%m<SOLIDUS>%y"
 
-t_fmt    "%OI:%OM:%OS %p"
+t_fmt    "%H:%M:%S"
 
-d_t_fmt  "%Oe %B, %Oy %OI:%OM:%OS %p %Z"
+d_t_fmt  "%e %B, %Y <RIGHT_SINGLE_QUOTATION_MARK><TAMIL_LETTER_A><TAMIL_LETTER_NNNA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_RRA><TAMIL_VOWEL_SIGN_U><RIGHT_SINGLE_QUOTATION_MARK> %H:%M:%S %Z"
 
 am_pm    "<TAMIL_LETTER_MA><TAMIL_VOWEL_SIGN_U><TAMIL_LETTER_RRA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_PA><TAMIL_LETTER_KA><TAMIL_LETTER_LA><TAMIL_SIGN_VIRAMA>";"<TAMIL_LETTER_PA><TAMIL_VOWEL_SIGN_I><TAMIL_LETTER_RRA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_PA><TAMIL_LETTER_KA><TAMIL_LETTER_LA><TAMIL_SIGN_VIRAMA>"
 
-t_fmt_ampm  "%OI:%OM:%OS %p"
+t_fmt_ampm  "%p %I:%M:%S"
 
-alt_digits "<TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_ONE><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_TWO><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_THREE><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_FOUR><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_FIVE><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_SIX><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_SEVEN><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_EIGHT><TAMIL_DIGIT_NINE>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_ZERO>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_ONE>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_TWO>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_THREE>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_FOUR>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_FIVE>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_SIX>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_SEVEN>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_EIGHT>";/
-           "<TAMIL_DIGIT_NINE><TAMIL_DIGIT_NINE>"
 END LC_TIME
 *************
 LC_MESSAGES
@@ -1445,9 +1345,9 @@ yesstr   "<TAMIL_LETTER_AA><TAMIL_LETTER_MA><TAMIL_SIGN_VIRAMA>:<TAMIL_LETTER_AA
 
 nostr    "<TAMIL_LETTER_I><TAMIL_LETTER_LA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_LA><TAMIL_VOWEL_SIGN_AI>:<TAMIL_LETTER_I>:no:n:NO:N"
 
-yesexpr  "^((<TAMIL_LETTER_AA><TAMIL_LETTER_MA><TAMIL_SIGN_VIRAMA>)|([yY]([eE][sS])?))"
+yesexpr  "^((<TAMIL_LETTER_AA><TAMIL_LETTER_MA><TAMIL_SIGN_VIRAMA>)|(<TAMIL_LETTER_AA>)|([yY]([eE][sS])?)|([yY]))"
 
-noexpr   "^((<TAMIL_LETTER_I><TAMIL_LETTER_LA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_LA><TAMIL_VOWEL_SIGN_AI>)|([nN]([oO])?))"
+noexpr   "^((<TAMIL_LETTER_I><TAMIL_LETTER_LA><TAMIL_SIGN_VIRAMA><TAMIL_LETTER_LA><TAMIL_VOWEL_SIGN_AI>)|(<TAMIL_LETTER_I>)|([nN]([oO])?)|([nN]))"
 
 
 END LC_MESSAGES

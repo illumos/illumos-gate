@@ -1,0 +1,157 @@
+.\" Copyright (c) 2014 Andriy Gapon <avg@FreeBSD.org>
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Apr 21, 2017
+.Dt GPTZFSBOOT 5
+.Os
+.Sh NAME
+.Nm gptzfsboot
+.Nd disk bootcode for BIOS-based computers
+.Sh DESCRIPTION
+.Nm
+is used on BIOS-based computers to boot from a filesystem on disk device.
+Depending on disk partitioning and boot file system, the
+.Nm
+is installed in a
+.Cm zfs pool boot area
+or
+.Cm boot
+partition of a disk with
+.Xr installboot 1M .
+.Ss IMPLEMENTATION NOTES
+The GPT standard allows a variable number of partitions, but
+.Nm
+only boots from tables with 128 partitions or less.
+.Ss BOOTING
+.Nm
+tries to find all ZFS pools that are composed of BIOS-visible
+hard disks or partitions on them.
+.Nm
+looks for ZFS device labels on all visible disks and in discovered
+supported partitions for all supported partition scheme types.
+Disks are probed in BIOS defined order.
+After a disk is probed and
+.Nm
+determines that the whole disk is not a ZFS pool member, the
+individual partitions are probed in their partition table order.
+Currently GPT and MBR partition schemes are supported.
+.Pp
+The default boot partition is recorded into
+.Nm
+binary by
+.Xr installboot 1M
+and the default boot file system is determined at run time.
+.Nm
+does support booting from the
+.Cm ZFS ,
+.Cm UFS
+and
+.Cm PCFS
+file systems.
+.Pp
+The filesystem specified by the
+.Cm bootfs
+property of the ZFS pool is used as a default boot filesystem.
+If the
+.Cm bootfs
+property is not set, then the root filesystem of the pool is used as
+the default.
+.Xr zfsloader 5
+is loaded from the boot filesystem.
+If
+.Pa /boot/config
+is present in the boot filesystem, boot options are read from it.
+.Pp
+The ZFS GUIDs of the boot pool and boot file system are made available to
+.Xr zfsloader 8 .
+.Ss USAGE
+Normally
+.Nm
+will boot in fully automatic mode.
+However, it is possible to interrupt the automatic boot process and
+interact with
+.Nm
+through a prompt.
+.Pp
+The filesystem specification and the path to
+.Xr zfsloader 5
+is specified as
+.Pp
+.Sm off
+.Oo zfs:pool/filesystem: Oc Oo /path/to/loader Oc
+.Sm on
+.Pp
+Both the filesystem and the path can be specified.
+If only a path is specified, then the default filesystem is used.
+If only a pool and filesystem are specified, then
+.Pa /boot/zfsloader
+is used as a path.
+.Pp
+Additionally, the
+.Nm
+does support two commands to get information about the system.
+.Ic ?directoryname
+can be used to list the content of named directory and
+.Ic status
+command can be used to query information about discovered devices.
+The output format for ZFS pools is similar to that of
+.Cm zpool status
+.Pq see Xr zpool 1M .
+.Pp
+The configured or automatically determined ZFS boot filesystem is
+stored in the
+.Xr zfsloader 5
+.Cm loaddev
+variable, and also set as the initial value of the
+.Cm currdev
+variable.
+.Sh FILES
+.Bl -tag -width /boot/gptzfsboot -compact
+.It Pa /boot/config
+parameters for the boot block
+.Pq optional
+.It Pa /boot/gptzfsboot
+boot code binary
+.El
+.Sh EXAMPLES
+.Nm
+is installed in combination with a
+.Dq protective MBR
+.Po
+see
+.Xr installboot 1M
+.Pc .
+To install
+.Nm
+on the
+.Pa c0t0d0s0
+drive:
+.Bd -literal -offset indent
+installboot /boot/pmbr /boot/gptzfsboot /dev/rdsk/c0t0d0s0
+.Ed
+.Sh SEE ALSO
+.Xr installboot 1M ,
+.Xr zpool 1M ,
+.Xr loader 5 ,
+.Xr zfsloader 5

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DOOR_SERVER_CREATE 3C "Mar 22, 2005"
+.TH DOOR_SERVER_CREATE 3C "May 12, 2017"
 .SH NAME
 door_server_create \- specify an alternative door server thread creation
 function
@@ -13,23 +13,22 @@ function
 \fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 #include <door.h>
 
-\fBvoid (*) ()\fR \fBdoor_server_create\fR(\fBvoid (*\fR\fIcreate_proc\fR)(door_info_t*));
+\fBvoid (*)(door_info_t *)\fR \fBdoor_server_create\fR(\fBvoid (*\fR\fIcreate_proc\fR)(door_info_t *));
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-Normally, the doors library creates new door  server threads in response to
+Normally, the doors library creates new door server threads in response to
 incoming concurrent door invocations automatically. There is no pre-defined
-upper limit on the number of  server threads that the system creates in
-response to incoming  invocations (1 server thread for each active door
+upper limit on the number of server threads that the system creates in
+response to incoming invocations (1 server thread for each active door
 invocation). These threads are created with the default thread stack size and
-POSIX (see \fBstandards\fR(5)) threads cancellation disabled.  The created
-threads also have the   \fBTHR_BOUND\fR |  \fBTHR_DETACHED\fR attributes  for
-Solaris threads and the  \fBPTHREAD_SCOPE_SYSTEM\fR |
+POSIX (see \fBstandards\fR(5)) threads cancellation disabled. The created
+threads also have the \fBTHR_BOUND\fR | \fBTHR_DETACHED\fR attributes for
+Solaris threads and the \fBPTHREAD_SCOPE_SYSTEM\fR |
 \fBPTHREAD_CREATE_DETACHED\fR attributes for POSIX threads. The signal
-disposition, and scheduling class of the  newly created thread are inherited
-from the  calling thread (initially from the thread calling
+disposition, and scheduling class of the newly created thread are inherited
+from the calling thread (initially from the thread calling
 \fBdoor_create()\fR, and subsequently from the current active door server
 thread).
 .sp
@@ -37,15 +36,15 @@ thread).
 The \fBdoor_server_create()\fR function allows control over the creation of
 server threads needed for door invocations. The procedure \fIcreate_proc\fR is
 called every time the available server thread pool is depleted. In the case of
-private server pools associated with a door  (see the  \fBDOOR_PRIVATE\fR
-attribute in  \fBdoor_create()\fR), information on which pool is depleted is
-passed  to the create function in the form of a \fBdoor_info_t\fR structure.
+private server pools associated with a door (see the \fBDOOR_PRIVATE\fR
+attribute in \fBdoor_create()\fR), information on which pool is depleted is
+passed to the create function in the form of a \fBdoor_info_t\fR structure.
 The \fBdi_proc\fR and \fBdi_data\fR members of the \fBdoor_info_t\fR structure
-can be  used as a door identifier associated with the depleted pool. The
-\fIcreate_proc\fR procedure may limit the number of  server threads created and
-may also create server  threads with appropriate attributes (stack size,
+can be used as a door identifier associated with the depleted pool. The
+\fIcreate_proc\fR procedure may limit the number of server threads created and
+may also create server threads with appropriate attributes (stack size,
 thread-specific data, POSIX thread cancellation, signal mask, scheduling
-attributes, and so forth)  for use with door invocations.
+attributes, and so forth) for use with door invocations.
 .sp
 .LP
 The overall amount of data and argument descriptors that can be sent through a
@@ -54,21 +53,21 @@ the door itself. See \fBdoor_setparam\fR(3C).
 .sp
 .LP
 The specified server creation function should create user level threads using
-\fBthr_create()\fR with the  \fBTHR_BOUND\fR flag, or in the case of POSIX
-threads, \fBpthread_create()\fR with the  \fBPTHREAD_SCOPE_SYSTEM\fR attribute.
+\fBthr_create()\fR with the \fBTHR_BOUND\fR flag, or in the case of POSIX
+threads, \fBpthread_create()\fR with the \fBPTHREAD_SCOPE_SYSTEM\fR attribute.
 The server threads make themselves available for incoming door invocations on
 this process by issuing a \fBdoor_return\fR(\fBNULL, 0, NULL, 0\fR). In this
-case, the  \fBdoor_return()\fR arguments are ignored. See \fBdoor_return\fR(3C)
+case, the \fBdoor_return()\fR arguments are ignored. See \fBdoor_return\fR(3C)
 and \fBthr_create\fR(3C).
 .sp
 .LP
-The server threads created by default are enabled for  POSIX thread
-cancellations which may lead to unexpected  thread terminations while holding
-resources  (such as locks) if the client aborts the associated
+The server threads created by default are enabled for POSIX thread
+cancellations which may lead to unexpected thread terminations while holding
+resources (such as locks) if the client aborts the associated
 \fBdoor_call()\fR. See \fBdoor_call\fR(3C). Unless the server code is truly
-interested in notifications  of client aborts during a door invocation and  is
-prepared to handle such notifications using  cancellation handlers, POSIX
-thread cancellation should  be disabled for server threads using
+interested in notifications of client aborts during a door invocation and is
+prepared to handle such notifications using cancellation handlers, POSIX
+thread cancellation should be disabled for server threads using
 \fBpthread_setcancelstate\fR (\fBPTHREAD_CANCEL_DISABLE\fR, \fINULL\fR). If all
 doors are created with the \fBDOOR_NO_CANCEL\fR flag (see
 \fBdoor_create\fR(3C)), the threads will never be cancelled by an aborted
@@ -77,12 +76,11 @@ doors are created with the \fBDOOR_NO_CANCEL\fR flag (see
 .LP
 The \fIcreate_proc\fR procedure need not create any additional server threads
 if there is at least one server thread currently active in the process (perhaps
-handling another door invocation)  or it may create as many as seen fit each
+handling another door invocation) or it may create as many as seen fit each
 time it is called. If there are no available server threads during an incoming
-door invocation, the associated  \fBdoor_call()\fR blocks until a server thread
-becomes  available. The \fIcreate_proc\fR procedure must be MT-Safe.
+door invocation, the associated \fBdoor_call()\fR blocks until a server thread
+becomes available. The \fIcreate_proc\fR procedure must be MT-Safe.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBdoor_server_create()\fR returns a pointer to the
 previous server creation function. This function has no failure mode (it cannot
@@ -92,7 +90,7 @@ fail).
 \fBExample 1 \fRCreating door server threads.
 .sp
 .LP
-The following example creates door server threads with  cancellation disabled
+The following example creates door server threads with cancellation disabled
 and an 8k stack instead of the default stack size:
 
 .sp
@@ -123,7 +121,6 @@ main(\|)
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -143,7 +140,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdoor_bind\fR(3C), \fBdoor_call\fR(3C), \fBdoor_create\fR(3C),
 \fBdoor_return\fR(3C), \fBpthread_create\fR(3C),
