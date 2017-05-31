@@ -239,6 +239,8 @@ shmget05		# OS-3326
 splice01
 splice02
 splice03
+splice04
+splice05
 ssetmask01
 sync_file_range01
 sysconf01		# OS-3305
