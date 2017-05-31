@@ -38,7 +38,7 @@ include		$(SRC)/cmd/Makefile.ctf
 XGETFLAGS +=	-a -x $(PROG).xcl
 
 LDLIBS +=	-L$(ROOT)/lib -lsocket
-LDLIBS +=	-ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil -ldevinfo
+LDLIBS +=	-ldladm -ldlpi -lkstat -lsecdb -lbsm -lofmt -linetutil -ldevinfo
 LDLIBS +=	$(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
 
 CERRWARN +=	-_gcc=-Wno-switch

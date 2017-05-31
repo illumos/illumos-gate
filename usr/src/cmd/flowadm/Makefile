@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-PROG=flowadm 
+PROG=flowadm
 
 ROOTFS_PROG= $(PROG)
 
@@ -34,7 +34,7 @@ include ../Makefile.cmd
 
 XGETFLAGS += -a -x $(PROG).xcl
 LDLIBS += -L$(ROOT)/lib
-LDLIBS += -ldladm -linetutil
+LDLIBS += -ldladm -lofmt
 
 ROOTCFGDIR=	$(ROOTETC)/dladm
 ROOTCFGFILES=	$(CONFIGFILES:%=$(ROOTCFGDIR)/%)
@@ -43,7 +43,7 @@ $(ROOTCFGFILES):= FILEMODE= 644
 
 .KEEP_STATE:
 
-all: $(ROOTFS_PROG) 
+all: $(ROOTFS_PROG)
 
 #
 # Message catalog

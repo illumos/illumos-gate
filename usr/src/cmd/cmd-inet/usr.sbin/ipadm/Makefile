@@ -27,7 +27,7 @@
 PROG =		ipadm
 ROOTFS_PROG =	$(PROG)
 LOCALOBJS=	ipadm.o
-COMMONOBJS=	
+COMMONOBJS=
 OBJS=		$(LOCALOBJS) $(COMMONOBJS)
 
 include ../../../Makefile.cmd
@@ -41,7 +41,7 @@ SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 CPPFLAGS +=	-I$(CMDINETCOMMONDIR)
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-uninitialized
-LDLIBS +=       -linetutil -lipadm -lnvpair
+LDLIBS +=       -lofmt -linetutil -lipadm -lnvpair
 LINTFLAGS +=	-m
 
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)

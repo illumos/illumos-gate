@@ -27,4 +27,3 @@
 /* PROTOLIB1 */
 
 #include <libinetutil.h>
-#include <ofmt.h>

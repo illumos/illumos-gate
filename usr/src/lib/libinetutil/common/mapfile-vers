@@ -63,11 +63,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	iu_tq_destroy;
 	iu_unregister_event;
 	octet_to_hexascii;
-	ofmt_open;
-	ofmt_close;
-	ofmt_print;
-	ofmt_update_winsize;
-	ofmt_strerror;
+	ofmt_open		{ TYPE = FUNCTION; FILTER = libofmt.so.1 };
+	ofmt_close		{ TYPE = FUNCTION; FILTER = libofmt.so.1 };
+	ofmt_print		{ TYPE = FUNCTION; FILTER = libofmt.so.1 };
+	ofmt_update_winsize	{ TYPE = FUNCTION; FILTER = libofmt.so.1 };
+	ofmt_strerror		{ TYPE = FUNCTION; FILTER = libofmt.so.1 };
 	mask2plen;
 	plen2mask;
 	sockaddrcmp;

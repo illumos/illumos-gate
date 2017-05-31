@@ -26,14 +26,10 @@
 
 include ../Makefile.lib
 
-HDRS =		libinetutil.h ofmt.h
+HDRS =		libinetutil.h
 HDRDIR =	common
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
-
-POFILE =	libinetutil.po
-MSGFILES =	common/ofmt.c
-XGETFLAGS =	-a
 
 all := 		TARGET = all
 clean :=	TARGET = clean
@@ -49,15 +45,9 @@ install_h:	$(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 
-$(POFILE):	$(MSGFILES)
-		$(BUILDPO.msgfiles)
-
-_msg:		$(MSGDOMAINPOFILE)
-
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
-include $(SRC)/Makefile.msg.targ
 include ../Makefile.targ
