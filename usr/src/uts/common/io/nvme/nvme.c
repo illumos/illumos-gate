@@ -13,6 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -2177,6 +2178,7 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 	 * We currently don't support namespaces that use either:
 	 * - thin provisioning
 	 * - protection information
+	 * - illegal block size (< 512)
 	 */
 	if (idns->id_nsfeat.f_thin ||
 	    idns->id_dps.dp_pinfo) {
@@ -2185,6 +2187,10 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 		    "thin = %d, pinfo = %d", nsid,
 		    idns->id_nsfeat.f_thin, idns->id_dps.dp_pinfo);
 		ns->ns_ignore = B_TRUE;
+	} else if (ns->ns_block_size < 512) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!ignoring namespace %d, unsupported block size %"PRIu64,
+		    nsid, (uint64_t)ns->ns_block_size);
 	} else {
 		ns->ns_ignore = B_FALSE;
 	}
