@@ -17,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -148,17 +148,14 @@ static const char *pchar(int ch);
  * matcher - the actual matching engine
  */
 static int			/* 0 success, REG_NOMATCH failure */
-matcher(struct re_guts *g,
-	const char *string,
-	size_t nmatch,
-	regmatch_t pmatch[],
-	int eflags)
+matcher(struct re_guts *g, const char *string, size_t nmatch,
+    regmatch_t pmatch[], int eflags)
 {
 	const char *endp;
-	int i;
+	size_t i;
 	struct match mv;
 	struct match *m = &mv;
-	const char *dp;
+	const char *dp = NULL;
 	const sopno gf = g->firststate+1;	/* +1 for OEND */
 	const sopno gl = g->laststate;
 	const char *start;
@@ -249,7 +246,7 @@ matcher(struct re_guts *g,
 	ZAPSTATE(&m->mbs);
 
 	/* Adjust start according to moffset, to speed things up */
-	if (g->moffset > -1)
+	if (dp != NULL && g->moffset > -1)
 		start = ((dp - g->moffset) < start) ? start : dp - g->moffset;
 
 	SP("mloop", m->st, *start);
@@ -605,8 +602,8 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			break;
 		case OBOL:
 			if ((sp == m->beginp && !(m->eflags&REG_NOTBOL)) ||
-			    (sp < m->endp && *(sp-1) == '\n' &&
-			    (m->g->cflags&REG_NEWLINE))) {
+			    (sp > m->offp && sp < m->endp &&
+			    *(sp-1) == '\n' && (m->g->cflags&REG_NEWLINE))) {
 				break;
 			}
 			return (NULL);
@@ -618,11 +615,9 @@ backref(struct match *m, const char *start, const char *stop, sopno startst,
 			}
 			return (NULL);
 		case OBOW:
-			if (((sp == m->beginp && !(m->eflags&REG_NOTBOL)) ||
-			    (sp < m->endp && *(sp-1) == '\n' &&
-			    (m->g->cflags&REG_NEWLINE)) ||
-			    (sp > m->beginp && !ISWORD(*(sp-1)))) &&
-			    (sp < m->endp && ISWORD(*sp))) {
+			if (sp < m->endp && ISWORD(*sp) &&
+			    ((sp == m->beginp && !(m->eflags&REG_NOTBOL)) ||
+			    (sp > m->offp && !ISWORD(*(sp-1))))) {
 				break;
 			}
 			return (NULL);
@@ -775,7 +770,7 @@ fast(struct match *m, const char *start, const char *stop, sopno startst,
 	ASSIGN(fresh, st);
 	SP("start", st, *p);
 	coldp = NULL;
-	if (start == m->beginp)
+	if (start == m->offp || (start == m->beginp && !(m->eflags&REG_NOTBOL)))
 		c = OUT;
 	else {
 		/*
@@ -876,7 +871,7 @@ slow(struct match *m, const char *start, const char *stop, sopno startst,
 	SP("sstart", st, *p);
 	st = step(m->g, startst, stopst, st, NOTHING, st);
 	matchp = NULL;
-	if (start == m->beginp)
+	if (start == m->offp || (start == m->beginp && !(m->eflags&REG_NOTBOL)))
 		c = OUT;
 	else {
 		/*
@@ -954,11 +949,11 @@ slow(struct match *m, const char *start, const char *stop, sopno startst,
  */
 static states
 step(struct re_guts *g,
-	sopno start,		/* start state within strip */
-	sopno stop,		/* state after stop state within strip */
-	states bef,		/* states reachable before */
-	wint_t ch,		/* character or NONCHAR code */
-	states aft)		/* states already known reachable after */
+    sopno start,	/* start state within strip */
+    sopno stop,		/* state after stop state within strip */
+    states bef,		/* states reachable before */
+    wint_t ch,		/* character or NONCHAR code */
+    states aft)		/* states already known reachable after */
 {
 	cset *cs;
 	sop s;
@@ -1073,7 +1068,7 @@ static void
 print(struct match *m, const char *caption, states st, int ch, FILE *d)
 {
 	struct re_guts *g = m->g;
-	int i;
+	sopno i;
 	int first = 1;
 
 	if (!(m->eflags&REG_TRACE))

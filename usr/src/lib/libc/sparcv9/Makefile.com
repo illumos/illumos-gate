@@ -39,12 +39,12 @@ TARGET_ARCH=	sparc
 
 # Symbol capabilities objects.
 EXTPICS=			\
-        $(LIBCDIR)/capabilities/sun4u/sparcv9/pics/symcap.o \
-        $(LIBCDIR)/capabilities/sun4u-opl/sparcv9/pics/symcap.o \
-        $(LIBCDIR)/capabilities/sun4u-us3-hwcap1/sparcv9/pics/symcap.o \
-        $(LIBCDIR)/capabilities/sun4u-us3-hwcap2/sparcv9/pics/symcap.o \
-        $(LIBCDIR)/capabilities/sun4v-hwcap1/sparcv9/pics/symcap.o \
-        $(LIBCDIR)/capabilities/sun4v-hwcap2/sparcv9/pics/symcap.o
+	$(LIBCDIR)/capabilities/sun4u/sparcv9/pics/symcap.o \
+	$(LIBCDIR)/capabilities/sun4u-opl/sparcv9/pics/symcap.o \
+	$(LIBCDIR)/capabilities/sun4u-us3-hwcap1/sparcv9/pics/symcap.o \
+	$(LIBCDIR)/capabilities/sun4u-us3-hwcap2/sparcv9/pics/symcap.o \
+	$(LIBCDIR)/capabilities/sun4v-hwcap1/sparcv9/pics/symcap.o \
+	$(LIBCDIR)/capabilities/sun4v-hwcap2/sparcv9/pics/symcap.o
 
 # local objects
 STRETS=
@@ -780,10 +780,6 @@ PORTLOCALE=			\
 	nextwctype.o		\
 	nl_langinfo.o		\
 	none.o			\
-	regcomp.o		\
-	regfree.o		\
-	regerror.o		\
-	regexec.o		\
 	rune.o			\
 	runetype.o		\
 	setlocale.o		\
@@ -948,7 +944,11 @@ PORTSYS=			\
 PORTREGEX=			\
 	glob.o			\
 	regcmp.o		\
+	regcomp.o		\
+	regerror.o		\
 	regex.o			\
+	regexec.o		\
+	regfree.o		\
 	wordexp.o
 
 VALUES=	values-Xa.o

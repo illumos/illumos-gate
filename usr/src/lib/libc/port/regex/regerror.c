@@ -15,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -48,8 +48,8 @@
 
 static struct rerr {
 	int code;
-	char *name;
-	char *explain;
+	const char *name;
+	const char *explain;
 } rerrs[] = {
 	RERR(REG_NOMATCH,	"regexec() failed to match"),
 	RERR(REG_BADPAT,	"invalid regular expression"),
@@ -90,7 +90,7 @@ regerror(int errcode, const regex_t *_RESTRICT_KYWD preg,
 {
 	struct rerr *r;
 	size_t len;
-	char *s;
+	const char *s;
 
 	for (r = rerrs; r->code != 0; r++)
 		if (r->code == errcode)
