@@ -1,0 +1,75 @@
+    libdis_test:       c5 f4 4a d0        kaddw  %k0,%k1,%k2
+    libdis_test+0x4:   c5 dd 4a eb        kaddb  %k3,%k4,%k5
+    libdis_test+0x8:   c4 e1 c5 4a c6     kaddd  %k6,%k7,%k0
+    libdis_test+0xd:   c4 e1 ec 4a d9     kaddq  %k1,%k2,%k3
+    libdis_test+0x12:  c5 f4 41 d0        kandw  %k0,%k1,%k2
+    libdis_test+0x16:  c5 dd 41 eb        kandb  %k3,%k4,%k5
+    libdis_test+0x1a:  c4 e1 c5 41 c6     kandd  %k6,%k7,%k0
+    libdis_test+0x1f:  c4 e1 ec 41 d9     kandq  %k1,%k2,%k3
+    libdis_test+0x24:  c5 f4 42 d0        kandnw %k0,%k1,%k2
+    libdis_test+0x28:  c5 dd 42 eb        kandnb %k3,%k4,%k5
+    libdis_test+0x2c:  c4 e1 c5 42 c6     kandnd %k6,%k7,%k0
+    libdis_test+0x31:  c4 e1 ec 42 d9     kandnq %k1,%k2,%k3
+    libdis_test+0x36:  c5 f4 45 d0        korw   %k0,%k1,%k2
+    libdis_test+0x3a:  c5 dd 45 eb        korb   %k3,%k4,%k5
+    libdis_test+0x3e:  c4 e1 c5 45 c6     kord   %k6,%k7,%k0
+    libdis_test+0x43:  c4 e1 ec 45 d9     korq   %k1,%k2,%k3
+    libdis_test+0x48:  c5 f4 46 d0        kxnorw %k0,%k1,%k2
+    libdis_test+0x4c:  c5 dd 46 eb        kxnorb %k3,%k4,%k5
+    libdis_test+0x50:  c4 e1 c5 46 c6     kxnord %k6,%k7,%k0
+    libdis_test+0x55:  c4 e1 ec 46 d9     kxnorq %k1,%k2,%k3
+    libdis_test+0x5a:  c5 f4 47 d0        kxorw  %k0,%k1,%k2
+    libdis_test+0x5e:  c5 dd 47 eb        kxorb  %k3,%k4,%k5
+    libdis_test+0x62:  c4 e1 c5 47 c6     kxord  %k6,%k7,%k0
+    libdis_test+0x67:  c4 e1 ec 47 d9     kxorq  %k1,%k2,%k3
+    libdis_test+0x6c:  c5 f5 4b d0        kunpckbw %k0,%k1,%k2
+    libdis_test+0x70:  c5 dc 4b eb        kunpckwd %k3,%k4,%k5
+    libdis_test+0x74:  c4 e1 c4 4b c6     kunpckdq %k6,%k7,%k0
+    libdis_test+0x79:  c5 f8 44 c8        knotw  %k0,%k1
+    libdis_test+0x7d:  c5 f9 44 da        knotb  %k2,%k3
+    libdis_test+0x81:  c4 e1 f9 44 ec     knotd  %k4,%k5
+    libdis_test+0x86:  c4 e1 f8 44 fe     knotq  %k6,%k7
+    libdis_test+0x8b:  c5 f8 98 c8        kortestw %k0,%k1
+    libdis_test+0x8f:  c5 f9 98 da        kortestb %k2,%k3
+    libdis_test+0x93:  c4 e1 f9 98 ec     kortestd %k4,%k5
+    libdis_test+0x98:  c4 e1 f8 98 fe     kortestq %k6,%k7
+    libdis_test+0x9d:  c5 f8 99 c8        ktestw %k0,%k1
+    libdis_test+0xa1:  c5 f9 99 da        ktestb %k2,%k3
+    libdis_test+0xa5:  c4 e1 f9 99 ec     ktestd %k4,%k5
+    libdis_test+0xaa:  c4 e1 f8 99 fe     ktestq %k6,%k7
+    libdis_test+0xaf:  c4 e3 f9 32 c8 01  kshiftlw $0x1,%k0,%k1
+    libdis_test+0xb5:  c4 e3 79 32 da 01  kshiftlb $0x1,%k2,%k3
+    libdis_test+0xbb:  c4 e3 79 33 ec 01  kshiftld $0x1,%k4,%k5
+    libdis_test+0xc1:  c4 e3 f9 33 fe 01  kshiftlq $0x1,%k6,%k7
+    libdis_test+0xc7:  c4 e3 f9 30 c8 01  kshiftrw $0x1,%k0,%k1
+    libdis_test+0xcd:  c4 e3 79 30 da 01  kshiftrb $0x1,%k2,%k3
+    libdis_test+0xd3:  c4 e3 79 31 ec 01  kshiftrd $0x1,%k4,%k5
+    libdis_test+0xd9:  c4 e3 f9 31 fe 01  kshiftrq $0x1,%k6,%k7
+    libdis_test+0xdf:  c5 f8 92 f8        kmovw  %eax,%k7
+    libdis_test+0xe3:  c5 f9 92 eb        kmovb  %ebx,%k5
+    libdis_test+0xe7:  c5 fb 92 d9        kmovd  %ecx,%k3
+    libdis_test+0xeb:  c4 e1 fb 92 ca     kmovq  %rdx,%k1
+    libdis_test+0xf0:  c5 f8 93 d0        kmovw  %k0,%edx
+    libdis_test+0xf4:  c5 f9 93 ca        kmovb  %k2,%ecx
+    libdis_test+0xf8:  c5 fb 93 dc        kmovd  %k4,%ebx
+    libdis_test+0xfc:  c4 e1 fb 93 c6     kmovq  %k6,%rax
+    libdis_test+0x101: c5 f8 91 02        kmovw  %k0,(%rdx)
+    libdis_test+0x105: c5 f9 91 11        kmovb  %k2,(%rcx)
+    libdis_test+0x109: c4 e1 f9 91 23     kmovd  %k4,(%rbx)
+    libdis_test+0x10e: c4 e1 f8 91 30     kmovq  %k6,(%rax)
+    libdis_test+0x113: c5 f8 90 f2        kmovw  %k2,%k6
+    libdis_test+0x117: c5 f9 90 fb        kmovb  %k3,%k7
+    libdis_test+0x11b: c4 e1 f9 90 c4     kmovd  %k4,%k0
+    libdis_test+0x120: c4 e1 f8 90 cd     kmovq  %k5,%k1
+    libdis_test+0x125: c5 f8 90 38        kmovw  (%rax),%k7
+    libdis_test+0x129: c5 f9 90 33        kmovb  (%rbx),%k6
+    libdis_test+0x12d: c4 e1 f9 90 29     kmovd  (%rcx),%k5
+    libdis_test+0x132: c4 e1 f8 90 22     kmovq  (%rdx),%k4
+    libdis_test+0x137: c5 f8 91 bc 24 00  kmovw  %k7,0x400(%rsp)
+                       04 00 00 
+    libdis_test+0x140: c5 f8 90 94 24 00  kmovw  0x400(%rsp),%k2
+                       04 00 00 
+    libdis_test+0x149: c4 a1 78 90 ac f0  kmovw  0x123(%rax,%r14,8),%k5
+                       23 01 00 00 
+    libdis_test+0x153: c4 a1 78 91 ac f0  kmovw  %k5,0x123(%rax,%r14,8)
+                       23 01 00 00 

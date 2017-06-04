@@ -1,6 +1,6 @@
 \ Copyright (c) 2012 Devin Teske <dteske@FreeBSD.org>
 \ All rights reserved.
-\ 
+\
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
 \ are met:
@@ -9,7 +9,7 @@
 \ 2. Redistributions in binary form must reproduce the above copyright
 \    notice, this list of conditions and the following disclaimer in the
 \    documentation and/or other materials provided with the distribution.
-\ 
+\
 \ THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 \ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 \ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -21,8 +21,7 @@
 \ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
-\ 
-\ $FreeBSD$
+\
 
 marker task-menusets.4th
 
@@ -182,6 +181,11 @@ create menuset_y        1   allot
 
 : menuset-unloadmenuxvar ( -- )
 	s" set type=menu" evaluate
+	menuset-unloadxvar
+;
+
+: menuset-unloadtypelessxvar ( -- )
+	s" set type=" evaluate
 	menuset-unloadxvar
 ;
 
@@ -549,7 +553,20 @@ only forth definitions also menusets-infrastructure
 
 : menusets-unset ( -- )
 
-	s" menuset_initial" unsetenv
+	\ clean up BE menu internal variables
+	s" beansi_bootfs"    unsetenv
+	s" beansi_current"   unsetenv
+	s" beansi_page"      unsetenv
+	s" beansi_pageof"    unsetenv
+	s" bemenu_bootfs"    unsetenv
+	s" bemenu_current"   unsetenv
+	s" bemenu_page"      unsetenv
+	s" bemenu_pageof"    unsetenv
+	s" zfs_be_active"    unsetenv
+	s" zfs_be_currpage"  unsetenv
+	s" zfs_be_pages"     unsetenv
+
+	s" menuset_initial"  unsetenv
 
 	1 begin
 		dup menuset-checksetnum ( n n -- n )
@@ -561,9 +578,9 @@ only forth definitions also menusets-infrastructure
 		\ we stop completely.
 
 		menuset_use_name @ true = if
-			s" set buf=${affix}menu_caption[1]"
+			s" set buf=${affix}menu_command[1]"
 		else
-			s" set buf=menuset${affix}_caption[1]"
+			s" set buf=menuset${affix}_command[1]"
 		then
 		evaluate s" buf" getenv getenv -1 = if
 			drop ( n -- )
@@ -594,6 +611,7 @@ only forth definitions also menusets-infrastructure
 			s" set var=command" evaluate menuset-unloadmenuxvar
 			s" set var=init"    evaluate menuset-unloadmenuxvar
 			s" set var=keycode" evaluate menuset-unloadmenuxvar
+			s" set var=root"    evaluate menuset-unloadtypelessxvar
 			s" set var=text"    evaluate menuset-unloadtoggledxvar
 			s" set var=ansi"    evaluate menuset-unloadtoggledxvar
 

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.Dd May 13, 2016
+.Dd Mar 30, 2017
 .Dt NVME 7D
 .Os
 .Sh NAME
@@ -48,7 +48,7 @@ to attach to devices supporting newer version of the NVMe
 specification.
 The default value is 1, limiting
 .Nm
-to work with devices up to specification version 1.1.
+to work with devices up to specification version 1.2.
 .It Va ignore-unknown-vendor-status
 This can be set to 1 to allow
 .Nm

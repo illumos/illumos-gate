@@ -263,7 +263,8 @@ rdc_count_vecs(nsc_vec_t *vec)
  * given setid, return index
  */
 int
-rdc_setid2idx(int setid) {
+rdc_setid2idx(int setid)
+{
 
 	int index = 0;
 
@@ -1866,9 +1867,10 @@ fail:
 		if (netq->nitems > 0) {
 			/* the never can happen case ... */
 			if ((netq->nitems == 1) &&
-			    (netq->net_qhead->handle == NULL))
+			    (netq->net_qhead->handle == NULL)) {
 				(void) nsc_free_buf(buf);
 				*abuf = NULL;
+			}
 
 		}
 		rdc_discard_tmpq(netq);
