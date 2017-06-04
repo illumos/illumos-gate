@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	cscope - interactive C symbol cross-reference
  *
@@ -995,6 +993,8 @@ do_assembly(int token)
 			 */
 			return (FCNCALL);
 		}
+
+		/* FALLTHROUGH */
 
 	default:
 		/* Default to normal behavior. */

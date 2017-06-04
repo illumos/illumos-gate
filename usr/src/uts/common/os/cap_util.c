@@ -560,9 +560,10 @@ cu_cpc_init(cpu_t *cp, kcpc_request_list_t *reqs, int nreqs)
 		 * Nothing to measure for this hardware sharing relationship
 		 */
 		if (nevents - nevents_save == 0) {
-			if (cntr_info != NULL)
+			if (cntr_info != NULL) {
 				kmem_free(cntr_info, sizeof (cu_cntr_info_t));
 				cntr_info_array[pg_hw_type] = NULL;
+			}
 			continue;
 		}
 

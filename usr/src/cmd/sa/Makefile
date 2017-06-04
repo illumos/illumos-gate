@@ -39,7 +39,6 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 GREP=		grep
 
 SADC= 		sadc
-SADP= 		sadp
 SAR= 		sar
 TIMEX=		timex
 SA1=		sa1
@@ -56,7 +55,7 @@ INITSHELL=	$(PERF)
 
 PROGS=		$(BINPROG) $(SBINPROG) $(LIBPROG)
 SHELLS=		$(LIBSHELL)
-TXTS= 		$(SADP).c README
+TXTS= 		README
 ALL=		$(PROGS) $(SHELLS)
 
 # Source files
@@ -129,7 +128,7 @@ $(ETCINITD)/%: %
 check:	$(CHKMANIFEST)
 
 clean:
-	$(RM) $(SADC_OBJECTS) $(PROGS) $(SHELLS) $(SADP)
+	$(RM) $(SADC_OBJECTS) $(PROGS) $(SHELLS)
 
 lint:	lint_SRCS
 

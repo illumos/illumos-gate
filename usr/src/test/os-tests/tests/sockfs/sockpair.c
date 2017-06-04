@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+extern char *__progname;
+
 static void *
 server(void *varg)
 {
@@ -62,66 +64,40 @@ server(void *varg)
 			    strerror(errno));
 			exit(1);
 		}
+		if (ret == 0) {
+			printf("SERVER: got HUP\n");
+			break;
+		}
 
 		printf("SERVER:%s\n", (char *)msg.msg_iov->iov_base);
 		fflush(stdout);
 	}
 
-	exit(0);
+	close(sock);
+	return (NULL);
 }
 
-/*
- * This should be a place only root is allowed to write.
- * The test will create and destroy this directory.
- */
-char testdir[100] = "/var/run/os-tests-sockfs";
-struct sockaddr_un addr;
-int test_uid = UID_NOBODY;
-
-int
-main(int argc, char **argv)
+void
+runtest(int sotype)
 {
-	int ret;
 	int sfds[2];
 	int sock;
+	int ret;
 	unsigned int i;
 
-	if (argc > 1) {
-		ret = strlcpy(testdir, argv[1], sizeof (testdir));
-		if (ret >= sizeof (testdir)) {
-			fprintf(stderr, "%s: too long\n", argv[1]);
-			exit(1);
-		}
-	}
-
-	addr.sun_family = AF_UNIX;
-	(void) sprintf(addr.sun_path, "%s/s", testdir);
-
-	if (mkdir(testdir, 0700) != 0) {
-		switch (errno) {
-		case EEXIST:
-		case EISDIR:
-			break;
-		default:
-			perror(testdir);
-			exit(1);
-		}
-	}
-	(void) unlink(addr.sun_path);
-
 	/* Create socketpair */
-	ret = socketpair(AF_UNIX, SOCK_STREAM, 0, sfds);
+	ret = socketpair(AF_UNIX, sotype, 0, sfds);
 	if (ret == -1) {
 		fprintf(stderr, "%s - socketpair fail %s\n",
-		    argv[0], strerror(errno));
+		    __progname, strerror(errno));
 		exit(1);
 	}
 
-	/* Set up the server. */
+	/* Set up the server.  It closes sfds[0] when done. */
 	ret = pthread_create(NULL, NULL, server, sfds);
 	if (ret == -1) {
 		fprintf(stderr, "%s - thread create fail %s\n",
-		    argv[0], strerror(errno));
+		    __progname, strerror(errno));
 		exit(1);
 	}
 
@@ -131,7 +107,7 @@ main(int argc, char **argv)
 	sock = sfds[1];
 
 	/* Send some messages */
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < 3; i++) {
 		struct iovec iov;
 		struct msghdr msg;
 		uint8_t buf[4096];
@@ -155,7 +131,7 @@ main(int argc, char **argv)
 
 		if (ret == -1) {
 			fprintf(stderr, "%s - sendmsg fail %s\n",
-			    argv[0], strerror(errno));
+			    __progname, strerror(errno));
 			exit(1);
 		}
 
@@ -163,6 +139,28 @@ main(int argc, char **argv)
 		sleep(1);
 	}
 
-	close(sock);
+	/*
+	 * Tell sever to terminate
+	 */
+	if (sotype == SOCK_STREAM) {
+		printf("CLIENT: close\n");
+		close(sock);
+	} else {
+		printf("CLIENT: send 0\n");
+		send(sock, "", 0, 0);
+	}
+	sleep(1);
+}
+
+int
+main(int argc, char **argv)
+{
+
+	printf("%s SOCK_STREAM test...\n", argv[0]);
+	runtest(SOCK_STREAM);
+
+	printf("%s SOCK_DGRAM test...\n", argv[0]);
+	runtest(SOCK_DGRAM);
+
 	return (0);
 }

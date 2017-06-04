@@ -196,15 +196,16 @@ process_rhl(const char *file)
 
 		if (tnrh(TNDB_LOAD, rhentp) != 0) {
 			(void) fclose(fp);
-			if (errno == EFAULT)
+			if (errno == EFAULT) {
 				perror("tnrh");
-			else
+			} else {
 				translate_inet_addr(rhentp, &alen, abuf,
 				    sizeof (abuf));
 				(void) fprintf(stderr,
 				    gettext("tnctl: load of remote-host entry "
 				    "%1$s into kernel cache failed: %2$s\n"),
 				    abuf, strerror(errno));
+			}
 			tsol_endrhent();
 			exit(1);
 		}

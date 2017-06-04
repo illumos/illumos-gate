@@ -1478,9 +1478,8 @@ sync_kern(void)
 			    sizeof (rp->ipRouteIfIndex.o_bytes))
 				rp->ipRouteIfIndex.o_bytes[
 				    rp->ipRouteIfIndex.o_length] = '\0';
-				(void) strncpy(ifname,
-				    rp->ipRouteIfIndex.o_bytes,
-				    sizeof (ifname));
+			(void) strncpy(ifname, rp->ipRouteIfIndex.o_bytes,
+			    sizeof (ifname));
 
 			/*
 			 * First try to match up on gwkludge entries
