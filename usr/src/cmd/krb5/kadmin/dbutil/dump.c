@@ -2833,9 +2833,9 @@ load_db(argc, argv)
 	    exit_status++;
 	    goto error;
 	}
-    }
-    else
+    } else {
 	db_locked = 1;
+    }
     
 	if (log_ctx && log_ctx->iproprole) {
 		if (add_update)
