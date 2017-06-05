@@ -163,13 +163,13 @@ typedef struct sa_hdr_phys {
 	/* BEGIN CSTYLED */
 	/*
 	 * Encoded with hdrsize and layout number as follows:
-	 * 16      10       0
+	 * 15      10       0
 	 * +--------+-------+
 	 * | hdrsz  |layout |
 	 * +--------+-------+
 	 *
-	 * Bits 0-10 are the layout number
-	 * Bits 11-16 are the size of the header.
+	 * Bits 0-9 are the layout number
+	 * Bits 10-15 are the size of the header.
 	 * The hdrsize is the number * 8
 	 *
 	 * For example.
