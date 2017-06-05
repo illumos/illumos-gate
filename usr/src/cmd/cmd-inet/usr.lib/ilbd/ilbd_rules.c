@@ -1017,7 +1017,7 @@ adjust_srv_info_cmd(ilb_servers_info_cmd_t **kcmdp, int index)
 static ilb_status_t
 i_update_ksrv_rules(char *name, ilbd_sg_t *sg, ilbd_rule_t *rl)
 {
-	ilb_status_t		rc;
+	ilb_status_t		rc = ILB_STATUS_OK;
 	ilbd_srv_t		*srvp;
 	ilb_servers_info_cmd_t	*kcmd = NULL;
 	int			i;
