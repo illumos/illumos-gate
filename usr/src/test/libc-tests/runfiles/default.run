@@ -74,6 +74,7 @@ timeout = 600
 [/opt/libc-tests/tests/endian.32]
 [/opt/libc-tests/tests/endian.64]
 [/opt/libc-tests/tests/quick_exit]
+[/opt/libc-tests/tests/psignal]
 [/opt/libc-tests/tests/printf-6961.64]
 [/opt/libc-tests/tests/priv_gettext]
 [/opt/libc-tests/tests/strerror]
