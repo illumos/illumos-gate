@@ -84,7 +84,7 @@ extern "C" {
 #define	NGROUPS_MAX	16	/* max number of groups for a user */
 
 #ifndef PATH_MAX
-#define	PATH_MAX	1024	/* max # of characters in a path name */
+#define	PATH_MAX	4096	/* max # of characters in a path name */
 #endif
 
 #define	SYMLINK_MAX	1024	/* max # of characters a symlink can contain */
