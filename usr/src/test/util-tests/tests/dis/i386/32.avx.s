@@ -1578,8 +1578,15 @@ libdis_test:
 	vpextrd	$0x23, %xmm1, (%ebx)
 	vpextrd	$0x23, %xmm2, 0x16(%ecx)
 
-	vpextrq	$0x23, %xmm1, (%ebx)
-	vpextrq	$0x23, %xmm2, 0x16(%ecx)
+	/*
+	 * gas will assemble the following two instructions with an EVEX
+	 * prefix. Force the VEX encoding with the correct W bit for the 3-byte
+	 * VEX prefix.
+	 * vpextrq	$0x23, %xmm1, (%ebx)
+	 * vpextrq	$0x23, %xmm2, 0x16(%ecx)
+	 */
+	.byte	0xc4, 0xe3, 0xf9, 0x16, 0x0b, 0x23
+	.byte	0xc4, 0xe3, 0xf9, 0x16, 0x51, 0x16, 0x23
 
 	vpextrw	$0x23, %xmm0, %eax
 	vpextrw	$0x23, %xmm1, (%ebx)
@@ -1639,8 +1646,15 @@ libdis_test:
 	vpinsrd	$0x20, (%ebx), %xmm2, %xmm3
 	vpinsrd	$0x20, 0x10(%ebx), %xmm2, %xmm3
 
-	vpinsrq	$0x20, (%ebx), %xmm2, %xmm3
-	vpinsrq	$0x20, 0x10(%ebx), %xmm2, %xmm3
+	/*
+	 * gas will assemble the following two instructions with an EVEX
+	 * prefix. Force the VEX encoding with the correct W bit for the 3-byte
+	 * VEX prefix.
+	 * vpinsrq	$0x20, (%ebx), %xmm2, %xmm3
+	 * vpinsrq	$0x20, 0x10(%ebx), %xmm2, %xmm3
+	 */
+	.byte	0xc4, 0xe3, 0xc9, 0x22, 0x1b, 0x20
+	.byte	0xc4, 0xe3, 0xc9, 0x22, 0x5b, 0x10, 0x20
 
 	vpinsrw	$0x20, %eax, %xmm0, %xmm1
 	vpinsrw	$0x20, (%ebx), %xmm2, %xmm3
