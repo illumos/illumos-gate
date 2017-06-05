@@ -1466,7 +1466,7 @@ known_cd:
 		}
 		if ((cdi->cd_info->sh_alloc != CD_ALLOCATED))
 			goto retry_open;
-			return (alloc_cd);
+		return (alloc_cd);
 	}
 
 	if (!(cdi->cd_rawfd =
@@ -4050,7 +4050,7 @@ sdbc_remq_dmchain(_sd_queue_t *q, _sd_cctl_t *cc_ent)
  */
 void
 sdbc_requeue_dmchain(_sd_queue_t *q, _sd_cctl_t *cc_ent, int mru,
-			int getlock)
+    int getlock)
 {
 	_sd_cctl_t *qhead = &(q->sq_qhead);
 
@@ -4230,7 +4230,7 @@ sdbc_centry_alloc_blks(int cd, nsc_off_t cblk, nsc_size_t reqblks, int flag)
 
 _sd_cctl_t *
 sdbc_centry_alloc(int cd, nsc_off_t cblk, nsc_size_t req_blocks, int *stall,
-			sdbc_allocbuf_t *alloc_tok, int flag)
+    sdbc_allocbuf_t *alloc_tok, int flag)
 {
 	_sd_cctl_t *centry;
 
@@ -4261,7 +4261,7 @@ sdbc_centry_alloc(int cd, nsc_off_t cblk, nsc_size_t req_blocks, int *stall,
  */
 static _sd_cctl_t *
 sdbc_alloc_dmc(int cd, nsc_off_t cblk, nsc_size_t req_blocks, int *stall,
-			sdbc_allocbuf_t *alloc_tok, int flag)
+    sdbc_allocbuf_t *alloc_tok, int flag)
 {
 	sdbc_allocbuf_impl_t *dmc = (sdbc_allocbuf_impl_t *)alloc_tok;
 	_sd_cctl_t *centry = NULL;
@@ -6538,10 +6538,8 @@ _sd_enqueue_dirty(int cd, _sd_cctl_t *chain, _sd_cctl_t *cc_last, int numq)
  */
 
 void
-_sd_enqueue_dirty_chain(int cd,
-			_sd_cctl_t *chain_first,
-			_sd_cctl_t *chain_last,
-			int numq)
+_sd_enqueue_dirty_chain(int cd, _sd_cctl_t *chain_first,
+    _sd_cctl_t *chain_last, int numq)
 {
 	_sd_cd_info_t *cdi;
 
@@ -6569,12 +6567,6 @@ _sd_enqueue_dirty_chain(int cd,
 	mutex_exit(&(cdi->cd_lock));
 }
 
-
-#ifndef _MULTI_DATAMODEL
-/* ARGSUSED */
-#endif
-static int
-convert_stats(_sd_stats32_t *uptr)
 /*
  *	Convert the 64 bit statistic structure to 32bit version.
  *	Possibly losing information when cache is > 4gb. Ha!
@@ -6586,6 +6578,11 @@ convert_stats(_sd_stats32_t *uptr)
  *	We can't use a local stack structure since the data size is
  *	70k or so and kernel stacks are tiny (8k).
  */
+#ifndef _MULTI_DATAMODEL
+/* ARGSUSED */
+#endif
+static int
+convert_stats(_sd_stats32_t *uptr)
 {
 #ifndef _MULTI_DATAMODEL
 	return (SDBC_EMODELCONVERT);
@@ -6961,7 +6958,7 @@ _sdbc_handles_deconfigure(void)
 
 _sd_buf_handle_t *
 _sd_alloc_handle(sdbc_callback_fn_t d_cb, sdbc_callback_fn_t r_cb,
-		sdbc_callback_fn_t w_cb)
+    sdbc_callback_fn_t w_cb)
 {
 	_sd_buf_handle_t *handle;
 

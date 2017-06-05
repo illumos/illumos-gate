@@ -727,10 +727,9 @@ http_srv_connect(http_handle_t handle)
 	if (c_id->fd < 0) {
 		if (ctx != NULL)
 			SSL_CTX_free(ctx);
-			libbootlog(BOOTLOG_CRIT,
-			    "http_srv_connect: %s returned %d",
-			    (c_id->proxied) ? "proxy_connect" : "tcp_connect",
-			    c_id->fd);
+		libbootlog(BOOTLOG_CRIT, "http_srv_connect: %s returned %d",
+		    (c_id->proxied) ? "proxy_connect" : "tcp_connect",
+		    c_id->fd);
 		return (-1);
 	}
 

@@ -31,7 +31,7 @@
 #include "Trace.h"
 #include "Exceptions.h"
 #include "sun_fc.h"
-
+#include <unistd.h>
 
 #ifdef  __cplusplus
 extern "C" {
