@@ -2088,7 +2088,7 @@ fdmotort(void *arg)
 	if ((fcp->c_flags & FCFLG_WAITING) &&
 	    fcp->c_mtrstate[unit] == FMS_ON &&
 	    (csb->csb_xstate == FXS_MTRON || csb->csb_xstate == FXS_HDST ||
-	    csb->csb_xstate == FXS_DKCHGX))
+	    csb->csb_xstate == FXS_DKCHGX)) {
 		newxstate = fdc_statemach(fcp);
 		if (newxstate == -1) {
 			FCERRPRINT(FDEP_L3, FDEM_EXEC,
@@ -2101,6 +2101,7 @@ fdmotort(void *arg)
 			fcp->c_flags ^= FCFLG_WAITING;
 			cv_signal(&fcp->c_iocv);
 		}
+	}
 	mutex_exit(&fcp->c_lock);
 }
 
