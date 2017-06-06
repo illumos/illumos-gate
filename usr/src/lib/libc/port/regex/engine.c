@@ -289,8 +289,7 @@ matcher(struct re_guts *g, const char *string, size_t nmatch,
 		}
 		for (i = 1; i <= m->g->nsub; i++)
 			m->pmatch[i].rm_so = m->pmatch[i].rm_eo = -1;
-		/* NB: FreeBSD has REG_BACKR, we do not */
-		if (!g->backrefs /* && !(m->eflags&REG_BACKR) */) {
+		if (!g->backrefs && !(m->eflags&REG_BACKR)) {
 			NOTE("dissecting");
 			dp = dissect(m, m->coldp, endp, gf, gl);
 		} else {

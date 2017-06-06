@@ -218,11 +218,7 @@ regexec(const regex_t *_RESTRICT_KYWD preg, const char *_RESTRICT_KYWD string,
 
 	if (MB_CUR_MAX > 1)
 		return (mmatcher(g, string, nmatch, pmatch, eflags));
-#ifdef	REG_LARGE
 	else if (g->nstates <= CHAR_BIT*sizeof (states1) && !(eflags&REG_LARGE))
-#else
-	else if (g->nstates <= CHAR_BIT*sizeof (states1))
-#endif
 		return (smatcher(g, string, nmatch, pmatch, eflags));
 	else
 		return (lmatcher(g, string, nmatch, pmatch, eflags));

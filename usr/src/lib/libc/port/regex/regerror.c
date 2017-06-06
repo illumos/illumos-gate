@@ -44,6 +44,8 @@
 #include "utils.h"
 #include "../gen/_libc_gettext.h"
 
+static const char *regatoi(const regex_t *preg, char *localbuf);
+
 #define	RERR(x, msg)	{ x, #x, msg }
 
 static struct rerr {
@@ -90,23 +92,58 @@ regerror(int errcode, const regex_t *_RESTRICT_KYWD preg,
 {
 	struct rerr *r;
 	size_t len;
+	int target = errcode &~ REG_ITOA;
 	const char *s;
+	char convbuf[50];
 
-	for (r = rerrs; r->code != 0; r++)
-		if (r->code == errcode)
-			break;
+	if (errcode == REG_ATOI) {
+		s = regatoi(preg, convbuf);
+	} else {
+		for (r = rerrs; r->code != 0; r++) {
+			if (r->code == target)
+				break;
+		}
 
-	s = _libc_gettext(r->explain);
+		if (errcode&REG_ITOA) {
+			if (r->code != 0)
+				(void) strcpy(convbuf, r->name);
+			else
+				(void) sprintf(convbuf, "REG_0x%x", target);
+			assert(strlen(convbuf) < sizeof (convbuf));
+			s = convbuf;
+		} else {
+			s = _libc_gettext(r->explain);
+		}
+	}
 
 	len = strlen(s) + 1;
 	if (errbuf_size > 0) {
-		if (errbuf_size > len)
+		if (errbuf_size > len) {
 			(void) strcpy(errbuf, s);
-		else {
+		} else {
 			(void) strncpy(errbuf, s, errbuf_size-1);
 			errbuf[errbuf_size-1] = '\0';
 		}
 	}
 
 	return (len);
+}
+
+/*
+ * regatoi - internal routine to implement REG_ATOI
+ */
+static const char *
+regatoi(const regex_t *preg, char *localbuf)
+{
+	struct rerr *r;
+
+	for (r = rerrs; r->code != 0; r++) {
+		if (strcmp(r->name, preg->re_endp) == 0)
+			break;
+	}
+	if (r->code == 0)
+		return ("0");
+
+	(void) sprintf(localbuf, "%d", r->code);
+	return (localbuf);
 }
