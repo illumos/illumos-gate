@@ -72,6 +72,14 @@
  * as the configured queue length.
  *
  *
+ * Polled I/O Support:
+ *
+ * For kernel core dump support the driver can do polled I/O. As interrupts are
+ * turned off while dumping the driver will just submit a command in the regular
+ * way, and then repeatedly attempt a command retrieval until it gets the
+ * command back.
+ *
+ *
  * Namespace Support:
  *
  * NVMe devices can have multiple namespaces, each being a independent data
@@ -176,7 +184,6 @@
  *
  * TODO:
  * - figure out sane default for I/O queue depth reported to blkdev
- * - polled I/O support to support kernel core dumping
  * - FMA handling of media errors
  * - support for devices supporting very large I/O requests using chained PRPs
  * - support for configuring hardware parameters like interrupt coalescing
@@ -856,20 +863,21 @@ nvme_retrieve_cmd(nvme_t *nvme, nvme_qpair_t *qp)
 	(void) ddi_dma_sync(qp->nq_cqdma->nd_dmah, 0,
 	    sizeof (nvme_cqe_t) * qp->nq_nentry, DDI_DMA_SYNC_FORKERNEL);
 
+	mutex_enter(&qp->nq_mutex);
 	cqe = &qp->nq_cq[qp->nq_cqhead];
 
 	/* Check phase tag of CQE. Hardware inverts it for new entries. */
-	if (cqe->cqe_sf.sf_p == qp->nq_phase)
+	if (cqe->cqe_sf.sf_p == qp->nq_phase) {
+		mutex_exit(&qp->nq_mutex);
 		return (NULL);
+	}
 
 	ASSERT(nvme->n_ioq[cqe->cqe_sqid] == qp);
 	ASSERT(cqe->cqe_cid < qp->nq_nentry);
 
-	mutex_enter(&qp->nq_mutex);
 	cmd = qp->nq_cmd[cqe->cqe_cid];
 	qp->nq_cmd[cqe->cqe_cid] = NULL;
 	qp->nq_active_cmds--;
-	mutex_exit(&qp->nq_mutex);
 
 	ASSERT(cmd != NULL);
 	ASSERT(cmd->nc_nvme == nvme);
@@ -886,6 +894,7 @@ nvme_retrieve_cmd(nvme_t *nvme, nvme_qpair_t *qp)
 		qp->nq_phase = qp->nq_phase ? 0 : 1;
 
 	nvme_put32(cmd->nc_nvme, qp->nq_cqhdbl, head.r);
+	mutex_exit(&qp->nq_mutex);
 
 	return (cmd);
 }
@@ -3269,13 +3278,11 @@ static int
 nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 {
 	nvme_t *nvme = ns->ns_nvme;
-	nvme_cmd_t *cmd;
+	nvme_cmd_t *cmd, *ret;
+	nvme_qpair_t *ioq;
+	boolean_t poll;
 
 	if (nvme->n_dead)
-		return (EIO);
-
-	/* No polling for now */
-	if (xfer->x_flags & BD_XFER_POLL)
 		return (EIO);
 
 	cmd = nvme_create_nvm_cmd(ns, opc, xfer);
@@ -3284,10 +3291,28 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 
 	cmd->nc_sqid = (CPU->cpu_id % nvme->n_ioq_count) + 1;
 	ASSERT(cmd->nc_sqid <= nvme->n_ioq_count);
+	ioq = nvme->n_ioq[cmd->nc_sqid];
 
-	if (nvme_submit_cmd(nvme->n_ioq[cmd->nc_sqid], cmd)
-	    != DDI_SUCCESS)
+	/*
+	 * Get the polling flag before submitting the command. The command may
+	 * complete immediately after it was submitted, which means we must
+	 * treat both cmd and xfer as if they have been freed already.
+	 */
+	poll = (xfer->x_flags & BD_XFER_POLL) != 0;
+
+	if (nvme_submit_cmd(ioq, cmd) != DDI_SUCCESS)
 		return (EAGAIN);
+
+	if (!poll)
+		return (0);
+
+	do {
+		ret = nvme_retrieve_cmd(nvme, ioq);
+		if (ret != NULL)
+			nvme_bd_xfer_done(ret);
+		else
+			drv_usecwait(10);
+	} while (ioq->nq_active_cmds != 0);
 
 	return (0);
 }
