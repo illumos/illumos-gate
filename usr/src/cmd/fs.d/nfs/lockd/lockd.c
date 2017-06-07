@@ -23,6 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
@@ -88,7 +89,7 @@
 struct lm_svc_args lmargs = {
 	.version = LM_SVC_CUR_VERS,
 	/* fd, n_fmly, n_proto, n_rdev (below) */
-	.debug = 0,
+	.n_v4_only = 0,
 	.timout = 5 * 60,
 	.grace = 90,
 	.retransmittimeout = 5
@@ -136,6 +137,8 @@ int	listen_backlog = 32;	/* used by bind_to_{provider,proto}() */
 int	(*Mysvc)(int, struct netbuf, struct netconfig *) = nlmsvc;
 				/* used by cots_listen_event() */
 int	max_conns_allowed = -1;	/* used by cots_listen_event() */
+
+int	debug = 0;
 
 int
 main(int ac, char *av[])
@@ -238,7 +241,7 @@ main(int ac, char *av[])
 			break;
 
 		case 'd': /* debug */
-			lmargs.debug = atoi(optarg);
+			debug = atoi(optarg);
 			break;
 
 		case 'g': /* grace_period */
@@ -288,12 +291,12 @@ main(int ac, char *av[])
 	if (optind != ac)
 		usage();
 
-	if (lmargs.debug) {
+	if (debug != 0) {
 		printf("%s: debug= %d, conn_idle_timout= %d,"
 		    " grace_period= %d, listen_backlog= %d,"
 		    " max_connections= %d, max_servers= %d,"
 		    " retrans_timeout= %d\n",
-		    MyName, lmargs.debug, lmargs.timout,
+		    MyName, debug, lmargs.timout,
 		    lmargs.grace, listen_backlog,
 		    max_conns_allowed, max_servers,
 		    lmargs.retransmittimeout);
@@ -309,7 +312,7 @@ main(int ac, char *av[])
 	}
 
 	/* Daemonize, if not debug. */
-	if (lmargs.debug == 0)
+	if (debug == 0)
 		pipe_fd = daemonize_init();
 
 	openlog(MyName, LOG_PID | LOG_NDELAY, LOG_DAEMON);
@@ -405,7 +408,7 @@ main(int ac, char *av[])
 	/*
 	 * lockd is up and running as far as we are concerned.
 	 */
-	if (lmargs.debug == 0)
+	if (debug == 0)
 		daemonize_fini(pipe_fd);
 
 	/*

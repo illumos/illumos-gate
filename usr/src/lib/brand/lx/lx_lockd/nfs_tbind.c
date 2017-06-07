@@ -599,6 +599,7 @@ nlm_do_one(char *provider, int (*svc)(int, struct netbuf, struct netconfig *))
 	struct netbuf addrmask;
 	int vers;
 	int err;
+	static boolean_t elogged = B_FALSE;
 
 	sock = nlm_bind_to_provider(provider, &retaddr, &retnconf);
 	if (sock == -1) {
@@ -619,16 +620,17 @@ nlm_do_one(char *provider, int (*svc)(int, struct netbuf, struct netconfig *))
 		for (vers = NLM_VERS; vers <= NLM4_VERS; vers++) {
 			lx_rpcb_unset(vers, retnconf->nc_netid);
 			have_rpcbind = lx_rpcb_set(vers, retnconf, retaddr);
-			if (!have_rpcbind) {
+			if (!have_rpcbind && !elogged) {
 				/*
 				 * No rpcbind running. The kernel NFS locking
-				 * code depends on connecting to rpcbind for
-				 * the _nfssys() call to enable locking to
-				 * succeed. Bail out now.
+				 * code interacts with rpcbind & rpc.statd for
+				 * NFSv3 locking. We warn about this but
+				 * proceed since NFSv4 locking is still usable.
 				 */
-				lx_syslog("rpcbind is not running, but is "
-				    "required for NFS locking");
-				exit(1);
+				lx_syslog("Warning: rpcbind is not running, "
+				    "but is required for NFSv3 locking");
+				elogged = B_TRUE;
+				break;
 			}
 		}
 	}
@@ -675,7 +677,7 @@ nlm_do_one(char *provider, int (*svc)(int, struct netbuf, struct netconfig *))
  */
 int
 do_all(struct protob *protobp,
-	int (*svc)(int, struct netbuf, struct netconfig *))
+    int (*svc)(int, struct netbuf, struct netconfig *))
 {
 	struct netconfig *nconf;
 	NCONF_HANDLE *nc;
@@ -1716,7 +1718,7 @@ out:
 
 static int
 bind_to_proto(NETSELDECL(proto), char *serv, struct netbuf **addr,
-		struct netconfig **retnconf)
+    struct netconfig **retnconf)
 {
 	struct netconfig *nconf;
 	NCONF_HANDLE *nc = NULL;
@@ -1754,9 +1756,7 @@ bind_to_proto(NETSELDECL(proto), char *serv, struct netbuf **addr,
  * to all-ones. The port number part of the mask is zeroes.
  */
 static int
-set_addrmask(int fd,
-	struct netconfig *nconf,
-	struct netbuf *mask)
+set_addrmask(int fd, struct netconfig *nconf, struct netbuf *mask)
 {
 	struct t_info info;
 

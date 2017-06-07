@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -122,13 +123,20 @@ struct nfs_revauth_args32 {
 enum lm_fmly  { LM_INET, LM_INET6, LM_LOOPBACK };
 enum lm_proto { LM_TCP, LM_UDP };
 
+/*
+ * The 'n_v4_only' member was formerly called 'debug'. This member is not used
+ * in the kernel. To avoid a new version of this user/kernel interface
+ * structure, the member was renamed in a binary compatible way. It is now used
+ * by the user-level code to indicate that the zone is not running
+ * rpcbind/rpc.statd and that only NFSv4 locking is needed.
+ */
 struct lm_svc_args {
 	int		version;	/* keep this first */
 	int		fd;
 	enum lm_fmly	n_fmly;		/* protocol family */
 	enum lm_proto	n_proto;	/* protocol */
 	dev_t		n_rdev;		/* device ID */
-	int		debug;		/* debugging level */
+	int		n_v4_only;	/* NFSv4 locking only */
 	time_t		timout;		/* client handle life (asynch RPCs) */
 	int		grace;		/* secs in grace period */
 	time_t	retransmittimeout;	/* retransmission interval */
@@ -141,7 +149,7 @@ struct lm_svc_args32 {
 	enum lm_fmly	n_fmly;		/* protocol family */
 	enum lm_proto	n_proto;	/* protocol */
 	dev32_t		n_rdev;		/* device ID */
-	int32_t		debug;		/* debugging level */
+	int32_t		n_v4_only;	/* NFSv4 locking only */
 	time32_t	timout;		/* client handle life (asynch RPCs) */
 	int32_t		grace;		/* secs in grace period */
 	time32_t	retransmittimeout;	/* retransmission interval */

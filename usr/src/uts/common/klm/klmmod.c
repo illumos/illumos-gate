@@ -12,6 +12,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -276,6 +277,10 @@ lm_svc(struct lm_svc_args *args)
 		if (INGLOBALZONE(curproc)) {
 			rfs4_grace_period = args->grace;
 			rfs4_lease_time   = args->grace;
+		}
+
+		if (args->n_v4_only == -1) {
+			g->nlm_v4_only = B_TRUE;
 		}
 
 		mutex_exit(&g->lock);

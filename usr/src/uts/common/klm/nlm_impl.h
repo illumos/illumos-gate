@@ -30,6 +30,7 @@
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -459,6 +460,7 @@ struct nlm_globals {
 	int				cn_idle_tmo;		/* (z) */
 	int				grace_period;		/* (z) */
 	int				retrans_tmo;		/* (z) */
+	boolean_t			nlm_v4_only;		/* (z) */
 	kmutex_t			clean_lock;		/* (c) */
 	TAILQ_ENTRY(nlm_globals)	nlm_link;		/* (g) */
 };

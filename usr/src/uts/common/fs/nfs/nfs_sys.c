@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  *
  * Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * All rights reserved.
@@ -247,7 +248,7 @@ nfssys(enum nfssys_op opcode, void *arg)
 			lsa.n_fmly = STRUCT_FGET(ulsa, n_fmly);
 			lsa.n_proto = STRUCT_FGET(ulsa, n_proto);
 			lsa.n_rdev = expldev(STRUCT_FGET(ulsa, n_rdev));
-			lsa.debug = STRUCT_FGET(ulsa, debug);
+			lsa.n_v4_only = STRUCT_FGET(ulsa, n_v4_only);
 			lsa.timout = STRUCT_FGET(ulsa, timout);
 			lsa.grace = STRUCT_FGET(ulsa, grace);
 			lsa.retransmittimeout = STRUCT_FGET(ulsa,

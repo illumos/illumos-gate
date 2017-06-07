@@ -112,7 +112,7 @@
 struct lm_svc_args lmargs = {
 	.version = LM_SVC_CUR_VERS,
 	/* fd, n_fmly, n_proto, n_rdev (below) */
-	.debug = 0,
+	.n_v4_only = 0,
 	.timout = 5 * 60,
 	.grace = 90, /* How long to wait for clients to re-establish locks. */
 	.retransmittimeout = 5
@@ -162,6 +162,8 @@ int	listen_backlog = 32;	/* used by bind_to_{provider,proto}() */
 				/* used by cots_listen_event() */
 int	max_conns_allowed = -1;	/* used by cots_listen_event() */
 int	(*Mysvc)(int, struct netbuf, struct netconfig *) = nlmsvc;
+
+boolean_t	debug = B_FALSE;
 
 #define	LX_PMAP_VERS	4
 
@@ -334,7 +336,7 @@ main(int ac, char *av[])
 
 	(void) enable_extended_FILE_stdio(-1, -1);
 
-	while ((c = getopt(ac, av, "c:d:g:l:t:")) != EOF)
+	while ((c = getopt(ac, av, "c:dg:l:t:")) != EOF)
 		switch (c) {
 		case 'c': /* max_connections */
 			if ((val = atoi(optarg)) <= 0)
@@ -343,7 +345,7 @@ main(int ac, char *av[])
 			break;
 
 		case 'd': /* debug */
-			lmargs.debug = atoi(optarg);
+			debug = B_TRUE;
 			break;
 
 		case 'g': /* grace_period */
@@ -365,12 +367,12 @@ main(int ac, char *av[])
 			break;
 
 		badval:
-			if (lmargs.debug) {
+			if (debug) {
 				fprintf(stderr, "Invalid -%c option value", c);
 			}
 			/* FALLTHROUGH */
 		default:
-			if (lmargs.debug) {
+			if (debug) {
 				usage();
 			}
 			exit(1);
@@ -380,7 +382,7 @@ main(int ac, char *av[])
 	if (optind < ac) {
 		val = atoi(av[optind]);
 		if (val <= 0) {
-			if (lmargs.debug) {
+			if (debug) {
 				fprintf(stderr, "Invalid max_servers argument");
 				usage();
 			}
@@ -391,18 +393,18 @@ main(int ac, char *av[])
 	}
 	/* If there are two or more arguments, then this is a usage error. */
 	if (optind != ac) {
-		if (lmargs.debug) {
+		if (debug) {
 			usage();
 		}
 		exit(1);
 	}
 
-	if (lmargs.debug) {
+	if (debug) {
 		printf("lx_lockd: debug=%d, conn_idle_timout=%d, "
 		    "grace_period=%d, listen_backlog=%d, "
 		    "max_connections=%d, max_servers=%d, "
 		    "retrans_timeout=%d\n",
-		    lmargs.debug, lmargs.timout, lmargs.grace, listen_backlog,
+		    debug, lmargs.timout, lmargs.grace, listen_backlog,
 		    max_conns_allowed, max_servers, lmargs.retransmittimeout);
 	}
 
@@ -412,7 +414,7 @@ main(int ac, char *av[])
 		exit(1);
 	}
 
-	if (lmargs.debug == 0) {
+	if (!debug) {
 		/* Block all signals if not debugging. */
 		sigset_t set;
 
@@ -543,6 +545,14 @@ nlmsvc(int fd, struct netbuf addrmask, struct netconfig *nconf)
 	lma.n_proto = nctype_to_lmprot(nconf->nc_semantics);
 	lma.n_rdev = ncdev_to_rdev(nconf->nc_device);
 
+	if (!have_rpcbind) {
+		/*
+		 * Inform the kernel NLM code to run without rpcbind and
+		 * rpc.statd.
+		 */
+		lma.n_v4_only = -1;
+	}
+
 	return (_nfssys(LM_SVC, &lma));
 }
 
@@ -551,7 +561,7 @@ usage(void)
 {
 	(void) fprintf(stderr, "usage: lx_lockd [options] [max_servers]\n");
 	(void) fprintf(stderr, "\t-c max_connections\n");
-	(void) fprintf(stderr, "\t-d debug_level\n");
+	(void) fprintf(stderr, "\t-d enable debugging\n");
 	(void) fprintf(stderr, "\t-g grace_period\n");
 	(void) fprintf(stderr, "\t-l listen_backlog\n");
 	(void) fprintf(stderr, "\t-t retransmit_timeout\n");
