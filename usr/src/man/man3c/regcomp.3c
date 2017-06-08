@@ -1,594 +1,764 @@
-'\" te
-.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.  Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
+.\" Copyright (c) 1992, 1993, 1994 Henry Spencer.
+.\" Copyright (c) 1992, 1993, 1994
+.\"	The Regents of the University of California.  All rights reserved.
+.\"
+.\" This code is derived from software contributed to Berkeley by
+.\" Henry Spencer.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission
+.\" to reproduce portions of its copyrighted documentation.
+.\"
+.\" Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
-.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
-.\"  This notice shall appear on any product containing this material.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH REGCOMP 3C "Nov 1, 2003"
-.SH NAME
-regcomp, regexec, regerror, regfree \- regular expression matching
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/types.h>
-#include <regex.h>
-
-\fBint\fR \fBregcomp\fR(\fBregex_t *restrict\fR \fIpreg\fR, \fBconst char *restrict\fR \fIpattern\fR,
-     \fBint\fR \fIcflags\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBregexec\fR(\fBconst regex_t *restrict\fR \fIpreg\fR,
-     \fBconst char *restrict\fR \fIstring\fR, \fBsize_t\fR \fInmatch\fR,
-     \fBregmatch_t\fR \fIpmatch\fR[restrict], \fBint\fR \fIeflags\fR);
-.fi
-
-.LP
-.nf
-\fBsize_t\fR \fBregerror\fR(\fBint\fR \fIerrcode\fR, \fBconst regex_t *restrict\fR \fIpreg\fR,
-     \fBchar *restrict\fR \fIerrbuf\fR, \fBsize_t\fR \fIerrbuf_size\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBregfree\fR(\fBregex_t *\fR\fIpreg\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-These functions interpret \fIbasic\fR and \fIextended\fR regular expressions
-(described on the \fBregex\fR(5) manual page).
-.sp
-.LP
-The structure type \fBregex_t\fR contains at least the following member:
-.sp
-.ne 2
-.na
-\fB\fBsize_t\fR \fBre_nsub\fR\fR
-.ad
-.RS 18n
-Number of parenthesised subexpressions.
-.RE
-
-.sp
-.LP
-The structure type \fBregmatch_t\fR contains at least the following members:
-.sp
-.ne 2
-.na
-\fB\fBregoff_t\fR \fBrm_so\fR\fR
-.ad
-.RS 18n
-Byte offset from start of \fIstring\fR to start of substring.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBregoff_t\fR \fBrm_eo\fR\fR
-.ad
-.RS 18n
-Byte offset from start of \fIstring\fR of the first character after the end of
-substring.
-.RE
-
-.SS "\fBregcomp()\fR"
-.sp
-.LP
-The \fBregcomp()\fR function will compile the regular expression contained in
-the string pointed to by the \fIpattern\fR argument and place the results in
-the structure pointed to by \fIpreg\fR. The \fIcflags\fR argument is the
-bitwise inclusive \fBOR\fR of zero or more of the following flags, which are
-defined in the header \fB<regex.h>\fR:
-.sp
-.ne 2
-.na
-\fB\fBREG_EXTENDED\fR\fR
-.ad
-.RS 16n
-Use Extended Regular Expressions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_ICASE\fR\fR
-.ad
-.RS 16n
-Ignore case in match.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_NOSUB\fR\fR
-.ad
-.RS 16n
-Report only success/fail in \fBregexec()\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_NEWLINE\fR\fR
-.ad
-.RS 16n
-Change the handling of \fBNEWLINE\fR characters, as described in the text.
-.RE
-
-.sp
-.LP
-The default regular expression type for \fIpattern\fR is a Basic Regular
-Expression. The application can specify Extended Regular Expressions using the
-\fBREG_EXTENDED\fR \fIcflags\fR flag.
-.sp
-.LP
-If the \fBREG_NOSUB\fR flag was not set in \fIcflags\fR, then \fBregcomp()\fR
-will set \fIre_nsub\fR to the number of parenthesised subexpressions (delimited
-by \e(\e) in basic regular expressions or () in extended regular expressions)
-found in \fI pattern\fR.
-.SS "\fBregexec()\fR"
-.sp
-.LP
-The \fBregexec()\fR function compares the null-terminated string specified by
-\fIstring\fR with the compiled regular expression \fIpreg\fR initialized by a
-previous call to \fBregcomp()\fR. The \fIeflags\fR argument is the bitwise
-inclusive \fBOR\fR of zero or more of the following flags, which are defined in
-the header <\fBregex.h\fR>:
-.sp
-.ne 2
-.na
-\fB\fBREG_NOTBOL\fR\fR
-.ad
-.RS 14n
-The first character of the string pointed to by \fIstring\fR is not the
-beginning of the line. Therefore, the circumflex character (\fI^\fR), when
-taken as a special character, will not match the beginning of \fIstring\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_NOTEOL\fR\fR
-.ad
-.RS 14n
-The last character of the string pointed to by \fIstring\fR is not the end of
-the line. Therefore, the dollar sign (\fI$\fR), when taken as a special
-character, will not match the end of \fIstring\fR.
-.RE
-
-.sp
-.LP
-If \fInmatch\fR is zero or \fBREG_NOSUB\fR was set in the \fIcflags\fR argument
-to \fBregcomp()\fR, then \fBregexec()\fR will ignore the \fIpmatch\fR argument.
-Otherwise, the \fIpmatch\fR argument must point to an array with at least
-\fInmatch\fR elements, and \fBregexec()\fR will fill in the elements of that
-array with offsets of the substrings of \fIstring\fR that correspond to the
-parenthesised subexpressions of \fIpattern\fR:
-\fIpmatch\fR\fB[\fR\fIi\fR\fB]\fR.\fIrm_so\fR will be the byte offset of the
-beginning and \fIpmatch\fR\fB[\fR\fIi\fR\fB]\fR.\fIrm_eo\fR will be one greater
-than the byte offset of the end of substring \fIi\fR. (Subexpression \fIi\fR
-begins at the \fIi\fRth matched open parenthesis, counting from 1.) Offsets in
-\fIpmatch\fR\fB[0]\fR identify the substring that corresponds to the entire
-regular expression. Unused elements of \fIpmatch\fR up to
-\fIpmatch\fR\fB[\fR\fInmatch\fR\fB\(mi1]\fR will be filled with \fB\(mi1\fR\&.
-If there are more than \fInmatch\fR subexpressions in \fIpattern\fR
-(\fIpattern\fR itself counts as a subexpression), then \fBregexec()\fR will
-still do the match, but will record only the first \fInmatch\fR substrings.
-.sp
-.LP
-When matching a basic or extended regular expression, any given parenthesised
-subexpression of \fIpattern\fR might participate in the match of several
-different substrings of \fIstring\fR, or it might not match any substring even
-though the pattern as a whole did match. The following rules are used to
-determine which substrings to report in \fIpmatch\fR when matching regular
-expressions:
-.sp
-.ne 2
-.na
-\fB1.\fR
-.ad
-.RS 6n
-If subexpression \fIi\fR in a regular expression is not contained within
-another subexpression, and it participated in the match several times, then the
-byte offsets in \fIpmatch\fR\fB[\fR\fIi\fR\fB]\fR will delimit the last such
-match.
-.RE
-
-.sp
-.ne 2
-.na
-\fB2.\fR
-.ad
-.RS 6n
-If subexpression \fIi\fR is not contained within another subexpression, and it
-did not participate in an otherwise successful match, the byte offsets in
-\fIpmatch\fR\fB[\fR\fIi\fR\fB]\fR will be \fB\(mi1\fR\&. A subexpression does
-not participate in the match when:
-.sp
-\fB*\fR or \fB\e{\e} \fR appears immediately after the subexpression in a basic
-regular expression, or \fB*\fR, \fB?\fR, or \fB{\|}\fR appears immediately
-after the subexpression in an extended regular expression, and the
-subexpression did not match (matched zero times)
-.sp
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open Group,
+.\" have given us permission to reprint portions of their documentation. In the
+.\" following statement, the phrase "this text" refers to portions of the system
+.\" documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form in the
+.\" Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for
+.\" Information Technology -- Portable Operating System Interface (POSIX),
+.\" The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the
+.\" Institute of Electrical and Electronics Engineers, Inc and The Open Group.
+.\"
+.\" In the event of any discrepancy between these versions and the original
+.\" IEEE and The Open Group Standard, the original IEEE and The Open Group
+.\" Standard is the referee document.
+.\"
+.\" The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
+.\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2017 Nexenta Systems, Inc.
+.\"
+.Dd June 14, 2017
+.Dt REGCOMP 3C
+.Os
+.Sh NAME
+.Nm regcomp ,
+.Nm regexec ,
+.Nm regerror ,
+.Nm regfree
+.Nd regular-expression library
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In regex.h
+.Ft int
+.Fo regcomp
+.Fa "regex_t *restrict preg" "const char *restrict pattern" "int cflags"
+.Fc
+.Ft int
+.Fo regexec
+.Fa "const regex_t *restrict preg" "const char *restrict string"
+.Fa "size_t nmatch" "regmatch_t pmatch[restrict]" "int eflags"
+.Fc
+.Ft size_t
+.Fo regerror
+.Fa "int errcode" "const regex_t *restrict preg"
+.Fa "char *restrict errbuf" "size_t errbuf_size"
+.Fc
+.Ft void
+.Fn regfree "regex_t *preg"
+.Sh DESCRIPTION
+These routines implement
+.St -p1003.2
+regular expressions; see
+.Xr regex 5 .
+The
+.Fn regcomp
+function compiles an RE written as a string into an internal form,
+.Fn regexec
+matches that internal form against a string and reports results,
+.Fn regerror
+transforms error codes from either into human-readable messages,
+and
+.Fn regfree
+frees any dynamically-allocated storage used by the internal form
+of an RE.
+.Pp
+The header
+.In regex.h
+declares two structure types,
+.Ft regex_t
+and
+.Ft regmatch_t ,
+the former for compiled internal forms and the latter for match reporting.
+It also declares the four functions, a type
+.Ft regoff_t ,
+and a number of constants with names starting with
+.Qq Dv REG_ .
+.Ss Fn regcomp
+The
+.Fn regcomp
+function compiles the regular expression contained in the
+.Fa pattern
+string, subject to the flags in
+.Fa cflags ,
+and places the results in the
+.Ft regex_t
+structure pointed to by
+.Fa preg .
+The
+.Fa cflags
+argument is the bitwise OR of zero or more of the following flags:
+.Bl -tag -width REG_EXTENDED
+.It Dv REG_EXTENDED
+Compile extended regular expressions
+.Pq EREs ,
+rather than the basic regular expressions
+.Pq BREs
+that are the default.
+.It Dv REG_BASIC
+This is a synonym for 0, provided as a counterpart to
+.Dv REG_EXTENDED
+to improve readability.
+.It Dv REG_NOSPEC
+Compile with recognition of all special characters turned off.
+All characters are thus considered ordinary, so the RE is a literal string.
+This is an extension, compatible with but not specified by
+.St -p1003.2 ,
+and should be used with caution in software intended to be portable to other
+systems.
+.Dv REG_EXTENDED
+and
+.Dv REG_NOSPEC
+may not be used in the same call to
+.Fn regcomp .
+.It Dv REG_ICASE
+Compile for matching that ignores upper/lower case distinctions.
+See
+.Xr regex 5 .
+.It Dv REG_NOSUB
+Compile for matching that need only report success or failure,
+not what was matched.
+.It Dv REG_NEWLINE
+Compile for newline-sensitive matching.
+By default, newline is a completely ordinary character with no special
+meaning in either REs or strings.
+With this flag,
+.Qq [^
+bracket expressions and
+.Qq \&.
+never match newline,
+a
+.Qq \&^
+anchor matches the null string after any newline in the string in addition to
+its normal function, and the
+.Qq \&$
+anchor matches the null string before any newline in the string in addition to
+its normal function.
+.It Dv REG_PEND
+The regular expression ends, not at the first NUL, but just before the character
+pointed to by the
+.Va re_endp
+member of the structure pointed to by
+.Fa preg .
+The
+.Va re_endp
+member is of type
+.Vt "const char *" .
+This flag permits inclusion of NULs in the RE; they are considered ordinary
+characters.
+This is an extension, compatible with but not specified by
+.St -p1003.2 ,
+and should be used with caution in software intended to be portable to other
+systems.
+.El
+.Pp
+When successful,
+.Fn regcomp
+returns 0 and fills in the structure pointed to by
+.Fa preg .
+One member of that structure
+.Po other than
+.Va re_endp
+.Pc
+is publicized:
+.Va re_nsub ,
+of type
+.Ft size_t ,
+contains the number of parenthesized subexpressions within the RE
+.Po except that the value of this member is undefined if the
+.Dv REG_NOSUB
+flag was used
+.Pc .
+.Ss Fn regexec
+The
+.Fn regexec
+function matches the compiled RE pointed to by
+.Fa preg
+against the
+.Fa string ,
+subject to the flags in
+.Fa eflags ,
+and reports results using
+.Fa nmatch ,
+.Fa pmatch ,
+and the returned value.
+The RE must have been compiled by a previous invocation of
+.Fn regcomp .
+The compiled form is not altered during execution of
+.Fn regexec ,
+so a single compiled RE can be used simultaneously by multiple threads.
+.Pp
+By default, the NUL-terminated string pointed to by
+.Fa string
+is considered to be the text of an entire line, minus any terminating
+newline.
+The
+.Fa eflags
+argument is the bitwise OR of zero or more of the following flags:
+.Bl -tag -width REG_STARTEND
+.It Dv REG_NOTBOL
+The first character of the string is treated as the continuation
+of a line.
+This means that the anchors
+.Qq \&^ ,
+.Qq [[:<:]] ,
+and
+.Qq \e<
+do not match before it; but see
+.Dv REG_STARTEND
+below.
+This does not affect the behavior of newlines under
+.Dv REG_NEWLINE .
+.It Dv REG_NOTEOL
+The NUL terminating the string does not end a line, so the
+.Qq \&$
+anchor does not match before it.
+This does not affect the behavior of newlines under
+.Dv REG_NEWLINE .
+.It Dv REG_STARTEND
+The string is considered to start at
+.Fa string No +
+.Fa pmatch Ns [0]. Ns Fa rm_so
+and to end before the byte located at
+.Fa string No +
+.Fa pmatch Ns [0]. Ns Fa rm_eo ,
+regardless of the value of
+.Fa nmatch .
+See below for the definition of
+.Fa pmatch
+and
+.Fa nmatch .
+This is an extension, compatible with but not specified by
+.St -p1003.2 ,
+and should be used with caution in software intended to be portable to other
+systems.
+.Pp
+Without
+.Dv REG_NOTBOL ,
+the position
+.Fa rm_so
+is considered the beginning of a line, such that
+.Qq \&^
+matches before it, and the beginning of a word if there is a word character at
+this position, such that
+.Qq [[:<:]]
+and
+.Qq \e<
+match before it.
+.Pp
+With
+.Dv REG_NOTBOL ,
+the character at position
+.Fa rm_so
+is treated as the continuation of a line, and if
+.Fa rm_so
+is greater than 0, the preceding character is taken into consideration.
+If the preceding character is a newline and the regular expression was compiled
+with
+.Dv REG_NEWLINE ,
+.Qq ^
+matches before the string; if the preceding character is not a word character
+but the string starts with a word character,
+.Qq [[:<:]]
+and
+.Qq \e<
+match before the string.
+.El
+.Pp
+See
+.Xr regex 5
+for a discussion of what is matched in situations where an RE or a portion
+thereof could match any of several substrings of
+.Fa string .
+.Pp
+If
+.Dv REG_NOSUB
+was specified in the compilation of the RE, or if
+.Fa nmatch
+is 0,
+.Fn regexec
+ignores the
+.Fa pmatch
+argument
+.Po but see below for the case where
+.Dv REG_STARTEND
+is specified
+.Pc .
+Otherwise,
+.Fa pmatch
+points to an array of
+.Fa nmatch
+structures of type
+.Ft regmatch_t .
+Such a structure has at least the members
+.Va rm_so
+and
+.Va rm_eo ,
+both of type
+.Ft regoff_t
+.Po a signed arithmetic type at least as large as an
+.Ft off_t
+and a
+.Ft ssize_t
+.Pc ,
+containing respectively the offset of the first character of a substring
+and the offset of the first character after the end of the substring.
+Offsets are measured from the beginning of the
+.Fa string
+argument given to
+.Fn regexec .
+An empty substring is denoted by equal offsets, both indicating the character
+following the empty substring.
+.Pp
+The 0th member of the
+.Fa pmatch
+array is filled in to indicate what substring of
+.Fa string
+was matched by the entire RE.
+Remaining members report what substring was matched by parenthesized
+subexpressions within the RE; member
+.Va i
+reports subexpression
+.Va i ,
+with subexpressions counted
+.Pq starting at 1
+by the order of their opening parentheses in the RE, left to right.
+Unused entries in the array
+.Po corresponding either to subexpressions that did not participate in the match
+at all, or to subexpressions that do not exist in the RE
+.Po that is,
+.Va i
+>
+.Fa preg Ns -> Ns Va re_nsub
+.Pc
+.Pc
+have both
+.Va rm_so
+and
+.Va rm_eo
+set to -1.
+If a subexpression participated in the match several times,
+the reported substring is the last one it matched.
+.Po Note, as an example in particular, that when the RE
+.Qq (b*)+
+matches
+.Qq bbb ,
+the parenthesized subexpression matches each of the three
+.So Li b Sc Ns s
+and then an infinite number of empty strings following the last
+.Qq b ,
+so the reported substring is one of the empties.
+.Pc
+.Pp
+If
+.Dv REG_STARTEND
+is specified,
+.Fa pmatch
+must point to at least one
+.Ft regmatch_t
+.Po even if
+.Fa nmatch
+is 0 or
+.Dv REG_NOSUB
+was specified
+.Pc ,
+to hold the input offsets for
+.Dv REG_STARTEND .
+Use for output is still entirely controlled by
+.Fa nmatch ;
+if
+.Fa nmatch
+is 0 or
+.Dv REG_NOSUB
+was specified,
+the value of
+.Fa pmatch Ns [0]
+will not be changed by a successful
+.Fn regexec .
+.Ss Fn regerror
+The
+.Fn regerror
+function maps a non-zero
+.Fa errcode
+from either
+.Fn regcomp
 or
-.sp
-\fB|\fR is used in an extended regular expression to select this subexpression
-or another, and the other subexpression matched.
-.RE
-
-.sp
-.ne 2
-.na
-\fB3.\fR
-.ad
-.RS 6n
-If subexpression \fIi\fR is contained within another subexpression \fIj\fR, and
-\fIi\fR is not contained within any other subexpression that is contained
-within \fIj\fR, and a match of subexpression \fIj\fR is reported in
-\fIpmatch\fR\fB[\fR\fIj\fR\fB]\fR, then the match or non-match of subexpression
-\fIi\fR reported in \fIpmatch\fR\fB[\fR\fIi\fR\fB]\fR will be as described in
-1. and 2. above, but within the substring reported in
-\fIpmatch\fR\fB[\fR\fIj\fR\fB]\fR rather than the whole string.
-.RE
-
-.sp
-.ne 2
-.na
-\fB4.\fR
-.ad
-.RS 6n
-If subexpression \fIi\fR is contained in subexpression \fIj\fR, and the byte
-offsets in \fIpmatch\fR\fB[\fR\fIj\fR\fB]\fR are \fB\(mi1\fR, then the pointers
-in \fIpmatch\fR\fB[\fR\fIi\fR\fB]\fR also will be \fB\(mi1\fR\&.
-.RE
-
-.sp
-.ne 2
-.na
-\fB5.\fR
-.ad
-.RS 6n
-If subexpression \fIi\fR matched a zero-length string, then both byte offsets
-in \fIpmatch\fR\fB[\fR\fIi\fR\fB]\fR will be the byte offset of the character
-or \fINULL\fR terminator immediately following the zero-length string.
-.RE
-
-.sp
-.LP
-If, when \fBregexec()\fR is called, the locale is different from when the
-regular expression was compiled, the result is undefined.
-.sp
-.LP
-If \fBREG_NEWLINE\fR is not set in \fIcflags\fR, then a \fBNEWLINE\fR character
-in \fIpattern\fR or \fIstring\fR will be treated as an ordinary character. If
-\fBREG_NEWLINE\fR is set, then newline will be treated as an ordinary character
-except as follows:
-.sp
-.ne 2
-.na
-\fB1.\fR
-.ad
-.RS 6n
-A \fBNEWLINE\fR character in \fIstring\fR will not be matched by a period
-outside a bracket expression or by any form of a non-matching list.
-.RE
-
-.sp
-.ne 2
-.na
-\fB2.\fR
-.ad
-.RS 6n
-A circumflex (^) in \fIpattern\fR, when used to specify expression anchoring
-will match the zero-length string immediately after a newline in \fIstring\fR,
-regardless of the setting of \fBREG_NOTBOL\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB3.\fR
-.ad
-.RS 6n
-A dollar-sign ($) in \fIpattern\fR, when used to specify expression anchoring,
-will match the zero-length string immediately before a newline in \fIstring\fR,
-regardless of the setting of \fBREG_NOTEOL.\fR
-.RE
-
-.SS "\fBregfree()\fR"
-.sp
-.LP
-The \fBregfree()\fR function frees any memory allocated by \fBregcomp()\fR
-associated with \fIpreg\fR.
-.sp
-.LP
-The following constants are defined as error return values:
-.sp
-.ne 2
-.na
-\fB\fBREG_NOMATCH\fR\fR
-.ad
-.RS 16n
-The \fBregexec()\fR function failed to match.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_BADPAT\fR\fR
-.ad
-.RS 16n
-Invalid regular expression.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_ECOLLATE\fR\fR
-.ad
-.RS 16n
-Invalid collating element referenced.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_ECTYPE\fR\fR
-.ad
-.RS 16n
-Invalid character class type referenced.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_EESCAPE\fR\fR
-.ad
-.RS 16n
-Trailing \e in pattern.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_ESUBREG\fR\fR
-.ad
-.RS 16n
-Number in \e\fIdigit\fR invalid or in error.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_EBRACK\fR\fR
-.ad
-.RS 16n
-\fB[\|]\fR imbalance.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_ENOSYS\fR\fR
-.ad
-.RS 16n
-The function is not supported.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_EPAREN\fR\fR
-.ad
-.RS 16n
-\fB\e(\|\e)\fR or \fB()\fR imbalance.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_EBRACE\fR\fR
-.ad
-.RS 16n
-\e{ \e} imbalance.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_BADBR\fR\fR
-.ad
-.RS 16n
-Content of \e{ \e} invalid: not a number, number too large, more than two
-numbers, first larger than second.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_ERANGE\fR\fR
-.ad
-.RS 16n
-Invalid endpoint in range expression.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_ESPACE\fR\fR
-.ad
-.RS 16n
-Out of memory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREG_BADRPT\fR\fR
-.ad
-.RS 16n
-?, * or + not preceded by valid regular expression.
-.RE
-
-.SS "\fBregerror()\fR"
-.sp
-.LP
-The \fBregerror()\fR function provides a mapping from error codes returned by
-\fBregcomp()\fR and \fBregexec()\fR to unspecified printable strings. It
-generates a string corresponding to the value of the \fIerrcode\fR argument,
-which must be the last non-zero value returned by \fBregcomp()\fR or
-\fBregexec()\fR with the given value of \fIpreg\fR. If \fIerrcode\fR is not
-such a value, an error message indicating that the error code is invalid is
-returned.
-.sp
-.LP
-If \fIpreg\fR is a \fINULL\fR pointer, but \fIerrcode\fR is a value returned by
-a previous call to \fBregexec()\fR or \fBregcomp()\fR, the \fBregerror()\fR
-still generates an error string corresponding to the value of \fIerrcode\fR.
-.sp
-.LP
-If the \fIerrbuf_size\fR argument is not zero, \fBregerror()\fR will place the
-generated string into the buffer of size \fIerrbuf_size\fR bytes pointed to by
-\fIerrbuf\fR. If the string (including the terminating \fBNULL)\fR cannot fit
-in the buffer, \fBregerror()\fR will truncate the string and null-terminate the
-result.
-.sp
-.LP
-If \fIerrbuf_size\fR is zero, \fBregerror()\fR ignores the \fIerrbuf\fR
-argument, and returns the size of the buffer needed to hold the generated
-string.
-.sp
-.LP
-If the \fIpreg\fR argument to \fBregexec()\fR or \fBregfree()\fR is not a
-compiled regular expression returned by \fBregcomp()\fR, the result is
-undefined. A \fIpreg\fR is no longer treated as a compiled regular expression
-after it is given to \fBregfree()\fR.
-.sp
-.LP
-See \fBregex\fR(5) for BRE (Basic Regular Expression) Anchoring.
-.SH RETURN VALUES
-.sp
-.LP
-On successful completion, the \fBregcomp()\fR function returns \fB0\fR.
+.Fn regexec
+to a human-readable, printable message.
+If
+.Fa preg
+is non-NULL, the error code should have arisen from use of the
+.Ft regex_t
+pointed to by
+.Fa preg ,
+and if the error code came from
+.Fn regcomp ,
+it should have been the result from the most recent
+.Fn regcomp
+using that
+.Ft regex_t .
+The
+.Po
+.Fn regerror
+may be able to supply a more detailed message using information
+from the
+.Ft regex_t .
+.Pc
+The
+.Fn regerror
+function places the NUL-terminated message into the buffer pointed to by
+.Fa errbuf ,
+limiting the length
+.Pq including the NUL
+to at most
+.Fa errbuf_size
+bytes.
+If the whole message will not fit, as much of it as will fit before the
+terminating NUL is supplied.
+In any case, the returned value is the size of buffer needed to hold the whole
+message
+.Pq including terminating NUL .
+If
+.Fa errbuf_size
+is 0,
+.Fa errbuf
+is ignored but the return value is still correct.
+.Pp
+If the
+.Fa errcode
+given to
+.Fn regerror
+is first ORed with
+.Dv REG_ITOA ,
+the
+.Qq message
+that results is the printable name of the error code, e.g.
+.Qq Dv REG_NOMATCH ,
+rather than an explanation thereof.
+If
+.Fa errcode
+is
+.Dv REG_ATOI ,
+then
+.Fa preg
+shall be non-NULL and the
+.Va re_endp
+member of the structure it points to must point to the printable name of an
+error code; in this case, the result in
+.Fa errbuf
+is the decimal digits of the numeric value of the error code
+.Pq 0 if the name is not recognized .
+.Dv REG_ITOA
+and
+.Dv REG_ATOI
+are intended primarily as debugging facilities; they are extensions,
+compatible with but not specified by
+.St -p1003.2 ,
+and should be used with caution in software intended to be portable to other
+systems.
+.Ss Fn regfree
+The
+.Fn regfree
+function frees any dynamically-allocated storage associated with the compiled RE
+pointed to by
+.Fa preg .
+The remaining
+.Ft regex_t
+is no longer a valid compiled RE and the effect of supplying it to
+.Fn regexec
+or
+.Fn regerror
+is undefined.
+.Sh IMPLEMENTATION NOTES
+There are a number of decisions that
+.St -p1003.2
+leaves up to the implementor,
+either by explicitly saying
+.Qq undefined
+or by virtue of them being forbidden by the RE grammar.
+This implementation treats them as follows.
+.Pp
+There is no particular limit on the length of REs, except insofar as memory is
+limited.
+Memory usage is approximately linear in RE size, and largely insensitive
+to RE complexity, except for bounded repetitions.
+.Pp
+A backslashed character other than one specifically given a magic meaning by
+.St -p1003.2
+.Pq such magic meanings occur only in BREs
+is taken as an ordinary character.
+.Pp
+Any unmatched
+.Qq \&[
+is a
+.Dv REG_EBRACK
+error.
+.Pp
+Equivalence classes cannot begin or end bracket-expression ranges.
+The endpoint of one range cannot begin another.
+.Pp
+.Dv RE_DUP_MAX ,
+the limit on repetition counts in bounded repetitions, is 255.
+.Pp
+A repetition operator
+.Po
+.Qq \&? ,
+.Qq \&* ,
+.Qq \&+ ,
+or bounds
+.Pc
+cannot follow another repetition operator.
+A repetition operator cannot begin an expression or subexpression
+or follow
+.Qq \&^
+or
+.Qq \&| .
+.Pp
+.Qq \&|
+cannot appear first or last in a (sub)expression or after another
+.Qq \&| ,
+i.e., an operand of
+.Qq \&|
+cannot be an empty subexpression.
+An empty parenthesized subexpression,
+.Qq () ,
+is legal and matches an empty (sub)string.
+An empty string is not a legal RE.
+.Pp
+A
+.Qq \&{
+followed by a digit is considered the beginning of bounds for a bounded
+repetition, which must then follow the syntax for bounds.
+A
+.Qq \&{
+.Em not
+followed by a digit is considered an ordinary character.
+.Pp
+.Qq \&^
+and
+.Qq \&$
+beginning and ending subexpressions in BREs are anchors, not ordinary
+characters.
+.Sh RETURN VALUES
+On successful completion, the
+.Fn regcomp
+function returns 0.
 Otherwise, it returns an integer value indicating an error as described in
-<\fBregex.h\fR>, and the content of \fIpreg\fR is undefined.
-.sp
-.LP
-On successful completion, the \fBregexec()\fR function returns \fB0\fR.
-Otherwise it returns \fBREG_NOMATCH\fR to indicate no match, or
-\fBREG_ENOSYS\fR to indicate that the function is not supported.
-.sp
-.LP
-Upon successful completion, the \fBregerror()\fR function returns the number of
-bytes needed to hold the entire generated string. Otherwise, it returns \fB0\fR
-to indicate that the function is not implemented.
-.sp
-.LP
-The \fBregfree()\fR function returns no value.
-.SH ERRORS
-.sp
-.LP
-No errors are defined.
-.SH USAGE
-.sp
-.LP
-An application could use:
-.sp
-.LP
-\fBregerror(code,preg,(char *)NULL,(size_t)0)\fR
-.sp
-.LP
-to find out how big a buffer is needed for the generated string, \fBmalloc\fR a
-buffer to hold the string, and then call \fBregerror()\fR again to get the
-string (see \fBmalloc\fR(3C)). Alternately, it could allocate a fixed, static
-buffer that is big enough to hold most strings, and then use \fBmalloc()\fR to
-allocate a larger buffer if it finds that this is too small.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRExample to match string against the extended regular expression
+.In regex.h ,
+and the content of preg is undefined.
+.Pp
+On successful completion, the
+.Fn regexec
+function returns 0.
+Otherwise it returns
+.Dv REG_NOMATCH
+to indicate no match, or
+.Dv REG_ENOSYS
+to indicate that the function is not supported.
+.Pp
+Upon successful completion, the
+.Fn regerror
+function returns the number of bytes needed to hold the entire generated string.
+Otherwise, it returns 0 to indicate that the function is not implemented.
+.Pp
+The
+.Fn regfree
+function returns no value.
+.Pp
+The following constants are defined as error return values:
+.Pp
+.Bl -tag -width "REG_ECOLLATE" -compact
+.It Dv REG_NOMATCH
+The
+.Fn regexec
+function failed to match.
+.It Dv REG_BADPAT
+Invalid regular expression.
+.It Dv REG_ECOLLATE
+Invalid collating element referenced.
+.It Dv REG_ECTYPE
+Invalid character class type referenced.
+.It Dv REG_EESCAPE
+Trailing
+.Qq \&\e
 in pattern.
-.sp
-.in +2
-.nf
+.It Dv REG_ESUBREG
+Number in
+.Qq \&\e Ns Em digit
+invalid or in error.
+.It Dv REG_EBRACK
+.Qq []
+imbalance.
+.It Dv REG_ENOSYS
+The function is not supported.
+.It Dv REG_EPAREN
+.Qq \e(\e)
+or
+.Qq ()
+imbalance.
+.It Dv REG_EBRACE
+.Qq \e{\e}
+imbalance.
+.It Dv REG_BADBR
+Content of
+.Qq \e{\e}
+invalid: not a number, number too large, more than two
+numbers, first larger than second.
+.It Dv REG_ERANGE
+Invalid endpoint in range expression.
+.It Dv REG_ESPACE
+Out of memory.
+.It Dv REG_BADRPT
+.Qq \&? ,
+.Qq *
+or
+.Qq +
+not preceded by valid regular expression.
+.El
+.Sh USAGE
+An application could use:
+.Bd -literal -offset Ds
+regerror(code, preg, (char *)NULL, (size_t)0)
+.Ed
+.Pp
+to find out how big a buffer is needed for the generated string,
+.Fn malloc
+a buffer to hold the string, and then call
+.Fn regerror
+again to get the string
+.Po see
+.Xr malloc 3C
+.Pc .
+Alternately, it could allocate a fixed, static buffer that is big enough to hold
+most strings, and then use
+.Fn malloc
+allocate a larger buffer if it finds that this is too small.
+.Sh EXAMPLES
+Matching string against the extended regular expression in pattern.
+.Bd -literal -offset Ds
 #include <regex.h>
+
 /*
 * Match string against the extended regular expression in
 * pattern, treating errors as no match.
 *
 * return 1 for match, 0 for no match
 */
-
 int
 match(const char *string, char *pattern)
 {
-      int status;
-      regex_t re;
-      if (regcomp(&re, pattern, REG_EXTENDED\||\|REG_NOSUB) != 0) {
-           return(0);      /* report error */
-      }
-      status = regexec(&re, string, (size_t) 0, NULL, 0);
-      regfree(&re);
-      if (status != 0) {
-            return(0);      /* report error */
-      }
-      return(1);
+	int status;
+	regex_t re;
+
+	if (regcomp(&re, pattern, REG_EXTENDED\||\|REG_NOSUB) != 0) {
+		return(0);      /* report error */
+	}
+	status = regexec(&re, string, (size_t) 0, NULL, 0);
+	regfree(&re);
+	if (status != 0) {
+		return(0);      /* report error */
+	}
+	return(1);
 }
-.fi
-.in -2
-
-.sp
-.LP
-The following demonstrates how the \fBREG_NOTBOL\fR flag could be used with
-\fBregexec()\fR to find all substrings in a line that match a pattern supplied
-by a user. (For simplicity of the example, very little error checking is done.)
-
-.sp
-.in +2
-.nf
-(void) regcomp (&re, pattern, 0);
-/* this call to regexec(\|) finds the first match on the line */
-error = regexec (&re, &buffer[0], 1, &pm, 0);
-while (error == 0) {	/* while matches found */
-        /* substring found between pm.rm_so and pm.rm_eo */
-        /* This call to regexec(\|) finds the next match */
-        error = regexec (&re, buffer + pm.rm_eo, 1, &pm, REG_NOTBOL);
+.Ed
+.Pp
+The following demonstrates how the
+.Dv REG_NOTBOL
+flag could be used with
+.Fn regexec
+to find all substrings in a line that match a pattern supplied by a user.
+.Pq For simplicity of the example, very little error checking is done.
+.Bd -literal -offset Ds
+(void) regcomp(&re, pattern, 0);
+/* this call to regexec() finds the first match on the line */
+error = regexec(&re, &buffer[0], 1, &pm, 0);
+while (error == 0) {    /* while matches found */
+	/* substring found between pm.rm_so and pm.rm_eo */
+	/* This call to regexec() finds the next match */
+	error = regexec(&re, buffer + pm.rm_eo, 1, &pm, REG_NOTBOL);
 }
-.fi
-.in -2
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe with exceptions
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBfnmatch\fR(3C), \fBglob\fR(3C), \fBmalloc\fR(3C), \fBsetlocale\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5), \fBregex\fR(5)
-.SH NOTES
-.sp
-.LP
-The \fBregcomp()\fR function can be used safely in a multithreaded application
-as long as \fBsetlocale\fR(3C) is not being called to change the locale.
+.Ed
+.Sh ERRORS
+No errors are defined.
+.Sh CODE SET INDEPENDENCE
+.Sy Enabled
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe with exceptions
+.Pp
+The
+.Fn regcomp
+function can be used safely in a multithreaded application as long as
+.Xr setlocale 3C
+is not being called to change the locale.
+.Sh SEE ALSO
+.Xr attributes 5 ,
+.Xr regex 5 ,
+.Xr standards 5
+.Pp
+.St -p1003.2 ,
+sections 2.8
+.Pq Regular Expression Notation
+and
+B.5
+.Pq C Binding for Regular Expression Matching .
