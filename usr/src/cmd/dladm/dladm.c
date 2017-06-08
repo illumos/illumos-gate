@@ -190,6 +190,11 @@ typedef struct show_usage_state_s {
 	ofmt_handle_t	us_ofmt;
 } show_usage_state_t;
 
+typedef struct show_overlay_request_s {
+	boolean_t	sor_failed;
+	ofmt_handle_t	sor_ofmt;
+} show_overlay_request_t;
+
 /*
  * callback functions for printing output and error diagnostics.
  */
@@ -10191,21 +10196,35 @@ static int
 show_one_overlay(dladm_handle_t hdl, datalink_id_t linkid, void *arg)
 {
 	char			buf[MAXLINKNAMELEN];
+	dladm_status_t		info_status;
 	showoverlay_state_t	state;
 	datalink_class_t	class;
+	show_overlay_request_t	*req = arg;
 
-	if (dladm_datalink_id2info(hdl, linkid, NULL, &class, NULL, buf,
-	    MAXLINKNAMELEN) != DLADM_STATUS_OK ||
-	    class != DATALINK_CLASS_OVERLAY)
+	if ((info_status = dladm_datalink_id2info(hdl, linkid, NULL, &class,
+	    NULL, buf, MAXLINKNAMELEN)) != DLADM_STATUS_OK) {
+		warn_dlerr(info_status, "failed to get info for "
+		    "datalink id %u", linkid);
+		req->sor_failed = B_TRUE;
 		return (DLADM_WALK_CONTINUE);
+	}
+
+	if (class != DATALINK_CLASS_OVERLAY) {
+		warn("%s is not an overlay", buf);
+		req->sor_failed = B_TRUE;
+		return (DLADM_WALK_CONTINUE);
+	}
 
 	state.sho_linkname = buf;
-	state.sho_ofmt = arg;
+	state.sho_ofmt = req->sor_ofmt;
 
 	dladm_errlist_reset(&errlist);
 	(void) dladm_overlay_walk_prop(handle, linkid, dladm_overlay_show_one,
 	    &state, &errlist);
 	warn_dlerrlist(&errlist);
+	if (errlist.el_count) {
+		req->sor_failed = B_TRUE;
+	}
 
 	return (DLADM_WALK_CONTINUE);
 }
@@ -10306,15 +10325,26 @@ static int
 show_one_overlay_table(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	char				linkbuf[MAXLINKNAMELEN];
+	dladm_status_t			info_status;
 	showoverlay_targ_state_t	shot;
 	datalink_class_t		class;
+	show_overlay_request_t		*req = arg;
 
-	if (dladm_datalink_id2info(handle, linkid, NULL, &class, NULL, linkbuf,
-	    MAXLINKNAMELEN) != DLADM_STATUS_OK ||
-	    class != DATALINK_CLASS_OVERLAY)
+	if ((info_status = dladm_datalink_id2info(handle, linkid, NULL, &class,
+	    NULL, linkbuf, MAXLINKNAMELEN)) != DLADM_STATUS_OK) {
+		warn_dlerr(info_status, "failed to get info for "
+		    "datalink id %u", linkid);
+		req->sor_failed = B_TRUE;
 		return (DLADM_WALK_CONTINUE);
+	}
 
-	shot.shot_ofmt = arg;
+	if (class != DATALINK_CLASS_OVERLAY) {
+		warn("%s is not an overlay", linkbuf);
+		req->sor_failed = B_TRUE;
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	shot.shot_ofmt = req->sor_ofmt;
 	shot.shot_linkname = linkbuf;
 
 	(void) dladm_overlay_walk_cache(handle, linkid,
@@ -10365,6 +10395,7 @@ show_one_overlay_fma(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	char			linkbuf[MAXLINKNAMELEN];
 	datalink_class_t	class;
 	showoverlay_fma_state_t	shof;
+	show_overlay_request_t	*req = arg;
 
 	if (dladm_datalink_id2info(handle, linkid, NULL, &class, NULL, linkbuf,
 	    MAXLINKNAMELEN) != DLADM_STATUS_OK ||
@@ -10372,7 +10403,7 @@ show_one_overlay_fma(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 		die("datalink %s is not an overlay device\n", linkbuf);
 	}
 
-	shof.shof_ofmt = arg;
+	shof.shof_ofmt = req->sor_ofmt;
 	shof.shof_linkname = linkbuf;
 
 	status = dladm_overlay_status(handle, linkid,
@@ -10395,14 +10426,14 @@ do_show_overlay(int argc, char *argv[], const char *use)
 	const ofmt_field_t	*fieldsp;
 	ofmt_status_t		oferr;
 	boolean_t		parse;
-	ofmt_handle_t		ofmt;
+	show_overlay_request_t	req;
 	uint_t			ofmtflags;
 	int			err;
-
 
 	funcp = show_one_overlay;
 	fieldsp = overlay_fields;
 	parse = B_FALSE;
+	req.sor_failed = B_FALSE;
 	ofmtflags = OFMT_WRAP;
 	while ((opt = getopt_long(argc, argv, ":o:pft", overlay_show_lopts,
 	    NULL)) != -1) {
@@ -10430,8 +10461,8 @@ do_show_overlay(int argc, char *argv[], const char *use)
 	if (fields_str != NULL && strcasecmp(fields_str, "all") == 0)
 		fields_str = NULL;
 
-	oferr = ofmt_open(fields_str, fieldsp, ofmtflags, 0, &ofmt);
-	ofmt_check(oferr, parse, ofmt, die, warn);
+	oferr = ofmt_open(fields_str, fieldsp, ofmtflags, 0, &req.sor_ofmt);
+	ofmt_check(oferr, parse, req.sor_ofmt, die, warn);
 
 	err = 0;
 	if (argc > optind) {
@@ -10444,14 +10475,17 @@ do_show_overlay(int argc, char *argv[], const char *use)
 				err = 1;
 				continue;
 			}
-			funcp(handle, linkid, ofmt);
+			(void) funcp(handle, linkid, &req);
 		}
 	} else {
-		(void) dladm_walk_datalink_id(funcp, handle, ofmt,
+		(void) dladm_walk_datalink_id(funcp, handle, &req,
 		    DATALINK_CLASS_OVERLAY, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_ACTIVE);
 	}
-	ofmt_close(ofmt);
+	if (req.sor_failed) {
+		err = 1;
+	}
+	ofmt_close(req.sor_ofmt);
 
 	exit(err);
 }

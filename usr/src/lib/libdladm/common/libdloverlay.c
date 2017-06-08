@@ -390,24 +390,37 @@ dladm_overlay_walk_prop(dladm_handle_t handle, datalink_id_t linkid,
     dladm_overlay_prop_f func, void *arg, dladm_errlist_t *errs)
 {
 	int i, ret;
+	char buf[MAXLINKNAMELEN];
+	char errmsg[DLADM_STRSIZE];
 	datalink_class_t class;
+	dladm_status_t info_status;
 	overlay_ioc_nprops_t oin;
 	overlay_ioc_propinfo_t oipi;
 	dladm_overlay_propinfo_t dop;
 	uint64_t varpdid = UINT64_MAX;
 
-	if (dladm_datalink_id2info(handle, linkid, NULL, &class, NULL,
-	    NULL, 0) != DLADM_STATUS_OK)
+	if ((info_status = dladm_datalink_id2info(handle, linkid, NULL, &class,
+	    NULL, buf, MAXLINKNAMELEN)) != DLADM_STATUS_OK) {
+		(void) dladm_errlist_append(errs, "failed to get info for "
+		    "datalink id %u: %s",
+		    linkid, dladm_status2str(info_status, errmsg));
 		return (DLADM_STATUS_BADARG);
+	}
 
-	if (class != DATALINK_CLASS_OVERLAY)
+	if (class != DATALINK_CLASS_OVERLAY) {
+		(void) dladm_errlist_append(errs, "%s is not an overlay", buf);
 		return (DLADM_STATUS_BADARG);
+	}
 
 	bzero(&oin, sizeof (overlay_ioc_nprops_t));
 	oin.oipn_linkid = linkid;
 	ret = ioctl(dladm_dld_fd(handle), OVERLAY_IOC_NPROPS, &oin);
-	if (ret != 0)
+	if (ret != 0) {
+		(void) dladm_errlist_append(errs, "failed to get "
+		    "overlay properties for overlay %s: %s",
+		    buf, strerror(errno));
 		return (dladm_errno2status(errno));
+	}
 
 	for (i = 0; i < oin.oipn_nprops; i++) {
 		bzero(&dop, sizeof (dladm_overlay_propinfo_t));
@@ -417,7 +430,8 @@ dladm_overlay_walk_prop(dladm_handle_t handle, datalink_id_t linkid,
 		ret = ioctl(dladm_dld_fd(handle), OVERLAY_IOC_PROPINFO, &oipi);
 		if (ret != 0) {
 			(void) dladm_errlist_append(errs, "failed to get "
-			    "propinfo for property %d: %s", i, strerror(errno));
+			    "propinfo for overlay %s, property %d: %s",
+			    buf, i, strerror(errno));
 			return (dladm_errno2status(errno));
 		}
 
@@ -448,8 +462,15 @@ dladm_overlay_walk_prop(dladm_handle_t handle, datalink_id_t linkid,
 	if (varpdid == UINT64_MAX)
 		return (DLADM_STATUS_OK);
 
-	return (dladm_overlay_walk_varpd_prop(handle, linkid, varpdid, func,
-	    arg));
+	ret = dladm_overlay_walk_varpd_prop(handle, linkid, varpdid, func,
+	    arg);
+	if (ret != DLADM_STATUS_OK) {
+		(void) dladm_errlist_append(errs,
+		    "failed to get varpd props for "
+		    "overlay %s, varpd id %llu: %s",
+		    buf, varpdid, dladm_status2str(info_status, errmsg));
+	}
+	return (ret);
 }
 
 dladm_status_t

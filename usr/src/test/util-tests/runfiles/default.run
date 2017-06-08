@@ -25,6 +25,7 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/printf_test]
 [/opt/util-tests/tests/allowed-ips]
 [/opt/util-tests/tests/set-linkprop]
+[/opt/util-tests/tests/show-overlay-exit]
 [/opt/util-tests/tests/vnic-mtu]
 [/opt/util-tests/tests/bunyan/bunyan]
 
