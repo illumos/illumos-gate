@@ -1227,6 +1227,8 @@ f lib/amd64/libnsl.so.1 0755 root bin
 s lib/amd64/libnsl.so=libnsl.so.1
 f lib/amd64/libnvpair.so.1 0755 root bin
 s lib/amd64/libnvpair.so=libnvpair.so.1
+f lib/amd64/libofmt.so.1 0755 root bin
+s lib/amd64/libofmt.so=libofmt.so.1
 f lib/amd64/libpam.so.1 0755 root bin
 s lib/amd64/libpam.so=libpam.so.1
 s lib/amd64/libposix4.so.1=librt.so.1
@@ -1426,6 +1428,8 @@ f lib/libnvpair.so.1 0755 root bin
 s lib/libnvpair.so=libnvpair.so.1
 f lib/libnwam.so.1 0755 root bin
 s lib/libnwam.so=libnwam.so.1
+f lib/libofmt.so.1 0755 root bin
+s lib/libofmt.so=libofmt.so.1
 f lib/libpam.so.1 0755 root bin
 s lib/libpam.so=libpam.so.1
 s lib/libposix4.so.1=librt.so.1
@@ -3144,7 +3148,6 @@ f usr/include/rpc/pmap_clnt.h 0644 root bin
 f usr/include/rpc/pmap_prot.h 0644 root bin
 f usr/include/rpc/pmap_prot.x 0644 root bin
 f usr/include/rpc/pmap_rmt.h 0644 root bin
-f usr/include/rpc/raw.h 0644 root bin
 f usr/include/rpc/rpc.h 0644 root bin
 f usr/include/rpc/rpc_com.h 0644 root bin
 f usr/include/rpc/rpc_msg.h 0644 root bin
@@ -16463,6 +16466,13 @@ s usr/share/man/man3nvpair/nvpair_value_uint64.3nvpair=nvpair_value_byte.3nvpair
 s usr/share/man/man3nvpair/nvpair_value_uint64_array.3nvpair=nvpair_value_byte.3nvpair
 s usr/share/man/man3nvpair/nvpair_value_uint8.3nvpair=nvpair_value_byte.3nvpair
 s usr/share/man/man3nvpair/nvpair_value_uint8_array.3nvpair=nvpair_value_byte.3nvpair
+d usr/share/man/man3ofmt 0755 root bin
+f usr/share/man/man3ofmt/ofmt.3ofmt 0444 root bin
+s usr/share/man/man3ofmt/ofmt_close.3ofmt=ofmt.3ofmt
+s usr/share/man/man3ofmt/ofmt_open.3ofmt=ofmt.3ofmt
+s usr/share/man/man3ofmt/ofmt_print.3ofmt=ofmt.3ofmt
+s usr/share/man/man3ofmt/ofmt_strerror.3ofmt=ofmt.3ofmt
+s usr/share/man/man3ofmt/ofmt_update_winsize.3ofmt=ofmt.3ofmt
 d usr/share/man/man3pam 0755 root bin
 f usr/share/man/man3pam/pam.3pam 0444 root bin
 f usr/share/man/man3pam/pam_acct_mgmt.3pam 0444 root bin

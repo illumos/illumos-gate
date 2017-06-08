@@ -23,7 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2013 Gary Mills
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 <include system-library.man3.inc>
@@ -53,6 +53,7 @@
 <include system-library.man3mp.inc>
 <include system-library.man3nsl.inc>
 <include system-library.man3nvpair.inc>
+<include system-library.man3ofmt.inc>
 <include system-library.man3pam.inc>
 <include system-library.man3proc.inc>
 <include system-library.man3project.inc>
@@ -154,6 +155,7 @@ dir path=usr/share/man/man3malloc
 dir path=usr/share/man/man3mp
 dir path=usr/share/man/man3nsl
 dir path=usr/share/man/man3nvpair
+dir path=usr/share/man/man3ofmt
 dir path=usr/share/man/man3pam
 dir path=usr/share/man/man3pool
 dir path=usr/share/man/man3proc
@@ -214,6 +216,7 @@ file path=lib/$(ARCH64)/libmd5.so.1
 file path=lib/$(ARCH64)/libmp.so.2
 file path=lib/$(ARCH64)/libnsl.so.1
 file path=lib/$(ARCH64)/libnvpair.so.1
+file path=lib/$(ARCH64)/libofmt.so.1
 file path=lib/$(ARCH64)/libpam.so.1
 file path=lib/$(ARCH64)/libproc.so.1
 file path=lib/$(ARCH64)/libpthread.so.1
@@ -296,6 +299,7 @@ file path=lib/libmp.so.2
 file path=lib/libnsl.so.1
 file path=lib/libnvpair.so.1
 file path=lib/libnwam.so.1
+file path=lib/libofmt.so.1
 file path=lib/libpam.so.1
 file path=lib/libproc.so.1
 file path=lib/libpthread.so.1
@@ -639,6 +643,7 @@ link path=lib/$(ARCH64)/libmd5.so target=libmd5.so.1
 link path=lib/$(ARCH64)/libmp.so target=libmp.so.2
 link path=lib/$(ARCH64)/libnsl.so target=libnsl.so.1
 link path=lib/$(ARCH64)/libnvpair.so target=libnvpair.so.1
+link path=lib/$(ARCH64)/libofmt.so target=libofmt.so.1
 link path=lib/$(ARCH64)/libpam.so target=libpam.so.1
 link path=lib/$(ARCH64)/libposix4.so target=libposix4.so.1
 link path=lib/$(ARCH64)/libposix4.so.1 target=librt.so.1
@@ -706,6 +711,7 @@ link path=lib/libmp.so target=libmp.so.2
 link path=lib/libnsl.so target=libnsl.so.1
 link path=lib/libnvpair.so target=libnvpair.so.1
 link path=lib/libnwam.so target=libnwam.so.1
+link path=lib/libofmt.so target=libofmt.so.1
 link path=lib/libpam.so target=libpam.so.1
 link path=lib/libposix4.so target=libposix4.so.1
 link path=lib/libposix4.so.1 target=librt.so.1
