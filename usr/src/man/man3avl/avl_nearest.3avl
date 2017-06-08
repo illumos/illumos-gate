@@ -48,7 +48,8 @@ If
 .Fa direction
 is set to
 .Dv AVL_AFTER ,
-then the node that would logically have followed it will be returned. If
+then the node that would logically have followed it will be returned.
+If
 .Fa direction
 is instead set to
 .Dv AVL_BEFORE ,

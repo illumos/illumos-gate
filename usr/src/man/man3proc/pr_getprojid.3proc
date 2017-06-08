@@ -42,9 +42,9 @@ on the currently running process.
 .Pp
 The
 .Fn pr_getprojid
-function only works on active processes. Process handles that correspond
-to core files, zombie processes, or ELF objects do not support system
-call injection.
+function only works on active processes.
+Process handles that correspond to core files, zombie processes, or ELF objects
+do not support system call injection.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn pr_getprojid

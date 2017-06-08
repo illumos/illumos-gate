@@ -49,24 +49,29 @@ The following list describes the properties:
 .Bl -tag -width Ds
 .It Sy timeout Ns = Ns Ar num
 Specifies a duration, in seconds, that a file system is to remain mounted when
-not in use. The default value is 600
+not in use.
+The default value is 600
 .Pq 10 minutes .
 Equivalent to the
 .Fl t
 option in
 .Nm automount .
 .It Sy automount_verbose Ns = Ns Sy true Ns | Ns Sy false
-Verbose mode. Causes you to be notified of non-critical events, such as
+Verbose mode.
+Causes you to be notified of non-critical events, such as
 .Nm
-mounts and unmounts. The default value is
+mounts and unmounts.
+The default value is
 .Sy false .
 Equivalent to the
 .Fl v
 option in
 .Nm automount .
 .It Sy automountd_verbose Ns = Ns Sy true Ns | Ns Sy false
-Verbose mode. Causes status messages to be logged to the
-svc:/system/filesystem/autofs:default log file. The default value is
+Verbose mode.
+Causes status messages to be logged to the svc:/system/filesystem/autofs:default
+log file.
+The default value is
 .Sy false .
 Equivalent to the
 .Fl v
@@ -75,7 +80,8 @@ option in
 .It Sy nobrowse Ns = Ns Sy true Ns | Ns Sy false
 Turn on or off browsing for all
 .Nm
-mount points. The default value is
+mount points.
+The default value is
 .Sy false .
 Equivalent to the
 .Fl n
@@ -83,15 +89,17 @@ option in
 .Nm automountd .
 .It Sy trace Ns = Ns Ar num
 Expands each RPC call and logs it to svc:/system/filesystem/autofs:default
-log file. The default value, 0, turns off such tracing. Starting with 1,
-with each higher value, the verbosity of trace output increases.
+log file.
+The default value, 0, turns off such tracing.
+Starting with 1, with each higher value, the verbosity of trace output
+increases.
 .It Xo
 .Sy environment Ns = Ns Ar name Ns = Ns Ar value Ns
 .Oo , Ns Ar name Ns = Ns Ar value Oc Ns ...
 .Xc
-Specifies a comma separated list of environment variables. If an environment
-variable has more than one value, those values should be separated with a comma,
-preceded by a backslash as an escape character
+Specifies a comma separated list of environment variables.
+If an environment variable has more than one value, those values should be
+separated with a comma, preceded by a backslash as an escape character
 .Pq Qq Sy \e, .
 For example:
 .Bd -literal -offset indent

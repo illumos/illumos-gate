@@ -29,17 +29,19 @@ The
 .Fn pthread_attr_get_np
 function provides a way to get the attributes of the thread
 .Fa thread
-after it has been created. This function is most commonly used to obtain
-the actual location and size of a thread's stack.
+after it has been created.
+This function is most commonly used to obtain the actual location and size of a
+thread's stack.
 .Pp
 The attributes pointer,
 .Fa attr ,
-will be filled in with the current attributes for the thread. The
-attributes should be allocated by a call to
+will be filled in with the current attributes for the thread.
+The attributes should be allocated by a call to
 .Xr pthread_attr_init 3C
 prior to calling the
 .Fn pthrad_attr_get_np
-function. When
+function.
+When
 .Fa attr
 is done being used, it should be destroyed through a call to
 .Xr pthread_attr_destroy 3C .
@@ -82,7 +84,8 @@ and it is the preferred interface for obtaining that information.
 The scheduling policy attribute of
 .Fa attr
 will be updated with the current scheduling policy being applied to the
-thread. This may have changed, for example, due to a call to
+thread.
+This may have changed, for example, due to a call to
 .Xr pthread_setschedparam 3C .
 As with the thread's scheduling parameter, the preferred interface for
 obtaining this information is by using

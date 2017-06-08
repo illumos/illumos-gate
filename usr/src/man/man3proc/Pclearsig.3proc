@@ -30,8 +30,8 @@
 .Fa "struct ps_lwphandle *L"
 .Fc
 .Sh DESCRIPTION
-During normal operation a process may receive a signal. Signals may
-indicate an error, for example referencing unmapped memory, an alarm
+During normal operation a process may receive a signal.
+Signals may indicate an error, for example referencing unmapped memory, an alarm
 firing, requests for information, and users requesting an interruption.
 For more information on the generation and usage of signals, see
 .Xr signal.h 3HEAD .
@@ -54,8 +54,9 @@ representive thread, it instead operates on the thread handle
 .Pp
 The
 .Fn Pclearsig
-function only has meaning for active processes. It will fail on process
-handles corresponding to core files, zombie processes and ELF objects.
+function only has meaning for active processes.
+It will fail on process handles corresponding to core files, zombie processes
+and ELF objects.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pclearsig

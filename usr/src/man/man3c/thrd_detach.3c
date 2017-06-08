@@ -28,17 +28,19 @@
 The
 .Fn thrd_detach
 function causes a thread to be considered detached from the rest of the
-execution environment. While detached threads are still fully
-observable, they cannot be joined with, calls to
+execution environment.
+While detached threads are still fully observable, they cannot be joined with,
+calls to
 .Fn thrd_join
-will fail. In addition, if all non-detached
-threads have terminated, the program will terminate; detached threads
-cannot keep a program running. The act of calling
+will fail.
+In addition, if all non-detached threads have terminated, the program will
+terminate; detached threads cannot keep a program running.
+The act of calling
 .Fn thrd_detach
 on a thread does not cause it to terminate.
 .Sh RETURN VALUES
 Upon successful completion, the
-.Xr thrd_detach
+.Xr thrd_detach 3C
 function returns
 .Sy thrd_success .
 Otherwise, it returns

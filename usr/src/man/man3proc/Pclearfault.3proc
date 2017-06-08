@@ -32,9 +32,9 @@
 .Sh DESCRIPTION
 During normal operation a process may encounter a
 .Sy fault ,
-due to a hardware exception, identifying a problem with the running
-process. Hardware faults include things like executing illegal
-instructions, encountering a breakpoint, and arithmetic exceptions.
+due to a hardware exception, identifying a problem with the running process.
+Hardware faults include things like executing illegal instructions, encountering
+a breakpoint, and arithmetic exceptions.
 Faults are discussed further in
 .Xr proc 4 .
 .Pp
@@ -58,8 +58,9 @@ The
 .Fn Pclearfault
 and
 .Fn Lclearfault
-functions only have meaning for active processes. They will fail on process
-handles corresponding to zombie processes, ELF objects, and cores.
+functions only have meaning for active processes.
+They will fail on process handles corresponding to zombie processes, ELF
+objects, and cores.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pclearfault

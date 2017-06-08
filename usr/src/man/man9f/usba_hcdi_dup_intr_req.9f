@@ -30,8 +30,8 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa dip
@@ -44,15 +44,16 @@ A pointer to the USB interrupt request which will be duplicated.
 The number of bytes in the allocated data block
 .Sy mblk_t .
 .It Fa flags
-Flags which describe how allocations should be performed. Valid flags
-are:
+Flags which describe how allocations should be performed.
+Valid flags are:
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -67,28 +68,34 @@ function is used to duplicate an existing interrupt request,
 .Pp
 The USBA framework initiates interrupt operations through the
 .Xr usba_hcdi_pipe_intr_xfer 9E
-entry point. It provides an initial USB interrupt request as an argument.
+entry point.
+It provides an initial USB interrupt request as an argument.
 When the HCD driver has interrupt data to return, it needs to duplicate
 that initial interrupt request each time that it submits data through
 the
 .Xr usba_hcdi_cb 9F
-function. In addition to duplicating the request, callers may also need
-to increase the pipe handle's request count. For more information, see
+function.
+In addition to duplicating the request, callers may also need to increase the
+pipe handle's request count.
+For more information, see
 .Xr usba_hcdi_pipe_intr_xfer 9E .
 .Pp
 The
 .Fa dip
 argument should correspond to the HCD driver's
 .Sy dev_info_t
-structure. The
+structure.
+The
 .Fa irqp
-pointer should correspond to the initial interrupt request. The
+pointer should correspond to the initial interrupt request.
+The
 .Fa size
-argument should describe the maximum amount of data needed for this
-request. The amount of data will be dependent on the endpoint and
-device. The value of
+argument should describe the maximum amount of data needed for this request.
+The amount of data will be dependent on the endpoint and device.
+The value of
 .Fa flags
-should depend on the caller's context. If
+should depend on the caller's context.
+If
 .Dv USB_FLAGS_SLEEP
 is passed while in interrupt context, then this function will fail.
 .Sh CONTEXT
@@ -106,7 +113,8 @@ must be
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn usba_hcdi_dup_intr_req
-function returns a pointer to a duplicated interrupt request. Otherwise,
+function returns a pointer to a duplicated interrupt request.
+Otherwise,
 .Sy NULL
 is returned to indicate that the request could not be duplicated.
 .Sh SEE ALSO

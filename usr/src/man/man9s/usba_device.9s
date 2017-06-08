@@ -24,30 +24,33 @@
 .Sy Volatile -
 illumos USB HCD private
 .Pp
-This is a private data structure that is not part of the stable DDI. It
-may be removed or changed at any time.
+This is a private data structure that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh DESCRIPTION
 The
 .Sy usba_device_t
 structure is used by the illumos USB Architecture (USBA) to represent a
-physical USB device. While a given USB device may be a composite device,
-a USB device that implements two or more classes, there will still only
-be a single device structure.  A USB device is always plugged into a
-port on some hub, excepting the root hub, and has an address on the USB
-fabric.
+physical USB device.
+While a given USB device may be a composite device, a USB device that implements
+two or more classes, there will still only be a single device structure.
+A USB device is always plugged into a port on some hub, excepting the root hub,
+and has an address on the USB fabric.
 .Pp
 Many of the USB HCD driver operations pass a
 .Sy usba_device_t
-to the HCD driver. The
+to the HCD driver.
+The
 .Sy usba_device_t
 should be used by an HCD driver in a
 .Em read-only
-fashion. A subset of the structure's fields that are useful for HCD
-drivers to read are listed below.
+fashion.
+A subset of the structure's fields that are useful for HCD drivers to read are
+listed below.
 .Pp
 In addition, there are two optional HCD entry points that interact with
 this structure and give the change for a driver to store per-device
-state. If the driver implements the
+state.
+If the driver implements the
 .Xr usba_hcdi_device_init 9E
 and
 .Xr usba_hcdi_device_fini 9E
@@ -77,9 +80,11 @@ The
 .Sy usb_dip
 member is a pointer to the device's
 .Sy dev_info_t
-structure. This generally is used if the HCD driver wants to get naming
-information for diagnostic purposes. When duplicating requests for
-isochronous and interrupt requests, HCD drivers should use the
+structure.
+This generally is used if the HCD driver wants to get naming information for
+diagnostic purposes.
+When duplicating requests for isochronous and interrupt requests, HCD drivers
+should use the
 .Sy dev_info_t
 from the
 .Xr usba_pipe_handle_data_t 9S .
@@ -88,7 +93,8 @@ The
 .Sy usb_hubdi
 member can be used to determine whether or not the
 .Sy usba_device_t
-in question is a hub or not. HCD drivers should compare this member to
+in question is a hub or not.
+HCD drivers should compare this member to
 .Dv NULL .
 If the member is not
 .Dv NULL ,
@@ -100,7 +106,8 @@ member indicates the address of the USB device on the broader USB bus.
 Note, that the actual address assigned to the device may be different,
 especially if the HCD driver implements the optional
 .Xr usba_hcdi_device_address 9E
-entry point. See the section
+entry point.
+See the section
 .Sy USB addressing
 in
 .Xr usba_hcdi 9E
@@ -108,13 +115,14 @@ for more information.
 .Pp
 The
 .Sy usb_dev_descr
-member points to the device descriptor for a given device. This
-structure is documented in
+member points to the device descriptor for a given device.
+This structure is documented in
 .Xr usb_dev_descr 9S .
 This member may be
 .Dv NULL
 as it may not have been populated during device
-attachment. This member may be
+attachment.
+This member may be
 .Dv NULL .
 HCD drivers should always check for
 .Dv NULL
@@ -123,7 +131,8 @@ before dereferencing it.
 The
 .Sy usb_mfg_str
 member may contain a pointer to a character string with the name of the
-manufacturer as retrieved from the device. This member may be
+manufacturer as retrieved from the device.
+This member may be
 .Dv NULL .
 HCD drivers should always check for
 .Dv NULL
@@ -132,7 +141,8 @@ before dereferencing it.
 The
 .Sy usb_product_str
 member may contain a pointer to a character string with the name of the
-product as retrieved from the device. This member may be
+product as retrieved from the device.
+This member may be
 .Dv NULL .
 HCD drivers should always check for
 .Dv NULL
@@ -141,43 +151,47 @@ before dereferencing it.
 The
 .Sy usb_serialno_str
 member may contain a pointer to a character string with the serial
-number of the device as retrieved from the device. This member may be
+number of the device as retrieved from the device.
+This member may be
 .Dv NULL .
 HCD drivers should always check for
 .Dv NULL
 before dereferencing it.
 .Pp
 The
-.Sy usb_port_status_t
+.Sy usb_port_status
 contains a
-.Xr usb_port_status_t
-entry, which describes the current negotiated speed of the device. See
+.Xr usb_port_status_t 9T
+entry, which describes the current negotiated speed of the device.
+See
 .Xr usb_port_status_t 9T
 for more information on the values and types.
 .Pp
 The
 .Sy usb_port
-member contains the port on a hub that the device is plugged into. Ports
-are always numbered starting at 1.
+member contains the port on a hub that the device is plugged into.
+Ports are always numbered starting at 1.
 .Pp
 The
 .Sy usb_hs_hub_usba_dev
-member is set when there is a parent high-speed hub. This is most
-notable for low- and full- speed devices which require split
-transaction support. This points to the
+member is set when there is a parent high-speed hub.
+This is most notable for low- and full- speed devices which require split
+transaction support.
+This points to the
 .Sy usb_device_t
-structure that is the closest high-speed parent hub. This member should
+structure that is the closest high-speed parent hub.
+This member should
 always be set to
 .Dv NULL
-for super-speed devices. A device operating a super-speed can never be
-plugged into a high-speed hub.
+for super-speed devices.
+A device operating a super-speed can never be plugged into a high-speed hub.
 .Pp
 The
 .Sy usb_parent_hub
 member points to the
 .Sy usba_device_t
-structure that the device in question is plugged into. If the device
-represents the root hub, then this field will be
+structure that the device in question is plugged into.
+If the device represents the root hub, then this field will be
 .Dv NULL .
 .Sh SEE ALSO
 .Xr usba_hcdi 9E ,

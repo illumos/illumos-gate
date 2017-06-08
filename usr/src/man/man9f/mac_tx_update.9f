@@ -37,10 +37,11 @@ The
 function is used by device drivers to indicate that the device
 represented by the handle
 .Fa mh
-can transmit data again. It should only be called after the device
-driver has returned data from its
+can transmit data again.
+It should only be called after the device driver has returned data from its
 .Xr mc_tx 9E
-endpoint. For more information on when this should be called, see both
+endpoint.
+For more information on when this should be called, see both
 .Xr mc_tx 9E
 and the
 .Sx Transmitting Data and Back Pressure
@@ -48,7 +49,8 @@ section of
 .Xr mac 9E .
 .Pp
 Device drivers should not hold any of their own locks when calling into
-this function. See the
+this function.
+See the
 .Sx MAC Callbacks
 section of
 .Xr mac 9E

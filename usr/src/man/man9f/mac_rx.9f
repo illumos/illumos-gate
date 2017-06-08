@@ -46,12 +46,13 @@ member.
 The
 .Fn mac_rx
 function is used by device drivers to deliver frames that a device
-driver has received to the rest of the operating system. This will
-generally be called at the end of a device driver's interrupt handler
+driver has received to the rest of the operating system.
+This will generally be called at the end of a device driver's interrupt handler
 after it is has converted all of the incoming data into a chain of
 .Xr mblk 9S
-structures. For a full description of the process that the device driver
-should take as part of receiving data, see the
+structures.
+For a full description of the process that the device driver should take as part
+of receiving data, see the
 .Sx Receiving Data
 section of
 .Xr mac 9E .
@@ -63,9 +64,9 @@ function.
 .Pp
 Device drivers should not call the
 .Fn mac_rx
-function after each individual mblk_t is assembled. Rather, the device
-driver should batch up as many frames as it is willing to process in a
-given interrupt or otherwise.
+function after each individual mblk_t is assembled.
+Rather, the device driver should batch up as many frames as it is willing to
+process in a given interrupt or otherwise.
 .Sh CONTEXT
 The
 .Fn mac_rx

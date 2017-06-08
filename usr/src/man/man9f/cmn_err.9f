@@ -296,7 +296,8 @@ The
 function can be called from user, kernel, interrupt, or high-level interrupt
 context.
 .Sh RETURN VALUES
-None. However, if an unknown
+None.
+However, if an unknown
 .Fa level
 is passed to
 .Fn cmn_err ,

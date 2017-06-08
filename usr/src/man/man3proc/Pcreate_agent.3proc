@@ -30,7 +30,8 @@ The
 function creates the agent LWP in the process represented by the handle
 .Fa P .
 The agent LWP is used as a means to force system calls to be invoked on
-the controlled process. For more information on the agent LWP, see
+the controlled process.
+For more information on the agent LWP, see
 .Xr proc 4 .
 .Pp
 The agent LWP cannot be created for process handles corresponding to
@@ -39,8 +40,9 @@ objects.
 .Pp
 The
 .Fn Pcreate_agent
-function is reentrant. It may be entered recursively. The act of
-creating the agent LWP will cause the process to be stopped.
+function is reentrant.
+It may be entered recursively.
+The act of creating the agent LWP will cause the process to be stopped.
 For every call to the
 .Fn Pcreate_agent
 function, a corresponding call to
@@ -51,7 +53,8 @@ Upon successful completion, the
 .Fn Pcreate_agent
 function returns
 .Sy 0
-and creates the agent LWP. Otherwise,
+and creates the agent LWP.
+Otherwise,
 .Sy -1
 is returned,
 .Sy errno
@@ -67,8 +70,8 @@ The process referred to by
 is a core file, zombie, ELF object, or has not begun execution.
 .El
 .Pp
-Note, it is possible for other error numbers to be returned. If they
-are, they represent unanticipated failure.
+Note, it is possible for other error numbers to be returned.
+If they are, they represent unanticipated failure.
 .Sh INTERFACE STABILITY
 .Sy Uncommitted
 .Sh MT-LEVEL

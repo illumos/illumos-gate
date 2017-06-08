@@ -32,9 +32,11 @@ Starting with the
 .Em USB 3.0
 specification,
 .Em USB 3.0
-endpoints have an endpoint SuperSpeed companion descriptor. See
+endpoints have an endpoint SuperSpeed companion descriptor.
+See
 .Xr usb_ep_ss_comp_descr 9S
-for a description of the descriptor. In the
+for a description of the descriptor.
+In the
 .Em USB 3.1
 specification, certain endpoints will have additional companion
 descriptors.
@@ -54,7 +56,8 @@ After looking up endpoint data, through the
 .Xr usb_lookup_ep_data 9F ,
 device drivers should call the
 .Xr usb_ep_xdescr_fill 9F
-function. After that, the
+function.
+After that, the
 .Sy usb_ep_xdescr_t
 structure will be filled in.
 .Sh STRUCTURE MEMBERS
@@ -70,32 +73,34 @@ usb_ep_ss_comp_descr_t	uex_ep_ss;
 .Pp
 The
 .Sy uex_version
-member is used to describe the current version of this structure. This
-member will be set to the value passed in by the device driver to
+member is used to describe the current version of this structure.
+This member will be set to the value passed in by the device driver to
 .Xr usb_ep_xdescr_fil 9F .
 Device drivers should ignore this field and should not modify the value
 placed there or modify it.
 .Pp
 The
 .Sy uex_flags
-member is an enumeration that defines a number of flags. Each flag
-indicates whether or not a given member is present or valid. Before
-accessing any member other than
+member is an enumeration that defines a number of flags.
+Each flag indicates whether or not a given member is present or valid.
+Before accessing any member other than
 .Sy uex_ep ,
 the device driver should check the flag here, otherwise its contents may
-be undefined. Currently the following flags are defined:
+be undefined.
+Currently the following flags are defined:
 .Bl -tag -width Sy -offset indent
 .It Sy USB_EP_XFLAGS_SS_COMP
 Indicates that a SuperSpeed endpoint companion descriptor is present and
-has been filled in. The member
+has been filled in.
+The member
 .Sy uex_ep_ss
 is valid.
 .El
 .Pp
 The
 .Sy uex_ep
-member contains a traditional USB endpoint descriptor. Its contents are
-defined in
+member contains a traditional USB endpoint descriptor.
+Its contents are defined in
 .Xr usb_ep_descr 9S .
 There is no flag for this member in
 .Sy uex_flags ,

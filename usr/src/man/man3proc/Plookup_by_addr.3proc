@@ -78,8 +78,8 @@ functions look up symbol information in the process handle
 .Fa P
 and fill in the ELF symbol information in
 .Fa symp
-with the found symbol. Symbols may be looked up both by address and
-name.
+with the found symbol.
+Symbols may be looked up both by address and name.
 .Pp
 The
 .Fn Plookup_by_addr
@@ -97,7 +97,8 @@ function is identical to the
 .Fn Plookup_by_addr
 function, except that it also fills in the structure
 .Fa sip
-with additional information. The definition of the
+with additional information.
+The definition of the
 .Sy prsyminfo_t
 is found in
 .Xr libproc 3PROC .
@@ -112,16 +113,19 @@ to an absolute path on the file system.
 .Pp
 The
 .Fn Plookup_by_name
-function attempts to look up a symbol based on its name. The
+function attempts to look up a symbol based on its name.
+The
 .Fa object
 argument allows the caller to specify a specific object that was mapped
 in by the run-time link-editor to search for
 .Fa symbol
-in. The system provides three special values which may be passed in for
+in.
+The system provides three special values which may be passed in for
 .Fa object .
 The value
 .Dv PR_OBJ_EXEC
-refers to the executable's object (a.out). The value
+refers to the executable's object (a.out).
+The value
 .Dv PR_OBJ_LDSO
 refers to the object
 .Sy ld.so.1 .
@@ -147,16 +151,18 @@ and symbol named
 .Fa symbol
 to the specified link-map.
 .Pp
-There are three special link-map identifiers
-that may be passed in. The symbol
+There are three special link-map identifiers that may be passed in.
+The symbol
 .Dv PR_LMID_EVERY
-indicates that every link-map should be searched. The symbol
+indicates that every link-map should be searched.
+The symbol
 .Dv LM_ID_BASE
 indicates that the base link-map, the one that is used for the
-executable should be searched. Finally, the symbol
+executable should be searched.
+Finally, the symbol
 .Dv LM_ID_LDSO
-refers to the link-map that is used by the run-time link editor,
-ld.so.1. The
+refers to the link-map that is used by the run-time link editor, ld.so.1.
+The
 .Fn Plookup_by_name
 function behaves like
 .Fn Pxlookup_by_name
@@ -175,7 +181,8 @@ and
 .Fn Pxlookup_by_name
 functions return
 .Sy 0
-and fill in the symbol information. Otherwise,
+and fill in the symbol information.
+Otherwise,
 .Sy -1
 is returned to indicate that the symbol could not be found.
 .Sh INTERFACE STABILITY

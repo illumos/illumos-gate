@@ -38,7 +38,8 @@ starting at the address
 .Fa address .
 It writes at most
 .Fa nbyte
-of data. The
+of data.
+The
 .Fn Pwrite
 function is logically analogous to the
 .Xr pwrite 2
@@ -47,9 +48,10 @@ function.
 For live processes, this function is equivalent to writing to the
 /proc file system
 .Sy as
-file for the process. For core files, it writes to the logical address
-space of what was once the process and not the corresponding offset in
-the on-disk file. ELF objects grabbed through
+file for the process.
+For core files, it writes to the logical address space of what was once the
+process and not the corresponding offset in the on-disk file.
+ELF objects grabbed through
 .Xr Pgrab_file 3PROC
 do not support being written to.
 .Pp
@@ -70,7 +72,8 @@ Otherwise, it returns
 .Sy -1
 and
 .Sy errno
-is set to indicate an error. For the full list of errors see the
+is set to indicate an error.
+For the full list of errors see the
 .Sy DIAGNOSTICS
 section in
 .Xr proc 4

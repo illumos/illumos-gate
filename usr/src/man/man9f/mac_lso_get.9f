@@ -47,19 +47,20 @@ function is used by device drivers that have indicated that they support
 the
 .Sy MAC_CAPAB_LSO
 capability to determine whether large send offload (also known as large
-segmentation offload or LSO) is required for this frame or not. If so,
-the driver should take the appropriate actions to program the hardware
+segmentation offload or LSO) is required for this frame or not.
+If so, the driver should take the appropriate actions to program the hardware
 to perform LSO.
 .Pp
 The
 .Fn mac_lso_get
 function should only be called on the first
 .Sy mblk_t
-that begins a given individual frame in a chain. In other words, it only
-works on entries where it is the first of many possible entries linked
-together by the
+that begins a given individual frame in a chain.
+In other words, it only works on entries where it is the first of many possible
+entries linked together by the
 .Sy b_cont
-member. The first
+member.
+The first
 .Sy mblk_t
 received from any
 .Xr mac 9E
@@ -75,8 +76,8 @@ may be a bitwise inclusive OR of the following:
 .Bl -tag -width Sy
 .It Sy HW_LSO
 This flag indicates that hardware needs to perform segmentation
-offload. The maximum segment size that the driver should use is
-available through the
+offload.
+The maximum segment size that the driver should use is available through the
 .Fa mss
 argument.
 .El

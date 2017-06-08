@@ -26,10 +26,12 @@
 .Sh DESCRIPTION
 The
 .Fn clearenv
-function clears the contents of the environment. All environment variables in
-the calling process are removed as though the function
+function clears the contents of the environment.
+All environment variables in the calling process are removed as though the
+function
 .Xr unsetenv 3C
-had been called on every environment variable. Until subsequent calls to
+had been called on every environment variable.
+Until subsequent calls to
 .Xr putenv 3C
 or
 .Xr setenv 3C
@@ -44,10 +46,11 @@ returns
 .Sy 0 .
 Otherwise, it returns a non-zero value and sets
 .Sy errno
-to indicate the error. At this time, no errors are defined for
+to indicate the error.
+At this time, no errors are defined for
 .Fn clearenv ,
-it will always succeed. Portable applications should always check the return
-value of
+it will always succeed.
+Portable applications should always check the return value of
 .Fn clearenv .
 .Sh ERRORS
 No errors are defined.

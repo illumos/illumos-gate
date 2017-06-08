@@ -48,13 +48,15 @@ Pointer to
 provides hints on pipe usage.
 .It Fa flags
 .Sy USB_FLAGS_SLEEP
-is only flag that is recognized. Wait for memory resources if
-not immediately available.
+is only flag that is recognized.
+Wait for memory resources if not immediately available.
 .It Fa pipe_handle
-Address to where new pipe handle is returned. (The handle is opaque.)
+Address to where new pipe handle is returned.
+(The handle is opaque.)
 .El
 .Sh DESCRIPTION
-A pipe is a logical connection to an endpoint on a USB device. The
+A pipe is a logical connection to an endpoint on a USB device.
+The
 .Fn usb_pipe_xopen
 function creates such a logical connection and returns an
 initialized handle which refers to that connection.
@@ -62,26 +64,34 @@ initialized handle which refers to that connection.
 The
 .Em USB 3.0
 specification defines four endpoint types, each with a
-corresponding type of pipe. Each of the four types of pipes uses its physical
-connection resource differently. They are:
+corresponding type of pipe.
+Each of the four types of pipes uses its physical connection resource
+differently.
+They are:
 .Bl -tag -width Sy
 .It Sy Control Pipe
 Used for bursty, non-periodic, reliable, host-initiated request/response
-communication, such as for command/status operations. These are guaranteed to
-get approximately 10% of frame time and will get more if needed and if
-available, but there is no guarantee on transfer promptness. Bidirectional.
+communication, such as for command/status operations.
+These are guaranteed to get approximately 10% of frame time and will get more if
+needed and if available, but there is no guarantee on transfer promptness.
+Bidirectional.
 .It Sy Bulk Pipe
-Used for large, reliable, non-time-critical data transfers. These get the bus
-on a bandwidth-available basis. Unidirectional. Sample uses include printer
-data.
+Used for large, reliable, non-time-critical data transfers.
+These get the bus on a bandwidth-available basis.
+Unidirectional.
+Sample uses include printer data.
 .It Sy Interrupt Pipe
 Used for sending or receiving small amounts of reliable data infrequently but
-with bounded service periods, as for interrupt handling. Unidirectional.
+with bounded service periods, as for interrupt handling.
+Unidirectional.
 .It Sy Isochronous Pipe
-Used for large, unreliable, time-critical data transfers. Boasts a guaranteed
-constant data rate as long as there is data, but there are no retries of failed
-transfers. Interrupt and isochronous data are together guaranteed 90% of frame
-time as needed. Unidirectional. Sample uses include audio.
+Used for large, unreliable, time-critical data transfers.
+Boasts a guaranteed constant data rate as long as there is data, but there are
+no retries of failed transfers.
+Interrupt and isochronous data are together guaranteed 90% of frame time as
+needed.
+Unidirectional.
+Sample uses include audio.
 .El
 .Pp
 The type of endpoint to which a pipe connects (and therefore the pipe type) is
@@ -97,26 +107,28 @@ Prior to the
 .Em USB 3.0
 specification, only the
 .Xr usb_ep_descr 9S
-was required to identify all of the attributes of a given pipe. Starting
-with
+was required to identify all of the attributes of a given pipe.
+Starting with
 .Em USB 3.0
 there are additional endpoint companion descriptors required to open a
-pipe. To support SuperSpeed devices, the new
+pipe.
+To support SuperSpeed devices, the new
 .Fn usb_pipe_xopen
 function must be used rather than the older
 .Fn usb_pipe_open
-function. The
+function.
+The
 .Xr usb_ep_xdescr 9S
 structure can be automatically filled out and obtained by calling the
 .Xr usb_ep_xdescr_fill 9F
 function.
 .Pp
-Opens to interrupt and isochronous pipes can fail
-if the required bandwidth cannot be guaranteed.
+Opens to interrupt and isochronous pipes can fail if the required bandwidth
+cannot be guaranteed.
 .Pp
 The polling interval for periodic (interrupt or isochronous) pipes, carried by
-the endpoint argument's bInterval field, must be within range. Valid ranges
-are:
+the endpoint argument's bInterval field, must be within range.
+Valid ranges are:
 .Pp
 Full speed: range of 1-255 maps to 1-255 ms.
 .Pp
@@ -127,11 +139,11 @@ High speed: range of 1-16 maps to (2**(bInterval-1)) * 125us.
 Super speed: range of 1-16 maps to (2**(bInterval-1)) * 125us.
 .Pp
 Adequate bandwidth during transfers is guaranteed for all periodic pipes which
-are opened successfully. Interrupt and isochronous pipes have guaranteed
-latency times, so bandwidth for them is allocated when they are opened.
+are opened successfully.
+Interrupt and isochronous pipes have guaranteed latency times, so bandwidth for
+them is allocated when they are opened.
 .Po
-Please
-refer to Sections
+Please refer to Sections
 .Em 4.4.7
 and
 .Em 4.4.8
@@ -141,21 +153,21 @@ specification
 which address isochronous and interrupt transfers.
 .Pc
 Opens of interrupt and isochronous pipes fail if inadequate bandwidth is
-available to support their guaranteed latency time. Because periodic
-pipe bandwidth is allocated on pipe open, open periodic pipes only when
-needed.
+available to support their guaranteed latency time.
+Because periodic pipe bandwidth is allocated on pipe open, open periodic pipes
+only when needed.
 .Pp
 The bandwidth required by a device varies based on polling interval, the
 maximum packet size
 .Pq Sy wMaxPacketSize
-and the device speed. Unallocated
-bandwidth remaining for new devices depends on the bandwidth already allocated
-for previously opened periodic pipes.
+and the device speed.
+Unallocated bandwidth remaining for new devices depends on the bandwidth already
+allocated for previously opened periodic pipes.
 .Pp
 The
 .Em pipe_policy
-parameter provides a hint as to pipe usage and must be
-specified. It is a
+parameter provides a hint as to pipe usage and must be specified.
+It is a
 .Em usb_pipe_policy_t
 which contains the following fields:
 .Bd -literal -offset indent
@@ -166,10 +178,10 @@ The
 .Sy pp_max_async_reqs
 member is a hint indicating how many asynchronous operations requiring
 their own kernel thread will be concurrently in progress, the highest
-number of threads ever needed at one time.  Allow at least one for
-synchronous callback handling and as many as are needed to accommodate
-the anticipated parallelism of asynchronous* calls to the following
-functions:
+number of threads ever needed at one time.
+Allow at least one for synchronous callback handling and as many as are needed
+to accommodate the anticipated parallelism of asynchronous* calls to the
+following functions:
 .Xr usb_pipe_close 9F ,
 .Xr usb_set_cfg 9F ,
 .Xr usb_set_alt_if 9F ,
@@ -180,30 +192,31 @@ functions:
 and
 .Xr usb_pipe_stop_isoc_polling 9F .
 .Pp
-Setting to too small a value can deadlock the pipe.  Asynchronous calls
-are calls made without the
+Setting to too small a value can deadlock the pipe.
+Asynchronous calls are calls made without the
 .Sy USB_FLAGS_SLEEP
-flag being passed.  Note that
-a large number of callbacks becomes an issue mainly when blocking
+flag being passed.
+Note that a large number of callbacks becomes an issue mainly when blocking
 functions are called from callback handlers.
 .Pp
 The control pipe to the default endpoints (endpoints for both directions with
 addr 0, sometimes called the default control pipe or default pipe) comes
-pre-opened by the hub. A client driver receives the default control pipe handle
-through
+pre-opened by the hub.
+A client driver receives the default control pipe handle through
 .Xr usb_get_dev_data 9F .
 A client driver cannot open the default
-control pipe manually. Note that the same control pipe may be shared among
-several drivers when a device has multiple interfaces and each interface is
-operated by its own driver.
+control pipe manually.
+Note that the same control pipe may be shared among several drivers when a
+device has multiple interfaces and each interface is operated by its own driver.
 .Pp
 All explicit pipe opens are exclusive; attempts to open an opened pipe fail.
 .Pp
 On success, the pipe_handle argument points to an opaque handle of the opened
-pipe. On failure, it is set to NULL.
+pipe.
+On failure, it is set to NULL.
 .Sh CONTEXT
-May be called from user or kernel context regardless of arguments. May also be
-called from interrupt context if the
+May be called from user or kernel context regardless of arguments.
+May also be called from interrupt context if the
 .Sy USB_FLAGS_SLEEP
 option is not set.
 .Sh RETURN VALUES
@@ -213,22 +226,25 @@ Open succeeded.
 .It Sy USB_NO_RESOURCES
 Insufficient resources were available.
 .It Sy USB_NO_BANDWIDTH
-Insufficient bandwidth available. (isochronous and interrupt pipes).
+Insufficient bandwidth available.
+(isochronous and interrupt pipes).
 .It Sy USB_INVALID_CONTEXT
 Called from interrupt handler with USB_FLAGS_SLEEP set.
 .It Sy USB_INVALID_ARGS
-dip and/or pipe_handle is NULL. Pipe_policy is NULL.
+dip and/or pipe_handle is NULL.
+Pipe_policy is NULL.
 .It Sy USB_INVALID_PERM
-Endpoint is NULL, signifying the default control pipe. A client driver cannot
-open the default control pipe.
+Endpoint is NULL, signifying the default control pipe.
+A client driver cannot open the default control pipe.
 .It Sy USB_NOT_SUPPORTED
 Isochronous or interrupt endpoint with maximum packet size of zero is not
 supported.
 .It Sy USB_HC_HARDWARE_ERROR
 Host controller is in an error state.
 .It Sy USB_FAILURE
-Pipe is already open. Host controller not in an operational state. Polling
-interval
+Pipe is already open.
+Host controller not in an operational state.
+Polling interval
 .Pq Sy Bep_descr bInterval No field
 is out of range (intr or isoc pipes).
 .Pp

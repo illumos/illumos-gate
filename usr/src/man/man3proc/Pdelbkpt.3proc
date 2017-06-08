@@ -40,8 +40,8 @@ If the instruction at
 .Fa address
 is no longer the architecture-specific breakpoint instruction, then
 .Fa saved
-is not restored, but the function still returns successfully. This
-behavior is done due to the presence of setting breakpoints in
+is not restored, but the function still returns successfully.
+This behavior is done due to the presence of setting breakpoints in
 self-modifying code, e.g. procedure linkage tables.
 .Pp
 The

@@ -69,7 +69,8 @@ The entry points listed here are the traditional character device
 .Xr ioctl 9E ,
 and
 .Xr close 9E
-entry points. As discussed in
+entry points.
+As discussed in
 .Xr usba_hcdi 9E
 all HCD drivers are required to implement these functions and vector
 them to
@@ -77,8 +78,9 @@ them to
 .Xr usba_hubdi_ioctl 9F ,
 and
 .Xr usba_hubdi_close 9F
-respectively. For background information on these functions and how they
-interact in the broader operating system, please see the general manual pages
+respectively.
+For background information on these functions and how they interact in the
+broader operating system, please see the general manual pages
 .Xr open 9E ,
 .Xr ioctl 9E ,
 and
@@ -91,8 +93,8 @@ section provides a sketch for how most HCD drivers should perform those
 transformations.
 .Pp
 One important distinction from the traditional character routines is
-that the USBA controls a bit more of the minor space. Therefore, the
-driver needs to take extra care around the values encoded in the
+that the USBA controls a bit more of the minor space.
+Therefore, the driver needs to take extra care around the values encoded in the
 .Sy dev_t
 and it should not perform any cloning or renumbering in its
 .Xr open 9E
@@ -100,13 +102,14 @@ entry point.
 .Sh EXAMPLES
 The following example is adapated from the
 .Xr xhci 7D
-driver which shows how an HCD driver might arrange things. This assumes
-that a driver is following the recommendations in
+driver which shows how an HCD driver might arrange things.
+This assumes that a driver is following the recommendations in
 .Xr usba_hcdi 9E
 and has initialized a soft state structure through the
 .Xr ddi_soft_state_init 9F
-function. This design also requires that the soft state structure
-contains a pointer to the
+function.
+This design also requires that the soft state structure contains a pointer to
+the
 .Sy dev_info_t
 structure during its
 .Xr attach 9E callback.

@@ -75,7 +75,8 @@ beginning or end of the tree, then
 is returned.
 .Pp
 These constructs are generally used as part of loops to iterate the
-tree. See the examples section in
+tree.
+See the examples section in
 .Xr libavl 3LIB
 for more information on using this
 interface.

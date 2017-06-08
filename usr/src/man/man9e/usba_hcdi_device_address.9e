@@ -27,12 +27,13 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ud
-Pointer to a USB device structure being updated. See
+Pointer to a USB device structure being updated.
+See
 .Xr usba_device 9S
 for more information.
 .El
@@ -41,10 +42,12 @@ The
 .Fn usba_hcdi_device_address
 entry point is an optional entry point for USB host controller drivers.
 Some USB host controllers do not allow the USB SET_ADDRESS command to be
-issued to a device. Instead, they will be responsible for setting the
-address in a controller-specific way. If the host controller driver
-requires this behavior, then it must implement this function. Otherwise,
-if the host controller does not require this functionality, it should
+issued to a device.
+Instead, they will be responsible for setting the address in a
+controller-specific way.
+If the host controller driver requires this behavior, then it must implement
+this function.
+Otherwise, if the host controller does not require this functionality, it should
 set the entry point in the
 .Xr usba_hcdi_ops 9S
 structure to
@@ -52,15 +55,15 @@ structure to
 .Pp
 The USBA will always set an address for the USBA device
 .Fa ud
-regardless of whether or not this function is implemented. If the HCD
-implements this entry point and it needs the addressing information for
-whatever reason, then it is the responsibility of the driver to keep
+regardless of whether or not this function is implemented.
+If the HCD implements this entry point and it needs the addressing information
+for whatever reason, then it is the responsibility of the driver to keep
 track of it separately.
 .Pp
 This entry point will be called after the
 .Xr usba_hcdi_device_init 9E
-entry point has been called. Any private data stored on the device will
-be available through the
+entry point has been called.
+Any private data stored on the device will be available through the
 .Xr usba_hcdi_get_device_private 9F
 function.
 .Pp
@@ -74,7 +77,8 @@ Upon successful completion, the
 .Fn usba_hcdi_device_address
 function should return
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi_device_init 9E ,

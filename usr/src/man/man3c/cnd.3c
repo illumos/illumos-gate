@@ -15,7 +15,7 @@
 .Dt CND 3C
 .Os
 .Sh NAME
-.Nm cnd
+.Nm cnd ,
 .Nm cnd_broadcast ,
 .Nm cnd_destroy ,
 .Nm cnd_init ,
@@ -57,9 +57,10 @@ The
 .Sy cnd
 family of functions implement condition variables which allow threads
 within a process to wait until a condition occurs and be signaled when
-it does. These functions behave similar to both the POSIX threads and
-illumos threads; however, they have slightly different call signatures
-and return values. For more information, see
+it does.
+These functions behave similar to both the POSIX threads and illumos threads;
+however, they have slightly different call signatures and return values.
+For more information, see
 .Xr threads 5 .
 Importantly, they do not allow for inter-process synchronization.
 .Ss Creating and Destroy Condition Variables
@@ -67,8 +68,9 @@ The function
 .Fn cnd_init
 initializes the condition variable referred to by
 .Fa cnd .
-The condition variable is suitable for intra-process use. Initializing
-an already initialized condition variable results in undefined behavior.
+The condition variable is suitable for intra-process use.
+Initializing an already initialized condition variable results in undefined
+behavior.
 .Pp
 The function
 .Fn cnd_destroy
@@ -77,9 +79,9 @@ to use it, though it may be initialized again.
 .Ss Condition Waiting
 The function
 .Fn cond_wait
-can be used to wait on a condition variable. A thread that waits on a
-condition variable blocks until another thread signals that the
-condition has changed, generally after making the condition that was
+can be used to wait on a condition variable.
+A thread that waits on a condition variable blocks until another thread signals
+that the condition has changed, generally after making the condition that was
 false, true.
 .Pp
 The function
@@ -90,10 +92,11 @@ and blocks on the condition variable
 .Fa cond .
 When the thread returns, it will once again be holding
 .Fa mtx
-and must check the current state of the condition. There is no
-guarantee that another thread has not gotten in and changed the value
-before being woken. In addition, a thread blocking on a condition
-variable, may be woken spuriously, such as when a signal is received or
+and must check the current state of the condition.
+There is no guarantee that another thread has not gotten in and changed the
+value before being woken.
+In addition, a thread blocking on a condition variable, may be woken spuriously,
+such as when a signal is received or
 .Fn fork
 is called .
 .Pp
@@ -104,8 +107,8 @@ allows a thread to block in a similar fashion to
 except that when the absolute time specified in seconds since the epoch
 (based on
 .Sy CLOCK_REALTIME )
-in UTC, expires, then the thread will be woken up. The timeout is
-specified in
+in UTC, expires, then the thread will be woken up.
+The timeout is specified in
 .Fa abstime .
 .Ss Conditional Signaling
 The
@@ -114,7 +117,8 @@ and
 .Fn cnd_broadcast
 functions can be used to signal threads waiting on the condition variable
 .Fa cnd
-that they should be woken up and check the variable again. The
+that they should be woken up and check the variable again.
+The
 .Fn cnd_signal
 function will only wake a single thread that is blocked on the
 condition variable

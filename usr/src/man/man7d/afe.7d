@@ -36,8 +36,9 @@ PCI controllers originally produced by ADMtek and Infineon.
 .Lp
 These devices generally support the standard Fast Ethernet features, including
 10BASE-T and 100BASE-TX, both full and half duplex operation, IEEE 802.3
-autonegotiation, etc.  They also support full size MTUs (1500 bytes),
-even when used with VLANs.  Most of them also support flow control.
+autonegotiation, etc.
+They also support full size MTUs (1500 bytes), even when used with VLANs.
+Most of them also support flow control.
 .
 .Lp
 The device driver supports the

@@ -84,31 +84,34 @@ An identifier, a signed 32-bit integer.
 .It Fa name
 An ASCII character string to call the identifier space.
 .It Fa low
-The lower end of an identifier space. This value is included in the
-range.
+The lower end of an identifier space.
+This value is included in the range.
 .It Fa high
-The upper end of an identifier space. This value is excluded from the
-range.
+The upper end of an identifier space.
+This value is excluded from the range.
 .El
 .Sh DESCRIPTION
 The
 .Sy id_space
-suite of functions is used to create and manage identifier spaces. An
-identifier space allows the system to manage a range of identifiers. It
-tracks what values have been used and which values have not been used
+suite of functions is used to create and manage identifier spaces.
+An identifier space allows the system to manage a range of identifiers.
+It tracks what values have been used and which values have not been used
 and has different ways of allocating values from the identifier space.
 .Pp
 Identifier spaces are often used by device drivers to manage ranges of
-numeric identifiers that may be disjoint. A common use case for
-identifier spaces is to manage the set of allocated minor numbers for a
-device driver.
+numeric identifiers that may be disjoint.
+A common use case for identifier spaces is to manage the set of allocated minor
+numbers for a device driver.
 .Ss Creating, Expanding and Destroying Identifier Spaces
 To create an identifier space, the
 .Fn id_space_create
-function should be used. A name for the id space must be passed in the
+function should be used.
+A name for the id space must be passed in the
 .Fa name
-argument. It should be unique. For device drivers, often combining the
-name of the driver and the instance from the
+argument.
+It should be unique.
+For device drivers, often combining the name of the driver and the instance from
+the
 .Xr ddi_get_instance 9F
 function results in a unique name.
 .Pp
@@ -116,9 +119,9 @@ The values of
 .Fa low
 and
 .Fa high
-describe the range of the identifier space. The range is inclusive on
-the low end and exclusive on the high end. Mathematically, this would be
-represented as
+describe the range of the identifier space.
+The range is inclusive on the low end and exclusive on the high end.
+Mathematically, this would be represented as
 .Pf [ Fa low ,
 .Fa high Ns ).
 .Pp
@@ -128,14 +131,17 @@ function has been successfully called, the returned identifier space can
 be used to allocate and manage identifiers.
 .Pp
 Once an identifier space has been created, additional ranges of
-identifiers can be added. This process allows for disjoint ranges of
-values to be added to a single identifier space. The
+identifiers can be added.
+This process allows for disjoint ranges of values to be added to a single
+identifier space.
+The
 .Fn id_space_extend
 function is used to do this, and it adds the range
 .Fa low
 to
 .Fa high
-to the identifier space. The range follows the same rules as with the
+to the identifier space.
+The range follows the same rules as with the
 .Fn id_space_create
 function.
 It is inclusive of
@@ -154,36 +160,39 @@ All three of these functions,
 .Fn id_space_extend ,
 and
 .Fn id_space_destroy
-may block. They should only be called from a context where it's safe for
-it to block. This is equivalent to performing a blocking memory allocation.
+may block.
+They should only be called from a context where it's safe for it to block.
+This is equivalent to performing a blocking memory allocation.
 .Ss Allocating Identifiers
 Once an id space has been created with the
 .Fn id_space_create
-function, identifiers can be allocated from the space. There are three
-different strategies for allocating an identifier:
+function, identifiers can be allocated from the space.
+There are three different strategies for allocating an identifier:
 .Bl -enum
 .It
 Allocating an identifier using the standard algorithm that attempts to
 use the next identifier first.
 .It
-Allocating an identifier using a first fit algorithm. These are
-functions with
+Allocating an identifier using a first fit algorithm.
+These are functions with
 .Em ff
-in the name. Using this will tend to keep the allocated id space more
-compressed.
+in the name.
+Using this will tend to keep the allocated id space more compressed.
 .It
 Allocating a specific id.
 .El
 .Pp
 In addition, identifiers can be allocated in both a blocking and
-non-blocking fashion. When functions with the
+non-blocking fashion.
+When functions with the
 .Sy _nosleep
-prefix are used, they are non-blocking. If no identifier is available,
-they will return an error.
+prefix are used, they are non-blocking.
+If no identifier is available, they will return an error.
 .Pp
 The
 .Fn id_alloc
-function will allocate the next identifier. The
+function will allocate the next identifier.
+The
 .Fn id_alloc_nosleep
 function uses the same algorithm as
 .Fn id_alloc ,
@@ -191,7 +200,8 @@ but will fail rather than block.
 .Pp
 The
 .Fn id_allocff
-function will allocate the first available identifier. The
+function will allocate the first available identifier.
+The
 .Fn id_allocff_nosleep
 function uses the same algorithm as
 .Fn id_allocff ,
@@ -201,12 +211,14 @@ The
 .Fn id_alloc_specific_nosleep
 function attempts to allocate the specific identifier
 .Fa id
-from the specified identifier space. If
+from the specified identifier space.
+If
 .Fa id
 has already been allocated, then the function will fail.
 .Ss Freeing Identifiers
 Every allocated identifier must eventually be freed and returned to the
-identifier space. To free an identifier, use the
+identifier space.
+To free an identifier, use the
 .Fn id_free
 function, specifying the identifier in
 .Fa id
@@ -220,7 +232,8 @@ All of these functions may be called in
 .Sy user
 or
 .Sy kernel
-context. The
+context.
+The
 .Fn id_alloc_nosleep ,
 .Fn id_allocff_nosleep ,
 and
@@ -231,7 +244,8 @@ context.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn id_space_create
-function returns a pointer to an identifier space. Otherwise,
+function returns a pointer to an identifier space.
+Otherwise,
 .Dv NULL
 is returned to indicate that the identifier space could not be created.
 .Pp
@@ -248,7 +262,8 @@ Upon successful completion, the
 and
 .Fn id_alloc_specific_nosleep
 functions will return an identifier that's in the range of the specified
-identifier space. Otherwise,
+identifier space.
+Otherwise,
 .Sy -1
 is returned to indicate that no identifier was available, or in the case
 of the

@@ -59,9 +59,10 @@ or
 .Xr mc_setprop 9E
 entry points then it does not need to implement the
 .Xr mc_propinfo 9E
-entry point. However, it is highly recommended that these interfaces be
-implemented in order to give users and administrators of the system
-access to the properties of the device.
+entry point.
+However, it is highly recommended that these interfaces be implemented in order
+to give users and administrators of the system access to the properties of the
+device.
 .Pp
 When the
 .Fn mc_propinfo
@@ -77,16 +78,16 @@ Most drivers will use a
 statement and for any property that it supports it should call the
 appropriate
 .Xr mac_prop_info 9F
-functions to set values and then return. When an unknown or unsupported
-property is encountered, generally the
+functions to set values and then return.
+When an unknown or unsupported property is encountered, generally the
 .Sy default
 case of the switch statement, the device driver should simply do nothing
 and return.
 .Pp
 The special property
 .Sy MAC_PROP_PRIVATE
-indicates that this is a device driver specific private property. The
-device driver must then look at the value of the
+indicates that this is a device driver specific private property.
+The device driver must then look at the value of the
 .Fa pr_name
 argument and use
 .Xr strcmp 9F
@@ -94,37 +95,41 @@ on it, comparing it to each of its private properties to identify which
 one it is.
 .Pp
 For each property the driver has three different sets of information
-that it can fill in. The driver should try to fill in all of these that
-make sense, if possible.
+that it can fill in.
+The driver should try to fill in all of these that make sense, if possible.
 .Bl -enum
 .It
 First, the driver should fill in the permissions of the property with
 the
 .Xr mac_prop_info_set_perm 9F
-function. These permissions indicate what the device driver supports for
-a given property. For each non-private property, see the property list
-in
+function.
+These permissions indicate what the device driver supports for a given property.
+For each non-private property, see the property list in
 .Xr mac 9E
-to see what the maximum property permissions are. As discussed in
+to see what the maximum property permissions are.
+As discussed in
 .Xr mac 9E ,
-a device driver may have more limited permissions than the default. For
-example, on some SFP-based devices, it may not be possible to change any
+a device driver may have more limited permissions than the default.
+For example, on some SFP-based devices, it may not be possible to change any
 of the auto-negotiation properties.
 .It
 The driver should then fill in any default value that it has for a
-property. This is the value that the device driver sets by default if no
-other tuning has been performed. There are different functions depending
-on the type of the default value to call. They are all listed in
+property.
+This is the value that the device driver sets by default if no other tuning has
+been performed.
+There are different functions depending on the type of the default value to
+call.
+They are all listed in
 .Xr mac_prop_info 9F .
 .It
-Finally, a driver may optionally set one or more value ranges. These are
-used for integer properties such as
+Finally, a driver may optionally set one or more value ranges.
+These are used for integer properties such as
 .Sy MAC_PROP_MTU .
 The driver may call
 .Xr mac_prop_info_set_range_uint32 9F
 to set a series of one or more inclusive ranges that describe valid
-values for the property. For example, a device that supports jumbo
-frames up to 9600 bytes would call
+values for the property.
+For example, a device that supports jumbo frames up to 9600 bytes would call
 .Xr mac_prop_info_set_range_uint32 9F
 to convey that it supports MTUs in the range of 1500-9600 bytes.
 .El
@@ -132,15 +137,15 @@ to convey that it supports MTUs in the range of 1500-9600 bytes.
 If the device driver needs to access its private data, it will be
 available in the
 .Fa driver
-argument which it should cast to the appropriate structure. From there,
-the device driver may need to lock the structure to ensure that access
-to it is properly serialized.
+argument which it should cast to the appropriate structure.
+From there, the device driver may need to lock the structure to ensure that
+access to it is properly serialized.
 .Sh RETURN VALUES
 The
 .Fn mc_propinfo
-entry point does not have a return value. Drivers should simply ignore
-and immediately return when encountering unsupported and unknown
-properties.
+entry point does not have a return value.
+Drivers should simply ignore and immediately return when encountering
+unsupported and unknown properties.
 .Sh EXAMPLES
 The following example shows how a device driver might structure its
 .Fn mc_propinfo

@@ -48,7 +48,8 @@ utility attaches a named
 .Ar resource
 to the file system hierarchy at the pathname location
 .Ar mount_point ,
-which must already exist. If
+which must already exist.
+If
 .Ar mount_point
 has any contents prior to the
 .Nm mount
@@ -73,7 +74,8 @@ and
 .Nm mount
 consults
 .Pa /etc/vfstab
-for more information. If the
+for more information.
+If the
 .Fl F
 option is omitted,
 .Nm mount
@@ -88,12 +90,12 @@ and the
 .Ar mount_point .
 .Pp
 .Ar host
-can be an IPv4 or IPv6 address string. As IPv6 addresses already contain colons,
-enclose
+can be an IPv4 or IPv6 address string.
+As IPv6 addresses already contain colons, enclose
 .Ar host
-in a pair of square brackets when specifying an IPv6 address string. Otherwise
-the first occurrence of a colon can be interpreted as the separator between the
-host name and path, for example,
+in a pair of square brackets when specifying an IPv6 address string.
+Otherwise the first occurrence of a colon can be interpreted as the separator
+between the host name and path, for example,
 .Li [1080::8:800:200C:417A]:tmp/file .
 See
 .Xr inet 7P
@@ -105,9 +107,10 @@ Where
 .Ar host
 is the name of the NFS server host, and
 .Ar pathname
-is the path name of the directory on the server being mounted. The path name is
-interpreted according to the server's path name parsing rules and is not
-necessarily slash-separated, though on most servers, this is the case.
+is the path name of the directory on the server being mounted.
+The path name is interpreted according to the server's path name parsing rules
+and is not necessarily slash-separated, though on most servers, this is the
+case.
 .It No nfs:// Ns Ar host Ns Oo : Ns Ar port Oc Ns / Ns Ar pathname
 This is an NFS URL and follows the standard convention for NFS URLs as described
 in
@@ -130,8 +133,8 @@ See the discussion of replicated file systems and failover under
 for a more detailed discussion.
 .It Ar hostlist pathname
 .Ar hostlist
-is a comma-separated list of hosts. See the discussion of replicated file
-systems and failover under
+is a comma-separated list of hosts.
+See the discussion of replicated file systems and failover under
 .Sx NFS FILE SYSTEMS
 for a more detailed discussion.
 .El
@@ -144,7 +147,8 @@ described in
 .Xr mnttab 4 .
 .Pp
 .Nm mount_nfs
-supports both NFSv3 and NFSv4 mounts. The default NFS version is NFSv4.
+supports both NFSv3 and NFSv4 mounts.
+The default NFS version is NFSv4.
 .Ss Options
 See
 .Xr mount 1M
@@ -170,15 +174,18 @@ The default value is 60.
 .It Sy acdirmin Ns = Ns Ar n
 Hold cached attributes for at least
 .Ar n
-seconds after directory update. The default value is 30.
+seconds after directory update.
+The default value is 30.
 .It Sy acregmax Ns = Ns Ar n
 Hold cached attributes for no more than
 .Ar n
-seconds after file modification. The default value is 60.
+seconds after file modification.
+The default value is 60.
 .It Sy acregmin Ns = Ns Ar n
 Hold cached attributes for at least
 .Ar n
-seconds after file modification. The default value is 3.
+seconds after file modification.
+The default value is 3.
 .It Sy actimeo Ns = Ns n
 Set
 .Sy min
@@ -186,7 +193,8 @@ and
 .Sy max
 times for regular files and directories to
 .Ar n
-seconds. See
+seconds.
+See
 .Sx File Attributes ,
 below, for a description of the effect of setting this option to 0.
 .Pp
@@ -200,22 +208,24 @@ are parsed on a
 .Nm mount
 command line.
 .It Sy bg Ns | Ns Sy fg
-If the first attempt fails, retry in the background, or, in the foreground. The
-default is
+If the first attempt fails, retry in the background, or, in the foreground.
+The default is
 .Sy fg .
 .It Sy forcedirectio Ns | Ns Sy noforcedirectio
 If
 .Sy forcedirectio
-is specified, then for the duration of the mount, forced direct I/O is used. If
-the filesystem is mounted using
+is specified, then for the duration of the mount, forced direct I/O is used.
+If the filesystem is mounted using
 .Sy forcedirectio ,
 data is transferred directly between client and server, with no buffering on the
-client. If the filesystem is mounted using
+client.
+If the filesystem is mounted using
 .Sy noforcedirectio ,
 data is buffered on the client.
 .Sy forcedirectio
 is a performance option that is of benefit only in large sequential data
-transfers. The default behavior is
+transfers.
+The default behavior is
 .Sy noforcedirectio .
 .It Sy grpid
 By default, the GID associated with a newly created file obeys the System V
@@ -245,32 +255,37 @@ Note that NFSv4 clients do not support soft mounts.
 Allow
 .Pq do not allow
 keyboard interrupts to kill a process that is hung while waiting for a response
-on a hard-mounted file system. The default is
+on a hard-mounted file system.
+The default is
 .Sy intr ,
 which makes it possible for clients to interrupt applications that can be
 waiting for a remote mount.
 .It Sy noac
-Suppress data and attribute caching. The data caching that is suppressed is the
-write-behind. The local page cache is still maintained, but data copied into it
-is immediately written to the server.
+Suppress data and attribute caching.
+The data caching that is suppressed is the write-behind.
+The local page cache is still maintained, but data copied into it is immediately
+written to the server.
 .It Sy nocto
-Do not perform the normal close-to-open consistency. When a file is closed, all
-modified data associated with the file is flushed to the server and not held on
-the client. When a file is opened the client sends a request to the server to
-validate the client's local caches. This behavior ensures a file's consistency
-across multiple NFS clients. When
+Do not perform the normal close-to-open consistency.
+When a file is closed, all modified data associated with the file is flushed to
+the server and not held on the client.
+When a file is opened the client sends a request to the server to validate the
+client's local caches.
+This behavior ensures a file's consistency across multiple NFS clients.
+When
 .Sy nocto
 is in effect, the client does not perform the flush on close and the request for
 validation, allowing the possibility of differences among copies of the same
 file as stored on multiple clients.
 .Pp
 This option can be used where it can be guaranteed that accesses to a specified
-file system are made from only one client and only that client. Under such a
-condition, the effect of
+file system are made from only one client and only that client.
+Under such a condition, the effect of
 .Sy nocto
 can be a slight performance gain.
 .It Sy port Ns = Ns Ar n
-The server IP port number. The default is
+The server IP port number.
+The default is
 .Dv NFS_PORT .
 If the
 .Sy port
@@ -278,20 +293,23 @@ option is specified, and if the resource includes one or more NFS URLs, and if
 any of the URLs include a port number, then the port number in the option and in
 the URL must be the same.
 .It Sy posix
-Request POSIX.1 semantics for the file system. Requires a mount Version 2
+Request POSIX.1 semantics for the file system.
+Requires a mount Version 2
 .Xr mountd 1M
-on the server. See
+on the server.
+See
 .Xr standards 5
 for information regarding POSIX.
 .It Sy proto Ns = Ns Ar netid Ns | Ns Sy rdma
 By default, the transport protocol that the NFS mount uses is the first
-available RDMA transport supported both by the client and the server. If no RDMA
-transport is found, then it attempts to use a TCP transport or, failing that, a
-UDP transport, as ordered in the
+available RDMA transport supported both by the client and the server.
+If no RDMA transport is found, then it attempts to use a TCP transport or,
+failing that, a UDP transport, as ordered in the
 .Pa /etc/netconfig
-file. If it does not find a connection oriented transport, it uses the first
-available connectionless transport. Use this option to override the default
-behavior.
+file.
+If it does not find a connection oriented transport, it uses the first available
+connectionless transport.
+Use this option to override the default behavior.
 .Pp
 .Sy proto
 is set to the value of
@@ -305,16 +323,17 @@ field entry in the
 .Pa /etc/netconfig
 file.
 .Pp
-The UDP protocol is not supported for NFS Version 4. If you specify a UDP
-protocol with the
+The UDP protocol is not supported for NFS Version 4.
+If you specify a UDP protocol with the
 .Sy proto
 option, NFS version 4 is not used.
 .It Sy public
 The
 .Sy public
 option forces the use of the public file handle when connecting to the NFS
-server. The resource specified might not have an NFS URL. See the discussion of
-URLs and the public option under
+server.
+The resource specified might not have an NFS URL.
+See the discussion of URLs and the public option under
 .Sx NFS FILE SYSTEMS
 for a more detailed discussion.
 .It Sy quota Ns | Ns Sy noquota
@@ -341,29 +360,33 @@ assumed that the transport performs retransmissions on behalf of NFS.
 .It Sy retry Ns = Ns Ar n
 The number of times to retry the
 .Nm mount
-operation. The default for the
+operation.
+The default for the
 .Nm mount
 command is 10000.
 .Pp
-The default for the automounter is 0, in other words, do not retry. You might
-find it useful to increase this value on heavily loaded servers, where
+The default for the automounter is 0, in other words, do not retry.
+You might find it useful to increase this value on heavily loaded servers, where
 automounter traffic is dropped, causing unnecessary
 .Qq server not responding
 errors.
 .It Sy rsize Ns = Ns Ar n
 Set the read buffer size to a maximum of
 .Ar n
-bytes. The default value is 1048576 when using connection-oriented transports
-with Version 3 or Version 4 of the NFS protocol, and 32768 when using
-connection-less transports. The default can be negotiated down if the server
-prefers a smaller transfer size.
+bytes.
+The default value is 1048576 when using connection-oriented transports with
+Version 3 or Version 4 of the NFS protocol, and 32768 when using connection-less
+transports.
+The default can be negotiated down if the server prefers a smaller transfer
+size.
 .Qq Read
-operations may not necessarily use the maximum buffer size. When using Version
-2, the default value is 32768 for all transports.
+operations may not necessarily use the maximum buffer size.
+When using Version 2, the default value is 32768 for all transports.
 .It Sy sec Ns = Ns Ar mode
 Set the security
 .Ar mode
-for NFS transactions. If
+for NFS transactions.
+If
 .Sy sec Ns =
 is not specified, then the default action is to use AUTH_SYS over NFS Version 2
 mounts, use a user-configured default
@@ -375,19 +398,22 @@ The preferred mode for NFS Version 3 mounts is the default mode specified in
 .Po see
 .Xr nfssec.conf 4
 .Pc
-on the client. If there is no default configured in this file or if the server
-does not export using the client's default mode, then the client picks the first
-mode that it supports in the array of modes returned by the server. These
-alternatives are limited to the security flavors listed in
+on the client.
+If there is no default configured in this file or if the server does not export
+using the client's default mode, then the client picks the first mode that it
+supports in the array of modes returned by the server.
+These alternatives are limited to the security flavors listed in
 .Pa /etc/nfssec.conf .
 .Pp
 NFS Version 4 mounts negotiate a security mode when the server returns an array
-of security modes. The client attempts the mount with each security mode, in
-order, until one is successful.
+of security modes.
+The client attempts the mount with each security mode, in order, until one is
+successful.
 .Pp
 Only one mode can be specified with the
 .Sy sec Ns =
-option. See
+option.
+See
 .Xr nfssec 5
 for the available
 .Ar mode
@@ -399,30 +425,35 @@ option.
 .It Sy timeo Ns = Ns Ar n
 Set the NFS timeout to
 .Ar n
-tenths of a second. The default value is 11 tenths of a second for
-connectionless transports, and 600 tenths of a second for connection-oriented
-transports. This value is ignored for connectionless transports. Such transports
-might implement their own timeouts, which are outside the control of NFS.
+tenths of a second.
+The default value is 11 tenths of a second for connectionless transports, and
+600 tenths of a second for connection-oriented transports.
+This value is ignored for connectionless transports.
+Such transports might implement their own timeouts, which are outside the
+control of NFS.
 .It Sy vers Ns = Ns Ar "NFS version number"
 By default, the version of NFS protocol used between the client and the server
-is the highest one available on both systems. If the NFS server does not support
-the client's default maximum, the next lowest version attempted until a matching
-version is found. See
+is the highest one available on both systems.
+If the NFS server does not support the client's default maximum, the next lowest
+version attempted until a matching version is found.
+See
 .Xr nfs 4
 for more information on setting default minimum and maximum client versions.
 .It Sy wsize Ns = Ns Ar n
 Set the write buffer size to a maximum of
 .Ar n
-bytes. The default value is 1048576 when using connection-oriented transports
-with Version 3 or Version 4 of the NFS protocol, and 32768 when using
-connection-less transports. The default can be negotiated down if the server
-prefers a smaller transfer size.
+bytes.
+The default value is 1048576 when using connection-oriented transports with
+Version 3 or Version 4 of the NFS protocol, and 32768 when using connection-less
+transports.
+The default can be negotiated down if the server prefers a smaller transfer
+size.
 .Qq Write
-operations may not necessarily use the maximum buffer size. When using Version
-2, the default value is 32768 for all transports.
+operations may not necessarily use the maximum buffer size.
+When using Version 2, the default value is 32768 for all transports.
 .It Sy xattr Ns | Ns Sy noxattr
-Allow or disallow the creation and manipulation of extended attributes. The
-default is
+Allow or disallow the creation and manipulation of extended attributes.
+The default is
 .Sy xattr .
 See
 .Xr fsattr 5
@@ -453,9 +484,10 @@ above
 .Pc .
 Once the file system is mounted, each NFS request made in the kernel waits
 .Sy timeo Ns = Ns Ar n
-tenths of a second for a response. If no response arrives, the time-out is
-multiplied by 2 and the request is retransmitted. When the number of
-retransmissions has reached the number specified in the
+tenths of a second for a response.
+If no response arrives, the time-out is multiplied by 2 and the request is
+retransmitted.
+When the number of retransmissions has reached the number specified in the
 .Sy retrans Ns = Ns Ar n
 option, a file system mounted with the
 .Sy soft
@@ -466,16 +498,19 @@ option prints a warning message and continues to retry the request.
 File systems that are mounted read-write or that contain executable files should
 always be mounted with the
 .Sy hard
-option. Applications using
+option.
+Applications using
 .Sy soft
 mounted file systems can incur unexpected I/O errors, file corruption, and
-unexpected program core dumps. The
+unexpected program core dumps.
+The
 .Sy soft
 option is not recommended.
 .Ss Authenticated requests
 The server can require authenticated NFS requests from the client.
 .Sy sec Ns = Ns Sy dh
-authentication might be required. See
+authentication might be required.
+See
 .Xr nfssec 5 .
 .Ss URLs and the public option
 If the
@@ -500,12 +535,13 @@ daemons to get the port number of the
 .Nm mount
 server and the initial file handle of
 .Ar pathname ,
-respectively. If the NFS client and server are separated by a firewall that
-allows all outbound connections through specific ports, such as
+respectively.
+If the NFS client and server are separated by a firewall that allows all
+outbound connections through specific ports, such as
 .Dv NFS_PORT ,
-then this enables NFS operations through the firewall. The public option and the
-NFS URL can be specified independently or together. They interact as specified
-in the following matrix:
+then this enables NFS operations through the firewall.
+The public option and the NFS URL can be specified independently or together.
+They interact as specified in the following matrix:
 .Bd -literal
                    Resource Style
 
@@ -525,40 +561,45 @@ default            Use MOUNT protocol.        Try public file handle
 .Ed
 .Pp
 A Native path is a path name that is interpreted according to conventions used
-on the native operating system of the NFS server. A Canonical path is a
-path name that is interpreted according to the URL rules. See
+on the native operating system of the NFS server.
+A Canonical path is a path name that is interpreted according to the URL rules.
+See
 .Rs
 .%R Uniform Resource Locators (URL)
 .%T RFC 1738
 .Re
 .Ss Replicated file systems and failover
 .Ar resource
-can list multiple read-only file systems to be used to provide data. These file
-systems should contain equivalent directory structures and identical files. It
-is also recommended that they be created by a utility such as
+can list multiple read-only file systems to be used to provide data.
+These file systems should contain equivalent directory structures and identical
+files.
+It is also recommended that they be created by a utility such as
 .Xr rdist 1 .
 The file systems can be specified either with a comma-separated list of
 .Pa host:/pathname
 entries and/or NFS URL entries, or with a comma-separated list of hosts, if all
-file system names are the same. If multiple file systems are named and the first
-server in the list is down, failover uses the next alternate server to access
-files. If the read-only option is not chosen, replication is disabled. File
-access, for NFS Versions 2 and 3, is blocked on the original if NFS locks are
-active for that file.
+file system names are the same.
+If multiple file systems are named and the first server in the list is down,
+failover uses the next alternate server to access files.
+If the read-only option is not chosen, replication is disabled.
+File access, for NFS Versions 2 and 3, is blocked on the original if NFS locks
+are active for that file.
 .Ss File Attributes
-To improve NFS read performance, files and file attributes are cached. File
-modification times get updated whenever a write occurs. However, file access
-times can be temporarily out-of-date until the cache gets refreshed.
+To improve NFS read performance, files and file attributes are cached.
+File modification times get updated whenever a write occurs.
+However, file access times can be temporarily out-of-date until the cache gets
+refreshed.
 .Pp
-The attribute cache retains file attributes on the client. Attributes for a
-file are assigned a time to be flushed. If the file is modified before the
-flush time, then the flush time is extended by the time since the last
-modification
+The attribute cache retains file attributes on the client.
+Attributes for a file are assigned a time to be flushed.
+If the file is modified before the flush time, then the flush time is extended
+by the time since the last modification
 .Po under the assumption that files that changed recently are likely to change
 soon
 .Pc .
 There is a minimum and maximum flush time extension for regular files and for
-directories. Setting
+directories.
+Setting
 .Sy actimeo Ns = Ns Ar n
 sets flush time to
 .Ar n
@@ -566,19 +607,21 @@ seconds for both regular files and directories.
 .Pp
 Setting
 .Sy actimeo Ns = Ns Sy 0
-disables attribute caching on the client. This means that every reference to
-attributes is satisfied directly from the server though file data is still
-cached. While this guarantees that the client always has the latest file
-attributes from the server, it has an adverse effect on performance through
-additional latency, network load, and server load.
+disables attribute caching on the client.
+This means that every reference to attributes is satisfied directly from the
+server though file data is still cached.
+While this guarantees that the client always has the latest file attributes from
+the server, it has an adverse effect on performance through additional latency,
+network load, and server load.
 .Pp
 Setting the
 .Sy noac
 option also disables attribute caching, but has the further effect of disabling
-client write caching. While this guarantees that data written by an application
-is written directly to a server, where it can be viewed immediately by other
-clients, it has a significant adverse effect on client write performance. Data
-written into memory-mapped file pages
+client write caching.
+While this guarantees that data written by an application is written directly to
+a server, where it can be viewed immediately by other clients, it has a
+significant adverse effect on client write performance.
+Data written into memory-mapped file pages
 .Pq Xr mmap 2
 are not written directly to this server.
 .Ss Specifying Values for Attribute Cache Duration Options
@@ -595,7 +638,8 @@ options specified following
 .Sy actimeo
 on a
 .Nm mount
-command line. For example, consider the following command:
+command line.
+For example, consider the following command:
 .Bd -literal -offset indent
 example# mount -o acdirmax=10,actimeo=1000 server:/path /localpath
 .Ed
@@ -748,7 +792,8 @@ example# mount serv-x:/usr/man,serv-y:/var/man,nfs://serv-z/man /usr/man
 .%D December 1994
 .Re
 .Sh NOTES
-An NFS server should not attempt to mount its own file systems. See
+An NFS server should not attempt to mount its own file systems.
+See
 .Xr lofs 7FS .
 .Pp
 If the directory on which a file system is to be mounted is a symbolic link,
@@ -758,7 +803,8 @@ rather than being mounted on top of the symbolic link itself.
 SunOS 4.x used the
 .Sy biod
 maintenance procedure to perform parallel read-ahead and write-behind on NFS
-clients. SunOS 5.x made
+clients.
+SunOS 5.x made
 .Sy biod
 obsolete with multi-threaded processing, which transparently performs parallel
 read-ahead and write-behind.

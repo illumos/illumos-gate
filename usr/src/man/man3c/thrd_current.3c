@@ -26,8 +26,8 @@
 .Sh DESCRIPTION
 The
 .Fn thrd_current
-function returns the thread ID of the current calling thread. Note, this
-ID may be different from the thread ID returned when using
+function returns the thread ID of the current calling thread.
+Note, this ID may be different from the thread ID returned when using
 .Xr thr_self 3C
 or
 .Xr pthread_self 3C ;

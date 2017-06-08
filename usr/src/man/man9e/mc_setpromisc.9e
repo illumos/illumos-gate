@@ -38,9 +38,11 @@ structure to the
 function.
 .It Fa enable
 A boolean that indicates the desired state of the device's promiscuous
-mode. If set to
+mode.
+If set to
 .Sy B_TRUE ,
-promiscuous mode should be enabled on the device. If set to
+promiscuous mode should be enabled on the device.
+If set to
 .Sy B_FALSE ,
 then promiscuous mode should be disabled on the device.
 .El
@@ -48,32 +50,35 @@ then promiscuous mode should be disabled on the device.
 The
 .Fn mc_setpromisc
 entry point is called when the GLDv3 wants to change the device's
-promiscuous mode. When this entry point is called, the device should
-manipulate both its unicast and multicast promiscuous mode.
+promiscuous mode.
+When this entry point is called, the device should manipulate both its unicast
+and multicast promiscuous mode.
 .Pp
 When
 .Fa enable
 is true, then it should make sure that both unicast and multicast
-promiscuous mode are enabled. When it's set to false, then they should
-be disabled. In general, devices should always start with promiscuous
-mode disabled until the framework indicates that it should be enabled.
+promiscuous mode are enabled.
+When it's set to false, then they should be disabled.
+In general, devices should always start with promiscuous mode disabled until the
+framework indicates that it should be enabled.
 .Pp
 The device driver's private state is available by casting the
 .Fa driver
-argument to the function. Note, this entry point may be called in
-parallel with others and therefore the device driver should employ any
-necessary locking on that structure.
+argument to the function.
+Note, this entry point may be called in parallel with others and therefore the
+device driver should employ any necessary locking on that structure.
 .Sh RETURN VALUES
 Upon successful completion, the device driver's
 .Fn mc_setpromisc
 entry point should return
 .Sy 0
-after having set the device's state. Otherwise, it should return a
-non-zero positive error number to indicate the error that occurred.
+after having set the device's state.
+Otherwise, it should return a non-zero positive error number to indicate the
+error that occurred.
 .Sh ERRORS
-The device driver may return one of the following errors. While this list
-is not intended to be exhaustive, it is recommended to use one of these
-if possible.
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommended to use one
+of these if possible.
 .Bl -tag -width Er
 .It Er EIO
 The driver encountered a device or transport error while trying to

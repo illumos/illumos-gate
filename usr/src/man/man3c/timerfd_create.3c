@@ -80,7 +80,8 @@ description of
 .Ed
 .It Sy TFD_NONBLOCK
 .Bd -filled -compact
-Instance will be set to be non-blocking.  A
+Instance will be set to be non-blocking.
+A
 .Xr read 2
 on a
 .Sy timerfd
@@ -109,8 +110,8 @@ or
 .Fn timerfd_settime .
 Upon success,
 the number of expirations will be copied into the eight byte buffer
-passed to the system call. If there have been no expirations of the
-timer since the last successful
+passed to the system call.
+If there have been no expirations of the timer since the last successful
 .Xr read 2
 or
 .Fn timerfd_sttime ,
@@ -165,7 +166,8 @@ same functional signature and semantics as
 .El
 .Sh RETURN VALUES
 Upon successful completion, a file descriptor associated with the instance
-is returned. Otherwise,
+is returned.
+Otherwise,
 .Sy -1
 is returned and errno is set to indicate the error.
 .Sh ERRORS

@@ -25,19 +25,22 @@
 The
 .Nm
 utility extracts the binary data from a dump of the system's Advanced
-Configuration and Power Interface (ACPI) tables.  The dump is usually obtained
-via the
+Configuration and Power Interface (ACPI) tables.
+The dump is usually obtained via the
 .Xr acpidump 1M
-command. The resulting binary file(s) are represented in the ACPI
+command.
+The resulting binary file(s) are represented in the ACPI
 .Sy ASL
-assembly language. For each table extracted, a corresponding
+assembly language.
+For each table extracted, a corresponding
 .Em table.dat
 file will be created.
 .Sh OPTIONS
 The following options are supported:
 .Bl -tag -width Ds
 .It Fl a
-Extract all of the tables found. By default only the
+Extract all of the tables found.
+By default only the
 .Sy DSDT
 and
 .Sy SSDT

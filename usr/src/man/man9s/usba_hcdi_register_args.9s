@@ -24,8 +24,8 @@
 .Sy Volatile -
 illumos USB HCD private
 .Pp
-This is a private data structure that is not part of the stable DDI. It
-may be removed or changed at any time.
+This is a private data structure that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh DESCRIPTION
 The
 .Sy usba_hcdi_register_args_t
@@ -34,9 +34,9 @@ framework.
 .Pp
 The structure is used with the
 .Xr usba_hcdi_register 9F
-function. Device drivers may statically allocate this structure on the
-stack. It does not need to be allocated on the heap or used beyond the
-call to
+function.
+Device drivers may statically allocate this structure on the stack.
+It does not need to be allocated on the heap or used beyond the call to
 .Xr usba_hcdi_register 9F .
 .Pp
 For more information on the HCD device driver initialization process,
@@ -59,8 +59,8 @@ The
 function should be set to the value of the pre-processor macro
 .Sy HCDI_REGISTER_VERSION .
 This ensures that if future revisions to this structure are made,
-existing drivers should continue to function. Note, that this structure
-is
+existing drivers should continue to function.
+Note, that this structure is
 .Sy Volatile .
 Support for older versions or drastic changes may occur at any time and
 this should not be relied on nor construed as a guarantee against such
@@ -75,7 +75,8 @@ of the device driver instance that is registering with the USBA.
 The
 .Sy usba_hcdi_register_ops
 member is a structure of entry points for the USBA framework to call
-into the USB framework. It should be allocated with a call to
+into the USB framework.
+It should be allocated with a call to
 .Xr usba_alloc_hcdi_ops 9F
 and released with a call to
 .Xr usba_free_hcdi_ops 9F ,
@@ -89,17 +90,17 @@ information on how they should be filled in.
 .Pp
 The
 .Sy usba_hcdi_register_dma_attr
-member should be a pointer to a set of DMA attributes. These DMA
-attributes will be used by a subset of client device drivers to perform
-allocations, in particular scsa2usb. In general, try to make sure that
-these DMA attributes are valid for more transforms, though these will
-generally be used for bulk transfers.
+member should be a pointer to a set of DMA attributes.
+These DMA attributes will be used by a subset of client device drivers to
+perform allocations, in particular scsa2usb.
+In general, try to make sure that these DMA attributes are valid for more
+transforms, though these will generally be used for bulk transfers.
 .Pp
 The
 .Sy usba_hcdi_register_iblock_cookie
 members should be filed in with the general interrupt priority of the
-device driver after it has allocated interrupts. Device drivers may
-obtain the priority by calling
+device driver after it has allocated interrupts.
+Device drivers may obtain the priority by calling
 .Xr ddi_intr_get_pri 9F
 and then casting the obtained interrupt priority to the
 .Sy ddi_iblock_cookie_t .

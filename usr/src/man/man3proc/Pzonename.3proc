@@ -108,7 +108,7 @@ refers to a core file and zone information was not available in the core
 dump or
 .Fa P
 refers to an ELF object grabbed through
-.Xr Pgrab_file .
+.Xr Pgrab_file 3PROC .
 .It Er EFAULT
 .Fa P
 refers to an active process and

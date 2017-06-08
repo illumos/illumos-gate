@@ -26,11 +26,13 @@
 .Sh DESCRIPTION
 The
 .Fn fcloseall
-function closes all open standard I/O streams. The equivalent of
+function closes all open standard I/O streams.
+The equivalent of
 .Xr fflush 3C
 is called on each stream before closing, thus any buffered or pending
 input is discarded while any buffered or pending output is written out
-to the underlying file. This includes the standard streams,
+to the underlying file.
+This includes the standard streams,
 .Vt stdin ,
 .Vt stdout ,
 and

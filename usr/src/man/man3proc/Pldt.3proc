@@ -60,7 +60,8 @@ The buffer
 .Fa pldt
 should contain sufficient space for
 .Fa nldt
-entries. For example, callers could allocate space as:
+entries.
+For example, callers could allocate space as:
 .Pp
 .Dl pldt = malloc(sizeof (struct ssd) * nldt);
 .Pp
@@ -91,9 +92,11 @@ is
 .Dv NULL
 or
 .Fa nldt
-is zero, then no data will be written. Otherwise,
+is zero, then no data will be written.
+Otherwise,
 .Sy -1
-is returned. The
+is returned.
+The
 .Fn Pldt
 function sets
 .Sy errno

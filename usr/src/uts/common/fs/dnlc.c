@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -67,12 +68,12 @@
 /*
  * We want to be able to identify files that are referenced only by the DNLC.
  * When adding a reference from the DNLC, call VN_HOLD_DNLC instead of VN_HOLD,
- * since multiple DNLC references should only be counted once in v_count. This
- * file contains only two(2) calls to VN_HOLD, renamed VN_HOLD_CALLER in the
- * hope that no one will mistakenly add a VN_HOLD to this file. (Unfortunately
- * it is not possible to #undef VN_HOLD and retain VN_HOLD_CALLER. Ideally a
- * Makefile rule would grep uncommented C tokens to check that VN_HOLD is
- * referenced only once in this file, to define VN_HOLD_CALLER.)
+ * since multiple DNLC references should only be counted once in v_count. The
+ * VN_HOLD macro itself is aliased to VN_HOLD_CALLER in this file to help
+ * differentiate the behaviors.  (Unfortunately it is not possible to #undef
+ * VN_HOLD and retain VN_HOLD_CALLER. Ideally a Makefile rule would grep
+ * uncommented C tokens to check that VN_HOLD is referenced only once in this
+ * file, to define VN_HOLD_CALLER.)
  */
 #define	VN_HOLD_CALLER	VN_HOLD
 #define	VN_HOLD_DNLC(vp)	{	\
@@ -634,7 +635,7 @@ dnlc_lookup(vnode_t *dp, const char *name)
 			 * put a hold on it.
 			 */
 			vp = ncp->vp;
-			VN_HOLD_CALLER(vp); /* VN_HOLD 1 of 2 in this file */
+			VN_HOLD_CALLER(vp);
 			mutex_exit(&hp->hash_lock);
 			ncstats.hits++;
 			ncs.ncs_hits.value.ui64++;

@@ -23,6 +23,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/

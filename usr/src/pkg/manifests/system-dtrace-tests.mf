@@ -358,6 +358,8 @@ file path=opt/SUNWdtrt/tst/common/aggs/tst.sizedkeys.d mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.sizedkeys.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.d mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.d.out mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.normalize.d mode=0444
+file path=opt/SUNWdtrt/tst/common/aggs/tst.stddev.normalize.d.out mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.subr.d mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.sum.d mode=0444
 file path=opt/SUNWdtrt/tst/common/aggs/tst.sum.d.out mode=0444

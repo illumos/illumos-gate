@@ -27,8 +27,8 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa usb_device
@@ -37,8 +37,8 @@ Pointer to a USB device.
 .Sh DESCRIPTION
 The
 .Fn usba_hcdi_get_device_private
-function obtains the private data set by a HCD driver. This private data
-is created by the HCD driver's optional entry point
+function obtains the private data set by a HCD driver.
+This private data is created by the HCD driver's optional entry point
 .Xr usba_hcdi_device_init 9E
 and is removed during the HCD driver's optional entry point
 .Xr usba_hcdi_device_fini 9E .
@@ -56,8 +56,8 @@ function is generally called from the context of a
 .Xr usba_hcdi 9E
 entry point, but may be called from user, kernel, or interrupt context.
 .Sh RETURN VALUES
-The private data set by an HCD driver is always returned. If no such
-value has been set, then
+The private data set by an HCD driver is always returned.
+If no such value has been set, then
 .Dv NULL
 is returned.
 .Sh SEE ALSO

@@ -56,8 +56,8 @@ The
 .Sy mtx
 family of functions implement mutual exclusion locks (mutexes) and behave
 similarly to both POSIX threads and illumos threads; however, they have
-slightly different call signatures and return values. For more
-information, see
+slightly different call signatures and return values.
+For more information, see
 .Xr threads 5 .
 Importantly, they do not allow for inter-process synchronization.
 .Ss Creating and Destroying Mutexes
@@ -75,11 +75,12 @@ A simple, intra-process mutex.
 A simple, intra-process mutex, which allows timed locking operations.
 .It Sy mtx_plain | mtx_recursive
 An intra-process mutex that may be acquired recursively by the same
-thread. It must be unlocked an equal number of times that it is locked.
+thread.
+It must be unlocked an equal number of times that it is locked.
 .It Sy mtx_timed | mtx_recursive
 An intra-process mutex that supports timed locking operations and may be
-acquired recursively by the same thread. It must be unlocked an equal
-number of times that it is locked.
+acquired recursively by the same thread.
+It must be unlocked an equal number of times that it is locked.
 .El
 For more information on the different kind of mutexes, see
 .Xr mutex_init 3C .
@@ -101,8 +102,8 @@ function attempts to lock the mutex
 When the function returns, it will be the sole owner of the mutex and
 must call
 .Fn mtx_unlock
-when it is done, or risk inducing a deadlock in the process. Other
-threads that make calls to
+when it is done, or risk inducing a deadlock in the process.
+Other threads that make calls to
 .Fn mtx_lock
 after another thread has successfully completed its call to
 .Fn mtx_lock
@@ -116,8 +117,9 @@ was created, a thread calling
 .Fn mtx_lock
 when it already holds
 .Fa mtx
-will cause the thread to deadlock. Othewrise, the lock will be
-successfully taken again. However, a thread must call
+will cause the thread to deadlock.
+Othewrise, the lock will be successfully taken again.
+However, a thread must call
 .Fn mtx_unlock
 for each time that it has acquried
 .Fa mtx .
@@ -154,9 +156,10 @@ The
 .Fn mtx_unlock
 function unlocks the mutex pointed to by
 .Fa mtx ,
-which allows another thread the opportunity to obtain it. If any threads
-are actively blocking on the mutex, one of them will obtain it and be
-woken up. It is an error to call
+which allows another thread the opportunity to obtain it.
+If any threads are actively blocking on the mutex, one of them will obtain it
+and be woken up.
+It is an error to call
 .Fn mtx_unlock
 on a mutex which the calling thread does not currently own.
 .Sh RETURN VALUES

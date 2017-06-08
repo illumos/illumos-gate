@@ -15,7 +15,7 @@
 .Dt PSETFLAGS 3PROC
 .Os
 .Sh NAME
-.Nm Psetflags
+.Nm Psetflags ,
 .Nm Punsetflags
 .Nd set and unset process flags
 .Sh SYNOPSIS
@@ -39,11 +39,12 @@ and
 functions manipulate the process flags for the process handle
 .Fa P .
 The process flags determine how the process behaves in the face of
-various actions. For example, setting the
+various actions.
+For example, setting the
 .Sy PR_FORK
 flag indicates that the tracing flags of the process and the
-inherit-on-fork mode should be set on children. A full list of the
-process flags is available in the
+inherit-on-fork mode should be set on children.
+A full list of the process flags is available in the
 .Sy PCSET
 section in
 .Xr proc 4 .
@@ -58,7 +59,8 @@ The
 .Fn Punsetflags
 function removes the flags specified in
 .Fa flags
-from the tracing flags of the process. Items not listed in
+from the tracing flags of the process.
+Items not listed in
 .Fa flags
 will remain.
 .Pp
@@ -66,14 +68,15 @@ To see the current set of flags active on the process, check the
 .Sy pr_flags
 member of the
 .Sy pstatus_t
-for the process. It can be obtained through the
+for the process.
+It can be obtained through the
 .Xr Pstatus 3PROC
 function.
 .Pp
 Note, attempting to modify the process flags only works on active
-processes. Attempting to call these functions of process handles
-corresponding to core files, zombie processes, or files, will result in
-an error.
+processes.
+Attempting to call these functions of process handles corresponding to core
+files, zombie processes, or files, will result in an error.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Psetflags

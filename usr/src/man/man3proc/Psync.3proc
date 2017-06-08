@@ -34,7 +34,8 @@ The
 .Fn Psync
 function synchronizes modifications to the process handle
 .Fa P
-back to the underlying active process. The
+back to the underlying active process.
+The
 .Fn Psync
 function ensures that any outstanding process holds, register
 modifications, signal injections, and modifications to the various fault
@@ -47,9 +48,9 @@ library, calling this function may be required.
 .Pp
 The
 .Fn Psync
-function is only meaningful for active processes. It will do nothing on
-process handles that refer to core files, zombie processes, and ELF
-objects.
+function is only meaningful for active processes.
+It will do nothing on process handles that refer to core files, zombie
+processes, and ELF objects.
 .Pp
 The
 .Fn Lsync

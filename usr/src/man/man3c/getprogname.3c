@@ -31,27 +31,27 @@
 .Sh DESCRIPTION
 The
 .Fn getprogname
-function is used to obtain the program name. The program name is set at
-program start-up, before
+function is used to obtain the program name.
+The program name is set at program start-up, before
 .Fn main
-is called. Note, other operating systems, do not guarantee that a
-program name has been set at start up time and therefore may return a
-null pointer if
+is called.
+Note, other operating systems, do not guarantee that a program name has been set
+at start up time and therefore may return a null pointer if
 .Fn setprogname
 has not been called.
 .Lp
 The
 .Fn setprogname
-function is used to change the program name to another value. The
-argument
+function is used to change the program name to another value.
+The argument
 .Fa progname
 must contain a null terminatd character string, whose last component
 which will become the new program name.
 .Sh RETURN VALUES
 The
 .Fn getprogname
-function always returns the current program name. The program name is
-always set, it will not return a null pointer.
+function always returns the current program name.
+The program name is always set, it will not return a null pointer.
 .Sh INTERFACE STABILITY
 .Sy Committed
 .Sh MT-LEVEL

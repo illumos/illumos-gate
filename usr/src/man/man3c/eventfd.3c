@@ -29,8 +29,8 @@ The
 .Fn eventfd
 function creates an
 .Xr eventfd 5
-instance that has an associated 64-bit unsigned counter. It returns a file
-descriptor that can be operated upon via
+instance that has an associated 64-bit unsigned counter.
+It returns a file descriptor that can be operated upon via
 .Xr read 2 ,
 .Xr write 2
 and the facilities that notify of file descriptor activity (e.g.,
@@ -44,8 +44,9 @@ should be called on the file descriptor.
 The
 .Fa initval
 argument specifies the initial value of the 64-bit counter associated with the
-instance.  (Note that this limits the initial value to be a 32-bit quantity
-despite the fact that the underlying counter is 64-bit.)
+instance.
+(Note that this limits the initial value to be a 32-bit quantity despite the
+fact that the underlying counter is 64-bit.)
 .Pp
 The \fIflags\fR argument specifies additional parameters for the
 instance, and can have any of the following values:
@@ -61,7 +62,8 @@ description of
 .Ed
 .It Sy EFD_NONBLOCK
 .Bd -filled -compact
-Instance will be set to be non-blocking.  A
+Instance will be set to be non-blocking.
+A
 .Xr read 2
 on an
 .Sy eventfd
@@ -76,7 +78,8 @@ in lieu of blocking if the count associated with the instance is zero.
 Provide counting semaphore semantics whereby a
 .Xr read 2
 will atomically decrement rather than atomically clear the count when it
-becomes non-zero. See below for details on
+becomes non-zero.
+See below for details on
 .Xr read 2
 semantics.
 .Ed
@@ -89,8 +92,8 @@ instance:
 .It Sy read(2)
 .Bd -filled -compact
 Atomically reads and modifies the value of the 64-bit counter associated
-with the instance.  The precise semantics
-of
+with the instance.
+The precise semantics of
 .Xr read 2
 depend on the disposition of
 .Sy EFD_SEMAPHORE
@@ -110,7 +113,8 @@ will
 .Em atomically clear
 the counter if (and when) it is non-zero, copying the former value of the
 counter to the eight byte buffer passed to the
-system call.  In either case,
+system call.
+In either case,
 .Xr read 2
 will block if the counter is
 zero (or return
@@ -127,8 +131,8 @@ will be returned.
 .It Sy write(2)
 .Bd -filled -compact
 Atomically adds the 64-bit value pointed to by the buffer to the 64-bit
-counter associated with the instance.  If the resulting value would overflow,
-the
+counter associated with the instance.
+If the resulting value would overflow, the
 .Xr write 2
 will block until the value would not overflow
 (or return
@@ -159,8 +163,10 @@ will be set.
 .El
 .Sh RETURN VALUES
 Upon successful completion, a file descriptor associated with the instance
-is returned. Otherwise,
-.Sy -1 is returned and
+is returned.
+Otherwise,
+.Sy -1
+is returned and
 .Sy errno
 is set to indicate the error.
 .Sh ERRORS
