@@ -38,8 +38,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
-not guaranteed.
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa wwn
@@ -61,20 +61,23 @@ functions convert an 8-byte world wide number to and from a string
 representation.
 .Pp
 World wide numbers are unique identifiers that are used in storage
-technologies, particularly ATA, SAS, and FC. The format of a WWN is
-defined by the IEEE and generally come in 8 and 16 byte forms. These
-interfaces only operate on the 8 byte forms.
+technologies, particularly ATA, SAS, and FC.
+The format of a WWN is defined by the IEEE and generally come in 8 and
+16 byte forms.
+These interfaces only operate on the 8 byte forms.
 .Pp
 When the WWN is represented as a string, it is represented as a 16
-character hexadecimal string. This character string may either use
-uppercase or lowercase hexadecimal characters. The character string may
-be preceded by a
+character hexadecimal string.
+This character string may either use uppercase or lowercase hexadecimal
+characters.
+The character string may be preceded by a
 .Sq w
-character. When this is present, this is called the
+character.
+When this is present, this is called the
 .Em unit-address form .
 If the string is not 16 ASCII character long or 17, when using the
-unit-address form, the string is considered invalid. The following
-macros are provided to help deal with these lengths:
+unit-address form, the string is considered invalid.
+The following macros are provided to help deal with these lengths:
 .Bl -tag -width Dv
 .It Dv SCSI_WWN_STRLEN
 The number of bytes, excluding a terminating nul character, for a world
@@ -91,8 +94,9 @@ The
 .Fn scsi_wwnstr_to_wwn
 function parses the string form of the WWN
 .Fa wwnstr
-and converts it to a 64-bit representation. The string form may either
-be in unit-address form or not. The string must have a nul terminator.
+and converts it to a 64-bit representation.
+The string form may either be in unit-address form or not.
+The string must have a nul terminator.
 If the string is successfully parsed, the world wide number is stored in
 .Fa wwnp .
 .Pp
@@ -100,7 +104,8 @@ The
 .Fn scsi_wwn_to_wwnstr
 converts the world wide number in
 .Fa wwn
-into a human-readable string as described above. If the
+into a human-readable string as described above.
+If the
 .Fa ua_form
 is non-zero then the unit-address form is used and a leading
 .Sq w
@@ -110,9 +115,11 @@ If the
 .Fa wwnstr
 argument is supplied by the user, then it must be large enough to
 contain both the string form of the world wide number and a nul
-character. The
+character.
+The
 .Dv SCSI_WWN_BUFLEN
-macro is recommended. It will always ensure that a buffer is large
+macro is recommended.
+It will always ensure that a buffer is large
 enough to hold any supported string representation of a world wide
 number.
 .Pp
@@ -121,9 +128,10 @@ If the
 argument is instead
 .Dv NULL ,
 then a character string of sufficient size will be allocated by the
-system. Note, this allocation will block until memory is available. If
-memory is allocated in this way, then the caller should free this memory
-with the
+system.
+Note, this allocation will block until memory is available.
+If memory is allocated in this way, then the caller should free this
+memory with the
 .Fn scsi_free_wwnstr
 function.
 .Sh CONTEXT
@@ -145,7 +153,8 @@ function returns
 .Dv DDI_SUCCESS
 and fills in
 .Fa wwnp
-with the WWN. Otherwise,
+with the WWN.
+Otherwise,
 .Dv DDI_FAILURE
 is returned, indicating an invalid argument or a malformed string in
 .Fa wwnstr .

@@ -41,7 +41,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
+This interface is still evolving in illumos.
+API and ABI stability is
 not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
@@ -58,17 +59,20 @@ A private value that the driver can get and set.
 .El
 .Sh DESCRIPTION
 These functions provide useful services for SCSI HBA drivers that use
-complex addressing. In complex addressing mode, the
+complex addressing.
+In complex addressing mode, the
 .Xr scsi_address 9S
 structure is treated as an opaque structure and is not a simple target
-and LUN. To use these functions, the driver must have enabled complex
-addressing by passing the
+and LUN.
+To use these functions, the driver must have enabled complex addressing
+by passing the
 .Dv SCSI_HBA_ADDR_COMPLEX
 flag into the
 .Fa hba_flags
 argument of the
 .Xr scsi_hba_attach_setup 9F
-function. If the
+function.
+If the
 .Dv SCSI_HBA_ADDR_COMPLEX
 flag was not passed, then the driver must not call the
 .Fn scsi_device_hba_private_get ,
@@ -83,7 +87,8 @@ function maps the
 .Xr scsi_address 9S
 function back to its corresponding
 .Xr scsi_device 9S
-structure. If the
+structure.
+If the
 .Dv SCSI_HBA_ADDR_COMPLEX
 flag has not been set, then the function will return
 .Dv NULL .
@@ -96,18 +101,20 @@ function, allows a driver to set a private data value on the
 .Xr scsi_device 9S
 structure, which it can later retrieve through the
 .Fn scsi_device_hba_private_get
-function. Most drivers will set a value during the
+function.
+Most drivers will set a value during the
 .Xr tran_start 9E
-entry point and then reference the data structure later on. This is
-designed to simplify the management of mapping between driver data
-structures and the corresponding system objects.
+entry point and then reference the data structure later on.
+This is designed to simplify the management of mapping between driver
+data structures and the corresponding system objects.
 .Pp
 The
 .Fn scsi_device_unit_address
 function returns the unit address of the
 .Xr scsi_device 9S
-structure. The returned string should not be modified by the device
-driver. The unit address string comes from values that are passed when
+structure.
+The returned string should not be modified by the device driver.
+The unit address string comes from values that are passed when
 the device is enumerated, generally through an instance of an
 .Xr iport 9 .
 .Sh CONTEXT
@@ -122,7 +129,8 @@ Upon successful completion, the
 .Fn scsi_address_device
 function returns a pointer to the
 .Xr scsi_device 9S
-structure. Otherwise, if an error occurred
+structure.
+Otherwise, if an error occurred
 .Dv NULL
 is returned.
 .Pp
@@ -130,7 +138,8 @@ The
 .Fn scsi_device_hba_private_set
 function returns a data value registered via the
 .Fn scsi_device_hba_private_get
-function. If the
+function.
+If the
 .Fn scsi_device_hba_private_get
 was never called,
 .Dv NULL

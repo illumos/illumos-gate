@@ -30,8 +30,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving. API and ABI stability is
-not guaranteed.
+This interface is still evolving.
+API and ABI stability is not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa driver
@@ -43,7 +43,8 @@ structure to the
 .Xr mac_register 9F
 function.
 .It Fa mode
-A value that indicates how the driver should drive the LEDs. See the
+A value that indicates how the driver should drive the LEDs.
+See the
 .Sx LED MODES
 section for a list of supported modes.
 .It Fa flags
@@ -53,33 +54,39 @@ Reserved for future use.
 The
 .Sy MAC_CAPAB_LED
 capability allows GLDv3 device drivers to expose an interface for
-controlling the LEDs on the device. This allows the system to control
-the LEDs to assist system administrators in finding and identifying
-specific physical devices in the system.
+controlling the LEDs on the device.
+This allows the system to control the LEDs to assist system
+administrators in finding and identifying specific physical devices in
+the system.
 .Pp
-Implementing this capability is optional. For more information on how to
-handle capabilities and how to indicate that a capability is not
-supported, see
+Implementing this capability is optional.
+For more information on how to handle capabilities and how to indicate
+that a capability is not supported, see
 .Xr mc_getcapab 9E .
 .Pp
 This capability should be implemented if the device in question provides
-a way to manipulate its LEDs. Generally the LEDs on a device default to
-indicating link status and activity. However, they can often be turned
-off or set to a specific pattern for identification purposes.
+a way to manipulate its LEDs.
+Generally the LEDs on a device default to indicating link status and
+activity.
+However, they can often be turned off or set to a specific pattern for
+identification purposes.
 .Ss LED MODES
-The system has a notion of different LED modes. Each LED mode suggests a
-different way that a device driver should drive the indicator LEDs on
-the device. While we generally want all such LED modes to be as uniform
+The system has a notion of different LED modes.
+Each LED mode suggests a different way that a device driver should drive
+the indicator LEDs on the device.
+While we generally want all such LED modes to be as uniform
 as possible, there is a limit to such similarities due to the
-capabilities of NICs. Each mode is a member of the
+capabilities of NICs.
+Each mode is a member of the
 .Vt mac_led_mode_t
-enumeration. The currently defined modes are:
+enumeration.
+The currently defined modes are:
 .Bl -tag -width Dv -offset indent
 .It Dv MAC_LED_DEFAULT
 This mode indicates that the device's default behavior should be used.
-This is usually some form of link status and activity. It is device
-specific and usually is the default behavior after a device is powered
-on.
+This is usually some form of link status and activity.
+It is device specific and usually is the default behavior after a device
+is powered on.
 .It Dv MAC_LED_OFF
 This mode indicates that the device's LEDs should be turned off and not
 emit any light.
@@ -88,11 +95,12 @@ This mode indicates that the device's LEDs should be turned on and
 remain solid.
 .It Dv MAC_LED_IDENT
 This mode indicates that the driver should emit some form of
-identification pattern. We suggest that devices indicate some form of
-solid blinking light that is on and off at alternating units of time,
-for example, every 200 milliseconds. If it is possible to use an
-alternate color from the normal link up and activity lighting, that is
-recommended.
+identification pattern.
+We suggest that devices indicate some form of solid blinking light that
+is on and off at alternating units of time, for example, every 200
+milliseconds.
+If it is possible to use an alternate color from the normal link up and
+activity lighting, that is recommended.
 .El
 .Ss MAC Capability Structure
 When the device driver's
@@ -117,19 +125,20 @@ rules:
 .It Fa mcl_flags
 The
 .Fa mcl_flags
-member is used to negotiate extensions with the driver. MAC will set the
-value of
+member is used to negotiate extensions with the driver.
+MAC will set the value of
 .Fa mcl_flags
-to include all of the currently known extensions. The driver should
-intersect this list with the set that they actually support. At this
-time, no such features are defined and the driver should set the member
-to
+to include all of the currently known extensions.
+The driver should intersect this list with the set that they actually
+support.
+At this time, no such features are defined and the driver should set the
+member to
 .Sy 0 .
 .It Fa mcl_modes
 The
 .Fa mcl_modes
-member represents the support modes of the device driver. The device
-driver should set
+member represents the support modes of the device driver.
+The device driver should set
 .Vt mcl_modes
 to the bitwise-inclusive-OR of the LED modes listed in
 .Sx LED MODES .
@@ -143,26 +152,29 @@ capability.
 The
 .Fa mcl_set
 entry point will be called by the MAC framework when it needs the device
-driver to change how it is driving its LEDs. Each call will ask the
-driver to change the display mode to the specified mode. The driver does
-not have to multiplex requests for multiple modes or keep track of what
-has been requested, that is taken care of by the system itself.
+driver to change how it is driving its LEDs.
+Each call will ask the driver to change the display mode to the
+specified mode.
+The driver does not have to multiplex requests for multiple modes or
+keep track of what has been requested, that is taken care of by the
+system itself.
 .Pp
 The driver should first validate that
 .Fa mode
-is a mode that it supports. While the device reports the set of
-supported modes as a bitwise-inclusive-OR, the driver should only
-receive a single value in
+is a mode that it supports.
+While the device reports the set of supported modes as a
+bitwise-inclusive-OR, the driver should only receive a single value in
 .Fa mode .
 The value of the
 .Fa flags
-argument is reserved for future use. Drivers must check that the value
-of flags is zero and if not, return
+argument is reserved for future use.
+Drivers must check that the value of flags is zero and if not, return
 .Er EINVAL .
 .Pp
 When this entry point is first called on a driver, it should snapshot
 its device registers such that it knows how to restore the default
-behavior. Because each method of programming the LEDs is different, it
+behavior.
+Because each method of programming the LEDs is different, it
 is up to the driver itself to take care of this, the broader framework
 cannot take care of it.
 .Pp
@@ -173,8 +185,8 @@ return success.
 Once the driver successfully changes the LED driving mode, it should
 return
 .Sy 0 .
-Otherwise, it should return the appropriate error number. For a full
-list of error numbers, see
+Otherwise, it should return the appropriate error number.
+For a full list of error numbers, see
 .Xr Intro 2 .
 Common values are:
 .Bl -tag -width Er -offset width
@@ -194,8 +206,8 @@ encountered an error.
 .Pp
 The broader framework will guarantee that only a single call to the
 .Fa mcl_set
-function is ongoing at any time. If other parts of the driver refer to
-the data used by the
+function is ongoing at any time.
+If other parts of the driver refer to the data used by the
 .Fa mcl_set
 function, then the driver must ensure that it is performing sufficient
 locking of its data.
@@ -207,7 +219,8 @@ entry point will only be called from
 .Sy user
 or
 .Sy kernel
-context. It will never be called from interrupt context.
+context.
+It will never be called from interrupt context.
 .Sh SEE ALSO
 .Xr Intro 2 ,
 .Xr mac 9E ,

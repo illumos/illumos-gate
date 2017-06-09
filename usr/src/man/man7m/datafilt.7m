@@ -23,13 +23,15 @@ The
 .Nm datafilt
 socket filter provides deferment of
 .Xr accept 3SOCKET
-for TCP connections. The accept call will not return until at least
-one byte has been buffered by the kernel. Deferment assures the
-application that the first call to
-.Xr read 2 or
+for TCP connections.
+The accept call will not return until at least one byte has been
+buffered by the kernel.
+Deferment assures the application that the first call to
+.Xr read 2
+or
 .Xr recv 3SOCKET
-will not block. It reduces unnecessary switching between user and
-kernel.
+will not block.
+It reduces unnecessary switching between user and kernel.
 .Sh EXAMPLES
 .Ss Example 1
 Enable deferment on the listening socket.

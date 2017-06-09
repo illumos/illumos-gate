@@ -46,8 +46,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
-not guaranteed.
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa dip
@@ -74,8 +74,8 @@ The
 .Fn scsi_hba_iportmap_create
 and
 .Fn scsi_hba_iportmap_destroy
-functions are used by HBA drivers to create and destroy an iportmap. For
-more information on an iportmap and its purpose, see
+functions are used by HBA drivers to create and destroy an iportmap.
+For more information on an iportmap and its purpose, see
 .Xr iportmap 9 .
 .Pp
 The
@@ -83,11 +83,12 @@ The
 and
 .Fa settle_usec
 are both times measured in microseconds that control two different
-properties of the iportmap and how it behaves. The value in
+properties of the iportmap and how it behaves.
+The value in
 .Fa settle_usec
 indicates the amount of time that the system should wait to quiesce all
-changes and consider the resulting system stable. Changes will not be
-reported until after
+changes and consider the resulting system stable.
+Changes will not be reported until after
 .Fa settle_usec
 have passed.
 .Fa csync_usec
@@ -111,7 +112,8 @@ and remove iports.
 .Pp
 To destroy the iportmap, drivers should use the
 .Fn scsi_hba_iportmap_destroy
-function. As part of destroying the iportmap, all associated iports will
+function.
+As part of destroying the iportmap, all associated iports will
 be detached from the system by having the driver's
 .Xr detach 9E
 entry point called.
@@ -119,18 +121,21 @@ entry point called.
 When the driver needs to add an iport to the system, generally in
 response to a hotplug event, then the driver should call the
 .Fn scsi_hba_iportmap_iport_add
-function. The value of
+function.
+The value of
 .Fa ua
-should be a character string that uniquely identifies the device. If the
-driver is using a phymap, then this unit address should be the same one
-as the phymap's callback provided. Otherwise, the driver sets
+should be a character string that uniquely identifies the device.
+If the driver is using a phymap, then this unit address should be the
+same one as the phymap's callback provided.
+Otherwise, the driver sets
 .Fa ua
 to a unique string which is generally the iport's WWN.
 .Pp
 When the corresponding iport needs to be removed, then the driver should
 call the
 .Fn scsi_hba_iportmap_remove
-function. The iport to remove is indicated by the
+function.
+The iport to remove is indicated by the
 .Fa ua
 argument, which should match the value passed into the
 .Fn scsi_hba_iportmap_add

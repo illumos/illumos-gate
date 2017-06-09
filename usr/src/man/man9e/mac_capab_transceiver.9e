@@ -40,7 +40,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Volatile -
-This interface is still evolving in illumos. API and ABI stability is
+This interface is still evolving in illumos.
+API and ABI stability is
 not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
@@ -75,43 +76,51 @@ bytes.
 The
 .Sy MAC_CAPAB_TRANSCEIVER
 capability allows for GLDv3 networking device drivers to provide
-information to the system about their transceiver. Implementing this
-capability is optional. For more information on how to handle
-capabilities and how to indicate that a capability is not supported, see
+information to the system about their transceiver.
+Implementing this capability is optional.
+For more information on how to handle capabilities and how to indicate
+that a capability is not supported, see
 .Xr mc_getcapab 9E .
 .Pp
 This capability should be implemented if the device in question supports
-a Small Form Factor (SFF) transceiver. These are more commonly known by
-names such as SFP, SFP+, SFP28, QSFP+, and QSFP28. This interface does
-not apply to traditional copper Ethernet phys. These transceivers
-provide standardized information over the i2c bus at specific pages.
+a Small Form Factor (SFF) transceiver.
+These are more commonly known by names such as SFP, SFP+, SFP28, QSFP+,
+and QSFP28.
+This interface does not apply to traditional copper Ethernet phys.
+These transceivers provide standardized information over the i2c bus at
+specific pages.
 .Ss Supported Standards
 .Bl -tag -width Sy
 .It Sy INF-8074
 The
 .Sy INF-8084
 standard was the original multiple source agreement (MSA) for SFP
-devices.  It proposed the original series of management pages at i2c
-page 0xa0.  This page contained up to 512 bytes, however, only the first
-96 bytes are standardized. Bytes 97 to 127 are reserved for the vendor.
-The remaining bytes are reserved by the specification. The management
-page was subsequently adopted by SFP+ devices.
+devices.
+It proposed the original series of management pages at i2c page 0xa0.
+This page contained up to 512 bytes, however, only the first
+96 bytes are standardized.
+Bytes 97 to 127 are reserved for the vendor.
+The remaining bytes are reserved by the specification.
+The management page was subsequently adopted by SFP+ devices.
 .It Sy SFF-8472
 The
 .Sy SFF-8472
-standard extended the original SFP MSA. This standard added a second i2c
-page at 0xa2, while maintaining the original page at 0xa0. The page at
-0xa0 is now explicitly 256 bytes. The page at 0xa2 is also 256 bytes.
+standard extended the original SFP MSA.
+This standard added a second i2c page at 0xa2, while maintaining the
+original page at 0xa0.
+The page at 0xa0 is now explicitly 256 bytes.
+The page at 0xa2 is also 256 bytes.
 This standard was also adopted for all SFP28 parts, which are commonly
 used in transceivers for 25 Gb/s Ethernet.
 .It Sy SFF-8436
 The
 .Sy SFF-8436
 standard was developed for QSFP+ transceivers, which involve the
-bonding of 4 SFP+ links. QSFP+ is commonly used in the transceivers for
-40 Gb/s Ethernet.  This standard uses i2c page 0xa0 for read-only
-identification purposes. The lower half of the page is used for control,
-while the upper 128 bytes is similar to the
+bonding of 4 SFP+ links.
+QSFP+ is commonly used in the transceivers for 40 Gb/s Ethernet.
+This standard uses i2c page 0xa0 for read-only identification purposes.
+The lower half of the page is used for control, while the upper 128
+bytes is similar to the
 .Sy INF-8084
 and
 .Sy SFF-8472
@@ -120,11 +129,12 @@ standards.
 The
 .Sy SFF-8636
 standard is a common management standard which is shared between both
-SAS and QSFP+ 28 Gb/s transceivers. The latter transceiver is commonly
-found in 100 Gb/s Ethernet. The transceiver's memory map is similar to
-that found in the
+SAS and QSFP+ 28 Gb/s transceivers.
+The latter transceiver is commonly found in 100 Gb/s Ethernet.
+The transceiver's memory map is similar to that found in the
 .Sy SFF-8436
-specification. The identification information is found in the upper 128
+specification.
+The identification information is found in the upper 128
 bytes of page 0xa0, while the lower part of the page is used for
 control, among other purposes.
 .El
@@ -163,26 +173,28 @@ rules:
 .It Sy mct_flags
 The
 .Vt mct_flags
-member is used to negotiate extensions with the driver. MAC will set the
-value of
+member is used to negotiate extensions with the driver.
+MAC will set the value of
 .Vt mct_flags
-to include all of the currently known extensions. The driver should
-intersect this list with the set that they actually support. At this
-time, no such features are defined and the driver should set the member
-to
+to include all of the currently known extensions.
+The driver should intersect this list with the set that they actually
+support.
+At this time, no such features are defined and the driver should set the
+member to
 .Sy 0 .
 .It Sy mct_ntransceivers
 The value of
 .Sy mct_ntransceivers
-indicates that the number of transceivers present in the device. For most
-devices, it is expected that this value will be set to one. However,
-some devices do support multiple transceivers and PHYs that show up
-behind a single logical MAC.
+indicates that the number of transceivers present in the device.
+For most devices, it is expected that this value will be set to one.
+However, some devices do support multiple transceivers and PHYs that
+show up behind a single logical MAC.
 .Pp
 It is expected that this value will not change across the lifetime of
-the device being attached. It is important to remember that this
-represents the total possible number of transceivers in the device, not
-how many are currently present and powered on.
+the device being attached.
+It is important to remember that this represents the total possible
+number of transceivers in the device, not how many are currently present
+and powered on.
 .Pp
 The number of transceivers will influence the
 .Fa id
@@ -190,16 +202,16 @@ argument used in the
 .Fn mct_info
 and
 .Fn mct_read
-entry points. The transceiver IDs will start at zero and go to the value
-of
+entry points.
+The transceiver IDs will start at zero and go to the value of
 .Fa mct_ntransceivers - 1 .
 It is up to the driver to keep the mapping between actual transceivers
 and the transceiver identifiers consistent.
 .It Sy mct_info
 The
 .Fn mct_info
-entry point is used to set basic information about the transceiver. This
-entry point is
+entry point is used to set basic information about the transceiver.
+This entry point is
 .Em required .
 If the device driver cannot implement this entry point, then it should
 not indicate that it supports the capability.
@@ -219,8 +231,8 @@ the functions described in the section
 After successfully calling all of the functions, the driver should
 return
 .Sy 0 .
-Othewrise, it should return the appropriate error number. For a full
-list of error numbers, see
+Othewrise, it should return the appropriate error number.
+For a full list of error numbers, see
 .Xr Intro 2 .
 Common values are:
 .Bl -tag -width Er -offset width
@@ -229,17 +241,18 @@ The transceiver identifier
 .Fa id
 was invalid.
 .It Er ENOTSUP
-This instance of the devices does not support a transceiver. For
-example, a device which sometimes has copper PHYs and therefore this
+This instance of the devices does not support a transceiver.
+For example, a device which sometimes has copper PHYs and therefore this
 instance does not have any PHYs.
 .It Er EIO
-An error occurred while trying to read device registers. For example, an
-FM-aware device had an error.
+An error occurred while trying to read device registers.
+For example, an FM-aware device had an error.
 .El
 .It Sy mct_read
 The
 .Fn mct_read
-function is used to read information from a transceiver's i2c bus. The
+function is used to read information from a transceiver's i2c bus.
+The
 .Fn mct_read
 entry point is an
 .Em optional
@@ -247,8 +260,8 @@ entry point.
 .Pp
 The transceiver should first check the value of
 .Fa id ,
-which indicates which transceiver information is being requested.  See
-the description above of
+which indicates which transceiver information is being requested.
+See the description above of
 .Sy mct_ntransceivers
 for more information on how the IDs are determined.
 .Pp
@@ -264,15 +277,18 @@ with the number of bytes written to the buffer
 .Fa buf .
 .Pp
 If for some reason the driver cannot read all of the requested bytes,
-that is acceptable. Instead it should perform a short read. This may
-occur because the transceiver does not allow reads at a requested region
-or the region is shorter than is common for most devices.
+that is acceptable.
+Instead it should perform a short read.
+This may occur because the transceiver does not allow reads at a
+requested region or the region is shorter than is common for most
+devices.
 .Pp
 Upon successful completion, the driver should ensure that
 .Fa nread
 has been updated and then return
 .Sy 0 .
-Otherwise, the driver should return the appropriate error number. For
+Otherwise, the driver should return the appropriate error number.
+For
 a full list of error numbers, see
 .Xr Intro 2 .
 Common values are:
@@ -280,9 +296,11 @@ Common values are:
 .It Er EINVAL
 The value of
 .Fa id
-represented an invalid transceiver identifier. The transceiver i2c page
+represented an invalid transceiver identifier.
+The transceiver i2c page
 .Fa page
-is not valid for this type of device. The value of
+is not valid for this type of device.
+The value of
 .Fa offset
 is beyond the range supported for this
 .Fa page .
@@ -294,10 +312,12 @@ An error occurred while trying to read the device i2c pages.
 The
 .Fn mct_info
 entry point is the primary required entry point for a device driver
-which supports this capability. The information structure is opaque to
-the device driver. Instead, a series of informational functions is
-available to the device driver to call on the transceiver. The device
-drivers should try to call and fill in as many of these as possible.
+which supports this capability.
+The information structure is opaque to the device driver.
+Instead, a series of informational functions is
+available to the device driver to call on the transceiver.
+The device drivers should try to call and fill in as many of these as
+possible.
 There are two different properties that a driver can set:
 .Bl -enum -offset indent
 .It
@@ -314,37 +334,42 @@ always be called with the value set to
 .Dv B_TRUE .
 .Pp
 Finally, the driver has the ability to provide information about whether
-or not the transceiver is usable or not. A transceiver may be present,
-but not usable, if the hardware and firmware support a limited number of
-transceivers. To set this information, the driver should call
+or not the transceiver is usable or not.
+A transceiver may be present, but not usable, if the hardware and
+firmware support a limited number of transceivers.
+To set this information, the driver should call
 .Xr mac_transceiver_info_set_usable 9F .
 If the transceiver is not present, then the driver should not call this
 function.
 .Ss Opaque Transceivers
 Some devices abstract the nature of the transceiver and do not allow
-direct access to the transceiver. In this case, if the device driver
-still has access to enough information to know if the transceiver is
-at least present, then it should still implement the
+direct access to the transceiver.
+In this case, if the device driver still has access to enough
+information to know if the transceiver is at least present, then it
+should still implement the
 .Fn mct_info
 entry point.
 .Ss Locking and Data Access
 Calls to get information about the transceivers may come at the same
-time as general I/O requests to the device to send or receive data. The
-driver should make sure that reading data from the i2c bus of the
+time as general I/O requests to the device to send or receive data.
+The driver should make sure that reading data from the i2c bus of the
 transceiver does not interfere with the device's functionality in this
-regard. Different locks should be used.
+regard.
+Different locks should be used.
 .Pp
 On some devices, reading from the transceiver's i2c bus might cause a
-disruption of service to the device. For example, on some devices a phy
-reset may be required or come about as a side effect of trying to read
-the device. If any kind of disruption would be caused, then the driver
+disruption of service to the device.
+For example, on some devices a phy reset may be required or come about
+as a side effect of trying to read the device.
+If any kind of disruption would be caused, then the driver
 must not implement the
 .Ft mct_read
 entry point.
 .Sh CONTEXT
 The various callback functions will be called from
 .Sy kernel
-context. These functions will never be called from
+context.
+These functions will never be called from
 .Sy interrupt
 context.
 .Sh SEE ALSO

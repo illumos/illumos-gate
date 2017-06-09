@@ -18,9 +18,10 @@ A
 .Vt scsi_address
 structure defines the addressing components for a
 .Sy SCSI
-target device. The address of the target device is separated into
-two components: target number and logical unit number. The two addressing
-components are used to uniquely identify any type of
+target device.
+The address of the target device is separated into two components:
+target number and logical unit number.
+The two addressing components are used to uniquely identify any type of
 .Sy SCSI
 device; however, most devices can be addressed with the target component of the
 address.
@@ -45,10 +46,10 @@ in the
 .Fa hba_flags
 argument to
 .Xr scsi_hba_attach_setup 9F .
-When the flag is set, this structure must be treated as opaque. Instead
-of storing a traditional target and LUN, the address is treated as the
-string form of a unit address. In addition, rather than storing a
-pointer to the
+When the flag is set, this structure must be treated as opaque.
+Instead of storing a traditional target and LUN, the address is treated
+as the string form of a unit address.
+In addition, rather than storing a pointer to the
 .Xr scsi_hba_tran 9S
 structure, the address structure can store any arbitrary pointer through
 the
@@ -67,7 +68,8 @@ uchar_t           a_lun;        /* SCSI logical unit */
 is a pointer to the controlling
 .Sy HBA 's
 transport vector
-structure. The
+structure.
+The
 .Sy SCSA
 interface uses this field to pass any transport
 requests from the
@@ -84,8 +86,8 @@ address
 .Fa a_lun
 is the logical unit component of the
 .Sy SCSI
-address. The
-logical unit is used to further distinguish a
+address.
+The logical unit is used to further distinguish a
 .Sy SCSI
 target device that
 supports multiple logical units from one that does not.

@@ -58,10 +58,11 @@ container.
 .Nm
 can also be used to dump out the raw
 .Sy CTF
-data and send it to another file. When writing out data, it always
-ensures that the
+data and send it to another file.
+When writing out data, it always ensures that the
 .Sy CTF
-data is decompressed. In this form, the
+data is decompressed.
+In this form, the
 .Sy CTF
 data can be inspected using
 .Nm
@@ -70,10 +71,11 @@ and other tools such as
 .Lp
 When no options are specified,
 .Nm
-displays all information. However, when the
+displays all information.
+However, when the
 .Fl u
 option is used, then no information is displayed by default, unless
-requested through the the appropriate option.
+requested through the appropriate option.
 .Sh OPTIONS
 The following options are supported:
 .Bl -hang -width Ds
@@ -101,7 +103,8 @@ labels associated with the file.
 .Bd -filled -compact
 Use the type information in
 .Em parent
-to supplement output. This is useful when a
+to supplement output.
+This is useful when a
 .Nm CTF
 container has been
 .Sy uniquified
@@ -147,23 +150,27 @@ When the
 utility is executed with its default options, it prints out a textual
 representation of the
 .Sy CTF
-information. Note, the output format of
+information.
+Note, the output format of
 .Nm
 is subject to change at any time and should not be relied upon as a
 stable format to be used for parsing.
 .Ss CTF Header
 This section describes the values in the
 .Sy CTF
-header. Each line in the section describes the value of one of the
-members of the header. For more information on the meaning and
-interpretation of these members, see
+header.
+Each line in the section describes the value of one of the
+members of the header.
+For more information on the meaning and interpretation of these members,
+see
 .Xr ctf 4 .
 .Ss Label Table
 This section describes information about the labels present in the
 .Sy CTF
-information. Each entry in this section, if present, starts with a
-number and is followed by a string. An example entry in the label
-section might look like:
+information.
+Each entry in this section, if present, starts with a
+number and is followed by a string.
+An example entry in the label section might look like:
 .Bd -literal
 \&...
    2270 joyent_20151001T070028Z
@@ -172,12 +179,14 @@ section might look like:
 .Pp
 The number,
 .Em 2270 ,
-represents the last type that the label applies to. The string,
+represents the last type that the label applies to.
+The string,
 .Em joyent_20151001T070028Z ,
-is the name of the label. In this case, if there were no other labels,
+is the name of the label.
+In this case, if there were no other labels,
 it would indicate that the label applied to all types up to, and
-including, the type number 2270. For more information
-on how labels are used with
+including, the type number 2270.
+For more information on how labels are used with
 .Sy CTF
 information, see the section
 .Em The Label Section
@@ -185,10 +194,12 @@ in
 .Xr ctf 4 .
 .Ss Data Objects
 This section describes the type information relating to data objects
-from the symbol table. An entry for a data object consists of four
-columns. The first column is just a monotonic ID. The second number is
-the type id of the object. The third column is the name of the symbol
-and the fourth column is the corresponding index from the symbol table.
+from the symbol table.
+An entry for a data object consists of four columns.
+The first column is just a monotonic ID.
+The second number is the type id of the object.
+The third column is the name of the symbol and the fourth column is the
+corresponding index from the symbol table.
 .Pp
 Take for example, the following couple of entries:
 .Bd -literal
@@ -202,18 +213,21 @@ Take for example, the following couple of entries:
 \&...
 .Ed
 .Pp
-Let's take the first entry in the list above. The symbol is named
+Let's take the first entry in the list above.
+The symbol is named
 .Sy hz .
 It is the first data object, as indicated by the number zero in
-brackets. It has a type id of 13 and in this case, it has a symbol table
-index of 48.
+brackets.
+It has a type id of 13 and in this case, it has a symbol table index of
+48.
 .Ss Functions
-This section describes the type information for functions. For each
-function present in the symbol table with type information, the
+This section describes the type information for functions.
+For each function present in the symbol table with type information, the
 function's entry into the function section, the function's name, the
 function's symbol table index, the function's return type, and the types
-of the function's arguments are printed. If a function is a variadic
-function, then the variadic argument is printed as the string
+of the function's arguments are printed.
+If a function is a variadic function, then the variadic argument is
+printed as the string
 .Sy '...' .
 .Pp
 Take for example, the following couple of entries:
@@ -228,40 +242,49 @@ Take for example, the following couple of entries:
 .Ed
 .Pp
 The first column is the function's entry number in the function type
-information section. It is enclosed in brackets. The next column is the
-function's name and it is followed in parenthesis by the its index in the
-symbol table. The following portions of this entry describe the return
+information section.
+It is enclosed in brackets.
+The next column is the function's name and it is followed in parenthesis
+by the its index in the
+symbol table.
+The following portions of this entry describe the return
 type and then all of the arguments, in positional order.
 .Ss Types
 The types section gives information about each type in the
 .Sy CTF
-container. Each entry begins with its type identifier. The type
-identifier may either be in square brackets or in angle brackets. If the
-type identifier is enclosed in angle brackets, then that represents that
-it is a root type or top-level type. If it is square brackets, then it
-is not. For more information on root types, see
+container.
+Each entry begins with its type identifier.
+The type identifier may either be in square brackets or in angle
+brackets.
+If the type identifier is enclosed in angle brackets, then that
+represents that it is a root type or top-level type.
+If it is square brackets, then it is not.
+For more information on root types, see
 .Xr ctf 4 .
 .Pp
-Next, the type will have its name and kind. If it is an array, it will
-be followed with a subscript that describes the number of entries in the
-array. If it is a pointer, it will followed by the
+Next, the type will have its name and kind.
+If it is an array, it will be followed with a subscript that describes
+the number of entries in the array.
+If it is a pointer, it will followed by the
 .Sy *
-symbol to indicate that it is a pointer. If the type has the
+symbol to indicate that it is a pointer.
+If the type has the
 .Sy const ,
 .Sy volatile ,
 .Sy typedef ,
 or
 .Sy restrict
-keyword applied to it, that will precede the name. All of these
-reference types, including pointer, will then be followed with an
-example of the type that they refer to.
+keyword applied to it, that will precede the name.
+All of these reference types, including pointer, will then be followed
+with an example of the type that they refer to.
 .Pp
 Types which are an integral or floating point value will be followed by
 information about their encoding and the number of bits represented in
 the type.
 .Pp
 Arrays will be followed by two different entries, the contents and
-index. The contents member contains the type id of the array's contents
+index.
+The contents member contains the type id of the array's contents
 and the index member describes a type which can represent the array's
 index.
 .Pp
@@ -269,10 +292,10 @@ Structures and unions will be preceded with the corresponding C keyword,
 .Sy struct
 or
 .Sy union .
-After that, the size in bytes of the structure will be indicated. ON
-each subsequent line, a single member will be listed. That line will
-contain the member's name, it's type identifier, and the offset into the
-structure that it can be found in, in bits.
+After that, the size in bytes of the structure will be indicated.
+ON each subsequent line, a single member will be listed.
+That line will contain the member's name, it's type identifier, and the
+offset into the structure that it can be found in, in bits.
 .Pp
 The following show examples of type information for all of these
 different types:
@@ -304,9 +327,12 @@ different types:
 .Ss String Table
 This section describes all of the strings that are present in the
 .Sy CTF
-container. Each line represents an entry in the string table. First the
-byte offset into the string table is shown in brackets and then the
-string's value is displayed. Note the following examples:
+container.
+Each line represents an entry in the string table.
+First the byte offset into the string table is shown in brackets and
+then the
+string's value is displayed.
+Note the following examples:
 .Bd -literal
   [0] \0
   [1] joyent_20151001T070028Z
@@ -317,15 +343,16 @@ string's value is displayed. Note the following examples:
 .Ss Statistics
 This section contains miscellaneous statistics about the
 .Sy CTF
-data present. Each line contains a single statistic. A brief explanation
-of the statistic is placed first, followed by an equals sign, and then
-finally the value.
+data present.
+Each line contains a single statistic.
+A brief explanation of the statistic is placed first, followed by an
+equals sign, and then finally the value.
 .Sh EXIT STATUS
 .Bl -inset
 .It Sy 0
 .Dl Execution completed successfully.
 .It Sy 1
-.Dl A fatal error occured.
+.Dl A fatal error occurred.
 .It Sy 2
 .Dl Invalid command line options were specified.
 .El

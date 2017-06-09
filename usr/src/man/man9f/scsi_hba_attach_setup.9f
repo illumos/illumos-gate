@@ -8,7 +8,7 @@
 .Dt SCSI_HBA_ATTACH_SETUP 9F
 .Os
 .Sh NAME
-.Nm scsi_hba_attach_setup
+.Nm scsi_hba_attach_setup ,
 .Nm scsi_hba_detach
 .Nd SCSI HBA attach and detach routines
 .Sh SYNOPSIS
@@ -37,7 +37,8 @@ Pointer to a
 .Xr scsi_hba_tran 9S
 structure.
 .It Fa hba_flags
-Flag modifiers. The defined flag values are
+Flag modifiers.
+The defined flag values are
 .Dv SCSI_HBA_TRAN_CLONE ,
 .Dv SCSI_HBA_TRAN_SCB ,
 .Dv SCSI_HBA_TRAN_CDB ,
@@ -69,7 +70,8 @@ function uses the
 .Vt dev_bus_ops
 field in the
 .Xr dev_ops 9S
-structure. The HBA driver should initialize this field to
+structure.
+The HBA driver should initialize this field to
 .Dv NULL
 before calling
 .Fn scsi_hba_attach_setup .
@@ -81,13 +83,15 @@ is requested in
 the
 Fa hba_tran
 structure is cloned once for each target that is attached to the
-HBA. The use of this flag is deprecated, drivers should instead use
+HBA.
+The use of this flag is deprecated, drivers should instead use
 .Dv SCSI_HBA_ADDR_COMPLEX
 for per-target data.
 .Pp
 The structure is cloned before the
 .Xr tran_tgt_init 9E
-entry point is called to initialize a target. At all subsequent HBA
+entry point is called to initialize a target.
+At all subsequent HBA
 entry points, including
 .Xr tran_tgt_init 9E ,
 the
@@ -101,9 +105,11 @@ structure, which allows the HBA to use the
 .Vt tran_tgt_private
 field in the
 .Vt scsi_hba_tran_t
-structure to point to per-target data. The HBA should free only the same
+structure to point to per-target data.
+The HBA should free only the same
 .Vt scsi_hba_tran_t
-structure allocated when the HBA detaches. All cloned
+structure allocated when the HBA detaches.
+All cloned
 .Vt scsi_hba_tran_t
 structures that are allocated by the system are freed by the system.
 .Pp
@@ -114,18 +120,21 @@ and
 are only valid
 when
 .Fn tran_setup_pkt
-is used. See
+is used.
+See
 .Xr tran_setup_pkt 9E
 for information on using these flags.
 .Pp
 The flag
 .Dv SCSI_HBA_ADDR_COMPLEX
 indicates to the system that this device handles more complex SCSI
-topologies, such as SAS. When this flag is set, the
+topologies, such as SAS.
+When this flag is set, the
 .Xr scsi_address 9S
-structure becomes opaque. The driver must not check it for the
-traditional target and LUN values. Instead, a target and LUN are
-identified by a unit address which can be retrieved using the
+structure becomes opaque.
+The driver must not check it for the traditional target and LUN values.
+Instead, a target and LUN are identified by a unit address which can be
+retrieved using the
 .Xr scsi_device_unit_address 9F
 function.
 .Pp
@@ -133,20 +142,24 @@ When operating with the flag
 .Dv SCSI_HBA_ADDR COMPLEX ,
 the driver may associate private data with the
 .Xr scsi_device 9S
-structure. This obviates the need and complexity around using
+structure.
+This obviates the need and complexity around using
 .Dv SCSI_HBA_TRAN_CLONE
-flag. To get and set private data, the driver can use the
+flag.
+To get and set private data, the driver can use the
 .Xr scsi_device_hba_private_get 9F
 and
 .Xr scsi_device_hba_private_set 9F
-functions. Notably, the
+functions.
+Notably, the
 .Fn scsi_device_hba_private_set
 function should be used during the
 .Xr tran_tgt_init 9E
-entry point. The
+entry point.
+The
 .Fn scsi_device_hba_private_get
-function should then be used during other SCSI HBA entry points. In
-addition, the
+function should then be used during other SCSI HBA entry points.
+In addition, the
 .Xr scsi_address_device 9F
 function now becomes available to the driver to map between the
 .Xr scsi_device 9S
@@ -159,21 +172,22 @@ The
 flag indicates that the HBA driver will only enumerate direct children
 which are
 .Xr iport 9
-instances. This mode of operation is recommended for device drivers as
-it simplifies the management of discovered devices. This flag is often
-used in tandem with
+instances.
+This mode of operation is recommended for device drivers as
+it simplifies the management of discovered devices.
+This flag is often used in tandem with
 .Dv SCSI_HBA_ADDR_COMPLEX
-and is recommended for all new SAS-based HBA drivers. For more
-information on the management of iports and the use of target maps,
-please see
+and is recommended for all new SAS-based HBA drivers.
+For more information on the management of iports and the use of target
+maps, please see
 .Xr iport 9 .
 .Pp
 The
 .Fn scsi_hba_attach_setup
 function attaches a number of integer-valued properties to
 .Fa dip ,
-unless properties of the same name are already attached to the node. An
-HBA driver should retrieve these configuration parameters via
+unless properties of the same name are already attached to the node.
+An HBA driver should retrieve these configuration parameters via
 .Xr ddi_prop_get_int 9F ,
 and respect any settings for features provided the HBA.
 .Bl -tag -width Sy
@@ -189,7 +203,8 @@ If not set, the HBA should not operate in Command Tagged Queueing mode.
 If not set, the HBA should not operate in parity mode.
 .It Dv SCSI_OPTIONS_QAS
 If not set, the HBA should not make use of the Quick Arbitration Select
-feature. Consult your hardware documentation to determine whether your
+feature.
+Consult your hardware documentation to determine whether your
 machine supports QAS.
 .It Dv SCSI_OPTIONS_FAST
 If not set, the HBA should not operate the bus in FAST SCSI mode.
@@ -211,8 +226,9 @@ If not set, the HBA should not operate the bus in synchronous transfer mode.
 .It Sy scsi-reset-delay
 SCSI bus or device reset recovery time, in milliseconds.
 .It Sy scsi-selection-timeout
-Default SCSI selection phase timeout value, in milliseconds. Please refer to
-individual HBA man pages for any HBA-specific information
+Default SCSI selection phase timeout value, in milliseconds.
+Please refer to individual HBA man pages for any HBA-specific
+information
 .El
 .Ss Fn scsi_hba_detach
 The

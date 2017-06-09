@@ -63,7 +63,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
+This interface is still evolving in illumos.
+API and ABI stability is
 not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
@@ -74,7 +75,8 @@ structure.
 .It Fa settle_usec
 A time in microseconds.
 .It Fa mode
-Mode of operation for the phy map. Should be set to
+Mode of operation for the phy map.
+Should be set to
 .Dv PHYMAP_MODE_SIMPLE .
 .It Fa mode_priv
 Drivers should pass
@@ -112,17 +114,18 @@ The
 and
 .Fn sas_phymap_destroy
 functions create and destroy phymaps which are used to manage a set of
-potentially-active SAS phys and the attached devices. For more
-background, see
+potentially-active SAS phys and the attached devices.
+For more background, see
 .Xr phymap 9 .
 If the driver in question is not a SAS HBA or a similar fabric-like
 device, then do not use this interface.
 .Pp
 The phy map maps one or more phys to a logical port-like construct that
-is represented based on the WWNs in question. This logical SAS port has
-a unit address derived from the two WWNs. When the first phy is noted as
-using these WWNs, then the phymap will call any registered callbacks as
-the port is created. If additional phys come online in service of the
+is represented based on the WWNs in question.
+This logical SAS port has a unit address derived from the two WWNs.
+When the first phy is noted as using these WWNs, then the phymap will
+call any registered callbacks as the port is created.
+If additional phys come online in service of the
 same port, then a new port will not be created.
 .Pp
 To facilitate the mapping between a PHY and the corresponding port unit
@@ -134,13 +137,15 @@ functions are available.
 .Pp
 To create a phy map, the driver uses the
 .Fn sas_phymap_create
-function. The resulting phy map will be stored in the
+function.
+The resulting phy map will be stored in the
 .Fa phymapout
-argument. The value in
+argument.
+The value in
 .Fa settle_usec
 indicates the amount of time that the system should wait to quiesce all
-changes and consider the resulting system stable. Changes will not be
-reported until after
+changes and consider the resulting system stable.
+Changes will not be reported until after
 .Fa settle_usec
 have passed.
 .Pp
@@ -157,19 +162,22 @@ argument will be passed to both callback functions.
 .Pp
 To destroy a phymap, the driver should call the
 .Fn sas_phymap_destroy
-function. A side effect of this is that all existing entries in the phy
+function.
+A side effect of this is that all existing entries in the phy
 map will be removed and their deactivate callbacks will fire.
 .Ss Callbacks
 The phymap provides a means for receiving callbacks when the addition of
 a phy causes a new logical port to be created or when the phy being
-removed is the last phy that is a member of the port. Unlike with the
+removed is the last phy that is a member of the port.
+Unlike with the
 .Xr tgtmap 9 ,
-there is no system managed driver that is attached with the phymap. For
-the phymap to be useful to drivers, the callbacks should generally be
-registered.
+there is no system managed driver that is attached with the phymap.
+For the phymap to be useful to drivers, the callbacks should generally
+be registered.
 .Pp
 It's important to emphasize that the callbacks do not represent phys,
-but instead the logical port that they are bound to. This is different
+but instead the logical port that they are bound to.
+This is different
 from the
 .Xr tgtmap 9
 and
@@ -183,7 +191,8 @@ functions may not result in anything being created in the system.
 The
 .Fa activate_cb
 callback occurs whenever a new logical port is created because the first
-phy that references that pair of WWNs has been created. The
+phy that references that pair of WWNs has been created.
+The
 .Fa phymap_priv
 argument corresponds to the value passed in the
 .Fn sas_phymap_create
@@ -198,7 +207,8 @@ and
 .Fa remote
 arguments to the
 .Fn sas_phymap_phy_add
-function. If this is being used together with an
+function.
+If this is being used together with an
 .Xr iportmap 9
 then the
 .Fa ua
@@ -206,17 +216,18 @@ should be the name of the added iport.
 .Pp
 The
 .Fa ua_privp
-argument allows for data to be correlated with the unit-address. This
-data is accessible throughout the lifetime of the unit-address through
-the
+argument allows for data to be correlated with the unit-address.
+This data is accessible throughout the lifetime of the unit-address
+through the
 .Xr sas_phymap_lookup_uapriv 9F
 function and is also made available during the deactivate callback.
 .Pp
 The
 .Fa deactivate_cb
 callback occurs when the logical port is being removed, because the last
-associated phy has been removed. The arguments to this are the same as
-to the activate callback, with the exception that the
+associated phy has been removed.
+The arguments to this are the same as to the activate callback, with the
+exception that the
 .Fa ua_priv
 argument is the value that was stored in the
 .Fa ua_privp
@@ -224,15 +235,17 @@ argument of the activate callback.
 .Ss Adding and Removing PHYs
 To add a phy to the system, the driver should call the
 .Fn sas_phymap_phy_add
-function. The
+function.
+The
 .Fa phy
 argument should indicate the phy identifier of the phy that has come up.
 The
 .Fa local
 WWN generally corresponds to the SAS port on the controller, while the
 .Fa remote
-WWN is whatever device is on the other side of the phy. The system
-enforces that a given phy only maps to a single port at any time.
+WWN is whatever device is on the other side of the phy.
+The system enforces that a given phy only maps to a single port at any
+time.
 .Pp
 When a phy goes offline, then the driver should call the
 .Fn sas_phymap_phy_rem

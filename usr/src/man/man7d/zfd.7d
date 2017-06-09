@@ -38,10 +38,10 @@ The zone's zfd device configuration is driven by
 .Nm zoneadmd
 and a zone attribute
 .Nm zlog-mode
-which is somewhat of a misnomer since its purpose has evolved. The attribute
-can have a variety of values, but the lowest two positions in the value string
-are used to control how many zfd devices are created inside the zone and if the
-primary stream is a tty.
+which is somewhat of a misnomer since its purpose has evolved.
+The attribute can have a variety of values, but the lowest two positions
+in the value string are used to control how many zfd devices are created
+inside the zone and if the primary stream is a tty.
 .sp
 .Dl --
 .Dl -n
@@ -61,19 +61,19 @@ That is,
 .Nm ldterm
 and
 .Nm ttycompat
-are autopushed onto the stream when the slave side is opened. There is only a
-single zfd device (0) needed for the primary stream.
+are autopushed onto the stream when the slave side is opened.
+There is only a single zfd device (0) needed for the primary stream.
 .sp
 When the
 .Nm n
 flag is set, it is assumed that output logging will be done within the zone
-itself. In this configuration 1 or 2 additional zfd devices, depending on tty
-mode
+itself.
+In this configuration 1 or 2 additional zfd devices, depending on tty mode
 .Nm ( t
-flag), are created within the zone. An application can then configure the
-zfd streams driver into a multiplexer. Output from the stdout/stderr zfd(s)
-will be teed into the correspond logging zfd(s) within the zone.
-.sp
+flag), are created within the zone.
+An application can then configure the zfd streams driver into a multiplexer.
+Output from the stdout/stderr zfd(s) will be teed into the correspond
+logging zfd(s) within the zone.
 .Sh SEE ALSO
 .Xr zlogin 1 ,
 .Xr zoneadmd 1M ,

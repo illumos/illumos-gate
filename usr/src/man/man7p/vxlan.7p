@@ -24,24 +24,27 @@
 .Nm
 (RFC 7348) is a network encapsulation protocol that is used by
 .Xr overlay 5
-devices. A payload, commonly an Ethernet frame, is placed inside of a
+devices.
+A payload, commonly an Ethernet frame, is placed inside of a
 UDP packet and prepended with an 8-byte
 .Nm
 header.
 .Pp
 The
 .Nm
-header contains two 32-bit words. The first word is an 8-bit flags field
-followed by 24 reserved bits. The second word is a 24-bit virtual network
-identifier followed by 8 reserved bits. The virtual network identifier
-identifies a unique
+header contains two 32-bit words.
+The first word is an 8-bit flags field followed by 24 reserved bits.
+The second word is a 24-bit virtual network identifier followed by 8
+reserved bits.
+The virtual network identifier identifies a unique
 .Nm
 and
 is similar in concept to an IEEE 802.1Q VLAN identifier.
 .Pp
 The system provides access to
 .Nm
-through dladm overlays. See
+through dladm overlays.
+See
 .Xr dladm 1M
 and
 .Xr overlay 5
@@ -51,10 +54,12 @@ The
 .In sys/vxlan.h
 header provides information for working with the
 .Nm
-protocol. The contents of this header are
+protocol.
+The contents of this header are
 .Sy uncommitted .
 The header defines a structure that may be used to encode and decode a VXLAN
-header. It defines a packed structure type
+header.
+It defines a packed structure type
 .Sy vxlan_hdr_t
 which represents the
 .Nm
@@ -70,7 +75,8 @@ Decoding a
 header
 .Pp
 The following example shows how to validate a
-.Nm header. For more information on this process, see RFC 7348.
+.Nm header.
+For more information on this process, see RFC 7348.
 .Bd -literal -offset indent
 #include <sys/types.h>
 #include <netinet/in.h>

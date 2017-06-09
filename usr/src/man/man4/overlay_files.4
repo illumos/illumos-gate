@@ -23,10 +23,11 @@ The
 plugin provides a means for a dynamic overlay where the destinations are
 determined based on a static description contained in a
 .Sy JSON
-file. This manual describes the format of the file used by the
+file.
+This manual describes the format of the file used by the
 .Sy files/config
-property. To create and manage overlays
-with the
+property.
+To create and manage overlays with the
 .Sy files
 plugin, use
 .Xr dladm 1M .
@@ -35,27 +36,33 @@ For more information on overlays, see
 .Pp
 Using the
 .Sy files
-module, a static and simple overlay network can be created. This network
-does not support the use of
+module, a static and simple overlay network can be created.
+This network does not support the use of
 .Em broadcast
 or
 .Em multicast
-traffic. Both ARP and NDP traffic are proxied by the plugin itself. In
-addition, the plugin allows for DHCP. Instead of providing a traditional
-DHCP proxy, when an initial DHCP broadcast goes out to a broadcast
-address, it will get rewritten to target a specific MAC address. The
+traffic.
+Both ARP and NDP traffic are proxied by the plugin itself.
+In addition, the plugin allows for DHCP.
+Instead of providing a traditional DHCP proxy, when an initial DHCP broadcast
+goes out to a broadcast address, it will get rewritten to target a specific MAC
+address.
+The
 .Sy files
 plugin is useful as proof of concept and for simple static networks
-where addresses do not need to be reconfigured. If more advanced
-topologies or more streamlined updates are required, consider a different
-plugin.
+where addresses do not need to be reconfigured.
+If more advanced topologies or more streamlined updates are required, consider
+a different plugin.
 .Pp
 The file format is encoded as a series of
 .Sy JSON
-objects. Each object has a key, which is a MAC address on the
+objects.
+Each object has a key, which is a MAC address on the
 .Sy overlay
-network. It has multiple values, some required, some optional, which
-describe various properties. The valid properties are:
+network.
+It has multiple values, some required, some optional, which describe various
+properties.
+The valid properties are:
 .Bl -hang -width Ds
 .It Sy ip
 .Bd -filled -compact
@@ -63,14 +70,16 @@ The
 .Sy ip
 key indicates the IP address on the
 .Sy underlay
-network that houses the MAC address in question. Packets directed for
-the MAC address will be encapsulated and set to this address. This field
-is required.
+network that houses the MAC address in question.
+Packets directed for the MAC address will be encapsulated and set to this
+address.
+This field is required.
 .Pp
 The value is a
 .Em JSON String .
 Both IPv4 and IPv6 addresses are supported and should be written out in their
-traditional forms.  Follow the guidelines for writing addresses in
+traditional forms.
+Follow the guidelines for writing addresses in
 .Xr inet_aton 3SOCKET .
 .Ed
 .It Sy port
@@ -79,9 +88,10 @@ The
 .Sy port
 key indicates the port on the
 .Sy underlay
-network that houses the MAC address in question. This property is required if
-the encapsulation module requires a port for its destination. The value is
-a
+network that houses the MAC address in question.
+This property is required if the encapsulation module requires a port for its
+destination.
+The value is a
 .Em JSON Number .
 .Ed
 .It Sy arp
@@ -90,10 +100,12 @@ The
 .Sy arp
 key stores the IPv4 address that corresponds to this MAC address on the
 .Sy overlay
-network. This will be used to respond to ARP queries that would traditionally
-have been received by the OS kernel. If this address is not present, no IPv4
-packets directed to this IP address will be received by the network interface
-that has this MAC address, regardless of what is configured on top of it.
+network.
+This will be used to respond to ARP queries that would traditionally have been
+received by the OS kernel.
+If this address is not present, no IPv4 packets directed to this IP address will
+be received by the network interface that has this MAC address, regardless of
+what is configured on top of it.
 .Pp
 The value is a
 .Em JSON String
@@ -106,10 +118,12 @@ The
 .Sy ndp
 key stores the IPv6 address that corresponds to this MAC address on the
 .Sy overlay
-network. This will be used to respond to NDP queries that would traditionally
-have been received by the OS kernel. If this address is not present, no IPv6
-packets directed to this IP address will be received by the network interface
-that has this MAC address, regardless of what is configured on top of it.
+network.
+This will be used to respond to NDP queries that would traditionally have been
+received by the OS kernel.
+If this address is not present, no IPv6 packets directed to this IP address will
+be received by the network interface that has this MAC address, regardless of
+what is configured on top of it.
 .Pp
 The value is a
 .Em JSON String
@@ -121,8 +135,10 @@ and should be written out following the guidelines for IPv6 addresses in
 The
 .Sy dhcp-proxy
 key stores a MAC address that DHCP messages directed to a broadcast address get
-rewritten to be sent to. This can be viewed as a form of proxy DHCP, but is
-different in mechanism from a traditional proxy. The value is a
+rewritten to be sent to.
+This can be viewed as a form of proxy DHCP, but is different in mechanism from a
+traditional proxy.
+The value is a
 .Em JSON String
 and should be written as a traditional MAC address string as described by
 .Xr ether_aton 3SOCKET .
@@ -133,10 +149,12 @@ and should be written as a traditional MAC address string as described by
 Sample configuration file
 .Pp
 This configuration file provides information for three different MAC
-addresses. Each MAC address has an entry which describes what its IPv4
+addresses.
+Each MAC address has an entry which describes what its IPv4
 and IPv6 address is, as well as the IP address and port of the host on
-the underlay network. Finally, one host has a DHCP proxy entry to
-demonstrate how one might configure DHCP.
+the underlay network.
+Finally, one host has a DHCP proxy entry to demonstrate how one might
+configure DHCP.
 .Bd -literal -offset indent
 {
 	"de:ad:be:ef:00:00": {

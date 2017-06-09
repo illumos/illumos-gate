@@ -31,8 +31,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
-not guaranteed.
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa dip
@@ -58,11 +58,11 @@ The
 .Fn scsi_hba_iport_find
 function attempts to find a child iport and return its
 .Vt dev_info
-structure if it exists. The iport is searched for by its unit address,
-which is passed in the
+structure if it exists.
+The iport is searched for by its unit address, which is passed in the
 .Fa ua
-argument. The unit address for an iport is established when the iport is
-created.
+argument.
+The unit address for an iport is established when the iport is created.
 .Sh CONTEXT
 The
 .Fn scsi_hba_iport_exist
@@ -87,7 +87,8 @@ The
 .Fn scsi_hba_iport_find
 function returns a pointer to the iport's
 .Vt dev_info
-structure, if found. Otherwise,
+structure, if found.
+Otherwise,
 .Dv NULL
 is returned.
 .Sh SEE ALSO

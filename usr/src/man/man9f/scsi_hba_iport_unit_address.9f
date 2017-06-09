@@ -25,7 +25,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
+This interface is still evolving in illumos.
+API and ABI stability is
 not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
@@ -37,12 +38,13 @@ structure.
 .Sh DESCRIPTION
 The
 .Fn scsi_hba_iport_unit_address
-function is used to obtain the unit address of an iport. For more
-information on iports, see
+function is used to obtain the unit address of an iport.
+For more information on iports, see
 .Xr iport 9 .
 .Pp
 This function can be used to determine whether or not a device node in
-the tree is an iport. If the device node corresponds to an iport, then
+the tree is an iport.
+If the device node corresponds to an iport, then
 the unit address used when it was created either through
 .Xr scsi_hba_iport_register 9F
 or
@@ -61,7 +63,8 @@ context.
 If
 .Fa dip
 is an iport, then the unit address string the device was registered with
-is returned. Otherwise,
+is returned.
+Otherwise,
 .Dv NULL
 is returned.
 .Sh SEE ALSO

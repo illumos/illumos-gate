@@ -21,8 +21,8 @@
 .Nm sas_phymap_ua_free ,
 .Nm sas_phymap_uahasphys ,
 .Nm sas_phymap_ua2phys ,
-.Nm sas_phymap_phys_next
-.Nm sas_phymap_phys_free ,
+.Nm sas_phymap_phys_next ,
+.Nm sas_phymap_phys_free
 .Nd SAS phymap utility functions
 .Sh SYNOPSIS
 .In sys/scsi/scsi.h
@@ -66,7 +66,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
+This interface is still evolving in illumos.
+API and ABI stability is
 not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
@@ -86,7 +87,8 @@ An opaque structure that represents a collection of phys on a port.
 .El
 .Sh DESCRIPTION
 The functions described here are all utility functions for operating on
-a phymap and the entities it creates.  For more information on phymaps,
+a phymap and the entities it creates.
+ For more information on phymaps,
 see
 .Xr phymap 9
 and
@@ -99,9 +101,11 @@ the tuple of the
 .Fa local
 and
 .Fa remote
-WWN. If a logical port exists for that tuple, then a pointer to its
-system generated unit-address is returned. This string is managed by the
-system and it must not be modified or freed. If it cannot be found, then
+WWN.
+If a logical port exists for that tuple, then a pointer to its
+system generated unit-address is returned.
+This string is managed by the system and it must not be modified or freed.
+If it cannot be found, then
 .Dv NULL
 is returned.
 .Pp
@@ -120,7 +124,8 @@ represented by the unit address specified in
 .Fa ua
 that is a part of the phymap
 .Fa phymap
-has any phys. If phys are found, then the function returns
+has any phys.
+If phys are found, then the function returns
 .Sy 1 .
 .Pp
 The
@@ -130,9 +135,11 @@ function attempts to map a given phy specified by
 to its unit-address in the map
 .Fa phymap .
 This function will allocate memory for the character string, thus it can
-be modified. The caller must call the
+be modified.
+The caller must call the
 .Fa sas_phymap_ua_free
-function to release the memory that was allocated. The
+function to release the memory that was allocated.
+The
 .Fa sas_phymap_ua_free
 function should not be used with the string returned from the
 .Fn sas_phymap_lookup_ua
@@ -147,11 +154,13 @@ in the map
 .Fa phymap .
 This set can be iterated by calling the
 .Fn sas_phyap_phys_next
-function. Each time the function is called, an entry is returned. When
-the value
+function.
+Each time the function is called, an entry is returned.
+When the value
 .Sy -1
-is returned it indicates that the set is empty. Regardless of whether or
-not the set has been iterated over, the caller must call the
+is returned it indicates that the set is empty.
+Regardless of whether or not the set has been iterated over, the caller
+must call the
 .Fn sas_phymap_phys_free
 function to release the memory associated with the set.
 .Sh CONTEXT
@@ -166,8 +175,9 @@ Upon successful completion, the
 .Fn sas_phymap_lookup_ua
 and
 .Fn sas_phymap_phy2ua
-function returns a pointer to the unit-address. If the port or phy could
-not be found or another error occurred, then the function returns
+function returns a pointer to the unit-address.
+If the port or phy could not be found or another error occurred, then
+the function returns
 .Dv NULL .
 .Pp
 Upon successful completion, the
@@ -180,16 +190,16 @@ Upon successful completion, the
 .Fn sas_phymap_uahasphys
 returns
 .Sy 1
-to indicate that the unit-address has phys. If the unit-address
-has no phys, then it returns
+to indicate that the unit-address has phys.
+If the unit-address has no phys, then it returns
 .Sy 0 .
 If an error occurred or the port doesn't exist, then the function returns
 .Sy 0 .
 .Pp
 Upon successful completion, the
 .Fn sas_phymap_ua2phys
-function returns a pointer to an allocated phy set. Otherwise, it
-returns
+function returns a pointer to an allocated phy set.
+Otherwise, it returns
 .Dv NULL .
 .Pp
 The

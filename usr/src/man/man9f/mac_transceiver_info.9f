@@ -33,7 +33,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Volatile -
-This interface is still evolving in illumos. API and ABI stability is
+This interface is still evolving in illumos.
+API and ABI stability is
 not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
@@ -53,8 +54,8 @@ and
 .Fn mac_transceiver_set_usable
 functions are used to set information about a transceiver as part of the
 .Xr mct_info 9E
-entry point to obtain information about a MAC transceiver. For more
-information and background, see the
+entry point to obtain information about a MAC transceiver.
+For more information and background, see the
 .Sy Transceiver Information Functions
 section of
 .Xr mac_capab_transceiver 9E .
@@ -62,7 +63,8 @@ section of
 The
 .Fn mct_transceiver_set_present
 function sets whether or not the transceiver is present and plugged into
-the system. If the transceiver is not plugged in, then the function
+the system.
+If the transceiver is not plugged in, then the function
 should be called with
 .Fa present set to
 .Dv B_FALSE ,

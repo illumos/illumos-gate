@@ -20,8 +20,8 @@
 .Sh DESCRIPTION
 Overlay devices are a GLDv3 device that allows users to create overlay
 networks that can be used to form the basis of network virtualization
-and software defined networking. Overlay networks allow a single
-physical network, often called an
+and software defined networking.
+Overlay networks allow a single physical network, often called an
 .Sy underlay
 network, to provide the means for creating multiple logical, isolated,
 and discrete layer two and layer three networks on top of it.
@@ -31,9 +31,11 @@ Overlay devices are administered through
 Overlay devices themselves cannot be plumbed up with
 .Sy IP ,
 .Sy vnd ,
-or any other protocol. Instead, like an
+or any other protocol.
+Instead, like an
 .Sy etherstub ,
-they allow for VNICs to be created on top of them. Like an
+they allow for VNICs to be created on top of them.
+Like an
 .Sy etherstub ,
 an overlay device acts as a local switch; however, when it encounters a
 non-local destination address, it instead looks up where it should send
@@ -50,45 +52,48 @@ How should a packet be transformed and put on the wire?
 Where should a transformed packet be sent?
 .El
 .Pp
-Each of these questions is answered by a plugin. The first question is
-answered by what's called an
+Each of these questions is answered by a plugin.
+The first question is answered by what's called an
 .Em encapsulation plugin .
 The second question is answered by what's called a
 .Em search plugin .
 Packets are encapsulated and decapsulated using the encapsulation plugin
-by the kernel. The search plugins are all user land plugins that are
-consumed by the varpd service whose FMRI is
+by the kernel.
+The search plugins are all user land plugins that are consumed by the
+varpd service whose FMRI is
 .Em svc:/network/varpd:default .
 This separation allows for the kernel to be responsible for the data
 path, while having the search plugins in userland allows the system to
 provide a much more expressive interface.
 .Ss Overlay Types
-Overlay devices come in
-two different flavors, one where all packets are always sent to a single
-address, the other, where the destination of a packet varies based on
-the target MAC address of the packet. This information is maintained in
-a
+Overlay devices come in two different flavors, one where all packets are
+always sent to a single address, the other, where the destination of a
+packet varies based on the target MAC address of the packet.
+This information is maintained in a
 .Em target table ,
-which is independent and unique to each overlay device. We call the
-plugins that send traffic to a single location, for example a single
-unicast or multicast IP address, a
+which is independent and unique to each overlay device.
+We call the plugins that send traffic to a single location, for example
+a single unicast or multicast IP address, a
 .Sy point to point
 overlay and the overlay devices that can send traffic to different
 locations based on the MAC address of that packet a
 .Sy dynamic
-overlay. The plugin type is determined based on the type of the
+overlay.
+The plugin type is determined based on the type of the
 .Sy search plugin .
 These are all fully listed in the section
 .Sx Plugins and their Properties .
 .Ss Overlay Destination
 Both encapsulation and search plugins define the kinds of destinations
-that they know how to support. An encapsulation plugin always has a
-single destination type that's determined based on how the encapsulation
-is defined. A search plugin, on the other hand, can support multiple
-combinations of destinations. A search plugin must support the
-destination type of the encapsulation device. The destination may
-require any of the following three pieces of information, depending on
-the encapsulation plugin:
+that they know how to support.
+An encapsulation plugin always has a single destination type that's
+determined based on how the encapsulation is defined.
+A search plugin, on the other hand, can support multiple combinations of
+destinations.
+A search plugin must support the destination type of the encapsulation
+device.
+The destination may require any of the following three pieces of
+information, depending on the encapsulation plugin:
 .Bl -hang -width Ds
 .It Sy MAC Address
 .Bd -filled -compact
@@ -96,7 +101,8 @@ An Ethernet MAC address is required to determine the destination.
 .Ed
 .It Sy IP Address
 .Bd -filled -compact
-An IP address is required. Both IPv4 and IPv6 addresses are supported.
+An IP address is required.
+Both IPv4 and IPv6 addresses are supported.
 .Ed
 .It Sy Port
 .Bd -filled -compact
@@ -109,15 +115,17 @@ encapsulation plugins is listed in the section
 .Sx Plugins and their Properties .
 .Ss varpd
 The varpd service, mentioned above, is responsible for providing the
-virtual ARP daemon. Its responsibility is conceptually similar to ARP.
+virtual ARP daemon.
+Its responsibility is conceptually similar to ARP.
 It runs all instances of search plugins in the system and is responsible
 for answering the kernel's ARP-like questions for where packets should
 be sent.
 .Pp
 The varpd service, svc:/network/varpd:default, must be enabled for
-overlay devices to function. If it is disabled while there are active
-devices, then most overlay devices will not function correctly and
-likely will end up dropping traffic.
+overlay devices to function.
+If it is disabled while there are active devices, then most overlay
+devices will not function correctly and likely will end up dropping
+traffic.
 .Sh PLUGINS AND PROPERTIES
 Properties fall into three categories in the system:
 .Bl -enum -offset indent -compact
@@ -137,8 +145,9 @@ link properties:
 .It Sy Name
 .Bd -filled -compact
 The name of a property is namespaced by its module and always structured
-and referred to as as module/property. This allows for both an
-encapsulation and search plugin to have a property with the same name.
+and referred to as as module/property.
+This allows for both an encapsulation and search plugin to have a
+property with the same name.
 Properties that are valid for all overlay devices and not specific to a
 module do not generally use a module prefix.
 .Pp
@@ -153,8 +162,8 @@ encapsulation module.
 Each property in the system has a type.
 .Xr dladm 1M
 takes care of converting between the internal representation and a
-value, but the type influences the acceptable input range. The types
-are:
+value, but the type influences the acceptable input range.
+The types are:
 .Bl -hang -width Ds
 .It Sy INT
 A signed integer that is up to eight bytes long
@@ -163,13 +172,14 @@ A signed integer that is up to eight bytes long
 An unsigned integer that is up to eight bytes long
 .Pq Sy uint64_t .
 .It Sy IP
-Either an IPv4 or IPv6 address in traditional string form. For example,
-192.168.128.23 or 2001:470:8af4::1:1. IPv4 addresses may also be encoded
-as IPv4-mapped IPv6 addresses.
+Either an IPv4 or IPv6 address in traditional string form.
+For example, 192.168.128.23 or 2001:470:8af4::1:1.
+IPv4 addresses may also be encoded as IPv4-mapped IPv6 addresses.
 .It Sy STRING
 A string of ASCII or UTF-8 encoded characters terminated with a
 .Sy NUL
-byte. The maximum string length, including the terminator, is currently
+byte.
+The maximum string length, including the terminator, is currently
 256 bytes.
 .El
 .Ed
@@ -183,9 +193,11 @@ This generally includes things like the overlay's encapsulation module.
 .It Sy Required
 .Bd -filled -compact
 This property indicates whether the property is required for the given
-plugin. If it is not specified during a call to
+plugin.
+If it is not specified during a call to
 .Sy dladm create-overlay ,
-then the overlay cannot be successfully created. Properties which have a
+then the overlay cannot be successfully created.
+Properties which have a
 .Sy default
 will use that value if one is not specified rather than cause the
 overlay creation to fail.
@@ -197,33 +209,36 @@ Required properties always have a value set.
 .Ed
 .It Sy Default Value
 .Bd -filled -compact
-The default value is an optional part of a given property. If a property
-does define a default value, then it will be used when an overlay is
-created and no other value is given.
+The default value is an optional part of a given property.
+If a property does define a default value, then it will be used when an
+overlay is created and no other value is given.
 .Ed
 .It Sy Value ranges
 .Bd -filled -compact
-Value ranges are an optional part of a given property. They indicate a
-range or set of values that are valid and may be set for a property. A
-property may not declare such a range as it may be impractical or
-unknown. For example, most properties based on IP addresses will not
+Value ranges are an optional part of a given property.
+They indicate a range or set of values that are valid and may be set for
+a property.
+A property may not declare such a range as it may be impractical or
+unknown.
+For example, most properties based on IP addresses will not
 declare a range.
 .Ed
 .El
 .Pp
 The following sections describe both the modules and the properties that
 exist for each module, noting their name, type, permissions, whether or
-not they are required, and if there is a default value. In addition, the
-effects of each property will be described.
+not they are required, and if there is a default value.
+In addition, the effects of each property will be described.
 .Ss Encapsulation Plugins
 .Bl -hang -width Ds
 .It Sy vxlan
 The
 .Sy vxlan
-module is a UDP based encapsulation method. It takes a frame that would
-be put on the wire, wraps it up in a VXLAN header and places it in a UDP
-packet that gets sent out on the underlying network. For more details
-about the specific format of the VXLAN header, see
+module is a UDP based encapsulation method.
+It takes a frame that would be put on the wire, wraps it up in a VXLAN
+header and places it in a UDP packet that gets sent out on the
+underlying network.
+For more details about the specific format of the VXLAN header, see
 .Xr vxlan 7P .
 .Pp
 The
@@ -232,7 +247,8 @@ module requires both an
 .Sy IP address
 and
 .Sy port
-to address it. It has a 24-bit virtual network ID space, allowing for
+to address it.
+It has a 24-bit virtual network ID space, allowing for
 virtual network identifiers that range from
 .Sy 0
 -
@@ -274,7 +290,8 @@ Range:
 The
 .Sy vxlan/listen_port
 property determines the UDP port that the system will listen on for
-VXLAN traffic for this overlay. The default value is
+VXLAN traffic for this overlay.
+The default value is
 .Sy 4789 ,
 the IANA assigned port for VXLAN.
 .Ed
@@ -285,10 +302,11 @@ The
 and
 .Sy vxlan/listen_port
 properties determine how the system will accept VXLAN encapsulated
-packets for this interface. It does not determine the interface that
-packets will be sent out over. Multiple overlays that all use VXLAN can
-share the same IP and port combination, as the virtual network
-identifier can be used to tell the different overlays apart.
+packets for this interface.
+It does not determine the interface that packets will be sent out over.
+Multiple overlays that all use VXLAN can share the same IP and port
+combination, as the virtual network identifier can be used to tell the
+different overlays apart.
 .El
 .Ss Search Plugins
 Because search plugins may support multiple destinations, they may have
@@ -296,9 +314,9 @@ more properties listed than necessarily show up for a given overlay.
 For example, the
 .Sy direct
 plugin supports destinations that are identified by both an IP address
-and a port, or just an IP address. In cases where the device is created
-over an overlay that only uses an IP address for its destination, then
-it will not have the
+and a port, or just an IP address.
+In cases where the device is created over an overlay that only uses an
+IP address for its destination, then it will not have the
 .Sy direct/dest_port
 property.
 .Bl -hang -width Ds
@@ -306,8 +324,8 @@ property.
 The
 .Sy direct
 plugin is a point to point module that can be used to create an overlay
-that forwards all non-local traffic to a single destination. It supports
-destinations that are a combination of an
+that forwards all non-local traffic to a single destination.
+It supports destinations that are a combination of an
 .Sy IP Address
 and a
 .Sy port .
@@ -358,12 +376,13 @@ The
 .Sy files
 plugin implements a
 .Sy dynamic
-plugin that specifies where traffic should be sent based on a file. It
-is a glorified version of /etc/ethers. The
+plugin that specifies where traffic should be sent based on a file.
+It is a glorified version of /etc/ethers.
+The
 .Sy dynamic
 plugin does not support broadcast or multicast traffic, but it has
-support for proxy ARP, NDP, and DHCPv4. For the full details of the file
-format, see
+support for proxy ARP, NDP, and DHCPv4.
+For the full details of the file format, see
 .Xr overlay_files 4 .
 .Pp
 The
@@ -381,16 +400,16 @@ Permissions:
 .Bd -filled
 The
 .Sy files/config
-property specifies an absolute path to a file to read. The file is a
-JSON file that is formatted according to
+property specifies an absolute path to a file to read.
+The file is a JSON file that is formatted according to
 .Xr overlay_files 4 .
 .Ed
 .El
 .El
 .Ss General Properties
 Each overaly has the following properties which are used to give
-additional information about the system. None of these properties may be
-specified as part of a
+additional information about the system.
+None of these properties may be specified as part of a
 .Sy dladm create-overlay ,
 instead they come from other arguments or from internal parts of the
 system.
@@ -421,12 +440,13 @@ Range:
 .Bd -filled
 The
 .Sy mtu
-property describes the maximum transmission unit of the overlay. The
-default value is
+property describes the maximum transmission unit of the overlay.
+The default value is
 .Sy 1400
 bytes, which ensures that in a traditional deployment with an MTU of
 1500 bytes, the overhead that is added from encapsulation is all
-accounted for. It is the administrator's responsibility to ensure that
+accounted for.
+It is the administrator's responsibility to ensure that
 the device's MTU and the encapsulation overhead does not exceed that of
 the interfaces that the encapsulated traffic will be sent out of.
 .Pp
@@ -477,11 +497,12 @@ encapsulation engine.
 Overlay devices are wired into FMA, the illumos fault management
 architecture, and generates error reports depending on the
 .Sy search
-plugin in use. Due to limitations in FMA today, when a single overlay
+plugin in use.
+Due to limitations in FMA today, when a single overlay
 enters a degraded state, meaning that it cannot properly perform look
 ups or another error occurred, then it degrades the overall
 .Sy overlay
-psuedo-device driver.
+pseudo-device driver.
 .Pp
 For more fine-grained information about which overlay is actually in a
 .Em degraded
@@ -491,8 +512,9 @@ In addition, for each overlay in a degraded state a more useful
 diagnostic message is provided which describes the reason that caused
 this overlay to enter into a degraded state.
 .Pp
-The overlay driver is self-healing. If the problem corrects itself on
-its own, it will clear the fault on the corresponding device.
+The overlay driver is self-healing.
+If the problem corrects itself on its own, it will clear the fault on
+the corresponding device.
 .Sh SEE ALSO
 .Xr dladm 1M ,
 .Xr overlay_files 4 ,

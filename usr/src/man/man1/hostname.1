@@ -23,13 +23,15 @@ The super-user can set the hostname by giving
 .Ar name-of-host .
 .Pp
 While setting the hostname changes the hostname for the running system,
-it does not persist the change. The proper way to update the hostname
-will vary depending on how the system is configured. For most systems,
-the persistent hostname is stored in the file
+it does not persist the change.
+The proper way to update the hostname will vary depending on how the
+system is configured.
+For most systems, the persistent hostname is stored in the file
 .Pa /etc/nodename .
 See
 .Xr nodename 4
-for more information on how to update it. Note, the
+for more information on how to update it.
+Note, the
 .Pa /etc/nodename
 file may be ignored in cases where the system is configured to use DHCP.
 .Sh OPTIONS

@@ -26,7 +26,8 @@
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
-This interface is still evolving in illumos. API and ABI stability is
+This interface is still evolving in illumos.
+API and ABI stability is
 not guaranteed.
 .Sh PARAMETERS
 .Bl -tag -width Fa
@@ -40,28 +41,29 @@ The name of the iport to add.
 .Sh DESCRIPTION
 The
 .Fn scsi_hba_iport_register
-function is used to create a new iport. For more information on iports
-and their uses, see
+function is used to create a new iport.
+For more information on iports and their uses, see
 .Xr iport 9 .
 This interface is generally used then there are a fixed, static set of
-iports that exist in the system. If the set of iports is dynamic or
-related to phys coming online and offline, then the driver should
-instead consider using the
+iports that exist in the system.
+If the set of iports is dynamic or related to phys coming online and
+offline, then the driver should instead consider using the
 .Xr iportmap 9
 abstraction.
 .Pp
 The iport will be created as a child of the device represented by
 .Fa dip .
-The iport will be bound to the same driver. To distinguish nodes, the
-driver should use the
+The iport will be bound to the same driver.
+To distinguish nodes, the driver should use the
 .Xr scsi_hba_iport_unit_address 9F
 function.
 .Pp
 The name of the iport, specified by
 .Fa port ,
-must be unique for a given parent. The iport will not be created if the
-name is already in use. While names generally are based on unit
-addresses, they may be synthetic names.
+must be unique for a given parent.
+The iport will not be created if the name is already in use.
+While names generally are based on unit addresses, they may be synthetic
+names.
 .Sh CONTEXT
 The
 .Fn scsi_hba_iport_register

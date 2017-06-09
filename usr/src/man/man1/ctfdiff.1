@@ -55,10 +55,12 @@ and
 .Lp
 Two
 .Sy labels
-are considered the same, if they have the same name. Two
+are considered the same, if they have the same name.
+Two
 .Sy objects
 are considered the same if they have the same name and the type of the
-object is the same. Two
+object is the same.
+Two
 .Sy functions
 are considered the same if they have the same, the same return type, the
 same number of arguments, and the types of their arguments are the same.
@@ -66,16 +68,18 @@ same number of arguments, and the types of their arguments are the same.
 Two
 .Sy types
 are considered the same if they have the same, they represent the same
-kind of thing, and the contents of the type are the same. This varies
-for each specific kind, for example, two structs are the same if they
-have the same members whose types, offsets, and names are all the same.
-For more information on the specifics for what we look at for each kind
-of type, and the kinds themselves, see the information we use to encode
-them in
-.Xr ctf 4 . If the option
+kind of thing, and the contents of the type are the same.
+This varies for each specific kind, for example, two structs are the
+same if they have the same members whose types, offsets, and names are
+all the same.
+For more information on the specifics for what we look at
+for each kind of type, and the kinds themselves, see the information we
+use to encode them in
+.Xr ctf 4 .
+If the option
 .Fl I
-is specified, then the names of basic integer types are ignored. For an
-example of where this makes sense, see
+is specified, then the names of basic integer types are ignored.
+For an example of where this makes sense, see
 .Sy Example 4 .
 .Lp
 If the
@@ -119,14 +123,15 @@ be specified and can be repeated multiple times.
 .Ed
 .It Fl I
 .Bd -filled -compact
-Ignore the names of integral types. This option is useful when comparing
-types between two
+Ignore the names of integral types.
+This option is useful when comparing types between two
 .Sy CTF
-containers that have different programming models. In this case, when
-comparing integers, the name of the type is not considered. This means
-that the ILP32 type long which is a 32-bit wide signed integer is the
-same as the LP64 type int which is a 32-bit wide signed integer, even
-though they have different names.
+containers that have different programming models.
+In this case, when comparing integers, the name of the type is not
+considered.
+This means that the ILP32 type long which is a 32-bit wide signed
+integer is the same as the LP64 type int which is a 32-bit wide signed
+integer, even though they have different names.
 .Ed
 .It Fl l
 .Bd -filled -compact
@@ -146,7 +151,8 @@ Diff type information for
 When diffing type information for
 .Sy objects ,
 only compare if the object is name
-.Em object . This option requires
+.Em object .
+This option requires
 .Fl o
 to be specified and can be repeated multiple times.
 .Ed
@@ -160,7 +166,8 @@ is
 .Em parent1 .
 This option is required if
 .Em file1
-has been uniquified. For more information on uniquification, see
+has been uniquified.
+For more information on uniquification, see
 .Xr ctf 4 .
 .Ed
 .It Fl P Ar parent2
@@ -172,12 +179,14 @@ container inside of
 .Em parent2 .
 This option is required if
 .Em file1
-has been uniquified. For more information on uniquification, see
+has been uniquified.
+For more information on uniquification, see
 .Xr ctf 4 .
 .Ed
 .It Fl q
 .Bd -filled -compact
-Enables quiet mode. Standard output from the diff will not be emitted.
+Enables quiet mode.
+Standard output from the diff will not be emitted.
 However, diagnostics messages will still be emitted to standard error.
 .Ed
 .It Fl t
@@ -229,7 +238,7 @@ and
 .It Sy 2
 .D1 Invalid command line options were specified.
 .It Sy 3
-.D1 A fatal error occured.
+.D1 A fatal error occurred.
 .El
 .Sh EXAMPLES
 .Sy Example 1
@@ -310,7 +319,8 @@ Diffing Types to Find Differences Between Different Data Models.
 .Lp
 This example looks for differences between structures used in an ioctl
 that the kernel wants to be bitness neutral by comparing a 32-bit and
-64-bit library that consumes it. In this example, we'll use the library
+64-bit library that consumes it.
+In this example, we'll use the library
 .Sy libvnd.so.1
 and the types
 .Sy vnd_ioc_attach_t ,
