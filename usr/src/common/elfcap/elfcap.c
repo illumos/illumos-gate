@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /* LINTLIBRARY */
@@ -339,7 +339,55 @@ static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
 	{						/* 0x00000080 */
 		AV_386_2_RDSEED, STRDESC("AV_386_2_RDSEED"),
 		STRDESC("RDSEED"), STRDESC("rdseed"),
-	}
+	},
+	{						/* 0x00000100 */
+		AV_386_2_AVX512F, STRDESC("AV_386_2_AVX512F"),
+		STRDESC("AVX512F"), STRDESC("avx512f"),
+	},
+	{						/* 0x00000200 */
+		AV_386_2_AVX512DQ, STRDESC("AV_386_2_AVX512DQ"),
+		STRDESC("AVX512DQ"), STRDESC("avx512dq"),
+	},
+	{						/* 0x00000400 */
+		AV_386_2_AVX512IFMA, STRDESC("AV_386_2_AVX512IFMA"),
+		STRDESC("AVX512IFMA"), STRDESC("avx512ifma"),
+	},
+	{						/* 0x00000800 */
+		AV_386_2_AVX512PF, STRDESC("AV_386_2_AVX512PF"),
+		STRDESC("AVX512PF"), STRDESC("avx512pf"),
+	},
+	{						/* 0x00001000 */
+		AV_386_2_AVX512ER, STRDESC("AV_386_2_AVX512ER"),
+		STRDESC("AVX512ER"), STRDESC("avx512er"),
+	},
+	{						/* 0x00002000 */
+		AV_386_2_AVX512CD, STRDESC("AV_386_2_AVX512CD"),
+		STRDESC("AVX512CD"), STRDESC("avx512cd"),
+	},
+	{						/* 0x00004000 */
+		AV_386_2_AVX512BW, STRDESC("AV_386_2_AVX512BW"),
+		STRDESC("AVX512BW"), STRDESC("avx512bw"),
+	},
+	{						/* 0x00008000 */
+		AV_386_2_AVX512VL, STRDESC("AV_386_2_AVX512VL"),
+		STRDESC("AVX512VL"), STRDESC("avx512vl"),
+	},
+	{						/* 0x00010000 */
+		AV_386_2_AVX512VBMI, STRDESC("AV_386_2_AVX512VBMI"),
+		STRDESC("AVX512VBMI"), STRDESC("avx512vbmi"),
+	},
+	{						/* 0x00020000 */
+		AV_386_2_AVX512VPOPCDQ, STRDESC("AV_386_2_AVX512VPOPCDQ"),
+		STRDESC("AVX512VPOPCDQ"), STRDESC("avx512_vpopcntdq"),
+	},
+	{						/* 0x00040000 */
+		AV_386_2_AVX512_4NNIW, STRDESC("AV_386_2_AVX512_4NNIW"),
+		STRDESC("AVX512_4NNIW"), STRDESC("avx512_4nniw"),
+	},
+	{						/* 0x00080000 */
+		AV_386_2_AVX512_4FMAPS, STRDESC("AV_386_2_AVX512_4FMAPS"),
+		STRDESC("AVX512_4FMAPS"), STRDESC("avx512_4fmaps"),
+	},
 };
 
 /*
