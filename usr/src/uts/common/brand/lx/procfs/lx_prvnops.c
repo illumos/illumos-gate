@@ -5155,6 +5155,8 @@ typedef enum {
 	LXCS_CPUID1_ECX,
 	LXCS_CPUID1_EDX,
 	LXCS_CPUID7_EBX,
+	LXCS_CPUID7_ECX,
+	LXCS_CPUID7_EDX,
 	LXCS_CPUIDD1_EAX,
 	LXCS_CPUIDX1_ECX,
 	LXCS_CPUIDX1_EDX,
@@ -5348,37 +5350,55 @@ lx_cpuinfo_mapping_t lx_cpuinfo_mappings[] = {
 	{ LXCS_CPUID7_EBX, 0x00000001,			"fsgsbase" },
 	{ LXCS_CPUID7_EBX, 0x00000002,			"tsc_adjust" },
 	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_BMI1,	"bmi1" },
-	{ LXCS_CPUID7_EBX, 0x00000010,			"hle" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_HLE,	"hle" },
 	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX2,	"avx2" },
 	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_SMEP,	"smep" },
 	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_BMI2,	"bmi2" },
 	{ LXCS_CPUID7_EBX, 0x00000200,			"erms" },
 	{ LXCS_CPUID7_EBX, 0x00000400,			"invpcid" },
 	{ LXCS_CPUID7_EBX, 0x00000800,			"rtm" },
-	{ LXCS_CPUID7_EBX, 0x00000000,			"cqm" },
-	{ LXCS_CPUID7_EBX, 0x00004000,			"mpx" },
-	{ LXCS_CPUID7_EBX, 0x00010000,			"avx512f" },
+	{ LXCS_CPUID7_EBX, 0x00001000,			"cqm" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_MPX,	"mpx" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512F,	"avx512f" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512DQ,	"avx512dq" },
 
 	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_RDSEED,	"rdseed" },
 	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_ADX,	"adx" },
 	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_SMAP,	"smap" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512IFMA, "avx512ifma" },
 
 	{ LXCS_CPUID7_EBX, 0x00400000,			"pcommit" },
 	{ LXCS_CPUID7_EBX, 0x00800000,			"clflushopt" },
-	{ LXCS_CPUID7_EBX, 0x01000000,			"clwb" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_CLWB,	"clwb" },
 
-	{ LXCS_CPUID7_EBX, 0x04000000,			"avx512pf" },
-	{ LXCS_CPUID7_EBX, 0x08000000,			"avx512er" },
-	{ LXCS_CPUID7_EBX, 0x10000000,			"avx512cd" },
-	{ LXCS_CPUID7_EBX, 0x20000000,			"sha_ni" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512PF,	"avx512pf" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512ER,	"avx512er" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512CD,	"avx512cd" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_SHA,	"sha_ni" },
+
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512BW,	"avx512bw" },
+	{ LXCS_CPUID7_EBX, CPUID_INTC_EBX_7_0_AVX512VL,	"avx512vl" },
+
+	/*
+	 * Intel-defined CPU features, CPUID level 0x00000007:0 (ecx)
+	 */
+	{ LXCS_CPUID7_ECX, CPUID_INTC_ECX_7_0_AVX512VBMI, "avx512vbmi" },
+	{ LXCS_CPUID7_ECX, CPUID_INTC_ECX_7_0_AVX512VPOPCDQ,
+	    "avx512_vpopcntdq" },
+
+	/*
+	 * Intel-defined CPU features, CPUID level 0x00000007:0 (edx)
+	 */
+	{ LXCS_CPUID7_EDX, CPUID_INTC_EDX_7_0_AVX5124NNIW, "avx512_4nniw" },
+	{ LXCS_CPUID7_EDX, CPUID_INTC_EDX_7_0_AVX5124FMAPS, "avx512_4fmaps" },
 
 	/*
 	 * Extended state features, CPUID level 0x0000000d:1 (eax)
 	 */
-	{ LXCS_CPUIDD1_EAX, 0x00000001,			"xsaveopt" },
-	{ LXCS_CPUIDD1_EAX, 0x00000002,			"xsavec" },
+	{ LXCS_CPUIDD1_EAX, CPUID_INTC_EAX_D_1_XSAVEOPT, "xsaveopt" },
+	{ LXCS_CPUIDD1_EAX, CPUID_INTC_EAX_D_1_XSAVEC,	"xsavec" },
 	{ LXCS_CPUIDD1_EAX, 0x00000004,			"xgetbv1" },
-	{ LXCS_CPUIDD1_EAX, 0x00000008,			"xsaves" },
+	{ LXCS_CPUIDD1_EAX, CPUID_INTC_EAX_D_1_XSAVES,	"xsaves" },
 
 	/*
 	 * Skipped:
@@ -5456,6 +5476,8 @@ lxpr_read_cpuinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			cpr.cp_eax = 7;
 			(void) cpuid_insn(cp, &cpr);
 			cpuid_res[LXCS_CPUID7_EBX] = cpr.cp_ebx;
+			cpuid_res[LXCS_CPUID7_ECX] = cpr.cp_ecx;
+			cpuid_res[LXCS_CPUID7_EDX] = cpr.cp_edx;
 		}
 		if (maxeax >= 0xd) {
 			cpr.cp_eax = 0xd;
