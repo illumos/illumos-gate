@@ -402,6 +402,7 @@ smbd_daemonize_fini(int fd, int exit_status)
 	(void) priv_addset(pset, PRIV_NET_MAC_AWARE);
 	(void) priv_addset(pset, PRIV_NET_PRIVADDR);
 	(void) priv_addset(pset, PRIV_PROC_AUDIT);
+	(void) priv_addset(pset, PRIV_SYS_CONFIG);
 	(void) priv_addset(pset, PRIV_SYS_DEVICES);
 	(void) priv_addset(pset, PRIV_SYS_SMB);
 	(void) priv_addset(pset, PRIV_SYS_MOUNT);
@@ -576,6 +577,7 @@ smbd_service_fini(void)
 	smbd_spool_stop();
 	smbd_kernel_unbind();
 	smbd_share_stop();
+	smb_shr_unload();
 	smb_shr_stop();
 	dyndns_stop();
 	smbd_nicmon_stop();
