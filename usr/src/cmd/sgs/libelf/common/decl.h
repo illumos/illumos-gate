@@ -30,7 +30,6 @@
 #define	_DECL_H
 
 #include <thread.h>
-#include <note.h>
 #include <_libelf.h>
 #include <sys/machelf.h>
 #include <msg.h>
@@ -147,89 +146,45 @@ struct	Elf_Scn
 	Dnode		s_dnode;	/* every scn needs one */
 };
 
-NOTE(MUTEX_PROTECTS_DATA(Elf_Scn::s_mutex, Elf_Scn Dnode Elf_Data))
-NOTE(SCHEME_PROTECTS_DATA("Scn lock held", Elf_Data))
-NOTE(SCHEME_PROTECTS_DATA("Scn lock held", Elf32_Shdr Elf32_Sym))
-NOTE(READ_ONLY_DATA(Elf_Scn::s_elf))
-NOTE(READ_ONLY_DATA(Dnode::db_scn))
-
-
 /*
  * Designates whether or not we are in a threaded_app.
  */
 extern int *_elf_libc_threaded;
 #define	elf_threaded	(_elf_libc_threaded && *_elf_libc_threaded)
 
-#ifdef	__lock_lint
-#define	SCNLOCK(x)	(void) mutex_lock(&((Elf_Scn *)x)->s_mutex);
-#else
 #define	SCNLOCK(x) \
 	if (elf_threaded) \
 		(void) mutex_lock(&((Elf_Scn *)x)->s_mutex);
-#endif
 
-#ifdef	__lock_lint
-#define	SCNUNLOCK(x)	(void) mutex_unlock(&((Elf_Scn *)x)->s_mutex);
-#else
 #define	SCNUNLOCK(x) \
 	if (elf_threaded) \
 		(void) mutex_unlock(&((Elf_Scn *)x)->s_mutex);
-#endif
 
-#ifdef	__lock_lint
-#define	UPGRADELOCKS(e, s)\
-		(void) mutex_unlock(&((Elf_Scn *)s)->s_mutex); \
-		(void) rw_unlock(&((Elf *)e)->ed_rwlock); \
-		(void) rw_wrlock(&((Elf *)e)->ed_rwlock);
-#else
 #define	UPGRADELOCKS(e, s)\
 	if (elf_threaded) { \
 		(void) mutex_unlock(&((Elf_Scn *)s)->s_mutex); \
 		(void) rw_unlock(&((Elf *)e)->ed_rwlock); \
 		(void) rw_wrlock(&((Elf *)e)->ed_rwlock); \
 	}
-#endif
 
-#ifdef	__lock_lint
-#define	DOWNGRADELOCKS(e, s)\
-		(void) rw_unlock(&((Elf *)e)->ed_rwlock); \
-		(void) rw_rdlock(&((Elf *)e)->ed_rwlock); \
-		(void) mutex_lock(&((Elf_Scn *)s)->s_mutex);
-#else
 #define	DOWNGRADELOCKS(e, s)\
 	if (elf_threaded) { \
 		(void) rw_unlock(&((Elf *)e)->ed_rwlock); \
 		(void) rw_rdlock(&((Elf *)e)->ed_rwlock); \
 		(void) mutex_lock(&((Elf_Scn *)s)->s_mutex); \
 	}
-#endif
 
-#ifdef	__lock_lint
-#define	READLOCKS(e, s) \
-		(void) rw_rdlock(&((Elf *)e)->ed_rwlock); \
-		(void) mutex_lock(&((Elf_Scn *)s)->s_mutex);
-#else
 #define	READLOCKS(e, s) \
 	if (elf_threaded) { \
 		(void) rw_rdlock(&((Elf *)e)->ed_rwlock); \
 		(void) mutex_lock(&((Elf_Scn *)s)->s_mutex); \
 	}
-#endif
 
-#ifdef	__lock_lint
-#define	READUNLOCKS(e, s) \
-		(void) mutex_unlock(&((Elf_Scn *)s)->s_mutex); \
-		(void) rw_unlock(&((Elf *)e)->ed_rwlock);
-#else
 #define	READUNLOCKS(e, s) \
 	if (elf_threaded) { \
 		(void) mutex_unlock(&((Elf_Scn *)s)->s_mutex); \
 		(void) rw_unlock(&((Elf *)e)->ed_rwlock); \
 	}
-#endif
-
-
-
 
 #define	SF_ALLOC	0x1	/* applies to Scn */
 #define	SF_READY	0x2	/* has section been cooked */
@@ -350,32 +305,17 @@ struct Elf
 	unsigned	ed_uflags;	/* elf descriptor flags */
 };
 
-NOTE(RWLOCK_PROTECTS_DATA(Elf::ed_rwlock, Elf))
-NOTE(RWLOCK_COVERS_LOCKS(Elf::ed_rwlock, Elf_Scn::s_mutex))
-
-#ifdef	__lock_lint
-#define	ELFRLOCK(e)	(void) rw_rdlock(&((Elf *)e)->ed_rwlock);
-#else
 #define	ELFRLOCK(e) \
 	if (elf_threaded) \
 		(void) rw_rdlock(&((Elf *)e)->ed_rwlock);
-#endif
 
-#ifdef	__lock_lint
-#define	ELFWLOCK(e)	(void) rw_wrlock(&((Elf *)e)->ed_rwlock);
-#else
 #define	ELFWLOCK(e) \
 	if (elf_threaded) \
 		(void) rw_wrlock(&((Elf *)e)->ed_rwlock);
-#endif
 
-#ifdef	__lock_lint
-#define	ELFUNLOCK(e)	(void) rw_unlock(&((Elf *)e)->ed_rwlock);
-#else
 #define	ELFUNLOCK(e) \
 	if (elf_threaded) \
 		(void) rw_unlock(&((Elf *)e)->ed_rwlock);
-#endif
 
 #define	EDF_ASALLOC	0x1	/* applies to ed_arsym */
 #define	EDF_EHALLOC	0x2	/* applies to ed_ehdr */
@@ -409,12 +349,6 @@ typedef enum
 /*
  * General thread management macros
  */
-#ifdef __lock_lint
-#define	ELFACCESSDATA(a, b) \
-	(void) mutex_lock(&_elf_globals_mutex); \
-	a = b; \
-	(void) mutex_unlock(&_elf_globals_mutex);
-#else
 #define	ELFACCESSDATA(a, b) \
 	if (elf_threaded) { \
 		(void) mutex_lock(&_elf_globals_mutex); \
@@ -422,28 +356,16 @@ typedef enum
 		(void) mutex_unlock(&_elf_globals_mutex); \
 	} else \
 		a = b;
-#endif
 
-#ifdef __lock_lint
-#define	ELFRWLOCKINIT(lock) \
-	(void) rwlock_init((lock), USYNC_THREAD, 0);
-#else
 #define	ELFRWLOCKINIT(lock) \
 	if (elf_threaded) { \
 		(void) rwlock_init((lock), USYNC_THREAD, 0); \
 	}
-#endif
 
-#ifdef	__lock_lint
-#define	ELFMUTEXINIT(lock) \
-	(void) mutex_init(lock, USYNC_THREAD, 0);
-#else
 #define	ELFMUTEXINIT(lock) \
 	if (elf_threaded) { \
 		(void) mutex_init(lock, USYNC_THREAD, 0); \
 	}
-#endif
-
 
 extern Member		*_elf_armem(Elf *, char *, size_t);
 extern void		_elf_arinit(Elf *);
@@ -486,11 +408,6 @@ extern unsigned		_elf_work;
 extern mutex_t		_elf_globals_mutex;
 extern off_t		_elf64_update(Elf * elf, Elf_Cmd cmd);
 extern int		_elf64_swap_wrimage(Elf *elf);
-
-/* CSTYLED */
-NOTE(MUTEX_PROTECTS_DATA(_elf_globals_mutex, \
-	_elf_byte _elf32_ehdr_init _elf64_ehdr_init _elf_encode \
-	_elf_snode_init _elf_work))
 
 #ifdef	__cplusplus
 }

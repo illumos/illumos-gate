@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libelf.h"
 #include "decl.h"
 #include "msg.h"
@@ -68,7 +66,6 @@ elf_getscn(Elf * elf, size_t index)
 		return (s);
 	}
 
-#ifndef	__lock_lint
 	if (tabsz)
 		s = &elf->ed_hdscn[tabsz - 1];
 	else
@@ -95,7 +92,7 @@ elf_getscn(Elf * elf, size_t index)
 	if (prev_s) {
 		SCNUNLOCK(prev_s)
 	}
-#endif
+
 	_elf_seterr(EREQ_NDX, 0);
 	ELFUNLOCK(elf);
 	return (0);

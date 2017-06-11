@@ -29,8 +29,6 @@
  *	All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ar.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -117,14 +115,12 @@ _elf_regular(int fd, unsigned flags)		/* initialize regular file */
 		return (0);
 	}
 
-	NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*elf))
 	elf->ed_fd = fd;
 	elf->ed_myflags |= flags;
 	if (_elf_inmap(elf) != OK_YES) {
 		free(elf);
 		return (0);
 	}
-	NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*elf))
 	return (elf);
 }
 
@@ -214,7 +210,6 @@ elf_memory(char *image, size_t sz)
 		_elf_seterr(EMEM_ELF, errno);
 		return (0);
 	}
-	NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*elf))
 	elf->ed_fd = -1;
 	elf->ed_myflags |= EDF_READ | EDF_MEMORY;
 	elf->ed_image = elf->ed_ident = image;
@@ -227,7 +222,6 @@ elf_memory(char *image, size_t sz)
 	elf->ed_identsz = EI_NIDENT;
 	elf->ed_activ = 1;
 	elf = _elf_config(elf);
-	NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*elf))
 	return (elf);
 }
 
@@ -337,14 +331,12 @@ elf_begin(int fd, Elf_Cmd cmd, Elf *ref)
 			_elf_seterr(EMEM_ELF, errno);
 			return (0);
 		}
-		NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*elf))
 		ELFRWLOCKINIT(&elf->ed_rwlock);
 		elf->ed_fd = fd;
 		elf->ed_activ = 1;
 		elf->ed_myflags |= EDF_WRITE;
 		if (cmd == ELF_C_IMAGE)
 			elf->ed_myflags |= EDF_WRALLOC;
-		NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*elf))
 		return (elf);
 	case ELF_C_RDWR:
 		flags = EDF_WRITE | EDF_READ;
@@ -386,10 +378,8 @@ elf_begin(int fd, Elf_Cmd cmd, Elf *ref)
 		ELFUNLOCK(ref);
 	}
 
-	NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*elf))
 	elf->ed_activ = 1;
 	elf = _elf_config(elf);
-	NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*elf))
 
 	return (elf);
 }

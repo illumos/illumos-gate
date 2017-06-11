@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <thread.h>
-#include <note.h>
 #include "elf_dem.h"
 #include "String.h"
 #include "msg.h"
@@ -123,7 +122,6 @@ demangle(char *c)
 	extern jmp_buf jbuf;
 	static mutex_t	mlock = DEFAULTMUTEX;
 
-	NOTE(MUTEX_PROTECTS_DATA(mlock, String))
 	(void) mutex_lock(&mlock);
 
 	if (setjmp(jbuf)) {

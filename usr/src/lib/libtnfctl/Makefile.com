@@ -116,12 +116,4 @@ objs/%.o pics/%.o: ../%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-WARLOCK_FILES= $(OBJECTS.c:%.o=%.ll)
-CLEANFILES= $(WARLOCK_FILES)
-warlock_files:	$(WARLOCK_FILES)
-%.ll:		../%.c
-		wlcc $(CFLAGS) $(CPPFLAGS) -o $@ $<
-warlock:	warlock_files
-		warlock -c wlcmd $(WARLOCK_FILES)
-
 include ../../Makefile.targ

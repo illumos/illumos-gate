@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Functions to sync up library list with that of the run time linker
  */
@@ -73,22 +71,11 @@ tnfctl_check_libs(tnfctl_handle_t *hndl)
  * this thread has the lock held.  The return value "release_lock" indicates
  * whether the lock should be released or not.  It can be passed into
  * _tnfctl_unlock_libs() which will do the right thing.
- *
- * All of this is a bit too complex for warlock.  Here we give warlock a
- * simpler view, that these routines have the side effect of acquiring and
- * releasing the lock, period.
  */
 
 tnfctl_errcode_t
 _tnfctl_lock_libs(tnfctl_handle_t *hndl, boolean_t *release_lock)
 {
-#if defined(__lock_lint)
-
-	NOTE(MUTEX_ACQUIRED_AS_SIDE_EFFECT(&warlock_kludge->lmap_lock))
-	mutex_lock(&warlock_kludge->lmap_lock);
-
-#else
-
 	/* this interface is only for INTERNAL_MODE clients */
 	assert(hndl->mode == INTERNAL_MODE);
 
@@ -107,20 +94,11 @@ _tnfctl_lock_libs(tnfctl_handle_t *hndl, boolean_t *release_lock)
 
 	*release_lock = B_TRUE;
 	return (TNFCTL_ERR_NONE);
-
-#endif
 }
 
 void
 _tnfctl_unlock_libs(tnfctl_handle_t *hndl, boolean_t release_lock)
 {
-#if defined(__lock_lint)
-
-	NOTE(LOCK_RELEASED_AS_SIDE_EFFECT(&warlock_kludge->lmap_lock))
-	mutex_unlock(&warlock_kludge->lmap_lock);
-
-#else
-
 	/* this interface is only for INTERNAL_MODE clients */
 	assert(hndl->mode == INTERNAL_MODE);
 
@@ -128,8 +106,6 @@ _tnfctl_unlock_libs(tnfctl_handle_t *hndl, boolean_t release_lock)
 		hndl->in_objlist = B_FALSE;
 		mutex_unlock(&_tnfctl_lmap_lock);
 	}
-
-#endif
 }
 
 /*
