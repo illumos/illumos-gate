@@ -41,9 +41,7 @@ OBJECTS		= $(IBMF_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBMF_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 LDFLAGS		+= -dy -Nmisc/ibtl
-WARLOCK_OUT	= $(IBMF_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
+
 #
 #	Include common rules.
 #
@@ -62,9 +60,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #DEBUG_DEFS_DBG32 += -DTNF_DEBUG
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -87,10 +85,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -104,27 +100,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-TEST		= test
-
-#
-#	Warlock targets
-#
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/ibmf.wlcmd
-	$(WARLOCK) -c $(WLCMD_DIR)/ibmf.wlcmd $(WARLOCK_OUT) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/mgt/ibmf/%.c
-	$(WLCC) $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock

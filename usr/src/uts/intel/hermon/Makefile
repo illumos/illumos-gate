@@ -44,9 +44,6 @@ LINTS		= $(HERMON_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/adapters/hermon
 LDFLAGS		+= -dy -Ndrv/ib -Nmisc/ibtl -Nmisc/ibmf
-WARLOCK_OUT	= $(HERMON_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -106,25 +103,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/hermon.wlcmd
-	$(WARLOCK) -c $(WLCMD_DIR)/hermon.wlcmd $(WARLOCK_OUT) -l \
-	$(UTSBASE)/intel/warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/adapters/hermon/%.c
-	$(WLCC)  $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd $(UTSBASE)/intel/warlock; pwd; $(MAKE) warlock

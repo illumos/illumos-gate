@@ -39,9 +39,6 @@ LINTS		= $(DAPLT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/daplt
 LDFLAGS		+= -dy -Nmisc/ibtl -Nmisc/ibcm
-WARLOCK_OUT     = $(DAPLT_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -60,9 +57,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 INCLUDE_PATH += -I$(UTSBASE)/common/sys/ib/clients/daplt
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -95,10 +92,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -112,28 +107,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#       Defines for local commands.
-#
-WARLOCK         = warlock
-WLCC            = wlcc
-TOUCH           = touch
-TEST            = test
-
-DAPL_FILES = $(DAPL_OBJS:%.o= -l ../daplt/%.ll)
-
-warlock: $(WARLOCK_OK) $(WARLOCK_OUT)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/daplt.wlcmd warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/daplt.wlcmd $(WARLOCK_OUT) \
-		-l $(UTSBASE)/sparc/warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/clients/daplt/%.c \
-	$(UTSBASE)/common/sys/ib/clients/daplt/daplt.h \
-	$(UTSBASE)/common/sys/ib/clients/daplt/daplt_if.h
-	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
-        
-warlock_ddi.files:
-	@cd $(UTSBASE)/sparc/warlock; pwd; $(MAKE) warlock
