@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2006 Marcel Moolenaar
  * All rights reserved.
@@ -26,16 +26,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <string.h>
 #include <sys/disklabel.h>
 #include <sys/param.h>
 #include <bootstrap.h>
-#ifdef EFI_ZFS_BOOT
 #include <libzfs.h>
-#endif
 
 #include <efi.h>
 #include <efilib.h>
@@ -99,7 +96,7 @@ efi_parsedev(struct devdesc **dev, const char *devspec, const char **path)
 	/* look for a device that matches */
 	for (i = 0; devsw[i] != NULL; i++) {
 		dv = devsw[i];
-		if (!strncmp(devspec, dv->dv_name, strlen(dv->dv_name)))
+		if (strncmp(devspec, dv->dv_name, strlen(dv->dv_name)) == 0)
 			break;
 	}
 	if (devsw[i] == NULL)
@@ -107,24 +104,21 @@ efi_parsedev(struct devdesc **dev, const char *devspec, const char **path)
 
 	np = devspec + strlen(dv->dv_name);
 
-#ifdef EFI_ZFS_BOOT
 	if (dv->dv_type == DEVT_ZFS) {
 		int err;
 
-		idev = malloc(sizeof(struct zfs_devdesc));
+		idev = malloc(sizeof (struct zfs_devdesc));
 		if (idev == NULL)
 			return (ENOMEM);
 
-		err = zfs_parsedev((struct zfs_devdesc*)idev, np, path);
+		err = zfs_parsedev((struct zfs_devdesc *)idev, np, path);
 		if (err != 0) {
 			free(idev);
 			return (err);
 		}
 		cp = strchr(np + 1, ':');
-	} else
-#endif
-	{
-		idev = malloc(sizeof(struct devdesc));
+	} else {
+		idev = malloc(sizeof (struct devdesc));
 		if (idev == NULL)
 			return (ENOMEM);
 
@@ -147,7 +141,7 @@ efi_parsedev(struct devdesc **dev, const char *devspec, const char **path)
 	}
 
 	if (path != NULL)
-		*path = (*cp == 0) ? cp : cp + 1;
+		*path = (*cp == '\0') ? cp : cp + 1;
 	if (dev != NULL)
 		*dev = idev;
 	else
@@ -161,17 +155,16 @@ efi_fmtdev(void *vdev)
 	struct devdesc *dev = (struct devdesc *)vdev;
 	static char buf[SPECNAMELEN + 1];
 
-	switch(dev->d_type) {
-#ifdef EFI_ZFS_BOOT
+	switch (dev->d_type) {
 	case DEVT_ZFS:
 		return (zfs_fmtdev(dev));
-#endif
 	case DEVT_NONE:
-		strcpy(buf, "(no device)");
+		strlcpy(buf, "(no device)", sizeof (buf));
 		break;
 
 	default:
-		sprintf(buf, "%s%d:", dev->d_dev->dv_name, dev->d_unit);
+		snprintf(buf, sizeof (buf), "%s%d:", dev->d_dev->dv_name,
+		    dev->d_unit);
 		break;
 	}
 
