@@ -75,8 +75,8 @@ the value in
 is sufficient for the property, comparing it to the minimum size
 listed for the property in
 .Xr mac 9E .
-If it is not, then it should return an error. Otherwise, it should
-update the property based on the value in
+If it is not, then it should return an error.
+Otherwise, it should update the property based on the value in
 .Fa pr_val .
 When an unknown or unsupported property is encountered, generally the
 .Sy default
@@ -84,25 +84,26 @@ case of the switch statement, the device driver should return an error.
 .Pp
 The special property
 .Sy MAC_PROP_PRIVATE
-indicates that this is a device driver specific private property. The
-device driver must then look at the value of the
+indicates that this is a device driver specific private property.
+The device driver must then look at the value of the
 .Fa pr_name
 argument and use
 .Xr strcmp 9F
 on it, comparing it to each of its private properties to identify which
 one it is.
 .Pp
-Not all properties are supposed to be writable. Some devices may opt to
-not allow a property that is designated as read/write to be set. When
-such a property is encountered, the driver should return the appropriate
+Not all properties are supposed to be writable.
+Some devices may opt to not allow a property that is designated as read/write to
+be set.
+When such a property is encountered, the driver should return the appropriate
 error.
 .Pp
 The device
 driver can access its device soft state by casting the
 .Fa device
-pointer to the appropriate structure. As this may be called while other
-operations are ongoing, the device driver should employ the appropriate
-locking while writing the properties.
+pointer to the appropriate structure.
+As this may be called while other operations are ongoing, the device driver
+should employ the appropriate locking while writing the properties.
 .Sh RETURN VALUES
 Upon successful completion, the device driver should have copied the
 value of the property into
@@ -211,9 +212,9 @@ exmple_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 }
 .Ed
 .Sh ERRORS
-The device driver may return one of the following errors. While this list
-is not intended to be exhaustive, it is recommended to use one of these
-if possible.
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommended to use one
+of these if possible.
 .Bl -tag -width Er
 .It Er EINVAL
 The contents of
@@ -221,18 +222,20 @@ The contents of
 are outside the valid range for the property.
 .It Er ENOTSUP
 This error should be used whenever an unknown or unsupported property is
-encountered. It should also be used when the property is not writable.
+encountered.
+It should also be used when the property is not writable.
 .It Er EOVERFLOW
 This error should be used when
 .Fa pr_valsize
 is smaller than the required size for a given value.
 .It Er EBUSY
 This error should be used when a property can't be set because the
-device has started. Note that device driver writers are encouraged to design
-device drivers such that this error is not possible.
+device has started.
+Note that device driver writers are encouraged to design device drivers such
+that this error is not possible.
 .It Er ECANCELLED
-The device is in a state that does not allow it to handle data; for
-example, it's suspended.
+The device is in a state that does not allow it to handle data;
+for example, it's suspended.
 .El
 .Sh SEE ALSO
 .Xr mac 9E ,

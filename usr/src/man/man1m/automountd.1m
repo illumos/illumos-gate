@@ -33,8 +33,9 @@
 .Nm
 is an RPC server that answers file system mount and unmount requests from the
 .Nm autofs
-file system. It uses local files or name service maps to locate file systems to
-be mounted. These maps are described with the
+file system.
+It uses local files or name service maps to locate file systems to be mounted.
+These maps are described with the
 .Xr automount 1M
 command.
 .Pp
@@ -59,20 +60,23 @@ Assign
 .Ar value
 to the indicated
 .Nm automount
-map substitution variable. These assignments cannot be used to substitute
-variables in the master map
+map substitution variable.
+These assignments cannot be used to substitute variables in the master map
 .Sy auto_master .
 .It Fl n
 Turn off browsing for all
 .Nm autofs
-mount points. This option overrides the
+mount points.
+This option overrides the
 .Sy -browse
 .Nm autofs
 map option on the local host.
 .It Fl T
-Trace. Expand each RPC call and display it on the standard output.
+Trace.
+Expand each RPC call and display it on the standard output.
 .It Fl v
-Verbose. Log status messages to the console.
+Verbose.
+Log status messages to the console.
 .El
 .Sh USAGE
 See

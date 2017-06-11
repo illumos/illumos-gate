@@ -27,15 +27,18 @@ illumos DDI specific
 The
 .Sy MAC
 framework provides a means for implementing high-performance networking
-device drivers. It is the successor to the GLD interfaces and is
-sometimes referred to as the GLDv3. The remainder of this manual
-introduces the aspects of writing devices drivers that leverage the MAC
-framework. While both the GLDv3 and MAC framework refer to the same thing, in
-this manual page we use the term the
+device drivers.
+It is the successor to the GLD interfaces and is sometimes referred to as the
+GLDv3.
+The remainder of this manual introduces the aspects of writing devices drivers
+that leverage the MAC framework.
+While both the GLDv3 and MAC framework refer to the same thing, in this manual
+page we use the term the
 .Em MAC framework
 to refer to the device driver interface.
 .Pp
-MAC device drivers are character devices. They define the standard
+MAC device drivers are character devices.
+They define the standard
 .Xr _init 9E ,
 .Xr _fini 9E ,
 and
@@ -49,18 +52,20 @@ structures.
 The main interface with MAC is through a series of callbacks defined in
 a
 .Xr mac_callbacks 9S
-structure. These callbacks control all the aspects of the device. They
-range from sending data, getting and setting of
-properties, controlling mac address filters, and also managing
-promiscuous mode.
+structure.
+These callbacks control all the aspects of the device.
+They range from sending data, getting and setting of properties, controlling mac
+address filters, and also managing promiscuous mode.
 .Pp
 The MAC framework takes care of many aspects of the device driver's
-management. A device that uses the MAC framework does not have to worry
-about creating device nodes or implementing
+management.
+A device that uses the MAC framework does not have to worry about creating
+device nodes or implementing
 .Xr open 9E
 or
 .Xr close 9E
-routines. In addition, all of the work to interact with
+routines.
+In addition, all of the work to interact with
 .Xr dlpi 7P
 is taken care of automatically and transparently.
 .Ss Initializing MAC Support
@@ -78,7 +83,8 @@ structure which is pointed to by a
 .Xr modldrv 9S
 structure and the corresponding NULL-terminated
 .Xr modlinkage 9S
-structure. The
+structure.
+The
 .Xr dev_ops 9S
 structure should have a
 .Xr cb_ops 9S
@@ -127,9 +133,10 @@ function pointers that will be used as callbacks by the framework.
 .Pp
 These steps should all be taken during a device's
 .Xr attach 9E
-entry point. It is recommended that the driver perform this sequence of
-steps after the device has finished its initialization of the chipset
-and interrupts, though interrupts should not be enabled at that point.
+entry point.
+It is recommended that the driver perform this sequence of steps after the
+device has finished its initialization of the chipset and interrupts, though
+interrupts should not be enabled at that point.
 After it calls
 .Xr mac_register 9F
 it will start receiving callbacks from the MAC framework.
@@ -142,23 +149,26 @@ as the argument to
 .Xr mac_alloc 9F .
 Upon successful completion, the driver will receive a
 .Sy mac_register_t
-structure which it should fill in. The structure and its members are
-documented in
+structure which it should fill in.
+The structure and its members are documented in
 .Xr mac_register 9S .
 .Pp
 The
 .Xr mac_callbacks 9S
 structure is not allocated as a part of the
 .Xr mac_register 9S
-structure. In general, device drivers declare this statically. See the
+structure.
+In general, device drivers declare this statically.
+See the
 .Sx MAC Callbacks
 section for more information on how to fill it out.
 .Pp
 Once the structure has been filled in, the driver should call
 .Xr mac_register 9F
-to register itself with MAC. The handle that it uses to register with
-should be part of the driver's soft state. It will be used in various
-other support functions and callbacks.
+to register itself with MAC.
+The handle that it uses to register with should be part of the driver's soft
+state.
+It will be used in various other support functions and callbacks.
 .Pp
 If the call is successful, then the device driver
 should enable interrupts and finish any other initialization required.
@@ -171,25 +181,28 @@ from its
 routine.
 .Ss MAC Callbacks
 The MAC framework interacts with a device driver through a series of
-callbacks. These callbacks are described in their individual manual
-pages and the collection of callbacks is indicated in the
+callbacks.
+These callbacks are described in their individual manual pages and the
+collection of callbacks is indicated in the
 .Xr mac_callbacks 9S
-manual page. This section does not focus on the specific functions, but
-rather on interactions between them and the rest of the device driver
-framework.
+manual page.
+This section does not focus on the specific functions, but rather on
+interactions between them and the rest of the device driver framework.
 .Pp
 A device driver should make no assumptions about when the various
 callbacks will be called and whether or not they will be called
-simultaneously. For example, a device driver may be asked to
-transmit data through a call to its
+simultaneously.
+For example, a device driver may be asked to transmit data through a call to its
 .Xr mc_tx 9F
 entry point while it is being asked to get a device property through a
 call to its
 .Xr mc_getprop 9F
-entry point.  As such, while some calls may be serialized to the device,
-such as setting properties, the device driver should always presume that
-all of its data needs to be protected with locks. While the device is
-holding locks, it is safe for it call the following MAC routines:
+entry point.
+As such, while some calls may be serialized to the device, such as setting
+properties, the device driver should always presume that all of its data needs
+to be protected with locks.
+While the device is holding locks, it is safe for it call the following MAC
+routines:
 .Bl -bullet -offset indent -compact
 .It
 .Xr mac_hcksum_get 9F
@@ -226,23 +239,28 @@ while locks are held or in interrupt context, though it is generally
 legal to do so.
 .Ss Receiving Data
 A device driver will often receive data through the means of an
-interrupt. When that interrupt occurs, the device driver will receive
-one or more frames with optional metadata. Often each frame has a
-corresponding descriptor which has information about whether or not
-there were errors or whether or not the device successfully checksummed
-the packet.
+interrupt.
+When that interrupt occurs, the device driver will receive one or more frames
+with optional metadata.
+Often each frame has a corresponding descriptor which has information about
+whether or not there were errors or whether or not the device successfully
+checksummed the packet.
 .Pp
 During a single interrupt, a device driver should process a fixed number
-of frames. For each frame the device driver should:
+of frames.
+For each frame the device driver should:
 .Bl -enum -offset indent
 .It
-First check whether or not the frame has errors. If errors were
-detected, then the frame should not be sent to the operating system. It
-is recommended that devices keep kstats (see
+First check whether or not the frame has errors.
+If errors were detected, then the frame should not be sent to the operating
+system.
+It is recommended that devices keep kstats (see
 .Xr kstat_create 9S
 for more information) and bump the counter whenever such an error is
-detected. If the device distinguishes between the types of errors, then
-separate kstats for each class of error are recommended. See the
+detected.
+If the device distinguishes between the types of errors, then separate kstats
+for each class of error are recommended.
+See the
 .Sx STATISTICS
 section for more information on the various error cases that should be
 considered.
@@ -264,17 +282,19 @@ It should then append this new message block to the
 .Em end
 of the message block chain, linking it to the
 .Sy b_next
-pointer. It is vitally important that all the frames be chained in the
-order that they were received. If the device driver mistakenly reorders
-frames, then it may cause performance impacts in the TCP stack and
-potentially impact application correctness.
+pointer.
+It is vitally important that all the frames be chained in the order that they
+were received.
+If the device driver mistakenly reorders frames, then it may cause performance
+impacts in the TCP stack and potentially impact application correctness.
 .El
 .Pp
 Once all the frames have been processed and assembled, the device driver
 should deliver them to the rest of the operating system by calling
 .Xr mac_rx 9F .
 The device driver should try to give as many mblk_t structures to the
-system at once. It
+system at once.
+It
 .Em should not
 call
 .Xr mac_rx 9F
@@ -287,8 +307,8 @@ networking stack and some replies may be generated and given to the
 driver to send out.
 .Pp
 It is not the device driver's responsibility to determine whether or not
-the system can keep up with a driver's delivery rate of frames. The rest
-of the networking stack will handle issues related to keeping up
+the system can keep up with a driver's delivery rate of frames.
+The rest of the networking stack will handle issues related to keeping up
 appropriately and ensure that kernel memory is not exhausted by packets
 that are not being processed.
 .Pp
@@ -299,11 +319,11 @@ can be received.
 A device driver will be asked to transmit a message block chain by
 having it's
 .Xr mc_tx 9E
-entry point called. While the driver is processing the message blocks,
-it may run out of resources. For example, a transmit descriptor ring may
-become full. At that point, the device driver should return the
-remaining unprocessed frames. The act of returning frames indicates that
-the device has asserted flow control.
+entry point called.
+While the driver is processing the message blocks, it may run out of resources.
+For example, a transmit descriptor ring may become full.
+At that point, the device driver should return the remaining unprocessed frames.
+The act of returning frames indicates that the device has asserted flow control.
 Once this has been done, no additional calls will be made to the
 driver's transmit entry point and the back pressure will be propagated
 throughout the rest of the networking stack.
@@ -311,46 +331,52 @@ throughout the rest of the networking stack.
 At some point in the future when resources have become available again,
 for example after an interrupt indicating that some portion of the
 transmit ring has been sent, then the device driver must notify the
-system that it can continue transmission. To do this, the
-driver should call
+system that it can continue transmission.
+To do this, the driver should call
 .Xr mac_tx_update 9F .
 After that point, the driver will receive calls to its
 .Xr mc_tx 9E
-entry point again. As mentioned in the section on callbacks, the device
-driver should avoid holding any particular locks across the call to
+entry point again.
+As mentioned in the section on callbacks, the device driver should avoid holding
+any particular locks across the call to
 .Xr mac_tx_update 9F .
 .Ss Interrupt Coalescing
 For devices operating at higher data rates, interrupt coalescing is an
 important part of a well functioning device and may impact the
-performance of the device. Not all devices support interrupt
-coalescing. If interrupt coalescing is supported on the device, it is
-recommended that device driver writers provide private properties for
-their device to control the interrupt coalescing rate. This will make it
-much easier to perform experiments and observe the impact of different
-interrupt rates on the rest of the system.
+performance of the device.
+Not all devices support interrupt coalescing.
+If interrupt coalescing is supported on the device, it is recommended that
+device driver writers provide private properties for their device to control the
+interrupt coalescing rate.
+This will make it much easier to perform experiments and observe the impact of
+different interrupt rates on the rest of the system.
 .Ss MAC Address Filter Management
 The MAC framework will attempt to use as many MAC address filters as a
-device has.  To program a multicast address filter, the driver's
+device has.
+To program a multicast address filter, the driver's
 .Xr mc_multicst 9E
-entry point will be called. If the device driver runs out of filters, it
-should not take any special action and just return the appropriate error
-as documented in the corresponding manual pages for the entry points.
+entry point will be called.
+If the device driver runs out of filters, it should not take any special action
+and just return the appropriate error as documented in the corresponding manual
+pages for the entry points.
 The framework will ensure that the device is placed in promiscuous mode
 if it needs to.
 .Ss Link Updates
 It is the responsibility of the device driver to keep track of the
-data link's state. Many devices provide a means of receiving an
-interrupt when the state of the link changes. When such a change
-happens, the driver should update its internal data structures and then
-call
+data link's state.
+Many devices provide a means of receiving an interrupt when the state of the
+link changes.
+When such a change happens, the driver should update its internal data
+structures and then call
 .Xr mac_link_update 9F
-to inform the MAC layer that this has occurred. If the device driver
-does not properly inform the system about link changes, then various
-features like link aggregations and other mechanisms that leverage the
-link state will not work correctly.
+to inform the MAC layer that this has occurred.
+If the device driver does not properly inform the system about link changes,
+then various features like link aggregations and other mechanisms that leverage
+the link state will not work correctly.
 .Ss Link Speed and Auto-negotiation
 Many networking devices support more than one possible speed that they
-can operate at. The selection of a speed is often performed through
+can operate at.
+The selection of a speed is often performed through
 .Em auto-negotiation ,
 though some devices allow the user to control what speeds are advertised
 and used.
@@ -372,35 +398,41 @@ A user can control what speeds a device advertises via auto-negotiation
 and whether or not it performs auto-negotiation at all by using a series
 of properties that have
 .Sy _EN_
-in the name. These are read/write properties and there is one for each
-speed supported in the operating system. For a full list of them, see
-the
+in the name.
+These are read/write properties and there is one for each speed supported in the
+operating system.
+For a full list of them, see the
 .Sx PROPERTIES
 section.
 .Pp
 In addition to these properties, there is a corresponding set of
 properties with
 .Sy _ADV_
-in the name. These are similar to the
+in the name.
+These are similar to the
 .Sy _EN_
 family of properties, but they are read-only and indicate what the
-device has actually negotiated. While they are generally similar to the
+device has actually negotiated.
+While they are generally similar to the
 .Sy _EN_
-family of properties, they may change depending on power settings. See
-the
+family of properties, they may change depending on power settings.
+See the
 .Sy Ethernet Link Properties
 section in
 .Xr dladm 1M
 for more information.
 .Pp
 It's worth discussing how these different values get used throughout the
-different entry points. The first entry point to consider is the
+different entry points.
+The first entry point to consider is the
 .Xr mc_propinfo 9E
-entry point. For a given speed, the driver should consult whether or not
-the hardware supports this speed. If it does, it should fill in the
-default value that the hardware takes and whether or not the property is
-writable. The properties should also be updated to indicate whether or
-not it is writable. This holds for both the
+entry point.
+For a given speed, the driver should consult whether or not the hardware
+supports this speed.
+If it does, it should fill in the default value that the hardware takes and
+whether or not the property is writable.
+The properties should also be updated to indicate whether or not it is writable.
+This holds for both the
 .Sy _EN_
 and
 .Sy _ADV_
@@ -409,15 +441,18 @@ family of properties.
 The next entry point is
 .Xr mc_getprop 9E .
 Here, the device should first consult whether the given speed is
-supported. If it is not, then the driver should return
+supported.
+If it is not, then the driver should return
 .Er ENOTSUP .
 If it does, then it should return the current value of the property.
 .Pp
 The last property endpoint is the
 .Xr mc_setprop 9E
-entry point. Here, the same logic applies. Before the driver considers
-whether or not the property is writable, it should first check whether
-or not it's a supported property. If it's not, then it should return
+entry point.
+Here, the same logic applies.
+Before the driver considers whether or not the property is writable, it should
+first check whether or not it's a supported property.
+If it's not, then it should return
 .Er ENOTSUP .
 Otherwise, it should proceed to check whether the property is writable,
 and if it is and a valid value, then it should update the property and
@@ -425,19 +460,22 @@ restart the link's negotiation.
 .Pp
 Finally, there is the
 .Xr mc_getstat 9E
-entry point. Several of the statistics that are queried relate to
-auto-negotiation and hardware capabilities. When a statistic relates to
-the hardware supporting a given speed, the
+entry point.
+Several of the statistics that are queried relate to auto-negotiation and
+hardware capabilities.
+When a statistic relates to the hardware supporting a given speed, the
 .Sy _EN_
-properties should be ignored. The only thing that should be consulted is
-what the hardware itself supports. Otherwise, the statistics should look
-at what is currently being advertised by the device.
+properties should be ignored.
+The only thing that should be consulted is what the hardware itself supports.
+Otherwise, the statistics should look at what is currently being advertised by
+the device.
 .Ss Unregistering from MAC
 During a driver's
 .Xr detach 9E
 routine, it should unregister the device instance from MAC by calling
 .Xr mac_unregister 9F
-on the handle that it originally called it on. If the call to
+on the handle that it originally called it on.
+If the call to
 .Xr mac_unregister 9F
 failed, then the device is likely still in use and the driver should
 fail the call to
@@ -445,8 +483,8 @@ fail the call to
 .Ss Interacting with Devices
 Administrators always interact with devices through the
 .Xr dladm 1M
-command line interface. The state of devices such as whether the link is
-considered
+command line interface.
+The state of devices such as whether the link is considered
 .Sy up
 or
 .Sy down ,
@@ -457,8 +495,8 @@ state,
 and
 .Sy flow control
 state,
-are all exposed. It is also the preferred way that these properties are
-set and configured.
+are all exposed.
+It is also the preferred way that these properties are set and configured.
 .Pp
 While device tunables may be presented in a
 .Xr driver.conf 4
@@ -468,26 +506,27 @@ private properties, whether explicitly documented or not.
 .Sh CAPABILITIES
 Capabilities in the MAC Framework are optional features that a device
 supports which indicate various hardware features that the device
-supports. The two current capabilities that the system supports are
-related to being able to hardware perform large send offloads (LSO),
-often also known as TCP segmentation and the ability for hardware to
-calculate and verify the checksums present in IPv4, IPV6, and protocol
-headers such as TCP and UDP.
+supports.
+The two current capabilities that the system supports are related to being able
+to hardware perform large send offloads (LSO), often also known as TCP
+segmentation and the ability for hardware to calculate and verify the checksums
+present in IPv4, IPV6, and protocol headers such as TCP and UDP.
 .Pp
 The MAC framework will query a device for support of a capability
 through the
 .Xr mc_getcapab 9E
-function. Each capability has its own constant and may have
-corresponding data that goes along with it and a specific structure that
-the device is required to fill in. Note, the set of capabilities changes
-over time and there are also private capabilities in the system. Several
-of the capabilities are used in the implementation of the MAC framework.
+function.
+Each capability has its own constant and may have corresponding data that goes
+along with it and a specific structure that the device is required to fill in.
+Note, the set of capabilities changes over time and there are also private
+capabilities in the system.
+Several of the capabilities are used in the implementation of the MAC framework.
 Others, like
 .Sy MAC_CAPAB_RINGS ,
-represent feature that have not been stabilized and thus both API and
-binary compatibility for them is not guaranteed. It is important that
-the device driver handles unknown capabilities correctly.  For more
-information, see
+represent feature that have not been stabilized and thus both API and binary
+compatibility for them is not guaranteed.
+It is important that the device driver handles unknown capabilities correctly.
+For more information, see
 .Xr mc_getcapab 9E .
 .Pp
 The following capabilities are
@@ -496,33 +535,35 @@ stable and defined in the system:
 The
 .Sy MAC_CAPAB_HCKSUM
 capability indicates to the system that the device driver supports some
-amount of checksumming. The specific data for this capability is a
-pointer to a
+amount of checksumming.
+The specific data for this capability is a pointer to a
 .Sy uint32_t .
 To indicate no support for any kind of checksumming, the driver should
 either set this value to zero or simply return that it doesn't support
 the capability.
 .Pp
 Note, the values that the driver declares in this capability indicate
-what it can do when it transmits data. If the driver can only
-verify checksums when receiving data, then it should not indicate that
-it supports this capability. The following set of flags may be combined
-through a bitwise inclusive OR:
+what it can do when it transmits data.
+If the driver can only verify checksums when receiving data, then it should not
+indicate that it supports this capability.
+The following set of flags may be combined through a bitwise inclusive OR:
 .Bl -tag -width Ds
 .It Sy HCKSUM_INET_PARTIAL
 This indicates that the hardware can calculate a partial checksum for
 both IPv4 and IPv6; however, it requires the pseudo-header checksum be
-calculated for it. The pseudo-header checksum will be available for the
-mblk_t when calling
+calculated for it.
+The pseudo-header checksum will be available for the mblk_t when calling
 .Xr mac_hcksum_get 9F .
 Note this does not imply that the hardware is capable of calculating the
-IPv4 header checksum. That should be indicated with the
+IPv4 header checksum.
+That should be indicated with the
 .Sy HCKSUM_IPHDRCKSUM flag.
 .It Sy HCKSUM_INET_FULL_V4
 This indicates that the hardware will fully calculate the L4 checksum
 for outgoing IPv4 packets and does not require a pseudo-header checksum.
 Note this does not imply that the hardware is capable of calculating the
-IPv4 header checksum. That should be indicated with the
+IPv4 header checksum.
+That should be indicated with the
 .Sy HCKSUM_IPHDRCKSUM .
 .It Sy HCKSUM_INET_FULL_V6
 This indicates that the hardware will fully calculate the L4 checksum
@@ -533,34 +574,38 @@ the IPv4 header itself.
 .El
 .Pp
 When in a driver's transmit function, the driver will be processing a
-single frame. It should call
+single frame.
+It should call
 .Xr mac_hcksum_get 9F
-to see what checksum flags are set on it. Note that the flags that are
-set on it are different from the ones described above and are documented
-in its manual page. These flags indicate how the driver is expected to
-program the hardware and what checksumming is required. Not all frames
-will require hardware checksumming or will ask the hardware to checksum
-it.
+to see what checksum flags are set on it.
+Note that the flags that are set on it are different from the ones described
+above and are documented in its manual page.
+These flags indicate how the driver is expected to program the hardware and what
+checksumming is required.
+Not all frames will require hardware checksumming or will ask the hardware to
+checksum it.
 .Pp
 If a driver supports offloading the receive checksum and verification,
-it should check to see what the hardware indicated was verified. The
-driver should then call
+it should check to see what the hardware indicated was verified.
+The driver should then call
 .Xr mac_hcksum_set 9F .
 The flags used are different from the ones above and are discussed in
 detail in the
 .Xr mac_hcksum_set 9F
-manual page. If there is no checksum information available or the driver
-does not support checksumming, then it should simply not call
+manual page.
+If there is no checksum information available or the driver does not support
+checksumming, then it should simply not call
 .Xr mac_hcksum_set 9F .
 .Pp
 Note that the checksum flags should be set on the first
-mblk_t that makes up a given message. In other words, if multiple
-mblk_t structures are linked together by the
+mblk_t that makes up a given message.
+In other words, if multiple mblk_t structures are linked together by the
 .Sy b_cont
 member to describe a single frame, then it should only be called on the
-first mblk_t of that set. However, each distinct message should have the
-checksum bits set on it, if applicable. In other words, each mblk_t that
-is linked together by the
+first mblk_t of that set.
+However, each distinct message should have the checksum bits set on it, if
+applicable.
+In other words, each mblk_t that is linked together by the
 .Sy b_next
 pointer may have checksum flags set.
 .Pp
@@ -568,8 +613,9 @@ It is recommended that device drivers provide a private property or
 .Xr driver.conf 4
 property to control whether or not checksumming is enabled for both rx
 and tx; however, the default disposition is recommended to be enabled
-for both. This way if hardware bugs are found in the checksumming
-implementation, they can be disabled without requiring software updates.
+for both.
+This way if hardware bugs are found in the checksumming implementation, they can
+be disabled without requiring software updates.
 The transmit property should be checked when determining how to reply to
 .Xr mc_getcapab 9E
 and the receive property should be checked in the context of the receive
@@ -578,9 +624,11 @@ function.
 The
 .Sy MAC_CAPAB_LSO
 capability indicates that the driver supports various forms of large
-send offload (LSO). The private data is a pointer to a
+send offload (LSO).
+The private data is a pointer to a
 .Sy mac_capab_lso_t
-structure. At the moment, LSO support is limited to TCP inside of IPv4.
+structure.
+At the moment, LSO support is limited to TCP inside of IPv4.
 This structure has the following members which are used to indicate
 various types of LSO support.
 .Bd -literal -offset indent
@@ -591,12 +639,14 @@ lso_basic_tcp_ivr4_t	lso_basic_tcp_ipv4;
 The
 .Sy lso_flags
 member is used to indicate which members are valid and should be
-considered. Each flag represents a different form of LSO. The member
-should be set to the bitwise inclusive OR of the following values:
+considered.
+Each flag represents a different form of LSO.
+The member should be set to the bitwise inclusive OR of the following values:
 .Bl -tag -width Dv -offset indent
 .It Sy LSO_TX_BASIC_TCP_IPV4
 This indicates hardware support for performing TCP segmentation
-offloading over IPv4. When this flag is set, the
+offloading over IPv4.
+When this flag is set, the
 .Sy lso_basic_tcp_ipv4
 member must be filled in.
 .El
@@ -619,31 +669,37 @@ means for disabling the support of LSO even if it is enabled by default.
 This deals with the case where issues that pop up for LSO may be worked
 around without requiring additional driver work.
 .Sh PROPERTIES
-Properties in the MAC framework represent aspects of a link. These
-include things like the link's current state and MTU. Many of the
-properties in the system are focused around auto-negotiation and
-controlling what link speeds are advertised. Information about
-properties is covered by three different device entry points. The
+Properties in the MAC framework represent aspects of a link.
+These include things like the link's current state and MTU.
+Many of the properties in the system are focused around auto-negotiation and
+controlling what link speeds are advertised.
+Information about properties is covered by three different device entry points.
+The
 .Xr mc_propinfo 9E
-entry point obtains metadata about the property. The
+entry point obtains metadata about the property.
+The
 .Xr mc_getprop 9E
-entry point obtains the property. The
+entry point obtains the property.
+The
 .Xr mc_setprop 9E
 entry point updates the property to a new value.
 .Pp
-Many of the properties listed below are read-only. Each property
-indicates whether it's read-only or it's read/write. However, driver
-writers may not implement the ability to set all writable properties.
-Many of these depend on the card itself. In particular, all properties
-that relate to auto-negotiation and are read/write may not be updated
-if the hardware in question does not support toggling what link speeds
-are auto-negotiated. While copper Ethernet often does not have this
-restriction, it often exists with various fiber standards and phys.
+Many of the properties listed below are read-only.
+Each property indicates whether it's read-only or it's read/write.
+However, driver writers may not implement the ability to set all writable
+properties.
+Many of these depend on the card itself.
+In particular, all properties that relate to auto-negotiation and are read/write
+may not be updated if the hardware in question does not support toggling what
+link speeds are auto-negotiated.
+While copper Ethernet often does not have this restriction, it often exists with
+various fiber standards and phys.
 .Pp
 The following properties are the subset of MAC framework properties that
-driver writers should be aware of and handle. While other properties
-exist in the system, driver writers should always return an error when a
-property not listed below is encountered. See
+driver writers should be aware of and handle.
+While other properties exist in the system, driver writers should always return
+an error when a property not listed below is encountered.
+See
 .Xr mc_getprop 9E
 and
 .Xr mc_setprop 9E
@@ -659,20 +715,22 @@ Permissions:
 .Pp
 The
 .Sy MAC_PROP_DUPLEX
-property is used to indicate whether or not the link is duplex. A duplex
-link may have traffic flowing in both directions at the same time. The
+property is used to indicate whether or not the link is duplex.
+A duplex link may have traffic flowing in both directions at the same time.
+The
 .Sy link_duplex_t
 is an enumeration which may be set to any of the following values:
 .Bl -tag -width Ds
 .It Sy LINK_DUPLEX_UNKNOWN
-The current state of the link is unknown. This may be because the link
-has not negotiated to a specific speed or it is down.
+The current state of the link is unknown.
+This may be because the link has not negotiated to a specific speed or it is
+down.
 .It Sy LINK_DUPLEX_HALF
-The link is running at half duplex. Communication may travel in only one
-direction on the link at a given time.
+The link is running at half duplex.
+Communication may travel in only one direction on the link at a given time.
 .It Sy LINK_DUPLEX_FULL
-The link is running at full duplex. Communication may travel in both
-directions on the link simultaneously.
+The link is running at full duplex.
+Communication may travel in both directions on the link simultaneously.
 .El
 .It Sy MAC_PROP_SPEED
 .Bd -filled -compact
@@ -684,9 +742,9 @@ Permissions:
 .Pp
 The
 .Sy MAC_PROP_SPEED
-property stores the current link speed in bits per second. A link
-that is running at 100 MBit/s would store the value 100000000ULL. A link
-that is running at 40 Gbit/s would store the value 40000000000ULL.
+property stores the current link speed in bits per second.
+A link that is running at 100 MBit/s would store the value 100000000ULL.
+A link that is running at 40 Gbit/s would store the value 40000000000ULL.
 .It Sy MAC_PROP_STATUS
 .Bd -filled -compact
 Type:
@@ -697,21 +755,24 @@ Permissions:
 .Pp
 The
 .Sy MAC_PROP_STATUS
-property is used to indicate the current state of the link. It indicates
-whether the link is up or down. The
+property is used to indicate the current state of the link.
+It indicates whether the link is up or down.
+The
 .Sy link_state_t
 is an enumeration which may be set to any of the following values:
 .Bl -tag -width Ds
 .It Sy LINK_STATE_UNKNOWN
-The current state of the link is unknown. This may be because the
-driver's
+The current state of the link is unknown.
+This may be because the driver's
 .Xr mc_start 9E
 endpoint has not been called so it has not attempted to start the link.
 .It Sy LINK_STATE_DOWN
-The link is down. This may be because of a negotiation problem, a cable
-problem, or some other device specific issue.
+The link is down.
+This may be because of a negotiation problem, a cable problem, or some other
+device specific issue.
 .It Sy LINK_STATE_UP
-The link is up. If auto-negotiation is in use, it should have completed.
+The link is up.
+If auto-negotiation is in use, it should have completed.
 Traffic should be able to flow over the link, barring other issues.
 .El
 .It Sy MAC_PROP_AUTONEG
@@ -725,17 +786,20 @@ Permissions:
 The
 .Sy MAC_PROP_AUTONEG
 property indicates whether or not the device is currently configured to
-perform auto-negotiation. A value of
+perform auto-negotiation.
+A value of
 .Sy 0
-indicates that auto-negotiation is disabled. A
+indicates that auto-negotiation is disabled.
+A
 .Sy non-zero
-value indicates that auto-negotiation is enabled. Devices should
-generally default to enabling auto-negotiation.
+value indicates that auto-negotiation is enabled.
+Devices should generally default to enabling auto-negotiation.
 .Pp
 When getting this property, the device driver should return the current
-state. When setting this property, if the device supports operating in
-the requested mode, then the device driver should reset the link to
-negotiate to the new speed after updating any internal registers.
+state.
+When setting this property, if the device supports operating in the requested
+mode, then the device driver should reset the link to negotiate to the new speed
+after updating any internal registers.
 .It Sy MAC_PROP_MTU
 .Bd -filled -compact
 Type:
@@ -746,24 +810,25 @@ Permissions:
 .Pp
 The
 .Sy MAC_PROP_MTU
-property determines the maximum transmission unit (MTU). This indicates
-the maximum size packet that the device can transmit, ignoring its own
-headers. For an Ethernet device, this would exclude the size of the
-Ethernet header and any VLAN headers that would be placed. It is up to
-the driver to ensure that any MTU values that it accepts when adding in
-its margin and header sizes does not exceed its maximum frame size.
+property determines the maximum transmission unit (MTU).
+This indicates the maximum size packet that the device can transmit, ignoring
+its own headers.
+For an Ethernet device, this would exclude the size of the Ethernet header and
+any VLAN headers that would be placed.
+It is up to the driver to ensure that any MTU values that it accepts when adding
+in its margin and header sizes does not exceed its maximum frame size.
 .Pp
 By default, drivers for Ethernet should initialize this value and the
 MTU to
 .Sy 1500 .
 When getting this property, the driver should return its current
-recorded MTU. When setting this property, the driver should first
-validate that it is within the device's valid range and then it must
-call
+recorded MTU.
+When setting this property, the driver should first validate that it is within
+the device's valid range and then it must call
 .Xr mac_maxsdu_update 9F .
-Note that the call may fail. If the call completes successfully, the
-driver should update the hardware with the new value of the MTU and
-perform any other work needed to handle it.
+Note that the call may fail.
+If the call completes successfully, the driver should update the hardware with
+the new value of the MTU and perform any other work needed to handle it.
 .Pp
 If the device does not support changing the MTU after the device's
 .Xr mc_start 9E
@@ -780,15 +845,17 @@ Permissions:
 The
 .Sy MAC_PROP_FLOWCTRL
 property manages the configuration of pause frames as part of Ethernet
-flow control. Note, this only describes what this device will advertise.
+flow control.
+Note, this only describes what this device will advertise.
 What is actually enabled may be different and is subject to the rules of
-auto-negotiation. The
+auto-negotiation.
+The
 .Sy link_flowctrl_t
 is an enumeration that may be set to one of the following values:
 .Bl -tag -width Ds
 .It Sy LINK_FLOWCTRL_NONE
-Flow control is disabled. No pause frames should be generated or
-honored.
+Flow control is disabled.
+No pause frames should be generated or honored.
 .It Sy LINK_FLOWCTRL_RX
 The device can receive pause frames; however, it should not generate
 them.
@@ -801,27 +868,33 @@ The device supports both sending and receiving pause frames.
 .Pp
 When getting this property, the device driver should return the way that
 it has configured the device, not what the device has actually
-negotiated. When setting the property, it should update the hardware and
-allow the link to potentially perform auto-negotiation again.
+negotiated.
+When setting the property, it should update the hardware and allow the link to
+potentially perform auto-negotiation again.
 .El
 .Pp
 The remaining properties are all about various auto-negotiation link
-speeds. They fall into two different buckets: properties with
+speeds.
+They fall into two different buckets: properties with
 .Sy _ADV_
 in the name and properties with
 .Sy _EN_
-in the name. For any given supported speed, there is one of each. The
+in the name.
+For any given supported speed, there is one of each.
+The
 .Sy _EN_
 set of properties are read/write properties that control what should be
-advertised by the device. When these are retrieved, they should return
-the current value of the property. When they are set, they should change
-how the hardware advertises the specific speed and trigger any kind of
-link reset and auto-negotiation, if enabled, to occur.
+advertised by the device.
+When these are retrieved, they should return the current value of the property.
+When they are set, they should change how the hardware advertises the specific
+speed and trigger any kind of link reset and auto-negotiation, if enabled, to
+occur.
 .Pp
 The
 .Sy _ADV_
-set of properties are read-only properties. They are meant to reflect
-what has actually been negotiated. These may be different from the
+set of properties are read-only properties.
+They are meant to reflect what has actually been negotiated.
+These may be different from the
 .Sy _EN_
 family of properties, especially when different power management
 settings are at play.
@@ -1125,23 +1198,24 @@ enabled.
 .El
 .Ss Private Properties
 In addition to the defined properties above, drivers are allowed to
-define private properties. These private properties are device-specific
-properties. All private properties share the same constant,
+define private properties.
+These private properties are device-specific properties.
+All private properties share the same constant,
 .Sy MAC_PROP_PRIVATE .
-Properties are distinguished by a name, which is a character string. The
-list of such private properties is defined when registering with mac in
-the
+Properties are distinguished by a name, which is a character string.
+The list of such private properties is defined when registering with mac in the
 .Sy m_priv_props
 member of the
 .Xr mac_register 9S
 structure.
 .Pp
 The driver may define whatever semantics it wants for these private
-properties. They will not be listed when running
+properties.
+They will not be listed when running
 .Xr dladm 1M ,
-unless explicitly requested by name. All such properties should start
-with a leading underscore character and then consist of alphanumeric
-ASCII characters and additional underscores or hyphens.
+unless explicitly requested by name.
+All such properties should start with a leading underscore character and then
+consist of alphanumeric ASCII characters and additional underscores or hyphens.
 .Pp
 Properties of type
 .Sy MAC_PROP_PRIVATE
@@ -1157,13 +1231,15 @@ When encountering properties that it doesn't know, it should treat them
 like all other unknown properties.
 .Sh STATISTICS
 The MAC framework defines a couple different sets of statistics which
-are based on various standards for devices to implement. Statistics are
-retrieved through the
+are based on various standards for devices to implement.
+Statistics are retrieved through the
 .Xr mc_getstat 9E
-entry point. There are both statistics that are required for all devices
-and then there is a separate set of Ethernet specific statistics. Not
-all devices will support every statistic. In many cases, several device
-registers will need to be combined to create the proper stat.
+entry point.
+There are both statistics that are required for all devices and then there is a
+separate set of Ethernet specific statistics.
+Not all devices will support every statistic.
+In many cases, several device registers will need to be combined to create the
+proper stat.
 .Pp
 In general, if the device is not keeping track of these statistics, then
 it is recommended that the driver store these values as a
@@ -1171,8 +1247,9 @@ it is recommended that the driver store these values as a
 to ensure that overflow does not occur.
 .Pp
 If a device does not support a specific statistic, then it is fine to
-return that it is not supported. The same should be used for
-unrecognized statistics. See
+return that it is not supported.
+The same should be used for unrecognized statistics.
+See
 .Xr mc_getstat 9E
 for more information on the proper way to handle these.
 .Ss General Device Statistics
@@ -1228,9 +1305,9 @@ The total number of packets that were larger than the maximum sized
 packet for the device and were therefore dropped.
 .El
 .Ss Ethernet Specific Statistics
-The following statistics are specific to Ethernet devices. They refer to
-values from RFC 1643 and include various MII/GMII specific stats. Many
-of these are also defined in IEEE 802.3.
+The following statistics are specific to Ethernet devices.
+They refer to values from RFC 1643 and include various MII/GMII specific stats.
+Many of these are also defined in IEEE 802.3.
 .Bl -tag -width Ds
 .It Sy ETHER_STAT_ADV_CAP_1000FDX
 Indicates that the device is advertising support for 1 Gbit/s
@@ -1281,8 +1358,9 @@ Indicates that the device is advertising support for detecting faults in
 the remote link peer.
 .It Sy ETHER_STAT_ALIGN_ERRORS
 Indicates the number of times an alignment error was generated by the
-Ethernet device. This is a count of packets that were not an integral
-number of octets and failed the FCS check.
+Ethernet device.
+This is a count of packets that were not an integral number of octets and failed
+the FCS check.
 .It Sy ETHER_STAT_CAP_1000FDX
 Indicates the device supports 1 Gbit/s full-duplex operation.
 .It Sy ETHER_STAT_CAP_1000HDX
@@ -1341,8 +1419,8 @@ frames.
 Indicates whether the current link state is a result of
 auto-negotiation.
 .It Sy ETHER_STAT_LINK_DUPLEX
-Indicates the current duplex state of the link. The values used here
-should be the same as documented for
+Indicates the current duplex state of the link.
+The values used here should be the same as documented for
 .Sy MAC_PROP_DUPLEX .
 .It Sy ETHER_STAT_LINK_PAUSE
 Indicates whether the link is currently configured to generate pause
@@ -1393,8 +1471,8 @@ error when attempting to process and transmit a frame.
 Indicates the number of times that a frame was eventually transmitted
 successfully, but only after more than one collision.
 .It Sy ETHER_STAT_SQE_ERRORS
-Indicates the number of times that an SQE error occurred. The specific
-conditions for this error are documented in IEEE 802.3.
+Indicates the number of times that an SQE error occurred.
+The specific conditions for this error are documented in IEEE 802.3.
 .It Sy ETHER_STAT_TOOLONG_ERRORS
 Indicates the number of frames that were received that were longer than
 the maximum frame size supported by the device.
@@ -1409,8 +1487,8 @@ Indicates the address of the MII/GMII receiver address.
 .It Sy ETHER_STAT_XCVR_ID
 Indicates the id of the MII/GMII receiver address.
 .It Sy ETHER_STAT_XCVR_INUSE
-Indicates what kind of receiver is in use. The following values may be
-used:
+Indicates what kind of receiver is in use.
+The following values may be used:
 .Bl -tag -width Ds
 .It Sy XCVR_UNDEFINED
 The receiver type is undefined by the hardware.
@@ -1425,11 +1503,11 @@ The receiver supports 100BASE-TX operation.
 .It Sy XCVR_100T2
 The receiver supports 100BASE-T2 operation.
 .It Sy XCVR_1000X
-The receiver supports 1000BASE-X operation. This is used for all fiber
-receivers.
+The receiver supports 1000BASE-X operation.
+This is used for all fiber receivers.
 .It Sy XCVR_1000T
-The receiver supports 1000BASE-T operation. This is used for all copper
-receivers.
+The receiver supports 1000BASE-T operation.
+This is used for all copper receivers.
 .El
 .El
 .Ss Device Specific kstats
@@ -1440,12 +1518,12 @@ statistics, it should create its own kstats through the
 function to allow operators to observe them.
 .Sh TX STALL DETECTION, DEVICE RESETS, AND FAULT MANAGEMENT
 Device drivers are the first line of defense for dealing with broken
-devices and bugs in their firmware. While most devices will rarely fail,
-it is important that when designing and implementing the device driver
-that particular attention is paid in the design with respect to RAS
-(Reliability, Availability, and Serviceability). While everything
-described in this section is optional, it is highly recommended that
-all new device drivers follow these guidelines.
+devices and bugs in their firmware.
+While most devices will rarely fail, it is important that when designing and
+implementing the device driver that particular attention is paid in the design
+with respect to RAS (Reliability, Availability, and Serviceability).
+While everything described in this section is optional, it is highly recommended
+that all new device drivers follow these guidelines.
 .Pp
 The Fault Management Architecture (FMA) provides facilities for
 detecting and reporting various classes of defects and faults.
@@ -1483,10 +1561,12 @@ calling
 .Xr ddi_fm_init 9F
 from their
 .Xr attach 9E
-routine. By registering with the fault management framework, a device
-driver is given the chance to detect and notice transport errors as well
-as report other errors that exist. While a device driver does not need to
-indicate that it is capable of all such capabilities described in
+routine.
+By registering with the fault management framework, a device driver is given the
+chance to detect and notice transport errors as well as report other errors that
+exist.
+While a device driver does not need to indicate that it is capable of all such
+capabilities described in
 .Xr ddi_fm_init 9F ,
 we suggest that device drivers at least register the
 .Sy DDI_FM_EREPORT_CAPABLE
@@ -1500,14 +1580,15 @@ during its
 .Xr detach 9E
 entry point.
 .Ss Transport Errors
-Many modern networking devices leverage PCI or PCI Express. As such,
-there are two primary ways that device drivers access data: they either
+Many modern networking devices leverage PCI or PCI Express.
+As such, there are two primary ways that device drivers access data: they either
 memory map device registers and use routines like
 .Xr ddi_get8 9F
 and
 .Xr ddi_put8 9F
-or they use direct memory access (DMA). New device drivers should always
-enable checking of the transport layer by marking their support in the
+or they use direct memory access (DMA).
+New device drivers should always enable checking of the transport layer by
+marking their support in the
 .Xr ddi_device_acc_attr_t 9S
 structure and using routines like
 .Xr ddi_fm_acc_err_get 9F
@@ -1516,62 +1597,66 @@ and
 to detect if errors have occurred.
 .Ss Device Indicated Errors
 Many devices have capabilities to announce to a device driver that a
-fatal correctable error or uncorrectable error has occurred. Other
-devices have the ability to indicate that various physical issues have
+fatal correctable error or uncorrectable error has occurred.
+Other devices have the ability to indicate that various physical issues have
 occurred such as a fan failing or a temperature sensor having fired.
 .Pp
 Drivers should wire themselves to receive notifications when these
-events occur. The means and capabilities will vary from device to
-device. For example, some devices will generate information about these
-notifications through special interrupts. Other devices may have a
-register that software can poll. In the cases where polling is required,
-driver writers should try not to poll too frequently and should
-generally only poll when the device is actively being used, e.g. between
-calls to the
+events occur.
+The means and capabilities will vary from device to device.
+For example, some devices will generate information about these notifications
+through special interrupts.
+Other devices may have a register that software can poll.
+In the cases where polling is required, driver writers should try not to poll
+too frequently and should generally only poll when the device is actively being
+used, e.g. between calls to the
 .Xr mc_start 9E
 and
 .Xr mc_stop 9E
 entry points.
 .Ss Driver Transmit Stall Detection
 One of the primary responsibilities of a hardened device driver is to
-perform transmit stall detection. The core idea behind tx stall
-detection is that the driver should record when it's getting activity
-related to when data has been successfully transmitted. Most devices
-should be transmitting data on a regular basis as long as the link is
-up. If it is not, then this may indicate that the device is stuck and
-needs to be reset. At this time, the MAC framework does not provide any
-resources for performing these checks; however, polling on each
-individual transmit ring for the last completion time while something is
-actively being transmitted through the use of routines such as
+perform transmit stall detection.
+The core idea behind tx stall detection is that the driver should record when
+it's getting activity related to when data has been successfully transmitted.
+Most devices should be transmitting data on a regular basis as long as the link
+is up.
+If it is not, then this may indicate that the device is stuck and needs to be
+reset.
+At this time, the MAC framework does not provide any resources for performing
+these checks; however, polling on each individual transmit ring for the last
+completion time while something is actively being transmitted through the use of
+routines such as
 .Xr timeout 9F
 may be a reasonable starting point.
 .Ss Driver Command Timeout Detection
-Each device is programmed in different ways. Some devices are programmed
-through asynchronous commands while others are programmed by writing
-directly to memory mapped registers. If a device receives asynchronous
-replies to commands, then the device driver should set reasonable
-timeouts for all such commands and plan on detecting them. If a timeout
-occurs, the driver should presume that there is an issue with the
+Each device is programmed in different ways.
+Some devices are programmed through asynchronous commands while others are
+programmed by writing directly to memory mapped registers.
+If a device receives asynchronous replies to commands, then the device driver
+should set reasonable timeouts for all such commands and plan on detecting them.
+If a timeout occurs, the driver should presume that there is an issue with the
 hardware and proceed to abort the command or reset the device.
 .Pp
-Many devices do not have such a communication mechanism. However,
-whenever there is some activity where the device driver must wait, then
+Many devices do not have such a communication mechanism.
+However, whenever there is some activity where the device driver must wait, then
 it should be prepared for the fact that the device may never get back to
 it and react appropriately by performing some kind of device reset.
 .Ss Reacting to Errors
 When any of the above categories of errors has been triggered, the
 behavior that the device driver should take depends on the kind of
-error. If a fatal error, for example, a transport error, a transmit
-stall was detected, or the device indicated an uncorrectable error was
-detected, then it is
+error.
+If a fatal error, for example, a transport error, a transmit stall was detected,
+or the device indicated an uncorrectable error was detected, then it is
 important that the driver take the following steps:
 .Bl -enum -offset indent
 .It
 Set a flag in the device driver's state that indicates that it has hit
-an error condition. When this error condition flag is asserted,
-transmitted packets should be accepted and dropped and actions that would
-require writing to the device state should fail with an error. This flag
-should remain until the device has been successfully restarted.
+an error condition.
+When this error condition flag is asserted, transmitted packets should be
+accepted and dropped and actions that would require writing to the device state
+should fail with an error.
+This flag should remain until the device has been successfully restarted.
 .It
 If the error was not a transport error that was indicated by the fault
 management architecture, e.g. a transport error that was detected, then
@@ -1591,9 +1676,9 @@ At this point the device driver should issue a device reset through some
 device-specific means.
 .It
 When the device reset has been completed, then the device driver should
-restore all of the programmed state to the device. This includes things
-like the current MTU, advertised auto-negotiation speeds, MAC address
-filters, and more.
+restore all of the programmed state to the device.
+This includes things like the current MTU, advertised auto-negotiation speeds,
+MAC address filters, and more.
 .It
 Finally, when service has been restored, the device driver should call
 .Xr ddi_fm_service_impact 9F
@@ -1610,27 +1695,29 @@ value depending on the nature of the problem that has occurred.
 .Pp
 Device drivers should never make the decision to remove a device from
 service based on errors that have occurred nor should they panic the
-system. Rather, the device driver should always try to notify the
-operating system with various ereports and allow its policy decisions to
-occur. The decision to retire a device lies in the hands of the fault
-management architecture. It knows more about the operator's intent and
-the surrounding system's state than the device driver itself does and it
-will make the call to offline and retire the device if it is required.
+system.
+Rather, the device driver should always try to notify the operating system with
+various ereports and allow its policy decisions to occur.
+The decision to retire a device lies in the hands of the fault management
+architecture.
+It knows more about the operator's intent and the surrounding system's state
+than the device driver itself does and it will make the call to offline and
+retire the device if it is required.
 .Ss Device Resets
-When resetting a device, a device driver must exercise caution. If a
-device driver has not been written to plan for a device reset, then it
-may not correctly restore the device's state after such a reset. Such
-state should be stored in the instance's private state data as the MAC
+When resetting a device, a device driver must exercise caution.
+If a device driver has not been written to plan for a device reset, then it
+may not correctly restore the device's state after such a reset.
+Such state should be stored in the instance's private state data as the MAC
 framework does not know about device resets and will not inform the
 device again about the expected, programmed state.
 .Pp
 One wrinkle with device resets is that many networking cards show up as
 multiple PCI functions on a single device, for example, each port may
 show up as a separate function and thus have a separate instance of the
-device driver attached. When resetting a function, device driver writers
-should carefully read the device programming manuals and verify whether
-or not a reset impacts only the stalled function or if it impacts all
-function across the device.
+device driver attached.
+When resetting a function, device driver writers should carefully read the
+device programming manuals and verify whether or not a reset impacts only the
+stalled function or if it impacts all function across the device.
 .Pp
 If the only way to reset a given function is through the device, then
 this may require more coordination and work on the part of the device
@@ -1641,28 +1728,32 @@ occurring.
 .Sh MBLKS AND DMA
 The networking stack manages framed data through the use of the
 .Xr mblk 9S
-structure. The mblk allows for a single message to be made up of
-individual blocks. Each part is linked together through its
+structure.
+The mblk allows for a single message to be made up of individual blocks.
+Each part is linked together through its
 .Sy b_cont
-member. However, it also allows for multiple messages to be chained
-together through the use of the
+member.
+However, it also allows for multiple messages to be chained together through the
+use of the
 .Sy b_next
-member. While the networking stack works with these structures, device
-drivers generally work with DMA regions. There are two different
-strategies that device drivers use for handling these two different
-cases: copying and binding.
+member.
+While the networking stack works with these structures, device drivers generally
+work with DMA regions.
+There are two different strategies that device drivers use for handling these
+two different cases: copying and binding.
 .Ss Copying Data
 The first way that device drivers handle interfacing between the two is
-by having two separate regions of memory. One part is memory which has
-been allocated for DMA through a call to
+by having two separate regions of memory.
+One part is memory which has been allocated for DMA through a call to
 .Xr ddi_dma_alloc 9F
 and the other is memory associated with the memory block.
 .Pp
 In this case, a driver will use
 .Xr bcopy 9F
-to copy memory between the two distinct regions. When transmitting a
-packet, it will copy the memory from the mblk_t to the DMA region. When
-receiving memory, it will allocate a mblk_t through the
+to copy memory between the two distinct regions.
+When transmitting a packet, it will copy the memory from the mblk_t to the DMA
+region.
+When receiving memory, it will allocate a mblk_t through the
 .Xr allocb 9F
 routine, copy the memory across with
 .Xr bcopy 9F ,
@@ -1671,67 +1762,74 @@ and then increment the mblk_t's
 structure.
 .Pp
 If, when receiving, memory is not available for a new message block,
-then the frame should be skipped and effectively dropped. A kstat should
-be bumped when such an occasion occurs.
+then the frame should be skipped and effectively dropped.
+A kstat should be bumped when such an occasion occurs.
 .Ss Binding Data
-An alternative approach to copying data is to use DMA binding. When
-using DMA binding, the OS takes care of mapping between DMA memory and
-normal device memory. The exact process is a bit different between
-transmit and receive.
+An alternative approach to copying data is to use DMA binding.
+When using DMA binding, the OS takes care of mapping between DMA memory and
+normal device memory.
+The exact process is a bit different between transmit and receive.
 .Pp
 When transmitting a device driver has an mblk_t and needs to call the
 .Xr ddi_dma_addr_bind_handle 9F
-function to bind it to an already existing DMA handle. At that point, it
-will receive various DMA cookies that it can use to obtain the addresses
-to program the device with for transmitting data. Once the transmit is
-done, the driver must then make sure to call
+function to bind it to an already existing DMA handle.
+At that point, it will receive various DMA cookies that it can use to obtain the
+addresses to program the device with for transmitting data.
+Once the transmit is done, the driver must then make sure to call
 .Xr freemsg 9F
-to release the data. It must not call
+to release the data.
+It must not call
 .Xr freemsg 9F
 before it receives an interrupt from the device indicating that the data
 has been transmitted, otherwise it risks sending arbitrary kernel
 memory.
 .Pp
-When receiving data, the device can perform a similar operation. First,
-it must bind the DMA memory into the kernel's virtual memory address
+When receiving data, the device can perform a similar operation.
+First, it must bind the DMA memory into the kernel's virtual memory address
 space through a call to the
 .Xr ddi_dma_addr_bind_handle 9F
-function if it has not already. Once it has, it must then call
+function if it has not already.
+Once it has, it must then call
 .Xr desballoc 9F
-to try and create a new mblk_t which leverages the associated memory. It
-can then pass that mblk_t up to the stack.
+to try and create a new mblk_t which leverages the associated memory.
+It can then pass that mblk_t up to the stack.
 .Ss Considerations
 When deciding which of these options to use, there are many different
-considerations that must be made. The answer as to whether to bind
-memory or to copy data is not always simpler.
+considerations that must be made.
+The answer as to whether to bind memory or to copy data is not always simpler.
 .Pp
 The first thing to remember is that DMA resources may be finite on a
-given platform. Consider the case of receiving data. A device driver
-that binds one of its receive descriptors may not get it back for quite
-some time as it may be used by the kernel until an application actually
-consumes it. Device drivers that try to bind memory for receive, often
-work with the constraint that they must be able to replace that DMA
-memory with another DMA descriptor. If they were not replaced, then
-eventually the device would not be able to receive additional data into
-the ring.
+given platform.
+Consider the case of receiving data.
+A device driver that binds one of its receive descriptors may not get it back
+for quite some time as it may be used by the kernel until an application
+actually consumes it.
+Device drivers that try to bind memory for receive, often work with the
+constraint that they must be able to replace that DMA memory with another DMA
+descriptor.
+If they were not replaced, then eventually the device would not be able to
+receive additional data into the ring.
 .Pp
 On the other hand, particularly for larger frames, copying every packet
 from one buffer to another can be a source of additional latency and
-memory waste in the system. For larger copies, the cost of copying may
-dwarf any potential cost of performing DMA binding.
+memory waste in the system.
+For larger copies, the cost of copying may dwarf any potential cost of
+performing DMA binding.
 .Pp
 For device driver authors that are unsure of what to do, they should
 first employ the copying method to simplify the act of writing the
-device driver. The copying method is simpler and also allows the device
-driver author not to worry about allocated DMA memory that is still
-outstanding when it is asked to unload.
+device driver.
+The copying method is simpler and also allows the device driver author not to
+worry about allocated DMA memory that is still outstanding when it is asked to
+unload.
 .Pp
 If device driver writers are worried about the cost, it is recommended
 to make the decision as to whether or not to copy or bind DMA data
-a separate private property for both transmitting and receiving. That
-private property should indicate the size of the received frame at which
-to switch from one format to the other. This way, data can be gathered
-to determine what the impact of each method is on a given platform.
+a separate private property for both transmitting and receiving.
+That private property should indicate the size of the received frame at which
+to switch from one format to the other.
+This way, data can be gathered to determine what the impact of each method is on
+a given platform.
 .Sh SEE ALSO
 .Xr dladm 1M ,
 .Xr driver.conf 4 ,

@@ -31,15 +31,17 @@ funtion returns a file descriptor that allows direct access to the
 address space of the process handle
 .Fa P .
 A defined file descriptor is provided when using the
-.Xr Pcreate ,
+.Xr Pcreate 3PROC ,
 .Xr Pgrab 3PROC ,
 .Xr Pgrab_file 3PROC ,
 and
 .Xr Pgrab_core 3PROC
-functions. Note that the address space may be different in each of these
-cases and doesn't necessarily correspond to the /proc
+functions.
+Note that the address space may be different in each of these cases and doesn't
+necessarily correspond to the /proc
 .Sy as
-file, except for live processes. Other means of obtaining a
+file, except for live processes.
+Other means of obtaining a
 .Sy libproc
 process handle may not define a file descriptor that contains the
 address space.
@@ -47,14 +49,15 @@ address space.
 The returned file descriptor must not be closed and is only valid for
 as long as the corresponding process handle
 .Fa P
-is valid. After a call to
+is valid.
+After a call to
 .Xr Prelease 3PROC
 the file descriptor is invalidated.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pasfd
-function returns a valid file descriptor. Otherwise, if none exists,
-then
+function returns a valid file descriptor.
+Otherwise, if none exists, then
 .Sy -1
 is returned.
 .Sh INTERFACE STABILITY

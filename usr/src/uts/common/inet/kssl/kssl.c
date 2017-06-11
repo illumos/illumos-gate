@@ -321,8 +321,8 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 			return (EFAULT);
 		}
 		error = kssl_add_entry(kssl_params);
-	if (auditing)
-		audit_kssl(KSSL_ADD_ENTRY, kssl_params, error);
+		if (auditing)
+			audit_kssl(KSSL_ADD_ENTRY, kssl_params, error);
 		off = offsetof(kssl_params_t, kssl_token) +
 		    offsetof(kssl_tokinfo_t, ck_rv);
 		ck_rv = kssl_params->kssl_token.ck_rv;
@@ -342,8 +342,8 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		}
 
 		error = kssl_delete_entry(&server_addr);
-	if (auditing)
-		audit_kssl(KSSL_DELETE_ENTRY, &server_addr, error);
+		if (auditing)
+			audit_kssl(KSSL_DELETE_ENTRY, &server_addr, error);
 		break;
 	}
 	}

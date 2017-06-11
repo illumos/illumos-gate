@@ -29,13 +29,14 @@
 .Nd IEEE 802.3 Ethernet parameters and statistics
 .Sh DESCRIPTION
 The IEEE 802.3 standard specifies the details for Ethernet
-networking.  This page describes the various statistics and tunables
-that device drivers supporting Ethernet commonly offer.
+networking.
+This page describes the various statistics and tunables that device drivers
+supporting Ethernet commonly offer.
 .
 Note that not every device or driver supports every one of these
 values, and many devices offer additional statistics and tunables that
-are specific to that hardware.  See the device driver's documentation
-for those specific details.
+are specific to that hardware.
+See the device driver's documentation for those specific details.
 .
 .Lp
 Values that are statistics are visible
@@ -43,11 +44,12 @@ Values that are statistics are visible
 whereas properties are visible using the
 .Xr dladm 1M
 .Sy show-linkprop
-subcommand.  Tunables are properties that can be changed using the
+subcommand.
+Tunables are properties that can be changed using the
 .Xr dladm 1M
 .Sy set-linkprop
-subcommand.  A more useful summary of current operational
-state can be seen with the
+subcommand.
+A more useful summary of current operational state can be seen with the
 .Xr dladm 1M
 .Sy show-ether
 subcommand.
@@ -59,11 +61,13 @@ Note that some statistics are available in both 32- and 64-bit counters,
 in which case the name of the 64 bit statistic will be the same as the
 32-bit, but with
 .Dq Sy 64
-appended.  For example,
+appended.
+For example,
 .Sy ipackets64
 is the 64-bit version of the
 .Sy ipackets
-statistic. These are indicated with the special suffix
+statistic.
+These are indicated with the special suffix
 .Op Sy 64
 in the table below.
 .
@@ -273,7 +277,8 @@ Transceiver address.
 .It Sy xcvr_id
 Transceiver vendor and device ID.
 .It Sy xcvr_inuse
-Identifies the type of transceiver in use.  Values are as follows:
+Identifies the type of transceiver in use.
+Values are as follows:
 .Bl -column "0"
 .It 0 Ta Unknown or undefined.
 .It 1 Ta None.
@@ -288,8 +293,9 @@ Identifies the type of transceiver in use.  Values are as follows:
 .Ss Properties
 The following parameters are accessible with
 .Xr dladm 1M .
-Some of these are normally read-only.  Other properties that are not
-specific to IEEE 802.3 / Ethernet links are also available via
+Some of these are normally read-only.
+Other properties that are not specific to IEEE 802.3 / Ethernet links are also
+available via
 .Xr dladm 1M ,
 and are documented in its man page rather than here.
 .
@@ -301,7 +307,8 @@ Link duplex, either "full" or "half".
 .It Sy state
 Link state, either "up" or "down".
 .It Sy mtu
-Maximum link frame size in bytes. See
+Maximum link frame size in bytes.
+See
 .Sx Jumbo Frames .
 .It Sy flowctrl
 Flow control setting, one of \(dqno\(dq, \(dqtx\(dq, \(dqrx\(dq, or \(dqbi\(dq.
@@ -343,9 +350,10 @@ Advertising 10 Mbps half-duplex support.
 Enable 10 Mbps half-duplex.
 .El
 .Ss Auto-negotiation
-With modern devices, auto-negotiation is normally handled automatically.  With
-10 Gbps and 1000 Gbps, it is mandatory.  (10GBASE-T also requires full-duplex
-operation.) It is also
+With modern devices, auto-negotiation is normally handled automatically.
+With 10 Gbps and 1000 Gbps, it is mandatory (10GBASE-T also requires full-duplex
+operation).
+It is also
 .Em strongly
 recommended for use whenever possible; without auto-negotiation the link
 will usually not operate unless both partners are configured to use the
@@ -385,18 +393,19 @@ property in
 .Lp
 Auto-negotiation may also be disabled, by setting the
 .Sy adv_autoneg_cap
-property to 0.  In this case, the highest enabled link mode (using the above
-list) is
+property to 0.
+In this case, the highest enabled link mode (using the above list) is
 .Dq forced
 for the link.
 .Ss Flow Control
 Link layer flow control is available on many modern devices, and is mandatory
-for operation at 10 Gbps. It requires that the link be auto-negotiated, and
-that the link be full-duplex, in order to function.
+for operation at 10 Gbps.
+It requires that the link be auto-negotiated, and that the link be full-duplex,
+in order to function.
 .Lp
-Flow control is applied when a receiver becomes congested.  In this case the
-receiver can send a special frame, called a pause frame, to request its
-partner cease transmitting for a short period of time.
+Flow control is applied when a receiver becomes congested.
+In this case the receiver can send a special frame, called a pause frame, to
+request its partner cease transmitting for a short period of time.
 .Lp
 Flow control can be said to be either symmetric, in which case both partners
 can send and honor pause frames, or asymmetric, in which case one partner
@@ -404,7 +413,8 @@ may not transmit pause frames.
 .Lp
 The flow control mode used is driven by the
 .Sy flowctrl
-property.  It has the following meanings:
+property.
+It has the following meanings:
 .Lp
 .Bl -column -compact -offset indent Dv
 .It \(dqno\(dq Ta Neither send, nor honor pause frames.
@@ -421,27 +431,30 @@ and
 .Sy link_asmpause
 .Pc
 are based on the properties exchanged in the auto-negotiation and are
-confusing as a result.  Administrators are advised to use the
+confusing as a result.
+Administrators are advised to use the
 .Sy flowctrl
 property instead.
 .
 .Ss Jumbo Frames
 The IEEE 802.3 standard specifies a standard frame size of 1518 bytes,
 which includes a 4-byte frame checksum, a 14-byte header, and 1500 bytes
-of payload.  Most devices support larger frame sizes than this, and
-when all possible parties on the same local network can do so, it may be
-advantageous to choose a larger frame size; 9000 bytes is the most common
-option, as it allows a transport layer to convey 8 KB (8192) of data, while
-leaving room for various link, network, and transport layer headers.
+of payload.
+Most devices support larger frame sizes than this, and when all possible parties
+on the same local network can do so, it may be advantageous to choose a larger
+frame size; 9000 bytes is the most common option, as it allows a transport layer
+to convey 8 KB (8192) of data, while leaving room for various link, network, and
+transport layer headers.
 .Lp
 Note that the use of frames carrying more than 1500 bytes of payload is
 not standardized, even though it is common practice.
 .Lp
 The
 .Sy mtu
-property is used to configure the frame size.  Note that this is the size of
-the payload, and excludes the preamble, checksum, and header.  It also excludes
-the tag for devices that support tagging (see
+property is used to configure the frame size.
+Note that this is the size of the payload, and excludes the preamble, checksum,
+and header.
+It also excludes the tag for devices that support tagging (see
 .Sx Virtual LANs
 below).
 .Lp
@@ -450,22 +463,24 @@ size, or communication may cease to function properly.
 .Lp
 Note that the
 .Sy mtu
-property refers to the link layer property.  It may be necessary to configure
-upper layer protocols such as IP to use a different size when this changes.
+property refers to the link layer property.
+It may be necessary to configure upper layer protocols such as IP to use a
+different size when this changes.
 See
 .Xr ifconfig 1M .
 .
 .Ss Virtual LANs
 Most devices support virtual LANs (and also priority control tagging) though
-the use of a 4-byte tag inserted between the frame header and payload.  The
-details of configuration of this are covered in the
+the use of a 4-byte tag inserted between the frame header and payload.
+The details of configuration of this are covered in the
 .Xr dladm 1M
 manual.
 .
 .Ss Data Link Provider Interface (DLPI) Details
 .
 The correct method for applications to access Ethernet devices directly
-is to use the DLPI. See
+is to use the DLPI.
+See
 .Xr dlpi 7P
 and
 .Xr libdlpi 3LIB
@@ -493,14 +508,16 @@ Additionally, it is possible to configure provide
 names to interfaces using the
 .Xr dladm 1M
 .Sy rename-link
-subcommand.  Such vanity names are only accessible using DLPI style 1.
+subcommand.
+Such vanity names are only accessible using DLPI style 1.
 .Sh NOTES
 There may be other mechanisms available to configure link layer properties.
 Historically the
 .Xr ndd 1M
 command, and
 .Xr driver.conf 4
-files could be used to do this.  These methods are deprecated in favor of
+files could be used to do this.
+These methods are deprecated in favor of
 .Xr dladm 1M
 properties.
 .

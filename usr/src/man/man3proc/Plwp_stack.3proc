@@ -73,7 +73,8 @@ in the process handle
 Each thread in a process has its own stack which is used both for
 maintaining function call sequences and the storing of local variables.
 A thread may also configure a different stack to handle specific
-signals. This stack is often called the
+signals.
+This stack is often called the
 .Em alternate stack .
 Whether or not the alternate stack is used may be controlled through the
 .Xr sigaction 2
@@ -134,7 +135,8 @@ functions return
 .Sy 0
 and fills in
 .Fa stkp
-with information about the appropriate stack. Otherwise,
+with information about the appropriate stack.
+Otherwise,
 .Sy -1
 is returned,
 .Sy errno

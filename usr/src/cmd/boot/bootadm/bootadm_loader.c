@@ -46,6 +46,7 @@
 #include <libbe.h>
 #include <ficl.h>
 #include <ficlplatform/emu.h>
+#include <ofmt.h>
 
 #include "bootadm.h"
 
@@ -60,12 +61,14 @@ extern char *bam_root;
 #define	TRANSIENT	BOOT_DIR "/transient.conf"
 #define	XEN_CONFIG	CONF_DIR "/xen"
 
-struct menu_entry {
-	int entry;
-	char *title;
-	char *bootfs;
-	STAILQ_ENTRY(menu_entry) next;
-};
+typedef struct menu_entry {
+	int me_idx;
+	boolean_t me_active;
+	char *me_title;
+	char *me_type;
+	char *me_bootfs;
+	STAILQ_ENTRY(menu_entry) me_next;
+} menu_entry_t;
 STAILQ_HEAD(menu_lst, menu_entry);
 
 static error_t set_option(struct menu_lst *, char *, char *);
@@ -88,57 +91,67 @@ static subcmd_defn_t menu_subcmds[] = {
 	NULL,			0,		NULL, 0 /* must be last */
 };
 
-#define	NUM_COLS	(4)
-struct col_info {
-	const char *col_name;
-	size_t width;
-};
+#define	NUM_COLS	(5)
 
-/*
- * all columns output format
- */
-struct hdr_info {
-	struct col_info cols[NUM_COLS];
-};
-
-static void
-print_hdr(struct hdr_info *hdr_info)
+static boolean_t
+print_menu_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
-	boolean_t first = B_TRUE;
-	size_t i;
+	menu_entry_t *entry = ofarg->ofmt_cbarg;
 
-	for (i = 0; i < NUM_COLS; i++) {
-		struct col_info *col_info = &hdr_info->cols[i];
-		const char *name = col_info->col_name;
-		size_t width = col_info->width;
-
-		if (name == NULL)
-			continue;
-
-		if (first) {
-			(void) printf("%-*s", width, name);
-			first = B_FALSE;
-		} else
-			(void) printf(" %-*s", width, name);
+	switch (ofarg->ofmt_id) {
+	case 0:
+		(void) snprintf(buf, bufsize, "%d", entry->me_idx);
+		break;
+	case 1:
+		(void) snprintf(buf, bufsize, "%s", entry->me_title);
+		break;
+	case 2:
+		(void) snprintf(buf, bufsize, "%s", entry->me_bootfs);
+		break;
+	case 3:
+		(void) snprintf(buf, bufsize, "%s", entry->me_type);
+		break;
+	case 4:
+		if (entry->me_active == B_TRUE)
+			(void) snprintf(buf, bufsize, "   *");
+		else
+			(void) snprintf(buf, bufsize, "   -");
+		break;
+	default:
+		return (B_FALSE);
 	}
-	(void) putchar('\n');
+	return (B_TRUE);
 }
 
 static void
-init_hdr_cols(struct hdr_info *hdr)
+init_hdr_cols(ofmt_field_t *hdr)
 {
-	struct col_info *col = hdr->cols;
-	size_t i;
-
-	col[0].col_name = _("Index");
-	col[1].col_name = _("Default");
-	col[2].col_name = _("Dataset");
-	col[3].col_name = _("Menu");
-	col[4].col_name = NULL;
+	uint_t i;
 
 	for (i = 0; i < NUM_COLS; i++) {
-		const char *name = col[i].col_name;
-		col[i].width = 0;
+		char *name = NULL;
+
+		switch (i) {
+		case 0:
+			name = _("INDEX");
+			break;
+		case 1:
+			name = _("NAME");
+			break;
+		case 2:
+			name = _("DEVICE");
+			break;
+		case 3:
+			name = _("TYPE");
+			break;
+		case 4:
+			name = _("DEFAULT");
+			break;
+		}
+
+		hdr[i].of_name = name;
+		hdr[i].of_id = i;
+		hdr[i].of_cb = print_menu_cb;
 
 		if (name != NULL) {
 			wchar_t wname[128];
@@ -147,94 +160,121 @@ init_hdr_cols(struct hdr_info *hdr)
 			if (sz > 0) {
 				int wcsw = wcswidth(wname, sz);
 				if (wcsw > 0)
-					col[i].width = wcsw;
+					hdr[i].of_width = wcsw;
 				else
-					col[i].width = sz;
+					hdr[i].of_width = sz;
 			} else {
-				col[i].width = strlen(name);
+				hdr[i].of_width = strlen(name);
 			}
 		}
 	}
 }
 
 static void
-count_widths(struct hdr_info *hdr, struct menu_lst *menu)
+menu_update_widths(ofmt_field_t *hdr, struct menu_lst *menu)
 {
 	size_t len[NUM_COLS];
-	struct menu_entry *entry;
+	menu_entry_t *entry;
 	int i;
 
 	for (i = 0; i < NUM_COLS; i++)
-		len[i] = hdr->cols[i].width + 1;
+		len[i] = hdr[i].of_width + 1;
 
-	STAILQ_FOREACH(entry, menu, next) {
-		size_t bootfs_len = strlen(entry->bootfs);
-		if (bootfs_len > len[2])
-			len[2] = bootfs_len + 1;
+	STAILQ_FOREACH(entry, menu, me_next) {
+		size_t entry_len;
+
+		entry_len = strlen(entry->me_title) + 1;
+		if (entry_len > len[1])
+			len[1] = entry_len;
+
+		entry_len = strlen(entry->me_bootfs) + 1;
+		if (entry_len > len[2])
+			len[2] = entry_len;
+
+		entry_len = strlen(entry->me_type) + 1;
+		if (entry_len > len[3])
+			len[3] = entry_len;
 	}
 
 	for (i = 0; i < NUM_COLS; i++)
-		hdr->cols[i].width = len[i];
+		hdr[i].of_width = len[i];
 }
 
-static void
-print_menu_nodes(boolean_t parsable, struct hdr_info *hdr,
-    struct menu_lst *menu)
+static ofmt_field_t *
+init_menu_template(struct menu_lst *menu)
 {
-	struct menu_entry  *entry;
-	int i = -1;
-	int rv;
-	be_node_list_t *be_nodes, *be_node;
+	ofmt_field_t *temp;
 
-	rv = be_list(NULL, &be_nodes);
-	if (rv != BE_SUCCESS)
-		return;
+	if ((temp = calloc(NUM_COLS + 1, sizeof (ofmt_field_t))) == NULL)
+		return (temp);
 
-	STAILQ_FOREACH(entry, menu, next) {
-		i++;
-		for (be_node = be_nodes; be_node;
-		    be_node = be_node->be_next_node)
-			if (strcmp(be_node->be_root_ds, entry->bootfs) == 0)
-				break;
-
-		if (parsable)
-			(void) printf("%d;%s;%s;%s\n", i,
-			    be_node->be_active_on_boot == B_TRUE? "*" : "-",
-			    entry->bootfs, entry->title);
-		else
-			(void) printf("%-*d %-*s %-*s %-*s\n",
-			    hdr->cols[0].width, i,
-			    hdr->cols[1].width,
-			    be_node->be_active_on_boot == B_TRUE? "*" : "-",
-			    hdr->cols[2].width, entry->bootfs,
-			    hdr->cols[3].width, entry->title);
-	}
-	be_free_list(be_nodes);
+	init_hdr_cols(temp);
+	menu_update_widths(temp, menu);
+	return (temp);
 }
 
 static void
 print_nodes(boolean_t parsable, struct menu_lst *menu)
 {
-	struct hdr_info hdr;
+	ofmt_status_t oferr;
+	ofmt_handle_t ofmt;
+	uint_t ofmtflags = 0;
+	ofmt_field_t *menu_template;
+	menu_entry_t  *entry;
 
-	if (!parsable) {
-		init_hdr_cols(&hdr);
-		count_widths(&hdr, menu);
-		print_hdr(&hdr);
+	if (parsable == B_TRUE)
+		ofmtflags = OFMT_PARSABLE;
+
+	menu_template = init_menu_template(menu);
+	oferr = ofmt_open(NULL, menu_template, ofmtflags, 0, &ofmt);
+
+	if (oferr != OFMT_SUCCESS) {
+		char buf[OFMT_BUFSIZE];
+
+		(void) ofmt_strerror(ofmt, oferr, buf, sizeof (buf));
+		(void) printf("bootadm: %s\n", buf);
+		free(menu_template);
+		return;
 	}
 
-	print_menu_nodes(parsable, &hdr, menu);
+	STAILQ_FOREACH(entry, menu, me_next)
+		ofmt_print(ofmt, entry);
+
+	ofmt_close(ofmt);
+	free(menu_template);
+}
+
+/*
+ * Get the be_active_on_boot for bootfs.
+ */
+static boolean_t
+menu_active_on_boot(be_node_list_t *be_nodes, const char *bootfs)
+{
+	be_node_list_t *be_node;
+	boolean_t rv = B_FALSE;
+
+	for (be_node = be_nodes; be_node != NULL;
+	    be_node = be_node->be_next_node) {
+		if (strcmp(be_node->be_root_ds, bootfs) == 0) {
+			rv = be_node->be_active_on_boot;
+			break;
+		}
+	}
+
+	return (rv);
 }
 
 error_t
 menu_read(struct menu_lst *menu, char *menu_path)
 {
 	FILE *fp;
-	struct menu_entry *mp;
+	be_node_list_t *be_nodes;
+	menu_entry_t *mp;
 	char buf[PATH_MAX];
 	char *title;
 	char *bootfs;
-	char *ptr;
+	char *type;
+	char *key, *value;
 	int i = 0;
 	int ret = BAM_SUCCESS;
 
@@ -242,87 +282,82 @@ menu_read(struct menu_lst *menu, char *menu_path)
 	if (fp == NULL)
 		return (BAM_ERROR);
 
+	if (be_list(NULL, &be_nodes) != BE_SUCCESS)
+		be_nodes = NULL;
+
 	/*
 	 * menu.lst entry is on two lines, one for title, one for bootfs
 	 * so we process both lines in succession.
 	 */
+	title = NULL;
+	type = NULL;
+	bootfs = NULL;
 	do {
 		if (fgets(buf, PATH_MAX, fp) == NULL) {
 			if (!feof(fp))
 				ret = BAM_ERROR;
-			(void) fclose(fp);
-			return (ret);
+			goto done;
 		}
-		ptr = strchr(buf, '\n');
-		if (ptr != NULL)
-			*ptr = '\0';
-
-		ptr = strchr(buf, ' ');
-		if (ptr == NULL) {
-			(void) fclose(fp);
-			return (BAM_ERROR);
+		key = strtok(buf, " \n");
+		if (strcmp(key, "title") != 0) {
+			ret = BAM_ERROR;
+			goto done;
 		}
-		*ptr++ = '\0';
-		if (strcmp(buf, "title") != 0) {
-			(void) fclose(fp);
-			return (BAM_ERROR);
-		}
-		if ((title = strdup(ptr)) == NULL) {
-			(void) fclose(fp);
-			return (BAM_ERROR);
+		value = strtok(NULL, " \n");
+		if ((title = strdup(value)) == NULL) {
+			ret = BAM_ERROR;
+			goto done;
 		}
 
 		if (fgets(buf, PATH_MAX, fp) == NULL) {
-			free(title);
-			(void) fclose(fp);
-			return (BAM_ERROR);
+			ret = BAM_ERROR;
+			goto done;
 		}
 
-		ptr = strchr(buf, '\n');
-		if (ptr != NULL)
-			*ptr = '\0';
+		key = strtok(buf, " \n");
+		if ((type = strdup(key)) == NULL) {
+			ret = BAM_ERROR;
+			goto done;
+		}
+		value = strtok(NULL, " \n");
+		if ((bootfs = strdup(value)) == NULL) {
+			ret = BAM_ERROR;
+			goto done;
+		}
+		if ((mp = malloc(sizeof (menu_entry_t))) == NULL) {
+			ret = BAM_ERROR;
+			goto done;
+		}
+		mp->me_idx = i++;
+		mp->me_title = title;
+		mp->me_type = type;
+		mp->me_bootfs = bootfs;
+		mp->me_active = menu_active_on_boot(be_nodes, bootfs);
+		STAILQ_INSERT_TAIL(menu, mp, me_next);
 
-		ptr = strchr(buf, ' ');
-		if (ptr == NULL) {
-			free(title);
-			(void) fclose(fp);
-			return (BAM_ERROR);
-		}
-		*ptr++ = '\0';
-		if (strcmp(buf, "bootfs") != 0) {
-			free(title);
-			(void) fclose(fp);
-			return (BAM_ERROR);
-		}
-		if ((bootfs = strdup(ptr)) == NULL) {
-			free(title);
-			(void) fclose(fp);
-			return (BAM_ERROR);
-		}
-		if ((mp = malloc(sizeof (struct menu_entry))) == NULL) {
-			free(title);
-			free(bootfs);
-			(void) fclose(fp);
-			return (BAM_ERROR);
-		}
-		mp->entry = i++;
-		mp->title = title;
-		mp->bootfs = bootfs;
-		STAILQ_INSERT_TAIL(menu, mp, next);
+		title = NULL;
+		type = NULL;
+		bootfs = NULL;
 	} while (feof(fp) == 0);
 
+done:
+	free(title);
+	free(type);
+	free(bootfs);
 	(void) fclose(fp);
+	be_free_list(be_nodes);
 	return (ret);
 }
 
 void
 menu_free(struct menu_lst *menu)
 {
-	struct menu_entry *entry;
-	STAILQ_FOREACH(entry, menu, next) {
-		STAILQ_REMOVE_HEAD(menu, next);
-		free(entry->title);
-		free(entry->bootfs);
+	menu_entry_t *entry;
+	STAILQ_FOREACH(entry, menu, me_next) {
+		STAILQ_REMOVE_HEAD(menu, me_next);
+		free(entry->me_title);
+		free(entry->me_type);
+		free(entry->me_bootfs);
 		free(entry);
 	}
 }
@@ -566,7 +601,7 @@ set_option(struct menu_lst *menu, char *dummy, char *opt)
 	char *val;
 	char *rest;
 	int optval;
-	struct menu_entry *entry;
+	menu_entry_t *entry;
 	nvlist_t *be_attrs;
 	FILE *fp;
 	int rv, ret = BAM_SUCCESS;
@@ -587,8 +622,8 @@ set_option(struct menu_lst *menu, char *dummy, char *opt)
 			bam_error(_("invalid boot entry number: %s\n"), val);
 			return (BAM_ERROR);
 		}
-		STAILQ_FOREACH(entry, menu, next) {
-			if (entry->entry == optval)
+		STAILQ_FOREACH(entry, menu, me_next) {
+			if (entry->me_idx == optval)
 				break;
 		}
 		if (entry == NULL) {
@@ -600,7 +635,7 @@ set_option(struct menu_lst *menu, char *dummy, char *opt)
 			return (BAM_ERROR);
 		}
 		if (nvlist_add_string(be_attrs, BE_ATTR_ORIG_BE_NAME,
-		    entry->title) != 0) {
+		    entry->me_title) != 0) {
 			bam_error(_("out of memory\n"));
 			nvlist_free(be_attrs);
 			return (BAM_ERROR);
@@ -660,7 +695,7 @@ set_option(struct menu_lst *menu, char *dummy, char *opt)
 }
 
 static int
-bam_mount_be(struct menu_entry *entry, char **dir)
+bam_mount_be(menu_entry_t *entry, char **dir)
 {
 	nvlist_t *be_attrs = NULL;
 	const char *tmpdir = getenv("TMPDIR");
@@ -690,7 +725,7 @@ bam_mount_be(struct menu_entry *entry, char **dir)
 
 	for (be_node = be_nodes; be_node;
 	    be_node = be_node->be_next_node)
-		if (strcmp(be_node->be_root_ds, entry->bootfs) == 0)
+		if (strcmp(be_node->be_root_ds, entry->me_bootfs) == 0)
 			break;
 
 	if (nvlist_add_string(be_attrs, BE_ATTR_ORIG_BE_NAME,
@@ -747,7 +782,7 @@ out:
  * display details of menu entry or single property
  */
 static error_t
-list_menu_entry(struct menu_entry *entry, char *setting)
+list_menu_entry(menu_entry_t *entry, char *setting)
 {
 	int ret = BAM_SUCCESS;
 	char *ptr, *dir;
@@ -755,13 +790,21 @@ list_menu_entry(struct menu_entry *entry, char *setting)
 	ficlVm *vm;
 	int mounted;
 
+	if (strcmp(entry->me_type, "bootfs") != 0 ||
+	    strchr(entry->me_bootfs, ':') != NULL) {
+		(void) printf("\nTitle:       %s\n", entry->me_title);
+		(void) printf("Type:        %s\n", entry->me_type);
+		(void) printf("Device:      %s\n", entry->me_bootfs);
+		return (ret);
+	}
+
 	mounted = bam_mount_be(entry, &dir);
 	if (mounted != BE_SUCCESS && mounted != BE_ERR_MOUNTED) {
 		if (dir != NULL) {
 			(void) rmdir(dir);
 			free(dir);
 		}
-		bam_error(_("%s is not mounted\n"), entry->title);
+		bam_error(_("%s is not mounted\n"), entry->me_title);
 		return (BAM_ERROR);
 	}
 
@@ -774,7 +817,7 @@ list_menu_entry(struct menu_entry *entry, char *setting)
 
 	/* should only get FICL_VM_STATUS_OUT_OF_TEXT */
 	(void) snprintf(buf, MAX_INPUT, "set currdev=zfs:%s:",
-	    entry->bootfs);
+	    entry->me_bootfs);
 	ret = ficlVmEvaluate(vm, buf);
 	if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
 		bam_error(_("error interpreting boot config\n"));
@@ -805,9 +848,9 @@ list_menu_entry(struct menu_entry *entry, char *setting)
 
 	ret = BAM_SUCCESS;
 	if (*setting == '\0')
-		(void) printf("\nTitle:       %s\n", entry->title);
+		(void) printf("\nTitle:       %s\n", entry->me_title);
 	else if (strcasecmp(setting, "title") == 0) {
-		(void) printf("%s\n", entry->title);
+		(void) printf("%s\n", entry->me_title);
 		goto done;
 	}
 
@@ -837,9 +880,9 @@ list_menu_entry(struct menu_entry *entry, char *setting)
 	}
 
 	if (*setting == '\0')
-		(void) printf("Bootfs:      %s\n", entry->bootfs);
+		(void) printf("Bootfs:      %s\n", entry->me_bootfs);
 	else if (strcasecmp(setting, "bootfs") == 0) {
-		(void) printf("%s\n", entry->bootfs);
+		(void) printf("%s\n", entry->me_bootfs);
 		goto done;
 	}
 
@@ -928,7 +971,7 @@ static error_t
 list_entry(struct menu_lst *menu, char *menu_root, char *opt)
 {
 	error_t ret = BAM_SUCCESS;
-	struct menu_entry *entry;
+	menu_entry_t *entry;
 	char *ptr, *title = NULL;
 	int i, e = -1;
 
@@ -952,11 +995,11 @@ list_entry(struct menu_lst *menu, char *menu_root, char *opt)
 		return (BAM_ERROR);
 	}
 
-	STAILQ_FOREACH(entry, menu, next) {
+	STAILQ_FOREACH(entry, menu, me_next) {
 		if (title != NULL) {
-			if (strcmp(title, entry->title) == 0)
+			if (strcmp(title, entry->me_title) == 0)
 				break;
-		} else if (entry->entry == e)
+		} else if (entry->me_idx == e)
 			break;
 	}
 
@@ -1133,7 +1176,7 @@ static error_t
 list_setting(struct menu_lst *menu, char *which, char *setting)
 {
 	int entry = -1;
-	struct menu_entry *m;
+	menu_entry_t *m;
 	be_node_list_t *be_nodes, *be_node = NULL;
 	int ret;
 
@@ -1167,13 +1210,16 @@ list_setting(struct menu_lst *menu, char *which, char *setting)
 			bam_error(_("No BE's found\n"));
 			return (BAM_ERROR);
 		}
-		STAILQ_FOREACH(m, menu, next) {
+		STAILQ_FOREACH(m, menu, me_next) {
 			entry++;
 			for (be_node = be_nodes; be_node;
-			    be_node = be_node->be_next_node)
-				if (strcmp(be_node->be_root_ds, m->bootfs) == 0)
+			    be_node = be_node->be_next_node) {
+				if (strcmp(be_node->be_root_ds,
+				    m->me_bootfs) == 0)
 					break;
-			if (be_node->be_active_on_boot == B_TRUE)
+			}
+			if (be_node != NULL &&
+			    be_node->be_active_on_boot == B_TRUE)
 				break; /* found active node */
 		}
 		be_free_list(be_nodes);
@@ -1182,8 +1228,8 @@ list_setting(struct menu_lst *menu, char *which, char *setting)
 			return (BAM_ERROR);
 		}
 	} else {
-		STAILQ_FOREACH(m, menu, next)
-			if (m->entry == entry)
+		STAILQ_FOREACH(m, menu, me_next)
+			if (m->me_idx == entry)
 				break;
 
 		if (m == NULL) {

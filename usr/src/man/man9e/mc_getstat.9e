@@ -47,12 +47,12 @@ place the statistic.
 .Sh DESCRIPTION
 The
 .Fn mc_getstat
-entry point is used to get statistics from the device driver. Statistics
-are stored as monotonic values. They should only ever increase over the
-lifetime of a device, resetting only as part of the instance of a
-device attaching and detaching. When hardware has values that may
-overflow, it is up to the device driver to store them as a 64-bit
-quantity that does not overflow in its soft state.
+entry point is used to get statistics from the device driver.
+Statistics are stored as monotonic values.
+They should only ever increase over the lifetime of a device, resetting only as
+part of the instance of a device attaching and detaching.
+When hardware has values that may overflow, it is up to the device driver to
+store them as a 64-bit quantity that does not overflow in its soft state.
 .Pp
 Most device drivers will use a
 .Sy switch
@@ -75,10 +75,10 @@ and instead return
 .Pp
 The device driver can obtain access to its soft state through the
 .Fa driver
-member. It should be cast to the appropriate structure. The device
-driver should employ any necessary locking to access the statistic
-members of its soft state to ensure that the data is properly
-serialized.
+member.
+It should be cast to the appropriate structure.
+The device driver should employ any necessary locking to access the statistic
+members of its soft state to ensure that the data is properly serialized.
 .Sh RETURN VALUES
 Upon successful completion, the device driver should fill in
 .Fa stat_value
@@ -137,9 +137,9 @@ example_m_getstat(void *arg, uint_t stat, uint64_t *val)
 }
 .Ed
 .Sh ERRORS
-The device driver may return one of the following errors. While this list
-is not intended to be exhaustive, it is recommended to use one of these
-if possible.
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommended to use one
+of these if possible.
 .Bl -tag -width Er
 .It Er ENOTSUP
 The specified statistic is unknown, unsupported, or unimplemented.

@@ -48,7 +48,8 @@ The
 .Fn Pcreate
 function creates a process controlled by the
 .Sy libproc
-library. The
+library.
+The
 .Fn Pxcreate
 function does the same while also allowing the replacement of the
 environment via
@@ -71,9 +72,10 @@ The process image will be invoked with the arguments specified by
 .Fa argv ,
 which should be a
 .Dv NULL Ns -terminated
-array of character strings. Each entry in the array is an individual
-argument. The environment of the process image will be inherited from
-the running process if the
+array of character strings.
+Each entry in the array is an individual argument.
+The environment of the process image will be inherited from the running process
+if the
 .Fn Pcreate
 function is called or if the
 .Fn Pxcreate
@@ -97,9 +99,9 @@ process before the call to
 .Xr exec 2 .
 The symbol
 .Sy Pcreate_callback
-is a symbol that may be interposed on by consumers. It allows the chance
-for the modification of signal dispositions or any other changes that a
-caller may wish to make.
+is a symbol that may be interposed on by consumers.
+It allows the chance for the modification of signal dispositions or any other
+changes that a caller may wish to make.
 .Pp
 If the caller's real user or group ID is not their effective user or
 group ID, then the child process's user and group IDs will all be reset
@@ -109,7 +111,8 @@ The
 .Fa perr
 argument must be a
 .Pf non- Dv NULL
-pointer. If the
+pointer.
+If the
 .Fn Pcreate
 or
 .Fn Pxcreate
@@ -125,7 +128,8 @@ may exist on the
 .Fa PATH .
 To determine the full path of the executable pass a non-NULL
 .Fa path
-pointer. Upon successful completion of
+pointer.
+Upon successful completion of
 .Fn Pcreate
 or
 .Fn Pxcreate
@@ -139,22 +143,24 @@ Upon successful completion of the
 .Fn Pcreate
 or
 .Fn Pxcreate
-function, a handle to the process is returned. This handle is usable
-with other
+function, a handle to the process is returned.
+This handle is usable with other
 .Sy libproc
 routines and will persist until either
 .Xr Pfree 3PROC
 or
 .Xr Prelease 3PROC
-is called on the resulting handle. The process created is stopped just
-after return from the
+is called on the resulting handle.
+The process created is stopped just after return from the
 .Xr exec 2
-family of system calls. The process will not run, unless the caller sets
-it running or releases its handle to the process.
+family of system calls.
+The process will not run, unless the caller sets it running or releases its
+handle to the process.
 .Pp
 A 32-bit process cannot use this interface to launch or control a
-64-bit process. However, a 64-bit process can create and control both
-32-bit and 64-bit processes.
+64-bit process.
+However, a 64-bit process can create and control both 32-bit and 64-bit
+processes.
 .Sh RETURN VALUES
 Upon successful completion, both the
 .Fn Pcreate
@@ -162,7 +168,8 @@ and
 .Fn Pxcreate
 functions create a new process and return a
 .Sy libproc
-handle to it. Otherwise,
+handle to it.
+Otherwise,
 .Sy NULL
 is returned and
 .Fa perr
@@ -202,9 +209,11 @@ or the one found by searching
 is set-id or unreadable.
 .It Er C_STRANGE
 An unanticipated system error occurred while trying to create the
-process and its handle. When this occurs, then the value of
+process and its handle.
+When this occurs, then the value of
 .Sy errno
-is meaningful. See
+is meaningful.
+See
 .Xr errno 3C
 for more information and
 .Xr Intro 2

@@ -32,8 +32,8 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMATERS
 .Bl -tag -width Fa
 .It Fa ops
@@ -44,10 +44,10 @@ The
 .Fn usba_alloc_hcdi_ops
 function allocates a
 .Xr usba_hcdi_ops_t 9S
-structure for use for a USB HCD driver. As part of initialization, a USB
-HCD driver will allocate this and fill it in. For more information on
-the full lifetime of the object and when a USB HCD driver should release
-the structure, see
+structure for use for a USB HCD driver.
+As part of initialization, a USB HCD driver will allocate this and fill it in.
+For more information on the full lifetime of the object and when a USB HCD
+driver should release the structure, see
 .Xr usba_hcdi 9E .
 .Pp
 The
@@ -65,8 +65,9 @@ HCD driver's
 .Xr attach 9E
 and
 .Xr detach 9E
-entry points. While it is safe to call this function from user context,
-it would be quite unusal to do so.
+entry points.
+While it is safe to call this function from user context, it would be quite
+unusal to do so.
 .Sh RETURN VALUES
 The
 .Fn usba_alloc_hcdi_ops

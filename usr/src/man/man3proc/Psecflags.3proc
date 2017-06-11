@@ -59,7 +59,8 @@ function returns
 .Sy 0
 and
 .Fa psf
-is updated with a pointer to the allocated security flags. Otherwise,
+is updated with a pointer to the allocated security flags.
+Otherwise,
 .Sy -1
 is returned and
 .Fa psf

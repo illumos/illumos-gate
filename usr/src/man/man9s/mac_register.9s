@@ -32,11 +32,12 @@ interface.
 .Pp
 The structure is allocated by a call to
 .Xr mac_alloc 9F
-after which the various structure members should be set. Once they have
-been set, the structure can be used by a GLDv3 device driver to register
-with the MAC framework by calling the
+after which the various structure members should be set.
+Once they have been set, the structure can be used by a GLDv3 device driver to
+register with the MAC framework by calling the
 .Xr mac_register 9F
-function. Once
+function.
+Once
 .Xr mac_register 9F
 has been called, the structure can be freed through a call to
 .Xr mac_free 9F .
@@ -67,8 +68,8 @@ Device drivers should not modify this field.
 The
 .Sy m_type_ident
 member identifies the kind of networking device that this driver
-represents. The following constants should be used to identify the
-device type:
+represents.
+The following constants should be used to identify the device type:
 .Bl -tag -width Dv
 .It Sy MAC_PLUGIN_IDENT_ETHER
 The device driver implements IEEE 802.3 Ethernet.
@@ -79,69 +80,74 @@ The
 value is a private value that the device driver may set and will be
 provided as an argument in many of the
 .Xr mac 9E
-callbacks. Most often this is set to the driver's soft state for a
-specific instance.
+callbacks.
+Most often this is set to the driver's soft state for a specific instance.
 .Pp
 The
 .Sy m_dip
 member should point to the device driver's
 .Sy dev_info
-structure for that specific instance. This structure is provided during
-the driver's
+structure for that specific instance.
+This structure is provided during the driver's
 .Xr attach 9E
 entry point.
 .Pp
 The
 .Sy m_instance
-member should be set to zero. The GLDv3 framework will determine the
-appropriate instance.
+member should be set to zero.
+The GLDv3 framework will determine the appropriate instance.
 .Pp
 The
 .Sy m_src_addr
 member should be set to a byte array that describes the source MAC
-address of the device. This is usually the default MAC address as
-programmed by the device manufacturer in that instance of the device.
+address of the device.
+This is usually the default MAC address as programmed by the device manufacturer
+in that instance of the device.
 .Pp
 The
 .Sy m_dst_addr
 member is an optional property and should be set to
 .Dv NULL
-by most device drivers. If set, this address will be the destination for
-outgoing frames.
+by most device drivers.
+If set, this address will be the destination for outgoing frames.
 .Pp
 The
 .Sy m_callbacks
 member contains the GLDv3 entry points implemented by the device driver.
-.Xr mac
 See
 .Xr mac_callbacks 9S
 for a full explanation of the structure, its members, and their
-responsibilities. See
+responsibilities.
+See
 .Xr mac 9E
 for a broader picture of how the entry points are used.
 .Pp
 The
 .Sy m_min_sdu
-property is the minimum service data unit. It represents the minimum
-size packet that the device can transmit, ignoring its own headers. Thus
-for an Ethernet device, this value would exclude the Ethernet header and
-any VLAN headers. If this is set to zero, then that means that either
-the MAC protocol does not require a minimum size or that the device
-driver and hardware will ensure that any minimum size is taken care of.
+property is the minimum service data unit.
+It represents the minimum size packet that the device can transmit, ignoring its
+own headers.
+Thus for an Ethernet device, this value would exclude the Ethernet header and
+any VLAN headers.
+If this is set to zero, then that means that either the MAC protocol does not
+require a minimum size or that the device driver and hardware will ensure that
+any minimum size is taken care of.
 .Pp
 The
 .Sy m_max_sdu
-property is the maximum service data unit. It represents the maximum
-size packet that the device can transmit, ignoring its own headers. For
-an Ethernet based device, this would exclude the size of the Ethernet
-header and a VLAN headers. This value is often called the maximum
-transmission unit (MTU).
+property is the maximum service data unit.
+It represents the maximum size packet that the device can transmit, ignoring its
+own headers.
+For an Ethernet based device, this would exclude the size of the Ethernet
+header and a VLAN headers.
+This value is often called the maximum transmission unit (MTU).
 .Pp
 The
 .Sy m_pdata
 member is used for data specific to the type specified in the
 .Sy m_type_ident
-member. For all devices of type
+member.
+For all devices of type
 .Sy MAC_PLUGIN_IDENT_ETHER ,
 this should be set to
 .Dv NULL .
@@ -165,7 +171,8 @@ and
 If the driver does not have any private properties, it should be set to
 .Dv NULL .
 Otherwise, it should be set to a NULL-terminated array of character
-strings where each entry is the name of a distinct property. See
+strings where each entry is the name of a distinct property.
+See
 .Xr mac 9E
 for more information on private properties.
 .Pp
@@ -173,10 +180,11 @@ The
 .Sy m_margin
 property
 indicates the amount of additional bytes of information that may be
-included beyond the basic MAC header. For example, with an Ethernet
-device, if the hardware supports a VLAN tag, then this property would be
-set to the size of a VLAN tag, indicating that it supported the
-additional bytes in a single packet beyond the Ethernet header and the
+included beyond the basic MAC header.
+For example, with an Ethernet device, if the hardware supports a VLAN tag, then
+this property would be set to the size of a VLAN tag, indicating that it
+supported the additional bytes in a single packet beyond the Ethernet header and
+the
 .Sy m_max_sdu .
 .Sh SEE ALSO
 .Xr attach 9E ,

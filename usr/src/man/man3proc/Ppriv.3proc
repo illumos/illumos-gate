@@ -59,7 +59,8 @@ function returns
 .Sy 0
 and
 .Fa pprv
-is updated with a pointer to the allocated privilege set. Otherwise,
+is updated with a pointer to the allocated privilege set.
+Otherwise,
 .Sy -1
 is returned and
 .Fa pprv

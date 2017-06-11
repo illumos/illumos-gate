@@ -32,14 +32,16 @@
 The
 .Nm
 driver provides support for the Intel PRO/100 family of Fast Ethernet
-PCI controllers. This includes support for Intel 82558, 82559, 82550,
-and 82551 parts, as well as certain controllers found on certain Intel
-southbridge controllers (ICH2 and ICH3).
+PCI controllers.
+This includes support for Intel 82558, 82559, 82550, and 82551 parts, as well as
+certain controllers found on certain Intel southbridge controllers (ICH2 and
+ICH3).
 .Lp
 These devices generally support the standard Fast Ethernet features, including
 10BASE-T and 100BASE-TX, both full and half duplex operation, IEEE 802.3
-autonegotiation, etc.  They also support full size MTUs (1500 bytes),
-even when used with VLANs.  Some of them also support flow control.
+autonegotiation, etc.
+They also support full size MTUs (1500 bytes), even when used with VLANs.
+Some of them also support flow control.
 .
 .Lp
 The device driver supports the

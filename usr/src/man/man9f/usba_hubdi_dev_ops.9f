@@ -15,7 +15,7 @@
 .Dt USBA_HCDI_DEV_OPS 9F
 .Os
 .Sh NAME
-.Nm usba_hubdi_bus_ops
+.Nm usba_hubdi_bus_ops ,
 .Nm usba_hubdi_root_hub_power
 .Nd device operations utility functions for HCD drivers
 .Sh SYNOPSIS
@@ -29,8 +29,8 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 For the parameters of the
 .Fn usba_hubdi_root_hub_power
@@ -40,14 +40,15 @@ function, see
 The
 .Fn usba_hubdi_root_hub_power
 function is a utility function for the implementation of USB HCD
-drivers. USB HCD drivers that support power management, should use set
-the
+drivers.
+USB HCD drivers that support power management, should use set the
 .Sy devo_power
 member of their
 .Xr dev_ops 9S
 structure to the
 .Fn usba_hubdi_root_hub_power
-function. They should not implement their own
+function.
+They should not implement their own
 .Xr power 9E
 function.
 .Pp
@@ -55,7 +56,8 @@ In addition, drivers should pass the symbol
 .Sy usba_hubdi_busops
 as the
 .Sy devo_bus_ops
-member. It contains a properly formatted bus operations structure.
+member.
+It contains a properly formatted bus operations structure.
 .Sh CONTEXT
 This function should not be called directly, it should only be used as a
 member of a device's

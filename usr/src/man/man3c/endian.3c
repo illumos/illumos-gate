@@ -113,10 +113,10 @@
 The
 .Nm
 family of functions convert 16, 32, and 64-bit values between the host's
-native byte order and big- or little-endian. All of the functions in
-this family simply return their input when the host's native byte order
-is the same as the desired order. For more information on
-endianness, see
+native byte order and big- or little-endian.
+All of the functions in this family simply return their input when the host's
+native byte order is the same as the desired order.
+For more information on endianness, see
 .Xr byteorder 5 .
 .Pp
 The
@@ -169,13 +169,14 @@ are the same as
 .Fn letoh32 ,
 and
 .Fn letoh64
-respectively. Historically, different platforms have diverged on the
-naming of these functions. To better support extant software, both are
-provided.
+respectively.
+Historically, different platforms have diverged on the naming of these
+functions.
+To better support extant software, both are provided.
 .Pp
 While these functions are common across multiple platforms, they have
-not been standardized. Portable applications should instead use the
-functions defined in
+not been standardized.
+Portable applications should instead use the functions defined in
 .Xr byteorder 3C .
 .Sh RETURN VALUES
 The functions always succeed and return a value that has been properly

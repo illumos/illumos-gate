@@ -29,27 +29,28 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ph
 A pointer to a USB pipe handle as defined in
 .Xr usba_pipe_handle_data 9S .
 .It Fa ucrp
-A pointer to a USB control transfer request. The structure's members are
-documented in
+A pointer to a USB control transfer request.
+The structure's members are documented in
 .Xr usb_ctrl_req 9S .
 .It Fa usb_flags
-Flags which describe how allocations should be performed. Valid flags
-are:
+Flags which describe how allocations should be performed.
+Valid flags are:
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -69,20 +70,23 @@ For more background on transfer types, see
 .Xr usba_hcdi 9E .
 .Pp
 The host controller driver should first check the USB address of the
-pipe handle. It may correspond to the root hub. If it does, rather than
-initiating an I/O transfer, the driver may need to emulate it using
-available information.
+pipe handle.
+It may correspond to the root hub.
+If it does, rather than initiating an I/O transfer, the driver may need to
+emulate it using available information.
 .Pp
-Control endpoints are always bi-directional. A given endpoint may
-perform transfer data from the OS to the device, or from the device to
-the OS. The driver will need to look at the control transfer request and
-transform that into the appropriate format for the controller.
+Control endpoints are always bi-directional.
+A given endpoint may perform transfer data from the OS to the device, or from
+the device to the OS.
+The driver will need to look at the control transfer request and transform that
+into the appropriate format for the controller.
 .Pp
-Control transfers are made up of three parts. A setup stage, an optional
-data stage, and a status stage. Depending on the controller, the driver
-may need to transform the transfer request into a format that matches
-this. Refer to the device's controller specification for more
-information on whether this is required or not.
+Control transfers are made up of three parts.
+A setup stage, an optional data stage, and a status stage.
+Depending on the controller, the driver may need to transform the transfer
+request into a format that matches this.
+Refer to the device's controller specification for more information on whether
+this is required or not.
 .Pp
 The device driver should a request based on the information present in
 the control request
@@ -92,8 +96,8 @@ If there is a non-zero length for the transfer, indicated by the
 member of
 .Fa ucrp
 being greater than zero, then the controller needs to allocate a
-separate memory buffer for the request. The corresponding data will be
-found in an
+separate memory buffer for the request.
+The corresponding data will be found in an
 .Xr mblk 9S
 structure as the
 .Sy ctrl_data
@@ -103,10 +107,11 @@ member of
 If this transfer needs to be sent to a device through the controller and
 is not being handled directly by the driver, then the driver should
 allocate a separate region of memory (generally memory suitable for a
-DMA transfer) for the transfer. If sending data to the device, the data
-in the message block should be copied prior to the transfer. Otherwise,
-once the transfer completes, data should be transferred into the message
-block and the write pointer incremented.
+DMA transfer) for the transfer.
+If sending data to the device, the data in the message block should be copied
+prior to the transfer.
+Otherwise, once the transfer completes, data should be transferred into the
+message block and the write pointer incremented.
 .Pp
 If the driver needs to allocate memory for this transfer, it should
 honor the values set in
@@ -121,14 +126,14 @@ If the driver returns successfully, it must call
 .Xr usba_hcdi_cb 9F
 with
 .Fa ucrp
-either before or after it returns. The only times that a driver would
-call the callback before the function returns are for requests to the
-root hub that it handles inline and does not need to send off
-asynchronous activity to the controller.
+either before or after it returns.
+The only times that a driver would call the callback before the function returns
+are for requests to the root hub that it handles inline and does not need to
+send off asynchronous activity to the controller.
 .Pp
 For asynchronous requests, the controller is also responsible for
-timing out the request if it does not complete. If the timeout in the
-request as indicated in the
+timing out the request if it does not complete.
+If the timeout in the request as indicated in the
 .Sy ctrl_timeout
 member is set to zero, then the driver should use the USBA default
 timeout of
@@ -179,7 +184,8 @@ Upon successful completion, the
 .Fn usba_hcdi_pipe_ctrl_xfer
 function should return
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi 9E ,

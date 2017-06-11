@@ -64,16 +64,17 @@ the
 .Sy prmap_t
 structure defined from
 .Xr proc 4 ,
-and a name of the mapping. The way that the name is obtained varies
-based on whether one calls
+and a name of the mapping.
+The way that the name is obtained varies based on whether one calls
 .Fn Pmapping_iter
 or
 .Fn Pmapping_iter_resolved .
 In both cases, the dynamic linker is consulted to determine the file
-name for the mapping, if it's known. If the name is unknown, for example
-an anonymous mapping, then the
+name for the mapping, if it's known.
+If the name is unknown, for example an anonymous mapping, then the
 .Dv NULL
-pointer is passed in for the name. In the case of the
+pointer is passed in for the name.
+In the case of the
 .Fn Pmapping_iter_resolved
 function the system tries to resolve it to a complete file system path.
 If that fails, it falls back to the information from the dynamic linker,
@@ -88,20 +89,24 @@ see
 .Pp
 The return value of
 .Fa func
-controls whether or not iteration continues. If
+controls whether or not iteration continues.
+If
 .Fa func
 returns
 .Sy 0
-then iteration continues. If
+then iteration continues.
+If
 .Fa func
 returns non-zero then iteration will halt and the value will be
-returned to the caller. Because
+returned to the caller.
+Because
 .Sy -1
-indicates internal failure, it is recommended that the callback
-function not return
+indicates internal failure, it is recommended that the callback function not
+return
 .Sy -1
-to indicate an error itself. This allows the caller to distinguish
-between failure of the callback function versus failure of the
+to indicate an error itself.
+This allows the caller to distinguish between failure of the callback function
+versus failure of the
 .Fn Pmapping_iter
 and
 .Fn Pmapping_iter_resolved
@@ -115,13 +120,13 @@ functions are similar to the
 .Fn Pmapping_iter
 and
 .Fn Pmapping_iter_resolved
-functions. Except, rather than iterating over every mapping, they
-iterate over the objects that the process has loaded by the dynamic
-linker. For example, an anonymous mapping will show up when iterating
-mappings, but will not show up when iterating objects. Further, while
-most dynamic shared objects have multiple mappings for the text and
-data sections, there will only be a single object that is iterated
-over.
+functions.
+Except, rather than iterating over every mapping, they iterate over the objects
+that the process has loaded by the dynamic linker.
+For example, an anonymous mapping will show up when iterating mappings, but will
+not show up when iterating objects.
+Further, while most dynamic shared objects have multiple mappings for the text
+and data sections, there will only be a single object that is iterated over.
 .Pp
 The distinction between the
 .Fn Pobject_iter
@@ -143,7 +148,8 @@ functions return
 .Sy 0.
 Otherwise, if there was an internal error then
 .Sy -1
-is returned. Otherwise, if the callback function
+is returned.
+Otherwise, if the callback function
 .Fa func
 returns non-zero, then its return value will be returned instead.
 .Sh INTERFACE STABILITY

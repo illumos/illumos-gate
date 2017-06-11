@@ -32,44 +32,41 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * clnt_raw.c
  *
  * Memory based rpc for simple testing and timing.
  * Interface to create an rpc client and server in the same process.
- * This lets us similate rpc and get round trip overhead, without
+ * This lets us simulate rpc and get round trip overhead, without
  * any interference from the kernel.
  */
 #include "mt.h"
 #include "rpc_mt.h"
 #include <stdlib.h>
 #include <rpc/rpc.h>
-#include <rpc/raw.h>
 #include <syslog.h>
 
 extern mutex_t	clntraw_lock;
 #define	MCALL_MSG_SIZE 24
-#ifndef UDPMSGSIZE
-#define	UDPMSGSIZE 8800
-#endif
 
 /*
  * This is the "network" we will be moving stuff over.
  */
 static struct clnt_raw_private {
 	CLIENT	client_object;
-	XDR	xdr_stream;
-	char	*raw_buf;	/* should be shared with server handle */
+	struct netbuf	*raw_netbuf;
 	char	mashl_callmsg[MCALL_MSG_SIZE];
 	uint_t	mcnt;
 } *clnt_raw_private;
 
 static struct clnt_ops *clnt_raw_ops();
 
-extern void svc_getreq_common(int);
 extern bool_t xdr_opaque_auth();
+
+/*
+ * This netbuf is shared with the raw server.
+ */
+extern struct netbuf _rawcomnetbuf;
 
 /*
  * Create a client handle for memory based rpc.
@@ -79,35 +76,26 @@ clnt_raw_create(const rpcprog_t prog, const rpcvers_t vers)
 {
 	struct clnt_raw_private *clp;
 	struct rpc_msg call_msg;
-	XDR *xdrs;
+	XDR xdrs;
 	CLIENT *client;
+	uint_t start;
 
 /* VARIABLES PROTECTED BY clntraw_lock: clp */
 
 	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
-	if (clp == NULL) {
-		clp = calloc(1, sizeof (*clp));
-		if (clp == NULL) {
-			(void) mutex_unlock(&clntraw_lock);
-			return (NULL);
-		}
-		if (_rawcombuf == NULL) {
-			_rawcombuf = calloc(UDPMSGSIZE, sizeof (char));
-			if (_rawcombuf == NULL) {
-				syslog(LOG_ERR, "clnt_raw_create: "
-					"out of memory.");
-				if (clp)
-					free(clp);
-				(void) mutex_unlock(&clntraw_lock);
-				return (NULL);
-			}
-		}
-		clp->raw_buf = _rawcombuf; /* Share it with the server */
-		clnt_raw_private = clp;
+	if (clp != NULL) {
+		(void) mutex_unlock(&clntraw_lock);
+		return (&clp->client_object);
 	}
-	xdrs = &clp->xdr_stream;
-	client = &clp->client_object;
+
+	clp = calloc(1, sizeof (*clp));
+	if (clp == NULL) {
+		(void) mutex_unlock(&clntraw_lock);
+		return (NULL);
+	}
+
+	clp->raw_netbuf = &_rawcomnetbuf;
 
 	/*
 	 * pre-serialize the static part of the call msg and stash it away
@@ -116,25 +104,30 @@ clnt_raw_create(const rpcprog_t prog, const rpcvers_t vers)
 	call_msg.rm_call.cb_rpcvers = RPC_MSG_VERSION;
 	call_msg.rm_call.cb_prog = prog;
 	call_msg.rm_call.cb_vers = vers;
-	xdrmem_create(xdrs, clp->mashl_callmsg, MCALL_MSG_SIZE, XDR_ENCODE);
-	if (!xdr_callhdr(xdrs, &call_msg))
+
+	xdrmem_create(&xdrs, clp->mashl_callmsg, sizeof (clp->mashl_callmsg),
+	    XDR_ENCODE);
+	start = XDR_GETPOS(&xdrs);
+	if (!xdr_callhdr(&xdrs, &call_msg)) {
+		free(clp);
 		(void) syslog(LOG_ERR,
-			(const char *) "clnt_raw_create :  \
-			Fatal header serialization error.");
+		    "clnt_raw_create: Fatal header serialization error");
 
-	clp->mcnt = XDR_GETPOS(xdrs);
-	XDR_DESTROY(xdrs);
-
-	/*
-	 * Set xdrmem for client/server shared buffer
-	 */
-	xdrmem_create(xdrs, clp->raw_buf, UDPMSGSIZE, XDR_FREE);
+		(void) mutex_unlock(&clntraw_lock);
+		return (NULL);
+	}
+	clp->mcnt = XDR_GETPOS(&xdrs) - start;
+	XDR_DESTROY(&xdrs);
 
 	/*
 	 * create client handle
 	 */
+	client = &clp->client_object;
 	client->cl_ops = clnt_raw_ops();
 	client->cl_auth = authnone_create();
+
+	clnt_raw_private = clp;
+
 	(void) mutex_unlock(&clntraw_lock);
 	return (client);
 }
@@ -142,20 +135,21 @@ clnt_raw_create(const rpcprog_t prog, const rpcvers_t vers)
 /*ARGSUSED*/
 static enum clnt_stat
 clnt_raw_call(CLIENT *h, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp,
-	xdrproc_t xresults, caddr_t resultsp, struct timeval timeout)
+    xdrproc_t xresults, caddr_t resultsp, struct timeval timeout)
 {
 	struct clnt_raw_private *clp;
-	XDR *xdrs;
+	XDR xdrs;
 	struct rpc_msg msg;
-	enum clnt_stat status;
-	struct rpc_err error;
+	uint_t start;
+
+	rpc_callerr.re_errno = 0;
+	rpc_callerr.re_terrno = 0;
 
 	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
-	xdrs = &clp->xdr_stream;
 	if (clp == NULL) {
 		(void) mutex_unlock(&clntraw_lock);
-		return (RPC_FAILED);
+		return (rpc_callerr.re_status = RPC_FAILED);
 	}
 	(void) mutex_unlock(&clntraw_lock);
 
@@ -163,45 +157,55 @@ call_again:
 	/*
 	 * send request
 	 */
-	xdrs->x_op = XDR_ENCODE;
-	XDR_SETPOS(xdrs, 0);
+	xdrmem_create(&xdrs, clp->raw_netbuf->buf, clp->raw_netbuf->maxlen,
+	    XDR_ENCODE);
+	start = XDR_GETPOS(&xdrs);
 /* LINTED pointer alignment */
 	((struct rpc_msg *)clp->mashl_callmsg)->rm_xid++;
-	if ((!XDR_PUTBYTES(xdrs, clp->mashl_callmsg, clp->mcnt)) ||
-	    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-	    (!AUTH_MARSHALL(h->cl_auth, xdrs)) ||
-	    (!(*xargs)(xdrs, argsp)))
-		return (RPC_CANTENCODEARGS);
-	(void) XDR_GETPOS(xdrs);  /* called just to cause overhead */
+	if ((!XDR_PUTBYTES(&xdrs, clp->mashl_callmsg, clp->mcnt)) ||
+	    (!XDR_PUTINT32(&xdrs, (int32_t *)&proc)) ||
+	    (!AUTH_MARSHALL(h->cl_auth, &xdrs)) ||
+	    (!(*xargs)(&xdrs, argsp))) {
+		XDR_DESTROY(&xdrs);
+		return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
+	}
+	clp->raw_netbuf->len = XDR_GETPOS(&xdrs) - start;
+	XDR_DESTROY(&xdrs);
 
 	/*
 	 * We have to call server input routine here because this is
 	 * all going on in one process.
-	 * By convention using FD_SETSIZE as the psuedo file descriptor.
+	 * By convention using FD_SETSIZE as the pseudo file descriptor.
 	 */
 	svc_getreq_common(FD_SETSIZE);
 
 	/*
 	 * get results
 	 */
-	xdrs->x_op = XDR_DECODE;
-	XDR_SETPOS(xdrs, 0);
+	xdrmem_create(&xdrs, clp->raw_netbuf->buf, clp->raw_netbuf->len,
+	    XDR_DECODE);
 	msg.acpted_rply.ar_verf = _null_auth;
 	msg.acpted_rply.ar_results.where = resultsp;
 	msg.acpted_rply.ar_results.proc = xresults;
-	if (!xdr_replymsg(xdrs, &msg))
-		return (RPC_CANTDECODERES);
-	if ((msg.rm_reply.rp_stat == MSG_ACCEPTED) &&
-		    (msg.acpted_rply.ar_stat == SUCCESS))
-		status = RPC_SUCCESS;
-	else {
-		__seterr_reply(&msg, &error);
-		status = error.re_status;
+	if (!xdr_replymsg(&xdrs, &msg)) {
+		XDR_DESTROY(&xdrs);
+		return (rpc_callerr.re_status = RPC_CANTDECODERES);
 	}
+	XDR_DESTROY(&xdrs);
+	if ((msg.rm_reply.rp_stat == MSG_ACCEPTED) &&
+	    (msg.acpted_rply.ar_stat == SUCCESS))
+		rpc_callerr.re_status = RPC_SUCCESS;
+	else
+		__seterr_reply(&msg, &rpc_callerr);
 
-	if (status == RPC_SUCCESS) {
+	if (rpc_callerr.re_status == RPC_SUCCESS) {
 		if (!AUTH_VALIDATE(h->cl_auth, &msg.acpted_rply.ar_verf)) {
-			status = RPC_AUTHERROR;
+			rpc_callerr.re_status = RPC_AUTHERROR;
+			rpc_callerr.re_why = AUTH_INVALIDRESP;
+		}
+		if (msg.acpted_rply.ar_verf.oa_base != NULL) {
+			xdr_free(xdr_opaque_auth,
+			    (char *)&(msg.acpted_rply.ar_verf));
 		}
 		/* end successful completion */
 	} else {
@@ -210,17 +214,7 @@ call_again:
 		/* end of unsuccessful completion */
 	}
 
-	if (status == RPC_SUCCESS) {
-		if (!AUTH_VALIDATE(h->cl_auth, &msg.acpted_rply.ar_verf)) {
-			status = RPC_AUTHERROR;
-		}
-		if (msg.acpted_rply.ar_verf.oa_base != NULL) {
-			xdrs->x_op = XDR_FREE;
-			(void) xdr_opaque_auth(xdrs,
-					&(msg.acpted_rply.ar_verf));
-		}
-	}
-	return (status);
+	return (rpc_callerr.re_status);
 }
 
 /*ARGSUSED*/
@@ -228,45 +222,53 @@ static enum clnt_stat
 clnt_raw_send(CLIENT *h, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp)
 {
 	struct clnt_raw_private *clp;
-	XDR *xdrs;
+	XDR xdrs;
+	uint_t start;
+
+	rpc_callerr.re_errno = 0;
+	rpc_callerr.re_terrno = 0;
 
 	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
-	xdrs = &clp->xdr_stream;
 	if (clp == NULL) {
 		(void) mutex_unlock(&clntraw_lock);
-		return (RPC_FAILED);
+		return (rpc_callerr.re_status = RPC_FAILED);
 	}
 	(void) mutex_unlock(&clntraw_lock);
 
 	/*
 	 * send request
 	 */
-	xdrs->x_op = XDR_ENCODE;
-	XDR_SETPOS(xdrs, 0);
+	xdrmem_create(&xdrs, clp->raw_netbuf->buf, clp->raw_netbuf->maxlen,
+	    XDR_ENCODE);
+	start = XDR_GETPOS(&xdrs);
 /* LINTED pointer alignment */
 	((struct rpc_msg *)clp->mashl_callmsg)->rm_xid++;
-	if ((!XDR_PUTBYTES(xdrs, clp->mashl_callmsg, clp->mcnt)) ||
-	    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-	    (!AUTH_MARSHALL(h->cl_auth, xdrs)) ||
-	    (!(*xargs)(xdrs, argsp)))
-		return (RPC_CANTENCODEARGS);
-	(void) XDR_GETPOS(xdrs);  /* called just to cause overhead */
+	if ((!XDR_PUTBYTES(&xdrs, clp->mashl_callmsg, clp->mcnt)) ||
+	    (!XDR_PUTINT32(&xdrs, (int32_t *)&proc)) ||
+	    (!AUTH_MARSHALL(h->cl_auth, &xdrs)) ||
+	    (!(*xargs)(&xdrs, argsp))) {
+		XDR_DESTROY(&xdrs);
+		return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
+	}
+	clp->raw_netbuf->len = XDR_GETPOS(&xdrs) - start;
+	XDR_DESTROY(&xdrs);
 
 	/*
 	 * We have to call server input routine here because this is
 	 * all going on in one process.
-	 * By convention using FD_SETSIZE as the psuedo file descriptor.
+	 * By convention using FD_SETSIZE as the pseudo file descriptor.
 	 */
 	svc_getreq_common(FD_SETSIZE);
 
-	return (RPC_SUCCESS);
+	return (rpc_callerr.re_status = RPC_SUCCESS);
 }
 
 /*ARGSUSED*/
 static void
 clnt_raw_geterr(CLIENT *cl, struct rpc_err *errp)
 {
+	*errp = rpc_callerr;
 }
 
 /*ARGSUSED*/
@@ -274,18 +276,18 @@ static bool_t
 clnt_raw_freeres(CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 {
 	struct clnt_raw_private *clp;
-	XDR *xdrs;
 
 	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
-	xdrs = &clp->xdr_stream;
 	if (clp == NULL) {
 		(void) mutex_unlock(&clntraw_lock);
 		return (FALSE);
 	}
 	(void) mutex_unlock(&clntraw_lock);
-	xdrs->x_op = XDR_FREE;
-	return ((*xdr_res)(xdrs, res_ptr));
+
+	xdr_free(xdr_res, res_ptr);
+
+	return (TRUE);
 }
 
 /*ARGSUSED*/

@@ -33,9 +33,11 @@ At the time that
 .Fn avl_destroy
 is called,
 .Fa tree
-must be empty. It is a programmer error to call
+must be empty.
+It is a programmer error to call
 .Fn avl_destroy
-otherwise. To efficiently remove all entries in the tree, see
+otherwise.
+To efficiently remove all entries in the tree, see
 .Xr avl_destroy_nodes 3AVL .
 .Pp
 After a call to

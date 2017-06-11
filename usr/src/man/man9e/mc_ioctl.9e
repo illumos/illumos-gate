@@ -51,21 +51,22 @@ request.
 .Sh DESCRIPTION
 The
 .Fn mc_ioctl
-entry point is an optional GLDv3 entry point. It provides a means
-for device-specific I/O control operations to be initiated. In general,
-this entry point is not recommended for most devices and is
+entry point is an optional GLDv3 entry point.
+It provides a means for device-specific I/O control operations to be initiated.
+In general, this entry point is not recommended for most devices and is
 unimplemented.
 .Pp
 The I/O control interface is not like a traditional character or block
 device's
 .Xr ioctl 9E
-entry point, rather it is a STREAMS-based I/O control operation. The
-data pointer of the
+entry point, rather it is a STREAMS-based I/O control operation.
+The data pointer of the
 .Fa mp
 argument is a
 .Xr iocblk 9S
-structure. After handling the message, the driver will need to reply to
-the message, which is usually done by using the
+structure.
+After handling the message, the driver will need to reply to the message, which
+is usually done by using the
 .Xr miocack 9F
 and
 .Xr miocnak 9F

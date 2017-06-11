@@ -34,8 +34,8 @@ in the process handle
 .Fa P
 corresponds to an entry in the procedure linkage table (PLT) and if so,
 returns a pointer to a null-terminated character string that contains
-the symbol's name. The returned pointer is not valid after any other
-calls to function in
+the symbol's name.
+The returned pointer is not valid after any other calls to function in
 .Xr libproc 3LIB .
 The
 .Fn Ppltdest
@@ -45,7 +45,8 @@ corresponds to an address in the PLT.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Ppltdest
-returns a pointer to a character string with the name. Otherwise,
+returns a pointer to a character string with the name.
+Otherwise,
 .Dv NULL
 is returned.
 .Sh INTERFACE STABILITY

@@ -30,10 +30,12 @@ The
 function allows for consumers of the
 .Sy libproc
 library to obtain additional diagnostic information during various
-operations. Consumers must explicitly
+operations.
+Consumers must explicitly
 .Em interpose
-on this symbol and provide their own definition, if desired. There is no
-requirement for such an interposition to be done. When called,
+on this symbol and provide their own definition, if desired.
+There is no requirement for such an interposition to be done.
+When called,
 .Fa P
 will be the process handle that the additional diagnostics are being
 generated for and the diagnostics will be provided in a
@@ -49,7 +51,7 @@ the provided diagnostics are
 and may change at any time.
 .Sh LOCKING
 Callers should presume that this function may be called from multiple
-threads and always in a context in which taking locks is fine. Callers
-should not expect to be called from a signal handler.
+threads and always in a context in which taking locks is fine.
+Callers should not expect to be called from a signal handler.
 .Sh SEE ALSO
 .Xr libproc 3LIB

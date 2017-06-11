@@ -33,7 +33,8 @@ illumos DDI specific
 .It Fa version
 Indicates the current version of the
 .Ft usb_ep_xdescr_t
-structure the driver is using. Callers should always specify
+structure the driver is using.
+Callers should always specify
 .Sy USB_EP_XDESCR_CURRENT_VERSION .
 .It Fa dip
 Pointer to the device's
@@ -60,10 +61,11 @@ can be used to open a pipe by calling
 .Pp
 Prior to USB 3.0, only one descriptor, the
 .Xr usb_ep_descr 9S ,
-was needed to describe an endpoint. However, with USB 3.0, additional
-companion descriptors have been added and are required to successfully
-open an endpoint. After calling this, all descriptors needed
-to successfully open a pipe will be placed into
+was needed to describe an endpoint.
+However, with USB 3.0, additional companion descriptors have been added and are
+required to successfully open an endpoint.
+After calling this, all descriptors needed to successfully open a pipe will be
+placed into
 .Fa ep_xdescr
 and the endpoint data,
 .Fa ep_data ,

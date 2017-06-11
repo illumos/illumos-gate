@@ -49,8 +49,8 @@ information from the process or core and fills it into
 .Pp
 The string
 .Fa arg
-contains the name of something to try and open. How it is interpreted
-depends on the value of
+contains the name of something to try and open.
+How it is interpreted depends on the value of
 .Fa oflag .
 The following values may be passed in as a bitwise-exclusive-OR for
 .Fa oflag :
@@ -98,7 +98,8 @@ and
 .Fn proc_arg_xpsinfo
 functions return the process identifier and fill in
 .Fa psp
-with the ps information of the process. Otherwise,
+with the ps information of the process.
+Otherwise,
 .Sy -1
 is returned and
 .Fa perr

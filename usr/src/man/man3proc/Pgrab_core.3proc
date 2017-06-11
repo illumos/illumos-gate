@@ -39,11 +39,12 @@ The
 .Fn Pgrab_core
 and
 .Fn Pfgrab_core
-functions open a core file for introspection. Unlike live processes,
-core files cannot have their state modified; however, all of the
-functions that iterate or query state will work. These functions work
-on all illumos core files and the core files of some other operating
-systems. See both
+functions open a core file for introspection.
+Unlike live processes, core files cannot have their state modified;
+however, all of the functions that iterate or query state will work.
+These functions work on all illumos core files and the core files of some other
+operating systems.
+See both
 .Xr core 4
 and the
 .Em Core Files
@@ -58,17 +59,18 @@ function attempts to open the core file specified by
 The system attempts to determine the path of the original executable.
 The argument
 .Fa aout
-may either be the path to that file, a path to a directory to
-search, or the
+may either be the path to that file, a path to a directory to search, or the
 .Dv NULL
-pointer, if neither is known. The system will search for it and will
-supplement information in the core file with that.
+pointer, if neither is known.
+The system will search for it and will supplement information in the core file
+with that.
 .Pp
 The
 .Fa gflag
 argument to the
 .Fn Pgrab_core
-function controls how the file is opened. If the
+function controls how the file is opened.
+If the
 .Dv PGRAB_RDONLY
 flag is specified, then the core file will be opened with the
 .Xr open 2
@@ -83,16 +85,17 @@ argument must be a
 .Pf non- Dv NULL
 pointer which will store a more detailed error in the event that the
 .Fn Pgrab_core
-function fails. A human-readable form of the error can be obtained
-through the routine
+function fails.
+A human-readable form of the error can be obtained through the routine
 .Xr Pgrab_error 3PROC .
 .Pp
 The
 .Fn Pfgrab_core
 is similar to the
 .Fn Pgrab_core
-function. Except, instead of operating on a path, it opens a handle to
-the core file referenced by
+function.
+Except, instead of operating on a path, it opens a handle to the core file
+referenced by
 .Fa core_fd .
 The
 .Fa aout
@@ -114,7 +117,8 @@ and
 .Fn Pfgrab_core
 functions return a
 .Sy libproc
-handle to the core file. Otherwise,
+handle to the core file.
+Otherwise,
 .Dv NULL
 is returned and
 .Fa perr

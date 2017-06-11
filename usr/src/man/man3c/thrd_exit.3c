@@ -28,8 +28,9 @@ The
 .Fn thrd_exit
 function terminates the calling thread, in a similar way that
 .Xr exit 3C
-terminates the calling process. If the calling thread has not been
-detached, then the exit status information provided in
+terminates the calling process.
+If the calling thread has not been detached, then the exit status information
+provided in
 .Fa res
 is saved and can be retrieved by the use of the
 .Xr thrd_join 3C

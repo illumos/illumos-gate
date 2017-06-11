@@ -29,27 +29,28 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ph
 A pointer to a USB pipe handle as defined in
 .Xr usba_pipe_handle_data 9S .
 .It Fa usrp
-A pointer to a USB isochronous transfer request. The structure's members
-are documented in
+A pointer to a USB isochronous transfer request.
+The structure's members are documented in
 .Xr usb_isoc_req 9S .
 .It Fa usb_flags
-Flags which describe how allocations should be performed. Valid flags
-are:
+Flags which describe how allocations should be performed.
+Valid flags are:
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -69,31 +70,35 @@ For more background on transfer types, see
 .Xr usba_hcdi 9E .
 .Pp
 The host controller driver should first check the USB address of the
-pipe handle. It may correspond to the root hub. If it does, the driver
-should return
+pipe handle.
+It may correspond to the root hub.
+If it does, the driver should return
 .Sy USB_NOT_SUPPORTED .
 .Pp
-Isochronous transfers happen once a period. Isochronous transfers may
-just be told to start as son as possible or to line up to a specific
-frame. At this time, nothing in the system uses the later behavior. It
-is reasonable for a new driver to require that the
+Isochronous transfers happen once a period.
+Isochronous transfers may just be told to start as son as possible or to line up
+to a specific frame.
+At this time, nothing in the system uses the later behavior.
+It is reasonable for a new driver to require that the
 .Sy USB_ATTRS_ISOC_XFER_ASAP
 flag be set in the
 .Sy isoc_attributes
 member of the
 .Fa usrp
-argument. In the case where it's not set and the controller driver does
-not support setting the frame, it should return
+argument.
+In the case where it's not set and the controller driver does not support
+setting the frame, it should return
 .Sy USB_NOT_SUPPORTED .
 .Pp
 Isochronous-IN transfers are
 .Em always periodic .
-Isochronous-OUT transfers are one shot transfers. Periodic transfers
-have slightly different handling and behavior.
+Isochronous-OUT transfers are one shot transfers.
+Periodic transfers have slightly different handling and behavior.
 .Pp
 Isochronous transfers may send data to the device or receive data from
-the device. A given isochronous endpoint is uni-directional. The
-direction can be determined from the endpoint address based on the
+the device.
+A given isochronous endpoint is uni-directional.
+The direction can be determined from the endpoint address based on the
 .Sy p_ep
 member of
 .Fa ubrp .
@@ -105,23 +110,24 @@ Isochronous transfers are a little bit different from other transfers.
 While there is still a single
 .Xr mblk 9S
 structure that all the data goes to or from, the transfer may be broken
-up into multiple packets. All of these packets make up a single transfer
-request and each one represents the data that is transferred during a
-single portion of a frame. For the description of them, see
+up into multiple packets.
+All of these packets make up a single transfer request and each one represents
+the data that is transferred during a single portion of a frame.
+For the description of them, see
 .Xr usb_isoc_req 9S .
 Because of these data structures, the way that transfers are recorded is
 different and will be discussed later on.
 .Pp
 The device driver should allocate memory, whether memory suitable for a
-DMA transfer or otherwise, to perform the transfer. For all memory
-allocated, it should honor the values in
+DMA transfer or otherwise, to perform the transfer.
+For all memory allocated, it should honor the values in
 .Fa usb_flags
 to determine whether or not it should block for allocations.
 .Pp
 For isochronous-out transfers which are one-shot transfers, the driver
 should verify that the sum of all of the individual packet counts
-matches the message block length of the data. If it does not, then the
-driver should return
+matches the message block length of the data.
+If it does not, then the driver should return
 .Sy USB_INVALID_ARGS .
 .Pp
 If the driver successfully schedules the I/O, then it should return
@@ -141,17 +147,18 @@ As there is no timeout member in the isochronous request structure, then
 the timeout should be set to
 .Sy HCDI_DEFAULT_TIMEOUT .
 .Ss Periodic Transfers
-All isochronous-in transfers are periodic transfers. Once a periodic
-transfer is initiated, every time data is received the driver should
-call the
+All isochronous-in transfers are periodic transfers.
+Once a periodic transfer is initiated, every time data is received the driver
+should call the
 .Xr usba_hcdi_cb 9F
 function with updated data.
 .Pp
 When a periodic transfer is initiated, many controller drivers will
-allocate multiple transfers up front and schedule them all. Many drivers
-do this to ensure that data isn't lost between servicing the first
-transfer and scheduling the next. The number of such transfers used
-depends on the polling frequency specified in the endpoint descriptor.
+allocate multiple transfers up front and schedule them all.
+Many drivers do this to ensure that data isn't lost between servicing the first
+transfer and scheduling the next.
+The number of such transfers used depends on the polling frequency specified in
+the endpoint descriptor.
 .Pp
 Unless an error occurs, the driver must not use the original isochronous
 request,
@@ -177,7 +184,8 @@ A request to close the pipe came in from the
 .Xr usba_hcdi_pipe_close 9E
 entry point.
 .It
-An out of memory condition occurred. The caller should call
+An out of memory condition occurred.
+The caller should call
 .Xr usba_hcdi_cb 9F
 with the code
 .Sy USB_CR_NO_RESOURCES .
@@ -189,7 +197,8 @@ When the isochronous transfer completes, the driver should consider the
 following items to determine what actions it should take on the
 callback:
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Bl -bullet
 .It
@@ -243,7 +252,8 @@ Upon successful completion, the
 function should return
 function should return
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi 9E ,

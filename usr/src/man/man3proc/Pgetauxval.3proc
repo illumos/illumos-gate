@@ -32,10 +32,11 @@ function looks up the entry
 .Fa type
 in the auxiliary vector of the process handle
 .Fa P
-and returns its value. The
+and returns its value.
+The
 .Fa type
-argument should be the entry of the auxiliary vector. The list of such
-types may be found in
+argument should be the entry of the auxiliary vector.
+The list of such types may be found in
 .In sys/auxv.h .
 .Sh RETURN VALUES
 Upon successful completion, the

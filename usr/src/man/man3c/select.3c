@@ -125,7 +125,8 @@ The
 .Fn select
 function has no
 .Fa sigmask
-argument. It behaves as
+argument.
+It behaves as
 .Fn pselect
 does when
 .Fa sigmask
@@ -142,9 +143,9 @@ The
 .Fn select
 and
 .Fn pselect
-functions support regular files,
-terminal and pseudo-terminal devices, STREAMS-based files, FIFOs, pipes, and
-sockets. The behavior of
+functions support regular files, terminal and pseudo-terminal devices,
+STREAMS-based files, FIFOs, pipes, and sockets.
+The behavior of
 .Fn select
 and
 .Fn pselect
@@ -192,13 +193,13 @@ Upon successful completion, the objects pointed to by the
 .Fa writefs ,
 and
 .Fa errorfds
-arguments are modified to indicate which file
-descriptors are ready for reading, ready for writing, or have an error
-condition pending, respectively, and return the total number of ready
-descriptors in all the output sets. For each file descriptor less than
+arguments are modified to indicate which file descriptors are ready for reading,
+ready for writing, or have an error condition pending, respectively, and return
+the total number of ready descriptors in all the output sets.
+For each file descriptor less than
 .Fa nfds ,
-the corresponding bit will be set on successful completion if it
-was set on input and the associated condition is true for that file descriptor.
+the corresponding bit will be set on successful completion if it was set on
+input and the associated condition is true for that file descriptor.
 .Pp
 If none of the selected descriptors are ready for the requested operation, the
 .Fn select
@@ -206,24 +207,29 @@ or
 .Fn pselect
 function blocks until at least one of the
 requested operations becomes ready, until the timeout occurs, or until
-interrupted by a signal. The
+interrupted by a signal.
+The
 .Fa timeout
 parameter controls how long the
 .Fn select
 or
 .Fn pselect
-function takes before timing out. If the
+function takes before timing out.
+If the
 .Fa timeout
 parameter is not a null pointer, it specifies a maximum interval
-to wait for the selection to complete. If the specified time interval expires
-without any requested operation becoming ready, the function returns. If the
+to wait for the selection to complete.
+If the specified time interval expires without any requested operation becoming
+ready, the function returns.
+If the
 .Fa timeout
 parameter is a null pointer, then the call to
 .Fn select
 or
 .Fn pselect
 blocks indefinitely until at least one descriptor meets the
-specified criteria. To effect a poll, the
+specified criteria.
+To effect a poll, the
 .Fa timeout
 parameter should not be a null pointer, and should point to a zero-valued
 .Vt timespec
@@ -251,9 +257,10 @@ A descriptor is considered ready for reading when a call to an input function
 with
 .Dv O_NONBLOCK
 clear would not block, whether or not the function would
-transfer data successfully. (The function might return data, an end-of-file
-indication, or an error other than one indicating that it is blocked, and in
-each of these cases the descriptor will be considered ready for reading.)
+transfer data successfully.
+(The function might return data, an end-of-file indication, or an error other
+than one indicating that it is blocked, and in each of these cases the
+descriptor will be considered ready for reading.)
 .Pp
 A descriptor is considered ready for writing when a call to an output function
 with
@@ -262,10 +269,12 @@ clear would not block, whether or not the function would
 transfer data successfully.
 .Pp
 If a socket has a pending error, it is considered to have an exceptional
-condition pending. Otherwise, what constitutes an exceptional condition is file
-type-specific. For a file descriptor for use with a socket, it is
-protocol-specific except as noted below. For other file types, if the operation
-is meaningless for a particular file type,
+condition pending.
+Otherwise, what constitutes an exceptional condition is file type-specific.
+For a file descriptor for use with a socket, it is protocol-specific except as
+noted below.
+For other file types, if the operation is meaningless for a particular file
+type,
 .Fn select
 or
 .Fn pselect
@@ -276,39 +285,41 @@ If a descriptor refers to a socket, the implied input function is the
 .Xr recvmsg 3XNET
 function with parameters requesting normal and ancillary
 data, such that the presence of either type causes the socket to be marked as
-readable. The presence of out-of-band data is checked if the socket option
+readable.
+The presence of out-of-band data is checked if the socket option
 .Dv SO_OOBINLINE
 has been enabled, as out-of-band data is enqueued with
-normal data. If the socket is currently listening, then it is marked as
-readable if an incoming connection request has been received, and a call to the
-accept function completes without blocking.
+normal data.
+If the socket is currently listening, then it is marked as readable if an
+incoming connection request has been received, and a call to the accept function
+completes without blocking.
 .Pp
 If a descriptor refers to a socket, the implied output function is the
 .Xr sendmsg 3XNET
 function supplying an amount of normal data equal to the
 current value of the
 .Dv SO_SNDLOWAT
-option for the socket. If a non-blocking
-call to the connect function has been made for a socket, and the connection
-attempt has either succeeded or failed leaving a pending error, the socket is
-marked as writable.
+option for the socket.
+If a non-blocking call to the connect function has been made for a socket, and
+the connection attempt has either succeeded or failed leaving a pending error,
+the socket is marked as writable.
 .Pp
 A socket is considered to have an exceptional condition pending if a receive
 operation with
 .Dv O_NONBLOCK
 clear for the open file description and with the
 .Dv MSG_OOB
-flag set would return out-of-band data without blocking. (It
-is protocol-specific whether the
+flag set would return out-of-band data without blocking.
+(It is protocol-specific whether the
 .Dv MSG_OOB
-flag would be used to read out-of-band data.) A socket will also be considered
-to have an exceptional condition pending if an out-of-band data mark is
-present in the receive queue.
+flag would be used to read out-of-band data.)
+A socket will also be considered to have an exceptional condition pending if an
+out-of-band data mark is present in the receive queue.
 .Pp
 A file descriptor for a socket that is listening for connections will indicate
-that it is ready for reading, when connections are available.  A file
-descriptor for a socket that is connecting asynchronously will indicate that it
-is ready for writing, when a connection has been established.
+that it is ready for reading, when connections are available.
+A file descriptor for a socket that is connecting asynchronously will indicate
+that it is ready for writing, when a connection has been established.
 .Pp
 Selecting true for reading on a socket descriptor upon which a
 .Xr listen 3XNET
@@ -321,8 +332,10 @@ If the
 argument is not a null pointer, it points to an object of type
 .Vt struct timeval
 that specifies a maximum interval to wait for the
-selection to complete. If the \fItimeout\fR argument points to an object of
-type
+selection to complete.
+If the
+.Fa timeout
+argument points to an object of type
 .Vt struct timeval
 whose members are 0,
 .Fn select
@@ -332,8 +345,9 @@ If the
 argument is a null pointer,
 .Fn select
 blocks until an event causes one of the masks to be returned with a valid
-(non-zero) value.  If the time limit expires before any event occurs that
-would cause one of the masks to be set to a non-zero value,
+(non-zero) value.
+If the time limit expires before any event occurs that would cause one of the
+masks to be set to a non-zero value,
 .Fn select
 completes successfully and returns 0.
 .Pp
@@ -349,7 +363,8 @@ argument is not a null pointer,
 or
 .Fn pselect
 blocks for the time specified, or until interrupted by a
-signal. If the
+signal.
+If the
 .Fa readfds ,
 .Fa writefds ,
 and
@@ -368,9 +383,9 @@ On failure, the objects pointed to by the
 .Fa writefds ,
 and
 .Fa errorfds
-arguments are not modified.  If the timeout interval expires
-without the specified condition being true for any of the specified file
-descriptors, the objects pointed to by the
+arguments are not modified.
+If the timeout interval expires without the specified condition being true for
+any of the specified file descriptors, the objects pointed to by the
 .Fa readfds ,
 .Fa writefds ,
 and
@@ -422,7 +437,8 @@ On successful completion,
 and
 .Fn pselect
 return the total
-number of bits set in the bit masks. Otherwise,
+number of bits set in the bit masks.
+Otherwise,
 .Sy 1
 is returned and
 .Dv errno

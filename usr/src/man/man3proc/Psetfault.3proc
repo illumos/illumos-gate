@@ -32,8 +32,8 @@ function sets the fault tracing flags on the process handle
 .Fa P
 to
 .Fa set .
-It replaces any existing fault tracing flags on the process. These
-flags indicate which faults cause execution of the thread to stop.
+It replaces any existing fault tracing flags on the process.
+These flags indicate which faults cause execution of the thread to stop.
 Allowing another tool, such as a debugger, to act upon the process.
 For more information on faults and the
 .Sy fltset_t
@@ -45,8 +45,8 @@ The current fault set for the process may be obtained through the
 .Xr Pfault 3PROC
 function.
 .Pp
-Note, only active processes may have their fault set updated. Process
-handles that refer to core files, zombie processes, and files do not
+Note, only active processes may have their fault set updated.
+Process handles that refer to core files, zombie processes, and files do not
 have fault tracing flags and this function is a no-op on them.
 .Sh INTERFACE STABILITY
 .Sy Uncommitted

@@ -43,14 +43,15 @@ If
 .Fa sig
 is non-zero, then the
 .Fn Psetrun
-function causes the signal to be delivered. See
+function causes the signal to be delivered.
+See
 .Xr signal.h 3HEAD
 for a list of valid signal identifiers.
 .Pp
 The
 .Fa flags
-member modifies the behavior of the resumed handle. The following values
-may be combined by a bitwise-inclusive-OR:
+member modifies the behavior of the resumed handle.
+The following values may be combined by a bitwise-inclusive-OR:
 .Bl -tag -width Dv -offset indent
 .It Dv PRCSIG
 Clears the current signal, if any.
@@ -58,17 +59,18 @@ Clears the current signal, if any.
 Clears the current fault, if any.
 .It Dv PRSTEP
 Indicates that the thread should single-step over the next machine
-instruction and upon completion, inject a trap. For the specific
-mechanics of single-stepping and what traps or signals will be injected,
-see the
+instruction and upon completion, inject a trap.
+For the specific mechanics of single-stepping and what traps or signals will be
+injected, see the
 .Sy PRSTEP
 section of
 .Xr proc 4 .
 .It Dv PRSABORT
 Indicates that the thread should abort the system call that it is
-currently executing. This is only valid if the thread is stopped because
-it is asleep or right before a system call. This will cause the system
-call to return
+currently executing.
+This is only valid if the thread is stopped because it is asleep or right before
+a system call.
+This will cause the system call to return
 .Er EINTR .
 .El
 .Pp
@@ -85,16 +87,17 @@ was passed the argument
 .Sy 0 .
 .Pp
 When the process is resumed all extent tracing flags and register
-changes will be synchronized with the process. For more information on
-resuming a thread see the
+changes will be synchronized with the process.
+For more information on resuming a thread see the
 .Sy PCRUN
 section in
 .Xr proc 4 .
 .Pp
 Note, the
 .Fn Psetrun
-function is only valid for active processes. It will fail on process
-handles that refer to core files, zombie processes, and ELF objects.
+function is only valid for active processes.
+It will fail on process handles that refer to core files, zombie processes, and
+ELF objects.
 .Pp
 The
 .Fn Lsetrun
@@ -105,7 +108,8 @@ thread.
 .Fn Lsetrun
 causes the specified thread,
 .Fa L ,
-to resume execution. Whereas
+to resume execution.
+Whereas
 .Fn Psetrun
 causes all threads in the process to resume.
 .Sh RETURN VALUES

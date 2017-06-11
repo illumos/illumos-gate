@@ -173,12 +173,12 @@ set optionstoggled_ansi[8]="^[1mD^[mebug....... ^[32;7mOn^[m"
 \ BOOT ENVIRONMENT MENU
 \
 
-\ the BE list is read from pool/boot/menu.lst, the list in file
+\ the BE list is read from [pool]/boot/menu.lst, the list in file
 \ is ordered from oldest to most recent.
 \ the BE menu will list entries from most recent to oldest,
 \ so the first page in menu is last page in menu.lst
 
-s" currdev" getenv drop 4 s" zfs:" compare 0= be-pages and [if]
+be-pages [if]
   set zfs_be_currpage=1
   be-set-page			\ set page data
   set menuset_name3="bootenv"

@@ -38,7 +38,8 @@ number of threads, the size of the stack, and more.
 .Pp
 The returned pointer is only valid as long as the process handle
 .Fa P
-is valid. After a call to
+is valid.
+After a call to
 .Xr Prelease 3PROC ,
 the returned data pointer is invalid.
 .Sh RETURN VALUES

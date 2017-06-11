@@ -38,8 +38,8 @@ functions provide means for testing the validity of thread ranges and
 whether a thread is in a range.
 .Pp
 A thread range is a series of one or more series of range identifiers
-which describe a collection of threads. These are often used by programs
-such as
+which describe a collection of threads.
+These are often used by programs such as
 .Xr pbind 1M ,
 .Xr pstack 1 ,
 .Xr prun 1 ,
@@ -52,8 +52,8 @@ More formally, the thread range may be described as:
 lwp_range[,lwp_range]*
 .Ed
 .Pp
-An LWP range may be specified as one of the following four strings. The
-following table shows the string formats and the corresponding set of
+An LWP range may be specified as one of the following four strings.
+The following table shows the string formats and the corresponding set of
 valid threads that match it:
 .Bl -column -offset indent ".Sy n-m" "n <= lwpid <= m"
 .It Sy -n Ta lwpid <= n
@@ -70,8 +70,8 @@ The
 .Fn proc_lwp_range_valid
 function determines whether or not the character string
 .Fa set
-is a valid thread range based on the rules above. Note, the empty
-string, the
+is a valid thread range based on the rules above.
+Note, the empty string, the
 .Dv NULL
 pointer, or otherwise are not valid.
 .Pp
@@ -108,7 +108,8 @@ function returns
 .Sy 0
 to indicate
 .Fa set
-is valid. Otherwise,
+is valid.
+Otherwise,
 .Sy -1
 is returned to indicate that the set is invalid.
 .Sh INTERFACE STABILITY

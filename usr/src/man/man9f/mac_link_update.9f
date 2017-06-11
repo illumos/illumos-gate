@@ -32,8 +32,8 @@ illumos DDI specific
 The MAC handle obtained from a call to
 .Xr mac_register 9F .
 .It Fa link
-The current state of the link. For valid link states see the discussion
-of
+The current state of the link.
+For valid link states see the discussion of
 .Sy MAC_PROP_STATUS
 in the
 .Sx PROPERTIES
@@ -44,16 +44,17 @@ section of
 The
 .Fn mac_link_update
 function is used by device drivers to inform the MAC layer that the
-state of a link has changed. As discussed in the
+state of a link has changed.
+As discussed in the
 .Sx Link Updates
 section of
 .Xr mac 9E ,
 the driver should call this whenever it detects that the state of the
-link has changed. If the state has not changed, then the driver should
-not call this function. In addition, if the device driver is powering
-off the link or is transitioning to a state where it can no longer
-determine the link status, then it should make sure to call this
-function with the value of
+link has changed.
+If the state has not changed, then the driver should not call this function.
+In addition, if the device driver is powering off the link or is transitioning
+to a state where it can no longer determine the link status, then it should make
+sure to call this function with the value of
 .Fa link
 set to
 .Sy LINK_STATE_UNKNOWN .

@@ -29,8 +29,8 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa dip
@@ -42,11 +42,12 @@ A pointer to the USB isochronous request which will be duplicated.
 .It Fa flags
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -62,9 +63,9 @@ function is used to duplicate an existing isochronous request,
 When the USBA framework initiates an isochronous in transfer with the
 .Xr usba_hcdi_pipe_isoc_xfer 9E
 entry point, it is the HCD driver's responsibility to receive the
-periodic data from the pipe. When there is data available, the HCD must
-duplicate the original isochronous request and copy the available data
-into the request structure's
+periodic data from the pipe.
+When there is data available, the HCD must duplicate the original isochronous
+request and copy the available data into the request structure's
 .Fa isoc_data
 member, before handing over the request structure to the USBA framework
 by calling the
@@ -72,18 +73,22 @@ by calling the
 function.
 .Pp
 In addition to duplicating the request, it is the callers responsibility
-to increase the pipe handle's request count. For more information, see
+to increase the pipe handle's request count.
+For more information, see
 .Xr usba_hcdi_pipe_isoc_xfer 9E .
 .Pp
 The
 .Fa dip
 argument should correspond to the HCD driver's
 .Sy dev_info_t
-structure. The
+structure.
+The
 .Fa usrp
-pointer should correspond to the initial isochronous request. The
+pointer should correspond to the initial isochronous request.
+The
 .Fa flags
-member must be appropriate for the context. If
+member must be appropriate for the context.
+If
 .Dv USB_FLAGS_SLEEP
 is passed while in interrupt context, then this function may fail.
 .Sh CONTEXT

@@ -49,15 +49,16 @@ The
 .Fn mac_register
 function is used to register an instance of a device driver with the
 .Xr mac 9E
-framework. Upon successfully calling the
+framework.
+Upon successfully calling the
 .Fn mac_register
 function, the device will start having its
 .Xr mac_callbacks 9S
-entry points called. The device driver should call this function
-during it's
+entry points called.
+The device driver should call this function during it's
 .Xr attach 9E
-entry point after the device has been configured and is set up. For a
-more detailed explanation of the exact steps that the device driver
+entry point after the device has been configured and is set up.
+For a more detailed explanation of the exact steps that the device driver
 should take and where in the sequence of a driver's
 .Xr attach 9E
 entry point this function should be called, see the
@@ -69,14 +70,16 @@ The driver should provide a pointer to a
 .Ft mac_handle_t
 structure as the second argument to the
 .Fn mac_register
-function. This handle will be used when the device driver needs to
-interact with the framework in various ways throughout its life. It is
-also where the driver gets the
+function.
+This handle will be used when the device driver needs to interact with the
+framework in various ways throughout its life.
+It is also where the driver gets the
 .Fa mh
 argument for calling the
 .Fn mac_unregister
-function. It is recommended that the device driver keep the handle
-around in its soft state structure for a given instance.
+function.
+It is recommended that the device driver keep the handle around in its soft
+state structure for a given instance.
 .Pp
 If the call to the
 .Fn mac_register
@@ -101,15 +104,18 @@ entry point, it should call the
 .Fn mac_unregister
 function immediately after draining any of its transmit and receive
 resources that might have been given to the rest of the operating system
-through DMA binding. See the
+through DMA binding.
+See the
 .Sx MBLKS AND DMA
 section of
 .Xr mac 9E
-for more information. This should be done before the driver does any
-tearing down. The call to the
+for more information.
+This should be done before the driver does any tearing down.
+The call to the
 .Fn mac_unregister
-function may fail. This may happen because the networking stack is still
-using the device. In such a case, the driver should fail the call to
+function may fail.
+This may happen because the networking stack is still using the device.
+In such a case, the driver should fail the call to
 .Xr detach 9E
 and return
 .Sy DDI_FAILURE .
@@ -118,13 +124,15 @@ The
 .Fn mac_register
 function is generally only called from a driver's
 .Xr attach 9E
-entry point. The
+entry point.
+The
 .Fn mac_unregister
 function is generally only called from a driver's
 .Xr attach 9E
 and
 .Xr detach 9E
-entry point. However, both functions may be called from either
+entry point.
+However, both functions may be called from either
 .Sy user
 or
 .Sy kernel

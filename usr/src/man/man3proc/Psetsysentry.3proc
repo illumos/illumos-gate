@@ -46,19 +46,20 @@ The call to
 or
 .Fn Psetsysexit
 replaces the corresponding set of system call tracing flags entirely
-with the new set. The system call entry tracing flags cause a thread to
-stop on entry to the system call and the exit tracing flags cause a
-thread to stop on return from the system call, before control returns
-back to the user land process. For more information on the state of the
-thread and for information on manipulating the
+with the new set.
+The system call entry tracing flags cause a thread to stop on entry to the
+system call and the exit tracing flags cause a thread to stop on return from the
+system call, before control returns back to the user land process.
+For more information on the state of the thread and for information on
+manipulating the
 .Sy sysset_t ,
 see
 .Xr proc 4 .
 .Pp
 Note that only active processes may have their system call tracing flags
-updated.  Process handles that refer to core files, zombie processes,
-and files do not have fault tracing flags and this function is a no-op
-on them.
+updated.
+Process handles that refer to core files, zombie processes, and files do not
+have fault tracing flags and this function is a no-op on them.
 .Sh INTERFACE STABILITY
 .Sy Uncommitted
 .Sh MT-LEVEL

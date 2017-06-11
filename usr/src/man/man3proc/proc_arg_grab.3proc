@@ -48,8 +48,8 @@ it.
 .Pp
 The string
 .Fa arg
-contains the name of something to try and open. How it is interpreted
-depends on the value of
+contains the name of something to try and open.
+How it is interpreted depends on the value of
 .Fa oflag .
 The following values may be passed in as a bitwise-exclusive-OR for
 .Fa oflag :
@@ -69,8 +69,8 @@ Encompasses all of the previous opens.
 The argument
 .Fa gflag
 controls the behavior when the corresponding process grabbing function
-is called by the underlying system. For a list of flags that may be
-passed in here, see
+is called by the underlying system.
+For a list of flags that may be passed in here, see
 .Xr Pgrab 3PROC
 and
 .Xr Pgrab_core 3PROC .

@@ -92,7 +92,8 @@ to the register state contained in
 .Fa gregs .
 .Pp
 Processes must be stopped before obtaining the register state of
-individual threads. Processes may be stopped with
+individual threads.
+Processes may be stopped with
 .Xr Pstop 3PROC .
 The structures used for registers are described in
 .Xr proc 4
@@ -112,7 +113,8 @@ and
 .Fn Plwp_setfpregs
 functions return
 .Sy 0
-and obtain or set the register state. Otherwise,
+and obtain or set the register state.
+Otherwise,
 .Sy -1
 is returned,
 .Sy errno

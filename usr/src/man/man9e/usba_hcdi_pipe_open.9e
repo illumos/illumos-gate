@@ -34,23 +34,24 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa ph
 A pointer to a USB pipe handle as defined in
 .Xr usba_pipe_handle_data 9S .
 .It Fa usb_flags
-Flags which describe how allocations should be performed. Valid flags
-are:
+Flags which describe how allocations should be performed.
+Valid flags are:
 .Bl -tag -width Sy
 .It Sy USB_FLAGS_NOSLEEP
-Do not block waiting for memory. If memory is not available the allocation
-will fail.
+Do not block waiting for memory.
+If memory is not available the allocation will fail.
 .It Sy USB_FLAGS_SLEEP
-Perform a blocking allocation. If memory is not available, the function
-will wait until memory is made available.
+Perform a blocking allocation.
+If memory is not available, the function will wait until memory is made
+available.
 .Pp
 Note, the request may still fail even if
 .Sy USB_FLAGS_SLEEP
@@ -63,14 +64,14 @@ The
 and
 .Fn usba_hcdi_pipe_close
 entry points are called by the USB framework whenever a client, or the
-framework itself, need to open or close a specific pipe. For additional
-background see
+framework itself, need to open or close a specific pipe.
+For additional background see
 .Xr usba_hcdi 9E .
 .Pp
 When a pipe is opened, the host controller driver is responsible for
-preparing the specified endpoint for performing transfers. This may
-include allocating bandwidth, programming the controller, and more. When
-the pipe is closed, the host controller driver is responsible for
+preparing the specified endpoint for performing transfers.
+This may include allocating bandwidth, programming the controller, and more.
+When the pipe is closed, the host controller driver is responsible for
 cleaning up any resources that were allocated during the open call.
 .Pp
 The pipe handle,
@@ -78,16 +79,20 @@ The pipe handle,
 identifies the endpoint that it the USBA is trying to open or close
 through its endpoint descriptor in the
 .Sy p_ep
-member. The endpoint descriptor is described in
+member.
+The endpoint descriptor is described in
 .Xr usb_ep_descr 9S .
 From the endpoint descriptor the driver can determine the type of
 endpoint, what the address of the endpoint is, and what direction the
-endpoint is in. When combined, these uniquely describe the pipe.
+endpoint is in.
+When combined, these uniquely describe the pipe.
 .Pp
 To open a pipe, the driver may need additional companion endpoint
-descriptors. If these are available, they will be in the
+descriptors.
+If these are available, they will be in the
 .Sy p_xep
-member of the pipe handle. See
+member of the pipe handle.
+See
 .Xr usb_ep_xdescr 9S
 for more information on how to determine which descriptors are present
 and get the information encoded in them.
@@ -95,31 +100,34 @@ and get the information encoded in them.
 Host controller drviers should check the USB address of the
 USB device that
 .Fa ph
-belongs to. The driver may be asked to open a pipe to the root hub. As
-the root hub is often sythetic, the driver man need to take a different
+belongs to.
+The driver may be asked to open a pipe to the root hub.
+As the root hub is often sythetic, the driver man need to take a different
 path than normal.
 .Ss Pipe open specifics
-A given endpoint on a device can only be opened once. If there's a
-request to open an already open endpoint, then the request to open the
-pipe should be failed.
+A given endpoint on a device can only be opened once.
+If there's a request to open an already open endpoint, then the request to open
+the pipe should be failed.
 .Pp
 By the time the call to open a pipe returns, the driver should expect
 that any of the pipe transfer or reset entry points will be called on
 the pipe.
 .Pp
-A driver can establish private data on an endpoint. During pipe open it
-may set the
+A driver can establish private data on an endpoint.
+During pipe open it may set the
 .Sy p_hcd_private
-member to any value. Generally this points to an allocated structure
-that contains data specific to the host controller. This value will
-remain on the pipe handle. It is the responsibility of the driver to
-clear the data when the pipe is closed.
+member to any value.
+Generally this points to an allocated structure that contains data specific to
+the host controller.
+This value will remain on the pipe handle.
+It is the responsibility of the driver to clear the data when the pipe is
+closed.
 .Ss Pipe close specifics
 When a pipe is closed, the driver must clean up all of the resources
-that it allocated when opening the pipe. For non-periodic transfers, the
-host controller driver may assueme that there are no outstanding
-transfers that need to be cleaned up. However, the same is not true for
-periodic pipes.
+that it allocated when opening the pipe.
+For non-periodic transfers, the host controller driver may assueme that there
+are no outstanding transfers that need to be cleaned up.
+However, the same is not true for periodic pipes.
 .Pp
 For pipes that have outstanding periodic transfers, the host controller
 driver needs to clean them up and quiesce them as though a call to
@@ -144,7 +152,8 @@ and
 .Fn uba_hcdi_pipe_close
 functions should return
 .Sy USB_SUCCESS .
-Otherwise, it should return the appropriate USB error. If uncertain, use
+Otherwise, it should return the appropriate USB error.
+If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi 9E ,

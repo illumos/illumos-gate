@@ -30,7 +30,8 @@ The
 function returns the thread handle
 .Fa L Ns 's
 .Xr ps 1
-information. The
+information.
+The
 .Sy lwpsinfo_t
 structure that is returned is defined in
 .Xr proc 4
@@ -39,7 +40,8 @@ and is valid until a subsequent call to
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Lpsinfo
-function returns a pointer to the thread's ps information. Otherwise,
+function returns a pointer to the thread's ps information.
+Otherwise,
 .Dv NULL
 is returned to indicate that it could not be found.
 .Sh INTERFACE STABILITY

@@ -37,7 +37,8 @@ function returning the value
 This may occur when the controlled process performs an
 .Xr exec 2
 of a setuid or setgid binary or one where the controlling process cannot
-read the object file. For more information on this, see the
+read the object file.
+For more information on this, see the
 .Sy PROGRAMMING NOTES
 section of
 .Xr proc 4 .

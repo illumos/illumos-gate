@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
@@ -249,6 +249,16 @@ typedef struct mptsas_smp {
 	uint16_t		m_pdevhdl;
 	uint32_t		m_pdevinfo;
 } mptsas_smp_t;
+
+/*
+ * This represents a single enclosure. Targets point to an enclosure through
+ * their m_enclosure member.
+ */
+typedef struct mptsas_enclosure {
+	list_node_t	me_link;
+	uint16_t	me_enchdl;
+	uint16_t	me_flags;
+} mptsas_enclosure_t;
 
 typedef struct mptsas_cache_frames {
 	ddi_dma_handle_t m_dma_hdl;
@@ -701,6 +711,7 @@ typedef struct mptsas {
 
 	refhash_t	*m_targets;
 	refhash_t	*m_smp_targets;
+	list_t		m_enclosures;
 	refhash_t	*m_tmp_targets;
 
 	m_raidconfig_t	m_raidconfig[MPTSAS_MAX_RAIDCONFIGS];
@@ -900,6 +911,7 @@ typedef struct mptsas {
 	int			m_mpxio_enable;
 	uint8_t			m_done_traverse_dev;
 	uint8_t			m_done_traverse_smp;
+	uint8_t			m_done_traverse_enc;
 	int			m_diag_action_in_progress;
 	uint16_t		m_dev_handle;
 	uint16_t		m_smp_devhdl;
@@ -1361,16 +1373,14 @@ int mptsas_get_manufacture_page5(mptsas_t *mpt);
 int mptsas_get_sas_port_page0(mptsas_t *mpt, uint32_t page_address,
     uint64_t *sas_wwn, uint8_t *portwidth);
 int mptsas_get_bios_page3(mptsas_t *mpt,  uint32_t *bios_version);
-int
-mptsas_get_sas_phy_page0(mptsas_t *mpt, uint32_t page_address,
+int mptsas_get_sas_phy_page0(mptsas_t *mpt, uint32_t page_address,
     smhba_info_t *info);
-int
-mptsas_get_sas_phy_page1(mptsas_t *mpt, uint32_t page_address,
+int mptsas_get_sas_phy_page1(mptsas_t *mpt, uint32_t page_address,
     smhba_info_t *info);
-int
-mptsas_get_manufacture_page0(mptsas_t *mpt);
-void
-mptsas_create_phy_stats(mptsas_t *mpt, char *iport, dev_info_t *dip);
+int mptsas_get_manufacture_page0(mptsas_t *mpt);
+int mptsas_get_enclosure_page0(mptsas_t *mpt, uint32_t page_address,
+    mptsas_enclosure_t *mpe);
+void mptsas_create_phy_stats(mptsas_t *mpt, char *iport, dev_info_t *dip);
 void mptsas_destroy_phy_stats(mptsas_t *mpt);
 int mptsas_smhba_phy_init(mptsas_t *mpt);
 /*

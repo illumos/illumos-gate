@@ -38,8 +38,8 @@ process
 The
 .Fn proc_get_priv
 function takes care of allocating memory for the privilege set and
-ensures that it is large enough to hold all of the privilege sets. The
-definition of the
+ensures that it is large enough to hold all of the privilege sets.
+The definition of the
 .Sy prpriv_t
 structure may be found in
 .Xr proc 4 .

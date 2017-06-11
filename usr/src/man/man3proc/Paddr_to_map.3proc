@@ -62,7 +62,8 @@ the mapping and is defined in
 The pointer to the data returned by the library will only be valid for
 as long as the handle
 .Fa P
-is valid. Any calls to
+is valid.
+Any calls to
 .Xr Prelease 3PROC
 will invalidate the data.
 .Pp
@@ -85,8 +86,9 @@ The
 .Fn Pname_to_map
 function looks up the object named
 .Fa name
-and returns the corresponding mapping information. Two special
-values may be used for name. The macro
+and returns the corresponding mapping information.
+Two special values may be used for name.
+The macro
 .Dv PR_OBJ_EXEC
 refers to the executable object itself and the macro
 .Dv PR_OBJ_LDSO refers to the object ld.so.1 .
@@ -99,7 +101,8 @@ It allows passing a link-map identifier,
 .Fa lmid ,
 which constricts the search of the object named with
 .Fa name
-to that link-map. The special value of
+to that link-map.
+The special value of
 .Dv PR_LMID_EVERY
 may be passed to indicate that every link-map should be searched, which
 is equivalent in behavior to the

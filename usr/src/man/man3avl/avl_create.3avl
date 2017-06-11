@@ -35,10 +35,12 @@ function initializes an AVL tree rooted at
 .Pp
 An AVL tree needs to encode information about the type of data
 structures being stored inside of it and needs to be told how to compare
-two different entries in the same tree. The
+two different entries in the same tree.
+The
 .Fa size
 argument represents the total size of the data structure being used in
-the tree. This is a constant that is generally expressed to
+the tree.
+This is a constant that is generally expressed to
 .Fn avl_create
 using the
 .Sy sizeof
@@ -46,9 +48,11 @@ operator.
 .Pp
 The data structure that is being stored in the AVL tree must include an
 .Sy avl_node_t
-as a member of the structure. The structure may have multiple
+as a member of the structure.
+The structure may have multiple
 .Sy avl_node_t Ns 's,
-one for each AVL tree that it may concurrently be a member of. The
+one for each AVL tree that it may concurrently be a member of.
+The
 .Fa offset
 argument indicates what the offset of the
 .Sy avl_node_t
@@ -56,11 +60,11 @@ is for the data structure that this AVL tree contains.
 .Pp
 The
 .Fa compare
-function pointer is used to compare two nodes in the tree. This is used as part
-of all operations on the tree that cause traversal. The function is
-given, as arguments, two pointers to the actual data nodes, which should be
-cast to the corresponding type of actual data. The return value must
-adhere to the following rules:
+function pointer is used to compare two nodes in the tree.
+This is used as part of all operations on the tree that cause traversal.
+The function is given, as arguments, two pointers to the actual data nodes,
+which should be cast to the corresponding type of actual data.
+The return value must adhere to the following rules:
 .Bl -enum
 .It
 If the first argument,
@@ -80,8 +84,8 @@ function must return
 Otherwise, if they compare to the same value, then it should return
 .Sy 0 .
 .It
-Only the return values, -1, 0, and 1, are valid. Returning values
-other than those will result in undefined behavior.
+Only the return values, -1, 0, and 1, are valid.
+Returning values other than those will result in undefined behavior.
 .El
 .Pp
 When two nodes in the tree compare equal, then that means that they

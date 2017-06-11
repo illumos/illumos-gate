@@ -39,8 +39,8 @@
 .Sh DESCRIPTION
 The
 .Nm
-command displays information from the reference manuals. It
-displays complete manual pages that you select by
+command displays information from the reference manuals.
+It displays complete manual pages that you select by
 .Ar name ,
 or one-line summaries selected either by
 .Ar keyword
@@ -55,7 +55,8 @@ Reference Manual pages are marked up with either
 .Xr man 5 ,
 or
 .Xr mdoc 5
-language tags. The
+language tags.
+The
 .Nm
 command recognizes the type of markup and
 processes the file accordingly.
@@ -65,8 +66,10 @@ processes the file accordingly.
 The online Reference Manual page directories are conventionally located in
 .Pa /usr/share/man .
 Each directory corresponds to a
-section of the manual. Since these directories are optionally installed, they
-might not reside on your host. You might have to mount
+section of the manual.
+Since these directories are optionally installed, they might not reside on your
+host.
+You might have to mount
 .Pa /usr/share/man
 from a host on which they do reside.
 The
@@ -92,15 +95,18 @@ Shows all manual pages matching
 .Ar name
 within the
 .Ev MANPATH
-search path. Manual pages are displayed in the order found.
+search path.
+Manual pages are displayed in the order found.
 .It Fl d
-Debugs. Displays what a section-specifier evaluates to, method used for
-searching, and paths searched by
+Debugs.
+Displays what a section-specifier evaluates to, method used for searching, and
+paths searched by
 .Nm .
 .It Fl f Ar file ...
 Attempts to locate manual pages related to any of the given
 .Ar file
-names. It strips the leading path name components from each
+names.
+It strips the leading path name components from each
 .Ar file ,
 and then prints one-line summaries containing the resulting basename or names.
 This option also uses the
@@ -108,7 +114,8 @@ This option also uses the
 database.
 .It Fl F
 This option is present for backwards compatibility and is documented
-here for reference only.  It performs no function.
+here for reference only.
+It performs no function.
 .It Fl k Ar keyword ...
 Prints out one-line summaries from the
 .Pa whatis
@@ -124,10 +131,12 @@ Lists all manual pages found matching
 .Ar name
 within the search path.
 .It Fl M Ar path
-Specifies an alternate search path for manual pages. The
+Specifies an alternate search path for manual pages.
+The
 .Ar path
 is a colon-separated list of directories that contain manual page directory
-subtrees. For example, if
+subtrees.
+For example, if
 .Ar path
 is
 .Pa /usr/share/man:/usr/local/man ,
@@ -143,11 +152,13 @@ or
 .Fl w
 options, the
 .Fl M
-option must appear first. Each directory in the
+option must appear first.
+Each directory in the
 .Ar path
 is assumed to contain subdirectories of the form
 .Pa man* ,
-one for each section. This option overrides the
+one for each section.
+This option overrides the
 .Ev MANPATH
 environment variable.
 .It Fl r
@@ -156,7 +167,8 @@ display it.
 .It Fl s Ar section
 Specifies sections of the manual for
 .Nm
-to search. The directories searched for
+to search.
+The directories searched for
 .Ar name
 are limited to those specified by
 .Ar section .
@@ -172,12 +184,14 @@ can be a word, for example,
 .Li old ,
 .Li public .
 .Ar section
-can also be a letter. To specify multiple sections,
-separate each section with a comma. This option overrides the
+can also be a letter.
+To specify multiple sections, separate each section with a comma.
+This option overrides the
 .Ev MANPATH
 environment variable and the
 .Pa man.cf
-file. See
+file.
+See
 .Sx Search Path
 below for an explanation of how
 .Nm
@@ -187,7 +201,8 @@ Arranges for the specified manual pages to be sent to the default
 printer as PostScript.
 .It Fl T Ar macro-package
 This option is present for backwards compatibility and is documented
-here for reference only.  It performs no function.
+here for reference only.
+It performs no function.
 .It Fl w
 Updates the
 .Nm whatis
@@ -210,8 +225,8 @@ Entries in the reference manuals are organized into
 .Em sections .
 A section
 name consists of a major section name, typically a single digit, optionally
-followed by a subsection name, typically one or more letters. An unadorned
-major section name, for example,
+followed by a subsection name, typically one or more letters.
+An unadorned major section name, for example,
 .Qq 9 ,
 does not act as an abbreviation for
 the subsections of that name, such as
@@ -223,7 +238,8 @@ That is, each subsection must be searched separately by
 .Nm
 .Fl s .
 Each section contains descriptions apropos to a particular reference category,
-with subsections refining these distinctions. See the
+with subsections refining these distinctions.
+See the
 .Em intro
 manual pages for an explanation of the classification used in this release.
 .
@@ -248,13 +264,14 @@ environment variable, primarily by substituting
 .Li man
 for the last component of the
 .Ev PATH
-element. Special provisions are added
-to account for unique characteristics of directories such as
+element.
+Special provisions are added to account for unique characteristics of
+directories such as
 .Pa /sbin ,
 .Pa /usr/ucb ,
 .Pa /usr/xpg4/bin ,
-and others. If the file argument contains
-a
+and others.
+If the file argument contains a
 .Qq /
 character, the
 .Em dirname
@@ -299,7 +316,8 @@ file has the following format:
 Lines beginning with
 .Sq Li #
 and blank lines are considered comments, and are
-ignored. Each directory specified in
+ignored.
+Each directory specified in
 .Ev MANPATH
 can contain a manual page
 configuration file, specifying the default search order for that directory.
@@ -310,9 +328,9 @@ page entry fitting the pattern:
 .Dl \&.so man*/ Ns Em sourcefile
 .Lp
 .Nm
-processes the indicated file in place of the current one. The
-reference must be expressed as a path name relative to the root of the manual
-page directory subtree.
+processes the indicated file in place of the current one.
+The reference must be expressed as a path name relative to the root of the
+manual page directory subtree.
 .Lp
 When the second or any subsequent line starts with
 .Sy \&.so ,
@@ -337,17 +355,20 @@ and
 .Bl -tag -width MANWIDTH
 .It Ev MANPATH
 A colon-separated list of directories; each directory can be followed by a
-comma-separated list of sections. If set, its value overrides
+comma-separated list of sections.
+If set, its value overrides
 .Pa /usr/share/man
 as the default directory search path, and the
 .Pa man.cf
-file as the default section search path. The
+file as the default section search path.
+The
 .Fl M
 and
 .Fl s
 flags, in turn, override these values.
 .It Ev MANWIDTH
-Width of the output. If set to the special value
+Width of the output.
+If set to the special value
 .Qq Sy TTY
 .Po or
 .Qq Sy tty
@@ -355,9 +376,11 @@ Width of the output. If set to the special value
 and output is to terminal, auto-detect terminal width.
 .It Ev PAGER
 A program to use for interactively delivering
-output to the screen. If not set,
+output to the screen.
+If not set,
 .Sq Nm more Fl s
-is used. See
+is used.
+See
 .Xr more 1 .
 .El
 .Sh FILES
@@ -419,5 +442,6 @@ created with the
 option.
 .Sh BUGS
 The manual is supposed to be reproducible either on a phototypesetter or on an
-ASCII terminal. However, on a terminal some information (indicated by
-font changes, for instance) is lost.
+ASCII terminal.
+However, on a terminal some information (indicated by font changes, for
+instance) is lost.

@@ -30,7 +30,8 @@ structure is used by GLDv3 networking device drivers implementing the
 interface.
 .Pp
 The structure is normally allocated statically by drivers as a single
-global entry. A pointer to it is passed as the
+global entry.
+A pointer to it is passed as the
 .Sy m_callbacks
 member of the
 .Sy mac_register_t
@@ -81,10 +82,11 @@ mac_prop_info_t	mc_propinfo;	/* Get property information */
 The
 .Sy mc_callbacks
 member is used to denote which of a series of optional callbacks are
-present. This method allows additional members to be added to the
+present.
+This method allows additional members to be added to the
 .Sy mac_callbacks_t
-structure while maintaining ABI compatibility with existing modules. If
-a member is not mentioned below, then it is a part of the base version
+structure while maintaining ABI compatibility with existing modules.
+If a member is not mentioned below, then it is a part of the base version
 of the structure and device drivers do not need to set anything to
 indicate that it is present.
 The
@@ -132,36 +134,38 @@ structure members have been set.
 The
 .Sy mc_getstat
 function defines an entry point used to receive statistics about the
-device. A list of statistics that it is required to support is available
-in
+device.
+A list of statistics that it is required to support is available in
 .Xr mac 9E .
 For more information on the requirements of the function, see
 .Xr mc_getstat 9E .
 .Pp
 The
 .Sy mc_start
-member defines an entry point that is used to start the device. For more
-information on the requirements of the function, see
+member defines an entry point that is used to start the device.
+For more information on the requirements of the function, see
 .Xr mc_start 9E .
 .Pp
 The
 .Sy mc_stop
-member defines an entry point that is used to stop the device. It is the
-opposite of the
+member defines an entry point that is used to stop the device.
+It is the opposite of the
 .Sy mc_start
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_stop 9E .
 .Pp
 The
 .Sy mc_setpromisc
-member is used to enable and disable promiscuous mode on the device. For
-more information on the requirements of the function, see
+member is used to enable and disable promiscuous mode on the device.
+For more information on the requirements of the function, see
 .Xr mc_setpromisc 9E .
 .Pp
 The
 .Sy mc_multicst
 member is used to enable or disable multicast addresses in the device's
-filters. For more information on the requirements of the function, see
+filters.
+For more information on the requirements of the function, see
 .Xr mc_multicst 9E .
 .Pp
 The
@@ -172,99 +176,114 @@ For more information on the requirements of the function, see
 .Pp
 The
 .Sy mc_tx
-member is used to transmit a single message on the wire. For more
-information on the requirements of the function, see
+member is used to transmit a single message on the wire.
+For more information on the requirements of the function, see
 .Xr mc_tx 9E .
 .Pp
 The
 .Sy mc_ioctl
-member is used to process device specific ioctls. The GLDv3 does not
-define any ioctls that devices should handle; however, there may be
-private ioctls for this device. This entry point is optional. For it to
-be considered, the
+member is used to process device specific ioctls.
+The GLDv3 does not define any ioctls that devices should handle; however, there
+may be private ioctls for this device.
+This entry point is optional.
+For it to be considered, the
 .Sy MC_IOCTL
 value must be present in the
 .Sy mc_callbacks
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_ioctl 9E .
 .Pp
 The
 .Sy mc_getcapab
-member is used to determine device capabilities. Each capability has its
-own data and semantics associated with it. A list of capabilities is
-provided in
+member is used to determine device capabilities.
+Each capability has its own data and semantics associated with it.
+A list of capabilities is provided in
 .Xr mac 9E .
-This entry point is optional. For it to be used, the
+This entry point is optional.
+For it to be used, the
 .Sy MC_GETCAPAB
 value must be present in the
 .Sy mc_callbacks
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_getcapab 9E .
 .Pp
 The
 .Sy mc_open
 member is used to provide specific actions to take when the device is
-opened. Note that most device drivers will not have a need to implement
-this. It is not required for this function to be implemented for this
-device to be used with
+opened.
+Note that most device drivers will not have a need to implement this.
+It is not required for this function to be implemented for this device to be
+used with
 .Xr dlpi 7P .
-This entry point is optional. For it to be used, the
+This entry point is optional.
+For it to be used, the
 .Sy MC_OPEN
 value must be present in the
 .Sy mc_callbacks
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_open 9E .
 .Pp
 The
 .Sy mc_close
 member is used to provide specific actions to take when the device is
-closed. Note that most device drivers will not have a need to implement
-this. It is not required for this function to be implemented for this
-device to be used with
+closed.
+Note that most device drivers will not have a need to implement this.
+It is not required for this function to be implemented for this device to be
+used with
 .Xr dlpi 7P .
-This entry point is optional. For it to be used, the
+This entry point is optional.
+For it to be used, the
 .Sy MC_CLOSE
 value must be present in the
 .Sy mc_callbacks
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_close 9E .
 .Pp
 The
 .Sy mc_getprop
-member is used to get the current value of a property from the device. A
-list of properties, their sizes, and their interpretation is available
-in
+member is used to get the current value of a property from the device.
+A list of properties, their sizes, and their interpretation is available in
 .Xr mac 9E .
-This entry point is optional. For it to be used, the
+This entry point is optional.
+For it to be used, the
 .Sy MC_GETPROP
 value must be present in the
 .Sy mc_callbacks
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_getprop 9E .
 .Pp
 The
 .Sy mc_setprop
-member is used to set the value of a device property. A list of
-properties, their sizes, and their interpretation is available in
+member is used to set the value of a device property.
+A list of properties, their sizes, and their interpretation is available in
 .Xr mac 9E .
-This entry point is optional. For it to be used, the
+This entry point is optional.
+For it to be used, the
 .Sy MC_SETPROP
 value must be present in the
 .Sy mc_callbacks
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_setprop 9E .
 .Pp
 The
 .Sy mc_propinfo
 member is used to obtain metadata about a property such as its default
-value, whether or not it is writable, and more. A list of properties,
-their sizes, and their interpretation is available in
+value, whether or not it is writable, and more.
+A list of properties, their sizes, and their interpretation is available in
 .Xr mac 9E .
-This entry point is optional. For it to be used, the
+This entry point is optional.
+For it to be used, the
 .Sy MC_PROPINFO
 value must be present in the
 .Sy mc_callbacks
-member. For more information on the requirements of the function, see
+member.
+For more information on the requirements of the function, see
 .Xr mc_propinfo 9E .
 .Pp
 .Ss Required Members
@@ -280,7 +299,7 @@ will fail.
 .It
 .Sy mc_stop
 .It
-. Sy mc_setpromisc
+.Sy mc_setpromisc
 .It
 .Sy mc_multicst
 .It
@@ -294,8 +313,8 @@ implement the
 .Sy mc_unicst
 and
 .Sy mc_tx
-functions. However, the ring capabilities are still private and evolving
-at this time.
+functions.
+However, the ring capabilities are still private and evolving at this time.
 .Pp
 Generally, a device that implements one of
 .Sy mc_getprop ,

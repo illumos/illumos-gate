@@ -36,13 +36,13 @@ handle, it allows one to inspect aspects of the ELF contents present in
 the handle, for example obtaining CTF information and looking up
 symbols.
 .Pp
-There is no running state associated with this handle nor can
-there be. If one intends to control a running process or create a
-process, see
+There is no running state associated with this handle nor can there be.
+If one intends to control a running process or create a process, see
 .Xr Pgrab 3PROC
 and
 .Xr Pcreate 3PROC
-respectively. To inspect a core file use
+respectively.
+To inspect a core file use
 .Xr Pgrab_core 3PROC .
 .Pp
 The
@@ -51,7 +51,8 @@ argument must be a
 .Pf non- Dv NULL
 pointer which will store a more detailed error in the event that
 .Fn Pgrab_file
-fails. A human-readable form of the error can be obtained with
+fails.
+A human-readable form of the error can be obtained with
 .Xr Pgrab_error 3PROC .
 .Pp
 When finished with the returned handle,
@@ -60,7 +61,8 @@ must be called to clean up resources associated with it.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pgrab_file
-function returns a control handle to the process. Otherwise,
+function returns a control handle to the process.
+Otherwise,
 .Dv NULL
 is returned and
 .Fa perr

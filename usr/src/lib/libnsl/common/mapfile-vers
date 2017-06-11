@@ -633,7 +633,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	pagf;
 	passwd2des;
 	passwd2des_g;
-	_rawcombuf;
 	__rpcbind_is_up;
 	__rpc_bindresvport;
 	rpcb_taddr2uaddr;

@@ -64,14 +64,16 @@ Up to
 .Fa buflen
 characters will be placed in
 .Fa buf ,
-including the null terminator. If
+including the null terminator.
+If
 .Fa buf
 is not large enough to hold the entire string, then an error
 will be returned.
 .Pp
 The
 .Fa members
-argument controls which members of the set are written out. If
+argument controls which members of the set are written out.
+If
 .Fa members
 is
 .Sy 1 ,
@@ -86,8 +88,8 @@ then the members which are not in the set are placed in
 .Pp
 The string
 .Fa delim
-will be placed in-between every member of the set. It will not come after
-the last entry in the set.
+will be placed in-between every member of the set.
+It will not come after the last entry in the set.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn proc_fltset2str ,

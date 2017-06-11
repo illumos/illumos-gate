@@ -50,9 +50,9 @@ breakpoint it generates a
 trap
 causing the thread to stop.
 .Pp
-Note, breakpoints may only be set in active processes. They may not be
-set in process handles that refer to core files, zombie processes, or
-files.
+Note, breakpoints may only be set in active processes.
+They may not be set in process handles that refer to core files, zombie
+processes, or files.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Psetbkpt

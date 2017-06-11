@@ -21,26 +21,28 @@
 .Fl man
 .Ar
 .Sh DESCRIPTION
-These macros are used to lay out the reference pages in this manual. Note: if
+These macros are used to lay out the reference pages in this manual.
+Note: if
 .Ar file
 contains format input for a preprocessor, the commands shown
-above must be piped through the appropriate preprocessor. This is handled
-automatically by the
+above must be piped through the appropriate preprocessor.
+This is handled automatically by the
 .Xr man 1
-command. See the
+command.
+See the
 .Sx Conventions
 section.
 .Lp
 Any text argument
 .Ar t
-may be zero to six words. Quotes may be used to
-include SPACE characters in a
+may be zero to six words.
+Quotes may be used to include SPACE characters in a
 .Qq word .
 If
 .Ar text
 is empty, the special
-treatment is applied to the next input line with text to be printed. In this
-way
+treatment is applied to the next input line with text to be printed.
+In this way
 .Nm \&.I
 may be used to italicize a whole line, or
 .Nm \&.SB
@@ -48,7 +50,8 @@ may be used to make small bold letters.
 .Lp
 A prevailing indent distance is remembered between successive indented
 paragraphs, and is reset to default value upon reaching a non-indented
-paragraph.  Default units for indents
+paragraph.
+Default units for indents
 .Nm i
 are ens.
 .Lp
@@ -108,7 +111,8 @@ Sets prevailing indent to .5i for nested indents.
 When formatting a manual page,
 .Nm
 examines the first line to determine
-whether it requires special processing. For example a first line consisting of:
+whether it requires special processing.
+For example a first line consisting of:
 .Lp
 .Dl \&'\e" t
 .Lp
@@ -122,13 +126,14 @@ A typical manual page for a command or function is laid out as follows:
 .It Nm \&.TH Ar title Op "1-9"
 .
 The name of the command or function, which serves as the title of the manual
-page. This is followed by the number of the section in which it appears.
+page.
+This is followed by the number of the section in which it appears.
 .
 .It Nm \&.SH NAME
 .
 The name, or list of names, by which the command is called, followed by a dash
-and then a one-line summary of the action performed. All in roman font, this
-section contains no
+and then a one-line summary of the action performed.
+All in roman font, this section contains no
 .Xr troff 1
 commands or escapes, and no macro requests.
 It is used to generate the database used by the
@@ -139,48 +144,52 @@ command.
 .Bl -tag -width "Functions:"
 .It Sy Commands:
 The syntax of the command and its arguments, as typed on the command line.
-When in boldface, a word must be typed exactly as printed.  When in italics, a
-word can be replaced with an argument that you supply. References to bold or
-italicized items are not capitalized in other sections, even when they begin a
-sentence.
+When in boldface, a word must be typed exactly as printed.
+When in italics, a word can be replaced with an argument that you supply.
+References to bold or italicized items are not capitalized in other sections,
+even when they begin a sentence.
 .Lp
 Syntactic symbols appear in roman face:
 .Bl -tag -width "   "
 .It Op " "
 An argument, when surrounded by brackets is optional.
 .It |
-Arguments separated by a vertical bar are exclusive. You can supply only one
-item from such a list.
+Arguments separated by a vertical bar are exclusive.
+You can supply only one item from such a list.
 .It \&.\|.\|.
-Arguments followed by an ellipsis can be repeated. When an ellipsis follows a
-bracketed set, the expression within the brackets can be repeated.
+Arguments followed by an ellipsis can be repeated.
+When an ellipsis follows a bracketed set, the expression within the brackets can
+be repeated.
 .El
 .It Sy Functions:
 If required, the data declaration, or
 .Li #include
 directive, is shown first,
-followed by the  function declaration. Otherwise, the function declaration is
-shown.
+followed by the  function declaration.
+Otherwise, the function declaration is shown.
 .El
 .
 .It Nm \&.SH DESCRIPTION
 .
-A narrative overview of the command or function's external behavior. This
-includes how it interacts with files or data, and how it handles the standard
-input, standard output and standard error. Internals and implementation details
-are normally omitted. This section attempts to provide a succinct overview in
-answer to the question, "what does it do?"
+A narrative overview of the command or function's external behavior.
+This includes how it interacts with files or data, and how it handles the
+standard input, standard output and standard error.
+Internals and implementation details are normally omitted.
+This section attempts to provide a succinct overview in answer to the question,
+"what does it do?"
 .Lp
 Literal text from the synopsis appears in constant width, as do literal
 filenames and references to items that appear elsewhere in the  reference
-manuals. Arguments are italicized.
+manuals.
+Arguments are italicized.
 .Lp
 If a command interprets either subcommands or an input grammar, its command
 interface or input grammar is normally described in a
 .Nm USAGE
 section, which follows the
 .Nm OPTIONS
-section.  The
+section.
+The
 .Nm DESCRIPTION
 section only
 describes the behavior of the command itself, not that of subcommands.
@@ -223,14 +232,15 @@ with the command or function.
 .Sh NOTES
 The
 .Nm
-package should not be used for new documentation.  The
+package should not be used for new documentation.
+The
 .Xr mdoc 5 ,
 package is preferred, as it uses semantic markup rather than physical markup.
 .Sh CODE SET INDEPENDENCE
 When processed with
 .Xr mandoc 1 ,
-this package is Code Set Independent. However, when processed with
-legacy tools such as
+this package is Code Set Independent.
+However, when processed with legacy tools such as
 .Xr nroff 1
 and
 .Xr troff 1 ,

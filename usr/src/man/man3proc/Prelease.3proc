@@ -35,8 +35,9 @@ The
 .Fn Prelease
 function is used to release all of the resources associated with a
 .Nm libproc
-handle. It is suitable for handles to core files, created processes, and
-grabbed processes from the
+handle.
+It is suitable for handles to core files, created processes, and grabbed
+processes from the
 .Xr Pgrab_core 3PROC ,
 .Xr Pcreate 3PROC ,
 .Xr Pgrab 3PROC ,
@@ -47,7 +48,8 @@ functions.
 After calling the
 .Fn Prelease
 function, all data that was returned via the handle will no longer be
-valid. For example, the data from calls to
+valid.
+For example, the data from calls to
 .Xr Pctlfd 3PROC ,
 .Xr Pgetauxvec 3PROC ,
 .Xr Pstatus 3PROC ,
@@ -55,16 +57,16 @@ and others.
 .Pp
 The behavior of the released process is controlled by the
 .Fa flags
-argument. By default, if no flags are passed, then the process
-represented by
+argument.
+By default, if no flags are passed, then the process represented by
 .Fa P
 will be set running if it was created by
-.Xr Pcreate
-or if it was not originally stopped or set to stop in /proc. The
-following values may be passed in to the
+.Xr Pcreate 3PROC
+or if it was not originally stopped or set to stop in /proc.
+The following values may be passed in to the
 .Fa flags
-argument. Multiple flags should be be combined with a
-bitwise-inclusive-OR.
+argument.
+Multiple flags should be be combined with a bitwise-inclusive-OR.
 .Bl -tag -width Er -offset indent
 .It Dv PRELEASE_CLEAR
 When releasing the process, clear all tracing flags that are set on the
@@ -73,14 +75,14 @@ process.
 When releasing the process, retain all tracing flags that are currently
 active on the process.
 .It Dv PRELEASE_HANG
-Leave the process stopped. It will not resume execution unless it is
-explicitly enabled with
+Leave the process stopped.
+It will not resume execution unless it is explicitly enabled with
 .Xr prun 1
 or another process explicitly enables it.
 .It Dv PRELEASE_KILL
 Release the process and terminate it with
-.Dv SIGKILL . This option takes precedence over all other values that may
-be passed in to
+.Dv SIGKILL .
+This option takes precedence over all other values that may be passed in to
 .Fa flags .
 .El
 .Pp
@@ -94,7 +96,8 @@ handle
 however, unlike the
 .Fn Prelease
 function, it does not handle any logic to change or set the grabbed processes
-state. In general, prefer
+state.
+In general, prefer
 .Fn Prelease
 to
 .Fn Pfree .
