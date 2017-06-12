@@ -70,10 +70,8 @@ static int mrsas_tbolt_check_map_info(struct mrsas_instance *);
 static int mrsas_tbolt_sync_map_info(struct mrsas_instance *);
 static int mrsas_tbolt_prepare_pkt(struct scsa_cmd *);
 static int mrsas_tbolt_ioc_init(struct mrsas_instance *, dma_obj_t *);
-#ifdef PDSUPPORT
 static void mrsas_tbolt_get_pd_info(struct mrsas_instance *,
     struct mrsas_tbolt_pd_info *, int);
-#endif /* PDSUPPORT */
 
 static int mrsas_debug_tbolt_fw_faults_after_ocr = 0;
 
@@ -1801,7 +1799,6 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 			break;
 		}
 	} else { /* Physical */
-#ifdef PDSUPPORT
 		/* Pass-through command to physical drive */
 
 		/* Acquire SYNC MAP UPDATE lock */
@@ -1852,10 +1849,6 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 		/* Release SYNC MAP UPDATE lock */
 		mutex_exit(&instance->sync_map_mtx);
-#else
-		/* If no PD support, return here. */
-		return (cmd);
-#endif
 	}
 
 	/* Set sense buffer physical address/length in scsi_io_request. */
@@ -2389,11 +2382,9 @@ tbolt_complete_cmd(struct mrsas_instance *instance,
 				if (acmd->islogical &&
 				    (status == MFI_STAT_OK)) {
 					display_scsi_inquiry((caddr_t)inq);
-#ifdef PDSUPPORT
 				} else if ((status == MFI_STAT_OK) &&
 				    inq->inq_dtype == DTYPE_DIRECT) {
 					display_scsi_inquiry((caddr_t)inq);
-#endif
 				} else {
 					/* for physical disk */
 					status = MFI_STAT_DEVICE_NOT_FOUND;
@@ -3526,8 +3517,6 @@ abort_syncmap_cmd(struct mrsas_instance *instance,
 	return (ret);
 }
 
-
-#ifdef PDSUPPORT
 /*
  * Even though these functions were originally intended for 2208 only, it
  * turns out they're useful for "Skinny" support as well.  In a perfect world,
@@ -3684,4 +3673,3 @@ mrsas_tbolt_get_pd_info(struct mrsas_instance *instance,
 	else
 		mrsas_return_mfi_pkt(instance, cmd);
 }
-#endif
