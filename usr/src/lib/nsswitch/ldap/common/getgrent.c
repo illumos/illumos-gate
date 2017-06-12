@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <grp.h>
@@ -353,42 +355,50 @@ getbymember(ldap_backend_ptr be, void *a)
 	username = (char *)argp->username;
 	result = (ns_ldap_result_t *)be->result;
 	curEntry = (ns_ldap_entry_t *)result->entry;
-	for (i = 0; i < result->entries_count; i++) {
+	for (i = 0; i < result->entries_count && curEntry != NULL; i++) {
 		membervalue = __ns_ldap_getAttr(curEntry, "memberUid");
-		if (membervalue) {
-			for (j = 0; membervalue[j]; j++) {
-				/*
-				 * If we find an '=' in the member attribute
-				 * value, treat it as a DN, otherwise as a
-				 * username.
-				 */
-				if (member_str = strchr(membervalue[j], '=')) {
-					member_str++; /* skip over the '=' */
-					member_str = strtok_r(member_str, ",",
-					    &strtok_state);
-				} else {
-					member_str = membervalue[j];
+		if (membervalue == NULL) {
+			curEntry = curEntry->next;
+			continue;
+		}
+		for (j = 0; membervalue[j]; j++) {
+			/*
+			 * If we find an '=' in the member attribute
+			 * value, treat it as a DN, otherwise as a
+			 * username.
+			 */
+			if (member_str = strchr(membervalue[j], '=')) {
+				member_str++; /* skip over the '=' */
+				member_str = strtok_r(member_str, ",",
+				    &strtok_state);
+			} else {
+				member_str = membervalue[j];
+			}
+			if (member_str != NULL &&
+			    strcmp(member_str, username) == 0) {
+				groupvalue = __ns_ldap_getAttr(curEntry,
+				    "gidnumber");
+				if (groupvalue == NULL ||
+				    groupvalue[0] == NULL) {
+					/* Drop this group from the list */
+					break;
 				}
-				if (member_str &&
-				    strcmp(member_str, username) == NULL) {
-					groupvalue = __ns_ldap_getAttr(curEntry,
-					    "gidnumber");
-					gid = (gid_t)strtol(groupvalue[0],
-					    (char **)NULL, 10);
-					if (argp->numgids < argp->maxgids) {
-						for (k = 0; k < argp->numgids;
-						    k++) {
-							if (argp->gid_array[k]
-							    == gid)
-						    /* already exists */
-						break;
+				errno = 0;
+				gid = (gid_t)strtol(groupvalue[0],
+				    (char **)NULL, 10);
+
+				if (errno == 0 &&
+				    argp->numgids < argp->maxgids) {
+					for (k = 0; k < argp->numgids; k++) {
+						if (argp->gid_array[k] == gid)
+							/* already exists */
+							break;
 					}
 					if (k == argp->numgids)
 						argp->gid_array[argp->numgids++]
 						    = gid;
-					}
-					break;
 				}
+				break;
 			}
 		}
 		curEntry = curEntry->next;
@@ -421,7 +431,7 @@ static ldap_backend_op_t gr_ops[] = {
 /*ARGSUSED0*/
 nss_backend_t *
 _nss_ldap_group_constr(const char *dummy1, const char *dummy2,
-			const char *dummy3)
+    const char *dummy3)
 {
 
 	return ((nss_backend_t *)_nss_ldap_constr(gr_ops,
