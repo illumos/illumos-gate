@@ -298,12 +298,12 @@ esp_kstat_update(kstat_t *kp, int rw)
 	}
 	ekp = (esp_kstats_t *)kp->ks_data;
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 	ekp->esp_stat_num_aalgs.value.ui64 =
 	    ipss->ipsec_nalgs[IPSEC_ALG_AUTH];
 	ekp->esp_stat_num_ealgs.value.ui64 =
 	    ipss->ipsec_nalgs[IPSEC_ALG_ENCR];
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	netstack_rele(ns);
 	return (0);
@@ -390,11 +390,11 @@ esp_ager(void *arg)
  */
 /* ARGSUSED */
 static int
-ipsecesp_param_get(q, mp, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	caddr_t	cp;
-	cred_t *cr;
+ipsecesp_param_get(
+    queue_t	*q,
+    mblk_t	*mp,
+    caddr_t	cp,
+    cred_t *cr)
 {
 	ipsecespparam_t	*ipsecesppa = (ipsecespparam_t *)cp;
 	uint_t value;
@@ -413,12 +413,12 @@ ipsecesp_param_get(q, mp, cp, cr)
  */
 /* ARGSUSED */
 static int
-ipsecesp_param_set(q, mp, value, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	char	*value;
-	caddr_t	cp;
-	cred_t *cr;
+ipsecesp_param_set(
+    queue_t	*q,
+    mblk_t	*mp,
+    char	*value,
+    caddr_t	cp,
+    cred_t *cr)
 {
 	ulong_t	new_value;
 	ipsecespparam_t	*ipsecesppa = (ipsecespparam_t *)cp;
@@ -1195,7 +1195,7 @@ esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs,
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_READ_HELD(&ipss->ipsec_alg_lock));
 
 	prop->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	prop->sadb_prop_len = SADB_8TO64(sizeof (sadb_prop_t));
@@ -1325,7 +1325,7 @@ esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 		mutex_exit(&acqrec->ipsacq_lock);
 		return;
 	}
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_READ_HELD(&ipss->ipsec_alg_lock));
 	combs = ipss->ipsec_nalgs[IPSEC_ALG_AUTH] *
 	    ipss->ipsec_nalgs[IPSEC_ALG_ENCR];
 	msgmp = pfkeymp->b_cont;
@@ -1338,7 +1338,7 @@ esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 	samsg->sadb_msg_len += prop->sadb_prop_len;
 	msgmp->b_wptr += SADB_64TO8(samsg->sadb_msg_len);
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	/*
 	 * Must mutex_exit() before sending PF_KEY message up, in
@@ -3043,7 +3043,7 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	 * Allocate the PF_KEY message that follows KEYSOCK_OUT.
 	 */
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 	/*
 	 * Fill SADB_REGISTER message's algorithm descriptors.  Hold
 	 * down the lock while filling it.
@@ -3072,7 +3072,7 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	}
 	keysock_out_mp->b_cont = allocb(allocsize, BPRI_HI);
 	if (keysock_out_mp->b_cont == NULL) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		freemsg(keysock_out_mp);
 		return (B_FALSE);
 	}
@@ -3166,7 +3166,7 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	current_aalgs = num_aalgs;
 	current_ealgs = num_ealgs;
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	if (sens_tsl != NULL) {
 		sens = (sadb_sens_t *)nextext;
@@ -3691,7 +3691,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	 * the weak key check up to the algorithm.
 	 */
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 
 	/*
 	 * First locate the authentication algorithm.
@@ -3706,7 +3706,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		aalg = ipss->ipsec_alglists[IPSEC_ALG_AUTH]
 		    [assoc->sadb_sa_auth];
 		if (aalg == NULL || !ALG_VALID(aalg)) {
-			mutex_exit(&ipss->ipsec_alg_lock);
+			rw_exit(&ipss->ipsec_alg_lock);
 			esp1dbg(espstack, ("Couldn't find auth alg #%d.\n",
 			    assoc->sadb_sa_auth));
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_AALG;
@@ -3721,7 +3721,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		 * a auth_key != NULL should be made here ( see below).
 		 */
 		if (!ipsec_valid_key_size(akey->sadb_key_bits, aalg)) {
-			mutex_exit(&ipss->ipsec_alg_lock);
+			rw_exit(&ipss->ipsec_alg_lock);
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_AKEYBITS;
 			return (EINVAL);
 		}
@@ -3730,7 +3730,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		/* check key and fix parity if needed */
 		if (ipsec_check_key(aalg->alg_mech_type, akey, B_TRUE,
 		    diagnostic) != 0) {
-			mutex_exit(&ipss->ipsec_alg_lock);
+			rw_exit(&ipss->ipsec_alg_lock);
 			return (EINVAL);
 		}
 	}
@@ -3745,7 +3745,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		ealg = ipss->ipsec_alglists[IPSEC_ALG_ENCR]
 		    [assoc->sadb_sa_encrypt];
 		if (ealg == NULL || !ALG_VALID(ealg)) {
-			mutex_exit(&ipss->ipsec_alg_lock);
+			rw_exit(&ipss->ipsec_alg_lock);
 			esp1dbg(espstack, ("Couldn't find encr alg #%d.\n",
 			    assoc->sadb_sa_encrypt));
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_EALG;
@@ -3766,7 +3766,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		keybits -= SADB_8TO1(ealg->alg_saltlen);
 		if ((assoc->sadb_sa_encrypt == SADB_EALG_NULL) ||
 		    (!ipsec_valid_key_size(keybits, ealg))) {
-			mutex_exit(&ipss->ipsec_alg_lock);
+			rw_exit(&ipss->ipsec_alg_lock);
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_EKEYBITS;
 			return (EINVAL);
 		}
@@ -3775,11 +3775,11 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		/* check key */
 		if (ipsec_check_key(ealg->alg_mech_type, ekey, B_FALSE,
 		    diagnostic) != 0) {
-			mutex_exit(&ipss->ipsec_alg_lock);
+			rw_exit(&ipss->ipsec_alg_lock);
 			return (EINVAL);
 		}
 	}
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	return (esp_add_sa_finish(mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi,
 	    diagnostic, espstack));

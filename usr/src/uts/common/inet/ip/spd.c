@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -413,7 +414,7 @@ ipsec_stack_fini(netstackid_t stackid, void *arg)
 		mutex_destroy(&(ipss->ipsec_sel_hash[i].hash_lock));
 	}
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_WRITER);
 	for (algtype = 0; algtype < IPSEC_NALGTYPES; algtype ++) {
 		int nalgs = ipss->ipsec_nalgs[algtype];
 
@@ -422,8 +423,8 @@ ipsec_stack_fini(netstackid_t stackid, void *arg)
 				ipsec_alg_unreg(algtype, i, ns);
 		}
 	}
-	mutex_exit(&ipss->ipsec_alg_lock);
-	mutex_destroy(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
+	rw_destroy(&ipss->ipsec_alg_lock);
 
 	ipsid_gc(ns);
 	ipsid_fini(ns);
@@ -655,7 +656,7 @@ ipsec_stack_init(netstackid_t stackid, netstack_t *ns)
 		mutex_init(&(ipss->ipsec_sel_hash[i].hash_lock),
 		    NULL, MUTEX_DEFAULT, NULL);
 
-	mutex_init(&ipss->ipsec_alg_lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&ipss->ipsec_alg_lock, NULL, RW_DEFAULT, NULL);
 	for (i = 0; i < IPSEC_NALGTYPES; i++) {
 		ipss->ipsec_nalgs[i] = 0;
 	}
@@ -718,7 +719,7 @@ alg_insert_sortlist(enum ipsec_algtype at, uint8_t algid, netstack_t *ns)
 	ASSERT(ai != NULL);
 	ASSERT(algid == ai->alg_id);
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_WRITE_HELD(&ipss->ipsec_alg_lock));
 
 	holder = algid;
 
@@ -755,7 +756,7 @@ alg_remove_sortlist(enum ipsec_algtype at, uint8_t algid, netstack_t *ns)
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	int newcount = ipss->ipsec_nalgs[at];
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_WRITE_HELD(&ipss->ipsec_alg_lock));
 
 	for (i = 0; i <= newcount; i++) {
 		if (copyback) {
@@ -776,7 +777,7 @@ ipsec_alg_reg(ipsec_algtype_t algtype, ipsec_alginfo_t *alg, netstack_t *ns)
 {
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_WRITE_HELD(&ipss->ipsec_alg_lock));
 
 	ASSERT(ipss->ipsec_alglists[algtype][alg->alg_id] == NULL);
 	ipsec_alg_fix_min_max(alg, algtype, ns);
@@ -795,7 +796,7 @@ ipsec_alg_unreg(ipsec_algtype_t algtype, uint8_t algid, netstack_t *ns)
 {
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_WRITE_HELD(&ipss->ipsec_alg_lock));
 
 	ASSERT(ipss->ipsec_alglists[algtype][algid] != NULL);
 	ipsec_alg_free(ipss->ipsec_alglists[algtype][algid]);
@@ -3535,7 +3536,7 @@ ipsec_update_present_flags(ipsec_stack_t *ipss)
 
 boolean_t
 ipsec_policy_delete(ipsec_policy_head_t *php, ipsec_selkey_t *keys, int dir,
-	netstack_t *ns)
+    netstack_t *ns)
 {
 	ipsec_sel_t *sp;
 	ipsec_policy_t *ip, *nip, *head;
@@ -4703,7 +4704,7 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
 	crypto_mech_usage_t mask;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_WRITE_HELD(&ipss->ipsec_alg_lock));
 
 	/*
 	 * Compute the min, max, and default key sizes (in number of
@@ -5056,7 +5057,7 @@ ipsec_prov_update_callback_stack(uint32_t event, void *event_arg,
 	 * the algorithm valid flag and trigger an update of the
 	 * SAs that depend on that algorithm.
 	 */
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_WRITER);
 	for (algtype = 0; algtype < IPSEC_NALGTYPES; algtype++) {
 		for (algidx = 0; algidx < ipss->ipsec_nalgs[algtype];
 		    algidx++) {
@@ -5119,7 +5120,7 @@ ipsec_prov_update_callback_stack(uint32_t event, void *event_arg,
 				    CRYPTO_MECH_ADDED, ns);
 		}
 	}
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 	crypto_free_mech_list(mechs, mech_count);
 
 	if (alg_changed) {

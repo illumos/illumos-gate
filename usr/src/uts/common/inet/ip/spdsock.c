@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -203,11 +204,11 @@ static const uint_t execmodes[] = {
 
 /* ARGSUSED */
 static int
-spdsock_param_get(q, mp, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	caddr_t	cp;
-	cred_t *cr;
+spdsock_param_get(
+    queue_t	*q,
+    mblk_t	*mp,
+    caddr_t	cp,
+    cred_t *cr)
 {
 	spdsockparam_t	*spdsockpa = (spdsockparam_t *)cp;
 	uint_t value;
@@ -225,12 +226,12 @@ spdsock_param_get(q, mp, cp, cr)
 /* This routine sets an NDD variable in a spdsockparam_t structure. */
 /* ARGSUSED */
 static int
-spdsock_param_set(q, mp, value, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	char *value;
-	caddr_t	cp;
-	cred_t *cr;
+spdsock_param_set(
+    queue_t	*q,
+    mblk_t	*mp,
+    char *value,
+    caddr_t	cp,
+    cred_t *cr)
 {
 	ulong_t	new_value;
 	spdsockparam_t	*spdsockpa = (spdsockparam_t *)cp;
@@ -2268,7 +2269,7 @@ spdsock_alglist(queue_t *q, mblk_t *mp)
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
 	ipsec_stack_t *ipss = ss->spdsock_spds->spds_netstack->netstack_ipsec;
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 	/*
 	 * The SPD client expects to receive separate entries for
 	 * AH authentication and ESP authentication supported algorithms.
@@ -2296,7 +2297,7 @@ spdsock_alglist(queue_t *q, mblk_t *mp)
 
 	m = allocb(size, BPRI_HI);
 	if (m == NULL) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		spdsock_error(q, mp, ENOMEM, 0);
 		return;
 	}
@@ -2367,7 +2368,7 @@ spdsock_alglist(queue_t *q, mblk_t *mp)
 		}
 	}
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 #undef EMITALGATTRS
 #undef EMIT
@@ -2404,7 +2405,7 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
 	ipsec_stack_t *ipss = ss->spdsock_spds->spds_netstack->netstack_ipsec;
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 
 	/*
 	 * For each algorithm, we encode:
@@ -2437,7 +2438,7 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 
 	m = allocb(size, BPRI_HI);
 	if (m == NULL) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		spdsock_error(q, mp, ENOMEM, 0);
 		return;
 	}
@@ -2471,7 +2472,7 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 	 */
 	if (act->spd_actions_count == 0) {
 		act->spd_actions_len = 0;
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		goto error;
 	}
 
@@ -2523,7 +2524,7 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 		}
 	}
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 #undef EMITALGATTRS
 #undef EMIT
@@ -3243,9 +3244,9 @@ spdsock_capability_req(queue_t *q, mblk_t *mp)
  * The current state of the stream is copied from spdsock_state.
  */
 static void
-spdsock_info_req(q, mp)
-	queue_t	*q;
-	mblk_t	*mp;
+spdsock_info_req(
+    queue_t	*q,
+    mblk_t	*mp)
 {
 	mp = tpi_ack_alloc(mp, sizeof (struct T_info_ack), M_PCPROTO,
 	    T_INFO_ACK);
@@ -3262,11 +3263,11 @@ spdsock_info_req(q, mp)
  * upstream.
  */
 static void
-spdsock_err_ack(q, mp, t_error, sys_error)
-	queue_t	*q;
-	mblk_t	*mp;
-	int	t_error;
-	int	sys_error;
+spdsock_err_ack(
+    queue_t	*q,
+    mblk_t	*mp,
+    int	t_error,
+    int	sys_error)
 {
 	if ((mp = mi_tpi_err_ack_alloc(mp, t_error, sys_error)) != NULL)
 		qreply(q, mp);
@@ -3684,7 +3685,7 @@ spdsock_merge_algs(spd_stack_t *spds)
 		}
 	}
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_WRITER);
 
 	/*
 	 * For each algorithm currently defined, check if it is
@@ -3740,7 +3741,7 @@ spdsock_merge_algs(spd_stack_t *spds)
 		    spds->spds_algs_exec_mode[algtype];
 	}
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	crypto_free_mech_list(mechs, mech_count);
 

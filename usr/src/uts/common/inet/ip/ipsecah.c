@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -247,9 +248,9 @@ ah_kstat_update(kstat_t *kp, int rw)
 	}
 	ekp = (ah_kstats_t *)kp->ks_data;
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 	ekp->ah_stat_num_aalgs.value.ui64 = ipss->ipsec_nalgs[IPSEC_ALG_AUTH];
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	netstack_rele(ns);
 	return (0);
@@ -283,11 +284,11 @@ ah_ager(void *arg)
  */
 /* ARGSUSED */
 static int
-ipsecah_param_get(q, mp, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	caddr_t	cp;
-	cred_t *cr;
+ipsecah_param_get(
+    queue_t	*q,
+    mblk_t	*mp,
+    caddr_t	cp,
+    cred_t *cr)
 {
 	ipsecahparam_t	*ipsecahpa = (ipsecahparam_t *)cp;
 	uint_t value;
@@ -306,12 +307,12 @@ ipsecah_param_get(q, mp, cp, cr)
  */
 /* ARGSUSED */
 static int
-ipsecah_param_set(q, mp, value, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	char	*value;
-	caddr_t	cp;
-	cred_t *cr;
+ipsecah_param_set(
+    queue_t	*q,
+    mblk_t	*mp,
+    char	*value,
+    caddr_t	cp,
+    cred_t *cr)
 {
 	ulong_t	new_value;
 	ipsecahparam_t	*ipsecahpa = (ipsecahparam_t *)cp;
@@ -324,7 +325,7 @@ ipsecah_param_set(q, mp, value, cp, cr)
 	if (ddi_strtoul(value, NULL, 10, &new_value) != 0 ||
 	    new_value < ipsecahpa->ipsecah_param_min ||
 	    new_value > ipsecahpa->ipsecah_param_max) {
-		    return (EINVAL);
+		return (EINVAL);
 	}
 
 	/* Set the new value */
@@ -573,7 +574,7 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	 * the variable part (i.e. the algorithms) of the message.
 	 */
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 
 	/*
 	 * Return only valid algorithms, so the number of algorithms
@@ -595,7 +596,7 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	}
 	mp->b_cont = allocb(allocsize, BPRI_HI);
 	if (mp->b_cont == NULL) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		freemsg(mp);
 		return (B_FALSE);
 	}
@@ -642,7 +643,7 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 		nextext = (sadb_ext_t *)saalg;
 	}
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	if (sens_tsl != NULL) {
 		sens = (sadb_sens_t *)nextext;
@@ -1123,10 +1124,10 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	 */
 
 	/* verify that there is a mapping for the specified algorithm */
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 	aalg = ipss->ipsec_alglists[IPSEC_ALG_AUTH][assoc->sadb_sa_auth];
 	if (aalg == NULL || !ALG_VALID(aalg)) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		ah1dbg(ahstack, ("Couldn't find auth alg #%d.\n",
 		    assoc->sadb_sa_auth));
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_AALG;
@@ -1136,7 +1137,7 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 
 	/* sanity check key sizes */
 	if (!ipsec_valid_key_size(key->sadb_key_bits, aalg)) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_AKEYBITS;
 		return (EINVAL);
 	}
@@ -1144,11 +1145,11 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	/* check key and fix parity if needed */
 	if (ipsec_check_key(aalg->alg_mech_type, key, B_TRUE,
 	    diagnostic) != 0) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		return (EINVAL);
 	}
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	return (ah_add_sa_finish(mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi,
 	    diagnostic, ahstack));
@@ -1749,7 +1750,7 @@ ah_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs,
 	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_READ_HELD(&ipss->ipsec_alg_lock));
 
 	prop->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	prop->sadb_prop_len = SADB_8TO64(sizeof (sadb_prop_t));
@@ -1861,7 +1862,7 @@ ah_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 		mutex_exit(&acqrec->ipsacq_lock);
 		return;
 	}
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_READ_HELD(&ipss->ipsec_alg_lock));
 	combs = ipss->ipsec_nalgs[IPSEC_ALG_AUTH];
 	msgmp = pfkeymp->b_cont;
 	samsg = (sadb_msg_t *)(msgmp->b_rptr);
@@ -1873,7 +1874,7 @@ ah_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 	samsg->sadb_msg_len += prop->sadb_prop_len;
 	msgmp->b_wptr += SADB_64TO8(samsg->sadb_msg_len);
 
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	/*
 	 * Must mutex_exit() before sending PF_KEY message up, in
