@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2016, Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/ostest@$(PKGVERS)
@@ -26,6 +26,7 @@ dir path=opt/os-tests/bin
 dir path=opt/os-tests/runfiles
 dir path=opt/os-tests/tests
 dir path=opt/os-tests/tests/file-locking
+dir path=opt/os-tests/tests/pf_key
 dir path=opt/os-tests/tests/sdevfs
 dir path=opt/os-tests/tests/secflags
 dir path=opt/os-tests/tests/sigqueue
@@ -39,6 +40,9 @@ file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
+file path=opt/os-tests/tests/pf_key/acquire-compare mode=0555
+file path=opt/os-tests/tests/pf_key/acquire-spray mode=0555
+file path=opt/os-tests/tests/pf_key/eacq-enabler mode=0555
 file path=opt/os-tests/tests/poll_test mode=0555
 file path=opt/os-tests/tests/sdevfs/sdevfs_eisdir mode=0555
 file path=opt/os-tests/tests/secflags/addrs-32 mode=0555
@@ -66,4 +70,5 @@ file path=opt/os-tests/tests/spoof-ras mode=0555
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+depend fmri=pkg:/network/telnet type=require
 depend fmri=system/test/testrunner type=require

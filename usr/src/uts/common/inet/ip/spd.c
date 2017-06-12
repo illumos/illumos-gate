@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -4686,8 +4687,9 @@ ipsid_fini(netstack_t *ns)
 }
 
 /*
- * Update the minimum and maximum supported key sizes for the
- * specified algorithm. Must be called while holding the algorithms lock.
+ * Update the minimum and maximum supported key sizes for the specified
+ * algorithm, which is either a member of a netstack alg array or about to be,
+ * and therefore must be called holding ipsec_alg_lock for write.
  */
 void
 ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,

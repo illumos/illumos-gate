@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -95,31 +97,6 @@ static	ipsecespparam_t	lcl_param_arr[] = {
 	{ 0,	2,		1,	"ipsecesp_padding_check"},
 	{ 0,	600,		20,	"ipsecesp_nat_keepalive_interval"},
 };
-#define	ipsecesp_debug	ipsecesp_params[0].ipsecesp_param_value
-#define	ipsecesp_age_interval ipsecesp_params[1].ipsecesp_param_value
-#define	ipsecesp_age_int_max	ipsecesp_params[1].ipsecesp_param_max
-#define	ipsecesp_reap_delay	ipsecesp_params[2].ipsecesp_param_value
-#define	ipsecesp_replay_size	ipsecesp_params[3].ipsecesp_param_value
-#define	ipsecesp_acquire_timeout	\
-	ipsecesp_params[4].ipsecesp_param_value
-#define	ipsecesp_larval_timeout	\
-	ipsecesp_params[5].ipsecesp_param_value
-#define	ipsecesp_default_soft_bytes	\
-	ipsecesp_params[6].ipsecesp_param_value
-#define	ipsecesp_default_hard_bytes	\
-	ipsecesp_params[7].ipsecesp_param_value
-#define	ipsecesp_default_soft_addtime	\
-	ipsecesp_params[8].ipsecesp_param_value
-#define	ipsecesp_default_hard_addtime	\
-	ipsecesp_params[9].ipsecesp_param_value
-#define	ipsecesp_default_soft_usetime	\
-	ipsecesp_params[10].ipsecesp_param_value
-#define	ipsecesp_default_hard_usetime	\
-	ipsecesp_params[11].ipsecesp_param_value
-#define	ipsecesp_log_unknown_spi	\
-	ipsecesp_params[12].ipsecesp_param_value
-#define	ipsecesp_padding_check	\
-	ipsecesp_params[13].ipsecesp_param_value
 /* For ipsecesp_nat_keepalive_interval, see ipsecesp.h. */
 
 #define	esp0dbg(a)	printf a
@@ -133,7 +110,6 @@ static int ipsecesp_close(queue_t *);
 static void ipsecesp_wput(queue_t *, mblk_t *);
 static void	*ipsecesp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecesp_stack_fini(netstackid_t stackid, void *arg);
-static void esp_send_acquire(ipsacq_t *, mblk_t *, netstack_t *);
 
 static void esp_prepare_udp(netstack_t *, mblk_t *, ipha_t *);
 static void esp_outbound_finish(mblk_t *, ip_xmit_attr_t *);
@@ -180,52 +156,6 @@ static taskq_t *esp_taskq;
  * Answer:	Yes, because I need to know which queue is BOUND to
  *		IPPROTO_ESP
  */
-
-/*
- * Stats.  This may eventually become a full-blown SNMP MIB once that spec
- * stabilizes.
- */
-
-typedef struct esp_kstats_s {
-	kstat_named_t esp_stat_num_aalgs;
-	kstat_named_t esp_stat_good_auth;
-	kstat_named_t esp_stat_bad_auth;
-	kstat_named_t esp_stat_bad_padding;
-	kstat_named_t esp_stat_replay_failures;
-	kstat_named_t esp_stat_replay_early_failures;
-	kstat_named_t esp_stat_keysock_in;
-	kstat_named_t esp_stat_out_requests;
-	kstat_named_t esp_stat_acquire_requests;
-	kstat_named_t esp_stat_bytes_expired;
-	kstat_named_t esp_stat_out_discards;
-	kstat_named_t esp_stat_crypto_sync;
-	kstat_named_t esp_stat_crypto_async;
-	kstat_named_t esp_stat_crypto_failures;
-	kstat_named_t esp_stat_num_ealgs;
-	kstat_named_t esp_stat_bad_decrypt;
-	kstat_named_t esp_stat_sa_port_renumbers;
-} esp_kstats_t;
-
-/*
- * espstack->esp_kstats is equal to espstack->esp_ksp->ks_data if
- * kstat_create_netstack for espstack->esp_ksp succeeds, but when it
- * fails, it will be NULL. Note this is done for all stack instances,
- * so it *could* fail. hence a non-NULL checking is done for
- * ESP_BUMP_STAT and ESP_DEBUMP_STAT
- */
-#define	ESP_BUMP_STAT(espstack, x)					\
-do {									\
-	if (espstack->esp_kstats != NULL)				\
-		(espstack->esp_kstats->esp_stat_ ## x).value.ui64++;	\
-_NOTE(CONSTCOND)							\
-} while (0)
-
-#define	ESP_DEBUMP_STAT(espstack, x)					\
-do {									\
-	if (espstack->esp_kstats != NULL)				\
-		(espstack->esp_kstats->esp_stat_ ## x).value.ui64--;	\
-_NOTE(CONSTCOND)							\
-} while (0)
 
 static int	esp_kstat_update(kstat_t *, int);
 
@@ -503,6 +433,7 @@ ipsecesp_param_register(IDP *ndp, ipsecespparam_t *espp, int cnt)
 	}
 	return (B_TRUE);
 }
+
 /*
  * Initialize things for ESP for each stack instance
  */
@@ -527,7 +458,6 @@ ipsecesp_stack_init(netstackid_t stackid, netstack_t *ns)
 
 	espstack->esp_sadb.s_acquire_timeout =
 	    &espstack->ipsecesp_acquire_timeout;
-	espstack->esp_sadb.s_acqfn = esp_send_acquire;
 	sadbp_init("ESP", &espstack->esp_sadb, SADB_SATYPE_ESP, esp_hash_size,
 	    espstack->ipsecesp_netstack);
 
@@ -558,7 +488,6 @@ ipsecesp_stack_fini(netstackid_t stackid, void *arg)
 	if (espstack->esp_pfkey_q != NULL) {
 		(void) quntimeout(espstack->esp_pfkey_q, espstack->esp_event);
 	}
-	espstack->esp_sadb.s_acqfn = NULL;
 	espstack->esp_sadb.s_acquire_timeout = NULL;
 	sadbp_destroy(&espstack->esp_sadb, espstack->ipsecesp_netstack);
 	ip_drop_unregister(&espstack->esp_dropper);
@@ -1181,179 +1110,6 @@ esp_inbound(mblk_t *data_mp, void *arg, ip_recv_attr_t *ira)
 	    (uint8_t *)esph - data_mp->b_rptr));
 }
 
-/*
- * Perform the really difficult work of inserting the proposed situation.
- * Called while holding the algorithm lock.
- */
-static void
-esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs,
-    netstack_t *ns)
-{
-	sadb_comb_t *comb = (sadb_comb_t *)(prop + 1);
-	ipsec_action_t *ap;
-	ipsec_prot_t *prot;
-	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-
-	ASSERT(RW_READ_HELD(&ipss->ipsec_alg_lock));
-
-	prop->sadb_prop_exttype = SADB_EXT_PROPOSAL;
-	prop->sadb_prop_len = SADB_8TO64(sizeof (sadb_prop_t));
-	*(uint32_t *)(&prop->sadb_prop_replay) = 0;	/* Quick zero-out! */
-
-	prop->sadb_prop_replay = espstack->ipsecesp_replay_size;
-
-	/*
-	 * Based upon algorithm properties, and what-not, prioritize a
-	 * proposal, based on the ordering of the ESP algorithms in the
-	 * alternatives in the policy rule or socket that was placed
-	 * in the acquire record.
-	 *
-	 * For each action in policy list
-	 *   Add combination.  If I've hit limit, return.
-	 */
-
-	for (ap = acqrec->ipsacq_act; ap != NULL;
-	    ap = ap->ipa_next) {
-		ipsec_alginfo_t *ealg = NULL;
-		ipsec_alginfo_t *aalg = NULL;
-
-		if (ap->ipa_act.ipa_type != IPSEC_POLICY_APPLY)
-			continue;
-
-		prot = &ap->ipa_act.ipa_apply;
-
-		if (!(prot->ipp_use_esp))
-			continue;
-
-		if (prot->ipp_esp_auth_alg != 0) {
-			aalg = ipss->ipsec_alglists[IPSEC_ALG_AUTH]
-			    [prot->ipp_esp_auth_alg];
-			if (aalg == NULL || !ALG_VALID(aalg))
-				continue;
-		}
-
-		ASSERT(prot->ipp_encr_alg > 0);
-		ealg = ipss->ipsec_alglists[IPSEC_ALG_ENCR]
-		    [prot->ipp_encr_alg];
-		if (ealg == NULL || !ALG_VALID(ealg))
-			continue;
-
-		comb->sadb_comb_flags = 0;
-		comb->sadb_comb_reserved = 0;
-		comb->sadb_comb_encrypt = ealg->alg_id;
-		comb->sadb_comb_encrypt_minbits =
-		    MAX(prot->ipp_espe_minbits, ealg->alg_ef_minbits);
-		comb->sadb_comb_encrypt_maxbits =
-		    MIN(prot->ipp_espe_maxbits, ealg->alg_ef_maxbits);
-
-		if (aalg == NULL) {
-			comb->sadb_comb_auth = 0;
-			comb->sadb_comb_auth_minbits = 0;
-			comb->sadb_comb_auth_maxbits = 0;
-		} else {
-			comb->sadb_comb_auth = aalg->alg_id;
-			comb->sadb_comb_auth_minbits =
-			    MAX(prot->ipp_espa_minbits, aalg->alg_ef_minbits);
-			comb->sadb_comb_auth_maxbits =
-			    MIN(prot->ipp_espa_maxbits, aalg->alg_ef_maxbits);
-		}
-
-		/*
-		 * The following may be based on algorithm
-		 * properties, but in the meantime, we just pick
-		 * some good, sensible numbers.  Key mgmt. can
-		 * (and perhaps should) be the place to finalize
-		 * such decisions.
-		 */
-
-		/*
-		 * No limits on allocations, since we really don't
-		 * support that concept currently.
-		 */
-		comb->sadb_comb_soft_allocations = 0;
-		comb->sadb_comb_hard_allocations = 0;
-
-		/*
-		 * These may want to come from policy rule..
-		 */
-		comb->sadb_comb_soft_bytes =
-		    espstack->ipsecesp_default_soft_bytes;
-		comb->sadb_comb_hard_bytes =
-		    espstack->ipsecesp_default_hard_bytes;
-		comb->sadb_comb_soft_addtime =
-		    espstack->ipsecesp_default_soft_addtime;
-		comb->sadb_comb_hard_addtime =
-		    espstack->ipsecesp_default_hard_addtime;
-		comb->sadb_comb_soft_usetime =
-		    espstack->ipsecesp_default_soft_usetime;
-		comb->sadb_comb_hard_usetime =
-		    espstack->ipsecesp_default_hard_usetime;
-
-		prop->sadb_prop_len += SADB_8TO64(sizeof (*comb));
-		if (--combs == 0)
-			break;	/* out of space.. */
-		comb++;
-	}
-}
-
-/*
- * Prepare and actually send the SADB_ACQUIRE message to PF_KEY.
- */
-static void
-esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
-{
-	uint_t combs;
-	sadb_msg_t *samsg;
-	sadb_prop_t *prop;
-	mblk_t *pfkeymp, *msgmp;
-	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-
-	ESP_BUMP_STAT(espstack, acquire_requests);
-
-	if (espstack->esp_pfkey_q == NULL) {
-		mutex_exit(&acqrec->ipsacq_lock);
-		return;
-	}
-
-	/* Set up ACQUIRE. */
-	pfkeymp = sadb_setup_acquire(acqrec, SADB_SATYPE_ESP,
-	    ns->netstack_ipsec);
-	if (pfkeymp == NULL) {
-		esp0dbg(("sadb_setup_acquire failed.\n"));
-		mutex_exit(&acqrec->ipsacq_lock);
-		return;
-	}
-	ASSERT(RW_READ_HELD(&ipss->ipsec_alg_lock));
-	combs = ipss->ipsec_nalgs[IPSEC_ALG_AUTH] *
-	    ipss->ipsec_nalgs[IPSEC_ALG_ENCR];
-	msgmp = pfkeymp->b_cont;
-	samsg = (sadb_msg_t *)(msgmp->b_rptr);
-
-	/* Insert proposal here. */
-
-	prop = (sadb_prop_t *)(((uint64_t *)samsg) + samsg->sadb_msg_len);
-	esp_insert_prop(prop, acqrec, combs, ns);
-	samsg->sadb_msg_len += prop->sadb_prop_len;
-	msgmp->b_wptr += SADB_64TO8(samsg->sadb_msg_len);
-
-	rw_exit(&ipss->ipsec_alg_lock);
-
-	/*
-	 * Must mutex_exit() before sending PF_KEY message up, in
-	 * order to avoid recursive mutex_enter() if there are no registered
-	 * listeners.
-	 *
-	 * Once I've sent the message, I'm cool anyway.
-	 */
-	mutex_exit(&acqrec->ipsacq_lock);
-	if (extended != NULL) {
-		putnext(espstack->esp_pfkey_q, extended);
-	}
-	putnext(espstack->esp_pfkey_q, pfkeymp);
-}
-
 /* XXX refactor me */
 /*
  * Handle the SADB_GETSPI message.  Create a larval SA.
@@ -1811,11 +1567,9 @@ esp_log_bad_auth(mblk_t *mp, ip_recv_attr_t *ira)
 /*
  * Invoked for outbound packets after ESP processing. If the packet
  * also requires AH, performs the AH SA selection and AH processing.
- * Returns B_TRUE if the AH processing was not needed or if it was
- * performed successfully. Returns B_FALSE and consumes the passed mblk
- * if AH processing was required but could not be performed.
  *
- * Returns data_mp unless data_mp was consumed/queued.
+ * Returns data_mp (possibly with AH added) unless data_mp was consumed
+ * due to an error, or queued due to async. crypto or an ACQUIRE trigger.
  */
 static mblk_t *
 esp_do_outbound_ah(mblk_t *data_mp, ip_xmit_attr_t *ixa)
