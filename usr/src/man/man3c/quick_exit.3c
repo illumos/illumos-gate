@@ -51,7 +51,8 @@ will be called in reverse order upon calling
 .Fn quick_exit .
 Functions registered with
 .Fn at_quick_exit
-will not be called at any other time. Functions that are registered with
+will not be called at any other time.
+Functions that are registered with
 .Fn at_quick_exit
 should not make use of
 .Xr longjump 3C
@@ -70,8 +71,8 @@ The
 .Fn at_quick_exit
 function returns
 .Sy 0
-on success. Otherwise, a non-zero error value is returned to indicate
-failure.
+on success.
+Otherwise, a non-zero error value is returned to indicate failure.
 .Sh ERRORS
 The
 .Fn at_quick_exit

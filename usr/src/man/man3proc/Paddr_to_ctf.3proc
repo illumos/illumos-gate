@@ -53,9 +53,11 @@ shared libraries are searched.
 .Pp
 The CTF container returned is valid as long as the process handle
 .Fa P
-is valid. That is, until a call to
+is valid.
+That is, until a call to
 .Xr Prelease 3PROC
-is made. Further, consumers must not close the CTF container.
+is made.
+Further, consumers must not close the CTF container.
 .Pp
 The
 .Fn Paddr_to_ctf
@@ -63,8 +65,8 @@ function attempts to find the CTF section, if any, that exists for the
 address
 .Fa addr .
 Note, not all addresses correspond to memory regions that have CTF
-data. For example, if a user creates a region of anonymous memory
-through the
+data.
+For example, if a user creates a region of anonymous memory through the
 .Xr mmap 2
 function, then it will not have any corresponding CTF information.
 .Pp
@@ -72,8 +74,9 @@ The
 .Fn Pname_to_ctf
 function looks up the object named
 .Fa name
-and returns the corresponding CTF section, if any exists. Two special
-values may be used for name. The macro
+and returns the corresponding CTF section, if any exists.
+Two special values may be used for name.
+The macro
 .Dv PR_OBJ_EXEC
 refers to the executable object itself and the macro
 .Dv PR_OBJ_LDSO refers to the object ld.so.1 .
@@ -86,7 +89,8 @@ It allows the passing of a link-map identifier,
 .Fa lmid ,
 which constricts the search of the object named with
 .Fa name
-to that link-map. The special value of
+to that link-map.
+The special value of
 .Dv PR_LMID_EVERY
 indicates that every link-map should be searched, which is equivalent
 in behavior to the

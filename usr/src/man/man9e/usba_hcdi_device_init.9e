@@ -36,8 +36,8 @@
 .Sy Volatile -
 illumos USB HCD private function
 .Pp
-This is a private function that is not part of the stable DDI. It may be
-removed or changed at any time.
+This is a private function that is not part of the stable DDI.
+It may be removed or changed at any time.
 .Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa usb_device
@@ -53,33 +53,35 @@ Pointer to the HCD driver's private data for the device.
 .Sh DESCRIPTION
 The
 .Fn usba_hcdi_device_init
-entry point is an optional entry point. It will be called when child
-devices of the root hub are being initialized. A call to this entry
-point will occur before any calls to open a pipe to the child device
-through the
+entry point is an optional entry point.
+It will be called when child devices of the root hub are being initialized.
+A call to this entry point will occur before any calls to open a pipe to the
+child device through the
 .Xr usba_hcdi_pipe_open 9E
 entry point.
 .Pp
 During this time, the HCD driver should do any required initialization
-required by the host controller. The HCD may also opt to store private
-data for this device as a result of whatever initialization it
-performed. The data should be stored in the
+required by the host controller.
+The HCD may also opt to store private data for this device as a result of
+whatever initialization it performed.
+The data should be stored in the
 .Fa hcd_privatep
-pointer. Data stored this will be accessible to the HCD driver through
-the
+pointer.
+Data stored this will be accessible to the HCD driver through the
 .Xr usba_hcdi_get_device_private 9F
 function.
 .Pp
 The
 .Fn usba_hcdi_device_fini
-entry point is an optional entry point. It will be called when child
-devices of the root hub are being removed. The HCD should perform any
-necessary work with the root controller to finish tearing down the
-device. In addition, if the HCD stored private data it will a pointer to
-it in the
+entry point is an optional entry point.
+It will be called when child devices of the root hub are being removed.
+The HCD should perform any necessary work with the root controller to finish
+tearing down the device.
+In addition, if the HCD stored private data it will a pointer to it in the
 .Fa hcd_private
-pointer. The HCD driver must release any resources associated with its
-private data. If it does not, the resources will be leaked.
+pointer.
+The HCD driver must release any resources associated with its private data.
+If it does not, the resources will be leaked.
 .Pp
 At the time
 .Fn usba_hcdi_device_fini
@@ -90,8 +92,9 @@ function.
 The HCD driver is guaranteed that no other entry points will be invoked
 for the USB device
 .Fa usb_device
-while a call to either function is ongoing. However, the entry point may
-be called in parallel on behalf of separate devices.
+while a call to either function is ongoing.
+However, the entry point may be called in parallel on behalf of separate
+devices.
 .Sh CONTEXT
 This function is called from kernel context only.
 .Sh RETURN VALUES

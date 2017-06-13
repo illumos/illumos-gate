@@ -25,8 +25,6 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	DKTYPENAMES
 #include <stdio.h>
 #include <stdlib.h>
@@ -611,11 +609,12 @@ find_superblock(caddr_t devstr)
 				    calcsb_names[style]) == 1 &&
 				    calcsb(style, devstr, fsreadfd, &sblock)) {
 					break;
+				}
 			}
 			/*
 			 * We got something from mkfs/newfs, so use it.
 			 */
-			if (style < MAX_SB_STYLES)
+			if (style < MAX_SB_STYLES) {
 				proto.fs_ncg = sblock.fs_ncg;
 				bflag = 0;
 			}

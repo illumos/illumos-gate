@@ -49,13 +49,15 @@ The value of
 controls whether or not information about the threads in the process are
 included and how many times the callback function
 .Fa func
-is called. The following values may be passed in for
+is called.
+The following values may be passed in for
 .Fa flag :
 .Bl -tag -width Dv -offset indent
 .It Dv PR_WALK_PROC
 Indicates that the walker is only concerned with the process.
 .Fa func
-will be called once for each process in the system. Only the
+will be called once for each process in the system.
+Only the
 .Sy psinfo
 will be read for the process and passed to
 .Fa func .
@@ -66,8 +68,8 @@ will be passed as
 .It Dv PR_WALK_LWP
 The caller wants both process and thread information.
 .Fa func
-will be called once for each thread in the system. In addition to the
-process
+will be called once for each thread in the system.
+In addition to the process
 .Sy psinfo
 information, the ps specific information for a given thread will be
 included in the
@@ -77,12 +79,13 @@ argument.
 .Pp
 The return value of the caller's
 .Fa func
-function determines whether or not iteration will continue. If
+function determines whether or not iteration will continue.
+If
 .Fa func
 returns a non-zero value, then iteration will terminate and that
-return value will be returned to the caller. To distinguish between
-system errors and caller errors, it is recommended that the function
-only return positive integers in the event of an error.
+return value will be returned to the caller.
+To distinguish between system errors and caller errors, it is recommended that
+the function only return positive integers in the event of an error.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn proc_walk

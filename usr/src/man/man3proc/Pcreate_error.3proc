@@ -28,7 +28,8 @@
 The
 .Fn Pcreate_error
 function returns a pointer to a human-readable character string
-describing the error that occurred. The
+describing the error that occurred.
+The
 .Fn Pcreate_error
 function translates errors produced by the
 .Xr Pcreate 3PROC

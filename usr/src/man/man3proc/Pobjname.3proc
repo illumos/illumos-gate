@@ -16,7 +16,7 @@
 .Os
 .Sh NAME
 .Nm Pobjname ,
-.Nm Pobjname_resolved ,
+.Nm Pobjname_resolved
 .Nd turn a virtual address into its mapped object
 .Sh SYNOPSIS
 .Lb libproc
@@ -46,9 +46,9 @@ contains the virtual address
 in the process handle
 .Fa P .
 .Pp
-A program consists of multiple memory mappings. Some are provided by the
-system, such as the stack and the heap. While others are created through
-explicit calls to
+A program consists of multiple memory mappings.
+Some are provided by the system, such as the stack and the heap.
+While others are created through explicit calls to
 .Xr mmap 2
 or brought in by the run-time link-editor due to dependencies
 specified in binaries and libraries.
@@ -62,8 +62,8 @@ of the name of the corresponding object will be written into
 .Fa buffer .
 The
 .Fn Pobjname_resolved
-function attempts to resolve the object to a full file system path. If
-the full file-system path cannot be determined, then it will fall back
+function attempts to resolve the object to a full file system path.
+If the full file-system path cannot be determined, then it will fall back
 to the name that the run-time link-editor has for that mapping, which is
 the behavior of
 .Fn Pobjname .

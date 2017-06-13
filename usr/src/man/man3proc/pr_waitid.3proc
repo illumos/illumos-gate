@@ -60,9 +60,9 @@ system call and its arguments.
 .Pp
 The
 .Fn pr_waitid
-function only works on active processes. Process handles that correspond
-to core files, zombie processes, or ELF objects do not support system
-call injection.
+function only works on active processes.
+Process handles that correspond to core files, zombie processes, or ELF objects
+do not support system call injection.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn pr_waitid

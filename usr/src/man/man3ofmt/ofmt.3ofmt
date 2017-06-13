@@ -1,0 +1,305 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2017 Nexenta Systems, Inc.
+.\"
+.Dd June 1, 2017
+.Dt OFMT 3OFMT
+.Os
+.Sh NAME
+.Nm ofmt_open ,
+.Nm ofmt_print ,
+.Nm ofmt_update_winsize ,
+.Nm ofmt_strerror ,
+.Nm ofmt_close
+.Nd data structures and routines for printing output
+.Sh LIBRARY
+.Lb libofmt
+.Sh SYNOPSIS
+.In ofmt.h
+.Ft ofmt_status_t
+.Fo ofmt_open
+.Fa "const char *fields"
+.Fa "const ofmt_field_t *template"
+.Fa "uint_t flags"
+.Fa "uint_t maxcols"
+.Fa "ofmt_handle_t *ofmt"
+.Fc
+.Ft void
+.Fo ofmt_print
+.Fa "ofmt_handle_t ofmt"
+.Fa "void *cbarg"
+.Fc
+.Ft void
+.Fo ofmt_update_winsize
+.Fa "ofmt_handle_t ofmt"
+.Fc
+.Ft "char *"
+.Fo ofmt_strerror
+.Fa "ofmt_handle_t ofmt"
+.Fa "ofmt_status_t error"
+.Fa "char *buf"
+.Fa "uint_t bufsize"
+.Fc
+.Ft void
+.Fo ofmt_close
+.Fa "ofmt_handle_t ofmt"
+.Fc
+.Sh DESCRIPTION
+The
+.Nm libofmt
+library provides data structures and routines for printing output.
+.Pp
+Currently this is an internal interface.
+The interface can and will change without notice as the project needs, at any
+time.
+.Pp
+All output is assumed to be in a columnar format, where each column represents
+a field to be printed out.
+Multiple fields in parsable output are separated by
+.Sq \&: ,
+with the
+.Sq \&:
+character itself escaped by a
+.Sq \e
+.Po e.g., IPv6 addresses  may be printed as
+.Qq fe80\e:\e:1
+.Pc ;
+single field output is printed as-is.
+In multiline mode, every
+.Bq field,value
+pair is printed in a line of its own, thus:
+.Qq field: value .
+.Ss Data Structures
+The
+.Vt ofmt_field_t
+data structure used in
+.Sx ofmt_open
+is defined as follows:
+.Bd -literal
+typedef struct ofmt_field_s {
+	char	*of_name;	/* column name */
+	uint_t	of_width;	/* output column width */
+	uint_t	of_id;		/* implementation specific cookie */
+	ofmt_cb_t *of_cb;	/* callback function defined by caller */
+} ofmt_field_t;
+.Ed
+.Pp
+The
+.Vt ofmt_arg_t
+data structure which is passed to callback function is defined as follows:
+.Bd -literal
+typedef struct ofmt_arg_s {
+	uint_t	ofmt_id;	/* implementation specific cookie */
+	uint_t	ofmt_width;	/* output column width */
+	uint_t	ofmt_index;	/* unused */
+	void	*ofmt_cbarg;	/* argument passed to ofmt_print() */
+} ofmt_arg_t;
+.Ed
+.Ss Fn ofmt_open
+The
+.Fn ofmt_open
+function opens a handle returned in
+.Fa ofmt
+for each set of fields to be printed.
+.Pp
+.Fa fields
+is a comma-separated list of the fields that have been selected for output
+.Po typically the string passed to
+.Fl o
+in the command-line
+.Pc .
+Columns selected for output are identified by a match between the
+.Va of_name
+value in the
+.Fa template
+and the
+.Fa fields
+requested.
+In human-friendly
+.Pq non machine-parsable
+mode,
+.Dv NULL
+.Fa fields ,
+or a value of
+.Qq all
+is treated as a request to print all allowable fields that fit other applicable
+constraints.
+.Pp
+.Fa template
+specifies the list of supported fields, along with formatting information
+.Pq e.g., field width ,
+and a pointer to a callback function that can provide a string representation of
+the value to be printed out.
+The set of supported fields must be a
+.Dv NULL
+terminated array of type
+.Vt ofmt_field_t ,
+described in
+.Sx Data Structures ,
+as follows:
+.Bd -literal -offset indent
+{<of_name>, <of_width>, <of_id>, <of_cb> },
+\&.\&.\&.
+{<of_name>, <of_width>, <of_id>, <of_cb> },
+{NULL, 0, 0, NULL}
+.Ed
+.Pp
+.Va of_cb
+is the application-specified callback function with the following prototype that
+provides a string representation of the value to be printed for the field:
+.Bd -literal -offset indent
+(*of_cb)(ofmt_arg_t *ofmt_arg, char *buf, uint_t bufsize)
+.Ed
+.Pp
+The interpretation of the
+.Va of_id
+field is completely private to the caller, and can be optionally used by the
+callback function as a cookie to identify the field being printed when a single
+callback function is shared between multiple
+.Fa template
+entries.
+.Pp
+The
+.Fa flags
+can be any valid combination of the following:
+.Pp
+.Bl -tag -width "OFMT_MULTILINE" -compact
+.It Dv OFMT_PARSABLE
+Machine-parsable mode.
+Specifying a null or empty
+.Va fields
+in the machine-parsable mode will result in a returned error value of
+.Dv OFMT_EPARSENONE .
+An attempt to create a handle in machine-parsable mode with the
+.Fa fields
+set to
+.Qq all
+will result in a returned error value of
+.Dv OFMT_EPARSEALL .
+.It Dv OFMT_WRAP
+Wrap output if field width is exceeded.
+Currently output is wrapped at whitespace or comma characters.
+.It Dv OFMT_MULTILINE
+Multiline mode.
+Specifying both
+.Dv OFMT_MULTILINE
+and
+.Dv OFMT_PARSABLE
+will result in
+.Dv OFMT_EPARSEMULTI .
+.It Dv OFMT_RIGHTJUST
+Right justified output.
+.El
+.Pp
+The non-zero
+.Fa maxcols
+limits the number of output columns.
+.Ss Fn ofmt_print
+The
+.Fn ofmt_print
+function prints a row of output.
+.Pp
+.Fa cbarg
+points at the arguments to be passed to the callback function for each column in
+the row.
+The call to
+.Fn ofmt_print
+will result in the callback function of each selected field invoked with
+.Va of_id ,
+.Va of_width
+and
+.Fa cbarg
+embedded in
+.Fa ofmt_arg ,
+described in
+.Sx Data Structures .
+.Pp
+The callback function should fill
+.Fa buf
+with the string to be printed for the field using the data in
+.Fa cbarg .
+.Ss Fn ofmt_update_winsize
+The
+.Fn ofmt_update_winsize
+function updates the window size information
+.Pq which is initially computed when the handle is created
+in the
+.Fa ofmt .
+If the
+.Dv TIOCGWINSZ
+ioctl fails, the window size is set to 80x24.
+.Ss Fn ofmt_strerror
+The
+.Fn ofmt_strerror
+function returns error diagnostics in
+.Fa buf
+using the information in the
+.Fa ofmt
+and
+.Fa error .
+.Pp
+Using a
+.Fa buf
+size of
+.Dv OFMT_BUFSIZE
+is recommended.
+.Ss Fn ofmt_close
+The
+.Fn ofmt_close
+function frees any resources allocated for the handle after printing is
+completed.
+.Sh RETURN VALUES
+If successful, the
+.Fn ofmt_open
+function will return
+.Dv OFMT_SUCCESS ,
+with a non-null
+.Fa ofmt_handle .
+The function returns one of the failure codes
+.Po enumerated in
+.Vt ofmt_status_t
+.Pc
+listed below otherwise:
+.Pp
+.Bl -tag -width "OFMT_ENOTEMPLATE" -compact
+.It Dv OFMT_ENOMEM
+out of memory
+.It Dv OFMT_EBADFIELDS
+one or more bad fields with good fields
+.It Dv OFMT_ENOFIELDS
+no valid output fields
+.It Dv OFMT_EPARSEALL
+"all" is invalid in parsable mode
+.It Dv OFMT_EPARSENONE
+output fields missing in parsable mode
+.It Dv OFMT_EPARSEWRAP
+parsable mode incompatible with wrap mode
+.It Dv OFMT_ENOTEMPLATE
+no template provided for fields
+.It Dv OFMT_EPARSEMULTI
+parsable and multiline don't mix
+.El
+.Pp
+More information about the type of failure can be obtained by calling
+.Fn ofmt_strerror .
+.Pp
+The
+.Fn ofmt_strerror
+function returns the
+.Fa buf .
+.Sh INTERFACE STABILITY
+.Sy Private .
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr strerror 3C ,
+.Xr attributes 5

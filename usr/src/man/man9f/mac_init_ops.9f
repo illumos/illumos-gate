@@ -55,7 +55,8 @@ The
 .Fn mac_init_ops
 function should be called during the driver's
 .Xr _init 9E
-entry point. As described in more detail in the
+entry point.
+As described in more detail in the
 .Sx Initializing MAC Support
 section of
 .Xr mac 9E ,
@@ -71,8 +72,8 @@ entry point, after the call to
 .Xr mod_remove 9F
 has succeeded, then the driver must call the
 .Fn mac_fini_ops
-function to finalize support and finish releasing any resources. If the
-call to
+function to finalize support and finish releasing any resources.
+If the call to
 .Xr mod_remove 9F
 fails, then the device driver should not call
 .Fn mac_fini_ops
@@ -105,8 +106,8 @@ The
 .Fn mac_init_ops
 and
 .Fn mac_fini_ops
-functions will always succeed. They do not have any kind of return
-value.
+functions will always succeed.
+They do not have any kind of return value.
 .Sh EXAMPLES
 The following example shows how a driver would call
 .Xr mac_init_ops 9F

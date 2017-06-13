@@ -25,8 +25,8 @@ The
 and
 .Fn vforkx
 functions create a new process without
-fully copying the address space of the old process. These functions are useful
-in instances where the purpose of a
+fully copying the address space of the old process.
+These functions are useful in instances where the purpose of a
 .Xr fork 2
 operation is to create a new
 system context for an
@@ -56,7 +56,8 @@ borrow only the thread of control that called
 .Fn vfork
 or
 .Fn vforkx
-in the parent; that is, the child contains only one thread. The use of
+in the parent; that is, the child contains only one thread.
+The use of
 .Fn vfork
 or
 .Fn vforkx
@@ -73,14 +74,15 @@ functions can normally be used the same way as
 .Fn fork
 and
 .Fn forkx ,
-respectively. The calling procedure,
-however, should not return while running in the child's context, since the
-eventual return from
+respectively.
+The calling procedure, however, should not return while running in the child's
+context, since the eventual return from
 .Fn vfork
 or
 .Fn vforkx
 in the parent would be to
-a stack frame that no longer exists. The
+a stack frame that no longer exists.
+The
 .Fn _exit
 function should be used
 in favor of
@@ -92,9 +94,9 @@ operation, since
 will invoke all functions registered by
 .Xr atexit 3C
 and will flush and close standard I/O channels, thereby corrupting the parent
-process's standard I/O data structures. Care must be taken in the child process
-not to modify any global or local data that affects the behavior of the parent
-process on return from
+process's standard I/O data structures.
+Care must be taken in the child process not to modify any global or local data
+that affects the behavior of the parent process on return from
 .Fn vfork
 or
 .Fn vforkx ,
@@ -115,8 +117,9 @@ The
 .Fn vfork
 and
 .Fn vforkx
-functions are deprecated. Their sole
-legitimate use as a prelude to an immediate call to a function from the
+functions are deprecated.
+Their sole legitimate use as a prelude to an immediate call to a function from
+the
 .Xr exec 2
 family can be achieved safely by
 .Xr posix_spawn 3C
@@ -141,7 +144,8 @@ in the header
 .Lp
 See
 .Xr fork 2
-for descriptions of these flags. If the
+for descriptions of these flags.
+If the
 .Fa flags
 argument is 0,
 .Fn vforkx
@@ -154,8 +158,9 @@ and
 .Fn vforkx
 return 0 to
 the child process and return the process ID of the child process to the parent
-process. Otherwise, \(mi1 is returned to the parent process, no child
-process is created, and
+process.
+Otherwise, \(mi1 is returned to the parent process, no child process is created,
+and
 .Va errno
 is set to indicate the error.
 .Sh ERRORS
@@ -167,8 +172,8 @@ functions will fail if:
 .Bl -tag -width Er
 .It Er EAGAIN
 The system-imposed limit on the total number of processes under execution
-(either system-quality or by a single user) would be exceeded. This limit is
-determined when the system is generated.
+(either system-quality or by a single user) would be exceeded.
+This limit is determined when the system is generated.
 .
 .It Er ENOMEM
 There is insufficient swap space for the new process.
@@ -250,8 +255,8 @@ On some systems, the implementation of
 and
 .Fn vforkx
 cause
-the parent to inherit register values from the child. This can create problems
-for certain optimizing compilers if
+the parent to inherit register values from the child.
+This can create problems for certain optimizing compilers if
 .In unistd.h
 is not included in the source calling
 .Fn vfork
@@ -263,7 +268,8 @@ source calling
 .Sh STANDARDS
 The
 .Fn vfork
-function is available in the following compilation environments.  See
+function is available in the following compilation environments.
+See
 .Xr standards 5 .
 .Lp
 .Bl -bullet -compact

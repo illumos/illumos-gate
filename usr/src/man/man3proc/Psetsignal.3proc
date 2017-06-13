@@ -37,9 +37,9 @@ The call to
 replaces any existing signal tracing flags entirely with
 .Fa set .
 The signal tracing flags determine which signals, when received by a
-thread in the process, will cause that thread to stop. For more
-information on the behavior of the signal tracing flags, including which
-signals may be traced this way, see the
+thread in the process, will cause that thread to stop.
+For more information on the behavior of the signal tracing flags, including
+which signals may be traced this way, see the
 .Sy PCSTRACE
 section in
 .Xr proc 4 .

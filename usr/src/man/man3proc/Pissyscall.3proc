@@ -16,7 +16,7 @@
 .Os
 .Sh NAME
 .Nm Pissyscall ,
-.Nm Pissyscall_prev ,
+.Nm Pissyscall_prev
 .Nd determine if instructions are system call instructions
 .Sh SYNOPSIS
 .Lb libproc
@@ -47,8 +47,8 @@ function determines whether or not the instruction before
 .Fa addr
 in the process handle
 .Fa P
-corresponds to one of the architecture's system call instructions. If it
-does, and
+corresponds to one of the architecture's system call instructions.
+If it does, and
 .Fa dst
 is a
 .Pf non- Dv NULL
@@ -62,7 +62,8 @@ function returns
 .Sy non-zero
 if
 .Fa addr
-corresponds to a system call instruction. Otherwise,
+corresponds to a system call instruction.
+Otherwise,
 .Sy 0
 is returned.
 .Pp
@@ -77,7 +78,8 @@ corresponds to a system call instruction and if
 is
 .Pf non- Dv NULL ,
 .Fa dst
-is updated. Otherwise,
+is updated.
+Otherwise,
 .Sy 0
 is returned.
 .Sh INTERFACE STABILITY

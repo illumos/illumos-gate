@@ -31,7 +31,7 @@
 .Nm avl_remove ,
 .Nm avl_swap ,
 .Nm AVL_NEXT ,
-.Nm AVL_PREV ,
+.Nm AVL_PREV
 .Nd AVL tree routines
 .Sh DESCRIPTION
 AVL trees are a general purpose, self-balancing binary tree that can be
@@ -44,10 +44,10 @@ The AVL tree interfaces are identical in both userland and the kernel.
 For more general information on AVL trees, see
 .Xr libavl 3LIB .
 For more information on any of the funtions defined here, please see the
-corresponding manual page in section 3AVL. Please note, that while
-the descriptions in those manual pages are accurate for writers of
-Device Drivers, the examples provided use scaffolding not available in
-the kernel, such as the use of
+corresponding manual page in section 3AVL.
+Please note, that while the descriptions in those manual pages are accurate for
+writers of Device Drivers, the examples provided use scaffolding not available
+in the kernel, such as the use of
 .Fn malloc ,
 and need to be adapated.
 .Sh CONTEXT
@@ -62,7 +62,8 @@ in
 .Sy Committed
 .Sh MT-Safety
 AVL trees do not inherently have any internal locking, it is up to the
-consumer to use locks as appropriate. See
+consumer to use locks as appropriate.
+See
 .Xr mutex 9F
 and
 .Xr rwlock 9F

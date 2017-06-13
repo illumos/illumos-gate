@@ -47,8 +47,8 @@ option selects physical mode.
 In this mode, each line of output likewise describes one disk device; however,
 the fields provided indicate the base name of the device in the
 .Pa /dev/dsk
-directory, the disk's vendor and product identification strings, the serial number of the
-device, whether the device is faulty as diagnosed by
+directory, the disk's vendor and product identification strings, the serial
+number of the device, whether the device is faulty as diagnosed by
 .Xr fmd 1M ,
 whether the locate or identification indicator is on for the device
 .Pq if one is present ,
@@ -156,8 +156,8 @@ that report themselves as removable will be identified as such.
 .Pp
 This field is available only in default output mode.
 .It Sy SERIAL
-The serial number of the device. The entire serial number is reported if the
-device and its drivers provide it.
+The serial number of the device.
+The entire serial number is reported if the device and its drivers provide it.
 .Pp
 This field is available in compact and physical output modes.
 .It Sy SIZE

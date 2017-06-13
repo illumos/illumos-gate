@@ -34,34 +34,37 @@ function controls what the process
 should do on faults.
 .Pp
 A fault is a hardware event that occurs in the context of a running
-process and thread. A hardware fault may occur because an illegal
-instruction was executed, a breakpoint or watchpoint was encountered, or
-an arithmetic exception occurred, among others. The full list of faults
-is available in both
+process and thread.
+A hardware fault may occur because an illegal instruction was executed,
+a breakpoint or watchpoint was encountered, or an arithmetic exception occurred,
+among others.
+The full list of faults is available in both
 .Xr proc 4
 and
 .In sys/fault.h .
 .Pp
 For each hardware fault, a process may be configured to stop the thread
-that encountered it when it occurs. The value of the
+that encountered it when it occurs.
+The value of the
 .Fa stop
 parameter controls whether or not the listed fault in
 .Fa which
-will cause the thread to trap. A value of 1 indicates the thread
-should stop; a value of 0 indicates it should not.
+will cause the thread to trap.
+A value of 1 indicates the thread should stop; a value of 0 indicates it should
+not.
 .Pp
 The value of
 .Fa which
-indicates which hardware fault the change applies to. However, if the
-value of
+indicates which hardware fault the change applies to.
+However, if the value of
 .Fa which
 is zero, then it applies to all faults.
 .Pp
 The
 .Fn Pfault
-function only applies to actively running processes. It does not
-function on handles that refer to core files, zombie processes, or ELF
-objects.
+function only applies to actively running processes.
+It does not function on handles that refer to core files, zombie processes, or
+ELF objects.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Pfault
@@ -70,7 +73,8 @@ function returns the old disposition of the fault --
 if it was not set to stop and
 .Sy 1
 if it was --
-and the fault state is updated. Otherwise,
+and the fault state is updated.
+Otherwise,
 .Sy -1
 is returned,
 .Dv errno

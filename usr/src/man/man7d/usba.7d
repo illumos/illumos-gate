@@ -12,13 +12,13 @@
 .Nd illumos USB Architecture (USBA)
 .Sh DESCRIPTION
 USB provides a low-cost means for attaching peripheral devices, including
-mass-storage devices, keyboards, mice, and printers, to a system. For complete
-information on the USB architecture, visit the USB website at
+mass-storage devices, keyboards, mice, and printers, to a system.
+For complete information on the USB architecture, visit the USB website at
 http://www.usb.org.
 .Pp
-USBA supports 126 hot-pluggable USB devices per USB bus. The maximum data
-transfer rate is 5 Gbits (SuperSpeed USB 3.0), 480 Mbits (high speed USB
-2.0), 12 Mbits (full speed USB 1.x), or 1.5 Mbits (low speed USB 1.x).
+USBA supports 126 hot-pluggable USB devices per USB bus.
+The maximum data transfer rate is 5 Gbits (SuperSpeed USB 3.0), 480 Mbits (high
+speed USB 2.0), 12 Mbits (full speed USB 1.x), or 1.5 Mbits (low speed USB 1.x).
 .Pp
 USBA adheres to the
 .Em Universal Serial Bus 3.0
@@ -38,9 +38,11 @@ Devices without a driver may be able to leverage
 .Xr libusb 3LIB .
 .Sh FILES
 Listed below are drivers and modules which either utilize or are utilized by
-USBA. Drivers in
-.Pa /kernel/drv\
-are 32 bit drivers (x86 only). Drivers in
+USBA.
+Drivers in
+.Pa /kernel/drv
+are 32 bit drivers (x86 only).
+Drivers in
 .Pa /kernel/drv/sparcv9
 or
 .Pa kernel/drv/amd64
@@ -117,7 +119,8 @@ are 64 bit drivers.
 .El
 .Sh DIAGNOSTICS
 The messages described below may appear on the system console as well as being
-logged. All  messages are formatted in the following manner:
+logged.
+All  messages are formatted in the following manner:
 .Bl -tag -width Sy -offset 2n
 .It WARNING: Error message...
 .El
@@ -125,14 +128,17 @@ logged. All  messages are formatted in the following manner:
 .It Sy no driver found for device <device_name> (interface <number> node
 name=<node_name>)
 The installed software does not contain a supported driver for this
-hardware. <number> is the interface number.  <name> is either the device path name or the device name.
+hardware.
+<number> is the interface number.
+<name> is either the device path name or the device name.
 .It Sy Draining callbacks timed out!
-An internal error occurred.  Please reboot your system.  If this problem
-persists, contact your system vendor.
+An internal error occurred.
+Please reboot your system.
+If this problem persists, contact your system vendor.
 .El
 .Pp
-The following messages may be logged into the system log. They are formatted in
-the following manner:
+The following messages may be logged into the system log.
+They are formatted in the following manner:
 .Bd -literal -offset 2n
 <device path><usba<instance number>): message...
 .Ed

@@ -43,8 +43,8 @@ functions get and set the extended register state of the thread
 in the process handle
 .Fa P .
 .Pp
-The extended register state is defined by the architecture. These
-registers may refer to optional registers that have become common on the
+The extended register state is defined by the architecture.
+These registers may refer to optional registers that have become common on the
 platform, but are not part of the standard ABI and thus not covered by
 functions such as
 .Xr Plwp_getregs 3PROC
@@ -63,7 +63,8 @@ for the process handle
 .Fa P .
 .Pp
 Processes must be stopped prior to obtaining the register state of
-individual threads. Processes may be stopped with
+individual threads.
+Processes may be stopped with
 .Xr Pstop 3PROC .
 .Pp
 The
@@ -80,7 +81,8 @@ and
 .Fn Plwp_setxregs
 functions return
 .Sy 0
-and get or set the register state. Otherwise,
+and get or set the register state.
+Otherwise,
 .Sy -1
 is returned and
 .Sy errno

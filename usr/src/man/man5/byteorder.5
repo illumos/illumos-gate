@@ -20,11 +20,12 @@
 .Nd byte order and endianness
 .Sh DESCRIPTION
 Integer values which occupy more than 1 byte in memory can be laid out
-in different ways on different platforms. In particular, there is a
-major split between those which place the least significant byte of an
-integer at the lowest address, and those which place the most
-significant byte there instead. As this difference relates to which
-end of the integer is found in memory first, the term
+in different ways on different platforms.
+In particular, there is a major split between those which place the least
+significant byte of an integer at the lowest address, and those which place the
+most significant byte there instead.
+As this difference relates to which end of the integer is found in memory first,
+the term
 .Em endian
 is used to refer to a particular byte order.
 .Pp
@@ -33,24 +34,25 @@ A platform is referred to as using a
 byte order when it places the most significant byte at the lowest
 address, and
 .Em little-endian
-when it places the least significant byte first. Some platforms may also
-switch between big- and little-endian mode and run code compiled for
-either.
+when it places the least significant byte first.
+Some platforms may also switch between big- and little-endian mode and run code
+compiled for either.
 .Pp
 Historically, there have also been some systems that utilized
 .Em middle-endian
-byte orders for integers larger than 2 bytes. Such orderings are not in
-common use today.
+byte orders for integers larger than 2 bytes.
+Such orderings are not in common use today.
 .Pp
 Endianness is also of particular importance when dealing with values
-that are being read into memory from an external source. For example,
-network protocols such as IP conventionally define the fields in a
-packet as being always stored in big-endian byte order. This means that
-a little-endian machine will have to perform transformations on these
-fields in order to process them.
+that are being read into memory from an external source.
+For example, network protocols such as IP conventionally define the fields in a
+packet as being always stored in big-endian byte order.
+This means that a little-endian machine will have to perform transformations on
+these fields in order to process them.
 .Ss Examples
 To illustrate endianness in memory, let us consider the decimal integer
-2864434397. This number fits in 32 bits of storage (4 bytes).
+2864434397.
+This number fits in 32 bits of storage (4 bytes).
 .Pp
 On a big-endian system, this integer would be written into memory as
 the bytes 0xAA, 0xBB, 0xCC, 0xDD, in order from lowest memory address to
@@ -89,8 +91,8 @@ bytes).
 On a big-endian system, this would be written into memory as 0x12, then
 0x34.
 .Pp
-On a little-endian system, it would be written as 0x34, then 0x12.  Note
-that this is not at all the same as seeing 0x43 then 0x21 in memory --
+On a little-endian system, it would be written as 0x34, then 0x12.
+Note that this is not at all the same as seeing 0x43 then 0x21 in memory --
 only the bytes are re-ordered, not any bits (or nybbles) within them.
 .Pp
 As before, storing this at address 0x100:
@@ -135,15 +137,16 @@ discussing
 which is also known as
 .Em middle-endian .
 While the PDP-11 was a 16-bit little-endian system, it laid out 32-bit
-values in a different way from current little-endian systems. First, it
-would divide a 32-bit number into two 16-bit numbers. Each 16-bit number
-would be stored in little-endian; however, the two 16-bit words would be
-stored with the larger 16-bit word appearing first in memory, followed
-by the latter.
+values in a different way from current little-endian systems.
+First, it would divide a 32-bit number into two 16-bit numbers.
+Each 16-bit number would be stored in little-endian; however, the two 16-bit
+words would be stored with the larger 16-bit word appearing first in memory,
+followed by the latter.
 .Pp
 The following image illustrates PDP-endian and compares it against
-little-endian values. Here, we'll start with the value 0xAABBCCDD and
-show how the four bytes for it will be laid out, starting at 0x100.
+little-endian values.
+Here, we'll start with the value 0xAABBCCDD and show how the four bytes for it
+will be laid out, starting at 0x100.
 .Bd -literal
                     PDP-Endian
 
@@ -162,16 +165,17 @@ show how the four bytes for it will be laid out, starting at 0x100.
 .Ed
 .Ss Network Byte Order
 The term 'network byte order' refers to big-endian ordering, and
-originates from the IEEE. Early disagreements over which byte ordering
-to use for network traffic prompted RFC1700 to define that all
-IETF-specified network protocols use big-endian ordering unless noted
-explicitly otherwise. The Internet protocol family (IP, and thus TCP and
-UDP etc) particularly adhere to this convention.
+originates from the IEEE.
+Early disagreements over which byte ordering to use for network traffic prompted
+RFC1700 to define that all IETF-specified network protocols use big-endian
+ordering unless noted explicitly otherwise.
+The Internet protocol family (IP, and thus TCP and UDP etc) particularly adhere
+to this convention.
 .Ss Determining the System's Byte Order
-The operating system supports both big-endian and little-endian CPUs. To
-make it easier for programs to determine the endianness of the
-platform they are being compiled for, functions and macro constants are
-provided in the system header files.
+The operating system supports both big-endian and little-endian CPUs.
+To make it easier for programs to determine the endianness of the platform they
+are being compiled for, functions and macro constants are provided in the system
+header files.
 .Pp
 The endianness of the system can be obtained by including the header
 .In sys/types.h
@@ -186,16 +190,18 @@ for more information.
 Additionally, the header
 .In endian.h
 defines an alternative means for determining the endianness of the
-current system. See
+current system.
+See
 .Xr endian.h 3HEAD
 for more information.
 .Pp
-illumos runs on both big- and little-endian systems. When writing
-software for which the endianness is important, one must always check
-the byte order and convert it appropriately.
+illumos runs on both big- and little-endian systems.
+When writing software for which the endianness is important, one must always
+check the byte order and convert it appropriately.
 .Ss Converting Between Byte Orders
 The system provides two different sets of functions to convert values
-between big-endian and little-endian. They are defined in
+between big-endian and little-endian.
+They are defined in
 .Xr byteorder 3C
 and
 .Xr endian 3C .
@@ -215,23 +221,24 @@ For example, to convert a 32-bit value, a long, from network byte order
 to the host's, one would use the function
 .Xr ntohl 3SOCKET .
 .Pp
-These functions have been standardized by POSIX. However, the 64-bit variants,
+These functions have been standardized by POSIX.
+However, the 64-bit variants,
 .Xr ntohll 3SOCKET
 and
 .Xr htonll 3SOCKET
-are not standardized and may not be found on other systems. For more
-information on these functions, see
+are not standardized and may not be found on other systems.
+For more information on these functions, see
 .Xr byteorder 3SOCKET .
 .Pp
 The second family of functions,
 .Xr endian 3C ,
 provide a means to convert between the host's byte order
-and big-endian and little-endian specifically. While these functions are
-similar to those in
+and big-endian and little-endian specifically.
+While these functions are similar to those in
 .Xr byteorder 3C ,
-they more explicitly cover different data conversions. Like them, these
-functions operate on either 16-bit, 32-bit, or 64-bit values. When
-converting from big-endian, to the host's endianness, the functions
+they more explicitly cover different data conversions.
+Like them, these functions operate on either 16-bit, 32-bit, or 64-bit values.
+When converting from big-endian, to the host's endianness, the functions
 begin with
 .Sy betoh .
 If instead, one is converting data from the host's native endianness to
@@ -244,16 +251,15 @@ and
 convert little-endian data to the host's endianness and from the host's
 to little-endian respectively.
 .Pp
-These functions
-are not standardized and the header they appear in varies between the
-BSDs and GNU/Linux. Applications that wish to be portable, should
-instead use the
+These functions are not standardized and the header they appear in varies
+between the BSDs and GNU/Linux.
+Applications that wish to be portable, shoulda instead use the
 .Xr byteorder 3C
 functions.
 .Pp
 All of these functions in both families simply return their input when
-the host's native byte order is the same as the desired order. For
-example, when calling
+the host's native byte order is the same as the desired order.
+For example, when calling
 .Xr htonl 3SOCKET
 on a big-endian system the original data is returned with no conversion
 or modification.

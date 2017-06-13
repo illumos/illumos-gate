@@ -31,10 +31,10 @@ function walks the process arguments of the
 .Fa psp
 structure (the
 .Sy pr_psargs
-member) converting unprintable characters into spaces. The conversion
-continues until a null character is encountered. Note, this routine only
-will correctly handle 7-bit ASCII characters. Characters in other
-encodings, e.g. UTF-8, may be misinterpreted as unprintable.
+member) converting unprintable characters into spaces.
+The conversion continues until a null character is encountered.
+Note, this routine only will correctly handle 7-bit ASCII characters.
+Characters in other encodings, e.g. UTF-8, may be misinterpreted as unprintable.
 .Sh INTERFACE STABILITY
 .Sy Uncommitted
 .Sh MT-LEVEL

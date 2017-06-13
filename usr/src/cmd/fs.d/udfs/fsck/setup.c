@@ -25,8 +25,6 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	DKTYPENAMES
 #include <stdio.h>
 #include <stdlib.h>
@@ -210,7 +208,7 @@ restat:
 		fswritefd = -1;
 		if (preen && !debug)
 			pfatal(gettext("(NO WRITE ACCESS)\n"));
-			(void) printf(gettext(" (NO WRITE)"));
+		(void) printf(gettext(" (NO WRITE)"));
 	}
 	if (preen == 0)
 		(void) printf("\n");

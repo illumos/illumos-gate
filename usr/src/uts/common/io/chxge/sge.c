@@ -30,8 +30,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/cmn_err.h>
@@ -237,11 +235,12 @@ t1_espi_workaround(ch_t *adapter)
 		seop = t1_espi_get_mon(adapter, 0x930, 0);
 		if ((seop & 0xfff0fff) == 0xfff) {
 			/* after first arp */
-			if (sge->pskb)
+			if (sge->pskb) {
 				rv = pe_start(adapter, (mblk_t *)sge->pskb,
 				    CH_ARP);
 				if (!rv)
 					sge->intr_cnt.arp_sent++;
+			}
 		}
 	}
 #ifdef HOST_PAUSE
@@ -301,7 +300,7 @@ uint32_t sge_cmdq_send_fail;
 
 int
 sge_data_out(pesge* sge, int qid, mblk_t *m0,
-			cmdQ_ce_t *cmp, int count, uint32_t flg)
+    cmdQ_ce_t *cmp, int count, uint32_t flg)
 {
 	struct cmdQ *Q = &sge->cmdQ[qid];
 	ddi_dma_handle_t dh = (ddi_dma_handle_t)sge->cmdQ[qid].cq_dh;
@@ -915,13 +914,12 @@ t1_sge_rx(pesge *sge, struct freelQ *Q, unsigned int len, unsigned int offload)
 		if (likely(toe_running(adapter))) {
 			/* sends pkt upstream to toe layer */
 			if (useit) {
-				if (sz == SGE_SM_BUF_SZ(adapter)) {
-					atomic_add(1,
-					&buffers_in_use[adapter->ch_sm_index]);
-				} else {
-					atomic_add(1,
-					&buffers_in_use[adapter->ch_big_index]);
-				}
+				uint_t index;
+				if (sz == SGE_SM_BUF_SZ(adapter))
+					index = adapter->ch_sm_index;
+				else
+					index = adapter->ch_big_index;
+				atomic_add(1, &buffers_in_use[index]);
 			}
 			if (adapter->toe_rcv)
 				adapter->toe_rcv(adapter->ch_toeinst, skb);

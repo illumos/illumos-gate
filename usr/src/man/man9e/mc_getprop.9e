@@ -75,8 +75,8 @@ the value in
 is sufficient for the property, comparing it to the minimum size
 listed for the property in
 .Xr mac 9E .
-If it is not, then it should return an error. Otherwise, it should copy
-the property's value into
+If it is not, then it should return an error.
+Otherwise, it should copy the property's value into
 .Fa pr_val .
 When an unknown or unsupported
 property is encountered, generally the
@@ -85,25 +85,25 @@ case of the switch statement, the device driver should return an error.
 .Pp
 The special property
 .Sy MAC_PROP_PRIVATE
-indicates that this is a device driver specific private property. The
-device driver must then look at the value of the
+indicates that this is a device driver specific private property.
+The device driver must then look at the value of the
 .Fa pr_name
 argument and use
 .Xr strcmp 9F
 on it, comparing it to each of its private (bounded-size) properties to
 identify which one it is.
 .Pp
-At this time, private properties are limited to being string based
-properties. If other types of property values are used, they will not be
-rendered correctly by
+At this time, private properties are limited to being string based properties.
+If other types of property values are used, they will not be rendered
+correctly by
 .Xr dladm 1M .
 .Pp
 The device
 driver can access its device soft state by casting the
 .Fa device
-pointer to the appropriate structure. As this may be called while other
-operations are ongoing, the device driver should employ the appropriate
-locking while reading the properties.
+pointer to the appropriate structure.
+As this may be called while other operations are ongoing, the device driver
+should employ the appropriate locking while reading the properties.
 .Sh CONTEXT
 The
 .Fn mc_getprop
@@ -217,9 +217,9 @@ example_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 }
 .Ed
 .Sh ERRORS
-The device driver may return one of the following errors. While this list
-is not intended to be exhaustive, it is recommended to use one of these
-if possible.
+The device driver may return one of the following errors.
+While this list is not intended to be exhaustive, it is recommended to use one
+of these if possible.
 .Bl -tag -width Er
 .It Er ENOTSUP
 This error should be used whenever an unknown or unsupported property is

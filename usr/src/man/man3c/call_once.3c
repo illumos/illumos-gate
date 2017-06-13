@@ -29,7 +29,8 @@
 The
 .Fn call_once
 function is used to ensure that an operation occurs only once, even
-across multiple threads. Each instance of a properly initialized
+across multiple threads.
+Each instance of a properly initialized
 .Ft once_flag
 can be pased to the
 .Ft call_once
@@ -38,10 +39,11 @@ specified function,
 .Fa func .
 This ensures that the argument
 .Fa func
-is called only once. Note, the argument
+is called only once.
+Note, the argument
 .Fa once
-is the only thing used as a point of synchronization. If multiple
-callers use the same pointer for
+is the only thing used as a point of synchronization.
+If multiple callers use the same pointer for
 .Fa once ,
 but use different values for
 .Fa func ,
@@ -73,7 +75,8 @@ had not completed successfully.
 .Sh RETURN VALUES
 The
 .Fn call_once
-function does not return any values. Upon its completion, it is guaranteed that
+function does not return any values.
+Upon its completion, it is guaranteed that
 .Fa func
 will have been called at most once across the liftime of the
 .Fa once

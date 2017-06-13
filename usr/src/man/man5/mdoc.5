@@ -374,8 +374,8 @@ This often contains snippets of well-formed, well-tested invocations.
 Make sure that examples work properly!
 .It Em DIAGNOSTICS
 Documents error and diagnostic messages displayed to the user or
-sent to logs. Note that exit
-status and return values should be documented in the
+sent to logs.
+Note that exit status and return values should be documented in the
 .Em EXIT STATUS
 and
 .Em RETURN VALUES
@@ -394,100 +394,113 @@ This section is usually absent, but will be present when the
 interface is specific to one or more architectures.
 .It Em CODE SET INDEPENDENCE
 Indicates whether the interface operates correctly with various different
-code sets.  True independent code sets will support not only ASCII and
-Extended UNIX Codesets (EUC), but also other multi-byte encodings such as
-UTF-8 and GB2312.
+code sets.
+True independent code sets will support not only ASCII and Extended UNIX
+Codesets (EUC), but also other multi-byte encodings such as UTF-8 and GB2312.
 .Pp
-Generally there will be some limitations that are fairly standard.  See
-.Xr standards 5 for more information about some of these.  Most interfaces
-should support at least UTF-8 in addition to ASCII.
+Generally there will be some limitations that are fairly standard.
+See
+.Xr standards 5
+for more information about some of these.
+Most interfaces should support at least UTF-8 in addition to ASCII.
 .It Em INTERFACE STABILITY
-Indicates the level of commitment to the interface. Interfaces can be described
-with in the following ways:
+Indicates the level of commitment to the interface.
+Interfaces can be described with in the following ways:
 .Bl -tag -width Ds
 .It Nm Standard
 Indicates that the interface is defined by one or more standards bodies.
 Generally, changes to the interface will be carefully managed to conform
-to the relevant standards.  These interfaces are generally the most suitable
-for use in portable programs.
+to the relevant standards.
+These interfaces are generally the most suitable for use in portable programs.
 .It Nm Committed
 Indicates that the interface is intended to be preserved for the long-haul, and
 will rarely, if ever change, and never without notification (barring
-extraordinary and extenuating circumstances). These interfaces are
-preferred over other interfaces with the exeception of
+extraordinary and extenuating circumstances).
+These interfaces are preferred over other interfaces with the exeception of
 .Nm Standard
 interfaces.
 .It Nm Uncommitted
-Indicates that the interface may change.  Generally, changes to these interfaces
-should be infrequent, and some effort will be made to address compatibility
-considerations when changing or removing such interfaces.  However, there is
-no firm commitment to the preservation of the interface.  Most often this
-is applied to interfaces where operational experience with the interface
-is still limited and some need to change may be anticipated.
+Indicates that the interface may change.
+Generally, changes to these interfaces should be infrequent, and some effort
+will be made to address compatibility considerations when changing or removing
+such interfaces.
+However, there is no firm commitment to the preservation of the interface.
+Most often this is applied to interfaces where operational experience with the
+interface is still limited and some need to change may be anticipated.
 .Pp
 Consumers should expect to revalidate any
 .Nm Uncommitted
-interfaces when crossing release boundaries.  Products intended for
-use on many releases or intended to support compatibility with future
-releases should avoid these interfaces.
+interfaces when crossing release boundaries.
+Products intended for use on many releases or intended to support compatibility
+with future releases should avoid these interfaces.
 .It Nm Volatile
-The interface can change at any time for any reason. Often this relates to
-interfaces that are part of external software components that are still evolving
-rapidly.  Consumers should not expect that the interface (either binary or
-source level) will be unchanged from one release to the next.
+The interface can change at any time for any reason.
+Often this relates to interfaces that are part of external software components
+that are still evolving rapidly.
+Consumers should not expect that the interface (either binary or source level)
+will be unchanged from one release to the next.
 .It Nm Not-an-Interface
 Describes something that is specifically not intended for programmatic
-consumption.  For example, specific human-readable output, or the layout
-of graphical items on a user interface, may be described this way.  Generally
-programmatic alternatives to these will be available, and should be used
-when programmatic consumption is needed.
+consumption.
+For example, specific human-readable output, or the layout of graphical items on
+a user interface, may be described this way.
+Generally programmatic alternatives to these will be available, and should be
+used when programmatic consumption is needed.
 .It Nm Private
-This is an internal interface.  Generally these interfaces should only be
-used within the project, and should not be used by other programs or modules.
-The interface can and will change without notice as the project needs, at
-any time.
+This is an internal interface.
+Generally these interfaces should only be used within the project, and should
+not be used by other programs or modules.
+The interface can and will change without notice as the project needs, at any
+time.
 .Pp
 Most often, Private interfaces will lack any documentation whatsoever, and
 generally any undocumented interface can be assumed to be Private.
 .It Nm Obsolete
 The interface is not intended for use in new projects or programs, and may
-be removed at a future date.  The
+be removed at a future date.
+The
 .Nm Obsolete
 word is a modifier that can
-be applied to other commitment levels. For example an
+be applied to other commitment levels.
+For example an
 .Nm Obsolete Committed
 interface is unlikely to be removed or changed, but nonetheless new use
 is discouraged (perhaps a better newer alternative is present).
 .El
 .It Em MT-LEVEL
 This section describes considerations for the interface when used within
-programs that use multiple threads.  More discussion of these considerations
-is made in the MT-Level section of
+programs that use multiple threads.
+More discussion of these considerations is made in the MT-Level section of
 .Xr attributes 5 .
 The interface can be described in the following ways.
 .Bl -tag -width Ds
 .It Nm Safe
-Indicates the interface is safe for use within multiple threads.  There
-may be additional caveats that apply, in which case those will be
-described.  Note that some interfaces have semantics which may affect
-other threads, but these should be an intrinsic part of the interface
-rather than an unexpected side effect.  For example, closing a file in
-one thread will cause that file to be closed in all threads.
+Indicates the interface is safe for use within multiple threads.
+There may be additional caveats that apply, in which case those will be
+described.
+Note that some interfaces have semantics which may affect other threads, but
+these should be an intrinsic part of the interface rather than an unexpected
+side effect.
+For example, closing a file in one thread will cause that file to be closed in
+all threads.
 .It Nm Unsafe
 Indicates the interface is unsuitable for concurrent use within multiple
-threads.  A threaded application may still make use of the interface, but
-will be required to provide external synchronization means to ensure that
-only a single thread calls the interface at a time.
+threads.
+A threaded application may still make use of the interface, but will be required
+to provide external synchronization means to ensure that only a single thread
+calls the interface at a time.
 .It Nm MT-Safe
 Indicates that the interface is not only safe for concurrent use, but is
-designed for such use.  For example, a
+designed for such use.
+For example, a
 .Nm Safe
 interface may make use of a global lock to provide safety, but at reduced
 internal concurrency, whereas an
 .Nm MT-Safe
 interface will be designed to be efficient even when used concurrently.
 .It Nm Async-Signal-Safe
-Indicates that the library is safe for use within a signal handler.  An
+Indicates that the library is safe for use within a signal handler.
+An
 .Nm MT-Safe
 interface can be made
 .Nm Async-Signal-Safe
@@ -1261,7 +1274,8 @@ See also
 and
 .Sx \&Ox .
 .Ss \&Cd
-Kernel configuration declaration.  It is found in pages for
+Kernel configuration declaration.
+It is found in pages for
 .Bx
 and not used here.
 .Pp

@@ -36,7 +36,8 @@ Up to
 .Fa ngroups
 supplemental groups will be read and written into
 .Fa credp
-in addition to the normal information. If
+in addition to the normal information.
+If
 .Fa ngroups
 is more than one, than it is up to the caller to have allocated enough
 space for

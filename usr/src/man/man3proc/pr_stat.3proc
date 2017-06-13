@@ -16,7 +16,7 @@
 .Os
 .Sh NAME
 .Nm pr_fstat ,
-.Nm pr_fstat64
+.Nm pr_fstat64 ,
 .Nm pr_lstat ,
 .Nm pr_lstat64 ,
 .Nm pr_stat ,
@@ -133,9 +133,9 @@ The
 .Fn pr_lstat ,
 and
 .Fn pr_fstat
-functions only work on active processes. Process handles that correspond
-to core files, zombie processes, or ELF objects do not support system
-call injection.
+functions only work on active processes.
+Process handles that correspond to core files, zombie processes, or ELF objects
+do not support system call injection.
 .Pp
 The
 .Fn pr_stat64 ,
@@ -147,9 +147,9 @@ functions are equivalent to
 .Fn pr_fstat ,
 and
 .Fn pr_lstat
-respectively; however, rather than having the stat information be
-subject to the data model of the target process, they always provide
-64-bit stat information. See
+respectively; however, rather than having the stat information be subject to the
+data model of the target process, they always provide 64-bit stat information.
+See
 .Xr lf64 5
 for more information.
 .Sh RETURN VALUES

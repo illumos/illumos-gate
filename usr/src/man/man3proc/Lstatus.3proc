@@ -38,7 +38,8 @@ of its stack, its user and system time, and more.
 .Pp
 The returned pointer is only valid as long as the thread handle
 .Fa L
-is valid. After a call to
+is valid.
+After a call to
 .Xr Ltree 3PROC ,
 the returned data pointer is invalid.
 .Sh RETURN VALUES

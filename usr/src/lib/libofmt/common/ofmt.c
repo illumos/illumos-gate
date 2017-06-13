@@ -182,9 +182,9 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 	uint_t		i, j, of_index;
 	const ofmt_field_t *ofp;
 	ofmt_field_t	*of;
-	ofmt_state_t	*os;
+	ofmt_state_t	*os = NULL;
 	int		nfields = 0;
-	ofmt_status_t	err = OFMT_SUCCESS;
+	ofmt_status_t	error = OFMT_SUCCESS;
 	boolean_t	parsable = (flags & OFMT_PARSABLE);
 	boolean_t	wrap = (flags & OFMT_WRAP);
 	boolean_t	multiline = (flags & OFMT_MULTILINE);
@@ -247,7 +247,7 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 		if (j == nfields) {
 			int nbad = os->os_nbad++;
 
-			err = OFMT_EBADFIELDS;
+			error = OFMT_EBADFIELDS;
 			if (os->os_badfields == NULL) {
 				os->os_badfields = malloc(sp->s_nfields *
 				    sizeof (char *));
@@ -277,14 +277,14 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 		return (OFMT_ENOFIELDS);
 	os->os_nfields = of_index; /* actual number of fields printed */
 	ofmt_update_winsize(*ofmt);
-	return (err);
+	return (error);
 nomem:
-	err = OFMT_ENOMEM;
+	error = OFMT_ENOMEM;
 	if (os != NULL)
 		ofmt_close(os);
 	*ofmt = NULL;
 	splitfree(sp);
-	return (err);
+	return (error);
 }
 
 /*
@@ -537,7 +537,8 @@ ofmt_update_winsize(ofmt_handle_t ofmt)
  * Return error diagnostics using the information in the ofmt_handle_t
  */
 char *
-ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t err, char *buf, uint_t bufsize)
+ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t error, char *buf,
+    uint_t bufsize)
 {
 	ofmt_state_t *os = ofmt;
 	int i;
@@ -551,7 +552,7 @@ ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t err, char *buf, uint_t bufsize)
 	 */
 	ebuf[0] = '\0';
 
-	switch (err) {
+	switch (error) {
 	case OFMT_SUCCESS:
 		s = "success";
 		break;
@@ -604,7 +605,7 @@ ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t err, char *buf, uint_t bufsize)
 	default:
 		(void) snprintf(buf, bufsize,
 		    dgettext(TEXT_DOMAIN, "unknown ofmt error (%d)"),
-		    err);
+		    error);
 		return (buf);
 	}
 	(void) snprintf(buf, bufsize, dgettext(TEXT_DOMAIN, s));

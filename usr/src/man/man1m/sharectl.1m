@@ -45,9 +45,10 @@
 .Sh DESCRIPTION
 The
 .Nm
-command operates on file sharing services. The command sets the client and
-server operational properties, takes and restores configuration snapshots, and
-gets status of the protocol service. Currently supported services are
+command operates on file sharing services.
+The command sets the client and server operational properties, takes and
+restores configuration snapshots, and gets status of the protocol service.
+Currently supported services are
 .Xr autofs 4 ,
 .Xr nfs 4 ,
 .Xr smb 4
@@ -64,9 +65,11 @@ authorizations, see appropriate sharing protocol man page.
 The following options are supported where applicable:
 .Bl -tag -width Ds
 .It Fl h
-Displays usage message. Supported for all subcommands.
+Displays usage message.
+Supported for all subcommands.
 .It Fl p Ar property Ns Op = Ns Ar value
-Specifies a property. See
+Specifies a property.
+See
 .Sx Subcommands ,
 below.
 .El
@@ -79,8 +82,8 @@ supports the subcommands described below:
 .Cm delsect
 .Ar section protocol
 .Xc
-Delete configuration section for the specified protocol. Currently only protocol
-that has configuration sections is
+Delete configuration section for the specified protocol.
+Currently only protocol that has configuration sections is
 .Nm smbfs
 .Po see
 .Xr nsmbrc 4
@@ -93,12 +96,14 @@ and
 .Oo Fl p Ar property Oc Ns ...
 .Ar protocol
 .Xc
-Get the property values for the specified protocol. If no
+Get the property values for the specified protocol.
+If no
 .Fl p
-option is provided, get all the properties for the specified protocol. For NFS,
-properties correspond to entries in the
+option is provided, get all the properties for the specified protocol.
+For NFS, properties correspond to entries in the
 .Pa /etc/default/nfs
-file. See
+file.
+See
 .Xr nfs 4 .
 .It Xo
 .Nm
@@ -192,7 +197,8 @@ The following command shows how an authorized user can use the
 .Nm sharectl Cm get
 command to view the global settings for
 .Nm smbfs
-in the SMF. The values shown are those set by the previous example.
+in the SMF.
+The values shown are those set by the previous example.
 .Bd -literal
 # sharectl get smbfs
 [default]

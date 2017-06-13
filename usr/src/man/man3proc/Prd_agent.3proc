@@ -43,8 +43,8 @@ is released through a call to
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Prd_agent
-function returns a pointer to the librtld_db agent. Otherwise, it
-returns
+function returns a pointer to the librtld_db agent.
+Otherwise, it returns
 .Dv NULL
 to indicate failure.
 .Sh INTERFACE STABILITY

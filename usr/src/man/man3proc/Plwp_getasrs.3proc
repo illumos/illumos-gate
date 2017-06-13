@@ -46,14 +46,16 @@ in the process handle
 .Pp
 The ancillary state registers are only present on 64-bit
 .Sy SPARCv9
-processes. They contain information that is specific to the platform and
-are not included in the information obtained through functions such as
+processes.
+They contain information that is specific to the platform and are not included
+in the information obtained through functions such as
 .Xr Plwp_getregs 3PROC ,
 .Xr Plwp_getfpregs 3PROC ,
 and
 .Xr Plwp_getxregs 3PROC .
 .Pp
-The Plwp_getasrs
+The
+.Fn Plwp_getasrs
 function reads the ancillary registers into
 .Fa asrs ,
 while the
@@ -62,7 +64,8 @@ sets the thread's ancillary registers to the values provided by
 .Fa asrs .
 .Pp
 Processes should be stopped prior to obtaining the register state of
-individual threads. Processes may be stopped with
+individual threads.
+Processes may be stopped with
 .Xr Pstop 3PROC .
 .Pp
 The
@@ -79,7 +82,8 @@ and
 .Fn Plwp_setasrs
 functions return
 .Sy 0
-and get or set the register state. Otherwise,
+and get or set the register state.
+Otherwise,
 .Sy -1
 is returned and
 .Sy errno

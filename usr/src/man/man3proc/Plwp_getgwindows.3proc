@@ -42,7 +42,8 @@ function returns
 .Sy 0
 and
 .Fa gwins
-is filled in with information about the windows. Otherwise,
+is filled in with information about the windows.
+Otherwise,
 .Sy -1
 is returned and
 .Sy errno

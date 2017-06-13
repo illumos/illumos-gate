@@ -33,32 +33,34 @@ function moves the process handle
 into the zone specified by
 .Fa zoneid .
 A process that is in the non-global zone may only move between the
-global zone and its original zone. A process that is in the global zone
-may not use this interface to enter a non-global zone. This function
-will fail if called from a non-global zone. This function only
-manipulates the processes credentials.
+global zone and its original zone.
+A process that is in the global zone may not use this interface to enter a
+non-global zone.
+This function will fail if called from a non-global zone.
+This function only manipulates the processes credentials.
 .Pp
 Care should be taken when moving a process around temporarily, such that
 if the process that is manipulating
 .Fa P
 dies, it does not cause
 .Fa P
-to resume running while still in the global zone. It is suggested that
-the
+to resume running while still in the global zone.
+It is suggested that the
 .Sy PR_KLC
 flag is set with
 .Xr Psetflags 3PROC
 which will cause the process to terminate if the process that holds
 .Fa P
-unexpectedly terminates. See
+unexpectedly terminates.
+See
 .Xr proc 4
 for more information on the
 .Sy PR_KLC
 flag.
 .Pp
-Note, only active processes may change their zone. It is an error to
-call this function on process handles that correspond to core files,
-zombie processes, or files.
+Note, only active processes may change their zone.
+It is an error to call this function on process handles that correspond to core
+files, zombie processes, or files.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Psetzoneid

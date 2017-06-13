@@ -54,18 +54,19 @@ identifier, the TLS module ID, and the address of various sections.
 The pointer to the data returned by the library will only be valid for
 as long as the handle
 .Fa P
-is valid. Any calls to
+is valid.
+Any calls to
 .Xr Prelease 3PROC
 will invalidate the data.
 .Pp
 The
 .Fn Paddr_to_loadobj
-function attempts to find the loaded object information, if any, that exists for the
-address
+function attempts to find the loaded object information, if any, that exists for
+the address
 .Fa addr .
 Not all address correspond to memory regions that were loaded by the
-run-time link-editor. For example, if a user creates a region of
-anonymous memory through the
+run-time link-editor.
+For example, if a user creates a region of anonymous memory through the
 .Xr mmap 2
 function, then it will not have any corresponding loaded module.
 .Pp
@@ -73,8 +74,9 @@ The
 .Fn Pname_to_loadobj
 function looks up the object named
 .Fa name
-and returns the corresponding loaded object information. Two special
-values may be used for name. The macro
+and returns the corresponding loaded object information.
+Two special values may be used for name.
+The macro
 .Dv PR_OBJ_EXEC
 refers to the executable object itself and the macro
 .Dv PR_OBJ_LDSO refers to the object ld.so.1 .
@@ -87,7 +89,8 @@ It allows the use of a link-map identifier,
 .Fa lmid ,
 which constricts the search of the object named with
 .Fa name
-to that link-map. The special value of
+to that link-map.
+The special value of
 .Dv PR_LMID_EVERY
 may be passed to indicate that every link-map should be searched, which
 is equivalent in behavior to the

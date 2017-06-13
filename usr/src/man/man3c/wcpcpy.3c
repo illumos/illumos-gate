@@ -48,7 +48,8 @@ of
 .Fn wcpncpy ,
 after
 .Fa n
-wide-characters have been copied. If
+wide-characters have been copied.
+If
 .Fa ws2
 contains fewer than
 .Fa n
@@ -89,8 +90,8 @@ The
 .Fn wcpcpy
 and
 .Fn wcpncpy
-functions return a pointer to the last wide-character written.  In the
-case of
+functions return a pointer to the last wide-character written.
+In the case of
 .Fn wcpncpy
 this will always be equal to
 .Po Fa ws1 Li + Fa n Li \(mi 1 Pc .

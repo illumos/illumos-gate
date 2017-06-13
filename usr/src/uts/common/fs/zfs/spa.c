@@ -5490,7 +5490,8 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		if (vd == NULL || unspare) {
 			if (vd == NULL)
 				vd = spa_lookup_by_guid(spa, guid, B_TRUE);
-			ev = spa_event_create(spa, vd, NULL, ESC_ZFS_VDEV_REMOVE_AUX);
+			ev = spa_event_create(spa, vd, NULL,
+			    ESC_ZFS_VDEV_REMOVE_AUX);
 			spa_vdev_remove_aux(spa->spa_spares.sav_config,
 			    ZPOOL_CONFIG_SPARES, spares, nspares, nv);
 			spa_load_spares(spa);

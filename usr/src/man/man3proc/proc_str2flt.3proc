@@ -63,7 +63,8 @@ and update
 .Fa signum ,
 and
 .Fa sysnum
-respectively. Otherwise,
+respectively.
+Otherwise,
 .Sy -1
 is returned to indicate that a conversion could not take place.
 .Sh INTERFACE STABILITY

@@ -26,10 +26,12 @@ illumos DDI Specific
 The
 .Sy usb_ep_ss_comp_descr_t
 structure defines additional endpoint attributes for USB 3.0 and newer
-devices. This structure is considered a
+devices.
+This structure is considered a
 .Em companion descriptor .
-On its own, it does not uniquely define an endpoint. A standard USB
-descriptor is still required. See
+On its own, it does not uniquely define an endpoint.
+A standard USB descriptor is still required.
+See
 .Xr usb_ep_descr 9S
 for the definition of the standard descriptor.
 .Pp
@@ -37,7 +39,8 @@ If available, the SuperSpeed companion descriptor can be accessed by
 getting the endpoint data through a call to
 .Xr usb_lookup_ep_data 9F .
 These descriptors are required to open pipes for USB 3.0 and newer
-devices. They can be assembled into the proper format for
+devices.
+They can be assembled into the proper format for
 .Xr usb_pipe_xopen 9F
 by calling
 .Xr usb_ep_xdescr_fill 9F .
@@ -67,15 +70,16 @@ whose value is 0x30.
 The
 .Sy bMaxBurst
 member indicates the maximum number of packets that the endpoint can
-send in one 'burst'. Valid values range from 0 to 15 and the values are
-one less than the number of packets. A value of 0 indicates that 1
-packet can be sent in a burst. A value of 15 indicates that 16 packets
-can be sent in a burst.
+send in one 'burst'.
+Valid values range from 0 to 15 and the values are one less than the number of
+packets.
+A value of 0 indicates that 1 packet can be sent in a burst.
+A value of 15 indicates that 16 packets can be sent in a burst.
 .Pp
 The
 .Sy bmAttributes
-member indicates different attributes of the endpoint. This member is
-reserved and should be zero for
+member indicates different attributes of the endpoint.
+This member is reserved and should be zero for
 .Sy control
 and
 .Sy interrupt
@@ -86,11 +90,14 @@ For a
 endpoint, the
 .Sy bmAttributes
 member is used to indicate the maximum number of streams that the device
-supports. The first five bits (4:0) are used, the remaining 3 bits are
-reserved and should be zero. Values range from 0 to 16.  A value of zero
-indicates that streams are not supported. Otherwise, it indicates that
-the device supports 2 raised to the value number of streams. A value of
-3, indicates 2^3 streams are supported.
+supports.
+The first five bits (4:0) are used, the remaining 3 bits are reserved and should
+be zero.
+Values range from 0 to 16.
+A value of zero indicates that streams are not supported.
+Otherwise, it indicates that the device supports 2 raised to the value number of
+streams.
+A value of 3, indicates 2^3 streams are supported.
 .Pp
 For an
 .Sy isochronous
@@ -99,14 +106,15 @@ endpoint, the
 member is used to indicate the value of the
 .Sy Mult
 property, a value used to calculate the maximum number of packets the
-device and receive in a service interval. The first two bits (1:0) are
-used to determine the mult. The remaining 6 bits (7:2) are reserved and
-should be set to zero.
+device and receive in a service interval.
+The first two bits (1:0) are used to determine the mult.
+The remaining 6 bits (7:2) are reserved and should be set to zero.
 .Pp
 The
 .Sy wBytesPerInterval
 member is used to indicate the total number of bytes that can be
-transferred in one service interval. Note, this is only valid for
+transferred in one service interval.
+Note, this is only valid for
 .Sy Isochronous
 and
 .Sy Interrupt IN

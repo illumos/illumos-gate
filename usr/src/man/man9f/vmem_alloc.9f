@@ -65,19 +65,22 @@ There are two meaningful groups of flags.
 .Dv VM_SLEEP
 or
 .Dv VM_NOSLEEP
-must be specified, and indicate whether the allocation may block.  A
+must be specified, and indicate whether the allocation may block.
+A
 .Dv VM_SLEEP
 allocation can never fail but may block indefinitely.
 .Pp
 The allocation policy may be specified by one of the following flags:
 .Bl -tag -width Ds
 .It Dv VM_BESTFIT
-Take the segment from the smallest free segment that could satisfy this allocation.
+Take the segment from the smallest free segment that could satisfy this
+allocation.
 .It Dv VM_FIRSTFIT
 Take the segment from the first free segment found that could satisfy this
 allocation.
 .It Dv VM_NEXTFIT
-Take the segment from the segment after the one previously allocated.  This
+Take the segment from the segment after the one previously allocated.
+This
 provides sequential behaviour useful when allocating identifiers from a
 .Dv VMC_IDENTIFIER
 arena.
@@ -95,8 +98,8 @@ an approximation of
 .Dv VM_BESTFIT
 in guaranteed constant time.
 .It Fa align_arg
-The minimum alignment of the allocation.  If 0,
-the allocated segment will be aligned as the arena's quantum.
+The minimum alignment of the allocation.
+If 0, the allocated segment will be aligned as the arena's quantum.
 .It Fa phase
 The allocated segment must be
 .Fa phase
@@ -150,8 +153,8 @@ Upon successful completion the
 .Fn vmem_alloc
 and
 .Fn vmem_xalloc
-functions return a pointer to the beginning of the allocated segment.  In the
-case of a
+functions return a pointer to the beginning of the allocated segment.
+In the case of a
 .Dv VMC_IDENTIFIER
 arena, the address of this pointer is the meaningful component, not the value
 to which it points.

@@ -31,7 +31,8 @@ The
 function adds a watchpoint to the process handle
 .Fa P .
 Allowing the hardware to generate a trap when the specified area is
-accessed. The watchpoint's parameters are described in
+accessed.
+The watchpoint's parameters are described in
 .Fa wp .
 For more information on watchpoints and the
 .Sy prwatch_t
@@ -42,9 +43,9 @@ section in
 The watched area will persist until a subsequent call to
 .Xr Pdelwapt 3PROC .
 .Pp
-Note, only active processes support watchpoints. It is an error to call
-this function on process handles that correspond to core files, zombie
-processes, or files.
+Note, only active processes support watchpoints.
+It is an error to call this function on process handles that correspond to core
+files, zombie processes, or files.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Psetwapt

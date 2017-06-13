@@ -590,7 +590,7 @@ datadm_enqueue_entry(datadm_list_t *list, datadm_entry_t *entry)
  */
 static int
 datadm_walk_list(datadm_list_t *list, int (*func)(datadm_entry_t *, void *),
-	void *arg)
+    void *arg)
 {
 	datadm_entry_t	*entry;
 	int		retval = 0;
@@ -710,7 +710,7 @@ datadm_sp_entry_match(datadm_sp_entry_t *sp1, datadm_sp_entry_t *sp2)
 	if (sp1->spe_threadsafe != sp2->spe_threadsafe) {
 		return (0);
 	}
-	if (sp2->spe_default != sp2->spe_default) {
+	if (sp1->spe_default != sp2->spe_default) {
 		return (0);
 	}
 	if (!datadm_str_match(sp1->spe_libpath, sp2->spe_libpath)) {
@@ -921,7 +921,7 @@ datadm_parse_line(char *line_buf, char *tokens[], int *token_count)
  */
 static int
 datadm_process_sp_entry(datadm_list_t *hca_list, datadm_sp_entry_t *sp_entry,
-	char *ia_name)
+    char *ia_name)
 {
 	datadm_hca_find_t	hca_find;
 	datadm_ia_find_t	ia_find;
@@ -1429,7 +1429,7 @@ out:
 
 static int
 datadm_generate_conf_entry(FILE *outfile, datadm_ia_entry_t *ia_entry,
-	datadm_sp_entry_t *sp_entry)
+    datadm_sp_entry_t *sp_entry)
 {
 	int	retval;
 

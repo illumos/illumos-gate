@@ -39,8 +39,9 @@ and
 fail.
 .Lp
 Each word is considered
-separately and the case of letters is ignored. Words which are part of other
-words are considered; for example, when looking for
+separately and the case of letters is ignored.
+Words which are part of other words are considered; for example, when looking
+for
 .Sq compile ,
 .Nm apropos
 finds all instances of
@@ -49,8 +50,8 @@ also.
 .Lp
 The
 .Nm whatis
-command performs the same search, but only matches whole words. In the above
-example,
+command performs the same search, but only matches whole words.
+In the above example,
 .Nm whatis
 would not match the instances of
 .Sq compiler
@@ -70,7 +71,8 @@ command.
 .Bl -tag -width "-s section"
 .It Fl M Ar path
 Force a specific colon separated manual path instead of the
-default search path.  Overrides the MANPATH environment variable.
+default search path.
+Overrides the MANPATH environment variable.
 .It Fl s Ar section
 Restrict search to specified section.
 .El

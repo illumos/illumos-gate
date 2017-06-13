@@ -36,6 +36,7 @@ PROGS = \
 	call_once \
 	endian \
 	env-7076 \
+	psignal-5097 \
 	quick_exit_order \
 	quick_exit_status \
 	strcoll-strxfrm-6907 \
@@ -45,7 +46,8 @@ PROGS = \
 	wcsncasecmp-7350
 
 SCRIPTS = \
-	quick_exit
+	quick_exit \
+	psignal
 
 CPPFLAGS += -D_REENTRANT
 

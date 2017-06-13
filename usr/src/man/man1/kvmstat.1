@@ -31,15 +31,15 @@ injected interrupts, emulations, and more, on a per virtual CPU basis.
 .Nm
 should be used when trying to get a rough sense of guest activity from the
 hypervisor's perspective, and allows one to understand from a low-level
-perspective, what kind of activity is going on inside of the virtual machine. In
-addition,
+perspective, what kind of activity is going on inside of the virtual machine.
+In addition,
 .Nm
 is useful for diagnosing reports of pathological or faulty behavior inside of
-guests. While there is no expected range of values for the fields displayed as
-that varies with the use of virtual machines, if all of the virtual CPUs for a
-given virtual machine are consistently zero, then that may indicate that a
-problem has occurred, for example, a panic inside of the guest or a bug in the
-hypervisor.
+guests.
+While there is no expected range of values for the fields displayed as that
+varies with the use of virtual machines, if all of the virtual CPUs for a given
+virtual machine are consistently zero, then that may indicate that a problem has
+occurred, for example, a panic inside of the guest or a bug in the hypervisor.
 .Lp
 If no operands are specified, then
 .Nm
@@ -96,15 +96,15 @@ The following operands are supported:
 .Bl -hang -width Ds
 .It Ar count
 .Bd -filled -compact
-Specifies the number of times that the statistics are repeated. If not
-specified,
+Specifies the number of times that the statistics are repeated.
+If not specified,
 .Nm
 will continue until it is terminated.
 .Ed
 .It Ar interval
 .Bd -filled -compact
-Specifies the number of seconds between reports of statistics. If not specified,
-reports are generated every second.
+Specifies the number of seconds between reports of statistics.
+If not specified, reports are generated every second.
 .Ed
 .El
 .Sh STABILITY

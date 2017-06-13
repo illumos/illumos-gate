@@ -53,7 +53,8 @@ is called with the pointer to the private data argument,
 .Fa data ,
 and the thread's
 .Sy lwpstatus_t
-structure. In the case of the
+structure.
+In the case of the
 .Fn Plwp_iter_all
 function, the thread's
 .Sy lwpsinfo_t
@@ -61,18 +62,21 @@ is also included.
 .Pp
 The return value of
 .Fa func
-controls whether or not iteration continues. If
+controls whether or not iteration continues.
+If
 .Fa func
 returns
 .Sy 0 ,
-then both functions will continue iteration. However, if
+then both functions will continue iteration.
+However, if
 .Fa func
 returns non-zero, then iteration will halt and that value will be used
 as the return value of the
 .Fn Plwp_iter
 and
 .Fn Plwp_iter_all
-functions. Because both functions return
+functions.
+Because both functions return
 .Sy -1
 on internal failure, it is recommended that the callback function does
 not return
@@ -92,7 +96,8 @@ functions return
 .Sy 0 .
 Otherwise, if there was an internal error or there is no thread data, then
 .Sy -1
-is returned. Otherwise, if the callback function
+is returned.
+Otherwise, if the callback function
 .Fa func
 returns non-zero, then its return value will be returned instead.
 .Sh INTERFACE STABILITY

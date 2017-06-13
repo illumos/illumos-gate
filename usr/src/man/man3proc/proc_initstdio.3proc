@@ -41,17 +41,19 @@ The
 and
 .Fn proc_finistdio
 functions are utilities provided to aid with the possibility of deadlock
-while doing I/O operations. If a process is trying to do I/O, but
-holding the process handle that would consume that I/O, then eventually
-the program holding the process handle will block as none of its I/O has
-been drained. However, because it is holding a process handle to that
-process, it will never be drained.
+while doing I/O operations.
+If a process is trying to do I/O, but holding the process handle that would
+consume that I/O, then eventually the program holding the process handle will
+block as none of its I/O has been drained.
+However, because it is holding a process handle to that process, it will never
+be drained.
 .Pp
 Consider, for example, the following invocation:
 .Li pfiles `pgrep xterm`
-where the command was launched from a shell on an xterm. Because the
-xterm is stopped, it will not be able to write out any of the standard
-out that gets passed to it, leading to a deadlock. The
+where the command was launched from a shell on an xterm.
+Because the xterm is stopped, it will not be able to write out any of the
+standard out that gets passed to it, leading to a deadlock.
+The
 .Li pfiles
 program cannot release the
 .Li xterm
@@ -60,9 +62,9 @@ due to the same hold.
 .Pp
 To address this, these functions duplicate the standard output and
 standard error of the process to temporary files and then flushes it out
-to the original file descriptors and streams later. When finished, the
-original file descriptors are restored as standard out and standard
-error.
+to the original file descriptors and streams later.
+When finished, the original file descriptors are restored as standard out and
+standard error.
 .Pp
 The
 .Fn proc_initstdio
@@ -72,9 +74,10 @@ descriptors and retains the originals.
 The
 .Fn proc_flushstdio
 functions flushes all of the cached data from the temporary standard out
-and standard error back to the underlying ones. This function should
-only be called after all process handles have been released. For
-example, if iterating on multiple processes, calling this after handling
+and standard error back to the underlying ones.
+This function should only be called after all process handles have been
+released.
+For example, if iterating on multiple processes, calling this after handling
 each one is safe.
 .Pp
 The

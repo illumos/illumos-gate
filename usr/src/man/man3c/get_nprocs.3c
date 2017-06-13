@@ -42,7 +42,8 @@ respectively.
 .Sh RETURN VALUES
 The
 .Fn get_nprocs
-function returns the number of processors that are currently online. The
+function returns the number of processors that are currently online.
+The
 .Fn get_nprocs_conf
 function returns the number of processors that the operating system has
 configured.

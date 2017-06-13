@@ -49,8 +49,8 @@ together with the
 or
 .Sy -
 characters, indicating that the subsequent token should be added or
-subtracted from the previous ones. The full list of tokens and constants
-is available in the
+subtracted from the previous ones.
+The full list of tokens and constants is available in the
 .Sy core_content_t
 portion of the
 .Sy TYPES

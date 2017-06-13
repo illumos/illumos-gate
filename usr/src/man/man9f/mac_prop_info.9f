@@ -69,7 +69,8 @@ illumos DDI specific
 .It Ft hdl
 A pointer to the MAC property information handle.
 .It Ft fctl
-A valid link flow control entry. Valid values are documented in the
+A valid link flow control entry.
+Valid values are documented in the
 .Sy MAC_PROP_FLOWCTRL
 property description in the
 .Sx PROPERTIES
@@ -117,18 +118,19 @@ The
 family of functions are used to fill in metadata about a given property
 as part of a driver's
 .Xr mc_propinfo 9E
-entry point. These functions can be used to fill in information about
-the default value that the device assigns to a property and the
-permissions that a privileged user has to update the property.
+entry point.
+These functions can be used to fill in information about the default value that
+the device assigns to a property and the permissions that a privileged user has
+to update the property.
 .Pp
 The
 .Fn mac_prop_info_set_perm
-function is used to set the permissions of a property. These permissions
-indicate whether or not the property can be read or modified from the
-device driver's perspective. The permissions for a given property should
-generally not change for a given device and they do not need to take
-into account user privileges. For the most case, properties will only
-take one of two values:
+function is used to set the permissions of a property.
+These permissions indicate whether or not the property can be read or modified
+from the device driver's perspective.
+The permissions for a given property should generally not change for a given
+device and they do not need to take into account user privileges.
+For the most case, properties will only take one of two values:
 .Sy MAC_PROP_PERM_READ
 or
 .Sy MAC_PROP_PERM_RW .
@@ -142,8 +144,9 @@ function will override the values stored in previous calls.
 The
 .Fn mac_prop_info_set_range_uint32
 function is used to indicate a range of possible integer values that a
-device may take. This range is generally inclusive, meaning the property
-may be set to any value in the range of
+device may take.
+This range is generally inclusive, meaning the property may be set to any value
+in the range of
 .Fa low
 to
 .Fa high .
@@ -160,14 +163,16 @@ The remaining functions,
 .Fn mac_prop_info_set_uint32 ,
 and
 .Fn mac_prop_info_set_range_uint32
-update the default value of a given property. The default value is the
-initial value that the property takes after the device driver has called
+update the default value of a given property.
+The default value is the initial value that the property takes after the device
+driver has called
 .Xr mac_register 9F .
 If these functions are called multiple times, then the default value
 will be replaced with each call.
 .Pp
 The different functions each support a different type of default value
-and some are used for specific properties. The
+and some are used for specific properties.
+The
 .Fn mac_prop_info_set_default_link_flowctrl
 function works with properties that describe flow control properties.
 The various values of a
@@ -177,8 +182,8 @@ are documented in
 .Pp
 The
 .Fn mac_prop_info_set_default_str
-function sets the default value for properties that use strings. The
-device driver should ensure that it uses alphanumeric ASCII characters
+function sets the default value for properties that use strings.
+The device driver should ensure that it uses alphanumeric ASCII characters
 only in the string to guarantee portability.
 .Pp
 The
@@ -197,9 +202,9 @@ and
 .Sy kernel
 context.
 .Sh RETURN VALUES
-All of the functions documented here do not return a value. It is not
-the driver's responsibility to ensure that there is sufficient space for
-permissions, ranges, or default values in the
+All of the functions documented here do not return a value.
+It is not the driver's responsibility to ensure that there is sufficient space
+for permissions, ranges, or default values in the
 .Ft mac_prop_info_handle_t
 structures: the surrounding driver framework will transparently take
 care of that and ensure that errors are correctly propagated.

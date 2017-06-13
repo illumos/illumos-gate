@@ -35,11 +35,11 @@ the agent LWP for the thread
 in the process handle
 .Fa P .
 .Pp
-The agent LWP allows another process to inject actions into the target
-process. When an agent LWP is created, it leverages an existing thread
-in the process and it also creates a record of whom created the agent,
-which is called the spy master. For more information on the agent LWP
-and the spy master, see
+The agent LWP allows another process to inject actions into the target process.
+When an agent LWP is created, it leverages an existing thread in the process and
+it also creates a record of whom created the agent, which is called the spy
+master.
+For more information on the agent LWP and the spy master, see
 .Xr proc 4 .
 .Pp
 If the thread identified
@@ -54,8 +54,9 @@ will be filled into
 Note, process handles that correspond to a file, created by
 .Xr Pgrab_file 3PROC ,
 cannot have an agent LWP created for them and thus cannot have any spy
-master information. In addition, core files from older releases may not
-have any data on the spy master.
+master information.
+In addition, core files from older releases may not have any data on the spy
+master.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Plwp_getspymaster

@@ -43,8 +43,9 @@ functions controls what actions the process handle
 should take upon executing a system call.
 .Pp
 The system allows a process to be stopped on both entry and exit of a
-system call. For information on the state of the process when it is
-stopped due to system call tracing, see the
+system call.
+For information on the state of the process when it is stopped due to system
+call tracing, see the
 .Sy PCSENTRY
 and
 .Sy PCSEXIT
@@ -55,18 +56,20 @@ The value of the
 .Fa stop
 parameter controls whether or not the system call listed in
 .Fa which
-causes the process to stop. A value of non-zero indicates the process
-should stop; a value of 0 indicates it should not.
+causes the process to stop.
+A value of non-zero indicates the process should stop;
+a value of 0 indicates it should not.
 .Pp
 The value of
 .Fa which
-indicates which system call the change applies to. A value of 0
-applies to all system calls. Note, the system does not supply a stable
-mapping from system call names to identifiers.
+indicates which system call the change applies to.
+A value of 0 applies to all system calls.
+Note, the system does not supply a stable mapping from system call names to
+identifiers.
 .Pp
-These functions only apply to actively running processes. They do not
-function on handles that refer to core files, zombie processes, or ELF
-objects.
+These functions only apply to actively running processes.
+They do not function on handles that refer to core files, zombie processes,
+or ELF objects.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Psetentry
@@ -77,7 +80,8 @@ functions return the previous disposition of the system call --
 if it was not set to stop and
 .Sy 1
 if it was --
-and the system call state is updated. Otherwise,
+and the system call state is updated.
+Otherwise,
 .Sy -1
 is returned,
 .Dv errno

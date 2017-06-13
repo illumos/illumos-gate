@@ -54,7 +54,8 @@ may not be stopped.
 .Pp
 Note, only active processes may have their signal tracing flags updated.
 Process handles that refer to core files, zombie processes, and files do
-not have signal tracing flags. Calling this function on them is an error.
+not have signal tracing flags.
+Calling this function on them is an error.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn Psignal
@@ -64,7 +65,8 @@ It returns
 .Sy 1
 if it was set and
 .Sy 0
-if not. Otherwise,
+if not.
+Otherwise,
 .Sy -1
 is returned and
 .Sy errno

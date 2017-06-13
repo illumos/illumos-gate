@@ -53,20 +53,22 @@ support the use of flow control through hardware pause frames.
 .Sh APPLICATION PROGRAMMING INTERFACE
 For each device supported by the
 .Nm
-installed in the system, a character-special file will be created. This
-file supports the Data Link Provider Interface (DLPI) which is documented
+installed in the system, a character-special file will be created.
+This file supports the Data Link Provider Interface (DLPI) which is documented
 in
 .Xr dlpi 7P .
 For most consumers, the use of
 .Xr libdlpi 3LIB ,
 is recommended.
 .Pp
-Each instance is assigned a unique ascending integer identifier. A
-device which has multiple ports may appear to the system as separate
-instances. The system does not provide a guarnatee on how these will be
-presented. Using this instance identifier, one can determine the exact
-character-special file to open. For example, the first instance
-enumerated in the system, with id 0, would be named
+Each instance is assigned a unique ascending integer identifier.
+A device which has multiple ports may appear to the system as separate
+instances.
+The system does not provide a guarnatee on how these will be presented.
+Using this instance identifier, one can determine the exact character-special
+file to open.
+For example, the first instance enumerated in the system, with id 0, would be
+named
 .Sy i40e0 .
 It exists in the file system at
 .Pa /dev/i40e0 .
@@ -74,8 +76,8 @@ It exists in the file system at
 The
 .Nm i40e
 driver always performs auto-negotiation and depending on the model may
-negotiate to 40 Gbps, 25 Gbps, 10 Gbps, or 1 Gbps. At this time, the
-driver requires the use of auto-negotiation.
+negotiate to 40 Gbps, 25 Gbps, 10 Gbps, or 1 Gbps.
+At this time, the driver requires the use of auto-negotiation.
 .Pp
 The
 .Nm
@@ -83,10 +85,13 @@ driver is managed by the
 .Xr dladm 1M
 utility.
 .Xr dladm 1M
-is the preferred interface for setting all properties. While
-.Xr driver.conf based configuration is possible,
+is the preferred interface for setting all properties.
+While
+.Xr driver.conf 4
+based configuration is possible,
 .Xr dladm 1M
-is recommended. The
+is recommended.
+The
 .Nm
 driver may be joined into an aggregation based on the link aggregation
 control protocol (LACP) through
@@ -95,10 +100,10 @@ control protocol (LACP) through
 The device supports the following properties which may be tuned through
 its driver.conf file,
 .Pa /kernel/drv/i40e.conf .
-Most of these properties cannot be changed after the device has been
-started. The device is started in response to a DLPI consumer opening
-the device and binding to it. This happens when an IP interfaces is
-plumbed or another
+Most of these properties cannot be changed after the device has been started.
+The device is started in response to a DLPI consumer opening the device and
+binding to it.
+This happens when an IP interfaces is plumbed or another
 .Xr dlpi 7P
 consumer such as
 .Xr snoop 1M
@@ -106,11 +111,13 @@ or an LLDP daemon is started.
 .Pp
 Some properties may be tuned at runtime with the
 .Xr dladm 1M
-utility. Properties that can be will have the name of the dladm property
-called out explicitly.
+utility.
+Properties that can be will have the name of the dladm property called out
+explicitly.
 .Pp
-These properties are not considered stable at this time. They may change
-and should not be relied on. They are considered
+These properties are not considered stable at this time.
+They may change and should not be relied on.
+They are considered
 .Sy Volatile .
 It is not expected that administrators of the system will have to tune
 these values.
@@ -129,7 +136,8 @@ The
 .Sy default_mtu
 property determines the starting MTU of the various device instances.
 Note that the device's MTU also determines the upper bound of the MTU of
-all VNICs created over the device. The default MTU is
+all VNICs created over the device.
+The default MTU is
 .Sy 1500 .
 .Ed
 .It Sy mr_enable
@@ -143,8 +151,9 @@ Maximum:
 The
 .Sy mr_enable
 proeprty determines whether or not support for multiple rings is enabled
-for the device. The default is always to enable them. It is not
-recommended to to disable them.
+for the device.
+The default is always to enable them.
+It is not recommended to to disable them.
 .Ed
 .It Sy rx_ring_size
 .Bd -filled -compact
@@ -157,10 +166,10 @@ Maximum:
 The
 .Sy rx_ring_size
 property determines the number of descriptors that will be used in each
-receive ring on the card. Administrators should not normally need to
-tune this value. Hardware requires that the ring size be a multiple of
-32. The system will round up the set value to the nearest multiple of
-32.
+receive ring on the card.
+Administrators should not normally need to tune this value.
+Hardware requires that the ring size be a multiple of 32.
+The system will round up the set value to the nearest multiple of 32.
 .Ed
 .It Sy tx_ring_size
 .Bd -filled -compact
@@ -173,10 +182,10 @@ Maximum:
 The
 .Sy tx_ring_size
 property determines the number of descriptors that will be used in each
-transmit ring on the card. Administrators should not normally need to
-tune this value. Hardware requires that the ring size be a multiple of
-32. The system will round up the set value to the nearest multiple of
-32.
+transmit ring on the card.
+Administrators should not normally need to tune this value.
+Hardware requires that the ring size be a multiple of 32.
+The system will round up the set value to the nearest multiple of 32.
 .Ed
 .It Sy tx_resched_threshold
 .Bd -filled -compact
@@ -189,11 +198,13 @@ Maximum:
 The
 .Sy tx_resched_threshold
 property determines the number of descriptors that must be available for
-a frame to be transmitted. The maximum is variable. It is dependent on
-the value of the
+a frame to be transmitted.
+The maximum is variable.
+It is dependent on the value of the
 .Sy tx_ring_size
-property. At least eight descriptors must be available for the device to
-function correctly.
+property.
+At least eight descriptors must be available for the device to function
+correctly.
 .Ed
 .It Sy rx_limit_per_intr
 .Bd -filled -compact
@@ -206,9 +217,9 @@ Maximum:
 The
 .Sy rx_limit_per_intr
 property determines the maximum number of packets that will be processed
-on a given ring during a single interrupt. This is done to try and
-guarantee some amount of liveness in the system. It is not expected
-that administrators will have to tune this value.
+on a given ring during a single interrupt.
+This is done to try and guarantee some amount of liveness in the system.
+It is not expected that administrators will have to tune this value.
 .Ed
 .It Sy tx_hcksum_enable
 .Bd -filled -compact
@@ -221,10 +232,10 @@ Maximum:
 The
 .Sy tx_hcksum_enable
 property controls whether or not the device enables support for hardware
-checksuming of outgoing packets. The default is to always enable support
-for this. Turning it off will increase latency and decrease throughput
-when transmitting packets, but should be done if a hardware bug is
-suspected.
+checksuming of outgoing packets.
+The default is to always enable support for this.
+Turning it off will increase latency and decrease throughput when transmitting
+packets, but should be done if a hardware bug is suspected.
 .Ed
 .It Sy rx_hcksum_enable
 .Bd -filled -compact
@@ -237,10 +248,10 @@ Maximum:
 The
 .Sy rx_hcksum_enable
 property controls whether or not the device enables support for hardware
-checksuming of incoming packets. The default is to always enable support
-for this. Turning it off will increase latency and decrease throughput
-when receiving packets, but should be done if a hardware bug is
-suspected.
+checksuming of incoming packets.
+The default is to always enable support for this.
+Turning it off will increase latency and decrease throughput when receiving
+packets, but should be done if a hardware bug is suspected.
 .Ed
 .It Sy rx_dma_threshold
 .Bd -filled -compact
@@ -256,9 +267,11 @@ The
 .Sy rx_dma_treshold
 indicates the size in bytes of a received frame, including all of its
 headers, at which the driver should not copy the frame but instead bind
-DMA memory. By setting this property to its minimum, all frames will be
-processed with DMA binding. By setting this property to its maximum, all
-frames will be processed by copying the frame.
+DMA memory.
+By setting this property to its minimum, all frames will be processed with DMA
+binding.
+By setting this property to its maximum, all frames will be processed by copying
+the frame.
 .Ed
 .El
 .Sh ARCHITECTURE

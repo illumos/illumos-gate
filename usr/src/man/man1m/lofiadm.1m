@@ -59,12 +59,14 @@ administers
 .Sy lofi ,
 the loopback file driver.
 .Sy lofi
-allows a file to be associated with a block device. That file can then be
-accessed through the block device. This is useful when the file contains an
-image of some filesystem (such as a floppy or
+allows a file to be associated with a block device.
+That file can then be accessed through the block device.
+This is useful when the file contains an image of some filesystem (such as a
+floppy or
 .Sy CD-ROM
 image), because the block device can then be used with the normal system
-utilities for mounting, checking or repairing filesystems. See
+utilities for mounting, checking or repairing filesystems.
+See
 .Xr fsck 1M
 and
 .Xr mount 1M .
@@ -98,16 +100,19 @@ partitioning by using partition management tools such as
 .Xr fdisk 1M .
 Once the device has been appropriately partitioned, the labeled
 device can be used as normal disk to create and mount file systems and to store
-data.  Mappings created by
+data.
+Mappings created by
 .Nm
-are not permanent and not persisted by the system. If power is lost or the system
-is rebooted, then the mappings will need to be created again.
+are not permanent and not persisted by the system.
+If power is lost or the system is rebooted, then the mappings will need to be
+created again.
 .Pp
 The partition table requires space from the mapped file.
 .Sy lofi
 does not support converting previously created unlabeled loopback device images
-to labeled loopback devices. If an unlabeled device is used as a labeled device,
-writing to it will corrupt it.
+to labeled loopback devices.
+If an unlabeled device is used as a labeled device, writing to it will corrupt
+it.
 .Sh OPTIONS
 The following options are supported:
 .Bl -tag -width Ds
@@ -129,8 +134,9 @@ attempts to assign it to
 .Sy device
 must be available or
 .Nm
-will fail. The ability to specify a device is provided for use in scripts that
-wish to reestablish a particular set of associations.
+will fail.
+The ability to specify a device is provided for use in scripts that wish to
+reestablish a particular set of associations.
 A device may not be specified when using a labeled lofi device.
 .It Fl C Ar {gzip | gzip-N | lzma}
 Compress the file with the specified compression algorithm.
@@ -139,10 +145,12 @@ The
 .Sy gzip
 compression algorithm uses the same compression as the open-source
 .Sy gzip
-command. You can specify the
+command.
+You can specify the
 .Sy gzip
 level by using the value gzip-\fR\fIN\fR where \fIN\fR is 6 (fast) or 9
-(best compression ratio). Currently,
+(best compression ratio).
+Currently,
 .Sy gzip ,
 without a number, is equivalent to
 .Sy gzip-6
@@ -165,8 +173,8 @@ device.
 .It Fl l
 This option should be used with
 .Fl a
-option to create labeled loopback device. If created in local zone, the device
-has to be enabled in zone configuration.
+option to create labeled loopback device.
+If created in local zone, the device has to be enabled in zone configuration.
 .It Fl r
 If the
 .Fl r
@@ -186,8 +194,9 @@ Uncompress a compressed file.
 The following options are used when the file is encrypted:
 .Bl -tag -width Ds
 .It Fl c Ar crypto_algorithm
-Select the encryption algorithm. The algorithm must be specified when
-encryption is enabled because the algorithm is not stored in the disk image.
+Select the encryption algorithm.
+The algorithm must be specified when encryption is enabled because the algorithm
+is not stored in the disk image.
 .Pp
 If none of
 .Fl e ,
@@ -200,10 +209,11 @@ prompts for a passphrase, with a minimum length of eight characters, to be
 entered.
 The passphrase is used to derive a symmetric encryption key using PKCS#5 PBKD2.
 .It Fl k Ar raw_key_file | Ar wrapped_key_file
-Path to raw or wrapped symmetric encryption key. If a PKCS#11 object is also
-given with the
+Path to raw or wrapped symmetric encryption key.
+If a PKCS#11 object is also given with the
 .Fl T
-option, then the key is wrapped by that object. If
+option, then the key is wrapped by that object.
+If
 .Fl T
 is not specified, the key is used raw.
 .It Fl T Ar token_key
@@ -232,15 +242,15 @@ One of:
 Display the file name associated with the block device
 .Sy device .
 .Pp
-Without arguments, print a list of the current associations. Filenames must be
-valid absolute pathnames.
+Without arguments, print a list of the current associations.
+Filenames must be valid absolute pathnames.
 .Pp
-When a file is added, it is opened for reading or writing by root. Any
-restrictions apply (such as restricted root access over
+When a file is added, it is opened for reading or writing by root.
+Any restrictions apply (such as restricted root access over
 .Sy NFS Ns ).
-The file is held open until the association is removed. It is not actually
-accessed until the block device is used, so it will never be written to if the
-block device is only opened read-only.
+The file is held open until the association is removed.
+It is not actually accessed until the block device is used, so it will never be
+written to if the block device is only opened read-only.
 .Pp
 Note that the filename may appear as "?" if it is not possible to resolve the
 path in the current context (for example, if it's an NFS path in a non-global
@@ -256,8 +266,8 @@ PKCS#11 token object in the format:
 .Pp
 .Ar token_name Ns : Ns Ar manufacturer_id Ns : Ns Ar serial_number Ns : Ns Ar key_label
 .Pp
-All but the key label are optional and can be empty. For example, to specify a
-token object with only its key label
+All but the key label are optional and can be empty.
+For example, to specify a token object with only its key label
 .Sy MylofiKey ,
 use:
 .Pp
@@ -300,8 +310,8 @@ image
 .Pf ( Sy sparc.iso Ns ),
 of the
 .Sy Red Hat 6.0 CD
-which was downloaded from the Internet. It was created
-with the
+which was downloaded from the Internet.
+It was created with the
 .Sy mkisofs
 utility from the Internet.
 .Pp
@@ -315,7 +325,8 @@ to attach a block device to it:
 .Pp
 .Nm
 picks the device and prints the device name to the standard
-output. You can run
+output.
+You can run
 .Nm
 again by issuing the following command:
 .Bd -literal
@@ -352,8 +363,8 @@ README        boot.cat*     kernels/      modules/
 RPM-PGP-KEY   dev@          lib@          proc/
 .Ed
 .Pp
-Solaris can mount the CD-ROM image, and understand the filenames. The image was
-created properly, and you can now create the
+Solaris can mount the CD-ROM image, and understand the filenames.
+The image was created properly, and you can now create the
 .Sy CD-ROM
 with confidence.
 .Pp
@@ -371,8 +382,8 @@ Using
 .Sy lofi
 to help you mount files that contain floppy images is helpful
 if a floppy disk contains a file that you need, but the machine which you are
-on does not have a floppy drive. It is also helpful if you do not want to take
-the time to use the
+on does not have a floppy drive.
+It is also helpful if you do not want to take the time to use the
 .Sy dd
 command to copy the image to a floppy.
 .Pp
@@ -394,8 +405,10 @@ APPEND.BAT*   MAKEDIR.BAT*  SOLARIS/
 Making a
 .Sy UFS
 filesystem on a file can be useful, particularly if a test
-suite requires a scratch filesystem. It can be painful (or annoying) to have to
-repartition a disk just for the test suite, but you do not have to. You can
+suite requires a scratch filesystem.
+It can be painful (or annoying) to have to repartition a disk just for the test
+suite, but you do not have to.
+You can
 .Sy newfs
 a file with
 .Sy lofi .
@@ -405,7 +418,8 @@ Create the file:
 # mkfile 35m /export/home/test
 .Ed
 .Pp
-Attach it to a block device. You also get the character device that
+Attach it to a block device.
+You also get the character device that
 .Sy newfs
 requires, so
 .Sy newfs
@@ -423,7 +437,8 @@ super-block backups (for fsck -F ufs -o b=#) at:
 .Pp
 Note that
 .Sy ufs
-might not be able to use the entire file. Mount and use the filesystem:
+might not be able to use the entire file.
+Mount and use the filesystem:
 .Bd -literal
 # mount /dev/lofi/1 /mnt
 # df -k /mnt
@@ -437,7 +452,8 @@ Filesystem            kbytes    used   avail capacity  Mounted on
 .It Sy Example 4 No Creating a PC (FAT) File System on a Unix File
 The following series of commands creates a
 .Sy FAT
-file system on a Unix file. The file is associated with a block device created by
+file system on a Unix file.
+The file is associated with a block device created by
 .Nm
 .
 .Bd -literal
@@ -575,8 +591,9 @@ Just as you would not directly access a disk device that has mounted file
 systems, you should not access a file associated with a block device except
 through the
 .Sy lofi
-file driver. It might also be appropriate to ensure that
-the file has appropriate permissions to prevent such access.
+file driver.
+It might also be appropriate to ensure that the file has appropriate permissions
+to prevent such access.
 .Pp
 The abilities of
 .Nm
@@ -584,8 +601,10 @@ The abilities of
 permissions of
 .Pa /dev/lofictl .
 Read-access allows query operations, such as
-listing all the associations. Write-access is required to do any state-changing
-operations, like adding an association. As shipped,
+listing all the associations.
+Write-access is required to do any state-changing operations, like adding an
+association.
+As shipped,
 .Pa /dev/lofictl
 is owned by
 .Sy root ,
@@ -603,15 +622,16 @@ In particular, the
 .Sy nosuid
 mount option might be appropriate for
 .Sy UFS
-images whose origin is unknown. Also, some options might not be useful or
-appropriate, like
+images whose origin is unknown.
+Also, some options might not be useful or appropriate, like
 .Sy logging
 or
 .Sy forcedirectio
 for
 .Sy UFS .
 For compatibility purposes, a raw device is also exported along with the block
-device. For example,
+device.
+For example,
 .Xr newfs 1M
 requires one.
 .Pp

@@ -63,17 +63,17 @@ system call and its arguments.
 .Pp
 The
 .Fn pr_setrlimit
-function only works on active processes. Process handles that correspond
-to core files, zombie processes, or ELF objects do not support system
-call injection.
+function only works on active processes.
+Process handles that correspond to core files, zombie processes, or ELF objects
+do not support system call injection.
 .Pp
 The
 .Fn pr_setrlimit64
 function is equivalent to
 .Fn pr_setrlimit ;
-however, rather than having the rlimit information be subject to the
-data model of the target process, they always provide 64-bit rlimit
-information. See
+however, rather than having the rlimit information be subject to the data model
+of the target process, they always provide 64-bit rlimit information.
+See
 .Xr lf64 5
 for more information.
 .Sh RETURN VALUES

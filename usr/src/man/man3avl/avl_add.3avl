@@ -46,7 +46,8 @@ function inserts
 into the tree.
 .Fa node
 must not already be in the tree, thus implying it must not compare equal
-to any other node in the tree. Adding
+to any other node in the tree.
+Adding
 .Fa node
 to
 .Fa tree

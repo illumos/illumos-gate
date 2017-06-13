@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1166,38 +1167,6 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 		}
 
 		/*
-		 * Try to obtain the path component from dnlc cache
-		 * before searching through the directory.
-		 */
-		if ((cmpvp = dnlc_reverse_lookup(vp, dbuf, dlen)) != NULL) {
-			/*
-			 * If we got parent vnode as a result,
-			 * then the answered path is correct.
-			 */
-			if (VN_CMP(cmpvp, pvp)) {
-				VN_RELE(cmpvp);
-				complen = strlen(dbuf);
-				bufloc -= complen;
-				if (bufloc <= buf) {
-					err = ENAMETOOLONG;
-					goto out;
-				}
-				bcopy(dbuf, bufloc, complen);
-
-				/* Prepend a slash to the current path */
-				*--bufloc = '/';
-
-				/* And continue with the next component */
-				VN_RELE(vp);
-				vp = pvp;
-				pvp = NULL;
-				continue;
-			} else {
-				VN_RELE(cmpvp);
-			}
-		}
-
-		/*
 		 * Search the parent directory for the entry corresponding to
 		 * this vnode.
 		 */
@@ -1269,10 +1238,9 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
     cred_t *cr, int flags)
 {
 	pathname_t pn, rpn;
-	int ret, len;
-	vnode_t *compvp, *pvp, *realvp;
+	int ret;
+	vnode_t *compvp, *realvp;
 	proc_t *p = curproc;
-	char path[MAXNAMELEN];
 	int doclose = 0;
 
 	/*
@@ -1409,41 +1377,10 @@ notcached:
 	pn_free(&pn);
 
 	if (vp->v_type != VDIR) {
-		/*
-		 * If we don't have a directory, try to find it in the dnlc via
-		 * reverse lookup.  Once this is found, we can use the regular
-		 * directory search to find the full path.
-		 */
-		if ((pvp = dnlc_reverse_lookup(vp, path, MAXNAMELEN)) != NULL) {
-			/*
-			 * Check if we have read privilege so, that
-			 * we can lookup the path in the directory
-			 */
-			ret = 0;
-			if ((flags & LOOKUP_CHECKREAD)) {
-				ret = VOP_ACCESS(pvp, VREAD, 0, cr, NULL);
-			}
-			if (ret == 0) {
-				ret = dirtopath(vrootp, pvp, buf, buflen,
-				    flags, cr);
-			}
-			if (ret == 0) {
-				len = strlen(buf);
-				if (len + strlen(path) + 1 >= buflen) {
-					ret = ENAMETOOLONG;
-				} else {
-					if (buf[len - 1] != '/')
-						buf[len++] = '/';
-					bcopy(path, buf + len,
-					    strlen(path) + 1);
-				}
-			}
-
-			VN_RELE(pvp);
-		} else
-			ret = ENOENT;
-	} else
+		ret = ENOENT;
+	} else {
 		ret = dirtopath(vrootp, vp, buf, buflen, flags, cr);
+	}
 
 	VN_RELE(vrootp);
 	if (doclose) {
