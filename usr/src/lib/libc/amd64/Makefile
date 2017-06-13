@@ -18,14 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Joyent, Inc.
-#
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
-# Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 LIBCBASE=	.
@@ -350,13 +349,13 @@ PORTGEN=			\
 	ascii_strcasecmp.o	\
 	ascii_strncasecmp.o	\
 	assert.o		\
+	atexit.o		\
+	atfork.o		\
 	atof.o			\
 	atoi.o			\
 	atol.o			\
 	atoll.o			\
 	attropen.o		\
-	atexit.o		\
-	atfork.o		\
 	basename.o		\
 	calloc.o		\
 	catgets.o		\
@@ -398,8 +397,10 @@ PORTGEN=			\
 	fmtmsg.o		\
 	ftime.o			\
 	ftok.o			\
+	fts.o			\
 	ftw.o			\
 	gcvt.o			\
+	get_nprocs.o		\
 	getauxv.o		\
 	getcwd.o		\
 	getdate_err.o		\
@@ -417,7 +418,6 @@ PORTGEN=			\
 	getlogin.o		\
 	getmntent.o		\
 	getnetgrent.o		\
-	get_nprocs.o		\
 	getopt.o		\
 	getopt_long.o		\
 	getpagesize.o		\
@@ -498,8 +498,8 @@ PORTGEN=			\
 	posix_madvise.o		\
 	posix_memalign.o	\
 	priocntl.o		\
-	privlib.o		\
 	priv_str_xlate.o	\
+	privlib.o		\
 	psecflags.o		\
 	psiginfo.o		\
 	psignal.o		\
@@ -512,6 +512,7 @@ PORTGEN=			\
 	rctlops.o		\
 	readdir.o		\
 	readdir_r.o		\
+	reallocarray.o		\
 	realpath.o		\
 	reboot.o		\
 	regexpr.o		\
@@ -555,6 +556,7 @@ PORTGEN=			\
 	strtoimax.o		\
 	strtok.o		\
 	strtok_r.o		\
+	strtonum.o		\
 	strtoumax.o		\
 	swab.o			\
 	swapctl.o		\
@@ -1088,24 +1090,24 @@ SRCS=							\
 	$(ATOMICOBJS:%.o=$(SRC)/common/atomic/%.c)	\
 	$(XATTROBJS:%.o=$(SRC)/common/xattr/%.c)	\
 	$(COMOBJS:%.o=$(SRC)/common/util/%.c)		\
-	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)			\
-	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)			\
-	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)		\
-	$(PORTLOCALE:%.o=$(LIBCDIR)/port/locale/%.c)		\
-	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)		\
-	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)		\
-	$(PORTSTDIO:%.o=$(LIBCDIR)/port/stdio/%.c)		\
-	$(PORTSYS:%.o=$(LIBCDIR)/port/sys/%.c)			\
-	$(AIOOBJS:%.o=$(LIBCDIR)/port/aio/%.c)			\
-	$(RTOBJS:%.o=$(LIBCDIR)/port/rt/%.c)			\
-	$(SECFLAGSOBJS:%.o=$(SRC)/common/secflags/%.c)		\
-	$(TPOOLOBJS:%.o=$(LIBCDIR)/port/tpool/%.c)		\
-	$(THREADSOBJS:%.o=$(LIBCDIR)/port/threads/%.c)		\
+	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)		\
+	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)		\
+	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)	\
+	$(PORTLOCALE:%.o=$(LIBCDIR)/port/locale/%.c)	\
+	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)	\
+	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)	\
+	$(PORTSTDIO:%.o=$(LIBCDIR)/port/stdio/%.c)	\
+	$(PORTSYS:%.o=$(LIBCDIR)/port/sys/%.c)		\
+	$(AIOOBJS:%.o=$(LIBCDIR)/port/aio/%.c)		\
+	$(RTOBJS:%.o=$(LIBCDIR)/port/rt/%.c)		\
+	$(SECFLAGSOBJS:%.o=$(SRC)/common/secflags/%.c)	\
+	$(TPOOLOBJS:%.o=$(LIBCDIR)/port/tpool/%.c)	\
+	$(THREADSOBJS:%.o=$(LIBCDIR)/port/threads/%.c)	\
 	$(THREADSMACHOBJS:%.o=threads/%.c)		\
 	$(UNICODEOBJS:%.o=$(SRC)/common/unicode/%.c)	\
 	$(UNWINDMACHOBJS:%.o=unwind/%.c)		\
 	$(FPOBJS:%.o=fp/%.c)				\
-	$(I386FPOBJS:%.o=$(LIBCDIR)/i386/fp/%.c)		\
+	$(I386FPOBJS:%.o=$(LIBCDIR)/i386/fp/%.c)	\
 	$(LIBCBASE)/gen/ecvt.c				\
 	$(LIBCBASE)/gen/makectxt.c			\
 	$(LIBCBASE)/gen/siginfolst.c			\

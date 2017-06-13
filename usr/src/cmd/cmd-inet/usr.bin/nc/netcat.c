@@ -65,7 +65,6 @@
 #include <signal.h>
 
 #include "atomicio.h"
-#include "strtonum.h"
 
 #ifndef	SUN_LEN
 #define	SUN_LEN(su) \

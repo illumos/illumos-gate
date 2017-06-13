@@ -11,7 +11,7 @@
 
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 PROG=		mandoc
@@ -61,9 +61,7 @@ OBJS=		att.o		\
 		term_ps.o	\
 		tree.o
 
-OBJS +=		compat_ohash.o		\
-		compat_reallocarray.o	\
-		compat_strtonum.o
+OBJS +=		compat_ohash.o
 
 CFLAGS +=	$(CC_VERBOSE)
 C99MODE =	$(C99_ENABLE)

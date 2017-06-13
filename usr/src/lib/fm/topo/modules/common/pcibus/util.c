@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -50,7 +48,7 @@ child_range_add(topo_mod_t *mp, tnode_t *tn, const char *cnm,
 }
 
 ulong_t
-strtonum(topo_mod_t *mp, char *str, int *err)
+fm_strtonum(topo_mod_t *mp, char *str, int *err)
 {
 	ulong_t r;
 	char *e;
@@ -74,17 +72,17 @@ get_pci_vpd_sn_pn(topo_mod_t *mp, di_node_t dn, char **serial, char **part)
 
 	if ((promtree = topo_mod_prominfo(mp)) == DI_PROM_HANDLE_NIL) {
 		topo_mod_dprintf(mp,
-			"get vpd data: di_prom_handle_init failed.\n");
+		    "get vpd data: di_prom_handle_init failed.\n");
 		return (-1);
 	}
 
 	/* Get Serial Number and Part Number */
 	if ((di_prom_prop_lookup_bytes(promtree, dn, "vpd-serial-number",
-		(uchar_t **)&s) > 0) && (s != NULL))
+	    (uchar_t **)&s) > 0) && (s != NULL))
 		*serial = topo_mod_strdup(mp, s);
 
 	if ((di_prom_prop_lookup_bytes(promtree, dn, "vpd-part-number",
-		(uchar_t **)&p) > 0) && (p != NULL))
+	    (uchar_t **)&p) > 0) && (p != NULL))
 		*part = topo_mod_strdup(mp, p);
 
 	return (0);
@@ -109,7 +107,7 @@ tnode_create(topo_mod_t *mp, tnode_t *parent,
 		(void) get_pci_vpd_sn_pn(mp, priv, &serial, &part);
 
 	fmri = topo_mod_hcfmri(mp, parent, FM_HC_SCHEME_VERSION, name, i, NULL,
-		auth, part, NULL, serial);
+	    auth, part, NULL, serial);
 	nvlist_free(auth);
 	topo_mod_strfree(mp, serial);
 	topo_mod_strfree(mp, part);

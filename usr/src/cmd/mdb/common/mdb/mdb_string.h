@@ -27,8 +27,6 @@
 #ifndef	_MDB_STRING_H
 #define	_MDB_STRING_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <strings.h>
 
@@ -42,7 +40,7 @@ extern "C" {
 #define	NTOS_SHOWBASE	0x8	/* Show base under appropriate circumstances */
 
 extern const char *numtostr(uintmax_t, int, uint_t);
-extern uintmax_t strtonum(const char *, int);
+extern uintmax_t mdb_strtonum(const char *, int);
 extern ulong_t strntoul(const char *, size_t, int);
 extern int strisnum(const char *);
 extern int strisbasenum(const char *);

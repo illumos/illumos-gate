@@ -27,8 +27,6 @@
 #ifndef _UTIL_H
 #define	_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/topo_mod.h>
 
 #ifdef __cplusplus
@@ -39,7 +37,7 @@ extern int child_range_add(topo_mod_t *, tnode_t *, const char *,
     topo_instance_t, topo_instance_t);
 extern int labelmethod_inherit(topo_mod_t *, tnode_t *, nvlist_t *,
     nvlist_t **);
-extern ulong_t strtonum(topo_mod_t *, char *, int *);
+extern ulong_t fm_strtonum(topo_mod_t *, char *, int *);
 extern tnode_t *tnode_create(topo_mod_t *, tnode_t *, const char *,
     topo_instance_t, void *);
 

@@ -2785,7 +2785,8 @@ cmd_delete(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		spec.spec_base = mdb_get_dot();
 	else if (argv->a_type == MDB_TYPE_STRING &&
 	    strcmp(argv->a_un.a_str, "all") != 0)
-		spec.spec_id = (int)(intmax_t)strtonum(argv->a_un.a_str, 10);
+		spec.spec_id = (int)(intmax_t)mdb_strtonum(argv->a_un.a_str,
+		    10);
 	else if (argv->a_type == MDB_TYPE_IMMEDIATE)
 		spec.spec_id = (int)(intmax_t)argv->a_un.a_val;
 
