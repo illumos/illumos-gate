@@ -26,7 +26,7 @@
  */
 
 /*
- * Copyright 2009 Jason King.  All rights reserved.
+ * Copyright 2017 Jason King.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,7 +125,6 @@
 
 #undef BUFSIZ
 #define	BUFSIZ 4096
-#define	NUMBER_WIDTH 40
 #define	FMTSIZE 50
 
 struct ditem {
@@ -216,11 +215,6 @@ struct dchain {
 	struct dchain *dc_next;	/* next directory in the chain */
 };
 
-/*
- * A numbuf_t is used when converting a number to a string representation
- */
-typedef char numbuf_t[NUMBER_WIDTH];
-
 static struct dchain *dfirst;	/* start of the dir chain */
 static struct dchain *cdfirst;	/* start of the current dir chain */
 static struct dchain *dtemp;	/* temporary - used for linking */
@@ -252,9 +246,6 @@ static struct cachenode *findincache(struct cachenode **, long);
 static void		csi_pprintf(unsigned char *);
 static void		pprintf(char *, char *);
 static int		compar(struct lbuf **pp1, struct lbuf **pp2);
-static char 		*number_to_scaled_string(numbuf_t buf,
-			    unsigned long long number,
-			    long scale);
 static void		record_ancestry(char *, struct stat *, struct lbuf *,
 			    int, struct ditem *);
 static void		ls_color_init(void);
@@ -306,7 +297,7 @@ static int		atm;
 static int		mtm;
 static int		crtm;
 static int		alltm;
-static long		hscale;
+static uint_t		nicenum_flags;
 static mode_t		flags;
 static int		err = 0;	/* Contains return code */
 static int		colorflg;
@@ -481,7 +472,7 @@ main(int argc, char *argv[])
 			if (strcmp(long_options[option_index].name,
 			    "si") == 0) {
 				hflg++;
-				hscale = 1000;
+				nicenum_flags |= NN_DIVISOR_1000;
 				continue;
 			}
 
@@ -751,7 +742,6 @@ main(int argc, char *argv[])
 			continue;
 		case 'h':
 			hflg++;
-			hscale = 1024;
 			continue;
 		case 'H':
 			Hflg++;
@@ -1255,7 +1245,6 @@ static void
 pentry(struct lbuf *ap)
 {
 	struct lbuf *p;
-	numbuf_t hbuf;
 	char *dmark = "";	/* Used if -p or -F option active */
 	char *cp;
 	char *str;
@@ -1308,9 +1297,13 @@ pentry(struct lbuf *ap)
 			curcol += printf("%3u, %2u",
 			    (uint_t)major((dev_t)p->lsize),
 			    (uint_t)minor((dev_t)p->lsize));
-		} else if (hflg && (p->lsize >= hscale)) {
-			curcol += printf("%7s",
-			    number_to_scaled_string(hbuf, p->lsize, hscale));
+		} else if (hflg) {
+			char numbuf[NN_NUMBUF_SZ];
+
+			nicenum_scale(p->lsize, 1, numbuf, sizeof (numbuf),
+			    nicenum_flags);
+
+			curcol += printf("%7s", numbuf);
 		} else {
 			uint64_t bsize = p->lsize / block_size;
 
@@ -2442,85 +2435,6 @@ strcol(unsigned char *s1)
 		w += w_col;
 	}
 	return (w);
-}
-
-/*
- * Convert an unsigned long long to a string representation and place the
- * result in the caller-supplied buffer.
- *
- * The number provided is a size in bytes.  The number is first
- * converted to an integral multiple of 'scale' bytes.  This new
- * number is then scaled down until it is small enough to be in a good
- * human readable format, i.e.  in the range 0 thru scale-1.  If the
- * number used to derive the final number is not a multiple of scale, and
- * the final number has only a single significant digit, we compute
- * tenths of units to provide a second significant digit.
- *
- * The value "(unsigned long long)-1" is a special case and is always
- * converted to "-1".
- *
- * A pointer to the caller-supplied buffer is returned.
- */
-static char *
-number_to_scaled_string(
-			numbuf_t buf,		/* put the result here */
-			unsigned long long number, /* convert this number */
-			long scale)
-{
-	unsigned long long save;
-	/* Measurement: kilo, mega, giga, tera, peta, exa */
-	char *uom = "KMGTPE";
-
-	if ((long long)number == (long long)-1) {
-		(void) strlcpy(buf, "-1", sizeof (numbuf_t));
-		return (buf);
-	}
-
-	save = number;
-	number = number / scale;
-
-	/*
-	 * Now we have number as a count of scale units.
-	 * If no further scaling is necessary, we round up as appropriate.
-	 *
-	 * The largest value number could have had entering the routine is
-	 * 16 Exabytes, so running off the end of the uom array should
-	 * never happen.  We check for that, though, as a guard against
-	 * a breakdown elsewhere in the algorithm.
-	 */
-	if (number < (unsigned long long)scale) {
-		if ((save % scale) >= (unsigned long long)(scale / 2)) {
-			if (++number == (unsigned long long)scale) {
-				uom++;
-				number = 1;
-			}
-		}
-	} else {
-		while ((number >= (unsigned long long)scale) && (*uom != 'E')) {
-			uom++; /* next unit of measurement */
-			save = number;
-			/*
-			 * If we're over half way to the next unit of
-			 * 'scale' bytes (which means we should round
-			 * up), then adding half of 'scale' prior to
-			 * the division will push us into that next
-			 * unit of scale when we perform the division
-			 */
-			number = (number + (scale / 2)) / scale;
-		}
-	}
-
-	/* check if we should output a decimal place after the point */
-	if ((save / scale) < 10) {
-		/* snprintf() will round for us */
-		float fnum = (float)save / scale;
-		(void) snprintf(buf, sizeof (numbuf_t), "%2.1f%c",
-		    fnum, *uom);
-	} else {
-		(void) snprintf(buf, sizeof (numbuf_t), "%4llu%c",
-		    number, *uom);
-	}
-	return (buf);
 }
 
 /* Get extended system attributes and set the display */

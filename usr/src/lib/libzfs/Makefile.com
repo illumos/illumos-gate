@@ -70,7 +70,7 @@ INCS += -I../../libc/inc
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
-	-ladm -lidmap -ltsol -lmd -lumem -lzfs_core
+	-ladm -lidmap -ltsol -lmd -lumem -lzfs_core -lcmdutils
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 

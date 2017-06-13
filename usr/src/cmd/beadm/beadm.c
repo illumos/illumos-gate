@@ -25,6 +25,7 @@
  * Copyright 2015 Toomas Soome <tsoome@me.com>
  * Copyright 2015 Gary Mills
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright 2017 Jason King
  */
 
 /*
@@ -40,6 +41,8 @@
 #include <stdlib.h>
 #include <wchar.h>
 #include <sys/types.h>
+#include <sys/debug.h>
+#include <libcmdutils.h>
 
 #include "libbe.h"
 
@@ -55,6 +58,7 @@
 
 #define	DT_BUF_LEN (128)
 #define	NUM_COLS (6)
+CTASSERT(DT_BUF_LEN >= NN_NUMBUF_SZ);
 
 static int be_do_activate(int argc, char **argv);
 static int be_do_create(int argc, char **argv);
@@ -244,32 +248,6 @@ init_hdr_cols(enum be_fmt be_fmt, struct hdr_info *hdr)
 			} else {
 				col[i].width = strlen(name);
 			}
-		}
-	}
-}
-
-static void
-nicenum(uint64_t num, char *buf, size_t buflen)
-{
-	uint64_t n = num;
-	int index = 0;
-	char u;
-
-	while (n >= 1024) {
-		n /= 1024;
-		index++;
-	}
-
-	u = " KMGTPE"[index];
-
-	if (index == 0) {
-		(void) snprintf(buf, buflen, "%llu", n);
-	} else {
-		int i;
-		for (i = 2; i >= 0; i--) {
-			if (snprintf(buf, buflen, "%.*f%c", i,
-			    (double)num / (1ULL << 10 * index), u) <= 5)
-				break;
 		}
 	}
 }

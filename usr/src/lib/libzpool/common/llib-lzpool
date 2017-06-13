@@ -62,6 +62,7 @@
 #include <sys/dsl_userhold.h>
 #include <sys/blkptr.h>
 #include <sys/abd.h>
+#include <libcmdutils.h>
 
 extern uint64_t metaslab_gang_bang;
 extern uint64_t metaslab_df_alloc_threshold;
