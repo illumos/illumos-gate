@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_SYS_SQUEUE_IMPL_H
@@ -84,7 +85,6 @@ typedef void (*sq_enter_proc_t)(squeue_t *, mblk_t *, mblk_t *, uint32_t,
 	    struct ip_recv_attr_s *, int, uint8_t);
 typedef void (*sq_drain_proc_t)(squeue_t *, uint_t, hrtime_t);
 
-extern void squeue_worker_wakeup(squeue_t *);
 extern int ip_squeue_flag;
 
 struct squeue_s {
@@ -99,14 +99,11 @@ struct squeue_s {
 	ill_rx_ring_t	*sq_rx_ring;	/* The Rx ring tied to this sq */
 	ill_t		*sq_ill;	/* The ill this squeue is tied to */
 
-	clock_t		sq_curr_time;	/* Current tick (lbolt) */
+	hrtime_t	sq_awoken;	/* time of worker wake req */
 	kcondvar_t	sq_worker_cv;	/* cond var. worker thread blocks on */
 	kcondvar_t	sq_poll_cv;	/* cond variable poll_thr waits on */
 	kcondvar_t	sq_synch_cv;	/* cond var. synch thread waits on */
 	kcondvar_t	sq_ctrlop_done_cv; /* cond variable for ctrl ops */
-	clock_t		sq_wait;	/* lbolts to wait after a fill() */
-	timeout_id_t	sq_tid;		/* timer id of pending timeout() */
-	clock_t		sq_awaken;	/* time async thread was awakened */
 
 	processorid_t	sq_bind;	/* processor to bind to */
 	kthread_t	*sq_worker;	/* kernel thread id */
@@ -141,7 +138,6 @@ struct squeue_s {
 #define	SQS_USER	0x00000010	/* A non interrupt user */
 #define	SQS_BOUND	0x00000020	/* Worker thread is bound */
 #define	SQS_REENTER	0x00000040	/* Re entered thread */
-#define	SQS_TMO_PROG	0x00000080	/* Timeout is being set */
 
 #define	SQS_POLL_CAPAB	0x00000100	/* Squeue can control interrupts */
 #define	SQS_ILL_BOUND	0x00000200	/* Squeue bound to an ill */

@@ -5535,8 +5535,7 @@ vnd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	vnd_sqset = gsqueue_set_create(GSQUEUE_DEFAULT_WAIT,
-	    GSQUEUE_DEFAULT_PRIORITY);
+	vnd_sqset = gsqueue_set_create(GSQUEUE_DEFAULT_PRIORITY);
 
 	return (DDI_SUCCESS);
 }

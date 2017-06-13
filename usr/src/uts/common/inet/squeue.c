@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -136,21 +136,19 @@
 
 #include <sys/squeue_impl.h>
 
-static void squeue_fire(void *);
 static void squeue_drain(squeue_t *, uint_t, hrtime_t);
 static void squeue_worker(squeue_t *sqp);
 static void squeue_polling_thread(squeue_t *sqp);
+static void squeue_worker_wakeup(squeue_t *sqp);
 
 kmem_cache_t *squeue_cache;
 
 #define	SQUEUE_MSEC_TO_NSEC 1000000
 
 int squeue_drain_ms = 20;
-int squeue_workerwait_ms = 0;
 
 /* The values above converted to ticks or nano seconds */
-static int squeue_drain_ns = 0;
-static int squeue_workerwait_tick = 0;
+static uint_t squeue_drain_ns = 0;
 
 uintptr_t squeue_drain_stack_needed = 10240;
 uint_t squeue_drain_stack_toodeep;
@@ -243,19 +241,16 @@ squeue_init(void)
 	    sizeof (squeue_t), 64, NULL, NULL, NULL, NULL, NULL, 0);
 
 	squeue_drain_ns = squeue_drain_ms * SQUEUE_MSEC_TO_NSEC;
-	squeue_workerwait_tick = MSEC_TO_TICK_ROUNDUP(squeue_workerwait_ms);
 }
 
-/* ARGSUSED */
 squeue_t *
-squeue_create(clock_t wait, pri_t pri, boolean_t isip)
+squeue_create(pri_t pri, boolean_t isip)
 {
 	squeue_t *sqp = kmem_cache_alloc(squeue_cache, KM_SLEEP);
 
 	bzero(sqp, sizeof (squeue_t));
 	sqp->sq_bind = PBIND_NONE;
 	sqp->sq_priority = pri;
-	sqp->sq_wait = MSEC_TO_TICK(wait);
 	sqp->sq_worker = thread_create(NULL, 0, squeue_worker,
 	    sqp, 0, &p0, TS_RUN, pri);
 
@@ -336,97 +331,6 @@ squeue_unbind(squeue_t *sqp)
 	sqp->sq_state &= ~SQS_BOUND;
 	thread_affinity_clear(sqp->sq_worker);
 	mutex_exit(&sqp->sq_lock);
-}
-
-void
-squeue_worker_wakeup(squeue_t *sqp)
-{
-	timeout_id_t tid = (sqp)->sq_tid;
-
-	ASSERT(MUTEX_HELD(&(sqp)->sq_lock));
-
-	if (sqp->sq_wait == 0) {
-		ASSERT(tid == 0);
-		ASSERT(!(sqp->sq_state & SQS_TMO_PROG));
-		sqp->sq_awaken = ddi_get_lbolt();
-		cv_signal(&sqp->sq_worker_cv);
-		mutex_exit(&sqp->sq_lock);
-		return;
-	}
-
-	/*
-	 * Queue isn't being processed, so take
-	 * any post enqueue actions needed before leaving.
-	 */
-	if (tid != 0) {
-		/*
-		 * Waiting for an enter() to process mblk(s).
-		 */
-		clock_t now = ddi_get_lbolt();
-		clock_t	waited = now - sqp->sq_awaken;
-
-		if (TICK_TO_MSEC(waited) >= sqp->sq_wait) {
-			/*
-			 * Times up and have a worker thread
-			 * waiting for work, so schedule it.
-			 */
-			sqp->sq_tid = 0;
-			sqp->sq_awaken = now;
-			cv_signal(&sqp->sq_worker_cv);
-			mutex_exit(&sqp->sq_lock);
-			(void) untimeout(tid);
-			return;
-		}
-		mutex_exit(&sqp->sq_lock);
-		return;
-	} else if (sqp->sq_state & SQS_TMO_PROG) {
-		mutex_exit(&sqp->sq_lock);
-		return;
-	} else {
-		clock_t	wait = sqp->sq_wait;
-		/*
-		 * Wait up to sqp->sq_wait ms for an
-		 * enter() to process this queue. We
-		 * don't want to contend on timeout locks
-		 * with sq_lock held for performance reasons,
-		 * so drop the sq_lock before calling timeout
-		 * but we need to check if timeout is required
-		 * after re acquiring the sq_lock. Once
-		 * the sq_lock is dropped, someone else could
-		 * have processed the packet or the timeout could
-		 * have already fired.
-		 */
-		sqp->sq_state |= SQS_TMO_PROG;
-		mutex_exit(&sqp->sq_lock);
-		tid = timeout(squeue_fire, sqp, wait);
-		mutex_enter(&sqp->sq_lock);
-		/* Check again if we still need the timeout */
-		if (((sqp->sq_state & (SQS_PROC|SQS_TMO_PROG)) ==
-		    SQS_TMO_PROG) && (sqp->sq_tid == 0) &&
-		    (sqp->sq_first != NULL)) {
-				sqp->sq_state &= ~SQS_TMO_PROG;
-				sqp->sq_tid = tid;
-				mutex_exit(&sqp->sq_lock);
-				return;
-		} else {
-			if (sqp->sq_state & SQS_TMO_PROG) {
-				sqp->sq_state &= ~SQS_TMO_PROG;
-				mutex_exit(&sqp->sq_lock);
-				(void) untimeout(tid);
-			} else {
-				/*
-				 * The timer fired before we could
-				 * reacquire the sq_lock. squeue_fire
-				 * removes the SQS_TMO_PROG flag
-				 * and we don't need to	do anything
-				 * else.
-				 */
-				mutex_exit(&sqp->sq_lock);
-			}
-		}
-	}
-
-	ASSERT(MUTEX_NOT_HELD(&sqp->sq_lock));
 }
 
 /*
@@ -529,18 +433,14 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 			sqp->sq_run = NULL;
 			if (sqp->sq_first == NULL ||
 			    process_flag == SQ_NODRAIN) {
-				if (sqp->sq_first != NULL) {
-					squeue_worker_wakeup(sqp);
-					return;
-				}
 				/*
-				 * We processed inline our packet and nothing
-				 * new has arrived. We are done. In case any
-				 * control actions are pending, wake up the
-				 * worker.
+				 * If work or control actions are pending, wake
+				 * up the worker thread.
 				 */
-				if (sqp->sq_state & SQS_WORKER_THR_CONTROL)
-					cv_signal(&sqp->sq_worker_cv);
+				if (sqp->sq_first != NULL ||
+				    sqp->sq_state & SQS_WORKER_THR_CONTROL) {
+					squeue_worker_wakeup(sqp);
+				}
 				mutex_exit(&sqp->sq_lock);
 				return;
 			}
@@ -597,10 +497,9 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 		 * up the worker.
 		 */
 		sqp->sq_run = NULL;
-		if (sqp->sq_state & SQS_WORKER_THR_CONTROL)
-			cv_signal(&sqp->sq_worker_cv);
-		mutex_exit(&sqp->sq_lock);
-		return;
+		if (sqp->sq_state & SQS_WORKER_THR_CONTROL) {
+			squeue_worker_wakeup(sqp);
+		}
 	} else {
 		/*
 		 * We let a thread processing a squeue reenter only
@@ -696,54 +595,33 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 			tail = mp = attrmp;
 		}
 		ENQUEUE_CHAIN(sqp, mp, tail, cnt);
-		if (!(sqp->sq_state & SQS_PROC)) {
-			squeue_worker_wakeup(sqp);
-			return;
-		}
 		/*
-		 * In case any control actions are pending, wake
-		 * up the worker.
+		 * If the worker isn't running or control actions are pending,
+		 * wake it it up now.
 		 */
-		if (sqp->sq_state & SQS_WORKER_THR_CONTROL)
-			cv_signal(&sqp->sq_worker_cv);
-		mutex_exit(&sqp->sq_lock);
-		return;
+		if ((sqp->sq_state & SQS_PROC) == 0 ||
+		    (sqp->sq_state & SQS_WORKER_THR_CONTROL) != 0) {
+			squeue_worker_wakeup(sqp);
+		}
 	}
+	mutex_exit(&sqp->sq_lock);
 }
 
 /*
  * PRIVATE FUNCTIONS
  */
 
+
+/*
+ * Wake up worker thread for squeue to process queued work.
+ */
 static void
-squeue_fire(void *arg)
+squeue_worker_wakeup(squeue_t *sqp)
 {
-	squeue_t	*sqp = arg;
-	uint_t		state;
+	ASSERT(MUTEX_HELD(&(sqp)->sq_lock));
 
-	mutex_enter(&sqp->sq_lock);
-
-	state = sqp->sq_state;
-	if (sqp->sq_tid == 0 && !(state & SQS_TMO_PROG)) {
-		mutex_exit(&sqp->sq_lock);
-		return;
-	}
-
-	sqp->sq_tid = 0;
-	/*
-	 * The timeout fired before we got a chance to set it.
-	 * Process it anyway but remove the SQS_TMO_PROG so that
-	 * the guy trying to set the timeout knows that it has
-	 * already been processed.
-	 */
-	if (state & SQS_TMO_PROG)
-		sqp->sq_state &= ~SQS_TMO_PROG;
-
-	if (!(state & SQS_PROC)) {
-		sqp->sq_awaken = ddi_get_lbolt();
-		cv_signal(&sqp->sq_worker_cv);
-	}
-	mutex_exit(&sqp->sq_lock);
+	cv_signal(&sqp->sq_worker_cv);
+	sqp->sq_awoken = gethrtime();
 }
 
 static void
@@ -753,10 +631,8 @@ squeue_drain(squeue_t *sqp, uint_t proc_type, hrtime_t expire)
 	mblk_t 		*head;
 	sqproc_t 	proc;
 	conn_t		*connp;
-	timeout_id_t 	tid;
 	ill_rx_ring_t	*sq_rx_ring = sqp->sq_rx_ring;
 	hrtime_t 	now;
-	boolean_t	did_wakeup = B_FALSE;
 	boolean_t	sq_poll_capable;
 	ip_recv_attr_t	*ira, iras;
 
@@ -768,8 +644,7 @@ squeue_drain(squeue_t *sqp, uint_t proc_type, hrtime_t expire)
 	if (proc_type != SQS_WORKER && STACK_BIAS + (uintptr_t)getfp() -
 	    (uintptr_t)curthread->t_stkbase < squeue_drain_stack_needed) {
 		ASSERT(mutex_owned(&sqp->sq_lock));
-		sqp->sq_awaken = ddi_get_lbolt();
-		cv_signal(&sqp->sq_worker_cv);
+		squeue_worker_wakeup(sqp);
 		squeue_drain_stack_toodeep++;
 		return;
 	}
@@ -784,9 +659,6 @@ again:
 	sqp->sq_first = NULL;
 	sqp->sq_last = NULL;
 	sqp->sq_count = 0;
-
-	if ((tid = sqp->sq_tid) != 0)
-		sqp->sq_tid = 0;
 
 	sqp->sq_state |= SQS_PROC | proc_type;
 
@@ -803,9 +675,6 @@ again:
 	 */
 	SQS_POLLING_ON(sqp, sq_poll_capable, sq_rx_ring);
 	mutex_exit(&sqp->sq_lock);
-
-	if (tid != 0)
-		(void) untimeout(tid);
 
 	while ((mp = head) != NULL) {
 
@@ -908,11 +777,9 @@ again:
 			if (proc_type == SQS_WORKER)
 				SQS_POLL_RING(sqp);
 			goto again;
-		} else {
-			did_wakeup = B_TRUE;
-			sqp->sq_awaken = ddi_get_lbolt();
-			cv_signal(&sqp->sq_worker_cv);
 		}
+
+		squeue_worker_wakeup(sqp);
 	}
 
 	/*
@@ -971,17 +838,14 @@ again:
 		    SQS_POLL_QUIESCE_DONE)));
 		SQS_POLLING_OFF(sqp, sq_poll_capable, sq_rx_ring);
 		sqp->sq_state &= ~(SQS_PROC | proc_type);
-		if (!did_wakeup && sqp->sq_first != NULL) {
-			squeue_worker_wakeup(sqp);
-			mutex_enter(&sqp->sq_lock);
-		}
 		/*
 		 * If we are not the worker and there is a pending quiesce
 		 * event, wake up the worker
 		 */
 		if ((proc_type != SQS_WORKER) &&
-		    (sqp->sq_state & SQS_WORKER_THR_CONTROL))
-			cv_signal(&sqp->sq_worker_cv);
+		    (sqp->sq_state & SQS_WORKER_THR_CONTROL)) {
+			squeue_worker_wakeup(sqp);
+		}
 	}
 }
 
@@ -1189,7 +1053,6 @@ poll_again:
 				 */
 			}
 
-			sqp->sq_awaken = ddi_get_lbolt();
 			/*
 			 * Put the SQS_PROC_HELD on so the worker
 			 * thread can distinguish where its called from. We
@@ -1205,7 +1068,7 @@ poll_again:
 			 */
 			sqp->sq_state |= SQS_PROC_HELD;
 			sqp->sq_state &= ~SQS_GET_PKTS;
-			cv_signal(&sqp->sq_worker_cv);
+			squeue_worker_wakeup(sqp);
 		} else if (sqp->sq_first == NULL &&
 		    !(sqp->sq_state & SQS_WORKER)) {
 			/*
@@ -1225,8 +1088,9 @@ poll_again:
 			 * wake up the worker, since it is currently
 			 * not running.
 			 */
-			if (sqp->sq_state & SQS_WORKER_THR_CONTROL)
-				cv_signal(&sqp->sq_worker_cv);
+			if (sqp->sq_state & SQS_WORKER_THR_CONTROL) {
+				squeue_worker_wakeup(sqp);
+			}
 		} else {
 			/*
 			 * Worker thread is already running. We don't need
@@ -1556,9 +1420,7 @@ squeue_synch_exit(conn_t *connp)
 		sqp->sq_run = NULL;
 		connp->conn_on_sqp = B_FALSE;
 
-		if (sqp->sq_first == NULL) {
-			mutex_exit(&sqp->sq_lock);
-		} else {
+		if (sqp->sq_first != NULL) {
 			/*
 			 * If this was a normal thread, then it would
 			 * (most likely) continue processing the pending
@@ -1568,9 +1430,7 @@ squeue_synch_exit(conn_t *connp)
 			 * worker thread right away when there are outstanding
 			 * requests.
 			 */
-			sqp->sq_awaken = ddi_get_lbolt();
-			cv_signal(&sqp->sq_worker_cv);
-			mutex_exit(&sqp->sq_lock);
+			squeue_worker_wakeup(sqp);
 		}
 	} else {
 		/*
@@ -1583,6 +1443,6 @@ squeue_synch_exit(conn_t *connp)
 
 		/* There should be only one thread blocking on sq_synch_cv. */
 		cv_signal(&sqp->sq_synch_cv);
-		mutex_exit(&sqp->sq_lock);
 	}
+	mutex_exit(&sqp->sq_lock);
 }

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_GSQUEUE_H
@@ -34,7 +34,7 @@ typedef struct gsqueue_set gsqueue_set_t;
 typedef void (*gsqueue_cb_f)(gsqueue_set_t *, gsqueue_t *, void *, boolean_t);
 typedef void (*gsqueue_proc_f)(void *, mblk_t *, gsqueue_t *, void *);
 
-extern gsqueue_set_t *gsqueue_set_create(uint_t, pri_t);
+extern gsqueue_set_t *gsqueue_set_create(pri_t);
 extern void gsqueue_set_destroy(gsqueue_set_t *);
 extern gsqueue_t *gsqueue_set_get(gsqueue_set_t *, uint_t);
 
@@ -48,12 +48,6 @@ extern int gsqueue_set_cb_remove(gsqueue_set_t *, uintptr_t);
 extern void gsqueue_enter_one(gsqueue_t *, mblk_t *, gsqueue_proc_f, void *,
     int, uint8_t);
 
-/*
- * The default wait is inherited from IP. This determines the amount of time
- * that must pass after queuing work, before we wake up the worker thread. This
- * value is in milliseconds.
- */
-#define	GSQUEUE_DEFAULT_WAIT	10
 #define	GSQUEUE_DEFAULT_PRIORITY	MAXCLSYSPRI
 
 #endif	/* _KERNEL */

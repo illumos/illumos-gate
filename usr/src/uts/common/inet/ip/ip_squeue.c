@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -101,10 +102,6 @@
  *
  * ip_squeue_fanout can be accessed and changed using ndd on /dev/tcp or
  * /dev/ip.
- *
- * ip_squeue_worker_wait: global value for the sq_wait field for all squeues *
- * created. This is the time squeue code waits before waking up the worker
- * thread after queuing a request.
  */
 
 #include <sys/types.h>
@@ -142,13 +139,6 @@ kmutex_t		sqset_lock;
 
 static void (*ip_squeue_create_callback)(squeue_t *) = NULL;
 
-/*
- * ip_squeue_worker_wait: global value for the sq_wait field for all squeues
- *	created. This is the time squeue code waits before waking up the worker
- *	thread after queuing a request.
- */
-uint_t ip_squeue_worker_wait = 10;
-
 static squeue_t *ip_squeue_create(pri_t);
 static squeue_set_t *ip_squeue_set_create(processorid_t);
 static int ip_squeue_cpu_setup(cpu_setup_t, int, void *);
@@ -163,7 +153,7 @@ ip_squeue_create(pri_t pri)
 {
 	squeue_t *sqp;
 
-	sqp = squeue_create(ip_squeue_worker_wait, pri, B_TRUE);
+	sqp = squeue_create(pri, B_TRUE);
 	ASSERT(sqp != NULL);
 	if (ip_squeue_create_callback != NULL)
 		ip_squeue_create_callback(sqp);

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_SYS_SQUEUE_H
@@ -87,7 +88,7 @@ typedef enum {
 
 struct ip_recv_attr_s;
 extern void squeue_init(void);
-extern squeue_t *squeue_create(clock_t, pri_t, boolean_t);
+extern squeue_t *squeue_create(pri_t, boolean_t);
 extern void squeue_bind(squeue_t *, processorid_t);
 extern void squeue_unbind(squeue_t *);
 extern void squeue_enter(squeue_t *, mblk_t *, mblk_t *,

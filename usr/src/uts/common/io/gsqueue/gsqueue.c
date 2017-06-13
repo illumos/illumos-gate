@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -84,9 +84,9 @@
  *       |    |     |
  *       |    |     * . . . gs_cpus
  *       |    |     |
- *       |    |     |      +-------------------------------------------------+
- *       |    |     +----->| gsqueue_cpu_t || gsqueue_cpu_t || gsqueue_cpu_t |...
- *       |    |            +-------------------------------------------------+
+ *       |    |     |    +-------------------------------------------------+
+ *       |    |     +--->| gsqueue_cpu_t || gsqueue_cpu_t || gsqueue_cpu_t |...
+ *       |    |          +-------------------------------------------------+
  *       |    |
  *       |    * . . . gs_defunct
  *       |    |
@@ -173,7 +173,6 @@ typedef struct gsqueue_cpu {
 
 struct gsqueue_set {
 	list_node_t gs_next;
-	uint_t gs_wwait;
 	pri_t gs_wpri;
 	kmutex_t gs_lock;
 	int gs_ncpus;
@@ -189,7 +188,7 @@ static kmem_cache_t *gsqueue_cpu_cache;
 static kmem_cache_t *gsqueue_set_cache;
 
 static gsqueue_cpu_t *
-gsqueue_cpu_create(uint_t wwait, pri_t wpri, processorid_t cpuid)
+gsqueue_cpu_create(pri_t wpri, processorid_t cpuid)
 {
 	gsqueue_cpu_t *scp;
 
@@ -197,7 +196,7 @@ gsqueue_cpu_create(uint_t wwait, pri_t wpri, processorid_t cpuid)
 
 	scp->gqc_next = NULL;
 	scp->gqc_cpuid = cpuid;
-	scp->gqc_head = squeue_create(wwait, wpri, B_FALSE);
+	scp->gqc_head = squeue_create(wpri, B_FALSE);
 	scp->gqc_head->sq_state = SQS_DEFAULT;
 	squeue_bind(scp->gqc_head, cpuid);
 
@@ -212,13 +211,12 @@ gsqueue_cpu_destroy(gsqueue_cpu_t *scp)
 }
 
 gsqueue_set_t *
-gsqueue_set_create(uint_t wwait, pri_t wpri)
+gsqueue_set_create(pri_t wpri)
 {
 	int i;
 	gsqueue_set_t *gssp;
 
 	gssp = kmem_cache_alloc(gsqueue_set_cache, KM_SLEEP);
-	gssp->gs_wwait = wwait;
 	gssp->gs_wpri = wpri;
 	gssp->gs_ncpus = 0;
 
@@ -234,7 +232,7 @@ gsqueue_set_create(uint_t wwait, pri_t wpri)
 		cpu_t *cp = cpu_get(i);
 		if (cp != NULL && CPU_ACTIVE(cp) &&
 		    cp->cpu_flags & CPU_EXISTS) {
-			scp = gsqueue_cpu_create(wwait, wpri, cp->cpu_id);
+			scp = gsqueue_cpu_create(wpri, cp->cpu_id);
 			gssp->gs_cpus[gssp->gs_ncpus] = scp;
 			gssp->gs_ncpus++;
 		}
@@ -414,8 +412,7 @@ gsqueue_handle_online(processorid_t id)
 		}
 
 		if (scp == NULL) {
-			scp = gsqueue_cpu_create(gssp->gs_wwait,
-			    gssp->gs_wpri, id);
+			scp = gsqueue_cpu_create(gssp->gs_wpri, id);
 		} else {
 			squeue_bind(scp->gqc_head, id);
 		}
