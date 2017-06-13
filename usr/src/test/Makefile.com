@@ -30,6 +30,10 @@ lint_SRCS:
 	$(LINT.c) $(SRCS) $(LDLIBS)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@if [ -f $@/Makefile  ]; then \
+		cd $@; pwd; $(MAKE) $(TARGET); \
+	else \
+		true; \
+	fi
 
 FRC:
