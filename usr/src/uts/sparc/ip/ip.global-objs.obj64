@@ -145,7 +145,6 @@ ip_squeue_create_callback
 ip_squeue_enter
 ip_squeue_fanout
 ip_squeue_flag
-ip_squeue_worker_wait
 ip_thread_data
 ip_thread_list
 ip_thread_rwlock
@@ -254,8 +253,6 @@ squeue_drain_ms
 squeue_drain_ns
 squeue_drain_stack_needed
 squeue_drain_stack_toodeep
-squeue_workerwait_ms
-squeue_workerwait_tick
 tcp_acceptor_rinit
 tcp_acceptor_winit
 tcp_conn_cache
