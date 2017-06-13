@@ -10,17 +10,20 @@
 #
 
 #
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2016 Joyent, Inc.
 #
 
 CMDDIR=		$(SRC)/cmd/mandoc
+LCDIR=		$(SRC)/lib/libc/port
 
 include		$(SRC)/tools/Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
 CPPFLAGS += -_gcc=-nostdinc -I/usr/include -I$(NATIVE_ADJUNCT)/include
 LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
+OBJS +=		reallocarray.o \
+		strtonum.o
 
 .KEEP_STATE:
 
@@ -36,6 +39,9 @@ $(PROG):	$(OBJS)
 		$(POST_PROCESS)
 
 %.o:		$(CMDDIR)/%.c
+		$(COMPILE.c) -o $@ $<
+
+%.o:		$(LCDIR)/gen/%.c
 		$(COMPILE.c) -o $@ $<
 
 include		$(SRC)/tools/Makefile.targ

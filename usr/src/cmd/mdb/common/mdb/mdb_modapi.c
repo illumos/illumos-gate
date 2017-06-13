@@ -204,7 +204,7 @@ mdb_lookup_by_obj(const char *obj, const char *name, GElf_Sym *sym)
 
 int
 mdb_lookup_by_addr(uintptr_t addr, uint_t flags, char *buf,
-	size_t nbytes, GElf_Sym *sym)
+    size_t nbytes, GElf_Sym *sym)
 {
 	return (mdb_tgt_lookup_by_addr(mdb.m_target, addr, flags,
 	    buf, nbytes, sym, NULL));
@@ -246,7 +246,7 @@ mdb_strtoull(const char *s)
 		}
 	}
 
-	return (strtonum(s, radix));
+	return (mdb_strtonum(s, radix));
 }
 
 size_t

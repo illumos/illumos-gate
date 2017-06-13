@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -105,7 +109,7 @@ dockspace(char *spacefile)
 
 		if (fs_tab->bfree < (LIM_BFREE + fs_tab->bused)) {
 			warn(TYPE_BLCK, fs_tab->name, fs_tab->bused,
-				fs_tab->bfree, LIM_BFREE);
+			    fs_tab->bfree, LIM_BFREE);
 			error++;
 		}
 
@@ -114,7 +118,7 @@ dockspace(char *spacefile)
 			continue;
 		if (fs_tab->ffree < (LIM_FFREE + fs_tab->fused)) {
 			warn(TYPE_NODE, fs_tab->name, fs_tab->fused,
-				fs_tab->ffree, LIM_FFREE);
+			    fs_tab->ffree, LIM_FFREE);
 			error++;
 		}
 	}
@@ -193,7 +197,7 @@ readmap(int *error)
 	struct stat statbuf;
 	char	tpath[PATH_MAX];
 	fsblkcnt_t	blk;
-	int	i, n;
+	int	i;
 
 	/*
 	 * Handle the installation files (ftype i) that are in the

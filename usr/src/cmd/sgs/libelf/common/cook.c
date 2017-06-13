@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <ar.h>
 #include <stdlib.h>
@@ -99,10 +97,8 @@ _elf_dnode()
 		_elf_seterr(EMEM_DNODE, errno);
 		return (0);
 	}
-	NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*d))
 	*d = _elf_dnode_init;
 	d->db_myflags = DBF_ALLOC;
-	NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*d))
 	return (d);
 }
 
@@ -111,7 +107,6 @@ _elf_dnode()
 int
 _elf_slide(Elf * elf)
 {
-	NOTE(ASSUMING_PROTECTED(*elf))
 	Elf		*par = elf->ed_parent;
 	size_t		sz, szof;
 	register char	*dst;
@@ -162,7 +157,6 @@ _elf_slide(Elf * elf)
 Okay
 _elf_cook(Elf * elf)
 {
-	NOTE(ASSUMING_PROTECTED(*elf))
 	register int	inplace = 1;
 
 	if (elf->ed_kind != ELF_K_ELF)

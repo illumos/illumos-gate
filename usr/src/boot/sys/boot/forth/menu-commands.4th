@@ -565,7 +565,6 @@ also menu-namespace also menu-command-helpers
 	dup s" bootenv_root[E]" 13 +c! getenv
 	s" currdev" getenv compare 0= if
 		s" zfs_be_active" getenv type ."  is already active"
-		500 ms				\ sleep
 	else
 		dup s" set currdev=${bootenv_root[E]}" 27 +c! evaluate
 		dup s" bootenvmenu_caption[E]" 20 +c! getenv
@@ -578,9 +577,25 @@ also menu-namespace also menu-command-helpers
 		s" /boot/loader.conf" read-conf
 		s" /boot/loader.conf.local" read-conf
 		init_bootenv
+
+		s" 1" s" zfs_be_currpage" setenv
+		s" be-set-page" evaluate
 	then
 
+	500 ms			\ sleep so user can see the message
 	be_draw_screen
+	menu-redraw
+	TRUE
+;
+
+\
+\ Chainload this entry. Normally we do not return, in case of error
+\ from chain load, we continue with normal menu code.
+\
+
+: set_be_chain ( N -- no return | N TRUE )
+	dup s" chain ${bootenv_root[E]}" 21 +c! evaluate catch drop
+
 	menu-redraw
 	TRUE
 ;

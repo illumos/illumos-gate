@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines that
  *	- return an address for a symbol name
@@ -42,7 +40,6 @@
 #include <sys/procfs.h>
 #include <sys/stat.h>
 #include <assert.h>
-#include <note.h>
 
 #include "tnfctl_int.h"
 #include "dbg.h"
@@ -56,7 +53,6 @@ typedef struct sym_args {
 	char		*sa_name;
 	uintptr_t	sa_addr;
 } sym_args_t;
-NOTE(SCHEME_PROTECTS_DATA("always automatic", sym_args))
 
 /*
  * Declarations

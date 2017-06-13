@@ -24,7 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
@@ -379,6 +379,7 @@ file path=usr/include/float.h
 file path=usr/include/fmtmsg.h
 file path=usr/include/fnmatch.h
 file path=usr/include/form.h
+file path=usr/include/fts.h
 file path=usr/include/ftw.h
 file path=usr/include/gelf.h
 file path=usr/include/getopt.h

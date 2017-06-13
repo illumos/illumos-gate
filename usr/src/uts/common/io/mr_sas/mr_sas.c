@@ -891,7 +891,8 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		instance->unroll.scsictl = 1;
 
-		(void) sprintf(instance->iocnode, "%d:lsirdctl", instance_no);
+		(void) snprintf(instance->iocnode, sizeof (instance->iocnode),
+		    "%d:lsirdctl", instance_no);
 
 		/*
 		 * Create a node for applications
@@ -1707,7 +1708,7 @@ mrsas_find_child(struct mrsas_instance *instance, uint16_t tgt, uint8_t lun)
 	char addr[SCSI_MAXNAMELEN];
 	char tmp[MAXNAMELEN];
 
-	(void) sprintf(addr, "%x,%x", tgt, lun);
+	(void) snprintf(addr, sizeof (addr), "%x,%x", tgt, lun);
 	for (child = ddi_get_child(instance->dip); child;
 	    child = ddi_get_next_sibling(child)) {
 

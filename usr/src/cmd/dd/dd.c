@@ -25,6 +25,7 @@
  * Use is subject to license terms.
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -103,10 +104,10 @@
 #define	USAGE\
 	"usage: dd [if=file] [of=file] [ibs=n|nk|nb|nxm] [obs=n|nk|nb|nxm]\n"\
 	"	   [bs=n|nk|nb|nxm] [cbs=n|nk|nb|nxm] [files=n] [skip=n]\n"\
-	"	   [iseek=n] [oseek=n] [seek=n] [count=n] [conv=[ascii]\n"\
-	"	   [,ebcdic][,ibm][,asciib][,ebcdicb][,ibmb]\n"\
-	"	   [,block|unblock][,lcase|ucase][,swab]\n"\
-	"	   [,noerror][,notrunc][,sync]]\n"\
+	"	   [iseek=n] [oseek=n] [seek=n] [stride=n] [istride=n]\n"\
+	"	   [ostride=n] [count=n] [conv=[ascii] [,ebcdic][,ibm]\n"\
+	"	   [,asciib][,ebcdicb][,ibmb][,block|unblock][,lcase|ucase]\n"\
+	"	   [,swab][,noerror][,notrunc][,sync]]\n"\
 	"	   [oflag=[dsync][sync]]\n"
 
 /* Global references */
@@ -148,6 +149,11 @@ static off_t	oseekn;	/* number of output records to seek past */
 static unsigned long long	count;	/* number of input records to copy */
 			/* (0 = all) */
 static boolean_t ecount;	/* explicit count given */
+static off_t	ostriden;	/* number of output blocks to skip between */
+				/* records */
+static off_t	istriden;	/* number of input blocks to skip between */
+				/* records */
+
 static int	trantype; /* BSD or SVr4 compatible EBCDIC */
 
 static char		*string;	/* command arg pointer */
@@ -569,6 +575,21 @@ main(int argc, char **argv)
 			oseekn = number(BIG);
 			continue;
 		}
+		if (match("ostride="))
+		{
+			ostriden = ((off_t)number(BIG)) - 1;
+			continue;
+		}
+		if (match("istride="))
+		{
+			istriden = ((off_t)number(BIG)) - 1;
+			continue;
+		}
+		if (match("stride="))
+		{
+			istriden = ostriden = ((off_t)number(BIG)) - 1;
+			continue;
+		}
 		if (match("count="))
 		{
 			count = number(BIG);
@@ -718,6 +739,16 @@ main(int argc, char **argv)
 	{
 		(void) fprintf(stderr, "dd: %s\n",
 			gettext("buffer sizes cannot be zero"));
+		exit(2);
+	}
+	if (ostriden == (off_t)-1) {
+		(void) fprintf(stderr, "dd: %s\n",
+			gettext("stride must be greater than zero"));
+		exit(2);
+	}
+	if (istriden == (off_t)-1) {
+		(void) fprintf(stderr, "dd: %s\n",
+			gettext("stride must be greater than zero"));
 		exit(2);
 	}
 	if (conv == COPY)
@@ -1034,6 +1065,12 @@ main(int argc, char **argv)
 			/* Read the next input block */
 
 			ibc = read(ibf, (char *)ibuf, ibs);
+
+			if (istriden > 0 && lseek(ibf, istriden * ((off_t)ibs),
+			    SEEK_CUR) == -1) {
+				perror("lseek");
+				exit(2);
+			}
 
 			/* Process input errors */
 
@@ -1804,7 +1841,7 @@ long long big;
 /* Flush the output buffer, move any excess bytes down to the beginning	*/
 /*									*/
 /* Arg:		none							*/
-/* Global args:	obuf, obc, obs, nofr, nopr				*/
+/* Global args:	obuf, obc, obs, nofr, nopr, ostriden			*/
 /*									*/
 /* Return:	Pointer to the first free byte in the output buffer.	*/
 /*		Also reset `obc' to account for moved bytes.		*/
@@ -1839,6 +1876,13 @@ static unsigned char
 				"wrote %d bytes, expected %d\n"), bc, oc);
 			term(2);
 		}
+
+		if (ostriden > 0 && lseek(obf, ostriden * ((off_t)obs),
+		    SEEK_CUR) == -1) {
+			perror("lseek");
+			exit(2);
+		}
+
 		obc -= oc;
 		op = obuf;
 		obytes += bc;

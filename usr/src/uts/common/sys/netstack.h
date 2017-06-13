@@ -32,6 +32,8 @@
 #define	_SYS_NETSTACK_H
 
 #include <sys/kstat.h>
+#include <sys/cred.h>
+#include <sys/mutex.h>
 
 #ifdef	__cplusplus
 extern "C" {

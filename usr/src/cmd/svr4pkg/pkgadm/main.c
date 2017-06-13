@@ -75,7 +75,7 @@ struct cmd  cmds[] = {
 int
 main(int argc, char **argv)
 {
-	char	cur_cmd;
+	int	cur_cmd;
 	int	newargc;
 	char	**newargv;
 	int	i;

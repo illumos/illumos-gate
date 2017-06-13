@@ -2706,6 +2706,7 @@ f usr/include/fm/topo_mod.h 0644 root bin
 f usr/include/fmtmsg.h 0644 root bin
 f usr/include/fnmatch.h 0644 root bin
 f usr/include/form.h 0644 root bin
+f usr/include/fts.h 0644 root bin
 f usr/include/ftw.h 0644 root bin
 d usr/include/fwflash 0755 root bin
 f usr/include/fwflash/fwflash.h 0644 root bin
@@ -12975,6 +12976,12 @@ f usr/share/man/man3c/ftime.3c 0444 root bin
 f usr/share/man/man3c/ftok.3c 0444 root bin
 s usr/share/man/man3c/ftruncate.3c=truncate.3c
 s usr/share/man/man3c/ftrylockfile.3c=flockfile.3c
+f usr/share/man/man3c/fts.3c 0444 root bin
+s usr/share/man/man3c/fts_children.3c=fts.3c
+s usr/share/man/man3c/fts_close.3c=fts.3c
+s usr/share/man/man3c/fts_open.3c=fts.3c
+s usr/share/man/man3c/fts_read.3c=fts.3c
+s usr/share/man/man3c/fts_set.3c=fts.3c
 f usr/share/man/man3c/ftw.3c 0444 root bin
 s usr/share/man/man3c/func_to_decimal.3c=string_to_decimal.3c
 s usr/share/man/man3c/funlockfile.3c=flockfile.3c
@@ -13517,6 +13524,7 @@ s usr/share/man/man3c/re_exec.3c=re_comp.3c
 f usr/share/man/man3c/readdir.3c 0444 root bin
 s usr/share/man/man3c/readdir_r.3c=readdir.3c
 s usr/share/man/man3c/realloc.3c=malloc.3c
+s usr/share/man/man3c/reallocarray.3c=malloc.3c
 f usr/share/man/man3c/realpath.3c 0444 root bin
 f usr/share/man/man3c/reboot.3c 0444 root bin
 f usr/share/man/man3c/regcmp.3c 0444 root bin
@@ -13697,6 +13705,7 @@ s usr/share/man/man3c/strtok_r.3c=string.3c
 f usr/share/man/man3c/strtol.3c 0444 root bin
 s usr/share/man/man3c/strtold.3c=strtod.3c
 s usr/share/man/man3c/strtoll.3c=strtol.3c
+f usr/share/man/man3c/strtonum.3c 0444 root bin
 f usr/share/man/man3c/strtoul.3c 0444 root bin
 s usr/share/man/man3c/strtoull.3c=strtoul.3c
 s usr/share/man/man3c/strtoumax.3c=strtoimax.3c

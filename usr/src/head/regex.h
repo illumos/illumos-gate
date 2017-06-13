@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  *
@@ -30,9 +31,9 @@
  * Copyright 1989, 1994 by Mortice Kern Systems Inc.
  * All rights reserved.
  */
+
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #ifndef	_REGEX_H
@@ -73,32 +74,31 @@ typedef long    wchar_t;
 typedef ssize_t regoff_t;
 
 /* regcomp flags */
-#define	REG_BASIC	0x00
-#define	REG_EXTENDED	0x01		/* Use Extended Regular Expressions */
-#define	REG_NEWLINE	0x08		/* Treat \n as regular character */
-#define	REG_ICASE	0x04		/* Ignore case in match */
-#define	REG_NOSUB	0x02		/* Don't set subexpression */
-#define	REG_EGREP	0x1000		/* running as egrep(1) */
-
-/* non-standard flags - note that most of these are not supported */
-#define	REG_DELIM	0x10		/* string[0] is delimiter */
-#define	REG_DEBUG	0x20		/* Debug recomp and regexec */
-#define	REG_ANCHOR	0x40		/* Implicit ^ and $ */
-#define	REG_WORDS	0x80		/* \< and \> match word boundries */
-
-/* FreeBSD additions */
-#define	REG_DUMP	0x2000
-#define	REG_PEND	0x4000
-#define	REG_NOSPEC	0x8000
-#define	REG_STARTEND	0x10000
+#define	REG_BASIC	0x00000
+#define	REG_EXTENDED	0x00001		/* Use Extended Regular Expressions */
+#define	REG_NOSUB	0x00002		/* Don't set subexpression */
+#define	REG_ICASE	0x00004		/* Ignore case in match */
+#define	REG_NEWLINE	0x00008		/* Treat \n as regular character */
+#define	REG_DELIM	0x00010		/* legacy, no effect */
+#define	REG_DEBUG	0x00020		/* legacy, no effect */
+#define	REG_ANCHOR	0x00040		/* legacy, no effect */
+#define	REG_WORDS	0x00080		/* legacy, no effect */
+#define	REG_EGREP	0x01000		/* legacy, no effect */
+#define	REG_DUMP	0x02000		/* internal */
+#define	REG_PEND	0x04000		/* NULs are ordinary characters */
+#define	REG_NOSPEC	0x08000		/* no special characters */
 
 /* internal flags */
-#define	REG_MUST	0x100		/* check for regmust substring */
+#define	REG_MUST	0x00100		/* legacy, no effect */
 
 /* regexec flags */
-#define	REG_NOTBOL	0x200		/* string is not BOL */
-#define	REG_NOTEOL	0x400		/* string has no EOL */
-#define	REG_NOOPT	0x800		/* don't do regmust optimization */
+#define	REG_NOTBOL	0x00200		/* string is not BOL */
+#define	REG_NOTEOL	0x00400		/* string has no EOL */
+#define	REG_NOOPT	0x00800		/* legacy, no effect */
+#define	REG_STARTEND	0x10000		/* match whole pattern */
+#define	REG_TRACE	0x20000		/* tracing of execution */
+#define	REG_LARGE	0x40000		/* force large representation */
+#define	REG_BACKR	0x80000		/* force use of backref code */
 
 /* regcomp and regexec return codes */
 #define	REG_OK		0		/* success (non-standard) */
@@ -118,12 +118,15 @@ typedef ssize_t regoff_t;
 #define	REG_BADPAT	14		/* syntax error */
 #define	REG_BADBR	15		/* \{ \} contents bad */
 #define	REG_EFATAL	16		/* internal error, not POSIX.2 */
-#define	REG_ECHAR	17		/* invalid mulitbyte character */
+#define	REG_ECHAR	17		/* invalid multibyte character */
 #define	REG_STACK	18		/* backtrack stack overflow */
 #define	REG_ENOSYS	19		/* function not supported (XPG4) */
 #define	REG__LAST	20		/* first unused code */
 #define	REG_EBOL	21		/* ^ anchor and not BOL */
 #define	REG_EEOL	22		/* $ anchor and not EOL */
+#define	REG_ATOI	255		/* convert name to number (!) */
+#define	REG_ITOA	256		/* convert number to name (!) */
+
 #define	_REG_BACKREF_MAX 9		/* Max # of subexp. backreference */
 
 typedef struct {		/* regcomp() data saved for regexec() */
@@ -151,15 +154,14 @@ typedef struct {
 
 
 /*
- * Additional API and structs to support regular expression manipulations
- * on wide characters.
+ * IEEE Std 1003.2 ("POSIX.2") regular expressions API.
  */
 
 extern int regcomp(regex_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, int);
 extern int regexec(const regex_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
-	size_t, regmatch_t *_RESTRICT_KYWD, int);
-extern size_t regerror(int, const regex_t *_RESTRICT_KYWD,
-	char *_RESTRICT_KYWD, size_t);
+    size_t, regmatch_t *_RESTRICT_KYWD, int);
+extern size_t regerror(int, const regex_t *_RESTRICT_KYWD, char *_RESTRICT_KYWD,
+    size_t);
 extern void regfree(regex_t *);
 
 #ifdef	__cplusplus

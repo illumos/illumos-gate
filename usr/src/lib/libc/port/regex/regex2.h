@@ -14,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -29,9 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)regex2.h	8.4 (Berkeley) 3/20/94
- * $FreeBSD: src/lib/libc/regex/regex2.h,v 1.11 2007/01/09 00:28:04 imp Exp $
  */
 
 /*
@@ -73,7 +70,7 @@
  * immediately *preceding* "execution" of that operator.
  */
 typedef unsigned int sop;	/* strip operator */
-typedef int sopno;
+typedef unsigned int sopno;
 #define	OPRMASK	0xf8000000U
 #define	OPDMASK	0x07ffffffU
 #define	OPSHIFT	((unsigned)27)
@@ -113,11 +110,11 @@ typedef struct {
 typedef struct {
 	unsigned char	bmp[NC / 8];
 	wctype_t	*types;
-	int		ntypes;
+	unsigned int	ntypes;
 	wint_t		*wides;
-	int		nwides;
+	unsigned int	nwides;
 	crange		*ranges;
-	int		nranges;
+	unsigned int	nranges;
 	int		invert;
 	int		icase;
 } cset;
@@ -125,7 +122,7 @@ typedef struct {
 static int
 CHIN1(cset *cs, wint_t ch)
 {
-	int i;
+	unsigned int i;
 
 	assert(ch >= 0);
 	if (ch < NC)
@@ -165,7 +162,7 @@ struct re_guts {
 	int magic;
 #define	MAGIC2	((('R'^0200)<<8)|'E')
 	sop *strip;		/* malloced area for strip */
-	int ncsets;		/* number of csets in use */
+	unsigned int ncsets;	/* number of csets in use */
 	cset *sets;		/* -> cset [ncsets] */
 	int cflags;		/* copy of regcomp() cflags argument */
 	sopno nstates;		/* = number of sops */

@@ -60,7 +60,6 @@
  */
 
 #include <unistd.h>
-#include <note.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -95,7 +94,6 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <sys/mman.h>
-#include <sys/note.h>
 #include <door.h>
 
 #include <wchar.h>
@@ -804,8 +802,6 @@ net_poll(void *ap)
 
 	DPRINT1(1, "net_poll(%u): net_thread started\n", mythreadno);
 
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mp))
-
 	for (;;) {
 		errno = 0;
 		t_errno = 0;
@@ -980,7 +976,6 @@ logmymsg(int pri, char *msg, int flags, int pending)
 		return (-1);
 	}
 
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mp))
 	mp->pri = pri;
 	mp->hlp = &LocalHostName;
 	(void) strlcpy(mp->msg, msg, MAXLINE+1);
@@ -1016,7 +1011,6 @@ shutdown_msg(void)
 		return (-1);
 	}
 
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mp));
 	mp->flags = SHUTDOWN;
 	mp->hlp = &LocalHostName;
 
@@ -1048,7 +1042,6 @@ flushmsg(int flags)
 		return;
 	}
 
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mp));
 	mp->flags = FLUSHMSG | flags;
 	mp->hlp = &LocalHostName;
 
@@ -1136,8 +1129,6 @@ formatsys(struct log_ctl *lp, char *msg, int sync)
 		 * We should do it here since a single message (msg)
 		 * could be composed of many lines.
 		 */
-		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mp));
-
 		if ((mp = new_msg()) == NULL) {
 			MALLOC_FAIL("dropping message");
 			/*
@@ -1233,7 +1224,6 @@ logmsg(void *ap)
 		} else {
 			(void) dataq_dequeue(&inputq, (void **)&mp, 0);
 		}
-		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mp))
 		DPRINT3(5, "logmsg(%u): msg dispatcher dequeued %p from "
 		    "queue %p\n", mythreadno, (void *)mp,
 		    (void *)&inputq);
@@ -1387,8 +1377,6 @@ logmsg(void *ap)
 		 * so the reference count is accurate before any
 		 * of the log threads can decrement it.
 		 */
-		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*mp))
-		_NOTE(COMPETING_THREADS_NOW)
 		(void) pthread_mutex_lock(&mp->msg_mutex);
 
 		for (f = Files; f < &Files[nlogs]; f++) {
@@ -1465,7 +1453,6 @@ logit(void *ap)
 	DPRINT4(5, "logit(%u): logger started for \"%s\" (queue %p, filed "
 	    "%p)\n", f->f_thread, f->f_un.f_fname, (void *)&f->f_queue,
 	    (void *)f);
-	_NOTE(COMPETING_THREADS_NOW);
 
 	while (f->f_type != F_UNUSED) {
 		(void) dataq_dequeue(&f->f_queue, (void **)&mp, 0);
@@ -4116,8 +4103,6 @@ new_msg(void)
 
 	if ((lm = malloc(sizeof (log_message_t))) == NULL)
 		return ((log_message_t *)NULL);
-
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*lm))
 
 	if (pthread_mutex_init(&lm->msg_mutex, NULL) != 0)
 		return ((log_message_t *)NULL);

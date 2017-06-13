@@ -2065,8 +2065,6 @@ _getUniqueId(void)
 {
 	char		newkey[LOCK_KEY_MAXLEN];
 	hrtime_t	hretime;
-	int		b;
-	int		execStatus;
 	struct tm	tstruct;
 	time_t		thetime;
 

@@ -22,13 +22,14 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/avl.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include "libcmdutils.h"
 
 /*
@@ -175,7 +176,7 @@ add_tnode(avl_tree_t **stree, dev_t device, ino_t inode)
 		avl_create(*stree,
 		    tnode_compare,
 		    sizeof (tree_node_t),
-		    OFFSETOF(tree_node_t, avl_link));
+		    offsetof(tree_node_t, avl_link));
 	}
 
 	/* Initialize the node */
