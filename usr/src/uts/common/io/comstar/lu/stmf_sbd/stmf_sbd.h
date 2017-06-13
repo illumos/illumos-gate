@@ -228,7 +228,7 @@ typedef struct sbd_lu {
 	void		*sl_zvol_objset_hdl;
 	void		*sl_zvol_zil_hdl;
 	void		*sl_zvol_rl_hdl;
-	void		*sl_zvol_bonus_hdl;
+	void		*sl_zvol_dn_hdl;
 
 	/* Backing store */
 	char		*sl_data_filename;
