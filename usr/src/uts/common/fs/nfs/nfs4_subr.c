@@ -1774,7 +1774,7 @@ exit:
 	kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
 
 	if (!ep->error)
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 	kmem_free(path, strlen(path)+1);
 }
 

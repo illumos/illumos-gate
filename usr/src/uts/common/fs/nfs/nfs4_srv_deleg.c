@@ -744,7 +744,7 @@ rfs4freeargres(CB_COMPOUND4args *args, CB_COMPOUND4res *resp)
 
 	kmem_free(args->array, arglen * sizeof (nfs_cb_argop4));
 	if (resp)
-		(void) xdr_free(xdr_CB_COMPOUND4res, (caddr_t)resp);
+		xdr_free(xdr_CB_COMPOUND4res, (caddr_t)resp);
 }
 
 /*

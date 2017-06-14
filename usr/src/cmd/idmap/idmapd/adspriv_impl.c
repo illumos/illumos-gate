@@ -205,6 +205,6 @@ out:
 int
 adspriv_program_1_freeresult(SVCXPRT *xprt, xdrproc_t fun, caddr_t res)
 {
-	(void) xdr_free(fun, res);
+	xdr_free(fun, res);
 	return (TRUE);
 }

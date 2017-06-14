@@ -169,7 +169,7 @@ static void nfs4delegreturn_cleanup_impl(rnode4_t *, nfs4_server_t *,
 
 static void
 cb_getattr(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
-	struct compound_state *cs, struct nfs4_callback_globals *ncg)
+    struct compound_state *cs, struct nfs4_callback_globals *ncg)
 {
 	CB_GETATTR4args *args = &argop->nfs_cb_argop4_u.opcbgetattr;
 	CB_GETATTR4res *resp = &resop->nfs_cb_resop4_u.opcbgetattr;
@@ -382,7 +382,7 @@ cb_getattr_free(nfs_cb_resop4 *resop)
 
 static void
 cb_recall(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
-	struct compound_state *cs, struct nfs4_callback_globals *ncg)
+    struct compound_state *cs, struct nfs4_callback_globals *ncg)
 {
 	CB_RECALL4args * args = &argop->nfs_cb_argop4_u.opcbrecall;
 	CB_RECALL4res *resp = &resop->nfs_cb_resop4_u.opcbrecall;
@@ -536,7 +536,7 @@ cb_null(CB_COMPOUND4args *args, CB_COMPOUND4res *resp, struct svc_req *req,
 /* ARGSUSED */
 static void
 cb_illegal(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
-	struct compound_state *cs, struct nfs4_callback_globals *ncg)
+    struct compound_state *cs, struct nfs4_callback_globals *ncg)
 {
 	CB_ILLEGAL4res *resp = &resop->nfs_cb_resop4_u.opcbillegal;
 
@@ -547,7 +547,7 @@ cb_illegal(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
 
 static void
 cb_compound(CB_COMPOUND4args *args, CB_COMPOUND4res *resp, struct svc_req *req,
-	struct nfs4_callback_globals *ncg)
+    struct nfs4_callback_globals *ncg)
 {
 	uint_t i;
 	struct compound_state cs;
@@ -806,7 +806,7 @@ nfs4callback_destroy(nfs4_server_t *np)
  */
 static void
 nfs4_setport(char *netid, char *uaddr, char *protofmly, char *proto,
-	struct nfs4_callback_globals *ncg)
+    struct nfs4_callback_globals *ncg)
 {
 	struct nfs4_cb_port *p;
 	bool_t found = FALSE;
@@ -1290,7 +1290,7 @@ nfs4_callback_fini(void)
  */
 static void
 nfs4delegreturn_cleanup_impl(rnode4_t *rp, nfs4_server_t *np,
-	struct nfs4_callback_globals *ncg)
+    struct nfs4_callback_globals *ncg)
 {
 	mntinfo4_t *mi = VTOMI4(RTOV4(rp));
 	boolean_t need_rele = B_FALSE;
@@ -1373,7 +1373,7 @@ nfs4delegreturn_cleanup(rnode4_t *rp, nfs4_server_t *np)
 
 static void
 nfs4delegreturn_save_lost_rqst(int error, nfs4_lost_rqst_t *lost_rqstp,
-	cred_t *cr, vnode_t *vp)
+    cred_t *cr, vnode_t *vp)
 {
 	if (error != ETIMEDOUT && error != EINTR &&
 	    !NFS4_FRC_UNMT_ERR(error, vp->v_vfsp)) {
@@ -1439,12 +1439,12 @@ nfs4delegreturn_otw(rnode4_t *rp, cred_t *cr, nfs4_error_t *ep)
 		nfs4_attr_cache(RTOV4(rp), garp, t, cr, TRUE, NULL);
 
 	}
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 }
 
 int
 nfs4_do_delegreturn(rnode4_t *rp, int flags, cred_t *cr,
-	struct nfs4_callback_globals *ncg)
+    struct nfs4_callback_globals *ncg)
 {
 	vnode_t *vp = RTOV4(rp);
 	mntinfo4_t *mi = VTOMI4(vp);
@@ -1536,7 +1536,7 @@ nfs4_do_delegreturn(rnode4_t *rp, int flags, cred_t *cr,
  */
 void
 nfs4_resend_delegreturn(nfs4_lost_rqst_t *lorp, nfs4_error_t *ep,
-	nfs4_server_t *np)
+    nfs4_server_t *np)
 {
 	rnode4_t *rp = VTOR4(lorp->lr_vp);
 
@@ -1879,7 +1879,7 @@ nfs4_deleg_discard(mntinfo4_t *mi, nfs4_server_t *sp)
 
 static int
 deleg_reopen(vnode_t *vp, bool_t *recovp, struct nfs4_callback_globals *ncg,
-	int flags)
+    int flags)
 {
 	nfs4_open_stream_t *osp;
 	nfs4_recov_state_t recov_state;
@@ -2151,7 +2151,7 @@ out:
  */
 void
 nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim, OPEN4res *res,
-	nfs4_ga_res_t *garp, cred_t *cr)
+    nfs4_ga_res_t *garp, cred_t *cr)
 {
 	open_read_delegation4 *orp;
 	open_write_delegation4 *owp;
@@ -2385,7 +2385,7 @@ nfs4delegabandon(rnode4_t *rp)
 
 static int
 wait_for_recall1(vnode_t *vp, nfs4_op_hint_t op, nfs4_recov_state_t *rsp,
-	int flg)
+    int flg)
 {
 	rnode4_t *rp;
 	int error = 0;
@@ -2426,7 +2426,7 @@ nfs4_end_op_recall(vnode_t *vp1, vnode_t *vp2, nfs4_recov_state_t *rsp)
 
 int
 wait_for_recall(vnode_t *vp1, vnode_t *vp2, nfs4_op_hint_t op,
-	nfs4_recov_state_t *rsp)
+    nfs4_recov_state_t *rsp)
 {
 	int error;
 
