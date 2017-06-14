@@ -418,16 +418,15 @@ struct msghdr32 {
 #define	MSG_OOB		0x1		/* process out-of-band data */
 #define	MSG_PEEK	0x2		/* peek at incoming message */
 #define	MSG_DONTROUTE	0x4		/* send without using routing tables */
-/* Added for XPGv2 compliance */
 #define	MSG_EOR		0x8		/* Terminates a record */
 #define	MSG_CTRUNC	0x10		/* Control data truncated */
 #define	MSG_TRUNC	0x20		/* Normal data truncated */
 #define	MSG_WAITALL	0x40		/* Wait for complete recv or error */
-#define	MSG_DUPCTRL	0x800		/* Save control message for use with */
-					/* with left over data */
-/* End of XPGv2 compliance */
 #define	MSG_DONTWAIT	0x80		/* Don't block for this recv */
 #define	MSG_NOTIFICATION 0x100		/* Notification, not data */
+#define	MSG_NOSIGNAL	0x200		/* Don't generate SIGPIPE */
+#define	MSG_DUPCTRL	0x800		/* Save control message for use with */
+					/* with left over data */
 #define	MSG_XPG4_2	0x8000		/* Private: XPG4.2 flag */
 
 #define	MSG_MAXIOVLEN	16

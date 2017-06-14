@@ -57,4 +57,4 @@ tests = ['runtests.32', 'runtests.64']
 
 [/opt/os-tests/tests/sockfs]
 user = root
-tests = ['conn', 'dgram', 'drop_priv', 'sockpair']
+tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'sockpair']

@@ -60,6 +60,7 @@ file path=opt/os-tests/tests/sigqueue/sigqueue_queue_size mode=0555
 file path=opt/os-tests/tests/sockfs/conn mode=0555
 file path=opt/os-tests/tests/sockfs/dgram mode=0555
 file path=opt/os-tests/tests/sockfs/drop_priv mode=0555
+file path=opt/os-tests/tests/sockfs/nosignal mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
