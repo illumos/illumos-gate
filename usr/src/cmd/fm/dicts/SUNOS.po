@@ -50,11 +50,11 @@ msgstr "Minor"
 msgid "SUNOS-8000-1L.description"
 msgstr "The EFT Diagnosis Engine encountered telemetry for which it is unable to produce a diagnosis.  Refer to %s for more information."
 msgid "SUNOS-8000-1L.response"
-msgstr "Error reports from the component will be logged for examination by Sun."
+msgstr "Error reports from the component will be logged for examination by your illumos distribution team."
 msgid "SUNOS-8000-1L.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-1L.action"
-msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly. Contact Sun for support."
+msgstr "Ensure that fault management software is installed properly. Contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-20
 # keys: defect.Deprecated defect.io.pci.driver fault.io.pci.bus fault.io.pci.device
@@ -70,7 +70,7 @@ msgstr "One or more of device instances may be disabled"
 msgid "SUNOS-8000-20.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUNOS-8000-20.action"
-msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-3V
 # keys: defect.Deprecated fault.io.pci.bus fault.io.pci.device
@@ -86,7 +86,7 @@ msgstr "One or more of device instances may be disabled"
 msgid "SUNOS-8000-3V.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUNOS-8000-3V.action"
-msgstr "Schedule a repair procedure to replace the affected device. Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+msgstr "Schedule a repair procedure to replace the affected device. Use fmdump -v -u <EVENT_ID> to identify the device or contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-46
 # keys: defect.Deprecated defect.io.pci.driver fault.io.pci.device
@@ -102,7 +102,7 @@ msgstr "One or more of device instances may be disabled"
 msgid "SUNOS-8000-46.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUNOS-8000-46.action"
-msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-5T
 # keys: defect.Deprecated defect.io.pci.driver fault.io.pci.bus
@@ -118,7 +118,7 @@ msgstr "One or more of device instances may be disabled"
 msgid "SUNOS-8000-5T.impact"
 msgstr "Loss of services provided by the device instances associated with this fault"
 msgid "SUNOS-8000-5T.action"
-msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-69
 # keys: defect.Deprecated fault.io.pci.device
@@ -134,7 +134,7 @@ msgstr "One or more of device instances may be disabled"
 msgid "SUNOS-8000-69.impact"
 msgstr "Loss of services provided by the device instances associated with this fault."
 msgid "SUNOS-8000-69.action"
-msgstr "Schedule a repair procedure to replace the affected device. Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+msgstr "Schedule a repair procedure to replace the affected device. Use fmdump -v -u <EVENT_ID> to identify the device or contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-7N
 # keys: defect.Deprecated fault.io.pci.bus
@@ -150,7 +150,7 @@ msgstr "One or more of device instances may be disabled"
 msgid "SUNOS-8000-7N.impact"
 msgstr "Loss of services provided by the device instances associated with this fault."
 msgid "SUNOS-8000-7N.action"
-msgstr "Schedule a repair procedure to replace the affected device. Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+msgstr "Schedule a repair procedure to replace the affected device. Use fmdump -v -u <EVENT_ID> to identify the device or contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-8W
 # keys: defect.Deprecated defect.io.pci.driver
@@ -166,7 +166,7 @@ msgstr "One or more of device instances may be disabled"
 msgid "SUNOS-8000-8W.impact"
 msgstr "Loss of services provided by the device instances associated with this fault."
 msgid "SUNOS-8000-8W.action"
-msgstr "Ensure latest drivers and patches are installed. Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact Sun for support."
+msgstr "Ensure latest drivers and patches are installed. Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact your illumos distribution team for support."
 #
 # code: SUNOS-8000-91
 # keys: defect.sunos.zones.upgrade
@@ -182,7 +182,7 @@ msgstr "The upgrade procedure has been terminated."
 msgid "SUNOS-8000-91.impact"
 msgstr "The illumos system or boot environment is not upgraded."
 msgid "SUNOS-8000-91.action"
-msgstr "\n	Evaluate each of the choices below and select the one that is\n	best for your needs.  Contact Sun for support.\n	"
+msgstr "\n	Evaluate each of the choices below and select the one that is\n	best for your needs.  Contact your illumos distribution team for support.\n	"
 #
 # code: SUNOS-8000-AK
 # keys: ereport.sunos.boot.upgrade.menu_lst
@@ -242,7 +242,7 @@ msgstr "Minor"
 msgid "SUNOS-8000-E8.description"
 msgstr "The diagnosis engine encountered an error while resuming diagnosis.  Refer to %s for more information."
 msgid "SUNOS-8000-E8.response"
-msgstr "Error reports have been logged for examination by Sun."
+msgstr "Error reports have been logged for examination by your illumos distribution team."
 msgid "SUNOS-8000-E8.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-E8.action"
@@ -258,7 +258,7 @@ msgstr "Major"
 msgid "SUNOS-8000-FU.description"
 msgstr "The diagnosis engine encountered telemetry for which it was unable to perform a diagnosis.  Refer to %s for more information."
 msgid "SUNOS-8000-FU.response"
-msgstr "Error reports have been logged for examination by Sun."
+msgstr "Error reports have been logged for examination by your illumos distribution team."
 msgid "SUNOS-8000-FU.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-FU.action"
@@ -274,7 +274,7 @@ msgstr "Minor"
 msgid "SUNOS-8000-G7.description"
 msgstr "The diagnosis engine hit a limit restriction and was unable to perform a diagnosis.  Refer to %s for more information."
 msgid "SUNOS-8000-G7.response"
-msgstr "Error reports have been logged for examination by Sun."
+msgstr "Error reports have been logged for examination by your illumos distribution team."
 msgid "SUNOS-8000-G7.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-G7.action"
@@ -290,7 +290,7 @@ msgstr "Minor"
 msgid "SUNOS-8000-HV.description"
 msgstr "The diagnosis engine encountered telemetry for which it was unable to perform a diagnosis.  Refer to %s for more information."
 msgid "SUNOS-8000-HV.response"
-msgstr "Error reports have been logged for examination by Sun."
+msgstr "Error reports have been logged for examination by your illumos distribution team."
 msgid "SUNOS-8000-HV.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-HV.action"
@@ -306,7 +306,7 @@ msgstr "Major"
 msgid "SUNOS-8000-J0.description"
 msgstr "The diagnosis engine encountered telemetry from the listed devices for which it was unable to perform a diagnosis - %.\n  Refer to %s for more information.  Refer to %s for more information."
 msgid "SUNOS-8000-J0.response"
-msgstr "Error reports have been logged for examination by Sun.\n"
+msgstr "Error reports have been logged for examination by your illumos distribution team.\n"
 msgid "SUNOS-8000-J0.impact"
 msgstr "Automated diagnosis and response for these events will not occur.\n"
 msgid "SUNOS-8000-J0.action"

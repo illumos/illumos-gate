@@ -43,11 +43,11 @@ msgstr "Minor"
 msgid "FMD-8000-0W.description"
 msgstr "The illumos Fault Manager received an event from a component to which no automated diagnosis software is currently subscribed.  Refer to %s for more information."
 msgid "FMD-8000-0W.response"
-msgstr "Error reports from the component will be logged for examination by Sun."
+msgstr "Error reports from the component will be logged for examination by your illumos distribution team."
 msgid "FMD-8000-0W.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "FMD-8000-0W.action"
-msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly.  Contact Sun for support."
+msgstr "Ensure that fault management software is installed properly.  Contact your illumos distribution team for support."
 #
 # code: FMD-8000-11
 # keys: defect.sunos.fmd.nodiagcode
@@ -59,11 +59,11 @@ msgstr "Minor"
 msgid "FMD-8000-11.description"
 msgstr "An illumos Fault Manager component generated a diagnosis for which no message summary exists.  Refer to %s for more information."
 msgid "FMD-8000-11.response"
-msgstr "The diagnosis has been saved in the fault log for examination by Sun."
+msgstr "The diagnosis has been saved in the fault log for examination by your illumos distribution team."
 msgid "FMD-8000-11.impact"
 msgstr "The fault log will need to be manually examined using fmdump(1M) in order to determine if any human response is required."
 msgid "FMD-8000-11.action"
-msgstr "Use fmdump -v -u <EVENT-ID> to view the diagnosis result.  Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly."
+msgstr "Use fmdump -v -u <EVENT-ID> to view the diagnosis result.  Ensure that fault management software is installed properly."
 #
 # code: FMD-8000-2K
 # keys: defect.sunos.fmd.module
