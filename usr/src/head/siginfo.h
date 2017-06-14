@@ -26,7 +26,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifndef	_SIGINFO_H
 #define	_SIGINFO_H
