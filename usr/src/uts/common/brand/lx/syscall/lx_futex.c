@@ -822,7 +822,8 @@ futex_lock_pi(memid_t *memid, uint32_t *addr, timespec_t *timeout,
 	int fpri, mypri;
 	int err;
 	int index;
-	pid_t mytid = lwpd->br_pid;
+	/* volatile to silence gcc clobber warning for longjmp */
+	volatile pid_t mytid;
 	pid_t ftid;			/* current futex holder tid */
 	proc_t *fproc = NULL;		/* current futex holder proc */
 	kthread_t *fthrd;		/* current futex holder thread */
@@ -830,6 +831,8 @@ futex_lock_pi(memid_t *memid, uint32_t *addr, timespec_t *timeout,
 
 	if ((uintptr_t)addr >= KERNELBASE)
 		return (set_errno(EFAULT));
+
+	mytid = (lwpd->br_pid == curzone->zone_proc_initpid ? 1 : lwpd->br_pid);
 
 	/*
 	 * Have to take mutex first to prevent the following race with unlock:
@@ -1059,7 +1062,7 @@ futex_unlock_pi(memid_t *memid, uint32_t *addr, pid_t clean_tid)
 	lx_lwp_data_t *lwpd = ttolxlwp(t);
 	fwaiter_t *fwp, *fnd_fwp;
 	uint32_t curval;
-	pid_t mytid = lwpd->br_pid;
+	pid_t mytid;
 	pid_t holder_tid;
 	int index;
 	int hipri;
@@ -1067,6 +1070,8 @@ futex_unlock_pi(memid_t *memid, uint32_t *addr, pid_t clean_tid)
 
 	if ((uintptr_t)addr >= KERNELBASE)
 		return (EFAULT);
+
+	mytid = (lwpd->br_pid == curzone->zone_proc_initpid ? 1 : lwpd->br_pid);
 
 	/* See comment in futex_lock_pi for why we take the mutex first. */
 	index = HASH_FUNC(memid);

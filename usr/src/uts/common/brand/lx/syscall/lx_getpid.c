@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/zone.h>
@@ -71,5 +71,5 @@ lx_gettid(void)
 {
 	lx_lwp_data_t *lwpd = ttolxlwp(curthread);
 
-	return (lwpd->br_pid);
+	return (lwpd->br_pid == curzone->zone_proc_initpid ? 1 : lwpd->br_pid);
 }
