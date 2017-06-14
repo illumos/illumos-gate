@@ -1218,6 +1218,7 @@ lx_init_brand_data(zone_t *zone, kmutex_t *zsl)
 	    LX_KERN_RELEASE_MAX);
 	(void) strlcpy(data->lxzd_kernel_version, "BrandZ virtual linux",
 	    LX_KERN_VERSION_MAX);
+	data->lxzd_pipe_max_sz = lx_pipe_max_default;
 
 	zone->zone_brand_data = data;
 

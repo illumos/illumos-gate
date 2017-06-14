@@ -211,6 +211,7 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_FS_INOTIFY_MAX_QUEUED_EVENTS,	/* inotify/max_queued_events */
 	LXPR_SYS_FS_INOTIFY_MAX_USER_INSTANCES,	/* inotify/max_user_instances */
 	LXPR_SYS_FS_INOTIFY_MAX_USER_WATCHES,	/* inotify/max_user_watches */
+	LXPR_SYS_FS_PIPE_MAX,	/* /proc/sys/fs/pipe-max-size	*/
 	LXPR_SYS_KERNELDIR,	/* /proc/sys/kernel/	*/
 	LXPR_SYS_KERNEL_CAPLCAP,	/* /proc/sys/kernel/cap_last_cap */
 	LXPR_SYS_KERNEL_COREPATT,	/* /proc/sys/kernel/core_pattern */

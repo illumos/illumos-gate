@@ -24,7 +24,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/zone.h>
@@ -42,9 +42,82 @@
 #include <sys/debug.h>
 #include <sys/fs/fifonode.h>
 #include <sys/fcntl.h>
+#include <sys/policy.h>
 #include <sys/brand.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_fcntl.h>
+#include <sys/sysmacros.h>
+
+#define	LX_DEFAULT_PIPE_SIZE	65536
+
+/*
+ * Our default value for fs.pipe-size-max mirrors Linux.  The enforced maximum
+ * is meant to provide some sort of upper bound on pipe buffer sizing.  Its
+ * value was chosen somewhat arbitrarily.
+ */
+uint_t lx_pipe_max_default = 1048576;
+uint_t lx_pipe_max_limit = 8388608;
+
+int
+lx_pipe_setsz(stdata_t *str, uint_t size, boolean_t is_init)
+{
+	int err;
+	stdata_t *mate;
+	lx_zone_data_t *lxzd = ztolxzd(curzone);
+	uint_t max_size = lxzd->lxzd_pipe_max_sz;
+
+
+	size = P2ROUNDUP(size, PAGESIZE);
+	if (size == 0) {
+		return (EINVAL);
+	} else if (size > max_size && secpolicy_resource(CRED()) != 0) {
+		if (!is_init) {
+			return (EPERM);
+		}
+		/*
+		 * If the size limit is breached during initial pipe setup,
+		 * simply clamp it to the maximum.  On Linux kernels prior to
+		 * 4.9, this clamping would not occur and it would be possible
+		 * to open a pipe with the default buffer size even if it
+		 * exceeded the sysctl limit.  Rather than trigger behavior
+		 * here based on  the configured kernel version, it is applied
+		 * to all callers.
+		 */
+		size = max_size;
+		ASSERT(max_size <= lx_pipe_max_limit);
+	} else if (size > lx_pipe_max_limit) {
+		/*
+		 * Unlike Linux, we do maintain a global hard cap on pipe
+		 * buffer limits.
+		 */
+		return (EPERM);
+	}
+
+	if (!STRMATED(str)) {
+		return (strqset(RD(str->sd_wrq), QHIWAT, 0, (intptr_t)size));
+	}
+
+	/*
+	 * Ensure consistent order so the set operation is always attempted on
+	 * the "higher" stream first.
+	 */
+	if (str > str->sd_mate) {
+		VERIFY((mate = str->sd_mate) != NULL);
+	} else {
+		mate = str;
+		VERIFY((str = mate->sd_mate) != NULL);
+	}
+
+	/*
+	 * While it is unfortunate that an error could occur for the latter
+	 * half of the stream pair, there is little to be done about it aside
+	 * from reporting the failure.
+	 */
+	if ((err = strqset(RD(str->sd_wrq), QHIWAT, 0, (intptr_t)size)) == 0) {
+		err = strqset(RD(mate->sd_wrq), QHIWAT, 0, (intptr_t)size);
+	}
+	return (err);
+}
 
 /*
  * Based on native pipe(2) system call, except that the pipe is half-duplex.
@@ -57,6 +130,7 @@ lx_hd_pipe(intptr_t arg, int flags)
 	int error = 0;
 	int flag1, flag2, iflags;
 	int fd1, fd2;
+	stdata_t *str;
 
 	/*
 	 * Validate allowed flags.
@@ -98,6 +172,12 @@ lx_hd_pipe(intptr_t arg, int flags)
 	strmate(vp1, vp2);
 
 	VTOF(vp1)->fn_ino = VTOF(vp2)->fn_ino = fifogetid();
+
+	/*
+	 * Attempt to set pipe buffer sizes to expected value.
+	 */
+	VERIFY((str = vp1->v_stream) != NULL);
+	(void) lx_pipe_setsz(str, LX_DEFAULT_PIPE_SIZE, B_TRUE);
 
 	/*
 	 * Set the O_NONBLOCK flag if requested.

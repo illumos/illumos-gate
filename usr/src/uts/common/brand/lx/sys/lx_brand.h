@@ -621,6 +621,7 @@ typedef struct lx_zone_data {
 	list_t *lxzd_vdisks;			/* virtual disks (zvols) */
 	dev_t lxzd_zfs_dev;			/* major num for zfs */
 	uint_t lxzd_aio_nr;			/* see lx_aio.c */
+	uint_t lxzd_pipe_max_sz;		/* pipe-max-size sysctl val */
 } lx_zone_data_t;
 
 /* LWP br_lwp_flags values */
@@ -709,6 +710,9 @@ extern int lx_lpid_lock(pid_t, zone_t *, lx_pid_flag_t, proc_t **,
 extern pid_t lx_lwp_ppid(klwp_t *, pid_t *, id_t *);
 extern void lx_pid_init(void);
 extern void lx_pid_fini(void);
+
+extern uint_t lx_pipe_max_limit;
+extern uint_t lx_pipe_max_default;
 
 /*
  * In-Kernel Linux System Call Description.

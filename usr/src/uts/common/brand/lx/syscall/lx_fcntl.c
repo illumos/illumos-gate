@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <sys/cmn_err.h>
 #include <sys/pathname.h>
+#include <sys/policy.h>
 #include <sys/lx_impl.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_fcntl.h>
@@ -32,6 +33,7 @@
 
 extern int fcntl(int, int, intptr_t);
 extern int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
+extern int lx_pipe_setsz(stdata_t *, uint_t, boolean_t);
 
 
 int
@@ -210,8 +212,6 @@ lx_fcntl_setfl(int fd, ulong_t arg)
 	return (fcntl(fd, F_SETFL, flags));
 }
 
-/* The default unprivileged limit in Linux is 1MB */
-static int lx_pipe_max_size = 1048576;
 
 static int
 lx_fcntl_pipesz(int fd, int cmd, ulong_t arg)
@@ -232,38 +232,7 @@ lx_fcntl_pipesz(int fd, int cmd, ulong_t arg)
 	VERIFY((str = vp->v_stream) != NULL);
 
 	if (cmd == LX_F_SETPIPE_SZ) {
-		stdata_t *mate;
-		intptr_t val = arg;
-
-		if (val < PAGESIZE || val > lx_pipe_max_size) {
-			err = EINVAL;
-			goto out;
-		}
-		if (!STRMATED(str)) {
-			err = strqset(RD(str->sd_wrq), QHIWAT, 0, val);
-			goto out;
-		}
-
-		/*
-		 * Ensure consistent order so the set operation is always
-		 * attempted on the "higher" stream first.
-		 */
-		if (str > str->sd_mate) {
-			VERIFY((mate = str->sd_mate) != NULL);
-		} else {
-			mate = str;
-			VERIFY((str = mate->sd_mate) != NULL);
-		}
-
-		/*
-		 * While it is unfortunate that an error could occur for the
-		 * latter half of the stream pair, there is little to be done
-		 * about it aside from reporting the failure.
-		 */
-		if ((err = strqset(RD(str->sd_wrq), QHIWAT, 0, val)) != 0) {
-			goto out;
-		}
-		err = strqset(RD(mate->sd_wrq), QHIWAT, 0, val);
+		err = lx_pipe_setsz(str, (uint_t)arg, B_FALSE);
 	} else if (cmd == LX_F_GETPIPE_SZ) {
 		size_t val;
 
