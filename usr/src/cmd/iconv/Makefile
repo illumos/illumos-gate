@@ -11,6 +11,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Joyent Inc.
 #
 
 PROG=iconv
@@ -44,6 +45,7 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 $(OBJS):	parser.tab.h
+$(PIFILES):	parser.tab.h
 
 parser.tab.c parser.tab.h: parser.y
 	$(YACC) $(YFLAGS) parser.y

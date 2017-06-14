@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014, Joyent, Inc. All rights reserved.
+# Copyright 2017, Joyent, Inc. All rights reserved.
 #
 # cmd/fs.d/nfs/mount/Makefile
 
@@ -101,7 +101,7 @@ webnfs.x:	../lib/webnfs.x
 #
 catalog: $(POFILE)
 
-$(POFILE): $(SRCS)
+$(POFILE): $(SRCS) webnfs.h
 	$(RM) $@
 	$(COMPILE.cpp) $(SRCS)   > $(POFILE).i
 	$(XGETTEXT)     $(XGETFLAGS) $(POFILE).i

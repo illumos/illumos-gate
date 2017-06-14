@@ -25,6 +25,8 @@
 #       Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #         All Rights Reserved
 #
+# Copyright 2017 Joyent, Inc.
+#
 
 # cmd/msgfmt/Makefile
 
@@ -89,6 +91,8 @@ gmsgfmt_rev:	$(GOBJS) $(YOBJS) $(LOBJS) $(COBJS)
 xgettext: $(XOBJS) $(LXOBJS)
 	$(LINK.c) $(XOBJS) $(LXOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
+
+$(POFILES): y.tab.h
 
 $(POFILE):	$(POFILES)
 	$(RM) $@

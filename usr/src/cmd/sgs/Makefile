@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 RackTop Systems.
+# Copyright 2017 Joyent, Inc.
 #
 
 include		$(SRC)/cmd/Makefile.cmd
@@ -123,7 +124,8 @@ _msg: _msg_gettext _msg_sgsmsg
 
 _msg_gettext: $(MSGDOMAIN)/$(POFILE)
 
-_msg_sgsmsg: $(MSGDIR)
+# $(MACH)/sgsmsg must be built before we can descend into $(MSGDIR)
+_msg_sgsmsg: native-add .WAIT $(MSGDIR)
 
 $(MSGDOMAIN)/$(POFILE): \
 		$(MSGDOMAIN) $(POFILE)
