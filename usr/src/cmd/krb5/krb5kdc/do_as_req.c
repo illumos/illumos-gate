@@ -477,19 +477,19 @@ errout:
 	free_padata_context(kdc_context, &pa_context);
 
     if (status) {
-	const char * emsg = 0;
+	const char *emsg = NULL;
 	if (errcode) 
 	    emsg = krb5_get_error_message (kdc_context, errcode);
 
-	    audit_krb5kdc_as_req(&from_in4, (in_port_t)from->port,
-				0, cname, sname, errcode);
+	audit_krb5kdc_as_req(&from_in4, (in_port_t)from->port,
+	    0, cname, sname, errcode);
         krb5_klog_syslog(LOG_INFO, "AS_REQ (%s) %s: %s: %s for %s%s%s",
-			 ktypestr,
-	       fromstring, status, 
-	       cname ? cname : "<unknown client>",
-	       sname ? sname : "<unknown server>",
-	       errcode ? ", " : "",
-	       errcode ? emsg : "");
+	    ktypestr,
+	    fromstring, status,
+	    cname ? cname : "<unknown client>",
+	    sname ? sname : "<unknown server>",
+	    errcode ? ", " : "",
+	    errcode ? emsg : "");
 	if (errcode)
 	    krb5_free_error_message (kdc_context, emsg);
     }

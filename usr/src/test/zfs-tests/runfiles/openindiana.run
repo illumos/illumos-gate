@@ -25,7 +25,8 @@ post = cleanup
 outputdir = /var/tmp/test_results
 
 [/opt/zfs-tests/tests/functional/acl/cifs]
-tests = ['cifs_attr_001_pos', 'cifs_attr_002_pos', 'cifs_attr_003_pos']
+tests = ['cifs_attr_001_pos', 'cifs_attr_002_pos', 'cifs_attr_003_pos',
+    'cifs_attr_004_pos']
 
 [/opt/zfs-tests/tests/functional/acl/nontrivial]
 tests = ['zfs_acl_chmod_001_neg', 'zfs_acl_chmod_002_pos',

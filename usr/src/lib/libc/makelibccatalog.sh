@@ -91,7 +91,7 @@ done
 #
 # Change Directory
 #
-	cd ../locale
+	cd ../regex
 	rm -f messages.po regerror.po
 
 	${XGETTEXT} -a regerror.c
