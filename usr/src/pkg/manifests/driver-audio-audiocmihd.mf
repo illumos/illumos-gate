@@ -45,6 +45,5 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=audiocmihd alias=pci13f6,8788
 file path=kernel/drv/$(ARCH64)/audiocmihd group=sys
-$(i386_ONLY)file path=kernel/drv/audiocmihd group=sys
 file path=usr/share/man/man7d/audiocmihd.7d
 license lic_CDDL license=lic_CDDL

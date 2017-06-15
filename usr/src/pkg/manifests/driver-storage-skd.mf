@@ -38,7 +38,6 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=skd alias=pciex1b39,1 class=disk perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/skd group=sys
-file path=kernel/drv/skd group=sys
 file path=kernel/drv/skd.conf group=sys
 file path=usr/share/man/man7d/skd.7d
 license lic_CDDL license=lic_CDDL

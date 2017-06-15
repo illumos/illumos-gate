@@ -48,14 +48,8 @@ file path=usr/kernel/drv/$(ARCH64)/pshot group=sys
 file path=usr/kernel/drv/$(ARCH64)/tclient group=sys
 file path=usr/kernel/drv/$(ARCH64)/tphci group=sys
 file path=usr/kernel/drv/$(ARCH64)/tvhci group=sys
-$(i386_ONLY)file path=usr/kernel/drv/emul64 group=sys
 file path=usr/kernel/drv/emul64.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/gen_drv group=sys
-$(i386_ONLY)file path=usr/kernel/drv/pshot group=sys
 file path=usr/kernel/drv/pshot.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/tclient group=sys
-$(i386_ONLY)file path=usr/kernel/drv/tphci group=sys
-$(i386_ONLY)file path=usr/kernel/drv/tvhci group=sys
 file path=usr/lib/scsi/sestopo mode=0555
 file path=usr/lib/scsi/smp mode=0555
 file path=usr/sbin/devctl mode=0555

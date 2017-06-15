@@ -44,7 +44,6 @@ driver name=audiocmi \
     alias=pci13f6,101 \
     alias=pci13f6,111
 file path=kernel/drv/$(ARCH64)/audiocmi group=sys
-file path=kernel/drv/audiocmi group=sys
 file path=usr/share/man/man7d/audiocmi.7d
 legacy pkg=SUNWaudiocmi desc="SunOS audio device driver for C-Media 8738" \
     name="C-Media 8738 Family Audio Driver"

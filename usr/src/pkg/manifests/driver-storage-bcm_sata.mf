@@ -43,7 +43,6 @@ dir path=usr/share/man/man7d
 driver name=bcm_sata alias=pci1166,24a class=scsi-self-identifying \
     perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/bcm_sata group=sys
-file path=kernel/drv/bcm_sata group=sys
 file path=usr/share/man/man7d/bcm_sata.7d
 legacy pkg=SUNWbcmsata desc="BroadCom ht1000 sata driver" \
     name="BroadCom ht1000 sata driver"

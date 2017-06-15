@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1997, by Sun Microsystems, Inc.
 # All rights reserved.
 #
@@ -30,4 +27,4 @@
 include ../Makefile.com
 include ../../Makefile.cmd.64
 
-install: all $(ROOTUSRSBINPROG64)
+install: all $(ROOTUSRSBINPROG)

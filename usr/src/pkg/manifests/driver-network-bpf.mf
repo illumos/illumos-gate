@@ -47,10 +47,8 @@ file path=usr/include/net/bpfdesc.h
 file path=usr/include/net/dlt.h
 file path=usr/include/netpacket/packet.h
 file path=usr/kernel/drv/$(ARCH64)/bpf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/bpf group=sys
 file path=usr/kernel/drv/bpf.conf group=sys
 file path=usr/kernel/socketmod/$(ARCH64)/sockpfp group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/socketmod/sockpfp group=sys mode=0755
 legacy pkg=SUNWpacketh desc="C header files for BPF/PF_PACKET" \
     name="Solaris Packet header files"
 legacy pkg=SUNWpacketu desc="BPF/PF_PACKET kernel packet modules" \

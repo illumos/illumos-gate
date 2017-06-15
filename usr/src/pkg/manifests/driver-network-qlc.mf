@@ -60,22 +60,14 @@ driver name=qlc class=fibre-channel perms="* 0666 root sys" \
 driver name=qlge alias=pciex1077,8000 perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/qlc group=sys
 file path=kernel/drv/$(ARCH64)/qlge group=sys
-$(i386_ONLY)file path=kernel/drv/qlc group=sys
 file path=kernel/drv/qlc.conf group=sys \
     original_name=SUNWqlc:kernel/drv/qlc.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/qlge group=sys
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2200 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2300 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2400 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_2500 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_6322 group=sys mode=0755
 file path=kernel/misc/qlc/$(ARCH64)/qlc_fw_8100 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2200 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2300 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2400 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_2500 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_6322 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/qlc/qlc_fw_8100 group=sys mode=0755
 file path=usr/share/man/man7d/qlc.7d
 legacy pkg=SUNWqlc \
     desc="Qlogic ISP Fibre Channel Device Driver and GLDv3 NIC driver" \

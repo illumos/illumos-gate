@@ -202,7 +202,6 @@ dir path=usr/lib/help/profiles/locale
 dir path=usr/lib/help/profiles/locale/C
 dir path=usr/lib/iconv
 dir path=usr/lib/inet
-dir path=usr/lib/inet/$(ARCH32)
 dir path=usr/lib/inet/$(ARCH64)
 dir path=usr/lib/locale
 dir path=usr/lib/locale/C
@@ -871,54 +870,30 @@ file path=usr/kernel/drv/$(ARCH64)/logindmux group=sys
 file path=usr/kernel/drv/$(ARCH64)/ptm group=sys
 file path=usr/kernel/drv/$(ARCH64)/pts group=sys
 file path=usr/kernel/drv/$(ARCH64)/timerfd group=sys
-$(i386_ONLY)file path=usr/kernel/drv/dump group=sys
 file path=usr/kernel/drv/dump.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/eventfd group=sys
 file path=usr/kernel/drv/eventfd.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/fssnap group=sys
 file path=usr/kernel/drv/fssnap.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/kstat group=sys
 file path=usr/kernel/drv/kstat.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/ksyms group=sys
 file path=usr/kernel/drv/ksyms.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/logindmux group=sys
 file path=usr/kernel/drv/logindmux.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/ptm group=sys
 file path=usr/kernel/drv/ptm.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/pts group=sys
 file path=usr/kernel/drv/pts.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/timerfd group=sys
 file path=usr/kernel/drv/timerfd.conf group=sys
 file path=usr/kernel/exec/$(ARCH64)/javaexec group=sys mode=0755
 file path=usr/kernel/exec/$(ARCH64)/shbinexec group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/exec/javaexec group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/exec/shbinexec group=sys mode=0755
 file path=usr/kernel/fs/$(ARCH64)/fdfs group=sys mode=0755
 file path=usr/kernel/fs/$(ARCH64)/pcfs group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/fs/fdfs group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/fs/pcfs group=sys mode=0755
 file path=usr/kernel/sched/$(ARCH64)/FX group=sys mode=0755
 file path=usr/kernel/sched/$(ARCH64)/FX_DPTBL group=sys mode=0755
 file path=usr/kernel/sched/$(ARCH64)/IA group=sys mode=0755
 file path=usr/kernel/sched/$(ARCH64)/RT group=sys mode=0755
 file path=usr/kernel/sched/$(ARCH64)/RT_DPTBL group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sched/FX group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sched/FX_DPTBL group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sched/IA group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sched/RT group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sched/RT_DPTBL group=sys mode=0755
 file path=usr/kernel/strmod/$(ARCH64)/cryptmod group=sys mode=0755
 file path=usr/kernel/strmod/$(ARCH64)/rlmod group=sys mode=0755
 file path=usr/kernel/strmod/$(ARCH64)/telmod group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/strmod/cryptmod group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/strmod/rlmod group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/strmod/telmod group=sys mode=0755
 file path=usr/kernel/sys/$(ARCH64)/acctctl group=sys mode=0755
 file path=usr/kernel/sys/$(ARCH64)/exacctsys group=sys mode=0755
 file path=usr/kernel/sys/$(ARCH64)/sysacct group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sys/acctctl group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sys/exacctsys group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sys/sysacct group=sys mode=0755
 file path=usr/kvm/README group=sys
 file path=usr/lib/$(ARCH64)/libshare.so.1
 file path=usr/lib/audit/audit_record_attr mode=0444
@@ -1199,7 +1174,6 @@ file path=usr/lib/iconv/8859.646it.t mode=0444
 file path=usr/lib/iconv/8859.646sv.t mode=0444
 file path=usr/lib/iconv/iconv_data mode=0444
 file path=usr/lib/idmapd mode=0555
-file path=usr/lib/inet/$(ARCH32)/in.iked mode=0555
 file path=usr/lib/inet/$(ARCH64)/in.iked mode=0555
 file path=usr/lib/inet/certdb mode=0555
 file path=usr/lib/inet/certlocal mode=0555
@@ -1263,32 +1237,9 @@ file path=usr/sadm/install/scripts/r.manifest group=sys mode=0555
 file path=usr/sadm/install/scripts/r.pkcs11conf group=sys mode=0555
 file path=usr/sadm/install/scripts/r.rbac group=sys mode=0555
 file path=usr/sadm/ugdates mode=0444
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/add_drv group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/modinfo group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/modload group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/modunload group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/pbind group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/prtconf group=sys mode=2555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/psrset group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/rem_drv group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/swap group=sys mode=2555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/sysdef group=sys mode=2555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/update_drv group=sys mode=0555
-$(i386_ONLY)file path=usr/sbin/$(ARCH32)/whodo mode=4555
-file path=usr/sbin/$(ARCH64)/add_drv group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/modinfo group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/modload group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/modunload group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/pbind group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/prtconf group=sys mode=2555
-file path=usr/sbin/$(ARCH64)/psrset group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/rem_drv group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/swap group=sys mode=2555
-file path=usr/sbin/$(ARCH64)/sysdef group=sys mode=2555
-file path=usr/sbin/$(ARCH64)/update_drv group=sys mode=0555
-file path=usr/sbin/$(ARCH64)/whodo mode=4555
 file path=usr/sbin/6to4relay mode=0555
 file path=usr/sbin/acctadm mode=0555
+file path=usr/sbin/add_drv group=sys mode=0555
 file path=usr/sbin/allocate mode=4555
 file path=usr/sbin/arp mode=0555
 file path=usr/sbin/audit mode=0555
@@ -1350,6 +1301,9 @@ file path=usr/sbin/makedbm mode=0555
 file path=usr/sbin/mkdevalloc mode=0555
 file path=usr/sbin/mkfile mode=0555
 file path=usr/sbin/mknod mode=0555
+file path=usr/sbin/modinfo group=sys mode=0555
+file path=usr/sbin/modload group=sys mode=0555
+file path=usr/sbin/modunload group=sys mode=0555
 file path=usr/sbin/mountall group=sys mode=0555
 file path=usr/sbin/msgid mode=0555
 file path=usr/sbin/mvdir mode=0555
@@ -1360,18 +1314,22 @@ file path=usr/sbin/nltest mode=0555
 file path=usr/sbin/nscd mode=0555
 file path=usr/sbin/nwamadm mode=0555
 file path=usr/sbin/nwamcfg mode=0555
+file path=usr/sbin/pbind group=sys mode=0555
 file path=usr/sbin/ping mode=4555
 file path=usr/sbin/pmadm group=sys mode=0555
 file path=usr/sbin/praudit mode=0555
+file path=usr/sbin/prtconf group=sys mode=2555
 $(i386_ONLY)file path=usr/sbin/prtdiag group=sys mode=2755
 file path=usr/sbin/prtvtoc group=sys mode=0555
 file path=usr/sbin/psradm group=sys mode=0555
 file path=usr/sbin/psrinfo group=sys mode=0555
+file path=usr/sbin/psrset group=sys mode=0555
 file path=usr/sbin/pwck mode=0555
 file path=usr/sbin/pwconv group=sys mode=0555
 file path=usr/sbin/raidctl mode=0555
 file path=usr/sbin/ramdiskadm mode=0555
 file path=usr/sbin/rctladm mode=0555
+file path=usr/sbin/rem_drv group=sys mode=0555
 file path=usr/sbin/root_archive group=sys mode=0555
 file path=usr/sbin/rpcbind mode=0555
 $(i386_ONLY)file path=usr/sbin/rtc mode=0555
@@ -1389,9 +1347,11 @@ file path=usr/sbin/strerr group=sys mode=0555
 file path=usr/sbin/sttydefs group=sys mode=0755
 file path=usr/sbin/svcadm mode=0555
 file path=usr/sbin/svccfg mode=0555
+file path=usr/sbin/swap group=sys mode=2555
 file path=usr/sbin/syncinit mode=0555
 file path=usr/sbin/syncloop mode=0555
 file path=usr/sbin/syncstat mode=0555
+file path=usr/sbin/sysdef group=sys mode=2555
 file path=usr/sbin/syseventadm group=sys mode=0555
 file path=usr/sbin/syslogd group=sys mode=0555
 file path=usr/sbin/tar mode=0555
@@ -1402,12 +1362,14 @@ $(i386_ONLY)file path=usr/sbin/ucodeadm mode=0555
 file path=usr/sbin/umountall group=sys mode=0555
 file path=usr/sbin/unlink mode=0555
 file path=usr/sbin/unshareall mode=0555
+file path=usr/sbin/update_drv group=sys mode=0555
 file path=usr/sbin/useradd group=sys mode=0555
 file path=usr/sbin/userdel group=sys mode=0555
 file path=usr/sbin/usermod group=sys mode=0555
 $(sparc_ONLY)file path=usr/sbin/virtinfo mode=0555
 file path=usr/sbin/volcopy mode=0555
 file path=usr/sbin/wall group=tty mode=2555
+file path=usr/sbin/whodo mode=4555
 file path=usr/sbin/zdump mode=0555
 file path=usr/sbin/zic mode=0555
 file path=usr/share/doc/ksh/COMPATIBILITY
@@ -1595,7 +1557,6 @@ hardlink path=usr/sadm/bin/valstr target=../../../usr/bin/ckstr
 hardlink path=usr/sadm/bin/valtime target=../../../usr/bin/cktime
 hardlink path=usr/sadm/bin/valuid target=../../../usr/bin/ckuid
 hardlink path=usr/sadm/bin/valyorn target=../../../usr/bin/ckyorn
-hardlink path=usr/sbin/add_drv target=../../usr/lib/isaexec
 hardlink path=usr/sbin/audlinks target=./devfsadm
 hardlink path=usr/sbin/consadmd target=../../usr/sbin/consadm
 hardlink path=usr/sbin/deallocate target=../../usr/sbin/allocate
@@ -1605,27 +1566,16 @@ hardlink path=usr/sbin/disks target=./devfsadm
 hardlink path=usr/sbin/drvconfig target=./devfsadm
 hardlink path=usr/sbin/list_devices target=../../usr/sbin/allocate
 hardlink path=usr/sbin/mkdevmaps target=../../usr/sbin/mkdevalloc
-hardlink path=usr/sbin/modinfo target=../../usr/lib/isaexec
-hardlink path=usr/sbin/modload target=../../usr/lib/isaexec
-hardlink path=usr/sbin/modunload target=../../usr/lib/isaexec
-hardlink path=usr/sbin/pbind target=../../usr/lib/isaexec
 hardlink path=usr/sbin/ports target=./devfsadm
 hardlink path=usr/sbin/poweroff target=./halt
-hardlink path=usr/sbin/prtconf target=../../usr/lib/isaexec
 $(sparc_ONLY)hardlink path=usr/sbin/prtdiag target=../../usr/lib/platexec
-hardlink path=usr/sbin/psrset target=../../usr/lib/isaexec
 hardlink path=usr/sbin/reboot target=./halt
-hardlink path=usr/sbin/rem_drv target=../../usr/lib/isaexec
 hardlink path=usr/sbin/roleadd target=../../usr/sbin/useradd
 hardlink path=usr/sbin/roledel target=../../usr/sbin/userdel
 hardlink path=usr/sbin/rolemod target=../../usr/sbin/usermod
 hardlink path=usr/sbin/share target=../../usr/sbin/sharemgr
-hardlink path=usr/sbin/swap target=../../usr/lib/isaexec
-hardlink path=usr/sbin/sysdef target=../../usr/lib/isaexec
 hardlink path=usr/sbin/tapes target=./devfsadm
 hardlink path=usr/sbin/unshare target=../../usr/sbin/sharemgr
-hardlink path=usr/sbin/update_drv target=../../usr/lib/isaexec
-hardlink path=usr/sbin/whodo target=../../usr/lib/isaexec
 legacy pkg=SUNWcsr \
     desc="core software for a specific instruction-set architecture" \
     name="Core Solaris, (Root)"

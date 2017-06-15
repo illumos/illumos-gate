@@ -70,7 +70,6 @@ $(i386_ONLY)driver name=mr_sas class=scsi-self-identifying \
     alias=pciex1000,ce \
     alias=pciex1000,cf
 file path=kernel/drv/$(ARCH64)/mr_sas group=sys
-$(i386_ONLY)file path=kernel/drv/mr_sas group=sys
 file path=kernel/drv/mr_sas.conf group=sys
 file path=usr/share/man/man7d/mr_sas.7d
 legacy pkg=SUNWmrsas desc="LSI MegaRAID SAS2.0 Controller HBA Driver" \

@@ -210,7 +210,6 @@ file path=usr/lib/libdtrace_jni.so.1
 file path=usr/lib/llib-ldtrace
 file path=usr/lib/llib-ldtrace.ln
 file path=usr/lib/mdb/kvm/$(ARCH64)/dtrace.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/dtrace.so group=sys mode=0555
 file path=usr/lib/mdb/raw/$(ARCH64)/dof.so group=sys mode=0555
 file path=usr/lib/mdb/raw/dof.so group=sys mode=0555
 file path=usr/sbin/$(ARCH32)/dtrace mode=0555

@@ -50,14 +50,7 @@ file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xdf group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xnf group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xpv group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xpvd group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/cmdk group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/rtls group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/sd group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/xdf group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/xnf group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/xpv group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/xpv.conf group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/xpvd group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/xpvd.conf group=sys
 file path=platform/$(ARCH32)hvm/kernel/misc/$(ARCH64)/hvm_bootstrap group=sys \
     mode=0755
@@ -65,9 +58,6 @@ file path=platform/$(ARCH32)hvm/kernel/misc/$(ARCH64)/hvm_cmdk group=sys \
     mode=0755
 file path=platform/$(ARCH32)hvm/kernel/misc/$(ARCH64)/hvm_sd group=sys \
     mode=0755
-file path=platform/$(ARCH32)hvm/kernel/misc/hvm_bootstrap group=sys mode=0755
-file path=platform/$(ARCH32)hvm/kernel/misc/hvm_cmdk group=sys mode=0755
-file path=platform/$(ARCH32)hvm/kernel/misc/hvm_sd group=sys mode=0755
 legacy pkg=SUNWxvmpv desc="xVM Paravirtualized Drivers" \
     name="xVM Paravirtualized Drivers"
 license cr_Sun license=cr_Sun

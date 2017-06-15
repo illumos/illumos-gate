@@ -50,7 +50,6 @@ driver name=ntxn \
     alias=pci4040,4 \
     alias=pci4040,5
 file path=kernel/drv/$(ARCH64)/ntxn group=sys
-file path=kernel/drv/ntxn group=sys
 file path=kernel/drv/ntxn.conf group=sys
 file path=usr/share/man/man7d/ntxn.7d
 legacy pkg=SUNWntxn desc="NetXen 1Gb/10Gb Ethernet Adapter Driver" \

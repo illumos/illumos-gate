@@ -41,7 +41,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=iwp clone_perms="iwp 0666 root sys" perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/iwp group=sys
-file path=kernel/drv/iwp group=sys
 legacy pkg=SUNWiwp desc="Intel(R) WiFi Link 6000 series driver" \
     name="Intel(R) WiFi Link 6000 series driver"
 license cr_Sun license=cr_Sun

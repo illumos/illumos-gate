@@ -34,7 +34,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=vioif alias=pci1af4,1 perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/vioif group=sys
-$(i386_ONLY)file path=kernel/drv/vioif group=sys
 legacy pkg=SUNWvioif desc="VirtIO network driver" name="VirtIO network driver"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

@@ -50,10 +50,8 @@ file path=etc/sdp.conf group=sys original_name=SUNWibsdp:etc/sdp.conf \
     preserve=true
 file path=etc/sock2path.d/driver%2Fnetwork%2Fsdp group=sys
 file path=kernel/drv/$(ARCH64)/sdp group=sys
-$(i386_ONLY)file path=kernel/drv/sdp group=sys
 file path=kernel/drv/sdp.conf group=sys
 file path=kernel/socketmod/$(ARCH64)/socksdp group=sys mode=0755
-$(i386_ONLY)file path=kernel/socketmod/socksdp group=sys mode=0755
 file path=usr/share/man/man7d/sdp.7d
 legacy pkg=SUNWibsdp desc="Sun InfiniBand layered Sockets Direct Protocol" \
     name="Sun InfiniBand layered Sockets Direct Protocol"

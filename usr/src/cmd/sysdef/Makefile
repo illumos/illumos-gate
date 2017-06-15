@@ -26,8 +26,7 @@ PROG= 		sysdef
 
 include ../Makefile.cmd
 
-$(64ONLY)SUBDIRS = $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+SUBDIRS += $(MACH64)
 
 all	:=	TARGET = all
 install	:=	TARGET = install
@@ -50,8 +49,6 @@ $(ROOTSYMLINK):
 clean clobber lint:	$(SUBDIRS)
 
 install:	$(SUBDIRS) $(ROOTSYMLINK)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

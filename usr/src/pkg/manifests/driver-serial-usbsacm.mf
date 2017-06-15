@@ -45,7 +45,6 @@ driver name=usbsacm perms="* 0666 root sys" \
     alias=usbc88,17da \
     alias=usbif,class2.2
 file path=kernel/drv/$(ARCH64)/usbsacm group=sys
-$(i386_ONLY)file path=kernel/drv/usbsacm group=sys
 file path=usr/share/man/man7d/usbsacm.7d
 legacy pkg=SUNWuacm desc="CDC ACM USB-to-serial driver" \
     name="CDC ACM USB-to-serial driver"

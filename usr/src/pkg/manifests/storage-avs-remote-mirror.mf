@@ -73,7 +73,6 @@ file path=etc/init.d/rdc mode=0744
 file path=etc/init.d/rdc.cluster mode=0744
 file path=etc/init.d/rdcfinish mode=0744
 file path=kernel/kmdb/$(ARCH64)/rdc group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/rdc group=sys mode=0555
 file path=lib/svc/manifest/system/nws_rdc.xml group=sys mode=0444
 file path=lib/svc/manifest/system/nws_rdcsyncd.xml group=sys mode=0444
 file path=usr/bin/sndradm mode=0555
@@ -84,14 +83,10 @@ file path=usr/cluster/sbin/rdc mode=0744
 file path=usr/kernel/drv/$(ARCH64)/rdc group=sys
 file path=usr/kernel/drv/$(ARCH64)/rdcsrv group=sys
 file path=usr/kernel/drv/$(ARCH64)/rdcstub group=sys
-$(i386_ONLY)file path=usr/kernel/drv/rdc group=sys
 file path=usr/kernel/drv/rdc.conf group=sys \
     original_name=SUNWrdc:usr/kernel/drv/rdc.conf preserve=true
-$(i386_ONLY)file path=usr/kernel/drv/rdcsrv group=sys
-$(i386_ONLY)file path=usr/kernel/drv/rdcstub group=sys
 file path=usr/lib/librdc.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/rdc.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/rdc.so group=sys mode=0555
 file path=usr/share/man/man1m/sndradm.1m
 file path=usr/share/man/man1m/sndrd.1m
 file path=usr/share/man/man1m/sndrsyncd.1m
@@ -103,8 +98,6 @@ hardlink path=usr/kernel/misc/$(ARCH64)/rdcsrv \
     target=../../drv/$(ARCH64)/rdcsrv
 hardlink path=usr/kernel/misc/$(ARCH64)/rdcstub \
     target=../../drv/$(ARCH64)/rdcstub
-$(i386_ONLY)hardlink path=usr/kernel/misc/rdcsrv target=../drv/rdcsrv
-$(i386_ONLY)hardlink path=usr/kernel/misc/rdcstub target=../drv/rdcstub
 hardlink path=usr/lib/sndrd target=../bin/sndrd
 hardlink path=usr/lib/sndrsyncd target=../bin/sndrsyncd
 hardlink path=usr/sbin/sndradm target=../bin/sndradm

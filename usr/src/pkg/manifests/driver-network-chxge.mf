@@ -45,7 +45,6 @@ driver name=chxge clone_perms="chxge 0666 root sys" perms="* 0666 root sys" \
     alias=pci1425,7 \
     alias=pci1425,a
 file path=kernel/drv/$(ARCH64)/chxge group=sys
-$(i386_ONLY)file path=kernel/drv/chxge group=sys
 file path=usr/share/man/man7d/chxge.7d
 legacy pkg=SUNWchxge \
     desc="Chelsio N110 10 Gigabit Ethernet Network Adapter Driver" \

@@ -59,7 +59,6 @@ file path=etc/default/nfslogd group=sys \
 file path=etc/nfs/nfslog.conf group=sys \
     original_name=SUNWnfss:etc/nfs/nfslog.conf preserve=true
 file path=kernel/misc/$(ARCH64)/nfssrv group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/nfssrv group=sys mode=0755
 file path=lib/svc/manifest/network/nfs/nfslogd.xml group=sys mode=0444
 file path=lib/svc/manifest/network/nfs/rquota.xml group=sys mode=0444
 file path=lib/svc/manifest/network/nfs/server.xml group=sys mode=0444

@@ -49,7 +49,6 @@ driver name=rge clone_perms="rge 0666 root sys" perms="* 0666 root sys" \
     alias=pci16ec,116 \
     alias=pciex10ec,8136
 file path=kernel/drv/$(ARCH64)/rge group=sys
-$(i386_ONLY)file path=kernel/drv/rge group=sys
 file path=usr/share/man/man7d/rge.7d
 legacy pkg=SUNWrge desc="Realtek Gigabit Ethernet Network Adapter Driver" \
     name="Realtek Gigabit Ethernet Driver"

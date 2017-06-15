@@ -272,7 +272,6 @@ DIRS= \
 	/usr/lib/hal \
 	/usr/lib/inet \
 	/usr/lib/inet/ilb \
-	/usr/lib/inet/$(MACH32) \
 	/usr/lib/inet/wanboot \
 	/usr/lib/krb5 \
 	/usr/lib/link_audit \

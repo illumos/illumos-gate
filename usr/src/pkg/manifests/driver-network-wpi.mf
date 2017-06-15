@@ -56,7 +56,6 @@ driver name=wpi clone_perms="wpi 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,4227.8086.1012 \
     alias=pciex8086,4227.8086.1014
 file path=kernel/drv/$(ARCH64)/wpi group=sys
-file path=kernel/drv/wpi group=sys
 file path=usr/share/man/man7d/wpi.7d
 legacy pkg=SUNWwpi desc="Intel(R) PRO/Wireless 3945ABG driver" \
     name="Intel(R) PRO/Wireless 3945ABG driver"

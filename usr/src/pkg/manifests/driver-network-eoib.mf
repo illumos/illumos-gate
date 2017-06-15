@@ -42,8 +42,6 @@ driver name=eibnx perms="* 0666 root sys"
 driver name=eoib clone_perms="eoib 0666 root sys" perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/eibnx group=sys
 file path=kernel/drv/$(ARCH64)/eoib group=sys
-$(i386_ONLY)file path=kernel/drv/eibnx group=sys
 file path=kernel/drv/eibnx.conf group=sys
-$(i386_ONLY)file path=kernel/drv/eoib group=sys
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

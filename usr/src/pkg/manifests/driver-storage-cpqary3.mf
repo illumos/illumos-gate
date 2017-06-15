@@ -83,7 +83,6 @@ driver name=cpqary3 class=scsi \
     alias=pcie11,409d \
     alias=pcie11,409e
 file path=kernel/drv/$(ARCH64)/cpqary3 group=sys
-file path=kernel/drv/cpqary3 group=sys
 file path=kernel/drv/cpqary3.conf group=sys
 file path=usr/share/man/man7d/cpqary3.7d
 legacy pkg=CPQary3 desc="HP Smart Array HBA Driver" \

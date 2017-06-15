@@ -139,7 +139,6 @@ MAPFILE-EXT	= $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
 
 #
 # kmdb is a kernel module, so we'll use the kernel's build flags.
-$(KMODOBJS) := CFLAGS += $(STAND_FLAGS_32)
 $(KMODOBJS) := CFLAGS64 += $(STAND_FLAGS_64)
 
 #

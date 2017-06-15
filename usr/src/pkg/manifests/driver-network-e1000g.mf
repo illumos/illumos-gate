@@ -222,7 +222,6 @@ driver name=e1000g clone_perms="e1000g 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,294c \
     alias=pciex8086,f0fe
 file path=kernel/drv/$(ARCH64)/e1000g group=sys
-$(i386_ONLY)file path=kernel/drv/e1000g group=sys
 file path=kernel/drv/e1000g.conf group=sys \
     original_name=SUNWintgige:kernel/drv/e1000g.conf preserve=renamenew
 legacy pkg=SUNWintgige desc="Intel(R) PRO/1000 Server Adapter Driver" \

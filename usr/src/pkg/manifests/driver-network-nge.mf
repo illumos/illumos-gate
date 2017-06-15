@@ -54,7 +54,6 @@ driver name=nge clone_perms="nge 0666 root sys" perms="* 0666 root sys" \
     alias=pci10de,df \
     alias=pci10de,e6
 file path=kernel/drv/$(ARCH64)/nge group=sys
-file path=kernel/drv/nge group=sys
 file path=kernel/drv/nge.conf group=sys
 legacy pkg=SUNWnge desc="Nvidia CK8-04 GE driver" \
     name="Nvidia CK8-04 GE driver"

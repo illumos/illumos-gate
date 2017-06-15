@@ -47,7 +47,6 @@ driver name=usbsprl perms="* 0666 root sys" \
     alias=usb67b,2303 \
     alias=usb67b,aaa2
 file path=kernel/drv/$(ARCH64)/usbsprl group=sys
-$(i386_ONLY)file path=kernel/drv/usbsprl group=sys
 file path=usr/share/man/man7d/usbsprl.7d
 legacy pkg=SUNWuprl desc="Prolific PL2303 USB-to-serial driver" \
     name="Prolific PL2303 USB-to-serial driver"

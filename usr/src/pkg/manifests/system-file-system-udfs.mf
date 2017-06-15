@@ -39,7 +39,6 @@ dir path=usr/share/man
 dir path=usr/share/man/man1m
 dir path=usr/share/man/man7fs
 file path=kernel/fs/$(ARCH64)/udfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/udfs group=sys mode=0755
 file path=usr/lib/fs/udfs/fsck mode=0555
 file path=usr/lib/fs/udfs/fsdb mode=0555
 file path=usr/lib/fs/udfs/fstyp.so.1 mode=0555

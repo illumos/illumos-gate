@@ -52,7 +52,6 @@ driver name=adpu320 class=scsi perms="adpu320ctl 0666 root root" \
     alias=pci9005,801f \
     alias=pci9005,808f
 file path=kernel/drv/$(ARCH64)/adpu320 group=sys
-file path=kernel/drv/adpu320 group=sys
 file path=kernel/drv/adpu320.conf group=sys
 legacy pkg=SUNWadpu320 desc="Adaptec 7902 SCSI Driver" \
     name="Adaptec Ultra320 Driver"

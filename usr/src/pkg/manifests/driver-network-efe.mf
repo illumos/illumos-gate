@@ -27,6 +27,5 @@ dir path=kernel/drv/$(ARCH64) group=sys
 driver name=efe alias=pci10b8,5 clone_perms="efe 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/efe group=sys
-$(i386_ONLY)file path=kernel/drv/efe group=sys
 license usr/src/uts/common/io/efe/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/efe/THIRDPARTYLICENSE

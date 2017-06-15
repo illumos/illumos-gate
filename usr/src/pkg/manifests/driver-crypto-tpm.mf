@@ -48,7 +48,6 @@ $(sparc_ONLY)driver name=tpm alias=SUNW,sun4v-ptpm \
 $(i386_ONLY)driver name=tpm devlink=type=ddi_pseudo;name=tpm\t\D \
     perms="* 0600 root sys"
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/tpm group=sys
-$(i386_ONLY)file path=kernel/drv/tpm group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/tpm group=sys
 legacy pkg=SUNWtpm desc="Trusted Platform Module driver" \
     name="Trusted Platform Module driver" version=11.11.0,REV=2009.11.11

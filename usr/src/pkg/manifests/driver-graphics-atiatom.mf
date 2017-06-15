@@ -40,7 +40,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=atiatom alias=pci1002,4752 perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/atiatom group=sys
-file path=kernel/drv/atiatom group=sys
 legacy pkg=SUNWatigfx desc="Drivers for ATI framebuffer hardware" \
     name="ATI Framebuffer Drivers"
 license cr_Sun license=cr_Sun

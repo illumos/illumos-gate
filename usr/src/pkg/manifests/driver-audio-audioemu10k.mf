@@ -48,7 +48,6 @@ driver name=audioemu10k \
     alias=pci1102,4 \
     alias=pci1102,8
 file path=kernel/drv/$(ARCH64)/audioemu10k group=sys
-file path=kernel/drv/audioemu10k group=sys
 file path=usr/share/man/man7d/audioemu10k.7d
 legacy pkg=SUNWaudioemu10k \
     desc="SunOS audio device driver for Creative EMU10K" \

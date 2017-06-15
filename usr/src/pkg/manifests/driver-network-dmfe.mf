@@ -46,7 +46,6 @@ driver name=dmfe clone_perms="dmfe 0666 root sys" perms="* 0666 root sys" \
     alias=pci1282,9102 \
     alias=pci128h,9102
 file path=kernel/drv/$(ARCH64)/dmfe group=sys
-$(i386_ONLY)file path=kernel/drv/dmfe group=sys
 file path=usr/share/man/man7d/dmfe.7d
 legacy pkg=SUNWdmfe desc="Davicom 9102 Fast Ethernet Network Adapter Driver" \
     name="Davicom 9102 Fast Ethernet Driver"

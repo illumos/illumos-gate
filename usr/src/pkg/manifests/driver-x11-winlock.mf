@@ -34,7 +34,6 @@ dir path=usr/kernel/drv group=sys
 dir path=usr/kernel/drv/$(ARCH64) group=sys
 driver name=winlock perms="* 0666 root sys"
 file path=usr/kernel/drv/$(ARCH64)/winlock group=sys
-$(i386_ONLY)file path=usr/kernel/drv/winlock group=sys
 file path=usr/kernel/drv/winlock.conf group=sys
 legacy pkg=SUNWxwdv desc="kernel device drivers for X Windows System" \
     name="X Windows System Window Drivers"
