@@ -73,6 +73,11 @@ extern "C" {
 #define	ARG_MAX		_ARG_MAX32	/* max length of arguments to exec */
 #endif	/* _LP64 */
 
+
+/*
+ * These two symbols have their historical values, the actual buffer is
+ * larger.
+ */
 #ifndef MAX_CANON
 #define	MAX_CANON	256	/* max bytes in line for canonical processing */
 #endif

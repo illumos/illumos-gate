@@ -71,13 +71,25 @@ extern "C" {
 #endif
 #endif /* !defined(_XPG6) || defined(__EXTENSIONS__) */
 
+/* The actual size of the TTY input queue */
+#define	_TTY_BUFSIZ	2048
+
+/*
+ * These defines all have their historical value.  The actual size of the tty
+ * buffer both for the line-editor in ldterm, and in general, is above as
+ * _TTY_BUFSIZ.
+ *
+ * We leave these defines at their historical value to match the behaviour of
+ * BSD and Linux.
+ */
 #ifndef	MAX_INPUT
 #define	MAX_INPUT	512	/* Maximum bytes stored in the input queue */
 #endif
-
 #ifndef	MAX_CANON
 #define	MAX_CANON	256	/* Maximum bytes for canonical processing */
 #endif
+#define	CANBSIZ		256	/* max size of typewriter line	*/
+
 
 #define	UID_NOBODY	60001	/* user ID no body */
 #define	GID_NOBODY	UID_NOBODY
@@ -116,8 +128,6 @@ extern "C" {
 #define	MINEPHUID	0x80000000u	/* min ephemeral user id */
 
 #define	NMOUNT		40	/* est. of # mountable fs for quota calc */
-
-#define	CANBSIZ		256	/* max size of typewriter line	*/
 
 #define	NOFILE		20	/* this define is here for	*/
 				/* compatibility purposes only	*/
