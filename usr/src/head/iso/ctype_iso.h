@@ -73,9 +73,9 @@ extern "C" {
 #define	_ISALNUM	(_ISALPHA | _ISDIGIT)
 
 extern unsigned char	__ctype[];
-extern unsigned int	__ctype_mask[];
-extern int		__trans_upper[];
-extern int		__trans_lower[];
+extern unsigned int	*__ctype_mask;
+extern int		*__trans_upper;
+extern int		*__trans_lower;
 
 #if __cplusplus >= 199711L
 namespace std {
