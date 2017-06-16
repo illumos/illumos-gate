@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2002, 2011, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include "bnxe.h"
@@ -1858,6 +1859,11 @@ static boolean_t BnxeMacGetCapability(void *      pArg,
         break;
 
 #endif /* not __S11 or __S12 */
+
+#if defined(ILLUMOS)
+    case MAC_CAPAB_TRANSCEIVER:
+        return bnxe_fill_transceiver(pUM, pCapabilityData);
+#endif
 
     default:
 
