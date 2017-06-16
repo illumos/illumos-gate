@@ -25,6 +25,7 @@
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -92,7 +93,7 @@ zfs_share_type_t zfs_is_shared_proto(zfs_handle_t *, char **,
     zfs_share_proto_t);
 
 /*
- * The share protocols table must be in the same order as the zfs_share_prot_t
+ * The share protocols table must be in the same order as the zfs_share_proto_t
  * enum in libzfs_impl.h
  */
 typedef struct {
@@ -922,7 +923,7 @@ unshare_one(libzfs_handle_t *hdl, const char *name, const char *mountpoint,
 	if ((err = zfs_init_libshare_arg(hdl, SA_INIT_ONE_SHARE_FROM_NAME,
 	    (void *)name)) != SA_OK) {
 		free(mntpt);	/* don't need the copy anymore */
-		return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
+		return (zfs_error_fmt(hdl, proto_table[proto].p_unshare_err,
 		    dgettext(TEXT_DOMAIN, "cannot unshare '%s': %s"),
 		    name, _sa_errorstr(err)));
 	}
@@ -933,12 +934,13 @@ unshare_one(libzfs_handle_t *hdl, const char *name, const char *mountpoint,
 	if (share != NULL) {
 		err = zfs_sa_disable_share(share, proto_table[proto].p_name);
 		if (err != SA_OK) {
-			return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
+			return (zfs_error_fmt(hdl,
+			    proto_table[proto].p_unshare_err,
 			    dgettext(TEXT_DOMAIN, "cannot unshare '%s': %s"),
 			    name, _sa_errorstr(err)));
 		}
 	} else {
-		return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
+		return (zfs_error_fmt(hdl, proto_table[proto].p_unshare_err,
 		    dgettext(TEXT_DOMAIN, "cannot unshare '%s': not found"),
 		    name));
 	}
