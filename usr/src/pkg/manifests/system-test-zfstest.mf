@@ -944,6 +944,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_013_pos \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_014_pos \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/zfs_rename.cfg \
