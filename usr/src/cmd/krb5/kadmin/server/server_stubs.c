@@ -554,42 +554,42 @@ create_principal_2_svc(cprinc_arg *arg, struct svc_req *rqstp)
 	 log_unauth("kadm5_create_principal", prime_arg,
 		client_name, service_name, client_addr(rqstp, buf));
     } else {
-	 ret.code = kadm5_create_principal((void *)handle,
+	ret.code = kadm5_create_principal((void *)handle,
 						&arg->rec, arg->mask,
 						arg->passwd);
 	/* Solaris Kerberos */
-	 if( ret.code != 0 )
+	if( ret.code != 0 )
 	     errmsg = krb5_get_error_message(handle ? handle->context : NULL, ret.code);
 
-		audit_kadmind_auth(rqstp->rq_xprt, l_port,
+	audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_create_principal",
 				prime_arg, client_name, ret.code);
-	 log_done("kadm5_create_principal", prime_arg,
+	log_done("kadm5_create_principal", prime_arg,
 	    errmsg ? errmsg : "success",
 	    client_name, service_name, client_addr(rqstp, buf));
 
-	  if (errmsg != NULL)
+	if (errmsg != NULL)
 		krb5_free_error_message(handle ? handle->context : NULL, errmsg);
 
-		if (policy_migrate && (ret.code == 0)) {
-			arg->rec.policy = strdup("default");
-			if ((arg->mask & KADM5_PW_EXPIRATION)) {
-				arg->mask = 0;
-				arg->mask |= KADM5_POLICY;
-				arg->mask |= KADM5_PW_EXPIRATION;
-			} else {
-				arg->mask = 0;
-				arg->mask |= KADM5_POLICY;
-			}
-
-			retval = kadm5_modify_principal((void *)handle,
-					&arg->rec, arg->mask);
-			log_done("kadm5_modify_principal",
-				prime_arg, ((retval == 0) ? "success" :
-				error_message(retval)), client_name,
-				service_name, client_addr(rqstp, buf));
+	if (policy_migrate && (ret.code == 0)) {
+		arg->rec.policy = strdup("default");
+		if ((arg->mask & KADM5_PW_EXPIRATION)) {
+			arg->mask = 0;
+			arg->mask |= KADM5_POLICY;
+			arg->mask |= KADM5_PW_EXPIRATION;
+		} else {
+			arg->mask = 0;
+			arg->mask |= KADM5_POLICY;
 		}
+
+		retval = kadm5_modify_principal((void *)handle,
+				&arg->rec, arg->mask);
+		log_done("kadm5_modify_principal",
+			prime_arg, ((retval == 0) ? "success" :
+			error_message(retval)), client_name,
+			service_name, client_addr(rqstp, buf));
 	}
+    }
 
 error:
     if (name)

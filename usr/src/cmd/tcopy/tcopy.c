@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -63,8 +61,7 @@ size_t size_256K = 256 * 1024;
 
 
 int
-main(argc, argv)
-char **argv;
+main(int argc, char **argv)
 {
 	int	n, nw, inp, outp;
 	struct mtop op;
@@ -157,8 +154,8 @@ char **argv;
 				else
 					(void) printf("file %d: record %ld:"
 					    " size %d\n", filen, lcount, ln);
-				(void) printf("file %d: eof after %ld records:"
-				    " %lld bytes\n", filen, count-1, size);
+			(void) printf("file %d: eof after %ld records:"
+			    " %lld bytes\n", filen, count-1, size);
 			if (copy) {
 				op.mt_op = MTWEOF;
 				op.mt_count = (daddr_t)1;
@@ -184,7 +181,7 @@ char **argv;
 }
 
 void
-RUBOUT()
+RUBOUT(void)
 {
 	if (count > lcount)
 		--count;

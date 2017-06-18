@@ -239,7 +239,7 @@ split_bus_address(topo_mod_t *mod, di_node_t dp, uint_t baseaddr,
 		return (NULL);
 	}
 	*comma = '\0';
-	bc = strtonum(mod, bac, &e);
+	bc = fm_strtonum(mod, bac, &e);
 	*comma = ',';
 	if (e < 0) {
 		topo_mod_dprintf(mod,
@@ -247,7 +247,7 @@ split_bus_address(topo_mod_t *mod, di_node_t dp, uint_t baseaddr,
 		topo_mod_strfree(mod, bac);
 		return (NULL);
 	}
-	ac = strtonum(mod, comma + 1, &e);
+	ac = fm_strtonum(mod, comma + 1, &e);
 	if (e < 0) {
 		topo_mod_dprintf(mod,
 		    "Trouble interpreting %s after comma.\n", bac);

@@ -26,7 +26,7 @@
  * Copyright (c) 2013 RackTop Systems.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -35,6 +35,11 @@
 
 #ifndef	_LIBCMDUTILS_H
 #define	_LIBCMDUTILS_H
+
+#if !defined(_LP64) && \
+	!((_FILE_OFFSET_BITS == 64) || defined(_LARGEFILE64_SOURCE))
+#error "libcmdutils.h can only be used in a largefile compilation environment"
+#endif
 
 /*
  * This is a private header file.  Applications should not directly include
@@ -70,16 +75,21 @@ extern "C" {
 #define	MAXMAPSIZE	(1024*1024*8)	/* map at most 8MB */
 #define	SMALLFILESIZE	(32*1024)	/* don't use mmap on little file */
 
-/* avltree */
-#define	OFFSETOF(s, m)	((size_t)(&(((s *)0)->m)))
-
 /* Type used for a node containing a device id and inode number */
+
+#if defined(_LP64) || (_FILE_OFFSET_BITS == 64)
 typedef struct tree_node {
 	dev_t		node_dev;
 	ino_t		node_ino;
 	avl_node_t	avl_link;
 } tree_node_t;
-
+#else
+typedef struct tree_node {
+	dev_t		node_dev;
+	ino64_t		node_ino;
+	avl_node_t	avl_link;
+} tree_node_t;
+#endif
 
 		/* extended system attribute support */
 
@@ -90,8 +100,13 @@ extern int sysattr_type(char *);
 extern int sysattr_support(char *, int);
 
 /* Copies the content of the source file to the target file */
+#if defined(_LP64) || (_FILE_OFFSET_BITS == 64)
 extern int writefile(int, int, char *, char *, char *, char *,
-struct stat *, struct stat *);
+	struct stat *, struct stat *);
+#else
+extern int writefile(int, int, char *, char *, char *, char *,
+	struct stat64 *, struct stat64 *);
+#endif
 
 /* Gets file descriptors of the source and target attribute files */
 extern int get_attrdirs(int, int, char *, int *, int *);
@@ -120,7 +135,11 @@ extern int tnode_compare(const void *, const void *);
  * application must set the tree pointer to NULL before calling
  * add_tnode() for the first time.
  */
+#if defined(_LP64) || (_FILE_OFFSET_BITS == 64)
 extern int add_tnode(avl_tree_t **, dev_t, ino_t);
+#else
+extern int add_tnode(avl_tree_t **, dev_t, ino64_t);
+#endif
 
 /*
  * Used to destroy a whole tree (all nodes) without rebalancing.

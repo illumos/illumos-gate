@@ -17,12 +17,6 @@
  *  specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifndef lint
-static char	SccsId[] = "%W%	%E% SMI";
-#endif /* not lint */
-
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -763,9 +757,10 @@ sendmessage(msgf, user, myname)
 	if (f == NULL)
 	{
 		f = fopen("/etc/mail/vacation.def", "r");
-		if (f == NULL)
+		if (f == NULL) {
 			usrerr("No message to send");
 			exit(EX_OSFILE);
+		}
 	}
 
 	if (pipe(pipefd) < 0) {

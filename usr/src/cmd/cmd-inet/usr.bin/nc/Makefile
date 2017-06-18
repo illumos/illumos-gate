@@ -24,7 +24,7 @@
 #
 
 PROG= nc
-OBJS= atomicio.o netcat.o socks.o strtonum.o
+OBJS= atomicio.o netcat.o socks.o
 
 SRCS= $(OBJS:%.o=%.c)
 

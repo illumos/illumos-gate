@@ -748,15 +748,12 @@ __key_net_get_2_svc(uid, arg, keynetname)
 }
 
 bool_t
-__key_get_conv_2_svc(uid, arg, res)
-	uid_t uid;
-	keybuf arg;
-	cryptkeyres *res;
+__key_get_conv_2_svc(uid_t uid, keybuf arg, cryptkeyres *res)
 {
 
 	if (debugging)
 		(void) fprintf(stderr, "get_conv(%d, %.*s) = ", uid,
-			sizeof (arg), arg);
+		    sizeof (keybuf), arg);
 
 
 	res->status = pk_get_conv_key(uid, arg, res);

@@ -45,11 +45,13 @@
 #include <sys/note.h>
 #include <netsmb/smb_conn.h>
 
+struct msgb;	/* avoiding sys/stream.h here */
+
 /* Helper function for SMBERROR */
 /*PRINTFLIKE3*/
 extern void smb_errmsg(int, const char *, const char *, ...)
 	__KPRINTFLIKE(3);
-void m_dumpm(mblk_t *m);
+void m_dumpm(struct msgb *);
 
 /*
  * Let's use C99 standard variadic macros!

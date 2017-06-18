@@ -511,7 +511,7 @@ static int (*cs_error_ptr)() = card_services_error;
  */
 int
 pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 	int e;
 	char name[64];
@@ -953,7 +953,7 @@ pcmcia_find_rnum(dev_info_t *dip, struct regspec *reg)
 
 int
 pcmcia_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	off_t offset, off_t len, caddr_t *vaddrp)
+    off_t offset, off_t len, caddr_t *vaddrp)
 {
 	struct pcm_regs *regs, *mregs = NULL, tmp_reg;
 	ddi_map_req_t mr = *mp;
@@ -1704,7 +1704,7 @@ pcm_find_parent_dip(int socket)
  */
 int
 pcmcia_set_em_handler(int (*handler)(), caddr_t events, int elen,
-			uint32_t id, void **cs, void **ss)
+    uint32_t id, void **cs, void **ss)
 {
 	struct pcmcia_mif *mif, *tmp;
 
@@ -2338,7 +2338,7 @@ pcmcia_fix_string(char *str)
 
 void
 pcmcia_1275_name(int socket, struct pcm_device_info *info,
-			client_handle_t handle)
+    client_handle_t handle)
 {
 	cistpl_manfid_t manfid;
 	cistpl_jedec_t jedec;
@@ -2453,7 +2453,7 @@ char *pcmcia_lan_types[] = {
 
 void
 pcmcia_generic_name(int socket, struct pcm_device_info *info,
-			client_handle_t handle)
+    client_handle_t handle)
 {
 	cistpl_funcid_t funcid;
 	cistpl_funce_t funce;
@@ -2642,7 +2642,7 @@ pcmcia_add_compatible(dev_info_t *dip, struct pcm_device_info *info)
  */
 static int
 pcmcia_get_mem_regs(struct pcm_regs *regs, struct pcm_device_info *info,
-			int type, int pctype)
+    int type, int pctype)
 {
 	int num_regs = 0;
 	tuple_t tuple;
@@ -2711,7 +2711,7 @@ pcmcia_get_mem_regs(struct pcm_regs *regs, struct pcm_device_info *info,
  */
 static int
 pcmcia_get_io_regs(struct pcm_regs *regs, struct pcm_device_info *info,
-		    int pctype)
+    int pctype)
 {
 	int num_regs = 0;
 	tuple_t tuple;
@@ -5425,13 +5425,14 @@ pcmcia_intr_disable_isr(dev_info_t *dip, dev_info_t *rdip,
 
 		/* Check if there is only one handler left */
 		if ((intr->next == intr) && (intr->prev == intr)) {
-			if (intr->handler_id != (uint32_t)(uintptr_t)rdip)
+			if (intr->handler_id != (uint32_t)(uintptr_t)rdip) {
 				/*
 				 * need to get the dip that was
 				 * used to add the handler
 				 */
 				rdip = sockp->ls_mfintr_dip;
-				ispecp = (struct intrspec *)&sockp->ls_intrspec;
+			}
+			ispecp = (struct intrspec *)&sockp->ls_intrspec;
 		} else {
 			/* Don't call cleanup if list still has members */
 			mutex_exit(&sockp->ls_ilock);

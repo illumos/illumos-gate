@@ -63,9 +63,6 @@ typedef	void		*Psocklen_t;
 
 #endif /* _SOCKLEN_T */
 
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-#include <sys/stream.h>
-#endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 /*
  * Symbols such as htonl() are required to be exposed through this file,
  * per XNS Issue 5. This is achieved by inclusion of <sys/byteorder.h>

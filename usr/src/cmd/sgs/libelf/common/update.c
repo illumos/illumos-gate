@@ -155,7 +155,6 @@ test_size(Lword hi)
 static size_t
 _elf_upd_lib(Elf * elf)
 {
-	NOTE(ASSUMING_PROTECTED(*elf))
 	Lword		hi;
 	Lword		hibit;
 	Elf_Scn *	s;
@@ -340,7 +339,6 @@ _elf_upd_lib(Elf * elf)
 static size_t
 _elf_upd_usr(Elf * elf)
 {
-	NOTE(ASSUMING_PROTECTED(*elf))
 	Lword		hi;
 	Elf_Scn *	s;
 	register Lword	sz;
@@ -455,7 +453,6 @@ _elf_upd_usr(Elf * elf)
 static size_t
 wrt(Elf * elf, Xword outsz, unsigned fill, int update_cmd)
 {
-	NOTE(ASSUMING_PROTECTED(*elf))
 	Elf_Data		dst, src;
 	unsigned		flag;
 	Xword			hi, sz;

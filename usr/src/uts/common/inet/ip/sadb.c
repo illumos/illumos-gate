@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -2426,7 +2427,7 @@ sadb_purge_cb(isaf_t *head, ipsa_t *entry, void *cookie)
  */
 int
 sadb_purge_sa(mblk_t *mp, keysock_in_t *ksi, sadb_t *sp,
-	int *diagnostic, queue_t *pfkey_q)
+    int *diagnostic, queue_t *pfkey_q)
 {
 	struct sadb_purge_state ps;
 	int error = sadb_form_query(ksi, 0,
@@ -3198,7 +3199,7 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		newbie->ipsa_kcfauthkey.ck_length = newbie->ipsa_authkeybits;
 		newbie->ipsa_kcfauthkey.ck_data = newbie->ipsa_authkey;
 
-		mutex_enter(&ipss->ipsec_alg_lock);
+		rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 		alg = ipss->ipsec_alglists[IPSEC_ALG_AUTH]
 		    [newbie->ipsa_auth_alg];
 		if (alg != NULL && ALG_VALID(alg)) {
@@ -3211,7 +3212,7 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 			newbie->ipsa_amech.cm_type = CRYPTO_MECHANISM_INVALID;
 		}
 		error = ipsec_create_ctx_tmpl(newbie, IPSEC_ALG_AUTH);
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		if (error != 0) {
 			mutex_exit(&newbie->ipsa_lock);
 			/*
@@ -3228,7 +3229,7 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	}
 
 	if (ekey != NULL) {
-		mutex_enter(&ipss->ipsec_alg_lock);
+		rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 		async = async || (ipss->ipsec_algs_exec_mode[IPSEC_ALG_ENCR] ==
 		    IPSEC_ALGS_EXEC_ASYNC);
 		alg = ipss->ipsec_alglists[IPSEC_ALG_ENCR]
@@ -3261,7 +3262,7 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		} else {
 			newbie->ipsa_emech.cm_type = CRYPTO_MECHANISM_INVALID;
 		}
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 
 		/*
 		 * The byte stream following the sadb_key_t is made up of:
@@ -3373,9 +3374,9 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		newbie->ipsa_kcfencrkey.ck_length = newbie->ipsa_encrkeybits;
 		newbie->ipsa_kcfencrkey.ck_data = newbie->ipsa_encrkey;
 
-		mutex_enter(&ipss->ipsec_alg_lock);
+		rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 		error = ipsec_create_ctx_tmpl(newbie, IPSEC_ALG_ENCR);
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		if (error != 0) {
 			mutex_exit(&newbie->ipsa_lock);
 			/* See above for error explanation. */
@@ -5281,18 +5282,18 @@ sadb_new_algdesc(uint8_t *start, uint8_t *limit,
 	 * a stronger policy, and when the framework loads a stronger version,
 	 * you can just keep plowing w/o rewhacking your SPD.
 	 */
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 	algp = ipss->ipsec_alglists[(algtype == SADB_X_ALGTYPE_AUTH) ?
 	    IPSEC_ALG_AUTH : IPSEC_ALG_ENCR][alg];
 	if (algp == NULL) {
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		return (NULL);	/* Algorithm doesn't exist.  Fail gracefully. */
 	}
 	if (minbits < algp->alg_ef_minbits)
 		minbits = algp->alg_ef_minbits;
 	if (maxbits > algp->alg_ef_maxbits)
 		maxbits = algp->alg_ef_maxbits;
-	mutex_exit(&ipss->ipsec_alg_lock);
+	rw_exit(&ipss->ipsec_alg_lock);
 
 	algdesc->sadb_x_algdesc_reserved = SADB_8TO1(algp->alg_saltlen);
 	algdesc->sadb_x_algdesc_satype = satype;
@@ -5774,7 +5775,7 @@ sadb_setup_acquire(ipsacq_t *acqrec, uint8_t satype, ipsec_stack_t *ipss)
 	/* Make sure there's enough to cover both AF_INET and AF_INET6. */
 	allocsize += 2 * sizeof (struct sockaddr_in6);
 
-	mutex_enter(&ipss->ipsec_alg_lock);
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
 	/* NOTE:  The lock is now held through to this function's return. */
 	allocsize += ipss->ipsec_nalgs[IPSEC_ALG_AUTH] *
 	    ipss->ipsec_nalgs[IPSEC_ALG_ENCR] * sizeof (sadb_comb_t);
@@ -5789,7 +5790,7 @@ sadb_setup_acquire(ipsacq_t *acqrec, uint8_t satype, ipsec_stack_t *ipss)
 	msgmp = allocb(allocsize, BPRI_HI);
 	if (msgmp == NULL) {
 		freeb(pfkeymp);
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		return (NULL);
 	}
 
@@ -5812,7 +5813,7 @@ sadb_setup_acquire(ipsacq_t *acqrec, uint8_t satype, ipsec_stack_t *ipss)
 		cmn_err(CE_WARN,
 		    "sadb_setup_acquire:  corrupt ACQUIRE record.\n");
 		ASSERT(0);
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 		return (NULL);
 	}
 
@@ -5859,7 +5860,7 @@ sadb_setup_acquire(ipsacq_t *acqrec, uint8_t satype, ipsec_stack_t *ipss)
 	if (cur != NULL)
 		samsg->sadb_msg_len = SADB_8TO64(cur - msgmp->b_rptr);
 	else
-		mutex_exit(&ipss->ipsec_alg_lock);
+		rw_exit(&ipss->ipsec_alg_lock);
 
 	return (pfkeymp);
 }
@@ -7190,7 +7191,7 @@ ipsec_create_ctx_tmpl(ipsa_t *sa, ipsec_algtype_t alg_type)
 	int rv;
 	ipsec_stack_t	*ipss = sa->ipsa_netstack->netstack_ipsec;
 
-	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
+	ASSERT(RW_READ_HELD(&ipss->ipsec_alg_lock));
 	ASSERT(MUTEX_HELD(&sa->ipsa_lock));
 
 	/* get pointers to the algorithm info, context template, and key */

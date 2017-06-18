@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libelf.h"
 #include "decl.h"
 #include "msg.h"
@@ -84,7 +82,6 @@ elf_newdata(Elf_Scn * s)
 		READUNLOCKS(elf, s)
 		return (0);
 	}
-	NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*d))
 	d->db_data.d_version = work;
 	d->db_scn = s;
 	d->db_uflags |= ELF_F_DIRTY;
@@ -92,7 +89,6 @@ elf_newdata(Elf_Scn * s)
 	s->s_tlnode->db_next = d;
 	s->s_tlnode = d;
 	rc = &d->db_data;
-	NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*d))
 	READUNLOCKS(elf, s)
 	return (rc);
 }

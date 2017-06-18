@@ -90,45 +90,6 @@ pics/ar.o:	msg.h
 objs/xlate.o \
 pics/xlate.o:	xlate.c
 
-#
-# Targets needed to support running of Warlock. The old warlock can be
-# located at:
-#	suntools.eng:/export/tools/internal/warlock
-#
-# to use add the following to your path:
-#	export PATH=/net/suntools.eng/export/tools/internal/warlock/bin:$PATH
-#
-# The newer warlock is at:
-#	export PATH=/ws/onnv-gate/public/warlock/$MACH:$PATH
-#
-# This target has value for manual debugging, but is not suitable
-# for production use. For this reason, the necessary rules are commented
-# out with '###'. Remove the comments to use it.
-#
-###warlock := CFLAGS=
-###
-###.PARALLEL: $(WARLOCKFILES)
-###warlock: wlocks .WAIT warlock_files
-###	warlock -c ../common/libelf.wlcmd $(WARLOCKFILES)
-###
-###warlock_files: $(BLTSRCS) .WAIT $(WARLOCKFILES)
-###
-###wlocks:
-###	-@mkdir -p $@
-###
-###wlocks/%.ll:	%.c
-###	wlcc $(CFLAGS) $(CPPFLAGS) -o $@ $<
-###
-###wlocks/%.ll:	../misc/%.c
-###	wlcc $(CFLAGS) $(CPPFLAGS) -o $@ $<
-###
-###wlocks/%.ll:	../common/%.c
-###	wlcc $(CFLAGS) $(CPPFLAGS) -o $@ $<
-###
-###wlocks/%64.ll:	../common/%.c
-###	wlcc -D_ELF64 $(CFLAGS) $(CPPFLAGS) -o $@ $<
-
-
 # Special target for native builds (ie. when we need to build a version of ld
 # to build a version of ld :-).
 

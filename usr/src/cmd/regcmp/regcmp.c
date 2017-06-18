@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <locale.h>
 #include <libgen.h>
@@ -83,11 +81,13 @@ main(int argc, char **argv)
 		cp = ofile;
 		while (*++bp)
 			if (*bp == '/') *bp = '\0';
-		while (*--bp == '\0');
+		while (*--bp == '\0')
+			;
 		while (*bp != '\0' && bp > *argv) bp--;
 		while (*bp == 0)
 			bp++;
-		while (*cp++ = *bp++);
+		while (*cp++ = *bp++)
+			;
 		cp--; *cp++ = '.';
 		if (cflg) *cp++ = 'c';
 		else *cp++ = 'i';
@@ -104,15 +104,18 @@ main(int argc, char **argv)
 			name = a2;
 			if (!gotflg)
 				while (((c = getc(iobuf)) == '\n') ||
-				    (c == ' '));
+				    (c == ' '))
+					;
 			else
 				gotflg = 0;
 			if (c == EOF) break;
 			*name++ = c;
 			while (((*name++ = c = getc(iobuf)) != ' ') &&
-			    (c != EOF) && (c != '\n'));
-				*--name = '\0';
-			while (((c = getc(iobuf)) == ' ') || (c == '\n'));
+			    (c != EOF) && (c != '\n'))
+				;
+			*--name = '\0';
+			while (((c = getc(iobuf)) == ' ') || (c == '\n'))
+				;
 			if (c != '"') {
 				if (c == EOF) {
 					message = gettext("unexpected eof\n");
@@ -125,7 +128,8 @@ main(int argc, char **argv)
 				message =
 				    gettext(" : remainder of line ignored\n");
 				write(2, message, strlen(message));
-				while ((c = getc(iobuf)) != '\n');
+				while ((c = getc(iobuf)) != '\n')
+					;
 				continue;
 			}
 			keeponl:
@@ -167,7 +171,8 @@ main(int argc, char **argv)
 				write(2, message, strlen(message));
 				exit(1);
 			}
-			while (((c = getc(iobuf)) == '\n') || (c == ' '));
+			while (((c = getc(iobuf)) == '\n') || (c == ' '))
+				;
 			if (c == '"') goto keeponl;
 			else {
 				gotflg++;

@@ -1,203 +1,332 @@
-'\" te
-.\" Copyright 1989 AT&T.  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MALLOC 3C "Mar 21, 2005"
-.SH NAME
-malloc, calloc, free, memalign, realloc, valloc, alloca \- memory allocator
-.SH SYNOPSIS
-.LP
-.nf
-#include <stdlib.h>
-
-\fBvoid *\fR\fBmalloc\fR(\fBsize_t\fR \fIsize\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBcalloc\fR(\fBsize_t\fR \fInelem\fR, \fBsize_t\fR \fIelsize\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBfree\fR(\fBvoid *\fR\fIptr\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBmemalign\fR(\fBsize_t\fR \fIalignment\fR, \fBsize_t\fR \fIsize\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBrealloc\fR(\fBvoid *\fR\fIptr\fR, \fBsize_t\fR \fIsize\fR);
-.fi
-
-.LP
-.nf
-\fBvoid *\fR\fBvalloc\fR(\fBsize_t\fR \fIsize\fR);
-.fi
-
-.LP
-.nf
-#include <alloca.h>
-
-\fBvoid *\fR\fBalloca\fR(\fBsize_t\fR \fIsize\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBmalloc()\fR and \fBfree()\fR functions provide a simple, general-purpose
-memory allocation package. The \fBmalloc()\fR function returns a pointer to a
-block of at least \fIsize\fR bytes suitably aligned for any use. If the space
-assigned by \fBmalloc()\fR is overrun, the results are undefined.
-.sp
-.LP
-The argument to \fBfree()\fR is a pointer to a block previously allocated by
-\fBmalloc()\fR, \fBcalloc()\fR, or \fBrealloc()\fR. After \fBfree()\fR is
-executed, this space is made available for further allocation by the
-application, though not returned to the system. Memory is returned to the
-system only upon termination of the application. If  \fIptr\fR is a null
-pointer, no action occurs. If a random number is passed to \fBfree()\fR, the
-results are undefined.
-.sp
-.LP
-The \fBcalloc()\fR function allocates space for an array of \fInelem\fR
-elements of size \fIelsize\fR. The space is initialized to zeros.
-.sp
-.LP
-The \fBmemalign()\fR function allocates \fIsize\fR bytes on a specified
-alignment boundary and returns a pointer to the allocated block. The value of
-the returned address is guaranteed to be an even multiple of \fIalignment\fR.
-The value of \fIalignment\fR must be a power of two and must be greater than or
-equal to the size of a word.
-.sp
-.LP
-The \fBrealloc()\fR function changes the size of the block pointed to by
-\fIptr\fR to \fIsize\fR bytes and returns a pointer to the (possibly moved)
-block. The contents will be unchanged up to the lesser of the new and old
-sizes. If the new size of the block requires movement of the block, the space
-for the previous instantiation of the block is freed. If the new size is
-larger, the contents of the newly allocated portion of the block are
-unspecified. If \fIptr\fR is \fINULL\fR, \fBrealloc()\fR behaves like
-\fBmalloc()\fR for the specified size. If \fIsize\fR is 0 and \fIptr\fR is not
-a null pointer, the space pointed to is freed.
-.sp
-.LP
-The \fBvalloc()\fR function has the same effect as \fBmalloc()\fR, except that
-the allocated memory will be aligned to a multiple of the value returned by
-\fBsysconf\fR(\fB_SC_PAGESIZE\fR).
-.sp
-.LP
-The \fBalloca()\fR function allocates \fIsize\fR bytes of space in the stack
-frame of the caller, and returns a pointer to the allocated block. This
-temporary space is automatically freed when the caller returns. If the
-allocated block is beyond the current stack limit, the resulting behavior is
-undefined.
-.SH RETURN VALUES
-.sp
-.LP
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\"
+.Dd March 10, 2017
+.Dt MALLOC 3C
+.Os
+.Sh NAME
+.Nm malloc ,
+.Nm calloc ,
+.Nm free ,
+.Nm memalign ,
+.Nm realloc ,
+.Nm reallocarray ,
+.Nm valloc ,
+.Nm alloca
+.Nd memory allocator
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft void *
+.Fo malloc
+.Fa "size_t size"
+.Fc
+.Ft void *
+.Fo calloc
+.Fa "size_t nelem"
+.Fa "size_t elsize"
+.Fc
+.Ft void
+.Fo free
+.Fa "void *ptr"
+.Fc
+.Ft void *
+.Fo memalign
+.Fa "size_t alignment"
+.Fa "size_t size"
+.Fc
+.Ft void *
+.Fo realloc
+.Fa "void *ptr"
+.Fa "size_t size"
+.Fc
+.Ft void *
+.Fo reallocarray
+.Fa "void *ptr"
+.Fa "size_t nelem"
+.Fa "size_t elsize"
+.Fc
+.Ft void *
+.Fo valloc
+.Fa "size_t size"
+.Fc
+.In alloca.h
+.Ft void *
+.Fo alloca
+.Fa "size_t size"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn malloc
+and
+.Fn free
+functions provide a simple, general-purpose memory allocation package.
+The
+.Fn malloc
+function returns a pointer to a block of at least
+.Fa size
+bytes suitably aligned for any use.
+If the space assigned by
+.Fn malloc
+is overrun, the results are undefined.
+.Pp
+The argument to
+.Fn free
+is a pointer to a block previously allocated by
+.Fn malloc ,
+.Fn calloc ,
+.Fn realloc ,
+or
+.Fn reallocarray .
+After
+.Fn free
+is executed, this space is made available for further allocation by the
+application, though not returned to the system.
+Memory is returned to the system only upon termination of the application.
+If
+.Fa ptr
+is a null pointer, no action occurs.
+If a random number is passed to
+.Fn free ,
+the results are undefined.
+.Pp
+The
+.Fn calloc
+function allocates space for an array of
+.Fa nelem
+elements of size
+.Fa elsize .
+The space is initialized to zeros.
+.Pp
+The
+.Fn memalign
+function allocates
+.Fa size
+bytes on a specified alignment boundary and returns a pointer to the allocated
+block.
+The value of the returned address is guaranteed to be an even multiple of
+.Fa alignment .
+The value of
+.Fa alignment
+must be a power of two and must be greater than or equal to the size of a word.
+.Pp
+The
+.Fn realloc
+function changes the size of the block pointed to by
+.Fa ptr
+to
+.Fa size
+bytes and returns a pointer to the
+.Pq possibly moved
+block.
+The contents will be unchanged up to the lesser of the new and old sizes.
+If the new size of the block requires movement of the block, the space for the
+previous instantiation of the block is freed.
+If the new size is larger, the contents of the newly allocated portion of the
+block are unspecified.
+If
+.Fa ptr
+is
+.Dv NULL ,
+.Fn realloc
+behaves like
+.Fn malloc
+for the specified size.
+If
+.Fa size
+is 0 and
+.Fa ptr
+is not a null pointer, the space pointed to is freed.
+.Pp
+The
+.Fn reallocarray
+function is similar to
+.Fn realloc ,
+but operates on
+.Fa nelem
+elements of size
+.Fa elsize
+and checks for overflow in
+.Fa nelem Ns * Ns Fa elsize
+calculation.
+.Pp
+The
+.Fn valloc
+function has the same effect as
+.Fn malloc ,
+except that the allocated memory will be aligned to a multiple of the value
+returned by
+.Nm sysconf Ns Pq Dv _SC_PAGESIZE .
+.Pp
+The
+.Fn alloca
+function allocates
+.Fa size
+bytes of space in the stack frame of the caller, and returns a pointer to the
+allocated block.
+This temporary space is automatically freed when the caller returns.
+If the allocated block is beyond the current stack limit, the resulting behavior
+is undefined.
+.Sh RETURN VALUES
 Upon successful completion, each of the allocation functions returns a pointer
-to space suitably aligned (after possible pointer coercion) for storage of any
-type of object.
-.sp
-.LP
-If there is no available memory, \fBmalloc()\fR, \fBrealloc()\fR,
-\fBmemalign()\fR, \fBvalloc()\fR, and \fBcalloc()\fR return a null pointer.
-When \fBrealloc()\fR is called with \fIsize\fR > 0 and returns \fINULL\fR, the
-block pointed to by \fIptr\fR is left intact. If \fIsize\fR, \fInelem\fR, or
-\fIelsize\fR is 0, either a null pointer or a unique pointer that can be passed
-to \fBfree()\fR is returned.
-.sp
-.LP
-If \fBmalloc()\fR, \fBcalloc()\fR, or \fBrealloc()\fR returns unsuccessfully,
-\fBerrno\fR will be set to indicate the error. The \fBfree()\fR function does
-not set \fBerrno\fR.
-.SH ERRORS
-.sp
-.LP
-The \fBmalloc()\fR, \fBcalloc()\fR, and \fBrealloc()\fR functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
-The physical limits of the system are exceeded by \fIsize\fR bytes of memory
-which cannot be allocated.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
-There is not enough memory available to allocate \fIsize\fR bytes of memory;
-but the application could try again later.
-.RE
-
-.SH USAGE
-.sp
-.LP
-Portable applications should avoid using \fBvalloc()\fR but should instead use
-\fBmalloc()\fR or \fBmmap\fR(2). On systems with a large page size, the number
-of successful \fBvalloc()\fR operations might be 0.
-.sp
-.LP
+to space suitably aligned
+.Pq after possible pointer coercion
+for storage of any type of object.
+.Pp
+If there is no available memory,
+.Fn malloc ,
+.Fn realloc ,
+.Fn reallocarray ,
+.Fn memalign ,
+.Fn valloc ,
+and
+.Fn calloc
+return a null pointer.
+.Pp
+When
+.Fn realloc
+or
+.Fn reallocarray
+is called with
+.Fa size
+> 0 and returns
+.Dv NULL ,
+the block pointed to by
+.Fa ptr
+is left intact.
+If
+.Fa size ,
+.Fa nelem ,
+or
+.Fa elsize
+is 0, either a null pointer or a unique pointer that can be passed to
+.Fn free
+is returned.
+.Pp
+If
+.Fn malloc ,
+.Fn calloc ,
+.Fn realloc ,
+or
+.Fn reallocarray
+returns unsuccessfully,
+.Va errno
+will be set to indicate the error.
+The
+.Fn free
+function does not set
+.Va errno .
+.Sh ERRORS
+The
+.Fn malloc ,
+.Fn calloc ,
+.Fn realloc ,
+and
+.Fn reallocarray
+functions will fail if:
+.Bl -tag -width "ENOMEM"
+.It Er ENOMEM
+The physical limits of the system are exceeded by
+.Fa size
+bytes of memory which cannot be allocated, or there's integer overflow in
+.Fn reallocarray .
+.It Er EAGAIN
+There is not enough memory available to allocate
+.Fa size
+bytes of memory; but the application could try again later.
+.El
+.Sh USAGE
+Portable applications should avoid using
+.Fn valloc
+but should instead use
+.Fn malloc
+or
+.Xr mmap 2 .
+On systems with a large page size, the number of successful
+.Fn valloc
+operations might be 0.
+.Pp
 These default memory allocation routines are safe for use in multithreaded
-applications but are not scalable. Concurrent accesses by multiple threads are
-single-threaded through the use of a single lock. Multithreaded applications
-that make heavy use of dynamic memory allocation should be linked with
-allocation libraries designed for concurrent access, such as
-\fBlibumem\fR(3LIB) or \fBlibmtmalloc\fR(3LIB). Applications that want to avoid
-using heap allocations (with \fBbrk\fR(2)) can do so by using either
-\fBlibumem\fR or \fBlibmapmalloc\fR(3LIB). The allocation libraries
-\fBlibmalloc\fR(3LIB) and \fBlibbsdmalloc\fR(3LIB) are available for special
-needs.
-.sp
-.LP
+applications but are not scalable.
+Concurrent accesses by multiple threads are single-threaded through the use of a
+single lock.
+Multithreaded applications that make heavy use of dynamic memory allocation
+should be linked with allocation libraries designed for concurrent access, such
+as
+.Xr libumem 3LIB
+or
+.Xr libmtmalloc 3LIB .
+Applications that want to avoid using heap allocations
+.Pq with Xr brk 2
+can do so by using either
+.Xr libumem 3LIB
+or
+.Xr libmapmalloc 3LIB .
+The allocation libraries
+.Xr libmalloc 3LIB
+and
+.Xr libbsdmalloc 3LIB
+are available for special needs.
+.Pp
 Comparative features of the various allocation libraries can be found in the
-\fBumem_alloc\fR(3MALLOC) manual page.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	See below.
-_
-MT-Level	Safe
-.TE
-
-.sp
-.LP
-The \fBmalloc()\fR, \fBcalloc()\fR, \fBfree()\fR, \fBrealloc()\fR,
-\fBvalloc()\fR functions are Standard. The \fBmemalign()\fR and \fBalloca()\fR
-functions are Stable.
-.SH SEE ALSO
-.sp
-.LP
-\fBbrk\fR(2), \fBgetrlimit\fR(2), \fBlibbsdmalloc\fR(3LIB),
-\fBlibmalloc\fR(3LIB), \fBlibmapmalloc\fR(3LIB), \fBlibmtmalloc\fR(3LIB),
-\fBlibumem\fR(3LIB), \fBumem_alloc\fR(3MALLOC), \fBwatchmalloc\fR(3MALLOC),
-\fBattributes\fR(5)
-.SH WARNINGS
-.sp
-.LP
+.Xr umem_alloc 3MALLOC
+manual page.
+.Sh INTERFACE STABILITY
+The
+.Fn malloc ,
+.Fn calloc ,
+.Fn free ,
+.Fn realloc ,
+.Fn valloc
+functions are
+.Sy Standard.
+.Pp
+The
+.Fn reallocarray
+function is
+.Sy Committed .
+.Pp
+The
+.Fn memalign
+and
+.Fn alloca
+functions are
+.Sy Stable .
+.Sh MT-LEVEL
+.Sy Safe.
+.Sh SEE ALSO
+.Xr brk 2 ,
+.Xr getrlimit 2 ,
+.Xr libbsdmalloc 3LIB ,
+.Xr libmalloc 3LIB ,
+.Xr libmapmalloc 3LIB ,
+.Xr libmtmalloc 3LIB ,
+.Xr libumem 3LIB ,
+.Xr umem_alloc 3MALLOC ,
+.Xr watchmalloc 3MALLOC ,
+.Xr attributes 5
+.Sh WARNINGS
 Undefined results will occur if the size requested for a block of memory
 exceeds the maximum size of a process's heap, which can be obtained with
-\fBgetrlimit\fR(2)
-.sp
-.LP
-The \fBalloca()\fR function is machine-, compiler-, and most of all,
-system-dependent. Its use is strongly discouraged.
+.Xr getrlimit 2 .
+.Pp
+The
+.Fn alloca
+function is machine-, compiler-, and most of all, system-dependent.
+Its use is strongly discouraged.

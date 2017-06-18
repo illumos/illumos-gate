@@ -573,8 +573,8 @@ const instable_t dis_op0FBA[8] = {
 
 const instable_t dis_op0FC7[8] = {
 
-/*  [0]  */	INVALID,		TNS("cmpxchg8b",M),	INVALID,		INVALID,
-/*  [4]  */	INVALID,		INVALID,		TNS("vmptrld",MG9),	TNS("vmptrst",MG9),
+/*  [0]  */	INVALID,		TNS("cmpxchg8b",M),	INVALID,		TNS("xrstors",MG9),
+/*  [4]  */	TNS("xsavec",MG9),	TNS("xsaves",MG9),		TNS("vmptrld",MG9),	TNS("vmptrst",MG9),
 };
 
 /*
@@ -3597,6 +3597,12 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 			opnd_size_prefix = 0;
 			if (opnd_size == SIZE16)
 				opnd_size = SIZE32;
+		} else if (reg == 4 || reg == 5) {
+			/*
+			 * We have xsavec (4) or xsaves (5), so rewrite.
+			 */
+			dp = (instable_t *)&dis_op0FC7[reg];
+			break;
 		}
 		break;
 
@@ -4829,7 +4835,8 @@ xmmprm:
 
 	case XMMFENCE:
 		/*
-		 * XRSTOR and LFENCE share the same opcode but differ in mode
+		 * XRSTOR, XSAVEOPT and LFENCE share the same opcode but
+		 * differ in mode and reg.
 		 */
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
 
@@ -4845,7 +4852,13 @@ xmmprm:
 				goto error;
 		} else {
 #ifdef DIS_TEXT
-			(void) strncpy(x->d86_mnem, "xrstor", OPLEN);
+			if (reg == 5) {
+				(void) strncpy(x->d86_mnem, "xrstor", OPLEN);
+			} else if (reg == 6) {
+				(void) strncpy(x->d86_mnem, "xsaveopt", OPLEN);
+			} else {
+				goto error;
+			}
 #endif
 			dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
 			dtrace_get_operand(x, mode, r_m, BYTE_OPND, 0);

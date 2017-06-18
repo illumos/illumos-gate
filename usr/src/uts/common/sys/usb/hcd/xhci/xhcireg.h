@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2014 Martin Pieuchot. All rights reserved.
  * Copyright (c) 2010 Hans Petter Selasky. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -57,6 +57,8 @@ extern "C" {
 #define	XHCI_HCIVERSION		0x02	/* RO Interface version number */
 #define	XHCI_HCIVERSION_0_9	0x0090	/* xHCI version 0.9 */
 #define	XHCI_HCIVERSION_1_0	0x0100	/* xHCI version 1.0 */
+
+#define	XHCI_VERSION_MASK(x)	(((x) >> 16) & 0xffff)
 
 /*
  * Structural Parameters 1 - xHCI 1.1 / 5.3.3

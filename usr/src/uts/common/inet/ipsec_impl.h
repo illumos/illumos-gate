@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _INET_IPSEC_IMPL_H
@@ -785,7 +786,7 @@ struct ipsec_stack {
 	 * Because policy needs to know what algorithms are supported, keep the
 	 * lists of algorithms here.
 	 */
-	kmutex_t 		ipsec_alg_lock;
+	krwlock_t 		ipsec_alg_lock;
 
 	uint8_t			ipsec_nalgs[IPSEC_NALGTYPES];
 	ipsec_alginfo_t	*ipsec_alglists[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];

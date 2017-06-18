@@ -39,8 +39,6 @@
 #ifndef	_SYSLOGD_H
 #define	_SYSLOGD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -110,10 +108,6 @@ typedef struct log_message {
 	char msg[MAXLINE+1];		/* the message itself */
 } log_message_t;
 
-_NOTE(MUTEX_PROTECTS_DATA(log_message_t::msg_mutex, log_message_t))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(log_message_t))		
-
-
 /*
  * format of a saved message. For each active file we are logging
  * we save the last message and the current message, to make it
@@ -174,9 +168,6 @@ struct filed {
 		char	f_fname[MAXPATHLEN + 1];
 	} f_un;
 };
-
-_NOTE(MUTEX_PROTECTS_DATA(filed::filed_mutex, filed))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(filed))
 
 /* values for f_type */
 #define	F_UNUSED	0		/* unused entry */

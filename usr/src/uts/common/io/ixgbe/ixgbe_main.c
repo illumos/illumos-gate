@@ -2998,7 +2998,7 @@ ixgbe_setup_rss_table(ixgbe_t *ixgbe)
 		reta = reta >> 8;
 		reta = reta | (((uint32_t)ring) << 24);
 
-		if ((i & 3) == 3)
+		if ((i & 3) == 3) {
 			/*
 			 * The first 128 table entries are programmed into the
 			 * RETA register, with any beyond that (eg; on X550)
@@ -3010,6 +3010,7 @@ ixgbe_setup_rss_table(ixgbe_t *ixgbe)
 				IXGBE_WRITE_REG(hw, IXGBE_ERETA((i >> 2) - 32),
 				    reta);
 			reta = 0;
+		}
 	}
 
 	/*

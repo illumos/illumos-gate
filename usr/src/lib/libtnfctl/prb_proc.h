@@ -45,7 +45,6 @@ extern "C" {
 #include <sys/procfs.h>
 #include <sys/errno.h>
 #include <signal.h>
-#include <note.h>
 
 #include <tnf/probe.h>
 
@@ -91,8 +90,6 @@ typedef struct prb_proc_state {
 	boolean_t	ps_isbptfault;
 	long		ps_syscallnum;
 } prb_proc_state_t;
-
-NOTE(SCHEME_PROTECTS_DATA("one thread per handle", prb_proc_state))
 
 /*
  * Opaque /proc handle

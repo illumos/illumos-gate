@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright (c) 2017 Peter Tribble.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -32,7 +33,7 @@ OBJS=	copyf.o         dockdeps.o      echo.o          eptstat.o       \
 	ocfile.o        pathdup.o       pkgdbmerg.o     procmap.o       \
 	pkgobjmap.o     ptext.o         putparam.o                      \
 	qreason.o       qstrdup.o       setadmin.o      setlist.o       \
-	srcpath.o       scriptvfy.o     stub.o          doulimit.o      \
+	srcpath.o       scriptvfy.o     doulimit.o      \
 	dryrun.o        listmgr.o       is_local_host.o cvtpath.o       \
 	depchk.o        pkgops.o        sml.o           log.o           \
 	setup_temporary_directory.o     open_package_datastream.o       \

@@ -7,13 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint)
-static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipfcomp.c,v 1.24.2.2 2004/04/28 10:34:44 darrenr Exp $";
-#endif
-
 #include "ipf.h"
 
 
@@ -391,7 +384,7 @@ extern frentry_t *ipfrule_match_out_%s __P((fr_info_t *, u_32_t *));\n\
 extern frentry_t *ipf_rules_out_%s[%d];\n",
 			grp->fg_name, grp->fg_name, outcount);
 
-		for (g = groups; g != g; g = g->fg_next)
+		for (g = groups; g != grp; g = g->fg_next)
 			if ((strncmp(g->fg_name, grp->fg_name,
 				     FR_GROUPLEN) == 0) &&
 			    g->fg_flags == grp->fg_flags)

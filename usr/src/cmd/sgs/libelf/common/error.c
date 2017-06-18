@@ -60,22 +60,18 @@ _elf_seterr(Msg lib_err, int sys_err)
 	intptr_t encerr = ((int)lib_err << ELFERRSHIFT) |
 	    (sys_err & SYSERRMASK);
 
-#ifndef	__lock_lint
 	if (thr_main()) {
 		_elf_err = (int)encerr;
 		return;
 	}
-#endif
 	(void) thr_keycreate_once(&errkey, 0);
 	(void) thr_setspecific(errkey, (void *)encerr);
 }
 
 int
 _elf_geterr() {
-#ifndef	__lock_lint
 	if (thr_main())
 		return (_elf_err);
-#endif
 	return ((uintptr_t)pthread_getspecific(errkey));
 }
 

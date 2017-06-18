@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Interfaces to control kernel tracing and kernel probes
  */
@@ -390,9 +388,7 @@ _tnfctl_refresh_kernel(tnfctl_handle_t *hndl)
 	if (prexstat)
 		return (prexstat);
 
-	NOTE(NO_COMPETING_THREADS_NOW)
 	obj_p = hndl->objlist;
-	NOTE(COMPETING_THREADS_NOW)
 	assert((obj_p != NULL) && (obj_p->probes != NULL));
 
 	for (i = 1; i <= maxprobe; ++i) {
@@ -474,9 +470,7 @@ alloc_probe_space(tnfctl_handle_t *hndl, int maxprobe)
 	prbctlref_t *probe_p;
 
 	/* we know that: hndl->maxprobe != maxprobe */
-	NOTE(NO_COMPETING_THREADS_NOW)
 	obj_p = hndl->objlist;
-	NOTE(COMPETING_THREADS_NOW)
 	if (obj_p == NULL) {
 		/* no objects allocated */
 		o_pp = &(hndl->objlist);
@@ -511,9 +505,7 @@ alloc_probe_space(tnfctl_handle_t *hndl, int maxprobe)
 
 	probe_p = &(nobj_p->probes[0]);
 	for (i = min_probe_num; i <= maxprobe; i++) {
-		NOTE(NO_COMPETING_THREADS_NOW)
 		probe_p->obj = nobj_p;
-		NOTE(COMPETING_THREADS_NOW)
 		probe_p->probe_id = i;
 		probe_p->probe_handle = calloc(1, sizeof (tnfctl_probe_t));
 		if (probe_p->probe_handle == NULL) {

@@ -1,4 +1,8 @@
-    libdis_test:     0f ae 28           xrstor (%eax)
-    libdis_test+0x3: 0f ae 20           xsave  (%eax)
-    libdis_test+0x6: 0f 01 d0           xgetbv 
-    libdis_test+0x9: 0f 01 d1           xsetbv 
+    libdis_test:      0f ae 20           xsave  (%eax)
+    libdis_test+0x3:  0f ae 28           xrstor (%eax)
+    libdis_test+0x6:  0f c7 20           xsavec (%eax)
+    libdis_test+0x9:  0f ae 30           xsaveopt (%eax)
+    libdis_test+0xc:  0f c7 28           xsaves (%eax)
+    libdis_test+0xf:  0f c7 18           xrstors (%eax)
+    libdis_test+0x12: 0f 01 d0           xgetbv 
+    libdis_test+0x15: 0f 01 d1           xsetbv 

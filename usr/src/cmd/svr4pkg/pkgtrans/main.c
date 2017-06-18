@@ -59,10 +59,8 @@ main(int argc, char *argv[])
 {
 	int	c;
 	void	(*func)();
-	extern char	*optarg;
 	extern int	optind;
-	char		*homedir = NULL;
-	int		ret, len;
+	int		ret;
 
 	(void) setlocale(LC_ALL, "");
 

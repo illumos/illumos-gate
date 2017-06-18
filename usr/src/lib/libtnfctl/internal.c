@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Implements the routines that are needed only for internal process
  * control.
@@ -276,19 +274,8 @@ boolean_t	_tnfctl_libs_changed = B_FALSE;
  * a lock it already holds.
  */
 static thread_t	lock_holder = 0;	/* XXX - no tid with 0 */
-NOTE(MUTEX_PROTECTS_DATA(warlock::lmap_lock, lock_holder))
-NOTE(DATA_READABLE_WITHOUT_LOCK(lock_holder))
 
-/*
- * In the routines below, we will appear to use a different lock if we
- * are running lock_lint/warlock.  We define a macro to represent whichever
- * lock is appropriate.
- */
-#if defined(__lock_lint)
-#define	LMAP_LOCK	(&warlock_kludge->lmap_lock)
-#else
 #define	LMAP_LOCK	(&_tnfctl_lmap_lock)
-#endif
 
 /*
  * dlclose interposition with a recursive lock so that a .fini section
@@ -408,19 +395,3 @@ _tnfctl_internal_getlock()
 	mutex_unlock(&_tnfctl_internalguard_lock);
 	return (TNFCTL_ERR_NONE);
 }
-
-
-#ifdef __lock_lint
-
-/*
- * dummy function for lock_lint (warlock) static lock analysis.
- */
-int
-warlock_dummy()
-{
-	int (*fp)();
-
-	return ((*fp)());
-}
-
-#endif

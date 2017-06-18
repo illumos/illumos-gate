@@ -1,10 +1,10 @@
 '\" te
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2013, Joyent, Inc. All Rights Reserved.
+.\" Copyright (c) 2017, Joyent, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_PERIODIC_ADD 9F "Jul 23, 2013"
+.TH DDI_PERIODIC_ADD 9F "May 04, 2017"
 .SH NAME
 ddi_periodic_add \- request periodic function invocation
 .SH SYNOPSIS
@@ -13,16 +13,14 @@ ddi_periodic_add \- request periodic function invocation
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
 
-\fBddi_periodic_t\fR \fBddi_periodic_add\fR(\fBvoid (*\fR\fIfunc\fR)(\fBvoid *)\fR, \fBvoid\fR \fIarg\fR,
+\fBddi_periodic_t\fR \fBddi_periodic_add\fR(\fBvoid (*\fR\fIfunc\fR)(\fBvoid *)\fR, \fBvoid *\fR\fIarg\fR,
      \fBhrtime_t\fR \fIinterval\fR, \fBint\fR \fIlevel\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIfunc\fR\fR
@@ -67,7 +65,6 @@ pre-defined macro (\fBDDI_IPL_0\fR, ... , \fBDDI_IPL_10\fR), or the
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBddi_periodic_add()\fR function schedules the specified function to be
 periodically invoked in the nanosecond interval time.
@@ -79,13 +76,11 @@ approximation.  If the callback function has not finished execution when the
 next interval expires, the system will skip running the callback for that
 interval.
 .SH RETURN VALUES
-.sp
 .LP
 \fBddi_periodic_add()\fR returns the non-zero opaque value
 (\fBddi_periodic_t\fR), which is later used to cancel the periodic request
 with \fBddi_periodic_delete\fR(9F).
 .SH CONTEXT
-.sp
 .LP
 The \fBddi_periodic_add()\fR function may be called from user or kernel
 context.
@@ -168,13 +163,11 @@ invoked in interrupt context at level 7.
 .in -2
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcv_timedwait\fR(9F), \fBddi_intr_get_pri\fR(9F),
 \fBddi_periodic_delete\fR(9F), \fBddi_intr_get_softint_pri\fR(9F),
 \fBqtimeout\fR(9F), \fBquntimeout\fR(9F), \fBtimeout\fR(9F), \fBuntimeout\fR(9F)
 .SH NOTES
-.sp
 .LP
 The caller must specify \fIinterval\fR as an even, non-zero multiple of 10ms.
 No other values are supported at this time. The interval specified is a lower

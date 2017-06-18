@@ -27,8 +27,6 @@
 #ifndef _PRB_PROC_INT_H
 #define	_PRB_PROC_INT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,7 +39,6 @@ extern "C" {
 #include <sys/syscall.h>
 
 #include <tnf/probe.h>
-#include <note.h>
 
 #include "prb_proc.h"
 
@@ -61,7 +58,6 @@ typedef unsigned char bptsave_t;
 typedef struct shmem_msg {
 	boolean_t	spin;
 } shmem_msg_t;
-NOTE(SCHEME_PROTECTS_DATA("parent writes; child reads", shmem_msg))
 
 /*
  * per /proc handle state
@@ -74,7 +70,6 @@ struct prb_proc_ctl {
 	boolean_t	bpt_inserted;	/* is bpt inserted ? */
 	uintptr_t	dbgaddr;
 };
-NOTE(SCHEME_PROTECTS_DATA("one thread per handle", prb_proc_ctl))
 
 /*
  * Declarations
