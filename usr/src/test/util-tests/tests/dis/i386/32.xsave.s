@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -22,8 +22,13 @@
 .globl libdis_test
 .type libdis_test, @function
 libdis_test:
-	xrstor		(%eax)
 	xsave		(%eax)
+	xrstor		(%eax)
+	xsavec		(%eax)
+	xsaveopt	(%eax)
+	xsaves		(%eax)
+	xrstors		(%eax)
+
 
 	xgetbv
 	xsetbv

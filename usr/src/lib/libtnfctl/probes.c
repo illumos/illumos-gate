@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Load object and probe discovery in target process.  This file is
  * not exercised for kernel probes.
@@ -70,8 +68,6 @@ typedef struct link_args2 {
 	ulong_t		la_index;
 	ulong_t		la_base;
 } link_args2_t;
-
-NOTE(SCHEME_PROTECTS_DATA("always automatic", link_args link_args2))
 
 static int per_loadobj(void *, const tnfctl_ind_obj_info_t *, void *);
 static objlist_t *loadobj_find(tnfctl_handle_t *,
@@ -271,7 +267,6 @@ _tnfctl_free_objs_and_probes(tnfctl_handle_t *hndl)
 {
 	objlist_t *obj, *tmp;
 
-	NOTE(NO_COMPETING_THREADS_NOW)
 	obj = hndl->objlist;
 	while (obj) {
 		free_obj_fields(obj);
@@ -280,7 +275,6 @@ _tnfctl_free_objs_and_probes(tnfctl_handle_t *hndl)
 		free(tmp);
 	}
 	hndl->objlist = NULL;
-	NOTE(COMPETING_THREADS_NOW)
 }
 
 /*

@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -206,7 +210,6 @@ ocfile(PKGserver *server, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 	VFP_T		*tmpvfp = (VFP_T *)NULL;
 	char		contents[PATH_MAX];
 	char		logfile[PATH_MAX];
-	int		n;
 	off_t		cdiff_alloc;
 	PKGserver	newserver;
 
@@ -371,7 +374,6 @@ ocfile(PKGserver *server, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 int
 socfile(PKGserver *server, boolean_t quiet)
 {
-	char		contents[PATH_MAX];
 	boolean_t 	readonly = B_FALSE;
 	PKGserver	newserver;
 
@@ -513,8 +515,6 @@ swapcfile(PKGserver server, VFP_T **a_cfTmpVfp, char *pkginst, int dbchg)
 	/* commit temporary contents file bytes to storage */
 
 	if (pkgservercommitfile(*a_cfTmpVfp, server) != 0) {
-		int	lerrno = errno;
-
 		logerr(gettext(ERR_COMMIT));
 		vfpClose(a_cfTmpVfp);
 		pkgcloseserver(server);
@@ -548,14 +548,15 @@ relslock(void)
  * or not the function displays the error message upon failure.
  */
 int
-pkgWlock(int verbose) {
+pkgWlock(int verbose)
+{
 	int retry_cnt, retval;
 	char lockpath[PATH_MAX];
 
 	active_lock = 0;
 
 	(void) snprintf(lockpath, sizeof (lockpath),
-			"%s/%s", pkgadm_dir, LOCKFILE);
+	    "%s/%s", pkgadm_dir, LOCKFILE);
 
 	retry_cnt = LOCKRETRY;
 
@@ -610,8 +611,7 @@ pkgWlock(int verbose) {
 
 	(void) signal(SIGALRM, SIG_IGN);
 
-	if (retval == 0)
-	{
+	if (retval == 0) {
 		if (retry_cnt == -1) {
 			logerr(gettext(ERR_TMOUT));
 		}
@@ -627,7 +627,8 @@ pkgWlock(int verbose) {
  * failure.
  */
 static int
-pkgWunlock(void) {
+pkgWunlock(void)
+{
 	if (active_lock) {
 		active_lock = 0;
 		if (close(lock_fd))

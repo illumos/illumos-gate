@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -153,7 +157,6 @@ rckdepend(void)
 {
 	int	n;
 	char	ans[MAX_INPUT];
-	char	**id, **name;
 
 	if (ADM(rdepend, "nocheck")) {
 		return (0);

@@ -28,6 +28,8 @@ dir path=opt/libc-tests/cfg/symbols
 dir path=opt/libc-tests/runfiles
 dir path=opt/libc-tests/tests
 dir path=opt/libc-tests/tests/random
+dir path=opt/libc-tests/tests/regex
+dir path=opt/libc-tests/tests/regex/data
 dir path=opt/libc-tests/tests/select
 dir path=opt/libc-tests/tests/symbols
 dir path=usr group=sys
@@ -124,6 +126,27 @@ file path=opt/libc-tests/tests/random/inz_region mode=0555
 file path=opt/libc-tests/tests/random/inz_split mode=0555
 file path=opt/libc-tests/tests/random/inz_split_vpp mode=0555
 file path=opt/libc-tests/tests/random/inz_vpp mode=0555
+file path=opt/libc-tests/tests/regex/data/anchor.in mode=0444
+file path=opt/libc-tests/tests/regex/data/backref.in mode=0444
+file path=opt/libc-tests/tests/regex/data/basic.in mode=0444
+file path=opt/libc-tests/tests/regex/data/bracket.in mode=0444
+file path=opt/libc-tests/tests/regex/data/c_comments.in mode=0444
+file path=opt/libc-tests/tests/regex/data/complex.in mode=0444
+file path=opt/libc-tests/tests/regex/data/error.in mode=0444
+file path=opt/libc-tests/tests/regex/data/meta.in mode=0444
+file path=opt/libc-tests/tests/regex/data/nospec.in mode=0444
+file path=opt/libc-tests/tests/regex/data/paren.in mode=0444
+file path=opt/libc-tests/tests/regex/data/regress.in mode=0444
+file path=opt/libc-tests/tests/regex/data/repet_bounded.in mode=0444
+file path=opt/libc-tests/tests/regex/data/repet_multi.in mode=0444
+file path=opt/libc-tests/tests/regex/data/repet_ordinary.in mode=0444
+file path=opt/libc-tests/tests/regex/data/startend.in mode=0444
+file path=opt/libc-tests/tests/regex/data/subexp.in mode=0444
+file path=opt/libc-tests/tests/regex/data/subtle.in mode=0444
+file path=opt/libc-tests/tests/regex/data/word_bound.in mode=0444
+file path=opt/libc-tests/tests/regex/data/zero.in mode=0444
+file path=opt/libc-tests/tests/regex/h_regex mode=0555
+file path=opt/libc-tests/tests/regex/t_regex mode=0555
 file path=opt/libc-tests/tests/select/select.sh mode=0555
 file path=opt/libc-tests/tests/select/select_test mode=0555
 file path=opt/libc-tests/tests/strcoll-strxfrm-6907.32 mode=0555
@@ -180,6 +203,8 @@ hardlink path=opt/libc-tests/tests/symbols/unistd_h target=setup
 hardlink path=opt/libc-tests/tests/symbols/wchar_h target=setup
 hardlink path=opt/libc-tests/tests/symbols/wctype_h target=setup
 license lic_CDDL license=lic_CDDL
+license usr/src/test/libc-tests/tests/regex/THIRDPARTYLICENSE \
+    license=usr/src/test/libc-tests/tests/regex/THIRDPARTYLICENSE
 depend fmri=locale/de type=require
 depend fmri=locale/en type=require
 depend fmri=locale/en-extra type=require

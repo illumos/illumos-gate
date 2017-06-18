@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2017 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -351,7 +355,7 @@ main(int argc, char **argv)
 
 		case 'O':
 			for (p = strtok(optarg, ","); p != NULL;
-				p = strtok(NULL, ",")) {
+			    p = strtok(NULL, ",")) {
 
 				/* debug - enable all tracing */
 
@@ -413,7 +417,7 @@ main(int argc, char **argv)
 
 	if (parseGlobalData(PKGCOND_GLOBAL_VARIABLE, &gdt) != R_SUCCESS) {
 		log_msg(LOG_MSG_ERR, ERR_CANNOT_USE_GLOBAL_DATA,
-			PKGCOND_GLOBAL_VARIABLE);
+		    PKGCOND_GLOBAL_VARIABLE);
 		return (R_ERROR);
 	}
 
@@ -421,7 +425,7 @@ main(int argc, char **argv)
 	    (strcmp(gdt->gd_installRoot, "/") == 0) ? NULL :
 	    ENV_VAR_SET, B_TRUE) != R_SUCCESS) {
 		log_msg(LOG_MSG_ERR, ERR_CANNOT_SET_ROOT_PATH,
-			ENV_VAR_PKGROOT);
+		    ENV_VAR_PKGROOT);
 		return (R_ERROR);
 	}
 
@@ -611,7 +615,7 @@ static	int	recursion = 0;
 
 	if (pkgTestInstalled("SUNWdclnt", "/") != B_TRUE) {
 		log_msg(LOG_MSG_DEBUG, DBG_IDLC_PKG_NOT_INSTALLED,
-			rootPath, "SUNWdclnt", "/");
+		    rootPath, "SUNWdclnt", "/");
 		return (R_FAILURE);
 	}
 
@@ -626,7 +630,7 @@ static	int	recursion = 0;
 
 	if (strcmp(a_gdt->gd_zoneName, GLOBAL_ZONENAME) != 0) {
 		log_msg(LOG_MSG_DEBUG, DBG_IDLC_ZONE_BAD, rootPath,
-			GLOBAL_ZONENAME);
+		    GLOBAL_ZONENAME);
 		return (R_FAILURE);
 	}
 
@@ -637,7 +641,7 @@ static	int	recursion = 0;
 	 */
 
 	(void) snprintf(cmd, sizeof (cmd), "%s %s >/dev/null 2>&1",
-		LS_CMD, "/export/exec/Solaris_*/usr");
+	    LS_CMD, "/export/exec/Solaris_*/usr");
 
 	/* execute command */
 
@@ -647,7 +651,7 @@ static	int	recursion = 0;
 
 	if (rc != 0) {
 		log_msg(LOG_MSG_DEBUG, DBG_IDLC_PATH_MISSING,
-			rootPath, "/export/exec/Solaris_*/usr");
+		    rootPath, "/export/exec/Solaris_*/usr");
 		return (R_FAILURE);
 	}
 
@@ -657,7 +661,7 @@ static	int	recursion = 0;
 	 * /usr/bin/ls -d1 $ROOTDIR/usr/\*
 	 */
 	(void) snprintf(cmd, sizeof (cmd), "%s %s %s/%s >/dev/null 2>&1",
-		LS_CMD, "-1d", rootPath, "usr/*");
+	    LS_CMD, "-1d", rootPath, "usr/*");
 
 	/* execute command */
 
@@ -667,17 +671,17 @@ static	int	recursion = 0;
 
 	if (rc == 0) {
 		log_msg(LOG_MSG_DEBUG, DBG_IDLC_USR_IS_NOT_EMPTY,
-			rootPath);
+		    rootPath);
 		return (R_FAILURE);
 	}
 
 	/* there must be a templates directory at ${ROOTPATH}/../templates */
 
 	r = testPath(TEST_EXISTS|TEST_IS_DIRECTORY,
-		"%s/%s", rootPath, "../templates");
+	    "%s/%s", rootPath, "../templates");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_IDLC_NO_TEMPLATES_PATH,
-			rootPath, rootPath, "../templates");
+		    rootPath, rootPath, "../templates");
 		return (R_FAILURE);
 	}
 
@@ -856,7 +860,7 @@ static	int	recursion = 0;
 			/* the path is a global zone */
 
 			log_msg(LOG_MSG_DEBUG, DBG_ISGZ_PATH_IS_GLOBAL_ZONE,
-				rootPath);
+			    rootPath);
 
 			return (R_SUCCESS);
 	}
@@ -868,7 +872,7 @@ static	int	recursion = 0;
 			/* the path is a global zone */
 
 			log_msg(LOG_MSG_DEBUG, DBG_ISGZ_PATH_IS_GLOBAL_ZONE,
-				rootPath);
+			    rootPath);
 
 			return (R_SUCCESS);
 		}
@@ -876,7 +880,7 @@ static	int	recursion = 0;
 		/* inside a non-global zone */
 
 		log_msg(LOG_MSG_DEBUG, DBG_ISGZ_ZONENAME_ISNT_GLOBAL,
-			rootPath, a_gdt->gd_zoneName);
+		    rootPath, a_gdt->gd_zoneName);
 
 		return (R_FAILURE);
 	}
@@ -893,30 +897,30 @@ static	int	recursion = 0;
 	/* not global zone if /etc/zones does not exist */
 
 	r = testPath(TEST_EXISTS|TEST_IS_DIRECTORY,
-		"%s/%s", rootPath, "/etc/zones");
+	    "%s/%s", rootPath, "/etc/zones");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_ISGZ_PATH_ISNT_DIRECTORY,
-			rootPath, "/etc/zones");
+		    rootPath, "/etc/zones");
 		return (R_FAILURE);
 	}
 
 	/* .tmp_proto must not exist */
 
 	r = testPath(TEST_NOT_EXISTS,
-		"%s/%s", rootPath, ".tmp_proto");
+	    "%s/%s", rootPath, ".tmp_proto");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_ISGZ_PATH_EXISTS,
-			rootPath, "/.tmp_proto");
+		    rootPath, "/.tmp_proto");
 		return (R_FAILURE);
 	}
 
 	/* /var must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/var");
+	    "%s/%s", rootPath, "/var");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_ISGZ_PATH_IS_SYMLINK,
-			rootPath, "/var");
+		    rootPath, "/var");
 		return (R_FAILURE);
 	}
 
@@ -1030,7 +1034,7 @@ static	int	recursion = 0;
 
 	if (strcmp(a_gdt->gd_zoneName, GLOBAL_ZONENAME) != 0) {
 		log_msg(LOG_MSG_DEBUG, DBG_INIM_BAD_CURRENT_ZONE,
-			rootPath, GLOBAL_ZONENAME);
+		    rootPath, GLOBAL_ZONENAME);
 		return (R_FAILURE);
 	}
 
@@ -1038,47 +1042,47 @@ static	int	recursion = 0;
 
 	if (cmd_is_mounted_miniroot(argc, argv, a_gdt) == R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_IMRT_PATH_IS_MOUNTED_MINIROOT,
-			rootPath);
+		    rootPath);
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/.tmp_proto exists */
 
 	r = testPath(TEST_EXISTS|TEST_IS_DIRECTORY,
-		"%s/%s", rootPath, ".tmp_proto");
+	    "%s/%s", rootPath, ".tmp_proto");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_INIM_PATH_ISNT_DIRECTORY,
-			rootPath, "/.tmp_proto");
+		    rootPath, "/.tmp_proto");
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/var is a symbolic link */
 
 	r = testPath(TEST_IS_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/var");
+	    "%s/%s", rootPath, "/var");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_INIM_PATH_ISNT_SYMLINK,
-			rootPath, "/var");
+		    rootPath, "/var");
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/tmp/kernel does exist */
 
 	r = testPath(TEST_EXISTS|TEST_IS_DIRECTORY,
-		"%s/%s", rootPath, "/tmp/kernel");
+	    "%s/%s", rootPath, "/tmp/kernel");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_INIM_PATH_ISNT_DIRECTORY,
-			rootPath, "/tmp/kernel");
+		    rootPath, "/tmp/kernel");
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/.tmp_proto/kernel is a symbolic link */
 
 	r = testPath(TEST_IS_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/.tmp_proto/kernel");
+	    "%s/%s", rootPath, "/.tmp_proto/kernel");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_INIM_PATH_ISNT_SYMLINK,
-			rootPath, "/.tmp_proto/kernel");
+		    rootPath, "/.tmp_proto/kernel");
 		return (R_FAILURE);
 	}
 
@@ -1188,27 +1192,27 @@ static	int	recursion = 0;
 
 	if (strcmp(a_gdt->gd_zoneName, GLOBAL_ZONENAME) != 0) {
 		log_msg(LOG_MSG_DEBUG, DBG_IMRT_BAD_CURRENT_ZONE,
-			rootPath, GLOBAL_ZONENAME);
+		    rootPath, GLOBAL_ZONENAME);
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/tmp/kernel is a symbolic link */
 
 	r = testPath(TEST_IS_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/tmp/kernel");
+	    "%s/%s", rootPath, "/tmp/kernel");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_IMRT_PATH_ISNT_SYMLINK,
-			rootPath, "/tmp/kernel");
+		    rootPath, "/tmp/kernel");
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/tmp/root/kernel is a directory */
 
 	r = testPath(TEST_EXISTS|TEST_IS_DIRECTORY,
-		"%s/%s", rootPath, "/tmp/root/kernel");
+	    "%s/%s", rootPath, "/tmp/root/kernel");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_IMRT_PATH_ISNT_DIRECTORY,
-			rootPath, "/tmp/root/kernel");
+		    rootPath, "/tmp/root/kernel");
 		return (R_FAILURE);
 	}
 
@@ -1316,7 +1320,7 @@ static	int	recursion = 0;
 	if ((a_gdt->gd_nonglobalZoneInstall == B_TRUE) &&
 	    (strcmp(a_gdt->gd_installRoot, rootPath) == 0)) {
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_INSTALL_ZONENAME_IS_NGZ,
-			rootPath, a_gdt->gd_zoneName);
+		    rootPath, a_gdt->gd_zoneName);
 		return (R_SUCCESS);
 	}
 
@@ -1352,12 +1356,12 @@ static	int	recursion = 0;
 		if (strcmp(a_gdt->gd_zoneName, GLOBAL_ZONENAME) == 0) {
 			/* in the global zone */
 			log_msg(LOG_MSG_DEBUG, DBG_NGZN_ZONENAME_ISNT_NGZ,
-				rootPath, a_gdt->gd_zoneName);
+			    rootPath, a_gdt->gd_zoneName);
 			return (R_FAILURE);
 		}
 		/* in a non-global zone */
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_ZONENAME_IS_NGZ,
-			rootPath, a_gdt->gd_zoneName);
+		    rootPath, a_gdt->gd_zoneName);
 		return (R_SUCCESS);
 	}
 
@@ -1401,29 +1405,29 @@ static	int	recursion = 0;
 	if (r != R_SUCCESS) {
 		/* $R/.tmp_proto cannot exist in a non-global zone */
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_PATH_EXISTS,
-			rootPath, "/.tmp_proto");
+		    rootPath, "/.tmp_proto");
 		return (R_FAILURE);
 	}
 
 	/* /var must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/var");
+	    "%s/%s", rootPath, "/var");
 	if (r != R_SUCCESS) {
 		/* $R/var cannot be a symbolic link in a non-global zone */
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_PATH_DOES_NOT_EXIST,
-			rootPath, "/var");
+		    rootPath, "/var");
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/tmp/root/kernel must not exist */
 
 	r = testPath(TEST_NOT_EXISTS,
-		"%s/%s", rootPath, "/tmp/root/kernel");
+	    "%s/%s", rootPath, "/tmp/root/kernel");
 	if (r != R_SUCCESS) {
 		/* $R/tmp/root/kernel cannot exist in a non-global zone */
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_PATH_EXISTS,
-			rootPath, "/tmp/root/kernel");
+		    rootPath, "/tmp/root/kernel");
 		return (R_FAILURE);
 	}
 
@@ -1439,7 +1443,7 @@ static	int	recursion = 0;
 	if (strcmp(a_gdt->gd_zoneName, GLOBAL_ZONENAME) == 0) {
 		/* in the global zone */
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_IN_GZ_IS_NONGLOBAL_ZONE,
-			rootPath);
+		    rootPath);
 		return (R_SUCCESS);
 	}
 
@@ -1461,12 +1465,12 @@ static	int	recursion = 0;
 	 */
 
 	if ((a_gdt->gd_parentZoneName != NULL) &&
-		(a_gdt->gd_currentZoneName != NULL) &&
-		(strcmp(a_gdt->gd_parentZoneName,
-					a_gdt->gd_currentZoneName) == 0)) {
+	    (a_gdt->gd_currentZoneName != NULL) &&
+	    (strcmp(a_gdt->gd_parentZoneName,
+	    a_gdt->gd_currentZoneName) == 0)) {
 			/* parent and current zone name identical: non-gz */
 			log_msg(LOG_MSG_DEBUG, DBG_NGZN_PARENT_CHILD_SAMEZONE,
-				rootPath, a_gdt->gd_parentZoneName);
+			    rootPath, a_gdt->gd_parentZoneName);
 			return (R_SUCCESS);
 	}
 
@@ -1491,18 +1495,18 @@ static	int	recursion = 0;
 	/* if defined, parent zone type must be "global" */
 
 	if ((a_gdt->gd_parentZoneType != NULL) &&
-		(strcmp(a_gdt->gd_parentZoneType, "nonglobal") == 0)) {
+	    (strcmp(a_gdt->gd_parentZoneType, "nonglobal") == 0)) {
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_BAD_PARENT_ZONETYPE,
-			rootPath, "nonglobal");
+		    rootPath, "nonglobal");
 		return (R_FAILURE);
 	}
 
 	/* if defined, current zone type must be "nonglobal" */
 
 	if ((a_gdt->gd_currentZoneType != NULL) &&
-		(strcmp(a_gdt->gd_currentZoneType, GLOBAL_ZONENAME) == 0)) {
+	    (strcmp(a_gdt->gd_currentZoneType, GLOBAL_ZONENAME) == 0)) {
 		log_msg(LOG_MSG_DEBUG, DBG_NGZN_BAD_CURRENT_ZONETYPE,
-			rootPath, GLOBAL_ZONENAME);
+		    rootPath, GLOBAL_ZONENAME);
 		return (R_FAILURE);
 	}
 
@@ -1623,7 +1627,7 @@ static	int	recursion = 0;
 
 	if (strcmp(a_gdt->gd_zoneName, GLOBAL_ZONENAME) != 0) {
 		log_msg(LOG_MSG_DEBUG, DBG_IRST_ZONE_BAD, rootPath,
-			GLOBAL_ZONENAME);
+		    GLOBAL_ZONENAME);
 		return (R_FAILURE);
 	}
 
@@ -1757,30 +1761,30 @@ static	int	recursion = 0;
 	/* /etc must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/etc");
+	    "%s/%s", rootPath, "/etc");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_ADDV_PATH_IS_SYMLINK,
-			rootPath, "/etc");
+		    rootPath, "/etc");
 		return (R_FAILURE);
 	}
 
 	/* /platform must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/platform");
+	    "%s/%s", rootPath, "/platform");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_ADDV_PATH_IS_SYMLINK,
-			rootPath, "/platform");
+		    rootPath, "/platform");
 		return (R_FAILURE);
 	}
 
 	/* /kernel must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/kernel");
+	    "%s/%s", rootPath, "/kernel");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_ADDV_PATH_IS_SYMLINK,
-			rootPath, "/kernel");
+		    rootPath, "/kernel");
 		return (R_FAILURE);
 	}
 
@@ -1896,30 +1900,30 @@ static	int	recursion = 0;
 	/* /etc must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/etc");
+	    "%s/%s", rootPath, "/etc");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_UPDV_PATH_IS_SYMLINK,
-			rootPath, "/etc");
+		    rootPath, "/etc");
 		return (R_FAILURE);
 	}
 
 	/* /platform must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/platform");
+	    "%s/%s", rootPath, "/platform");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_UPDV_PATH_IS_SYMLINK,
-			rootPath, "/platform");
+		    rootPath, "/platform");
 		return (R_FAILURE);
 	}
 
 	/* /kernel must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/kernel");
+	    "%s/%s", rootPath, "/kernel");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_UPDV_PATH_IS_SYMLINK,
-			rootPath, "/kernel");
+		    rootPath, "/kernel");
 		return (R_FAILURE);
 	}
 
@@ -2035,30 +2039,30 @@ static	int	recursion = 0;
 	/* /etc must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/etc");
+	    "%s/%s", rootPath, "/etc");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_RMDV_PATH_IS_SYMLINK,
-			rootPath, "/etc");
+		    rootPath, "/etc");
 		return (R_FAILURE);
 	}
 
 	/* /platform must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/platform");
+	    "%s/%s", rootPath, "/platform");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_RMDV_PATH_IS_SYMLINK,
-			rootPath, "/platform");
+		    rootPath, "/platform");
 		return (R_FAILURE);
 	}
 
 	/* /kernel must exist and must not be a symbolic link */
 
 	r = testPath(TEST_EXISTS|TEST_NOT_SYMBOLIC_LINK,
-		"%s/%s", rootPath, "/kernel");
+	    "%s/%s", rootPath, "/kernel");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_RMDV_PATH_IS_SYMLINK,
-			rootPath, "/kernel");
+		    rootPath, "/kernel");
 		return (R_FAILURE);
 	}
 
@@ -2169,8 +2173,8 @@ static	int	recursion = 0;
 	}
 
 	log_msg(LOG_MSG_DEBUG, DBG_PWRT_INFO,
-		rootPath, list[nn].fsi_mntPoint, list[nn].fsi_fsType,
-		list[nn].fsi_mntOptions);
+	    rootPath, list[nn].fsi_mntPoint, list[nn].fsi_fsType,
+	    list[nn].fsi_mntOptions);
 
 	/*
 	 * need to determine if the mount point is writeable:
@@ -2181,7 +2185,7 @@ static	int	recursion = 0;
 	r = mountOptionPresent(list[nn].fsi_mntOptions, MNTOPT_RO);
 	if (r == R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_PWRT_READONLY,
-			rootPath, list[nn].fsi_mntOptions);
+		    rootPath, list[nn].fsi_mntOptions);
 		return (R_FAILURE);
 	}
 
@@ -2348,10 +2352,10 @@ static	int	recursion = 0;
 	/* /var must exist */
 
 	r = testPath(TEST_EXISTS,
-		"%s/%s", rootPath, "/var");
+	    "%s/%s", rootPath, "/var");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_IALR_PATH_DOES_NOT_EXIST,
-			rootPath, "/var");
+		    rootPath, "/var");
 		return (R_FAILURE);
 	}
 
@@ -2497,7 +2501,7 @@ static	int	recursion = 0;
 
 	if (strcmp(a_gdt->gd_zoneName, GLOBAL_ZONENAME) != 0) {
 		log_msg(LOG_MSG_DEBUG, DBG_BENV_BAD_ZONE, rootPath,
-			GLOBAL_ZONENAME);
+		    GLOBAL_ZONENAME);
 		return (R_FAILURE);
 	}
 
@@ -2506,14 +2510,14 @@ static	int	recursion = 0;
 	r = testPath(TEST_EXISTS, "%s/%s", rootPath, "/etc/lutab");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_BENV_NO_ETCLUTAB, rootPath,
-			"/etc/lutab");
+		    "/etc/lutab");
 		return (R_FAILURE);
 	}
 
 	/* $ROOTDIR/etc/lu must exist */
 
 	r = testPath(TEST_EXISTS|TEST_IS_DIRECTORY,
-		"%s/%s", rootPath, "/etc/lu");
+	    "%s/%s", rootPath, "/etc/lu");
 	if (r != R_SUCCESS) {
 		log_msg(LOG_MSG_DEBUG, DBG_BENV_NO_ETCLU, rootPath, "/etc/lu");
 		return (R_FAILURE);
@@ -2635,7 +2639,7 @@ static	char	*cmdName = "is_what";
 
 		result = adjustResults(result);
 		log_msg(LOG_MSG_INFO, MSG_IS_WHAT_RESULT,
-			cmds[cur_cmd].c_name, result);
+		    cmds[cur_cmd].c_name, result);
 	}
 	return (R_SUCCESS);
 }
@@ -2758,7 +2762,7 @@ mountOptionPresent(char *a_mntOptions, char *a_opt)
 
 static void
 sortedInsert(FSI_T **r_list, long *a_listSize, char *a_mntPoint,
-	char *a_fsType, char *a_mntOptions)
+    char *a_fsType, char *a_mntOptions)
 {
 	int	listSize;
 	FSI_T	*list;
@@ -2824,7 +2828,7 @@ sortedInsert(FSI_T **r_list, long *a_listSize, char *a_mntPoint,
 			/* entry already in list -- merge entries */
 
 			len = strlen(list[n].fsi_mntOptions) +
-				strlen(a_mntOptions) + 2;
+			    strlen(a_mntOptions) + 2;
 			me = (char *)calloc(1, len);
 
 			/* merge two mount options lists into one */
@@ -2839,9 +2843,9 @@ sortedInsert(FSI_T **r_list, long *a_listSize, char *a_mntPoint,
 			list[n].fsi_mntOptions = me;
 
 			echoDebug(DBG_SORTEDINS_SKIPPED,
-				n, list[n].fsi_mntPoint, a_fsType,
-				list[n].fsi_fsType, a_mntOptions,
-				list[n].fsi_mntOptions);
+			    n, list[n].fsi_mntPoint, a_fsType,
+			    list[n].fsi_fsType, a_mntOptions,
+			    list[n].fsi_mntOptions);
 
 			continue;
 		} else if (c < 0) {
@@ -2856,9 +2860,9 @@ sortedInsert(FSI_T **r_list, long *a_listSize, char *a_mntPoint,
 		/* allocate one more entry and make space for new entry */
 		listSize++;
 		list = (FSI_T *)realloc(list,
-			sizeof (FSI_T)*(listSize+1));
+		    sizeof (FSI_T)*(listSize+1));
 		(void) memmove(&(list[n+1]), &(list[n]),
-			sizeof (FSI_T)*(listSize-n));
+		    sizeof (FSI_T)*(listSize-n));
 
 		/* insert this entry into list */
 		list[n].fsi_mntPoint = strdup(a_mntPoint);
@@ -2936,9 +2940,10 @@ calculateFileSystemConfig(GLOBALDATA_T *a_gdt)
 	while (getmntent(fp, &mntbuf) == 0) {
 		if (mntbuf.mnt_mountp[0] == '/') {
 			sortedInsert(&list, &listSize,
-			strdup(mntbuf.mnt_mountp),
-			strdup(mntbuf.mnt_fstype),
-			strdup(mntbuf.mnt_mntopts ? mntbuf.mnt_mntopts : ""));
+			    strdup(mntbuf.mnt_mountp),
+			    strdup(mntbuf.mnt_fstype),
+			    strdup(mntbuf.mnt_mntopts ?
+			    mntbuf.mnt_mntopts : ""));
 		}
 
 		/*
@@ -2947,8 +2952,8 @@ calculateFileSystemConfig(GLOBALDATA_T *a_gdt)
 		 */
 
 		if (strcmp(mntbuf.mnt_mountp, "/a") == 0 &&
-			strcmp(mntbuf.mnt_special, "/a") == 0 &&
-			strcmp(mntbuf.mnt_fstype, "lofs") == 0) {
+		    strcmp(mntbuf.mnt_special, "/a") == 0 &&
+		    strcmp(mntbuf.mnt_fstype, "lofs") == 0) {
 			a_gdt->inMountedState = B_TRUE;
 		}
 
@@ -3000,7 +3005,7 @@ adjustResults(int a_result)
 	/* debugging output */
 
 	log_msg(LOG_MSG_DEBUG, DBG_ADJUST_RESULTS, a_result, negate,
-		realResult);
+	    realResult);
 
 	/* return results */
 
@@ -3075,7 +3080,7 @@ setRootPath(char *a_path, char *a_envVar, boolean_t a_mustExist)
 		if (a_mustExist == B_TRUE) {
 			/* must exist ... error */
 			log_msg(LOG_MSG_ERR, ERR_DEFAULT_ROOT_INVALID,
-				a_path, strerror(errno));
+			    a_path, strerror(errno));
 			return (R_ERROR);
 		} else {
 			/* may not exist - use path as specified */
@@ -3095,7 +3100,7 @@ setRootPath(char *a_path, char *a_envVar, boolean_t a_mustExist)
 
 		if (stat(rp, &statbuf) != 0) {
 			log_msg(LOG_MSG_ERR, ERR_DEFAULT_ROOT_INVALID,
-				rp, strerror(errno));
+			    rp, strerror(errno));
 			return (R_ERROR);
 		}
 
@@ -3195,7 +3200,7 @@ testPath(TEST_TYPES a_tt, char *a_format, ...)
 
 		if (lstat(mbPath, &statbuf) != 0) {
 			echoDebug(DBG_CANNOT_LSTAT_PATH, mbPath,
-				strerror(errno));
+			    strerror(errno));
 			free(mbPath);
 			return (R_FAILURE);
 		}
@@ -3413,7 +3418,8 @@ findToken(char *path, char *token)
 	}
 
 	while (fgets(line, sizeof (line), fp) != NULL) {
-		for (cp = line; *cp && isspace(*cp); cp++);
+		for (cp = line; *cp && isspace(*cp); cp++)
+			;
 		/* skip comments */
 		if (*cp == '#') {
 			continue;
@@ -3482,7 +3488,7 @@ resolvePath(char **r_path)
 	mbPathlen = strlen(*r_path);
 
 	if ((wcPath = (wchar_t *)
-		calloc(1, sizeof (wchar_t)*(mbPathlen+1))) == NULL) {
+	    calloc(1, sizeof (wchar_t)*(mbPathlen+1))) == NULL) {
 		return (R_FAILURE);
 	}
 
@@ -3631,7 +3637,7 @@ static char zoneName[ZONENAME_MAX] = { '\0' };
 
 	if (zoneName[0] == '\0') {
 		if (getzonenamebyid(getzoneid(), zoneName,
-			sizeof (zoneName)) < 0) {
+		    sizeof (zoneName)) < 0) {
 			log_msg(LOG_MSG_ERR, ERR_CANNOT_GET_ZONENAME);
 			return (R_ERROR);
 		}
@@ -3695,7 +3701,7 @@ static void
 setNegateResults(boolean_t setting)
 {
 	log_msg(LOG_MSG_DEBUG, DBG_SET_NEGATE_RESULTS,
-		_negateResults, setting);
+	    _negateResults, setting);
 
 	_negateResults = setting;
 }
@@ -3770,7 +3776,7 @@ usage(char *a_format, ...)
 		(void) strlcat(cmdlst, cmds[cur_cmd].c_name, sizeof (cmdlst));
 		if (cmds[cur_cmd].c_args != NULL) {
 			(void) strlcat(cmdlst, cmds[cur_cmd].c_args,
-						sizeof (cmdlst));
+			    sizeof (cmdlst));
 		}
 		(void) strlcat(cmdlst, "\n", sizeof (cmdlst));
 	}
@@ -3799,7 +3805,6 @@ static int
 parseGlobalData(char *a_envVar, GLOBALDATA_T **r_gdt)
 {
 	int		r;
-	int		n;
 	char		*a;
 	SML_TAG		*tag;
 	SML_TAG		*ntag;
@@ -3912,7 +3917,7 @@ parseGlobalData(char *a_envVar, GLOBALDATA_T **r_gdt)
 	ntag = smlGetTagByName(tag, 0, TAG_COND_TOPLEVEL);
 	if (ntag == SML_TAG__NULL) {
 		log_msg(LOG_MSG_WRN, WRN_PARSED_DATA_MISSING,
-			TAG_COND_TOPLEVEL);
+		    TAG_COND_TOPLEVEL);
 		return (R_FAILURE);
 	}
 
@@ -3933,13 +3938,13 @@ parseGlobalData(char *a_envVar, GLOBALDATA_T **r_gdt)
 	/* current zone name */
 
 	a = smlGetParamByTag(ntag, 0, TAG_COND_CURRENT_ZONE,
-		TAG_COND_ZONE_NAME);
+	    TAG_COND_ZONE_NAME);
 	(*r_gdt)->gd_currentZoneName = a;
 
 	/* current zone type */
 
 	a = smlGetParamByTag(ntag, 0, TAG_COND_CURRENT_ZONE,
-		TAG_COND_ZONE_TYPE);
+	    TAG_COND_ZONE_TYPE);
 	(*r_gdt)->gd_currentZoneType = a;
 
 	return (R_SUCCESS);
@@ -3964,11 +3969,11 @@ dumpGlobalData(GLOBALDATA_T *a_gdt)
 
 	echoDebug(DBG_DUMP_GLOBAL_ENTRY);
 	echoDebug(DBG_DUMP_GLOBAL_PARENT_ZONE,
-		a_gdt->gd_parentZoneName ? a_gdt->gd_parentZoneName : "",
-		a_gdt->gd_parentZoneType ? a_gdt->gd_parentZoneType : "");
+	    a_gdt->gd_parentZoneName ? a_gdt->gd_parentZoneName : "",
+	    a_gdt->gd_parentZoneType ? a_gdt->gd_parentZoneType : "");
 	echoDebug(DBG_DUMP_GLOBAL_CURRENT_ZONE,
-		a_gdt->gd_currentZoneName ? a_gdt->gd_currentZoneName : "",
-		a_gdt->gd_currentZoneType ? a_gdt->gd_currentZoneType : "");
+	    a_gdt->gd_currentZoneName ? a_gdt->gd_currentZoneName : "",
+	    a_gdt->gd_currentZoneType ? a_gdt->gd_currentZoneType : "");
 
 }
 

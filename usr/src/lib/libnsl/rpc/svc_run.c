@@ -184,10 +184,6 @@ static bool_t svc_exit_done = TRUE;
 
 /* END PROTECTED BY svc_exit_mutex */
 
-/*
- * Warlock section
- */
-
 /* VARIABLES PROTECTED BY svc_mutex:
 	svc_thr_total, svc_thr_active, svc_pending_fds, svc_next_pending,
 	svc_last_pending, svc_total_pending, svc_thr_total_creates,

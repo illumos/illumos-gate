@@ -15,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -195,9 +195,8 @@ xmbrtowc_dummy(wint_t *wi, const char *s, size_t n, mbstate_t *mbs,
  * have been prototyped.
  */
 int				/* 0 success, REG_NOMATCH failure */
-regexec(const regex_t *_RESTRICT_KYWD preg,
-    const char *_RESTRICT_KYWD string, size_t nmatch,
-	regmatch_t pmatch[_RESTRICT_KYWD], int eflags)
+regexec(const regex_t *_RESTRICT_KYWD preg, const char *_RESTRICT_KYWD string,
+    size_t nmatch, regmatch_t pmatch[_RESTRICT_KYWD], int eflags)
 {
 	struct re_guts *g = preg->re_g;
 #ifdef REDEBUG
@@ -218,13 +217,9 @@ regexec(const regex_t *_RESTRICT_KYWD preg,
 	eflags = GOODFLAGS(eflags);
 
 	if (MB_CUR_MAX > 1)
-		return (mmatcher(g, (char *)string, nmatch, pmatch, eflags));
-#ifdef	REG_LARGE
+		return (mmatcher(g, string, nmatch, pmatch, eflags));
 	else if (g->nstates <= CHAR_BIT*sizeof (states1) && !(eflags&REG_LARGE))
-#else
-	else if (g->nstates <= CHAR_BIT*sizeof (states1))
-#endif
-		return (smatcher(g, (char *)string, nmatch, pmatch, eflags));
+		return (smatcher(g, string, nmatch, pmatch, eflags));
 	else
-		return (lmatcher(g, (char *)string, nmatch, pmatch, eflags));
+		return (lmatcher(g, string, nmatch, pmatch, eflags));
 }

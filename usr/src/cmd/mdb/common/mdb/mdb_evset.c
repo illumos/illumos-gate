@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_string.h>
@@ -110,7 +108,7 @@ cmd_evset(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				}
 			} else if (argv->a_un.a_str[0] != '-') {
 				idv[idc++] = (int)(intmax_t)
-				    strtonum(argv->a_un.a_str, 10);
+				    mdb_strtonum(argv->a_un.a_str, 10);
 			} else
 				return (DCMD_USAGE);
 		} else

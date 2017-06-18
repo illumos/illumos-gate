@@ -103,7 +103,7 @@ static struct code	FacNames[] = {
 	NULL,		-1
 };
 
-static int	pencode(register char *);
+static int	pencode(char *);
 static int	decode(char *, struct code *);
 static void	bailout(char *, char *);
 static void	usage(void);
@@ -174,8 +174,8 @@ main(int argc, char **argv)
 			usage();
 		}
 
-		argc -= optind;
-		argv = &argv[optind];
+	argc -= optind;
+	argv = &argv[optind];
 
 	if ((tag == NULL) && ((tag = getlogin()) == NULL)) {
 		u = getuid();
@@ -307,14 +307,14 @@ main(int argc, char **argv)
 
 
 static int
-pencode(s)
-register char *s;
+pencode(char *s)
 {
-	register char *p;
+	char *p;
 	int lev;
 	int fac = 0;
 
-	for (p = s; *s && *s != '.'; s++);
+	for (p = s; *s && *s != '.'; s++)
+		;
 	if (*s) {
 		*s = '\0';
 		fac = decode(p, FacNames);
@@ -332,11 +332,9 @@ register char *s;
 
 
 static int
-decode(name, codetab)
-char *name;
-struct code *codetab;
+decode(char *name, struct code *codetab)
 {
-	register struct code *c;
+	struct code *c;
 
 	if (isdigit(*name))
 		return (atoi(name));
@@ -350,8 +348,7 @@ struct code *codetab;
 
 
 static void
-bailout(a, b)
-char *a, *b;
+bailout(char *a, char *b)
 {
 	(void) fprintf(stderr, gettext("logger: %s%s\n"), a, b);
 	exit(1);

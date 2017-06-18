@@ -93,6 +93,17 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.23 {	# openbsd compat
+    protected:
+	fts_children;
+	fts_close;
+	fts_open;
+	fts_read;
+	fts_set;
+	reallocarray;
+	strtonum;
+} ILLUMOS_0.22;
+
 SYMBOL_VERSION ILLUMOS_0.22 {	# endian(3C)
     protected:
 	htobe16;

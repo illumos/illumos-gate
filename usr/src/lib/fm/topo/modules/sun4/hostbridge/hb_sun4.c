@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <fm/topo_mod.h>
 #include <libdevinfo.h>
@@ -52,7 +50,7 @@ busorrc_new(topo_mod_t *mod, const char *bus_addr, di_node_t di)
 	bac = topo_mod_strdup(mod, bus_addr);
 	if ((comma = strchr(bac, ',')) != NULL)
 		*comma = '\0';
-	pp->br_ba_bc = strtonum(mod, bac, &e);
+	pp->br_ba_bc = fm_strtonum(mod, bac, &e);
 	if (e < 0) {
 		topo_mod_dprintf(mod,
 		    "Trouble interpreting bus_addr before comma.\n");
@@ -67,7 +65,7 @@ busorrc_new(topo_mod_t *mod, const char *bus_addr, di_node_t di)
 		topo_mod_strfree(mod, bac);
 		return (pp);
 	}
-	pp->br_ba_ac = strtonum(mod, comma + 1, &e);
+	pp->br_ba_ac = fm_strtonum(mod, comma + 1, &e);
 	if (e < 0) {
 		topo_mod_dprintf(mod,
 		    "Trouble interpreting bus_addr after comma.\n");

@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "libelf.h"
 #include "decl.h"
 #include "msg.h"
@@ -65,7 +63,6 @@ elf_newscn(Elf * elf)
 				ELFUNLOCK(elf)
 				return (0);
 			}
-			NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*s))
 			s->sb_scn.s_elf = elf;
 			elf->ed_hdscn = elf->ed_tlscn = &s->sb_scn;
 			s->sb_scn.s_uflags |= ELF_F_DIRTY;
@@ -74,7 +71,6 @@ elf_newscn(Elf * elf)
 			ELFUNLOCK(elf)
 			return (0);
 		}
-		NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*s))
 		tl = elf->ed_tlscn;
 		s->sb_scn.s_elf = elf;
 		s->sb_scn.s_index = tl->s_index + 1;
@@ -84,7 +80,6 @@ elf_newscn(Elf * elf)
 		    = (Elf32_Half)(tl->s_index + 2);
 		s->sb_scn.s_uflags |= ELF_F_DIRTY;
 		tl = &s->sb_scn;
-		NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*s))
 		ELFUNLOCK(elf)
 		return (tl);
 	} else if (elf->ed_class == ELFCLASS64) {
@@ -95,7 +90,6 @@ elf_newscn(Elf * elf)
 				ELFUNLOCK(elf)
 				return (0);
 			}
-			NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*s))
 			s->sb_scn.s_elf = elf;
 			elf->ed_hdscn = elf->ed_tlscn = &s->sb_scn;
 			s->sb_scn.s_uflags |= ELF_F_DIRTY;
@@ -104,7 +98,6 @@ elf_newscn(Elf * elf)
 			ELFUNLOCK(elf)
 			return (0);
 		}
-		NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*s))
 		tl = elf->ed_tlscn;
 		s->sb_scn.s_elf = elf;
 		s->sb_scn.s_index = tl->s_index + 1;
@@ -114,7 +107,6 @@ elf_newscn(Elf * elf)
 		    = (Elf64_Half)(tl->s_index + 2);
 		s->sb_scn.s_uflags |= ELF_F_DIRTY;
 		tl = &s->sb_scn;
-		NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*s))
 		ELFUNLOCK(elf)
 		return (tl);
 	} else {

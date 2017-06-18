@@ -28,14 +28,11 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.13	*/
-
 #include "libelf.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
 #include <nlist.h>
-#include <note.h>
 #include "syms.h"
 #include "gelf.h"
 
@@ -118,9 +115,6 @@ _elf_nlist(int fd, struct nlist * list)
 	(void) close(fd);
 	return (0);
 }
-
-
-NOTE(SCHEME_PROTECTS_DATA("user provides buffers", nlist))
 
 int
 nlist(const char * name, struct nlist * list)

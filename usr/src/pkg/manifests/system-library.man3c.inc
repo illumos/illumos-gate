@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
@@ -147,6 +147,7 @@ file path=usr/share/man/man3c/fsync.3c
 file path=usr/share/man/man3c/ftell.3c
 file path=usr/share/man/man3c/ftime.3c
 file path=usr/share/man/man3c/ftok.3c
+file path=usr/share/man/man3c/fts.3c
 file path=usr/share/man/man3c/ftw.3c
 file path=usr/share/man/man3c/fwide.3c
 file path=usr/share/man/man3c/fwprintf.3c
@@ -440,6 +441,7 @@ file path=usr/share/man/man3c/strsignal.3c
 file path=usr/share/man/man3c/strtod.3c
 file path=usr/share/man/man3c/strtoimax.3c
 file path=usr/share/man/man3c/strtol.3c
+file path=usr/share/man/man3c/strtonum.3c
 file path=usr/share/man/man3c/strtoul.3c
 file path=usr/share/man/man3c/strtows.3c
 file path=usr/share/man/man3c/strxfrm.3c
@@ -818,6 +820,11 @@ link path=usr/share/man/man3c/fsetattr.3c target=fgetattr.3c
 link path=usr/share/man/man3c/ftello.3c target=ftell.3c
 link path=usr/share/man/man3c/ftruncate.3c target=truncate.3c
 link path=usr/share/man/man3c/ftrylockfile.3c target=flockfile.3c
+link path=usr/share/man/man3c/fts_children.3c target=fts.3c
+link path=usr/share/man/man3c/fts_close.3c target=fts.3c
+link path=usr/share/man/man3c/fts_open.3c target=fts.3c
+link path=usr/share/man/man3c/fts_read.3c target=fts.3c
+link path=usr/share/man/man3c/fts_set.3c target=fts.3c
 link path=usr/share/man/man3c/func_to_decimal.3c target=string_to_decimal.3c
 link path=usr/share/man/man3c/funlockfile.3c target=flockfile.3c
 link path=usr/share/man/man3c/gconvert.3c target=econvert.3c
@@ -1197,6 +1204,7 @@ link path=usr/share/man/man3c/rctlblk_size.3c target=rctlblk_set_value.3c
 link path=usr/share/man/man3c/re_exec.3c target=re_comp.3c
 link path=usr/share/man/man3c/readdir_r.3c target=readdir.3c
 link path=usr/share/man/man3c/realloc.3c target=malloc.3c
+link path=usr/share/man/man3c/reallocarray.3c target=malloc.3c
 link path=usr/share/man/man3c/regerror.3c target=regcomp.3c
 link path=usr/share/man/man3c/regex.3c target=regcmp.3c
 link path=usr/share/man/man3c/regexec.3c target=regcomp.3c

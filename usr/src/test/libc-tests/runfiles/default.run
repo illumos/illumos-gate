@@ -57,6 +57,8 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/random/arc4random_preforksig]
 [/opt/libc-tests/tests/random/arc4key.ksh]
 
+[/opt/libc-tests/tests/regex/t_regex]
+
 [/opt/libc-tests/tests/select/select.sh]
 timeout = 600
 

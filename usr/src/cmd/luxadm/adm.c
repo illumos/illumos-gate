@@ -405,15 +405,15 @@ static	const	int EOK	= 0;	/* errno.h type success return code */
 static int
 getaction(char *cmd, struct keyword *matches, int  *retval)
 {
-int actlen;
+	int actlen;
 
 	/* Idiot checking of pointers */
 	if (! cmd || ! matches || ! retval ||
 	    ! (actlen = strlen(cmd)))	/* Is there an cmd ? */
 	    return (EFAULT);
 
-	    /* Keep looping until NULL match string (end of list) */
-	    while (matches->match) {
+	/* Keep looping until NULL match string (end of list) */
+	while (matches->match) {
 		/*
 		 * Precedence: Make sure target is no longer than
 		 * current match string
@@ -432,7 +432,7 @@ int actlen;
 		} else {
 		    matches++;		/* Next match string/struct */
 		}
-	    }	/* End of matches loop */
+	}	/* End of matches loop */
 	return (EINVAL);
 
 }	/* End of getaction() */

@@ -20,6 +20,7 @@
 #
 
 #
+# Copyright (c) 2017 Peter Tribble.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -33,12 +34,8 @@ CPPFLAGS +=	-I$(SRC)/cmd/svr4pkg/hdrs \
 		-D_FILE_OFFSET_BITS=64
 
 
-CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-address
 
 LIBINST =       $(SRC)/cmd/svr4pkg/libinst/libinst.a

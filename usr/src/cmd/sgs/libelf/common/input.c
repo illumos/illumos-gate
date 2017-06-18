@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -73,8 +71,6 @@
  * to repeatedly call this through out libelf.
  */
 static unsigned long	_elf_pagesize = 0;
-NOTE(SCHEME_PROTECTS_DATA("read only data", _elf_pagesize))
-
 
 #define	NBITS		(8 * sizeof (unsigned))
 #define	REGSZ		(NBITS * _elf_pagesize)
@@ -86,7 +82,6 @@ NOTE(SCHEME_PROTECTS_DATA("read only data", _elf_pagesize))
 Okay
 _elf_vm(Elf * elf, size_t base, size_t sz)
 {
-	NOTE(ASSUMING_PROTECTED(*elf))
 	register unsigned	*hdreg, hdbit;
 	unsigned		*tlreg, tlbit;
 	size_t			tail;

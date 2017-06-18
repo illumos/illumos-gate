@@ -110,20 +110,18 @@ xdr_gid_t(XDR *xdrs, gid_t *ip)
  * NOTE: this is an XDR_ENCODE only routine.
  */
 bool_t
-xdr_authkern(XDR *xdrs)
+xdr_authkern(XDR *xdrs, cred_t *cr)
 {
 	uid_t uid;
 	gid_t gid;
 	uint_t len;
 	caddr_t groups;
 	char *name = uts_nodename();
-	struct cred *cr;
 	time_t now;
 
 	if (xdrs->x_op != XDR_ENCODE)
 		return (FALSE);
 
-	cr = CRED();
 	uid = crgetuid(cr);
 	gid = crgetgid(cr);
 	len = crgetngroups(cr);
@@ -137,8 +135,7 @@ xdr_authkern(XDR *xdrs)
 	    xdr_string(xdrs, &name, MAX_MACHINE_NAME) &&
 	    xdr_uid_t(xdrs, &uid) &&
 	    xdr_gid_t(xdrs, &gid) &&
-	    xdr_array(xdrs, &groups, &len, NGRPS, sizeof (int),
-	    (xdrproc_t)xdr_int))
+	    xdr_array(xdrs, &groups, &len, NGRPS, sizeof (gid_t), xdr_gid_t))
 		return (TRUE);
 	return (FALSE);
 }
@@ -148,20 +145,18 @@ xdr_authkern(XDR *xdrs)
  * NOTE: this is an XDR_ENCODE only routine.
  */
 bool_t
-xdr_authloopback(XDR *xdrs)
+xdr_authloopback(XDR *xdrs, cred_t *cr)
 {
 	uid_t uid;
 	gid_t gid;
-	int len;
+	uint_t len;
 	caddr_t groups;
 	char *name = uts_nodename();
-	struct cred *cr;
 	time_t now;
 
 	if (xdrs->x_op != XDR_ENCODE)
 		return (FALSE);
 
-	cr = CRED();
 	uid = crgetuid(cr);
 	gid = crgetgid(cr);
 	len = crgetngroups(cr);
@@ -171,8 +166,8 @@ xdr_authloopback(XDR *xdrs)
 	    xdr_string(xdrs, &name, MAX_MACHINE_NAME) &&
 	    xdr_uid_t(xdrs, &uid) &&
 	    xdr_gid_t(xdrs, &gid) &&
-	    xdr_array(xdrs, &groups, (uint_t *)&len, NGRPS_LOOPBACK,
-	    sizeof (int), (xdrproc_t)xdr_int))
+	    xdr_array(xdrs, &groups, &len, NGROUPS_UMAX, sizeof (gid_t),
+	    xdr_gid_t))
 		return (TRUE);
 	return (FALSE);
 }

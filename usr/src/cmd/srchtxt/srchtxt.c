@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdio.h>
 #include	<dirent.h>
 #include	<regexpr.h>
@@ -270,14 +268,12 @@ char	*regexpr;
 	num_msgs = *(int *)addr;
 	for (msgnum = 1; msgnum <= num_msgs; msgnum++) {
 		msg = (char *)(*(int *)(addr + sizeof (int) * msgnum) + addr);
-		if (textflg)
-			if (step(msg, regexpr)) {
+		if (textflg) {
+			if (step(msg, regexpr))
 				prnt_str(msg);
-					continue;
-				}
-				else
-					continue;
-			prnt_str(msg);
+			continue;
+		}
+		prnt_str(msg);
 	}
 }
 

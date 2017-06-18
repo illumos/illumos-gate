@@ -35,6 +35,7 @@ extern "C" {
 #include <sys/socket.h>
 #include <sys/socketvar.h>	/* for struct sonode */
 #endif
+#include <sys/param.h>		/* for MAXPATHLEN */
 #include <netinet/in.h>
 #include <sys/scsi/impl/uscsi.h>
 #include <sys/iscsi_protocol.h>

@@ -17,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,22 +46,22 @@
 #include <wchar.h>
 #include <wctype.h>
 
-#include "runetype.h"
-#include "collate.h"
+#include "../locale/runetype.h"
+#include "../locale/collate.h"
 
 #include "utils.h"
 #include "regex2.h"
 
 #include "cname.h"
-#include "mblocal.h"
+#include "../locale/mblocal.h"
 
 /*
  * parse structure, passed up and down to avoid global variables and
  * other clumsinesses
  */
 struct parse {
-	char *next;		/* next character in RE */
-	char *end;		/* end of string (-> NUL normally) */
+	const char *next;	/* next character in RE */
+	const char *end;	/* end of string (-> NUL normally) */
 	int error;		/* has an error been seen? */
 	sop *strip;		/* malloced strip */
 	sopno ssize;		/* malloced strip size (allocated) */
@@ -79,10 +79,10 @@ extern "C" {
 #endif
 
 /* === regcomp.c === */
-static void p_ere(struct parse *p, wint_t stop);
+static void p_ere(struct parse *p, int stop);
 static void p_ere_exp(struct parse *p);
 static void p_str(struct parse *p);
-static void p_bre(struct parse *p, wint_t end1, wint_t end2);
+static void p_bre(struct parse *p, int end1, int end2);
 static int p_simp_re(struct parse *p, int starordinary);
 static int p_count(struct parse *p);
 static void p_bracket(struct parse *p);
@@ -107,7 +107,7 @@ static sopno dupl(struct parse *p, sopno start, sopno finish);
 static void doemit(struct parse *p, sop op, size_t opnd);
 static void doinsert(struct parse *p, sop op, size_t opnd, sopno pos);
 static void dofwd(struct parse *p, sopno pos, sop value);
-static void enlarge(struct parse *p, sopno size);
+static int enlarge(struct parse *p, sopno size);
 static void stripsnug(struct parse *p, struct re_guts *g);
 static void findmust(struct parse *p, struct re_guts *g);
 static int altoffset(sop *scan, int offset);
@@ -164,15 +164,15 @@ static int never = 0;		/* for use in asserts; shuts lint up */
  * regcomp - interface for parser and compilation
  */
 int				/* 0 success, otherwise REG_something */
-regcomp(regex_t *_RESTRICT_KYWD preg,
-	const char *_RESTRICT_KYWD pattern,
-	int cflags)
+regcomp(regex_t *_RESTRICT_KYWD preg, const char *_RESTRICT_KYWD pattern,
+    int cflags)
 {
 	struct parse pa;
 	struct re_guts *g;
 	struct parse *p = &pa;
 	int i;
 	size_t len;
+	size_t maxlen;
 #ifdef REDEBUG
 #define	GOODFLAGS(f)	(f)
 #else
@@ -189,13 +189,29 @@ regcomp(regex_t *_RESTRICT_KYWD preg,
 			return (REG_EFATAL);
 		len = preg->re_endp - pattern;
 	} else
-		len = strlen((char *)pattern);
+		len = strlen(pattern);
 
 	/* do the mallocs early so failure handling is easy */
 	g = (struct re_guts *)malloc(sizeof (struct re_guts));
 	if (g == NULL)
 		return (REG_ESPACE);
+	/*
+	 * Limit the pattern space to avoid a 32-bit overflow on buffer
+	 * extension.  Also avoid any signed overflow in case of conversion
+	 * so make the real limit based on a 31-bit overflow.
+	 *
+	 * Likely not applicable on 64-bit systems but handle the case
+	 * generically (who are we to stop people from using ~715MB+
+	 * patterns?).
+	 */
+	maxlen = ((size_t)-1 >> 1) / sizeof (sop) * 2 / 3;
+	if (len >= maxlen) {
+		free((char *)g);
+		return (REG_ESPACE);
+	}
 	p->ssize = len/(size_t)2*(size_t)3 + (size_t)1;	/* ugh */
+	assert(p->ssize >= len);
+
 	p->strip = (sop *)malloc(p->ssize * sizeof (sop));
 	p->slen = 0;
 	if (p->strip == NULL) {
@@ -205,7 +221,7 @@ regcomp(regex_t *_RESTRICT_KYWD preg,
 
 	/* set things up */
 	p->g = g;
-	p->next = (char *)pattern;	/* convenience; we do not modify it */
+	p->next = pattern;	/* convenience; we do not modify it */
 	p->end = p->next + len;
 	p->error = 0;
 	p->ncsalloc = 0;
@@ -276,7 +292,7 @@ regcomp(regex_t *_RESTRICT_KYWD preg,
  */
 static void
 p_ere(struct parse *p,
-    wint_t stop)		/* character this ERE should end at */
+    int stop)		/* character this ERE should end at */
 {
 	char c;
 	sopno prevback;
@@ -410,6 +426,8 @@ p_ere_exp(struct parse *p)
 		(void) REQUIRE(!MORE() || !isdigit((uch)PEEK()), REG_BADRPT);
 		/* FALLTHROUGH */
 	default:
+		if (p->error != 0)
+			return;
 		p->next--;
 		wc = WGETNEXT();
 		ordinary(p, wc);
@@ -497,8 +515,8 @@ p_str(struct parse *p)
  */
 static void
 p_bre(struct parse *p,
-    wint_t end1,		/* first terminating character */
-    wint_t end2)		/* second terminating character */
+    int end1,		/* first terminating character */
+    int end2)		/* second terminating character */
 {
 	sopno start = HERE();
 	int first = 1;			/* first subexpression? */
@@ -528,7 +546,7 @@ p_bre(struct parse *p,
  */
 static int			/* was the simple RE an unbackslashed $? */
 p_simp_re(struct parse *p,
-	int starordinary)	/* is a leading * an ordinary character? */
+    int starordinary)	/* is a leading * an ordinary character? */
 {
 	int c;
 	int count;
@@ -539,7 +557,7 @@ p_simp_re(struct parse *p,
 	sopno subno;
 #define	BACKSL	(1<<CHAR_BIT)
 
-	pos = HERE();		/* repetion op, if any, covers from here */
+	pos = HERE();		/* repetition op, if any, covers from here */
 
 	assert(MORE());		/* caller should have ensured this */
 	c = GETNEXT();
@@ -613,6 +631,8 @@ p_simp_re(struct parse *p,
 		(void) REQUIRE(starordinary, REG_BADRPT);
 		/* FALLTHROUGH */
 	default:
+		if (p->error != 0)
+			return (0);	/* Definitely not $... */
 		p->next--;
 		wc = WGETNEXT();
 		ordinary(p, wc);
@@ -800,7 +820,7 @@ p_b_term(struct parse *p, cset *cs)
 static void
 p_b_cclass(struct parse *p, cset *cs)
 {
-	char *sp = p->next;
+	const char *sp = p->next;
 	size_t len;
 	wctype_t wct;
 	char clname[16];
@@ -858,14 +878,13 @@ p_b_symbol(struct parse *p)
  */
 static wint_t			/* value of collating element */
 p_b_coll_elem(struct parse *p,
-	wint_t endc)		/* name ended by endc,']' */
+    wint_t endc)		/* name ended by endc,']' */
 {
-	char *sp = p->next;
+	const char *sp = p->next;
 	struct cname *cp;
-	int len;
 	mbstate_t mbs;
 	wchar_t wc;
-	size_t clen;
+	size_t clen, len;
 
 	while (MORE() && !SEETWO(endc, ']'))
 		NEXT();
@@ -910,8 +929,8 @@ othercase(wint_t ch)
 static void
 bothcases(struct parse *p, wint_t ch)
 {
-	char *oldnext = p->next;
-	char *oldend = p->end;
+	const char *oldnext = p->next;
+	const char *oldend = p->end;
 	char bracket[3 + MB_LEN_MAX];
 	size_t n;
 	mbstate_t mbs;
@@ -962,8 +981,8 @@ ordinary(struct parse *p, wint_t ch)
 static void
 nonnewline(struct parse *p)
 {
-	char *oldnext = p->next;
-	char *oldend = p->end;
+	const char *oldnext = p->next;
+	const char *oldend = p->end;
 	char bracket[4];
 
 	p->next = bracket;
@@ -1192,7 +1211,7 @@ CHaddrange(struct parse *p, cset *cs, wint_t min, wint_t max)
 	}
 	cs->ranges = newranges;
 	cs->ranges[cs->nranges].min = min;
-	cs->ranges[cs->nranges].min = max;
+	cs->ranges[cs->nranges].max = max;
 	cs->nranges++;
 }
 
@@ -1223,8 +1242,8 @@ CHaddtype(struct parse *p, cset *cs, wctype_t wct)
  */
 static sopno			/* start of duplicate */
 dupl(struct parse *p,
-	sopno start,		/* from here */
-	sopno finish)		/* to this less one */
+    sopno start,		/* from here */
+    sopno finish)		/* to this less one */
 {
 	sopno ret = HERE();
 	sopno len = finish - start;
@@ -1232,7 +1251,8 @@ dupl(struct parse *p,
 	assert(finish >= start);
 	if (len == 0)
 		return (ret);
-	enlarge(p, p->ssize + len);	/* this many unexpected additions */
+	if (!enlarge(p, p->ssize + len)) /* this many unexpected additions */
+		return (ret);
 	assert(p->ssize >= p->slen + len);
 	(void) memcpy((char *)(p->strip + p->slen),
 	    (char *)(p->strip + start), (size_t)len*sizeof (sop));
@@ -1259,8 +1279,8 @@ doemit(struct parse *p, sop op, size_t opnd)
 
 	/* deal with undersized strip */
 	if (p->slen >= p->ssize)
-		enlarge(p, (p->ssize+1) / 2 * 3);	/* +50% */
-	assert(p->slen < p->ssize);
+		if (!enlarge(p, (p->ssize+1) / 2 * 3))	/* +50% */
+			return;
 
 	/* finally, it's all reduced to the easy case */
 	p->strip[p->slen++] = SOP(op, opnd);
@@ -1318,21 +1338,22 @@ dofwd(struct parse *p, sopno pos, sop value)
 /*
  * enlarge - enlarge the strip
  */
-static void
+static int
 enlarge(struct parse *p, sopno size)
 {
 	sop *sp;
 
 	if (p->ssize >= size)
-		return;
+		return (1);
 
 	sp = (sop *)realloc(p->strip, size*sizeof (sop));
 	if (sp == NULL) {
 		SETERROR(REG_ESPACE);
-		return;
+		return (0);
 	}
 	p->strip = sp;
 	p->ssize = size;
+	return (1);
 }
 
 /*
@@ -1362,8 +1383,8 @@ static void
 findmust(struct parse *p, struct re_guts *g)
 {
 	sop *scan;
-	sop *start;
-	sop *newstart;
+	sop *start = NULL;
+	sop *newstart = NULL;
 	sopno newlen;
 	sop s;
 	char *cp;
@@ -1678,8 +1699,10 @@ computematchjumps(struct parse *p, struct re_guts *g)
 	}
 
 	g->matchjump = (int *)malloc(g->mlen * sizeof (unsigned int));
-	if (g->matchjump == NULL)	/* Not a fatal error */
+	if (g->matchjump == NULL) {	/* Not a fatal error */
+		free(pmatches);
 		return;
+	}
 
 	/* Set maximum possible jump for each character in the pattern */
 	for (mindex = 0; mindex < g->mlen; mindex++)

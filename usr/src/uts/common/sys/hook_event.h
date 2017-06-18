@@ -39,6 +39,8 @@
 extern "C" {
 #endif
 
+struct msgb;	/* avoiding sys/stream.h here */
+
 /*
  * The hook_pkt_event_t structure is supplied with packet events on
  * associated network interfaces.
@@ -57,8 +59,8 @@ typedef struct hook_pkt_event {
 	phy_if_t		hpe_ifp;
 	phy_if_t		hpe_ofp;
 	void			*hpe_hdr;
-	mblk_t			**hpe_mp;
-	mblk_t			*hpe_mb;
+	struct msgb		**hpe_mp;
+	struct msgb		*hpe_mb;
 	int			hpe_flags;
 	void			*hpe_reserved[2];
 } hook_pkt_event_t;
@@ -145,7 +147,7 @@ typedef struct hook_pkt_observe_s {
 	/*
 	 * Fields used internally are below.
 	 */
-	mblk_t		*hpo_pkt;
+	struct msgb	*hpo_pkt;
 	void		*hpo_ctx;
 } hook_pkt_observe_t;
 

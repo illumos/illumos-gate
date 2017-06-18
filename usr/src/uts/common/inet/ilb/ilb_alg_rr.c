@@ -26,6 +26,8 @@
 
 #include <sys/errno.h>
 #include <sys/sysmacros.h>
+#include <sys/debug.h>
+#include <sys/kmem.h>
 #include <sys/list.h>
 #include <net/if.h>
 #include <netinet/in.h>

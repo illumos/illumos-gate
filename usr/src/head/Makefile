@@ -24,26 +24,29 @@
 # Use is subject to license terms.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
-#
-# head/Makefile
-#
 # include global definitions
 include ../Makefile.master
 
 sparc_HDRS=
 i386_HDRS=	stack_unwind.h
 
-# Headers are listed one per line so that TeamWare can auto-merge most changes
+KRB5HDRS=		\
+	mit_copyright.h	\
+	mit-sipb-copyright.h
 
-KRB5HDRS= mit_copyright.h mit-sipb-copyright.h
+ATTRDB_HDRS=		\
+	auth_attr.h	\
+	auth_list.h	\
+	exec_attr.h	\
+	prof_attr.h	\
+	secdb.h		\
+	user_attr.h
 
-ATTRDB_HDRS=	secdb.h auth_attr.h exec_attr.h prof_attr.h user_attr.h \
-	auth_list.h
-
-HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
+HDRS=   $($(MACH)_HDRS)	\
+	$(ATTRDB_HDRS)	\
 	aio.h		\
 	alloca.h	\
 	apptrace.h	\
@@ -81,6 +84,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	floatingpoint.h	\
 	fmtmsg.h	\
 	fnmatch.h	\
+	fts.h		\
 	ftw.h		\
 	gelf.h		\
 	getopt.h	\

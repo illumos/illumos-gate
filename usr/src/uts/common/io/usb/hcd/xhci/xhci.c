@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -1172,12 +1172,19 @@ xhci_read_params(xhci_t *xhcip)
 	uint8_t usb;
 	uint16_t vers;
 	uint32_t struc1, struc2, struc3, cap1, cap2, pgsz;
-	uint32_t psize, pbit;
+	uint32_t psize, pbit, capreg;
 	xhci_capability_t *xcap;
 	unsigned long ps;
 
+	/*
+	 * While it's tempting to do a 16-bit read at offset 0x2, unfortunately,
+	 * a few emulated systems don't support reading at offset 0x2 for the
+	 * version. Instead we need to read the caplength register and get the
+	 * upper two bytes.
+	 */
+	capreg = xhci_get32(xhcip, XHCI_R_CAP, XHCI_CAPLENGTH);
+	vers = XHCI_VERSION_MASK(capreg);
 	usb = pci_config_get8(xhcip->xhci_cfg_handle, PCI_XHCI_USBREV);
-	vers = xhci_get16(xhcip, XHCI_R_CAP, XHCI_HCIVERSION);
 	struc1 = xhci_get32(xhcip, XHCI_R_CAP, XHCI_HCSPARAMS1);
 	struc2 = xhci_get32(xhcip, XHCI_R_CAP, XHCI_HCSPARAMS2);
 	struc3 = xhci_get32(xhcip, XHCI_R_CAP, XHCI_HCSPARAMS3);

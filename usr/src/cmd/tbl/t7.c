@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"     
-
 /* t7.c: control to write table entries */
 # include "t..c"
 # define realsplit ((ct=='a'||ct=='n') && table[ldata][c].rcol)
@@ -67,8 +65,8 @@ for(c=0; c<ncol; c++)
 		case 'c':
 		case 'l':
 		case 'r':
-		    if (realsplit? rused[c]: (used[c]+lused[c]))
-			fprintf(tabout, "\\n(%du ",c+CRIGHT);
+			if (realsplit? rused[c]: (used[c]+lused[c]))
+				fprintf(tabout, "\\n(%du ",c+CRIGHT);
 			continue;
 		case 's':
 			if (lspan(lform, c))

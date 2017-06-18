@@ -2000,7 +2000,7 @@ Unknown disk type in backup label\n");
 				plist->pinfo_next = parts;
 			}
 			parts->pinfo_name = alloc_string("original");
-			for (i = 0; i < NDKMAP; i++)
+			for (i = 0; i < NDKMAP; i++) {
 
 #if defined(_SUNOS_VTOC_8)
 				parts->pinfo_map[i] = label.dkl_map[i];
@@ -2013,6 +2013,7 @@ Unknown disk type in backup label\n");
 #else
 #error No VTOC layout defined.
 #endif /* defined(_SUNOS_VTOC_8) */
+			}
 			parts->vtoc = label.dkl_vtoc;
 		}
 		/*

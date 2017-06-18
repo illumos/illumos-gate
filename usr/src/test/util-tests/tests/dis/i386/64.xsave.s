@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
- * Test 32-bit xsave related instructions
+ * Test 64-bit xsave related instructions
  */
 
 .text
@@ -22,8 +22,12 @@
 .globl libdis_test
 .type libdis_test, @function
 libdis_test:
-	xrstor		(%rax)
 	xsave		(%rax)
+	xrstor		(%rax)
+	xsavec		(%rax)
+	xsaveopt	(%rax)
+	xsaves		(%rax)
+	xrstors		(%rax)
 
 	xgetbv
 	xsetbv

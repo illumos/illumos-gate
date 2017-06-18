@@ -15,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -32,57 +32,16 @@
  * SUCH DAMAGE.
  */
 
-#include "lint.h"
-#include "file64.h"
-#include <sys/types.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <regex.h>
-#include <wchar.h>
-#include <wctype.h>
+/* utility definitions */
+#define	DUPMAX		_POSIX2_RE_DUP_MAX	/* xxx is this right? */
+#define	INFINITY	(DUPMAX + 1)
+#define	NC		(CHAR_MAX - CHAR_MIN + 1)
+typedef unsigned char uch;
 
-#include "utils.h"
-#include "regex2.h"
-
-/*
- * regfree - free everything
- */
-void
-regfree(regex_t *preg)
-{
-	struct re_guts *g;
-	int i;
-
-#ifdef	__lint
-	/* shut up lint! */
-	CHIN(NULL, 0);
+/* switch off assertions (if not already off) if no REDEBUG */
+#ifndef REDEBUG
+#ifndef NDEBUG
+#define	NDEBUG	/* no assertions please */
 #endif
-
-	if (preg->re_magic != MAGIC1)	/* oops */
-		return;			/* nice to complain, but hard */
-
-	g = preg->re_g;
-	if (g == NULL || g->magic != MAGIC2)	/* oops again */
-		return;
-	preg->re_magic = 0;		/* mark it invalid */
-	g->magic = 0;			/* mark it invalid */
-
-	if (g->strip != NULL)
-		free((char *)g->strip);
-	if (g->sets != NULL) {
-		for (i = 0; i < g->ncsets; i++) {
-			free(g->sets[i].ranges);
-			free(g->sets[i].wides);
-			free(g->sets[i].types);
-		}
-		free((char *)g->sets);
-	}
-	if (g->must != NULL)
-		free(g->must);
-	if (g->charjump != NULL)
-		free(&g->charjump[CHAR_MIN]);
-	if (g->matchjump != NULL)
-		free(g->matchjump);
-	free((char *)g);
-}
+#endif
+#include <assert.h>
