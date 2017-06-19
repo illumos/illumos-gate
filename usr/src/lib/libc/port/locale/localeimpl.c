@@ -146,7 +146,7 @@ static char *categories[7] = {
  * Prototypes.
  */
 static const char *get_locale_env(int);
-static struct locdata *locdata_get(int, const const char *);
+static struct locdata *locdata_get(int, const char *);
 static struct locdata *locdata_get_cache(int, const char *);
 static locale_t mklocname(locale_t);
 
