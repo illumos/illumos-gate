@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -2194,7 +2195,24 @@ backend_tx_begin(backend_type_t t, backend_tx_t **txp)
 	UPDATE_TOTALS((*txp)->bt_be, bt_exec, ts, vts);
 	if (r == SQLITE_FULL)
 		(*txp)->bt_full = 1;
-	r = backend_error((*txp)->bt_be, r, errmsg);
+	/*
+	 * We explicitly handle an ENOSPC error here for the beginning of the
+	 * transaction, instead of in backend_error, which calls backend_panic
+	 * for this case, resulting in the death of svc.configd. That may be
+	 * appropriate in other cases, but in this case we would rather fail so
+	 * that configd remains up and the caller gets an approprate error. The
+	 * failure mode is that there is not enough swap space to open the
+	 * non-persistent database, so there won't be enough space to restart
+	 * configd, leaving SMF in a state requiring manual intervention.
+	 */
+	if (r == SQLITE_CANTOPEN && errno == ENOSPC &&
+	    (*txp)->bt_type == BACKEND_TYPE_NONPERSIST) {
+		configd_info("Warning: no space to open %s\n",
+		    bes[BACKEND_TYPE_NONPERSIST]->be_path);
+		r = REP_PROTOCOL_FAIL_NO_RESOURCES;
+	} else {
+		r = backend_error((*txp)->bt_be, r, errmsg);
+	}
 
 	if (r != REP_PROTOCOL_SUCCESS) {
 		assert(r != REP_PROTOCOL_DONE);
