@@ -328,17 +328,17 @@ ehdr_mach_strings(Conv_fmt_flags_t fmt_flags)
 
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_mach_0_11_cf), CONV_DS_ADDR(ds_mach_15_22_cf),
 		CONV_DS_ADDR(ds_mach_36_63_cf), CONV_DS_ADDR(ds_mach_66_94_cf),
 		NULL
 	};
-	static const const conv_ds_t	*ds_nf[] = {
+	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_mach_0_11_nf), CONV_DS_ADDR(ds_mach_15_22_nf),
 		CONV_DS_ADDR(ds_mach_36_63_nf), CONV_DS_ADDR(ds_mach_66_94_nf),
 		NULL
 	};
-	static const const conv_ds_t	*ds_dmp[] = {
+	static const conv_ds_t	*ds_dmp[] = {
 		CONV_DS_ADDR(ds_mach_0_11_dmp), CONV_DS_ADDR(ds_mach_15_22_dmp),
 		CONV_DS_ADDR(ds_mach_36_63_dmp),
 		CONV_DS_ADDR(ds_mach_66_94_dmp), NULL
@@ -426,7 +426,7 @@ error "EI_PAD has grown. Update etypes[]"
 		CONV_DS_MSG_INIT(EI_MAG0, eident_nf) };
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_eident_cf), NULL };
 	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_eident_nf), NULL };
@@ -495,7 +495,7 @@ error "ET_LOSUNW has grown. Update type_osabi[]"
 
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_type_cf), CONV_DS_ADDR(ds_type_osabi_cf),
 		NULL };
 	static const conv_ds_t	*ds_nf[] = {
@@ -557,7 +557,7 @@ error "EV_NUM has grown. Update versions[]"
 		CONV_DS_MSG_INIT(EV_NONE, versions_dmp) };
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_versions_cf), NULL };
 	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_versions_nf), NULL };
@@ -805,13 +805,13 @@ ehdr_osabi_strings(Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_VD, ELFOSABI_ARM, ELFOSABI_STANDALONE, osabi_misc_dmp };
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_osabi_0_3_cf), CONV_DS_ADDR(ds_osabi_6_15_cf),
 		CONV_DS_ADDR(ds_osabi_misc_cf), NULL };
-	static const const conv_ds_t	*ds_nf[] = {
+	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_osabi_0_3_nf), CONV_DS_ADDR(ds_osabi_6_15_nf),
 		CONV_DS_ADDR(ds_osabi_misc_nf), NULL };
-	static const const conv_ds_t	*ds_dmp[] = {
+	static const conv_ds_t	*ds_dmp[] = {
 		CONV_DS_ADDR(ds_osabi_0_3_dmp), CONV_DS_ADDR(ds_osabi_6_15_dmp),
 		CONV_DS_ADDR(ds_osabi_misc_dmp), NULL };
 
@@ -879,7 +879,7 @@ error "EAV_SUNW_NUM has grown. Update abiversions[]"
 		CONV_DS_MSG_INIT(EV_NONE, abiversions_nf) };
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_abiversions_cf), NULL };
 	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_abiversions_nf), NULL };
