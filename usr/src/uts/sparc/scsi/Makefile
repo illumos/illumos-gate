@@ -43,8 +43,6 @@ MODULE		= scsi
 OBJECTS		= $(SCSI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SCSI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OUT     = $(SCSI_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -58,9 +56,9 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -86,10 +84,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -103,23 +99,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-
-#
-#	Warlock targets
-#
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT)
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/scsi/impl/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-%.ll: $(UTSBASE)/common/io/scsi/conf/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

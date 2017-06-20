@@ -37,8 +37,8 @@ UTSBASE	= ../../..
 #
 #	Define the module and object file sets.
 #
-# Normally when compiling sd there are .conf file definitions and
-# definitions for warlock, but we don't bother with those here.
+# Normally when compiling sd there are .conf file definitions,
+# but we don't bother with those here.
 #
 MODULE		= hvm_sd
 OBJECTS		= $(HVM_SD_OBJS:%=$(OBJS_DIR)/%)

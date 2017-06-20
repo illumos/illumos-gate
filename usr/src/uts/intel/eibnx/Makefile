@@ -42,9 +42,6 @@ OBJECTS		= $(EIBNX_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(EIBNX_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/eoib
-WARLOCK_OUT	= $(EIBNX_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 # Include common rules
@@ -62,9 +59,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CPPFLAGS += -DENX_DEBUG
 
-# 
-# Lint pass one enforcement 
-# 
+#
+# Lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -90,10 +87,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -107,34 +102,3 @@ install:	$(INSTALL_DEPS)
 # Include common targets
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-# Defines for local commands
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/eibnx.wlcmd warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/eibnx.wlcmd $(WARLOCK_OUT)  \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/clients/eoib/enx_main.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/enx_hdlrs.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/enx_ibt.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/enx_log.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/enx_fip.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/enx_misc.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/enx_q.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/enx_ctl.c \
-	    $(UTSBASE)/common/sys/ib/clients/eoib/fip.h \
-	    $(UTSBASE)/common/sys/ib/clients/eoib/eib.h \
-	    $(UTSBASE)/common/sys/ib/clients/eoib/enx_impl.h
-	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock

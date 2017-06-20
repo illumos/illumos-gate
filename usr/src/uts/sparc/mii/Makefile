@@ -39,9 +39,6 @@ MODULE		= mii
 OBJECTS		= $(MII_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(MII_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OUT	= $(MII_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -70,10 +67,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 

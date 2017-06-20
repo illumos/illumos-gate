@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -45,9 +43,9 @@ ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 LDFLAGS += -dy -N misc/i2c_svc
@@ -81,24 +79,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sun4u/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	Warlock targets
-#
-
-TDA8444 = $(TDA8444_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok 
-
-%.ok:	$(TDA8444_FILES)
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/sun4u/io/i2c/clients/tda8444/%.c
-	$(WLCC) $(CFLAGS) $(CPPFLAGS) -DDEBUG -o $@ $<

@@ -43,9 +43,6 @@ OBJECTS		= $(SES_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SES_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
-WARLOCK_OUT     = $(SES_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 # Include common rules.
@@ -58,7 +55,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-CLEANFILES	+= $(WARLOCK_TARGETS)
 
 #
 # Define dependency on scsi
@@ -84,10 +80,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint64
 
@@ -99,58 +93,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-
-#
-# Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-# Warlock targets
-#
-# XXX FIX ME.  this can be improved quite a bit
-
-SES_FILES	= $(MODULE).ll
-SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
-
-WARLOCK_TARGETS	= $(WARLOCK_OK) warlock_with_esp.ok warlock_with_fas.ok
-
-warlock: $(WARLOCK_TARGETS)
-
-$(WARLOCK_OK): $(WLCMD_DIR)/$(MODULE).wlcmd $(SES_FILES)
-	@cd ../warlock; $(MAKE) warlock
-	@cd ../scsi; $(MAKE) warlock
-	$(WARLOCK) -c $(WLCMD_DIR)/$(MODULE).wlcmd $(SES_FILES) ../warlock/scsi.ll \
-	        -l ../warlock/ddi_dki_impl.ll  \
-	        $(SCSI_FILES)
-	@ $(TOUCH) $@
-
-warlock_with_esp.ok: $(WLCMD_DIR)/ses_with_esp.wlcmd $(SES_FILES)
-	@cd ../warlock; $(MAKE) warlock
-	@cd ../scsi; $(MAKE) warlock
-	@cd ../esp; $(MAKE) warlock;
-	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_esp.wlcmd $(SES_FILES) ../esp/esp  \
-	        ../warlock/scsi.ll \
-	        -l ../warlock/ddi_dki_impl.ll \
-	        $(SCSI_FILES)
-	@ $(TOUCH) $@
-
-warlock_with_fas.ok: $(WLCMD_DIR)/ses_with_fas.wlcmd $(SES_FILES)
-	@cd ../warlock; $(MAKE) warlock
-	@cd ../scsi; $(MAKE) warlock
-	@cd ../fas; $(MAKE) warlock;
-	$(WARLOCK) -c $(WLCMD_DIR)/ses_with_fas.wlcmd $(SES_FILES) \
-	        ../fas/fas ../fas/fas_callbacks \
-	        ../warlock/scsi.ll \
-	        -l ../warlock/ddi_dki_impl.ll \
-	        $(SCSI_FILES)
-	@ $(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/scsi/targets/%.c
-	$(WLCC) $(CPPFLAGS) -o $@ $<
-
-

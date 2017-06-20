@@ -25,7 +25,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 #
@@ -123,7 +123,7 @@ stage-licenses: install2
 
 install1: mapfiles closedbins sgs
 
-install2: install1 $(SUBDIRS)
+install2: install1 .WAIT $(SUBDIRS)
 
 _msg: _msgdirs rootdirs FRC
 	@for m in $(MSGSUBDIRS); do \

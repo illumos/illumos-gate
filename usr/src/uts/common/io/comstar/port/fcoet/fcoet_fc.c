@@ -785,7 +785,7 @@ fcoet_send_status(fct_cmd_t *cmd)
 	 * Fill fcp_rsp
 	 */
 	ffr = (fcoe_fcp_rsp_t *)frm->frm_payload;
-	FCOE_V2B_4(0, ffr->ffr_retry_delay_timer);
+	FCOE_V2B_2(0, ffr->ffr_retry_delay_timer);
 	FCOE_V2B_1(0, ffr->ffr_flags);
 	if (task->task_scsi_status == STATUS_CHECK || task->task_resid) {
 		if (task->task_scsi_status == STATUS_CHECK) {

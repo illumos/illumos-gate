@@ -448,9 +448,7 @@ main(int argc, char ** argv)
 			 * no specified log file
 			 */
 			(void) strcpy(current_admin.logfile, LOGFILE);
-		else
-			(void) cachemgr_set_lf(&current_admin,
-			    current_admin.logfile);
+		(void) cachemgr_set_lf(&current_admin, current_admin.logfile);
 		/*
 		 * validate the range of debug level number
 		 * and set the number to current_admin.debug_level
@@ -470,8 +468,7 @@ main(int argc, char ** argv)
 	} else {
 		if (strlen(current_admin.logfile) == 0)
 			(void) strcpy(current_admin.logfile, "/dev/null");
-			(void) cachemgr_set_lf(&current_admin,
-			    current_admin.logfile);
+		(void) cachemgr_set_lf(&current_admin, current_admin.logfile);
 	}
 
 	if (dofg == 0)
@@ -1405,12 +1402,11 @@ is_root(int free_uc, char *dc_str, ucred_t **ucp)
 
 int
 is_called_from_nscd(pid_t pid)
-
 {
 	static mutex_t	_door_lock = DEFAULTMUTEX;
 	static	int	doorfd = -1;
 	int		match;
-	door_info_t 	my_door;
+	door_info_t	my_door;
 
 	/*
 	 * the first time in we try and open and validate the door.

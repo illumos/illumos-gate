@@ -43,9 +43,9 @@ ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 LDFLAGS += -dy -N misc/i2c_svc
@@ -88,32 +88,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sun4u/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	Warlock targets
-#
-
-SEEPROM_FILES = $(SEEPROM_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok 
-	warlock -c seeprom.wlcmd $(SEEPROM_FILES) \
-		-l ../../sparc/warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-# i2c_svc_files warlock_ddi_files
-
-warlock_with_svc: $(SEEPROM_FILES) 	
-	$(WARLOCK) -c seeprom.wlcmd $(SEEPROM_FILES) ../i2c_svc/i2c_svc.ll \
-		-l ../../sparc/warlock/ddi_dki_impl.ll
-
-%.ok:	$(SEEPROM_FILES)
-
-%.ll: $(UTSBASE)/sun4u/io/i2c/clients/%.c
-	$(WLCC) $(CFLAGS) $(CPPFLAGS) -DDEBUG -o $@ $< 

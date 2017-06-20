@@ -31,8 +31,6 @@
 #ifndef _PCMCIA_H
 #define	_PCMCIA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -283,7 +281,8 @@ struct pcmcia_mif {
 #define	PR_CLEAR(map, bit)	(((uchar_t *)(map))[(bit)/PR_WORDSIZE] &=\
 					~(1 << ((bit) & PR_MASK)))
 #define	PR_ADDR(map, bit)	(((uchar_t *)(map)) + ((bit)/PR_WORDSIZE))
-#define	PR_ZERO(map)		bzero((caddr_t)map, sizeof (map))
+#define	PR_ZERO(map)		\
+	bzero((caddr_t)map, PCMCIA_MAX_SOCKETS / PR_WORDSIZE)
 
 /* socket bit map */
 typedef uchar_t socket_enum_t[PCMCIA_MAX_SOCKETS/PR_WORDSIZE];

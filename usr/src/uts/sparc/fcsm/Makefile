@@ -85,9 +85,6 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-warlock:
-	@echo warlock is not supported
-
 modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)

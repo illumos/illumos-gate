@@ -39,9 +39,6 @@ OBJECTS		= $(PMCS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(PMCS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/scsi/adapters/pmcs
-WARLOCK_OUT     = $(PMCS_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Kernel Module Dependencies

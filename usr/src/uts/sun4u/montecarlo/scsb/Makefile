@@ -101,23 +101,3 @@ LINT_LIB_DIR    = $(MONTECARLO_LINT_LIB_DIR)
 #	Include common targets.
 #
 include $(UTSBASE)/sun4u/montecarlo/Makefile.targ
-
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	Warlock targets
-#
-
-SCSB_FILES = $(SCSB_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok 
-
-%.ok:	$(SCSB_FILES)
-	$(TOUCH) $@
-
-%.ll:	$(UTSBASE)/sun4u/montecarlo/io/%.c
-	$(WLCC) $(CFLAGS) $(CPPFLAGS) -DDEBUG -o $@ $<

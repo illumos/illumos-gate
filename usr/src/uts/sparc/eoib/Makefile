@@ -41,9 +41,6 @@ MODULE		= eoib
 OBJECTS		= $(EOIB_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(EOIB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-WARLOCK_OUT	= $(EOIB_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 # Include common rules
@@ -67,9 +64,9 @@ DEF_BUILDS	= $(DEF_BUILDSONLY64)
 #
 CPPFLAGS += -DEIB_DEBUG
 
-# 
-# Lint pass one enforcement 
-# 
+#
+# Lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-switch
@@ -90,10 +87,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -107,39 +102,3 @@ install:	$(INSTALL_DEPS)
 # Include common targets
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-# Defines for local commands
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/eoib.wlcmd warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/eoib.wlcmd $(WARLOCK_OUT)  \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/clients/eoib/eib_adm.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_chan.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_cmn.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_ctl.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_data.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_fip.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_ibt.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_log.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_mac.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_main.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_rsrc.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_svc.c \
-	    $(UTSBASE)/common/io/ib/clients/eoib/eib_vnic.c \
-	    $(UTSBASE)/common/sys/ib/clients/eoib/fip.h \
-	    $(UTSBASE)/common/sys/ib/clients/eoib/eib.h \
-	    $(UTSBASE)/common/sys/ib/clients/eoib/eib_impl.h
-	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
