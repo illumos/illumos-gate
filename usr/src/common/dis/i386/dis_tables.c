@@ -245,7 +245,7 @@ enum {
 	ADX,		/* ADX instructions, support REX.w, mod_rm->mod_reg */
 	EVEX_RX,        /* EVEX  mod_reg                      -> mod_rm */
 	EVEX_MX,        /* EVEX  mod_rm                       -> mod_reg */
-	EVEX_RMrX,	/* EVEX  EVEX.vvvv, mod_rm            -> mod_reg */
+	EVEX_RMrX	/* EVEX  EVEX.vvvv, mod_rm            -> mod_reg */
 };
 
 /*
@@ -2636,9 +2636,10 @@ dtrace_vex_adjust(uint_t vex_byte1, uint_t mode, uint_t *reg, uint_t *r_m)
 /*
  * Adjust the instruction mnemonic with the appropriate suffix.
  */
+/* ARGSUSED */
 static void
 dtrace_evex_mnem_adjust(dis86_t *x, instable_t *dp, uint_t vex_W,
-   uint_t evex_byte2)
+    uint_t evex_byte2)
 {
 #ifdef DIS_TEXT
 	if (dp == &dis_opAVX62[0x7f] ||		/* vmovdq */
@@ -2650,7 +2651,7 @@ dtrace_evex_mnem_adjust(dis86_t *x, instable_t *dp, uint_t vex_W,
 			    OPLEN);
 		} else {
 			(void) strlcat(x->d86_mnem, "u", OPLEN);
-			switch(evex_byte2 & 0x81) {
+			switch (evex_byte2 & 0x81) {
 			case 0x0:
 				(void) strlcat(x->d86_mnem, "32", OPLEN);
 				break;
@@ -2756,6 +2757,7 @@ dtrace_evex_adjust_disp8_n(dis86_t *x, int opindex, uint_t L, uint_t modrm)
 /*
  * Adjust target for opmask and zeroing. See IASDv2 Section 2.6.1 Table 2-30.
  */
+/* ARGSUSED */
 static void
 dtrace_evex_adjust_z_opmask(dis86_t *x, uint_t evex_byte3)
 {
@@ -3449,7 +3451,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		/* Currently only 3 valid values for evex L'L: 00, 01, 10 */
 		evex_L = (opcode8 & EVEX_L) >> 1;
 
-		dp = (instable_t *) &dis_opAVX62[(opcode1 << 4) | opcode2];
+		dp = (instable_t *)&dis_opAVX62[(opcode1 << 4) | opcode2];
 	}
 not_avx512:
 
@@ -4099,9 +4101,8 @@ not_avx512:
 				 * To handle PINSRD and PEXTRD
 				 */
 				(void) strlcat(x->d86_mnem, "d", OPLEN);
-			} else if (dp == &dis_distable[0x6][0x2]) {
-				/* It's a bound instn. no suffix */
-			} else {
+			} else if (dp != &dis_distable[0x6][0x2]) {
+				/* bound instructions (0x62) have no suffix */
 				(void) strlcat(x->d86_mnem, types[opnd_size],
 				    OPLEN);
 			}
