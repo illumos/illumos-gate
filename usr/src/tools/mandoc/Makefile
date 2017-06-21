@@ -11,6 +11,7 @@
 
 #
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 CMDDIR=		$(SRC)/cmd/mandoc
@@ -24,6 +25,8 @@ OBJS +=		fts.o \
 		strtonum.o
 
 CPPFLAGS +=	-I. -include fts.h
+CPPFLAGS +=	-I$(NATIVE_ADJUNCT)/include
+LDFLAGS +=	-L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
 
 .KEEP_STATE:
 
