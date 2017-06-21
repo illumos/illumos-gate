@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017, Joyent, Inc.
 #
 
 #
@@ -29,6 +30,20 @@
 # to use /usr/bin/tail rather than the ksh93 builtin.
 #
 TAIL=/usr/bin/tail
+
+while [[ $# -gt 0 ]]; do
+	case $1 in
+	    -o)
+		TAIL=$(cd $(dirname $2); pwd)/$(basename $2)
+		shift 2
+		;;
+	    *)
+		echo "Usage: sun_solaris_tail.sh" \
+		    "[-o <override tail executable>]"
+		exit 1
+		;;
+	esac
+done
 
 # test setup
 function err_exit
