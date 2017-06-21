@@ -17,7 +17,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.TH LIBCURSES 3LIB "Mar 24, 2004"
+.TH LIBCURSES 3LIB "May 13, 2017"
 .SH NAME
 libcurses, libtermcap, libtermlib \- screen handling and optimization library
 .SH SYNOPSIS
@@ -27,7 +27,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lcurses\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Functions in the \fBlibcurses\fR library provide a terminal-independent
 method of updating character screens with reasonable optimization.
@@ -44,7 +43,6 @@ is maintained for backward compatibility.
 See \fBlibcurses\fR(3XCURSES) for information about the curses library that
 conforms to X/Open Curses, Issue 4, Version 2.
 .SH INTERFACES
-.sp
 .LP
 The shared objects \fBlibcurses.so.1\fR and
 \fBlibtermlib.so.1\fR provide the public interfaces defined below. See
@@ -249,7 +247,6 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libcurses.so.1\fR\fR
@@ -304,7 +301,6 @@ shared object (symbolic link to \fB/lib/libcurses.so.1\fR)
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -319,7 +315,6 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBIntro\fR(3), \fBcurses\fR(3CURSES), \fBlibcurses\fR(3LIBUCB),
+\fBIntro\fR(3), \fBcurses\fR(3CURSES),
 \fBlibcurses\fR(3XCURSES), \fBattributes\fR(5)

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LUXADM 1M "Sep 24, 2003"
+.TH LUXADM 1M "May 13, 2017"
 .SH NAME
 luxadm \- administer Sun Fire 880 storage subsystem and FC_AL devices
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ luxadm \- administer Sun Fire 880 storage subsystem and FC_AL devices
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBluxadm\fR program is an administrative command that manages the
 \fBSENA\fR, Sun Fire 880 internal storage subsystem, and individual Fiber
@@ -37,7 +36,6 @@ of the \fBSENA\fR enclosure, and an optional identifier for the particular
 device in the enclosure. The individual \fBFC_AL\fR devices may be specified by
 entering the \fBWWN\fR for the device or a port to the device.
 .SS "Pathname"
-.sp
 .LP
 Specify the device or controller by either a complete physical pathname or a
 complete logical pathname.
@@ -122,7 +120,6 @@ and a typical logical pathname is:
 .sp
 
 .SS "Enclosure"
-.sp
 .LP
 For \fBSENA,\fR a device may be identified by its enclosure name and slotname:
 .br
@@ -172,7 +169,6 @@ the disk slot number in the Sun Fire 880 internal storage subsystem, \fB0\fR -
 See \fBdisks\fR(1M) and \fBdevlinks\fR(1M) for additional information on
 logical names for disks and subsystems.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported by all subcommands:
 .sp
@@ -198,7 +194,6 @@ Verbose mode.
 Options that are specific to particular subcommands are described with the
 subcommand in the \fBUSAGE\fR section.
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -244,7 +239,6 @@ subsystem, or disk device. \fIpathname\fR can also be the \fBWWN\fR of a
 
 .SH USAGE
 .SS "Subcommands"
-.sp
 .ne 2
 .na
 \fB\fBdisplay\fR \fIenclosure\fR[,\fIdev\fR]\|.\|.\|.\||
@@ -752,7 +746,6 @@ Spin down the specified disks in a SENA.
 .RE
 
 .SS "SENA, Sun Fire 880 Internal Storage Subsystem, and Individual FC_AL Drive Expert Mode Subcommands"
-.sp
 .LP
 The following subcommands are for expert use only, and are applicable only to
 the \fBSENA\fR, Sun Fire 880 internal storage subsystem, and fiber channel
@@ -874,7 +867,6 @@ the loop that contains the device specified by the enclosure or pathname.
 .RE
 
 .SS "Other Expert Mode Subcommands"
-.sp
 .LP
 See \fBNOTES\fR for limitations of these subcommands. They should only be used
 by users that are knowledgeable about the systems they are managing.
@@ -1215,12 +1207,10 @@ example# \fBluxadm release /dev/rdsk/c1t8d0s2\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for a description of the \fBLANG\fR environment variable
 that affects the execution of \fBluxadm\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1242,7 +1232,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fBusr/lib/firmware/fc_s/fc_s_fcode\fR\fR
@@ -1263,26 +1252,12 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdevlinks\fR(1M), \fBdisks\fR(1M), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBses\fR( 7D)
-.sp
-.LP
-\fISENA Array Installation and Service Manual\fR (p/n 802-7573).
-.sp
-.LP
-\fIRAID Manager 6.1 Installation and Support Guide Answerbook\fR
-.sp
-.LP
-\fIRAID Manager 6.1 User's Guide Answerbook\fR
 .SH NOTES
-.sp
 .LP
-See the \fISENA Array Installation and Service Manual\fR for additional
-information on the \fBSENA.\fR Refer to \fITutorial for SCSI use of IEEE
-Company_ID\fR, R. Snively, for additional information regarding the \fBIEEE\fR
-extended \fBWWN.\fR See \fBSEE ALSO\fR. Currently, only some device drivers
+Currently, only some device drivers
 support hot plugging. If hot plugging is attempted on a disk or bus where it is
 not supported, an error message of the form:
 .sp

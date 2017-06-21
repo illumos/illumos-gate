@@ -3,7 +3,7 @@
 .\" Modified for Solaris to to add the Solaris stability classification,
 .\" and to add a note about source availability.
 .\"
-.TH HOSTS_ACCESS 4 "April 9, 2016"
+.TH HOSTS_ACCESS 4 "May 13, 2017"
 .SH NAME
 hosts_access \- format of host access control files
 .SH DESCRIPTION
@@ -108,7 +108,7 @@ Matches any host whose name does not contain a dot character.
 .IP UNKNOWN
 Matches any user whose name is unknown, and matches any host whose name
 \fIor\fR address are unknown.  This pattern should be used with care:
-host names may be unavailable due to temporary name server problems. A
+host names may be unavailable due to temporary name server problems.  A
 network address will be unavailable when the software cannot figure out
 what type of network it is talking to.
 .IP KNOWN
@@ -394,6 +394,5 @@ l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 =
 Interface Stability	Committed
-Source for tcp_wrappers is available in the SUNWtcpdS package.
 .TE
 .\" End Sun update

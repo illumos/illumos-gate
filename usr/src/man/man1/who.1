@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WHO 1 "Nov 3, 2000"
+.TH WHO 1 "May 13, 2017"
 .SH NAME
 who \- who is on the system
 .SH SYNOPSIS
@@ -59,7 +59,6 @@ who \- who is on the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwho\fR utility can list the user's name, terminal line, login time,
 elapsed time since activity occurred on the line, and the process-ID of the
@@ -155,7 +154,6 @@ Exit status for dead processes
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -186,7 +184,7 @@ Indicates the time and date of the last reboot.
 .RS 9n
 Displays all processes that have expired and not been respawned by \fBinit\fR.
 The \fBexit\fR field appears for dead processes and contains the termination
-and exit values (as returned by \fBwait\fR(3UCB)), of the dead process. This
+and exit values of the dead process. This
 can be useful in determining why a process terminated.
 .RE
 
@@ -273,7 +271,6 @@ Indicates the current \fIrun-level\fR of the \fBinit\fR process.
 .RE
 
 .SS "/usr/bin/who"
-.sp
 .ne 2
 .na
 \fB\fB-T\fR \fR
@@ -312,7 +309,6 @@ The terminal write-access state cannot be determined.
 .RE
 
 .SS "/usr/xpg4/bin/who"
-.sp
 .ne 2
 .na
 \fB\fB-T\fR \fR
@@ -357,7 +353,6 @@ and so forth.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -386,13 +381,11 @@ users that \fBwho\fR uses by default.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBwho\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -414,7 +407,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/sbin/inittab\fR \fR
@@ -442,13 +434,9 @@ Historic user and accounting information
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/xpg4/bin/who"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -459,13 +447,11 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdate\fR(1), \fBlogin\fR(1), \fBmesg\fR(1), \fBinit\fR(1M), \fBsu\fR(1M),
-\fBwait\fR(3UCB), \fBinittab\fR(4), \fButmpx\fR(4), \fBattributes\fR(5),
+\fBinittab\fR(4), \fButmpx\fR(4), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 \fBSuperuser:\fR After a shutdown to the single-user state, \fBwho\fR returns a
 prompt. Since \fB/var/adm/utmpx\fR is updated at login time and there is no

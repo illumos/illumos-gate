@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FSS 7 "Oct 1, 2004"
+.TH FSS 7 "May 13, 2017"
 .SH NAME
 FSS \- Fair share scheduler
 .SH DESCRIPTION
-.sp
 .LP
 The fair share scheduler (FSS) guarantees application performance by explicitly
 allocating shares of CPU resources to projects. A share indicates a project's
@@ -153,7 +152,6 @@ as shown in the following example:
 .in -2
 
 .SH CONFIGURING SCHEDULER WITH DISPADMIN
-.sp
 .LP
 You can use the \fBdispadmin\fR(1M) command to examine and tune the FSS
 scheduler's time quantum value. Time quantum is the amount of time that a
@@ -191,27 +189,11 @@ different while the amount of time is the same.
 You can use the \fB-s\fR option to change the time quantum value. Note that
 such changes are not preserved across reboot. Please refer to the
 \fBdispadmin\fR(1M) man page for additional information.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-l l
-l l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-Architecture	SUNWcsu
-.TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBprctl\fR(1), \fBpriocntl\fR(1), \fBdispadmin\fR(1M), \fBpsrset\fR(1M),
-\fBpriocntl\fR(2), \fBproject\fR(4), \fBattributes\fR(5),
-\fBresource_controls\fR(5)
+\fBpriocntl\fR(2), \fBproject\fR(4), \fBresource_controls\fR(5)
 .sp
 .LP
 \fISystem Administration Guide:  Virtualization Using the Solaris Operating

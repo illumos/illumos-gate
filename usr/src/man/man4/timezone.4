@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TIMEZONE 4 "Feb 18, 2003"
+.TH TIMEZONE 4 "May 13, 2017"
 .SH NAME
 timezone \- default timezone data base
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ timezone \- default timezone data base
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The timezone file contains information regarding the default timezone for each
 host in a domain. Alternatively, a single default line for the entire domain
@@ -34,10 +33,8 @@ relative to the directory \fB/usr/share/lib/zoneinfo\fR.
 .sp
 .LP
 This file is not actually referenced by any system software; it is merely used
-as a source file to construct the \fBNIS\fR \fBtimezone.byname\fR map. This map
-is read by \fBsysidtool\fR(1M) to initialize the timezone of the client system
-at installation time. For more information, see the \fISolaris Express
-Installation Guide: Basic Installations\fR.
+as a source file to construct the \fBNIS\fR \fBtimezone.byname\fR map, which
+was used by the installer in older releases of Solaris.
 .sp
 .LP
 The \fBtimezone\fR file does not set the timezone environment variable
@@ -59,7 +56,6 @@ US/Eastern          East.Sun.COM #Sun East Coast
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/timezone\fR\fR
@@ -69,9 +65,5 @@ US/Eastern          East.Sun.COM #Sun East Coast
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBsysidtool\fR(1M), \fBTIMEZONE\fR(4)
-.sp
-.LP
-\fISolaris Express Installation Guide: Basic Installations\fR
+\fBTIMEZONE\fR(4)

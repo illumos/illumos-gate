@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KVM_NLIST 3KVM "May 2, 2002"
+.TH KVM_NLIST 3KVM "May 13, 2017"
 .SH NAME
 kvm_nlist \- get entries from kernel symbol table
 .SH SYNOPSIS
@@ -17,7 +17,6 @@ kvm_nlist \- get entries from kernel symbol table
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBkvm_nlist()\fR function examines the symbol table from the kernel image
 identified by \fIkd\fR (see \fBkvm_open\fR(3KVM)) and selectively extracts a
@@ -32,12 +31,9 @@ and type are placed in the \fBn_value\fR and \fBn_type\fR fields. If a symbol
 cannot be located, the corresponding \fBn_type\fR field of \fInl\fR is set to
 0.
 .SH RETURN VALUES
-.sp
 .LP
-The \fBkvm_nlist()\fR functions returns the value of  \fBnlist\fR(3UCB) or
-\fBnlist\fR(3ELF), depending on the library used.
+The \fBkvm_nlist()\fR functions returns the value of \fBnlist\fR(3ELF).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -55,12 +51,10 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkvm_open\fR(3KVM), \fBkvm_kread\fR(3KVM), \fBnlist\fR(3ELF),
-\fBnlist\fR(3UCB), \fBattributes\fR(5)
+\fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 Although the \fBlibkvm\fR API is Stable, the symbol names and data values that
 can be accessed through this set of interfaces are Private and are subject to

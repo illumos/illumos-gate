@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP_CACHEMGR 1M "Oct 7, 2008"
+.TH LDAP_CACHEMGR 1M "May 13, 2017"
 .SH NAME
 ldap_cachemgr \- LDAP daemon to manage client configuration for LDAP based
 Network Information Service lookups
@@ -14,7 +14,6 @@ Network Information Service lookups
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBldap_cachemgr\fR daemon is a process that provides an up-to-date
 configuration cache for LDAP naming services. It is started during multi-user
@@ -46,7 +45,6 @@ The \fBldap_cachemgr\fR daemon also acts as its own administration tool. If an
 instance of \fBldap_cachemgr\fR is already running, commands are passed
 transparently to the running version.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -104,7 +102,6 @@ example# pkill -HUP ldap_cachemgr
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/ldap/cachemgr.log\fR\fR
@@ -131,21 +128,18 @@ be modified manually. Their content is not guaranteed to be human readable. Use
 .RE
 
 .SH WARNINGS
-.sp
 .LP
 The \fBldap_cachemgr\fR utility is included in the current Solaris release on
 an uncommitted basis only. It is subject to change or removal in a future minor
 release.
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(1), \fBldapadd\fR(1), \fBldapdelete\fR(1), \fBldaplist\fR(1),
 \fBldapmodify\fR(1), \fBldapmodrdn\fR(1), \fBldapsearch\fR(1), \fBpkill\fR(1),
 \fBsvcs\fR(1), \fBidsconfig\fR(1M), \fBldapaddent\fR(1M), \fBldapclient\fR(1M),
-\fBsuninstall\fR(1M), \fBsvcadm\fR(1M), \fBsignal.h\fR(3HEAD),
+\fBsvcadm\fR(1M), \fBsignal.h\fR(3HEAD),
 \fBresolv.conf\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBldap_cachemgr\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

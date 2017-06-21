@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC.SMSERVERD 1M "Mar 1, 2007"
+.TH RPC.SMSERVERD 1M "May 13, 2017"
 .SH NAME
 rpc.smserverd \- removable media device server
 .SH SYNOPSIS
@@ -13,16 +13,14 @@ rpc.smserverd \- removable media device server
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBrpc.smserverd\fR is a server that handles requests from client
-applications, such as volume management software, for access to removable media
-devices. In addition to volume management software, \fBrmformat\fR(1) and the
-CDE Filemanager (when performing removable media operations) are
-\fBrpc.smserverd\fR clients. The \fBrpc.smserverd\fR daemon is started by
+applications, such as volume management software or \fBrmformat\fR(1),
+for access to removable media
+devices. The \fBrpc.smserverd\fR daemon is started by
 \fBinetd\fR(1M) when a client makes a call to a Solaris-internal library to
 access a SCSI, IDE, or USB device. The daemon is not started if a client
-attempts to access a  floppy or PCMCIA device. Once started, the daemon remains
+attempts to access a floppy or PCMCIA device. Once started, the daemon remains
 active until such time as it is idle for three minutes or more.
 .sp
 .LP
@@ -30,12 +28,10 @@ The \fBrpc.smserverd\fR daemon is provided for the exclusive use of the client
 applications mentioned above. It has no external, customer-accessible
 interfaces, including no configuration file.
 .SH SEE ALSO
-.sp
 .LP
-\fBsvcs\fR(1), \fBinetadm\fR(1M), \fBinetd\fR(1M), \fBsvcadm\fR(1M),
-\fBattributes\fR(5), \fBsmf\fR(5)
+\fBrmformat\fR(1), \fBsvcs\fR(1), \fBinetadm\fR(1M), \fBinetd\fR(1M),
+\fBsvcadm\fR(1M), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBrpc.smserverd\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:

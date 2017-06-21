@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROUTEADM 1M "April 9, 2016"
+.TH ROUTEADM 1M "May 13, 2017"
 .SH NAME
 routeadm \- IP forwarding and routing configuration
 .SH SYNOPSIS
@@ -99,9 +99,7 @@ the configuration for the specified option or variable is displayed.
 .ad
 .sp .6
 .RS 4n
-Specify an alternate root directory where \fBrouteadm\fR applies changes. This
-can be useful from within JumpStart scripts, where the root directory of the
-system being modified is mounted elsewhere.
+Specify an alternate root directory where \fBrouteadm\fR applies changes.
 .LP
 Note -
 .sp
@@ -161,7 +159,7 @@ routing daemon service.
 .RS 4n
 Change property value of property \fIkey\fR to \fIvalue\fR in routing
 application property group for the SMF routing daemon service. For multi-valued
-properties, the  property name can be used multiple times in the modify
+properties, the property name can be used multiple times in the modify
 operation, and each associated value will be added.
 .RE
 

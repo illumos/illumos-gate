@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CDRW 1 "Dec 1, 2012"
+.TH CDRW 1 "May 13, 2017"
 .SH NAME
 cdrw \- CD read and write
 .SH SYNOPSIS
@@ -56,7 +56,6 @@ cdrw \- CD read and write
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcdrw\fR command provides the ability to create data and audio CDs. This
 command also provides the ability to extract audio tracks from an audio CD and
@@ -79,7 +78,6 @@ the \fB-l\fR option provides a list of CD or DVD writers.
 For instructions on adding a USB-mass-storage-class-compliant CD-RW or DVD-RW
 device to your system, see \fBscsa2usb\fR(7D).
 .SS "Creating Data CDs"
-.sp
 .LP
 When creating data CDs, \fBcdrw\fR uses the Track-At-Once mode of writing. Use
 the \fB-i\fR option to specify a file that contains the data to write on CD
@@ -91,7 +89,6 @@ In either case, the data is typically prepared by using the \fBmkisofs\fR
 command to convert the file and file information into the ISO 9660 format
 used on CDs. See the examples that include use of this command.
 .SS "Creating Data DVDs"
-.sp
 .LP
 \fBcdrw\fR can create single-session data DVDs on DVD+RW or DVD-RW devices
 using images generated from \fBmkisofs\fR. These disks can be mounted as HSFS
@@ -101,7 +98,6 @@ further sessions from being added. The image should be prepared in advance when
 writing an image to the DVD media since DAO mode requires that the size of the
 image be known in advance.
 .SS "Creating Audio CDs"
-.sp
 .LP
 Use the \fB-a\fR option to create an audio CD. Single or multiple audio files
 can be specified with this option. All of the audio files should be in a
@@ -152,7 +148,6 @@ to be the audio file type for all the files specified. Also, using the \fB-c\fR
 option closes the session after writing the audio tracks. Therefore, the tracks
 to be written should be specified in a single command line.
 .SS "Extracting Audio"
-.sp
 .LP
 \fBcdrw\fR can also be used for extracting audio data from an audio CD with the
 \fB-x\fR option. The CD should have tracks in Red Book CDDA form. By default,
@@ -160,7 +155,6 @@ the output format is based on the file extension. A user can specify a
 \fBsun\fR, \fBwav\fR, \fBcda\fR, or \fBaur\fR output format with the \fB-T\fR
 option.
 .SS "Copying CDs"
-.sp
 .LP
 \fBcdrw\fR can be used to copy single session data CD-ROMs and Red Book audio
 CDs. When copying a CD, \fBcdrw\fR looks for a specified source device. If no
@@ -171,7 +165,6 @@ current CD writer. If no media is found, insert a blank writable CD media in
 the current CD writer. If the default temporary directory does not have enough
 space, an alternate directory can be specified by using the \fB-m\fR option.
 .SS "Erasing CD-RW or DVD-RW Media"
-.sp
 .LP
 Users have to erase the CD-RW media before it can be rewritten. With the
 \fB-b\fR option, the following flavors of erasing are currently supported:
@@ -227,18 +220,14 @@ DVD+RW media does not support erasing. To re-use DVD+RW media, simply write a
 new image onto the media. \fBcdrw\fR formats and overwrites the existing media
 automatically.
 .SS "Checking device-list or media-status"
-.sp
 .LP
 You can list a system's CD or DVD writers by using the \fB-l\fR option. Also,
 for a particular media, you can get the blanking status and table of contents
 by using the \fB-M\fR option. The \fB-M\fR option also prints information about
 the last session's start address and the next writable address. This
 information, along with the \fB-O\fR option, can be used to create multisession
-CDs. Refer to the \fBmkisofs\fR(8) man page,
-(\fB/usr/share/man/man8/mkisofs.8\fR), in the SUNWfsman package for more
-information.
+CDs. Refer to the \fBmkisofs\fR(8) man page for more information.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -601,19 +590,14 @@ example% \fBmkisofs -o /tmp/image2 -r -C 0,173464 -M \e
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBaudioconvert\fR(1), \fBpriocntl\fR(1), \fBpolicy.conf\fR(4),
-\fBattributes\fR(5), \fBrbac\fR(5), \fBscsa2usb\fR(7D), \fBsd\fR(7D)
-.sp
-.LP
-\fBmkisofs\fR(8), (\fB/usr/share/man/man8/mkisofs.8\fR), in the SUNWfsman
-package
+\fBattributes\fR(5), \fBrbac\fR(5), \fBscsa2usb\fR(7D), \fBsd\fR(7D),
+\fBmkisofs\fR(8)
 .sp
 .LP
 \fISystem Administration Guide: Devices and File Systems\fR
 .SH NOTES
-.sp
 .LP
 The CD writing process requires data to be supplied at a constant rate to the
 drive. Keep I/O activity to a minimum and shut down any related I/O

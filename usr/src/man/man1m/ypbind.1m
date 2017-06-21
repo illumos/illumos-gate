@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH YPBIND 1M "Feb 25, 2017"
+.TH YPBIND 1M "May 13, 2017"
 .SH NAME
 ypbind \- NIS binder process
 .SH SYNOPSIS
@@ -26,7 +26,7 @@ Administrative tools are described in \fBypinit\fR(1M), \fBypwhich\fR(1), and
 \fBypbind\fR is a daemon process that is activated at system startup time from
 the \fBsvc:/network/nis/client:default\fR service. By default, it is invoked as
 \fBypbind\fR \fB-broadcast\fR. \fBypbind\fR runs on all client machines that
-are set up to use \fBNIS\fR. See \fBsysidtool\fR(1M). The function of
+are set up to use \fBNIS\fR. The function of
 \fBypbind\fR is to remember information that lets all \fBNIS\fR client
 processes on a node communicate with some \fBNIS\fR server process.
 \fBypbind\fR must run on every machine which has \fBNIS\fR client processes.
@@ -36,10 +36,10 @@ running somewhere on the network.
 .LP
 The information \fBypbind\fR remembers is called a \fIbinding\fR \(em the
 association of a domain name with a \fBNIS\fR server. The process of binding is
-driven by client requests.  As a request for  an unbound domain comes in, if
-started with the \fB-broadcast\fR option, the \fBypbind\fR process  broadcasts
+driven by client requests.  As a request for an unbound domain comes in, if
+started with the \fB-broadcast\fR option, the \fBypbind\fR process broadcasts
 on the net trying to find an \fBNIS\fR server, a \fBypserv\fR process
-serving the domain. Since the binding is established by broadcasting,  there
+serving the domain. Since the binding is established by broadcasting, there
 must be at least one \fBNIS\fR server on the net. If started without the
 \fB-broadcast\fR option, \fBypbind\fR process steps through the list of
 \fBNIS\fR servers that was created by \fBypinit\fR \fB-c\fR for the requested
@@ -75,7 +75,7 @@ work, \fBypbind\fR must have been invoked with flags \fB-ypset\fR or
 .ad
 .sp .6
 .RS 4n
-Send a broadcast datagram using \fBUDP/IP\fR  that requests the information
+Send a broadcast datagram using \fBUDP/IP\fR that requests the information
 needed to bind to a specific \fBNIS\fR server. This option is analogous to
 \fBypbind\fR with no options in earlier Sun releases and is recommended for
 ease of use.
@@ -134,9 +134,9 @@ File in which it is recommended that NIS servers be listed.
 \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
 .LP
-\fBypbind\fR supports multiple domains. The  \fBypbind\fR process can maintain
+\fBypbind\fR supports multiple domains. The \fBypbind\fR process can maintain
 bindings to several domains and their servers, the default domain is the one
-specified by the  \fBdomainname\fR(1M) command at startup time.
+specified by the \fBdomainname\fR(1M) command at startup time.
 .sp
 .LP
 The \fB-broadcast\fR option works only on the \fBUDP\fR transport. It is

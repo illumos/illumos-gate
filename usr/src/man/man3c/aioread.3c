@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AIOREAD 3C "Feb 5, 2008"
+.TH AIOREAD 3C "May 13, 2017"
 .SH NAME
 aioread, aiowrite \- read or write asynchronous I/O operations
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ aioread, aiowrite \- read or write asynchronous I/O operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBaioread()\fR function initiates one asynchronous \fBread\fR(2) and
 returns control to the calling program. The read continues concurrently with
@@ -72,8 +71,8 @@ application until after the operation has completed. While the operation is in
 progress, this buffer is in use by the operating system.
 .sp
 .LP
-Notification of the completion of an asynchronous I/O  operation can be
-obtained synchronously through the  \fBaiowait\fR(3C) function, or
+Notification of the completion of an asynchronous I/O operation can be
+obtained synchronously through the \fBaiowait\fR(3C) function, or
 asynchronously by installing a signal handler for the \fBSIGIO\fR signal.
 Asynchronous notification is accomplished by sending the process a \fBSIGIO\fR
 signal. If a signal handler is not installed for the \fBSIGIO\fR signal,
@@ -97,13 +96,11 @@ It is an error to use the same result buffer in more than one outstanding
 request. These structures can be reused only after the system has completed the
 operation.
 .SH RETURN VALUES
-.sp
 .LP
-Upon successful completion,  \fBaioread()\fR and \fBaiowrite()\fR return
+Upon successful completion, \fBaioread()\fR and \fBaiowrite()\fR return
 \fB0\fR. Upon failure, \fBaioread()\fR and \fBaiowrite()\fR return \fB\(mi1\fR
 and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBaioread()\fR and \fBaiowrite()\fR functions will fail if:
 .sp
@@ -165,12 +162,10 @@ Memory resources are unavailable to initiate request.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBaioread()\fR and \fBaiowrite()\fR functions have transitional interfaces
 for 64-bit file offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -186,9 +181,8 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBclose\fR(2), \fBexecve\fR(2), \fBexit\fR(2), \fBllseek\fR(2),
 \fBlseek\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBaiocancel\fR(3C), \fBaiowait\fR(3C), \fBsigvec\fR(3UCB),
+\fBaiocancel\fR(3C), \fBaiowait\fR(3C),
 \fBattributes\fR(5), \fBlf64\fR(5)

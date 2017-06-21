@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FSEEK 3C "Nov 1, 2003"
+.TH FSEEK 3C "May 13, 2017"
 .SH NAME
 fseek, fseeko \- reposition a file-position indicator in a stream
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ fseek, fseeko \- reposition a file-position indicator in a stream
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfseek()\fR function sets the file-position indicator for the stream
 pointed to by \fIstream\fR. The \fBfseeko()\fR function is identical to
@@ -94,12 +93,10 @@ underlying file, \fBfseek()\fR will cause the unwritten data to be written to
 the file and mark the \fBst_ctime\fR and \fBst_mtime\fR fields of the file for
 update.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBfseek()\fR and \fBfseeko()\fR functions return \fB0\fR on success;
 otherwise, they returned \fB\(mi1\fR and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBfseek()\fR and \fBfseeko()\fR functions will fail if, either the
 \fIstream\fR is unbuffered or the \fIstream\fR's buffer needed to be flushed,
@@ -235,7 +232,6 @@ correctly in an object of type \fBoff_t\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Although on the UNIX system an offset returned by \fBftell()\fR or
 \fBftello()\fR (see \fBftell\fR(3C)) is measured in bytes, and it is
@@ -248,7 +244,6 @@ necessarily measured in bytes.
 The \fBfseeko()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -266,8 +261,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBgetrlimit\fR(2), \fBulimit\fR(2), \fBfopen\fR(3UCB), \fBftell\fR(3C),
+\fBgetrlimit\fR(2), \fBulimit\fR(2), \fBftell\fR(3C),
 \fBrewind\fR(3C), \fBungetc\fR(3C), \fBungetwc\fR(3C), \fBattributes\fR(5),
 \fBlf64\fR(5), \fBstandards\fR(5)

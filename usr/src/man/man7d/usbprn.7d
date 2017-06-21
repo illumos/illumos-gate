@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USBPRN 7D "April 9, 2016"
+.TH USBPRN 7D "May 13, 2017"
 .SH NAME
 usbprn \- USB printer class driver
 .SH SYNOPSIS
@@ -31,13 +31,11 @@ driver functionality. However, unlike the STREAMS-based \fBecpp\fR driver,
 \fBusbprn\fR is a character driver.
 .sp
 .LP
-The \fBusbprn\fR driver supports all USB printer-class compliant printers. For
-a list of recommended printers and USB parallel printer adapters, visit
-http://\fIwww.sun.com/io\fR.
+The \fBusbprn\fR driver supports all USB printer-class compliant printers.
 .sp
 .LP
 The \fBusbrpn\fR driver includes support for communicating with many different
-printers. To use these printers, it may be nesessary to install and configure
+printers. To use these printers, it may be necessary to install and configure
 additional format conversion packages available in the Solaris distribution.
 Configuration of these conversion packages under the Solaris printing system
 can be simplified through the use of the \fBprintmgr\fR(1M). This tool allows
@@ -48,7 +46,7 @@ printer.
 .SS "UGEN (Generic USB)"
 .LP
 The \fBusbprn\fR driver also supports a \fBugen\fR(7D) interface allowing raw
-access to the device, for example by \fBlibusb\fR(3LIB) applications, by
+access to the device, for example by libusb applications, by
 passing the drivers bound to each interface. Because a libusb application might
 change the state of the device, you should not access the device through the
 child interface drivers.
@@ -84,7 +82,7 @@ call. The captured status information is overwritten each time an
 ECPPIOC_TESTIO \fBioctl\fR(2) occurs.
 .SH IOCTLS
 .LP
-The \fBusbprn\fR driver supports \fBprnio(7I)\fR interfaces. Note that the
+The \fBusbprn\fR driver supports \fBprnio\fR(7I) interfaces. Note that the
 \fBPRNIOC_RESET\fR command has no effect on USB printers.
 .sp
 .LP
@@ -246,14 +244,14 @@ Unlike \fBecpp\fR(7D), only the ECPP_CENTRONICS mode is currently supported in
 
 .SH READ OPERATION
 .LP
- The \fBread\fR operation is not supported and returns \fBEIO\fR.
+The \fBread\fR operation is not supported and returns \fBEIO\fR.
 .SH ERRORS
 .ne 2
 .na
 \fB\fBEBUSY\fR\fR
 .ad
 .RS 19n
- The device has been opened and another open is attempted. An attempt has been
+The device has been opened and another open is attempted. An attempt has been
 made to unload the driver while one of the units is open.
 .RE
 
@@ -373,8 +371,8 @@ Architecture	SPARC, x86, PCI-based systems
 .SH SEE ALSO
 .LP
 \fBcfgadm_usb\fR(1M), \fBprintmgr\fR(1M), \fBioctl\fR(2), \fBopen\fR(2),
-\fBread\fR(2), \fBwrite\fR(2), \fBlibusb\fR(3LIB), \fBattributes\fR(5),
-\fBbpp\fR(7D), \fBecpp\fR(7D), \fBugen\fR(7D), \fBusba\fR(7D)\fBprnio\fR(7I),
+\fBread\fR(2), \fBwrite\fR(2), \fBattributes\fR(5),
+\fBbpp\fR(7D), \fBecpp\fR(7D), \fBugen\fR(7D), \fBusba\fR(7D), \fBprnio\fR(7I),
 \fBattach\fR(9E)
 .sp
 .LP
@@ -388,9 +386,6 @@ Architecture	SPARC, x86, PCI-based systems
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
-.sp
-.LP
-http://\fIwww.sun.com/io\fR
 .SH DIAGNOSTICS
 .LP
 In addition to being logged, the following messages may appear on the system

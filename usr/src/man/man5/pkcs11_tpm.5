@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PKCS11_TPM 5 "Mar 20, 2009"
+.TH PKCS11_TPM 5 "May 13, 2017"
 .SH NAME
 pkcs11_tpm \- RSA PKCS#11 token for Trusted Platform Modules (TPM)
 .SH SYNOPSIS
@@ -18,12 +18,11 @@ pkcs11_tpm \- RSA PKCS#11 token for Trusted Platform Modules (TPM)
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpkcs11_tpm.so\fR object implements the RSA PKCS#11 v2.20 specification
 using Trusted Computing Group protocols to talk to a TPM security device. This
 provider implements the PKCS#11 specification and uses the TCG Software Stack
-(TSS) APIs in the \fBSUNWtrousers\fR package.
+(TSS) APIs in the \fBtrousers\fR package.
 .sp
 .LP
 Application developers should link to \fBlibpkcs11.so.1\fR rather than link
@@ -79,10 +78,9 @@ CKM_MD5_HMAC_GENERAL
 .sp
 
 .SS "Per-User Initialization"
-.sp
 .LP
 The \fBpkcs11_tpm\fR provider can only be used on a system which has a TPM
-device and which also has the \fBSUNWtrousers\fR package installed. If those
+device and which also has the \fBtrousers\fR package installed. If those
 prerequisites are met, users can create their own private tokens using
 \fBpktool\fR(1), which will allow them to perform operations using the TPM
 device and protect their private data with TPM-protected keys.
@@ -178,7 +176,6 @@ The PIN provided for the \fBpktool\fR \fBsetpin\fR operation or by calling
 \fBC_Login()\fR and \fBC_SetPIN()\fR functions can be any string of characters
 with a length between 1 and 256 and no embedded nulls.
 .SS "Accessing the Token"
-.sp
 .LP
 After a user initializes their token, they can begin using it with
 \fBpktool\fR(1) or by writing PKCS11 applications and locating the token using
@@ -196,7 +193,6 @@ $ \fBpktool list token=tpm/joeuser\fR
 .sp
 
 .SS "Notes"
-.sp
 .LP
 \fBpkcs11_tpm.so\fR provides object storage in a filesystem-specific token
 object storage area. Private objects are protected by encryption with private
@@ -222,12 +218,10 @@ for each token created. By default, this area is created as
 the \fBPKCS11_TPM_DIR\fR environment variable prior to initializing or using
 the token.
 .SH RETURN VALUES
-.sp
 .LP
 The return values for each of the implemented functions are defined and listed
 in the RSA PKCS#11 v2.20 specification. See \fBhttp://www.rsasecurity.com\fR.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/tpm/pkcs11/USERNAME\fR\fR
@@ -248,7 +242,6 @@ Alternate token object store.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -272,11 +265,9 @@ Standard 	PKCS#11 v2.20
 Exceptions to MT-Safe attribute are documented in section 6.5.2 of RSA PKCS#11
 v2.20.
 .SH SEE ALSO
-.sp
 .LP
 \fBpktool\fR(1), \fBcryptoadm\fR(1M), \fBlibpkcs11\fR(3LIB),
 \fBattributes\fR(5)
 .sp
 .LP
-TCG Software Stack (TSS) Specifications: \fBhttps://www.trustedcomputinggroup.
-org/specs/TSS\fR (as of the date of publication)
+TCG Software Stack (TSS) Specifications: \fBhttps://www.trustedcomputinggroup.org/specs/TSS\fR (as of the date of publication)

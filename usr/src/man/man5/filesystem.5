@@ -18,8 +18,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
+.\" Copyright 2017 Peter Tribble
 .\"
-.TH FILESYSTEM 5 "Mar 6, 2017"
+.TH FILESYSTEM 5 "May 13, 2017"
 .SH NAME
 filesystem \- File system organization
 .SH SYNOPSIS
@@ -83,11 +84,6 @@ platform-independent file is a standard configuration file, such as
 the \fBplatform-specific\fR file is installed only on a subset of supported
 platforms. Most platform-specific files are gathered under \fB/platform\fR and
 \fB/usr/platform\fR.
-.sp
-.LP
-In the following file or directory descriptions, GNOME stands for GNU Network
-Object Model Environment. The GNOME Desktop is shipped with the Solaris
-operating system.
 .SS "Root File System"
 .LP
 The root file system contains files that are unique to each machine. It
@@ -109,8 +105,7 @@ Root of the overall file system name space.
 .ad
 .sp .6
 .RS 4n
-Primary location for special files. Typically, device files are built to match
-the kernel and hardware configuration of the machine.
+The device name file system. See \fBdev\fR(7FS).
 .RE
 
 .sp
@@ -291,7 +286,7 @@ Terminal devices.
 .ad
 .sp .6
 .RS 4n
-Physical device files.
+The devices file system. See \fBdevfs\fR(7FS).
 .RE
 
 .sp
@@ -325,38 +320,7 @@ Xorg Xserver (X11) configuration files.
 .ad
 .sp .6
 .RS 4n
-Accounting system configuration information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/apache\fR\fR
-.ad
-.sp .6
-.RS 4n
-Apache configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/apoc\fR\fR
-.ad
-.sp .6
-.RS 4n
-Files for configuring Sun Java Desktop System Configuration Manager remote
-access.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/bonobo-activation\fR\fR
-.ad
-.sp .6
-.RS 4n
-GNOME XML configuration file for identifying CORBA servers.
+Process accounting system configuration information.
 .RE
 
 .sp
@@ -422,36 +386,6 @@ Dynamic Host Configuration Protocol (\fBDHCP\fR) configuration files.
 .sp
 .ne 2
 .na
-\fB\fB/etc/dmi\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solstice Enterprise Agents configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/dt\fR\fR
-.ad
-.sp .6
-.RS 4n
-Desktop configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/flash\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solaris Flash Archive configuration files.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/etc/fm\fR\fR
 .ad
 .sp .6
@@ -493,94 +427,12 @@ Binaries organized by file system types for operations required before
 .sp
 .ne 2
 .na
-\fB\fB/etc/gconf\fR\fR
-.ad
-.sp .6
-.RS 4n
-GConf system configuration (including system defaults and system mandatory
-settings)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/gimp\fR\fR
-.ad
-.sp .6
-.RS 4n
-GNU Image Manipulation Program (GIMP) configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/gnome\fR\fR
-.ad
-.sp .6
-.RS 4n
-GNOME Desktop configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/gnome-vfs-2.0\fR\fR
-.ad
-.sp .6
-.RS 4n
-Files for customizing GNOME 2.0 desktop menus.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/gnopernicus-1.0\fR\fR
-.ad
-.sp .6
-.RS 4n
-Configuration files for GNOME's Gnopernicus, an Assistive Technology (AT)
-screen reader.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/etc/gss\fR\fR
 .ad
 .sp .6
 .RS 4n
 Generic Security Service (\fBGSS\fR) Application Program Interface
 configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/gtk\fR\fR
-.ad
-.sp .6
-.RS 4n
-GTK+ configuration files
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/gtk-2.0\fR\fR
-.ad
-.sp .6
-.RS 4n
-GTK+ Pixbuf loaders and Input Method modules
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/imq\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sun Java System Message Queue security configuration files.
 .RE
 
 .sp
@@ -600,7 +452,8 @@ Configuration files for Internet services.
 .ad
 .sp .6
 .RS 4n
-Shell scripts for transitioning between run levels.
+Shell scripts for transitioning between init states. The service management
+facility, \fBsmf\fR(5) is the preferred mechanism for managing services.
 .RE
 
 .sp
@@ -691,26 +544,6 @@ NFS server logging configuration file.
 .sp .6
 .RS 4n
 Configuration information for optional packages.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/pango\fR\fR
-.ad
-.sp .6
-.RS 4n
-Pango configuration and module information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/patch\fR\fR
-.ad
-.sp .6
-.RS 4n
-Configuration files for patch management.
 .RE
 
 .sp
@@ -817,62 +650,11 @@ Extensions).
 .sp
 .ne 2
 .na
-\fB\fB/etc/sfw\fR\fR
-.ad
-.sp .6
-.RS 4n
-Platform-dependent administrative, configuration files and databases for
-subsystems from \fB/usr/sfw\fR that are not shared among systems.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/sfw/samba\fR\fR
-.ad
-.sp .6
-.RS 4n
-Samba configuration files.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/etc/skel\fR\fR
 .ad
 .sp .6
 .RS 4n
 Default profile scripts for new user accounts. See \fBuseradd\fR(1M).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/sma\fR\fR
-.ad
-.sp .6
-.RS 4n
-Systems Management Agent (SMA) configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/smartcard\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solaris Smart Card configuration files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/snmp\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solstice Enterprise Agents configuration files.
 .RE
 
 .sp
@@ -971,6 +753,16 @@ Extensible Markup Language (XML) catalog.
 .sp
 .ne 2
 .na
+\fB\fB/etc/zfs\fR\fR
+.ad
+.sp .6
+.RS 4n
+Contains the zfs state file, \fBzpool.cache\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB/etc/zones\fR\fR
 .ad
 .sp .6
@@ -995,7 +787,8 @@ Default root of the shared file system tree.
 .ad
 .sp .6
 .RS 4n
-Default root of a subtree for user directories.
+Default root of a subtree for user directories. Often managed by the
+automounter, see \fBautomount\fR(1M) for more details.
 .RE
 
 .sp
@@ -1253,7 +1046,7 @@ Solaris software and for add-on system software.
 .ad
 .sp .6
 .RS 4n
-Root of a subtree for the process file system.
+Root of a subtree for the process file system. See \fBproc\fR(4).
 .RE
 
 .sp
@@ -1276,7 +1069,8 @@ Solaris software.
 .ad
 .sp .6
 .RS 4n
-Mount point for the contract (CTFS) and object (OBJFS) file systems.
+Mount point for the contract (CTFS) and object (OBJFS) file systems. See
+\fBctfs\fR(7FS) and \fBobjfs\fR(7FS).
 .RE
 
 .sp
@@ -1286,7 +1080,8 @@ Mount point for the contract (CTFS) and object (OBJFS) file systems.
 .ad
 .sp .6
 .RS 4n
-Temporary files; cleared during the boot operation.
+Temporary files. Usually mounted as a memory based file system. See
+\fBtmpfs\fR(7FS).
 .RE
 
 .sp
@@ -1327,26 +1122,6 @@ System logging and accounting files.
 .sp
 .ne 2
 .na
-\fB\fB/var/apache\fR\fR
-.ad
-.sp .6
-.RS 4n
-Scripts, icons, logs, and cache pages for Apache web server.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/appserver\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sun Java System Application Server administrative domain files.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/var/audit\fR\fR
 .ad
 .sp .6
@@ -1361,7 +1136,7 @@ Default location for Audit log files.
 .ad
 .sp .6
 .RS 4n
-Directory provided for global core files storage.
+Directory provided for global core files storage. See \fBcoreadm\fR(1M).
 .RE
 
 .sp
@@ -1371,7 +1146,7 @@ Directory provided for global core files storage.
 .ad
 .sp .6
 .RS 4n
-Default depository for kernel crash dumps.
+Default depository for kernel crash dumps. See \fBdumpadm\fR(1M).
 .RE
 
 .sp
@@ -1387,42 +1162,11 @@ Log files for \fBcron\fR(1M).
 .sp
 .ne 2
 .na
-\fB\fB/var/dmi\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solstice Enterprise Agents (\fBSEA\fR) Desktop Management Interface (\fBDMI\fR)
-run-time components.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/dt\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBdtlogin\fR configuration files.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/var/fm\fR\fR
 .ad
 .sp .6
 .RS 4n
 Fault manager state files. For more information, see \fBfmd\fR(1M).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/imq\fR\fR
-.ad
-.sp .6
-.RS 4n
-Message queue broker instance configuration file.
 .RE
 
 .sp
@@ -1462,7 +1206,7 @@ Database and log files for Kerberos.
 .ad
 .sp .6
 .RS 4n
-Configuration files for runtime linker.
+Configuration files for runtime linker. See \fBcrle\fR(1).
 .RE
 
 .sp
@@ -1518,16 +1262,6 @@ Directory where users' mail is kept.
 .sp
 .ne 2
 .na
-\fB\fB/var/mysql\fR\fR
-.ad
-.sp .6
-.RS 4n
-Dynamic database directory for MySQL Database Management System.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/var/news\fR\fR
 .ad
 .sp .6
@@ -1569,11 +1303,11 @@ An approved installation location for add-on system software and applications.
 .sp
 .ne 2
 .na
-\fB\fB/var/patchsrv\fR\fR
+\fB\fB/var/pkg\fR\fR
 .ad
 .sp .6
 .RS 4n
-Patch management log files.
+Data associated with the Image Packaging System.
 .RE
 
 .sp
@@ -1604,20 +1338,7 @@ contents of this directory.
 .ad
 .sp .6
 .RS 4n
-Databases maintained by the software package management utilities.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/sadm/system/logs\fR\fR
-.ad
-.sp .6
-.RS 4n
-Status log files produced by software management functions and/or applications.
-For example, log files produced for product installation. An approved
-installation location for bundled Solaris software and for add-on system
-software and applications.
+Data associated with legacy SVR4 package management utilities.
 .RE
 
 .sp
@@ -1628,36 +1349,6 @@ software and applications.
 .sp .6
 .RS 4n
 Service access facility logging and accounting files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/samba\fR\fR
-.ad
-.sp .6
-.RS 4n
-Log and lock files for Samba.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/sma_snmp\fR\fR
-.ad
-.sp .6
-.RS 4n
-Systems Management Agent (SMA) security and MIB component information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/snmp\fR\fR
-.ad
-.sp .6
-.RS 4n
-SNMP status and configuration information.
 .RE
 
 .sp
@@ -1739,16 +1430,6 @@ Spooled packages.
 .sp .6
 .RS 4n
 LP print service client-side request staging area.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/var/spool/samba\fR\fR
-.ad
-.sp .6
-.RS 4n
-Samba print queue.
 .RE
 
 .sp
@@ -1905,26 +1586,6 @@ Symbolic link to the \fB/usr/bin\fR directory.
 .sp
 .ne 2
 .na
-\fB\fB/usr/SUNWale\fR\fR
-.ad
-.sp .6
-.RS 4n
-Configuration files for Asian Lanuguage Environment (ALE).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/X\fR\fR
-.ad
-.sp .6
-.RS 4n
-Symbolic link to the \fB/usr/openwin\fR directory.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/X11\fR\fR
 .ad
 .sp .6
@@ -1940,36 +1601,6 @@ Xorg Xserver (X11) executables and documentation.
 .sp .6
 .RS 4n
 Symbolic link to the \fB/var/adm\fR directory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/apache\fR\fR
-.ad
-.sp .6
-.RS 4n
-Apache executables, loadable modules, and documentation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/appserver\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sun Java System Application Server software.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/benchmarks\fR\fR
-.ad
-.sp .6
-.RS 4n
-Directory for benchmarks.
 .RE
 
 .sp
@@ -2082,27 +1713,9 @@ is \fB/opt/\fIpackagename\fR/bin/sparcv9\fR.
 .ad
 .sp .6
 .RS 4n
-C compilation system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/ccs/bin\fR\fR
-.ad
-.sp .6
-.RS 4n
-C compilation commands and system utilities.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/ccs/lib\fR\fR
-.ad
-.sp .6
-.RS 4n
-Symbolic link to \fB/usr/lib\fR.
+Former location of files for the C compilation system, now containing
+compatibility symbolic links to their new locations in \fB/usr/bin\fR
+and \fB/usr/lib\fR.
 .RE
 
 .sp
@@ -2124,78 +1737,6 @@ Demo programs and data.
 .RS 4n
 Symbolic link to the \fB/usr/share/lib/dict\fR directory, which contains the
 dictionary file used by the \fBUNIX\fR spell program.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/dt\fR\fR
-.ad
-.sp .6
-.RS 4n
-root of a subtree for CDE software.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/dt/bin\fR\fR
-.ad
-.sp .6
-.RS 4n
-Primary location for CDE system utilities.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/dt/include\fR\fR
-.ad
-.sp .6
-.RS 4n
-Header files for CDE software.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/dt/lib\fR\fR
-.ad
-.sp .6
-.RS 4n
-Libraries for CDE software.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/dt/share/man\fR\fR
-.ad
-.sp .6
-.RS 4n
-On-line reference manual pages for CDE software.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/games\fR\fR
-.ad
-.sp .6
-.RS 4n
-An empty directory, a remnant of the SunOS 4.0/4.1 software.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/gnome\fR\fR
-.ad
-.sp .6
-.RS 4n
-This is an obsolete directory where 3rd party programs can install their
-applications and \fBpixmap\fR files. It is supported for backwards
-compatibility.
 .RE
 
 .sp
@@ -2381,31 +1922,11 @@ Database files for \fBspell\fR(1).
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/dns\fR\fR
-.ad
-.sp .6
-.RS 4n
-Contains DNS resolver libraries.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/lib/dtrace\fR\fR
 .ad
 .sp .6
 .RS 4n
 Contains \fBdtrace\fR D source files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/flash\fR\fR
-.ad
-.sp .6
-.RS 4n
-Contains Solaris flash archive deployment scripts.
 .RE
 
 .sp
@@ -2714,16 +2235,6 @@ Solaris security plug-in modules.
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/smartcard\fR\fR
-.ad
-.sp .6
-.RS 4n
-IFD handler libraries.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/lib/smedia\fR\fR
 .ad
 .sp .6
@@ -2862,16 +2373,6 @@ Auxiliary programs and daemons for \fBuucp\fR(1C).
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/webconsole\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sun Java web console programs and scripts.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/lib/zones\fR\fR
 .ad
 .sp .6
@@ -2943,16 +2444,6 @@ Symbolic link to the \fB/var/news\fR directory.
 .sp .6
 .RS 4n
 Programs that are being phased out.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/openwin\fR\fR
-.ad
-.sp .6
-.RS 4n
-Installation or mount point for the OpenWindows software.
 .RE
 
 .sp
@@ -3048,7 +2539,8 @@ Symbolic link to the \fB/var/preserve\fR directory.
 .ad
 .sp .6
 .RS 4n
-Directory for the \fBproc\fR tools.
+Former location of the \fBproc\fR(1) tools, now containing compatibility
+symbolic links to their new locations in \fB/usr/bin\fR.
 .RE
 
 .sp
@@ -3070,17 +2562,6 @@ and character processing.
 .sp .6
 .RS 4n
 System administration files and directories.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/sadm/bin\fR\fR
-.ad
-.sp .6
-.RS 4n
-Binaries for the Form and Menu Language Interpreter (\fBFMLI\fR) scripts. See
-\fBfmli\fR(1).
 .RE
 
 .sp
@@ -3109,21 +2590,11 @@ applications is \fB/opt/\fIpackagename\fR/sbin\fR.
 .sp
 .ne 2
 .na
-\fB\fB/usr/sbin/install.d\fR\fR
+\fB\fB/usr/sbin/sparcv7\fR and \fBsparcv9\fR\fR
 .ad
 .sp .6
 .RS 4n
-Custom Jumpstart scripts and executables.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/sbin/sparc7\fR and \fBsparc9\fR\fR
-.ad
-.sp .6
-.RS 4n
-32-bit and 64-bit versions of commands.
+32-bit and 64-bit SPARC versions of commands.
 .RE
 
 .sp
@@ -3133,7 +2604,7 @@ Custom Jumpstart scripts and executables.
 .ad
 .sp .6
 .RS 4n
-64-bit x86versions of commands.
+64-bit x86 versions of commands.
 .RE
 
 .sp
@@ -3167,16 +2638,6 @@ add-on system software or for applications is
 .sp
 .ne 2
 .na
-\fB\fB/usr/sfw\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBGNU\fR and open source executables, libraries, and documentation.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/share\fR\fR
 .ad
 .sp .6
@@ -3202,7 +2663,7 @@ Open source \fBm4\fR files.
 .ad
 .sp .6
 .RS 4n
-Open source desktop applications files.
+Desktop application files.
 .RE
 
 .sp
@@ -3218,62 +2679,11 @@ Sample audio files.
 .sp
 .ne 2
 .na
-\fB\fB/usr/share/glib-2.0\fR\fR
-.ad
-.sp .6
-.RS 4n
-Makefile for \fBglib\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/gnome\fR\fR
-.ad
-.sp .6
-.RS 4n
-GNOME desktop and application data.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/gtk-2.0\fR\fR
-.ad
-.sp .6
-.RS 4n
-GTK+ application data and demos
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/gtk-doc\fR\fR
-.ad
-.sp .6
-.RS 4n
-API documentation for libraries which use gtk-doc documentation format, which
-mostly includes desktop interfaces.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/share/icons\fR\fR
 .ad
 .sp .6
 .RS 4n
-Sun Java Desktop icons.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/idl\fR\fR
-.ad
-.sp .6
-.RS 4n
-Open source Interface Definition Language (IDL) files.
+Desktop icon files.
 .RE
 
 .sp
@@ -3294,16 +2704,6 @@ XML translation tools.
 .sp .6
 .RS 4n
 Open source IP Filter sample files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/javadoc\fR\fR
-.ad
-.sp .6
-.RS 4n
-Help files for Message Queue broker and Smart Card applications.
 .RE
 
 .sp
@@ -3423,41 +2823,11 @@ or for applications is \fB/opt/\fIpackagename\fR/man\fR.
 .sp
 .ne 2
 .na
-\fB\fB/usr/share/omf\fR\fR
-.ad
-.sp .6
-.RS 4n
-GNOME Scrollkeeper database files.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/usr/share/pixmaps\fR\fR
 .ad
 .sp .6
 .RS 4n
-Sun Java graphics.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/scrollkeeper\fR\fR
-.ad
-.sp .6
-.RS 4n
-GNOME Scrollkeeper templates and \fBxslt\fR files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/sgml\fR\fR
-.ad
-.sp .6
-.RS 4n
-Open source SGML files.
+Desktop icon files.
 .RE
 
 .sp
@@ -3487,27 +2857,7 @@ Source code for kernel, utilities, and libraries.
 .ad
 .sp .6
 .RS 4n
-GNOME 2.0 Desktop themes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/webconsole\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sun Web Console status files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/xml\fR\fR
-.ad
-.sp .6
-.RS 4n
-GNOME Scrollkeeper DTD files.
+Desktop themes.
 .RE
 
 .sp
@@ -3602,7 +2952,7 @@ Directory for newer versions of POSIX-compliant utilities.
 
 .SH SEE ALSO
 .LP
-\fBat\fR(1), \fBex\fR(1), \fBfmli\fR(1), \fBiconv\fR(1), \fBlp\fR(1),
+\fBat\fR(1), \fBex\fR(1), \fBiconv\fR(1), \fBlp\fR(1),
 \fBisainfo\fR(1), \fBmail\fR(1), \fBmailx\fR(1), \fBnroff\fR(1),
 \fBpriocntl\fR(1), \fBrefer\fR(1), \fBsar\fR(1), \fBsh\fR(1), \fBspell\fR(1),
 \fBsvcs\fR(1), \fBtroff\fR(1), \fBuname\fR(1), \fBuucp\fR(1C), \fBvi\fR(1),
@@ -3610,4 +2960,6 @@ Directory for newer versions of POSIX-compliant utilities.
 \fBfmd\fR(1M), \fBfsck\fR(1M), \fBinit\fR(1M), \fBkernel\fR(1M),
 \fBmknod\fR(1M), \fBmount\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBuseradd\fR(1M), \fBypbind\fR(1M), \fBmount\fR(2), \fBIntro\fR(4),
-\fBterminfo\fR(4)
+\fBproc\fR(4), \fBterminfo\fR(4), \fBsmf\fR(5), \fBctfs\fR(7FS),
+\fBdev\fR(7FS), \fBdevfs\fR(7FS), \fBctfs\fR(7FS), \fBobjfs\fR(7FS),
+\fBtmpfs\fR(7FS)

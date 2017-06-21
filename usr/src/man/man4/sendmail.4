@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SENDMAIL 4 "May 8, 2008"
+.TH SENDMAIL 4 "May 13, 2017"
 .SH NAME
 sendmail, sendmail.cf, submit.cf \- sendmail configuration files
 .SH SYNOPSIS
@@ -18,7 +18,6 @@ sendmail, sendmail.cf, submit.cf \- sendmail configuration files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsendmail.cf\fR and \fBsubmit.cf\fR files are the configuration files for
 \fBsendmail\fR(1M). Starting with version 8.12 of \fBsendmail\fR, which was
@@ -222,7 +221,6 @@ You do not need to restart \fBsendmail\fR for changes to \fBsubmit.cf\fR to
 take effect.  Steps 4 and 5 can be automated. See \fBAutomated Rebuilding of
 Configuration Files\fR below.
 .SS "Enabling Access to Remote Clients"
-.sp
 .LP
 The \fBsendmail\fR(1M) man page describes how the \fBconfig/local_only\fR
 property can be set to \fBtrue\fR or \fBfalse\fR to disallow or allow,
@@ -261,11 +259,10 @@ Each property, if set, results in the corresponding \fB\&.mc\fR file being used
 to (re)build the matching \fB\&.cf\fR file when the service is started.
 .sp
 .LP
-These properties persist across upgrades and patches. To prevent a patch or
-upgrade from clobbering your \fB\&.cf\fR file, or renaming it to
-\fB\&.cf.old\fR, you can set the desired  properties instead.
+These properties persist across updates. To prevent an update
+from clobbering your \fB\&.cf\fR file, or renaming it to
+\fB\&.cf.old\fR, you can set the desired properties instead.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/mail/cf/README\fR\fR
@@ -275,7 +272,6 @@ Describes \fBsendmail\fR configuration files.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -291,7 +287,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmake\fR(1S), \fBps\fR(1), \fBsendmail\fR(1M), \fBsvcadm\fR(1M),
 \fBattributes\fR(5)

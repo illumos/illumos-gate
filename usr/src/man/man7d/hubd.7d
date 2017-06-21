@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HUBD 7D "Oct 4, 2016"
+.TH HUBD 7D "May 13, 2017"
 .SH NAME
 hubd \- USB hub driver
 .SH SYNOPSIS
@@ -82,9 +82,6 @@ Architecture	SPARC, x86, PCI-based systems
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
-.sp
-.LP
-http://\fIwww.sun.com/io\fR
 .SH DIAGNOSTICS
 .LP
 In addition to being logged, the following messages may also appear on the
@@ -257,7 +254,7 @@ bus.\fR
 .sp .6
 .RS 4n
 A USB self/bus-powered hub has lost external power. Some USB devices connected
-down-stream from this hub may cease          to function. Disconnect the
+down-stream from this hub may cease to function. Disconnect the
 external power-supply and then plug in the hub again.
 .RE
 

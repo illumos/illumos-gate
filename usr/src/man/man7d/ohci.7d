@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH OHCI 7D "Nov 23, 2006"
+.TH OHCI 7D "May 13, 2017"
 .SH NAME
 ohci \- OpenHCI host controller driver
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ ohci \- OpenHCI host controller driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBohci\fR driver is a USBA (Solaris USB Architecture) compliant nexus
 driver that supports the \fIOpen Host Controller Interface Specification
@@ -24,7 +23,6 @@ Semiconductor.
 The \fBohci\fR driver supports bulk, interrupt, control and isochronous
 transfers.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/ohci\fR\fR
@@ -61,7 +59,6 @@ driver configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -77,7 +74,6 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBehci\fR(7D), \fBhubd\fR(7D), \fBuhci\fR(7D),
 \fBusba\fR(7D)
@@ -93,11 +89,7 @@ Architecture	SPARC, x86, PCI-based systems
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
-.sp
-.LP
-\fIhttp://www.sun.com/io\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 All host controller errors are passed to the client drivers. Root hub errors
 are documented in \fBhubd\fR(7D).
@@ -138,7 +130,7 @@ system. If this problem persists, contact your system vendor.
 
 .sp
 .LP
-The following messages may be entered into the  system  log. They are formatted
+The following messages may be entered into the system log. They are formatted
 in the following manner:
 .sp
 .in +2

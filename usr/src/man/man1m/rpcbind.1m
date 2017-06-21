@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPCBIND 1M "Feb 13, 2015"
+.TH RPCBIND 1M "May 13, 2017"
 .SH NAME
 rpcbind \- universal addresses to RPC program number mapper
 .SH SYNOPSIS
@@ -247,11 +247,8 @@ TCP wrappers is External.
 .SH SEE ALSO
 .LP
 \fBsmf\fR(5), \fBrpcinfo\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
-\fBrpcbind\fR(3NSL), \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
-.sp
-.LP
-For information on the TCP wrappers facility, see the \fBhosts_access(4)\fR man
-page available in the \fBSUNWtcpd\fR package.
+\fBrpcbind\fR(3NSL), \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBsmf\fR(5),
+\fBhosts_access\fR(4)
 .SH NOTES
 .LP
 Terminating \fBrpcbind\fR with \fBSIGKILL\fR prevents the warm-start files from

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TNCTL 1M "Mar 6, 2008"
+.TH TNCTL 1M "May 13, 2017"
 .SH NAME
 tnctl \- configure Trusted Extensions network parameters
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ tnctl \- configure Trusted Extensions network parameters
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBtnctl\fR provides an interface to manipulate trusted network parameters in
 the Solaris kernel.
@@ -24,8 +23,8 @@ the Solaris kernel.
 As part of Solaris Trusted Extensions initialization, \fBtnctl\fR is run in the
 global zone by an \fBsmf\fR(5) script during system boot. The \fBtnctl\fR
 command is not intended to be used during normal system administration.
-Instead, if a local trusted networking database file is modified without using
-the Solaris Management Console, the administrator first issues
+Instead, if a local trusted networking database file is modified,
+the administrator first issues
 \fBtnchkdb\fR(1M) to check the syntax, and then refreshes the kernel copy with
 this command:
 .sp
@@ -41,7 +40,6 @@ this command:
 See \fBWARNINGS\fR about the risks of changing remote host and template
 information on a running system.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-d\fR\fR
@@ -94,7 +92,7 @@ Turn on verbose mode.
 .ad
 .sp .6
 .RS 4n
-Update the kernel remote-host cache on the local host for  the specified
+Update the kernel remote-host cache on the local host for the specified
 \fIhost\fR or, if a template name is given, change the kernel's cache to use
 the specified \fItemplate\fR. If \fIprefix\fR is not specified, then an implied
 prefix length is determined according to the rules used for interpreting the
@@ -167,7 +165,6 @@ reload MLPs for a non-global zone, reboot the zone:
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -183,7 +180,6 @@ Interface Stability	Uncommitted
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/security/tsol/tnrhdb\fR\fR
@@ -224,7 +220,6 @@ Configuration file for the name service switch
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBsvcadm\fR(1M), \fBtninfo\fR(1M), \fBtnd\fR(1M),
 \fBtnchkdb\fR(1M), \fBzoneadm\fR(1M), \fBnsswitch.conf\fR(4),
@@ -234,12 +229,10 @@ Configuration file for the name service switch
 \fIHow to Synchronize Kernel Cache With Network Databases\fR in \fISolaris
 Trusted Extensions Administrator\&'s Procedures\fR
 .SH WARNINGS
-.sp
 .LP
 Changing a template while the network is up can change the security view of an
 undetermined number of hosts.
 .SH NOTES
-.sp
 .LP
 The functionality described on this manual page is available only if the system
 is configured with Trusted Extensions.

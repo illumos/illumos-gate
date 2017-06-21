@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ATTRIBUTES 5 "Jul 29, 2007"
+.TH ATTRIBUTES 5 "May 13, 2017"
 .SH NAME
 attributes, architecture, availability, CSI, stability, MT-Level, standard \-
 attributes of interfaces
@@ -13,8 +13,6 @@ The \fBATTRIBUTES\fR section of a manual page contains a table defining
 attribute types and their corresponding values. The following is an example of
 an attributes table. Not all attribute types are appropriate for all types of
 interfaces.
-.sp
-
 .sp
 .TS
 box;
@@ -45,7 +43,7 @@ code sets are said to have Code Set Independence (CSI). They have the attribute
 of being \fBCSI\fR enabled. This is in contrast to many commands and utilities,
 for example, that work only with Extended Unix Codesets (EUC), an encoding
 method that allows concurrent support for up to four code sets and is commonly
-used  to represent Asian character sets.
+used to represent Asian character sets.
 .sp
 .LP
 For practical reasons, however, this independence is not absolute. Certain
@@ -60,7 +58,7 @@ File code is a superset of \fBASCII\fR.
 .TP
 .ie t \(bu
 .el o
-To support multi-byte characters and null-terminated  \fBUNIX\fR file names,
+To support multi-byte characters and null-terminated \fBUNIX\fR file names,
 the \fINULL\fR and \fB/\fR (slash) characters cannot be part of any multi-byte
 characters.
 .RE
@@ -222,7 +220,7 @@ l l l .
 Release	Version	Significance
 _
 Major	x.0	T{
-Likely to contain major feature additions; adhere to different,  possibly incompatible standard revisions; and though unlikely, could change, drop, or replace Committed interfaces. Initial product releases are usually 1.0.
+Likely to contain major feature additions; adhere to different, possibly incompatible standard revisions; and though unlikely, could change, drop, or replace Committed interfaces. Initial product releases are usually 1.0.
 T}
 _
 Minor	x.y	T{
@@ -240,7 +238,7 @@ In the context of interface stability, update releases (occasionally referred
 to as patch releases) should be considered equivalent to Micro Releases.
 .SS "Classifications"
 .LP
-The following table summarizes how stability level  classifications relate to
+The following table summarizes how stability level classifications relate to
 release level. The first column lists the Stability Level. The second column
 lists the Release Level for Incompatible Changes, and the third column lists
 other comments. For a complete discussion of individual classifications, see
@@ -263,7 +261,7 @@ Volatile	Micro (x.y.z)	Incompatibilities are common.
 .sp
 .LP
 The interface stability level classifications described on this manual page
-apply to both source and binary  interfaces unless otherwise stated. All
+apply to both source and binary interfaces unless otherwise stated. All
 stability level classifications are public, with the exception of the
 \fBPrivate\fR classification. The precise stability level of a public interface
 (one that is documented in the manual pages) is unspecified unless explicitly
@@ -719,4 +717,4 @@ accepted organization such as IETF, or as informal as the sole contributor in
 the case of FOSS (Free or Open Source Software).
 .SH SEE ALSO
 .LP
-\fBuname\fR(1), \fBpkgadd\fR(1M), \fBIntro\fR(3), \fBstandards\fR(5)
+\fBuname\fR(1), \fBIntro\fR(3), \fBstandards\fR(5)

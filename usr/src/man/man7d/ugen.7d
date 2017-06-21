@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2017 Peter Tribble
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UGEN 7D "April 9, 2016"
+.TH UGEN 7D "May 13, 2017"
 .SH NAME
 ugen \- USB generic driver
 .SH SYNOPSIS
@@ -28,8 +29,8 @@ endpoint. Status is obtained by reading file descriptors created for endpoint
 and full device status.
 .sp
 .LP
-\fBugen\fR supports control, bulk, isochronous and interrupt (in and  out)
-transfers. \fBlibusb\fR(3LIB) uses \fBugen\fR to access devices that do not
+\fBugen\fR supports control, bulk, isochronous and interrupt (in and out)
+transfers. libusb uses \fBugen\fR to access devices that do not
 contain drivers (such as digital cameras and PDAs).
 .SH BINDING
 .LP
@@ -63,12 +64,12 @@ USB 2.0 device (usb<vid>,<pid>)...
 
 .sp
 .LP
-where vid is the USB vendor identifier in hex and pid is the  product
-identifier in hex supplied by the device  descriptor \fBusb_dev_descr\fR(9S).
+where vid is the USB vendor identifier in hex and pid is the product
+identifier in hex supplied by the device descriptor \fBusb_dev_descr\fR(9S).
 Note, the USB device version may vary depending on the device.
 .sp
 .LP
-When using ugen for the first time, you must add the  driver utilizing
+When using ugen for the first time, you must add the driver utilizing
 \fBadd_drv\fR(1M), using a command of the following form:
 .sp
 .in +2
@@ -121,7 +122,7 @@ where cfg value is the value of bConfigurationValue in the configuration
 descriptor (\fBusb_cfg_descr\fR(9S)). For example "usbif1234,4567.config1.0."
 .sp
 .LP
-Note that you can use update_drv to  also  remove  bindings. Please see
+Note that you can use update_drv to also remove bindings. Please see
 \fBupdate_drv\fR(1M) for more information.
 .sp
 .LP
@@ -142,23 +143,10 @@ update_drv -a -m '* 0666 root sys'
 
 .sp
 .LP
-Note that you can completely uninstall the \fBugen\fR driver and delete it from
-the system by doing:
-.sp
-.in +2
-.nf
-pkgrm SUNWugen
-.fi
-.in -2
-
-.sp
-.LP
-Any \fBpkgadd\fR of SUNWugen after the \fBpkgrm\fR reactivates any pre-existing
-ugen driver device-bindings.
-.sp
-.LP
-Any pre-existing ugen driver device-bindings are preserved across operating
-system upgrades.
+Note that if you uninstall the \fBugen\fR driver, and later reinstall it,
+any pre-existing ugen driver device-bindings will be reactivated. Likewise,
+any pre-existing ugen driver device-bindings are preserved across operating
+system updates or upgrades.
 .SH LOGICAL DEVICE NAME FORMAT
 .LP
 For each device or child device it manages, \fBugen\fR creates one logical
@@ -181,7 +169,7 @@ first interface and as \fBif1devstat\fR to the second interface.
 .sp
 .LP
 Any \fBugen\fR logical device name can be held open by only one user at a time,
-regardless of whether the\fB O_EXCL\fR flag passed to \fBopen\fR(2). When a
+regardless of whether the \fBO_EXCL\fR flag passed to \fBopen\fR(2). When a
 single pipe or data source is shared by multiple logical device names, such as
 if[0,1]cntrl0 or if[0,1]devstat above, more than one logical device name
 sharing the pipe or data source can be open at a time.  However, only one user
@@ -884,14 +872,14 @@ interrupt-IN data endpoints, not their status endpoints.)
 You can monitor the device status endpoint via \fBpoll\fR(2) concurrently with
 the multiple interrupt-IN endpoints.  Simply add another pollfd element to the
 pfd array in the previous code example, and initialize the new element's
-\fBfd\fR field with the file  descriptor  of the device status endpoint (opened
-without O_NONBLOCK  or  O_NDELAY).  Set the new element's event field to POLLIN
+\fBfd\fR field with the file descriptor of the device status endpoint (opened
+without O_NONBLOCK or O_NDELAY).  Set the new element's event field to POLLIN
 like the other elements. Note that only interrupt-IN endpoints and the device
 status endpoint can be monitored using \fBpoll\fR(2).
 .SH INTERRUPT-OUT TRANSFERS
 .LP
 Applications requiring output on an interrupt-OUT endpoint can open the
-corresponding  logical  device name and perform regular UNIX I/O  system calls
+corresponding logical device name and perform regular UNIX I/O system calls
 such as \fBwrite\fR(2) and \fBaiowrite\fR(3C).
 .sp
 .LP
@@ -1147,7 +1135,7 @@ The following example shows how to read an isochronous-IN endpoint:
 .sp
 .LP
 For an isochronous-OUT endpoint, applications use the same packet descriptor
-and request structures to write request   information to the \fBugen\fR node.
+and request structures to write request information to the \fBugen\fR node.
 Following the packet request head information is the packet payload data. Upon
 successful return of \fBwrite\fR(2), applications can \fBread\fR(2) the same
 \fBugen\fR file immediately to retrieve the individual packet transfer status
@@ -1430,7 +1418,7 @@ Device was disconnected.
 .ad
 .sp .6
 .RS 4n
-Polling was stopped as the interrupt-IN data buffer was full. Buffer is  now
+Polling was stopped as the interrupt-IN data buffer was full. Buffer is now
 empty and polling has been resumed.
 .RE
 
@@ -1582,46 +1570,72 @@ No memory for the allocation of internal structures.
 .RE
 
 .SH FILES
-.in +2
-.nf
-        /kernel/drv/ugen   32 bit ELF kernel module (x86 platform only)
-        /kernel/drv/sparcv9/ugen   64 bit ELF kernel module
-
-        /dev/usb/<vid>.<pid>/<N>/cntrl0
-        /dev/usb/<vid>.<pid>/<N>/cntrl0stat
-
-        /dev/usb/<vid>.<pid>/<N>/if<interface#>
-                                <in|out|cntrl><endpoint#>
-        /dev/usb/<vid>.<pid>/<N>/if<interface#>
-                                <in|out|cntrl><endpoint#>stat
-
-        /dev/usb/<vid>.<pid>/<N>/if<interface#>.
-                                <alternate><in|out|cntrl<endpoint#>
-        /dev/usb/<vid>.<pid>/<N>/if<interface#>.
-                                <alternate><in|out|cntrl><endpoint#>stat
-
-        /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
-                                <in|out|cntrl><endpoint#>
-        /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
-                                <in|out|cntrl<endpoint#stat>
-
-        /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
-                                <alternate><in|out|cntrl><endpoint#>
-        /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
-                                <alternate><in|out|cntrl><endpoint#>stat
-
-
-        /dev/usb/<vid>.<pid>/<N>/devstat
-
-        /dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0
-        /dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0stat
-.fi
-.in -2
+.ne 2
+.na
+\fB\fB/kernel/drv/ugen\fR\fR
+.ad
+.sp .6
+.RS 4n
+32-bit ELF kernel module. (x86).
+.RE
 
 .sp
-.LP
+.ne 2
+.na
+\fB\fB/kernel/drv/amd64/ugen\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (x86).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB/kernel/drv/sparcv9/ugen\fR\fR
+.ad
+.sp .6
+.RS 4n
+64-bit ELF kernel module. (SPARC).
+.RE
+
+.sp
+.ne 2
+.na
+/dev/usb/<vid>.<pid>/<N>/cntrl0
+/dev/usb/<vid>.<pid>/<N>/cntrl0stat
+
+/dev/usb/<vid>.<pid>/<N>/if<interface#>
+                        <in|out|cntrl><endpoint#>
+/dev/usb/<vid>.<pid>/<N>/if<interface#>
+                        <in|out|cntrl><endpoint#>stat
+
+/dev/usb/<vid>.<pid>/<N>/if<interface#>.
+                        <alternate><in|out|cntrl<endpoint#>
+/dev/usb/<vid>.<pid>/<N>/if<interface#>.
+                        <alternate><in|out|cntrl><endpoint#>stat
+
+/dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
+                        <in|out|cntrl><endpoint#>
+/dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
+                        <in|out|cntrl<endpoint#stat>
+
+/dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
+                        <alternate><in|out|cntrl><endpoint#>
+/dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
+                        <alternate><in|out|cntrl><endpoint#>stat
+
+/dev/usb/<vid>.<pid>/<N>/devstat
+
+/dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0
+/dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0stat
+.ad
+.sp .6
+.RS 4n
 where \fIN\fR is an integer representing the instance number of this type of
 device. (All logical device names for a single device share the same \fIN\fR.)
+.RE
+
 .SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
@@ -1634,12 +1648,12 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Architecture	PCI-based  SPARC
+Architecture	SPARC & x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
 .LP
-\fBlibusb\fR(3LIB), \fBclose\fR(2), \fBpoll\fR(2), \fBread\fR(2),
+\fBclose\fR(2), \fBpoll\fR(2), \fBread\fR(2),
 \fBwrite\fR(2), \fBaioread\fR(3C), \fBaiowrite\fR(3C), \fBusba\fR(7D),
 \fBusb_dev_descr\fR(9S).
 .SH DIAGNOSTICS

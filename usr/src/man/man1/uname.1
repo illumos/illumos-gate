@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UNAME 1 "Apr 14, 2016"
+.TH UNAME 1 "May 13, 2017"
 .SH NAME
 uname \- print name of current system
 .SH SYNOPSIS
@@ -109,8 +109,8 @@ The nodename may be changed by specifying a system name argument. The system
 name argument is restricted to \fBSYS_NMLN\fR characters. \fBSYS_NMLN\fR is an
 implementation specific value defined in \fB<sys/utsname.h>\fR\&. Only the
 super-user is allowed this capability. This change does not persist across
-reboots of the system. Use \fBsys-unconfig\fR(1M) to change a host's name
-permanently.
+reboots of the system. See \fBnodename\fR(4) for details of how to change a
+host's name permanently.
 .RE
 
 .sp
@@ -214,7 +214,7 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBarch\fR(1), \fBisalist\fR(1), \fBsys-unconfig\fR(1M), \fBsysinfo\fR(2),
+\fBarch\fR(1), \fBisalist\fR(1), \fBsysinfo\fR(2),
 \fBuname\fR(2), \fBnodename\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
@@ -228,8 +228,7 @@ To determine the operating system name and release level, use \fBuname
 \fR\fB-sr\fR. To determine only the operating system release level, use
 \fBuname \fR\fB-r\fR. Notice that operating system release levels are not
 guaranteed to be in \fIx.y\fR format (such as 5.3, 5.4, 5.5, and so forth);
-future releases could be in the \fIx.y.z\fR format (such as 5.3.1, 5.3.2,
-5.4.1, and so forth).
+but could be in the \fIx.y.z\fR format (such as 5.5.1).
 .sp
 .LP
 In SunOS 4.\fIx\fR releases, the \fBarch\fR(1) command was often used to obtain
