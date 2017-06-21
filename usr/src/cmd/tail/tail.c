@@ -30,9 +30,14 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2017, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <stdio.h>
@@ -226,6 +231,24 @@ main(int argc, char *argv[])
 	exit(rval);
 }
 
+static boolean_t
+iscount(const char *ap)
+{
+	char c;
+
+	if (ap == NULL) {
+		return (B_FALSE);
+	}
+
+	c = ap[0];
+
+	if (c == '+' || c == '-') {
+		c = ap[1];
+	}
+
+	return (isdigit(c) ? B_TRUE : B_FALSE);
+}
+
 /*
  * Convert the obsolete argument form into something that getopt can handle.
  * This means that anything of the form [+-][0-9][0-9]*[lbc][Ffr] that isn't
@@ -293,28 +316,83 @@ obsolete(char *argv[])
 
 		/*
 		 * Legacy Solaris tail supports "+c" "-c", "+l", "-l",
-		 * "+b", and "-b" with an default number of 10.  Map
-		 * these arguments to an explicit +/-10 for FreeBSD.
-		 * New argument will be of the form -[bcn][+-]10
+		 * "+b", and "-b" with a default value of 10. We need
+		 * to determine here whether or not a count has been
+		 * provided after the flag, and create a new, explicit
+		 * argument as appropriate. [+-]l isn't allowed to have
+		 * any numbers after it, but [+-][bc] can, potentially
+		 * in the next command-line argument. We therefore
+		 * handle them in two separate cases below.
 		 */
+		case 'l':
+			len = strlen(ap);
+			start = NULL;
+
+			if (len > 2) {
+				errx(1, "illegal option -- %s", *argv);
+			}
+
+			/* The only characters following should be flags */
+			if (len == 2 && !isalpha(ap[1])) {
+				errx(1, "illegal option -- %s", *argv);
+			}
+
+			if (asprintf(&start, "-%sn%c10",
+			    ap + 1, *argv[0]) == -1) {
+				err(1, "asprintf");
+			}
+
+			*argv = start;
+
+			continue;
 		case 'b':
 		case 'c':
-		case 'l':
-			if ((start = p = malloc(6)) == NULL)
-				err(1, "malloc");
-			*p++ = '-';
-			switch (ap[0]) {
-			case 'c':
-				*p++ = ap[0];
-				break;
-			case 'b':
-				*p++ = ap[0];
-				break;
-			case 'l':
-				*p++ = 'n';
-				break;
+			len = strlen(ap);
+			start = NULL;
+
+			if (len == 1) {
+				/*
+				 * The option is just the flag name. Check if
+				 * the next argument is a count, so we know
+				 * whether we need to default to 10.
+				 */
+				if (iscount(argv[1])) {
+					++argv;
+					continue;
+				} else {
+					if (asprintf(&start,
+					    "-%c%c10", ap[0], *argv[0]) == -1) {
+						err(1, "asprintf");
+					}
+				}
+			} else {
+				/*
+				 * The option has characters following the c/b.
+				 * If the characters following the option are a
+				 * count, then we use those. This invocation is
+				 * only allowed when '-' is used.
+				 *
+				 * Otherwise, we need to honor the following
+				 * flags, and default to 10.
+				 */
+				if (iscount(ap + 1)) {
+					if (*argv[0] != '-') {
+						errx(1, "illegal option -- %s",
+						    *argv);
+					}
+
+					if (asprintf(&start, "-%c%s",
+					    ap[0], ap + 1) == -1) {
+						err(1, "asprintf");
+					}
+				} else {
+					if (asprintf(&start, "-%s%c%c10",
+					    ap + 1, ap[0], *argv[0]) == -1) {
+						err(1, "asprintf");
+					}
+				}
 			}
-			(void) snprintf(p, 6, "%c10", *argv[0]);
+
 			*argv = start;
 
 			continue;
