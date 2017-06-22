@@ -71,8 +71,6 @@ extern "C" {
 #define	ADAPTER_RESET_NOT_REQUIRED		0
 #define	ADAPTER_RESET_REQUIRED			1
 
-#define	PDSUPPORT	1
-
 /*
  * MegaRAID SAS2.0 device id conversion definitions.
  */
@@ -124,8 +122,6 @@ extern "C" {
 
 #define	MRSAS_1_SECOND				1000000
 
-#ifdef PDSUPPORT
-
 #define	UNCONFIGURED_GOOD			0x0
 #define	PD_SYSTEM				0x40
 #define	MR_EVT_PD_STATE_CHANGE			0x0072
@@ -135,8 +131,6 @@ extern "C" {
 #define	MRSAS_TBOLT_PD_LUN		1
 #define	MRSAS_TBOLT_PD_TGT_MAX	255
 #define	MRSAS_TBOLT_GET_PD_MAX(s)	((s)->mr_tbolt_pd_max)
-
-#endif
 
 /* Raid Context Flags */
 #define	MR_RAID_CTX_RAID_FLAGS_IO_SUB_TYPE_SHIFT 0x4
@@ -433,7 +427,6 @@ struct mrsas_ld {
 };
 
 
-#ifdef PDSUPPORT
 struct mrsas_tbolt_pd {
 	dev_info_t		*dip;
 	uint8_t 		lun_type;
@@ -467,7 +460,6 @@ struct mrsas_tbolt_pd_info {
 		uint8_t	reserved2[16];
 	} pathInfo;
 };
-#endif
 
 typedef struct mrsas_instance {
 	uint32_t	*producer;
@@ -604,10 +596,8 @@ typedef struct mrsas_instance {
 	/* ThunderBolt (TB) specific */
 	ddi_softintr_t	tbolt_soft_intr_id;
 
-#ifdef PDSUPPORT
 	uint32_t	mr_tbolt_pd_max;
 	struct mrsas_tbolt_pd *mr_tbolt_pd_list;
-#endif
 
 	uint8_t		fast_path_io;
 
@@ -1975,10 +1965,8 @@ struct mrsas_aen {
 int mrsas_config_scsi_device(struct mrsas_instance *,
     struct scsi_device *, dev_info_t **);
 
-#ifdef PDSUPPORT
 int mrsas_tbolt_config_pd(struct mrsas_instance *, uint16_t,
     uint8_t, dev_info_t **);
-#endif
 
 dev_info_t *mrsas_find_child(struct mrsas_instance *, uint16_t, uint8_t);
 int mrsas_service_evt(struct mrsas_instance *, int, int, int, uint64_t);

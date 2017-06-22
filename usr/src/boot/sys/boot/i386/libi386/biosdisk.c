@@ -457,10 +457,10 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 	int rc;
 
 	/*
-	 * First make sure the IO is multiple of 512 bytes. While we do
+	 * First make sure the IO size is a multiple of 512 bytes. While we do
 	 * process partial reads below, the strategy mechanism is built
-	 * assuming IO of multiple of 512B blocks. If the request is not
-	 * multiple of 512B blocks, it has to be some sort of bug.
+	 * assuming IO is a multiple of 512B blocks. If the request is not
+	 * a multiple of 512B blocks, it has to be some sort of bug.
 	 */
 	if (size == 0 || (size % BIOSDISK_SECSIZE) != 0) {
 		printf("bd_strategy: %d bytes I/O not multiple of %d\n",
@@ -481,7 +481,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 	 * while translating block count to bytes.
 	 */
 	if (size > INT_MAX) {
-		DEBUG("too large read: %zu bytes", size);
+		DEBUG("requested read: %zu too large", size);
 		return (EIO);
 	}
 

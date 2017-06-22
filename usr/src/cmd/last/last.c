@@ -20,6 +20,8 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2017 Olaf Bohlen
+ *
  * Copyright (c) 2013 Gary Mills
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
@@ -77,7 +79,8 @@
 #define	linehostnameq(a, b, c, d) \
 	    (lineq(a, b)&&hosteq(a+LMAX+1, c)&&nameq(a+LMAX+HMAX+2, d))
 
-#define	USAGE	"usage: last [-n number] [-f filename] [-a ] [name | tty] ...\n"
+#define	USAGE	"usage: last [-n number] [-f filename] [-a ] [ -l ] [name |\
+ tty] ...\n"
 
 /* Beware: These are set in main() to exclude the executable name.  */
 static char	**argv;
@@ -116,6 +119,7 @@ main(int ac, char **av)
 {
 	int i, j;
 	int aflag = 0;
+	int lflag = 0;  /* parameter -l, long format with seconds and years */
 	int fpos;	/* current position in time format buffer */
 	int chrcnt;	/* # of chars formatted by current sprintf */
 	int bl, wtmp;
@@ -210,6 +214,11 @@ main(int ac, char **av)
 					aflag++;
 					break;
 
+				/* -l turns on long dates and times */
+				case 'l':
+					lflag++;
+					break;
+
 				default:
 					(void) fprintf(stderr, gettext(USAGE));
 					exit(1);
@@ -299,9 +308,17 @@ next_word:
 				(void) snprintf(hostf, sizeof (hostf),
 				    "%-*.*s", hostf_len, hostf_len,
 				    bp->ut_host);
-				fpos = snprintf(timef, sizeof (timef),
-				    "%10.10s %5.5s ",
-				    ct, 11 + ct);
+				/* write seconds and year if -l specified */
+				if (lflag > 0) {
+					fpos = snprintf(timef, sizeof (timef),
+					    "%10.10s %13.13s ",
+					    ct, 11 + ct);
+				} else {
+					fpos = snprintf(timef, sizeof (timef),
+					    "%10.10s %5.5s ",
+					    ct, 11 + ct);
+				}
+
 				if (!lineq(bp->ut_line, "system boot") &&
 				    !lineq(bp->ut_line, "system down")) {
 					if (otime == 0 &&
@@ -342,8 +359,13 @@ next_word:
 
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
-		chrcnt = snprintf(timef + fpos, sizeof (timef) - fpos,
-		    gettext("- %5.5s"), ctime(&otime) + 11);
+		if (lflag > 0) {
+			chrcnt = snprintf(timef + fpos, sizeof (timef) - fpos,
+			    gettext("- %8.8s"), ctime(&otime) + 11);
+		} else {
+			chrcnt = snprintf(timef + fpos, sizeof (timef) - fpos,
+			    gettext("- %5.5s"), ctime(&otime) + 11);
+		}
 		fpos += chrcnt;
 	}
 
@@ -353,28 +375,53 @@ next_word:
 
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
-		(void) snprintf(timef + fpos, sizeof (timef) - fpos,
-		    gettext("  (%5.5s)"), asctime(gmtime(&delta)) + 11);
+		if (lflag > 0) {
+			(void) snprintf(timef + fpos, sizeof (timef) - fpos,
+			    gettext("  (%8.8s)"), asctime(gmtime(&delta)) + 11);
+		} else {
+			(void) snprintf(timef + fpos, sizeof (timef) - fpos,
+			    gettext("  (%5.5s)"), asctime(gmtime(&delta)) + 11);
+		}
+
 	}
 
 					} else {
 
 	if (fpos < sizeof (timef)) {
 		/* timef still has room */
-		(void) snprintf(timef + fpos, sizeof (timef) - fpos,
-		    gettext(" (%ld+%5.5s)"), delta / SECDAY,
-		    asctime(gmtime(&delta)) + 11);
+		if (lflag > 0) {
+			(void) snprintf(timef + fpos, sizeof (timef) - fpos,
+			    gettext(" (%ld+%8.8s)"), delta / SECDAY,
+			    asctime(gmtime(&delta)) + 11);
+		} else {
+			(void) snprintf(timef + fpos, sizeof (timef) - fpos,
+			    gettext(" (%ld+%5.5s)"), delta / SECDAY,
+			    asctime(gmtime(&delta)) + 11);
+		}
 	}
 
 					}
+					}
 				}
+				if (lflag > 0) {
+					if (aflag)
+						(void) printf("%-.*s %-.*s\n",
+						    strlen(timef), timef,
+						    strlen(hostf), hostf);
+					else
+						(void) printf(
+						    "%-16.16s %-.*s\n", hostf,
+						    strlen(timef), timef);
+				} else {
+					if (aflag)
+						(void) printf(
+						    "%-35.35s %-.*s\n", timef,
+						    strlen(hostf), hostf);
+					else
+						(void) printf(
+						    "%-16.16s %-.35s\n", hostf,
+						    timef);
 				}
-				if (aflag)
-					(void) printf("%-35.35s %-.*s\n",
-					    timef, strlen(hostf), hostf);
-				else
-					(void) printf("%-16.16s %-.35s\n",
-					    hostf, timef);
 				(void) fflush(stdout);
 				if (++outrec >= maxrec)
 					exit(0);
@@ -399,7 +446,13 @@ next_word:
 		}
 	}
 	ct = ctime(&buf[0].ut_xtime);
-	(void) printf(gettext("\nwtmp begins %10.10s %5.5s \n"), ct, ct + 11);
+	if (lflag > 0) {
+		(void) printf(gettext("\nwtmp begins %10.10s %13.13s \n"), ct,
+		    ct + 11);
+	} else {
+		(void) printf(gettext("\nwtmp begins %10.10s %5.5s \n"), ct,
+		    ct + 11);
+	}
 
 	/* free() called to prevent lint warning about names */
 	free(names);

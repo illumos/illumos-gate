@@ -23,7 +23,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1071,7 +1071,7 @@ vnode_valid_pn(vnode_t *vp, vnode_t *vrootp, pathname_t *pn, pathname_t *rpn,
 
 /*
  * Struct for tracking vnodes with invalidated v_path entries during a
- * dirtopath reverse lookup.  By keepeing adequate state, those vnode can be
+ * dirtopath reverse lookup.  By keeping adequate state, those vnodes can be
  * revisted to populate v_path.
  */
 struct dirpath_walk {

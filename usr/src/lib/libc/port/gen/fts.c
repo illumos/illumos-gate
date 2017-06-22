@@ -551,7 +551,7 @@ fts_build(FTS *sp, int type)
 	size_t len, maxlen;
 	int nitems, cderrno, descend, level, nlinks, doadjust;
 	int saved_errno;
-	char *cp;
+	char *cp = NULL;
 
 	/* Set current node pointer. */
 	cur = sp->fts_cur;

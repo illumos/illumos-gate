@@ -24,6 +24,7 @@
  * Copyright (c) 2015, Joyent, Inc.
  * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/types.h>

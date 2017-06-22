@@ -380,7 +380,8 @@ main(int argc, char **argv)
 	if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
 		signal(SIGTERM, quit);
 	p1 = *argv;
-	while (*p1++);
+	while (*p1++)
+		;
 	while (--p1 >= *argv)
 		if (*p1 == '/')
 			break;
@@ -428,7 +429,7 @@ main(int argc, char **argv)
 			}
 		}
 		if (argv[optind] && strcmp(argv[optind], "-") == 0 &&
-			strcmp(argv[optind-1], "--") != 0) {
+		    strcmp(argv[optind-1], "--") != 0) {
 			vflag = 0;
 			optind++;
 			continue;
@@ -442,8 +443,8 @@ main(int argc, char **argv)
 		if (permflag)
 			crypt_close(perm);
 		permflag = 1;
-		if ((kflag = run_setkey(&perm[0], getkey(msgtab[66])))
-			== -1) {
+		kflag = run_setkey(&perm[0], getkey(msgtab[66]));
+		if (kflag == -1) {
 			puts(gettext(msgtab[64]));
 			xflag = 0;
 			kflag = 0;
@@ -461,7 +462,8 @@ main(int argc, char **argv)
 			exit(2);
 		}
 		p2 = savedfile;
-		while (*p2++ = *p1++);
+		while (*p2++ = *p1++)
+			;
 		globp = "e";
 		fflg++;
 	} else 	/* editing with no file so set savtime to 0 */
@@ -566,7 +568,7 @@ swch:
 		/* line becomes the line after the lines deleted. */
 
 		if (((linebuf[0] != '.') || (dot == (addr1-1))) &&
-			(addr2 <= dol))
+		    (addr2 <= dol))
 			dot = addr1;
 		continue;
 
@@ -689,8 +691,7 @@ swch:
 				putchr('\t');
 			}
 			puts(getaline((a1++)->cur));
-		}
-		while (a1 <= addr2);
+		} while (a1 <= addr2);
 		dot = addr2;
 		pflag = 0;
 		listn = 0;
@@ -787,7 +788,7 @@ swch:
 		/* on NULL-RE condition do not generate error */
 
 		if ((linebuf[0] != '.') && (zero != dol) &&
-			(addr1 <= zero || addr2 > dol))
+		    (addr1 <= zero || addr2 > dol))
 			(void) error(15);
 		filename(c);
 		if (Xqt) {
@@ -798,7 +799,7 @@ swch:
 			fstat(tfile, &Tf);
 			if (stat(file, &Fl) < 0) {
 				if ((io = creat(file, S_IRUSR|S_IWUSR|S_IRGRP
-					|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
+				    |S_IWGRP|S_IROTH|S_IWOTH)) < 0)
 					(void) error(7);
 				fstat(io, &Fl);
 				Fl.st_mtime = 0;
@@ -855,25 +856,32 @@ swch:
 						newtime();
 					/* check if entire buffer was written */
 					fsave = fchange;
-		fchange = (((addr1 == zero) || (addr1 == (zero + 1))) &&
-			(addr2 == dol)) ? 0 : 1;
-			if (fchange == 1 && m != 0) fchange = fsave;
+					if (((addr1 == zero) ||
+					    (addr1 == (zero + 1))) &&
+					    (addr2 == dol))
+						fchange = 0;
+					else
+						fchange = 1;
+					if (fchange == 1 && m != 0)
+						fchange = fsave;
 					continue;
 				}
-			} else
+			} else {
 				n = 1;	/* set n so newtime will not execute */
+			}
 			if ((io = open(file,
-				(c == 'w') ? O_WRONLY|O_CREAT|O_TRUNC
-				: O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR
-				|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
+			    (c == 'w') ? O_WRONLY|O_CREAT|O_TRUNC
+			    : O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR
+			    |S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
 				(void) error(7);
 		}
 		putfile();
 		exfile();
-		if (!n) newtime();
+		if (!n)
+			newtime();
 		fsave = fchange;
 		fchange = (((addr1 == zero) || (addr1 == (zero + 1))) &&
-			(addr2 == dol)) ? 0 : 1;
+		    (addr2 == dol)) ? 0 : 1;
 	/* Leave fchange alone if partial write was to another file */
 		if (fchange == 1 && m != 0) fchange = fsave;
 		continue;
@@ -895,8 +903,7 @@ encrypt:
 		if (permflag)
 			(void) crypt_close(perm);
 		permflag = 1;
-		if ((kflag = run_setkey(&perm[0], getkey(msgtab[66])))
-			== -1) {
+		if ((kflag = run_setkey(&perm[0], getkey(msgtab[66]))) == -1) {
 			xflag = 0;
 			kflag = 0;
 			crflag = 0;
@@ -1124,13 +1131,15 @@ filename(int comm)
 		if (comm == 'f')
 			ncflg++;
 		p2 = file;
-		while (*p2++ = *p1++);
+		while (*p2++ = *p1++)
+			;
 		red(savedfile);
 		return;
 	}
 	if (c != ' ')
 		(void) error(22);
-	while ((c = getchr()) == ' ');
+	while ((c = getchr()) == ' ')
+		;
 	if (c == '!')
 		++Xqt, c = getchr();
 	if (c == '\n')
@@ -1154,7 +1163,8 @@ filename(int comm)
 	if (savedfile[0] == 0 || comm == 'e' || comm == 'f') {
 		p1 = savedfile;
 		p2 = file;
-		while (*p1++ = *p2++);
+		while (*p1++ = *p2++)
+			;
 	}
 	red(file);
 }
@@ -1221,7 +1231,7 @@ onhup(int sig)
 		addr1 = zero+1;
 		addr2 = dol;
 		io = creat("ed.hup",
-			S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+		    S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
 		if (io < 0 && home) {
 			char	*fn;
 
@@ -1230,7 +1240,7 @@ onhup(int sig)
 				strcpy(fn, home);
 				strcat(fn, "/ed.hup");
 				io = creat(fn, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP
-						|S_IROTH|S_IWOTH);
+				    |S_IROTH|S_IWOTH);
 				free(fn);
 			}
 		}
@@ -1287,7 +1297,8 @@ error(int code)
 	globp = 0;
 	peekc = lastc;
 	if (lastc)
-		while ((c = getchr()) != '\n' && c != EOF);
+		while ((c = getchr()) != '\n' && c != EOF)
+			;
 	if (io) {
 		eclose(io);
 		io = -1;
@@ -1413,7 +1424,7 @@ getfile(void)
 	nextip = fp;
 	if (fss.Ffill && fss.Flim && lenchk(linebuf, &fss) < 0) {
 		write(1, gettext("line too long: lno = "),
-			strlen(gettext("line too long: lno = ")));
+		    strlen(gettext("line too long: lno = ")));
 		ccount = count;
 		count = (++dot-zero)&077777;
 		dot--;
@@ -1439,7 +1450,7 @@ putfile(void)
 		lp = getaline(a1++->cur);
 		if (fss.Ffill && fss.Flim && lenchk(linebuf, &fss) < 0) {
 			write(1, gettext("line too long: lno = "),
-				strlen(gettext("line too long: lno = ")));
+			    strlen(gettext("line too long: lno = ")));
 			ccount = count;
 			count = (a1-zero-1)&077777;
 			putd();
@@ -1531,7 +1542,8 @@ unixcom(void)
 			(void) error(56);
 		else {
 			psavcmd = savcmd;
-			while (*pcurcmd++ = *psavcmd++);
+			while (*pcurcmd++ = *psavcmd++)
+				;
 			--pcurcmd;
 			shflg = 1;
 		}
@@ -1552,7 +1564,8 @@ unixcom(void)
 			else {
 				psavedfile = savedfile;
 				while (pcurcmd < curcmd + LBSIZE &&
-					(*pcurcmd++ = *psavedfile++));
+				    (*pcurcmd++ = *psavedfile++))
+					;
 				--pcurcmd;
 				shflg = 1;
 			}
@@ -1580,11 +1593,12 @@ unixcom(void)
 		signal(SIGHUP, oldhup);
 		signal(SIGQUIT, oldquit);
 		close(tfile);
-		execlp(_PATH_BSHELL, "sh", "-c", curcmd, (char *)0);
+		execlp(_PATH_BSHELL, "sh", "-c", curcmd, NULL);
 		exit(0100);
 	}
 	savint = signal(SIGINT, SIG_IGN);
-	while ((rpid = wait(&retcode)) != pid && rpid != (pid_t)-1);
+	while ((rpid = wait(&retcode)) != pid && rpid != (pid_t)-1)
+		;
 	signal(SIGINT, savint);
 	if (vflag) puts("!");
 }
@@ -1619,7 +1633,8 @@ delete(void)
 	setdot();
 	newline();
 	nonzero();
-	if (!globflg) save();
+	if (!globflg)
+		save();
 	rdelete(addr1, addr2);
 }
 
@@ -1632,9 +1647,9 @@ rdelete(LINE ad1, LINE ad2)
 	a2 = ad2+1;
 	a3 = dol;
 	dol -= a2 - a1;
-	do
+	do {
 		(a1++)->cur = (a2++)->cur;
-	while (a2 <= a3);
+	} while (a2 <= a3);
 	a1 = ad1;
 	if (a1 > dol)
 		a1 = dol;
@@ -1907,7 +1922,8 @@ join(void)
 	}
 	lp = linebuf;
 	gp = genbuf;
-	while (*lp++ = *gp++);
+	while (*lp++ = *gp++)
+		;
 	addr1->cur = putline();
 	if (addr1 < addr2)
 		rdelete(addr1+1, addr2);
@@ -2058,7 +2074,8 @@ getsub(void)
 	p1 = linebuf;
 	if ((p2 = linebp) == 0)
 		return (EOF);
-	while (*p1++ = *p2++);
+	while (*p1++ = *p2++)
+		;
 	linebp = 0;
 	return (0);
 }
@@ -2088,7 +2105,8 @@ dosub(void)
 		} else if (c == '\\') {
 			c = *rp++;
 			if (c >= '1' && c < nbra + '1') {
-			sp = place(sp, braslist[c-'1'], braelist[c-'1']);
+				sp = place(sp, braslist[c-'1'],
+				    braelist[c-'1']);
 				continue;
 			}
 		}
@@ -2103,7 +2121,8 @@ dosub(void)
 			(void) error(27);
 	lp = linebuf;
 	sp = genbuf;
-	while (*lp++ = *sp++);
+	while (*lp++ = *sp++)
+		;
 }
 
 static char *
@@ -2316,14 +2335,14 @@ puts(const char *sp)
 			write(1, funny, fss.Flim & 0377);
 			putchr('\n');
 			write(1, gettext("too long"),
-				strlen(gettext("too long")));
+			    strlen(gettext("too long")));
 		}
 		else
 			write(1, funny, sz);
 		putchr('\n');
 		if (i == -2)
 			write(1, gettext("tab count\n"),
-				strlen(gettext("tab count\n")));
+			    strlen(gettext("tab count\n")));
 		return (0);
 	}
 	col = 0;
@@ -2384,7 +2403,7 @@ putwchr(wchar_t ac)
 					*lp++ = '\n';
 				}
 				(void) sprintf(lp, "\\%03o",
-					*(unsigned char *)p++);
+				    *(unsigned char *)p++);
 				col += 4;
 				lp += 4;
 			}
@@ -2609,7 +2628,7 @@ globaln(int k)
 							*gp++ = '\\';
 					}
 					if ((gp + (unsigned int)MB_CUR_MAX) >=
-							&globuf[LBSIZE-1])
+					    &globuf[LBSIZE-1])
 						(void) error(34);
 
 					if ((len = wctomb(gp, c)) <= 0) {
@@ -2732,7 +2751,8 @@ mkfunny(void)
 	 * basename of file.
 	 */
 	while (*p1++ = *p)
-		if (*p++ == '/') p2 = p1;
+		if (*p++ == '/')
+			p2 = p1;
 	/*
 	 * Set p1 to point to basename of tfname.
 	 */
@@ -2744,7 +2764,8 @@ mkfunny(void)
 	/*
 	 * Copy tfname to file.
 	 */
-	while (*++p2 = *p1++);
+	while (*++p2 = *p1++)
+		;
 }
 
 
@@ -2776,9 +2797,11 @@ newtime(void) /* get new mod time and save */
 }
 
 
+/*
+ * restricted - check for '/' in name and delete trailing '/'
+ */
 static void
-red(char *op)	/* restricted - check for '/' in name */
-		/* and delete trailing '/' */
+red(char *op)
 {
 	char *p;
 
@@ -2832,8 +2855,9 @@ fspec(char line[], struct Fspec *f, int up)
 						havespec = 1;
 						clear(f);
 						if (!ioctl(1, TCGETA, &arg) &&
-						((arg.c_oflag&TAB3) == TAB3))
-						    f->Ffill = 1;
+						    ((arg.c_oflag & TAB3) ==
+						    TAB3))
+							f->Ffill = 1;
 						fsp++;
 						continue;
 					}
@@ -2917,7 +2941,9 @@ tstd(struct Fspec *f)
 	if (*(fsp+1) >= '0' && *(fsp+1) <= '9')  {
 						std[1] = *++fsp;
 						std[2] = '\0';
-	} else std[1] = '\0';
+	} else {
+		std[1] = '\0';
+	}
 	fsprtn = stdtab(std, f->Ftabs);
 }
 
@@ -2956,10 +2982,16 @@ expnd(char line[], char buf[], int *sz, struct Fspec *f)
 
 	while (*++l && *l != '\n' && b < 511) {
 		if (*l == '\t') {
-			while (*t && b >= *t) t++;
-			if (*t == 0) fsprtn = -2;
-			do buf[b-1] = ' '; while (++b < *t);
-		} else buf[b++ - 1] = *l;
+			while (*t && b >= *t)
+				t++;
+			if (*t == 0)
+				fsprtn = -2;
+			do {
+				buf[b-1] = ' ';
+			} while (++b < *t);
+		} else {
+			buf[b++ - 1] = *l;
+		}
 	}
 
 	buf[b] = '\0';
@@ -2995,9 +3027,13 @@ lenchk(char line[], struct Fspec *f)
 
 	while (*++l && *l != '\n' && b < 511) {
 		if (*l == '\t') {
-			while (*t && b >= *t) t++;
-			while (++b < *t);
-		} else b++;
+			while (*t && b >= *t)
+				t++;
+			while (++b < *t)
+				;
+		} else {
+			b++;
+		}
 	}
 
 	if ((*l != '\0' && *l != '\n') || (f->Flim && (b-1 > (int)f->Flim)))
@@ -3047,7 +3083,8 @@ stdtab(char option[], char tabvect[NTABS])
 			strcopy(scan, tabvect);
 			break;
 		} else
-			while (*scan++);    /* skip over tab specs */
+			while (*scan++)		/* skip over tab specs */
+				;
 	}
 
 /*	later: look up code in /etc/something */
@@ -3068,13 +3105,15 @@ strequal(char **scan1, char *str)
 {
 	char c, *scan;
 	scan = *scan1;
-	while ((c = *scan++) == *str && c) str++;
+	while ((c = *scan++) == *str && c)
+		str++;
 	*scan1 = scan;
 	if (c == 0 && *str == 0)
 		return (1);
 	if (c)
-		while (*scan++);
-			*scan1 = scan;
+		while (*scan++)
+			;
+	*scan1 = scan;
 	return (0);
 }
 
@@ -3085,7 +3124,8 @@ strequal(char **scan1, char *str)
 static void
 strcopy(char *source, char *dest)
 {
-	while (*dest++ = *source++);
+	while (*dest++ = *source++)
+		;
 }
 
 
@@ -3094,7 +3134,8 @@ strcopy(char *source, char *dest)
 
 
 static void
-save(void) {
+save(void)
+{
 	LINE i;
 	int	j;
 
@@ -3115,7 +3156,8 @@ save(void) {
 
 
 static void
-undo(void) {
+undo(void)
+{
 	int j;
 	long tmp;
 	LINE i, tmpdot, tmpdol;
@@ -3142,7 +3184,7 @@ undo(void) {
 }
 
 static wchar_t
-get_wchr()
+get_wchr(void)
 {
 	wchar_t	wc;
 	char	multi[MB_LEN_MAX];

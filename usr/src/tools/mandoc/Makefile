@@ -22,8 +22,11 @@ include		$(CMDDIR)/Makefile.common
 
 CPPFLAGS += -_gcc=-nostdinc -I/usr/include -I$(NATIVE_ADJUNCT)/include
 LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
-OBJS +=		reallocarray.o \
+OBJS +=		fts.o \
+		reallocarray.o \
 		strtonum.o
+
+CPPFLAGS +=	-I. -include fts.h
 
 .KEEP_STATE:
 
