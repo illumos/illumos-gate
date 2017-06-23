@@ -27,6 +27,8 @@
 #
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 #
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -39,7 +41,8 @@ ARCHDIR:sh = cd ..; basename `pwd`
 #	Define the module and object file sets.
 #
 MODULE		= zfs
-OBJECTS		= $(ZFS_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS		= $(ZFS_OBJS:%=$(OBJS_DIR)/%) $(LUA_OBJS:%=$(OBJS_DIR)/%)
+# LUA_OBJS are intentionally omitted from LINTS
 LINTS		= $(ZFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_FS_DIR)/$(MODULE)
@@ -68,6 +71,7 @@ LDFLAGS		+= -dy -Nfs/specfs -Ncrypto/swrand -Nmisc/idmap \
 	-Nsched/SDC -Nmisc/sha2 -Nmisc/skein -Nmisc/edonr
 
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
+INC_PATH	+= -I$(UTSBASE)/common/fs/zfs/lua
 INC_PATH	+= -I$(SRC)/common
 INC_PATH	+= -I$(COMMONBASE)/zfs
 

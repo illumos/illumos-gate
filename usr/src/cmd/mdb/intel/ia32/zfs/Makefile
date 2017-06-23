@@ -23,6 +23,8 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2016 by Delphix. All rights reserved.
+#
 
 MODULE = zfs.so
 MDBTGT = kvm
@@ -35,6 +37,7 @@ include ../../../Makefile.module
 include ../../../common/modules/zfs/Makefile.zfs
 
 CPPFLAGS += -I../../../../../uts/common/fs/zfs
+CPPFLAGS += -I../../../../../uts/common/fs/zfs/lua
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

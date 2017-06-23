@@ -256,12 +256,14 @@ do_mans() {
     (cd $SRC/man/man1m && make \
       $ROOT/usr/share/man/man1m/zdb.1m \
       $ROOT/usr/share/man/man1m/zfs.1m \
+      $ROOT/usr/share/man/man1m/zfs-program.1m \
       $ROOT/usr/share/man/man1m/zpool.1m )
     (cd $SRC/man/man5 && make \
       $ROOT/usr/share/man/man5/zpool-features.5 )
     ;;
   lint)
-    (cd $SRC/man/man1m && make zdb.1m.check zfs.1m.check zpool.1m.check)
+    (cd $SRC/man/man1m && make zdb.1m.check zfs.1m.check zfs-program.1m.check \
+      zpool.1m.check)
     (cd $SRC/man/man5 && make zpool-features.5.check)
     ;;
   *)
@@ -339,6 +341,7 @@ usr/sbin/$arch64/zinject
 usr/sbin/zstreamdump
 usr/share/man/man1m/zdb.1m
 usr/share/man/man1m/zfs.1m
+usr/share/man/man1m/zfs-program.1m
 usr/share/man/man1m/zpool.1m
 usr/share/man/man5/zpool-features.5
 "

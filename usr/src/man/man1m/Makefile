@@ -12,6 +12,8 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Joyent, Inc.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2017 Nexenta Systems, Inc.
 #
@@ -545,6 +547,7 @@ _MANFILES=	6to4relay.1m		\
 		zdb.1m			\
 		zdump.1m		\
 		zfs.1m			\
+		zfs-program.1m		\
 		zic.1m			\
 		zoneadm.1m		\
 		zoneadmd.1m		\
