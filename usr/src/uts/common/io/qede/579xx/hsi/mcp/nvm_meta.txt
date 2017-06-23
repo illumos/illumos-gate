@@ -1,0 +1,333 @@
+/*
+* CDDL HEADER START
+*
+* The contents of this file are subject to the terms of the
+* Common Development and Distribution License, v.1,  (the "License").
+* You may not use this file except in compliance with the License.
+*
+* You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+* or http://opensource.org/licenses/CDDL-1.0.
+* See the License for the specific language governing permissions
+* and limitations under the License.
+*
+* When distributing Covered Code, include this CDDL HEADER in each
+* file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+* If applicable, add the following below this CDDL HEADER, with the
+* fields enclosed by brackets "[]" replaced with your own identifying
+* information: Portions Copyright [yyyy] [name of copyright owner]
+*
+* CDDL HEADER END
+*/
+
+/*
+* Copyright 2014-2017 Cavium, Inc. 
+* The contents of this file are subject to the terms of the Common Development 
+* and Distribution License, v.1,  (the "License").
+
+* You may not use this file except in compliance with the License.
+
+* You can obtain a copy of the License at available 
+* at http://opensource.org/licenses/CDDL-1.0
+
+* See the License for the specific language governing permissions and 
+* limitations under the License.
+*/
+
+#
+# Name:        
+#
+# Description: NVM meta tcl file - helper file for programming boards.
+# Generated file from nvm cfg excel.
+#              DO NOT MODIFY !!!
+#
+# Created:     3/21/2017
+#
+
+foreach var [info vars nvmcfgT::*] {array unset $var}
+namespace eval nvmcfgT {
+array set Watt_scale {0 {Unknown} 1 {0.1W} 2 {0.01W} 3 {0.001W} }
+array set Led_Mode {0 {Mac1} 1 {Phy1} 2 {Phy2} 3 {Phy3} 4 {Mac2} 5 {Phy4} 6 {Phy5} 7 {Phy6} 8 {Mac3} 9 {Phy7} 10 {Phy8} 11 {Phy9} 12 {Mac4} 13 {Phy10} 14 {Phy11} 15 {Phy12} 16 {Breakout} }
+array set BARS_size {0 {Disabled} 1 {64K} 2 {128K} 3 {256K} 4 {512K} 5 {1M} 6 {2M} 7 {4M} 8 {8M} 9 {16M} 10 {32M} 11 {64M} 12 {128M} 13 {256M} 14 {512M} 15 {1G} }
+array set MBA_boot_protocol {0 {PXE} 3 {iSCSI Boot} 4 {FCoE Boot} 7 {NONE} }
+array set MBA_Boot_Type {0 {Auto} 1 {BBS} 2 {Int18h} 3 {Int19h} }
+array set Hot_Key {0 {Ctrl S} 1 {Ctrl B} }
+array set exp_ROM_size {0 {Disabled} 1 {2K} 2 {4K} 3 {8K} 4 {16K} 5 {32K} 6 {64K} 7 {128K} 8 {256K} 9 {512K} 10 {1M} 11 {2M} 12 {4M} 13 {8M} 14 {16M} 15 {32M} }
+array set ext_phy {0 {None} 1 {BCM8485x} }
+array set SMBus_timing {0 {100Khz} 1 {400Khz} }
+array set mf_mode {0 {MF allowed} 1 {Default} 2 {SPIO4} 3 {NPAR1.0} 4 {NPAR1.5} 5 {NPAR2.0} 6 {BD} 7 {UFP} }
+array set pcie_gen2_preemphasis {0 {HW} 1 {0dB} 2 {3_5dB} 3 {6_0dB} }
+array set fan_failure {0 {Disabled} 1 {Enabled} }
+array set om_enfrcmnt {0 {No enforcement} 1 {Disable Tx laser} 2 {Warning msg} 3 {Power down} }
+array set aspm_support {0 {L0s L1 enabled} 1 {L0s disabled} 2 {L1 disabled} 3 {L0s L1 disabled} }
+array set en_dis {0 {Disabled} 1 {Enabled} }
+array set vf_bar2_size {0 {Disabled} 1 {4K} 2 {8K} 3 {16K} 4 {32K} 5 {64K} 6 {128K} 7 {256K} 8 {512K} 9 {1M} 10 {2M} 11 {4M} 12 {8M} 13 {16M} 14 {32M} 15 {64M} }
+array set nic_partition_cfg {0 {disabled} 1 {enabled} }
+array set nic_partition_func_flags {1 {enabled} 2 {ethernet} 4 {iSCSI_offload} 8 {FCOE_offload} }
+array set gpio_cfg {0 {NA} 1 {Low} 2 {High} 3 {Input} }
+array set phy_mode_interface {0 {Bypass} 2 {KR} 3 {KR2} 4 {KR4} 8 {XFI} 9 {SFI} 11 {1000X} 12 {SGMII} 17 {XLAUI} 18 {XLPPI} 33 {CAUI} 34 {CPPI} 49 {25GAUI} }
+array set Lane_Swap {27 {3210} 39 {3120} 216 {213} 228 {123} }
+array set gpio_control {0 {NA} 1 {GPIO0} 2 {GPIO1} 3 {GPIO2} 4 {GPIO3} 5 {GPIO4} 6 {GPIO5} 7 {GPIO6} 8 {GPIO7} 9 {GPIO8} 10 {GPIO9} 11 {GPIO10} 12 {GPIO11} 13 {GPIO12} 14 {GPIO13} 15 {GPIO14} 16 {GPIO15} 17 {GPIO16} 18 {GPIO17} 19 {GPIO18} 20 {GPIO19} 21 {GPIO20} 22 {GPIO21} 23 {GPIO22} 24 {GPIO23} 25 {GPIO24} 26 {GPIO25} 27 {GPIO26} 28 {GPIO27} 29 {GPIO28} 30 {GPIO29} 31 {GPIO30} 32 {GPIO31} }
+array set loopgain {0 {HW_default} 8 {X2} 9 {X4} 10 {X8} 11 {X16} 12 {DIV8} 13 {DIV4} 14 {DIV2} 15 {X1} }
+array set vif_func_type {0 {disabled} 3 {ethernet} 5 {iscsi} 9 {fcoe} }
+array set eee_power_mode_vals {0 {Disabled} 1 {Balanced} 2 {Aggressive} 3 {Low latency} }
+array set net_port__mode {0 {BB_2x40G} 1 {2x50G} 2 {BB_1x100G} 3 {4x10G_F} 4 {BB_4x10G_E} 5 {BB_4x20G} 11 {1x40G} 12 {2x25G} 13 {1x25G} 14 {4x25G} 15 {2x10G} }
+array set personality {0 {DEFAULT} 1 {ETHERNET} 2 {ETH ROCE} }
+array set tap_vals {0 {post_15_main_43} 1 {post_14_main_44} 2 {post_13_main_45} 3 {post_12_main_46} 4 {post_11_main_47} 5 {post_10_main_48} }
+array set bfLink_Speed {1 {1G} 2 {10G} 8 {25G} 16 {40G} 32 {50G} 64 {BB_100G} }
+array set Link_Speed {0 {Autoneg} 1 {1G} 2 {10G} 4 {25G} 5 {40G} 6 {50G} 7 {BB_100G} }
+array set Flow_Control {1 {Autoneg} 2 {Rx} 4 {Tx} }
+array set board_swap {0 {None} 1 {Path} 2 {Port} 3 {Both} }
+array set adv_link_modes {1 {HiGig} 2 {Scrambler} 4 {Fiber} 8 {Disable CL72 AN} 16 {Disable FEC AN} }
+array set an_mode {0 {None} 1 {CL73} 2 {CL37} 3 {CL73 BAM} 4 {BB_CL37_BAM} 5 {BB_HPAM} 6 {BB_SGMII} }
+array set dcbx_mode {0 {Disabled} 1 {IEEE} 2 {CEE} 3 {Dynamic} }
+array set mgmt_traffic {0 {Disabled} 1 {NCSI over RMII} 2 {NCSI over SMBUS} }
+array set pci_gen {0 {PCI Gen1} 1 {PCI Gen2} 2 {PCI Gen3} }
+array set personality_type {0 {Ethernet} 1 {iSCSI} 2 {FCoE} 3 {RoCE} }
+array set led_speed_select {1 {1G} 2 {10G} 4 {AH_25G} 8 {BB_25G} 8 {AH_40G} 16 {BB_40G} 16 {AH_50G} 32 {BB_50G} 64 {BB_100G} }
+array set avs_mode {0 {Close Loop} 1 {Open Loop CFG} 2 {Open Loop OTP} 3 {Disabled} }
+array set sideband_mode {0 {Disabled} 1 {RMII} 2 {SGMII} }
+array set smbus_mode {0 {Disabled} 1 {100Khz} 2 {400Khz} }
+array set device_capabilities {1 {Ethernet} 2 {FCoE} 4 {iSCSI} 8 {RoCE} 16 {iWarp} }
+array set enabled_protocols {1 {Ethernet} 2 {FCoE} 4 {iSCSI} }
+array set board_type {0 {Undefined} 1 {Module} 2 {Backplane} 3 {Ext_phy} 4 {Module_slave} }
+array set aux_mode {0 {Default} 1 {SMBUS only} }
+array set pcie_link_width {0 {BB_16 lanes} 1 {1 lane} 2 {2 lanes} 3 {4 lanes} 4 {8 lanes} }
+array set L1_mode {0 {Forced} 1 {Dynamic low latency} }
+array set sensor_mode {0 {Disabled} 1 {Int_Ext_I2C} 2 {Int_Only} 3 {Int_Ext_SMBUS} }
+array set temp_feature_mode {0 {Disable} 1 {Internal} 2 {External} 3 {Both} }
+array set an_25g_50g_oui {0 {Consortium} 1 {BAM} }
+array set pldm_sensors {0 {internal} 1 {external} 2 {both} }
+array set fec_force_mode {0 {None} 1 {Firecode} 2 {RS} 7 {Auto} }
+array set mnm_modes {1 {4x10G} 2 {1x25G} 4 {2x25G} 8 {4x25G} 16 {1x40G} 32 {2x40G} 64 {2x50G} 128 {BB_1x100G} 256 {2x10G} }
+array set AH_BARS_size {0 {Disabled} 5 {1M} 6 {2M} 7 {4M} 8 {8M} 9 {16M} 10 {32M} 11 {64M} 12 {128M} 13 {256M} 14 {512M} 15 {1G} }
+array set rdma_enablement {0 {None} 1 {RoCE} 2 {iWARP} 3 {Both} }
+array set fec_an_mode {0 {None} 1 {10G_Firecode} 2 {25G_Firecode} 3 {10G_and_25G_Firecode} 4 {25G_RS} 5 {25G_Firecode_and_RS} 6 {All} }
+array set pkg_method {0 {nvram} 1 {IO_pins} }
+array set pf_mapping {0 {Continuous} 1 {Fixed} }
+array set NPAR_enabled_protocols {1 {Ethernet} 2 {FCoE} 4 {iSCSI} 8 {RDMA} }
+array set regulator_type {0 {Disabled} 1 {TI} }
+array set nvm_cfg {\
+1,name "MAC address" 1,group_name "board" 1,entity_name "func" 1,struct_name "nvm_cfg1" 1,offset 0 1,size mac 1,elementSize 0 1,stringFormat {^(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2})$}\
+8,name "Board Swap" 8,group_name "board" 8,entity_name "glob" 8,struct_name "nvm_cfg1" 8,offset 0 8,size 4 8,elementSize 0 8,stringFormat {^(\d+)$} 8,listType enum 8,allowedList board_swap\
+9,name "MF Mode" 9,group_name "board" 9,entity_name "glob" 9,struct_name "nvm_cfg1" 9,offset 4 9,size 8 9,elementSize 0 9,stringFormat {^(\d+)$} 9,listType enum 9,allowedList mf_mode\
+10,name "Led Mode" 10,group_name "board" 10,entity_name "port" 10,struct_name "nvm_cfg1" 10,offset 64 10,size 8 10,elementSize 0 10,stringFormat {^(\d+)$} 10,listType enum 10,allowedList Led_Mode\
+11,name "Fan Failure Enforcement" 11,group_name "board io" 11,entity_name "glob" 11,struct_name "nvm_cfg1" 11,offset 12 11,size 1 11,elementSize 0 11,stringFormat {^(\d+)$} 11,listType enum 11,allowedList en_dis\
+12,name "Engineering Change" 12,group_name "pcie" 12,entity_name "glob" 12,struct_name "nvm_cfg1" 12,offset 32 12,size 96 12,elementSize 0 12,stringFormat {^(.{1,10})$}\
+13,name "Manufacturing ID" 13,group_name "pcie" 13,entity_name "glob" 13,struct_name "nvm_cfg1" 13,offset 128 13,size 32 13,elementSize 0 13,stringFormat {^(.{1,4})$}\
+14,name "Serial Number" 14,group_name "pcie" 14,entity_name "glob" 14,struct_name "nvm_cfg1" 14,offset 160 14,size 128 14,elementSize 0 14,stringFormat {^(.{1,16})$}\
+15,name "PCI Gen" 15,group_name "pcie" 15,entity_name "glob" 15,struct_name "nvm_cfg1" 15,offset 288 15,size 2 15,elementSize 0 15,stringFormat {^(\d+)$} 15,listType enum 15,allowedList pci_gen\
+16,name "Beacon WOL_Enabled" 16,group_name "pcie" 16,entity_name "glob" 16,struct_name "nvm_cfg1" 16,offset 290 16,size 1 16,elementSize 0 16,stringFormat {^(\d+)$} 16,listType enum 16,allowedList en_dis\
+17,name "ASPM Support" 17,group_name "pcie" 17,entity_name "glob" 17,struct_name "nvm_cfg1" 17,offset 291 17,size 2 17,elementSize 0 17,stringFormat {^(\d+)$} 17,listType enum 17,allowedList aspm_support\
+20,name "RoCE priority" 20,group_name "features" 20,entity_name "port" 20,struct_name "nvm_cfg1" 20,offset 72 20,size 8 20,elementSize 0 20,stringFormat {^(\d+)$}\
+22,name "Enable WoL on ACPI pattern" 22,group_name "features" 22,entity_name "port" 22,struct_name "nvm_cfg1" 22,offset 128 22,size 1 22,elementSize 0 22,stringFormat {^(\d+)$} 22,listType enum 22,allowedList en_dis\
+23,name "Magic Packet WoL" 23,group_name "features" 23,entity_name "port" 23,struct_name "nvm_cfg1" 23,offset 129 23,size 1 23,elementSize 0 23,stringFormat {^(\d+)$} 23,listType enum 23,allowedList en_dis\
+24,name "AVS Margin Low" 24,group_name "board" 24,entity_name "glob" 24,struct_name "nvm_cfg1" 24,offset 13 24,size 8 24,elementSize 0 24,stringFormat {^(\d+)$} 24,exChipNumAttrs {57940}\
+25,name "AVS Margin High" 25,group_name "board" 25,entity_name "glob" 25,struct_name "nvm_cfg1" 25,offset 21 25,size 8 25,elementSize 0 25,stringFormat {^(\d+)$} 25,exChipNumAttrs {57940}\
+26,name "DCBX Mode" 26,group_name "features" 26,entity_name "port" 26,struct_name "nvm_cfg1" 26,offset 80 26,size 4 26,elementSize 0 26,stringFormat {^(\d+)$} 26,listType enum 26,allowedList dcbx_mode\
+27,name "Drv Speed capability mask" 27,group_name "link settings" 27,entity_name "port" 27,struct_name "nvm_cfg1" 27,offset 160 27,size 16 27,elementSize 0 27,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 27,listType bitfield 27,allowedList bfLink_Speed\
+28,name "MFW Speed capability mask" 28,group_name "link settings" 28,entity_name "port" 28,struct_name "nvm_cfg1" 28,offset 176 28,size 16 28,elementSize 0 28,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 28,listType bitfield 28,allowedList bfLink_Speed\
+29,name "Drv Link speed" 29,group_name "link settings" 29,entity_name "port" 29,struct_name "nvm_cfg1" 29,offset 192 29,size 4 29,elementSize 0 29,stringFormat {^(\d+)$} 29,listType enum 29,allowedList Link_Speed\
+30,name "Drv Flow control" 30,group_name "link settings" 30,entity_name "port" 30,struct_name "nvm_cfg1" 30,offset 196 30,size 3 30,elementSize 0 30,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 30,listType bitfield 30,allowedList Flow_Control\
+31,name "MFW Link speed" 31,group_name "link settings" 31,entity_name "port" 31,struct_name "nvm_cfg1" 31,offset 199 31,size 4 31,elementSize 0 31,stringFormat {^(\d+)$} 31,listType enum 31,allowedList Link_Speed\
+32,name "MFW Flow control" 32,group_name "link settings" 32,entity_name "port" 32,struct_name "nvm_cfg1" 32,offset 203 32,size 3 32,elementSize 0 32,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 32,listType bitfield 32,allowedList Flow_Control\
+33,name "Optic Module Vendor Enforcement" 33,group_name "link settings" 33,entity_name "port" 33,struct_name "nvm_cfg1" 33,offset 206 33,size 1 33,elementSize 0 33,stringFormat {^(\d+)$} 33,listType enum 33,allowedList en_dis\
+34,name "Optional Link Modes" 34,group_name "link settings" 34,entity_name "port" 34,struct_name "nvm_cfg1" 34,offset 224 34,size 16 34,elementSize 0 34,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 34,listType bitfield 34,allowedList adv_link_modes 34,exChipNumAttrs {57940}\
+37,name "MF Vendor Device ID" 37,group_name "pcie" 37,entity_name "func" 37,struct_name "nvm_cfg1" 37,offset 128 37,size 16 37,elementSize 0 37,stringFormat {^(?:0x)?([0-9a-fA-F]{4})$}\
+38,name "Network Port Mode" 38,group_name "phy" 38,entity_name "glob" 38,struct_name "nvm_cfg1" 38,offset 352 38,size 8 38,elementSize 0 38,stringFormat {^(\d+)$} 38,listType enum 38,allowedList net_port__mode\
+39,name "MPS10 RX Lane swap (L3:L2:L1:L0)" 39,group_name "phy" 39,entity_name "glob" 39,struct_name "nvm_cfg1" 39,offset 384 39,size 16 39,elementSize 4 39,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 39,exChipNumAttrs {57940}\
+40,name "MPS10 TX Lane swap (L3:L2:L1:L0)" 40,group_name "phy" 40,entity_name "glob" 40,struct_name "nvm_cfg1" 40,offset 400 40,size 16 40,elementSize 4 40,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 40,exChipNumAttrs {57940}\
+41,name "MPS10 RX Lane polarity (L3:L2:L1:L0)" 41,group_name "phy" 41,entity_name "glob" 41,struct_name "nvm_cfg1" 41,offset 416 41,size 4 41,elementSize 1 41,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 41,exChipNumAttrs {57940}\
+42,name "MPS10 TX Lane polarity (L3:L2:L1:L0)" 42,group_name "phy" 42,entity_name "glob" 42,struct_name "nvm_cfg1" 42,offset 420 42,size 4 42,elementSize 1 42,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 42,exChipNumAttrs {57940}\
+43,name "MPS25 RX Lane swap (L3:L2:L1:L0)" 43,group_name "phy" 43,entity_name "glob" 43,struct_name "nvm_cfg1" 43,offset 448 43,size 16 43,elementSize 4 43,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 43,exChipNumAttrs {57940}\
+44,name "MPS25 TX Lane swap (L3:L2:L1:L0)" 44,group_name "phy" 44,entity_name "glob" 44,struct_name "nvm_cfg1" 44,offset 464 44,size 16 44,elementSize 4 44,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 44,exChipNumAttrs {57940}\
+45,name "MPS25 RX Lane polarity (L3:L2:L1:L0)" 45,group_name "phy" 45,entity_name "glob" 45,struct_name "nvm_cfg1" 45,offset 480 45,size 4 45,elementSize 1 45,stringFormat {^(\d+):(\d+):(\d+):(\d+)$}\
+46,name "MPS25 TX Lane polarity (L3:L2:L1:L0)" 46,group_name "phy" 46,entity_name "glob" 46,struct_name "nvm_cfg1" 46,offset 484 46,size 4 46,elementSize 1 46,stringFormat {^(\d+):(\d+):(\d+):(\d+)$}\
+47,name "MPS10 Preemphasis (L3:L2:L1:L0)" 47,group_name "phy" 47,entity_name "glob" 47,struct_name "nvm_cfg1" 47,offset 512 47,size 32 47,elementSize 8 47,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$} 47,exChipNumAttrs {57940}\
+48,name "MPS10 Driver Current (L3:L2:L1:L0)" 48,group_name "phy" 48,entity_name "glob" 48,struct_name "nvm_cfg1" 48,offset 544 48,size 32 48,elementSize 8 48,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$} 48,exChipNumAttrs {57940}\
+49,name "MPS10 Enforce TX FIR cfg" 49,group_name "phy" 49,entity_name "glob" 49,struct_name "nvm_cfg1" 49,offset 360 49,size 1 49,elementSize 0 49,stringFormat {^(\d+)$} 49,listType enum 49,allowedList en_dis 49,exChipNumAttrs {57940}\
+50,name "MPS25 Preemphasis (L3:L2:L1:L0)" 50,group_name "phy" 50,entity_name "glob" 50,struct_name "nvm_cfg1" 50,offset 576 50,size 32 50,elementSize 8 50,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+51,name "MPS25 Driver Current (L3:L2:L1:L0)" 51,group_name "phy" 51,entity_name "glob" 51,struct_name "nvm_cfg1" 51,offset 608 51,size 32 51,elementSize 8 51,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+52,name "MPS25 Enforce TX FIR cfg" 52,group_name "phy" 52,entity_name "glob" 52,struct_name "nvm_cfg1" 52,offset 361 52,size 1 52,elementSize 0 52,stringFormat {^(\d+)$} 52,listType enum 52,allowedList en_dis\
+53,name "MPS10 Core Addr" 53,group_name "phy" 53,entity_name "glob" 53,struct_name "nvm_cfg1" 53,offset 362 53,size 8 53,elementSize 0 53,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 53,exChipNumAttrs {57940}\
+54,name "MPS25 Core Addr" 54,group_name "phy" 54,entity_name "glob" 54,struct_name "nvm_cfg1" 54,offset 370 54,size 8 54,elementSize 0 54,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 54,exChipNumAttrs {57940}\
+55,name "External PHY type" 55,group_name "phy" 55,entity_name "port" 55,struct_name "nvm_cfg1" 55,offset 288 55,size 8 55,elementSize 0 55,stringFormat {^(\d+)$} 55,listType enum 55,allowedList ext_phy\
+56,name "External PHY address" 56,group_name "phy" 56,entity_name "port" 56,struct_name "nvm_cfg1" 56,offset 296 56,size 8 56,elementSize 0 56,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+57,name "Serdes Net Interface" 57,group_name "phy" 57,entity_name "port" 57,struct_name "nvm_cfg1" 57,offset 240 57,size 8 57,elementSize 0 57,stringFormat {^(\d+)$} 57,listType enum 57,allowedList phy_mode_interface 57,exChipNumAttrs {57940}\
+58,name "AN mode" 58,group_name "phy" 58,entity_name "port" 58,struct_name "nvm_cfg1" 58,offset 248 58,size 8 58,elementSize 0 58,stringFormat {^(\d+)$} 58,listType enum 58,allowedList an_mode 58,exChipNumAttrs {57940}\
+59,name "Preboot OpROM" 59,group_name "pre-boot" 59,entity_name "port" 59,struct_name "nvm_cfg1" 59,offset 320 59,size 1 59,elementSize 0 59,stringFormat {^(\d+)$} 59,listType enum 59,allowedList en_dis\
+61,name "MBA Delay Time (0-15)" 61,group_name "pre-boot" 61,entity_name "port" 61,struct_name "nvm_cfg1" 61,offset 323 61,size 4 61,elementSize 0 61,stringFormat {^(\d+)$}\
+62,name "MBA Setup Hot Key" 62,group_name "pre-boot" 62,entity_name "port" 62,struct_name "nvm_cfg1" 62,offset 327 62,size 1 62,elementSize 0 62,stringFormat {^(\d+)$} 62,listType enum 62,allowedList Hot_Key\
+63,name "MBA hide setup prompt" 63,group_name "pre-boot" 63,entity_name "port" 63,struct_name "nvm_cfg1" 63,offset 328 63,size 1 63,elementSize 0 63,stringFormat {^(\d+)$} 63,listType enum 63,allowedList en_dis\
+67,name "Preboot Link Speed" 67,group_name "pre-boot" 67,entity_name "port" 67,struct_name "nvm_cfg1" 67,offset 337 67,size 4 67,elementSize 0 67,stringFormat {^(\d+)$} 67,listType enum 67,allowedList Link_Speed\
+69,name "Preboot Boot Protocol" 69,group_name "pre-boot" 69,entity_name "func" 69,struct_name "nvm_cfg1" 69,offset 160 69,size 3 69,elementSize 0 69,stringFormat {^(\d+)$} 69,listType enum 69,allowedList MBA_boot_protocol\
+70,name "Enable SRIOV" 70,group_name "VF" 70,entity_name "glob" 70,struct_name "nvm_cfg1" 70,offset 29 70,size 1 70,elementSize 0 70,stringFormat {^(\d+)$} 70,listType enum 70,allowedList en_dis\
+71,name "Enable ATC" 71,group_name "VF" 71,entity_name "glob" 71,struct_name "nvm_cfg1" 71,offset 30 71,size 1 71,elementSize 0 71,stringFormat {^(\d+)$} 71,listType enum 71,allowedList en_dis\
+74,name "Number of VFs per PF" 74,group_name "VF" 74,entity_name "func" 74,struct_name "nvm_cfg1" 74,offset 192 74,size 7 74,elementSize 0 74,stringFormat {^(\d+)$}\
+75,name "VF PCI BAR2 size" 75,group_name "VF" 75,entity_name "func" 75,struct_name "nvm_cfg1" 75,offset 199 75,size 7 75,elementSize 0 75,stringFormat {^(\d+)$} 75,listType enum 75,allowedList vf_bar2_size 75,exChipNumAttrs {57980}\
+76,name "Vendor ID" 76,group_name "pcie" 76,entity_name "glob" 76,struct_name "nvm_cfg1" 76,offset 640 76,size 16 76,elementSize 0 76,stringFormat {^(?:0x)?([0-9a-fA-F]{4})$}\
+78,name "Subsystem Vendor ID" 78,group_name "pcie" 78,entity_name "glob" 78,struct_name "nvm_cfg1" 78,offset 672 78,size 16 78,elementSize 0 78,stringFormat {^(?:0x)?([0-9a-fA-F]{4})$}\
+79,name "Subsystem Device ID" 79,group_name "pcie" 79,entity_name "glob" 79,struct_name "nvm_cfg1" 79,offset 688 79,size 16 79,elementSize 0 79,stringFormat {^(?:0x)?([0-9a-fA-F]{4})$}\
+80,name "Expansion ROM size" 80,group_name "pre-boot" 80,entity_name "glob" 80,struct_name "nvm_cfg1" 80,offset 704 80,size 4 80,elementSize 0 80,stringFormat {^(\d+)$} 80,listType enum 80,allowedList exp_ROM_size\
+81,name "VF PCI BAR2 size" 81,group_name "VF" 81,entity_name "glob" 81,struct_name "nvm_cfg1" 81,offset 708 81,size 4 81,elementSize 0 81,stringFormat {^(\d+)$} 81,listType enum 81,allowedList vf_bar2_size 81,exChipNumAttrs {57940}\
+82,name "Bar1 size" 82,group_name "pcie" 82,entity_name "func" 82,struct_name "nvm_cfg1" 82,offset 206 82,size 4 82,elementSize 0 82,stringFormat {^(\d+)$} 82,listType enum 82,allowedList BARS_size\
+83,name "Bar2 size" 83,group_name "pcie" 83,entity_name "glob" 83,struct_name "nvm_cfg1" 83,offset 712 83,size 4 83,elementSize 0 83,stringFormat {^(\d+)$} 83,listType enum 83,allowedList BARS_size 83,exChipNumAttrs {57940}\
+84,name "VF PCI Device ID" 84,group_name "VF" 84,entity_name "func" 84,struct_name "nvm_cfg1" 84,offset 163 84,size 16 84,elementSize 0 84,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+85,name "MPS10 TXFIR Main (L3:L2:L1:L0)" 85,group_name "phy" 85,entity_name "glob" 85,struct_name "nvm_cfg1" 85,offset 736 85,size 32 85,elementSize 8 85,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$} 85,exChipNumAttrs {57940}\
+86,name "MPS10 TXFIR Post (L3:L2:L1:L0)" 86,group_name "phy" 86,entity_name "glob" 86,struct_name "nvm_cfg1" 86,offset 768 86,size 32 86,elementSize 8 86,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$} 86,exChipNumAttrs {57940}\
+87,name "MPS25 TXFIR Main (L3:L2:L1:L0)" 87,group_name "phy" 87,entity_name "glob" 87,struct_name "nvm_cfg1" 87,offset 800 87,size 32 87,elementSize 8 87,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+88,name "MPS25 TXFIR Post (L3:L2:L1:L0)" 88,group_name "phy" 88,entity_name "glob" 88,struct_name "nvm_cfg1" 88,offset 832 88,size 32 88,elementSize 8 88,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+89,name "Manufacture kit version" 89,group_name "board" 89,entity_name "glob" 89,struct_name "nvm_cfg1" 89,offset 864 89,size 30 89,elementSize 6 89,stringFormat {^(\d{2}):(\d{2}):(\d{2}):(\d{2}):(\d{2})$}\
+90,name "Manufacture timestamp" 90,group_name "board" 90,entity_name "glob" 90,struct_name "nvm_cfg1" 90,offset 896 90,size 18 90,elementSize 6 90,stringFormat {^(\d{2}):(\d{2}):(\d{2})$}\
+92,name "Personality" 92,group_name "features" 92,entity_name "func" 92,struct_name "nvm_cfg1" 92,offset 179 92,size 4 92,elementSize 0 92,stringFormat {^(\d+)$} 92,listType enum 92,allowedList personality_type\
+93,name "FCoE node wwn mac addr" 93,group_name "features" 93,entity_name "func" 93,struct_name "nvm_cfg1" 93,offset 224 93,size mac 93,elementSize 0 93,stringFormat {^(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2})$}\
+94,name "FCoe port wwn mac addr" 94,group_name "features" 94,entity_name "func" 94,struct_name "nvm_cfg1" 94,offset 288 94,size mac 94,elementSize 0 94,stringFormat {^(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2})$}\
+95,name "Bandwidth weight" 95,group_name "features" 95,entity_name "func" 95,struct_name "nvm_cfg1" 95,offset 183 95,size 8 95,elementSize 0 95,stringFormat {^(\d+)$}\
+96,name "Max Bandwidth" 96,group_name "features" 96,entity_name "func" 96,struct_name "nvm_cfg1" 96,offset 210 96,size 8 96,elementSize 0 96,stringFormat {^(\d+)$}\
+97,name "Pause on host ring" 97,group_name "features" 97,entity_name "func" 97,struct_name "nvm_cfg1" 97,offset 191 97,size 1 97,elementSize 0 97,stringFormat {^(\d+)$} 97,listType enum 97,allowedList en_dis\
+98,name "PCIE Preemphasis" 98,group_name "pcie" 98,entity_name "glob" 98,struct_name "nvm_cfg1" 98,offset 298 98,size 3 98,elementSize 0 98,stringFormat {^(\d+)$} 98,listType enum 98,allowedList pcie_gen2_preemphasis\
+99,name "LLDP MAC address" 99,group_name "features" 99,entity_name "port" 99,struct_name "nvm_cfg1" 99,offset 416 99,size mac 99,elementSize 0 99,stringFormat {^(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2})$}\
+100,name "FCoE wwn node prefix" 100,group_name "features" 100,entity_name "glob" 100,struct_name "nvm_cfg1" 100,offset 301 100,size 16 100,elementSize 8 100,stringFormat {^(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2})$}\
+101,name "FCoE wwn port prefix" 101,group_name "features" 101,entity_name "glob" 101,struct_name "nvm_cfg1" 101,offset 321 101,size 16 101,elementSize 8 101,stringFormat {^(?:0x)?([0-9a-fA-F]{2}):(?:0x)?([0-9a-fA-F]{2})$}\
+102,name "LED speed select (S2:S1:S0)" 102,group_name "board" 102,entity_name "port" 102,struct_name "nvm_cfg1" 102,offset 480 102,size 24 102,elementSize 8 102,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$} 102,listType bitfield 102,allowedList led_speed_select\
+103,name "LED port swap (P3:P2:P1:P0)" 103,group_name "board" 103,entity_name "glob" 103,struct_name "nvm_cfg1" 103,offset 928 103,size 16 103,elementSize 4 103,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+104,name "AVS mode" 104,group_name "board" 104,entity_name "glob" 104,struct_name "nvm_cfg1" 104,offset 378 104,size 3 104,elementSize 0 104,stringFormat {^(\d+)$} 104,listType enum 104,allowedList avs_mode 104,exChipNumAttrs {57940}\
+105,name "Override Secure Mode" 105,group_name "board" 105,entity_name "glob" 105,struct_name "nvm_cfg1" 105,offset 381 105,size 2 105,elementSize 0 105,stringFormat {^(\d+)$} 105,listType enum 105,allowedList en_dis\
+106,name "AVS DAC Code" 106,group_name "board" 106,entity_name "glob" 106,struct_name "nvm_cfg1" 106,offset 960 106,size 10 106,elementSize 0 106,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 106,exChipNumAttrs {57940}\
+107,name "MBI version" 107,group_name "features" 107,entity_name "glob" 107,struct_name "nvm_cfg1" 107,offset 992 107,size 24 107,elementSize 8 107,stringFormat {^(\d{2}):(\d{2}):(\d{2})$}\
+108,name "MBI date" 108,group_name "features" 108,entity_name "glob" 108,struct_name "nvm_cfg1" 108,offset 1024 108,size 32 108,elementSize 0 108,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+109,name "SMBus Address" 109,group_name "mng_fw" 109,entity_name "glob" 109,struct_name "nvm_cfg1" 109,offset 337 109,size 8 109,elementSize 0 109,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+110,name "NCSI Package ID" 110,group_name "mng_fw" 110,entity_name "glob" 110,struct_name "nvm_cfg1" 110,offset 317 110,size 2 110,elementSize 0 110,stringFormat {^(\d+)$}\
+111,name "Sideband Mode" 111,group_name "mng_fw" 111,entity_name "glob" 111,struct_name "nvm_cfg1" 111,offset 345 111,size 2 111,elementSize 0 111,stringFormat {^(\d+)$} 111,listType enum 111,allowedList sideband_mode\
+112,name "SMBus Mode" 112,group_name "mng_fw" 112,entity_name "glob" 112,struct_name "nvm_cfg1" 112,offset 424 112,size 4 112,elementSize 0 112,stringFormat {^(\d+)$} 112,listType enum 112,allowedList smbus_mode\
+113,name "NCSI" 113,group_name "mng_fw" 113,entity_name "glob" 113,struct_name "nvm_cfg1" 113,offset 428 113,size 4 113,elementSize 0 113,stringFormat {^(\d+)$} 113,listType enum 113,allowedList en_dis\
+114,name "Transceiver Module Absent" 114,group_name "board io" 114,entity_name "port" 114,struct_name "nvm_cfg1" 114,offset 512 114,size 8 114,elementSize 0 114,stringFormat {^(\d+)$} 114,listType enum 114,allowedList gpio_control\
+115,name "I2C Mux Select GPIO (M1:M0)" 115,group_name "board io" 115,entity_name "glob" 115,struct_name "nvm_cfg1" 115,offset 1056 115,size 16 115,elementSize 8 115,stringFormat {^(\d+):(\d+)$} 115,listType enum 115,allowedList gpio_control 115,exChipNumAttrs {57940}\
+116,name "I2C Mux Select Value (V1:V0)" 116,group_name "board io" 116,entity_name "port" 116,struct_name "nvm_cfg1" 116,offset 520 116,size 8 116,elementSize 4 116,stringFormat {^(\d+):(\d+)$} 116,exChipNumAttrs {57940}\
+117,name "Device capabilities" 117,group_name "features" 117,entity_name "glob" 117,struct_name "nvm_cfg1" 117,offset 1088 117,size 32 117,elementSize 0 117,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 117,listType bitfield 117,allowedList device_capabilities\
+118,name "ETH DID suffix" 118,group_name "features" 118,entity_name "port" 118,struct_name "nvm_cfg1" 118,offset 544 118,size 8 118,elementSize 0 118,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+119,name "FCoE DID suffix" 119,group_name "features" 119,entity_name "port" 119,struct_name "nvm_cfg1" 119,offset 552 119,size 8 119,elementSize 0 119,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+120,name "iSCSI DID suffix" 120,group_name "features" 120,entity_name "port" 120,struct_name "nvm_cfg1" 120,offset 560 120,size 8 120,elementSize 0 120,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+122,name "Default enabled protocols" 122,group_name "features" 122,entity_name "port" 122,struct_name "nvm_cfg1" 122,offset 84 122,size 4 122,elementSize 0 122,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 122,listType bitfield 122,allowedList enabled_protocols\
+123,name "Power Dissipated (D3:D2:D1:D0)" 123,group_name "pcie" 123,entity_name "glob" 123,struct_name "nvm_cfg1" 123,offset 1120 123,size 32 123,elementSize 8 123,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 123,exChipNumAttrs {57940}\
+124,name "Power Consumed (D3:D2:D1:D0)" 124,group_name "pcie" 124,entity_name "glob" 124,struct_name "nvm_cfg1" 124,offset 1152 124,size 32 124,elementSize 8 124,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 124,exChipNumAttrs {57940}\
+125,name "AUX mode" 125,group_name "board" 125,entity_name "glob" 125,struct_name "nvm_cfg1" 125,offset 347 125,size 4 125,elementSize 0 125,stringFormat {^(\d+)$} 125,listType enum 125,allowedList aux_mode\
+126,name "Port Type" 126,group_name "board io" 126,entity_name "port" 126,struct_name "nvm_cfg1" 126,offset 576 126,size 8 126,elementSize 0 126,stringFormat {^(\d+)$} 126,listType enum 126,allowedList board_type\
+127,name "Tx Disable" 127,group_name "board io" 127,entity_name "port" 127,struct_name "nvm_cfg1" 127,offset 584 127,size 8 127,elementSize 0 127,stringFormat {^(\d+)$} 127,listType enum 127,allowedList gpio_control\
+128,name "Max link width" 128,group_name "pcie" 128,entity_name "glob" 128,struct_name "nvm_cfg1" 128,offset 432 128,size 4 128,elementSize 0 128,stringFormat {^(\d+)$} 128,listType enum 128,allowedList pcie_link_width\
+130,name "ASPM L1 mode" 130,group_name "pcie" 130,entity_name "glob" 130,struct_name "nvm_cfg1" 130,offset 436 130,size 2 130,elementSize 0 130,stringFormat {^(\d+)$} 130,listType enum 130,allowedList L1_mode\
+131,name "On Chip Sensor Mode" 131,group_name "mng_fw" 131,entity_name "glob" 131,struct_name "nvm_cfg1" 131,offset 438 131,size 3 131,elementSize 0 131,stringFormat {^(\d+)$} 131,listType enum 131,allowedList sensor_mode\
+132,name "Preboot VLAN value" 132,group_name "pre-boot" 132,entity_name "func" 132,struct_name "nvm_cfg1" 132,offset 352 132,size 16 132,elementSize 0 132,stringFormat {^(\d+)$}\
+133,name "Preboot VLAN" 133,group_name "pre-boot" 133,entity_name "func" 133,struct_name "nvm_cfg1" 133,offset 368 133,size 1 133,elementSize 0 133,stringFormat {^(\d+)$}\
+134,name "Temperature period between checks" 134,group_name "board io" 134,entity_name "glob" 134,struct_name "nvm_cfg1" 134,offset 488 134,size 8 134,elementSize 0 134,stringFormat {^(\d+)$}\
+135,name "Shutdown threshold temperature" 135,group_name "board io" 135,entity_name "glob" 135,struct_name "nvm_cfg1" 135,offset 496 135,size 8 135,elementSize 0 135,stringFormat {^(\d+)$}\
+136,name "max count oper threshold" 136,group_name "board io" 136,entity_name "glob" 136,struct_name "nvm_cfg1" 136,offset 504 136,size 8 136,elementSize 0 136,stringFormat {^(\d+)$}\
+137,name "Caution threshold temperature" 137,group_name "board io" 137,entity_name "glob" 137,struct_name "nvm_cfg1" 137,offset 656 137,size 8 137,elementSize 0 137,stringFormat {^(\d+)$}\
+139,name "Temperature monitoring mode" 139,group_name "board io" 139,entity_name "glob" 139,struct_name "nvm_cfg1" 139,offset 441 139,size 2 139,elementSize 0 139,stringFormat {^(\d+)$} 139,listType enum 139,allowedList temp_feature_mode\
+140,name "AN 25G/50G OUI" 140,group_name "link settings" 140,entity_name "port" 140,struct_name "nvm_cfg1" 140,offset 207 140,size 2 140,elementSize 0 140,stringFormat {^(\d+)$} 140,listType enum 140,allowedList an_25g_50g_oui\
+141,name "PLDM sensor mode" 141,group_name "mng_fw" 141,entity_name "glob" 141,struct_name "nvm_cfg1" 141,offset 443 141,size 3 141,elementSize 0 141,stringFormat {^(\d+)$} 141,listType enum 141,allowedList pldm_sensors\
+142,name "External thermal sensor" 142,group_name "mng_fw" 142,entity_name "glob" 142,struct_name "nvm_cfg1" 142,offset 351 142,size 1 142,elementSize 0 142,stringFormat {^(\d+)$} 142,listType enum 142,allowedList en_dis\
+143,name "External thermal sensor address" 143,group_name "mng_fw" 143,entity_name "glob" 143,struct_name "nvm_cfg1" 143,offset 664 143,size 8 143,elementSize 0 143,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+144,name "Fan Failure duration" 144,group_name "board io" 144,entity_name "glob" 144,struct_name "nvm_cfg1" 144,offset 716 144,size 4 144,elementSize 0 144,stringFormat {^(\d+)$}\
+145,name "FEC force mode" 145,group_name "link settings" 145,entity_name "port" 145,struct_name "nvm_cfg1" 145,offset 209 145,size 3 145,elementSize 0 145,stringFormat {^(\d+)$} 145,listType enum 145,allowedList fec_force_mode\
+146,name "Multi Network Modes Capability" 146,group_name "link settings" 146,entity_name "glob" 146,struct_name "nvm_cfg1" 146,offset 1216 146,size 32 146,elementSize 0 146,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 146,listType bitfield 146,allowedList mnm_modes\
+147,name "MNM 10G Drv Speed capability mask" 147,group_name "Multi Mode 10G" 147,entity_name "port" 147,struct_name "nvm_cfg1" 147,offset 608 147,size 16 147,elementSize 0 147,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 147,listType bitfield 147,allowedList bfLink_Speed\
+148,name "MNM 10G MFW Speed capability mask" 148,group_name "Multi Mode 10G" 148,entity_name "port" 148,struct_name "nvm_cfg1" 148,offset 624 148,size 16 148,elementSize 0 148,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 148,listType bitfield 148,allowedList bfLink_Speed\
+149,name "MNM 10G Drv Link speed" 149,group_name "Multi Mode 10G" 149,entity_name "port" 149,struct_name "nvm_cfg1" 149,offset 640 149,size 4 149,elementSize 0 149,stringFormat {^(\d+)$} 149,listType enum 149,allowedList Link_Speed\
+150,name "MNM 10G MFW Link speed" 150,group_name "Multi Mode 10G" 150,entity_name "port" 150,struct_name "nvm_cfg1" 150,offset 644 150,size 4 150,elementSize 0 150,stringFormat {^(\d+)$} 150,listType enum 150,allowedList Link_Speed\
+151,name "MNM 10G Port Type" 151,group_name "Multi Mode 10G" 151,entity_name "port" 151,struct_name "nvm_cfg1" 151,offset 648 151,size 8 151,elementSize 0 151,stringFormat {^(\d+)$} 151,listType enum 151,allowedList board_type\
+152,name "MNM 10G Serdes Net Interface" 152,group_name "Multi Mode 10G" 152,entity_name "port" 152,struct_name "nvm_cfg1" 152,offset 656 152,size 8 152,elementSize 0 152,stringFormat {^(\d+)$} 152,listType enum 152,allowedList phy_mode_interface\
+153,name "MNM 10G FEC force mode" 153,group_name "Multi Mode 10G" 153,entity_name "port" 153,struct_name "nvm_cfg1" 153,offset 672 153,size 3 153,elementSize 0 153,stringFormat {^(\d+)$} 153,listType enum 153,allowedList fec_force_mode\
+154,name "MNM 10G ETH DID suffix" 154,group_name "Multi Mode 10G" 154,entity_name "port" 154,struct_name "nvm_cfg1" 154,offset 664 154,size 8 154,elementSize 0 154,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+155,name "MNM 25G Drv Speed capability mask" 155,group_name "Multi Mode 25G" 155,entity_name "port" 155,struct_name "nvm_cfg1" 155,offset 704 155,size 16 155,elementSize 0 155,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 155,listType bitfield 155,allowedList bfLink_Speed\
+156,name "MNM 25G MFW Speed capability mask" 156,group_name "Multi Mode 25G" 156,entity_name "port" 156,struct_name "nvm_cfg1" 156,offset 720 156,size 16 156,elementSize 0 156,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 156,listType bitfield 156,allowedList bfLink_Speed\
+157,name "MNM 25G Drv Link speed" 157,group_name "Multi Mode 25G" 157,entity_name "port" 157,struct_name "nvm_cfg1" 157,offset 736 157,size 4 157,elementSize 0 157,stringFormat {^(\d+)$} 157,listType enum 157,allowedList Link_Speed\
+158,name "MNM 25G MFW Link speed" 158,group_name "Multi Mode 25G" 158,entity_name "port" 158,struct_name "nvm_cfg1" 158,offset 740 158,size 4 158,elementSize 0 158,stringFormat {^(\d+)$} 158,listType enum 158,allowedList Link_Speed\
+159,name "MNM 25G Port Type" 159,group_name "Multi Mode 25G" 159,entity_name "port" 159,struct_name "nvm_cfg1" 159,offset 744 159,size 8 159,elementSize 0 159,stringFormat {^(\d+)$} 159,listType enum 159,allowedList board_type\
+160,name "MNM 25G Serdes Net Interface" 160,group_name "Multi Mode 25G" 160,entity_name "port" 160,struct_name "nvm_cfg1" 160,offset 752 160,size 8 160,elementSize 0 160,stringFormat {^(\d+)$} 160,listType enum 160,allowedList phy_mode_interface\
+161,name "MNM 25G ETH DID suffix" 161,group_name "Multi Mode 25G" 161,entity_name "port" 161,struct_name "nvm_cfg1" 161,offset 760 161,size 8 161,elementSize 0 161,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+162,name "MNM 25G FEC force mode" 162,group_name "Multi Mode 25G" 162,entity_name "port" 162,struct_name "nvm_cfg1" 162,offset 768 162,size 3 162,elementSize 0 162,stringFormat {^(\d+)$} 162,listType enum 162,allowedList fec_force_mode\
+163,name "MNM 40G Drv Speed capability mask" 163,group_name "Multi Mode 40G" 163,entity_name "port" 163,struct_name "nvm_cfg1" 163,offset 800 163,size 16 163,elementSize 0 163,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 163,listType bitfield 163,allowedList bfLink_Speed\
+164,name "MNM 40G MFW Speed capability mask" 164,group_name "Multi Mode 40G" 164,entity_name "port" 164,struct_name "nvm_cfg1" 164,offset 816 164,size 16 164,elementSize 0 164,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 164,listType bitfield 164,allowedList bfLink_Speed\
+165,name "MNM 40G Drv Link speed" 165,group_name "Multi Mode 40G" 165,entity_name "port" 165,struct_name "nvm_cfg1" 165,offset 832 165,size 4 165,elementSize 0 165,stringFormat {^(\d+)$} 165,listType enum 165,allowedList Link_Speed\
+166,name "MNM 40G MFW Link speed" 166,group_name "Multi Mode 40G" 166,entity_name "port" 166,struct_name "nvm_cfg1" 166,offset 836 166,size 4 166,elementSize 0 166,stringFormat {^(\d+)$} 166,listType enum 166,allowedList Link_Speed\
+167,name "MNM 40G Port Type" 167,group_name "Multi Mode 40G" 167,entity_name "port" 167,struct_name "nvm_cfg1" 167,offset 840 167,size 8 167,elementSize 0 167,stringFormat {^(\d+)$} 167,listType enum 167,allowedList board_type\
+168,name "MNM 40G Serdes Net Interface" 168,group_name "Multi Mode 40G" 168,entity_name "port" 168,struct_name "nvm_cfg1" 168,offset 848 168,size 8 168,elementSize 0 168,stringFormat {^(\d+)$} 168,listType enum 168,allowedList phy_mode_interface\
+169,name "MNM 40G ETH DID suffix" 169,group_name "Multi Mode 40G" 169,entity_name "port" 169,struct_name "nvm_cfg1" 169,offset 856 169,size 8 169,elementSize 0 169,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+170,name "MNM 40G FEC force mode" 170,group_name "Multi Mode 40G" 170,entity_name "port" 170,struct_name "nvm_cfg1" 170,offset 864 170,size 3 170,elementSize 0 170,stringFormat {^(\d+)$} 170,listType enum 170,allowedList fec_force_mode\
+171,name "MNM 50G Drv Speed capability mask" 171,group_name "Multi Mode 50G" 171,entity_name "port" 171,struct_name "nvm_cfg1" 171,offset 896 171,size 16 171,elementSize 0 171,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 171,listType bitfield 171,allowedList bfLink_Speed\
+172,name "MNM 50G MFW Speed capability mask" 172,group_name "Multi Mode 50G" 172,entity_name "port" 172,struct_name "nvm_cfg1" 172,offset 912 172,size 16 172,elementSize 0 172,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 172,listType bitfield 172,allowedList bfLink_Speed\
+173,name "MNM 50G Drv Link speed" 173,group_name "Multi Mode 50G" 173,entity_name "port" 173,struct_name "nvm_cfg1" 173,offset 928 173,size 4 173,elementSize 0 173,stringFormat {^(\d+)$} 173,listType enum 173,allowedList Link_Speed\
+174,name "MNM 50G MFW Link speed" 174,group_name "Multi Mode 50G" 174,entity_name "port" 174,struct_name "nvm_cfg1" 174,offset 932 174,size 4 174,elementSize 0 174,stringFormat {^(\d+)$} 174,listType enum 174,allowedList Link_Speed\
+175,name "MNM 50G Port Type" 175,group_name "Multi Mode 50G" 175,entity_name "port" 175,struct_name "nvm_cfg1" 175,offset 936 175,size 8 175,elementSize 0 175,stringFormat {^(\d+)$} 175,listType enum 175,allowedList board_type\
+176,name "MNM 50G Serdes Net Interface" 176,group_name "Multi Mode 50G" 176,entity_name "port" 176,struct_name "nvm_cfg1" 176,offset 944 176,size 8 176,elementSize 0 176,stringFormat {^(\d+)$} 176,listType enum 176,allowedList phy_mode_interface\
+177,name "MNM 50G ETH DID suffix" 177,group_name "Multi Mode 50G" 177,entity_name "port" 177,struct_name "nvm_cfg1" 177,offset 952 177,size 8 177,elementSize 0 177,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+178,name "MNM 50G FEC force mode" 178,group_name "Multi Mode 50G" 178,entity_name "port" 178,struct_name "nvm_cfg1" 178,offset 960 178,size 3 178,elementSize 0 178,stringFormat {^(\d+)$} 178,listType enum 178,allowedList fec_force_mode\
+179,name "MNM 100G Drv Speed Cap mask" 179,group_name "Multi Mode 100G" 179,entity_name "port" 179,struct_name "nvm_cfg1" 179,offset 992 179,size 16 179,elementSize 0 179,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 179,listType bitfield 179,allowedList bfLink_Speed 179,exChipNumAttrs {57940}\
+180,name "MNM 100G MFW Speed Cap mask" 180,group_name "Multi Mode 100G" 180,entity_name "port" 180,struct_name "nvm_cfg1" 180,offset 1008 180,size 16 180,elementSize 0 180,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 180,listType bitfield 180,allowedList bfLink_Speed 180,exChipNumAttrs {57940}\
+181,name "MNM 100G Drv Link speed" 181,group_name "Multi Mode 100G" 181,entity_name "port" 181,struct_name "nvm_cfg1" 181,offset 1024 181,size 4 181,elementSize 0 181,stringFormat {^(\d+)$} 181,listType enum 181,allowedList Link_Speed 181,exChipNumAttrs {57940}\
+182,name "MNM 100G MFW Link speed" 182,group_name "Multi Mode 100G" 182,entity_name "port" 182,struct_name "nvm_cfg1" 182,offset 1028 182,size 4 182,elementSize 0 182,stringFormat {^(\d+)$} 182,listType enum 182,allowedList Link_Speed 182,exChipNumAttrs {57940}\
+183,name "MNM 100G Port Type" 183,group_name "Multi Mode 100G" 183,entity_name "port" 183,struct_name "nvm_cfg1" 183,offset 1032 183,size 8 183,elementSize 0 183,stringFormat {^(\d+)$} 183,listType enum 183,allowedList board_type 183,exChipNumAttrs {57940}\
+184,name "MNM 100G Serdes Net Interface" 184,group_name "Multi Mode 100G" 184,entity_name "port" 184,struct_name "nvm_cfg1" 184,offset 1040 184,size 8 184,elementSize 0 184,stringFormat {^(\d+)$} 184,listType enum 184,allowedList phy_mode_interface 184,exChipNumAttrs {57940}\
+185,name "MNM 100G ETH DID suffix" 185,group_name "Multi Mode 100G" 185,entity_name "port" 185,struct_name "nvm_cfg1" 185,offset 1048 185,size 8 185,elementSize 0 185,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 185,exChipNumAttrs {57940}\
+186,name "MNM 100G FEC force mode" 186,group_name "Multi Mode 100G" 186,entity_name "port" 186,struct_name "nvm_cfg1" 186,offset 1056 186,size 3 186,elementSize 0 186,stringFormat {^(\d+)$} 186,listType enum 186,allowedList fec_force_mode 186,exChipNumAttrs {57940}\
+187,name "Function hide" 187,group_name "features" 187,entity_name "func" 187,struct_name "nvm_cfg1" 187,offset 218 187,size 1 187,elementSize 0 187,stringFormat {^(\d+)$} 187,listType enum 187,allowedList en_dis\
+188,name "Bar2 Total Budget" 188,group_name "pcie" 188,entity_name "glob" 188,struct_name "nvm_cfg1" 188,offset 720 188,size 8 188,elementSize 0 188,stringFormat {^(\d+)$} 188,listType enum 188,allowedList BARS_size 188,exChipNumAttrs {57940}\
+189,name "Crash dump trigger enable" 189,group_name "features" 189,entity_name "glob" 189,struct_name "nvm_cfg1" 189,offset 728 189,size 8 189,elementSize 0 189,stringFormat {^(?:0x)?([0-9a-fA-F]+)$}\
+190,name "MPS25 Lane Swap (L3:L2:L1:L0)" 190,group_name "phy" 190,entity_name "glob" 190,struct_name "nvm_cfg1" 190,offset 970 190,size 8 190,elementSize 2 190,stringFormat {^(\d+):(\d+):(\d+):(\d+)$} 190,exChipNumAttrs {57980}\
+191,name "Bar2 size" 191,group_name "pcie" 191,entity_name "func" 191,struct_name "nvm_cfg1" 191,offset 219 191,size 4 191,elementSize 0 191,stringFormat {^(\d+)$} 191,listType enum 191,allowedList AH_BARS_size 191,exChipNumAttrs {57980}\
+192,name "Ext PHY reset" 192,group_name "phy" 192,entity_name "port" 192,struct_name "nvm_cfg1" 192,offset 88 192,size 8 192,elementSize 0 192,stringFormat {^(\d+)$} 192,listType enum 192,allowedList gpio_control\
+193,name "EEE power saving mode" 193,group_name "phy" 193,entity_name "port" 193,struct_name "nvm_cfg1" 193,offset 304 193,size 8 193,elementSize 0 193,stringFormat {^(\d+)$} 193,listType enum 193,allowedList eee_power_mode_vals\
+194,name "Override PCIe Preset Equal" 194,group_name "pcie" 194,entity_name "glob" 194,struct_name "nvm_cfg1" 194,offset 978 194,size 1 194,elementSize 0 194,stringFormat {^(\d+)$} 194,listType enum 194,allowedList en_dis 194,exChipNumAttrs {57940}\
+195,name "PCIe Preset value (If Enabled)" 195,group_name "pcie" 195,entity_name "glob" 195,struct_name "nvm_cfg1" 195,offset 979 195,size 4 195,elementSize 0 195,stringFormat {^(\d+)$} 195,exChipNumAttrs {57940}\
+196,name "Max MSIX" 196,group_name "features" 196,entity_name "glob" 196,struct_name "nvm_cfg1" 196,offset 914 196,size 8 196,elementSize 0 196,stringFormat {^(\d+)$}\
+197,name "NVM_CFG version" 197,group_name "board" 197,entity_name "glob" 197,struct_name "nvm_cfg1" 197,offset 1248 197,size 32 197,elementSize 0 197,stringFormat {^(\d+)$}\
+198,name "NVM_CFG new option seq" 198,group_name "board" 198,entity_name "glob" 198,struct_name "nvm_cfg1" 198,offset 1280 198,size 32 198,elementSize 0 198,stringFormat {^(\d+)$}\
+199,name "NVM_CFG removed option seq" 199,group_name "board" 199,entity_name "glob" 199,struct_name "nvm_cfg1" 199,offset 1312 199,size 32 199,elementSize 0 199,stringFormat {^(\d+)$}\
+200,name "NVM_CFG updated value seq" 200,group_name "board" 200,entity_name "glob" 200,struct_name "nvm_cfg1" 200,offset 1344 200,size 32 200,elementSize 0 200,stringFormat {^(\d+)$}\
+201,name "Extended serial number" 201,group_name "pcie" 201,entity_name "glob" 201,struct_name "nvm_cfg1" 201,offset 1376 201,size 256 201,elementSize 0 201,stringFormat {^(.{1,32})$}\
+202,name "RDMA enablement" 202,group_name "features" 202,entity_name "func" 202,struct_name "nvm_cfg1" 202,offset 384 202,size 2 202,elementSize 0 202,stringFormat {^(\d+)$} 202,listType enum 202,allowedList rdma_enablement\
+203,name "Max cont operating temp" 203,group_name "mng_fw" 203,entity_name "glob" 203,struct_name "nvm_cfg1" 203,offset 944 203,size 8 203,elementSize 0 203,stringFormat {^(\d+)$}\
+204,name "Runtime Port Swap GPIO" 204,group_name "board io" 204,entity_name "glob" 204,struct_name "nvm_cfg1" 204,offset 952 204,size 8 204,elementSize 0 204,stringFormat {^(\d+)$} 204,listType enum 204,allowedList gpio_control\
+205,name "Runtime Port Swap Map (P3:P2:P1:P0)" 205,group_name "board io" 205,entity_name "glob" 205,struct_name "nvm_cfg1" 205,offset 983 205,size 8 205,elementSize 2 205,stringFormat {^(\d+):(\d+):(\d+):(\d+)$}\
+206,name "Thermal Event GPIO" 206,group_name "board io" 206,entity_name "glob" 206,struct_name "nvm_cfg1" 206,offset 1016 206,size 8 206,elementSize 0 206,stringFormat {^(\d+)$} 206,listType enum 206,allowedList gpio_control\
+207,name "I2C Interrupt GPIO" 207,group_name "board io" 207,entity_name "glob" 207,struct_name "nvm_cfg1" 207,offset 1072 207,size 8 207,elementSize 0 207,stringFormat {^(\d+)$} 207,listType enum 207,allowedList gpio_control\
+208,name "DCI support" 208,group_name "mng_fw" 208,entity_name "glob" 208,struct_name "nvm_cfg1" 208,offset 383 208,size 1 208,elementSize 0 208,stringFormat {^(\d+)$} 208,listType enum 208,allowedList en_dis\
+209,name "PCIE VDM ENABLED" 209,group_name "mng_fw" 209,entity_name "glob" 209,struct_name "nvm_cfg1" 209,offset 446 209,size 1 209,elementSize 0 209,stringFormat {^(\d+)$} 209,listType enum 209,allowedList en_dis\
+210,name "OEM1 Number" 210,group_name "pcie" 210,entity_name "glob" 210,struct_name "nvm_cfg1" 210,offset 1632 210,size 256 210,elementSize 0 210,stringFormat {^(.{1,32})$}\
+211,name "OEM2 Number" 211,group_name "pcie" 211,entity_name "glob" 211,struct_name "nvm_cfg1" 211,offset 1888 211,size 256 211,elementSize 0 211,stringFormat {^(.{1,32})$}\
+212,name "FEC AN mode" 212,group_name "link settings" 212,entity_name "port" 212,struct_name "nvm_cfg1" 212,offset 212 212,size 3 212,elementSize 0 212,stringFormat {^(\d+)$} 212,listType enum 212,allowedList fec_an_mode 212,exChipNumAttrs {57980}\
+213,name "NPAR enabled protocol" 213,group_name "features" 213,entity_name "func" 213,struct_name "nvm_cfg1" 213,offset 369 213,size 4 213,elementSize 0 213,stringFormat {^(?:0x)?([0-9a-fA-F]+)$} 213,listType bitfield 213,allowedList NPAR_enabled_protocols\
+214,name "MPS25 Active TXFIR Pre (L3:L2:L1:L0)" 214,group_name "phy" 214,entity_name "glob" 214,struct_name "nvm_cfg1" 214,offset 2144 214,size 32 214,elementSize 8 214,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+215,name "MPS25 Active TXFIR Main (L3:L2:L1:L0)" 215,group_name "phy" 215,entity_name "glob" 215,struct_name "nvm_cfg1" 215,offset 2176 215,size 32 215,elementSize 8 215,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+216,name "MPS25 Active TXFIR Post (L3:L2:L1:L0)" 216,group_name "phy" 216,entity_name "glob" 216,struct_name "nvm_cfg1" 216,offset 2208 216,size 32 216,elementSize 8 216,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+217,name "ALOM FAN ON AUX GPIO" 217,group_name "board io" 217,entity_name "glob" 217,struct_name "nvm_cfg1" 217,offset 1080 217,size 8 217,elementSize 0 217,stringFormat {^(\d+)$} 217,listType enum 217,allowedList gpio_control\
+218,name "ALOM FAN ON AUX value" 218,group_name "board io" 218,entity_name "glob" 218,struct_name "nvm_cfg1" 218,offset 2240 218,size 8 218,elementSize 0 218,stringFormat {^(\d+)$}\
+219,name "SLOT ID GPIO" 219,group_name "board io" 219,entity_name "glob" 219,struct_name "nvm_cfg1" 219,offset 2248 219,size 8 219,elementSize 0 219,stringFormat {^(\d+)$} 219,listType enum 219,allowedList gpio_control\
+220,name "PMBUS SCL GPIO" 220,group_name "board io" 220,entity_name "glob" 220,struct_name "nvm_cfg1" 220,offset 2256 220,size 8 220,elementSize 0 220,stringFormat {^(\d+)$} 220,listType enum 220,allowedList gpio_control\
+221,name "PMBUS SDA GPIO" 221,group_name "board io" 221,entity_name "glob" 221,struct_name "nvm_cfg1" 221,offset 2264 221,size 8 221,elementSize 0 221,stringFormat {^(\d+)$} 221,listType enum 221,allowedList gpio_control\
+222,name "Reset On Lan" 222,group_name "features" 222,entity_name "glob" 222,struct_name "nvm_cfg1" 222,offset 447 222,size 1 222,elementSize 0 222,stringFormat {^(\d+)$} 222,listType enum 222,allowedList en_dis\
+223,name "NCSI Package ID IO" 223,group_name "features" 223,entity_name "glob" 223,struct_name "nvm_cfg1" 223,offset 894 223,size 1 223,elementSize 0 223,stringFormat {^(\d+)$} 223,listType enum 223,allowedList pkg_method\
+224,name "Tx Rx EQ 25G HLPC (POST:MAIN:PRE:DFE)" 224,group_name "phy" 224,entity_name "glob" 224,struct_name "nvm_cfg1" 224,offset 2272 224,size 32 224,elementSize 8 224,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+225,name "Tx Rx EQ 25G LLPC (POST:MAIN:PRE:DFE)" 225,group_name "phy" 225,entity_name "glob" 225,struct_name "nvm_cfg1" 225,offset 2304 225,size 32 225,elementSize 8 225,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+226,name "Tx Rx EQ 25G AC (POST:MAIN:PRE:DFE)" 226,group_name "phy" 226,entity_name "glob" 226,struct_name "nvm_cfg1" 226,offset 2336 226,size 32 226,elementSize 8 226,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+227,name "Tx Rx EQ 10G PC (POST:MAIN:PRE:DFE)" 227,group_name "phy" 227,entity_name "glob" 227,struct_name "nvm_cfg1" 227,offset 2368 227,size 32 227,elementSize 8 227,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+228,name "Tx Rx EQ 10G AC (POST:MAIN:PRE:DFE)" 228,group_name "phy" 228,entity_name "glob" 228,struct_name "nvm_cfg1" 228,offset 2400 228,size 32 228,elementSize 8 228,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+229,name "Tx Rx EQ 1G (POST:MAIN:PRE:DFE)" 229,group_name "phy" 229,entity_name "glob" 229,struct_name "nvm_cfg1" 229,offset 2432 229,size 32 229,elementSize 8 229,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+230,name "Tx Rx EQ 25G BT (POST:MAIN:PRE:DFE)" 230,group_name "phy" 230,entity_name "glob" 230,struct_name "nvm_cfg1" 230,offset 2464 230,size 32 230,elementSize 8 230,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+231,name "Tx Rx EQ 10G BT (POST:MAIN:PRE:DFE)" 231,group_name "phy" 231,entity_name "glob" 231,struct_name "nvm_cfg1" 231,offset 2496 231,size 32 231,elementSize 8 231,stringFormat {^(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+):(?:0x)?([0-9a-fA-F]+)$}\
+232,name "PF Mapping" 232,group_name "features" 232,entity_name "glob" 232,struct_name "nvm_cfg1" 232,offset 922 232,size 2 232,elementSize 0 232,stringFormat {^(\d+)$} 232,listType enum 232,allowedList pf_mapping\
+233,name "Thermal Alarm gpio" 233,group_name "features" 233,entity_name "glob" 233,struct_name "nvm_cfg1" 233,offset 2528 233,size 8 233,elementSize 0 233,stringFormat {^(\d+)$} 233,listType enum 233,allowedList gpio_control\
+234,name "Recovery Mode" 234,group_name "features" 234,entity_name "glob" 234,struct_name "nvm_cfg1" 234,offset 895 234,size 1 234,elementSize 0 234,stringFormat {^(\d+)$} 234,listType enum 234,allowedList en_dis\
+235,name "PHY Module Dead Temp TH" 235,group_name "features" 235,entity_name "port" 235,struct_name "nvm_cfg1" 235,offset 1088 235,size 8 235,elementSize 0 235,stringFormat {^(\d+)$}\
+236,name "PHY Module aLOM fan on temp TH" 236,group_name "features" 236,entity_name "port" 236,struct_name "nvm_cfg1" 236,offset 1096 236,size 8 236,elementSize 0 236,stringFormat {^(\d+)$}\
+237,name "Preboot Debug Mode Std" 237,group_name "features" 237,entity_name "glob" 237,struct_name "nvm_cfg1" 237,offset 2560 237,size 32 237,elementSize 0 237,stringFormat {^(\d+)$}\
+238,name "Preboot Debug Mode Ext" 238,group_name "features" 238,entity_name "glob" 238,struct_name "nvm_cfg1" 238,offset 2592 238,size 32 238,elementSize 0 238,stringFormat {^(\d+)$}\
+239,name "SmartLinQ Mode" 239,group_name "link settings" 239,entity_name "port" 239,struct_name "nvm_cfg1" 239,offset 215 239,size 1 239,elementSize 0 239,stringFormat {^(\d+)$} 239,listType enum 239,allowedList en_dis\
+243,name "voltage regulator type" 243,group_name "mng_fw" 243,entity_name "glob" 243,struct_name "nvm_cfg1" 243,offset 924 243,size 2 243,elementSize 0 243,stringFormat {^(\d+)$} 243,listType enum 243,allowedList regulator_type\
+}
+set IDs { 1 8 9 10 11 12 13 14 15 16 17 20 22 23 24 25 26 27 28 29 30 31 32 33 34 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 61 62 63 67 69 70 71 74 75 76 78 79 80 81 82 83 84 85 86 87 88 89 90 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 122 123 124 125 126 127 128 130 131 132 133 134 135 136 137 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 243 }
+set chkIDs { 8 9 10 11 15 16 17 20 22 23 24 25 26 27 28 29 30 31 32 33 34 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 61 62 63 67 69 70 71 74 75 76 78 79 80 81 82 83 84 85 86 87 88 92 95 96 97 98 100 101 102 103 104 105 106 110 111 112 114 115 116 117 118 119 120 122 123 124 125 126 127 128 130 132 133 140 145 187 188 189 190 191 192 193 194 195 202 204 205 206 207 208 212 214 215 216 224 225 226 227 228 229 230 231 239 }
+set noDefault { 1 12 14 93 94 99 201 }
+array set ChipIdToChipNum {0x1628 57940 0x1629 57980 0x1630 57940 0x1631 57941 0x1632 57942 0x1633 57942 0x1634 57980 0x1635 57980 0x1636 57980 0x1637 57980 0x1638 57980 0x1639 57980 0x16A1 57980 0x16A4 57980 0x163a 57980 0x1644 57980 0x1654 57980 0x1656 57980 0x1664 57980 0x1666 57980 0x165c 57980 0x165e 57980 0x165f 57980 0x8070 57940 0x8071 57940 0x8072 57940 0x8073 57940 0x8080 57940 0x8081 57940 0x8082 57940 0x8083 57940 0x8084 57940 0x8085 57940 0x8086 57940 0x8087 57940 0x8088 57940 0x808c 57940 0x8090 57940 0x8004 57940 0x8006 57940 0x8016 57940 0x8005 57940 0x800a 57940 0x801a 57940 0x8009 57940 0x80f0 57940 0x809a 57940 0x808a 57940 0x163c 57980 0x163d 57980 0x163e 57980 0x163f 57980 }
+
+}

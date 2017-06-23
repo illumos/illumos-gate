@@ -1,0 +1,1796 @@
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[11pt,fleqn,hidelinks,oneside]{book} % Default font size and left-justified equations
+\usepackage[nottoc,notlot,notlof]{tocbibind}
+\makeindex % Tells LaTeX to create the files required for indexing
+%----------------------------------------------------------------------------------------
+
+% Create a command to cleanly insert a snippet with the style above anywhere in the document
+\newcommand{\insertcode}[2]{\begin{itemize}\item[]\lstinputlisting[caption=#2,label=#1,style=Style1,float=h!]{#1}\end{itemize}} % The first argument is the script location/filename and the second is a caption for the listing
+
+\newcommand{\myref}[1]
+	{\textcolor{blue}{[\ref{#1}]}}
+
+\newcommand{\myindex}[1]
+	{\index{#1@\texttt{#1}}#1}
+
+\newcommand{\ChapterFuncs}{}
+
+%Fpr some reason, this doesn't work inside \item so we can't have this as part of \myfunc
+\newcommand{\silentfunc}[1]
+{\expandafter\def\expandafter\ChapterFuncs\expandafter{\ChapterFuncs { } \insertcode{snippets/#1_generated.h}{}}}
+
+\newcommand{\myfunc}[2]
+{\index{ZZZ@API Function!ecore\_#1@\texttt{ecore\_#1}}%
+\silentfunc{#2}\texttt{ecore\_#1()}}
+	
+\newenvironment{bottompar}{\par\vspace*{\fill}}{\clearpage}	
+	
+\newcommand{\SpillChapterFuncs}%
+%{\begin{bottompar}
+{%
+%\texttt{\textbf{\\API functions in this chapter: \\}}%
+\section{API functions discussed in this chapter}
+\ChapterFuncs{}%
+%\end{bottompar}%
+\renewcommand{\ChapterFuncs}{}}
+	
+%----------------------------------------------------------------------------------------
+
+\input{structure} % Insert the commands.tex file which contains the majority of the structure behind the template
+
+%\lstset{belowskip=-20pt plus 2pt}
+\lstset{belowskip=\smallskipamount,aboveskip=\smallskipamount,boxpos=h!,float=h!}
+\makeatletter
+\setlength{\@fptop}{5pt}
+\makeatother
+
+
+\usepackage{hyperref}
+\usepackage{verbatim}
+
+%Macros
+\newcommand{\mlist}[1]{\begin{itemize}{#1}\end{itemize}}
+\newcommand{\mlisti}[2]{\item {\textcolor{red}{#1} -- #2}}
+        
+\long\def\greybox#1{%
+    \newbox\contentbox%
+    \newbox\bkgdbox%
+    \setbox\contentbox\hbox to \hsize{%
+        \vtop{
+            \kern\columnsep
+            \hbox to \hsize{%
+                \kern\columnsep%
+                \advance\hsize by -2\columnsep%
+                \setlength{\textwidth}{\hsize}%
+                \vbox{
+                    \parskip=\baselineskip
+                    \parindent=0bp
+                    #1
+                }% 
+                \kern\columnsep%
+            }%
+            \kern\columnsep%
+        }%
+    }%
+    \setbox\bkgdbox\vbox{
+        \pdfliteral{0.75 0.75 0.75 rg}
+        \hrule width  \wd\contentbox %
+               height \ht\contentbox %
+               depth  \dp\contentbox
+        \pdfliteral{0 0 0 rg}
+    }%
+    \wd\bkgdbox=0bp%
+    \vbox{\hbox to \hsize{\box\bkgdbox\box\contentbox}}%
+    \vskip\baselineskip%
+}
+
+\newcommand{\greycom}[2]{\greybox{\textcolor{red}{#1} -- #2}}
+
+
+\global \mdfdefinestyle{MyMdStyle}{%
+	linecolor=black, linewidth=1,%
+	outerlinecolor=red,outerlinewidth=2pt,%
+	roundcorner=5pt,backgroundcolor=brown!10,nobreak=true}
+
+\newenvironment{warning}
+	{\par\begin{mdframed}[style=MyMdStyle] \begin{Warning}}
+	{\end{Warning}\end{mdframed}\vspace{5pt}\par}
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+\newenvironment{TBD}
+	{\par\vspace{3pt}\begin{mdframed}[style=MyMdStyle,outerlinecolor=blue,%
+									  backgroundcolor=blue!10]%
+		\begin{question}}
+  {\end{question}\end{mdframed}\par}
+
+\newenvironment{NOTICE}
+  {\par\begin{mdframed}[style=MyMdStyle,outerlinecolor=black,% 
+  						linecolor=black, outerlinewidth=1.5pt]%
+    \begin{itemize}{}{\leftmargin=1cm
+                   \labelwidth=\leftmargin}\item[\Large\Info]}
+  {\end{itemize}\end{mdframed}\par}
+
+\newenvironment{REMINDER}
+	{\par\begin{mdframed}[style=MyMdStyle,outerlinecolor=blue,% 
+  						  linecolor=blue, outerlinewidth=2pt]%
+		\begin{reminder}}
+  {\end{reminder}\end{mdframed}\par}
+
+\bibliographystyle{plain}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+
+% Upper part of the page. The '~' is needed because \\
+% only works if a paragraph has started.
+\includegraphics[width=0.5\textwidth]{./qlogic-logo}~\\[3cm]
+
+% Title
+\HRule \\[0.4cm]
+{ \huge \bfseries E4 ecore \\[0.4cm] }
+
+\HRule \\[1.5cm]
+
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft} \large
+\emph{Authors:}\\
+Ariel \textsc{Elior} \\
+Michal \textsc{Kalderon} \\
+Yuval \textsc{Mintz} \\
+Merav \textsc{Sicron} \\
+Tomer \textsc{Tayar} \\
+Sudarsana Reddy \textsc{Kalluru} \\
+\end{flushleft}
+\end{minipage}
+\begin{minipage}{0.4\textwidth}
+\begin{flushright} \large
+\emph{Version:} \\
+0.0.10
+\end{flushright}
+\end{minipage}
+
+\vfill
+
+% Bottom of the page
+{\large \today}
+
+\end{center}
+\end{titlepage}
+
+\pagestyle{empty} % No headers
+\chapterimage{qlogic-full-36}
+\tableofcontents % Print the table of contents itself
+
+\cleardoublepage % Forces the first chapter to start on an odd page so it's on the right
+
+\pagestyle{fancy} % Print headers again
+
+
+%----------------------------------------------------------------------------------------
+%	Real Content
+%----------------------------------------------------------------------------------------
+\chapterimage{pictures/qlogic-full-36.jpg}
+\chapter{Introduction}
+By definition, a driver is the entity which allows an OS to drive a hardware device.
+As such the driver contains both device-specific parts and OS-specific parts.
+The Everest architecture, with programmable fastpath processors (Storms), host-based device-dedicated memory (ILT), and minimal on-chip management presents a device which requires a driver with significant portions of device-specific code.
+
+Drivers will be implemented for Everest 4 devices in many OSs (linux, windows, freebsd, solaris, esx, aix, hpux…).
+Implementing the device-specific code again and again in each OS is both wasteful and difficult to maintain.
+For this purpose the ecore was conceived.
+A large mass of code for operating and interacting with the Everest 4 device, to be incorporated into and used by OS drivers.
+
+In the abstract, the ecore is a layer between the HW/FW and the OS.
+It is device-specific and OS-agnostic. When ecore code requires OS services (e.g. memory allocation, pci configuration space access, etc.) it calls an abstract OS function for that purpose. These are implemented in OS-specific layers.
+Ecore flows may be driven by the HW (e.g. by an interrupt) or by the OS specific portion of the driver (e.g. driver load/unload).
+
+\begin{itemize}
+
+	\item Slowpath flows tend to reside largely in ecore and less so in OS specific layers. As much of the functionality as possible is placed in the ecore to leverage it across multiple platforms. \\
+
+	\item Fastpath flows tend to be in the OS specific layer as too much layering and abstraction is out of place in fastpath.
+However, the fastpath would usually be set up by ecore flows, for example the address where transmission flow should write a doorbell to the BAR is determined by the ecore at init phase and this address is supplied by ecore to the OS specific layer. \\
+
+\end{itemize}
+
+Different drivers in the same OS may have the ecore within them, and may use it for similar or different purposes:
+
+\begin{exampleT}
+	In linux there will be an ethernet driver, an fcoe driver, an iscsi driver, a roce driver and also a slim driver for the diag utility.
+	All of these may exists in the same system.
+	All of these will have an ecore instance incorporated in them.
+	Either one of the drivers might use the ecore to initialize the device, or the sections of the device pertaining to that driver’s operation.
+	A storage driver may use the ecore for storage specific purposes, such as the initialization and allocation of task context.
+\end{exampleT}
+
+The ecore is not a driver in its own capacity, but only code which is used by other drivers. Thus, separate drivers, including separate instances of the same driver within an OS, have separate instances of the ecore within them, which are concurrently active.
+
+\section{scope}
+This document strives to define and detail what is the ecore.
+The first parts of the document deal with the concept of the ecore, and its place in the software layers between the device and the OS.
+The rest of the document deals with the content of the ecore.
+This document does not deal with the needs and use cases of any specific OS or tool, but only with the common ground which is the ecore.
+
+The document sometimes delves in-depth into the inner-workings of the ecore; Since the programmer coming to utilize the ecore might not need [or want] to know those inner workings, such a person should look into specific sections in each chapter, specifically:
+\begin{enumerate}
+	\item Chapter \ref{cha:overview}'s introduction and section \ref{sec:overview-api} for a listing of the ecore API files and their locations.
+
+	\item OS abstraction layer [\ref{sec:osal}] for functions needed to be implemented by upper-layer driver in order to support the ecore.
+	
+	\item Register-access [\ref{cha:reg}], mainly for learning about PTTs which are required by various ecore API functions.
+	
+	\item Initialization and De-initialization of the HW [ \ref{sec:init-init}, \ref{sec:init-de-init}].
+	
+	\item Status block initialization [\ref{ssec:sb-init}] and Interrupt handling flow [\ref{sec:sb-flow}].
+	
+	\item Link interface [\ref{sec:mfw-link}].
+	
+	\item Protocol related initialization/de-initialization:
+	\begin{enumerate}
+		\item L2-related, see Chapter [\ref{cha:l2}].
+	\end{enumerate}
+\end{enumerate}
+
+In addition, each chapter which includes ecore API functions that can be called by the upper-layer driver lists those functions' prototypes at its end.
+
+%\bibliography{ecore}
+
+\chapterimage{qlogic-full-36}
+\chapter{Ecore interface overview}
+\label{cha:overview}
+The ecore can be found at the perforce servers under:
+\begin{center}
+	//servers/main/nx2/579xx/drivers/ecore
+\end{center}
+
+Most of the ecore consists of the \textit{inner} parts, i.e., HW-oriented implementation to which the upper-layer driver writer is oblivious.
+Above that is a concise API layer, through which the upper-layer driver should manipulate the ecore code.
+
+\section{Ecore API}
+\label{sec:overview-api}
+The Ecore API contains two types of files:
+\begin{enumerate}
+	\item Files of the format \texttt{ecore\_<module>\_api.h} -- these files are the SW API between the ecore and the upper-layer driver:
+	\begin{enumerate}
+		\item \texttt{ecore\_cxt\_api.h}.
+		\item \texttt{ecore\_dev\_api.h}.
+		\item \texttt{ecore\_fcoe\_api.h}.
+		\item \texttt{ecore\_int\_api.h}.
+		\item \texttt{ecore\_iov\_api.h}.
+		\item \texttt{ecore\_iscsi\_api.h}.
+		\item \texttt{ecore\_ll2\_api.h}.
+		\item \texttt{ecore\_roce\_api.h}.
+		\item \texttt{ecore\_sp\_api.h}.
+		\item \texttt{ecore\_vf\_api.h}.
+		\item \texttt{ecore\_mcp\_api.h}.
+	\end{enumerate}
+	\item Files of the format \texttt{ecore\_hsi\_<protocol>.h} -- these files contain the API between FW/HW and the the ecore/upper-layer driver:
+	\begin{enumerate}
+		\item \texttt{ecore\_hsi\_common.h}.
+		\item \texttt{ecore\_hsi\_eth.h}.
+		\item \texttt{ecore\_hsi\_fcoe.h}.
+		\item \texttt{ecore\_hsi\_iscsi.h}.
+		\item \texttt{ecore\_hsi\_roce.h}.
+		\item \texttt{ecore\_hsi\_tcp.h}.
+		\item \texttt{ecore\_hsi\_toe.h}.
+	\end{enumerate}
+\end{enumerate}
+Upper-layer driver should not include any other ecore header file, as the rest of the header files are internal, with the following exceptions:
+\begin{itemize}
+	\item \texttt{ecore\_chain.h} -- Networking drivers will probably want to include this to benefit from the already-implemented chain.
+	\item \texttt{ecore\_utils.h} -- Useful macros which can be used by upper-layer driver.
+	\item \texttt{ecore\_status.h} -- contains \texttt{enum \_ecore\_status\_t}. Many of the ecore return values are of this type.
+\end{itemize}
+
+\begin{warning}
+Currently \texttt{ecore.h, ecore\_proto\_if.h} should also be included by upper-layer driver; This will (hopefully) be fixed shortly.
+\end{warning}
+
+
+\section{Ecore Internal files}
+This lists the ecore files, giving each a short description:
+
+\begin{itemize}
+	\item \texttt{ecore\_attn\_values.h}
+	
+	\item \texttt{ecore\_chain.h} -- Implements a cyclic chain; Used for various interfaces with the FW [Buffer-Descriptoss, Event Queues, etc.].
+	
+	\item \texttt{ecore\_cxt\_api.[ch]} -- Handles the allocation, configuration and distribution of contexts to the various clients. 
+	
+	\item \texttt{ecore\_dbg\_fw\_funcs.[ch], ecore\_dbg\_values.h, ecore\_fw\_defs} -- Files which contain code related for various debug features ecore can provide [e.g., grcDump].
+	
+	\item \texttt{ecore\_fcoe.[ch], ecore\_iscsi.[ch], ecore\_ll2.[ch], ecore\_roce.[ch]} -- files containing specific ecore code for the storage protocols.
+	
+	\item \texttt{ecore\_dev.[ch]} -- Contains much of the functionality of starting/stopping the hardware. See chapter \ref{cha:hwinit}.
+	
+	\item \texttt{ecore\_hw.[ch], ecore\_gtt\_reg\_addr.h, ecore\_gtt\_values.h} -- contains the functionality for register access and DMAE. See chapter \ref{cha:reg}.
+	
+	\item \texttt{ecore.h} -- contains the defintion of the most \textit{elementary} structures in the ecore, the \texttt{ecore\_dev} and the \texttt{ecore\_hwfn}.
+	
+	\item \texttt{ecore\_init\_defs.h, ecore\_init\_fw\_funcs.[ch], ecore\_init\_ops.[ch], \\ ecore\_init\_values.h, ecore\_rt\_defs} -- Code responsible for initialization and configuration of the HW and loading of the FW, mostly in relation with the init-tool. See chapter \ref{cha:hwinit}.
+	\begin{REMINDER}
+			Chapter \ref{cha:hwinit} doesn't really give a thorough explanation of the init tool - at most it mentions it. Do we want a section/chapter of it somewhere?
+	\end{REMINDER}
+	
+	\item \texttt{ecore\_int.[ch]} -- Handles interrupts and attentions. See chapter \ref{cha:int}.
+
+	\item \texttt{ecore\_iro.h, ecore\_iro\_values.h} -- Generated FW files. Enables ecore to access [or supply to upper-layer] addresses inside the \texttt{storm}'s RAM.
+
+	\item \texttt{ecore\_mcp.[ch]} -- Contains the interface between the ecore and the MFW. See chapter \ref{cha:mfw}.
+
+	\item \texttt{ecore\_sp\_commands.[ch], ecore\_spq.[ch]} -- Contained the slowpath logic required for sending ramrods and configuring \& handling the various slowpath events.
+	
+	\item \texttt{ecore\_sriov.[ch], ecore\_vf.[ch], ecore\_vfpf\_if.h} -- Contains the SRIOV implementation both from the PF and VF sides.
+\end{itemize}
+
+\section{OS abstraction Layer}
+\label{sec:osal}
+
+%\section{Driver Core}
+%As the ecore contains most of the lowlevel code operating the non-fastpath parts of the working with the HW and FW, it can be thought of as some sort of library – it contains bits of code meant to be operated from an outside source. Each OS needs to implement its own driver, calling the various functions in the ecore API in a place fitting for that OS driver flows.
+%Each OS will independently need to create a driver that incorporates the ecore, both filling the OS dependent callbacks required by the ecore to perform and supply an upper level of abstraction which best suits that OS. Notice this upper layer is sometimes also, mistakenly, referred to as ecore [e.g., bnx2c for linux drivers] but there’s an important distinction:
+%\begin{itemize}
+%	\item Ecore – shared code between ALL operating systems.
+%	\item Upper-Layer – shared code by all drivers on a single operating system.
+%\end{itemize}
+
+%It’s possible [and likely] that an operating system will break the various protocols into different sub-drivers, where each sub-driver will be designated for a specific protocol. Notice that if such separation is made, the preferred implementation is that the OS will implement a ‘core’ driver consisting of the Ecore and an upper-layer, and define an API through which the various protocol drivers communicate with the OS core driver\footnote{Although notice there should be no inter-dependencies between HW-functions in the ecore, so the alternative method where each contains the ecore is also feasible}.
+
+The ecore utilizes various functions which should be implemented by the upper layer. There are two main ‘types’ of functions:
+\begin{enumerate}
+	\item Basic OS-specific operations that the ecore needs in order to perform it’s work; e.g., memory allocations – the ecore needs to allocate memory for various reasons, and it needs the upper layer to supply the method by which it can do so.
+	\item Hooks by which the upper-layer can run additional OS specific code, or make decisions affecting the work of the ecore. E.g., in the SRIOV flows, the mechanism for passing messages from VF to PF is implemented in the ecore but the decision whether a request is valid or not might be OS specific – as in the case of unicast filters.
+\end{enumerate}
+
+The various functions that need to be implemented by the upper-layer can be found in Appendix \ref{app:osal} -- OSAL Documentation.
+
+
+\section{Ecore print scheme}
+The ecore utilizes several printing methods to print messages to the system logs; It requires some functions to be implemented by the upper-layer for this to work – the required documentation can be found in Appendix \ref{app:osal} -- OSAL Documentation.
+In order to support this, the verbosity mechanism contains two distinct values \myindex{\texttt{DP\_LEVEL}} and \myindex{\texttt{DP\_MODULE}} [both can be found in \texttt{ecore.h}]. Since the printing scheme in the ecore was defined with the linux limitations in mind – that is, the API [via ethtool] allowing the setting of the debug message level is only 32-bit long, both \texttt{DP\_MODULE} and \texttt{DP\_LEVEL} together contain only 32-bits.
+The \texttt{DP\_LEVEL} determines which prints will actually reach the logs based on the message urgency, defining 4 levels – verbose, info, notice and error. When level is set, all prints which are at least as urgent will be printed. Notice this means there’s a single level – e.g., you can’t have a configuration in which you’ll get all the `info’ level prints, but not the `notice’ level.
+The \texttt{DP\_MODULE} is relevant only when level is set to verbose, and it defines which of the verbose prints should reach system logs, based mostly on component/flow. When setting the module level, a bit mask of the requested components/flows is set.
+In order to set which prints should reach system logs, the upper layer should utilize the ecore function \myfunc{init\_dp}{init_dp} defined in \texttt{ecore\_dev.c}.
+
+\section{Compilation flags}
+The ecore project contains several optional compilation flags that if passed would affect the content compiled. A few notable flags:
+\begin{itemize}
+	\item ASIC\_ONLY -- By default, this is `off'. Setting this would remove content that is relevant only for simulations of the hardware, I.e., emulations and FPGAs.
+
+	\item REAL\_ASIC\_ONLY -- By default, this is `off'. Setting this would remove content that is relevant for non-productized hardware, E.g., workarounds for BigBear A0.
+
+	\item REMOVE\_DBG -- By default, this is `off'. There are several structures and field in ecore which aren't functional; there sole purpose is to store interesting data for memory dumps in case of failures. Setting this would remove all such data items.
+\end{itemize}
+
+\SpillChapterFuncs
+
+
+\chapterimage{qlogic-full-36}
+\chapter{Register Access}
+\label{cha:reg}
+This section describes the ecore API for accessing registers. 
+The E4 bar is a reduced BAR, i.e., it does not map the entire register address range.
+To access the entire range, windows are defined that can be configured to point to a certain address within the device and allow reading and writing of registers / memory from that address.
+There are two types of windows, \textbf{PTT} (per PF Translation Table) and \textbf{GTT} (Global Translation Table). 
+
+The \textit{external BAR} is the BAR accessed by the ecore. It is divided into configurable windows which point to different areas within the device (Image \ref{fig:bars}, Internal BAR vs. External BAR, demonstrates this).
+
+\begin{figure}[ht]
+	\caption{Internal BAR vs. External BAR}
+	\centering
+	\includegraphics[width=0.8\paperwidth]{reg_access}
+	\label{fig:bars}
+\end{figure}
+
+For more details on the E4 BAR access scheme the reader is referred to the “Reduced PF BAR0 size” section of \cite{doc:PXP}. \\
+
+
+All register access should be done within the ecore layer and it is not expected for the upper layers to access registers at all.
+For this reason, there is no description here on how to find the register address and how to distinguish whether the address is mapped into a \myindex{GTT} or a \myindex{PTT}.
+However, in case a need does rise in the future, API for reading/writing is detailed below as well.
+
+Ecore requires an OSAL implementation of the macros:
+\begin{enumerate}
+	\item \myindex{REG\_RD}
+	\item \myindex{REG\_WR}
+\end{enumerate}
+These macros are a direct read / write from the BAR with the absolute address offset given. 
+Implementation should add the offset to the mapped BAR address and call the appropriate OS specific API. 
+
+Several ecore interface functions require a PTT. There is a pool of PTTs maintained by ecore.
+The reason there are several PTTs is to enable simultaneous access to device registers from different flows.
+The PTT is reserved per flow, and it is the responsibility of the upper layer to make sure it does not use the same PTT in flows that can run concurrently. Upper-layer requests for a PTT entry using \myfunc{ptt\_acquire}{ptt_acquire}. 
+However, to avoid running out of this resource, it is also the responsibility of the upper layer not to acquire too many PTTs without releasing them. Returning a PTT entry back to the pool is done via \myfunc{ptt\_release}{ptt_release}.
+
+Using a PTT, ecore [and upper-driver] can access registers/memories using inner BAR addresses; The ecore is responsible for configuring the memory windows, and translates the inner address into an external address [i.e., one which resides on the actual BAR as seen by the host]. The register access is then made by calling \texttt{ecore\_wr} and \texttt{ecore\_rd}.
+\SpillChapterFuncs
+
+
+\chapterimage{qlogic-full-36}
+\chapter{Hardware/Firmware initialization}
+\label{cha:hwinit}
+
+\section{Basic concepts -- inner-working of the ecore}
+\begin{itemize}
+	\item \myindex{ILT} – one of the features of our device is that the memories used by various HW blocks are allocated on the host memory [as opposed to large embedded memory segment on chip]. The driver is responsible for allocating the memory needed for those HW blocks [DMA-coherent memory] and configure both the HW blocks themselves and a communal sub-block known as ILT. The ecore contains complicated code that decides exactly how much memory each such block needs, allocates it in an ‘ilt\_shadow’, and then uses that shadow to configure the ILT itself with all the allocated chunks of memory. 
+	
+Additional ILT documentation is at \cite{doc:ILT}.	
+
+	\item \myindex{RT array} – when the ecore initializes the HW, it utilizes a common, tool-generated code known as the init-tool. Since there are quite a few values which depend upon actual setup configuration and thus must receive feedback during the initialization from the ecore, instead of adding many such hooks there’s the concept of the RunTime array – an array of values filled by the ecore prior to the init-tool run based on the complex ecore logic. The init-tool will then utilize the values in that array to configure the HW according to the correct order of configuration [i.e., writing the values set by ecore in the array in the correct place in the initialization flow where they’re required/the block that contains them is configured].
+\end{itemize}
+
+\section{Initialization}
+\label{sec:init-init}
+The functions required for initializing the HW/FW mostly reside in \texttt{ecore\_dev.[ch]}; More accurately, most of the outside API [toward the upper-layer] is in \texttt{ecore\_dev.h} – the functions themselves utilize many other ecore files.
+This section gives a brief description of the functions that need to be called, what they do, requirements, etc., in order to successfully initialize the ecore structs and load the HW/FW.
+
+\silentfunc{init_struct}
+\silentfunc{hw_prepare}
+\silentfunc{resc_alloc}
+\silentfunc{resc_setup}
+\silentfunc{hw_init}
+\begin{itemize}
+	\item \myfunc{init\_struct}{init\_struct} – After allocating and setting of zeroes of the ecore\_dev [the upper-layer responsibility], a pointer to it should be passed to this function for some early initialization of the data structure. \\
+	
+	\item \myfunc{hw\_prepare}{hw_prepare} – This function serves two purposes [plus some additional inner ecore workings]:
+	\begin{enumerate}
+		\item It enables the ecore to access its BAR, doing things such as enabling the PTT pool and opening the access in the PGLUE\_B block.
+		Notice this doesn’t actually do anything to the PCI BAR itself – the upper-layer should have initialized those before calling this function, and must guarantee that its REG\_WR/RD functions actually point to valid, accessible addresses.
+		\item It learns as much as it can about system configuration from HW and SHMEM. 
+	\end{enumerate}
+
+Trying to access registers except for pci-related ones prior to calling this function will fail. \\
+
+	\item \myfunc{resc\_alloc}{resc_alloc} – Allocates the various ecore-related memory, e.g., contexts, slowpath queue, SRIOV information, etc. Notice that before calling this function, each HW-function of the \texttt{ecore\_dev} should have its `pf\_params’ set, as the function depends upon the protocol-specific resources for its calculations. \\
+	
+	\item \myfunc{resc\_setup}{resc_setup} – Configures the various slowpath elements. Notice that since there’s no guarantee chip is alive at this point [i.e., it’s very likely the chip is reset at this point], it fills the configuration in the runtime array instead of actually writing it to chip. \\
+
+	\item \myfunc{hw\_init}{hw_init} – This function actually initializes the chip, using the init-tool and the runtime array to make the correct configuration.
+	 As part of the slowpath interrupt enablement, ecore invokes OSAL\_SLOWPATH\_IRQ\_REQ() callback for each HW function. The client implementation should setup the IRQ handlers for slowpath interrupt handling.
+	 This is required since as part of the flow the \texttt{function\_start} ramrod will be sent to FW; Once FW finishes handling it, an \myindex{EQE} [Event Queue Element] will be placed in the slowpath event queue and an interrupt will be fired. The flow is dependent on the EQE being processed.
+	 
+	Some interesting sub-functions of the \texttt{ecore\_hw\_init()} method, at least for debugging purposes as many possible errors can be caught there:
+	\begin{itemize}
+		\item \texttt{ecore\_get\_init\_mode()} – this creates a bitmask which will be later passed to the init-tool which describes the configured mode – Multi function vs. Single function, 40G vs. 100G etc. A wrong configuration here could explain many peculiar events later on. \\
+
+%		\item ecore\_mcp\_load\_req() – the MFW [assuming it is present] will answer with one of 3 possible answers: ENGINE, PORT or FUNCTION.
+%		The MFW is responsible for initializing the common blocks [i.e., the HW blocks shared between the 2 engines], but the driver is responsible for the rest.
+%		Each function needs to perform different initialization based on whether it’s the first to load on its engine [ENGINE], the first to load on its port [PORT] or if it’s being loaded on an already initialized port [FUNCTION]\footnote{Initialization which is common for both engines will be performed by the MFW.}.
+%	Some very basic errors can be detected here, if the function receives an unexpected answer from MFW.
+	\end{itemize}
+
+Once this function returns, the chip is initialized, FW is functional and slowpath event queues are operational.	
+
+\end{itemize}
+
+\section{Zipped and Binary firmware}
+\label{sec:init-Zipped and Binary firmware}
+\begin{itemize}
+	\item \myindex{Zipped Firmware} - There are two types of firmware files generated in ecore.\\
+Non-zipped firmware [ecore\_init\_values.h and ecore\_init\_values.bin] and Zipped firmware [ecore\_init\_values\_zipped.h and
+ecore\_init\_values\_zipped.bin] files. Each type of file is generated in two formats that is a C header file and binary file,
+where each has all relevant data needed to initialize the firmware. Either of these file types can be used for firmware initialization.
+The difference is that Zipped firmware files has lot of dmae firmware data zipped which is beneficiary in reducing the code size.\\
+
+By default, the non-zipped variant is used. If ecore clients want to use zipped version of firmware then they need to have
+CONFIG\_ECORE\_ZIPPED\_FW defined/enabled by their operating system drivers to make feature operational. For unzipping the
+zipped firmware data ecore clients need to implement OSAL\_UNZIP\_DATA() as well. This OSAL is meant for unzipping the
+zipped firmware data in order to do firmware initialization.\\
+
+	\item \myindex{Binary Firmware} - As explained above there are two formats of firmware files
+generated by ecore, C header files [ecore\_init\_values.h and ecore\_init\_values\_zipped.h] and
+binary firmware files [ecore\_init\_values.bin and ecore\_init\_values\_zipped.bin]. Either of those files formats
+can be used by ecore clients to utilize firmware data. By default, ecore uses the .h files which are compiled as part of the ecore,
+but using binary firmware files has the advantage where the code size is reduced and the FW can be loaded from a file imported by
+the system.\\
+
+If ecore clients want to use firmware data from binary files then they need to have CONFIG\_ECORE\_BINARY\_FW defined/enabled by their
+operating system drivers to make feature operational. Ecore clients must store all binary firmware data from the
+file in to a void* pointer and pass that firmware data buffer pointer in ecore\_hw\_init() as an argument.
+If ecore client is not using binary firmware file or instead using firmware from regular header files then they
+should pass NULL as an argument for binary firmware data buffer in ecore\_hw\_init().
+
+
+\end{itemize}
+
+\section{De-Initialization}
+\label{sec:init-de-init}
+\silentfunc{hw_stop}
+\silentfunc{resc_free}
+\silentfunc{hw_remove}
+\begin{itemize}
+	\item \myfunc{hw\_stop}{hw_stop} – this function notifies the MFW that the HW-functions unload, stops the FW/HW for all HW-functions in the \texttt{ecore\_dev} including sending the common PF\_STOP ramrod for each HW-function, and disables the HW-functions in various HW blocks.
+	Notice that before calling this, all the protocol specifics done after initializing the HW should have already been reversed by the upper-layer [e.g., L2 VPORTs which were started by the upper layer should be stopped before calling this].
+	Following this function, it is guaranteed HW will not generate any more slowpath interrupts, so the interrupt handler can be released [and slowpath DPC context can be stopped]. \\
+	
+	\item \myfunc{int\_disable\_post\_isr\_release}{ecore_int_disable_post_isr_release} – this function performs the required IRQ related cleanup post the ISR release. The function need to be called after releasing all slowpath IRQs of the device.
+
+	\item \myfunc{resc\_free}{resc_free} – Releases the memory allocated by the ecore during \texttt{ecore\_resc\_alloc()}. \\
+	
+	\item \myfunc{hw\_remove}{hw_remove} – Release the memory allocated early by the ecore during \texttt{ecore\_hw\_prepare()}.
+	Following this, REG\_RD/REG\_WR are no longer operational - upper layer can disable the PCI BAR.
+\end{itemize}
+\SpillChapterFuncs
+
+%\chapterimage{qlogic-full-36}
+%\chapter{Firmware hsi}
+%\begin{NOTICE}
+%Placeholder - owner Michal
+%\end{NOTICE}
+
+
+\chapterimage{qlogic-full-36}
+\chapter{Interrupts}
+\label{cha:int}
+This chapter describes how the device notifies the driver about operations -
+it describes how firmware status is reflected on host memory via status blocks, and how the firmware initiates an interrupt toward the driver.
+
+A reference document that fully describes status blocks can be found at \cite{doc:SB}.
+
+
+\section{Status blocks - host point of view}
+The \myindex{status block} structures are allocated on host memory. The status block is an array of indices which are updated by firmware (mainly ring consumer values). 
+There are 288 status blocks per path in Big Bear and 368 in K2.
+
+When one of the indices on a status block is updated (because some event occurred at the device), the status block is copied from internal device memory to host memory, and an interrupt is generated.
+The CAU unit may aggregate several events and generate a single update of the status block and a single interrupt, in order to lower the number of interrupts sent to host CPU.
+ 
+The indices of the status blocks are referred to as \myindex{protocol indices} (abbreviated to \textit{pi}).
+Originally, the motivation behind multiple status blocks was to enable multiple protocols to work with the same status block, giving each protocol a different index.
+However, with single personality this is no longer the case.
+Multiple indices are used for L2 to differentiate between RX / TX and different class of service operations. 
+
+\subsection{Initialization}
+\label{ssec:sb-init}
+There is a dedicated status block for ecore usage which is allocated and maintained by ecore.
+The fastpath status blocks used for traffic need to be allocated by the protocol driver.
+This memory must be DMA-coherent memory.
+The ecore defines a structure called \texttt{ecore\_sb\_info} which should be allocated by the protocol driver and initialized using the function \myfunc{int\_sb\_init}{int_sb_init} 
+%[code snippet \ref{snippets/ecore_int_sb_init.h}].
+This structure is later used for calling the functions \texttt{ecore\_sb\_update\_sb\_idx()} and \texttt{ecore\_sb\_ack()}.
+
+%\insertcode{snippets/ecore_int_sb_init.h}{Initialize status blocks}
+
+\begin{NOTICE}
+	Status blocks need to be allocated and initialized before queues are created.
+\end{NOTICE}
+
+\section{Mode and configuration}
+The device can work in one of the following interrupt modes:
+\begin{enumerate}
+	\item INTA – Physical interrupt line.
+	\item MSI –  Message signaled interrupts. Device is programmed with one address to write to, and 16-bit data to identify the interrupt.
+	\item MSIX – Large number of interrupts (up to 2048) and each one gets a separate target address, making it possible to designate different interrupts to different processors.
+	This is the preferred mode for performance.
+	\item POLL – HW increments producers on status blocks in case of interrupts but it doesn't generate any message nor does it assert any physical line. It's the upper-layer responsibility to periodically poll on those changes to identify interrupts. \\
+\end{enumerate}
+
+Enabling and disabling interrupts is OS specific and done differently by the OS specific layer of the driver.
+However, the device needs to be configured differently according to the selected interrupt mode; This initialization is done by the ecore.
+
+In order to so, the proper interrupt mode using an \myindex{ecore\_int\_mode} enum [can be seen in code snippet [\ref{snippets/ecore_int_mode.h}]] needs to be passed when calling \texttt{ecore\_hw\_init}.
+
+\insertcode{snippets/ecore_int_mode.h}{Enum for the interrupt mode}
+
+If upper-layer driver would later wish to change the interrupt mode, it can do so by calling \myfunc{int\_igu\_enable\_int}{int_igu_enable_int},
+or to \myfunc{int\_igu\_disable\_int}{int_igu_disable_int} when wishing to disable interrupt generation altogether.
+
+%\insertcode{snippets/ecore_int_endis.h}{Functions for enabling/disabling interrupts}
+
+In MSIX mode, each status block should generate it's own interrupt message, meaning in reasonable OSes it should be possible to connect each interrupt with the specific handler of that interrupt's source.
+The \textit{sb\_id} passed as value to \textit{ecore\_int\_sb\_init()} will indicate the index of the vector in the MSI-X table that would be used to generate interrupts for this specific SB.
+I.e., if the value passed is $X$, then the $X^{th}$ MSI-X vector will generate interrupts for this SB.
+
+When working in INTA / MSI we work in single-ISR multiple-DPC mode; The same interrupt line can signify interrupts from many possible status blocks. In this case the information of which status block generated an interrupt needs to be read from a register in the IGU. Use \myfunc{int\_igu\_read\_sisr\_reg}{int_igu_read_sisr_reg} to get the information [returned value is a bitmask of status blocks which asserted the interrupt].
+
+%\insertcode{snippets/ecore_int_sisr.h}{INTA mechanism for reading interrupt source}
+
+\section{IGU block operation}
+The IGU block has a mapping of status blocks to interrupts.
+The mapping is done inside the IGU CAM and maps a (function, vector) pair to an MSI-X message.
+In case of INTA / MSI, each function has a register in the IGU stating which status block gave the interrupt.
+The IGU block is responsible for generating the interrupt. It receives the command to generate an interrupt from the CAU block.
+The IGU block maintains producer-consumer pairs per status block.
+The CAU updates the producer after it wrote the status block to host memory.
+The driver updates the consumer after it finished processing the status block.
+The IGU block generates an interrupt when there is a prod-cons difference on the status block.
+
+CAU also handles coalescing of status block writes and interrupt generation.
+The CAU unit may aggregate several events and generate a single update of the status block and a single interrupt, in order to lower the number of interrupts sent to host CPU.
+
+\section{Interrupt handling flow}
+\label{sec:sb-flow}
+The flow of handling an interrupt in the device and driver is as follows:
+\silentfunc{sb_update_sb_idx}
+\silentfunc{sb_ack}
+\begin{enumerate}
+	\item The device (Firmware/CAU) updates a status block index.
+	
+	\item The device copies the status block to host memory and generates an interrupt.
+	
+	\item OS is triggered, calling the driver's Interrupt Service Routine [ISR].
+	
+	\item (Possible upper-half handling and bottom-half scheduling, or other OS-specifics which are outside the scope of this document).
+	
+	\item Driver identifies a producer update on the status block (as the producer is written as part of the status block on host memory) using \myfunc{sb\_update\_sb\_idx}{sb_update_sb_idx}.
+	
+	\item Driver scans the protocol indices in the status block to determine the interrupt source.
+	\begin{NOTICE}
+		It's likely the upper-layer doesn't really need to scan the status block, but rather compare values in some previous-supplied addresses against a shadow copy. E.g., In L2 the ecore callbacks configuring the queues will return the addresses which upper-layer should test for producer updates. See section [\ref{sec:l2-start}].
+	\end{NOTICE}
+
+	\item When Driver completes processing all the indices on the status block, it writes the producer value from the status block into the IGU consumer address, using \myfunc{sb\_ack}{sb_ack}.
+	
+	\item The IGU compares the producer and consumer -- if they differ it will generate an additional interrupt.
+	
+\end{enumerate}
+
+\begin{exampleT}
+	Assume an Rx packet is received by device. After FW places the packet in the Rx rings, it updates the status block of that Rx ring; This in turn is copied into host memory and an MSI-X interrupt for the appropriate Rx queue's status block is triggered.
+	Driver reads the status blocks, scanning the indicies and identifies the interrupt is an Rx CQE consumer and handles the incoming packet. Assuming this is the only interrupt source [and there was also a single packet] driver than acks the status block.
+\end{exampleT}
+\SpillChapterFuncs
+
+
+\chapterimage{qlogic-full-36}
+\chapter{Management firmware [MFW] interface}
+\label{cha:mfw}
+
+The management firmware runs on its own processor on the chip [\myindex{MCP}] and has many responsibilities – it serves as the entity initially configuring the chip [during bios phase], answering the various management protocols, synchronizing between PFs, configuring the physical link, etc.
+HW functions and the \myindex{MFW} may interact with each other in both ways – driver may send messages to the MFW in the form of commands on a buffer, while the MFW generates attentions for the driver and posts messages in a designated mailbox in the SHMEM. The implementation of the interface resides in \texttt{ecore\_mcp.[ch]}, with the addition of \texttt{.h} files generated by the MFW owners, e.g., \texttt{mcp\_public.h} which contains the SHMEM structure and the list of commands.
+The API that should be included by upper-layer driver is defined in \texttt{ecore\_mcp\_api.h}.
+
+The interface between driver and MFW is initialized as early as possible in the initial initialization flow [specifically as part of \texttt{ecore\_hw\_prepare()}],  as this initializes the Driver access to SHMEM which is used later during initialization to learn about the chip configuration [which was read from NVRAM by MFW and written into SHMEM].
+The upper layer doesn’t need to take care of allocating/releasing of this interface – it’s part of the greater initialization/de-initialization of the ecore.
+
+\section{Shared Memory [SHMEM]}
+The \myindex{shared memory} is a segment of memory accessible to all functions as well as the MFW. The memory is used for various purposes:
+\begin{enumerate}
+	\item MFW fills it with current HW configuration, either based on the default found in the NVRAM or based on some management-protocol [e.g., it’s possible vlans configuration is determined by switch and communicated to the MFW]. Driver reads those values and decides upon its logical state/configures HW appropriately. \\
+	
+	\item The driver--MFW interface is based on mailboxes in well-known addresses in the SHMEM. \\
+	
+	\item It’s possible [as in E3] that there will be driver-held information that will be requested by some management-protocol, and the driver will have to fill it in some well-known address in the SHMEM.
+\end{enumerate}
+
+An upper-layer driver is not supposed to access the SHMEM directly; It should only do so by using ecore functions and accessing ecore structs. The ecore \textit{mcp\_info} struct contains as one of its fields \textit{func\_info} which is filled by the ecore during early device initialization with all the function-specific static\footnote{i.e., data that shouldn't change while driver is running} data. Upper-layer driver can read those values for its own usage.
+
+\section{Ecore - MFW interface}
+\begin{itemize}
+	\item Sending messages from driver to MFW -- Each HW-function has an address in the SHMEM in which the MFW will poll for messages from that HW-function.
+	A message is a u32 consisting of a command bit-mask which indicates of the message the HW-functions sends and a cyclic sequential number.
+	In addition there’s another u32 field which might contain additional parameters [command-specific].
+	The driver increases the sequence number and writes the message and then polls until the MFW writes its response [with the correct sequence number] to another known address in SHMEM\footnote{Obviously, this is a one-pending mechanism.}
+	The MFW can also send an additional parameter [command-specific]. \\
+	
+	\item Messages from MFW to driver -- MFW will trigger a general HW attention which will be handled by the specific HW-function [there’s a different general HW attention per HW-function].
+	Per-HW-function there’s an array of message producers in SHMEM,  of which the ecore maintains a copy.
+	Before sending the attention, the MFW will increment the producer of the message it wishes to inform the driver and the driver will recognize the message by noticing the difference in producers.
+	After handling said message, the driver will ack the message by writing the new producer back to SHMEM and disabling the general HW attention.
+	Notice it's [at least theoretically] possible for the ecore to encounter multiple MFW messages following a single attention from HW. \\
+\end{itemize}
+
+Notice the commands’ content vary -- some of the commands will require additional parameters to be filled in specific fields in the SHMEM before the commands are passed.
+
+\section{API between ecore's MCP interface and upper-layer driver}
+\myfunc{mcp\_cmd}{mcp_cmd} --  this is the very core of message-passing from driver to MFW. Upper-layer driver should pass the command (FW\_MSG\_CODE\_* from \texttt{mcp\_public.h}) and a parameter, as well as pointers for the MFW response and additional possible parameter. The function will pass the command for MFW and await [sleep] for its reply. \\
+
+A ‘special’ instance of this function is \texttt{ecore\_mcp\_load\_req()} [which isn’t an API function] - that function sends an indication to the MCP that the HW-function is being loaded.
+The MFW is used as both a book-keeper and synchronization mechanism for the loading of PFs, as there are communal resources. The response will be (FW\_MSG\_CODE\_DRV\_LOAD\_<X>), where X can be either ENGINE, PORT or FUNCTION:
+\begin{itemize}
+	\item Engine – HW-function is the first being loaded on its engine.
+	\item Port – Another HW-function has already initialized the engine, but this HW-function is first on its port.
+	\item Function – Another HW-function has already initialized the port.
+\end{itemize}
+According to the MFW response the ecore knows what need to be initialized. \\
+
+\texttt{ecore\_handle\_mcp\_events()} – This function is called from the slowpath interrupt context [sleepless] upon MFW attention to the driver.
+Dependent on the exact message received from the MFW, it’s possible that this will eventually will call some OSAL which will need to be implemented by the upper-layer driver, e.g., in case of link change indication [The upper-layer needs to be notified and should decide on its own what to do with that information].
+
+\section{Link Interface}
+\label{sec:mfw-link}
+The MFW is responsible for configuring the physical link [i.e., MAC, PHY, etc.]. The ecore encapsulates the entire interface with MFW for configuring the link, leaving a relatively narrow API with the upper-layer driver.
+The ecore HW-function contains 2 related strctures –
+\silentfunc{mcp_get_link_params}
+\silentfunc{mcp_get_link_state}
+\begin{itemize}
+	\item Link\_params – The ecore uses this as inputs for configuring the link; According to the values in this struct, the ecore will later configure shmem in the appropriate places so that once the MFW receives the command to set the link it will use this configuratio.
+	During ecore initialization, the ecore will fill this structure with the default values from SHMEM [values set by MFW according to NVRAM configuration]
+When upper-layer driver wishes to update link configuration, it should change this struct.
+It can access it by calling \myfunc{mcp\_get\_link\_params}{mcp_get_link_params} \\
+
+	\item Link\_output – The ecore fills the structure from attention handling context whenever the MFW indicates that a link change has occurred. Upper layer driver can read this to get information about the current state of the physical link. It can access this struct by calling \myfunc{mcp\_get\_link\_state}{mcp_get_link_state}.\\
+\end{itemize}
+
+In order to work with the ecore link interface, upper driver needs to implement an OSAL [\texttt{osal\_link\_update()}] which will be called whenever the link state has changed – this will notify the upper driver that the link has changed and that it should probably read link\_output and act upon it. \\
+
+In order to set/reset the link, the upper driver should call \myfunc{mcp\_set\_link}{mcp_set_link} after overriding the link\_params fields with its required link configured [optional, as without doing anything the structure will contain the default link configuration found in SHMEM].
+Passing true will cause MFW to try setting the link [either by force or via auto-negotiation, based on the configuration], while passing false will cause the MFW to reset the link.
+
+Notice the logic for link-flap-avoidance should be contained in MFW, e.g., in multi-function mode there’s no need for the upper-layer driver to count the number of functions loaded in order to decide whether during unload it should request a link reset; It should do it regardless.
+It’s the MFW's duty to decide whether the unloading function is actually the last loaded function on its port and thus whether to actually reset the link.
+
+\subsection{Energy Efficient Ethernet (EEE)}
+EEE feature enables the device to put its transistors in sleep mode when there is no data activity on the wire. Hence achieves the significant reduction in the power consumption of the device. It's a Base-T feature, more details of which are captured under IEEE 802.3az standard. MFW negotiates the EEE parameters with the peer device and the results will be shared to the ecore as part of link notification. Following are the negotiated parameters which will be encapsulated in the struct \texttt{ecore\_mcp\_link\_state}.
+\begin{itemize}
+	\item eee\_active – EEE is negotiated and is currently operational.
+	\item eee\_adv\_caps – Device advertized capabilities.
+	\item eee\_lpi\_adv\_caps – Peer device advertized capabilities.
+\end{itemize}
+Following are the EEE link parameters which can be queried by upper layer driver using \myfunc{mcp\_get\_link\_params}{mcp_get_link_params} API.
+\begin{itemize}
+	\item eee\_enable – EEE is enabled.
+	\item eee\_supported – Device supports EEE.
+	\item eee\_tx\_lpi\_enable – Determines whether the device should assert its Tx LPI.
+	\item eee\_tx\_lpi\_timer – EEE delay timer value, i.e., amount of time device should stay in idle mode prior to asserting its Tx LPI  (in  microseconds).
+\end{itemize}
+Upper layer driver can configure the one or more of the EEE following parameters.
+\begin{itemize}
+	\item eee\_enable
+	\item eee\_adv\_caps
+	\item eee\_tx\_lpi\_enable
+	\item eee\_tx\_lpi\_timer
+\end{itemize}
+
+\section{Dcbx Interface}
+\label{sec:mfw-dcbx}
+The MFW is responsible for negotiating the dcbx parameters [e.g., per priority flow control (PFC)] with peer device. During initialization, MFW reads the dcbx parameters from NVRAM (called local parameters) and negotiates these with the peer. The negotiated/agreed parameters are called operational dcbx parameters. MFW provides driver interfaces for querying and configuring the dcbx parameters. The ecore dcbx implementation provides three APIs, one for querying the dcbx paramters and the other two for updating the dcbx configuration.
+\silentfunc{dcbx_query_params}
+\silentfunc{dcbx_get_config_params}
+\silentfunc{dcbx_config_params}
+\begin{itemize}
+	\item \myfunc{dcbx\_query\_params}{dcbx\_query\_params} – The API returns the current dcbx configuration. It expects type (i.e., local/remote/operational) and the buffer for storing the dcbx parameters of that type.\\
+
+	\item \myfunc{dcbx\_get\_config\_params}{dcbx\_get\_config\_params} - The API returns the currently cached dcbx parameter set that can be modified for making the dcbx update requests. \\
+
+	\item \myfunc{dcbx\_config\_params}{dcbx\_config\_params} – The API is used for sending the dcbx parameters update request. The API expects dcbx parameters to be configured and the flag specifying whether the parameters need to be sent to hardware or just cache at the ecore. When driver sends dcbx config to the hardware, device initiates the dcbx negotiation with the peer using lldp protocol. The negotiation takes few seconds to complete, and also the lldp requests are rate limited (using a predefined credit value). The dcbx API option “hw\_commit” specifies whether the dcbx parameters need to be committed to the hardware or just cache at the driver. When client requests the commit, all the cached parameters are sent to the device and the parameter negotiation will be initiated with the peer. \\
+\end{itemize}
+The steps for configuring the dcbx parameters are, upper layer driver invokes ecore\_dcbx\_get\_config\_params() API to get the current config parameter set, and update the required parameters, and then invoke ecore\_dcbx\_config\_params() API.
+
+If there is any change in the dcbx configuration at the host (for example due to a negotiation with the peer), then MFW notifies the same to ecore. OSAL\_DCBX\_AEN() would be called after such notification, ecore client would need to provide the implementation for this OSAL.
+
+\section{Management protocol APIs}
+\label{sec:mfw-protocols}
+MFW needs various bits of information from the driver, and it gathers those in one of two methods:
+\begin{itemize}
+	\item Pulling – if ecore can’t provide information on its own, ecore-client would be required to implement an OSAL.\\
+	\item Pushing – it’s the ecore and ecore-client’s responsibility to push the data.\\
+\end{itemize}
+In some cases, ‘Push’ is done without involvement of the ecore-client. If that’s not possible, it becomes more risky as the responsibility of doing things correctly passes to the ecore-client. Ecore-client shouldn’t presume to do ‘push’ only for calls which match the configured management mode. Instead it should always do them and let the ecore be the arbiter of whether those are needed by MFW or not. Ecore provides the following APIs for updating the configuration attributes, it is the client's responsibility to invoke these APIs at the appropriate time.
+\silentfunc{mcp_ov_update_current_config}
+\silentfunc{mcp_ov_update_mtu}
+\silentfunc{mcp_ov_update_mac}
+\silentfunc{mcp_ov_update_wol}
+\silentfunc{mcp_ov_update_driver_state}
+\silentfunc{mcp_update_fcoe_cvid}
+\silentfunc{mcp_update_fcoe_fabric_name}
+\begin{itemize}
+	\item \myfunc{mcp\_ov\_update\_current\_config}{mcp\_ov\_update\_current\_config} – Drivers need to call this API when user updates one (or more) of the following: mtu, primary mac or Wake on LAN settings (to a non-default value). In addition, it also needs to call a unique API per each:
+	\begin{itemize}
+		\item \myfunc{mcp\_ov\_update\_mtu}{mcp\_ov\_update\_mtu} – called when user sets the mtu to a value other than the default provided by the ecore.\\
+
+		\item \myfunc{mcp\_ov\_update\_mac}{mcp\_ov\_update\_mac} – called when user updates the primary mac address.\\
+
+		\item \myfunc{mcp\_ov\_update\_wol}{mcp\_ov\_update\_wol} – called when Wake-on-LAN settings are updated.\\
+	\end{itemize}
+	\item \myfunc{mcp\_ov\_update\_driver\_state}{mcp\_ov\_update\_driver\_state} – notify about a change in the driver state. Following are the possible driver states,
+	\begin{itemize}
+		\item ECORE\_OV\_DRIVER\_STATE\_NOT\_LOADED - Firmware is not loaded.\\
+
+		\item ECORE\_OV\_DRIVER\_STATE\_DISABLED - Driver is not ready yet.\\
+
+		\item ECORE\_OV\_DRIVER\_STATE\_ACTIVE - Driver is operational.\\
+	\end{itemize}
+	Ecore sets the following driver states,
+	\begin{itemize}
+		\item DISABLED - After firmware is successfully loaded on the device, ecore updates the driver state as DISABLED (as part of ecore\_hw\_init() implementation). \\
+		\item NOT\_LOADED - Ecore sets this state when the protocol driver is unloaded (as part of ecore\_hw\_remove()).\\
+	\end{itemize}
+	It's the protocol driver's responsibility to alternate between the states,
+	\begin{itemize}
+		\item ACTIVE - Set when the required initialization is done from the driver side and the device is ready for traffic switching.\\
+		\item DISABLED - Set when device is not operational (e.g., fastpath queues are released or not configured).\\
+	\end{itemize}
+	\item \myfunc{mcp\_update\_fcoe\_cvid}{mcp_update_fcoe_cvid} - Update MFW with the 802.1q fcoe vlan id assigned for the PF.\\
+	\item \myfunc{mcp\_update\_fcoe\_fabric\_name}{mcp_update_fcoe_fabric_name} - Update fabric name value to the MFW. Fabric name is the value returned by the fabric domain controller in response to a GS-FC “Get Fabric Name” command from the adapter.\\
+\end{itemize}
+
+Ecore also provides the TLV request interface for MFW for querying the driver/device attributes. MFW uses mailbox interface to notify ecore on the required TLV information. Ecore parses the request, populates the required information with the help of ecore clients and sends it to the MFW. Ecore client need to provide necessary infrastructure and the OSALs for implementing this interface. 
+\begin{itemize}
+	\item OSAL\_MFW\_TLV\_REQ - The call indicates that ecore has received a TLV request notification from the MFW. The execution context in interrupt mode, hence ecore client need to schedule a thread/bottom-half context to handle this task, and return the control immediately. The bottom-half thread will need to invoke \myfunc{mfw\_process\_tlv\_req}{mfw_process_tlv_req} for further processing of the TLV request.\\
+	\item OSAL\_MFW\_FILL\_TLV\_DATA - Ecore invokes this callback to get the TLV values of a given type. Ecore client need to fill in the values for all the fields that it's aware of, and also need to set the flags associated with the respective fields. For instance,  if client sets value for 'npiv\_enabled' field, it needs to set the flag 'npiv\_enabled\_set' to true.\\
+\end{itemize}
+
+\SpillChapterFuncs
+
+
+\chapterimage{qlogic-full-36}
+\chapter{L2 protocol}
+\label{cha:l2}
+
+\section{L2-related terminology}
+This section describes in a very highlevel manner several FW objects which are related to L2. Developers implementing L2 support over the ecore should be familiar with these\footnote{Probably even more than is in the scope of this document.}.
+\begin{itemize}
+	\item Virtual port [\myindex{VPORT}] -- Can simply be seen as a collection of queues, each HW-function will have at least one VPORT configured\footnote{And in most scenarios one will suffice.}. Classifications are configured per-VPORT. \\
+	
+	\item Queues -- Either Rx/Tx, queues are attached to a VPORT. There can multiple queues per-VPORT [e.g., if RSS/TSS is supported]. Usually, each Rx queue will use it's own status block for interrupts upon Rx packets but Tx queues can utilize the same status blocks, using different protocol indices. \\
+\end{itemize}
+
+\section{Starting an L2 device}
+\label{sec:l2-start}
+This section begins after section \ref{sec:init-init}, I.e., assuming the HW-function has already been initialized by the init tool and the PF\_START ramrod has already been sent.
+
+	\begin{NOTICE}
+	Although VPORTs' and queues' indices are shared between all HW-function on the same engine, the resource allocation scheme determines a range of VPORTs per-HW-function to use for configuration [i.e., developer can assume starting index is always 0 per-HW-function].
+	\end{NOTICE}
+
+
+\silentfunc{sp_vport_start}
+\silentfunc{eth_rx_queue_start}
+\silentfunc{eth_tx_queue_start}
+\silentfunc{sp_vport_update}
+\begin{enumerate}
+	\item \myfunc{sp\_vport\_start}{sp_vport_start} -- this function initializes a vport in FW [ETH\_RAMROD\_VPORT\_START will be sent]. The handle for this function is a \texttt{vport\_id} which is passed and the most 'interesting' argument is the MTU for that VPORT.
+	This VPORT will be inactive after sending this ramrod, i.e., until enabling it via a vport update it will not actually perform Rx/Tx. \\	
+
+	\item \myfunc{eth\_rx\_queue\_start}{eth_rx_queue_start} -- initializes an rx queue on a given VPORT.
+	A pre-request is that the VPORT has already been initialized.
+	There are 2 identifier of the queue - the queue index to add and the VPORT index to add it to. The queue-index should be unique for the Rx-queue; No 2 Rx-queues of the same PF should use the same id. 
+	There are quite a few parameters that need to be supplied, e.g., status block, physical addresses of rings, etc.
+	
+	The function is expected to receive a pointer to a \texttt{p\_ret\_params} which it will fill with outputs [upon success]. The ecore would fill the address where producer-updates need to be written [in the storm's RAM]; The upper-driver will write producer updates to that address to replenish its Rx-rings.
+
+	\begin{NOTICE}
+	Address is mapped by GTT, so upper-driver can simply write to that address, using the necessary memory barriers.
+	\end{NOTICE}
+	In addition, ecore would also fill a \texttt{p\_handle}. This handle is opaque to the ecore-client, and should be passed to other Rx-queue APIs when doing configuration relating to that queue.
+	
+	After calling this function, upper-layer driver should initialize the Rx packets producers. \\
+
+	\item \myfunc{eth\_tx\_queue\_start}{eth_tx_queue_start} -- initializes a Tx queue on a given VPORT0.
+		Very similar to the Rx queue start method, with some slight differences in the parameters [BD ring address instead of Rx rings, etc.]. For Tx-queues, the same queue-id can be shared between 2 different queues. That would cause those queues to share the same coalescing configuration.
+		Just like for Rx-queues, the ecore would fill the \texttt{p\_ret\_params} with an opaque handler to be used for further calls relating to this queue. In addition, it will provide a \texttt{p\_doorbell} address, which is an address into which a doorbell needs to be written to activate firmware once a packet is placed on this Tx queue and the buffer descriptors are filled. 
+		\begin{NOTICE}
+		Doorbell addresses are on a different BAR than that of other memories/registers accessed by driver, and the PTT/GTT scheme does not apply to it; Thus the address can simply be accessed using the necessary memory barriers.
+		\end{NOTICE}
+
+	\item \myfunc{sp\_vport\_update}{sp_vport_update} -- This is required to enable the VPORT. It should be called after the Tx/Rx queues were already added, and this will enable the VPORT to send and receive packets\footnote{Notice that without classification configuration Rx won't actually work. Also notice this function can do a lot of things; Enabling the VPORT is only one of them.}.
+
+	In order to enable the VPORT for traffic, the upper-layer driver should set in \texttt{p\_params} the following:
+	\begin{enumerate}
+		\item \texttt{update\_vport\_active\_flg} to 1.
+		\item \texttt{vport\_active\_flg} to 1.
+	\end{enumerate}
+
+\end{enumerate}
+
+\section{Configuring Classifications}
+\label{sec:l2-class}
+Classification configuration consists [mostly] of three thing:
+\begin{enumerate}
+	\item Configuration of the \myindex{Rx mode} -- This defines which datagrams [unicast, multicast, broadcast] should be accepted by the VPORT, and whether all such datagrams or only if a filter is configured for them.
+	\item Configuration of unicast / multicast filters -- defining filters for specific unicast / multicast addresses which should be matched, given that Rx mode  agrees.
+	\item Configuration of vlan filters -- by default, all vlans will be accepted. If at least one vlan [or vlan-mac] filter will be configured only traffic which matches one of the configured vlan filters will pass through.
+\end{enumerate}
+
+There are several ecore functions which are responsible for configuring classifications:
+
+\silentfunc{filter_accept_cmd}
+\silentfunc{sp_eth_filter_ucast}
+\silentfunc{filter_mcast_cmd}
+\begin{itemize}
+	\item \myfunc{filter\_accept\_cmd}{filter_accept_cmd} -- configures the Rx mode of the device.
+	\item \myfunc{sp\_vport\_update}{sp_vport_update} -- although not exactly a classification function, calling this will re-set the Rx mode [this calls \texttt{ecore\_filter\_accept\_cmd()} as part of its work].
+	\item \myfunc{sp\_eth\_filter\_ucast}{sp_eth_filter_ucast} -- configures either a unicast filter, vlan filter or a unicast/vlan filter pair.
+		An important parameter for the upper-layer driver\footnote{in the sense that it might affect design, since all fields are relevant.} is the `opcode' field:
+		\begin{itemize}
+			\item ECORE\_FILTER\_ADD -- adds a new filter.
+			\item ECORE\_FILTER\_REMOVE -- removes a filter.
+			\item ECORE\_FILTER\_MOVE -- removes a filter from one vport and adds it to another simultaneously\footnote{Needed by windows.}.
+			\item ECORE\_FILTER\_REPLACE -- adds a new filter after removing all previously configured filters.
+		\end{itemize}
+		
+	\item \myfunc{filter\_mcast\_cmd}{filter_mcast_cmd} -- configures a multicast filter.
+	\begin{warning}
+		This function exists in the ecore but at the moment it's not implemented.
+	\end{warning}
+
+\end{itemize}
+These functions expose the \texttt{ecore\_spq} implementation -- upper-driver layer can choose whether to wait for completion, supply a callback for completion or do-nothing upon completion (the last will usually be the chosen path).
+
+\section{Stopping an L2 device}
+This is pretty straight forward, and works in reverse-order to the initialization of the L2 device.
+After upper-layer driver guarantees that no new Tx-packets will be generated and once Tx queues are all empty, it should do the following:
+\silentfunc{eth_tx_queue_stop}
+\silentfunc{eth_rx_queue_stop}
+\silentfunc{sp_vport_stop}
+\begin{enumerate}
+	\item Disable the VPORT by calling \texttt{ecore\_vport\_update()} after setting:
+	\begin{enumerate}
+		\item \texttt{update\_vport\_active\_flg} to 1.
+		\item \texttt{vport\_active\_flg} to 0.
+	\end{enumerate}
+	
+	\item Close all Tx queues\footnote{Actually, order does not matter between Tx and Rx queues}  by calling \myfunc{eth\_tx\_queue\_stop}{eth_tx_queue_stop}.
+
+	\item Close all Rx queues by \myfunc{eth\_rx\_queue\_stop}{eth_rx_queue_stop}.
+
+	\item Close the vport by calling \myfunc{sp\_vport\_stop}{sp_vport_stop}.
+\end{enumerate}
+
+Following the completion of the \texttt{vport\_stop}, no further traffic should be working. Interrupts can be released, and resources can freed.
+Notice this on its own doesn't return the device into a 'clean-slate' state; There are still several non-L2 things that needs to be done [e.g., cleaning the status blocks of the queues]
+\SpillChapterFuncs
+
+\chapterimage{pictures/qlogic-full-36.jpg}
+\chapter{100G support}
+\label{cha:100}
+
+Our device supports \myindex{100G} link. However, the fastpath pipeline of each HW engine isn't fast enough for that line-rate. The Hardware function term is a catchphrase for the HW resource and identifications normally required by a single pci function. In 100G mode, the device will enumerate as a single pci function\footnote{Or more in multi-function mode; But we will stick with single-function mode for simplicity here.}, but the driver running over this pci function will utilize multiple HW functions.
+From pci standpoint, the distinction between the HW functions (and thus the HW engines) is done via the bar address. Access to the first half of each of the pci function's bars will be translated into an access into a HW function on the first engine, while access to the second half will be translated into an access into a HW function on the second engine.
+From the wire standpoint, both HW-functions are connected to a single physical port, i.e. transmitting traffic from either HW-function will lead to transmission on the same physical port. Incoming traffic from the port is routed to a hardware engine according to its protocol 4-tuple. The HW block responsible for this routing it the \myindex{OPTE}.
+
+This special configuration is also sometimes referred to as \myindex{Couple Mode Teaming} or \myindex{CMT}.
+
+After the early initialization phase of the ecore (i.e., following ecore\_hw\_prepare()), the \textit{ecore\_dev} field \myindex{num\_hwfns} will be filled with the correct number of HW-functions under the PCI device. The ecore and its client should access only the first num\_hwfns entries in the \textit{hwfns} array.
+
+\section{Effects on MSI-X interrupts}
+\label{sec:100int}
+Each path has its own IGU CAM, meaning it has its own set of available status block. But as both HW-functions share the same PCI function, there is a single MSI-X table for that device.
+As a result, when in CMT the MSI-X vectors are split between the two hw-func/Incomtions.
+
+\begin{exampleT}
+\label{ex:CMT1}
+Assume a PCI function is in CMT mode. Let $\text{hwfn}_0$ stand for its HW-function under the first engine and $\text{hwfn}_1$ stand for its HW-function under the second engine.
+Let $\text{MSIX}_i$ stand for the $i^{th}$ entry in the PCI function's MSI-X table.
+
+Then for $\forall n \in \mathbb{N}_{+}$, $\text{MSIX}_{2n}$ is connected to $\text{hwfn}_0$'s status block of index $n$, and $\text{MSIX}_{2n+1}$ is connected to $hwfn_1$'s status block of index $n$.
+\end{exampleT}
+
+\section{Effects on device slowpath configuration}
+Ecore handles almost all the difference between CMT and regular mode on it's own, i.e., it reads the number of HW-functions under the devices and iterates when needed to configure both engines correctly (where as in the non-CMT mode it would have simply configured one).
+What it does require is:
+\begin{itemize}
+	\item Implement OSAL\_BAR\_SIZE. Ecore uses it to determine where it needs to split the bars; Without it it's very likely things will fail very early during initialization.
+	
+	\item Set the HW-function's pf\_params for each HW-function before calling \textit{ecore\_resc\_alloc}.
+	
+	\item Enable slowpath interrupts -- the first 2 MSI-X vectors should be used for slowpath. Notice that the ecore itself will call OSAL\_DPC\_INIT for each HW-function.
+	\begin {exampleT}
+		following Example [\ref{ex:CMT1}], $\text{MSIX}_0$ should be enabled and connected to the DPC of $\text{hwfn}_0$ and $\text{MSIX}_1$ should be enabled and connected to the DPC of $\text{hwfn}_1$.
+	\end{exampleT}
+\end{itemize}
+
+When disabling the slowpath, it's important to remember that there were 2 different DPCs allocated and 2 MSI-X vectors configured to support them, as it's the ecore-client responsibility for disabling the interrupts.
+
+\section{Effects on L2 fastpath configuration}
+Since each HW-function is running on a different path and is an independent entity (as perceived by FW/HW), configuration should be almost symmetric for both HW-functions. E.g., Following the flow of section \ref{sec:l2-start}, ecore\_sp\_vport\_start() should be called separately for each HW-function, queues should be opened separately for each, etc..
+
+Notice that in most cases you can even use the same indices, since FW-indices are per-path. E.g., you can use $\text{vport}_0$ on both HW-functions, since they are different on each path.
+
+\begin{warning}
+	When allocating the status blocks for your queues, do recall that the MSI-X table is shared between the engines, as explained in section [\ref{sec:100int}].
+\end{warning}
+
+\begin{NOTICE}
+	There is an issue between the user control of the number of queues and the actual configuration of queues - e.g., assume user wants $X$ queues. If we use a symmetric configuration what we actually do is open $X$ queues on each path, meaning we actually open $2X$ queues.
+
+	We can either only open $X/2$ queues on each engine, in which case we lose some abilities, e.g., control the keys of the RSS hash-function, or open $2X$ queues and try to hide this fact from user, but this most likely will either incur a performance penalty, hard-to-maintain code or both.
+\end{NOTICE}
+
+\chapterimage{qlogic-full-36}
+\chapter{iSCSI protocol}
+\label{cha:iscsi}
+
+This chapter describes the ecore interface for the upper-layer driver of the iSCSI protocol.
+
+\section{Start iSCSI PF}
+\silentfunc{sp_iscsi_func_start}
+\silentfunc{iscsi_get_global_cmdq_cons}
+\begin{itemize}
+	\item The basic initialization process is described in section \ref{sec:init-init} for all protocols. \\
+	Specifically for iSCSI, before calling \texttt{ecore\_resc\_alloc()}, the upper driver should determine the PF-global parameters, allocate all PF-global queues, and fill the \texttt{iscsi\_pf\_params} part in struct \texttt{ecore\_pf\_params}. \\
+	The following table describes the parameters that should be filled (the rest should be zero):
+	\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Parameter} & \textbf{Description} \\ \hline
+		\texttt{num\_cons} & Up to 4K are supported, suggested default value 128 \\ \hline
+		\texttt{num\_tasks} & Up to 4K are supported, suggested default value 1K \\ \hline
+		\texttt{half\_way\_close\_timeout} & Timeout from sending FIN until abortive close, suggested default value 10sec \\ \hline
+		\texttt{num\_sq\_pages\_in\_ring} & Number of outstanding tasks on the connection * 8B / page-size. \newline Suggested default value for number of outstanding tasks on the connection 256 \\ \hline
+		\texttt{num\_r2tq\_pages\_in\_ring} & Same as \texttt{num\_sq\_pages\_in\_ring} \\ \hline
+		\texttt{num\_uhq\_pages\_in\_ring} & Number of outstanding un-ACKed PDUs, suggested default value -- same as \texttt{num\_sq\_pages\_in\_ring} \\ \hline
+		\texttt{num\_queues} & Number of global queues (CQ / CmdQ / RQ). \newline This should be $\leq$ number of available MSIX vectors for the PF \\ \hline
+		\texttt{log\_page\_size} & 12 for 4KB pages \\ \hline
+		\texttt{glbl\_q\_params\_addr} & The physical address of the list of pointers to the arrays of pointers to global queues pages. \newline The list is built as follows: CQ\#0 PBL pointer, RQ\#0 PBL pointer, CmdQ\#0 PBL pointer, CQ\#1 PBL pointer, RQ\#1 PBL pointer, CmdQ\#1 PBL pointer, etc. \newline Each PBL pointer points to the physical address which contains an array of pointers to the physical addresses of the specific queue pages. \\ \hline
+		\texttt{rqe\_log\_size} & 8 for 256B RQE \\ \hline
+		\texttt{rq\_num\_entries} & Number of RQ entries, suggested value for Initiator 16 (4KB RQ), for Target 128 \\ \hline
+		\texttt{cq\_num\_entries} & \texttt{num\_tasks} + \texttt{rq\_num\_entries} \\ \hline
+		\texttt{cmdq\_num\_entries} & Number of CmdQ entries, suggested default value \texttt{num\_tasks} \\ \hline
+		\texttt{max\_cwnd} & Max congestion window, suggested default value 0xFFFFFFFF (no limit) \\ \hline
+		\texttt{dup\_ack\_threshold} & Dup-ACK counter, suggested default value 3 \\ \hline
+		\texttt{max\_fin\_rt} & Number of FIN retransmits before abortive close, suggested default value 3 \\ \hline
+		\texttt{gl\_rq\_pi} & The index in the status-block for CQ completions, suggested value 0 \\ \hline
+		\texttt{gl\_cmd\_pi} & The index in the status-block for CmdQ completions, suggested value 1 \\ \hline
+		\end{tabular}
+	\end{center}
+	\item After the basic initialization process is completed successfully, it is possible to establish the LL2 queue, and send / receive LL2 packets (as described in section \ref{cha:ll2}).
+	\item \myfunc{sp\_iscsi\_func\_start}{sp_iscsi_func_start} -- this function initializes the iSCSI PF, and passes PF-global parameters to FW. This function should be called before offloading any iSCSI connection.
+	\item \myfunc{iscsi\_get\_global\_cmdq\_cons}{iscsi_get_global_cmdq_cons} -- this function returns the address in the device for updating RQ CONS for the specified queue.
+\end{itemize}
+
+\section{Establish iSCSI connection}
+\silentfunc{iscsi_acquire_connection}
+\silentfunc{iscsi_offload_connection}
+\silentfunc{iscsi_get_db_addr}
+\silentfunc{iscsi_update_connection}
+\begin{itemize}
+	\item \myfunc{iscsi\_acquire\_connection}{iscsi_acquire_connection} -- this function allocates the resources for the connection. \texttt{p\_in\_conn} which is passed to this function should be NULL. Note that ecore allocates by itself struct \texttt{ecore\_iscsi\_conn}, and returns its pointer to the upper driver via \texttt{p\_out\_conn}. Amongst others, ecore initializes in this struct the \texttt{icid} to be used in later task initialization, and the \texttt{conn\_id} which is zero based index.
+	\item \myfunc{iscsi\_offload\_connection}{iscsi_offload_connection} -- this function offloads the connection to the device, and requests to establish the TCP connection. Before calling this function, the upper driver should determine the connection TCP parameters, allocate the connection SQ, and fill parameters in \texttt{ecore\_iscsi\_conn} struct. \\
+	The following table describes the parameters that should be filled:
+	\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Parameter} & \textbf{Description} \\ \hline
+		\texttt{tcp\_on\_chip\_1b} & 1 \\ \hline
+		\texttt{sq\_pbl\_addr} & The physical address of the array of pointers to the physical addresses of the SQ pages \\ \hline
+		\texttt{local\_mac} & Local MAC address \\ \hline
+		\texttt{remote\_mac} & Remote MAC address \\ \hline
+		\texttt{vlan\_id} & VLAN ID \\ \hline
+		\texttt{flags} & TS\_EN (timestamp enable) -- suggested default value 1 \newline DA\_EN (delayed-ACK enable) -- suggested default value 1 \newline DA\_CNT\_EN (delayed-ACK counter enable) -- suggested default value 1 \newline SACK\_EN (SACK enable) -- NA (not supported for iSCSI) \newline KA\_EN (keep-alive enable) -- suggested default value 1 \newline NAGLE\_EN (nagle enable) = NA (not supported for iSCSI) \newline FIN\_SENT – should be 0 \newline FIN\_RECEIVED -- should be 0 \\ \hline
+		\texttt{ip\_version} & IP version \\ \hline
+		\texttt{remote\_ip} & Remote IP address \\ \hline
+		\texttt{local\_ip} & Local IP address \\ \hline
+		\texttt{ka\_max\_probe\_cnt} & Number of keep-alive probe retransmits before indicating connection error, suggested default value 10 \\ \hline
+		\texttt{dup\_ack\_theshold} & Dup-ACK counter, suggested default value 3 \\ \hline
+		\texttt{rcv\_next} & In passive-open, SYN sequence number + 1. NA in active open \\ \hline
+		\texttt{rcv\_wnd} & The window to advertise to the peer (before the scaling) \\ \hline
+		\texttt{snd\_wl1} & In passive-open, SYN sequence number. NA in active open \\ \hline
+		\texttt{cwnd} & Initial congestion window, suggested default value MSS \\ \hline
+		\texttt{ss\_thresh} & Slow-start threshold, suggested default value 65535 \\ \hline
+		\texttt{srtt} & Smoothed round-trip time, suggested default value 300 (300msec) \\ \hline
+		\texttt{rtt\_var} & Round-trip time variation, suggested default value 150 (150msec) \\ \hline
+		\texttt{ts\_recent} & In passive-open, the timestamp value in the SYN packet. NA in active open \\ \hline
+		\texttt{flow\_label} & Flow label for IPv6, NA for IPv4 \\ \hline
+		\texttt{ka\_timeout} & Timeout before the next KA after receiving ACK, suggested default value 7200000 (2 hours) \\ \hline
+		\texttt{ka\_interval} & Timeout before the next KA after sending KA probe, suggested default value 10000 (10 sec) \\ \hline
+		\texttt{max\_rt\_time} & Maximum retransmit time before indicating connection error, suggested default value 20sec \\ \hline
+		\texttt{ttl} & Time-to-live for IPv4, hop-limit for IPv6 \\ \hline
+		\texttt{tos\_or\_tc} & Type-of-service for IPv4, traffic-class for IPv6 \\ \hline
+		\texttt{remote\_port} & Remote TCP port \\ \hline
+		\texttt{local\_port} & Local TCP port \\ \hline
+		\texttt{mss} & Maximum segment size \\ \hline
+		\texttt{snd\_wnd\_scale} & In passive-open, taken from the TS-scale option in the received SYN packet, NA for active open \\ \hline
+		\texttt{rcv\_wnd\_scale} & Receive window scale, suggested default value 4 \\ \hline
+		\texttt{ts\_ticks\_per\_second} & Time-stamp resolution, suggested default value 1000 (1msec) \\ \hline
+		\texttt{da\_timeout\_value} & Delayed-ACK timeout, suggested default value 200 (msec) \\ \hline
+		\texttt{ack\_frequency} & Delayed-ACK counter, suggested default value 2 \\ \hline
+		\texttt{default\_cq} & The desired queue number for completing un-solicited packets / commands \\ \hline
+		\end{tabular}
+	\end{center}
+	When this call completes, the connection is offloaded and 3-way handshake started. 3-way handshake completion is indicated by an asynchronous call from ecore.
+	After this call completes (and even before the asynchronous call), driver can post Login PDU to SQ. However FW will process SQ only after 3-way handshake is completed.
+	\item \myfunc{iscsi\_get\_db\_addr}{iscsi_get_db_addr} -- this function returns the address in the device for updating SQ PROD for the specified CID.
+	\item \myfunc{iscsi\_update\_connection}{iscsi_update_connection} -- this function sends updated iSCSI connection parameters to the device, after Login negotiation ended successfully. Before calling this function, the upper driver should fill parameters in \texttt{ecore\_iscsi\_conn} struct. The following table describes the parameters that should be filled:
+	\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Parameter} & \textbf{Description} \\ \hline
+		\texttt{update\_flag} & The negotiated values for HeaderDigest, DataDigest, InitialR2T and ImmediateData \\ \hline
+		\texttt{max\_seq\_size} & The negotiated value for MaxBurstLength \\ \hline
+		\texttt{max\_pdu\_size} & The negotiated value for MaxRecvDataSegmentLength \\ \hline
+		\texttt{first\_seq\_length} & The negotiated value for FirstBurstLength \\ \hline
+		\texttt{exp\_stat\_sn} & For Initiator, StatSN from the Login response + 1. NA for Target \\ \hline
+		\end{tabular}
+	\end{center}
+\end{itemize}
+
+\section{Close iSCSI connection}
+\silentfunc{iscsi_terminate_connection}
+\silentfunc{iscsi_release_connection}
+\begin{itemize}
+	\item \myfunc{iscsi\_terminate\_connection}{iscsi_terminate_connection} -- this function removes the connection from the device, and requests to close the TCP connection. When this call completes, the connection closure state machine has started, but the connection is still offloaded. Connection closure and removal from the device is indicated by an asynchronous call from ecore.
+	Before calling this function, driver needs to clean all outstanding tasks on the connection by sending cleanup requests via SQ. Clear-SQ / drain may be needed in exceptional cases. \\
+	Logout PDU, if desired, should be posted to SQ before calling this function.
+	\item \myfunc{iscsi\_release\_connection}{iscsi_release_connection} -- this function releases the resources for the connection. It should be called only after the asynchronous call from ecore on connection termination is received.
+\end{itemize}
+
+\section{Close iSCSI PF}
+\silentfunc{sp_iscsi_func_stop}
+\begin{itemize}
+	\item \myfunc{sp\_iscsi\_func\_stop}{sp_iscsi_func_stop} -- this function closes the iSCSI PF. This function should be called only after all the connections on the PF were closed.
+	\item If an LL2 queue was established, it should be closed before continuing with the de-initialization process.
+	\item The rest of the de-initialization process is described in section \ref{sec:init-de-init} for all protocols.
+\end{itemize}
+
+\section{Getting statistics}
+\myfunc{iscsi\_get\_stats}{iscsi_get_stats} can be used to query the device for various protocol-related statistics.
+
+\SpillChapterFuncs
+
+\chapterimage{qlogic-full-36}
+\chapter{FCoE protocol}
+\label{cha:fcoe}
+
+This chapter describes the ecore interface for the upper-layer driver of the FCoE protocol.
+
+\section{Start FCoE PF}
+\silentfunc{sp_fcoe_func_start}
+\silentfunc{fcoe_get_global_cmdq_cons}
+\begin{itemize}
+	\item The initialization process is described in section \ref{sec:init-init} for all protocols. \\
+	Specifically for FCoE, before calling \texttt{ecore\_resc\_alloc()}, the upper driver should determine the PF-global parameters, allocate all PF-global queues, and fill the \texttt{fcoe\_pf\_params} part in struct \texttt{ecore\_pf\_params}. \\
+	The following table describes the parameters that should be filled (the rest should be zero):
+	\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Parameter} & \textbf{Description} \\ \hline
+		\texttt{num\_cons} & Up to 4K are supported, suggested default value 128 \\ \hline
+		\texttt{num\_tasks} & Up to 4K are supported, suggested default value 1K \\ \hline
+		\texttt{glbl\_q\_params\_addr} & The physical address of the list of pointers to the arrays of pointers to global queues pages. \newline The list is built as follows: CQ\#0 PBL pointer, RQ\#0 PBL pointer, CmdQ\#0 PBL pointer, CQ\#1 PBL pointer, RQ\#1 PBL pointer, CmdQ\#1 PBL pointer, etc. \newline Each PBL pointer points to the physical address which contains an array of pointers to the physical addresses of the specific queue pages. \\ \hline
+		\texttt{sq\_num\_pbl\_pages} & Number of outstanding tasks on the connection * 8B / page-size. \newline Suggested default value for number of outstanding tasks on the connection 256 \\ \hline
+		\texttt{rq\_num\_entries} & Number of RQ entries, suggested value for Initiator 16 (4KB RQ), for Target 128 \\ \hline
+		\texttt{cq\_num\_entries} & \texttt{num\_tasks} + \texttt{rq\_num\_entries} \\ \hline
+		\texttt{cmdq\_num\_entries} & Number of CmdQ entries, suggested value \texttt{num\_tasks} \\ \hline
+		\texttt{rq\_buffer\_log\_size} & 8 for 256B RQE \\ \hline
+		\texttt{num\_cqs} & Number of global queues (CQ / CmdQ / RQ). This should be $\leq$ number of available MSIX vectors for the PF \\ \hline
+		\texttt{log\_page\_size} & 12 for 4KB pages \\ \hline
+		\texttt{mtu} & Ethernet maximum transmission unit \\ \hline
+		\texttt{gl\_rq\_pi} & The index in the status-block for CQ completions, suggested value 0 \\ \hline
+		\texttt{gl\_cmd\_pi} & The index in the status-block for CmdQ completions, suggested value 1 \\ \hline
+		\end{tabular}
+	\end{center}
+	\item After the basic initialization process is completed successfully, it is possible to establish the LL2 queue, and send / receive LL2 packets.
+	\item \myfunc{sp\_fcoe\_func\_start}{sp_fcoe_func_start} -- this function initializes the FCoE PF, and passes PF-global parameters to FW. This function should be called before offloading any FCoE connection.
+	\item \myfunc{fcoe\_get\_global\_cmdq\_cons}{fcoe_get_global_cmdq_cons} -- this function returns the address in the device for updating RQ CONS for the specified queue.
+\end{itemize}
+
+\section{Establish FCoE connection}
+\silentfunc{fcoe_acquire_connection}
+\silentfunc{fcoe_offload_connection}
+\silentfunc{fcoe_get_db_addr}
+\begin{itemize}
+	\item \myfunc{fcoe\_acquire\_connection}{fcoe_acquire_connection} -- this function allocates the resources for the connection. \texttt{p\_in\_conn} which is passed to this function should be NULL. Note that ecore allocates by itself struct \texttt{ecore\_fcoe\_conn}, and returns its pointer to the upper driver via \texttt{p\_out\_conn}. Amongst others, ecore initializes in this struct the \texttt{icid} to be used in later task initialization, and the \texttt{conn\_id} which is zero based index.
+	\item \myfunc{fcoe\_offload\_connection}{fcoe_offload_connection} -- this function offloads the connection to the device. Before calling this function, the upper driver should allocate the connection SQ, and fill parameters in \texttt{ecore\_fcoe\_conn} struct. \\
+	The following table describes the parameters that should be filled:
+	\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Parameter} & \textbf{Description} \\ \hline
+		\texttt{sq\_pbl\_addr} & The physical address of the array of pointers to the physical addresses of the SQ pages \\ \hline
+		\texttt{sq\_curr\_page\_addr} & The physical address of the first SQ page \\ \hline
+		\texttt{sq\_next\_page\_addr} & The physical address of the second SQ page (or the first in case of a single page SQ) \\ \hline
+		\texttt{dst\_mac\_addr\_lo} & Remote MAC address – 2 LSB bytes \\ \hline
+		\texttt{dst\_mac\_addr\_mid} & Remote MAC address – 2 middle bytes \\ \hline
+		\texttt{dst\_mac\_addr\_hi} & Remote MAC address – 2 MSB bytes \\ \hline
+		\texttt{src\_mac\_addr\_lo} & Local MAC address – 2 LSB bytes \\ \hline
+		\texttt{src\_mac\_addr\_mid} & Local MAC address – 2 middle bytes \\ \hline
+		\texttt{src\_mac\_addr\_hi} & Local MAC address – 2 MSB bytes \\ \hline
+		\texttt{tx\_max\_fc\_pay\_len} & The maximum FC payload size to transmit \\ \hline
+		\texttt{e\_d\_tov\_timer\_val} & E\_D\_TOV timeout value in 1msec resolution \\ \hline
+		\texttt{rec\_tov\_timer\_val} & REC\_TOV timeout value in 1msec resolution \\ \hline
+		\texttt{rx\_max\_fc\_pay\_len} & The maximum FC payload size to receive \\ \hline
+		\texttt{vlan\_tag} & VLAN ID \\ \hline
+		\texttt{s\_id} & FC Source ID \\ \hline
+		\texttt{max\_conc\_seqs\_c3} & Max concurrent sequences \\ \hline
+		\texttt{d\_id} & FC destination ID \\ \hline
+		\texttt{flags} & INCR\_SEQ\_CNT (continuously increasing SEQ\_CNT on receive) \newline CONF\_REQ (confirmation request supported) \newline REC\_VALID (REC timeout supported) \newline VLAN\_FLAG (indicates if the VLAN ID is valid) \\ \hline
+		\texttt{def\_q\_idx} & The desired queue number for completing un-solicited packets / commands \\ \hline
+		\end{tabular}
+	\end{center}
+	After this call completes driver can post tasks to SQ.
+	\item \myfunc{fcoe\_get\_db\_addr}{fcoe_get_db_addr} -- this function returns the address in the device for updating SQ PROD for the specified CID.
+\end{itemize}
+
+\section{Close FCoE connection}
+\silentfunc{fcoe_terminate_connection}
+\silentfunc{fcoe_release_connection}
+\begin{itemize}
+	\item \myfunc{fcoe\_terminate\_connection}{fcoe_terminate_connection} -- this function removes the connection from the device. \\
+	Before calling this function, driver needs to clean all outstanding tasks on the connection by sending cleanup requests via SQ. Drain may be needed in exceptional cases.
+	\item \myfunc{fcoe\_release\_connection}{fcoe_release_connection} -- this function releases the resources for the connection.
+\end{itemize}
+
+\section{Close FCoE PF}
+\silentfunc{sp_fcoe_func_stop}
+\begin{itemize}
+	\item \myfunc{sp\_fcoe\_func\_stop}{sp_fcoe_func_stop} -- this function closes the FCoE PF. This function should be called only after all the connections on the PF were closed.
+	\item If an LL2 queue was established, it should be closed before continuing with the de-initialization process.
+	\item The rest of the de-initialization process is described in section \ref{sec:init-de-init} for all protocols.
+\end{itemize}
+
+\section{Getting statistics}
+\myfunc{fcoe\_get\_stats}{fcoe_get_stats} can be used to query the device for various protocol-related statistics.
+
+\SpillChapterFuncs
+
+\chapterimage{qlogic-full-36}
+\chapter{RDMA protocol}
+\label{cha:rdma}
+
+This chapter describes the ecore interface for the upper-layer driver of the RDMA protocol. The interface aims at sharing as much as possible between RoCE and iWARP. This chapter is not complete, and currently only details changes for iWARP. (Except for dcqcn which was already detailed before )
+For iwarp support, modification to existing structures and functions names will be made to ease distinction between the two. Similar to HSI changes. The following convention will be used:
+\begin{itemize}
+\item ecore\_rdma\_xxx will be used for common structures and functions
+\item ecore\_roce\_xxx will be used for roce specific structures, fields and functions
+\item ecore\_iwarp\_xxx will be used for iwarp specific structures, fields and functions
+\end{itemize}
+
+\section{Distinguish between iWARP and RoCE}
+Ecore per function context has a field “personality” which is set based on the protocol being iWARP/FCoE/iSCSI/RoCE/Ethernet. In context of network driver, ecore personality could be ECORE\_PCI\_ETH\_ROCE, ECORE\_PCI\_IWARP, or ECORE\_PCI\_ETH. (enum ecore\_pci\_personality)
+Ecore provides the driver the ability to set the ecore personality through the call to ecore\_hw\_prepare by passing personality as a parameter. If ‘personality’ passed in call to ecore\_hw\_prepare is ECORE\_PCI\_DEFAULT the ‘personality’ is derived from the NVRAM configuration for protocol and device capability, else the setting passed by upper driver in the call overrides the NVRAM configuration.
+TBD: NVRAM configuration for distinguishing iWARP and RoCE does not exist and is not finalized yet.
+
+
+\section{Init RDMA PF}
+\silentfunc{rdma_start}
+\silentfunc{rdma_add_user}
+\silentfunc{rdma_query_device}
+\silentfunc{rdma_get_sb_id}
+\begin{itemize}
+\item The initialization process is described in section \ref{sec:init-init} for all protocols. \\
+	Specifically for RDMA, before calling \texttt{ecore\_resc\_alloc()}, the upper driver should determine the PF-global parameters, allocate all PF-global queues, and fill the \texttt{rdma\_pf\_params} part in struct \texttt{ecore\_pf\_params}. \\
+	The following table describes the parameters that should be filled (the rest should be zero):
+	\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Parameter} & \textbf{Description} \\ \hline
+		\texttt{min\_dpis} & the minimum number of device contexts required (i.e. the number of times open device can be called simultaneously) \\ \hline
+		\texttt{num\_qps} & requested number of queue pairs\\ \hline
+		\texttt{edpm\_mode} & (0-Enable EDPM if BAR size is adequate, 1-Force EDPM (modprobe may fail on small BARs), 2-Disable EDPM) This field is relevant to RoCE only\\ \hline
+		\texttt{num\_mrs} & Number of supported MRs. Up to 4K are supported, suggested default value 1K \\ \hline
+		\texttt{gl\_pi} & The index in the status-block for CNQ completions, suggested value 3 (define named QED\_RDMA\_PROTOCOL\_INDEX exists)\\ \hline
+		\texttt{roce\_enable\_dcqcn} & If enabled maximum number of rate limiters will be allocated during hardware initialization which can later be initialized and configured during roce start. Must be set to enabled dcqcn during roce initialization. This field is relevant to RoCE only.\\ \hline
+		\texttt{iwarp\_port} & TCP port number to be used for the iwarp traffic\\ \hline
+		\end{tabular}
+	\end{center}
+	The values of num\_qps, num\_mrs will impact the amount of memory allocated in the ILT. Note that although these parameters are rdma specific, they are actually used during common hw initialization phase. The amount of ilt memory will differ between RoCE and iWARP as iWARP requires only one cid per QP and RoCE requires two.
+
+	\item \myfunc{rdma\_start}{rdma_start} -- this function initializes the RDMA PF, allocates resources required for RDMA and passes PF-global parameters to FW. This function should be called before performing any other RDMA operations.
+ The following table describes the parameters that should be passed to the function:
+	\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Parameter} & \textbf{Description} \\ \hline
+		\texttt{events} & RoCE - callback functions for affiliated and unaffiliated events.\\ \hline
+		\texttt{desired\_cnq} & desired number of cnqs to be used. Upper layer driver needs to make sure enough resources are available for this number (number of msix vectors and cnq resource\\ \hline
+		\texttt{cnq\_pbl\_list} & Array of pbls used per cnq. The array should be initialized according to the value set in desired\_cnq\\ \hline
+		\texttt{cq\_mode} & The CQ Mode affects the CQ doorbell transaction size. 64 or 32 bit machines should configure to 32 or 16 bits respectively.\\ \hline
+		\texttt{roce\_dcqcn\_params} & relevant only if enable\_dcqcn was initialized to true in rdma\_pf\_params. Upper level driver needs to set appropriate fields. See dcqcn section below.\\ \hline
+		\texttt{max\_mtu} & Required for iWARP ll2. Can give ethernet mtu.\\ \hline
+		\texttt{mac\_addr} & Required for iWARP ll2. Should be primary mac used for RDMA.\\ \hline
+		\texttt{iwarp\_flags} & TCP related flags that can be controlled by user. 
+		\begin{tabbing}
+			TS\_EN: Timestamp enabled \\
+			DA\_EN: Delayed ack enabled \\
+		\end{tabbing} \\ \hline
+		\texttt{iwarp\_crc\_needed} & Control whether CRC should be used. \\ \hline
+		\texttt{iwarp\_rcv\_wnd\_size} & ecore will calculate the receive window scale from this. This number should be provided in bytes. There is a minimum of 64K, any number below this will result in the default window size being set which is 1MB \\ \hline
+		\end{tabular}
+	\end{center}
+	\item \myfunc{rdma\_get\_sb\_id}{rdma_get_sb_id} -- this function returns the first status block id assigned for RDMA. This is required for initializing the RDMA status blocks using the function \textit{ecore\_int\_sb\_init()}.
+	\item \myfunc{rdma\_add\_user}{rdma_add_user} -- this function allocates a dpi index for the client.During initialization, this function should be called to allocate a reserved dpi index for the kernel.
+	\item \myfunc{rdma\_query\_device}{rdma_query_device} -- this function returns a struct of type ecore\_rdma\_device which contains the capabilities and set options for the given device.
+\subsection{DCQCN}
+DCQCN is only relevant for RoCE.
+\item Enable\_dcqcn under rdma\_pf\_params allocates additional hardware resources (rate limiters ) which can later be used to enable DCQCN notification point and reaction point. This must be set prior to calling \texttt{ecore\_resc\_alloc()}.
+\item Additional parameters were added to ecore\_rdma\_start parameters to configure dcqcn. These will only be valid if the roce\_enable\_dcqcn in rdma\_pf\_params was set.
+Notification point and reaction point can be enabled independently.
+When configuring the device to act as notification point, the ecore will initialize the NIG block accordingly and pass the priority vlan and cnp send timeout values to FW. When configuring the device to act as reaction point, the ecore will send a ramrod to FW that configures the rate limiters allocated for dcqcn support with the values received from the upper layer driver ( such as maximum rate, byte counter limit, active increase rate etc... full detail in ecore\_roce\_api.h file ). At this point all rate limiters will be configured with the same values. If in the future there will be a need to configure different rate limiters with different values an additional API function will be provided. During initialization, ecore will map between physical queues used for RoCE and rate limiters. The number of rate limiters allocated is handled by resource management and is currently divided equally between the functions. During modify\_qp, ecore will configure the responder and requester to work with a unique physical queue, which is configured to work with a unique rate limiter. QPs that are opened after rate limiters are used out will be configured to run on a default physical queue which does not have a rate limiter. FW assumes that the qp\_id is equal to the physical queue id. For simplicity, the implementation assumes that Ethernet is not run simultaneously with RoCE (i.e. Roce only personality). If dcqcn is enabled and ethernet is run, ethernet will run on the same physical queue as the first qp that is allocated.
+\end{itemize}
+
+\section{iWARP Connection Establishment}
+Unlike RoCE in which connection management is implemented completely in host, connection management for iWARP which involves the TCP 3 way handshake and MPA exchanges is implemented in  F/W. The host is nevertheless involved in offloading TCP and MPA and exchanging connection parameters as part of the connection establishment/teardown process. 
+\subsection{Ecore-upper driver connection establishment/teardown API for iWARP}
+During connection establishment/teardown, the driver calls ecore connection related APIs and receives callbacks from ecore for connection related events. The driver registers its event callbacks by passing them as parameters to the different connection ecore APIs. 
+
+\subsection{Ecore APIs/functions for driver (downcalls)}
+\begin{tabular}{| l | p{10cm} |}
+	\hline
+	\textbf{Ecore Functions} & \textbf{Description} \\ \hline
+	\texttt{ecore\_iwarp\_connect} & Used during active connection establishment. Called to establish an iWARP connection with a peer. This is a non-blocking call. Once connection is established an async event will be sent to driver. \\ \hline
+	\texttt{ecore\_iwarp\_create\_listen} & Used for passive connection. Called to start a listener. \\ \hline
+	\texttt{ecore\_iwarp\_destroy\_listen} & Used for passive connection. Called to destroy a listener. \\ \hline
+	\texttt{ecore\_iwarp\_accept} & Used during passive connection establishment. Called for accepting a previously received iWARP connection request event. i.e. MPA request event. Once connection is fully established an async event will be sent to driver. \\ \hline
+
+\end{tabular}
+\subsection{Communication Management information}
+\label{sec:cminfo}
+For both passive and active connect, basic information on host and peer is required. We define a structure called \texttt{ecore\_iwarp\_cm\_info} which will be passed between driver and ecore on both downcalls and upcalls. Throughout the rest of the chapter we'll refer to this as the cm\_info. 
+\begin{tabular}{| l | p{10cm} |}
+ 	\hline
+ 	\textbf{Field} & \textbf{Description} \\ \hline
+ 	\texttt{ip\_version} & Type: enum ecore\_tcp\_ip\_version. Determines if ipv6 or ipv4 \\ \hline
+ 	\texttt{remote\_ip} & Ip address of remote side. In host byte order. \\ \hline
+ 	\texttt{local\_ip} & Ip address of local side. In host byte order. \\ \hline
+ 	\texttt{remote\_port} & Port of the remote side. In host byte order. \\ \hline
+ 	\texttt{local\_port} & Port of the local side. In host byte order. \\ \hline
+ 	\texttt{vlan} & vlan to be used. 0 value means no vlan. \\ \hline
+ 	\texttt{private\_data} & Used for MPA. This data will be sent on the MPA request. \\ \hline
+ 	\texttt{private\_data\_len} & Length of the private data. \\ \hline
+ 	\texttt{ord} & Negotiated in MPA Rev2. Used as is in MPA Rev1. \\ \hline
+ 	\texttt{ird} & Negotiated in MPA Rev2. Used as is in MPA Rev1. \\ \hline
+\end{tabular} 	
+Ecore sends same parameter for all different event types, though the required parameters for an event type is a subset of the complete set of parameters. It does this so that it can pass a pointer to a data structure instead of reformatting the parameters in a different structure.
+
+\subsection{Active side connection establishment}
+On the active side of iWARP connection establishment, it is assumed that create\_qp will be called prior to calling connect. QP created will be sent as a parameter to the accept function call.
+\subsubsection{ecore\_iwarp\_connect}
+ This function will take care of initiating the TCP 3-way handshake and MPA negotiation. Once the MPA response is received the event EVENT\_ACTIVE\_COMPLETE will be issued to upper-layer driver. This function is asynchronous. The function will receive cm\_info (detailed in \ref{sec:cminfo} ), mss, local and remote mac address. The mac address will be acquired by upper-layer driver using OS ip routing functions (such as find\_route in linux). In addition, it will require a pointer to the associated QP and a pointer to a callback function and callback context which will be used to indicate events to the driver which are related to this connection. \newline
+ \begin{tabular}{| l | p{10cm} |}
+ 	\hline
+ 	\textbf{Return Values} & \textbf{Description} \\ \hline
+ 	\texttt{ECORE\_NO\_MEM} & Memory is required for driver context of a connection. If it can't allocate it will return this failure. \\ \hline
+ 	\texttt{ECORE\_SUCCESS} & Means tcp offload was performed. Does not mean connection was established. The status of connection establishment will be passed with the EVENT\_ACTIVE\_COMPLETE. \\ \hline
+\end{tabular}
+\subsubsection{event callbacks related}
+The callback received in connect call will be called with the following values after MPA response was received from peer: \newline
+ \begin{tabular}{| l | p{10cm} |}
+ 	\hline
+ 	\textbf{Field} & \textbf{Value} \\ \hline
+ 	\texttt{event} & \texttt{ECORE\_IWARP\_EVENT\_ACTIVE\_COMPLETE} \\ \hline
+ 	\texttt{cm\_info} & \ref{sec:cminfo} with finalized values. MPA Rev2 for example will contain the negotiated ird/ord \\ \hline
+ 	\texttt{ep\_context} & Dont Care for active side \\ \hline
+ 	\texttt{status} & ECORE\_SUCCESS if connection establishment was successful. ECORE\_TIMEOUT if connection timed out, ECORE\_CONNECTION\_REFUSED if mpa\_reject was received, ECORE\_CONN\_RESET if connection establishment failed for any other reason. \\ \hline
+ \end{tabular}
+ 	
+\subsection{Passive side connection establishment}
+The ecore will use the ll2 interface for implementing passive side connection establishment. Upper layer driver will send 2\-tuples and vlan to ecore layer which the ecore should listen on. Once a SYN packet is received on the ll2 interface, the ecore will search its database to check if a listener was registered with the received 2\-tuple and vlan. If it was received, tcp offload ramrod will be sent and once the MPA request will be received, the event EVENT\_MPA\_REQUEST will be issued to upper layer driver. At this stage it is expected that the upper layer driver will pass the MPA parameters such as private data, ord, ird to all the way to user app, which will in turn create a QP and related objects and later issue a call to ecore\_iwarp\_accept.  
+\subsubsection{iwarp\_create\_listen}
+This function will receive socket local and remote addresses (port, ip and vlan) and add them to its listening database. In addition a callback function and callback context will be provided which will be used by ecore to send events of connection requests to the driver. 
+
+\subsubsection{event callbacks related}
+The callback received in listen call will be called with the following values after MPA request was received from network: \newline
+\begin{tabular}{| l | p{10cm} |}
+	\hline
+	\textbf{Field} & \textbf{Value} \\ \hline
+	\texttt{event} & \texttt{ECORE\_IWARP\_EVENT\_MPA\_REQUEST} \\ \hline
+	\texttt{cm\_info} & \ref{sec:cminfo} with values received on the MPA request. \\ \hline
+	\texttt{ep\_context} & Should be sent down to ecore during call to ecore\_iwarp\_accept. \\ \hline
+	\texttt{status} & Dont Care for this event. \\ \hline
+\end{tabular}
+
+\subsubsection{ecore\_iwarp\_accept}
+This function should be called when upper layer driver wants to accept a request issued by ecore's EVENT\_MPA\_REQUEST. Qp should have been created during before calling this function. This function will send the MPA ramrod which will send a MPA response. Once the ACK on the MPA response is received the event EVENT\_PASSIVE\_COMPLETE will be sent to upper layer driver.
+\begin{center}
+		\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Param} & \textbf{Description}\\ \hline
+		\texttt{ep\_context} & The ep\_context received in the MPA\_REQUEST event\\ \hline
+		\texttt{cb\_context} & The same callback function passed in create\_listen will be used but with this new cb\_context.\\ \hline
+		\texttt{private\_data} & attach to MPA frame.\\ \hline
+		\texttt{private\_data\_len} & length of private data.\\ \hline
+		\texttt{ord} & to send on MPA response. \\ \hline
+		\texttt{ird} & to send on MPA response. \\ \hline		
+		\texttt{qp} & QP associated with this connection.\\ \hline		
+		\end{tabular}
+\end{center}
+
+\subsubsection{ecore\_iwarp\_reject}
+This function should be called when upper layer driver / App wants to reject a connection request for whatever reason. As a result of ecore's EVENT\_MPA\_REQUEST.
+If a connection is rejected QP will not be associated with the connection request and remains an independent object ( if it was created ). Calling this function
+will result in an MPA response being sent to peer with the 'reject' flag being turned on. EVENT\_PASSIVE\_COMPLETE will be sent to upper layer driver with status
+code CONNECTION\_REFUSED.
+\begin{center}
+	\begin{tabular}{| l | p{10cm} |}
+		\hline
+		\textbf{Param} & \textbf{Description}\\ \hline
+		\texttt{ep\_context} & The ep\_context received in the MPA\_REQUEST event\\ \hline
+		\texttt{cb\_context} & The same callback function passed in create\_listen will be used but with this new cb\_context.\\ \hline
+		\texttt{private\_data} & attach to MPA frame.\\ \hline
+		\texttt{private\_data\_len} & length of private data.\\ \hline
+	\end{tabular}
+\end{center}
+
+\subsubsection{event callbacks related}
+The callback received in listen call will be called with the following values after MPA response was acked by network/peer: \newline
+\begin{tabular}{| l | p{10cm} |}
+	\hline
+	\textbf{Field} & \textbf{Value} \\ \hline
+	\texttt{event} & \texttt{ECORE\_IWARP\_EVENT\_PASSIVE\_COMPLETE} \\ \hline
+	\texttt{cm\_info} & \ref{sec:cminfo} with values negotiated. Dont care incase of mpa\_reject \\ \hline
+	\texttt{ep\_context} & Dont care for this event. \\ \hline
+	\texttt{status} & ECORE\_SUCCESS if connection establishment was successful. ECORE\_CONN\_RESET if connection establishment failed for any reason. ECORE\_CONNECTION\_REFUSED if mpa\_reject was called on the connection\\ \hline
+\end{tabular}
+
+\subsubsection{ecore\_iwarp\_destroy\_listen}
+This function will remove socket local and remote addresses (port, ip and vlan) from its listening database.
+
+
+\subsection{Connection Teardown}
+\label{sec:iwarp_teardown}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.3]{iwarp_sm}
+	\caption{iwarp state machine form hilland verbs}
+	\label{fig:iwarp_sm}
+\end{figure}
+
+Connection teardown is performed via the modify\_qp verb according to the hilland verbs state machine.\ref{fig:iwarp_sm}
+The interface into ecore is done with the states of RoCE and translated internally to iwarp states. This was done 
+to utilize the same interface for RoCE and iWARP. However, in the future this may be changes so that state translation
+is done in the upper layer driver. Translation between the states is done as follows: \newline
+\begin{tabular}{| l | p{10cm} |}
+	\hline
+	\textbf{RoCE State} & \textbf{iWARP State} \\ \hline
+	ECORE\_ROCE\_QP\_STATE\_RESET & ECORE\_IWARP\_QP\_STATE\_IDLE \\ \hline
+	ECORE\_ROCE\_QP\_STATE\_INIT & ECORE\_IWARP\_QP\_STATE\_IDLE \\ \hline
+	ECORE\_ROCE\_QP\_STATE\_RTR & ECORE\_IWARP\_QP\_STATE\_IDLE \\ \hline
+	ECORE\_ROCE\_QP\_STATE\_RTS & ECORE\_IWARP\_QP\_STATE\_RTS \\ \hline
+	ECORE\_ROCE\_QP\_STATE\_SQD & ECORE\_IWARP\_QP\_STATE\_CLOSING \\ \hline
+	ECORE\_ROCE\_QP\_STATE\_ERR & ECORE\_IWARP\_QP\_STATE\_ERROR \\ \hline
+	ECORE\_ROCE\_QP\_STATE\_SQE & ECORE\_IWARP\_QP\_STATE\_TERMINATE \\ \hline
+\end{tabular}
+
+\subsection{Active side connection Teardown}
+\subsubsection{Graceful disconnect}
+To initiate a graceful disconnect sequence, the active side will perform a modify\_qp to ECORE\_ROCE\_QP\_STATE\_SQD. This will be translated to ECORE\_IWARP\_QP\_STATE\_CLOSING and initiate a graceful teardown sequence with FW. Currently, due to existing FW implementation a modify qp to error will be sent fo FW before closing the connection. In the future, FW HSI will be changed so that a CLOSING state is added to FW as well. Once the disconnect is complete, whether gracefully or abortively ( in some cases a graceful disconnect will turn into an abortive one, timeouts, errors in close etc... ) an ECORE\_IWARP\_EVENT\_CLOSE event will be sent to upper layer driver. Ecore will transition to ERROR state in any case at the end of the flow.
+
+\subsubsection{Abortive disconnect}
+To initiate an abortive disconnect sequence, the active side will perform a modify\_qp to ECORE\_ROCE\_QP\_STATE\_ERR. This will be translated to ECORE\_IWARP\_QP\_STATE\_ERROR and initiate an abortive teardown sequence with FW. Once the disconnect is completed, an ECORE\_IWARP\_EVENT\_CLOSE event will be sent to upper layer driver. Ecore will transition to ERROR state in any case at the end of the flow. 
+
+\subsubsection{event callbacks related}
+The callback received in connect / accept call will be called with the following values after disconnect has completed: \newline
+\begin{tabular}{| l | p{10cm} |}
+	\hline
+	\textbf{Field} & \textbf{Value} \\ \hline
+	\texttt{event} & \texttt{ECORE\_IWARP\_EVENT\_CLOSE} \\ \hline
+	\texttt{cm\_info} & Dont care. \\ \hline
+	\texttt{ep\_context} & Dont care for this event. \\ \hline
+	\texttt{status} & ECORE\_SUCCESS if connection was terminated gracefully ( fin ) was successful. ECORE\_CONN\_RESET if connection was terminated abortively (RST) for any reason. \\ \hline
+\end{tabular}
+
+\subsection{Passive side connection Teardown}
+On passive side teardown sequence is initiated once a graceful / abortive request is received from peer. In this case ecore will send a ECORE\_IWARP\_EVENT\_DISCONNECT to upper layer driver. Ecore will transition to ERROR state in any case at the end of the flow.
+
+\subsubsection{event callbacks related}
+The callback received in connect / accept call will be called with the following values once close request was received from peer: \newline
+\begin{tabular}{| l | p{10cm} |}
+	\hline
+	\textbf{Field} & \textbf{Value} \\ \hline
+	\texttt{event} & \texttt{ECORE\_IWARP\_EVENT\_DISCONNECT} \\ \hline
+	\texttt{cm\_info} & Dont care. \\ \hline
+	\texttt{ep\_context} & Dont care for this event. \\ \hline
+	\texttt{status} & ECORE\_SUCCESS if graceful disconnect was received. ECORE\_CONN\_RESET if abortive disconnect was received. \\ \hline
+\end{tabular}
+\\
+Ecore will continue the disconnect flow against FW without any additional requests from upper layer driver. Ecore will call upper layer driver with the following values after disconnect has completed: \newline
+\begin{tabular}{| l | p{10cm} |}
+	\hline
+	\textbf{Field} & \textbf{Value} \\ \hline
+	\texttt{event} & \texttt{ECORE\_IWARP\_EVENT\_CLOSE} \\ \hline
+	\texttt{cm\_info} & Dont care. \\ \hline
+	\texttt{ep\_context} & Dont care for this event. \\ \hline
+	\texttt{status} & ECORE\_SUCCESS if connection was terminated gracefully ( fin ) was successful. ECORE\_CONN\_RESET if connection was terminated abortively (RST) for any reason. \\ \hline
+\end{tabular}
+
+\section{IB verb implementation}
+
+\silentfunc{rdma_alloc_pd}
+\silentfunc{rdma_alloc_tid}
+\silentfunc{rdma_create_qp}
+
+\begin{itemize}
+	\item \myfunc{rdma\_alloc\_pd}{rdma_alloc_pd} -- This function allocates a unique protection domain id. The id is returned in the out parameter pd. (verb: Allocate Protection Domain).
+	\item \myfunc{rdma\_alloc\_tid}{rdma_alloc_tid} -- this function allocates a unique tid (task id). The id is returned in the out parameter itid.This function also allocates required memory in the ilt array (Host memory used for hw purposes).
+	\item \myfunc{rdma\_create\_qp}{rdma_create_qp} -- This function will create the qp object in ecore and for iWARP in FW. In RoCE no FW ramrods are sent during the call to this function. The main change from existing create\_qp function, for iWARP is that instead of providing addresses to rq, sq separately, and allocating memory for FW queues in ecore, FW requires contiguous memory for the the pbl of all FW queues (RQ, SQ, ORQ, IRQ, HQ). Therefore interface will change, and instead of upper layer driver providing pbl address to create\_qp, these will be provided as out\_parameters after being allocated in ecore. Upper layer driver will be required to pass the number of pages required for SQ / RQ. Populating the pbls will be done after calling create\_qp and not before as done today. For ease of code sharing between iWARP and RoCE FW will modify RoCE implementation to work the same as iWARP.
+	\item \myfunc{rdma\_modify\_qp}{rdma_modify_qp} -- The API will remain the same, however, for iWARP not all fields are relevant. Naming convention of RDMA/iWARP/RoCE was done in ecore\_roce\_api to distinguish between what is required and what is not. Modify QP is used in iWARP for part of the teardown flow detailed in \ref{sec:iwarp_teardown}
+\end{itemize}
+
+\section{IWARP APP TLV configuration}
+Ecore client has the ability to signal ecore that a specific tcp port in app tlv should be recognized as pertaining to the iwarp offloaded connections. If an app tlv which matches this port is indicated by MFW, all offloaded iwarp traffic of the PF will abide by this configuration (regardless of the actual tcp port of the offloaded connections). The app tlv can be set by the ecore client via the regular APIs for setting "locally administered params”. Ecore client communicates the tcp port value via \texttt{rdma\_pf\_params} structure, the value needs to be populated before invoking  \myfunc{resc\_alloc}{resc_alloc}. To configure the iwarp app tlv in the locally administered dcbx parameters, ecore client need to use the Dcbx APIs described in "Dcbx Interface" section. The relevant APIs are \myfunc{dcbx\_get\_config\_params}{dcbx_get_config_params} and \myfunc{dcbx\_config\_params}{dcbx_config_params}.
+
+\SpillChapterFuncs
+
+\chapterimage{qlogic-full-36}
+\chapter{LL2 (Light L2)}
+\label{cha:ll2}
+
+This chapter describes the ecore interface for LL2 (Light L2). \\
+The LL2 is a simplified version of L2 for which both slowpath and fastpath flows reside in ecore, and it is being used by the upper-layer drivers of the storage protocols.
+
+\section{Start LL2 connection}
+\silentfunc{ll2_acquire_connection}
+\silentfunc{ll2_establish_connection}
+\begin{itemize}
+	\item \myfunc{ll2\_acquire\_connection}{ll2_acquire_connection} -- this function allocates the resources for the LL2 connection. ll2\_acquire\_data structure that is received in this function contains the following parameters:
+	
+	 \begin{tabular}{| l | p{10cm} |}
+	 	\hline
+	 	\textbf{Param} & \textbf{Description} \\ \hline
+	 	\texttt{conn\_type} & should be set according to the protocol. \\ \hline
+	 	\texttt{mtu} & Maximum bytes that can be placed on a BD. \\ \hline
+	 	\texttt{rx\_num\_desc} & maximal number of entries in the Rx ring. \\ \hline
+	 	\texttt{tx\_num\_desc} & maximal number of entries in the Tx ring (each packet-buffer occupies an entry). \\ \hline
+	 	\texttt{rx\_num\_ooo\_buffers} & Relevant only for OOO connection if 0 default value of 2*rx\_num\_desc will be used). \\ \hline
+	 	\texttt{rx\_drop\_ttl0\_flg} & can be set. \\ \hline
+	 	\texttt{rx\_vlan\_removal\_en} & can be set if it is desired to get the VLAN stripped and out-of-band. \\ \hline
+	 	\texttt{tx\_tc} & tx traffic class. 0 - regular tc, or for loopback use PURE\_LB\_TC or PKT\_LB\_TC for the rest. \\ \hline
+	 	\texttt{tx\_dest} & Destination of tx -> Network or Loopback. \\ \hline
+	 	\texttt{ai\_err\_packet\_too\_big} & How FW should handle packet too big error: (DROP, NOTHING, ASSERT). \\ \hline
+	 	\texttt{ai\_err\_no\_buf} & How FW should handle no buffers error: (DROP, NOTHING, ASSERT). \\ \hline
+	 	\texttt{gsi\_enable} & Relevant for RoCE only - is the ll2 intended to work with GSI Offload or not. \\ \hline
+	 	\texttt{p\_connection\_handle} & Output parameter contains a handle which is used in future calls related to this LL2 connection. \\ \hline
+	 	\texttt{cbs} & Callback functions that should be called on completion or release of rx / tx packets. \\ \hline
+	 \end{tabular}
+	 
+
+	\item \myfunc{ll2\_establish\_connection}{ll2_establish_connection} -- this function offloads the LL2 connection to the device (both Tx and Rx).
+	\item After establishing the connection, it is possible to post Rx buffers and to send Tx packets.
+\end{itemize}
+
+\section{Receive LL2 packets}
+\silentfunc{ll2_post_rx_buffer}
+\begin{itemize}
+	\item \myfunc{ll2\_post\_rx\_buffer}{ll2_post_rx_buffer} -- this function adds the provided buffer to the receive ring. The buffer size should be at least mtu (as provided during connection start) + maximum Ethernet header size + cache line size + 4 (cache line size is typically 64 byte). \texttt{notify\_fw} should be set. \texttt{addr} should be a DMA-mapped address.
+	\subsection{Related callback functions ( received in acquire\_connection)}
+	\item \texttt{complete\_rx\_packet} -- this is a callback function that should be implemented in the upper driver. Ecore calls this function when a packet is received and written to a buffer in the Rx ring. \texttt{cookie} and \texttt{rx\_buf\_addr} are echoed from the call that posted that buffer. \texttt{placement\_offset} is the offset in bytes in the buffer, starting from which the packet was written. \texttt{packet\_length} is the total packet length in bytes. \texttt{opaque\_data\_0/1} and \texttt{b\_last\_packet} can be ignored. \texttt{vlan} is the VLAN tag stripped from the packet, and it is valid only if PARSING\_AND\_ERR\_FLAGS\_TAG8021QEXIST bit is set in \texttt{parse\_flags}. \texttt{parse\_flags} field contains additional flags which are mostly not interesting for the upper driver.
+	\item \texttt{release\_rx\_packet} -- this is a callback function that should be implemented in the upper driver. Ecore calls this function when the connection is terminated and there are still buffers in the Rx ring. In this case it will call this function per each buffer, so the upper driver can free those buffers.
+\end{itemize}
+
+\section{Transmit LL2 packets}
+\silentfunc{ll2_prepare_tx_packet}
+\silentfunc{ll2_set_fragment_of_tx_packet}
+\begin{itemize}
+	\item \myfunc{ll2\_prepare\_tx\_packet}{ll2_prepare_tx_packet} -- this function adds a new packet to the transmit ring. If the packet is composed from more than a single buffer, than the address and length of the additional buffers is provided to ecore by calling \texttt{ecore\_ll2\_set\_fragment\_of\_tx\_packet} for each additional buffer. \\
+	\texttt{num\_of\_bds} is the number of buffers that compose the packet (including the first buffer), and is limited to CORE\_LL2\_TX\_LOCAL\_RING\_SIZE.
+	\texttt{first\_frag} should be a DMA-mapped address, and \texttt{first\_frag\_len} is the buffer length in bytes. \texttt{vlan} is the VLAN tag to insert in the packet (if desired), and in this case CORE\_TX\_BD\_FLAGS\_VLAN\_INSERTION flag in \texttt{bd\_flags} should be set. \\
+	For IP checksum and L4 checksum offload, CORE\_TX\_BD\_FLAGS\_IP\_CSUM and CORE\_TX\_BD\_FLAGS\_L4\_CSUM flags in \texttt{bd\_flags} should be set. \texttt{notify\_fw} should be set.
+	\item \myfunc{ll2\_set\_fragment\_of\_tx\_packet}{ll2_set_fragment_of_tx_packet} -- this function provides the next buffer of a packet. \texttt{addr} should be a DMA-mapped address, and \texttt{nbytes} is the buffer length in bytes.
+	\subsection{Related callback functions ( received in acquire\_connection)}
+	\item \texttt{complete\_tx\_packet} -- this is a callback function that should be implemented in the upper driver. Ecore calls this function when the transmission of the packet is completed (it is called once per-packet). \texttt{cookie} and \texttt{first\_frag\_addr} are echoed from the call that posted that first fragment of the packet. \texttt{b\_last\_fragment} and \texttt{b\_last\_packet} can be ignored.
+	\item \texttt{release\_tx\_packet} -- this is a callback function that should be implemented in the upper driver. Ecore calls this function when the connection is terminated and there are still packets in the Tx ring. In this case it will call this function per each packet, so the upper driver can free the associated buffers.
+\end{itemize}
+
+\section{Stop LL2 connection}
+\silentfunc{ll2_terminate_connection}
+\silentfunc{ll2_release_connection}
+\begin{itemize}
+	\item \myfunc{ll2\_terminate\_connection}{ll2_terminate_connection} -- this function removes the LL2 connection from the device. When this function is called, ecore checks for non-completed Tx packet / Rx buffers, and calls the \texttt{release\_tx\_packet()} and / \texttt{release\_rx\_packet()} callback functions respectively.
+	\item \myfunc{ll2\_release\_connection}{ll2_release_connection} -- this function releases the resources for the LL2 connection.
+\end{itemize}
+
+\section{Getting statistics}
+\myfunc{ll2\_get\_stats}{ll2_get_stats} can be used to query the device for various ll2-related statistics.
+
+\SpillChapterFuncs
+
+\chapterimage{qlogic-full-36}
+\chapter{Single Root I/O Virtualization}
+\label{cha:sriov}
+
+\myindex{SRIOV} is a PCIe functionality which allows Physical functions (also termed \myindex{PF}s) to spawn Virtual functions (also termed \myindex{VF}s), with a limited set of registers in their PCI configuration space and bars, but that should supply ~the same basic functionality 
+
+SR-IOV handling is performed by the ecore on the hypervisor as well as the ecore on the VM.
+These work hand in hand (either via HW-channel or through SW-channel) to configure the VF device for SR-IOV.
+With some exceptions, it could be said that the upper driver doesn’t need to be aware of driving a VF instead of a PF.
+Where on the PF side upper-layer driver accesses the ecore to send a ramrod on its behalf or perform a configuration,
+on the VF side the upper driver will use the same API to access it’s ecore, which will in turn communicate with the PF’s ecore via the channel to perform the equivalent configuration.
+This is an abstraction, and there are quite a few reservations and exceptions, but that is the working model.
+
+Sections \ref{sec:sriov-hw-channel}, \ref{sec:sriov-tlv} mostly give a glimpse of the mechanism used by the ecore to support the feature, while the rest of the sections are of more interest to the upper-driver implementer since they contain the howtos.
+
+Some relevant documents are \cite{doc:iov-lec}, \cite{doc:iov-sys} and \cite{doc:iov-doc}.
+
+\section{IOV-related fields and terminology}
+The \textit{ecore\_dev} contains an \textit{sriov\_info} field, which is filled very early during initialization (inside \textit{ecore\_hw\_prepare()} according to pci configuration space sriov capability. Later on, this struct is read-only by the ecore.
+Upper driver can read values in this struct [instead of accessing PCI configuration space] if needed,
+but there are is a single field it 'owns', b\_hw\_channel -- In most distros VFs will communicate with PFs using the HW-channel [see section \ref{sec:sriov-hw-channel}], and upper-driver should set it to `true'. However, if upper-driver utilizes a designated SW-channel which it can use instead of the HW-channel, it should set let this field remain 'false'. \\
+
+An additional important field is the \myindex{total\_vfs} which represents the maximal number of VFs current PF can possibly have. The macro \myindex{IS\_ECORE\_SRIOV} can be used to determined if PF has $\text{total\_vfs} > 0$, therefore whether IOV is relevant to the PF or not. \\
+
+Important terminology when talking about VFs is \myindex{relative\_vfid} versus \myindex{absolute\_vfid}. The relative vfid is the zero-based index of the VF relative to its parent PF, i.e., the first VF of a given PF is always 0, second is 1, etc.
+The absolute vfid is the zero-based index of the VF relate to all the VFs on the same path, i.e., it's possible the first PF of a given VF will have an absolute vfid which is greater than zero.
+
+For most upper-driver uses, the relative vfid is the interesting index. Ecore sometimes needs to use the absolute value for configuring the FW/HW.
+
+\section{Initializing and Closing VFs}
+When a PF is about to initialize its VFs, it should enable the access of each VF to the HW by calling \myfunc{iov\_init\_hw\_for\_vf}{iov_init_hw_for_vf} for each VF [passing its relative vfid]. 
+\begin{NOTICE}
+	At this point upper-layer driver has to know the number of interrupts to assign to each VF, since the MSIX table in each VF configuration space must be arranged by ecore prior to VF activation.
+\end{NOTICE}
+
+Following this, upper-driver can initiate the sequence [usually via OS api] that would enable the VFs and cause them to be probed.
+Afterwards, upper-driver can initialize the VF same as it would have the PF, i.e., the difference in initialization logic is 'hidden' inside the ecore. Upper-layer code doesn't need to contain all sorts of if-else clauses to differentiate between VF and PF [at least, not as far as the ecore initialization is concerned.
+
+Closing the VF should operate smoothly without need of any special calls. I.e., regular closure sequence for PFs should be translated by ecore opaquely into a sequence closing the VF.
+
+The only 'special' effort that should be taken is that after all the flow is done the PF's upper-driver should call \myfunc{iov\_release\_hw\_for\_vf}{iov_release_hw_for_vf}. After doing this, VF can only be re-activated by re-calling \textit{ecore\_iov\_init\_hw\_for\_vf()}.
+
+If the upper-driver has the option, during sriov-disable prior to VFs been unset in the PF's PCI configuration space, upper-driver should call \myfunc{iov\_set\_vf\_to\_disable}{iov_set_vf_to_disable} for each one of its active VFs. This will result with a cleaner FW/HW after closure is complete.
+
+\section{Message passing from VF to PF}
+\label{sec:sriov-tlv}
+The VF's PCI bar is very different from the PF bar, and with much more limited access toward chip; see \cite{doc:iov-sys} for details about the VF bar. As a result, most of the slowpath configuration that needs to be done for the VF actually has to be done by the PF.
+
+To support this, there is a mechanism of \myindex{TLV}\footnote{Type-Length-Value} message passing from VF to PF, in which the VF can request the PF to either perform services for it or supply it with information which is otherwise inaccessible for the VF.
+This message passing is usually done via the HW channel [see section \ref{sec:sriov-hw-channel}], but assuming the existence of an alternative method [i.e., SW-channel] it can be done via it just as well.
+
+\begin{exampleT}
+	During \textit{ecore\_hw\_prepare()} ecore gathers information about the chip from various locations - HW, shared memory with Management FW, etc.. However, almost all of that information is inaccessible to the VF. Thus the VF has an alternative flow by which it sends an ACQUIRE message to the PF, notifying it that it's up and requesting information about the device - e.g., number of resources such as status blocks and queues available to the VF.
+\end{exampleT}
+
+Notice the upper-driver itself should never initiate such a message passing directly; All such message passing is 'hidden' inside the VF's ecore.
+
+\begin{exampleT}
+	When a VF driver wants to start a vport, it calls \textit{ecore\_sp\_vport\_start()},
+ unaware that inside the ecore this will send a VPORT\_START TLV message from VF to PF, and that the PF will open the vport for the VF as a result.
+\end{exampleT}
+
+\section{HW channel}
+\label{sec:sriov-hw-channel}
+This is how the HW-channel operates [High level]:
+
+\silentfunc{iov_process_mbx_req}
+\silentfunc{iov_copy_vf_msg}
+\begin{enumerate}
+	\item Prior to VF activation, PF enables VF access to the HW-channel, which actually permits it to access its PCI bar.
+	\item VF prepares a message on DMA-able memory, which also contains an address of an additional DMA-able memory upon which the VF will poll for the PF reply.
+	\item VF writes a `trigger' containing the buffer's ghost physical address into the specific address in the USDM. It then polls until reply is received [or timeout is reached].
+	\item This BAR access to the Ustorm RAM is trapped as an aggregated interrupt to and activates a handler in Storm FW. 
+	\item FW identifies the sending VF according to address and trigger's content and derives the parent PF's id. It then triggers an interrupt [event] on the PF, filling the event's cookie with buffer's address.
+	\item PF driver's ISR wakes. It recognizes the message and calls OSAL\_PF\_VF\_MSG to notify upper-layer driver of the message; This is mostly since the slowpath context isn't the proper place to handle VF messages.
+	\item Upper-layer driver should utilizes DMAE [\myfunc{iov\_copy\_vf\_msg}{iov_copy_vf_msg}] in order to copy the buffer from the VF's memory domain into it's own. [PF uses the VF's pci requestor-id for the DMAE transaction, to access the VM's Ghost Physical Address].
+	Following that, it should schedule the proper context for handling the VF message calling \myfunc{iov\_process\_mbx\_req}{iov_process_mbx_req} to allow ecore to process the VF's message.
+	\item ... PF processes the VF's request ...
+	\item PF prepares an answer for the VF [success, failure, etc.] which might also contain information. It uses DMAE to copy this message to the VF's reply address [specified in the VF's message].
+	\item VF wakes from the PF's message and processes the answer.
+\end{enumerate}
+
+One optional auxilary function that can be used by the ecore-client is \myfunc{iov\_pf\_get\_pending\_events}{iov_pf_get_pending_events}. It will return a bitmask of all the VFs belonging to the PF for which there's a message yet to be processed.
+
+Notice that the Hw-channel is one-pending, i.e., VF cannot send an additional message until PF has notified FW that it's done processing the message.
+
+\begin{NOTICE}
+	If VF will try sending an additional message, FW will mark it as malicious.
+\end{NOTICE}
+
+\section{Message Passing from PF to VF}
+The Message passing from VF to PF benefits from the PF's slowpath status-block, i.e., the ability of the PF to receive slowpath interrupts.
+Since the VF hasn't got such a status block allocated for it, the message passing between the PF and the VF consists of polling on the VF side.
+The VF has a buffer named \myindex{bulletin-board} into which the PF posts messages.
+The VF would periodically poll this buffer for updates.
+
+\begin{exampleT}
+	PF can use bulletin boards to notify VF of current link state. Notice that link state doesn't necessarily has to reflect the physical link state.
+E.g., Hypervisor tools might be used to configure VF link state as always up regardless of physical state, so that VFs could communicate using Tx-Switching.
+\end{exampleT}
+
+The bulletin board periodic sampling is a policy that needs to be determined and done by the upper-layer driver. It's done by calling the API function
+\myfunc{vf\_read\_bulletin}{vf_read_bulletin}, which checks for any changes.
+If such a change occurs, since the bulletin doesn't contain deltas from previous messages but rather the entire data [due to lack of handshake the PF can't know if VF read previous bulletin boards], the upper-driver has a wide assortment of functions-per-feature which are defined in ecore\_vf\_api.h and can be used to learn of the current state. E.g., \myfunc{vf\_get\_link\_state}{vf_get_link_state},
+\myfunc{vf\_get\_port\_mac}{vf_get_port_mac}.
+
+\subsection{How the bulletin board works}
+
+[Inner workings of the ecore; Not necessary for the upper-driver implementer]
+
+\begin{enumerate}
+	\item During \textit{ecore\_hw\_prepare()} of the VF, ecore allocates a DMA-able buffer for the bulletin board.
+	\item During the ACQUIRE message sent from VF to PF, VF posts the physical address of the bulletin board as well as its size.
+	\item During the ACQUIRE response sent from PF to VF, PF agrees upon the size of bulletin board which will be used [forward-backward compatibility].
+	\item Whenever any of the field of the bulletin fields the PF wants to post changes, PF increments a counter, calculate a CRC and uses DMAE to copy its local buffer into the VF's bulletin buffer.
+	\item On the VF-side, the polled \textit{ecore\_vf\_read\_bulletin()} samples the buffer, verifies the CRC [to make sure it has a consistent image of the buffer] and if the bulletin index has increment since last seen get's updated according to the new bulletin board.
+\end{enumerate}
+
+\section{Function Level Reset}
+PCI Function Level Reset [\myindex{FLR}] is the a functionality triggered by a write to a specific [standard] bit in the PCI function configuration space, which should result in the function being reset.
+On many OSes this feature is used to reset VFs on certain occasions, such as their physical assignment and de-assignment from VMs.
+In addition, FLR might be used internally by driver/FW in case of malicious VFs, where that VF's database should be cleared before re-enablement.
+
+\begin{NOTICE}
+	At this time, malicious VF handling does not exist in the ecore.
+\end{NOTICE}
+
+The FLR flow is a complicated flow which involves Management firmware, storm firmware and driver all working on cleaning the HW and their own databases
+[See \cite{doc:iov-sys} for more details]. From driver point-of-view, management FW notifies driver of FLR after it and the storm FW have already done some work [storm FW done what's called `initial cleanup'].
+Ecore handles the MFW messasge about FLR, and eventually notifies upper-layer driver via \myindex{OSAL\_VF\_FLR\_UPDATE} about the FLR.
+
+\begin{NOTICE}
+	Again, this OSAL is mainly for allowing the upper-layer driver to move this run from the slowpath context into a different context.
+\end{NOTICE}
+
+Upper-layer driver should clean whatever non-ecore `volatile' information it holds for those VFs, and then call \myfunc{iov\_vf\_flr\_cleanup}{iov_vf_flr_cleanup}, which will continue the FLR process -- send a final cleanup ramrod to FW and notify MFW that the FLR process has been complete. Following this call, the FLRed VFs should be operational and in `clean slate' mode.
+
+\begin{NOTICE}
+	Unless \textit{ecore\_iov\_set\_vf\_to\_disable()} was called, in which case following the FLR those VFs will be disabled in FW/HW.
+\end{NOTICE}
+
+\section{versioning}
+\subsection{Slowpath versions}
+Sr-iov is exposed to complex versioning challenges. Specifically, a given PF driver may be working with VF drivers of older and/or newer versions at the same time.
+This means that the channel and bulletin board must be forwards and backwards compatible. The Bulletin Board achieves this by only adding new fields.
+The Channel achieves compatibility through a TLV interface. Messages will always contain a type, length, value header, and may have multiple such parts.
+The receiver of a message (be it PF receiving a request or VF receiving a response) will parse the message, process the parts it is aware of and be able to skip over parts which it doesn't recognize.
+This design allows to declare messages as obsolete, modify existing messages by adding/removing modular pieces, etc.
+
+\subsection{Fastpath versions}
+The compatibility requirements of fastpath flows have to be lenient, as we can't afford to penalize the performance.
+If the fastpath API changes in a non backward compatible fashion (assumed to be a rare occurrence) the VF will either fail to load, or else have to carry with it several alternate implementations for fastpath. The VF driver learns of the fastpath version from the slowpath interaction with the PF.
+
+\SpillChapterFuncs
+
+\chapterimage{qlogic-full-36}
+\chapter{Selftest}
+\label{cha:Selftest}
+
+This chapter describes the ecore interfaces for selftests. The scope of the selftests is to sample various aspects of device functionality and verify that it is operational. It is not intended and does not lay claim to perform full coverage of any functionality. \\
+
+\section{Register Test}
+	\myfunc{selftest\_register}{selftest_register} -- this test verifies the data integrity of the registers. It writes a predefined value to the register, reads it back and verifies that the contents are correctly saved. It saves the register original content before preforming the test and restores its value after the test. This test is performed via MFW and accesses registers from both engines as well as registers from engine common blocks.
+
+\section{Clock Test}
+	\myfunc{selftest\_clock}{selftest_clock} -- it measures the clock frequencies of the E4 modules. The clocks verified in this test are,
+	\begin{itemize}
+		\item Main clock frequency
+		\item STORM clock frequency
+		\item NW clock frequency
+	\end{itemize}
+
+\section{Interrupt Test}
+	\myfunc{selftest\_interrupt}{selftest_interrupt} -- this test verifies the interrupt path. Ecore employs its most basic flow which exercises interrupts, the heartbeat ramrod. Ramrod is sent and interrupt is received.
+
+\section{Memory Test}
+	\myfunc{selftest\_memory}{selftest_memory} -- this test samples some of the memories in the device. Ecore employs its most basic flow which exercises memories, again the heartbeat ramrod. In this flow context is loaded to the context manager memory and is verified by the storm FW (otherwise the ramrod would fail).
+
+\section{NVRAM Test}
+	\myfunc{selftest\_nvram}{selftest_nvram} -- this performs the nvram test. It loops through all the nvram partitions, reads the image on the partition and validates its crc.
+
+\SpillChapterFuncs
+
+\chapterimage{qlogic-full-36}
+\chapter{Precision Time Protocol (PTP) support}
+\label{cha:ptp}
+This chapter provides an high level overview of PTP and describes the ecore interfaces for the same. PTP also known as Time Sync allows the synchronization of the clocks in the distributed systems. The protocol selects one clock in the network as master clock and all other clocks (slave clocks) synchronizes their clocks with the master. Driver's responsibilities include enable/disable of the PTP feature on the device, register/un-register of the hardware clock and its operations to the OS and configure the required Rx/Tx PTP filters. HW/FW does the timestamping of Tx/Rx PTP packets, driver need to read these timestamp values and present it to upper layer protocols (e.g., IPv4). Rx timestamping will be available during the Rx interrupt processing of the driver. FW does the Tx timestamping when first byte of the PTP packet is placed on the wire, driver has to poll for the availability of this timestamp value when processing the PTP Tx packet. \\
+\section{Ecore APIs}
+To enable PTP support, ecore-client should call \myfunc{ptp\_enable}{ptp_enable} and then configure the required PTP filters which include
+enabling the Tx timestamping using \myfunc{ptp\_hwtstamp\_tx\_on}{ptp_hwtstamp_tx_on} and configuring the Rx filter mode
+using \myfunc{ptp\_cfg\_rx\_filters}{ptp_cfg_rx_filters} API.
+Rx filter mode instructs the device to trace the configured Rx PTP packets such as L2, IPv4 etc.
+Rx/Tx timestamp values can be read using the APIs \myfunc{ptp\_read\_rx\_ts}{ptp_read_rx_ts} and
+\myfunc{ptp\_read\_tx\_ts}{ptp_read_tx_ts} respectively.
+The API \myfunc{ptp\_read\_cc}{ptp_read_cc} can be used to read the Phy hardware clock and
+the API \myfunc{ptp\_adjfreq}{ptp_adjfreq} provides implementation for adjusting the hardware clock by a rate given in parts-per-billion (ppb) units. \\
+As part of feature clean up, ecore client should call \myfunc{ptp\_disable}{ptp_disable} API to disable the PTP feature on the hardware. \\
+\begin{NOTICE}
+It is the driver's responsibility to read the Rx/Tx timestamp values. The timestamp register will not be freed for next PTP packets until current value is read by the driver.
+\end{NOTICE}
+
+\SpillChapterFuncs
+
+%\chapterimage{qlogic-full-36}
+%\chapter{Statistics}
+%\begin{NOTICE}
+%Placeholder - owner Dmitry
+%\end{NOTICE}
+
+%\chapterimage{qlogic-full-36}
+%\chapter{Peripherals}
+%\begin{NOTICE}
+%Placeholder - owner Yuval
+%\end{NOTICE}
+
+\appendix
+\chapter{Osal Documentation}
+\label{app:osal}
+\verbatiminput{osal.txt}
+
+%----------------------------------------------------------------------------------------
+%	INDEX
+%----------------------------------------------------------------------------------------
+
+\cleardoublepage
+\setlength{\columnsep}{0.75cm}
+%\addcontentsline{toc}{chapter}{\textcolor{ocre}{Index}}
+\printindex
+
+\bibliography{ecore}
+%----------------------------------------------------------------------------------------
+\end{document}

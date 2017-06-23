@@ -1121,6 +1121,7 @@ usr/src/uts/common/io/nfp/nfp_hostif.h
 usr/src/uts/common/io/nfp/nfdev-common.h
 usr/src/uts/common/io/nfp/autoversion.h
 usr/src/uts/common/io/nfp/i21285.h
+usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/sfxge/common/ef10_ev.c
 usr/src/uts/common/io/sfxge/common/ef10_filter.c
 usr/src/uts/common/io/sfxge/common/ef10_impl.h

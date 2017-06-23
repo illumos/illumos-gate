@@ -668,6 +668,7 @@ f kernel/drv/amd64/pseudo 0755 root sys
 f kernel/drv/amd64/ptc 0755 root sys
 f kernel/drv/amd64/ptsl 0755 root sys
 f kernel/drv/amd64/pvscsi 0755 root sys
+f kernel/drv/amd64/qede 0755 root sys
 f kernel/drv/amd64/qlc 0755 root sys
 f kernel/drv/amd64/qlge 0755 root sys
 f kernel/drv/amd64/ramdisk 0755 root sys
@@ -821,6 +822,7 @@ f kernel/drv/profile.conf 0644 root sys
 f kernel/drv/pseudo.conf 0644 root sys
 f kernel/drv/ptc.conf 0644 root sys
 f kernel/drv/ptsl.conf 0644 root sys
+f kernel/drv/qede.conf 0644 root sys
 f kernel/drv/qlc.conf 0644 root sys
 f kernel/drv/ramdisk.conf 0644 root sys
 f kernel/drv/random.conf 0644 root sys
@@ -18769,6 +18771,7 @@ f usr/share/man/man7d/fd.7d 0444 root bin
 s usr/share/man/man7d/fdc.7d=fd.7d
 s usr/share/man/man7d/firewire.7d=ieee1394.7d
 f usr/share/man/man7d/full.7d 0444 root bin
+f usr/share/man/man7d/qede.7d 0444 root bin
 f usr/share/man/man7d/gld.7d 0444 root bin
 f usr/share/man/man7d/hci1394.7d 0444 root bin
 f usr/share/man/man7d/hid.7d 0444 root bin

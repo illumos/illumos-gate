@@ -1,0 +1,733 @@
+Ecore Operating System Abstraction Layer (osal) documentation
+=============================================================
+
+Introduction
+============
+This document contains the osal information - functions utilized by the ecore
+which the various parties incorporating the ecore into their own sourcecode
+need to implement in order for the ecore to function.
+
+Everything osal should be prefixed with osal*. Structures should be prefixed by
+lowercase `osal_' and be lowercase themselves, while functions should be
+prefixed with upper case letters `OSAL_' and be uppercased.
+
+Notice that some are very trivial, and can be easily replaced by a single
+function call or preprocessor macro. Also notice some are weakly-typed, or
+include values [e.g., struct types] that should probably be implemented
+as preprocessor macros.
+
+* - as always, there are a couple of exceptions.
+
+Time related osals
+==================
+- OSAL_UDELAY(int)
+	The function should delay for said amount of micro-seconds.
+
+- OSAL_MSLEEP(int)
+	The function should sleep for said amount of mili-seconds, releasing the CPU.
+	(The existing of such a call in a flow demands the flow to be run from a
+	context supporting sleep).
+
+Memory related osals
+====================
+- void* OSAL_ALLOC(struct *ecore_dev, u32 mode, u32 size)
+	Allocate `size' memory for said device. The mode comes from linux's GFP_*
+	defines [Notice this means you need to define those values, at least
+	KERNEL & ATOMIC even if you don't need them on your OS].
+	Return value should be NULL if allocation fails, and otherwise return the
+	pointer to allocated memory.
+
+- void* OSAL_ZALLOC(struct *ecore_dev, u32 mode, u32 size)
+	Like OSAL_ALLOC, only the memory [if succesfully allocated] should be set
+	to 0s.
+
+- void* OSAL_CALLOC(struct *ecore_dev, u32 mode, u32 num, u32 elem_size)
+	Like OSAL_ALLOC, only this allocates memory sufficient for `num' elements,
+	each of size `elem_size'.
+
+- void* OSAL_VZALLOC(struct *ecore_dev, u32 size)
+	Allocate `size' memory for said device, but as opposed to OSAL_ALLOC,
+	the allocated memory is only virtually contiguous and not necessarily
+	physically contiguous. Content of memory should be zeroed.
+	Return value should be NULL if allocation fails, and otherwise return the
+	pointer to allocated memory.
+
+- void OSAL_FREE(struct *ecore_dev, void* memory)
+	frees a memory previously dynamically allocated by OSAL_([Z|C]?)ALLOC.
+	Notice this should succeed even if the pointer is NULL.
+
+- void OSAL_VFREE(struct *ecore_dev, void* memory)
+	frees a memory previously dynamically allocated by OSAL_VZALLOC.
+	Notice this should succeed even if the pointer is NULL.
+
+- void OSAL_MEM_ZERO(void* memory, u32 size)
+	Set `size' bytes starting at the address pointed by `memory' with 0s.
+
+- void OSAL_MEMCPY(void* dst, void* src, u32 size)
+	Copy `size' bytes from address pointed by `src' to address pointed by `dst'.
+
+- void OSAL_MEMSET(void *s, int c, u32  size)
+	Set `size' bytes starting at the address pointed to by s with c.
+
+- int OSAL_MEMCMP(void *s1, void *s2, u32 n)
+	Comapre the first n bytes of memory areas s1 and s2.
+	The function returns an integer less than, equal to, or
+	greater than zero if the first n bytes of s1 is found, respectively,
+	to be less than, to match, or be greater than the first n bytes of
+	s2.
+
+dma_addr_t - this variable type should be defined as a variable that can contain
+	physical addresses. It's utilized in OSAL_DMA_* functions.
+
+- void* OSAL_DMA_ALLOC_COHERENT(struct *ecore_dev, dma_addr_t *phys, u32 size)
+	Allocate `size' bytes of DMA-able memory [which will later be accessed by
+	our HW]. The physical address will by filled in `phys' [NULL if allocation
+	fails], and the virtual address will return [NULL if allocation fails].
+
+- void OSAL_DMA_FREE_COHERENT(struct *ecore_dev, void* virt, dma_addr_t *phys, u32 size)
+	Frees previously allocated memory [via OSAL_DMA_ALLOC_COHERENT].
+
+Memory Access related osals
+===========================
+Notice - these do not begin with the OSAL convention.
+
+- void REG_WR(struct *ecore_hwfn, u32 addr, u32 value)
+- void REG_WR16(struct *ecore_hwfn, u32 addr, u16 value)
+	These should perform the memory write toward chip. Address is an offset
+	inside the Bar.
+
+- void DOORBELL(struct *ecore_hwfn, u32 addr, u32 value)
+	This should perform memory write toward chip. Addrees is an offset
+	inside the doorbell bar.
+
+- void DIRECT_REG_WR(struct *ecore_hwfn, u32 addr, u32 value)
+	Perform a memory write toward chip. Address is absolute [i.e., includes
+	bar offset in memory].
+	Notice most ecore clients don't need the ecore_hwfn; Notice that unless
+	ECORE_CONFIG_DIRECT_HWFN is set during compilation, this function will
+	be called sometimes when the ecore_hwfn is set to be OSAL_NULL.
+
+- void DIRECT_REG_RD(struct *ecore_hwfn, u32 addr)
+	Perform a memory read from chip. Address is absolute.
+	[Same comment as for DIRECT_REG_WR]
+
+- u32 REG_RD(struct *ecore_hwfn, u32 addr)
+	This should perform the memory read from chip. Address is an offset
+	inside the Bar.
+
+Synchronization related osals
+=============================
+For most upper-layer driver there's no need to allocate memory for lock primitives -
+for such upper-layer drivers, it should suffice to give an empty implementations
+to - MUTEX_ALLOC(), MUTEX_DEALLOC(), SPIN_LOCK_ALLOC(), SPIN_LOCK_DEALLOC().
+In case this is actually needed, the ecore should also be compile with the
+CONFIG_ECORE_LOCK_ALLOC flag [since sometimes flows diverge a bit].
+
+osal_spinlock_t - a type of variable [struct] which is used as a spinlock in the
+		  various OSAL_SPIN_* calls. Spinlock assumes locking is blocking
+		  and interrupt disabling on all CPUs, protecting an exclusive
+		  critical section.
+
+osal_mutex_t - a type of variable [struct] which is used as a mutex in the
+	       various OSAL_MUTEX_* calls. Mutices assume locking is sleeping,
+	       protecting an exclusive critical section.
+
+- void OSAL_MUTEX_ALLOC(struct ecore_hwfn*, osal_mutex*)
+- void OSAL_SPIN_LOCK_ALLOC(struct ecore_hwfn*, osal_spinlock_t*)
+	Used to allocate [if upper-layer needs to] the spinlock/mutex.
+	NOTICE - counter-intuitively ecore assuumes this always succeeds.
+	But upper-layer can assume this will only be called by rescource alloc &
+	init schemes [and not dynamically], and thus prepare the memory before-hand.
+
+- void OSAL_MUTEX_DEALLOC(osal_mutex*)
+- void OSAL_SPIN_LOCK_DEALLOC(osal_spinlock_t*)
+	Used to free any previously allocated memory of the spinlock/mutex.
+
+- void OSAL_MUTEX_INIT(osal_mutex_t*)
+- void OSAL_SPIN_LOCK_INIT(osal_spinlock_t*)
+	Initializes the given spinlock/mutex.
+
+- void OSAL_MUTEX_ACQUIRE(osal_mutex_t*)
+- void OSAL_SPIN_LOCK(osal_spinlock_t*)
+	Wait until spinlock/mutex is exclusively held - blocking for spinlocks,
+	sleeping for mutices.
+- void OSAL_SPIN_LOCK_IRQSAVE(osal_spinlock_t*, flags)
+	Wait until spinlock/mutex is exclusively held - blocking for spinlocks,
+	sleeping for mutices. Use the type of spinlock that also syncronizes
+	with irqs. Relevant only for some OSs, in most cases an implementation
+	that is identical to OSAL_SPIN_LOCK will suffice.
+
+- OSAL_MUTEX_RELEASE(osal_mutex_t*)
+- void OSAL_SPIN_UNLOCK(osal_spinlock_t*)
+	Release a held spinlock/mutex [no logic necessary for checking whether
+	it's already locked; that's the caller's responsibility].
+- void OSAL_SPIN_UNLOCK_IRQSAVE(osal_spinlock_t*, flags)
+	Release a held spinlock/mutex [no logic necessary for checking whether
+	it's already locked; that's the caller's responsibility]. Should be
+	called on a lock that was taken using OSAL_SPIN_LOCK_IRQSAVE.
+	Relevant only for some OSs, in most cases an implementation
+	that is identical to OSAL_SPIN_LOCK will suffice.
+
+osal_dpc_t - a variable representing a non-sleepable context, used by
+	     bcm_osal_dpc_* calls.
+
+- osal_dpc_t OSAL_DPC_ALLOC(struct ecore_hwfn)
+	Allocates the dpc.
+
+- void OSAL_DPC_INIT(osal_dpc_t dpc, struct ecore_hwfn)
+	Initializes the dpc.
+
+- void OSAL_DPC_SYNC(struct ecore_hwfn *p_hwfn)
+	Make sure all slowpath OS dpc's are synced/flushed.
+
+- void OSAL_POLL_MODE_DPC(struct ecore_hnfn*)
+	Polls ecore_int_sp_dpc during blocking ramrods if needed.  Used when
+	no other thread will service the sp dpc, such as with single threaded
+	systems.
+
+Notice that the DPC interface from ecore is probably the worst [or at least
+one-of the worst] implementation in the API - this API does not determine
+when the DPC will run and what will run in its context.
+At the moment, the only DPC used by the ecore is sp_dpc in ecore_int.c, and
+the missing logic here is that it should somehow be connected by the upper
+layer to the slowpath interrupt ISR [either directly or indirectly], and that
+it should run [or call in some manner] `ecore_int_sp_dpc'.
+
+Linked List osals
+=================
+osal_list_t - this struct is the linked-list root, i.e., from it the linked
+	      list can be travelled; Most OSAL_LIST_* functions will require
+	      such an anchor to be passed.
+osal_list_entry_t - each struct which will be added to a list should contain
+		    such a field.
+
+- void OSAL_LIST_INIT(osal_list_t*)
+	Initializes the list passed to the function [so it can be utilized
+	later on by other OSAL_LIST_* calls].
+
+- void OSAL_LIST_PUSH_HEAD(osal_list_entry_t *entry, osal_list_t *list)
+- void OSAL_LIST_PUSH_TAIL(osal_list_entry_t *entry, osal_list_t *list)
+	Add `entry' to the beginning/end of a list anchored by `list'.
+
+- type* OSAL_LIST_FIRST_ENTRY(osal_list_t*, type, name_of_list_field)
+	[Notice - this is weakly typed and should probably only be
+	implemented as a macro]
+	Assume the first entry in the list is of type `type', and that
+	the osal_list_t entry inside it is named `name_of_list_field'.
+	Return a pointer to that entry.
+
+	E.g., a short example of list functions uses:
+
+	struct foo {
+		osal_struct_t list_head;
+		int x;
+	};
+	osal_struct_list_t root;
+	struct foo foo1, *tmp_foo;
+
+	OSAL_LIST_INIT(&root)
+	foo1.x = 10;
+	OSAL_LIST_PUSH_HEAD(&foo1.head, &root);
+	tmp_foo = OSAL_LIST_FIRST_ENTRY(&root, struct foo, list_head)
+	/* tmp_foo now points to foo1 */
+
+- void OSAL_LIST_REMOVE_ENTRY(osal_list_entry_t *entry, osal_list_t *list)
+	Removes `entry' from `list' [Notice no need to check that entry is
+	part of list; That's the caller's responsiblity]
+
+- bool OSAL_LIST_IS_EMPTY(osal_list_t*)
+	return true iff the list passed to the function contains at least one
+	element.
+
+- void OSAL_LIST_FOR_EACH_ENTRY(type *entry, osal_list_t* list,
+				type, name_of_list_field)
+- void OSAL_LIST_FOR_EACH_ENTRY_SAFE(type *entry, type *tmp_entry,
+				     osal_list_t* list,
+				     type, name_of_list_field)
+	[This is a loop macro, which opens a new statement block and should
+	 probably be implemented as a preprocessor macro]
+	In every iteration of this for-loop `entry' will be filled with the
+	subsequent entry from the list anchored at `list'. The type of the
+	elements of the list and the name of the osal_list_entry_t fields
+	they contain should be explicitly stated [as is the case in
+	OSAL_LIST_FIRST_ENTRY].
+	The 'SAFE' variant requires an additional temporary variable which
+	points to the same type as `entry' (`tmp_entry'), and is safe in the
+	sense that `entry' can be removed from the list and the iteration
+	logic should not break.
+	If breaking from the loop one can assume `tmp_entry' would point to
+	the element it pointed to while breaking. But no assumption can be
+	made on its value assuming the iteration runs on all list elements.
+
+ - void OSAL_LIST_INSERT_ENTRY_BEFORE(type *new_entry, type *entry, 
+                                                            osal_list_t* list)
+   Insert a new entry before the specified entry in the list,
+   or insert at head of list if specified entry is 0.
+
+- void OSAL_LIST_INSERT_ENTRY_AFTER(type *new_entry, type *entry, 
+                                                            osal_list_t* list)
+   Insert a new entry after the specified entry in the list,
+   or insert at tail of list if specified entry is 0.
+
+- void OSAL_LIST_SPLICE_INIT(osal_list_t* new_list, osal_list_t* list)
+   Update new_list by splicing list to the head of new_list.
+
+- void OSAL_LIST_SPLICE_TAIL_INIT(osal_list_t* new_list, osal_list_t* list)
+   Update new_list by splicing list to the tail of new_list.
+
+PCI access osals
+================
+- void OSAL_PCI_READ_CONFIG_BYTE(struct *ecore_dev, u32 address, u8 *dst)
+- void OSAL_PCI_READ_CONFIG_WORD(struct *ecore_dev, u32 address, u16 *dst)
+- void OSAL_PCI_READ_CONFIG_DWORD(struct *ecore_dev, u32 address, u32 *dst)
+	Read the appropraite data size and fill in `dst' from offset
+	`address' in the device's configuration space.
+- void OSAL_PCI_WRITE_CONFIG_WORD(struct *ecore_dev, u32 address, u16 val)
+	Write the given value at the offset `address' in the device's
+	configuration space.
+- int OSAL_PCI_FIND_CAPABILITY(struct *ecore_dev, u16 pcie_id)
+	Returns the offset in the PCI configuration space of the PCIe capability
+	`pcie_id', or 0 if no such if capability is found.
+- int OSAL_PCI_FIND_EXT_CAPABILITY(struct *ecore_dev, u16 pcie_id)
+	Returns the offset in the PCI configuration space of the PCIe extended
+	capability `pcie_id', or 0 if no such if capability is found.
+- u32 OSAL_BAR_SIZE(struct *ecore_dev, u8 bar_id)
+	Returns the PCI bar size of the bar specified by `bar_id' - id 0 refers
+	to the regview bar and id 1 to the doorbell bar.
+
+Memory Barriers
+===============
+- void OSAL_MMIOWB(strcut *ecore_dev)
+- void OSAL_BARRIER(struct *ecore_dev)
+- void OSAL_SMP_RMB(struct *ecore_dev)
+- void OSAL_SMP_WMB(struct *ecore_dev)
+- void OSAL_RMB(struct *ecore_dev)
+- void OSAL_WMB(struct *ecore_dev)
+
+Memory barriers mostly follow the linux's definition of memory barriers,
+as can be found in the linux kernel under `Documentation/memory-barriers.txt'.
+It's possible that certain Operating systems will not require all of said
+memory barriers, e.g., if there's no need to support weak-memory ordered
+system with the OS; In such a case, they should implement the barriers as
+empty functions.
+Also notice that on most implementations the ecore_dev pointer isn't needed for
+the barrier implementation.
+
+- void OSAL_DMA_SYNC(struct *ecore_dev, void* addr, u32 size, bool is_post)
+	Used in upper-layer drivers that need to sync memory and caches
+	surrounding a dma transaction; This will be called with
+	'is_post == false' prior to the DMA transaction, and 'is_post == true'
+	following it.
+	`addr' will be the physical address of the source buffer.
+
+Bit operations
+==============
+- void OSAL_SET_BIT(u8 bit, unsigned long *bitmap)
+	Set a bit in a bitmap; Logically *bitmap |= (1ULL << bit)
+
+- void OSAL_CLEAR_BIT(u8 bit, unsigned long *bitmap)
+	Clears a bit in a bitmap; Logically *bitmap &= ~(1ULL << bit)
+
+- bool OSAL_TEST_BIT(u8 bit, unsigned long *bitmap)
+	Tests whether a bit is set in a bitmap.
+	Logically !!(*bitmap & (1ULL << bit))
+
+- bool OSAL_TEST_AND_CLEAR_BIT(u8 bit, unsigned long *bitmap)
+	Tests whether a bit is set in a bitmap and clears it.
+	Logically returns !!(*bitmap & (1ULL << bit)) and then performs
+	*bitmap &= ~(1ULL << bit)
+
+- bool OSAL_TEST_AND_FLIP_BIT(u8 bit, unsigned long *bitmap)
+	Tests whether a bit is set in a bitmap and flips it.
+	Logically returns !!(*bitmap & (1ULL << bit)) and then performs
+	*bitmap ^= (1ULL << bit)
+
+- u8 OSAL_FIND_FIRST_ZERO_BIT(unsigned long *bitmap, u8 length)
+	Returns the bit-index of the first non-set bit in a bitmap of
+	length `length'. Logically, returns min bit s.t. 
+	(bit < length) && !(*bitmap & (1ULL << bit))
+
+- u8 OSAL_FIND_FIRST_BIT(unsigned long *bitmap, u8 length)
+        Returns the bit-index of the first non-set bit in a bitmap of
+        length `length'. Logically, returns min bit s.t.
+        (bit < length) && (*bitmap & (1ULL << bit)).
+	In case no bit is set, should return length.
+
+- int OSAL_BITMAP_WEIGHT(u32 *bitmap, u32 nbits)
+	Returns the Hamming weight (number of set bits) in the bitmap. 
+
+Endianess
+=========
+OSAL_BE32 - a variable representing a 32-bit data in BE format.
+- __be32 OSAL_CPU_TO_BE32(u32 val)
+	convert a u32 val into big-endian format.
+
+- __be64 OSAL_CPU_TO_BE64(u64 val)
+	convert a u64 val into big-endian format
+
+- u32 OSAL_BE32_TO_CPU(u32 val)
+	convert a 32-bit value in big-endian format into current architecture.
+
+- __be16 OSAL_CPU_TO_BE16(u16 val)
+	convert a u16 val into big-endian format.
+
+- u16 OSAL_BE16_TO_CPU(u16 val)
+	convert a 16-bit value in big-endian format into current architecture.
+
+- u32 OSAL_CPU_TO_LE32(u32 val)
+	convert a 32-bit value from native byte ordering to little endian format.
+
+- u16 OSAL_CPU_TO_LE16(u16 val)
+	convert a 16-bit value from native byte ordering to little endian format.
+
+- u32 OSAL_LE32_TO_CPU(u32 val)
+	convert a 32-bit little endian value to native byte ordering.
+
+- u16 OSAL_LE16_TO_CPU(u32 val)
+	convert a 16-bit little endian value to native byte ordering.
+
+Physical link
+=============
+- void OSAL_LINK_UPDATE(struct ecore_hwfn*)
+	ecore uses this callback to inform upper-layer driver that a link
+	change has been informed by the MFW, and the link state is parsed
+	inside the hwfn->mcp_info->link_output.
+	Notice this is called from non-sleepable context, so it's possible
+	upper layer driver will have to schedule in its implementation to
+	process the change in some other context.
+
+Single Root IOV
+===============
+- ? OSAL_VF_SEND_MSG2PF(struct *ecore_dev, u8* done, union vfpf_tlvs *msg,
+			union pfvf_tlvs *reply_addr, u32 msg_size,
+			u32 reply_size)
+	This should be implemented by drivers utilizing a SW channel
+	[as opposed to the ecore hw_channel] for sending messages from VF
+	to PF. This should send a buffer pointed by `msg' of length `msg_size'
+	to the PF, where the PF's answer should be written to `reply_addr'
+	of maximum size `reply_size'. Writing to `done' should signal the
+	transaction is complete.
+
+- int OSAL_PF_VF_MSG(struct ecore_hwfn*, u8 relative_vfid)
+	This should be implemented by drivers utilizing the HW channel
+	for sending messages from VF to PF. This is called on the PF by
+	ecore on the EQ-handling context to signal to upper-layer that
+	the vf with the relative vfid has sent a message, and allow the
+	upper-layer to handle the request. Should return 0 on success,
+	non-zero otherwise.
+
+- void OSAL_PF_VF_MALICIOUS(struct ecore_hwfn*, u8 relative_vfid)
+	This indicates to ecore-client that the specific VF is now considered
+	malicious by FW. Exact implication may vary [I.e., it's possible that
+	the hw-channel is still operational or it might be disabled, depending
+	on the exact nature of the vf maliciousness].
+
+- enum _ecore_status OSAL_IOV_CHK_UCAST(struct *ecore_hwfn,
+					int vfid,
+					struct ecore_filter_ucast *params)
+	Called on the PF whenever the VF requests to configure a unicast
+	filter, to allow the upper layer to decide whether to allow the
+	unicast configuration or not. Should return ECORE_SUCCESS if
+	configuration is allowed, ECORE_EXISTS if it's already configured
+	and ECORE_INVAL if its forbidden.
+			
+- enum _ecore_status 
+  OSAL_IOV_PRE_START_VPORT(struct *ecore_hwfn,
+			   int relative_vf_id,
+			   struct ecore_sp_vport_start_params *params)
+	Called on the PF before starting a VF's vport, to check the 
+	OS-specific setting for that vport.
+
+- void OSAL_IOV_POST_START_VPORT(struct *ecore_hwfn,
+				 int relative_vf_id,
+				 u8 vport_id,
+				 u16 opaque_fid)
+	Called on the PF after succesfully starting a VF's vport,
+	to allow the upper layer the chance of doing some additional
+	OS-specific work.
+
+- enum _ecore_status_t
+  OSAL_IOV_VF_VPORT_UPDATE(struct *ecore_hwfn, u8 relative_vfid,
+			   struct *ecore_sp_vport_update_params,
+			   u16 *p_tlvs_mask)
+ 	Called on PF side to allow upper-client to manipulate the configuration
+        of a vport update request by VF.
+        `p_tlv_mask' is a bit mask of ECORE_IOV_VP_UPDATE_* values, and it's
+        the ecore-client responsibility to clear bits which are NOT to be
+	configured.
+	If the ecore-client wants to fail the configuaration altogether, it
+	should return a value other than ECORE_SUCCESS.
+
+- void OSAL_IOV_VF_VPORT_STOP(struct ecore_hwfn *p_hwfn,
+			       struct ecore_vf_info *vf)
+ 	Called on PF side to allow upper-client to to execute required operations
+        before closing vport.
+
+- void OSAL_VF_FLR_UPDATE(struct *ecore_hwfn)
+	Called on PF side to indicate MFW signaled some of the PF's
+	vfs were Function Level Resetted. When this is called,
+	pending_flr field in the PF's iov information should be set
+	to be a bitmask of all relative VFIDs that need FLR.
+
+- void OSAL_IOV_VF_CLEANUP(struct *ecore_hwfn, u8 relative_vfid)
+	Called on PF side to indicate that VF has been cleaned, to allow
+	ecore-client the change of cleaning any database it had for that vf.
+
+- void OSAL_VF_FILL_ACQUIRE_RESC_REQ(struct ecore_hwfn *p_hwfn,
+                                     struct vf_pf_resc_request *p_resc_req,
+				     struct ecore_vf_acquire_sw_info *p_sw_info)
+        Called on the VF before sending acquire messgae to the PF,
+        to allow the upper layer to fill the num of requested resources.
+
+- enum _ecore_status_t 
+  OSAL_VF_UPDATE_ACQUIRE_RESC_RESP(struct ecore_hwfn *p_hwfn,
+                                   struct pf_vf_resc *p_resc_resp)
+        Called on the VF after acquire response has recieved to update
+        upper layer with the acquired resources. The upper layer should
+        return error in case there is a problem with the amount of acquired
+        resources, otherwise success.
+
+- enum _ecore_status_t
+  OSAL_IOV_VF_ACQUIRE(struct ecore_hwfn *p_hwfn, u8 relative_vfid)
+	Called on PF side while processing a VF acquisition message, to allow
+        the ecore-client to prevent the acquisition if required.
+
+- enum _ecore_status_t
+  OSAL_VF_CQE_COMPLETION(struct ecore_hwfn *p_hwfn,
+                         struct eth_slow_path_rx_cqe *cqe,
+                         enum protocol_type protocol)
+        Called on the VF to let the upper layer chance to handle the cqe.
+
+- u8 OSAL_IOV_GET_OS_TYPE()
+	Called on PF side - should return a VFPF_ACQUIRE_OS_* value matching
+	the OS hypervisor type.
+
+- void OSAL_IOV_VF_MSG_TYPE(struct ecore_hwfn *p_hwfn,
+                            u8 vf_id,
+                            int vf_msg_type)
+	Called on PF side to indicate  the VF to PF TLV Request type send by VF in 
+	the MailBox request through HW Channel.
+
+- void OSAL_IOV_PF_RESP_TYPE(struct ecore_hwfn *p_hwfn,
+                             u8 vf_id,
+                             enum ecore_iov_pf_to_vf_status pf_resp_type)
+	Called on PF side to indicate the PF to VF Response type after the processing
+        of VF Mailbox request through HW Channel.
+
+- int OSAL_PF_VALIDATE_MODIFY_TUNN_CONFIG(struct ecore_hwfn *p_hwfn,
+					  u16 *feature_mask, bool *update,
+					  struct ecore_tunnel_info *p_tun)
+	Called on PF side to validate and modify VF's requested tunnel mode,
+	classes and udp ports based on update masks/flags. In case PF modifies
+	VF requested data then it should still return an error
+	to indicate to VF flow. Finally, If any tunnel configuration update
+	is required then they must set "true" in "update" address.
+	PF should also set the features in "feature_mask" which are enabled
+	or requested from VF to be enabled and can be kept intact
+	[i.e they can no longer be modified further by PF in terms of tunn
+	mode or tun classes].
+
+HW errors & Recovery
+====================
+- void OSAL_SCHEDULE_RECOVERY_HANDLER(struct ecore_hwfn* p_hwfn)
+	ecore uses this callback to inform the upper-layer driver that a process
+	kill indication has been received from the MFW, and that a recovery 
+	handler should be scheduled to handle the recovery flow.
+
+- void OSAL_HW_ERROR_OCCURRED(struct ecore_hwfn *p_hwfn,
+			      enum ecore_hw_err_type err_type)
+	ecore uses this callback to inform the upper-layer driver about an error
+	in the HW/FW.
+
+Unzipping functionality related osal
+====================================
+- u32 OSAL_UNZIP_DATA(struct ecore_hwfn *p_hwfn, u32 input_len, u8 *input_buf,
+		      u32 max_size, u8 *unzip_buf)
+	Unzip zipped data of length "input_len" present in "input_buf" and
+	write unzipped data into "unzip_buf". "max_size" is max length of unzipped
+	data which can be written into "unzip_buf".
+	returns the length of unzipped data in dwords, in case of failure returns 0.
+
+Note -	All drivers has to define/set CONFIG_ECORE_ZIPPED_FW to take zipped
+	firmware file and implement their own functionality to unzip data.
+
+String handling related osals
+=============================
+- int OSAL_SPRINTF(char *str, const char *format, ...)
+	Write a formatted output to a string pointed to by str.
+
+- int OSAL_SNPRINTF(char *str, osal_size_t n, const char *format, ...)
+	Write a formatted output to a string pointed to by str, taking n as the maximum number of characters to write.
+	The remaining characters are discarded and not stored, but counted for the value returned by the function.
+
+- u32 OSAL_STRLEN(const char *str)
+	Return the length of the string pointed to by str, excluding the terminating null byte ('\0').
+
+- char *OSAL_STRCPY(char *dest, const char *src)
+	Copy the string pointed to by src, including the terminating null byte ('\0'), to the buffer  pointed to by dest.
+
+- char *OSAL_STRNCPY(char *dest, const char *src, osal_size_t n)
+	Copies up to n characters from the string pointed to by src to dest.
+	In the case where the length of src is less than that of n, the remainder of dest will be padded with null bytes.
+
+- int OSAL_STRCMP(const char *str1, const char *str2)
+	Compares the string pointed by str1 to the string pointed by str2.
+
+- int OSAL_STRTOUL(const char *str, unsigned int base, unsigned long *res)
+	Converts a string pointed by str to an unsigned long.
+	The string base can be given explicitly, or "0" can be provided and then it will be automatically detected with the conventional semantics
+	(begins with 0x - the number will be parsed as a hexadecimal, if it otherwise begins with 0 - octal, otherwise - decimal).
+	The the result of the conversion is written to the variable pointed by res.
+
+Miscellaneous
+=============
+osal_size_t  - The type is used to store the result of sizeof operator.
+		On certain platfroms it is typedefed to __SIZE_TYPE__, a
+		compiler predefined macro.
+
+osal_int_ptr_t - Integer type large enough to hold a pointer. The data type is
+	          useful for casting pointers when we want to do address
+	          arithmetic.
+
+OSAL_NULL -  Null value defintion.
+
+OSAL_INLINE - The specifier instructs the compiler to insert a copy of the
+	       function body into each place the function is called.
+
+OSAL_BUILD_BUG_ON(condition) - Break compilation if the "condition" is true.
+
+OSAL_PAGE_SIZE - Macro for the page size value i.e., number of bytes in a
+	          memory page.
+
+OSAL_CACHE_LINE_SIZE - Macro for the cache line size value in bytes.
+
+OSAL_IOMEM - Annotation used to mark pointers to I/O memory. It is used by
+	      Sparse, a tool used to find possible coding faults in the
+	      kernel. The annotation is ignored in the normal compilation.
+	      When checking the code with sparse, however, developers will see
+	      a whole new set of warnings caused by code which mixes normal
+	      pointers with OSAL_IOMEM pointers, or which dereferences those
+	      pointers. 
+
+OSAL_UNLIKELY(condition) -  An instruction to the compiler to emit instructions
+	     in the favor of "condition" value likely to be false (zero).
+
+- type OSAL_MIN_T(type, val1, val2)
+	Returns the minimum of (val1, val2) which are of data type "type".
+
+- type OSAL_MAX_T(type, val1, val2)
+	Returns the maximum of (val1, val2) which are of data type "type".
+
+- u32* OSAL_REG_ADDR(struct *ecore_hwfn, u32 hw_offset)
+	Returns the memory address value of the device at the offset hw_offset.
+
+- u32 OSAL_NUM_ACTIVE_CPU()
+	Returns the number of active CPUs on the machine
+
+- u32 DIV_ROUND_UP(u32 size, u32 divisor_size)
+	Returns number of elements required of `divisor_size' each,
+        required to hold at least `size' data.
+
+- u32 ROUNDUP(u32 size, u32 divisor_size)
+	Returns DIV_ROUND_UP * divisor_size [how much memory will be
+	required for holding `size' data, if we can only allocate
+	in granularity of `divisor_size'].
+
+- u32 OSAL_ROUNDUP_POW_OF_TWO(u32)
+	Return a round-up to closest value which is a power of 2.
+
+- u32 OSAL_LOG2(u32)
+	Returns a log on a 2-basis of the value.
+
+- void OSAL_ASSERT(bool cond)
+	Should perform some sort of panic in case `cond' is false.
+
+- u32 OFFSETOF(struct, field)
+	returns the offset in bytes of field inside struct.
+	TBD - isn't it ANSI-C? If so, can be removed from ecore.
+
+- void PRINT(void *dp_ctx, char *format_string, ...)
+- void PRINT_ERR(void *dp_ctx, char *format_string, ...)
+	Macros used by the ecore debug facilities to print verbose & error logs.
+
+- void OSAL_WARN(bool condition, const char *format, ...)
+	Should cause a warning [at least on debug mode] if hit.
+
+- void OSAL_BEFORE_PF_START(struct file, engine id)
+	Perform some action just before first interaction with FW.
+
+- void OSAL_AFTER_PF_STOP(struct file, engine id)
+	Perform some action just aftter last interaction with FW.
+
+- u32 ARRAY_SIZE(array[])
+	Returns the number of elements in an array.
+
+- osal_uintptr_t - Used for casting pointer to integer value.
+	Some 32 bit OS complains about "cast from pointer to integer of different size". As on those platform
+	integers and pointers are of different sizes. Due to this fact we couldn't use any generic data type in
+	ecore to cast pointer to integer data type which can be appropriate for both 32 bit and 64 bit platform
+	for all OS distributions, as a data type size on each OS distribution may vary. So this osal serves the
+	purpose of to define OS specific data type cast which can be used on both 32 bit and 64 bit platform.
+
+- void OSAL_GET_PROTOCOL_STATS(struct *ecore_dev, enum ecore_mcp_protocol_type type,
+			       union ecore_mcp_protocol_stats *stats);
+	Call from the ecore to get the statististics of a protocol driver. Ecore client
+	need to populate the requested statistics. If the PF has more than one function,
+	driver should return the statistics sum of all the interfaces under the PF.
+
+- int OSAL_SLOWPATH_IRQ_REQ(struct ecore_hwfn *p_hwfn)
+	Call from ecore to the upper layer driver to request IRQs for the slowpath
+	interrupts handling.
+
+- u32 OSAL_GET_RDMA_SB_ID(struct ecore_hwfn *p_hwfn, u32 relative_sb_id)
+	Call from ecore to obtain real SB ID from upper layer.
+
+- void OSAL_DCBX_AEN(struct ecore_hwfn *p_hwfn, enum ecore_mib_read_type mib_type)
+	Call from ecore to notify the dcbx related asynchronous events from the MFW.
+
+- u32 OSAL_CRC32(u32 crc, u8 *buf, osal_size_t length)
+	Compute a CRC-32 value using a Castagnoli polynomial.
+	`crc' is the previous value for the checksum, and `buf' shall point to
+	an array of `length' bytes of data to be added to this checksum.
+
+- void OSAL_CRC8_POPULATE(u8 table[CRC8_TABLE_SIZE], u8 polynomial)
+	Fill the provided crc table for given polynomial in reverse bit order (msb first).
+	The table size is 256 ('CRC8_TABLE_SIZE').
+
+- u8 OSAL_CRC8(const u8 table[CRC8_TABLE_SIZE], u8 *pdata, osal_size_t nbytes, u8 crc)
+	Calculate a crc8 over the given input data.
+	`table' is the crc table used for calculation, `pdata' is a pointer to data buffer,
+	`nbytes' is the size of the data buffer, and `crc' is the previous returned crc8 value.
+
+- s64 OSAL_DIV_S64(s64 value, s64 base)
+	Some distros [32-bit] are having problems with direct division of 64-bit variables.
+	This should logically return (value / base), and for distros that don't care about this
+	sort of issues it can be defined to be exactly that.
+
+NVRAM related osals
+===================
+- bool OSAL_NVM_IS_ACCESS_ENABLED(struct ecore_hwfn *p_hwfn)
+        This osal allows to upper layer decide if it is allowed to access
+        the NVRAM.
+
+Management changes related osals
+================================
+- int OSAL_MFW_TLV_REQ(struct ecore_hwfn *p_hwfn)
+	Called to inform that MFW has requested for TLVs. We are in the interrupt
+	context here, ecore client need to schedule a thread/bottom-half context
+	to handle this task, and return the control immediately.
+	The bottom-half thread will need to invoke ecore_mfw_process_tlv_req()
+	for further processing of the TLV request.
+
+- int OSAL_MFW_FILL_TLV_DATA(struct ecore_hwfn *p_hwfn, enum ecore_mfw_tlv_type type,
+                             union ecore_mfw_tlv_data *data)
+	Called from ecore to get the TLV values of a given type. Ecore client
+	need to fill in the values for all the fields that it's aware of, and
+	also need to set the flags associated with the respective fields. For instance,
+	if client sets value for 'npi_enabled' field, it needs to set the flag
+	'npiv_enabled_set' to true.
+
+- void OSAL_HW_INFO_CHANGE(struct ecore_hwfn *p_hwfn, enum ecore_hw_info_change)
+	Called after management has changed some property of a hw_info field.
+	The enum value indicates which field has changed. This is a FYI kind of
+	notification - direct HW/FW changes [if applicable] were already done.
