@@ -25,6 +25,7 @@
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright (c) 2016 by Delphix. All rights reserved.
 #
 
 #
@@ -350,6 +351,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/zfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/zfs/lua/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/zut/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -376,7 +381,7 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/fsreparse/%.c
 
 KMECHKRB5_BASE=$(UTSBASE)/common/gssapi/mechs/krb5
 
-KGSSDFLAGS=-I $(UTSBASE)/common/gssapi/include 
+KGSSDFLAGS=-I $(UTSBASE)/common/gssapi/include
 
 # Note, KRB5_DEFS can be assigned various preprocessor flags,
 # typically -D defines on the make invocation.  The standard compiler
@@ -1883,6 +1888,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/vscan/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/zfs/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/zfs/lua/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/zut/%.c

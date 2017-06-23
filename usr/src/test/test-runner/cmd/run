@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 import ConfigParser
@@ -438,12 +438,8 @@ class TestGroup(Test):
                 return False
 
         # If one of the tests is invalid, delete it, log it, and drive on.
-        for test in self.tests:
-            if not verify_file(os.path.join(self.pathname, test)):
-                del self.tests[self.tests.index(test)]
-                logger.info("Warning: Test '%s' removed from TestGroup '%s' "
-                            "because it failed verification." %
-                            (test, self.pathname))
+        self.tests[:] = [f for f in self.tests if
+          verify_file(os.path.join(self.pathname, f))]
 
         return len(self.tests) is not 0
 
@@ -578,6 +574,22 @@ class TestRun(object):
 
                 if testgroup.verify(logger):
                     self.testgroups[section] = testgroup
+
+            elif 'autotests' in config.options(section):
+                testgroup = TestGroup(section)
+                for prop in TestGroup.props:
+                    for sect in ['DEFAULT', section]:
+                        if config.has_option(sect, prop):
+                            setattr(testgroup, prop, config.get(sect, prop))
+
+                filenames = os.listdir(section)
+                # only files starting with "tst." are considered tests
+                filenames = [f for f in filenames if f.startswith("tst.")]
+                testgroup.tests = sorted(filenames)
+
+                if testgroup.verify(logger):
+                    self.testgroups[section] = testgroup
+
             else:
                 test = Test(section)
                 for prop in Test.props:

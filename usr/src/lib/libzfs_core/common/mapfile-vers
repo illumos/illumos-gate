@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2017 RackTop Systems.
 #
 # MAPFILE HEADER START
@@ -43,6 +43,7 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 	libzfs_core_fini;
 	libzfs_core_init;
 	lzc_bookmark;
+	lzc_channel_program;
 	lzc_clone;
 	lzc_promote;
 	lzc_create;
