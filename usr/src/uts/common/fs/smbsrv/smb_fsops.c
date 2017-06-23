@@ -1243,25 +1243,6 @@ smb_fsop_setattr(
 		return (EACCES);
 
 	/*
-	 * The file system cannot detect pending READDONLY
-	 * (i.e. if the file has been opened readonly but
-	 * not yet closed) so we need to test READONLY here.
-	 *
-	 * Note that file handle that were opened before the
-	 * READONLY flag was set in the node (or the FS) are
-	 * immune to that change, and remain writable.
-	 */
-	if (sr && (set_attr->sa_mask & SMB_AT_SIZE)) {
-		if (sr->fid_ofile) {
-			if (SMB_OFILE_IS_READONLY(sr->fid_ofile))
-				return (EACCES);
-		} else {
-			if (SMB_PATHFILE_IS_READONLY(sr, snode))
-				return (EACCES);
-		}
-	}
-
-	/*
 	 * SMB checks access on open and retains an access granted
 	 * mask for use while the file is open.  ACL changes should
 	 * not affect access to an open file.
@@ -1349,23 +1330,6 @@ smb_fsop_set_data_length(
 
 	if (SMB_TREE_HAS_ACCESS(sr, access) == 0)
 		return (EACCES);
-
-	/*
-	 * The file system cannot detect pending READDONLY
-	 * (i.e. if the file has been opened readonly but
-	 * not yet closed) so we need to test READONLY here.
-	 *
-	 * Note that file handle that were opened before the
-	 * READONLY flag was set in the node (or the FS) are
-	 * immune to that change, and remain writable.
-	 */
-	if (sr->fid_ofile) {
-		if (SMB_OFILE_IS_READONLY(sr->fid_ofile))
-			return (EACCES);
-	} else {
-		/* This requires an open file. */
-		return (EACCES);
-	}
 
 	/*
 	 * SMB checks access on open and retains an access granted
@@ -1502,8 +1466,7 @@ smb_fsop_write(
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
-	if (SMB_OFILE_IS_READONLY(of) ||
-	    SMB_TREE_HAS_ACCESS(sr, ACE_WRITE_DATA | ACE_APPEND_DATA) == 0)
+	if (SMB_TREE_HAS_ACCESS(sr, ACE_WRITE_DATA | ACE_APPEND_DATA) == 0)
 		return (EACCES);
 
 	rc = smb_ofile_access(of, cr, FILE_WRITE_DATA);

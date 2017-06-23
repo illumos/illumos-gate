@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -1721,9 +1721,7 @@ typedef struct mdb_smb_ofile {
 
 static const mdb_bitmask_t
 ofile_flag_bits[] = {
-	{ "RO",
-	    SMB_OFLAGS_READONLY,
-	    SMB_OFLAGS_READONLY },
+	{ "RO", 1, 1 }, /* old SMB_OFLAGS_READONLY */
 	{ "EXEC",
 	    SMB_OFLAGS_EXECONLY,
 	    SMB_OFLAGS_EXECONLY },
