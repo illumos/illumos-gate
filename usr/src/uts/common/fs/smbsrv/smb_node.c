@@ -1165,7 +1165,6 @@ smb_node_alloc(
 	node->n_refcnt = 1;
 	node->n_hash_bucket = bucket;
 	node->n_hashkey = hashkey;
-	node->n_pending_dosattr = 0;
 	node->n_open_count = 0;
 	node->n_allocsz = 0;
 	node->n_dnode = NULL;
@@ -1387,9 +1386,9 @@ smb_node_is_system(smb_node_t *node)
  * smb_node_file_is_readonly
  *
  * Checks if the file (which node represents) is marked readonly
- * in the filesystem. No account is taken of any pending readonly
- * in the node, which must be handled by the callers.
- * (See SMB_OFILE_IS_READONLY and SMB_PATHFILE_IS_READONLY)
+ * in the filesystem.  Note that there may be handles open with
+ * modify rights, and those continue to allow access even after
+ * the DOS read-only flag has been set in the file system.
  */
 boolean_t
 smb_node_file_is_readonly(smb_node_t *node)
@@ -1398,9 +1397,6 @@ smb_node_file_is_readonly(smb_node_t *node)
 
 	if (node == NULL)
 		return (B_FALSE);	/* pipes */
-
-	if (node->n_pending_dosattr & FILE_ATTRIBUTE_READONLY)
-		return (B_TRUE);
 
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
@@ -1573,40 +1569,18 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 		 */
 	}
 
-	/*
-	 * After this point, tmp_attr is what we will actually
-	 * store in the file system _now_, which may differ
-	 * from the callers attr and f_pending_attr w.r.t.
-	 * the DOS readonly flag etc.
-	 */
-	bcopy(attr, &tmp_attr, sizeof (tmp_attr));
-	if (attr->sa_mask & (SMB_AT_DOSATTR | SMB_AT_ALLOCSZ)) {
+	if ((attr->sa_mask & SMB_AT_ALLOCSZ) != 0) {
 		mutex_enter(&node->n_mutex);
-		if ((attr->sa_mask & SMB_AT_DOSATTR) != 0) {
-			tmp_attr.sa_dosattr &= smb_vop_dosattr_settable;
-			if (((tmp_attr.sa_dosattr &
-			    FILE_ATTRIBUTE_READONLY) != 0) &&
-			    (node->n_open_count != 0)) {
-				/* Delay setting readonly */
-				node->n_pending_dosattr =
-				    tmp_attr.sa_dosattr;
-				tmp_attr.sa_dosattr &=
-				    ~FILE_ATTRIBUTE_READONLY;
-			} else {
-				node->n_pending_dosattr = 0;
-			}
-		}
 		/*
 		 * Simulate n_allocsz persistence only while
 		 * there are opens.  See smb_node_getattr
 		 */
-		if ((attr->sa_mask & SMB_AT_ALLOCSZ) != 0 &&
-		    node->n_open_count != 0)
+		if (node->n_open_count != 0)
 			node->n_allocsz = attr->sa_allocsz;
 		mutex_exit(&node->n_mutex);
 	}
 
-	rc = smb_fsop_setattr(sr, cr, node, &tmp_attr);
+	rc = smb_fsop_setattr(sr, cr, node, attr);
 	if (rc != 0)
 		return (rc);
 
@@ -1655,21 +1629,7 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, cred_t *cr,
 
 	mutex_enter(&node->n_mutex);
 
-	/*
-	 * When there are open handles, and one of them has
-	 * set the DOS readonly flag (in n_pending_dosattr),
-	 * it will not have been stored in the file system.
-	 * In this case use n_pending_dosattr. Note that
-	 * n_pending_dosattr has only the settable bits,
-	 * (setattr masks it with smb_vop_dosattr_settable)
-	 * so we need to keep any non-settable bits we got
-	 * from the file-system above.
-	 */
 	if (attr->sa_mask & SMB_AT_DOSATTR) {
-		if (node->n_pending_dosattr) {
-			attr->sa_dosattr &= ~smb_vop_dosattr_settable;
-			attr->sa_dosattr |= node->n_pending_dosattr;
-		}
 		if (attr->sa_dosattr == 0) {
 			attr->sa_dosattr = (isdir) ?
 			    FILE_ATTRIBUTE_DIRECTORY:

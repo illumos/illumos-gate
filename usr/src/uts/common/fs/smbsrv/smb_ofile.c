@@ -22,7 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -278,18 +278,6 @@ smb_ofile_open(
 			}
 		}
 
-		if (tree->t_flags & SMB_TREE_READONLY)
-			of->f_flags |= SMB_OFLAGS_READONLY;
-
-		/*
-		 * Note that if we created_readonly, that
-		 * will _not_ yet show in attr.sa_dosattr
-		 * so creating a readonly file gives the
-		 * caller a writable handle as it should.
-		 */
-		if (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)
-			of->f_flags |= SMB_OFLAGS_READONLY;
-
 		smb_node_inc_open_ofiles(node);
 		smb_node_add_ofile(node, of);
 		smb_node_ref(node);
@@ -416,22 +404,18 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 		}
 		if (smb_node_dec_open_ofiles(of->f_node) == 0) {
 			/*
-			 * Last close. The f_pending_attr has
-			 * only times (atime,ctime,mtime) so
-			 * we can borrow it to commit the
-			 * n_pending_dosattr from the node.
+			 * Last close.  If we're not deleting
+			 * the file, apply any pending attrs.
+			 * Leave allocsz zero when no open files,
+			 * just to avoid confusion, because it's
+			 * only updated when there are opens.
 			 */
-			pa->sa_dosattr =
-			    of->f_node->n_pending_dosattr;
-			if (pa->sa_dosattr != 0)
-				pa->sa_mask |= SMB_AT_DOSATTR;
-			/* Let's leave this zero when not in use. */
-			of->f_node->n_allocsz = 0;
 			mutex_enter(&of->f_node->n_mutex);
 			if (of->f_node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
 				smb_node_delete_on_close(of->f_node);
 				pa->sa_mask = 0;
 			}
+			of->f_node->n_allocsz = 0;
 			mutex_exit(&of->f_node->n_mutex);
 		}
 		if (pa->sa_mask != 0) {
@@ -441,9 +425,6 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 			 * we pass NULL as the ofile to setattr
 			 * so it will write to the file system
 			 * and not keep anything on the ofile.
-			 * This clears n_pending_dosattr if
-			 * there are no opens, otherwise the
-			 * dosattr will be pending again.
 			 */
 			(void) smb_node_setattr(NULL, of->f_node,
 			    of->f_cr, NULL, pa);

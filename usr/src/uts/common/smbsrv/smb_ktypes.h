@@ -667,7 +667,6 @@ typedef struct smb_node {
 	/* If entering both, go in order n_lock_list, n_wlock_list */
 	smb_llist_t		n_lock_list;	/* active locks */
 	smb_llist_t		n_wlock_list;	/* waiting locks */
-	uint32_t		n_pending_dosattr;
 	volatile int		flags;
 	u_offset_t		n_allocsz;
 	uint32_t		n_fcn_count;
@@ -1123,16 +1122,6 @@ typedef struct smb_tree {
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_TRAVERSE_MOUNTS))
 
 /*
- * SMB_OFILE_IS_READONLY reflects whether an ofile is readonly or not.
- * The macro takes into account read-only settings in any of:
- * the tree, the node (pending) and the file-system object.
- * all of this is evaluated in smb_ofile_open() and after that
- * we can just test the f_flags & SMB_OFLAGS_READONLY
- */
-#define	SMB_OFILE_IS_READONLY(of)	\
-	((of)->f_flags & SMB_OFLAGS_READONLY)
-
-/*
  * SMB_PATHFILE_IS_READONLY indicates whether or not a file is
  * readonly when the caller has a path rather than an ofile.
  */
@@ -1265,7 +1254,7 @@ typedef struct smb_opipe {
  *   will be set for the file node upon close.
  */
 
-#define	SMB_OFLAGS_READONLY		0x0001
+/*	SMB_OFLAGS_READONLY		0x0001 (obsolete) */
 #define	SMB_OFLAGS_EXECONLY		0x0002
 #define	SMB_OFLAGS_SET_DELETE_ON_CLOSE	0x0004
 #define	SMB_OFLAGS_LLF_POS_VALID	0x0008

@@ -244,14 +244,10 @@ smb_common_open(smb_request_t *sr)
  * 1. The creator of a readonly file can write to/modify the size of the file
  * using the original create fid, even though the file will appear as readonly
  * to all other fids and via a CIFS getattr call.
- * The readonly bit therefore cannot be set in the filesystem until the file
- * is closed (smb_ofile_close). It is accounted for via ofile and node flags.
  *
  * 2. A setinfo operation (using either an open fid or a path) to set/unset
  * readonly will be successful regardless of whether a creator of a readonly
- * file has an open fid (and has the special privilege mentioned in #1,
- * above).  I.e., the creator of a readonly fid holding that fid will no longer
- * have a special privilege.
+ * file has an open fid.
  *
  * 3. The DOS readonly bit affects only data and some metadata.
  * The following metadata can be changed regardless of the readonly bit:
@@ -636,10 +632,10 @@ smb_open_subr(smb_request_t *sr)
 		case FILE_OVERWRITE_IF:
 		case FILE_OVERWRITE:
 			op->dattr |= FILE_ATTRIBUTE_ARCHIVE;
-			/* Don't apply readonly bit until smb_ofile_close */
+			/* Don't apply readonly until smb_set_open_attributes */
 			if (op->dattr & FILE_ATTRIBUTE_READONLY) {
-				op->created_readonly = B_TRUE;
 				op->dattr &= ~FILE_ATTRIBUTE_READONLY;
+				op->created_readonly = B_TRUE;
 			}
 
 			/*
@@ -728,16 +724,26 @@ create:
 		 */
 		smb_node_wrlock(dnode);
 
-		/* Don't apply readonly bit until smb_ofile_close */
+		/*
+		 * Create always sets the DOS attributes, type, and mode
+		 * in the if/else below (different for file vs directory).
+		 * Don't set the readonly bit until smb_set_open_attributes
+		 * or that would prevent this open.  Note that op->dattr
+		 * needs to be what smb_set_open_attributes will use,
+		 * except for the readonly bit.
+		 */
+		bzero(&new_attr, sizeof (new_attr));
+		new_attr.sa_mask = SMB_AT_DOSATTR | SMB_AT_TYPE | SMB_AT_MODE;
 		if (op->dattr & FILE_ATTRIBUTE_READONLY) {
 			op->dattr &= ~FILE_ATTRIBUTE_READONLY;
 			op->created_readonly = B_TRUE;
 		}
 
-		bzero(&new_attr, sizeof (new_attr));
+		/*
+		 * SMB create can specify the create time.
+		 */
 		if ((op->crtime.tv_sec != 0) &&
 		    (op->crtime.tv_sec != UINT_MAX)) {
-
 			new_attr.sa_mask |= SMB_AT_CRTIME;
 			new_attr.sa_crtime = op->crtime;
 		}
@@ -746,11 +752,12 @@ create:
 			op->dattr |= FILE_ATTRIBUTE_ARCHIVE;
 			new_attr.sa_dosattr = op->dattr;
 			new_attr.sa_vattr.va_type = VREG;
-			new_attr.sa_vattr.va_mode = is_stream ? S_IRUSR :
-			    S_IRUSR | S_IRGRP | S_IROTH |
-			    S_IWUSR | S_IWGRP | S_IWOTH;
-			new_attr.sa_mask |=
-			    SMB_AT_DOSATTR | SMB_AT_TYPE | SMB_AT_MODE;
+			if (is_stream)
+				new_attr.sa_vattr.va_mode = S_IRUSR | S_IWUSR;
+			else
+				new_attr.sa_vattr.va_mode =
+				    S_IRUSR | S_IRGRP | S_IROTH |
+				    S_IWUSR | S_IWGRP | S_IWOTH;
 
 			/*
 			 * We set alloc_size = op->dsize later,
@@ -795,8 +802,6 @@ create:
 			new_attr.sa_dosattr = op->dattr;
 			new_attr.sa_vattr.va_type = VDIR;
 			new_attr.sa_vattr.va_mode = 0777;
-			new_attr.sa_mask |=
-			    SMB_AT_DOSATTR | SMB_AT_TYPE | SMB_AT_MODE;
 
 			rc = smb_fsop_mkdir(sr, sr->user_cr, dnode,
 			    op->fqi.fq_last_comp, &new_attr, &op->fqi.fq_fnode);
@@ -849,8 +854,8 @@ create:
 
 	/*
 	 * This MUST be done after ofile creation, so that explicitly
-	 * set timestamps can be remembered on the ofile, and the
-	 * readonly flag will be stored "pending" on the node.
+	 * set timestamps can be remembered on the ofile, and setting
+	 * the readonly flag won't affect access via this open.
 	 */
 	if (status == NT_STATUS_SUCCESS) {
 		if ((rc = smb_set_open_attributes(sr, of)) != 0) {
@@ -1007,8 +1012,6 @@ smb_open_overwrite(smb_arg_open_t *op)
  * - If we created_readonly, we now store the real DOS attributes
  *   (including the readonly bit) so subsequent opens will see it.
  *
- * Both are stored "pending" rather than in the file system.
- *
  * Returns: errno
  */
 static int
@@ -1047,7 +1050,7 @@ smb_set_open_attributes(smb_request_t *sr, smb_ofile_t *of)
 	 * However, keep track of the fact that we modified
 	 * the file via this handle, so we can do the evil,
 	 * gratuitious mtime update on close that Windows
-	 * clients appear to expect.
+	 * clients expect.
 	 */
 	if (op->action_taken == SMB_OACT_TRUNCATED)
 		of->f_written = B_TRUE;
