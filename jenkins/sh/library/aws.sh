@@ -19,8 +19,7 @@ source ${JENKINS_DIRECTORY}/sh/library/common.sh
 source ${JENKINS_DIRECTORY}/sh/library/vault.sh
 
 function aws_setup_environment() {
-	local REGION="$1"
-	check_env PWD REGION
+	check_env PWD
 
 	export HOME="$PWD"
 	log_must mkdir -p $HOME/.aws
@@ -29,7 +28,7 @@ function aws_setup_environment() {
 	[default]
 	aws_access_key_id = $(vault_read_aws_access_key)
 	aws_secret_access_key = $(vault_read_aws_secret_key)
-	region = $REGION
+	region = us-east-1
 	EOF
 }
 
@@ -39,6 +38,23 @@ function aws_get_instance_state() {
 
 	log_must aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
 		| jq -M -r .Reservations[0].Instances[0].State.Name
+}
+
+function aws_wait_for_spot_request_status() {
+	local REQUEST_ID="$1"
+	local DESIRED_STATUS="$2"
+	check_env REQUEST_ID DESIRED_STATUS
+
+	for i in {1..30}; do
+		CURRENT_STATUS=$(log_must aws ec2 \
+		    describe-spot-instance-requests \
+		    --spot-instance-request-ids "$REQUEST_ID" \
+		    | jq -M -r .SpotInstanceRequests[0].Status.Code)
+		[[ "$CURRENT_STATUS" == "$DESIRED_STATUS" ]] && return 0
+		sleep 10
+	done
+
+	return 1
 }
 
 function aws_wait_for_instance_state() {

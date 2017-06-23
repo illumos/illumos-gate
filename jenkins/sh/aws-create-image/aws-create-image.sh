@@ -18,9 +18,9 @@
 source ${JENKINS_DIRECTORY}/sh/library/common.sh
 source ${JENKINS_DIRECTORY}/sh/library/aws.sh
 
-check_env REGION INSTANCE_ID
+check_env INSTANCE_ID
 
-aws_setup_environment "$REGION"
+aws_setup_environment
 
 #
 # The assumption here, is we're creating an image from the system that

@@ -19,9 +19,9 @@ source ${JENKINS_DIRECTORY}/sh/library/common.sh
 source ${JENKINS_DIRECTORY}/sh/library/vault.sh
 source ${JENKINS_DIRECTORY}/sh/library/aws.sh
 
-check_env JENKINS_URL REGION INSTANCE_ID ROLES WAIT_FOR_SSH
+check_env JENKINS_URL INSTANCE_ID ROLES WAIT_FOR_SSH
 
-aws_setup_environment "$REGION"
+aws_setup_environment
 
 log_must cd "$JENKINS_DIRECTORY/ansible"
 

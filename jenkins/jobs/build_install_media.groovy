@@ -18,7 +18,6 @@ pipelineJob('build-install-media') {
     concurrentBuild(true)
 
     environmentVariables {
-        env('REGION', 'us-east-1')
         env('BASE_IMAGE_ID', 'ami-c5c0a7d3')
         env('MEDIA_DIRECTORY', '/rpool/dc/media')
 

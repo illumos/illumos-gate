@@ -18,9 +18,9 @@
 source ${JENKINS_DIRECTORY}/sh/library/common.sh
 source ${JENKINS_DIRECTORY}/sh/library/aws.sh
 
-check_env REGION IMAGE_ID
+check_env IMAGE_ID
 
-aws_setup_environment "$REGION"
+aws_setup_environment
 
 SNAP_ID=$(log_must aws ec2 describe-images --image-ids "$IMAGE_ID" \
 	| jq -M -r .Images[0].BlockDeviceMappings[0].Ebs.SnapshotId)

@@ -19,9 +19,9 @@ source ${JENKINS_DIRECTORY}/sh/library/common.sh
 source ${JENKINS_DIRECTORY}/sh/library/aws.sh
 source ${JENKINS_DIRECTORY}/sh/library/ssh.sh
 
-check_env REGION INSTANCE_ID REMOTE_FILE LOCAL_FILE
+check_env INSTANCE_ID REMOTE_FILE LOCAL_FILE
 
-aws_setup_environment "$REGION"
+aws_setup_environment
 
 HOST=$(log_must aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
 	| jq -M -r .Reservations[0].Instances[0].PublicIpAddress)

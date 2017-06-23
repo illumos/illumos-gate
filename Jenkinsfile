@@ -13,7 +13,6 @@
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
-env.REGION = 'us-east-1'
 env.BASE_IMAGE_ID = 'ami-c5c0a7d3'
 
 node('master') {
@@ -52,11 +51,11 @@ node('master') {
 
     try {
         stage('create build instance') {
-            env.BUILD_INSTANCE_ID = shscript('aws-run-instances', true, [
-                ['REGION', env.REGION],
+            env.BUILD_INSTANCE_ID = shscript('aws-request-spot-instances', true, [
                 ['IMAGE_ID', env.BASE_IMAGE_ID],
                 ['INSTANCE_TYPE', 'c4.xlarge'],
-                ['ADD_DISKS_FOR', 'none']
+                ['ADD_DISKS_FOR', 'none'],
+                ['SPOT_PRICE', '0.199']
             ]).trim()
         }
 
@@ -67,7 +66,6 @@ node('master') {
                 }
 
                 shscript('ansible-deploy-roles', false, [
-                    ['REGION', env.REGION],
                     ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
                     ['ROLES', 'openzfs.build-slave openzfs.jenkins-slave'],
                     ['WAIT_FOR_SSH', 'yes']
@@ -110,7 +108,6 @@ node('master') {
 
             stage('archive build artifacts') {
                 shscript('download-remote-file', false, [
-                    ['REGION', env.REGION],
                     ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
                     ['REMOTE_FILE', "${build_workspace}/log/*/nightly.log"],
                     ['LOCAL_FILE', 'nightly.log']
@@ -118,7 +115,6 @@ node('master') {
                 archive(includes: 'nightly.log')
 
                 shscript('download-remote-file', false, [
-                    ['REGION', env.REGION],
                     ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
                     ['REMOTE_FILE', "${build_workspace}/log/*/mail_msg"],
                     ['LOCAL_FILE', 'nightly-mail.log']
@@ -126,7 +122,6 @@ node('master') {
                 archive(includes: 'nightly-mail.log')
 
                 shscript('download-remote-directory', false, [
-                    ['REGION', env.REGION],
                     ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
                     ['REMOTE_DIRECTORY', "${build_workspace}/packages"],
                     ['LOCAL_FILE', 'nightly-packages.tar.xz']
@@ -136,36 +131,34 @@ node('master') {
         }
 
         stage('create image') {
-            shscript('aws-stop-instances', false, [
-                ['REGION', env.REGION],
-                ['INSTANCE_ID', env.BUILD_INSTANCE_ID]
-            ])
-
             env.BUILD_IMAGE_ID = shscript('aws-create-image', true, [
-                ['REGION', env.REGION],
                 ['INSTANCE_ID', env.BUILD_INSTANCE_ID]
             ]).trim()
+
+            shscript('aws-terminate-instances', false, [
+                ['INSTANCE_ID', env.BUILD_INSTANCE_ID]
+            ])
         }
 
         stage('run tests') {
             parallel('run libc-tests': {
-                run_test('run-libc-tests', 't2.small', 1, 'none', [
+                run_test('run-libc-tests', 'm4.large', '0.100', 1, 'none', [
                     ['RUNFILE', '/opt/libc-tests/runfiles/default.run']
                 ])
             }, 'run os-tests': {
-                run_test('run-os-tests', 't2.small', 1, 'none', [
+                run_test('run-os-tests', 'm4.large', '0.100', 1, 'none', [
                     ['RUNFILE', '/opt/os-tests/runfiles/default.run']
                 ])
             }, 'run util-tests': {
-                run_test('run-util-tests', 't2.small', 1, 'none', [
+                run_test('run-util-tests', 'm4.large', '0.100', 1, 'none', [
                     ['RUNFILE', '/opt/util-tests/runfiles/default.run']
                 ])
             }, 'run zfs-tests': {
-                run_test('run-zfs-tests', 'm4.large', 8, 'run-zfs-tests', [
+                run_test('run-zfs-tests', 'm4.large', '0.100', 8, 'run-zfs-tests', [
                     ['RUNFILE', '/opt/zfs-tests/runfiles/delphix.run']
                 ])
             }, 'run zloop': {
-                run_test('run-zloop', 'm4.large', 2, 'none', [
+                run_test('run-zloop', 'm4.large', '0.100', 2, 'none', [
                     ['ENABLE_WATCHPOINTS', 'no'],
                     ['RUN_TIME', '6000']
                 ])
@@ -173,16 +166,8 @@ node('master') {
         }
     } finally {
         stage('delete image') {
-            if (env.BUILD_INSTANCE_ID) {
-                shscript('aws-terminate-instances', false, [
-                    ['REGION', env.REGION],
-                    ['INSTANCE_ID', env.BUILD_INSTANCE_ID]
-                ])
-            }
-
             if (env.BUILD_IMAGE_ID && env.BUILD_IMAGE_ID != env.BASE_IMAGE_ID) {
                 shscript('aws-delete-image', false, [
-                    ['REGION', env.REGION],
                     ['IMAGE_ID', env.BUILD_IMAGE_ID]
                 ])
             }
@@ -190,7 +175,7 @@ node('master') {
     }
 }
 
-def run_test(script, instance_type, limit, disks, parameters) {
+def run_test(script, instance_type, spot_price, limit, disks, parameters) {
     /*
      * Ideally, we'd use different Jenkins "stages" from within this function, much like we do for creating,
      * configuring, and executing the build. Unfortuanately, though, "stages" nested inside a "parallel" isn't
@@ -225,10 +210,10 @@ def run_test(script, instance_type, limit, disks, parameters) {
             deleteDir()
             unstash('jenkins')
 
-            instance_id = shscript('aws-run-instances', true, [
-                ['REGION', env.REGION],
+            instance_id = shscript('aws-request-spot-instances', true, [
                 ['IMAGE_ID', env.BUILD_IMAGE_ID],
                 ['INSTANCE_TYPE', instance_type],
+                ['SPOT_PRICE', spot_price],
                 ['ADD_DISKS_FOR', disks]
             ]).trim()
 
@@ -238,7 +223,6 @@ def run_test(script, instance_type, limit, disks, parameters) {
                 }
 
                 shscript('ansible-deploy-roles', false, [
-                    ['REGION', env.REGION],
                     ['INSTANCE_ID', instance_id],
                     ['ROLES', 'openzfs.build-slave openzfs.jenkins-slave'],
                     ['WAIT_FOR_SSH', 'yes']
@@ -254,7 +238,6 @@ def run_test(script, instance_type, limit, disks, parameters) {
                 } finally {
                     try {
                         shscript('download-remote-directory', false, [
-                            ['REGION', env.REGION],
                             ['INSTANCE_ID', instance_id],
                             ['REMOTE_DIRECTORY', '/var/tmp/test_results'],
                             ['LOCAL_FILE', "${script}-results.tar.xz"]
@@ -267,7 +250,6 @@ def run_test(script, instance_type, limit, disks, parameters) {
 
                     try {
                         shscript('download-remote-directory', false, [
-                            ['REGION', env.REGION],
                             ['INSTANCE_ID', instance_id],
                             ['REMOTE_DIRECTORY', '/var/crash'],
                             ['LOCAL_FILE', "${script}-crash.tar.xz"]
@@ -288,7 +270,6 @@ def run_test(script, instance_type, limit, disks, parameters) {
 
                     try {
                         shscript('download-remote-file', false, [
-                            ['REGION', env.REGION],
                             ['INSTANCE_ID', instance_id],
                             ['REMOTE_FILE', remote_file],
                             ['LOCAL_FILE', "${script}.log"]
@@ -303,7 +284,6 @@ def run_test(script, instance_type, limit, disks, parameters) {
         } finally {
             if (instance_id) {
                 shscript('aws-terminate-instances', false, [
-                    ['REGION', env.REGION],
                     ['INSTANCE_ID', instance_id]
                 ])
             }

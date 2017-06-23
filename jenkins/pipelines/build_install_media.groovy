@@ -28,11 +28,11 @@ node('master') {
 
     try {
         stage('create instance') {
-            env.INSTANCE_ID = misc.shscript('aws-run-instances', true, [
-                ['REGION', env.REGION],
+            env.INSTANCE_ID = misc.shscript('aws-request-spot-instances', true, [
                 ['IMAGE_ID', env.BASE_IMAGE_ID],
                 ['INSTANCE_TYPE', 'c4.xlarge'],
-                ['ADD_DISKS_FOR', 'none']
+                ['ADD_DISKS_FOR', 'none'],
+                ['SPOT_PRICE', '0.199']
             ]).trim()
         }
 
@@ -42,7 +42,6 @@ node('master') {
             }
 
             misc.shscript('ansible-deploy-roles', false, [
-                ['REGION', env.REGION],
                 ['INSTANCE_ID', env.INSTANCE_ID],
                 ['ROLES', 'openzfs.build-slave openzfs.jenkins-slave'],
                 ['WAIT_FOR_SSH', 'yes']
@@ -71,7 +70,6 @@ node('master') {
 
         stage('archive install media') {
             misc.shscript('download-remote-directory', false, [
-                ['REGION', env.REGION],
                 ['INSTANCE_ID', instance_id],
                 ['REMOTE_DIRECTORY', env.MEDIA_DIRECTORY],
                 ['LOCAL_FILE', "install-media.tar.xz"]
@@ -83,7 +81,6 @@ node('master') {
         stage('terminate instance') {
             if (env.INSTANCE_ID) {
                 misc.shscript('aws-terminate-instances', false, [
-                    ['REGION', env.REGION],
                     ['INSTANCE_ID', env.INSTANCE_ID]
                 ])
             }
