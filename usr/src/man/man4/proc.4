@@ -1,241 +1,406 @@
-'\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2018, Joyent, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 4 "August 22, 2018"
-.SH NAME
-proc \- /proc, the process file system
-.SH DESCRIPTION
-.LP
-\fB/proc\fR is a file system that provides access to the state of each process
-and light-weight process (lwp) in the system. The name of each entry in the
-\fB/proc\fR directory is a decimal number corresponding to a process-ID. These
-entries are themselves subdirectories. Access to process state is provided by
-additional files contained within each subdirectory; the hierarchy is described
-more completely below. In this document, ``\fB/proc\fR file'' refers to a
-non-directory file within the hierarchy rooted at \fB/proc\fR. The owner of
-each \fB/proc\fR file and subdirectory is determined by the user-ID of the
-process.
-.sp
-.LP
-\fB/proc\fR can be mounted on any mount point, in addition to the standard
-\fB/proc\fR mount point, and can be mounted several places at once. Such
-additional mounts are allowed in order to facilitate the confinement of
-processes to subtrees of the file system via \fBchroot\fR(1M) and yet allow
-such processes access to commands like \fBps\fR(1).
-.sp
-.LP
-Standard system calls are used to access \fB/proc\fR files: \fBopen\fR(2),
-\fBclose\fR(2), \fBread\fR(2), and \fBwrite\fR(2) (including \fBreadv\fR(2),
-\fBwritev\fR(2), \fBpread\fR(2), and \fBpwrite\fR(2)). Most files describe
-process state and can only be opened for reading. \fBctl\fR and \fBlwpctl\fR
+.\" Copyright 2019, Joyent, Inc.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd January 11, 2019
+.Dt PROC 4
+.Os
+.Sh NAME
+.Nm proc
+.Nd /proc, the process file system
+.Sh DESCRIPTION
+.Pa /proc
+is a file system that provides access to the state of each process
+and light-weight process (lwp) in the system.
+The name of each entry in the
+.Pa /proc
+directory is a decimal number corresponding to a process-ID.
+These entries are themselves subdirectories.
+Access to process state is provided by additional files contained within each
+subdirectory; the hierarchy is described more completely below.
+In this document,
+.Dq Pa /proc file
+refers to a non-directory file within the hierarchy rooted at
+.Pa /proc .
+The owner of each
+.Pa /proc
+file and subdirectory is determined by the user-ID of the process.
+.Pp
+.Pa /proc
+can be mounted on any mount point, in addition to the standard
+.Pa /proc
+mount point, and can be mounted several places at once.
+Such additional mounts are allowed in order to facilitate the confinement of
+processes to subtrees of the file system via
+.Xr chroot 2
+and yet allow such processes access to commands like
+.Xr ps 1 .
+.Pp
+Standard system calls are used to access
+.Pa /proc
+files:
+.Xr open 2 ,
+.Xr close 2 ,
+.Xr read 2 ,
+and
+.Xr write 2
+(including
+.Xr readv 2 ,
+.Xr writev 2 ,
+.Xr pread 2 ,
+and
+.Xr pwrite 2 ) .
+Most files describe process state and can only be opened for reading.
+.Pa ctl
+and
+.Pa lwpctl
 (control) files permit manipulation of process state and can only be opened for
-writing. \fBas\fR (address space) files contain the image of the running
-process and can be opened for both reading and writing. An open for writing
-allows process control; a read-only open allows inspection but not control. In
-this document, we refer to the process as open for reading or writing if any of
-its associated \fB/proc\fR files is open for reading or writing.
-.sp
-.LP
-In general, more than one process can open the same \fB/proc\fR file at the
-same time. \fIExclusive\fR \fIopen\fR is an advisory mechanism provided to
-allow controlling processes to avoid collisions with each other. A process can
-obtain exclusive control of a target process, with respect to other cooperating
-processes, if it successfully opens any \fB/proc\fR file in the target process
-for writing (the \fBas\fR or \fBctl\fR files, or the \fBlwpctl\fR file of any
-lwp) while specifying \fBO_EXCL\fR in the \fBopen\fR(2). Such an open will fail
-if the target process is already open for writing (that is, if an \fBas\fR,
-\fBctl\fR, or \fBlwpctl\fR file is already open for writing). There can be any
-number of concurrent read-only opens; \fBO_EXCL\fR is ignored on opens for
-reading. It is recommended that the first open for writing by a controlling
-process use the \fBO_EXCL\fR flag; multiple controlling processes usually
-result in chaos.
-.sp
-.LP
-If a process opens one of its own \fB/proc\fR files for writing, the open
-succeeds regardless of \fBO_EXCL\fR and regardless of whether some other
-process has the process open for writing. Self-opens do not count when another
-process attempts an exclusive open. (A process cannot exclude a debugger by
-opening itself for writing and the application of a debugger cannot prevent a
-process from opening itself.) All self-opens for writing are forced to be
-close-on-exec (see the \fBF_SETFD\fR operation of \fBfcntl\fR(2)).
-.sp
-.LP
+writing.
+.Pa as
+(address space) files contain the image of the running process and can be
+opened for both reading and writing.
+An open for writing allows process control; a read-only open allows inspection
+but not control.
+In this document, we refer to the process as open for reading or writing if
+any of its associated
+.Pa /proc
+files is open for reading or writing.
+.Pp
+In general, more than one process can open the same
+.Pa /proc
+file at the same time. \fIExclusive\fR \fIopen\fR is an advisory mechanism provided to
+allow controlling processes to avoid collisions with each other.
+A process can obtain exclusive control of a target process, with respect to
+other cooperating processes, if it successfully opens any
+.Pa /proc
+file in the target process for writing (the
+.Pa as
+or
+.Pa ctl
+files, or the
+.Pa lwpctl
+file of any lwp) while specifying
+.Sy O_EXCL
+in the
+.Xr open 2 .
+Such an open will fail if the target process is already open for writing (that
+is, if an
+.Pa as ,
+.Pa ctl ,
+or
+.Pa lwpctl
+file is already open for writing).
+There can be any number of concurrent read-only opens;
+.Sy O_EXCL
+is ignored on opens for reading.
+It is recommended that the first open for writing by a controlling
+process use the
+.Sy O_EXCL
+flag; multiple controlling processes usually result in chaos.
+.Pp
+If a process opens one of its own
+.Pa /proc
+files for writing, the open
+succeeds regardless of
+.Sy O_EXCL
+and regardless of whether some other process has the process open for writing.
+Self-opens do not count when another process attempts an exclusive open.
+(A process cannot exclude a debugger by opening itself for writing and the
+application of a debugger cannot prevent a process from opening itself.)
+All self-opens for writing are forced to be close-on-exec (see the
+.Sy F_SETFD
+operation of
+.Xr fcntl 2 ) .
+.Pp
 Data may be transferred from or to any locations in the address space of the
-traced process by applying \fBlseek\fR(2) to position the \fBas\fR file at the
-virtual address of interest followed by \fBread\fR(2) or \fBwrite\fR(2) (or by
-using \fBpread\fR(2) or \fBpwrite\fR(2) for the combined operation). The
-address-map files \fB/proc/\fR\fIpid\fR\fB/map\fR and
-\fB/proc/\fR\fIpid\fR\fB/xmap\fR can be read to determine the accessible areas
-(mappings) of the address space. \fBI/O\fR transfers may span contiguous
-mappings. An \fBI/O\fR request extending into an unmapped area is truncated at
-the boundary. A write request beginning at an unmapped virtual address fails
-with \fBEIO\fR; a read request beginning at an unmapped virtual address returns
-zero (an end-of-file indication).
-.sp
-.LP
+traced process by applying
+.Xr lseek 2
+to position the
+.Pa as
+file at the virtual address of interest followed by
+.Xr read 2
+or
+.Xr write 2
+(or by using
+.Xr pread 2
+or
+.Xr pwrite 2
+for the combined operation).
+The address-map files
+.Pa /proc/ Ns Em pid Ns Pa /map
+and
+.Pa /proc/ Ns Em pid Ns Pa /xmap
+can be read to determine the accessible areas (mappings) of the address space.
+.Sy I/O
+transfers may span contiguous mappings.
+An
+.Sy I/O
+request extending into an unmapped area is truncated at the boundary.
+A write request beginning at an unmapped virtual address fails with
+.Er EIO ;
+a read request beginning at an unmapped virtual address returns zero (an
+end-of-file indication).
+.Pp
 Information and control operations are provided through additional files.
-\fB<procfs.h>\fR contains definitions of data structures and message formats
-used with these files. Some of these definitions involve the use of sets of
-flags. The set types \fBsigset_t\fR, \fBfltset_t\fR, and \fBsysset_t\fR
+.In procfs.h
+contains definitions of data structures and message formats
+used with these files.
+Some of these definitions involve the use of sets of flags.
+The set types
+.Sy sigset_t ,
+.Sy fltset_t ,
+and
+.Sy sysset_t
 correspond, respectively, to signal, fault, and system call enumerations
-defined in \fB<sys/signal.h>\fR, \fB<sys/fault.h>\fR, and
-\fB<sys/syscall.h>\fR\&. Each set type is large enough to hold flags for its
-own enumeration. Although they are of different sizes, they have a common
+defined in
+.In sys/signal.h ,
+.In sys/fault.h ,
+and
+.In sys/syscall.h .
+Each set type is large enough to hold flags for its own enumeration.
+Although they are of different sizes, they have a common
 structure and can be manipulated by these macros:
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 prfillset(&set);             /* turn on all flags in set */
 premptyset(&set);            /* turn off all flags in set */
 praddset(&set, flag);        /* turn on the specified flag */
 prdelset(&set, flag);        /* turn off the specified flag */
 r = prismember(&set, flag);  /* != 0 iff flag is turned on */
-.fi
-.in -2
-
-.sp
-.LP
-One of \fBprfillset()\fR or \fBpremptyset()\fR must be used to initialize
-\fBset\fR before it is used in any other operation. \fBflag\fR must be a member
-of the enumeration corresponding to \fBset\fR.
-.sp
-.LP
-Every process contains at least one \fIlight-weight process\fR, or \fIlwp\fR.
+.Ed
+.Pp
+One of
+.Fn prfillset
+or
+.Fn premptyset
+must be used to initialize
+.Fa set
+before it is used in any other operation.
+.Fa flag
+must be a member of the enumeration corresponding to
+.Fa set .
+.Pp
+Every process contains at least one
+.Em light-weight process ,
+or
+.Sy lwp .
 Each lwp represents a flow of execution that is independently scheduled by the
-operating system. All lwps in a process share its address space as well as many
-other attributes. Through the use of \fBlwpctl\fR and \fBctl\fR files as
-described below, it is possible to affect individual lwps in a process or to
-affect all of them at once, depending on the operation.
-.sp
-.LP
+operating system.
+All lwps in a process share its address space as well as many other attributes.
+Through the use of
+.Pa lwpctl
+and
+.Pa ctl
+files as described below, it is possible to affect individual lwps in a
+process or to affect all of them at once, depending on the operation.
+.Pp
 When the process has more than one lwp, a representative lwp is chosen by the
-system for certain process status files and control operations. The
-representative lwp is a stopped lwp only if all of the process's lwps are
+system for certain process status files and control operations.
+The representative lwp is a stopped lwp only if all of the process's lwps are
 stopped; is stopped on an event of interest only if all of the lwps are so
-stopped (excluding \fBPR_SUSPENDED\fR lwps); is in a \fBPR_REQUESTED\fR stop
-only if there are no other events of interest to be found; or, failing
-everything else, is in a \fBPR_SUSPENDED\fR stop (implying that the process is
-deadlocked). See the description of the \fBstatus\fR file for definitions of
-stopped states. See the \fBPCSTOP\fR control operation for the definition of
-``event of interest''.
-.sp
-.LP
+stopped (excluding
+.Sy PR_SUSPENDED
+lwps); is in a
+.Sy PR_REQUESTED
+stop only if there are no other events of interest to be found; or, failing
+everything else, is in a
+.Sy PR_SUSPENDED
+stop (implying that the process is deadlocked).
+See the description of the
+.Pa status
+file for definitions of stopped states.
+See the
+.Sy PCSTOP
+control operation for the definition of
+.Dq event of interest .
+.Pp
 The representative lwp remains fixed (it will be chosen again on the next
 operation) as long as all of the lwps are stopped on events of interest or are
-in a \fBPR_SUSPENDED\fR stop and the \fBPCRUN\fR control operation is not
-applied to any of them.
-.sp
-.LP
-When applied to the process control file, every \fB/proc\fR control operation
+in a
+.Sy PR_SUSPENDED
+stop and the
+.Sy PCRUN
+control operation is not applied to any of them.
+.Pp
+When applied to the process control file, every
+.Pa /proc
+control operation
 that must act on an lwp uses the same algorithm to choose which lwp to act
-upon. Together with synchronous stopping (see \fBPCSET\fR), this enables a
-debugger to control a multiple-lwp process using only the process-level status
-and control files if it so chooses. More fine-grained control can be achieved
-using the lwp-specific files.
-.sp
-.LP
+upon.
+Together with synchronous stopping (see
+.Sy PCSET ) ,
+this enables a debugger to control a multiple-lwp process using only the
+process-level status and control files if it so chooses.
+More fine-grained control can be achieved using the lwp-specific files.
+.Pp
 The system supports two process data models, the traditional 32-bit data model
 in which ints, longs and pointers are all 32 bits wide (the ILP32 data model),
 and on some platforms the 64-bit data model in which longs and pointers, but
-not ints, are 64 bits in width (the LP64 data model). In the LP64 data model
-some system data types, notably \fBsize_t\fR, \fBoff_t\fR, \fBtime_t\fR and
-\fBdev_t\fR, grow from 32 bits to 64 bits as well.
-.sp
-.LP
-The \fB/proc\fR interfaces described here are available to both 32-bit and
-64-bit controlling processes. However, many operations attempted by a 32-bit
-controlling process on a 64-bit target process will fail with \fBEOVERFLOW\fR
+not ints, are 64 bits in width (the LP64 data model).
+In the LP64 data model some system data types, notably
+.Sy size_t ,
+.Sy off_t ,
+.Sy time_t
+and
+.Sy dev_t ,
+grow from 32 bits to 64 bits as well.
+.Pp
+The
+.Pa /proc
+interfaces described here are available to both 32-bit and
+64-bit controlling processes.
+However, many operations attempted by a 32-bit
+controlling process on a 64-bit target process will fail with
+.Er EOVERFLOW
 because the address space range of a 32-bit process cannot encompass a 64-bit
 process or because the data in some 64-bit system data type cannot be
 compressed to fit into the corresponding 32-bit type without loss of
-information. Operations that fail in this circumstance include reading and
+information.
+Operations that fail in this circumstance include reading and
 writing the address space, reading the address-map files, and setting the
-target process's registers. There is no restriction on operations applied by a
+target process's registers.
+There is no restriction on operations applied by a
 64-bit process to either a 32-bit or a 64-bit target processes.
-.sp
-.LP
-The format of the contents of any \fB/proc\fR file depends on the data model of
-the observer (the controlling process), not on the data model of the target
-process. A 64-bit debugger does not have to translate the information it reads
-from a \fB/proc\fR file for a 32-bit process from 32-bit format to 64-bit
-format. However, it usually has to be aware of the data model of the target
-process. The \fBpr_dmodel\fR field of the \fBstatus\fR files indicates the
-target process's data model.
-.sp
-.LP
+.Pp
+The format of the contents of any
+.Pa /proc
+file depends on the data model of the observer (the controlling process), not
+on the data model of the target process.
+A 64-bit debugger does not have to translate the information it reads from a
+.Pa /proc
+file for a 32-bit process from 32-bit format to 64-bit format.
+However, it usually has to be aware of the data model of the target process.
+The
+.Sy pr_dmodel
+field of the
+.Pa status
+files indicates the target process's data model.
+.Pp
 To help deal with system data structures that are read from 32-bit processes, a
 64-bit controlling program can be compiled with the C preprocessor symbol
-\fB_SYSCALL32\fR defined before system header files are included. This makes
-explicit 32-bit fixed-width data structures (like \fBcstruct stat32\fR) visible
-to the 64-bit program. See \fBtypes32.h\fR(3HEAD).
-.SH DIRECTORY STRUCTURE
-.LP
-At the top level, the directory \fB/proc\fR contains entries each of which
-names an existing process in the system. These entries are themselves
-directories. Except where otherwise noted, the files described below can be
-opened for reading only. In addition, if a process becomes a \fIzombie\fR (one
-that has exited but whose parent has not yet performed a \fBwait\fR(3C) upon
-it), most of its associated \fB/proc\fR files disappear from the hierarchy;
-subsequent attempts to open them, or to read or write files opened before the
-process exited, will elicit the error \fBENOENT\fR.
-.sp
-.LP
-Although process state and consequently the contents of \fB/proc\fR files can
-change from instant to instant, a single \fBread\fR(2) of a \fB/proc\fR file is
-guaranteed to return a sane representation of state; that is, the read will be
-atomic with respect to the state of the process. No such guarantee applies to
-successive reads applied to a \fB/proc\fR file for a running process. In
-addition, atomicity is not guaranteed for \fBI/O\fR applied to the \fBas\fR
+.Dv _SYSCALL32
+defined before system header files are included.
+This makes explicit 32-bit fixed-width data structures (like
+.Sy struct stat32 )
+visible to the 64-bit program.
+See
+.Xr types32.h 3HEAD .
+.Sh DIRECTORY STRUCTURE
+At the top level, the directory
+.Pa /proc
+contains entries each of which names an existing process in the system.
+These entries are themselves directories.
+Except where otherwise noted, the files described below can be
+opened for reading only.
+In addition, if a process becomes a
+.Em zombie
+(one that has exited but whose parent has not yet performed a
+.Xr wait 3C
+upon it), most of its associated
+.Pa /proc
+files disappear from the hierarchy; subsequent attempts to open them, or to
+read or write files opened before the process exited, will elicit the error
+.Er ENOENT .
+.Pp
+Although process state and consequently the contents of
+.Pa /proc
+files can change from instant to instant, a single
+.Xr read 2
+of a
+.Pa /proc
+file is guaranteed to return a sane representation of state; that is, the read
+will be atomic with respect to the state of the process.
+No such guarantee applies to successive reads applied to a
+.Pa /proc
+file for a running process.
+In addition, atomicity is not guaranteed for
+.Sy I/O
+applied to the
+.Pa as
 (address-space) file for a running process or for a process whose address space
 contains memory shared by another running process.
-.sp
-.LP
-A number of structure definitions are used to describe the files. These
-structures may grow by the addition of elements at the end in future releases
-of the system and it is not legitimate for a program to assume that they will
-not.
-.SH STRUCTURE OF \fB/proc/\fR\fIpid\fR
-.LP
-A given directory \fB/proc/\fR\fIpid\fR contains the following entries. A
-process can use the invisible alias \fB/proc/self\fR if it wishes to open one
-of its own \fB/proc\fR files (invisible in the sense that the name ``self''
-does not appear in a directory listing of \fB/proc\fR obtained from
-\fBls\fR(1), \fBgetdents\fR(2), or \fBreaddir\fR(3C)).
-.SS "contracts"
-.LP
-A directory containing references to the contracts held by the process. Each
-entry is a symlink to the contract's directory under \fB/system/contract\fR.
-See \fBcontract\fR(4).
-.SS "as"
-.LP
+.Pp
+A number of structure definitions are used to describe the files.
+These structures may grow by the addition of elements at the end in future
+releases of the system and it is not legitimate for a program to assume that
+they will not.
+.Sh STRUCTURE OF Pa /proc/ Ns Em pid
+A given directory
+.Pa /proc/ Ns Em pid
+contains the following entries.
+A process can use the invisible alias
+.Pa /proc/self
+if it wishes to open one of its own
+.Pa /proc
+files (invisible in the sense that the name
+.Dq self
+does not appear in a directory listing of
+.Pa /proc
+obtained from
+.Xr ls 1 ,
+.Xr getdents 2 ,
+or
+.Xr readdir 3C ) .
+.Ss contracts
+A directory containing references to the contracts held by the process.
+Each entry is a symlink to the contract's directory under
+.Pa /system/contract .
+See
+.Xr contract 4 .
+.Ss as
 Contains the address-space image of the process; it can be opened for both
-reading and writing. \fBlseek\fR(2) is used to position the file at the virtual
-address of interest and then the address space can be examined or changed
-through \fBread\fR(2) or \fBwrite\fR(2) (or by using \fBpread\fR(2) or
-\fBpwrite\fR(2) for the combined operation).
-.SS "ctl"
-.LP
+reading and writing.
+.Xr lseek 2
+is used to position the file at the virtual address of interest and then the
+address space can be examined or changed through
+.Xr read 2
+or
+.Xr write 2
+(or by using
+.Xr pread 2
+or
+.Xr pwrite 2
+for the combined operation).
+.Ss ctl
 A write-only file to which structured messages are written directing the system
 to change some aspect of the process's state or control its behavior in some
-way. The seek offset is not relevant when writing to this file. Individual lwps
-also have associated \fBlwpctl\fR files in the lwp subdirectories. A control
-message may be written either to the process's \fBctl\fR file or to a specific
-\fBlwpctl\fR file with operation-specific effects. The effect of a control
-message is immediately reflected in the state of the process visible through
-appropriate status and information files. The types of control messages are
-described in detail later. See \fBCONTROL MESSAGES\fR.
-.SS "status"
-.LP
-Contains state information about the process and the representative lwp. The
-file contains a \fBpstatus\fR structure which contains an embedded
-\fBlwpstatus\fR structure for the representative lwp, as follows:
-.sp
-.in +2
-.nf
+way.
+The seek offset is not relevant when writing to this file.
+Individual lwps also have associated
+.Pa lwpctl
+files in the lwp subdirectories.
+A control message may be written either to the process's
+.Pa ctl
+file or to a specific
+.Pa lwpctl
+file with operation-specific effects.
+The effect of a control message is immediately reflected in the state of the
+process visible through appropriate status and information files.
+The types of control messages are described in detail later.
+See
+.Sx CONTROL MESSAGES .
+.Ss status
+Contains state information about the process and the representative lwp.
+The file contains a
+.Sy pstatus
+structure which contains an embedded
+.Sy lwpstatus
+structure for the representative lwp, as follows:
+.Bd -literal -offset 2
 typedef struct pstatus {
      int pr_flags;            /* flags (see below) */
      int pr_nlwp;             /* number of active lwps in the process */
@@ -265,204 +430,167 @@ typedef struct pstatus {
      zoneid_t pr_zoneid;      /* zone id */
      lwpstatus_t pr_lwp;      /* status of the representative lwp */
 } pstatus_t;
-.fi
-.in -2
-
-.sp
-.LP
-\fBpr_flags\fR is a bit-mask holding the following process flags. For
-convenience, it also contains the lwp flags for the representative lwp,
+.Ed
+.Pp
+.Sy pr_flags
+is a bit-mask holding the following process flags.
+For convenience, it also contains the lwp flags for the representative lwp,
 described later.
-.sp
-.ne 2
-.na
-\fB\fBPR_ISSYS\fR\fR
-.ad
-.RS 13n
-process is a system process (see \fBPCSTOP\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_VFORKP\fR\fR
-.ad
-.RS 13n
-process is the parent of a vforked child (see \fBPCWATCH\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_FORK\fR\fR
-.ad
-.RS 13n
-process has its inherit-on-fork mode set (see \fBPCSET\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_RLC\fR\fR
-.ad
-.RS 13n
-process has its run-on-last-close mode set (see \fBPCSET\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_KLC\fR\fR
-.ad
-.RS 13n
-process has its kill-on-last-close mode set (see \fBPCSET\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_ASYNC\fR\fR
-.ad
-.RS 13n
-process has its asynchronous-stop mode set (see \fBPCSET\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_MSACCT\fR\fR
-.ad
-.RS 13n
+.Bl -tag -width "PR_MSACCT" -offset indent
+.It Sy PR_ISSYS
+process is a system process (see
+.Sx PCSTOP ) .
+.It Sy PR_VFORKP
+process is the parent of a vforked child (see
+.Sx PCWATCH ) .
+.It Sy PR_FORK
+process has its inherit-on-fork mode set (see
+.Sx PCSET ) .
+.It Sy PR_RLC
+process has its run-on-last-close mode set (see
+.Sx PCSET ) .
+.It Sy PR_KLC
+process has its kill-on-last-close mode set (see
+.Sx PCSET ) .
+.It Sy PR_ASYNC
+process has its asynchronous-stop mode set (see
+.Sx PCSET ) .
+.It Sy PR_MSACCT
 Set by default in all processes to indicate that microstate accounting is
-enabled. However, this flag has been deprecated and no longer has any effect.
+enabled.
+However, this flag has been deprecated and no longer has any effect.
 Microstate accounting may not be disabled; however, it is still possible to
 toggle the flag.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_MSFORK\fR\fR
-.ad
-.RS 13n
+.It Sy PR_MSFORK
 Set by default in all processes to indicate that microstate accounting will be
-enabled for processes that this parent forks(). However, this flag has been
-deprecated and no longer has any effect. It is possible to toggle this flag;
-however, it is not possible to disable microstate accounting.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_BPTADJ\fR\fR
-.ad
-.RS 13n
-process has its breakpoint adjustment mode set (see \fBPCSET\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_PTRACE\fR\fR
-.ad
-.RS 13n
-process has its ptrace-compatibility mode set (see \fBPCSET\fR).
-.RE
-
-.sp
-.LP
-\fBpr_nlwp\fR is the total number of active lwps in the process. pr_nzomb is
-the total number of zombie lwps in the process. A zombie lwp is a non-detached
-lwp that has terminated but has not been reaped with \fBthr_join\fR(3C) or
-\fBpthread_join\fR(3C).
-.sp
-.LP
-\fBpr_pid\fR, \fBpr_ppid\fR, \fBpr_pgid\fR, and \fBpr_sid\fR are, respectively,
-the process ID, the ID of the process's parent, the process's process group ID,
-and the process's session ID.
-.sp
-.LP
-\fBpr_aslwpid\fR is obsolete and is always zero.
-.sp
-.LP
-\fBpr_agentid\fR is the lwp-ID for the \fB/proc\fR agent lwp (see the
-\fBPCAGENT\fR control operation). It is zero if there is no agent lwp in the
-process.
-.sp
-.LP
-\fBpr_sigpend\fR identifies asynchronous signals pending for the process.
-.sp
-.LP
-\fBpr_brkbase\fR is the virtual address of the process heap and
-\fBpr_brksize\fR is its size in bytes. The address formed by the sum of these
-values is the process \fBbreak\fR (see \fBbrk\fR(2)). \fBpr_stkbase\fR and
-\fBpr_stksize\fR are, respectively, the virtual address of the process stack
-and its size in bytes. (Each lwp runs on a separate stack; the distinguishing
-characteristic of the process stack is that the operating system will grow it
-when necessary.)
-.sp
-.LP
-\fBpr_utime\fR, \fBpr_stime\fR, \fBpr_cutime\fR, and \fBpr_cstime\fR are,
-respectively, the user \fBCPU\fR and system \fBCPU\fR time consumed by the
-process, and the cumulative user \fBCPU\fR and system \fBCPU\fR time consumed
-by the process's children, in seconds and nanoseconds.
-.sp
-.LP
-\fBpr_sigtrace\fR and \fBpr_flttrace\fR contain, respectively, the set of
-signals and the set of hardware faults that are being traced (see
-\fBPCSTRACE\fR and \fBPCSFAULT\fR).
-.sp
-.LP
-\fBpr_sysentry\fR and \fBpr_sysexit\fR contain, respectively, the sets of
-system calls being traced on entry and exit (see \fBPCSENTRY\fR and
-\fBPCSEXIT\fR).
-.sp
-.LP
-\fBpr_dmodel\fR indicates the data model of the process. Possible values are:
-.sp
-.ne 2
-.na
-\fB\fBPR_MODEL_ILP32\fR\fR
-.ad
-.RS 19n
+enabled for processes that this parent
+.Xr fork 2 Ns s .
+However, this flag has been deprecated and no longer has any effect.
+It is possible to toggle this flag; however, it is not possible to disable
+microstate accounting.
+.It Sy PR_BPTADJ
+process has its breakpoint adjustment mode set (see
+.Sx PCSET ) .
+.It Sy PR_PTRACE
+process has its ptrace-compatibility mode set (see
+.Sx PCSET ) .
+.El
+.Pp
+.Sy pr_nlwp
+is the total number of active lwps in the process.
+.Sy pr_nzomb
+is the total number of zombie lwps in the process.
+A zombie lwp is a non-detached lwp that has terminated but has not been reaped
+with
+.Xr thr_join 3
+or
+.Xr pthread_join 3C .
+.Pp
+.Sy pr_pid ,
+.Sy pr_ppi ,
+.Sy pr_pgid ,
+and
+.Sy pr_sid
+are, respectively, the process ID, the ID of the process's parent, the
+process's process group ID, and the process's session ID.
+.Pp
+.Sy pr_aslwpid
+is obsolete and is always zero.
+.Pp
+.Sy pr_agentid
+is the lwp-ID for the
+.Pa /proc
+agent lwp (see the
+.Sx PCAGENT
+control operation).
+It is zero if there is no agent lwp in the process.
+.Pp
+.Sy pr_sigpend
+identifies asynchronous signals pending for the process.
+.Pp
+.Sy pr_brkbase
+is the virtual address of the process heap and
+.Sy pr_brksize
+is its size in bytes.
+The address formed by the sum of these values is the process
+.Sy break
+(see
+.Xr brk 2 ) .
+.Sy pr_stkbase
+and
+.Sy pr_stksize
+are, respectively, the virtual address of the process stack and its size in
+bytes.
+(Each lwp runs on a separate stack; the distinguishing characteristic of the
+process stack is that the operating system will grow it when necessary.)
+.Pp
+.Sy pr_utime ,
+.Sy pr_stime ,
+.Sy pr_cutime ,
+.Sy and pr_cstime
+are, respectively, the user
+.Sy CPU
+and system
+.Sy CPU
+time consumed by the process, and the cumulative user
+.Sy CPU
+and system
+.Sy CPU
+time consumed by the process's children, in seconds and nanoseconds.
+.Pp
+.Sy pr_sigtrace
+and
+.Sy pr_flttrace
+contain, respectively, the set of signals and the set of hardware faults that
+are being traced (see
+.Sx PCSTRACE
+and
+.Sx PCSFAULT ) .
+.Pp
+.Sy pr_sysentry
+and
+.Sy pr_sysexit
+contain, respectively, the sets of system calls being traced on entry and exit
+(see
+.Sx PCSENTRY
+and
+.Sx PCSEXIT ) .
+.Pp
+.Sy pr_dmodel
+indicates the data model of the process.
+Possible values are:
+.Bl -tag -width "PR_MODEL_NATIVE" -offset indent
+.It Sy PR_MODEL_ILP32
 process data model is ILP32.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_MODEL_LP64\fR\fR
-.ad
-.RS 19n
+.It Sy PR_MODEL_LP64
 process data model is LP64.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_MODEL_NATIVE\fR\fR
-.ad
-.RS 19n
+.It Sy PR_MODEL_NATIVE
 process data model is native.
-.RE
-
-.sp
-.LP
-The \fBpr_taskid\fR, \fBpr_projid\fR, and \fBpr_zoneid\fR fields contain
-respectively, the numeric \fBID\fRs of the task, project, and zone in which the
-process was running.
-.sp
-.LP
-The constant \fBPR_MODEL_NATIVE\fR reflects the data model of the controlling
-process, \fIthat is\fR, its value is \fBPR_MODEL_ILP32\fR or
-\fBPR_MODEL_LP64\fR according to whether the controlling process has been
+.El
+.Pp
+The
+.Sy pr_taskid ,
+.Sy pr_projid ,
+and
+.Sy pr_zoneid
+fields contain respectively, the numeric
+.Sy ID Ns s
+of the task, project, and zone in which the process was running.
+.Pp
+The constant
+.Sy PR_MODEL_NATIVE
+reflects the data model of the controlling process,
+.Em that is ,
+its value is
+.Sy PR_MODEL_ILP32
+or
+.Sy PR_MODEL_LP64
+according to whether the controlling process has been
 compiled as a 32-bit program or a 64-bit program, respectively.
-.sp
-.LP
-\fBpr_lwp\fR contains the status information for the representative lwp:
-.sp
-.in +2
-.nf
+.Pp
+.Sy pr_lwp
+contains the status information for the representative lwp:
+.Bd -literal -offset 2
 typedef struct lwpstatus {
   int pr_flags;              /* flags (see below) */
   id_t pr_lwpid;             /* specific lwp identifier */
@@ -490,382 +618,344 @@ typedef struct lwpstatus {
   prgregset_t pr_reg;        /* general registers */
   prfpregset_t pr_fpreg;     /* floating-point registers */
 } lwpstatus_t;
-.fi
-.in -2
-
-.sp
-.LP
-\fBpr_flags\fR is a bit-mask holding the following lwp flags. For convenience,
-it also contains the process flags, described previously.
-.sp
-.ne 2
-.na
-\fB\fBPR_STOPPED\fR\fR
-.ad
-.RS 14n
+.Ed
+.Pp
+.Sy pr_flags
+is a bit-mask holding the following lwp flags.
+For convenience, it also contains the process flags, described previously.
+.Bl -tag -width "PR_STOPPED" -offset indent
+.It Sy PR_STOPPED
 The lwp is stopped.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_ISTOP\fR\fR
-.ad
-.RS 14n
-The lwp is stopped on an event of interest (see \fBPCSTOP\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_DSTOP\fR\fR
-.ad
-.RS 14n
-The lwp has a stop directive in effect (see \fBPCSTOP\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_STEP\fR\fR
-.ad
-.RS 14n
-The lwp has a single-step directive in effect (see \fBPCRUN\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_ASLEEP\fR\fR
-.ad
-.RS 14n
+.It Sy PR_ISTOP
+The lwp is stopped on an event of interest (see
+.Sx PCSTOP ) .
+.It Sy PR_DSTOP
+The lwp has a stop directive in effect (see
+.Sx PCSTOP ) .
+.It Sy PR_STEP
+The lwp has a single-step directive in effect (see
+.Sx PCRUN ) .
+.It Sy PR_ASLEEP
 The lwp is in an interruptible sleep within a system call.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_PCINVAL\fR\fR
-.ad
-.RS 14n
-The lwp's current instruction (\fBpr_instr\fR) is undefined.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_DETACH\fR\fR
-.ad
-.RS 14n
-This is a detached lwp (see \fBpthread_create\fR(3C) and
-\fBpthread_join\fR(3C)).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_DAEMON\fR\fR
-.ad
-.RS 14n
-This is a daemon lwp (see \fBpthread_create\fR(3C)).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_ASLWP\fR\fR
-.ad
-.RS 14n
+.It Sy PR_PCINVAL
+The lwp's current instruction
+.Pq Sy pr_instr
+is undefined.
+.It Sy PR_DETACH
+This is a detached lwp (see
+.Xr pthread_create 3C
+and
+.Xr pthread_join 3C ) .
+.It Sy PR_DAEMON
+This is a daemon lwp (see
+.Xr pthread_create 3C ) .
+.It Sy PR_ASLWP
 This flag is obsolete and is never set.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_AGENT\fR\fR
-.ad
-.RS 14n
-This is the \fB/proc\fR agent lwp for the process.
-.RE
-
-.sp
-.LP
-\fBpr_lwpid\fR names the specific lwp.
-.sp
-.LP
-\fBpr_why\fR and \fBpr_what\fR together describe, for a stopped lwp, the reason
-for the stop. Possible values of \fBpr_why\fR and the associated \fBpr_what\fR
+.It Sy PR_AGENT
+This is the
+.Pa /proc
+agent lwp for the process.
+.El
+.Pp
+.Sy pr_lwpid
+names the specific lwp.
+.Pp
+.Sy pr_why
+.Sy and
+pr_what
+together describe, for a stopped lwp, the reason for the stop.
+Possible values of
+.Sy pr_why
+and the associated
+.Sy pr_what
 are:
-.sp
-.ne 2
-.na
-\fB\fBPR_REQUESTED\fR\fR
-.ad
-.RS 17n
+.Bl -tag -width "PR_JOBCONTROL" -offset left
+.It Sy PR_REQUESTED
 indicates that the stop occurred in response to a stop directive, normally
-because \fBPCSTOP\fR was applied or because another lwp stopped on an event of
-interest and the asynchronous-stop flag (see \fBPCSET\fR) was not set for the
-process. \fBpr_what\fR is unused in this case.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_SIGNALLED\fR\fR
-.ad
-.RS 17n
-indicates that the lwp stopped on receipt of a signal (see \fBPCSTRACE\fR);
-\fBpr_what\fR holds the signal number that caused the stop (for a newly-stopped
-lwp, the same value is in \fBpr_cursig\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_FAULTED\fR\fR
-.ad
-.RS 17n
+because
+.Sy PCSTOP
+was applied or because another lwp stopped on an event of interest and the
+asynchronous-stop flag (see
+.Sx PCSET )
+was not set for the process.
+.Sy pr_what
+is unused in this case.
+.It Sy PR_SIGNALLED
+indicates that the lwp stopped on receipt of a signal (see
+.Sx PCSTRACE ) ;
+.Sy pr_what
+holds the signal number that caused the stop (for a newly-stopped
+lwp, the same value is in
+.Sy pr_cursig ) .
+.It Sy PR_FAULTED
 indicates that the lwp stopped on incurring a hardware fault (see
-\fBPCSFAULT\fR); \fBpr_what\fR holds the fault number that caused the stop.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_SYSENTRY\fR\fR
-.ad
-.br
-.na
-\fB\fBPR_SYSEXIT\fR\fR
-.ad
-.RS 17n
-indicate a stop on entry to or exit from a system call (see \fBPCSENTRY\fR and
-\fBPCSEXIT\fR); \fBpr_what\fR holds the system call number.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_JOBCONTROL\fR\fR
-.ad
-.RS 17n
+.Sx PCSFAULT ) ;
+.Sy pr_what
+holds the fault number that caused the stop.
+.It Sy PR_SYSENTRY
+.It Sy PR_SYSEXIT
+indicate a stop on entry to or exit from a system call (see
+.Sx PCSENTRY
+and
+.Sx PCSEXIT ) ;
+.Sy pr_what
+holds the system call number.
+.It Sy PR_JOBCONTROL
 indicates that the lwp stopped due to the default action of a job control stop
-signal (see \fBsigaction\fR(2)); \fBpr_what\fR holds the stopping signal
-number.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_SUSPENDED\fR\fR
-.ad
-.RS 17n
+signal (see
+.Xr sigaction 2 ) ;
+.Sy pr_what
+holds the stopping signal number.
+.It Sy PR_SUSPENDED
 indicates that the lwp stopped due to internal synchronization of lwps within
-the process. \fBpr_what\fR is unused in this case.
-.RE
-
-.sp
-.LP
-\fBpr_cursig\fR names the current signal, that is, the next signal to be
-delivered to the lwp, if any. \fBpr_info\fR, when the lwp is in a
-\fBPR_SIGNALLED\fR or \fBPR_FAULTED\fR stop, contains additional information
-pertinent to the particular signal or fault (see \fB<sys/siginfo.h>\fR).
-.sp
-.LP
-\fBpr_lwppend\fR identifies any synchronous or directed signals pending for the
-lwp. \fBpr_lwphold\fR identifies those signals whose delivery is being blocked
-by the lwp (the signal mask).
-.sp
-.LP
-\fBpr_action\fR contains the signal action information pertaining to the
-current signal (see \fBsigaction\fR(2)); it is undefined if \fBpr_cursig\fR is
-zero. \fBpr_altstack\fR contains the alternate signal stack information for the
-lwp (see \fBsigaltstack\fR(2)).
-.sp
-.LP
-\fBpr_oldcontext\fR, if not zero, contains the address on the lwp stack of a
-\fBucontext\fR structure describing the previous user-level context (see
-\fBucontext.h\fR(3HEAD)). It is non-zero only if the lwp is executing in the
-context of a signal handler.
-.sp
-.LP
-\fBpr_syscall\fR is the number of the system call, if any, being executed by
-the lwp; it is non-zero if and only if the lwp is stopped on \fBPR_SYSENTRY\fR
-or \fBPR_SYSEXIT\fR, or is asleep within a system call ( \fBPR_ASLEEP\fR is
-set). If \fBpr_syscall\fR is non-zero, \fBpr_nsysarg\fR is the number of
-arguments to the system call and \fBpr_sysarg\fR contains the actual arguments.
-.sp
-.LP
-\fBpr_rval1\fR, \fBpr_rval2\fR, and \fBpr_errno\fR are defined only if the lwp
-is stopped on \fBPR_SYSEXIT\fR or if the \fBPR_VFORKP\fR flag is set. If
-\fBpr_errno\fR is zero, \fBpr_rval1\fR and \fBpr_rval2\fR contain the return
-values from the system call. Otherwise, \fBpr_errno\fR contains the error
-number for the failing system call (see \fB<sys/errno.h>\fR).
-.sp
-.LP
-\fBpr_clname\fR contains the name of the lwp's scheduling class.
-.sp
-.LP
-\fBpr_tstamp\fR, if the lwp is stopped, contains a time stamp marking when the
+the process.
+.Sy pr_what
+is unused in this case.
+.El
+.Pp
+.Sy pr_cursig
+names the current signal, that is, the next signal to be delivered to the lwp,
+if any.
+.Sy pr_info ,
+when the lwp is in a
+.Sy PR_SIGNALLED
+or
+.Sy PR_FAULTED
+stop, contains additional information pertinent to the particular signal or
+fault (see
+.In sys/siginfo.h ) .
+.Pp
+.Sy pr_lwppend
+identifies any synchronous or directed signals pending for the lwp.
+.Sy pr_lwphold
+identifies those signals whose delivery is being blocked by the lwp (the
+signal mask).
+.Pp
+.Sy pr_action
+contains the signal action information pertaining to the current signal (see
+.Xr sigaction 2 ) ;
+it is undefined if
+.Sy pr_cursig
+is zero.
+.Sy pr_altstack
+contains the alternate signal stack information for the lwp (see
+.Xr sigaltstack 2 ) .
+.Pp
+.Sy pr_oldcontext ,
+if not zero, contains the address on the lwp stack of a
+.Sy ucontext
+structure describing the previous user-level context (see
+.Xr ucontext.h 3HEAD ) .
+It is non-zero only if the lwp is executing in the context of a signal handler.
+.Pp
+.Sy pr_syscall
+is the number of the system call, if any, being executed by
+the lwp; it is non-zero if and only if the lwp is stopped on
+.Sy PR_SYSENTRY
+or
+.Sy PR_SYSEXIT ,
+or is asleep within a system call
+.Pf ( Sy PR_ASLEEP
+is set).
+If
+.Sy pr_syscall
+is non-zero,
+.Sy pr_nsysarg
+is the number of arguments to the system call and
+.Sy pr_sysarg
+contains the actual arguments.
+.Pp
+.Sy pr_rval1 ,
+.Sy pr_rval2 ,
+and
+.Sy pr_errno
+are defined only if the lwp
+is stopped on
+.Sy PR_SYSEXIT
+or if the
+.Sy PR_VFORKP
+flag is set.
+If
+.Sy pr_errno
+is zero,
+.Sy pr_rval1
+and
+.Sy pr_rval2
+contain the return values from the system call.
+Otherwise,
+.Sy pr_errno
+contains the error number for the failing system call (see
+.In sys/errno.h ) .
+.Pp
+.Sy pr_clname
+contains the name of the lwp's scheduling class.
+.Pp
+.Sy pr_tstamp ,
+if the lwp is stopped, contains a time stamp marking when the
 lwp stopped, in real time seconds and nanoseconds since an arbitrary time in
 the past.
-.sp
-.LP
-\fBpr_utime\fR is the amount of user level CPU time used by this LWP.
-.sp
-.LP
-\fBpr_stime\fR is the amount of system level CPU time used by this LWP.
-.sp
-.LP
-\fBpr_ustack\fR is the virtual address of the \fBstack_t\fR that contains the
-stack boundaries for this LWP. See \fBgetustack\fR(2) and
-\fB_stack_grow\fR(3C).
-.sp
-.LP
-\fBpr_instr\fR contains the machine instruction to which the lwp's program
-counter refers. The amount of data retrieved from the process is
-machine-dependent. On SPARC based machines, it is a 32-bit word. On x86-based
-machines, it is a single byte. In general, the size is that of the machine's
-smallest instruction. If \fBPR_PCINVAL\fR is set, \fBpr_instr\fR is undefined;
-this occurs whenever the lwp is not stopped or when the program counter refers
-to an invalid virtual address.
-.sp
-.LP
-\fBpr_reg\fR is an array holding the contents of a stopped lwp's general
-registers.
-.sp
-.ne 2
-.na
-\fBSPARC\fR
-.ad
-.RS 21n
-On SPARC-based machines, the predefined constants \fBR_G0\fR ... \fBR_G7\fR,
-\fBR_O0\fR ... \fBR_O7\fR, \fBR_L0\fR ... \fBR_L7\fR, \fBR_I0\fR ...
-\fBR_I7\fR, \fBR_PC\fR, \fBR_nPC\fR, and \fBR_Y\fR can be used as indices to
-refer to the corresponding registers; previous register windows can be read
-from their overflow locations on the stack (however, see the \fBgwindows\fR
-file in the \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR subdirectory).
-.RE
-
-.sp
-.ne 2
-.na
-\fBSPARC V8 (32-bit)\fR
-.ad
-.RS 21n
+.Pp
+.Sy pr_utime
+is the amount of user level CPU time used by this LWP.
+.Pp
+.Sy pr_stime
+is the amount of system level CPU time used by this LWP.
+.Pp
+.Sy pr_ustack
+is the virtual address of the
+.Sy stack_t
+that contains the stack boundaries for this LWP.
+See
+.Xr getustack 2
+and
+.Xr _stack_grow 3C .
+.Pp
+.Sy pr_instr
+contains the machine instruction to which the lwp's program counter refers.
+The amount of data retrieved from the process is machine-dependent.
+On SPARC based machines, it is a 32-bit word.
+On x86-based machines, it is a single byte.
+In general, the size is that of the machine's smallest instruction.
+If
+.Sy PR_PCINVAL
+is set,
+.Sy pr_instr
+is undefined; this occurs whenever the lwp is not stopped or when the program
+counter refers to an invalid virtual address.
+.Pp
+.Sy pr_reg
+is an array holding the contents of a stopped lwp's general registers.
+.Bl -tag -offset left -width "SPARC V8 (32-bit)"
+.It Sy SPARC
+On SPARC-based machines, the predefined constants
+.Sy R_G0
+\&.\&.\&.
+.Sy R_G7 ,
+.Sy R_O0
+\&.\&.\&.
+.Sy R_O7 ,
+.Sy R_L0
+\&.\&.\&.
+.Sy R_L7 ,
+.Sy R_I0
+\&.\&.\&.
+.Sy R_I7 ,
+.Sy R_PC ,
+.Sy R_nPC ,
+and
+.Sy R_Y
+can be used as indices to refer to the corresponding registers; previous
+register windows can be read from their overflow locations on the stack
+(however, see the
+.Pa gwindows
+file in the
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
+subdirectory).
+.It Sy SPARC V8 (32-bit)
 For SPARC V8 (32-bit) controlling processes, the predefined constants
-\fBR_PSR\fR, \fBR_WIM\fR, and \fBR_TBR\fR can be used as indices to refer to
-the corresponding special registers. For SPARC V9 (64-bit) controlling
-processes, the predefined constants \fBR_CCR\fR, \fBR_ASI\fR, and \fBR_FPRS\fR
+.Sy R_PSR ,
+.Sy R_WIM ,
+and
+.Sy R_TBR
 can be used as indices to refer to the corresponding special registers.
-.RE
-
-.sp
-.ne 2
-.na
-\fBx86 (32-bit)\fR
-.ad
-.RS 21n
+For SPARC V9 (64-bit) controlling processes, the predefined constants
+.Sy R_CCR ,
+.Sy R_ASI ,
+and
+.Sy R_FPRS
+can be used as indices to refer to the corresponding special registers.
+.It Sy x86 (32-bit)
 For 32-bit x86 processes, the predefined constants listed belowcan be used as
 indices to refer to the corresponding registers.
-.sp
-.in +2
-.nf
-SS
-UESP
-EFL
-CS
-EIP
-ERR
-TRAPNO
-EAX
-ECX
-EDX
-EBX
-ESP
-EBP
-ESI
-EDI
-DS
-ES
-GS
-.fi
-.in -2
-
-The preceding constants are listed in \fB<sys/regset.h>\fR\&.
-.sp
+.Bl -tag -width "TRAPNO" -offset indent -compact
+.It SS
+.It UESP
+.It EFL
+.It CS
+.It EIP
+.It ERR
+.It TRAPNO
+.It EAX
+.It ECX
+.It EDX
+.It EBX
+.It ESP
+.It EBP
+.It ESI
+.It EDI
+.It DS
+.It ES
+.It GS
+.El
+.Pp
+The preceding constants are listed in
+.In sys/regset.h .
+.Pp
 Note that a 32-bit process can run on an x86 64-bit system, using the constants
 listed above.
-.RE
-
-.sp
-.ne 2
-.na
-\fBx86 (64-bit)\fR
-.ad
-.RS 21n
-To read the registers of a 32- \fBor\fR a 64-bit process, a 64-bit x86 process
-should use the predefined constants listed below.
-.sp
-.in +2
-.nf
-REG_GSBASE
-REG_FSBASE
-REG_DS
-REG_ES
-REG_GS
-REG_FS
-REG_SS
-REG_RSP
-REG_RFL
-REG_CS
-REG_RIP
-REG_ERR
-REG_TRAPNO
-REG_RAX
-REG_RCX
-REG_RDX
-REG_RBX
-REG_RBP
-REG_RSI
-REG_RDI
-REG_R8
-REG_R9
-REG_R10
-REG_R11
-REG_R12
-REG_R13
-REG_R14
-REG_R15
-.fi
-.in -2
-
-The preceding constants are listed in \fB<sys/regset.h>\fR\&.
-.RE
-
-.sp
-.LP
-\fBpr_fpreg\fR is a structure holding the contents of the floating-point
-registers.
-.sp
-.LP
+.It Sy x86 (64-bit)
+To read the registers of a 32-
+.Em or
+a 64-bit process, a 64-bit x86 process should use the predefined constants
+listed below.
+.Bl -tag -width "REG_TRAPNO" -offset indent -compact
+.It REG_GSBASE
+.It REG_FSBASE
+.It REG_DS
+.It REG_ES
+.It REG_GS
+.It REG_FS
+.It REG_SS
+.It REG_RSP
+.It REG_RFL
+.It REG_CS
+.It REG_RIP
+.It REG_ERR
+.It REG_TRAPNO
+.It REG_RAX
+.It REG_RCX
+.It REG_RDX
+.It REG_RBX
+.It REG_RBP
+.It REG_RSI
+.It REG_RDI
+.It REG_R8
+.It REG_R9
+.It REG_R10
+.It REG_R11
+.It REG_R12
+.It REG_R13
+.It REG_R14
+.It REG_R15
+.El
+.Pp
+The preceding constants are listed in
+.In sys/regset.h .
+.El
+.Pp
+.Sy pr_fpreg
+is a structure holding the contents of the floating-point registers.
+.Pp
 SPARC registers, both general and floating-point, as seen by a 64-bit
 controlling process are the V9 versions of the registers, even if the target
-process is a 32-bit (V8) process. V8 registers are a subset of the V9
-registers.
-.sp
-.LP
+process is a 32-bit (V8) process.
+V8 registers are a subset of the V9 registers.
+.Pp
 If the lwp is not stopped, all register values are undefined.
-.SS "psinfo"
-.LP
+.Ss psinfo
 Contains miscellaneous information about the process and the representative lwp
-needed by the \fBps\fR(1) command. \fBpsinfo\fR remains accessible after a
-process becomes a \fIzombie\fR. The file contains a \fBpsinfo\fR structure
-which contains an embedded \fBlwpsinfo\fR structure for the representative lwp,
-as follows:
-.sp
-.in +2
-.nf
+needed by the
+.Xr ps 1
+command.
+.Sy psinfo
+remains accessible after a process becomes a
+.Em zombie .
+The file contains a
+.Sy psinfo
+structure which contains an embedded
+.Sy lwpsinfo
+structure for the representative lwp, as follows:
+.Bd -literal -offset 2
 typedef struct psinfo {
     int pr_flag;             /* process flags (DEPRECATED: see below) */
     int pr_nlwp;             /* number of active lwps in the process */
@@ -901,34 +991,51 @@ typedef struct psinfo {
     ctid_t pr_contract;      /* process contract id */
     lwpsinfo_t pr_lwp;       /* information for representative lwp */
 } psinfo_t;
-.fi
-.in -2
-
-.sp
-.LP
-Some of the entries in \fBpsinfo\fR, such as \fBpr_addr\fR, refer to internal
-kernel data structures and should not be expected to retain their meanings
-across different versions of the operating system.
-.sp
-.LP
-\fBpsinfo_t.pr_flag\fR is a deprecated interface that should no longer be used.
-Applications currently relying on the \fBSSYS\fR bit in \fBpr_flag\fR should
-migrate to checking \fBPR_ISSYS\fR in the \fBpstatus\fR structure's
-\fBpr_flags\fR field.
-.sp
-.LP
-\fBpr_pctcpu\fR and \fBpr_pctmem\fR are 16-bit binary fractions in the range
-0.0 to 1.0 with the binary point to the right of the high-order bit (1.0 ==
-0x8000). \fBpr_pctcpu\fR is the summation over all lwps in the process.
-.sp
-.LP
-\fBpr_lwp\fR contains the \fBps\fR(1) information for the representative lwp.
-If the process is a \fIzombie\fR, \fBpr_nlwp\fR, \fBpr_nzomb\fR, and
-\fBpr_lwp.pr_lwpid\fR are zero and the other fields of \fBpr_lwp\fR are
-undefined:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+Some of the entries in
+.Sy psinfo ,
+such as
+.Sy pr_addr ,
+refer to internal kernel data structures and should not be expected to retain
+their meanings across different versions of the operating system.
+.Pp
+.Sy psinfo_t.pr_flag
+is a deprecated interface that should no longer be used.
+Applications currently relying on the
+.Sy SSYS
+bit in
+.Sy pr_flag
+should migrate to checking
+.Sy PR_ISSYS
+in the
+.Sy pstatus
+structure's
+.Sy pr_flags
+field.
+.Pp
+.Sy pr_pctcpu
+and
+.Sy pr_pctmem
+are 16-bit binary fractions in the range 0.0 to 1.0 with the binary point to
+the right of the high-order bit (1.0 == 0x8000).
+.Sy pr_pctcpu
+is the summation over all lwps in the process.
+.Pp
+.Sy pr_lwp
+contains the
+.Xr ps 1
+information for the representative lwp.
+If the process is a
+.Em zombie ,
+.Sy pr_nlwp ,
+.Sy pr_nzomb ,
+and
+.Sy pr_lwp.pr_lwpid
+are zero and the other fields of
+.Sy pr_lwp
+are undefined:
+.Bd -literal -offset 2
 typedef struct lwpsinfo {
     int pr_flag;             /* lwp flags (DEPRECATED: see below) */
     id_t pr_lwpid;           /* lwp id */
@@ -950,36 +1057,43 @@ typedef struct lwpsinfo {
     processorid_t pr_onpro;  /* processor which last ran this lwp */
     processorid_t pr_bindpro;/* processor to which lwp is bound */
     psetid_t pr_bindpset;    /* processor set to which lwp is bound */
-    lgrp_id_t pr_lgrp	      /* home lgroup */
+    lgrp_id_t pr_lgrp;       /* home lgroup */
 } lwpsinfo_t;
-.fi
-.in -2
-
-.sp
-.LP
-Some of the entries in \fBlwpsinfo\fR, such as \fBpr_addr\fR, \fBpr_wchan\fR,
-\fBpr_stype\fR, \fBpr_state\fR, and \fBpr_name\fR, refer to internal kernel
-data structures and should not be expected to retain their meanings across
-different versions of the operating system.
-.sp
-.LP
-\fBlwpsinfo_t.pr_flag\fR is a deprecated interface that should no longer be
-used.
-.sp
-.LP
-\fBpr_pctcpu\fR is a 16-bit binary fraction, as described above. It represents
-the \fBCPU\fR time used by the specific lwp. On a multi-processor machine, the
-maximum value is 1/N, where N is the number of \fBCPU\fRs.
-.sp
-.LP
-\fBpr_contract\fR is the id of the process contract of which the process is a
-member. See \fBcontract\fR(4) and \fBprocess\fR(4).
-.SS "cred"
-.LP
+.Ed
+.Pp
+Some of the entries in
+.Sy lwpsinfo ,
+such as
+.Sy pr_addr ,
+.Sy pr_wchan ,
+.Sy pr_stype ,
+.Sy pr_state ,
+and
+.Sy pr_name ,
+refer to internal kernel data structures and should not be expected to retain
+their meanings across different versions of the operating system.
+.Pp
+.Sy lwpsinfo_t.pr_flag
+is a deprecated interface that should no longer be used.
+.Pp
+.Sy pr_pctcpu
+is a 16-bit binary fraction, as described above.
+It represents the
+.Sy CPU
+time used by the specific lwp.
+On a multi-processor machine, the maximum value is 1/N, where N is the number
+of
+.Sy CPU Ns s .
+.Pp
+.Sy pr_contract
+is the id of the process contract of which the process is a member.
+See
+.Xr contract 4
+and
+.Xr process 4 .
+.Ss cred
 Contains a description of the credentials associated with the process:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2
 typedef struct prcred {
 	uid_t pr_euid;      /* effective user id */
 	uid_t pr_ruid;      /* real user id */
@@ -990,56 +1104,46 @@ typedef struct prcred {
 	int pr_ngroups;     /* number of supplementary groups */
 	gid_t pr_groups[1]; /* array of supplementary groups */
 } prcred_t;
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The array of associated supplementary groups in \fBpr_groups\fR is of variable
-length; the \fBcred\fR file contains all of the supplementary groups.
-\fBpr_ngroups\fR indicates the number of supplementary groups. (See also the
-\fBPCSCRED\fR and \fBPCSCREDX\fR control operations.)
-.SS "priv"
-.LP
+.Ed
+.Pp
+The array of associated supplementary groups in
+.Sy pr_groups
+ is of variable
+length; the
+.Sy cred
+file contains all of the supplementary groups.
+.Sy pr_ngroups
+indicates the number of supplementary groups. (See also the
+.Sy PCSCRED
+and
+.Sy PCSCREDX
+control operations.)
+.Ss priv
 Contains a description of the privileges associated with the process:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2
 typedef struct prpriv {
      uint32_t        pr_nsets;      /* number of privilege set */
      uint32_t        pr_setsize;    /* size of privilege set */
      uint32_t        pr_infosize;   /* size of supplementary data */
      priv_chunk_t    pr_sets[1];    /* array of sets */
 } prpriv_t;
-.fi
-.in -2
-
-.sp
-.LP
-The actual dimension of the \fBpr_sets\fR[] field is
-.sp
-.in +2
-.nf
-pr_sets[pr_nsets][pr_setsize]
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
+The actual dimension of the
+.Sy pr_sets Ns []
+field is
+.D1 pr_sets[pr_nsets][pr_setsize]
+.Pp
 which is followed by additional information about the process state
-\fBpr_infosize\fR bytes in size.
-.sp
-.LP
+.Sy pr_infosize
+bytes in size.
+.Pp
 The full size of the structure can be computed using
-\fBPRIV_PRPRIV_SIZE\fR(\fBprpriv_t *\fR).
-.SS "secflags"
-.LP
-This file contains the security-flags of the process.  It contains a
-description of the security flags associated with the process.
-.sp
-.in +2
-.nf
+.Fn PRIV_PRPRIV_SIZE "prpriv_t *" .
+.Ss secflags
+This file contains the security-flags of the process.
+It contains a description of the security flags associated with the process.
+.Bd -literal -offset 2
 typedef struct prsecflags {
 	uint32_t pr_version;		/* ABI Versioning of this structure */
 	secflagset_t pr_effective;	/* Effective flags */
@@ -1047,41 +1151,55 @@ typedef struct prsecflags {
 	secflagset_t pr_lower;		/* Lower flags */
 	secflagset_t pr_upper;		/* Upper flags */
 } prsecflags_t;
-.in -2
-
-.sp
-.LP
-The \fBpr_version\fR field is a version number for the structure, currently
-\fBPRSECFLAGS_VERSION_1\fR.
-.SS "sigact"
-.LP
-Contains an array of \fBsigaction structures\fR describing the current
-dispositions of all signals associated with the traced process (see
-\fBsigaction\fR(2)). Signal numbers are displaced by 1 from array indices, so
-that the action for signal number \fIn\fR appears in position \fIn\fR-1 of the
-array.
-.SS "auxv"
-.LP
+.Ed
+.Pp
+The
+.Sy pr_version
+field is a version number for the structure, currently
+.Sy PRSECFLAGS_VERSION_1 .
+.Ss sigact
+Contains an array of
+.Sy sigaction structures
+describing the current dispositions of all signals associated with the traced
+process (see
+.Xr sigaction 2 ) .
+Signal numbers are displaced by 1 from array indices, so that the action for
+signal number
+.Va n
+appears in position
+.Va n Ns -1
+of the array.
+.Ss auxv
 Contains the initial values of the process's aux vector in an array of
-\fBauxv_t\fR structures (see \fB<sys/auxv.h>\fR). The values are those that
-were passed by the operating system as startup information to the dynamic
-linker.
-.SS "ldt"
-.LP
-This file exists only on x86-based machines. It is non-empty only if the
-process has established a local descriptor table (\fBLDT\fR). If non-empty, the
-file contains the array of currently active \fBLDT\fR entries in an array of
-elements of type \fBstruct ssd\fR, defined in \fB<sys/sysi86.h>\fR, one element
-for each active \fBLDT\fR entry.
-.SS "map, xmap"
-.LP
-Contain information about the virtual address map of the process. The map file
-contains an array of \fBprmap\fR structures while the xmap file contains an
-array of \fBprxmap\fR structures. Each structure describes a contiguous virtual
+.Sy auxv_t
+structures (see
+.In sys/auxv.h ) .
+The values are those that were passed by the operating system as startup
+information to the dynamic linker.
+.Ss ldt
+This file exists only on x86-based machines.
+It is non-empty only if the process has established a local descriptor table
+.Pq Sy LDT .
+If non-empty, the file contains the array of currently active
+.Sy LDT
+entries in an array of elements of type
+.Vt struct ssd ,
+defined in
+.In sys/sysi86.h ,
+one element for each active
+.Sy LDT
+entry.
+.Ss map, xmap
+Contain information about the virtual address map of the process.
+The map file contains an array of
+.Sy prmap
+structures while the xmap file contains an
+array of
+.Sy prxmap
+structures.
+Each structure describes a contiguous virtual
 address region in the address space of the traced process:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2
 typedef struct prmap {
 	uintptr_tpr_vaddr;         /* virtual address of mapping */
 	size_t pr_size;            /* size of mapping in bytes */
@@ -1091,13 +1209,8 @@ typedef struct prmap {
 	int pr_pagesize;           /* pagesize for this mapping in bytes */
 	int pr_shmid;              /* SysV shared memory identifier */
 } prmap_t;
-.fi
-.in -2
-.sp
-
-.sp
-.in +2
-.nf
+.Ed
+.Bd -literal -offset 2
 typedef struct prxmap {
 	uintptr_t pr_vaddr;        /* virtual address of mapping */
 	size_t pr_size;            /* size of mapping in bytes */
@@ -1113,222 +1226,229 @@ typedef struct prxmap {
 	size_t pr_locked;          /* pages of locked memory */
 	uint64_t pr_hatpagesize;   /* pagesize of mapping */
 } prxmap_t;
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-\fBpr_vaddr\fR is the virtual address of the mapping within the traced process
-and \fBpr_size\fR is its size in bytes. \fBpr_mapname\fR, if it does not
-contain a null string, contains the name of a file in the \fBobject\fR
+.Ed
+.Pp
+.Sy pr_vaddr
+is the virtual address of the mapping within the traced process and
+.Sy pr_size
+is its size in bytes.
+.Sy pr_mapname ,
+if it does not contain a null string, contains the name of a file in the
+.Sy object
 directory (see below) that can be opened read-only to obtain a file descriptor
-for the mapped file associated with the mapping. This enables a debugger to
-find object file symbol tables without having to know the real path names of
-the executable file and shared libraries of the process. \fBpr_offset\fR is the
-64-bit offset within the mapped file (if any) to which the virtual address is
-mapped.
-.sp
-.LP
-\fBpr_mflags\fR is a bit-mask of protection and attribute flags:
-.sp
-.ne 2
-.na
-\fB\fBMA_READ\fR\fR
-.ad
-.RS 17n
+for the mapped file associated with the mapping.
+This enables a debugger to find object file symbol tables without having to
+know the real path names of the executable file and shared libraries of
+the process.
+.Sy pr_offset
+is the 64-bit offset within the mapped file (if any) to which the virtual
+address is mapped.
+.Pp
+.Sy pr_mflags
+is a bit-mask of protection and attribute flags:
+.Bl -tag -width "MA_NORESERVE" -offset left
+.It Sy MA_READ
 mapping is readable by the traced process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMA_WRITE\fR\fR
-.ad
-.RS 17n
+.It Sy MA_WRITE
 mapping is writable by the traced process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMA_EXEC\fR\fR
-.ad
-.RS 17n
+.It Sy MA_EXEC
 mapping is executable by the traced process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMA_SHARED\fR\fR
-.ad
-.RS 17n
+.It Sy MA_SHARED
 mapping changes are shared by the mapped object.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMA_ISM\fR\fR
-.ad
-.RS 17n
+.It Sy MA_ISM
 mapping is intimate shared memory (shared MMU resources)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMAP_NORESERVE\fR\fR
-.ad
-.RS 17n
+.It Sy MAP_NORESERVE
 mapping does not have swap space reserved (mapped with MAP_NORESERVE)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMA_SHM\fR\fR
-.ad
-.RS 17n
+.It Sy MA_SHM
 mapping System V shared memory
-.RE
-
-.sp
-.LP
+.El
+.Pp
 A contiguous area of the address space having the same underlying mapped object
 may appear as multiple mappings due to varying read, write, and execute
-attributes. The underlying mapped object does not change over the range of a
-single mapping. An \fBI/O\fR operation to a mapping marked \fBMA_SHARED\fR
+attributes.
+The underlying mapped object does not change over the range of a
+single mapping.
+An
+.Sy I/O
+operation to a mapping marked
+.Sy MA_SHARED
 fails if applied at a virtual address not corresponding to a valid page in the
-underlying mapped object. A write to a \fBMA_SHARED\fR mapping that is not
-marked \fBMA_WRITE\fR fails. Reads and writes to private mappings always
-succeed. Reads and writes to unmapped addresses fail.
-.sp
-.LP
-\fBpr_pagesize\fR is the page size for the mapping, currently always the system
-pagesize.
-.sp
-.LP
-\fBpr_shmid\fR is the shared memory identifier, if any, for the mapping. Its
-value is \fB\(mi1\fR if the mapping is not System V shared memory. See
-\fBshmget\fR(2).
-.sp
-.LP
-\fBpr_dev\fR is the device of the mapped object, if any, for the mapping. Its
-value is \fBPRNODEV\fR (-1) if the mapping does not have a device.
-.sp
-.LP
-\fBpr_ino\fR is the inode of the mapped object, if any, for the mapping. Its
-contents are only valid if \fBpr_dev\fR is not \fBPRNODEV.\fR
-.sp
-.LP
-\fBpr_rss\fR is the number of resident pages of memory for the mapping. The
-number of resident bytes for the mapping may be determined by multiplying
-\fBpr_rss\fR by the page size given by \fBpr_pagesize.\fR
-.sp
-.LP
-\fBpr_anon\fR is the number of resident anonymous memory pages (pages which are
+underlying mapped object.
+A write to a
+.Sy MA_SHARED
+mapping that is not marked
+.Sy MA_WRITE
+fails.
+Reads and writes to private mappings always succeed.
+Reads and writes to unmapped addresses fail.
+.Pp
+.Sy pr_pagesize
+is the page size for the mapping, currently always the system pagesize.
+.Pp
+.Sy pr_shmid
+is the shared memory identifier, if any, for the mapping.
+Its value is \-1
+if the mapping is not System V shared memory.
+See
+.Xr shmget 2 .
+.Pp
+.Sy pr_dev
+is the device of the mapped object, if any, for the mapping.
+Its value is
+.Sy PRNODEV
+.Pq \-1
+if the mapping does not have a device.
+.Pp
+.Sy pr_ino
+is the inode of the mapped object, if any, for the mapping.
+Its contents are only valid if
+.Sy pr_dev
+is not
+.Sy PRNODEV .
+.Pp
+.Sy pr_rss
+is the number of resident pages of memory for the mapping.
+The number of resident bytes for the mapping may be determined by multiplying
+.Sy pr_rss
+by the page size given by
+.Sy pr_pagesize .
+.Pp
+.Sy pr_anon
+is the number of resident anonymous memory pages (pages which are
 private to this process) for the mapping.
-.sp
-.LP
-\fBpr_locked\fR is the number of locked pages for the mapping. Pages which are
-locked are always resident in memory.
-.sp
-.LP
-\fBpr_hatpagesize\fR is the size, in bytes, of the \fBHAT\fR (\fBMMU\fR)
-translation for the mapping. \fBpr_hatpagesize\fR may be different than
-\fBpr_pagesize.\fR The possible values are hardware architecture specific, and
+.Pp
+.Sy pr_locked
+is the number of locked pages for the mapping.
+Pages which are locked are always resident in memory.
+.Pp
+.Sy pr_hatpagesize
+is the size, in bytes, of the
+.Sy HAT
+.Pq Sy MMU
+translation for the mapping.
+.Sy pr_hatpagesize
+may be different than
+.Sy pr_pagesize .
+The possible values are hardware architecture specific, and
 may change over a mapping's lifetime.
-.SS "rmap"
-.LP
-Contains information about the reserved address ranges of the process. The file
-contains an array of \fBprmap\fR structures, as defined above for the \fBmap\fR
-file. Each structure describes a contiguous virtual address region in the
+.Ss rmap
+Contains information about the reserved address ranges of the process.
+The file contains an array of
+.Sy prmap
+structures, as defined above for the
+.Sy map
+file.
+Each structure describes a contiguous virtual address region in the
 address space of the traced process that is reserved by the system in the sense
-that an \fBmmap\fR(2) system call that does not specify \fBMAP_FIXED\fR will
-not use any part of it for the new mapping. Examples of such reservations
-include the address ranges reserved for the process stack and the individual
-thread stacks of a multi-threaded process.
-.SS "cwd"
-.LP
-A symbolic link to the process's current working directory. See \fBchdir\fR(2).
-A \fBreadlink\fR(2) of \fB/proc/\fIpid\fR/cwd\fR yields a null string. However,
-it can be opened, listed, and searched as a directory, and can be the target of
-\fBchdir\fR(2).
-.SS "root"
-.LP
+that an
+.Xr mmap 2
+system call that does not specify
+.Sy MAP_FIXED
+will not use any part of it for the new mapping.
+Examples of such reservations include the address ranges reserved for the
+process stack and the individual thread stacks of a multi-threaded process.
+.Ss cwd
+A symbolic link to the process's current working directory.
+See
+.Xr chdir 2 .
+A
+.Xr readlink 2
+of
+.Pa /proc/ Ns Em pid Ns Pa /cwd
+yields a null string.
+However, it can be opened, listed, and searched as a directory, and can be the
+target of
+.Xr chdir 2 .
+.Ss root
 A symbolic link to the process's root directory.
-\fB/proc/\fR\fIpid\fR\fB/root\fR can differ from the system root directory if
-the process or one of its ancestors executed \fBchroot\fR(2) as super user. It
-has the same semantics as \fB/proc/\fR\fIpid\fR\fB/cwd\fR.
-.SS "fd"
-.LP
-A directory containing references to the open files of the process. Each entry
-is a decimal number corresponding to an open file descriptor in the process.
-.sp
-.LP
+.Pa /proc/ Ns Em pid Ns Pa /root
+can differ from the system root directory if the process or one of its
+ancestors executed
+.Xr chroot 2
+as super user.
+It has the same semantics as
+.Pa /proc/ Ns Em pid Ns Pa /cwd .
+.Ss fd
+A directory containing references to the open files of the process.
+Each entry is a decimal number corresponding to an open file descriptor in the
+process.
+.Pp
 If an entry refers to a regular file, it can be opened with normal file system
 semantics but, to ensure that the controlling process cannot gain greater
 access than the controlled process, with no file access modes other than its
-read/write open modes in the controlled process. If an entry refers to a
-directory, it can be accessed with the same semantics as
-\fB/proc/\fIpid\fR/cwd\fR. An attempt to open any other type of entry fails
-with \fBEACCES\fR.
-.SS "object"
-.LP
+read/write open modes in the controlled process.
+If an entry refers to a directory, it can be accessed with the same semantics
+as
+.Pa /proc/ Ns Em pid Ns Pa /cwd .
+An attempt to open any other type of entry fails with
+.Er EACCES .
+.Ss object
 A directory containing read-only files with names corresponding to the
-\fBpr_mapname\fR entries in the \fBmap\fR and \fBpagedata\fR files. Opening
-such a file yields a file descriptor for the underlying mapped file associated
-with an address-space mapping in the process. The file name \fBa.out\fR appears
-in the directory as an alias for the process's executable file.
-.sp
-.LP
-The \fBobject\fR directory makes it possible for a controlling process to gain
+.Sy pr_mapname
+entries in the
+.Sy map
+and
+.Sy pagedata
+files.
+Opening such a file yields a file descriptor for the underlying mapped file
+associated with an address-space mapping in the process.
+The file name
+.Pa a.out
+appears in the directory as an alias for the process's executable file.
+.Pp
+The
+.Pa object
+directory makes it possible for a controlling process to gain
 access to the object file and any shared libraries (and consequently the symbol
 tables) without having to know the actual path names of the executable files.
-.SS "path"
-.LP
-A directory containing symbolic links to files opened by the process. The
-directory includes one entry for \fBcwd\fR and \fBroot\fR. The directory also
-contains a numerical entry for each file descriptor in the \fBfd\fR directory,
-and entries matching those in the \fBobject\fR directory. If this information
-is not available, any attempt to read the contents of the symbolic link will
-fail. This is most common for files that do not exist in the filesystem
-namespace (such as \fBFIFO\fRs and sockets), but can also happen for regular
-files. For the file descriptor entries, the path may be different from the one
+.Ss path
+A directory containing symbolic links to files opened by the process.
+The directory includes one entry for
+.Pa cwd
+and
+.Pa root .
+The directory also contains a numerical entry for each file descriptor in the
+.Pa fd
+directory, and entries matching those in the
+.Pa object
+directory.
+If this information is not available, any attempt to read the contents of the
+symbolic link will fail.
+This is most common for files that do not exist in the filesystem namespace
+(such as
+.Sy FIFO Ns s
+and sockets), but can also happen for regular files.
+For the file descriptor entries, the path may be different from the one
 used by the process to open the file.
-.SS "pagedata"
-.LP
+.Ss pagedata
 Opening the page data file enables tracking of address space references and
 modifications on a per-page basis.
-.sp
-.LP
-A \fBread\fR(2) of the page data file descriptor returns structured page data
-and atomically clears the page data maintained for the file by the system. That
-is to say, each read returns data collected since the last read; the first read
-returns data collected since the file was opened. When the call completes, the
-read buffer contains the following structure as its header and thereafter
-contains a number of section header structures and associated byte arrays that
-must be accessed by walking linearly through the buffer.
-.sp
-.in +2
-.nf
+.Pp
+A
+.Xr read 2
+of the page data file descriptor returns structured page data
+and atomically clears the page data maintained for the file by the system.
+That is to say, each read returns data collected since the last read; the
+first read returns data collected since the file was opened.
+When the call completes, the read buffer contains the following structure as
+its header and thereafter contains a number of section header structures and
+associated byte arrays that must be accessed by walking linearly through the
+buffer.
+.Bd -literal -offset 2
 typedef struct prpageheader {
     timestruc_t pr_tstamp; /* real time stamp, time of read() */
     ulong_t pr_nmap;       /* number of address space mappings */
     ulong_t pr_npage;      /* total number of pages */
 } prpageheader_t;
-.fi
-.in -2
-
-.sp
-.LP
-The header is followed by \fBpr_nmap prasmap\fR structures and associated data
-arrays. The \fBprasmap\fR structure contains the following elements:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+The header is followed by
+.Sy "pr_nmap prasmap"
+structures and associated data arrays.
+The
+.Sy prasmap
+structure contains the following elements:
+.Bd -literal -offset 2
 typedef struct prasmap {
     uintptr_t pr_vaddr;        /* virtual address of mapping */
     ulong_t pr_npage;          /* number of pages in mapping */
@@ -1338,59 +1458,56 @@ typedef struct prasmap {
     int pr_pagesize;           /* pagesize for this mapping in bytes */
     int pr_shmid;              /* SysV shared memory identifier */
 } prasmap_t;
-.fi
-.in -2
-
-.sp
-.LP
-Each section header is followed by \fBpr_npage\fR bytes, one byte for each page
-in the mapping, plus 0-7 null bytes at the end so that the next \fBprasmap\fR
-structure begins on an eight-byte aligned boundary. Each data byte may contain
-these flags:
-.sp
-.ne 2
-.na
-\fB\fBPG_REFERENCED\fR\fR
-.ad
-.RS 17n
+.Ed
+.Pp
+Each section header is followed by
+.Sy pr_npage
+bytes, one byte for each page in the mapping, plus 0-7 null bytes at the end
+so that the next
+.Sy prasmap
+structure begins on an eight-byte aligned boundary.
+Each data byte may contain these flags:
+.Bl -tag -width "PG_REFERENCED" -offset 2
+.It Sy PG_REFERENCED
 page has been referenced.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPG_MODIFIED\fR\fR
-.ad
-.RS 17n
+.It Sy PG_MODIFIED
 page has been modified.
-.RE
-
-.sp
-.LP
+.El
+.Pp
 If the read buffer is not large enough to contain all of the page data, the
-read fails with \fBE2BIG\fR and the page data is not cleared. The required size
-of the read buffer can be determined through \fBfstat\fR(2). Application of
-\fBlseek\fR(2) to the page data file descriptor is ineffective; every read
-starts from the beginning of the file. Closing the page data file descriptor
+read fails with
+.Er E2BIG
+and the page data is not cleared.
+The required size of the read buffer can be determined through
+.Xr fstat 2 .
+Application of
+.Xr lseek 2
+to the page data file descriptor is ineffective; every read
+starts from the beginning of the file.
+Closing the page data file descriptor
 terminates the system overhead associated with collecting the data.
-.sp
-.LP
+.Pp
 More than one page data file descriptor for the same process can be opened, up
-to a system-imposed limit per traced process. A read of one does not affect the
-data being collected by the system for the others. An open of the page data
-file will fail with \fBENOMEM\fR if the system-imposed limit would be exceeded.
-.SS "watch"
-.LP
-Contains an array of \fBprwatch\fR structures, one for each watched area
-established by the \fBPCWATCH\fR control operation. See \fBPCWATCH\fR for
-details.
-.SS "usage"
-.LP
-Contains process usage information described by a \fBprusage\fR structure which
-contains at least the following fields:
-.sp
-.in +2
-.nf
+to a system-imposed limit per traced process.
+A read of one does not affect the data being collected by the system for the
+others.
+An open of the page data file will fail with
+.Er ENOMEM
+if the system-imposed limit would be exceeded.
+.Ss watch
+Contains an array of
+.Vt prwatch
+structures, one for each watched area established by the
+.Sy PCWATCH
+control operation.
+See
+.Sx PCWATCH
+for details.
+.Ss usage
+Contains process usage information described by a
+.Vt prusage
+structure which contains at least the following fields:
+.Bd -literal -offset 2
 typedef struct prusage {
     id_t pr_lwpid;           /* lwp id.  0: process or defunct */
     int pr_count;            /* number of contributing lwps */
@@ -1421,1556 +1538,1540 @@ typedef struct prusage {
     ulong_t pr_sysc;         /* system calls */
     ulong_t pr_ioch;         /* chars read and written */
 } prusage_t;
-.fi
-.in -2
-
-.sp
-.LP
-Microstate accounting is now continuously enabled. While this information was
+.Ed
+.Pp
+Microstate accounting is now continuously enabled.
+While this information was
 previously an estimate, if microstate accounting were not enabled, the current
 information is now never an estimate represents time the process has spent in
 various states.
-.SS "lstatus"
-.LP
-Contains a \fBprheader\fR structure followed by an array of \fBlwpstatus\fR
+.Ss lstatus
+Contains a
+.Vt prheader
+structure followed by an array of
+.Vt lwpstatus
 structures, one for each active lwp in the process (see also
-\fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR/\fBlwpstatus\fR, below). The
-\fBprheader\fR structure describes the number and size of the array entries
-that follow.
-.sp
-.in +2
-.nf
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpstatus ,
+below).
+The
+.Vt prheader
+structure describes the number and size of the array entries that follow.
+.Bd -literal -offset 2
 typedef struct prheader {
     long pr_nent;        /* number of entries */
     size_t pr_entsize;   /* size of each entry, in bytes */
 } prheader_t;
-.fi
-.in -2
-
-.sp
-.LP
-The \fBlwpstatus\fR structure may grow by the addition of elements at the end
-in future releases of the system. Programs must use \fBpr_entsize\fR in the
-file header to index through the array. These comments apply to all \fB/proc\fR
-files that include a \fBprheader\fR structure (\fBlpsinfo\fR and \fBlusage\fR,
+.Ed
+.Pp
+The
+.Vt lwpstatus
+structure may grow by the addition of elements at the end in future releases
+of the system.
+Programs must use
+.Sy pr_entsize
+in the file header to index through the array.
+These comments apply to all
+.Pa /proc
+files that include a
+.Vt prheader
+structure
+.Pf ( Pa lpsinfo
+and
+.Pa lusage ,
 below).
-.SS "lpsinfo"
-.LP
-Contains a \fBprheader\fR structure followed by an array of \fBlwpsinfo\fR
-structures, one for eachactive and zombie lwp in the process. See also
-\fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR/\fBlwpsinfo\fR, below.
-.SS "lusage"
-.LP
-Contains a \fBprheader\fR structure followed by an array of \fBprusage\fR
+.Ss lpsinfo
+Contains a
+.Vt prheader
+structure followed by an array of
+.Vt lwpsinfo
+structures, one for eachactive and zombie lwp in the process.
+See also
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpsinfo ,
+below.
+.Ss lusage
+Contains a
+.Vt prheader
+structure followed by an array of
+.Vt prusage
 structures, one for each active lwp in the process, plus an additional element
 at the beginning that contains the summation over all defunct lwps (lwps that
-once existed but no longer exist in the process). Excluding the \fBpr_lwpid\fR,
-\fBpr_tstamp\fR, \fBpr_create\fR, and \fBpr_term\fR entries, the entry-by-entry
-summation over all these structures is the definition of the process usage
-information obtained from the \fBusage\fR file. (See also
-\fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR/\fBlwpusage\fR, below.)
-.SS "lwp"
-.LP
+once existed but no longer exist in the process).
+Excluding the
+.Sy pr_lwpid ,
+.Sy pr_tstamp ,
+.Sy pr_create ,
+and
+.Sy pr_term
+entries, the entry-by-entry summation over all these structures is the
+definition of the process usage information obtained from the
+.Pa usage
+file. (See also
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpusage ,
+below.)
+.Ss lwp
 A directory containing entries each of which names an active or zombie lwp
-within the process. These entries are themselves directories containing
-additional files as described below. Only the \fBlwpsinfo\fR file exists in the
-directory of a zombie lwp.
-.SH STRUCTURE OF \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR
-.LP
-A given directory \fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid\fR contains the
-following entries:
-.SS "lwpctl"
-.LP
-Write-only control file. The messages written to this file affect the specific
+within the process.
+These entries are themselves directories containing additional files as
+described below.
+Only the
+.Pa lwpsinfo
+file exists in the directory of a zombie lwp.
+.Sh "STRUCTURE OF" Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
+A given directory
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
+contains the following entries:
+.Ss lwpctl
+Write-only control file.
+The messages written to this file affect the specific
 lwp rather than the representative lwp, as is the case for the process's
-\fBctl\fR file.
-.SS lwpname
-A buffer of \fBTHREAD_NAME_MAX\fR bytes representing the LWP name; the buffer is
-zero-filled if the thread name is shorter than the buffer. If no thread name is
-set, the buffer contains the empty string. A read with a buffer shorter than
-\fBTHREAD_NAME_MAX\fR bytes is not guaranteed to be NUL-terminated.  Writing to
-this file will set the LWP name for the specific lwp.  This file may not be
-present in older operating system versions. \fBTHREAD_NAME_MAX\fR may increase
-in the future; clients should be prepared for this.
-.SS "lwpstatus"
-.LP
-lwp-specific state information. This file contains the \fBlwpstatus\fR
+.Pa ctl
+file.
+.Ss lwpname
+A buffer of
+.Dv THREAD_NAME_MAX
+bytes representing the LWP name; the buffer is
+zero-filled if the thread name is shorter than the buffer.
+If no thread name is set, the buffer contains the empty string.
+A read with a buffer shorter than
+.Dv THREAD_NAME_MAX
+bytes is not guaranteed to be NUL-terminated.
+Writing to this file will set the LWP name for the specific lwp.
+This file may not be present in older operating system versions.
+.Dv THREAD_NAME_MAX
+may increase in the future; clients should be prepared for this.
+.Ss lwpstatus
+lwp-specific state information.
+This file contains the
+.Vt lwpstatus
 structure for the specific lwp as described above for the representative lwp in
-the process's \fBstatus\fR file.
-.SS "lwpsinfo"
-.LP
-lwp-specific \fBps\fR(1) information. This file contains the \fBlwpsinfo\fR
+the process's
+.Pa status
+file.
+.Ss lwpsinfo
+lwp-specific
+.Xr ps 1
+information.
+This file contains the
+.Vt lwpsinfo
 structure for the specific lwp as described above for the representative lwp in
-the process's \fBpsinfo\fR file. The \fBlwpsinfo\fR file remains accessible
-after an lwp becomes a zombie.
-.SS "lwpusage"
-.LP
-This file contains the \fBprusage\fR structure for the specific lwp as
-described above for the process's \fBusage\fR file.
-.SS "gwindows"
-.LP
-This file exists only on SPARC based machines. If it is non-empty, it contains
-a \fBgwindows_t\fR structure, defined in \fB<sys/regset.h>\fR, with the values
-of those SPARC register windows that could not be stored on the stack when the
-lwp stopped. Conditions under which register windows are not stored on the
+the process's
+.Pa psinfo
+file.
+The
+.Pa lwpsinfo
+file remains accessible after an lwp becomes a zombie.
+.Ss lwpusage
+This file contains the
+.Vt prusage
+structure for the specific lwp as described above for the process's
+.Pa usage
+file.
+.Ss gwindows
+This file exists only on SPARC based machines.
+If it is non-empty, it contains a
+.Vt gwindows_t
+structure, defined in
+.In sys/regset.h ,
+with the values of those SPARC register windows that could not be stored on
+the stack when the lwp stopped.
+Conditions under which register windows are not stored on the
 stack are: the stack pointer refers to nonexistent process memory or the stack
-pointer is improperly aligned. If the lwp is not stopped or if there are no
+pointer is improperly aligned.
+If the lwp is not stopped or if there are no
 register windows that could not be stored on the stack, the file is empty (the
 usual case).
-.SS "xregs"
-.LP
-Extra state registers. The extra state register set is architecture dependent;
-this file is empty if the system does not support extra state registers. If the
-file is non-empty, it contains an architecture dependent structure of type
-\fBprxregset_t\fR, defined in \fB<procfs.h>\fR, with the values of the lwp's
-extra state registers. If the lwp is not stopped, all register values are
-undefined. See also the \fBPCSXREG\fR control operation, below.
-.SS "asrs"
-.LP
-This file exists only for 64-bit SPARC V9 processes. It contains an
-\fBasrset_t\fR structure, defined in <\fBsys/regset.h\fR>, containing the
-values of the lwp's platform-dependent ancillary state registers. If the lwp is
-not stopped, all register values are undefined. See also the \fBPCSASRS\fR
+.Ss xregs
+Extra state registers.
+The extra state register set is architecture dependent;
+this file is empty if the system does not support extra state registers.
+If the file is non-empty, it contains an architecture dependent structure of
+type
+.Vt prxregset_t ,
+defined in
+.In procfs.h ,
+with the values of the lwp's extra state registers.
+If the lwp is not stopped, all register values are undefined.
+See also the
+.Sx PCSXREG
 control operation, below.
-.SS "spymaster"
-.LP
-For an agent lwp (see \fBPCAGENT\fR), this file contains a \fBpsinfo_t\fR
+.Ss asrs
+This file exists only for 64-bit SPARC V9 processes.
+It contains an
+.Vt asrset_t
+structure, defined in
+.In sys/regset.h ,
+containing the values of the lwp's platform-dependent ancillary state registers.
+If the lwp is not stopped, all register values are undefined.
+See also the
+.Sx PCSASRS
+control operation, below.
+.Ss spymaster
+For an agent lwp (see
+.Sx PCAGENT ) ,
+this file contains a
+.Vt psinfo_t
 structure that corresponds to the process that created the agent lwp at the
-time the agent was created. This structure is identical to that retrieved via
-the \fBpsinfo\fR file, with one modification: the \fBpr_time\fR field does not
-correspond to the CPU time for the process, but rather to the creation time of
-the agent lwp.
-.SS "templates"
-.LP
+time the agent was created.
+This structure is identical to that retrieved via the
+.Pa psinfo
+file, with one modification: the
+.Sy pr_time
+field does not correspond to the CPU time for the process, but rather to the
+creation time of the agent lwp.
+.Ss templates
 A directory which contains references to the active templates for the lwp,
-named by the contract type. Changes made to an active template descriptor do
+named by the contract type.
+Changes made to an active template descriptor do
 not affect the original template which was activated, though they do affect the
-active template. It is not possible to activate an active template descriptor.
-See \fBcontract\fR(4).
-.SH CONTROL MESSAGES
-.LP
+active template.
+It is not possible to activate an active template descriptor.
+See
+.Xr contract 4 .
+.Sh CONTROL MESSAGES
 Process state changes are effected through messages written to a process's
-\fBctl\fR file or to an individual lwp's \fBlwpctl\fR file. All control
-messages consist of a \fBlong\fR that names the specific operation followed by
+.Sy ctl
+file or to an individual lwp's
+.Sy lwpctl
+file.
+All control messages consist of a
+.Sy long
+that names the specific operation followed by
 additional data containing the operand, if any.
-.sp
-.LP
-Multiple control messages may be combined in a single \fBwrite\fR(2) (or
-\fBwritev\fR(2)) to a control file, but no partial writes are permitted. That
-is, each control message, operation code plus operand, if any, must be
-presented in its entirety to the \fBwrite\fR(2) and not in pieces over several
-system calls. If a control operation fails, no subsequent operations contained
-in the same \fBwrite\fR(2) are attempted.
-.sp
-.LP
-Descriptions of the allowable control messages follow. In all cases, writing a
-message to a control file for a process or lwp that has terminated elicits the
-error \fBENOENT\fR.
-.SS "PCSTOP PCDSTOP PCWSTOP PCTWSTOP"
-.LP
-When applied to the process control file, \fBPCSTOP\fR directs all lwps to stop
-and waits for them to stop, \fBPCDSTOP\fR directs all lwps to stop without
-waiting for them to stop, and \fBPCWSTOP\fR simply waits for all lwps to stop.
-When applied to an lwp control file, \fBPCSTOP\fR directs the specific lwp to
-stop and waits until it has stopped, \fBPCDSTOP\fR directs the specific lwp to
-stop without waiting for it to stop, and \fBPCWSTOP\fR simply waits for the
-specific lwp to stop. When applied to an lwp control file, \fBPCSTOP\fR and
-\fBPCWSTOP\fR complete when the lwp stops on an event of interest, immediately
+.Pp
+Multiple control messages may be combined in a single
+.Xr write 2
+(or
+.Xr writev 2 )
+to a control file, but no partial writes are permitted.
+That is, each control message, operation code plus operand, if any, must be
+presented in its entirety to the
+.Xr write 2
+and not in pieces over several system calls.
+If a control operation fails, no subsequent operations contained in the same
+.Xr write 2
+are attempted.
+.Pp
+Descriptions of the allowable control messages follow.
+In all cases, writing a message to a control file for a process or lwp that
+has terminated elicits the error
+.Er ENOENT .
+.Ss PCSTOP PCDSTOP PCWSTOP PCTWSTOP
+When applied to the process control file,
+.Sy PCSTOP
+directs all lwps to stop and waits for them to stop,
+.Sy PCDSTOP
+directs all lwps to stop without waiting for them to stop, and
+.Sy PCWSTOP
+simply waits for all lwps to stop.
+When applied to an lwp control file,
+.Sy PCSTOP
+directs the specific lwp to stop and waits until it has stopped,
+.Sy PCDSTOP
+directs the specific lwp to stop without waiting for it to stop, and
+.Sy PCWSTOP
+ simply waits for the specific lwp to stop.
+When applied to an lwp control file,
+.Sy PCSTOP
+and
+.Sy PCWSTOP
+complete when the lwp stops on an event of interest, immediately
 if already so stopped; when applied to the process control file, they complete
 when every lwp has stopped either on an event of interest or on a
-\fBPR_SUSPENDED\fR stop.
-.sp
-.LP
-\fBPCTWSTOP\fR is identical to \fBPCWSTOP\fR except that it enables the
-operation to time out, to avoid waiting forever for a process or lwp that may
-never stop on an event of interest. \fBPCTWSTOP\fR takes a \fBlong\fR operand
-specifying a number of milliseconds; the wait will terminate successfully after
-the specified number of milliseconds even if the process or lwp has not
-stopped; a timeout value of zero makes the operation identical to
-\fBPCWSTOP\fR.
-.sp
-.LP
-An ``event of interest'' is either a \fBPR_REQUESTED\fR stop or a stop that has
-been specified in the process's tracing flags (set by \fBPCSTRACE\fR,
-\fBPCSFAULT\fR, \fBPCSENTRY\fR, and \fBPCSEXIT\fR). \fBPR_JOBCONTROL\fR and
-\fBPR_SUSPENDED\fR stops are specifically not events of interest. (An lwp may
-stop twice due to a stop signal, first showing \fBPR_SIGNALLED\fR if the signal
-is traced and again showing \fBPR_JOBCONTROL\fR if the lwp is set running
-without clearing the signal.) If \fBPCSTOP\fR or \fBPCDSTOP\fR is applied to an
+.Sy PR_SUSPENDED
+stop.
+.Pp
+.Sy PCTWSTOP
+is identical to
+.Sy PCWSTOP
+except that it enables the operation to time out, to avoid waiting forever for
+a process or lwp that may never stop on an event of interest.
+.Sy PCTWSTOP
+takes a
+.Sy long
+operand specifying a number of milliseconds; the wait will terminate
+successfully after the specified number of milliseconds even if the process or
+lwp has not stopped; a timeout value of zero makes the operation identical to
+.Sy PCWSTOP .
+.Pp
+An
+.Dq event of interest
+is either a
+.Sy PR_REQUESTED
+stop or a stop that has been specified in the process's tracing flags (set by
+.Sy PCSTRACE ,
+.Sy PCSFAULT ,
+.Sy PCSENTRY ,
+and
+.Sy PCSEXIT ) .
+.Sy PR_JOBCONTROL
+ and
+.Sy PR_SUSPENDED
+stops are specifically not events of interest.
+(An lwp may stop twice due to a stop signal, first showing
+.Sy PR_SIGNALLED
+if the signal is traced and again showing
+.Sy PR_JOBCONTROL
+if the lwp is set running without clearing the signal.)
+If
+.Sy PCSTOP
+or
+.Sy PCDSTOP
+is applied to an
 lwp that is stopped, but not on an event of interest, the stop directive takes
-effect when the lwp is restarted by the competing mechanism. At that time, the
-lwp enters a \fBPR_REQUESTED\fR stop before executing any user-level code.
-.sp
-.LP
+effect when the lwp is restarted by the competing mechanism.
+At that time, the lwp enters a
+.Sy PR_REQUESTED
+stop before executing any user-level code.
+.Pp
 A write of a control message that blocks is interruptible by a signal so that,
-for example, an \fBalarm\fR(2) can be set to avoid waiting forever for a
-process or lwp that may never stop on an event of interest. If \fBPCSTOP\fR is
-interrupted, the lwp stop directives remain in effect even though the
-\fBwrite\fR(2) returns an error. (Use of \fBPCTWSTOP\fR with a non-zero timeout
-is recommended over \fBPCWSTOP\fR with an \fBalarm\fR(2).)
-.sp
-.LP
-A system process (indicated by the \fBPR_ISSYS\fR flag) never executes at user
-level, has no user-level address space visible through \fB/proc\fR, and cannot
-be stopped. Applying one of these operations to a system process or any of its
-lwps elicits the error \fBEBUSY\fR.
-.SS "PCRUN"
-.LP
-Make an lwp runnable again after a stop. This operation takes a \fBlong\fR
+for example, an
+.Xr alarm 2
+can be set to avoid waiting forever for a
+process or lwp that may never stop on an event of interest.
+If
+.Sy PCSTOP
+is interrupted, the lwp stop directives remain in effect even though the
+.Xr write 2
+returns an error.
+(Use of
+.Sy PCTWSTOP
+with a non-zero timeout is recommended over
+.Sy PCWSTOP
+with an
+.Xr alarm 2 . )
+.Pp
+A system process (indicated by the
+.Sy PR_ISSYS
+flag) never executes at user level, has no user-level address space visible
+through
+.Pa /proc ,
+and cannot be stopped.
+Applying one of these operations to a system process or any of its
+lwps elicits the error
+.Er EBUSY .
+.Ss PCRUN
+Make an lwp runnable again after a stop.
+This operation takes a
+.Vt long
 operand containing zero or more of the following flags:
-.sp
-.ne 2
-.na
-\fB\fBPRCSIG\fR\fR
-.ad
-.RS 12n
-clears the current signal, if any (see \fBPCCSIG\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPRCFAULT\fR\fR
-.ad
-.RS 12n
-clears the current fault, if any (see \fBPCCFAULT\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPRSTEP\fR\fR
-.ad
-.RS 12n
-directs the lwp to execute a single machine instruction. On completion of the
-instruction, a trace trap occurs. If \fBFLTTRACE\fR is being traced, the lwp
-stops; otherwise, it is sent \fBSIGTRAP\fR. If \fBSIGTRAP\fR is being traced
-and is not blocked, the lwp stops. When the lwp stops on an event of interest,
+.Bl -tag -width "PRSABORT" -offset left
+.It Sy PRCSIG
+clears the current signal, if any (see
+.Sx PCCSIG ) .
+.It Sy PRCFAULT
+clears the current fault, if any (see
+.Sx PCCFAULT ) .
+.It Sy PRSTEP
+directs the lwp to execute a single machine instruction.
+On completion of the instruction, a trace trap occurs.
+If
+.Sy FLTTRACE
+is being traced, the lwp stops; otherwise, it is sent
+.Sy SIGTRAP .
+If
+.Sy SIGTRAP
+is being traced and is not blocked, the lwp stops.
+When the lwp stops on an event of interest,
 the single-step directive is cancelled, even if the stop occurs before the
-instruction is executed. This operation requires hardware and operating system
-support and may not be implemented on all processors. It is implemented on
-SPARC and x86-based machines.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPRSABORT\fR\fR
-.ad
-.RS 12n
-is meaningful only if the lwp is in a \fBPR_SYSENTRY\fR stop or is marked
-\fBPR_ASLEEP\fR; it instructs the lwp to abort execution of the system call
-(see \fBPCSENTRY\fR and \fBPCSEXIT\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPRSTOP\fR\fR
-.ad
-.RS 12n
+instruction is executed.
+This operation requires hardware and operating system
+support and may not be implemented on all processors.
+It is implemented on SPARC and x86-based machines.
+.It Sy PRSABORT
+is meaningful only if the lwp is in a
+.Sy PR_SYSENTRY
+stop or is marked
+.Sy PR_ASLEEP ;
+it instructs the lwp to abort execution of the system call (see
+.Sx PCSENTRY
+and
+.Sx PCSEXIT ) .
+.It Sy PRSTOP
 directs the lwp to stop again as soon as possible after resuming execution (see
-\fBPCDSTOP\fR). In particular, if the lwp is stopped on \fBPR_SIGNALLED\fR or
-\fBPR_FAULTED\fR, the next stop will show \fBPR_REQUESTED\fR, no other stop
+.Sx PCDSTOP ) .
+In particular, if the lwp is stopped on
+.Sy PR_SIGNALLED
+or
+.Sy PR_FAULTED ,
+the next stop will show
+.Sy PR_REQUESTED ,
+no other stop
 will have intervened, and the lwp will not have executed any user-level code.
-.RE
-
-.sp
-.LP
-When applied to an lwp control file, \fBPCRUN\fR clears any outstanding
-directed-stop request and makes the specific lwp runnable. The operation fails
-with \fBEBUSY\fR if the specific lwp is not stopped on an event of interest or
+.El
+.Pp
+When applied to an lwp control file,
+.Sy PCRUN
+clears any outstanding
+directed-stop request and makes the specific lwp runnable.
+The operation fails with
+.Er EBUSY
+if the specific lwp is not stopped on an event of interest or
 has not been directed to stop or if the agent lwp exists and this is not the
-agent lwp (see \fBPCAGENT\fR).
-.sp
-.LP
+agent lwp (see
+.Sx PCAGENT ) .
+.Pp
 When applied to the process control file, a representative lwp is chosen for
-the operation as described for \fB/proc/\fR\fIpid\fR\fB/status\fR. The
-operation fails with \fBEBUSY\fR if the representative lwp is not stopped on an
+the operation as described for
+.Pa /proc/ Ns Em pid Ns Pa /status .
+The operation fails with
+.Er EBUSY
+if the representative lwp is not stopped on an
 event of interest or has not been directed to stop or if the agent lwp exists.
-If \fBPRSTEP\fR or \fBPRSTOP\fR was requested, the representative lwp is made
+If
+.Sy PRSTEP
+or
+.Sy PRSTOP
+was requested, the representative lwp is made
 runnable and its outstanding directed-stop request is cleared; otherwise all
 outstanding directed-stop requests are cleared and, if it was stopped on an
-event of interest, the representative lwp is marked \fBPR_REQUESTED\fR. If, as
-a consequence, all lwps are in the \fBPR_REQUESTED\fR or \fBPR_SUSPENDED\fR
-stop state, all lwps showing \fBPR_REQUESTED\fR are made runnable.
-.SS "PCSTRACE"
-.LP
-Define a set of signals to be traced in the process. The receipt of one of
-these signals by an lwp causes the lwp to stop. The set of signals is defined
-using an operand \fBsigset_t\fR contained in the control message. Receipt of
-\fBSIGKILL\fR cannot be traced; if specified, it is silently ignored.
-.sp
-.LP
+event of interest, the representative lwp is marked
+.Sy PR_REQUESTED .
+If, as a consequence, all lwps are in the
+.Sy PR_REQUESTED
+or
+.Sy PR_SUSPENDED
+stop state, all lwps showing
+.Sy PR_REQUESTED
+are made runnable.
+.Ss PCSTRACE
+Define a set of signals to be traced in the process.
+The receipt of one of these signals by an lwp causes the lwp to stop.
+The set of signals is defined using an operand
+.Sy sigset_t
+contained in the control message.
+Receipt of
+.Sy SIGKILL
+cannot be traced; if specified, it is silently ignored.
+.Pp
 If a signal that is included in an lwp's held signal set (the signal mask) is
 sent to the lwp, the signal is not received and does not cause a stop until it
 is removed from the held signal set, either by the lwp itself or by setting the
-held signal set with \fBPCSHOLD\fR.
-.SS "PCCSIG"
-.LP
+held signal set with
+.Sy PCSHOLD .
+.Ss PCCSIG
 The current signal, if any, is cleared from the specific or representative lwp.
-.SS "PCSSIG"
-.LP
+.Ss PCSSIG
 The current signal and its associated signal information for the specific or
 representative lwp are set according to the contents of the operand
-\fBsiginfo\fR structure (see \fB<sys/siginfo.h>\fR). If the specified signal
-number is zero, the current signal is cleared. The semantics of this operation
-are different from those of \fBkill\fR(2) in that the signal is delivered to
-the lwp immediately after execution is resumed (even if it is being blocked)
-and an additional \fBPR_SIGNALLED\fR stop does not intervene even if the signal
-is traced. Setting the current signal to \fBSIGKILL\fR terminates the process
-immediately.
-.SS "PCKILL"
-.LP
+.Vt siginfo
+structure (see
+.In sys/siginfo.h ) .
+If the specified signal number is zero, the current signal is cleared.
+The semantics of this operation are different from those of
+.Xr kill 2
+in that the signal is delivered to the lwp immediately after execution is
+resumed (even if it is being blocked) and an additional
+.Sy PR_SIGNALLED
+stop does not intervene even if the signal is traced.
+Setting the current signal to
+.Sy SIGKILL
+terminates the process immediately.
+.Ss PCKILL
 If applied to the process control file, a signal is sent to the process with
-semantics identical to those of \fBkill\fR(2). If applied to an lwp control
-file, a directed signal is sent to the specific lwp. The signal is named in a
-\fBlong\fR operand contained in the message. Sending \fBSIGKILL\fR terminates
-the process immediately.
-.SS "PCUNKILL"
-.LP
-A signal is deleted, that is, it is removed from the set of pending signals. If
-applied to the process control file, the signal is deleted from the process's
-pending signals. If applied to an lwp control file, the signal is deleted from
-the lwp's pending signals. The current signal (if any) is unaffected. The
-signal is named in a \fBlong\fR operand in the control message. It is an error
-(\fBEINVAL\fR) to attempt to delete \fBSIGKILL\fR.
-.SS "PCSHOLD"
-.LP
+semantics identical to those of
+.Xr kill 2
+If applied to an lwp control file, a directed signal is sent to the specific
+lwp.
+The signal is named in a
+.Vt long
+operand contained in the message.
+Sending
+.Sy SIGKILL
+terminates the process immediately.
+.Ss PCUNKILL
+A signal is deleted, that is, it is removed from the set of pending signals.
+If applied to the process control file, the signal is deleted from the process's
+pending signals.
+If applied to an lwp control file, the signal is deleted from
+the lwp's pending signals.
+The current signal (if any) is unaffected.
+The signal is named in a
+.Sy long
+operand in the control message.
+It is an error
+.Pq Er EINVAL
+to attempt to delete
+.Sy SIGKILL .
+.Ss PCSHOLD
 Set the set of held signals for the specific or representative lwp (signals
-whose delivery will be blocked if sent to the lwp). The set of signals is
-specified with a \fBsigset_t\fR operand. \fBSIGKILL\fR and \fBSIGSTOP\fR cannot
-be held; if specified, they are silently ignored.
-.SS "PCSFAULT"
-.LP
-Define a set of hardware faults to be traced in the process. On incurring one
-of these faults, an lwp stops. The set is defined via the operand
-\fBfltset_t\fR structure. Fault names are defined in \fB<sys/fault.h>\fR and
-include the following. Some of these may not occur on all processors; there may
+whose delivery will be blocked if sent to the lwp).
+The set of signals is specified with a
+.Vt sigset_t
+operand.
+.Sy SIGKILL
+and
+.Sy SIGSTOP
+cannot be held; if specified, they are silently ignored.
+.Ss PCSFAULT
+Define a set of hardware faults to be traced in the process.
+On incurring one of these faults, an lwp stops.
+The set is defined via the operand
+.Vt fltset_t
+structure.
+Fault names are defined in
+.In sys/fault.h
+and include the following.
+Some of these may not occur on all processors; there may
 be processor-specific faults in addition to these.
-.sp
-.ne 2
-.na
-\fB\fBFLTILL\fR\fR
-.ad
-.RS 13n
+.Bl -tag -width "FLTACCESS" -offset indent
+.It Sy FLTILL
 illegal instruction
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTPRIV\fR\fR
-.ad
-.RS 13n
+.It Sy FLTPRIV
 privileged instruction
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTBPT\fR\fR
-.ad
-.RS 13n
+.It Sy FLTBPT
 breakpoint trap
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTTRACE\fR\fR
-.ad
-.RS 13n
+.It Sy FLTTRACE
 trace trap (single-step)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTWATCH\fR\fR
-.ad
-.RS 13n
+.It Sy FLTWATCH
 watchpoint trap
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTACCESS\fR\fR
-.ad
-.RS 13n
+.It Sy FLTACCESS
 memory access fault (bus error)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTBOUNDS\fR\fR
-.ad
-.RS 13n
+.It Sy FLTBOUNDS
 memory bounds violation
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTIOVF\fR\fR
-.ad
-.RS 13n
+.It Sy FLTIOVF
 integer overflow
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTIZDIV\fR\fR
-.ad
-.RS 13n
+.It Sy FLTIZDIV
 integer zero divide
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTFPE\fR\fR
-.ad
-.RS 13n
+.It Sy FLTFPE
 floating-point exception
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTSTACK\fR\fR
-.ad
-.RS 13n
+.It Sy FLTSTACK
 unrecoverable stack fault
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLTPAGE\fR\fR
-.ad
-.RS 13n
+.It Sy FLTPAGE
 recoverable page fault
-.RE
-
-.sp
-.LP
+.El
+.Pp
 When not traced, a fault normally results in the posting of a signal to the lwp
-that incurred the fault. If an lwp stops on a fault, the signal is posted to
-the lwp when execution is resumed unless the fault is cleared by \fBPCCFAULT\fR
-or by the \fBPRCFAULT\fR option of \fBPCRUN\fR. \fBFLTPAGE\fR is an exception;
-no signal is posted. The \fBpr_info\fR field in the \fBlwpstatus\fR structure
-identifies the signal to be sent and contains machine-specific information
-about the fault.
-.SS "PCCFAULT"
-.LP
+that incurred the fault.
+If an lwp stops on a fault, the signal is posted to
+the lwp when execution is resumed unless the fault is cleared by
+.Sy PCCFAULT
+or by the
+.Sy PRCFAULT
+option of
+.Sy PCRUN .
+.Sy FLTPAGE
+is an exception; no signal is posted.
+The
+.Sy pr_info
+field in the
+.Vt lwpstatus
+structure identifies the signal to be sent and contains machine-specific
+information about the fault.
+.Ss PCCFAULT
 The current fault, if any, is cleared; the associated signal will not be sent
 to the specific or representative lwp.
-.SS "PCSENTRY PCSEXIT"
-.LP
+.Ss PCSENTRY PCSEXIT
 These control operations instruct the process's lwps to stop on entry to or
-exit from specified system calls. The set of system calls to be traced is
-defined via an operand \fBsysset_t\fR structure.
-.sp
-.LP
+exit from specified system calls.
+The set of system calls to be traced is defined via an operand
+.Vt sysset_t
+structure.
+.Pp
 When entry to a system call is being traced, an lwp stops after having begun
 the call to the system but before the system call arguments have been fetched
-from the lwp. When exit from a system call is being traced, an lwp stops on
-completion of the system call just prior to checking for signals and returning
-to user level. At this point, all return values have been stored into the lwp's
-registers.
-.sp
-.LP
-If an lwp is stopped on entry to a system call (\fBPR_SYSENTRY\fR) or when
-sleeping in an interruptible system call (\fBPR_ASLEEP\fR is set), it may be
-instructed to go directly to system call exit by specifying the \fBPRSABORT\fR
-flag in a \fBPCRUN\fR control message. Unless exit from the system call is
-being traced, the lwp returns to user level showing \fBEINTR\fR.
-.SS "PCWATCH"
-.LP
-Set or clear a watched area in the controlled process from a \fBprwatch\fR
+from the lwp.
+When exit from a system call is being traced, an lwp stops on completion of
+the system call just prior to checking for signals and returning to user level.
+At this point, all return values have been stored into the lwp's registers.
+.Pp
+If an lwp is stopped on entry to a system call
+.Pq Sy PR_SYSENTRY
+or when sleeping in an interruptible system call
+.Pf ( Sy PR_ASLEEP
+is set), it may be instructed to go directly to system call exit by specifying
+the
+.Sy PRSABORT
+flag in a
+.Sy PCRUN
+control message.
+Unless exit from the system call is being traced, the lwp returns to user
+level showing
+.Er EINTR .
+.Ss PCWATCH
+Set or clear a watched area in the controlled process from a
+.Vt prwatch
 structure operand:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2
 typedef struct prwatch {
     uintptr_t pr_vaddr;  /* virtual address of watched area */
     size_t pr_size;      /* size of watched area in bytes */
     int pr_wflags;       /* watch type flags */
 } prwatch_t;
-.fi
-.in -2
-
-.sp
-.LP
-\fBpr_vaddr\fR specifies the virtual address of an area of memory to be watched
-in the controlled process. \fBpr_size\fR specifies the size of the area, in
-bytes. \fBpr_wflags\fR specifies the type of memory access to be monitored as a
+.Ed
+.Pp
+.Sy pr_vaddr
+specifies the virtual address of an area of memory to be watched
+in the controlled process.
+.Sy pr_size
+specifies the size of the area, in bytes.
+.Sy pr_wflags
+specifies the type of memory access to be monitored as a
 bit-mask of the following flags:
-.sp
-.ne 2
-.na
-\fB\fBWA_READ\fR\fR
-.ad
-.RS 16n
+.Bl -tag -width "WA_TRAPAFTER" -offset indent
+.It Sy WA_READ
 read access
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBWA_WRITE\fR\fR
-.ad
-.RS 16n
+.It Sy WA_WRITE
 write access
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBWA_EXEC\fR\fR
-.ad
-.RS 16n
+.It Sy WA_EXEC
 execution access
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBWA_TRAPAFTER\fR\fR
-.ad
-.RS 16n
+.It Sy WA_TRAPAFTER
 trap after the instruction completes
-.RE
-
-.sp
-.LP
-If \fBpr_wflags\fR is non-empty, a watched area is established for the virtual
-address range specified by \fBpr_vaddr\fR and \fBpr_size\fR. If \fBpr_wflags\fR
+.El
+.Pp
+If
+.Sy pr_wflags
+is non-empty, a watched area is established for the virtual
+address range specified by
+.Sy pr_vaddr
+and
+.Sy pr_size .
+If
+.Sy pr_wflags
 is empty, any previously-established watched area starting at the specified
-virtual address is cleared; \fBpr_size\fR is ignored.
-.sp
-.LP
+virtual address is cleared;
+.Sy pr_size
+is ignored.
+.Pp
 A watchpoint is triggered when an lwp in the traced process makes a memory
 reference that covers at least one byte of a watched area and the memory
-reference is as specified in \fBpr_wflags\fR. When an lwp triggers a
-watchpoint, it incurs a watchpoint trap. If \fBFLTWATCH\fR is being traced, the
-lwp stops; otherwise, it is sent a \fBSIGTRAP\fR signal; if \fBSIGTRAP\fR is
-being traced and is not blocked, the lwp stops.
-.sp
-.LP
+reference is as specified in
+.Sy pr_wflags .
+When an lwp triggers a watchpoint, it incurs a watchpoint trap.
+If
+.Sy FLTWATCH
+is being traced, the lwp stops; otherwise, it is sent a
+.Sy SIGTRAP
+signal; if
+.Sy SIGTRAP
+is being traced and is not blocked, the lwp stops.
+.Pp
 The watchpoint trap occurs before the instruction completes unless
-\fBWA_TRAPAFTER\fR was specified, in which case it occurs after the instruction
-completes. If it occurs before completion, the memory is not modified. If it
-occurs after completion, the memory is modified (if the access is a write
+.Sy WA_TRAPAFTER
+was specified, in which case it occurs after the instruction completes.
+If it occurs before completion, the memory is not modified.
+If it occurs after completion, the memory is modified (if the access is a write
 access).
-.sp
-.LP
-Physical i/o is an exception for watchpoint traps. In this instance, there is
-no guarantee that memory before the watched area has already been modified (or
-in the case of \fBWA_TRAPAFTER\fR, that the memory following the watched area
+.Pp
+Physical i/o is an exception for watchpoint traps.
+In this instance, there is no guarantee that memory before the watched area
+has already been modified (or in the case of
+.Sy WA_TRAPAFTER ,
+that the memory following the watched area
 has not been modified) when the watchpoint trap occurs and the lwp stops.
-.sp
-.LP
-\fBpr_info\fR in the \fBlwpstatus\fR structure contains information pertinent
-to the watchpoint trap. In particular, the \fBsi_addr\fR field contains the
+.Pp
+.Sy pr_info
+in the
+.Vt lwpstatus
+structure contains information pertinent to the watchpoint trap.
+In particular, the
+.Sy si_addr
+field contains the
 virtual address of the memory reference that triggered the watchpoint, and the
-\fBsi_code\fR field contains one of \fBTRAP_RWATCH\fR, \fBTRAP_WWATCH\fR, or
-\fBTRAP_XWATCH\fR, indicating read, write, or execute access, respectively. The
-\fBsi_trapafter\fR field is zero unless \fBWA_TRAPAFTER\fR is in effect for
-this watched area; non-zero indicates that the current instruction is not the
-instruction that incurred the watchpoint trap. The \fBsi_pc\fR field contains
-the virtual address of the instruction that incurred the trap.
-.sp
-.LP
+.Sy si_code
+field contains one of
+.Sy TRAP_RWATCH ,
+.Sy TRAP_WWATCH ,
+or
+.Sy TRAP_XWATCH ,
+indicating read, write, or execute access, respectively.
+The
+.Sy si_trapafter
+field is zero unless
+.Sy WA_TRAPAFTER
+is in effect for this watched area; non-zero indicates that the current
+instruction is not the instruction that incurred the watchpoint trap.
+The
+.Sy si_pc
+field contains the virtual address of the instruction that incurred the trap.
+.Pp
 A watchpoint trap may be triggered while executing a system call that makes
-reference to the traced process's memory. The lwp that is executing the system
-call incurs the watchpoint trap while still in the system call. If it stops as
-a result, the \fBlwpstatus\fR structure contains the system call number and its
-arguments. If the lwp does not stop, or if it is set running again without
-clearing the signal or fault, the system call fails with \fBEFAULT\fR. If
-\fBWA_TRAPAFTER\fR was specified, the memory reference will have completed and
+reference to the traced process's memory.
+The lwp that is executing the system call incurs the watchpoint trap while
+still in the system call.
+If it stops as a result, the
+.Vt lwpstatus
+structure contains the system call number and its arguments.
+If the lwp does not stop, or if it is set running again without
+clearing the signal or fault, the system call fails with
+.Er EFAULT .
+If
+.Sy WA_TRAPAFTER
+was specified, the memory reference will have completed and
 the memory will have been modified (if the access was a write access) when the
 watchpoint trap occurs.
-.sp
-.LP
-If more than one of \fBWA_READ\fR, \fBWA_WRITE\fR, and \fBWA_EXEC\fR is
-specified for a watched area, and a single instruction incurs more than one of
-the specified types, only one is reported when the watchpoint trap occurs. The
-precedence is \fBWA_EXEC\fR, \fBWA_READ\fR, \fBWA_WRITE\fR (\fBWA_EXEC\fR and
-\fBWA_READ\fR take precedence over \fBWA_WRITE\fR), unless \fBWA_TRAPAFTER\fR
-was specified, in which case it is \fBWA_WRITE\fR, \fBWA_READ\fR, \fBWA_EXEC\fR
-(\fBWA_WRITE\fR takes precedence).
-.sp
-.LP
-\fBPCWATCH\fR fails with \fBEINVAL\fR if an attempt is made to specify
-overlapping watched areas or if \fBpr_wflags\fR contains flags other than those
-specified above. It fails with \fBENOMEM\fR if an attempt is made to establish
-more watched areas than the system can support (the system can support
-thousands).
-.sp
-.LP
-The child of a \fBvfork\fR(2) borrows the parent's address space. When a
-\fBvfork\fR(2) is executed by a traced process, all watched areas established
+.Pp
+If more than one of
+.Sy WA_READ ,
+.Sy WA_WRITE ,
+and
+.Sy WA_EXEC
+is specified for a watched area, and a single instruction incurs more than one
+of the specified types, only one is reported when the watchpoint trap occurs.
+The precedence is
+.Sy WA_EXEC ,
+.Sy WA_READ ,
+.Sy WA_WRITE
+.Pf ( Sy WA_EXEC
+and
+.Sy WA_READ
+take precedence over
+.Sy WA_WRITE ) ,
+unless
+.Sy WA_TRAPAFTER
+was specified, in which case it is
+.Sy WA_WRITE ,
+.Sy WA_READ ,
+.Sy WA_EXEC
+.Pf ( Sy WA_WRITE
+takes precedence).
+.Pp
+.Sy PCWATCH
+fails with
+.Er EINVAL
+if an attempt is made to specify overlapping watched areas or if
+.Sy pr_wflags
+contains flags other than those specified above.
+It fails with
+.Er ENOMEM
+if an attempt is made to establish more watched areas than the system can
+support (the system can support thousands).
+.Pp
+The child of a
+.Xr vfork 2
+borrows the parent's address space.
+When a
+.Xr vfork 2
+is executed by a traced process, all watched areas established
 for the parent are suspended until the child terminates or performs an
-\fBexec\fR(2). Any watched areas established independently in the child are
+.Xr exec 2 .
+Any watched areas established independently in the child are
 cancelled when the parent resumes after the child's termination or
-\fBexec\fR(2). \fBPCWATCH\fR fails with \fBEBUSY\fR if applied to the parent of
-a \fBvfork\fR(2) before the child has terminated or performed an \fBexec\fR(2).
-The \fBPR_VFORKP\fR flag is set in the \fBpstatus\fR structure for such a
-parent process.
-.sp
-.LP
+.Xr exec 2 .
+.Sy PCWATCH
+fails with
+.Er EBUSY
+if applied to the parent of a
+.Xr vfork 2
+before the child has terminated or performed an
+.Xr exec 2 .
+The
+.Sy PR_VFORKP
+flag is set in the
+.Sy pstatus
+structure for such a parent process.
+.Pp
 Certain accesses of the traced process's address space by the operating system
-are immune to watchpoints. The initial construction of a signal stack frame
-when a signal is delivered to an lwp will not trigger a watchpoint trap even if
-the new frame covers watched areas of the stack. Once the signal handler is
-entered, watchpoint traps occur normally. On SPARC based machines, register
-window overflow and underflow will not trigger watchpoint traps, even if the
-register window save areas cover watched areas of the stack.
-.sp
-.LP
+are immune to watchpoints.
+The initial construction of a signal stack frame when a signal is delivered to
+an lwp will not trigger a watchpoint trap even if the new frame covers watched
+areas of the stack.
+Once the signal handler is entered, watchpoint traps occur normally.
+On SPARC based machines, register window overflow and underflow will not
+trigger watchpoint traps, even if the register window save areas cover watched
+areas of the stack.
+.Pp
 Watched areas are not inherited by child processes, even if the traced
-process's inherit-on-fork mode, \fBPR_FORK\fR, is set (see \fBPCSET\fR, below).
+process's inherit-on-fork mode,
+.Sy PR_FORK ,
+is set (see
+.Sy PCSET ,
+below).
 All watched areas are cancelled when the traced process performs a successful
-\fBexec\fR(2).
-.SS "PCSET PCUNSET"
-.LP
-\fBPCSET\fR sets one or more modes of operation for the traced process.
-\fBPCUNSET\fR unsets these modes. The modes to be set or unset are specified by
-flags in an operand \fBlong\fR in the control message:
-.sp
-.ne 2
-.na
-\fB\fBPR_FORK\fR\fR
-.ad
-.RS 13n
+.Xr exec 2 .
+.Ss PCSET PCUNSET
+.Sy PCSET
+sets one or more modes of operation for the traced process.
+.Sy PCUNSET
+unsets these modes.
+The modes to be set or unset are specified by flags in an operand
+.Sy long
+in the control message:
+.Bl -tag -offset left -width "PR_MSFORK"
+.It Sy PR_FORK
 (inherit-on-fork): When set, the process's tracing flags and its
-inherit-on-fork mode are inherited by the child of a \fBfork\fR(2),
-\fBfork1\fR(2), or \fBvfork\fR(2). When unset, child processes start with all
-tracing flags cleared.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_RLC\fR\fR
-.ad
-.RS 13n
-(run-on-last-close): When set and the last writable \fB/proc\fR file descriptor
-referring to the traced process or any of its lwps is closed, all of the
-process's tracing flags and watched areas are cleared, any outstanding stop
-directives are canceled, and if any lwps are stopped on events of interest,
-they are set running as though \fBPCRUN\fR had been applied to them. When
-unset, the process's tracing flags and watched areas are retained and lwps are
-not set running on last close.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_KLC\fR\fR
-.ad
-.RS 13n
-(kill-on-last-close): When set and the last writable \fB/proc\fR file
-descriptor referring to the traced process or any of its lwps is closed, the
-process is terminated with \fBSIGKILL\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_ASYNC\fR\fR
-.ad
-.RS 13n
+inherit-on-fork mode are inherited by the child of a
+.Xr fork 2 ,
+.Xr fork1 2 ,
+or
+.Xr vfork 2 .
+When unset, child processes start with all tracing flags cleared.
+.It Sy PR_RLC
+(run-on-last-close): When set and the last writable
+.Pa /proc
+file descriptor referring to the traced process or any of its lwps is closed,
+all of the process's tracing flags and watched areas are cleared, any
+outstanding stop directives are canceled, and if any lwps are stopped on
+events of interest, they are set running as though
+.Sy PCRUN
+had been applied to them.
+When unset, the process's tracing flags and watched areas are retained and
+lwps are not set running on last close.
+.It Sy PR_KLC
+(kill-on-last-close): When set and the last writable
+.Pa /proc
+file descriptor referring to the traced process or any of its lwps is closed,
+the process is terminated with
+.Sy SIGKILL .
+.It Sy PR_ASYNC
 (asynchronous-stop): When set, a stop on an event of interest by one lwp does
-not directly affect any other lwp in the process. When unset and an lwp stops
-on an event of interest other than \fBPR_REQUESTED\fR, all other lwps in the
-process are directed to stop.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_MSACCT\fR\fR
-.ad
-.RS 13n
+not directly affect any other lwp in the process.
+When unset and an lwp stops on an event of interest other than
+.Sy PR_REQUESTED ,
+all other lwps in the process are directed to stop.
+.It Sy PR_MSACCT
 (microstate accounting): Microstate accounting is now continuously enabled.
 This flag is deprecated and no longer has any effect upon microstate
-accounting. Applications may toggle this flag; however, microstate accounting
+accounting.
+Applications may toggle this flag; however, microstate accounting
 will remain enabled regardless.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_MSFORK\fR\fR
-.ad
-.RS 13n
+.It Sy PR_MSFORK
 (inherit microstate accounting): All processes now inherit microstate
-accounting, as it is continuously enabled. This flag has been deprecated and
-its use no longer has any effect upon the behavior of microstate accounting.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_BPTADJ\fR\fR
-.ad
-.RS 13n
+accounting, as it is continuously enabled.
+This flag has been deprecated and its use no longer has any effect upon the
+behavior of microstate accounting.
+.It Sy PR_BPTADJ
 (breakpoint trap pc adjustment): On x86-based machines, a breakpoint trap
-leaves the program counter (the \fBEIP\fR) referring to the breakpointed
-instruction plus one byte. When \fBPR_BPTADJ\fR is set, the system will adjust
-the program counter back to the location of the breakpointed instruction when
-the lwp stops on a breakpoint. This flag has no effect on SPARC based machines,
-where breakpoint traps leave the program counter referring to the breakpointed
-instruction.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPR_PTRACE\fR\fR
-.ad
-.RS 13n
+leaves the program counter (the
+.Sy EIP )
+referring to the breakpointed instruction plus one byte.
+When
+.Sy PR_BPTADJ
+is set, the system will adjust the program counter back to the location of the
+breakpointed instruction when the lwp stops on a breakpoint.
+This flag has no effect on SPARC based machines, where breakpoint traps leave
+the program counter referring to the breakpointed instruction.
+.It Sy PR_PTRACE
 (ptrace-compatibility): When set, a stop on an event of interest by the traced
-process is reported to the parent of the traced process by \fBwait\fR(3C),
-\fBSIGTRAP\fR is sent to the traced process when it executes a successful
-\fBexec\fR(2), setuid/setgid flags are not honored for execs performed by the
+process is reported to the parent of the traced process by
+.Xr wait 3C ,
+.Sy SIGTRAP
+is sent to the traced process when it executes a successful
+.Xr exec 2 ,
+setuid/setgid flags are not honored for execs performed by the
 traced process, any exec of an object file that the traced process cannot read
-fails, and the process dies when its parent dies. This mode is deprecated; it
-is provided only to allow \fBptrace\fR(3C) to be implemented as a library
-function using \fB/proc\fR.
-.RE
-
-.sp
-.LP
-It is an error (\fBEINVAL\fR) to specify flags other than those described above
-or to apply these operations to a system process. The current modes are
-reported in the \fBpr_flags\fR field of \fB/proc/\fR\fIpid\fR\fB/status\fR and
-\fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwp\fR\fB/lwpstatus\fR.
-.SS "PCSREG"
-.LP
+fails, and the process dies when its parent dies.
+This mode is deprecated; it is provided only to allow
+.Xr ptrace 3C
+to be implemented as a library function using
+.Pa /proc .
+.El
+.Pp
+It is an error
+.Pq Er EINVAL
+to specify flags other than those described above
+or to apply these operations to a system process.
+The current modes are reported in the
+.Sy pr_flags
+field of
+.Pa /proc/ Ns Em pid Ns Pa /status
+and
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwp Ns Pa /lwpstatus .
+.Ss PCSREG
 Set the general registers for the specific or representative lwp according to
-the operand \fBprgregset_t\fR structure.
-.sp
-.LP
+the operand
+.Vt prgregset_t
+structure.
+.Pp
 On SPARC based systems, only the condition-code bits of the processor-status
 register (R_PSR) of SPARC V8 (32-bit) processes can be modified by
-\fBPCSREG\fR. Other privileged registers cannot be modified at all.
-.sp
-.LP
+.Sy PCSREG .
+Other privileged registers cannot be modified at all.
+.Pp
 On x86-based systems, only certain bits of the flags register (EFL) can be
-modified by \fBPCSREG\fR: these include the condition codes, direction-bit, and
-overflow-bit.
-.sp
-.LP
-\fBPCSREG\fR fails with \fBEBUSY\fR if the lwp is not stopped on an event of
-interest.
-.SS "PCSVADDR"
-.LP
+modified by
+.Sy PCSREG :
+these include the condition codes, direction-bit, and overflow-bit.
+.Pp
+.Sy PCSREG
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSVADDR
 Set the address at which execution will resume for the specific or
-representative lwp from the operand \fBlong\fR. On SPARC based systems, both
-%pc and %npc are set, with %npc set to the instruction following the virtual
-address. On x86-based systems, only %eip is set. \fBPCSVADDR\fR fails with
-\fBEBUSY\fR if the lwp is not stopped on an event of interest.
-.SS "PCSFPREG"
-.LP
+representative lwp from the operand
+.Vt long .
+On SPARC based systems, both %pc and %npc are set, with %npc set to the
+instruction following the virtual address.
+On x86-based systems, only %eip is set.
+.Sy PCSVADDR
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSFPREG
 Set the floating-point registers for the specific or representative lwp
-according to the operand \fBprfpregset_t\fR structure. An error (\fBEINVAL\fR)
+according to the operand
+.Vt prfpregset_t
+structure.
+An error
+.Pq Er EINVAL
 is returned if the system does not support floating-point operations (no
 floating-point hardware and the system does not emulate floating-point machine
-instructions). \fBPCSFPREG\fR fails with \fBEBUSY\fR if the lwp is not stopped
-on an event of interest.
-.SS "PCSXREG"
-.LP
+instructions).
+.Sy PCSFPREG
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSXREG
 Set the extra state registers for the specific or representative lwp according
-to the architecture-dependent operand \fBprxregset_t\fR structure. An error
-(\fBEINVAL\fR) is returned if the system does not support extra state
-registers. \fBPCSXREG\fR fails with \fBEBUSY\fR if the lwp is not stopped on an
-event of interest.
-.SS "PCSASRS"
-.LP
+to the architecture-dependent operand
+.Vt prxregset_t
+structure.
+An error
+.Pq Er EINVAL
+is returned if the system does not support extra state registers.
+.Sy PCSXREG
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCSASRS
 Set the ancillary state registers for the specific or representative lwp
-according to the SPARC V9 platform-dependent operand \fBasrset_t\fR structure.
-An error (\fBEINVAL\fR) is returned if either the target process or the
-controlling process is not a 64-bit SPARC V9 process. Most of the ancillary
-state registers are privileged registers that cannot be modified. Only those
-that can be modified are set; all others are silently ignored. \fBPCSASRS\fR
-fails with \fBEBUSY\fR if the lwp is not stopped on an event of interest.
-.SS "PCAGENT"
-.LP
+according to the SPARC V9 platform-dependent operand
+.Vt asrset_t
+structure.
+An error
+.Pq Er EINVAL
+is returned if either the target process or the
+controlling process is not a 64-bit SPARC V9 process.
+Most of the ancillary state registers are privileged registers that cannot be
+modified.
+Only those that can be modified are set; all others are silently ignored.
+.Sy PCSASRS
+fails with
+.Er EBUSY
+if the lwp is not stopped on an event of interest.
+.Ss PCAGENT
 Create an agent lwp in the controlled process with register values from the
-operand \fBprgregset_t\fR structure (see \fBPCSREG\fR, above). The agent lwp is
-created in the stopped state showing \fBPR_REQUESTED\fR and with its held
-signal set (the signal mask) having all signals except \fBSIGKILL\fR and
-\fBSIGSTOP\fR blocked.
-.sp
-.LP
-The \fBPCAGENT\fR operation fails with \fBEBUSY\fR unless the process is fully
-stopped via \fB/proc\fR, that is, unless all of the lwps in the process are
-stopped either on events of interest or on \fBPR_SUSPENDED\fR, or are stopped
-on \fBPR_JOBCONTROL\fR and have been directed to stop via \fBPCDSTOP\fR.  It
-fails with \fBEBUSY\fR if an agent lwp already exists. It fails with
-\fBENOMEM\fR if system resources for creating new lwps have been exhausted.
-.sp
-.LP
-Any \fBPCRUN\fR operation applied to the process control file or to the control
-file of an lwp other than the agent lwp fails with \fBEBUSY\fR as long as the
-agent lwp exists. The agent lwp must be caused to terminate by executing the
-\fBSYS_lwp_exit\fR system call trap before the process can be restarted.
-.sp
-.LP
+operand
+.Vt prgregset_t
+structure (see
+.Sy PCSREG ,
+above).
+The agent lwp is created in the stopped state showing
+.Sy PR_REQUESTED
+and with its held signal set (the signal mask) having all signals except
+.Sy SIGKILL
+and
+.Sy SIGSTOP
+blocked.
+.Pp
+The
+.Sy PCAGENT
+operation fails with
+.Er EBUSY
+unless the process is fully stopped via
+.Pa /proc ,
+that is, unless all of the lwps in the process are
+stopped either on events of interest or on
+.Sy PR_SUSPENDED ,
+or are stopped on
+.Sy PR_JOBCONTROL
+and have been directed to stop via
+.Sy PCDSTOP .
+It fails with
+.Er EBUSY
+if an agent lwp already exists.
+It fails with
+.Er ENOMEM
+if system resources for creating new lwps have been exhausted.
+.Pp
+Any
+.Sy PCRUN
+operation applied to the process control file or to the control
+file of an lwp other than the agent lwp fails with
+.Er EBUSY
+as long as the agent lwp exists.
+The agent lwp must be caused to terminate by executing the
+.Sy SYS_lwp_exit
+system call trap before the process can be restarted.
+.Pp
 Once the agent lwp is created, its lwp-ID can be found by reading the process
-status file. To facilitate opening the agent lwp's control and status files,
-the directory name \fB/propc/\fR\fIpid\fR\fB/lwp/agent\fR is accepted for
-lookup operations as an invisible alias for
-\fB/proc/\fR\fIpid\fR\fB/lwp/\fR\fIlwpid,\fR \fIlwpid\fR being the lwp-ID of
-the agent lwp (invisible in the sense that the name ``agent'' does not appear
-in a directory listing of \fB/proc/\fR\fIpid\fR\fB/lwp\fR obtained from
-\fBls\fR(1), \fBgetdents\fR(2), or \fBreaddir\fR(3C)).
-.sp
-.LP
+status file.
+To facilitate opening the agent lwp's control and status files,
+the directory name
+.Pa /proc/ Ns Em pid Ns Pa /lwp/agent
+is accepted for lookup operations as an invisible alias for
+.Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid ,
+.Em lwpid
+being the lwp-ID of the agent lwp (invisible in the sense that the name
+.Dq agent
+does not appear in a directory listing of
+.Pa /proc/ Ns Em pid Ns Pa /lwp
+obtained from
+.Xr ls 1 ,
+.Xr getdents 2 ,
+or
+.Xr readdir 3C .
+.Pp
 The purpose of the agent lwp is to perform operations in the controlled process
 on behalf of the controlling process: to gather information not directly
-available via \fB/proc\fR files, or in general to make the process change state
-in ways not directly available via \fB/proc\fR control operations. To make use
-of an agent lwp, the controlling process must be capable of making it execute
-system calls (specifically, the \fBSYS_lwp_exit\fR system call trap). The
-register values given to the agent lwp on creation are typically the registers
-of the representative lwp, so that the agent lwp can use its stack.
-.sp
-.LP
+available via
+.Pa /proc
+files, or in general to make the process change state
+in ways not directly available via
+.Pa /proc
+control operations.
+To make use of an agent lwp, the controlling process must be capable of making
+it execute system calls (specifically, the
+.Sy SYS_lwp_exit
+system call trap).
+The register values given to the agent lwp on creation are typically the
+registers of the representative lwp, so that the agent lwp can use its stack.
+.Pp
 If the controlling process neglects to force the agent lwp to execute the
-\fBSYS_lwp_exit\fR system call (due to either logic error or fatal failure on
+.Sy SYS_lwp_exit
+system call (due to either logic error or fatal failure on
 the part of the controlling process), the agent lwp will remain in the target
-process.  For purposes of being able to debug these otherwise rogue agents,
+process.
+For purposes of being able to debug these otherwise rogue agents,
 information as to the creator of the agent lwp is reflected in that lwp's
-\fBspymaster\fR file in \fB/proc\fR. Should the target process generate a core
+.Pa spymaster
+file in
+.Pa /proc .
+Should the target process generate a core
 dump with the agent lwp in place, this information will be available via the
-\fBNT_SPYMASTER\fR note in the core file (see \fBcore\fR(4)).
-.sp
-.LP
-The agent lwp is not allowed to execute any variation of the \fBSYS_fork\fR or
-\fBSYS_exec\fR system call traps. Attempts to do so yield \fBENOTSUP\fR to the
-agent lwp.
-.sp
-.LP
-Symbolic constants for system call trap numbers like \fBSYS_lwp_exit\fR and
-\fBSYS_lwp_create\fR can be found in the header file <\fBsys/syscall.h\fR>.
-.SS "PCREAD PCWRITE"
-.LP
-Read or write the target process's address space via a \fBpriovec\fR structure
-operand:
-.sp
-.in +2
-.nf
+.Sy NT_SPYMASTER
+note in the core file (see
+.Xr core 4 ) .
+.Pp
+The agent lwp is not allowed to execute any variation of the
+.Sy SYS_fork
+or
+.Sy SYS_exec
+system call traps.
+Attempts to do so yield
+.Er ENOTSUP
+to the agent lwp.
+.Pp
+Symbolic constants for system call trap numbers like
+.Sy SYS_lwp_exit
+and
+.Sy SYS_lwp_create
+can be found in the header file
+.In sys/syscall.h .
+.Ss PCREAD PCWRITE
+Read or write the target process's address space via a
+.Vt priovec
+structure operand:
+.Bd -literal -offset 2
 typedef struct priovec {
     void *pio_base;      /* buffer in controlling process */
     size_t pio_len;      /* size of read/write request in bytes */
     off_t pio_offset;    /* virtual address in target process */
 } priovec_t;
-.fi
-.in -2
-
-.sp
-.LP
-These operations have the same effect as \fBpread\fR(2) and \fBpwrite\fR(2),
-respectively, of the target process's address space file. The difference is
-that more than one \fBPCREAD\fR or \fBPCWRITE\fR control operation can be
+.Ed
+.Pp
+These operations have the same effect as
+.Xr pread 2
+and
+.Xr pwrite 2 ,
+respectively, of the target process's address space file.
+The difference is that more than one
+.Sy PCREAD
+or
+.Sy PCWRITE
+control operation can be
 written to the control file at once, and they can be interspersed with other
-control operations in a single write to the control file. This is useful, for
-example, when planting many breakpoint instructions in the process's address
-space, or when stepping over a breakpointed instruction. Unlike \fBpread\fR(2)
-and \fBpwrite\fR(2), no provision is made for partial reads or writes; if the
-operation cannot be performed completely, it fails with \fBEIO\fR.
-.SS "PCNICE"
-.LP
-The traced process's \fBnice\fR(2) value is incremented by the amount in the
-operand \fBlong\fR. Only a process with the {\fBPRIV_PROC_PRIOCNTL\fR}
+control operations in a single write to the control file.
+This is useful, for example, when planting many breakpoint instructions in
+the process's address space, or when stepping over a breakpointed instruction.
+Unlike
+.Xr pread 2
+and
+.Xr pwrite 2 ,
+no provision is made for partial reads or writes; if the
+operation cannot be performed completely, it fails with
+.Er EIO .
+.Ss PCNICE
+The traced process's
+.Xr nice 2
+value is incremented by the amount in the
+operand
+.Vt long .
+Only a process with the
+.Brq Sy PRIV_PROC_PRIOCNTL
 privilege asserted in its effective set can better a process's priority in this
-way, but any user may lower the priority. This operation is not meaningful for
-all scheduling classes.
-.SS "PCSCRED"
-.LP
+way, but any user may lower the priority.
+This operation is not meaningful for all scheduling classes.
+.Ss PCSCRED
 Set the target process credentials to the values contained in the
-\fBprcred_t\fR structure operand (see \fB/proc/\fR\fIpid\fR\fB/cred\fR). The
+.Vt prcred_t
+structure operand (see
+.Pa /proc/ Ns Em pid Ns Pa /cred ) .
+The
 effective, real, and saved user-IDs and group-IDs of the target process are
-set. The target process's supplementary groups are not changed; the
-\fBpr_ngroups\fR and \fBpr_groups\fR members of the structure operand are
-ignored. Only the privileged processes can perform this operation; for all
-others it fails with \fBEPERM\fR.
-.SS "PCSCREDX"
-.LP
-Operates like \fBPCSCRED\fR but also sets the supplementary groups; the length
+set.
+The target process's supplementary groups are not changed; the
+.Sy pr_ngroups
+and
+.Sy pr_groups
+members of the structure operand are ignored.
+Only the privileged processes can perform this operation; for all
+others it fails with
+.Er EPERM .
+.Ss PCSCREDX
+Operates like
+.Sy PCSCRED
+but also sets the supplementary groups; the length
 of the data written with this control operation should be "sizeof
-(\fBprcred_t\fR) + sizeof (\fBgid_t)\fR * (#groups - 1)".
-.SS "PCSPRIV"
-.LP
-Set the target process privilege to the values contained in the \fBprpriv_t\fR
-operand (see \fB/proc/pid/priv\fR). The effective, permitted, inheritable, and
-limit sets are all changed. Privilege flags can also be set. The process is
-made privilege aware unless it can relinquish privilege awareness. See
-\fBprivileges\fR(5).
-.sp
-.LP
-The limit set of the target process cannot be grown. The other privilege sets
-must be subsets of the intersection of the effective set of the calling process
-with the new limit set of the target process or subsets of the original values
-of the sets in the target process.
-.sp
-.LP
-If any of the above restrictions are not met, \fBEPERM\fR is returned. If the
-structure written is improperly formatted, \fBEINVAL\fR is returned.
-.SH PROGRAMMING NOTES
-.LP
-For security reasons, except for the \fBpsinfo\fR, \fBusage\fR, \fBlpsinfo\fR,
-\fBlusage\fR, \fBlwpsinfo\fR, and \fBlwpusage\fR files, which are
-world-readable, and except for privileged processes, an open of a \fB/proc\fR
+.Pq Vt prcred_t
++ sizeof
+.Pq Vt gid_t
+* (#groups - 1)".
+.Ss PCSPRIV
+Set the target process privilege to the values contained in the
+.Vt prpriv_t
+operand (see
+.Pa /proc/pid/priv ) .
+The effective, permitted, inheritable, and
+limit sets are all changed.
+Privilege flags can also be set.
+The process is made privilege aware unless it can relinquish privilege awareness.
+See
+.Xr privileges 5 .
+.Pp
+The limit set of the target process cannot be grown.
+The other privilege sets must be subsets of the intersection of the effective set
+of the calling process with the new limit set of the target process or subsets of
+the original values of the sets in the target process.
+.Pp
+If any of the above restrictions are not met,
+.Er EPERM
+is returned.
+If the structure written is improperly formatted,
+.Er EINVAL
+is returned.
+.Sh PROGRAMMING NOTES
+For security reasons, except for the
+.Sy psinfo ,
+.Sy usage ,
+.Sy lpsinfo ,
+.Sy lusage ,
+.Sy lwpsinfo ,
+and
+.Sy lwpusage
+files, which are world-readable, and except for privileged processes, an open
+of a
+.Pa /proc
 file fails unless both the user-ID and group-ID of the caller match those of
-the traced process and the process's object file is readable by the caller. The
-effective set of the caller is a superset of both the inheritable and the
-permitted set of the target process. The limit set of the caller is a superset
-of the limit set of the target process. Except for the world-readable files
-just mentioned, files corresponding to setuid and setgid processes can be
-opened only by the appropriately privileged process.
-.sp
-.LP
-A process that is missing the basic privilege {\fBPRIV_PROC_INFO\fR} cannot see
-any processes under \fB/proc\fR that it cannot send a signal to.
-.sp
-.LP
-A process that has {\fBPRIV_PROC_OWNER\fR} asserted in its effective set can
-open any file for reading. To manipulate or control a process, the controlling
-process must have at least as many privileges in its effective set as the
-target process has in its effective, inheritable, and permitted sets. The limit
-set of the controlling process must be a superset of the limit set of the
-target process. Additional restrictions apply if any of the uids of the target
-process are 0. See \fBprivileges\fR(5).
-.sp
-.LP
+the traced process and the process's object file is readable by the caller.
+The effective set of the caller is a superset of both the inheritable and the
+permitted set of the target process.
+The limit set of the caller is a superset of the limit set of the target
+process.
+Except for the world-readable files just mentioned, files corresponding to
+setuid and setgid processes can be opened only by the appropriately privileged
+process.
+.Pp
+A process that is missing the basic privilege
+.Brq Sy PRIV_PROC_INFO
+cannot see any processes under
+.Pa /proc
+that it cannot send a signal to.
+.Pp
+A process that has
+.Brq Sy PRIV_PROC_OWNER
+asserted in its effective set can open any file for reading.
+To manipulate or control a process, the controlling process must have at least
+as many privileges in its effective set as the target process has in its
+effective, inheritable, and permitted sets.
+The limit set of the controlling process must be a superset of the limit set
+of the target process.
+Additional restrictions apply if any of the uids of the target process are 0.
+See
+.Xr privileges 5 .
+.Pp
 Even if held by a privileged process, an open process or lwp file descriptor
 (other than file descriptors for the world-readable files) becomes invalid if
-the traced process performs an \fBexec\fR(2) of a setuid/setgid object file or
-an object file that the traced process cannot read. Any operation performed on
-an invalid file descriptor, except \fBclose\fR(2), fails with \fBEAGAIN\fR. In
-this situation, if any tracing flags are set and the process or any lwp file
-descriptor is open for writing, the process will have been directed to stop and
-its run-on-last-close flag will have been set (see \fBPCSET\fR). This enables a
-controlling process (if it has permission) to reopen the \fB/proc\fR files to
-get new valid file descriptors, close the invalid file descriptors, unset the
-run-on-last-close flag (if desired), and proceed. Just closing the invalid file
-descriptors causes the traced process to resume execution with all tracing
-flags cleared. Any process not currently open for writing via \fB/proc\fR, but
-that has left-over tracing flags from a previous open, and that executes a
-setuid/setgid or unreadable object file, will not be stopped but will have all
-its tracing flags cleared.
-.sp
-.LP
+the traced process performs an
+.Xr exec 2
+of a setuid/setgid object file or
+an object file that the traced process cannot read.
+Any operation performed on an invalid file descriptor, except
+.Xr close 2 ,
+fails with
+.Er EAGAIN .
+In this situation, if any tracing flags are set and the process or any lwp
+file descriptor is open for writing, the process will have been directed to
+stop and its run-on-last-close flag will have been set (see
+.Sx PCSET ) .
+This enables a controlling process (if it has permission) to reopen the
+.Pa /proc
+files to get new valid file descriptors, close the invalid file descriptors,
+unset the run-on-last-close flag (if desired), and proceed.
+Just closing the invalid file descriptors causes the traced process to resume
+execution with all tracing flags cleared.
+Any process not currently open for writing via
+.Pa /proc ,
+but that has left-over tracing flags from a previous open, and that executes
+a setuid/setgid or unreadable object file, will not be stopped but will have
+all its tracing flags cleared.
+.Pp
 To wait for one or more of a set of processes or lwps to stop or terminate,
-\fB/proc\fR file descriptors (other than those obtained by opening the
-\fBcwd\fR or \fBroot\fR directories or by opening files in the \fBfd\fR or
-\fBobject\fR directories) can be used in a \fBpoll\fR(2) system call. When
-requested and returned, either of the polling events \fBPOLLPRI\fR or
-\fBPOLLWRNORM\fR indicates that the process or lwp stopped on an event of
-interest. Although they cannot be requested, the polling events \fBPOLLHUP\fR,
-\fBPOLLERR\fR, and \fBPOLLNVAL\fR may be returned. \fBPOLLHUP\fR indicates that
-the process or lwp has terminated. \fBPOLLERR\fR indicates that the file
-descriptor has become invalid. \fBPOLLNVAL\fR is returned immediately if
-\fBPOLLPRI\fR or \fBPOLLWRNORM\fR is requested on a file descriptor referring
-to a system process (see \fBPCSTOP\fR). The requested events may be empty to
-wait simply for termination.
-.SH FILES
-.ne 2
-.na
-\fB\fB/proc\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pa /proc
+file descriptors (other than those obtained by opening the
+.Pa cwd
+or
+.Pa root
+directories or by opening files in the
+.Pa fd
+or
+.Pa object
+directories) can be used in a
+.Xr poll 2
+system call.
+When requested and returned, either of the polling events
+.Sy POLLPRI
+or
+.Sy POLLWRNORM
+indicates that the process or lwp stopped on an event of
+interest.
+Although they cannot be requested, the polling events
+.Sy POLLHUP ,
+.Sy POLLERR ,
+and
+.Sy POLLNVAL
+may be returned.
+.Sy POLLHUP
+indicates that the process or lwp has terminated.
+.Sy POLLERR
+indicates that the file descriptor has become invalid.
+.Sy POLLNVAL
+is returned immediately if
+.Sy POLLPRI
+or
+.Sy POLLWRNORM
+is requested on a file descriptor referring to a system process (see
+.Sx  PCSTOP ) .
+The requested events may be empty to wait simply for termination.
+.Sh FILES
+.Bl -tag -compact -width Ds
+.It Pa /proc
 directory (list of processes)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid
 specific process directory
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/self\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/self
 alias for a process's own directory
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/as\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /as
 address space file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/ctl\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /ctl
 process control file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/status\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /status
 process status
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lstatus\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lstatus
 array of lwp status structs
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/psinfo\fR\fR
-.ad
-.sp .6
-.RS 4n
-process \fBps\fR(1) info
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lpsinfo\fR\fR
-.ad
-.sp .6
-.RS 4n
-array of lwp \fBps\fR(1) info structs
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/map\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /psinfo
+process
+.Xr ps 1
+info
+.It Pa /proc/ Ns Em pid Ns Pa /lpsinfo
+array of lwp
+.Xr ps 1
+info structs
+.It Pa /proc/ Ns Em pid Ns Pa /map
 address space map
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/xmap\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /xmap
 extended address space map
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/rmap\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /rmap
 reserved address map
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/cred\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /cred
 process credentials
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/priv\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /priv
 process privileges
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/sigact\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /sigact
 process signal actions
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/auxv\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /auxv
 process aux vector
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/ldt\fR\fR
-.ad
-.sp .6
-.RS 4n
-process \fBLDT\fR (x86 only)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/usage\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /ldt
+process
+.Sy LDT
+(x86 only)
+.It Pa /proc/ Ns Em pid Ns Pa /usage
 process usage
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lusage\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lusage
 array of lwp usage structs
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/path\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /path
 symbolic links to process open files
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/pagedata\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /pagedata
 process page data
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/watch\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /watch
 active watchpoints
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/cwd\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /cwd
 alias for the current working directory
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/root\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /root
 alias for the root directory
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/fd\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /fd
 directory (list of open files)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/fd/*\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /fd/*
 aliases for process's open files
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/object\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /object
 directory (list of mapped files)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/object/a.out\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /object/a.out
 alias for process's executable file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/object/*\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /object/*
 aliases for other mapped files
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp
 directory (list of lwps)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid
 specific lwp directory
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/agent\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/agent
 alias for the agent lwp directory
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpctl\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpctl
 lwp control file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpstatus\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpstatus
 lwp status
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpsinfo\fR\fR
-.ad
-.sp .6
-.RS 4n
-lwp \fBps\fR(1) info
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/lwpusage\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpsinfo
+lwp
+.Xr ps 1
+info
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /lwpusage
 lwp usage
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/gwindows\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /gwindows
 register windows (SPARC only)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/xregs\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /xregs
 extra state registers
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/asrs\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /asrs
 ancillary state registers (SPARC V9 only)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/proc/\fIpid\fR/lwp/\fIlwpid\fR/spymaster\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Pa /proc/ Ns Em pid Ns Pa /lwp/ Ns Em lwpid Ns Pa /spymaster
 For an agent LWP, the controlling process
-.RE
-
-.SH SEE ALSO
-.LP
-\fBls\fR(1), \fBps\fR(1), \fBchroot\fR(1M), \fBalarm\fR(2), \fBbrk\fR(2),
-\fBchdir\fR(2), \fBchroot\fR(2), \fBclose\fR(2), \fBcreat\fR(2), \fBdup\fR(2),
-\fBexec\fR(2), \fBfcntl\fR(2), \fBfork\fR(2), \fBfork1\fR(2), \fBfstat\fR(2),
-\fBgetdents\fR(2), \fBgetustack\fR(2), \fBkill\fR(2), \fBlseek\fR(2),
-\fBmmap\fR(2), \fBnice\fR(2), \fBopen\fR(2), \fBpoll\fR(2), \fBpread\fR(2),
-\fBptrace\fR(3C), \fBpwrite\fR(2), \fBread\fR(2), \fBreadlink\fR(2),
-\fBreadv\fR(2), \fBshmget\fR(2), \fBsigaction\fR(2), \fBsigaltstack\fR(2),
-\fBvfork\fR(2), \fBwrite\fR(2), \fBwritev\fR(2), \fB_stack_grow\fR(3C),
-\fBreaddir\fR(3C), \fBpthread_create\fR(3C), \fBpthread_join\fR(3C),
-\fBsiginfo.h\fR(3HEAD), \fBsignal.h\fR(3HEAD), \fBthr_create\fR(3C),
-\fBthr_join\fR(3C), \fBtypes32.h\fR(3HEAD), \fBucontext.h\fR(3HEAD),
-\fBwait\fR(3C), \fBcontract\fR(4), \fBcore\fR(4), \fBprocess\fR(4),
-\fBlfcompile\fR(5), \fBprivileges\fR(5), \fBsecurity-flags\fR(5)
-.SH DIAGNOSTICS
-.LP
+.El
+.Sh DIAGNOSTICS
 Errors that can occur in addition to the errors normally associated with file
 system access:
-.sp
-.ne 2
-.na
-\fB\fBE2BIG\fR\fR
-.ad
-.RS 13n
-Data to be returned in a \fBread\fR(2) of the page data file exceeds the size
-of the read buffer provided by the caller.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR\fR
-.ad
-.RS 13n
+.Bl -tag -width "EOVERFLOW" -offset left
+.It Er E2BIG
+Data to be returned in a
+.Xr read 2
+of the page data file exceeds the size of the read buffer provided by the
+caller.
+.It Er EACCES
 An attempt was made to examine a process that ran under a different uid than
-the controlling process and {\fBPRIV_PROC_OWNER\fR} was not asserted in the
-effective set.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 13n
-The traced process has performed an \fBexec\fR(2) of a setuid/setgid object
+the controlling process and
+.Brq Sy PRIV_PROC_OWNER
+was not asserted in the effective set.
+.It Er EAGAIN
+The traced process has performed an
+.Xr exec 2
+of a setuid/setgid object
 file or of an object file that it cannot read; all further operations on the
-process or lwp file descriptor (except \fBclose\fR(2)) elicit this error.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBUSY\fR\fR
-.ad
-.RS 13n
-\fBPCSTOP\fR, \fBPCDSTOP\fR, \fBPCWSTOP\fR, or \fBPCTWSTOP\fR was applied to a
-system process; an exclusive \fBopen\fR(2) was attempted on a \fB/proc\fR file
-for a process already open for writing; \fBPCRUN\fR, \fBPCSREG\fR,
-\fBPCSVADDR\fR, \fBPCSFPREG\fR, or \fBPCSXREG\fR was applied to a process or
+process or lwp file descriptor (except
+.Xr close 2 )
+elicit this error.
+.It Er EBUSY
+.Sy PCSTOP ,
+.Sy PCDSTOP ,
+.Sy PCWSTOP , or
+.Sy PCTWSTOP
+was applied to a system process; an exclusive
+.Xr open 2
+was attempted on a
+.Pa /proc
+file for a process already open for writing;
+.Sy PCRUN ,
+.Sy PCSREG ,
+.Sy PCSVADDR ,
+.Sy PCSFPREG ,
+or
+.Sy PCSXREG
+was applied to a process or
 lwp not stopped on an event of interest; an attempt was made to mount
-\fB/proc\fR when it was already mounted; \fBPCAGENT\fR was applied to a process
+.Pa /proc
+when it was already mounted;
+.Sy PCAGENT
+was applied to a process
 that was not fully stopped or that already had an agent lwp.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 13n
+.It Er EINVAL
 In general, this means that some invalid argument was supplied to a system
-call. A non-exhaustive list of conditions eliciting this error includes: a
+call.
+A non-exhaustive list of conditions eliciting this error includes: a
 control message operation code is undefined; an out-of-range signal number was
-specified with \fBPCSSIG\fR, \fBPCKILL\fR, or \fBPCUNKILL\fR; \fBSIGKILL\fR was
-specified with \fBPCUNKILL\fR; \fBPCSFPREG\fR was applied on a system that does
-not support floating-point operations; \fBPCSXREG\fR was applied on a system
-that does not support extra state registers.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINTR\fR\fR
-.ad
-.RS 13n
+specified with
+.Sy PCSSIG ,
+.Sy PCKILL ,
+or
+.Sy PCUNKILL ;
+.Sy SIGKILL
+was specified with
+.Sy PCUNKILL ;
+.Sy PCSFPREG
+was applied on a system that does not support floating-point operations;
+.Sy PCSXREG
+was applied on a system that does not support extra state registers.
+.It Er EINTR
 A signal was received by the controlling process while waiting for the traced
-process or lwp to stop via \fBPCSTOP\fR, \fBPCWSTOP\fR, or \fBPCTWSTOP\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEIO\fR\fR
-.ad
-.RS 13n
-A \fBwrite\fR(2) was attempted at an illegal address in the traced process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOENT\fR\fR
-.ad
-.RS 13n
-The traced process or lwp has terminated after being opened. The basic
-privilege {\fBPRIV_PROC_INFO\fR} is not asserted in the effective set of the
-calling process and the calling process cannot send a signal to the target
-process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 13n
+process or lwp to stop via
+.Sy PCSTOP ,
+.Sy PCWSTOP ,
+or
+.Sy PCTWSTOP .
+.It Er EIO
+A
+.Xr write 2
+was attempted at an illegal address in the traced process.
+.It Er ENOENT
+The traced process or lwp has terminated after being opened.
+The basic privilege
+.Brq Sy PRIV_PROC_INFO
+is not asserted in the effective set of the calling process and the calling
+process cannot send a signal to the target process.
+.It Er ENOMEM
 The system-imposed limit on the number of page data file descriptors was
-reached on an open of \fB/proc/\fR\fIpid\fR\fB/pagedata\fR; an attempt was made
-with \fBPCWATCH\fR to establish more watched areas than the system can support;
-the \fBPCAGENT\fR operation was issued when the system was out of resources for
+reached on an open of
+.Pa /proc/ Ns Em pid Ns Pa /pagedata ;
+an attempt was made
+with
+.Sy PCWATCH
+to establish more watched areas than the system can support;
+the
+.Sy PCAGENT
+operation was issued when the system was out of resources for
 creating lwps.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOSYS\fR\fR
-.ad
-.RS 13n
+.It Er ENOSYS
 An attempt was made to perform an unsupported operation (such as
-\fBcreat\fR(2), \fBlink\fR(2), or \fBunlink\fR(2)) on an entry in \fB/proc\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOVERFLOW\fR\fR
-.ad
-.RS 13n
-A 32-bit controlling process attempted to read or write the \fBas\fR file or
-attempted to read the \fBmap\fR, \fBrmap\fR, or \fBpagedata\fR file of a 64-bit
-target process. A 32-bit controlling process attempted to apply one of the
-control operations \fBPCSREG\fR, \fBPCSXREG\fR, \fBPCSVADDR\fR, \fBPCWATCH\fR,
-\fBPCAGENT\fR, \fBPCREAD\fR, \fBPCWRITE\fR to a 64-bit target process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 13n
-The process that issued the \fBPCSCRED\fR or \fBPCSCREDX\fR operation did not
-have the {\fBPRIV_PROC_SETID\fR} privilege asserted in its effective set, or
-the process that issued the \fBPCNICE\fR operation did not have the
-{\fBPRIV_PROC_PRIOCNTL\fR} in its effective set.
-.sp
+.Xr creat 2 ,
+.Xr link 2 ,
+or
+.Xr unlink 2 )
+on an entry in
+.Pa /proc .
+.It Er EOVERFLOW
+A 32-bit controlling process attempted to read or write the
+.Pa as
+file or attempted to read the
+.Pa map ,
+.Pa rmap ,
+or
+.Pa pagedata
+file of a 64-bit target process.
+A 32-bit controlling process attempted to apply one of the
+control operations
+.Sy PCSREG ,
+.Sy PCSXREG ,
+.Sy PCSVADDR ,
+.Sy PCWATCH ,
+.Sy PCAGENT ,
+.Sy PCREAD ,
+.Sy PCWRITE
+to a 64-bit target process.
+.It Er EPERM
+The process that issued the
+.Sy PCSCRED
+or
+.Sy PCSCREDX
+operation did not have the
+.Brq Sy PRIV_PROC_SETID
+privilege asserted in its effective set, or
+the process that issued the
+.Sy PCNICE
+operation did not have the
+.Brq Sy PRIV_PROC_PRIOCNTL
+in its effective set.
+.Pp
 An attempt was made to control a process of which the E, P, and I privilege
 sets were not a subset of the effective set of the controlling process or the
 limit set of the controlling process is not a superset of limit set of the
 controlled process.
-.sp
-Any of the uids of the target process are 0 or an attempt was made to change
-any of the uids to 0 using PCSCRED and the security policy imposed additional
-restrictions. See \fBprivileges\fR(5).
-.RE
-
-.SH NOTES
-.LP
+.Pp
+Any of the uids of the target process are
+.Sy 0
+or an attempt was made to change any of the uids to
+.Sy 0
+using
+.Sy PCSCRED
+and the security policy imposed additional restrictions.
+See
+.Xr privileges 5 .
+.El
+.Sh SEE ALSO
+.Xr ls 1 ,
+.Xr ps 1 ,
+.Xr chroot 1M ,
+.Xr alarm 2 ,
+.Xr brk 2 ,
+.Xr chdir 2 ,
+.Xr chroot 2 ,
+.Xr close 2 ,
+.Xr creat 2 ,
+.Xr dup 2 ,
+.Xr exec 2 ,
+.Xr fcntl 2 ,
+.Xr fork 2 ,
+.Xr fork1 2 ,
+.Xr fstat 2 ,
+.Xr getdents 2 ,
+.Xr getustack 2 ,
+.Xr kill 2 ,
+.Xr lseek 2 ,
+.Xr mmap 2 ,
+.Xr nice 2 ,
+.Xr open 2 ,
+.Xr poll 2 ,
+.Xr pread 2 ,
+.Xr pwrite 2 ,
+.Xr read 2 ,
+.Xr readlink 2 ,
+.Xr readv 2 ,
+.Xr shmget 2 ,
+.Xr sigaction 2 ,
+.Xr sigaltstack 2 ,
+.Xr vfork 2 ,
+.Xr write 2 ,
+.Xr writev 2 ,
+.Xr _stack_grow 3C ,
+.Xr pthread_create 3C ,
+.Xr pthread_join 3C ,
+.Xr ptrace 3C ,
+.Xr readdir 3C ,
+.Xr thr_create 3C ,
+.Xr thr_join 3C ,
+.Xr wait 3C ,
+.Xr siginfo.h 3HEAD ,
+.Xr signal.h 3HEAD ,
+.Xr types32.h 3HEAD ,
+.Xr ucontext.h 3HEAD ,
+.Xr contract 4 ,
+.Xr core 4 ,
+.Xr process 4 ,
+.Xr lfcompile 5 ,
+.Xr privileges 5 ,
+.Xr security-flags 5
+.Sh NOTES
 Descriptions of structures in this document include only interesting structure
 elements, not filler and padding fields, and may show elements out of order for
-descriptive clarity. The actual structure definitions are contained in
-\fB<procfs.h>\fR\&.
-.SH BUGS
-.LP
-Because the old \fBioctl\fR(2)-based version of \fB/proc\fR is currently
-supported for binary compatibility with old applications, the top-level
-directory for a process, \fB/proc/\fR\fIpid\fR, is not world-readable, but it
-is world-searchable. Thus, anyone can open \fB/proc/\fR\fIpid\fR\fB/psinfo\fR
-even though \fBls\fR(1) applied to \fB/proc/\fR\fIpid\fR will fail for anyone
-but the owner or an appropriately privileged process. Support for the old
-\fBioctl\fR(2)-based version of \fB/proc\fR will be dropped in a future
-release, at which time the top-level directory for a process will be made
-world-readable.
-.sp
-.LP
-On SPARC based machines, the types \fBgregset_t\fR and \fBfpregset_t\fR defined
-in <\fBsys/regset.h\fR> are similar to but not the same as the types
-\fBprgregset_t\fR and \fBprfpregset_t\fR defined in <\fBprocfs.h\fR>.
+descriptive clarity.
+The actual structure definitions are contained in
+.In procfs.h .
+.Sh BUGS
+Because the old
+.Xr ioctl 2 Ns -based
+version of
+.Pa /proc
+is currently supported for binary compatibility with old applications, the
+top-level directory for a process,
+.Pa /proc/ Ns Em pid ,
+is not world-readable, but it is world-searchable.
+Thus, anyone can open
+.Pa /proc/ Ns Em pid Ns Pa /psinfo
+even though
+.Xr ls 1
+applied to
+.Pa /proc/ Ns Em pid
+will fail for anyone but the owner or an appropriately privileged process.
+Support for the old
+.Xr ioctl 2 Ns -based
+version of
+.Pa /proc
+will be dropped in a future release, at which time the top-level directory for
+a process will be made world-readable.
+.Pp
+On SPARC based machines, the types
+.Sy gregset_t
+and
+.Sy fpregset_t
+defined in
+.In sys/regset.h
+are similar to but not the same as the types
+.Sy prgregset_t
+and
+.Sy prfpregset_t
+defined in
+.In procfs.h .
