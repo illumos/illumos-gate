@@ -1964,7 +1964,7 @@ cred_retry:
 		cred_otw = cr;
 		crhold(cred_otw);
 		if (!ep->error)
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+			xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		goto cred_retry;
 	}
 
@@ -1998,7 +1998,7 @@ cred_retry:
 	}
 
 	if (!ep->error)
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 
 no_args_out:
 	crfree(cred_otw);
@@ -2247,8 +2247,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 				nfs4_end_open_seqid_sync(oop);
 				kmem_free(destcfp, destclen + 1);
 				nfs4args_copen_free(open_args);
-				(void) xdr_free(xdr_COMPOUND4res_clnt,
-				    (caddr_t)&res);
+				xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 				nfs_rw_exit(&mi->mi_fh_lock);
 				nfs4_fail_recov(vp, failed_msg, ep->error,
 				    ep->stat);
@@ -2279,7 +2278,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 					nfs4_end_open_seqid_sync(oop);
 					kmem_free(destcfp, destclen + 1);
 					nfs4args_copen_free(open_args);
-					(void) xdr_free(xdr_COMPOUND4res_clnt,
+					xdr_free(xdr_COMPOUND4res_clnt,
 					    (caddr_t)&res);
 					nfs_rw_exit(&mi->mi_fh_lock);
 					nfs4_fail_recov(vp, failed_msg,
@@ -2319,7 +2318,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 		kmem_free(destcfp, destclen + 1);
 		nfs4args_copen_free(open_args);
 		if (!ep->error)
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+			xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		return;
 	}
 
@@ -2390,7 +2389,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 	else
 		PURGE_ATTRCACHE4(vp);
 
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 
 	ASSERT(nfs4_consistent_type(vp));
 
@@ -2401,5 +2400,5 @@ err_out:
 	kmem_free(destcfp, destclen + 1);
 	nfs4args_copen_free(open_args);
 	if (!ep->error)
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 }

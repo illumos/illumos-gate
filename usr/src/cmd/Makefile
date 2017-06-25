@@ -480,6 +480,7 @@ i386_SUBDIRS=		\
 	addbadsec	\
 	biosdev		\
 	diskscan	\
+	nvmeadm		\
 	rtc		\
 	ucodeadm	\
 	xvm

@@ -43,9 +43,6 @@ OBJECTS		= $(DAD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DAD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/dada/targets
-WARLOCK_OUT     = $(DAD_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -94,10 +91,8 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -111,46 +106,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include	$(UTSBASE)/sparc/Makefile.targ
-
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-# Warlock targets
-#
-# Note that in warlock_with_{esp,isp} it is important to load sd.ll
-# before {isp,esp}.ll; the reason is that both have _init/_info/_fini
-# and warlock can only handle one extern function by a given name;
-# any loaded after the first are ignored.
-
-DADA_FILES = $(DADA_OBJS:%.o=-l $(UTSBASE)/sparc/dada/%.ll)
-CMLB_FILES = $(CMLB_OBJS:%.o=-l $(UTSBASE)/sparc/cmlb/%.ll)
-
-warlock: warlock_alone
-
-warlock_alone: $(WARLOCK_OK)
-
-dada_files:
-	@cd $(UTSBASE)/sparc/dada; pwd; $(MAKE) warlock
-
-cmlb_files:
-	@cd $(UTSBASE)/sparc/cmlb; pwd; $(MAKE) warlock
-
-$(WARLOCK_OK): $(WLCMD_DIR)/dad.wlcmd $(WARLOCK_OUT) dada_files \
-	warlock_ddi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/dad.wlcmd $(WARLOCK_OUT) -l $(DADA_FILES) \
-	-l $(CMLB_FILES) \
-	-l $(UTSBASE)/sparc/warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/sun/io/dada/targets/%.c
-	$(WLCC) $(CPPFLAGS) -o $@ $<
-
-warlock_ddi.files:
-	@cd $(UTSBASE)/sparc/warlock; pwd; $(MAKE) warlock

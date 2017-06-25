@@ -1,4 +1,4 @@
-/*	$Id: read.c,v 1.150.2.5 2017/01/09 02:25:53 schwarze Exp $ */
+/*	$Id: read.c,v 1.161 2017/02/18 17:29:28 schwarze Exp $ */
 /*
  * Copyright (c) 2008, 2009, 2010, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
  * Copyright (c) 2010-2017 Ingo Schwarze <schwarze@openbsd.org>
@@ -19,10 +19,8 @@
 #include "config.h"
 
 #include <sys/types.h>
-#if HAVE_MMAP
 #include <sys/mman.h>
 #include <sys/stat.h>
-#endif
 
 #include <assert.h>
 #include <ctype.h>
@@ -32,7 +30,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,8 +47,8 @@
 #define	REPARSE_LIMIT	1000
 
 struct	mparse {
-	struct roff_man	 *man; /* man parser */
 	struct roff	 *roff; /* roff parser (!NULL) */
+	struct roff_man	 *man; /* man parser */
 	char		 *sodest; /* filename pointed to by .so */
 	const char	 *file; /* filename of current input file */
 	struct buf	 *primary; /* buffer currently being parsed */
@@ -179,6 +176,7 @@ static	const char * const	mandocerrs[MANDOCERR_MAX] = {
 	"blank line in fill mode, using .sp",
 	"tab in filled text",
 	"whitespace at end of input line",
+	"new sentence, new line",
 	"bad comment style",
 	"invalid escape sequence",
 	"undefined string, using \"\"",
@@ -604,12 +602,10 @@ static int
 read_whole_file(struct mparse *curp, const char *file, int fd,
 		struct buf *fb, int *with_mmap)
 {
+	struct stat	 st;
 	gzFile		 gz;
 	size_t		 off;
 	ssize_t		 ssz;
-
-#if HAVE_MMAP
-	struct stat	 st;
 
 	if (fstat(fd, &st) == -1)
 		err((int)MANDOCLEVEL_SYSERR, "%s", file);
@@ -632,7 +628,6 @@ read_whole_file(struct mparse *curp, const char *file, int fd,
 		if (fb->buf != MAP_FAILED)
 			return 1;
 	}
-#endif
 
 	if (curp->gzip) {
 		if ((gz = gzdopen(fd, "rb")) == NULL)
@@ -757,11 +752,9 @@ mparse_readfd(struct mparse *curp, int fd, const char *file)
 		    (MPARSE_UTF8 | MPARSE_LATIN1);
 		mparse_parse_buffer(curp, blk, file);
 		curp->filenc = save_filenc;
-#if HAVE_MMAP
 		if (with_mmap)
 			munmap(blk.buf, blk.sz);
 		else
-#endif
 			free(blk.buf);
 	}
 	return curp->file_status;
@@ -835,13 +828,15 @@ mparse_reset(struct mparse *curp)
 {
 	roff_reset(curp->roff);
 	roff_man_reset(curp->man);
+
+	free(curp->sodest);
+	curp->sodest = NULL;
+
 	if (curp->secondary)
 		curp->secondary->sz = 0;
 
 	curp->file_status = MANDOCLEVEL_OK;
-
-	free(curp->sodest);
-	curp->sodest = NULL;
+	curp->gzip = 0;
 }
 
 void
@@ -849,8 +844,7 @@ mparse_free(struct mparse *curp)
 {
 
 	roff_man_free(curp->man);
-	if (curp->roff)
-		roff_free(curp->roff);
+	roff_free(curp->roff);
 	if (curp->secondary)
 		free(curp->secondary->buf);
 

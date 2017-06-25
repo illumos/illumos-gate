@@ -35,9 +35,6 @@ MODULE		= scsa1394
 OBJECTS		= $(SCSA1394_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SCSA1394_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-WARLOCK_OUT     = $(SCSA1394_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -92,10 +89,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint32
 
@@ -109,50 +104,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-#	Warlock targets
-#
-SBP2_FILES = $(SBP2_OBJS:%.o= -l ../sbp2/%.ll)
-SD_FILES   = $(SD_OBJS:%.o=../sd/%.ll)
-SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
-CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) sbp2.files warlock_ddi.files \
-	$(WLCMD_DIR)/scsa1394.wlcmd sd.files scsi.files cmlb.files
-	$(WARLOCK) -c $(WLCMD_DIR)/scsa1394.wlcmd $(WARLOCK_OUT) $(SD_FILES) \
-		$(SCSI_FILES) \
-		$(CMLB_FILES) \
-		$(SBP2_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/1394/targets/scsa1394/%.c
-	$(WLCC) $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-sbp2.files:
-	@cd ../sbp2; pwd; $(MAKE) warlock
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
-
-sd.files:
-	@cd ../sd; pwd; $(MAKE) warlock_alone
-
-scsi.files:
-	@cd ../scsi; pwd; $(MAKE) warlock
-
-cmlb.files:
-	@cd ../cmlb; pwd; $(MAKE) warlock
-
-

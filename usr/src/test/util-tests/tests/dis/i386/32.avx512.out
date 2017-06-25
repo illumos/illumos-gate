@@ -1,0 +1,97 @@
+    libdis_test:       62 03              bound  %eax,(%ebx)
+    libdis_test+0x2:   c5 f8 28 c8        vmovaps %xmm0,%xmm1
+    libdis_test+0x6:   c5 f8 28 da        vmovaps %xmm2,%xmm3
+    libdis_test+0xa:   c5 f8 28 ec        vmovaps %xmm4,%xmm5
+    libdis_test+0xe:   c5 f8 28 fe        vmovaps %xmm6,%xmm7
+    libdis_test+0x12:  c5 fc 28 c8        vmovaps %ymm0,%ymm1
+    libdis_test+0x16:  c5 fc 28 da        vmovaps %ymm2,%ymm3
+    libdis_test+0x1a:  c5 fc 28 ec        vmovaps %ymm4,%ymm5
+    libdis_test+0x1e:  c5 fc 28 fe        vmovaps %ymm6,%ymm7
+    libdis_test+0x22:  62 f1 7c 48 28 c8  vmovaps %zmm0,%zmm1
+    libdis_test+0x28:  62 f1 7c 48 28 da  vmovaps %zmm2,%zmm3
+    libdis_test+0x2e:  62 f1 7c 48 28 ec  vmovaps %zmm4,%zmm5
+    libdis_test+0x34:  62 f1 7c 48 28 fe  vmovaps %zmm6,%zmm7
+    libdis_test+0x3a:  62 f1 7c 48 29 a4  vmovaps %zmm4,0x8(%esp)
+                       24 08 00 00 00 
+    libdis_test+0x45:  62 f1 7c 48 28 9c  vmovaps 0x8(%esp),%zmm3
+                       24 08 00 00 00 
+    libdis_test+0x50:  62 f1 7c c9 28 f9  vmovaps %zmm1,%zmm7{%k1}{z}
+    libdis_test+0x56:  62 f1 7c 4f 28 e6  vmovaps %zmm6,%zmm4{%k7}
+    libdis_test+0x5c:  62 f1 7c c8 28 da  vmovaps %zmm2,%zmm3{z}
+    libdis_test+0x62:  62 f1 7c 8b 28 d7  vmovaps %xmm7,%xmm2{%k3}{z}
+    libdis_test+0x68:  62 f1 7c 2d 28 d9  vmovaps %ymm1,%ymm3{%k5}
+    libdis_test+0x6e:  62 f1 fd 48 28 fa  vmovapd %zmm2,%zmm7
+    libdis_test+0x74:  62 f1 7c 48 11 bd  vmovups %zmm7,0x20(%ebp)
+                       20 00 00 00 
+    libdis_test+0x7e:  62 f1 7c 48 10 bc  vmovups 0x8(%esp),%zmm7
+                       24 08 00 00 00 
+    libdis_test+0x89:  62 f1 7c c8 10 18  vmovups (%eax),%zmm3{z}
+    libdis_test+0x8f:  62 f1 fd 4a 10 0c  vmovupd (%esp),%zmm1{%k2}
+                       24 
+    libdis_test+0x96:  62 f1 fd 48 11 34  vmovupd %zmm6,(%esp)
+                       24 
+    libdis_test+0x9d:  62 f1 7c 48 29 2c  vmovaps %zmm5,(%esp)
+                       24 
+    libdis_test+0xa4:  62 f1 7c 48 29 ac  vmovaps %zmm5,0x20(%esp)
+                       24 20 00 00 00 
+    libdis_test+0xaf:  62 f1 7c 48 29 64  vmovaps %zmm4,0x40(%esp)
+                       24 01 
+    libdis_test+0xb7:  62 f1 7c 48 29 a4  vmovaps %zmm4,0x60(%esp)
+                       24 60 00 00 00 
+    libdis_test+0xc2:  62 f1 7c 48 29 64  vmovaps %zmm4,0x80(%esp)
+                       24 02 
+    libdis_test+0xca:  62 f1 7c 48 29 64  vmovaps %zmm4,-0x80(%esp)
+                       24 fe 
+    libdis_test+0xd2:  62 f1 7c 48 29 a4  vmovaps %zmm4,-0x20(%esp)
+                       24 e0 ff ff ff 
+    libdis_test+0xdd:  62 f1 7c 48 28 2c  vmovaps (%esp),%zmm5
+                       24 
+    libdis_test+0xe4:  62 f1 7c 48 28 ac  vmovaps 0x20(%esp),%zmm5
+                       24 20 00 00 00 
+    libdis_test+0xef:  62 f1 7c 48 28 6c  vmovaps 0x40(%esp),%zmm5
+                       24 01 
+    libdis_test+0xf7:  62 f1 7c 48 28 ac  vmovaps 0x60(%esp),%zmm5
+                       24 60 00 00 00 
+    libdis_test+0x102: 62 f1 7c 48 28 6c  vmovaps 0x80(%esp),%zmm5
+                       24 02 
+    libdis_test+0x10a: 62 f1 7c 48 28 6c  vmovaps -0x80(%esp),%zmm5
+                       24 fe 
+    libdis_test+0x112: 62 f1 7c 48 28 ac  vmovaps -0x20(%esp),%zmm5
+                       24 e0 ff ff ff 
+    libdis_test+0x11d: 62 f1 7d 48 7f 74  vmovdqa32 %zmm6,0x100(%esp)
+                       24 04 
+    libdis_test+0x125: 62 f1 7d 28 7f 74  vmovdqa32 %ymm6,0x100(%esp)
+                       24 08 
+    libdis_test+0x12d: 62 f1 7d 08 7f 74  vmovdqa32 %xmm6,0x100(%esp)
+                       24 10 
+    libdis_test+0x135: 62 f1 7d 48 6f 30  vmovdqa32 (%eax),%zmm6
+    libdis_test+0x13b: 62 f1 7d 28 6f 30  vmovdqa32 (%eax),%ymm6
+    libdis_test+0x141: 62 f1 7d 08 6f 30  vmovdqa32 (%eax),%xmm6
+    libdis_test+0x147: 62 f1 fd 48 7f 74  vmovdqa64 %zmm6,0x100(%esp)
+                       24 04 
+    libdis_test+0x14f: 62 f1 fd 28 7f 74  vmovdqa64 %ymm6,0x100(%esp)
+                       24 08 
+    libdis_test+0x157: 62 f1 fd 08 7f 74  vmovdqa64 %xmm6,0x100(%esp)
+                       24 10 
+    libdis_test+0x15f: 62 f1 fd 48 6f 74  vmovdqa64 0x800(%esp),%zmm6
+                       24 20 
+    libdis_test+0x167: 62 f1 fd 28 6f 74  vmovdqa64 0x800(%esp),%ymm6
+                       24 40 
+    libdis_test+0x16f: 62 f1 fd 08 6f b4  vmovdqa64 0x800(%esp),%xmm6
+                       24 00 08 00 00 
+    libdis_test+0x17a: 62 f1 7f 48 7f 04  vmovdqu8 %zmm0,(%esp)
+                       24 
+    libdis_test+0x181: 62 f1 ff 48 7f 04  vmovdqu16 %zmm0,(%esp)
+                       24 
+    libdis_test+0x188: 62 f1 7e 48 7f 04  vmovdqu32 %zmm0,(%esp)
+                       24 
+    libdis_test+0x18f: 62 f1 fe 48 7f 04  vmovdqu64 %zmm0,(%esp)
+                       24 
+    libdis_test+0x196: 62 f1 7f 48 6f 04  vmovdqu8 (%esp),%zmm0
+                       24 
+    libdis_test+0x19d: 62 f1 ff 48 6f 04  vmovdqu16 (%esp),%zmm0
+                       24 
+    libdis_test+0x1a4: 62 f1 7e 48 6f 04  vmovdqu32 (%esp),%zmm0
+                       24 
+    libdis_test+0x1ab: 62 f1 fe 48 6f 04  vmovdqu64 (%esp),%zmm0
+                       24 

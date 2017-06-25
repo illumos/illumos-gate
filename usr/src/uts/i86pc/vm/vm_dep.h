@@ -67,7 +67,8 @@ extern void plcnt_inc_dec(page_t *, int, int, long, int);
 #define	PLCNT_INCR(pp, mnode, mtype, szc, flags)			\
 	plcnt_inc_dec(pp, mtype, szc, 1l << PAGE_BSZS_SHIFT(szc), flags)
 #define	PLCNT_DECR(pp, mnode, mtype, szc, flags)			\
-	plcnt_inc_dec(pp, mtype, szc, -1l << PAGE_BSZS_SHIFT(szc), flags)
+	plcnt_inc_dec(pp, mtype, szc, \
+	(long)(ULONG_MAX << PAGE_BSZS_SHIFT(szc)), flags)
 
 /*
  * macro to update page list max counts.  no-op on x86.

@@ -45,9 +45,6 @@ LINTS		= $(HCI1394_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/1394/adapters
 LDFLAGS		+= -dy -Nmisc/s1394
-WARLOCK_OUT     = $(HCI1394_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -96,10 +93,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -113,34 +108,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-#	Warlock targets
-#
-S1394_FILES = $(S1394_OBJS:%.o= -l ../s1394/%.ll)
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) s1394.files warlock_ddi.files \
-	$(WLCMD_DIR)/hci1394.wlcmd
-	$(WARLOCK) -c $(WLCMD_DIR)/hci1394.wlcmd $(WARLOCK_OUT) $(S1394_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/1394/adapters/%.c
-	$(WLCC) $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
-
-s1394.files:
-	@cd ../s1394; pwd; $(MAKE) warlock
-

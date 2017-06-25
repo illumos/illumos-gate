@@ -24,12 +24,11 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This file brings down all that is needed to build just 
+# This file brings down all that is needed to build just
 # SCSI Subsystem.
 #
 
 find_files "s.*"	\
-	usr/src/uts/common/io/warlock \
 	usr/src/uts/common/io/scsi \
 	usr/src/uts/common/sys \
 	usr/src/uts/sparc/dada	\
@@ -39,7 +38,6 @@ find_files "s.*"	\
 	usr/src/uts/sparc/ses	\
 	usr/src/uts/sparc/ssd	\
 	usr/src/uts/sparc/st	\
-	usr/src/uts/sparc/warlock \
 	usr/src/uts/sun/io/dada \
 	usr/src/uts/sun/sys/dada \
 	usr/src/uts/sun/sys/scsi

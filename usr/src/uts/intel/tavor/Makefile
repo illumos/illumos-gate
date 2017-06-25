@@ -44,9 +44,6 @@ LINTS		= $(TAVOR_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/adapters/tavor
 LDFLAGS		+= -dy -Ndrv/ib -Nmisc/ibtl -Nmisc/ibmf
-WARLOCK_OUT    	= $(TAVOR_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -99,10 +96,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -116,25 +111,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-
-#
-#	Defines for local commands.
-#
-WARLOCK         = warlock
-WLCC            = wlcc
-TOUCH           = touch
-TEST            = test
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/tavor.wlcmd
-	$(WARLOCK) -c $(WLCMD_DIR)/tavor.wlcmd $(WARLOCK_OUT) -l \
-	$(UTSBASE)/intel/warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/adapters/tavor/%.c
-	$(WLCC)  $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd $(UTSBASE)/intel/warlock; pwd; $(MAKE) warlock

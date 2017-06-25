@@ -53,11 +53,11 @@ struct idmap_udt_handle {
 };
 
 #define	_IDMAP_RESET_UDT_HANDLE(uh) \
-	(void) xdr_free(xdr_idmap_update_batch, (caddr_t)&uh->batch);\
+	xdr_free(xdr_idmap_update_batch, (caddr_t)&uh->batch);\
 	uh->next = 0;\
 	uh->error_index = -1;\
-	(void) xdr_free(xdr_idmap_namerule, (caddr_t)&uh->error_rule);\
-	(void) xdr_free(xdr_idmap_namerule, (caddr_t)&uh->conflict_rule);
+	xdr_free(xdr_idmap_namerule, (caddr_t)&uh->error_rule);\
+	xdr_free(xdr_idmap_namerule, (caddr_t)&uh->conflict_rule);
 
 typedef struct idmap_get_res {
 	idmap_id_type	idtype;
@@ -78,7 +78,7 @@ struct idmap_get_handle {
 };
 
 #define	_IDMAP_RESET_GET_HANDLE(gh) \
-	(void) xdr_free(xdr_idmap_mapping_batch, (caddr_t)&gh->batch);\
+	xdr_free(xdr_idmap_mapping_batch, (caddr_t)&gh->batch);\
 	if (gh->retlist) \
 		free(gh->retlist);\
 	gh->retlist = NULL;\

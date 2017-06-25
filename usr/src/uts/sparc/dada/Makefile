@@ -25,8 +25,6 @@
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -39,8 +37,6 @@ MODULE		= dada
 OBJECTS		= $(DADA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DADA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OUT     = $(DADA_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -77,10 +73,8 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint64
 
@@ -92,23 +86,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-
-#
-#	Warlock targets
-#
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT)
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/sun/io/dada/impl/%.c
-	$(WLCC) $(CPPFLAGS) -o $@ $<
-
-%.ll: $(UTSBASE)/sun/io/dada/conf/%.c
-	$(WLCC) $(CPPFLAGS) -o $@ $<

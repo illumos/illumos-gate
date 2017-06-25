@@ -39,9 +39,6 @@ MODULE		= sbp2
 OBJECTS		= $(SBP2_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SBP2_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-WARLOCK_OUT     = $(SBP2_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -62,9 +59,9 @@ ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
 CLEANLINTFILES	+= $(LINT32_FILES)
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -85,10 +82,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -102,25 +97,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	Warlock
-#
-WARLOCK_CMD	= $(WLCMD_DIR)/$(MODULE).wlcmd
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK):	$(WARLOCK_OUT) $(WARLOCK_CMD)
-	$(WARLOCK) -c $(WARLOCK_CMD) $(WARLOCK_OUT) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/sbp2/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

@@ -29,8 +29,6 @@
  * to communicate with entities that reside on service processor.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -348,7 +346,7 @@ pcp_close(int channel_fd)
  */
 int
 pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
-		uint32_t timeout)
+    uint32_t timeout)
 {
 	void *datap;
 	void *resp_msg_data = NULL;
@@ -381,7 +379,7 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 	if (req_msg_hdr == NULL) {
 		req_msg_hdr_sz = sizeof (pcp_req_msg_hdr_t);
 		req_msg_hdr = (pcp_req_msg_hdr_t *)umem_zalloc(req_msg_hdr_sz,
-								UMEM_DEFAULT);
+		    UMEM_DEFAULT);
 		if (req_msg_hdr == NULL)
 			return (PCPL_MALLOC_FAIL);
 	}
@@ -407,7 +405,7 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 
 	/* fill request header checksum */
 	req_msg_hdr->hdr_cksum = checksum((uint16_t *)req_msg_hdr,
-					req_msg_hdr_sz);
+	    req_msg_hdr_sz);
 	/*
 	 * set sig jmp location
 	 */
@@ -429,7 +427,7 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 	 */
 	if (req_msg->msg_len != 0) {
 		if ((ret = pcp_io_op(datap, req_msg->msg_len,
-					PCPL_IO_OP_WRITE))) {
+		    PCPL_IO_OP_WRITE))) {
 			return (ret);
 		}
 	}
@@ -440,7 +438,7 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 	if (resp_msg_hdr == NULL) {
 		resp_msg_hdr_sz = sizeof (pcp_resp_msg_hdr_t);
 		resp_msg_hdr = (pcp_resp_msg_hdr_t *)umem_alloc(resp_msg_hdr_sz,
-								UMEM_DEFAULT);
+		    UMEM_DEFAULT);
 		if (resp_msg_hdr == NULL)
 			return (PCPL_MALLOC_FAIL);
 	}
@@ -481,7 +479,7 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 	}
 
 	/*
-	 * check status field for any channel protocol errrors
+	 * check status field for any channel protocol errors
 	 * This field signifies something happend during request
 	 * message trasmission. This field is set by the receiver.
 	 */
@@ -494,14 +492,14 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 
 		/* libpcp users should free this memory */
 		if ((resp_msg_data = (uint8_t *)malloc(resp_msg_hdr->msg_len))
-			== NULL)
+		    == NULL)
 			return (PCPL_MALLOC_FAIL);
 		bzero(resp_msg_data, resp_msg_hdr->msg_len);
 		/*
 		 * Receive response message.
 		 */
 		if ((ret = pcp_io_op(resp_msg_data, resp_msg_hdr->msg_len,
-						PCPL_IO_OP_READ))) {
+		    PCPL_IO_OP_READ))) {
 			free(resp_msg_data);
 			return (ret);
 		}
@@ -509,7 +507,7 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 #ifdef PCP_CKSUM_ENABLE
 		/* verify response message data checksum */
 		cksum = checksum((uint16_t *)resp_msg_data,
-					resp_msg_hdr->msg_len);
+		    resp_msg_hdr->msg_len);
 		if (cksum != resp_msg_hdr->msg_cksum) {
 			free(resp_msg_data);
 			return (PCPL_CKSUM_ERROR);
@@ -552,7 +550,7 @@ pcp_get_prop(int channel_fd, int prop, unsigned int *val)
 	(void) alarm(glvc_timeout);
 
 	if ((ret = ioctl(channel_fd, GLVC_XPORT_IOCTL_OPT_OP,
-		&channel_op)) < 0) {
+	    &channel_op)) < 0) {
 
 		(void) alarm(0);
 		return (ret);
@@ -649,7 +647,7 @@ pcp_peek(uint8_t *buf, int bytes_cnt)
 	 */
 	if (peek_area == NULL) {
 		peek_area = (uint8_t *)umem_zalloc(PEEK_AREA_SIZE,
-							UMEM_DEFAULT);
+		    UMEM_DEFAULT);
 		if (peek_area == NULL) {
 			return (PCPL_MALLOC_FAIL);
 		}
@@ -665,7 +663,7 @@ pcp_peek(uint8_t *buf, int bytes_cnt)
 	(void) alarm(glvc_timeout);
 
 	if ((ret = ioctl(chnl_fd, GLVC_XPORT_IOCTL_DATA_PEEK, &peek_ctrl))
-		< 0) {
+	    < 0) {
 		(void) alarm(0);
 		return (ret);
 	}
@@ -743,7 +741,7 @@ pcp_read(uint8_t *buf, int byte_cnt)
 	 */
 	if (read_area == NULL) {
 		read_area = (uint8_t *)umem_zalloc(READ_AREA_SIZE,
-							UMEM_DEFAULT);
+		    UMEM_DEFAULT);
 		if (read_area == NULL) {
 			return (PCPL_MALLOC_FAIL);
 		}
@@ -793,7 +791,7 @@ pcp_read(uint8_t *buf, int byte_cnt)
 		 */
 		m = byte_cnt - (read_tail - read_head);
 		if ((ret = vldc_read(chnl_fd,
-				read_tail, m)) <= 0) {
+		    read_tail, m)) <= 0) {
 			return (ret);
 		}
 	}
@@ -831,7 +829,7 @@ pcp_update_read_area(int byte_cnt)
 	 */
 	if (read_area == NULL) {
 		read_area = (uint8_t *)umem_zalloc(READ_AREA_SIZE,
-							UMEM_DEFAULT);
+		    UMEM_DEFAULT);
 		if (read_area == NULL) {
 			return (PCPL_MALLOC_FAIL);
 		}
@@ -860,7 +858,7 @@ pcp_update_read_area(int byte_cnt)
 	n = byte_cnt - (read_tail - read_head);
 
 	if ((ret = vldc_read(chnl_fd,
-			read_tail, n)) <= 0) {
+	    read_tail, n)) <= 0) {
 		return (ret);
 	}
 	read_tail += ret;
@@ -894,7 +892,7 @@ pcp_peek_read(uint8_t *buf, int byte_cnt)
 	 */
 	if (peek_read_area == NULL) {
 		peek_read_area = (uint8_t *)umem_zalloc(PEEK_READ_AREA_SIZE,
-						UMEM_DEFAULT);
+		    UMEM_DEFAULT);
 		if (peek_read_area == NULL) {
 			return (PCPL_MALLOC_FAIL);
 		}
@@ -952,7 +950,7 @@ pcp_send_req_msg_hdr(pcp_req_msg_hdr_t *req_hdr)
 
 	hdr_sz = sizeof (pcp_req_msg_hdr_t);
 	if ((hdrp = (pcp_req_msg_hdr_t *)umem_zalloc(hdr_sz,
-						UMEM_DEFAULT)) == NULL) {
+	    UMEM_DEFAULT)) == NULL) {
 		return (PCPL_MALLOC_FAIL);
 	}
 
@@ -1014,7 +1012,7 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* read magic number first */
 	if ((ret = pcp_io_op(&magic_num, sizeof (magic_num),
-					PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1026,7 +1024,7 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* read version field */
 	if ((ret = pcp_io_op(&proto_ver, sizeof (proto_ver),
-					PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1037,25 +1035,25 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* Read message type */
 	if ((ret = pcp_io_op(&msg_type, sizeof (msg_type),
-					PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
 	/* Read message sub type */
 	if ((ret = pcp_io_op(&sub_type, sizeof (sub_type),
-					PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
 	/* Read rcvd_pad bits */
 	if ((ret = pcp_io_op(&rsvd_pad, sizeof (rsvd_pad),
-					PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
 	/* receive transaction id */
 	if ((ret = pcp_io_op(&xid, sizeof (xid),
-			PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1063,7 +1061,7 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* receive timeout value */
 	if ((ret = pcp_io_op(&timeout, sizeof (timeout),
-				PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1071,7 +1069,7 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* receive message length */
 	if ((ret = pcp_io_op(&msg_len, sizeof (msg_len),
-				PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1079,7 +1077,7 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* receive status field */
 	if ((ret = pcp_io_op(&status, sizeof (status),
-				PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1087,7 +1085,7 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* receive message checksum */
 	if ((ret = pcp_io_op(&msg_cksum, sizeof (msg_cksum),
-					PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1095,7 +1093,7 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 
 	/* receive header checksum */
 	if ((ret = pcp_io_op(&hdr_cksum, sizeof (hdr_cksum),
-					PCPL_IO_OP_READ)) != 0) {
+	    PCPL_IO_OP_READ)) != 0) {
 		return (ret);
 	}
 
@@ -1143,7 +1141,7 @@ pcp_get_xid(void)
 		 */
 		(void) gettimeofday(&tv, NULL);
 		msg_xid = (uint32_t)((tv.tv_sec << 20) |
-				(tv.tv_usec >> 10));
+		    (tv.tv_usec >> 10));
 	}
 
 	ret = msg_xid++;
@@ -1180,7 +1178,7 @@ pcp_frame_error_handle(void)
 		 * if mathing not found, discard 1 byte and continue checking.
 		 */
 		if (!check_magic_byte_presence(4, &magic_num_buf[0],
-							&ispresent)) {
+		    &ispresent)) {
 			if (!ispresent) {
 				/* remove 1 byte */
 				(void) pcp_io_op(buf, 1, PCPL_IO_OP_READ);
@@ -1232,7 +1230,7 @@ pcp_vldc_frame_error_handle(void)
 		 * if the magic number can be matched
 		 */
 		if (memcmp(read_head, magic_num_buf,
-				sizeof (host_magic_num))) {
+		    sizeof (host_magic_num))) {
 			read_head += 1;
 		} else {
 			found_magic = 1;
@@ -1342,7 +1340,7 @@ pcp_cleanup(int channel_fd)
 
 		(void) alarm(PCP_CLEANUP_TIMEOUT);
 		if ((ret = ioctl(channel_fd, GLVC_XPORT_IOCTL_DATA_PEEK,
-							&peek_ctrl)) < 0) {
+		    &peek_ctrl)) < 0) {
 			(void) alarm(0);
 			done = 1;
 			continue;
@@ -1431,7 +1429,7 @@ vldc_read(int fd, uint8_t *bufp, int size)
 		res = read(fd, bufp, left);
 			/* return on error or short read */
 		if ((res == 0) || ((res < 0) &&
-			(errno == EAGAIN))) {
+		    (errno == EAGAIN))) {
 				/* poll until the read is unblocked */
 				if ((poll(fds, 1, glvc_timeout * MILLISEC)) < 0)
 					return (-1);

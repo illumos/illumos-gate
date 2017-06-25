@@ -1805,7 +1805,7 @@ db_dictionary::add_table_aux(char *tab, table_obj* tobj, int mode)
 
 /*
  * Add table with given name 'tab' and description 'zdesc' to dictionary.
- * Returns errror code if table already exists, or if no memory can be found
+ * Returns error code if table already exists, or if no memory can be found
  * to store the descriptor, or if dictionary has not been intialized.
  * Dictionary is updated to stable store if addition is successful.
  * Fatal error occurs if dictionary cannot be saved.

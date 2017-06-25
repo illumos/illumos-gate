@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -3402,6 +3402,25 @@ prlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 			return (error);
 		/* FALLTHROUGH */
 	case PR_FD:
+		/*
+		 * Performing a VOP_LOOKUP on the underlying vnode and emitting
+		 * the resulting vnode, without encapsulation, as our own is a
+		 * very special case when it comes to the assumptions built
+		 * into VFS.
+		 *
+		 * Since the resulting vnode is highly likely to be at some
+		 * abitrary position in another filesystem, we insist that the
+		 * VTRAVERSE flag is set on the parent.  This prevents things
+		 * such as the v_path freshness logic from mistaking the
+		 * resulting vnode as a "real" child of the parent, rather than
+		 * a consequence of this "procfs wormhole".
+		 *
+		 * Failure to establish such protections can lead to
+		 * incorrectly calculated v_paths being set on nodes reached
+		 * through these lookups.
+		 */
+		ASSERT((dp->v_flag & VTRAVERSE) != 0);
+
 		dp = pnp->pr_realvp;
 		return (VOP_LOOKUP(dp, comp, vpp, pathp, flags, rdir, cr, ct,
 		    direntflags, realpnp));
@@ -3651,7 +3670,8 @@ pr_lookup_piddir(vnode_t *dp, char *comp)
 		vp = (type == PR_CURDIR)? up->u_cdir :
 		    (up->u_rdir? up->u_rdir : rootdir);
 
-		if (vp == NULL) {	/* can't happen? */
+		if (vp == NULL) {
+			/* can't happen(?) */
 			prunlock(dpnp);
 			prfreenode(pnp);
 			return (NULL);
@@ -3662,6 +3682,7 @@ pr_lookup_piddir(vnode_t *dp, char *comp)
 		 */
 		VN_HOLD(vp);
 		pnp->pr_realvp = vp;
+		PTOV(pnp)->v_flag |= VTRAVERSE;
 		break;
 	default:
 		break;
@@ -4083,8 +4104,10 @@ pr_lookup_fddir(vnode_t *dp, char *comp)
 		pnp->pr_parent = dp;		/* needed for prlookup */
 		VN_HOLD(dp);
 		vp = PTOV(pnp);
-		if (pnp->pr_realvp->v_type == VDIR)
+		if (pnp->pr_realvp->v_type == VDIR) {
 			vp->v_type = VDIR;
+			vp->v_flag |= VTRAVERSE;
+		}
 	}
 
 	return (vp);

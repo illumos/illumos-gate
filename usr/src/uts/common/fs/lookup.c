@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -978,6 +978,108 @@ localpath(char *path, struct vnode *vrootp, cred_t *cr)
 }
 
 /*
+ * Clean a stale v_path from a vnode.  This is only performed if the v_path has
+ * not been altered since it was found to be stale
+ */
+static void
+vnode_clear_vpath(vnode_t *vp, char *vpath_old)
+{
+	mutex_enter(&vp->v_lock);
+	if (vp->v_path != vn_vpath_empty && vp->v_path == vpath_old) {
+		vp->v_path = vn_vpath_empty;
+		mutex_exit(&vp->v_lock);
+		kmem_free(vpath_old, strlen(vpath_old) + 1);
+	} else {
+		mutex_exit(&vp->v_lock);
+	}
+}
+
+/*
+ * Validate that a pathname refers to a given vnode.
+ */
+static int
+vnode_valid_pn(vnode_t *vp, vnode_t *vrootp, pathname_t *pn, pathname_t *rpn,
+    int flags, cred_t *cr)
+{
+	vnode_t *compvp;
+	/*
+	 * If we are in a zone or a chroot environment, then we have to
+	 * take additional steps, since the path to the root might not
+	 * be readable with the current credentials, even though the
+	 * process can legitmately access the file.  In this case, we
+	 * do the following:
+	 *
+	 * lookuppnvp() with all privileges to get the resolved path.
+	 * call localpath() to get the local portion of the path, and
+	 * continue as normal.
+	 *
+	 * If the the conversion to a local path fails, then we continue
+	 * as normal.  This is a heuristic to make process object file
+	 * paths available from within a zone.  Because lofs doesn't
+	 * support page operations, the vnode stored in the seg_t is
+	 * actually the underlying real vnode, not the lofs node itself.
+	 * Most of the time, the lofs path is the same as the underlying
+	 * vnode (for example, /usr/lib/libc.so.1).
+	 */
+	if (vrootp != rootdir) {
+		char *local = NULL;
+
+		VN_HOLD(rootdir);
+		if (lookuppnvp(pn, rpn, FOLLOW, NULL, &compvp, rootdir,
+		    rootdir, kcred) == 0) {
+			local = localpath(rpn->pn_path, vrootp, kcred);
+			VN_RELE(compvp);
+		}
+
+		/*
+		 * The original pn was changed through lookuppnvp().
+		 * Set it to local for next validation attempt.
+		 */
+		if (local) {
+			(void) pn_set(pn, local);
+		} else {
+			return (1);
+		}
+	}
+
+	/*
+	 * We should have a local path at this point, so start the search from
+	 * the root of the current process.
+	 */
+	VN_HOLD(vrootp);
+	if (vrootp != rootdir)
+		VN_HOLD(vrootp);
+	if (lookuppnvp(pn, rpn, FOLLOW | flags, NULL, &compvp, vrootp, vrootp,
+	    cr) == 0) {
+		/*
+		 * Check to see if the returned vnode is the same as the one we
+		 * expect.
+		 */
+		if (vn_compare(vp, compvp) ||
+		    vnode_match(vp, compvp, cr)) {
+			VN_RELE(compvp);
+			return (0);
+		}
+	}
+
+	VN_RELE(compvp);
+	return (1);
+}
+
+/*
+ * Struct for tracking vnodes with invalidated v_path entries during a
+ * dirtopath reverse lookup.  By keeping adequate state, those vnodes can be
+ * revisted to populate v_path.
+ */
+struct dirpath_walk {
+	struct dirpath_walk	*dw_next;
+	vnode_t			*dw_vnode;
+	vnode_t			*dw_pvnode;
+	size_t			dw_len;
+	char			*dw_name;
+};
+
+/*
  * Given a directory, return the full, resolved path.  This looks up "..",
  * searches for the given vnode in the parent, appends the component, etc.  It
  * is used to implement vnodetopath() and getcwd() when the cached path fails.
@@ -986,16 +1088,14 @@ static int
 dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
     cred_t *cr)
 {
-	pathname_t pn, rpn, emptypn;
-	vnode_t *cmpvp, *pvp = NULL;
-	vnode_t *startvp = vp;
-	int err = 0, vprivs;
-	size_t complen;
-	char *dbuf;
-	dirent64_t *dp;
-	char		*bufloc;
-	size_t		dlen = DIRENT64_RECLEN(MAXPATHLEN);
-	refstr_t	*mntpt;
+	pathname_t	pn, rpn, emptypn;
+	vnode_t		*pvp = NULL, *startvp = vp;
+	int		err = 0;
+	size_t		complen;
+	dirent64_t	*dp;
+	char		*bufloc, *dbuf;
+	const size_t	dlen = DIRENT64_RECLEN(MAXPATHLEN);
+	struct dirpath_walk *dw_chain = NULL, *dw_entry;
 
 	/* Operation only allowed on directories */
 	ASSERT(vp->v_type == VDIR);
@@ -1020,6 +1120,9 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 	VN_HOLD(vp);
 
 	for (;;) {
+		int vprivs;
+		hrtime_t cached_stamp;
+
 		/*
 		 * Return if we've reached the root.  If the buffer is empty,
 		 * return '/'.  We explicitly don't use vn_compare(), since it
@@ -1044,85 +1147,33 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 		}
 
 		/*
-		 * Shortcut: see if this vnode is a mountpoint.  If so,
-		 * grab the path information from the vfs_t.
-		 */
-		if (vp->v_flag & VROOT) {
-
-			mntpt = vfs_getmntpoint(vp->v_vfsp);
-			if ((err = pn_set(&pn, (char *)refstr_value(mntpt)))
-			    == 0) {
-				refstr_rele(mntpt);
-				rpn.pn_path = rpn.pn_buf;
-
-				/*
-				 * Ensure the mountpoint still exists.
-				 */
-				VN_HOLD(vrootp);
-				if (vrootp != rootdir)
-					VN_HOLD(vrootp);
-				if (lookuppnvp(&pn, &rpn, flags, NULL,
-				    &cmpvp, vrootp, vrootp, cr) == 0) {
-
-					if (VN_CMP(vp, cmpvp)) {
-						VN_RELE(cmpvp);
-
-						complen = strlen(rpn.pn_path);
-						bufloc -= complen;
-						if (bufloc < buf) {
-							err = ERANGE;
-							goto out;
-						}
-						bcopy(rpn.pn_path, bufloc,
-						    complen);
-						break;
-					} else {
-						VN_RELE(cmpvp);
-					}
-				}
-			} else {
-				refstr_rele(mntpt);
-			}
-		}
-
-		/*
 		 * Shortcut: see if this vnode has correct v_path. If so,
 		 * we have the work done.
 		 */
 		mutex_enter(&vp->v_lock);
-		if (vp->v_path != NULL) {
+		if (vp->v_path != vn_vpath_empty &&
+		    pn_set(&pn, vp->v_path) == 0) {
+			cached_stamp = vp->v_path_stamp;
+			mutex_exit(&vp->v_lock);
+			rpn.pn_path = rpn.pn_buf;
 
-			if ((err = pn_set(&pn, vp->v_path)) == 0) {
-				mutex_exit(&vp->v_lock);
-				rpn.pn_path = rpn.pn_buf;
-
-				/*
-				 * Ensure the v_path pointing to correct vnode
-				 */
-				VN_HOLD(vrootp);
-				if (vrootp != rootdir)
-					VN_HOLD(vrootp);
-				if (lookuppnvp(&pn, &rpn, flags, NULL,
-				    &cmpvp, vrootp, vrootp, cr) == 0) {
-
-					if (VN_CMP(vp, cmpvp)) {
-						VN_RELE(cmpvp);
-
-						complen = strlen(rpn.pn_path);
-						bufloc -= complen;
-						if (bufloc < buf) {
-							err = ERANGE;
-							goto out;
-						}
-						bcopy(rpn.pn_path, bufloc,
-						    complen);
-						break;
-					} else {
-						VN_RELE(cmpvp);
-					}
+			/* Ensure the v_path pointing to correct vnode */
+			if (vnode_valid_pn(vp, vrootp, &pn, &rpn, flags,
+			    cr) == 0) {
+				complen = strlen(rpn.pn_path);
+				bufloc -= complen;
+				if (bufloc < buf) {
+					err = ERANGE;
+					goto out;
 				}
+				bcopy(rpn.pn_path, bufloc, complen);
+				break;
 			} else {
-				mutex_exit(&vp->v_lock);
+				/*
+				 * Immediately nuke cached v_path entries known
+				 * to be invalid.
+				 */
+				vn_clearpath(vp, cached_stamp);
 			}
 		} else {
 			mutex_exit(&vp->v_lock);
@@ -1184,6 +1235,19 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 		/* Prepend a slash to the current path.  */
 		*--bufloc = '/';
 
+		/*
+		 * Record the name and directory for later reconstruction and
+		 * link it up with the others.
+		 */
+		dw_entry = kmem_alloc(sizeof (*dw_entry), KM_SLEEP);
+		dw_entry->dw_name = kmem_alloc(complen + 1, KM_SLEEP);
+		VN_HOLD(dw_entry->dw_vnode = vp);
+		VN_HOLD(dw_entry->dw_pvnode = pvp);
+		bcopy(dp->d_name, dw_entry->dw_name, complen + 1);
+		dw_entry->dw_len = complen;
+		dw_entry->dw_next = dw_chain;
+		dw_chain = dw_entry;
+
 		/* And continue with the next component */
 		VN_RELE(vp);
 		vp = pvp;
@@ -1197,6 +1261,37 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
 		ovbcopy(bufloc, buf, buflen - (bufloc - buf));
 
 out:
+	/*
+	 * Walk over encountered directory entries which were afflicted with a
+	 * stale or absent v_path.  If the dirtopath was successful, we should
+	 * possess the necessary information to populate all of them with a
+	 * valid v_path.
+	 *
+	 * While processing this list, it is safe to call vn_setpath despite
+	 * the fact that racing vnode actions may have altered v_path entries
+	 * while the above loopwas still executing.  Any updated entries will
+	 * have a newer v_path_stamp value which prevents an invalid overwrite.
+	 *
+	 * If an error was encountered during the search, freeing the chain is
+	 * still required.
+	 */
+	dw_entry = dw_chain;
+	while (dw_entry != NULL) {
+		struct dirpath_walk *next = dw_entry->dw_next;
+
+		if (err == 0) {
+			vn_setpath(NULL, dw_entry->dw_pvnode,
+			    dw_entry->dw_vnode, dw_entry->dw_name,
+			    dw_entry->dw_len);
+		}
+
+		VN_RELE(dw_entry->dw_vnode);
+		VN_RELE(dw_entry->dw_pvnode);
+		kmem_free(dw_entry->dw_name, dw_entry->dw_len + 1);
+		kmem_free(dw_entry, sizeof (*dw_entry));
+		dw_entry = next;
+	}
+
 	/*
 	 * If the error was ESTALE and the current directory to look in
 	 * was the root for this lookup, the root for a mounted file
@@ -1237,17 +1332,18 @@ static int
 vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
     cred_t *cr, int flags)
 {
-	pathname_t pn, rpn;
-	int ret;
-	vnode_t *compvp, *realvp;
-	proc_t *p = curproc;
-	int doclose = 0;
+	pathname_t pn;
+	int ret = 0;
+	vnode_t *realvp;
+	boolean_t doclose = B_FALSE;
 
 	/*
 	 * If vrootp is NULL, get the root for curproc.  Callers with any other
 	 * requirements should pass in a different vrootp.
 	 */
 	if (vrootp == NULL) {
+		proc_t *p = curproc;
+
 		mutex_enter(&p->p_lock);
 		if ((vrootp = PTOU(p)->u_rdir) == NULL)
 			vrootp = rootdir;
@@ -1269,119 +1365,59 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
 	    realvp != vp) {
 		VN_HOLD(vp);
 		if (VOP_OPEN(&vp, FREAD, cr, NULL) == 0)
-			doclose = 1;
+			doclose = B_TRUE;
 		else
 			VN_RELE(vp);
 	}
 
-	pn_alloc(&pn);
-
 	/*
-	 * Check to see if we have a cached path in the vnode.
+	 * Check to see if we have a valid cached path in the vnode.
 	 */
+	pn_alloc(&pn);
 	mutex_enter(&vp->v_lock);
-	if (vp->v_path != NULL) {
+	if (vp->v_path != vn_vpath_empty) {
+		hrtime_t cached_stamp;
+		pathname_t rpn;
+
+		cached_stamp = vp->v_path_stamp;
 		(void) pn_set(&pn, vp->v_path);
 		mutex_exit(&vp->v_lock);
-
-		pn_alloc(&rpn);
 
 		/* We should only cache absolute paths */
 		ASSERT(pn.pn_buf[0] == '/');
 
-		/*
-		 * If we are in a zone or a chroot environment, then we have to
-		 * take additional steps, since the path to the root might not
-		 * be readable with the current credentials, even though the
-		 * process can legitmately access the file.  In this case, we
-		 * do the following:
-		 *
-		 * lookuppnvp() with all privileges to get the resolved path.
-		 * call localpath() to get the local portion of the path, and
-		 * continue as normal.
-		 *
-		 * If the the conversion to a local path fails, then we continue
-		 * as normal.  This is a heuristic to make process object file
-		 * paths available from within a zone.  Because lofs doesn't
-		 * support page operations, the vnode stored in the seg_t is
-		 * actually the underlying real vnode, not the lofs node itself.
-		 * Most of the time, the lofs path is the same as the underlying
-		 * vnode (for example, /usr/lib/libc.so.1).
-		 */
-		if (vrootp != rootdir) {
-			char *local = NULL;
-			VN_HOLD(rootdir);
-			if (lookuppnvp(&pn, &rpn, FOLLOW,
-			    NULL, &compvp, rootdir, rootdir, kcred) == 0) {
-				local = localpath(rpn.pn_path, vrootp,
-				    kcred);
-				VN_RELE(compvp);
-			}
-
-			/*
-			 * The original pn was changed through lookuppnvp().
-			 * Set it to local for next validation attempt.
-			 */
-			if (local) {
-				(void) pn_set(&pn, local);
+		pn_alloc(&rpn);
+		if (vnode_valid_pn(vp, vrootp, &pn, &rpn, flags, cr) == 0) {
+			/* Return the result, if we're able. */
+			if (buflen > rpn.pn_pathlen) {
+				bcopy(rpn.pn_path, buf, rpn.pn_pathlen + 1);
 			} else {
-				goto notcached;
+				ret = ENAMETOOLONG;
 			}
-		}
-
-		/*
-		 * We should have a local path at this point, so start the
-		 * search from the root of the current process.
-		 */
-		VN_HOLD(vrootp);
-		if (vrootp != rootdir)
-			VN_HOLD(vrootp);
-		ret = lookuppnvp(&pn, &rpn, FOLLOW | flags, NULL,
-		    &compvp, vrootp, vrootp, cr);
-		if (ret == 0) {
-			/*
-			 * Check to see if the returned vnode is the same as
-			 * the one we expect.  If not, give up.
-			 */
-			if (!vn_compare(vp, compvp) &&
-			    !vnode_match(vp, compvp, cr)) {
-				VN_RELE(compvp);
-				goto notcached;
-			}
-
-			VN_RELE(compvp);
-
-			/*
-			 * Return the result.
-			 */
-			if (buflen <= rpn.pn_pathlen)
-				goto notcached;
-
-			bcopy(rpn.pn_path, buf, rpn.pn_pathlen + 1);
 			pn_free(&pn);
 			pn_free(&rpn);
-			VN_RELE(vrootp);
-			if (doclose) {
-				(void) VOP_CLOSE(vp, FREAD, 1, 0, cr, NULL);
-				VN_RELE(vp);
-			}
-			return (0);
+			goto out;
 		}
-
-notcached:
 		pn_free(&rpn);
+		vn_clearpath(vp, cached_stamp);
 	} else {
 		mutex_exit(&vp->v_lock);
 	}
-
 	pn_free(&pn);
 
 	if (vp->v_type != VDIR) {
+		/*
+		 * The reverse lookup tricks used by dirtopath aren't possible
+		 * for non-directory entries.  The best which can be done is
+		 * clearing any stale v_path so later lookups can potentially
+		 * repopulate it with a valid path.
+		 */
 		ret = ENOENT;
 	} else {
 		ret = dirtopath(vrootp, vp, buf, buflen, flags, cr);
 	}
 
+out:
 	VN_RELE(vrootp);
 	if (doclose) {
 		(void) VOP_CLOSE(vp, FREAD, 1, 0, cr, NULL);

@@ -27,7 +27,7 @@
  */
 
 #ifdef __cplusplus
-/* extern "C" { */
+extern "C" {
 #endif
 
 #define	NVME_FMA_INIT			0x1
@@ -47,10 +47,17 @@
 
 typedef struct nvme nvme_t;
 typedef struct nvme_namespace nvme_namespace_t;
+typedef struct nvme_minor_state nvme_minor_state_t;
 typedef struct nvme_dma nvme_dma_t;
 typedef struct nvme_cmd nvme_cmd_t;
 typedef struct nvme_qpair nvme_qpair_t;
 typedef struct nvme_task_arg nvme_task_arg_t;
+
+struct nvme_minor_state {
+	kmutex_t	nm_mutex;
+	boolean_t	nm_oexcl;
+	uint_t		nm_ocnt;
+};
 
 struct nvme_dma {
 	ddi_dma_handle_t nd_dmah;
@@ -69,6 +76,7 @@ struct nvme_cmd {
 	void (*nc_callback)(void *);
 	bd_xfer_t *nc_xfer;
 	boolean_t nc_completed;
+	boolean_t nc_dontpanic;
 	uint16_t nc_sqid;
 
 	nvme_dma_t *nc_dma;
@@ -137,6 +145,8 @@ struct nvme {
 	boolean_t n_write_cache_present;
 	boolean_t n_write_cache_enabled;
 	int n_error_log_len;
+	boolean_t n_lba_range_supported;
+	boolean_t n_auto_pst_supported;
 
 	int n_nssr_supported;
 	int n_doorbell_stride;
@@ -168,9 +178,8 @@ struct nvme {
 
 	ddi_taskq_t *n_cmd_taskq;
 
-	nvme_error_log_entry_t *n_error_log;
-	nvme_health_log_t *n_health_log;
-	nvme_fwslot_log_t *n_fwslot_log;
+	/* state for devctl minor node */
+	nvme_minor_state_t n_minor;
 
 	/* errors detected by driver */
 	uint32_t n_dma_bind_err;
@@ -217,6 +226,7 @@ struct nvme {
 struct nvme_namespace {
 	nvme_t *ns_nvme;
 	uint8_t ns_eui64[8];
+	char	ns_name[17];
 
 	bd_handle_t ns_bd_hdl;
 
@@ -228,6 +238,9 @@ struct nvme_namespace {
 	boolean_t ns_ignore;
 
 	nvme_identify_nsid_t *ns_idns;
+
+	/* state for attachment point minor node */
+	nvme_minor_state_t ns_minor;
 
 	/*
 	 * If a namespace has no EUI64, we create a devid in
@@ -241,8 +254,9 @@ struct nvme_task_arg {
 	nvme_cmd_t *nt_cmd;
 };
 
+
 #ifdef __cplusplus
-/* } */
+}
 #endif
 
 #endif /* _NVME_VAR_H */

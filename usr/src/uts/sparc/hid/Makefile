@@ -43,18 +43,15 @@ MODULE		= hid
 OBJECTS		= $(HID_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(HID_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-WARLOCK_OUT	= $(HID_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -85,10 +82,8 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -102,54 +97,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-#	lock_lint rules
-#
-USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
-OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
-UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
-EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
-
-warlock: $(WARLOCK_OK) warlock_with_usba
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/hid.wlcmd warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/hid.wlcmd $(WARLOCK_OUT)  \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/usb/clients/hid/%.c \
-		$(UTSBASE)/common/sys/usb/clients/hid/hidvar.h
-	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_with_usba: $(WLCMD_DIR)/hid_with_usba.wlcmd  $(WARLOCK_OUT) usba_files \
-	ohci_files ehci_files uhci_files warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/hid_with_usba.wlcmd \
-		$(USBA_FILES) \
-		$(UHCI_FILES) $(OHCI_FILES) $(EHCI_FILES) \
-		$(WARLOCK_OUT) \
-	-l ../warlock/ddi_dki_impl.ll
-
-usba_files:
-	@cd ../usba;pwd; $(MAKE) warlock
-
-ohci_files:
-	@cd ../ohci;pwd; $(MAKE) warlock
-
-uhci_files:
-	@cd ../uhci;pwd; $(MAKE) warlock
-
-ehci_files:
-	@cd ../ehci;pwd; $(MAKE) warlock
-
-warlock_ddi.files:
-	cd ../warlock; pwd; $(MAKE) warlock
-

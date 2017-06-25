@@ -38,14 +38,11 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= ohci 
+MODULE		= ohci
 OBJECTS		= $(OHCI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(OHCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
-WARLOCK_OUT	= $(OHCI_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/hcd/openhci
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -55,7 +52,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 # lint pass one enforcement
 #
-CFLAGS += $(CCVERBOSE)   
+CFLAGS += $(CCVERBOSE)
 
 #
 # depends on misc/usba
@@ -85,10 +82,8 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -102,34 +97,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-#	lock_lint rules
-#
-USBA_FILES = $(USBA_OBJS:%.o= -l ../usba/%.ll)
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/ohci.wlcmd warlock_ddi.files \
-	usba.files
-	$(WARLOCK) -c $(WLCMD_DIR)/ohci.wlcmd  $(WARLOCK_OUT) \
-	$(USBA_FILES) \
-	-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/usb/hcd/openhci/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
-
-usba.files:
-	@cd ../usba; pwd; $(MAKE) warlock

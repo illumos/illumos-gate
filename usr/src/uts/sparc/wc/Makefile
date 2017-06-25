@@ -41,9 +41,6 @@ OBJECTS		= $(WC_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(WC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io
-WARLOCK_OUT	= $(WC_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -97,37 +94,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands
-#
-TEST		= test
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	warlock targets
-#
-
-#
-# vcons_conf.c is compiled to genunix, add it to WARLOCK_OUT
-#
-WARLOCK_OUT	+= vcons_conf.ll
-
-warlock:	$(WARLOCK_OUT) sdev_vtops.file  warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/wc.wlcmd $(WARLOCK_OUT) \
-	-l ../../sparc/warlock/ddi_dki_impl.ll
-	$(WARLOCK) -c $(WLCMD_DIR)/wc_devfs.wlcmd sdev_vtops.ll vcons_conf.ll \
-	-l ../../sparc/warlock/ddi_dki_impl.ll
-	$(TOUCH) $(WARLOCK_OK)
-
-%.ll:	$(UTSBASE)/common/io/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-sdev_vtops.file:
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o sdev_vtops.ll -c \
-	../../common/fs/dev/sdev_vtops.c
-
-warlock_ddi.files:
-	@cd ../../sparc/warlock; pwd; $(MAKE) warlock

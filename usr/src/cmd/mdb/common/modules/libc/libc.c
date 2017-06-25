@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -913,11 +913,18 @@ ulwp_walk_init(mdb_walk_state_t *wsp)
 {
 	uintptr_t addr = wsp->walk_addr;
 	uintptr_t uber_addr;
+	int offset;
+
+	offset = mdb_ctf_offsetof_by_name("uberdata_t", "all_lwps");
+	if (offset == -1) {
+		offset = OFFSETOF(uberdata_t, all_lwps);
+		mdb_warn("CTF data is missing for uberdata_t; using current "
+		    "platform's offset for uberdata.all_lwps");
+	}
 
 	if (addr == NULL &&
 	    ((uber_addr = uberdata_addr()) == NULL ||
-	    mdb_vread(&addr, sizeof (addr),
-	    uber_addr + OFFSETOF(uberdata_t, all_lwps))
+	    mdb_vread(&addr, sizeof (addr), uber_addr + offset)
 	    != sizeof (addr))) {
 		mdb_warn("cannot find 'uberdata.all_lwps'");
 		return (WALK_ERR);

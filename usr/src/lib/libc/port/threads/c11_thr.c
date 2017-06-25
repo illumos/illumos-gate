@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -156,7 +156,7 @@ mtx_lock(mtx_t *mtx)
 
 int
 mtx_timedlock(mtx_t *_RESTRICT_KYWD mtx,
-	const struct timespec *_RESTRICT_KYWD abstime)
+    const struct timespec *_RESTRICT_KYWD abstime)
 {
 	int ret;
 
@@ -221,7 +221,7 @@ thrd_detach(thrd_t thr)
 int
 thrd_equal(thrd_t t1, thrd_t t2)
 {
-	return (!pthread_equal(t1, t2));
+	return (pthread_equal(t1, t2));
 }
 
 _NORETURN_KYWD void

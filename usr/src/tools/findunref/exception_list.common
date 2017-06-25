@@ -51,14 +51,6 @@
 */TODO
 
 #
-# Ignore warlock-related goop; not used during a nightly.
-#
-*.wlc
-*.wlcmd
-*/wlcmd
-*/warlock
-
-#
 # Ignore internal test directories and test programs.
 #
 */tests

@@ -39,8 +39,6 @@ UTSBASE	= ../..
 MODULE		= usba
 OBJECTS		= $(USBA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USBA_OBJS:%.o=$(LINTS_DIR)/%.ln)
-WARLOCK_OUT	= $(USBA_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -48,9 +46,9 @@ ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
@@ -73,11 +71,9 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
@@ -91,24 +87,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	Warlock targets
-#
-
-USBA_FILES = $(USBA_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok 
-
-%.ok:	$(USBA_FILES)
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/usb/usba/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

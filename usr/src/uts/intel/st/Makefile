@@ -43,9 +43,6 @@ OBJECTS		= $(ST_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ST_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/intel/io/scsi/targets
-WARLOCK_OUT     = $(ST_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -93,10 +90,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -110,41 +105,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-# Warlock targets
-#
-
-SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
-
-WARLOCK_TARGETS = warlock_alone
-
-warlock: $(WARLOCK_TARGETS)
-
-warlock_alone: $(WARLOCK_OK)
-
-scsi_files:
-	@cd ../scsi; pwd; $(MAKE) warlock
-
-$(WARLOCK_OK): 	$(WLCMD_DIR)/st.wlcmd $(WARLOCK_OUT) scsi_files \
-	warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/st.wlcmd $(WARLOCK_OUT) $(SCSI_FILES) \
-	-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/scsi/targets/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
-
-scsi.files:
-	@cd ../scsi; pwd; $(MAKE) warlock

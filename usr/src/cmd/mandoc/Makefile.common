@@ -18,6 +18,12 @@ PROG=		mandoc
 
 OBJS=		att.o		\
 		chars.o		\
+		dba.o		\
+		dba_array.o	\
+		dba_read.o	\
+		dba_write.o	\
+		dbm.o		\
+		dbm_map.o	\
 		eqn.o		\
 		eqn_html.o	\
 		eqn_term.o	\
@@ -34,6 +40,8 @@ OBJS=		att.o		\
 		mandoc.o	\
 		mandoc_aux.o	\
 		mandoc_ohash.o	\
+		mandocdb.o	\
+		mansearch.o	\
 		mdoc.o		\
 		mdoc_argv.o	\
 		mdoc_hash.o	\
