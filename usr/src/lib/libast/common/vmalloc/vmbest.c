@@ -980,7 +980,8 @@ int		type;		/* !=0 to move, <0 for not copy */
 				CLRBITS(s);
 			}
 			else if(ISJUNK(s) )
-			{	if(!bestreclaim(vd,np,C_INDEX(s)) )
+			{
+				if(!bestreclaim(vd,np,C_INDEX(s)) )
 					/**/ASSERT(0); /* oops: did not see np! */
 				s = SIZE(np); /**/ASSERT(s%ALIGN == 0);
 			}

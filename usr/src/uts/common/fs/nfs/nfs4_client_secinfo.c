@@ -486,7 +486,7 @@ retry:
 	}
 
 	if (res.status == NFS4ERR_WRONGSEC) {
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		if (secinfo_check(mi->mi_curr_serv))
 			goto retry;
 		/*
@@ -502,12 +502,12 @@ retry:
 		    "secinfo_tryroot_otw: let the caller retry\n"));
 
 		if (!e.error)
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+			xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		return (0);
 	}
 
 	if (res.status) {
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		return (geterrno4(res.status));
 	}
 
@@ -518,7 +518,7 @@ retry:
 	 * SV4_TRYSECINFO has been cleared in rfs4call.
 	 * sv_currsec will be used.
 	 */
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 	return (e.error);
 }
 
@@ -702,7 +702,7 @@ retry:
 			nfs4args_lookup_free(argop, num_argops);
 			kmem_free(argop,
 			    lookuparg.arglen * sizeof (nfs_argop4));
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+			xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 			kmem_free(tmp_path, path_len + 1);
 
 			if (e.error = secinfo_tryroot_otw(mi, cr)) {
@@ -713,7 +713,7 @@ retry:
 		ncomp = res.array_len - 1;
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		kmem_free(tmp_path, path_len + 1);
 		goto retry;
 	}
@@ -732,8 +732,7 @@ retry:
 		if (!isrecov) {
 			if (!e.error) {
 				e.error = geterrno4(res.status);
-				(void) xdr_free(xdr_COMPOUND4res_clnt,
-				    (caddr_t)&res);
+				xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 			}
 
 			nfs4args_lookup_free(argop, num_argops);
@@ -750,7 +749,7 @@ retry:
 		    NULL, NULL, NULL, OP_SECINFO, NULL, NULL, NULL);
 		if (!e.error) {
 			e.error = geterrno4(res.status);
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+			xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		}
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
@@ -768,7 +767,7 @@ retry:
 	if (res.status) {
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		kmem_free(tmp_path, path_len + 1);
 		return (geterrno4(res.status));
 	}
@@ -787,7 +786,7 @@ retry:
 		 */
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(tmp_path, path_len + 1);
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		kmem_free(argop, num_argops * sizeof (nfs_argop4));
 		return (EACCES);
 	}
@@ -804,7 +803,7 @@ retry:
 		 */
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		kmem_free(tmp_path, path_len + 1);
 		return (EACCES);
 	}
@@ -819,7 +818,7 @@ retry:
 		ncomp = tcomp;
 		nfs4args_lookup_free(argop, num_argops);
 		kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		kmem_free(tmp_path, path_len + 1);
 		goto retry;
 	}
@@ -827,7 +826,7 @@ retry:
 	/* Done! */
 	nfs4args_lookup_free(argop, num_argops);
 	kmem_free(argop, lookuparg.arglen * sizeof (nfs_argop4));
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 	kmem_free(tmp_path, path_len + 1);
 
 	return (0); /* got the secinfo */
@@ -943,7 +942,7 @@ nfs4_secinfo_fh_otw(mntinfo4_t *mi, nfs4_sharedfh_t *fh, char *nm, cred_t *cr)
 		return (e.error);
 
 	if (res.status) {
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		return (geterrno4(res.status));
 	}
 
@@ -958,7 +957,7 @@ nfs4_secinfo_fh_otw(mntinfo4_t *mi, nfs4_sharedfh_t *fh, char *nm, cred_t *cr)
 		 * Server does not return any flavor for this export point.
 		 * Return EACCES.
 		 */
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		return (EACCES);
 	}
 
@@ -973,13 +972,13 @@ nfs4_secinfo_fh_otw(mntinfo4_t *mi, nfs4_sharedfh_t *fh, char *nm, cred_t *cr)
 		 * the client does not have netname/syncaddr data
 		 * from sv_dhsec.
 		 */
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		return (EACCES);
 	}
 	nfs_rw_exit(&svp->sv_lock);
 
 	/* Done! */
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 
 	return (0); /* got the secinfo */
 }

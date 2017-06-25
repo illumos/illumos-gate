@@ -554,7 +554,8 @@ _MANFILES=	6to4relay.1m		\
 
 i386_MANFILES=				\
 		acpidump.1m		\
-		acpixtract.1m
+		acpixtract.1m		\
+		nvmeadm.1m
 
 sparc_MANFILES=	cvcd.1m			\
 		dcs.1m			\

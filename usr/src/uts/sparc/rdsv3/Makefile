@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#	This makefile drives the production of the rds driver 
+#	This makefile drives the production of the rds driver
 #	kernel module.
 #
 #	sparc architecture dependent
@@ -40,9 +40,6 @@ OBJECTS		= $(RDSV3_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(RDSV3_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/rdsv3
-WARLOCK_OUT     = $(RDSV3_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -114,36 +111,3 @@ $(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOTMODULE)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#       Defines for local commands.
-#
-WARLOCK         = warlock
-WLCC            = wlcc
-TOUCH           = touch
-TEST            = test
-
-warlock: $(WARLOCK_OK) $(WARLOCK_OUT)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/rdsv3.wlcmd warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/rdsv3.wlcmd $(WARLOCK_OUT) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/clients/rdsv3/%.c \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/ib.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/info.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/loop.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rdma.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rdma_transport.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rds.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rds_rdma.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rdsv3_atomic.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rdsv3_debug.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rdsv3_impl.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rdsv3_ofed_types.h \
-	$(UTSBASE)/common/sys/ib/clients/rdsv3/rdsv3_sc.h
-	$(WLCC)  $(CPPFLAGS) -DDEBUG -Dinline=  -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock

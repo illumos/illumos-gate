@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/stat.h>
@@ -461,7 +462,7 @@ vscan_svc_scan_file(vnode_t *vp, cred_t *cr, int async)
 	boolean_t allow;
 	clock_t timeout, time_left;
 
-	if ((vp == NULL) || (vp->v_path == NULL) || cr == NULL)
+	if ((vp == NULL) || (vp->v_path == vn_vpath_empty) || cr == NULL)
 		return (0);
 
 	DTRACE_PROBE2(vscan__scan__file, char *, vp->v_path, int, async);
@@ -1080,7 +1081,6 @@ vscan_svc_exempt_file(vnode_t *vp, boolean_t *allow)
 	struct vattr attr;
 
 	ASSERT(vp != NULL);
-	ASSERT(vp->v_path != NULL);
 
 	attr.va_mask = AT_SIZE;
 

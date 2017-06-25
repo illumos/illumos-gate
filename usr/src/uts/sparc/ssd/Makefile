@@ -45,9 +45,6 @@ OBJECTS		= $(SSD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SSD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
-WARLOCK_OUT     = ssd.ll 
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -61,9 +58,9 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE) -D__fibre -dalign
 LINTFLAGS += -D__fibre
 WLCCFLAGS = -D__fibre
@@ -100,10 +97,8 @@ all:		$(ALL_DEPS)
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -117,46 +112,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include	$(UTSBASE)/sparc/Makefile.targ
-
-browser:	$(BINARY)
-
-browser		:= CFLAGS += -xsb
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-# Warlock targets
-
-SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
-CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
-
-warlock: warlock_alone
-
-warlock_alone: $(WARLOCK_OK)
-
-scsi_files:
-	@cd ../scsi; pwd; $(MAKE) warlock
-
-cmlb_files:
-	 @cd ../cmlb; pwd; $(MAKE) warlock
-
-$(WARLOCK_OK): $(WLCMD_DIR)/ssd.wlcmd $(WARLOCK_OUT) scsi.files cmlb_files
-	$(WARLOCK) -c $(WLCMD_DIR)/ssd.wlcmd $(WARLOCK_OUT) \
-	$(SCSI_FILES) $(CMLB_FILES) \
-	-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-ssd.ll: $(UTSBASE)/common/io/scsi/targets/sd.c
-	$(WLCC) $(CPPFLAGS) $(WLCCFLAGS) -DDEBUG -o $@ $(UTSBASE)/common/io/scsi/targets/sd.c 
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
-
-scsi.files:
-	@cd ../scsi; pwd; $(MAKE) warlock

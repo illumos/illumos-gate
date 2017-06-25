@@ -293,10 +293,10 @@ void fcoet_modhash_find_cb(mod_hash_key_t, mod_hash_val_t);
 #define	PRT_FRM_HDR(x_p, x_f)						\
 	{								\
 		FCOET_LOG(x_p, "rctl/%x, type/%x, fctl/%x, oxid/%x",	\
-		    FCOE_B2V_1((x_f)->frm_hdr->hdr_r_ctl),		\
-		    FCOE_B2V_1((x_f)->frm_hdr->hdr_type),		\
-		    FCOE_B2V_3((x_f)->frm_hdr->hdr_f_ctl),		\
-		    FCOE_B2V_4((x_f)->frm_hdr->hdr_oxid));		\
+		    FRM_R_CTL(x_f),		\
+		    FRM_TYPE(x_f),		\
+		    FRM_F_CTL(x_f),		\
+		    FRM_OXID(x_f));		\
 	}
 
 #endif	/* _KERNEL */

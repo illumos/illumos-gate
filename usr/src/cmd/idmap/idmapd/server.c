@@ -179,7 +179,7 @@ validate_rules(idmap_update_batch *batch)
 /* ARGSUSED */
 bool_t
 idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
-		idmap_ids_res *result, struct svc_req *rqstp)
+    idmap_ids_res *result, struct svc_req *rqstp)
 {
 	sqlite		*cache = NULL, *db = NULL;
 	lookup_state_t	state;
@@ -718,7 +718,7 @@ out:
 	if (sql)
 		sqlite_freemem(sql);
 	if (IDMAP_ERROR(result->retcode))
-		(void) xdr_free(xdr_idmap_mappings_res, (caddr_t)result);
+		xdr_free(xdr_idmap_mappings_res, (caddr_t)result);
 	result->retcode = idmap_stat4prot(result->retcode);
 	return (TRUE);
 }
@@ -798,8 +798,7 @@ list_namerules_cb(void *parg, int argc, char **argv, char **colnames)
 /* ARGSUSED */
 bool_t
 idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
-		uint64_t limit, idmap_namerules_res *result,
-		struct svc_req *rqstp)
+    uint64_t limit, idmap_namerules_res *result, struct svc_req *rqstp)
 {
 
 	sqlite		*db = NULL;
@@ -865,7 +864,7 @@ out:
 	if (sql)
 		sqlite_freemem(sql);
 	if (IDMAP_ERROR(result->retcode))
-		(void) xdr_free(xdr_idmap_namerules_res, (caddr_t)result);
+		xdr_free(xdr_idmap_namerules_res, (caddr_t)result);
 	result->retcode = idmap_stat4prot(result->retcode);
 	return (TRUE);
 }
@@ -922,7 +921,7 @@ verify_rules_auth(struct svc_req *rqstp)
 /* ARGSUSED */
 bool_t
 idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
-		struct svc_req *rqstp)
+    struct svc_req *rqstp)
 {
 	sqlite		*db = NULL;
 	idmap_update_op	*up;
@@ -1113,7 +1112,7 @@ errout:
 /* ARGSUSED */
 bool_t
 idmap_get_mapped_id_by_name_1_svc(idmap_mapping request,
-		idmap_mappings_res *result, struct svc_req *rqstp)
+    idmap_mappings_res *result, struct svc_req *rqstp)
 {
 	idmap_mapping_batch batch_request;
 	idmap_ids_res batch_result;
@@ -1194,7 +1193,7 @@ out:
 /* ARGSUSED */
 bool_t
 idmap_get_prop_1_svc(idmap_prop_type request,
-		idmap_prop_res *result, struct svc_req *rqstp)
+    idmap_prop_res *result, struct svc_req *rqstp)
 {
 	idmap_pg_config_t *pgcfg;
 
@@ -1311,9 +1310,9 @@ idmap_flush_1_svc(
 /* ARGSUSED */
 int
 idmap_prog_1_freeresult(SVCXPRT *transp, xdrproc_t xdr_result,
-		caddr_t result)
+    caddr_t result)
 {
-	(void) xdr_free(xdr_result, result);
+	xdr_free(xdr_result, result);
 	return (TRUE);
 }
 

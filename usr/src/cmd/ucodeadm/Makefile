@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2017 RackTop Systems.
+#
 
 PROG = ucodeadm
 
@@ -50,7 +52,7 @@ CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-type-limits
 LINTFLAGS += -errtags -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_INCONS_ARG_DECL2,E_INCONS_VAL_TYPE_DECL2
-LDLIBS = -lgen
+LDLIBS += -lgen
 
 DIRMODE = 0755
 FILEMODE = 0555

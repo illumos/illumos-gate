@@ -1,5 +1,4 @@
-
-/*	$Id: main.c,v 1.273.2.3 2017/01/09 02:27:58 schwarze Exp $ */
+/*	$Id: main.c,v 1.283 2017/02/17 14:31:52 schwarze Exp $ */
 /*
  * Copyright (c) 2008-2012 Kristaps Dzonsons <kristaps@bsd.lv>
  * Copyright (c) 2010-2012, 2014-2017 Ingo Schwarze <schwarze@openbsd.org>
@@ -83,9 +82,7 @@ struct	curparse {
 };
 
 
-#if HAVE_SQLITE3
 int			  mandocdb(int, char *[]);
-#endif
 
 static	int		  fs_lookup(const struct manpaths *,
 				size_t ipath, const char *,
@@ -103,7 +100,7 @@ static	void		  parse(struct curparse *, int, const char *);
 static	void		  passthrough(const char *, int, int);
 static	pid_t		  spawn_pager(struct tag_files *);
 static	int		  toptions(struct curparse *, char *);
-static	void		  usage(enum argmode) __attribute__((noreturn));
+static	void		  usage(enum argmode) __attribute__((__noreturn__));
 static	int		  woptions(struct curparse *, char *);
 
 static	const int sec_prios[] = {1, 4, 5, 8, 6, 3, 7, 2, 9};
@@ -116,16 +113,14 @@ int
 main(int argc, char *argv[])
 {
 	struct manconf	 conf;
-	struct curparse	 curp;
 	struct mansearch search;
+	struct curparse	 curp;
 	struct tag_files *tag_files;
-	const char	*progname;
-	char		*auxpaths;
-	char		*defos;
-	unsigned char	*uc;
 	struct manpage	*res, *resp;
-	char		*conf_file, *defpaths;
-	const char	*sec;
+	const char	*progname, *sec, *thisarg;
+	char		*conf_file, *defpaths, *auxpaths;
+	char		*defos, *oarg;
+	unsigned char	*uc;
 	size_t		 i, sz;
 	int		 prio, best_prio;
 	enum outmode	 outmode;
@@ -149,11 +144,9 @@ main(int argc, char *argv[])
 	setprogname(progname);
 #endif
 
-#if HAVE_SQLITE3
 	if (strncmp(progname, "mandocdb", 8) == 0 ||
 	    strcmp(progname, BINM_MAKEWHATIS) == 0)
 		return mandocdb(argc, argv);
-#endif
 
 #if HAVE_PLEDGE
 	if (pledge("stdio rpath tmppath tty proc exec flock", NULL) == -1)
@@ -173,6 +166,7 @@ main(int argc, char *argv[])
 
 	memset(&search, 0, sizeof(struct mansearch));
 	search.outkey = "Nd";
+	oarg = NULL;
 
 	if (strcmp(progname, BINM_MAN) == 0)
 		search.argmode = ARG_NAME;
@@ -251,10 +245,7 @@ main(int argc, char *argv[])
 			auxpaths = optarg;
 			break;
 		case 'O':
-			search.outkey = optarg;
-			while (optarg != NULL)
-				manconf_output(&conf.output,
-				    strsep(&optarg, ","));
+			oarg = optarg;
 			break;
 		case 'S':
 			search.arch = optarg;
@@ -296,6 +287,21 @@ main(int argc, char *argv[])
 		default:
 			outmode = OUTMODE_LST;
 			break;
+		}
+	}
+
+	if (oarg != NULL) {
+		if (outmode == OUTMODE_LST)
+			search.outkey = oarg;
+		else {
+			while (oarg != NULL) {
+				thisarg = oarg;
+				if (manconf_output(&conf.output,
+				    strsep(&oarg, ","), 0) == 0)
+					continue;
+				warnx("-O %s: Bad argument", thisarg);
+				return (int)MANDOCLEVEL_BADARG;
+			}
 		}
 	}
 
@@ -351,9 +357,6 @@ main(int argc, char *argv[])
 	/* man(1), whatis(1), apropos(1) */
 
 	if (search.argmode != ARG_FILE) {
-		if (argc == 0)
-			usage(search.argmode);
-
 		if (search.argmode == ARG_NAME &&
 		    outmode == OUTMODE_ONE)
 			search.firstmatch = 1;
@@ -361,19 +364,9 @@ main(int argc, char *argv[])
 		/* Access the mandoc database. */
 
 		manconf_parse(&conf, conf_file, defpaths, auxpaths);
-#if HAVE_SQLITE3
-		mansearch_setup(1);
 		if ( ! mansearch(&search, &conf.manpath,
 		    argc, argv, &res, &sz))
 			usage(search.argmode);
-#else
-		if (search.argmode != ARG_NAME) {
-			fputs("mandoc: database support not compiled in\n",
-			    stderr);
-			return (int)MANDOCLEVEL_BADARG;
-		}
-		sz = 0;
-#endif
 
 		if (sz == 0) {
 			if (search.argmode == ARG_NAME)
@@ -476,7 +469,7 @@ main(int argc, char *argv[])
 
 			if (resp == NULL)
 				parse(&curp, fd, *argv);
-			else if (resp->form & FORM_SRC) {
+			else if (resp->form == FORM_SRC) {
 				/* For .so only; ignore failure. */
 				chdir(conf.manpath.paths[resp->ipath]);
 				parse(&curp, fd, resp->file);
@@ -527,10 +520,7 @@ main(int argc, char *argv[])
 out:
 	if (search.argmode != ARG_FILE) {
 		manconf_free(&conf);
-#if HAVE_SQLITE3
 		mansearch_free(res, sz);
-		mansearch_setup(0);
-#endif
 	}
 
 	free(defos);
@@ -552,10 +542,10 @@ out:
 
 			/* Stop here until moved to the foreground. */
 
-			tc_pgid = tcgetpgrp(STDIN_FILENO);
+			tc_pgid = tcgetpgrp(tag_files->ofd);
 			if (tc_pgid != man_pgid) {
 				if (tc_pgid == pager_pid) {
-					(void)tcsetpgrp(STDIN_FILENO,
+					(void)tcsetpgrp(tag_files->ofd,
 					    man_pgid);
 					if (signum == SIGTTIN)
 						continue;
@@ -568,7 +558,7 @@ out:
 			/* Once in the foreground, activate the pager. */
 
 			if (pager_pid) {
-				(void)tcsetpgrp(STDIN_FILENO, pager_pid);
+				(void)tcsetpgrp(tag_files->ofd, pager_pid);
 				kill(pager_pid, SIGCONT);
 			} else
 				pager_pid = spawn_pager(tag_files);
@@ -634,7 +624,8 @@ fs_lookup(const struct manpaths *paths, size_t ipath,
 	glob_t		 globinfo;
 	struct manpage	*page;
 	char		*file;
-	int		 form, globres;
+	int		 globres;
+	enum form	 form;
 
 	form = FORM_SRC;
 	mandoc_asprintf(&file, "%s/man%s/%s.%s",
@@ -672,10 +663,8 @@ fs_lookup(const struct manpaths *paths, size_t ipath,
 		return 0;
 
 found:
-#if HAVE_SQLITE3
 	warnx("outdated mandoc.db lacks %s(%s) entry, run %s %s",
 	    name, sec, BINM_MAKEWHATIS, paths->paths[ipath]);
-#endif
 	*res = mandoc_reallocarray(*res, ++*ressz, sizeof(struct manpage));
 	page = *res + (*ressz - 1);
 	page->file = file;
@@ -758,7 +747,8 @@ parse(struct curparse *curp, int fd, const char *file)
 	if (man == NULL)
 		return;
 	if (man->macroset == MACROSET_MDOC) {
-		mdoc_validate(man);
+		if (curp->outtype != OUTT_TREE || !curp->outopts->noval)
+			mdoc_validate(man);
 		switch (curp->outtype) {
 		case OUTT_HTML:
 			html_mdoc(curp->outdata, man);
@@ -781,7 +771,8 @@ parse(struct curparse *curp, int fd, const char *file)
 		}
 	}
 	if (man->macroset == MACROSET_MAN) {
-		man_validate(man);
+		if (curp->outtype != OUTT_TREE || !curp->outopts->noval)
+			man_validate(man);
 		switch (curp->outtype) {
 		case OUTT_HTML:
 			html_man(curp->outdata, man);
@@ -1098,7 +1089,7 @@ spawn_pager(struct tag_files *tag_files)
 		break;
 	default:
 		(void)setpgid(pager_pid, 0);
-		(void)tcsetpgrp(STDIN_FILENO, pager_pid);
+		(void)tcsetpgrp(tag_files->ofd, pager_pid);
 #if HAVE_PLEDGE
 		if (pledge("stdio rpath tmppath tty proc", NULL) == -1)
 			err((int)MANDOCLEVEL_SYSERR, "pledge");
@@ -1116,7 +1107,7 @@ spawn_pager(struct tag_files *tag_files)
 
 	/* Do not start the pager before controlling the terminal. */
 
-	while (tcgetpgrp(STDIN_FILENO) != getpid())
+	while (tcgetpgrp(STDOUT_FILENO) != getpid())
 		nanosleep(&timeout, NULL);
 
 	execvp(argv[0], argv);

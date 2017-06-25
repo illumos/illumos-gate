@@ -1,21 +1,21 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2004 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2017 Olaf Bohlen
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LAST 1 "Jul 24, 2004"
+.TH LAST 1 "Apr 12, 2017"
 .SH NAME
 last \- display login and logout information about users and terminals
 .SH SYNOPSIS
 .LP
 .nf
-\fBlast\fR [\fB-a\fR] [\fB-n\fR \fInumber\fR | \fB-number\fR] [\fB-f\fR \fIfilename\fR]
+\fBlast\fR [\fB-a\fR] [\fB-l\fR] [\fB-n\fR \fInumber\fR | \fB-number\fR] [\fB-f\fR \fIfilename\fR]
      [\fIname\fR | \fItty\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlast\fR command looks in the \fB/var/adm/wtmpx\fR file, which records
 all logins and logouts, for information about a user, a terminal, or any group
@@ -55,7 +55,6 @@ If \fBlast\fR is interrupted, it indicates how far the search has progressed in
 CTRL\(mi\e), \fBlast\fR indicates how far the search has progressed, and then
 continues the search.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -65,6 +64,15 @@ The following options are supported:
 .ad
 .RS 25n
 Displays the hostname in the last column.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR\fR
+.ad
+.RS 25n
+Displays timestamps with seconds and years.
 .RE
 
 .sp
@@ -89,12 +97,10 @@ transition tool only and is removed in future releases.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 Date and time format is based on locale specified by the \fBLC_ALL\fR,
 \fBLC_TIME\fR, or \fBLANG\fR environments, in that order of priority.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/wtmpx\fR\fR
@@ -104,6 +110,5 @@ accounting file
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fButmpx\fR(4), \fBattributes\fR(5)

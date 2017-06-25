@@ -1,0 +1,410 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+.\"
+.Dd May 04, 2016
+.Dt NVMEADM 1M
+.Os
+.Sh NAME
+.Nm nvmeadm
+.Nd NVMe administration utility
+.Sh SYNOPSIS
+.Nm
+.Fl h
+.Op Ar command
+.Nm
+.Op Fl dv
+.Cm list
+.Op Ar ctl[/ns][,...]
+.Nm
+.Op Fl dv
+.Cm identify
+.Ar ctl[/ns][,...]
+.Nm
+.Op Fl dv
+.Cm get-logpage
+.Ar ctl[/ns][,...]
+.Ar logpage
+.Nm
+.Op Fl dv
+.Cm get-features
+.Ar ctl[/ns][,...]
+.Op Ar feature-list
+.Nm
+.Op Fl dv
+.Cm format
+.Ar ctl[/ns]
+.Op Ar lba-format
+.Nm
+.Op Fl dv
+.Cm secure-erase
+.Ar ctl[/ns]
+.Op Fl c
+.Nm
+.Op Fl dv
+.Cm detach
+.Ar ctl[/ns]
+.Nm
+.Op Fl dv
+.Cm attach
+.Ar ctl[/ns]
+.Sh DESCRIPTION
+The
+.Nm
+utility can be used to enumerate the NVMe controllers and their
+namespaces, query hardware information from a NVMe controller or
+namespace, and to format or secure-erase a NVMe controller or
+namespace.
+.Pp
+The information returned by the hardware is printed by
+.Nm
+in a human-readable form were applicable.
+Generally all 0-based counts are normalized and values may be
+converted to human-readable units such as MB (megabytes), W (watts),
+or C (degrees Celsius).
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl h
+Print a short help text for
+.Nm ,
+or for an optionally specified
+.Nm
+command.
+.It Fl d
+Enable debugging output.
+.It Fl v
+Enable verbose output.
+.El
+.Sh ARGUMENTS
+.Nm
+expects the following kinds of arguments:
+.Bl -tag -width "ctl/[ns]"
+.It Ar command
+Any command
+.Nm
+understands.
+See section
+.Sx COMMANDS .
+.It Ar ctl/[ns]
+Specifies a NVMe controller and optionally a namespace within that
+controller.
+The controller name consists of the driver name
+.Qq nvme
+followed by an instance number.
+A namespace is specified by appending a single
+.Qq /
+followed by the namespace ID to the controller name.
+The namespace ID is the EUI64 of the namespace, or a positive non-zero
+decimal number if the namespace doesn't have an EUI64.
+For commands that don't change the device state multiple controllers
+and namespaces can be specified as a comma-separated list.
+.Pp
+The list of controllers and namespaces present in the system can be
+queried with the
+.Cm list
+command without any arguments.
+.It Ar logpage
+Specifies the log page name for the
+.Cm get-logpage
+command.
+.It Ar feature-list
+A comma-separated list of feature names for the
+.Cm get-features
+command.
+Feature names can be specified in upper or lower case and can be
+shortened the shortest unique name.
+Some features may also have an alternative short name.
+.It Ar lba-format
+A non-zero integer specifying the LBA format for the
+.Cm format
+command.
+The list of supported LBA formats on a namespace can be retrieved
+with the
+.Nm
+.Cm identify
+command.
+.El
+.Sh COMMANDS
+.Bl -tag -width ""
+.It Xo
+.Nm
+.Cm list
+.Op Ar ctl[/ns][,...]
+.Xc
+Lists the NVMe controllers and their namespaces in the system and
+prints a 1-line summary of their basic properties for each.
+If a list of controllers and/or namespaces is given then the listing
+is limited to those devices.
+.It Xo
+.Nm
+.Cm identify
+.Ar ctl[/ns][,...]
+.Xc
+Print detailed information about the specified controllers and/or
+namespaces.
+The information returned differs depending on whether a controller or
+a namespace is specified.
+For an explanation of the data printed by this command refer to the
+description of the
+.Qq IDENTIFY
+admin command in the NVMe specification.
+.It Xo
+.Nm
+.Cm get-logpage
+.Ar ctl[/ns][,...]
+.Ar logpage
+.Xc
+Print the specified log page of the specified controllers and/or namespaces.
+Most log pages are only available on a per-controller basis.
+Known log pages are:
+.Bl -tag -width "firmware"
+.It error
+Error Information
+.It health
+SMART/Health Information.
+A controller may support this log page on a per-namespace basis.
+.It firmware
+Firmware Slot Information
+.El
+.Pp
+For an explanation of the contents of the log pages refer to the
+description of the
+.Qq GET LOGPAGE
+admin command in the NVMe specification.
+.It Xo
+.Nm
+.Cm get-features
+.Ar ctl[/ns][,...]
+.Op Ar feature-list
+.Xc
+Prints information about the specified features, or all features if
+none are given, of the specified controllers and/or namespaces.
+Feature names are case-insensitive, and they can be shortened as long
+as they remain unique.
+Some features also have alternative short names to which the same
+rules apply.
+The following features are supported:
+.Pp
+.TS
+tab(:);
+l l l.
+FULL NAME:SHORT NAME:CONTROLLER/NAMESPACE
+Arbitration::controller
+Power Management::controller
+LBA Range Type:range:namespace
+Temperature Threshold::controller
+Error Recovery::controller
+Volatile Write Cache:cache:controller
+Number of Queues:queues:controller
+Interrupt Coalescing:coalescing:controller
+Interrupt Vector Configuration:vector:controller
+Write Atomicity:atomicity:controller
+Asynchronous Event Configuration:event:controller
+Autonomous Power State Transition::controller
+Software Progress Marker:progress:controller
+.TE
+.Pp
+For an explanation of the individual features refer to the description
+of the
+.Qq SET FEATURES
+admin command in the NVMe specification.
+.It Xo
+.Nm
+.Cm format
+.Ar ctl[/ns]
+.Op Ar lba-format
+.Xc
+Formats the specified namespace or all namespaces of the specified
+controller.
+This command implies a
+.Nm
+.Cm detach
+and subsequent
+.Nm
+.Cm attach
+of the specified namespace(s), which will cause a changed LBA format
+to be detected.
+If no LBA format is specified the LBA format currently used by the
+namespace will be used.
+When formatting all namespaces without specifying a LBA format the LBA
+format of namespace 1 will be used.
+A list of LBA formats supported by a namespace can be queried with the
+.Nm
+.Cm identify
+command.
+.Pp
+Note that not all devices support formatting individual or all
+namespaces, or support formatting at all.
+.Pp
+LBA formats using a non-zero metadata size are not supported by
+.Nm
+or
+.Xr nvme 7D .
+.Pp
+The list of supported LBA formats on a namespace can be retrieved
+with the
+.Nm
+.Cm identify
+command.
+.It Xo
+.Nm
+.Cm secure-erase
+.Ar ctl[/ns]
+.Op Fl c
+.Xc
+Erases the specified namespace or all namespaces of the controller.
+The flag
+.Fl c
+will cause a cryptographic erase instead of a normal erase.
+This command implies a
+.Nm
+.Cm detach
+and
+.Nm
+.Cm attach
+of the specified namespace(s).
+.Pp
+Note that not all devices support erasing individual or all
+namespaces, or support erasing at all.
+.It Xo
+.Nm
+.Cm detach
+.Ar ctl[/ns]
+.Xc
+Temporarily detaches the
+.Xr blkdev 7D
+instance from the specified namespace or all namespaces of the controller.
+This will prevent I/O access to the affected namespace(s).
+Detach will only succeed if the affected namespace(s) are not
+currently opened.
+The detached state will not persist across reboots or reloads of the
+.Xr nvme 7D
+driver.
+.It Xo
+.Nm
+.Cm attach
+.Ar ctl[/ns]
+.Xc
+Attaches the
+.Xr blkdev 7D
+instance to the specified namespace or all namespaces of the controller.
+This will make I/O accesses to the namespace(s) possible again after a
+previous
+.Nm
+.Cm detach
+command.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Bl -tag -width ""
+.It Sy Example 1: List all NVMe controllers and namespaces
+.Bd -literal
+# nvmeadm list
+nvme1: model: INTEL SSDPEDMD800G4, serial: CVFT4134001R800CGN, FW rev: 8DV10049, NVMe v1.0
+  nvme1/1 (c1t1d0): Size = 763097 MB, Capacity = 763097 MB, Used = 763097 MB
+nvme4: model: SAMSUNG MZVPV128HDGM-00000, serial: S1XVNYAGA00640, FW rev: BXW7300Q, NVMe v1.1
+  nvme4/1 (c2t2d0): Size = 122104 MB, Capacity = 122104 MB, Used = 5127 MB
+.Ed
+.It Sy Example 2: Identify a namespace
+.Bd -literal
+# nvmeadm identify nvme4/1
+nvme4/1: Identify Namespace
+  Namespace Capabilities and Features
+    Namespace Size:                         122104MB
+    Namespace Capacity:                     122104MB
+    Namespace Utilization:                  5127MB
+    Namespace Features
+      Thin Provisioning:                    unsupported
+    Number of LBA Formats:                  1
+    Formatted LBA Size
+      LBA Format:                           1
+      Extended Data LBA:                    no
+    Metadata Capabilities
+      Extended Data LBA:                    unsupported
+      Separate Metadata:                    unsupported
+    End-to-End Data Protection Capabilities
+      Protection Information Type 1:        unsupported
+      Protection Information Type 2:        unsupported
+      Protection Information Type 3:        unsupported
+      Protection Information first:         unsupported
+      Protection Information last:          unsupported
+    End-to-End Data Protection Settings
+      Protection Information:               disabled
+      Protection Information in Metadata:   last 8 bytes
+    LBA Format 1
+      Metadata Size:                        0 bytes
+      LBA Data Size:                        512 bytes
+      Relative Performance:                 Best
+.Ed
+.It Sy Example 3: Get SMART/Health information (verbose)
+.Bd -literal
+# nvmeadm -v get-logpage nvme4/1 health
+nvme4/1: SMART/Health Information
+  Critical Warnings
+    Available Space:                        OK
+    Temperature:                            OK
+    Device Reliability:                     OK
+    Media:                                  OK
+    Volatile Memory Backup:                 OK
+  Temperature:                              37C
+  Available Spare Capacity:                 100%
+  Available Spare Threshold:                10%
+  Device Life Used:                         0%
+  Data Read:                                0GB
+  Data Written:                             64GB
+  Read Commands:                            52907
+  Write Commands:                           567874
+  Controller Busy:                          1min
+  Power Cycles:                             6
+  Power On:                                 141h
+  Unsafe Shutdowns:                         1
+  Uncorrectable Media Errors:               0
+  Errors Logged:                            1
+.Ed
+.It Sy Example 4: Get Asynchronous Event Configuration information
+.Bd -literal
+# nvmeadm get-features nvme0,nvme4 event,power
+nvme0: Get Features
+  Asynchronous Event Configuration
+    Available Space below threshold:        disabled
+    Temperature above threshold:            disabled
+    Device Reliability compromised:         disabled
+    Media read-only:                        disabled
+  Power Management
+    Power State:                            0
+nvme4: Get Features
+  Asynchronous Event Configuration
+    Available Space below threshold:        disabled
+    Temperature above threshold:            disabled
+    Device Reliability compromised:         disabled
+    Media read-only:                        disabled
+    Volatile Memory Backup failed:          disabled
+  Power Management
+    Power State:                            0
+.Ed
+.El
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Evolving .
+The output of
+.Nm
+is
+.Sy Not-an-Interface
+and may change any time.
+.Sh SEE ALSO
+.Xr nvme 7D
+.Pp
+.Lk http://www.nvmexpress.org/specifications/ "NVMe specifications"

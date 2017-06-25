@@ -455,7 +455,7 @@ nfs4_trigger_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 
 static int
 nfs4_trigger_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
-		caller_context_t *ct)
+    caller_context_t *ct)
 {
 	int error;
 	vnode_t *newvp;
@@ -1506,7 +1506,7 @@ nfs4_fetch_locations(mntinfo4_t *mi, nfs4_sharedfh_t *sfh, char *nm,
 exit:
 	if (retval == 0) {
 		/* the call was ok but failed validating the call results */
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 	} else {
 		ASSERT(callres != NULL);
 		*callres = res;
@@ -1548,7 +1548,7 @@ find_referral_stubvp(vnode_t *dvp, char *nm, cred_t *cr)
 	    &garp, &callres, FALSE) == 0)
 		return (NULL);
 	mnt_on_fileid = garp.n4g_mon_fid;
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
 
 	/*
 	 * Build a fake filehandle from the dir FH and the mounted_on_fileid
@@ -1648,7 +1648,7 @@ nfs4_process_referral(mntinfo4_t *mi, nfs4_sharedfh_t *sfh,
 		DTRACE_PROBE3(nfs4clnt__debug__referral__migration,
 		    mntinfo4_t *, mi, nfs4_ga_res_t *, &garp,
 		    char *, "nfs4_process_referral");
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
 		return (-1);
 	}
 
@@ -1675,14 +1675,14 @@ nfs4_process_referral(mntinfo4_t *mi, nfs4_sharedfh_t *sfh,
 		    sockaddr_in *, (struct sockaddr_in *)nfsfsloc.addr->buf,
 		    char *, "nfs4_process_referral");
 
-		(void) xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
+		xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
 	}
 	knc = nfsfsloc.knconf;
 	if ((i >= garp.n4g_ext_res->n4g_fslocations.locations_len) ||
 	    (knc->knc_protofmly == NULL) || (knc->knc_proto == NULL)) {
 		DTRACE_PROBE2(nfs4clnt__debug__referral__nofsloc,
 		    nfs4_ga_res_t *, &garp, char *, "nfs4_process_referral");
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+		xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
 		return (-1);
 	}
 
@@ -1813,8 +1813,8 @@ nfs4_trigger_esi_create_referral(vnode_t *vp, cred_t *cr)
 	kmem_free(p, MAXPATHLEN);
 
 	/* Allocated in nfs4_process_referral() */
-	(void) xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+	xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
 
 	return (esi);
 err:
@@ -1827,8 +1827,8 @@ err:
 	kmem_free(esi->esi_knconf, sizeof (*esi->esi_knconf));
 	kmem_free(esi->esi_netname, nfsfsloc.netnm_len);
 	kmem_free(esi, sizeof (ephemeral_servinfo_t));
-	(void) xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
-	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
+	xdr_free(xdr_nfs_fsl_info, (char *)&nfsfsloc);
+	xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&callres);
 	return (NULL);
 }
 

@@ -879,8 +879,8 @@ void um_dbg_log_msg(void* ctx, char *file, char *function, unsigned long line, c
 #endif // !WIN_DIAG
 
 #define CHK_NULL(p) (p==NULL)
-#define ERR_IF(cond)(cond==TRUE)
-#define WRN_IF(cond)(cond==TRUE)
+#define ERR_IF(cond)((cond)==TRUE)
+#define WRN_IF(cond)((cond)==TRUE)
 
 #endif // !DBG
 

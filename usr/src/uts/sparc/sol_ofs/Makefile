@@ -36,9 +36,7 @@ OBJECTS		= $(SOL_OFS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SOL_OFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 LDFLAGS		+= -dy -Nmisc/ibtl -Nmisc/ibcm
-WARLOCK_OUT	= $(SOL_OFS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
+
 #
 #	Include common rules.
 #
@@ -76,10 +74,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -93,25 +89,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-
-#
-#       Defines for local commands.
-#
-WARLOCK         = warlock
-WLCC            = wlcc
-TOUCH           = touch
-TEST            = test
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/sol_ofs.wlcmd warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/sol_ofs.wlcmd $(WARLOCK_OUT) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/ib/clients/of/sol_ofs/%.c \
-	$(UTSBASE)/common/sys/ib/clients/of/sol_ofs/sol_uverbs.h
-	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock

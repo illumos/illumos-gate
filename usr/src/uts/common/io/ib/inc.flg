@@ -26,7 +26,7 @@
 
 #
 # This file brings down all that is needed to build the
-# core Infiniband code. 
+# core Infiniband code.
 #
 
 # header files
@@ -49,10 +49,6 @@ find_files "s.*.h"	\
 # cfgadm plugin directory
 find_files "s.*"	\
 	usr/src/lib/cfgadm_plugins/ib
-
-# warlock
-find_files "s.*"	\
-	usr/src/uts/common/io/warlock
 
 # to compile the drivers/modules
 find_files "s.*"	\

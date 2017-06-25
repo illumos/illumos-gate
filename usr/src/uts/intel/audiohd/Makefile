@@ -39,18 +39,15 @@ OBJECTS		= $(AUDIOHD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AUDIOHD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audiohd
-WARLOCK_OUT	= $(AUDIOHD_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
-WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-# 
-#	Overrides, lint pass one enforcement 
-# 
+#
+#	Overrides, lint pass one enforcement
+#
 CFLAGS		+= $(CCVERBOSE)
 DEBUG_FLGS	=
 $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
@@ -86,10 +83,8 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -103,30 +98,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-#	lock_lint rules
-#
-AUDIOHD_FILES = $(AUDIOHD_OBJS:%.o=../audiohd/%.ll)
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/audiohd.wlcmd warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/audiohd.wlcmd $(WARLOCK_OUT)  \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/audio/drv/audiohd/audiohd.c \
-		$(UTSBASE)/common/io/audio/drv/audiohd/audiohd.h
-	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	cd ../warlock; pwd; $(MAKE) warlock

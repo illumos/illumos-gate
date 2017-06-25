@@ -194,7 +194,7 @@
 ./usr/src/cmd/sendmail/src/statusd_shm.h
 
 #
-# Ignore files originally supplied by ISC (Internet Software Consortium) 
+# Ignore files originally supplied by ISC (Internet Software Consortium)
 # as part of a BIND release.
 #
 ./usr/src/lib/libresolv2/common/irs/getaddrinfo.c
@@ -207,15 +207,6 @@
 # assembly files. We keep it around for future reference.
 #
 ./usr/src/common/bignum/mont_mulf.c
-
-#
-# Ignore the sparc Makefiles for x86-only drivers;
-# they're used to build warlock only.
-#
-./usr/src/uts/sparc/sata/Makefile
-./usr/src/uts/sparc/si3124/Makefile
-./usr/src/uts/sparc/nv_sata/Makefile
-./usr/src/uts/sparc/ahci/Makefile
 
 #
 # Ignore uttrack.c.  It is provided as part of the standard

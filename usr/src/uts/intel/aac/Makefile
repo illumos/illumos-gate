@@ -43,9 +43,6 @@ OBJECTS		= $(AAC_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AAC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR     = $(UTSBASE)/common/io/aac
-WARLOCK_OUT     = $(AAC_OBJS:%.o=%.ll)
-WARLOCK_OK      = $(MODULE).ok
-WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
@@ -99,37 +96,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-TEST		= test
-
-#
-#	lock_lint rules
-#
-SCSI_FILES = $(SCSI_OBJS:%.o= -l $(UTSBASE)/intel/scsi/%.ll)
-
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@ || $(SCCS) get $@
-
-warlock: $(WARLOCK_OK)
-
-$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files scsi.files aac.wlcmd
-	$(WARLOCK) -c $(WLCMD_DIR)/aac.wlcmd $(WARLOCK_OUT) \
-	$(SCSI_FILES) \
-	$(UTSBASE)/intel/warlock/scsi.ll \
-	-l $(UTSBASE)/intel/warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/aac/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd $(UTSBASE)/intel/warlock; pwd; $(MAKE) warlock
-
-scsi.files:
-	@cd $(UTSBASE)/intel/scsi; pwd; $(MAKE) warlock

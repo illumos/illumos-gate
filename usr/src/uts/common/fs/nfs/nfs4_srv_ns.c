@@ -22,6 +22,7 @@
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -178,12 +179,12 @@ pseudo_exportfs(vnode_t *vp, fid_t *fid, struct exp_visible *vis_head,
 	kex = &exi->exi_export;
 	kex->ex_flags = EX_PSEUDO;
 
-	vpathlen = vp->v_path ? strlen(vp->v_path) : 0;
+	vpathlen = strlen(vp->v_path);
 	kex->ex_pathlen = vpathlen + strlen(PSEUDOFS_SUFFIX);
 	kex->ex_path = kmem_alloc(kex->ex_pathlen + 1, KM_SLEEP);
 
 	if (vpathlen)
-		(void) strcpy(kex->ex_path, vp->v_path);
+		(void) strncpy(kex->ex_path, vp->v_path, vpathlen);
 	(void) strcpy(kex->ex_path + vpathlen, PSEUDOFS_SUFFIX);
 
 	/* Transfer the secinfo data from exdata to this new pseudo node */

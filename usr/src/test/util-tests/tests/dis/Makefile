@@ -28,6 +28,7 @@ I386_TESTS =		\
 	32.adx 		\
 	32.avx		\
 	32.avx2		\
+	32.avx512	\
 	32.aes 		\
 	32.bmi1 	\
 	32.bmi2 	\
@@ -49,6 +50,7 @@ I386_TESTS =		\
 	32.xsave 	\
 	64.avx		\
 	64.avx2		\
+	64.avx512	\
 	64.adx 		\
 	64.aes 		\
 	64.bmi1 	\

@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2017 Joyent, Inc.
 .\"
-.Dd "Jan 11, 2015"
+.Dd "Jan 19, 2017"
 .Dt THRD_EQUAL 3C
 .Os
 .Sh NAME
@@ -36,13 +36,15 @@ and determines whether or not they refer to the same thread.
 The
 .Fn thrd_equal
 function returns
-.Sy 0
+.Sy non-zero
 if
 .Fa thrd0
 and
 .Fa thrd1
 refer to the same thread.
-Otherwise, a non-zero value is returned, indicating that
+Otherwise,
+.Sy 0
+is returned, indicating that
 .Fa thrd0
 and
 .Fa thrd1
