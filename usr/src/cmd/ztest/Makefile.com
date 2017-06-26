@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 #
 
 PROG= ztest
@@ -32,6 +32,7 @@ include ../../Makefile.ctf
 
 INCS += -I../../../lib/libzpool/common
 INCS += -I../../../uts/common/fs/zfs
+INCS += -I../../../uts/common/fs/zfs/lua
 INCS += -I../../../common/zfs
 
 LDLIBS += -lumem -lzpool -lcmdutils -lm -lnvpair

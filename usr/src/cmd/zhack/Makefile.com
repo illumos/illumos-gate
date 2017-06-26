@@ -35,8 +35,9 @@ OBJS= $(PROG).o
 include ../../Makefile.cmd
 include ../../Makefile.ctf
 
-INCS += -I../../../lib/libzpool/common
+INCS +=	-I../../../lib/libzpool/common
 INCS +=	-I../../../uts/common/fs/zfs
+INCS +=	-I../../../uts/common/fs/zfs/lua
 INCS +=	-I../../../common/zfs
 
 LDLIBS += -lzpool -lumem -lnvpair -lzfs

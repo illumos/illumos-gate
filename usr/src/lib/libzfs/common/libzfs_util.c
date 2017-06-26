@@ -687,6 +687,9 @@ libzfs_init(void)
 	libzfs_mnttab_init(hdl);
 
 	hdl->libzfs_cachedprops = B_FALSE;
+	if (getenv("ZFS_PROP_DEBUG") != NULL) {
+		hdl->libzfs_prop_debug = B_TRUE;
+	}
 
 	return (hdl);
 }

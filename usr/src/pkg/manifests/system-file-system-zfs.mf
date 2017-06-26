@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 #
 
@@ -135,6 +135,7 @@ $(i386_ONLY)file path=usr/sbin/$(ARCH32)/zdb mode=0555
 file path=usr/sbin/$(ARCH64)/zdb mode=0555
 file path=usr/sbin/zstreamdump mode=0555
 file path=usr/share/man/man1m/zdb.1m
+file path=usr/share/man/man1m/zfs-program.1m
 file path=usr/share/man/man1m/zfs.1m
 file path=usr/share/man/man1m/zpool.1m
 file path=usr/share/man/man1m/zstreamdump.1m

@@ -83,6 +83,12 @@ tests = ['case_all_values', 'norm_all_values',
     'mixed_none_lookup', 'mixed_none_lookup_ci', 'mixed_none_delete',
     'mixed_formd_lookup', 'mixed_formd_lookup_ci', 'mixed_formd_delete']
 
+[/opt/zfs-tests/tests/functional/channel_program/lua_core]
+autotests = 1
+
+[/opt/zfs-tests/tests/functional/channel_program/synctask_core]
+autotests = 1
+
 [/opt/zfs-tests/tests/functional/checksum]
 tests = ['run_edonr_test', 'run_sha2_test', 'run_skein_test']
 pre =
@@ -317,6 +323,7 @@ tests = ['zdb_001_neg', 'zfs_001_neg', 'zfs_allow_001_neg',
     'zfs_rollback_001_neg', 'zfs_send_001_neg', 'zfs_set_001_neg',
     'zfs_share_001_neg', 'zfs_snapshot_001_neg', 'zfs_unallow_001_neg',
     'zfs_unmount_001_neg', 'zfs_unshare_001_neg', 'zfs_upgrade_001_neg',
+    'zfs_channel_001_neg',
     'zpool_001_neg', 'zpool_add_001_neg', 'zpool_attach_001_neg',
     'zpool_clear_001_neg', 'zpool_create_001_neg', 'zpool_destroy_001_neg',
     'zpool_detach_001_neg', 'zpool_export_001_neg', 'zpool_get_001_neg',
