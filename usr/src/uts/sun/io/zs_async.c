@@ -2272,7 +2272,7 @@ zsa_softint(struct zscom *zs)
 	 * about an error- They do not track multiple errors. In fact,
 	 * you could consider them latched register bits if you like.
 	 * We are only interested in printing the error message once for
-	 * any cluster of overrun errrors.
+	 * any cluster of overrun errors.
 	 */
 	if ((!za->za_kick_rcv_id) && (zs->zs_rd_cur || za_kick_active)) {
 		if (g_zsticks)

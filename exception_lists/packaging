@@ -978,6 +978,11 @@ usr/lib/llib-lpcidb
 usr/lib/llib-lpcidb.ln
 
 #
+# private nvme header file
+#
+usr/include/sys/nvme.h
+
+#
 # debugging program for libadutils
 #
 usr/bin/test-getdc

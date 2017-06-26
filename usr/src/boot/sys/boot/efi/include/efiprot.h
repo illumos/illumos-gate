@@ -90,12 +90,14 @@ typedef struct {
     BOOLEAN             LogicalPartition;
     BOOLEAN             ReadOnly;
     BOOLEAN             WriteCaching;
+    UINT8               pad1[3];
 
     UINT32              BlockSize;
     UINT32              IoAlign;
+    UINT8               pad2[4];
 
     EFI_LBA             LastBlock;
-} EFI_BLOCK_IO_MEDIA;
+} __packed EFI_BLOCK_IO_MEDIA;
 
 typedef struct _EFI_BLOCK_IO {
     UINT64                  Revision;

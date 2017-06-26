@@ -1120,7 +1120,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 asyinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	dev_t dev = (dev_t)arg;
 	int instance, error;
@@ -2942,7 +2942,7 @@ rv:
 	 * about an error- They do not track multiple errors. In fact,
 	 * you could consider them latched register bits if you like.
 	 * We are only interested in printing the error message once for
-	 * any cluster of overrun errrors.
+	 * any cluster of overrun errors.
 	 */
 	if (async->async_hw_overrun) {
 		if (async->async_flags & ASYNC_ISOPEN) {

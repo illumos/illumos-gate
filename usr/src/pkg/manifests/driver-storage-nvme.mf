@@ -34,6 +34,7 @@ dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 dir path=usr group=sys
+dir path=usr/sbin
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man7d
@@ -41,5 +42,7 @@ driver name=nvme alias=pciexclass,010802 class=disk perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/nvme group=sys
 file path=kernel/drv/nvme group=sys
 file path=kernel/drv/nvme.conf group=sys
+file path=usr/sbin/nvmeadm mode=0555
+file path=usr/share/man/man1m/nvmeadm.1m
 file path=usr/share/man/man7d/nvme.7d
 license lic_CDDL license=lic_CDDL

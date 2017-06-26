@@ -10465,6 +10465,7 @@ f usr/sbin/nfsref 0555 root bin
 f usr/sbin/nlsadmin 0755 root adm
 f usr/sbin/nltest 0555 root bin
 f usr/sbin/nscd 0555 root bin
+f usr/sbin/nvmeadm 0555 root bin
 f usr/sbin/nwamadm 0555 root bin
 f usr/sbin/nwamcfg 0555 root bin
 h usr/sbin/pbind=usr/lib/isaexec
@@ -12114,6 +12115,7 @@ f usr/share/man/man1m/nfsmapid.1m 0444 root bin
 f usr/share/man/man1m/nfsstat.1m 0444 root bin
 f usr/share/man/man1m/nlsadmin.1m 0444 root bin
 f usr/share/man/man1m/nscd.1m 0444 root bin
+f usr/share/man/man1m/nvmeadm.1m 0444 root bin
 f usr/share/man/man1m/nwamd.1m 0444 root bin
 f usr/share/man/man1m/passmgmt.1m 0444 root bin
 f usr/share/man/man1m/pbind.1m 0444 root bin
