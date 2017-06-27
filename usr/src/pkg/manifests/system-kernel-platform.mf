@@ -1140,6 +1140,8 @@ license usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE \
 license usr/src/common/bzip2/LICENSE license=usr/src/common/bzip2/LICENSE
 $(sparc_ONLY)license usr/src/stand/lib/tcp/THIRDPARTYLICENSE \
     license=usr/src/stand/lib/tcp/THIRDPARTYLICENSE
+license usr/src/uts/common/krtld/THIRDPARTYLICENSE.bootrd_cpio \
+    license=usr/src/uts/common/krtld/THIRDPARTYLICENSE.bootrd_cpio
 license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 license usr/src/uts/common/zmod/THIRDPARTYLICENSE \

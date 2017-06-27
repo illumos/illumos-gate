@@ -164,6 +164,7 @@ VGATEXT_OBJS += vgatext.o vgasubr.o
 KRTLD_OBJS +=		\
 	bootfsops.o	\
 	bootrd.o	\
+	bootrd_cpio.o	\
 	ufsops.o	\
 	hsfs.o		\
 	doreloc.o	\
@@ -273,7 +274,7 @@ S10_BRAND_OBJS	=	s10_brand.o s10_brand_asm.o
 #
 #	special files
 #
-MODSTUB_OBJ +=	 	\
+MODSTUB_OBJ +=		\
 	modstubs.o
 
 BOOTDEV_OBJS +=		\
