@@ -7797,7 +7797,7 @@ mon     "<E><n><e><r><o>";/
         "<N><o><b><y><e><m><b><r><e>";/
         "<D><i><s><y><e><m><b><r><e>"
 
-d_fmt    "%m<SOLIDUS>%e<SOLIDUS>%y"
+d_fmt    "%m<SOLIDUS>%d<SOLIDUS>%y"
 
 t_fmt    "%I:%M:%S %p"
 

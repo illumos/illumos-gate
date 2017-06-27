@@ -7739,7 +7739,7 @@ mon     "<J><a><n><u><a><r><y>";/
         "<N><o><v><e><m><b><e><r>";/
         "<D><e><c><e><m><b><e><r>"
 
-d_fmt    "%m<SOLIDUS>%e<SOLIDUS>%y"
+d_fmt    "%m<SOLIDUS>%d<SOLIDUS>%y"
 
 t_fmt    "%I:%M:%S %p"
 
