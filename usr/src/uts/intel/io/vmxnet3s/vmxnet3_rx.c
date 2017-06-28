@@ -394,8 +394,8 @@ vmxnet3_rx_intr(vmxnet3_softc_t *dp, vmxnet3_rxqueue_t *rxq)
 				mpTail = &mblk->b_cont;
 				ASSERT(*mpTail == NULL);
 
-				VMXNET3_DEBUG(dp, 3, "rx 0x%p on [%u]\n", mblk,
-				    rxdIdx);
+				VMXNET3_DEBUG(dp, 3, "rx 0x%p on [%u]\n",
+				    (void *)mblk, rxdIdx);
 
 				if (eop) {
 					if (!compDesc->rcd.err) {

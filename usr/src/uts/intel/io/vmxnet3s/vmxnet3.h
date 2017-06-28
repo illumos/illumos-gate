@@ -202,13 +202,14 @@ extern int vmxnet3s_debug;
 #define	VMXNET3_DRIVER_VERSION_STRING	"1.1.0.0"
 
 /* Logging stuff */
-#define	VMXNET3_WARN(Device, ...) vmxnet3_log(CE_WARN, Device, __VA_ARGS__)
+#define	VMXNET3_WARN(Device, ...) \
+	dev_err((Device)->dip, CE_WARN, "!" __VA_ARGS__)
 
 #ifdef	DEBUG
-#define	VMXNET3_DEBUG(Device, Level, ...) {			\
-	if (Level <= vmxnet3s_debug) {				\
-		vmxnet3_log(CE_CONT, Device, "?" __VA_ARGS__);	\
-	}							\
+#define	VMXNET3_DEBUG(Device, Level, ...) {				\
+	if (Level <= vmxnet3s_debug) {					\
+		dev_err((Device)->dip, CE_CONT, "?" __VA_ARGS__);	\
+	}								\
 }
 #else
 #define	VMXNET3_DEBUG(Device, Level, ...)
