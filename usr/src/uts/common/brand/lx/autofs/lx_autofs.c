@@ -2240,10 +2240,21 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		 * will also do a rele on the original dvp and that would leave
 		 * us one ref short on our autofs root vnode.
 		 */
+		vnode_t *orig_dvp = dvp;
+
 		VN_HOLD(dvp);
 		if ((error = traverse(&dvp)) != 0) {
 			VN_RELE(dvp);
 			return (error);
+		}
+
+		if (dvp == orig_dvp) {
+			/*
+			 * For some reason the automountd did not actually
+			 * mount the new filesystem. Return an error.
+			 */
+			VN_RELE(dvp);
+			return (ENOENT);
 		}
 
 		error = VOP_LOOKUP(dvp, nm, vpp, pnp, flags, rdir, cr, ctp,
