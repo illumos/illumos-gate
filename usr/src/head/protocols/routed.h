@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1983, 1989, 1993
@@ -49,8 +49,6 @@
 
 #ifndef _PROTOCOLS_ROUTED_H
 #define	_PROTOCOLS_ROUTED_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOTEST 1 "May 5, 2009"
+.TH AUDIOTEST 1 "May 13, 2017"
 .SH NAME
 audiotest \- test audio device
 .SH SYNOPSIS
@@ -13,14 +13,12 @@ audiotest \- test audio device
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBaudiotest\fR utility runs a test for the named audio device (or all
 audio devices found on the system if none is given). The test includes playing
 an audio sample over each channel and measuring the rate of playback for clock
 drift.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -75,7 +73,6 @@ The low frequency effects channel is not tested.
 .RE
 
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR\fR
@@ -85,7 +82,6 @@ The path the device to test, for example, \fB/dev/dsp0\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -103,12 +99,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBaudioconvert\fR(1), \fBaudiorecord\fR(1), \fBmixerctl\fR(1),
+\fBaudioconvert\fR(1), \fBaudiorecord\fR(1),
 \fBattributes\fR(5), \fBaudio\fR(7I)
 .SH BUGS
-.sp
 .LP
 \fBaudiotest\fR has no way to detect the number of actual audio channels
 supported by the physical device.

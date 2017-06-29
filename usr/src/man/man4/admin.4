@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ADMIN 4 "Mar 2, 2017"
+.TH ADMIN 4 "May 13, 2017"
 .SH NAME
 admin \- installation defaults file
 .SH DESCRIPTION
@@ -303,10 +303,8 @@ Abort installation if package dependencies are not met.
 \fB\fBrdepend\fR\fR
 .ad
 .RS 30n
-Controls resolution if other packages depend on the package to be removed. Also
-determines behavior if registered products components to be removed. See
-\fBlibwsreg\fR(3LIB) and \fBprodreg\fR(1M) for a definition of product
-components. Options are:
+Controls resolution if other packages depend on the package to be removed.
+Options are:
 .sp
 .ne 2
 .na
@@ -389,7 +387,7 @@ basic privileges of the unprivileged user \fBnoaccess\fR.
 If this parameter is not present or has a null value, the user \fBnoaccess\fR
 is assumed. Likewise, if this parameter is set to anything other than the
 values described here, a warning is issued, and \fBnoaccess\fR is assumed.
-\fBrscriptalt\fR is not present in the default  \fBadmin\fR file,
+\fBrscriptalt\fR is not present in the default \fBadmin\fR file,
 \fB/var/sadm/install/admin/default\fR. In this case, request scripts are run as
 the user \fBnoaccess\fR.
 .RE
@@ -474,8 +472,7 @@ Interface Stability	Evolving
 
 .SH SEE ALSO
 .LP
-\fBpkgadd\fR(1M), \fBprodreg\fR(1M), \fBlibwsreg\fR(3LIB), \fBpkginfo\fR(4),
-\fBattributes\fR(5), \fBzones\fR(5)
+\fBpkgadd\fR(1M), \fBpkginfo\fR(4), \fBattributes\fR(5), \fBzones\fR(5)
 .SH NOTES
 .LP
 The value \fBask\fR should not be defined in an \fBadmin\fR file that will be

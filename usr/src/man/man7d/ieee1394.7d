@@ -3,16 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IEEE1394 7D "Apr 3, 2009"
+.TH IEEE1394 7D "May 13, 2017"
 .SH NAME
 ieee1394, firewire, 1394 \- Solaris IEEE-1394 Architecture
 .SH DESCRIPTION
-.sp
 .LP
-IEEE-1394 provides a means for interconnecting devices  in computer and  home
+IEEE-1394 provides a means for interconnecting devices in computer and home
 entertainment systems. (The IEEE-1394 architecture is also known as Firewire,
 an Apple Computer trademark, and i.Link, a Sony trademark). The most common
-IEEE-1394 devices  are digital camcorders, mass-storage devices and cameras
+IEEE-1394 devices are digital camcorders, mass-storage devices and cameras
 (including webcam-type devices). For more information on USB, refer to the 1394
 Trade Association website at http://\fIwww.1394ta.org\fR.
 .sp
@@ -28,13 +27,12 @@ in the \fIIEEE 1394-1995\fR and \fIIEEE 1394a-2000\fR specifications.
 .sp
 .LP
 IEEE-1394 host controllers implementing the 1394 Open Host Controller Interface
-specification are supported. Camcorders      implementing the \fIIEC 61883\fR
+specification are supported. Camcorders implementing the \fIIEC 61883\fR
 and 1394 Trade Association AV/C specifications are supported. Mass-storage
 devices implementing the \fIANSI SBP-2\fR specification are supported. Digital
 cameras implementing the 1394 Trade Association 1394-based Digital Camera
 (IIDC) specification are supported.
 .SH FILES
-.sp
 .LP
 Listed below are drivers and modules which either utilize or are utilized by
 the Solaris IEEE-1394 architecture. Drivers in \fB/kernel/drv\fR are 32 bit
@@ -85,7 +83,6 @@ _
 .TE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -101,13 +98,9 @@ Architecture	PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBav1394\fR(7D), \fBdcam1394\fR(7D), \fBhci1394\fR(7D),
 \fBscsa1394\fR(7D), \fBiec61883\fR(7I)
-.sp
-.LP
-http://www.sun.com
 .sp
 .LP
 \fIIEEE 1394a\fR Specification - 1394 Trade Association, 2000
@@ -115,7 +108,6 @@ http://www.sun.com
 .LP
 \fIIEEE 1394\fR Specification - 1394 Trade Association, 1995
 .SH NOTES
-.sp
 .LP
 Booting from IEEE-1394 mass-storage devices is not supported, but may be
-possible if supported by the BIOS of the computer      system.
+possible if supported by the BIOS of the computer system.

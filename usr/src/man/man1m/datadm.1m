@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DATADM 1M "Jun 18, 2004"
+.TH DATADM 1M "May 13, 2017"
 .SH NAME
 datadm \- maintain DAT static registry file
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ datadm \- maintain DAT static registry file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdatadm\fR utility maintains the DAT static registry file,
 \fBdat.conf\fR(4).
@@ -30,7 +29,6 @@ a system after its installation. You can use \fBdatadm\fR to update the
 interface adapters for all the service providers currently installed is
 regenerated.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -174,7 +172,6 @@ ibd2 u1.2 nonthreadsafe default udapl_tavor.so.1 SUNW.1.0 ""
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/dat/dat.conf\fR\fR
@@ -184,7 +181,6 @@ DAT static registry file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -200,7 +196,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBpkgadd\fR(1M), \fBpkgrm\fR(1M), \fBlibdat\fR(3LIB), \fBdat.conf\fR(4),
-\fBservice_provider.conf\fR(4). \fBattributes\fR(5)
+\fBlibdat\fR(3LIB), \fBdat.conf\fR(4),
+\fBservice_provider.conf\fR(4), \fBattributes\fR(5)

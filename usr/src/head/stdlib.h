@@ -29,7 +29,7 @@
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifndef _STDLIB_H
 #define	_STDLIB_H

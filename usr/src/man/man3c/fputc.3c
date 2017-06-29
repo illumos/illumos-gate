@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FPUTC 3C "Nov 1, 2003"
+.TH FPUTC 3C "May 13, 2017"
 .SH NAME
 fputc, putc, putc_unlocked, putchar, putchar_unlocked, putw \- put a byte on a
 stream
@@ -45,7 +45,6 @@ stream
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfputc()\fR function writes the byte specified by \fIc\fR (converted to
 an \fBunsigned char\fR) to the output stream pointed to by \fIstream\fR, at the
@@ -90,7 +89,6 @@ update between the successful execution of \fBputw()\fR and the next successful
 completion of a call to \fBfflush\fR(3C) or \fBfclose\fR(3C) on the same stream
 or a call to \fBexit\fR(3C) or \fBabort\fR(3C).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBfputc()\fR, \fBputc()\fR, \fBputc_unlocked()\fR,
 \fBputchar()\fR, and \fBputchar_unlocked()\fR return the value that was
@@ -106,7 +104,6 @@ sets \fBerrno\fR to indicate the error.
 An unsuccessful completion will occur, for example, if the file associated with
 \fIstream\fR is not open for writing or if the output file cannot grow.
 .SH ERRORS
-.sp
 .LP
 The \fBfputc()\fR, \fBputc()\fR, \fBputc_unlocked()\fR, \fBputchar()\fR,
 \fBputchar_unlocked()\fR, and \fBputw()\fR functions will fail if either the
@@ -138,7 +135,7 @@ for writing.
 \fB\fBEFBIG\fR\fR
 .ad
 .RS 10n
-An attempt was made to write to a file that exceeds the maximum file size  or
+An attempt was made to write to a file that exceeds the maximum file size or
 the process' file size limit.
 .RE
 
@@ -168,7 +165,7 @@ was transferred.
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-A physical I/O error has occurred, or  the process is a member of a background
+A physical I/O error has occurred, or the process is a member of a background
 process group attempting to write to its controlling terminal, \fBTOSTOP\fR is
 set, the process is neither ignoring nor blocking \fBSIGTTOU\fR and the process
 group of the process is orphaned. This error may also be returned under
@@ -219,7 +216,6 @@ capabilities of the device.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Functions exist for the \fBputc()\fR, \fBputc_unlocked()\fR, \fBputchar()\fR,
 and \fBputchar_unlocked()\fR macros. To get the function form, the macro name
@@ -244,7 +240,6 @@ in the context of either multibyte character streams or wide-character streams.
 Application programmers are encouraged to use one of the character-based output
 functions instead.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -264,15 +259,13 @@ MT-Level	See \fBNOTES\fR below.
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetrlimit\fR(2), \fBulimit\fR(2) \fBwrite\fR(2), \fBIntro\fR(3),
 \fBabort\fR(3C), \fBexit\fR(3C), \fBfclose\fR(3C), \fBferror\fR(3C),
-\fBfflush\fR(3C), \fBflockfile\fR(3C), \fBfopen\fR(3UCB), \fBprintf\fR(3C),
+\fBfflush\fR(3C), \fBflockfile\fR(3C), \fBprintf\fR(3C),
 \fBputc\fR(3C), \fBputs\fR(3C), \fBsetbuf\fR(3C), \fBstdio\fR(3C),
 \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBfputc()\fR, \fBputc()\fR, \fBputchar()\fR, and \fBputw()\fR routines are
 MT-Safe in multithreaded applications.  The \fBputc_unlocked()\fR and

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DPOST 1 "Sep 9, 1996"
+.TH DPOST 1 "May 13, 2017"
 .SH NAME
 dpost \- troff postprocessor for PostScript printers
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ dpost \- troff postprocessor for PostScript printers
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBdpost\fR translates \fIfiles\fR created by \fBtroff\fR(1) into PostScript
 and writes the results on the standard output. If no \fIfiles\fR are specified,
@@ -43,7 +42,6 @@ command sets the resolution used to translate the input \fIfiles\fR, the
 resolution used in the binary font files, and the PostScript prologue is
 responsible for setting up an appropriate user coordinate system.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-c\fR\fI num\fR\fR
@@ -73,7 +71,7 @@ previous versions of \fBdpost\fR.
 .RS 11n
 Magnify each logical page by the factor \fInum\fR. Pages are scaled uniformly
 about the origin, which is located near the upper left corner of each page. The
-default magnification is  \fB1.0\fR.
+default magnification is \fB1.0\fR.
 .RE
 
 .sp
@@ -83,7 +81,7 @@ default magnification is  \fB1.0\fR.
 .ad
 .RS 11n
 Print \fInum\fR logical pages on each piece of paper, where \fInum\fR can be
-any positive integer. By default, \fInum\fR is set to  \fB1\fR.
+any positive integer. By default, \fInum\fR is set to \fB1\fR.
 .RE
 
 .sp
@@ -122,7 +120,7 @@ character of \fImode\fR is significant. The default \fImode\fR is portrait.
 .RS 11n
 Set the line width used to implement \fBtroff\fR graphics commands to \fInum\fR
 points, where a point is approximately 1/72 of an inch. By default, \fInum\fR
-is set to  \fB0.3\fR points.
+is set to \fB0.3\fR points.
 .RE
 
 .sp
@@ -134,7 +132,7 @@ is set to  \fB0.3\fR points.
 Translate the origin \fInum\fR inches along the positive x axis. The default
 coordinate system has the origin fixed near the upper left corner of the page,
 with positive x to the right and positive y down the page. Positive \fInum\fR
-moves everything right. The default offset is  \fB0\fR inches.
+moves everything right. The default offset is \fB0\fR inches.
 .RE
 
 .sp
@@ -144,7 +142,7 @@ moves everything right. The default offset is  \fB0\fR inches.
 .ad
 .RS 11n
 Translate the origin \fInum\fR inches along the positive y axis. Positive
-\fInum\fR moves text up the page. The default offset is  \fB0\fR.
+\fInum\fR moves text up the page. The default offset is \fB0\fR.
 .RE
 
 .sp
@@ -236,7 +234,6 @@ example% \fBpic \fR\fBfile\fR\fB | tbl | eqn | troff \fR\fB-mm\fR\fB \fR\fB-Tpos
 should give the best results.
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -258,7 +255,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/font/devpost/*.out\fR\fR
@@ -318,38 +314,15 @@ An error occurred.
 
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/macros/pictures\fR\fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/lib/macros/color\fR\fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
 .SH SEE ALSO
-.sp
 .LP
-\fBdownload\fR(1), \fBpostdaisy\fR(1), \fBpostdmd\fR(1), \fBpostio\fR(1),
-\fBpostmd\fR(1), \fBpostprint\fR(1), \fBpostreverse\fR(1), \fBposttek\fR(1),
+\fBdownload\fR(1), \fBpostio\fR(1), \fBpostprint\fR(1), \fBpostreverse\fR(1),
 \fBtroff\fR(1), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 Output files often do not conform to Adobe's file structuring conventions.
-Piping the output of \fBdpost\fR through \fBpostreverse\fR(1) should produce a
-minimally conforming PostScript file.
+Piping the output of \fBdpost\fR(1) through \fBpostreverse\fR(1) should produce
+a minimally conforming PostScript file.
 .sp
 .LP
 Although \fBdpost\fR can handle files formatted for any device, emulation is
@@ -360,7 +333,7 @@ white space, and unrecognized fonts will usually default to one of the Times
 fonts (that is, \fBR\fR, \fBI\fR, \fBB\fR, or \fBBI\fR).
 .sp
 .LP
-An \fBx res\fR command  must precede the first \fBx init\fR command, and all
+An \fBx res\fR command must precede the first \fBx init\fR command, and all
 the input \fIfiles\fR should have been prepared for the same output device.
 .sp
 .LP

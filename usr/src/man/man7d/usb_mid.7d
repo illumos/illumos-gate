@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_MID 7D "Dec 22, 2006"
+.TH USB_MID 7D "May 13, 2017"
 .SH NAME
 usb_mid \- USB Multi Interface Driver
 .SH SYNOPSIS
@@ -13,26 +13,23 @@ usb_mid \- USB Multi Interface Driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_mid\fR driver is a \fBUSBA\fR (Solaris Universal Serial Bus
-Architecture)-compliant  nexus  driver that binds to device level nodes of a
+Architecture)-compliant nexus driver that binds to device level nodes of a
 composite (multi interface) device if no vendor or class-specific driver is
 available. The \fBusb_mid\fR driver creates interface nodes or interface
 association nodes and attempts to bind drivers to them. If no driver is found
 for interface association nodes, \fBusb_ia\fR(7D) is bound by default.
 .SS "UGEN (Generic USB)"
-.sp
 .LP
 The \fBusb_mid\fR driver also supports a \fBugen\fR(7D) interface allowing raw
-access to the device, for example by \fBlibusb\fR(3LIB) applications, by
+access to the device, for example by libusb applications, by
 passing the drivers bound to each interface. Since a libusb application might
 change the state of the device, you should not access the device through the
 child interface drivers. Note that the \fBusb_mid\fR driver creates a ugen
 interface only if none of its children are explicitly bound to the
 \fBugen\fR(7D) driver. Additionally, \fBusb_mid\fR does not create children.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/usb_mid\fR \fR
@@ -73,7 +70,6 @@ ugen(7D) nodes.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -89,9 +85,8 @@ Architecture	SPARC & x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBcfgadm_usb\fR(1M), \fBlibusb\fR(3LIB), \fBattributes\fR(5), \fBusba\fR(7D),
+\fBcfgadm_usb\fR(1M), \fBattributes\fR(5), \fBusba\fR(7D),
 \fBusb_ia\fR(7D)
 .sp
 .LP
@@ -105,11 +100,7 @@ Architecture	SPARC & x86, PCI-based systems
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
-.sp
-.LP
-http://\fIwww.sun.com/io\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 In addition to being logged, the following messages may appear on the system
 console. All messages are formatted in the following manner:
@@ -195,7 +186,7 @@ child interface drivers.\fR
 .ad
 .sp .6
 .RS 4n
-No ugen interface is available and \fBlibusb\fR(3LIB) cannot work with this
+No ugen interface is available and libusb cannot work with this
 device.
 .RE
 

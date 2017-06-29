@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DOWNLOAD 1 "Sep 9, 1996"
+.TH DOWNLOAD 1 "May 13, 2017"
 .SH NAME
 download \- host resident PostScript font downloader
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ download \- host resident PostScript font downloader
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBdownload\fR prepends host resident fonts to \fIfiles\fR and writes the
 results on the standard output. If no \fIfiles\fR are specified, or if
@@ -41,12 +40,11 @@ font directory. Comments are introduced by % (as in PostScript) and extend to
 the end of the line.
 .sp
 .LP
-The only candidates for downloading are  fonts listed in the map table  that
+The only candidates for downloading are fonts listed in the map table that
 point \fBdownload\fR to readable files. A font is downloaded once, at most.
 Requests for unlisted fonts or inaccessible files are ignored. All requests are
 ignored if the map table can not be read.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-f\fR\fR
@@ -74,7 +72,7 @@ Check the list of printer-resident fonts in
 .ad
 .RS 16n
 Use \fIname\fR as the font map table. A \fIname\fR that begins with \fB/\fR is
-the full pathname of the map table and is used as is. Otherwise  \fIname\fR is
+the full pathname of the map table and is used as is. Otherwise \fIname\fR is
 appended to the pathname of the host font directory.
 .RE
 
@@ -93,7 +91,7 @@ Use \fIdir\fR as the host font directory. The default is
 \fBExample 1 \fRExamples of the \fBdownload\fR command.
 .sp
 .LP
-The following  map table could be used to control the downloading of the
+The following map table could be used to control the downloading of the
 Bookman font family:
 
 .sp
@@ -114,8 +112,8 @@ Bookman font family:
 
 .sp
 .LP
-Using the file \fBmyprinter/map\fR (in the default host font directory)  as the
-map table, you could download fonts  by issuing the following command:
+Using the file \fBmyprinter/map\fR (in the default host font directory) as the
+map table, you could download fonts by issuing the following command:
 
 .sp
 .in +2
@@ -126,7 +124,6 @@ map table, you could download fonts  by issuing the following command:
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -148,12 +145,9 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBdpost\fR(1), \fBpostdaisy\fR(1), \fBpostdmd\fR(1), \fBpostio\fR(1),
-\fBpostmd\fR(1), \fBpostprint\fR(1), \fBposttek\fR(1), \fBattributes\fR(5)
+\fBdpost\fR(1), \fBpostio\fR(1), \fBpostprint\fR(1), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBdownload\fR program should be part of a more general program.
 .sp

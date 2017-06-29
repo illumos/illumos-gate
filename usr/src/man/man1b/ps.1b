@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 2002, Sun Microsystems, Inc. - All Rights Reserved.
 .\" Copyright (c), 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH PS 1B "May 26, 2006"
+.TH PS 1B "May 13, 2017"
 .SH NAME
 ps \- display the status of current processes
 .SH SYNOPSIS
@@ -11,11 +11,10 @@ ps \- display the status of current processes
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBps\fR command displays information about processes. Normally, only those
 processes that are running with your effective user \fBID\fR and are attached
-to a controlling terminal (see  \fBtermio\fR(7I)) are shown. Additional
+to a controlling terminal (see \fBtermio\fR(7I)) are shown. Additional
 categories of processes can be added to the display using various options. In
 particular, the \fB-a\fR option allows you to include processes that are not
 owned by you (that do not have your user \fBID\fR), and the \fB-x\fR option
@@ -79,7 +78,6 @@ Traced. Process stopped by a signal because parent is tracing it.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options must all be combined to form the first argument:
 .sp
@@ -167,9 +165,9 @@ children.
 .ad
 .RS 11n
 Lists only process data associated with the terminal, \fIterm\fR. Terminal
-identifiers may be specified in one of two forms:  the device's file name (for
-example,  \fBtty04\fR or \fBterm/14\fR ) or, if the device's file name starts
-with  \fBtty\fR, just the digit identifier (for example, \fB04\fR).
+identifiers may be specified in one of two forms: the device's file name (for
+example, \fBtty04\fR or \fBterm/14\fR ) or, if the device's file name starts
+with \fBtty\fR, just the digit identifier (for example, \fB04\fR).
 .RE
 
 .sp
@@ -235,7 +233,6 @@ process. This option must be supplied last.
 .RE
 
 .SH DISPLAY FORMATS
-.sp
 .LP
 Fields that are not common to all output formats:
 .sp
@@ -263,7 +260,7 @@ previous (real) time.
 \fB\fBNI\fR\fR
 .ad
 .RS 9n
-Process scheduling increment (see \fBgetpriority\fR(3C) and \fBnice\fR(3UCB)).
+Process scheduling increment (see \fBgetpriority\fR(3C) and \fBnice\fR(2)).
 .RE
 
 .sp
@@ -379,7 +376,6 @@ the parent, is marked <\fBdefunct\fR>\|; otherwise, \fBps\fR tries to determine
 the command name and arguments given when the process was created by examining
 the user block.
 .SH FILES
-.sp
 .LP
 \fB/dev/tty*\fR
 .sp
@@ -392,12 +388,10 @@ the user block.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkill\fR(1), \fBps\fR(1), \fBwhodo\fR(1M), \fBgetpriority\fR(3C),
-\fBnice\fR(3UCB), \fBproc\fR(4), \fBattributes\fR(5), \fBtermio\fR(7I)
+\fBnice\fR(2), \fBproc\fR(4), \fBattributes\fR(5), \fBtermio\fR(7I)
 .SH NOTES
-.sp
 .LP
 Things can change while \fBps\fR is running. The picture \fBps\fR gives is only
 a close approximation to the current state. Some data printed for defunct

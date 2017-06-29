@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BSD_SIGNAL 3C "Jul 24, 2002"
+.TH BSD_SIGNAL 3C "May 13, 2017"
 .SH NAME
 bsd_signal \- simplified signal facilities
 .SH SYNOPSIS
@@ -19,7 +19,6 @@ bsd_signal \- simplified signal facilities
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBbsd_signal()\fR function provides a partially compatible interface for
 programs written to historical system interfaces (see \fBUSAGE\fR below).
@@ -61,28 +60,24 @@ where \fIsig\fR is the signal number.  The behavior is undefined if \fIfunc\fR
 is a function that takes more than one argument, or an argument of a different
 type.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBbsd_signal()\fR returns the previous action for
 \fIsig\fR. Otherwise, \fBSIG_ERR\fR is returned and \fBerrno\fR is set to
 indicate the error.
 .SH ERRORS
-.sp
 .LP
 Refer to \fBsigaction\fR(2).
 .SH USAGE
-.sp
 .LP
-This function is a direct replacement for the \fBBSD\fR \fBsignal\fR(3UCB)
+This function is a direct replacement for the \fBBSD\fR \fBsignal()\fR
 function for simple applications that are installing a single-argument signal
 handler function.  If a \fBBSD\fR signal handler function is being installed
 that expects more than one argument, the application has to be modified to use
-\fBsigaction\fR(2). The \fBbsd_signal()\fR function differs from
-\fBsignal\fR(3UCB) in that the \fBSA_RESTART\fR flag is set and the
+\fBsigaction\fR(2). The \fBbsd_signal()\fR function differs from the \fBBSD\fR
+\fBsignal()\fR in that the \fBSA_RESTART\fR flag is set and the
 \fBSA_RESETHAND\fR will be clear when \fBbsd_signal()\fR is used.  The state of
-these flags is not specified for \fBsignal\fR(3UCB).
+these flags is not specified for the \fBBSD\fR \fBsignal()\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -98,7 +93,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsigaction\fR(2), \fBsigaddset\fR(3C), \fBsigemptyset\fR(3C),
-\fBsignal\fR(3UCB), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBattributes\fR(5), \fBstandards\fR(5)

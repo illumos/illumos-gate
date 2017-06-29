@@ -856,9 +856,8 @@ vmxnet3_get_prop(void *data, const char *prop_name, mac_prop_id_t prop_id,
 		bcopy(&dp->cur_mtu, prop_val, sizeof (uint32_t));
 		break;
 	default:
-		VMXNET3_WARN(dp, "vmxnet3_get_prop property %d not supported",
-		    prop_id);
 		ret = ENOTSUP;
+		break;
 	}
 	return (ret);
 }
@@ -880,9 +879,8 @@ vmxnet3_set_prop(void *data, const char *prop_name, mac_prop_id_t prop_id,
 		break;
 	}
 	default:
-		VMXNET3_WARN(dp, "vmxnet3_set_prop property %d not supported",
-		    prop_id);
 		ret = ENOTSUP;
+		break;
 	}
 
 	return (ret);
@@ -893,16 +891,13 @@ static void
 vmxnet3_prop_info(void *data, const char *prop_name, mac_prop_id_t prop_id,
     mac_prop_info_handle_t prop_handle)
 {
-	vmxnet3_softc_t *dp = data;
-
 	switch (prop_id) {
 	case MAC_PROP_MTU:
 		mac_prop_info_set_range_uint32(prop_handle, VMXNET3_MIN_MTU,
 		    VMXNET3_MAX_MTU);
 		break;
 	default:
-		VMXNET3_WARN(dp, "vmxnet3_prop_info: property %d not supported",
-		    prop_id);
+		break;
 	}
 }
 
@@ -1623,10 +1618,4 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&vmxnet3_modlinkage, modinfop));
-}
-
-void
-vmxnet3_log(int level, vmxnet3_softc_t *dp, char *fmt, ...)
-{
-	dev_err(dp->dip, level, fmt);
 }

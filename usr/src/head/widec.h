@@ -27,7 +27,7 @@
  */
 
 /*	Copyright (c) 1986 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*	This module is created for NLS on Jun.04.86		*/

@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2017 Peter Tribble
 .\" Copyright 2015 Joyent, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 3 "Mar 6, 2017"
+.TH INTRO 3 "May 13, 2017"
 .SH NAME
 Intro, intro \- introduction to functions and libraries
 .SH DESCRIPTION
@@ -38,17 +39,6 @@ Other interfaces can exist within the shared object, for example
 \fBSUNWprivate.1.1\fR. The public interface provides a stable, committed set of
 symbols for application development. The private interfaces are for internal
 use only, and could change at any time.
-.RE
-
-.sp
-.ne 2
-.na
-\fB(3LIBUCB)\fR
-.ad
-.sp .6
-.RS 4n
-The SunOS/BSD Compatibility libraries described in this section are implemented
-as a shared object. See (3LIB) above.
 .RE
 
 .sp
@@ -124,21 +114,6 @@ link with, respectively, \fBlibmalloc\fR, \fBlibbsdmalloc\fR,
 \fBlibmapmalloc\fR, \fBlibmtmalloc\fR, and \fBlibumem\fR. See
 \fBlibmalloc\fR(3LIB), \fBlibbsdmalloc\fR(3LIB), \fBlibmapmalloc\fR(3LIB),
 \fBlibmtmalloc\fR(3LIB), and \fBlibumem\fR(3LIB).
-.RE
-
-.sp
-.ne 2
-.na
-\fB(3UCB)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the source compatibility (with BSD functions)
-library. It is implemented as a shared object, \fBlibucb.so\fR, but is not
-automatically linked by the C compilation system. Specify \fB-lucb\fR on the
-\fBcc\fR command line to link with this library, which is located in the
-\fB/usr/ucb\fR subdirectory. Headers for this library are located within
-\fB/usr/ucbinclude\fR. See \fBlibucb\fR(3LIBUCB).
 .RE
 
 .SS "Networking Library Functions"
@@ -256,7 +231,7 @@ applications should not link to it. Both libraries are implemented as shared
 objects, \fBlibrpcsvc.so\fR and \fBlibrpcsoc.so\fR, respectively. Neither
 library is automatically linked by the C compilation system. Specify
 \fB-lrpcsvc\fR or \fB-lrpcsoc\fR on the \fBcc\fR command line to link with
-these libraries. See \fBlibrpcsvc\fR(3LIB) and \fBlibrpcsoc\fR(3LIBUCB).
+these libraries. See \fBlibrpcsvc\fR(3LIB).
 .RE
 
 .sp
@@ -401,19 +376,6 @@ linked by the C compilation system. Specify \fB-lpanel\fR on the \fBcc\fR
 command line to link with this library. See \fBlibpanel\fR(3LIB).
 .RE
 
-.RE
-
-.sp
-.ne 2
-.na
-\fB(3PLOT)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the graphics library, \fBlibplot\fR. This library is
-implemented as a shared object, \fBlibplot.so\fR, but is not automatically
-linked by the C compilation system. Specify \fB-lplot\fR on the \fBcc\fR
-command line to link with this library. See \fBlibplot\fR(3LIB).
 .RE
 
 .sp
@@ -571,7 +533,7 @@ command line to link with these libraries. See \fBlibexacct\fR(3LIB) and
 .ad
 .sp .6
 .RS 4n
-These functions constitute the Fibre  Channel  over Ethernet port management
+These functions constitute the Fibre Channel over Ethernet port management
 library. This library is implemented as a shared object, \fBlibfcoe.so\fR, but
 is not automatically linked by the C compilation system. Specify \fB-lfcoe\fR
 on the \fBcc\fR command line to link with this library. See
@@ -656,19 +618,6 @@ These functions allow access to the kernel's virtual memory library, which is
 implemented as a shared object, \fBlibkvm.so\fR, but is not automatically
 linked by the C compilation system. Specify \fB-lkvm\fR on the \fBcc\fR command
 line to link with this library. See \fBlibkvm\fR(3LIB).
-.RE
-
-.sp
-.ne 2
-.na
-\fB(3LAYOUT)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the layout service library, which is implemented as
-a shared object, \fBliblayout.so\fR, but is not automatically linked by the C
-compilation system. Specify \fB-llayout\fR on the \fBcc\fR command line to link
-with this library. See \fBliblayout\fR(3LIB).
 .RE
 
 .sp
@@ -918,35 +867,6 @@ See \fBlibsecdb\fR(3LIB).
 .sp
 .ne 2
 .na
-\fB(3SMARTCARD)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the smartcard library, \fBlibsmartcard\fR. This
-library is implemented as a shared object, \fBlibsmartcard.so\fR, but is not
-automatically linked by the C compilation system. Specify \fB-lsmartcard\fR on
-the \fBcc\fR command line to link with this library. See
-\fBlibsmartcard\fR(3LIB).
-.RE
-
-.sp
-.ne 2
-.na
-\fB(3SNMP)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the SNMP libraries, \fBlibssagent\fR and
-\fBlibssasnmp\fR. These libraries are implemented as shared objects,
-\fBlibssagent.so\fR and \fBlibssasnmp.so\fR, respectively, but are not
-automatically linked by the C compilation system. Specify \fB-lssagent\fR or
-\fB-lssasnmp\fR on the \fBcc\fR command line to link with these libraries. See
-\fBlibssagent\fR(3LIB) and \fBlibssasnmp\fR(3LIB).
-.RE
-
-.sp
-.ne 2
-.na
 \fB(3STMF)\fR
 .ad
 .sp .6
@@ -1047,20 +967,6 @@ automatically linked by the C compilation system. Specify \fB-lvolmgt\fR on the
 .sp
 .ne 2
 .na
-\fB(3WSREG)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the product install registry library,
-\fBlibwsreg\fR. This library is implemented as a shared object,
-\fBlibwsreg.so\fR, but is not automatically linked by the C compilation system.
-Specify \fB-lwsreg\fR on the \fBcc\fR command line to link with this library.
-See \fBlibwsreg\fR(3LIB).
-.RE
-
-.sp
-.ne 2
-.na
 \fB(3XTSOL)\fR
 .ad
 .sp .6
@@ -1070,32 +976,6 @@ These functions constitute the Trusted Extensions to the X windows library,
 \fBlibXtsol.so\fR, but is not automatically linked by the C compilation system.
 Specify \fB-lX11\fR and then \fB-lXtsol\fR on the \fBcc\fR command line to link
 with this library. See \fBlibXtsol\fR(3LIB).
-.RE
-
-.SS "Multimedia Library Functions"
-.ne 2
-.na
-\fB(3MLIB)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the mediaLib library, \fBlibmlib\fR. This library is
-implemented as a shared object, \fBlibmlib.so\fR, but is not automatically
-linked by the C compilation system. Specify \fB-lmlib\fR on the \fBcc\fR
-command line to link with this library. See \fBlibmlib\fR(3LIB).
-.RE
-
-.sp
-.ne 2
-.na
-\fB(3MMS)\fR
-.ad
-.sp .6
-.RS 4n
-These functions constitute the Media Management System library, \fBlibmms\fR.
-This library is implemented as a shared object, \fBlibmms.so\fR, but is not
-automatically linked by the C compilation system. Specify \fB-lmms\fR on the
-\fBcc\fR command line to link with this library. See \fBlibmms\fR(3LIB).
 .RE
 
 .SH DEFINITIONS

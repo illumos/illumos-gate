@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LD 1 "Jun 6, 2016"
+.TH LD 1 "May 13, 2017"
 .SH NAME
 ld \- link-editor for object files
 .SH SYNOPSIS
@@ -113,7 +113,7 @@ drawbacks.
 .TP
 .ie t \(bu
 .el o
-The executable is immune to the benefits of system patches delivered as shared
+The executable is immune to the benefits of system updates delivered as shared
 objects. The executable therefore, must be rebuilt to take advantage of many
 system improvements.
 .RE
@@ -1486,7 +1486,7 @@ no new members are extracted.
 \fB-z\fR \fBrescan\fR is a position independent option. The link-editor defers
 the rescan operation until after it has processed the entire command line, and
 then initiates a final rescan operation over all archives seen on the command
-line. The \fB-z\fR \fBrescan\fR operation can interact          incorrectly
+line. The \fB-z\fR \fBrescan\fR operation can interact incorrectly
 with objects that contain initialization (.init) or finalization (.fini)
 sections, preventing the code in those sections from running. For this reason,
 \fB-z\fR \fBrescan\fR is deprecated, and use of \fB-z\fR \fBrescan-now\fR is
@@ -1511,9 +1511,9 @@ advised.
 Defines an archive rescan group. This is a positional construct, and is
 processed by the link-editor immediately upon encountering the closing
 delimiter option.  Archives found within the group delimiter options are
-reprocessed as a group in an attempt to locate  additional archive members that
-resolve symbol references. This archive rescanning  is repeated  until a  pass
-over the archives On the occurs in  which no  new  members are extracted.
+reprocessed as a group in an attempt to locate additional archive members that
+resolve symbol references. This archive rescanning is repeated until a pass
+over the archives occurs in which no new members are extracted.
 Archive rescan groups cannot be nested.
 .RE
 

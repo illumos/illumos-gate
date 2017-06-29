@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POSTPRINT 1 "Sep 9, 1996"
+.TH POSTPRINT 1 "May 13, 2017"
 .SH NAME
 postprint \- PostScript translator for text files
 .SH SYNOPSIS
@@ -20,13 +20,11 @@ postprint \- PostScript translator for text files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpostprint\fR filter translates text \fIfiles\fR into PostScript and
 writes the results on the standard output. If no \fIfiles\fR are specified, or
 if \fB\(mi\fR is one of the input \fIfiles\fR, the standard input is read.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-c\fR\fI num\fR\fR
@@ -53,7 +51,7 @@ default font is Courier.
 .ad
 .RS 11n
 Set the length of a page to \fInum\fR lines. By default, \fInum\fR is \fB66\fR.
-Setting \fInum\fR to  \fB0\fR is allowed, and will cause \fBpostprint\fR to
+Setting \fInum\fR to \fB0\fR is allowed, and will cause \fBpostprint\fR to
 guess a value, based on the point size that's being used.
 .RE
 
@@ -65,7 +63,7 @@ guess a value, based on the point size that's being used.
 .RS 11n
 Magnify each logical page by the factor \fInum\fR. Pages are scaled uniformly
 about the origin, which is located near the upper left corner of each page. The
-default magnification is  \fB1.0\fR.
+default magnification is \fB1.0\fR.
 .RE
 
 .sp
@@ -75,7 +73,7 @@ default magnification is  \fB1.0\fR.
 .ad
 .RS 11n
 Print \fInum\fR logical pages on each piece of paper, where \fInum\fR can be
-any positive integer. By default, \fInum\fR is set to  \fB1\fR.
+any positive integer. By default, \fInum\fR is set to \fB1\fR.
 .RE
 
 .sp
@@ -87,12 +85,12 @@ any positive integer. By default, \fInum\fR is set to  \fB1\fR.
 Print pages whose numbers are given in the comma-separated \fIlist\fR. The
 \fIlist\fR contains single numbers \fIN\fR and ranges \fIN1 \fR\(mi\fI N2\fR. A
 missing \fIN1\fR means the lowest numbered page, a missing \fIN2\fR means the
-highest. The page range is an expression of logical pages rather  than physical
+highest. The page range is an expression of logical pages rather than physical
 sheets of paper. For example, if you are printing two logical pages to a
-sheet, and you specified a range of  \fB4\fR, then two sheets of paper would
-print, containing four  page layouts. If you specified a page range of
-\fB3-4\fR, when requesting two logical pages to a sheet; then \fIonly\fR  page
-3 and page 4 layouts would print, and they would  appear on one physical sheet
+sheet, and you specified a range of \fB4\fR, then two sheets of paper would
+print, containing four page layouts. If you specified a page range of
+\fB3-4\fR, when requesting two logical pages to a sheet; then \fIonly\fR page
+3 and page 4 layouts would print, and they would appear on one physical sheet
 of paper.
 .RE
 
@@ -113,8 +111,8 @@ character of \fImode\fR is significant. The default \fImode\fR is portrait.
 .ad
 .RS 11n
 Selects carriage return behavior. Carriage returns are ignored if \fInum\fR is
-\fB0\fR, cause a return to column 1 if \fInum\fR is  \fB1\fR, and generate a
-newline if \fInum\fR is  \fB2\fR. The default \fInum\fR is  \fB0\fR.
+\fB0\fR, cause a return to column 1 if \fInum\fR is \fB1\fR, and generate a
+newline if \fInum\fR is \fB2\fR. The default \fInum\fR is \fB0\fR.
 .RE
 
 .sp
@@ -125,7 +123,7 @@ newline if \fInum\fR is  \fB2\fR. The default \fInum\fR is  \fB0\fR.
 .RS 11n
 Print \fIfiles\fR using point size \fInum\fR. When printing in landscape mode
 \fInum\fR is scaled by a factor that depends on the imaging area of the device.
-The default size for portrait mode is  \fB10\fR. Note that increasing point
+The default size for portrait mode is \fB10\fR. Note that increasing point
 size increases virtual image size, so you either need to load larger paper, or
 use the \fB\(mil0\fR option to scale the number of lines per page.
 .RE
@@ -137,7 +135,7 @@ use the \fB\(mil0\fR option to scale the number of lines per page.
 .ad
 .RS 11n
 Assume tabs are set every \fInum\fR columns, starting with the first column. By
-default, tabs are set every  \fB8\fR columns.
+default, tabs are set every \fB8\fR columns.
 .RE
 
 .sp
@@ -149,7 +147,7 @@ default, tabs are set every  \fB8\fR columns.
 Translate the origin \fInum\fR inches along the positive x axis. The default
 coordinate system has the origin fixed near the upper left corner of the page,
 with positive x to the right and positive y down the page. Positive \fInum\fR
-moves everything to the right. The default offset is  \fB0.25\fR inches.
+moves everything to the right. The default offset is \fB0.25\fR inches.
 .RE
 
 .sp
@@ -159,13 +157,13 @@ moves everything to the right. The default offset is  \fB0.25\fR inches.
 .ad
 .RS 11n
 Translate the origin \fInum\fR inches along the positive y axis. Positive
-\fInum\fR moves text up the page. The default offset is  \fB\(mi0.25\fR inches.
+\fInum\fR moves text up the page. The default offset is \fB\(mi0.25\fR inches.
 .RE
 
 .sp
 .LP
-A new logical page is started  after 66 lines have been printed on the current
-page,  or whenever an ASCII form feed character is read. The number of lines
+A new logical page is started after 66 lines have been printed on the current
+page, or whenever an ASCII form feed character is read. The number of lines
 per page can be changed using the \fB-l\fR option. Unprintable ASCII characters
 are ignored, and lines that are too long are silently truncated by the printer.
 .SH EXAMPLES
@@ -173,7 +171,7 @@ are ignored, and lines that are too long are silently truncated by the printer.
 \fBExample 1 \fRExamples of \fBpostprint\fR.
 .sp
 .LP
-To print \fIfile1\fR  and  \fIfile2\fR  in landscape mode, issue the following
+To print \fIfile1\fR and \fIfile2\fR in landscape mode, issue the following
 command:
 
 .sp
@@ -197,7 +195,6 @@ To print three logical pages on each physical page in portrait mode:
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -219,7 +216,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/lp/postscript/forms.ps\fR\fR
@@ -240,8 +236,6 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBdownload\fR(1), \fBdpost\fR(1), \fBpostdaisy\fR(1), \fBpostdmd\fR(1),
-\fBpostio\fR(1), \fBpostmd\fR(1), \fBpostreverse\fR(1), \fBposttek\fR(1),
+\fBdownload\fR(1), \fBdpost\fR(1), \fBpostio\fR(1), \fBpostreverse\fR(1),
 \fBattributes\fR(5)

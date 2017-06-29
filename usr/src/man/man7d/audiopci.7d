@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOPCI 7D "May 6, 2009"
+.TH AUDIOPCI 7D "May 13, 2017"
 .SH NAME
 audiopci \- Ensoniq 1370 driver support
 .SH DESCRIPTION
-.sp
 .LP
 The \fBaudiopci\fR driver provides support for the Ensoniq 1370 audio
 controller. Ensoniq 1370 chips are found on add-in PCI cards commonly
 identified as Audio PCI and SoundBlaster PCI.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/audiopci\fR\fR
@@ -34,7 +32,7 @@ identified as Audio PCI and SoundBlaster PCI.
 .sp
 .ne 2
 .na
-\fB\fB/kernel/drv/amd64/audiopci\fR\fR
+\fB\fB/kernel/drv/sparcv9/audiopci\fR\fR
 .ad
 .RS 30n
 64-bit SPARC kernel driver module
@@ -50,7 +48,6 @@ Driver configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -66,13 +63,9 @@ Architecture	PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBioctl\fR(2), \fBattributes\fR(5), \fBaudio\fR(7I), \fBmixer\fR(7I),
 \fBstreamio\fR(7I)
 .sp
 .LP
 \fICreative Technology Ltd ES1370 Specification\fR
-.sp
-.LP
-http://www.sun.com

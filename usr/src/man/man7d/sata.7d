@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SATA 7D "Sep 10, 2009"
+.TH SATA 7D "May 13, 2017"
 .SH NAME
 sata \- Solaris SATA framework
 .SH DESCRIPTION
-.sp
 .LP
 Serial ATA is an interconnect technology designed to replace parallel ATA
 technology. It is used to connect hard drives, optical drives, removable
@@ -18,7 +17,7 @@ http://\fIwww.serialata.org\fR.
 .LP
 Up to 32 SATA devices may be plugged directly to each SATA HBA and up to 15
 SATA devices may be plugged directly to each SATA port multiplier supported by
-the Solaris SATA framework. The actual number of pluggable devices my be lower,
+the Solaris SATA framework. The actual number of pluggable devices may be lower,
 and is limited by the number of device ports on the SATA HBA or the SATA port
 multiplier. The maximum data rate is either 1.5Gb/sec. or 3.0Gb/sec., depending
 on the capability of a SATA device, port multiplier and SATA HBA controller.
@@ -32,7 +31,6 @@ attached as a target driver for each device node created by the SATA framework.
 You can use the \fBcfgadm\fR(1M) utility to manage hot plugged and unplugged
 SATA devices.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/misc/sata\fR\fR
@@ -51,7 +49,6 @@ SATA devices.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attribute:
 .sp
@@ -67,10 +64,9 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcfgadm\fR(1M), \fBprtconf\fR(1M), \fBcfgadm_sata\fR(1M),
-\fBattributes\fR(5), \fBahci\fR(7D), \fBmarvell88sx\fR(7D), \fBnv_sata\fR(7D),
+\fBattributes\fR(5), \fBahci\fR(7D), \fBnv_sata\fR(7D),
 \fBsd\fR(7D), \fBsi3124\fR(7D)
 .sp
 .LP
@@ -79,11 +75,7 @@ Architecture	x86
 .LP
 \fISerial ATA II (Extension to Serial ATA 1.0.a.)\fR \(em Serial ATA
 International Organization.
-.sp
-.LP
-\fIhttp://www.sun.com/\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 The messages described below may appear on the system console as well as being
 logged. All messages are presented in one of the following formats and are

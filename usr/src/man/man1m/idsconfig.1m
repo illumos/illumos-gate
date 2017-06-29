@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IDSCONFIG 1M "Oct 18, 2001"
+.TH IDSCONFIG 1M "May 13, 2017"
 .SH NAME
 idsconfig \- prepare an iPlanet Directory Server (iDS) to be populated with
 data and serve LDAP clients
@@ -15,12 +15,11 @@ data and serve LDAP clients
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Use the \fBidsconfig\fR tool to set up an iPlanet Directory Server (iDS). You
 can specify the input configuration file with the \fB-i\fR option on the
 command line. Alternatively, the tool will prompt the user for configuration
-information. The input configuration  file is created by \fBidsconfig\fR with
+information. The input configuration file is created by \fBidsconfig\fR with
 the \fB-o\fR option on a previous run.
 .sp
 .LP
@@ -37,7 +36,6 @@ appropriate security precautions.
 You should back up the directory server's configuration and data prior to
 running this command.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -47,7 +45,7 @@ The following options are supported:
 .ad
 .RS 24n
 Specify the file name for \fBidsconfig\fR to use as a configuration file.  This
-file will be read by \fBidsconfig\fR, and the values  in the file will be used
+file will be read by \fBidsconfig\fR, and the values in the file will be used
 to configure the server.  Do not manually edit \fIinput_configfile\fR. The
 \fIinput_configfile\fR is only partially validated, as \fBidsconfig\fR assumes
 that the file was created by a previous invocation of the command.
@@ -72,7 +70,6 @@ Verbose output.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -140,7 +137,6 @@ example# \fBidsconfig -v -i config.1\fR
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -162,7 +158,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -178,9 +173,8 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(1), \fBldapadd\fR(1), \fBldapdelete\fR(1), \fBldaplist\fR(1),
 \fBldapmodify\fR(1), \fBldapmodrdn\fR(1), \fBldapsearch\fR(1),
 \fBldap_cachemgr\fR(1M), \fBldapaddent\fR(1M), \fBldapclient\fR(1M),
-\fBsuninstall\fR(1M), \fBresolv.conf\fR(4), \fBattributes\fR(5)
+\fBresolv.conf\fR(4), \fBattributes\fR(5)

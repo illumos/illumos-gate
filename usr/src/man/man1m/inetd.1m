@@ -4,9 +4,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INETD 1M "April 9, 2016"
+.TH INETD 1M "May 13, 2017"
 .SH NAME
-inetd \- Solaris Management Facility delegated restarter for inet services
+inetd \- Service Management Facility delegated restarter for inet services
 .SH SYNOPSIS
 .LP
 .nf
@@ -540,10 +540,8 @@ wrappers facility and its configuration files is External. As the TCP wrappers
 facility is not controlled by Sun, intra-release incompatibilities are not
 uncommon. See \fBattributes\fR(5).
 .sp
-For more information about configuring TCP wrappers, you can refer to the
-\fBtcpd(1M)\fR and \fBhosts_access(4)\fR man pages, which are delivered as part
-of the Solaris operating system at \fB/usr/sfw/man\fR. These pages are not part
-of the standard Solaris man pages, available at \fB/usr/man\fR.
+For more information about configuring TCP wrappers, refer to
+\fBtcpd\fR(1M) and \fBhosts_access\fR(4).
 .sp
 \fBtcp_wrappers\fR is equivalent to the previous inetd's
 \fB/etc/default/inetd\fR property \fBENABLE_TCPWRAPPERS\fR.
@@ -843,7 +841,7 @@ Interface Stability	Evolving
 The \fBinetd\fR daemon performs the same function as, but is implemented
 significantly differently from, the daemon of the same name in Solaris 9 and
 prior Solaris operating system releases. In the current Solaris release,
-\fBinetd\fR is part of the Solaris Management Facility (see \fBsmf\fR(5)) and
+\fBinetd\fR is part of the Service Management Facility (see \fBsmf\fR(5)) and
 will run only within that facility.
 .sp
 .LP

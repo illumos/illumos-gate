@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POWERD 1M "Oct 15, 1999"
+.TH POWERD 1M "May 13, 2017"
 .SH NAME
 powerd \- power manager daemon
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ powerd \- power manager daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpowerd\fR daemon is started by \fBpmconfig\fR(1M) to monitor system
 activity and perform an automatic shutdown using the suspend-resume feature.
@@ -26,7 +25,6 @@ prior to suspend.
 Immediately prior to system shutdown, the daemon notifies \fBsyslogd\fR(1M) of
 the shutdown, which broadcasts a notification.
 .SH OPTIONS
-.sp
 .LP
 The following option is supported:
 .sp
@@ -40,7 +38,6 @@ No broadcast mode. The daemon silently shuts down the system without notifying
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/power.conf\fR\fR
@@ -50,7 +47,6 @@ Power Management configuration information file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -66,9 +62,8 @@ Interface Stability 	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBpmconfig\fR(1M), \fBdtpower\fR(1M), \fBsyslogd\fR(1M), \fBpower.conf\fR(4),
+\fBpmconfig\fR(1M), \fBsyslogd\fR(1M), \fBpower.conf\fR(4),
 \fBattributes\fR(5), \fBcpr\fR(7), \fBpm\fR(7D)
 .sp
 .LP

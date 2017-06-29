@@ -23,7 +23,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  */
 /*	Copyright (c) 1996 Sun Microsystems, Inc.	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef _XTI_H
