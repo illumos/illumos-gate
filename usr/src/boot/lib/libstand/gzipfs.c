@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include "stand.h"
 
@@ -301,8 +300,6 @@ zf_seek(struct open_file *f, off_t offset, int where)
     case SEEK_CUR:
 	target = offset + zf->zf_zstream.total_out;
 	break;
-    case SEEK_END:
-	target = -1;
     default:
 	errno = EINVAL;
 	return(-1);
