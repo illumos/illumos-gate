@@ -60,7 +60,7 @@ extern boolean_t zfs_abd_scatter_enabled;
 inline boolean_t
 abd_is_linear(abd_t *abd)
 {
-	return ((abd->abd_flags & ABD_FLAG_LINEAR) != 0);
+	return ((abd->abd_flags & ABD_FLAG_LINEAR) != 0 ? B_TRUE : B_FALSE);
 }
 
 /*
@@ -113,7 +113,7 @@ abd_copy(abd_t *dabd, abd_t *sabd, size_t size)
 }
 
 inline void
-abd_copy_from_buf(abd_t *abd, void *buf, size_t size)
+abd_copy_from_buf(abd_t *abd, const void *buf, size_t size)
 {
 	abd_copy_from_buf_off(abd, buf, 0, size);
 }
@@ -125,7 +125,7 @@ abd_copy_to_buf(void* buf, abd_t *abd, size_t size)
 }
 
 inline int
-abd_cmp_buf(abd_t *abd, void *buf, size_t size)
+abd_cmp_buf(abd_t *abd, const void *buf, size_t size)
 {
 	return (abd_cmp_buf_off(abd, buf, 0, size));
 }

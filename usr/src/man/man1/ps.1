@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
+.\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright (c) 2013 Gary Mills
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at  http://www.opengroup.org/bookstore/.
@@ -12,7 +12,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PS 1 "Apr 16, 2013"
+.TH PS 1 "Jun 13, 2017"
 .SH NAME
 ps \- report process status
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ ps \- report process status
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBps\fR command prints information about active processes. Without
 options, \fBps\fR prints information about processes that have the same
@@ -42,7 +41,6 @@ for \fIproclist\fR and \fIgrplist\fR must be numeric.
 .LP
 The \fBps\fR command also accepts BSD-style options.  See \fBps\fR(1b).
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -53,6 +51,8 @@ The following options are supported:
 .RS 15n
 Lists information about \fBa\fRll processes most frequently requested: all
 those except session leaders and processes not associated with a terminal.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -92,8 +92,8 @@ Lists information about all processes except session leaders.
 .RS 15n
 Lists information about \fBe\fRvery process now running.
 .sp
-When the \fB-e\fRoption is specified, options \fB-z\fR, \fB-t\fR, \fB-u\fR,
-\fB-U\fR, \fB-g\fR, \fB-G\fR, \fB-p\fR, \fB-g\fR, \fB-s\fR and \fB-a\fR options
+When the \fB-e\fR option is specified, options \fB-z\fR, \fB-t\fR, \fB-u\fR,
+\fB-U\fR, \fB-g\fR, \fB-G\fR, \fB-p\fR, \fB-h\fR, \fB-s\fR and \fB-a\fR
 have no effect.
 .RE
 
@@ -116,6 +116,8 @@ full listing.)
 Lists only process data whose group leader's \fBID\fR number(s) appears in
 \fIgrplist\fR. (A group leader is a process whose process \fBID\fR number is
 identical to its process group \fBID\fR number.)
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -127,6 +129,8 @@ identical to its process group \fBID\fR number.)
 Lists information for processes whose real group ID numbers are given in
 \fIgidlist\fR. The \fIgidlist\fR must be a single argument in the form of a
 blank- or comma-separated list.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -137,6 +141,8 @@ blank- or comma-separated list.
 .RS 15n
 Lists only the processes homed to the specified \fIlgrplist\fR. Nothing is
 listed for any invalid group specified in \fIlgrplist\fR.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -207,6 +213,8 @@ option-arguments.
 .RS 15n
 Lists only process data whose process \fBID\fR numbers are given in
 \fIproclist\fR.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -227,6 +235,8 @@ any, under an additional column header, \fBPSR\fR.
 .RS 15n
 Lists information on all session leaders whose \fBID\fRs appear in
 \fIsidlist\fR.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -238,6 +248,8 @@ Lists information on all session leaders whose \fBID\fRs appear in
 Lists only process data associated with \fIterm\fR. Terminal identifiers are
 specified as a device file name, and an identifier. For example, \fBterm/a\fR,
 or \fBpts/0\fR.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -249,6 +261,8 @@ or \fBpts/0\fR.
 Lists only process data whose effective user \fBID\fR number or login name is
 given in \fIuidlist\fR. In the listing, the numerical user \fBID\fR is printed
 unless you give the \fB-f\fR option, which prints the login name.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -260,6 +274,8 @@ unless you give the \fB-f\fR option, which prints the login name.
 Lists information for processes whose real user \fBID\fR numbers or login names
 are given in \fIuidlist\fR. The \fIuidlist\fR must be a single argument in the
 form of a blank- or comma-separated list.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -294,6 +310,8 @@ reported in units of kilobytes instead of pages.
 .RS 15n
 Lists only processes in the specified zones. Zones can be specified either by
 name or ID. This option is only useful when executed in the global zone.
+.sp
+This option is ignored when the \fB-e\fR option is also specified.
 .RE
 
 .sp
@@ -323,7 +341,6 @@ Many of the options shown are used to select processes to list. If any are
 specified, the default list is ignored and \fBps\fR selects the processes
 represented by the inclusive OR of all the selection-criteria options.
 .SH DISPLAY FORMATS
-.sp
 .LP
 Under the \fB-f\fR option, \fBps\fR tries to determine the command name and
 arguments given when the process was created by examining the user block.
@@ -616,7 +633,6 @@ lwp.
 A process that has exited and has a parent, but has not yet been waited for by
 the parent, is marked \fB<defunct>\fR\&.
 .SS "\fB-o\fR format"
-.sp
 .LP
 The \fB-o\fR option allows the output format to be specified under user
 control.
@@ -1216,7 +1232,6 @@ The contents of the \fBCOMMAND\fR field need not be the same due to possible
 truncation.
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBps\fR: \fBLANG\fR, \fBLC_ALL\fR,
@@ -1232,7 +1247,6 @@ number of text columns to display.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1254,7 +1268,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/pts/*\fR\fR
@@ -1291,7 +1304,6 @@ process control files
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1311,7 +1323,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkill\fR(1), \fBlgrpinfo\fR(1), \fBnice\fR(1), \fBpagesize\fR(1),
 \fBpmap\fR(1), \fBpriocntl\fR(1), \fBps\fR(1b), \fBwho\fR(1), \fBgetty\fR(1M),
@@ -1319,7 +1330,6 @@ Standard	See \fBstandards\fR(5).
 \fBttysrch\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBresource_controls\fR(5), \fBstandards\fR(5), \fBzones\fR(5)
 .SH NOTES
-.sp
 .LP
 Things can change while \fBps\fR is running. The snapshot it gives is true only
 for a split-second, and it might not be accurate by the time you see it. Some

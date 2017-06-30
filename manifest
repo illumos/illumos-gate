@@ -2001,7 +2001,6 @@ f usr/bin/bdiff 0755 root bin
 h usr/bin/bg=usr/bin/alias
 f usr/bin/busstat 0555 root bin
 f usr/bin/cal 0555 root bin
-f usr/bin/calendar 0555 root bin
 f usr/bin/captoinfo 0555 root bin
 f usr/bin/cat 0555 root bin
 h usr/bin/catman=usr/bin/man
@@ -5100,7 +5099,6 @@ f usr/lib/brand/shared/common.ksh 0444 root bin
 f usr/lib/brand/shared/query 0755 root bin
 f usr/lib/brand/shared/uninstall.ksh 0444 root bin
 f usr/lib/bridged 0555 root bin
-f usr/lib/calprog 0555 root bin
 d usr/lib/cfgadm 0755 root bin
 d usr/lib/cfgadm/amd64 0755 root bin
 f usr/lib/cfgadm/amd64/fp.so.1 0755 root bin
@@ -11483,7 +11481,6 @@ f usr/share/man/man1/bc.1 0444 root bin
 f usr/share/man/man1/bdiff.1 0444 root bin
 s usr/share/man/man1/bg.1=jobs.1
 f usr/share/man/man1/cal.1 0444 root bin
-f usr/share/man/man1/calendar.1 0444 root bin
 f usr/share/man/man1/cat.1 0444 root bin
 f usr/share/man/man1/cd.1 0444 root bin
 s usr/share/man/man1/checkeq.1=eqn.1

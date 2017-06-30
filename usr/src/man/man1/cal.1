@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CAL 1 "Feb 1, 1995"
+.TH CAL 1 "Mar 7, 2017"
 .SH NAME
 cal \- display a calendar
 .SH SYNOPSIS
@@ -17,13 +17,11 @@ cal \- display a calendar
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcal\fR utility writes a Gregorian calendar to standard output. If the
 \fIyear\fR operand is specified, a calendar for that year is written. If no
 operands are specified, a calendar for the current month is written.
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -47,7 +45,6 @@ integer from \fB1\fR to \fB9999\fR. The default is the current year.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See  \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBcal\fR: \fBLANG\fR, \fBLC_ALL\fR,
@@ -62,7 +59,6 @@ Determine the timezone used to calculate the value of the current month.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -84,7 +80,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -100,11 +95,9 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBcalendar\fR(1), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 An unusual calendar is printed for September 1752. That is the month 11 days
 were skipped to make up for lack of leap year adjustments. To see this
