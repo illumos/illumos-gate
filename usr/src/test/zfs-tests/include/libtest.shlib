@@ -30,6 +30,7 @@
 # Copyright (c) 2025, Klara, Inc.
 # Copyright 2024 MNX Cloud, Inc.
 # Copyright 2026 Gordon W. Ross
+# Copyright 2026 Oxide Computer Company
 #
 
 UNAME=$(uname)
@@ -1786,6 +1787,7 @@ function check_pool_status # pool token keyword <verbose>
 #	is_pool_removing - to check if the pool is removing a vdev
 #	is_pool_removed - to check if the pool is remove completed
 #	is_pool_discarding - to check if the pool has checkpoint being discarded
+#	is_pool_suspended - to check if the pool's I/O is suspended
 #
 function is_pool_resilvering #pool <verbose>
 {
@@ -1839,6 +1841,12 @@ function is_pool_discarding #pool
 {
 	check_pool_status "$1" "checkpoint" "discarding"
 	return $?
+}
+
+function is_pool_suspended #pool
+{
+	check_pool_status "$1" "see" "ZFS-8000-HC" ||
+	    check_pool_status "$1" "see" "ZFS-8000-JQ"
 }
 
 function wait_for_degraded

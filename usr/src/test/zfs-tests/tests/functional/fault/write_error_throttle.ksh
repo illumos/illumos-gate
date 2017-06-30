@@ -46,7 +46,7 @@ function cleanup
 	typeset pid stuck=""
 
 	zinject -c all >/dev/null 2>&1
-	if pool_is_suspended; then
+	if is_pool_suspended $TESTPOOL; then
 		zpool clear $TESTPOOL >/dev/null 2>&1 &
 		pid=$!
 		if ! wait_for 60 is_done $pid; then
@@ -61,7 +61,7 @@ function cleanup
 			stuck=1
 		fi
 	done
-	if [[ -n $stuck ]] || pool_is_suspended; then
+	if [[ -n $stuck ]] || is_pool_suspended $TESTPOOL; then
 		log_note "not destroying $TESTPOOL"
 	else
 		poolexists $TESTPOOL && destroy_pool $TESTPOOL
@@ -71,24 +71,9 @@ function cleanup
 	[[ -n $throttle ]] && set_tunable32 zio_dva_throttle_enabled $throttle
 }
 
-function pool_is_suspended
-{
-	zpool status $TESTPOOL 2>/dev/null | grep -q -E "ZFS-8000-(HC|JQ)"
-}
-
 function is_done # pid
 {
 	! kill -0 $1 2>/dev/null
-}
-
-#
-# log_fail prints its message only after the cleanup, which hangs if the txg
-# sync is stuck, so log the reason first.
-#
-function fail
-{
-	log_note "$*"
-	log_fail "$*"
 }
 
 function wait_for # seconds command ...
@@ -125,18 +110,18 @@ log_must zinject -d $VDEV -L pad2 $TESTPOOL
 log_must cp $SRC /$FS/file
 zpool sync $TESTPOOL &
 sync_pid=$!
-wait_for 60 pool_is_suspended || fail "pool did not suspend"
+wait_for 60 is_pool_suspended $TESTPOOL || log_fail "pool did not suspend"
 
 log_must zinject -c all
 zpool clear $TESTPOOL &
 clear_pid=$!
-wait_for 60 is_done $clear_pid || fail "zpool clear hung"
-wait $clear_pid || fail "zpool clear failed"
+wait_for 60 is_done $clear_pid || log_fail "zpool clear hung"
+wait $clear_pid || log_fail "zpool clear failed"
 clear_pid=""
-wait_for 60 is_done $sync_pid || fail "txg sync hung"
-wait $sync_pid || fail "txg sync failed"
+wait_for 60 is_done $sync_pid || log_fail "txg sync hung"
+wait $sync_pid || log_fail "txg sync failed"
 sync_pid=""
-pool_is_suspended && fail "pool still suspended"
+is_pool_suspended $TESTPOOL && log_fail "pool still suspended"
 
 log_must zpool export $TESTPOOL
 log_must zpool import -d $TEST_BASE_DIR $TESTPOOL
