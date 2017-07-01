@@ -604,11 +604,11 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			siginfo.si_addr  = (caddr_t)rp->r_pc;
 			siginfo.si_trapno = type & ~USER;
 			fault = FLTILL;
-			break;
 		} else {
 			(void) die(type, rp, addr, cpuid);
 			/*NOTREACHED*/
 		}
+		break;
 
 	case T_PGFLT:		/* system page fault */
 		/*
@@ -2144,17 +2144,11 @@ dump_ttrace(void)
 			case TT_SYSENTER:
 			case TT_SYSC:
 			case TT_SYSC64:
-#if defined(__amd64)
 				sys = &sysent32[rec->ttr_sysnum];
 				switch (rec->ttr_marker) {
 				case TT_SYSC64:
 					sys = &sysent[rec->ttr_sysnum];
-					/*FALLTHROUGH*/
-#elif defined(__i386)
-				sys = &sysent[rec->ttr_sysnum];
-				switch (rec->ttr_marker) {
-				case TT_SYSC64:
-#endif
+					/* FALLTHROUGH */
 				case TT_SYSC:
 					stype = "sysc";	/* syscall */
 					break;

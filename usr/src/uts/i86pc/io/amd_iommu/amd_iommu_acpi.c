@@ -591,7 +591,7 @@ add_deventry_info(ivhd_t *ivhdp, ivhd_deventry_t *deventry,
 	default:
 		cmn_err(CE_PANIC, "%s: Unsupported deventry type",
 		    amd_iommu_modname);
-		/*NOTREACHED*/
+		/* FALLTHROUGH */
 	}
 
 	acpi_ivhdp->ach_Lint1Pass = deventry->idev_Lint1Pass;
