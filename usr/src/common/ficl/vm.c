@@ -252,7 +252,7 @@ ficlVmInnerLoop(ficlVm *vm, ficlWord *fw)
 	jmp_buf exceptionHandler;
 	int except;
 	int once;
-	int count;
+	volatile int count;	/* volatile because of longjmp */
 	ficlInstruction instruction;
 	ficlInteger i;
 	ficlUnsigned u;
