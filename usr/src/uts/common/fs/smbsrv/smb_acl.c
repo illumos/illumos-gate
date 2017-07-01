@@ -75,7 +75,7 @@
  *    SYSTEM: full access
  */
 #ifdef	_KERNEL
-static const ace_t const default_dacl[DEFAULT_DACL_ACENUM] = {
+static const ace_t default_dacl[DEFAULT_DACL_ACENUM] = {
 	{ (uid_t)-1, ACE_ALL_PERMS, 0, ACE_ACCESS_ALLOWED_ACE_TYPE },
 	{ IDMAP_WK_LOCAL_SYSTEM_GID, ACE_ALL_PERMS, ACE_IDENTIFIER_GROUP,
 	    ACE_ACCESS_ALLOWED_ACE_TYPE }

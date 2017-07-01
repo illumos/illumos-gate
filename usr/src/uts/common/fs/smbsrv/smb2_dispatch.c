@@ -68,7 +68,7 @@ void smb2sr_do_async(smb_request_t *);
 smb_sdrc_t smb2_invalid_cmd(smb_request_t *);
 static void smb2_tq_work(void *);
 
-static const smb_disp_entry_t const
+static const smb_disp_entry_t
 smb2_disp_table[SMB2__NCMDS] = {
 
 	/* text-name, pre, func, post, cmd-code, dialect, flags */
@@ -942,7 +942,7 @@ cmd_done:
  */
 uint32_t
 smb2sr_go_async(smb_request_t *sr,
-	smb_sdrc_t (*async_func)(smb_request_t *))
+    smb_sdrc_t (*async_func)(smb_request_t *))
 {
 	smb2_async_req_t *ar;
 
