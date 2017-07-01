@@ -363,6 +363,7 @@ loop_fmt :
 				goto loop_flags;
 		do_star:
 			form += 1; /* fall thru for '*' */
+		/* FALLTHROUGH */
 		case '*' :
 			form = (*_Sffmtintf)(form,&n);
 			if(*form == '$')
@@ -668,6 +669,7 @@ loop_fmt :
 
 		case 'S':
 			flags = (flags & ~(SFFMT_TYPES|SFFMT_LDOUBLE)) | SFFMT_LONG;
+		/* FALLTHROUGH */
 		case 's':
 #if _has_multibyte && defined(mbwidth)
 			wc = (flags & SFFMT_LDOUBLE) && mbwide();
@@ -788,6 +790,7 @@ loop_fmt :
 
 		case 'C':
 			flags = (flags & ~(SFFMT_TYPES|SFFMT_LDOUBLE)) | SFFMT_LONG;
+		/* FALLTHROUGH */
 		case 'c':
 #if _has_multibyte && defined(mbwidth)
 			wc = (flags & SFFMT_LDOUBLE) && mbwide();
@@ -914,6 +917,7 @@ loop_fmt :
 			goto int_arg;
 		case 'X':
 			ssp = "0123456789ABCDEF";
+		/* FALLTHROUGH */
 		case 'x':
 			base = 16; n_s = 15; n = 4;
 			flags &= ~(SFFMT_SIGN|SFFMT_BLANK);
@@ -929,6 +933,7 @@ loop_fmt :
 			goto d_format;
 		case 'u':
 			flags &= ~(SFFMT_SIGN|SFFMT_BLANK);
+		/* FALLTHROUGH */
 		case 'd':
 		d_format:
 #if _PACKAGE_ast

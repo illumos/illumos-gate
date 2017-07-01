@@ -66,12 +66,19 @@ Sflong_t	v;	/* the value to be written */
 	{	switch(n)
 		{
 		case 8 : *ps++ = *s++;
+		/* FALLTHROUGH */
 		case 7 : *ps++ = *s++;
+		/* FALLTHROUGH */
 		case 6 : *ps++ = *s++;
+		/* FALLTHROUGH */
 		case 5 : *ps++ = *s++;
+		/* FALLTHROUGH */
 		case 4 : *ps++ = *s++;
+		/* FALLTHROUGH */
 		case 3 : *ps++ = *s++;
+		/* FALLTHROUGH */
 		case 2 : *ps++ = *s++;
+		/* FALLTHROUGH */
 		case 1 : *ps++ = *s++;
 		}
 		f->next = ps;

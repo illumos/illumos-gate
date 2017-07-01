@@ -380,6 +380,7 @@ scan(register const char* s, char** e, const char* format, char** f, Time_t t, l
 					u = 0;
 				if (d == 'q')
 					continue;
+				/* FALLTHROUGH */
 			case 'z':
 				if ((zp = tmzone(s, &u, u, &m)))
 				{
