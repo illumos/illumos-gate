@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -33,12 +31,6 @@
 /*
  *  getdn.c
  */
-
-#if 0
-#ifndef lint 
-static char copyright[] = "@(#) Copyright (c) 1990 Regents of the University of Michigan.\nAll rights reserved.\n";
-#endif
-#endif
 
 #include "ldap-int.h"
 
@@ -238,6 +230,7 @@ ldap_explode( const char *dn, const int notypes, const int nametype )
 				state = INQUOTE;
 			break;
 		case '+': if ( nametype != LDAP_RDN ) break;
+			/* FALLTHROUGH */
 		case ';':
 		case ',':
 		case '\0':
@@ -323,7 +316,7 @@ ldap_explode( const char *dn, const int notypes, const int nametype )
 			if ( state == OUTQUOTE ) {
 				goteq = 1;
 			}
-			/* FALL */
+			/* FALLTHROUGH */
 		default:
 			plen = LDAP_UTF8LEN(p);
 			break;

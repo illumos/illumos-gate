@@ -870,7 +870,7 @@ ber_sockbuf_set_option( Sockbuf *sb, int option, void *value )
 	switch ( option ) {
 	case LBER_SOCKBUF_OPT_MAX_INCOMING_SIZE:
 		sb->sb_max_incoming = *((ber_uint_t *) value);
-		/* FALL */
+		/* FALLTHROUGH */
 	case LBER_SOCKBUF_OPT_TO_FILE:
 	case LBER_SOCKBUF_OPT_TO_FILE_ONLY:
 	case LBER_SOCKBUF_OPT_NO_READ_AHEAD:
