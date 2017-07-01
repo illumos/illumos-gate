@@ -1,0 +1,190 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd December 17, 2019
+.Dt CCIDADM 1M
+.Os
+.Sh NAME
+.Nm ccidadm
+.Nd CCID administration utility
+.Sh SYNOPSIS
+.Nm
+.Cm list
+.Nm
+.Cm atr
+.Op Fl pvx
+.Op Ar device
+.Nm
+.Cm reader
+.Op Ar device
+.Sh DESCRIPTION
+The
+.Nm
+utility can be used to list the CCID controllers and their slots known to the
+.Xr ccid 7D
+driver, query the features and capabilities of a CCID controller, and print
+the ATR of an ICC (integrated circuit card) that is inserted in a slot on an
+CCID controller.
+.Pp
+The information returned by the hardware is printed by
+.Nm
+in a human-readable form were applicable.
+.Sh ARGUMENTS
+.Nm
+expects the following kinds of arguments:
+.Bl -tag -width "device"
+.It Ar command
+Any command
+.Nm
+understands.
+See section
+.Sx COMMANDS
+for more information.
+.It Ar device
+Specifies a CCID reader or a slot, either as absolute path to the device node
+or in a short-hand form.
+The short-hand form consists of the reader instance, specified by the driver
+name
+.Qq ccid
+followed by the instance number of the reader, and optionally a slot instance
+separated by a
+.Qq / ,
+consisting of the word
+.Qq slot
+followed by the slot number.
+Here's an example for slot 1 on ccid reader 5:
+.Qq ccid5/slot1
+.El
+.Sh COMMANDS
+.Bl -tag -width ""
+.It Xo
+.Nm
+.Cm list
+.Xc
+Lists the CCID controllers and their slots known to the system and prints their
+product name, device node, card state, and the transport protocol in use.
+.It Xo
+.Nm
+.Cm atr
+.Op Fl pvx
+.Op Ar device
+.Xc
+Prints the ATR of an ICC that is inserted in the specified slot.
+If a device is specified it must refer to a certain slot.
+If no device is specified the command will print the ATR of all inserted slots
+in the system.
+A human-readable summary of the ATR data is printed when no flags are given.
+The following options can be used to alter the output of the
+.Cm atr
+command:
+.Bl -tag -width Ds
+.It Fl v
+Verbose output, the individual bytes of the ATR are printed and decoded
+in a human-readable form.
+Additionally the historic data in the ATR is printed as a hexadecimal dump.
+.It Fl x
+The complete ATR is printed as a hexadecimal dump.
+.El
+.It Xo
+.Nm
+.Cm reader
+.Op Ar device
+.Xc
+Print the capabilities of the specified CCID reader.
+Specifying slot number is not required but can optionally be specified.
+If no device is given, the command will print the capabilities of all attached
+CCID readers.
+.El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, 1 on any error opening or accessing the device, and
+2 if no command or an unknown command are given.
+.Sh EXAMPLES
+.Bl -tag -width ""
+.It Sy Example 1: List all CCID devices
+.Bd -literal
+# ccidadm list
+PRODUCT                 DEVICE          CARD STATE  TRANSPORT   SUPPORTED
+Yubikey 4 OTP+U2F+CCID  ccid0/slot0     activated   APDU (T=1)  supported
+Yubikey 4 OTP+U2F+CCID  ccid1/slot0     unactivated APDU        supported
+Smart Card Reader USB   ccid2/slot0     missing     TPDU        unsupported
+Smart Card Reader USB   ccid3/slot0     unactivated TPDU        unsupported
+.Ed
+.It Sy Example 2: Get the ATR of a Yubikey
+.Bd -literal
+# ccidadm atr ccid0/slot0
+ATR for ccid0/slot0 (18 bytes):
+ICC supports protocol(s): T=1
+Card protocol is negotiable; starts with default T=1 parameters
+Reader will run ICC at ICC's Di/Fi values
+T=1 properties that would be negotiated:
+  + Fi/Fmax Index: 1 (Fi 372/Fmax 5 MHz)
+  + Di Index: 3 (Di 4)
+  + Checksum: LRC
+  + Extra Guardtime: 0
+  + BWI: 1
+  + CWI: 5
+  + Clock Stop: 0 (disallowed)
+  + IFSC: 254
+  + CCID Supports NAD: no
+.Ed
+.It Sy Example 2: Get capabilities of a Smart Card Reader
+.Bd -literal
+# ccidadm reader ccid3
+Reader ccid3, CCID class v1.0 device:
+  Product: Smart Card Reader USB
+  Serial: <unknown>
+  Slots Present: 1
+  Maximum Busy Slots: 1
+  Supported Voltages:
+    + 5.0 V
+    + 3.0 V
+    + 1.8 V
+  Supported Protocols:
+    + T=0
+    + T=1
+  Default Clock: 3.69 MHz
+  Maximum Clock: 3.69 MHz
+  Supported Clock Rates: 1
+  Default Data Rate: 9.92 Kbps
+  Maximum Data Rate: 318 Kbps
+  Supported Data Rates: 19
+  Maximum IFSD (T=1 only): 254
+  Synchronous Protocols Supported:
+    + 2-Wire Support
+    + 3-Wire Support
+    + I2C Support
+  Device Features:
+    + Automatic ICC clock frequency change
+    + Automatic baud rate change
+    + Automatic PPS made by CCID
+    + CCID can set ICC in clock stop mode
+    + NAD value other than zero accepted
+    + TPDU support
+  Maximum Message Length: 271 bytes
+.Ed
+.El
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Evolving .
+The output of
+.Nm
+is
+.Sy Not-an-Interface
+and may change any time.
+.Sh SEE ALSO
+.Xr cfgadm 1M ,
+.Xr ccid 7D

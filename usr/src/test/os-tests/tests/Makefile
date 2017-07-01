@@ -27,6 +27,7 @@ SUBDIRS =       \
 		sockfs \
 		spoof-ras \
 		stress \
+		uccid \
 		$(SUBDIRS_$(MACH))
 
 PROGS = \

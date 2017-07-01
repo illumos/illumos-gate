@@ -16,7 +16,7 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	7i
+MANSECT=	7i
 
 MANFILES=	audio.7i	\
 		cdio.7i		\

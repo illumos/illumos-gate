@@ -21,6 +21,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
 
 #include <devfsadm.h>
 #include <stdio.h>
@@ -36,6 +39,8 @@ extern char *devfsadm_get_devices_dir();
 static int usb_process(di_minor_t minor, di_node_t node);
 
 static void ugen_create_link(char *p_path, char *node_name,
+    di_node_t node, di_minor_t minor);
+static void ccid_create_link(char *p_path, char *node_name,
     di_node_t node, di_minor_t minor);
 
 
@@ -81,6 +86,8 @@ static devfsadm_create_t usb_cbt[] = {
 						ILEVEL_0, usb_process },
 	{ "usb", DDI_NT_NEXUS, "hwahc", DRV_EXACT|TYPE_EXACT,
 						ILEVEL_0, usb_process },
+	{ "usb", DDI_NT_CCID_ATTACHMENT_POINT, "ccid", DRV_EXACT|TYPE_EXACT,
+						ILEVEL_0, usb_process },
 };
 
 /* For debug printing (-V filter) */
@@ -105,6 +112,7 @@ DEVFSADM_CREATE_INIT_V0(usb_cbt);
 #define	USB_LINK_RE_WHOST	"^usb/whost[0-9]+$"
 #define	USB_LINK_RE_HWARC	"^usb/hwarc[0-9]+$"
 #define	USB_LINK_RE_WUSB_CA	"^usb/wusb_ca[0-9]+$"
+#define	USB_LINK_RE_CCID	"^ccid/ccid[0-9]+/slot[0-9]+$"
 
 /* Rules for removing links */
 static devfsadm_remove_t usb_remove_cbt[] = {
@@ -138,7 +146,9 @@ static devfsadm_remove_t usb_remove_cbt[] = {
 	{ "usb", USB_LINK_RE_HWARC, RM_POST | RM_HOT | RM_ALWAYS, ILEVEL_0,
 			devfsadm_rm_all },
 	{ "usb", USB_LINK_RE_WUSB_CA, RM_POST | RM_HOT | RM_ALWAYS, ILEVEL_0,
-			devfsadm_rm_all }
+			devfsadm_rm_all },
+	{ "usb", USB_LINK_RE_CCID, RM_POST | RM_HOT | RM_ALWAYS, ILEVEL_0,
+		devfsadm_rm_all }
 };
 
 /*
@@ -301,6 +311,14 @@ usb_process(di_minor_t minor, di_node_t node)
 
 	if (strcmp(di_minor_nodetype(minor), DDI_NT_UGEN) == 0) {
 		ugen_create_link(p_path, minor_nm, node, minor);
+		free(l_path);
+		free(p_path);
+		return (DEVFSADM_CONTINUE);
+	}
+
+	if (strcmp(di_minor_nodetype(minor), DDI_NT_CCID_ATTACHMENT_POINT) ==
+	    0) {
+		ccid_create_link(p_path, minor_nm, node, minor);
 		free(l_path);
 		free(p_path);
 		return (DEVFSADM_CONTINUE);
@@ -492,4 +510,20 @@ ugen_create_link(char *p_path, char *node_name,
 	(void) devfsadm_mklink(l_path, node, minor, flags);
 
 	free(buf);
+}
+
+/*
+ * Create a CCID related link.
+ */
+static void
+ccid_create_link(char *p_path, char *minor_nm, di_node_t node, di_minor_t minor)
+{
+	char l_path[MAXPATHLEN];
+
+	(void) snprintf(l_path, sizeof (l_path), "ccid/ccid%d/%s",
+	    di_instance(node), minor_nm);
+
+	devfsadm_print(debug_mid, "mklink %s -> %s\n", l_path, p_path);
+
+	(void) devfsadm_mklink(l_path, node, minor, 0);
 }

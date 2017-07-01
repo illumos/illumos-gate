@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
 
 /* private devlink info interfaces */
 
@@ -43,6 +46,7 @@ extern "C" {
 #define	SDCARD_CFG_LINK_RE	"^cfg/sdcard[0-9]+/[0-9]+$"
 #define	PCI_CFG_PATH_LINK_RE	\
 	"^cfg/(.*(pci[0-9]|pcie[0-9]|Slot[0-9]|\\<pci\\>|\\<pcie\\>).*)$"
+#define	CCID_CFG_LINK_RE	"^cfg/ccid[0-9]+/slot[0-9]+$"
 
 #define	CFG_DIRNAME		"cfg"
 
