@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecp.h"
 #include "mpi.h"
 #include "mplogic.h"
@@ -96,14 +94,19 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		switch (a_used) {
 		case 12:
 			a5b = MP_DIGIT(a, 11);
+			/* FALLTHROUGH */
 		case 11:
 			a5a = MP_DIGIT(a, 10);
+			/* FALLTHROUGH */
 		case 10:
 			a4b = MP_DIGIT(a, 9);
+			/* FALLTHROUGH */
 		case 9:
 			a4a = MP_DIGIT(a, 8);
+			/* FALLTHROUGH */
 		case 8:
 			a3b = MP_DIGIT(a, 7);
+			/* FALLTHROUGH */
 		case 7:
 			a3a = MP_DIGIT(a, 6);
 		}
@@ -186,8 +189,10 @@ ec_GFp_nistp192_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		switch (a_used) {
 		case 6:
 			a5 = MP_DIGIT(a, 5);
+			/* FALLTHROUGH */
 		case 5:
 			a4 = MP_DIGIT(a, 4);
+			/* FALLTHROUGH */
 		case 4:
 			a3 = MP_DIGIT(a, 3);
 		}
@@ -308,16 +313,20 @@ ec_GFp_nistp192_add(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 3:
 		a2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		a1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		a0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 3:
 		r2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(b,0);
 	}
@@ -389,8 +398,10 @@ ec_GFp_nistp192_sub(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 3:
 		r2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(a,0);
 	}
@@ -398,8 +409,10 @@ ec_GFp_nistp192_sub(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(b)) {
 	case 3:
 		b2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		b1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		b0 = MP_DIGIT(b,0);
 	}

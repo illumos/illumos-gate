@@ -44,8 +44,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ec2.h"
 #include "mp_gf2m.h"
 #include "mp_gf2m-priv.h"
@@ -206,17 +204,23 @@ ec_GF2m_193_mul(const mp_int *a, const mp_int *b, mp_int *r,
 #ifdef ECL_THIRTY_TWO_BIT
 		case 7:
 			a6 = MP_DIGIT(a, 6);
+			/* FALLTHROUGH */
 		case 6:
 			a5 = MP_DIGIT(a, 5);
+			/* FALLTHROUGH */
 		case 5:
 			a4 = MP_DIGIT(a, 4);
 #endif
+			/* FALLTHROUGH */
 		case 4:
 			a3 = MP_DIGIT(a, 3);
+			/* FALLTHROUGH */
 		case 3:
 			a2 = MP_DIGIT(a, 2);
+			/* FALLTHROUGH */
 		case 2:
 			a1 = MP_DIGIT(a, 1);
+			/* FALLTHROUGH */
 		default:
 			a0 = MP_DIGIT(a, 0);
 		}
@@ -224,17 +228,23 @@ ec_GF2m_193_mul(const mp_int *a, const mp_int *b, mp_int *r,
 #ifdef ECL_THIRTY_TWO_BIT
 		case 7:
 			b6 = MP_DIGIT(b, 6);
+			/* FALLTHROUGH */
 		case 6:
 			b5 = MP_DIGIT(b, 5);
+			/* FALLTHROUGH */
 		case 5:
 			b4 = MP_DIGIT(b, 4);
 #endif
+			/* FALLTHROUGH */
 		case 4:
 			b3 = MP_DIGIT(b, 3);
+			/* FALLTHROUGH */
 		case 3:
 			b2 = MP_DIGIT(b, 2);
+			/* FALLTHROUGH */
 		case 2:
 			b1 = MP_DIGIT(b, 1);
+			/* FALLTHROUGH */
 		default:
 			b0 = MP_DIGIT(b, 0);
 		}
