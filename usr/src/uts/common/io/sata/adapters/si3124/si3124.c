@@ -1834,7 +1834,7 @@ si_tran_reset_dport(dev_info_t *dip, sata_device_t *sd)
 	case SATA_ADDR_DPMPORT:
 		SIDBG_P(SIDBG_RESET, si_portp,
 		    "port mult reset not implemented yet", NULL);
-		/* FALLSTHROUGH */
+		/* FALLTHROUGH */
 
 	default:
 		retval = SI_FAILURE;
