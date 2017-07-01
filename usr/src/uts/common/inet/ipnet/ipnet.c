@@ -685,7 +685,8 @@ ipnet_ioctl(queue_t *q, mblk_t *mp)
 			qreply(q, mp);
 			break;
 		}
-		/* Fallthrough, we don't support I_STR with DLIOCIPNETINFO. */
+		/* We don't support I_STR with DLIOCIPNETINFO. */
+		/* FALLTHROUGH */
 	default:
 		miocnak(q, mp, 0, EINVAL);
 		break;
