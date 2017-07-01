@@ -147,6 +147,7 @@ RUNTIME_FIXUP:
 		case ficlInstructionBranchParenWithCheck:
 			/* preoptimize where we're jumping to */
 			ficlVmOptimizeJumpToJump(vm, destination);
+			/* FALLTHROUGH */
 		case ficlInstructionBranchParen:
 			destination++;
 			destination += *(ficlInteger *)destination;
