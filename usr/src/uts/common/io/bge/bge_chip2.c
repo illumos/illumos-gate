@@ -455,7 +455,7 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 *
 	 * (1)	acknowledge & disable interrupts
 	 * (2)	while (more to do)
-	 * 		process packets
+	 *		process packets
 	 * (3)	enable interrupts -- also clears pending
 	 *
 	 * If the chip received more packets and internally generated
@@ -2145,6 +2145,7 @@ bge_ape_lock(bge_t *bgep, int locknum)
 	case BGE_APE_LOCK_GPIO:
 		if (bgep->chipid.device == DEVICE_ID_5761)
 			return (0);
+		/* FALLTHROUGH */
 	case BGE_APE_LOCK_GRC:
 	case BGE_APE_LOCK_MEM:
 		if (!bgep->pci_func)
@@ -2206,6 +2207,7 @@ bge_ape_unlock(bge_t *bgep, int locknum)
 	case BGE_APE_LOCK_GPIO:
 		if (bgep->chipid.device == DEVICE_ID_5761)
 			return;
+		/* FALLTHROUGH */
 	case BGE_APE_LOCK_GRC:
 	case BGE_APE_LOCK_MEM:
 		if (!bgep->pci_func)
@@ -5170,7 +5172,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 
 		/*
 		 * Drop the mutex while we:
-		 * 	Receive any newly-arrived packets
+		 *	Receive any newly-arrived packets
 		 *	Recycle any newly-finished send buffers
 		 */
 		bgep->bge_intr_running = B_TRUE;
