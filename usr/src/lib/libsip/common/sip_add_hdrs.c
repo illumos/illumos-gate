@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
@@ -1020,7 +1018,7 @@ sip_add_warning(sip_msg_t sip_msg, int code, char *addr, char *msg)
 	char		*hdr_name = SIP_WARNING;
 
 	if (sip_msg == NULL || addr == NULL || msg == NULL ||
-	    addr[0] == '\0' || msg == '\0' || code < 100 || code > 999) {
+	    addr[0] == '\0' || msg[0] == '\0' || code < 100 || code > 999) {
 		return (EINVAL);
 	}
 
