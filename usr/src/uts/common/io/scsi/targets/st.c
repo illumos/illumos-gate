@@ -8181,8 +8181,9 @@ st_modesense(struct scsi_tape *un)
 		} else {
 			un->un_comp_page = 0;
 		}
+		/* FALLTHROUGH */
 
-	default:	/* FALLTHROUGH */
+	default:
 		rval = st_cmd(un, SCMD_MODE_SENSE, MSIZE, SYNC_CMD);
 	}
 	return (rval);
@@ -11209,7 +11210,8 @@ check_keys:
 					severity = SCSI_ERR_INFO;
 					break;
 				}
-			default: /* FALLTHRU */
+				/* FALLTHROUGH */
+			default:
 				/* give up */
 				rval = COMMAND_DONE_ERROR;
 				severity = SCSI_ERR_FATAL;
@@ -12040,6 +12042,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			if (new_lastop != ST_OP_NIL) {
 				break;
 			}
+			/* FALLTHROUGH */
 		default:
 			/*
 			 * Unknown command, If was USCSI and USCSI_SILENT
@@ -18496,6 +18499,7 @@ st_reset(struct scsi_tape *un, int reset_type)
 				ST_DEBUG3(ST_DEVINFO, st_label, CE_WARN,
 				    "bus reset failed trying all reset");
 				reset_type = RESET_ALL;
+				break;
 			default:
 				mutex_enter(ST_MUTEX);
 				return (rval);
