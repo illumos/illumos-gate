@@ -551,6 +551,7 @@ add_deventry_info(ivhd_t *ivhdp, ivhd_deventry_t *deventry,
 		cmn_err(CE_PANIC, "%s: Unexpected Range End Deventry",
 		    amd_iommu_modname);
 		/*NOTREACHED*/
+		break;
 	case DEVENTRY_ALIAS_SELECT:
 		acpi_ivhdp->ach_deviceid_start = deventry->idev_deviceid;
 		acpi_ivhdp->ach_deviceid_end = deventry->idev_deviceid;
@@ -586,6 +587,7 @@ add_deventry_info(ivhd_t *ivhdp, ivhd_deventry_t *deventry,
 		acpi_ivhdp->ach_special_handle = deventry->idev_handle;
 		acpi_ivhdp->ach_special_variety = deventry->idev_variety;
 		idx = AMD_IOMMU_ACPI_INFO_HASH_SZ;
+		break;
 	default:
 		cmn_err(CE_PANIC, "%s: Unsupported deventry type",
 		    amd_iommu_modname);
