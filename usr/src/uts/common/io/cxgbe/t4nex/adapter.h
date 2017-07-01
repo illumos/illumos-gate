@@ -30,6 +30,7 @@
 
 #include "offload.h"
 #include "firmware/t4fw_interface.h"
+#include "shared.h"
 
 struct adapter;
 typedef struct adapter adapter_t;
@@ -75,6 +76,12 @@ enum {
 	CXGBE_HW_CSUM	= (1 << 1),
 };
 
+enum {
+	UDBS_SEG_SHIFT	= 7,	/* log2(UDBS_SEG_SIZE) */
+	UDBS_DB_OFFSET	= 8,	/* offset of the 4B doorbell in a segment */
+	UDBS_WR_OFFSET	= 64,	/* offset of the work request in a segment */
+};
+
 #define	IS_DOOMED(pi)	(pi->flags & DOOMED)
 #define	SET_DOOMED(pi)	do { pi->flags |= DOOMED; } while (0)
 #define	IS_BUSY(sc)	(sc->flags & CXGBE_BUSY)
@@ -87,7 +94,7 @@ struct port_info {
 	kmutex_t lock;
 	struct adapter *adapter;
 
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	void *tdev;
 #endif
 
@@ -100,7 +107,7 @@ struct port_info {
 	uint16_t first_txq;	/* index of first tx queue */
 	uint16_t nrxq;		/* # of rx queues */
 	uint16_t first_rxq;	/* index of first rx queue */
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	uint16_t nofldtxq;		/* # of offload tx queues */
 	uint16_t first_ofld_txq;	/* index of first offload tx queue */
 	uint16_t nofldrxq;		/* # of offload rx queues */
@@ -112,6 +119,7 @@ struct port_info {
 	uint8_t  mod_type;
 	uint8_t  port_id;
 	uint8_t  tx_chan;
+	uint8_t  rx_chan;
 	uint8_t instance; /* Associated adapter instance */
 	uint8_t child_inst; /* Associated child instance */
 	uint8_t	tmr_idx;
@@ -119,6 +127,9 @@ struct port_info {
 	struct link_config link_cfg;
 	struct port_stats stats;
 	uint32_t features;
+	uint8_t macaddr_cnt;
+	u8 rss_mode;
+	u16 viid_mirror;
 	kstat_t *ksp_config;
 	kstat_t *ksp_info;
 };
@@ -182,6 +193,8 @@ struct sge_iq {
 	uint16_t pending;	/* # of descs processed since last doorbell */
 	uint16_t cntxt_id;	/* SGE context id  for the iq */
 	uint16_t abs_id;	/* absolute SGE id for the iq */
+	kmutex_t lock;		/* Rx access lock */
+	uint8_t polling;
 
 	STAILQ_ENTRY(sge_iq) link;
 };
@@ -189,7 +202,7 @@ struct sge_iq {
 enum {
 	EQ_CTRL		= 1,
 	EQ_ETH		= 2,
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	EQ_OFLD		= 3,
 #endif
 
@@ -277,6 +290,7 @@ struct sge_txq {
 
 	struct port_info *port;	/* the port this txq belongs to */
 	struct tx_sdesc *sdesc;	/* KVA of software descriptor ring */
+	mac_ring_handle_t ring_handle;
 
 	/* DMA handles used for tx */
 	ddi_dma_handle_t *tx_dhdl;
@@ -295,6 +309,8 @@ struct sge_txq {
 	uint32_t txb_avail;	/* # of bytes available */
 	uint16_t copy_threshold; /* anything this size or less is copied up */
 
+	uint64_t txpkts;	/* # of ethernet packets */
+	uint64_t txbytes;	/* # of ethernet bytes */
 	kstat_t *ksp;
 
 	/* stats for common events first */
@@ -329,16 +345,21 @@ struct sge_rxq {
 	struct port_info *port;	/* the port this rxq belongs to */
 	kstat_t *ksp;
 
+	mac_ring_handle_t ring_handle;
+	uint64_t ring_gen_num;
+
 	/* stats for common events first */
 
 	uint64_t rxcsum;	/* # of times hardware assisted with checksum */
+	uint64_t rxpkts;	/* # of ethernet packets */
+	uint64_t rxbytes;	/* # of ethernet bytes */
 
 	/* stats for not-that-common events */
 
 	uint32_t nomem;		/* mblk allocation during rx failed */
 };
 
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 /* ofld_rxq: SGE ingress queue + SGE free list + miscellaneous items */
 struct sge_ofld_rxq {
 	struct sge_iq iq;	/* MUST be first */
@@ -373,20 +394,23 @@ struct sge {
 
 	int nrxq;	/* total rx queues (all ports and the rest) */
 	int ntxq;	/* total tx queues (all ports and the rest) */
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	int nofldrxq;	/* total # of TOE rx queues */
 	int nofldtxq;	/* total # of TOE tx queues */
 #endif
 	int niq;	/* total ingress queues */
 	int neq;	/* total egress queues */
+	int stat_len;	/* length of status page at ring end */
+	int pktshift;	/* padding between CPL & packet data */
+	int fl_align;	/* response queue message alignment */
 
 	struct sge_iq fwq;	/* Firmware event queue */
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	struct sge_wrq mgmtq;	/* Management queue (Control queue) */
 #endif
 	struct sge_txq *txq;	/* NIC tx queues */
 	struct sge_rxq *rxq;	/* NIC rx queues */
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	struct sge_wrq *ctrlq;	/* Control queues */
 	struct sge_wrq *ofld_txq;	/* TOE tx queues */
 	struct sge_ofld_rxq *ofld_rxq;	/* TOE rx queues */
@@ -416,7 +440,7 @@ struct driver_properties {
 	int max_nrxq_10g;
 	int max_ntxq_1g;
 	int max_nrxq_1g;
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	int max_nofldtxq_10g;
 	int max_nofldrxq_10g;
 	int max_nofldtxq_1g;
@@ -434,6 +458,9 @@ struct driver_properties {
 	int counter_val[SGE_NCOUNTERS];
 
 	int wc;
+
+	int multi_rings;
+	int t4_fw_install;
 };
 
 struct rss_header;
@@ -448,6 +475,11 @@ struct adapter {
 
 	unsigned int pf;
 	unsigned int mbox;
+
+	unsigned int vpd_busy;
+	unsigned int vpd_flag;
+
+	u32 t4_bar0;
 
 	uint_t open;	/* character device is open */
 
@@ -490,12 +522,12 @@ struct adapter {
 	struct adapter_params params;
 	struct t4_virt_res vres;
 
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	struct uld_softc tom;
 	struct tom_tunables tt;
 #endif
 
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 	int offload_map;
 #endif
 	uint16_t linkcaps;
@@ -522,6 +554,11 @@ enum {
 	TOM_H,
 	IW_H,
 	ISCSI_H
+};
+
+struct memwin {
+	uint32_t base;
+	uint32_t aperture;
 };
 
 #define	ADAPTER_LOCK(sc)		mutex_enter(&(sc)->lock)
@@ -582,23 +619,220 @@ enum {
 /* One for errors, one for firmware events */
 #define	T4_EXTRA_INTR 2
 
-/* adapter.c */
-uint32_t t4_read_reg(struct adapter *sc, uint32_t reg);
-void t4_write_reg(struct adapter *sc, uint32_t reg, uint32_t val);
-void t4_os_pci_read_cfg1(struct adapter *sc, int reg, uint8_t *val);
-void t4_os_pci_write_cfg1(struct adapter *sc, int reg, uint8_t val);
-void t4_os_pci_read_cfg2(struct adapter *sc, int reg, uint16_t *val);
-void t4_os_pci_write_cfg2(struct adapter *sc, int reg, uint16_t val);
-void t4_os_pci_read_cfg4(struct adapter *sc, int reg, uint32_t *val);
-void t4_os_pci_write_cfg4(struct adapter *sc, int reg, uint32_t val);
-uint64_t t4_read_reg64(struct adapter *sc, uint32_t reg);
-void t4_write_reg64(struct adapter *sc, uint32_t reg, uint64_t val);
-struct port_info *adap2pinfo(struct adapter *sc, int idx);
-void t4_os_set_hw_addr(struct adapter *sc, int idx, uint8_t hw_addr[]);
-bool is_10G_port(const struct port_info *pi);
-bool is_40G_port(const struct port_info *pi);
-struct sge_rxq *iq_to_rxq(struct sge_iq *iq);
-int t4_wrq_tx(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m);
+/* Presently disabling locking around  mbox access
+ * We may need to reenable it later
+ */
+typedef int t4_os_lock_t;
+static inline void t4_os_lock(t4_os_lock_t *lock)
+{
+
+}
+static inline void t4_os_unlock(t4_os_lock_t *lock)
+{
+
+}
+
+static inline uint32_t
+t4_read_reg(struct adapter *sc, uint32_t reg)
+{
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
+	return (ddi_get32(sc->regh, (uint32_t *)(sc->regp + reg)));
+}
+
+static inline void
+t4_write_reg(struct adapter *sc, uint32_t reg, uint32_t val)
+{
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
+	ddi_put32(sc->regh, (uint32_t *)(sc->regp + reg), val);
+}
+
+static inline void
+t4_os_pci_read_cfg1(struct adapter *sc, int reg, uint8_t *val)
+{
+	*val = pci_config_get8(sc->pci_regh, reg);
+}
+
+static inline void
+t4_os_pci_write_cfg1(struct adapter *sc, int reg, uint8_t val)
+{
+	pci_config_put8(sc->pci_regh, reg, val);
+}
+
+static inline void
+t4_os_pci_read_cfg2(struct adapter *sc, int reg, uint16_t *val)
+{
+	*val = pci_config_get16(sc->pci_regh, reg);
+}
+
+static inline void
+t4_os_pci_write_cfg2(struct adapter *sc, int reg, uint16_t val)
+{
+	pci_config_put16(sc->pci_regh, reg, val);
+}
+
+static inline void
+t4_os_pci_read_cfg4(struct adapter *sc, int reg, uint32_t *val)
+{
+	*val = pci_config_get32(sc->pci_regh, reg);
+}
+
+static inline void
+t4_os_pci_write_cfg4(struct adapter *sc, int reg, uint32_t val)
+{
+	pci_config_put32(sc->pci_regh, reg, val);
+}
+
+static inline uint64_t
+t4_read_reg64(struct adapter *sc, uint32_t reg)
+{
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
+	return (ddi_get64(sc->regh, (uint64_t *)(sc->regp + reg)));
+}
+
+static inline void
+t4_write_reg64(struct adapter *sc, uint32_t reg, uint64_t val)
+{
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
+	ddi_put64(sc->regh, (uint64_t *)(sc->regp + reg), val);
+}
+
+static inline struct port_info *
+adap2pinfo(struct adapter *sc, int idx)
+{
+	return (sc->port[idx]);
+}
+
+static inline void
+t4_os_set_hw_addr(struct adapter *sc, int idx, uint8_t hw_addr[])
+{
+	bcopy(hw_addr, sc->port[idx]->hw_addr, ETHERADDRL);
+}
+
+static inline bool
+is_10G_port(const struct port_info *pi)
+{
+	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_10G) != 0);
+}
+
+static inline struct sge_rxq *
+iq_to_rxq(struct sge_iq *iq)
+{
+	return (container_of(iq, struct sge_rxq, iq));
+}
+
+static inline bool
+is_25G_port(const struct port_info *pi)
+{
+	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_25G) != 0);
+}
+
+static inline bool
+is_40G_port(const struct port_info *pi)
+{
+	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_40G) != 0);
+}
+
+static inline bool
+is_100G_port(const struct port_info *pi)
+{
+	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_100G) != 0);
+}
+
+static inline bool
+is_10XG_port(const struct port_info *pi)
+{
+	return (is_10G_port(pi) || is_40G_port(pi) ||
+		is_25G_port(pi) || is_100G_port(pi));
+}
+
+static inline char *
+print_port_speed(const struct port_info *pi)
+{
+	if (!pi)
+		return "-";
+
+	if (is_100G_port(pi))
+		return "100G";
+	else if (is_40G_port(pi))
+		return "40G";
+	else if (is_25G_port(pi))
+		return "25G";
+	else if (is_10G_port(pi))
+		return "10G";
+	else
+		return "1G";
+}
+
+#ifdef TCP_OFFLOAD_ENABLE
+int t4_wrq_tx_locked(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m0);
+
+static inline int
+t4_wrq_tx(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m)
+{
+	int rc;
+
+	TXQ_LOCK(wrq);
+	rc = t4_wrq_tx_locked(sc, wrq, m);
+	TXQ_UNLOCK(wrq);
+	return (rc);
+}
+#endif
+
+/**
+ * t4_os_pci_read_seeprom - read four bytes of SEEPROM/VPD contents
+ * @adapter: the adapter
+ * @addr: SEEPROM/VPD Address to read
+ * @valp: where to store the value read
+ *
+ * Read a 32-bit value from the given address in the SEEPROM/VPD.  The address
+ * must be four-byte aligned.  Returns 0 on success, a negative erro number
+ * on failure.
+ */
+static inline int t4_os_pci_read_seeprom(adapter_t *adapter,
+					 int addr, u32 *valp)
+{
+	int t4_seeprom_read(struct adapter *adapter, u32 addr, u32 *data);
+	int ret;
+
+	ret = t4_seeprom_read(adapter, addr, valp);
+
+	return ret >= 0 ? 0 : ret;
+}
+
+/**
+ * t4_os_pci_write_seeprom - write four bytes of SEEPROM/VPD contents
+ * @adapter: the adapter
+ * @addr: SEEPROM/VPD Address to write
+ * @val: the value write
+ *
+ * Write a 32-bit value to the given address in the SEEPROM/VPD.  The address
+ * must be four-byte aligned.  Returns 0 on success, a negative erro number
+ * on failure.
+ */
+static inline int t4_os_pci_write_seeprom(adapter_t *adapter,
+					  int addr, u32 val)
+{
+	int t4_seeprom_write(struct adapter *adapter, u32 addr, u32 data);
+	int ret;
+
+	ret = t4_seeprom_write(adapter, addr, val);
+
+	return ret >= 0 ? 0 : ret;
+}
+
+static inline int t4_os_pci_set_vpd_size(struct adapter *adapter, size_t len)
+{
+	return 0;
+}
+
+static inline unsigned int t4_use_ldst(struct adapter *adap)
+{
+	return (adap->flags & FW_OK);
+}
+#define t4_os_alloc(_size)	kmem_alloc(_size, KM_SLEEP)
+
+static inline void t4_db_full(struct adapter *adap) {}
+static inline void t4_db_dropped(struct adapter *adap) {}
 
 /* t4_nexus.c */
 int t4_os_find_pci_capability(struct adapter *sc, int cap);
@@ -623,20 +857,22 @@ uint_t t4_intr_all(caddr_t arg1, caddr_t arg2);
 uint_t t4_intr(caddr_t arg1, caddr_t arg2);
 uint_t t4_intr_err(caddr_t arg1, caddr_t arg2);
 int t4_mgmt_tx(struct adapter *sc, mblk_t *m);
-#ifndef TCP_OFFLOAD_DISABLE
-int t4_wrq_tx_locked(struct adapter *sc, struct sge_wrq *wrq, mblk_t *m0);
-#endif
 void memwin_info(struct adapter *, int, uint32_t *, uint32_t *);
 uint32_t position_memwin(struct adapter *, int, uint32_t);
 
-mblk_t *t4_eth_tx(struct port_info *pi, struct sge_txq *txq, mblk_t *frame);
+mblk_t *t4_eth_tx(void *, mblk_t *);
+mblk_t *t4_mc_tx(void *arg, mblk_t *m);
+mblk_t *t4_ring_rx(struct sge_rxq *rxq, int poll_bytes);
 int t4_alloc_tx_maps(struct adapter *sc, struct tx_maps *txmaps,  int count,
     int flags);
 
 /* t4_mac.c */
 void t4_mc_init(struct port_info *pi);
+void t4_mc_cb_init(struct port_info *);
 void t4_os_link_changed(struct adapter *sc, int idx, int link_stat);
 void t4_mac_rx(struct port_info *pi, struct sge_rxq *rxq, mblk_t *m);
+void t4_mac_tx_update(struct port_info *pi, struct sge_txq *txq);
+int t4_addmac(void *arg, const uint8_t *ucaddr);
 
 /* t4_ioctl.c */
 int t4_ioctl(struct adapter *sc, int cmd, void *data, int mode);

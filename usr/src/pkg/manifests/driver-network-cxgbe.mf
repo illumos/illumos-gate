@@ -86,7 +86,30 @@ driver name=t4nex clone_perms="t4nex 0666 root sys" \
     alias=pciex1425,5499 \
     alias=pciex1425,549a \
     alias=pciex1425,549b \
-    alias=pciex1425,549c
+    alias=pciex1425,549c \
+    alias=pciex1425,549c \
+    alias=pciex1425,549d \
+    alias=pciex1425,549e \
+    alias=pciex1425,549f \
+    alias=pciex1425,54a0 \
+    alias=pciex1425,54a1 \
+    alias=pciex1425,6400 \
+    alias=pciex1425,6401 \
+    alias=pciex1425,6402 \
+    alias=pciex1425,6403 \
+    alias=pciex1425,6404 \
+    alias=pciex1425,6405 \
+    alias=pciex1425,6406 \
+    alias=pciex1425,6407 \
+    alias=pciex1425,6408 \
+    alias=pciex1425,6409 \
+    alias=pciex1425,640d \
+    alias=pciex1425,6410 \
+    alias=pciex1425,6411 \
+    alias=pciex1425,6414 \
+    alias=pciex1425,6415 \
+    alias=pciex1425,6480 \
+    alias=pciex1425,6481
 file path=kernel/drv/$(ARCH64)/cxgbe group=sys
 file path=kernel/drv/$(ARCH64)/t4nex group=sys
 $(i386_ONLY)file path=kernel/drv/cxgbe group=sys
