@@ -277,6 +277,7 @@ lock(mutex_t *mp)
 			case ENOTRECOVERABLE:
 				log(LOG_DEBUG, ROUTINE,
 				    "Lock failed: not recoverable 0x%x", mp);
+				break;
 			default:
 				if (loop > DEADLOCK_WARNING) {
 					log(LOG_DEBUG, ROUTINE,
