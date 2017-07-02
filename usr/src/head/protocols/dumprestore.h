@@ -35,8 +35,6 @@
 #ifndef _PROTOCOLS_DUMPRESTORE_H
 #define	_PROTOCOLS_DUMPRESTORE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -89,7 +87,7 @@ extern	int32_t		tp_bsize;
 #define	TP_BUFSIZE	TP_BSIZE
 #endif /* SUPPORTS_MTB_TAPE_FORMAT */
 
-#define	NTREC   	10
+#define	NTREC		10
 #define	HIGHDENSITYTREC	32
 #define	CARTRIDGETREC	63
 #define	TP_NINDIR	(TP_BSIZE_MIN/2)
@@ -97,9 +95,9 @@ extern	int32_t		tp_bsize;
 #define	LBLSIZE		16
 #define	NAMELEN		64
 
-#define	OFS_MAGIC   	(int)60011
-#define	NFS_MAGIC   	(int)60012
-#define	MTB_MAGIC   	(int)60013
+#define	OFS_MAGIC	(int)60011
+#define	NFS_MAGIC	(int)60012
+#define	MTB_MAGIC	(int)60013
 #define	CHECKSUM	(int)84446
 
 union u_data {
@@ -156,12 +154,12 @@ union u_spcl {
 /*
  * special record types
  */
-#define	TS_TAPE 	1	/* dump tape header */
+#define	TS_TAPE		1	/* dump tape header */
 #define	TS_INODE	2	/* beginning of file record */
-#define	TS_ADDR 	4	/* continuation of file record */
-#define	TS_BITS 	3	/* map of inodes on tape */
-#define	TS_CLRI 	6	/* map of inodes deleted since last dump */
-#define	TS_END  	5	/* end of volume marker */
+#define	TS_ADDR		4	/* continuation of file record */
+#define	TS_BITS		3	/* map of inodes on tape */
+#define	TS_CLRI		6	/* map of inodes deleted since last dump */
+#define	TS_END		5	/* end of volume marker */
 #define	TS_EOM		7	/* floppy EOM - restore compat w/ old dump */
 
 /*

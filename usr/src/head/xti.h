@@ -140,7 +140,7 @@ extern int t_errno;
 #endif				/* Should be <= IOV_MAX */
 
 #ifndef _SC_T_IOV_MAX
-#define	_SC_T_IOV_MAX 	79	/* Should be same in <unistd.h> for use by */
+#define	_SC_T_IOV_MAX	79	/* Should be same in <unistd.h> for use by */
 #endif				/* sysconf() */
 
 struct t_iovec {
@@ -352,7 +352,7 @@ struct t_unitdata {
  */
 struct t_uderr {
 	struct netbuf	addr;		/* address		*/
-	struct netbuf	opt;		/* options 		*/
+	struct netbuf	opt;		/* options		*/
 	t_scalar_t	error;		/* error code		*/
 };
 
@@ -385,7 +385,7 @@ struct t_uderr {
 #define	T_UNINIT	0		/* uninitialized		*/
 #define	T_UNBND		1		/* unbound			*/
 #define	T_IDLE		2		/* idle				*/
-#define	T_OUTCON	3		/* outgoing connection pending 	*/
+#define	T_OUTCON	3		/* outgoing connection pending	*/
 #define	T_INCON		4		/* incoming connection pending	*/
 #define	T_DATAXFER	5		/* data transfer		*/
 #define	T_OUTREL	6		/* outgoing release pending	*/
@@ -443,7 +443,7 @@ struct t_uderr {
  *     Get aligned start of data part after option header
  *
  * struct t_opthdr *T_OPT_NEXTHDR(struct netbuf *nbp, struct t_opthdr *tohp):
- * 	Skip to next option header
+ *	Skip to next option header
  */
 
 #define	T_OPT_FIRSTHDR(nbp)    \

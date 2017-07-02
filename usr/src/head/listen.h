@@ -20,13 +20,11 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef	_LISTEN_H
 #define	_LISTEN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.3.1 */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -101,7 +99,7 @@ struct call_list {
 };
 
 
-#define	EMPTYLIST(p)	(p->cl_head == (struct callsave *) NULL)
+#define	EMPTYLIST(p)	(p->cl_head == (struct callsave *)NULL)
 
 /*
  * Ridiculously high value for maximum number of connects per stream.

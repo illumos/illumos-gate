@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
@@ -472,7 +472,7 @@ advance(const char *lp, const char *ep)
 			}
 			if (size < 0)
 				lp++;
-			ep += 18; 		/* 16 + 2 */
+			ep += 18;		/* 16 + 2 */
 			goto star;
 			/*FALLTHRU*/
 
@@ -504,13 +504,15 @@ advance(const char *lp, const char *ep)
 
 		case CDOT | STAR:
 			curlp = lp;
-			while (*lp++);
+			while (*lp++)
+				;
 			goto star;
 			/*FALLTHRU*/
 
 		case CCHR | STAR:
 			curlp = lp;
-			while (*lp++ == *ep);
+			while (*lp++ == *ep)
+				;
 			ep++;
 			goto star;
 			/*FALLTHRU*/

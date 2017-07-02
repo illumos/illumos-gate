@@ -84,7 +84,7 @@ extern "C" {
 #define	LONG_MIN	(-2147483647L-1L)
 					/* min value of a "long int" */
 #define	LONG_MAX	2147483647L	/* max value of a "long int" */
-#define	ULONG_MAX	4294967295UL 	/* max value of "unsigned long int" */
+#define	ULONG_MAX	4294967295UL	/* max value of "unsigned long int" */
 #endif
 #if !defined(_STRICT_STDC) || defined(_STDC_C99) || defined(__EXTENSIONS__)
 #define	LLONG_MIN	(-9223372036854775807LL-1LL)

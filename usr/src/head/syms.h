@@ -181,18 +181,18 @@ union auxent
 				long	x_lnnoptr;	/* ptr to fcn line # */
 				long	x_endndx;	/* entry ndx past */
 							/* block end */
-			} 	x_fcn;
+			}	x_fcn;
 			struct			/* if ISARY, up to 4 dimen. */
 			{
 				unsigned short	x_dimen[DIMNUM];
-			} 	x_ary;
+			}	x_ary;
 		}		x_fcnary;
 		unsigned short  x_tvndx;		/* tv index */
-	} 	x_sym;
+	}	x_sym;
 	struct
 	{
 		char	x_fname[FILNMLEN];
-	} 	x_file;
+	}	x_file;
 	struct
 	{
 		long		x_scnlen;	/* section length */

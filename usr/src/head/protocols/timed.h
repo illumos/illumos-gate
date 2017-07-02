@@ -44,7 +44,7 @@ extern "C" {
 #endif
 
 #define	TSPVERSION	1
-#define	ANYADDR 	NULL
+#define	ANYADDR		NULL
 
 struct tsp {
 	uchar_t	tsp_type;

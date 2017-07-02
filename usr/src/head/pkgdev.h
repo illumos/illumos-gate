@@ -35,7 +35,7 @@ extern "C" {
 struct pkgdev {
 	int			rdonly;
 	int			mntflg;
-	longlong_t 	capacity; /* number of 512-blocks on device */
+	longlong_t	capacity; /* number of 512-blocks on device */
 	char		*name;
 	char		*dirname;
 	char		*pathname;

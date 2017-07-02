@@ -27,7 +27,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifndef _DIRENT_H
 #define	_DIRENT_H
@@ -174,7 +174,8 @@ extern int __posix_readdir_r(DIR *_RESTRICT_KYWD,
 
 static int
 readdir_r(DIR *_RESTRICT_KYWD __dp, struct dirent *_RESTRICT_KYWD __ent,
-		struct dirent **_RESTRICT_KYWD __res) {
+    struct dirent **_RESTRICT_KYWD __res)
+{
 	return (__posix_readdir_r(__dp, __ent, __res));
 }
 
