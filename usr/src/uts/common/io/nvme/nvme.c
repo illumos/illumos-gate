@@ -13,6 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -29,15 +30,16 @@
  *
  * Interrupt Usage:
  *
- * The driver will use a FIXED interrupt while configuring the device as the
- * specification requires. Later in the attach process it will switch to MSI-X
- * or MSI if supported. The driver wants to have one interrupt vector per CPU,
- * but it will work correctly if less are available. Interrupts can be shared
- * by queues, the interrupt handler will iterate through the I/O queue array by
- * steps of n_intr_cnt. Usually only the admin queue will share an interrupt
- * with one I/O queue. The interrupt handler will retrieve completed commands
- * from all queues sharing an interrupt vector and will post them to a taskq
- * for completion processing.
+ * The driver will use a single interrupt while configuring the device as the
+ * specification requires, but contrary to the specification it will try to use
+ * a single-message MSI(-X) or FIXED interrupt. Later in the attach process it
+ * will switch to multiple-message MSI(-X) if supported. The driver wants to
+ * have one interrupt vector per CPU, but it will work correctly if less are
+ * available. Interrupts can be shared by queues, the interrupt handler will
+ * iterate through the I/O queue array by steps of n_intr_cnt. Usually only
+ * the admin queue will share an interrupt with one I/O queue. The interrupt
+ * handler will retrieve completed commands from all queues sharing an interrupt
+ * vector and will post them to a taskq for completion processing.
  *
  *
  * Command Processing:
@@ -2176,6 +2178,7 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 	 * We currently don't support namespaces that use either:
 	 * - thin provisioning
 	 * - protection information
+	 * - illegal block size (< 512)
 	 */
 	if (idns->id_nsfeat.f_thin ||
 	    idns->id_dps.dp_pinfo) {
@@ -2184,6 +2187,10 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 		    "thin = %d, pinfo = %d", nsid,
 		    idns->id_nsfeat.f_thin, idns->id_dps.dp_pinfo);
 		ns->ns_ignore = B_TRUE;
+	} else if (ns->ns_block_size < 512) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!ignoring namespace %d, unsupported block size %"PRIu64,
+		    nsid, (uint64_t)ns->ns_block_size);
 	} else {
 		ns->ns_ignore = B_FALSE;
 	}

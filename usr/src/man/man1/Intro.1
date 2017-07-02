@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 1 "Nov 18, 2008"
+.TH INTRO 1 "May 13, 2017"
 .SH NAME
 Intro, intro \- introduction to commands and application programs
 .SH DESCRIPTION
-.sp
 .LP
 This section describes, in alphabetical order, commands available with this
 operating system.
@@ -36,15 +35,6 @@ Commands for communicating with other systems.
 .sp
 .ne 2
 .na
-\fB1F\fR
-.ad
-.RS 6n
-Commands associated with \fIForm and Menu Language Interpreter\fR (FMLI).
-.RE
-
-.sp
-.ne 2
-.na
 \fB1S\fR
 .ad
 .RS 6n
@@ -52,7 +42,6 @@ Commands specific to SunOS.
 .RE
 
 .SS "OTHER SECTIONS"
-.sp
 .LP
 See the following sections of the SunOS Reference Manual for more information.
 .RS +4
@@ -79,7 +68,6 @@ information pages.
 For tutorial information about these commands and procedures, see \fISolaris
 Advanced User\&'s Guide\fR.
 .SS "Manual Page Command Syntax"
-.sp
 .LP
 Unless otherwise noted, commands described in the SYNOPSIS section of a manual
 page accept options and other arguments according to the following syntax and
@@ -208,7 +196,6 @@ are syntactically recognized as numeric values.
 Ranges greater than those listed here are allowed.
 .RE
 .SS "Command Syntax Standard: Guidelines"
-.sp
 .LP
 These command syntax guidelines are not followed by all current commands, but
 new commands are likely to obey them. \fBgetopts\fR(1) should be used by all
@@ -414,7 +401,7 @@ long-option. The form \fB--name argument\fR is also accepted.
 All utilities should support two standard long-options: \fB--version\fR (with
 the short-option synonym \fB-V\fR ) and \fB--help\fR (with the short-option
 synonym \fB-?\fR ). The short option synonyms for \fB--\fRversion can vary if
-the preferred synonym is already in use (but a  synonym shall be provided).
+the preferred synonym is already in use (but a synonym shall be provided).
 Both of these options stop further argument processing when encountered and
 after displaying the appropriate output, the utility successfully exits.
 .RE
@@ -473,7 +460,7 @@ arbitrary character.
 If a long-option name consists of a single character, it must use the same
 character as the short-option name. Single character long-options should be
 avoided. They are only allowed for the exceptionally rare case that a single
-character is the most  descriptive name.
+character is the most descriptive name.
 .RE
 
 .sp
@@ -498,12 +485,10 @@ Several of these guidelines are only of interest to the authors of utilities.
 They are provided here for the use of anyone wanting to author utilities
 following this syntax.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a discussion of the attributes listed in this
 section.
 .SH ACKNOWLEDGMENTS
-.sp
 .LP
 Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
 reproduce portions of its copyrighted documentation. Original documentation
@@ -532,23 +517,20 @@ http://www.opengroup.org/unix/online.html\&.
 .LP
 This notice shall appear on any product containing this material.
 .SH SEE ALSO
-.sp
 .LP
 \fBgetopts\fR(1), \fBwait\fR(1), \fBexit\fR(2), \fBgetopt\fR(3C),
-\fBwait\fR(3UCB), \fBattributes\fR(5)
+\fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 Upon termination, each command returns two bytes of status, one supplied by the
 system and giving the cause for termination, and (in the case of "normal"
-termination) one supplied by the program [see \fBwait\fR(3UCB) and
+termination) one supplied by the program [see
 \fBexit\fR(2)]. The former byte is \fB0\fR for normal termination. The latter
 byte is customarily \fB0\fR for successful execution and non-zero to indicate
 troubles such as erroneous parameters, or bad or inaccessible data. It is
 called variously "exit code", "exit status", or "return code", and is described
 only where special conventions are involved.
 .SH WARNINGS
-.sp
 .LP
 Some commands produce unexpected results when processing files containing null
 characters. These commands often treat text input lines as strings and

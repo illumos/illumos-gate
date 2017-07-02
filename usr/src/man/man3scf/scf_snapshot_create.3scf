@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCF_SNAPSHOT_CREATE 3SCF "Aug 27, 2007"
+.TH SCF_SNAPSHOT_CREATE 3SCF "May 13, 2017"
 .SH NAME
 scf_snapshot_create, scf_snapshot_handle, scf_snapshot_destroy,
 scf_snapshot_get_parent, scf_snapshot_get_name, scf_snapshot_update,
@@ -52,11 +52,10 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 A snapshot is an unchanging picture of the full set of property groups
 associated with an instance. Snapshots are automatically created and managed by
-the Solaris Management Facility. See \fBsmf\fR(5).
+the Service Management Facility. See \fBsmf\fR(5).
 .sp
 .LP
 A snapshot consists of a set of snaplevels, each of which holds copies of the
@@ -94,7 +93,6 @@ the snapshots, see \fBscf_iter_instance_snapshots\fR(3SCF).
 To access the snaplevels of a snapshot, see
 \fBscf_snapshot_get_base_snaplevel\fR(3SCF).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBscf_snapshot_create()\fR returns a new
 \fBscf_snapshot_t\fR. Otherwise, it returns \fINULL\fR.
@@ -116,7 +114,6 @@ The \fBscf_snapshot_update()\fR function returns 1 if the snapshot was updated,
 Upon successful completion, \fBscf_snapshot_get_parent()\fR and
 \fBscf_instance_get_snapshot()\fR return 0. Otherwise, they return -1.
 .SH ERRORS
-.sp
 .LP
 The \fBscf_snapshot_create()\fR function will fail if:
 .sp
@@ -279,7 +276,7 @@ The \fBscf_instance_get_snapshot()\fR function will fail if:
 .ad
 .sp .6
 .RS 4n
-The  storage  mechanism  that  the   repository server (\fBsvc.configd\fR(1M))
+The storage mechanism that the repository server (\fBsvc.configd\fR(1M))
 chose for the operation denied access.
 .RE
 
@@ -377,7 +374,6 @@ The instance is not set.
 .LP
 The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -395,7 +391,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF),
 \fBscf_iter_instance_snapshots\fR(3SCF),

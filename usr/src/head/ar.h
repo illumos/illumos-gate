@@ -20,13 +20,11 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef _AR_H
 #define	_AR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.12	*/
 
 #ifdef	__cplusplus
 extern "C" {

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USBVC 7D "Jul 18, 2008"
+.TH USBVC 7D "May 13, 2017"
 .SH NAME
 usbvc \- USB video class driver
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ usbvc@unit-address
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusbvc\fR driver is a USBA (Solaris USB Architecture)-compliant client
 driver that supports the \fIUSB Device Class Definition for Video Devices\fR
@@ -36,17 +35,15 @@ visit \fIhttp://www.thedirks.org/v4l2\fR.
 .sp
 .LP
 Note that the \fBusbvc\fR driver supports the video capture function only and
-that video output is not supported. For more information on supported USB
-video-class devices and functions, visit \fIhttp://www.sun.com/io\fR.
+that video output is not supported.
 .SH READING DATA
-.sp
 .LP
 The \fBusbvc\fR driver reads video data from the isochronous endpoint of the
 device. Bulk data endpoints are not supported.
 .sp
 .LP
 MJPEG and UNCOMPRESSED video formats are supported. Isochronous data are read
-from the isochronous  input  device frame-by-frame and are maintained in a
+from the isochronous input device frame-by-frame and are maintained in a
 buffer array within the driver. Video frames are read from the driver using the
 \fBread\fR(2) or \fBmmap\fR(2) I/O method. For \fBread\fR(2), each read returns
 a buffer of a video frame. For \fBmmap\fR(2), each \fBVIDIOC_DQBUF\fR ioctl
@@ -54,7 +51,6 @@ returns the buffer structure v4l2_buffer. (A video frame buffer pointer is
 included in the structure). See the \fIV4L2 API\fR for buffer structure and
 other related data structure information.
 .SH IOCTLS
-.sp
 .LP
 A brief overview of supported ioctl requests appears below. For more detailed
 information, refer to the \fIV4L2 API\fR document. Note: ioctl information
@@ -197,7 +193,7 @@ one input only.
 .ad
 .sp .6
 .RS 4n
-Set the  device's current input. At this time, the \fBusbvc\fR driver supports
+Set the device's current input. At this time, the \fBusbvc\fR driver supports
 one input only.
 .RE
 
@@ -256,7 +252,6 @@ used internally by driver in read/write mode.
 .RE
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEBUSY\fR\fR
@@ -271,7 +266,7 @@ An open was attempted after the device has already been opened.
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-An  unsupported ioctl is received or an ioctl is attempted with an out-of-range
+An unsupported ioctl is received or an ioctl is attempted with an out-of-range
 value.
 .RE
 
@@ -281,7 +276,7 @@ value.
 \fB\fBEIO\fR\fR
 .ad
 .RS 10n
-The driver received an  unrecoverable device error or the device did not
+The driver received an unrecoverable device error or the device did not
 respond or the device stalled when attempting an access. A \fBread\fR(2) or
 \fBioctl\fR(2) did not complete due to a peripheral access.
 .RE
@@ -292,7 +287,7 @@ respond or the device stalled when attempting an access. A \fBread\fR(2) or
 \fB\fBENXIO\fR\fR
 .ad
 .RS 10n
-The driver received  an \fBopen\fR(2) request for a device for which the attach
+The driver received an \fBopen\fR(2) request for a device for which the attach
 failed.
 .RE
 
@@ -302,11 +297,10 @@ failed.
 \fBENODEV\fR
 .ad
 .RS 10n
-The driver received  an \fBopen\fR(2) request for a disconnected device.
+The driver received an \fBopen\fR(2) request for a disconnected device.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/usbvc\fR\fR
@@ -357,7 +351,6 @@ Device node for isochronous input from USB video device and device control.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -373,10 +366,9 @@ Architecture	 SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcfgadm_usb\fR(1M), \fBioctl\fR(2), \fBopen\fR(2), \fBmmap\fR(2),
-\fBread\fR(2), \fBlibusb\fR(3LIB), \fBattributes\fR(5),\fBugen\fR(7D),
+\fBread\fR(2), \fBattributes\fR(5), \fBugen\fR(7D),
 \fBusba\fR(7D), \fBattach\fR(9E)
 .sp
 .LP
@@ -395,21 +387,14 @@ Architecture	 SPARC, x86, PCI-based systems
 \fIVideo4Linux2 API (V4L2), Version 0.20\fR
 .sp
 .LP
-\fII/O Technologies and Solutions \(emhttp://www.sun.com/io\fR
-.sp
-.LP
-\fIhttp://docs.sun.com\fR
-.sp
-.LP
 \fIhttp://www.usb.org\fR
 .sp
 .LP
 \fIhttp://www.thedirks.org/v4l2\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 In addition to being logged, the following messages may appear on the system
-console. All messages are formatted in the     following manner:
+console. All messages are formatted in the following manner:
 .sp
 .in +2
 .nf
@@ -455,7 +440,6 @@ reconnect the original device to the same port.
 .RE
 
 .SH NOTES
-.sp
 .LP
 The USB video device will be power-managed when the device is idle.
 .sp
@@ -466,7 +450,7 @@ you of potential data loss. Hot-removal of an active video device is strongly
 discouraged.
 .sp
 .LP
-Always close all applications before hot-removing or  hot-inserting a  device.
-If an application is open when a device is hot-removed, inserting the  device
-in  a  different  port  will create new \fB/dev/video\fR\fIN\fR  links. Moving
+Always close all applications before hot-removing or hot-inserting a device.
+If an application is open when a device is hot-removed, inserting the device
+in a different port will create new \fB/dev/video\fR\fIN\fR links. Moving
 an active device to another port is not recommended.

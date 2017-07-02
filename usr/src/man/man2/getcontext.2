@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETCONTEXT 2 "Feb 5, 2001"
+.TH GETCONTEXT 2 "May 13, 2017"
 .SH NAME
 getcontext, setcontext \- get and set current user context
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ getcontext, setcontext \- get and set current user context
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetcontext()\fR function initializes the structure pointed to by
 \fIucp\fR to the current user context of the calling process.  The
@@ -52,23 +51,20 @@ then this context is the main context, and the process will exit when this
 context returns.  The effects of passing a \fIucp\fR argument obtained from any
 other source are unspecified.
 .SH RETURN VALUES
-.sp
 .LP
 On successful completion, \fBsetcontext()\fR does not return and
 \fBgetcontext()\fR returns \fB0\fR. Otherwise, \fB\(mi1\fR is returned.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH USAGE
-.sp
 .LP
 When a signal handler is executed, the current user context is saved and a new
 context is created.  If the thread leaves the signal handler via
-\fBlongjmp\fR(3UCB), then it is unspecified whether the context at the time of
-the corresponding \fBsetjmp\fR(3UCB) call is restored and thus whether future
+\fBlongjmp\fR(3C), then it is unspecified whether the context at the time of
+the corresponding \fBsetjmp\fR(3C) call is restored and thus whether future
 calls to \fBgetcontext()\fR will provide an accurate representation of the
-current context, since the context restored by \fBlongjmp\fR(3UCB) may not
+current context, since the context restored by \fBlongjmp\fR(3C) may not
 contain all the information that \fBsetcontext()\fR requires.  Signal handlers
 should use \fBsiglongjmp\fR(3C) instead.
 .sp
@@ -79,7 +75,6 @@ includes any process-wide static data, possibly including \fBerrno\fR. Users
 manipulating contexts should take care to handle these explicitly when
 required.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -95,9 +90,8 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsigaction\fR(2), \fBsigaltstack\fR(2), \fBsigprocmask\fR(2),
-\fBbsd_signal\fR(3C), \fBmakecontext\fR(3C), \fBsetjmp\fR(3UCB),
+\fBbsd_signal\fR(3C), \fBmakecontext\fR(3C), \fBsetjmp\fR(3C),
 \fBsigsetjmp\fR(3C), \fBucontext.h\fR(3HEAD), \fBattributes\fR(5),
 \fBstandards\fR(5)

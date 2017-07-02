@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -462,13 +462,14 @@ i40e_intr_init_queue_shared(i40e_t *i40e)
  * build assertions are specific to that.
  */
 void
-i40e_intr_rx_queue_enable(i40e_t *i40e, uint_t queue)
+i40e_intr_rx_queue_enable(i40e_trqpair_t *itrq)
 {
 	uint32_t reg;
-	i40e_hw_t *hw = &i40e->i40e_hw_space;
+	uint_t queue = itrq->itrq_index;
+	i40e_hw_t *hw = &itrq->itrq_i40e->i40e_hw_space;
 
-	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
-	ASSERT(queue < i40e->i40e_num_trqpairs);
+	ASSERT(MUTEX_HELD(&itrq->itrq_rx_lock));
+	ASSERT(queue < itrq->itrq_i40e->i40e_num_trqpairs);
 
 	reg = I40E_READ_REG(hw, I40E_QINT_RQCTL(queue));
 	ASSERT0(reg & I40E_QINT_RQCTL_CAUSE_ENA_MASK);
@@ -482,13 +483,14 @@ i40e_intr_rx_queue_enable(i40e_t *i40e, uint_t queue)
  * debug build assertions are specific to that.
  */
 void
-i40e_intr_rx_queue_disable(i40e_t *i40e, uint_t queue)
+i40e_intr_rx_queue_disable(i40e_trqpair_t *itrq)
 {
 	uint32_t reg;
-	i40e_hw_t *hw = &i40e->i40e_hw_space;
+	uint_t queue = itrq->itrq_index;
+	i40e_hw_t *hw = &itrq->itrq_i40e->i40e_hw_space;
 
-	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
-	ASSERT(queue < i40e->i40e_num_trqpairs);
+	ASSERT(MUTEX_HELD(&itrq->itrq_rx_lock));
+	ASSERT(queue < itrq->itrq_i40e->i40e_num_trqpairs);
 
 	reg = I40E_READ_REG(hw, I40E_QINT_RQCTL(queue));
 	ASSERT3U(reg & I40E_QINT_RQCTL_CAUSE_ENA_MASK, ==,

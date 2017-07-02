@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HISTORY 1 "Nov 2, 2007"
+.TH HISTORY 1 "May 13, 2017"
 .SH NAME
 history, fc, hist \- process command history list
 .SH SYNOPSIS
@@ -59,7 +59,6 @@ history, fc, hist \- process command history list
 
 .SH DESCRIPTION
 .SS "/usr/bin/fc"
-.sp
 .LP
 The \fBfc\fR utility lists or edits and reexecutes, commands previously entered
 to an interactive \fBsh\fR.
@@ -99,7 +98,6 @@ the \fBfc\fR command itself as well as the command that results, for example:
 reinvokes the previous command, suppressing standard error for both \fBfc\fR
 and the previous command.
 .SS "csh"
-.sp
 .LP
 Display the history list. If \fIn\fR is given, display only the \fIn\fR most
 recent events.
@@ -124,7 +122,6 @@ command, \fBsource\fR(1).
 .RE
 
 .SS "History Substitution:"
-.sp
 .LP
 History substitution allows you to use words from previous command lines in the
 command line you are typing. This simplifies spelling corrections and the
@@ -155,7 +152,6 @@ Input lines containing history substitutions are echoed on the terminal after
 being expanded, but before any other substitutions take place or the command
 gets executed.
 .SS "Event Designators:"
-.sp
 .LP
 An event designator is a reference to a command line entry in the history list.
 .sp
@@ -273,7 +269,6 @@ say, re-executing command #6:
 .RE
 
 .SS "Word Designators:"
-.sp
 .LP
 A `\fB:\fR' (colon) separates the event specification from the word designator.
 2It can be omitted if the word designator begins with a \fB^\fR, \fB$\fR,
@@ -373,7 +368,6 @@ Like \fIx\fR\fB*\fR but omitting word \fB$\fR.
 .RE
 
 .SS "Modifiers:"
-.sp
 .LP
 After the optional word designator, you can add a sequence of one or more of
 the following modifiers, each preceded by a \fB:\fR.
@@ -499,7 +493,6 @@ Without an event specification, a history reference refers either to the
 previous command, or to a previous history reference on the command line (if
 any).
 .SS "ksh"
-.sp
 .LP
 Using \fBfc\fR, in the form of
 .sp
@@ -576,7 +569,6 @@ or equal to this number. The default is \fB128\fR.
 .RE
 
 .SS "Command Re-entry:"
-.sp
 .LP
 The text of the last \fBHISTSIZE\fR (default 128) commands entered from a
 terminal device is saved in a \fBhistory\fR file. The file
@@ -602,7 +594,6 @@ modify the command before execution. For example, if \fBr\fR is aliased to
 Using the \fBfc\fR built-in command within a compound command causes the whole
 command to disappear from the history file.
 .SS "ksh93"
-.sp
 .LP
 \fBhist\fR lists, edits, or re-executes commands previously entered into the
 current shell environment.
@@ -671,7 +662,6 @@ If no editor is specified, then the editor specified by the \fBHISTEDIT\fR
 variable is used if set, or the \fBFCEDIT\fR variable is used if set,
 otherwise, \fBed\fR is used.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -727,7 +717,6 @@ Re-executes the command without invoking an editor.
 .RE
 
 .SS "ksh93"
-.sp
 .LP
 \fBksh93\fR supports the following options:
 .sp
@@ -798,7 +787,6 @@ string \fIold\fR in the command to \fInew\fR before re-executing the command.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -918,7 +906,6 @@ reexecuted by the string \fInew\fR.
 .RE
 
 .SH OUTPUT
-.sp
 .LP
 When the \fB-l\fR option is used to list commands, the format of each command
 in the list is as follows:
@@ -985,7 +972,6 @@ after the first are displayed as:
 .in -2
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBfc\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
@@ -1026,7 +1012,7 @@ definition commands are recorded in the history file, unless the \fBset\fR
 function definitions in some system startup file called before the \fBENV\fR
 file, the history file is initialized before the user gets a chance to
 influence its characteristics.) The variable \fBHISTFILE\fR is accessed
-initially when the shell is invoked. Any changes to \fBHISTFILE\fR does not
+initially when the shell is invoked. Any change to \fBHISTFILE\fR does not
 take effect until another shell is invoked.
 .RE
 
@@ -1044,7 +1030,6 @@ take effect until another shell is invoked.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1070,8 +1055,7 @@ An error occurred.
 Otherwise, the exit status is that of the commands executed by \fBfc\fR or
 \fBhist\fR.
 .SH SEE ALSO
-.sp
 .LP
 \fBcsh\fR(1), \fBed\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBset\fR(1),
-\fBset\fR(1F), \fBsh\fR(1), \fBsource\fR(1), \fBattributes\fR(5),
+\fBsh\fR(1), \fBsource\fR(1), \fBattributes\fR(5),
 \fBenviron\fR(5)

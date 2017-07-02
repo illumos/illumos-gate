@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
@@ -28,8 +28,6 @@
 
 #ifndef	_PKGSTRCT_H
 #define	_PKGSTRCT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
 
 #include <time.h>
 

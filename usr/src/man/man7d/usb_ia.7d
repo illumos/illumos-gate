@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USB_IA 7D "Dec 21, 2006"
+.TH USB_IA 7D "May 13, 2017"
 .SH NAME
 usb_ia \- USB interface association driver
 .SH SYNOPSIS
@@ -18,7 +18,6 @@ interface association@unit-address
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBusb_ia\fR driver is a USBA (Solaris Universal Serial Bus
 Architecture)-compliant nexus driver that binds to a device's interface
@@ -32,7 +31,6 @@ Each interface association node has a parent device node that is created by
 \fBusb_mid\fR(7D). (Note: attempting to export \fBugen\fR(7D) interfaces using
 \fBusb_ia\fR is prohibited.)
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/usb_ia\fR\fR
@@ -63,7 +61,6 @@ Each interface association node has a parent device node that is created by
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -79,9 +76,8 @@ Architecture	SPARC & x86 PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBattributes\fR(5),\fBugen\fR(7D), \fBusb_mid\fR(7D), \fBusba\fR(7D)
+\fBattributes\fR(5), \fBugen\fR(7D), \fBusb_mid\fR(7D), \fBusba\fR(7D)
 .sp
 .LP
 \fIWriting Device Drivers\fR
@@ -94,14 +90,7 @@ Architecture	SPARC & x86 PCI-based systems
 .sp
 .LP
 \fIInterface Association Descriptor Engineering Change Notice (ECN)\fR\(em2003
-.sp
-.LP
-\fIhttp://www.sun.com/io\fR
-.sp
-.LP
-\fIhttp://docs.sun.com\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 In addition to being logged, the following messages may appear on the system
 console. All messages are formatted in the     following manner:

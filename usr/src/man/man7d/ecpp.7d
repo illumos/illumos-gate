@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ECPP 7D "Oct 9, 2004"
+.TH ECPP 7D "May 13, 2017"
 .SH NAME
 ecpp \- IEEE 1284 compliant parallel port driver
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ ecpp@unit-address
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBecpp\fR driver provides a bi-directional interface to \fIIEEE 1284\fR
 compliant devices as well as a forward single-directional interface to
@@ -49,7 +48,6 @@ in \fBecpp.conf\fR.
 The \fBecpp\fR driver is an \fIexclusive-use\fR device, meaning that if the
 device is already open, subsequent opens fail with \fBEBUSY\fR.
 .SS "Default Operation"
-.sp
 .LP
 Each time the \fBecpp\fR device is opened, the device is marked as \fBEBUSY\fR
 and the configuration variables are set to their default values. The
@@ -73,7 +71,6 @@ the \fBwrite_timeout\fR values through the \fBECPPIOC_SETPARMS\fR
 \fBioctl\fR(2) call. For mode negotiation to be successful, both the host
 workstation and the peripheral must support the requested mode.
 .SS "Tunables"
-.sp
 .LP
  Characteristics of the \fBecpp\fR driver may be tuned by the variables
 described in \fB/kernel/drv/ecpp.conf\fR. These variables are read by the
@@ -86,13 +83,11 @@ will not operate with the parallel port operating in a fast handshaking mode.
 If printing problems occur, set "fast-centronics" and "fast-1284-compatible" to
 "false." See \fB/kernel/drv/ecpp.conf\fR for more information.
 .SS "Read/Write Operation"
-.sp
 .LP
 The \fBecpp\fR driver is a full duplex STREAMS device driver. While an
 application is writing to an \fIIEEE 1284\fR compliant device, another thread
 may read from it.
 .SS "Write Operation"
-.sp
 .LP
 A \fBwrite\fR(2) operation returns the number of bytes successfully written to
 the stream head. If a failure occurs while a Centronics device is transferring
@@ -101,7 +96,6 @@ and can be retrieved by the application program using the \fBBPPIOC_GETERR\fR
 \fBioctl\fR(2) call. The captured status information is overwritten each time
 an attempted transfer or a \fBBPPIOC_TESTIO\fR \fBioctl\fR(2) occurs.
 .SS "Read Operation"
-.sp
 .LP
 If a failure or error condition occurs during a \fBread\fR(2), the number of
 bytes successfully read is returned (short read). When attempting to read a
@@ -110,7 +104,6 @@ port that has no data currently available, \fBread\fR(2) returns \fB0\fR if
 \fB-1\fR and sets errno to \fBEAGAIN.\fR If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR
 are clear, \fBread\fR(2) blocks until data become available.
 .SH IOCTLS
-.sp
 .LP
 The \fBioctl\fR(2) calls described below are supported. Note that when
 \fBecpp\fR is transferring data, the driver waits until the data has been sent
@@ -127,7 +120,7 @@ followed by default negotiation.
 .RE
 .sp
 .LP
-The following \fBioctl(2)\fR calls are supported for backward compatibility and
+The following \fBioctl\fR(2) calls are supported for backward compatibility and
 are not recommended for new applications:
 .sp
 .ne 2
@@ -342,7 +335,6 @@ bits are reserved. Reading reserved bits always return 1. An attempt to write
 .RE
 
 .SH DEVICE SPECIAL FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/lp\fIN\fR\fR\fR
@@ -361,7 +353,6 @@ Solaris x86 only. (Backwards compatibility with former \fBlp\fR(7D) devices.)
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fBkernel/drv/ecpp\fR\fR
@@ -422,7 +413,6 @@ driver configuration file for 64-bit x86
 .RE
 
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEBADF\fR\fR
@@ -478,7 +468,6 @@ peripheral error.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -498,19 +487,14 @@ Interface stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBmodload\fR(1M), \fBmodunload\fR(1M), \fBupdate_drv\fR(1M)\fBioctl\fR(2),
+\fBmodload\fR(1M), \fBmodunload\fR(1M), \fBupdate_drv\fR(1M), \fBioctl\fR(2),
 \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2), \fBattributes\fR(5),
 \fBbpp\fR(7D), \fBusbprn\fR(7D), \fBprnio\fR(7I), \fBstreamio\fR(7I)
 .sp
 .LP
 \fIIEEE Std 1284-1994\fR
-.sp
-.LP
-\fIhttp://www.sun.com/io\fR
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fBParallel port controller not supported\fR

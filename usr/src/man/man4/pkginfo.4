@@ -1,14 +1,14 @@
 '\" te
+.\" Copyright 2017 Peter Tribble
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PKGINFO 4 "Mar 24, 2006"
+.TH PKGINFO 4 "May 13, 2017"
 .SH NAME
 pkginfo \- package characteristics file
 .SH DESCRIPTION
-.sp
 .LP
 \fBpkginfo\fR is an \fBASCII\fR file that describes the characteristics of the
 package along with information that helps control the flow of installation. It
@@ -124,8 +124,8 @@ company's stock symbol.
 Text that specifies the current version associated with the software package.
 The maximum length is 256 \fBASCII\fR characters and the first character cannot
 be a left parenthesis. The \fBpkgmk\fR(1) tool can be used to create or modify
-this value when actually building the package. Current Solaris software
-practice is to assign this parameter monotonically increasing Dewey decimal
+this value when actually building the package. Traditional Solaris
+practice was to assign this parameter monotonically increasing Dewey decimal
 values of the form:
 .sp
 .in +2
@@ -299,49 +299,6 @@ Solaris-only optional parameter that indicates a software package contains
 64-bit objects if it is set to \fBsparcv9\fR. If this parameter is not set, the
 default \fBISA\fR (instruction set architecture) is set to the value of the
 \fBARCH\fR parameter.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSUNW_LOC\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solaris-only optional parameter used to indicate a software package containing
-localization files for a given product or application. The parameter value is a
-comma-separated list of locales supported by a package. It is only used for
-packages containing localization files, typically the message catalogues. The
-allowable values for this string field are those found in the table of Standard
-Locale Names located in the \fIInternational Language Environments Guide\fR.
-.sp
-.in +2
-.nf
-SUNW_LOC="<\fIlocale_name\fR>,<\fIlocale_name\fR>,..,\e
-<\fIlocale_name\fR>"
-.fi
-.in -2
-
-where
-.sp
-.in +2
-.nf
-<\fIlocale_name\fR>::= <\fIlanguage\fR>[_<\fIterritory\fR>]\e
-[.<\fIcodeset\fR>]
-<\fIlanguage\fR>::= the set of names from ISO 639
-<\fIterritory\fR>::= the set of territories specified
-in ISO 3166
-<\fIcodeset\fR>::= is a string corresponding to the coded
-character set
-.fi
-.in -2
-
-Since a value of C specifies the traditional UNIX system behavior (American
-English, en_US), packages belonging to the C locale are viewed as non-localized
-packages, and thus must not have \fBSUNW_LOC\fR and \fBSUNW_PKGLIST\fR included
-in their \fBpkginfo\fR file. See also the \fBSUNW_LOC\fR parameter in
-\fBpackagetoc\fR(4) and \fBsetlocale\fR(3C) for more information. This keyword
-is not recognized by the add-on software utility Software Manager.
 .RE
 
 .sp
@@ -605,54 +562,6 @@ non-global zones.
 .sp
 .ne 2
 .na
-\fB\fBSUNW_PKGLIST\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solaris-only optional parameter used to associate a localization package to the
-package(s) from which it is derived. It is required whenever the \fBSUNW_LOC\fR
-parameter is defined. This parameter value is an comma-separated list of
-package abbreviations of the form:
-.sp
-.in +2
-.nf
-SUNW_PKGLIST="\fIpkg1\fR[\fI:version\fR],\fIpkg2\fR[:\fIversion\fR],..."
-.fi
-.in -2
-
-where \fIversion\fR (if specified) should match the version string in the base
-package specified (see \fBVERSION\fR parameter in this manual page). When in
-use, \fBSUNW_PKGLIST\fR helps determine the order of package installation. The
-packages listed in the parameter are installed before the localization package
-in question is installed. When left blank, \fBSUNW_PKGLIST="\|"\fR, the package
-is assumed to be required for the locale to function correctly. See the
-\fBSUNW_PKGLIST\fR parameter in \fBpackagetoc\fR(4) for more information. This
-keyword is not recognized by the add-on software utility Software Manager.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSUNW_PKGTYPE\fR\fR
-.ad
-.sp .6
-.RS 4n
-Solaris-only parameter for Sun internal use only. Required for packages part of
-the Solaris operating environment releases which install into the \fB/\fR,
-\fB/usr\fR, \fB/usr/kvm\fR, and \fB/usr/openwin\fR file systems. The Solaris
-operating environment installation software must know which packages are part
-of which file system to properly install a server/client configuration. The
-currently allowable values for this parameter are \fBroot\fR, \fBusr\fR,
-\fBkvm\fR, and \fBow\fR. If no \fBSUNW_PKGTYPE\fR parameter is present, the
-package is assumed to be of \fBBASEDIR=\fR\fI/opt\fR. \fBSUNW_PKGTYPE\fR is
-optional only for packages which install into the \fB/opt\fR name space as is
-the case for the majority of Solaris add-on software. See the
-\fBSUNW_PKGTYPE\fR parameter in \fBpackagetoc\fR(4) for further information.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBSUNW_PKGVERS\fR\fR
 .ad
 .sp .6
@@ -666,7 +575,7 @@ SUNW_PKGVERS="<\fIsunw_package_version\fR>"
 .fi
 .in -2
 
-where <\fIunw_package_version\fR> has the form \fIx.y[.z]\fR and \fIx\fR,
+where <\fIsunw_package_version\fR> has the form \fIx.y[.z]\fR and \fIx\fR,
 \fIy\fR, and z are integers. For packages built for this release and previous
 releases, use \fBSUNW_PKGVERS="\fI1.0\fR"\fR.
 .RE
@@ -680,7 +589,7 @@ releases, use \fBSUNW_PKGVERS="\fI1.0\fR"\fR.
 .RS 4n
 Solaris-only parameter indicating the name of the product this package is a
 part of or comprises (maximum length of 256 \fBASCII\fR characters). A few
-examples of currently used \fBSUNW_PRODNAME\fR values are: \fB"SunOS"\fR,
+examples of \fBSUNW_PRODNAME\fR values are: \fB"SunOS"\fR,
 \fB"OpenWindows"\fR, and \fB"Common Desktop Environment"\fR.
 .RE
 
@@ -737,79 +646,8 @@ of 256 \fBASCII\fR characters).
 .sp
 .LP
 For further discussion of the zones-related parameters described above, see
-\fISystem Administration Guide:  Virtualization Using the Solaris Operating
+\fISystem Administration Guide: Virtualization Using the Solaris Operating
 System\fR.
-.SH ENVIRONMENT VARIABLES
-.sp
-.LP
-The following environment variables are available only to package class action
-scripts and to checkinstall, preinstall, postinstall scripts.
-.sp
-.ne 2
-.na
-\fB\fBSUNW_PKG_INSTALL_ZONENAME\fR\fR
-.ad
-.sp .6
-.RS 4n
-This variable is set only during the initial installation of a zone.
-.sp
-If this variable is not set, the system does not support the \fBzones\fR(5)
-feature. In this case, the package is being installed to or removed from a
-system that is not configured for zones.
-.sp
-If the variable is set, and equal to \fBglobal\fR, the package is being
-installed to or removed from the global zone.
-.sp
-If the variable is set and not equal to \fBglobal\fR, the package is being
-installed to or removed from the non-global zone named by the contents of the
-environment variable \fB${\fR\fBSUNW_PKG_INSTALL_ZONENAME\fR\fB}\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPKG_INIT_INSTALL\fR\fR
-.ad
-.sp .6
-.RS 4n
-This variable is set only during an initial installation of Solaris, such as
-installing Solaris from a CD, DVD, or net install image.
-.sp
-If this variable is set and equal to \fBTRUE\fR, then the package is being
-installed as part of an initial installation of Solaris.
-.sp
-If this variable is not set, or set and not equal to \fBTRUE\fR, then the
-package is not being installed as part of an initial installation of Solaris.
-.RE
-
-.sp
-.LP
-The following code excerpt illustrates the semantics of the preceding
-environment variables.
-.sp
-.in +2
-.nf
-if [ $PKG_INIT_INSTALL != "" ] ; then
-        # Package being installed as part of initial
-        # installation of Solaris.
-
-elif [ $SUNW_PKG_INSTALL_ZONENAME != "" ] ; then
-
-    if [ $SUNW_PKG_INSTALL_ZONENAME != "global" ] ; then
-         # Package being installed as part of initial installation
-         # of non-global zone $SUNW_PKG_INSTALL_ZONENAME
-    else
-         # Package being installed as part of initial installation
-         # of a global zone.
-    fi
-
-else
-    # Package not being installed as part of initial installation of
-    # Solaris and package not being installed as part of initial
-    # installation of non-global zone.
-fi
-.fi
-.in -2
 
 .SH EXAMPLES
 .LP
@@ -823,7 +661,6 @@ Here is a sample \fBpkginfo\fR file:
 .nf
 SUNW_PRODNAME="SunOS"
 SUNW_PRODVERS="5.5"
-SUNW_PKGTYPE="usr"
 SUNW_PKG_ALLZONES=false
 SUNW_PKG_HOLLOW=false
 PKG="SUNWesu"
@@ -841,7 +678,6 @@ RSTATES="S 2"
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -887,35 +723,21 @@ SUNW_PRODVERS	Evolving
 _
 SUNW_PKGVERS	Evolving
 _
-SUNW_PKGTYPE	Unstable
-_
-SUNW_LOC	Evolving
-_
-SUNW_PKGLIST	Evolving
-_
 SUNW_PKG_DIR	Evolving
-_
-PKG_INIT_INSTALL	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBisalist\fR(1), \fBlimit\fR(1), \fBpkgmk\fR(1), \fBuname\fR(1),
-\fBinit\fR(1M), \fBsetlocale\fR(3C), \fBclustertoc\fR(4), \fBorder\fR(4),
-\fBpackagetoc\fR(4), \fBpkgmap\fR(4), \fBattributes\fR(5), \fBzones\fR(5)
+\fBinit\fR(1M), \fBpkgmap\fR(4), \fBattributes\fR(5), \fBzones\fR(5)
 .sp
 .LP
 \fIApplication Packaging Developer\&'s Guide\fR
 .sp
 .LP
-\fIInternational Language Environments Guide\fR
-.sp
-.LP
-\fISystem Administration Guide:  Virtualization Using the Solaris Operating
+\fISystem Administration Guide: Virtualization Using the Solaris Operating
 System\fR
 .SH NOTES
-.sp
 .LP
 Developers can define their own installation parameters by adding a definition
 to this file. A developer-defined parameter must begin with a capital letter.

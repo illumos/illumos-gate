@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FSSNAP_UFS 1M "Jan 29, 2007"
+.TH FSSNAP_UFS 1M "May 13, 2017"
 .SH NAME
 fssnap_ufs \- create a temporary snapshot of a UFS file system
 .SH SYNOPSIS
@@ -24,7 +24,6 @@ fssnap_ufs \- create a temporary snapshot of a UFS file system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfssnap\fR command queries, creates, or deletes a temporary snapshot of a
 \fBUFS\fR file system. A snapshot is a point-in-time image of a file system
@@ -45,7 +44,6 @@ file system that is being captured in a snapshot. The backing-store file(s) can
 reside on any type of file system, including another \fBUFS\fR file system or
 an \fBNFS\fR-mounted file system.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -278,7 +276,6 @@ Both devices are always created. This option affects only the output.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -468,7 +465,6 @@ they will have names of the form \fIfile\fR (for the first file), \fIfile\fR.1,
 \fIfile\fR.2, and so forth.
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -496,15 +492,9 @@ An error occurred.
 The script-readable output mode is a stable interface that can be added to, but
 will not change. All other interfaces are subject to change.
 .SH SEE ALSO
-.sp
 .LP
 \fBmlock\fR(3C), \fBattributes\fR(5)
-.sp
-.LP
-See the \fBntpd\fR man page, delivered in the \fBSUNWntpu\fR package (not a
-SunOS man page).
 .SH NOTES
-.sp
 .LP
 The \fBfssnap\fR device files should be treated like a regular disk block or
 character device.
@@ -512,14 +502,14 @@ character device.
 .LP
 The association between a file system and the snapshot is lost when the
 snapshot is deleted or the system reboots. Snapshot persistence across reboots
-is not currently supported.
+is not supported.
 .sp
 .LP
 To avoid unnecessary performance impacts, perform the snapshot and system
 backup when the system is least active.
 .sp
 .LP
-It is not possible to perform a snapshot of a file system if any of  the
+It is not possible to perform a snapshot of a file system if any of the
 following conditions are true:
 .RS +4
 .TP
@@ -539,7 +529,7 @@ The file system contains a local swap file
 .el o
 The file system is used as backing store by an application that uses
 \fBmlock\fR(3C) to lock its pages. Typically, these are real time applications,
-such as \fBntpd\fR (delivered in the \fBSUNWntpu\fR package).
+such as \fBntpd\fR.
 .RE
 .sp
 .LP

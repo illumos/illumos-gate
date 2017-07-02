@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HID 7D "Aug 21, 2009"
+.TH HID 7D "May 13, 2017"
 .SH NAME
 hid \- Human interface device (HID) class driver
 .SH SYNOPSIS
@@ -17,7 +17,6 @@ hid \- Human interface device (HID) class driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBhid\fR driver is a USBA (Solaris USB Architecture) compliant client
 driver that supports the \fIHuman Interface Device Class (HID) 1.0\fR
@@ -45,7 +44,6 @@ information about the device. The \fBhid\fR driver queries the HID parser to
 find out the type and characteristics of the HID device. The HID specification
 predefines packet formats for the boot protocol keyboard and mouse.
 .SH IOCTLS
-.sp
 .ne 2
 .na
 \fB\fBHIDIOCKMGDIRECT\fR\fR
@@ -79,7 +77,6 @@ gets the input.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/hid\fR\fR
@@ -140,7 +137,6 @@ gets the input.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -156,7 +152,6 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcfgadm_usb\fR(1M), \fBattributes\fR(5), \fBusba\fR(7D), \fBvirtualkm\fR(7D)
 .sp
@@ -174,11 +169,7 @@ Architecture	SPARC, x86, PCI-based systems
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
-.sp
-.LP
-\fIhttp://www.sun.com\fR
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fBhid_attach: Unsupported HID device.\fR
@@ -253,13 +244,12 @@ The device cannot be supported by this version of the HID driver.
 .RE
 
 .SH NOTES
-.sp
 .LP
 The hid driver currently supports only keyboard, mouse and audio HID control
 devices.
 .sp
 .LP
-Normally a mouse is not power managed and consquently, screen darkening can be
+Normally a mouse is not power managed and consequently, screen darkening can be
 undone with a mouse movement. If power management of the mouse is required, add
 the following line to \fBhid.conf\fR then reboot the system:
 .sp

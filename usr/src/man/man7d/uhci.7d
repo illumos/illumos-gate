@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UHCI 7D "Jul 26, 2005"
+.TH UHCI 7D "May 13, 2017"
 .SH NAME
 uhci \- host controller driver
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ uhci \- host controller driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBuhci\fR host controller driver is a \fBUSBA \fR (Solaris USB
 Architecture) compliant nexus driver that supports the \fIUniversal Host
@@ -21,7 +20,6 @@ Controller Interface Specification 1.1\fR, an industry standard developed by
 Intel. The \fBuhci\fR driver supports all USB transfers, including interrupt,
 control, isochronous and bulk.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/uhci\fR\fR
@@ -58,7 +56,6 @@ Driver configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -74,7 +71,6 @@ Architecture	SPARC or  x86  PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBehci\fR(7D), \fBhubd\fR(7D), \fBohci\fR(7D),
 \fBusba\fR(7D)
@@ -90,11 +86,7 @@ Architecture	SPARC or  x86  PCI-based systems
 .sp
 .LP
 \fISystem Administration Guide: Basic Administration\fR
-.sp
-.LP
-http://\fIwww.sun.com/io\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 All host controller errors are passed to the client drivers. Root errors are
 documented in \fBhubd\fR(7D).

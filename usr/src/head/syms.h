@@ -20,13 +20,11 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef	_SYMS_H
 #define	_SYMS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.8	*/
 
 /*		Storage Classes are defined in storclass.h  */
 #include <storclass.h>

@@ -28,7 +28,7 @@
  */
 
 /*	Copyright (c) 1984 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifndef	_GETWIDTH_H
 #define	_GETWIDTH_H

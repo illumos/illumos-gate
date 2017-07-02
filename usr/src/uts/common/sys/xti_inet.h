@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1996-1998 Sun Microsystems, Inc.	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * This is a private header file. Applications should not directly include
@@ -29,8 +29,6 @@
 
 #ifndef _SYS_XTI_INET_H
 #define	_SYS_XTI_INET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 

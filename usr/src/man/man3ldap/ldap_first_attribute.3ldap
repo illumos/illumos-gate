@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP_FIRST_ATTRIBUTE 3LDAP "Dec 16, 2003"
+.TH LDAP_FIRST_ATTRIBUTE 3LDAP "May 13, 2017"
 .SH NAME
 ldap_first_attribute, ldap_next_attribute \- step through LDAP entry attributes
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ cc [ \fIflag\fR...] \fIfile\fR... -lldap[ \fIlibrary\fR...]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBldap_first_attribute()\fR function gets the value of the first attribute
 in an entry.
@@ -45,13 +44,11 @@ After stepping through the attributes, the application should call
 \fBber_free()\fR to free the \fBBerElement\fR structure allocated by the
 \fBldap_first_attribute()\fR function if the structure is other than NULL.
 .SH ERRORS
-.sp
 .LP
 If an error occurs, \fINULL\fR is returned and the \fBld_errno\fR field in the
 \fIld\fR parameter is set to indicate the error. See \fBldap_error\fR(3LDAP)
 for a description of possible error codes.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -63,18 +60,14 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-Level	SUNWcsl (32-bit)SUNWcslx (64-bit)
-_
 Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBldap\fR(3LDAP), \fBldap_first_entry\fR(3LDAP), \fBldap_get_values\fR(3LDAP),
 \fBldap_error\fR(3LDAP), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBldap_first_attribute()\fR function alllocates memory that might need to
 be freed by the caller by means of \fBber_free\fR(3LDAP).

@@ -276,8 +276,6 @@ retry:
 			 * to find the interface state.
 			 */
 			for (ifap = ifa; ifap != NULL; ifap = ifap->ifa_next) {
-				if (ifap->ifa_addr->sa_family == AF_LINK)
-					continue;
 				if (strcmp(ifap->ifa_name, aifp->ifi_name) == 0)
 					break;
 			}

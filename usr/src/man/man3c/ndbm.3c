@@ -5,7 +5,7 @@
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.TH NDBM 3C "Sep 17, 2001"
+.TH NDBM 3C "May 13, 2017"
 .SH NAME
 ndbm, dbm_clearerr, dbm_close, dbm_delete, dbm_error, dbm_fetch, dbm_firstkey,
 dbm_nextkey, dbm_open, dbm_store \- database functions
@@ -58,12 +58,11 @@ dbm_nextkey, dbm_open, dbm_store \- database functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions create, access and modify a database. They maintain
 \fIkey\fR/\fIcontent\fR pairs in a database. The functions will handle large
 databases (up to a billion blocks) and will access a keyed item in one or two
-file system accesses. This package replaces the earlier \fBdbm\fR(3UCB)
+file system accesses. This package replaces the earlier \fBdbm\fR
 library, which managed only a single database.
 .sp
 .LP
@@ -152,7 +151,6 @@ returned from a call to \fBdbm_open()\fR.
 .LP
 These database functions support key/content pairs of at least 1024 bytes.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBdbm_store()\fR and \fBdbm_delete()\fR functions return \fB0\fR when they
 succeed and a negative value when they fail.
@@ -185,11 +183,9 @@ The \fBdbm_open()\fR function returns a pointer to a database structure.  If an
 error is detected during the operation, \fBdbm_open()\fR returns a (\fBDBM
 *\fR)0.
 .SH ERRORS
-.sp
 .LP
 No errors are defined.
 .SH USAGE
-.sp
 .LP
 The following code can be used to traverse the database:
 .sp
@@ -263,7 +259,6 @@ main()
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -281,12 +276,10 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBar\fR(1), \fBcat\fR(1), \fBcp\fR(1), \fBtar\fR(1), \fBopen\fR(2),
-\fBdbm\fR(3UCB), \fBnetconfig\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBnetconfig\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fB\&.pag\fR file will contain holes so that its apparent size may be
 larger than its actual content. Older versions of the UNIX operating system may
@@ -312,5 +305,5 @@ updating and reading is risky.
 .LP
 The database files (\fBfile\fR\fB\&.dir\fR and \fBfile\fR\fB\&.pag\fR) are
 binary and are architecture-specific (for example, they depend on the
-architecture's byte order.)  These files are not guaranteed to be portable
+architecture's byte order.) These files are not guaranteed to be portable
 across architectures.

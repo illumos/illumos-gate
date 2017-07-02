@@ -7742,8 +7742,8 @@ order_start forward;forward;forward;forward
 <LATIN_SMALL_LIGATURE_OE>                                    "<X5C6F><X0300>";<X48>;"<X05><XC0>";<LATIN_SMALL_LIGATURE_OE>
 <LATIN_CAPITAL_LIGATURE_OE>                                  "<X5C6F><X0300>";<X48>;"<X86><XC0>";<LATIN_CAPITAL_LIGATURE_OE>
 <LATIN_SMALL_LETTER_A_WITH_RING_ABOVE>                       "<X5C6F><X0400>";<X05>;"<X05><XC0>";<LATIN_SMALL_LETTER_A_WITH_RING_ABOVE>
-<LATIN_CAPITAL_LETTER_A_WITH_RING_ABOVE>                     "<X5C6F><X0400>";<X05>;"<X86><XC0>";"<A><COMBINING_RING_ABOVE>"
-<ANGSTROM_SIGN>                                              "<X5C6F><X0400>";<X05>;"<X86><XC0>";"<A><COMBINING_RING_ABOVE>"
+<LATIN_CAPITAL_LETTER_A_WITH_RING_ABOVE>                     "<X5C6F><X0400>";<X05>;"<X86><XC0>";<LATIN_CAPITAL_LETTER_A_WITH_RING_ABOVE>
+<ANGSTROM_SIGN>                                              "<X5C6F><X0400>";<X05>;"<X86><XC0>";<ANGSTROM_SIGN>
 <LATIN_SMALL_LETTER_A_WITH_RING_ABOVE_AND_ACUTE>             "<X5C6F><X0400>";"<X05><X88>";"<X05><XC0><X05>";<LATIN_SMALL_LETTER_A_WITH_RING_ABOVE_AND_ACUTE>
 <LATIN_CAPITAL_LETTER_A_WITH_RING_ABOVE_AND_ACUTE>           "<X5C6F><X0400>";"<X05><X88>";"<X86><XC0><X05>";<LATIN_CAPITAL_LETTER_A_WITH_RING_ABOVE_AND_ACUTE>
 <a-a>                                                        "<X5C6F><X0400>";<X46>;"<X05><XC0>";<a-a>

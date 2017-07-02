@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONEADM 1M "Sep 8, 2015"
+.TH ZONEADM 1M "May 13, 2017"
 .SH NAME
 zoneadm \- administer zones
 .SH SYNOPSIS
@@ -666,13 +666,3 @@ svc:/system/zones:default
 Administrative actions on this service, such as enabling, disabling, or
 requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
 status can be queried using the \fBsvcs\fR(1) command.
-.sp
-.LP
-The act of installing a new non-global zone is a fresh installation of the
-Solaris operating system. A new installation of Solaris must not require
-interaction with the user (that is, it must be "hands off"). Because of this,
-packages installed in the global zone and all non-global zones cannot contain
-request scripts (see \fBpkgask\fR(1M)). If a package did have a request script,
-then the creation of a non-global zone could not be done without user
-intervention. Any package that contains a request script is added to the global
-zone only. See \fBpkgadd\fR(1M).

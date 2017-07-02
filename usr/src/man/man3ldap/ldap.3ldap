@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAP 3LDAP "April 9, 2016"
+.TH LDAP 3LDAP "May 13, 2017"
 .SH NAME
 ldap \- Lightweight Directory Access Protocol package
 .SH SYNOPSIS
@@ -17,7 +17,7 @@ cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 
 .SH DESCRIPTION
 .LP
-The Lightweight Directory Access Protocol ("LDAP") package (SUNWlldap) includes
+The Lightweight Directory Access Protocol ("LDAP") package includes
 various command line LDAP clients and a LDAP client library to provide
 programmatic access to the LDAP protocol. This man page gives an overview of
 the LDAP client library functions.
@@ -29,20 +29,20 @@ application would initialize a LDAP session with a LDAP server by calling
 \fBldap_sasl_bind\fR(3LDAP) and friends. It may perform some LDAP operations
 and obtain results by calling \fBldap_search\fR(3LDAP) and friends. To parse
 the results returned from these functions, it calls
-\fBldap_parse_result\fR(3LDAP),\fBldap_next_entry\fR(3LDAP), and
+\fBldap_parse_result\fR(3LDAP), \fBldap_next_entry\fR(3LDAP), and
 \fBldap_first_entry\fR(3LDAP) and others. It closes the LDAP session by calling
 \fBldap_unbind\fR(3LDAP).
 .sp
 .LP
 LDAP operations can be either synchronous or asynchronous. By convention, the
-names of the sychronous functions end with "_s." For example, a synchronous
+names of the synchronous functions end with "_s." For example, a synchronous
 binding to the LDAP server can be performed by calling
 \fBldap_sasl_bind_s\fR(3LDAP). Complete an asynchronous binding with
 \fBldap_sasl_bind\fR(3LDAP). All synchronous functions return the actual
 outcome of the operation, either \fBLDAP_SUCCESS\fR or an error code.
 Asynchronous routines provide an invocation identifier which can be used to
-obtain the  result of a specific operation by passing it to
-the\fBldap_result\fR(3LDAP) function.
+obtain the result of a specific operation by passing it to
+the \fBldap_result\fR(3LDAP) function.
 .SS "Initializing a LDAP session"
 .LP
 Initializing a LDAP session involves calling the \fBldap_init\fR(3LDAP)
@@ -135,14 +135,14 @@ names like "mark smith, umich, us".
 .LP
 The \fBldap_memcache\fR(3LDAP) functions provide an in-memory client side cache
 to store search requests. Caching improves performance and reduces network
-bandwidth when a client  makes repeated requests.
+bandwidth when a client makes repeated requests.
 .SS "Utility Functions"
 .LP
 There are also various utility functions. You can use the
 \fBldap_sort\fR(3LDAP) functions are used to sort the entries and values
 returned by means of the ldap search functions. The \fBldap_friendly\fR(3LDAP)
 functions will map from short two letter country codes or other strings to
-longer  "friendlier" names. Use the \fBldap_charset\fR(3LDAP) functions to
+longer "friendlier" names. Use the \fBldap_charset\fR(3LDAP) functions to
 translate to and from the T.61 character set that is used for many character
 strings in the LDAP protocol.
 .SS "Generating Filters"
@@ -159,7 +159,7 @@ that has been allocated by means of \fBldap_init_getfilter()\fR.
 The LDAP package includes a set of lightweight Basic Encoding Rules ("BER)"
 functions. The LDAP library functions use the BER functions to encode and
 decode LDAP protocol elements through the slightly simplified BER defined by
-LDAP. They are not normally used directly by an LDAP  application program will
+LDAP. They are not normally used directly by an LDAP application program will
 not normally use the BER functions directly. Instead, these functions provide a
 \fBprintf()\fR and \fBscanf()\fR-like interface, as well as lower-level access.
 .SH LIST OF INTERFACES
@@ -354,7 +354,7 @@ Create the in-memory client side cache.
 .ad
 .sp .6
 .RS 4n
-Associate an in-memory cache that has been already created  by calling the
+Associate an in-memory cache that has been already created by calling the
 \fBldap_memcache_init\fR(3LDAP) function with an LDAP connection handle.
 .RE
 

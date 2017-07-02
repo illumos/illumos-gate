@@ -722,6 +722,11 @@ label=AUE_PFEXEC
     comment=process if ruid, euid, rgid or egid is changed:
     comment=output if arge policy is set
 
+label=AUE_sudo
+  format=exec_args1:[text]2
+    comment=command args:
+    comment=error message (failure only)
+
 label=AUE_EXIT
   format=arg1:[text]2
     comment=1, exit status, "exit status":

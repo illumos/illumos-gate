@@ -12,7 +12,7 @@
 .\"
 .\" Copyright (c) 2013, Joyent, Inc. All rights reserved.
 .\"
-.TH GETIFADDRS 3SOCKET "May 18, 2017"
+.TH GETIFADDRS 3SOCKET "Apr 18, 2013"
 .SH NAME
 getifaddrs, freeifaddrs \- get interface addresses
 .SH SYNOPSIS
@@ -97,9 +97,7 @@ for more information.
 
 .sp
 .LP
-The \fIifa_data\fR member is specific to the address family. It is currently
-only available for AF_LINK entries where it contains a pointer to the
-\fBstruct if_data\fR (as defined in \fBif.h\fR(3HEAD)).
+The \fIifa_data\fR member is presently unused.
 
 .sp
 .LP
@@ -137,9 +135,11 @@ MT-Level	MT-Safe
 
 .SH NOTES
 .LP
-This function lists interfaces of type AF_INET, AF_INET6, and AF_LINK.
-For AF_INET and AF_INET6 only interfaces with the \fBIFF_UP\fR
-flag set are listed; see \fBif_tcp\fR(7P) and \fBifconfig\fR(1M) for more
-information. For AF_LINK entries the interface index is only available when the
-link is plumbed.
+On an illumos system, this function lists only interfaces with the \fBIFF_UP\fR
+flag set; see \fBif_tcp\fR(7P) and \fBifconfig\fR(1M) for more information.
 
+.SH BUGS
+.LP
+At present, this function only lists addresses from the \fBAF_INET\fR and
+\fBAF_INET6\fR families.  Other families, such as \fBAF_LINK\fR, are not
+included.

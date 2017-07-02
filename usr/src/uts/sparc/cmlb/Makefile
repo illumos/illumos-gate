@@ -39,6 +39,7 @@ UTSBASE	= ../..
 MODULE		= cmlb
 OBJECTS		= $(CMLB_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CMLB_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.

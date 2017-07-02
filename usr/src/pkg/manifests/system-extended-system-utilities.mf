@@ -99,7 +99,6 @@ file path=usr/bin/batch mode=0555
 file path=usr/bin/bc mode=0555
 file path=usr/bin/bdiff mode=0755
 file path=usr/bin/cal mode=0555
-file path=usr/bin/calendar mode=0555
 file path=usr/bin/col mode=0555
 file path=usr/bin/compress mode=0555
 file path=usr/bin/csplit mode=0555
@@ -168,7 +167,6 @@ file path=usr/share/man/man1/banner.1
 file path=usr/share/man/man1/bc.1
 file path=usr/share/man/man1/bdiff.1
 file path=usr/share/man/man1/cal.1
-file path=usr/share/man/man1/calendar.1
 file path=usr/share/man/man1/col.1
 file path=usr/share/man/man1/compress.1
 file path=usr/share/man/man1/csplit.1
