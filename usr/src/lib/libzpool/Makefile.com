@@ -48,7 +48,7 @@ SRCDIR=		../common
 # There should be a mapfile here
 MAPFILES =
 
-LIBS +=		$(LINTLIB) $(DYNLIB)
+LIBS +=		$(DYNLIB) $(LINTLIB)
 
 INCS += -I../common
 INCS += -I../../../uts/common/fs/zfs
@@ -61,6 +61,7 @@ CLEANFILES += $(EXTPICS)
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 $(LINTLIB): ../common/zfs.h
+$(LIBS): ../common/zfs.h
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
