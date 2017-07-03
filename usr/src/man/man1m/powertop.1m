@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POWERTOP 1M "May 19, 2009"
+.TH POWERTOP 1M "May 13, 2017"
 .SH NAME
 powertop \- report and analyze events that affect power management
 .SH SYNOPSIS
@@ -13,12 +13,11 @@ powertop \- report and analyze events that affect power management
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBPowerTOP\fR is an observability tool that shows how effectively the system
 is taking advantage of the CPU's power management features. By running the tool
 on an otherwise idle system, the user can see for how long the CPU is running
-at dif- ferent power states. Ideally, an unutilized (idle) system spends 100%
+at different power states. Ideally, an unutilized (idle) system spends 100%
 of its time running at the lowest power state, but because of background user
 and kernel activity (random software periodically waking to poll status), idle
 systems can consume more power than they should.
@@ -49,8 +48,8 @@ management perspective.
 .sp
 .LP
 PowerTOP allows you to freeze each of its three subwindows, enabling you to
-better analyze each subwindow's contents.  when you have three different DTrace
-scripts running at the same time, freezing subwindows lowers CPU consumption .
+better analyze each subwindow's contents.  When you have three different DTrace
+scripts running at the same time, freezing subwindows lowers CPU consumption.
 This feature is activated by pressing the \fBi\fR, \fBf\fR, or \fBe\fR key
 while the tool running.  Pressing one of these keys freezes the idle,
 frequency, or event report, respectively. Pressing it once more, unfreezes it.
@@ -63,7 +62,6 @@ transitions might or might not be accurate as the physical CPU can be shared by
 different virtual CPUs. Both wakeup count and event report displays information
 regarding the current virtualized environment.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -177,7 +175,6 @@ The following command runs PowerTOP and only displays data for CPU 3:
 .sp
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -208,7 +205,6 @@ Incorrect usage.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -226,16 +222,11 @@ Interface Stability	Volatile
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkstat\fR(1M), \fBpmconfig\fR(1M), \fBpowerd\fR(1M), \fBpsrinfo\fR(1M),
 \fBuadmin\fR(2), \fBlibdevinfo\fR(3LIB), \fBattributes\fR(5), \fBxVM\fR(5),
 \fBcpr\fR(7), \fBpm\fR(7D), \fBpm-components\fR(9P), \fBremovable-media\fR(9P)
-.sp
-.LP
-Among non-SunOS man pages, \fBxscreensaver(1)\fR and \fBdtpower(1M)\fR.
 .SH USAGE
-.sp
 .LP
 You must have \fBDTrace\fR privileges to run \fBPowerTOP\fR and root
 (superuser) privileges or assume the Primary Administrator role for the tool to

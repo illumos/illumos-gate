@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VACATION 1 "Aug 20, 2005"
+.TH VACATION 1 "May 13, 2017"
 .SH NAME
 vacation \- reply to mail automatically
 .SH SYNOPSIS
@@ -25,17 +25,15 @@ vacation \- reply to mail automatically
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBvacation\fR utility automatically replies to incoming mail.
 .SS "Installation"
-.sp
 .LP
 The installation consists of an interactive program which sets up
 \fBvacation\fR's basic configuration.
 .sp
 .LP
-To install \fBvacation\fR,  type it with no arguments on the command line. The
+To install \fBvacation\fR, type it with no arguments on the command line. The
 program creates a \fB\&.vacation.msg\fR file, which contains the message that
 is automatically sent to all senders when \fBvacation\fR is enabled, and starts
 an editor for you to modify the message. (See USAGE section.) Which editor is
@@ -68,29 +66,24 @@ The program automatically creates \fB\&.vacation.pag\fR and
 \fB\&.vacation.dir\fR, which contain a list of senders when \fBvacation\fR is
 enabled.
 .SS "Activation and Deactivation"
-.sp
 .LP
 The presence of the \fB\&.forward\fR file determines whether or not
 \fBvacation\fR is disabled or enabled. To disable \fBvacation\fR, remove the
 \fB\&.forward\fR file, or move it to a new name.
 .SS "Initialization"
-.sp
 .LP
 The \fB-I\fR option clears the \fBvacation\fR log files, \fB\&.vacation.pag\fR
 and \fB\&.vacation.dir\fR, erasing the list of senders from a previous
 \fBvacation\fR session. (See OPTIONS section.)
 .SS "Additional Configuration"
-.sp
 .LP
 \fBvacation\fR provides configuration options that are not part of the
 installation, these being \fB-a\fR, \fB-e\fR, \fB-f\fR, \fB-j\fR, \fB-m\fR,
 \fB-s\fR, and \fB-t\fR. (See OPTIONS section.)
 .SS "Reporting"
-.sp
 .LP
 \fBvacation\fR provides a reporting option, \fB-l\fR. See \fBOPTIONS\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -212,7 +205,6 @@ of \fBvacation -I\fR, along with a date and time stamp.
 .RE
 
 .SH USAGE
-.sp
 .LP
 \fB\&.vacation.msg\fR should include a header with at least a \fBSubject:\fR
 line (it should not include a \fBTo:\fR line). For example:
@@ -293,9 +285,8 @@ anotherfriend@herisp.com
 
 .sp
 .LP
-Blank lines and lines starting with  "\fB#\fR" are ignored.
+Blank lines and lines starting with "\fB#\fR" are ignored.
 .SH FILES
-.sp
 .LP
 \fB~/.forward\fR
 .sp
@@ -310,7 +301,6 @@ A list of senders is kept in the \fBdbm\fR format files \fB\&.vacation.pag\fR
 and \fB\&.vacation.dir\fR in your home directory. These files are \fBdbm\fR
 files and cannot be viewed directly with text editors.
 .SH SEE ALSO
-.sp
 .LP
-\fBvi\fR(1), \fBsendmail\fR(1M), \fBdbm\fR(3UCB), \fBgetusershell\fR(3C),
+\fBvi\fR(1), \fBsendmail\fR(1M), \fBgetusershell\fR(3C),
 \fBaliases\fR(4), \fBshells\fR(4), \fBattributes\fR(5)

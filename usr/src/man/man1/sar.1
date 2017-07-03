@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SAR 1 "Jul 24, 2004"
+.TH SAR 1 "May 13, 2017"
 .SH NAME
 sar \- system activity reporter
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ sar \- system activity reporter
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 In the first instance, the \fBsar\fR utility samples cumulative activity
 counters in the operating system at \fIn\fR intervals of \fIt\fR seconds, where
@@ -41,7 +40,6 @@ arguments with \fItime\fR specified in the form \fIhh\fR[:\fImm\fR[:\fIss\fR]].
 The \fB-i\fR option selects records at \fIsec\fR second intervals. Otherwise,
 all intervals found in the data file are reported.
 .SH OPTIONS
-.sp
 .LP
 The following options modify the subsets of information reported by \fBsar\fR.
 .sp
@@ -663,7 +661,6 @@ example% sar -d -f temp
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/sa/sa\fIdd\fR\fR\fR
@@ -673,15 +670,13 @@ daily data file, where \fIdd\fR are digits representing the day of the month
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBsag\fR(1), \fBiostat\fR(1M), \fBsar\fR(1M), \fBvmstat\fR(1M), \fBexec\fR(2),
+\fBiostat\fR(1M), \fBsar\fR(1M), \fBvmstat\fR(1M), \fBexec\fR(2),
 \fBfork\fR(2), \fBattributes\fR(5)
 .sp
 .LP
 \fISystem Administration Guide: Advanced Administration\fR
 .SH NOTES
-.sp
 .LP
 The sum of CPU utilization might vary slightly from 100 because of rounding
 errors in the production of a percentage figure.

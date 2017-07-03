@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INIT.D 4 "Aug 17, 2005"
+.TH INIT.D 4 "May 13, 2017"
 .SH NAME
 init.d \- initialization and termination scripts for changing init states
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ init.d \- initialization and termination scripts for changing init states
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fB/etc/init.d\fR is a directory containing initialization and termination
 scripts for changing init states. These scripts are linked when appropriate to
@@ -88,12 +87,10 @@ is executed by \fB/etc/rc2.d/S68netdaemon start\fR when init state 2 is entered
 and by \fB/etc/rc0.d/K67netdaemon stop\fR when shutting the system down.
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBinit\fR(1M), \fBsvc.startd\fR(1M), \fBsvccfg\fR(1M),
 \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 Solaris now provides an expanded mechanism, which includes automated restart,
 for applications historically started via the init script mechanism. The
@@ -108,9 +105,3 @@ On earlier Solaris releases, a script named with a suffix of '.sh' would be
 sourced, allowing scripts to modify the environment of other scripts executed
 later. This behavior is no longer supported; for altering the environment in
 which services are run, see the \fBsetenv\fR subcommand in \fBsvccfg\fR(1M).
-.sp
-.LP
-\fB/sbin/rc2\fR has references to the obsolescent \fBrc.d\fR directory. These
-references are for compatibility with old \fBINSTALL\fR scripts. New
-\fBINSTALL\fR scripts should use the \fBinit.d\fR directory for related
-executables. The same is true for the \fBshutdown.d\fR directory.

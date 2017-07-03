@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPR 7 "May 7, 2001"
+.TH CPR 7 "May 13, 2017"
 .SH NAME
 cpr \- Suspend and resume module
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ cpr \- Suspend and resume module
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcpr\fR module is a loadable module used to suspend and resume the entire
 system. You may wish to suspend a system to save power or to power off
@@ -26,11 +25,11 @@ state is preserved in non-volatile storage until a resume operation is
 conducted.
 .sp
 .LP
-\fBdtpower\fR(1M) or \fBpower.conf\fR(4) are used to configure the
+\fBpmconfig\fR(1M) and \fBpower.conf\fR(4) are used to configure the
 suspend-resume feature.
 .sp
 .LP
-The speed of suspend  and resume operations can range from 15 seconds to
+The speed of suspend and resume operations can range from 15 seconds to
 several minutes, depending on the system speed, memory size, and load.
 .sp
 .LP
@@ -45,14 +44,14 @@ refresh the screen in response to \fBSIGTHAW\fR.
 In some cases the \fBcpr\fR module may be unable to perform the suspend
 operation. If a system contains additional devices outside the standard shipped
 configuration, it is possible that device drivers for these additional devices
-might not support suspend-resume  operations. In this case, the suspend fails
+might not support suspend-resume operations. In this case, the suspend fails
 and an error message is displayed. These devices must be removed or their
-device drivers unloaded for the  suspend operation to succeed. Contact the
+device drivers unloaded for the suspend operation to succeed. Contact the
 device manufacturer to obtain a new version of device driver that supports
 suspend-resume.
 .sp
 .LP
-A  suspend  may also fail when devices or processes are performing critical or
+A suspend may also fail when devices or processes are performing critical or
 time-sensitive operations (such as realtime operations). The system will remain
 in its current running state. Messages reporting the failure will be displayed
 on the console and status returned to the caller. Once the system is
@@ -63,10 +62,9 @@ influences such as a hardware reconfiguration.
 Some network-based applications may fail across a suspend and resume cycle.
 This largely depends on the underlying network protocol and the applications
 involved.  In general, applications that retry and automatically reestablish
-connections will continue to operate  transparently on a resume  operation;
+connections will continue to operate transparently on a resume operation;
 those applications that do not will likely fail.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -82,26 +80,19 @@ Interface stability 	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBdtpower\fR(1M) (OpenWindows Reference Manual), \fBpmconfig\fR(1M),
+\fBpmconfig\fR(1M),
 \fBuadmin\fR(1M), \fBuadmin\fR(2), \fBpower.conf\fR(4), \fBattributes\fR(5)
-.sp
-.LP
-\fIUsing Power Management\fR
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
 .LP
 Certain device operations such as tape and floppy disk activities are not
 resumable due to the nature of removable media.  These activities are detected
-at suspend time, and must be stopped before the suspend  operation will
+at suspend time, and must be stopped before the suspend operation will
 complete successfully.
 .sp
 .LP
-Suspend-resume is currently  supported only on a limited set of hardware
-platforms. Please see  the book \fIUsing Power Management\fR for a complete
-list of platforms that support system Power Management. See \fBuname\fR(2) to
-programatically determine if the machine supports suspend-resume.
+Suspend-resume is currently supported only on a limited set of hardware
+platforms.

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER,
 .\" with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SD 7D "Sep 8, 2009"
+.TH SD 7D "May 13, 2017"
 .SH NAME
 sd \- SCSI disk and ATAPI/SCSI CD-ROM device driver
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ sd \- SCSI disk and ATAPI/SCSI CD-ROM device driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 To open a device without checking if the vtoc is valid, use the O_NDELAY flag.
 When the device is opened using O_NDELAY, the first read or write to the device
@@ -21,7 +20,6 @@ that happens after the open results in the label being read if the label is not
 currently valid. Once read, the label remains valid until the last close of the
 device. Except for reading the label, O_NDELAY has no impact on the driver.
 .SS "SPARC"
-.sp
 .LP
 The \fBsd\fR \fBSCSI\fR and \fBSCSI/ATAPI\fR driver supports embedded
 \fBSCSI\fR-2 and \fBCCS\fR-compatible \fBSCSI\fR disk and CD-ROM drives,
@@ -36,7 +34,6 @@ describes the disk geometry and partitioning and must be present for the disk
 to be mounted by the system.) A volume label is not required for removable,
 re-writable or read-only media.
 .SS "x86 Only"
-.sp
 .LP
 The \fBsd\fRdriver supports embedded \fBSCSI\fR-2 and \fBCCS\fR-compatible
 \fBSCSI \fRdisk and CD-ROM drives, \fBATAPI \fR2.6 (SFF-8020i)-compliant CD-ROM
@@ -49,7 +46,6 @@ in the first physical sector of the bootable media. If the x86 hard disk
 contains a Solaris disk label, it is located in the second 512-byte sector of
 the FDISK partition.
 .SH DEVICE SPECIAL FILES
-.sp
 .LP
 Block-files access the disk using normal buffering mechanism and are read-from
 and written-to without regard to physical disk records. A \fBraw\fR interface
@@ -66,7 +62,6 @@ Requests that do not meet these requirements will trigger an \fBEINVAL\fR
 error. There are no alignment or length restrictions on I/O requests to the
 block device.
 .SH CD-ROM DRIVE SUPPORT
-.sp
 .LP
 A CD-ROM disk is single-sided and contains approximately 640 megabytes of data
 or 74 minutes of audio. When the CD-ROM is opened, the eject button is disabled
@@ -76,7 +71,6 @@ information are constant and never change. If the CD-ROM contains data recorded
 in a Solaris-aware file system format, it can be mounted using the appropriate
 Solaris file system support.
 .SH DVD-ROM DRIVE SUPPORT
-.sp
 .LP
 DVD-ROM media can be single or double-sided and can be recorded upon using a
 single or double layer structure. Double-layer media provides parallel or
@@ -91,7 +85,6 @@ required for a DVD-ROM. If the DVD-ROM contains data recorded in a
 Solaris-aware file system format, it can be mounted using the appropriate
 Solaris file system support.
 .SH ZIP/JAZ DRIVE SUPPORT
-.sp
 .LP
 \fBZIP/JAZ\fR media provide varied data capacity points; a single \fBJAZ
 \fRdrive can store up to 2 GBytes of data, while a ZIP-250 can store up to
@@ -105,7 +98,6 @@ label is required for a \fBZIP/JAZ\fR drive. If the \fBZIP/JAZ\fR drive
 contains data recorded in a Solaris-aware file system format, it can be mounted
 using the appropriate Solaris file system support.
 .SH DEVICE STATISTICS SUPPORT
-.sp
 .LP
 Each device maintains I/O statistics for the device and for partitions
 allocated for that device. For each device/partition, the driver accumulates
@@ -118,11 +110,9 @@ Not all device drivers make per-partition IO statistics available for
 reporting. \fBsd\fR and \fBssd\fR(7D) per-partition statistics are enabled by
 default but may disabled in their configuration files.
 .SH IOCTLS
-.sp
 .LP
 Refer to \fBdkio\fR(7I), and \fBcdio\fR(7I)
 .SS "ERRORS"
-.sp
 .ne 2
 .na
 \fB\fBEACCES\fR\fR
@@ -232,7 +222,6 @@ media.
 .RE
 
 .SH CONFIGURATION
-.sp
 .LP
 The \fBsd\fR driver can be configured by defining properties in the
 \fBsd.conf\fR file. The \fBsd\fR driver supports the following properties:
@@ -308,7 +297,7 @@ to 0 prevents automatic binding. The default behavior for the SPARC-based
 .ad
 .RS 27n
 Boolean type, when set to \fBFalse\fR, it indicates that the disk does not
-support \fBpower condition\fR field in th\fBe START STOP UNIT\fR command.
+support \fBpower condition\fR field in the \fBSTART STOP UNIT\fR command.
 .RE
 
 .sp
@@ -360,7 +349,6 @@ command is used instead.
 .RE
 
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 The following is an example of a global sd-config-list property:
@@ -372,7 +360,6 @@ The following is an example of a global sd-config-list property:
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/sd.conf\fR\fR
@@ -440,7 +427,6 @@ partition n (0-7)
 .RE
 
 .SS "x86 Only"
-.sp
 .ne 2
 .na
 \fB\fB/dev/rdsk/cntndnpn\fR\fR
@@ -462,7 +448,6 @@ Where \fIn\fR=0 the node corresponds to the entire disk.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsar\fR(1), \fBcfgadm_scsi\fR(1M), \fBfdisk\fR(1M), \fBformat\fR(1M),
 \fBiostat\fR(1M), \fBclose\fR(2), \fBioctl\fR(2), \fBlseek\fR(2),
@@ -479,11 +464,7 @@ Where \fIn\fR=0 the node corresponds to the entire disk.
 .sp
 .LP
 \fIMt.Fuji Commands for CD and DVD, SFF8090v3\fR
-.sp
-.LP
-http://\fIwww.sun.com/io\fR
 .SH DIAGNOSTICS
-.sp
 .in +2
 .nf
 Error for Command:\fI<command name>\fR
@@ -864,7 +845,6 @@ Drive went offline; probably powered down.
 .RE
 
 .SH NOTES
-.sp
 .LP
 DVD-ROM media containing DVD-Video data may follow/adhere to the requirements
 of content scrambling system or copy protection scheme. Reading of

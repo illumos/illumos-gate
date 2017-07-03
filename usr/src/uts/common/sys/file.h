@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 /* Copyright 2015 Joyent, Inc. */

@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #ifndef REGRESSION
 #include "stand.h"
@@ -320,8 +319,6 @@ bzf_seek(struct open_file *f, off_t offset, int where)
     case SEEK_CUR:
 	target = offset + bzf->bzf_bzstream.total_out_lo32;
 	break;
-    case SEEK_END:
-	target = -1;
     default:
 	errno = EINVAL;
 	return(-1);

@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMF_SECURITY 5 "May 20, 2009"
+.TH SMF_SECURITY 5 "May 13, 2017"
 .SH NAME
 smf_security \- service management facility security behavior
 .SH DESCRIPTION
-.sp
 .LP
 The configuration subsystem for the service management facility, \fBsmf\fR(5),
 requires privilege to modify the configuration of a service. Privileges are
@@ -28,7 +27,6 @@ properties, and to read protected property values.
 .RE
 
 .SS "Property Group Authorizations"
-.sp
 .LP
 The \fBsmf\fR(5) configuration subsystem associates properties with each
 service and service instance. Related properties are grouped. Groups can
@@ -144,7 +142,6 @@ The above authorization properties are only used if they have type
 properties, but the instance's service has a property group of the same name
 with the property, its values are used.
 .SS "Protected Property Groups"
-.sp
 .LP
 Normally, all property values in the repository can be read by any user without
 explicit authorization. Property groups of non-framework types can be used to
@@ -161,7 +158,6 @@ the face of such a policy, non-protected property values can be backed up by
 using the \fBsvccfg\fR(1M) archive command to create an archive of the
 repository without protected property values.
 .SS "Service Action Authorization"
-.sp
 .LP
 Certain actions on service instances can result in service interruption or
 deactivation. These actions require an authorization to ensure that any denial
@@ -186,7 +182,6 @@ additional authorizations that permit service actions to be requested for that
 service instance. The \fBsolaris.smf.manage\fR authorization is required to
 modify this property.
 .SS "Defined Rights Profiles"
-.sp
 .LP
 Two rights profiles are included that offer grouped authorizations for
 manipulating typical \fBsmf\fR(5) operations.
@@ -199,10 +194,6 @@ manipulating typical \fBsmf\fR(5) operations.
 A service manager can manipulate any service in the repository in any way. It
 corresponds to the \fBsolaris.smf.manage\fR and \fBsolaris.smf.modify\fR
 authorizations.
-.sp
-The service management profile is the minimum required to use the
-\fBpkgadd\fR(1M) or \fBpkgrm\fR(1M) commands to add or remove software packages
-that contain an inventory of services in its service manifest.
 .RE
 
 .sp
@@ -220,18 +211,15 @@ Sites can define additional rights profiles customized to their needs.
 .RE
 
 .SS "Remote Repository Modification"
-.sp
 .LP
 Remote repository servers can deny modification attempts due to additional
 privilege checks. See NOTES.
 .SH SEE ALSO
-.sp
 .LP
-\fBauths\fR(1), \fBprofiles\fR(1), \fBpkgadd\fR(1M), \fBpkgrm\fR(1M),
+\fBauths\fR(1), \fBprofiles\fR(1),
 \fBsvccfg\fR(1M), \fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBrbac\fR(5),
 \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 The present version of \fBsmf\fR(5) does not support remote repositories.
 .sp

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIVILEGES 5 "Jun 6, 2016"
+.TH PRIVILEGES 5 "May 13, 2017"
 .SH NAME
 privileges \- process privilege model
 .SH DESCRIPTION
@@ -1323,8 +1323,7 @@ set priv_debug = 1
 On a running system, you can use \fBmdb\fR(1) to change this variable.
 .SS "Privilege Administration"
 .LP
-The Solaris Management Console (see \fBsmc\fR(1M)) is the preferred method of
-modifying privileges for a command. Use \fBusermod\fR(1M) or \fBsmrole\fR(1M)
+Use \fBusermod\fR(1M) or \fBrolemod\fR(1M)
 to assign privileges to or modify privileges for, respectively, a user or a
 role. Use \fBppriv\fR(1) to enumerate the privileges supported on a system and
 \fBtruss\fR(1) to determine which privileges a program requires.

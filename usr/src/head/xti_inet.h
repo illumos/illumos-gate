@@ -20,13 +20,11 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1998 Sun Microsystems, Inc.	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef _XTI_INET_H
 #define	_XTI_INET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/xti_inet.h>
 

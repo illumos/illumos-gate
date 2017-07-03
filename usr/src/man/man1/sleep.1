@@ -11,7 +11,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SLEEP 1 "Sep 10, 2013"
+.TH SLEEP 1 "May 13, 2017"
 .SH NAME
 sleep \- suspend execution for an interval
 .SH SYNOPSIS
@@ -28,7 +28,6 @@ sleep \- suspend execution for an interval
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBsleep\fR suspends execution for at least the time in seconds specified by
 \fIseconds\fR or until a \fBSIGALRM\fR signal is received. The \fIseconds\fR
@@ -36,7 +35,6 @@ operand can be specified as a floating point number but the actual granularity
 normally depends on the underlying system.
 .SH OPERANDS
 .SS "/usr/bin/sleep"
-.sp
 .LP
 The following operands are supported for \fB/usr/bin/sleep\fR and \fBksh93\fR's
 \fBsleep\fR built-in command:
@@ -48,11 +46,10 @@ The following operands are supported for \fB/usr/bin/sleep\fR and \fBksh93\fR's
 .RS 11n
 A non-negative floating-point number specifying the number of seconds for which
 to suspend execution. The floating-point number may be specified in all formats
-required by C99/XPG6, including constants such as "Inf" or "infinite".
+required by C99/XPG6, including constants such as "Inf" or "infinity".
 .RE
 
 .SS "ksh93"
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -134,13 +131,11 @@ example% sleep 0x1.0000000000000000000000000000p-01
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBsleep\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -163,13 +158,9 @@ An error has occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/bin/sleep"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -182,9 +173,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -195,12 +183,10 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBksh93\fR(1), \fBwait\fR(1), \fBalarm\fR(2), \fBsleep\fR(3C),
-\fBwait\fR(3UCB), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+\fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 If the \fBsleep\fR utility receives a \fBSIGALRM\fR signal, one of the
 following actions is taken:

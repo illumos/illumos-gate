@@ -293,7 +293,8 @@ vmxnet3_tx_one(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq,
 		txqCtrl->txNumDeferred++;
 	}
 
-	VMXNET3_DEBUG(dp, 3, "tx 0x%p on [%u;%u]\n", mp, sopIdx, eopIdx);
+	VMXNET3_DEBUG(dp, 3, "tx 0x%p on [%u;%u]\n", (void *)mp, sopIdx,
+	    eopIdx);
 
 	goto done;
 
@@ -458,7 +459,7 @@ vmxnet3_tx_complete(vmxnet3_softc_t *dp, vmxnet3_txqueue_t *txq)
 
 		completedTx = B_TRUE;
 
-		VMXNET3_DEBUG(dp, 3, "cp 0x%p on [%u;%u]\n", mp, sopIdx,
+		VMXNET3_DEBUG(dp, 3, "cp 0x%p on [%u;%u]\n", (void *)mp, sopIdx,
 		    eopIdx);
 
 		VMXNET3_INC_RING_IDX(compRing, compRing->next2comp);

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd October 4, 2016
+.Dd May 13, 2017
 .Dt USBA 7D
 .Os
 .Sh NAME
@@ -34,8 +34,7 @@ For a complete list of USBA interfaces, see
 or
 .Xr Intro 9S .
 .Pp
-Devices without a driver may be able to leverage
-.Xr libusb 3LIB .
+Devices without a driver may be able to leverage libusb.
 .Sh FILES
 Listed below are drivers and modules which either utilize or are utilized by
 USBA.
@@ -148,7 +147,6 @@ Driver is incompatible with USBA framework.
 .El
 .Sh SEE ALSO
 .Xr cfgadm_usb 1M ,
-.Xr libusb 3LIB ,
 .Xr attributes 5 ,
 .Xr ehci 7D ,
 .Xr hid 7D ,

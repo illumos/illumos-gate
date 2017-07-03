@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VIRTUALKM 7D "Jan 16, 2007"
+.TH VIRTUALKM 7D "May 13, 2017"
 .SH NAME
 virtualkm \- Virtual keyboard and mouse
 .SH SYNOPSIS
@@ -33,11 +33,10 @@ virtualkm \- Virtual keyboard and mouse
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 A virtual keyboard or mouse is an abstraction of one or more physical keyboards
-or mice (USB or PS2) connected to a system.   Input streams for these physical
-devices are coalesced into a single input  stream and appear as a single device
+or mice (USB or PS2) connected to a system.  Input streams for these physical
+devices are coalesced into a single input stream and appear as a single device
 to the upper layers.
 .sp
 .LP
@@ -57,28 +56,27 @@ single mouse to the window system.
 Commands from applications are dispatched by the virtual keyboard/mouse
 facility to the underlying physical devices and will succeed provided that one
 of the underlying devices responds with success. For example, a single command
-issued to turn on LED's  will turn on corresponding LED's for all underlying
+issued to turn on LED's will turn on corresponding LED's for all underlying
 physical keyboards.
 .sp
 .LP
-Although physical keyboards/mice are linked to the  virtual keyboard/mouse
-facility, each may be opened separately by  accessing its associated device
+Although physical keyboards/mice are linked to the virtual keyboard/mouse
+facility, each may be opened separately by accessing its associated device
 file. (For example, \fB/dev/usb/hid0\fR for a usb mouse).  Directly accessing a
-device file can be useful for multi-seat, \fBgok(1)\fR or similar purposes.
+device file can be useful for multi-seat or similar purposes.
 .sp
 .LP
-When a single physical device is opened via its associated device file, it  is
+When a single physical device is opened via its associated device file, it is
 automatically removed from the single virtual input stream. When closed, it is
 automatically re- coalesced into the single virtual input stream.
 .sp
 .LP
 Under the \fBvirtualkm\fR facility, the PS/2 mouse is coalesced into a virtual
 mouse single input stream and can be accessed using the \fB/dev/mouse\fR file.
-(Note that in previous releases, the  PS/2 mouse was accessed via the
+(Note that in previous releases, the PS/2 mouse was accessed via the
 \fB/dev/kdmouse\fR physical device file). In the current release, you use the
-\fB/dev/kdmouse\fR file to directly access the physical PS/2  mouse.
+\fB/dev/kdmouse\fR file to directly access the physical PS/2 mouse.
 .SS "INTERFACES"
-.sp
 .LP
 The virtual mouse provides the following event ID's for mouse capability
 changes:
@@ -112,7 +110,7 @@ with other events, firm events are received using \fBread\fR(2).
 .sp
 .LP
 Event ID's are used by applications (including certain mouse demo applications)
-that are programmed to graphically  represent the actual number of buttons and
+that are programmed to graphically represent the actual number of buttons and
 wheels on a mouse. When an application of this type receives a \fBFirm_event\fR
 with a ID MOUSE_CAP_CHANGE_NUM_BUT or MOUSE_CAP_CHANGE_NUM_WHEEL event, it is
 instructed to update its state information using the new value. Consider, for
@@ -122,17 +120,16 @@ mouse. If, for example, the system has a single two-button USB mouse attached,
 the application, by default, will graphically display the mouse with a left and
 a right button. However, if a another three-button USB mouse is hot-plugged
 into the system, a MOUSE_CAP_CHANGE_NUM_BUT Firm event with
-\fBFirm_event.value\fR of three instructs the demo  application to update the
+\fBFirm_event.value\fR of three instructs the demo application to update the
 mouse display to indicate three buttons.
 .SH IOCTLS
-.sp
 .ne 2
 .na
 \fBKIOCSETFREQ\fR
 .ad
 .RS 15n
 Sets the frequency for either keyboard beeper or console beeper. To set the
-corresponding beeper frequency,  \fIarg\fR must point to a \fBfreq_request\fR
+corresponding beeper frequency, \fIarg\fR must point to a \fBfreq_request\fR
 structure:
 .sp
 .in +2
@@ -158,7 +155,6 @@ inclusive.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/kbd\fR\fR
@@ -204,7 +200,6 @@ Device auto-configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -220,19 +215,14 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkbd\fR(1), \fBeeprom\fR(1M), \fBread\fR(2), \fBattributes\fR(5),
 \fBhid\fR(7D), \fBusba\fR(7D), \fBkb\fR(7M), \fBusbkbm\fR(7M), \fBusbms\fR(7M),
 \fBvuidmice\fR(7M)
-.sp
-.LP
-See gok(1) in the GNOME man pages, available in the SUNWgnome package.
 .SH DIAGNOSTICS
-.sp
 .LP
-The messages described below may appear on the  system  console as well as
-being logged. All  messages are formatted in the following manner:
+The messages described below may appear on the system console as well as
+being logged. All messages are formatted in the following manner:
 .sp
 .in +2
 .nf
@@ -280,9 +270,8 @@ removed), it is unavailable beneath \fB/dev/mouse\fR.
 .RE
 
 .SH NOTES
-.sp
 .LP
-Currently, the \fBvirtualkm\fR device supports only  USB and PS2 keyboards and
+Currently, the \fBvirtualkm\fR device supports only USB and PS2 keyboards and
 mice.
 .sp
 .LP

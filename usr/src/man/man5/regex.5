@@ -1,769 +1,1041 @@
-'\" te
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission
+.\" to reproduce portions of its copyrighted documentation.
+.\"
+.\" Original documentation from The Open Group can be obtained online at
+.\" http://www.opengroup.org/bookstore/.
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open Group,
+.\" have given us permission to reprint portions of their documentation. In the
+.\" following statement, the phrase "this text" refers to portions of the system
+.\" documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form in the
+.\" Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for
+.\" Information Technology -- Portable Operating System Interface (POSIX),
+.\" The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the
+.\" Institute of Electrical and Electronics Engineers, Inc and The Open Group.
+.\"
+.\" In the event of any discrepancy between these versions and the original
+.\" IEEE and The Open Group Standard, the original IEEE and The Open Group
+.\" Standard is the referee document.
+.\"
+.\" The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Portions Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
-.\" http://www.opengroup.org/bookstore/.
-.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
-.\"  This notice shall appear on any product containing this material.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH REGEX 5 "Apr 21, 2005"
-.SH NAME
-regex \- internationalized basic and extended regular expression matching
-.SH DESCRIPTION
-.LP
-Regular Expressions (REs) provide a mechanism to select specific strings from a
-set of character strings. The Internationalized Regular Expressions described
-below differ from the Simple Regular Expressions described on the
-\fBregexp\fR(5) manual page in the following ways:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.\" Copyright 2017 Nexenta Systems, Inc.
+.\"
+.Dd June 2, 2017
+.Dt REGEX 5
+.Os
+.Sh NAME
+.Nm regex
+.Nd internationalized basic and extended regular expression matching
+.Sh DESCRIPTION
+Regular Expressions
+.Pq REs
+provide a mechanism to select specific strings from a set of character strings.
+The Internationalized Regular Expressions described below differ from the Simple
+Regular Expressions described on the
+.Xr regexp 5
+manual page in the following ways:
+.Bl -bullet
+.It
 both Basic and Extended Regular Expressions are supported
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-the Internationalization features\(emcharacter class, equivalence class, and
-multi-character collation\(emare supported.
-.RE
-.sp
-.LP
-The Basic Regular Expression (BRE) notation and construction rules described in
-the \fBBASIC\fR \fBREGULAR\fR \fBEXPRESSIONS\fR section apply to most utilities
-supporting regular expressions. Some utilities, instead, support the Extended
-Regular Expressions (ERE) described in the \fBEXTENDED\fR \fBREGULAR\fR
-\fBEXPRESSIONS\fR section; any exceptions for both cases are noted in the
-descriptions of the specific utilities using regular expressions. Both BREs and
-EREs are supported by the Regular Expression Matching interfaces
-\fBregcomp\fR(3C) and \fBregexec\fR(3C).
-.SH BASIC REGULAR EXPRESSIONS
-.SS "BREs Matching a Single Character"
-.LP
+.It
+the Internationalization features -- character class, equivalence class, and
+multi-character collation -- are supported.
+.El
+.Pp
+The Basic Regular Expression
+.Pq BRE
+notation and construction rules described in the
+.Sx BASIC REGULAR EXPRESSIONS
+section apply to most utilities supporting regular expressions.
+Some utilities, instead, support the Extended Regular Expressions
+.Pq ERE
+described in the
+.Sx EXTENDED REGULAR EXPRESSIONS
+section; any exceptions for both cases are noted in the descriptions of the
+specific utilities using regular expressions.
+Both BREs and EREs are supported by the Regular Expression Matching interfaces
+.Xr regcomp 3C
+and
+.Xr regexec 3C .
+.Sh BASIC REGULAR EXPRESSIONS
+.Ss BREs Matching a Single Character
 A BRE ordinary character, a special character preceded by a backslash, or a
-period matches a single character. A bracket expression matches a single
-character or a single collating element. See \fBRE Bracket Expression\fR,
+period matches a single character.
+A bracket expression matches a single character or a single collating element.
+See
+.Sx RE Bracket Expression ,
 below.
-.SS "BRE Ordinary Characters"
-.LP
+.Ss BRE Ordinary Characters
 An ordinary character is a BRE that matches itself: any character in the
-supported character set, except for the BRE special characters listed in \fBBRE
-Special Characters\fR, below.
-.sp
-.LP
-The interpretation of an ordinary character preceded by a backslash (\e) is
-undefined, except for:
-.RS +4
-.TP
-1.
-the characters ), (, {, and }
-.RE
-.RS +4
-.TP
-2.
-the digits 1 to 9 inclusive (see \fBBREs Matching Multiple Characters\fR,
-below)
-.RE
-.RS +4
-.TP
-3.
+supported character set, except for the BRE special characters listed in
+.Sx BRE Special Characters ,
+below.
+.Pp
+The interpretation of an ordinary character preceded by a backslash
+.Pq Qq \e
+is undefined, except for:
+.Bl -enum
+.It
+the characters
+.Qq \&) ,
+.Qq \&( ,
+.Qq { ,
+and
+.Qq }
+.It
+the digits 1 to 9 inclusive
+.Po see
+.Sx BREs Matching Multiple Characters ,
+below
+.Pc
+.It
 a character inside a bracket expression.
-.RE
-.SS "BRE Special Characters"
-.LP
-A BRE \fIspecial\fR \fIcharacter\fR has special properties in certain contexts.
+.El
+.Ss BRE Special Characters
+A BRE special character has special properties in certain contexts.
 Outside those contexts, or when preceded by a backslash, such a character will
-be a BRE that matches the special character itself. The BRE special characters
-and the contexts in which they have their special meaning are:
-.sp
-.ne 2
-.na
-\fB\&. [ \e\fR
-.ad
-.RS 12n
+be a BRE that matches the special character itself.
+The BRE special characters and the contexts in which they have their special
+meaning are:
+.Bl -tag -width Ds
+.It Sy \&. \&[ \&\e
 The period, left-bracket, and backslash are special except when used in a
-bracket expression (see \fBRE Bracket Expression\fR, below). An expression
-containing a [ that is not preceded by a backslash and is not part of a bracket
-expression produces undefined results.
-.RE
-
-.sp
-.ne 2
-.na
-\fB*\fR
-.ad
-.RS 12n
+bracket expression
+.Po see
+.Sx RE Bracket Expression ,
+below
+.Pc .
+An expression containing a
+.Qq \&[
+that is not preceded by a backslash and is not part of a bracket expression
+produces undefined results.
+.It Sy *
 The asterisk is special except when used:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Bl -bullet
+.It
 in a bracket expression
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-as the first character of an entire BRE (after an initial ^, if any)
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-as the first character of a subexpression (after an initial ^, if any); see
-\fBBREs Matching Multiple Characters\fR, below.
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fI^\fR\fR
-.ad
-.RS 12n
+.It
+as the first character of an entire BRE
+.Po after an initial
+.Qq ^ ,
+if any
+.Pc
+.It
+as the first character of a subexpression
+.Po after an initial
+.Qq ^ ,
+if any; see
+.Sx BREs Matching Multiple Characters ,
+below
+.Pc .
+.El
+.It Sy ^
 The circumflex is special when used:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-as an anchor (see \fBBRE Expression Anchoring\fR, below).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-as the first character of a bracket expression (see \fBRE Bracket
-Expression\fR, below).
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB$\fR
-.ad
-.RS 12n
+.Bl -bullet
+.It
+as an anchor
+.Po see
+.Sx BRE Expression Anchoring ,
+below
+.Pc .
+.It
+as the first character of a bracket expression
+.Po see
+.Sx RE Bracket Expression ,
+below
+.Pc .
+.El
+.It Sy $
 The dollar sign is special when used as an anchor.
-.RE
-
-.SS "Periods in BREs"
-.LP
-A period (\fB\&.\fR), when used outside a bracket expression, is a BRE that
-matches any character in the supported character set except NUL.
-.SS "RE Bracket Expression"
-.LP
-A bracket expression (an expression enclosed in square brackets, [\|]) is an RE
-that matches a single collating element contained in the non-empty set of
-collating elements represented by the bracket expression.
-.sp
-.LP
+.El
+.Ss Periods in BREs
+A period
+.Pq Qq \&. ,
+when used outside a bracket expression, is a BRE that matches any character in
+the supported character set except NUL.
+.Ss RE Bracket Expression
+A bracket expression
+.Po an expression enclosed in square brackets,
+.Qq []
+.Pc
+is an RE that matches a single collating element contained in the non-empty set
+of collating elements represented by the bracket expression.
+.Pp
 The following rules and definitions apply to bracket expressions:
-.RS +4
-.TP
-1.
-A \fIbracket expression\fR is either a matching list expression or a
-non-matching list expression. It consists of one or more expressions: collating
-elements, collating symbols, equivalence classes, character classes, or range
-expressions (see rule 7 below). Portable applications must not use range
-expressions, even though all implementations support them. The right-bracket
-(]) loses its special meaning and represents itself in a bracket expression if
-it occurs first in the list (after an initial circumflex (^), if any).
+.Bl -enum
+.It
+A
+.Em bracket expression
+is either a matching list expression or a non-matching list expression.
+It consists of one or more expressions: collating elements, collating symbols,
+equivalence classes, character classes, or range expressions
+.Pq see rule 7 below .
+Portable applications must not use range expressions, even though all
+implementations support them.
+The right-bracket
+.Pq Qq \&]
+loses its special meaning and represents itself in a bracket expression if it
+occurs first in the list
+.Po after an initial circumflex
+.Pq Qq ^ ,
+if any
+.Pc .
 Otherwise, it terminates the bracket expression, unless it appears in a
-collating symbol (such as [.].]) or is the ending right-bracket for a collating
-symbol, equivalence class, or character class. The special characters:
-.sp
-.in +2
-.nf
-	.   *   [   \e
-.fi
-.in -2
-.sp
-
-(period, asterisk, left-bracket and backslash, respectively) lose their special
-meaning within a bracket expression.
-.sp
-The character sequences:
-.sp
-.in +2
-.nf
-	[.   [=    [:
-.fi
-.in -2
-.sp
-
-(left-bracket followed by a period, equals-sign, or colon) are special inside a
-bracket expression and are used to delimit collating symbols, equivalence class
-expressions, and character class expressions. These symbols must be followed by
-a valid expression and the matching terminating sequence .], =] or :], as
-described in the following items.
-.RE
-.RS +4
-.TP
-2.
-A \fImatching list\fR expression specifies a list that matches any one of
-the expressions represented in the list. The first character in the list must
-not be the circumflex. For example, \fB[abc]\fR is an RE that matches any of
-the characters \fBa\fR, \fBb\fR or \fBc\fR.
-.RE
-.RS +4
-.TP
-3.
-A \fInon-matching list\fR expression begins with a circumflex (^), and
-specifies a list that matches any character or collating element except for the
-expressions represented in the list after the leading circumflex. For example,
-[^abc] is an RE that matches any character or collating element except the
-characters \fBa,\fR \fBb\fR, or \fBc\fR. The circumflex will have this special
-meaning only when it occurs first in the list, immediately following the
-left-bracket.
-.RE
-.RS +4
-.TP
-4.
-A \fIcollating symbol\fR is a collating element enclosed within
-bracket-period ([..]) delimiters. Multi-character collating elements must be
-represented as collating symbols when it is necessary to distinguish them from
-a list of the individual characters that make up the multi-character collating
-element. For example, if the string \fBch\fR is a collating element in the
-current collation sequence with the associated collating symbol <ch>, the
-expression [[.ch.]] will be treated as an RE matching the character sequence
-\fBch\fR, while [ch] will be treated as an RE matching \fBc\fR or \fBh\fR.
-Collating symbols will be recognized only inside bracket expressions. This
-implies that the RE \fB[[.ch.]]*c\fR matches the first to fifth character in
-the string chchch. If the string is not a collating element in the current
-collating sequence definition, or if the collating element has no characters
-associated with it, the symbol will be treated as an invalid expression.
-.RE
-.RS +4
-.TP
-5.
-An \fIequivalence class expression\fR represents the set of collating
-elements belonging to an equivalence class. Only primary equivalence classes
-will be recognised. The class is expressed by enclosing any one of the
-collating elements in the equivalence class within bracket-equal ([==])
-delimiters. For example, if a and b belong to the same equivalence class, then
-[[=a=]b], [[==]b] and [[==]b] will each be equivalent to [ab]. If the collating
-element does not belong to an equivalence class, the equivalence class
-expression will be treated as a \fIcollating symbol\fR.
-.RE
-.RS +4
-.TP
-6.
-A \fIcharacter class expression\fR represents the set of characters
-belonging to a character class, as defined in the \fBLC_CTYPE\fR category in
-the current locale. All character classes specified in the current locale will
-be recognized. A character class expression is expressed as a character class
-name enclosed within bracket-colon ([::]) delimiters.
-.sp
+collating symbol
+.Po such as
+.Qq [.].]
+.Pc
+or is the ending right-bracket for a collating symbol, equivalence class, or
+character class.
+.Pp
+The special characters
+.Qq \&. ,
+.Qq * ,
+.Qq \&[ ,
+.Qq \&\e
+.Pq period, asterisk, left-bracket and backslash, respectively
+lose their special meaning within a bracket expression.
+.Pp
+The character sequences
+.Qq [. ,
+.Qq [= ,
+.Qq [:
+.Pq left-bracket followed by a period, equals-sign, or colon
+are special inside a bracket expression and are used to delimit collating
+symbols, equivalence class expressions, and character class expressions.
+These symbols must be followed by a valid expression and the matching
+terminating sequence
+.Qq .] ,
+.Qq =]
+or
+.Qq :] ,
+as described in the following items.
+.It
+A
+.Em matching list expression
+specifies a list that matches any one of the expressions represented in the
+list.
+The first character in the list must not be the circumflex.
+For example,
+.Qq [abc]
+is an RE that matches any of the characters
+.Qq a ,
+.Qq b
+or
+.Qq c .
+.It
+A
+.Em non-matching list expression
+begins with a circumflex
+.Pq Qq ^ ,
+and specifies a list that matches any character or collating element except for
+the expressions represented in the list after the leading circumflex.
+For example,
+.Qq [^abc]
+is an RE that matches any character or collating element except the characters
+.Qq a ,
+.Qq b ,
+or
+.Qq c .
+The circumflex will have this special meaning only when it occurs first in the
+list, immediately following the left-bracket.
+.It
+A
+.Em collating symbol
+is a collating element enclosed within bracket-period
+.Pq Qq [..]
+delimiters.
+Multi-character collating elements must be represented as collating symbols when
+it is necessary to distinguish them from a list of the individual characters
+that make up the multi-character collating element.
+For example, if the string
+.Qq ch
+is a collating element in the current collation sequence with the associated
+collating symbol
+.Qq Aq ch ,
+the expression
+.Qq [[.ch.]]
+will be treated as an RE matching the character sequence
+.Qq ch ,
+while
+.Qq [ch]
+will be treated as an RE matching
+.Qq c
+or
+.Qq h .
+Collating symbols will be recognized only inside bracket expressions.
+This implies that the RE
+.Qq [[.ch.]]*c
+matches the first to fifth character in the string
+.Qq chchch.
+If the string is not a collating element in the current collating sequence
+definition, or if the collating element has no characters associated with it,
+the symbol will be treated as an invalid expression.
+.It
+An
+.Em equivalence class expression
+represents the set of collating elements belonging to an equivalence class.
+Only primary equivalence classes will be recognised.
+The class is expressed by enclosing any one of the collating elements in the
+equivalence class within bracket-equal
+.Pq Qq [==]
+delimiters.
+For example, if
+.Qq a
+and
+.Qq b
+belong to the same equivalence class, then
+.Qq [[=a=]b] ,
+.Qq [[==]a]
+and
+.Qq [[==]b]
+will each be equivalent to
+.Qq [ab] .
+If the collating element does not belong to an equivalence class, the
+equivalence class expression will be treated as a
+.Em collating symbol .
+.It
+A
+.Em character class expression
+represents the set of characters belonging to a character class, as defined in
+the
+.Ev LC_CTYPE
+category in the current locale.
+All character classes specified in the current locale will be recognized.
+A character class expression is expressed as a character class name enclosed
+within bracket-colon
+.Pq Qq [::]
+delimiters.
+.Pp
 The following character class expressions are supported in all locales:
-.sp
-
-.sp
-.TS
-l l l l
-l l l l .
-\fB[:alnum:]\fR	\fB[:cntrl:]\fR	\fB[:lower:]\fR	\fB[:space:]\fR
-\fB[:alpha:]\fR	\fB[:digit:]\fR	\fB[:print:]\fR	\fB[:upper:]\fR
-\fB[:blank:]\fR	\fB[:graph:]\fR	\fB[:punct:]\fR	\fB[:xdigit:]\fR
-.TE
-
-In addition, character class expressions of the form:
-.sp
-.in +2
-.nf
-	\fB[:name:]\fR
-.fi
-.in -2
-.sp
-
-are recognized in those locales where the \fIname\fR keyword has been given a
-\fBcharclass\fR definition in the \fBLC_CTYPE\fR category.
-.RE
-.RS +4
-.TP
-7.
-A \fIrange expression\fR represents the set of collating elements that fall
-between two elements in the current collation sequence, inclusively. It is
-expressed as the starting point and the ending point separated by a hyphen
-(\fB-\fR).
-.sp
+.Bl -column "[:alnum:]" "[:cntrl:]" "[:lower:]" "[:xdigit:]"
+.It [:alnum:] Ta [:cntrl:] Ta [:lower:] Ta [:space:]
+.It [:alpha:] Ta [:digit:] Ta [:print:] Ta [:upper:]
+.It [:blank:] Ta [:graph:] Ta [:punct:] Ta [:xdigit:]
+.El
+.Pp
+In addition, character class expressions of the form
+.Qq [:name:]
+are recognized in those locales where the
+.Em name
+keyword has been given a
+.Em charclass
+definition in the
+.Ev LC_CTYPE
+category.
+.It
+A
+.Em range expression
+represents the set of collating elements that fall between two elements in the
+current collation sequence, inclusively.
+It is expressed as the starting point and the ending point separated by a hyphen
+.Pq Qq - .
+.Pp
 Range expressions must not be used in portable applications because their
-behavior is dependent on the collating sequence. Ranges will be treated
-according to the current collating sequence, and include such characters that
-fall within the range based on that collating sequence, regardless of character
-values. This, however, means that the interpretation will differ depending on
-collating sequence. If, for instance, one collating sequence defines as a
-variant of \fBa\fR, while another defines it as a letter following \fBz\fR,
-then the expression [-z] is valid in the first language and invalid in the
-second.
+behavior is dependent on the collating sequence.
+Ranges will be treated according to the current collating sequence, and include
+such characters that fall within the range based on that collating sequence,
+regardless of character values.
+This, however, means that the interpretation will differ depending on collating
+sequence.
+If, for instance, one collating sequence defines as a variant of
+.Qq a ,
+while another defines it as a letter following
+.Qq z ,
+then the expression
+.Qq [-z]
+is valid in the first language and invalid in the second.
 .sp
 In the following, all examples assume the collation sequence specified for the
 POSIX locale, unless another collation sequence is specifically defined.
-.sp
+.Pp
 The starting range point and the ending range point must be a collating element
-or collating symbol. An equivalence class expression used as a starting or
-ending point of a range expression produces unspecified results. An equivalence
-class can be used portably within a bracket expression, but only outside the
-range. For example, the unspecified expression [[=e=]\(mif] should be given as
-[[=e=]e\(mif]. The ending range point must collate equal to or higher than the
-starting range point; otherwise, the expression will be treated as invalid. The
-order used is the order in which the collating elements are specified in the
-current collation definition. One-to-many mappings (see \fBlocale\fR(5)) will
-not be performed. For example, assuming that the character eszet is placed in
-the collation sequence after \fBr\fR and \fBs\fR, but before \fBt\fR, and that
-it maps to the sequence \fBss\fR for collation purposes, then the expression
-[r\(mis] matches only \fBr\fR and \fBs\fR, but the expression [s\(mit] matches
-\fBs\fR, \fBbeta\fR, or \fBt\fR.
-.sp
+or collating symbol.
+An equivalence class expression used as a starting or ending point of a range
+expression produces unspecified results.
+An equivalence class can be used portably within a bracket expression, but only
+outside the range.
+For example, the unspecified expression
+.Qq [[=e=]-f]
+should be given as
+.Qq [[=e=]e-f] .
+The ending range point must collate equal to or higher than the starting range
+point; otherwise, the expression will be treated as invalid.
+The order used is the order in which the collating elements are specified in the
+current collation definition.
+One-to-many mappings
+.Po see
+.Xr locale 5
+.Pc
+will not be performed.
+For example, assuming that the character
+.Qq eszet
+is placed in the collation sequence after
+.Qq r
+and
+.Qq s ,
+but before
+.Qq t ,
+and that it maps to the sequence
+.Qq ss
+for collation purposes, then the expression
+.Qq [r-s]
+matches only
+.Qq r
+and
+.Qq s ,
+but the expression
+.Qq [s-t]
+matches
+.Qq s ,
+.Qq beta ,
+or
+.Qq t .
+.Pp
 The interpretation of range expressions where the ending range point is also
-the starting range point of a subsequent range expression (for instance
-[a\(mim\(mio]) is undefined.
-.sp
-The hyphen character will be treated as itself if it occurs first (after an
-initial ^, if any) or last in the list, or as an ending range point in a range
-expression. As examples, the expressions [\(miac] and [ac\(mi] are equivalent
-and match any of the characters \fBa\fR, \fBc\fR, or \fB\(mi;\fR [^\(miac] and
-[^ac\(mi] are equivalent and match any characters except \fBa\fR, \fBc\fR, or
-\(mi; the expression [%\(mi\|\(mi] matches any of the characters between % and
-\(mi inclusive; the expression [\(mi\|\(mi@] matches any of the characters
-between \(mi and @ inclusive; and the expression [a\(mi\|\(mi@] is invalid,
-because the letter \fBa\fR follows the symbol \(mi in the POSIX locale. To use
-a hyphen as the starting range point, it must either come first in the bracket
-expression or be specified as a collating symbol, for example:
-[][.\(mi.]\(mi0], which matches either a right bracket or any character or
-collating element that collates between hyphen and 0, inclusive.
-.sp
-If a bracket expression must specify both \(mi and ], the ] must be placed
-first (after the ^, if any) and the \(mi last within the bracket expression.
-.RE
-.sp
-.LP
-Note: Latin-1 characters such as \(ga or ^ are not printable in some locales,
-for example, the \fBja\fR locale.
-.SS "BREs Matching Multiple Characters"
-.LP
+the starting range point of a subsequent range expression
+.Po for instance
+.Qq [a-m-o]
+.Pc
+is undefined.
+.Pp
+The hyphen character will be treated as itself if it occurs first
+.Po after an initial
+.Qq ^ ,
+if any
+.Pc
+or last in the list, or as an ending range point in a range expression.
+As examples, the expressions
+.Qq [-ac]
+and
+.Qq [ac-]
+are equivalent and match any of the characters
+.Qq a ,
+.Qq c ,
+or
+.Qq -;
+.Qq [^-ac]
+and
+.Qq [^ac-]
+are equivalent and match any characters except
+.Qq a ,
+.Qq c ,
+or
+.Qq -;
+the expression
+.Qq [%--]
+matches any of the characters between
+.Qq %
+and
+.Qq -
+inclusive; the expression
+.Qq [--@]
+matches any of the characters between
+.Qq -
+and
+.Qq @
+inclusive; and the expression
+.Qq [a--@]
+is invalid, because the letter
+.Qq a
+follows the symbol
+.Qq -
+in the POSIX locale.
+To use a hyphen as the starting range point, it must either come first in the
+bracket expression or be specified as a collating symbol, for example:
+.Qq [][.-.]-0] ,
+which matches either a right bracket or any character or collating element that
+collates between hyphen and 0, inclusive.
+.Pp
+If a bracket expression must specify both
+.Qq -
+and
+.Qq \&] ,
+the
+.Qq \&]
+must be placed first
+.Po after the
+.Qq ^ ,
+if any
+.Pc
+and the
+.Qq -
+last within the bracket expression.
+.El
+.Pp
+Note: Latin-1 characters such as
+.Qq \(ga
+or
+.Qq ^
+are not printable in some locales, for example, the
+.Em ja
+locale.
+.Ss BREs Matching Multiple Characters
 The following rules can be used to construct BREs matching multiple characters
 from BREs matching a single character:
-.RS +4
-.TP
-1.
+.Bl -enum
+.It
 The concatenation of BREs matches the concatenation of the strings matched
 by each component of the BRE.
-.RE
-.RS +4
-.TP
-2.
-A \fIsubexpression\fR can be defined within a BRE by enclosing it between
-the character pairs \e( and \e) . Such a subexpression matches whatever it
-would have matched without the \e( and \e), except that anchoring within
-subexpressions is optional behavior; see \fBBRE Expression Anchoring\fR, below.
+.It
+A
+.Em subexpression
+can be defined within a BRE by enclosing it between the character pairs
+.Qq \e(
+and
+.Qq \e) .
+Such a subexpression matches whatever it would have matched without the
+.Qq \e(
+and
+Qq \e) ,
+except that anchoring within subexpressions is optional behavior; see
+.Sx BRE Expression Anchoring ,
+below.
 Subexpressions can be arbitrarily nested.
-.RE
-.RS +4
-.TP
-3.
-The \fIback-reference\fR expression \e\fIn\fR matches the same (possibly
-empty) string of characters as was matched by a subexpression enclosed between
-\e( and \e) preceding the \e\fIn\fR. The character \fIn\fR must be a digit from
-1 to 9 inclusive, \fIn\fRth subexpression (the one that begins with the
-\fIn\fRth \e( and ends with the corresponding paired \e)\|). The expression is
-invalid if less than \fIn\fR subexpressions precede the \e\fIn\fR. For example,
-the expression \|^\e(.*\e)\e1$ matches a line consisting of two adjacent
-appearances of the same string, and the expression \e(a\e)*\e1 fails to match
-\fBa\fR. The limit of nine back-references to subexpressions in the RE is based
-on the use of a single digit identifier. This does not imply that only nine
-subexpressions are allowed in REs. The following is a valid BRE with ten
-subexpressions:
-.sp
-.in +2
-.nf
-\fB\e(\e(\e(ab\e)*c\e)*d\e)\e(ef\e)*\e(gh\e)\e{2\e}\e(ij\e)*\e(kl\e)*\e(mn\e)*\e(op\e)*\e(qr\e)*\fR
-.fi
-.in -2
-.sp
-
-.RE
-.RS +4
-.TP
-4.
-When a BRE matching a single character, a subexpression or a back-reference
-is followed by the special character asterisk (*), together with that asterisk
-it matches what zero or more consecutive occurrences of the BRE would match.
-For example, \fB[ab]*\fR \fBand\fR \fB[ab][ab]\fR are equivalent when matching
-the string \fBab\fR.
-.RE
-.RS +4
-.TP
-5.
+.It
+The
+.Em back-reference
+expression
+.Qq \e Ns Em n
+matches the same
+.Pq possibly empty
+string of characters as was matched by a subexpression enclosed between
+.Qq \e(
+and
+.Qq \e)
+preceding the
+.Qq \e Ns Em n .
+The character
+.Qq Em n
+must be a digit from 1 to 9 inclusive,
+.Em n Ns th
+subexpression
+.Po the one that begins with the
+.Em n Ns th
+.Qq \e(
+and ends with the corresponding paired
+.Qq \e)
+.Pc .
+The expression is invalid if less than
+.Em n
+subexpressions precede the
+.Qq \e Ns Em n .
+For example, the expression
+.Qq ^\e(.*\e)\e1$
+matches a line consisting of two adjacent appearances of the same string, and
+the expression
+.Qq \e(a\e)*\e1
+fails to match
+.Qq a .
+The limit of nine back-references to subexpressions in the RE is based on the
+use of a single digit identifier.
+This does not imply that only nine subexpressions are allowed in REs.
+.It
+When a BRE matching a single character, a subexpression or a back-reference is
+followed by the special character asterisk
+.Pq Qq * ,
+together with that asterisk it matches what zero or more consecutive occurrences
+of the BRE would match.
+For example,
+.Qq [ab]*
+and
+.Qq [ab][ab]
+are equivalent when matching the string
+.Qq ab .
+.It
 When a BRE matching a single character, a subexpression, or a back-reference
-is followed by an \fIinterval expression\fR of the format \e{\fIm\fR\e},
-\e{\fIm\fR,\e} or \e{\fIm\fR,\fIn\fR\e}, together with that interval expression
-it matches what repeated consecutive occurrences of the BRE would match. The
-values of \fIm\fR and \fIn\fR will be decimal integers in the range 0 \(<=
-\fIm\fR \(<= \fIn\fR \(<= {\fBRE_DUP_MAX\fR}, where \fIm\fR specifies the exact
-or minimum number of occurrences and \fIn\fR specifies the maximum number of
-occurrences. The expression \e{\fIm\fR\e} matches exactly \fIm\fR occurrences
-of the preceding BRE, \e{\fIm\fR,\e} matches at least \fIm\fR occurrences and
-\e{\fIm,n\fR\e} matches any number of occurrences between \fIm\fR and \fIn\fR,
+is followed by an
+.Em interval expression
+of the format
+.Qq \e{ Ns Em m Ns \e} ,
+.Qq \e{ Ns Em m Ns ,\e}
+or
+.Qq \e{ Ns Em m Ns , Ns Em n Ns \e} ,
+together with that interval expression it matches what repeated consecutive
+occurrences of the BRE would match.
+The values of
+.Em m
+and
+.Em n
+will be decimal integers in the range 0 <=
+.Em m
+<=
+.Em n
+<=
+.Dv BRE_DUP_MAX ,
+where
+.Em m
+specifies the exact or minimum number of occurrences and
+.Em n
+specifies the maximum number of occurrences.
+The expression
+.Qq \e{ Ns Em m Ns \e}
+matches exactly
+.Em m
+occurrences of the preceding BRE,
+.Qq \e{ Ns Em m Ns ,\e}
+matches at least
+.Em m
+occurrences and
+.Qq \e{ Ns Em m Ns , Ns Em n Ns \e}
+matches any number of occurrences between
+.Em m
+and
+.Em n ,
 inclusive.
-.sp
-For example, in the string \fBabababccccccd\fR, the BRE c\e{3\e} is matched by
-characters seven to nine, the BRE \e(ab\e)\e{4,\e} is not matched at all and
-the BRE c\e{1,3\e}d is matched by characters ten to thirteen.
-.RE
-.sp
-.LP
-The behavior of multiple adjacent duplication symbols \fB(\fR \fB*\fR \fB\fR
-and intervals) produces undefined results.
-.SS "BRE Precedence"
-.LP
+.Pp
+For example, in the string
+.Qq abababccccccd ,
+the BRE
+.Qq c\e{3\e}
+is matched by characters seven to nine, the BRE
+.Qq \e(ab\e)\e{4,\e}
+is not matched at all and the BRE
+.Qq c\e{1,3\e}d
+is matched by characters ten to thirteen.
+.El
+.Pp
+The behavior of multiple adjacent duplication symbols
+.Po Qq *
+and intervals
+.Pc
+produces undefined results.
+.Ss BRE Precedence
 The order of precedence is as shown in the following table:
-.sp
-.in +2
-.nf
-
-.fi
-.in -2
-.sp
-
-.sp
-
-.sp
-.TS
-box;
-l l
-l l .
-\fBBRE Precedence (from high to low)\fR
-collation-related bracket symbols	[= =]  [: :]  [. .]
-escaped characters	\e<\fIspecial character\fR>
-bracket expression	[ ]
-subexpressions/back-references	\e( \e) \e\fIn\fR
-single-character-BRE duplication	* \e{\fIm\fR,\fIn\fR\e}
-concatenation	
-anchoring	^  $
-.TE
-
-.SS "BRE Expression Anchoring"
-.LP
+.Bl -column "BRE Precedence (from high to low)" ""
+.It Sy BRE Precedence (from high to low) Ta
+.It collation-related bracket symbols Ta [= =]  [: :]  [. .]
+.It escaped characters Ta \e< Ns Em special character Ns >
+.It bracket expression Ta [ ]
+.It subexpressions/back-references Ta \e( \e) \e Ns Em n
+.It single-character-BRE duplication Ta * \e{ Ns Em m Ns , Ns Em n Ns \e}
+.It concatenation Ta
+.It anchoring Ta ^ $
+.El
+.Ss BRE Expression Anchoring
 A BRE can be limited to matching strings that begin or end a line; this is
-called \fIanchoring\fR. The circumflex and dollar sign special characters will
-be considered BRE anchors in the following contexts:
-.RS +4
-.TP
-1.
-A circumflex \fB(\fR \fB^\fR \fB)\fR is an anchor when used as the first
-character of an entire BRE. The implementation may treat circumflex as an
-anchor when used as the first character of a subexpression. The circumflex will
-anchor the expression to the beginning of a string; only sequences starting at
-the first character of a string will be matched by the BRE. For example, the
-BRE ^ab matches \fBab\fR in the string \fBabcdef,\fR but fails to match in the
-string \fBcdefab\fR. A portable BRE must escape a leading circumflex in a
-subexpression to match a literal circumflex.
-.RE
-.RS +4
-.TP
-2.
-A dollar sign \fB(\fR \fB$\fR \fB)\fR is an anchor when used as the last
-character of an entire BRE. The implementation may treat a dollar sign as an
-anchor when used as the last character of a subexpression. The dollar sign will
-anchor the expression to the end of the string being matched; the dollar sign
-can be said to match the end-of-string following the last character.
-.RE
-.RS +4
-.TP
-3.
-A BRE anchored by both \fB^\fR and \fB$\fR matches only an entire string.
-For example, the BRE \fB^abcdef$\fR matches strings consisting only of
-\fBabcdef\fR.
-.RE
-.RS +4
-.TP
-4.
-\fB^\fR and \fB$\fR are not special in subexpressions.
-.RE
-.sp
-.LP
+called
+.Em anchoring .
+The circumflex and dollar sign special characters will be considered BRE anchors
+in the following contexts:
+.Bl -enum
+.It
+A circumflex
+.Pq Qq ^
+is an anchor when used as the first character of an entire BRE.
+The implementation may treat circumflex as an anchor when used as the first
+character of a subexpression.
+The circumflex will anchor the expression to the beginning of a string;
+only sequences starting at the first character of a string will be matched by
+the BRE.
+For example, the BRE
+.Qq ^ab
+matches
+.Qq ab
+in the string
+.Qq abcdef ,
+but fails to match in the string
+.Qq cdefab .
+A portable BRE must escape a leading circumflex in a subexpression to match a
+literal circumflex.
+.It
+A dollar sign
+.Pq Qq $
+is an anchor when used as the last character of an entire BRE.
+The implementation may treat a dollar sign as an anchor when used as the last
+character of a subexpression.
+The dollar sign will anchor the expression to the end of the string being
+matched; the dollar sign can be said to match the end-of-string following the
+last character.
+.It
+A BRE anchored by both
+.Qq ^
+and
+.Qq $
+matches only an entire string.
+For example, the BRE
+^abcdef$
+matches strings consisting only of
+.Qq abcdef .
+.It
+.Qq ^
+and
+.Qq $
+are not special in subexpressions.
+.El
+.Pp
 Note: The Solaris implementation does not support anchoring in BRE
 subexpressions.
-.SH EXTENDED REGULAR EXPRESSIONS
-.LP
-The rules specified for BREs apply to Extended Regular Expressions (EREs) with
-the following exceptions:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The characters \fB|\fR, \fB+\fR, and \fB?\fR have special meaning, as defined
-below.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The \fB{\fR and \fB}\fR characters, when used as the duplication operator, are
-not preceded by backslashes. The constructs \fB\e{\fR and \fB\e}\fR simply
-match the characters \fB{\fR and \fB}\fR, respectively.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Sh EXTENDED REGULAR EXPRESSIONS
+The rules specified for BREs apply to Extended Regular Expressions
+.Pq EREs
+with the following exceptions:
+.Bl -bullet
+.It
+The characters
+.Qq | ,
+.Qq + ,
+and
+.Qq \&?
+have special meaning, as defined below.
+.It
+The
+.Qq {
+and
+.Qq }
+characters, when used as the duplication operator, are not preceded by
+backslashes.
+The constructs
+.Qq \e{
+and
+.Qq \e}
+simply match the characters
+.Qq {
+and
+.Qq }, respectively.
+.It
 The back reference operator is not supported.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Anchoring (\fB^$\fR) is supported in subexpressions.
-.RE
-.SS "EREs Matching a Single Character"
-.LP
+.It
+Anchoring
+.Pq Qq ^$
+is supported in subexpressions.
+.El
+.Ss EREs Matching a Single Character
 An ERE ordinary character, a special character preceded by a backslash, or a
-period matches a single character. A bracket expression matches a single
-character or a single collating element. An \fIERE\fR \fImatching\fR \fIa\fR
-\fIsingle\fR \fIcharacter\fR enclosed in parentheses matches the same as the
-ERE without parentheses would have matched.
-.SS "ERE Ordinary Characters"
-.LP
-An \fIordinary character\fR is an ERE that matches itself. An ordinary
-character is any character in the supported character set, except for the ERE
-special characters listed in \fBERE\fR \fBSpecial\fR \fBCharacters\fR below.
-The interpretation of an ordinary character preceded by a backslash (\fB\e\fR)
+period matches a single character.
+A bracket expression matches a single character or a single collating element.
+An
+.Em ERE matching a single character
+enclosed in parentheses matches the same as the ERE without parentheses would
+have matched.
+.Ss ERE Ordinary Characters
+An
+.Em ordinary character
+is an ERE that matches itself.
+An ordinary character is any character in the supported character set, except
+for the ERE special characters listed in
+.Sx ERE Special Characters
+below.
+The interpretation of an ordinary character preceded by a backslash
+.Pq Qq \&\e
 is undefined.
-.SS "ERE Special Characters"
-.LP
-An \fIERE\fR \fIspecial\fR \fIcharacter\fR has special properties in certain
-contexts. Outside those contexts, or when preceded by a backslash, such a
-character is an ERE that matches the special character itself. The extended
-regular expression special characters and the contexts in which they have their
-special meaning are:
-.sp
-.ne 2
-.na
-\fB\&. [ \e (\fR
-.ad
-.RS 14n
+.Ss ERE Special Characters
+An
+.Em ERE special character
+has special properties in certain contexts.
+Outside those contexts, or when preceded by a backslash, such a character is an
+ERE that matches the special character itself.
+The extended regular expression special characters and the contexts in which
+they have their special meaning are:
+.Bl -tag -width Ds
+.It Sy \&. \&[ \&\e \&(
 The period, left-bracket, backslash, and left-parenthesis are special except
-when used in a bracket expression (see \fBRE Bracket Expression\fR, above).
+when used in a bracket expression
+.Po see
+.Sx RE Bracket Expression ,
+above
+.Pc .
 Outside a bracket expression, a left-parenthesis immediately followed by a
 right-parenthesis produces undefined results.
-.RE
-
-.sp
-.ne 2
-.na
-\fB)\fR
-.ad
-.RS 14n
+.It Sy \&)
 The right-parenthesis is special when matched with a preceding
 left-parenthesis, both outside a bracket expression.
-.RE
-
-.sp
-.ne 2
-.na
-\fB* + ? {\fR
-.ad
-.RS 14n
+.It Sy * + \&? {
 The asterisk, plus-sign, question-mark, and left-brace are special except when
-used in a bracket expression (see \fBRE Bracket Expression\fR, above). Any of
-the following uses produce undefined results:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+used in a bracket expression
+.Po see
+.Sx RE Bracket Expression ,
+above
+.Pc .
+Any of the following uses produce undefined results:
+.Bl -bullet
+.It
 if these characters appear first in an ERE, or immediately following a
 vertical-line, circumflex or left-parenthesis
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 if a left-brace is not part of a valid interval expression.
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB|\fR
-.ad
-.RS 14n
-The vertical-line is special except when used in a bracket expression (see
-\fBRE Bracket Expression\fR, above). A vertical-line appearing first or last in
-an ERE, or immediately following a vertical-line or a left-parenthesis, or
-immediately preceding a right-parenthesis, produces undefined results.
-.RE
-
-.sp
-.ne 2
-.na
-\fB^\fR
-.ad
-.RS 14n
+.El
+.It Sy \&|
+The vertical-line is special except when used in a bracket expression
+.Po see
+.Sx RE Bracket Expression ,
+above
+.Pc .
+A vertical-line appearing first or last in an ERE, or immediately following a
+vertical-line or a left-parenthesis, or immediately preceding a
+right-parenthesis, produces undefined results.
+.It Sy ^
 The circumflex is special when used:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-as an anchor (see \fBERE Expression Anchoring\fR, below).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-as the first character of a bracket expression (see \fBRE Bracket
-Expression\fR, above).
-.RE
-.RE
-
-.sp
-.ne 2
-.na
-\fB$\fR
-.ad
-.RS 14n
+.Bl -bullet
+.It
+as an anchor
+.Po see
+.Sx ERE Expression Anchoring ,
+below
+.Pc .
+.It
+as the first character of a bracket expression
+.Po see
+.Sx RE Bracket Expression ,
+above
+.Pc .
+.El
+.It Sy $
 The dollar sign is special when used as an anchor.
-.RE
-
-.SS "Periods in EREs"
-.LP
-A period (\fB\&.\fR), when used outside a bracket expression, is an ERE that
-matches any character in the supported character set except NUL.
-.SS "ERE Bracket Expression"
-.LP
+.El
+.Ss Periods in EREs
+A period
+.Pq Qq \&. ,
+when used outside a bracket expression, is an ERE that matches any character in
+the supported character set except NUL.
+.Ss ERE Bracket Expression
 The rules for ERE Bracket Expressions are the same as for Basic Regular
-Expressions; see \fBRE Bracket Expression\fR, above).
-.SS "EREs Matching Multiple Characters"
-.LP
+Expressions; see
+.Sx RE Bracket Expression ,
+above.
+.Ss EREs Matching Multiple Characters
 The following rules will be used to construct EREs matching multiple characters
 from EREs matching a single character:
-.RS +4
-.TP
-1.
-A \fIconcatenation\fR \fIof\fR \fIEREs\fR matches the concatenation of the
-character sequences matched by each component of the ERE. A concatenation of
-EREs enclosed in parentheses matches whatever the concatenation without the
-parentheses matches. For example, both the ERE \fBcd\fR and the ERE \fB(cd)\fR
-are matched by the third and fourth character of the string \fBabcdefabcdef\fR.
-.RE
-.RS +4
-.TP
-2.
+.Bl -enum
+.It
+A
+.Em concatenation of EREs
+matches the concatenation of the character sequences matched by each component
+of the ERE.
+A concatenation of EREs enclosed in parentheses matches whatever the
+concatenation without the parentheses matches.
+For example, both the ERE
+.Qq cd
+and the ERE
+.Qq (cd)
+are matched by the third and fourth character of the string
+.Qq abcdefabcdef .
+.It
 When an ERE matching a single character or an ERE enclosed in parentheses is
-followed by the special character plus-sign (+), together with that plus-sign
-it matches what one or more consecutive occurrences of the ERE would match. For
-example, the ERE \fBb+(bc)\fR matches the fourth to seventh characters in the
-string \fBacabbbcde;\fR \fB[ab]\fR + and \fB[ab][ab]*\fR are equivalent.
-.RE
-.RS +4
-.TP
-3.
+followed by the special character plus-sign
+.Pq Qq + ,
+together with that plus-sign it matches what one or more consecutive occurrences
+of the ERE would match.
+For example, the ERE
+.Qq b+(bc)
+matches the fourth to seventh characters in the string
+.Qq acabbbcde ;
+.Qq [ab]+
+and
+.Qq [ab][ab]*
+are equivalent.
+.It
 When an ERE matching a single character or an ERE enclosed in parentheses is
-followed by the special character asterisk (\fB*\fR), together with that
-asterisk it matches what zero or more consecutive occurrences of the ERE would
-match. For example, the ERE \fBb*c\fR matches the first character in the string
-\fBcabbbcde,\fR and the ERE \fBb*cd\fR matches the third to seventh characters
-in the string \fBcabbbcdebbbbbbcdbc\fR. And, \fB[ab]*\fR and \fB[ab][ab]\fR are
-equivalent when matching the string \fBab\fR.
-.RE
-.RS +4
-.TP
-4.
+followed by the special character asterisk
+.Pq Qq * ,
+together with that asterisk it matches what zero or more consecutive occurrences
+of the ERE would match.
+For example, the ERE
+.Qq b*c
+matches the first character in the string
+.Qq cabbbcde ,
+and the ERE
+.Qq b*cd
+matches the third to seventh characters in the string
+.Qq cabbbcdebbbbbbcdbc .
+And,
+.Qq [ab]*
+and
+.Qq [ab][ab]
+are equivalent when matching the string
+.Qq ab .
+.It
 When an ERE matching a single character or an ERE enclosed in parentheses is
-followed by the special character question-mark (\fB?\fR), together with that
-question-mark it matches what zero or one consecutive occurrences of the ERE
-would match. For example, the ERE \fBb?c\fR matches the second character in the
-string \fBacabbbcde\fR.
-.RE
-.RS +4
-.TP
-5.
+followed by the special character question-mark
+.Pq Qq \&? ,
+together with that question-mark it matches what zero or one consecutive
+occurrences of the ERE would match.
+For example, the ERE
+.Qq b?c
+matches the second character in the string
+.Qq acabbbcde .
+.It
 When an ERE matching a single character or an ERE enclosed in parentheses is
-followed by an \fIinterval\fR \fIexpression\fR of the format {\fIm\fR},
-{\fIm\fR,} or {\fIm\fR,\fIn\fR}, together with that interval expression it
-matches what repeated consecutive occurrences of the ERE would match. The
-values of \fIm\fR and \fIn\fR will be decimal integers in the range 0 \(<=
-\fIm\fR \(<= \fIn\fR \(<= \fB{RE_DUP_MAX}\fR, where \fIm\fR specifies the exact
-or minimum number of occurrences and \fIn\fR specifies the maximum number of
-occurrences. The expression {\fIm\fR} matches exactly \fIm\fR occurrences of
-the preceding ERE, {\fIm\fR,} matches at least \fIm\fR occurrences and
-{\fIm\fR,\fIn\fR} matches any number of occurrences between \fIm\fR and
-\fIn\fR, inclusive.
-.RE
-.sp
-.LP
-For example, in the string \fBabababccccccd\fR the ERE c{3} is matched by
-characters seven to nine and the ERE (ab){2,} is matched by characters one to
-six.
-.sp
-.LP
-The behavior of multiple adjacent duplication symbols \fB(\fR+\fB,\fR \fB*\fR,
-\fB?\fR and intervals) produces undefined results.
-.SS "ERE Alternation"
-.LP
-Two EREs separated by the special character vertical-line (|) match a string
-that is matched by either. For example, the ERE a((bc)|d) matches the string
-abc and the string ad. Single characters, or expressions matching single
-characters, separated by the vertical bar and enclosed in parentheses, will be
-treated as an ERE matching a single character.
-.SS "ERE Precedence"
-.LP
+followed by an
+.Em interval expression
+of the format
+.Qq { Ns Em m Ns } ,
+.Qq { Ns Em m Ns ,}
+or
+.Qq { Ns Em m Ns , Ns Em n Ns } ,
+together with that interval expression it matches what repeated consecutive
+occurrences of the ERE would match.
+The values of
+.Em m
+and
+.Em n
+will be decimal integers in the range 0 <=
+.Em m
+<=
+.Em n
+<=
+.Dv RE_DUP_MAX ,
+where
+.Em m
+specifies the exact or minimum number of occurrences and
+.Em n
+specifies the maximum number of occurrences.
+The expression
+.Qq { Ns Em m Ns }
+matches exactly
+.Em m
+occurrences of the preceding ERE,
+.Qq { Ns Em m Ns ,}
+matches at least
+.Em m
+occurrences and
+.Qq { Ns m Ns , Ns Em n Ns }
+matches any number of occurrences between
+.Em m
+and
+.Em n ,
+inclusive.
+.El
+.Pp
+For example, in the string
+.Qq abababccccccd
+the ERE
+.Qq c{3}
+is matched by characters seven to nine and the ERE
+.Qq (ab){2,}
+is matched by characters one to six.
+.Pp
+The behavior of multiple adjacent duplication symbols
+.Po
+.Qq + ,
+.Qq * ,
+.Qq \&?
+and intervals
+.Pc
+produces undefined results.
+.Ss ERE Alternation
+Two EREs separated by the special character vertical-line
+.Pq Qq |
+match a string that is matched by either.
+For example, the ERE
+.Qq a((bc)|d)
+matches the string
+.Qq abc
+and the string
+.Qq ad .
+Single characters, or expressions matching single characters, separated by the
+vertical bar and enclosed in parentheses, will be treated as an ERE matching a
+single character.
+.Ss ERE Precedence
 The order of precedence will be as shown in the following table:
-.sp
-
-.sp
-.TS
-box;
-l l
-l l .
-\fBERE Precedence (from high to low)\fR
-collation-related bracket symbols	[= =]  [: :]  [. .]
-escaped characters	\e<\fIspecial character\fR>
-bracket expression	[ ]
-grouping	( )
-single-character-ERE duplication	* + ? {\fIm\fR,\fIn\fR}
-concatenation	
-anchoring	^  $
-alternation	|
-.TE
-
-.sp
-.LP
-For example, the ERE \fBabba\||\|cde\fR matches either the string \fBabba\fR or
-the string \fBcde\fR (rather than the string \fBabbade\fR or \fBabbcde\fR,
-because concatenation has a higher order of precedence than alternation).
-.SS "ERE Expression Anchoring"
-.LP
+.Bl -column "ERE Precedence (from high to low)" ""
+.It Sy ERE Precedence (from high to low) Ta
+.It collation-related bracket symbols Ta [= =]  [: :]  [. .]
+.It escaped characters Ta \e< Ns Em special character Ns >
+.It bracket expression Ta \&[ \&]
+.It grouping Ta \&( \&)
+.It single-character-ERE duplication Ta * + \&? { Ns Em m Ns , Ns Em n Ns}
+.It concatenation Ta
+.It anchoring Ta ^  $
+.It alternation Ta |
+.El
+.Pp
+For example, the ERE
+.Qq abba|cde
+matches either the string
+.Qq abba
+or the string
+.Qq cde
+.Po rather than the string
+.Qq abbade
+or
+.Qq abbcde ,
+because concatenation has a higher order of precedence than alternation
+.Pc .
+.Ss ERE Expression Anchoring
 An ERE can be limited to matching strings that begin or end a line; this is
-called \fIanchoring\fR. The circumflex and dollar sign special characters are
-considered ERE anchors when used anywhere outside a bracket expression. This
-has the following effects:
-.RS +4
-.TP
-1.
-A circumflex (^) outside a bracket expression anchors the expression or
-subexpression it begins to the beginning of a string; such an expression or
-subexpression can match only a sequence starting at the first character of a
-string. For example, the EREs ^ab and (^ab) match ab in the string abcdef, but
-fail to match in the string cdefab, and the ERE a^b is valid, but can never
-match because the \fBa\fR prevents the expression ^b from matching starting at
-the first character.
-.RE
-.RS +4
-.TP
-2.
-A dollar sign \fB(\fR \fB$\fR \fB)\fR outside a bracket expression anchors
-the expression or subexpression it ends to the end of a string; such an
-expression or subexpression can match only a sequence ending at the last
-character of a string. For example, the EREs ef$ and (ef$) match ef in the
-string abcdef, but fail to match in the string cdefab, and the ERE e$f is
-valid, but can never match because the \fBf\fR prevents the expression e$ from
-matching ending at the last character.
-.RE
-.SH SEE ALSO
-.LP
-\fBlocaledef\fR(1), \fBregcomp\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBlocale\fR(5), \fBregexp\fR(5)
+called
+.Em anchoring .
+The circumflex and dollar sign special characters are considered ERE anchors
+when used anywhere outside a bracket expression.
+This has the following effects:
+.Bl -enum
+.It
+A circumflex
+.Pq Qq ^
+outside a bracket expression anchors the expression or subexpression it begins
+to the beginning of a string; such an expression or subexpression can match only
+a sequence starting at the first character of a string.
+For example, the EREs
+.Qq ^ab
+and
+.Qq (^ab)
+match
+.Qq ab
+in the string
+.Qq abcdef ,
+but fail to match in the string
+.Qq cdefab ,
+and the ERE
+.Qq a^b
+is valid, but can never match because the
+.Qq a
+prevents the expression
+.Qq ^b
+from matching starting at the first character.
+.It
+A dollar sign
+.Pq Qq $
+outside a bracket expression anchors the expression or subexpression it ends to
+the end of a string; such an expression or subexpression can match only a
+sequence ending at the last character of a string.
+For example, the EREs
+.Qq ef$
+and
+.Qq (ef$)
+match
+.Qq ef
+in the string
+.Qq abcdef ,
+but fail to match in the string
+.Qq cdefab ,
+and the ERE
+.Qq e$f
+is valid, but can never match because the
+.Qq f
+prevents the expression
+.Qq e$
+from matching ending at the last character.
+.El
+.Sh SEE ALSO
+.Xr localedef 1 ,
+.Xr regcomp 3C ,
+.Xr attributes 5 ,
+.Xr environ 5 ,
+.Xr locale 5 ,
+.Xr regexp 5

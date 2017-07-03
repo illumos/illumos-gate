@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ADD_DRV 1M "Dec 1, 2005"
+.TH ADD_DRV 1M "May 13, 2017"
 .SH NAME
 add_drv \- add a new device driver to the system
 .SH SYNOPSIS
@@ -15,7 +15,6 @@ add_drv \- add a new device driver to the system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBadd_drv\fR command is used to inform the system about newly installed
 device drivers.
@@ -42,7 +41,6 @@ In some cases, adding a new driver may require a reconfiguration boot. See the
 Aliases might require quoting (with double-quotes) if they contain numbers. See
 \fBEXAMPLES\fR.
 .SS "The \fB/etc/minor_perm\fR File"
-.sp
 .LP
 \fBadd_drv\fR and \fBupdate_drv\fR(1M) read the \fB/etc/minor_perm\fR file to
 obtain permission information. The permission specified is applied to matching
@@ -87,9 +85,9 @@ are set to \fB0600\fR permission, owned by \fBuucp\fR, with group \fBuucp\fR.
 In the third line the \fBkmem\fR device exported by the \fBmm\fR driver is set
 to \fB0640\fR permission, owned by \fBroot\fR, with group \fBbin\fR.
 .SS "Running \fBadd_drv\fR from a \fBpostinstall\fR Script"
-.sp
 .LP
-When running \fBadd_drv\fR from within the context of a package's postinstall
+When running \fBadd_drv\fR from within the context of a legacy SVR4
+package's postinstall
 script, you must consider whether the package is being added to a system image
 or to a running system. When a package is being installed on a system image,
 the \fBBASEDIR\fR variable refers to the image's base directory. In this
@@ -137,16 +135,14 @@ fi
 .LP
 The \fB-b\fR option is described below.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-b\fR \fIbasedir\fR\fR
 .ad
 .RS 26n
 Installs the driver on the system with a root directory of \fIbasedir\fR rather
-than installing on the system executing \fBadd_drv\fR. This option is typically
-used in package post-installation scripts when the package is not being
-installed on the system executing the \fBpkgadd\fR command. The system using
+than installing on the system executing \fBadd_drv\fR. This option was typically
+used in package post-installation scripts. The system using
 \fIbasedir\fR as its root directory must reboot to complete the driver
 installation.
 .LP
@@ -430,11 +426,9 @@ example# add_drv -i '"pci10c5,25"' smc
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 \fBadd_drv\fR returns \fB0\fR on success and \fB1\fR on failure.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv\fR\fR
@@ -585,7 +579,6 @@ device privileges
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBboot\fR(1M), \fBchmod\fR(1), \fBdevfsadm\fR(1M), \fBkernel\fR(1M),
 \fBmodinfo\fR(1M), \fBrem_drv\fR(1M), \fBupdate_drv\fR(1M),
@@ -595,7 +588,6 @@ device privileges
 .LP
 \fI\fR
 .SH NOTES
-.sp
 .LP
 It is possible to add a driver for a device already being managed by a
 different driver, where the driver being added appears in the device's
@@ -639,7 +631,6 @@ alias is optional when used from the command line. However, when using
 \fBadd_drv\fR from packaging scripts, you should continue to use double quotes
 to specify an alias.
 .SH BUGS
-.sp
 .LP
 Previous versions of \fBadd_drv\fR accepted a pathname for \fIdevice_driver\fR.
 This feature is no longer supported and results in failure.

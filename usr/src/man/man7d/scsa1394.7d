@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSA1394 7D "Mar 2, 2007"
+.TH SCSA1394 7D "May 13, 2017"
 .SH NAME
 scsa1394 \- SCSI to 1394 bridge driver
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ scsa1394 \- SCSI to 1394 bridge driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBscsa1394\fR driver is a 1394 target and an SCSA HBA driver that supports
 1394 mass storage devices compliant with the \fISerial Bus Protocol 2
@@ -41,11 +40,10 @@ In the current release, however, only mass storage devices with a removable bit
 INQUIRY data.) See SCSI specifications T10/995D Revision 11a, T10/1236-D
 Revision 20 or T10/1416-D Revision 23 for more information. However, for
 backward compatibility, all 1394 mass storage devices can still be managed by
-\fBrmformat\fR(1). With or without a volume  manager,  you can mount, eject,
-hot remove and hot insert a  1394 mass storage device as the following sections
+\fBrmformat\fR(1). With or without a volume manager, you can mount, eject,
+hot remove and hot insert a 1394 mass storage device as the following sections
 explain.
 .SH USING VOLUME MANAGEMENT
-.sp
 .LP
 Mass storage devices are managed by a volume manager. Software that manages
 removable media creates a device nickname that can be listed with
@@ -69,12 +67,7 @@ the USB device, use \fBeject\fR(1) to unmount the file system.
 You can disable the automatic mounting and unmounting of removable devices by
 inserting a entry for a removable device in \fB/etc/vfstab\fR. In this entry,
 you must set the \fBmount at boot\fR field to \fBno\fR. See \fBvfstab\fR(4).
-See the \fISystem Administration Guide, Volume I\fR and \fISolaris Common
-Desktop Environment: User's Guide\fR for details on how to manage a removable
-device with CDE and Removable Media Manager. See \fBdtfile.1X\fR under CDE for
-information on how to use Removable Media Manager.
 .SH USING \fBmount\fR AND \fBumount\fR
-.sp
 .LP
 Use \fBmount\fR(1M) to explicitly mount the device and \fBumount\fR(1M) to
 unmount the device. Use \fBeject\fR(1) to eject the media. After you have
@@ -86,26 +79,18 @@ Removing the storage device while it is being accessed or mounted fails with a
 console warning. To hot remove the storage device from the system, unmount the
 file system, then kill all applications accessing the device. Next, hot remove
 the device. A storage device can be hot inserted at any time.
-.sp
-.LP
-For a comprehensive listing of (non-bootable) 1394 mass-storage devices that
-are compatible with this driver, see \fBwww.sun.com/io\fR.
 .SH DEVICE SPECIAL FILES
-.sp
 .LP
 Block special file names are located in \fB/dev/dsk\fR. Raw file names are
 located in \fB/dev/rdsk\fR. Input/output requests to the devices must follow
 the same restrictions as those for SCSI disks. Refer to \fBsd\fR(7D).
 .SH IOCTLS
-.sp
 .LP
 Refer to \fBcdio\fR(7I) and \fBdkio\fR(7I).
 .SH ERRORS
-.sp
 .LP
 Refer to \fBsd\fR(7D).
 .SH FILES
-.sp
 .LP
 The device special files for the 1394 mass storage device are created like
 those for a SCSI disk. Refer to \fBsd\fR(7D).
@@ -171,7 +156,6 @@ is a generic removable media device.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -187,11 +171,10 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcdrw\fR(1), \fBeject\fR(1), \fBrmformat\fR(1), \fBrmmount\fR(1),
 \fBcfgadm_scsi\fR(1M), \fBfdisk\fR(1M), \fBmount\fR(1M), \fBumount\fR(1M),
-\fBdtfile.1X\fR (in CDE man pages), \fBscsi\fR(4), \fBvfstab\fR(4),
+\fBscsi\fR(4), \fBvfstab\fR(4),
 \fBattributes\fR(5), \fBhci1394\fR(7D), \fBsd\fR(7D), \fBpcfs\fR(7FS),
 \fBcdio\fR(7I), \fBdkio\fR(7I)
 .sp
@@ -212,9 +195,3 @@ SCSI Specification\fIT10/1236-D Revision 20\fR \(em July 2001
 .sp
 .LP
 SCSI Specification\fIT10/1416-D Revision 23\fR\(em May 2005
-.sp
-.LP
-\fISolaris Common Desktop Environment: User's Guide\fR
-.sp
-.LP
-\fIhttp://www.sun.com/io\fR

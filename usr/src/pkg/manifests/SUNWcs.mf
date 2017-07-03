@@ -923,7 +923,6 @@ $(i386_ONLY)file path=usr/kernel/sys/sysacct group=sys mode=0755
 file path=usr/kvm/README group=sys
 file path=usr/lib/$(ARCH64)/libshare.so.1
 file path=usr/lib/audit/audit_record_attr mode=0444
-file path=usr/lib/calprog mode=0555
 file path=usr/lib/class/FX/FXdispadmin mode=0555
 file path=usr/lib/class/FX/FXpriocntl mode=0555
 file path=usr/lib/class/IA/IAdispadmin mode=0555

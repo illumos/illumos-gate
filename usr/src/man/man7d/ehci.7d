@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EHCI 7D "Apr 13, 2006"
+.TH EHCI 7D "May 13, 2017"
 .SH NAME
 ehci \- Enhanced host controller driver
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ ehci \- Enhanced host controller driver
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBehci\fR driver is a USBA (Solaris USB Architecture) compliant nexus
 driver that supports the Enhanced Host Controller Interface Specification 2.0,
@@ -26,8 +25,8 @@ EHCI (Enhanced Host Controller Interface) that is used for all high-speed
 communications to high-speed-mode devices.
 .sp
 .LP
-All USB 2.0 devices  connected to the root ports of the USB 2.0  host
-controller and all devices connected to a high- speed-mode hub should be routed
+All USB 2.0 devices connected to the root ports of the USB 2.0 host
+controller and all devices connected to a high-speed-mode hub should be routed
 to the EHCI host controller.
 .sp
 .LP
@@ -36,10 +35,9 @@ controller should be routed to the companion USB 1.1 host controllers. (OHCI or
 UHCI host controller).
 .sp
 .LP
-The \fBehci\fR supports bulk, interrupt, control  and  iso chronous transfers
+The \fBehci\fR supports bulk, interrupt, control and iso chronous transfers
 (on USB1.\fIx\fR devices behind a USB2.0 hub).
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/ehci\fR\fR
@@ -76,7 +74,6 @@ Driver configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -92,7 +89,6 @@ Architecture	SPARC, x86, PCI-based systems
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBadd_drv\fR(1M), \fBprtconf\fR(1M), \fBrem_drv\fR(1M), \fBupdate_drv\fR(1M),
 \fBattributes\fR(5), \fBhubd\fR(7D), \fBuhci\fR(7D), \fBohci\fR(7D),
@@ -114,15 +110,8 @@ Architecture	SPARC, x86, PCI-based systems
 \fIhttp://www.usb.org\fR
 .sp
 .LP
-\fIhttp://www.sun.com/io\fR
-.sp
-.LP
-\fIhttp://www.sun.com/bigadmin/hcl\fR
-.sp
-.LP
 \fIhttp://www.intel.com/technology/usb/ehcispec.htm\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 In addition to being logged, the following messages may appear on the system
 console. All messages are formatted in the following manner:
@@ -212,7 +201,7 @@ comment out a property in ehci.conf. (x86 only).
 .ad
 .sp .6
 .RS 4n
-The driver is unable to take control of the EHCI hardware          from the
+The driver is unable to take control of the EHCI hardware from the
 system's BIOS and aborts the attach. High speed (USB 2.0) support is disabled.
 In this case, all USB devices run at full/low speed. Contact your system vendor
 or your system administror for possible changes in BIOS settings. You can
@@ -300,13 +289,11 @@ Note -
 Due to recently discovered incompatibilities with this USB controller,
 USB2.\fIx\fR transfer support has been disabled. However, this device continues
 to function as a USB1.\fIx\fR controller. Information on enabling USB2.x
-support is provided in this man page. Please refer to \fIwww.sun.com/io\fR for
-Solaris Ready products and to \fIwww.sun.com/bigadmin/hcl\fR for additional
-compatible USB products.
+support is provided in this man page.
 .LP
 VIA chips may not be compatible with this driver. To bind \fBehci\fR
 specifically to the chip and eliminate the warnings, and to enable USB2.x
-suppport, a new, more specific driver alias  (refer to \fBadd_drv\fR(1M) and
+support, a new, more specific driver alias (refer to \fBadd_drv\fR(1M) and
 \fBupdate_drv\fR(1M)) must be specified for \fBehci\fR. By default, the
 \fBehci\fR alias is 'pciclass,0c0320.' The compatible names in the
 \fBprtconf\fR(1M) output provides additional aliases. For example:

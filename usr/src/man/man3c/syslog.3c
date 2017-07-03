@@ -7,7 +7,7 @@
 .\" are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical
 .\" and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.TH SYSLOG 3C "Mar 16, 2009"
+.TH SYSLOG 3C "May 13, 2017"
 .SH NAME
 syslog, openlog, closelog, setlogmask \- control system log
 .SH SYNOPSIS
@@ -45,7 +45,7 @@ timestamp, a tag string, and optionally the process ID.
 .sp
 .LP
 The message body is generated from the \fImessage\fR and following arguments in
-the same manner as if these were arguments to \fBprintf\fR(3UCB), except that
+the same manner as if these were arguments to \fBprintf\fR(3C), except that
 occurrences of \fB%m\fR in the format string pointed to by the \fImessage\fR
 argument are replaced by the error message string associated with the current
 value of \fBerrno\fR.  A trailing \fBNEWLINE\fR character is added if needed.
@@ -461,7 +461,7 @@ call to \fBsyslog\fR:
 .LP
 A locally-written utility could use the following call to \fBsyslog()\fR to log
 a message at priority \fBLOG_INFO\fR to be treated by \fBsyslogd\fR(1M) as
-other messages to the facility  \fBLOG_LOCAL2\fR are:
+other messages to the facility \fBLOG_LOCAL2\fR are:
 
 .sp
 .in +2
@@ -494,5 +494,5 @@ Standard	See \fBstandards\fR(5).
 .LP
 \fBat\fR(1), \fBcrontab\fR(1), \fBlogger\fR(1), \fBlogin\fR(1), \fBlpc\fR(1B),
 \fBlpr\fR(1B), \fBauditd\fR(1M), \fBcron\fR(1M), \fBgetty\fR(1M),
-\fBsu\fR(1M), \fBsyslogd\fR(1M), \fBprintf\fR(3UCB),
+\fBsu\fR(1M), \fBsyslogd\fR(1M), \fBprintf\fR(3C),
 \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5)
