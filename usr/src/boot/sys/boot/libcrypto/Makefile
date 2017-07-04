@@ -10,15 +10,14 @@
 #
 
 #
-# Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
 .KEEP_STATE:
 
 include $(SRC)/Makefile.master
 
-INSTDIRS = i386 efi
-SUBDIRS = libstand libficl libcrypto zfs $(INSTDIRS)
+SUBDIRS = $(MACH) $(MACH64)
 
 all	:=	TARGET = all
 clean	:=	TARGET = clean
@@ -27,15 +26,7 @@ install	:=	TARGET = install
 
 all clean clobber: $(SUBDIRS)
 
-#
-# The directories in INSTDIRS depend implicitly on SUBDIRS being built already.
-# We use .WAIT instead of explicit dependencies because we only want to make
-# the "install" target in INSTDIRS, not in SUBDIRS.
-#
-# If adding SUBDIRS which are not dependencies of INSTDIRS, "install: all"
-# rules should be added to the Makefiles in those directories.
-#
-install: all .WAIT $(INSTDIRS)
+install: all
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)

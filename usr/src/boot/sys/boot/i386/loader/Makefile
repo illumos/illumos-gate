@@ -98,6 +98,7 @@ LDFLAGS=	-static -Ttext 0x0
 # i386 standalone support library
 CPPFLAGS +=	-I.. -I../../../../lib/libstand
 LIBSTAND=	../../libstand/$(MACH)/libstand.a
+LIBCRYPTO=	../../libcrypto/$(MACH)/libcrypto.a
 
 # BTX components
 CPPFLAGS +=	-I../btx/lib
@@ -135,8 +136,8 @@ FORTH +=	menu.rc
 
 # XXX crt0.o needs to be first for pxeboot(8) to work
 
-DPADD=	${LIBFICL} ${LIBZFSBOOT} ${LIBI386} ${LIBSTAND}
-LDADD=	${LIBFICL} ${LIBZFSBOOT} ${LIBI386} ${LIBSTAND}
+DPADD=	${LIBFICL} ${LIBZFSBOOT} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
+LDADD=	${LIBFICL} ${LIBZFSBOOT} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
 
 CLEANFILES +=	machine x86
 

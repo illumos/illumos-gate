@@ -147,9 +147,11 @@ loader.bin: loader.sym
 		--output-target=$(EFI_TARGET) --subsystem efi-app loader.sym $@
 
 LIBEFI=		../../libefi/$(MACHINE)/libefi.a
+LIBCRYPTO=	../../../libcrypto/$(MACHINE)/libcrypto.a
 
-DPADD=		$(LIBFICL) $(LIBZFSBOOT) $(LIBEFI) $(LIBSTAND) $(LDSCRIPT)
-LDADD=		$(LIBFICL) $(LIBZFSBOOT) $(LIBEFI) $(LIBSTAND)
+DPADD=		$(LIBFICL) $(LIBZFSBOOT) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND) \
+		$(LDSCRIPT)
+LDADD=		$(LIBFICL) $(LIBZFSBOOT) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND)
 
 
 loader.sym:	$(OBJS) $(DPADD)
