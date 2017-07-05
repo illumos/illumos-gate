@@ -29,7 +29,6 @@
 # Copyright (c) 2014 by Delphix. All rights reserved.
 #
 
-format=ufs
 ALT_ROOT=
 EXTRACT_ARGS=
 compress=yes
@@ -51,18 +50,8 @@ usage() {
 # default platform is what we're running on
 PLATFORM=`uname -m`
 
-#
-# set path, but inherit /tmp/bfubin if owned by
-# same uid executing this process, which must be root.
-#
-if [ "`echo $PATH | cut -f 1 -d :`" = /tmp/bfubin ] && \
-    [ -O /tmp/bfubin ] ; then
-	export PATH=/tmp/bfubin
-	export GZIP_CMD=/tmp/bfubin/gzip
-else
-	export PATH=/usr/sbin:/usr/bin:/sbin
-	export GZIP_CMD=/usr/bin/gzip
-fi
+export PATH=/usr/sbin:/usr/bin:/sbin
+export GZIP_CMD=/usr/bin/gzip
 
 EXTRACT_FILELIST="/boot/solaris/bin/extract_boot_filelist"
 
@@ -91,19 +80,6 @@ do
         esac
 	shift
 done
-
-if [ -x /usr/bin/mkisofs -o -x /tmp/bfubin/mkisofs ] ; then
-	format=isofs
-fi
-
-#
-# mkisofs on s8 doesn't support functionality used by GRUB boot.
-# Use ufs format for boot archive instead.
-#
-release=`uname -r`
-if [ "$release" = "5.8" ]; then
-	format=ufs
-fi
 
 shift `expr $OPTIND - 1`
 
@@ -134,18 +110,10 @@ BOOT_ARCHIVE=platform/$PLATFORM/boot_archive
 BOOT_ARCHIVE_64=platform/$PLATFORM/$ARCH64/boot_archive
 
 if [ $PLATFORM = i86pc ] ; then
-	if [ ! -x "$ALT_ROOT"/boot/solaris/bin/symdef ]; then
-		# no dboot implies combined archives for example
-		# live-upgrade from s9 to s10u6 is multiboot-only
-		echo "Creating single archive at $ALT_ROOT/$BOOT_ARCHIVE"
-		SPLIT=no
-		compress=no
-	else
-		SPLIT=yes
-	fi
+	SPLIT=yes
 else			# must be sparc
 	SPLIT=no	# there's only 64-bit (sparcv9), so don't split
-	compress=no	
+	compress=no
 fi
 
 [ -x $GZIP_CMD ] || compress=no
@@ -300,91 +268,6 @@ function create_ufs
 	fi
 }
 
-#
-# The first argument can be:
-#
-# "both" - create an archive with both 32-bit and 64-bit binaries
-# "32-bit" - create an archive with only 32-bit binaries
-# "64-bit" - create an archive with only 64-bit binaries
-#
-function create_isofs
-{
-	which=$1
-	archive=$2
-
-	# should we exclude amd64 binaries?
-	if [ "$which" = "32-bit" ]; then
-		rdmnt="$rdmnt32"
-		errlog="$errlog32"
-		list="$list32"
-	elif [ "$which" = "64-bit" ]; then
-		rdmnt="$rdmnt64"
-		errlog="$errlog64"
-		list="$list64"
-	else
-		rdmnt="$rdmnt32"
-		errlog="$errlog32"
-		list="$list32"
-	fi
-
-	# create image directory seed with graft points
-	mkdir "$rdmnt"
-	files=
-	isocmd="mkisofs -quiet -graft-points -dlrDJN -relaxed-filenames"
-
-	if [ $ISA = sparc ] ; then
-		bb="$ALT_ROOT/platform/$PLATFORM/lib/fs/hsfs/bootblk"
-		isocmd="$isocmd -G \"$bb\""
-	fi
-
-	copy_files "$list"
-	isocmd="$isocmd \"$rdmnt\""
-	rm -f "$errlog"
-
-	#
-	# Check if gzip exists in /usr/bin, so we only try to run gzip
-	# on systems that have gzip. Then run gzip out of the patch to
-	# pick it up from bfubin or something like that if needed.
-	#
-	# If compress is set, the individual files in the archive are
-	# compressed, and the final compression will accomplish very
-	# little.  To save time, we skip the gzip in this case.
-	#
-	mkiso_ret=0
-
-	if [ $ISA = i386 ] &&[ $compress = no ] && [ -x $GZIP_CMD ]
-	then
-		ksh -c "$isocmd" 2> "$errlog" | \
-		    gzip > "${archive}-new"
-	else
-		ksh -c "$isocmd" 2> "$errlog" > "${archive}-new"
-	fi
-
-	if [ $? -ne 0 ]; then
-		cat "$errlog"
-		rm -f "${archive}-new" 2> /dev/null
-		rm -f "$errlog" 2> /dev/null
-		return
-	fi
-
-	dd_ret=0
-	if [ $ISA = sparc ] ; then
-		bb="$ALT_ROOT/platform/$PLATFORM/lib/fs/hsfs/bootblk"
-		dd if="$bb" of="${archive}-new" bs=1b oseek=1 count=15 \
-		    conv=notrunc conv=sync >> "$errlog" 2>&1
-		dd_ret=$?
-	fi
-
-	if [ -s "$errlog" ] || [ $dd_ret -ne 0 ] ; then
-		grep Error: "$errlog" >/dev/null 2>&1
-		if [ $? -eq 0 ] || [ $dd_ret -ne 0 ] ; then
-			cat "$errlog"
-			rm -f "${archive}-new"
-		fi
-	fi
-	rm -f "$errlog"
-}
-
 function create_archive
 {
 	which=$1
@@ -393,11 +276,7 @@ function create_archive
 
 	echo "updating $archive"
 
-	if [ "$format" = "ufs" ]; then
-		create_ufs "$which" "$archive" "$lofidev"
-	else
-		create_isofs "$which" "$archive"
-	fi
+	create_ufs "$which" "$archive" "$lofidev"
 
 	# sanity check the archive before moving it into place
 	#
@@ -484,14 +363,12 @@ do
 	if [ $SPLIT = no ]; then
 		print "$path"
 	elif [ -d "$path" ]; then
-		if [ $format = ufs ]; then
-			size=`ls -lLd "$path" | nawk '
-			    {print ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}'`
-			if [ `basename "$path"` != "amd64" ]; then
-				(( dirsize32 += size ))
-			fi
-			(( dirsize64 += size ))
+		size=`ls -lLd "$path" | nawk '
+		    {print ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}'`
+		if [ `basename "$path"` != "amd64" ]; then
+			(( dirsize32 += size ))
 		fi
+		(( dirsize64 += size ))
 	else
 		case `LC_MESSAGES=C /usr/bin/file -m /dev/null "$path" 2>/dev/null` in
 		*ELF\ 64-bit*)
@@ -508,36 +385,34 @@ do
 	fi
 done >"$list32"
 
-if [ $format = ufs ] ; then
-	# calculate image size
-	getsize
+# calculate image size
+getsize
 
-	# check to see if there is sufficient space in tmpfs 
-	#
-	tmp_free=`df -b /tmp | tail -1 | awk '{ printf ($2) }'`
-	(( tmp_free = tmp_free / 3 ))
-	if [ $SPLIT = yes ]; then
-		(( tmp_free = tmp_free / 2 ))
-	fi
+# check to see if there is sufficient space in tmpfs
+#
+tmp_free=`df -b /tmp | tail -1 | awk '{ printf ($2) }'`
+(( tmp_free = tmp_free / 3 ))
+if [ $SPLIT = yes ]; then
+	(( tmp_free = tmp_free / 2 ))
+fi
 
-	if [ $total_size -gt $tmp_free  ] ; then
-		# assumes we have enough scratch space on $ALT_ROOT
-		new_rddir="/$ALT_ROOT/var/tmp/create_ramdisk.$$.tmp"
-		rm -rf "$new_rddir"
-		mkdir "$new_rddir" || fatal_error \
-		    "Could not create temporary directory $new_rddir"
+if [ $total_size -gt $tmp_free  ] ; then
+	# assumes we have enough scratch space on $ALT_ROOT
+	new_rddir="/$ALT_ROOT/var/tmp/create_ramdisk.$$.tmp"
+	rm -rf "$new_rddir"
+	mkdir "$new_rddir" || fatal_error \
+	    "Could not create temporary directory $new_rddir"
 
-		# Save the file lists
-		mv "$list32" "$new_rddir"/
-		mv "$list64" "$new_rddir"/
-		list32="/$new_rddir/filelist.32"
-		list64="/$new_rddir/filelist.64"
+	# Save the file lists
+	mv "$list32" "$new_rddir"/
+	mv "$list64" "$new_rddir"/
+	list32="/$new_rddir/filelist.32"
+	list64="/$new_rddir/filelist.64"
 
-		# Remove the old $rddir and set the new value of rddir
-		rm -rf "$rddir"
-		rddir="$new_rddir"
-		new_rddir=
-	fi
+	# Remove the old $rddir and set the new value of rddir
+	rm -rf "$rddir"
+	rddir="$new_rddir"
+	new_rddir=
 fi
 
 rdfile32="$rddir/rd.file.32"
@@ -554,26 +429,20 @@ if [ $SPLIT = yes ]; then
 	# We can't run lofiadm commands in parallel, so we have to do
 	# them here.
 	#
-	if [ "$format" = "ufs" ]; then
-		mkfile ${size32}k "$rdfile32"
-		lofidev32=`lofiadm -a "$rdfile32"`
-		mkfile ${size64}k "$rdfile64"
-		lofidev64=`lofiadm -a "$rdfile64"`
-	fi
+	mkfile ${size32}k "$rdfile32"
+	lofidev32=`lofiadm -a "$rdfile32"`
+	mkfile ${size64}k "$rdfile64"
+	lofidev64=`lofiadm -a "$rdfile64"`
 	create_archive "32-bit" "$ALT_ROOT/$BOOT_ARCHIVE" $lofidev32 &
 	create_archive "64-bit" "$ALT_ROOT/$BOOT_ARCHIVE_64" $lofidev64
 	wait
-	if [ "$format" = "ufs" ]; then
-		lofiadm -d "$rdfile32"
-		lofiadm -d "$rdfile64"
-	fi
+	lofiadm -d "$rdfile32"
+	lofiadm -d "$rdfile64"
 else
-	if [ "$format" = "ufs" ]; then
-		mkfile ${total_size}k "$rdfile32"
-		lofidev32=`lofiadm -a "$rdfile32"`
-	fi
+	mkfile ${total_size}k "$rdfile32"
+	lofidev32=`lofiadm -a "$rdfile32"`
 	create_archive "both" "$ALT_ROOT/$BOOT_ARCHIVE" $lofidev32
-	[ "$format" = "ufs" ] && lofiadm -d "$rdfile32"
+	lofiadm -d "$rdfile32"
 fi
 if [ $ERROR = 1 ]; then
 	cleanup
