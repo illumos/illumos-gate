@@ -1093,12 +1093,11 @@ ace_list_to_aent(ace_list_t *list, aclent_t **aclentp, int *aclcnt,
 
 	if ((list->seen & (USER_OBJ | GROUP_OBJ | OTHER_OBJ)) !=
 	    (USER_OBJ | GROUP_OBJ | OTHER_OBJ)) {
-		error = ENOTSUP;
-		goto out;
+		return (ENOTSUP);
 	}
+
 	if ((! list->hasmask) && (list->numusers + list->numgroups > 0)) {
-		error = ENOTSUP;
-		goto out;
+		return (ENOTSUP);
 	}
 
 	resultcount = 3 + list->numusers + list->numgroups;
