@@ -696,9 +696,9 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
     char *my_fmri, parse_cmdln_fn parseit, CplMatchFn *match_fn)
 {
 	char		ibuf[IBUF_SIZE], holder[IBUF_SIZE];
-	char		*hptr, **thisargv, *ebuf;
+	char		*volatile hptr, **thisargv, *ebuf;
 	int		thisargc;
-	boolean_t	continue_in_progress = B_FALSE;
+	volatile boolean_t	continue_in_progress = B_FALSE;
 	char		*s;
 
 	(void) setjmp(env);
@@ -2296,7 +2296,7 @@ ipsec_convert_sl_to_sens(int doi, bslabel_t *sl, sadb_sens_t *sens)
  */
 void
 print_sens(FILE *file, char *prefix, const struct sadb_sens *sens,
-	boolean_t ignore_nss)
+    boolean_t ignore_nss)
 {
 	char *plabel;
 	char *hlabel;
