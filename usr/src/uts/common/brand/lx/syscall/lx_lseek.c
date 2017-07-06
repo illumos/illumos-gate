@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -46,6 +46,7 @@ long
 lx_lseek32(int fd, off32_t offset, int whence)
 {
 	offset_t res;
+	const uint32_t hival = (offset < 0) ? (uint32_t)-1 : 0;
 
 	/*
 	 * When returning EOVERFLOW for an offset which is outside the bounds
@@ -57,7 +58,7 @@ lx_lseek32(int fd, off32_t offset, int whence)
 	 * successful seek.
 	 */
 	ASSERT(get_udatamodel() == DATAMODEL_ILP32);
-	res = llseek32(fd, (uint32_t)offset, 0, whence);
+	res = llseek32(fd, (uint32_t)offset, hival, whence);
 	if (ttolwp(curthread)->lwp_errno == 0 && res > MAXOFF32_T) {
 		return (set_errno(EOVERFLOW));
 	}
