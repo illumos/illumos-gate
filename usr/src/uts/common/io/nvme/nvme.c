@@ -2191,6 +2191,7 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!ignoring namespace %d, unsupported block size %"PRIu64,
 		    nsid, (uint64_t)ns->ns_block_size);
+		ns->ns_ignore = B_TRUE;
 	} else {
 		ns->ns_ignore = B_FALSE;
 	}
