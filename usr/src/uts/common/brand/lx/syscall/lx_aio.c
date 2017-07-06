@@ -577,6 +577,15 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 	uint_t nworkers;
 	k_sigset_t hold_set;
 
+#ifdef _SYSCALL32_IMPL
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		uintptr32_t cid32;
+
+		if (copyin(ctxp, &cid32, sizeof (cid32)) != 0)
+			return (set_errno(EFAULT));
+		cid = (uintptr_t)cid32;
+	} else
+#endif
 	if (copyin(ctxp, &cid, sizeof (cid)) != 0)
 		return (set_errno(EFAULT));
 
@@ -767,6 +776,17 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 	/* Release our hold, worker thread refs keep ctx alive. */
 	lx_io_cp_rele(cp);
 
+#ifdef _SYSCALL32_IMPL
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		uintptr32_t cid32 = (uintptr32_t)cid;
+
+		if (copyout(&cid32, ctxp, sizeof (cid32)) != 0) {
+			/* Since we did a copyin above, this shouldn't fail */
+			(void) lx_io_destroy(cid);
+			return (set_errno(EFAULT));
+		}
+	} else
+#endif
 	if (copyout(&cid, ctxp, sizeof (cid)) != 0) {
 		/* Since we did a copyin above, this shouldn't fail */
 		(void) lx_io_destroy(cid);
@@ -779,7 +799,7 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 long
 lx_io_submit(lx_aio_context_t cid, const long nr, uintptr_t **bpp)
 {
-	int i = 0;
+	uint_t i = 0;
 	int err = 0;
 	const size_t sz = nr * sizeof (uintptr_t);
 	lx_io_ctx_t *cp;
@@ -809,6 +829,29 @@ lx_io_submit(lx_aio_context_t cid, const long nr, uintptr_t **bpp)
 		iocbpp = (lx_iocb_t **)alloca(sz);
 	}
 
+#ifdef _SYSCALL32_IMPL
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		uintptr32_t *iocbpp32;
+
+		if (copyin(bpp, iocbpp, nr * sizeof (uintptr32_t)) != 0) {
+			lx_io_cp_rele(cp);
+			err = EFAULT;
+			goto out;
+		}
+
+		/*
+		 * Zero-extend the 32-bit pointers to proper size.  This is
+		 * performed "in reverse" so it can be done in-place, rather
+		 * than with an additional translation copy.
+		 */
+		iocbpp32 = (uintptr32_t *)iocbpp;
+		i = nr;
+		do {
+			i--;
+			iocbpp[i] = (lx_iocb_t *)(uintptr_t)iocbpp32[i];
+		} while (i != 0);
+	} else
+#endif
 	if (copyin(bpp, iocbpp, nr * sizeof (uintptr_t)) != 0) {
 		lx_io_cp_rele(cp);
 		err = EFAULT;
@@ -873,12 +916,12 @@ lx_io_submit(lx_aio_context_t cid, const long nr, uintptr_t **bpp)
 
 		if (cb.lxiocb_op == LX_IOCB_CMD_PREAD &&
 		    (fp->f_flag & FREAD) == 0) {
-			err = EINVAL;
+			err = EBADF;
 			releasef(cb.lxiocb_fd);
 			break;
 		} else if (cb.lxiocb_op == LX_IOCB_CMD_PWRITE &&
 		    (fp->f_flag & FWRITE) == 0) {
-			err = EINVAL;
+			err = EBADF;
 			releasef(cb.lxiocb_fd);
 			break;
 		}
