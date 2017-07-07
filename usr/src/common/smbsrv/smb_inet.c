@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 /*
@@ -101,28 +101,12 @@ smb_inet_iszero(smb_inaddr_t *ipaddr)
 const char *
 smb_inet_ntop(smb_inaddr_t *addr, char *buf, int size)
 {
-	/* Lint avoidance. */
-#if !defined(_KERNEL)
-	size_t sz = (size_t)size;
-#else	/* _KERNEL */
+	/* Lint avoidance */
+#ifdef	_KERNEL
 	int sz = size;
-
-	/*
-	 * Until uts/common/inet/ip/inet_ntop.c is fixed so it
-	 * no longer uses leading zeros printing IPv4 addresses,
-	 * we need to handle IPv4 ourselves.  If we leave the
-	 * leading zeros, Windows clients get errors trying to
-	 * resolve those address strings to names.  After:
-	 * https://www.illumos.org/issues/5980 is fixed,
-	 * this work-around can be removed.
-	 */
-	if (addr->a_family == AF_INET) {
-		uint8_t *p = (void *) &addr->a_ipv4;
-		(void) snprintf(buf, size, "%d.%d.%d.%d",
-		    p[0], p[1], p[2], p[3]);
-		return (buf);
-	}
-#endif	/* _KERNEL */
+#else
+	size_t sz = (size_t)size;
+#endif
 
 	return ((char *)inet_ntop(addr->a_family, addr, buf, sz));
 }

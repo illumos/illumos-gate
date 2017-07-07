@@ -23,7 +23,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -34,96 +34,7 @@
 #include <netinet/in.h>
 #include <inet/led.h>
 
-static void	convert2ascii(char *, const in6_addr_t *);
-static char	*strchr_w(const char *, int);
-static int	str2inet_addr(char *, ipaddr_t *);
-
 /*
- * inet_ntop -- Convert an IPv4 or IPv6 address in binary form into
- * printable form, and return a pointer to that string. Caller should
- * provide a buffer of correct length to store string into.
- * Note: this routine is kernel version of inet_ntop. It has similar
- * format as inet_ntop() defined in rfc2553. But it does not do
- * error handling operations exactly as rfc2553 defines. This function
- * is used by kernel inet directory routines only for debugging.
- * This inet_ntop() function, does not return NULL if third argument
- * is NULL. The reason is simple that we don't want kernel to panic
- * as the output of this function is directly fed to ip<n>dbg macro.
- * Instead it uses a local buffer for destination address for
- * those calls which purposely pass NULL ptr for the destination
- * buffer. This function is thread-safe when the caller passes a non-
- * null buffer with the third argument.
- */
-/* ARGSUSED */
-char *
-inet_ntop(int af, const void *addr, char *buf, int addrlen)
-{
-	static char local_buf[INET6_ADDRSTRLEN];
-	static char *err_buf1 = "<badaddr>";
-	static char *err_buf2 = "<badfamily>";
-	in6_addr_t	*v6addr;
-	uchar_t		*v4addr;
-	char		*caddr;
-
-	/*
-	 * We don't allow thread unsafe inet_ntop calls, they
-	 * must pass a non-null buffer pointer. For DEBUG mode
-	 * we use the ASSERT() and for non-debug kernel it will
-	 * silently allow it for now. Someday we should remove
-	 * the static buffer from this function.
-	 */
-
-	ASSERT(buf != NULL);
-	if (buf == NULL)
-		buf = local_buf;
-	buf[0] = '\0';
-
-	/* Let user know politely not to send NULL or unaligned addr */
-	if (addr == NULL || !(OK_32PTR(addr))) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "inet_ntop: addr is <null> or unaligned");
-#endif
-		return (err_buf1);
-	}
-
-
-#define	UC(b)	(((int)b) & 0xff)
-	switch (af) {
-	case AF_INET:
-		ASSERT(addrlen >= INET_ADDRSTRLEN);
-		v4addr = (uchar_t *)addr;
-		(void) sprintf(buf, "%03d.%03d.%03d.%03d",
-		    UC(v4addr[0]), UC(v4addr[1]), UC(v4addr[2]), UC(v4addr[3]));
-		return (buf);
-
-	case AF_INET6:
-		ASSERT(addrlen >= INET6_ADDRSTRLEN);
-		v6addr = (in6_addr_t *)addr;
-		if (IN6_IS_ADDR_V4MAPPED(v6addr)) {
-			caddr = (char *)addr;
-			(void) sprintf(buf, "::ffff:%d.%d.%d.%d",
-			    UC(caddr[12]), UC(caddr[13]),
-			    UC(caddr[14]), UC(caddr[15]));
-		} else if (IN6_IS_ADDR_V4COMPAT(v6addr)) {
-			caddr = (char *)addr;
-			(void) sprintf(buf, "::%d.%d.%d.%d",
-			    UC(caddr[12]), UC(caddr[13]), UC(caddr[14]),
-			    UC(caddr[15]));
-		} else if (IN6_IS_ADDR_UNSPECIFIED(v6addr)) {
-			(void) sprintf(buf, "::");
-		} else {
-			convert2ascii(buf, v6addr);
-		}
-		return (buf);
-
-	default:
-		return (err_buf2);
-	}
-#undef UC
-}
-
-/*
- *
  * v6 formats supported
  * General format xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
  * The short hand notation :: is used for COMPAT addr
@@ -256,6 +167,93 @@ str2inet_addr(char *cp, ipaddr_t *addrp)
 }
 
 /*
+ * inet_ntop: Convert an IPv4 or IPv6 address in binary form into
+ * printable form, and return a pointer to that string.  Caller should
+ * provide a buffer of correct length to store string into.
+ * Note: this routine is kernel version of inet_ntop.  It has similar
+ * format as inet_ntop() defined in RFC 2553, but it does not do
+ * error handling operations exactly as RFC 2553 defines.
+ */
+static char *
+__inet_ntop(int af, const void *addr, char *buf, int addrlen, int compat)
+{
+	static char	*badaf = "<badfamily>";
+	in6_addr_t	*v6addr;
+	uchar_t		*v4addr;
+	char		*caddr;
+
+	VERIFY(addr != NULL);
+	VERIFY(OK_32PTR(addr));
+	VERIFY(buf != NULL);
+
+	buf[0] = '\0';
+
+#define	UC(b)	(((int)b) & 0xff)
+	switch (af) {
+	case AF_INET:
+		ASSERT(addrlen >= INET_ADDRSTRLEN);
+		v4addr = (uchar_t *)addr;
+		(void) sprintf(buf,
+		    (compat) ? "%03d.%03d.%03d.%03d" : "%d.%d.%d.%d",
+		    UC(v4addr[0]), UC(v4addr[1]), UC(v4addr[2]), UC(v4addr[3]));
+		return (buf);
+	case AF_INET6:
+		ASSERT(addrlen >= INET6_ADDRSTRLEN);
+		v6addr = (in6_addr_t *)addr;
+		if (IN6_IS_ADDR_V4MAPPED(v6addr)) {
+			caddr = (char *)addr;
+			(void) sprintf(buf, "::ffff:%d.%d.%d.%d",
+			    UC(caddr[12]), UC(caddr[13]),
+			    UC(caddr[14]), UC(caddr[15]));
+		} else if (IN6_IS_ADDR_V4COMPAT(v6addr)) {
+			caddr = (char *)addr;
+			(void) sprintf(buf, "::%d.%d.%d.%d",
+			    UC(caddr[12]), UC(caddr[13]), UC(caddr[14]),
+			    UC(caddr[15]));
+		} else if (IN6_IS_ADDR_UNSPECIFIED(v6addr)) {
+			(void) sprintf(buf, "::");
+		} else {
+			convert2ascii(buf, v6addr);
+		}
+		return (buf);
+
+	default:
+		return (badaf);
+	}
+#undef UC
+}
+
+/*
+ * Provide fixed inet_ntop() implementation.
+ */
+char *
+_inet_ntop(int af, const void *addr, char *buf, int addrlen)
+{
+	return (__inet_ntop(af, addr, buf, addrlen, 0));
+}
+
+/*
+ * Provide old inet_ntop() implementation by default for binary
+ * compatibility.
+ */
+char *
+inet_ntop(int af, const void *addr, char *buf, int addrlen)
+{
+	static char	local_buf[INET6_ADDRSTRLEN];
+	static char	*badaddr = "<badaddr>";
+
+	if (addr == NULL || !(OK_32PTR(addr)))
+		return (badaddr);
+
+	if (buf == NULL) {
+		buf = local_buf;
+		addrlen = sizeof (local_buf);
+	}
+
+	return (__inet_ntop(af, addr, buf, addrlen, 1));
+}
+
+/*
  * inet_pton: This function takes string format IPv4 or IPv6 address and
  * converts it to binary form. The format of this function corresponds to
  * inet_pton() in the socket library.
@@ -265,7 +263,7 @@ str2inet_addr(char *cp, ipaddr_t *addrp)
  *  1 successful conversion
  * -1 af is not AF_INET or AF_INET6
  */
-int
+static int
 __inet_pton(int af, char *inp, void *outp, int compat)
 {
 	int i;
