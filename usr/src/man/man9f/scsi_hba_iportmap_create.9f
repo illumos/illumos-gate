@@ -1,0 +1,178 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 18, 2017
+.Dt SCSI_HBA_IPORTMAP_CREATE 9F
+.Os
+.Sh NAME
+.Nm scsi_hba_iportmap_create ,
+.Nm scsi_hba_iportmap_destroy ,
+.Nm scsi_hba_iportmap_iport_add ,
+.Nm scsi_hba_iportmap_iport_remove
+.Nd create and manage an iportmap
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft int
+.Fo scsi_hba_iportmap_create
+.Fa "dev_info_t *dip"
+.Fa "int csync_usec"
+.Fa "int settle_usec"
+.Fa "scsi_hba_iportmap_t **iportmapout"
+.Fc
+.Ft void
+.Fo scsi_hba_iportmap_destroy
+.Fa "scsi_hba_iportmap_t *iportmap"
+.Fc
+.Ft int
+.Fo scsi_hba_iportmap_iport_add
+.Fa "scsi_hba_iportmap_t *iportmap"
+.Fa "char *ua"
+.Fa "void *priv"
+.Fc
+.Ft int
+.Fo scsi_hba_iportmap_iport_remove
+.Fa "scsi_hba_iportmap_t *iportmap"
+.Fa "char *ua"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to
+.Vt dev_info
+structure.
+.It Fa csync_usec
+A time in microseconds.
+.It Fa settle_usec
+A time in microseconds.
+.It Fa iportmap
+An allocated iportmap.
+.It Fa iportmapout
+Pointer where the iportmap is stored.
+.It Fa ua
+A character string that represents a unit address for an iport.
+.It Fa priv
+Drivers should pass
+.Dv NULL
+for this field.
+.El
+.Sh DESCRIPTION
+The
+.Fn scsi_hba_iportmap_create
+and
+.Fn scsi_hba_iportmap_destroy
+functions are used by HBA drivers to create and destroy an iportmap.
+For more information on an iportmap and its purpose, see
+.Xr iportmap 9 .
+.Pp
+The
+.Fa csync_usec
+and
+.Fa settle_usec
+are both times measured in microseconds that control two different
+properties of the iportmap and how it behaves.
+The value in
+.Fa settle_usec
+indicates the amount of time that the system should wait to quiesce all
+changes and consider the resulting system stable.
+Changes will not be reported until after
+.Fa settle_usec
+have passed.
+.Fa csync_usec
+indicates how much time needs to elapse after creation before an initial
+enumeration has been completed.
+.Pp
+The
+.Vt dev_info
+structure passed into
+.Fa dip
+is usually the HBA driver's
+.Vt dev_info
+structure.
+.Pp
+When the
+.Fn scsi_hba_iportmap_iport
+function returns,
+.Fa iportmapout
+will be populated with a pointer to an iportmap that can be used to add
+and remove iports.
+.Pp
+To destroy the iportmap, drivers should use the
+.Fn scsi_hba_iportmap_destroy
+function.
+As part of destroying the iportmap, all associated iports will
+be detached from the system by having the driver's
+.Xr detach 9E
+entry point called.
+.Pp
+When the driver needs to add an iport to the system, generally in
+response to a hotplug event, then the driver should call the
+.Fn scsi_hba_iportmap_iport_add
+function.
+The value of
+.Fa ua
+should be a character string that uniquely identifies the device.
+If the driver is using a phymap, then this unit address should be the
+same one as the phymap's callback provided.
+Otherwise, the driver sets
+.Fa ua
+to a unique string which is generally the iport's WWN.
+.Pp
+When the corresponding iport needs to be removed, then the driver should
+call the
+.Fn scsi_hba_iportmap_remove
+function.
+The iport to remove is indicated by the
+.Fa ua
+argument, which should match the value passed into the
+.Fn scsi_hba_iportmap_add
+function.
+.Sh CONTEXT
+The
+.Fn scsi_hba_iportmap_create
+function is generally called during a driver's
+.Xr attach 9E
+entry point.
+.Pp
+The
+.Fn scsi_hba_iportmap_destroy
+function is generally called during a driver's
+.Xr detach 9E
+entry point.
+.Pp
+The
+.Fn scsi_hba_iportmap_iport_add
+and
+.Fn scsi_hba_iportmap_iport_remove
+functions should be called from
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn scsi_hba_iportmap_create ,
+.Fn scsi_hba_iportmap_iport_add ,
+and
+.Fn scsi_hba_iportmap_iport_remove
+functions return
+.Dv DDI_SUCCESS.
+Otherwise,
+.Dv DDI_FAILURE
+is returned.
+.Sh SEE ALSO
+.Xr iport 9 ,
+.Xr iportmap 9 ,
+.Xr attach 9E ,
+.Xr detach 9E

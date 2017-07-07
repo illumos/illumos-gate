@@ -18,12 +18,19 @@ include		$(SRC)/Makefile.master
 
 MANSECT= 	9
 MANFILES=	Intro.9	\
+		iport.9 \
 		vmem.9
 
 
-MANLINKS=	intro.9
+MANLINKS=	intro.9 \
+		iportmap.9 \
+		phymap.9 \
+		tgtmap.9
 
 intro.9		:= LINKSRC = Intro.9
+iportmap.9	:= LINKSRC = iport.9
+phymap.9	:= LINKSRC = iport.9
+tgtmap.9	:= LINKSRC = iport.9
 
 .KEEP_STATE:
 

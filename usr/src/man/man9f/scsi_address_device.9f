@@ -1,0 +1,169 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 20, 2017
+.Dt SCSI_ADDRESS_DEVICE 9F
+.Os
+.Sh NAME
+.Nm scsi_address_device ,
+.Nm scsi_device_unit_address ,
+.Nm scsi_device_hba_private_get ,
+.Nm scsi_device_hba_private_set
+.Nd SCSI Complex addressing utility functions
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft "struct scsi_device *"
+.Fo scsi_address_device
+.Fa "struct scsi_address *sa"
+.Fc
+.Ft "void *"
+.Fo scsi_device_hba_private_get
+.Fa "struct scsi_device *sd"
+.Fc
+.Ft void
+.Fo scsi_device_hba_private_set
+.Fa "struct scsi_device *sd"
+.Fa "void *data"
+.Fc
+.Ft "char *"
+.Fo scsi_device_unit_address
+.Fa "struct scsi_device *sd"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa sa
+Pointer to a
+.Xr scsi_address 9S
+structure.
+.It Fa sd
+Pointer to a
+.Xr scsi_device 9S
+structure.
+.It Fa data
+A private value that the driver can get and set.
+.El
+.Sh DESCRIPTION
+These functions provide useful services for SCSI HBA drivers that use
+complex addressing.
+In complex addressing mode, the
+.Xr scsi_address 9S
+structure is treated as an opaque structure and is not a simple target
+and LUN.
+To use these functions, the driver must have enabled complex addressing
+by passing the
+.Dv SCSI_HBA_ADDR_COMPLEX
+flag into the
+.Fa hba_flags
+argument of the
+.Xr scsi_hba_attach_setup 9F
+function.
+If the
+.Dv SCSI_HBA_ADDR_COMPLEX
+flag was not passed, then the driver must not call the
+.Fn scsi_device_hba_private_get ,
+.Fn scsi_device_hba_private_set ,
+or
+.Fn scsi_device_unit_address
+functions.
+.Pp
+The
+.Fn scsi_address_device
+function maps the
+.Xr scsi_address 9S
+function back to its corresponding
+.Xr scsi_device 9S
+structure.
+If the
+.Dv SCSI_HBA_ADDR_COMPLEX
+flag has not been set, then the function will return
+.Dv NULL .
+This can be used as a way to check if the flag has been set on the
+device.
+.Pp
+The
+.Fn scsi_device_hba_private_set
+function, allows a driver to set a private data value on the
+.Xr scsi_device 9S
+structure, which it can later retrieve through the
+.Fn scsi_device_hba_private_get
+function.
+Most drivers will set a value during the
+.Xr tran_start 9E
+entry point and then reference the data structure later on.
+This is designed to simplify the management of mapping between driver
+data structures and the corresponding system objects.
+.Pp
+The
+.Fn scsi_device_unit_address
+function returns the unit address of the
+.Xr scsi_device 9S
+structure.
+The returned string should not be modified by the device driver.
+The unit address string comes from values that are passed when
+the device is enumerated, generally through an instance of an
+.Xr iport 9 .
+.Sh CONTEXT
+These functions may be used in
+.Sy user ,
+.Sy kernel ,
+and
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn scsi_address_device
+function returns a pointer to the
+.Xr scsi_device 9S
+structure.
+Otherwise, if an error occurred
+.Dv NULL
+is returned.
+.Pp
+The
+.Fn scsi_device_hba_private_get
+function returns a data value registered via the
+.Fn scsi_device_hba_private_set
+function.
+If the
+.Fn scsi_device_hba_private_set
+was never called,
+.Dv NULL
+is returned.
+.Pp
+Upon successful completion, the
+.Fn scsi_device_unit_address
+returns a pointer to a character string with the device's unit address.
+Otherwise,
+.Dv NULL
+is returned.
+.Pp
+If the
+.Dv SCSI_HBA_ADDR_COMPLEX
+flag has not been set for the HBA structure or iport, then the
+.Fn scsi_address_device ,
+.Fn scsi_device_hba_private_get ,
+and
+.Fn scsi_device_unit_address
+functions return
+.Dv NULL .
+.Sh SEE ALSO
+.Xr iport 9 ,
+.Xr tran_start 9E ,
+.Xr scsi_hba_attach_setup 9F ,
+.Xr scsi_address 9S ,
+.Xr scsi_device 9S
