@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -2731,10 +2732,10 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		 * for MAC addresses. I.e. all requests from the clients
 		 * must have the MAC_UNICAST_HW flag set or clear.
 		 */
-		if ((mcip->mci_state_flags & MCIS_UNICAST_HW) != 0 &&
-		    !is_unicast_hw ||
-		    (mcip->mci_state_flags & MCIS_UNICAST_HW) == 0 &&
-		    is_unicast_hw) {
+		if (((mcip->mci_state_flags & MCIS_UNICAST_HW) != 0 &&
+		    !is_unicast_hw) ||
+		    ((mcip->mci_state_flags & MCIS_UNICAST_HW) == 0 &&
+		    is_unicast_hw)) {
 			err = EINVAL;
 			goto bail_out;
 		}
