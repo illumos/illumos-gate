@@ -20,6 +20,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014, Joyent, Inc.
 # Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.
 #
 
 import getopt
@@ -121,8 +122,8 @@ def git_parent_branch(branch):
     if not branch:
         return None
 
-    p = git("for-each-ref --format=%(refname:short) %(upstream:short) " +
-            "refs/heads/")
+    p = git(["for-each-ref", "--format=%(refname:short) %(upstream:short)", 
+            "refs/heads/"])
 
     if not p:
         sys.stderr.write("Failed finding git parent branch\n")

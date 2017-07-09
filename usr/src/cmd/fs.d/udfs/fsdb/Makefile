@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2017, Joyent Inc.
+#
 
 FSTYPE=		udfs
 LIBPROG=	fsdb
@@ -100,7 +102,7 @@ catalog:        $(POFILE)
 
 CATSRCS=	$(SRCS) lex.yy.c y.tab.c
 
-$(POFILE):      $(CATSRCS)
+$(POFILE):      $(CATSRCS) ud_lib.h
 	$(RM) $@
 	$(COMPILE.cpp) $(CATSRCS)   > $(POFILE).i
 	$(XGETTEXT) $(XGETFLAGS)        $(POFILE).i

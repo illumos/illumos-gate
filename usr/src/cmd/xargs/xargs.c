@@ -21,6 +21,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2012 DEY Storage Systems, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  *
  * Portions of this file developed by DEY Storage Systems, Inc. are licensed
  * under the terms of the Common Development and Distribution License (CDDL)
@@ -54,6 +55,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <sys/fork.h>
 #include "getresponse.h"
 
 #define	HEAD	0
@@ -90,6 +92,7 @@
 #define	MISSQUOTE	"Missing quote"
 #define	BADESCAPE	"Incomplete escape"
 #define	IBUFOVERFLOW	"Insert buffer overflow"
+#define	NOCHILDSLOT	"No free child slot available"
 
 #define	_(x)	gettext(x)
 
@@ -110,6 +113,7 @@ static struct inserts {
 
 static int	PROMPT = -1;
 static int	BUFLIM = BUFSIZE;
+static int	MAXPROCS = 1;
 static int	N_ARGS = 0;
 static int	N_args = 0;
 static int	N_lines = 0;
@@ -130,15 +134,17 @@ static int	exitstat = 0;	/* our exit status			*/
 static int	mac;		/* modified argc, after parsing		*/
 static char	**mav;		/* modified argv, after parsing		*/
 static int	n_inserts;	/* # of insertions.			*/
+static pid_t	*procs;		/* pids of children			*/
+static int	n_procs;	/* # of child processes.		*/
 
 /* our usage message:							*/
 #define	USAGEMSG "Usage: xargs: [-t] [-p] [-0] [-e[eofstr]] [-E eofstr] "\
-	"[-I replstr] [-i[replstr]] [-L #] [-l[#]] [-n # [-x]] [-s size] "\
-	"[cmd [args ...]]\n"
+	"[-I replstr] [-i[replstr]] [-L #] [-l[#]] [-n # [-x]] [-P maxprocs] "\
+	"[-s size] [cmd [args ...]]\n"
 
 static int	echoargs();
 static wint_t	getwchr(char *, size_t *);
-static int	lcall(char *sub, char **subargs);
+static void	lcall(char *sub, char **subargs);
 static void	addibuf(struct inserts *p);
 static void	ermsg(char *messages, ...);
 static char	*addarg(char *arg);
@@ -147,17 +153,24 @@ static char	*getarg(char *);
 static char	*insert(char *pattern, char *subst);
 static void	usage();
 static void	parseargs();
+static int	procs_find(pid_t child);
+static void	procs_store(pid_t child);
+static boolean_t procs_delete(pid_t child);
+static pid_t	procs_waitpid(boolean_t blocking, int *stat_loc);
+static void	procs_wait(boolean_t blocking);
 
 int
 main(int argc, char **argv)
 {
 	int	j;
+	unsigned long	l;
 	struct inserts *psave;
 	int c;
 	int	initsize;
 	char	*cmdname, **initlist;
 	char	*arg;
 	char	*next;
+	char	*eptr;
 
 	/* initialization */
 	blank = wctype("blank");
@@ -176,7 +189,7 @@ main(int argc, char **argv)
 	parseargs(argc, argv);
 
 	/* handling all of xargs arguments:				*/
-	while ((c = getopt(mac, mav, "0tpe:E:I:i:L:l:n:s:x")) != EOF) {
+	while ((c = getopt(mac, mav, "0tpe:E:I:i:L:l:n:P:s:x")) != EOF) {
 		switch (c) {
 		case '0':
 			ZERO = TRUE;
@@ -301,6 +314,25 @@ main(int argc, char **argv)
 			}
 			break;
 
+		case 'P':	/* -P maxprocs: # of child processses	*/
+			errno = 0;
+			l = strtoul(optarg, &eptr, 10);
+			if (*eptr != '\0' || errno != 0) {
+				ermsg(_("failed to parse maxprocs (-P): %s\n"),
+				    optarg);
+				break;
+			}
+
+			/*
+			 * Come up with an upper bound that'll probably fit in
+			 * memory.
+			 */
+			if (l == 0 || l > ((INT_MAX / sizeof (pid_t) >> 1))) {
+				l = INT_MAX / sizeof (pid_t) >> 1;
+			}
+			MAXPROCS = (int)l;
+			break;
+
 		case 's':	/* -s size: set max size of each arg list */
 			BUFLIM = atoi(optarg);
 			if (BUFLIM > BUFSIZE || BUFLIM <= 0) {
@@ -340,6 +372,12 @@ main(int argc, char **argv)
 
 	mac -= optind;	/* dec arg count by what we've processed 	*/
 	mav += optind;	/* inc to current mav				*/
+
+	procs = calloc(MAXPROCS, sizeof (pid_t));
+	if (procs == NULL) {
+		PERR(MALLOCFAIL);
+		exit(1);
+	}
 
 	if (mac <= 0) {	/* if there're no more args to process,	*/
 		cmdname = "/usr/bin/echo";	/* our default command	*/
@@ -411,6 +449,7 @@ main(int argc, char **argv)
 				 */
 				if (LEGAL || N_args == 0) {
 					EMSG(LIST2LONG);
+					procs_wait(B_TRUE);
 					exit(2);
 					/* NOTREACHED */
 				}
@@ -440,7 +479,7 @@ main(int argc, char **argv)
 		*ARGV = NULL;
 		if (N_args == 0) {
 			/* Reached the end with no more work. */
-			exit(exitstat);
+			break;
 		}
 
 		/* insert arg if requested */
@@ -469,6 +508,7 @@ main(int argc, char **argv)
 			}
 			if (linesize >= BUFLIM) {
 				EMSG(LIST2LONG);
+				procs_wait(B_TRUE);
 				exit(2);
 				/* NOTREACHED */
 			}
@@ -489,10 +529,12 @@ main(int argc, char **argv)
 				 * so if we have a non-zero status here,
 				 * quit immediately.
 				 */
-				exitstat |= lcall(cmdname, arglist);
+				(void) lcall(cmdname, arglist);
 			}
 		}
 	}
+
+	procs_wait(B_TRUE);
 
 	if (OK)
 		return (exitstat);
@@ -863,34 +905,22 @@ getwchr(char *mbc, size_t *sz)
 }
 
 
-static int
+static void
 lcall(char *sub, char **subargs)
 {
-	int retcode, retry = 0;
-	pid_t iwait, child;
+	int	retry = 0;
+	pid_t	child;
 
 	for (;;) {
-		switch (child = fork()) {
+		switch (child = forkx(FORK_NOSIGCHLD)) {
 		default:
-			while ((iwait = wait(&retcode)) != child &&
-			    iwait != (pid_t)-1)
-				;
-			if (iwait == (pid_t)-1) {
-				PERR(WAITFAIL);
-				exit(122);
-				/* NOTREACHED */
-			}
-			if (WIFSIGNALED(retcode)) {
-				EMSG2(CHILDSIG, WTERMSIG(retcode));
-				exit(125);
-				/* NOTREACHED */
-			}
-			if ((WEXITSTATUS(retcode) & 0377) == 0377) {
-				EMSG(CHILDFAIL);
-				exit(124);
-				/* NOTREACHED */
-			}
-			return (WEXITSTATUS(retcode));
+			procs_store(child);
+			/*
+			 * Note, if we have used up all of our slots, then this
+			 * call may end up blocking.
+			 */
+			procs_wait(B_FALSE);
+			return;
 		case 0:
 			(void) execvp(sub, subargs);
 			PERR(EXECFAIL);
@@ -908,6 +938,110 @@ lcall(char *sub, char **subargs)
 	}
 }
 
+/*
+ * Return the index of child in the procs array.
+ */
+static int
+procs_find(pid_t child)
+{
+	int	i;
+
+	for (i = 0; i < MAXPROCS; i++) {
+		if (procs[i] == child) {
+			return (i);
+		}
+	}
+
+	return (-1);
+}
+
+static void
+procs_store(pid_t child)
+{
+	int	i;
+
+	i = procs_find(0);
+	if (i < 0) {
+		EMSG(NOCHILDSLOT);
+		exit(1);
+	}
+	procs[i] = child;
+	n_procs++;
+}
+
+static boolean_t
+procs_delete(pid_t child)
+{
+	int	i;
+
+	i = procs_find(child);
+	if (i < 0) {
+		return (B_FALSE);
+	}
+
+	procs[i] = (pid_t)0;
+	n_procs--;
+
+	return (B_TRUE);
+}
+
+static pid_t
+procs_waitpid(boolean_t blocking, int *stat_loc)
+{
+	pid_t	child;
+	int	options;
+
+	if (n_procs == 0) {
+		errno = ECHILD;
+		return (-1);
+	}
+
+	options = 0;
+	if (!blocking) {
+		options |= WNOHANG;
+	}
+
+	while ((child = waitpid((pid_t)-1, stat_loc, options)) > 0) {
+		if (procs_delete(child)) {
+			break;
+		}
+	}
+
+	return (child);
+}
+
+static void
+procs_wait(boolean_t blocking)
+{
+	pid_t	child;
+	int	stat_loc;
+
+	/*
+	 * If we currently have filled all of our slots, then we need to block
+	 * further execution.
+	 */
+	if (n_procs >= MAXPROCS)
+		blocking = B_TRUE;
+	while ((child = procs_waitpid(blocking, &stat_loc)) > 0) {
+		if (WIFSIGNALED(stat_loc)) {
+			EMSG2(CHILDSIG, WTERMSIG(stat_loc));
+			exit(125);
+			/* NOTREACHED */
+		} else if ((WEXITSTATUS(stat_loc) & 0377) == 0377) {
+			EMSG(CHILDFAIL);
+			exit(124);
+			/* NOTREACHED */
+		} else {
+			exitstat |= WEXITSTATUS(stat_loc);
+		}
+	}
+
+	if (child == (pid_t)(-1) && errno != ECHILD) {
+		EMSG(WAITFAIL);
+		exit(122);
+		/* NOTREACHED */
+	}
+}
 
 static void
 usage()
@@ -1006,6 +1140,7 @@ process_special:
 			 * and the new XCU4 way of handling things are allowed.
 			 */
 			case	'n':	/* FALLTHROUGH			*/
+			case	'P':	/* FALLTHROUGH			*/
 			case	's':	/* FALLTHROUGH			*/
 			case	'E':	/* FALLTHROUGH			*/
 			case	'I':	/* FALLTHROUGH			*/

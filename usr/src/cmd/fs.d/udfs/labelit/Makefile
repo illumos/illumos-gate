@@ -22,6 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2017 Joyent, Inc.
+#
 
 FSTYPE=		udfs
 LIBPROG=	labelit
@@ -63,7 +65,7 @@ POFILE= labelit.po
 #
 catalog:	$(POFILE)
 
-$(POFILE):	$(SRCS)
+$(POFILE):	$(SRCS) ud_lib.h
 	$(RM) $@
 	$(COMPILE.cpp) $(SRCS) > $(POFILE).i
 	$(XGETTEXT) $(XGETFLAGS) $(POFILE).i
