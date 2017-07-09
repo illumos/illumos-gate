@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH XARGS 1 "November 24, 2012"
+.TH XARGS 1 "May 28, 2017"
 .SH NAME
 xargs \- construct argument lists and invoke utility
 .SH SYNOPSIS
@@ -15,11 +15,11 @@ xargs \- construct argument lists and invoke utility
 .nf
 \fBxargs\fR [\fB-t\fR] [\fB-0\fR] [\fB-p\fR] [\fB-e\fR[\fIeofstr\fR]] [\fB-E\fR \fIeofstr\fR]
      [\fB-I\fR \fIreplstr\fR] [\fB-i\fR[\fIreplstr\fR]] [\fB-L\fR \fInumber\fR] [\fB-l\fR[\fInumber\fR]]
-     [\fB-n\fR \fInumber\fR [\fB-x\fR]] [\fB-s\fR \fIsize\fR] [\fIutility\fR [\fIargument\fR...]]
+     [\fB-n\fR \fInumber\fR [\fB-x\fR]] [\fB-P\fR \fImaxprocs\fR] [\fB-s\fR \fIsize\fR]
+     [\fIutility\fR [\fIargument\fR...]]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBxargs\fR utility constructs a command line consisting of the
 \fIutility\fR and \fIargument\fR operands specified followed by as many
@@ -49,7 +49,6 @@ argument and environment lists can not exceed \fB{ARG_MAX}\(mi2048\fR bytes.
 Within this constraint, if neither the \fB-n\fR nor the \fB-s\fR option is
 specified, the default command line length is at least \fB{LINE_MAX}\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -171,6 +170,16 @@ otherwise, that particular invocation of \fIutility\fR is skipped.
 .sp
 .ne 2
 .na
+\fB\fB-P\fR \fImaxprocs\fR\fR
+.ad
+.RS 15n
+Invokes \fIutility\fR using at most \fImaxprocs\fR (a positive decimal integer)
+parallel child processes.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-s\fR \fIsize\fR\fR
 .ad
 .RS 15n
@@ -236,7 +245,6 @@ the -print0 argument to \fBfind\fR(1).
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -262,7 +270,6 @@ An initial option or operand for the invocation of \fIutility\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fB255\fR exit status allows a utility being used by \fBxargs\fR to tell
 \fBxargs\fR to terminate if it knows no further invocations using the current
@@ -371,7 +378,6 @@ example% \fBecho $* | xargs -n 2 diff\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBxargs\fR: \fBLANG\fR, \fBLC_ALL\fR,
@@ -396,7 +402,6 @@ in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
 bytes of text data a characters, the behavior of character classes used in the
 expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -445,7 +450,6 @@ signal, or an invocation of the utility exits with exit status \fB255\fR, the
 \fBxargs\fR utility writes a diagnostic message and exit without processing any
 remaining input.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -463,7 +467,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBecho\fR(1), \fBshell_builtins\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)

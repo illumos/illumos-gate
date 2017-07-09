@@ -13,6 +13,7 @@
 
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2017, Joyent, Inc.
 #
 
 XARGS=${XARGS:=/usr/bin/xargs}
@@ -242,6 +243,39 @@ test18() {
 	test_pass $t
 }
 
+test19() {
+	t=test19
+	test_start $t "bad -P option (negative value)"
+	$XARGS -P -3 </dev/null 2>/dev/null
+	if [[ $? -eq 2 ]]; then
+		test_pass $t
+	else
+		test_fail $t
+	fi
+}
+
+test20() {
+	t=test20
+	test_start $t "bad -P option (bad string)"
+	$XARGS -P as3f </dev/null 2>/dev/null
+	if [[ $? -eq 2 ]]; then
+		test_pass $t
+	else
+		test_fail $t
+	fi
+}
+
+test21() {
+	t=test21
+	test_start $t "bad -P option (extraneous characters)"
+	$XARGS -P 2c </dev/null 2>/dev/null
+	if [[ $? -eq 2 ]]; then
+		test_pass $t
+	else
+		test_fail $t
+	fi
+}
+
 test1
 test2
 test3
@@ -260,3 +294,6 @@ test15
 test16
 test17
 test18
+test19
+test20
+test21
