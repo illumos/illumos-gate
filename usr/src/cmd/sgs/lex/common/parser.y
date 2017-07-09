@@ -30,7 +30,6 @@
 
 
 %{
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Lint is unable to properly handle formats with wide strings
@@ -898,6 +897,7 @@ Character range specified between different codesets.");
 				break;
 			case '\\':
 				c = usescape(c=gch());
+				/* FALLTHROUGH */
 			default:
 			character:
 				if(iter){	/* second part of an iteration */

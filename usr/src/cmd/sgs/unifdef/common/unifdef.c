@@ -29,8 +29,6 @@
 
 /* Copyright (c) 1982 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *    unifdef - remove ifdef'ed lines
  */
@@ -524,6 +522,7 @@ ent:
 					while (--tmp);
 					break;
 				}
+				/* FALLTHROUGH */
 			default:
 				*line++ = chr;
 				num++;
