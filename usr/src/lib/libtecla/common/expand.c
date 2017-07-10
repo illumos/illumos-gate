@@ -29,8 +29,6 @@
  * of the copyright holder.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * If file-system access is to be excluded, this module has no function,
  * so all of its code should be excluded.
@@ -887,6 +885,7 @@ static int ef_string_matches_pattern(const char *file, const char *pattern,
 /*
  * A normal character to be matched explicitly.
  */
+      /* FALLTHROUGH */
     default:
       if(*fptr == *pptr) {
         fptr++;
