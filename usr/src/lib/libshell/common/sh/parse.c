@@ -490,7 +490,7 @@ static Shnode_t	*sh_cmd(Lex_t *lexp, register int sym, int flag)
 	{
 	    case COOPSYM:		/* set up a cooperating process */
 		type |= (FPIN|FPOU|FPCL|FCOOP);
-		/* FALL THRU */		
+		/* FALLTHROUGH */
 	    case '&':
 		if(left)
 		{
@@ -499,7 +499,7 @@ static Shnode_t	*sh_cmd(Lex_t *lexp, register int sym, int flag)
 				left = left->par.partre;
 			left = makeparent(lexp,TFORK|type, left);
 		}
-		/* FALL THRU */		
+		/* FALLTHROUGH */
 	    case ';':
 		if(!left)
 			sh_syntax(lexp);
@@ -509,6 +509,7 @@ static Shnode_t	*sh_cmd(Lex_t *lexp, register int sym, int flag)
 	    case EOFSYM:
 		if(sym==NL)
 			break;
+		/* FALLTHROUGH */
 	    default:
 		if(sym && sym!=lexp->token)
 		{
@@ -1225,6 +1226,7 @@ static Shnode_t	*item(Lex_t *lexp,int flag)
 	    default:
 		if(io==0)
 			return(0);
+		/* FALLTHROUGH */
 
 	    case ';':
 		if(io==0)
@@ -1235,7 +1237,7 @@ static Shnode_t	*item(Lex_t *lexp,int flag)
 				sh_syntax(lexp);
 			showme =  FSHOWME;
 		}
-	    /* simple command */
+		/* FALLTHROUGH */
 	    case 0:
 		t = (Shnode_t*)simple(lexp,flag,io);
 		if(t->com.comarg && lexp->intypeset && (lexp->sh->shcomp || sh_isoption(SH_NOEXEC) || sh.dot_depth))

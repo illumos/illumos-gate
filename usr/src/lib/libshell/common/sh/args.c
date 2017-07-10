@@ -271,6 +271,7 @@ int sh_argopts(int argc,register char *argv[], void *context)
 		    case 'I':
 			continue;
 #endif /* SHOPT_REGRESS */
+			/*FALLTHROUGH*/
 		    skip:
 		    default:
 			if(cp=strchr(optksh,n))
