@@ -415,7 +415,7 @@ lx_mount(const char *sourcep, const char *targetp, const char *fstypep,
 	/*
 	 * Vector back out to userland emulation for NFS.
 	 */
-	if (strcmp(fstype, "nfs") == 0) {
+	if (strcmp(fstype, "nfs") == 0 || strcmp(fstype, "nfs4") == 0) {
 		uintptr_t uargs[5] = {(uintptr_t)sourcep, (uintptr_t)targetp,
 		    (uintptr_t)fstypep, (uintptr_t)flags, (uintptr_t)datap};
 

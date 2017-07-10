@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -405,7 +405,7 @@ lx_mount(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 	lx_debug("\tlinux mount fstype: %s", fstype);
 
 	/* The in-kernel mount code should only call us for an NFS mount. */
-	assert(strcmp(fstype, "nfs") == 0);
+	assert(strcmp(fstype, "nfs") == 0 || strcmp(fstype, "nfs4") == 0);
 
 	/*
 	 * While SunOS is picky about mount(2) target paths being absolute,

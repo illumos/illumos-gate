@@ -1364,7 +1364,6 @@ convert_nfs_arg_str(char *srcp, char *mntopts, nfs_mnt_data_t *nmdp)
 	return (0);
 }
 
-/* ARGSUSED2 */
 int
 lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 {
@@ -1390,6 +1389,9 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 	if ((r = convert_nfs_arg_str(srcp, opts, nmdp)) < 0) {
 		return (r);
 	}
+
+	if (strcmp(fst, "nfs4") == 0)
+		nmdp->nmd_nfsvers = NFS_V4;
 
 	/* Linux seems to always allow overlay mounts */
 	il_flags |= MS_OVERLAY;
@@ -1443,7 +1445,7 @@ lx_nfs_mount(char *srcp, char *mntp, char *fst, int lx_flags, char *opts)
 	if ((r = set_args(&il_flags, argp, host, opts, nmdp)) != 0)
 		goto out;
 
-	if (nmdp->nmd_nfsvers == 4) {
+	if (nmdp->nmd_nfsvers == NFS_V4) {
 		/*
 		 * In the case of version 4 there is no MOUNT program, thus no
 		 * need for an RPC to get a file handle.
