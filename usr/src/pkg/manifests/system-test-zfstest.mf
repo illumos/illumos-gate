@@ -1297,6 +1297,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/zpool_clear_003_neg \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/zpool_clear_readonly \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/setup mode=0555
