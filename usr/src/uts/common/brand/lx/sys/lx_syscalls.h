@@ -37,6 +37,7 @@ extern "C" {
 extern long lx_accept();
 extern long lx_accept4();
 extern long lx_access();
+extern long lx_acct();
 extern long lx_alarm();
 extern long lx_arch_prctl();
 extern long lx_bind();

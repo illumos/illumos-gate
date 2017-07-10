@@ -570,7 +570,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"signal",	NULL,			0,		2}, /* 48 */
 	{"geteuid16",	lx_geteuid16,		0,		0}, /* 49 */
 	{"getegid16",	lx_getegid16,		0,		0}, /* 50 */
-	{"acct",	NULL,			NOSYS_NO_EQUIV,	0}, /* 51 */
+	{"acct",	lx_acct,		0,		1}, /* 51 */
 	{"umount2",	lx_umount2,		0,		2}, /* 52 */
 	{"lock",	NULL,			NOSYS_OBSOLETE,	0}, /* 53 */
 	{"ioctl",	lx_ioctl,		0,		3}, /* 54 */
@@ -1053,7 +1053,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"setrlimit",	lx_setrlimit,		0,		2}, /* 160 */
 	{"chroot",	lx_chroot,		0,		1}, /* 161 */
 	{"sync",	lx_sync,		0,		0}, /* 162 */
-	{"acct",	NULL,			NOSYS_NO_EQUIV,	0}, /* 163 */
+	{"acct",	lx_acct,		0,		1}, /* 163 */
 	{"settimeofday", NULL,			0,		2}, /* 164 */
 	{"mount",	lx_mount,		0,		5}, /* 165 */
 	{"umount2",	lx_umount2,		0,		2}, /* 166 */

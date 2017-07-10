@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -601,7 +601,7 @@ proc_exit(int why, int what)
 		semexit(p);
 	rv = wstat(why, what);
 
-	acct(rv & 0xff);
+	acct(rv);
 	exacct_commit_proc(p, rv);
 
 	/*

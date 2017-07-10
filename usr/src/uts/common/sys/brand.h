@@ -151,6 +151,7 @@ struct execa;
  * b_intp_parse_arg - Controls interpreter argument handling (allow 1 or all)
  * b_clearbrand - Perform any actions necessary when clearing the brand.
  * b_rpc_statd - Upcall to rpc.statd running within the zone
+ * b_acct_out - Output properly formatted accounting record
  */
 struct brand_ops {
 	void	(*b_init_brand_data)(zone_t *, kmutex_t *);
@@ -202,6 +203,7 @@ struct brand_ops {
 	boolean_t b_intp_parse_arg;
 	void	(*b_clearbrand)(proc_t *, boolean_t);
 	void	(*b_rpc_statd)(int, void *, void *);
+	void	(*b_acct_out)(struct vnode *, int);
 };
 
 /*

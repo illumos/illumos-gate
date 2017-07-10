@@ -307,7 +307,8 @@ struct brand_ops lx_brops = {
 #endif
 	B_FALSE,			/* b_intp_parse_arg */
 	lx_clearbrand,			/* b_clearbrand */
-	lx_upcall_statd			/* b_rpc_statd */
+	lx_upcall_statd,		/* b_rpc_statd */
+	lx_acct_out			/* b_acct_out */
 };
 
 struct brand_mach_ops lx_mops = {

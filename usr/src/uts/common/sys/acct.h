@@ -22,6 +22,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -88,7 +89,7 @@ extern int acct(const char *);
 
 #if defined(_KERNEL)
 
-void	acct(char);
+void	acct(int);
 int	sysacct(char *);
 
 struct vnode;

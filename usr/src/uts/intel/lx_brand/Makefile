@@ -69,7 +69,7 @@ AS_INC_PATH	+= -I$(UTSBASE)/i86pc/genassym/$(OBJS_DIR)
 CFLAGS		+= $(CCVERBOSE)
 
 LDFLAGS		+= -dy -Nexec/elfexec -Nfs/fifofs -Nfs/sockfs -Ndrv/ip \
-		    -Nfs/zfs -Nmisc/klmmod
+		    -Nfs/zfs -Nmisc/klmmod -Nsys/sysacct
 
 #
 # For now, disable these lint checks; maintainers should endeavor

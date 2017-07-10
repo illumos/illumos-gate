@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/systeminfo.h>
@@ -75,6 +75,8 @@ extern int chdir_proc(proc_t *, vnode_t *, boolean_t, boolean_t);
 extern int lookupname(char *, enum uio_seg, int, vnode_t **, vnode_t **);
 /* From uts/common/fs/fs_subr.c */
 extern int fs_need_estale_retry(int);
+/* From uts/common/os/acct.c */
+extern int sysacct(char *);
 
 /* The callback arguments when handling a FS clone group. */
 typedef struct {
@@ -410,4 +412,10 @@ lx_vhangup(void)
 	 * already checked that our process is root, just succeed.
 	 */
 	return (0);
+}
+
+long
+lx_acct(char *p)
+{
+	return (sysacct(p));
 }

@@ -710,6 +710,7 @@ extern int lx_lpid_lock(pid_t, zone_t *, lx_pid_flag_t, proc_t **,
 extern pid_t lx_lwp_ppid(klwp_t *, pid_t *, id_t *);
 extern void lx_pid_init(void);
 extern void lx_pid_fini(void);
+extern void lx_acct_out(vnode_t *, int);
 
 extern uint_t lx_pipe_max_limit;
 extern uint_t lx_pipe_max_default;

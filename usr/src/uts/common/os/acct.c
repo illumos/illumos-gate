@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -47,6 +48,7 @@
 #include <sys/time.h>
 #include <sys/msacct.h>
 #include <sys/zone.h>
+#include <sys/brand.h>
 
 /*
  * Each zone has its own accounting settings (on or off) and associated
@@ -373,7 +375,7 @@ acct_compress(ulong_t t)
  * On exit, write a record on the accounting file.
  */
 void
-acct(char st)
+acct(int st)
 {
 	struct vnode *vp;
 	struct cred *cr;
@@ -402,6 +404,21 @@ acct(char st)
 	 * This only gets called from exit after all lwp's have exited so no
 	 * cred locking is needed.
 	 */
+
+	/* If there is a brand-specific hook, use it instead */
+	if (ZONE_IS_BRANDED(curzone) && ZBROP(curzone)->b_acct_out != NULL) {
+		ZBROP(curzone)->b_acct_out(vp, st);
+		mutex_exit(&ag->aclock);
+		return;
+	}
+
+	/*
+	 * The 'st' status value was traditionally masked this way by our
+	 * caller, but we now accept the unmasked value for brand handling.
+	 * Zones not using the brand hook mask the status here.
+	 */
+	st &= 0xff;
+
 	p = curproc;
 	ua = PTOU(p);
 	bcopy(ua->u_comm, ag->acctbuf.ac_comm, sizeof (ag->acctbuf.ac_comm));
