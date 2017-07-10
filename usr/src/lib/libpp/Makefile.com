@@ -112,6 +112,9 @@ pics/pplex.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppop.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppsearch.o 	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppsearch.o 	:= CERRWARN += -_gcc=-Wno-sequence-point
+pics/pplex.o		:= CERRWARN += -_gcc=-Wno-implicit-fallthrough
+pics/ppcpp.o		:= CERRWARN += -_gcc=-Wno-implicit-fallthrough
+pics/ppproto.o		:= CERRWARN += -_gcc=-Wno-implicit-fallthrough
 
 .KEEP_STATE:
 
