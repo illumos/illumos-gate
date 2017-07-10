@@ -19,7 +19,7 @@
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" "
-.TH NIGHTLY 1ONBLD "Jan 28, 2014"
+.TH NIGHTLY 1ONBLD "Jul 2, 2017"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -284,18 +284,6 @@ build.  If $MULTI_PROTO is "yes", $ROOT contains the DEBUG build and
 $ROOT-nd contains the non-DEBUG build.
 .RE
 .LP
-.B TOOLS_ROOT
-.RS 5
-Root of the tools proto area for the build.  The makefiles direct
-installation of tools build products to this area.  Unless \fB+t\fR
-is part of $NIGHTLY_OPTIONS, these tools will be used during the
-build.
-.LP
-As built by nightly, this will always contain non-DEBUG objects.
-Therefore, this will always have a -nd suffix, regardless of
-$MULTI_PROTO.
-.RE
-.LP
 .B MACH
 .RS 5
 The instruction set architecture of the build machine as given
@@ -442,16 +430,6 @@ The gate-defined default location of things formerly in /opt; e.g.,
 /ws/onnv-tools.  This is used by nightly, but not the makefiles.
 .RE
 .LP
-.B TEAMWARE
-.RS 5
-The gate-defined default location for the Teamware tools; e.g.,
-/ws/onnv-tools/SUNWspro.  By default, it is derived from
-.BR OPTHOME .
-This is used by nightly, but not the makefiles.  There is no
-corresponding variable for Mercurial or Subversion, which are assumed
-to be installed in the default path.
-.RE
-.LP
 .B ON_CLOSED_BINS
 .RS 5
 OpenSolaris builds do not contain the closed source tree.  Instead,
@@ -468,13 +446,6 @@ Normally, nightly runs the 'checkpaths' script to check for
 discrepancies among the files that list paths to other files, such as
 exception lists and req.flg.  Set this flag to 'n' to disable this
 check, which appears in the nightly output as "Check lists of files."
-.RE
-.LP
-.B CHECK_DMAKE
-.RS 5
-Nightly validates that the version of dmake encountered is known to be
-safe to use.  Set this flag to 'n' to disable this test, allowing any
-version of dmake to be used.
 .RE
 .LP
 .B MULTI_PROTO

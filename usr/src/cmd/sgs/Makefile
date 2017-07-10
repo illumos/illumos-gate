@@ -125,7 +125,8 @@ _msg: _msg_gettext _msg_sgsmsg
 _msg_gettext: $(MSGDOMAIN)/$(POFILE)
 
 # $(MACH)/sgsmsg must be built before we can descend into $(MSGDIR)
-_msg_sgsmsg: native-add .WAIT $(MSGDIR)
+$(MSGDIR): native-add
+_msg_sgsmsg: $(MSGDIR)
 
 $(MSGDOMAIN)/$(POFILE): \
 		$(MSGDOMAIN) $(POFILE)
