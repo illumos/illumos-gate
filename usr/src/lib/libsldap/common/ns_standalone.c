@@ -430,6 +430,7 @@ _filter_gethostbyaddr_r(const char *addr, int len, int type,
 		nss_initf	= _initf_ipnodes;
 		nss_db_root	= &db_root_ipnodes;
 		dbop		= NSS_DBOP_IPNODES_BYADDR;
+		break;
 	default:
 		return (NULL);
 	}
