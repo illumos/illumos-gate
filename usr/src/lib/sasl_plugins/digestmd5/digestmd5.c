@@ -1261,7 +1261,7 @@ static int init_uef(context_t *text,
     CK_OBJECT_CLASS	class = CKO_SECRET_KEY;
     CK_BBOOL		true = TRUE;
     static CK_MECHANISM	mechanism = {CKM_RC4, NULL, 0};
-    unsigned char 	keybuf[24];
+    unsigned char	keybuf[24];
     CK_ATTRIBUTE	template[] = {
 				{CKA_CLASS, NULL, sizeof (class)},
 				{CKA_KEY_TYPE, NULL, sizeof (keyType)},
@@ -1410,7 +1410,7 @@ free_uef(context_t *text)
     uef_context_t	*dec_context =
 		(uef_context_t *)text->cipher_dec_context;
     CK_RV		rv;
-    unsigned char 	buf[1];
+    unsigned char	buf[1];
     CK_ULONG		ulLen = 0;
 
 
@@ -1419,7 +1419,7 @@ free_uef(context_t *text)
 	if (rv != CKR_OK) {
 #ifdef DEBUG
 	    text->utils->log(text->utils->conn, SASL_LOG_DEBUG,
-	    		     "C_EncryptFinal failed:0x%.8X\n", rv);
+			     "C_EncryptFinal failed:0x%.8X\n", rv);
 #endif
 	}
 	rv = C_DestroyObject(enc_context->hSession, enc_context->hKey);
@@ -5091,6 +5091,7 @@ digestmd5_client_mech_step(void *conn_context,
 	}
 
 	/* fall through and respond to challenge */
+	/* FALLTHROUGH */
 
     case 3:
 	if (serverin && !strncasecmp(serverin, "rspauth=", 8)) {
@@ -5121,6 +5122,7 @@ digestmd5_client_mech_step(void *conn_context,
 	text->realm = text->nonce = text->cnonce = NULL;
 #endif /* _SUN_SDK_ */
 	ctext->cipher = NULL;
+	/* FALLTHROUGH */
 
     case 2:
 	return digestmd5_client_mech_step2(ctext, params,
@@ -5173,7 +5175,7 @@ static sasl_client_plug_t digestmd5_client_plugins[] =
 	SASL_SEC_NOPLAINTEXT
 	| SASL_SEC_NOANONYMOUS
 	| SASL_SEC_MUTUAL_AUTH,		/* security_flags */
-	SASL_FEAT_ALLOWS_PROXY, 	/* features */
+	SASL_FEAT_ALLOWS_PROXY,		/* features */
 	NULL,				/* required_prompts */
 	NULL,				/* glob_context */
 	&digestmd5_client_mech_new,	/* mech_new */
@@ -5306,7 +5308,7 @@ getSlotID(const sasl_utils_t *utils, CK_MECHANISM_TYPE mech_type,
 	if (rv != CKR_OK) {
 #ifdef DEBUG
 	    utils->log(utils->conn, SASL_LOG_DEBUG,
-	    	       "C_GetMechanismList returned 0x%.8X count:%d\n", rv,
+		       "C_GetMechanismList returned 0x%.8X count:%d\n", rv,
 		       ulMechTypeCount);
 #endif
 	    utils->free(pMechTypeList);

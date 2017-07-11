@@ -10,7 +10,7 @@
  * based on PLAIN, by Tim Martin <tmartin@andrew.cmu.edu>
  * $Id: login.c,v 1.25 2003/02/13 19:56:04 rjs3 Exp $
  */
-/* 
+/*
  * Copyright (c) 1998-2003 Carnegie Mellon University.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -18,7 +18,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -28,7 +28,7 @@
  * 3. The name "Carnegie Mellon University" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For permission or any other legal
- *    details, please contact  
+ *    details, please contact
  *      Office of Technology Transfer
  *      Carnegie Mellon University
  *      5000 Forbes Avenue
@@ -80,27 +80,27 @@ typedef struct context {
     size_t username_len;
 } server_context_t;
 
-static int login_server_mech_new(void *glob_context __attribute__((unused)), 
+static int login_server_mech_new(void *glob_context __attribute__((unused)),
 				 sasl_server_params_t *sparams,
 				 const char *challenge __attribute__((unused)),
 				 unsigned challen __attribute__((unused)),
 				 void **conn_context)
 {
     server_context_t *text;
-    
+
     /* holds state are in */
     text = sparams->utils->malloc(sizeof(server_context_t));
     if (text == NULL) {
 	MEMERROR( sparams->utils );
 	return SASL_NOMEM;
     }
-    
+
     memset(text, 0, sizeof(server_context_t));
-    
+
     text->state = 1;
-    
+
     *conn_context = text;
-    
+
     return SASL_OK;
 }
 
@@ -116,10 +116,10 @@ static int login_server_mech_step(void *conn_context,
 				  sasl_out_params_t *oparams)
 {
     server_context_t *text = (server_context_t *) conn_context;
-    
+
     *serverout = NULL;
     *serveroutlen = 0;
-    
+
     switch (text->state) {
 
     case 1:
@@ -129,14 +129,14 @@ static int login_server_mech_step(void *conn_context,
 	/* In this case fall through to state 2 */
 	if (clientinlen == 0) {
 	    /* demand username */
-	    
+
 	    *serveroutlen = strlen(USERNAME_CHALLENGE);
 	    *serverout = USERNAME_CHALLENGE;
 
 	    return SASL_CONTINUE;
 	}
-	
-	
+	/* FALLTHROUGH */
+
     case 2:
 	/* Catch really long usernames */
 	if (clientinlen > 1024) {
@@ -148,7 +148,7 @@ static int login_server_mech_step(void *conn_context,
 #endif	/* _SUN_SDK_ */
 	    return SASL_BADPROT;
 	}
-	
+
 	/* get username */
 	text->username =
 	    params->utils->malloc(sizeof(sasl_secret_t) + clientinlen + 1);
@@ -156,24 +156,24 @@ static int login_server_mech_step(void *conn_context,
 	    MEMERROR( params->utils );
 	    return SASL_NOMEM;
 	}
-	
+
 	strncpy(text->username, clientin, clientinlen);
 	text->username_len = clientinlen;
 	text->username[clientinlen] = '\0';
-	
+
 	/* demand password */
 	*serveroutlen = strlen(PASSWORD_CHALLENGE);
 	*serverout = PASSWORD_CHALLENGE;
-	
+
 	text->state = 3;
-	
+
 	return SASL_CONTINUE;
-	
-	
+
+
     case 3: {
 	sasl_secret_t *password;
 	int result;
-	
+
 	/* Catch really long passwords */
 	if (clientinlen > 1024) {
 #ifdef _SUN_SDK_
@@ -185,7 +185,7 @@ static int login_server_mech_step(void *conn_context,
 #endif	/* _SUN_SDK_ */
 	    return SASL_BADPROT;
 	}
-	
+
 	/* get password */
 	password =
 	    params->utils->malloc(sizeof(sasl_secret_t) + clientinlen + 1);
@@ -193,7 +193,7 @@ static int login_server_mech_step(void *conn_context,
 	    MEMERROR(params->utils);
 	    return SASL_NOMEM;
 	}
-	
+
 	strncpy((char *)password->data, clientin, clientinlen);
 	password->data[clientinlen] = '\0';
 	password->len = clientinlen;
@@ -207,27 +207,27 @@ static int login_server_mech_step(void *conn_context,
 		_plug_free_secret(params->utils, &password);
 		return result;
 	}
-	
+
 	/* verify_password - return sasl_ok on success */
 	result = params->utils->checkpass(params->utils->conn,
 					oparams->authid, oparams->alen,
 					(char *)password->data, password->len);
-	
+
 	if (result != SASL_OK) {
 	    _plug_free_secret(params->utils, &password);
 	    return result;
 	}
-	
+
 	if (params->transition) {
 	    params->transition(params->utils->conn,
 			       (char *)password->data, password->len);
 	}
-	
+
 	_plug_free_secret(params->utils, &password);
-	
+
 	*serverout = NULL;
 	*serveroutlen = 0;
-	
+
 	oparams->doneflag = 1;
 	oparams->mech_ssf = 0;
 	oparams->maxoutbuf = 0;
@@ -236,7 +236,7 @@ static int login_server_mech_step(void *conn_context,
 	oparams->decode_context = NULL;
 	oparams->decode = NULL;
 	oparams->param_version = 0;
-	
+
 	return SASL_OK;
     }
 
@@ -246,7 +246,7 @@ static int login_server_mech_step(void *conn_context,
 			   "Invalid LOGIN server step %d\n", text->state);
 	return SASL_FAIL;
     }
-    
+
     return SASL_FAIL; /* should never get here */
 }
 
@@ -254,15 +254,15 @@ static void login_server_mech_dispose(void *conn_context,
 				      const sasl_utils_t *utils)
 {
     server_context_t *text = (server_context_t *) conn_context;
-    
+
     if (!text) return;
-    
+
     if (text->username) utils->free(text->username);
-    
+
     utils->free(text);
 }
 
-static sasl_server_plug_t login_server_plugins[] = 
+static sasl_server_plug_t login_server_plugins[] =
 {
     {
 	"LOGIN",			/* mech_name */
@@ -292,11 +292,11 @@ int login_server_plug_init(sasl_utils_t *utils,
 	SETERROR(utils, "LOGIN version mismatch");
 	return SASL_BADVERS;
     }
-    
+
     *out_version = SASL_SERVER_PLUG_VERSION;
     *pluglist = login_server_plugins;
-    *plugcount = 1;  
-    
+    *plugcount = 1;
+
     return SASL_OK;
 }
 
@@ -317,20 +317,20 @@ static int login_client_mech_new(void *glob_context __attribute__((unused)),
 				 void **conn_context)
 {
     client_context_t *text;
-    
+
     /* holds state are in */
     text = params->utils->malloc(sizeof(client_context_t));
     if (text == NULL) {
 	MEMERROR(params->utils);
 	return SASL_NOMEM;
     }
-    
+
     memset(text, 0, sizeof(client_context_t));
-    
+
     text->state = 1;
-    
+
     *conn_context = text;
-    
+
     return SASL_OK;
 }
 
@@ -344,10 +344,10 @@ static int login_client_mech_step(void *conn_context,
 				  sasl_out_params_t *oparams)
 {
     client_context_t *text = (client_context_t *) conn_context;
-    
+
     *clientout = NULL;
     *clientoutlen = 0;
-    
+
     switch (text->state) {
 
     case 1: {
@@ -355,7 +355,7 @@ static int login_client_mech_step(void *conn_context,
 	int auth_result = SASL_OK;
 	int pass_result = SASL_OK;
 	int result;
-	
+
 	/* check if sec layer strong enough */
 	if (params->props.min_ssf > params->external_ssf) {
 #ifdef _INTEGRATED_SOLARIS_
@@ -366,7 +366,7 @@ static int login_client_mech_step(void *conn_context,
 #endif /* _INTEGRATED_SOLARIS_ */
 	    return SASL_TOOWEAK;
 	}
-	
+
 	/* try to get the userid */
 	/* Note: we want to grab the authname and not the userid, which is
 	 *       who we AUTHORIZE as, and will be the same as the authname
@@ -374,26 +374,26 @@ static int login_client_mech_step(void *conn_context,
 	 */
 	if (oparams->user == NULL) {
 	    auth_result = _plug_get_authid(params->utils, &user, prompt_need);
-	    
+
 	    if ((auth_result != SASL_OK) && (auth_result != SASL_INTERACT))
 		return auth_result;
 	}
-	
+
 	/* try to get the password */
 	if (text->password == NULL) {
 	    pass_result = _plug_get_password(params->utils, &text->password,
 					     &text->free_password, prompt_need);
-	    
+
 	    if ((pass_result != SASL_OK) && (pass_result != SASL_INTERACT))
 		return pass_result;
 	}
-	
+
 	/* free prompts we got */
 	if (prompt_need && *prompt_need) {
 	    params->utils->free(*prompt_need);
 	    *prompt_need = NULL;
 	}
-	
+
 	/* if there are prompts not filled in */
 	if ((auth_result == SASL_INTERACT) || (pass_result == SASL_INTERACT)) {
 	    /* make the prompt list */
@@ -420,19 +420,19 @@ static int login_client_mech_step(void *conn_context,
 				   NULL, NULL, NULL);
 #endif /* _INTEGRATED_SOLARIS_ */
 	    if (result != SASL_OK) return result;
-	    
+
 	    return SASL_INTERACT;
 	}
-	
+
 	if (!text->password) {
 	    PARAMERROR(params->utils);
 	    return SASL_BADPARAM;
 	}
-    
+
 	result = params->canon_user(params->utils->conn, user, 0,
 				    SASL_CU_AUTHID | SASL_CU_AUTHZID, oparams);
 	if (result != SASL_OK) return result;
-	
+
 	/* server should have sent request for username - we ignore it */
 	if (!serverin) {
 #ifdef _SUN_SDK_
@@ -444,17 +444,17 @@ static int login_client_mech_step(void *conn_context,
 #endif /* _SUN_SDK_ */
 	    return SASL_BADPROT;
 	}
-	
+
 	if (!clientout) {
 	    PARAMERROR( params->utils );
 	    return SASL_BADPARAM;
 	}
-	
+
 	if (clientoutlen) *clientoutlen = oparams->alen;
 	*clientout = oparams->authid;
-	
+
 	text->state = 2;
-	
+
 	return SASL_CONTINUE;
     }
 
@@ -470,15 +470,15 @@ static int login_client_mech_step(void *conn_context,
 #endif /* _SUN_SDK_ */
 	    return SASL_BADPROT;
 	}
-	
+
 	if (!clientout) {
 	    PARAMERROR(params->utils);
 	    return SASL_BADPARAM;
 	}
-	
+
 	if (clientoutlen) *clientoutlen = text->password->len;
 	*clientout = (char *)text->password->data;
-	
+
 	/* set oparams */
 	oparams->doneflag = 1;
 	oparams->mech_ssf = 0;
@@ -488,7 +488,7 @@ static int login_client_mech_step(void *conn_context,
 	oparams->decode_context = NULL;
 	oparams->decode = NULL;
 	oparams->param_version = 0;
-	
+
 	return SASL_OK;
 
     default:
@@ -504,19 +504,19 @@ static void login_client_mech_dispose(void *conn_context,
 				      const sasl_utils_t *utils)
 {
     client_context_t *text = (client_context_t *) conn_context;
-    
+
     if (!text) return;
-    
+
     /* free sensitive info */
     if (text->free_password) _plug_free_secret(utils, &(text->password));
 #ifdef _INTEGRATED_SOLARIS_
     convert_prompt(utils, &text->h, NULL);
 #endif /* _INTEGRATED_SOLARIS_ */
-    
+
     utils->free(text);
 }
 
-static sasl_client_plug_t login_client_plugins[] = 
+static sasl_client_plug_t login_client_plugins[] =
 {
     {
 	"LOGIN",			/* mech_name */
@@ -545,10 +545,10 @@ int login_client_plug_init(sasl_utils_t *utils,
 	SETERROR(utils, "Version mismatch in LOGIN");
 	return SASL_BADVERS;
     }
-    
+
     *out_version = SASL_CLIENT_PLUG_VERSION;
     *pluglist = login_client_plugins;
     *plugcount = 1;
-    
+
     return SASL_OK;
 }
