@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #include <netdb.h>
@@ -102,6 +103,14 @@ getallifaddrs(sa_family_t af, struct ifaddrs **ifap, int64_t flags)
 	int sock6;
 	int err;
 
+	/*
+	 * Initialize ifap to NULL so we can safely call freeifaddrs
+	 * on it in case of error.
+	 */
+	if (ifap == NULL)
+		return (EINVAL);
+	*ifap = NULL;
+
 	if ((sock4 = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 		return (-1);
 	if ((sock6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
@@ -123,7 +132,6 @@ retry:
 	 */
 	prev = NULL;
 	lifrp = buf;
-	*ifap = NULL;
 	for (n = 0; n < numifs; n++, lifrp++) {
 
 		/* Prepare for the ioctl call */

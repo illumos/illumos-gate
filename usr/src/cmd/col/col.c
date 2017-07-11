@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	col - filter reverse carraige motions
  *
@@ -311,22 +309,22 @@ outc(wchar_t c)
 		if (*line != '\b')
 			if (esc_chars)
 				esc_chars = '\0';
-			switch (*line)	{
-			case ESC:
-				incr_line(1);
-				esc_chars = 1;
-				break;
-			case '\0':
-				*line = ' ';
-				lp++;
-				break;
-			case '\b':
-				/* if ( ! esc_chars ) */
-					lp--;
-				break;
-			default:
-				lp += wcscrwidth(*line);
-			}
+		switch (*line)	{
+		case ESC:
+			incr_line(1);
+			esc_chars = 1;
+			break;
+		case '\0':
+			*line = ' ';
+			lp++;
+			break;
+		case '\b':
+			/* if ( ! esc_chars ) */
+			lp--;
+			break;
+		default:
+			lp += wcscrwidth(*line);
+		}
 		incr_line(1);
 	}
 	while (*line == '\b') {
@@ -468,7 +466,7 @@ store(int lno)
 	if (page[lno] != 0)
 		free((char *)page[lno]);
 	page[lno] = (wchar_t *)malloc((unsigned)(wcslen(lbuff) + 2)
-		* sizeof (wchar_t));
+	    * sizeof (wchar_t));
 	if (page[lno] == 0) {
 		/* fprintf(stderr, "%s: no storage\n", pgmname); */
 		exit(2);
