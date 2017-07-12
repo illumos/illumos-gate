@@ -1344,15 +1344,17 @@ static cfga_err_t
 cfga_get_condition(hp_node_t node, ap_condition_t *cond)
 {
 	char *condition;
+	char *tmpc;
+	cfga_err_t ret = CFGA_OK;
 
 	/* "condition" bus specific commands */
 	if (hp_get_private(node, PCIEHPC_PROP_SLOT_CONDITION,
-	    &condition) != 0) {
+	    &tmpc) != 0) {
 		*cond = AP_COND_UNKNOWN;
 		return (CFGA_ERROR);
 	}
 
-	condition = get_val_from_result(condition);
+	condition = get_val_from_result(tmpc);
 
 	if (strcmp(condition, PCIEHPC_PROP_COND_OK) == 0)
 		*cond = AP_COND_OK;
@@ -1365,9 +1367,10 @@ cfga_get_condition(hp_node_t node, ap_condition_t *cond)
 	else if (strcmp(condition, PCIEHPC_PROP_COND_UNKNOWN) == 0)
 		*cond = AP_COND_UNKNOWN;
 	else
-		return (CFGA_ERROR);
+		ret = CFGA_ERROR;
 
-	return (CFGA_OK);
+	free(tmpc);
+	return (ret);
 }
 
 /*ARGSUSED*/
