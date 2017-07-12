@@ -208,7 +208,8 @@ slice_get_stats(descriptor_t *dp, int stat_type, int *errp)
 	}
 
 	if ((*errp = add_inuse(dp->name, stats)) != 0) {
-	    return (NULL);
+		nvlist_free(stats);
+		return (NULL);
 	}
 
 	/* if no cluster use, check for a use of the local name */
@@ -248,6 +249,7 @@ slice_get_stats(descriptor_t *dp, int stat_type, int *errp)
 				sizeof (localpath));
 
 			    if ((*errp = add_inuse(localpath, stats)) != 0) {
+				nvlist_free(stats);
 				return (NULL);
 			    }
 
