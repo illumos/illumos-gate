@@ -3,74 +3,95 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_FFS 9F "Jun 5, 2013"
-.SH NAME
-ddi_ffs, ddi_fls \- find first (last) bit set in a long integer
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/conf.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-
-
-
-\fBint\fR \fBddi_ffs\fR(\fBlong\fR \fImask\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBddi_fls\fR(\fBlong\fR \fImask\fR);
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
+.Dd July 14, 2017
+.Dt DDI_FFS 9F
+.Os
+.Sh NAME
+.Nm ddi_ffs, ddi_ffsll, ddi_fls, ddi_flsll
+.Nd find first (last) bit set in a long (long) integer
+.Sh SYNOPSIS
+.In sys/conf.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Ft int
+.Fo "ddi_ffs"
+.Fa "long mask"
+.Fc
+.Ft int
+.Fo "ddi_fls"
+.Fa "long mask"
+.Fc
+.Ft int
+.Fo "ddi_ffs"
+.Fa "long long mask"
+.Fc
+.Ft int
+.Fo "ddi_fls"
+.Fa "long long mask"
+.Fc
+.Sh INTERFACE LEVEL
 Solaris DDI specific (Solaris DDI).
-.SH PARAMETERS
-.sp
-.ne 2
-.na
-\fB\fImask\fR\fR
-.ad
-.RS 8n
-A 32-bit argument value to search through.
-.RE
-
-.SH DESCRIPTION
-.sp
-.LP
-The function \fBddi_ffs()\fR takes its argument and returns the shift count
-that the first (least significant) bit set in the argument corresponds to. The
-function \fBddi_fls()\fR does the same, only it returns the shift count for the
-last (most significant) bit set in the argument.
-.SH RETURN VALUES
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 5n
+.Sh PARAMETERS
+.Bl -tag -width Va
+.It Fa mask
+A 32-bit or 64-bit argument value to search through.
+.El
+.Sh DESCRIPTION
+The functions
+.Fn ddi_ffs
+and
+.Fn ddi_ffsll
+take their argument and return the shift count that the first (least
+significant) bit set in the argument corresponds to.
+The functions
+.Fn ddi_fls
+and
+.Fn ddi_flsll
+do the same, only they returns the shift count for the last (most
+significant) bit set in the argument.
+.Fn ddi_ffs
+and
+.Fn ddi_fls
+operate on 32-bit values, while
+.Fn ddi_ffsll
+and
+.Fn ddi_flsll
+operate on 64-bit values.
+.Sh CONTEXT
+These functions can be called from user, interrupt, or kernel context.
+.Sh RETURN VALUES
+.Bl -tag -width Va
+.It 0
 No bits are set in mask.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIN\fR\fR
-.ad
-.RS 5n
-Bit  \fIN\fR is the least significant (\fBddi_ffs\fR) or most significant
-(\fBddi_fls\fR) bit set in mask. Bits are numbered from  \fB1\fR to  \fB32\fR,
-with bit \fB1\fR being the least significant bit position and bit \fB32\fR the
-most significant position.
-.RE
-
-.SH CONTEXT
-.sp
-.LP
-This function can be called from user, interrupt, or kernel context.
-.SH SEE ALSO
-.sp
-.LP
+.It N
+Bit
+.Em N
+is the least significant
+.Po
+.Fn ddi_ffs ,
+.Fn ddi_ffsll
+.Pc
+or most significant
+.Po
+.Fn ddi_fls ,
+.Fn ddi_flsll
+.Pc
+bit set in
+.Fa mask .
+Bits are numbered from
+.Em 1
+to
+.Em 32
+or
+.Em 64 ,
+with bit
+.Em 1
+being the least significant bit position and bit
+.Em 32
+or
+.Em 64
+the most significant position, depending on the variant of the
+functions used.
+.El
+.Sh SEE ALSO
 \fIWriting Device Drivers\fR

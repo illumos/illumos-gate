@@ -755,7 +755,9 @@ MANLINKS=	AVL_NEXT.9f					\
 		ddi_dmae_release.9f				\
 		ddi_dmae_stop.9f				\
 		ddi_exit_critical.9f				\
+		ddi_ffsll.9f					\
 		ddi_fls.9f					\
+		ddi_flsll.9f					\
 		ddi_fm_capable.9f				\
 		ddi_fm_dma_err_clear.9f				\
 		ddi_fm_dma_err_get.9f				\
@@ -1556,7 +1558,9 @@ ddi_dmae_stop.9f			:= LINKSRC = ddi_dmae.9f
 
 ddi_exit_critical.9f			:= LINKSRC = ddi_enter_critical.9f
 
+ddi_ffsll.9f				:= LINKSRC = ddi_ffs.9f
 ddi_fls.9f				:= LINKSRC = ddi_ffs.9f
+ddi_flsll.9f				:= LINKSRC = ddi_ffs.9f
 
 ddi_fm_dma_err_clear.9f			:= LINKSRC = ddi_fm_acc_err_clear.9f
 

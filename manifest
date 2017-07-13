@@ -19429,7 +19429,9 @@ f usr/share/man/man9f/ddi_driver_name.9f 0444 root bin
 f usr/share/man/man9f/ddi_enter_critical.9f 0444 root bin
 s usr/share/man/man9f/ddi_exit_critical.9f=ddi_enter_critical.9f
 f usr/share/man/man9f/ddi_ffs.9f 0444 root bin
+s usr/share/man/man9f/ddi_ffsll.9f=ddi_ffs.9f
 s usr/share/man/man9f/ddi_fls.9f=ddi_ffs.9f
+s usr/share/man/man9f/ddi_flsll.9f=ddi_ffs.9f
 f usr/share/man/man9f/ddi_fm_acc_err_clear.9f 0444 root bin
 f usr/share/man/man9f/ddi_fm_acc_err_get.9f 0444 root bin
 s usr/share/man/man9f/ddi_fm_capable.9f=ddi_fm_init.9f

@@ -1585,7 +1585,13 @@ int
 ddi_ffs(long mask);
 
 int
+ddi_ffsll(long long mask);
+
+int
 ddi_fls(long mask);
+
+int
+ddi_flsll(long long mask);
 
 /*
  * The ddi_soft_state* routines comprise generic storage management utilities
