@@ -1,0 +1,224 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd February 12, 2018
+.Dt PCITOOL 1M
+.Os
+.Sh NAME
+.Nm pcitool
+.Nd interrupt routing tool
+.Sh SYNOPSIS
+.Ss Sy x86
+.Nm
+.Cm pci@ Ns Ar unit-address Ns | Ns Cm niu@ Ns Ar unit-address
+.Fl i Ar cpu# Ns \&, Ns Ar ino# Ns | Ns Cm all
+.Op Fl qv
+.Op Fl r Oo Fl c Oc Ns | Ns Fl w Ar cpu# Oo Fl g Oc
+.Ss SPARC
+.Nm
+.Cm pci@ Ns Ar unit-address Ns | Ns Cm niu@ Ns Ar unit-address
+.Fl i Ar ino# Ns | Ns Cm all
+.Op Fl qv
+.Op Fl r Oo Fl c Oc Ns | Ns Fl w Ar cpu# Oo Fl g Oc
+.Nm
+.Cm pci@ Ns Ar unit-address
+.Fl m Ar msi# Ns | Ns Cm all
+.Op Fl qv
+.Op Fl r Oo Fl c Oc Ns | Ns Fl w Ar cpu# Oo Fl g Oc
+.Sh DESCRIPTION
+.Nm
+is a low-level tool which provides a facility for getting and setting interrupt
+routing information.
+.Ss Interrupt Routing
+On x86 platforms, both INOs and MSI/Xs are mapped to the same interrupt vectors.
+Use
+.Nm Fl i
+option to retrieve and reroute any interrupt vectors (both INO and MSI/Xs).
+.Pp
+On SPARC platforms, the INO is mapped to an interrupt mondo, where as one or
+more MSI/Xs are mapped to an INO.
+So, INO and MSI/Xs are individually retargetable.
+Use
+.Nm Fl i
+option to retrieve or reroute a given INO, where as use
+.Nm Fl m
+option for MSI/Xs.
+.Pp
+The following options are supported by
+.Nm
+for interrupt routing:
+.Bl -tag -width Ds
+.It Fl c
+.Pq Used with Fl r .
+Dump interrupt controller information.
+.It Fl g
+.Pq Used with Fl w .
+On some platforms (such as x86) multiple MSI interrupts of a single function
+need to be rerouted together.
+Use
+.Fl g
+to do this.
+.Fl g
+works only on supported platforms and only for groups of MSI interrupts.
+(A "group" of 1 is accepted).
+When
+.Fl g
+is used, the vector provided must be the lowest-numbered vector of the group.
+The size of the group is determined internally.
+.It Fl i
+Display device and CPU routing information for INOs on a given nexus,
+or reroute the given INO or INO group to a specific CPU.
+.It Fl m
+.Pq SPARC only
+Display device and CPU routing information for MSI/Xs on a given nexus,
+or reroute the given MSI/X or MSI/X group to a specific CPU.
+.It Fl q
+No errors reported as messages.
+Unix error status still returned by program, however.
+.It Fl r
+Display device and CPU routing information for INOs on a given nexus.
+The device path and instance number of each device for each displayed INO will
+be shown.
+On some platforms, interrupts dedicated to the root complex are indicated with
+.Ql (Internal)
+appended to their pathname.
+Default if neither
+.Fl r
+nor
+.Fl w
+are specified.
+.It Fl v
+Verbose output.
+.It Fl w
+Route the given INO or MSI/X to the given CPU.
+Display the new and original routing information.
+The INO or MSI/X must be specified.
+.El
+.Sh EXIT STATUS
+The following error statuses are returned to the shell:
+.Bl -tag -width Er
+.It Er 0
+No error
+.It Er EINVAL
+Out-of-range, misaligned or otherwise invalid argument has been passed in.
+.It Er ETIME
+Timeout waiting for pending interrupt to settle before changing interrupts to
+a new CPU.
+.It Er EIO
+An IO error occurred.
+.El
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Showing INOs or MSI/Xs
+The command for showing all INOs on /pci@0,0 is:
+.Bd -literal
+# pcitool /pci@0,0 -i all
+.Ed
+.Pp
+The command for showing ino <0x0,0x21> on the same root nexus, along with sample
+output, is:
+.Pp
+On x86 platform:
+.Bd -literal
+# pcitool /pci@0,0 -i 0,21
+0x0,0x21: mpt       0    /pci@7b,0/pci1022,7458@11/pci1000,3060@2
+.Ed
+.Pp
+On SPARC platform:
+.Bd -literal
+# pcitool /pci@0,0 -i 21
+0x0,0x21: mpt       0    /pci@7b,0/pci1022,7458@11/pci1000,3060@2
+.Ed
+.Pp
+The command for showing MSI 0x1 on the same root nexus, along with sample
+output, is:
+.Bd -literal
+# pcitool /pci@0,0 -m 0x1
+0x0,0x1: pcieb     0    /pci@7b,0/pci10de,5d@e
+.Ed
+.It Sy Example 2 No Rerouting INOs or MSI/Xs
+Successful rerouting ino 21 above from cpu 0 to cpu 1 gives the following
+output:
+.Pp
+On x86 platform:
+.Bd -literal
+# pcitool /pci@0,0 -i 0,21 -w 1
+0x0,0x21 -> 0x1,0x20
+.Ed
+.Pp
+On SPARC platform:
+.Bd -literal
+# pcitool /pci@0,0 -i 21 -w 1
+0x0,0x21 -> 0x1,0x21
+.Ed
+.Pp
+Successful rerouting msi 1 above from cpu 1 to cpu 0 gives the following
+output:
+.Bd -literal
+# pcitool /pci@0,0 -m 1 -w 0
+0x1,0x1 -> 0x0,0x1
+.Ed
+.Pp
+Successful rerouting a group of INOs starting at 24 from cpu 0 to cpu 1 gives
+the following output:
+.Pp
+On x86 platform:
+.Bd -literal
+# pcitool /pci@0,0 -i 3,24 -w 1 -g
+0x3,0x24 => 0x1,0x22
+.Ed
+.Pp
+On SPARC platform:
+.Bd -literal
+# pcitool /pci@0,0 -i 24 -w 1 -g
+0x3,0x24 => 0x1,0x22
+.Ed
+.El
+.Sh ARCHITECTURE
+.Sy PCI-based systems
+.Sh INTERFACE STABILITY
+.Sy Volatile
+.Sh SEE ALSO
+.Xr su 1M ,
+.Xr pci 4 ,
+.Xr user_attr 4 ,
+.Xr rbac 5
+.Pp
+PCI specification
+.Po available from
+.Lk https://pcisig.com
+.Pc
+.Sh NOTES
+All values are entered in hex.
+.Pp
+Not all commands are applicable to all platforms.
+.Pp
+The user must have all privileges in order to access interrupt information.
+A regular user can access interrupt information when
+.Xr su 1M
+to root or granted the
+.Qq Maintenance and Repair
+rights profile in the
+.Pa user_attr
+file.
+See
+.Xr user_attr 4
+and
+.Xr rbac 5 .
