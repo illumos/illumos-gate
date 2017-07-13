@@ -833,7 +833,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"faccessat",	lx_faccessat,		0,		4}, /* 307 */
 	{"pselect6",	lx_pselect,		LX_SYS_EBPARG6,	6}, /* 308 */
 	{"ppoll",	lx_ppoll,		0,		5}, /* 309 */
-	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 310 */
+	{"unshare",	lx_unshare,		0,		1}, /* 310 */
 	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 311 */
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 312 */
 	{"splice",	NULL,			NOSYS_NULL,	0}, /* 313 */
@@ -1162,7 +1162,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"faccessat",	lx_faccessat,		0,		4}, /* 269 */
 	{"pselect6",	lx_pselect,		0,		6}, /* 270 */
 	{"ppoll",	lx_ppoll,		0,		5}, /* 271 */
-	{"unshare",	NULL,			NOSYS_NULL,	0}, /* 272 */
+	{"unshare",	lx_unshare,		0,		1}, /* 272 */
 	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 273 */
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 274 */
 	{"splice",	NULL,			NOSYS_NULL,	0}, /* 275 */

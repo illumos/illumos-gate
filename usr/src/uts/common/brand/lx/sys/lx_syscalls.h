@@ -259,6 +259,7 @@ extern long lx_umount2();
 extern long lx_uname();
 extern long lx_unlink();
 extern long lx_unlinkat();
+extern long lx_unshare();
 extern long lx_vhangup();
 extern long lx_wait4();
 extern long lx_waitid();
