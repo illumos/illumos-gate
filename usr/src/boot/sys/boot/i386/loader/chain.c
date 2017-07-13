@@ -45,7 +45,6 @@ command_chain(int argc, char *argv[])
 	int fd, len, size = SECTOR_SIZE;
 	struct stat st;
 	vm_offset_t mem = 0x100000;
-	uint32_t *uintptr = &relocater_data;
 	struct i386_devdesc *rootdev;
 
 	if (argc == 1) {
@@ -97,9 +96,9 @@ command_chain(int argc, char *argv[])
 		return (CMD_ERROR);
 	}
 
-	uintptr[0] = mem;
-	uintptr[1] = 0x7C00;
-	uintptr[2] = size;
+	relocater_data[0].src = mem;
+	relocater_data[0].dest = 0x7C00;
+	relocater_data[0].size = size;
 
 	relocator_edx = bd_unit2bios(rootdev->d_unit);
 	relocator_esi = relocater_size;

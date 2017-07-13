@@ -6230,7 +6230,7 @@ mptsas_update_sata_bridge(mptsas_t *mpt, dev_info_t *parent,
 	}
 
 	mptsas_log(mpt, CE_WARN, "mptsas failed to find dev_info_t or "
-	    "mdi_pathinfo_t for target with WWN %016"PRIx64,
+	    "mdi_pathinfo_t for target with WWN %016" PRIx64,
 	    ptgt->m_addr.mta_wwn);
 
 	return (B_FALSE);
