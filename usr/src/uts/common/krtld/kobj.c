@@ -25,6 +25,7 @@
 /*
  * Copyright 2011 Bayard G. Bell <buffer.g.overflow@gmail.com>.
  * All rights reserved. Use is subject to license terms.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 /*
@@ -2178,6 +2179,7 @@ static void
 free_module_data(struct module *mp)
 {
 	struct module_list *lp, *tmp;
+	hotinline_desc_t *hid, *next;
 	int ksyms_exported = 0;
 
 	lp = mp->head;
@@ -2185,6 +2187,15 @@ free_module_data(struct module *mp)
 		tmp = lp;
 		lp = lp->next;
 		kobj_free((char *)tmp, sizeof (*tmp));
+	}
+
+	/* release hotinlines */
+	hid = mp->hi_calls;
+	while (hid != NULL) {
+		next = hid->hid_next;
+		kobj_free(hid->hid_symname, strlen(hid->hid_symname) + 1);
+		kobj_free(hid, sizeof (hotinline_desc_t));
+		hid = next;
 	}
 
 	rw_enter(&ksyms_lock, RW_WRITER);
@@ -3032,8 +3043,18 @@ do_symbols(struct module *mp, Elf64_Addr bss_base)
 		if (sp->st_shndx == SHN_UNDEF) {
 			resolved = 0;
 
+			/*
+			 * Skip over sdt probes and smap calls,
+			 * they're relocated later.
+			 */
 			if (strncmp(name, sdt_prefix, strlen(sdt_prefix)) == 0)
 				continue;
+#if defined(__x86)
+			if (strcmp(name, "smap_enable") == 0 ||
+			    strcmp(name, "smap_disable") == 0)
+				continue;
+#endif /* defined(__x86) */
+
 
 			/*
 			 * If it's not a weak reference and it's

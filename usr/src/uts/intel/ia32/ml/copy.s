@@ -36,7 +36,7 @@
 /*         All Rights Reserved						*/
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -3137,47 +3137,6 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 #endif
 
 #endif	/* __lint */
-
-/*
- * These functions are used for SMAP, supervisor mode access protection. They
- * are hotpatched to become real instructions when the system starts up which is
- * done in mlsetup() as a part of enabling the other CR4 related features.
- *
- * Generally speaking, smap_disable() is a stac instruction and smap_enable is a
- * clac instruction. It's safe to call these any number of times, and in fact,
- * out of paranoia, the kernel will likely call it at several points.
- */
-
-#if defined(__lint)
-
-void
-smap_enable(void)
-{}
-
-void
-smap_disable(void)
-{}
-
-#else
-
-#if defined (__amd64) || defined(__i386)
-	ENTRY(smap_disable)
-	nop
-	nop
-	nop
-	ret
-	SET_SIZE(smap_disable)
-
-	ENTRY(smap_enable)
-	nop
-	nop
-	nop
-	ret
-	SET_SIZE(smap_enable)
-
-#endif /* __amd64 || __i386 */
-
-#endif /* __lint */
 
 #ifndef __lint
 

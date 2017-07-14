@@ -184,13 +184,17 @@ extern void fakesoftint(void);
 extern void *plat_traceback(void *);
 
 /*
- * The following two macros are the four byte instruction sequence of stac, ret
- * and clac, ret. These are used in startup_smap() as a part of properly setting
- * up the valid instructions. For more information on SMAP, see
- * uts/intel/ia32/ml/copy.s.
+ * The following two macros are the four byte instruction sequence of stac, nop
+ * and clac, nop. These are used in startup_smap() and hotinline_smap() as a
+ * part of properly setting up the valid instructions. For more information on
+ * SMAP, see uts/intel/ia32/ml/copy.s, uts/i86pc/os/machdep.c and
+ * uts/common/os/modctl.c.
+ *
+ * Note that smap_disable and smap_enable are resolved to stubs at compile time,
+ * but inlined at runtime by do_hotinlines() in uts/i86pc/os/machdep.c.
  */
-#define	SMAP_CLAC_INSTR	0xc3ca010f
-#define	SMAP_STAC_INSTR	0xc3cb010f
+#define	SMAP_CLAC_INSTR	0x90ca010f
+#define	SMAP_STAC_INSTR	0x90cb010f
 extern void smap_disable(void);
 extern void smap_enable(void);
 

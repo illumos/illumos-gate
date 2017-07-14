@@ -22,8 +22,8 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -694,6 +694,7 @@ startup_smap(void)
 	uint32_t inst;
 	uint8_t *instp;
 	char sym[128];
+	struct modctl *modp;
 
 	extern int _smap_enable_patch_count;
 	extern int _smap_disable_patch_count;
@@ -727,8 +728,15 @@ startup_smap(void)
 		hot_patch_kernel_text((caddr_t)instp, inst, 4);
 	}
 
-	hot_patch_kernel_text((caddr_t)smap_enable, SMAP_CLAC_INSTR, 4);
-	hot_patch_kernel_text((caddr_t)smap_disable, SMAP_STAC_INSTR, 4);
+	/*
+	 * Hotinline calls to smap_enable and smap_disable within
+	 * unix module. Hotinlines in other modules are done on
+	 * mod_load().
+	 */
+	modp = mod_hold_by_name("unix");
+	do_hotinlines(modp->mod_mp);
+	mod_release_mod(modp);
+
 	setcr4(getcr4() | CR4_SMAP);
 	smap_enable();
 }

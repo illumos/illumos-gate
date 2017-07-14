@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 /*
@@ -3467,6 +3468,11 @@ mod_load(struct modctl *mp, int usepath)
 		kmem_free(modinfop, sizeof (struct modinfo));
 		(void) mod_sysctl(SYS_SET_MVAR, (void *)mp);
 		retval = install_stubs_by_name(mp, mp->mod_modname);
+
+		/*
+		 * Perform hotinlines before module is started.
+		 */
+		do_hotinlines(mp->mod_mp);
 
 		/*
 		 * Now that the module is loaded, we need to give DTrace

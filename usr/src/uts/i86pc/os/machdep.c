@@ -190,6 +190,12 @@ extern void pm_cfb_rele(void);
 extern fastboot_info_t newkernel;
 
 /*
+ * Instructions to enable or disable SMAP, respectively.
+ */
+static const uint8_t clac_instr[3] = { 0x0f, 0x01, 0xca };
+static const uint8_t stac_instr[3] = { 0x0f, 0x01, 0xcb };
+
+/*
  * Machine dependent code to reboot.
  * "mdep" is interpreted as a character pointer; if non-null, it is a pointer
  * to a string to be used as the argument string when rebooting.
@@ -1454,4 +1460,46 @@ void
 plat_dr_disable_capability(uint64_t features)
 {
 	atomic_and_64(&plat_dr_options, ~features);
+}
+
+/*
+ * If SMAP is supported, look through hi_calls and inline
+ * calls to smap_enable() to clac and smap_disable() to stac.
+ */
+void
+hotinline_smap(hotinline_desc_t *hid)
+{
+	if (is_x86_feature(x86_featureset, X86FSET_SMAP) == B_FALSE)
+		return;
+
+/*
+ * We should never hit this since SMAP feature detection is behind
+ * an AMD64 header guard.
+ */
+#if defined(__i386)
+	panic("illumos only suppports SMAP on the AMD64 architecture.");
+#endif
+
+	if (strcmp(hid->hid_symname, "smap_enable") == 0) {
+		bcopy(clac_instr, (void *)hid->hid_instr_offset,
+		    sizeof (clac_instr));
+	} else if (strcmp(hid->hid_symname, "smap_disable") == 0) {
+		bcopy(stac_instr, (void *)hid->hid_instr_offset,
+		    sizeof (stac_instr));
+	}
+}
+
+/*
+ * Loop through hi_calls and hand off the inlining to
+ * the appropriate calls.
+ */
+void
+do_hotinlines(struct module *mp)
+{
+	for (hotinline_desc_t *hid = mp->hi_calls; hid != NULL;
+	    hid = hid->hid_next) {
+#if !defined(__xpv)
+		hotinline_smap(hid);
+#endif	/* __xpv */
+	}
 }

@@ -22,6 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 Joyent, Inc.
+ */
 
 #ifndef _SYS_KOBJ_H
 #define	_SYS_KOBJ_H
@@ -46,6 +49,12 @@ struct module_list {
 	struct module_list *next;
 	struct module *mp;
 };
+
+typedef struct hotinline_desc {
+	char	*hid_symname;		/* symbol name */
+	uintptr_t hid_instr_offset;	/* offset of call in text */
+	struct hotinline_desc *hid_next;	/* next hotinline */
+} hotinline_desc_t;
 
 typedef unsigned short	symid_t;		/* symbol table index */
 typedef unsigned char	*reloc_dest_t;
@@ -98,6 +107,8 @@ struct module {
 	size_t fbt_nentries;
 	caddr_t textwin;
 	caddr_t textwin_base;
+
+	hotinline_desc_t *hi_calls;
 
 	sdt_probedesc_t *sdt_probes;
 	size_t sdt_nprobes;
@@ -187,6 +198,7 @@ extern int kobj_read_file(struct _buf *, char *, unsigned, unsigned);
 extern int kobj_get_filesize(struct _buf *, uint64_t *size);
 extern uintptr_t kobj_getelfsym(char *, void *, int *);
 extern void kobj_set_ctf(struct module *, caddr_t data, size_t size);
+extern void do_hotinlines(struct module *);
 
 extern int kobj_filbuf(struct _buf *);
 extern void kobj_sync(void);
