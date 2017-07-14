@@ -36,7 +36,7 @@
 /*         All Rights Reserved						*/
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -66,11 +66,10 @@
  *
  * Rules and Constraints:
  *
- * 1. For anything that's not in copy.s, we have it do explicit calls to the
- * smap related code. It usually is in a position where it is able to. This is
- * restricted to the following three places: DTrace, resume() in swtch.s and
- * on_fault/no_fault. If you want to add it somewhere else, we should be
- * thinking twice.
+ * 1. For anything that's not in copy.s, we have it do explicit smap_disable()
+ * or smap_enable() calls.  This is restricted to the following three places:
+ * DTrace, resume() in swtch.s and on_fault/no_fault. If you want to add it
+ * somewhere else, we should be thinking twice.
  *
  * 2. We try to toggle this at the smallest window possible. This means that if
  * we take a fault, need to try to use a copyop in copyin() or copyout(), or any
@@ -81,33 +80,25 @@
  * explicitly only allowed to be called while in an on_fault()/no_fault() handler,
  * which already takes care of ensuring that SMAP is enabled and disabled. Note
  * this means that when under an on_fault()/no_fault() handler, one must not
- * call the non-*_noeer() routines.
+ * call the non-*_noerr() routines.
  *
  * 4. The first thing we should do after coming out of an lofault handler is to
- * make sure that we call smap_enable again to ensure that we are safely
+ * make sure that we call smap_enable() again to ensure that we are safely
  * protected, as more often than not, we will have disabled smap to get there.
  *
- * 5. The SMAP functions, smap_enable and smap_disable may not touch any
- * registers beyond those done by the call and ret. These routines may be called
- * from arbitrary contexts in copy.s where we have slightly more special ABIs in
- * place.
+ * 5. smap_enable() and smap_disable() don't exist: calls to these functions
+ * generate runtime relocations, that are then processed into the necessary
+ * clac/stac, via the krtld hotinlines mechanism and hotinline_smap().
  *
  * 6. For any inline user of SMAP, the appropriate SMAP_ENABLE_INSTR and
- * SMAP_DISABLE_INSTR macro should be used (except for smap_enable() and
- * smap_disable()). If the number of these is changed, you must update the
- * constants SMAP_ENABLE_COUNT and SMAP_DISABLE_COUNT below.
+ * SMAP_DISABLE_INSTR macro should be used. If the number of these is changed,
+ * you must update the constants SMAP_ENABLE_COUNT and SMAP_DISABLE_COUNT below.
  *
- * 7. Note, at this time SMAP is not implemented for the 32-bit kernel. There is
- * no known technical reason preventing it from being enabled.
- *
- * 8. Generally this .s file is processed by a K&R style cpp. This means that it
+ * 7. Generally this .s file is processed by a K&R style cpp. This means that it
  * really has a lot of feelings about whitespace. In particular, if you have a
  * macro FOO with the arguments FOO(1, 3), the second argument is in fact ' 3'.
  *
- * 9. The smap_enable and smap_disable functions should not generally be called.
- * They exist such that DTrace and on_trap() may use them, that's it.
- *
- * 10. In general, the kernel has its own value for rflags that gets used. This
+ * 8. In general, the kernel has its own value for rflags that gets used. This
  * is maintained in a few different places which vary based on how the thread
  * comes into existence and whether it's a user thread. In general, when the
  * kernel takes a trap, it always will set ourselves to a known set of flags,
@@ -1901,30 +1892,6 @@ _flt_/**/NAME:					\
 .cpyout_ne_pmsg:
 	.string "copyout_noerr: argument not in kernel address space"
 #endif
-
-/*
- * These functions are used for SMAP, supervisor mode access protection. They
- * are hotpatched to become real instructions when the system starts up which is
- * done in mlsetup() as a part of enabling the other CR4 related features.
- *
- * Generally speaking, smap_disable() is a stac instruction and smap_enable is a
- * clac instruction. It's safe to call these any number of times, and in fact,
- * out of paranoia, the kernel will likely call it at several points.
- */
-
-	ENTRY(smap_disable)
-	nop
-	nop
-	nop
-	ret
-	SET_SIZE(smap_disable)
-
-	ENTRY(smap_enable)
-	nop
-	nop
-	nop
-	ret
-	SET_SIZE(smap_enable)
 
 .data
 .align	4
