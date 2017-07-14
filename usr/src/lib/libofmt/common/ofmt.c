@@ -23,6 +23,11 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
+
 #include <errno.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -34,6 +39,7 @@
 #include <unistd.h>
 #include <sys/sysmacros.h>
 #include <libintl.h>
+#include <assert.h>
 
 /*
  * functions and structures to internally process a comma-separated string
@@ -45,9 +51,8 @@ typedef struct {
 	uint_t	s_nfields;	/* the number of fields in s_buf */
 	uint_t	s_currfield;	/* the current field being processed */
 } split_t;
+
 static void splitfree(split_t *);
-static split_t *split_str(const char *, uint_t);
-static split_t *split_fields(const ofmt_field_t *, uint_t, uint_t);
 
 /*
  * The state of the output is tracked in a ofmt_state_t structure.
@@ -122,26 +127,30 @@ fail:
 }
 
 /*
- * Split `fields' into at most `maxfields' fields. Return a pointer to
- * a split_t containing the split fields, or NULL on failure. Invoked
- * when all fields are implicitly selected at handle creation by
- * passing in a NULL fields_str
+ * Split a template into its maximum number of fields (capped by the maxcols
+ * if it's non-zero).  Return a pointer to a split_t containing the split
+ * fields, or NULL on failure.  Invoked when all fields are implicitly
+ * selected at handle creation.
  */
 static split_t *
-split_fields(const ofmt_field_t *template, uint_t maxfields, uint_t maxcols)
+split_max(const ofmt_field_t *template, uint_t maxcols)
 {
+	const ofmt_field_t *ofp;
 	split_t	*sp;
-	int i, cols;
+	int i, cols, nfields = 0;
 
 	sp = calloc(sizeof (split_t), 1);
 	if (sp == NULL)
 		return (NULL);
 
-	sp->s_fields = malloc(sizeof (char *) * maxfields);
+	for (ofp = template; ofp->of_name != NULL; ofp++)
+		nfields++;
+
+	sp->s_fields = malloc(sizeof (char *) * nfields);
 	if (sp->s_fields == NULL)
 		goto fail;
 	cols = 0;
-	for (i = 0; i < maxfields; i++) {
+	for (i = 0; i < nfields; i++) {
 		cols += template[i].of_width;
 		/*
 		 * If all fields are implied without explicitly passing
@@ -179,11 +188,10 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
     uint_t maxcols, ofmt_handle_t *ofmt)
 {
 	split_t		*sp;
-	uint_t		i, j, of_index;
+	uint_t		i, of_index;
 	const ofmt_field_t *ofp;
 	ofmt_field_t	*of;
 	ofmt_state_t	*os = NULL;
-	int		nfields = 0;
 	ofmt_status_t	error = OFMT_SUCCESS;
 	boolean_t	parsable = (flags & OFMT_PARSABLE);
 	boolean_t	wrap = (flags & OFMT_WRAP);
@@ -207,18 +215,29 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 	}
 	if (template == NULL)
 		return (OFMT_ENOTEMPLATE);
-	for (ofp = template; ofp->of_name != NULL; ofp++)
-		nfields++;
+
 	/*
 	 * split str into the columns selected, or construct the
 	 * full set of columns (equivalent to -o all).
 	 */
 	if (str != NULL && strcasecmp(str, "all") != 0) {
+		const char *c;
+		int nfields = 1;
+
+		/*
+		 * Get an upper bound on the number of fields by counting
+		 * the commas.
+		 */
+		for (c = str; *c != '\0'; c++) {
+			if (*c == ',')
+				nfields++;
+		}
+
 		sp = split_str(str, nfields);
 	} else {
 		if (parsable || (str != NULL && strcasecmp(str, "all") == 0))
 			maxcols = 0;
-		sp = split_fields(template, nfields, maxcols);
+		sp = split_max(template, maxcols);
 	}
 	if (sp == NULL)
 		goto nomem;
@@ -238,13 +257,12 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 	 * nfields is the number of fields in template.
 	 */
 	for (i = 0; i < sp->s_nfields; i++) {
-		for (j = 0; j < nfields; j++) {
-			if (strcasecmp(sp->s_fields[i],
-			    template[j].of_name) == 0) {
+		for (ofp = template; ofp->of_name != NULL; ofp++) {
+			if (strcasecmp(sp->s_fields[i], ofp->of_name) == 0)
 				break;
-			}
 		}
-		if (j == nfields) {
+
+		if (ofp->of_name == NULL) {
 			int nbad = os->os_nbad++;
 
 			error = OFMT_EBADFIELDS;
@@ -259,7 +277,7 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 				goto nomem;
 			continue;
 		}
-		of[of_index].of_name = strdup(template[j].of_name);
+		of[of_index].of_name = strdup(ofp->of_name);
 		if (of[of_index].of_name == NULL)
 			goto nomem;
 		if (multiline) {
@@ -267,9 +285,9 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 
 			os->os_maxnamelen = MAX(n, os->os_maxnamelen);
 		}
-		of[of_index].of_width = template[j].of_width;
-		of[of_index].of_id = template[j].of_id;
-		of[of_index].of_cb = template[j].of_cb;
+		of[of_index].of_width = ofp->of_width;
+		of[of_index].of_id = ofp->of_id;
+		of[of_index].of_cb = ofp->of_cb;
 		of_index++;
 	}
 	splitfree(sp);
@@ -611,4 +629,32 @@ ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t error, char *buf,
 	(void) snprintf(buf, bufsize, dgettext(TEXT_DOMAIN, s));
 	(void) strlcat(buf, ebuf, bufsize);
 	return (buf);
+}
+
+void
+ofmt_check(ofmt_status_t oferr, boolean_t parsable, ofmt_handle_t ofmt,
+    void (*die)(const char *, ...), void (*warn)(const char *, ...))
+{
+	char buf[OFMT_BUFSIZE];
+
+	assert(die != NULL);
+	assert(warn != NULL);
+
+	if (oferr == OFMT_SUCCESS)
+		return;
+
+	(void) ofmt_strerror(ofmt, oferr, buf, sizeof (buf));
+
+	/*
+	 * All errors are considered fatal in parsable mode.  OFMT_ENOMEM and
+	 * OFMT_ENOFIELDS errors are always fatal, regardless of mode.  For
+	 * other errors, we print diagnostics in human-readable mode and
+	 * processs what we can.
+	 */
+	if (parsable || oferr == OFMT_ENOFIELDS || oferr == OFMT_ENOMEM) {
+		ofmt_close(ofmt);
+		die(buf);
+	} else {
+		warn(buf);
+	}
 }

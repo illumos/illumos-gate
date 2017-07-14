@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
+
 #include <stdio.h>
 #include <locale.h>
 #include <stdarg.h>
@@ -81,7 +85,6 @@ static void	warn_dlerr(dladm_status_t, const char *, ...);
 
 /* callback functions for printing output */
 static ofmt_cb_t print_flowprop_cb, print_default_cb;
-static void flowadm_ofmt_check(ofmt_status_t, boolean_t, ofmt_handle_t);
 
 typedef struct	cmd {
 	char	*c_name;
@@ -642,7 +645,7 @@ do_show_flow(int argc, char *argv[])
 	}
 
 	oferr = ofmt_open(fields_str, flow_fields, ofmtflags, 0, &ofmt);
-	flowadm_ofmt_check(oferr, state.fs_parsable, ofmt);
+	ofmt_check(oferr, state.fs_parsable, ofmt, die, warn);
 	state.fs_ofmt = ofmt;
 
 	/* Show attributes of one flow */
@@ -1186,7 +1189,7 @@ do_show_flowprop(int argc, char **argv)
 	state.fs_status = DLADM_STATUS_OK;
 
 	oferr = ofmt_open(fields_str, flowprop_fields, ofmtflags, 0, &ofmt);
-	flowadm_ofmt_check(oferr, state.fs_parsable, ofmt);
+	ofmt_check(oferr, state.fs_parsable, ofmt, die, warn);
 	state.fs_ofmt = ofmt;
 
 	/* Show properties for one flow */
@@ -1276,27 +1279,4 @@ print_default_cb(ofmt_arg_t *of_arg, char *buf, uint_t bufsize)
 	value = (char *)of_arg->ofmt_cbarg + of_arg->ofmt_id;
 	(void) strlcpy(buf, value, bufsize);
 	return (B_TRUE);
-}
-
-static void
-flowadm_ofmt_check(ofmt_status_t oferr, boolean_t parsable,
-    ofmt_handle_t ofmt)
-{
-	char buf[OFMT_BUFSIZE];
-
-	if (oferr == OFMT_SUCCESS)
-		return;
-	(void) ofmt_strerror(ofmt, oferr, buf, sizeof (buf));
-	/*
-	 * All errors are considered fatal in parsable mode.
-	 * NOMEM errors are always fatal, regardless of mode.
-	 * For other errors, we print diagnostics in human-readable
-	 * mode and processs what we can.
-	 */
-	if (parsable || oferr == OFMT_ENOFIELDS) {
-		ofmt_close(ofmt);
-		die(buf);
-	} else {
-		warn(buf);
-	}
 }
