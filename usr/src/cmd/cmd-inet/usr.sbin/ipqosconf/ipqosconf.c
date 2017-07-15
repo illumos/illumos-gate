@@ -4823,7 +4823,7 @@ char **token)
 
 		/* Skip any whitespace */
 
-		while (isspace(*st) && st != '\0') {
+		while (isspace(*st) && *st != '\0') {
 			st++;
 		}
 
