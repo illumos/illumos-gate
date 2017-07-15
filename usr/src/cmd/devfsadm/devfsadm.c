@@ -6308,7 +6308,7 @@ split_devlinktab_entry(char *entry, char **selector, char **p_link,
 		return (DEVFSADM_FAILURE);
 	}
 
-	if (*p_link == '\0') {
+	if (**p_link == '\0') {
 		err_print(MISSING_DEVNAME, devlinktab_line, devlinktab_file);
 		return (DEVFSADM_FAILURE);
 	}
