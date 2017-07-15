@@ -218,7 +218,7 @@ static int	peekc;
 static int	io;
 static void	(*oldhup)(), (*oldintr)();
 static void	(*oldquit)(), (*oldpipe)();
-static void	quit(int);
+static void	quit(int) __NORETURN;
 static int	vflag = 1;
 static int	xflag;
 static int	xtflag;
@@ -579,6 +579,7 @@ swch:
 	case 'E':
 		fchange = 0;
 		c = 'e';
+		/* FALLTHROUGH */
 	case 'e':
 		fflg++;
 		setnoaddr();
@@ -678,6 +679,7 @@ swch:
 
 	case 'l':
 		listf++;
+		/* FALLTHROUGH */
 	case 'p':
 		newline();
 	print:
@@ -700,6 +702,7 @@ swch:
 
 	case 'Q':
 		fchange = 0;
+		/* FALLTHROUGH */
 	case 'q':
 		setnoaddr();
 		newline();
@@ -2859,8 +2862,8 @@ fspec(char line[], struct Fspec *f, int up)
 						    TAB3))
 							f->Ffill = 1;
 						fsp++;
-						continue;
 					}
+					continue;
 
 			case ' ':	continue;
 
