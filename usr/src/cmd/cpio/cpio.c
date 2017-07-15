@@ -4679,7 +4679,7 @@ gethdr(void)
 					(void) strcpy(&fullnam[0], &prebuf[0]);
 					j = 0;
 					fullnam[k++] = '/';
-					while ((j < NAMSIZ) && (&nambuf[j] !=
+					while ((j < NAMSIZ) && (nambuf[j] !=
 					    '\0')) {
 						fullnam[k] = nambuf[j];
 						k++; j++;
