@@ -110,7 +110,7 @@ lm_clear_chain_sb_cons_idx(
         LM_INTMEM_WRITE32(PFDEV(pdev), CSTORM_HC_SYNC_LINE_DHC_OFFSET(hc_sb_info->hc_index_value, fw_sb_id), 0, BAR_CSTRORM_INTMEM);
         LM_INTMEM_READ32(PFDEV(pdev), CSTORM_HC_SYNC_LINE_DHC_OFFSET(hc_sb_info->hc_index_value, fw_sb_id), &rd_val_32, BAR_CSTRORM_INTMEM);
         DbgBreakIfAll(rd_val_32 != 0);
-        //Go to zeroing index value without break
+        /* FALLTHROUGH */
     case STATUS_BLOCK_NORMAL_TYPE:
         if (CHIP_IS_E1x(PFDEV(pdev))) {
             LM_INTMEM_WRITE16(PFDEV(pdev), CSTORM_HC_SYNC_LINE_INDEX_E1X_OFFSET(hc_sb_info->hc_index_value, fw_sb_id), 0, BAR_CSTRORM_INTMEM);

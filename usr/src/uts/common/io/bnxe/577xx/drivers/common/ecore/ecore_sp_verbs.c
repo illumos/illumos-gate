@@ -3389,7 +3389,7 @@ static int ecore_mcast_validate_e2(struct _lm_device_t *pdev,
 	/* DEL command deletes all currently configured MACs */
 	case ECORE_MCAST_CMD_DEL:
 		o->set_registry_size(o, 0);
-		/* Don't break */
+		/* FALLTHROUGH */
 
 	/* RESTORE command will restore the entire multicast configuration */
 	case ECORE_MCAST_CMD_RESTORE:
@@ -3695,7 +3695,7 @@ static int ecore_mcast_validate_e1(struct _lm_device_t *pdev,
 	/* DEL command deletes all currently configured MACs */
 	case ECORE_MCAST_CMD_DEL:
 		o->set_registry_size(o, 0);
-		/* Don't break */
+		/* FALLTHROUGH */
 
 	/* RESTORE command will restore the entire multicast configuration */
 	case ECORE_MCAST_CMD_RESTORE:

@@ -4616,6 +4616,7 @@ lm_chip_init( struct _lm_device_t *pdev)
         {
             return lm_status;
         }
+        /* FALLTHROUGH */
     case LM_LOADER_RESPONSE_LOAD_COMMON:
 #ifdef _VBD_
         lm_fl_reset_clear_inprogress(pdev);
@@ -4643,6 +4644,7 @@ lm_chip_init( struct _lm_device_t *pdev)
 
         //Check if there is dbus work
         mm_dbus_start_if_enable(pdev);
+        /* FALLTHROUGH */
 
     case LM_LOADER_RESPONSE_LOAD_PORT:
 #ifdef _VBD_
@@ -4672,7 +4674,7 @@ lm_chip_init( struct _lm_device_t *pdev)
         init_port_part(pdev);
         lm_init_intmem_port(pdev);
 
-        // going to the function part - fall through
+        /* FALLTHROUGH */
     case LM_LOADER_RESPONSE_LOAD_FUNCTION:
 #ifdef _VBD_
     if (lm_is_function_after_flr(pdev))
