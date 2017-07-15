@@ -1729,7 +1729,7 @@ gld_wput(queue_t *q, mblk_t *mp)
 		 */
 		GLD_CLEAR_MBLK_VTAG(mp);
 		multidata = B_FALSE;
-		/* LINTED: E_CASE_FALLTHRU */
+		/* FALLTHROUGH */
 	case M_MULTIDATA:
 		/* Only call gld_start() directly if nothing queued ahead */
 		/* No guarantees about ordering with different threads */
@@ -3082,7 +3082,7 @@ gld_paccept(gld_t *gld, pktinfo_t *pktinfo)
 
 static void
 gld_passon(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo,
-	void (*send)(queue_t *qp, mblk_t *mp))
+    void (*send)(queue_t *qp, mblk_t *mp))
 {
 	boolean_t is_phys = GLD_IS_PHYS(gld);
 	int skiplen;
