@@ -2034,8 +2034,8 @@ fc_fca_update_errors(fc_packet_t *pkt)
 			pkt->pkt_action = lsrjt->action;
 			break;
 		}
-		/* FALLTHROUGH */
 	}
+	/* FALLTHROUGH */
 
 	default:
 		ret = FC_FAILURE;
