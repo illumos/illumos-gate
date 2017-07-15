@@ -420,8 +420,7 @@ main(int argc, char **argv)
 
 
 static char *
-mkjobname(t)
-time_t t;
+mkjobname(time_t t)
 {
 	int i, fd;
 	char *name;
@@ -450,8 +449,7 @@ catch(int x)
 
 
 void
-atabort(msg)
-char *msg;
+atabort(char *msg)
 {
 	fprintf(stderr, "at: %s\n", gettext(msg));
 
@@ -515,8 +513,7 @@ leap(int year)
  * return time from time structure
  */
 static time_t
-gtime(tptr)
-struct	tm *tptr;
+gtime(struct tm *tptr)
 {
 	int i;
 	long	tv;
@@ -737,9 +734,9 @@ out:
 	fflush(NULL);
 }
 
+/* remove jobs that are specified */
 static int
 remove_jobs(int argc, char **argv, char *login)
-/* remove jobs that are specified */
 {
 	int		i, r;
 	int		error = 0;
@@ -758,7 +755,7 @@ remove_jobs(int argc, char **argv, char *login)
 	for (i = 0; i < argc; i++)
 		if (strchr(argv[i], '/') != NULL) {
 			fprintf(stderr, "at: %s: not a valid job-id\n",
-					argv[i]);
+			    argv[i]);
 		} else if (stat(argv[i], &buf)) {
 			fprintf(stderr, "at: %s: ", argv[i]);
 			perror("");
@@ -959,6 +956,7 @@ parse_time(char *t)
 		case 12:	/* CCYYMMDDhhmm */
 			century = atoi_for2(t);
 			t += 2;
+			/* FALLTHROUGH */
 		case 10:	/* YYMMDDhhmm */
 			tm.tm_year = atoi_for2(t);
 			t += 2;
@@ -967,6 +965,7 @@ parse_time(char *t)
 					tm.tm_year += 100;
 			} else
 				tm.tm_year += (century - 19) * 100;
+			/* FALLTHROUGH */
 		case 8:		/* MMDDhhmm */
 			tm.tm_mon = atoi_for2(t) - 1;
 			t += 2;
@@ -990,7 +989,8 @@ parse_time(char *t)
 }
 
 static int
-atoi_for2(char *p) {
+atoi_for2(char *p)
+{
 	int value;
 
 	value = (*p - '0') * 10 + *(p+1) - '0';
