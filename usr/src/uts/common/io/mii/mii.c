@@ -61,7 +61,7 @@ enum {
 	MII_ELOOP,
 };
 
-static const char *mii_errors[] = {
+static const char * const mii_errors[] = {
 	"",
 	"Failure resetting PHY.",
 	"Failure starting PHY.",
@@ -71,7 +71,7 @@ static const char *mii_errors[] = {
 };
 
 /* Indexed by XCVR_ type */
-static const const char *mii_xcvr_types[] = {
+static const char * const mii_xcvr_types[] = {
 	"Undefined",
 	"Unknown",
 	"10 Mbps",
