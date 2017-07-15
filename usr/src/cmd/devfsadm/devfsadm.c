@@ -2800,6 +2800,7 @@ create_link_common(char *devlink, char *contents, int *exists)
 				case EINVAL:
 					/* not a symlink, remove and create */
 					s_unlink(devlink);
+					/* FALLTHROUGH */
 				default:
 					/* maybe it didn't exist at all */
 					try = CREATE_LINK;
