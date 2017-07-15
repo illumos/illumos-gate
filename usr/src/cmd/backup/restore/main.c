@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Modified to recursively extract all files within a subtree
  *	(supressed by the h option) and recreate the heirarchical

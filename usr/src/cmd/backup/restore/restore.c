@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "restore.h"
 /* undef MAXNAMLEN to prevent compiler warnings about redef in dirent.h */
 #undef MAXNAMLEN
@@ -487,7 +485,7 @@ nodeupdates(name, ino, type)
 		(void) fprintf(stderr, "[%s] %s: %s\n",
 		    keyval(key), name, gettext("inconsistent state"));
 		done(1);
-		/*NOTREACHED*/
+		/* NOTREACHED */
 
 	/*
 	 * These states "cannot" arise for any state of the symbol table.
@@ -498,7 +496,7 @@ nodeupdates(name, ino, type)
 		(void) fprintf(stderr, "[%s] %s: %s\n",
 		    keyval(key), name, gettext("impossible state"));
 		done(1);
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	return (descend);
 }
