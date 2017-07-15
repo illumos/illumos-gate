@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*-
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -35,10 +33,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)hash_func.c	8.4 (Berkeley) 11/7/95";
-#endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
 
@@ -161,9 +155,7 @@ hash3(key, len)
 
 /* Chris Torek's hash function. */
 static u_int32_t
-hash4(key, len)
-	const void *key;
-	size_t len;
+hash4(const void *key, size_t len)
 {
 	u_int32_t h, loop;
 	const u_int8_t *k;
@@ -181,18 +173,25 @@ hash4(key, len)
 		case 0:
 			do {	/* All fall throughs */
 				HASH4;
+				/* FALLTHROUGH */
 		case 7:
 				HASH4;
+				/* FALLTHROUGH */
 		case 6:
 				HASH4;
+				/* FALLTHROUGH */
 		case 5:
 				HASH4;
+				/* FALLTHROUGH */
 		case 4:
 				HASH4;
+				/* FALLTHROUGH */
 		case 3:
 				HASH4;
+				/* FALLTHROUGH */
 		case 2:
 				HASH4;
+				/* FALLTHROUGH */
 		case 1:
 				HASH4;
 			} while (--loop);
