@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 // XXX - all this either goes away or gets repackaged
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +56,7 @@ AudioStderrMsg(
 	const Audio*	cp,		// object pointer
 	AudioError	code,		// error code
 	AudioSeverity	sev,		// error severity
-	char		*str)		// additional message string
+	const char	*str)		// additional message string
 {
 	int		id;
 	char		*name;
