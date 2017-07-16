@@ -13,8 +13,6 @@
  * specifies the terms and conditions for redistribution.
  */
   
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /* t4.c: read table specification */
 # include "t..c"
 int oncol;
@@ -62,10 +60,12 @@ while (c=get1char())
 		default:
 			if (c != tab)
 			error(gettext("bad table specification character"));
+			/* FALLTHROUGH */
 		case ' ': /* note this is also case tab */
 			continue;
 		case '\n':
 			if(sawchar==0) continue;
+			/* FALLTHROUGH */
 		case ',':
 		case '.': /* end of table specification */
 			ncol = max(ncol, icol);
@@ -96,7 +96,9 @@ while (c=get1char())
 			continue;
 		case 'C': case 'S': case 'R': case 'N': case 'L':  case 'A':
 			c += ('a'-'A');
+			/* FALLTHROUGH */
 		case '_': if (c=='_') c= '-';
+			/* FALLTHROUGH */
 		case '=': case '-':
 		case '^':
 		case 'c': case 's': case 'n': case 'r': case 'l':  case 'a':
