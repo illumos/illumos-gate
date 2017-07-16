@@ -956,18 +956,23 @@ listen(void)
 				case POLLERR:
 					logmessage("poll() returned POLLERR");
 					error(E_SYS_ERROR, EXIT | NO_MSG);
+					break;
 				case POLLHUP:
 					logmessage("poll() returned POLLHUP");
 					error(E_SYS_ERROR, EXIT | NO_MSG);
+					break;
 				case POLLNVAL:
 					logmessage("poll() returned POLLNVAL");
 					error(E_SYS_ERROR, EXIT | NO_MSG);
+					break;
 				case POLLPRI:
 					logmessage("poll() returned POLLPRI");
 					error(E_SYS_ERROR, EXIT | NO_MSG);
+					break;
 				case POLLOUT:
 					logmessage("poll() returned POLLOUT");
 					error(E_SYS_ERROR, EXIT | NO_MSG);
+					break;
 				default:
 					logmessage("poll() returned unrecognized event");
 					error(E_SYS_ERROR, EXIT | NO_MSG);
@@ -1080,6 +1085,7 @@ doevent(struct call_list *phead, int fd)
 	case 0:
 		sys_error(E_POLL, EXIT);
 		/* no return */
+		break;
 	case T_LISTEN:
 	DEBUG((9, "case t_listen "));
 		current = dequeue(Free_call_p);
