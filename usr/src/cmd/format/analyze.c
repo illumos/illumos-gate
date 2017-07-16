@@ -246,6 +246,7 @@ do_scan(flags, mode)
 					break;
 				case READPATTERN:
 					flags |=  SCAN_PURGE_READ_PASS;
+					/* FALLTHROUGH */
 				default:
 					data = purge_patterns[pattern];
 					pattern++;
