@@ -2523,7 +2523,7 @@ adminCredCheck(clientopts_t *arglist)
 	}
 
 	/* Now let's check if we have the cred stuff we need */
-	if (adminDN == NULL || adminDN[0] == '\0') {
+	if (adminDN == NULL || adminDN[0] == NULL) {
 		CLIENT_FPUTS(
 		    gettext("Shadow Update is enabled, but "
 		    "no adminDN is configured.\n"), stderr);
@@ -2532,7 +2532,7 @@ adminCredCheck(clientopts_t *arglist)
 	}
 
 	/* If we need adminPassword (prompt) */
-	if (adminPassword == NULL || adminPassword[0] == '\0') {
+	if (adminPassword == NULL || adminPassword[0] == NULL) {
 		CLIENT_FPUTS(
 		    gettext("Shadow Update requires adminPassword\n"),
 		    stderr);
