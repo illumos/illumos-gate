@@ -2123,6 +2123,7 @@ scn_proc(
 			if (scn_dispatched != 0) {
 				(void) scn_trigger();
 			}
+			/* FALLTHROUGH */
 		case SCN_IGNORE:
 			/* clean the scn(s) */
 			free_scn();

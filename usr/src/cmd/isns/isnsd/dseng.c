@@ -96,6 +96,7 @@ load_data(
 			    ISNS_ISCSI_SCN_BITMAP_ATTR_ID)];
 			scn_name = &obj->attrs[ATTR_INDEX_ISCSI(
 			    ISNS_ISCSI_NAME_ATTR_ID)];
+			/* FALLTHROUGH */
 		case OBJ_PORTAL:
 			if (puid != 0 &&
 			    TYPE_OF_PARENT[obj->type] == ptype) {
