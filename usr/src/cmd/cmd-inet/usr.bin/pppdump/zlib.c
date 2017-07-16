@@ -2884,6 +2884,7 @@ int f;
         break;
       }
       z->state->mode = FLAG;
+      /* FALLTHROUGH */
     case FLAG:
       NEEDBYTE
       if ((b = NEXTBYTE) & 0x20)
@@ -2902,6 +2903,7 @@ int f;
       }
       Trace((stderr, "inflate: zlib header ok\n"));
       z->state->mode = BLOCKS;
+      /* FALLTHROUGH */
     case BLOCKS:
       r = inflate_blocks(z->state->blocks, z, r);
       if (f == Z_PACKET_FLUSH && z->avail_in == 0 && z->avail_out != 0)
@@ -2922,18 +2924,22 @@ int f;
         break;
       }
       z->state->mode = CHECK4;
+      /* FALLTHROUGH */
     case CHECK4:
       NEEDBYTE
       z->state->sub.check.need = (uLong)NEXTBYTE << 24;
       z->state->mode = CHECK3;
+      /* FALLTHROUGH */
     case CHECK3:
       NEEDBYTE
       z->state->sub.check.need += (uLong)NEXTBYTE << 16;
       z->state->mode = CHECK2;
+      /* FALLTHROUGH */
     case CHECK2:
       NEEDBYTE
       z->state->sub.check.need += (uLong)NEXTBYTE << 8;
       z->state->mode = CHECK1;
+      /* FALLTHROUGH */
     case CHECK1:
       NEEDBYTE
       z->state->sub.check.need += (uLong)NEXTBYTE;
@@ -2947,6 +2953,7 @@ int f;
       }
       Trace((stderr, "inflate: zlib check ok\n"));
       z->state->mode = DONE;
+      /* FALLTHROUGH */
     case DONE:
       return Z_STREAM_END;
     case BAD:
@@ -3474,6 +3481,7 @@ int r;
         s->sub.decode.td = td;
       }
       s->mode = CODES;
+      /* FALLTHROUGH */
     case CODES:
       UPDATE
       if ((r = inflate_codes(s, z, r)) != Z_STREAM_END)
@@ -3499,11 +3507,13 @@ int r;
         p--;                    /* can always return one */
       }
       s->mode = DRY;
+      /* FALLTHROUGH */
     case DRY:
       FLUSH
       if (s->read != s->write)
         LEAVE
       s->mode = DONEB;
+      /* FALLTHROUGH */
     case DONEB:
       r = Z_STREAM_END;
       LEAVE
@@ -4180,6 +4190,7 @@ int r;
       c->sub.code.need = c->lbits;
       c->sub.code.tree = c->ltree;
       c->mode = LEN;
+      /* FALLTHROUGH */
     case LEN:           /* i: get length/literal/eob next */
       j = c->sub.code.need;
       NEEDBITS(j)
@@ -4227,6 +4238,7 @@ int r;
       c->sub.code.tree = c->dtree;
       Tracevv((stderr, "inflate:         length %u\n", c->len));
       c->mode = DIST;
+      /* FALLTHROUGH */
     case DIST:          /* i: get distance next */
       j = c->sub.code.need;
       NEEDBITS(j)
@@ -4257,6 +4269,7 @@ int r;
       DUMPBITS(j)
       Tracevv((stderr, "inflate:         distance %u\n", c->sub.copy.dist));
       c->mode = COPY;
+      /* FALLTHROUGH */
     case COPY:          /* o: copying bytes in window, waiting for space */
 #ifndef __TURBOC__ /* Turbo C bug for following expression */
       f = (uInt)(q - s->window) < c->sub.copy.dist ?
@@ -4287,6 +4300,7 @@ int r;
       if (s->read != s->write)
         LEAVE
       c->mode = END;
+      /* FALLTHROUGH */
     case END:
       r = Z_STREAM_END;
       LEAVE
