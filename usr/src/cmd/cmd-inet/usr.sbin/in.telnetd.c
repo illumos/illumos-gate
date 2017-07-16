@@ -3046,7 +3046,7 @@ doit(int f, struct sockaddr_storage *who)
 	 * Show banner that getty never gave, but
 	 * only if the user did not automatically authenticate.
 	 */
-	if (getenv("USER") == '\0' && auth_status < AUTH_USER)
+	if (getenv("USER") == NULL && auth_status < AUTH_USER)
 		showbanner();
 
 	/*
