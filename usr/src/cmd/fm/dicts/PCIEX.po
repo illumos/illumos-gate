@@ -38,7 +38,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-0A.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-0A.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-1P
 # keys: fault.io.pciex.device-interr fault.io.pciex.device-invreq
@@ -54,7 +54,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-1P.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-1P.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-25
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-noresp
@@ -70,7 +70,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-25.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-25.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-3S
 # keys: fault.io.pciex.bus-linkerr fault.io.pciex.device-interr
@@ -86,7 +86,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-3S.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-3S.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-43
 # keys: fault.io.pci.bus-linkerr fault.io.pciex.device-interr
@@ -102,7 +102,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-43.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-43.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-5Y
 # keys: fault.io.pci.device-invreq
@@ -118,7 +118,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-5Y.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-5Y.action"
-msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support."
+msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support."
 #
 # code: PCIEX-8000-6D
 # keys: fault.io.pci.device-invreq fault.io.pciex.device-interr
@@ -134,7 +134,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-6D.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-6D.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-7H
 # keys: fault.io.pci.device-interr fault.io.pciex.device-invreq
@@ -150,7 +150,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-7H.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-7H.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-8R
 # keys: fault.io.pciex.device-invreq
@@ -166,7 +166,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-8R.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-8R.action"
-msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-94
 # keys: fault.io.pci.device-noresp fault.io.pciex.device-invreq
@@ -182,7 +182,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-94.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-94.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-AQ
 # keys: fault.io.pci.device-invreq fault.io.pciex.device-noresp
@@ -198,7 +198,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-AQ.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-AQ.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-CC
 # keys: fault.io.pci.bus-linkerr fault.io.pci.device-interr fault.io.pciex.device-interr
@@ -214,7 +214,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-CC.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-CC.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-DJ
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-noresp
@@ -230,7 +230,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-DJ.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-DJ.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-EE
 # keys: fault.io.pciex.bus-linkerr fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-noresp
@@ -246,7 +246,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-EE.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-EE.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-FX
 # keys: fault.io.pciex.bus-linkerr fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-invreq fault.io.pciex.device-noresp
@@ -262,7 +262,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-FX.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-FX.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-G2
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-invreq fault.io.pciex.device-noresp
@@ -278,7 +278,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-G2.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-G2.action"
-msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-HS
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-interr
@@ -294,7 +294,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-HS.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-HS.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-J5
 # keys: fault.io.pciex.device-interr-corr
@@ -310,7 +310,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-J5.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-J5.action"
-msgstr "Schedule a repair procedure to replace the affected device. Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device. Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-KP
 # keys: fault.io.pciex.bus-linkerr-corr fault.io.pciex.device-interr-corr
@@ -326,7 +326,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-KP.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-KP.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-LA
 # keys: fault.io.pci.bus-linkerr-unaf fault.io.pciex.device-interr-unaf
@@ -342,7 +342,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-LA.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-LA.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-MH
 # keys: fault.io.pciex.device-interr-unaf
@@ -358,7 +358,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-MH.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-MH.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-ND
 # keys: fault.io.pciex.device-interr-deg
@@ -374,7 +374,7 @@ msgstr "None\n"
 msgid "PCIEX-8000-ND.impact"
 msgstr "Degraded services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-ND.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-PY
 # keys: fault.io.pciex.fw_corrupt
@@ -390,7 +390,7 @@ msgstr "One or more device instances may be disabled.\n"
 msgid "PCIEX-8000-PY.impact"
 msgstr "Degraded services provided by the device instances associated with this fault.\n"
 msgid "PCIEX-8000-PY.action"
-msgstr "Use 'fmadm faulty' to identify the device and then update the firmware to the latest version or schedule a repair procedure to replace the affected device. Contact Sun support for further information.\n"
+msgstr "Use 'fmadm faulty' to identify the device and then update the firmware to the latest version or schedule a repair procedure to replace the affected device. Contact your illumos distribution team for further information.\n"
 #
 # code: PCIEX-8000-Q3
 # keys: fault.io.pciex.fw_mismatch
@@ -406,7 +406,7 @@ msgstr "One or more device instances may be disabled.\n"
 msgid "PCIEX-8000-Q3.impact"
 msgstr "Degraded services provided by the device instances associated with this fault.\n"
 msgid "PCIEX-8000-Q3.action"
-msgstr "Use 'fmadm faulty' to identify the device and then update the firmware to the latest version. Contact Sun support for further information.\n"
+msgstr "Use 'fmadm faulty' to identify the device and then update the firmware to the latest version. Contact your illumos distribution team for further information.\n"
 #
 # code: PCIEX-8000-RC
 # keys: fault.io.pciex.rc.generic-ce
@@ -422,7 +422,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-RC.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "PCIEX-8000-RC.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-SQ
 # keys: fault.io.pciex.rc.generic-ue
@@ -438,7 +438,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-SQ.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "PCIEX-8000-SQ.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-T4
 # keys: fault.io.pciex.rc.generic-sw
@@ -454,7 +454,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-T4.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "PCIEX-8000-T4.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: PCIEX-8000-UR
 # keys: fault.io.pciex.rc.generic-fw
@@ -470,4 +470,4 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-UR.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "PCIEX-8000-UR.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"

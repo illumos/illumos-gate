@@ -111,8 +111,7 @@ static zone_key_t	idmap_zone_key;
 
 static int
 kidmap_rpc_call(idmap_zone_specific_t *zs, uint32_t op,
-		xdrproc_t xdr_args, caddr_t args,
-		xdrproc_t xdr_res, caddr_t res);
+    xdrproc_t xdr_args, caddr_t args, xdrproc_t xdr_res, caddr_t res);
 
 static int
 kidmap_call_door(idmap_zone_specific_t *zs, door_arg_t *arg);
@@ -183,7 +182,7 @@ idmap_unreg_dh(zone_t *zone, door_handle_t dh)
  */
 void
 idmap_get_cache_data(zone_t *zone, size_t *uidbysid, size_t *gidbysid,
-	size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid)
+    size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid)
 {
 	idmap_zone_specific_t *zs;
 
@@ -200,7 +199,7 @@ kidmap_call_door(idmap_zone_specific_t *zs, door_arg_t *arg)
 	door_info_t	di;
 	int		status = 0;
 	int		num_retries = 5;
-	int		door_retried;
+	int		door_retried = 0;
 
 retry:
 	mutex_enter(&zs->zone_mutex);
@@ -423,7 +422,7 @@ idmap_purge_cache(zone_t *zone)
  */
 idmap_stat
 kidmap_getuidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
-		uid_t *uid)
+    uid_t *uid)
 {
 	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
@@ -500,7 +499,7 @@ kidmap_getuidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
  */
 idmap_stat
 kidmap_getgidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
-		gid_t *gid)
+    gid_t *gid)
 {
 	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
@@ -577,7 +576,7 @@ kidmap_getgidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
  */
 idmap_stat
 kidmap_getpidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
-		uid_t *pid, int *is_user)
+    uid_t *pid, int *is_user)
 {
 	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
@@ -665,7 +664,7 @@ kidmap_getpidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
  */
 idmap_stat
 kidmap_getsidbyuid(zone_t *zone, uid_t uid, const char **sid_prefix,
-		uint32_t *rid)
+    uint32_t *rid)
 {
 	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
@@ -749,7 +748,7 @@ kidmap_getsidbyuid(zone_t *zone, uid_t uid, const char **sid_prefix,
  */
 idmap_stat
 kidmap_getsidbygid(zone_t *zone, gid_t gid, const char **sid_prefix,
-		uint32_t *rid)
+    uint32_t *rid)
 {
 	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
@@ -896,7 +895,7 @@ kidmap_get_extend(idmap_get_handle_t *get_handle)
  */
 idmap_stat
 kidmap_batch_getuidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
-			uint32_t rid, uid_t *uid, idmap_stat *stat)
+    uint32_t rid, uid_t *uid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
 	idmap_get_res 	*result;
@@ -957,7 +956,7 @@ kidmap_batch_getuidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
  */
 idmap_stat
 kidmap_batch_getgidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
-			uint32_t rid, uid_t *gid, idmap_stat *stat)
+    uint32_t rid, uid_t *gid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
 	idmap_get_res 	*result;
@@ -1020,7 +1019,7 @@ kidmap_batch_getgidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
  */
 idmap_stat
 kidmap_batch_getpidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
-		uint32_t rid, uid_t *pid, int *is_user, idmap_stat *stat)
+    uint32_t rid, uid_t *pid, int *is_user, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
 	idmap_get_res 	*result;
@@ -1079,7 +1078,7 @@ kidmap_batch_getpidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
  */
 idmap_stat
 kidmap_batch_getsidbyuid(idmap_get_handle_t *get_handle, uid_t uid,
-		const char **sid_prefix, uint32_t *rid, idmap_stat *stat)
+    const char **sid_prefix, uint32_t *rid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
 	idmap_get_res 	*result;
@@ -1134,7 +1133,7 @@ kidmap_batch_getsidbyuid(idmap_get_handle_t *get_handle, uid_t uid,
  */
 idmap_stat
 kidmap_batch_getsidbygid(idmap_get_handle_t *get_handle, gid_t gid,
-		const char **sid_prefix, uint32_t *rid, idmap_stat *stat)
+    const char **sid_prefix, uint32_t *rid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
 	idmap_get_res 	*result;
@@ -1395,7 +1394,7 @@ kidmap_get_destroy(idmap_get_handle_t *get_handle)
 
 static int
 kidmap_rpc_call(idmap_zone_specific_t *zs, uint32_t op, xdrproc_t xdr_args,
-		caddr_t args, xdrproc_t xdr_res, caddr_t res)
+    caddr_t args, xdrproc_t xdr_res, caddr_t res)
 {
 	XDR		xdr_ctx;
 	struct	rpc_msg reply_msg;

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Sebastian Wiedenroth
  */
 
 #include <sys/types.h>
@@ -339,8 +340,10 @@ socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 			error = 0;
 		break;
 	case EPIPE:
-		if ((so->so_mode & SM_KERNEL) == 0)
+		if (((so->so_mode & SM_KERNEL) == 0) &&
+		    ((msg->msg_flags & MSG_NOSIGNAL) == 0)) {
 			tsignal(curthread, SIGPIPE);
+		}
 		break;
 	}
 

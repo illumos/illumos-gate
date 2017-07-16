@@ -263,7 +263,7 @@ loadauditlist(char *dirstr, char *minfreestr)
 	dirlist_t	*thisdir;
 	int		node_count = 0;
 	int		rc;
-	int		temp_minfree;
+	int		temp_minfree = 0;
 
 	static dirlist_t	*activeList = NULL;	/* directory list */
 
@@ -691,7 +691,8 @@ spacecheck(dirlist_t *thisdir, int test_limit, size_t next_buf_size)
  * INT_MAX.  Defaults to 0 if the value is invalid or is missing.
  */
 static void
-save_maxsize(char *maxsize) {
+save_maxsize(char *maxsize)
+{
 	/*
 	 * strtol() returns a long which could be larger than int so
 	 * store here for sanity checking first
@@ -713,11 +714,11 @@ save_maxsize(char *maxsize) {
 		 */
 		if ((errno == ERANGE) ||
 		    ((proposed_maxsize != 0) &&
-			(proposed_maxsize < FSIZE_MIN)) ||
+		    (proposed_maxsize < FSIZE_MIN)) ||
 		    (proposed_maxsize > INT_MAX)) {
 			binfile_maxsize = 0;
 			DPRINT((dbfp, "binfile: p_fsize parameter out of "
-					"range: %s\n", maxsize));
+			    "range: %s\n", maxsize));
 			/*
 			 * Inform administrator of the error via
 			 * syslog

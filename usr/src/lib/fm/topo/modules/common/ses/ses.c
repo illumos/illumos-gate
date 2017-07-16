@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -1138,6 +1138,55 @@ ses_set_standard_props(topo_mod_t *mod, tnode_t *frutn, tnode_t *tn,
 }
 
 /*
+ * Iterate over the SES phy information. If any of the ports indicates that it's
+ * a SATA device and we haven't matched any disk devices yet, that means
+ * that the HBA was able to create a WWN for the SATA device based on its GUID,
+ * which is good. However, SES includes the WWN for the device's STP bridge. In
+ * theory, if the driver includes the WWN based on the SATA guid then it should
+ * also set the bridge-port property indicating the WWN that should match the
+ * SATA device.
+ */
+static int
+ses_create_disk_bridge(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props,
+    tnode_t **child)
+{
+	nvlist_t **phys;
+	uint_t i, n_phys;
+	topo_mod_t *mod = sdp->sed_mod;
+
+	if (nvlist_lookup_nvlist_array(props, SES_SAS_PROP_PHYS, &phys,
+	    &n_phys) != 0)
+		return (1);
+
+	for (i = 0; i < n_phys; i++) {
+		uint64_t wwn;
+		boolean_t sata;
+		char wwnstr[64];
+
+		if (nvlist_lookup_uint64(phys[i], SES_SAS_PROP_ADDR,
+		    &wwn) != 0 || wwn == 0) {
+			continue;
+		}
+
+		if (nvlist_lookup_boolean_value(phys[i],
+		    SES_SAS_PROP_SATA_DEVICE, &sata) != 0 || !sata) {
+			continue;
+		}
+
+		if (scsi_wwn_to_wwnstr(wwn, 0, wwnstr) == NULL)
+			continue;
+
+		if (disk_declare_bridge(mod, pnode, &sdp->sed_devs,
+		    wwnstr, child) == 0) {
+			return (0);
+		}
+
+	}
+
+	return (1);
+}
+
+/*
  * Callback to add a disk to a given bay.  We first check the status-code to
  * determine if a disk is present, ignoring those that aren't in an appropriate
  * state.  We then scan the parent bay node's SAS address array to determine
@@ -1207,8 +1256,17 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 		}
 	}
 
-	if (s == nsas)
-		(void) disk_declare_non_enumerated(mod, pnode, &child);
+	/*
+	 * We need to take another pass through the properties for this bay by
+	 * iterating over the phys and noting if any of these are SATA. Note,
+	 * this information isn't commonly part of the topo tree at this time,
+	 * hence why we end up going back and iterating over the properties
+	 * ourselves.
+	 */
+	if (s == nsas) {
+		if (ses_create_disk_bridge(sdp, pnode, props, &child) != 0)
+			(void) disk_declare_non_enumerated(mod, pnode, &child);
+	}
 
 	/* copy sas_addresses (target-ports) from parent (with 'w'added) */
 	if (child != NULL) {

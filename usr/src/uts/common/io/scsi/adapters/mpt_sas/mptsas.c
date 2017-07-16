@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
@@ -6162,6 +6162,80 @@ mptsas_free_devhdl(mptsas_t *mpt, uint16_t devhdl)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * We have a SATA target that has changed, which means the "bridge-port"
+ * property must be updated to reflect the SAS WWN of the new attachment point.
+ * This may change if a SATA device changes which bay, and therefore phy, it is
+ * plugged into. This SATA device may be a multipath virtual device or may be a
+ * physical device. We have to handle both cases.
+ */
+static boolean_t
+mptsas_update_sata_bridge(mptsas_t *mpt, dev_info_t *parent,
+    mptsas_target_t *ptgt)
+{
+	int			rval;
+	uint16_t		dev_hdl;
+	uint16_t		pdev_hdl;
+	uint64_t		dev_sas_wwn;
+	uint8_t			physport;
+	uint8_t			phy_id;
+	uint32_t		page_address;
+	uint16_t		bay_num, enclosure, io_flags;
+	uint32_t		dev_info;
+	char 			uabuf[SCSI_WWN_BUFLEN];
+	dev_info_t		*dip;
+	mdi_pathinfo_t		*pip;
+
+	mutex_enter(&mpt->m_mutex);
+	page_address = (MPI2_SAS_DEVICE_PGAD_FORM_HANDLE &
+	    MPI2_SAS_DEVICE_PGAD_FORM_MASK) | (uint32_t)ptgt->m_devhdl;
+	rval = mptsas_get_sas_device_page0(mpt, page_address, &dev_hdl,
+	    &dev_sas_wwn, &dev_info, &physport, &phy_id, &pdev_hdl, &bay_num,
+	    &enclosure, &io_flags);
+	mutex_exit(&mpt->m_mutex);
+	if (rval != DDI_SUCCESS) {
+		mptsas_log(mpt, CE_WARN, "unable to get SAS page 0 for "
+		    "handle %d", page_address);
+		return (B_FALSE);
+	}
+
+	if (scsi_wwn_to_wwnstr(dev_sas_wwn, 1, uabuf) == NULL) {
+		mptsas_log(mpt, CE_WARN,
+		    "mptsas unable to format SATA bridge WWN");
+		return (B_FALSE);
+	}
+
+	if (mpt->m_mpxio_enable == TRUE && (pip = mptsas_find_path_addr(parent,
+	    ptgt->m_addr.mta_wwn, 0)) != NULL) {
+		if (mdi_prop_update_string(pip, SCSI_ADDR_PROP_BRIDGE_PORT,
+		    uabuf) != DDI_SUCCESS) {
+			mptsas_log(mpt, CE_WARN,
+			    "mptsas unable to create SCSI bridge port "
+			    "property for SATA device");
+			return (B_FALSE);
+		}
+		return (B_TRUE);
+	}
+
+	if ((dip = mptsas_find_child_addr(parent, ptgt->m_addr.mta_wwn,
+	    0)) != NULL) {
+		if (ndi_prop_update_string(DDI_DEV_T_NONE, dip,
+		    SCSI_ADDR_PROP_BRIDGE_PORT, uabuf) != DDI_PROP_SUCCESS) {
+			mptsas_log(mpt, CE_WARN,
+			    "mptsas unable to create SCSI bridge port "
+			    "property for SATA device");
+			return (B_FALSE);
+		}
+		return (B_TRUE);
+	}
+
+	mptsas_log(mpt, CE_WARN, "mptsas failed to find dev_info_t or "
+	    "mdi_pathinfo_t for target with WWN %016" PRIx64,
+	    ptgt->m_addr.mta_wwn);
+
+	return (B_FALSE);
+}
+
 static void
 mptsas_update_phymask(mptsas_t *mpt)
 {
@@ -6539,6 +6613,21 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 			ndi_devi_exit(scsi_vhci_dip, circ);
 
 			/*
+			 * If this is a SATA device, make sure that the
+			 * bridge-port (the SAS WWN that the SATA device is
+			 * plugged into) is updated. This may change if a SATA
+			 * device changes which bay, and therefore phy, it is
+			 * plugged into.
+			 */
+			if (IS_SATA_DEVICE(ptgt->m_deviceinfo)) {
+				if (!mptsas_update_sata_bridge(mpt, parent,
+				    ptgt)) {
+					mutex_enter(&mpt->m_mutex);
+					return;
+				}
+			}
+
+			/*
 			 * Add parent's props for SMHBA support
 			 */
 			if (flags == MPTSAS_TOPO_FLAG_DIRECT_ATTACHED_DEVICE) {
@@ -6556,6 +6645,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 					    SCSI_ADDR_PROP_ATTACHED_PORT);
 					mptsas_log(mpt, CE_WARN, "Failed to"
 					    "attached-port props");
+					mutex_enter(&mpt->m_mutex);
 					return;
 				}
 				if (ddi_prop_update_int(DDI_DEV_T_NONE, parent,
@@ -6565,6 +6655,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 					    parent, MPTSAS_NUM_PHYS);
 					mptsas_log(mpt, CE_WARN, "Failed to"
 					    " create num-phys props");
+					mutex_enter(&mpt->m_mutex);
 					return;
 				}
 
@@ -6573,7 +6664,6 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				 */
 				mutex_enter(&mpt->m_mutex);
 				if (mptsas_smhba_phy_init(mpt)) {
-					mutex_exit(&mpt->m_mutex);
 					mptsas_log(mpt, CE_WARN, "mptsas phy"
 					    " update failed");
 					return;
@@ -6595,6 +6685,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 					mptsas_log(mpt, CE_WARN,
 					    "mptsas virtual-port"
 					    "port prop update failed");
+					mutex_enter(&mpt->m_mutex);
 					return;
 				}
 			}
@@ -6672,6 +6763,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				    SCSI_ADDR_PROP_ATTACHED_PORT);
 				mptsas_log(mpt, CE_WARN, "mptsas attached port "
 				    "prop update failed");
+				mutex_enter(&mpt->m_mutex);
 				break;
 			}
 			if (ddi_prop_update_int(DDI_DEV_T_NONE, parent,
@@ -6681,6 +6773,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				    MPTSAS_NUM_PHYS);
 				mptsas_log(mpt, CE_WARN, "mptsas num phys "
 				    "prop update failed");
+				mutex_enter(&mpt->m_mutex);
 				break;
 			}
 			if (ddi_prop_update_int(DDI_DEV_T_NONE, parent,
@@ -6690,6 +6783,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				    MPTSAS_VIRTUAL_PORT);
 				mptsas_log(mpt, CE_WARN, "mptsas virtual port "
 				    "prop update failed");
+				mutex_enter(&mpt->m_mutex);
 				break;
 			}
 		}
@@ -15437,6 +15531,27 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 			    mpt->un.m_base_wwid);
 		}
 
+		if (IS_SATA_DEVICE(ptgt->m_deviceinfo)) {
+			char	uabuf[SCSI_WWN_BUFLEN];
+
+			if (scsi_wwn_to_wwnstr(dev_sas_wwn, 1, uabuf) == NULL) {
+				mptsas_log(mpt, CE_WARN,
+				    "mptsas unable to format SATA bridge WWN");
+				mdi_rtn = MDI_FAILURE;
+				goto virt_create_done;
+			}
+
+			if (mdi_prop_update_string(*pip,
+			    SCSI_ADDR_PROP_BRIDGE_PORT, uabuf) !=
+			    DDI_SUCCESS) {
+				mptsas_log(mpt, CE_WARN,
+				    "mptsas unable to create SCSI bridge port "
+				    "property for SATA device");
+				mdi_rtn = MDI_FAILURE;
+				goto virt_create_done;
+			}
+		}
+
 		if (mdi_prop_update_string(*pip,
 		    SCSI_ADDR_PROP_ATTACHED_PORT, pdev_wwn_str) !=
 		    DDI_PROP_SUCCESS) {
@@ -15756,12 +15871,31 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 		}
 
 		if (IS_SATA_DEVICE(dev_info)) {
+			char	uabuf[SCSI_WWN_BUFLEN];
+
 			if (ndi_prop_update_string(DDI_DEV_T_NONE,
 			    *lun_dip, MPTSAS_VARIANT, "sata") !=
 			    DDI_PROP_SUCCESS) {
 				mptsas_log(mpt, CE_WARN,
 				    "mptsas unable to create "
 				    "property for device variant ");
+				ndi_rtn = NDI_FAILURE;
+				goto phys_create_done;
+			}
+
+			if (scsi_wwn_to_wwnstr(dev_sas_wwn, 1, uabuf) == NULL) {
+				mptsas_log(mpt, CE_WARN,
+				    "mptsas unable to format SATA bridge WWN");
+				ndi_rtn = NDI_FAILURE;
+				goto phys_create_done;
+			}
+
+			if (ndi_prop_update_string(DDI_DEV_T_NONE, *lun_dip,
+			    SCSI_ADDR_PROP_BRIDGE_PORT, uabuf) !=
+			    DDI_PROP_SUCCESS) {
+				mptsas_log(mpt, CE_WARN,
+				    "mptsas unable to create SCSI bridge port "
+				    "property for SATA device");
 				ndi_rtn = NDI_FAILURE;
 				goto phys_create_done;
 			}

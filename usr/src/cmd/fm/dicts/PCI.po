@@ -38,7 +38,7 @@ msgstr "One or more of device instances may be disabled."
 msgid "PCI-8000-0C.impact"
 msgstr "Loss of services provided by the device instances associated with this problem."
 msgid "PCI-8000-0C.action"
-msgstr "Ensure latest drivers and patches are installed.  Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact Sun for support."
+msgstr "Ensure latest drivers and patches are installed.  Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact your illumos distribution team for support."
 #
 # code: PCI-8000-1Q
 # keys: fault.io.pci.bus
@@ -54,7 +54,7 @@ msgstr "One or more device instances may be disabled."
 msgid "PCI-8000-1Q.impact"
 msgstr "Loss of services provided by the device instances associated with this fault."
 msgid "PCI-8000-1Q.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact your illumos distribution team for support."
 #
 # code: PCI-8000-24
 # keys: defect.io.pci.driver fault.io.pci.bus
@@ -150,7 +150,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-7J.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-7J.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-8S
 # keys: fault.io.pci.bus-linkerr fault.io.pci.device-interr
@@ -166,7 +166,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-8S.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-8S.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-95
 # keys: fault.io.pci.device-invreq fault.io.pci.device-noresp
@@ -182,7 +182,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-95.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-95.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-AP
 # keys: fault.io.pci.device-interr fault.io.pci.device-invreq
@@ -198,7 +198,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-AP.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-AP.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-CA
 # keys: fault.io.pci.device-noresp
@@ -214,7 +214,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-CA.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-CA.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-DH
 # keys: fault.io.pci.bus-linkerr-unaf fault.io.pci.device-interr-unaf
@@ -230,7 +230,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-DH.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-DH.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-ED
 # keys: fault.io.pci.device-interr-corr
@@ -246,7 +246,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-ED.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-ED.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-FY
 # keys: fault.io.pci.bus-linkerr-deg fault.io.pci.device-interr-deg
@@ -262,7 +262,7 @@ msgstr "None\n"
 msgid "PCI-8000-FY.impact"
 msgstr "Degraded services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-FY.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-G3
 # keys: fault.io.pci.device-interr-deg
@@ -278,7 +278,7 @@ msgstr "None\n"
 msgid "PCI-8000-G3.impact"
 msgstr "Degraded services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-G3.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact your illumos distribution team for support.\n"
 #
 # code: PCI-8000-HR
 # keys: fault.io.pci.fw_corrupt
@@ -294,7 +294,7 @@ msgstr "One or more device instances may be disabled.\n"
 msgid "PCI-8000-HR.impact"
 msgstr "Degraded services provided by the device instances associated with this fault.\n"
 msgid "PCI-8000-HR.action"
-msgstr "Use fmadm faulty to identify the device and then update the firmware to the latest version or schedule a repair procedure to replace the affected device. Contact Sun support for further information.\n"
+msgstr "Use fmadm faulty to identify the device and then update the firmware to the latest version or schedule a repair procedure to replace the affected device. Contact your illumos distribution team for further information.\n"
 #
 # code: PCI-8000-J4
 # keys: fault.io.pci.fw_mismatch
@@ -310,4 +310,4 @@ msgstr "One or more device instances may be disabled.\n"
 msgid "PCI-8000-J4.impact"
 msgstr "Degraded services provided by the device instances associated with this fault.\n"
 msgid "PCI-8000-J4.action"
-msgstr "Use fmadm faulty to identify the device and then update the firmware to the latest version. Contact Sun support for further information.\n"
+msgstr "Use fmadm faulty to identify the device and then update the firmware to the latest version. Contact your illumos distribution team for further information.\n"
