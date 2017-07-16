@@ -1867,7 +1867,7 @@ description_of_column(int c)
 
 
 static void
-print_usage(const char *progname, FILE *f, boolean_t do_exit)
+print_usage(const char *progname, FILE *f)
 {
 	(void) fprintf(f, gettext(
 	    "Usage: %1$s [-aHpv] [-o col[,col ... ]] [-R restarter] "
@@ -1877,19 +1877,21 @@ print_usage(const char *progname, FILE *f, boolean_t do_exit)
 	    "       %1$s [-l | -L] [-Z | -z zone] <service> ...\n"
 	    "       %1$s -x [-v] [-Z | -z zone] [<service> ...]\n"
 	    "       %1$s -?\n"), progname);
-
-	if (do_exit)
-		exit(UU_EXIT_USAGE);
 }
 
-#define	argserr(progname)	print_usage(progname, stderr, B_TRUE)
+static __NORETURN void
+argserr(const char *progname)
+{
+	print_usage(progname, stderr);
+	exit(UU_EXIT_USAGE);
+}
 
 static void
 print_help(const char *progname)
 {
 	int i;
 
-	print_usage(progname, stdout, B_FALSE);
+	print_usage(progname, stdout);
 
 	(void) printf(gettext("\n"
 	"\t-a  list all service instances rather than "
@@ -3609,7 +3611,6 @@ main(int argc, char **argv)
 
 		case '?':
 			argserr(progname);
-			/* NOTREACHED */
 
 		default:
 			assert(0);
