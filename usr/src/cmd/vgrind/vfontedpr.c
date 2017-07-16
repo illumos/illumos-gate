@@ -4,8 +4,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -792,6 +790,7 @@ putcp(int c)
 	default:
 		if (c < 040)
 			putchar('^'), c |= '@';
+		/* FALLTHROUGH */
 	case '\t':
 	case '\n':
 		putchar(c);
