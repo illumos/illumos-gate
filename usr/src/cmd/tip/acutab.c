@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 
 extern int	df02_dialer(char *, char *), df03_dialer(char *, char *);
@@ -67,5 +65,5 @@ acu_t acutable[] = {
 	"hayes", hayes_dialer,	hayes_disconnect,	hayes_abort,
 	"at",	hayes_dialer,	hayes_disconnect,	hayes_abort,
 #endif
-	0,	0,		0,			0
+	NULL,	NULL,		NULL,			NULL
 };
