@@ -39,8 +39,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	PR command (print files in pages and columns, with headings)
  *	2+head+2+page[56]+5
@@ -1054,6 +1052,7 @@ readbuf(wchar_t **s, int lincol, COLP p)
 				move = (move < width-chars) ? move :
 				    width-chars;
 				chars += move;
+				/* FALLTHROUGH */
 
 			default:
 				if (isascii(**s)) {
