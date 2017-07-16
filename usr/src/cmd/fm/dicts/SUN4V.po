@@ -246,7 +246,7 @@ msgstr "No automated response.\n"
 msgid "SUN4V-8000-FJ.impact"
 msgstr "System performance may be impacted.\n"
 msgid "SUN4V-8000-FJ.action"
-msgstr "At convenient time, try reseating the memory module(s).  If problem persists,\ncontact Sun to schedule part replacement.\n"
+msgstr "At a convenient time, try reseating the memory module(s).  If the problem persists,\ncontact your hardware support team to schedule part replacement.\n"
 #
 # code: SUN4V-8000-GE
 # keys: fault.cpu.ultraSPARC-T2.ireg
@@ -438,7 +438,7 @@ msgstr "No automated response.\n"
 msgid "SUN4V-8000-TC.impact"
 msgstr "System performance may be impacted.\n"
 msgid "SUN4V-8000-TC.action"
-msgstr "At convenient time, try reseating the memory module.  If problem persists,\ncontact Sun to schedule part replacement.\n"
+msgstr "At a convenient time, try reseating the memory module.  If the problem persists,\ncontact your hardware support team to schedule part replacement.\n"
 #
 # code: SUN4V-8000-UQ
 # keys: fault.cpu.ultraSPARC-T2.l2data-u
@@ -498,7 +498,7 @@ msgstr "Major"
 msgid "SUN4V-8000-X2.description"
 msgstr "Errors have been detected on multiple memory modules, suggesting that a problem exists somewhere else in the system.\n  Refer to %s for more information."
 msgid "SUN4V-8000-X2.response"
-msgstr "Error reports from the affected components will be logged for examination by Sun.\n"
+msgstr "Error reports from the affected components will be logged for examination by your illumos distribution team.\n"
 msgid "SUN4V-8000-X2.impact"
 msgstr "System performance and stability may be affected. \n"
 msgid "SUN4V-8000-X2.action"
@@ -518,7 +518,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8000-YX.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8000-YX.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your hardware support team for support.\n"
 #
 # code: SUN4V-8001-02
 # keys: fault.io.n2.dmu
@@ -534,7 +534,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8001-02.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-02.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: SUN4V-8001-1X
 # keys: fault.io.n2.niu
@@ -550,7 +550,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8001-1X.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-1X.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: SUN4V-8001-2E
 # keys: fault.io.n2.siu
@@ -566,7 +566,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8001-2E.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-2E.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: SUN4V-8001-3J
 # keys: fault.io.n2.soc
@@ -582,7 +582,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8001-3J.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-3J.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: SUN4V-8001-4C
 # keys: fault.io.n2.crossbar
@@ -598,7 +598,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8001-4C.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-4C.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: SUN4V-8001-5Q
 # keys: fault.io.fire.fw-epkt fault.io.fire.sw-epkt fault.io.fire.sw-fw-mismatch
@@ -614,7 +614,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8001-5Q.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-5Q.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: SUN4V-8001-64
 # keys: fault.io.vf.ncx
@@ -630,7 +630,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8001-64.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-64.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
 #
 # code: SUN4V-8001-7R
 # keys: fault.memory.link-f
@@ -646,7 +646,7 @@ msgstr "No automated response.\n"
 msgid "SUN4V-8001-7R.impact"
 msgstr "System performance may be impacted.\n"
 msgid "SUN4V-8001-7R.action"
-msgstr "At convenient time, try reseating the memory module(s).  If problem persists,\ncontact Sun to schedule part replacement.\n"
+msgstr "At a convenient time, try reseating the memory module(s).  If the problem persists,\ncontact your hardware support team to schedule part replacement.\n"
 #
 # code: SUN4V-8001-8H
 # keys: fault.cpu.ultraSPARC-T2plus.ireg
@@ -1478,4 +1478,4 @@ msgstr "No automated response.\n"
 msgid "SUN4V-8002-US.impact"
 msgstr "Some services such as Fault Diagnosis may be degraded as a result.\n"
 msgid "SUN4V-8002-US.action"
-msgstr "Schedule a repair procedure for the Service Processor, or contact Sun for support.\n"
+msgstr "Schedule a repair procedure for the Service Processor, or contact your illumos distribution team for support.\n"

@@ -675,9 +675,9 @@ pcitool_io_access(pcitool_reg_t *prg, boolean_t write_flag)
 	int port = (int)prg->phys_addr;
 	size_t size = PCITOOL_ACC_ATTR_SIZE(prg->acc_attr);
 	boolean_t big_endian = PCITOOL_ACC_IS_BIG_ENDIAN(prg->acc_attr);
-	int rval = SUCCESS;
+	volatile int rval = SUCCESS;
 	on_trap_data_t otd;
-	uint64_t local_data;
+	volatile uint64_t local_data;
 
 
 	/*
@@ -763,9 +763,9 @@ pcitool_mem_access(pcitool_reg_t *prg, uint64_t virt_addr, boolean_t write_flag)
 {
 	size_t size = PCITOOL_ACC_ATTR_SIZE(prg->acc_attr);
 	boolean_t big_endian = PCITOOL_ACC_IS_BIG_ENDIAN(prg->acc_attr);
-	int rval = DDI_SUCCESS;
+	volatile int rval = DDI_SUCCESS;
 	on_trap_data_t otd;
-	uint64_t local_data;
+	volatile uint64_t local_data;
 
 	/*
 	 * on_trap works like setjmp.

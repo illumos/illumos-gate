@@ -561,9 +561,9 @@ msgstr "Defect"
 msgid "SUN4U-8001-2X.severity"
 msgstr "Minor"
 msgid "SUN4U-8001-2X.description"
-msgstr "The Solaris Fault Manager received an event from the IO subsystem for which automated diagnosis software is currently unavailable.  Refer to %s for more information."
+msgstr "The illumos Fault Manager received an event from the IO subsystem for which automated diagnosis software is currently unavailable.  Refer to %s for more information."
 msgid "SUN4U-8001-2X.response"
-msgstr "The error information has been saved for examination by Sun."
+msgstr "The error information has been saved for examination by your illumos distribution team."
 msgid "SUN4U-8001-2X.impact"
 msgstr "The error log will need to be manually examined using fmdump(1M) in order to determine if any human response is required."
 msgid "SUN4U-8001-2X.action"
@@ -579,7 +579,7 @@ msgstr "Major"
 msgid "SUN4U-8001-32.description"
 msgstr "Errors have been detected on multiple memory modules, suggesting that a problem exists somewhere else in the system.  Refer to %s for more information."
 msgid "SUN4U-8001-32.response"
-msgstr "Error reports from the affected components will be logged for examination by Sun."
+msgstr "Error reports from the affected components will be logged for examination by your illumos distribution team."
 msgid "SUN4U-8001-32.impact"
 msgstr "System performance and stability may be affected."
 msgid "SUN4U-8001-32.action"
@@ -599,7 +599,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-4R.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-4R.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-54
 # keys: defect.io.pci.driver fault.io.datapath
@@ -615,7 +615,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-54.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-54.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-6Q
 # keys: fault.io.datapath fault.io.pci.bus
@@ -631,7 +631,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-6Q.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-6Q.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-7C
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus
@@ -647,7 +647,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-7C.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-7C.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-83
 # keys: fault.io.datapath fault.io.pci.device
@@ -663,7 +663,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-83.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-83.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-9Y
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.device
@@ -679,7 +679,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-9Y.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-9Y.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-AD
 # keys: fault.io.datapath fault.io.pci.bus fault.io.pci.device
@@ -695,7 +695,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-AD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-AD.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-CH
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.pci.device
@@ -711,7 +711,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-CH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-CH.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-DA
 # keys: fault.io.hbus
@@ -727,7 +727,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-DA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-DA.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-EP
 # keys: defect.io.pci.driver fault.io.hbus
@@ -743,7 +743,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-EP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-EP.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-F5
 # keys: fault.io.hbus fault.io.pci.bus
@@ -759,7 +759,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-F5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-F5.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-GS
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus
@@ -775,7 +775,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-GS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-GS.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-H2
 # keys: fault.io.hbus fault.io.pci.device
@@ -791,7 +791,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-H2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-H2.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-JX
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.device
@@ -807,7 +807,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-JX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-JX.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-KE
 # keys: fault.io.hbus fault.io.pci.bus fault.io.pci.device
@@ -823,7 +823,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-KE.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-KE.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-LJ
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.pci.device
@@ -839,7 +839,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-LJ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-LJ.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-MC
 # keys: fault.io.datapath fault.io.hbus
@@ -855,7 +855,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-MC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-MC.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-NQ
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus
@@ -871,7 +871,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-NQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-NQ.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-P4
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus
@@ -887,7 +887,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-P4.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-P4.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-QR
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus
@@ -903,7 +903,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-QR.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-QR.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-RH
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.device
@@ -919,7 +919,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-RH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-RH.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-SD
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.device
@@ -935,7 +935,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-SD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-SD.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-TY
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device
@@ -951,7 +951,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-TY.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-TY.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-U3
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device
@@ -967,7 +967,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-U3.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-U3.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-VS
 # keys: fault.io.schizo
@@ -983,7 +983,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-VS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-VS.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-W5
 # keys: defect.io.pci.driver fault.io.schizo
@@ -999,7 +999,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-W5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-W5.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8001-XP
 # keys: fault.io.pci.bus fault.io.schizo
@@ -1015,7 +1015,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-XP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-XP.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8001-YA
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.schizo
@@ -1031,7 +1031,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8001-YA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8001-YA.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-0R
 # keys: fault.io.pci.device fault.io.schizo
@@ -1047,7 +1047,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-0R.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-0R.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-14
 # keys: defect.io.pci.driver fault.io.pci.device fault.io.schizo
@@ -1063,7 +1063,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-14.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-14.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-2Q
 # keys: fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1079,7 +1079,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-2Q.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-2Q.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-3C
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1095,7 +1095,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-3C.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-3C.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-4J
 # keys: fault.io.datapath fault.io.schizo
@@ -1111,7 +1111,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-4J.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-4J.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-5E
 # keys: defect.io.pci.driver fault.io.datapath fault.io.schizo
@@ -1127,7 +1127,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-5E.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-5E.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-6X
 # keys: fault.io.datapath fault.io.pci.bus fault.io.schizo
@@ -1143,7 +1143,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-6X.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-6X.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-72
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.schizo
@@ -1159,7 +1159,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-72.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-72.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-8A
 # keys: fault.io.datapath fault.io.pci.device fault.io.schizo
@@ -1175,7 +1175,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-8A.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-8A.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-9P
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.device fault.io.schizo
@@ -1191,7 +1191,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-9P.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-9P.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-A5
 # keys: fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1207,7 +1207,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-A5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-A5.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-CS
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1223,7 +1223,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-CS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-CS.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-D3
 # keys: fault.io.hbus fault.io.schizo
@@ -1239,7 +1239,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-D3.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-D3.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-EY
 # keys: defect.io.pci.driver fault.io.hbus fault.io.schizo
@@ -1255,7 +1255,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-EY.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-EY.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-FD
 # keys: fault.io.hbus fault.io.pci.bus fault.io.schizo
@@ -1271,7 +1271,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-FD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-FD.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-GH
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.schizo
@@ -1287,7 +1287,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-GH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-GH.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-HC
 # keys: fault.io.hbus fault.io.pci.device fault.io.schizo
@@ -1303,7 +1303,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-HC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-HC.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-JQ
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.device fault.io.schizo
@@ -1319,7 +1319,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-JQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-JQ.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-K4
 # keys: fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1335,7 +1335,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-K4.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-K4.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-LR
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1351,7 +1351,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-LR.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-LR.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-M2
 # keys: fault.io.datapath fault.io.hbus fault.io.schizo
@@ -1367,7 +1367,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-M2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-M2.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-NX
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.schizo
@@ -1383,7 +1383,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-NX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-NX.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-PE
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.schizo
@@ -1399,7 +1399,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-PE.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-PE.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-QJ
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.schizo
@@ -1415,7 +1415,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-QJ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-QJ.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-RS
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.schizo
@@ -1431,7 +1431,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-RS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-RS.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-S5
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.schizo
@@ -1447,7 +1447,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-S5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-S5.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-TP
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1463,7 +1463,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-TP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-TP.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-UA
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo
@@ -1479,7 +1479,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-UA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-UA.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-VH
 # keys: fault.io.xmits
@@ -1495,7 +1495,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-VH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-VH.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-WD
 # keys: defect.io.pci.driver fault.io.xmits
@@ -1511,7 +1511,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-WD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-WD.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8002-XY
 # keys: fault.io.pci.bus fault.io.xmits
@@ -1527,7 +1527,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-XY.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-XY.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8002-Y3
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.xmits
@@ -1543,7 +1543,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8002-Y3.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8002-Y3.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-0Y
 # keys: fault.io.pci.device fault.io.xmits
@@ -1559,7 +1559,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-0Y.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-0Y.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-13
 # keys: defect.io.pci.driver fault.io.pci.device fault.io.xmits
@@ -1575,7 +1575,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-13.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-13.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-2H
 # keys: fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1591,7 +1591,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-2H.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-2H.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-3D
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1607,7 +1607,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-3D.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-3D.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-4P
 # keys: fault.io.datapath fault.io.xmits
@@ -1623,7 +1623,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-4P.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-4P.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-5A
 # keys: defect.io.pci.driver fault.io.datapath fault.io.xmits
@@ -1639,7 +1639,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-5A.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-5A.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-6S
 # keys: fault.io.datapath fault.io.pci.bus fault.io.xmits
@@ -1655,7 +1655,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-6S.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-6S.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-75
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.xmits
@@ -1671,7 +1671,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-75.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-75.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-8E
 # keys: fault.io.datapath fault.io.pci.device fault.io.xmits
@@ -1687,7 +1687,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-8E.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-8E.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-9J
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.device fault.io.xmits
@@ -1703,7 +1703,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-9J.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-9J.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-A2
 # keys: fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1719,7 +1719,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-A2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-A2.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-CX
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1735,7 +1735,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-CX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-CX.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-D4
 # keys: fault.io.hbus fault.io.xmits
@@ -1751,7 +1751,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-D4.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-D4.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-ER
 # keys: defect.io.pci.driver fault.io.hbus fault.io.xmits
@@ -1767,7 +1767,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-ER.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-ER.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-FC
 # keys: fault.io.hbus fault.io.pci.bus fault.io.xmits
@@ -1783,7 +1783,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-FC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-FC.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-GQ
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.xmits
@@ -1799,7 +1799,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-GQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-GQ.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-HD
 # keys: fault.io.hbus fault.io.pci.device fault.io.xmits
@@ -1815,7 +1815,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-HD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-HD.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-JH
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.device fault.io.xmits
@@ -1831,7 +1831,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-JH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-JH.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-K3
 # keys: fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1847,7 +1847,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-K3.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-K3.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-LY
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1863,7 +1863,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-LY.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-LY.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-M5
 # keys: fault.io.datapath fault.io.hbus fault.io.xmits
@@ -1879,7 +1879,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-M5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-M5.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-NS
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.xmits
@@ -1895,7 +1895,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-NS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-NS.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-PA
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.xmits
@@ -1911,7 +1911,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-PA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-PA.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-QP
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.xmits
@@ -1927,7 +1927,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-QP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-QP.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-RX
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.xmits
@@ -1943,7 +1943,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-RX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-RX.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-S2
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.xmits
@@ -1959,7 +1959,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-S2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-S2.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-TJ
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1975,7 +1975,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-TJ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-TJ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-UE
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.xmits
@@ -1991,7 +1991,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-UE.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-UE.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-VQ
 # keys: fault.io.schizo fault.io.xmits
@@ -2007,7 +2007,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-VQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-VQ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-WC
 # keys: defect.io.pci.driver fault.io.schizo fault.io.xmits
@@ -2023,7 +2023,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-WC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-WC.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8003-XR
 # keys: fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2039,7 +2039,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-XR.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-XR.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8003-Y4
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2055,7 +2055,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8003-Y4.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8003-Y4.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-0A
 # keys: fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2071,7 +2071,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-0A.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-0A.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-1P
 # keys: defect.io.pci.driver fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2087,7 +2087,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-1P.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-1P.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-25
 # keys: fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2103,7 +2103,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-25.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-25.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-3S
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2119,7 +2119,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-3S.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-3S.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-43
 # keys: fault.io.datapath fault.io.schizo fault.io.xmits
@@ -2135,7 +2135,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-43.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-43.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-5Y
 # keys: defect.io.pci.driver fault.io.datapath fault.io.schizo fault.io.xmits
@@ -2151,7 +2151,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-5Y.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-5Y.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-6D
 # keys: fault.io.datapath fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2167,7 +2167,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-6D.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-6D.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-7H
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2183,7 +2183,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-7H.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-7H.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-8R
 # keys: fault.io.datapath fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2199,7 +2199,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-8R.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-8R.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-94
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2215,7 +2215,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-94.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-94.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-AQ
 # keys: fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2231,7 +2231,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-AQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-AQ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-CC
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2247,7 +2247,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-CC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-CC.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-DJ
 # keys: fault.io.hbus fault.io.schizo fault.io.xmits
@@ -2263,7 +2263,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-DJ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-DJ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-EE
 # keys: defect.io.pci.driver fault.io.hbus fault.io.schizo fault.io.xmits
@@ -2279,7 +2279,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-EE.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-EE.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-FX
 # keys: fault.io.hbus fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2295,7 +2295,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-FX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-FX.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-G2
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2311,7 +2311,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-G2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-G2.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-HS
 # keys: fault.io.hbus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2327,7 +2327,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-HS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-HS.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-J5
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2343,7 +2343,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-J5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-J5.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-KP
 # keys: fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2359,7 +2359,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-KP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-KP.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-LA
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2375,7 +2375,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-LA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-LA.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-MH
 # keys: fault.io.datapath fault.io.hbus fault.io.schizo fault.io.xmits
@@ -2391,7 +2391,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-MH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-MH.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-ND
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.schizo fault.io.xmits
@@ -2407,7 +2407,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-ND.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-ND.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-PY
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2423,7 +2423,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-PY.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-PY.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-Q3
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.schizo fault.io.xmits
@@ -2439,7 +2439,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-Q3.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-Q3.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-RC
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2455,7 +2455,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-RC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-RC.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-SQ
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2471,7 +2471,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-SQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-SQ.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-T4
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2487,7 +2487,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-T4.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-T4.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-UR
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.schizo fault.io.xmits
@@ -2503,7 +2503,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-UR.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-UR.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-V2
 # keys: fault.io.psycho
@@ -2519,7 +2519,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-V2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-V2.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-WX
 # keys: defect.io.pci.driver fault.io.psycho
@@ -2535,7 +2535,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-WX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-WX.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8004-XE
 # keys: fault.io.datapath fault.io.psycho
@@ -2551,7 +2551,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-XE.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-XE.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8004-YJ
 # keys: defect.io.pci.driver fault.io.datapath fault.io.psycho
@@ -2567,7 +2567,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8004-YJ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8004-YJ.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-0E
 # keys: fault.io.hbus fault.io.psycho
@@ -2583,7 +2583,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-0E.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-0E.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-1J
 # keys: defect.io.pci.driver fault.io.hbus fault.io.psycho
@@ -2599,7 +2599,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-1J.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-1J.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-22
 # keys: fault.io.datapath fault.io.hbus fault.io.psycho
@@ -2615,7 +2615,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-22.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-22.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-3X
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.psycho
@@ -2631,7 +2631,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-3X.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-3X.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-44
 # keys: fault.io.pci.bus fault.io.psycho
@@ -2647,7 +2647,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-44.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-44.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-5R
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.psycho
@@ -2663,7 +2663,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-5R.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-5R.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-6C
 # keys: fault.io.datapath fault.io.pci.bus fault.io.psycho
@@ -2679,7 +2679,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-6C.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-6C.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-7Q
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.psycho
@@ -2695,7 +2695,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-7Q.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-7Q.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-8Y
 # keys: fault.io.hbus fault.io.pci.bus fault.io.psycho
@@ -2711,7 +2711,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-8Y.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-8Y.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-93
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.psycho
@@ -2727,7 +2727,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-93.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-93.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-AH
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.psycho
@@ -2743,7 +2743,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-AH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-AH.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-CD
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.psycho
@@ -2759,7 +2759,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-CD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-CD.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-DP
 # keys: fault.io.pci.device fault.io.psycho
@@ -2775,7 +2775,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-DP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-DP.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-EA
 # keys: defect.io.pci.driver fault.io.pci.device fault.io.psycho
@@ -2791,7 +2791,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-EA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-EA.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-FS
 # keys: fault.io.datapath fault.io.pci.device fault.io.psycho
@@ -2807,7 +2807,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-FS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-FS.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-G5
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.device fault.io.psycho
@@ -2823,7 +2823,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-G5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-G5.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-HX
 # keys: fault.io.hbus fault.io.pci.device fault.io.psycho
@@ -2839,7 +2839,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-HX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-HX.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-J2
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.device fault.io.psycho
@@ -2855,7 +2855,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-J2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-J2.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-KJ
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.psycho
@@ -2871,7 +2871,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-KJ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-KJ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-LE
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.psycho
@@ -2887,7 +2887,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-LE.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-LE.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-MQ
 # keys: fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -2903,7 +2903,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-MQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-MQ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-NC
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -2919,7 +2919,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-NC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-NC.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-PR
 # keys: fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -2935,7 +2935,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-PR.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-PR.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-Q4
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -2951,7 +2951,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-Q4.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-Q4.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-RD
 # keys: fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -2967,7 +2967,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-RD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-RD.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-SH
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -2983,7 +2983,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-SH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-SH.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-T3
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -2999,7 +2999,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-T3.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-T3.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-UY
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.psycho
@@ -3015,7 +3015,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-UY.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-UY.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-V5
 # keys: fault.io.tomatillo
@@ -3031,7 +3031,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-V5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-V5.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-WS
 # keys: defect.io.pci.driver fault.io.tomatillo
@@ -3047,7 +3047,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-WS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-WS.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8005-XA
 # keys: fault.io.datapath fault.io.tomatillo
@@ -3063,7 +3063,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-XA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-XA.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8005-YP
 # keys: defect.io.pci.driver fault.io.datapath fault.io.tomatillo
@@ -3079,7 +3079,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8005-YP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8005-YP.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-04
 # keys: fault.io.hbus fault.io.tomatillo
@@ -3095,7 +3095,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-04.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-04.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-1R
 # keys: defect.io.pci.driver fault.io.hbus fault.io.tomatillo
@@ -3111,7 +3111,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-1R.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-1R.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-2C
 # keys: fault.io.datapath fault.io.hbus fault.io.tomatillo
@@ -3127,7 +3127,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-2C.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-2C.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-3Q
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.tomatillo
@@ -3143,7 +3143,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-3Q.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-3Q.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-4E
 # keys: fault.io.pci.bus fault.io.tomatillo
@@ -3159,7 +3159,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-4E.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-4E.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-5J
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.tomatillo
@@ -3175,7 +3175,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-5J.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-5J.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-62
 # keys: fault.io.datapath fault.io.pci.bus fault.io.tomatillo
@@ -3191,7 +3191,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-62.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-62.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-7X
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.tomatillo
@@ -3207,7 +3207,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-7X.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-7X.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-8P
 # keys: fault.io.hbus fault.io.pci.bus fault.io.tomatillo
@@ -3223,7 +3223,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-8P.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-8P.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-9A
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.tomatillo
@@ -3239,7 +3239,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-9A.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-9A.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-AS
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.tomatillo
@@ -3255,7 +3255,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-AS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-AS.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-C5
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.tomatillo
@@ -3271,7 +3271,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-C5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-C5.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-DY
 # keys: fault.io.pci.device fault.io.tomatillo
@@ -3287,7 +3287,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-DY.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-DY.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-E3
 # keys: defect.io.pci.driver fault.io.pci.device fault.io.tomatillo
@@ -3303,7 +3303,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-E3.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-E3.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-FH
 # keys: fault.io.datapath fault.io.pci.device fault.io.tomatillo
@@ -3319,7 +3319,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-FH.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-FH.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-GD
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.device fault.io.tomatillo
@@ -3335,7 +3335,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-GD.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-GD.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-HQ
 # keys: fault.io.hbus fault.io.pci.device fault.io.tomatillo
@@ -3351,7 +3351,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-HQ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-HQ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-JC
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.device fault.io.tomatillo
@@ -3367,7 +3367,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-JC.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-JC.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-KR
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.tomatillo
@@ -3383,7 +3383,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-KR.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-KR.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-L4
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.device fault.io.tomatillo
@@ -3399,7 +3399,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-L4.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-L4.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-MX
 # keys: fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3415,7 +3415,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-MX.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-MX.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-N2
 # keys: defect.io.pci.driver fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3431,7 +3431,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-N2.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-N2.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-PJ
 # keys: fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3447,7 +3447,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-PJ.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-PJ.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-QE
 # keys: defect.io.pci.driver fault.io.datapath fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3463,7 +3463,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-QE.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-QE.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-R5
 # keys: fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3479,7 +3479,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-R5.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-R5.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-SS
 # keys: defect.io.pci.driver fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3495,7 +3495,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-SS.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-SS.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-TA
 # keys: fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3511,7 +3511,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-TA.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-TA.action"
-msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nyour illumos distribution team for support.\n"
 #
 # code: SUN4U-8006-UP
 # keys: defect.io.pci.driver fault.io.datapath fault.io.hbus fault.io.pci.bus fault.io.pci.device fault.io.tomatillo
@@ -3527,7 +3527,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8006-UP.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8006-UP.action"
-msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is a package then run \npkgchk on the package(s).\n"
+msgstr "\nUse fmdump -v -u <EVENT_ID> to identify the \nsuspected device(s).  Schedule a repair of the most likely suspect \nlisted in the output.  If the most likely suspect is software, then consult\nyour illumos distribution team.\n"
 #
 # code: SUN4U-8006-VD
 # keys: fault.cpu.ultraSPARC-IIIiplus.dcache
@@ -3703,7 +3703,7 @@ msgstr "This fault requires user and/or service interaction and currently does n
 msgid "SUN4U-8007-65.impact"
 msgstr "Possible loss of devices that may be attached to the system via this device/bus and/or system downtime."
 msgid "SUN4U-8007-65.action"
-msgstr "Ensure that the latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+msgstr "Ensure that the latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact your illumos distribution team for support."
 #
 # code: SUN4U-8007-7S
 # keys: fault.cpu.SPARC64-VI.chip
@@ -3767,7 +3767,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4U-8007-AX.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "SUN4U-8007-AX.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact your illumos distribution team for support.\n"
 #
 # code: SUN4U-8007-C2
 # keys: fault.cpu.SPARC64-VII.chip
@@ -3825,7 +3825,7 @@ msgstr "Fault"
 msgid "SUN4U-8007-FQ.severity"
 msgstr "Minor"
 msgid "SUN4U-8007-FQ.description"
-msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgstr "The illumos Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
 msgid "SUN4U-8007-FQ.response"
 msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
 msgid "SUN4U-8007-FQ.impact"
@@ -3841,7 +3841,7 @@ msgstr "Fault"
 msgid "SUN4U-8007-GC.severity"
 msgstr "Minor"
 msgid "SUN4U-8007-GC.description"
-msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgstr "The illumos Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
 msgid "SUN4U-8007-GC.response"
 msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
 msgid "SUN4U-8007-GC.impact"
@@ -3857,7 +3857,7 @@ msgstr "Fault"
 msgid "SUN4U-8007-HH.severity"
 msgstr "Minor"
 msgid "SUN4U-8007-HH.description"
-msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgstr "The illumos Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
 msgid "SUN4U-8007-HH.response"
 msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
 msgid "SUN4U-8007-HH.impact"
@@ -3873,7 +3873,7 @@ msgstr "Fault"
 msgid "SUN4U-8007-JD.severity"
 msgstr "Minor"
 msgid "SUN4U-8007-JD.description"
-msgstr "The Solaris Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
+msgstr "The illumos Fault Manager has determined that the\nnumber of correctable errors against a\nparticular CPU's cache index and way exceeds recommended\nlimts.\n  Refer to %s for more information."
 msgid "SUN4U-8007-JD.response"
 msgstr "The system will attempt to remove the CPU's offending\ncache index and way from service.\n"
 msgid "SUN4U-8007-JD.impact"

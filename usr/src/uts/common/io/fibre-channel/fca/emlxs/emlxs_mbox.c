@@ -2536,7 +2536,7 @@ emlxs_mb_config_hbq(emlxs_hba_t *hba, MAILBOXQ *mbq, int hbq_id)
 	if ((hbq->HBQ_profile == 2) || (hbq->HBQ_profile == 3) ||
 	    (hbq->HBQ_profile == 5)) {
 		bcopy(&hbq->profiles.allprofiles,
-		    &mb->un.varCfgHbq.profiles.allprofiles,
+		    (void *)&mb->un.varCfgHbq.profiles.allprofiles,
 		    sizeof (hbq->profiles));
 	}
 
