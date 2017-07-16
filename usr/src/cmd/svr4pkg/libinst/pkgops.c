@@ -1150,10 +1150,10 @@ pkgTestInstalled(char *a_packageName, char *a_rootPath)
 
 	/* entry assertions */
 
-	assert(a_packageName != (char *)NULL);
+	assert(a_packageName != NULL);
 	assert(*a_packageName != '\0');
-	assert(a_rootPath != (char *)NULL);
-	assert(a_rootPath != '\0');
+	assert(a_rootPath != NULL);
+	assert(*a_rootPath != '\0');
 
 	/* entry debugging info */
 
