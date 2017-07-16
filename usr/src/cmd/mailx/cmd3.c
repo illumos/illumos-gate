@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcv.h"
 #include <locale.h>
 
@@ -852,7 +850,7 @@ getfilename(char *name, int *aedit)
 			nstrcpy(origname, PATHSIZE, cp);
 			return(cp);
 		}
-		/* Fall into . . . */
+		/* FALLTHROUGH */
 
 	default:
 regular:
