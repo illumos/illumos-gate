@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "refer..c"
 #include <locale.h>
 #define	NFLD 30
@@ -137,6 +135,8 @@ again:
 			while (*p != '\n')
 				p++;
 			*++p = 0;
+			/* FALLTHROUGH */
+
 		case 1:
 			if (endpush)
 				if (nr = chkdup(answer)) {
