@@ -1204,7 +1204,7 @@ print_mapping(print_handle_t *pnm, name_mapping_t *nm)
 			free(winname);
 			return (-1);
 		}
-	/* LINTED E_CASE_FALLTHRU */
+		/* FALLTHROUGH */
 	case MAPPING_ID:
 		if (pnm->format == MAPPING_ID) {
 			if (nm->sidprefix == NULL) {
@@ -2339,7 +2339,8 @@ print_flags(flag_t *f)
 /* Convert string like sid or winname to the identity type code */
 
 static int
-string2type(char *str, cmd_pos_t *pos) {
+string2type(char *str, cmd_pos_t *pos)
+{
 	int i;
 	int code = TYPE_INVALID;
 
