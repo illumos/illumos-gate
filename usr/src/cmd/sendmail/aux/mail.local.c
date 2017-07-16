@@ -19,7 +19,7 @@ static char copyright[] =
 	The Regents of the University of California.  All rights reserved.\n";
 #endif /* not lint */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident  "%Z%%M% %I%     %E% SMI"
 
 #ifndef lint
 static char sccsid[] = "@(#)mail.local.c	8.83 (Berkeley) 12/17/98";
@@ -1145,9 +1145,9 @@ e_to_sys(num)
 			eval = EX_UNAVAILABLE;
 			break;
 		}
-		/* FALLTHROUGH */
 #endif /* EDQUOT */
 #ifdef EAGAIN
+		/* FALLTHROUGH */
 	case EAGAIN:		/* Resource temporarily unavailable */
 #endif
 #ifdef EBUSY

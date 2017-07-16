@@ -11,8 +11,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 #ifndef lint
 SM_UNUSED(static char copyright[]) =
@@ -263,7 +261,7 @@ main(argc, argv)
 # endif /* UID_MAX */
 				break;
 			}
-
+			/* FALLTHROUGH */
 
 		  default:
 			continue;

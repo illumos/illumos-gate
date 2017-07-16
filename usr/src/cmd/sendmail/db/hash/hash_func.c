@@ -50,13 +50,6 @@
 
 #include "config.h"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifndef lint
-static const char sccsid[] = "@(#)hash_func.c	10.7 (Sleepycat) 9/16/97";
-static const char sccsi2[] = "%W% (Sun) %G%";
-#endif /* not lint */
-
 #ifndef NO_SYSTEM_INCLUDES
 #include <sys/types.h>
 #endif
@@ -124,18 +117,25 @@ __ham_func3(key, len)
 	case 0:
 		do {
 			HASHC;
+			/* FALLTHROUGH */
 	case 7:
 			HASHC;
+			/* FALLTHROUGH */
 	case 6:
 			HASHC;
+			/* FALLTHROUGH */
 	case 5:
 			HASHC;
+			/* FALLTHROUGH */
 	case 4:
 			HASHC;
+			/* FALLTHROUGH */
 	case 3:
 			HASHC;
+			/* FALLTHROUGH */
 	case 2:
 			HASHC;
+			/* FALLTHROUGH */
 	case 1:
 			HASHC;
 		} while (--loop);
@@ -173,18 +173,25 @@ __ham_func4(key, len)
 	case 0:
 		do {
 			HASH4;
+			/* FALLTHROUGH */
 	case 7:
 			HASH4;
+			/* FALLTHROUGH */
 	case 6:
 			HASH4;
+			/* FALLTHROUGH */
 	case 5:
 			HASH4;
+			/* FALLTHROUGH */
 	case 4:
 			HASH4;
+			/* FALLTHROUGH */
 	case 3:
 			HASH4;
+			/* FALLTHROUGH */
 	case 2:
 			HASH4;
+			/* FALLTHROUGH */
 	case 1:
 			HASH4;
 		} while (--loop);

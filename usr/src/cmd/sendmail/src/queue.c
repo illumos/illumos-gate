@@ -4468,6 +4468,7 @@ readqf(e, openonly)
 			/* format: flag (1 char) space long-integer */
 			e->e_dlvr_flag = buf[1];
 			e->e_deliver_by = strtol(&buf[3], NULL, 10);
+			/* FALLTHROUGH */
 
 		  case '$':		/* define macro */
 			{
