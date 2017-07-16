@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libtsnet.h>
 #include <stdlib.h>
 #include <string.h>
@@ -89,9 +87,9 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		    "pam_tsol_account: allowed_unlabeled = %d, user %s, "
 		    "rhost %s",
 		    allow_unlabeled,
-		    (user == NULL) ? "NULL" : (user == '\0') ? "ZERO" :
+		    (user == NULL) ? "NULL" : (*user == '\0') ? "ZERO" :
 		    user,
-		    (rhost == NULL) ? "NULL" : (rhost == '\0') ? "ZERO" :
+		    (rhost == NULL) ? "NULL" : (*rhost == '\0') ? "ZERO" :
 		    rhost);
 	}
 	if (user == NULL || *user == '\0') {
