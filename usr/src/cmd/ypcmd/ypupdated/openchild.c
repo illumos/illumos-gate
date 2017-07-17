@@ -32,12 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint) && defined(SCCSIDS)
-static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
-#endif
-
 /*
  * openchild.c
  *
@@ -46,29 +40,17 @@ static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
  * interface, but for internal use only!
  */
 #include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
 
-extern void *malloc();
-extern char *strrchr();
-
-static char *basename();
+static char *basename(char *);
 static char SHELL[] = "/bin/sh";
-
-extern int close();
-extern int dup();
-extern int execl();
-extern void exit();
-extern long fork();
-extern int pipe();
-extern unsigned int strlen();
 
 /*
  * returns pid, or -1 for failure
  */
 int
-_openchild(command, fto, ffrom)
-	char *command;
-	FILE **fto;
-	FILE **ffrom;
+_openchild(char *command, FILE **fto, FILE **ffrom)
 {
 	int i;
 	int pid;
@@ -139,8 +121,7 @@ printf("openchild: error1");
 }
 
 static char *
-basename(path)
-	char *path;
+basename(char *path)
 {
 	char *p;
 
