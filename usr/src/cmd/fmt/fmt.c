@@ -233,6 +233,7 @@ fmt(FILE *fi)
 		switch (hdr_state) {
 		case off:
 			prefix(canonb);
+			/* FALLTHROUGH */
 		case not_in_hdr:
 			/* look for an initial mail header line */
 			/* skip initial blanks */
