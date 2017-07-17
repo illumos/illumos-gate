@@ -1978,7 +1978,7 @@ get_fh_via_pub(struct nfs_args *args, char *fshost, char *fspath, bool_t url,
 				break;
 			case NFS_V3:
 				fstype = MNTTYPE_NFS3;
-				/* fall through to pick up llock option */
+				/* FALLTHROUGH */
 			default:
 				args->flags |= NFSMNT_LLOCK;
 				break;
