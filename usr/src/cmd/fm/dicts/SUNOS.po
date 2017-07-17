@@ -262,7 +262,7 @@ msgstr "Error reports have been logged for examination by your illumos distribut
 msgid "SUNOS-8000-FU.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-FU.action"
-msgstr "Ensure that the latest illumos Kernel and Predictive Self-Healing (PSH) bugfixes are installed."
+msgstr "Ensure that the latest illumos Kernel and Predictive Self-Healing (PSH) updates are installed."
 #
 # code: SUNOS-8000-G7
 # keys: defect.sunos.eft.undiag.limit
@@ -294,7 +294,7 @@ msgstr "Error reports have been logged for examination by your illumos distribut
 msgid "SUNOS-8000-HV.impact"
 msgstr "Automated diagnosis and response for these events will not occur."
 msgid "SUNOS-8000-HV.action"
-msgstr "Ensure that the latest illumos Kernel and Predictive Self-Healing (PSH) bugfixes are installed."
+msgstr "Ensure that the latest illumos Kernel and Predictive Self-Healing (PSH) updates are installed."
 #
 # code: SUNOS-8000-J0
 # keys: defect.sunos.eft.unexpected_telemetry fault.sunos.eft.unexpected_telemetry
@@ -310,7 +310,7 @@ msgstr "Error reports have been logged for examination by your illumos distribut
 msgid "SUNOS-8000-J0.impact"
 msgstr "Automated diagnosis and response for these events will not occur.\n"
 msgid "SUNOS-8000-J0.action"
-msgstr "Ensure that the latest illumos Kernel and Predictive Self-Healing (PSH) bugfixes are installed.\n"
+msgstr "Ensure that the latest illumos Kernel and Predictive Self-Healing (PSH) updates are installed.\n"
 #
 # code: SUNOS-8000-KL
 # keys: defect.sunos.kernel.panic

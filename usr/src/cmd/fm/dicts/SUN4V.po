@@ -246,7 +246,7 @@ msgstr "No automated response.\n"
 msgid "SUN4V-8000-FJ.impact"
 msgstr "System performance may be impacted.\n"
 msgid "SUN4V-8000-FJ.action"
-msgstr "At convenient time, try reseating the memory module(s).  If problem persists,\ncontact your illumos distribution team to schedule part replacement.\n"
+msgstr "At a convenient time, try reseating the memory module(s).  If the problem persists,\ncontact your hardware support team to schedule part replacement.\n"
 #
 # code: SUN4V-8000-GE
 # keys: fault.cpu.ultraSPARC-T2.ireg
@@ -438,7 +438,7 @@ msgstr "No automated response.\n"
 msgid "SUN4V-8000-TC.impact"
 msgstr "System performance may be impacted.\n"
 msgid "SUN4V-8000-TC.action"
-msgstr "At convenient time, try reseating the memory module.  If problem persists,\ncontact your illumos distribution team to schedule part replacement.\n"
+msgstr "At a convenient time, try reseating the memory module.  If the problem persists,\ncontact your hardware support team to schedule part replacement.\n"
 #
 # code: SUN4V-8000-UQ
 # keys: fault.cpu.ultraSPARC-T2.l2data-u
@@ -518,7 +518,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "SUN4V-8000-YX.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8000-YX.action"
-msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your illumos distribution team for support.\n"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact your hardware support team for support.\n"
 #
 # code: SUN4V-8001-02
 # keys: fault.io.n2.dmu
@@ -646,7 +646,7 @@ msgstr "No automated response.\n"
 msgid "SUN4V-8001-7R.impact"
 msgstr "System performance may be impacted.\n"
 msgid "SUN4V-8001-7R.action"
-msgstr "At convenient time, try reseating the memory module(s).  If problem persists,\ncontact your illumos distribution team to schedule part replacement.\n"
+msgstr "At a convenient time, try reseating the memory module(s).  If the problem persists,\ncontact your hardware support team to schedule part replacement.\n"
 #
 # code: SUN4V-8001-8H
 # keys: fault.cpu.ultraSPARC-T2plus.ireg
