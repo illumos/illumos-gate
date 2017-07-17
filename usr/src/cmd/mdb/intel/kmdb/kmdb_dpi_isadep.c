@@ -51,6 +51,7 @@ kmdb_dpi_handle_fault(kreg_t trapno, kreg_t pc, kreg_t sp, int cpuid)
 	switch (trapno) {
 	case T_GPFLT:
 		errno = EACCES;
+		break;
 	default:
 		errno = EMDB_NOMAP;
 	}

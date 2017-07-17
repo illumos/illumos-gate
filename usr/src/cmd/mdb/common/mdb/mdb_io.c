@@ -904,6 +904,7 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 
 	case SZ_SHORT:
 		n = (ushort_t)VA_ARG(ap, uint_t);
+		break;
 
 	default:
 		n = (uint_t)VA_ARG(ap, uint_t);

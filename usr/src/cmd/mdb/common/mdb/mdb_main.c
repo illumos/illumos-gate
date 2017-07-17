@@ -110,7 +110,7 @@ ucontext_t _mdb_abort_ctx;		/* context fatal signal interrupted */
 int _mdb_abort_rcount;			/* number of times resume requested */
 int _mdb_self_fd = -1;			/* fd for self as for valid_frame */
 
-static void
+__NORETURN static void
 terminate(int status)
 {
 	(void) mdb_signal_blockall();
