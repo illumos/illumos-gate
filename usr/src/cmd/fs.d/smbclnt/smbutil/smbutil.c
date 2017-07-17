@@ -54,8 +54,7 @@
 #define	EX_DATAERR 1
 #endif
 
-static void help(void);
-
+static void help(void) __NORETURN;
 
 typedef int cmd_fn_t (int argc, char *argv[]);
 typedef void cmd_usage_t (void);

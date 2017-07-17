@@ -25,12 +25,6 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef lint
-char copyright[] =
-"@(#) Copyright(c) 1988 Regents of the University of California.\n\
-All rights reserved.\n";
-#endif /* not lint */
-
 /*
  *  fsdb - file system debugger
  *
@@ -323,7 +317,7 @@ static void		print(long value, int fieldsz, int digits, int lead);
 static void		printsb(struct fs *);
 static void		printcg(struct cg *);
 static void		pbits(unsigned char *, int);
-static void		old_fsdb(int, char *);	/* For old fsdb functionality */
+static void		old_fsdb(int, char *) __NORETURN;	/* For old fsdb functionality */
 
 static int		isnumber(char *);
 static int		icheck(u_offset_t);
