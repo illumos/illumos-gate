@@ -803,7 +803,7 @@ suspend:
 #endif
 
 			}
-			/* fall into ... */
+			/* FALLTHROUGH */
 
 /* & */
 /* ~ */

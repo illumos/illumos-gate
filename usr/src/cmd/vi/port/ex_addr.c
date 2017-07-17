@@ -30,7 +30,6 @@
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include "ex.h"
 #include "ex_re.h"
 
@@ -246,6 +245,7 @@ address(inputline)
 		case '\'':
 		case '\\':
 			bigmove++;
+			/* FALLTHROUGH */
 		case '.':
 			if (addr || offset)
 				error(gettext("Badly formed address"));

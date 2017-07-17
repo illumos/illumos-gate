@@ -1362,7 +1362,7 @@ ws:
 				goto def;
 			}
 			c = '\n';
-			/* presto chango ... */
+			/* FALLTHROUGH */
 
 		/*
 		 * \n		Start new line.
@@ -1417,6 +1417,7 @@ ws:
 				ogcursor = cp;
 				goto vbackup;
 			}
+			/* FALLTHROUGH */
 			/*
 			 * ^D works only if we are at the (end of) the
 			 * generated autoindent.  We count the ^D for repeat
