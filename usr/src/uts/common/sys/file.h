@@ -33,7 +33,7 @@
 #define	_SYS_FILE_H
 
 #include <sys/t_lock.h>
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/model.h>
 #include <sys/user.h>
 #endif
@@ -123,11 +123,6 @@ typedef struct fpollinfo {
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
- * This is a flag that is set on f_flag2, but is never user-visible
- */
-#define	FEPOLLED	0x8000
-
-/*
  * Fake flags for driver ioctl calls to inform them of the originating
  * process' model.  See <sys/model.h>
  *
@@ -201,6 +196,7 @@ struct vattr;
 struct uf_info;
 
 extern file_t *getf(int);
+extern file_t *getf_gen(int, uf_entry_gen_t *);
 extern void releasef(int);
 extern void areleasef(int, struct uf_info *);
 #ifndef	_BOOT

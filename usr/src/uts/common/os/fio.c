@@ -386,6 +386,7 @@ flist_grow(int maxfd)
 		dst->uf_flag = src->uf_flag;
 		dst->uf_busy = src->uf_busy;
 		dst->uf_portfd = src->uf_portfd;
+		dst->uf_gen = src->uf_gen;
 	}
 
 	/*
@@ -575,13 +576,12 @@ is_active_fd(kthread_t *t, int fd)
 }
 
 /*
- * Convert a user supplied file descriptor into a pointer to a file
- * structure.  Only task is to check range of the descriptor (soft
- * resource limit was enforced at open time and shouldn't be checked
- * here).
+ * Convert a user supplied file descriptor into a pointer to a file structure.
+ * Only task is to check range of the descriptor (soft resource limit was
+ * enforced at open time and shouldn't be checked here).
  */
 file_t *
-getf(int fd)
+getf_gen(int fd, uf_entry_gen_t *genp)
 {
 	uf_info_t *fip = P_FINFO(curproc);
 	uf_entry_t *ufp;
@@ -607,12 +607,21 @@ getf(int fd)
 		return (NULL);
 	}
 	ufp->uf_refcnt++;
+	if (genp != NULL) {
+		*genp = ufp->uf_gen;
+	}
 
 	set_active_fd(fd);	/* record the active file descriptor */
 
 	UF_EXIT(ufp);
 
 	return (fp);
+}
+
+file_t *
+getf(int fd)
+{
+	return (getf_gen(fd, NULL));
 }
 
 /*
@@ -667,6 +676,7 @@ closeandsetf(int fd, file_t *newfp)
 			ASSERT(ufp->uf_flag == 0);
 			fd_reserve(fip, fd, 1);
 			ufp->uf_file = newfp;
+			ufp->uf_gen++;
 			UF_EXIT(ufp);
 			mutex_exit(&fip->fi_lock);
 			return (0);
@@ -861,6 +871,7 @@ flist_fork(uf_info_t *pfip, uf_info_t *cfip)
 		cufp->uf_alloc = pufp->uf_alloc;
 		cufp->uf_flag = pufp->uf_flag;
 		cufp->uf_busy = pufp->uf_busy;
+		cufp->uf_gen = pufp->uf_gen;
 		if (pufp->uf_file == NULL) {
 			ASSERT(pufp->uf_flag == 0);
 			if (pufp->uf_busy) {
@@ -1029,6 +1040,9 @@ ufalloc_file(int start, file_t *fp)
 	fd_reserve(fip, fd, 1);
 	ASSERT(ufp->uf_file == NULL);
 	ufp->uf_file = fp;
+	if (fp != NULL) {
+		ufp->uf_gen++;
+	}
 	UF_EXIT(ufp);
 	mutex_exit(&fip->fi_lock);
 	return (fd);
@@ -1184,6 +1198,7 @@ setf(int fd, file_t *fp)
 	} else {
 		UF_ENTER(ufp, fip, fd);
 		ASSERT(ufp->uf_busy);
+		ufp->uf_gen++;
 	}
 	ASSERT(ufp->uf_fpollinfo == NULL);
 	ASSERT(ufp->uf_flag == 0);
@@ -1213,8 +1228,7 @@ f_getfl(int fd, int *flagp)
 			error = EBADF;
 		else {
 			vnode_t *vp = fp->f_vnode;
-			int flag = fp->f_flag |
-			    ((fp->f_flag2 & ~FEPOLLED) << 16);
+			int flag = fp->f_flag | (fp->f_flag2 << 16);
 
 			/*
 			 * BSD fcntl() FASYNC compatibility.

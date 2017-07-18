@@ -31,6 +31,7 @@ extern "C" {
 struct exdata;
 #if defined(_KERNEL) || defined(_FAKE_KERNEL) || defined(_KMEMUSER)
 typedef struct uf_info uf_info_t;
+typedef uint_t uf_entry_gen_t;
 #endif
 typedef struct user user_t;
 

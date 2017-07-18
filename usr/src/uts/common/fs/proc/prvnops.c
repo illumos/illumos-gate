@@ -877,8 +877,7 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 	fdinfo = pr_iol_newbuf(&data, offsetof(prfdinfo_t, pr_misc));
 	fdinfo->pr_fd = fd;
 	fdinfo->pr_fdflags = ufp_flag;
-	/* FEPOLLED on f_flag2 should never be user-visible */
-	fdinfo->pr_fileflags = (fp->f_flag2 & ~FEPOLLED) << 16 | fp->f_flag;
+	fdinfo->pr_fileflags = fp->f_flag2 << 16 | fp->f_flag;
 	if ((fdinfo->pr_fileflags & (FSEARCH | FEXEC)) == 0)
 		fdinfo->pr_fileflags += FOPEN;
 	fdinfo->pr_offset = fp->f_offset;
