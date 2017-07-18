@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -82,6 +82,21 @@ extern "C" {
 #endif
 
 /*
+ * File Descriptor assignment generation.
+ *
+ * Certain file descriptor consumers (namely epoll) need to be able to detect
+ * when the resource underlying an fd change due to (re)assignment.  Checks
+ * comparing old and new file_t pointers work OK, but could easily be fooled by
+ * an entry freed-to and reused-from the cache.  To better detect such
+ * assingments, a generation number is kept in the uf_entry.  Whenever a
+ * non-NULL file_t is assigned to the entry, the generation is incremented,
+ * indicating the change.  There is a minute possibility that a rollover of the
+ * value could cause assigments to evade detection by consumers, but it is
+ * considered acceptably small.
+ */
+typedef uint_t uf_entry_gen_t;
+
+/*
  * Entry in the per-process list of open files.
  * Note: only certain fields are copied in flist_grow() and flist_fork().
  * This is indicated in brackets in the structure member comments.
@@ -97,10 +112,12 @@ typedef struct uf_entry {
 	kcondvar_t	uf_wanted_cv;	/* waiting for setf() [never copied] */
 	kcondvar_t	uf_closing_cv;	/* waiting for close() [never copied] */
 	struct portfd 	*uf_portfd;	/* associated with port [grow] */
+	uf_entry_gen_t	uf_gen;		/* assigned fd generation [grow,fork] */
 	/* Avoid false sharing - pad to coherency granularity (64 bytes) */
 	char		uf_pad[64 - sizeof (kmutex_t) - 2 * sizeof (void*) -
 		2 * sizeof (int) - 2 * sizeof (short) -
-		2 * sizeof (kcondvar_t) - sizeof (struct portfd *)];
+		2 * sizeof (kcondvar_t) - sizeof (struct portfd *) -
+		sizeof (uf_entry_gen_t)];
 } uf_entry_t;
 
 /*

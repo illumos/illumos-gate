@@ -226,6 +226,7 @@ struct polldat {
 	int		pd_nsets;	/* num of xref sets, used by poll(2) */
 	xref_t		*pd_ref;	/* ptr to xref info, 1 for each set */
 	port_kevent_t	*pd_portev;	/* associated port event struct */
+	uf_entry_gen_t	pd_gen;		/* fd generation at cache time */
 	uint64_t	pd_epolldata;	/* epoll data, if any */
 };
 
