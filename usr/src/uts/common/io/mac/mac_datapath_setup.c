@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1602,30 +1602,6 @@ mac_srs_update_bwlimit(flow_entry_t *flent, mac_resource_props_t *mrp)
 	for (count = 0; count < flent->fe_rx_srs_cnt; count++)
 		mac_rx_srs_update_bwlimit(flent->fe_rx_srs[count], mrp);
 	mac_tx_srs_update_bwlimit(flent->fe_tx_srs, mrp);
-}
-
-void
-mac_srs_change_upcall(void *arg, mac_direct_rx_t rx_func, void *rx_arg1)
-{
-	mac_soft_ring_set_t	*mac_srs = arg;
-	mac_srs_rx_t		*srs_rx = &mac_srs->srs_rx;
-	mac_soft_ring_t		*softring;
-
-	mutex_enter(&mac_srs->srs_lock);
-	ASSERT((mac_srs->srs_type & SRST_TX) == 0);
-	srs_rx->sr_func = rx_func;
-	srs_rx->sr_arg1 = rx_arg1;
-
-	softring = mac_srs->srs_soft_ring_head;
-	while (softring != NULL) {
-		mutex_enter(&softring->s_ring_lock);
-		softring->s_ring_rx_func = rx_func;
-		softring->s_ring_rx_arg1 = rx_arg1;
-		mutex_exit(&softring->s_ring_lock);
-		softring = softring->s_ring_next;
-	}
-
-	mutex_exit(&mac_srs->srs_lock);
 }
 
 /*

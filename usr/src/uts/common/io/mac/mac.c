@@ -343,9 +343,6 @@ boolean_t		mac_flow_log_enable;
 boolean_t		mac_link_log_enable;
 timeout_id_t		mac_logging_timer;
 
-/* for debugging, see MAC_DBG_PRT() in mac_impl.h */
-int mac_dbg = 0;
-
 #define	MACTYPE_KMODDIR	"mac"
 #define	MACTYPE_HASHSZ	67
 static mod_hash_t	*i_mactype_hash;
