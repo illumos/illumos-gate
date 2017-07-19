@@ -924,6 +924,39 @@ extern SVCXPRT	*svc_tp_create(void (*)(struct svc_req *, SVCXPRT *),
 	 */
 
 /*
+ * Variant of svc_tp_create that accepts a binding address.
+ * If bindaddr == NULL, this is the same as svc_tp_create().
+ */
+extern SVCXPRT	*svc_tp_create_withbind(void (*)(struct svc_req *, SVCXPRT *),
+				const rpcprog_t, const rpcvers_t,
+				const struct netconfig *,
+			        const struct t_bind *);
+	/*
+	 * void (*dispatch)();			-- dispatch routine
+	 * const rpcprog_t prognum;		-- program number
+	 * const rpcvers_t versnum;		-- version number
+	 * const struct netconfig *nconf;	-- netconfig structure
+	 * const struct t_bind *bindaddr;	-- address to bind
+	 */
+
+/*
+ * Variant of svc_tp_create that accepts an IP port number.
+ * The port number is ignored on transports other than IP.
+ * If portnum = 0, this is the same as svc_tp_create().
+ */
+extern SVCXPRT	*svc_tp_create_withport(void (*)(struct svc_req *, SVCXPRT *),
+				const rpcprog_t, const rpcvers_t,
+				const struct netconfig *,
+			        int portnum);
+	/*
+	 * void (*dispatch)();			-- dispatch routine
+	 * const rpcprog_t prognum;		-- program number
+	 * const rpcvers_t versnum;		-- version number
+	 * const struct netconfig *nconf;	-- netconfig structure
+	 * int portnum;				-- IP port number
+	 */
+
+/*
  * Generic TLI create routine
  */
 extern  SVCXPRT	*svc_tli_create(const int, const struct netconfig *,
