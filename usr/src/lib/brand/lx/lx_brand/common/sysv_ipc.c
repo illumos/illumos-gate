@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -693,6 +693,18 @@ lx_shmat(int shmid, void *addr, int flags)
 	void *ptr;
 
 	lx_debug("\tlx_shmat(%d, 0x%p, %d)\n", shmid, addr, flags);
+
+	/*
+	 * Linux has a fix for CVE-2017-5669 which LTP is testing for. The
+	 * kernel will disallow mapping into the first 64k of the address space.
+	 * LTP passes 1 as the address which will then round down to 0.
+	 * In the future, once more work has been done to tighten up the lx
+	 * brand handling for the minimum mappable address (e.g. with secflags),
+	 * then we can remove this check.
+	 */
+	if ((flags & LX_SHM_RND) && addr != NULL && addr < (void *)0x10000) {
+		return (-EINVAL);
+	}
 
 	sol_flags = 0;
 	if (flags & LX_SHM_RDONLY)
