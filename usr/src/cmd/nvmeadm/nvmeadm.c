@@ -528,6 +528,15 @@ static int
 do_list_nsid(int fd, const nvme_process_arg_t *npa)
 {
 	_NOTE(ARGUNUSED(fd));
+	const uint_t format = npa->npa_idns->id_flbas.lba_format;
+	const uint_t bshift = npa->npa_idns->id_lbaf[format].lbaf_lbads;
+
+	/*
+	 * Some devices have extra namespaces with illegal block sizes and
+	 * zero blocks. Don't list them when verbose operation isn't requested.
+	 */
+	if ((bshift < 9 || npa->npa_idns->id_nsize == 0) && verbose == 0)
+		return (0);
 
 	(void) printf("  %s/%s (%s): ", npa->npa_name,
 	    di_minor_name(npa->npa_minor),
