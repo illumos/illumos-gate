@@ -432,21 +432,29 @@ nvme_dskname(const nvme_process_arg_t *npa)
 		path = di_dim_path_dev(dim, di_driver_name(child),
 		    di_instance(child), "c");
 
-		if (path != NULL) {
-			path[strlen(path) - 2] = '\0';
-			path = strrchr(path, '/') + 1;
-			if (path != NULL) {
-				path = strdup(path);
-				if (path == NULL)
-					err(-1, "nvme_dskname");
-			}
-		}
+		/*
+		 * Error out if we didn't get a path, or if it's too short for
+		 * the following operations to be safe.
+		 */
+		if (path == NULL || strlen(path) < 2)
+			goto fail;
+
+		/* Chop off 's0' and get everything past the last '/' */
+		path[strlen(path) - 2] = '\0';
+		path = strrchr(path, '/');
+		if (path == NULL)
+			goto fail;
+		path++;
 
 		break;
 	}
 
 	di_dim_fini(dim);
+
 	return (path);
+
+fail:
+	err(-1, "nvme_dskname");
 }
 
 static int
