@@ -579,7 +579,7 @@ lx_msgctl_ipcinfo(int cmd, void *buf)
 	 * in the Linux header file.  We're lying, but trying to be
 	 * coherent about it.
 	 */
-	m.msgmax = m.msgmnb;
+	m.msgmax = LX_MSGMAX;
 	m.msgssz = 16;
 	msgseg = (m.msgpool * 1024) / m.msgssz;
 	m.msgseg = (msgseg > 0xffff) ? 0xffff : msgseg;

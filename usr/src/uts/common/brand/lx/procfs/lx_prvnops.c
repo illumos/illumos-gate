@@ -235,6 +235,8 @@ static void lxpr_read_sys_fs_pipe_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_caplcap(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_corepatt(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_hostname(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_msgmax(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_kernel_msgmnb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_msgmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_ngroups_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_osrel(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -299,6 +301,7 @@ static int lxpr_write_sys_kernel_corepatt(lxpr_node_t *, uio_t *, cred_t *,
 extern rctl_hndl_t rc_process_semmsl;
 extern rctl_hndl_t rc_process_semopm;
 extern rctl_hndl_t rc_zone_semmni;
+extern rctl_hndl_t rc_process_msgmnb;
 
 extern rctl_hndl_t rc_zone_msgmni;
 extern rctl_hndl_t rc_zone_shmmax;
@@ -544,6 +547,8 @@ static lxpr_dirent_t sys_kerneldir[] = {
 	{ LXPR_SYS_KERNEL_CAPLCAP,	"cap_last_cap" },
 	{ LXPR_SYS_KERNEL_COREPATT,	"core_pattern" },
 	{ LXPR_SYS_KERNEL_HOSTNAME,	"hostname" },
+	{ LXPR_SYS_KERNEL_MSGMAX,	"msgmax" },
+	{ LXPR_SYS_KERNEL_MSGMNB,	"msgmnb" },
 	{ LXPR_SYS_KERNEL_MSGMNI,	"msgmni" },
 	{ LXPR_SYS_KERNEL_NGROUPS_MAX,	"ngroups_max" },
 	{ LXPR_SYS_KERNEL_OSREL,	"osrelease" },
@@ -869,6 +874,8 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_kernel_caplcap,	/* /proc/sys/kernel/cap_last_cap */
 	lxpr_read_sys_kernel_corepatt,	/* /proc/sys/kernel/core_pattern */
 	lxpr_read_sys_kernel_hostname,	/* /proc/sys/kernel/hostname */
+	lxpr_read_sys_kernel_msgmax,	/* /proc/sys/kernel/msgmax */
+	lxpr_read_sys_kernel_msgmnb,	/* /proc/sys/kernel/msgmnb */
 	lxpr_read_sys_kernel_msgmni,	/* /proc/sys/kernel/msgmni */
 	lxpr_read_sys_kernel_ngroups_max, /* /proc/sys/kernel/ngroups_max */
 	lxpr_read_sys_kernel_osrel,	/* /proc/sys/kernel/osrelease */
@@ -1018,6 +1025,8 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/core_pattern */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/hostname */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmax */
+	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmnb */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/kernel/osrelease */
@@ -1167,6 +1176,8 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/cap_last_cap */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/core_pattern */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/hostname */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmax */
+	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmnb */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/msgmni */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/ngroups_max */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/kernel/osrelease */
@@ -4540,6 +4551,39 @@ lxpr_read_sys_kernel_hostname(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_HOSTNAME);
 	lxpr_uiobuf_printf(uiobuf, "%s\n", uts_nodename());
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_sys_kernel_msgmax(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	/*
+	 * We don't have an rctl for this. See our definition for LX_MSGMAX
+	 * in the user-level emulation library. Once that code moves into
+	 * the kernel, we can use a common definition. This matches the
+	 * value on Linux.
+	 */
+	uint_t val = 8192;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_MSGMAX);
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
+}
+
+/* ARGSUSED */
+static void
+lxpr_read_sys_kernel_msgmnb(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	rctl_qty_t val;
+	proc_t *pp = curproc;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_KERNEL_MSGMNB);
+
+	mutex_enter(&pp->p_lock);
+	val = rctl_enforced_value(rc_process_msgmnb, pp->p_rctls, pp);
+	mutex_exit(&pp->p_lock);
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", (uint_t)val);
 }
 
 /* ARGSUSED */
