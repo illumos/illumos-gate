@@ -1161,6 +1161,9 @@ smb_tree_get_flags(const smb_kshare_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	if (si->shr_flags & SMB_SHRF_ABE)
 		flags |= SMB_TREE_ABE;
 
+	if (si->shr_flags & SMB_SHRF_FSO)
+		flags |= SMB_TREE_FORCE_L2_OPLOCK;
+
 	if (ssn->s_cfg.skc_oplock_enable) {
 		/* if 'smb' zfs property: oplocks=enabled */
 		flags |= SMB_TREE_OPLOCKS;

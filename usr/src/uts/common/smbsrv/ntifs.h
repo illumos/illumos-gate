@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -198,6 +198,25 @@ extern "C" {
 #define	FILE_VALID_SET_FLAGS			0x00000036
 
 /*
+ * "Granular" oplock flags; [MS-FSA], WinDDK/ntifs.h
+ * Same as smb2.h SMB2_LEASE_...
+ */
+#define	OPLOCK_LEVEL_CACHE_READ			0x01
+#define	OPLOCK_LEVEL_CACHE_HANDLE		0x02
+#define	OPLOCK_LEVEL_CACHE_WRITE		0x04
+#define	OPLOCK_LEVEL_CACHE_MASK			0x07
+
+/*
+ * [MS-FSA] oplock types (also "levels")
+ */
+#define	OPLOCK_LEVEL_NONE			0
+#define	OPLOCK_LEVEL_TWO			0x100
+#define	OPLOCK_LEVEL_ONE			0x200
+#define	OPLOCK_LEVEL_BATCH			0x400
+#define	OPLOCK_LEVEL_GRANULAR			0x800
+#define	OPLOCK_LEVEL_TYPE_MASK			0xf00
+
+/*
  * Define the file information class values used by the NT DDK and HAL.
  */
 typedef enum _FILE_INFORMATION_CLASS {
@@ -368,7 +387,7 @@ typedef enum _FILE_FS_INFORMATION_CLASS {
  *		If this flag is not set,
  *		the ACE is an effective ACE which controls access to the object
  *		to which it is attached.
- * 		Both effective and inherit-only ACEs can be inherited
+ *		Both effective and inherit-only ACEs can be inherited
  *		depending on the state of the other inheritance flags.
  *
  * INHERITED_ACE: Windows 2000/XP: Indicates that the ACE was inherited.
@@ -559,10 +578,10 @@ typedef struct smb_acl {
 typedef struct smb_sd {
 	uint8_t		sd_revision;
 	uint16_t	sd_control;
-	smb_sid_t 	*sd_owner;	/* SID file owner */
-	smb_sid_t 	*sd_group;	/* SID group (for POSIX) */
-	smb_acl_t 	*sd_sacl;	/* ACL System (audits) */
-	smb_acl_t 	*sd_dacl;	/* ACL Discretionary (perm) */
+	smb_sid_t	*sd_owner;	/* SID file owner */
+	smb_sid_t	*sd_group;	/* SID group (for POSIX) */
+	smb_acl_t	*sd_sacl;	/* ACL System (audits) */
+	smb_acl_t	*sd_dacl;	/* ACL Discretionary (perm) */
 } smb_sd_t;
 
 /*

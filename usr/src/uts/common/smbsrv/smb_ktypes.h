@@ -576,67 +576,58 @@ int MBC_SHADOW_CHAIN(struct mbuf_chain *SUBMBC, struct mbuf_chain *MBC,
 
 #define	MBC_ROOM_FOR(b, n) (((b)->chain_offset + (n)) <= (b)->max_bytes)
 
-#define	OPLOCK_MIN_TIMEOUT	(5 * 1000)
-#define	OPLOCK_STD_TIMEOUT	(30 * 1000)
-
 /*
- * Oplock break flags:
- * SMB_OPLOCK_BREAK_EXCLUSIVE - only break exclusive oplock
- * (type SMB_OPLOCK_EXCLUSIVE or SMB_OPLOCK_BATCH)
- * SMB_OPLOCK_BREAK_BATCH - only break exclusive BATCH oplock
- * SMB_OPLOCK_BREAK_NOWAIT - do not wait for oplock break ack
+ * Per smb_node oplock state
  */
-#define	SMB_OPLOCK_NO_BREAK		0x00
-#define	SMB_OPLOCK_BREAK_TO_NONE	0x01
-#define	SMB_OPLOCK_BREAK_TO_LEVEL_II	0x02
-#define	SMB_OPLOCK_BREAK_EXCLUSIVE	0x04
-#define	SMB_OPLOCK_BREAK_BATCH		0x08
-#define	SMB_OPLOCK_BREAK_NOWAIT		0x10
-
-/*
- * Oplocks levels are defined to match the levels in the SMB
- * protocol (nt_create_andx / nt_transact_create) and should
- * not be changed
- */
-#define	SMB_OPLOCK_NONE		0
-#define	SMB_OPLOCK_EXCLUSIVE	1
-#define	SMB_OPLOCK_BATCH	2
-#define	SMB_OPLOCK_LEVEL_II	3
-
 typedef struct smb_oplock {
 	kmutex_t		ol_mutex;
-	kcondvar_t		ol_cv;
-	kthread_t		*ol_xthread;
 	boolean_t		ol_fem;		/* fem monitor installed? */
-	uint8_t			ol_brk_pending;
-	uint8_t			ol_break;
-	uint32_t		ol_count;	/* number of grants */
-	list_t			ol_grants;	/* list of smb_oplock_grant_t */
+	struct smb_ofile	*excl_open;
+	uint32_t		ol_state;
+	int32_t			cnt_II;
+	int32_t			cnt_R;
+	int32_t			cnt_RH;
+	int32_t			cnt_RHBQ;
+	int32_t			waiters;
+	kcondvar_t		WaitingOpenCV;
 } smb_oplock_t;
 
-#define	SMB_OPLOCK_GRANT_MAGIC	0x4F4C4B47	/* OLKG */
-#define	SMB_OPLOCK_GRANT_VALID(p) \
-	ASSERT((p)->og_magic == SMB_OPLOCK_GRANT_MAGIC)
-#define	SMB_OFILE_OPLOCK_GRANTED(p) \
-	((p)->f_oplock_grant.og_magic == SMB_OPLOCK_GRANT_MAGIC)
+/*
+ * Per smb_ofile oplock state
+ */
 typedef struct smb_oplock_grant {
-	list_node_t		og_lnd;
-	uint32_t		og_magic;
-	uint8_t			og_breaking;
-	uint8_t			og_level;
-	uint8_t			og_dialect;	/* how to send breaks */
-	struct smb_ofile	*og_ofile;
+	/* smb protocol-level state */
+	uint32_t		og_state;	/* latest sent to client */
+	uint32_t		og_breaking;	/* BREAK_TO... flags */
+	uint16_t		og_dialect;	/* how to send breaks */
+	/* File-system level state */
+	uint8_t			onlist_II;
+	uint8_t			onlist_R;
+	uint8_t			onlist_RH;
+	uint8_t			onlist_RHBQ;
+	uint8_t			BreakingToRead;
 } smb_oplock_grant_t;
 
-#define	SMB_OPLOCK_BREAK_MAGIC	0x4F4C4B42	/* OLKB */
-#define	SMB_OPLOCK_BREAK_VALID(p) \
-	ASSERT((p)->ob_magic == SMB_OPLOCK_BREAK_MAGIC)
-typedef struct smb_oplock_break {
-	list_node_t	ob_lnd;
-	uint32_t	ob_magic;
-	struct smb_node	*ob_node;
-} smb_oplock_break_t;
+#define	SMB_LEASE_KEY_SZ	16
 
+typedef struct smb_lease {
+	list_node_t		ls_lnd;		/* sv_lease_ht */
+	kmutex_t		ls_mutex;
+	smb_llist_t		*ls_bucket;
+	struct smb_node		*ls_node;
+	/*
+	 * With a lease, just one ofile has the oplock.
+	 * This (used only for comparison) identifies which.
+	 */
+	void			*ls_oplock_ofile;
+	uint32_t		ls_refcnt;
+	uint32_t		ls_state;
+	uint32_t		ls_breaking;	/* BREAK_TO... flags */
+	uint16_t		ls_epoch;
+	uint16_t		ls_version;
+	uint8_t			ls_key[SMB_LEASE_KEY_SZ];
+	uint8_t			ls_clnt[SMB_LEASE_KEY_SZ];
+} smb_lease_t;
 
 #define	SMB_VFS_MAGIC	0x534D4256	/* 'SMBV' */
 
@@ -1091,6 +1082,8 @@ typedef struct smb_user {
 #define	SMB_TREE_DFSROOT		0x00020000
 #define	SMB_TREE_SPARSE			0x00040000
 #define	SMB_TREE_TRAVERSE_MOUNTS	0x00080000
+#define	SMB_TREE_FORCE_L2_OPLOCK	0x00100000
+/* Note: SMB_TREE_... in the mdb module too. */
 
 /*
  * See the long "Tree State Machine" comment in smb_tree.c
@@ -1343,7 +1336,8 @@ typedef enum {
  * See the long "Ofile State Machine" comment in smb_ofile.c
  */
 typedef enum {
-	SMB_OFILE_STATE_OPEN = 0,
+	SMB_OFILE_STATE_ALLOC = 0,
+	SMB_OFILE_STATE_OPEN,
 	SMB_OFILE_STATE_SAVE_DH,
 	SMB_OFILE_STATE_SAVING,
 	SMB_OFILE_STATE_CLOSING,
@@ -1393,7 +1387,11 @@ typedef struct smb_ofile {
 	pid_t			f_pid;
 	smb_attr_t		f_pending_attr;
 	boolean_t		f_written;
-	smb_oplock_grant_t	f_oplock_grant;
+	smb_oplock_grant_t	f_oplock;
+	uint8_t			TargetOplockKey[SMB_LEASE_KEY_SZ];
+	uint8_t			ParentOplockKey[SMB_LEASE_KEY_SZ];
+	struct smb_lease	*f_lease;
+
 	smb_notify_t		f_notify;
 
 	smb_dh_vers_t		dh_vers;
@@ -1598,8 +1596,16 @@ typedef struct open_param {
 	smb_opipe_t	*pipe;	/* for smb_opipe_open */
 	struct smb_sd	*sd;	/* for NTTransactCreate */
 	void		*create_ctx;
+
 	uint8_t		op_oplock_level;	/* requested/granted level */
-	boolean_t	op_oplock_levelII;	/* TRUE if levelII supported */
+	uint32_t	op_oplock_state;	/* internal type+level */
+	uint32_t	lease_state;		/* SMB2_LEASE_... */
+	uint32_t	lease_flags;
+	uint16_t	lease_epoch;
+	uint16_t	lease_version;		/* 1 or 2 */
+	uint8_t		lease_key[SMB_LEASE_KEY_SZ];	/* from client */
+	uint8_t		parent_lease_key[SMB_LEASE_KEY_SZ]; /* for V2 */
+
 	smb_dh_vers_t	dh_vers;
 	smb2fid_t	dh_fileid;		/* for durable reconnect */
 	uint8_t		create_guid[16];
@@ -1612,6 +1618,11 @@ typedef struct smb_arg_lock {
 	uint32_t	lcnt;
 	uint32_t	lseq;
 } smb_arg_lock_t;
+
+typedef struct smb_arg_olbrk {
+	uint32_t	NewLevel;
+	boolean_t	AckRequired;
+} smb_arg_olbrk_t;
 
 /*
  * SMB Request State Machine
@@ -1764,6 +1775,9 @@ typedef struct smb_request {
 	void			(*cancel_method)(struct smb_request *);
 	void			*cancel_arg2;
 
+	/* Queue used by smb_request_append_postwork. */
+	struct smb_request	*sr_postwork;
+
 	list_node_t		sr_waiters;	/* smb_notify.c */
 
 	/* Info from session service header */
@@ -1859,8 +1873,8 @@ typedef struct smb_request {
 		smb_arg_dirop_t		dirop;
 		smb_arg_open_t		open;
 		smb_arg_lock_t		lock;
+		smb_arg_olbrk_t		olbrk;	/* for async oplock break */
 		smb_rw_param_t		*rw;
-		smb_oplock_grant_t	olbrk;	/* for async oplock break */
 		int32_t			timestamp;
 	} arg;
 } smb_request_t;
@@ -2053,6 +2067,7 @@ typedef struct smb_server {
 	smb_session_t		*sv_session;
 	smb_llist_t		sv_session_list;
 	smb_hash_t		*sv_persistid_ht;
+	smb_hash_t		*sv_lease_ht;
 
 	struct smb_export	sv_export;
 	struct __door_handle	*sv_lmshrd;

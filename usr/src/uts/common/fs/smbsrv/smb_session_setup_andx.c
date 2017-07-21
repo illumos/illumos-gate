@@ -235,10 +235,6 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		sr->session->smb_msg_size = sinfo->ssi_maxbufsize;
 		sr->session->smb_max_mpx = sinfo->ssi_maxmpxcount;
 		sr->session->capabilities = sinfo->ssi_capabilities;
-
-		if (!smb_oplock_levelII)
-			sr->session->capabilities &= ~CAP_LEVEL_II_OPLOCKS;
-
 		sr->session->native_os = sinfo->ssi_native_os;
 		sr->session->native_lm = sinfo->ssi_native_lm;
 	}

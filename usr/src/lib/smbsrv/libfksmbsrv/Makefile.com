@@ -54,6 +54,7 @@ OBJS_FS_SMBSRV = \
 		smb_alloc.o				\
 		smb_authenticate.o			\
 		smb_close.o				\
+		smb_cmn_oplock.o			\
 		smb_cmn_rename.o			\
 		smb_cmn_setfile.o			\
 		smb_common_open.o			\
@@ -108,6 +109,7 @@ OBJS_FS_SMBSRV = \
 		smb_session_setup_andx.o		\
 		smb_set_fileinfo.o			\
 		smb_signing.o				\
+		smb_srv_oplock.o			\
 		smb_thread.o				\
 		smb_tree.o				\
 		smb_trans2_create_directory.o		\
@@ -131,6 +133,7 @@ OBJS_FS_SMBSRV = \
 		smb2_echo.o \
 		smb2_flush.o \
 		smb2_ioctl.o \
+		smb2_lease.o \
 		smb2_lock.o \
 		smb2_logoff.o \
 		smb2_negotiate.o \

@@ -604,6 +604,7 @@ usr/lib/smbsrv/libmlsvc.so
 usr/lib/smbsrv/libsmb.so
 usr/lib/smbsrv/libsmbns.so
 usr/lib/smbsrv/test-msgbuf
+usr/lib/smbsrv/testoplock
 #
 #
 # Private/Internal 64-bit libraries of smbsrv. Do not ship.

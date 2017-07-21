@@ -17,3 +17,4 @@ usr/src/tools/smatch/src/*
 usr/src/data/hwdata/pci.ids
 usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/readme.txt
+usr/src/cmd/smbsrv/testoplock/case*.ref

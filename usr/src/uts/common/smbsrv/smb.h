@@ -213,6 +213,17 @@ typedef uint32_t smb_utime_t;
 	FILE_RESERVE_OPFILTER))
 
 /*
+ * Oplocks levels as expressed in the SMB procotol, i.e.
+ * in nt_create_andx and nt_transact_create responses.
+ * The FS-level oplock interface flags are in ntifs.h
+ * (See OPLOCK_LEVEL_...)
+ */
+#define	SMB_OPLOCK_NONE		0
+#define	SMB_OPLOCK_EXCLUSIVE	1
+#define	SMB_OPLOCK_BATCH	2
+#define	SMB_OPLOCK_LEVEL_II	3
+
+/*
  * Define the filter flags for NtNotifyChangeDirectoryFile
  */
 #define	FILE_NOTIFY_CHANGE_FILE_NAME	0x00000001

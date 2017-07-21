@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -49,17 +49,11 @@
  * with Windows NT4.0. Previous experiments with NT4.0 resulted in directory
  * listing problems so this buffer size is configurable based on the end-user
  * environment. When in doubt use 37KB.
- *
- * smb_raw_mode: read_raw and write_raw supported (1) or NOT supported (0).
  */
 int	smb_maxbufsize = SMB_NT_MAXBUF;
-int	smb_oplock_levelII = 1;
-int	smb_oplock_timeout = OPLOCK_STD_TIMEOUT;
-int	smb_oplock_min_timeout = OPLOCK_MIN_TIMEOUT;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
 int	smb_sign_debug = 0;
-int	smb_raw_mode = 0;
 int	smb_shortnames = 1;
 uint_t	smb_audit_flags =
 #ifdef	DEBUG

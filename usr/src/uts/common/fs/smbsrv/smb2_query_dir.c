@@ -309,7 +309,7 @@ static uint32_t
 smb2_find_entries(smb_request_t *sr, smb_odir_t *od, smb2_find_args_t *args)
 {
 	smb_odir_resume_t odir_resume;
-	char 		*tbuf = NULL;
+	char		*tbuf = NULL;
 	size_t		tbuflen = 0;
 	uint16_t	count;
 	uint16_t	minsize;

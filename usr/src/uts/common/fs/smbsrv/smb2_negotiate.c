@@ -24,6 +24,7 @@ static int smb2_negotiate_common(smb_request_t *, uint16_t);
 
 uint32_t smb2srv_capabilities =
 	SMB2_CAP_DFS |
+	SMB2_CAP_LEASING |
 	SMB2_CAP_LARGE_MTU;
 
 /*

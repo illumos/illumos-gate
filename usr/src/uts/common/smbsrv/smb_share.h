@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -94,6 +94,7 @@ extern "C" {
 #define	SHOPT_DFSROOT		"dfsroot"
 #define	SHOPT_DESCRIPTION	"description"
 #define	SHOPT_QUOTAS		"quotas"
+#define	SHOPT_FSO		"fso"	/* Force Shared Oplocks */
 #define	SHOPT_AUTOHOME		"Autohome"
 
 #define	SMB_DEFAULT_SHARE_GROUP	"smb"
@@ -174,7 +175,8 @@ extern "C" {
 #define	SMB_SHRF_ACC_RW		0x0400
 #define	SMB_SHRF_ACC_ALL	0x0F00
 
-#define	SMB_SHRF_QUOTAS		0x1000
+#define	SMB_SHRF_QUOTAS		0x1000	/* Enable SMB Quotas */
+#define	SMB_SHRF_FSO		0x2000	/* Force Shared Oplocks */
 
 /*
  * Runtime flags

@@ -1,0 +1,28 @@
+# Input for testoplock, case 12
+# simulate smbtorture smb2.lease.breaking3
+#
+open 1 1
+req 1 0x807
+show
+#
+# a conflicting open (no oplock) is blocked until lease break ack
+open 2
+brk-open 2
+waiters 2 1
+show
+# should see lease break RWH to RH, and brk-open would block.
+# now a conflicting open with disp=overwrite(4), no oplock
+open 3
+brk-open 3 4
+waiters 3 2
+show
+# should see break_to_none pending (but no break ind yet)
+# and brk-open shoud block (break in progress)
+#
+# ack the first lease break above (RWH to RH)
+# should get a new break ind. (RH to none)
+ack 1 0x803
+show
+# got break ind?
+ack 1 0x800
+show

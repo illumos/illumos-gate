@@ -1,0 +1,29 @@
+open 1
+ open 1 OK
+req 1 0x807
+ req oplock fid=1 ret oplock=0x807 status=0x0 (SUCCESS)
+show
+ ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease= OgState=0x807 Brk=0x0 Excl=Y onlist:   
+brk-open 2
+*smb_oplock_ind_break fid=1 NewLevel=0x3, AckReq=1, ComplStatus=0x0 (SUCCESS)
+ brk-open 2 ret status=0x108 (OPLOCK_BREAK_IN_PROGRESS)
+show
+ ol_state=0x30017 ( BREAK_TO_HANDLE_CACHING BREAK_TO_READ_CACHING EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease= OgState=0x807 Brk=0x30000 Excl=Y onlist:   
+ack 1
+ ack: break fid=1, newstate=0x803, status=0x0 (SUCCESS)
+open 2
+ open 2 OK
+req 2 0x803
+ req oplock fid=2 ret oplock=0x803 status=0x0 (SUCCESS)
+show
+ ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=2 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease= OgState=0x803 Brk=0x0 Excl=N onlist:   RH
+  fid=2 Lease= OgState=0x803 Brk=0x0 Excl=N onlist:   RH

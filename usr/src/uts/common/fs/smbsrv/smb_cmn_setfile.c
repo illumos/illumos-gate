@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -29,7 +29,7 @@
  * SMB2 Set File Info
  */
 
-#include <smbsrv/smb_kproto.h>
+#include <smbsrv/smb2_kproto.h>
 #include <smbsrv/smb_fsops.h>
 
 /*
@@ -108,6 +108,7 @@ smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *si)
 	smb_attr_t *attr = &si->si_attr;
 	smb_node_t *node = si->si_node;
 	uint64_t eof;
+	uint32_t status;
 	int rc;
 
 	if (smb_mbc_decodef(&si->si_data, "q", &eof) != 0)
@@ -116,10 +117,16 @@ smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *si)
 	if (smb_node_is_dir(node))
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	/* If opened by path, break exclusive oplock */
-	if (sr->fid_ofile == NULL)
-		(void) smb_oplock_break(sr, node,
-		    SMB_OPLOCK_BREAK_EXCLUSIVE | SMB_OPLOCK_BREAK_TO_NONE);
+	status = smb_oplock_break_SETINFO(node, sr->fid_ofile,
+	    FileEndOfFileInformation);
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		if (sr->session->dialect >= SMB_VERS_2_BASE)
+			(void) smb2sr_go_async(sr);
+		(void) smb_oplock_wait_break(node, 0);
+		status = 0;
+	}
+	if (status != 0)
+		return (status);
 
 	bzero(attr, sizeof (*attr));
 	attr->sa_mask = SMB_AT_SIZE;
@@ -128,7 +135,6 @@ smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *si)
 	if (rc != 0)
 		return (smb_errno2status(rc));
 
-	smb_oplock_break_levelII(node);
 	return (0);
 }
 
@@ -144,6 +150,7 @@ smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *si)
 	smb_attr_t *attr = &si->si_attr;
 	smb_node_t *node = si->si_node;
 	uint64_t allocsz;
+	uint32_t status;
 	int rc;
 
 	if (smb_mbc_decodef(&si->si_data, "q", &allocsz) != 0)
@@ -152,10 +159,16 @@ smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *si)
 	if (smb_node_is_dir(node))
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	/* If opened by path, break exclusive oplock */
-	if (sr->fid_ofile == NULL)
-		(void) smb_oplock_break(sr, node,
-		    SMB_OPLOCK_BREAK_EXCLUSIVE | SMB_OPLOCK_BREAK_TO_NONE);
+	status = smb_oplock_break_SETINFO(node, sr->fid_ofile,
+	    FileAllocationInformation);
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		if (sr->session->dialect >= SMB_VERS_2_BASE)
+			(void) smb2sr_go_async(sr);
+		(void) smb_oplock_wait_break(node, 0);
+		status = 0;
+	}
+	if (status != 0)
+		return (status);
 
 	bzero(attr, sizeof (*attr));
 	attr->sa_mask = SMB_AT_ALLOCSZ;
@@ -164,7 +177,6 @@ smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *si)
 	if (rc != 0)
 		return (smb_errno2status(rc));
 
-	smb_oplock_break_levelII(node);
 	return (0);
 }
 
@@ -211,6 +223,7 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *si)
 	smb_node_t *node = si->si_node;
 	smb_ofile_t *of = sr->fid_ofile;
 	uint8_t		mark_delete;
+	uint32_t	status;
 	uint32_t	flags = 0;
 
 	if (smb_mbc_decodef(&si->si_data, "b", &mark_delete) != 0)
@@ -219,13 +232,27 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *si)
 	if ((of == NULL) || !(smb_ofile_granted_access(of) & DELETE))
 		return (NT_STATUS_ACCESS_DENIED);
 
-	if (mark_delete) {
-		if (SMB_TREE_SUPPORTS_CATIA(sr))
-			flags |= SMB_CATIA;
-		return (smb_node_set_delete_on_close(node, of->f_cr, flags));
-	} else {
+	if (mark_delete == 0) {
 		smb_node_reset_delete_on_close(node);
+		return (NT_STATUS_SUCCESS);
 	}
 
-	return (NT_STATUS_SUCCESS);
+	/*
+	 * Break any oplock handle caching.
+	 */
+	status = smb_oplock_break_SETINFO(node, of,
+	    FileDispositionInformation);
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		if (sr->session->dialect >= SMB_VERS_2_BASE)
+			(void) smb2sr_go_async(sr);
+		(void) smb_oplock_wait_break(node, 0);
+		status = 0;
+	}
+	if (status != 0)
+		return (status);
+
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
+
+	return (smb_node_set_delete_on_close(node, of->f_cr, flags));
 }

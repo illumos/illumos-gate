@@ -891,6 +891,7 @@ smb_kshare_decode(nvlist_t *share)
 	    SMB_SHRF_DFSROOT);
 	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_QUOTAS,
 	    SMB_SHRF_QUOTAS);
+	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_FSO, SMB_SHRF_FSO);
 	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_AUTOHOME,
 	    SMB_SHRF_AUTOHOME);
 

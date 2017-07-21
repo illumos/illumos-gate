@@ -1,0 +1,31 @@
+open 1
+ open 1 OK
+req 1 0x100
+ req oplock fid=1 ret oplock=0x100 status=0x0 (SUCCESS)
+show
+ ol_state=0x100 ( LEVEL_TWO_OPLOCK )
+ Excl=n cnt_II=1 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease= OgState=0x100 Brk=0x0 Excl=N onlist: II  
+open 2 2
+ open 2 OK
+brk-open 2
+ brk-open 2 ret status=0x0 (SUCCESS)
+show
+ ol_state=0x100 ( LEVEL_TWO_OPLOCK )
+ Excl=n cnt_II=1 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease= OgState=0x100 Brk=0x0 Excl=N onlist: II  
+  fid=2 Lease=2 OgState=0x0 Brk=0x0 Excl=N onlist:   
+req 2 0x807
+ req oplock fid=2 ret oplock=0x0 status=0xc00000e2 (OPLOCK_NOT_GRANTED)
+req 2 0x803
+ req oplock fid=2 ret oplock=0x0 status=0xc00000e2 (OPLOCK_NOT_GRANTED)
+req 2 0x801
+ req oplock fid=2 ret oplock=0x801 status=0x0 (SUCCESS)
+show
+ ol_state=0x101 ( LEVEL_TWO_OPLOCK READ_CACHING )
+ Excl=n cnt_II=1 cnt_R=1 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease= OgState=0x100 Brk=0x0 Excl=N onlist: II  
+  fid=2 Lease=2 OgState=0x801 Brk=0x0 Excl=N onlist:  R 

@@ -315,6 +315,7 @@ smb_server_g_init(void)
 	smb_codepage_init();
 	smb_mbc_init();		/* smb_mbc_cache */
 	smb_node_init();	/* smb_node_cache, lists */
+	smb2_lease_init();
 
 	smb_cache_request = kmem_cache_create("smb_request_cache",
 	    sizeof (smb_request_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
@@ -371,6 +372,7 @@ smb_server_g_fini(void)
 	kmem_cache_destroy(smb_cache_event);
 	kmem_cache_destroy(smb_cache_lock);
 
+	smb2_lease_fini();
 	smb_node_fini();
 	smb_mbc_fini();
 	smb_codepage_fini();
@@ -420,6 +422,9 @@ smb_server_create(void)
 
 	sv->sv_persistid_ht = smb_hash_create(sizeof (smb_ofile_t),
 	    offsetof(smb_ofile_t, f_dh_lnd), SMB_OFILE_HASH_NBUCKETS);
+
+	sv->sv_lease_ht = smb_hash_create(sizeof (smb_lease_t),
+	    offsetof(smb_lease_t, ls_lnd), SMB_LEASE_HASH_NBUCKETS);
 
 	smb_llist_constructor(&sv->sv_session_list, sizeof (smb_session_t),
 	    offsetof(smb_session_t, s_lnd));
@@ -536,6 +541,7 @@ smb_server_delete(void)
 	smb_thread_destroy(&sv->si_thread_timers);
 
 	mutex_destroy(&sv->sv_mutex);
+	smb_hash_destroy(sv->sv_lease_ht);
 	smb_hash_destroy(sv->sv_persistid_ht);
 	cv_destroy(&sv->sv_cv);
 	sv->sv_magic = 0;

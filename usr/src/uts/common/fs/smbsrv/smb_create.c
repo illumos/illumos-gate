@@ -196,9 +196,12 @@ smb_common_create(smb_request_t *sr)
 	} else {
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 	}
-	op->op_oplock_levelII = B_FALSE;
 
 	status = smb_common_open(sr);
+	if (status == 0 && op->op_oplock_level != SMB_OPLOCK_NONE) {
+		/* Oplock req. in op->op_oplock_level etc. */
+		smb1_oplock_acquire(sr, B_FALSE);
+	}
 
 	if (op->op_oplock_level == SMB_OPLOCK_NONE) {
 		sr->smb_flg &=

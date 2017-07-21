@@ -347,6 +347,21 @@ string that represents a domain name. By default, no value is set.
 .sp
 .ne 2
 .na
+\fB\fBoplock_enable\fR\fR
+.ad
+.sp .6
+.RS 4n
+Controls whether "oplocks" may be granted by the SMB server.
+The term "oplock" is short for "opportunistic lock", which is
+the legacy name for cache delegations in SMB.
+By default, oplocks are enabled.
+Note that if oplocks are disabled, file I/O perfrormance may be
+severely reduced.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBpdc\fR\fR
 .ad
 .sp .6

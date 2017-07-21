@@ -22,6 +22,7 @@
 
 smb_sdrc_t smb2_invalid_cmd(smb_request_t *);
 static void smb2_tq_work(void *);
+static void smb2sr_run_postwork(smb_request_t *);
 
 static const smb_disp_entry_t
 smb2_disp_table[SMB2__NCMDS] = {
@@ -569,7 +570,6 @@ cmd_start:
 		 * avoid dangling references: file, tree, user
 		 */
 		if (sr->fid_ofile != NULL) {
-			smb_ofile_request_complete(sr->fid_ofile);
 			smb_ofile_release(sr->fid_ofile);
 			sr->fid_ofile = NULL;
 		}
@@ -841,6 +841,9 @@ cmd_done:
 cleanup:
 	if (disconnect)
 		smb_session_disconnect(session);
+
+	if (sr->sr_postwork != NULL)
+		smb2sr_run_postwork(sr);
 
 	mutex_enter(&sr->sr_mutex);
 	sr->sr_state = SMB_REQ_STATE_COMPLETED;
@@ -1414,5 +1417,59 @@ smb2_dispatch_stats_update(smb_server_t *sv,
 			sds[i].sdt_lat.ly_d_sum = 0;
 			mutex_exit(&sds[i].sdt_lat.ly_mutex);
 		}
+	}
+}
+
+/*
+ * Append new_sr to the postwork queue.  sr->smb2_cmd_code encodes
+ * the action that should be run by this sr.
+ *
+ * This queue is rarely used (and normally empty) so we're OK
+ * using a simple "walk to tail and insert" here.
+ */
+void
+smb2sr_append_postwork(smb_request_t *top_sr, smb_request_t *new_sr)
+{
+	smb_request_t *last_sr;
+
+	ASSERT(top_sr->session->dialect >= SMB_VERS_2_BASE);
+
+	last_sr = top_sr;
+	while (last_sr->sr_postwork != NULL)
+		last_sr = last_sr->sr_postwork;
+
+	last_sr->sr_postwork = new_sr;
+}
+
+/*
+ * Run any "post work" that was appended to the main SR while it
+ * was running.  This is called after the request has been sent
+ * for the main SR, and used in cases i.e. the oplock code, where
+ * we need to send something to the client only _after_ the main
+ * sr request has gone out.
+ */
+static void
+smb2sr_run_postwork(smb_request_t *top_sr)
+{
+	smb_request_t *post_sr;	/* the one we're running */
+	smb_request_t *next_sr;
+
+	while ((post_sr = top_sr->sr_postwork) != NULL) {
+		next_sr = post_sr->sr_postwork;
+		top_sr->sr_postwork = next_sr;
+		post_sr->sr_postwork = NULL;
+
+		post_sr->sr_worker = top_sr->sr_worker;
+		post_sr->sr_state = SMB_REQ_STATE_ACTIVE;
+
+		switch (post_sr->smb2_cmd_code) {
+		case SMB2_OPLOCK_BREAK:
+			smb_oplock_send_brk(post_sr);
+			break;
+		default:
+			ASSERT(0);
+		}
+		post_sr->sr_state = SMB_REQ_STATE_COMPLETED;
+		smb_request_free(post_sr);
 	}
 }

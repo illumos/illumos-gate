@@ -1,0 +1,36 @@
+open 1 1
+ open 1 OK
+req 1 0x805
+ req oplock fid=1 ret oplock=0x805 status=0x0 (SUCCESS)
+show
+ ol_state=0x15 ( EXCLUSIVE WRITE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease=1 OgState=0x805 Brk=0x0 Excl=Y onlist:   
+open 2 2
+ open 2 OK
+brk-open 2
+*smb_oplock_ind_break fid=1 NewLevel=0x1, AckReq=1, ComplStatus=0x0 (SUCCESS)
+ brk-open 2 ret status=0x108 (OPLOCK_BREAK_IN_PROGRESS)
+show
+ ol_state=0x10015 ( BREAK_TO_READ_CACHING EXCLUSIVE WRITE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 OgState=0x805 Brk=0x10000 Excl=Y onlist:   
+  fid=2 Lease=2 OgState=0x0 Brk=0x0 Excl=N onlist:   
+ack 1
+ ack: break fid=1, newstate=0x801, status=0x0 (SUCCESS)
+show
+ ol_state=0x1 ( READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=1 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 OgState=0x801 Brk=0x0 Excl=N onlist:  R 
+  fid=2 Lease=2 OgState=0x0 Brk=0x0 Excl=N onlist:   
+req 2 0x801
+ req oplock fid=2 ret oplock=0x801 status=0x0 (SUCCESS)
+show
+ ol_state=0x1 ( READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=2 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 OgState=0x801 Brk=0x0 Excl=N onlist:  R 
+  fid=2 Lease=2 OgState=0x801 Brk=0x0 Excl=N onlist:  R 

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_NTSTATUS_H
@@ -783,7 +783,7 @@ extern "C" {
 #define	NT_STATUS_ILLEGAL_ELEMENT_ADDRESS		0xC0000285
 #define	NT_STATUS_MAGAZINE_NOT_PRESENT			0xC0000286
 #define	NT_STATUS_REINITIALIZATION_NEEDED		0xC0000287
-/* 	NT_STATUS_DEVICE_REQUIRES_CLEANING		0x80000288 */
+/*	NT_STATUS_DEVICE_REQUIRES_CLEANING		0x80000288 */
 /*	NT_STATUS_DEVICE_DOOR_OPEN			0x80000289 */
 #define	NT_STATUS_ENCRYPTION_FAILED			0xC000028A
 #define	NT_STATUS_DECRYPTION_FAILED			0xC000028B

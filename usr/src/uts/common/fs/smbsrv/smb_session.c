@@ -1482,7 +1482,6 @@ smb_request_free(smb_request_t *sr)
 	ASSERT(sr->r_xa == NULL);
 
 	if (sr->fid_ofile != NULL) {
-		smb_ofile_request_complete(sr->fid_ofile);
 		smb_ofile_release(sr->fid_ofile);
 	}
 
@@ -1532,10 +1531,6 @@ boolean_t
 smb_session_levelII_oplocks(smb_session_t *session)
 {
 	SMB_SESSION_VALID(session);
-
-	/* Clients using SMB2 and later always know about oplocks. */
-	if (session->dialect > NT_LM_0_12)
-		return (B_TRUE);
 
 	/* Older clients only do Level II oplocks if negotiated. */
 	if ((session->capabilities & CAP_LEVEL_II_OPLOCKS) != 0)

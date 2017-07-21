@@ -24,6 +24,23 @@
 #define	DH_PERSISTENT	SMB2_DHANDLE_FLAG_PERSISTENT
 
 /*
+ * Compile-time check that the SMB2_LEASE_... definitions
+ * match the (internal) equivalents from ntifs.h
+ */
+#if SMB2_LEASE_NONE != OPLOCK_LEVEL_NONE
+#error "SMB2_LEASE_NONE"
+#endif
+#if SMB2_LEASE_READ_CACHING != OPLOCK_LEVEL_CACHE_READ
+#error "SMB2_LEASE_READ_CACHING"
+#endif
+#if SMB2_LEASE_HANDLE_CACHING != OPLOCK_LEVEL_CACHE_HANDLE
+#error "SMB2_LEASE_HANDLE_CACHING"
+#endif
+#if SMB2_LEASE_WRITE_CACHING != OPLOCK_LEVEL_CACHE_WRITE
+#error "SMB2_LEASE_WRITE_CACHING"
+#endif
+
+/*
  * Some flags used locally to keep track of which Create Context
  * names have been provided and/or requested.
  */
@@ -64,6 +81,7 @@ typedef struct smb2_create_ctx {
 	smb2_create_ctx_elem_t cc_out_max_access;
 	smb2_create_ctx_elem_t cc_out_file_id;
 	smb2_create_ctx_elem_t cc_out_aapl;
+	smb2_create_ctx_elem_t cc_out_req_lease;
 	smb2_create_ctx_elem_t cc_out_dh_request;
 	smb2_create_ctx_elem_t cc_out_dh_request_v2;
 } smb2_create_ctx_t;
@@ -88,7 +106,6 @@ smb2_create(smb_request_t *sr)
 	smb_ofile_t *of = NULL;
 	uint16_t StructSize;
 	uint8_t SecurityFlags;
-	uint8_t OplockLevel;
 	uint32_t ImpersonationLevel;
 	uint64_t SmbCreateFlags;
 	uint64_t Reserved4;
@@ -110,7 +127,6 @@ smb2_create(smb_request_t *sr)
 	 * if we already have one, release it now.
 	 */
 	if (sr->fid_ofile != NULL) {
-		smb_ofile_request_complete(sr->fid_ofile);
 		smb_ofile_release(sr->fid_ofile);
 		sr->fid_ofile = NULL;
 	}
@@ -283,15 +299,26 @@ smb2_create(smb_request_t *sr)
 		    CCTX_TIMEWARP_TOKEN |
 		    CCTX_QUERY_ON_DISK_ID);
 
+		/*
+		 * Reconnect check needs to know if a lease was requested.
+		 * The requested oplock level is ignored in reconnect, so
+		 * using op_oplock_level to convey this info.
+		 */
+		if (cctx.cc_in_flags & CCTX_REQUEST_LEASE)
+			op->op_oplock_level = SMB2_OPLOCK_LEVEL_LEASE;
+		else
+			op->op_oplock_level = 0;
+
 		status = smb2_dh_reconnect(sr);
 		if (status != NT_STATUS_SUCCESS)
 			goto cmd_done;
 
 		/*
-		 * Skip most open execution during reconnect.
+		 * Skip most open execution during reconnect,
+		 * but need (reclaimed) oplock state in *op.
 		 */
 		of = sr->fid_ofile;
-
+		smb2_oplock_reconnect(sr);
 		goto reconnect_done;
 	}
 
@@ -301,28 +328,57 @@ smb2_create(smb_request_t *sr)
 
 	/*
 	 * Validate the requested oplock level.
-	 * Convert the SMB2 oplock level into SMB1 form.
+	 * Conversion to internal form is in smb2_oplock_acquire()
 	 */
 	switch (op->op_oplock_level) {
-	case SMB2_OPLOCK_LEVEL_NONE:
-		op->op_oplock_level = SMB_OPLOCK_NONE;
+	case SMB2_OPLOCK_LEVEL_NONE:		/* OPLOCK_LEVEL_NONE */
+	case SMB2_OPLOCK_LEVEL_II:		/* OPLOCK_LEVEL_TWO */
+	case SMB2_OPLOCK_LEVEL_EXCLUSIVE:	/* OPLOCK_LEVEL_ONE */
+	case SMB2_OPLOCK_LEVEL_BATCH:		/* OPLOCK_LEVEL_BATCH */
+		/*
+		 * Ignore lease create context (if any)
+		 */
+		cctx.cc_in_flags &= ~CCTX_REQUEST_LEASE;
 		break;
-	case SMB2_OPLOCK_LEVEL_II:
-		op->op_oplock_level = SMB_OPLOCK_LEVEL_II;
+
+	case SMB2_OPLOCK_LEVEL_LEASE:		/* OPLOCK_LEVEL_GRANULAR */
+		/*
+		 * Require a lease create context.
+		 */
+		if ((cctx.cc_in_flags & CCTX_REQUEST_LEASE) == 0) {
+			cmn_err(CE_NOTE, "smb2:create, oplock=ff and no lease");
+			status = NT_STATUS_INVALID_PARAMETER;
+			goto cmd_done;
+		}
+
+		/*
+		 * Validate lease request state
+		 * Only a few valid combinations.
+		 */
+		switch (op->lease_state) {
+		case SMB2_LEASE_NONE:
+		case SMB2_LEASE_READ_CACHING:
+		case SMB2_LEASE_READ_CACHING | SMB2_LEASE_HANDLE_CACHING:
+		case SMB2_LEASE_READ_CACHING | SMB2_LEASE_WRITE_CACHING:
+		case SMB2_LEASE_READ_CACHING | SMB2_LEASE_WRITE_CACHING |
+		    SMB2_LEASE_HANDLE_CACHING:
+			break;
+
+		default:
+			/*
+			 * Invalid lease state flags
+			 * Just force to "none".
+			 */
+			op->lease_state = SMB2_LEASE_NONE;
+			break;
+		}
 		break;
-	case SMB2_OPLOCK_LEVEL_EXCLUSIVE:
-		op->op_oplock_level = SMB_OPLOCK_EXCLUSIVE;
-		break;
-	case SMB2_OPLOCK_LEVEL_BATCH:
-		op->op_oplock_level = SMB_OPLOCK_BATCH;
-		break;
-	case SMB2_OPLOCK_LEVEL_LEASE:	/* not yet */
+
 	default:
 		/* Unknown SMB2 oplock level. */
 		status = NT_STATUS_INVALID_PARAMETER;
 		goto cmd_done;
 	}
-	op->op_oplock_levelII = B_TRUE;
 
 	/*
 	 * Only disk trees get oplocks or leases.
@@ -385,28 +441,47 @@ smb2_create(smb_request_t *sr)
 	 * non-durable handles in case we get the ioctl
 	 * to set "resiliency" on this handle.
 	 */
-	if (of->f_ftype == SMB_FTYPE_DISK) {
+	if (of->f_ftype == SMB_FTYPE_DISK)
 		smb_ofile_set_persistid(of);
+
+	/*
+	 * [MS-SMB2] 3.3.5.9.8
+	 * Handling the SMB2_CREATE_REQUEST_LEASE Create Context
+	 */
+	if ((cctx.cc_in_flags & CCTX_REQUEST_LEASE) != 0) {
+		status = smb2_lease_create(sr);
+		if (status != NT_STATUS_SUCCESS) {
+			if (op->action_taken == SMB_OACT_CREATED) {
+				smb_ofile_set_delete_on_close(sr, of);
+			}
+			goto cmd_done;
+		}
+	}
+	if (op->op_oplock_level == SMB2_OPLOCK_LEVEL_LEASE) {
+		smb2_lease_acquire(sr);
+	} else if (op->op_oplock_level != SMB2_OPLOCK_LEVEL_NONE) {
+		smb2_oplock_acquire(sr);
 	}
 
 	/*
-	 * We're supposed to process Durable Handle requests
-	 * if any one of the following conditions is true:
+	 * Make this a durable open, but only if:
+	 * (durable handle requested and...)
 	 *
-	 * 1. op_oplock_level == SMB_OPLOCK_BATCH
+	 * 1. op_oplock_level == SMB2_OPLOCK_LEVEL_BATCH
 	 * 2. A lease is requested with handle caching
 	 *    - for v1, the lease must not be on a directory
 	 * 3. For v2, flags has "persistent" (tree is CA)
 	 *    (when tree not CA, turned off persist above)
 	 *
-	 * Otherwise, the requests are ignored.
-	 * However, because we don't support leases or CA,
-	 * cases 2 and 3 are not of concern to us yet.
+	 * Otherwise, DH requests are ignored, so we set
+	 * dh_vers = not durable
 	 */
 	if ((cctx.cc_in_flags &
 	    (CCTX_DH_REQUEST|CCTX_DH_REQUEST_V2)) != 0 &&
 	    smb_node_is_file(of->f_node) &&
-	    (op->op_oplock_level == SMB_OPLOCK_BATCH)) {
+	    ((op->op_oplock_level == SMB2_OPLOCK_LEVEL_BATCH) ||
+	    (op->op_oplock_level == SMB2_OPLOCK_LEVEL_LEASE &&
+	    (op->lease_state & OPLOCK_LEVEL_CACHE_HANDLE) != 0))) {
 		/*
 		 * OK, make this handle "durable"
 		 */
@@ -456,7 +531,7 @@ reconnect_done:
 	case STYPE_DISKTREE:
 	case STYPE_PRINTQ:
 		if (op->create_options & FILE_DELETE_ON_CLOSE)
-			smb_ofile_set_delete_on_close(of);
+			smb_ofile_set_delete_on_close(sr, of);
 		break;
 	}
 
@@ -499,6 +574,16 @@ reconnect_done:
 		status = 0;
 	}
 
+	/*
+	 * If a lease was requested, and we got one...
+	 */
+	if ((cctx.cc_in_flags & CCTX_REQUEST_LEASE) != 0 &&
+	    op->op_oplock_level == SMB2_OPLOCK_LEVEL_LEASE)
+		cctx.cc_out_flags |= CCTX_REQUEST_LEASE;
+
+	/*
+	 * If a durable handle was requested and we got one...
+	 */
 	if ((cctx.cc_in_flags & CCTX_DH_REQUEST) != 0 &&
 	    of->dh_vers == SMB2_DURABLE_V1) {
 		cctx.cc_out_flags |= CCTX_DH_REQUEST;
@@ -531,26 +616,6 @@ cmd_done:
 	}
 
 	/*
-	 * Convert the negotiated Oplock level back into
-	 * SMB2 encoding form.
-	 */
-	switch (op->op_oplock_level) {
-	default:
-	case SMB_OPLOCK_NONE:
-		OplockLevel = SMB2_OPLOCK_LEVEL_NONE;
-		break;
-	case SMB_OPLOCK_LEVEL_II:
-		OplockLevel = SMB2_OPLOCK_LEVEL_II;
-		break;
-	case SMB_OPLOCK_EXCLUSIVE:
-		OplockLevel = SMB2_OPLOCK_LEVEL_EXCLUSIVE;
-		break;
-	case SMB_OPLOCK_BATCH:
-		OplockLevel = SMB2_OPLOCK_LEVEL_BATCH;
-		break;
-	}
-
-	/*
 	 * Encode the SMB2 Create reply
 	 */
 	attr = &op->fqi.fq_fattr;
@@ -558,7 +623,7 @@ cmd_done:
 	    &sr->reply,
 	    "wb.lTTTTqqllqqll",
 	    89,	/* StructSize */	/* w */
-	    OplockLevel,		/* b */
+	    op->op_oplock_level,	/* b */
 	    op->action_taken,		/* l */
 	    &attr->sa_crtime,		/* T */
 	    &attr->sa_vattr.va_atime,	/* T */
@@ -790,6 +855,40 @@ smb2_decode_create_ctx(smb_request_t *sr, smb2_create_ctx_t *cc)
 			op->create_timewarp = B_TRUE;
 			break;
 
+		/*
+		 * Note: This handles both V1 and V2 leases,
+		 * which differ only by their length.
+		 */
+		case SMB2_CREATE_REQUEST_LEASE:		/* ("RqLs") */
+			if (data_len == 52) {
+				op->lease_version = 2;
+			} else if (data_len == 32) {
+				op->lease_version = 1;
+			} else {
+				cmn_err(CE_NOTE, "Cctx RqLs bad len=0x%x",
+				    data_len);
+			}
+			rc = smb_mbc_decodef(&cce->cce_mbc, "#cllq",
+			    UUID_LEN,			/* # */
+			    op->lease_key,		/* c */
+			    &op->lease_state,		/* l */
+			    &op->lease_flags,		/* l */
+			    &nttime);	/* (ignored)	   q */
+			if (rc != 0)
+				goto errout;
+			if (op->lease_version == 2) {
+				rc = smb_mbc_decodef(&cce->cce_mbc,
+				    "#cw..",
+				    UUID_LEN,
+				    op->parent_lease_key,
+				    &op->lease_epoch);
+				if (rc != 0)
+					goto errout;
+			} else {
+				bzero(op->parent_lease_key, UUID_LEN);
+			}
+			break;
+
 		case SMB2_CREATE_DURABLE_HANDLE_RECONNECT_V2: /* ("DH2C") */
 			rc = smb_mbc_decodef(&cce->cce_mbc, "qq#cl",
 			    &op->dh_fileid.persistent,	/* q */
@@ -926,6 +1025,34 @@ smb2_encode_create_ctx(smb_request_t *sr, smb2_create_ctx_t *cc)
 		    mbc->chain_offset - last_top);
 	}
 
+	if (cc->cc_out_flags & CCTX_REQUEST_LEASE) {
+		cce = &cc->cc_out_req_lease;
+
+		cce->cce_mbc.max_bytes = cce->cce_len = 32;
+		(void) smb_mbc_encodef(&cce->cce_mbc, "#cllq",
+		    UUID_LEN,			/* # */
+		    op->lease_key,		/* c */
+		    op->lease_state,		/* l */
+		    op->lease_flags,		/* l */
+		    0LL);			/* q */
+		if (op->lease_version == 2) {
+			cce->cce_mbc.max_bytes = cce->cce_len = 52;
+			(void) smb_mbc_encodef(&cce->cce_mbc,
+			    "#cw..",
+			    UUID_LEN,
+			    op->parent_lease_key,
+			    op->lease_epoch);
+		}
+
+		last_top = mbc->chain_offset;
+		rc = smb2_encode_create_ctx_elem(mbc, cce,
+		    SMB2_CREATE_REQUEST_LEASE);
+		if (rc)
+			return (NT_STATUS_INTERNAL_ERROR);
+		(void) smb_mbc_poke(mbc, last_top, "l",
+		    mbc->chain_offset - last_top);
+	}
+
 	if (cc->cc_out_flags & CCTX_DH_REQUEST) {
 		cce = &cc->cc_out_dh_request;
 
@@ -1029,6 +1156,10 @@ smb2_free_create_ctx(smb2_create_ctx_t *cc)
 	}
 	if (cc->cc_out_flags & CCTX_AAPL_EXT) {
 		cce = &cc->cc_out_aapl;
+		MBC_FLUSH(&cce->cce_mbc);
+	}
+	if (cc->cc_out_flags & CCTX_REQUEST_LEASE) {
+		cce = &cc->cc_out_req_lease;
 		MBC_FLUSH(&cce->cce_mbc);
 	}
 	if (cc->cc_out_flags & CCTX_DH_REQUEST) {

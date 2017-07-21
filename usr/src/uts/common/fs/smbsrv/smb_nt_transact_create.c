@@ -201,12 +201,14 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		op->fqi.fq_dnode = op->dir->f_node;
 	}
 
-	op->op_oplock_levelII = B_TRUE;
-
 	status = smb_common_open(sr);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
+	if (op->op_oplock_level != SMB_OPLOCK_NONE) {
+		/* Oplock req. in op->op_oplock_level etc. */
+		smb1_oplock_acquire(sr, B_TRUE);
 	}
 
 	/*
@@ -220,7 +222,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	case STYPE_DISKTREE:
 	case STYPE_PRINTQ:
 		if (op->create_options & FILE_DELETE_ON_CLOSE)
-			smb_ofile_set_delete_on_close(of);
+			smb_ofile_set_delete_on_close(sr, of);
 		DirFlag = smb_node_is_dir(of->f_node) ? 1 : 0;
 		break;
 

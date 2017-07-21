@@ -178,6 +178,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_GUEST,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_DFSROOT,	OPT_TYPE_BOOLEAN },
 	{ SHOPT_DESCRIPTION,	OPT_TYPE_STRING },
+	{ SHOPT_FSO,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_QUOTAS,		OPT_TYPE_BOOLEAN },
 	{ NULL, NULL }
 };
@@ -916,6 +917,8 @@ struct smb_proto_option_defs {
 	{ SMB_CI_DISPOSITION, 0, MAX_VALUE_BUFLEN,
 	    disposition_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_MAX_PROTOCOL, 0, MAX_VALUE_BUFLEN, max_protocol_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_OPLOCK_ENABLE, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
 };
 
@@ -2159,6 +2162,9 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 
 	if (smb_saprop_getbool(opts, SHOPT_DFSROOT, B_FALSE))
 		si->shr_flags |= SMB_SHRF_DFSROOT;
+
+	if (smb_saprop_getbool(opts, SHOPT_FSO, B_FALSE))
+		si->shr_flags |= SMB_SHRF_FSO;
 
 	/* Quotas are enabled by default. */
 	si->shr_flags |= SMB_SHRF_QUOTAS;

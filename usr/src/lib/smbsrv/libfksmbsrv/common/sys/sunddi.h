@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SUNDDI_H
@@ -101,19 +102,7 @@ extern int ddi_strtoul(const char *, char **, int, unsigned long *);
 extern int ddi_strtoll(const char *, char **, int, longlong_t *);
 extern int ddi_strtoull(const char *, char **, int, u_longlong_t *);
 
-/*
- * kiconv functions and their macros.
- */
-#define	KICONV_IGNORE_NULL	(0x0001)
-#define	KICONV_REPLACE_INVALID	(0x0002)
-
-extern kiconv_t kiconv_open(const char *, const char *);
-extern size_t kiconv(kiconv_t, char **, size_t *, char **, size_t *, int *);
-extern int kiconv_close(kiconv_t);
-extern size_t kiconvstr(const char *, const char *, char *, size_t *, char *,
-	size_t *, int, int *);
-
-#endif	/* _KERNEL */
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
 #ifdef	__cplusplus
 }

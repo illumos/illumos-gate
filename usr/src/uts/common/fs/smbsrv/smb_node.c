@@ -751,6 +751,10 @@ smb_node_open_check(smb_node_t *node, uint32_t desired_access,
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
+			DTRACE_PROBE3(conflict3,
+			    smb_ofile_t, of,
+			    uint32_t, desired_access,
+			    uint32_t, share_access);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
@@ -783,6 +787,7 @@ smb_node_rename_check(smb_node_t *node)
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
+			DTRACE_PROBE1(conflict1, smb_ofile_t, of);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
@@ -820,6 +825,7 @@ smb_node_delete_check(smb_node_t *node)
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
+			DTRACE_PROBE1(conflict1, smb_ofile_t, of);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
@@ -1185,9 +1191,6 @@ smb_node_alloc(
 	node->delete_on_close_cred = NULL;
 	node->n_delete_on_close_flags = 0;
 	node->n_oplock.ol_fem = B_FALSE;
-	node->n_oplock.ol_xthread = NULL;
-	node->n_oplock.ol_count = 0;
-	node->n_oplock.ol_break = SMB_OPLOCK_NO_BREAK;
 
 	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
 	if (strcmp(od_name, XATTR_DIR) == 0)
@@ -1218,8 +1221,6 @@ smb_node_free(smb_node_t *node)
 	VERIFY(node->n_lock_list.ll_count == 0);
 	VERIFY(node->n_wlock_list.ll_count == 0);
 	VERIFY(node->n_ofile_list.ll_count == 0);
-	VERIFY(node->n_oplock.ol_count == 0);
-	VERIFY(node->n_oplock.ol_xthread == NULL);
 	VERIFY(node->n_oplock.ol_fem == B_FALSE);
 	VERIFY(MUTEX_NOT_HELD(&node->n_mutex));
 	VERIFY(!RW_LOCK_HELD(&node->n_lock));
@@ -1245,10 +1246,8 @@ smb_node_constructor(void *buf, void *un, int kmflags)
 	    offsetof(smb_lock_t, l_lnd));
 	smb_llist_constructor(&node->n_wlock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
-	cv_init(&node->n_oplock.ol_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&node->n_oplock.ol_mutex, NULL, MUTEX_DEFAULT, NULL);
-	list_create(&node->n_oplock.ol_grants, sizeof (smb_oplock_grant_t),
-	    offsetof(smb_oplock_grant_t, og_lnd));
+	cv_init(&node->n_oplock.WaitingOpenCV, NULL, CV_DEFAULT, NULL);
 	rw_init(&node->n_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&node->n_mutex, NULL, MUTEX_DEFAULT, NULL);
 	smb_node_create_audit_buf(node, kmflags);
@@ -1268,12 +1267,11 @@ smb_node_destructor(void *buf, void *un)
 	smb_node_destroy_audit_buf(node);
 	mutex_destroy(&node->n_mutex);
 	rw_destroy(&node->n_lock);
-	cv_destroy(&node->n_oplock.ol_cv);
+	cv_destroy(&node->n_oplock.WaitingOpenCV);
 	mutex_destroy(&node->n_oplock.ol_mutex);
 	smb_llist_destructor(&node->n_lock_list);
 	smb_llist_destructor(&node->n_wlock_list);
 	smb_llist_destructor(&node->n_ofile_list);
-	list_destroy(&node->n_oplock.ol_grants);
 }
 
 /*

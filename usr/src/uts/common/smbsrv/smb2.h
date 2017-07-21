@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_SMB2_H
@@ -190,12 +190,28 @@ typedef enum {
  * SMB2 Create (open)
  */
 
-/* SMB2 requested oplock levels */
+/*
+ * SMB2 requested oplock levels
+ * Corresponds to ntifs.h OPLOCK_LEVEL_... but NOT the same!
+ */
 #define	SMB2_OPLOCK_LEVEL_NONE				0x00
 #define	SMB2_OPLOCK_LEVEL_II				0x01
 #define	SMB2_OPLOCK_LEVEL_EXCLUSIVE			0x08
 #define	SMB2_OPLOCK_LEVEL_BATCH				0x09
 #define	SMB2_OPLOCK_LEVEL_LEASE				0xFF
+
+/*
+ * SMB2 create request lease "type"
+ * Note: Same as ntifs.h OPLOCK_LEVEL_CACHE...
+ */
+#define	SMB2_LEASE_NONE					0x00
+#define	SMB2_LEASE_READ_CACHING				0x01
+#define	SMB2_LEASE_HANDLE_CACHING			0x02
+#define	SMB2_LEASE_WRITE_CACHING			0x04
+
+/* SMB2 create lease flags */
+#define	SMB2_LEASE_FLAG_BREAK_IN_PROGRESS		0x00000002
+#define	SMB2_LEASE_FLAG_PARENT_LEASE_KEY_SET		0x00000004
 
 /* SMB2 impersonation levels */
 #define	SMB2_IMPERSONATION_ANONYMOUS			0x00
@@ -289,19 +305,10 @@ typedef enum {
  * Client is MacOS X looking for MacOS-specific extensions.
  */
 
-/* SMB2 create request lease */
-#define	SMB2_LEASE_NONE				0x00
-#define	SMB2_LEASE_READ_CACHING			0x01
-#define	SMB2_LEASE_HANDLE_CACHING		0x02
-#define	SMB2_LEASE_WRITE_CACHING		0x04
-
-/* SMB2 lease break notification flags */
-#define	SMB2_NOTIFY_BREAK_LEASE_FLAG_ACK_REQUIRED  0x01
-
 /*
  * SMB2 Close
  */
-#define	SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB 	0x0001
+#define	SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB	0x0001
 
 /*
  * SMB2 Write
@@ -350,7 +357,7 @@ typedef enum {
 /*
  * SMB2 Ioctl Request
  */
-#define	SMB2_0_IOCTL_IS_FSCTL 		0x00000001
+#define	SMB2_0_IOCTL_IS_FSCTL		0x00000001
 
 
 /*
@@ -389,6 +396,9 @@ typedef enum {
  * SMB2 Change Nofity Request
  */
 #define	SMB2_WATCH_TREE			0x00000001
+
+/* SMB2 Oplock Break: lease break notification flags */
+#define	SMB2_NOTIFY_BREAK_LEASE_FLAG_ACK_REQUIRED  0x01
 
 #ifdef __cplusplus
 }

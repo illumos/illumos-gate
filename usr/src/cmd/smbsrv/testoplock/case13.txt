@@ -1,0 +1,25 @@
+# Input for testoplock, case 13
+# simulate smbtorture smb2.lease.complex1
+#
+open 1 1
+req 1 0x801
+show
+
+# upgrade lease 1
+open 2 1
+brk-open 2
+req 2 0x807
+show
+
+move 2 1
+close 2
+show
+
+# contend via lease2
+open 3 2
+brk-open 3
+ack 1
+show
+
+req 3 0x801
+show

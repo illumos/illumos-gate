@@ -93,14 +93,24 @@ smb_dh_should_save(smb_ofile_t *of)
 	if (of->f_user->preserve_opens == SMB2_DH_PRESERVE_ALL)
 		return (B_TRUE);
 
-	if (of->dh_vers == SMB2_RESILIENT)
+	switch (of->dh_vers) {
+	case SMB2_RESILIENT:
 		return (B_TRUE);
 
-	if (!SMB_OFILE_OPLOCK_GRANTED(of))
-		return (B_FALSE);
-
-	if (of->f_oplock_grant.og_level == SMB_OPLOCK_BATCH)
-		return (B_TRUE);
+	case SMB2_DURABLE_V2:
+		if (of->dh_persist)
+			return (B_TRUE);
+		/* FALLTHROUGH */
+	case SMB2_DURABLE_V1:
+		/* IS durable (v1 or v2) */
+		if ((of->f_oplock.og_state & (OPLOCK_LEVEL_BATCH |
+		    OPLOCK_LEVEL_CACHE_HANDLE)) != 0)
+			return (B_TRUE);
+		/* FALLTHROUGH */
+	case SMB2_NOT_DURABLE:
+	default:
+		break;
+	}
 
 	return (B_FALSE);
 }
@@ -127,6 +137,40 @@ static uint32_t
 smb2_dh_reconnect_checks(smb_request_t *sr, smb_ofile_t *of)
 {
 	smb_arg_open_t	*op = &sr->sr_open;
+	char *fname;
+
+	if (of->f_lease != NULL) {
+		if (bcmp(sr->session->clnt_uuid,
+		    of->f_lease->ls_clnt, 16) != 0)
+			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
+
+		if (op->op_oplock_level != SMB2_OPLOCK_LEVEL_LEASE)
+			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
+		if (bcmp(op->lease_key, of->f_lease->ls_key,
+		    SMB_LEASE_KEY_SZ) != 0)
+			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
+
+		/*
+		 * We're supposed to check the name is the same.
+		 * Not really necessary to do this, so just do
+		 * minimal effort (check last component)
+		 */
+		fname = strrchr(op->fqi.fq_path.pn_path, '\\');
+		if (fname != NULL)
+			fname++;
+		else
+			fname = op->fqi.fq_path.pn_path;
+		if (smb_strcasecmp(fname, of->f_node->od_name, 0) != 0) {
+#ifdef	DEBUG
+			cmn_err(CE_NOTE, "reconnect name <%s> of name <%s>",
+			    fname, of->f_node->od_name);
+#endif
+			return (NT_STATUS_INVALID_PARAMETER);
+		}
+	} else {
+		if (op->op_oplock_level == SMB2_OPLOCK_LEVEL_LEASE)
+			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
+	}
 
 	if (op->dh_vers == SMB2_DURABLE_V2) {
 		boolean_t op_persist =
@@ -217,8 +261,6 @@ smb2_dh_reconnect(smb_request_t *sr)
 	smb_tree_hold_internal(tree);
 	of->f_tree = tree;
 	of->f_fid = fid;
-
-	op->op_oplock_level = of->f_oplock_grant.og_level;
 
 	smb_llist_enter(&tree->t_ofile_list, RW_WRITER);
 	smb_llist_insert_tail(&tree->t_ofile_list, of);

@@ -38,10 +38,6 @@ static uint32_t smb_nt_trans_ioctl_enum_snaps(smb_request_t *, smb_xa_t *);
 /*
  * This table defines the list of FSCTL values for which we'll
  * call a funtion to perform specific processing.
- *
- * Note: If support is added for FSCTL_SET_ZERO_DATA, it must break
- * any oplocks on the file to none:
- *   smb_oplock_break(sr, node, SMB_OPLOCK_BREAK_TO_NONE);
  */
 static const struct {
 	uint32_t fcode;
@@ -222,7 +218,12 @@ smb_nt_trans_ioctl_set_sparse(smb_request_t *sr, smb_xa_t *xa)
  * smb_nt_trans_ioctl_set_zero_data
  *
  * Check that the request is valid on the specified file.
- * The implementation is a noop.
+ * The implementation is a noop. XXX - bug!
+ * XXX: We have this in the fsclt module now.  Call that.
+ *
+ * Note: When support is added for FSCTL_SET_ZERO_DATA, it must
+ * break any oplocks on the file to none:
+ *	(void) smb_oplock_break_WRITE(node, ofile);
  */
 /* ARGSUSED */
 static uint32_t
