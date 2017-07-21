@@ -114,9 +114,9 @@ typedef char cfga_phys_ext_t[CFGA_PHYS_EXT_LEN];
 typedef char cfga_class_t[CFGA_CLASS_LEN];
 
 typedef struct cfga_list_data {
-	cfga_log_ext_t 	ap_log_id;	/* Attachment point logical id */
+	cfga_log_ext_t	ap_log_id;	/* Attachment point logical id */
 	cfga_phys_ext_t	ap_phys_id;	/* Attachment point physical id */
-	cfga_class_t 	ap_class;	/* Attachment point class */
+	cfga_class_t	ap_class;	/* Attachment point class */
 	cfga_stat_t	ap_r_state;	/* Receptacle state */
 	cfga_stat_t	ap_o_state;	/* Occupant state */
 	cfga_cond_t	ap_cond;	/* Attachment point condition */

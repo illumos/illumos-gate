@@ -16252,6 +16252,7 @@ s usr/share/man/man3nsl/svc_run.3nsl=rpc_svc_calls.3nsl
 s usr/share/man/man3nsl/svc_sendreply.3nsl=rpc_svc_calls.3nsl
 s usr/share/man/man3nsl/svc_tli_create.3nsl=rpc_svc_create.3nsl
 s usr/share/man/man3nsl/svc_tp_create.3nsl=rpc_svc_create.3nsl
+s usr/share/man/man3nsl/svc_tp_create_addr.3nsl=rpc_svc_create.3nsl
 s usr/share/man/man3nsl/svc_unreg.3nsl=rpc_svc_reg.3nsl
 s usr/share/man/man3nsl/svc_unregister.3nsl=rpc_soc.3nsl
 s usr/share/man/man3nsl/svc_vc_create.3nsl=rpc_svc_create.3nsl

@@ -23,6 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  */
 
 /*
@@ -2563,6 +2564,14 @@ struct proto_option_defs {
 	{"mountd_max_threads",
 	    "mountd_max_threads", PROTO_OPT_MOUNTD_MAX_THREADS,
 	    OPT_TYPE_NUMBER, 16, SVC_NFSD|SVC_MOUNTD, 1, INT32_MAX},
+#define	PROTO_OPT_MOUNTD_PORT			17
+	{"mountd_port",
+	    "mountd_port", PROTO_OPT_MOUNTD_PORT,
+	    OPT_TYPE_NUMBER, 0, SVC_MOUNTD, 1, UINT16_MAX},
+#define	PROTO_OPT_STATD_PORT			18
+	{"statd_port",
+	    "statd_port", PROTO_OPT_STATD_PORT,
+	    OPT_TYPE_NUMBER, 0, SVC_STATD, 1, UINT16_MAX},
 	{NULL}
 };
 

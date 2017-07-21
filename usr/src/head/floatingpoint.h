@@ -69,8 +69,8 @@ typedef int sigfpe_code_type;	/* Type of SIGFPE code. */
 typedef void (*sigfpe_handler_type)();	/* Pointer to exception handler */
 
 #define	SIGFPE_DEFAULT (void (*)())0	/* default exception handling */
-#define	SIGFPE_IGNORE  (void (*)())1  	/* ignore this exception or code */
-#define	SIGFPE_ABORT   (void (*)())2  	/* force abort on exception */
+#define	SIGFPE_IGNORE  (void (*)())1	/* ignore this exception or code */
+#define	SIGFPE_ABORT   (void (*)())2	/* force abort on exception */
 
 extern sigfpe_handler_type sigfpe __P((sigfpe_code_type, sigfpe_handler_type));
 
@@ -109,7 +109,7 @@ typedef struct {
 	int	more;		/* On conversion from decimal to binary, != 0 */
 				/* indicates more non-zero digits following */
 				/* ds. */
-	int 	ndigits;	/* On fixed_form conversion from binary to */
+	int	ndigits;	/* On fixed_form conversion from binary to */
 				/* decimal, contains number of digits */
 				/* required for ds. */
 } decimal_record;
@@ -134,8 +134,8 @@ typedef struct {
 enum decimal_string_form {	/* Valid decimal number string formats. */
 	invalid_form,		/* Not a valid decimal string format. */
 	whitespace_form,	/* All white space - valid in Fortran! */
-	fixed_int_form,		/* <digs> 		*/
-	fixed_intdot_form,	/* <digs>. 		*/
+	fixed_int_form,		/* <digs>		*/
+	fixed_intdot_form,	/* <digs>.		*/
 	fixed_dotfrac_form,	/* .<digs>		*/
 	fixed_intdotfrac_form,	/* <digs>.<frac>	*/
 	floating_int_form,	/* <digs><exp>		*/

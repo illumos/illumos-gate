@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -237,6 +237,7 @@ MANLINKS=	auth_destroy.3nsl			\
 		svc_sendreply.3nsl			\
 		svc_tli_create.3nsl			\
 		svc_tp_create.3nsl			\
+		svc_tp_create_addr.3nsl			\
 		svc_unreg.3nsl				\
 		svc_unregister.3nsl			\
 		svc_vc_create.3nsl			\
@@ -462,6 +463,7 @@ svc_fd_create.3nsl			:= LINKSRC = rpc_svc_create.3nsl
 svc_raw_create.3nsl			:= LINKSRC = rpc_svc_create.3nsl
 svc_tli_create.3nsl			:= LINKSRC = rpc_svc_create.3nsl
 svc_tp_create.3nsl			:= LINKSRC = rpc_svc_create.3nsl
+svc_tp_create_addr.3nsl			:= LINKSRC = rpc_svc_create.3nsl
 svc_vc_create.3nsl			:= LINKSRC = rpc_svc_create.3nsl
 
 svcerr_auth.3nsl			:= LINKSRC = rpc_svc_err.3nsl

@@ -40,13 +40,13 @@
 extern "C" {
 #endif
 
-#define	NL_SETD 		1    /* XPG3 Conformant Default set number. */
-#define	NL_CAT_LOCALE 		(-1) /* XPG4 requirement */
+#define	NL_SETD			1    /* XPG3 Conformant Default set number. */
+#define	NL_CAT_LOCALE		(-1) /* XPG4 requirement */
 
-#define	_CAT_MAGIC 		0xFF88FF89
-#define	_CAT_HDR_SIZE 		sizeof (struct _cat_hdr)
-#define	_CAT_SET_HDR_SIZE 	sizeof (struct _cat_set_hdr)
-#define	_CAT_MSG_HDR_SIZE 	sizeof (struct _cat_msg_hdr)
+#define	_CAT_MAGIC		0xFF88FF89
+#define	_CAT_HDR_SIZE		sizeof (struct _cat_hdr)
+#define	_CAT_SET_HDR_SIZE	sizeof (struct _cat_set_hdr)
+#define	_CAT_MSG_HDR_SIZE	sizeof (struct _cat_msg_hdr)
 
 struct _cat_hdr
 {

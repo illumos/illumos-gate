@@ -39,7 +39,7 @@ extern "C" {
 #endif
 
 typedef struct devid_nmlist {
-	char 	*devname;
+	char	*devname;
 	dev_t	dev;
 } devid_nmlist_t;
 

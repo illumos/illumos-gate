@@ -20,8 +20,8 @@
  */
 
 /*
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1988 AT&T */
@@ -86,6 +86,10 @@ extern mutex_t xprtlist_lock;
 
 static SVCXPRT * svc_tli_create_common(int, const struct netconfig *,
     const struct t_bind *, uint_t, uint_t, boolean_t);
+
+static SVCXPRT *svc_tp_create_bind(void (*dispatch)(),
+    const rpcprog_t, const rpcvers_t,
+    const struct netconfig *, const struct t_bind *);
 
 boolean_t
 is_multilevel(rpcprog_t prognum)
@@ -176,11 +180,50 @@ svc_create(void (*dispatch)(), const rpcprog_t prognum, const rpcvers_t versnum,
 /*
  * The high level interface to svc_tli_create().
  * It tries to create a server for "nconf" and registers the service
- * with the rpcbind. It calls svc_tli_create();
+ * with the rpcbind.
  */
 SVCXPRT *
 svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
-			const rpcvers_t versnum, const struct netconfig *nconf)
+    const rpcvers_t versnum, const struct netconfig *nconf)
+{
+	return (svc_tp_create_bind(dispatch, prognum, versnum, nconf, NULL));
+}
+
+/*
+ * svc_tp_create_addr()
+ * Variant of svc_tp_create() that allows specifying just the
+ * the binding address, for convenience.
+ */
+SVCXPRT *
+svc_tp_create_addr(void (*dispatch)(), const rpcprog_t prognum,
+    const rpcvers_t versnum, const struct netconfig *nconf,
+    const struct netbuf *addr)
+{
+	struct t_bind bind;
+	struct t_bind *bindp = NULL;
+
+	if (addr != NULL) {
+
+		bind.addr = *addr;
+		if (!rpc_control(__RPC_SVC_LSTNBKLOG_GET, &bind.qlen)) {
+			syslog(LOG_ERR,
+			    "svc_tp_create: can't get listen backlog");
+			return (NULL);
+		}
+		bindp = &bind;
+	}
+
+	/*
+	 * When bindp == NULL, this is the same as svc_tp_create().
+	 */
+	return (svc_tp_create_bind(dispatch, prognum, versnum,
+	    nconf, bindp));
+}
+
+static SVCXPRT *
+svc_tp_create_bind(void (*dispatch)(), const rpcprog_t prognum,
+    const rpcvers_t versnum, const struct netconfig *nconf,
+    const struct t_bind *bindaddr)
 {
 	SVCXPRT *xprt;
 	boolean_t anon_mlp = B_FALSE;
@@ -194,7 +237,8 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 	/* Some programs need to allocate MLP for multilevel services */
 	if (is_system_labeled() && is_multilevel(prognum))
 		anon_mlp = B_TRUE;
-	xprt = svc_tli_create_common(RPC_ANYFD, nconf, NULL, 0, 0, anon_mlp);
+	xprt = svc_tli_create_common(RPC_ANYFD, nconf, bindaddr, 0, 0,
+	    anon_mlp);
 	if (xprt == NULL)
 		return (NULL);
 
@@ -324,7 +368,6 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 	}
 
 	switch (state) {
-		bool_t tcp, exclbind;
 	case T_UNBND:
 		/* If this is a labeled system, then ask for an MLP */
 		if (is_system_labeled() &&
@@ -337,32 +380,15 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 				    SO_ANON_MLP, 1);
 		}
 
-		/*
-		 * SO_EXCLBIND has the following properties
-		 *    - an fd bound to port P via IPv4 will prevent an IPv6
-		 *    bind to port P (and vice versa)
-		 *    - an fd bound to a wildcard IP address for port P will
-		 *    prevent a more specific IP address bind to port P
-		 *    (see {tcp,udp}.c for details)
-		 *
-		 * We use the latter property to prevent hijacking of RPC
-		 * services that reside at non-privileged ports.
-		 */
-		tcp = nconf ? (strcmp(nconf->nc_proto, NC_TCP) == 0) : 0;
-		if (nconf &&
-		    (tcp || (strcmp(nconf->nc_proto, NC_UDP) == 0)) &&
-		    rpc_control(__RPC_SVC_EXCLBIND_GET, &exclbind)) {
-			if (exclbind) {
-				if (__rpc_tli_set_options(fd, SOL_SOCKET,
-				    SO_EXCLBIND, 1) < 0) {
-					syslog(LOG_ERR,
-			    "svc_tli_create: can't set EXCLBIND [netid='%s']",
-					    nconf->nc_netid);
-					goto freedata;
-				}
-			}
-		}
 		if (bindaddr) {
+			/*
+			 * Services that specify a bind address typically
+			 * use a fixed service (IP port) so we need to set
+			 * SO_REUSEADDR to prevent bind errors on restart.
+			 */
+			if (bindaddr->addr.len != 0)
+				(void) __rpc_tli_set_options(fd, SOL_SOCKET,
+				    SO_REUSEADDR, 1);
 			if (t_bind(fd, (struct t_bind *)bindaddr, tres) == -1) {
 				char errorstr[100];
 
@@ -401,6 +427,47 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 				(void) syslog(LOG_ERR,
 				    "svc_tli_create: could not bind: %s",
 				    errorstr);
+				goto freedata;
+			}
+		}
+
+		/*
+		 * If requested, set SO_EXCLBIND on each binding.
+		 *
+		 * SO_EXCLBIND has the following properties
+		 *    - an fd bound to port P via IPv4 will prevent an IPv6
+		 *    bind to port P (and vice versa)
+		 *    - an fd bound to a wildcard IP address for port P will
+		 *    prevent a more specific IP address bind to port P
+		 *    (see {tcp,udp}.c for details)
+		 *
+		 * We use the latter property to prevent hijacking of RPC
+		 * services that reside at non-privileged ports.
+		 *
+		 * When the bind address is not specified, each bind gets a
+		 * new port number, and (for IP transports) we should set
+		 * the exclusive flag after every IP bind.  That's the
+		 * strcmp nc_proto part of the expression below.
+		 *
+		 * When the bind address IS specified, we need to set the
+		 * exclusive flag only after we've bound both IPv6+IPv4,
+		 * or the IPv4 bind will fail.  Setting the exclusive flag
+		 * after the "tcp" or "udp" transport bind does that.
+		 * That's the strcmp nc_netid part below.
+		 */
+		if (nconf != NULL && ((bindaddr == NULL &&
+		    (strcmp(nconf->nc_proto, NC_TCP) == 0 ||
+		    strcmp(nconf->nc_proto, NC_UDP) == 0)) ||
+		    (strcmp(nconf->nc_netid, "tcp") == 0 ||
+		    strcmp(nconf->nc_netid, "udp") == 0))) {
+			bool_t exclbind = FALSE;
+			(void) rpc_control(__RPC_SVC_EXCLBIND_GET, &exclbind);
+			if (exclbind &&
+			    __rpc_tli_set_options(fd, SOL_SOCKET,
+			    SO_EXCLBIND, 1) < 0) {
+				syslog(LOG_ERR,
+			    "svc_tli_create: can't set EXCLBIND [netid='%s']",
+				    nconf->nc_netid);
 				goto freedata;
 			}
 		}

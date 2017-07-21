@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc. All rights reserved.
 #
 
 file path=usr/share/man/man3nsl/dial.3nsl
@@ -263,6 +263,8 @@ link path=usr/share/man/man3nsl/svc_run.3nsl target=rpc_svc_calls.3nsl
 link path=usr/share/man/man3nsl/svc_sendreply.3nsl target=rpc_svc_calls.3nsl
 link path=usr/share/man/man3nsl/svc_tli_create.3nsl target=rpc_svc_create.3nsl
 link path=usr/share/man/man3nsl/svc_tp_create.3nsl target=rpc_svc_create.3nsl
+link path=usr/share/man/man3nsl/svc_tp_create_addr.3nsl \
+    target=rpc_svc_create.3nsl
 link path=usr/share/man/man3nsl/svc_unreg.3nsl target=rpc_svc_reg.3nsl
 link path=usr/share/man/man3nsl/svc_unregister.3nsl target=rpc_soc.3nsl
 link path=usr/share/man/man3nsl/svc_vc_create.3nsl target=rpc_svc_create.3nsl
