@@ -53,8 +53,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- * 	This product includes software developed by the University of
- * 	California, Berkeley and its contributors.
+ *	This product includes software developed by the University of
+ *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -155,8 +155,8 @@ typedef res_sendhookact (*res_send_rhook)__P((const struct sockaddr *ns,
 
 struct res_sym {
 	int		number;	   /* Identifying number, like T_MX */
-	const char 	*name;	   /* Its symbolic name, like "MX" */
-	const char 	*humanname; /* Its fun name, like "mail exchanger" */
+	const char	*name;	   /* Its symbolic name, like "MX" */
+	const char	*humanname; /* Its fun name, like "mail exchanger" */
 };
 
 /*
@@ -423,12 +423,12 @@ void		res_send_setqhook __P((res_send_qhook hook));
 void		res_send_setrhook __P((res_send_rhook hook));
 int		__res_vinit __P((res_state, int));
 void		res_destroyservicelist __P((void));
-const char 	*res_servicename __P((uint16_t port, const char *proto));
-const char 	*res_protocolname __P((int num));
+const char	*res_servicename __P((uint16_t port, const char *proto));
+const char	*res_protocolname __P((int num));
 void		res_destroyprotolist __P((void));
 void		res_buildprotolist __P((void));
-const char 	*res_get_nibblesuffix __P((res_state));
-const char 	*res_get_nibblesuffix2 __P((res_state));
+const char	*res_get_nibblesuffix __P((res_state));
+const char	*res_get_nibblesuffix2 __P((res_state));
 void		res_ndestroy __P((res_state));
 uint16_t	res_nametoclass __P((const char *buf, int *success));
 uint16_t	res_nametotype __P((const char *buf, int *success));

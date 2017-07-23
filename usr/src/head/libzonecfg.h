@@ -184,7 +184,7 @@ typedef struct zone_fsopt {
 } zone_fsopt_t;
 
 struct zone_fstab {
-	char		zone_fs_special[MAXPATHLEN]; 	/* special file */
+	char		zone_fs_special[MAXPATHLEN];	/* special file */
 	char		zone_fs_dir[MAXPATHLEN];	/* mount point */
 	char		zone_fs_type[FSTYPSZ];		/* e.g. ufs */
 	zone_fsopt_t   *zone_fs_options;		/* mount options */
@@ -344,7 +344,7 @@ extern	int	zonecfg_lookup_filesystem(zone_dochandle_t,
 extern	int	zonecfg_add_fs_option(struct zone_fstab *, char *);
 extern	int	zonecfg_remove_fs_option(struct zone_fstab *, char *);
 extern	void	zonecfg_free_fs_option_list(zone_fsopt_t *);
-extern	int 	zonecfg_find_mounts(char *, int(*)(const struct mnttab *,
+extern	int	zonecfg_find_mounts(char *, int(*)(const struct mnttab *,
     void *), void *);
 
 /*

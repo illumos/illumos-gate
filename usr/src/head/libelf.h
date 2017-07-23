@@ -123,10 +123,10 @@ typedef struct {
 	char		*ar_name;
 	time_t		ar_date;
 	uid_t		ar_uid;
-	gid_t 		ar_gid;
+	gid_t		ar_gid;
 	mode_t		ar_mode;
 	off_t		ar_size;
-	char 		*ar_rawname;
+	char		*ar_rawname;
 } Elf_Arhdr;
 
 

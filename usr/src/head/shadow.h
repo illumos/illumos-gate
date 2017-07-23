@@ -37,10 +37,10 @@
 extern "C" {
 #endif
 
-#define	PASSWD 		"/etc/passwd"
+#define	PASSWD		"/etc/passwd"
 #define	SHADOW		"/etc/shadow"
 #define	OPASSWD		"/etc/opasswd"
-#define	OSHADOW 	"/etc/oshadow"
+#define	OSHADOW		"/etc/oshadow"
 #define	PASSTEMP	"/etc/ptmp"
 #define	SHADTEMP	"/etc/stmp"
 

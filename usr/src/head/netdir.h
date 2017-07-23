@@ -49,8 +49,8 @@ extern "C" {
 #endif
 
 struct nd_addrlist {
-	int 		n_cnt;		/* number of netbufs */
-	struct netbuf 	*n_addrs;	/* the netbufs */
+	int		n_cnt;		/* number of netbufs */
+	struct netbuf	*n_addrs;	/* the netbufs */
 };
 
 struct nd_hostservlist {
@@ -126,8 +126,8 @@ char *_netdir_mergeaddr(struct netconfig *, char *uaddr, char *ruaddr);
 #define	ND_NO_DATA	-3	/* Valid name, no data record of requested */
 				/* type */
 #define	ND_NO_ADDRESS ND_NO_DATA /* no address, look for MX record */
-#define	ND_BADARG	-2	/* Bad arguments passed 	*/
-#define	ND_NOMEM 	-1	/* No virtual memory left	*/
+#define	ND_BADARG	-2	/* Bad arguments passed		*/
+#define	ND_NOMEM	-1	/* No virtual memory left	*/
 #define	ND_OK		0	/* Translation successful	*/
 #define	ND_NOHOST	1	/* Hostname was not resolvable	*/
 #define	ND_NOSERV	2	/* Service was unknown		*/

@@ -107,16 +107,16 @@ extern "C" {
 /* YESSTR and NOSTR marked as legacy in XPG5 and removed in SUSv3 */
 #if !defined(_XPG6) || defined(__EXTENSIONS__)
 #define	YESSTR	  41    /* affirmative response for yes/no queries */
-#define	NOSTR	  42  	/* negative response for yes/no queries */
+#define	NOSTR	  42	/* negative response for yes/no queries */
 #endif /* !defined(_XPG6) || defined(__EXTENSIONS__ */
-#define	CRNCYSTR  43 	/* currency symbol */
+#define	CRNCYSTR  43	/* currency symbol */
 
 /*
  * Default string used to format date and time
  *	e.g. Sunday, August 24 21:08:38 MET 1986
  */
 
-#define	D_T_FMT	  44 	/* string for formatting date and time */
+#define	D_T_FMT	  44	/* string for formatting date and time */
 #define	D_FMT	  45	/* date format */
 #define	T_FMT	  46	/* time format */
 #define	AM_STR	  47	/* am string */

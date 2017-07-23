@@ -50,10 +50,10 @@ extern "C" {
 #define	LDAP_PORT		389
 #define	LDAPS_PORT		636
 #define	LDAP_PORT_MAX		65535		/* API extension */
-#define	LDAP_VERSION1   	1		/* API extension */
-#define	LDAP_VERSION2   	2
-#define	LDAP_VERSION3   	3
-#define	LDAP_VERSION    	LDAP_VERSION2	/* API extension */
+#define	LDAP_VERSION1		1		/* API extension */
+#define	LDAP_VERSION2		2
+#define	LDAP_VERSION3		3
+#define	LDAP_VERSION		LDAP_VERSION2	/* API extension */
 #define	LDAP_VERSION_MIN	LDAP_VERSION3
 #define	LDAP_VERSION_MAX	LDAP_VERSION3
 
@@ -223,7 +223,7 @@ typedef struct ldap_apifeature_info {
 
 #ifdef	_SOLARIS_SDK
 #define	LDAP_SASL_CRAM_MD5	"CRAM-MD5"
-#define	LDAP_SASL_DIGEST_MD5 	"DIGEST-MD5"
+#define	LDAP_SASL_DIGEST_MD5	"DIGEST-MD5"
 #define	LDAP_SASL_BIND_INPROGRESS	0x0e    /* for backward compatibility */
 #endif
 
@@ -330,7 +330,7 @@ typedef struct ldap_apifeature_info {
 #define	LDAP_CONTROL_SORTRESPONSE	"1.2.840.113556.1.4.474"
 #define	LDAP_CONTROL_PERSISTENTSEARCH	"2.16.840.1.113730.3.4.3"
 #define	LDAP_CONTROL_ENTRYCHANGE	"2.16.840.1.113730.3.4.7"
-#define	LDAP_CONTROL_VLVREQUEST    	"2.16.840.1.113730.3.4.9"
+#define	LDAP_CONTROL_VLVREQUEST		"2.16.840.1.113730.3.4.9"
 #define	LDAP_CONTROL_VLVRESPONSE	"2.16.840.1.113730.3.4.10"
 #define	LDAP_CONTROL_PROXYAUTH		"2.16.840.1.113730.3.4.12"
 	/* version 1 */
@@ -533,9 +533,9 @@ int LDAP_CALL ldap_result2error(LDAP *ld, LDAPMessage *r,
 char *LDAP_CALL ldap_err2string(int err);
 LDAP_API(void) LDAP_CALL ldap_perror(LDAP *ld, const char *s);
 LDAP_API(LDAPMessage *) LDAP_CALL ldap_first_entry(LDAP *ld,
-	LDAPMessage *chain);
+    LDAPMessage *chain);
 LDAP_API(LDAPMessage *) LDAP_CALL ldap_next_entry(LDAP *ld,
-	LDAPMessage *entry);
+    LDAPMessage *entry);
 int LDAP_CALL ldap_count_entries(LDAP *ld, LDAPMessage *chain);
 char *LDAP_CALL ldap_get_dn(LDAP *ld, LDAPMessage *entry);
 char *LDAP_CALL ldap_dn2ufn(const char *dn);
@@ -634,14 +634,14 @@ int LDAP_CALL ldap_parse_result(LDAP *ld, LDAPMessage *res,
 int LDAP_CALL ldap_parse_extended_result(LDAP *ld, LDAPMessage *res,
 	char **retoidp, struct berval **retdatap, int freeit);
 LDAP_API(LDAPMessage *) LDAP_CALL ldap_first_message(LDAP *ld,
-	LDAPMessage *res);
+    LDAPMessage *res);
 LDAP_API(LDAPMessage *) LDAP_CALL ldap_next_message(LDAP *ld,
-	LDAPMessage *msg);
+    LDAPMessage *msg);
 int LDAP_CALL ldap_count_messages(LDAP *ld, LDAPMessage *res);
 LDAP_API(LDAPMessage *) LDAP_CALL ldap_first_reference(LDAP *ld,
-	LDAPMessage *res);
+    LDAPMessage *res);
 LDAP_API(LDAPMessage *) LDAP_CALL ldap_next_reference(LDAP *ld,
-	LDAPMessage *ref);
+    LDAPMessage *ref);
 int LDAP_CALL ldap_count_references(LDAP *ld, LDAPMessage *res);
 int LDAP_CALL ldap_parse_reference(LDAP *ld, LDAPMessage *ref,
 	char ***referralsp, LDAPControl ***serverctrlsp, int freeit);
@@ -944,97 +944,75 @@ struct ldap_disptmpl {
 
 typedef int (*writeptype)(void *writeparm, char *p, int len);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_init_templates(char *file, struct ldap_disptmpl **tmpllistp);
+LDAP_API(int) LDAP_CALL ldap_init_templates(char *file,
+    struct ldap_disptmpl **tmpllistp);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_init_templates_buf(char *buf, long buflen,
-	struct ldap_disptmpl **tmpllistp);
+LDAP_API(int) LDAP_CALL ldap_init_templates_buf(char *buf, long buflen,
+    struct ldap_disptmpl **tmpllistp);
 
-LDAP_API(void)
-LDAP_CALL
-ldap_free_templates(struct ldap_disptmpl *tmpllist);
+LDAP_API(void) LDAP_CALL ldap_free_templates(struct ldap_disptmpl *tmpllist);
 
-LDAP_API(struct ldap_disptmpl *)
-LDAP_CALL
-ldap_first_disptmpl(struct ldap_disptmpl *tmpllist);
+LDAP_API(struct ldap_disptmpl *) LDAP_CALL ldap_first_disptmpl(
+    struct ldap_disptmpl *tmpllist);
 
-LDAP_API(struct ldap_disptmpl *)
-LDAP_CALL
-ldap_next_disptmpl(struct ldap_disptmpl *tmpllist,
-	struct ldap_disptmpl *tmpl);
+LDAP_API(struct ldap_disptmpl *) LDAP_CALL ldap_next_disptmpl(
+    struct ldap_disptmpl *tmpllist,
+    struct ldap_disptmpl *tmpl);
 
-LDAP_API(struct ldap_disptmpl *)
-LDAP_CALL
-ldap_name2template(char *name, struct ldap_disptmpl *tmpllist);
+LDAP_API(struct ldap_disptmpl *) LDAP_CALL ldap_name2template(char *name,
+    struct ldap_disptmpl *tmpllist);
 
-LDAP_API(struct ldap_disptmpl *)
-LDAP_CALL
-ldap_oc2template(char **oclist, struct ldap_disptmpl *tmpllist);
+LDAP_API(struct ldap_disptmpl *) LDAP_CALL ldap_oc2template(char **oclist,
+    struct ldap_disptmpl *tmpllist);
 
-LDAP_API(char **)
-LDAP_CALL
-ldap_tmplattrs(struct ldap_disptmpl *tmpl, char **includeattrs, int exclude,
-	unsigned long syntaxmask);
+LDAP_API(char **) LDAP_CALL ldap_tmplattrs(struct ldap_disptmpl *tmpl,
+    char **includeattrs, int exclude,
+    unsigned long syntaxmask);
 
-LDAP_API(struct ldap_tmplitem *)
-LDAP_CALL
-ldap_first_tmplrow(struct ldap_disptmpl *tmpl);
+LDAP_API(struct ldap_tmplitem *) LDAP_CALL ldap_first_tmplrow(
+    struct ldap_disptmpl *tmpl);
 
-LDAP_API(struct ldap_tmplitem *)
-LDAP_CALL
-ldap_next_tmplrow(struct ldap_disptmpl *tmpl, struct ldap_tmplitem *row);
+LDAP_API(struct ldap_tmplitem *) LDAP_CALL ldap_next_tmplrow(
+    struct ldap_disptmpl *tmpl, struct ldap_tmplitem *row);
 
-LDAP_API(struct ldap_tmplitem *)
-LDAP_CALL
-ldap_first_tmplcol(struct ldap_disptmpl *tmpl, struct ldap_tmplitem *row);
+LDAP_API(struct ldap_tmplitem *) LDAP_CALL ldap_first_tmplcol(
+    struct ldap_disptmpl *tmpl, struct ldap_tmplitem *row);
 
-LDAP_API(struct ldap_tmplitem *)
-LDAP_CALL
-ldap_next_tmplcol(struct ldap_disptmpl *tmpl, struct ldap_tmplitem *row,
-	struct ldap_tmplitem *col);
+LDAP_API(struct ldap_tmplitem *) LDAP_CALL ldap_next_tmplcol(
+    struct ldap_disptmpl *tmpl, struct ldap_tmplitem *row,
+    struct ldap_tmplitem *col);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_entry2text(LDAP *ld, char *buf, LDAPMessage *entry,
-	struct ldap_disptmpl *tmpl, char **defattrs, char ***defvals,
-	writeptype writeproc, void *writeparm, char *eol, int rdncount,
-	unsigned long opts);
+LDAP_API(int) LDAP_CALL ldap_entry2text(LDAP *ld, char *buf, LDAPMessage *entry,
+    struct ldap_disptmpl *tmpl, char **defattrs, char ***defvals,
+    writeptype writeproc, void *writeparm, char *eol, int rdncount,
+    unsigned long opts);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_vals2text(LDAP *ld, char *buf, char **vals, char *label, int labelwidth,
-	unsigned long syntaxid, writeptype writeproc, void *writeparm,
-	char *eol, int rdncount);
+LDAP_API(int) LDAP_CALL ldap_vals2text(LDAP *ld, char *buf, char **vals,
+    char *label, int labelwidth,
+    unsigned long syntaxid, writeptype writeproc, void *writeparm,
+    char *eol, int rdncount);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_entry2text_search(LDAP *ld, char *dn, char *base, LDAPMessage *entry,
-	struct ldap_disptmpl *tmpllist, char **defattrs, char ***defvals,
-	writeptype writeproc, void *writeparm, char *eol, int rdncount,
-	unsigned long opts);
+LDAP_API(int) LDAP_CALL ldap_entry2text_search(LDAP *ld, char *dn, char *base,
+    LDAPMessage *entry,
+    struct ldap_disptmpl *tmpllist, char **defattrs, char ***defvals,
+    writeptype writeproc, void *writeparm, char *eol, int rdncount,
+    unsigned long opts);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_entry2html(LDAP *ld, char *buf, LDAPMessage *entry,
-	struct ldap_disptmpl *tmpl, char **defattrs, char ***defvals,
-	writeptype writeproc, void *writeparm, char *eol, int rdncount,
-	unsigned long opts, char *urlprefix, char *base);
+LDAP_API(int) LDAP_CALL ldap_entry2html(LDAP *ld, char *buf, LDAPMessage *entry,
+    struct ldap_disptmpl *tmpl, char **defattrs, char ***defvals,
+    writeptype writeproc, void *writeparm, char *eol, int rdncount,
+    unsigned long opts, char *urlprefix, char *base);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_vals2html(LDAP *ld, char *buf, char **vals, char *label, int labelwidth,
-	unsigned long syntaxid, writeptype writeproc, void *writeparm,
-	char *eol, int rdncount, char *urlprefix);
+LDAP_API(int) LDAP_CALL ldap_vals2html(LDAP *ld, char *buf, char **vals,
+    char *label, int labelwidth,
+    unsigned long syntaxid, writeptype writeproc, void *writeparm,
+    char *eol, int rdncount, char *urlprefix);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_entry2html_search(LDAP *ld, char *dn, char *base, LDAPMessage *entry,
-	struct ldap_disptmpl *tmpllist, char **defattrs, char ***defvals,
-	writeptype writeproc, void *writeparm, char *eol, int rdncount,
-	unsigned long opts, char *urlprefix);
+LDAP_API(int) LDAP_CALL ldap_entry2html_search(LDAP *ld, char *dn, char *base,
+    LDAPMessage *entry,
+    struct ldap_disptmpl *tmpllist, char **defattrs, char ***defvals,
+    writeptype writeproc, void *writeparm, char *eol, int rdncount,
+    unsigned long opts, char *urlprefix);
 
 /*
  * Search Preference Definitions
@@ -1088,27 +1066,19 @@ struct ldap_searchobj {
 #define	LDAP_SEARCHPREF_ERR_SYNTAX	3
 #define	LDAP_SEARCHPREF_ERR_FILE	4
 
-LDAP_API(int)
-LDAP_CALL
-ldap_init_searchprefs(char *file, struct ldap_searchobj **solistp);
+LDAP_API(int) LDAP_CALL ldap_init_searchprefs(char *file,
+    struct ldap_searchobj **solistp);
 
-LDAP_API(int)
-LDAP_CALL
-ldap_init_searchprefs_buf(char *buf, long buflen,
-	struct ldap_searchobj **solistp);
+LDAP_API(int) LDAP_CALL ldap_init_searchprefs_buf(char *buf, long buflen,
+    struct ldap_searchobj **solistp);
 
-LDAP_API(void)
-LDAP_CALL
-ldap_free_searchprefs(struct ldap_searchobj *solist);
+LDAP_API(void) LDAP_CALL ldap_free_searchprefs(struct ldap_searchobj *solist);
 
-LDAP_API(struct ldap_searchobj *)
-LDAP_CALL
-ldap_first_searchobj(struct ldap_searchobj *solist);
+LDAP_API(struct ldap_searchobj *) LDAP_CALL ldap_first_searchobj(
+    struct ldap_searchobj *solist);
 
-LDAP_API(struct ldap_searchobj *)
-LDAP_CALL
-ldap_next_searchobj(struct ldap_searchobj *sollist,
-struct ldap_searchobj *so);
+LDAP_API(struct ldap_searchobj *) LDAP_CALL ldap_next_searchobj(
+    struct ldap_searchobj *sollist, struct ldap_searchobj *so);
 
 /*
  * specific LDAP instantiations of BER types we know about
@@ -1207,7 +1177,7 @@ struct berval **LDAP_CALL ldap_get_lang_values_len(LDAP *ld,
 typedef int (LDAP_CALL LDAP_CALLBACK LDAP_REBINDPROC_CALLBACK)(LDAP *ld,
 	char **dnp, char **passwdp, int *authmethodp, int freeit, void *arg);
 LDAP_API(void) LDAP_CALL ldap_set_rebind_proc(LDAP *ld,
-	LDAP_REBINDPROC_CALLBACK *rebindproc, void *arg);
+    LDAP_REBINDPROC_CALLBACK *rebindproc, void *arg);
 
 /*
  * Thread function callbacks (an API extension --
@@ -1301,9 +1271,9 @@ typedef struct ldap_filt_desc LDAPFiltDesc; /* opaque filter desc handle */
  */
 LDAP_API(LDAPFiltDesc *) LDAP_CALL ldap_init_getfilter(char *fname);
 LDAP_API(LDAPFiltDesc *) LDAP_CALL ldap_init_getfilter_buf(char *buf,
-	ssize_t buflen);
+    ssize_t buflen);
 LDAP_API(LDAPFiltInfo *) LDAP_CALL ldap_getfirstfilter(LDAPFiltDesc *lfdp,
-	char *tagpat, char *value);
+    char *tagpat, char *value);
 LDAP_API(LDAPFiltInfo *) LDAP_CALL ldap_getnextfilter(LDAPFiltDesc *lfdp);
 int LDAP_CALL ldap_set_filter_additions(LDAPFiltDesc *lfdp,
 	char *prefix, char *suffix);
@@ -1336,7 +1306,7 @@ int LDAP_CALL ldap_memcache_init(unsigned long ttl,
 int LDAP_CALL ldap_memcache_set(LDAP *ld, LDAPMemCache *cache);
 int LDAP_CALL ldap_memcache_get(LDAP *ld, LDAPMemCache **cachep);
 LDAP_API(void) LDAP_CALL ldap_memcache_flush(LDAPMemCache *cache, char *dn,
-	int scope);
+    int scope);
 LDAP_API(void) LDAP_CALL ldap_memcache_destroy(LDAPMemCache *cache);
 LDAP_API(void) LDAP_CALL ldap_memcache_update(LDAPMemCache *cache);
 
@@ -1431,11 +1401,11 @@ int LDAP_CALL ldap_version(LDAPVersion *ver);
 
 /* use ldap_create_filter() instead of ldap_build_filter() */
 LDAP_API(void) LDAP_CALL ldap_build_filter(char *buf, size_t buflen,
-	char *pattern, char *prefix, char *suffix, char *attr,
-	char *value, char **valwords);
+    char *pattern, char *prefix, char *suffix, char *attr,
+    char *value, char **valwords);
 /* use ldap_set_filter_additions() instead of ldap_setfilteraffixes() */
 LDAP_API(void) LDAP_CALL ldap_setfilteraffixes(LDAPFiltDesc *lfdp,
-	char *prefix, char *suffix);
+    char *prefix, char *suffix);
 
 /* older result types a server can return -- use LDAP_RES_MODDN instead */
 #define	LDAP_RES_MODRDN			LDAP_RES_MODDN

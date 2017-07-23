@@ -44,7 +44,7 @@ typedef struct {
 	uint16_t	sem_type;
 	uint16_t	sem_magic;
 	upad64_t	sem_pad1[3];	/* reserved for a mutex_t */
-	upad64_t 	sem_pad2[2];	/* reserved for a cond_t */
+	upad64_t	sem_pad2[2];	/* reserved for a cond_t */
 } sem_t;
 
 #define	SEM_FAILED	((sem_t *)(-1))

@@ -1,14 +1,15 @@
 '\" te
-.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
+.\" Copyright 2017 Nexenta Systems, Inc.  All Rights Reserved.
 .\"  Copyright 1989 AT&T
 .\" Copyright (C) 2005, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RPC_SVC_CREATE 3NSL "May 18, 2017"
+.TH RPC_SVC_CREATE 3NSL "Jun 19, 2017"
 .SH NAME
 rpc_svc_create, svc_control, svc_create, svc_destroy, svc_dg_create,
-svc_fd_create, svc_raw_create, svc_tli_create, svc_tp_create, svc_vc_create,
+svc_fd_create, svc_raw_create, svc_tli_create, svc_tp_create,
+svc_tp_create_addr, svc_vc_create,
 svc_door_create \- server handle creation routines
 .SH SYNOPSIS
 .LP
@@ -50,7 +51,7 @@ svc_door_create \- server handle creation routines
 .LP
 .nf
 \fBSVCXPRT *\fR\fBsvc_tli_create\fR(\fBconst int\fR \fIfildes\fR, \fBconst struct netconfig *\fR\fInetconf\fR,
-     \fBconst struct t_bind *\fR\fIbind_addr\fR, \fBconst uint_t\fR \fIsendsz\fR,
+     \fBconst struct t_bind *\fR\fIbind_info\fR, \fBconst uint_t\fR \fIsendsz\fR,
      \fBconst uint_t\fR \fIrecvsz\fR);
 .fi
 
@@ -59,6 +60,15 @@ svc_door_create \- server handle creation routines
 \fBSVCXPRT *\fR\fBsvc_tp_create\fR(\fBconst void (*\fR\fIdispatch\fR)
      (const struct svc_req *, const SVCXPRT *), \fBconst rpcprog_t\fR \fIprognum\fR,
      \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst struct netconfig *\fR\fInetconf\fR);
+.fi
+
+.LP
+.nf
+\fBSVCXPRT *\fR\fBsvc_tp_create_addr\fR(\fBconst void (*\fR\fIdispatch\fR)
+     (const struct svc_req *, const SVCXPRT *), \fBconst rpcprog_t\fR \fIprognum\fR,
+     \fBconst rpcvers_t\fR \fIversnum\fR, \fBconst struct netconfig *\fR\fInetconf\fR,
+     \fBconst struct netbuf *\fR\fIbind_addr\fR)
+);
 .fi
 
 .LP
@@ -88,7 +98,7 @@ See \fBrpc\fR(3NSL) for the definition of the \fBSVCXPRT\fR data structure.
 .na
 \fB\fBsvc_control()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 A function to change or retrieve information about a service object. \fIreq\fR
 indicates the type of operation and \fIinfo\fR is a pointer to the information.
 The supported values of \fIreq\fR,  their argument types, and what they do are:
@@ -97,7 +107,7 @@ The supported values of \fIreq\fR,  their argument types, and what they do are:
 .na
 \fB\fBSVCGET_VERSQUIET\fR\fR
 .ad
-.RS 25n
+.RS 10n
 If a request is received for a program number served by this server but the
 version number is outside the range registered with the server, an
 \fBRPC_PROGVERSMISMATCH\fR error will normally be returned.  \fIinfo\fR should
@@ -113,7 +123,7 @@ behavior, that is, an  \fBRPC_PROGVERSMISMATCH\fR error will be returned.
 .na
 \fB\fBSVCSET_VERSQUIET\fR\fR
 .ad
-.RS 25n
+.RS 10n
 If a request is received for a program number served by this server but the
 version number is outside the range registered with the server, an
 \fBRPC_PROGVERSMISMATCH\fR error will normally be returned.  It is sometimes
@@ -128,7 +138,7 @@ the out of range request should be silently ignored.
 .na
 \fB\fBSVCGET_XID\fR\fR
 .ad
-.RS 25n
+.RS 10n
 Returns the transaction  \fBID\fR of connection\(mioriented and connectionless
 transport service calls. The transaction  \fBID\fR assists in uniquely
 identifying client requests for a given \fBRPC\fR version, program number,
@@ -148,7 +158,7 @@ of rendezvous or raw type, and the request is of type \fBSVCGET_XID,\fR
 .na
 \fB\fBSVCSET_RECVERRHANDLER\fR\fR
 .ad
-.RS 25n
+.RS 10n
 Attaches or detaches a disconnection handler to the service handle, \fIsvc\fR,
 that will be called when a transport error arrives during the reception of a
 request or when the server is waiting for a request and the connection shuts
@@ -177,7 +187,7 @@ MT-safe way.
 .na
 \fB\fBSVCGET_RECVERRHANDLER\fR\fR
 .ad
-.RS 25n
+.RS 10n
 Upon successful completion of the \fBSVCGET_RECVERRHANDLER\fR request,
 \fI*info\fR contains the address of the handler for receiving errors. Upon
 failure, \fI*info\fR contains \fINULL\fR.
@@ -188,7 +198,7 @@ failure, \fI*info\fR contains \fINULL\fR.
 .na
 \fB\fBSVCSET_CONNMAXREC\fR\fR
 .ad
-.RS 25n
+.RS 10n
 Set the maximum record size (in bytes) and enable non-blocking mode for this
 service handle. Value can be set and read for both connection and
 non-connection oriented transports, but is silently ignored for the
@@ -201,7 +211,7 @@ non-connection oriented case. The \fIinfo\fR argument should be a pointer to an
 .na
 \fB\fBSVCGET_CONNMAXREC\fR\fR
 .ad
-.RS 25n
+.RS 10n
 Get the maximum record size for this service handle. Zero means no maximum in
 effect and the connection is in blocking mode. The result is not significant
 for non-connection oriented transports. The \fIinfo\fR argument should be a
@@ -217,7 +227,7 @@ returns false.
 .na
 \fB\fBsvc_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 \fBsvc_create()\fR creates server handles for all the transports belonging to
 the class \fInettype\fR.
 .sp
@@ -239,7 +249,7 @@ created, otherwise it returns \fB0\fR and an error message is logged.
 .na
 \fB\fBsvc_destroy()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 A function macro that destroys the \fBRPC\fR service handle \fIxprt\fR.
 Destruction usually involves deallocation of private data structures, including
 \fIxprt\fR itself.  Use of \fIxprt\fR is undefined after calling this routine.
@@ -250,7 +260,7 @@ Destruction usually involves deallocation of private data structures, including
 .na
 \fB\fBsvc_dg_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 This routine creates a connectionless \fBRPC\fR service handle, and returns a
 pointer to it. This routine returns \fINULL\fR if it fails, and an error
 message is logged. \fIsendsz\fR and \fIrecvsz\fR are parameters used to specify
@@ -268,7 +278,7 @@ large arguments or return huge results.
 .na
 \fB\fBsvc_fd_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 This routine creates a service on top of an open and bound file descriptor, and
 returns the handle to it. Typically, this descriptor is a connected file
 descriptor for a connection-oriented transport. \fIsendsz\fR and \fIrecvsz\fR
@@ -282,7 +292,7 @@ and an error message is logged.
 .na
 \fB\fBsvc_raw_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 This routine creates an \fBRPC\fR service handle and returns a pointer to it.
 The transport is really a buffer within the process's address space, so the
 corresponding \fBRPC\fR client should live in the same address space; (see
@@ -300,13 +310,13 @@ used.
 .na
 \fB\fBsvc_tli_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 This routine creates an \fBRPC\fR server handle, and returns a pointer to it.
 \fIfildes\fR is the file descriptor on which the service is listening.  If
 \fIfildes\fR is \fBRPC_ANYFD\fR, it opens a file descriptor on the transport
 specified by \fInetconf\fR. If the file descriptor is unbound and
-\fIbindaddr\fR is non-null \fIfildes\fR is bound to the address specified by
-\fIbindaddr\fR, otherwise \fIfildes\fR is bound to a default address chosen by
+\fIbind_info\fR is non-null \fIfildes\fR is bound to the address specified by
+\fIbind_info\fR, otherwise \fIfildes\fR is bound to a default address chosen by
 the transport. In the case where the default address is chosen, the number of
 outstanding connect requests is set to 8 for connection-oriented transports.
 The user may specify the size of the send and receive buffers with the
@@ -321,7 +331,7 @@ service.
 .na
 \fB\fBsvc_tp_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 \fBsvc_tp_create()\fR creates a server handle for the network specified by
 \fInetconf\fR, and registers itself with the \fBrpcbind\fR service.
 \fIdispatch\fR is called when there is a remote procedure call for the given
@@ -333,9 +343,25 @@ service.
 .sp
 .ne 2
 .na
+\fB\fBsvc_tp_create_addr()\fR\fR
+.ad
+.RS 15n
+\fBsvc_tp_create_addr()\fR creates a server handle for the network specified
+by \fInetconf\fR, and registers itself with the \fBrpcbind\fR service.
+If \fIbind_addr\fR is non-NULL, that address is used for the listener binding.
+If \fIbind_addr\fR is NULL, this call is the same as \fBsvc_tp_create()\fR.
+\fIdispatch\fR is called when there is a remote procedure call for the given
+\fIprognum\fR and \fIversnum\fR; this requires calling \fBsvc_run()\fR.
+\fBsvc_tp_create_addr()\fR returns the service handle if it succeeds,
+otherwise a \fINULL\fR is returned and an error message is logged.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBsvc_vc_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 This routine creates a connection-oriented \fBRPC\fR service and returns a
 pointer to it. This routine returns \fINULL\fR if it fails, and an error
 message is logged. The users may specify the size of the send and receive
@@ -349,10 +375,10 @@ bound. The server is not registered with the \fBrpcbind\fR(1M) service.
 .na
 \fB\fBsvc_door_create()\fR\fR
 .ad
-.RS 21n
+.RS 15n
 This routine creates an RPC server handle over doors for the given program
-\fIprognum\fR and version \fIversnum\fR and returns a pointer to
-it. Doors is a transport mechanism that facilitates fast data transfer between
+\fIprognum\fR and version \fIversnum\fR and returns a pointer to it.
+Doors is a transport mechanism that facilitates fast data transfer between
 processes on the same machine. The user may set the size
 of the send buffer with the parameter \fIsendsz\fR. If \fIsendsz\fR is 0, the
 corresponding default buffer size is 16 Kbyte. If successful, the

@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-#define	PI_INSTALLED 	0
+#define	PI_INSTALLED	0
 #define	PI_PARTIAL	1
 #define	PI_PRESVR4	2
 #define	PI_UNKNOWN	3

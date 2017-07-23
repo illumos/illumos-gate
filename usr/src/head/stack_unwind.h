@@ -31,8 +31,6 @@
 #ifndef _STACK_UNWIND_H
 #define	_STACK_UNWIND_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -147,8 +145,8 @@ void _Unwind_Resume(struct _Unwind_Exception *exception_object);
 void _Unwind_DeleteException(struct _Unwind_Exception *exception_object);
 /*
  * {
- * 	(*(exception_object->exception_cleanup))(_URC_NO_REASON,
- * 		exception_object);
+ *	(*(exception_object->exception_cleanup))(_URC_NO_REASON,
+ *		exception_object);
  * }
  */
 
@@ -157,8 +155,8 @@ void _Unwind_DeleteException(struct _Unwind_Exception *exception_object);
 
 extern "C" _Unwind_Reason_Code
 __example_stop_fn(int version, int actions, uint64_t exclass,
-	struct _Unwind_Exception *exception_object,
-	struct _Unwind_Context *ctx, void *_Sa)
+    struct _Unwind_Exception *exception_object,
+    struct _Unwind_Context *ctx, void *_Sa)
 {
 	_Unwind_Reason_Code res;
 

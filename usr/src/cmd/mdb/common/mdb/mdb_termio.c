@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -142,7 +142,7 @@ typedef struct termio_info {
 	termio_attr_val_t ti_am;	/* Automatic right margin? */
 	termio_attr_val_t ti_bw;	/* Backward motion at left edge? */
 	termio_attr_val_t ti_npc;	/* No padding character? */
-	termio_attr_val_t ti_xenl;	/* Newline ignored after 80 cols? */
+	termio_attr_val_t ti_xenl;	/* Newline ignored at autowrap? */
 	termio_attr_val_t ti_xon;	/* Use xon/xoff handshaking? */
 	termio_attr_val_t ti_cols;	/* # of columns */
 	termio_attr_val_t ti_lines;	/* # of rows */
@@ -168,6 +168,7 @@ typedef struct termio_info {
 	termio_attr_val_t ti_cnorm;	/* Make cursor appear normal */
 	termio_attr_val_t ti_nel;	/* Newline */
 	termio_attr_val_t ti_cr;	/* Carriage return */
+	termio_attr_val_t ti_smam;	/* Turn on automatic margins */
 } termio_info_t;
 
 typedef enum {
@@ -196,6 +197,7 @@ typedef void (*putp_t)(struct termio_data *, const char *, uint_t);
 #define	TIO_CAPWARN	0x40		/* Warnings about terminfo issued */
 #define	TIO_XTERM	0x80		/* Terminal is xterm compatible */
 #define	TIO_TAB		0x100		/* Tab completion mode */
+#define	TIO_LAZYWRAP	0x200		/* Lazy cursor on autowrap */
 
 static const mdb_bitmask_t tio_flag_masks[] = {
 	{ "FINDHIST", TIO_FINDHIST, TIO_FINDHIST },
@@ -206,7 +208,8 @@ static const mdb_bitmask_t tio_flag_masks[] = {
 	{ "TTYWARN", TIO_TTYWARN, TIO_TTYWARN },
 	{ "CAPWARN", TIO_CAPWARN, TIO_CAPWARN },
 	{ "XTERM", TIO_XTERM, TIO_XTERM },
-	{ "TAB", TIO_TAB, TIO_TAB},
+	{ "TAB", TIO_TAB, TIO_TAB },
+	{ "LAZYWRAP", TIO_LAZYWRAP, TIO_LAZYWRAP },
 	{ NULL, 0, 0 }
 };
 
@@ -365,6 +368,7 @@ static const termio_attr_t termio_attrs[] = {
 	{ "cnorm", TIO_ATTR_STR, &termio_info.ti_cnorm },
 	{ "nel", TIO_ATTR_STR, &termio_info.ti_nel },
 	{ "cr", TIO_ATTR_STR, &termio_info.ti_cr },
+	{ "smam", TIO_ATTR_STR, &termio_info.ti_smam },
 	{ NULL, NULL, NULL }
 };
 
@@ -873,6 +877,18 @@ termio_resume_tty(termio_data_t *td, struct termios *iosp)
 	termio_tput(td, td->tio_info.ti_cnorm.at_str, 1); /* cursor visible */
 	termio_tput(td, td->tio_info.ti_enacs.at_str, 1); /* alt char set */
 
+	/*
+	 * If the terminal is automargin-capable and we have an initialization
+	 * sequence to enable automargins, we must send it now.  Note that
+	 * we don't have a way of querying this mode and restoring it; if
+	 * we are fighting with (say) a target that is depending on automargin
+	 * being turned off, it will lose.
+	 */
+	if ((td->tio_flags & TIO_AUTOWRAP) &&
+	    td->tio_info.ti_smam.at_str != NULL) {
+		termio_tput(td, td->tio_info.ti_smam.at_str, 1);
+	}
+
 	mdb_iob_flush(td->tio_out);
 }
 
@@ -1121,6 +1137,24 @@ static void
 termio_bspch(termio_data_t *td)
 {
 	if (td->tio_x == 0) {
+		/*
+		 * If TIO_LAZYWRAP is set, we are regrettably in one of two
+		 * states that we cannot differentiate between:  the cursor is
+		 * either on the right margin of the previous line (having not
+		 * advanced due to the lazy wrap) _or_ the cursor is on the
+		 * left margin of the current line because a wrap has already
+		 * been induced due to prior activity.  Because these cases are
+		 * impossible to differentiate, we force the latter case by
+		 * emitting a space and then moving the cursor back.  If the
+		 * wrap had not been induced, emitting this space will induce
+		 * it -- and will assure that our termio_backleft() is the
+		 * correct behavior with respect to the cursor.
+		 */
+		if (td->tio_flags & TIO_LAZYWRAP) {
+			mdb_iob_putc(td->tio_out, ' ');
+			termio_tput(td, td->tio_info.ti_cub1.at_str, 1);
+		}
+
 		termio_backleft(td);
 		td->tio_x = td->tio_cols - 1;
 		td->tio_y--;
@@ -1137,10 +1171,21 @@ termio_delch(termio_data_t *td)
 {
 	mdb_iob_putc(td->tio_out, ' ');
 
-	if (td->tio_x == td->tio_cols - 1 && (td->tio_flags & TIO_AUTOWRAP))
-		termio_backleft(td);
-	else
+	if (td->tio_x == td->tio_cols - 1 && (td->tio_flags & TIO_AUTOWRAP)) {
+		/*
+		 * We just overwrote a space in the final column, so we know
+		 * that we have autowrapped and we therefore definitely don't
+		 * want to issue the ti_cub1.  If we have TIO_LAZYWRAP, we know
+		 * that the cursor remains on the final column, and we want to
+		 * do nothing -- but if TIO_LAZYWRAP isn't set, we have wrapped
+		 * and we need to move the cursor back up and all the way to
+		 * the right via termio_backleft().
+		 */
+		if (!(td->tio_flags & TIO_LAZYWRAP))
+			termio_backleft(td);
+	} else {
 		termio_tput(td, td->tio_info.ti_cub1.at_str, 1);
+	}
 
 	mdb_iob_flush(td->tio_out);
 }
@@ -1397,8 +1442,52 @@ termio_setup_attrs(termio_data_t *td, const char *name)
 
 	td->tio_flags = 0;
 
-	if (td->tio_info.ti_am.at_val && !td->tio_info.ti_xenl.at_val)
+	/*
+	 * We turn on TIO_AUTOWRAP if "am" (automargin) is set on the terminal.
+	 * Previously, this check was too smart for its own good, turning
+	 * TIO_AUTOWRAP on only when both "am" was set _and_ "xenl" was unset.
+	 * "xenl" is one of the (infamous?) so-called "Xanthippe glitches",
+	 * this one pertaining to the Concept 100's feature of not autowrapping
+	 * if the autowrap-inducing character is a newline.  (That is, the
+	 * newline was "eaten" in this case -- and "xenl" accordingly stands
+	 * for "Xanthippe eat newline", which itself sounds like a command from
+	 * an Infocom game about line discipline set in ancient Greece.) This
+	 * (now removed) condition misunderstood the semantics of "xenl",
+	 * apparently inferring that its presence denoted that the terminal
+	 * could not autowrap at all.  In fact, "xenl" is commonly set, and
+	 * denotes that the terminal will not autowrap on a newline -- a
+	 * feature (nee glitch) that is not particularly relevant with respect
+	 * to our input processing.  (Ironically, disabling TIO_AUTOWRAP in
+	 * this case only results in correct-seeming output because of the
+	 * presence of the feature, as the inserted newline to force the wrap
+	 * isn't actually displayed; were it displayed, the input buffer would
+	 * appear double-spaced.)  So with respect to "xenl" and autowrapping,
+	 * the correct behavior is to ignore it entirely, and adopt the
+	 * (simpler and less arcane) logic of setting TIO_AUTOWRAP if (and only
+	 * if) "am" is set on the terminal.  This does not, however, mean that
+	 * "xenl" is meaningless; see below...
+	 */
+	if (td->tio_info.ti_am.at_val)
 		td->tio_flags |= TIO_AUTOWRAP;
+
+	/*
+	 * While "xenl" doesn't dictate our TIO_AUTOWRAP setting, it does have
+	 * a subtle impact on the way we process input:  in addition to its
+	 * eponymous behavior of eating newlines, "xenl" denotes a second,
+	 * entirely orthogonal idiosyncracy.  As terminfo(4) tells it: "Those
+	 * terminals whose cursor remains on the right-most column until
+	 * another character has been received, rather than wrapping
+	 * immediately upon receiving the right- most character, such as the
+	 * VT100, should also indicate xenl."  So yes, "xenl" in fact has two
+	 * entirely different meanings -- it is a glitch-within-a-glitch, in
+	 * what one assumes (hopes?) to be an accident of history rather than a
+	 * deliberate act of sabotage.  This second behavior is relevant to us
+	 * because it affects the way we redraw the screen after a backspace in
+	 * the left-most column.  We call this second behavior "lazy wrapping",
+	 * and we set it if (and only if) "xenl" is set on the terminal.
+	 */
+	if (td->tio_info.ti_xenl.at_val)
+		td->tio_flags |= TIO_LAZYWRAP;
 
 	if (td->tio_info.ti_bw.at_val)
 		td->tio_flags |= TIO_BACKLEFT;

@@ -2,8 +2,9 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -18,28 +19,32 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2016 RackTop Systems.
-#
+# cmd/fs.d/nfs/tests/Makefile
 
-LIBRARY=	pam_smb_passwd.a
-VERS=		.1
-OBJECTS=	smb_passwd.o
+FSTYPE=		nfs
+LIBPROG=	test_svc_tp_create
 
-include		../../Makefile.pam_modules
+include		../../Makefile.fstype
 
-# These are in LDLIBS32/64 so they come before -lsmb
-LDLIBS32 += -L$(ROOT)/usr/lib/smbsrv
-LDLIBS64 += -L$(ROOT)/usr/lib/smbsrv/$(MACH64)
+OBJS=		$(LIBPROG).o
+SRCS=		$(LIBPROG).c
 
-LDLIBS		+= -lsmb -lpam -lc
+CFLAGS += $(CCVERBOSE)
 
-all:	$(LIBS)
+LDLIBS +=	-lnsl -lsocket
 
-lint:	lintcheck
+# message catalog
+catalog:
 
-include	$(SRC)/lib/Makefile.targ
+$(LIBPROG):	$(OBJS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(POST_PROCESS)
+
+lint:	lint_SRCS
+
+clean:     
+	$(RM) $(LIBPROG).o

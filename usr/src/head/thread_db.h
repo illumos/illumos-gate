@@ -27,8 +27,6 @@
 #ifndef _THREAD_DB_H
 #define	_THREAD_DB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  *  Description:
@@ -95,7 +93,7 @@ typedef struct td_thr_events {
 
 #define	td_event_emptyset(setp)				\
 	{								\
-		int _i_; 						\
+		int _i_;						\
 		_i_ = TD_EVENTSIZE;					\
 		while (_i_) (setp)->event_bits[--_i_] = 0;	\
 	}
@@ -466,7 +464,7 @@ td_ta_tsd_iter(const td_thragent_t *, td_key_iter_f *, void *);
  */
 td_err_e
 td_ta_thr_iter(const td_thragent_t *, td_thr_iter_f *, void *,
-	td_thr_state_e, int, sigset_t *, unsigned);
+    td_thr_state_e, int, sigset_t *, unsigned);
 
 /*
  * Iterate over a process's known synchronization objects.
