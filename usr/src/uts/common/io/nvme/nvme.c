@@ -70,6 +70,14 @@
  * so a command submission may block if the queue is full.
  *
  *
+ * Polled I/O Support:
+ *
+ * For kernel core dump support the driver can do polled I/O. As interrupts are
+ * turned off while dumping the driver will just submit a command in the regular
+ * way, and then repeatedly attempt a command retrieval until it gets the
+ * command back.
+ *
+ *
  * Namespace Support:
  *
  * NVMe devices can have multiple namespaces, each being a independent data
@@ -202,7 +210,6 @@
  *
  * TODO:
  * - figure out sane default for I/O queue depth reported to blkdev
- * - polled I/O support to support kernel core dumping
  * - FMA handling of media errors
  * - support for devices supporting very large I/O requests using chained PRPs
  * - support for configuring hardware parameters like interrupt coalescing
@@ -3269,7 +3276,8 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	 */
 	poll = (xfer->x_flags & BD_XFER_POLL) != 0;
 
-	nvme_submit_cmd(ioq, cmd);
+	if (nvme_submit_cmd(ioq, cmd) != DDI_SUCCESS)
+		return (EAGAIN);
 
 	if (!poll)
 		return (0);

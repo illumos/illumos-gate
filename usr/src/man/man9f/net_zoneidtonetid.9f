@@ -5,7 +5,7 @@
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .TH NET_ZONEIDTONETID 9F "May 1, 2008"
 .SH NAME
-net_zoneidtonetid \- map a zoneid_t struture identifier to a netid_t structure
+net_zoneidtonetid \- map a zoneid_t structure identifier to a netid_t structure
 .SH SYNOPSIS
 .LP
 .nf
@@ -15,11 +15,9 @@ net_zoneidtonetid \- map a zoneid_t struture identifier to a netid_t structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIzone\fR\fR
@@ -29,14 +27,12 @@ valid \fBzoneid_t\fR structure that refers to a running zone.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnet_zoneidtonetid()\fR function maps the given \fBzoneid_t\fR structure
 (used to represent a zone that is currently running) into a \fBnetid_t\fR
 structure that is associated with the \fBIP\fR instance supporting network
 functions for that zone.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBnet_zoneidtonetid()\fR function returns -1 if no mapping took place.
 Otherwise, it returns the \fBnetid_t\fR structure currently used by the
@@ -44,12 +40,10 @@ Otherwise, it returns the \fBnetid_t\fR structure currently used by the
 the \fBnetid_t\fR structure for the instance owned by the global zone is
 returned.
 .SH CONTEXT
-.sp
 .LP
 The \fBnet_zoneidtonetid()\fR function may be called from user,  kernel, or
 interrupt context.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -65,6 +59,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBnet_netidtozonid\fR(9F), \fBattributes\fR(5)

@@ -101,7 +101,7 @@ This function is called from kernel context only.
 Upon successful completion, the
 .Fn usba_hcdi_device_init
 function should return
-.Sy USB_SUCCECSS .
+.Sy USB_SUCCESS .
 Otherwise, it should return the appropriate error.
 .Sh SEE ALSO
 .Xr usba_hcd 9E ,
