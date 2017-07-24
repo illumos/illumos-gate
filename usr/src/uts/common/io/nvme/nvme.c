@@ -3276,8 +3276,7 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	 */
 	poll = (xfer->x_flags & BD_XFER_POLL) != 0;
 
-	if (nvme_submit_cmd(ioq, cmd) != DDI_SUCCESS)
-		return (EAGAIN);
+	nvme_submit_cmd(ioq, cmd);
 
 	if (!poll)
 		return (0);
