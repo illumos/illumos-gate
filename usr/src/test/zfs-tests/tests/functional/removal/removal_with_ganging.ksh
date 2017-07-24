@@ -15,26 +15,26 @@
 #
 
 #
-# Copyright (c) 2014, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2014, 2017 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-function set_metaslab_gang_bang # new_value
+function set_metaslab_force_ganging # new_value
 {
 	typeset new_value=$1
-	echo "metaslab_gang_bang/W $new_value" | mdb -kw
+	echo "metaslab_force_ganging/W $new_value" | mdb -kw
 }
 
 function cleanup
 {
-	log_must set_metaslab_gang_bang 0t$((2**17 + 1))
+	log_must set_metaslab_force_ganging 0t$((2**17 + 1))
 	default_cleanup_noexit
 }
 
 default_setup_noexit "$DISKS"
-log_must set_metaslab_gang_bang 0t$((2**12))
+log_must set_metaslab_force_ganging 0t$((2**14))
 log_onexit cleanup
 
 FILE_CONTENTS="Leeloo Dallas mul-ti-pass."
