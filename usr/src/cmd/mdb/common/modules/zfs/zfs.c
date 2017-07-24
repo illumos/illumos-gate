@@ -396,7 +396,7 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"zfs_read_chunk_size",
 		"zfs_nocacheflush",
 		"zil_replay_disable",
-		"metaslab_gang_bang",
+		"metaslab_force_ganging",
 		"metaslab_df_alloc_threshold",
 		"metaslab_df_free_pct",
 		"zio_injection_enabled",
