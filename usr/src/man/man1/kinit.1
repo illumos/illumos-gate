@@ -17,7 +17,6 @@ kinit \- obtain and cache Kerberos ticket-granting ticket
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBkinit\fR command is used to obtain and cache an initial ticket-granting
 ticket (credential) for \fIprincipal\fR. This ticket is used for authentication
@@ -47,7 +46,6 @@ Kerberos configuration file for \fIlifetime\fR and \fIrenewable_life\fR.
 The \fBkdestroy\fR(1) command can be used to destroy any active tickets before
 you end your login session.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -318,13 +316,12 @@ section for details.
 \fB\fBflag_RSA_PROTOCOL[=yes]\fR\fR
 .ad
 .RS 27n
-Specifies the use of RSA, rather than the default Diffie-Hellman protoco.
+Specifies the use of RSA, rather than the default Diffie-Hellman protocol.
 .RE
 
 .RE
 
 .SS "PKINIT URI Types"
-.sp
 .ne 2
 .na
 \fBFILE:\fIfile-name\fR[,\fIkey-file-name\fR]\fR
@@ -434,7 +431,6 @@ been set to \fBFILE:/tmp/my_proxy.pem\fR.
 .RE
 
 .SS "Time Formats"
-.sp
 .LP
 The following absolute time formats can be used for the \fB-s\fR
 \fIstart_time\fR option. The examples are based on the date and time of July 2,
@@ -528,7 +524,6 @@ Variable	Description
 .TE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 \fBkinit\fR uses the following environment variable:
 .sp
@@ -542,7 +537,6 @@ and details.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/tmp/krb5cc_\fIuid\fR\fR\fR
@@ -571,7 +565,6 @@ Default location for the local host's configuration file. See
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -590,13 +583,11 @@ Interface Stability	See below.
 .LP
 The command arguments are Evolving. The command output is Unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBkdestroy\fR(1), \fBklist\fR(1), \fBkadmin\fR(1M), \fBktkt_warnd\fR(1M),
 \fBlibpkcs11\fR(3LIB), \fBkdc.conf\fR(4), \fBkrb5.conf\fR(4),
 \fBattributes\fR(5), \fBkerberos\fR(5), \fBkrb5envvar\fR(5), \fBpam_krb5\fR(5)
 .SH NOTES
-.sp
 .LP
 On success, \fBkinit\fR notifies \fBktkt_warnd\fR(1M) to alert the user when
 the initial credentials (ticket-granting ticket) are about to expire.
