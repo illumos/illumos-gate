@@ -56,6 +56,7 @@ known = {
     'cli_root/zpool_add/zpool_add_001_pos': 'FAIL',
     'cli_root/zpool_add/zpool_add_002_pos': 'FAIL',
     'cli_root/zpool_clear/zpool_clear_001_pos': 'FAIL',
+    'cli_root/zpool_create/zpool_create_008_pos': 'FAIL',
     'cli_root/zpool_create/zpool_create_016_pos': 'FAIL',
     'cli_root/zpool_expand/zpool_expand_001_pos': 'FAIL',
     'cli_root/zpool_get/zpool_get_002_pos': 'FAIL',
