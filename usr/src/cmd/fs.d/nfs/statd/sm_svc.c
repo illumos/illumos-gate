@@ -20,8 +20,9 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -37,10 +38,6 @@
  * contributors.
  */
 
-/*
- * Copyright (c) 2012 by Delphix. All rights reserved.
- */
-
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -49,9 +46,11 @@
 #include <string.h>
 #include <syslog.h>
 #include <netconfig.h>
+#include <netdir.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <rpc/rpc.h>
+#include <rpc/svc.h>
 #include <netinet/in.h>
 #include <sys/param.h>
 #include <sys/resource.h>
@@ -69,6 +68,7 @@
 #include <limits.h>
 #include <rpcsvc/daemon_utils.h>
 #include <priv_utils.h>
+#include "smfcfg.h"
 #include "sm_statd.h"
 
 
@@ -99,6 +99,7 @@ static char statd_home[MAXPATHLEN];
 
 int debug;
 int regfiles_only = 0;		/* 1 => use symlinks in statmon, 0 => don't */
+int statd_port = 0;
 char hostname[MAXHOSTNAMELEN];
 
 /*
@@ -457,6 +458,78 @@ thr_statd_merges(void)
 	(void) mutex_unlock(&merges_lock);
 }
 
+/*
+ * This function is called for each configured network type to
+ * bind and register our RPC service programs.
+ *
+ * On TCP or UDP, we may want to bind SM_PROG on a specific port
+ * (when statd_port is specified) in which case we'll use the
+ * variant of svc_tp_create() that lets us pass a bind address.
+ */
+static void
+sm_svc_tp_create(struct netconfig *nconf)
+{
+	char port_str[8];
+	struct nd_hostserv hs;
+	struct nd_addrlist *al = NULL;
+	SVCXPRT *xprt = NULL;
+
+	/*
+	 * If statd_port is set and this is an inet transport,
+	 * bind this service on the specified port.  The TLI way
+	 * to create such a bind address is netdir_getbyname()
+	 * with the special "host" HOST_SELF_BIND.  This builds
+	 * an all-zeros IP address with the specified port.
+	 */
+	if (statd_port != 0 &&
+	    (strcmp(nconf->nc_protofmly, NC_INET) == 0 ||
+	    strcmp(nconf->nc_protofmly, NC_INET6) == 0)) {
+		int err;
+
+		snprintf(port_str, sizeof (port_str), "%u",
+		    (unsigned short)statd_port);
+
+		hs.h_host = HOST_SELF_BIND;
+		hs.h_serv = port_str;
+		err = netdir_getbyname((struct netconfig *)nconf, &hs, &al);
+		if (err == 0 && al != NULL) {
+			xprt = svc_tp_create_addr(sm_prog_1, SM_PROG, SM_VERS,
+			    nconf, al->n_addrs);
+			netdir_free(al, ND_ADDRLIST);
+		}
+		if (xprt == NULL) {
+			syslog(LOG_ERR, "statd: unable to create "
+			    "(SM_PROG, SM_VERS) on transport %s (port %d)",
+			    nconf->nc_netid, statd_port);
+		}
+		/* fall-back to default bind */
+	}
+	if (xprt == NULL) {
+		/*
+		 * Had statd_port=0, or non-inet transport,
+		 * or the bind to a specific port failed.
+		 * Do a default bind.
+		 */
+		xprt = svc_tp_create(sm_prog_1, SM_PROG, SM_VERS, nconf);
+	}
+	if (xprt == NULL) {
+		syslog(LOG_ERR, "statd: unable to create "
+		    "(SM_PROG, SM_VERS) for transport %s",
+		    nconf->nc_netid);
+		return;
+	}
+
+	/*
+	 * Also register the NSM_ADDR program on this
+	 * transport handle (same dispatch function).
+	 */
+	if (!svc_reg(xprt, NSM_ADDR_PROGRAM, NSM_ADDR_V1, sm_prog_1, nconf)) {
+		syslog(LOG_ERR, "statd: failed to register "
+		    "(NSM_ADDR_PROGRAM, NSM_ADDR_V1) for "
+		    "netconfig %s", nconf->nc_netid);
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -468,7 +541,10 @@ main(int argc, char *argv[])
 	int mode;
 	int sz;
 	int pipe_fd = -1;
+	int ret;
 	int connmaxrec = RPC_MAXDATASIZE;
+	struct netconfig *nconf;
+	NCONF_HANDLE *nc;
 
 	addrix = 0;
 	pathix = 0;
@@ -477,7 +553,14 @@ main(int argc, char *argv[])
 	if (init_hostname() < 0)
 		exit(1);
 
-	while ((c = getopt(argc, argv, "Dd:a:G:p:rU:")) != EOF)
+	ret = nfs_smf_get_iprop("statd_port", &statd_port,
+	    DEFAULT_INSTANCE, SCF_TYPE_INTEGER, STATD);
+	if (ret != SA_OK) {
+		syslog(LOG_ERR, "Reading of statd_port from SMF "
+		    "failed, using default value");
+	}
+
+	while ((c = getopt(argc, argv, "Dd:a:G:p:P:rU:")) != EOF)
 		switch (c) {
 		case 'd':
 			(void) sscanf(optarg, "%d", &debug);
@@ -539,7 +622,15 @@ main(int argc, char *argv[])
 				pathix++;
 			} else {
 				(void) fprintf(stderr,
-				"statd: -p pathname is too long.\n");
+				    "statd: -p pathname is too long.\n");
+			}
+			break;
+		case 'P':
+			(void) sscanf(optarg, "%d", &statd_port);
+			if (statd_port < 1 || statd_port > UINT16_MAX) {
+				(void) fprintf(stderr,
+				    "statd: -P port invalid.\n");
+				statd_port = 0;
 			}
 			break;
 		case 'r':
@@ -547,7 +638,7 @@ main(int argc, char *argv[])
 			break;
 		default:
 			(void) fprintf(stderr,
-			"statd [-d level] [-D]\n");
+			    "statd [-d level] [-D]\n");
 			return (1);
 		}
 
@@ -636,16 +727,29 @@ main(int argc, char *argv[])
 		syslog(LOG_INFO, "unable to set maximum RPC record size");
 	}
 
-	if (!svc_create(sm_prog_1, SM_PROG, SM_VERS, "netpath")) {
-		syslog(LOG_ERR, "statd: unable to create (SM_PROG, SM_VERS) "
-		    "for netpath.");
-		exit(1);
+	/*
+	 * Enumerate network transports and create service listeners
+	 * as appropriate for each.
+	 */
+	if ((nc = setnetconfig()) == NULL) {
+		syslog(LOG_ERR, "setnetconfig failed: %m");
+		return (-1);
 	}
+	while ((nconf = getnetconfig(nc)) != NULL) {
 
-	if (!svc_create(sm_prog_1, NSM_ADDR_PROGRAM, NSM_ADDR_V1, "netpath")) {
-		syslog(LOG_ERR, "statd: unable to create (NSM_ADDR_PROGRAM, "
-		    "NSM_ADDR_V1) for netpath.");
+		/*
+		 * Skip things like tpi_raw, invisible...
+		 */
+		if ((nconf->nc_flag & NC_VISIBLE) == 0)
+			continue;
+		if (nconf->nc_semantics != NC_TPI_CLTS &&
+		    nconf->nc_semantics != NC_TPI_COTS &&
+		    nconf->nc_semantics != NC_TPI_COTS_ORD)
+			continue;
+
+		sm_svc_tp_create(nconf);
 	}
+	(void) endnetconfig(nc);
 
 	/*
 	 * Make sure /var/statmon and any alternate (-p) statmon
@@ -825,7 +929,7 @@ one_statmon_owner(const char *dir)
 /*ARGSUSED3*/
 static int
 nftw_owner(const char *path, const struct stat *statp, int info,
-	struct FTW *ftw)
+    struct FTW *ftw)
 {
 	if (!(info == FTW_F || info == FTW_D))
 		return (0);

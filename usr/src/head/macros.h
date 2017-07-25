@@ -42,8 +42,8 @@ extern "C" {
  *	abs() is absolute value
  */
 #define	numeric(c)		((c) >= '0' && (c) <= '9')
-#define	max(a, b) 		((a) < (b) ? (b) : (a))
-#define	min(a, b) 		((a) > (b) ? (b) : (a))
+#define	max(a, b)		((a) < (b) ? (b) : (a))
+#define	min(a, b)		((a) > (b) ? (b) : (a))
 #define	abs(x)			((x) >= 0 ? (x) : -(x))
 
 #define	compare(str1, str2)	strcmp((str1), (str2))

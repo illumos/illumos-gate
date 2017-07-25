@@ -342,13 +342,13 @@ struct yppushresp_xfr {
 
 #define	YPPUSH_SUCC	(1)	/* Success */
 #define	YPPUSH_AGE	(2)	/* Master's version not newer */
-#define	YPPUSH_NOMAP 	(-1)	/* Can't find server for map */
-#define	YPPUSH_NODOM 	(-2)	/* Domain not supported */
-#define	YPPUSH_RSRC 	(-3)	/* Local resouce alloc failure */
-#define	YPPUSH_RPC 	(-4)	/* RPC failure talking to server */
+#define	YPPUSH_NOMAP	(-1)	/* Can't find server for map */
+#define	YPPUSH_NODOM	(-2)	/* Domain not supported */
+#define	YPPUSH_RSRC	(-3)	/* Local resouce alloc failure */
+#define	YPPUSH_RPC	(-4)	/* RPC failure talking to server */
 #define	YPPUSH_MADDR	(-5)	/* Can't get master address */
-#define	YPPUSH_YPERR 	(-6)	/* YP server/map db error */
-#define	YPPUSH_BADARGS 	(-7)	/* Request arguments bad */
+#define	YPPUSH_YPERR	(-6)	/* YP server/map db error */
+#define	YPPUSH_BADARGS	(-7)	/* Request arguments bad */
 #define	YPPUSH_DBM	(-8)	/* Local dbm operation failed */
 #define	YPPUSH_FILE	(-9)	/* Local file I/O operation failed */
 #define	YPPUSH_SKEW	(-10)	/* Map version skew during transfer */

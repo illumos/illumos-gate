@@ -26,8 +26,6 @@
 #ifndef	_NDPD_H
 #define	_NDPD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -111,10 +109,10 @@ typedef struct ndpd_phyint_info_s {
 	uint_t		phyint_info_type;
 	uint_t		phyint_info_version;
 	int		phyint_index;
-	struct confvar 	phyint_config[I_IFSIZE];
-#define	phyint_DupAddrDetectTransmits 	\
+	struct confvar	phyint_config[I_IFSIZE];
+#define	phyint_DupAddrDetectTransmits	\
 				phyint_config[I_DupAddrDetectTransmits].cf_value
-#define	phyint_AdvSendAdvertisements 	\
+#define	phyint_AdvSendAdvertisements	\
 				phyint_config[I_AdvSendAdvertisements].cf_value
 #define	phyint_MaxRtrAdvInterval	\
 				phyint_config[I_MaxRtrAdvInterval].cf_value
@@ -140,8 +138,8 @@ typedef struct ndpd_phyint_info_s {
 				phyint_config[I_TmpMaxDesyncFactor].cf_value
 #define	phyint_StatefulAddrConf	\
 				phyint_config[I_StatefulAddrConf].cf_value
-	uint_t 		phyint_num_of_prefixes;
-	uint_t 		phyint_num_of_routers;
+	uint_t		phyint_num_of_prefixes;
+	uint_t		phyint_num_of_routers;
 } ndpd_phyint_info_t;
 
 #ifdef	__cplusplus

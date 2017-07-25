@@ -27,8 +27,6 @@
 #ifndef _AUDIO_AU_H
 #define	_AUDIO_AU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 #include <sys/types.h>
 
@@ -70,7 +68,7 @@ typedef struct au_filehdr au_filehdr_t;
 	 *
 	 *	------------------------------------------------------------
 	 *	|			|		|		   |
-	 *	|   AU Audio Header	|    Info 	|   Audio Data	   |
+	 *	|   AU Audio Header	|    Info	|   Audio Data	   |
 	 *	|			| (optional)	|		   |
 	 *	|			|		|		   |
 	 *	|	24 bytes	| 4 bytes (min)	|    n bytes	   |

@@ -29,7 +29,6 @@
 include ../Makefile.com
 include ../../../Makefile.lib.64
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv/$(MACH64)
 DYNFLAGS += -R/usr/lib/smbsrv/$(MACH64)
 DYNFLAGS += $(ROOT)/usr/lib/$(MACH64)/passwdutil.so.1
 

@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -38,6 +38,11 @@
 #
 
 $mapfile_version 2
+
+SYMBOL_VERSION ILLUMOS_0.1 {    # Illumos additions
+    global:
+	svc_tp_create_addr;
+} SUNW_1.10;
 
 SYMBOL_VERSION SUNW_1.10 {	# SunOS 5.11 (Solaris 11)
     global:

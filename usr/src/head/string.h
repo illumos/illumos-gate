@@ -176,7 +176,7 @@ extern __thread char *__strdupa_str;
 extern __thread size_t __strdupa_len;
 
 #define	strdupa(s)							\
-	(__strdupa_str = (char *)(s), 					\
+	(__strdupa_str = (char *)(s),					\
 	strcpy((char *)__builtin_alloca(strlen(__strdupa_str) + 1),	\
 	    __strdupa_str))
 

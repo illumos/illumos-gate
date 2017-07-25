@@ -116,7 +116,7 @@ struct __nsw_switchconfig {
 	struct __nsw_lookup *lookups;
 };
 
-#define	__NSW_ACTION(lkp, err) 	\
+#define	__NSW_ACTION(lkp, err)	\
 	((lkp)->next == NULL ? \
 		__NSW_RETURN \
 	: \
