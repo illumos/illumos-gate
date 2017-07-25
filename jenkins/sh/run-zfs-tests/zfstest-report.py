@@ -60,6 +60,7 @@ known = {
     'cli_root/zpool_create/zpool_create_016_pos': 'FAIL',
     'cli_root/zpool_expand/zpool_expand_001_pos': 'FAIL',
     'cli_root/zpool_get/zpool_get_002_pos': 'FAIL',
+    'cli_root/zpool_remove/zpool_remove_001_neg': 'FAIL',
     'delegate/zfs_allow_007_pos': 'FAIL',
     'devices/devices_001_pos': 'FAIL',
     'devices/devices_002_neg': 'FAIL',
