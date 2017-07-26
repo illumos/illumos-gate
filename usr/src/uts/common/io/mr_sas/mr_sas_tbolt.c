@@ -64,8 +64,7 @@ extern U8 MR_BuildRaidContext(struct mrsas_instance *, struct IO_REQUEST_INFO *,
 /* Local static prototypes. */
 static struct mrsas_cmd *mrsas_tbolt_build_cmd(struct mrsas_instance *,
     struct scsi_address *, struct scsi_pkt *, uchar_t *);
-static void mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr,
-    U64 start_blk, U32 num_blocks);
+static void mrsas_tbolt_set_pd_lba(U8 *, size_t, uint8_t *, U64, U32);
 static int mrsas_tbolt_check_map_info(struct mrsas_instance *);
 static int mrsas_tbolt_sync_map_info(struct mrsas_instance *);
 static int mrsas_tbolt_prepare_pkt(struct scsa_cmd *);
@@ -1656,6 +1655,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 				    &io_info, scsi_raid_io, start_lba_lo);
 			} else {
 				mrsas_tbolt_set_pd_lba(scsi_raid_io->CDB.CDB32,
+				    sizeof (scsi_raid_io->CDB.CDB32),
 				    (uint8_t *)&pd_cmd_cdblen,
 				    io_info.pdBlock, io_info.numBlocks);
 				ddi_put16(acc_handle,
@@ -2969,14 +2969,16 @@ mrsas_tbolt_prepare_cdb(struct mrsas_instance *instance, U8 cdb[],
 /*
  * mrsas_tbolt_set_pd_lba -	Sets PD LBA
  * @cdb:		CDB
- * @cdb_len:		cdb length
+ * @cdb_size:		CDB size
+ * @cdb_len_ptr:	cdb length
  * @start_blk:		Start block of IO
+ * @num_blocks:		Number of blocks
  *
  * Used to set the PD LBA in CDB for FP IOs
  */
 static void
-mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
-    U32 num_blocks)
+mrsas_tbolt_set_pd_lba(U8 *cdb, size_t cdb_size, uint8_t *cdb_len_ptr,
+    U64 start_blk, U32 num_blocks)
 {
 	U8 cdb_len = *cdb_len_ptr;
 	U8 flagvals = 0, opcode = 0, groupnum = 0, control = 0;
@@ -3000,7 +3002,7 @@ mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
 			control = cdb[11];
 		}
 
-		bzero(cdb, sizeof (cdb));
+		bzero(cdb, cdb_size);
 
 		cdb[0] = opcode;
 		cdb[1] = flagvals;
@@ -3033,7 +3035,7 @@ mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
 			break;
 		}
 
-		bzero(cdb, sizeof (cdb));
+		bzero(cdb, cdb_size);
 
 		cdb[0] = opcode;
 		cdb[1] = flagvals;
@@ -3053,7 +3055,7 @@ mrsas_tbolt_set_pd_lba(U8 cdb[], uint8_t *cdb_len_ptr, U64 start_blk,
 		opcode = cdb[0] == READ_6 ? READ_10 : WRITE_10;
 		control = cdb[5];
 
-		bzero(cdb, sizeof (cdb));
+		bzero(cdb, cdb_size);
 		cdb[0] = opcode;
 		cdb[9] = control;
 

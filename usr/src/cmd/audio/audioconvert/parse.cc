@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -173,7 +171,7 @@ parse_format(
 		// If so, left side is keyword, right side is value.
 		// If not, entire string is value.
 		if (cp2 = strchr(cp, '=')) {
-			*cp2++ = NULL;
+			*cp2++ = '\0';
 			key = cp;
 			val = cp2;
 
