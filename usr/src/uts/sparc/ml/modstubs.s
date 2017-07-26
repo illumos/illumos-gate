@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 #if !defined(lint)
@@ -422,6 +422,7 @@ stubs_base:
 
 #ifndef KEYSOCK_MODULE
 	MODULE(keysock,drv);
+	WSTUB(keysock,	keysock_spdsock_wput_iocdata,	nomod_void);
 	WSTUB(keysock,	keysock_plumb_ipsec,	nomod_zero);
 	WSTUB(keysock,	keysock_extended_reg,	nomod_zero);
 	WSTUB(keysock,	keysock_next_seq,	nomod_zero);

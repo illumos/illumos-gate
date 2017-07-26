@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -34,6 +35,7 @@
 #include <sys/sysmacros.h>
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
+#include <sys/timod.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/mkdev.h>
@@ -3404,11 +3406,24 @@ spdsock_wput_other(queue_t *q, mblk_t *mp)
 			break;
 		}
 		return;
+	case M_IOCDATA:
+		keysock_spdsock_wput_iocdata(q, mp, PF_POLICY);
+		return;
 	case M_IOCTL:
 		iocp = (struct iocblk *)mp->b_rptr;
 		error = EINVAL;
 
 		switch (iocp->ioc_cmd) {
+		case TI_GETMYNAME:
+		case TI_GETPEERNAME:
+			/*
+			 * For pfiles(1) observability with getsockname().
+			 * See keysock_spdsock_wput_iocdata() for the rest of
+			 * this.
+			 */
+			mi_copyin(q, mp, NULL,
+			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
+			return;
 		case ND_SET:
 		case ND_GET:
 			if (nd_getset(q, spds->spds_g_nd, mp)) {

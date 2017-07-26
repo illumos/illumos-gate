@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _INET_IPSEC_IMPL_H
@@ -109,6 +110,9 @@ extern "C" {
  */
 extern boolean_t keysock_extended_reg(netstack_t *);
 extern uint32_t keysock_next_seq(netstack_t *);
+
+/* Common-code for spdsock and keysock. */
+extern void keysock_spdsock_wput_iocdata(queue_t *, mblk_t *, sa_family_t);
 
 /*
  * Locking for ipsec policy rules:
