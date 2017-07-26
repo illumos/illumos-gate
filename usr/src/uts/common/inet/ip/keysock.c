@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -892,6 +895,81 @@ keysock_opt_set(queue_t *q, uint_t mgmt_flags, int level,
 }
 
 /*
+ * Handle STREAMS ioctl copyin for getsockname() for both PF_KEY and
+ * PF_POLICY.
+ */
+void
+keysock_spdsock_wput_iocdata(queue_t *q, mblk_t *mp, sa_family_t family)
+{
+	mblk_t *mp1;
+	STRUCT_HANDLE(strbuf, sb);
+	/* What size of sockaddr do we need? */
+	const uint_t addrlen = sizeof (struct sockaddr);
+
+	/* We only handle TI_GET{MY,PEER}NAME (get{sock,peer}name()). */
+	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
+	case TI_GETMYNAME:
+	case TI_GETPEERNAME:
+		break;
+	default:
+		freemsg(mp);
+		return;
+	}
+
+	switch (mi_copy_state(q, mp, &mp1)) {
+	case -1:
+		return;
+	case MI_COPY_CASE(MI_COPY_IN, 1):
+		break;
+	case MI_COPY_CASE(MI_COPY_OUT, 1):
+		/*
+		 * The address has been copied out, so now
+		 * copyout the strbuf.
+		 */
+		mi_copyout(q, mp);
+		return;
+	case MI_COPY_CASE(MI_COPY_OUT, 2):
+		/*
+		 * The address and strbuf have been copied out.
+		 * We're done, so just acknowledge the original
+		 * M_IOCTL.
+		 */
+		mi_copy_done(q, mp, 0);
+		return;
+	default:
+		/*
+		 * Something strange has happened, so acknowledge
+		 * the original M_IOCTL with an EPROTO error.
+		 */
+		mi_copy_done(q, mp, EPROTO);
+		return;
+	}
+
+	/*
+	 * Now we have the strbuf structure for TI_GET{MY,PEER}NAME. Next we
+	 * copyout the requested address and then we'll copyout the strbuf.
+	 * Regardless of sockname or peername, we just return a sockaddr with
+	 * sa_family set.
+	 */
+	STRUCT_SET_HANDLE(sb, ((struct iocblk *)mp->b_rptr)->ioc_flag,
+	    (void *)mp1->b_rptr);
+
+	if (STRUCT_FGET(sb, maxlen) < addrlen) {
+		mi_copy_done(q, mp, EINVAL);
+		return;
+	}
+
+	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
+	if (mp1 == NULL)
+		return;
+
+	STRUCT_FSET(sb, len, addrlen);
+	((struct sockaddr *)mp1->b_wptr)->sa_family = family;
+	mp1->b_wptr += addrlen;
+	mi_copyout(q, mp);
+}
+
+/*
  * Handle STREAMS messages.
  */
 static void
@@ -954,11 +1032,24 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 			break;
 		}
 		return;
+	case M_IOCDATA:
+		keysock_spdsock_wput_iocdata(q, mp, PF_KEY);
+		return;
 	case M_IOCTL:
 		iocp = (struct iocblk *)mp->b_rptr;
 		error = EINVAL;
 
 		switch (iocp->ioc_cmd) {
+		case TI_GETMYNAME:
+		case TI_GETPEERNAME:
+			/*
+			 * For pfiles(1) observability with getsockname().
+			 * See keysock_spdsock_wput_iocdata() for the rest of
+			 * this.
+			 */
+			mi_copyin(q, mp, NULL,
+			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
+			return;
 		case ND_SET:
 		case ND_GET:
 			if (nd_getset(q, keystack->keystack_g_nd, mp)) {
