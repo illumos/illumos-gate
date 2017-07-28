@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _SYS_USB_XHCI_XHCI_H
@@ -56,18 +56,36 @@ extern "C" {
  *
  * We can transfer up to 64K in one transfer request block (TRB) which
  * corresponds to a single SGL entry. Each ring we create is a single page in
- * size and will support at most 256 TRBs. We've selected to use up to 8 SGLs
- * for these transfer cases. This allows us to put up to 512 KiB in a given
- * transfer request and in the worst case, we can have about 30 of them
- * outstanding. Experimentally, this has proven to be sufficient for most of the
- * drivers that we support today.
+ * size and will support at most 256 TRBs. To try and give the operating system
+ * flexibility when allocating DMA transfers, we've opted to allow up to 63
+ * SGLs. Because there isn't a good way to support DMA windows with the xHCI
+ * controller design, if this number is too small then DMA allocations and
+ * binding might fail. If the DMA binding fails, the transfer will fail.
+ *
+ * The reason that we use 63 SGLs and not the expected 64 is that we always need
+ * to allocate an additional TRB for the event data. This leaves us with a
+ * nicely divisible number of entries.
+ *
+ * The final piece of this is the maximum sized transfer that the driver
+ * advertises to the broader framework. This is currently sized at 512 KiB. For
+ * reference the ehci driver sized this value at 640 KiB. It's important to
+ * understand that this isn't reflected in the DMA attribute limitation, because
+ * it's not an attribute of the hardware. Experimentally, this has proven to be
+ * sufficient for most of the drivers that we support today. When considering
+ * increasing this number, please note the impact that might have on the
+ * required number of DMA SGL entries required to satisfy the allocation.
+ *
+ * The value of 512 KiB was originally based on the number of SGLs we supported
+ * multiplied by the maximum transfer size. The original number of
+ * XHCI_TRANSFER_DMA_SGL was 8. The 512 KiB value was based upon taking the
+ * number of SGLs and assuming that each TRB used its maximum transfer size of
+ * 64 KiB.
  */
-#define	XHCI_TRB_MAX_TRANSFER	65536
+#define	XHCI_TRB_MAX_TRANSFER	65536	/* 64 KiB */
 #define	XHCI_DMA_ALIGN		64
 #define	XHCI_DEF_DMA_SGL	1
-#define	XHCI_TRANSFER_DMA_SGL	8
-#define	XHCI_MAX_TRANSFER	(XHCI_TRB_MAX_TRANSFER * XHCI_TRANSFER_DMA_SGL)
-#define	XHCI_DMA_STRUCT_SIZE	4096
+#define	XHCI_TRANSFER_DMA_SGL	63
+#define	XHCI_MAX_TRANSFER	524288	/* 512 KiB */
 
 /*
  * Properties and values for rerouting ehci ports to xhci.
@@ -98,6 +116,13 @@ extern "C" {
 #endif
 
 /*
+ * TRBs need to indicate the number of remaining USB packets in the overall
+ * transfer. This is a 5-bit value, which means that the maximum value we can
+ * store in that TRD field is 31.
+ */
+#define	XHCI_MAX_TDSIZE		31
+
+/*
  * This defines a time in 2-ms ticks that is required to wait for the controller
  * to be ready to go. Section 5.4.8 of the XHCI specification in the description
  * of the PORTSC register indicates that the upper bound is 20 ms. Therefore the
@@ -118,7 +143,7 @@ extern "C" {
  * second. This is supposed to be the default value of the controller. See xHCI
  * 1.1 / 4.17.2 for more information.
  */
-#define	XHCI_IMOD_DEFAULT 	0x000003F8U
+#define	XHCI_IMOD_DEFAULT	0x000003F8U
 
 /*
  * Definitions that surround the default values used in various contexts. These
@@ -198,15 +223,15 @@ extern "C" {
 /*
  * These represent known issues with various xHCI controllers.
  *
- * 	XHCI_QUIRK_NO_MSI	MSI support on this controller is known to be
- * 				broken.
+ *	XHCI_QUIRK_NO_MSI	MSI support on this controller is known to be
+ *				broken.
  *
- * 	XHCI_QUIRK_32_ONLY	Only use 32-bit DMA addreses with this
- * 				controller.
+ *	XHCI_QUIRK_32_ONLY	Only use 32-bit DMA addreses with this
+ *				controller.
  *
- * 	XHCI_QUIRK_INTC_EHCI	This is an Intel platform which supports
- * 				rerouting ports between EHCI and xHCI
- * 				controllers on the platform.
+ *	XHCI_QUIRK_INTC_EHCI	This is an Intel platform which supports
+ *				rerouting ports between EHCI and xHCI
+ *				controllers on the platform.
  */
 typedef enum xhci_quirk {
 	XHCI_QUIRK_NO_MSI	= 0x01,
@@ -218,7 +243,7 @@ typedef enum xhci_quirk {
  * xHCI capability parameter flags. These are documented in xHCI 1.1 / 5.3.6.
  */
 typedef enum xhci_cap_flags {
-	XCAP_AC64 	= 0x001,
+	XCAP_AC64	= 0x001,
 	XCAP_BNC	= 0x002,
 	XCAP_CSZ	= 0x004,
 	XCAP_PPC	= 0x008,
@@ -310,6 +335,7 @@ typedef struct xhci_transfer {
 	usb_cr_t		xt_cr;
 	boolean_t		xt_data_tohost;
 	xhci_trb_t		*xt_trbs;
+	uint64_t		*xt_trbs_pa;
 	usb_isoc_pkt_descr_t	*xt_isoc;
 	usb_opaque_t		xt_usba_req;
 } xhci_transfer_t;
@@ -427,19 +453,19 @@ typedef struct xhci_command_ring {
  * Individual command states.
  *
  * XHCI_COMMAND_S_INIT		The command has yet to be inserted into the
- * 				command ring.
+ *				command ring.
  *
  * XHCI_COMMAND_S_QUEUED	The command is queued in the command ring.
  *
  * XHCI_COMMAND_S_RECEIVED	A command completion for this was received.
  *
  * XHCI_COMMAND_S_DONE		The command has been executed. Note that it may
- * 				have been aborted.
+ *				have been aborted.
  *
  * XHCI_COMMAND_S_RESET		The ring is being reset due to a fatal error and
- * 				this command has been removed from the ring.
- * 				This means it has been aborted, but it was not
- * 				the cause of the abort.
+ *				this command has been removed from the ring.
+ *				This means it has been aborted, but it was not
+ *				the cause of the abort.
  *
  * Note, when adding states, anything after XHCI_COMMAND_S_DONE implies that
  * upon reaching this state, it is no longer in the ring.
@@ -648,7 +674,7 @@ extern uint64_t xhci_dma_pa(xhci_dma_buffer_t *);
  * DMA Transfer Ring functions
  */
 extern xhci_transfer_t *xhci_transfer_alloc(xhci_t *, xhci_endpoint_t *, size_t,
-    int, int);
+    uint_t, int);
 extern void xhci_transfer_free(xhci_t *, xhci_transfer_t *);
 extern void xhci_transfer_copy(xhci_transfer_t *, void *, size_t, boolean_t);
 extern int xhci_transfer_sync(xhci_t *, xhci_transfer_t *, uint_t);
@@ -714,7 +740,8 @@ extern boolean_t xhci_ring_trb_tail_valid(xhci_ring_t *, uint64_t);
 extern int xhci_ring_trb_valid_range(xhci_ring_t *, uint64_t, uint_t);
 
 extern boolean_t xhci_ring_trb_space(xhci_ring_t *, uint_t);
-extern void xhci_ring_trb_fill(xhci_ring_t *, uint_t, xhci_trb_t *, boolean_t);
+extern void xhci_ring_trb_fill(xhci_ring_t *, uint_t, xhci_trb_t *, uint64_t *,
+    boolean_t);
 extern void xhci_ring_trb_produce(xhci_ring_t *, uint_t);
 extern boolean_t xhci_ring_trb_consumed(xhci_ring_t *, uint64_t);
 extern void xhci_ring_trb_put(xhci_ring_t *, xhci_trb_t *);

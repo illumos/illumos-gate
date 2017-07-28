@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -172,10 +172,13 @@ xhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	mutex_exit(&xhcip->xhci_lock);
 
 	/*
-	 * Update the slot and input context for this endpoint.
+	 * Update the slot and input context for this endpoint. We make sure to
+	 * always set the slot as having changed in the context field as the
+	 * specification suggests we should and some hardware requires it.
 	 */
 	xd->xd_input->xic_drop_flags = LE_32(0);
-	xd->xd_input->xic_add_flags = LE_32(XHCI_INCTX_MASK_DCI(epid + 1));
+	xd->xd_input->xic_add_flags = LE_32(XHCI_INCTX_MASK_DCI(0) |
+	    XHCI_INCTX_MASK_DCI(epid + 1));
 
 	if (epid + 1 > XHCI_SCTX_GET_DCI(LE_32(xd->xd_slotin->xsc_info))) {
 		uint32_t info;
@@ -471,11 +474,11 @@ xhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 
 	/*
 	 * Potentially update the slot input context about the current max
-	 * endpoint. While we don't update the slot context with this,
-	 * surrounding code expects it to be updated to be consistent.
+	 * endpoint. Make sure to set that the slot context is being updated
+	 * here as it may be changing and some hardware requires it.
 	 */
 	xd->xd_input->xic_drop_flags = LE_32(XHCI_INCTX_MASK_DCI(epid + 1));
-	xd->xd_input->xic_add_flags = LE_32(0);
+	xd->xd_input->xic_add_flags = LE_32(XHCI_INCTX_MASK_DCI(0));
 	for (i = XHCI_NUM_ENDPOINTS - 1; i >= 0; i--) {
 		if (xd->xd_endpoints[i] != NULL &&
 		    xd->xd_endpoints[i] != xep)
@@ -798,6 +801,7 @@ xhci_hcdi_pipe_ctrl_xfer(usba_pipe_handle_data_t *ph, usb_ctrl_req_t *ucrp,
 	xt->xt_trbs[xt->xt_ntrbs - 1].trb_flags = LE_32(XHCI_TRB_TYPE_STATUS |
 	    XHCI_TRB_IOC | statusdir);
 
+
 	mutex_enter(&xhcip->xhci_lock);
 
 	/*
@@ -930,8 +934,8 @@ xhci_hcdi_isoc_transfer_fill(xhci_device_t *xd, xhci_endpoint_t *xep,
 		trb->trb_addr = LE_64(buf);
 
 		/*
-		 * Beacuse we know that a single frame can have all of its data
-		 * in a single instance, we know that we don't neeed to do
+		 * Because we know that a single frame can have all of its data
+		 * in a single instance, we know that we don't need to do
 		 * anything special here.
 		 */
 		trb->trb_status = LE_32(XHCI_TRB_LEN(len) | XHCI_TRB_TDREM(0) |
@@ -940,7 +944,9 @@ xhci_hcdi_isoc_transfer_fill(xhci_device_t *xd, xhci_endpoint_t *xep,
 		/*
 		 * Always enable SIA to start the frame ASAP. We also always
 		 * enable an interrupt on a short packet. If this is the last
-		 * trb, then we will set IOC.
+		 * trb, then we will set IOC. Each TRB created here is really
+		 * its own TD. However, we only set an interrupt on the last
+		 * entry to better deal with scheduling.
 		 */
 		flags = XHCI_TRB_SIA | XHCI_TRB_ISP | XHCI_TRB_SET_FRAME(0);
 		flags |= XHCI_TRB_TYPE_ISOCH;
