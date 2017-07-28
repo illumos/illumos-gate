@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -2461,6 +2462,11 @@ multilist_walk_init(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
+typedef struct mdb_txg_list {
+	size_t		tl_offset;
+	uintptr_t	tl_head[TXG_SIZE];
+} mdb_txg_list_t;
+
 typedef struct txg_list_walk_data {
 	uintptr_t lw_head[TXG_SIZE];
 	int	lw_txgoff;
@@ -2473,17 +2479,18 @@ static int
 txg_list_walk_init_common(mdb_walk_state_t *wsp, int txg, int maxoff)
 {
 	txg_list_walk_data_t *lwd;
-	txg_list_t list;
+	mdb_txg_list_t list;
 	int i;
 
 	lwd = mdb_alloc(sizeof (txg_list_walk_data_t), UM_SLEEP | UM_GC);
-	if (mdb_vread(&list, sizeof (txg_list_t), wsp->walk_addr) == -1) {
+	if (mdb_ctf_vread(&list, "txg_list_t", "mdb_txg_list_t", wsp->walk_addr,
+	    0) == -1) {
 		mdb_warn("failed to read txg_list_t at %#lx", wsp->walk_addr);
 		return (WALK_ERR);
 	}
 
 	for (i = 0; i < TXG_SIZE; i++)
-		lwd->lw_head[i] = (uintptr_t)list.tl_head[i];
+		lwd->lw_head[i] = list.tl_head[i];
 	lwd->lw_offset = list.tl_offset;
 	lwd->lw_obj = mdb_alloc(lwd->lw_offset + sizeof (txg_node_t),
 	    UM_SLEEP | UM_GC);
