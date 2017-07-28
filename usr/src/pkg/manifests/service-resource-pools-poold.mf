@@ -28,10 +28,18 @@ set name=pkg.description value="core software for dynamic resource pools"
 set name=pkg.summary value="Dynamic Resource Pools"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
+dir path=lib variant.opensolaris.zone=global
+dir path=lib/svc variant.opensolaris.zone=global
+dir path=lib/svc/manifest group=sys variant.opensolaris.zone=global
+dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
+dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/pool
 dir path=usr/share/man/man1m
+file path=lib/svc/manifest/system/poold.xml group=sys mode=0444 \
+    variant.opensolaris.zone=global
+file path=lib/svc/method/svc-poold mode=0555 variant.opensolaris.zone=global
 file path=usr/lib/pool/JPool.jar mode=0444
 file path=usr/lib/pool/libjkstat.so.1
 file path=usr/lib/pool/libjlgrp.so.1
