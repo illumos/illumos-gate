@@ -18,17 +18,16 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+#
 
 #
 # MAPFILE HEADER START
@@ -92,6 +91,12 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.24 {	# openbsd compat
+    protected:
+	freezero;
+	recallocarray;
+} ILLUMOS_0.23;
 
 SYMBOL_VERSION ILLUMOS_0.23 {	# openbsd compat
     protected:

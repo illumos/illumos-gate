@@ -814,6 +814,7 @@ link path=usr/share/man/man3c/fpsetsticky.3c target=fpgetround.3c
 link path=usr/share/man/man3c/fputs.3c target=puts.3c
 link path=usr/share/man/man3c/free.3c target=malloc.3c
 link path=usr/share/man/man3c/freelocale.3c target=newlocale.3c
+link path=usr/share/man/man3c/freezero.3c target=malloc.3c
 link path=usr/share/man/man3c/fscanf.3c target=scanf.3c
 link path=usr/share/man/man3c/fseeko.3c target=fseek.3c
 link path=usr/share/man/man3c/fsetattr.3c target=fgetattr.3c
@@ -1205,6 +1206,7 @@ link path=usr/share/man/man3c/re_exec.3c target=re_comp.3c
 link path=usr/share/man/man3c/readdir_r.3c target=readdir.3c
 link path=usr/share/man/man3c/realloc.3c target=malloc.3c
 link path=usr/share/man/man3c/reallocarray.3c target=malloc.3c
+link path=usr/share/man/man3c/recallocarray.3c target=malloc.3c
 link path=usr/share/man/man3c/regerror.3c target=regcomp.3c
 link path=usr/share/man/man3c/regex.3c target=regcmp.3c
 link path=usr/share/man/man3c/regexec.3c target=regcomp.3c

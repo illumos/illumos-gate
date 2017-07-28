@@ -17,17 +17,20 @@
 .\"
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2017 Nexenta Systems, Inc.
 .\"
-.Dd March 10, 2017
+.Dd July 28, 2017
 .Dt MALLOC 3C
 .Os
 .Sh NAME
 .Nm malloc ,
 .Nm calloc ,
 .Nm free ,
+.Nm freezero ,
 .Nm memalign ,
 .Nm realloc ,
 .Nm reallocarray ,
+.Nm recallocarray ,
 .Nm valloc ,
 .Nm alloca
 .Nd memory allocator
@@ -46,6 +49,11 @@
 .Fo free
 .Fa "void *ptr"
 .Fc
+.Ft void
+.Fo freezero
+.Fa "void *ptr"
+.Fa "size_t size"
+.Fc
 .Ft void *
 .Fo memalign
 .Fa "size_t alignment"
@@ -60,6 +68,13 @@
 .Fo reallocarray
 .Fa "void *ptr"
 .Fa "size_t nelem"
+.Fa "size_t elsize"
+.Fc
+.Ft void *
+.Fo recallocarray
+.Fa "void *ptr"
+.Fa "size_t oldnelem"
+.Fa "size_t newnelem"
 .Fa "size_t elsize"
 .Fc
 .Ft void *
@@ -92,8 +107,9 @@ is a pointer to a block previously allocated by
 .Fn malloc ,
 .Fn calloc ,
 .Fn realloc ,
+.Fn reallocarray ,
 or
-.Fn reallocarray .
+.Fn recallocarray .
 After
 .Fn free
 is executed, this space is made available for further allocation by the
@@ -105,6 +121,32 @@ is a null pointer, no action occurs.
 If a random number is passed to
 .Fn free ,
 the results are undefined.
+.Pp
+The
+.Fn freezero
+function is similar to the
+.Fn free
+function except it ensures memory is explicitly discarded.
+If
+.Fa ptr
+is
+.Dv NULL ,
+no action occurs.
+If
+.Fa ptr
+is not
+.Dv NULL ,
+the
+.Fa size
+argument must be equal or smaller than the size of the earlier allocation that
+returned
+.Fa ptr .
+.Fn freezero
+guarantees the memory range starting at
+.Fa ptr
+with length
+.Fa size
+is discarded while deallocating the whole object originally allocated.
 .Pp
 The
 .Fn calloc
@@ -167,6 +209,30 @@ and checks for overflow in
 calculation.
 .Pp
 The
+.Fn recallocarray
+function is similar to
+.Fn reallocarray
+except it ensures newly allocated memory is cleared similar to
+.Fn calloc .
+If
+.Fa ptr
+is
+.Dv NULL ,
+.Fa oldnelem
+is ignored and the call is equivalent to
+.Fn calloc .
+If
+.Fa ptr
+is not
+.Dv NULL ,
+.Fa oldnelem
+must be a value such that
+.Fa oldnelem Ns * Ns Fa elsize
+is the size of the earlier allocation that returned
+.Fa ptr ,
+otherwise the behaviour is undefined.
+.Pp
+The
 .Fn valloc
 function has the same effect as
 .Fn malloc ,
@@ -191,18 +257,17 @@ for storage of any type of object.
 .Pp
 If there is no available memory,
 .Fn malloc ,
+.Fn calloc ,
 .Fn realloc ,
 .Fn reallocarray ,
+.Fn recallocarray ,
 .Fn memalign ,
-.Fn valloc ,
 and
-.Fn calloc
+.Fn valloc
 return a null pointer.
 .Pp
 When
 .Fn realloc
-or
-.Fn reallocarray
 is called with
 .Fa size
 > 0 and returns
@@ -223,14 +288,17 @@ If
 .Fn malloc ,
 .Fn calloc ,
 .Fn realloc ,
+.Fn reallocarray ,
 or
-.Fn reallocarray
+.Fn recallocarray
 returns unsuccessfully,
 .Va errno
 will be set to indicate the error.
 The
 .Fn free
-function does not set
+and
+.Fn freezero
+functions do not set
 .Va errno .
 .Sh ERRORS
 The
@@ -240,7 +308,7 @@ The
 and
 .Fn reallocarray
 functions will fail if:
-.Bl -tag -width "ENOMEM"
+.Bl -tag -width Er
 .It Er ENOMEM
 The physical limits of the system are exceeded by
 .Fa size
@@ -250,6 +318,21 @@ bytes of memory which cannot be allocated, or there's integer overflow in
 There is not enough memory available to allocate
 .Fa size
 bytes of memory; but the application could try again later.
+.El
+.Pp
+The
+.Fn recallocarray
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa ptr
+is not
+.Dv NULL
+and multiplying
+.Fa oldnelem
+and
+.Fa elsize
+results in integer overflow.
 .El
 .Sh USAGE
 Portable applications should avoid using
@@ -298,8 +381,11 @@ functions are
 .Sy Standard.
 .Pp
 The
-.Fn reallocarray
-function is
+.Fn freezero ,
+.Fn reallocarray ,
+and
+.Fn recallocarray
+functions are
 .Sy Committed .
 .Pp
 The
