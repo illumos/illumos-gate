@@ -176,7 +176,7 @@ this can be one of the following values:
 .Cm tcp ,
 .Cm sctp
 or
-.Cm udp.
+.Cm udp .
 .Sh SUBCOMMANDS
 The following subcommands are supported:
 .Bl -tag -width ""
@@ -191,7 +191,7 @@ The interface will be enabled as part of the creation process.
 The IPv4 interface will have the address 0.0.0.0.
 The IPv6 interface will have the address ::.
 .Bl -tag -width ""
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -202,7 +202,7 @@ Temporary, not persistent across reboots.
 .Xc
 Disable an IP interface.
 .Bl -tag -width ""
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -213,7 +213,7 @@ Temporary, not persistent across reboots.
 .Xc
 Enable an IP interface.
 .Bl -tag -width ""
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -230,7 +230,7 @@ Permanently delete an IP interface.
 .Xc
 Show the current IP interface configuration.
 .Bl -tag -width ""
-.It Fl o Ns , Ns Fl -output
+.It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
 The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
@@ -292,7 +292,7 @@ IPv4
 IPv6
 .El
 .El
-.It Fl p Ns , Ns Fl -parsable
+.It Fl p Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
 .El
 .It Xo
@@ -305,9 +305,9 @@ Print the output in a parsable format.
 .Xc
 Set a property's value(s) on the IP interface.
 .Bl -tag -width ""
-.It Fl m Ns , Ns Fl -module
+.It Fl m Ns \&, Ns Fl -module
 Specify which protocol the setting applies to.
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify the property name and value(s).
 The property name can be one of the following:
 .Bl -tag -compact -width "exchange_routes"
@@ -334,7 +334,7 @@ A value
 .Cm none
 may also be used.
 .El
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -347,14 +347,14 @@ Temporary, not persistent across reboots.
 .Xc
 Reset an IP interface's property value to the default.
 .Bl -tag -width ""
-.It Fl m Ns , Ns Fl -module
+.It Fl m Ns \&, Ns Fl -module
 Specify which protocol the setting applies to.
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
 .Nm ipadm Ic set-ifprop
 subcommand for the list of property names.
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -367,11 +367,11 @@ Temporary, not persistent across reboots.
 .Xc
 Display the property values for one or all of the IP interfaces.
 .Bl -tag -width ""
-.It Fl c Ns , Ns Fl -parsable
+.It Fl c Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
-.It Fl m Ns , Ns Fl -module
+.It Fl m Ns \&, Ns Fl -module
 Specify which protocol to display.
-.It Fl o Ns , Ns Fl -output
+.It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
 The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
@@ -397,7 +397,7 @@ The default value of the property.
 .It Cm POSSIBLE
 The possible values for the property.
 .El
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify which properties to display.
 See the
 .Nm ipadm Ic set-ifprop
@@ -446,7 +446,7 @@ address configured on an interface is required to configure
 IPv6 address on the same interface.
 This takes the following options:
 .Bl -tag -width ""
-.It Fl a Ns , Ns Fl -address
+.It Fl a Ns \&, Ns Fl -address
 Specify the address.
 The
 .Cm local
@@ -458,26 +458,26 @@ Otherwise, the equal sign
 .Pq Qq =
 should be omitted and the address should be provided by itself without second
 address.
-.It Fl d Ns , Ns Fl -down
+.It Fl d Ns \&, Ns Fl -down
 The address is down.
 .El
 .It Fl T Cm dhcp
 Obtain the address via DHCP.
 This takes the following options:
 .Bl -tag -width ""
-.It Fl w Ns , Ns Fl -wait
+.It Fl w Ns \&, Ns Fl -wait
 Specify the time, in seconds, that the command should wait to obtain an address.
 .El
 .It Fl T Cm addrconf
 Create an auto-configured address.
 This takes the following options:
 .Bl -tag -width ""
-.It Fl i Ns , Ns Fl -interface-id
+.It Fl i Ns \&, Ns Fl -interface-id
 Specify the interface ID to be used.
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify which method of auto-configuration should be used.
 .El
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -489,7 +489,7 @@ Temporary, not persistent across reboots.
 Down the address.
 This will stop packets from being sent or received.
 .Bl -tag -width ""
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -501,7 +501,7 @@ Temporary, not persistent across reboots.
 Up the address.
 This will enable packets to be sent and received.
 .Bl -tag -width ""
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -512,7 +512,7 @@ Temporary, not persistent across reboots.
 .Xc
 Disable the address.
 .Bl -tag -width ""
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -523,7 +523,7 @@ Temporary, not persistent across reboots.
 .Xc
 Enable the address.
 .Bl -tag -width ""
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -539,7 +539,7 @@ It also restarts duplicate address detection for
 .Cm static
 addresses.
 .Bl -tag -width ""
-.It Fl i Ns , Ns Fl -inform
+.It Fl i Ns \&, Ns Fl -inform
 Obtain network configuration from DHCP without taking a lease on the address.
 .El
 .It Xo
@@ -550,7 +550,7 @@ Obtain network configuration from DHCP without taking a lease on the address.
 .Xc
 Delete the given address.
 .Bl -tag -width ""
-.It Fl r Ns , Ns Fl -release
+.It Fl r Ns \&, Ns Fl -release
 Indicate that the DHCP-assigned address should be released.
 .El
 .It Xo
@@ -561,7 +561,7 @@ Indicate that the DHCP-assigned address should be released.
 .Xc
 Show the current address properties.
 .Bl -tag -width ""
-.It Fl o Ns , Ns Fl -output
+.It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
 The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
@@ -624,7 +624,7 @@ deprecated
 .It Cm ADDR
 The address.
 .El
-.It Fl p Ns , Ns Fl -parsable
+.It Fl p Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
 .El
 .It Xo
@@ -636,7 +636,7 @@ Print the output in a parsable format.
 .Xc
 Set a property's value(s) on the addrobj.
 .Bl -tag -width ""
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify the property name and value(s).
 The property name can be one of the following:
 .Bl -tag -compact -width "deprecated"
@@ -656,7 +656,7 @@ Packets can be transmitted
 .It Cm zone
 The zone the addrobj is in.
 .El
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -668,12 +668,12 @@ Temporary, not persistent across reboots.
 .Xc
 Reset an addrobj's property value to the default.
 .Bl -tag -width ""
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
 .Nm ipadm Ic set-addrprop
 subcommand for the list of property names.
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -685,9 +685,9 @@ Temporary, not persistent across reboots.
 .Xc
 Display the property values for one or all of the addrobjs.
 .Bl -tag -width ""
-.It Fl c Ns , Ns Fl -parsable
+.It Fl c Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
-.It Fl o Ns , Ns Fl -output
+.It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
 The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
@@ -711,7 +711,7 @@ The default value of the property.
 .It Cm POSSIBLE
 The possible values for the property.
 .El
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify which properties to display.
 See the
 .Nm ipadm Ic set-addrprop
@@ -726,7 +726,7 @@ subcommand for the list of property names.
 .Xc
 Set a property's value(s) on the protocol.
 .Bl -tag -width ""
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify the property name and value(s).
 The optional
 .Sy + Ns | Ns Sy -
@@ -782,7 +782,7 @@ Smallest non-privileged port
 .It Cm ttl
 The IPv4 time-to-live.
 .El
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -794,12 +794,12 @@ Temporary, not persistent across reboots.
 .Xc
 Reset a protocol's property value to the default.
 .Bl -tag -width ""
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
 .Nm ipadm Ic set-prop
 subcommand for the list of property names.
-.It Fl t Ns , Ns Fl -temporary
+.It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
 .It Xo
@@ -811,9 +811,9 @@ Temporary, not persistent across reboots.
 .Xc
 Display the property values for one or all of the protocols.
 .Bl -tag -width ""
-.It Fl c Ns , Ns Fl -parsable
+.It Fl c Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
-.It Fl o Ns , Ns Fl -output
+.It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
 The field value can be one of the following names:
 .Bl -tag -compact -width "PERSISTENT"
@@ -837,7 +837,7 @@ The default value of the property.
 .It Cm POSSIBLE
 The possible values for the property.
 .El
-.It Fl p Ns , Ns Fl -prop
+.It Fl p Ns \&, Ns Fl -prop
 Specify which properties to display.
 See the
 .Nm ipadm Ic set-prop

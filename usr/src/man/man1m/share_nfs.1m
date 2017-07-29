@@ -109,9 +109,9 @@ some other local user.
 For clients where the gid in the incoming request is
 .Ar clnt
 and the client matches the
-.Ar access_list Ns
-, change the group ID to
-.Ar srv Ns .
+.Ar access_list ,
+change the group ID to
+.Ar srv .
 If
 .Ar clnt
 is asterisk (*), all groups are mapped by this rule.
@@ -329,9 +329,9 @@ some other local user.
 For clients where the uid in the incoming request is
 .Ar clnt
 and the client matches the
-.Ar access_list Ns
-, change the user ID to
-.Ar srv Ns .
+.Ar access_list ,
+change the user ID to
+.Ar srv .
 If
 .Ar clnt
 is asterisk (*), all users are mapped by this rule.
@@ -553,7 +553,7 @@ The following example remaps the user with uid
 at client
 .Sy 10.0.0.1
 to user
-.Sy joe Ns :
+.Sy joe :
 .Bd -literal -offset indent
 share -o uidmap=100:joe:@10.0.0.1 /export
 .Ed

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 #
 
 MANDOC=		$(ONBLD_TOOLS)/bin/${MACH}/mandoc
@@ -46,7 +46,7 @@ $(ROOTMAN)/man$(MANSECT)/% : % $(ROOTMAN)/man$(MANSECT)
 $(MANCHECKS):
 		@$(EGREP) -q "^.TH" $(@:%.check=%) || \
 		( $(ECHO) "checking $(@:%.check=%)"; \
-		$(MANDOC) -Tlint $(@:%.check=%) )
+		$(MANDOC) -Tlint -Wwarning $(@:%.check=%) )
 
 $(MANLINKS):
 		$(RM) $@; $(SYMLINK) $(LINKSRC) $@

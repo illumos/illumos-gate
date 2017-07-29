@@ -33,7 +33,7 @@ The
 .Fn Lgrab_error
 function only knows how to translate error codes that were stored in
 the third argument
-.Pf ( Fa perr Ns )
+.Pq Fa perr
 of a call to
 .Xr Lgrab 3PROC .
 .Sh RETURN VALUES

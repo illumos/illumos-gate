@@ -32,7 +32,6 @@ OBJS=		att.o		\
 		main.o		\
 		man.o		\
 		manpath.o	\
-		man_hash.o	\
 		man_html.o	\
 		man_macro.o	\
 		man_term.o	\
@@ -40,14 +39,15 @@ OBJS=		att.o		\
 		mandoc.o	\
 		mandoc_aux.o	\
 		mandoc_ohash.o	\
+		mandoc_xr.o	\
 		mandocdb.o	\
 		mansearch.o	\
 		mdoc.o		\
 		mdoc_argv.o	\
-		mdoc_hash.o	\
 		mdoc_html.o	\
 		mdoc_macro.o	\
 		mdoc_man.o	\
+		mdoc_markdown.o	\
 		mdoc_state.o	\
 		mdoc_term.o	\
 		mdoc_validate.o	\
@@ -55,6 +55,9 @@ OBJS=		att.o		\
 		out.o		\
 		read.o		\
 		roff.o		\
+		roff_html.o	\
+		roff_term.o	\
+		roff_validate.o	\
 		preconv.o	\
 		st.o		\
 		tag.o		\
@@ -67,6 +70,7 @@ OBJS=		att.o		\
 		term.o		\
 		term_ascii.o	\
 		term_ps.o	\
+		term_tab.o	\
 		tree.o
 
 OBJS +=		compat_ohash.o

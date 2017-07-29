@@ -61,7 +61,7 @@ representative thread (LWP).
 For more information on how the representative is chosen, see
 .Xr proc 4 .
 To change the registers of a specific thread, use the
-.Xr Lgetareg 3PROC
+.Fn Lgetareg
 and
 .Xr Lsetareg 3PROC
 functions.
