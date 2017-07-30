@@ -28,20 +28,6 @@
 # global zone only.  See the include file for greater detail, as well as
 # information about overriding the defaults.
 #
-<include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/audio/audiovia97@$(PKGVERS)
-set name=pkg.description value="SunOS audio device driver for Via 82C686"
-set name=pkg.summary value="Via 82C686 Audio Driver"
-set name=info.classification value=org.opensolaris.category.2008:Drivers/Media
+set name=pkg.obsolete value=true
 set name=variant.arch value=i386
-dir path=kernel group=sys
-dir path=kernel/drv group=sys
-dir path=usr/share/man
-dir path=usr/share/man/man7d
-driver name=audiovia97 alias=pci1106,3058
-file path=kernel/drv/audiovia97 group=sys
-file path=usr/share/man/man7d/audiovia97.7d
-legacy pkg=SUNWaudiovia97 desc="SunOS audio device driver for Via 82C686" \
-    name="Via 82C686 Audio Driver"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL

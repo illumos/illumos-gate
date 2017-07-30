@@ -6,8 +6,8 @@
 #define __T5FW_H
 
 #define T5FW_VERSION_MAJOR 1
-#define T5FW_VERSION_MINOR 15
-#define T5FW_VERSION_MICRO 37
+#define T5FW_VERSION_MINOR 16
+#define T5FW_VERSION_MICRO 43
 #define T5FW_VERSION_BUILD 0
 
 extern unsigned char t5fw_data[];

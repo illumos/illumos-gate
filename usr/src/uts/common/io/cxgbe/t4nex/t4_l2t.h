@@ -64,7 +64,7 @@ void t4_l2t_release(struct l2t_entry *e);
 int  do_l2t_write_rpl(struct sge_iq *iq, const struct rss_header *rss,
     mblk_t *m);
 
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 struct l2t_entry *t4_l2t_get(struct port_info *pi, conn_t *connp);
 int t4_l2t_send(struct adapter *sc, mblk_t *m, struct l2t_entry *e);
 void t4_l2t_update(ip2mac_t *ip2macp, void* arg);

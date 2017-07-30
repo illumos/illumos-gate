@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #include <sys/cpuvar.h>
@@ -53,19 +53,6 @@
 
 void
 iscsit_text_cmd_fini(iscsit_conn_t *ict);
-
-/*
- * The kernel inet_ntop() function formats ipv4 address fields with
- * leading zeros which the win2k initiator interprets as octal.
- */
-
-static void
-iscsit_v4_ntop(struct in_addr *in, char a[], int size)
-{
-	unsigned char *p = (unsigned char *) in;
-
-	(void) snprintf(a, size, "%d.%d.%d.%d", *p, *(p+1), *(p+2), *(p+3));
-}
 
 static void
 iscsit_bump_ttt(iscsit_conn_t *ict)
@@ -135,7 +122,8 @@ iscsit_add_portal(struct sockaddr_storage *ss, int tag, nvlist_t *nv_resp)
 	switch (ss->ss_family) {
 	case AF_INET:
 		sin = (struct sockaddr_in *)ss;
-		iscsit_v4_ntop(&sin->sin_addr, ipaddr, sizeof (ipaddr));
+		(void) inet_ntop(AF_INET, &sin->sin_addr, ipaddr,
+		    sizeof (ipaddr));
 		(void) snprintf(ta_value, sizeof (ta_value), "%s:%d,%d",
 		    ipaddr, ntohs(sin->sin_port), tag);
 		break;

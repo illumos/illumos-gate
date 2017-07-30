@@ -70,11 +70,30 @@ static boolean_t persistent_disc_meth_common(iSCSIDiscoveryMethod_t method,
 static void persistent_static_addr_upgrade_to_v2();
 
 /*
+ * This wrapper keeps old inet_ntop() behaviour and should be called when
+ * IP addresses are used as keys into persistent storage.
+ */
+static void
+iscsi_inet_ntop(int af, const void *addr, char *buf)
+{
+#define	UC(b)	(((int)b) & 0xff)
+	if (af == AF_INET) {
+		uchar_t *v4addr = (uchar_t *)addr;
+		(void) snprintf(buf, INET6_ADDRSTRLEN, "%03d.%03d.%03d.%03d",
+		    UC(v4addr[0]), UC(v4addr[1]), UC(v4addr[2]), UC(v4addr[3]));
+	} else {
+		(void) inet_ntop(af, addr, buf, INET6_ADDRSTRLEN);
+	}
+#undef	UC
+}
+
+/*
  * persistent_init_disc_addr_oids - Oid is stored with discovery address
  * however oids are not persisted and the discovery address oids need to
  * be regenerated during initialization.
  */
-static void persistent_init_disc_addr_oids()
+static void
+persistent_init_disc_addr_oids()
 {
 	uint32_t addr_count = 0;
 	void *void_p = NULL;
@@ -122,7 +141,8 @@ static void persistent_init_disc_addr_oids()
  * however oids are not persisted and the static address oids need to
  * be regenerated during initialization.
  */
-static void persistent_init_static_addr_oids()
+static void
+persistent_init_static_addr_oids()
 {
 	uint32_t addr_count = 0;
 	void *void_p = NULL;
@@ -422,13 +442,10 @@ persistent_static_addr_set(char *target_name, entry_t *e)
 
 	key = kmem_zalloc(MAX_KEY_SIZE, KM_SLEEP);
 	ip_str = kmem_zalloc(INET6_ADDRSTRLEN, KM_SLEEP);
-	if (e->e_insize == sizeof (struct in_addr)) {
-		(void) inet_ntop(AF_INET, &e->e_u.u_in4,
-		    ip_str, INET6_ADDRSTRLEN);
-	} else {
-		(void) inet_ntop(AF_INET6, &e->e_u.u_in6,
-		    ip_str, INET6_ADDRSTRLEN);
-	}
+	if (e->e_insize == sizeof (struct in_addr))
+		iscsi_inet_ntop(AF_INET, &e->e_u.u_in4, ip_str);
+	else
+		iscsi_inet_ntop(AF_INET6, &e->e_u.u_in6, ip_str);
 
 	if (snprintf(key, MAX_KEY_SIZE - 1, "%s,%s:%d,%d",
 	    target_name, ip_str, e->e_port, e->e_tpgt) >= MAX_KEY_SIZE) {
@@ -517,13 +534,10 @@ persistent_static_addr_clear(uint32_t oid)
 	if (e.e_oid == oid) {
 		ip_str = kmem_zalloc(INET6_ADDRSTRLEN, KM_SLEEP);
 		key = kmem_zalloc(MAX_KEY_SIZE, KM_SLEEP);
-		if (e.e_insize == sizeof (struct in_addr)) {
-			(void) inet_ntop(AF_INET, &e.e_u.u_in4,
-			    ip_str, INET6_ADDRSTRLEN);
-		} else {
-			(void) inet_ntop(AF_INET6, &e.e_u.u_in6,
-			    ip_str, INET6_ADDRSTRLEN);
-		}
+		if (e.e_insize == sizeof (struct in_addr))
+			iscsi_inet_ntop(AF_INET, &e.e_u.u_in4, ip_str);
+		else
+			iscsi_inet_ntop(AF_INET6, &e.e_u.u_in6, ip_str);
 
 		if (snprintf(key, MAX_KEY_SIZE - 1, "%s,%s:%d,%d",
 		    target_name, ip_str, e.e_port, e.e_tpgt) >= MAX_KEY_SIZE) {
@@ -587,11 +601,10 @@ persistent_isns_addr_set(entry_t *e)
 	 * nodes do not have an associated node name. A name is manufactured
 	 * from the IP address given.
 	 */
-	if (e->e_insize == sizeof (struct in_addr)) {
-		(void) inet_ntop(AF_INET, &e->e_u.u_in4, name, sizeof (name));
-	} else {
-		(void) inet_ntop(AF_INET6, &e->e_u.u_in6, name, sizeof (name));
-	}
+	if (e->e_insize == sizeof (struct in_addr))
+		iscsi_inet_ntop(AF_INET, &e->e_u.u_in4, name);
+	else
+		iscsi_inet_ntop(AF_INET6, &e->e_u.u_in6, name);
 
 	mutex_enter(&isns_addr_data_lock);
 	rval = nvf_data_set(ISNS_SERVER_ADDR_ID, name,
@@ -641,11 +654,10 @@ persistent_isns_addr_clear(entry_t *e)
 	 * nodes do not have an associated node name. A name is manufactured
 	 * from the IP address given.
 	 */
-	if (e->e_insize == sizeof (struct in_addr)) {
-		(void) inet_ntop(AF_INET, &e->e_u.u_in4, name, sizeof (name));
-	} else {
-		(void) inet_ntop(AF_INET6, &e->e_u.u_in6, name, sizeof (name));
-	}
+	if (e->e_insize == sizeof (struct in_addr))
+		iscsi_inet_ntop(AF_INET, &e->e_u.u_in4, name);
+	else
+		iscsi_inet_ntop(AF_INET6, &e->e_u.u_in6, name);
 
 	mutex_enter(&static_addr_data_lock);
 	rval = nvf_data_clear(ISNS_SERVER_ADDR_ID, name);
@@ -698,11 +710,10 @@ persistent_disc_addr_set(entry_t *e)
 	 * nodes do not have an associated node name. A name is manufactured
 	 * from the IP address given.
 	 */
-	if (e->e_insize == sizeof (struct in_addr)) {
-		(void) inet_ntop(AF_INET, &e->e_u.u_in4, name, sizeof (name));
-	} else {
-		(void) inet_ntop(AF_INET6, &e->e_u.u_in6, name, sizeof (name));
-	}
+	if (e->e_insize == sizeof (struct in_addr))
+		iscsi_inet_ntop(AF_INET, &e->e_u.u_in4, name);
+	else
+		iscsi_inet_ntop(AF_INET6, &e->e_u.u_in6, name);
 
 	mutex_enter(&disc_addr_data_lock);
 	rval = nvf_data_set(DISCOVERY_ADDR_ID, name,
@@ -752,11 +763,10 @@ persistent_disc_addr_clear(entry_t *e)
 	 * nodes do not have an associated node name. A name is manufactured
 	 * from the IP address given.
 	 */
-	if (e->e_insize == sizeof (struct in_addr)) {
-		(void) inet_ntop(AF_INET, &e->e_u.u_in4, name, sizeof (name));
-	} else {
-		(void) inet_ntop(AF_INET6, &e->e_u.u_in6, name, sizeof (name));
-	}
+	if (e->e_insize == sizeof (struct in_addr))
+		iscsi_inet_ntop(AF_INET, &e->e_u.u_in4, name);
+	else
+		iscsi_inet_ntop(AF_INET6, &e->e_u.u_in6, name);
 
 	mutex_enter(&static_addr_data_lock);
 	rval = nvf_data_clear(DISCOVERY_ADDR_ID, name);

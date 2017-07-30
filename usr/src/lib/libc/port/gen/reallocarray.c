@@ -26,12 +26,12 @@
 #define	MUL_NO_OVERFLOW	((size_t)1 << (sizeof (size_t) * 4))
 
 void *
-reallocarray(void *optr, size_t nmemb, size_t size)
+reallocarray(void *ptr, size_t nelem, size_t elsize)
 {
-	if ((nmemb >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
-	    nmemb > 0 && SIZE_MAX / nmemb < size) {
+	if ((nelem >= MUL_NO_OVERFLOW || elsize >= MUL_NO_OVERFLOW) &&
+	    nelem > 0 && SIZE_MAX / nelem < elsize) {
 		errno = ENOMEM;
 		return (NULL);
 	}
-	return (realloc(optr, size * nmemb));
+	return (realloc(ptr, elsize * nelem));
 }

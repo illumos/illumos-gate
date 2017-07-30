@@ -438,6 +438,9 @@ int addseverity(int value, const char *string);
 int fmtmsg(long class, const char *label, int severity, const char *text,
     const char *action, const char *tag);
 
+/* freezero.c */
+void freezero(void *, size_t);
+
 /* ftime.c */
 int ftime(struct timeb *tp);
 
@@ -830,6 +833,9 @@ struct dirent *readdir(DIR *dirp);
 
 /* reallocarray.c */
 void *reallocarray(void *, size_t, size_t);
+
+/* recallocarray.c */
+void *recallocarray(void *, size_t, size_t, size_t);
 
 /* realpath.c */
 char *realpath(const char *_RESTRICT_KYWD raw, char *_RESTRICT_KYWD canon);
