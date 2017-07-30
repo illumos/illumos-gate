@@ -84,7 +84,7 @@ typedef struct	instable {
 	uint_t		it_invalid32:1;		/* invalid in IA32 */
 	uint_t		it_stackop:1;		/* push/pop stack operation */
 	uint_t		it_vexwoxmm:1;		/* VEX instructions that don't use XMM/YMM */
-	uint_t		it_avxsuf:1;		/* AVX suffix required */
+	uint_t		it_avxsuf:2;		/* AVX2/AVX512 suffix rqd. */
 	uint_t		it_vexopmask:1;		/* VEX inst. that use opmask */
 } instable_t;
 
@@ -283,7 +283,9 @@ enum {
  *   IND - indirect to another to another table
  *   "T" - means to Terminate indirections (this is the final opcode)
  *   "S" - means "operand length suffix required"
- *   "Sa" - means AVX2 suffix (d/q) required
+ *   "Sa" - means AVX2 suffix (q/d) required
+ *   "Sq" - means AVX512 suffix (q/d) required
+ *   "Sd" - means AVX512 suffix (d/s) required
  *   "NS" - means "no suffix" which is the operand length suffix of the opcode
  *   "Z" - means instruction size arg required
  *   "u" - means the opcode is invalid in IA32 but valid in amd64
@@ -293,6 +295,10 @@ enum {
  *   "vr" - means VEX instruction that operates on normal registers, not fpu
  *   "vo" - means VEX instruction that operates on opmask registers, not fpu
  */
+
+#define	AVS2	(uint_t)1	/* it_avxsuf: AVX2 q/d suffix handling */
+#define	AVS5Q	(uint_t)2	/* it_avxsuf: AVX512 q/d suffix handling */
+#define	AVS5D	(uint_t)3	/* it_avxsuf: AVX512 d/s suffix handling */
 
 #if defined(DIS_TEXT) && defined(DIS_MEM)
 #define	IND(table)		{(instable_t *)table, 0, "", 0, 0, 0, 0, 0, 0}
@@ -305,14 +311,15 @@ enum {
 #define	TNSZ(name, amode, sz)	{TERM, amode, name, 0, sz, 0, 0, 0, 0}
 #define	TNSZy(name, amode, sz)	{TERM, amode, name, 0, sz, 0, 1, 0, 0}
 #define	TNSZvr(name, amode, sz)	{TERM, amode, name, 0, sz, 0, 0, 0, 0, 1}
-#define	TSavo(name, amode)	{TERM, amode, name, 1,  0, 0, 0, 0, 0, 0, 1, 1}
 #define	TSvo(name, amode)	{TERM, amode, name, 1,  0, 0, 0, 0, 0, 0, 0, 1}
 #define	TS(name, amode)		{TERM, amode, name, 1, 0, 0, 0, 0, 0}
 #define	TSx(name, amode)	{TERM, amode, name, 1, 0, 1, 0, 0, 0}
 #define	TSy(name, amode)	{TERM, amode, name, 1, 0, 0, 1, 0, 0}
 #define	TSp(name, amode)	{TERM, amode, name, 1, 0, 0, 0, 0, 1}
 #define	TSZ(name, amode, sz)	{TERM, amode, name, 1, sz, 0, 0, 0, 0}
-#define	TSaZ(name, amode, sz)	{TERM, amode, name, 1, sz, 0, 0, 0, 0, 0, 1}
+#define	TSaZ(name, amode, sz)	{TERM, amode, name, 1, sz, 0, 0, 0, 0, 0, AVS2}
+#define	TSq(name, amode)	{TERM, amode, name, 0, 0, 0, 0, 0, 0, 0, AVS5Q}
+#define	TSd(name, amode)	{TERM, amode, name, 0, 0, 0, 0, 0, 0, 0, AVS5D}
 #define	TSZx(name, amode, sz)	{TERM, amode, name, 1, sz, 1, 0, 0, 0}
 #define	TSZy(name, amode, sz)	{TERM, amode, name, 1, sz, 0, 1, 0, 0}
 #define	INVALID			{TERM, UNKNOWN, "", 0, 0, 0, 0, 0}
@@ -333,7 +340,9 @@ enum {
 #define	TSy(name, amode)	{TERM, amode, name, 1, 0, 1, 0, 0}
 #define	TSp(name, amode)	{TERM, amode, name, 1, 0, 0, 0, 1}
 #define	TSZ(name, amode, sz)	{TERM, amode, name, 1, 0, 0, 0, 0}
-#define	TSaZ(name, amode, sz)	{TERM, amode, name, 1, 0, 0, 0, 0, 0, 1}
+#define	TSaZ(name, amode, sz)	{TERM, amode, name, 1, 0, 0, 0, 0, 0, AVS2}
+#define	TSq(name, amode)	{TERM, amode, name, 0, 0, 0, 0, 0, 0, AVS5Q}
+#define	TSd(name, amode)	{TERM, amode, name, 0, 0, 0, 0, 0, 0, AVS5D}
 #define	TSZx(name, amode, sz)	{TERM, amode, name, 1, 1, 0, 0, 0}
 #define	TSZy(name, amode, sz)	{TERM, amode, name, 1, 0, 1, 0, 0}
 #define	INVALID			{TERM, UNKNOWN, "", 0, 0, 0, 0, 0}
@@ -354,7 +363,9 @@ enum {
 #define	TSy(name, amode)	{TERM, amode,  0, 0, 1, 0, 0}
 #define	TSp(name, amode)	{TERM, amode,  0, 0, 0, 0, 1}
 #define	TSZ(name, amode, sz)	{TERM, amode, sz, 0, 0, 0, 0}
-#define	TSaZ(name, amode, sz)	{TERM, amode, sz, 0, 0, 0, 0, 0, 1}
+#define	TSaZ(name, amode, sz)	{TERM, amode, sz, 0, 0, 0, 0, 0, AVS2}
+#define	TSq(name, amode)	{TERM, amode, 0, 0, 0, 0, 0, 0, AVS5Q}
+#define	TSd(name, amode)	{TERM, amode, 0, 0, 0, 0, 0, 0, AVS5D}
 #define	TSZx(name, amode, sz)	{TERM, amode, sz, 1, 0, 0, 0}
 #define	TSZy(name, amode, sz)	{TERM, amode, sz, 0, 1, 0, 0}
 #define	INVALID			{TERM, UNKNOWN, 0, 0, 0, 0, 0}
@@ -375,7 +386,9 @@ enum {
 #define	TSy(name, amode)	{TERM, amode,  0, 1, 0, 0}
 #define	TSp(name, amode)	{TERM, amode,  0, 0, 0, 1}
 #define	TSZ(name, amode, sz)	{TERM, amode,  0, 0, 0, 0}
-#define	TSaZ(name, amode, sz)	{TERM, amode,  0, 0, 0, 0, 0, 1}
+#define	TSaZ(name, amode, sz)	{TERM, amode,  0, 0, 0, 0, 0, AVS2}
+#define	TSq(name, amode)	{TERM, amode,  0, 0, 0, 0, 0, AVS5Q}
+#define	TSd(name, amode)	{TERM, amode,  0, 0, 0, 0, 0, AVS5D}
 #define	TSZx(name, amode, sz)	{TERM, amode,  1, 0, 0, 0}
 #define	TSZy(name, amode, sz)	{TERM, amode,  0, 1, 0, 0}
 #define	INVALID			{TERM, UNKNOWN, 0, 0, 0, 0}
@@ -1442,14 +1455,14 @@ const instable_t dis_opAVX62[256] = {
 /*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [10]  */	TNS("vmovup",EVEX_MX),	TNS("vmovup",EVEX_RX),	INVALID,		INVALID,
+/*  [10]  */	TSd("vmovup",EVEX_MX),	TSd("vmovup",EVEX_RX),	INVALID,		INVALID,
 /*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [28]  */	TNS("vmovap",EVEX_MX),	TNS("vmovap",EVEX_RX),	INVALID,		INVALID,
+/*  [28]  */	TSd("vmovap",EVEX_MX),	TSd("vmovap",EVEX_RX),	INVALID,		INVALID,
 /*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1463,7 +1476,7 @@ const instable_t dis_opAVX62[256] = {
 /*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [54]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	TSd("vandp",EVEX_RMrX), TSd("vandnp",EVEX_RMrX), TSd("vorp",EVEX_RMrX),		TSd("vxorp",EVEX_RMrX),
 /*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
@@ -1504,13 +1517,13 @@ const instable_t dis_opAVX62[256] = {
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		TSq("vpand",EVEX_RMrX),
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		TSq("vpandn",EVEX_RMrX),
 
 /*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		TSq("vpor",EVEX_RMrX),
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		TSq("vpxor",EVEX_RMrX),
 
 /*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -2668,7 +2681,13 @@ dtrace_evex_mnem_adjust(dis86_t *x, instable_t *dp, uint_t vex_W,
 		}
 
 	} else {
-		(void) strlcat(x->d86_mnem, vex_W != 0 ? "d" : "s", OPLEN);
+		if (dp->it_avxsuf == AVS5Q) {
+			(void) strlcat(x->d86_mnem, vex_W != 0 ?  "q" : "d",
+			    OPLEN);
+		} else {
+			(void) strlcat(x->d86_mnem, vex_W != 0 ?  "d" : "s",
+			    OPLEN);
+		}
 	}
 #endif
 }
@@ -2759,10 +2778,10 @@ dtrace_evex_adjust_disp8_n(dis86_t *x, int opindex, uint_t L, uint_t modrm)
  */
 /* ARGSUSED */
 static void
-dtrace_evex_adjust_z_opmask(dis86_t *x, uint_t evex_byte3)
+dtrace_evex_adjust_z_opmask(dis86_t *x, uint_t tgtop, uint_t evex_byte3)
 {
 #ifdef DIS_TEXT
-	char *opnd = x->d86_opnd[1].d86_opnd;
+	char *opnd = x->d86_opnd[tgtop].d86_opnd;
 	int opmask_reg = evex_byte3 & EVEX_OPREG_MASK;
 #endif
 	if (x->d86_error)
@@ -3255,9 +3274,9 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	uint_t vex_X = 1;
 	uint_t vex_B = 1;
 	uint_t vex_W = 0;
-	uint_t vex_L;
-	uint_t evex_L;
-	uint_t evex_modrm;
+	uint_t vex_L = 0;
+	uint_t evex_L = 0;
+	uint_t evex_modrm = 0;
 	dis_gather_regs_t *vreg;
 
 #ifdef	DIS_TEXT
@@ -4042,7 +4061,7 @@ not_avx512:
 		if (strcmp(dp->it_name, "INVALID") == 0)
 			goto error;
 		(void) strlcat(x->d86_mnem, dp->it_name, OPLEN);
-		if (dp->it_avxsuf && dp->it_suffix) {
+		if (dp->it_avxsuf == AVS2 && dp->it_suffix) {
 			(void) strlcat(x->d86_mnem, vex_W != 0 ? "q" : "d",
 			    OPLEN);
 		} else if (dp->it_vexopmask && dp->it_suffix) {
@@ -5769,7 +5788,7 @@ L_VEX_RM:
 		dtrace_evex_adjust_rm(evex_byte1, &r_m);
 		dtrace_evex_adjust_reg_name(evex_L, &wbit);
 		dtrace_get_operand(x, REG_ONLY, reg, wbit, 1);
-		dtrace_evex_adjust_z_opmask(x, evex_byte3);
+		dtrace_evex_adjust_z_opmask(x, 1, evex_byte3);
 		dtrace_get_operand(x, mode, r_m, wbit, 0);
 		dtrace_evex_adjust_disp8_n(x, 0, evex_L, evex_modrm);
 		break;
@@ -5784,8 +5803,28 @@ L_VEX_RM:
 		dtrace_evex_adjust_reg_name(evex_L, &wbit);
 		dtrace_get_operand(x, mode, r_m, wbit, 1);
 		dtrace_evex_adjust_disp8_n(x, 1, evex_L, evex_modrm);
-		dtrace_evex_adjust_z_opmask(x, evex_byte3);
+		dtrace_evex_adjust_z_opmask(x, 1, evex_byte3);
 		dtrace_get_operand(x, REG_ONLY, reg, wbit, 0);
+		break;
+	case EVEX_RMrX:
+		/* ModR/M.reg := op(EVEX.vvvv, ModR/M.r/m) */
+		x->d86_numopnds = 3;
+		dtrace_evex_mnem_adjust(x, dp, vex_W, evex_byte2);
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		evex_modrm = x->d86_bytes[x->d86_len - 1] & 0xff;
+		dtrace_evex_adjust_reg(evex_byte1, &reg);
+		dtrace_evex_adjust_rm(evex_byte1, &r_m);
+		dtrace_evex_adjust_reg_name(evex_L, &wbit);
+		dtrace_get_operand(x, REG_ONLY, reg, wbit, 2);
+		/*
+		 * EVEX.vvvv is the same as VEX.vvvv (ones complement of the
+		 * register specifier). The EVEX prefix handling uses the vex_v
+		 * variable for these bits.
+		 */
+		dtrace_get_operand(x, REG_ONLY, (0xF - vex_v), wbit, 1);
+		dtrace_get_operand(x, mode, r_m, wbit, 0);
+		dtrace_evex_adjust_disp8_n(x, 0, evex_L, evex_modrm);
+		dtrace_evex_adjust_z_opmask(x, 2, evex_byte3);
 		break;
 	/* an invalid op code */
 	case AM:

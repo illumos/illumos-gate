@@ -23,7 +23,7 @@
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -3713,11 +3713,13 @@ extern boolean_t ip_recv_attr_from_mblk(mblk_t *, ip_recv_attr_t *);
 extern mblk_t	*ip_recv_attr_free_mblk(mblk_t *);
 extern boolean_t ip_recv_attr_is_mblk(mblk_t *);
 
-#ifdef __PRAGMA_REDEFINE_EXTNAME
-#pragma redefine_extname inet_pton _inet_pton
-#else /* __PRAGMA_REDEFINE_EXTNAME */
+#ifdef	__PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname inet_ntop _inet_ntop
+#pragma	redefine_extname inet_pton _inet_pton
+#else
+#define	inet_ntop _inet_ntop
 #define	inet_pton _inet_pton
-#endif /* __PRAGMA_REDEFINE_EXTNAME */
+#endif	/* __PRAGMA_REDEFINE_EXTNAME */
 
 extern char	*inet_ntop(int, const void *, char *, int);
 extern int	inet_pton(int, char *, void *);

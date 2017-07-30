@@ -95,7 +95,7 @@ If the old file gave no errors for one of the invocations, the new file
 must also give no errors.  This way, files can only become more clean.
 .SH CONTINUATION CHECKING
 .LP
-The continuation checker is a resonably simple state machine that knows
+The continuation checker is a reasonably simple state machine that knows
 something about how C is layed out, and can match parenthesis, etc. over
 multiple lines.  It does have some limitations:
 .TP 4

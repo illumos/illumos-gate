@@ -94,7 +94,6 @@ descendents
 
 .SH DESCRIPTION
 .SS "sh"
-.sp
 .LP
 The \fBset\fR built-in command has the following options:
 .sp
@@ -220,7 +219,6 @@ no arguments are specified, variable names that have been marked for export
 during the current shell's execution are listed. Function names are \fBnot\fR
 exported.
 .SS "csh"
-.sp
 .LP
 With no arguments, \fBset\fR displays the values of all shell variables.
 Multiword values are displayed as a parenthesized list. With the \fIvar\fR
@@ -280,7 +278,6 @@ environment variables.
 \fBunsetenv\fR removes \fIvariable\fR from the environment. As with
 \fBunset\fR, pattern matching is not performed.
 .SS "ksh"
-.sp
 .LP
 The flags for the \fBset\fR built-in have meaning as follows:
 .sp
@@ -390,7 +387,7 @@ Ignored for interactive shells.
 \fB\fB+o\fR\fR
 .ad
 .RS 13n
-Writes the current option stettings to standard output in a format that is
+Writes the current option settings to standard output in a format that is
 suitable for reinput to the shell as commands that achieve the same option
 settings.
 .RE
@@ -769,7 +766,6 @@ This means that tilde substitution is performed after the \fB=\fR sign and word
 splitting and file name generation are not performed.
 .RE
 .SS "ksh93"
-.sp
 .LP
 \fBset\fR sets or unsets options and positional parameters. Options that are
 specified with a \fB-\fR cause the options to be set. Options that are
@@ -1439,7 +1435,6 @@ field splitting and file name generation are not performed.
 .RE
 .SH EXAMPLES
 .SS "csh"
-.sp
 .LP
 The following example sets the \fBPATH\fR variable to search for files in the
 \fB/bin\fR, \fB/usr/bin\fR, \fB/usr/sbin\fR, and \fB/usr/ucb/bin\fR
@@ -1453,7 +1448,6 @@ setenv PATH "/bin:/usr/bin:/usr/sbin:usr/ucb/bin"
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBread\fR(1), \fBsh\fR(1),
 \fBtypeset\fR(1), \fBattributes\fR(5), \fBenviron\fR(5)

@@ -814,6 +814,7 @@ MANLINKS=	FD_CLR.3c				\
 		fputs.3c				\
 		free.3c					\
 		freelocale.3c				\
+		freezero.3c				\
 		fscanf.3c				\
 		fseeko.3c				\
 		fsetattr.3c				\
@@ -1138,6 +1139,7 @@ MANLINKS=	FD_CLR.3c				\
 		readdir_r.3c				\
 		realloc.3c				\
 		reallocarray.3c				\
+		recallocarray.3c			\
 		regerror.3c				\
 		regex.3c				\
 		regexec.3c				\
@@ -1937,9 +1939,11 @@ minor.3c				:= LINKSRC = makedev.3c
 alloca.3c				:= LINKSRC = malloc.3c
 calloc.3c				:= LINKSRC = malloc.3c
 free.3c					:= LINKSRC = malloc.3c
+freezero.3c				:= LINKSRC = malloc.3c
 memalign.3c				:= LINKSRC = malloc.3c
 realloc.3c				:= LINKSRC = malloc.3c
 reallocarray.3c				:= LINKSRC = malloc.3c
+recallocarray.3c			:= LINKSRC = malloc.3c
 valloc.3c				:= LINKSRC = malloc.3c
 
 mblen_l.3c				:= LINKSRC = mblen.3c

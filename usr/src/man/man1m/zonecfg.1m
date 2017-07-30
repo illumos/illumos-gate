@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright (c) 2004, 2009 Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2013 Joyent, Inc. All Rights Reserved.
+.\" Copyright 2017 Peter Tribble
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONECFG 1M "May 13, 2017"
+.TH ZONECFG 1M "Jul 24, 2017"
 .SH NAME
 zonecfg \- set up zone configuration
 .SH SYNOPSIS
@@ -171,6 +172,16 @@ Resource control.
 .sp .6
 .RS 4n
 Process security flag settings.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadmin\fR\fR
+.ad
+.sp .6
+.RS 4n
+Delegation of administration to specific users.
 .RE
 
 .SS "Properties"
@@ -358,7 +369,7 @@ The following properties are supported:
 .ad
 .sp .6
 .RS 4n
-\fBaddress\fR, \fBphysical\fR, \fBdefrouter\fR
+\fBaddress\fR, \fBallowed-address\fR, \fBphysical\fR, \fBdefrouter\fR
 .RE
 
 .sp
@@ -434,11 +445,21 @@ The following properties are supported:
 .sp
 .ne 2
 .na
-\fB\fBsecurity-flags\fB\fB
+\fB\fBsecurity-flags\fR\fR
 .ad
 .sp .6
 .RS 4n
 \fBlower\fR, \fBdefault\fR, \fBupper\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadmin\fR\fR
+.ad
+.sp .6
+.RS 4n
+\fBuser\fR, \fBauths\fR.
 .RE
 
 .sp
@@ -631,7 +652,7 @@ Values needed to determine how, where, and so forth to mount file systems. See
 .sp
 .ne 2
 .na
-\fB\fBnet\fR: address, physical, defrouter\fR
+\fB\fBnet\fR: address, allowed-address, physical, defrouter\fR
 .ad
 .sp .6
 .RS 4n
@@ -672,6 +693,12 @@ interface should be specified here.
 .sp
 For an exclusive-IP zone, the physical property must be set and the address and
 default router properties cannot be set.
+.sp
+An exclusive-IP zone is responsible for managing its own network configuration.
+If the allowed-address property is set, the zone administrator will only be
+permitted to configure the interface with the specified address. To allow
+multiple addresses (for example, an IPv4 and IPv6 address), use add net
+multiple times.
 .RE
 
 .sp
@@ -705,7 +732,7 @@ is to use the global property name associated with a specific rctl.
 .RS 4n
 The name, type and value of a generic attribute. The \fBtype\fR must be one of
 \fBint\fR, \fBuint\fR, \fBboolean\fR or \fBstring\fR, and the value must be of
-that type. \fBuint\fR means unsigned , that is, a non-negative integer.
+that type. \fBuint\fR means unsigned, that is, a non-negative integer.
 .RE
 
 .sp
@@ -894,6 +921,23 @@ zone processes inherit.
 .sp
 .ne 2
 .na
+\fB\fBadmin\fR: user, auths\fR
+.ad
+.sp .6
+.RS 4n
+Delegate zone administration to the named user. Valid values for \fBauths\fR
+are \fBlogin\fR, \fBmanage\fR, and \fBclonefrom\fR. The \fBlogin\fR
+authorization enables the user to use \fBzlogin\fR(1) to log in to the zone,
+being prompted for authentication (but not to access the zone console). The
+\fBmanage\fR authorization enables the user to install, update, boot or halt
+the zone, to log in using \fBzlogin\fR(1) without authentication, and to access
+the zone console. The \fBclonefrom\fR authorization allows the user to install
+a new zone using this zone as a clone source.
+.RE
+
+.sp
+.ne 2
+.na
 \fBglobal: \fBfs-allowed\fR\fR
 .ad
 .sp .6
@@ -960,6 +1004,8 @@ capped-cpu        ncpus           simple
 security-flags	  lower           simple
                    default        simple
                    upper          simple
+admin             user            simple
+                   auths          simple
 .fi
 .in -2
 .sp

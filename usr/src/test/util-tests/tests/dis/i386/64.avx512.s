@@ -14,7 +14,7 @@
  */
 
 /*
- * Basic test for AVX512 mov instructions
+ * Basic tests for AVX512 instructions
  */
 
 .text
@@ -154,4 +154,165 @@ libdis_test:
 	vmovdqu16	(%rsp), %zmm20
 	vmovdqu32	(%rsp), %zmm20
 	vmovdqu64	(%rsp), %zmm20
+
+	vandnpd	%xmm0, %xmm1, %xmm2{z}
+	vandnpd	(%rax), %xmm3, %xmm4{z}
+	vandnpd	0x42(%rcx), %xmm5, %xmm6{z}
+	vandnpd	%ymm0, %ymm1, %ymm2{z}
+	vandnpd	(%rbx), %ymm3, %ymm4{z}
+	vandnpd	0x42(%rdx), %ymm5, %ymm6{z}
+	vandnpd	%zmm0, %zmm1, %zmm2
+	vandnpd	(%rbx), %zmm3, %zmm4
+	vandnpd	0x42(%rdx), %zmm5, %zmm6
+
+	vandnps	%xmm0, %xmm1, %xmm2{z}
+	vandnps	(%rax), %xmm3, %xmm4{z}
+	vandnps	0x42(%rcx), %xmm5, %xmm6{z}
+	vandnps	%ymm0, %ymm1, %ymm2{z}
+	vandnps	(%rbx), %ymm3, %ymm4{z}
+	vandnps	0x42(%rdx), %ymm5, %ymm6{z}
+	vandnps	%zmm0, %zmm1, %zmm2
+	vandnps	(%rbx), %zmm3, %zmm4
+	vandnps	0x42(%rdx), %zmm5, %zmm6
+
+	vandpd	%xmm0, %xmm1, %xmm2{z}
+	vandpd	(%rax), %xmm3, %xmm4{z}
+	vandpd	0x42(%rcx), %xmm5, %xmm6{z}
+	vandpd	%ymm0, %ymm1, %ymm2{z}
+	vandpd	(%rbx), %ymm3, %ymm4{z}
+	vandpd	0x42(%rdx), %ymm5, %ymm6{z}
+	vandpd	%zmm0, %zmm1, %zmm2
+	vandpd	(%rbx), %zmm3, %zmm4
+	vandpd	0x42(%rdx), %zmm5, %zmm6
+
+	vandps	%xmm0, %xmm1, %xmm2{z}
+	vandps	(%rax), %xmm3, %xmm4{z}
+	vandps	0x42(%rcx), %xmm5, %xmm6{z}
+	vandps	%ymm0, %ymm1, %ymm2{z}
+	vandps	(%rbx), %ymm3, %ymm4{z}
+	vandps	0x42(%rdx), %ymm5, %ymm6{z}
+	vandps	%zmm0, %zmm1, %zmm2
+	vandps	(%rbx), %zmm3, %zmm4
+	vandps	0x42(%rdx), %zmm5, %zmm6
+
+	vpandd	%xmm0, %xmm1, %xmm2
+	vpandd	(%rax), %xmm3, %xmm4
+	vpandd	0x42(%rcx), %xmm5, %xmm6
+	vpandd	%ymm0, %ymm1, %ymm2
+	vpandd	(%rbx), %ymm3, %ymm4
+	vpandd	0x42(%rdx), %ymm5, %ymm6
+	vpandd	%zmm0, %zmm1, %zmm2
+	vpandd	(%rbx), %zmm3, %zmm4
+	vpandd	0x42(%rdx), %zmm5, %zmm6
+
+	vpandq	%xmm0, %xmm1, %xmm2
+	vpandq	(%rax), %xmm3, %xmm4
+	vpandq	0x42(%rcx), %xmm5, %xmm6
+	vpandq	%ymm0, %ymm1, %ymm2
+	vpandq	(%rbx), %ymm3, %ymm4
+	vpandq	0x42(%rdx), %ymm5, %ymm6
+	vpandq	%zmm0, %zmm1, %zmm2
+	vpandq	(%rbx), %zmm3, %zmm4
+	vpandq	0x42(%rdx), %zmm5, %zmm6
+
+	vpandnd	%xmm0, %xmm1, %xmm2
+	vpandnd	(%rax), %xmm3, %xmm4
+	vpandnd	0x42(%rcx), %xmm5, %xmm6
+	vpandnd	%ymm0, %ymm1, %ymm2
+	vpandnd	(%rbx), %ymm3, %ymm4
+	vpandnd	0x42(%rdx), %ymm5, %ymm6
+	vpandnd	%zmm0, %zmm1, %zmm2
+	vpandnd	(%rbx), %zmm3, %zmm4
+	vpandnd	0x42(%rdx), %zmm5, %zmm6
+
+	vpandnq	%xmm0, %xmm1, %xmm2
+	vpandnq	(%rax), %xmm3, %xmm4
+	vpandnq	0x42(%rcx), %xmm5, %xmm6
+	vpandnq	%ymm0, %ymm1, %ymm2
+	vpandnq	(%rbx), %ymm3, %ymm4
+	vpandnq	0x42(%rdx), %ymm5, %ymm6
+	vpandnq	%zmm0, %zmm1, %zmm2
+	vpandnq	(%rbx), %zmm3, %zmm4
+	vpandnq	0x42(%rdx), %zmm5, %zmm6
+
+	vorpd	%xmm0, %xmm1, %xmm2{z}
+	vorpd	(%rax), %xmm3, %xmm4{z}
+	vorpd	0x42(%rcx), %xmm5, %xmm6{z}
+	vorpd	%ymm0, %ymm1, %ymm2{z}
+	vorpd	(%rbx), %ymm3, %ymm4{z}
+	vorpd	0x42(%rdx), %ymm5, %ymm6{z}
+	vorpd	%zmm0, %zmm1, %zmm2
+	vorpd	(%rax), %zmm3, %zmm4
+	vorpd	0x42(%rcx), %zmm5, %zmm6
+
+	vorps	%xmm0, %xmm1, %xmm2{z}
+	vorps	(%rax), %xmm3, %xmm4{z}
+	vorps	0x42(%rcx), %xmm5, %xmm6{z}
+	vorps	%ymm0, %ymm1, %ymm2{z}
+	vorps	(%rbx), %ymm3, %ymm4{z}
+	vorps	0x42(%rdx), %ymm5, %ymm6{z}
+	vorps	%zmm0, %zmm1, %zmm2
+	vorps	(%rax), %zmm3, %zmm4
+	vorps	0x42(%rcx), %zmm5, %zmm6
+
+	vpord	%xmm0, %xmm1, %xmm2
+	vpord	(%rax), %xmm3, %xmm4
+	vpord	0x42(%rcx), %xmm5, %xmm6
+	vpord	%ymm0, %ymm1, %ymm2
+	vpord	(%rbx), %ymm3, %ymm4
+	vpord	0x42(%rdx), %ymm5, %ymm6
+	vpord	%zmm0, %zmm1, %zmm2
+	vpord	(%rax), %zmm3, %zmm4
+	vpord	0x42(%rcx), %zmm5, %zmm6
+
+	vporq	%xmm0, %xmm1, %xmm2
+	vporq	(%rax), %xmm3, %xmm4
+	vporq	0x42(%rcx), %xmm5, %xmm6
+	vporq	%ymm0, %ymm1, %ymm2
+	vporq	(%rbx), %ymm3, %ymm4
+	vporq	0x42(%rdx), %ymm5, %ymm6
+	vporq	%zmm0, %zmm1, %zmm2
+	vporq	(%rax), %zmm3, %zmm4
+	vporq	0x42(%rcx), %zmm5, %zmm6
+
+	vpxord	%xmm0, %xmm1, %xmm2
+	vpxord	(%rax), %xmm3, %xmm4
+	vpxord	0x42(%rcx), %xmm5, %xmm6
+	vpxord	%ymm0, %ymm1, %ymm2
+	vpxord	(%rbx), %ymm3, %ymm4
+	vpxord	0x42(%rdx), %ymm5, %ymm6
+	vpxord	%zmm0, %zmm1, %zmm2
+	vpxord	(%rax), %zmm3, %zmm4
+	vpxord	0x42(%rcx), %zmm5, %zmm6
+
+	vpxorq	%xmm0, %xmm1, %xmm2
+	vpxorq	(%rax), %xmm3, %xmm4
+	vpxorq	0x42(%rcx), %xmm5, %xmm6
+	vpxorq	%ymm0, %ymm1, %ymm2
+	vpxorq	(%rbx), %ymm3, %ymm4
+	vpxorq	0x42(%rdx), %ymm5, %ymm6
+	vpxorq	%zmm0, %zmm1, %zmm2
+	vpxorq	(%rax), %zmm3, %zmm4
+	vpxorq	0x42(%rcx), %zmm5, %zmm6
+
+	vxorpd	%xmm0, %xmm1, %xmm2{z}
+	vxorpd	(%rax), %xmm3, %xmm4{z}
+	vxorpd	0x42(%rcx), %xmm5, %xmm6{z}
+	vxorpd	%ymm0, %ymm1, %ymm2{z}
+	vxorpd	(%rbx), %ymm3, %ymm4{z}
+	vxorpd	0x42(%rdx), %ymm5, %ymm6{z}
+	vxorpd	%zmm0, %zmm1, %zmm2
+	vxorpd	(%rbx), %zmm3, %zmm4
+	vxorpd	0x42(%rdx), %zmm5, %zmm6
+
+	vxorps	%xmm0, %xmm1, %xmm2{z}
+	vxorps	(%rax), %xmm3, %xmm4{z}
+	vxorps	0x42(%rcx), %xmm5, %xmm6{z}
+	vxorps	%ymm0, %ymm1, %ymm2{z}
+	vxorps	(%rbx), %ymm3, %ymm4{z}
+	vxorps	0x42(%rdx), %ymm5, %ymm6{z}
+	vxorps	%zmm0, %zmm1, %zmm2
+	vxorps	(%rbx), %zmm3, %zmm4
+	vxorps	0x42(%rdx), %zmm5, %zmm6
+
 .size libdis_test, [.-libdis_test]
