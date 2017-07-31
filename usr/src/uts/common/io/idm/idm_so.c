@@ -3093,39 +3093,30 @@ idm_sa_ntop(const struct sockaddr_storage *sa,
 	char tmp[INET6_ADDRSTRLEN];
 
 	switch (sa->ss_family) {
-	case AF_INET6:
-		{
-			const struct sockaddr_in6 *in6 =
-			    (const struct sockaddr_in6 *) sa;
+	case AF_INET6: {
+		const struct sockaddr_in6 *in6 =
+		    (const struct sockaddr_in6 *) sa;
 
-			if (inet_ntop(in6->sin6_family,
-			    &in6->sin6_addr, tmp, sizeof (tmp)) == NULL) {
-				goto err;
-			}
-			if (strlen(tmp) + sizeof ("[].65535") > size) {
-				goto err;
-			}
-			/* struct sockaddr_storage gets port info from v4 loc */
-			(void) snprintf(buf, size, "[%s].%u", tmp,
-			    ntohs(in6->sin6_port));
-			return (buf);
-		}
-	case AF_INET:
-		{
-			const struct sockaddr_in *in =
-			    (const struct sockaddr_in *) sa;
+		(void) inet_ntop(in6->sin6_family, &in6->sin6_addr, tmp,
+		    sizeof (tmp));
+		if (strlen(tmp) + sizeof ("[].65535") > size)
+			goto err;
+		/* struct sockaddr_storage gets port info from v4 loc */
+		(void) snprintf(buf, size, "[%s].%u", tmp,
+		    ntohs(in6->sin6_port));
+		return (buf);
+	}
+	case AF_INET: {
+		const struct sockaddr_in *in = (const struct sockaddr_in *) sa;
 
-			if (inet_ntop(in->sin_family, &in->sin_addr,
-			    tmp, sizeof (tmp)) == NULL) {
+		(void) inet_ntop(in->sin_family, &in->sin_addr, tmp,
+		    sizeof (tmp));
+		if (strlen(tmp) + sizeof ("[].65535") > size)
 				goto err;
-			}
-			if (strlen(tmp) + sizeof ("[].65535") > size) {
-				goto err;
-			}
-			(void) snprintf(buf, size,  "[%s].%u", tmp,
-			    ntohs(in->sin_port));
-			return (buf);
-		}
+		(void) snprintf(buf, size,  "[%s].%u", tmp,
+		    ntohs(in->sin_port));
+		return (buf);
+	}
 	default:
 		break;
 	}

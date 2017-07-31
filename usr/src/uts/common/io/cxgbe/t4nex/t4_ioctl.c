@@ -1230,7 +1230,7 @@ get_sge_context(struct adapter *sc, void *data, int flags)
 	if (rc != 0)
 		goto _exit;
 
-	sgec.version = 4 | (sc->params.rev << 10);
+	sgec.version = 4 | (sc->params.chip << 10);
 
 	/* copyout data and then t4_sge_context */
 	rc = ddi_copyout(buff, sgec.data, sgec.len, flags);
@@ -1419,8 +1419,9 @@ get_devlog(struct adapter *sc, void *data, int flags)
 		goto done;
 	}
 
-	rc = -t4_mem_read(sc, dparams->memtype, dparams->start, dparams->size,
-	    (void *)buf);
+	rc = -t4_memory_rw(sc, sc->params.drv_memwin, dparams->memtype,
+			   dparams->start, dparams->size, (void *)buf,
+			   T4_MEMORY_READ);
 	if (rc != 0)
 		goto done1;
 
@@ -1511,7 +1512,8 @@ read_edc(struct adapter *sc, void *data, int flags)
 	while (count) {
 		u32 len;
 
-		rc = t4_mem_win_read(sc, (pos + memoffset), edc);
+		rc = t4_memory_rw(sc, sc->params.drv_memwin, memoffset, pos,
+				  count, edc, T4_MEMORY_READ);
 		if (rc != 0) {
 			kmem_free(edc, t4edc.len);
 			goto _exit;

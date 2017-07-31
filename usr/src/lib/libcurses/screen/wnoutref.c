@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include	<string.h>
@@ -53,8 +51,8 @@ wnoutrefresh(WINDOW *win)
 	short	*bch, *ech, *sbch, *sech;
 	chtype	**wcp, **scp, *wc, *sc;
 	int	*hash;
-	short	y, x, xorg, yorg, scrli, scrco,
-		boty, sminy, smaxy, minx, maxx, lo, hi;
+	short	y, x, xorg, yorg, scrli, scrco, boty, sminy, smaxy, minx,
+	    maxx, lo, hi;
 	bool	doall;
 
 	if (win->_parent)
@@ -138,13 +136,13 @@ wnoutrefresh(WINDOW *win)
 				for (x = lo - 1; x >= minx; --x)
 					if (!ISCBIT(wc[x]))
 						break;
-					if (x < minx) {
-						for (x = lo+1; x <= maxx; ++x)
-							if (!ISCBIT(wc[x]))
-								break;
-						if (x > maxx)
-							goto nextline;
-					}
+				if (x < minx) {
+					for (x = lo + 1; x <= maxx; ++x)
+						if (!ISCBIT(wc[x]))
+							break;
+					if (x > maxx)
+						goto nextline;
+				}
 				lo = x;
 			}
 			if (ISMBIT(wc[hi])) {
@@ -188,7 +186,7 @@ wnoutrefresh(WINDOW *win)
 		/* update the image */
 		wc = *wcp + lo;
 		sc = *scp + lo + xorg;
-		(void) memcpy((char *) sc, (char *) wc, (size_t)
+		(void) memcpy((char *)sc, (char *)wc, (size_t)
 		    (((hi - lo) + 1) * sizeof (chtype)));
 
 		/* the hash value of the line */

@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include	<sys/types.h>
@@ -100,12 +98,13 @@ move_to_begin_line:
 					chtype	space = ' ' | rawattrs;
 
 					if ((newx = x + (TABSIZE -
-					    (x % TABSIZE))) > win->_maxx)
+					    (x % TABSIZE))) > win->_maxx) {
 						newx = win->_maxx;
-						for (; x < newx; x++)
-							if (waddch(win,
-							    space) == ERR)
-								goto next;
+					}
+					for (; x < newx; x++) {
+						if (waddch(win, space) == ERR)
+							goto next;
+					}
 				} else {
 					if ((waddch(win, (chtype)
 					    '^'|rawattrs) == ERR) ||
@@ -173,18 +172,22 @@ new_line:
 					}
 #endif	/* DEBUG */
 					break;
-				} else
+				} else {
 					savimmed = 1;
-			} else
+				}
+			} else {
 				y++;
-				x = 0;
-		} else
+			}
+			x = 0;
+		} else {
 			savimmed += 2;
+		}
 #ifdef	FULLDEBUG
-		if (outf)
+		if (outf) {
 			fprintf(outf, "ADDCH: 2: y = %d, x = %d, "
 			    "firstch = %d, lastch = %d\n", y, x,
 			    win->_firstch[y], win->_lastch[y]);
+		}
 #endif	/* FULLDEBUG */
 		break;
 	}

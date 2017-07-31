@@ -147,6 +147,13 @@ cxgbe_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mac->m_priv_props = pi->props;
 	mac->m_margin = 22; /* TODO: mac_register(9s) and onnv code disagree */
 
+	if (!mac->m_callbacks->mc_unicst) {
+		cmn_err(CE_NOTE, "%s%d: Multiple Rings Enabled",
+			ddi_driver_name(pi->dip), ddi_get_instance(pi->dip));
+		mac->m_v12n = MAC_VIRT_LEVEL1;
+	} else
+		cmn_err(CE_NOTE, "%s%d: Multiple Rings Disbled",
+			ddi_driver_name(pi->dip), ddi_get_instance(pi->dip));
 	rc = mac_register(mac, &mh);
 	mac_free(mac);
 	if (rc != 0) {

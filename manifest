@@ -12966,6 +12966,7 @@ f usr/share/man/man3c/fputws.3c 0444 root bin
 f usr/share/man/man3c/fread.3c 0444 root bin
 s usr/share/man/man3c/free.3c=malloc.3c
 s usr/share/man/man3c/freelocale.3c=newlocale.3c
+s usr/share/man/man3c/freezero.3c=malloc.3c
 f usr/share/man/man3c/freopen.3c 0444 root bin
 s usr/share/man/man3c/fscanf.3c=scanf.3c
 f usr/share/man/man3c/fseek.3c 0444 root bin
@@ -13506,6 +13507,7 @@ f usr/share/man/man3c/raise.3c 0444 root bin
 f usr/share/man/man3c/rand.3c 0444 root bin
 s usr/share/man/man3c/rand_r.3c=rand.3c
 f usr/share/man/man3c/random.3c 0444 root bin
+s usr/share/man/man3c/recallocarray.3c=malloc.3c
 f usr/share/man/man3c/rctl_walk.3c 0444 root bin
 s usr/share/man/man3c/rctlblk_get_enforced_value.3c=rctlblk_set_value.3c
 s usr/share/man/man3c/rctlblk_get_firing_time.3c=rctlblk_set_value.3c

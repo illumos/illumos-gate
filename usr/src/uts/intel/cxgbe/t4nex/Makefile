@@ -66,6 +66,32 @@ LINTFLAGS += -I$(UTSBASE)/common/io/cxgbe -I$(UTSBASE)/common/io/cxgbe/common \
 LINTFLAGS += -Xc99=%all
 
 #
+# A lot of these come from the fact that there are static inlines and
+# that this driver leverages various C99 and some GNU C extensions.
+#
+LINTTAGS += -erroff=E_STATIC_UNUSED
+LINTTAGS += -erroff=E_FUNC_ARG_UNUSED
+LINTTAGS += -erroff=E_ZERO_OR_NEGATIVE_SUBSCRIPT
+LINTTAGS += -erroff=E_ZERO_SIZED_STRUCT_UNION
+LINTTAGS += -erroff=E_ANONYMOUS_UNION_DECL
+LINTTAGS += -erroff=E_CONSTANT_CONDITION
+
+#
+# These have been manually verified at the moment. When updating this
+# driver, please manually check the following lint warnings. Note some
+# of these are due to limitations in Sun Studio.
+#
+LINTTAGS += -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS += -erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
+LINTTAGS += -erroff=E_FUNC_NO_RET_VAL
+LINTTAGS += -erroff=E_NOP_IF_STMT
+LINTTAGS += -erroff=E_FUNC_SET_NOT_USED
+LINTTAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+LINTTAGS += -erroff=E_FUNC_RET_MAYBE_IGNORED2
+LINTTAGS += -erroff=E_CASE_FALLTHRU
+LINTTAGS += -erroff=E_ASSIGN_NARROW_CONV
+
+#
 # Default build targets.
 #
 .KEEP_STATE:

@@ -417,9 +417,11 @@ ficlPrimitiveSprintf(ficlVm *vm)
 			case 'x':
 			case 'X':
 				base = 16;
+				/* FALLTHROUGH */
 			case 'u':
 			case 'U':
 				unsignedInteger = 1; /* true */
+				/* FALLTHROUGH */
 			case 'd':
 			case 'D': {
 				int integer;
@@ -437,6 +439,7 @@ ficlPrimitiveSprintf(ficlVm *vm)
 			case '%':
 				source = format;
 				actualLength = 1;
+				/* FALLTHROUGH */
 			default:
 				continue;
 			}

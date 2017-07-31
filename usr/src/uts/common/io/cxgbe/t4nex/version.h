@@ -23,7 +23,7 @@
 #ifndef __CXGBE_VERSION_H
 #define	__CXGBE_VERSION_H
 
-#define	DRV_VERSION "2.0.0.1"
+#define	DRV_VERSION "2.2.1.0"
 
 #define	T4_NEXUS_NAME   "t4nex"
 #define	T4_PORT_NAME    "cxgbe"

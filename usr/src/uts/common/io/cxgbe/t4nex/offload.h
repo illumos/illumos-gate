@@ -137,7 +137,7 @@ struct tom_tunables {
 	int ddp_thres;
 };
 
-#ifndef TCP_OFFLOAD_DISABLE
+#ifdef TCP_OFFLOAD_ENABLE
 struct offload_req {
 	__be32 sip[4];
 	__be32 dip[4];
