@@ -192,6 +192,7 @@ mq_timedsend01
 mq_unlink01
 msgctl12
 msgrcv07
+msync04
 open02
 open10
 perf_event_open01
