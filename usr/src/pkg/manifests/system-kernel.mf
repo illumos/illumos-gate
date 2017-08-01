@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2017 by Delphix. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
@@ -65,6 +66,8 @@ dir path=etc/crypto group=sys
 dir path=etc/sock2path.d group=sys
 dir path=kernel group=sys
 $(i386_ONLY)dir path=kernel/$(ARCH64) group=sys
+dir path=kernel/cc group=sys
+dir path=kernel/cc/$(ARCH64) group=sys
 dir path=kernel/crypto group=sys
 dir path=kernel/crypto/$(ARCH64) group=sys
 dir path=kernel/dacf group=sys
@@ -311,6 +314,9 @@ file path=etc/name_to_sysnum group=sys \
 file path=etc/sock2path.d/system%2Fkernel group=sys
 file path=etc/system group=sys original_name=SUNWckr:etc/system preserve=true
 $(i386_ONLY)file path=kernel/$(ARCH64)/genunix group=sys mode=0755
+file path=kernel/cc/$(ARCH64)/cc_cubic group=sys mode=0755
+file path=kernel/cc/$(ARCH64)/cc_newreno group=sys mode=0755
+file path=kernel/cc/$(ARCH64)/cc_sunreno group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/aes group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/arcfour group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/blowfish group=sys mode=0755

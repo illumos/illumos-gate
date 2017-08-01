@@ -23,6 +23,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright (c) 2017 by Delphix. All rights reserved.
 #
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
@@ -176,6 +177,9 @@ $(ROOT_DACF_DIR)/%:	$(OBJS_DIR)/% $(ROOT_DACF_DIR) FRC
 	$(INS.file)
 
 $(ROOT_BRAND_DIR)/%:	$(OBJS_DIR)/% $(ROOT_BRAND_DIR) FRC
+	$(INS.file)
+
+$(ROOT_CC_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) $(ROOT_CC_DIR) FRC
 	$(INS.file)
 
 $(ROOT_CRYPTO_DIR)/%:	$(OBJS_DIR)/% $(ROOT_CRYPTO_DIR) FRC

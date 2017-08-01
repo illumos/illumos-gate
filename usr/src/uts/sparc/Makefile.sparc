@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright (c) 2015, 2017 by Delphix. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Gary Mills
 # Copyright 2016 Nexenta Systems, Inc.
@@ -202,6 +203,13 @@ $(IF_DEBUG_OBJ)clock.o		:=	DEBUG_DEFS	+= -DKSLICE=1
 #	files.
 #
 ALL_DEFS	 = $(MACHINE_DEFS) $(DEBUG_DEFS) $(OPTION_DEFS)
+
+#
+#	TCP congestion control modules (/kernel/cc)
+#
+MISC_KMODS	+= cc
+CC_KMODS	+= cc_newreno cc_cubic cc_sunreno
+
 #
 #
 #	The kernels modules which are "implementation architecture"

@@ -22,12 +22,13 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
 #include <inet/ip.h>
 #include <inet/tcp_impl.h>
+#include <inet/cc.h>
 #include <sys/multidata.h>
 #include <sys/sunddi.h>
 
@@ -37,6 +38,12 @@
 
 /* Max of the above */
 #define	TCP_MSS_MAX		TCP_MSS_MAX_IPV4
+
+typedef struct {
+	char *ccn_buf;
+	uint_t ccn_bufsize;
+	uint_t ccn_bytes;
+} tcp_copy_ccname_t;
 
 /*
  * Set the RFC 1948 pass phrase
@@ -236,6 +243,65 @@ tcp_largest_anon_set(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
 	if ((uint32_t)new_value < tcps->tcps_smallest_anon_port)
 		return (ERANGE);
 	pinfo->prop_cur_uval = (uint32_t)new_value;
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+tcp_set_cc_algorithm(netstack_t *stack, cred_t *cr, mod_prop_info_t *pinfo,
+    const char *ifname, const void *pval, uint_t flags)
+{
+	tcp_stack_t *tcps = stack->netstack_tcp;
+	char *name = (flags & MOD_PROP_DEFAULT) ?
+	    CC_DEFAULT_ALGO_NAME : (char *)pval;
+	struct cc_algo *algo = cc_load_algo(name);
+
+	if (algo == NULL) {
+		return (EINVAL);
+	}
+
+	tcps->tcps_default_cc_algo = algo;
+
+	return (0);
+}
+
+static int
+tcp_copy_ccname(void *data, struct cc_algo *algo)
+{
+	tcp_copy_ccname_t *cd = data;
+	char *sep = cd->ccn_bytes > 0 ? "," : "";
+	size_t avail = 0;
+
+	if (cd->ccn_bytes < cd->ccn_bufsize) {
+		avail = cd->ccn_bufsize - cd->ccn_bytes;
+	}
+
+	cd->ccn_bytes += snprintf(cd->ccn_buf + cd->ccn_bytes, avail,
+	    "%s%s", sep, algo->name);
+
+	return (cd->ccn_bytes >= cd->ccn_bufsize ? ENOBUFS : 0);
+}
+
+/* ARGSUSED */
+static int
+tcp_get_cc_algorithm(netstack_t *stack, mod_prop_info_t *pinfo,
+    const char *ifname, void *pval, uint_t psize, uint_t flags)
+{
+	size_t nbytes;
+
+	if (flags & MOD_PROP_POSSIBLE) {
+		tcp_copy_ccname_t cd = { pval, psize, 0 };
+		return (cc_walk_algos(tcp_copy_ccname, &cd));
+	} else if (flags & MOD_PROP_PERM) {
+		nbytes = snprintf(pval, psize, "%u", MOD_PROP_PERM_RW);
+	} else if (flags & MOD_PROP_DEFAULT) {
+		nbytes = snprintf(pval, psize, "%s", CC_DEFAULT_ALGO_NAME);
+	} else {
+		nbytes = snprintf(pval, psize, "%s",
+		    stack->netstack_tcp->tcps_default_cc_algo->name);
+	}
+	if (nbytes >= psize)
+		return (ENOBUFS);
 	return (0);
 }
 
@@ -526,6 +592,17 @@ mod_prop_info_t tcp_propinfo_tbl[] = {
 	    mod_set_uint32, mod_get_uint32,
 	    {1, ISS_INCR, ISS_INCR},
 	    {ISS_INCR} },
+
+	{ "congestion_control", MOD_PROTO_TCP,
+	    tcp_set_cc_algorithm, tcp_get_cc_algorithm, {0}, {0} },
+
+	/* RFC 3465 - TCP Congestion Control with Appropriate Byte Counting */
+	{ "_abc", MOD_PROTO_TCP,
+	    mod_set_boolean, mod_get_boolean, {B_TRUE}, {B_TRUE} },
+
+	/* "L" value from RFC 3465 */
+	{ "_abc_l_var", MOD_PROTO_TCP,
+	    mod_set_uint32, mod_get_uint32, {1, UINT32_MAX, 2}, {2} },
 
 	{ "?", MOD_PROTO_TCP, NULL, mod_get_allprop, {0}, {0} },
 

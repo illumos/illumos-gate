@@ -810,6 +810,10 @@ usr/src/uts/common/gssapi/mechs/krb5/mech/val_cred.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/verify.c
 usr/src/uts/common/gssapi/mechs/krb5/mech/wrap_size_limit.c
 usr/src/uts/common/inet/ipf/ip_fil_solaris.c
+usr/src/uts/common/inet/cc.h
+usr/src/uts/common/inet/cc/cc_cubic.c
+usr/src/uts/common/inet/cc/cc_module.h
+usr/src/uts/common/inet/cc/cc_newreno.c
 usr/src/uts/common/io/bnx/570x/*
 usr/src/uts/common/io/bnx/include/*
 usr/src/uts/common/io/bnxe/577xx/common/bnxe_clc.c

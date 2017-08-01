@@ -492,6 +492,14 @@ BLKDEV_OBJS += blkdev.o
 
 CARDBUS_OBJS += cardbus.o cardbus_hp.o cardbus_cfg.o
 
+CC_OBJS += cc.o
+
+CC_CUBIC_OBJS += cc_cubic.o
+
+CC_NEWRENO_OBJS += cc_newreno.o
+
+CC_SUNRENO_OBJS += cc_sunreno.o
+
 CONSKBD_OBJS += conskbd.o
 
 CONSMS_OBJS +=	consms.o

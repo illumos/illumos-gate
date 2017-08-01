@@ -170,6 +170,133 @@ static void	tcp_set_rto(tcp_t *, hrtime_t);
 static void	tcp_setcred_data(mblk_t *, ip_recv_attr_t *);
 
 /*
+ * CC wrapper hook functions
+ */
+static void
+cc_ack_received(tcp_t *tcp, uint32_t seg_ack, int32_t bytes_acked,
+    uint16_t type)
+{
+	uint32_t old_cwnd = tcp->tcp_cwnd;
+
+	tcp->tcp_ccv.bytes_this_ack = bytes_acked;
+	if (tcp->tcp_cwnd <= tcp->tcp_swnd)
+		tcp->tcp_ccv.flags |= CCF_CWND_LIMITED;
+	else
+		tcp->tcp_ccv.flags &= ~CCF_CWND_LIMITED;
+
+	if (type == CC_ACK) {
+		if (tcp->tcp_cwnd > tcp->tcp_cwnd_ssthresh) {
+			if (tcp->tcp_ccv.flags & CCF_RTO)
+				tcp->tcp_ccv.flags &= ~CCF_RTO;
+
+			tcp->tcp_ccv.t_bytes_acked +=
+			    min(tcp->tcp_ccv.bytes_this_ack,
+			    tcp->tcp_tcps->tcps_abc_l_var * tcp->tcp_mss);
+			if (tcp->tcp_ccv.t_bytes_acked >= tcp->tcp_cwnd) {
+				tcp->tcp_ccv.t_bytes_acked -= tcp->tcp_cwnd;
+				tcp->tcp_ccv.flags |= CCF_ABC_SENTAWND;
+			}
+		} else {
+			tcp->tcp_ccv.flags &= ~CCF_ABC_SENTAWND;
+			tcp->tcp_ccv.t_bytes_acked = 0;
+		}
+	}
+
+	if (CC_ALGO(tcp)->ack_received != NULL) {
+		/*
+		 * The FreeBSD code where this originated had a comment "Find
+		 * a way to live without this" in several places where curack
+		 * got set.  If they eventually dump curack from the cc
+		 * variables, we'll need to adapt our code.
+		 */
+		tcp->tcp_ccv.curack = seg_ack;
+		CC_ALGO(tcp)->ack_received(&tcp->tcp_ccv, type);
+	}
+
+	DTRACE_PROBE3(cwnd__cc__ack__received, tcp_t *, tcp, uint32_t, old_cwnd,
+	    uint32_t, tcp->tcp_cwnd);
+}
+
+void
+cc_cong_signal(tcp_t *tcp, uint32_t seg_ack, uint32_t type)
+{
+	uint32_t old_cwnd = tcp->tcp_cwnd;
+	uint32_t old_cwnd_ssthresh = tcp->tcp_cwnd_ssthresh;
+	switch (type) {
+	case CC_NDUPACK:
+		if (!IN_FASTRECOVERY(tcp->tcp_ccv.flags)) {
+			tcp->tcp_rexmit_max = tcp->tcp_snxt;
+			if (tcp->tcp_ecn_ok) {
+				tcp->tcp_cwr_snd_max = tcp->tcp_snxt;
+				tcp->tcp_cwr = B_TRUE;
+				tcp->tcp_ecn_cwr_sent = B_FALSE;
+			}
+		}
+		break;
+	case CC_ECN:
+		if (!IN_CONGRECOVERY(tcp->tcp_ccv.flags)) {
+			tcp->tcp_rexmit_max = tcp->tcp_snxt;
+			if (tcp->tcp_ecn_ok) {
+				tcp->tcp_cwr_snd_max = tcp->tcp_snxt;
+				tcp->tcp_cwr = B_TRUE;
+				tcp->tcp_ecn_cwr_sent = B_FALSE;
+			}
+		}
+		break;
+	case CC_RTO:
+		tcp->tcp_ccv.flags |= CCF_RTO;
+		tcp->tcp_dupack_cnt = 0;
+		tcp->tcp_ccv.t_bytes_acked = 0;
+		/*
+		 * Give up on fast recovery and congestion recovery if we were
+		 * attempting either.
+		 */
+		EXIT_RECOVERY(tcp->tcp_ccv.flags);
+		if (CC_ALGO(tcp)->cong_signal == NULL) {
+			/*
+			 * RFC5681 Section 3.1
+			 * ssthresh = max (FlightSize / 2, 2*SMSS) eq (4)
+			 */
+			tcp->tcp_cwnd_ssthresh = max(
+			    (tcp->tcp_snxt - tcp->tcp_suna) / 2 / tcp->tcp_mss,
+			    2) * tcp->tcp_mss;
+			tcp->tcp_cwnd = tcp->tcp_mss;
+		}
+
+		if (tcp->tcp_ecn_ok) {
+			tcp->tcp_cwr = B_TRUE;
+			tcp->tcp_cwr_snd_max = tcp->tcp_snxt;
+			tcp->tcp_ecn_cwr_sent = B_FALSE;
+		}
+		break;
+	}
+
+	if (CC_ALGO(tcp)->cong_signal != NULL) {
+		tcp->tcp_ccv.curack = seg_ack;
+		CC_ALGO(tcp)->cong_signal(&tcp->tcp_ccv, type);
+	}
+
+	DTRACE_PROBE6(cwnd__cc__cong__signal, tcp_t *, tcp, uint32_t, old_cwnd,
+	    uint32_t, tcp->tcp_cwnd, uint32_t, old_cwnd_ssthresh,
+	    uint32_t, tcp->tcp_cwnd_ssthresh, uint32_t, type);
+}
+
+static void
+cc_post_recovery(tcp_t *tcp, uint32_t seg_ack)
+{
+	uint32_t old_cwnd = tcp->tcp_cwnd;
+
+	if (CC_ALGO(tcp)->post_recovery != NULL) {
+		tcp->tcp_ccv.curack = seg_ack;
+		CC_ALGO(tcp)->post_recovery(&tcp->tcp_ccv);
+	}
+	tcp->tcp_ccv.t_bytes_acked = 0;
+
+	DTRACE_PROBE3(cwnd__cc__post__recovery, tcp_t *, tcp,
+	    uint32_t, old_cwnd, uint32_t, tcp->tcp_cwnd);
+}
+
+/*
  * Set the MSS associated with a particular tcp based on its current value,
  * and a new one passed in. Observe minimums and maximums, and reset other
  * state variables that we want to view as multiples of MSS.
@@ -548,6 +675,9 @@ tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
 	 * updated properly.
 	 */
 	TCP_SET_INIT_CWND(tcp, tcp->tcp_mss, tcps->tcps_slow_start_initial);
+
+	if (tcp->tcp_cc_algo->conn_init != NULL)
+		tcp->tcp_cc_algo->conn_init(&tcp->tcp_ccv);
 }
 
 /*
@@ -1405,7 +1535,7 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	ASSERT(ira->ira_sqp != NULL);
 	new_sqp = ira->ira_sqp;
 
-	econnp = (conn_t *)tcp_get_conn(arg2, tcps);
+	econnp = tcp_get_conn(arg2, tcps);
 	if (econnp == NULL)
 		goto error2;
 
@@ -2324,8 +2454,6 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	ip_pkt_t	ipp;
 	boolean_t	ofo_seg = B_FALSE; /* Out of order segment */
 	uint32_t	cwnd;
-	uint32_t	add;
-	int		npkt;
 	int		mss;
 	conn_t		*connp = (conn_t *)arg;
 	squeue_t	*sqp = (squeue_t *)arg2;
@@ -2601,6 +2729,9 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 				 * draft-floyd-incr-init-win-01.txt,
 				 * Increasing TCP's Initial Window.
 				 */
+				DTRACE_PROBE3(cwnd__retransmitted__syn,
+				    tcp_t *, tcp, uint32_t, tcp->tcp_cwnd,
+				    uint32_t, tcp->tcp_mss);
 				tcp->tcp_cwnd = tcp->tcp_mss;
 			}
 
@@ -3823,6 +3954,9 @@ process_ack:
 			tcp->tcp_rexmit_nxt = tcp->tcp_snxt;
 			tcp->tcp_rexmit_max = tcp->tcp_snxt;
 			tcp->tcp_ms_we_have_waited = 0;
+			DTRACE_PROBE3(cwnd__retransmitted__syn,
+			    tcp_t *, tcp, uint32_t, tcp->tcp_cwnd,
+			    uint32_t, tcp->tcp_mss);
 			tcp->tcp_cwnd = mss;
 		}
 
@@ -3866,33 +4000,22 @@ process_ack:
 	 */
 	if (tcp->tcp_cwr && SEQ_GT(seg_ack, tcp->tcp_cwr_snd_max))
 		tcp->tcp_cwr = B_FALSE;
-	if (tcp->tcp_ecn_ok && (flags & TH_ECE)) {
-		if (!tcp->tcp_cwr) {
-			npkt = ((tcp->tcp_snxt - tcp->tcp_suna) >> 1) / mss;
-			tcp->tcp_cwnd_ssthresh = MAX(npkt, 2) * mss;
-			tcp->tcp_cwnd = npkt * mss;
-			/*
-			 * If the cwnd is 0, use the timer to clock out
-			 * new segments.  This is required by the ECN spec.
-			 */
-			if (npkt == 0) {
-				TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
-				/*
-				 * This makes sure that when the ACK comes
-				 * back, we will increase tcp_cwnd by 1 MSS.
-				 */
-				tcp->tcp_cwnd_cnt = 0;
-			}
-			tcp->tcp_cwr = B_TRUE;
-			/*
-			 * This marks the end of the current window of in
-			 * flight data.  That is why we don't use
-			 * tcp_suna + tcp_swnd.  Only data in flight can
-			 * provide ECN info.
-			 */
-			tcp->tcp_cwr_snd_max = tcp->tcp_snxt;
-			tcp->tcp_ecn_cwr_sent = B_FALSE;
-		}
+	if (tcp->tcp_ecn_ok && (flags & TH_ECE) && !tcp->tcp_cwr) {
+		cc_cong_signal(tcp, seg_ack, CC_ECN);
+		/*
+		 * If the cwnd is 0, use the timer to clock out
+		 * new segments.  This is required by the ECN spec.
+		 */
+		if (tcp->tcp_cwnd == 0)
+			TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
+		tcp->tcp_cwr = B_TRUE;
+		/*
+		 * This marks the end of the current window of in
+		 * flight data.  That is why we don't use
+		 * tcp_suna + tcp_swnd.  Only data in flight can
+		 * provide ECN info.
+		 */
+		tcp->tcp_cwr_snd_max = tcp->tcp_snxt;
 	}
 
 	mp1 = tcp->tcp_xmit_head;
@@ -3914,6 +4037,8 @@ process_ack:
 				/* Do Limited Transmit */
 				if ((dupack_cnt = ++tcp->tcp_dupack_cnt) <
 				    tcps->tcps_dupack_fast_retransmit) {
+					cc_ack_received(tcp, seg_ack,
+					    bytes_acked, CC_DUPACK);
 					/*
 					 * RFC 3042
 					 *
@@ -3960,12 +4085,10 @@ process_ack:
 				 * dropped (due to congestion.)
 				 */
 				if (!tcp->tcp_cwr) {
-					npkt = ((tcp->tcp_snxt -
-					    tcp->tcp_suna) >> 1) / mss;
-					tcp->tcp_cwnd_ssthresh = MAX(npkt, 2) *
-					    mss;
-					tcp->tcp_cwnd = (npkt +
-					    tcp->tcp_dupack_cnt) * mss;
+					cc_cong_signal(tcp, seg_ack,
+					    CC_NDUPACK);
+					cc_ack_received(tcp, seg_ack,
+					    bytes_acked, CC_DUPACK);
 				}
 				if (tcp->tcp_ecn_ok) {
 					tcp->tcp_cwr = B_TRUE;
@@ -4027,6 +4150,8 @@ process_ack:
 				} /* tcp_snd_sack_ok */
 
 				} else {
+					cc_ack_received(tcp, seg_ack,
+					    bytes_acked, CC_DUPACK);
 					/*
 					 * Here we perform congestion
 					 * avoidance, but NOT slow start.
@@ -4048,6 +4173,10 @@ process_ack:
 					cwnd = tcp->tcp_cwnd + mss;
 					if (cwnd > tcp->tcp_cwnd_max)
 						cwnd = tcp->tcp_cwnd_max;
+					DTRACE_PROBE3(cwnd__fast__recovery,
+					    tcp_t *, tcp,
+					    uint32_t, tcp->tcp_cwnd,
+					    uint32_t, cwnd);
 					tcp->tcp_cwnd = cwnd;
 					if (tcp->tcp_unsent > 0)
 						flags |= TH_XMIT_NEEDED;
@@ -4180,15 +4309,10 @@ process_ack:
 		ASSERT(tcp->tcp_rexmit == B_FALSE);
 		if (SEQ_GEQ(seg_ack, tcp->tcp_rexmit_max)) {
 			tcp->tcp_dupack_cnt = 0;
-			/*
-			 * Restore the orig tcp_cwnd_ssthresh after
-			 * fast retransmit phase.
-			 */
-			if (tcp->tcp_cwnd > tcp->tcp_cwnd_ssthresh) {
-				tcp->tcp_cwnd = tcp->tcp_cwnd_ssthresh;
-			}
+
+			cc_post_recovery(tcp, seg_ack);
+
 			tcp->tcp_rexmit_max = seg_ack;
-			tcp->tcp_cwnd_cnt = 0;
 
 			/*
 			 * Remove all notsack info to avoid confusion with
@@ -4217,8 +4341,12 @@ process_ack:
 				 * aggressive behaviour in sending new
 				 * segments.
 				 */
-				tcp->tcp_cwnd = tcp->tcp_cwnd_ssthresh +
+				cwnd = tcp->tcp_cwnd_ssthresh +
 				    tcps->tcps_dupack_fast_retransmit * mss;
+				DTRACE_PROBE3(cwnd__fast__retransmit__part__ack,
+				    tcp_t *, tcp, uint32_t, tcp->tcp_cwnd,
+				    uint32_t, cwnd);
+				tcp->tcp_cwnd = cwnd;
 				tcp->tcp_cwnd_cnt = tcp->tcp_cwnd;
 				flags |= TH_REXMIT_NEEDED;
 			}
@@ -4279,28 +4407,10 @@ process_ack:
 	 * usual.
 	 */
 	if (!tcp->tcp_ecn_ok || !(flags & TH_ECE)) {
-		cwnd = tcp->tcp_cwnd;
-		add = mss;
-
-		if (cwnd >= tcp->tcp_cwnd_ssthresh) {
-			/*
-			 * This is to prevent an increase of less than 1 MSS of
-			 * tcp_cwnd.  With partial increase, tcp_wput_data()
-			 * may send out tinygrams in order to preserve mblk
-			 * boundaries.
-			 *
-			 * By initializing tcp_cwnd_cnt to new tcp_cwnd and
-			 * decrementing it by 1 MSS for every ACKs, tcp_cwnd is
-			 * increased by 1 MSS for every RTTs.
-			 */
-			if (tcp->tcp_cwnd_cnt <= 0) {
-				tcp->tcp_cwnd_cnt = cwnd + add;
-			} else {
-				tcp->tcp_cwnd_cnt -= add;
-				add = 0;
-			}
+		if (IN_RECOVERY(tcp->tcp_ccv.flags)) {
+			EXIT_RECOVERY(tcp->tcp_ccv.flags);
 		}
-		tcp->tcp_cwnd = MIN(cwnd + add, tcp->tcp_cwnd_max);
+		cc_ack_received(tcp, seg_ack, bytes_acked, CC_ACK);
 	}
 
 	/* See if the latest urgent data has been acknowledged */
@@ -5636,6 +5746,10 @@ noticmpv4:
 			npkt = ((tcp->tcp_snxt - tcp->tcp_suna) >> 1) /
 			    tcp->tcp_mss;
 			tcp->tcp_cwnd_ssthresh = MAX(npkt, 2) * tcp->tcp_mss;
+
+			DTRACE_PROBE3(cwnd__source__quench, tcp_t *, tcp,
+			    uint32_t, tcp->tcp_cwnd,
+			    uint32_t, tcp->tcp_mss);
 			tcp->tcp_cwnd = tcp->tcp_mss;
 			tcp->tcp_cwnd_cnt = 0;
 		}

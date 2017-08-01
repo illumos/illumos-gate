@@ -577,6 +577,11 @@ f etc/zshrc 0644 root bin
 d kernel 0755 root sys
 d kernel/amd64 0755 root sys
 f kernel/amd64/genunix 0755 root sys
+d kernel/cc 0755 root sys
+d kernel/cc/amd64 0755 root sys
+f kernel/cc/amd64/cc_cubic 0755 root sys
+f kernel/cc/amd64/cc_newreno 0755 root sys
+f kernel/cc/amd64/cc_sunreno 0755 root sys
 d kernel/crypto 0755 root sys
 d kernel/crypto/amd64 0755 root sys
 f kernel/crypto/amd64/aes 0755 root sys
@@ -1059,6 +1064,7 @@ f kernel/misc/amd64/acpica 0755 root sys
 f kernel/misc/amd64/bignum 0755 root sys
 f kernel/misc/amd64/bootdev 0755 root sys
 f kernel/misc/amd64/busra 0755 root sys
+f kernel/misc/amd64/cc 0755 root sys
 f kernel/misc/amd64/cmlb 0755 root sys
 f kernel/misc/amd64/consconfig 0755 root sys
 f kernel/misc/amd64/ctf 0755 root sys

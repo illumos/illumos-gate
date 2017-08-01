@@ -95,6 +95,7 @@
 #include <netinet/igmp.h>
 #include <netinet/ip_mroute.h>
 #include <inet/ipp_common.h>
+#include <inet/cc.h>
 
 #include <net/pfkeyv2.h>
 #include <inet/sadb.h>

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -153,6 +153,9 @@ static const char *ecn_sack_vals[] = {"never", "passive", "active", NULL};
 
 /* Supported TCP protocol properties */
 static ipadm_prop_desc_t ipadm_tcp_prop_table[] = {
+	{ "congestion_control", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
+	    i_ipadm_set_prop, i_ipadm_get_prop, i_ipadm_get_prop },
+
 	{ "ecn", NULL, IPADMPROP_CLASS_MODULE, MOD_PROTO_TCP, 0,
 	    i_ipadm_set_ecnsack, i_ipadm_get_ecnsack, i_ipadm_get_ecnsack },
 
