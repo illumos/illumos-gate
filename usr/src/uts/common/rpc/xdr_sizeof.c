@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #include <rpc/types.h>
@@ -112,11 +113,6 @@ xdr_sizeof(xdrproc_t func, void *data)
 	XDR x;
 	struct xdr_ops ops;
 	bool_t stat;
-	/* to stop ANSI-C compiler from complaining */
-	typedef  bool_t (* dummyfunc1)(XDR *, long *);
-	typedef  bool_t (* dummyfunc2)(XDR *, caddr_t, int);
-	typedef  bool_t (* dummyfunc3)(XDR *, int32_t *);
-	typedef	 bool_t (* dummyfunc4)(XDR *, int, void *);
 
 	ops.x_putbytes = x_putbytes;
 	ops.x_inline = x_inline;
@@ -125,13 +121,13 @@ xdr_sizeof(xdrproc_t func, void *data)
 	ops.x_destroy = x_destroy;
 
 #if defined(_LP64) || defined(_KERNEL)
-	ops.x_getint32 = (dummyfunc3)harmless;
+	ops.x_getint32 = (void *)harmless;
 	ops.x_putint32 = x_putint32_t;
 #endif
 
 	/* the other harmless ones */
-	ops.x_getbytes = (dummyfunc2)harmless;
-	ops.x_control = (dummyfunc4)harmless;
+	ops.x_getbytes = (void *)harmless;
+	ops.x_control = (void *)harmless;
 
 	x.x_op = XDR_ENCODE;
 	x.x_ops = &ops;
