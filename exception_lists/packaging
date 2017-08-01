@@ -137,6 +137,7 @@ usr/lib/llib-like.ln
 usr/lib/amd64/llib-like.ln		i386
 usr/lib/sparcv9/llib-like.ln		sparc
 #
+usr/include/inet/cc.h
 usr/include/inet/ip_impl.h
 usr/include/inet/ip_ndp.h
 usr/include/inet/ip2mac_impl.h

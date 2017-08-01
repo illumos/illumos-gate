@@ -1,4 +1,4 @@
-#                                                                               
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -23,12 +23,14 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2014, 2017 by Delphix. All rights reserved.
+#
 # uts/common/inet/Makefile
 #
 # include global definitions
 include ../../../Makefile.master
 
-HDRS=	arp.h common.h ipclassifier.h ip.h ip6.h ipdrop.h ipnet.h \
+HDRS=	arp.h cc.h common.h ipclassifier.h ip.h ip6.h ipdrop.h ipnet.h \
 	ipsecah.h ipsecesp.h ipsec_info.h iptun.h ip6_asp.h ip_if.h ip_ire.h \
 	ip_multi.h ip_netinfo.h ip_ndp.h ip_rts.h ipsec_impl.h keysock.h \
 	led.h mi.h mib2.h nd.h optcom.h sadb.h sctp_itf.h snmpcom.h tcp.h \

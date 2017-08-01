@@ -23,7 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2011 Joyent, Inc.  All rights reserved.
- * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -784,36 +784,7 @@ tcp_timer(void *arg)
 					    SL_TRACE, "tcp_timer: zero win");
 				}
 			} else {
-				/*
-				 * After retransmission, we need to do
-				 * slow start.  Set the ssthresh to one
-				 * half of current effective window and
-				 * cwnd to one MSS.  Also reset
-				 * tcp_cwnd_cnt.
-				 *
-				 * Note that if tcp_ssthresh is reduced because
-				 * of ECN, do not reduce it again unless it is
-				 * already one window of data away (tcp_cwr
-				 * should then be cleared) or this is a
-				 * timeout for a retransmitted segment.
-				 */
-				uint32_t npkt;
-
-				if (!tcp->tcp_cwr || tcp->tcp_rexmit) {
-					npkt = ((tcp->tcp_timer_backoff ?
-					    tcp->tcp_cwnd_ssthresh :
-					    tcp->tcp_snxt -
-					    tcp->tcp_suna) >> 1) / tcp->tcp_mss;
-					tcp->tcp_cwnd_ssthresh = MAX(npkt, 2) *
-					    tcp->tcp_mss;
-				}
-				tcp->tcp_cwnd = tcp->tcp_mss;
-				tcp->tcp_cwnd_cnt = 0;
-				if (tcp->tcp_ecn_ok) {
-					tcp->tcp_cwr = B_TRUE;
-					tcp->tcp_cwr_snd_max = tcp->tcp_snxt;
-					tcp->tcp_ecn_cwr_sent = B_FALSE;
-				}
+				cc_cong_signal(tcp, NULL, CC_RTO);
 			}
 			break;
 		}

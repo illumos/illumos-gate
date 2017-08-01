@@ -1,0 +1,3 @@
+The congestion control framework, its header, and the CUBIC and NewReno
+congestion control modules came from FreeBSD, and are therefore licensed
+under the 2-Clause BSD License.
