@@ -221,7 +221,7 @@ typedef struct lx_io_elem {
 	int64_t		lxioelem_offset;	/* offset in file */
 	uint64_t	lxioelem_data;
 	ssize_t		lxioelem_res;
-	lx_iocb_t	*lxioelem_cbp;
+	void		*lxioelem_cbp;		/* ptr to iocb in userspace */
 } lx_io_elem_t;
 
 /* From lx_rw.c */
@@ -1240,7 +1240,7 @@ lx_io_cancel(lx_aio_context_t cid, lx_iocb_t *iocbp, lx_io_event_t *result)
 		ep->lxioelem_resfp = NULL;
 	}
 
-	ev.lxioe_data = ep->lxioelem_cbp->lxiocb_data;
+	ev.lxioe_data = ep->lxioelem_data;
 	ev.lxioe_object = (uint64_t)(uintptr_t)ep->lxioelem_cbp;
 	ev.lxioe_res = 0;
 	ev.lxioe_res2 = 0;
