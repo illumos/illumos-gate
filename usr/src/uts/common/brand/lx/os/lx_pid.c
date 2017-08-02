@@ -284,7 +284,7 @@ int
 lx_lpid_lock(pid_t lpid, zone_t *zone, lx_pid_flag_t flag, proc_t **pp,
     kthread_t **tp)
 {
-	proc_t *p = NULL;
+	proc_t *p;
 	kthread_t *t;
 	id_t tid = 0;
 
@@ -293,6 +293,7 @@ lx_lpid_lock(pid_t lpid, zone_t *zone, lx_pid_flag_t flag, proc_t **pp,
 	ASSERT(zone != NULL && zone->zone_brand == &lx_brand);
 
 retry:
+	p = NULL;
 	if (lpid == 1) {
 		pid_t initpid;
 
