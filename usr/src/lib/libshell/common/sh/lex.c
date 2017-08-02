@@ -1082,11 +1082,13 @@ int sh_lex(Lex_t* lp)
 					}
 					/* backward compatibility */
 					{
+						char *tmp;
 						if(lp->lexd.warn)
 							errormsg(SH_DICT,ERROR_warn(0),e_lexnested,shp->inlineno);
 						if(!(state=lp->lexd.first))
 							state = fcfirst();
-						fcseek(state-fcseek(0));
+						tmp = fcseek(0);
+						fcseek(state - tmp);
 						if(lp->arg)
 						{
 							lp->arg = (struct argnod*)stkfreeze(stkp,1);
