@@ -416,9 +416,7 @@ ipsec_stack_fini(netstackid_t stackid, void *arg)
 
 	rw_enter(&ipss->ipsec_alg_lock, RW_WRITER);
 	for (algtype = 0; algtype < IPSEC_NALGTYPES; algtype ++) {
-		int nalgs = ipss->ipsec_nalgs[algtype];
-
-		for (i = 0; i < nalgs; i++) {
+		for (i = 0; i < IPSEC_MAX_ALGS; i++) {
 			if (ipss->ipsec_alglists[algtype][i] != NULL)
 				ipsec_alg_unreg(algtype, i, ns);
 		}
