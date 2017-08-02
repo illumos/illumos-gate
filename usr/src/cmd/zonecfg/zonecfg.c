@@ -416,6 +416,7 @@ static const char *net_res_scope_cmds[] = {
 	"help",
 	"info",
 	"set address=",
+	"set allowed-address=",
 	"set physical=",
 	"set defrouter=",
 	NULL
