@@ -1759,6 +1759,10 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		vnode_t *vp;
 		uint_t protbits;
 
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
+
 		pbuf = kmem_alloc(sizeof (*pbuf), KM_SLEEP);
 
 		pbuf->saddr = (uintptr_t)seg->s_base;

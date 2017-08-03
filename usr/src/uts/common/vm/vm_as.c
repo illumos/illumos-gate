@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -68,6 +68,7 @@
 #include <vm/seg_kmem.h>
 #include <vm/seg_map.h>
 #include <vm/seg_spt.h>
+#include <vm/seg_hole.h>
 #include <vm/page.h>
 
 clock_t deadlk_wait = 1; /* number of ticks to wait before retrying */
@@ -819,7 +820,9 @@ as_dup(struct as *as, struct proc *forkedproc)
 			as_free(newas);
 			return (error);
 		}
-		newas->a_size += seg->s_size;
+		if ((newseg->s_flags & S_HOLE) == 0) {
+			newas->a_size += seg->s_size;
+		}
 	}
 	newas->a_resvsize = as->a_resvsize - purgesize;
 
@@ -1330,6 +1333,8 @@ top:
 	as_clearwatchprot(as, raddr, eaddr - raddr);
 
 	for (seg = as_findseg(as, raddr, 0); seg != NULL; seg = seg_next) {
+		const boolean_t is_hole = ((seg->s_flags & S_HOLE) != 0);
+
 		if (eaddr <= seg->s_base)
 			break;		/* eaddr was in a gap; all done */
 
@@ -1434,9 +1439,11 @@ retry:
 			return (-1);
 		}
 
-		as->a_size -= ssize;
-		if (rsize)
-			as->a_resvsize -= rsize;
+		if (!is_hole) {
+			as->a_size -= ssize;
+			if (rsize)
+				as->a_resvsize -= rsize;
+		}
 		raddr += ssize;
 	}
 	AS_LOCK_EXIT(as);
@@ -1686,6 +1693,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	size_t rsize;			/* rounded up size */
 	int error;
 	int unmap = 0;
+	boolean_t is_hole = B_FALSE;
 	/*
 	 * The use of a_proc is preferred to handle the case where curproc is
 	 * a door_call server and is allocating memory in the client's (a_proc)
@@ -1712,7 +1720,14 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	gethrestime(&as->a_updatetime);
 
 	if (as != &kas) {
-		if (as->a_size + rsize > (size_t)p->p_vmem_ctl) {
+		/*
+		 * Ensure that the virtual size of the process will not exceed
+		 * the configured limit.  Since seg_hole segments will later
+		 * set the S_HOLE flag indicating their status as a hole in the
+		 * AS, they are excluded from this check.
+		 */
+		if (as->a_size + rsize > (size_t)p->p_vmem_ctl &&
+		    !AS_MAP_CHECK_SEGHOLE(crfp)) {
 			AS_LOCK_EXIT(as);
 
 			(void) rctl_action(rctlproc_legacy[RLIMIT_VMEM],
@@ -1770,19 +1785,24 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 		}
 		/*
 		 * Add size now so as_unmap will work if as_ctl fails.
+		 * Not applicable to explicit hole segments.
 		 */
-		as->a_size += rsize;
-		as->a_resvsize += rsize;
+		if ((seg->s_flags & S_HOLE) == 0) {
+			as->a_size += rsize;
+			as->a_resvsize += rsize;
+		} else {
+			is_hole = B_TRUE;
+		}
 	}
 
 	as_setwatch(as);
 
 	/*
-	 * If the address space is locked,
-	 * establish memory locks for the new segment.
+	 * Establish memory locks for the segment if the address space is
+	 * locked, provided it's not an explicit hole in the AS.
 	 */
 	mutex_enter(&as->a_contents);
-	if (AS_ISPGLCK(as)) {
+	if (AS_ISPGLCK(as) && !is_hole) {
 		mutex_exit(&as->a_contents);
 		AS_LOCK_EXIT(as);
 		error = as_ctl(as, addr, size, MC_LOCK, 0, 0, NULL, 0);
@@ -2310,6 +2330,9 @@ retry:
 		}
 
 		for (seg = AS_SEGFIRST(as); seg; seg = AS_SEGNEXT(as, seg)) {
+			if (seg->s_flags & S_HOLE != 0) {
+				continue;
+			}
 			error = SEGOP_LOCKOP(seg, seg->s_base,
 			    seg->s_size, attr, MC_LOCK, mlock_map, pos);
 			if (error != 0)
@@ -2339,6 +2362,9 @@ retry:
 		mutex_exit(&as->a_contents);
 
 		for (seg = AS_SEGFIRST(as); seg; seg = AS_SEGNEXT(as, seg)) {
+			if (seg->s_flags & S_HOLE != 0) {
+				continue;
+			}
 			error = SEGOP_LOCKOP(seg, seg->s_base,
 			    seg->s_size, attr, MC_UNLOCK, NULL, 0);
 			if (error != 0)

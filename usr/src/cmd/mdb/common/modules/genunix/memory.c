@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <mdb/mdb_param.h>
@@ -40,6 +40,7 @@
 #include <sys/vnode.h>
 #include <vm/seg_map.h>
 #include <vm/seg_vn.h>
+#include <vm/seg_hole.h>
 #if defined(__i386) || defined(__amd64)
 #include <sys/balloon_impl.h>
 #endif
@@ -975,6 +976,11 @@ seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct pmap_walk_types {
+	uintptr_t pwt_segvn;
+	uintptr_t pwt_seghole;
+} pmap_walk_types_t;
+
 /*ARGSUSED*/
 static int
 pmap_walk_count_pages(uintptr_t addr, const void *data, void *out)
@@ -987,12 +993,14 @@ pmap_walk_count_pages(uintptr_t addr, const void *data, void *out)
 }
 
 static int
-pmap_walk_seg(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
+pmap_walk_seg(uintptr_t addr, const struct seg *seg,
+    const pmap_walk_types_t *types)
 {
+	const uintptr_t ops = (uintptr_t)seg->s_ops;
 
 	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
 
-	if (segvn == (uintptr_t)seg->s_ops && seg->s_data != NULL) {
+	if (ops == types->pwt_segvn && seg->s_data != NULL) {
 		struct segvn_data svn;
 		pgcnt_t nres = 0;
 
@@ -1018,6 +1026,18 @@ pmap_walk_seg(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
 		} else {
 			mdb_printf(" [ anon ]");
 		}
+	} else if (ops == types->pwt_seghole && seg->s_data != NULL) {
+		seghole_data_t shd;
+		char name[16];
+
+		(void) mdb_vread(&shd, sizeof (shd), (uintptr_t)seg->s_data);
+		if (shd.shd_name == NULL || mdb_readstr(name, sizeof (name),
+		    (uintptr_t)shd.shd_name) == 0) {
+			name[0] = '\0';
+		}
+
+		mdb_printf(" %8s [ hole%s%s ]", "-",
+		    name[0] == '0' ? "" : ":", name);
 	} else {
 		mdb_printf(" %8s [ &%a ]", "?", seg->s_ops);
 	}
@@ -1027,11 +1047,14 @@ pmap_walk_seg(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
 }
 
 static int
-pmap_walk_seg_quick(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
+pmap_walk_seg_quick(uintptr_t addr, const struct seg *seg,
+    const pmap_walk_types_t *types)
 {
+	const uintptr_t ops = (uintptr_t)seg->s_ops;
+
 	mdb_printf("%0?p %0?p %7dk", addr, seg->s_base, seg->s_size / 1024);
 
-	if (segvn == (uintptr_t)seg->s_ops && seg->s_data != NULL) {
+	if (ops == types->pwt_segvn && seg->s_data != NULL) {
 		struct segvn_data svn;
 
 		svn.vp = NULL;
@@ -1054,10 +1077,10 @@ pmap_walk_seg_quick(uintptr_t addr, const struct seg *seg, uintptr_t segvn)
 int
 pmap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	uintptr_t segvn;
 	proc_t proc;
 	uint_t quick = FALSE;
 	mdb_walk_cb_t cb = (mdb_walk_cb_t)pmap_walk_seg;
+	pmap_walk_types_t wtypes = { 0 };
 
 	GElf_Sym sym;
 
@@ -1074,9 +1097,9 @@ pmap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_lookup_by_name("segvn_ops", &sym) == 0)
-		segvn = (uintptr_t)sym.st_value;
-	else
-		segvn = NULL;
+		wtypes.pwt_segvn = (uintptr_t)sym.st_value;
+	if (mdb_lookup_by_name("seghole_ops", &sym) == 0)
+		wtypes.pwt_seghole = (uintptr_t)sym.st_value;
 
 	mdb_printf("%?s %?s %8s ", "SEG", "BASE", "SIZE");
 
@@ -1087,7 +1110,7 @@ pmap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%8s %s\n", "RES", "PATH");
 	}
 
-	if (mdb_pwalk("seg", cb, (void *)segvn, (uintptr_t)proc.p_as) == -1) {
+	if (mdb_pwalk("seg", cb, (void *)&wtypes, (uintptr_t)proc.p_as) == -1) {
 		mdb_warn("failed to walk segments of as %p", proc.p_as);
 		return (DCMD_ERR);
 	}

@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -113,6 +113,7 @@ typedef struct seg {
 } seg_t;
 
 #define	S_PURGE		(0x01)		/* seg should be purged in as_gap() */
+#define	S_HOLE		(0x02)		/* seg represents hole in AS */
 
 struct	seg_ops {
 	int	(*dup)(struct seg *, struct seg *);

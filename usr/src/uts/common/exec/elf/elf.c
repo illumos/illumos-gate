@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -2354,6 +2354,10 @@ top:
 		caddr_t saddr, naddr;
 		void *tmp = NULL;
 		extern struct seg_ops segspt_shmops;
+
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
 
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			uint_t prot;
