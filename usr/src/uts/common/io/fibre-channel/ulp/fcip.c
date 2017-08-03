@@ -4684,7 +4684,7 @@ fcip_init_port(struct fcip *fptr)
 	int rval = FC_SUCCESS;
 	fcip_port_info_t	*fport = fptr->fcip_port_info;
 	static char buf[64];
-	size_t	tok_buf_size;
+	size_t	tok_buf_size = 0;
 
 	ASSERT(fport != NULL);
 
