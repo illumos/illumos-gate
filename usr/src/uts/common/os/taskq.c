@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -596,6 +597,7 @@ struct taskq_kstat {
 	kstat_named_t	tq_nactive;
 	kstat_named_t	tq_pri;
 	kstat_named_t	tq_nthreads;
+	kstat_named_t	tq_nomem;
 } taskq_kstat = {
 	{ "pid",		KSTAT_DATA_UINT64 },
 	{ "tasks",		KSTAT_DATA_UINT64 },
@@ -606,6 +608,7 @@ struct taskq_kstat {
 	{ "nactive",		KSTAT_DATA_UINT64 },
 	{ "priority",		KSTAT_DATA_UINT64 },
 	{ "threads",		KSTAT_DATA_UINT64 },
+	{ "nomem",		KSTAT_DATA_UINT64 },
 };
 
 struct taskq_d_kstat {
@@ -1157,6 +1160,7 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		TASKQ_S_RANDOM_DISPATCH_FAILURE(tq, flags);
 
 		if ((tqe = taskq_ent_alloc(tq, flags)) == NULL) {
+			tq->tq_nomem++;
 			mutex_exit(&tq->tq_lock);
 			return (NULL);
 		}
@@ -1270,7 +1274,7 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		if ((tqe1 = taskq_ent_alloc(tq, TQ_NOSLEEP)) != NULL) {
 			TQ_ENQUEUE_FRONT(tq, tqe1, taskq_bucket_extend, bucket);
 		} else {
-			TQ_STAT(bucket, tqs_nomem);
+			tq->tq_nomem++;
 		}
 	}
 
@@ -1282,7 +1286,7 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		if ((tqe = taskq_ent_alloc(tq, flags)) != NULL) {
 			TQ_ENQUEUE(tq, tqe, func, arg);
 		} else {
-			TQ_STAT(bucket, tqs_nomem);
+			tq->tq_nomem++;
 		}
 	}
 	mutex_exit(&tq->tq_lock);
@@ -2171,12 +2175,13 @@ taskq_bucket_extend(void *arg)
 	taskq_t *tq = b->tqbucket_taskq;
 	int nthreads;
 
+	mutex_enter(&tq->tq_lock);
+
 	if (! ENOUGH_MEMORY()) {
-		TQ_STAT(b, tqs_nomem);
+		tq->tq_nomem++;
+		mutex_exit(&tq->tq_lock);
 		return;
 	}
-
-	mutex_enter(&tq->tq_lock);
 
 	/*
 	 * Observe global taskq limits on the number of threads.
@@ -2192,7 +2197,7 @@ taskq_bucket_extend(void *arg)
 
 	if (tqe == NULL) {
 		mutex_enter(&tq->tq_lock);
-		TQ_STAT(b, tqs_nomem);
+		tq->tq_nomem++;
 		tq->tq_tcreates--;
 		mutex_exit(&tq->tq_lock);
 		return;
@@ -2254,6 +2259,7 @@ taskq_kstat_update(kstat_t *ksp, int rw)
 	tqsp->tq_nalloc.value.ui64 = tq->tq_nalloc;
 	tqsp->tq_pri.value.ui64 = tq->tq_pri;
 	tqsp->tq_nthreads.value.ui64 = tq->tq_nthreads;
+	tqsp->tq_nomem.value.ui64 = tq->tq_nomem;
 	return (0);
 }
 
@@ -2277,6 +2283,7 @@ taskq_d_kstat_update(kstat_t *ksp, int rw)
 	tqsp->tqd_bnactive.value.ui64 = tq->tq_active;
 	tqsp->tqd_btotaltime.value.ui64 = tq->tq_totaltime;
 	tqsp->tqd_pri.value.ui64 = tq->tq_pri;
+	tqsp->tqd_nomem.value.ui64 = tq->tq_nomem;
 
 	tqsp->tqd_hits.value.ui64 = 0;
 	tqsp->tqd_misses.value.ui64 = 0;
@@ -2298,7 +2305,6 @@ taskq_d_kstat_update(kstat_t *ksp, int rw)
 		tqsp->tqd_tdeaths.value.ui64 += b->tqbucket_stat.tqs_tdeaths;
 		tqsp->tqd_maxthreads.value.ui64 +=
 		    b->tqbucket_stat.tqs_maxthreads;
-		tqsp->tqd_nomem.value.ui64 += b->tqbucket_stat.tqs_nomem;
 		tqsp->tqd_disptcreates.value.ui64 +=
 		    b->tqbucket_stat.tqs_disptcreates;
 		tqsp->tqd_totaltime.value.ui64 += b->tqbucket_totaltime;
