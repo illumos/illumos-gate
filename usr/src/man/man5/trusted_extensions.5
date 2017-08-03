@@ -1,18 +1,18 @@
 '\" te
+.\" Copyright 2017 Peter Tribble
 .\" Copyright (c) 2007, Sun Microsystems Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TRUSTED_EXTENSIONS 5 "Nov 12, 2007"
+.TH TRUSTED_EXTENSIONS 5 "Aug 3, 2017"
 .SH NAME
-trusted_extensions \- Solaris Trusted Extensions
+trusted_extensions \- Trusted Extensions
 .SH DESCRIPTION
-.sp
 .LP
-Solaris\u\s-2TM\s+2\d Trusted Extensions software is a specific configuration
-of the Solaris Operating System (Solaris OS). Solaris Trusted Extensions
-(Trusted Extensions) provides labels for local objects and processes, for the
-desktop and windowing system, for zones and file systems, and for network
+Trusted Extensions software is a specific configuration
+of the Operating System. Trusted Extensions
+provides labels for local objects and processes,
+for zones and file systems, and for network
 communications. These labels are used to implement a Multilevel Security (MLS)
 policy that restricts the flow of information based on label relationships. In
 contrast to Discretionary Access Control (DAC) based on ownership, the MLS
@@ -32,17 +32,9 @@ svc:/system/labeld:default
 
 .sp
 .LP
-Refer to the Administrator's Guide listed below for the required configuration
-of Trusted Extensions software necessary before use. The system must be
+The system must be
 rebooted after enabling or disabling \fBlabeld\fR to activate or deactivate
 Trusted Extensions software.
 .SH SEE ALSO
-.sp
 .LP
 \fBlabeld\fR(1M), \fBlabel_encodings\fR(4), \fBlabels\fR(5)
-.sp
-.LP
-\fISolaris Trusted Extensions Administrator\&'s Procedures\fR
-.sp
-.LP
-\fISolaris Trusted Extensions User\&'s Guide\fR

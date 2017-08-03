@@ -85,9 +85,6 @@ file path=usr/lib/help/auths/locale/C/LabelHeader.html
 file path=usr/lib/help/auths/locale/C/LabelPrint.html
 file path=usr/lib/help/auths/locale/C/LabelRange.html
 file path=usr/lib/help/auths/locale/C/LabelServer.html
-file path=usr/lib/help/auths/locale/C/LabelWinDowngrade.html
-file path=usr/lib/help/auths/locale/C/LabelWinNoView.html
-file path=usr/lib/help/auths/locale/C/LabelWinUpgrade.html
 file path=usr/lib/help/auths/locale/C/PrintAdmin.html
 file path=usr/lib/help/auths/locale/C/PrintCancel.html
 file path=usr/lib/help/auths/locale/C/PrintHeader.html
@@ -137,7 +134,6 @@ file path=usr/share/man/man1m/tnd.1m
 file path=usr/share/man/man1m/tninfo.1m
 file path=usr/share/man/man1m/txzonemgr.1m
 file path=usr/share/man/man1m/updatehome.1m
-file path=usr/share/man/man4/sel_config.4
 file path=usr/share/man/man5/trusted_extensions.5
 hardlink path=usr/sbin/remove_allocatable target=add_allocatable
 legacy pkg=SUNWtsr desc="Solaris Trusted Extensions, (Root)" \

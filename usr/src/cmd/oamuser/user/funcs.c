@@ -59,8 +59,6 @@ static const char auth[] = "authorization";
 static const char type[] = "user type";
 static const char lock[] = "lock_after_retries value";
 static const char label[] = "label";
-static const char idlecmd[] = "idlecmd value";
-static const char idletime[] = "idletime value";
 static const char auditflags[] = "audit mask";
 static char	  auditerr[256];
 
@@ -73,8 +71,6 @@ static const char *check_privset(const char *);
 static const char *check_type(const char *);
 static const char *check_lock_after_retries(const char *);
 static const char *check_label(const char *);
-static const char *check_idlecmd(const char *);
-static const char *check_idletime(const char *);
 static const char *check_auditflags(const char *);
 
 int nkeys;
@@ -91,8 +87,6 @@ static ua_key_t keys[] = {
 	{ USERATTR_LOCK_AFTER_RETRIES_KW, check_lock_after_retries,  lock },
 	{ USERATTR_CLEARANCE,	check_label,	label },
 	{ USERATTR_MINLABEL,	check_label,	label },
-	{ USERATTR_IDLECMD_KW,	check_idlecmd,	idlecmd },
-	{ USERATTR_IDLETIME_KW,	check_idletime,	idletime },
 	{ USERATTR_AUDIT_FLAGS_KW, check_auditflags, auditflags },
 };
 
@@ -443,33 +437,6 @@ check_label(const char *labelstr)
 
 	if (err == -1)
 		return (labelstr);
-
-	return (NULL);
-}
-
-static const char *
-check_idlecmd(const char *cmd)
-{
-	if ((strcmp(cmd, USERATTR_IDLECMD_LOCK_KW) != 0) &&
-	    (strcmp(cmd, USERATTR_IDLECMD_LOGOUT_KW) != 0)) {
-		return (cmd);
-	}
-
-	return (NULL);
-}
-
-static const char *
-check_idletime(const char *time)
-{
-	int		c;
-	unsigned char	*up = (unsigned char *)time;
-
-	c = *up;
-	while (c != '\0') {
-		if (!isdigit(c))
-			return (time);
-		c = *++up;
-	}
 
 	return (NULL);
 }

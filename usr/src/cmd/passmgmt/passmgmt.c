@@ -93,8 +93,6 @@ kvopts_t ua_opts[] =  {
 { '\0', USERATTR_LABELVIEW },
 { '\0', USERATTR_CLEARANCE },
 { '\0', USERATTR_MINLABEL },
-{ '\0', USERATTR_IDLECMD_KW },
-{ '\0', USERATTR_IDLETIME_KW },
 { '\0', USERATTR_AUDIT_FLAGS_KW },
 };
 
