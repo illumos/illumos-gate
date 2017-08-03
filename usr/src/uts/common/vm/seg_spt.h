@@ -21,12 +21,11 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_SEG_SPT_H
 #define	_VM_SEG_SPT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -101,7 +100,7 @@ typedef struct shm_data {
 int	sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
 	    uint_t prot, uint_t flags, uint_t szc);
 void	sptdestroy(struct as *, struct anon_map *);
-int	segspt_shmattach(struct seg *, caddr_t *);
+int	segspt_shmattach(struct seg **, void *);
 
 #define	isspt(sp)	((sp)->shm_sptinfo ? (sp)->shm_sptinfo->sptas : NULL)
 #define	spt_locked(a)	((a) & SHM_SHARE_MMU)

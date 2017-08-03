@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -3542,6 +3543,10 @@ oprgetmap(proc_t *p, list_t *iolhead)
 		caddr_t saddr, naddr;
 		void *tmp = NULL;
 
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
+
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			prot = pr_getprot(seg, 0, &tmp, &saddr, &naddr, eaddr);
 			if (saddr == naddr)
@@ -3602,6 +3607,10 @@ oprgetmap32(proc_t *p, list_t *iolhead)
 		caddr_t saddr, naddr;
 		void *tmp = NULL;
 
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
+
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			prot = pr_getprot(seg, 0, &tmp, &saddr, &naddr, eaddr);
 			if (saddr == naddr)
@@ -3655,6 +3664,10 @@ oprpdsize(struct as *as)
 		void *tmp = NULL;
 		size_t npage;
 
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
+
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			(void) pr_getprot(seg, 0, &tmp, &saddr, &naddr, eaddr);
 			if ((npage = (naddr - saddr) / PAGESIZE) != 0)
@@ -3684,6 +3697,10 @@ oprpdsize32(struct as *as)
 		caddr_t saddr, naddr;
 		void *tmp = NULL;
 		size_t npage;
+
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
 
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			(void) pr_getprot(seg, 0, &tmp, &saddr, &naddr, eaddr);
@@ -3734,6 +3751,10 @@ again:
 		caddr_t eaddr = seg->s_base + pr_getsegsize(seg, 0);
 		caddr_t saddr, naddr;
 		void *tmp = NULL;
+
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
 
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			size_t len;
@@ -3841,6 +3862,10 @@ again:
 		caddr_t eaddr = seg->s_base + pr_getsegsize(seg, 0);
 		caddr_t saddr, naddr;
 		void *tmp = NULL;
+
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
 
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			size_t len;

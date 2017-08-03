@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -99,8 +99,9 @@ static struct seg_ops segumap_ops = {
  * Create a kernel/user-mapped segment.
  */
 int
-segumap_create(struct seg *seg, void *argsp)
+segumap_create(struct seg **segpp, void *argsp)
 {
+	struct seg *seg = *segpp;
 	segumap_crargs_t *a = (struct segumap_crargs *)argsp;
 	segumap_data_t *data;
 

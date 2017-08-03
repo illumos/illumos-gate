@@ -13,30 +13,28 @@
  * Copyright 2018 Joyent, Inc.
  */
 
-#ifndef	_VM_SEG_UMAP_H
-#define	_VM_SEG_UMAP_H
+#ifndef	_VM_SEG_HOLE_H
+#define	_VM_SEG_HOLE_H
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-typedef struct segumap_crargs {
-	caddr_t	kaddr;
-	uchar_t	prot;		/* protection */
-	uchar_t	maxprot;	/* maximum protection */
-} segumap_crargs_t;
+typedef struct seghole_crargs {
+	const char *name;
+} seghole_crargs_t;
 
-typedef struct segumap_data {
-	krwlock_t	sud_lock;
-	caddr_t		sud_kaddr;
-	uchar_t		sud_prot;
-	size_t		sud_softlockcnt;
-} segumap_data_t;
+typedef struct seghole_data {
+	const char	*shd_name;
+} seghole_data_t;
 
-extern int segumap_create(struct seg **, void *);
+extern int seghole_create(struct seg **, void *);
+
+#define	AS_MAP_CHECK_SEGHOLE(crfp)		\
+	((crfp) == (segcreate_func_t)seghole_create)
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _VM_SEG_UMAP_H */
+#endif	/* _VM_SEG_HOLE_H */

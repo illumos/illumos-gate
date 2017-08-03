@@ -19,7 +19,10 @@
  * CDDL HEADER END
  */
 
-/* Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved. */
+/*
+ * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
+ */
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -329,9 +332,10 @@ grow(caddr_t sp)
 	} else {
 		err = grow_internal(sp, p->p_stkpageszc);
 	}
+	newsize = p->p_stksize;
 	as_rangeunlock(as);
 
-	if (err == 0 && (newsize = p->p_stksize) > oldsize) {
+	if (err == 0 && newsize > oldsize) {
 		ASSERT(IS_P2ALIGNED(oldsize, PAGESIZE));
 		ASSERT(IS_P2ALIGNED(newsize, PAGESIZE));
 		/*
@@ -424,6 +428,7 @@ grow_internal(caddr_t sp, uint_t growszc)
 	struct proc *p = curproc;
 	size_t newsize;
 	size_t oldsize;
+	uintptr_t new_start;
 	int    error;
 	size_t pgsz;
 	uint_t szc;
@@ -494,7 +499,32 @@ grow_internal(caddr_t sp, uint_t growszc)
 	}
 	crargs.lgrp_mem_policy_flags = LGRP_MP_FLAG_EXTEND_DOWN;
 
-	if ((error = as_map(p->p_as, p->p_usrstack - newsize, newsize - oldsize,
+	/*
+	 * The stack is about to grow into its guard.  This can be acceptable
+	 * if the size restriction on the stack has been expanded since its
+	 * initialization during exec().  In such cases, the guard segment will
+	 * be shrunk, provided the new size is reasonable.
+	 */
+	new_start = (uintptr_t)p->p_usrstack - newsize;
+	if (p->p_stkg_start != 0 && new_start > p->p_stkg_start &&
+	    new_start < p->p_stkg_end) {
+		const size_t unmap_sz = p->p_stkg_end - new_start;
+		const size_t remain_sz = new_start - p->p_stkg_start;
+		extern size_t stack_guard_min_sz;
+
+		/* Do not allow the guard to shrink below minimum size */
+		if (remain_sz < stack_guard_min_sz) {
+			return (ENOMEM);
+		}
+
+		error = as_unmap(p->p_as, (caddr_t)new_start, unmap_sz);
+		if (error != 0) {
+			return (error);
+		}
+		p->p_stkg_end -= unmap_sz;
+	}
+
+	if ((error = as_map(p->p_as, (caddr_t)new_start, newsize - oldsize,
 	    segvn_create, &crargs)) != 0) {
 		if (error == EAGAIN) {
 			cmn_err(CE_WARN, "Sorry, no swap space to grow stack "

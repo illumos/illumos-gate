@@ -776,9 +776,6 @@ map_addr_proc(
 
 	base = p->p_brkbase;
 #if defined(__amd64)
-	/*
-	 * XX64 Yes, this needs more work.
-	 */
 	if (p->p_model == DATAMODEL_NATIVE) {
 		if (userlimit < as->a_userlimit) {
 			/*
@@ -798,16 +795,24 @@ map_addr_proc(
 			}
 		} else {
 			/*
-			 * XX64 This layout is probably wrong .. but in
-			 * the event we make the amd64 address space look
-			 * like sparcv9 i.e. with the stack -above- the
-			 * heap, this bit of code might even be correct.
+			 * With the stack positioned at a higher address than
+			 * the heap for 64-bit processes, it is necessary to be
+			 * mindful of its location and potential size.
+			 *
+			 * Unallocated space above the top of the stack (that
+			 * is, at a lower address) but still within the bounds
+			 * of the stack limit should be considered unavailable.
+			 *
+			 * As the 64-bit stack guard is mapped in immediately
+			 * adjacent to the stack limit boundary, this prevents
+			 * new mappings from having accidentally dangerous
+			 * proximity to the stack.
 			 */
 			slen = p->p_usrstack - base -
 			    ((p->p_stk_ctl + PAGEOFFSET) & PAGEMASK);
 		}
 	} else
-#endif
+#endif /* defined(__amd64) */
 		slen = userlimit - base;
 
 	/* Make len be a multiple of PAGESIZE */

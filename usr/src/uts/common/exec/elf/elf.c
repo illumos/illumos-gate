@@ -2075,6 +2075,10 @@ top:
 		void *tmp = NULL;
 		extern struct seg_ops segspt_shmops;
 
+		if ((seg->s_flags & S_HOLE) != 0) {
+			continue;
+		}
+
 		for (saddr = seg->s_base; saddr < eaddr; saddr = naddr) {
 			uint_t prot;
 			size_t size;

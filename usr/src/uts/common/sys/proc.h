@@ -251,8 +251,15 @@ typedef struct	proc {
 	kmutex_t p_maplock;		/* lock for pr_mappage() */
 	struct	proc  *p_rlink;		/* linked list for server */
 	kcondvar_t p_srwchan_cv;
-	size_t	p_stksize;		/* process stack size in bytes */
-	uint_t	p_stkpageszc;		/* preferred stack max page size code */
+
+	/*
+	 * Stack sizing and guard information.
+	 * Generally protected by as_rangelock()
+	 */
+	size_t		p_stksize;	/* process stack size in bytes */
+	uint_t		p_stkpageszc;	/* preferred stack max page size code */
+	uintptr_t	p_stkg_start;	/* start of stack guard */
+	uintptr_t	p_stkg_end;	/* end of stack guard */
 
 	/*
 	 * Microstate accounting, resource usage, and real-time profiling

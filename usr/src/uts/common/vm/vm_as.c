@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -67,6 +67,7 @@
 #include <vm/seg_kmem.h>
 #include <vm/seg_map.h>
 #include <vm/seg_spt.h>
+#include <vm/seg_hole.h>
 #include <vm/page.h>
 
 clock_t deadlk_wait = 1; /* number of ticks to wait before retrying */
@@ -75,7 +76,6 @@ static struct kmem_cache *as_cache;
 
 static void as_setwatchprot(struct as *, caddr_t, size_t, uint_t);
 static void as_clearwatchprot(struct as *, caddr_t, size_t);
-int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
 
 
 /*
@@ -816,7 +816,9 @@ as_dup(struct as *as, struct proc *forkedproc)
 			as_free(newas);
 			return (error);
 		}
-		newas->a_size += seg->s_size;
+		if ((newseg->s_flags & S_HOLE) == 0) {
+			newas->a_size += seg->s_size;
+		}
 	}
 	newas->a_resvsize = as->a_resvsize - purgesize;
 
@@ -1312,6 +1314,8 @@ top:
 	as_clearwatchprot(as, raddr, eaddr - raddr);
 
 	for (seg = as_findseg(as, raddr, 0); seg != NULL; seg = seg_next) {
+		const boolean_t is_hole = ((seg->s_flags & S_HOLE) != 0);
+
 		if (eaddr <= seg->s_base)
 			break;		/* eaddr was in a gap; all done */
 
@@ -1416,9 +1420,11 @@ retry:
 			return (-1);
 		}
 
-		as->a_size -= ssize;
-		if (rsize)
-			as->a_resvsize -= rsize;
+		if (!is_hole) {
+			as->a_size -= ssize;
+			if (rsize)
+				as->a_resvsize -= rsize;
+		}
 		raddr += ssize;
 	}
 	AS_LOCK_EXIT(as);
@@ -1427,35 +1433,34 @@ retry:
 
 static int
 as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
-    int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
+    segcreate_func_t crfp, struct segvn_crargs *vn_a, boolean_t *segcreated)
 {
-	uint_t szc;
-	uint_t nszc;
+	uint_t szc, nszc, save_szcvec;
 	int error;
-	caddr_t a;
-	caddr_t eaddr;
-	size_t segsize;
-	struct seg *seg;
+	caddr_t a, eaddr;
 	size_t pgsz;
-	int do_off = (vn_a->vp != NULL || vn_a->amp != NULL);
-	uint_t save_szcvec;
+	const boolean_t do_off = (vn_a->vp != NULL || vn_a->amp != NULL);
 
 	ASSERT(AS_WRITE_HELD(as));
 	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
 	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
 	ASSERT(vn_a->vp == NULL || vn_a->amp == NULL);
+
 	if (!do_off) {
 		vn_a->offset = 0;
 	}
 
 	if (szcvec <= 1) {
-		seg = seg_alloc(as, addr, size);
+		struct seg *seg, *segref;
+
+		seg = segref = seg_alloc(as, addr, size);
 		if (seg == NULL) {
 			return (ENOMEM);
 		}
 		vn_a->szc = 0;
-		error = (*crfp)(seg, vn_a);
+		error = (*crfp)(&seg, vn_a);
 		if (error != 0) {
+			VERIFY3P(seg, ==, segref);
 			seg_free(seg);
 		} else {
 			as->a_size += size;
@@ -1479,21 +1484,26 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 		pgsz = page_get_pagesize(nszc);
 		a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
 		if (a != addr) {
+			struct seg *seg, *segref;
+			size_t segsize;
+
 			ASSERT(a < eaddr);
+
 			segsize = a - addr;
-			seg = seg_alloc(as, addr, segsize);
+			seg = segref = seg_alloc(as, addr, segsize);
 			if (seg == NULL) {
 				return (ENOMEM);
 			}
 			vn_a->szc = szc;
-			error = (*crfp)(seg, vn_a);
+			error = (*crfp)(&seg, vn_a);
 			if (error != 0) {
+				VERIFY3P(seg, ==, segref);
 				seg_free(seg);
 				return (error);
 			}
 			as->a_size += segsize;
 			as->a_resvsize += segsize;
-			*segcreated = 1;
+			*segcreated = B_TRUE;
 			if (do_off) {
 				vn_a->offset += segsize;
 			}
@@ -1509,20 +1519,24 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 		a = (caddr_t)P2ALIGN((uintptr_t)eaddr, pgsz);
 		ASSERT(a >= addr);
 		if (a != addr) {
+			struct seg *seg, *segref;
+			size_t segsize;
+
 			segsize = a - addr;
-			seg = seg_alloc(as, addr, segsize);
+			seg = segref = seg_alloc(as, addr, segsize);
 			if (seg == NULL) {
 				return (ENOMEM);
 			}
 			vn_a->szc = szc;
-			error = (*crfp)(seg, vn_a);
+			error = (*crfp)(&seg, vn_a);
 			if (error != 0) {
+				VERIFY3P(seg, ==, segref);
 				seg_free(seg);
 				return (error);
 			}
 			as->a_size += segsize;
 			as->a_resvsize += segsize;
-			*segcreated = 1;
+			*segcreated = B_TRUE;
 			if (do_off) {
 				vn_a->offset += segsize;
 			}
@@ -1541,14 +1555,13 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 
 static int
 as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
-    int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
+    segcreate_func_t crfp, struct segvn_crargs *vn_a, boolean_t *segcreated)
 {
 	uint_t mapflags = vn_a->flags & (MAP_TEXT | MAP_INITDATA);
 	int type = (vn_a->type == MAP_SHARED) ? MAPPGSZC_SHM : MAPPGSZC_PRIVM;
 	uint_t szcvec = map_pgszcvec(addr, size, (uintptr_t)addr, mapflags,
 	    type, 0);
 	int error;
-	struct seg *seg;
 	struct vattr va;
 	u_offset_t eoff;
 	size_t save_size = 0;
@@ -1562,13 +1575,16 @@ as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
 
 again:
 	if (szcvec <= 1) {
-		seg = seg_alloc(as, addr, size);
+		struct seg *seg, *segref;
+
+		seg = segref = seg_alloc(as, addr, size);
 		if (seg == NULL) {
 			return (ENOMEM);
 		}
 		vn_a->szc = 0;
-		error = (*crfp)(seg, vn_a);
+		error = (*crfp)(&seg, vn_a);
 		if (error != 0) {
+			VERIFY3P(seg, ==, segref);
 			seg_free(seg);
 		} else {
 			as->a_size += size;
@@ -1623,7 +1639,7 @@ again:
  */
 static int
 as_map_ansegs(struct as *as, caddr_t addr, size_t size,
-    int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
+    segcreate_func_t crfp, struct segvn_crargs *vn_a, boolean_t *segcreated)
 {
 	uint_t szcvec;
 	uchar_t type;
@@ -1653,21 +1669,21 @@ as_map_ansegs(struct as *as, caddr_t addr, size_t size,
 }
 
 int
-as_map(struct as *as, caddr_t addr, size_t size, int (*crfp)(), void *argsp)
+as_map(struct as *as, caddr_t addr, size_t size, segcreate_func_t crfp,
+    void *argsp)
 {
 	AS_LOCK_ENTER(as, RW_WRITER);
 	return (as_map_locked(as, addr, size, crfp, argsp));
 }
 
 int
-as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
+as_map_locked(struct as *as, caddr_t addr, size_t size, segcreate_func_t crfp,
     void *argsp)
 {
-	struct seg *seg = NULL;
 	caddr_t raddr;			/* rounded down addr */
 	size_t rsize;			/* rounded up size */
 	int error;
-	int unmap = 0;
+	boolean_t is_hole = B_FALSE;
 	/*
 	 * The use of a_proc is preferred to handle the case where curproc is
 	 * a door_call server and is allocating memory in the client's (a_proc)
@@ -1693,63 +1709,97 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	as->a_updatedir = 1;	/* inform /proc */
 	gethrestime(&as->a_updatetime);
 
-	if (as != &kas && as->a_size + rsize > (size_t)p->p_vmem_ctl) {
-		AS_LOCK_EXIT(as);
+	if (as != &kas) {
+		/*
+		 * Ensure that the virtual size of the process will not exceed
+		 * the configured limit.  Since seg_hole segments will later
+		 * set the S_HOLE flag indicating their status as a hole in the
+		 * AS, they are excluded from this check.
+		 */
+		if (as->a_size + rsize > (size_t)p->p_vmem_ctl &&
+		    !AS_MAP_CHECK_SEGHOLE(crfp)) {
+			AS_LOCK_EXIT(as);
 
-		(void) rctl_action(rctlproc_legacy[RLIMIT_VMEM], p->p_rctls, p,
-		    RCA_UNSAFE_ALL);
-
-		return (ENOMEM);
+			(void) rctl_action(rctlproc_legacy[RLIMIT_VMEM],
+			    p->p_rctls, p, RCA_UNSAFE_ALL);
+			return (ENOMEM);
+		}
 	}
 
 	if (AS_MAP_CHECK_VNODE_LPOOB(crfp, argsp)) {
+		boolean_t do_unmap = B_FALSE;
+
 		crargs = *(struct segvn_crargs *)argsp;
-		error = as_map_vnsegs(as, raddr, rsize, crfp, &crargs, &unmap);
+		error = as_map_vnsegs(as, raddr, rsize, crfp, &crargs,
+		    &do_unmap);
 		if (error != 0) {
 			AS_LOCK_EXIT(as);
-			if (unmap) {
+			if (do_unmap) {
 				(void) as_unmap(as, addr, size);
 			}
 			return (error);
 		}
 	} else if (AS_MAP_CHECK_ANON_LPOOB(crfp, argsp)) {
+		boolean_t do_unmap = B_FALSE;
+
 		crargs = *(struct segvn_crargs *)argsp;
-		error = as_map_ansegs(as, raddr, rsize, crfp, &crargs, &unmap);
+		error = as_map_ansegs(as, raddr, rsize, crfp, &crargs,
+		    &do_unmap);
 		if (error != 0) {
 			AS_LOCK_EXIT(as);
-			if (unmap) {
+			if (do_unmap) {
 				(void) as_unmap(as, addr, size);
 			}
 			return (error);
 		}
 	} else {
-		seg = seg_alloc(as, addr, size);
+		struct seg *seg, *segref;
+
+		seg = segref = seg_alloc(as, addr, size);
 		if (seg == NULL) {
 			AS_LOCK_EXIT(as);
 			return (ENOMEM);
 		}
 
-		error = (*crfp)(seg, argsp);
+		/*
+		 * It is possible that the segment creation routine will free
+		 * 'seg' as part of a more advanced operation, such as when
+		 * segvn concatenates adjacent segments together.  When this
+		 * occurs, the seg*_create routine must communicate the
+		 * resulting segment out via the 'struct seg **' parameter.
+		 *
+		 * If segment creation fails, it must not free the passed-in
+		 * segment, nor alter the argument pointer.
+		 */
+		error = (*crfp)(&seg, argsp);
 		if (error != 0) {
+			VERIFY3P(seg, ==, segref);
 			seg_free(seg);
 			AS_LOCK_EXIT(as);
 			return (error);
 		}
+
 		/*
-		 * Add size now so as_unmap will work if as_ctl fails.
+		 * Check if the resulting segment represents a hole in the
+		 * address space, rather than contributing to the AS size.
 		 */
-		as->a_size += rsize;
-		as->a_resvsize += rsize;
+		is_hole = ((seg->s_flags & S_HOLE) != 0);
+
+		/* Add size now so as_unmap will work if as_ctl fails. */
+		if (!is_hole) {
+			as->a_size += rsize;
+			as->a_resvsize += rsize;
+		}
 	}
 
 	as_setwatch(as);
 
 	/*
-	 * If the address space is locked,
-	 * establish memory locks for the new segment.
+	 * Establish memory locks for the segment if the address space is
+	 * locked, provided it's not an explicit hole in the AS.
 	 */
 	mutex_enter(&as->a_contents);
-	if (AS_ISPGLCK(as)) {
+	if (AS_ISPGLCK(as) && !is_hole) {
 		mutex_exit(&as->a_contents);
 		AS_LOCK_EXIT(as);
 		error = as_ctl(as, addr, size, MC_LOCK, 0, 0, NULL, 0);
@@ -2277,6 +2327,9 @@ retry:
 		}
 
 		for (seg = AS_SEGFIRST(as); seg; seg = AS_SEGNEXT(as, seg)) {
+			if ((seg->s_flags & S_HOLE) != 0) {
+				continue;
+			}
 			error = SEGOP_LOCKOP(seg, seg->s_base,
 			    seg->s_size, attr, MC_LOCK, mlock_map, pos);
 			if (error != 0)
@@ -2306,6 +2359,9 @@ retry:
 		mutex_exit(&as->a_contents);
 
 		for (seg = AS_SEGFIRST(as); seg; seg = AS_SEGNEXT(as, seg)) {
+			if ((seg->s_flags & S_HOLE) != 0) {
+				continue;
+			}
 			error = SEGOP_LOCKOP(seg, seg->s_base,
 			    seg->s_size, attr, MC_UNLOCK, NULL, 0);
 			if (error != 0)

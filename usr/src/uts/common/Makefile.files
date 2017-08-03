@@ -303,6 +303,7 @@ GENUNIX_OBJS +=	\
 		sctp_crc32.o	\
 		secflags.o	\
 		seg_dev.o	\
+		seg_hole.o	\
 		seg_kp.o	\
 		seg_kpm.o	\
 		seg_map.o	\

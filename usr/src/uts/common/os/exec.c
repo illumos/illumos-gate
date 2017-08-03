@@ -26,7 +26,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -78,6 +78,7 @@
 #include <vm/as.h>
 #include <vm/seg.h>
 #include <vm/seg_vn.h>
+#include <vm/seg_hole.h>
 
 #define	PRIV_RESET		0x01	/* needs to reset privs */
 #define	PRIV_SETID		0x02	/* needs to change uids */
@@ -113,6 +114,14 @@ uint_t auxv_hwcap32_2 = 0;	/* 32-bit version of auxv_hwcap2 */
 size_t aslr_max_brk_skew = 16 * 1024 * 1024; /* 16MB */
 #pragma weak exec_stackgap = aslr_max_stack_skew /* Old, compatible name */
 size_t aslr_max_stack_skew = 64 * 1024; /* 64KB */
+
+/*
+ * Size of guard segment for 64-bit processes and minimum size it can be shrunk
+ * to in the case of grow() operations.  These are kept as variables in case
+ * they need to be tuned in an emergency.
+ */
+size_t stack_guard_seg_sz = 256 * 1024 * 1024;
+size_t stack_guard_min_sz = 64 * 1024 * 1024;
 
 /*
  * exece() - system call wrapper around exec_common()
@@ -1858,6 +1867,15 @@ exec_get_spslew(void)
  * The initial user stack layout is as follows:
  *
  *	User Stack
+ *	+---------------+
+ *	|		|
+ *	| stack guard	|
+ *	| (64-bit only)	|
+ *	|		|
+ *	+...............+ <--- stack limit (base - curproc->p_stk_ctl)
+ *	.		.
+ *	.		.
+ *	.		.
  *	+---------------+ <--- curproc->p_usrstack
  *	|		|
  *	| slew		|
@@ -1899,6 +1917,11 @@ exec_get_spslew(void)
  *	+---------------+ <--- argv[]
  *	| argc		|
  *	+---------------+ <--- stack base
+ *
+ * In 64-bit processes, a stack guard segment is allocated at the address
+ * immediately below where the stack limit ends.  This protects new library
+ * mappings (such as the linker) from being placed in relatively dangerous
+ * proximity to the stack.
  */
 int
 exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
@@ -1912,6 +1935,9 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	struct as *as;
 	extern int use_stk_lpg;
 	size_t sp_slew;
+#if defined(_LP64)
+	const size_t sg_sz = (stack_guard_seg_sz & PAGEMASK);
+#endif /* defined(_LP64) */
 
 	args->from_model = p->p_model;
 	if (p->p_model == DATAMODEL_NATIVE) {
@@ -2060,6 +2086,8 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	p->p_brkpageszc = 0;
 	p->p_stksize = 0;
 	p->p_stkpageszc = 0;
+	p->p_stkg_start = 0;
+	p->p_stkg_end = 0;
 	p->p_model = args->to_model;
 	p->p_usrstack = usrstack;
 	p->p_stkprot = args->stk_prot;
@@ -2097,10 +2125,36 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	(void) hat_setup(as->a_hat, HAT_ALLOC);
 	hat_join_srd(as->a_hat, args->ex_vp);
 
-	/*
-	 * Finally, write out the contents of the new stack.
-	 */
+	/* Write out the contents of the new stack. */
 	error = stk_copyout(args, usrstack - sp_slew, auxvpp, up);
 	kmem_free(args->stk_base, args->stk_size);
+
+#if defined(_LP64)
+	/* Add stack guard segment (if needed) after successful copyout */
+	if (error == 0 && p->p_model == DATAMODEL_LP64 && sg_sz != 0) {
+		seghole_crargs_t sca;
+		caddr_t addr_end = (caddr_t)(((uintptr_t)usrstack -
+		    p->p_stk_ctl) & PAGEMASK);
+		caddr_t addr_start = addr_end - sg_sz;
+
+		DTRACE_PROBE4(stack__guard__chk, proc_t *, p,
+		    caddr_t, addr_start, caddr_t, addr_end, size_t, sg_sz);
+
+		if (addr_end >= usrstack || addr_start >= addr_end ||
+		    valid_usr_range(addr_start, sg_sz, PROT_NONE, as,
+		    as->a_userlimit) != RANGE_OKAY) {
+			return (E2BIG);
+		}
+
+		/* Create un-mappable area in AS with seg_hole */
+		sca.name = "stack_guard";
+		error = as_map(as, addr_start, sg_sz, seghole_create, &sca);
+		if (error == 0) {
+			p->p_stkg_start = (uintptr_t)addr_start;
+			p->p_stkg_end = (uintptr_t)addr_start + sg_sz;
+		}
+	}
+#endif /* defined(_LP64) */
+
 	return (error);
 }

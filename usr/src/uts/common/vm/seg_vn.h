@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -162,14 +162,14 @@ typedef struct	segvn_data {
 	{ NULL, NULL, 0, MAP_PRIVATE, prot, max, 0, NULL, 0, 0 }
 
 #define	AS_MAP_CHECK_VNODE_LPOOB(crfp, argsp)				\
-	((crfp) == (int (*)())segvn_create &&				\
+	((crfp) == (segcreate_func_t)segvn_create &&			\
 	(((struct segvn_crargs *)(argsp))->flags &			\
 	    (MAP_TEXT | MAP_INITDATA)) &&				\
 	((struct segvn_crargs *)(argsp))->szc == 0 &&			\
 	((struct segvn_crargs *)(argsp))->vp != NULL)
 
 #define	AS_MAP_CHECK_ANON_LPOOB(crfp, argsp)				\
-	((crfp) == (int (*)())segvn_create &&				\
+	((crfp) == (segcreate_func_t)segvn_create &&			\
 	(((struct segvn_crargs *)(argsp))->szc == 0 ||			\
 	((struct segvn_crargs *)(argsp))->szc == AS_MAP_HEAP ||		\
 	((struct segvn_crargs *)(argsp))->szc == AS_MAP_STACK) &&	\
@@ -228,7 +228,7 @@ typedef struct svntr_stats {
 } svntr_stats_t;
 
 extern void	segvn_init(void);
-extern int	segvn_create(struct seg *, void *);
+extern int	segvn_create(struct seg **, void *);
 
 extern	struct seg_ops segvn_ops;
 
