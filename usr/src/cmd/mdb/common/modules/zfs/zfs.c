@@ -178,55 +178,110 @@ mdb_nicenum(uint64_t num, char *buf)
 	}
 }
 
-static int verbose;
-
+/*
+ * <addr>::sm_entries <buffer length in bytes>
+ *
+ * Treat the buffer specified by the given address as a buffer that contains
+ * space map entries. Iterate over the specified number of entries and print
+ * them in both encoded and decoded form.
+ */
+/* ARGSUSED */
 static int
-freelist_walk_init(mdb_walk_state_t *wsp)
+sm_entries(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	if (wsp->walk_addr == NULL) {
-		mdb_warn("must supply starting address\n");
-		return (WALK_ERR);
-	}
+	uint64_t bufsz = 0;
+	boolean_t preview = B_FALSE;
 
-	wsp->walk_data = 0;  /* Index into the freelist */
-	return (WALK_NEXT);
-}
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
 
-static int
-freelist_walk_step(mdb_walk_state_t *wsp)
-{
-	uint64_t entry;
-	uintptr_t number = (uintptr_t)wsp->walk_data;
-	char *ddata[] = { "ALLOC", "FREE", "CONDENSE", "INVALID",
-			    "INVALID", "INVALID", "INVALID", "INVALID" };
-	int mapshift = SPA_MINBLOCKSHIFT;
-
-	if (mdb_vread(&entry, sizeof (entry), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read freelist entry %p", wsp->walk_addr);
-		return (WALK_DONE);
-	}
-	wsp->walk_addr += sizeof (entry);
-	wsp->walk_data = (void *)(number + 1);
-
-	if (SM_DEBUG_DECODE(entry)) {
-		mdb_printf("DEBUG: %3u  %10s: txg=%llu  pass=%llu\n",
-		    number,
-		    ddata[SM_DEBUG_ACTION_DECODE(entry)],
-		    SM_DEBUG_TXG_DECODE(entry),
-		    SM_DEBUG_SYNCPASS_DECODE(entry));
+	if (argc < 1) {
+		preview = B_TRUE;
+		bufsz = 2;
+	} else if (argc != 1) {
+		return (DCMD_USAGE);
 	} else {
-		mdb_printf("Entry: %3u  offsets=%08llx-%08llx  type=%c  "
-		    "size=%06llx", number,
-		    SM_OFFSET_DECODE(entry) << mapshift,
-		    (SM_OFFSET_DECODE(entry) + SM_RUN_DECODE(entry)) <<
-		    mapshift,
-		    SM_TYPE_DECODE(entry) == SM_ALLOC ? 'A' : 'F',
-		    SM_RUN_DECODE(entry) << mapshift);
-		if (verbose)
-			mdb_printf("      (raw=%012llx)\n", entry);
-		mdb_printf("\n");
+		switch (argv[0].a_type) {
+		case MDB_TYPE_STRING:
+			bufsz = mdb_strtoull(argv[0].a_un.a_str);
+			break;
+		case MDB_TYPE_IMMEDIATE:
+			bufsz = argv[0].a_un.a_val;
+			break;
+		default:
+			return (DCMD_USAGE);
+		}
 	}
-	return (WALK_NEXT);
+
+	char *actions[] = { "ALLOC", "FREE", "INVALID" };
+	for (uintptr_t bufend = addr + bufsz; addr < bufend;
+	    addr += sizeof (uint64_t)) {
+		uint64_t nwords;
+		uint64_t start_addr = addr;
+
+		uint64_t word = 0;
+		if (mdb_vread(&word, sizeof (word), addr) == -1) {
+			mdb_warn("failed to read space map entry %p", addr);
+			return (DCMD_ERR);
+		}
+
+		if (SM_PREFIX_DECODE(word) == SM_DEBUG_PREFIX) {
+			(void) mdb_printf("\t    [%6llu] %s: txg %llu, "
+			    "pass %llu\n",
+			    (u_longlong_t)(addr),
+			    actions[SM_DEBUG_ACTION_DECODE(word)],
+			    (u_longlong_t)SM_DEBUG_TXG_DECODE(word),
+			    (u_longlong_t)SM_DEBUG_SYNCPASS_DECODE(word));
+			continue;
+		}
+
+		char entry_type;
+		uint64_t raw_offset, raw_run, vdev_id = SM_NO_VDEVID;
+
+		if (SM_PREFIX_DECODE(word) != SM2_PREFIX) {
+			entry_type = (SM_TYPE_DECODE(word) == SM_ALLOC) ?
+			    'A' : 'F';
+			raw_offset = SM_OFFSET_DECODE(word);
+			raw_run = SM_RUN_DECODE(word);
+			nwords = 1;
+		} else {
+			ASSERT3U(SM_PREFIX_DECODE(word), ==, SM2_PREFIX);
+
+			raw_run = SM2_RUN_DECODE(word);
+			vdev_id = SM2_VDEV_DECODE(word);
+
+			/* it is a two-word entry so we read another word */
+			addr += sizeof (uint64_t);
+			if (addr >= bufend) {
+				mdb_warn("buffer ends in the middle of a two "
+				    "word entry\n", addr);
+				return (DCMD_ERR);
+			}
+
+			if (mdb_vread(&word, sizeof (word), addr) == -1) {
+				mdb_warn("failed to read space map entry %p",
+				    addr);
+				return (DCMD_ERR);
+			}
+
+			entry_type = (SM2_TYPE_DECODE(word) == SM_ALLOC) ?
+			    'A' : 'F';
+			raw_offset = SM2_OFFSET_DECODE(word);
+			nwords = 2;
+		}
+
+		(void) mdb_printf("\t    [%6llx]    %c  range:"
+		    " %010llx-%010llx  size: %06llx vdev: %06llu words: %llu\n",
+		    (u_longlong_t)start_addr,
+		    entry_type, (u_longlong_t)raw_offset,
+		    (u_longlong_t)(raw_offset + raw_run),
+		    (u_longlong_t)raw_run,
+		    (u_longlong_t)vdev_id, (u_longlong_t)nwords);
+
+		if (preview)
+			break;
+	}
+	return (DCMD_OK);
 }
 
 static int
@@ -3974,6 +4029,9 @@ static const mdb_dcmd_t dcmds[] = {
 	    "\t-M display metaslab group statistic\n"
 	    "\t-h display histogram (requires -m or -M)\n",
 	    "given a spa_t, print vdev summary", spa_vdevs },
+	{ "sm_entries", "<buffer length in bytes>",
+	    "print out space map entries from a buffer decoded",
+	    sm_entries},
 	{ "vdev", ":[-remMh]\n"
 	    "\t-r display recursively\n"
 	    "\t-e display statistics\n"
@@ -4024,8 +4082,6 @@ static const mdb_dcmd_t dcmds[] = {
 };
 
 static const mdb_walker_t walkers[] = {
-	{ "zms_freelist", "walk ZFS metaslab freelist",
-	    freelist_walk_init, freelist_walk_step, NULL },
 	{ "txg_list", "given any txg_list_t *, walk all entries in all txgs",
 	    txg_list_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list0", "given any txg_list_t *, walk all entries in txg 0",

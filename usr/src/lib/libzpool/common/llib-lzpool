@@ -71,3 +71,4 @@ extern uint64_t zfs_deadman_synctime_ms;
 extern int metaslab_preload_limit;
 extern boolean_t zfs_compressed_arc_enabled;
 extern boolean_t zfs_abd_scatter_enabled;
+extern boolean_t zfs_force_some_double_word_sm_entries;
