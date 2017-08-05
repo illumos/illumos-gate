@@ -369,7 +369,7 @@ xenconsattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 xenconsinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	dev_t dev = (dev_t)arg;
 	int instance, error;
@@ -547,14 +547,18 @@ xencons_rxint(struct xencons *xcp)
 loop:
 	mutex_enter(&xcp->excl);
 
+	instance = xcp->unit;
+
 	/* sanity check if we should bail */
 	if (xencons_console == NULL) {
 		mutex_exit(&xcp->excl);
+		DEBUGCONT1(XENCONS_DEBUG_PROCS,
+		    "xencons%d_rxint: xencons_console is NULL\n",
+		    instance);
 		goto out;
 	}
 
 	async = xcp->priv;
-	instance = xcp->unit;
 	ifp = xcp->ifp;
 	tp = &async->async_ttycommon;
 	q = tp->t_readq;
