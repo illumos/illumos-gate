@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -58,3 +58,7 @@ tests = ['runtests.32', 'runtests.64']
 [/opt/os-tests/tests/sockfs]
 user = root
 tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'sockpair']
+
+[/opt/os-tests/tests/pf_key]
+user = root
+tests = ['acquire-compare', 'acquire-spray']

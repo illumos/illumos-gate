@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include	<sys/types.h>
@@ -146,14 +144,14 @@ wrefresh(WINDOW *win)
 			 * If there is no exit_attribute mode, then vidupdate
 			 * could only possibly turn off one of the below three
 			 * so that's all we ask it turn off.
-			*/
+			 */
 			vidupdate(A_NORMAL, (A_ALTCHARSET | A_STANDOUT |
 			    A_UNDERLINE), _outch);
 
 		SP->fl_endwin = FALSE;
 
 #ifdef	_VR2_COMPAT_CODE
-		_endwin = (char) FALSE;
+		_endwin = (char)FALSE;
 #endif	/* _VR2_COMPAT_CODE */
 	}
 
@@ -218,7 +216,7 @@ wrefresh(WINDOW *win)
 		/* there is type-ahead */
 		if (!curwin && (_INPUTPENDING = _chkinput()) == TRUE) {
 			/* LINTED */
-			_VIRTTOP = (short) wy;
+			_VIRTTOP = (short)wy;
 			goto done;
 		}
 
@@ -263,9 +261,9 @@ next:
 	if (wy != cy || wx != cx) {
 		(void) mvcur(cy, cx, wy, wx);
 		/* LINTED */
-		cy = (short) wy;
+		cy = (short)wy;
 		/* LINTED */
-		cx = (short) wx;
+		cx = (short)wx;
 	}
 
 	/* reset the flags */
@@ -298,8 +296,7 @@ _shove(int wy)
 
 	/* allocate space for shifted line */
 	if (length < scrco) {
-		if (line)
-			free((char *) line);
+		free(line);
 		line = (chtype *) malloc(scrco * sizeof (chtype));
 		length = line ? scrco : 0;
 	}
@@ -371,7 +368,7 @@ _updateln(int wy)
 {
 	chtype	*wcp, *scp, *wp, *sp, wc, sc;
 	int	wx, lastx, x, mtch, idch, blnkx, idcx, video_attrx,
-		color_attrx, maxi, endns, begns, wx_sav, multi_col;
+	    color_attrx, maxi, endns, begns, wx_sav, multi_col;
 	bool	redraw, changed, didcolor, didvideo;
 
 	redraw = (_virtscr->_firstch[wy] == _REDRAW);
@@ -565,12 +562,12 @@ _updateln(int wy)
 
 				_PUTS(clr_bol, 1);
 				/* LINTED */
-				cy = (short) wy;
+				cy = (short)wy;
 				/* LINTED */
-				cx = (short) x;
+				cx = (short)x;
 
 				mtch = x - wx;
-				(void) memcpy((char *) scp, (char *) wcp,
+				(void) memcpy(scp, wcp,
 				    (mtch * sizeof (chtype)));
 				wcp += mtch;
 				scp += mtch;
@@ -585,9 +582,9 @@ _updateln(int wy)
 		if (cy != wy || cx != wx)
 			(void) mvcur(cy, cx, wy, wx);
 		/* LINTED */
-		cy = (short) wy;
+		cy = (short)wy;
 		/* LINTED */
-		cx = (short) wx;
+		cx = (short)wx;
 
 		/* update screen image */
 		while (wx < lastx) {
@@ -609,9 +606,9 @@ _updateln(int wy)
 
 				_PUTS(clr_eol, 1);
 				/* LINTED */
-				curscr->_curx = (short) wx;
-		 		/* LINTED */
-				curscr->_cury = (short) wy;
+				curscr->_curx = (short)wx;
+				/* LINTED */
+				curscr->_cury = (short)wy;
 				(void) wclrtoeol(curscr);
 
 				if (marks && wx > 0 && _ATTR(*(scp - 1)) !=
@@ -643,15 +640,21 @@ _updateln(int wy)
 
 			/* color and video attributes */
 			if (_ATTR(wc) != curscr->_attrs) {
-			    bool  color_change = FALSE;
-			    bool  video_change = FALSE;
+				bool  color_change = FALSE;
+				bool  video_change = FALSE;
 
-			    if (marks)
-				if (_VIDEO(wc) != _VIDEO(curscr->_attrs))
-					video_change = TRUE;
-				if (color_marks)
-				    if (_COLOR(wc) != _COLOR(curscr->_attrs))
-					color_change = TRUE;
+				if (marks) {
+					if (_VIDEO(wc) !=
+					    _VIDEO(curscr->_attrs)) {
+						video_change = TRUE;
+					}
+				}
+				if (color_marks) {
+					if (_COLOR(wc) !=
+					    _COLOR(curscr->_attrs)) {
+						color_change = TRUE;
+					}
+				}
 
 				/* the following may occurs when, for */
 				/* example the application */
@@ -694,8 +697,8 @@ _updateln(int wy)
 						    color_attrx);
 				/*
 				 * sc = _COLOR(curscr->_y[wy][color_attrx]);
-				 *_VIDS(sc, (~sc & A_COLOR));
-				*/
+				 * _VIDS(sc, (~sc & A_COLOR));
+				 */
 					_VIDS(_COLOR(_virtscr->_y[wy]
 					    [color_attrx]),
 					    _COLOR(_virtscr->_y[wy]
@@ -762,7 +765,7 @@ done:
 			if (_DARKCHAR(*scp))
 				break;
 		/* LINTED */
-		_BEGNS[wy] = (short) wx;
+		_BEGNS[wy] = (short)wx;
 		if (wx == scrco)
 			_ENDNS[wy] = -1;
 		else {
@@ -772,7 +775,7 @@ done:
 				if (_DARKCHAR(*scp))
 					break;
 			/* LINTED */
-			_ENDNS[wy] = (short) wx;
+			_ENDNS[wy] = (short)wx;
 		}
 
 		/* update the hash structure */
@@ -925,7 +928,7 @@ do_insert_char:
 	/* update the screen image */
 	for (x1 = length - 1, x2 = length - idch - 1; x2 >= 0; --x1, --x2)
 		scp[x1] = scp[x2];
-	(void) memcpy((char *) scp, (char *) wcp, idch * sizeof (chtype));
+	(void) memcpy(scp, wcp, idch * sizeof (chtype));
 
 	*id = idch;
 	return (match + idch);
@@ -1096,7 +1099,7 @@ _rmargin(int wx)
 
 		/* update screen image */
 		/* LINTED */
-		cx = (short) wx;
+		cx = (short)wx;
 		curscr->_y[cy][wx] = wcp[wx];
 		for (x = wx + 1; x < scrco; ++x) {
 			(void) _outwch(wcp[x]);
@@ -1205,13 +1208,13 @@ _useceod(int topy, int boty)
 		_PUTS(clear_screen, scrli);
 		cy = 0; cx = 0;
 		(void) werase(curscr);
-	} else
+	} else {
 
 		/* use clear-to-end-of-display or delete lines */
 		if (clr_eos || (parm_delete_line && !memory_below)) {
 			(void) mvcur(cy, cx, topy, 0);
 			/* LINTED */
-			cy = (short) topy;
+			cy = (short)topy;
 			cx = 0;
 			/* SS: colors */
 			if (back_color_erase)
@@ -1221,15 +1224,17 @@ _useceod(int topy, int boty)
 
 			/* update curscr */
 			/* LINTED */
-			curscr->_cury = (short) topy;
+			curscr->_cury = (short)topy;
 			curscr->_curx = 0;
 			(void) wclrtobot(curscr);
-		} else
+		} else {
 			/* no hardware support */
 			return;
+		}
+	}
 
-		/* correct the update structure */
-		(void) wtouchln(_virtscr, topy, scrli, FALSE);
+	/* correct the update structure */
+	(void) wtouchln(_virtscr, topy, scrli, FALSE);
 }
 
 

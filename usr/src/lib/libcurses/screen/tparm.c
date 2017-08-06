@@ -135,7 +135,8 @@ pop(STACK *st)
 	return (st->stack[st->top--]);
 }
 
-/* The following routine was added to make lint shut up about converting from
+/*
+ * The following routine was added to make lint shut up about converting from
  * a long to a char *.  It is identical to the pop routine, except for the
  * cast on the return statement.
  */
@@ -165,16 +166,16 @@ free_stack(STACK *st)
 }
 
 
-char	*
+char *
 tparm_p0(char *instring)
 {
 	long	p[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	return (tparm(instring, p[0], p[1], p[2], p[3], p[4], p[5], p[6],
-			p[7], p[8]));
+	    p[7], p[8]));
 }
 
-char	*
+char *
 tparm_p1(char *instring, long l1)
 {
 	long	p[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -182,10 +183,10 @@ tparm_p1(char *instring, long l1)
 	p[0] = l1;
 
 	return (tparm(instring, p[0], p[1], p[2], p[3], p[4], p[5], p[6],
-			p[7], p[8]));
+	    p[7], p[8]));
 }
 
-char	*
+char *
 tparm_p2(char *instring, long l1, long l2)
 {
 	long	p[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -194,10 +195,10 @@ tparm_p2(char *instring, long l1, long l2)
 	p[1] = l2;
 
 	return (tparm(instring, p[0], p[1], p[2], p[3], p[4], p[5], p[6],
-			p[7], p[8]));
+	    p[7], p[8]));
 }
 
-char	*
+char *
 tparm_p3(char *instring, long l1, long l2, long l3)
 {
 	long	p[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -207,10 +208,10 @@ tparm_p3(char *instring, long l1, long l2, long l3)
 	p[2] = l3;
 
 	return (tparm(instring, p[0], p[1], p[2], p[3], p[4], p[5], p[6],
-			p[7], p[8]));
+	    p[7], p[8]));
 }
 
-char	*
+char *
 tparm_p4(char *instring, long l1, long l2, long l3, long l4)
 {
 	long	p[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -221,12 +222,12 @@ tparm_p4(char *instring, long l1, long l2, long l3, long l4)
 	p[3] = l4;
 
 	return (tparm(instring, p[0], p[1], p[2], p[3], p[4], p[5], p[6],
-			p[7], p[8]));
+	    p[7], p[8]));
 }
 
-char	*
+char *
 tparm_p7(char *instring, long l1, long l2, long l3, long l4, long l5, long l6,
-	long l7)
+    long l7)
 {
 	long	p[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -239,13 +240,13 @@ tparm_p7(char *instring, long l1, long l2, long l3, long l4, long l5, long l6,
 	p[6] = l7;
 
 	return (tparm(instring, p[0], p[1], p[2], p[3], p[4], p[5], p[6],
-			p[7], p[8]));
+	    p[7], p[8]));
 }
 
 /* VARARGS */
-char	*
+char *
 tparm(char *instring, long fp1, long fp2, long p3, long p4,
-	long p5, long p6, long p7, long p8, long p9)
+    long p5, long p6, long p7, long p8, long p9)
 {
 	static	char	result[512];
 	static	char	added[100];
@@ -257,7 +258,7 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 	long		op;
 	long		op2;
 	int		sign;
-	int		onrow = 0;
+	volatile int	onrow = 0;
 	volatile long	p1 = fp1, p2 = fp2; /* copy in case < 2 actual parms */
 	char		*xp;
 	char		formatbuffer[100];
@@ -386,8 +387,7 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 			 * now.
 			 */
 			if (c == 's')
-				(void) sprintf(outp, formatbuffer,
-				    (char *) op);
+				(void) sprintf(outp, formatbuffer, (char *)op);
 			else
 				(void) sprintf(outp, formatbuffer, op);
 			/*
@@ -398,7 +398,7 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 			 * BSD emulations are particularly confusing.
 			 */
 				while (*outp)
-				    outp++;
+					outp++;
 				(void) pop(&stk);
 
 				continue;
@@ -425,24 +425,24 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 			 */
 				switch (op) {
 				/*
-				* Null.  Problem is that our
-				* output is, by convention, null terminated.
-				*/
+				 * Null.  Problem is that our
+				 * output is, by convention, null terminated.
+				 */
 					case 0:
 						op = 0200; /* Parity should */
 							/* be ignored. */
 						break;
 				/*
-				* Control D.  Problem is that certain very
-				* ancient hardware hangs up on this, so the
-				* current(!) UNIX tty driver doesn't xmit
-				* control D's.
-				*/
+				 * Control D.  Problem is that certain very
+				 * ancient hardware hangs up on this, so the
+				 * current(!) UNIX tty driver doesn't xmit
+				 * control D's.
+				 */
 					case _CHCTRL('d'):
 				/*
-				* Newline.  Problem is that UNIX will expand
-				* this to CRLF.
-				*/
+				 * Newline.  Problem is that UNIX will expand
+				 * this to CRLF.
+				 */
 					case '\n':
 						xp = (onrow ? cursor_down :
 						    cursor_right);
@@ -486,10 +486,10 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 				break;
 
 			/*
-			* %i: shorthand for increment first two parms.
-			* Useful for terminals that start numbering from
-			* one instead of zero(like ANSI terminals).
-			*/
+			 * %i: shorthand for increment first two parms.
+			 * Useful for terminals that start numbering from
+			 * one instead of zero(like ANSI terminals).
+			 */
 			case 'i':
 				p1++;
 				p2++;
@@ -545,8 +545,8 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 				} else {
 					if (*cp >= 'A' && *cp <= 'Z') {
 						regs[*cp++ - 'A'] =
-							/* LINTED */
-							(short) pop(&stk);
+						    /* LINTED */
+						    (short)pop(&stk);
 					}
 #ifdef	DEBUG
 					else if (outf) {
@@ -692,17 +692,17 @@ tparm(char *instring, long fp1, long fp2, long p3, long p4,
 			/* Sorry, no unary minus, because minus is binary. */
 
 			/*
-			* If-then-else.  Implemented by a low level hack of
-			* skipping forward until the match is found, counting
-			* nested if-then-elses.
-			*/
+			 * If-then-else.  Implemented by a low level hack of
+			 * skipping forward until the match is found, counting
+			 * nested if-then-elses.
+			 */
 			case '?':	/* IF - just a marker */
 				break;
 
 			case 't':	/* THEN - branch if false */
 				if (!pop(&stk))
 					cp = _branchto(cp, 'e');
-					break;
+				break;
 
 			case 'e':	/* ELSE - branch to ENDIF */
 				cp = _branchto(cp, ';');
