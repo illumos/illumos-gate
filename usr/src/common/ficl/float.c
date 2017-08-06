@@ -294,7 +294,7 @@ ficlVmParseFloatNumber(ficlVm *vm, ficlString s)
 			if (c == '+') {
 				break;
 			}
-		/* Note!  Drop through to FPS_ININT */
+			/* FALLTHROUGH */
 		/*
 		 * Converting integer part of number.
 		 * Only allow digits, decimal and 'E'.
@@ -339,7 +339,7 @@ ficlVmParseFloatNumber(ficlVm *vm, ficlString s)
 			} else if (c == '+') {
 				break;
 			}
-		/* Note!  Drop through to FPS_INEXP */
+			/* FALLTHROUGH */
 		/*
 		 * Processing the exponent part of number.
 		 * Only allow digits.

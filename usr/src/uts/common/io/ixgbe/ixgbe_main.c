@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
@@ -4516,7 +4516,7 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 		tx_ring->reschedule = B_FALSE;
 		mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
 		    tx_ring->ring_handle);
-		IXGBE_DEBUG_STAT(tx_ring->stat_reschedule);
+		tx_ring->stat_reschedule++;
 	}
 }
 
@@ -4737,7 +4737,7 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 	if (tx_reschedule)  {
 		tx_ring->reschedule = B_FALSE;
 		mac_tx_ring_update(ixgbe->mac_hdl, tx_ring->ring_handle);
-		IXGBE_DEBUG_STAT(tx_ring->stat_reschedule);
+		tx_ring->stat_reschedule++;
 	}
 
 	return (result);

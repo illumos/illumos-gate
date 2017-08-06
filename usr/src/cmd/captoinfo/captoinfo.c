@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  NAME
  *	captoinfo - convert a termcap description to a terminfo description
@@ -229,7 +227,7 @@ checktermcap()
 				    "%s: TERM=%s: wrong type given for the "
 				    "boolean termcap code '%.2s'.\n", progname,
 				    term_name, tbuf);
-				continue;
+			continue;
 		}
 
 		/* look for the name in nums */
@@ -239,7 +237,7 @@ checktermcap()
 				    "%s: TERM=%s: wrong type given for the "
 				    "numeric termcap code '%.2s'.\n", progname,
 				    term_name, tbuf);
-				continue;
+			continue;
 		}
 
 		/* look for the name in strs */
@@ -249,7 +247,7 @@ checktermcap()
 				    "%s: TERM=%s: wrong type given for the "
 				    "string termcap code '%.2s'.\n", progname,
 				    term_name, tbuf);
-				continue;
+			continue;
 		}
 
 		(void) fprintf(stderr,
@@ -469,7 +467,7 @@ search(char *names[], int max, char *infoname)
 	for (i = 0; names [i] != NULL; i++)
 		if (strcmp(names [i], infoname) == 0)
 			return (i);
-		return (-1);
+	return (-1);
 #else				/* this doesn't work for some reason */
 	char **bret;
 
@@ -1037,7 +1035,7 @@ fancycap(char *string)
 			}
 			string++;
 		}
-		return (0);
+	return (0);
 }
 
 /*
@@ -1367,7 +1365,7 @@ initdirname(void)
 #endif /* SYSV || USG */
 	if (verbose)
 		(void) fprintf(trace, "current directory name=%s.\n", dirname);
-		environ = newenviron;
+	environ = newenviron;
 }
 
 static void
