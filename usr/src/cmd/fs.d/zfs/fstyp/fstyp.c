@@ -89,8 +89,7 @@ fstyp_mod_ident(fstyp_mod_handle_t handle)
 	uint64_t u64;
 	char	buf[64];
 
-	if (zpool_read_label(h->fd, &h->config) != 0 ||
-	    h->config == NULL) {
+	if (zpool_read_label(h->fd, &h->config) != 0) {
 		return (FSTYP_ERR_NO_MATCH);
 	}
 
