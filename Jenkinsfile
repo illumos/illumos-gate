@@ -217,7 +217,7 @@ def run_test(script, instance_type, spot_price, limit, disks, parameters) {
                 ['ADD_DISKS_FOR', disks]
             ]).trim()
 
-            timeout(time: 2 * limit, unit: 'HOURS') {
+            timeout(time: 1.5 * limit, unit: 'HOURS') {
                 if (!instance_id) {
                     error('Unable to create instance.')
                 }
