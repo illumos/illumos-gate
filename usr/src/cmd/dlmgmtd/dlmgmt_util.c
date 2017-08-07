@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -355,8 +355,8 @@ link_destroy(dlmgmt_link_t *linkp)
 
 /*
  * Set the DLMGMT_ACTIVE flag on the link to note that it is active.
- * When a link is active and assigned to an NGZ it is added to that
- * zone's datalink list and marked as on loan.
+ * When a link is active and is owned by an NGZ then it is added to
+ * that zone's datalink list.
  */
 int
 link_activate(dlmgmt_link_t *linkp)
@@ -364,27 +364,64 @@ link_activate(dlmgmt_link_t *linkp)
 	int		err = 0;
 	zoneid_t	zoneid = ALL_ZONES;
 
+	/*
+	 * If zone_check_datalink() returns 0 it means we found the
+	 * link in one of the NGZ's datalink lists. Otherwise the link
+	 * is under the GZ.
+	 */
 	if (zone_check_datalink(&zoneid, linkp->ll_linkid) == 0) {
 		/*
-		 * This link was already added to a non-global zone.  This can
-		 * happen if dlmgmtd is restarted.
+		 * This is a bit subtle. If the following expression
+		 * is true then the link was found in one of the NGZ's
+		 * datalink lists but the link structure has it under
+		 * the GZ. This means that the link is supposed to be
+		 * loaned out to an NGZ but the dlmgmtd state is out
+		 * of sync -- possibly due to the process restarting.
+		 * In this case we need to sync the dlmgmtd state by
+		 * marking it as on-loan to the NGZ it's currently
+		 * under.
 		 */
 		if (zoneid != linkp->ll_zoneid) {
+			assert(linkp->ll_zoneid == 0);
+			assert(linkp->ll_onloan == B_FALSE);
+
+			/*
+			 * If dlmgmtd already has a link with this
+			 * name under the NGZ then we have a problem.
+			 */
 			if (link_by_name(linkp->ll_link, zoneid) != NULL) {
 				err = EEXIST;
 				goto done;
 			}
 
+			/*
+			 * Remove the current linkp entry from the
+			 * list because it's under the wrong zoneid.
+			 * We don't have to update the dlmgmt_id_avl
+			 * because it compares entries by ll_linkid
+			 * only.
+			 */
 			if (avl_find(&dlmgmt_name_avl, linkp, NULL) != NULL)
 				avl_remove(&dlmgmt_name_avl, linkp);
 
+			/*
+			 * Update the link to reflect the fact that
+			 * it's on-loan to an NGZ and re-add it to the
+			 * list.
+			 */
 			linkp->ll_zoneid = zoneid;
 			avl_add(&dlmgmt_name_avl, linkp);
 			linkp->ll_onloan = B_TRUE;
 		}
 	} else if (linkp->ll_zoneid != GLOBAL_ZONEID) {
+		/*
+		 * In this case the link was not found under any NGZs
+		 * but according to its ll_zoneid member it is owned
+		 * by an NGZ. Add the datalink to the appropriate zone
+		 * datalink list.
+		 */
 		err = zone_add_datalink(linkp->ll_zoneid, linkp->ll_linkid);
-		linkp->ll_onloan = B_TRUE;
+		assert(linkp->ll_onloan == B_FALSE);
 	}
 done:
 	if (err == 0)

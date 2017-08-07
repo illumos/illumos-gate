@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -61,6 +61,17 @@ typedef struct dlmgmt_link_s {
 	datalink_class_t	ll_class;
 	uint32_t		ll_media;
 	datalink_id_t		ll_linkid;
+
+	/*
+	 * The zone that owns the link. If this is set to the id of
+	 * an NGZ and ll_onloan is set then the link was created and
+	 * is owned by the GZ but is currently being loaned out to an
+	 * NGZ. E.g., when the GZ admin creates a VNIC for exclusive
+	 * use by an NGZ. If ll_onloan is set then ll_zoneid cannot be 0.
+	 *
+	 * If ll_zoneid is set to the id of an NGZ but ll_onloan is
+	 * not set then the link was created and is owned by the NGZ.
+	 */
 	zoneid_t		ll_zoneid;
 	boolean_t		ll_onloan;
 	avl_node_t		ll_name_node;
