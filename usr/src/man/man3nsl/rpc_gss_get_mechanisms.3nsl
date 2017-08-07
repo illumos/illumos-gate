@@ -156,7 +156,8 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBrpc\fR(3NSL),\fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4), \fBattributes\fR(5)
+\fBrpc\fR(3NSL), \fBrpcsec_gss\fR(3NSL), \fBmech\fR(4), \fBqop\fR(4),
+\fBattributes\fR(5)
 .sp
 .LP
 \fIONC+ Developer\&'s Guide\fR

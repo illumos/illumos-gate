@@ -186,7 +186,7 @@ For example, open an endpoint, the host controller has to implement
 .Xr usba_hcdi_pipe_open 9E
 and for each transfer type, there is a different transfer function.
 One example is
-.Xr usba_hcdi_bulk_xfer 9E .
+.Xr usba_hcdi_pipe_bulk_xfer 9E .
 See
 .Xr usba_hcdi_ops 9S
 for a full list of the different function endpoints.
@@ -268,7 +268,7 @@ are not packed for this purpose.
 They should not be used as they have gaps added by the compiler for alignment.
 .Pp
 Once assembled, the device driver should call
-.Xr usb_hubdi_bind_root_hub 9F .
+.Xr usba_hubdi_bind_root_hub 9F .
 This will cause an instance of the
 .Xr hubd 7D
 driver to be attached and associated with the root controller.
@@ -276,10 +276,10 @@ As such, driver writers need to ensure that all initialization is done prior to
 loading the root hub.
 Once successfully loaded, driver writers should assume that they'll get other
 calls into the driver's operation vector before the call to
-.Xr usb_hcdi_bind_root_hub 9F.
+.Xr usba_hubdi_bind_root_hub 9F.
 .Pp
 If the call to
-.Xr usb_hcdi_bind_root_hub 9F
+.Xr usba_hubdi_bind_root_hub 9F
 failed for whatever reason, the driver should unregister from USBA (see
 the next section), unwind all of the resources it has allocated, and
 return
@@ -355,7 +355,7 @@ The
 member should be set to the symbol
 .Sy usba_hubdi_busops .
 See
-.Xr usba_hubdi_devops 9F
+.Xr usba_hubdi_dev_ops 9F
 for more information.
 .It Sy devo_power
 The
@@ -363,7 +363,7 @@ The
 member should be set to the symbol
 .Sy usba_hubdi_root_hub_power .
 See
-.Xr usba_hubdi_Devops 9F
+.Xr usba_hubdi_dev_ops 9F
 for more information.
 .El
 .Pp
@@ -832,7 +832,7 @@ The device is running as a super speed device.
 This is a USB 3.0 device.
 .It Vt usb_cr_t
 This is a set of codes that may be returned as a part of the call to
-.Xr usb_hcdi_cb 9F .
+.Xr usba_hcdi_cb 9F .
 The best place for the full set of these is currently in the source
 control headers.
 .El
@@ -859,7 +859,6 @@ file.
 .Xr getinfo 9E ,
 .Xr ioctl 9E ,
 .Xr open 9E ,
-.Xr usba_hcdi_bulk_xfer 9E ,
 .Xr usba_hcdi_cb_close 9E ,
 .Xr usba_hcdi_cb_ioctl 9E ,
 .Xr usba_hcdi_cb_open 9E ,
@@ -875,17 +874,15 @@ file.
 .Xr nochpoll 9F ,
 .Xr nodev 9F ,
 .Xr timeout 9F ,
-.Xr usb_hcdi_bind_root_hub 9F ,
-.Xr usb_hubdi_bind_root_hub 9F ,
 .Xr usba_alloc_hcdi_ops 9F ,
 .Xr usba_hcdi_cb 9F ,
 .Xr usba_hcdi_dup_intr_req 9F ,
 .Xr usba_hcdi_dup_isoc_req 9F ,
 .Xr usba_hcdi_register 9F ,
 .Xr usba_hcdi_unregister 9F ,
+.Xr usba_hubdi_bind_root_hub 9F ,
 .Xr usba_hubdi_close 9F ,
-.Xr usba_hubdi_devops 9F ,
-.Xr usba_hubdi_Devops 9F ,
+.Xr usba_hubdi_dev_ops 9F ,
 .Xr usba_hubdi_ioctl 9F ,
 .Xr usba_hubdi_open 9F ,
 .Xr usba_hubdi_unbind_root_hub 9F ,

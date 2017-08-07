@@ -202,7 +202,7 @@ check the byte order and convert it appropriately.
 The system provides two different sets of functions to convert values
 between big-endian and little-endian.
 They are defined in
-.Xr byteorder 3C
+.Xr byteorder 3SOCKET
 and
 .Xr endian 3C .
 .Pp
@@ -235,7 +235,7 @@ The second family of functions,
 provide a means to convert between the host's byte order
 and big-endian and little-endian specifically.
 While these functions are similar to those in
-.Xr byteorder 3C ,
+.Xr byteorder 3SOCKET ,
 they more explicitly cover different data conversions.
 Like them, these functions operate on either 16-bit, 32-bit, or 64-bit values.
 When converting from big-endian, to the host's endianness, the functions
@@ -254,7 +254,7 @@ to little-endian respectively.
 These functions are not standardized and the header they appear in varies
 between the BSDs and GNU/Linux.
 Applications that wish to be portable, shoulda instead use the
-.Xr byteorder 3C
+.Xr byteorder 3SOCKET
 functions.
 .Pp
 All of these functions in both families simply return their input when

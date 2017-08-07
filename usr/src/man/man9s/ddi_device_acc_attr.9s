@@ -215,7 +215,7 @@ The following examples illustrate the use of device register address mapping
 setup functions and different data access functions.
 .LP
 \fBExample 1 \fRUsing \fBddi_device_acc_attr()\fR in
->\fBddi_regs_map_setup\fR(9F)
+\fBddi_regs_map_setup\fR(9F)
 .sp
 .LP
 This example demonstrates the use of the \fBddi_device_acc_attr()\fR structure

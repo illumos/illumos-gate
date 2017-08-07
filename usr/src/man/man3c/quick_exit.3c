@@ -34,10 +34,10 @@ The
 and
 .Fn at_quick_exit
 functions provide a veneer around
-.Xr _Exit 3C
+.Xr _Exit 2
 that allows for registered functions to be called before terminating.
 Like
-.Xr _Exit 3C ,
+.Xr _Exit 2 ,
 standard library termination is not done.
 .Xr atexit 3C
 functions are not called and various standard termination that occurs
@@ -55,7 +55,7 @@ will not be called at any other time.
 Functions that are registered with
 .Fn at_quick_exit
 should not make use of
-.Xr longjump 3C
+.Xr longjmp 3C
 and related functions.
 .Pp
 After calling all registered functions, the
@@ -86,7 +86,7 @@ Insufficient storage space is available.
 .Sh MT-LEVEL
 .Sy Safe
 .Sh SEE ALSO
-.Xr _Exit 3C ,
+.Xr _Exit 2 ,
 .Xr atexit 3C ,
 .Xr exit 3C ,
 .Xr attributes 5 ,

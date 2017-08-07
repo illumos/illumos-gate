@@ -69,7 +69,7 @@ Insufficient table space exists to record the fork handler addresses.
 Solaris threads do not offer \fBpthread_atfork()\fR functionality (there is no
 \fBthr_atfork()\fR interface). However, a Solaris threads application can call
 \fBpthread_atfork()\fR to ensure \fBfork()\fR-safety, since the two thread APIs
-are interoperable. See\fBfork\fR(2) for information relating to \fBfork()\fR in
+are interoperable. See \fBfork\fR(2) for information relating to \fBfork()\fR in
 a Solaris threads environment in Solaris 10 relative to previous releases.
 .SH EXAMPLES
 .LP

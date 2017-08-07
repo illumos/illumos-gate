@@ -49,11 +49,11 @@ typedef struct td_thrinfo_t {
   short            ti_flags           /* set of special flags used by
                                          libc*/
   int              ti_pri             /* priority of thread returned by
-                                         thr_getprio(3T)*/
+                                         thr_getprio(3C)*/
   lwpid_t          ti_lid             /* id of light weight process (LWP)
                                          executing this thread*/
   sigset_t         ti_sigmask         /* thread's signal mask.  See
-                                         thr_sigsetmask(3T)*/
+                                         thr_sigsetmask(3C)*/
   u_char           ti_traceme         /* non-zero if event tracing is on*/
   u_char_t         ti_preemptflag     /* non-zero if thread preempted when
                                          last active*/

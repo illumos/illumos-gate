@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 #
 
 file path=usr/share/man/man1m/6to4relay.1m
@@ -55,6 +56,7 @@ file path=usr/share/man/man1m/dd.1m
 file path=usr/share/man/man1m/devattr.1m
 file path=usr/share/man/man1m/devfree.1m
 file path=usr/share/man/man1m/devfsadm.1m
+link path=usr/share/man/man1m/audlinks.1m target=devfsadm.1m
 file path=usr/share/man/man1m/devinfo.1m
 file path=usr/share/man/man1m/devlinks.1m
 file path=usr/share/man/man1m/devnm.1m

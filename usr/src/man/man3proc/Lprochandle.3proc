@@ -31,7 +31,7 @@ function returns the process handle to which the thread handle
 .Fa L
 belongs.
 This proccess handle may be used with other
-.Xr libproc 3PROC
+.Xr libproc 3LIB
 functions just as if
 .Xr Pgrab 3PROC was called.
 The returned handle is valid even if

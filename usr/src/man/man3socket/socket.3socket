@@ -317,7 +317,7 @@ MT-Level	Safe
 \fBnca\fR(1), \fBclose\fR(2), \fBfcntl\fR(2), \fBioctl\fR(2), \fBread\fR(2),
 \fBwrite\fR(2), \fBaccept\fR(3SOCKET), \fBbind\fR(3SOCKET), \fBexec\fR(2),
 \fBconnect\fR(3SOCKET), \fBgetsockname\fR(3SOCKET), \fBgetsockopt\fR(3SOCKET),
-\fBin.h\fR(3HEAD),\fBlisten\fR(3SOCKET), \fBrecv\fR(3SOCKET), \fBopen\fR(2),
+\fBin.h\fR(3HEAD), \fBlisten\fR(3SOCKET), \fBrecv\fR(3SOCKET), \fBopen\fR(2),
 \fBsetsockopt\fR(3SOCKET), \fBsend\fR(3SOCKET), \fBshutdown\fR(3SOCKET),
 \fBsocket.h\fR(3HEAD), \fBsocketpair\fR(3SOCKET), \fBattributes\fR(5)
 .SH NOTES

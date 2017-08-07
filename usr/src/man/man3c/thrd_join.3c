@@ -67,7 +67,7 @@ function returns
 and if
 .Fa res
 is a non-null pointer, it will be filled in with the exit status of
-.Xr thrd 3C .
+.Fa thrd .
 If an error occurs,
 .Sy thrd_error
 will be returned.

@@ -97,5 +97,5 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBvolmgt_ownspath\fR(3VOLMGT),\fBvolmgt_running\fR(3VOLMGT),\fBattributes\fR(5
-), \fBhal\fR(5)
+\fBvolmgt_ownspath\fR(3VOLMGT), \fBvolmgt_running\fR(3VOLMGT),
+\fBattributes\fR(5), \fBhal\fR(5)

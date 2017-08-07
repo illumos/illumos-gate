@@ -116,7 +116,7 @@ completed request is returned through a normal callback.
 Allocate room for data when allocating isochronous-OUT requests via
 usb_alloc_isoc_req(9F), by passing a positive value for     the \fIlen\fR
 argument. The data will be divided among the request transactions, each
-transaction represented by a packet descriptor.  (See usb_isoc_request(9F).
+transaction represented by a packet descriptor.  (See usb_isoc_request(9S).
 When all of the data has been sent, regardless of any errors encountered, a
 normal transfer callback will be     made to notify the client driver of
 completion.

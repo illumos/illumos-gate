@@ -69,7 +69,7 @@ to generate a new result.
 One data pool is used for all consumers in a process, so that consumption
 under program flow can act as additional stirring.
 The subsystem is re-seeded from the kernel random number subsystem using
-.Xr getentropy 2
+.Xr getentropy 3C
 on a regular basis, and also upon
 .Xr fork 2 .
 .Pp

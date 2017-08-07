@@ -98,7 +98,7 @@ Symbol's name as a character string.
 .LP
 The function prototypes for \fBddi_modopen()\fR, \fBddi_modsym()\fR, and
 \fBddi_modclose()\fR are modeled after the userland \fBlibdl\fR(3LIB),
-\fBdlopen\fR(3C), \fBdlsym\fR(3C) , and\fBdlclose\fR(3C) interfaces, however
+\fBdlopen\fR(3C), \fBdlsym\fR(3C), and \fBdlclose\fR(3C) interfaces, however
 not all userland features are available and the kernel symbol resolution is
 different. The \fBdlerror\fR(3C) interface is not appropriate for the kernel
 environment, so the new \fIerrnop\fR return argument was added for
@@ -142,7 +142,7 @@ limited to the module directly associated with the handle.
 .sp
 .LP
 The \fBddi_modopen()\fR function increments the reference count on the named
-kernel module. Upon the first load of a module, the\fB_init\fR(9E)
+kernel module. Upon the first load of a module, the \fB_init\fR(9E)
 initialization code in the module is called; \fBddi_modopen()\fR does not
 return until \fB_init\fR completes.
 .sp
@@ -151,7 +151,7 @@ The \fBddi_modsym()\fR function allows a caller to obtain the address of a
 symbol that is defined within a module. The \fIhandle\fR argument is a valid
 \fBddi_modhandle_t\fR as returned by \fBddi_modopen()\fR, the \fIsymname\fR
 argument is the symbol's name as a character string. The special handle values
-supported by ddi_modsym(3C) are not supported.
+supported by ddi_modsym(9F) are not supported.
 .sp
 .LP
 The \fBddi_modclose()\fR function decrements the reference count of the kernel

@@ -71,10 +71,10 @@ See
 .El
 .
 .Sh SEE ALSO
+.Xr rmformat 1 ,
 .Xr devinfo 1M ,
 .Xr fdisk 1M ,
 .Xr mount 1M ,
-.Xr rmformat 1M ,
 .Xr umount 1M ,
 .Xr sd 7D ,
 .Xr pcfs 7FS ,

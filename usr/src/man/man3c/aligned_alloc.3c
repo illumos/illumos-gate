@@ -71,6 +71,6 @@ It is not a power of two multiple of the word size.
 .Sy MT-Safe
 .Sh SEE ALSO
 .Xr malloc 3C ,
-.Xr memalgin 3C ,
+.Xr memalign 3C ,
 .Xr posix_memalign 3C ,
 .Xr attributes 5

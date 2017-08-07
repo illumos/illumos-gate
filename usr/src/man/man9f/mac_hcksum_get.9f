@@ -201,5 +201,5 @@ and
 functions may be called from any context.
 .Sh SEE ALSO
 .Xr mac 9E ,
-.Xr mac_getcapab 9E ,
+.Xr mc_getcapab 9E ,
 .Xr mblk 9S

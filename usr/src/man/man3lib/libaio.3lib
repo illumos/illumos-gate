@@ -16,7 +16,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-laio\fR [ \fIlibrary\fR... ]
 .sp
 .LP
 Historically, functions in this library provided asynchronous I/O operations.
-This functionality now resides in\fBlibc\fR(3LIB)
+This functionality now resides in \fBlibc\fR(3LIB)
 .sp
 .LP
 This library is maintained to provide backward compatibility for both runtime

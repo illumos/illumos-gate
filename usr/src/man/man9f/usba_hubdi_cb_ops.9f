@@ -107,5 +107,5 @@ entry points.
 .Xr close 9E ,
 .Xr ioctl 9E ,
 .Xr open 9E ,
-.Xr usb_hcdi 9E ,
+.Xr usba_hcdi 9E ,
 .Xr cb_ops 9S
