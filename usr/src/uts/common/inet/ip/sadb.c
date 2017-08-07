@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -74,8 +75,7 @@
  * of falling under export control, it was safe to link it in there.
  */
 
-static mblk_t *sadb_extended_acquire(ipsec_selector_t *, ipsec_policy_t *,
-    ipsec_action_t *, boolean_t, uint32_t, uint32_t, sadb_sens_t *,
+static uint8_t *sadb_action_to_ecomb(uint8_t *, uint8_t *, ipsec_action_t *,
     netstack_t *);
 static ipsa_t *sadb_torch_assoc(isaf_t *, ipsa_t *);
 static void sadb_destroy_acqlist(iacqf_t **, uint_t, boolean_t,
@@ -83,7 +83,6 @@ static void sadb_destroy_acqlist(iacqf_t **, uint_t, boolean_t,
 static void sadb_destroy(sadb_t *, netstack_t *);
 static mblk_t *sadb_sa2msg(ipsa_t *, sadb_msg_t *);
 static ts_label_t *sadb_label_from_sens(sadb_sens_t *, uint64_t *);
-static sadb_sens_t *sadb_make_sens_ext(ts_label_t *tsl, int *len);
 
 static time_t sadb_add_time(time_t, uint64_t);
 static void lifetime_fuzz(ipsa_t *);
@@ -4844,6 +4843,555 @@ sadb_checkacquire(iacqf_t *bucket, ipsec_action_t *ap, ipsec_policy_t *pp,
 }
 
 /*
+ * Generate an SADB_ACQUIRE base message mblk, including KEYSOCK_OUT metadata.
+ * In other words, this will return, upon success, a two-mblk chain.
+ */
+static inline mblk_t *
+sadb_acquire_msg_base(minor_t serial, uint8_t satype, uint32_t seq, pid_t pid)
+{
+	mblk_t *mp;
+	sadb_msg_t *samsg;
+
+	mp = sadb_keysock_out(serial);
+	if (mp == NULL)
+		return (NULL);
+	mp->b_cont = allocb(sizeof (sadb_msg_t), BPRI_HI);
+	if (mp->b_cont == NULL) {
+		freeb(mp);
+		return (NULL);
+	}
+
+	samsg = (sadb_msg_t *)mp->b_cont->b_rptr;
+	mp->b_cont->b_wptr += sizeof (*samsg);
+	samsg->sadb_msg_version = PF_KEY_V2;
+	samsg->sadb_msg_type = SADB_ACQUIRE;
+	samsg->sadb_msg_errno = 0;
+	samsg->sadb_msg_reserved = 0;
+	samsg->sadb_msg_satype = satype;
+	samsg->sadb_msg_seq = seq;
+	samsg->sadb_msg_pid = pid;
+
+	return (mp);
+}
+
+/*
+ * Generate address and TX/MLS sensitivity label PF_KEY extensions that are
+ * common to both regular and extended ACQUIREs.
+ */
+static mblk_t *
+sadb_acquire_msg_common(ipsec_selector_t *sel, ipsec_policy_t *pp,
+    ipsec_action_t *ap, boolean_t tunnel_mode, ts_label_t *tsl,
+    sadb_sens_t *sens)
+{
+	size_t len;
+	mblk_t *mp;
+	uint8_t *start, *cur, *end;
+	uint32_t *saddrptr, *daddrptr;
+	sa_family_t af;
+	ipsec_action_t *oldap;
+	ipsec_selkey_t *ipsl;
+	uint8_t proto, pfxlen;
+	uint16_t lport, rport;
+	int senslen = 0;
+
+	/*
+	 * Get action pointer set if it isn't already.
+	 */
+	oldap = ap;
+	if (pp != NULL) {
+		ap = pp->ipsp_act;
+		if (ap == NULL)
+			ap = oldap;
+	}
+
+	/*
+	 * Biggest-case scenario:
+	 * 4x (sadb_address_t + struct sockaddr_in6)
+	 *	(src, dst, isrc, idst)
+	 *	(COMING SOON, 6x, because of triggering-packet contents.)
+	 * sadb_x_kmc_t
+	 * sadb_sens_t
+	 * And wiggle room for label bitvectors.  Luckily there are
+	 * programmatic ways to find it.
+	 */
+	len = 4 * (sizeof (sadb_address_t) + sizeof (struct sockaddr_in6));
+
+	/* Figure out full and proper length of sensitivity labels. */
+	if (sens != NULL) {
+		ASSERT(tsl == NULL);
+		senslen = SADB_64TO8(sens->sadb_sens_len);
+	} else if (tsl != NULL) {
+		senslen = sadb_sens_len_from_label(tsl);
+	}
+#ifdef DEBUG
+	else {
+		ASSERT(senslen == 0);
+	}
+#endif /* DEBUG */
+	len += senslen;
+
+	mp = allocb(len, BPRI_HI);
+	if (mp == NULL)
+		return (NULL);
+
+	start = mp->b_rptr;
+	end = start + len;
+	cur = start;
+
+	/*
+	 * Address extensions first, from most-recently-defined to least.
+	 * (This should immediately trigger surprise or verify robustness on
+	 * older apps, like in.iked.)
+	 */
+	if (tunnel_mode) {
+		/*
+		 * Form inner address extensions based NOT on the inner
+		 * selectors (i.e. the packet data), but on the policy's
+		 * selector key (i.e. the policy's selector information).
+		 *
+		 * NOTE:  The position of IPv4 and IPv6 addresses is the
+		 * same in ipsec_selkey_t (unless the compiler does very
+		 * strange things with unions, consult your local C language
+		 * lawyer for details).
+		 */
+		ASSERT(pp != NULL);
+
+		ipsl = &(pp->ipsp_sel->ipsl_key);
+		if (ipsl->ipsl_valid & IPSL_IPV4) {
+			af = AF_INET;
+			ASSERT(sel->ips_protocol == IPPROTO_ENCAP);
+			ASSERT(!(ipsl->ipsl_valid & IPSL_IPV6));
+		} else {
+			af = AF_INET6;
+			ASSERT(sel->ips_protocol == IPPROTO_IPV6);
+			ASSERT(ipsl->ipsl_valid & IPSL_IPV6);
+		}
+
+		if (ipsl->ipsl_valid & IPSL_LOCAL_ADDR) {
+			saddrptr = (uint32_t *)(&ipsl->ipsl_local);
+			pfxlen = ipsl->ipsl_local_pfxlen;
+		} else {
+			saddrptr = (uint32_t *)(&ipv6_all_zeros);
+			pfxlen = 0;
+		}
+		/* XXX What about ICMP type/code? */
+		lport = (ipsl->ipsl_valid & IPSL_LOCAL_PORT) ?
+		    ipsl->ipsl_lport : 0;
+		proto = (ipsl->ipsl_valid & IPSL_PROTOCOL) ?
+		    ipsl->ipsl_proto : 0;
+
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_SRC,
+		    af, saddrptr, lport, proto, pfxlen);
+		if (cur == NULL) {
+			freeb(mp);
+			return (NULL);
+		}
+
+		if (ipsl->ipsl_valid & IPSL_REMOTE_ADDR) {
+			daddrptr = (uint32_t *)(&ipsl->ipsl_remote);
+			pfxlen = ipsl->ipsl_remote_pfxlen;
+		} else {
+			daddrptr = (uint32_t *)(&ipv6_all_zeros);
+			pfxlen = 0;
+		}
+		/* XXX What about ICMP type/code? */
+		rport = (ipsl->ipsl_valid & IPSL_REMOTE_PORT) ?
+		    ipsl->ipsl_rport : 0;
+
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_DST,
+		    af, daddrptr, rport, proto, pfxlen);
+		if (cur == NULL) {
+			freeb(mp);
+			return (NULL);
+		}
+		/*
+		 * TODO  - if we go to 3884's dream of transport mode IP-in-IP
+		 * _with_ inner-packet address selectors, we'll need to further
+		 * distinguish tunnel mode here.  For now, having inner
+		 * addresses and/or ports is sufficient.
+		 *
+		 * Meanwhile, whack proto/ports to reflect IP-in-IP for the
+		 * outer addresses.
+		 */
+		proto = sel->ips_protocol;	/* Either _ENCAP or _IPV6 */
+		lport = rport = 0;
+	} else if ((ap != NULL) && (!ap->ipa_want_unique)) {
+		/*
+		 * For cases when the policy calls out specific ports (or not).
+		 */
+		proto = 0;
+		lport = 0;
+		rport = 0;
+		if (pp != NULL) {
+			ipsl = &(pp->ipsp_sel->ipsl_key);
+			if (ipsl->ipsl_valid & IPSL_PROTOCOL)
+				proto = ipsl->ipsl_proto;
+			if (ipsl->ipsl_valid & IPSL_REMOTE_PORT)
+				rport = ipsl->ipsl_rport;
+			if (ipsl->ipsl_valid & IPSL_LOCAL_PORT)
+				lport = ipsl->ipsl_lport;
+		}
+	} else {
+		/*
+		 * For require-unique-SA policies.
+		 */
+		proto = sel->ips_protocol;
+		lport = sel->ips_local_port;
+		rport = sel->ips_remote_port;
+	}
+
+	/*
+	 * Regular addresses.  These are outer-packet ones for tunnel mode.
+	 * Or for transport mode, the regulard address & port information.
+	 */
+	af = sel->ips_isv4 ? AF_INET : AF_INET6;
+
+	/*
+	 * NOTE:  The position of IPv4 and IPv6 addresses is the same in
+	 * ipsec_selector_t.
+	 */
+	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_SRC, af,
+	    (uint32_t *)(&sel->ips_local_addr_v6), lport, proto, 0);
+	if (cur == NULL) {
+		freeb(mp);
+		return (NULL);
+	}
+
+	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_DST, af,
+	    (uint32_t *)(&sel->ips_remote_addr_v6), rport, proto, 0);
+	if (cur == NULL) {
+		freeb(mp);
+		return (NULL);
+	}
+
+	/*
+	 * If present, generate a sensitivity label.
+	 */
+	if (cur + senslen > end) {
+		freeb(mp);
+		return (NULL);
+	}
+	if (sens != NULL) {
+		/* Explicit sadb_sens_t, usually from inverse-ACQUIRE. */
+		bcopy(sens, cur, senslen);
+	} else if (tsl != NULL) {
+		/* Generate sadb_sens_t from ACQUIRE source. */
+		sadb_sens_from_label((sadb_sens_t *)cur, SADB_EXT_SENSITIVITY,
+		    tsl, senslen);
+	}
+#ifdef DEBUG
+	else {
+		ASSERT(senslen == 0);
+	}
+#endif /* DEBUG */
+	cur += senslen;
+	mp->b_wptr = cur;
+
+	return (mp);
+}
+
+/*
+ * Generate a regular ACQUIRE's proposal extension and KMC information..
+ */
+static mblk_t *
+sadb_acquire_prop(ipsec_action_t *ap, netstack_t *ns, boolean_t do_esp)
+{
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsecah_stack_t *ahstack = ns->netstack_ipsecah;
+	mblk_t *mp = NULL;
+	sadb_prop_t *prop;
+	sadb_comb_t *comb;
+	ipsec_action_t *walker;
+	int ncombs, allocsize, ealgid, aalgid, aminbits, amaxbits, eminbits,
+	    emaxbits, replay;
+	uint64_t softbytes, hardbytes, softaddtime, hardaddtime, softusetime,
+	    hardusetime;
+	uint32_t kmc = 0, kmp = 0;
+
+	/*
+	 * Since it's an rwlock read, AND writing to the IPsec algorithms is
+	 * rare, just acquire it once up top, and drop it upon return.
+	 */
+	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
+	if (do_esp) {
+		uint64_t num_aalgs, num_ealgs;
+
+		if (espstack->esp_kstats == NULL)
+			goto bail;
+
+		num_aalgs = ipss->ipsec_nalgs[IPSEC_ALG_AUTH];
+		num_ealgs = ipss->ipsec_nalgs[IPSEC_ALG_ENCR];
+		if (num_ealgs == 0)
+			goto bail;	/* IPsec not loaded yet, apparently. */
+		num_aalgs++;	/* No-auth or self-auth-crypto ESP. */
+
+		/* Use netstack's maximum loaded algorithms... */
+		ncombs = num_ealgs * num_aalgs;
+		replay =  espstack->ipsecesp_replay_size;
+	} else {
+		if (ahstack->ah_kstats == NULL)
+			goto bail;
+
+		ncombs = ipss->ipsec_nalgs[IPSEC_ALG_AUTH];
+
+		if (ncombs == 0)
+			goto bail;	/* IPsec not loaded yet, apparently. */
+		replay =  ahstack->ipsecah_replay_size;
+	}
+
+	allocsize = sizeof (*prop) + ncombs * sizeof (*comb) +
+	    sizeof (sadb_x_kmc_t);
+	mp = allocb(allocsize, BPRI_HI);
+	if (mp == NULL)
+		goto bail;
+	prop = (sadb_prop_t *)mp->b_rptr;
+	mp->b_wptr += sizeof (*prop);
+	comb = (sadb_comb_t *)mp->b_wptr;
+	/* Decrement allocsize, if it goes to or below 0, stop. */
+	allocsize -= sizeof (*prop);
+	prop->sadb_prop_exttype = SADB_EXT_PROPOSAL;
+	prop->sadb_prop_len = SADB_8TO64(sizeof (*prop));
+	*(uint32_t *)(&prop->sadb_prop_replay) = 0;	/* Quick zero-out! */
+	prop->sadb_prop_replay = replay;
+
+	/*
+	 * Based upon algorithm properties, and what-not, prioritize a
+	 * proposal, based on the ordering of the ESP algorithms in the
+	 * alternatives in the policy rule or socket that was placed
+	 * in the acquire record.
+	 *
+	 * For each action in policy list
+	 *   Add combination.
+	 *   I should not hit it, but if I've hit limit, return.
+	 */
+
+	for (walker = ap; walker != NULL; walker = walker->ipa_next) {
+		ipsec_alginfo_t *ealg, *aalg;
+		ipsec_prot_t *prot;
+
+		if (walker->ipa_act.ipa_type != IPSEC_POLICY_APPLY)
+			continue;
+
+		prot = &walker->ipa_act.ipa_apply;
+		if (walker->ipa_act.ipa_apply.ipp_km_proto != 0)
+			kmp = walker->ipa_act.ipa_apply.ipp_km_proto;
+		if (walker->ipa_act.ipa_apply.ipp_km_cookie != 0)
+			kmc = walker->ipa_act.ipa_apply.ipp_km_cookie;
+		if (walker->ipa_act.ipa_apply.ipp_replay_depth) {
+			prop->sadb_prop_replay =
+			    walker->ipa_act.ipa_apply.ipp_replay_depth;
+		}
+
+		if (do_esp) {
+			if (!prot->ipp_use_esp)
+				continue;
+
+			if (prot->ipp_esp_auth_alg != 0) {
+				aalg = ipss->ipsec_alglists[IPSEC_ALG_AUTH]
+				    [prot->ipp_esp_auth_alg];
+				if (aalg == NULL || !ALG_VALID(aalg))
+					continue;
+			} else
+				aalg = NULL;
+
+			ASSERT(prot->ipp_encr_alg > 0);
+			ealg = ipss->ipsec_alglists[IPSEC_ALG_ENCR]
+			    [prot->ipp_encr_alg];
+			if (ealg == NULL || !ALG_VALID(ealg))
+				continue;
+
+			/*
+			 * These may want to come from policy rule..
+			 */
+			softbytes = espstack->ipsecesp_default_soft_bytes;
+			hardbytes = espstack->ipsecesp_default_hard_bytes;
+			softaddtime = espstack->ipsecesp_default_soft_addtime;
+			hardaddtime = espstack->ipsecesp_default_hard_addtime;
+			softusetime = espstack->ipsecesp_default_soft_usetime;
+			hardusetime = espstack->ipsecesp_default_hard_usetime;
+		} else {
+			if (!prot->ipp_use_ah)
+				continue;
+			ealg = NULL;
+			aalg = ipss->ipsec_alglists[IPSEC_ALG_AUTH]
+			    [prot->ipp_auth_alg];
+			if (aalg == NULL || !ALG_VALID(aalg))
+				continue;
+
+			/*
+			 * These may want to come from policy rule..
+			 */
+			softbytes = ahstack->ipsecah_default_soft_bytes;
+			hardbytes = ahstack->ipsecah_default_hard_bytes;
+			softaddtime = ahstack->ipsecah_default_soft_addtime;
+			hardaddtime = ahstack->ipsecah_default_hard_addtime;
+			softusetime = ahstack->ipsecah_default_soft_usetime;
+			hardusetime = ahstack->ipsecah_default_hard_usetime;
+		}
+
+		if (ealg == NULL) {
+			ealgid = eminbits = emaxbits = 0;
+		} else {
+			ealgid = ealg->alg_id;
+			eminbits =
+			    MAX(prot->ipp_espe_minbits, ealg->alg_ef_minbits);
+			emaxbits =
+			    MIN(prot->ipp_espe_maxbits, ealg->alg_ef_maxbits);
+		}
+
+		if (aalg == NULL) {
+			aalgid = aminbits = amaxbits = 0;
+		} else {
+			aalgid = aalg->alg_id;
+			aminbits = MAX(prot->ipp_espa_minbits,
+			    aalg->alg_ef_minbits);
+			amaxbits = MIN(prot->ipp_espa_maxbits,
+			    aalg->alg_ef_maxbits);
+		}
+
+		comb->sadb_comb_flags = 0;
+		comb->sadb_comb_reserved = 0;
+		comb->sadb_comb_encrypt = ealgid;
+		comb->sadb_comb_encrypt_minbits = eminbits;
+		comb->sadb_comb_encrypt_maxbits = emaxbits;
+		comb->sadb_comb_auth = aalgid;
+		comb->sadb_comb_auth_minbits = aminbits;
+		comb->sadb_comb_auth_maxbits = amaxbits;
+		comb->sadb_comb_soft_allocations = 0;
+		comb->sadb_comb_hard_allocations = 0;
+		comb->sadb_comb_soft_bytes = softbytes;
+		comb->sadb_comb_hard_bytes = hardbytes;
+		comb->sadb_comb_soft_addtime = softaddtime;
+		comb->sadb_comb_hard_addtime = hardaddtime;
+		comb->sadb_comb_soft_usetime = softusetime;
+		comb->sadb_comb_hard_usetime = hardusetime;
+
+		prop->sadb_prop_len += SADB_8TO64(sizeof (*comb));
+		mp->b_wptr += sizeof (*comb);
+		allocsize -= sizeof (*comb);
+		/* Should never dip BELOW sizeof (KM cookie extension). */
+		ASSERT3S(allocsize, >=, sizeof (sadb_x_kmc_t));
+		if (allocsize <= sizeof (sadb_x_kmc_t))
+			break;	/* out of space.. */
+		comb++;
+	}
+
+	/* Don't include KMC extension if there's no room. */
+	if (((kmp != 0) || (kmc != 0)) && allocsize >= sizeof (sadb_x_kmc_t)) {
+		if (sadb_make_kmc_ext(mp->b_wptr,
+		    mp->b_wptr + sizeof (sadb_x_kmc_t), kmp, kmc) == NULL) {
+			freeb(mp);
+			mp = NULL;
+			goto bail;
+		}
+		mp->b_wptr += sizeof (sadb_x_kmc_t);
+		prop->sadb_prop_len += SADB_8TO64(sizeof (sadb_x_kmc_t));
+	}
+
+bail:
+	rw_exit(&ipss->ipsec_alg_lock);
+	return (mp);
+}
+
+/*
+ * Generate an extended ACQUIRE's extended-proposal extension.
+ */
+/* ARGSUSED */
+static mblk_t *
+sadb_acquire_extended_prop(ipsec_action_t *ap, netstack_t *ns)
+{
+	sadb_prop_t *eprop;
+	uint8_t *cur, *end;
+	mblk_t *mp;
+	int allocsize, numecombs = 0, numalgdescs = 0;
+	uint32_t kmc = 0, kmp = 0, replay = 0;
+	ipsec_action_t *walker;
+
+	allocsize = sizeof (*eprop);
+
+	/*
+	 * Going to walk through the action list twice.  Once for allocation
+	 * measurement, and once for actual construction.
+	 */
+	for (walker = ap; walker != NULL; walker = walker->ipa_next) {
+		ipsec_prot_t *ipp;
+
+		/*
+		 * Skip non-IPsec policies
+		 */
+		if (walker->ipa_act.ipa_type != IPSEC_ACT_APPLY)
+			continue;
+
+		ipp = &walker->ipa_act.ipa_apply;
+
+		if (walker->ipa_act.ipa_apply.ipp_km_proto)
+			kmp = ipp->ipp_km_proto;
+		if (walker->ipa_act.ipa_apply.ipp_km_cookie)
+			kmc = ipp->ipp_km_cookie;
+		if (walker->ipa_act.ipa_apply.ipp_replay_depth)
+			replay = ipp->ipp_replay_depth;
+
+		if (ipp->ipp_use_ah)
+			numalgdescs++;
+		if (ipp->ipp_use_esp) {
+			numalgdescs++;
+			if (ipp->ipp_use_espa)
+				numalgdescs++;
+		}
+
+		numecombs++;
+	}
+	ASSERT(numecombs > 0);
+
+	allocsize += numecombs * sizeof (sadb_x_ecomb_t) +
+	    numalgdescs * sizeof (sadb_x_algdesc_t) + sizeof (sadb_x_kmc_t);
+	mp = allocb(allocsize, BPRI_HI);
+	if (mp == NULL)
+		return (NULL);
+	eprop = (sadb_prop_t *)mp->b_rptr;
+	end = mp->b_rptr + allocsize;
+	cur = mp->b_rptr + sizeof (*eprop);
+
+	eprop->sadb_prop_exttype = SADB_X_EXT_EPROP;
+	eprop->sadb_x_prop_ereserved = 0;
+	eprop->sadb_x_prop_numecombs = 0;
+	*(uint32_t *)(&eprop->sadb_prop_replay) = 0;	/* Quick zero-out! */
+	/* Pick ESP's replay default if need be. */
+	eprop->sadb_prop_replay = (replay == 0) ?
+	    ns->netstack_ipsecesp->ipsecesp_replay_size : replay;
+
+	/* This time, walk through and actually allocate. */
+	for (walker = ap; walker != NULL; walker = walker->ipa_next) {
+		/*
+		 * Skip non-IPsec policies
+		 */
+		if (walker->ipa_act.ipa_type != IPSEC_ACT_APPLY)
+			continue;
+		cur = sadb_action_to_ecomb(cur, end, walker, ns);
+		if (cur == NULL) {
+			/* NOTE: inverse-ACQUIRE should note this as ENOMEM. */
+			freeb(mp);
+			return (NULL);
+		}
+		eprop->sadb_x_prop_numecombs++;
+	}
+
+	ASSERT(end - cur >= sizeof (sadb_x_kmc_t));
+	if ((kmp != 0) || (kmc != 0)) {
+		cur = sadb_make_kmc_ext(cur, end, kmp, kmc);
+		if (cur == NULL) {
+			freeb(mp);
+			return (NULL);
+		}
+	}
+	mp->b_wptr = cur;
+	eprop->sadb_prop_len = SADB_8TO64(cur - mp->b_rptr);
+
+	return (mp);
+}
+
+/*
  * For this mblk, insert a new acquire record.  Assume bucket contains addrs
  * of all of the same length.  Give up (and drop) if memory
  * cannot be allocated for a new one; otherwise, invoke callback to
@@ -4857,12 +5405,11 @@ void
 sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
     boolean_t need_esp)
 {
-	mblk_t	*asyncmp;
+	mblk_t	*asyncmp, *regular, *extended, *common, *prop, *eprop;
 	sadbp_t *spp;
 	sadb_t *sp;
 	ipsacq_t *newbie;
 	iacqf_t *bucket;
-	mblk_t *extended;
 	ipha_t *ipha = (ipha_t *)datamp->b_rptr;
 	ip6_t *ip6h = (ip6_t *)datamp->b_rptr;
 	uint32_t *src, *dst, *isrc, *idst;
@@ -4872,36 +5419,37 @@ sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
 	int hashoffset;
 	uint32_t seq;
 	uint64_t unique_id = 0;
-	ipsec_selector_t sel;
 	boolean_t tunnel_mode = (ixa->ixa_flags & IXAF_IPSEC_TUNNEL) != 0;
-	ts_label_t 	*tsl = NULL;
+	ts_label_t 	*tsl;
 	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-	sadb_sens_t 	*sens = NULL;
-	int 		sens_len;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
+	ipsec_selector_t sel;
+	queue_t *q;
 
 	ASSERT((pp != NULL) || (ap != NULL));
 
-	ASSERT(need_ah != NULL || need_esp != NULL);
+	ASSERT(need_ah || need_esp);
 
 	/* Assign sadb pointers */
-	if (need_esp) { /* ESP for AH+ESP */
-		ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
-
+	if (need_esp) {
+		/*
+		 * ESP happens first if we need both AH and ESP.
+		 */
 		spp = &espstack->esp_sadb;
 	} else {
-		ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
-
 		spp = &ahstack->ah_sadb;
 	}
 	sp = (ixa->ixa_flags & IXAF_IS_IPV4) ? &spp->s_v4 : &spp->s_v6;
 
 	if (is_system_labeled())
 		tsl = ixa->ixa_tsl;
+	else
+		tsl = NULL;
 
 	if (ap == NULL)
 		ap = pp->ipsp_act;
-
 	ASSERT(ap != NULL);
 
 	if (ap->ipa_act.ipa_apply.ipp_use_unique || tunnel_mode)
@@ -5031,6 +5579,13 @@ sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
 		}
 		ip_drop_output("No memory for asyncmp", datamp, NULL);
 		freemsg(datamp);
+		/*
+		 * The acquire record will be freed quickly if it's new
+		 * (ipsacq_expire == 0), and will proceed as if no packet
+		 * showed up if not.
+		 */
+		mutex_exit(&newbie->ipsacq_lock);
+		return;
 	} else if (newbie->ipsacq_numpackets == 0) {
 		/* First one. */
 		newbie->ipsacq_mp = asyncmp;
@@ -5063,9 +5618,9 @@ sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
 		}
 		newbie->ipsacq_unique_id = unique_id;
 
-		if (ixa->ixa_tsl != NULL) {
-			label_hold(ixa->ixa_tsl);
-			newbie->ipsacq_tsl = ixa->ixa_tsl;
+		if (tsl != NULL) {
+			label_hold(tsl);
+			newbie->ipsacq_tsl = tsl;
 		}
 	} else {
 		/* Scan to the end of the list & insert. */
@@ -5110,11 +5665,25 @@ sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
 		return;
 	}
 
-	if (!keysock_extended_reg(ns))
-		goto punt_extended;
+	if (need_esp) {
+		ESP_BUMP_STAT(espstack, acquire_requests);
+		q = espstack->esp_pfkey_q;
+	} else {
+		/*
+		 * Two cases get us here:
+		 * 1.) AH-only policy.
+		 *
+		 * 2.) A continuation of an AH+ESP policy, and this is the
+		 * post-ESP, AH-needs-to-send-a-regular-ACQUIRE case.
+		 * (i.e. called from esp_do_outbound_ah().)
+		 */
+		AH_BUMP_STAT(ahstack, acquire_requests);
+		q = ahstack->ah_pfkey_q;
+	}
+
 	/*
-	 * Construct an extended ACQUIRE.  There are logging
-	 * opportunities here in failure cases.
+	 * Get selectors and other policy-expression bits needed for an
+	 * ACQUIRE.
 	 */
 	bzero(&sel, sizeof (sel));
 	sel.ips_isv4 = (ixa->ixa_flags & IXAF_IS_IPV4) != 0;
@@ -5137,45 +5706,99 @@ sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
 		sel.ips_remote_addr_v6 = ip6h->ip6_dst;
 	}
 
-	extended = sadb_keysock_out(0);
-	if (extended == NULL)
-		goto punt_extended;
-
-	if (ixa->ixa_tsl != NULL) {
-		/*
-		 * XXX MLS correct condition here?
-		 * XXX MLS other credential attributes in acquire?
-		 * XXX malloc failure?  don't fall back to original?
-		 */
-		sens = sadb_make_sens_ext(ixa->ixa_tsl, &sens_len);
-
-		if (sens == NULL) {
-			freeb(extended);
-			goto punt_extended;
-		}
-	}
-
-	extended->b_cont = sadb_extended_acquire(&sel, pp, ap, tunnel_mode,
-	    seq, 0, sens, ns);
-
-	if (sens != NULL)
-		kmem_free(sens, sens_len);
-
-	if (extended->b_cont == NULL) {
-		freeb(extended);
-		goto punt_extended;
-	}
 
 	/*
-	 * Send an ACQUIRE message (and possible an extended ACQUIRE) based on
-	 * this new record.  The send-acquire callback assumes that acqrec is
-	 * already locked.
+	 * 1. Generate addresses, kmc, and sensitivity.  These are "common"
+	 * and should be an mblk pointed to by common. TBD -- eventually it
+	 * will include triggering packet contents as more address extensions.
+	 *
+	 * 2. Generate ACQUIRE & KEYSOCK_OUT and single-protocol proposal.
+	 * These are "regular" and "prop".  String regular->b_cont->b_cont =
+	 * common, common->b_cont = prop.
+	 *
+	 * 3. If extended register got turned on, generate EXT_ACQUIRE &
+	 * KEYSOCK_OUT and multi-protocol eprop. These are "extended" and
+	 * "eprop".  String extended->b_cont->b_cont = dupb(common) and
+	 * extended->b_cont->b_cont->b_cont = prop.
+	 *
+	 * 4. Deliver:  putnext(q, regular) and if there, putnext(q, extended).
 	 */
-	(*spp->s_acqfn)(newbie, extended, ns);
+
+	regular = extended = prop = eprop = NULL;
+
+	common = sadb_acquire_msg_common(&sel, pp, ap, tunnel_mode, tsl, NULL);
+	if (common == NULL)
+		goto bail;
+
+	regular = sadb_acquire_msg_base(0, (need_esp ?
+	    SADB_SATYPE_ESP : SADB_SATYPE_AH), newbie->ipsacq_seq, 0);
+	if (regular == NULL)
+		goto bail;
+
+	/*
+	 * Pardon the boolean cleverness. At least one of need_* must be true.
+	 * If they are equal, it's an AH & ESP policy and ESP needs to go
+	 * first.  If they aren't, just check the contents of need_esp.
+	 */
+	prop = sadb_acquire_prop(ap, ns, need_esp);
+	if (prop == NULL)
+		goto bail;
+
+	/* Link the parts together. */
+	regular->b_cont->b_cont = common;
+	common->b_cont = prop;
+	/*
+	 * Prop is now linked, so don't freemsg() it if the extended
+	 * construction goes off the rails.
+	 */
+	prop = NULL;
+
+	((sadb_msg_t *)(regular->b_cont->b_rptr))->sadb_msg_len =
+	    SADB_8TO64(msgsize(regular->b_cont));
+
+	/*
+	 * If we need an extended ACQUIRE, build it here.
+	 */
+	if (keysock_extended_reg(ns)) {
+		/* NOTE: "common" still points to what we need. */
+		extended = sadb_acquire_msg_base(0, 0, newbie->ipsacq_seq, 0);
+		if (extended == NULL) {
+			common = NULL;
+			goto bail;
+		}
+
+		extended->b_cont->b_cont = dupb(common);
+		common = NULL;
+		if (extended->b_cont->b_cont == NULL)
+			goto bail;
+
+		eprop = sadb_acquire_extended_prop(ap, ns);
+		if (eprop == NULL)
+			goto bail;
+		extended->b_cont->b_cont->b_cont = eprop;
+
+		((sadb_msg_t *)(extended->b_cont->b_rptr))->sadb_msg_len =
+		    SADB_8TO64(msgsize(extended->b_cont));
+	}
+
+	/* So we don't hold a lock across putnext()... */
+	mutex_exit(&newbie->ipsacq_lock);
+
+	if (extended != NULL)
+		putnext(q, extended);
+	ASSERT(regular != NULL);
+	putnext(q, regular);
 	return;
 
-punt_extended:
-	(*spp->s_acqfn)(newbie, NULL, ns);
+bail:
+	/* Make this acquire record go away quickly... */
+	newbie->ipsacq_expire = 0;
+	/* Exploit freemsg(NULL) being legal for fun & profit. */
+	freemsg(common);
+	freemsg(prop);
+	freemsg(extended);
+	freemsg(regular);
+	mutex_exit(&newbie->ipsacq_lock);
 }
 
 /*
@@ -5429,21 +6052,6 @@ sadb_sens_from_label(sadb_sens_t *sens, int exttype, ts_label_t *tsl,
 	bcopy(&(((_bslabel_impl_t *)sl)->compartments), bitmap, _C_LEN * 4);
 }
 
-static sadb_sens_t *
-sadb_make_sens_ext(ts_label_t *tsl, int *len)
-{
-	/* XXX allocation failure? */
-	int sens_len = sadb_sens_len_from_label(tsl);
-
-	sadb_sens_t *sens = kmem_alloc(sens_len, KM_SLEEP);
-
-	sadb_sens_from_label(sens, SADB_EXT_SENSITIVITY, tsl, sens_len);
-
-	*len = sens_len;
-
-	return (sens);
-}
-
 /*
  * Okay, how do we report errors/invalid labels from this?
  * With a special designated "not a label" cred_t ?
@@ -5478,392 +6086,6 @@ sadb_label_from_sens(sadb_sens_t *sens, uint64_t *bitmap)
 }
 
 /* End XXX label-library-leakage */
-
-/*
- * Construct an extended ACQUIRE message based on a selector and the resulting
- * IPsec action.
- *
- * NOTE: This is used by both inverse ACQUIRE and actual ACQUIRE
- * generation. As a consequence, expect this function to evolve
- * rapidly.
- */
-static mblk_t *
-sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
-    ipsec_action_t *act, boolean_t tunnel_mode, uint32_t seq, uint32_t pid,
-    sadb_sens_t *sens, netstack_t *ns)
-{
-	mblk_t *mp;
-	sadb_msg_t *samsg;
-	uint8_t *start, *cur, *end;
-	uint32_t *saddrptr, *daddrptr;
-	sa_family_t af;
-	sadb_prop_t *eprop;
-	ipsec_action_t *ap, *an;
-	ipsec_selkey_t *ipsl;
-	uint8_t proto, pfxlen;
-	uint16_t lport, rport;
-	uint32_t kmp, kmc;
-
-	/*
-	 * Find the action we want sooner rather than later..
-	 */
-	an = NULL;
-	if (pol == NULL) {
-		ap = act;
-	} else {
-		ap = pol->ipsp_act;
-
-		if (ap != NULL)
-			an = ap->ipa_next;
-	}
-
-	/*
-	 * Just take a swag for the allocation for now.	 We can always
-	 * alter it later.
-	 */
-#define	SADB_EXTENDED_ACQUIRE_SIZE	4096
-	mp = allocb(SADB_EXTENDED_ACQUIRE_SIZE, BPRI_HI);
-	if (mp == NULL)
-		return (NULL);
-
-	start = mp->b_rptr;
-	end = start + SADB_EXTENDED_ACQUIRE_SIZE;
-
-	cur = start;
-
-	samsg = (sadb_msg_t *)cur;
-	cur += sizeof (*samsg);
-
-	samsg->sadb_msg_version = PF_KEY_V2;
-	samsg->sadb_msg_type = SADB_ACQUIRE;
-	samsg->sadb_msg_errno = 0;
-	samsg->sadb_msg_reserved = 0;
-	samsg->sadb_msg_satype = 0;
-	samsg->sadb_msg_seq = seq;
-	samsg->sadb_msg_pid = pid;
-
-	if (tunnel_mode) {
-		/*
-		 * Form inner address extensions based NOT on the inner
-		 * selectors (i.e. the packet data), but on the policy's
-		 * selector key (i.e. the policy's selector information).
-		 *
-		 * NOTE:  The position of IPv4 and IPv6 addresses is the
-		 * same in ipsec_selkey_t (unless the compiler does very
-		 * strange things with unions, consult your local C language
-		 * lawyer for details).
-		 */
-		ASSERT(pol != NULL);
-
-		ipsl = &(pol->ipsp_sel->ipsl_key);
-		if (ipsl->ipsl_valid & IPSL_IPV4) {
-			af = AF_INET;
-			ASSERT(sel->ips_protocol == IPPROTO_ENCAP);
-			ASSERT(!(ipsl->ipsl_valid & IPSL_IPV6));
-		} else {
-			af = AF_INET6;
-			ASSERT(sel->ips_protocol == IPPROTO_IPV6);
-			ASSERT(ipsl->ipsl_valid & IPSL_IPV6);
-		}
-
-		if (ipsl->ipsl_valid & IPSL_LOCAL_ADDR) {
-			saddrptr = (uint32_t *)(&ipsl->ipsl_local);
-			pfxlen = ipsl->ipsl_local_pfxlen;
-		} else {
-			saddrptr = (uint32_t *)(&ipv6_all_zeros);
-			pfxlen = 0;
-		}
-		/* XXX What about ICMP type/code? */
-		lport = (ipsl->ipsl_valid & IPSL_LOCAL_PORT) ?
-		    ipsl->ipsl_lport : 0;
-		proto = (ipsl->ipsl_valid & IPSL_PROTOCOL) ?
-		    ipsl->ipsl_proto : 0;
-
-		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_SRC,
-		    af, saddrptr, lport, proto, pfxlen);
-		if (cur == NULL) {
-			freeb(mp);
-			return (NULL);
-		}
-
-		if (ipsl->ipsl_valid & IPSL_REMOTE_ADDR) {
-			daddrptr = (uint32_t *)(&ipsl->ipsl_remote);
-			pfxlen = ipsl->ipsl_remote_pfxlen;
-		} else {
-			daddrptr = (uint32_t *)(&ipv6_all_zeros);
-			pfxlen = 0;
-		}
-		/* XXX What about ICMP type/code? */
-		rport = (ipsl->ipsl_valid & IPSL_REMOTE_PORT) ?
-		    ipsl->ipsl_rport : 0;
-
-		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_DST,
-		    af, daddrptr, rport, proto, pfxlen);
-		if (cur == NULL) {
-			freeb(mp);
-			return (NULL);
-		}
-		/*
-		 * TODO  - if we go to 3408's dream of transport mode IP-in-IP
-		 * _with_ inner-packet address selectors, we'll need to further
-		 * distinguish tunnel mode here.  For now, having inner
-		 * addresses and/or ports is sufficient.
-		 *
-		 * Meanwhile, whack proto/ports to reflect IP-in-IP for the
-		 * outer addresses.
-		 */
-		proto = sel->ips_protocol;	/* Either _ENCAP or _IPV6 */
-		lport = rport = 0;
-	} else if ((ap != NULL) && (!ap->ipa_want_unique)) {
-		proto = 0;
-		lport = 0;
-		rport = 0;
-		if (pol != NULL) {
-			ipsl = &(pol->ipsp_sel->ipsl_key);
-			if (ipsl->ipsl_valid & IPSL_PROTOCOL)
-				proto = ipsl->ipsl_proto;
-			if (ipsl->ipsl_valid & IPSL_REMOTE_PORT)
-				rport = ipsl->ipsl_rport;
-			if (ipsl->ipsl_valid & IPSL_LOCAL_PORT)
-				lport = ipsl->ipsl_lport;
-		}
-	} else {
-		proto = sel->ips_protocol;
-		lport = sel->ips_local_port;
-		rport = sel->ips_remote_port;
-	}
-
-	af = sel->ips_isv4 ? AF_INET : AF_INET6;
-
-	/*
-	 * NOTE:  The position of IPv4 and IPv6 addresses is the same in
-	 * ipsec_selector_t.
-	 */
-	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_SRC, af,
-	    (uint32_t *)(&sel->ips_local_addr_v6), lport, proto, 0);
-
-	if (cur == NULL) {
-		freeb(mp);
-		return (NULL);
-	}
-
-	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_DST, af,
-	    (uint32_t *)(&sel->ips_remote_addr_v6), rport, proto, 0);
-
-	if (cur == NULL) {
-		freeb(mp);
-		return (NULL);
-	}
-
-	if (sens != NULL) {
-		uint8_t *sensext = cur;
-		int senslen = SADB_64TO8(sens->sadb_sens_len);
-
-		cur += senslen;
-		if (cur > end) {
-			freeb(mp);
-			return (NULL);
-		}
-		bcopy(sens, sensext, senslen);
-	}
-
-	/*
-	 * This section will change a lot as policy evolves.
-	 * For now, it'll be relatively simple.
-	 */
-	eprop = (sadb_prop_t *)cur;
-	cur += sizeof (*eprop);
-	if (cur > end) {
-		/* no space left */
-		freeb(mp);
-		return (NULL);
-	}
-
-	eprop->sadb_prop_exttype = SADB_X_EXT_EPROP;
-	eprop->sadb_x_prop_ereserved = 0;
-	eprop->sadb_x_prop_numecombs = 0;
-	eprop->sadb_prop_replay = 32;	/* default */
-
-	kmc = kmp = 0;
-
-	for (; ap != NULL; ap = an) {
-		an = (pol != NULL) ? ap->ipa_next : NULL;
-
-		/*
-		 * Skip non-IPsec policies
-		 */
-		if (ap->ipa_act.ipa_type != IPSEC_ACT_APPLY)
-			continue;
-
-		if (ap->ipa_act.ipa_apply.ipp_km_proto)
-			kmp = ap->ipa_act.ipa_apply.ipp_km_proto;
-		if (ap->ipa_act.ipa_apply.ipp_km_cookie)
-			kmc = ap->ipa_act.ipa_apply.ipp_km_cookie;
-		if (ap->ipa_act.ipa_apply.ipp_replay_depth) {
-			eprop->sadb_prop_replay =
-			    ap->ipa_act.ipa_apply.ipp_replay_depth;
-		}
-
-		cur = sadb_action_to_ecomb(cur, end, ap, ns);
-		if (cur == NULL) { /* no space */
-			freeb(mp);
-			return (NULL);
-		}
-		eprop->sadb_x_prop_numecombs++;
-	}
-
-	if (eprop->sadb_x_prop_numecombs == 0) {
-		/*
-		 * This will happen if we fail to find a policy
-		 * allowing for IPsec processing.
-		 * Construct an error message.
-		 */
-		samsg->sadb_msg_len = SADB_8TO64(sizeof (*samsg));
-		samsg->sadb_msg_errno = ENOENT;
-		samsg->sadb_x_msg_diagnostic = 0;
-		return (mp);
-	}
-
-	if ((kmp != 0) || (kmc != 0)) {
-		cur = sadb_make_kmc_ext(cur, end, kmp, kmc);
-		if (cur == NULL) {
-			freeb(mp);
-			return (NULL);
-		}
-	}
-
-	eprop->sadb_prop_len = SADB_8TO64(cur - (uint8_t *)eprop);
-	samsg->sadb_msg_len = SADB_8TO64(cur - start);
-	mp->b_wptr = cur;
-
-	return (mp);
-}
-
-/*
- * Generic setup of an RFC 2367 ACQUIRE message.  Caller sets satype.
- *
- * NOTE: This function acquires alg_lock as a side-effect if-and-only-if we
- * succeed (i.e. return non-NULL).  Caller MUST release it.  This is to
- * maximize code consolidation while preventing algorithm changes from messing
- * with the callers finishing touches on the ACQUIRE itself.
- */
-mblk_t *
-sadb_setup_acquire(ipsacq_t *acqrec, uint8_t satype, ipsec_stack_t *ipss)
-{
-	uint_t allocsize;
-	mblk_t *pfkeymp, *msgmp;
-	sa_family_t af;
-	uint8_t *cur, *end;
-	sadb_msg_t *samsg;
-	uint16_t sport_typecode;
-	uint16_t dport_typecode;
-	uint8_t check_proto;
-	boolean_t tunnel_mode = (acqrec->ipsacq_inneraddrfam != 0);
-
-	ASSERT(MUTEX_HELD(&acqrec->ipsacq_lock));
-
-	pfkeymp = sadb_keysock_out(0);
-	if (pfkeymp == NULL)
-		return (NULL);
-
-	/*
-	 * First, allocate a basic ACQUIRE message
-	 */
-	allocsize = sizeof (sadb_msg_t) + sizeof (sadb_address_t) +
-	    sizeof (sadb_address_t) + sizeof (sadb_prop_t);
-
-	/* Make sure there's enough to cover both AF_INET and AF_INET6. */
-	allocsize += 2 * sizeof (struct sockaddr_in6);
-
-	rw_enter(&ipss->ipsec_alg_lock, RW_READER);
-	/* NOTE:  The lock is now held through to this function's return. */
-	allocsize += ipss->ipsec_nalgs[IPSEC_ALG_AUTH] *
-	    ipss->ipsec_nalgs[IPSEC_ALG_ENCR] * sizeof (sadb_comb_t);
-
-	if (tunnel_mode) {
-		/* Tunnel mode! */
-		allocsize += 2 * sizeof (sadb_address_t);
-		/* Enough to cover both AF_INET and AF_INET6. */
-		allocsize += 2 * sizeof (struct sockaddr_in6);
-	}
-
-	msgmp = allocb(allocsize, BPRI_HI);
-	if (msgmp == NULL) {
-		freeb(pfkeymp);
-		rw_exit(&ipss->ipsec_alg_lock);
-		return (NULL);
-	}
-
-	pfkeymp->b_cont = msgmp;
-	cur = msgmp->b_rptr;
-	end = cur + allocsize;
-	samsg = (sadb_msg_t *)cur;
-	cur += sizeof (sadb_msg_t);
-
-	af = acqrec->ipsacq_addrfam;
-	switch (af) {
-	case AF_INET:
-		check_proto = IPPROTO_ICMP;
-		break;
-	case AF_INET6:
-		check_proto = IPPROTO_ICMPV6;
-		break;
-	default:
-		/* This should never happen unless we have kernel bugs. */
-		cmn_err(CE_WARN,
-		    "sadb_setup_acquire:  corrupt ACQUIRE record.\n");
-		ASSERT(0);
-		rw_exit(&ipss->ipsec_alg_lock);
-		return (NULL);
-	}
-
-	samsg->sadb_msg_version = PF_KEY_V2;
-	samsg->sadb_msg_type = SADB_ACQUIRE;
-	samsg->sadb_msg_satype = satype;
-	samsg->sadb_msg_errno = 0;
-	samsg->sadb_msg_pid = 0;
-	samsg->sadb_msg_reserved = 0;
-	samsg->sadb_msg_seq = acqrec->ipsacq_seq;
-
-	ASSERT(MUTEX_HELD(&acqrec->ipsacq_lock));
-
-	if ((acqrec->ipsacq_proto == check_proto) || tunnel_mode) {
-		sport_typecode = dport_typecode = 0;
-	} else {
-		sport_typecode = acqrec->ipsacq_srcport;
-		dport_typecode = acqrec->ipsacq_dstport;
-	}
-
-	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_SRC, af,
-	    acqrec->ipsacq_srcaddr, sport_typecode, acqrec->ipsacq_proto, 0);
-
-	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_DST, af,
-	    acqrec->ipsacq_dstaddr, dport_typecode, acqrec->ipsacq_proto, 0);
-
-	if (tunnel_mode) {
-		sport_typecode = acqrec->ipsacq_srcport;
-		dport_typecode = acqrec->ipsacq_dstport;
-		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_SRC,
-		    acqrec->ipsacq_inneraddrfam, acqrec->ipsacq_innersrc,
-		    sport_typecode, acqrec->ipsacq_inner_proto,
-		    acqrec->ipsacq_innersrcpfx);
-		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_DST,
-		    acqrec->ipsacq_inneraddrfam, acqrec->ipsacq_innerdst,
-		    dport_typecode, acqrec->ipsacq_inner_proto,
-		    acqrec->ipsacq_innerdstpfx);
-	}
-
-	/* XXX Insert identity information here. */
-
-	/* XXXMLS Insert sensitivity information here. */
-
-	if (cur != NULL)
-		samsg->sadb_msg_len = SADB_8TO64(cur - msgmp->b_rptr);
-	else
-		rw_exit(&ipss->ipsec_alg_lock);
-
-	return (pfkeymp);
-}
 
 /*
  * Given an SADB_GETSPI message, find an appropriately ranged SA and
@@ -6856,14 +7078,34 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 		}
 	}
 
-	/*
-	 * Now that we have a policy entry/widget, construct an ACQUIRE
-	 * message based on that, fix fields where appropriate,
-	 * and return the message.
-	 */
-	retmp = sadb_extended_acquire(&sel, pp, NULL,
-	    (itp != NULL && (itp->itp_flags & ITPF_P_TUNNEL)),
-	    samsg->sadb_msg_seq, samsg->sadb_msg_pid, sens, ns);
+	ASSERT(pp != NULL);
+	retmp = sadb_acquire_msg_base(0, 0, samsg->sadb_msg_seq,
+	    samsg->sadb_msg_pid);
+	if (retmp != NULL) {
+		/* Remove KEYSOCK_OUT, because caller constructs it instead. */
+		mblk_t *kso = retmp;
+
+		retmp = retmp->b_cont;
+		freeb(kso);
+		/* Append addresses... */
+		retmp->b_cont = sadb_acquire_msg_common(&sel, pp, NULL,
+		    (itp != NULL && (itp->itp_flags & ITPF_P_TUNNEL)), NULL,
+		    sens);
+		if (retmp->b_cont == NULL) {
+			freemsg(retmp);
+			retmp = NULL;
+		}
+		/* And the policy result. */
+		retmp->b_cont->b_cont =
+		    sadb_acquire_extended_prop(pp->ipsp_act, ns);
+		if (retmp->b_cont->b_cont == NULL) {
+			freemsg(retmp);
+			retmp = NULL;
+		}
+		((sadb_msg_t *)retmp->b_rptr)->sadb_msg_len =
+		    SADB_8TO64(msgsize(retmp));
+	}
+
 	if (pp != NULL) {
 		IPPOL_REFRELE(pp);
 	}

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_INET_IPSECESP_H
@@ -42,6 +43,52 @@ typedef struct ipsecespparam_s {
 	uint_t	ipsecesp_param_value;
 	char	*ipsecesp_param_name;
 } ipsecespparam_t;
+
+/*
+ * Stats.  This may eventually become a full-blown SNMP MIB once that spec
+ * stabilizes.
+ */
+
+typedef struct esp_kstats_s {
+	kstat_named_t esp_stat_num_aalgs;
+	kstat_named_t esp_stat_good_auth;
+	kstat_named_t esp_stat_bad_auth;
+	kstat_named_t esp_stat_bad_padding;
+	kstat_named_t esp_stat_replay_failures;
+	kstat_named_t esp_stat_replay_early_failures;
+	kstat_named_t esp_stat_keysock_in;
+	kstat_named_t esp_stat_out_requests;
+	kstat_named_t esp_stat_acquire_requests;
+	kstat_named_t esp_stat_bytes_expired;
+	kstat_named_t esp_stat_out_discards;
+	kstat_named_t esp_stat_crypto_sync;
+	kstat_named_t esp_stat_crypto_async;
+	kstat_named_t esp_stat_crypto_failures;
+	kstat_named_t esp_stat_num_ealgs;
+	kstat_named_t esp_stat_bad_decrypt;
+	kstat_named_t esp_stat_sa_port_renumbers;
+} esp_kstats_t;
+
+/*
+ * espstack->esp_kstats is equal to espstack->esp_ksp->ks_data if
+ * kstat_create_netstack for espstack->esp_ksp succeeds, but when it
+ * fails, it will be NULL. Note this is done for all stack instances,
+ * so it *could* fail. hence a non-NULL checking is done for
+ * ESP_BUMP_STAT and ESP_DEBUMP_STAT
+ */
+#define	ESP_BUMP_STAT(espstack, x)					\
+do {									\
+	if (espstack->esp_kstats != NULL)				\
+		(espstack->esp_kstats->esp_stat_ ## x).value.ui64++;	\
+_NOTE(CONSTCOND)							\
+} while (0)
+
+#define	ESP_DEBUMP_STAT(espstack, x)					\
+do {									\
+	if (espstack->esp_kstats != NULL)				\
+		(espstack->esp_kstats->esp_stat_ ## x).value.ui64--;	\
+_NOTE(CONSTCOND)							\
+} while (0)
 
 /*
  * IPSECESP stack instances
@@ -72,7 +119,31 @@ struct ipsecesp_stack {
 };
 typedef struct ipsecesp_stack ipsecesp_stack_t;
 
-/* Define *this* NDD variable here because we use it outside ESP proper. */
+#define	ipsecesp_debug	ipsecesp_params[0].ipsecesp_param_value
+#define	ipsecesp_age_interval ipsecesp_params[1].ipsecesp_param_value
+#define	ipsecesp_age_int_max	ipsecesp_params[1].ipsecesp_param_max
+#define	ipsecesp_reap_delay	ipsecesp_params[2].ipsecesp_param_value
+#define	ipsecesp_replay_size	ipsecesp_params[3].ipsecesp_param_value
+#define	ipsecesp_acquire_timeout	\
+	ipsecesp_params[4].ipsecesp_param_value
+#define	ipsecesp_larval_timeout	\
+	ipsecesp_params[5].ipsecesp_param_value
+#define	ipsecesp_default_soft_bytes	\
+	ipsecesp_params[6].ipsecesp_param_value
+#define	ipsecesp_default_hard_bytes	\
+	ipsecesp_params[7].ipsecesp_param_value
+#define	ipsecesp_default_soft_addtime	\
+	ipsecesp_params[8].ipsecesp_param_value
+#define	ipsecesp_default_hard_addtime	\
+	ipsecesp_params[9].ipsecesp_param_value
+#define	ipsecesp_default_soft_usetime	\
+	ipsecesp_params[10].ipsecesp_param_value
+#define	ipsecesp_default_hard_usetime	\
+	ipsecesp_params[11].ipsecesp_param_value
+#define	ipsecesp_log_unknown_spi	\
+	ipsecesp_params[12].ipsecesp_param_value
+#define	ipsecesp_padding_check	\
+	ipsecesp_params[13].ipsecesp_param_value
 #define	ipsecesp_nat_keepalive_interval	\
 	ipsecesp_params[14].ipsecesp_param_value
 

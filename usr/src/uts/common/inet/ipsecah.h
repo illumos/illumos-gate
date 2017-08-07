@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_INET_IPSECAH_H
@@ -113,6 +114,21 @@ struct ipsecah_stack {
 	timeout_id_t		ah_event;
 };
 typedef struct ipsecah_stack ipsecah_stack_t;
+
+#define	ipsecah_debug			ipsecah_params[0].ipsecah_param_value
+#define	ipsecah_age_interval		ipsecah_params[1].ipsecah_param_value
+#define	ipsecah_age_int_max		ipsecah_params[1].ipsecah_param_max
+#define	ipsecah_reap_delay		ipsecah_params[2].ipsecah_param_value
+#define	ipsecah_replay_size		ipsecah_params[3].ipsecah_param_value
+#define	ipsecah_acquire_timeout		ipsecah_params[4].ipsecah_param_value
+#define	ipsecah_larval_timeout		ipsecah_params[5].ipsecah_param_value
+#define	ipsecah_default_soft_bytes	ipsecah_params[6].ipsecah_param_value
+#define	ipsecah_default_hard_bytes	ipsecah_params[7].ipsecah_param_value
+#define	ipsecah_default_soft_addtime	ipsecah_params[8].ipsecah_param_value
+#define	ipsecah_default_hard_addtime	ipsecah_params[9].ipsecah_param_value
+#define	ipsecah_default_soft_usetime	ipsecah_params[10].ipsecah_param_value
+#define	ipsecah_default_hard_usetime	ipsecah_params[11].ipsecah_param_value
+#define	ipsecah_log_unknown_spi		ipsecah_params[12].ipsecah_param_value
 
 #endif	/* _KERNEL */
 
