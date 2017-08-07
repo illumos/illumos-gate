@@ -511,11 +511,6 @@ typedef struct ixgbe_tx_ring {
 	uint32_t		stat_fail_no_tcb;
 	uint32_t		stat_fail_dma_bind;
 	uint32_t		stat_reschedule;
-
-#ifdef IXGBE_DEBUG
-	/*
-	 * Debug statistics
-	 */
 	uint32_t		stat_break_tbd_limit;
 	uint32_t		stat_lso_header_fail;
 
