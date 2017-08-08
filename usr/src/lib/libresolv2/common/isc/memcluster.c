@@ -22,11 +22,6 @@
 /* #define DEBUGGING_MEMCLUSTER */
 #define MEMCLUSTER_ATEND
 
-
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: memcluster.c,v 1.11 2006/08/30 23:34:38 marka Exp $";
-#endif /* not lint */
-
 #include "port_before.h"
 
 #include <sys/types.h>

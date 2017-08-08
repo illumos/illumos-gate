@@ -19,10 +19,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: irs_data.c,v 1.12 2007/08/27 03:32:26 marka Exp $";
-#endif
-
 #include "port_before.h"
 
 #ifndef __BIND_NOSTATIC

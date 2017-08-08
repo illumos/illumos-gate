@@ -48,10 +48,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: irpmarshall.c,v 1.7 2006/03/09 23:57:56 marka Exp $";
-#endif /* LIBC_SCCS and not lint */
-
 #if 0
 
 Check values are in approrpriate endian order.

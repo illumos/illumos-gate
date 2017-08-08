@@ -21,10 +21,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: gethostent.c,v 1.8 2006/01/10 05:06:00 marka Exp $";
-#endif
-
 /* Imports */
 
 #include "port_before.h"
