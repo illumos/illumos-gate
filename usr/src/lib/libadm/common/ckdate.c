@@ -115,22 +115,19 @@ static char *
 p_eday(char *string, int llim, int ulim)
 {
 	char *ptr, *copy;
-	char daynum[3];
 	int begin = -1;
 	int iday = 0;
 	int idaymax = 2;
 
-	daynum[0] = '\0';
 	if (*string == BLANK) {
 		string++;
 		idaymax--;
 	}
 	copy = string;
 	while (isdigit((unsigned char)*copy) && (iday < idaymax)) {
-		daynum[iday] = *copy++;
+		copy++;
 		iday++;
 	}
-	daynum[iday] = '\0';
 	if (iday == 1) {
 		llim = 1;
 		ulim = 9;
