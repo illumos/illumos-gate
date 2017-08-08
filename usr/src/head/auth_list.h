@@ -67,7 +67,6 @@ extern "C" {
 /*
  * Authorizations used by Trusted Extensions.
  */
-#define	BYPASS_FILE_VIEW_AUTH	"solaris.label.win.noview"
 #define	DEVICE_CONFIG_AUTH	"solaris.device.config"
 #define	FILE_CHOWN_AUTH		"solaris.file.chown"
 #define	FILE_DOWNGRADE_SL_AUTH	"solaris.label.file.downgrade"
@@ -85,8 +84,6 @@ extern "C" {
 #define	SYS_ACCRED_SET_AUTH	"solaris.label.range"
 #define	SYSEVENT_READ_AUTH	"solaris.system.sysevent.read"
 #define	SYSEVENT_WRITE_AUTH	"solaris.system.sysevent.write"
-#define	WIN_DOWNGRADE_SL_AUTH	"solaris.label.win.downgrade"
-#define	WIN_UPGRADE_SL_AUTH	"solaris.label.win.upgrade"
 
 #ifdef	__cplusplus
 }

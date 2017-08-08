@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2017 Peter Tribble
 .\"  Copyright (c) 2006 by Sun Microsystems, Inc. All rights reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EXEC_ATTR 4 "Mar 6, 2017"
+.TH EXEC_ATTR 4 "Aug 3, 2017"
 .SH NAME
 exec_attr \- execution profiles database
 .SH SYNOPSIS
@@ -76,12 +77,9 @@ release should use \fBsuser\fR.
 \fB\fItype\fR\fR
 .ad
 .RS 10n
-The type of object defined in the profile. There are two valid types: \fBcmd\fR
-and \fBact\fR. The \fBcmd\fR type specifies that the \fBID\fR field is a
-command that would be executed by a shell. The \fBact\fR type is available only
-if the system is configured with Trusted Extensions. It specifies that the
-\fBID\fR field is a \fBCDE\fR action that should be executed by the Trusted
-Extensions \fBCDE\fR action mechanism.
+The type of object defined in the profile. The only valid type is
+\fBcmd\fR, which specifies that the \fBID\fR field is a
+command that would be executed by a shell.
 .RE
 
 .sp
@@ -108,11 +106,10 @@ Reserved for future use.
 \fB\fIid\fR\fR
 .ad
 .RS 10n
-A string that uniquely identifies the object described by the profile. For a
-profile of type \fBcmd,\fR the id is either the full path to the command or the
-asterisk (\fB*\fR) symbol, which is used to allow all commands. An asterisk
-that replaces the filename component in a pathname indicates all files in a
-particular directory.
+A string that uniquely identifies the object described by the profile.
+The id is either the full path to the command or the asterisk (\fB*\fR) symbol,
+which is used to allow all commands. An asterisk that replaces the filename
+component in a pathname indicates all files in a particular directory.
 .sp
 To specify arguments, the pathname should point to a shell script that is
 written to execute the command with the desired argument. In a Bourne shell,
@@ -128,53 +125,6 @@ can start the script with the \fB-p\fR option.
 .fi
 .in -2
 .sp
-
-If the Trusted Extensions feature is configured and the profile entry type is
-\fBact\fR, the \fBid\fR is either the fully qualified name of a \fBCDE\fR
-action, or an asterisk (\fB*\fR) representing a wildcard. A fully qualified
-\fBCDE\fR action is specified using the action name and four additional
-semicolon-separated fields. These fields can be empty but the semicolons are
-required. The fields in a \fBCDE\fR action are as follows:
-.sp
-.ne 2
-.na
-\fB\fIargclass\fR\fR
-.ad
-.RS 12n
-Specifies the argument class (for example, \fBFILE\fR or \fBSESSION\fR.)
-Corresponds to \fBARG_CLASS\fR for \fBCDE\fR actions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIargtype\fR\fR
-.ad
-.RS 12n
-Specifies the data type for the argument. Corresponds to \fBARG_TYPE\fR for
-\fBCDE\fR actions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIargmode\fR\fR
-.ad
-.RS 12n
-Specifies the read or write mode for the argument. Corresponds to
-\fBARG_MODE\fR for \fBCDE\fR actions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIargcount\fR\fR
-.ad
-.RS 12n
-Specifies the number of arguments that the action can accept. Corresponds to
-\fBARG_COUNT\fR for \fBCDE\fR actions.
-.RE
-
 .RE
 
 .sp
@@ -271,7 +221,7 @@ escaped with a backslash if used as data: colon (\fB:\fR), semicolon (\fB;\fR),
 equals (\fB=\fR), and backslash (\fB\\fR).
 .SH SEE ALSO
 .LP
-\fBauths\fR(1), \fBdtaction\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
+\fBauths\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
 \fBsh\fR(1), \fBmakedbm\fR(1M), \fBgetauthattr\fR(3SECDB),
 \fBgetexecattr\fR(3SECDB), \fBgetprofattr\fR(3SECDB),
 \fBgetuserattr\fR(3SECDB), \fBkva_match\fR(3SECDB), \fBauth_attr\fR(4),

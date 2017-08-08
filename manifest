@@ -5590,9 +5590,6 @@ f usr/lib/help/auths/locale/C/LabelHeader.html 0444 root bin
 f usr/lib/help/auths/locale/C/LabelPrint.html 0444 root bin
 f usr/lib/help/auths/locale/C/LabelRange.html 0444 root bin
 f usr/lib/help/auths/locale/C/LabelServer.html 0444 root bin
-f usr/lib/help/auths/locale/C/LabelWinDowngrade.html 0444 root bin
-f usr/lib/help/auths/locale/C/LabelWinNoView.html 0444 root bin
-f usr/lib/help/auths/locale/C/LabelWinUpgrade.html 0444 root bin
 f usr/lib/help/auths/locale/C/LinkSecurity.html 0444 root bin
 f usr/lib/help/auths/locale/C/LoginEnable.html 0444 root bin
 f usr/lib/help/auths/locale/C/LoginHeader.html 0444 root bin
@@ -5721,9 +5718,6 @@ f usr/lib/help/auths/locale/LabelHeader.html 0444 root bin
 f usr/lib/help/auths/locale/LabelPrint.html 0444 root bin
 f usr/lib/help/auths/locale/LabelRange.html 0444 root bin
 f usr/lib/help/auths/locale/LabelServer.html 0444 root bin
-f usr/lib/help/auths/locale/LabelWinDowngrade.html 0444 root bin
-f usr/lib/help/auths/locale/LabelWinNoView.html 0444 root bin
-f usr/lib/help/auths/locale/LabelWinUpgrade.html 0444 root bin
 f usr/lib/help/auths/locale/LinkSecurity.html 0444 root bin
 f usr/lib/help/auths/locale/LoginEnable.html 0444 root bin
 f usr/lib/help/auths/locale/LoginHeader.html 0444 root bin
@@ -18517,7 +18511,6 @@ f usr/share/man/man4/rt_dptbl.4 0444 root bin
 f usr/share/man/man4/sasl_appname.conf.4 0444 root bin
 f usr/share/man/man4/scsi.4 0444 root bin
 f usr/share/man/man4/securenets.4 0444 root bin
-f usr/share/man/man4/sel_config.4 0444 root bin
 f usr/share/man/man4/sendmail.4 0444 root bin
 s usr/share/man/man4/sendmail.cf.4=sendmail.4
 f usr/share/man/man4/service_bundle.4 0444 root bin
