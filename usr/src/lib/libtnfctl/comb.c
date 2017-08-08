@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Functions that know how to create and decode combinations that are
  * used for connecting probe functions.
@@ -90,10 +88,10 @@ extern void	 prb_chain_end(void);
 
 static comb_calltmpl_t calltmpl[PRB_COMB_COUNT] = {
 {
-		(uintptr_t) prb_chain_entry,
-		(uintptr_t) prb_chain_down,
-		(uintptr_t) prb_chain_next,
-		(uintptr_t) prb_chain_end}
+		(uintptr_t)prb_chain_entry,
+		(uintptr_t)prb_chain_down,
+		(uintptr_t)prb_chain_next,
+		(uintptr_t)prb_chain_end}
 };
 
 /*
@@ -103,9 +101,9 @@ static comb_calltmpl_t calltmpl[PRB_COMB_COUNT] = {
 static tnfctl_errcode_t decode(tnfctl_handle_t *hndl, uintptr_t addr,
 	char ***func_names, uintptr_t **func_addrs);
 static boolean_t find(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down,
-	uintptr_t next, uintptr_t * comb_p);
+	uintptr_t next, uintptr_t *comb_p);
 static tnfctl_errcode_t build(tnfctl_handle_t *hndl, comb_op_t op,
-	uintptr_t down, uintptr_t next, uintptr_t * comb_p);
+	uintptr_t down, uintptr_t next, uintptr_t *comb_p);
 static tnfctl_errcode_t add(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down,
 	uintptr_t next, uintptr_t comb);
 static int comb_compare(const void *a, const void *b);
@@ -126,28 +124,28 @@ static tnfctl_errcode_t findname(tnfctl_handle_t *hndl, uintptr_t addr,
  */
 tnfctl_errcode_t
 _tnfctl_comb_build(tnfctl_handle_t *hndl, comb_op_t op,
-	uintptr_t down, uintptr_t next, uintptr_t *comb_p)
+    uintptr_t down, uintptr_t next, uintptr_t *comb_p)
 {
 	tnfctl_errcode_t	prexstat;
 
 	*comb_p = NULL;
 
 	DBG_TNF_PROBE_0(_tnfctl_comb_build_start, "libtnfctl",
-			"start _tnfctl_comb_build; sunw%verbosity 1");
+	    "start _tnfctl_comb_build; sunw%verbosity 1");
 
 	if (find(hndl, op, down, next, comb_p)) {
 
 		DBG_TNF_PROBE_1(_tnfctl_comb_build_end, "libtnfctl",
-			"end _tnfctl_comb_build; sunw%verbosity 1",
-			tnf_opaque, found_comb_at, *comb_p);
+		    "end _tnfctl_comb_build; sunw%verbosity 1",
+		    tnf_opaque, found_comb_at, *comb_p);
 
 		return (TNFCTL_ERR_NONE);
 	}
 	prexstat = build(hndl, op, down, next, comb_p);
 
 	DBG_TNF_PROBE_1(_tnfctl_comb_build_end, "libtnfctl",
-			"end _tnfctl_comb_build; sunw%verbosity 1",
-			tnf_opaque, built_comb_at, *comb_p);
+	    "end _tnfctl_comb_build; sunw%verbosity 1",
+	    tnf_opaque, built_comb_at, *comb_p);
 
 	return (prexstat);
 }
@@ -160,17 +158,17 @@ _tnfctl_comb_build(tnfctl_handle_t *hndl, comb_op_t op,
  */
 tnfctl_errcode_t
 _tnfctl_comb_decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
-	uintptr_t **func_addrs)
+    uintptr_t **func_addrs)
 {
 	tnfctl_errcode_t prexstat;
 
 	DBG_TNF_PROBE_0(_tnfctl_comb_decode_start, "libtnfctl",
-			"start _tnfctl_comb_decode; sunw%verbosity 2");
+	    "start _tnfctl_comb_decode; sunw%verbosity 2");
 
 	prexstat = decode(hndl, addr, func_names, func_addrs);
 
 	DBG_TNF_PROBE_0(_tnfctl_comb_decode_end, "libtnfctl",
-			"end _tnfctl_comb_decode; sunw%verbosity 2");
+	    "end _tnfctl_comb_decode; sunw%verbosity 2");
 
 	return (prexstat);
 }
@@ -186,7 +184,7 @@ _tnfctl_comb_decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
  */
 static tnfctl_errcode_t
 decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
-	uintptr_t **func_addrs)
+    uintptr_t **func_addrs)
 {
 	tnfctl_errcode_t	prexstat = TNFCTL_ERR_NONE;
 	decode_key_t	key;
@@ -199,17 +197,17 @@ decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
 
 	/* see if we can find the previously decoded answer */
 	key.addr = addr;
-	find_pp = (decode_key_t **) tfind(&key, &hndl->decoderoot,
-			decode_compare);
+	find_pp = (decode_key_t **)tfind(&key, &hndl->decoderoot,
+	    decode_compare);
 	if (find_pp) {
 		DBG_TNF_PROBE_0(decode_1, "libtnfctl",
-			"sunw%verbosity 2; sunw%debug 'found existing'");
+		    "sunw%verbosity 2; sunw%debug 'found existing'");
 		*func_names = (*find_pp)->name_ptrs;
 		*func_addrs = (*find_pp)->func_addrs;
 		return (TNFCTL_ERR_NONE);
 	}
 
-	new_p = (decode_key_t *) calloc(1, sizeof (decode_key_t));
+	new_p = calloc(1, sizeof (decode_key_t));
 	if (!new_p)
 		return (TNFCTL_ERR_ALLOCFAIL);
 	new_p->addr = addr;
@@ -226,8 +224,7 @@ decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
 		int count, j;
 
 		DBG_TNF_PROBE_2(decode_2, "libtnfctl", "sunw%verbosity 2;",
-			tnf_opaque, down, down,
-			tnf_opaque, next, next);
+		    tnf_opaque, down, down, tnf_opaque, next, next);
 
 		prexstat = findname(hndl, down, &thisname);
 		if (prexstat == TNFCTL_ERR_USR1) {
@@ -245,18 +242,19 @@ decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
 			goto Error;
 
 		/* count number of elements - caution: empty 'for' loop */
-		for (count = 0; nextnames[count]; count++);
+		for (count = 0; nextnames[count]; count++)
+			;
 		count++;	/* since it was 0 based */
 
 		/* allocate one more for new function name */
 		new_p->name_ptrs = malloc((count + 1) *
-					sizeof (new_p->name_ptrs[0]));
+		    sizeof (new_p->name_ptrs[0]));
 		if (new_p->name_ptrs == NULL) {
 			prexstat = TNFCTL_ERR_ALLOCFAIL;
 			goto Error;
 		}
 		new_p->func_addrs = malloc((count + 1) *
-					sizeof (new_p->func_addrs[0]));
+		    sizeof (new_p->func_addrs[0]));
 		if (new_p->func_addrs == NULL) {
 			prexstat = TNFCTL_ERR_ALLOCFAIL;
 			goto Error;
@@ -295,12 +293,11 @@ decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
 	}
 
 	DBG_TNF_PROBE_1(decode_3, "libtnfctl",
-			"sunw%verbosity 2; sunw%debug 'decode built'",
-			tnf_string, func_name,
-				(thisname) ? (thisname) : "end_func");
+	    "sunw%verbosity 2; sunw%debug 'decode built'",
+	    tnf_string, func_name, (thisname) ? (thisname) : "end_func");
 
-	find_pp = (decode_key_t **) tsearch(new_p,
-		&hndl->decoderoot, decode_compare);
+	find_pp = (decode_key_t **)tsearch(new_p, &hndl->decoderoot,
+	    decode_compare);
 	assert(*find_pp == new_p);
 	*func_names = new_p->name_ptrs;
 	*func_addrs = new_p->func_addrs;
@@ -323,9 +320,8 @@ Error:
  * it is, return the down and next pointers
  */
 static tnfctl_errcode_t
-iscomb(tnfctl_handle_t *hndl,
-	uintptr_t addr, uintptr_t *down_p, uintptr_t *next_p,
-	boolean_t *ret_val)
+iscomb(tnfctl_handle_t *hndl, uintptr_t addr, uintptr_t *down_p,
+    uintptr_t *next_p, boolean_t *ret_val)
 {
 	int		type;
 	boolean_t	matched = B_FALSE;
@@ -342,8 +338,8 @@ iscomb(tnfctl_handle_t *hndl,
 		int		tmp_bits = prb_callinfo.mask;
 
 		/* allocate room to copy the target code */
-		size = (size_t) (calltmpl[type].end - calltmpl[type].entry);
-		targ_p = (char *) malloc(size);
+		size = (size_t)(calltmpl[type].end - calltmpl[type].entry);
+		targ_p = malloc(size);
 		if (!targ_p)
 			return (TNFCTL_ERR_ALLOCFAIL);
 
@@ -361,20 +357,20 @@ iscomb(tnfctl_handle_t *hndl,
 		}
 
 		/* loop over all the words */
-		tptr = (char *) calltmpl[type].entry;
+		tptr = (char *)calltmpl[type].entry;
 		for (ptr = targ_p; ptr < (targ_p + size); ptr++, tptr++) {
 			int			 downbits;
 			int			 nextbits;
 		/* LINTED pointer cast may result in improper alignment */
-			int			*uptr = (int *) ptr;
+			int			*uptr = (int *)ptr;
 
 			/*
 			 * If we are pointing at one of the words that we
 			 * patch, * (down or next displ) then read that value
 			 * in. * Otherwise make sure the words match.
 			 */
-			if ((uintptr_t) tptr == calltmpl[type].down +
-				prb_callinfo.offset) {
+			if ((uintptr_t)tptr == calltmpl[type].down +
+			    prb_callinfo.offset) {
 				downbits = *uptr;
 				downbits &= prb_callinfo.mask;
 				/* sign extend */
@@ -388,8 +384,8 @@ iscomb(tnfctl_handle_t *hndl,
 
 				ptr += 3;
 				tptr += 3;
-			} else if ((uintptr_t) tptr == calltmpl[type].next +
-				prb_callinfo.offset) {
+			} else if ((uintptr_t)tptr == calltmpl[type].next +
+			    prb_callinfo.offset) {
 				nextbits = *uptr;
 				nextbits &= prb_callinfo.mask;
 				/* sign extend */
@@ -478,7 +474,7 @@ findname(tnfctl_handle_t *hndl, uintptr_t addr, char **ret_name)
  */
 static boolean_t
 find(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
-	uintptr_t * comb_p)
+    uintptr_t *comb_p)
 {
 	comb_key_t	key;
 	comb_key_t	**find_pp;
@@ -488,7 +484,7 @@ find(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	key.next = next;
 	key.comb = NULL;
 
-	find_pp = (comb_key_t **) tfind(&key, &hndl->buildroot, comb_compare);
+	find_pp = (comb_key_t **)tfind(&key, &hndl->buildroot, comb_compare);
 	if (find_pp) {
 		*comb_p = (*find_pp)->comb;
 		return (B_TRUE);
@@ -502,13 +498,13 @@ find(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
  */
 static tnfctl_errcode_t
 add(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
-	uintptr_t comb)
+    uintptr_t comb)
 {
 	comb_key_t	 *new_p;
 	/* LINTED set but not used in function */
-	comb_key_t	**ret_pp;
+	comb_key_t	**ret_pp __unused;
 
-	new_p = (comb_key_t *) malloc(sizeof (comb_key_t));
+	new_p = malloc(sizeof (comb_key_t));
 	if (!new_p)
 		return (TNFCTL_ERR_ALLOCFAIL);
 
@@ -517,8 +513,8 @@ add(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	new_p->next = next;
 	new_p->comb = comb;
 
-	ret_pp = (comb_key_t **) tsearch(new_p, &hndl->buildroot,
-			comb_compare);
+	ret_pp = (comb_key_t **)tsearch(new_p, &hndl->buildroot,
+	    comb_compare);
 	assert(*ret_pp == new_p);
 	return (TNFCTL_ERR_NONE);
 }
@@ -531,10 +527,10 @@ add(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 static int
 decode_compare(const void *v0p, const void *v1p)
 {
-	decode_key_t   *k0p = (decode_key_t *) v0p;
-	decode_key_t   *k1p = (decode_key_t *) v1p;
+	const decode_key_t   *k0p = v0p;
+	const decode_key_t   *k1p = v1p;
 
-	return (int) ((uintptr_t) k1p->addr - (uintptr_t) k0p->addr);
+	return (int)((uintptr_t)k1p->addr - (uintptr_t)k0p->addr);
 }				/* end decode_compare */
 
 
@@ -544,8 +540,8 @@ decode_compare(const void *v0p, const void *v1p)
 static int
 comb_compare(const void *v0p, const void *v1p)
 {
-	comb_key_t	 *k0p = (comb_key_t *) v0p;
-	comb_key_t	 *k1p = (comb_key_t *) v1p;
+	const comb_key_t *k0p = v0p;
+	const comb_key_t *k1p = v1p;
 
 	if (k0p->op != k1p->op)
 		return ((k0p->op < k1p->op) ? -1 : 1);
@@ -565,7 +561,7 @@ comb_compare(const void *v0p, const void *v1p)
  */
 static tnfctl_errcode_t
 build(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
-	uintptr_t *comb_p)
+    uintptr_t *comb_p)
 {
 	size_t		size;
 	uintptr_t	addr;
@@ -576,14 +572,6 @@ build(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	int		miscstat;
 	tnfctl_errcode_t	prexstat;
 
-#if 0
-	(void) fprintf(stderr, "off=0x%x shift=0x%x mask=0x%x size=%d\n",
-		prb_callinfo.offset,
-		prb_callinfo.shift,
-		prb_callinfo.mask,
-		calltmpl[op].end - calltmpl[op].entry);
-#endif
-
 	*comb_p = NULL;
 	size = calltmpl[op].end - calltmpl[op].entry;
 
@@ -591,7 +579,7 @@ build(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	prexstat = _tnfctl_targmem_alloc(hndl, size, &addr);
 	if (prexstat) {
 		DBG((void) fprintf(stderr,
-			"build: trouble allocating target memory:\n"));
+		    "build: trouble allocating target memory:\n"));
 		goto Error;
 	}
 
@@ -607,17 +595,15 @@ build(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	/* poke the down address */
 	offset = calltmpl[op].down - calltmpl[op].entry;
 	/*LINTED pointer cast may result in improper alignment*/
-	word_p = (unsigned *) (buffer_p + offset + prb_callinfo.offset);
+	word_p = (unsigned *)(buffer_p + offset + prb_callinfo.offset);
 	contents = down - (addr + offset);
 #if defined(i386)
 	contents -= 5;		/* intel offset is relative to *next* instr */
 #endif
 
 	DBG_TNF_PROBE_4(build_1, "libtnfctl", "sunw%verbosity 3",
-			tnf_opaque, down, down,
-			tnf_opaque, contents, contents,
-			tnf_opaque, word_p, word_p,
-			tnf_long, offset, offset);
+	    tnf_opaque, down, down, tnf_opaque, contents, contents,
+	    tnf_opaque, word_p, word_p, tnf_long, offset, offset);
 
 	*word_p &= ~prb_callinfo.mask;	/* clear the relevant field */
 	*word_p |= ((contents >> prb_callinfo.shift) & prb_callinfo.mask);
@@ -625,17 +611,15 @@ build(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	/* poke the next address */
 	offset = calltmpl[op].next - calltmpl[op].entry;
 	/*LINTED pointer cast may result in improper alignment*/
-	word_p = (unsigned *) (buffer_p + offset + prb_callinfo.offset);
+	word_p = (unsigned *)(buffer_p + offset + prb_callinfo.offset);
 	contents = next - (addr + offset);
 #if defined(i386)
 	contents -= 5;		/* intel offset is relative to *next* instr */
 #endif
 
 	DBG_TNF_PROBE_4(build_2, "libtnfctl", "sunw%verbosity 3",
-			tnf_opaque, next, next,
-			tnf_opaque, contents, contents,
-			tnf_opaque, word_p, word_p,
-			tnf_long, offset, offset);
+	    tnf_opaque, next, next, tnf_opaque, contents, contents,
+	    tnf_opaque, word_p, word_p, tnf_long, offset, offset);
 
 	*word_p &= ~prb_callinfo.mask;	/* clear the relevant field */
 	*word_p |= ((contents >> prb_callinfo.shift) & prb_callinfo.mask);
@@ -644,7 +628,7 @@ build(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	miscstat = hndl->p_write(hndl->proc_p, addr, buffer_p, size);
 	if (miscstat) {
 		DBG((void) fprintf(stderr,
-			"build: trouble writing combination: \n"));
+		    "build: trouble writing combination: \n"));
 		prexstat = TNFCTL_ERR_INTERNAL;
 		goto Error;
 	}
