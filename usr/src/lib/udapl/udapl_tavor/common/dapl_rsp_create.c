@@ -154,7 +154,7 @@ dapl_rsp_create(
 	/*
 	 * Take a reference on the EVD handle
 	 */
-	(void) dapl_os_atomic_inc(&((DAPL_EVD *)evd_handle)->evd_ref_count);
+	dapl_os_atomic_inc(&((DAPL_EVD *)evd_handle)->evd_ref_count);
 
 	/*
 	 * Update the EP state indicating the provider now owns it

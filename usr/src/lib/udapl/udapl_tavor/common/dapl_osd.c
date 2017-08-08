@@ -400,7 +400,7 @@ dapls_osd_fork_cleanup(void)
 				    rmr_list_head);
 				if (rmr_ptr->param.lmr_triplet.
 				    virtual_address != 0) {
-					(void) dapl_os_atomic_dec(&rmr_ptr->
+					dapl_os_atomic_dec(&rmr_ptr->
 					    lmr->lmr_ref_count);
 					rmr_ptr->param.lmr_triplet.
 					    virtual_address = 0;

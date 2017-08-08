@@ -144,7 +144,7 @@ dapl_psp_create_any(
 	/*
 	 * Take a reference on the EVD handle
 	 */
-	(void) dapl_os_atomic_inc(&((DAPL_EVD *)evd_handle)->evd_ref_count);
+	dapl_os_atomic_inc(&((DAPL_EVD *)evd_handle)->evd_ref_count);
 
 	/* Link it onto the IA */
 	dapl_ia_link_psp(ia_ptr, sp_ptr);
