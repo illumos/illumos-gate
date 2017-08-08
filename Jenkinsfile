@@ -138,6 +138,13 @@ node('master') {
             shscript('aws-terminate-instances', false, [
                 ['INSTANCE_ID', env.BUILD_INSTANCE_ID]
             ])
+
+            /*
+             * Since the build instance was just terminated above, we want to prevent the "finally" clause below
+             * from attempting to terminate the instance a second time. Otherwise, the second attempt to
+             * terminate the instance would fail, and then prevent the build image from being deleted.
+             */
+            env.BUILD_INSTANCE_ID = ''
         }
 
         stage('run tests') {
@@ -169,6 +176,12 @@ node('master') {
             if (env.BUILD_IMAGE_ID && env.BUILD_IMAGE_ID != env.BASE_IMAGE_ID) {
                 shscript('aws-delete-image', false, [
                     ['IMAGE_ID', env.BUILD_IMAGE_ID]
+                ])
+            }
+
+            if (env.BUILD_INSTANCE_ID) {
+                shscript('aws-terminate-instances', false, [
+                    ['INSTANCE_ID', env.BUILD_INSTANCE_ID]
                 ])
             }
         }
