@@ -27,8 +27,6 @@
 
 /* $Id: psm.c 146 2006-03-24 00:26:54Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
@@ -63,7 +61,7 @@ psm_open(service_t *svc, char *scheme)
 			result = PAPI_NOT_POSSIBLE;
 #ifdef DEBUG
 		detailed_error(svc, "psm_open(%s): %s: %s", scheme, path,
-				dlerror());
+		    dlerror());
 #endif
 	}
 
@@ -79,12 +77,19 @@ psm_close(void *handle)
 void *
 psm_sym(service_t *svc, char *name)
 {
+#ifdef DEBUG
 	char *error = "invalid input";
+#endif
 	void *func = NULL;
 
 	if ((svc != NULL) && (svc->so_handle != NULL) && (name != NULL)) {
-		if ((func = dlsym(svc->so_handle, name)) == NULL)
+		if ((func = dlsym(svc->so_handle, name)) == NULL) {
+#ifdef DEBUG
 			error = dlerror();
+#else
+			return (func);
+#endif
+		}
 	}
 #ifdef DEBUG
 	if (func == NULL)
