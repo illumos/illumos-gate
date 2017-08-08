@@ -21,13 +21,7 @@
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
- *
- * $Header$
  */
-
-#if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header$";
-#endif
 
 #include	<sys/types.h>
 #include	<sys/time.h>
@@ -216,7 +210,7 @@ kadm5_create_principal_3(void *server_handle,
     osa_princ_ent_rec		adb;
     kadm5_policy_ent_rec	polent;
     krb5_int32			now;
-    krb5_tl_data		*tl_data_orig, *tl_data_tail;
+    krb5_tl_data		*tl_data_tail;
     unsigned int		ret;
     kadm5_server_handle_t handle = server_handle;
 
@@ -369,7 +363,6 @@ kadm5_create_principal_3(void *server_handle,
 
     if (mask & KADM5_TL_DATA) {
 	/* splice entry->tl_data onto the front of kdb.tl_data */
-	tl_data_orig = kdb.tl_data;
 	for (tl_data_tail = entry->tl_data; tl_data_tail;
 	     tl_data_tail = tl_data_tail->tl_data_next)
 	{
