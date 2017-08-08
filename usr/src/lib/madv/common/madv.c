@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -676,9 +674,6 @@ shmat(int shmid, const void *shmaddr, int shmflag)
 	struct shmid_ds	mds;
 #ifdef MADVDEBUG
 	int rc;
-#else
-	/* LINTED */
-	int rc;
 #endif
 
 	if (!shmatfunc) {
@@ -703,16 +698,21 @@ shmat(int shmid, const void *shmaddr, int shmflag)
 	 * Apply advice if specified and shmat succeeded.
 	 */
 	if (advice >= 0 && result != (void *)-1) {
+#ifdef MADVDEBUG
 		/* First determine segment size */
 		rc = shmctl(shmid, IPC_STAT, &mds);
-		MADVPRINT(4, (stderr, "shmctl rc %d errno %d\n",
-		    strerror(errno)));
-
+		MADVPRINT(4, (stderr, "shmctl rc %d errno %d\n", rc, errno));
 		rc = memcntl(result, mds.shm_segsz, MC_ADVISE,
 		    (caddr_t)(intptr_t)advice, 0, 0);
 		MADVPRINT(1, (stderr,
 		    "shmat advice: 0x%x 0x%x %d, rc %d errno %d\n",
 		    result, mds.shm_segsz, advice, rc, errno));
+#else
+		/* First determine segment size */
+		(void) shmctl(shmid, IPC_STAT, &mds);
+		(void) memcntl(result, mds.shm_segsz, MC_ADVISE,
+		    (caddr_t)(intptr_t)advice, 0, 0);
+#endif
 	}
 
 	return (result);
@@ -727,12 +727,6 @@ mmap(caddr_t addr, size_t len, int prot, int flags, int fd, off_t pos)
 	static caddr_t (*mmapfunc)() = NULL;
 	caddr_t result;
 	int advice = -1;
-#ifdef MADVDEBUG
-	int rc;
-#else
-	/* LINTED */
-	int rc;
-#endif
 
 	if (!mmapfunc) {
 		mmapfunc = (caddr_t (*)()) dlsym(RTLD_NEXT, "mmap");
@@ -759,11 +753,18 @@ mmap(caddr_t addr, size_t len, int prot, int flags, int fd, off_t pos)
 	 * Apply advice if specified and mmap succeeded.
 	 */
 	if (advice >= 0 && result != MAP_FAILED) {
+#ifdef MADVDEBUG
+		int rc;
+
 		rc = memcntl(result, len, MC_ADVISE,
 		    (caddr_t)(intptr_t)advice, 0, 0);
 		MADVPRINT(1, (stderr,
 		    "mmap advice: 0x%x 0x%x %d, rc %d errno %d\n",
 		    result, len, advice, rc, errno));
+#else
+		(void) memcntl(result, len, MC_ADVISE,
+		    (caddr_t)(intptr_t)advice, 0, 0);
+#endif
 	}
 
 	return (result);
@@ -779,12 +780,6 @@ mmap64(caddr_t addr, size_t len, int prot, int flags, int fd, off64_t pos)
 	static caddr_t (*mmap64func)();
 	caddr_t result;
 	int advice = -1;
-#ifdef MADVDEBUG
-	int rc;
-#else
-	/* LINTED */
-	int rc;
-#endif
 
 	if (!mmap64func) {
 		mmap64func = (caddr_t (*)()) dlsym(RTLD_NEXT, "mmap64");
@@ -811,10 +806,16 @@ mmap64(caddr_t addr, size_t len, int prot, int flags, int fd, off64_t pos)
 	 * Apply advice if specified and mmap succeeded.
 	 */
 	if (advice >= 0 && result != MAP_FAILED) {
+#ifdef MADVDEBUG
+		int rc;
+
 		rc = memcntl(result, len, MC_ADVISE, (caddr_t)advice, 0, 0);
 		MADVPRINT(1, (stderr,
 		    "mmap64 advice: 0x%x 0x%x %d, rc %d errno %d\n",
 		    result, len, advice, rc, errno));
+#else
+		(void) memcntl(result, len, MC_ADVISE, (caddr_t)advice, 0, 0);
+#endif
 	}
 
 	return (result);
