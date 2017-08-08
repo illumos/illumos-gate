@@ -104,7 +104,7 @@ nextafterl(long double x, long double y) {
 	}
 #ifndef lint
 	{
-		volatile long double dummy;
+		volatile long double dummy __unused;
 		int k = XBIASED_EXP(x);
 
 		if (k == 0)

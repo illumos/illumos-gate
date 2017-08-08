@@ -572,7 +572,7 @@ __fex_get_op(siginfo_t *sip, ucontext_t *uap, fex_info_t *info)
 	long double			op2v, x;
 	unsigned int			cwsw, ex, sw, op;
 	unsigned long			ea;
-	volatile int			c;
+	volatile int			c __unused;
 
 	/* get the exception type, status word, opcode, and data address */
 	ex = sip->si_code;

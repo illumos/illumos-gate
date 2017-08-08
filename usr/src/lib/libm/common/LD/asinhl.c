@@ -41,7 +41,7 @@ long double
 asinhl(long double x) {
 	long double t, w;
 #ifndef lint
-	volatile long double dummy;
+	volatile long double dummy __unused;
 #endif
 
 	w = fabsl(x);
