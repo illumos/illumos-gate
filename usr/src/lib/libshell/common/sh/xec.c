@@ -2977,7 +2977,7 @@ static pid_t sh_ntfork(Shell_t *shp,const Shnode_t *t,char *argv[],int *jobid,in
 {
 	static pid_t	spawnpid;
 	static int	savetype;
-	static int	savejobid;
+	static int	savejobid __unused;
 	struct checkpt	buff;
 	int		otype=0, jmpval;
 	volatile int	jobwasset=0, scope=0, sigwasset=0;
