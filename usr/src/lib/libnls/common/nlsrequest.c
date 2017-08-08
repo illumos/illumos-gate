@@ -22,9 +22,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"        /* SVr4.0 1.5.1.1	*/
-
 /*
  *
  * nlsrequest(3):
@@ -67,7 +64,7 @@ nlsrequest(int fd, char *svc_code)
 	int	len, err, flags;
 	char 	buf[256];
 	char	*p;
-	int	version, ret;
+	int	ret;
 	extern  int t_errno;
 
 	t_errno = 0;		/* indicates a 'name' problem	*/
@@ -79,55 +76,68 @@ nlsrequest(int fd, char *svc_code)
 
 	if (!svc_code || !strlen(svc_code) ||
 	    (strlen(svc_code) >= (size_t)SVC_CODE_SZ)) {
-		if (_nlslog)
-			fprintf(stderr, "nlsrequest: invalid service code format\n");
-		return(-1);
+		if (_nlslog) {
+			fprintf(stderr,
+			    "nlsrequest: invalid service code format\n");
+		}
+		return (-1);
 	}
 
 	/*
 	 * send protocol message requesting the service
 	 */
 
-	len = sprintf(buf, nls_v2_msg, svc_code)+1;/* inc trailing null */
+	len = sprintf(buf, nls_v2_msg, svc_code) + 1; /* inc trailing null */
 
 	if (t_snd(fd, buf, len, 0) < len) {
 		if (_nlslog)
 			t_error("t_snd of listener request message failed");
-		return(-1);
+		return (-1);
 	}
 
 	p = _nlsbuf;
 	len = 0;
 
 	do {
-		if (++len > sizeof(_nlsbuf)) {
-			if (_nlslog)
-				fprintf(stderr, "nlsrequest: _nlsbuf not large enough\n");
-			return(-1);
+		if (++len > sizeof (_nlsbuf)) {
+			if (_nlslog) {
+				fprintf(stderr,
+				    "nlsrequest: _nlsbuf not large enough\n");
+			}
+			return (-1);
 		}
-		if (t_rcv(fd, p, sizeof(char), &flags) != sizeof(char)) {
-			if (_nlslog)
-				t_error("t_rcv of listener response msg failed");
-			return(-1);
+		if (t_rcv(fd, p, sizeof (char), &flags) != sizeof (char)) {
+			if (_nlslog) {
+				t_error("t_rcv of listener response msg "
+				    "failed");
+			}
+			return (-1);
 		}
 
 	} while (*p++ != '\0');
 
 
-	if ((p = strtok(_nlsbuf, ":")) == (char *)0)
+	if ((p = strtok(_nlsbuf, ":")) == NULL)
 		goto parsefail;
-	version = atoi(p);
 
-	if ((p = strtok((char *)0, ":")) == (char *)0)
+	/*
+	 * We ignore the version number here as we do not have any use for it.
+	 * Previous versions of the code looked at it by calling atoi() on it,
+	 * which did not mutate the actual string and did not use it.
+	 */
+
+	if ((p = strtok(NULL, ":")) ==  NULL)
 		goto parsefail;
 	ret = atoi(p);
 	_nlsrmsg = p + strlen(p) + 1;
 	if (ret && _nlslog)
 		fprintf(stderr, "%s\n", _nlsrmsg); /* debug only */
-	return(ret);
+	return (ret);
 
 parsefail:
-	if (_nlslog)
-		fprintf(stderr, "nlsrequest: failed parse of response message\n");
-	return(-1);
+	if (_nlslog) {
+		fprintf(stderr,
+		    "nlsrequest: failed parse of response message\n");
+	}
+	return (-1);
 }
