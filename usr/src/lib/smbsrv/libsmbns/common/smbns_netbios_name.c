@@ -484,16 +484,12 @@ smb_name_buf_from_packet(unsigned char *buf, int n_buf,
 	addr_entry_t		*raddr;
 	unsigned char 		*heap = buf;
 	unsigned char 		*end_heap = heap + n_buf;
-	unsigned char 		*dnptrs[32];
 	unsigned char		comp_name_buf[MAX_NAME_LENGTH];
 	unsigned int		tmp;
 	int			i, step;
 
 	if (n_buf < NAME_HEADER_SIZE)
 		return (-1);		/* no header, impossible */
-
-	dnptrs[0] = heap;
-	dnptrs[1] = 0;
 
 	BE_OUT16(heap, npb->name_trn_id);
 	heap += 2;
