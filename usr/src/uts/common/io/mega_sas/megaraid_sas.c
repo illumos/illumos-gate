@@ -1127,7 +1127,7 @@ megasas_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 /*ARGSUSED*/
 static int
 megasas_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
-		scsi_hba_tran_t *tran, struct scsi_device *sd)
+    scsi_hba_tran_t *tran, struct scsi_device *sd)
 {
 	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
@@ -1156,8 +1156,8 @@ megasas_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
  */
 static struct scsi_pkt *
 megasas_tran_init_pkt(struct scsi_address *ap, register struct scsi_pkt *pkt,
-	struct buf *bp, int cmdlen, int statuslen, int tgtlen,
-	int flags, int (*callback)(), caddr_t arg)
+    struct buf *bp, int cmdlen, int statuslen, int tgtlen,
+    int flags, int (*callback)(), caddr_t arg)
 {
 	struct scsa_cmd	*acmd;
 	struct megasas_instance	*instance;
@@ -3307,7 +3307,6 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 {
 	uint16_t	flags = 0;
 	uint32_t	i;
-	uint32_t 	context;
 	uint32_t	sge_bytes;
 
 	struct megasas_cmd		*cmd;
@@ -3396,8 +3395,6 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 			ldio->sge_count = acmd->cmd_cookiecnt;
 			mfi_sgl = (struct megasas_sge64	*)&ldio->sgl;
 
-			context = ldio->context;
-
 			if (acmd->cmd_cdblen == CDB_GROUP0) {
 				ldio->lba_count	= host_to_le16(
 				    (uint16_t)(pkt->pkt_cdbp[4]));
@@ -3474,15 +3471,10 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 		pthru->sense_buf_phys_addr_hi = 0;
 		pthru->sense_buf_phys_addr_lo = cmd->sense_phys_addr;
 
-		context = pthru->context;
-
 		bcopy(pkt->pkt_cdbp, pthru->cdb, acmd->cmd_cdblen);
 
 		break;
 	}
-#ifdef lint
-	context = context;
-#endif
 	/* bzero(mfi_sgl, sizeof (struct megasas_sge64) * MAX_SGL); */
 
 	/* prepare the scatter-gather list for the firmware */
@@ -4749,8 +4741,6 @@ disable_intr_xscale(struct megasas_instance *instance)
 static void
 disable_intr_ppc(struct megasas_instance *instance)
 {
-	uint32_t	mask;
-
 	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: called\n"));
 
 	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: before : "
@@ -4763,10 +4753,7 @@ disable_intr_ppc(struct megasas_instance *instance)
 	    "outbound_intr_mask = 0x%x\n", RD_OB_INTR_MASK(instance)));
 
 	/* dummy read to force PCI flush */
-	mask = RD_OB_INTR_MASK(instance);
-#ifdef lint
-	mask = mask;
-#endif
+	(void) RD_OB_INTR_MASK(instance);
 }
 
 static int
