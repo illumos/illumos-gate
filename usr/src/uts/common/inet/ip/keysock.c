@@ -317,11 +317,7 @@ bail:
 
 /* ARGSUSED */
 static int
-keysock_param_get(q, mp, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	caddr_t	cp;
-	cred_t *cr;
+keysock_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 {
 	keysockparam_t	*keysockpa = (keysockparam_t *)cp;
 	uint_t value;
@@ -339,12 +335,7 @@ keysock_param_get(q, mp, cp, cr)
 /* This routine sets an NDD variable in a keysockparam_t structure. */
 /* ARGSUSED */
 static int
-keysock_param_set(q, mp, value, cp, cr)
-	queue_t	*q;
-	mblk_t	*mp;
-	char	*value;
-	caddr_t	cp;
-	cred_t *cr;
+keysock_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
 {
 	ulong_t	new_value;
 	keysockparam_t	*keysockpa = (keysockparam_t *)cp;
@@ -778,9 +769,7 @@ keysock_capability_req(queue_t *q, mblk_t *mp)
  * The current state of the stream is copied from keysock_state.
  */
 static void
-keysock_info_req(q, mp)
-	queue_t	*q;
-	mblk_t	*mp;
+keysock_info_req(queue_t *q, mblk_t *mp)
 {
 	mp = tpi_ack_alloc(mp, sizeof (struct T_info_ack), M_PCPROTO,
 	    T_INFO_ACK);
@@ -797,11 +786,7 @@ keysock_info_req(q, mp)
  * upstream.
  */
 static void
-keysock_err_ack(q, mp, t_error, sys_error)
-	queue_t	*q;
-	mblk_t	*mp;
-	int	t_error;
-	int	sys_error;
+keysock_err_ack(queue_t *q, mblk_t *mp, int t_error, int sys_error)
 {
 	if ((mp = mi_tpi_err_ack_alloc(mp, t_error, sys_error)) != NULL)
 		qreply(q, mp);

@@ -536,7 +536,7 @@ fcnname/**/_info:							\
 
 #ifndef	KEYSOCK_MODULE
 	MODULE(keysock,	drv);
-	WSTUB(keysock,	keysock_spdsock_wput_iocdata,	nomod_zero);
+	WSTUB(keysock,	keysock_spdsock_wput_iocdata,	nomod_void);
 	WSTUB(keysock,	keysock_plumb_ipsec,	nomod_zero);
 	WSTUB(keysock,	keysock_extended_reg,	nomod_zero);
 	WSTUB(keysock,	keysock_next_seq,	nomod_zero);

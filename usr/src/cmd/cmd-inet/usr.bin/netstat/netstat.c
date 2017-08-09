@@ -384,6 +384,7 @@ ns_lookup_end(void)
  * the case, we end up warning them and suggest that they may want to use the -n
  * flag.
  */
+/* ARGSUSED */
 static void *
 ns_warning_thr(void *unsued)
 {

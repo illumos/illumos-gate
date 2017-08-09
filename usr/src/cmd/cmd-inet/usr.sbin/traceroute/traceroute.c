@@ -2244,6 +2244,7 @@ usage(void)
 	exit(EXIT_FAILURE);
 }
 
+/* ARGSUSED */
 static void *
 ns_warning_thr(void *unused)
 {
