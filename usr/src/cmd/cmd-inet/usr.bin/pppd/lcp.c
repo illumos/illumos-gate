@@ -22,12 +22,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#define RCSID	"$Id: lcp.c,v 1.54 2000/04/27 03:51:18 masputra Exp $"
-
-/*
- * TODO:
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -50,10 +44,6 @@
 #include "chap.h"
 #include "magic.h"
 #include "patchlevel.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 /*
  * Special failure codes for logging link failure reasons.

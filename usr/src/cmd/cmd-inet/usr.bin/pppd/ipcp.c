@@ -23,12 +23,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#define RCSID	"$Id: ipcp.c,v 1.54 2000/04/15 01:27:11 masputra Exp $"
-
-/*
- * TODO:
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <netdb.h>
@@ -46,10 +40,6 @@
 #include "fsm.h"
 #include "ipcp.h"
 #include "pathnames.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 /* global vars */
 ipcp_options ipcp_wantoptions[NUM_PPP];	/* Options that we want to request */
