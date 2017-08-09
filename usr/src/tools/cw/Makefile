@@ -54,6 +54,9 @@ CPPFLAGS += -DDEFAULT_GPLUSPLUS_DIR='"$(GCC_ROOT)/bin"'
 
 $(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644
 
+# Assume we don't have the install.bin available yet
+INS.file=	$(RM) $@; $(CP) $< $(@D); $(CHMOD) $(FILEMODE) $@
+
 .KEEP_STATE:
 
 all: $(PROG) $(MAN1ONBLDFILES)

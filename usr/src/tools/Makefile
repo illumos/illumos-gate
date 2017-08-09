@@ -28,11 +28,16 @@
 
 include ../Makefile.master
 
-# Bootstrap problem --
-# 'cw' must be built before anything else can be built.
-
+# Bootstrap problem: 'cw' must be built before anything else can be built.
+# 'install.bin' should be built next, being the 'install' target dependency
+# for everything else.
+#
+# Because of somewhat cyclic dependency between them, both cw and install.bin
+# override the way we install binaries in their Makefiles.
 BOOT_SUBDIRS= \
-	cw
+	cw \
+	.WAIT \
+	install.bin
 
 COMMON_SUBDIRS= \
 	codereview \
@@ -41,7 +46,6 @@ COMMON_SUBDIRS= \
 	ctf \
 	env \
 	findunref \
-	install.bin \
 	lintdump \
 	make \
 	ndrgen \
@@ -147,8 +151,9 @@ $(SUBDIRS) $(CLOSED_SUBDIRS): $(BOOT_SUBDIRS)
 $(BOOT_SUBDIRS) $(SUBDIRS): $$(DOROOTDIRS) $$(DOROOTONBLDLIBPY) FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
+# Assume we don't have the install.bin available yet
 $(ROOTDIRS):
-	$(INS.dir)
+	$(MKDIR) -p -m $(DIRMODE) $@
 
 $(ROOTONBLDLIBPY): $(ROOTDIRS)
 	$(RM) -r $@; $(SYMLINK) python$(PYTHON_VERSION) $@
