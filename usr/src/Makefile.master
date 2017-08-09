@@ -134,9 +134,16 @@ ELFEXTRACT=	$(ONBLD_TOOLS)/bin/$(MACH)/elfextract
 MBH_PATCH=	$(ONBLD_TOOLS)/bin/$(MACH)/mbh_patch
 BTXLD=		$(ONBLD_TOOLS)/bin/$(MACH)/btxld
 VTFONTCVT=	$(ONBLD_TOOLS)/bin/$(MACH)/vtfontcvt
+# echo(1) and true(1) are specified without absolute paths, so that the shell
+# spawned by make(1) may use the built-in versions.  This is minimally
+# problematic, as the shell spawned by make(1) is known and under control, the
+# only risk being if the shell falls back to $PATH.
+#
+# We specifically want an echo(1) that does interpolation of escape sequences,
+# which ksh93, /bin/sh, and bash will all provide.
 ECHO=		echo
-INS=		install
 TRUE=		true
+INS=		$(ONBLD_TOOLS)/bin/$(MACH)/install
 SYMLINK=	/usr/bin/ln -s
 LN=		/usr/bin/ln
 CHMOD=		/usr/bin/chmod
