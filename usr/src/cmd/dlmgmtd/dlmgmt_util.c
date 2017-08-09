@@ -412,6 +412,17 @@ link_activate(dlmgmt_link_t *linkp)
 			linkp->ll_zoneid = zoneid;
 			avl_add(&dlmgmt_name_avl, linkp);
 			linkp->ll_onloan = B_TRUE;
+
+			/*
+			 * When a VNIC is not persistent and loaned to
+			 * a zone it is considered transient. This is
+			 * the same logic found in do_create_vnic()
+			 * and is needed here in the event of a
+			 * dlmgmtd restart.
+			 */
+			if (linkp->ll_class == DATALINK_CLASS_VNIC &&
+			    !(linkp->ll_flags & DLMGMT_PERSIST))
+				linkp->ll_trans = B_TRUE;
 		}
 	} else if (linkp->ll_zoneid != GLOBAL_ZONEID) {
 		/*
