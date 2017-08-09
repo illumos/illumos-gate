@@ -77,7 +77,7 @@ __hal_channel_dtr_next_not_completed(xge_hal_channel_h channelh,
 		xge_hal_dtr_h *dtrh)
 {
 	/* LINTED E_FUNC_SET_NOT_USED */
-	xge_hal_ring_rxd_1_t *rxdp; /* doesn't matter 1, 3 or 5... */
+	xge_hal_ring_rxd_1_t *rxdp __unused; /* doesn't matter 1, 3 or 5... */
 
 	__hal_channel_dtr_try_complete(channelh, dtrh);
 	if (*dtrh == NULL) {
