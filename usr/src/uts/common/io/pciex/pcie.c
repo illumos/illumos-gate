@@ -938,6 +938,172 @@ pcie_rc_fini_bus(dev_info_t *dip)
 }
 
 /*
+ * We need to capture the supported, maximum, and current device speed and
+ * width. The way that this has been done has changed over time.
+ *
+ * Prior to PCIe Gen 3, there were only current and supported speed fields.
+ * These were found in the link status and link capabilities registers of the
+ * PCI express capability. With the change to PCIe Gen 3, the information in the
+ * link capabilities changed to the maximum value. The supported speeds vector
+ * was moved to the link capabilities 2 register.
+ *
+ * Now, a device may not implement some of these registers. To determine whether
+ * or not it's here, we have to do the following. First, we need to check the
+ * revision of the PCI express capability. The link capabilities 2 register did
+ * not exist prior to version 2 of this register.
+ */
+static void
+pcie_capture_speeds(pcie_bus_t *bus_p, pcie_req_id_t bdf, dev_info_t *rcdip)
+{
+	uint16_t	vers, status;
+	uint32_t	val, cap, cap2;
+
+	if (!PCIE_IS_PCIE(bus_p))
+		return;
+
+	vers = pci_cfgacc_get16(rcdip, bdf, bus_p->bus_pcie_off + PCIE_PCIECAP);
+	if (vers == PCI_EINVAL16)
+		return;
+	vers &= PCIE_PCIECAP_VER_MASK;
+
+	/*
+	 * Verify the capability's version.
+	 */
+	switch (vers) {
+	case PCIE_PCIECAP_VER_1_0:
+		cap2 = 0;
+		break;
+	case PCIE_PCIECAP_VER_2_0:
+		cap2 = pci_cfgacc_get32(rcdip, bdf, bus_p->bus_pcie_off +
+		    PCIE_LINKCAP2);
+		if (cap2 == PCI_EINVAL32)
+			cap2 = 0;
+		break;
+	default:
+		/* Don't try and handle an unknown version */
+		return;
+	}
+
+	status = pci_cfgacc_get16(rcdip, bdf, bus_p->bus_pcie_off +
+	    PCIE_LINKSTS);
+	cap = pci_cfgacc_get32(rcdip, bdf, bus_p->bus_pcie_off + PCIE_LINKCAP);
+	if (status == PCI_EINVAL16 || cap == PCI_EINVAL32)
+		return;
+
+	switch (status & PCIE_LINKSTS_SPEED_MASK) {
+	case PCIE_LINKSTS_SPEED_2_5:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_2_5;
+		break;
+	case PCIE_LINKSTS_SPEED_5:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_5;
+		break;
+	case PCIE_LINKSTS_SPEED_8:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_8;
+		break;
+	default:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_UNKNOWN;
+		break;
+	}
+
+	switch (status & PCIE_LINKSTS_NEG_WIDTH_MASK) {
+	case PCIE_LINKSTS_NEG_WIDTH_X1:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_X1;
+		break;
+	case PCIE_LINKSTS_NEG_WIDTH_X2:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_X2;
+		break;
+	case PCIE_LINKSTS_NEG_WIDTH_X4:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_X4;
+		break;
+	case PCIE_LINKSTS_NEG_WIDTH_X8:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_X8;
+		break;
+	case PCIE_LINKSTS_NEG_WIDTH_X12:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_X12;
+		break;
+	case PCIE_LINKSTS_NEG_WIDTH_X16:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_X16;
+		break;
+	case PCIE_LINKSTS_NEG_WIDTH_X32:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_X32;
+		break;
+	default:
+		bus_p->bus_cur_width = PCIE_LINK_WIDTH_UNKNOWN;
+		break;
+	}
+
+	switch (cap & PCIE_LINKCAP_MAX_WIDTH_MASK) {
+	case PCIE_LINKCAP_MAX_WIDTH_X1:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_X1;
+		break;
+	case PCIE_LINKCAP_MAX_WIDTH_X2:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_X2;
+		break;
+	case PCIE_LINKCAP_MAX_WIDTH_X4:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_X4;
+		break;
+	case PCIE_LINKCAP_MAX_WIDTH_X8:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_X8;
+		break;
+	case PCIE_LINKCAP_MAX_WIDTH_X12:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_X12;
+		break;
+	case PCIE_LINKCAP_MAX_WIDTH_X16:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_X16;
+		break;
+	case PCIE_LINKCAP_MAX_WIDTH_X32:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_X32;
+		break;
+	default:
+		bus_p->bus_max_width = PCIE_LINK_WIDTH_UNKNOWN;
+		break;
+	}
+
+	/*
+	 * If we have the Link Capabilities 2, then we can get the supported
+	 * speeds from it and treat the bits in Link Capabilities 1 as the
+	 * maximum. If we don't, then we need to follow the Implementation Note
+	 * in the standard under Link Capabilities 2. Effectively, this means
+	 * that if the value of 10b is set in Link Capabilities register, that
+	 * it supports both 2.5 and 5 GT/s speeds.
+	 */
+	if (cap2 != 0) {
+		if (cap2 & PCIE_LINKCAP2_SPEED_2_5)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_2_5;
+		if (cap2 & PCIE_LINKCAP2_SPEED_5)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_5;
+		if (cap2 & PCIE_LINKCAP2_SPEED_8)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_8;
+
+		switch (cap & PCIE_LINKCAP_MAX_SPEED_MASK) {
+		case PCIE_LINKCAP_MAX_SPEED_2_5:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_2_5;
+			break;
+		case PCIE_LINKCAP_MAX_SPEED_5:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_5;
+			break;
+		case PCIE_LINKCAP_MAX_SPEED_8:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_8;
+			break;
+		default:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_UNKNOWN;
+			break;
+		}
+	} else {
+		if (cap & PCIE_LINKCAP_MAX_SPEED_5) {
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_5;
+			bus_p->bus_sup_speed = PCIE_LINK_SPEED_2_5 |
+			    PCIE_LINK_SPEED_5;
+		}
+
+		if (cap & PCIE_LINKCAP_MAX_SPEED_2_5) {
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_2_5;
+			bus_p->bus_sup_speed = PCIE_LINK_SPEED_2_5;
+		}
+	}
+}
+
+/*
  * partially init pcie_bus_t for device (dip,bdf) for accessing pci
  * config space
  *
@@ -1134,6 +1300,10 @@ pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf, uint8_t flags)
 		}
 	}
 
+	/*
+	 * Save and record speed information about the device.
+	 */
+
 caps_done:
 	/* save RP dip and RP bdf */
 	if (PCIE_IS_RP(bus_p)) {
@@ -1225,6 +1395,8 @@ initial_done:
 	pcie_init_pfd(dip);
 
 	pcie_init_plat(dip);
+
+	pcie_capture_speeds(bus_p, bdf, rcdip);
 
 final_done:
 

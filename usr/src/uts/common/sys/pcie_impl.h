@@ -282,6 +282,28 @@ typedef struct pf_root_fault {
 
 typedef struct pf_data pf_data_t;
 
+typedef enum pcie_link_width {
+	PCIE_LINK_WIDTH_UNKNOWN,
+	PCIE_LINK_WIDTH_X1,
+	PCIE_LINK_WIDTH_X2,
+	PCIE_LINK_WIDTH_X4,
+	PCIE_LINK_WIDTH_X8,
+	PCIE_LINK_WIDTH_X12,
+	PCIE_LINK_WIDTH_X16,
+	PCIE_LINK_WIDTH_X32
+} pcie_link_width_t;
+
+/*
+ * Note, this member should always be treated as a bit field, as a device may
+ * support multiple speeds.
+ */
+typedef enum pcie_link_speed {
+	PCIE_LINK_SPEED_UNKNOWN = 0x00,
+	PCIE_LINK_SPEED_2_5	= 0x01,
+	PCIE_LINK_SPEED_5	= 0x02,
+	PCIE_LINK_SPEED_8	= 0x04
+} pcie_link_speed_t;
+
 /*
  * For hot plugged device, these data are init'ed during during probe
  * For non-hotplugged device, these data are init'ed in pci_autoconfig (on x86),
@@ -336,6 +358,15 @@ typedef struct pcie_bus {
 
 	/* workaround for PCI/PCI-X devs behind PCIe2PCI Bridge */
 	pcie_req_id_t   bus_pcie2pci_secbus;
+
+	/*
+	 * Link speed specific fields.
+	 */
+	pcie_link_width_t	bus_max_width;
+	pcie_link_width_t	bus_cur_width;
+	pcie_link_speed_t	bus_sup_speed;
+	pcie_link_speed_t	bus_max_speed;
+	pcie_link_speed_t	bus_cur_speed;
 } pcie_bus_t;
 
 /*

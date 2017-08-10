@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017, Joyent, Inc.
+ */
 
 #ifndef	_SYS_PCIE_H
 #define	_SYS_PCIE_H
@@ -187,7 +190,14 @@ extern "C" {
 /*
  * Link Capability Register (4 bytes)
  */
-#define	PCIE_LINKCAP_MAX_SPEED_2_5	0x1	/* 2.5 Gb/s Speed */
+#define	PCIE_LINKCAP_MAX_SPEED_2_5	0x1	/* 2.5 GT/s Speed */
+/*
+ * In version 2 of PCI express, this indicated that both 5.0 GT/s and 2.5 GT/s
+ * speeds were supported. The use of this as the maximum link speed was added
+ * with PCIex v3.
+ */
+#define	PCIE_LINKCAP_MAX_SPEED_5	0x2	/* 5.0 GT/s Speed */
+#define	PCIE_LINKCAP_MAX_SPEED_8	0x3	/* 8.0 GT/s Speed */
 #define	PCIE_LINKCAP_MAX_SPEED_MASK	0xF	/* Maximum Link Speed */
 #define	PCIE_LINKCAP_MAX_WIDTH_X1	0x010
 #define	PCIE_LINKCAP_MAX_WIDTH_X2	0x020
@@ -251,7 +261,9 @@ extern "C" {
 /*
  * Link Status Register (2 bytes)
  */
-#define	PCIE_LINKSTS_SPEED_2_5		0x1	/* Link Speed */
+#define	PCIE_LINKSTS_SPEED_2_5		0x1	/* 2.5 GT/s Link Speed */
+#define	PCIE_LINKSTS_SPEED_5		0x2	/* 5.0 GT/s Link Speed */
+#define	PCIE_LINKSTS_SPEED_8		0x3	/* 8.0 GT/s Link Speed */
 #define	PCIE_LINKSTS_SPEED_MASK		0xF	/* Link Speed */
 
 #define	PCIE_LINKSTS_NEG_WIDTH_X1	0x010
@@ -405,8 +417,14 @@ extern "C" {
 #define	PCIE_DEVCTL2_END_END_TLP_PREFIX	0x8000
 
 
-
-
+/*
+ * Link Capability 2 Register (4 bytes)
+ */
+#define	PCIE_LINKCAP2_SPEED_2_5		0x02
+#define	PCIE_LINKCAP2_SPEED_5		0x04
+#define	PCIE_LINKCAP2_SPEED_8		0x08
+#define	PCIE_LINKCAP2_SPEED_MASK	0xfe
+#define	PCIE_LINKCAP2_CROSSLINK		0x100
 
 /*
  * PCI-Express Enhanced Capabilities Link Entry Bit Offsets
