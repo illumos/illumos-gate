@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016, Joyent Inc.
+ * Copyright 2017, Joyent Inc.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
@@ -83,6 +83,7 @@
 #include <libdlpi.h>
 #include <libdllink.h>
 #include <libdlvlan.h>
+#include <libdlvnic.h>
 
 #include <inet/tcp.h>
 #include <arpa/inet.h>
@@ -5169,7 +5170,6 @@ delete_transient_vnics(zlog_t *zlogp, zoneid_t zoneid)
 	uint32_t link_flags;
 	datalink_class_t link_class;
 	char link_name[MAXLINKNAMELEN];
-	vnic_ioc_delete_t ioc;
 
 	if (zone_list_datalink(zoneid, &num_links, NULL) != 0) {
 		zerror(zlogp, B_TRUE, "unable to determine "
@@ -5213,12 +5213,13 @@ delete_transient_vnics(zlog_t *zlogp, zoneid_t zoneid)
 
 		if (link_flags & DLADM_OPT_TRANSIENT) {
 			assert(link_class & DATALINK_CLASS_VNIC);
+			status = dladm_vnic_delete(dld_handle, link,
+			    DLADM_OPT_ACTIVE);
 
-			ioc.vd_vnic_id = link;
-			if (ioctl(dladm_dld_fd(dld_handle), VNIC_IOC_DELETE,
-			    &ioc) < 0) {
-				zerror(zlogp, B_TRUE,
-				    "delete VNIC ioctl failed %d", link);
+			if (status != DLADM_STATUS_OK) {
+				zerror(zlogp, B_TRUE, "failed to delete link "
+				    "with id %d: %s", link,
+				    dladm_status2str(status, dlerr));
 				return (-1);
 			}
 		}
