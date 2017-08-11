@@ -1,9 +1,20 @@
 # the dreaded bounded repetitions
-{		&	{	{
-{abc		&	{abc	{abc
+{		C	BADRPT
+{		b	{	{
+\{		-	{	{
+\{		bC	BADRPT
+{}		C	BADRPT
+{}		b	{}	{}
+\{\}		-	{}	{}
+\{\}		bC	BADRPT
+}		&	}	}
+\}		&	}	}
+{abc		b	{abc	{abc
+{abc		C	BADRPT
 {1		C	BADRPT
 {1}		C	BADRPT
-a{b		&	a{b	a{b
+a{b		b	a{b	a{b
+a{b		C	BADRPT
 a{1}b		-	ab	ab
 a\{1\}b		b	ab	ab
 a{1,}b		-	ab	ab
@@ -16,9 +27,11 @@ a{1a		C	EBRACE
 a\{1a		bC	EBRACE
 a{1a}		C	BADBR
 a\{1a\}		bC	BADBR
-a{,2}		-	a{,2}	a{,2}
+a{,2}		b	a{,2}	a{,2}
+a{,2}		C	BADBR
 a\{,2\}		bC	BADBR
-a{,}		-	a{,}	a{,}
+a{,}		b	a{,}	a{,}
+a{,}		C	BADBR
 a\{,\}		bC	BADBR
 a{1,x}		C	BADBR
 a\{1,x\}	bC	BADBR
