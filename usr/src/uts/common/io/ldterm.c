@@ -566,8 +566,8 @@ static struct module_info ldtermmiinfo = {
 	0x0bad,
 	"ldterm",
 	0,
-	256,
-	HIWAT,
+	_TTY_BUFSIZ,
+	_TTY_BUFSIZ,
 	LOWAT
 };
 
@@ -793,7 +793,7 @@ ldtermopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	strop = (struct stroptions *)bp->b_wptr;
 	strop->so_flags = SO_READOPT|SO_HIWAT|SO_LOWAT|SO_NDELON|SO_ISTTY;
 	strop->so_readopt = RMSGN;
-	strop->so_hiwat = HIWAT;
+	strop->so_hiwat = _TTY_BUFSIZ;
 	strop->so_lowat = LOWAT;
 	bp->b_wptr += sizeof (struct stroptions);
 	bp->b_datap->db_type = M_SETOPTS;
@@ -1895,7 +1895,7 @@ escaped:
 	 * Allows MAX_CANON bytes in the buffer before throwing awaying
 	 * the the overflow of characters.
 	 */
-	if ((tp->t_msglen > ((MAX_CANON + 1) - (int)tp->t_maxeuc)) &&
+	if ((tp->t_msglen > ((_TTY_BUFSIZ + 1) - (int)tp->t_maxeuc)) &&
 	    !((tp->t_state & TS_MEUC) && tp->t_eucleft)) {
 
 		/*
@@ -4383,8 +4383,8 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 			}
 			if ((tp->t_maxeuc > 1) || (tp->t_state & TS_MEUC)) {
 				if (!tp->t_eucp_mp) {
-					if (!(tp->t_eucp_mp = allocb(CANBSIZ,
-					    BPRI_HI))) {
+					if ((tp->t_eucp_mp = allocb(_TTY_BUFSIZ,
+					    BPRI_HI)) == NULL) {
 						tp->t_maxeuc = 1;
 						tp->t_state &= ~TS_MEUC;
 						cmn_err(CE_WARN,
@@ -4612,7 +4612,7 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 		tp->t_state &= ~TS_MEUC;
 		if (maxbytelen > 1 || maxscreenlen > 1) {
 			if (!tp->t_eucp_mp) {
-				if (!(tp->t_eucp_mp = allocb(CANBSIZ,
+				if (!(tp->t_eucp_mp = allocb(_TTY_BUFSIZ,
 				    BPRI_HI))) {
 					cmn_err(CE_WARN,
 					    "Can't allocate eucp_mp");

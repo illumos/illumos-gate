@@ -215,7 +215,7 @@ static struct module_info zc_info = {
 	"zcons",
 	0,
 	INFPSZ,
-	2048,
+	_TTY_BUFSIZ,
 	128
 };
 
@@ -252,7 +252,7 @@ static struct streamtab zc_tab_info = {
  * this will define (struct cb_ops cb_zc_ops) and (struct dev_ops zc_ops)
  */
 DDI_DEFINE_STREAM_OPS(zc_ops, nulldev, nulldev,	zc_attach, zc_detach, nodev, \
-	zc_getinfo, ZC_CONF_FLAG, &zc_tab_info, ddi_quiesce_not_needed);
+    zc_getinfo, ZC_CONF_FLAG, &zc_tab_info, ddi_quiesce_not_needed);
 
 /*
  * Module linkage information for the kernel.
@@ -501,7 +501,7 @@ zc_master_open(zc_state_t *zcs,
 		sop->so_flags = SO_HIWAT | SO_LOWAT;
 	else
 		sop->so_flags = SO_HIWAT | SO_LOWAT | SO_ISTTY;
-	sop->so_hiwat = 512;
+	sop->so_hiwat = _TTY_BUFSIZ;
 	sop->so_lowat = 256;
 	putnext(rqp, mop);
 
@@ -576,7 +576,7 @@ zc_slave_open(zc_state_t *zcs,
 	mop->b_wptr += sizeof (struct stroptions);
 	sop = (struct stroptions *)(void *)mop->b_rptr;
 	sop->so_flags = SO_HIWAT | SO_LOWAT | SO_ISTTY;
-	sop->so_hiwat = 512;
+	sop->so_hiwat = _TTY_BUFSIZ;
 	sop->so_lowat = 256;
 	putnext(rqp, mop);
 
@@ -587,11 +587,11 @@ zc_slave_open(zc_state_t *zcs,
  * open(9e) entrypoint; checks sflag, and rejects anything unordinary.
  */
 static int
-zc_open(queue_t *rqp,		/* pointer to the read side queue */
-	dev_t   *devp,		/* pointer to stream tail's dev */
-	int	oflag,		/* the user open(2) supplied flags */
-	int	sflag,		/* open state flag */
-	cred_t  *credp)		/* credentials */
+zc_open(queue_t *rqp,	/* pointer to the read side queue */
+    dev_t   *devp,	/* pointer to stream tail's dev */
+    int	oflag,		/* the user open(2) supplied flags */
+    int	sflag,		/* open state flag */
+    cred_t  *credp)	/* credentials */
 {
 	int instance = ZC_INSTANCE(*devp);
 	int ret;
