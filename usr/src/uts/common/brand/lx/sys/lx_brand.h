@@ -622,6 +622,7 @@ typedef struct lx_zone_data {
 	dev_t lxzd_zfs_dev;			/* major num for zfs */
 	uint_t lxzd_aio_nr;			/* see lx_aio.c */
 	uint_t lxzd_pipe_max_sz;		/* pipe-max-size sysctl val */
+	boolean_t lxzd_swap_disabled;		/* no fake swap in zone? */
 } lx_zone_data_t;
 
 /* LWP br_lwp_flags values */

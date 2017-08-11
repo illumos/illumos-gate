@@ -3713,12 +3713,16 @@ static void
 lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	zone_t *zone = LXPTOZ(lxpnp);
-	int global = zone == global_zone;
+	lx_zone_data_t *lxzd = ztolxzd(zone);
 	long total_mem, free_mem, total_swap;
+	boolean_t swap_disabled;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_MEMINFO);
+	ASSERT(zone->zone_brand == &lx_brand);
+	ASSERT(lxzd != NULL);
+	swap_disabled = lxzd->lxzd_swap_disabled;
 
-	if (global || zone->zone_phys_mem_ctl == UINT64_MAX) {
+	if (zone->zone_phys_mem_ctl == UINT64_MAX) {
 		total_mem = physmem * PAGESIZE;
 		free_mem = freemem * PAGESIZE;
 	} else {
@@ -3728,12 +3732,16 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 			free_mem = 0;
 	}
 
-	if (global || zone->zone_max_swap_ctl == UINT64_MAX) {
-		total_swap = k_anoninfo.ani_max * PAGESIZE;
+	if (swap_disabled) {
+		total_swap = 0;
 	} else {
-		mutex_enter(&zone->zone_mem_lock);
-		total_swap = zone->zone_max_swap_ctl;
-		mutex_exit(&zone->zone_mem_lock);
+		if (zone->zone_max_swap_ctl == UINT64_MAX) {
+			total_swap = k_anoninfo.ani_max * PAGESIZE;
+		} else {
+			mutex_enter(&zone->zone_mem_lock);
+			total_swap = zone->zone_max_swap_ctl;
+			mutex_exit(&zone->zone_mem_lock);
+		}
 	}
 
 	/*
@@ -4318,6 +4326,9 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * our entire swap cap as one swap partition. See lxpr_read_meminfo for an
  * explanation on why we report 0 used swap.
  *
+ * The zone's lxzd_swap_disabled boolean controls whether or not we pretend
+ * swap space is configured.
+ *
  * It is important to use formatting identical to the Linux implementation
  * so that consumers do not break. See swap_show() in mm/swapfile.c.
  */
@@ -4326,22 +4337,32 @@ static void
 lxpr_read_swaps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	zone_t *zone = LXPTOZ(lxpnp);
-	uint64_t totswap, usedswap;
+	boolean_t swap_enabled;
+	lx_zone_data_t *lxzd = ztolxzd(zone);
 
-	if (zone->zone_max_swap_ctl == UINT64_MAX) {
-		totswap = (k_anoninfo.ani_max * PAGESIZE) >> 10;
-	} else {
-		mutex_enter(&zone->zone_mem_lock);
-		/* Uses units of 1 kb (2^10). */
-		totswap = zone->zone_max_swap_ctl >> 10;
-		mutex_exit(&zone->zone_mem_lock);
-	}
-	usedswap = 0;
+	ASSERT(zone->zone_brand == &lx_brand);
+	ASSERT(lxzd != NULL);
+	swap_enabled = !lxzd->lxzd_swap_disabled;
 
 	lxpr_uiobuf_printf(uiobuf,
 	    "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
-	lxpr_uiobuf_printf(uiobuf, "%-40s%s\t%llu\t%llu\t%d\n",
-	    "/dev/swap", "partition", totswap, usedswap, -1);
+
+	if (swap_enabled) {
+		uint64_t totswap, usedswap;
+
+		if (zone->zone_max_swap_ctl == UINT64_MAX) {
+			totswap = (k_anoninfo.ani_max * PAGESIZE) >> 10;
+		} else {
+			mutex_enter(&zone->zone_mem_lock);
+			/* Uses units of 1 kb (2^10). */
+			totswap = zone->zone_max_swap_ctl >> 10;
+			mutex_exit(&zone->zone_mem_lock);
+		}
+		usedswap = 0;
+
+		lxpr_uiobuf_printf(uiobuf, "%-40s%s\t%llu\t%llu\t%d\n",
+		    "/dev/swap", "partition", totswap, usedswap, -1);
+	}
 }
 
 /* ARGSUSED */

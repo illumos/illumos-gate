@@ -606,7 +606,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"oldlstat",	NULL,			NOSYS_OBSOLETE,	0}, /* 84 */
 	{"readlink",	lx_readlink,		0,		3}, /* 85 */
 	{"uselib",	NULL,			NOSYS_KERNEL,	0}, /* 86 */
-	{"swapon",	NULL,			NOSYS_KERNEL,	0}, /* 87 */
+	{"swapon",	lx_swapon,		0,		2}, /* 87 */
 	{"reboot",	lx_reboot,		0,		4}, /* 88 */
 	{"readdir",	NULL,			0,		3}, /* 89 */
 	{"mmap",	NULL,			0,		6}, /* 90 */
@@ -634,7 +634,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"idle",	NULL,			NOSYS_NO_EQUIV,	0}, /* 112 */
 	{"vm86old",	NULL,			NOSYS_OBSOLETE,	0}, /* 113 */
 	{"wait4",	lx_wait4,		0,		4}, /* 114 */
-	{"swapoff",	NULL,			NOSYS_KERNEL,	0}, /* 115 */
+	{"swapoff",	lx_swapoff,		0,		1}, /* 115 */
 	{"sysinfo",	lx_sysinfo32,		0,		1}, /* 116 */
 	{"ipc",		NULL,			0,		5}, /* 117 */
 	{"fsync",	NULL,			0,		1}, /* 118 */
@@ -1057,8 +1057,8 @@ lx_sysent_t lx_sysent64[] = {
 	{"settimeofday", NULL,			0,		2}, /* 164 */
 	{"mount",	lx_mount,		0,		5}, /* 165 */
 	{"umount2",	lx_umount2,		0,		2}, /* 166 */
-	{"swapon",	NULL,			NOSYS_KERNEL,	0}, /* 167 */
-	{"swapoff",	NULL,			NOSYS_KERNEL,	0}, /* 168 */
+	{"swapon",	lx_swapon,		0,		2}, /* 167 */
+	{"swapoff",	lx_swapoff,		0,		1}, /* 168 */
 	{"reboot",	lx_reboot,		0,		4}, /* 169 */
 	{"sethostname",	lx_sethostname,		0,		2}, /* 170 */
 	{"setdomainname", lx_setdomainname,	0,		2}, /* 171 */

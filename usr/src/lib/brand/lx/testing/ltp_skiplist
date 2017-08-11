@@ -72,9 +72,7 @@ setfsuid04
 setfsuid04_16
 settimeofday01
 stime01
-swapoff01
 swapoff02
-swapon01
 swapon02
 swapon03
 switch01

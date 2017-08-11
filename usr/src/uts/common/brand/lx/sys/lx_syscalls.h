@@ -242,6 +242,8 @@ extern long lx_socketpair();
 extern long lx_stat32();
 extern long lx_stat64();
 extern long lx_stime();
+extern long lx_swapoff();
+extern long lx_swapon();
 extern long lx_sync();
 extern long lx_sync_file_range();
 extern long lx_syncfs();

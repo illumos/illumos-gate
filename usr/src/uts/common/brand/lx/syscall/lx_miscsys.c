@@ -40,6 +40,17 @@
 #define	LX_RUSAGE_BOTH			(-2)
 #define	LX_RUSAGE_THREAD		1
 
+#define	LX_SWAP_PRIOMASK		0x7fff
+#define	LX_SWAP_PREFER			0x8000
+#define	LX_SWAP_DISCARD			0x10000
+#define	LX_SWAP_DISCARD_ONCE		0x20000
+#define	LX_SWAP_DISCARD_PAGES		0x40000
+
+#define	LX_SWAP_ALL			(LX_SWAP_DISCARD_PAGES | \
+					LX_SWAP_DISCARD_ONCE | \
+					LX_SWAP_DISCARD | \
+					LX_SWAP_PREFER | LX_SWAP_PRIOMASK)
+
 /* From uts/common/fs/vfs.c */
 extern void vfs_sync(int);
 /* From uts/common/os/grow.c */
@@ -434,4 +445,57 @@ long
 lx_unshare(int flags)
 {
 	return (set_errno(EPERM));
+}
+
+/*
+ * The whole idea of "swap space" within a zone is a complete fabrication.
+ * However, some apps expect to be able to see swap space data in the /proc
+ * files, while other apps actually don't want there to be any swap space
+ * configured. We use the swapon/off syscalls to allow this visibility to be
+ * controlled from within the zone iself. Note that the "swapon" CLI tends to
+ * do a lot of additional validation which will fail within a zone.
+ *
+ * Once we have better Linux capabilities(7) support we should check
+ * CAP_SYS_ADMIN instead of uid == 0.
+ */
+long
+lx_swapoff(char *path)
+{
+	char buf[MAXPATHLEN];
+	size_t len;
+	lx_zone_data_t *lxzd;
+
+	/* Simple validaton of the argument */
+	if (copyinstr(path, buf, sizeof (buf), &len) != 0)
+		return (set_errno(EFAULT));
+	if (crgetuid(CRED()) != 0)
+		return (set_errno(EPERM));
+
+	lxzd = ztolxzd(curzone);
+	ASSERT(lxzd != NULL);
+
+	lxzd->lxzd_swap_disabled = B_TRUE;
+	return (0);
+}
+
+long
+lx_swapon(char *path, int flags)
+{
+	char buf[MAXPATHLEN];
+	size_t len;
+	lx_zone_data_t *lxzd;
+
+	/* Simple validaton of the arguments */
+	if (copyinstr(path, buf, sizeof (buf), &len) != 0)
+		return (set_errno(EFAULT));
+	if (flags & ~LX_SWAP_ALL)
+		return (set_errno(EINVAL));
+	if (crgetuid(CRED()) != 0)
+		return (set_errno(EPERM));
+
+	lxzd = ztolxzd(curzone);
+	ASSERT(lxzd != NULL);
+
+	lxzd->lxzd_swap_disabled = B_FALSE;
+	return (0);
 }
