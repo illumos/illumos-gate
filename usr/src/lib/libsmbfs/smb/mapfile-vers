@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -34,6 +34,11 @@
 # copy of that file. If you need help, contact a gatekeeper for guidance.
 #
 # MAPFILE HEADER END
+#
+
+#
+# Note that several things in here are NODIRECT so that the
+# "fksmbcl" development tool can provide its own versions.
 #
 
 $mapfile_version 2
@@ -60,6 +65,9 @@ SYMBOL_VERSION SUNWprivate {
 	nls_str_toloc;
 	nls_str_upper;
 
+	nsmb_close		{ FLAGS = NODIRECT };
+	nsmb_ioctl		{ FLAGS = NODIRECT };
+
 	smb_close_rcfile;
 
 	smb_ctx_alloc;
@@ -72,6 +80,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_ctx_gethandle;
 	smb_ctx_init;
 	smb_ctx_kill;
+	smb_ctx_newvc		{ FLAGS = NODIRECT };
 	smb_ctx_opt;
 	smb_ctx_parseunc;
 	smb_ctx_readrc;
@@ -108,10 +117,11 @@ SYMBOL_VERSION SUNWprivate {
 	smb_getprogname;
 	smb_iod_connect;
 	smb_iod_door_path;
-	smb_iod_open_door;
-	smb_iod_start;
+	smb_iod_open_door	{ FLAGS = NODIRECT };
+	smb_iod_start		{ FLAGS = NODIRECT };
 	smb_iod_work;
 	smb_lib_init;
+	smb_open_driver		{ FLAGS = NODIRECT };
 	smb_open_printer;
 	smb_open_rcfile;
 	smb_simplecrypt;

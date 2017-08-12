@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -65,7 +65,7 @@
 int
 smb_fh_close(int fd)
 {
-	return (close(fd));
+	return (nsmb_close(fd));
 }
 
 int
@@ -96,7 +96,7 @@ smb_fh_ntcreate(
 		goto errout;
 	}
 	from_fd = ctx->ct_dev_fd;
-	if (ioctl(new_fd, SMBIOC_DUP_DEV, &from_fd) == -1) {
+	if (nsmb_ioctl(new_fd, SMBIOC_DUP_DEV, &from_fd) == -1) {
 		err = errno;
 		goto errout;
 	}
@@ -111,7 +111,7 @@ smb_fh_ntcreate(
 	ioc.ioc_share_acc = share_acc;
 	ioc.ioc_open_disp = open_disp;
 	ioc.ioc_creat_opts = create_opts;
-	if (ioctl(new_fd, SMBIOC_NTCREATE, &ioc) == -1) {
+	if (nsmb_ioctl(new_fd, SMBIOC_NTCREATE, &ioc) == -1) {
 		err = errno;
 		goto errout;
 	}
@@ -120,7 +120,7 @@ smb_fh_ntcreate(
 
 errout:
 	if (new_fd != -1)
-		close(new_fd);
+		nsmb_close(new_fd);
 	errno = err;
 	return (-1);
 }
@@ -214,7 +214,7 @@ smb_fh_read(int fd, off64_t offset, size_t count,
 	rwrq.ioc_base = dst;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
-	if (ioctl(fd, SMBIOC_READ, &rwrq) == -1) {
+	if (nsmb_ioctl(fd, SMBIOC_READ, &rwrq) == -1) {
 		return (-1);
 	}
 	return (rwrq.ioc_cnt);
@@ -231,7 +231,7 @@ smb_fh_write(int fd, off64_t offset, size_t count,
 	rwrq.ioc_base = (char *)src;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
-	if (ioctl(fd, SMBIOC_WRITE, &rwrq) == -1) {
+	if (nsmb_ioctl(fd, SMBIOC_WRITE, &rwrq) == -1) {
 		return (-1);
 	}
 	return (rwrq.ioc_cnt);

@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -97,10 +98,13 @@ smb_credinit(struct smb_cred *scred, cred_t *cr)
 	/* cr arg is optional */
 	if (cr == NULL)
 		cr = ddi_get_cred();
+#ifdef	_KERNEL
 	if (is_system_labeled()) {
 		cr = crdup(cr);
 		(void) setpflags(NET_MAC_AWARE, 1, cr);
-	} else {
+	} else
+#endif
+	{
 		crhold(cr);
 	}
 	scred->scr_cred = cr;

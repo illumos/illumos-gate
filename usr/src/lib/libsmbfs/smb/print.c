@@ -1,5 +1,4 @@
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2000, Boris Popov
  * All rights reserved.
  *
@@ -31,6 +30,10 @@
  * SUCH DAMAGE.
  *
  * $Id: print.c,v 1.1.1.3 2001/07/06 22:38:43 conrad Exp $
+ */
+
+/*
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -75,7 +78,7 @@ smb_open_printer(struct smb_ctx *ctx, const char *title,
 	if (new_fd < 0)
 		return (errno);
 	from_fd = ctx->ct_dev_fd;
-	if (ioctl(new_fd, SMBIOC_DUP_DEV, &from_fd) == -1) {
+	if (nsmb_ioctl(new_fd, SMBIOC_DUP_DEV, &from_fd) == -1) {
 		err = errno;
 		goto errout;
 	}
@@ -88,7 +91,7 @@ smb_open_printer(struct smb_ctx *ctx, const char *title,
 	ioc.ioc_prmode = mode;
 	strlcpy(ioc.ioc_title, title, SMBIOC_MAX_NAME);
 
-	if (ioctl(new_fd, SMBIOC_PRINTJOB, &ioc) == -1) {
+	if (nsmb_ioctl(new_fd, SMBIOC_PRINTJOB, &ioc) == -1) {
 		err = errno;
 		goto errout;
 	}
@@ -96,7 +99,7 @@ smb_open_printer(struct smb_ctx *ctx, const char *title,
 	return (new_fd);
 
 errout:
-	close(new_fd);
+	nsmb_close(new_fd);
 	errno = err;
 	return (-1);
 }

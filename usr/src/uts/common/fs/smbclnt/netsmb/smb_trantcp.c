@@ -34,7 +34,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -163,7 +164,7 @@ nb_getmsg_mlen(struct nbpcb *nbp, mblk_t **mpp, size_t mlen)
 			case T_DISCON_IND:
 				/* Peer disconnected. */
 				NBDEBUG("T_DISCON_IND: reason=%d",
-				    pptr->discon_ind.DISCON_reason);
+				    (int)pptr->discon_ind.DISCON_reason);
 				goto discon;
 			case T_ORDREL_IND:
 				/* Peer disconnecting. */
@@ -176,11 +177,11 @@ nb_getmsg_mlen(struct nbpcb *nbp, mblk_t **mpp, size_t mlen)
 					goto discon;
 				default:
 					NBDEBUG("T_OK_ACK/prim=%d",
-					    pptr->ok_ack.CORRECT_prim);
+					    (int)pptr->ok_ack.CORRECT_prim);
 					goto discon;
 				}
 			default:
-				NBDEBUG("M_PROTO/type=%d", pptr->type);
+				NBDEBUG("M_PROTO/type=%d", (int)pptr->type);
 				goto discon;
 			}
 			break; /* M_PROTO, M_PCPROTO */

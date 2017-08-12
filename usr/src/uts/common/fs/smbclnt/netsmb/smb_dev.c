@@ -31,9 +31,10 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -73,6 +74,14 @@
 #include <netsmb/smb_dev.h>
 #include <netsmb/smb_pass.h>
 
+#ifndef	_KERNEL
+#include <libfknsmb.h>
+
+#define	_init(v)	nsmb_drv_init(v)
+#define	_fini(v)	nsmb_drv_fini(v)
+
+#endif	/* _KERNEL */
+
 #define	NSMB_MIN_MINOR	1
 #define	NSMB_MAX_MINOR	L_MAXMIN32
 
@@ -82,13 +91,7 @@ const uint32_t nsmb_version = NSMB_VERSION;
 static void *statep;
 static major_t nsmb_major;
 static minor_t last_minor = NSMB_MIN_MINOR;
-static dev_info_t *nsmb_dip;
 static kmutex_t  dev_lck;
-
-/* Zone support */
-zone_key_t nsmb_zone_key;
-extern void nsmb_zone_shutdown(zoneid_t zoneid, void *data);
-extern void nsmb_zone_destroy(zoneid_t zoneid, void *data);
 
 /*
  * cb_ops device operations.
@@ -98,6 +101,15 @@ static int nsmb_close(dev_t dev, int flag, int otyp, cred_t *credp);
 static int nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				cred_t *credp, int *rvalp);
 static int nsmb_close2(smb_dev_t *sdp, cred_t *cr);
+
+#ifdef	_KERNEL
+
+static dev_info_t *nsmb_dip;
+
+/* Zone support */
+zone_key_t nsmb_zone_key;
+extern void nsmb_zone_shutdown(zoneid_t zoneid, void *data);
+extern void nsmb_zone_destroy(zoneid_t zoneid, void *data);
 
 /* smbfs cb_ops */
 static struct cb_ops nsmb_cbops = {
@@ -160,10 +172,14 @@ static struct modlinkage nsmb_modlinkage = {
 	NULL
 };
 
+#endif	/* _KERNEL */
+
 int
 _init(void)
 {
+#ifdef	_KERNEL
 	int error;
+#endif	/* _KERNEL */
 
 	(void) ddi_soft_state_init(&statep, sizeof (smb_dev_t), 1);
 
@@ -182,6 +198,7 @@ _init(void)
 	/* Initialize crypto mechanisms. */
 	smb_crypto_mech_init();
 
+#ifdef	_KERNEL
 	zone_key_create(&nsmb_zone_key, NULL, nsmb_zone_shutdown,
 	    nsmb_zone_destroy);
 
@@ -200,6 +217,11 @@ _init(void)
 
 		return (error);
 	}
+#else	/* _KERNEL */
+	streams_msg_init();
+	/* No attach, so need to set major. */
+	nsmb_major = 1;
+#endif	/* _KERNEL */
 
 	return (0);
 }
@@ -218,6 +240,7 @@ _fini(void)
 	if ((status = smb_pkey_idle()) != 0)
 		return (status);
 
+#ifdef	_KERNEL
 	/*
 	 * Remove the module.  Do this before destroying things,
 	 * to prevent new entrances while we're destorying.
@@ -227,6 +250,7 @@ _fini(void)
 	}
 
 	(void) zone_key_delete(nsmb_zone_key);
+#endif	/* _KERNEL */
 
 	/* Time conversion stuff. */
 	smb_time_fini();
@@ -241,6 +265,8 @@ _fini(void)
 
 	return (status);
 }
+
+#ifdef	_KERNEL
 
 int
 _info(struct modinfo *modinfop)
@@ -315,6 +341,65 @@ nsmb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+#else	/* _KERNEL */
+
+/*
+ * Wrappers for libfknsmb: ioctl, open, close, load
+ */
+
+/*ARGSUSED*/
+int
+nsmb_drv_ioctl(dev32_t dev32, int cmd, intptr_t arg, int flags)
+{
+	dev_t dev = expldev(dev32);
+	cred_t *cr = CRED();
+	int err;
+
+	err = nsmb_ioctl(dev, cmd, arg, flags, cr, NULL);
+	return (err);
+}
+
+/*ARGSUSED*/
+int
+nsmb_drv_open(dev32_t *dev32p, int flags, int otyp)
+{
+	dev_t dev = expldev(*dev32p);
+	int err;
+
+	err = nsmb_open(&dev, flags, otyp, CRED());
+	if (err == 0) {
+		/*
+		 * We have NSMB_MAX_MINOR == L_MAXMIN32
+		 * therefore cmpldev never fails.
+		 */
+		VERIFY(cmpldev(dev32p, dev) != 0);
+	}
+	return (err);
+}
+
+/*ARGSUSED*/
+int
+nsmb_drv_close(dev32_t dev32, int flags, int otyp)
+{
+	dev_t dev = expldev(dev32);
+	int err;
+
+	err = nsmb_close(dev, flags, otyp, CRED());
+	return (err);
+}
+
+/*
+ * This function intentionally does nothing.  It's used only to
+ * force libfknsmb to load at program start so one can set
+ * breakpoints etc. without debugger "force load" tricks.
+ */
+void
+nsmb_drv_load(void)
+{
+}
+
+#endif	/* _KERNEL */
+
 /*ARGSUSED*/
 static int
 nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
@@ -325,7 +410,7 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 
 	sdp = ddi_get_soft_state(statep, getminor(dev));
 	if (sdp == NULL) {
-		return (DDI_FAILURE);
+		return (EBADF);
 	}
 	if ((sdp->sd_flags & NSMBFL_OPEN) == 0) {
 		return (EBADF);
@@ -566,8 +651,10 @@ nsmb_close2(smb_dev_t *sdp, cred_t *cr)
 int
 smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags)
 {
+#ifdef	_KERNEL
 	file_t *fp = NULL;
 	vnode_t *vp;
+#endif	/* _KERNEL */
 	smb_dev_t *from_sdp;
 	dev_t dev;
 	int32_t ufd;
@@ -582,16 +669,24 @@ smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags)
 	 */
 	if (ddi_copyin((void *) arg, &ufd, sizeof (ufd), flags))
 		return (EFAULT);
+#ifdef	_KERNEL
 	if ((fp = getf(ufd)) == NULL)
 		return (EBADF);
 	/* rele fp below */
 	vp = fp->f_vnode;
 	dev = vp->v_rdev;
+#else	/* _KERNEL */
+	/*
+	 * No getf(ufd) -- ufd is really a dev32_t
+	 */
+	dev = expldev((dev32_t)ufd);
+#endif	/* _KERNEL */
 	if (dev == 0 || dev == NODEV ||
 	    getmajor(dev) != nsmb_major) {
 		err = EINVAL;
 		goto out;
 	}
+
 	from_sdp = ddi_get_soft_state(statep, getminor(dev));
 	if (from_sdp == NULL) {
 		err = EINVAL;
@@ -609,8 +704,10 @@ smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags)
 	err = 0;
 
 out:
+#ifdef	_KERNEL
 	if (fp)
 		releasef(ufd);
+#endif	/* _KERNEL */
 	return (err);
 }
 
@@ -621,19 +718,27 @@ out:
 int
 smb_dev2share(int fd, struct smb_share **sspp)
 {
+#ifdef	_KERNEL
 	file_t *fp = NULL;
 	vnode_t *vp;
+#endif	/* _KERNEL */
 	smb_dev_t *sdp;
 	smb_share_t *ssp;
 	dev_t dev;
 	int err;
 
+#ifdef	_KERNEL
 	if ((fp = getf(fd)) == NULL)
 		return (EBADF);
 	/* rele fp below */
-
 	vp = fp->f_vnode;
 	dev = vp->v_rdev;
+#else	/* _KERNEL */
+	/*
+	 * No getf(ufd) -- fd is really a dev32_t
+	 */
+	dev = expldev((dev32_t)fd);
+#endif	/* _KERNEL */
 	if (dev == 0 || dev == NODEV ||
 	    getmajor(dev) != nsmb_major) {
 		err = EINVAL;
@@ -660,7 +765,9 @@ smb_dev2share(int fd, struct smb_share **sspp)
 	err = 0;
 
 out:
+#ifdef	_KERNEL
 	if (fp)
 		releasef(fd);
+#endif	/* _KERNEL */
 	return (err);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -128,7 +128,7 @@ smbfs_keychain_cmn(
 	}
 
 	err = 0;
-	if (ioctl(fd, cmd, &pk) < 0) {
+	if (nsmb_ioctl(fd, cmd, &pk) < 0) {
 		err = errno;
 		goto out;
 	}
@@ -142,7 +142,7 @@ smbfs_keychain_cmn(
 
 out:
 	if (fd != -1)
-		close(fd);
+		nsmb_close(fd);
 
 	return (err);
 }

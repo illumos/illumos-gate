@@ -20,13 +20,19 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#include <sys/mdb_modapi.h>
 #include <sys/types.h>
+#include <sys/mdb_modapi.h>
+
+#ifdef	_USER
+#include "../genunix/avl.h"
+#define	_FAKE_KERNEL
+#endif
+
 #include <sys/refstr_impl.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
@@ -149,7 +155,7 @@ smbfs_vfs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (!(flags & DCMD_ADDRSPEC)) {
-		if (mdb_walk("genunix`vfs", smbfs_vfs_cb, cbd)
+		if (mdb_walk("vfs", smbfs_vfs_cb, cbd)
 		    == -1) {
 			mdb_warn("can't walk smbfs vfs");
 			return (DCMD_ERR);
@@ -238,7 +244,7 @@ smbfs_node_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 	addr += OFFSETOF(smbmntinfo_t, smi_hash_avl);
 
-	if (mdb_pwalk("genunix`avl", smbfs_node_cb, cbd, addr) == -1) {
+	if (mdb_pwalk("avl", smbfs_node_cb, cbd, addr) == -1) {
 		mdb_warn("cannot walk smbfs nodes");
 		return (DCMD_ERR);
 	}
@@ -267,9 +273,58 @@ static const mdb_dcmd_t dcmds[] = {
 	{NULL}
 };
 
+#ifdef _USER
+/*
+ * Sadly, can't just compile ../genunix/vfs.c with this since
+ * it has become a catch-all for FS-specific headers etc.
+ */
+int
+vfs_walk_init(mdb_walk_state_t *wsp)
+{
+	if (wsp->walk_addr == NULL &&
+	    mdb_readvar(&wsp->walk_addr, "rootvfs") == -1) {
+		mdb_warn("failed to read 'rootvfs'");
+		return (WALK_ERR);
+	}
+
+	wsp->walk_data = (void *)wsp->walk_addr;
+	return (WALK_NEXT);
+}
+
+int
+vfs_walk_step(mdb_walk_state_t *wsp)
+{
+	vfs_t vfs;
+	int status;
+
+	if (mdb_vread(&vfs, sizeof (vfs), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read vfs_t at %p", wsp->walk_addr);
+		return (WALK_DONE);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, &vfs, wsp->walk_cbdata);
+
+	if (vfs.vfs_next == wsp->walk_data)
+		return (WALK_DONE);
+
+	wsp->walk_addr = (uintptr_t)vfs.vfs_next;
+
+	return (status);
+}
+#endif	// _USER
+
 static const mdb_walker_t walkers[] = {
+#ifdef	_USER
+	/* from avl.c */
+	{ AVL_WALK_NAME, AVL_WALK_DESC,
+		avl_walk_init, avl_walk_step, avl_walk_fini },
+	/* from vfs.c */
+	{ "vfs", "walk file system list",
+		vfs_walk_init, vfs_walk_step },
+#endif	// _USER
 	{NULL}
 };
+
 
 static const mdb_modinfo_t modinfo = {
 	MDB_API_VERSION,

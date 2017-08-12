@@ -1,5 +1,4 @@
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2000, Boris Popov
  * All rights reserved.
  *
@@ -31,6 +30,10 @@
  * SUCH DAMAGE.
  *
  * $Id: rq.c,v 1.4 2004/12/13 00:25:23 lindak Exp $
+ */
+
+/*
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -266,7 +269,7 @@ smb_rq_simple(struct smb_rq *rqp)
 	/*
 	 * Call the driver
 	 */
-	if (ioctl(rqp->rq_ctx->ct_dev_fd, SMBIOC_REQUEST, &krq) == -1)
+	if (nsmb_ioctl(rqp->rq_ctx->ct_dev_fd, SMBIOC_REQUEST, &krq) == -1)
 		return (errno);
 
 	/*
@@ -312,7 +315,7 @@ smb_t2_request(int dev_fd, int setupcount, uint16_t *setup,
 	krq->ioc_rparam = rparam;
 	krq->ioc_rdata  = rdata;
 
-	if (ioctl(dev_fd, SMBIOC_T2RQ, krq) == -1) {
+	if (nsmb_ioctl(dev_fd, SMBIOC_T2RQ, krq) == -1) {
 		return (errno);
 	}
 

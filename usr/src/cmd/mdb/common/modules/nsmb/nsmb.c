@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -34,6 +34,12 @@
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_rq.h>
 #include <netsmb/smb_pass.h>
+
+#ifdef _KERNEL
+#define	NSMB_OBJNAME	"nsmb"
+#else
+#define	NSMB_OBJNAME	"libfknsmb.so.1"
+#endif
 
 #define	OPT_VERBOSE	0x0001	/* Be [-v]erbose in dcmd's */
 #define	OPT_RECURSE	0x0002	/* recursive display */
@@ -146,7 +152,7 @@ smb_vc_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	/* Locate the VC list head. */
-	if (mdb_lookup_by_obj("nsmb", "smb_vclist", &sym)) {
+	if (mdb_lookup_by_obj(NSMB_OBJNAME, "smb_vclist", &sym)) {
 		mdb_warn("failed to lookup `smb_vclist'\n");
 		return (WALK_ERR);
 	}
@@ -471,7 +477,7 @@ pwtree_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (mdb_lookup_by_obj("nsmb", "smb_ptd", &sym) == -1) {
+	if (mdb_lookup_by_obj(NSMB_OBJNAME, "smb_ptd", &sym) == -1) {
 		mdb_warn("failed to find symbol 'smb_ptd'");
 		return (WALK_ERR);
 	}

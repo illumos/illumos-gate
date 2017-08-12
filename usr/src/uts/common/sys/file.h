@@ -119,7 +119,7 @@ typedef struct fpollinfo {
 
 #define	FCLOEXEC	0x800000	/* O_CLOEXEC = 0x800000 */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * This is a flag that is set on f_flag2, but is never user-visible
@@ -188,7 +188,7 @@ typedef struct fpollinfo {
 extern int flock(int, int);
 #endif
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * Routines dealing with user per-open file flags and
@@ -197,14 +197,15 @@ extern int flock(int, int);
 struct proc;	/* forward reference for function prototype */
 struct vnodeops;
 struct vattr;
+struct uf_info;
 
 extern file_t *getf(int);
 extern void releasef(int);
-extern void areleasef(int, uf_info_t *);
+extern void areleasef(int, struct uf_info *);
 #ifndef	_BOOT
-extern void closeall(uf_info_t *);
+extern void closeall(struct uf_info *);
 #endif
-extern void flist_fork(uf_info_t *, uf_info_t *);
+extern void flist_fork(struct uf_info *, struct uf_info *);
 extern int closef(file_t *);
 extern int closeandsetf(int, file_t *);
 extern int ufalloc_file(int, file_t *);
@@ -221,8 +222,8 @@ extern void f_setfd(int, char);
 extern int f_getfl(int, int *);
 extern int f_badfd(int, int *, int);
 extern int fassign(struct vnode **, int, int *);
-extern void fcnt_add(uf_info_t *, int);
-extern void close_exec(uf_info_t *);
+extern void fcnt_add(struct uf_info *, int);
+extern void close_exec(struct uf_info *);
 extern void clear_stale_fd(void);
 extern void clear_active_fd(int);
 extern void free_afd(afd_t *afd);

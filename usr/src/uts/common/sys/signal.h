@@ -245,7 +245,7 @@ struct sigstack {
 #include <sys/ucontext.h>
 #endif /* defined(_XPG4_2) */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/t_lock.h>
 
 extern const k_sigset_t nullsmask;	/* a null signal mask */
