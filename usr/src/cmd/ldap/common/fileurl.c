@@ -1,4 +1,5 @@
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -360,7 +361,6 @@ berval_from_file( const char *path, struct berval *bvp, int reporterrs )
 {
     FILE	*fp;
     long	rlen;
-    int		eof;
 #if defined( XP_WIN32 )
     char	mode[20] = "r+b";
 #else
@@ -397,7 +397,6 @@ berval_from_file( const char *path, struct berval *bvp, int reporterrs )
     }
 
     rlen = fread( bvp->bv_val, 1, bvp->bv_len, fp );
-    eof = feof( fp );
     fclose( fp );
 
     if ( rlen != (long)bvp->bv_len ) {

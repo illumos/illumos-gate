@@ -20,14 +20,13 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mail.h"
 
@@ -90,7 +89,6 @@ xxxcopylet(int letnum, FILE *f, int type)
 					/* H_RECEIVED lines? */
 	long	clen = -1L;
 	int	htype;			/* header type */
-	int	sav_htype;	/* Header type of last non-H_CONT header line */
 	struct hdrs *hptr;
 
 	if (!sending) {
@@ -296,7 +294,6 @@ xxxcopylet(int letnum, FILE *f, int type)
 			sav_suppress = suppress;
 			suppress = FALSE;
 			print_from_struct = FALSE;
-			sav_htype = htype;
 			htype = isheader (buf, &ctf);
 			Dout(pn, 5, "loop 2: buf = %s, htype= %d/%s\n", buf, htype, header[htype].tag);
 			/* The following order is defined in the MTA documents. */

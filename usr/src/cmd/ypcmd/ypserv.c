@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,8 +32,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This contains the mainline code for the YP server.  Data
@@ -174,7 +173,7 @@ static void
 ypinit(int argc, char **argv)
 {
 	int pid;
-	int stat, t;
+	int stat;
 	struct sigaction act;
 	int ufd, tfd;
 	SVCXPRT *utransp, *ttransp;
@@ -237,7 +236,7 @@ ypinit(int argc, char **argv)
 		    freopen(logfile, "a", stderr);
 		}
 
-		t = open("/dev/tty", 2);
+		(void) open("/dev/tty", 2);
 
 		setpgrp();
 	}

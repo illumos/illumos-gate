@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1294,9 +1295,7 @@ char **argv;
 	OM_UINT32 status;
 	gss_ctx_id_t *context_handle;
 	OM_uint32 minor_status;
-	uid_t uid;
 
-	uid = (uid_t) getuid();
 
 	/* parse the command line to determine the variable input argument */
 
