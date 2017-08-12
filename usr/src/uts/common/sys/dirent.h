@@ -76,7 +76,7 @@ typedef struct dirent64 {
 #endif	/* _LARGEFILE64_SOURCE */
 
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #define	DIRENT64_RECLEN(namelen)	\
 	((offsetof(dirent64_t, d_name[0]) + 1 + (namelen) + 7) & ~ 7)
 #define	DIRENT64_NAMELEN(reclen)	\

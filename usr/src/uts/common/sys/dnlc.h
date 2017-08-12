@@ -169,7 +169,7 @@ struct nc_stats {
 		(namlen) = Xcp - (name);			\
 	}
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/vfs.h>
 #include <sys/vnode.h>

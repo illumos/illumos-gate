@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_LIB_H_
@@ -181,6 +181,8 @@ struct smb_ctx {
 int  smb_ctx_init(struct smb_ctx *);
 void smb_ctx_done(struct smb_ctx *);
 int  smb_open_driver(void);
+int  nsmb_ioctl(int, int, void *);
+int  nsmb_close(int);
 
 int  smb_ctx_gethandle(struct smb_ctx *);
 int  smb_ctx_findvc(struct smb_ctx *);

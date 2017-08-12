@@ -814,11 +814,27 @@ usr/lib/llib-lsmbfs.ln
 usr/lib/amd64/llib-lsmbfs.ln		i386
 usr/lib/sparcv9/llib-lsmbfs.ln		sparc
 #
-# demo & test program for smbfs (private) ACL support
+# debug & test program for smbfs (private)
 #
 usr/lib/fs/smbfs/chacl
 usr/lib/fs/smbfs/lsacl
-opt/smbcl-tests
+usr/lib/mdb/proc/libfknsmb.so
+usr/lib/mdb/proc/libfksmbfs.so
+usr/lib/mdb/proc/amd64/libfknsmb.so	i386
+usr/lib/mdb/proc/amd64/libfksmbfs.so	i386
+usr/lib/mdb/proc/sparc/libfknsmb.so	sparc
+usr/lib/mdb/proc/sparc/libfksmbfs.so	sparc
+usr/lib/smbfs/amd64			i386
+usr/lib/smbfs/sparcv9			sparc
+usr/lib/smbfs/fksmbcl
+usr/lib/smbfs/libfknsmb.so
+usr/lib/smbfs/libfknsmb.so.1
+usr/lib/smbfs/libfksmbfs.so
+usr/lib/smbfs/libfksmbfs.so.1
+usr/lib/smbfs/llib-lfknsmb
+usr/lib/smbfs/llib-lfknsmb.ln
+usr/lib/smbfs/llib-lfksmbfs
+usr/lib/smbfs/llib-lfksmbfs.ln
 #
 # FC related files
 kernel/kmdb/amd64/fcip		i386

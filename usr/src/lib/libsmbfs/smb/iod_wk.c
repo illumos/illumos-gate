@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -69,7 +69,7 @@ smb_iod_work(smb_ctx_t *ctx)
 
 	DPRINT("server: %s", ctx->ct_srvname);
 
-	/* Calle should have opened these */
+	/* Caller should have opened these */
 	if (ctx->ct_tran_fd == -1 || ctx->ct_dev_fd == -1) {
 		err = EINVAL;
 		goto out;
@@ -96,7 +96,7 @@ smb_iod_work(smb_ctx_t *ctx)
 			 * Next state is normally RECONNECT.
 			 */
 			DPRINT("state: idle");
-			if (ioctl(ctx->ct_dev_fd,
+			if (nsmb_ioctl(ctx->ct_dev_fd,
 			    SMBIOC_IOD_IDLE, &vcst) == -1) {
 				err = errno;
 				DPRINT("ioc_idle: err %d", err);
@@ -132,7 +132,7 @@ smb_iod_work(smb_ctx_t *ctx)
 			 * then get ready to try again.
 			 * Next state is normally IDLE.
 			 */
-			if (ioctl(ctx->ct_dev_fd,
+			if (nsmb_ioctl(ctx->ct_dev_fd,
 			    SMBIOC_IOD_RCFAIL, &vcst) == -1) {
 				err = errno;
 				DPRINT("ioc_rcfail: err %d", err);
@@ -142,7 +142,7 @@ smb_iod_work(smb_ctx_t *ctx)
 
 		case SMBIOD_ST_VCACTIVE:
 			DPRINT("state: active");
-			if (ioctl(ctx->ct_dev_fd,
+			if (nsmb_ioctl(ctx->ct_dev_fd,
 			    SMBIOC_IOD_WORK, work) == -1) {
 				err = errno;
 				DPRINT("ioc_work: err %d", err);
@@ -176,7 +176,7 @@ out:
 		ctx->ct_tran_fd = -1;
 	}
 	if (ctx->ct_dev_fd != -1) {
-		close(ctx->ct_dev_fd);
+		nsmb_close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
 	}
 

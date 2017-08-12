@@ -35,7 +35,7 @@
  * For source compatibility
  */
 #include <sys/isa_defs.h>
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #endif
@@ -627,7 +627,7 @@ struct stroptions {
 #define	SO_MAXBLK	0x100000	/* set maximum message block size */
 #define	SO_TAIL		0x200000	/* set the extra allocated space */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 /*
  * Structure for rw (read/write) procedure calls. A pointer
  * to a struiod_t is passed as a parameter to the rwnext() call.
@@ -755,7 +755,7 @@ typedef struct cmdblk {
  */
 #define	bpsize(bp) ((unsigned int)(bp->b_datap->db_lim - bp->b_datap->db_base))
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * For two-byte M_ERROR messages: indication that a side does not have an error

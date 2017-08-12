@@ -33,13 +33,15 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/inttypes.h>
 #include <sys/time.h>
 #include <sys/vnode.h>
 #include <sys/sunddi.h>
@@ -623,9 +625,8 @@ smbfs_smb_seteof(struct smb_share *ssp, uint16_t fid, uint64_t newsize,
 }
 
 int
-smbfs_smb_setdisp(struct smbnode *np,
- uint16_t fid, uint8_t newdisp,
-			struct smb_cred *scrp)
+smbfs_smb_setdisp(struct smbnode *np, uint16_t fid, uint8_t newdisp,
+	struct smb_cred *scrp)
 {
 	struct smb_t2rq *t2p;
 	struct smb_share *ssp = np->n_mount->smi_share;
@@ -2375,6 +2376,9 @@ smbfs_smb_findclose(struct smbfs_fctx *ctx, struct smb_cred *scrp)
 		break;
 	case ft_XA:
 		error = smbfs_xa_findclose(ctx);
+		break;
+	default:
+		error = ENOSYS;
 		break;
 	}
 	if (ctx->f_rname)

@@ -56,10 +56,15 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CSTD =       $(CSTD_GNU99)
 C99LMODE =      -Xc99=%all
 
-# Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.
-CPPFLAGS.first += -I../common
-
 CFLAGS +=	$(CCVERBOSE)
+
+# Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.
+# Also Note: intentionally override CPPFLAGS, not +=
+CPPFLAGS.first += -I../common
+CPPFLAGS= $(CPPFLAGS.first)
+
+INCS += -I$(SRC)/uts/common
+
 CPPFLAGS += $(INCS) -D_REENTRANT -D_FAKE_KERNEL
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 

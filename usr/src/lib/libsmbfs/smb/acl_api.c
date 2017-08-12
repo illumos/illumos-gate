@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -83,6 +85,7 @@ smbfs_acl_iocget(int fd, uint32_t selector, mbdata_t *mbp)
 		return (error);
 
 	m = mbp->mb_top;
+	bzero(&iocb, sizeof (iocb));
 	iocb.addr = mtod(m, uintptr_t);
 	iocb.alloc = m->m_maxlen;
 	iocb.used = 0;
@@ -91,7 +94,7 @@ smbfs_acl_iocget(int fd, uint32_t selector, mbdata_t *mbp)
 	/*
 	 * This does the OTW Get.
 	 */
-	if (ioctl(fd, SMBFSIO_GETSD, &iocb) < 0) {
+	if (nsmb_ioctl(fd, SMBFSIO_GETSD, &iocb) < 0) {
 		error = errno;
 		goto errout;
 	}
@@ -120,6 +123,7 @@ smbfs_acl_iocset(int fd, uint32_t selector, mbdata_t *mbp)
 	if (mbp->mb_top != m)
 		mb_initm(mbp, m);
 
+	bzero(&iocb, sizeof (iocb));
 	iocb.addr = mtod(m, uintptr_t);
 	iocb.alloc = m->m_maxlen;
 	iocb.used  = m->m_len;
@@ -128,7 +132,7 @@ smbfs_acl_iocset(int fd, uint32_t selector, mbdata_t *mbp)
 	/*
 	 * This does the OTW Set.
 	 */
-	if (ioctl(fd, SMBFSIO_SETSD, &iocb) < 0)
+	if (nsmb_ioctl(fd, SMBFSIO_SETSD, &iocb) < 0)
 		error = errno;
 
 	return (error);

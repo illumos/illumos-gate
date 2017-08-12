@@ -1,0 +1,121 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate {
+    global:
+	kmem_avail;
+	kmem_maxavail;
+
+	nsmb_drv_close;
+	nsmb_drv_fini;
+	nsmb_drv_init;
+	nsmb_drv_ioctl;
+	nsmb_drv_load;
+	nsmb_drv_open;
+
+	nsmb_version;
+
+	m_fixhdr;
+	mb_done;
+	mb_init;
+	mb_initm;
+	mb_put_mem;
+	mb_put_padbyte;
+	mb_put_uint16le;
+	mb_put_uint32le;
+	mb_put_uint64le;
+	mb_put_uint8;
+	mb_reserve;
+
+	md_done;
+	md_get_mbuf;
+	md_get_mem;
+	md_get_uint16le;
+	md_get_uint32le;
+	md_get_uint64le;
+	md_get_uint8;
+	md_initm;
+
+	secpolicy_fs_allowed_mount;
+	secpolicy_vnode_access2;
+	secpolicy_vnode_owner;
+	secpolicy_vnode_setattr;
+	secpolicy_vnode_setdac;
+
+	smb_credinit;
+	smb_credrele;
+	smb_dev2share;
+	smb_dos2unixtime;
+	smb_errmsg;
+	smb_nt_alloc;
+	smb_nt_done;
+	smb_nt_request;
+	smb_put_dmem;
+	smb_rq_alloc;
+	smb_rq_bend;
+	smb_rq_bstart;
+	smb_rq_done;
+	smb_rq_init;
+	smb_rq_simple;
+	smb_rq_simple_timed;
+	smb_rq_wend;
+	smb_rq_wstart;
+	smb_rwuio;
+	smb_share_kill;
+	smb_share_rele;
+	smb_smb_close;
+	smb_smb_ntcreate;
+	smb_t2_alloc;
+	smb_t2_done;
+	smb_t2_request;
+	smb_time_NT2local;
+	smb_time_local2NT;
+	smb_time_local2server;
+	smb_time_server2local;
+	smb_time_unix2dos;
+	smb_timo_append;
+	smb_timo_open;
+	smb_timo_read;
+	smb_timo_write;
+
+    local:
+	*;
+};

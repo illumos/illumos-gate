@@ -64,12 +64,20 @@ extern void cmn_err(int, const char *, ...)
 extern void vcmn_err(int, const char *, __va_list)
     __KVPRINTFLIKE(2);
 
+/*PRINTFLIKE3*/
+extern void zcmn_err(zoneid_t, int, const char *, ...)
+    __KPRINTFLIKE(3);
+
 /*PRINTFLIKE1*/
 extern void panic(const char *, ...)
     __KPRINTFLIKE(1) __NORETURN;
 
 extern void vpanic(const char *, __va_list)
     __KVPRINTFLIKE(1) __NORETURN;
+
+/*PRINTFLIKE2*/
+extern void zprintf(zoneid_t, const char *, ...)
+    __KPRINTFLIKE(2);
 
 #endif /* !_ASM && (_KERNEL || _FAKE_KERNEL) */
 

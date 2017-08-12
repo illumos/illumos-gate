@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -333,7 +333,12 @@ smb_ctx_scan_argv(struct smb_ctx *ctx, int argc, char **argv,
 	cf_opt_lock();
 	/* Careful: no return/goto before cf_opt_unlock! */
 	while (error == 0) {
-		opt = cf_getopt(argc, argv, STDPARAM_OPT);
+		/*
+		 * Leading ':' tells this to skip unknown opts.
+		 * Just get -A and -U here so we know the user
+		 * for config file parsing.
+		 */
+		opt = cf_getopt(argc, argv, ":AU:");
 		if (opt == -1)
 			break;
 		arg = cf_optarg;
@@ -398,7 +403,7 @@ smb_ctx_done(struct smb_ctx *ctx)
 	rpc_cleanup_smbctx(ctx);
 
 	if (ctx->ct_dev_fd != -1) {
-		close(ctx->ct_dev_fd);
+		nsmb_close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
 	}
 	if (ctx->ct_door_fd != -1) {
@@ -1147,6 +1152,10 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	return (0);
 }
 
+/*
+ * Note: The next three have NODIRECT binding so the
+ * "fksmbcl" development tool can provide its own.
+ */
 int
 smb_open_driver()
 {
@@ -1164,6 +1173,19 @@ smb_open_driver()
 }
 
 int
+nsmb_close(int fd)
+{
+	return (close(fd));
+}
+
+int
+nsmb_ioctl(int fd, int cmd, void *arg)
+{
+	return (ioctl(fd, cmd, arg));
+}
+
+
+int
 smb_ctx_gethandle(struct smb_ctx *ctx)
 {
 	int fd, err;
@@ -1171,7 +1193,7 @@ smb_ctx_gethandle(struct smb_ctx *ctx)
 
 	if (ctx->ct_dev_fd != -1) {
 		rpc_cleanup_smbctx(ctx);
-		close(ctx->ct_dev_fd);
+		nsmb_close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
 		ctx->ct_flags &= ~SMBCF_SSNACTIVE;
 	}
@@ -1187,12 +1209,12 @@ smb_ctx_gethandle(struct smb_ctx *ctx)
 	/*
 	 * Check the driver version (paranoia)
 	 */
-	if (ioctl(fd, SMBIOC_GETVERS, &version) < 0)
+	if (nsmb_ioctl(fd, SMBIOC_GETVERS, &version) < 0)
 		version = 0;
 	if (version != NSMB_VERSION) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "incorrect driver version"), 0);
-		close(fd);
+		nsmb_close(fd);
 		return (ENODEV);
 	}
 
@@ -1220,6 +1242,15 @@ smb_ctx_get_ssn(struct smb_ctx *ctx)
 	if (err == 0) {
 		DPRINT("found an existing VC");
 	} else {
+		/*
+		 * If we're authenticating (real user, not NULL session)
+		 * and we don't yet have a password, return EAUTH and
+		 * the caller will prompt for it and call again.
+		 */
+		if (ctx->ct_user[0] != '\0' &&
+		    ctx->ct_password[0] == '\0')
+			return (EAUTH);
+
 		/*
 		 * This calls the IOD to create a new session.
 		 */
@@ -1272,7 +1303,7 @@ smb_ctx_get_tree(struct smb_ctx *ctx)
 	 *
 	 * The driver does the actual TCON call.
 	 */
-	if (ioctl(ctx->ct_dev_fd, cmd, tcon) == -1) {
+	if (nsmb_ioctl(ctx->ct_dev_fd, cmd, tcon) == -1) {
 		err = errno;
 		goto out;
 	}
@@ -1303,7 +1334,7 @@ smb_ctx_flags2(struct smb_ctx *ctx)
 {
 	uint16_t flags2;
 
-	if (ioctl(ctx->ct_dev_fd, SMBIOC_FLAGS2, &flags2) == -1) {
+	if (nsmb_ioctl(ctx->ct_dev_fd, SMBIOC_FLAGS2, &flags2) == -1) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "can't get flags2 for a session"), errno);
 		return (-1);
@@ -1321,7 +1352,7 @@ smb_fh_getssnkey(int dev_fd, uchar_t *key, size_t len)
 	if (len < SMBIOC_HASH_SZ)
 		return (EINVAL);
 
-	if (ioctl(dev_fd, SMBIOC_GETSSNKEY, key) == -1)
+	if (nsmb_ioctl(dev_fd, SMBIOC_GETSSNKEY, key) == -1)
 		return (errno);
 
 	return (0);

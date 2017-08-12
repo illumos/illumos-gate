@@ -1,16 +1,35 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2001 - 2012 Apple Inc. All rights reserved.
+ *
+ * @APPLE_LICENSE_HEADER_START@
+ *
+ * This file contains Original Code and/or Modifications of Original Code
+ * as defined in and that are subject to the Apple Public Source License
+ * Version 2.0 (the 'License'). You may not use this file except in
+ * compliance with the License. Please obtain a copy of the License at
+ * http://www.opensource.apple.com/apsl/ and read it before using this
+ * file.
+ *
+ * The Original Code and all software distributed under the License are
+ * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
+ * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+ * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
+ * Please see the License for the specific language governing rights and
+ * limitations under the License.
+ *
+ * @APPLE_LICENSE_HEADER_END@
+ */
 
 /*
  * Code corresponding to smb_apple.h
- * XXX: Could merge this into smb_subr.h
- * as long as that doesn't break smbfs
  */
 
 #ifndef _NETSMB_SMB_OSDEP_H_
 #define	_NETSMB_SMB_OSDEP_H_
 
 #ifndef PRIVSYM
-#define PRIVSYM 
+#define	PRIVSYM
 #endif
 
 #ifndef min
@@ -65,8 +84,14 @@ typedef uint32_t u_int32_t;
 typedef uint16_t u_int16_t;
 typedef uint8_t u_int8_t;
 
-typedef const char * c_caddr_t;
+typedef const char *c_caddr_t;
 typedef uint64_t 	user_addr_t;
+typedef ssize_t		user_ssize_t;
+typedef size_t		user_size_t;
+
+#ifdef _FAKE_KERNEL
+#define	ddi_get_cred()  CRED()
+#endif
 
 /*
  * Time related calls.

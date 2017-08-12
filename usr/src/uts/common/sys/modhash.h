@@ -34,7 +34,7 @@
 extern "C" {
 #endif
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/types.h>
 

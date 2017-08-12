@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -37,8 +38,6 @@
 #include <sys/md5.h>
 #include <sys/des.h>
 #include <sys/kmem.h>
-#include <sys/crypto/api.h>
-#include <sys/crypto/common.h>
 #include <sys/cmn_err.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -50,6 +49,7 @@
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_dev.h>
 #include <netsmb/smb_rq.h>
+#include <netsmb/smb_signing.h>
 
 #ifdef DEBUG
 /*
@@ -60,14 +60,14 @@ int nsmb_signing_fudge = 0;
 #endif
 
 /* Mechanism definitions */
-static  crypto_mechanism_t crypto_mech_md5 = { CRYPTO_MECH_INVALID };
+static  smb_sign_mech_t smb_mech_md5;
 
 void
 smb_crypto_mech_init(void)
 {
-	crypto_mech_md5.cm_type = crypto_mech2id(SUN_CKM_MD5);
+	if (smb_md5_getmech(&smb_mech_md5) != 0)
+		cmn_err(CE_NOTE, "nsmb can't get md5 mech");
 }
-
 
 
 #define	SMBSIGLEN	8	/* SMB signature length */
@@ -83,12 +83,12 @@ static int
 smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	uint32_t seqno, uchar_t *signature)
 {
-	crypto_context_t crypto_ctx;
-	crypto_data_t key;
-	crypto_data_t data;
-	crypto_data_t digest;
-	uchar_t mac[16];
-	int status;
+	uchar_t digest[MD5_DIGEST_LENGTH];
+	smb_sign_ctx_t ctx = 0;
+	mblk_t *m = mp;
+	int size;
+	int rc;
+
 	/*
 	 * This union is a little bit of trickery to:
 	 * (1) get the sequence number int aligned, and
@@ -109,78 +109,66 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 		} s;
 	} smbhdr;
 
-	ASSERT(mp != NULL);
-	ASSERT(MBLKL(mp) >= SMB_HDRLEN);
-	ASSERT(vcp->vc_mackey != NULL);
+	/* Later: check vcp->sign_mech == NULL */
+	if (vcp->vc_mackey == NULL)
+		return (-1);
+
+	if ((rc = smb_md5_init(&ctx, &smb_mech_md5)) != 0)
+		return (rc);
+
+	/* Digest the MAC Key */
+	rc = smb_md5_update(ctx, vcp->vc_mackey, vcp->vc_mackeylen);
+	if (rc != 0)
+		return (rc);
+
+	ASSERT(m != NULL);
+	ASSERT(MBLKL(m) >= SMB_HDRLEN);
 
 	/*
-	 * Make an aligned copy of the SMB header
-	 * and fill in the sequence number.
+	 * Make an aligned copy of the SMB header,
+	 * fill in the sequence number, and digest.
 	 */
-	bcopy(mp->b_rptr, smbhdr.r.raw, SMB_HDRLEN);
+	size = SMB_HDRLEN;
+	if (MBLKL(m) < size)
+		(void) pullupmsg(m, size);
+	bcopy(m->b_rptr, smbhdr.r.raw, size);
 	smbhdr.s.sig[0] = htolel(seqno);
 	smbhdr.s.sig[1] = 0;
 
+	rc = smb_md5_update(ctx, &smbhdr.r.raw, size);
+	if (rc != 0)
+		return (rc);
+
 	/*
-	 * Compute the MAC: MD5(concat(Key, message))
+	 * Digest the rest of the SMB header packet, starting at
+	 * the data just after the SMB header.
 	 */
-	if (crypto_mech_md5.cm_type == CRYPTO_MECH_INVALID) {
-		SMBSDEBUG("crypto_mech_md5 invalid\n");
-		return (CRYPTO_MECHANISM_INVALID);
-	}
-	status = crypto_digest_init(&crypto_mech_md5, &crypto_ctx, 0);
-	if (status != CRYPTO_SUCCESS)
-		return (status);
-
-	/* Digest the MAC Key */
-	key.cd_format = CRYPTO_DATA_RAW;
-	key.cd_offset = 0;
-	key.cd_length = vcp->vc_mackeylen;
-	key.cd_miscdata = 0;
-	key.cd_raw.iov_base = (char *)vcp->vc_mackey;
-	key.cd_raw.iov_len = vcp->vc_mackeylen;
-	status = crypto_digest_update(crypto_ctx, &key, 0);
-	if (status != CRYPTO_SUCCESS)
-		return (status);
-
-	/* Digest the (copied) SMB header */
-	data.cd_format = CRYPTO_DATA_RAW;
-	data.cd_offset = 0;
-	data.cd_length = SMB_HDRLEN;
-	data.cd_miscdata = 0;
-	data.cd_raw.iov_base = (char *)smbhdr.r.raw;
-	data.cd_raw.iov_len = SMB_HDRLEN;
-	status = crypto_digest_update(crypto_ctx, &data, 0);
-	if (status != CRYPTO_SUCCESS)
-		return (status);
+	size = MBLKL(m) - SMB_HDRLEN;
+	rc = smb_md5_update(ctx, m->b_rptr + SMB_HDRLEN, size);
+	if (rc != 0)
+		return (rc);
+	m = m->b_cont;
 
 	/* Digest rest of the SMB message. */
-	data.cd_format = CRYPTO_DATA_MBLK;
-	data.cd_offset = SMB_HDRLEN;
-	data.cd_length = msgdsize(mp) - SMB_HDRLEN;
-	data.cd_miscdata = 0;
-	data.cd_mp = mp;
-	status = crypto_digest_update(crypto_ctx, &data, 0);
-	if (status != CRYPTO_SUCCESS)
-		return (status);
-
-	/* Final */
-	digest.cd_format = CRYPTO_DATA_RAW;
-	digest.cd_offset = 0;
-	digest.cd_length = sizeof (mac);
-	digest.cd_miscdata = 0;
-	digest.cd_raw.iov_base = (char *)mac;
-	digest.cd_raw.iov_len = sizeof (mac);
-	status = crypto_digest_final(crypto_ctx, &digest, 0);
-	if (status != CRYPTO_SUCCESS)
-		return (status);
+	while (m != NULL) {
+		size = MBLKL(m);
+		if (size > 0) {
+			rc = smb_md5_update(ctx, m->b_rptr, size);
+			if (rc != 0)
+				return (rc);
+		}
+		m = m->b_cont;
+	}
+	rc = smb_md5_final(ctx, digest);
+	if (rc != 0)
+		return (rc);
 
 	/*
 	 * Finally, store the signature.
 	 * (first 8 bytes of the mac)
 	 */
 	if (signature)
-		bcopy(mac, signature, SMBSIGLEN);
+		bcopy(digest, signature, SMBSIGLEN);
 
 	return (0);
 }
@@ -221,7 +209,7 @@ smb_rq_sign(struct smb_rq *rqp)
 	 * directly into the message at sigloc.
 	 */
 	status = smb_compute_MAC(vcp, mp, rqp->sr_seqno, sigloc);
-	if (status != CRYPTO_SUCCESS) {
+	if (status != 0) {
 		SMBSDEBUG("Crypto error %d", status);
 		bzero(sigloc, SMBSIGLEN);
 	}
@@ -267,7 +255,7 @@ smb_rq_verify(struct smb_rq *rqp)
 	 */
 	rsn = rqp->sr_rseqno;
 	status = smb_compute_MAC(vcp, mp, rsn, sigbuf);
-	if (status != CRYPTO_SUCCESS) {
+	if (status != 0) {
 		SMBSDEBUG("Crypto error %d", status);
 		/*
 		 * If we can't compute a MAC, then there's

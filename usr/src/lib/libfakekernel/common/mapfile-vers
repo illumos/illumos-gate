@@ -42,7 +42,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	aok		{ FLAGS = NODIRECT };
 	boot_time;
 	cmn_err;
+	copyin;
 	copyinstr;
+	copyout;
 	copystr;
 
 	cyclic_add;
@@ -55,6 +57,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	crgetgid;
 	crgetngroups;
 	crgetgroups;
+	crgetzone;
+	crgetzoneid;
 	crhold;
 
 	cv_broadcast;
@@ -69,12 +73,16 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	cv_wait;
 	cv_wait_sig;
 
+	ddi_copyin;
+	ddi_copyout;
+	ddi_get_cred;
 	ddi_get_lbolt64;
 	ddi_get_lbolt;
 	ddi_get_pid;
 	ddi_strtoul;
 	ddi_strtoull;
 
+	debug_enter;
 	delay;
 
 	fm_panic;
@@ -225,8 +233,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	vcmn_err;
 	vmem_qcache_reap;
 	vpanic;
+	vzprintf;
 	zone0;
 	zone_kcred;
+	zprintf;
 	zthread_create;
 	zthread_exit;
 

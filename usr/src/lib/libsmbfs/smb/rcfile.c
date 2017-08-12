@@ -31,6 +31,9 @@
  *
  * $Id: rcfile.c,v 1.1.1.2 2001/07/06 22:38:43 conrad Exp $
  */
+/*
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -343,11 +346,10 @@ set_value(struct rcfile *rcp, struct rcsection *rsp, struct rckey *rkp,
 {
 	int now, new;
 #ifdef DEBUG
-	char *from;
+	char *from = "SMF";
 
-	if (smb_debug)
-		from = (home_nsmbrc) ?
-		    "user file" : "SMF";
+	if (home_nsmbrc != 0)
+		from = "user file";
 #endif
 
 	if (strcmp(rkp->rk_name, "minauth") == 0) {

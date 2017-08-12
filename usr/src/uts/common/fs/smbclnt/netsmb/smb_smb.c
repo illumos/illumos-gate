@@ -33,8 +33,8 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -49,6 +49,7 @@
 #include <sys/uio.h>
 #include <sys/random.h>
 #include <sys/note.h>
+#include <sys/errno.h>
 #include <sys/cmn_err.h>
 
 #include <netsmb/smb_osdep.h>

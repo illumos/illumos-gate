@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -33,7 +34,7 @@
 #include <sys/acl.h>
 #include <sys/byteorder.h>
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/cred.h>
 #include <sys/cmn_err.h>
@@ -42,16 +43,18 @@
 #include <sys/vnode.h>
 #include <sys/vfs.h>
 
-#include <sys/kidmap.h>
-
-#else	/* _KERNEL */
+#else	/* _KERNEL || _FAKE_KERNEL */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
 
-#include <idmap.h>
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
+#ifdef _KERNEL
+#include <sys/kidmap.h>
+#else	/* _KERNEL */
+#include <idmap.h>
 #endif	/* _KERNEL */
 
 #include <netsmb/mchain.h>
@@ -61,7 +64,7 @@
 #define	NT_SD_REVISION	1
 #define	NT_ACL_REVISION	2
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #define	MALLOC(size) kmem_alloc(size, KM_SLEEP)
 #define	FREESZ(p, sz) kmem_free(p, sz)
 #else	/* _KERNEL */
@@ -887,7 +890,7 @@ ntace2zace(ace_t *zacep, i_ntace_t *ntace, struct mapinfo2uid *mip)
 int
 smbfs_acl_sd2zfs(
 	i_ntsd_t *sd,
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	vsecattr_t *acl_info,
 #else /* _KERNEL */
 	acl_t *acl_info,
@@ -908,12 +911,12 @@ smbfs_acl_sd2zfs(
 	 * sanity checks
 	 */
 	if (acl_info) {
-#ifndef	_KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 		if (acl_info->acl_type != ACE_T ||
 		    acl_info->acl_aclp != NULL ||
 		    acl_info->acl_entry_size != sizeof (ace_t))
 			return (EINVAL);
-#endif /* _KERNEL */
+#endif /* !_KERNEL */
 		if ((sd->sd_flags & SD_DACL_PRESENT) == 0)
 			return (EINVAL);
 	}
@@ -1117,7 +1120,7 @@ smbfs_acl_sd2zfs(
 		zacep->a_type = ACCESS_ALLOWED_ACE_TYPE;
 	}
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	acl_info->vsa_aclcnt = zacecnt;
 	acl_info->vsa_aclentp = zacep0;
 	acl_info->vsa_aclentsz = zacl_size;
@@ -1226,7 +1229,7 @@ smbfs_str2sid(const char *sid_prefix, uint32_t *ridp, i_ntsid_t **osidp)
 			goto out;
 		}
 		p++;
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 		err = ddi_strtoul(p, &np, 10, &sa);
 		if (err != 0)
 			goto out;
@@ -1409,7 +1412,7 @@ zace2ntace(i_ntace_t **ntacep, ace_t *zacep, struct mapinfo2sid *mip)
  */
 int
 smbfs_acl_zfs2sd(
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	vsecattr_t *acl_info,
 #else /* _KERNEL */
 	acl_t *acl_info,
@@ -1455,7 +1458,7 @@ smbfs_acl_zfs2sd(
 			return (EINVAL);
 		if (own_gid == (gid_t)-1)
 			return (EINVAL);
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 		if ((acl_info->vsa_mask & VSA_ACE) == 0)
 			return (EINVAL);
 		zacecnt = acl_info->vsa_aclcnt;

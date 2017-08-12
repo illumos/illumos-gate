@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -60,8 +61,9 @@
 #include <sys/sdt.h>
 #include <sys/taskq_impl.h>
 #include <sys/zone.h>
-#include <sys/vmsystm.h>
 
+#ifdef	_KERNEL
+#include <sys/vmsystm.h>	// for desfree
 #include <vm/hat.h>
 #include <vm/as.h>
 #include <vm/page.h>
@@ -70,6 +72,7 @@
 #include <vm/seg_map.h>
 #include <vm/seg_kpm.h>
 #include <vm/seg_vn.h>
+#endif	// _KERNEL
 
 #include <netsmb/smb_osdep.h>
 #include <netsmb/smb.h>
@@ -82,6 +85,10 @@
 
 #include <sys/fs/smbfs_ioctl.h>
 #include <fs/fs_subr.h>
+
+#ifndef	MAXOFF32_T
+#define	MAXOFF32_T	0x7fffffff
+#endif
 
 /*
  * We assign directory offsets like the NFS client, where the
@@ -140,21 +147,24 @@ static int	smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 static void	smbfs_rele_fid(smbnode_t *, struct smb_cred *);
 static uint32_t xvattr_to_dosattr(smbnode_t *, struct vattr *);
 
-static int	smbfs_rdwrlbn(vnode_t *, page_t *, u_offset_t, size_t, int,
-			cred_t *);
-static int	smbfs_bio(struct buf *, int, cred_t *);
-static int	smbfs_writenp(smbnode_t *np, caddr_t base, int tcount,
-			struct uio *uiop, int pgcreated);
-
 static int	smbfs_fsync(vnode_t *, int, cred_t *, caller_context_t *);
+
 static int	smbfs_putpage(vnode_t *, offset_t, size_t, int, cred_t *,
 			caller_context_t *);
+#ifdef	_KERNEL
 static int	smbfs_getapage(vnode_t *, u_offset_t, size_t, uint_t *,
 			page_t *[], size_t, struct seg *, caddr_t,
 			enum seg_rw, cred_t *);
 static int	smbfs_putapage(vnode_t *, page_t *, u_offset_t *, size_t *,
 			int, cred_t *);
 static void	smbfs_delmap_async(void *);
+
+static int	smbfs_rdwrlbn(vnode_t *, page_t *, u_offset_t, size_t, int,
+			cred_t *);
+static int	smbfs_bio(struct buf *, int, cred_t *);
+static int	smbfs_writenp(smbnode_t *np, caddr_t base, int tcount,
+			struct uio *uiop, int pgcreated);
+#endif	// _KERNEL
 
 /*
  * Error flags used to pass information about certain special errors
@@ -562,12 +572,6 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	ssize_t		past_eof;
 	int		error;
 
-	caddr_t		base;
-	u_offset_t	off;
-	size_t		n;
-	int		on;
-	uint_t		flags;
-
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
 	ssp = smi->smi_share;
@@ -648,8 +652,15 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 		return (error);
 	}
 
+#ifdef	_KERNEL
 	/* (else) Do I/O through segmap. */
 	do {
+		caddr_t		base;
+		u_offset_t	off;
+		size_t		n;
+		int		on;
+		uint_t		flags;
+
 		off = uiop->uio_loffset & MAXBMASK; /* mapping offset */
 		on = uiop->uio_loffset & MAXBOFFSET; /* Relative offset */
 		n = MIN(MAXBSIZE - on, uiop->uio_resid);
@@ -698,6 +709,9 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 			}
 		}
 	} while (!error && uiop->uio_resid > 0);
+#else	// _KERNEL
+	error = ENOSYS;
+#endif	// _KERNEL
 
 	/* undo adjustment of resid */
 	uiop->uio_resid += past_eof;
@@ -719,14 +733,11 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	offset_t	endoff, limit;
 	ssize_t		past_limit;
 	int		error, timo;
-	caddr_t		base;
-	u_offset_t	off;
-	size_t		n;
-	int		on;
-	uint_t		flags;
 	u_offset_t	last_off;
 	size_t		last_resid;
+#ifdef	_KERNEL
 	uint_t		bsize;
+#endif
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
@@ -789,12 +800,14 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	if (limit == RLIM64_INFINITY || limit > MAXOFFSET_T)
 		limit = MAXOFFSET_T;
 	if (uiop->uio_loffset >= limit) {
+#ifdef	_KERNEL
 		proc_t *p = ttoproc(curthread);
 
 		mutex_enter(&p->p_lock);
 		(void) rctl_action(rctlproc_legacy[RLIMIT_FSIZE],
 		    p->p_rctls, p, RCA_UNSAFE_SIGINFO);
 		mutex_exit(&p->p_lock);
+#endif	// _KERNEL
 		return (EFBIG);
 	}
 	if (endoff > limit) {
@@ -813,7 +826,9 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	    np->r_mapcnt == 0 && np->r_inmap == 0 &&
 	    !vn_has_cached_data(vp))) {
 
+#ifdef	_KERNEL
 smbfs_fwrite:
+#endif	// _KERNEL
 		if (np->r_flags & RSTALE) {
 			last_resid = uiop->uio_resid;
 			last_off = uiop->uio_loffset;
@@ -865,10 +880,17 @@ smbfs_fwrite:
 		return (error);
 	}
 
+#ifdef	_KERNEL
 	/* (else) Do I/O through segmap. */
 	bsize = vp->v_vfsp->vfs_bsize;
 
 	do {
+		caddr_t		base;
+		u_offset_t	off;
+		size_t		n;
+		int		on;
+		uint_t		flags;
+
 		off = uiop->uio_loffset & MAXBMASK; /* mapping offset */
 		on = uiop->uio_loffset & MAXBOFFSET; /* Relative offset */
 		n = MIN(MAXBSIZE - on, uiop->uio_resid);
@@ -993,6 +1015,11 @@ smbfs_fwrite:
 				goto smbfs_fwrite;
 		}
 	} while (!error && uiop->uio_resid > 0);
+#else	// _KERNEL
+	last_resid = uiop->uio_resid;
+	last_off = uiop->uio_loffset;
+	error = ENOSYS;
+#endif	// _KERNEL
 
 bottom:
 	/* undo adjustment of resid */
@@ -1005,6 +1032,8 @@ bottom:
 
 	return (error);
 }
+
+#ifdef	_KERNEL
 
 /*
  * Like nfs_client.c: writerp()
@@ -1361,6 +1390,7 @@ smbfs_bio(struct buf *bp, int sync, cred_t *cr)
 
 	return (error);
 }
+#endif	// _KERNEL
 
 /*
  * Here NFS has: nfs3write, nfs3read
@@ -3692,6 +3722,8 @@ smbfs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 
 /* mmap support ******************************************************** */
 
+#ifdef	_KERNEL
+
 #ifdef DEBUG
 static int smbfs_lostpage = 0;	/* number of times we lost original page */
 #endif
@@ -4011,6 +4043,8 @@ again:
  * No read-ahead in smbfs yet.
  */
 
+#endif	// _KERNEL
+
 /*
  * Flags are composed of {B_INVAL, B_FREE, B_DONTNEED, B_FORCE}
  * If len == 0, do from off to EOF.
@@ -4026,6 +4060,7 @@ static int
 smbfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
 	caller_context_t *ct)
 {
+#ifdef	_KERNEL
 	smbnode_t *np;
 	smbmntinfo_t *smi;
 	page_t *pp;
@@ -4157,7 +4192,13 @@ smbfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
 	}
 
 	return (error);
+
+#else	// _KERNEL
+	return (ENOSYS);
+#endif	// _KERNEL
 }
+
+#ifdef	_KERNEL
 
 /*
  * Write out a single page, possibly klustering adjacent dirty pages.
@@ -4331,6 +4372,9 @@ smbfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 	return (error);
 }
 
+#endif	// _KERNEL
+
+
 /*
  * NFS has this in nfs_client.c (shared by v2,v3,...)
  * We have it here so smbfs_putapage can be file scope.
@@ -4355,14 +4399,18 @@ smbfs_invalidate_pages(vnode_t *vp, u_offset_t off, cred_t *cr)
 	/* Here NFSv3 has np->r_truncaddr = off; */
 	mutex_exit(&np->r_statelock);
 
+#ifdef	_KERNEL
 	(void) pvn_vplist_dirty(vp, off, smbfs_putapage,
 	    B_INVAL | B_TRUNC, cr);
+#endif	// _KERNEL
 
 	mutex_enter(&np->r_statelock);
 	np->r_flags &= ~RTRUNCATE;
 	cv_broadcast(&np->r_cv);
 	mutex_exit(&np->r_statelock);
 }
+
+#ifdef	_KERNEL
 
 /* Like nfs3_map */
 
@@ -4658,6 +4706,8 @@ smbfs_delmap_async(void *varg)
 }
 
 /* No smbfs_pageio() or smbfs_dispose() ops. */
+
+#endif	// _KERNEL
 
 /* misc. ******************************************************** */
 
@@ -4961,11 +5011,13 @@ const fs_operation_def_t smbfs_vnodeops_template[] = {
 	VOPNAME_FRLOCK,		{ .vop_frlock = smbfs_frlock },
 	VOPNAME_SPACE,		{ .vop_space = smbfs_space },
 	VOPNAME_REALVP,		{ .vop_realvp = smbfs_realvp },
+#ifdef	_KERNEL
 	VOPNAME_GETPAGE,	{ .vop_getpage = smbfs_getpage },
 	VOPNAME_PUTPAGE,	{ .vop_putpage = smbfs_putpage },
 	VOPNAME_MAP,		{ .vop_map = smbfs_map },
 	VOPNAME_ADDMAP,		{ .vop_addmap = smbfs_addmap },
 	VOPNAME_DELMAP,		{ .vop_delmap = smbfs_delmap },
+#endif	// _KERNEL
 	VOPNAME_PATHCONF,	{ .vop_pathconf = smbfs_pathconf },
 	VOPNAME_SETSECATTR,	{ .vop_setsecattr = smbfs_setsecattr },
 	VOPNAME_GETSECATTR,	{ .vop_getsecattr = smbfs_getsecattr },

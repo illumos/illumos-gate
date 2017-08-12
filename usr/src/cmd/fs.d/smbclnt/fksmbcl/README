@@ -1,0 +1,99 @@
+
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+#
+
+This directory builds a program linking all of the SMB client code
+into a user-level process.  The result is not a fully functional
+SMB client but is very useful for some kinds of development work.
+
+The architecture of this roughly parallels the in-kernel version,
+where the kernel modules are built as libraries including:
+  libfksmbfs, libfknsmb
+
+Just as with the kernel code, there are mdb modules that know
+how to walk data structures in libfksmbfs, etc.
+
+For debugging, etc. it's easiest to run this as a normal user,
+i.e. yourself (not root)
+
+Now you can run fksmbcl from the proto area using this script:
+  ./Run.sh -df
+
+You can also run it under dbx (see the .dbxrc file).
+To run it under mdb (with mdb modules build here):
+  mdb -L $ROOT/usr/lib/mdb/proc:/usr/lib/mdb/proc ...
+where ... is one of: fksmbcl, core.nnn, -p $PID
+
+There are also some dtrace scripts in here, and in ../dtrace
+for watching either all activity or only selected areas.
+Run these like:  dtrace -s Watch-all.d -p $PID -o output
+
+These two (from over in ../dtrace) also work with fksmbcl:
+	dtrace -s fksmbcl.d -p `pgrep fksmbcl`  -o output
+
+Here is the help output:
+
+	> help
+	Commands:
+	help 
+	exit 
+	logon [user [dom [pass]]]
+	logoff [close-driver]
+	shares 
+	mount {share} [optstr]
+	umount 
+	unmount 
+	statfs 
+	dir {rdir} [lfile]
+	dirx {rdir} [lfile]
+	get {rfile} [lfile]
+	put {lfile} [rfile]
+	mv {from} {to}
+	rm {rfile}
+	mkdir {rfile}
+	rmdir {rfile}
+	opt {option}
+
+
+Here is an example of how to connect, mount, and list a directory:
+
+	$ ./Run.sh //myserver
+	# Start with:
+	> logon [user [dom [pw]]]
+	> shares
+	> mount {share}
+
+	> logon test test test
+	> shares
+	open pipe: /srvsvc
+	enum strings
+	junk
+	c$
+	Default Share
+	test1
+	ipc$
+	Remote IPC
+	test
+	> mount test
+	> dir
+	    1224750917    .
+	    1224750917    ..
+	     900818955    test9.dat
+	    3908265151    lock1.txt
+	    2452346625    test_dir
+	> umount
+	> logoff
+	> exit
+	$

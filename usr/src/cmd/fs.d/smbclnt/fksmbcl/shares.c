@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -36,26 +36,16 @@
 #include <string.h>
 #include <unistd.h>
 #include <libintl.h>
+#include <ctype.h>
 
-#include <netsmb/smbfs_api.h>
+#include <netsmb/smb_lib.h>
 
 /*
  * This is a quick hack for testing client-side named pipes.
- * Its purpose is to test the ability to connect to a server,
- * open a pipe, send and receive data.  The "hack" aspect is
- * the use of hand-crafted RPC messages, which allows testing
- * of the named pipe API separately from the RPC libraries.
- *
- * I captured the two small name pipe messages sent when
- * requesting a share list via RPC over /pipe/srvsvc and
- * dropped them into the arrays below (bind and enum).
- * This program sends the two messages (with adjustments)
- * and just dumps whatever comes back over the pipe.
- * Use wireshark if you want to see decoded messages.
+ * Its purpose is to test SMB named-pipe interface separately
+ * from the RPC implementation.  It's a "hack" because it uses
+ * hand-crafted RPC messages (extracted from network traffic).
  */
-
-extern char *optarg;
-extern int optind, opterr, optopt;
 
 /* This is a DCE/RPC bind call for "srvsvc". */
 static const uchar_t
@@ -95,175 +85,35 @@ srvsvc_enum2[] = {
 
 static uchar_t sendbuf[1024];
 static uchar_t recvbuf[4096];
-static char *server;
 
-static int pipetest(struct smb_ctx *);
-
+/*
+ * Print strings found in the buffer.
+ */
 static void
-srvenum_usage(void)
+pstrings(const uchar_t *buf, int len)
 {
-	printf("usage: srvenum [-d domain][-u user][-p passwd] server\n");
-	exit(1);
-}
+	const uchar_t *p = buf;
+	uint16_t u2;
+	boolean_t instr = B_FALSE;
 
-int
-main(int argc, char *argv[])
-{
-	int c, error;
-	struct smb_ctx *ctx = NULL;
-	char *dom = NULL;
-	char *usr = NULL;
-	char *pw = NULL;
+	while (len > 2) {
+		u2 = *p++;
+		u2 |= (*p++) << 8;
+		len -= 2;
 
-	while ((c = getopt(argc, argv, "vd:u:p:")) != -1) {
-		switch (c) {
-		case 'v':
-			smb_verbose = 1;
-			break;
-
-		case 'd':
-			dom = optarg;
-			break;
-		case 'u':
-			usr = optarg;
-			break;
-		case 'p':
-			pw = optarg;
-			break;
-		case '?':
-			srvenum_usage();
-			break;
+		if ((u2 & 0xFF80) == 0 && isprint(u2)) {
+			/* printable */
+			instr = B_TRUE;
+			putchar(u2);
+		} else {
+			/* not printalbe */
+			if (instr)
+				putchar('\n');
+			instr = B_FALSE;
 		}
 	}
-	if (optind >= argc)
-		srvenum_usage();
-	server = argv[optind];
-
-	if (pw != NULL && (dom == NULL || usr == NULL)) {
-		fprintf(stderr, "%s: -p arg requires -d dom -u usr\n",
-		    argv[0]);
-		srvenum_usage();
-	}
-
-	/*
-	 * This section is intended to demonstrate how an
-	 * RPC client library might use this interface.
-	 */
-	error = smb_ctx_alloc(&ctx);
-	if (error) {
-		fprintf(stderr, "%s: smb_ctx_alloc failed\n", argv[0]);
-		goto out;
-	}
-
-	/*
-	 * Set server, share, domain, user
-	 * (in the ctx handle).
-	 */
-	smb_ctx_setfullserver(ctx, server);
-	smb_ctx_setshare(ctx, "IPC$", USE_IPC);
-	if (dom)
-		smb_ctx_setdomain(ctx, dom, B_TRUE);
-	if (usr)
-		smb_ctx_setuser(ctx, usr, B_TRUE);
-	if (pw)
-		smb_ctx_setpassword(ctx, pw, NULL);
-
-
-	/*
-	 * If this code were in smbutil or mount_smbfs, it would
-	 * get system and $HOME/.nsmbrc settings here, like this:
-	 */
-#if 0
-	error = smb_ctx_readrc(ctx);
-	if (error) {
-		fprintf(stderr, "%s: smb_ctx_readrc failed\n", argv[0]);
-		goto out;
-	}
-#endif
-
-	/*
-	 * Resolve the server address,
-	 * setup derived defaults.
-	 */
-	error = smb_ctx_resolve(ctx);
-	if (error) {
-		fprintf(stderr, "%s: smb_ctx_resolve failed\n", argv[0]);
-		goto out;
-	}
-
-	/*
-	 * Get the session and tree.
-	 */
-	error = smb_ctx_get_ssn(ctx);
-	if (error) {
-		fprintf(stderr, "//%s: login failed, error %d\n",
-		    server, error);
-		goto out;
-	}
-	error = smb_ctx_get_tree(ctx);
-	if (error) {
-		fprintf(stderr, "//%s/%s: tree connect failed, %d\n",
-		    server, "IPC$", error);
-		goto out;
-	}
-
-	/*
-	 * Do some named pipe I/O.
-	 */
-	error = pipetest(ctx);
-	if (error) {
-		fprintf(stderr, "pipetest, %d\n", error);
-		goto out;
-	}
-
-out:
-	smb_ctx_free(ctx);
-
-	return ((error) ? 1 : 0);
-}
-
-static void
-hexdump(const uchar_t *buf, int len) {
-	int idx;
-	char ascii[24];
-	char *pa = ascii;
-
-	memset(ascii, '\0', sizeof (ascii));
-
-	idx = 0;
-	while (len--) {
-		if ((idx & 15) == 0) {
-			printf("[%04X] ", idx);
-			pa = ascii;
-		}
-		if (*buf > ' ' && *buf <= '~')
-			*pa++ = *buf;
-		else
-			*pa++ = '.';
-		printf("%02x ", *buf++);
-
-		idx++;
-		if ((idx & 7) == 0) {
-			*pa++ = ' ';
-			putchar(' ');
-		}
-		if ((idx & 15) == 0) {
-			*pa = '\0';
-			printf("%s\n", ascii);
-		}
-	}
-
-	if ((idx & 15) != 0) {
-		*pa = '\0';
-		/* column align the last ascii row */
-		do {
-			printf("   ");
-			idx++;
-			if ((idx & 7) == 0)
-				putchar(' ');
-		} while ((idx & 15) != 0);
-		printf("%s\n", ascii);
-	}
+	if (instr)
+		putchar('\n');
 }
 
 /*
@@ -309,10 +159,6 @@ do_bind(int fid)
 		printf("xact bind, err=%d\n", err);
 		return (err);
 	}
-	if (smb_verbose) {
-		printf("bind ack, len=%d\n", len);
-		hexdump(recvbuf, len);
-	}
 	if (more > 0) {
 		if (more > sizeof (recvbuf)) {
 			printf("bogus more=%d\n", more);
@@ -325,17 +171,13 @@ do_bind(int fid)
 			printf("read enum resp, err=%d\n", err);
 			return (err);
 		}
-		if (smb_verbose) {
-			printf("bind ack (more), len=%d\n", len);
-			hexdump(recvbuf, len);
-		}
 	}
 
 	return (0);
 }
 
 static int
-do_enum(int fid)
+do_enum(char *server, int fid)
 {
 	int err, len, rlen, wlen;
 	uchar_t *p;
@@ -393,18 +235,22 @@ do_enum(int fid)
 		return (err);
 	}
 
-	/* Just dump the response data. */
-	printf("enum recv, len=%d\n", rlen);
-	hexdump(recvbuf, rlen);
+	/*
+	 * Just dump strings found in the response data.
+	 * Skip the first 0x90 (RPC wrappers).
+	 */
+	printf("enum strings\n");
+	pstrings(recvbuf + 0x90, rlen - 0x90);
 
 	return (0);
 }
 
-static int
-pipetest(struct smb_ctx *ctx)
+int
+list_shares(struct smb_ctx *ctx)
 {
 	static char path[] = "/srvsvc";
 	static uchar_t key[16];
+	char *server = ctx->ct_srvname;
 	int err, fd;
 
 	printf("open pipe: %s\n", path);
@@ -426,7 +272,7 @@ pipetest(struct smb_ctx *ctx)
 		printf("do_bind: %d\n", err);
 		goto out;
 	}
-	err = do_enum(fd);
+	err = do_enum(server, fd);
 	if (err)
 		printf("do_enum: %d\n", err);
 

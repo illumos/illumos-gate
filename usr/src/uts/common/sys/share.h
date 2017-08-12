@@ -63,7 +63,7 @@ struct shrlocklist {
 	struct shrlocklist *next;
 };
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 struct flock64;
 
 extern int add_share(struct vnode *, struct shrlock *);

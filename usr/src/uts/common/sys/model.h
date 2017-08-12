@@ -37,7 +37,7 @@ extern "C" {
 
 #include <sys/isa_defs.h>
 
-#if defined(_KERNEL) || defined(_KMEMUSER)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL) || defined(_KMEMUSER)
 
 /*
  * These bits are used in various places to specify the data model

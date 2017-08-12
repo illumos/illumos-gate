@@ -70,7 +70,7 @@ extern const int	_sys_siglistn;		/* # of signal descriptions */
 extern int kill(pid_t, int);
 extern int sigaction(int, const struct sigaction *_RESTRICT_KYWD,
 	struct sigaction *_RESTRICT_KYWD);
-#ifndef	_KERNEL
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL)
 extern int sigaddset(sigset_t *, int);
 extern int sigdelset(sigset_t *, int);
 extern int sigemptyset(sigset_t *);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -18,6 +18,20 @@
 #include <sys/time.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
+
+int
+copyin(const void *u, void *k, size_t s)
+{
+	bcopy(u, k, s);
+	return (0);
+}
+
+int
+copyout(const void *k, void *u, size_t s)
+{
+	bcopy(k, u, s);
+	return (0);
+}
 
 int
 copyinstr(const char *src, char *dst, size_t max_len, size_t *copied)
@@ -47,4 +61,18 @@ void
 ovbcopy(const void *src, void *dst, size_t len)
 {
 	(void) memmove(dst, src, len);
+}
+
+/* ARGSUSED */
+int
+ddi_copyin(const void *buf, void *kernbuf, size_t size, int flags)
+{
+	return (copyin(buf, kernbuf, size));
+}
+
+/* ARGSUSED */
+int
+ddi_copyout(const void *buf, void *kernbuf, size_t size, int flags)
+{
+	return (copyout(buf, kernbuf, size));
 }

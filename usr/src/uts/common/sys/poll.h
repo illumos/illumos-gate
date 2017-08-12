@@ -96,7 +96,7 @@ typedef unsigned long	nfds_t;
 
 #endif /* _KERNEL */
 
-#if defined(_KERNEL) || defined(_KMEMUSER)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL) || defined(_KMEMUSER)
 
 #include <sys/thread.h>
 

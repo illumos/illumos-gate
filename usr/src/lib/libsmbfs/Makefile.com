@@ -107,28 +107,20 @@ CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
 	-I$(SRC)/uts/common \
 	-I$(SRC)/common/smbclnt
 
+# This is pretty mature code, so let's just ignore these.
+LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
+LINTCHECKFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
+LINTCHECKFLAGS += -erroff=E_FUNC_RET_MAYBE_IGNORED2
+LINTCHECKFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+
 # Debugging
 ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
 
-# uncomment these for dbx debugging
-#COPTFLAG = -g
-#CTF_FLAGS =
-#CTFCONVERT_O=
-#CTFMERGE_LIB=
-
-# Filter out the less important lint.
-# See lgrep.awk
-LGREP =	$(AWK) -f $(SRCDIR)/lgrep.awk
-LTAIL	+=	2>&1 | $(LGREP)
-
 all:	$(LIBS)
 
-lint:	lintcheck_t
+lint:	lintcheck
 
 include ../../Makefile.targ
-
-lintcheck_t: $$(SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS) $(LTAIL)
 
 objs/%.o pics/%.o: $(CMNDIR)/%.c
 	$(COMPILE.c) -o $@ $<

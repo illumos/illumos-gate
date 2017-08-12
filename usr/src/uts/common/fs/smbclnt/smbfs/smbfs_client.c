@@ -24,6 +24,8 @@
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -60,6 +62,7 @@
 #include <smbfs/smbfs_node.h>
 #include <smbfs/smbfs_subr.h>
 
+#ifdef	_KERNEL
 #include <vm/hat.h>
 #include <vm/as.h>
 #include <vm/page.h>
@@ -67,6 +70,7 @@
 #include <vm/seg.h>
 #include <vm/seg_map.h>
 #include <vm/seg_vn.h>
+#endif	// _KERNEL
 
 #define	ATTRCACHE_VALID(vp)	(gethrtime() < VTOSMB(vp)->r_attrtime)
 

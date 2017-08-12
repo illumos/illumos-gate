@@ -35,6 +35,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MCHAIN_H_
@@ -93,7 +95,7 @@
  * wrappers for streams functions.  See: subr_mchain.c
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * BSD-style mbuf "shim" for kernel code.  Note, this
@@ -177,7 +179,7 @@ void m_freem(mbuf_t *);
 #define	MB_MZERO	3		/* bzero(), mb_put_mem only */
 #define	MB_MCUSTOM	4		/* use an user defined function */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 struct mbchain {
 	mblk_t *mb_top;

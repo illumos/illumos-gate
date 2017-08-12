@@ -39,6 +39,7 @@
  */
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/vnode.h>
 #include <sys/kstat.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
@@ -1076,7 +1077,7 @@ typedef struct str_stack str_stack_t;
 #define	STRUNLOCKMATES(X)	mutex_exit(&((X)->sd_lock)); \
 			mutex_exit(&(((X)->sd_mate)->sd_lock))
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern void strinit(void);
 extern int strdoioctl(struct stdata *, struct strioctl *, int, int,

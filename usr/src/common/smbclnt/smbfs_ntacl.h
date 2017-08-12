@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBFS_NTACL_H
@@ -122,7 +124,7 @@ int mb_put_ntsd(mbchain_t *mbp, i_ntsd_t *sd);
  * Convert an internal SD to a ZFS-style ACL.
  * Get uid/gid too if pointers != NULL.
  */
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 int smbfs_acl_sd2zfs(i_ntsd_t *, vsecattr_t *, uid_t *, gid_t *);
 #else /* _KERNEL */
 /* See also: lib/libsmbfs/netsmb/smbfs_acl.h */
@@ -136,7 +138,7 @@ int smbfs_acl_sd2zfs(struct i_ntsd *, acl_t *, uid_t *, gid_t *);
  * (when setting them) or existing, so that any
  * owner@ or group@ ACEs can be translated.
  */
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 int smbfs_acl_zfs2sd(vsecattr_t *, uid_t, gid_t, uint32_t, i_ntsd_t **);
 #else /* _KERNEL */
 /* See also: lib/libsmbfs/netsmb/smbfs_acl.h */

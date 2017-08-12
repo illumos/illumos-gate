@@ -138,12 +138,12 @@ _NOTE(CONSTCOND) } while (0)
 #define	__CTASSERT(x, y) \
 	typedef char __compile_time_assertion__ ## y [(x) ? 1 : -1] __unused
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern void abort_sequence_enter(char *);
 extern void debug_enter(char *);
 
-#endif	/* _KERNEL */
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
 #if defined(DEBUG) && !defined(__sun)
 /* CSTYLED */

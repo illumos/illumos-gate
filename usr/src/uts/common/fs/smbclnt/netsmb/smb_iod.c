@@ -35,6 +35,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifdef DEBUG
@@ -74,6 +76,10 @@
 #include <netsmb/smb_trantcp.h>
 
 int smb_iod_send_echo(smb_vc_t *);
+
+#ifdef	_FAKE_KERNEL
+extern void tsignal(kthread_t *, int);
+#endif
 
 /*
  * This is set/cleared when smbfs loads/unloads
@@ -752,7 +758,7 @@ smb_iod_waitrq(struct smb_rq *rqp)
 			rc = cv_wait_sig(&rqp->sr_cond, &rqp->sr_lock);
 		rqp->sr_flags &= ~SMBR_SENDWAIT;
 		if (rc == 0) {
-			SMBIODEBUG("EINTR in sendwait, rqp=%p\n", rqp);
+			SMBIODEBUG("EINTR in sendwait, rq=%p\n", (void *)rqp);
 			error = EINTR;
 			goto out;
 		}
@@ -791,7 +797,7 @@ smb_iod_waitrq(struct smb_rq *rqp)
 			goto out;
 		}
 		if (tr < 0) {
-#ifdef DTRACE_PROBE
+#ifdef DTRACE_PROBE1
 			DTRACE_PROBE1(smb_iod_waitrq1,
 			    (smb_rq_t *), rqp);
 #endif
