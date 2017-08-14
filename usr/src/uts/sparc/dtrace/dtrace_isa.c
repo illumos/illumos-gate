@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/dtrace_impl.h>
@@ -938,6 +938,15 @@ got_fp:
 	}
 
 	return (value);
+}
+
+/* ARGSUSED */
+int
+dtrace_setreg(struct regs *rp, uint_t reg, ulong_t val)
+{
+	/* Not supported at this time */
+	DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+	return (0);
 }
 
 /*ARGSUSED*/
