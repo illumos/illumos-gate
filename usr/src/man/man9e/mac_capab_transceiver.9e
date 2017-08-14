@@ -379,7 +379,7 @@ context.
 .Xr mac_register 9F ,
 .Xr mac_transceiver_info_set_present 9F ,
 .Xr mac_transceiver_info_set_usable 9F ,
-.Xr mac_register 9S ,
+.Xr mac_register 9S
 .Rs
 .%N INF-8074i
 .%T SFP (Small Formfactor Pluggable) Interface

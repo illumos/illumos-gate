@@ -84,9 +84,5 @@ Otherwise,
 is returned.
 .Sh SEE ALSO
 .Xr iport 9 ,
-.Xr iport 9 ,
 .Xr iportmap 9 ,
-.Xr scsi_hba_iport_register 9F ,
-.Xr scsi_hba_iport_register 9F ,
-.Xr scsi_hba_iportmap_iport_add 9F ,
 .Xr scsi_hba_iportmap_iport_add 9F
