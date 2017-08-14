@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -524,6 +524,7 @@ typedef struct smbios_processor {
 #define	SMB_PRU_BGA1515		0x35	/* BGA1515 */
 #define	SMB_PRU_LGA36471	0x36	/* LGA3647-1 */
 #define	SMB_PRU_SP3		0x37	/* socket SP3 */
+#define	SMB_PRU_SP3r2		0x38	/* socket SP3r2 */
 
 #define	SMB_PRC_RESERVED	0x0001	/* reserved */
 #define	SMB_PRC_UNKNOWN		0x0002	/* unknown */
@@ -632,6 +633,7 @@ typedef struct smbios_processor {
 #define	SMB_PRF_OPTERON_X2K	0x68	/* AMD Opteron X2000 APU */
 #define	SMB_PRF_OPTERON_A	0x69	/* AMD Opteron A Series */
 #define	SMB_PRF_OPERTON_X3K	0x6A	/* AMD Opteron X3000 APU */
+#define	SMB_PRF_ZEN		0x6B	/* AMD Zen Processor Family */
 #define	SMB_PRF_HOBBIT		0x70	/* Hobbit */
 #define	SMB_PRF_TM5000		0x78	/* Crusoe TM5000 */
 #define	SMB_PRF_TM3000		0x79	/* Crusoe TM3000 */
