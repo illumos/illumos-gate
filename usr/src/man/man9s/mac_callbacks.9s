@@ -285,7 +285,6 @@ value must be present in the
 member.
 For more information on the requirements of the function, see
 .Xr mc_propinfo 9E .
-.Pp
 .Ss Required Members
 Many members in the structure are optional; however, the following
 members must be set or a call to

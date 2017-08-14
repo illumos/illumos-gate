@@ -16,7 +16,7 @@
 .\"
 .\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2016 Nexenta Systems, Inc.
+.\" Copyright 2017 Nexenta Systems, Inc.
 .\"
 .Dd March 1, 2016
 .Dt STMFADM 1M
@@ -247,7 +247,7 @@ Add a host group member to a host group.
 .Pp
 An initiator cannot be a member of more than one host group.
 .Bl -tag -width Ds
-.It Fl g Ns , Ns Fl -group-name Ar host-group
+.It Fl g Ns \&, Ns Fl -group-name Ar host-group
 Specifies group name.
 .Ar host-group
 must be an existing group created using the
@@ -264,7 +264,7 @@ Add a target group member to a target group.
 .Pp
 A target cannot be a member of more than one target group.
 .Bl -tag -width Ds
-.It Fl g Ns , Ns Fl -group-name Ar target-group
+.It Fl g Ns \&, Ns Fl -group-name Ar target-group
 Specifies group name.
 .Ar target-group
 must be an existing group created using the
@@ -300,20 +300,20 @@ and
 .Cm remove-view
 subcommands.
 .Bl -tag -width Ds
-.It Fl h Ns , Ns Fl -host-group Ar host-group
+.It Fl h Ns \&, Ns Fl -host-group Ar host-group
 .Ar host-group
 is the name of an host group previously created using
 .Cm create-hg
 subcommand.
 If this option is not specified, the logical unit will be available to all
 initiators that log in to the STMF framework.
-.It Fl n Ns , Ns Fl -lun Ar lu-number
+.It Fl n Ns \&, Ns Fl -lun Ar lu-number
 .Ar lu-number
 is an integer in the range 0-16383 to be assigned to the logical unit for this
 view entry.
 If this option is not specified, a logical unit number will be assigned by the
 STMF framework.
-.It Fl t Ns , Ns Fl -target-group Ar target-group
+.It Fl t Ns \&, Ns Fl -target-group Ar target-group
 .Ar target-group
 is the name of a target group previously created using
 .Cm create-tg
@@ -365,12 +365,12 @@ subcommand to specify an alternate file to contain the metadata.
 It is advisable to use a file that can provide sufficient storage of the logical
 unit metadata, preferably 64k.
 .Bl -tag -width Ds
-.It Fl p Ns , Ns Fl -lu-prop Ar property Ns = Ns Ar value
+.It Fl p Ns \&, Ns Fl -lu-prop Ar property Ns = Ns Ar value
 Set specified logical unit property.
 Check
 .Sx Logical Unit Properties
 for the list of available properties.
-.It Fl s Ns , Ns Fl -size Ar size
+.It Fl s Ns \&, Ns Fl -size Ar size
 .Ar size
 is an integer followed by one of the following letters, to indicate a unit of
 size:
@@ -407,7 +407,7 @@ subcommand.
 This effectively unloads the logical unit from the STMF framework.
 Any existing data on the logical unit remains intact.
 .Bl -tag -width Ds
-.It Fl k Ns , Ns Fl -keep-views
+.It Fl k Ns \&, Ns Fl -keep-views
 Keep view entries for this logical unit.
 .El
 .It Xo
@@ -449,7 +449,7 @@ If
 .Ar host-group
 is not specified, all host groups in the system will be listed.
 .Bl -tag -width Ds
-.It Fl v Ns , Ns Fl -verbose
+.It Fl v Ns \&, Ns Fl -verbose
 Display all host group members.
 .El
 .It Xo
@@ -464,7 +464,7 @@ If
 .Ar lu-name
 is not specified, all logical units in the system will be listed.
 .Bl -tag -width Ds
-.It Fl v Ns , Ns Fl -verbose
+.It Fl v Ns \&, Ns Fl -verbose
 Display verbose information about the logical unit.
 .El
 .It Xo
@@ -482,7 +482,7 @@ List information for the target port in the system referenced by
 .Ar target .
 If target name is not specified, all target ports in the system will be listed.
 .Bl -tag -width Ds
-.It Fl v Ns , Ns Fl -verbose
+.It Fl v Ns \&, Ns Fl -verbose
 Display verbose information about the target along with SCSI session information
 for logged-in initiators.
 .El
@@ -498,7 +498,7 @@ If
 .Ar target-group
 is not specified, all target groups in the system will be listed.
 .Bl -tag -width Ds
-.It Fl v Ns , Ns Fl -verbose
+.It Fl v Ns \&, Ns Fl -verbose
 Display all group members.
 .El
 .It Xo
@@ -514,7 +514,7 @@ If
 is not specified, all view entries for the specified logical unit will be
 listed.
 .Bl -tag -width Ds
-.It Fl l Ns , Ns Fl -lu-name Ar lu-name
+.It Fl l Ns \&, Ns Fl -lu-name Ar lu-name
 Specify logical unit.
 .El
 .It Xo
@@ -535,18 +535,18 @@ is not specified,
 is interpreted as
 .Ar lu-name.
 .Bl -tag -width Ds
-.It Fl f Ns , Ns Fl -file
+.It Fl f Ns \&, Ns Fl -file
 If specified,
 .Ar lu-arg
 is interpreted as file name.
 This provides the ability to modify a logical unit that is not currently
 imported into the STMF.
-.It Fl p Ns , Ns Fl -lu-prop Ar property
+.It Fl p Ns \&, Ns Fl -lu-prop Ar property
 Modify specified logical unit property.
 See
 .Sx Logical Unit Properties
 for the list of available properties.
-.It Fl s Ns , Ns Fl -size Ar size
+.It Fl s Ns \&, Ns Fl -size Ar size
 .Ar size
 is an integer followed by one of the following letters, to indicate a unit of
 size:
@@ -588,7 +588,7 @@ Remove specified
 .Ar initiator
 from host group
 .Bl -tag -width Ds
-.It Fl g Ns , Ns Fl -group-name Ar host-group
+.It Fl g Ns \&, Ns Fl -group-name Ar host-group
 Specifies group name.
 .Ar host-group
 must be an existing group created using the
@@ -605,7 +605,7 @@ Remove specified
 .Ar target
 from target group.
 .Bl -tag -width Ds
-.It Fl g Ns , Ns Fl -group-name Ar taget-group
+.It Fl g Ns \&, Ns Fl -group-name Ar taget-group
 Specifies group name.
 .Ar target-group
 must be an existing group created using the
@@ -621,9 +621,9 @@ subcommand.
 .Xc
 Remove one or more view entries from a logical unit.
 .Bl -tag -width Ds
-.It Fl a Ns , Ns Fl -all
+.It Fl a Ns \&, Ns Fl -all
 Remove all view entries for this logical unit.
-.It Fl l Ns , Ns Fl -lu-name
+.It Fl l Ns \&, Ns Fl -lu-name
 Specify logical unit.
 .El
 .El

@@ -575,7 +575,7 @@ of the format
 .Qq \e{ Ns Em m Ns \e} ,
 .Qq \e{ Ns Em m Ns ,\e}
 or
-.Qq \e{ Ns Em m Ns , Ns Em n Ns \e} ,
+.Qq \e{ Ns Em m Ns \&, Ns Em n Ns \e} ,
 together with that interval expression it matches what repeated consecutive
 occurrences of the BRE would match.
 The values of
@@ -602,7 +602,7 @@ occurrences of the preceding BRE,
 matches at least
 .Em m
 occurrences and
-.Qq \e{ Ns Em m Ns , Ns Em n Ns \e}
+.Qq \e{ Ns Em m Ns \&, Ns Em n Ns \e}
 matches any number of occurrences between
 .Em m
 and
@@ -633,7 +633,7 @@ The order of precedence is as shown in the following table:
 .It escaped characters Ta \e< Ns Em special character Ns >
 .It bracket expression Ta [ ]
 .It subexpressions/back-references Ta \e( \e) \e Ns Em n
-.It single-character-BRE duplication Ta * \e{ Ns Em m Ns , Ns Em n Ns \e}
+.It single-character-BRE duplication Ta * \e{ Ns Em m Ns \&, Ns Em n Ns \e}
 .It concatenation Ta
 .It anchoring Ta ^ $
 .El
@@ -887,7 +887,7 @@ of the format
 .Qq { Ns Em m Ns } ,
 .Qq { Ns Em m Ns ,}
 or
-.Qq { Ns Em m Ns , Ns Em n Ns } ,
+.Qq { Ns Em m Ns \&, Ns Em n Ns } ,
 together with that interval expression it matches what repeated consecutive
 occurrences of the ERE would match.
 The values of
@@ -914,7 +914,7 @@ occurrences of the preceding ERE,
 matches at least
 .Em m
 occurrences and
-.Qq { Ns m Ns , Ns Em n Ns }
+.Qq { Ns m Ns \&, Ns Em n Ns }
 matches any number of occurrences between
 .Em m
 and
@@ -959,7 +959,7 @@ The order of precedence will be as shown in the following table:
 .It escaped characters Ta \e< Ns Em special character Ns >
 .It bracket expression Ta \&[ \&]
 .It grouping Ta \&( \&)
-.It single-character-ERE duplication Ta * + \&? { Ns Em m Ns , Ns Em n Ns}
+.It single-character-ERE duplication Ta * + \&? { Ns Em m Ns \&, Ns Em n Ns}
 .It concatenation Ta
 .It anchoring Ta ^  $
 .It alternation Ta |

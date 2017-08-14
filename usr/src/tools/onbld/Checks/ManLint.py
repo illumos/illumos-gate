@@ -42,6 +42,7 @@ def manlint(fh, filename=None, output=sys.stderr, **opts):
 
 	options = [opttrans[x] for x in opts if opts[x] and opttrans[x]]
 	options.append('-Tlint')
+	options.append('-Wwarning')
 
 	if not filename:
 		filename = fh.name

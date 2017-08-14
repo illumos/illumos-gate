@@ -44,10 +44,12 @@ For more information on the agent LWP and the spy master, see
 .Pp
 If the thread identified
 .Fa lwpid
-has an agent LWP, the corresponding ps information (see
+has an agent LWP, the corresponding ps information
+.Po see
 .Xr proc 4
 for the definition of the
-.Sy psinfo_t Ns )
+.Sy psinfo_t
+.Pc
 will be filled into
 .Fa ps .
 .Pp
