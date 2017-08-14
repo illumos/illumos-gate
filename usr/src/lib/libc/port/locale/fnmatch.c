@@ -13,7 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -107,10 +107,8 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 		}
 		switch (pc) {
 		case EOS:
-			/*
-			 * Removed FNM_LEADING_DIR, as it is not present
-			 * on Solaris.
-			 */
+			if ((flags & FNM_LEADING_DIR) && sc == '/')
+				return (0);
 			if (sc == EOS)
 				return (0);
 			goto backtrack;
@@ -139,7 +137,8 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 			/* Optimize for pattern with * at end or before /. */
 			if (c == EOS)
 				if (flags & FNM_PATHNAME)
-					return (strchr(string, '/') == NULL ?
+					return ((flags & FNM_LEADING_DIR) ||
+					    strchr(string, '/') == NULL ?
 					    0 : FNM_NOMATCH);
 				else
 					return (0);
@@ -184,10 +183,9 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 			if (!(flags & FNM_NOESCAPE)) {
 				pclen = mbrtowc_l(&pc, pattern, MB_LEN_MAX,
 				    &patmbs, loc);
-				if (pclen == (size_t)-1 || pclen == (size_t)-2)
+				if (pclen == 0 || pclen == (size_t)-1 ||
+				    pclen == (size_t)-2)
 					return (FNM_NOMATCH);
-				if (pclen == 0)
-					pc = '\\';
 				pattern += pclen;
 			}
 			/* FALLTHROUGH */
@@ -196,7 +194,7 @@ fnmatch1(const char *pattern, const char *string, const char *stringstart,
 			string += sclen;
 			if (pc == sc)
 				break;
-			else if ((flags & FNM_IGNORECASE) &&
+			else if ((flags & FNM_CASEFOLD) &&
 			    (towlower_l(pc, loc) == towlower_l(sc, loc)))
 				break;
 			else {
@@ -251,7 +249,7 @@ rangematch(const char *pattern, wchar_t test, int flags, char **newp,
 	if ((negate = (*pattern == '!' || *pattern == '^')) != 0)
 		++pattern;
 
-	if (flags & FNM_IGNORECASE)
+	if (flags & FNM_CASEFOLD)
 		test = towlower_l(test, loc);
 
 	/*
@@ -276,7 +274,7 @@ rangematch(const char *pattern, wchar_t test, int flags, char **newp,
 			return (RANGE_NOMATCH);
 		pattern += pclen;
 
-		if (flags & FNM_IGNORECASE)
+		if (flags & FNM_CASEFOLD)
 			c = towlower_l(c, loc);
 
 		if (*pattern == '-' && *(pattern + 1) != EOS &&
@@ -292,7 +290,7 @@ rangematch(const char *pattern, wchar_t test, int flags, char **newp,
 			if (c2 == EOS)
 				return (RANGE_ERROR);
 
-			if (flags & FNM_IGNORECASE)
+			if (flags & FNM_CASEFOLD)
 				c2 = towlower_l(c2, loc);
 
 			if (loc->collate->lc_is_posix ?
