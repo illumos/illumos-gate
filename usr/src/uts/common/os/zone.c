@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016, Joyent Inc.
+ * Copyright 2017, Joyent Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -7645,6 +7645,27 @@ zone_add_datalink(zoneid_t zoneid, datalink_id_t linkid)
 	zone_t *zone;
 	zone_t *thiszone;
 
+	/*
+	 * Only the GZ may add a datalink to a zone's list.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID)
+		return (set_errno(EPERM));
+
+	/*
+	 * Only a process with the datalink config priv may add a
+	 * datalink to a zone's list.
+	 */
+	if (secpolicy_dl_config(CRED()) != 0)
+		return (set_errno(EPERM));
+
+	/*
+	 * When links exist in the GZ, they aren't added to the GZ's
+	 * zone_dl_list. We must enforce this because link_activate()
+	 * depends on zone_check_datalink() returning only NGZs.
+	 */
+	if (zoneid == GLOBAL_ZONEID)
+		return (set_errno(EINVAL));
+
 	if ((thiszone = zone_find_by_id(zoneid)) == NULL)
 		return (set_errno(ENXIO));
 
@@ -7677,6 +7698,26 @@ zone_remove_datalink(zoneid_t zoneid, datalink_id_t linkid)
 	zone_t *zone;
 	int err = 0;
 
+	/*
+	 * Only the GZ may remove a datalink from a zone's list.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID)
+		return (set_errno(EPERM));
+
+	/*
+	 * Only a process with the datalink config priv may remove a
+	 * datalink from a zone's list.
+	 */
+	if (secpolicy_dl_config(CRED()) != 0)
+		return (set_errno(EPERM));
+
+	/*
+	 * If we can't add a datalink to the GZ's zone_dl_list then we
+	 * certainly can't remove them either.
+	 */
+	if (zoneid == GLOBAL_ZONEID)
+		return (set_errno(EINVAL));
+
 	if ((zone = zone_find_by_id(zoneid)) == NULL)
 		return (set_errno(EINVAL));
 
@@ -7694,25 +7735,63 @@ zone_remove_datalink(zoneid_t zoneid, datalink_id_t linkid)
 }
 
 /*
- * Using the zoneidp as ALL_ZONES, we can lookup which zone has been assigned
- * the linkid.  Otherwise we just check if the specified zoneidp has been
- * assigned the supplied linkid.
+ *
+ * This function may be used in two ways:
+ *
+ * 1. to get the zoneid of the zone this link is under, or
+ *
+ * 2. to verify that the link is under a specific zone.
+ *
+ * The first use is achieved by passing a zoneid of ALL_ZONES. The
+ * function then iterates the datalink list of every zone on the
+ * system until it finds the linkid. If the linkid is found then the
+ * function returns 0 and zoneidp is updated. Otherwise, ENXIO is
+ * returned and zoneidp is not modified. The use of ALL_ZONES is
+ * limited to callers in the GZ to prevent leaking information to
+ * NGZs. If an NGZ passes ALL_ZONES it's query is implicitly changed
+ * to the second type in the list above.
+ *
+ * The second use is achieved by passing a specific zoneid. The GZ can
+ * use this to verify a link is under a particular zone. An NGZ can
+ * use this to verify a link is under itself. But an NGZ cannot use
+ * this to determine if a link is under some other zone as that would
+ * result in information leakage. If the link exists under the zone
+ * then 0 is returned. Otherwise, ENXIO is returned.
  */
 int
 zone_check_datalink(zoneid_t *zoneidp, datalink_id_t linkid)
 {
 	zone_t *zone;
+	zoneid_t zoneid = *zoneidp;
+	zoneid_t caller = getzoneid();
 	int err = ENXIO;
 
-	if (*zoneidp != ALL_ZONES) {
-		if ((zone = zone_find_by_id(*zoneidp)) != NULL) {
-			if (zone_dl_exists(zone, linkid))
+	/*
+	 * Only the GZ may enquire about all zones; an NGZ may only
+	 * enuqire about itself.
+	 */
+	if (zoneid == ALL_ZONES && caller != GLOBAL_ZONEID)
+		zoneid = caller;
+
+	if (zoneid != caller && caller != GLOBAL_ZONEID)
+		return (err);
+
+	if (zoneid != ALL_ZONES) {
+		if ((zone = zone_find_by_id(zoneid)) != NULL) {
+			if (zone_dl_exists(zone, linkid)) {
+				/*
+				 * We need to set this in case an NGZ
+				 * passes ALL_ZONES.
+				 */
+				*zoneidp = zoneid;
 				err = 0;
+			}
 			zone_rele(zone);
 		}
 		return (err);
 	}
 
+	ASSERT(caller == GLOBAL_ZONEID);
 	mutex_enter(&zonehash_lock);
 	for (zone = list_head(&zone_active); zone != NULL;
 	    zone = list_next(&zone_active, zone)) {
@@ -7723,6 +7802,7 @@ zone_check_datalink(zoneid_t *zoneidp, datalink_id_t linkid)
 		}
 	}
 	mutex_exit(&zonehash_lock);
+
 	return (err);
 }
 
@@ -7742,6 +7822,12 @@ zone_list_datalink(zoneid_t zoneid, int *nump, datalink_id_t *idarray)
 	zone_t *zone;
 	zone_dl_t *zdl;
 	datalink_id_t *idptr = idarray;
+
+	/*
+	 * Only the GZ or the owning zone may look at the datalink list.
+	 */
+	if ((getzoneid() != GLOBAL_ZONEID) && (getzoneid() != zoneid))
+		return (set_errno(EPERM));
 
 	if (copyin(nump, &dlcount, sizeof (dlcount)) != 0)
 		return (set_errno(EFAULT));
