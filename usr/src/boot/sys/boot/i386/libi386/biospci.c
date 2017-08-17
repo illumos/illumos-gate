@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
+ * Copyright (c) 2016 Netflix, Inc
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * PnP enumerator using the PCI BIOS.
@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <isapnp.h>
 #include <btxv86.h>
 #include "libi386.h"
+#include "ficl.h"
 
 /*
  * Stupid PCI BIOS interface doesn't let you simply enumerate everything
@@ -338,7 +339,7 @@ biospci_find_devclass(uint32_t class, int index, uint32_t *locator)
 	return (0);
 }
 
-int
+static int
 biospci_find_device(uint32_t devid, int index, uint32_t *locator)
 {
 	v86.ctl = V86_FLAGS;
@@ -407,7 +408,7 @@ biospci_locator(int8_t bus, uint8_t device, uint8_t function)
  * Counts the number of instances of devid we have in the system, as least as
  * far as the PCI BIOS is able to tell.
  */
-int
+static int
 biospci_count_device_type(uint32_t devid)
 {
 	int i;
@@ -426,3 +427,175 @@ biospci_count_device_type(uint32_t devid)
 	}
 	return i;
 }
+
+/*
+ * pcibios-device-count (devid -- count)
+ *
+ * Returns the PCI BIOS' count of how many devices matching devid are
+ * in the system. devid is the 32-bit vendor + device.
+ */
+static void
+ficlPciBiosCountDevices(ficlVm *pVM)
+{
+	uint32_t devid;
+	int i;
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 1, 1);
+
+	devid = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+
+	i = biospci_count_device_type(devid);
+
+	ficlStackPushInteger(ficlVmGetDataStack(pVM), i);
+}
+
+/*
+ * pcibios-write-config (locator offset width value -- )
+ *
+ * Writes the specified config register.
+ * Locator is bus << 8 | device << 3 | fuction
+ * offset is the pci config register
+ * width is 0 for byte, 1 for word, 2 for dword
+ * value is the value to write
+ */
+static void
+ficlPciBiosWriteConfig(ficlVm *pVM)
+{
+	uint32_t value, width, offset, locator;
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 4, 0);
+
+	value = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	width = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	offset = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	locator = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+
+	biospci_write_config(locator, offset, width, value);
+}
+
+/*
+ * pcibios-read-config (locator offset width -- value)
+ *
+ * Reads the specified config register.
+ * Locator is bus << 8 | device << 3 | fuction
+ * offset is the pci config register
+ * width is 0 for byte, 1 for word, 2 for dword
+ * value is the value to read from the register
+ */
+static void
+ficlPciBiosReadConfig(ficlVm *pVM)
+{
+	uint32_t value, width, offset, locator;
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 3, 1);
+
+	width = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	offset = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	locator = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+
+	biospci_read_config(locator, offset, width, &value);
+
+	ficlStackPushInteger(ficlVmGetDataStack(pVM), value);
+}
+
+/*
+ * pcibios-find-devclass (class index -- locator)
+ *
+ * Finds the index'th instance of class in the pci tree.
+ * must be an exact match.
+ * class is the class to search for.
+ * index 0..N (set to 0, increment until error)
+ *
+ * Locator is bus << 8 | device << 3 | fuction (or -1 on error)
+ */
+static void
+ficlPciBiosFindDevclass(ficlVm *pVM)
+{
+	uint32_t index, class, locator;
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 2, 1);
+
+	index = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	class = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+
+	if (biospci_find_devclass(class, index, &locator))
+		locator = 0xffffffff;
+
+	ficlStackPushInteger(ficlVmGetDataStack(pVM), locator);
+}
+
+/*
+ * pcibios-find-device(devid index -- locator)
+ *
+ * Finds the index'th instance of devid in the pci tree.
+ * must be an exact match.
+ * class is the class to search for.
+ * index 0..N (set to 0, increment until error)
+ *
+ * Locator is bus << 8 | device << 3 | fuction (or -1 on error)
+ */
+static void
+ficlPciBiosFindDevice(ficlVm *pVM)
+{
+	uint32_t index, devid, locator;
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 2, 1);
+
+	index = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	devid = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+
+	if (biospci_find_device(devid, index, &locator))
+		locator = 0xffffffff;
+
+	ficlStackPushInteger(ficlVmGetDataStack(pVM), locator);
+}
+
+/*
+ * pcibios-locator(bus device function -- locator)
+ *
+ * converts bus, device, function to locator.
+ *
+ * Locator is bus << 8 | device << 3 | fuction
+ */
+static void
+ficlPciBiosLocator(ficlVm *pVM)
+{
+	uint32_t bus, device, function, locator;
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 3, 1);
+
+	function = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	device = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	bus = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+
+	locator = biospci_locator(bus, device, function);
+
+	ficlStackPushInteger(ficlVmGetDataStack(pVM), locator);
+}
+
+/*
+ * Glue function to add the appropriate forth words to access pci bios
+ * functionality.
+ */
+static void
+ficlCompilePciBios(ficlSystem *pSys)
+{
+	ficlDictionary *dp = ficlSystemGetDictionary(pSys);
+
+	FICL_SYSTEM_ASSERT(pSys, dp);
+
+	ficlDictionarySetPrimitive(dp, "pcibios-device-count",
+	    ficlPciBiosCountDevices, FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "pcibios-read-config",
+	    ficlPciBiosReadConfig, FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "pcibios-write-config",
+	    ficlPciBiosWriteConfig, FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "pcibios-find-devclass",
+	    ficlPciBiosFindDevclass, FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "pcibios-find-device",
+	    ficlPciBiosFindDevice, FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "pcibios-locator", ficlPciBiosLocator,
+	    FICL_WORD_DEFAULT);
+}
+
+FICL_COMPILE_SET(ficlCompilePciBios);

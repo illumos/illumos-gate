@@ -975,12 +975,6 @@ setup_xfem(void)
 	if (is_x86_feature(x86_featureset, X86FSET_AVX))
 		flags |= XFEATURE_AVX;
 
-	/*
-	 * TBD:
-	 * if (is_x86_feature(x86_featureset, X86FSET_MPX))
-	 *	flags |= XFEATURE_MPX;
-	 */
-
 	if (is_x86_feature(x86_featureset, X86FSET_AVX512F))
 		flags |= XFEATURE_AVX512;
 

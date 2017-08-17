@@ -18,7 +18,7 @@ include $(SRC)/Makefile.master
 
 CFLAGS= -O2 -I../../../../include -I../../..
 CFLAGS += -DLOADER_ZFS_SUPPORT
-CPPFLAGS=
+CPPFLAGS=	-DSTAND
 
 all: libi386.a
 
@@ -75,7 +75,8 @@ CFLAGS += -DTERM_EMU
 # XXX: make alloca() useable
 CFLAGS += -Dalloca=__builtin_alloca
 
-CFLAGS +=	-I../../common -I../common \
+CFLAGS +=	-I$(SRC)/common/ficl -I../../ficl \
+		-I../../common -I../common \
 		-I../btx/lib \
 		-I$(SRC)/uts/intel/sys/acpi \
 		-I../../.. -I.

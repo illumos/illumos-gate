@@ -24,8 +24,8 @@ all:	lib$(LIB).a
 
 install:
 
-SRCS=	delay.c devpath.c efi_console.c efinet.c efipart.c errno.c handles.c \
-	libefi.c time.c
+SRCS=	delay.c devpath.c efi_console.c efinet.c efipart.c env.c errno.c \
+	handles.c libefi.c time.c wchar.c
 
 #.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 #SRCS +=	time.c
@@ -35,7 +35,7 @@ SRCS=	delay.c devpath.c efi_console.c efinet.c efipart.c errno.c handles.c \
 
 OBJS=	$(SRCS:%.c=%.o)
 
-CPPFLAGS= -DTERM_EMU
+CPPFLAGS= -DTERM_EMU -DSTAND
 CFLAGS = -O2
 
 #.if ${MACHINE_CPUARCH} == "aarch64"
@@ -46,6 +46,7 @@ CFLAGS += -fPIC
 #.endif
 
 CFLAGS += -nostdinc -I. -I../../../../include -I../../..
+CFLAGS += -I$(SRC)/common/ficl -I../../ficl
 CFLAGS += -I../include
 CFLAGS += -I../include/${MACH64}
 CFLAGS += -I../../../../lib/libstand

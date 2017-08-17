@@ -114,6 +114,7 @@ loader.efi: loader.sym
 	${OBJCOPY} --readonly-text -j .peheader -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym -j .rel.dyn \
 		-j .rela.dyn -j .reloc -j .eh_frame -j set_Xcommand_set \
+		-j set_Xficl_compile_set \
 		--output-target=${EFI_TARGET} --subsystem efi-app loader.sym $@
 
 LIBEFI=		../libefi/libefi.a

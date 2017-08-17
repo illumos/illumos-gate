@@ -283,6 +283,11 @@ xsaveopt_ctxt(void *arg)
 
 /*ARGSUSED*/
 void
+xsaveopt_ctxt(void *arg)
+{}
+
+/*ARGSUSED*/
+void
 fpxsave_ctxt(void *arg)
 {}
 
