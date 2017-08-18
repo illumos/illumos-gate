@@ -409,8 +409,6 @@ main(int argc, CHAR16 *argv[])
 	}
 
 	efi_init_environment();
-	setenv("LINES", "24", 1);	/* optional */
-	setenv("COLUMNS", "80", 1);	/* optional */
 	setenv("ISADIR", "amd64", 1);	/* we only build 64bit */
 	acpi_detect();
 
