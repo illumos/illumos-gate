@@ -25,34 +25,19 @@
 # Copyright (c) 2017, Joyent, Inc.
 #
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		sparc \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6300 \
-		SUNW,Sun-Blade-T6320 \
-		SUNW,SPARC-Enterprise-T5120 \
-		SUNW,T5140 \
-		SUNW,Netra-CP3060 \
-		SUNW,Netra-CP3260 \
-		SUNW,USBRDT-5240 \
-		SUNW,Netra-T5220 \
-		SUNW,Netra-T5440
+# NOTE: The name of the xml file we are building is 'platform'
+# specific, but its build is structured as 'arch' specific since
+# 'uname -i' on all x86 platforms returns i86pc.
 
-i386_SUBDIRS = i86pc \
-		i386 \
-		SUNW,Sun-Fire-X4200-Server \
-		SUNW,Sun-Fire-X4200-M2 \
-		SUNW,Netra-X4200-M2 \
-		SUNW,Sun-Fire-X4500 \
-		SUNW,Sun-Fire-X4540 \
-		SUNW,Sun-Fire-X4600-M2 \
-		Joyent,Joyent-Compute-Platform-1101 \
-		Joyent,Joyent-Compute-Platform-3101
+ARCH = i86pc
+CLASS = arch
+DTDFILE = topology.dtd.1
+TOPOFILE = Joyent-Compute-Platform-3101-disk-hc-topology.xml
+SRCDIR = ../Joyent,Joyent-Compute-Platform-3101
 
-SUBDIRS = $($(MACH)_SUBDIRS)
+PLATFORM = Joyent-Compute-Platform-3101
+TOPOBASE = ../i86pc/i86pc-hc-topology.xml
 
-include ../../Makefile.subdirs
+CLOBBERFILES +=	$(TOPOFILE)
+
+include ../Makefile.map
