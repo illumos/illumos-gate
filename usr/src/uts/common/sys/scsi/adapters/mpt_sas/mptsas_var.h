@@ -230,9 +230,6 @@ typedef	struct mptsas_target {
 		uint16_t		m_enclosure;
 		uint16_t		m_slot_num;
 		uint32_t		m_tgt_unconfigured;
-		uint8_t			m_led_status;
-		uint8_t			m_scsi_req_desc_type;
-
 } mptsas_target_t;
 
 /*
@@ -256,6 +253,9 @@ typedef struct mptsas_enclosure {
 	list_node_t	me_link;
 	uint16_t	me_enchdl;
 	uint16_t	me_flags;
+	uint16_t	me_nslots;
+	uint16_t	me_fslot;
+	uint8_t		*me_slotleds;
 } mptsas_enclosure_t;
 
 typedef struct mptsas_cache_frames {

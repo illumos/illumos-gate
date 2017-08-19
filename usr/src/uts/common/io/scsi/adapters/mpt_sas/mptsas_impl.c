@@ -2938,6 +2938,9 @@ mptsas_get_enclosure_page0(mptsas_t *mpt, uint32_t page_address,
 	if (rval == DDI_SUCCESS) {
 		mep->me_enchdl = encpage.EnclosureHandle;
 		mep->me_flags = encpage.Flags;
+		mep->me_nslots = encpage.NumSlots;
+		mep->me_fslot = encpage.StartSlot;
+		mep->me_slotleds = NULL;
 	}
 
 	return (rval);

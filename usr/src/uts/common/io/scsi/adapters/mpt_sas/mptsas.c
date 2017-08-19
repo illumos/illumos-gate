@@ -357,13 +357,14 @@ static int mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
     uint16_t *handle, mptsas_target_t **pptgt);
 static void mptsas_update_phymask(mptsas_t *mpt);
 
-static int mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
+static int mptsas_flush_led_status(mptsas_t *mpt, mptsas_enclosure_t *mep,
+    uint16_t idx);
+static int mptsas_send_sep(mptsas_t *mpt, mptsas_enclosure_t *mep, uint16_t idx,
     uint32_t *status, uint8_t cmd);
 static dev_info_t *mptsas_get_dip_from_dev(dev_t dev,
     mptsas_phymask_t *phymask);
 static mptsas_target_t *mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr,
     mptsas_phymask_t phymask);
-static int mptsas_flush_led_status(mptsas_t *mpt, mptsas_target_t *ptgt);
 
 
 /*
@@ -729,18 +730,6 @@ mptsas_target_eval_devhdl(const void *op, void *arg)
 	const mptsas_target_t *tp = op;
 
 	return ((int)tp->m_devhdl - (int)dh);
-}
-
-static int
-mptsas_target_eval_slot(const void *op, void *arg)
-{
-	mptsas_led_control_t *lcp = arg;
-	const mptsas_target_t *tp = op;
-
-	if (tp->m_enclosure != lcp->Enclosure)
-		return ((int)tp->m_enclosure - (int)lcp->Enclosure);
-
-	return ((int)tp->m_slot_num - (int)lcp->Slot);
 }
 
 static int
@@ -2330,12 +2319,24 @@ mptsas_enc_setup(mptsas_t *mpt)
 }
 
 static void
+mptsas_enc_free(mptsas_enclosure_t *mep)
+{
+	if (mep == NULL)
+		return;
+	if (mep->me_slotleds != NULL) {
+		VERIFY3U(mep->me_nslots, >, 0);
+		kmem_free(mep->me_slotleds, sizeof (uint8_t) * mep->me_nslots);
+	}
+	kmem_free(mep, sizeof (mptsas_enclosure_t));
+}
+
+static void
 mptsas_enc_teardown(mptsas_t *mpt)
 {
 	mptsas_enclosure_t *mep;
 
 	while ((mep = list_remove_head(&mpt->m_enclosures)) != NULL) {
-		kmem_free(mep, sizeof (mptsas_enclosure_t));
+		mptsas_enc_free(mep);
 	}
 	list_destroy(&mpt->m_enclosures);
 }
@@ -6791,8 +6792,6 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		}
 
 		mutex_enter(&mpt->m_mutex);
-		ptgt->m_led_status = 0;
-		(void) mptsas_flush_led_status(mpt, ptgt);
 		if (rval == DDI_SUCCESS) {
 			refhash_remove(mpt->m_targets, ptgt);
 			ptgt = NULL;
@@ -7887,7 +7886,8 @@ mptsas_handle_event(void *args)
 			mep = mptsas_enc_lookup(mpt, enchdl);
 			if (mep != NULL) {
 				list_remove(&mpt->m_enclosures, mep);
-				kmem_free(mep, sizeof (*mep));
+				mptsas_enc_free(mep);
+				mep = NULL;
 			}
 			(void) sprintf(string, ", not responding");
 			break;
@@ -12660,7 +12660,8 @@ led_control(mptsas_t *mpt, intptr_t data, int mode)
 {
 	int ret = 0;
 	mptsas_led_control_t lc;
-	mptsas_target_t *ptgt;
+	mptsas_enclosure_t *mep;
+	uint16_t slotidx;
 
 	if (ddi_copyin((void *)data, &lc, sizeof (lc), mode) != 0) {
 		return (EFAULT);
@@ -12679,29 +12680,42 @@ led_control(mptsas_t *mpt, intptr_t data, int mode)
 	    (lc.Command == MPTSAS_LEDCTL_FLAG_GET && (mode & FREAD) == 0))
 		return (EACCES);
 
-	/* Locate the target we're interrogating... */
+	/* Locate the required enclosure */
 	mutex_enter(&mpt->m_mutex);
-	ptgt = refhash_linear_search(mpt->m_targets,
-	    mptsas_target_eval_slot, &lc);
-	if (ptgt == NULL) {
-		/* We could not find a target for that enclosure/slot. */
+	mep = mptsas_enc_lookup(mpt, lc.Enclosure);
+	if (mep == NULL) {
+		mutex_exit(&mpt->m_mutex);
+		return (ENOENT);
+	}
+
+	if (lc.Slot < mep->me_fslot) {
+		mutex_exit(&mpt->m_mutex);
+		return (ENOENT);
+	}
+
+	/*
+	 * Slots on the enclosure are maintained in array where me_fslot is
+	 * entry zero. We normalize the requested slot.
+	 */
+	slotidx = lc.Slot - mep->me_fslot;
+	if (slotidx >= mep->me_nslots) {
 		mutex_exit(&mpt->m_mutex);
 		return (ENOENT);
 	}
 
 	if (lc.Command == MPTSAS_LEDCTL_FLAG_SET) {
 		/* Update our internal LED state. */
-		ptgt->m_led_status &= ~(1 << (lc.Led - 1));
-		ptgt->m_led_status |= lc.LedStatus << (lc.Led - 1);
+		mep->me_slotleds[slotidx] &= ~(1 << (lc.Led - 1));
+		mep->me_slotleds[slotidx] |= lc.LedStatus << (lc.Led - 1);
 
 		/* Flush it to the controller. */
-		ret = mptsas_flush_led_status(mpt, ptgt);
+		ret = mptsas_flush_led_status(mpt, mep, slotidx);
 		mutex_exit(&mpt->m_mutex);
 		return (ret);
 	}
 
 	/* Return our internal LED state. */
-	lc.LedStatus = (ptgt->m_led_status >> (lc.Led - 1)) & 1;
+	lc.LedStatus = (mep->me_slotleds[slotidx] >> (lc.Led - 1)) & 1;
 	mutex_exit(&mpt->m_mutex);
 
 	if (ddi_copyout(&lc, (void *)data, sizeof (lc), mode) != 0) {
@@ -12878,21 +12892,6 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 				ndi_dc_freehdl(dcp);
 				goto out;
 			}
-			mutex_enter(&mpt->m_mutex);
-			if (cmd == DEVCTL_DEVICE_ONLINE) {
-				ptgt->m_tgt_unconfigured = 0;
-			} else if (cmd == DEVCTL_DEVICE_OFFLINE) {
-				ptgt->m_tgt_unconfigured = 1;
-			}
-			if (cmd == DEVCTL_DEVICE_OFFLINE) {
-				ptgt->m_led_status |=
-				    (1 << (MPTSAS_LEDCTL_LED_OK2RM - 1));
-			} else {
-				ptgt->m_led_status &=
-				    ~(1 << (MPTSAS_LEDCTL_LED_OK2RM - 1));
-			}
-			(void) mptsas_flush_led_status(mpt, ptgt);
-			mutex_exit(&mpt->m_mutex);
 			ndi_dc_freehdl(dcp);
 		}
 		goto out;
@@ -14749,13 +14748,58 @@ mptsas_enclosure_update(mptsas_t *mpt, mptsas_enclosure_t *mep)
 	ASSERT(MUTEX_HELD(&mpt->m_mutex));
 	m = mptsas_enc_lookup(mpt, mep->me_enchdl);
 	if (m != NULL) {
+		uint8_t *ledp;
 		m->me_flags = mep->me_flags;
+
+
+		/*
+		 * If the number of slots and the first slot entry in the
+		 * enclosure has not changed, then we don't need to do anything
+		 * here. Otherwise, we need to allocate a new array for the LED
+		 * status of the slot.
+		 */
+		if (m->me_fslot == mep->me_fslot &&
+		    m->me_nslots == mep->me_nslots)
+			return;
+
+		/*
+		 * If the number of slots or the first slot has changed, it's
+		 * not clear that we're really in a place that we can continue
+		 * to honor the existing flags.
+		 */
+		if (mep->me_nslots > 0) {
+			ledp = kmem_zalloc(sizeof (uint8_t) * mep->me_nslots,
+			    KM_SLEEP);
+		} else {
+			ledp = NULL;
+		}
+
+		if (m->me_slotleds != NULL) {
+			kmem_free(m->me_slotleds, sizeof (uint8_t) *
+			    m->me_nslots);
+		}
+		m->me_slotleds = ledp;
+		m->me_fslot = mep->me_fslot;
+		m->me_nslots = mep->me_nslots;
 		return;
 	}
 
 	m = kmem_zalloc(sizeof (*m), KM_SLEEP);
 	m->me_enchdl = mep->me_enchdl;
 	m->me_flags = mep->me_flags;
+	m->me_nslots = mep->me_nslots;
+	m->me_fslot = mep->me_fslot;
+	if (m->me_nslots > 0) {
+		m->me_slotleds = kmem_zalloc(sizeof (uint8_t) * mep->me_nslots,
+		    KM_SLEEP);
+		/*
+		 * It may make sense to optionally flush all of the slots and/or
+		 * read the slot status flag here to synchronize between
+		 * ourselves and the card. So far, that hasn't been needed
+		 * annecdotally when enumerating something new. If we do, we
+		 * should kick that off in a taskq potentially.
+		 */
+	}
 	list_insert_tail(&mpt->m_enclosures, m);
 }
 
@@ -15412,11 +15456,6 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 				    (!MDI_PI_IS_STANDBY(*pip)) &&
 				    (ptgt->m_tgt_unconfigured == 0)) {
 					rval = mdi_pi_online(*pip, 0);
-					mutex_enter(&mpt->m_mutex);
-					ptgt->m_led_status = 0;
-					(void) mptsas_flush_led_status(mpt,
-					    ptgt);
-					mutex_exit(&mpt->m_mutex);
 				} else {
 					rval = DDI_SUCCESS;
 				}
@@ -15691,12 +15730,6 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 		}
 		NDBG20(("new path:%s onlining,", MDI_PI(*pip)->pi_addr));
 		mdi_rtn = mdi_pi_online(*pip, 0);
-		if (mdi_rtn == MDI_SUCCESS) {
-			mutex_enter(&mpt->m_mutex);
-			ptgt->m_led_status = 0;
-			(void) mptsas_flush_led_status(mpt, ptgt);
-			mutex_exit(&mpt->m_mutex);
-		}
 		if (mdi_rtn == MDI_NOT_SUPPORTED) {
 			mdi_rtn = MDI_FAILURE;
 		}
@@ -16068,12 +16101,6 @@ phys_create_done:
 			 * Try to online the new node
 			 */
 			ndi_rtn = ndi_devi_online(*lun_dip, NDI_ONLINE_ATTACH);
-		}
-		if (ndi_rtn == NDI_SUCCESS) {
-			mutex_enter(&mpt->m_mutex);
-			ptgt->m_led_status = 0;
-			(void) mptsas_flush_led_status(mpt, ptgt);
-			mutex_exit(&mpt->m_mutex);
 		}
 
 		/*
@@ -16790,22 +16817,24 @@ mptsas_addr_to_ptgt(mptsas_t *mpt, char *addr, mptsas_phymask_t phymask)
 }
 
 static int
-mptsas_flush_led_status(mptsas_t *mpt, mptsas_target_t *ptgt)
+mptsas_flush_led_status(mptsas_t *mpt, mptsas_enclosure_t *mep, uint16_t idx)
 {
 	uint32_t slotstatus = 0;
 
+	ASSERT3U(idx, <, mep->me_nslots);
+
 	/* Build an MPI2 Slot Status based on our view of the world */
-	if (ptgt->m_led_status & (1 << (MPTSAS_LEDCTL_LED_IDENT - 1)))
+	if (mep->me_slotleds[idx] & (1 << (MPTSAS_LEDCTL_LED_IDENT - 1)))
 		slotstatus |= MPI2_SEP_REQ_SLOTSTATUS_IDENTIFY_REQUEST;
-	if (ptgt->m_led_status & (1 << (MPTSAS_LEDCTL_LED_FAIL - 1)))
+	if (mep->me_slotleds[idx] & (1 << (MPTSAS_LEDCTL_LED_FAIL - 1)))
 		slotstatus |= MPI2_SEP_REQ_SLOTSTATUS_PREDICTED_FAULT;
-	if (ptgt->m_led_status & (1 << (MPTSAS_LEDCTL_LED_OK2RM - 1)))
+	if (mep->me_slotleds[idx] & (1 << (MPTSAS_LEDCTL_LED_OK2RM - 1)))
 		slotstatus |= MPI2_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE;
 
 	/* Write it to the controller */
 	NDBG14(("mptsas_ioctl: set LED status %x for slot %x",
-	    slotstatus, ptgt->m_slot_num));
-	return (mptsas_send_sep(mpt, ptgt, &slotstatus,
+	    slotstatus, idx + mep->me_fslot));
+	return (mptsas_send_sep(mpt, mep, idx, &slotstatus,
 	    MPI2_SEP_REQ_ACTION_WRITE_STATUS));
 }
 
@@ -16813,49 +16842,29 @@ mptsas_flush_led_status(mptsas_t *mpt, mptsas_target_t *ptgt)
  *  send sep request, use enclosure/slot addressing
  */
 static int
-mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
+mptsas_send_sep(mptsas_t *mpt, mptsas_enclosure_t *mep, uint16_t idx,
     uint32_t *status, uint8_t act)
 {
 	Mpi2SepRequest_t	req;
 	Mpi2SepReply_t		rep;
 	int			ret;
-	mptsas_enclosure_t	*mep;
 	uint16_t 		enctype;
+	uint16_t		slot;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
-
-	/*
-	 * We only support SEP control of directly-attached targets, in which
-	 * case the "SEP" we're talking to is a virtual one contained within
-	 * the HBA itself.  This is necessary because DA targets typically have
-	 * no other mechanism for LED control.  Targets for which a separate
-	 * enclosure service processor exists should be controlled via ses(7d)
-	 * or sgen(7d).  Furthermore, since such requests can time out, they
-	 * should be made in user context rather than in response to
-	 * asynchronous fabric changes.
-	 *
-	 * In addition, we do not support this operation for RAID volumes,
-	 * since there is no slot associated with them.
-	 */
-	if (!(ptgt->m_deviceinfo & DEVINFO_DIRECT_ATTACHED) ||
-	    ptgt->m_addr.mta_phymask == 0) {
-		return (ENOTTY);
-	}
 
 	/*
 	 * Look through the enclosures and make sure that this enclosure is
 	 * something that is directly attached device. If we didn't find an
 	 * enclosure for this device, don't send the ioctl.
 	 */
-	mep = mptsas_enc_lookup(mpt, ptgt->m_enclosure);
-	if (mep == NULL)
-		return (ENOTTY);
 	enctype = mep->me_flags & MPI2_SAS_ENCLS0_FLAGS_MNG_MASK;
 	if (enctype != MPI2_SAS_ENCLS0_FLAGS_MNG_IOC_SES &&
 	    enctype != MPI2_SAS_ENCLS0_FLAGS_MNG_IOC_SGPIO &&
 	    enctype != MPI2_SAS_ENCLS0_FLAGS_MNG_IOC_GPIO) {
 		return (ENOTTY);
 	}
+	slot = idx + mep->me_fslot;
 
 	bzero(&req, sizeof (req));
 	bzero(&rep, sizeof (rep));
@@ -16863,8 +16872,8 @@ mptsas_send_sep(mptsas_t *mpt, mptsas_target_t *ptgt,
 	req.Function = MPI2_FUNCTION_SCSI_ENCLOSURE_PROCESSOR;
 	req.Action = act;
 	req.Flags = MPI2_SEP_REQ_FLAGS_ENCLOSURE_SLOT_ADDRESS;
-	req.EnclosureHandle = LE_16(ptgt->m_enclosure);
-	req.Slot = LE_16(ptgt->m_slot_num);
+	req.EnclosureHandle = LE_16(mep->me_enchdl);
+	req.Slot = LE_16(slot);
 	if (act == MPI2_SEP_REQ_ACTION_WRITE_STATUS) {
 		req.SlotStatus = LE_32(*status);
 	}
