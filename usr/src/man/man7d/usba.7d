@@ -47,74 +47,42 @@ or
 .Pa kernel/drv/amd64
 are 64 bit drivers.
 .Bl -column -offset indent ".Pa kernel/drv/[sparcv9|amd64/]usbser_edge" "Edgeport USB to serial port"
-.It Em Client Driver
-.Ta Em Function/Device
-.It
-.Ta
-.It Pa kernel/drv/[sparcv9|amd64/]hid
-.Ta HID class
-.It Pa kernel/drv/[sparcv9|amd64/]hubd
-.Ta hub class
-.It Pa kernel/drv/[sparcv9|amd64/]scsa2usb
-.Ta mass storage class
-.It Pa kernel/drv/[sparcv9|amd64/]usbprn
-.Ta printer class
-.It Pa kernel/drv/[sparcv9|amd64/]usb_as
-.Ta audio streaming class
-.It Pa kernel/drv/[sparcv9|amd64/]usb_ac
-.Ta audio control class
-.It Pa kernel/drv/[sparcv9|amd64/]usbvc
-.Ta video class
-.It Pa kernel/drv/[sparcv9|amd64/]usb_mid
-.Ta multi-interface device
-.It Pa kernel/drv/[sparcv9|amd64/]usb_ia
-.Ta interface-association driver
-.It Pa kernel/drv/[sparcv9|amd64/]usbser_edge
-.Ta Edgeport USB to serial port
-.It Pa kernel/drv/[sparcv9|amd64/]usbsksp
-.Ta Keyspan USB to serial port
-.It Pa kernel/drv/[sparcv9|amd64/]usbsprl
-.Ta pl2303 USB to serial port
-.It Pa kernel/drv/[sparcv9|amd64/]usbsacm
-.Ta CDC ACM class to serial port
-.It Pa kernel/drv/[sparcv9|amd64/]ugen
-.Ta generic USB driver
-.It Pa kernel/drv/[sparcv9|amd64/]ohci
-.Ta open host controller driver
-.It Pa kernel/drv/[sparcv9|amd64/]uhci
-.Ta universal host controller driver
-.It Pa kernel/drv/[sparcv9|amd64/]ehci
-.Ta enhanced host controller driver
-.It Pa kernel/drv/[sparcv9|amd64/]xhci
-.Ta extensible host controller driver
+.It Em Client Driver Ta Em Function/Device
+.It Ta
+.It Pa kernel/drv/[sparcv9|amd64/]hid Ta HID class
+.It Pa kernel/drv/[sparcv9|amd64/]hubd Ta hub class
+.It Pa kernel/drv/[sparcv9|amd64/]scsa2usb Ta mass storage class
+.It Pa kernel/drv/[sparcv9|amd64/]usbprn Ta printer class
+.It Pa kernel/drv/[sparcv9|amd64/]usb_as Ta audio streaming class
+.It Pa kernel/drv/[sparcv9|amd64/]usb_ac Ta audio control class
+.It Pa kernel/drv/[sparcv9|amd64/]usbvc Ta video class
+.It Pa kernel/drv/[sparcv9|amd64/]usb_mid Ta multi-interface device
+.It Pa kernel/drv/[sparcv9|amd64/]usb_ia Ta interface-association driver
+.It Pa kernel/drv/[sparcv9|amd64/]usbser_edge Ta Edgeport USB to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]usbsksp Ta Keyspan USB to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]usbsprl Ta pl2303 USB to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]usbsacm Ta CDC ACM class to serial port
+.It Pa kernel/drv/[sparcv9|amd64/]ugen Ta generic USB driver
+.It Pa kernel/drv/[sparcv9|amd64/]ohci Ta open host controller driver
+.It Pa kernel/drv/[sparcv9|amd64/]uhci Ta universal host controller driver
+.It Pa kernel/drv/[sparcv9|amd64/]ehci Ta enhanced host controller driver
+.It Pa kernel/drv/[sparcv9|amd64/]xhci Ta extensible host controller driver
 .El
 .Bl -column -offset indent ".Pa /kernel/strmod/[sparcv9|amd64/]usb_ah" "Function/Device"
-.It
-.Ta
-.It Em Client Streams Modules
-.Ta Em Function/Device
-.It
-.Ta
-.It Pa /kernel/strmod/[sparcv9|amd64/]usbkbm
-.Ta Keyboad
-.It Pa /kernel/strmod/[sparcv9|amd64/]usbms
-.Ta Mouse
-.It Pa /kernel/strmod/[sparcv9|amd64/]usb_ah
-.Ta Audio HID
+.It Ta
+.It Em Client Streams Modules Ta Em Function/Device
+.It Ta
+.It Pa /kernel/strmod/[sparcv9|amd64/]usbkbm Ta Keyboad
+.It Pa /kernel/strmod/[sparcv9|amd64/]usbms Ta Mouse
+.It Pa /kernel/strmod/[sparcv9|amd64/]usb_ah Ta Audio HID
 .El
 .Bl -column -offset indent ".Em Host Controller Interface Drivers" "Extensible HCI"
-.It Em Host Controller Interface Drivers
-.Ta Em Device
-.It
-.Ta
-.It Pa /kernel/drv/[amd64/]xhci
-.Ta Extensible HCI
-.It Pa /kernel/drv/[sparcv9|amd64/]ehci
-.Ta Enhanced HCI
-.It Pa /kernel/drv/[sparcv9|amd64/]ohci
-.Ta Open HCI
-.It Pa /kernel/drv/[sparcv|amd64/]uhci
-.Ta Universal HCI
+.It Em Host Controller Interface Drivers Ta Em Device
+.It Ta
+.It Pa /kernel/drv/[amd64/]xhci Ta Extensible HCI
+.It Pa /kernel/drv/[sparcv9|amd64/]ehci Ta Enhanced HCI
+.It Pa /kernel/drv/[sparcv9|amd64/]ohci Ta Open HCI
+.It Pa /kernel/drv/[sparcv|amd64/]uhci Ta Universal HCI
 .El
 .Sh DIAGNOSTICS
 The messages described below may appear on the system console as well as being

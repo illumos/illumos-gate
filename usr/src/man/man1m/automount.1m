@@ -17,7 +17,7 @@
 .\"
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2016 Nexenta Systems, Inc.
+.\" Copyright 2017 Nexenta Systems, Inc.
 .\"
 .Dd February 25, 2017
 .Dt AUTOMOUNT 1M
@@ -205,7 +205,7 @@ and
 .Ar location
 takes the form:
 .Pp
-.Dl Ar host Ns : Ns Ar pathname
+.Dl Ar host Ns \&: Ns Ar pathname
 .Pp
 .Ar host
 is the name of the host from which to mount the file system, and
@@ -259,7 +259,7 @@ then a single
 .Ar location
 may be used with a comma-separated list of hostnames:
 .Bd -literal -offset indent
-.Ar hostname Ns , Ns Ar hostname Ns ...: Ns Ar pathname
+.Ar hostname Ns \&, Ns Ar hostname Ns ...: Ns Ar pathname
 .Ed
 .Pp
 Requests for a server may be weighted, with the weighting factor appended to
@@ -338,7 +338,7 @@ this would allow automatic mounts in
 .Pa /config
 of any remote file system whose location could be specified as:
 .Bd -literal -offset indent
-.Ar hostname Ns : Ns Pa /export/config/ Ns Ar hostname
+.Ar hostname Ns \&: Ns Pa /export/config/ Ns Ar hostname
 .Ed
 .Pp
 Note that the wildcard key does not work in conjunction with the
@@ -356,42 +356,19 @@ would expand it to its current value for the client's host name.
 Supported variables are:
 .Bl -column "PLATFORM" "arch -k or uname -m"
 .It Sy NAME Ta Sy OUTPUT OF Ta Sy DESCRIPTION (EXAMPLE)
-.It Ev ARCH
-.Ta Nm arch
-.Ta architecture name
-.Pq Qq Sy sun4
-.It Ev CPU
-.Ta Nm uname Fl p
-.Ta processor type
-.Pq Qq Sy sparc
-.It Ev HOST
-.Ta Nm uname Fl n
-.Ta host name
-.Pq Qq Sy myhost
-.It Ev KARCH
-.Ta Nm arch Fl k No or Nm uname Fl m
-.Ta kernel architecture name or machine hardware name
+.It Ev ARCH Ta Nm arch Ta architecture name Pq Qq Sy sun4
+.It Ev CPU Ta Nm uname Fl p Ta processor type Pq Qq Sy sparc
+.It Ev HOST Ta Nm uname Fl n Ta host name Pq Qq Sy myhost
+.It Ev KARCH Ta Nm arch Fl k No or Nm uname Fl m Ta kernel architecture name or
+machine hardware name
 .Pq Qq Sy sun4u
-.It Ev OSNAME
-.Ta Nm uname Fl s
-.Ta OS name
-.Pq Qq Sy SunOS
-.It Ev OSREL
-.Ta Nm name Fl r
-.Ta OS release name
-.Pq Qq Sy 5.3
-.It Ev OSVERS
-.Ta Nm uname Fl v
-.Ta OS version
-.Pq Qq Sy beta1.0
-.It Ev NATISA
-.Ta Nm isainfo Fl n
-.Ta native instruction set architecture for the system
+.It Ev OSNAME Ta Nm uname Fl s Ta OS name Pq Qq Sy SunOS
+.It Ev OSREL Ta Nm name Fl r Ta OS release name Pq Qq Sy 5.3
+.It Ev OSVERS Ta Nm uname Fl v Ta OS version Pq Qq Sy beta1.0
+.It Ev NATISA Ta Nm isainfo Fl n Ta native instruction set architecture for the
+system
 .Pq Qq Sy sparcv9
-.It Ev PLATFORM
-.Ta Nm uname Fl i
-.Ta platform name
-.Pq Qq Sy SUNW,Sun-Fire-V240
+.It Ev PLATFORM Ta Nm uname Fl i Ta platform name Pq Qq Sy SUNW,Sun-Fire-V240
 .El
 .Pp
 If a reference needs to be protected from affixed characters, you can surround

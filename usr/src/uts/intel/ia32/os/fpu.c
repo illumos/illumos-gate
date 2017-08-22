@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -59,6 +60,8 @@
 #include <sys/x86_archext.h>
 #include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
+
+kmem_cache_t *fpsave_cachep;
 
 /* Legacy fxsave layout + xsave header + ymm */
 #define	AVX_XSAVE_SIZE		(512 + 64 + 256)
@@ -124,7 +127,7 @@ const struct xsave_state avx_initial = {
 	 * and CPU should initialize XMM/YMM.
 	 */
 	1,
-	{0, 0}	/* These 2 bytes must be zero */
+	0	/* xs_xcomp_bv */
 	/* rest of structure is zero */
 };
 
@@ -161,6 +164,11 @@ void (*fpsave_ctxt)(void *) = fpxsave_ctxt;
  */
 void (*fpsave_ctxt)(void *) = fpnsave_ctxt;
 #endif
+
+/*
+ * This function pointer is changed to xsaveopt if the CPU is xsaveopt capable.
+ */
+void (*xsavep)(struct xsave_state *, uint64_t) = xsave;
 
 static int fpe_sicode(uint_t);
 static int fpe_simd_sicode(uint_t);
@@ -202,15 +210,15 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fn = &fp->fpu_regs.kfpu_u.kfpu_fn;
-		cfn = &cfp->fpu_regs.kfpu_u.kfpu_fn;
+		fn = fp->fpu_regs.kfpu_u.kfpu_fn;
+		cfn = cfp->fpu_regs.kfpu_u.kfpu_fn;
 		bcopy(&x87_initial, cfn, sizeof (*cfn));
 		cfn->f_fcw = fn->f_fcw;
 		break;
 #endif
 	case FP_FXSAVE:
-		fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
-		cfx = &cfp->fpu_regs.kfpu_u.kfpu_fx;
+		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
+		cfx = cfp->fpu_regs.kfpu_u.kfpu_fx;
 		bcopy(&sse_initial, cfx, sizeof (*cfx));
 		cfx->fx_mxcsr = fx->fx_mxcsr & ~SSE_MXCSR_EFLAGS;
 		cfx->fx_fcw = fx->fx_fcw;
@@ -219,8 +227,10 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	case FP_XSAVE:
 		cfp->fpu_xsave_mask = fp->fpu_xsave_mask;
 
-		fx = &fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave;
-		cxs = &cfp->fpu_regs.kfpu_u.kfpu_xs;
+		VERIFY(fp->fpu_regs.kfpu_u.kfpu_xs != NULL);
+
+		fx = &fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave;
+		cxs = cfp->fpu_regs.kfpu_u.kfpu_xs;
 		cfx = &cxs->xs_fxsave;
 
 		bcopy(&avx_initial, cxs, sizeof (*cxs));
@@ -247,12 +257,12 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 /*
  * Free any state associated with floating point context.
  * Fp_free can be called in three cases:
- * 1) from reaper -> thread_free -> ctxfree -> fp_free
+ * 1) from reaper -> thread_free -> freectx-> fp_free
  *	fp context belongs to a thread on deathrow
  *	nothing to do,  thread will never be resumed
  *	thread calling ctxfree is reaper
  *
- * 2) from exec -> ctxfree -> fp_free
+ * 2) from exec -> freectx -> fp_free
  *	fp context belongs to the current thread
  *	must disable fpu, thread calling ctxfree is curthread
  *
@@ -305,15 +315,15 @@ fp_save(struct fpu_ctx *fp)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fpsave(&fp->fpu_regs.kfpu_u.kfpu_fn);
+		fpsave(fp->fpu_regs.kfpu_u.kfpu_fn);
 		break;
 #endif
 	case FP_FXSAVE:
-		fpxsave(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		fpxsave(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
 
 	case FP_XSAVE:
-		xsave(&fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
+		xsavep(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -336,15 +346,15 @@ fp_restore(struct fpu_ctx *fp)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fprestore(&fp->fpu_regs.kfpu_u.kfpu_fn);
+		fprestore(fp->fpu_regs.kfpu_u.kfpu_fn);
 		break;
 #endif
 	case FP_FXSAVE:
-		fpxrestore(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		fpxrestore(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
 
 	case FP_XSAVE:
-		xrestore(&fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
+		xrestore(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -393,6 +403,80 @@ fp_seed(void)
 }
 
 /*
+ * When using xsave/xrstor, these three functions are used by the lwp code to
+ * manage the memory for the xsave area.
+ */
+void
+fp_lwp_init(struct _klwp *lwp)
+{
+	struct fpu_ctx *fp = &lwp->lwp_pcb.pcb_fpu;
+
+	/*
+	 * We keep a copy of the pointer in lwp_fpu so that we can restore the
+	 * value in forklwp() after we duplicate the parent's LWP state.
+	 */
+	lwp->lwp_fpu = fp->fpu_regs.kfpu_u.kfpu_generic =
+	    kmem_cache_alloc(fpsave_cachep, KM_SLEEP);
+
+	if (fp_save_mech == FP_XSAVE) {
+		/*
+		 *
+		 * We bzero since the fpinit() code path will only
+		 * partially initialize the xsave area using avx_inital.
+		 */
+		ASSERT(cpuid_get_xsave_size() >= sizeof (struct xsave_state));
+		bzero(fp->fpu_regs.kfpu_u.kfpu_xs, cpuid_get_xsave_size());
+	}
+}
+
+void
+fp_lwp_cleanup(struct _klwp *lwp)
+{
+	struct fpu_ctx *fp = &lwp->lwp_pcb.pcb_fpu;
+
+	if (fp->fpu_regs.kfpu_u.kfpu_generic != NULL) {
+		kmem_cache_free(fpsave_cachep,
+		    fp->fpu_regs.kfpu_u.kfpu_generic);
+		lwp->lwp_fpu = fp->fpu_regs.kfpu_u.kfpu_generic = NULL;
+	}
+}
+
+/*
+ * Called during the process of forklwp(). The kfpu_u pointer will have been
+ * overwritten while copying the parent's LWP structure. We have a valid copy
+ * stashed in the child's lwp_fpu which we use to restore the correct value.
+ */
+void
+fp_lwp_dup(struct _klwp *lwp)
+{
+	void *xp = lwp->lwp_fpu;
+	size_t sz;
+
+	switch (fp_save_mech) {
+#if defined(__i386)
+	case FP_FNSAVE:
+		sz = sizeof (struct fnsave_state);
+		break;
+#endif
+	case FP_FXSAVE:
+		sz = sizeof (struct fxsave_state);
+		break;
+	case FP_XSAVE:
+		sz = cpuid_get_xsave_size();
+		break;
+	default:
+		panic("Invalid fp_save_mech");
+		/*NOTREACHED*/
+	}
+
+	/* copy the parent's values into the new lwp's struct */
+	bcopy(lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_generic, xp, sz);
+	/* now restore the pointer */
+	lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_generic = xp;
+}
+
+
+/*
  * This routine is called from trap() when User thread takes No Extension
  * Fault. The possiblities are:
  *	1. User thread has executed a FP instruction for the first time.
@@ -419,11 +503,6 @@ fpnoextflt(struct regs *rp)
 	ASSERT(sizeof (struct _fpu) == sizeof (struct __old_fpu));
 #endif	/* __i386 */
 #endif	/* !__lint */
-
-	/*
-	 * save area MUST be 16-byte aligned, else will page fault
-	 */
-	ASSERT(((uintptr_t)(&fp->fpu_regs.kfpu_u.kfpu_fx) & 0xf) == 0);
 
 	kpreempt_disable();
 	/*
@@ -546,27 +625,27 @@ fpexterrflt(struct regs *rp)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fpsw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw;
-		fpcw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw;
-		fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw &= ~FPS_SW_EFLAGS;
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_fn->f_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_fn->f_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fn->f_fsw &= ~FPS_SW_EFLAGS;
 		break;
 #endif
 
 	case FP_FXSAVE:
-		fpsw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
-		fpcw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fcw;
-		fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fx->fx_fsw &= ~FPS_SW_EFLAGS;
 		break;
 
 	case FP_XSAVE:
-		fpsw = fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave.fx_fsw;
-		fpcw = fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave.fx_fcw;
-		fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave.fx_fsw &= ~FPS_SW_EFLAGS;
+		fpsw = fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave.fx_fsw;
+		fpcw = fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave.fx_fcw;
+		fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave.fx_fsw &= ~FPS_SW_EFLAGS;
 		/*
 		 * Always set LEGACY_FP as it may have been cleared by XSAVE
 		 * instruction
 		 */
-		fp->fpu_regs.kfpu_u.kfpu_xs.xs_xstate_bv |= XFEATURE_LEGACY_FP;
+		fp->fpu_regs.kfpu_u.kfpu_xs->xs_xstate_bv |= XFEATURE_LEGACY_FP;
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -620,10 +699,14 @@ fpsimderrflt(struct regs *rp)
 	 */
 	fp_save(fp); 		/* save the FPU state */
 
-	mxcsr = fp->fpu_regs.kfpu_u.kfpu_fx.fx_mxcsr;
-
-	fp->fpu_regs.kfpu_status = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
-
+	if (fp_save_mech == FP_XSAVE) {
+		mxcsr = fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave.fx_mxcsr;
+		fp->fpu_regs.kfpu_status =
+		    fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave.fx_fsw;
+	} else {
+		mxcsr = fp->fpu_regs.kfpu_u.kfpu_fx->fx_mxcsr;
+		fp->fpu_regs.kfpu_status = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fsw;
+	}
 	fp->fpu_regs.kfpu_xstatus = mxcsr;
 
 	/*
@@ -731,24 +814,24 @@ fpsetcw(uint16_t fcw, uint32_t mxcsr)
 	switch (fp_save_mech) {
 #if defined(__i386)
 	case FP_FNSAVE:
-		fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw = fcw;
+		fp->fpu_regs.kfpu_u.kfpu_fn->f_fcw = fcw;
 		break;
 #endif
 	case FP_FXSAVE:
-		fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
+		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
 		fx->fx_fcw = fcw;
 		fx->fx_mxcsr = sse_mxcsr_mask & mxcsr;
 		break;
 
 	case FP_XSAVE:
-		fx = &fp->fpu_regs.kfpu_u.kfpu_xs.xs_fxsave;
+		fx = &fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave;
 		fx->fx_fcw = fcw;
 		fx->fx_mxcsr = sse_mxcsr_mask & mxcsr;
 		/*
 		 * Always set LEGACY_FP as it may have been cleared by XSAVE
 		 * instruction
 		 */
-		fp->fpu_regs.kfpu_u.kfpu_xs.xs_xstate_bv |= XFEATURE_LEGACY_FP;
+		fp->fpu_regs.kfpu_u.kfpu_xs->xs_xstate_bv |= XFEATURE_LEGACY_FP;
 		break;
 	default:
 		panic("Invalid fp_save_mech");

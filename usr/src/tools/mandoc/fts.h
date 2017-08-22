@@ -28,17 +28,32 @@
  */
 
 /*
- * This is a compat version of fts.h including reallocarray() and strtonum()
- * prototypes to be used for usr/src/tools/mandoc build.
+ * This file provides required compatibility definitions and prototypes to build
+ * tools version of mandoc on older systems.
+ */
+
+#ifndef	_COMPAT_H
+#define	_COMPAT_H
+
+#include <sys/types.h>
+
+extern void *reallocarray(void *, size_t, size_t);
+extern void *recallocarray(void *, size_t, size_t, size_t);
+extern long long strtonum(const char *, long long, long long, const char **);
+
+#define	be32toh ntohl
+#define	htobe32 htonl
+
+#endif	/* !_COMPAT_H */
+
+/*
+ * Below is the copy of fts.h.
  */
 
 #ifndef	_FTS_H
 #define	_FTS_H
 
 #include <sys/types.h>
-
-extern void *reallocarray(void *, size_t, size_t);
-extern long long strtonum(const char *, long long, long long, const char **);
 
 typedef struct {
 	struct _ftsent *fts_cur;	/* current node */

@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -39,9 +40,12 @@
 #include <signal.h>
 #include <setjmp.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #include "snoop.h"
 
 static sigjmp_buf nisjmp;
+static hrtime_t snoop_lastwarn;		/* Last time NS warning fired */
+static unsigned snoop_warninter = 60;	/* Time in seconds between warnings */
 
 #define	MAXHASH 1024  /* must be a power of 2 */
 
@@ -86,6 +90,19 @@ wakeup(int n)
 
 extern char *inet_ntoa();
 
+static void
+snoop_nswarn(void)
+{
+	hrtime_t now = gethrtime();
+
+	if (now - snoop_lastwarn >= snoop_warninter * NANOSEC) {
+		snoop_lastwarn = now;
+		(void) fprintf(stderr, "snoop: warning: packets captured, but "
+		    "name service lookups are timing out. Use snoop -r to "
+		    "disable name service lookups\n");
+	}
+}
+
 static struct hostdata *
 iplookup(struct in_addr ipaddr)
 {
@@ -112,17 +129,21 @@ iplookup(struct in_addr ipaddr)
 	 * an unresponsive name server.
 	 * Give it 3 sec to do its work.
 	 */
-	if (! rflg && sigsetjmp(nisjmp, 1) == 0) {
-		(void) snoop_alarm(3, wakeup);
-		hp = getipnodebyaddr((char *)&ipaddr, sizeof (int),
-		    AF_INET, &error_num);
-		if (hp == NULL && inet_lnaof(ipaddr) == 0) {
-			np = getnetbyaddr(inet_netof(ipaddr), AF_INET);
-			if (np)
-				return (addhost(AF_INET, &ipaddr, np->n_name,
-				    np->n_aliases));
+	if (!rflg) {
+		if (sigsetjmp(nisjmp, 1) == 0) {
+			(void) snoop_alarm(3, wakeup);
+			hp = getipnodebyaddr((char *)&ipaddr, sizeof (int),
+			    AF_INET, &error_num);
+			if (hp == NULL && inet_lnaof(ipaddr) == 0) {
+				np = getnetbyaddr(inet_netof(ipaddr), AF_INET);
+				if (np)
+					return (addhost(AF_INET, &ipaddr,
+					    np->n_name, np->n_aliases));
+			}
+			(void) snoop_alarm(0, wakeup);
+		} else {
+			snoop_nswarn();
 		}
-		(void) snoop_alarm(0, wakeup);
 	}
 
 	retval = addhost(AF_INET, &ipaddr,
@@ -158,11 +179,15 @@ ip6lookup(const struct in6_addr *ip6addr)
 	 * an unresponsive name server.
 	 * Give it 3 sec to do its work.
 	 */
-	if (! rflg && sigsetjmp(nisjmp, 1) == 0) {
-		(void) snoop_alarm(3, wakeup);
-		hp = getipnodebyaddr(ip6addr, sizeof (struct in6_addr),
-		    AF_INET6, &error_num);
-		(void) snoop_alarm(0, wakeup);
+	if (!rflg) {
+		if (sigsetjmp(nisjmp, 1) == 0) {
+			(void) snoop_alarm(3, wakeup);
+			hp = getipnodebyaddr(ip6addr, sizeof (struct in6_addr),
+			    AF_INET6, &error_num);
+			(void) snoop_alarm(0, wakeup);
+		} else {
+			snoop_nswarn();
+		}
 	} else {
 		hp = NULL;
 	}
@@ -295,8 +320,7 @@ addrtoname(int family, const void *ipaddr)
 }
 
 void
-load_names(fname)
-	char *fname;
+load_names(char *fname)
 {
 	char buf[1024];
 	char *addr, *name, *alias;

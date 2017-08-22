@@ -365,12 +365,17 @@ mlsetup(struct regs *rp)
 	if (boothowto & RB_DEBUG)
 		kdi_idt_sync();
 
-	/*
-	 * Explicitly set console to text mode (0x3) if this is a boot
-	 * post Fast Reboot, and the console is set to CONS_SCREEN_TEXT.
-	 */
-	if (post_fastreboot && boot_console_type(NULL) == CONS_SCREEN_TEXT)
-		set_console_mode(0x3);
+	if (BOP_GETPROPLEN(bootops, "efi-systab") < 0) {
+		/*
+		 * In BIOS system, explicitly set console to text mode (0x3)
+		 * if this is a boot post Fast Reboot, and the console is set
+		 * to CONS_SCREEN_TEXT.
+		 */
+		if (post_fastreboot &&
+		    boot_console_type(NULL) == CONS_SCREEN_TEXT) {
+			set_console_mode(0x3);
+		}
+	}
 
 	/*
 	 * If requested (boot -d) drop into kmdb.

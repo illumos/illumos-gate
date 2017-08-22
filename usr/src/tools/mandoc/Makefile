@@ -22,9 +22,10 @@ include		$(CMDDIR)/Makefile.common
 
 OBJS +=		fts.o \
 		reallocarray.o \
+		recallocarray.o \
 		strtonum.o
 
-CPPFLAGS +=	-I. -include config.h -include fts.h
+CPPFLAGS +=	-I. -include fts.h
 CPPFLAGS +=	-I$(NATIVE_ADJUNCT)/include
 LDFLAGS +=	-L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
 

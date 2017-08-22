@@ -23,6 +23,7 @@
  * Copyright (c) 1990  Mentat Inc.
  * netstat.c 2.2, last change 9/9/91
  * MROUTING Revision 3.5
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -55,6 +56,8 @@
 #include <kstat.h>
 #include <assert.h>
 #include <locale.h>
+#include <synch.h>
+#include <thread.h>
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -253,6 +256,15 @@ static int	proto = IPPROTO_MAX;	/* all protocols */
 kstat_ctl_t	*kc = NULL;
 
 /*
+ * Name service timeout detection constants.
+ */
+static mutex_t ns_lock = ERRORCHECKMUTEX;
+static boolean_t ns_active = B_FALSE;	/* Is a lookup ongoing? */
+static hrtime_t ns_starttime;		/* Time the lookup started */
+static int ns_sleeptime = 2;		/* Time in seconds between checks */
+static int ns_warntime = 2;		/* Time in seconds before warning */
+
+/*
  * Sizes of data structures extracted from the base mib.
  * This allows the size of the tables entries to grow while preserving
  * binary compatibility.
@@ -348,6 +360,55 @@ static uint_t timestamp_fmt = NODATE;
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it isn't */
 #endif
+
+static void
+ns_lookup_start(void)
+{
+	mutex_enter(&ns_lock);
+	ns_active = B_TRUE;
+	ns_starttime = gethrtime();
+	mutex_exit(&ns_lock);
+}
+
+static void
+ns_lookup_end(void)
+{
+	mutex_enter(&ns_lock);
+	ns_active = B_FALSE;
+	mutex_exit(&ns_lock);
+}
+
+/*
+ * When name services are not functioning, this program appears to hang to the
+ * user. To try and give the user a chance of figuring out that this might be
+ * the case, we end up warning them and suggest that they may want to use the -n
+ * flag.
+ */
+/* ARGSUSED */
+static void *
+ns_warning_thr(void *unsued)
+{
+	for (;;) {
+		hrtime_t now;
+
+		(void) sleep(ns_sleeptime);
+		now = gethrtime();
+		mutex_enter(&ns_lock);
+		if (ns_active && now - ns_starttime >= ns_warntime * NANOSEC) {
+			(void) fprintf(stderr, "warning: data "
+			    "available, but name service lookups are "
+			    "taking a while. Use the -n option to "
+			    "disable name service lookups.\n");
+			mutex_exit(&ns_lock);
+			return (NULL);
+		}
+		mutex_exit(&ns_lock);
+	}
+
+	/* LINTED: E_STMT_NOT_REACHED */
+	return (NULL);
+}
+
 
 int
 main(int argc, char **argv)
@@ -557,6 +618,15 @@ main(int argc, char **argv)
 	}
 	if (interval)
 		setbuf(stdout, NULL);
+
+	/*
+	 * Start up the thread to check for name services warnings.
+	 */
+	if (thr_create(NULL, 0, ns_warning_thr, NULL,
+	    THR_DETACHED | THR_DAEMON, NULL) != 0) {
+		fatal(1, "%s: failed to create name services "
+		    "thread: %s\n", name, strerror(errno));
+	}
 
 	if (DHCPflag) {
 		dhcp_report(Iflag ? ifname : NULL);
@@ -972,7 +1042,8 @@ mib_item_dup(mib_item_t *item)
  * for item->mib_id == 0
  */
 static mib_item_t *
-mib_item_diff(mib_item_t *item1, mib_item_t *item2) {
+mib_item_diff(mib_item_t *item1, mib_item_t *item2)
+{
 	int	nitems	= 0; /* no. of items in item2 */
 	mib_item_t *tempp2;  /* walking copy of item2 */
 	mib_item_t *tempp1;  /* walking copy of item1 */
@@ -1498,7 +1569,8 @@ mibdiff_out_of_memory:;
  * mib_item_diff
  */
 static void
-mib_item_destroy(mib_item_t **itemp) {
+mib_item_destroy(mib_item_t **itemp)
+{
 	int	nitems = 0;
 	int	c = 0;
 	mib_item_t *tempp;
@@ -3264,8 +3336,9 @@ if_report(mib_item_t *item, char *matchname,
 
 static void
 if_report_ip4(mib2_ipAddrEntry_t *ap,
-	char ifname[], char logintname[], struct ifstat *statptr,
-	boolean_t ksp_not_null) {
+    char ifname[], char logintname[], struct ifstat *statptr,
+    boolean_t ksp_not_null)
+{
 
 	char abuf[MAXHOSTNAMELEN + 1];
 	char dstbuf[MAXHOSTNAMELEN + 1];
@@ -3297,7 +3370,7 @@ if_report_ip4(mib2_ipAddrEntry_t *ap,
 		(void) printf("%-5s %-4u ", logintname, ap->ipAdEntInfo.ae_mtu);
 		if (ap->ipAdEntInfo.ae_flags & IFF_POINTOPOINT)
 			(void) pr_addr(ap->ipAdEntInfo.ae_pp_dst_addr, abuf,
-			sizeof (abuf));
+			    sizeof (abuf));
 		else
 			(void) pr_netaddr(ap->ipAdEntAddr, ap->ipAdEntNetMask,
 			    abuf, sizeof (abuf));
@@ -3312,8 +3385,9 @@ if_report_ip4(mib2_ipAddrEntry_t *ap,
 
 static void
 if_report_ip6(mib2_ipv6AddrEntry_t *ap6,
-	char ifname[], char logintname[], struct ifstat *statptr,
-	boolean_t ksp_not_null) {
+    char ifname[], char logintname[], struct ifstat *statptr,
+    boolean_t ksp_not_null)
+{
 
 	char abuf[MAXHOSTNAMELEN + 1];
 	char dstbuf[MAXHOSTNAMELEN + 1];
@@ -5450,8 +5524,7 @@ plurales(int n)
 }
 
 static char *
-pktscale(n)
-	int n;
+pktscale(int n)
 {
 	static char buf[6];
 	char t;
@@ -5735,8 +5808,10 @@ pr_addr(uint_t addr, char *dst, uint_t dstlen)
 	}
 	cp = NULL;
 	if (!Nflag) {
+		ns_lookup_start();
 		hp = getipnodebyaddr((char *)&addr, sizeof (uint_t), AF_INET,
 		    &error_num);
+		ns_lookup_end();
 		if (hp) {
 			if ((cp = strchr(hp->h_name, '.')) != NULL &&
 			    strcasecmp(cp + 1, domain) == 0)
@@ -5791,8 +5866,10 @@ pr_addr6(const struct in6_addr *addr, char *dst, uint_t dstlen)
 	}
 	cp = NULL;
 	if (!Nflag) {
+		ns_lookup_start();
 		hp = getipnodebyaddr((char *)addr,
 		    sizeof (struct in6_addr), AF_INET6, &error_num);
+		ns_lookup_end();
 		if (hp) {
 			if ((cp = strchr(hp->h_name, '.')) != NULL &&
 			    strcasecmp(cp + 1, domain) == 0)
@@ -5943,15 +6020,19 @@ pr_net(uint_t addr, uint_t mask, char *dst, uint_t dstlen)
 		net = addr & mask;
 		while ((mask & 1) == 0)
 			mask >>= 1, net >>= 1;
+		ns_lookup_start();
 		np = getnetbyaddr(net, AF_INET);
+		ns_lookup_end();
 		if (np && np->n_net == net)
 			cp = np->n_name;
 		else {
 			/*
 			 * Look for subnets in hosts map.
 			 */
+			ns_lookup_start();
 			hp = getipnodebyaddr((char *)&addr, sizeof (uint_t),
 			    AF_INET, &error_num);
+			ns_lookup_end();
 			if (hp)
 				cp = hp->h_name;
 		}
@@ -6025,15 +6106,19 @@ pr_netaddr(uint_t addr, uint_t mask, char *dst, uint_t dstlen)
 
 	/* Try looking up name unless -n was specified. */
 	if (!Nflag) {
+		ns_lookup_start();
 		np = getnetbyaddr(netshifted, AF_INET);
+		ns_lookup_end();
 		if (np && np->n_net == netshifted)
 			cp = np->n_name;
 		else {
 			/*
 			 * Look for subnets in hosts map.
 			 */
+			ns_lookup_start();
 			hp = getipnodebyaddr((char *)&nbo_addr, sizeof (uint_t),
 			    AF_INET, &error_num);
+			ns_lookup_end();
 			if (hp)
 				cp = hp->h_name;
 		}
@@ -6133,8 +6218,11 @@ portname(uint_t port, char *proto, char *dst, uint_t dstlen)
 {
 	struct servent *sp = NULL;
 
-	if (!Nflag && port)
+	if (!Nflag && port) {
+		ns_lookup_start();
 		sp = getservbyport(htons(port), proto);
+		ns_lookup_end();
+	}
 	if (sp || port == 0)
 		(void) snprintf(dst, dstlen, "%.*s", MAXHOSTNAMELEN,
 		    sp ? sp->s_name : "*");

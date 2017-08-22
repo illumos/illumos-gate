@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SYS_AUXV_386_H
@@ -83,6 +83,9 @@ extern "C" {
 	"\017sse3\015sse2\014sse\013fxsr\012amd3dx\011amd3d"		\
 	"\010amdmmx\07mmx\06cmov\05amdsysc\04sep\03cx8\02tsc\01fpu"
 
+/*
+ * Flags used in AT_SUN_HWCAP2 elements
+ */
 #define	AV_386_2_F16C		0x00001	/* F16C half percision extensions */
 #define	AV_386_2_RDRAND		0x00002	/* RDRAND insn */
 #define	AV_386_2_BMI1		0x00004 /* BMI1 insns */
@@ -91,10 +94,24 @@ extern "C" {
 #define	AV_386_2_AVX2		0x00020	/* AVX2 insns */
 #define	AV_386_2_ADX		0x00040	/* ADX insns */
 #define	AV_386_2_RDSEED		0x00080	/* RDSEED insn */
+#define	AV_386_2_AVX512F	0x00100	/* AVX512 foundation insns */
+#define	AV_386_2_AVX512DQ	0x00200	/* AVX512DQ insns */
+#define	AV_386_2_AVX512IFMA	0x00400	/* AVX512IFMA insns */
+#define	AV_386_2_AVX512PF	0x00800	/* AVX512PF insns */
+#define	AV_386_2_AVX512ER	0x01000	/* AVX512ER insns */
+#define	AV_386_2_AVX512CD	0x02000	/* AVX512CD insns */
+#define	AV_386_2_AVX512BW	0x04000	/* AVX512BW insns */
+#define	AV_386_2_AVX512VL	0x08000	/* AVX512VL insns */
+#define	AV_386_2_AVX512VBMI	0x10000	/* AVX512VBMI insns */
+#define	AV_386_2_AVX512VPOPCDQ	0x20000	/* AVX512VPOPCNTDQ insns */
+#define	AV_386_2_AVX512_4NNIW	0x40000	/* AVX512 4NNIW insns */
+#define	AV_386_2_AVX512_4FMAPS	0x80000	/* AVX512 4FMAPS insns */
 
 #define	FMT_AV_386_2							\
-	"\020"								\
-	"\10rdseed\07adx\06avx2\05fma\04bmi2\03bmi1\02rdrand\01f16c"
+	"\024avx512_4fmaps\023avx512_4nniw\022avx512vpopcntdq"		\
+	"\021avx512vbmi\020avx512vl\017avx512bw\016avx512cd"		\
+	"\015avx512er\014avx512pf\013avx512ifma\012avx512dq\011avx512f"	\
+	"\010rdseed\07adx\06avx2\05fma\04bmi2\03bmi1\02rdrand\01f16c"
 
 #ifdef __cplusplus
 }

@@ -358,6 +358,10 @@ apic_probe_common(char *modname)
 
 	retval = acpi_probe(modname);
 
+	/* in UEFI system, there is no BIOS data */
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), 0, "efi-systab"))
+		goto apic_ret;
+
 	/*
 	 * mapin the bios data area 40:0
 	 * 40:13h - two-byte location reports the base memory size

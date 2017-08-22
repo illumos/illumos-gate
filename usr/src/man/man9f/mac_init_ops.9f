@@ -85,7 +85,7 @@ In addition, if the call to
 in the driver's
 .Xr _init 9E
 entry point fails, then the driver should also call
-.Xr mac_fini_ops 9F .
+.Fn mac_fini_ops .
 See the example below for how this should be structured.
 .Sh CONTEXT
 The
@@ -110,9 +110,9 @@ functions will always succeed.
 They do not have any kind of return value.
 .Sh EXAMPLES
 The following example shows how a driver would call
-.Xr mac_init_ops 9F
+.Fn mac_init_ops
 and
-.Xr mac_fini_ops 9F
+.Fn mac_fini_ops
 correctly in the
 .Xr _init 9E
 and

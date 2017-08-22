@@ -103,6 +103,8 @@ progressbar_init()
 	(void) BOP_GETPROP(bootops, "console", cons);
 	if (strncmp(cons, "graphics", strlen("graphics")) != 0)
 		return;
+	if (BOP_GETPROPLEN(bootops, "efi-systab") > 0)
+		return;
 
 	graphics_mode = 1;
 

@@ -4,7 +4,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * "Plug and Play" functionality.
@@ -17,8 +16,9 @@ __FBSDID("$FreeBSD$");
 #include <stand.h>
 #include <string.h>
 #include <bootstrap.h>
+#include "ficl.h"
 
-struct pnpinfo_stql	pnp_devices;
+static struct pnpinfo_stql pnp_devices;
 static int		pnp_devices_initted = 0;
 
 static void		pnp_discard(void);
@@ -182,3 +182,44 @@ pnp_eisaformat(u_int8_t *data)
     return(idbuf);
 }
 
+void
+ficlPnpdevices(ficlVm *pVM)
+{
+	static int pnp_devices_initted = 0;
+
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 0, 1);
+
+	if (!pnp_devices_initted) {
+		STAILQ_INIT(&pnp_devices);
+		pnp_devices_initted = 1;
+	}
+
+	ficlStackPushPointer(ficlVmGetDataStack(pVM), &pnp_devices);
+}
+
+void
+ficlPnphandlers(ficlVm *pVM)
+{
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 0, 1);
+
+	ficlStackPushPointer(ficlVmGetDataStack(pVM), pnphandlers);
+}
+
+/*
+ * Glue function to add the appropriate forth words to access pnp BIOS
+ * functionality.
+ */
+static void
+ficlCompilePnp(ficlSystem *pSys)
+{
+	ficlDictionary *dp = ficlSystemGetDictionary(pSys);
+
+	FICL_SYSTEM_ASSERT(pSys, dp);
+
+	ficlDictionarySetPrimitive(dp, "pnpdevices", ficlPnpdevices,
+	    FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "pnphandlers", ficlPnphandlers,
+	    FICL_WORD_DEFAULT);
+}
+
+FICL_COMPILE_SET(ficlCompilePnp);

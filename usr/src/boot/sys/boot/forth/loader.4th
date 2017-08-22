@@ -43,6 +43,9 @@ include /boot/forth/support.4th
 include /boot/forth/color.4th
 include /boot/forth/delay.4th
 include /boot/forth/check-password.4th
+s" efi-version" getenv? [if]
+	include /boot/forth/efi.4th
+[then]
 
 only forth definitions
 

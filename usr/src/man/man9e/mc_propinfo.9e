@@ -58,7 +58,7 @@ If the device driver does not implement either of the
 or
 .Xr mc_setprop 9E
 entry points then it does not need to implement the
-.Xr mc_propinfo 9E
+.Fn mc_propinfo
 entry point.
 However, it is highly recommended that these interfaces be implemented in order
 to give users and administrators of the system access to the properties of the
@@ -260,5 +260,4 @@ example_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 .Sh SEE ALSO
 .Xr mac 9E ,
 .Xr mc_getprop 9E ,
-.Xr mc_propinfo 9E ,
 .Xr mac_prop_info 9F

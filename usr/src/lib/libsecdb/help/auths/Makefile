@@ -148,9 +148,6 @@ HTMLENTS = \
 	LabelPrint.html \
 	LabelRange.html \
 	LabelServer.html \
-	LabelWinDowngrade.html \
-	LabelWinNoView.html \
-	LabelWinUpgrade.html \
 	PrintAdmin.html \
 	PrintCancel.html \
 	PrintHeader.html \

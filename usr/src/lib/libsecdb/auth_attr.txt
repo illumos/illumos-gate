@@ -71,9 +71,6 @@ solaris.label.file.downgrade:::Downgrade File Label::help=LabelFileDowngrade.htm
 solaris.label.file.upgrade:::Upgrade File Label::help=LabelFileUpgrade.html
 solaris.label.print:::View Printer Queue at All Labels::help=LabelPrint.html
 solaris.label.range:::Set Label Outside User Accred Range::help=LabelRange.html
-solaris.label.win.downgrade:::Downgrade DragNDrop or CutPaste Info::help=LabelWinDowngrade.html
-solaris.label.win.noview:::DragNDrop or CutPaste without viewing contents::help=LabelWinNoView.html
-solaris.label.win.upgrade:::Upgrade DragNDrop or CutPaste Info::help=LabelWinUpgrade.html
 #
 solaris.login.:::Login Control::help=LoginHeader.html
 solaris.login.enable:::Enable Logins::help=LoginEnable.html

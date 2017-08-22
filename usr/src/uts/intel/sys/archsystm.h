@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
@@ -60,6 +60,7 @@ extern void patch_sse2(void);
 #endif
 
 extern void patch_xsave(void);
+extern kmem_cache_t *fpsave_cachep;
 
 extern void cli(void);
 extern void sti(void);

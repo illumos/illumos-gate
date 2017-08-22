@@ -28,6 +28,7 @@
 
 /*
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_IXGBE_DEBUG_H
@@ -55,9 +56,6 @@ extern "C" {
 #define	IXGBE_DEBUGLOG_6(adapter, fmt, d1, d2, d3, d4, d5, d6)	\
 	ixgbe_log((adapter), (fmt), (d1), (d2), (d3), (d4), (d5), (d6))
 
-#define	IXGBE_DEBUG_STAT_COND(val, cond)	if (cond) (val)++;
-#define	IXGBE_DEBUG_STAT(val)		(val)++;
-
 #else
 
 #define	IXGBE_DEBUGLOG_0(adapter, fmt)
@@ -65,9 +63,6 @@ extern "C" {
 #define	IXGBE_DEBUGLOG_2(adapter, fmt, d1, d2)
 #define	IXGBE_DEBUGLOG_3(adapter, fmt, d1, d2, d3)
 #define	IXGBE_DEBUGLOG_6(adapter, fmt, d1, d2, d3, d4, d5, d6)
-
-#define	IXGBE_DEBUG_STAT_COND(val, cond)
-#define	IXGBE_DEBUG_STAT(val)
 
 #endif	/* IXGBE_DEBUG */
 
@@ -123,8 +118,6 @@ void ixgbe_dump_addr(void *, char *, const uint8_t *);
  * it as blank.
  */
 #define	DEBUGFUNC(F)
-
-#define	IXGBE_STAT(val)		(val)++;
 
 extern void ixgbe_log(void *, const char *, ...);
 

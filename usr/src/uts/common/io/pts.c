@@ -139,8 +139,8 @@ static struct module_info pts_info = {
 	0xface,
 	"pts",
 	0,
-	512,
-	512,
+	_TTY_BUFSIZ,
+	_TTY_BUFSIZ,
 	128
 };
 
@@ -181,8 +181,8 @@ static int pts_detach(dev_info_t *, ddi_detach_cmd_t);
  * this will define (struct cb_ops cb_pts_ops) and (struct dev_ops pts_ops)
  */
 DDI_DEFINE_STREAM_OPS(pts_ops, nulldev, nulldev,	\
-	pts_attach, pts_detach, nodev,			\
-	pts_devinfo, PTS_CONF_FLAG, &ptsinfo, ddi_quiesce_not_supported);
+    pts_attach, pts_detach, nodev,			\
+    pts_devinfo, PTS_CONF_FLAG, &ptsinfo, ddi_quiesce_not_supported);
 
 /*
  * Module linkage information for the kernel.
@@ -409,7 +409,7 @@ ptsopen(
 	mop->b_wptr += sizeof (struct stroptions);
 	sop = (struct stroptions *)mop->b_rptr;
 	sop->so_flags = SO_HIWAT | SO_LOWAT | SO_ISTTY;
-	sop->so_hiwat = 512;
+	sop->so_hiwat = _TTY_BUFSIZ;
 	sop->so_lowat = 256;
 	putnext(rqp, mop);
 

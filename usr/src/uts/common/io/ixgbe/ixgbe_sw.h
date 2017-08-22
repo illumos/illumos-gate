@@ -511,14 +511,9 @@ typedef struct ixgbe_tx_ring {
 	uint32_t		stat_fail_no_tcb;
 	uint32_t		stat_fail_dma_bind;
 	uint32_t		stat_reschedule;
-
-#ifdef IXGBE_DEBUG
-	/*
-	 * Debug statistics
-	 */
 	uint32_t		stat_break_tbd_limit;
 	uint32_t		stat_lso_header_fail;
-#endif
+
 	uint64_t		stat_obytes;
 	uint64_t		stat_opackets;
 
@@ -774,6 +769,8 @@ typedef struct ixgbe_stat {
 	kstat_named_t tx_fail_no_tbd;	/* Tx Fail Desc Ring Empty */
 	kstat_named_t tx_fail_dma_bind;	/* Tx Fail DMA bind */
 	kstat_named_t tx_reschedule;	/* Tx Reschedule */
+	kstat_named_t tx_break_tbd_limit; /* Reached single xmit desc limit */
+	kstat_named_t tx_lso_header_fail; /* New mblk for last LSO hdr frag */
 
 	kstat_named_t gprc;	/* Good Packets Received Count */
 	kstat_named_t gptc;	/* Good Packets Xmitted Count */

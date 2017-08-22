@@ -148,7 +148,7 @@ span.new {
 '
 
 # CSS for the HTML version of the man pages.
-# Current version is from mdocml-1.14.1.
+# Current version is from mandoc 1.14.2.
 MANCSS='
 html { max-width: 100ex; }
 body { font-family: Helvetica,Arial,sans-serif; }
@@ -156,6 +156,8 @@ table { margin-top: 0em; margin-bottom: 0em; }
 td { vertical-align: top; }
 ul, ol, dl { margin-top: 0em; margin-bottom: 0em; }
 li, dt { margin-top: 1em; }
+a.selflink { border-bottom: thin dotted; color: inherit; font: inherit;
+    text-decoration: inherit; }
 fieldset { border: thin solid silver; border-radius: 1em; text-align: center; }
 input[name=expr] { width: 25%; }
 table.results { margin-top: 1em; margin-left: 2em; font-size: smaller; }
@@ -183,29 +185,33 @@ ul.Bl-dash { list-style-type: none; padding-left: 0em; }
 li.It-dash:before { content: "\2014  "; }
 ul.Bl-item { list-style-type: none; padding-left: 0em; }
 li.It-item { }
+ul.Bl-compact > li { margin-top: 0ex; }
 ol.Bl-enum { padding-left: 2em; }
 li.It-enum { }
+ol.Bl-compact > li { margin-top: 0ex; }
 dl.Bl-diag { }
 dt.It-diag { }
-dd.It-diag { }
+dd.It-diag { margin-left: 0ex; }
 b.It-diag { font-style: normal; }
 dl.Bl-hang { }
 dt.It-hang { }
-dd.It-hang { }
+dd.It-hang { margin-left: 10.2ex; }
 dl.Bl-inset { }
 dt.It-inset { }
-dd.It-inset { }
+dd.It-inset { margin-left: 0ex; }
 dl.Bl-ohang { }
 dt.It-ohang { }
 dd.It-ohang { margin-left: 0ex; }
-dl.Bl-tag { margin-left: 8ex; }
-dt.It-tag { float: left; clear: both; margin-top: 0ex; margin-left: -8ex;
+dl.Bl-tag { margin-left: 10.2ex; }
+dt.It-tag { float: left; margin-top: 0ex; margin-left: -10.2ex;
     padding-right: 2ex; vertical-align: top; }
-dd.It-tag { width: 100%; margin-top: 0ex; margin-left: 0ex; vertical-align: top;
-    overflow: auto; }
+dd.It-tag { clear: right; width: 100%; margin-top: 0ex; margin-left: 0ex;
+    vertical-align: top; overflow: auto; }
+dl.Bl-compact > dt { margin-top: 0ex; }
 table.Bl-column { }
 tr.It-column { }
 td.It-column { margin-top: 1em; }
+table.Bl-compact > tbody > tr > td { margin-top: 0ex; }
 cite.Rs { font-style: normal; font-weight: normal; }
 span.RsA { }
 i.RsB { font-weight: normal; }

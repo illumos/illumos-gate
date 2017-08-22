@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 #include <sys/asm_linkage.h>
@@ -518,7 +518,7 @@ fcnname/**/_info:							\
 	WSTUB(ipsecah,	ipsecah_icmp_error,	nomod_zero);
 	END_MODULE(ipsecah);
 #endif
-	
+
 #ifndef	IPSECESP_MODULE
 	MODULE(ipsecesp,drv);
 	WSTUB(ipsecesp,	ipsecesp_fill_defs,	nomod_zero);
@@ -529,9 +529,10 @@ fcnname/**/_info:							\
 	WSTUB(ipsecesp,	ipsecesp_send_keepalive,	nomod_zero);
 	END_MODULE(ipsecesp);
 #endif
-	
+
 #ifndef	KEYSOCK_MODULE
 	MODULE(keysock,	drv);
+	WSTUB(keysock,	keysock_spdsock_wput_iocdata,	nomod_void);
 	WSTUB(keysock,	keysock_plumb_ipsec,	nomod_zero);
 	WSTUB(keysock,	keysock_extended_reg,	nomod_zero);
 	WSTUB(keysock,	keysock_next_seq,	nomod_zero);
