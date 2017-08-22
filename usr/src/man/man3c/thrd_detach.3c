@@ -40,7 +40,7 @@ The act of calling
 on a thread does not cause it to terminate.
 .Sh RETURN VALUES
 Upon successful completion, the
-.Xr thrd_detach 3C
+.Fn thrd_detach
 function returns
 .Sy thrd_success .
 Otherwise, it returns

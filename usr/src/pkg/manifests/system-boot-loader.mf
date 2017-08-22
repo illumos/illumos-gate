@@ -52,6 +52,7 @@ $(i386_ONLY)file path=boot/forth/brand.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/check-password.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/color.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/delay.4th group=sys mode=0444
+$(i386_ONLY)file path=boot/forth/efi.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/frames.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/loader.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/logo-beastie.4th group=sys mode=0444

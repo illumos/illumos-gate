@@ -66,7 +66,7 @@ section of
 When the driver is done with the
 .Xr mac_register 9S
 structure, it must call the
-.Xr mac_free 9F
+.Fn mac_free
 function to release any associated memory.
 .Sh CONTEXT
 The

@@ -107,7 +107,7 @@ Event Notification Agent Management:::Manage Event Notification Agents:auths=sol
 # Trusted Extensions profiles:
 #
 Information Security:::Maintains MAC and DAC security policies:profiles=Device Security,File System Security,Name Service Security,Network Security,Object Access Management,Object Label Management;help=RtInfoSec.html
-Object Label Management:::Change labels on files.:auths=solaris.device.allocate,solaris.label.file.downgrade,solaris.label.win.downgrade,solaris.label.win.upgrade,solaris.label.file.upgrade,solaris.label.range,solaris.smf.manage.labels;help=RtObjectLabelMngmnt.html
+Object Label Management:::Change labels on files.:auths=solaris.device.allocate,solaris.label.file.downgrade,solaris.label.file.upgrade,solaris.label.range,solaris.smf.manage.labels;help=RtObjectLabelMngmnt.html
 Outside Accred:::Allow a user to operate outside the user accreditation range.:auths=solaris.label.range;help=RtOutsideAccred.html
 #
 # Power Management profiles:

@@ -380,7 +380,7 @@ ptmopen(
 		sop->so_flags = SO_HIWAT | SO_LOWAT;
 	else
 		sop->so_flags = SO_HIWAT | SO_LOWAT | SO_ISTTY;
-	sop->so_hiwat = 512;
+	sop->so_hiwat = _TTY_BUFSIZ;
 	sop->so_lowat = 256;
 	putnext(rqp, mop);
 

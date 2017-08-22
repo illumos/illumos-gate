@@ -28,7 +28,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
@@ -176,6 +176,11 @@ extern "C" {
 #define	CPUID_AMD_ECX_TOPOEXT	0x00400000	/* AMD: Topology Extensions */
 
 /*
+ * AMD uses %ebx for some of their features (extended function 0x80000008).
+ */
+#define	CPUID_AMD_EBX_ERR_PTR_ZERO	0x00000004 /* AMD: FP Err. Ptr. Zero */
+
+/*
  * Intel now seems to have claimed part of the "extended" function
  * space that we previously for non-Intel implementors to use.
  * More excitingly still, they've claimed bit 20 to mean LAHF/SAHF
@@ -192,12 +197,54 @@ extern "C" {
  * specifically label the EBX features with their leaf and sub-leaf.
  */
 #define	CPUID_INTC_EBX_7_0_BMI1		0x00000008	/* BMI1 instrs */
+#define	CPUID_INTC_EBX_7_0_HLE		0x00000010	/* HLE */
 #define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
 #define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
 #define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 instrs */
+#define	CPUID_INTC_EBX_7_0_MPX		0x00004000	/* Mem. Prot. Ext. */
+#define	CPUID_INTC_EBX_7_0_AVX512F	0x00010000	/* AVX512 foundation */
+#define	CPUID_INTC_EBX_7_0_AVX512DQ	0x00020000	/* AVX512DQ */
 #define	CPUID_INTC_EBX_7_0_RDSEED	0x00040000	/* RDSEED instr */
 #define	CPUID_INTC_EBX_7_0_ADX		0x00080000	/* ADX instrs */
 #define	CPUID_INTC_EBX_7_0_SMAP		0x00100000	/* SMAP in CR 4 */
+#define	CPUID_INTC_EBX_7_0_AVX512IFMA	0x00200000	/* AVX512IFMA */
+#define	CPUID_INTC_EBX_7_0_CLWB		0x01000000	/* CLWB */
+#define	CPUID_INTC_EBX_7_0_AVX512PF	0x04000000	/* AVX512PF */
+#define	CPUID_INTC_EBX_7_0_AVX512ER	0x08000000	/* AVX512ER */
+#define	CPUID_INTC_EBX_7_0_AVX512CD	0x10000000	/* AVX512CD */
+#define	CPUID_INTC_EBX_7_0_SHA		0x20000000	/* SHA extensions */
+#define	CPUID_INTC_EBX_7_0_AVX512BW	0x40000000	/* AVX512BW */
+#define	CPUID_INTC_EBX_7_0_AVX512VL	0x80000000	/* AVX512VL */
+
+#define	CPUID_INTC_EBX_7_0_ALL_AVX512 \
+	(CPUID_INTC_EBX_7_0_AVX512F | CPUID_INTC_EBX_7_0_AVX512DQ | \
+	CPUID_INTC_EBX_7_0_AVX512IFMA | CPUID_INTC_EBX_7_0_AVX512PF | \
+	CPUID_INTC_EBX_7_0_AVX512ER | CPUID_INTC_EBX_7_0_AVX512CD | \
+	CPUID_INTC_EBX_7_0_AVX512BW | CPUID_INTC_EBX_7_0_AVX512VL)
+
+#define	CPUID_INTC_ECX_7_0_AVX512VBMI	0x00000002	/* AVX512VBMI */
+#define	CPUID_INTC_ECX_7_0_UMIP		0x00000004	/* UMIP */
+#define	CPUID_INTC_ECX_7_0_PKU		0x00000008	/* umode prot. keys */
+#define	CPUID_INTC_ECX_7_0_OSPKE	0x00000010	/* OSPKE */
+#define	CPUID_INTC_ECX_7_0_AVX512VPOPCDQ 0x00004000	/* AVX512 VPOPCNTDQ */
+
+#define	CPUID_INTC_ECX_7_0_ALL_AVX512 \
+	(CPUID_INTC_ECX_7_0_AVX512VBMI | CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
+
+#define	CPUID_INTC_EDX_7_0_AVX5124NNIW	0x00000004	/* AVX512 4NNIW */
+#define	CPUID_INTC_EDX_7_0_AVX5124FMAPS	0x00000008	/* AVX512 4FMAPS */
+
+#define	CPUID_INTC_EDX_7_0_ALL_AVX512 \
+	(CPUID_INTC_EDX_7_0_AVX5124NNIW | CPUID_INTC_EDX_7_0_AVX5124FMAPS)
+
+/*
+ * Intel also uses cpuid leaf 0xd to report additional instructions and features
+ * when the sub-leaf in %ecx == 1. We label these using the same convention as
+ * with leaf 7.
+ */
+#define	CPUID_INTC_EAX_D_1_XSAVEOPT	0x00000001	/* xsaveopt inst. */
+#define	CPUID_INTC_EAX_D_1_XSAVEC	0x00000002	/* xsavec inst. */
+#define	CPUID_INTC_EAX_D_1_XSAVES	0x00000008	/* xsaves inst. */
 
 #define	P5_MCHADDR	0x0
 #define	P5_CESR		0x11
@@ -376,6 +423,26 @@ extern "C" {
 #define	X86FSET_SMAP		46
 #define	X86FSET_ADX		47
 #define	X86FSET_RDSEED		48
+#define	X86FSET_MPX		49
+#define	X86FSET_AVX512F		50
+#define	X86FSET_AVX512DQ	51
+#define	X86FSET_AVX512PF	52
+#define	X86FSET_AVX512ER	53
+#define	X86FSET_AVX512CD	54
+#define	X86FSET_AVX512BW	55
+#define	X86FSET_AVX512VL	56
+#define	X86FSET_AVX512FMA	57
+#define	X86FSET_AVX512VBMI	58
+#define	X86FSET_AVX512VPOPCDQ	59
+#define	X86FSET_AVX512NNIW	60
+#define	X86FSET_AVX512FMAPS	61
+#define	X86FSET_XSAVEOPT	62
+#define	X86FSET_XSAVEC		63
+#define	X86FSET_XSAVES		64
+#define	X86FSET_SHA		65
+#define	X86FSET_UMIP		66
+#define	X86FSET_PKU		67
+#define	X86FSET_OSPKE		68
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -611,24 +678,30 @@ extern "C" {
 
 /*
  * xgetbv/xsetbv support
+ * See section 13.3 in vol. 1 of the Intel devlopers manual.
  */
 
 #define	XFEATURE_ENABLED_MASK	0x0
 /*
  * XFEATURE_ENABLED_MASK values (eax)
+ * See setup_xfem().
  */
 #define	XFEATURE_LEGACY_FP	0x1
 #define	XFEATURE_SSE		0x2
 #define	XFEATURE_AVX		0x4
-#define	XFEATURE_MAX		XFEATURE_AVX
+#define	XFEATURE_MPX		0x18	/* 2 bits, both 0 or 1 */
+#define	XFEATURE_AVX512		0xe0	/* 3 bits, all 0 or 1 */
+	/* bit 8 unused */
+#define	XFEATURE_PKRU		0x200
 #define	XFEATURE_FP_ALL	\
-	(XFEATURE_LEGACY_FP|XFEATURE_SSE|XFEATURE_AVX)
+	(XFEATURE_LEGACY_FP | XFEATURE_SSE | XFEATURE_AVX | XFEATURE_MPX | \
+	XFEATURE_AVX512 | XFEATURE_PKRU)
 
 #if !defined(_ASM)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	49
+#define	NUM_X86_FEATURES	69
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -712,6 +785,8 @@ extern uint_t cpuid_get_procnodeid(struct cpu *cpu);
 extern uint_t cpuid_get_procnodes_per_pkg(struct cpu *cpu);
 extern uint_t cpuid_get_compunitid(struct cpu *cpu);
 extern uint_t cpuid_get_cores_per_compunit(struct cpu *cpu);
+extern size_t cpuid_get_xsave_size();
+extern boolean_t cpuid_need_fp_excp_handling();
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);

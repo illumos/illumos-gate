@@ -122,7 +122,5 @@ in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
 .Xr libproc 3LIB ,
-.Xr Psysentry 3PROC ,
-.Xr Psysexit 3PROC ,
 .Xr proc 4 ,
 .Xr attributes 5

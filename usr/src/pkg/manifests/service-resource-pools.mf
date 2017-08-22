@@ -57,11 +57,8 @@ dir path=var group=sys variant.opensolaris.zone=global
 dir path=var/adm/pool group=sys variant.opensolaris.zone=global
 dir path=var/log/pool group=sys variant.opensolaris.zone=global
 driver name=pool perms="pool 0666 root sys" perms="poolctl 0666 root sys"
-file path=lib/svc/manifest/system/poold.xml group=sys mode=0444 \
-    variant.opensolaris.zone=global
 file path=lib/svc/manifest/system/pools.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
-file path=lib/svc/method/svc-poold mode=0555 variant.opensolaris.zone=global
 file path=lib/svc/method/svc-pools mode=0555 variant.opensolaris.zone=global
 file path=usr/bin/poolstat mode=0555
 file path=usr/include/pool.h

@@ -32,12 +32,16 @@
 #include <sys/reboot.h>
 #include <sys/boot.h>
 #include <stand.h>
+#include <inttypes.h>
 #include <string.h>
 #include <setjmp.h>
 
 #include <efi.h>
 #include <efilib.h>
 #include <efigpt.h>
+
+#include <uuid.h>
+#include <stdbool.h>
 
 #include <bootstrap.h>
 #include <smbios.h>
@@ -52,19 +56,10 @@ extern char bootprog_info[];
 
 struct arch_switch archsw;	/* MI/MD interface boundary */
 
-EFI_GUID acpi = ACPI_TABLE_GUID;
-EFI_GUID acpi20 = ACPI_20_TABLE_GUID;
 EFI_GUID devid = DEVICE_PATH_PROTOCOL;
 EFI_GUID imgid = LOADED_IMAGE_PROTOCOL;
-EFI_GUID mps = MPS_TABLE_GUID;
-EFI_GUID netid = EFI_SIMPLE_NETWORK_PROTOCOL;
 EFI_GUID smbios = SMBIOS_TABLE_GUID;
 EFI_GUID smbios3 = SMBIOS3_TABLE_GUID;
-EFI_GUID dxe = DXE_SERVICES_TABLE_GUID;
-EFI_GUID hoblist = HOB_LIST_TABLE_GUID;
-EFI_GUID memtype = MEMORY_TYPE_INFORMATION_TABLE_GUID;
-EFI_GUID debugimg = DEBUG_IMAGE_INFO_TABLE_GUID;
-EFI_GUID fdtdtb = FDT_TABLE_GUID;
 EFI_GUID inputid = SIMPLE_TEXT_INPUT_PROTOCOL;
 EFI_GUID serial_io = SERIAL_IO_PROTOCOL;
 
@@ -73,29 +68,6 @@ void efi_serial_init(void);
 #ifdef EFI_ZFS_BOOT
 static void efi_zfs_probe(void);
 #endif
-
-/*
- * Need this because EFI uses UTF-16 unicode string constants, but we
- * use UTF-8. We can't use printf due to the possibility of \0 and we
- * don't support wide characters either.
- */
-static void
-print_str16(const CHAR16 *str)
-{
-	int i;
-
-	for (i = 0; str[i]; i++)
-		printf("%c", (char)str[i]);
-}
-
-static void
-cp16to8(const CHAR16 *src, char *dst, size_t len)
-{
-	size_t i;
-
-	for (i = 0; i < len && src[i]; i++)
-		dst[i] = (char)src[i];
-}
 
 static int
 has_keyboard(void)
@@ -311,14 +283,14 @@ main(int argc, CHAR16 *argv[])
 						if (i + 1 == argc) {
 							setenv("comconsole_speed", "115200", 1);
 						} else {
-							cp16to8(&argv[i + 1][0], var,
+							cpy16to8(&argv[i + 1][0], var,
 							    sizeof(var));
 							setenv("comconsole_speedspeed", var, 1);
 						}
 						i++;
 						break;
 					} else {
-						cp16to8(&argv[i][j + 1], var,
+						cpy16to8(&argv[i][j + 1], var,
 						    sizeof(var));
 						setenv("comconsole_speed", var, 1);
 						break;
@@ -374,19 +346,15 @@ main(int argc, CHAR16 *argv[])
 
 	printf("Command line arguments:");
 	for (i = 0; i < argc; i++) {
-		printf(" ");
-		print_str16(argv[i]);
+		printf(" %S", argv[i]);
 	}
 	printf("\n");
 
 	printf("Image base: 0x%lx\n", (u_long)img->ImageBase);
 	printf("EFI version: %d.%02d\n", ST->Hdr.Revision >> 16,
 	    ST->Hdr.Revision & 0xffff);
-	printf("EFI Firmware: ");
-	/* printf doesn't understand EFI Unicode */
-	ST->ConOut->OutputString(ST->ConOut, ST->FirmwareVendor);
-	printf(" (rev %d.%02d)\n", ST->FirmwareRevision >> 16,
-	    ST->FirmwareRevision & 0xffff);
+	printf("EFI Firmware: %S (rev %d.%02d)\n", ST->FirmwareVendor,
+	    ST->FirmwareRevision >> 16, ST->FirmwareRevision & 0xffff);
 
 	printf("\n%s", bootprog_info);
 
@@ -440,8 +408,7 @@ main(int argc, CHAR16 *argv[])
 	}
 	}
 
-	setenv("LINES", "24", 1);	/* optional */
-	setenv("COLUMNS", "80", 1);	/* optional */
+	efi_init_environment();
 	setenv("ISADIR", "amd64", 1);	/* we only build 64bit */
 	acpi_detect();
 
@@ -487,22 +454,6 @@ command_memmap(int argc __attribute((unused)),
 	int i, ndesc;
 	int rv = 0;
 	char line[80];
-	static const char *types[] = {
-	    "Reserved",
-	    "LoaderCode",
-	    "LoaderData",
-	    "BootServicesCode",
-	    "BootServicesData",
-	    "RuntimeServicesCode",
-	    "RuntimeServicesData",
-	    "ConventionalMemory",
-	    "UnusableMemory",
-	    "ACPIReclaimMemory",
-	    "ACPIMemoryNVS",
-	    "MemoryMappedIO",
-	    "MemoryMappedIOPortSpace",
-	    "PalCode"
-	};
 
 	sz = 0;
 	status = BS->GetMemoryMap(&sz, 0, &key, &dsz, &dver);
@@ -530,7 +481,7 @@ command_memmap(int argc __attribute((unused)),
 	for (i = 0, p = map; i < ndesc;
 	     i++, p = NextMemoryDescriptor(p, dsz)) {
 		snprintf(line, 80, "%23s %012lx %012lx %08lx ",
-		    types[p->Type],
+		    efi_memory_type(p->Type),
 		    p->PhysicalStart,
 		    p->VirtualStart,
 		    p->NumberOfPages);
@@ -554,6 +505,12 @@ command_memmap(int argc __attribute((unused)),
 			printf("RP ");
 		if (p->Attribute & EFI_MEMORY_XP)
 			printf("XP ");
+		if (p->Attribute & EFI_MEMORY_NV)
+			printf("NV ");
+		if (p->Attribute & EFI_MEMORY_MORE_RELIABLE)
+			printf("MR ");
+		if (p->Attribute & EFI_MEMORY_RO)
+			printf("RO ");
 		rv = pager_output("\n");
 		if (rv)
 			break;
@@ -566,23 +523,12 @@ command_memmap(int argc __attribute((unused)),
 COMMAND_SET(configuration, "configuration", "print configuration tables",
     command_configuration);
 
-static const char *
-guid_to_string(EFI_GUID *guid)
-{
-	static char buf[40];
-
-	sprintf(buf, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-	    guid->Data1, guid->Data2, guid->Data3, guid->Data4[0],
-	    guid->Data4[1], guid->Data4[2], guid->Data4[3], guid->Data4[4],
-	    guid->Data4[5], guid->Data4[6], guid->Data4[7]);
-	return (buf);
-}
-
 static int
 command_configuration(int argc __attribute((unused)),
     char *argv[] __attribute((unused)))
 {
 	UINTN i;
+	char *name;
 
 	printf("NumberOfTableEntries=%lu\n",
 		(unsigned long)ST->NumberOfTableEntries);
@@ -591,28 +537,13 @@ command_configuration(int argc __attribute((unused)),
 
 		printf("  ");
 		guid = &ST->ConfigurationTable[i].VendorGuid;
-		if (!memcmp(guid, &mps, sizeof(EFI_GUID)))
-			printf("MPS Table");
-		else if (!memcmp(guid, &acpi, sizeof(EFI_GUID)))
-			printf("ACPI Table");
-		else if (!memcmp(guid, &acpi20, sizeof(EFI_GUID)))
-			printf("ACPI 2.0 Table");
-		else if (!memcmp(guid, &smbios, sizeof(EFI_GUID)))
-			printf("SMBIOS Table");
-		else if (!memcmp(guid, &smbios3, sizeof(EFI_GUID)))
-			printf("SMBIOS3 Table");
-		else if (!memcmp(guid, &dxe, sizeof(EFI_GUID)))
-			printf("DXE Table");
-		else if (!memcmp(guid, &hoblist, sizeof(EFI_GUID)))
-			printf("HOB List Table");
-		else if (!memcmp(guid, &memtype, sizeof(EFI_GUID)))
-			printf("Memory Type Information Table");
-		else if (!memcmp(guid, &debugimg, sizeof(EFI_GUID)))
-			printf("Debug Image Info Table");
-		else if (!memcmp(guid, &fdtdtb, sizeof(EFI_GUID)))
-			printf("FDT Table");
-		else
-			printf("Unknown Table (%s)", guid_to_string(guid));
+
+		if (efi_guid_to_name(guid, &name) == true) {
+			printf(name);
+			free(name);
+		} else {
+			printf("Error while translating UUID to name");
+		}
 		printf(" at %p\n", ST->ConfigurationTable[i].VendorTable);
 	}
 
@@ -675,209 +606,18 @@ command_mode(int argc, char *argv[])
 	return (CMD_OK);
 }
 
-
-COMMAND_SET(nvram, "nvram", "get NVRAM variables", command_nvram);
-
-static int
-command_nvram(int argc __attribute((unused)),
-    char *argv[] __attribute((unused)))
-{
-	CHAR16 var[128];
-	UINT8 *data;		/* value is in bytes */
-	EFI_STATUS status;
-	EFI_GUID varguid = { 0,0,0,{0,0,0,0,0,0,0,0} };
-	UINTN varsz, datasz, i;
-	UINT32 attr;
-	SIMPLE_TEXT_OUTPUT_INTERFACE *conout;
-
-	conout = ST->ConOut;
-
-	pager_open();
-	var[0] = 0;		/* Initiate the enumeration */
-	varsz = 128;
-
-	for (status = RS->GetNextVariableName(&varsz, var, &varguid);
-	    status != EFI_NOT_FOUND;
-	    status = RS->GetNextVariableName(&varsz, var, &varguid)) {
-
-		/*
-		 * as term emu is keeping track on cursor, use putchar().
-		 */
-		for (i = 0; var[i] != 0; i++)
-			putchar(var[i]);
-		varsz = 128;    /* GetNextVariableName() did change it. */
-
-		printf(": Attributes:");
-		datasz = 0;
-		status = RS->GetVariable(var, &varguid, &attr, &datasz, NULL);
-		if ((data = malloc(datasz)) == NULL)
-			break;
-		status = RS->GetVariable(var, &varguid, &attr, &datasz, data);
-		if (EFI_ERROR(status))
-			printf("<error retrieving variable>");
-		else {
-			if (attr & EFI_VARIABLE_NON_VOLATILE)
-				printf(" NV");
-			if (attr & EFI_VARIABLE_BOOTSERVICE_ACCESS)
-				printf(" BS");
-			if (attr & EFI_VARIABLE_RUNTIME_ACCESS)
-				printf(" RS");
-			if (attr & EFI_VARIABLE_HARDWARE_ERROR_RECORD)
-				printf(" HR");
-			if (attr & EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS)
-				printf(" AW");
-			if (attr &
-			    EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS)
-				printf(" TW");
-
-			printf(": DataLength: %lld", (long long)datasz);
-		}
-		free(data);
-		if (pager_output("\n"))
-			break;
-	}
-
-	pager_close();
-	return (CMD_OK);
-}
-
-struct protocol_name {
-	EFI_GUID guid;
-	const char *name;
-} proto_names[] = {
-	{ DEVICE_PATH_PROTOCOL, "device path" },
-	{ BLOCK_IO_PROTOCOL, "block io" },
-	{ DISK_IO_PROTOCOL, "disk io" },
-	{ EFI_DISK_INFO_PROTOCOL_GUID, "disk info" },
-	{ SIMPLE_FILE_SYSTEM_PROTOCOL, "simple fs" },
-	{ LOAD_FILE_PROTOCOL, "load file" },
-	{ DEVICE_IO_PROTOCOL, "device io" },
-	{ UNICODE_COLLATION_PROTOCOL, "unicode collation" },
-	{ EFI_UNICODE_COLLATION2_PROTOCOL_GUID, "unicode collation2" },
-	{ EFI_SIMPLE_NETWORK_PROTOCOL, "simple network" },
-	{ SIMPLE_TEXT_OUTPUT_PROTOCOL, "simple text output" },
-	{ SIMPLE_TEXT_INPUT_PROTOCOL, "simple text input" },
-	{ EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID, "simple text ex input" },
-	{ EFI_CONSOLE_CONTROL_PROTOCOL_GUID, "console control" },
-	{ EFI_CONSOLE_IN_DEVICE_GUID, "stdin" },
-	{ EFI_CONSOLE_OUT_DEVICE_GUID, "stdout" },
-	{ EFI_STANDARD_ERROR_DEVICE_GUID, "stderr" },
-	{ EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, "GOP" },
-	{ EFI_UGA_DRAW_PROTOCOL_GUID, "UGA draw" },
-	{ EFI_PXE_BASE_CODE_PROTOCOL, "PXE base code" },
-	{ EFI_PXE_BASE_CODE_CALLBACK_PROTOCOL, "PXE base code callback" },
-	{ SERIAL_IO_PROTOCOL, "serial io" },
-	{ LOADED_IMAGE_PROTOCOL, "loaded image" },
-	{ EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID,
-	    "loaded image device path" },
-	{ EFI_ISA_IO_PROTOCOL_GUID, "ISA io" },
-	{ EFI_IDE_CONTROLLER_INIT_PROTOCOL_GUID, "IDE controller init" },
-	{ EFI_ISA_ACPI_PROTOCOL_GUID, "ISA ACPI" },
-	{ EFI_PCI_IO_PROTOCOL_GUID, "PCI" },
-	{ EFI_PCI_ROOT_IO_GUID, "PCI root" },
-	{ EFI_PCI_ENUMERATION_COMPLETE_GUID, "PCI enumeration" },
-	{ EFI_DRIVER_DIAGNOSTICS_PROTOCOL_GUID, "Driver diagnostics" },
-	{ EFI_DRIVER_DIAGNOSTICS2_PROTOCOL_GUID, "Driver diagnostics2" },
-	{ EFI_SIMPLE_POINTER_PROTOCOL_GUID, "simple pointer" },
-	{ EFI_ABSOLUTE_POINTER_PROTOCOL_GUID, "absolute pointer" },
-	{ EFI_VLAN_CONFIG_PROTOCOL_GUID, "VLAN config" },
-	{ EFI_ARP_SERVICE_BINDING_PROTOCOL_GUID, "ARP service binding" },
-	{ EFI_ARP_PROTOCOL_GUID, "ARP" },
-	{ EFI_IP4_SERVICE_BINDING_PROTOCOL, "IPv4 service binding" },
-	{ EFI_IP4_PROTOCOL, "IPv4" },
-	{ EFI_IP4_CONFIG_PROTOCOL_GUID, "IPv4 config" },
-	{ EFI_IP6_SERVICE_BINDING_PROTOCOL, "IPv6 service binding" },
-	{ EFI_IP6_PROTOCOL, "IPv6" },
-	{ EFI_IP6_CONFIG_PROTOCOL_GUID, "IPv6 config" },
-	{ EFI_UDP4_PROTOCOL, "UDPv4" },
-	{ EFI_UDP4_SERVICE_BINDING_PROTOCOL, "UDPv4 service binding" },
-	{ EFI_UDP6_PROTOCOL, "UDPv6" },
-	{ EFI_UDP6_SERVICE_BINDING_PROTOCOL, "UDPv6 service binding" },
-	{ EFI_TCP4_PROTOCOL, "TCPv4" },
-	{ EFI_TCP4_SERVICE_BINDING_PROTOCOL, "TCPv4 service binding" },
-	{ EFI_TCP6_PROTOCOL, "TCPv6" },
-	{ EFI_TCP6_SERVICE_BINDING_PROTOCOL, "TCPv6 service binding" },
-	{ EFI_PART_TYPE_EFI_SYSTEM_PART_GUID, "EFI System partition" },
-	{ EFI_PART_TYPE_LEGACY_MBR_GUID, "MBR legacy" },
-	{ EFI_DEVICE_TREE_GUID, "device tree" },
-	{ EFI_USB_IO_PROTOCOL_GUID, "USB io" },
-	{ EFI_USB2_HC_PROTOCOL_GUID, "USB2 HC" },
-	{ EFI_COMPONENT_NAME_PROTOCOL_GUID, "component name" },
-	{ EFI_COMPONENT_NAME2_PROTOCOL_GUID, "component name2" },
-	{ EFI_DRIVER_BINDING_PROTOCOL_GUID, "driver binding" },
-	{ EFI_DRIVER_CONFIGURATION_PROTOCOL_GUID, "driver configuration" },
-	{ EFI_DRIVER_CONFIGURATION2_PROTOCOL_GUID, "driver configuration2" },
-	{ EFI_DECOMPRESS_PROTOCOL_GUID, "decompress" },
-	{ EFI_EBC_INTERPRETER_PROTOCOL_GUID, "ebc interpreter" },
-	{ EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL,
-	    "network interface identifier" },
-	{ EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL_31,
-	    "network interface identifier_31" },
-	{ EFI_MANAGED_NETWORK_SERVICE_BINDING_PROTOCOL_GUID,
-	    "managed network service binding" },
-	{ EFI_MANAGED_NETWORK_PROTOCOL_GUID, "managed network" },
-	{ EFI_FORM_BROWSER2_PROTOCOL_GUID, "form browser" },
-	{ EFI_HII_CONFIG_ROUTING_PROTOCOL_GUID, "HII config routing" },
-	{ EFI_HII_DATABASE_PROTOCOL_GUID, "HII database" },
-	{ EFI_HII_STRING_PROTOCOL_GUID, "HII string" },
-	{ EFI_HII_IMAGE_PROTOCOL_GUID, "HII image" },
-	{ EFI_HII_FONT_PROTOCOL_GUID, "HII font" },
-	{ EFI_HII_CONFIGURATION_ACCESS_PROTOCOL_GUID, "HII config" },
-	{ EFI_MTFTP4_SERVICE_BINDING_PROTOCOL_GUID, "MTFTP4 service binding" },
-	{ EFI_MTFTP4_PROTOCOL_GUID, "MTFTP4" },
-	{ EFI_MTFTP6_SERVICE_BINDING_PROTOCOL_GUID, "MTFTP6 service binding" },
-	{ EFI_MTFTP6_PROTOCOL_GUID, "MTFTP6" },
-	{ EFI_DHCP4_SERVICE_BINDING_PROTOCOL_GUID, "DHCP4 service binding" },
-	{ EFI_DHCP4_PROTOCOL_GUID, "DHCP4" },
-	{ EFI_DHCP6_SERVICE_BINDING_PROTOCOL_GUID, "DHCP6 service binding" },
-	{ EFI_DHCP6_PROTOCOL_GUID, "DHCP6" },
-	{ EFI_SCSI_IO_PROTOCOL_GUID, "SCSI io" },
-	{ EFI_SCSI_PASS_THRU_PROTOCOL_GUID, "SCSI pass thru" },
-	{ EFI_EXT_SCSI_PASS_THRU_PROTOCOL_GUID, "SCSI pass thru ext" },
-	{ EFI_CAPSULE_ARCH_PROTOCOL_GUID, "Capsule arch" },
-	{ EFI_MONOTONIC_COUNTER_ARCH_PROTOCOL_GUID, "monotonic counter arch" },
-	{ EFI_REALTIME_CLOCK_ARCH_PROTOCOL_GUID, "realtime clock arch" },
-	{ EFI_VARIABLE_ARCH_PROTOCOL_GUID, "variable arch" },
-	{ EFI_VARIABLE_WRITE_ARCH_PROTOCOL_GUID, "variable write arch" },
-	{ EFI_WATCHDOG_TIMER_ARCH_PROTOCOL_GUID, "watchdog timer arch" },
-	{ EFI_MP_SERVICES_PROTOCOL_GUID, "MP services" },
-	{ EFI_ACPI_SUPPORT_PROTOCOL_GUID, "ACPI support" },
-	{ EFI_BDS_ARCH_PROTOCOL_GUID, "BDS arch" },
-	{ EFI_METRONOME_ARCH_PROTOCOL_GUID, "metronome arch" },
-	{ EFI_TIMER_ARCH_PROTOCOL_GUID, "timer arch" },
-	{ EFI_DPC_PROTOCOL_GUID, "DPC" },
-	{ EFI_PRINT2_PROTOCOL_GUID, "print2" },
-	{ EFI_DEVICE_PATH_TO_TEXT_PROTOCOL_GUID, "device path to text" },
-	{ EFI_RESET_ARCH_PROTOCOL_GUID, "reset arch" },
-	{ EFI_CPU_ARCH_PROTOCOL_GUID, "CPU arch" },
-	{ EFI_CPU_IO2_PROTOCOL_GUID, "CPU IO2" },
-	{ EFI_LEGACY_8259_PROTOCOL_GUID, "Legacy 8259" },
-	{ EFI_SECURITY_ARCH_PROTOCOL_GUID, "Security arch" },
-	{ EFI_SECURITY2_ARCH_PROTOCOL_GUID, "Security2 arch" },
-	{ EFI_RUNTIME_ARCH_PROTOCOL_GUID, "Runtime arch" },
-	{ EFI_STATUS_CODE_RUNTIME_PROTOCOL_GUID, "status code runtime" },
-	{ EFI_DATA_HUB_PROTOCOL_GUID, "data hub" },
-	{ PCD_PROTOCOL_GUID, "PCD" },
-	{ EFI_PCD_PROTOCOL_GUID, "EFI PCD" },
-	{ EFI_FIRMWARE_VOLUME_BLOCK_PROTOCOL_GUID, "firmware volume block" },
-	{ EFI_FIRMWARE_VOLUME2_PROTOCOL_GUID, "firmware volume2" },
-	{ EFI_FIRMWARE_VOLUME_DISPATCH_PROTOCOL_GUID,
-	    "firmware volume dispatch" },
-	{ LZMA_COMPRESS_GUID, "lzma compress" },
-	{ { 0,0,0,{0,0,0,0,0,0,0,0} }, NULL }	/* must be last entry */
-};
-
 COMMAND_SET(lsefi, "lsefi", "list EFI handles", command_lsefi);
 
 static int
 command_lsefi(int argc __attribute((unused)),
     char *argv[] __attribute((unused)))
 {
+	char *name;
 	EFI_HANDLE *buffer = NULL;
 	EFI_HANDLE handle;
 	UINTN bufsz = 0, i, j;
 	EFI_STATUS status;
-	int k, ret;
+	int ret;
 
 	status = BS->LocateHandle(AllHandles, NULL, NULL, &bufsz, buffer);
 	if (status != EFI_BUFFER_TOO_SMALL) {
@@ -916,21 +656,19 @@ command_lsefi(int argc __attribute((unused)),
 			    (long long)status);
 			continue;
 		}
+
 		for (j = 0; j < nproto; j++) {
-			for (k = 0; proto_names[k].name != NULL; k++)
-				if (memcmp(protocols[j], &proto_names[k].guid,
-				    sizeof (proto_names[k].guid)) == 0)
-					break;
-			if (proto_names[k].name != NULL)
-				printf("  %s", proto_names[k].name);
-			else
-				printf("  %s", guid_to_string(protocols[j]));
-			ret = pager_output("\n");
-			if (ret)
+			if (efi_guid_to_name(protocols[j], &name) == true) {
+				printf("  %s", name);
+				free(name);
+			} else {
+				printf("Error while translating UUID to name");
+			}
+			if ((ret = pager_output("\n")) != 0)
 				break;
 		}
 		BS->FreePool(protocols);
-		if (ret)
+		if (ret != 0)
 			break;
 	}
 	pager_close();
@@ -938,7 +676,6 @@ command_lsefi(int argc __attribute((unused)),
 	return (CMD_OK);
 }
 
-#ifdef EFI_ZFS_BOOT
 COMMAND_SET(lszfs, "lszfs", "list child datasets of a zfs dataset",
     command_lszfs);
 
@@ -993,7 +730,6 @@ command_reloadbe(int argc, char *argv[])
 	return (CMD_OK);
 }
 #endif /* __FreeBSD__ */
-#endif
 
 void
 efi_serial_init(void)

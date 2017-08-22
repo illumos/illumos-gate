@@ -43,7 +43,7 @@ By default, the following is the system-wide configuration for meta slot.
 Meta slot is enabled.
 Meta slot provides token-based object support with the Software RSA PKCS#11
 softtoken
-.Pf ( Xr pkcs11_softtoken 5 ) .
+.Pq Xr pkcs11_softtoken 5 .
 Meta slot is
 allowed to move sensitive token objects to other slots if that is necessary to
 perform an operation.
@@ -139,7 +139,7 @@ Applications can include either of these headers in place of
 which contains both function and type definitions.
 .Sh INTERFACES
 The shared object
-.Lb libpkcs11.so.1
+.Pa libpkcs11.so.1
 provides the public interfaces defined below.
 See
 .Xr Intro 3

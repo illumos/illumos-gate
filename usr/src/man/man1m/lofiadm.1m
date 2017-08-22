@@ -264,14 +264,14 @@ encryption key.
 .It Ar token_key
 PKCS#11 token object in the format:
 .Pp
-.Ar token_name Ns : Ns Ar manufacturer_id Ns : Ns Ar serial_number Ns : Ns Ar key_label
+.Ar token_name Ns \&: Ns Ar manufacturer_id Ns \&: Ns
+.Ar serial_number Ns \&: Ns Ar key_label
 .Pp
 All but the key label are optional and can be empty.
 For example, to specify a token object with only its key label
 .Sy MylofiKey ,
-use:
-.Pp
-.Fl T Ar ::: Ns Ar MylofiKey
+use
+.Fl T Sy :::MylofiKey .
 .It Ar wrapped_key_file
 Path to file containing a symmetric encryption key wrapped by the RSA private
 key specified by

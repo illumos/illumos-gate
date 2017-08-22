@@ -25,7 +25,11 @@
  * SUCH DAMAGE.
  */
 
+#ifndef _LOADER_EFILIB_H
+#define	_LOADER_EFILIB_H
+
 #include <stand.h>
+#include <stdbool.h>
 
 extern EFI_HANDLE		IH;
 extern EFI_SYSTEM_TABLE		*ST;
@@ -52,6 +56,7 @@ CHAR16 *efi_devpath_name(EFI_DEVICE_PATH *);
 void efi_free_devpath_name(CHAR16 *);
 
 int efi_status_to_errno(EFI_STATUS);
+EFI_STATUS errno_to_efi_status(int errno);
 
 void efi_time_init(void);
 void efi_time_fini(void);
@@ -59,3 +64,22 @@ void efi_time_fini(void);
 EFI_STATUS main(int argc, CHAR16 *argv[]);
 void exit(EFI_STATUS status);
 void delay(int usecs);
+
+/* EFI environment initialization. */
+void efi_init_environment(void);
+
+/* EFI Memory type strings. */
+const char *efi_memory_type(EFI_MEMORY_TYPE);
+
+/* CHAR16 utility functions. */
+int wcscmp(CHAR16 *, CHAR16 *);
+void cpy8to16(const char *, CHAR16 *, size_t);
+void cpy16to8(const CHAR16 *, char *, size_t);
+
+/* guids and names */
+bool efi_guid_to_str(const EFI_GUID *, char **);
+bool efi_str_to_guid(const char *, EFI_GUID *);
+bool efi_name_to_guid(const char *, EFI_GUID *);
+bool efi_guid_to_name(EFI_GUID *, char **);
+
+#endif /* _LOADER_EFILIB_H */

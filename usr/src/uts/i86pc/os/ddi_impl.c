@@ -2569,7 +2569,7 @@ impl_setup_ddi(void)
 	check_driver_disable();
 
 #if !defined(__xpv)
-	if (!post_fastreboot)
+	if (!post_fastreboot && BOP_GETPROPLEN(bootops, "efi-systab") < 0)
 		startup_bios_disk();
 #endif
 	/* do bus dependent probes. */

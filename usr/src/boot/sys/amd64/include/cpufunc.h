@@ -11,7 +11,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -324,6 +324,13 @@ mfence(void)
 {
 
 	__asm __volatile("mfence" : : : "memory");
+}
+
+static __inline void
+sfence(void)
+{
+
+	__asm __volatile("sfence" : : : "memory");
 }
 
 static __inline void
@@ -645,9 +652,33 @@ load_gs(u_short sel)
 #endif
 
 static __inline void
+bare_lgdt(struct region_descriptor *addr)
+{
+	__asm __volatile("lgdt (%0)" : : "r" (addr));
+}
+
+static __inline void
+sgdt(struct region_descriptor *addr)
+{
+	char *loc;
+
+	loc = (char *)addr;
+	__asm __volatile("sgdt %0" : "=m" (*loc) : : "memory");
+}
+
+static __inline void
 lidt(struct region_descriptor *addr)
 {
 	__asm __volatile("lidt (%0)" : : "r" (addr));
+}
+
+static __inline void
+sidt(struct region_descriptor *addr)
+{
+	char *loc;
+
+	loc = (char *)addr;
+	__asm __volatile("sidt %0" : "=m" (*loc) : : "memory");
 }
 
 static __inline void
@@ -660,6 +691,15 @@ static __inline void
 ltr(u_short sel)
 {
 	__asm __volatile("ltr %0" : : "r" (sel));
+}
+
+static __inline uint32_t
+read_tr(void)
+{
+	u_short sel;
+
+	__asm __volatile("str %0" : "=r" (sel));
+	return (sel);
 }
 
 static __inline uint64_t
@@ -716,34 +756,6 @@ static __inline void
 load_dr3(uint64_t dr3)
 {
 	__asm __volatile("movq %0,%%dr3" : : "r" (dr3));
-}
-
-static __inline uint64_t
-rdr4(void)
-{
-	uint64_t data;
-	__asm __volatile("movq %%dr4,%0" : "=r" (data));
-	return (data);
-}
-
-static __inline void
-load_dr4(uint64_t dr4)
-{
-	__asm __volatile("movq %0,%%dr4" : : "r" (dr4));
-}
-
-static __inline uint64_t
-rdr5(void)
-{
-	uint64_t data;
-	__asm __volatile("movq %%dr5,%0" : "=r" (data));
-	return (data);
-}
-
-static __inline void
-load_dr5(uint64_t dr5)
-{
-	__asm __volatile("movq %0,%%dr5" : : "r" (dr5));
 }
 
 static __inline uint64_t
@@ -823,8 +835,6 @@ void	load_dr0(uint64_t dr0);
 void	load_dr1(uint64_t dr1);
 void	load_dr2(uint64_t dr2);
 void	load_dr3(uint64_t dr3);
-void	load_dr4(uint64_t dr4);
-void	load_dr5(uint64_t dr5);
 void	load_dr6(uint64_t dr6);
 void	load_dr7(uint64_t dr7);
 void	load_fs(u_short sel);
@@ -847,8 +857,6 @@ uint64_t rdr0(void);
 uint64_t rdr1(void);
 uint64_t rdr2(void);
 uint64_t rdr3(void);
-uint64_t rdr4(void);
-uint64_t rdr5(void);
 uint64_t rdr6(void);
 uint64_t rdr7(void);
 uint64_t rdtsc(void);

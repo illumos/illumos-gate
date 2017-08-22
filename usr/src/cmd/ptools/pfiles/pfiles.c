@@ -24,7 +24,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
 /*
- * Copyright (c) 2013 Joyent, Inc.  All Rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.  All Rights reserved.
  */
 
 #include <stdio.h>
@@ -556,6 +556,8 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 	case AF_GOSIP:		p = "AF_GOSIP";		break;
 	case AF_IPX:		p = "AF_IPX";		break;
 	case AF_ROUTE:		p = "AF_ROUTE";		break;
+	case AF_KEY:		p = "AF_KEY";		break;
+	case AF_POLICY:		p = "AF_POLICY";	break;
 	case AF_LINK:		p = "AF_LINK";		break;
 	}
 
