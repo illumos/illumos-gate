@@ -86,6 +86,8 @@ file path=opt/libc-tests/tests/endian.32 mode=0555
 file path=opt/libc-tests/tests/endian.64 mode=0555
 file path=opt/libc-tests/tests/env-7076.32 mode=0555
 file path=opt/libc-tests/tests/env-7076.64 mode=0555
+file path=opt/libc-tests/tests/fnmatch.32 mode=0555
+file path=opt/libc-tests/tests/fnmatch.64 mode=0555
 file path=opt/libc-tests/tests/fpround_test mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH) mode=0555
 file path=opt/libc-tests/tests/fpround_test.$(ARCH64) mode=0555
