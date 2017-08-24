@@ -186,7 +186,9 @@ lx_hd_pipe(intptr_t arg, int flags)
 	 * the pipe capacity is limited to "Fifohiwat" which is a compile-time
 	 * limit set to FIFOHIWAT.
 	 */
+	mutex_enter(&VTOF(vp1)->fn_lock->flk_lock);
 	fifo_fastoff(VTOF(vp1));
+	mutex_exit(&VTOF(vp1)->fn_lock->flk_lock);
 
 	/*
 	 * Set the O_NONBLOCK flag if requested.
