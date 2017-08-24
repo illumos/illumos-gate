@@ -598,7 +598,7 @@ typedef struct lx_hd_geom {
  * something sane. In this case, we return the total size (which is normally
  * limited by a quota) of the dataset that the zone root lives on.
  */
-static int
+static boolean_t
 lx_lookup_zdsk_info(lx_zone_data_t *lxzd, dev_t dev, lx_virt_disk_t *vdp)
 {
 	lx_virt_disk_t *vd;
@@ -616,20 +616,21 @@ lx_lookup_zdsk_info(lx_zone_data_t *lxzd, dev_t dev, lx_virt_disk_t *vdp)
 			vdp->lxvd_blksize = 512;
 		}
 
-		return (0);
+		return (B_TRUE);
 	}
 
 	vd = list_head(lxzd->lxzd_vdisks);
 	while (vd != NULL) {
 		if (vd->lxvd_type == LXVD_ZVOL && vd->lxvd_real_dev == dev) {
+			bzero(vdp, sizeof (*vdp));
 			vdp->lxvd_volsize = vd->lxvd_volsize;
 			vdp->lxvd_blksize = vd->lxvd_blksize;
-			return (0);
+			return (B_TRUE);
 		}
 		vd = list_next(lxzd->lxzd_vdisks, vd);
 	}
 
-	return (-1);
+	return (B_FALSE);
 }
 
 /*
@@ -653,22 +654,44 @@ ict_hdgetgeo(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
 		lx_virt_disk_t vd;
 
-		if (lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd) != 0) {
+		if (!lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd) ||
+		    vd.lxvd_volsize == 0 || vd.lxvd_blksize == 0) {
 			/* should only happen if new zvol */
 			bzero(&lx_geom, sizeof (lx_geom));
 		} else {
-			diskaddr_t tot;
-
-			tot = vd.lxvd_volsize / vd.lxvd_blksize;
+			const diskaddr_t blks =
+			    MAX(1, vd.lxvd_volsize / vd.lxvd_blksize);
 
 			/*
-			 * Since the 'sectors' value is only one byte we make
-			 * up heads/cylinder values to get things to fit.
-			 * We roundup the number of heads to ensure we don't
-			 * overflow the sectors due to truncation.
+			 * Attempt to conjure up a Cylinder-Head-Sector
+			 * geometry for the given virtual disk size.
 			 */
-			lx_geom.heads = lx_geom.cylinders = (tot / 0xff) + 1;
-			lx_geom.sectors = tot / lx_geom.heads;
+			if (blks <= (63*16*65535)) {
+				/*
+				 * Use traditional BIOS-style geometry for
+				 * adequately small disks.
+				 */
+				lx_geom.sectors	= 63;
+				lx_geom.heads	= 16;
+				lx_geom.cylinders = MAX(1, (blks / (63 * 16)));
+			} else if (blks <= (64*32*65535)) {
+				/* 1MB per cylinder for 512-byte sectors */
+				lx_geom.sectors	= 64;
+				lx_geom.heads	= 32;
+				lx_geom.cylinders = (blks / (64 * 32));
+			} else {
+				/*
+				 * Max out the geometry sizing for large disks.
+				 * This may not be adequate for truely huge
+				 * volumes (maxing out at a little under 2TB
+				 * for those with a 512-byte blocksize), but it
+				 * is the best we can do with the given struct.
+				 */
+				lx_geom.sectors	= 255;
+				lx_geom.heads	= 255;
+				lx_geom.cylinders = MIN(65535,
+				    (blks / (255*255)));
+			}
 			lx_geom.start = 0;
 		}
 	} else {
@@ -712,7 +735,7 @@ ict_blkgetsize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
 		lx_virt_disk_t vd;
 
-		if (lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd) != 0) {
+		if (!lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd)) {
 			/* should only happen if new zvol */
 			tot = 0;
 		} else {
@@ -760,7 +783,7 @@ ict_blkgetssize(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
 		lx_virt_disk_t vd;
 
-		if (lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd) != 0) {
+		if (!lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd)) {
 			/* should only happen if new zvol */
 			bsize = 0;
 		} else {
@@ -803,7 +826,7 @@ ict_blkgetsize64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	if (getmajor(fp->f_vnode->v_rdev) == getmajor(lxzd->lxzd_zfs_dev)) {
 		lx_virt_disk_t vd;
 
-		if (lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd) != 0) {
+		if (!lx_lookup_zdsk_info(lxzd, fp->f_vnode->v_rdev, &vd)) {
 			/* should only happen if new zvol */
 			tot = 0;
 		} else {
