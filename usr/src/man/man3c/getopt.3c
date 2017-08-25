@@ -183,7 +183,7 @@ main(int argc, char *argv[ ])
     char *ofile;
     extern char *optarg;
     extern int optind, optopt;
-    . . .
+    ...
     while ((c = getopt(argc, argv, ":abf:o:")) != -1) {
         switch(c) {
         case 'a':
@@ -218,12 +218,12 @@ main(int argc, char *argv[ ])
         }
     }
     if (errflg) {
-        fprintf(stderr, "usage: . . . ");
+        fprintf(stderr, "usage: ... ");
         exit(2);
     }
     for ( ; optind < argc; optind++) {
         if (access(argv[optind], R_OK)) {
-    . . .
+    ...
 }
 .fi
 .in -2

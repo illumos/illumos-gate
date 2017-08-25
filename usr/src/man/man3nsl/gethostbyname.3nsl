@@ -278,7 +278,7 @@ int main(int argc, const char **argv)
 	    struct in_addr in;
 	    char **q;
 	    (void) memcpy(&in.s_addr, *p, sizeof (in.s_addr));
-         (void) printf("%s\t%s", inet_ntoa(in), hp\(mi>h_name);
+         (void) printf("%s\et%s", inet_ntoa(in), hp\(mi>h_name);
 	    for (q = hp->h_aliases; *q != 0; q++)
 	        (void) printf(" %s", *q);
 	    (void) putchar('\en');

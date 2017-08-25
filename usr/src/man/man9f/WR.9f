@@ -69,7 +69,7 @@ module-specific data structure for the minor device.
 4   {
 5	         q->q_ptr = NULL;
 6         WR(q)->q_ptr = NULL;
-	         . . .
+	         ...
 7   }
 .fi
 .in -2

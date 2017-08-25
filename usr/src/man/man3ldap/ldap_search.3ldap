@@ -95,7 +95,7 @@ test, or can contain text and *'s interspersed to achieve substring matching.
 .LP
 For example, the filter \fBmail=*\fR finds entries that have a mail attribute.
 The filter \fBmail=*@terminator.rs.itd.umich.edu\fR finds entries that have a
-mail attribute ending in the specified string. Use a backslash (\fB\\fR) to
+mail attribute ending in the specified string. Use a backslash (\fB\e\fR) to
 escape parentheses characters in a filter. See RFC 1588 for a more complete
 description of the filters that are allowed. See \fBldap_getfilter\fR(3LDAP)
 for functions to help construct search filters automatically.

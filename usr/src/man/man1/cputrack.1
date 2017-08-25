@@ -304,13 +304,13 @@ time    pid lwp      event      pic0      pic1
 0.029 101143   1   fini_lwp   1025546     25074
 0.029 101143   1       exec   1025546     25074
 0.000 101143   1       exec                     \e
-                                      # '/usr/bin/sh /usr/bin/basename\e
+                                      # '/usr/bin/sh /usr/bin/basename \e
                                          /bin/ulimit'
 0.039 101143   1   init_lwp   1025546     25074
 0.050 101143   1   fini_lwp   1140482     27806
 0.050 101143   1       exec   1140482     27806
 0.000 101143   1       exec                     # '/usr/bin/expr \e
-   //bin/ulimit : \(.*[^/]\)/*$ : .*/\(..*\) : \(.*\)$ | //bin/ulimi'
+   //bin/ulimit : \e(.*[^/]\e)/*$ : .*/ \e(..*\e) : \e(.*\e)$ | //bin/ulimi'
 0.059 101143   1   init_lwp   1140482     27806
 0.075 101143   1   fini_lwp   1237647     30207
 0.075 101143   1       exit   1237647     30207

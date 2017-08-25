@@ -31,7 +31,7 @@ associated with the directory stream when \fBtelldir()\fR was performed.
 .LP
 If the value of \fIloc\fR was not obtained from an earlier call to
 \fBtelldir()\fR or if a call to \fBrewinddir\fR(3C) occurred between the call
-to \fBtelldir\fR \fB()\fR and the call to \fBseekdir()\fR, the results of
+to \fBtelldir()\fR and the call to \fBseekdir()\fR, the results of
 subsequent calls to \fBreaddir()\fR are unspecified.
 .SH RETURN VALUES
 .sp

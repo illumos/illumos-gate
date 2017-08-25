@@ -8,11 +8,11 @@
 .\" specifies the terms and conditions for redistribution.
 .\" Portions Copyright (c) 2006, Sun Microsystems,
 .\" Inc. All Rights Reserved.
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
-.TH lgamma 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.TH LGAMMA 3M "Jul 12, 2006" "SunOS 5.11" "Mathematical Library Functions"
 .SH NAME
 lgamma, lgammaf, lgammal, lgamma_r, lgammaf_r, lgammal_r, gamma, gammaf,
 gammal, gamma_r, gammaf_r, gammal_r \- log gamma function
@@ -135,7 +135,7 @@ These functions will fail if:
 \fBPole Error\fR
 .ad
 .RS 14n
-.rt  
+.rt
 The \fIx\fR argument is a negative integer or 0.
 .sp
 If the integer expression (\fBmath_errhandling\fR & \fBMATH_ERREXCEPT\fR) is
@@ -177,15 +177,15 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
+tab(	) box;
+cw(2.75i) |cw(2.75i)
+lw(2.75i) |lw(2.75i)
 .
-ATTRIBUTE TYPEATTRIBUTE VALUE
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface StabilitySee below.
+Interface Stability	See below.
 _
-MT-LevelSee below.
+MT-Level	See below.
 .TE
 
 .sp

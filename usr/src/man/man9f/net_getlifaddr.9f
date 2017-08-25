@@ -178,4 +178,4 @@ Interface Stability	Committed
 .sp
 .LP
 \fBnet_lifgetnext\fR(9F), \fBnet_phylookup\fR(9F),
-\fBnet_phygetnext\fR(9F)\fBnet_protocol_lookup\fR(9F)
+\fBnet_phygetnext\fR(9F), \fBnet_protocol_lookup\fR(9F)

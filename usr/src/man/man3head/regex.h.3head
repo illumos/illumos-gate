@@ -170,7 +170,7 @@ Trailing '\e' in pattern.
 \fB\fBREG_ESUBREG\fR\fR
 .ad
 .RS 16n
-Number in \\fIdigit\fR invalid or in error.
+Number in \fIdigit\fR invalid or in error.
 .RE
 
 .sp

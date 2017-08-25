@@ -91,4 +91,4 @@ MT-Level	MT-Safe
 .LP
 \fBferror\fR(3C), \fBfgetwc\fR(3C), \fBfread\fR(3C), \fBgetwc\fR(3C),
 \fBputws\fR(3C), \fBscanf\fR(3C), \fBungetc\fR(3C),
-\fBungetwc\fR(3C)\fBattributes\fR(5), \fBstandards\fR(5)
+\fBungetwc\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)

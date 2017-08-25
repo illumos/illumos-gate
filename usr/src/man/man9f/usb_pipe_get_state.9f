@@ -170,6 +170,7 @@ Interface stability	Committed
 
 .SH SEE ALSO
 .LP
-\fBattributes\fR(5), \fBusb_clr_feature\fR(9F), \fBusb_get_cfg\fR(9F).
+\fBattributes\fR(5), \fBusb_clr_feature\fR(9F), \fBusb_get_cfg\fR(9F),
 \fBusb_get_status\fR(9F), \fBusb_pipe_close\fR(9F),
-\fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_xopen\fR(9F). \fBusb_pipe_reset\fR(9F)
+\fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_xopen\fR(9F),
+\fBusb_pipe_reset\fR(9F)

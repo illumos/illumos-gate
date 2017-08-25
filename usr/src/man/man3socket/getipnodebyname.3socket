@@ -476,7 +476,7 @@ hostname.
         char **q;
 
         bcopy(*p, (caddr_t)&in6, hp->h_length);
-        (void) printf("%s\t%s", inet_ntop(AF_INET6, (void *)&in6,
+        (void) printf("%s\et%s", inet_ntop(AF_INET6, (void *)&in6,
             abuf, sizeof(abuf)), hp->h_name);
         for (q = hp->h_aliases; *q != 0; q++)
         (void) printf(" %s", *q);

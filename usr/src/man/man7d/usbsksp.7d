@@ -255,7 +255,7 @@ may be lost.
 .sp
 .ne 2
 .na
-\fBCannot access <\fIdevice\fR>. Please reconnect.\fR
+\fBCannot access <\fR\fIdevice\fR\fB>. Please reconnect.\fR
 .ad
 .sp .6
 .RS 4n

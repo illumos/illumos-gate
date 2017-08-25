@@ -4,7 +4,7 @@
 .\"  Common Development and Distribution License ("CDDL"), version 1.0.
 .\"  You may only use this file in accordance with the terms of version
 .\"  1.0 of the CDDL.
-.\" 
+.\"
 .\"  A full copy of the text of the CDDL should have accompanied this
 .\"  source.  A copy of the CDDL is also available via the Internet at
 .\"  http://www.illumos.org/license/CDDL.
@@ -191,8 +191,8 @@ exclusive; a stream can never be writable if a hangup has occurred. However,
 this event and  \fBEPOLLIN\fR, \fBEPOLLRDNORM\fR, \fBEPOLLRDBAND\fR,
 \fBEPOLLRDHUP\fR or
 \fBEPOLLPRI\fR are not mutually exclusive. This flag is only valid in the
-the \fIevents\fR field returned from \fBepoll_wait\fR(3C); it is not used
-in the \fIevents\fR field specified via \fBepoll_ctl()\fR.
+\fIevents\fR field returned from \fBepoll_wait\fR(3C); it is not used in the
+\fIevents\fR field specified via \fBepoll_ctl()\fR.
 .RE
 
 .sp

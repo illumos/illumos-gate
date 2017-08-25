@@ -84,7 +84,7 @@ Interface stability	Committed
 .sp
 .LP
 \fBattributes\fR(5), \fBusb_get_alt_if\fR(9F), \fBusb_get_cfg\fR(9F),
-\fBusb_get_dev_data\fR(9F), \fBusb_get_string_descr\fR(9F).
+\fBusb_get_dev_data\fR(9F), \fBusb_get_string_descr\fR(9F),
 \fBusb_parse_data\fR(9F), \fBusb_ctrl_request\fR(9S), \fBusb_cfg_descr\fR(9S),
 \fBusb_dev_descr\fR(9S), \fBusb_ep_descr\fR(9S), \fBusb_if_descr\fR(9S),
 \fBusb_other_speed_cfg_descr\fR(9S), \fBusb_string_descr\fR(9S)

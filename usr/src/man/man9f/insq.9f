@@ -112,7 +112,7 @@ queue, \fBbp\fR will be \fINULL\fR and we fall out of the \fBfor\fR loop (line
 28               (void)insq(q, bp, mp);
 29               /* End of region that must be protected */
 30               break;
-          . . .
+          ...
 31              }
 32    }
 33   }

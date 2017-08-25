@@ -134,12 +134,12 @@ regular expression.
 .in +2
 .nf
 #include<regexpr.h>
- . . .
+\&...
 if(compile(*argv, (char *)0, (char *)0) == (char *)0)
- 	regerr(regerrno);
- . . .
-if (step(linebuf, expbuf)) 	
-   succeed(\|);
+	regerr(regerrno);
+\&...
+if (step(linebuf, expbuf))
+	succeed(\|);
 .fi
 .in -2
 

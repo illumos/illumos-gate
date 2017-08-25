@@ -76,7 +76,7 @@ The following code fragment demonstrates how the spray program is used:
 .nf
 #include <rpc/rpc.h>
 #include <rpcsvc/spray.h>
- .  .  .
+\&...
 	spraycumul	spray_result;
 	sprayarr	spray_data;
 	char		buf[100];		/* arbitrary data */

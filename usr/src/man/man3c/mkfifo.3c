@@ -46,7 +46,7 @@ of the process.
 .sp
 .LP
 The \fBmkfifoat()\fR function is equivalent to \fBmkfifo()\fR; however, if
-\fIpath\fr is a relative path, then it is resolved start at the directory
+\fIpath\fR is a relative path, then it is resolved start at the directory
 represented by \fIfd\fR. \fIfd\fR may be set to the special value of
 \fBAT_FDCWD\fR which indicates that the current working directory should be used
 to start resolving \fIpath\fR.

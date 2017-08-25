@@ -194,7 +194,7 @@ dominated by the process sensitivity label and the process does not have
 If memory cannot be allocated for the return string or if the pre-allocated
 return string memory is insufficient to hold the string, these functions return
 0. The value of the pre-allocated string is set to the \fINULL\fR string
-(\fB*string[0]='\00';\fR).
+(\fBstring[0]='\e0';\fR).
 .SH FILES
 .sp
 .ne 2

@@ -86,7 +86,7 @@ function return value to indicate the error.
 .SH ERRORS
 .sp
 .LP
-See \fBposix_spawn\fB(3C).
+See \fBposix_spawn\fR(3C).
 
 .SH ATTRIBUTES
 .sp

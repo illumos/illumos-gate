@@ -112,7 +112,7 @@ MT-Level	Safe
 .sp
 .LP
 \fBgss_accept_sec_context\fR(3GSS), \fBgss_canonicalize_name\fR(3GSS),
-\fBgss_release_buffer\fR(3GSS)\fBmemory\fR(3C), \fBattributes\fR(5)
+\fBgss_release_buffer\fR(3GSS), \fBmemory\fR(3C), \fBattributes\fR(5)
 .sp
 .LP
 \fISolaris Security for Developers Guide\fR

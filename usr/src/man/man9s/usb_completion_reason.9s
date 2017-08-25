@@ -259,4 +259,4 @@ Interface stability	Committed
 \fBusb_pipe_ctrl_xfer\fR(9F), \fBusb_pipe_intr_xfer\fR(9F),
 \fBusb_pipe_isoc_xfer\fR(9F), \fBusb_bulk_request\fR(9S),
 \fBusb_ctrl_request\fR(9S), \fBusb_intr_request\fR(9S),
-\fBusb_isoc_request\fR(9S).
+\fBusb_isoc_request\fR(9S)

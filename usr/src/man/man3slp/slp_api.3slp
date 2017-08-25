@@ -59,10 +59,10 @@ unescape strings and convert escaped string-encoded opaques to binary. The
 .LP
 Opaque values consist of a character buffer that contains a \fBUTF-8\fR-encoded
 string, the first characters of which are the non \fBUTF-8\fR encoding
-"\fB\ff\fR". Subsequent characters are the escaped values for the original
+"\fB\eff\fR". Subsequent characters are the escaped values for the original
 bytes in the opaque.  The escape convention is relatively simple. An escape
 consists of a backslash followed by the two hexadecimal digits encoding the
-byte. An example is "\fB\2c\fR" for the byte \fB0x2c\fR. Clients handle opaque
+byte. An example is "\fB\e2c\fR" for the byte \fB0x2c\fR. Clients handle opaque
 processing themselves, since the algorithm is relatively simple and uniform.
 .SS "System Properties"
 .sp

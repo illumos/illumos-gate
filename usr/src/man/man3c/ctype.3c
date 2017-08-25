@@ -131,7 +131,7 @@ characters are classified according to the rules of the \fBUS-ASCII\fR
 7-bit coded character set.
 .LP
 The functions \fBisalnum_l()\fR, \fBisalpha_l()\fR, \fBisblank_l()\fR,
-\fBiscntrl_l\fR, \fBisdigit_l()\fR, \fBisgraph_l()\fr,
+\fBiscntrl_l\fR, \fBisdigit_l()\fR, \fBisgraph_l()\fR,
 \fBislower_l()\fR, \fBisprint_l()\fR, \fBispunct_l()\fR,
 \fBisspace_l()\fR, \fBisupper_l()\fR, and \fBisxdigit_l()\fR all behave
 identically to their counterparts without the '\fB_l\fR' prefix, except

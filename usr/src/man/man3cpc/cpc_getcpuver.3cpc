@@ -130,7 +130,7 @@ Interface Stability	Obsolete
 .LP
 \fBcpc\fR(3CPC), \fBcpc_access\fR(3CPC), \fBcpc_cciname\fR(3CPC),
 \fBcpc_cpuref\fR(3CPC), \fBcpc_npic\fR(3CPC),
-\fBcpc_walk_events_all\fR(3CPC)\fBlibcpc\fR(3LIB), \fBattributes\fR(5)
+\fBcpc_walk_events_all\fR(3CPC), \fBlibcpc\fR(3LIB), \fBattributes\fR(5)
 .SH NOTES
 .sp
 .LP

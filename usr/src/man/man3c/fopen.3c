@@ -403,6 +403,6 @@ respects this function is Standard.
 .SH SEE ALSO
 .LP
 \fBenable_extended_FILE_stdio\fR(3C), \fBfclose\fR(3C),
-\fRfcloseall\fR(3C), \fBfdopen\fR(3C), \fBfflush\fR(3C),
+\fBfcloseall\fR(3C), \fBfdopen\fR(3C), \fBfflush\fR(3C),
 \fBfreopen\fR(3C), \fBfsetpos\fR(3C), \fBrewind\fR(3C), \fBopen\fR(2),
 \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)

@@ -199,7 +199,7 @@ The following example demonstrates the use of ldi_prop_get_int64().
 .sp
 .LP
 \fBddi_prop_get_int\fR(9F), \fBddi_prop_get_int64\fR(9F),
-\fBldi_prop_exists\fR(9F).
+\fBldi_prop_exists\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

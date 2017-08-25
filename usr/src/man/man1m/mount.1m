@@ -28,7 +28,7 @@ mount, umount \- mount or unmount file systems and remote resources
 .LP
 .nf
 \fBmount\fR \fB-a\fR [\fB-F\fR \fIFSType\fR] [\fB-V\fR] [\fIcurrent_options\fR]
-     [\fB-o\fR \fIspecific_options\fR] [\fImount_point\fR]...
+     [\fB-o\fR \fIspecific_options\fR] [\fImount_points...\fR]
 .fi
 
 .LP
@@ -38,7 +38,7 @@ mount, umount \- mount or unmount file systems and remote resources
 
 .LP
 .nf
-\fBumount\fR \fB-a\fR [\fB-f\fR] [\fB-V\fR] [\fB-o\fR \fIspecific_options\fR] [\fImount_point\fR]...
+\fBumount\fR \fB-a\fR [\fB-f\fR] [\fB-V\fR] [\fB-o\fR \fIspecific_options\fR] [\fImount_points...\fR]
 .fi
 
 .SH DESCRIPTION
@@ -98,7 +98,7 @@ specified or must be determinable from \fB/etc/vfstab\fR, or by consulting
 .sp
 .ne 2
 .na
-\fB\fB-a\fR [ \fImount_points\fR. . . ]\fR
+\fB\fB-a\fR [ \fImount_points\fR... ]\fR
 .ad
 .sp .6
 .RS 4n
