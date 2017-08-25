@@ -51,7 +51,7 @@ Power level to which the indicated component has changed
 .SH DESCRIPTION
 .sp
 .LP
-The \fBpm_power_has_changed\fR(9) function notifies the Power Management
+The \fBpm_power_has_changed\fR(9F) function notifies the Power Management
 framework that the power level of component of \fIdip \fR has changed to
 \fIlevel\fR.
 .sp
@@ -115,7 +115,7 @@ Management function called by the driver.
 .sp
 .LP
 A hypothetical driver might include this code to handle
-\fBpm_power_has_changed\fR(9):
+\fBpm_power_has_changed\fR(9F):
 .sp
 .in +2
 .nf

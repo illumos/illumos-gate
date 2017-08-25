@@ -191,5 +191,5 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBfork\fR(2),\fBdoor_create\fR(3C), \fBdoor_return\fR(3C),
+\fBfork\fR(2), \fBdoor_create\fR(3C), \fBdoor_return\fR(3C),
 \fBdoor_server_create\fR(3C), \fBattributes\fR(5)

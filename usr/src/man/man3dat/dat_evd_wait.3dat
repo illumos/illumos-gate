@@ -295,6 +295,6 @@ MT-Level	Safe
 .LP
 \fBdat_cr_accept\fR(3DAT), \fBdat_cr_handoff\fR(3DAT),
 \fBdat_cr_reject\fR(3DAT), \fBdat_ep_connect\fR(3DAT),
-\fBdat_ep_dup_connect\fR(3DAT),\fBdat_ep_free\fR(3DAT),
+\fBdat_ep_dup_connect\fR(3DAT), \fBdat_ep_free\fR(3DAT),
 \fBdat_evd_dequeue\fR(3DAT), \fBdat_evd_set_unwaitable\fR(3DAT),
 \fBlibdat\fR(3LIB), \fBattributes\fR(5)

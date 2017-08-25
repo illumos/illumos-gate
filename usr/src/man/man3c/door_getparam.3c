@@ -193,7 +193,7 @@ if (door_setparam(fd, DOOR_PARAM_DATA_MIN,
  /* handle error */
 
 /*
- * the door will only accept door_call(3DOOR)s with a
+ * the door will only accept door_call(3C)s with a
  * data_size which is exactly sizeof (my_request_t).
  */
 .fi

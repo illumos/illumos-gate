@@ -44,7 +44,7 @@ has changed the largest size frame that it can transmit, also known as
 its Send Data Unit (SDU).
 This should be called when the device's MTU has been requested to be changed
 when a driver's
-.Xr mac_setprop 9E
+.Xr mc_setprop 9E
 entry point has been called with the property
 .Sy MAC_PROP_MTU
 or some other device-related event occurring.
@@ -72,7 +72,7 @@ For an example of how a device driver should use the
 function, see the
 .Sx EXAMPLES
 section in
-.Xr mac_setprop 9E .
+.Xr mc_setprop 9E .
 .Sh ERRORS
 The
 .Fn max_maxsdu_update
@@ -85,5 +85,5 @@ is lower than the minimum SDU of the device.
 .El
 .Sh SEE ALSO
 .Xr mac 9E ,
-.Xr mac_setprop 9E ,
+.Xr mc_setprop 9E ,
 .Xr mac_register 9F

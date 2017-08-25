@@ -11890,6 +11890,7 @@ f usr/share/man/man1m/auditd.1m 0444 root bin
 f usr/share/man/man1m/auditrecord.1m 0444 root bin
 f usr/share/man/man1m/auditreduce.1m 0444 root bin
 f usr/share/man/man1m/auditstat.1m 0444 root bin
+s usr/share/man/man1m/audlinks.1m=devfsadm.1m
 f usr/share/man/man1m/automount.1m 0444 root bin
 f usr/share/man/man1m/automountd.1m 0444 root bin
 f usr/share/man/man1m/autopush.1m 0444 root bin
@@ -15900,7 +15901,10 @@ f usr/share/man/man3m/fegetexceptflag.3m 0444 root bin
 f usr/share/man/man3m/fegetround.3m 0444 root bin
 f usr/share/man/man3m/feholdexcept.3m 0444 root bin
 f usr/share/man/man3m/feraiseexcept.3m 0444 root bin
+s usr/share/man/man3m/fesetenv.3m=fegetenv.3m
+s usr/share/man/man3m/fesetexceptflag.3m=fegetexceptflag.3m
 f usr/share/man/man3m/fesetprec.3m 0444 root bin
+s usr/share/man/man3m/fesetround.3m=fegetround.3m
 f usr/share/man/man3m/fetestexcept.3m 0444 root bin
 f usr/share/man/man3m/feupdateenv.3m 0444 root bin
 f usr/share/man/man3m/fex_merge_flags.3m 0444 root bin

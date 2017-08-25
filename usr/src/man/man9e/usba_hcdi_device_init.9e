@@ -104,6 +104,6 @@ function should return
 .Sy USB_SUCCESS .
 Otherwise, it should return the appropriate error.
 .Sh SEE ALSO
-.Xr usba_hcd 9E ,
+.Xr usba_hcdi 9E ,
 .Xr usba_hcdi_pipe_close 9E ,
 .Xr usba_hcdi_pipe_open 9E

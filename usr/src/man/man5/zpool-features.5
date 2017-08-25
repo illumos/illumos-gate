@@ -468,7 +468,7 @@ cannot for whatever reason utilize the faster \fBskein\fR and
 
 When the \fBsha512\fR feature is set to \fBenabled\fR, the administrator
 can turn on the \fBsha512\fR checksum on any dataset using the
-\fBzfs set checksum=sha512\fR(1M) command.  This feature becomes
+\fBzfs set checksum=sha512\fR command.  This feature becomes
 \fBactive\fR once a \fBchecksum\fR property has been set to \fBsha512\fR,
 and will return to being \fBenabled\fR once all filesystems that have
 ever had their checksum set to \fBsha512\fR are destroyed.
@@ -503,7 +503,7 @@ given pool, preventing hash collision attacks on systems with dedup.
 
 When the \fBskein\fR feature is set to \fBenabled\fR, the administrator
 can turn on the \fBskein\fR checksum on any dataset using the
-\fBzfs set checksum=skein\fR(1M) command.  This feature becomes
+\fBzfs set checksum=skein\fR command.  This feature becomes
 \fBactive\fR once a \fBchecksum\fR property has been set to \fBskein\fR,
 and will return to being \fBenabled\fR once all filesystems that have
 ever had their checksum set to \fBskein\fR are destroyed.
@@ -545,7 +545,7 @@ pool.
 
 When the \fBedonr\fR feature is set to \fBenabled\fR, the administrator
 can turn on the \fBedonr\fR checksum on any dataset using the
-\fBzfs set checksum=edonr\fR(1M) command.  This feature becomes
+\fBzfs set checksum=edonr\fR command.  This feature becomes
 \fBactive\fR once a \fBchecksum\fR property has been set to \fBedonr\fR,
 and will return to being \fBenabled\fR once all filesystems that have
 ever had their checksum set to \fBedonr\fR are destroyed.
@@ -555,4 +555,4 @@ Booting off of pools using \fBedonr\fR is \fBNOT\fR supported
 error.
 
 .SH "SEE ALSO"
-\fBzpool\fR(1M)
+\fBzfs\fR(1M), \fBzpool\fR(1M)

@@ -160,7 +160,7 @@ MT-Level	Unsafe
 \fBsavecore\fR(1M), \fBexec\fR(2), \fBexit\fR(2), \fBpathconf\fR(2),
 \fBgetloadavg\fR(3C), \fBkstat\fR(3KSTAT), \fBkvm_getu\fR(3KVM),
 \fBkvm_nextproc\fR(3KVM), \fBkvm_nlist\fR(3KVM), \fBkvm_kread\fR(3KVM),
-\fBlibkvm\fR(3LIB),\fBsysconf\fR(3C), \fBproc\fR(4), \fBattributes\fR(5),
+\fBlibkvm\fR(3LIB), \fBsysconf\fR(3C), \fBproc\fR(4), \fBattributes\fR(5),
 \fBlfcompile\fR(5)
 .SH NOTES
 .sp

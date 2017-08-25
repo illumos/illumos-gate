@@ -38,7 +38,7 @@ itself.
 .Pp
 Only live processes have a control file descriptor.
 Process handles that correspond to files and cores, created through
-.Xr Prab_file 3PROC
+.Xr Pgrab_file 3PROC
 and
 .Xr Pgrab_core 3PROC ,
 do not have a corresponding file descriptor.

@@ -31,7 +31,7 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lSMHBAAPI\fR [ \fIlibrary\fR\
 .SH DESCRIPTION
 .sp
 .LP
-The functions in this library access Fibre Channel and/or Sereal Attached SCSI
+The functions in this library access Fibre Channel and/or Serial Attached SCSI
 HBA data depending on vendor provided implementation underneath.
 .sp
 .LP

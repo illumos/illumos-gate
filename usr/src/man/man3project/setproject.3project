@@ -221,7 +221,7 @@ enabled with \fBpooladm\fR(1M).
 .sp
 .LP
 The final attribute is used to finalize the task created by \fBsetproject()\fR.
-See\fBsettaskid\fR(2).
+See \fBsettaskid\fR(2).
 .sp
 .in +2
 .nf

@@ -169,7 +169,7 @@ Unregister to receive a specific command
 .SH SEE ALSO
 .sp
 .LP
-\fBipmitool\fR(1M), \fBioctl\fR(2), \fBsmbios\fR(7d)
+\fBipmitool\fR(1), \fBioctl\fR(2), \fBsmbios\fR(7d)
 .sp
 .LP
 \fIIntelligent Platform Management Interface Specification Second

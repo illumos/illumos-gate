@@ -26,7 +26,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
 .LP
 The \fBrsm_memseg_import_putv()\fR and \fBrsm_memseg_import_getv()\fR functions
 provide for using a list of I/O requests rather than a single source and
-destination address as is done for the\fBrsm_memseg_import_put\fR(3RSM) and
+destination address as is done for the \fBrsm_memseg_import_put\fR(3RSM) and
 \fBrsm_memseg_import_get\fR(3RSM) functions.
 .sp
 .LP
