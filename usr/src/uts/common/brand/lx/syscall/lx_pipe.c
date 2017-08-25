@@ -180,17 +180,6 @@ lx_hd_pipe(intptr_t arg, int flags)
 	(void) lx_pipe_setsz(str, LX_DEFAULT_PIPE_SIZE, B_TRUE);
 
 	/*
-	 * Because we're using streams to increase the capacity of the pipe
-	 * up to the default Linux capacity, we have to switch the pipe
-	 * out of FIFOFAST mode and back to a normal stream. In fast mode
-	 * the pipe capacity is limited to "Fifohiwat" which is a compile-time
-	 * limit set to FIFOHIWAT.
-	 */
-	mutex_enter(&VTOF(vp1)->fn_lock->flk_lock);
-	fifo_fastoff(VTOF(vp1));
-	mutex_exit(&VTOF(vp1)->fn_lock->flk_lock);
-
-	/*
 	 * Set the O_NONBLOCK flag if requested.
 	 */
 	if (flags & FNONBLOCK) {
