@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -416,8 +417,13 @@ specfind(dev_t dev, vtype_t type)
 			nvp = STOV(st);
 			if (nvp->v_type == type && st->s_commonvp != nvp) {
 				VN_HOLD(nvp);
-				mutex_exit(&stable_lock);
-				return (nvp);
+				/* validate vnode is visible in the zone */
+				if (nvp->v_path != NULL &&
+				    ZONE_PATH_VISIBLE(nvp->v_path, curzone)) {
+					mutex_exit(&stable_lock);
+					return (nvp);
+				}
+				VN_RELE(nvp);
 			}
 		}
 		st = st->s_next;
