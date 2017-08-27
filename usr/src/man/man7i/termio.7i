@@ -466,7 +466,7 @@ arrives, or the condition is cleared by a program.
 .RS 11n
 (Control-t or \fBASCII DC4\fR) generates a \fBSIGINFO\fR signal. Processes with
 a handler will output status information when they receive \fBSIGINFO\fR, for
-example, \fBdd(1)\fR. If a process does not have a \fBSIGINFO\fR handler, the
+example, \fBdd\fR(1M). If a process does not have a \fBSIGINFO\fR handler, the
 signal will be ignored.
 .RE
 

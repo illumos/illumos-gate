@@ -81,7 +81,7 @@ cc[ \fIflag\fR... ] \fIfile\fR... -lldap[ \fIlibrary\fR... ]
 .sp
 .LP
 These functions use the LDAP display template functions (see
-\fBldap_disptmpl\fR(3LDAP) and  \fBldap_templates.conf(4))\fR to produce a
+\fBldap_disptmpl\fR(3LDAP) and \fBldaptemplates.conf\fR(4)) to produce a
 plain text or an HyperText Markup Language (HTML) display of an entry or a set
 of values.  Typical plain text output produced for an entry might look like:
 .sp

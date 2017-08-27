@@ -78,7 +78,7 @@ If the call to
 fails, then the device driver should not call
 .Fn mac_fini_ops
 and should fail the call to
-.Xr _fini 9F .
+.Xr _fini 9E .
 .Pp
 In addition, if the call to
 .Xr mod_install 9F

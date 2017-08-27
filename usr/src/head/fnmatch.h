@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1994 by Sun Microsystems, Inc.
@@ -37,6 +38,10 @@ extern "C" {
 #define	FNM_PERIOD	0x04	/* Leading period in string must be exactly */
 				/* matched by period in pattern	*/
 #define	FNM_IGNORECASE	0x08	/* Ignore case when making comparisons */
+#define	FNM_CASEFOLD	0x08	/* Ignore case when making comparisons */
+				/* (for FreeBSD/Linux compatibility) */
+#define	FNM_LEADING_DIR	0x10	/* Match if pattern matches initial segment */
+				/* of str which is followed by a slash */
 
 #define	FNM_NOMATCH	1	/* string doesnt match the specified pattern */
 #define	FNM_ERROR	2	/* error occured */

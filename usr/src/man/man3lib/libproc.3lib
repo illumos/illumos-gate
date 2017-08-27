@@ -405,7 +405,7 @@ Many functions relating to tracing processes, for example
 .Xr Psignal 3PROC ,
 .Xr Psetsignal 3PROC ,
 .Xr Psetfault 3PROC ,
-.Xr Psetentry 3PROC ,
+.Xr Psysentry 3PROC ,
 and others, mention that they only act upon
 .Em Active Processes .
 This specifically refers to processes whose state are in
@@ -414,8 +414,7 @@ and
 .Dv PS_STOP .
 Process handles in the other states have no notion of settable tracing
 flags, though core files
-.Pf ( type Dv PS_DEAD ) ,
-=======
+.Pf ( type Dv PS_DEAD )
 may have a read-only snapshot of their tracing settings available.
 .Sh TYPES
 The

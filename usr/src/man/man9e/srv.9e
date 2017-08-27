@@ -171,5 +171,5 @@ Each stream module must specify a read and a write service \fBsrv()\fR routine.
 If a service routine is not needed (because the \fBput()\fR routine processes
 all messages), a \fBNULL\fR pointer should be placed in module's
 \fBqinit\fR(9S) structure. Do not use \fBnulldev\fR(9F) instead of the
-\fBNULL\fR pointer. Use  of\fBnulldev\fR(9F) for a \fBsrv()\fR routine can
+\fBNULL\fR pointer. Use of \fBnulldev\fR(9F) for a \fBsrv()\fR routine can
 result in flow control errors.

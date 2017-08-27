@@ -37,6 +37,7 @@ PROGS = \
 	call_once \
 	endian \
 	env-7076 \
+	fnmatch \
 	psignal-5097 \
 	quick_exit_order \
 	quick_exit_status \

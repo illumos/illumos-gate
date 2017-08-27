@@ -35,9 +35,9 @@
 .Fc
 .Sh DESCRIPTION
 The
-.Fn Psetentry
+.Fn Psysentry
 and
-.Fn Psetexit
+.Fn Psysexit
 functions controls what actions the process handle
 .Fa P
 should take upon executing a system call.
@@ -72,9 +72,9 @@ They do not function on handles that refer to core files, zombie processes,
 or ELF objects.
 .Sh RETURN VALUES
 Upon successful completion, the
-.Fn Psetentry
+.Fn Psysentry
 and
-.Fn Psetexit
+.Fn Psysexit
 functions return the previous disposition of the system call --
 .Sy 0
 if it was not set to stop and

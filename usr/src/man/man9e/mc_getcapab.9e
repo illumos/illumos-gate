@@ -107,7 +107,7 @@ It is recommended that any capability that is supported have some form of
 tunable, whether in the form of a
 .Sy MAC_PROP_PRIVATE
 driver-specific property and/or a
-.Xr driver.conf 5
+.Xr driver.conf 4
 property to disable it.
 This way when problems are discovered in the field, they can be worked around
 without requiring initial changes to the device driver.
@@ -135,7 +135,7 @@ entry point.
  * the purpose of this example, we assume that we have a device which
  * has members that indicate whether the various capabilities have been
  * enabled and that they are read-only after the driver has had its
- * mc_start(9F) entry point called.
+ * mc_start(9E) entry point called.
  */
 
 #define	EXAMPLE_LSO_MAX		65535

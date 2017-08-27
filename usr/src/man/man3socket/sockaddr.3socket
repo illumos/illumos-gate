@@ -575,7 +575,7 @@ main(void)
 .Ed
 .Sh SEE ALSO
 .Xr socket 3HEAD ,
-.Xr uh.h 3HEAD ,
+.Xr un.h 3HEAD ,
 .Xr accept 3SOCKET ,
 .Xr bind 3SOCKET ,
 .Xr connect 3SOCKET ,

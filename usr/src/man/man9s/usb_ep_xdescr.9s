@@ -75,7 +75,7 @@ The
 .Sy uex_version
 member is used to describe the current version of this structure.
 This member will be set to the value passed in by the device driver to
-.Xr usb_ep_xdescr_fil 9F .
+.Xr usb_ep_xdescr_fill 9F .
 Device drivers should ignore this field and should not modify the value
 placed there or modify it.
 .Pp

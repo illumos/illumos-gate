@@ -109,7 +109,7 @@ function fails, then the driver must be removed by a call to
 .Xr mac_fini_ops 9F .
 .Pp
 Conversely, in the driver's
-.Xr _fini 9F
+.Xr _fini 9E
 routine, it should call
 .Xr mac_fini_ops 9F
 after it successfully calls
@@ -193,10 +193,10 @@ A device driver should make no assumptions about when the various
 callbacks will be called and whether or not they will be called
 simultaneously.
 For example, a device driver may be asked to transmit data through a call to its
-.Xr mc_tx 9F
+.Xr mc_tx 9E
 entry point while it is being asked to get a device property through a
 call to its
-.Xr mc_getprop 9F
+.Xr mc_getprop 9E
 entry point.
 As such, while some calls may be serialized to the device, such as setting
 properties, the device driver should always presume that all of its data needs
@@ -255,7 +255,7 @@ First check whether or not the frame has errors.
 If errors were detected, then the frame should not be sent to the operating
 system.
 It is recommended that devices keep kstats (see
-.Xr kstat_create 9S
+.Xr kstat_create 9F
 for more information) and bump the counter whenever such an error is
 detected.
 If the device distinguishes between the types of errors, then separate kstats
@@ -1575,7 +1575,7 @@ so as to allow the driver to report issues that it detects.
 If the driver registers with the fault management framework during its
 .Xr attach 9E
 entry point, it must call
-.Xr ddi_fm_fini 9E
+.Xr ddi_fm_fini 9F
 during its
 .Xr detach 9E
 entry point.
@@ -1589,7 +1589,7 @@ and
 or they use direct memory access (DMA).
 New device drivers should always enable checking of the transport layer by
 marking their support in the
-.Xr ddi_device_acc_attr_t 9S
+.Xr ddi_device_acc_attr 9S
 structure and using routines like
 .Xr ddi_fm_acc_err_get 9F
 and
@@ -1745,7 +1745,7 @@ two different cases: copying and binding.
 The first way that device drivers handle interfacing between the two is
 by having two separate regions of memory.
 One part is memory which has been allocated for DMA through a call to
-.Xr ddi_dma_alloc 9F
+.Xr ddi_dma_mem_alloc 9F
 and the other is memory associated with the memory block.
 .Pp
 In this case, a driver will use
@@ -1858,7 +1858,7 @@ a given platform.
 .Xr allocb 9F ,
 .Xr bcopy 9F ,
 .Xr ddi_dma_addr_bind_handle 9F ,
-.Xr ddi_dma_alloc 9F ,
+.Xr ddi_dma_mem_alloc 9F ,
 .Xr ddi_fm_acc_err_get 9F ,
 .Xr ddi_fm_dma_err_get 9F ,
 .Xr ddi_fm_ereport_post 9F ,
@@ -1888,16 +1888,13 @@ a given platform.
 .Xr mac_register 9F ,
 .Xr mac_rx 9F ,
 .Xr mac_unregister 9F ,
-.Xr mc_getprop 9F ,
-.Xr mc_tx 9F ,
 .Xr mod_install 9F ,
 .Xr mod_remove 9F ,
 .Xr strcmp 9F ,
 .Xr timeout 9F ,
 .Xr cb_ops 9S ,
-.Xr ddi_device_acc_attr_t 9S ,
+.Xr ddi_device_acc_attr 9S ,
 .Xr dev_ops 9S ,
-.Xr kstat_create 9S ,
 .Xr mac_callbacks 9S ,
 .Xr mac_register 9S ,
 .Xr mblk 9S ,

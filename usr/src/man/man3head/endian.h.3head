@@ -77,7 +77,7 @@ to one of the aforementioned macros.
 .Pp
 In addition to the routines provided by this header, standardized
 functions may be found in
-.Xr byteorder 3C .
+.Xr byteorder 3SOCKET .
 The header
 .Xr types.h 3HEAD
 also defines additional pre-processor symbols to determine the current

@@ -1003,9 +1003,12 @@ The argument of the first
 macro is not
 .Sq NAME .
 This may confuse
-.Xr makewhatis 8
-and
-.Xr apropos 1 .
+.Xr apropos 1
+or confuse
+.Xr man 1
+when updating the
+.Xr whatis 1
+database.
 .It Sy "NAME section without Nm before Nd"
 .Pq mdoc
 The NAME section does not contain any
