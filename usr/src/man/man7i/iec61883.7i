@@ -174,7 +174,7 @@ the remaining \fBarq_len - 4\fR bytes should be read and concatenated.
 .LP
 \fBread\fR(2) blocks until the specified amount of data is available, unless
 \fBO_NONBLOCK\fR or \fBO_NDELAY\fR flag was set during \fBopen\fR(2), in which
-case\fBread\fR(2) returns immediately.
+case \fBread\fR(2) returns immediately.
 .SS "poll(2)"
 .sp
 .LP

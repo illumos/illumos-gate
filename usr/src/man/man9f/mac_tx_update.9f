@@ -66,5 +66,5 @@ or
 context.
 .Sh SEE ALSO
 .Xr mac 9E ,
-.Xr mac_tx 9E ,
+.Xr mc_tx 9E ,
 .Xr mac_register 9F

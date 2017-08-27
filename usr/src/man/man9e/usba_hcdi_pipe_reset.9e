@@ -59,9 +59,9 @@ entry point is designed to take a pipe in an arbitrary state and return
 it to the same state it was in after a call to
 .Xr usba_hcdi_pipe_open 9E .
 While this entry point does some similar things to the
-.Xr usba_hcdi_stop_intr_polling 9E
+.Xr usba_hcdi_pipe_stop_intr_polling 9E
 and
-.Xr usba_hcdi_stop_isoc_polling 9E
+.Xr usba_hcdi_pipe_stop_isoc_polling 9E
 entry points, there are some notable differences.
 .Pp
 This entry point is synchronous.
@@ -95,7 +95,7 @@ If uncertain, use
 .Sy USB_FAILURE .
 .Sh SEE ALSO
 .Xr usba_hcdi_pipe_open 9E ,
-.Xr usba_hcdi_stop_intr_polling 9E ,
-.Xr usba_hcdi_stop_isoc_polling 9E ,
+.Xr usba_hcdi_pipe_stop_intr_polling 9E ,
+.Xr usba_hcdi_pipe_stop_isoc_polling 9E ,
 .Xr usba_hcdi_cb 9F ,
 .Xr usba_pipe_handle_data 9S

@@ -202,7 +202,7 @@ Architecture	 SPARC, x86 PCI-based systems
 .SH SEE ALSO
 .sp
 .LP
-\fBstrconf\fR(1), \fBtip\fR(1),\fBuucp\fR(1C), \fBautopush\fR(1M),
+\fBstrconf\fR(1), \fBtip\fR(1), \fBuucp\fR(1C), \fBautopush\fR(1M),
 \fBpppd\fR(1M), \fBioctl\fR(2), \fBopen\fR(2), \fBtermios\fR(3C),
 \fBattributes\fR(5), \fBusba\fR(7D), \fBtermio\fR(7I), \fBldterm\fR(7M),
 \fBttcompat\fR(7M)

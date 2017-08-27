@@ -75,6 +75,8 @@ timeout = 600
 [/opt/libc-tests/tests/env-7076.64]
 [/opt/libc-tests/tests/endian.32]
 [/opt/libc-tests/tests/endian.64]
+[/opt/libc-tests/tests/fnmatch.32]
+[/opt/libc-tests/tests/fnmatch.64]
 [/opt/libc-tests/tests/quick_exit]
 [/opt/libc-tests/tests/psignal]
 [/opt/libc-tests/tests/printf-6961.64]

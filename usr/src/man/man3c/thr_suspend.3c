@@ -36,7 +36,7 @@ have no effect.
 .LP
 A suspended thread will not be awakened by any mechanism other than a call to
 \fBthr_continue()\fR.  Signals and the effect of calls
-to\fBmutex_unlock\fR(3C), \fBrw_unlock\fR(3C), \fBsema_post\fR(3C),
+to \fBmutex_unlock\fR(3C), \fBrw_unlock\fR(3C), \fBsema_post\fR(3C),
 \fBcond_signal\fR(3C), and \fBcond_broadcast\fR(3C) remain pending until the
 execution of the thread is resumed by \fBthr_continue()\fR.
 .SH RETURN VALUES

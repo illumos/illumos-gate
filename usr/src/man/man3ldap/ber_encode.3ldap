@@ -103,7 +103,7 @@ The  \fBber_alloc()\fR function is used to allocate a new BER element.
 .sp
 .LP
 The  \fBber_printf()\fR function is used to encode a BER element in much the
-same way that  \fBsprintf(3S)\fR works.  One important difference, though, is
+same way that \fBsprintf(3C)\fR works.  One important difference, though, is
 that some state information is kept with the \fIber\fR parameter so that
 multiple calls can be made to  \fBber_printf()\fR to append things to the end
 of the BER element.   \fBBer_printf()\fR writes to \fIber\fR, a pointer to a

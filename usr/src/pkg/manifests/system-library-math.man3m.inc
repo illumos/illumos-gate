@@ -10,6 +10,7 @@
 #
 
 # Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 
 file path=usr/share/man/man3m/acos.3m
 file path=usr/share/man/man3m/acosh.3m
@@ -54,8 +55,11 @@ file path=usr/share/man/man3m/fabs.3m
 file path=usr/share/man/man3m/fdim.3m
 file path=usr/share/man/man3m/feclearexcept.3m
 file path=usr/share/man/man3m/fegetenv.3m
+link path=usr/share/man/man3m/fesetenv.3m target=fegetenv.3m
 file path=usr/share/man/man3m/fegetexceptflag.3m
+link path=usr/share/man/man3m/fesetexceptflag.3m target=fegetexceptflag.3m
 file path=usr/share/man/man3m/fegetround.3m
+link path=usr/share/man/man3m/fesetround.3m target=fegetround.3m
 file path=usr/share/man/man3m/feholdexcept.3m
 file path=usr/share/man/man3m/feraiseexcept.3m
 file path=usr/share/man/man3m/fesetprec.3m

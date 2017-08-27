@@ -132,7 +132,7 @@ allocate and initialize a \fBscsi_pkt\fR structure on behalf of a \fBSCSI
 .LP
 If \fIbp\fR is non-\fINULL\fR, the \fBHBA \fRdriver must allocate appropriate
 \fBDMA \fRresources for the \fIpkt\fR, for example,
-through\fBddi_dma_buf_setup\fR(9F) or \fBddi_dma_buf_bind_handle\fR(9F).
+through \fBddi_dma_buf_setup\fR(9F) or \fBddi_dma_buf_bind_handle\fR(9F).
 .sp
 .LP
 If the \fBPKT_CONSISTENT\fR bit is set in \fIflags\fR, the buffer was allocated
@@ -229,7 +229,7 @@ on success, or \fINULL\fR on failure.
 .sp
 .LP
 If \fIpkt\fR is \fINULL\fR on entry, and \fBtran_init_pkt()\fR allocated a
-packet through\fBscsi_hba_pkt_alloc\fR(9F) but was unable to allocate \fBDMA
+packet through \fBscsi_hba_pkt_alloc\fR(9F) but was unable to allocate \fBDMA
 \fRresources, \fBtran_init_pkt()\fR must free the packet through
 \fBscsi_hba_pkt_free\fR(9F) before returning \fINULL\fR.
 .SH SEE ALSO

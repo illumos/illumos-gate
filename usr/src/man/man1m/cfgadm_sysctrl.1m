@@ -99,7 +99,7 @@ creates the Solaris device tree nodes, attaching devices as required. For
 \fBCPU\fR/Memory boards, \fBconfigure\fR adds \fBCPU\fRs to the \fBCPU\fR list
 in the \fBpowered-off \fRstate. These are visible to the \fBpsrinfo\fR(1M) and
 \fBpsradm\fR(1M) commands. Two memory attachment points are published for
-CPU/memory boards. Use \fBmount\fR(1M) and\fBifconfig\fR(1M) to use \fBI/O\fR
+CPU/memory boards. Use \fBmount\fR(1M) and \fBifconfig\fR(1M) to use \fBI/O\fR
 devices on the new board. To use \fBCPU\fRs, use \fBpsradm\fR \fB-n\fR to
 on-line the new processors. Use \fBcfgadm_ac\fR(1M) to test and configure the
 memory banks.
@@ -160,7 +160,7 @@ changed to the unconfigured state prior to issuing the board unconfigure
 operation. The \fBCPU\fRs on the board are off-lined, powered off and removed
 from the Solaris \fBCPU\fR list. \fBCPU\fRs that have processes bound to them
 cannot be off-lined. See \fBpsradm\fR(1M), \fBpsrinfo\fR(1M), \fBpbind\fR(1M),
-and\fBp_online\fR(2) for more information on off-lining \fBCPU\fRs.
+and \fBp_online\fR(2) for more information on off-lining \fBCPU\fRs.
 .RE
 
 .RE

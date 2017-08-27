@@ -263,7 +263,7 @@ These functions can be called from kernel, non-interrupt context.
 .in +2
 .nf
 /*
-    * attach(9F) routine.
+    * attach(9E) routine.
     *
     * Creates soft state, registers callback handler, initializes
     * hardware, and sets up interrupt handling for the driver.
@@ -363,7 +363,7 @@ These functions can be called from kernel, non-interrupt context.
     }
 
     /*
-     * detach(9F) routine.
+     * detach(9E) routine.
      *
      * Stops the hardware, disables interrupt handling, unregisters
      * a callback handler, and destroys the soft state for the driver.

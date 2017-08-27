@@ -64,7 +64,7 @@ Information about encodings are stored in data type\fBauto_ef_t\fR in the order
 of possibility with the most possible encoding stored first. To examine the
 information, use the \fBauto_ef_get_encoding()\fR and \fBauto_ef_get_score()\fR
 access functions. For a list of encodings with which \fBauto_ef_file()\fR can
-examine text, see \fBauto_ef\fR(1).
+examine text, see \fBauto_ef\fR(3EXT).
 .sp
 .LP
 If \fBauto_ef_file()\fR cannot determine the encoding of text, it returns 0 and
@@ -199,4 +199,4 @@ MT-Level	MT-Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBauto_ef\fR(1), \fBlibauto_ef\fR(3LIB), \fBattributes\fR(5)
+\fBauto_ef\fR(3EXT), \fBlibauto_ef\fR(3LIB), \fBattributes\fR(5)

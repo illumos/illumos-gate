@@ -101,7 +101,7 @@ with additional information.
 The definition of the
 .Sy prsyminfo_t
 is found in
-.Xr libproc 3PROC .
+.Xr libproc 3LIB .
 .Pp
 The
 .Fn Pxlookup_by_addr_resolved

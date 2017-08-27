@@ -176,12 +176,12 @@ is returned to indicate an error.
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO
-.Xr cond_braodcast 3C ,
+.Xr cond_broadcast 3C ,
 .Xr cond_destroy 3C ,
 .Xr cond_init 3C ,
 .Xr cond_signal 3C ,
 .Xr cond_timedwait 3C ,
 .Xr cond_wait 3C ,
-.Xr threads 3HEAD ,
+.Xr threads.h 3HEAD ,
 .Xr attributes 5 ,
 .Xr threads 5

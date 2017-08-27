@@ -10,6 +10,7 @@
 #
 
 # Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 
 include ../../Makefile.master
 
@@ -123,8 +124,18 @@ MANFILES =	acos.3m \
 		trunc.3m \
 		y0.3m
 
+MANLINKS=	fesetenv.3m				\
+		fesetexceptflag.3m			\
+		fesetround.3m
+
+fesetenv.3m				:= LINKSRC = fegetenv.3m
+
+fesetexceptflag.3m			:= LINKSRC = fegetexceptflag.3m
+
+fesetround.3m				:= LINKSRC = fegetround.3m
+
 .KEEP_STATE:
 
 include ../Makefile.man
 
-install: $(ROOTMANFILES)
+install: $(ROOTMANFILES) $(ROOTMANLINKS)

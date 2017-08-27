@@ -55,15 +55,15 @@ and
 functions read and update the registers of the process handle referred
 to by
 .Fa P .
-.Pp
 The getting and setting of registers of the process operates on the
 representative thread (LWP).
 For more information on how the representative is chosen, see
 .Xr proc 4 .
+.Pp
 To change the registers of a specific thread, use the
 .Fn Lgetareg
 and
-.Xr Lsetareg 3PROC
+.Fn Lputareg
 functions.
 .Pp
 The getting and setting of registers only applies to stopped processes.

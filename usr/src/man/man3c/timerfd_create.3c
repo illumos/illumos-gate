@@ -199,5 +199,5 @@ is not asserted in the effective set of the calling process.
 .Xr timer_create 3C ,
 .Xr timer_gettime 3C ,
 .Xr timer_settime 3C ,
-.Xr privileages 5 ,
+.Xr privileges 5 ,
 .Xr timerfd 5

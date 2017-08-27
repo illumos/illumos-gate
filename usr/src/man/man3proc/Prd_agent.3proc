@@ -29,7 +29,7 @@ The
 .Fn Prd_agent
 function returns a pointer to an agent suitable for use with the
 run-time link editing database library,
-.Xr librtld_db 3PROC ,
+.Xr librtld_db 3LIB ,
 corresponding to the process handle
 .Fa P .
 .Pp

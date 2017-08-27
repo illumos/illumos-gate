@@ -28,7 +28,7 @@
 The
 .Fn pr_getzoneid
 function injects the
-.Xr getzoneid 2
+.Xr getzoneid 3C
 system call into the target process
 .Fa P
 by means of the agent LWP.
@@ -37,7 +37,7 @@ If the process handle
 is the value
 .Dv NULL
 then this will be equivalent to calling
-.Xr getzoneid 2
+.Xr getzoneid 3C
 on the currently running process.
 .Pp
 The
@@ -49,7 +49,7 @@ do not support system call injection.
 Upon successful completion, the
 .Fn pr_getzoneid
 function's return value is that described in
-.Xr getzoneid 2 .
+.Xr getzoneid 3C .
 Otherwise,
 .Sy -1
 is returned and
@@ -61,7 +61,7 @@ to indicate that the system call could not be injected.
 For the full list of errors see the
 .Sy ERRORS
 section in
-.Xr getzoneid 2 .
+.Xr getzoneid 3C .
 .Pp
 The
 .Fn pr_getzoneid
@@ -83,6 +83,6 @@ See
 in
 .Xr libproc 3LIB .
 .Sh SEE ALSO
-.Xr getzoneid 2 ,
+.Xr getzoneid 3C ,
 .Xr libproc 3LIB ,
 .Xr proc 4

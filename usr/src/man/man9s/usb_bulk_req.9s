@@ -34,7 +34,7 @@ The usb_bulk_req_t fields are:
 .nf
 uint_t          bulk_len;       /* number of bytes to xfer      */
                                 /* Please see */
-                                /* usb_pipe_get_max_bulk_xfer_size(9F) */
+                                /* usb_pipe_get_max_bulk_transfer_size(9F) */
                                 /* for maximum size */
 mblk_t          *bulk_data;     /* the data for the data phase  */
                                 /* IN or OUT: allocated by client */
@@ -99,7 +99,7 @@ Please see \fBusb_request_attributes\fR(9S) for more information.
 Bulk transfers/requests are subject to the following constraints and caveats:
 .sp
 .LP
-1) The following table indicates combinations of \fBusb_pipe_bulk_xfer()\fR
+1) The following table indicates combinations of \fBusb_pipe_bulk_xfer\fR()
 flags argument and fields of the usb_bulk_req_t request argument (X = don't
 care).
 .br
@@ -216,13 +216,13 @@ is not set is considered a device error.)  An exception callback is made and
 completion_reason will be non-zero.
 .sp
 .LP
-4) Splitting large Bulk xfers: Due to internal constraints, the USBA framework
-can only do a limited size bulk data xfer per request.  A client driver may
-first determine this limitation by calling the USBA interface
-(usb_pipe_get_max_bulk_xfer_size(9F)) and then restrict itself to doing
-transfers in multiples of this fixed size. This forces a client driver to do
-data xfers in a loop for a large request, splitting it into multiple chunks of
-fixed size.
+4) Splitting large bulk transfers: Due to internal constraints, the USBA
+framework can only do a limited size bulk data transfer per request.  A client
+driver may first determine this limitation by calling the USBA interface,
+\fBusb_pipe_get_max_bulk_transfer_size\fR(9F), and then restrict itself to
+doing transfers in multiples of this fixed size. This forces a client driver
+to do data transfers in a loop for a large request, splitting it into multiple
+chunks of fixed size.
 .sp
 .LP
 The bulk_completion_reason indicates the status of the transfer.  See

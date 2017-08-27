@@ -175,7 +175,7 @@ Special character device\.
 .SH "SEE ALSO"
 .sp
 .LP
-\fBdlpi\fR(1m), \fBattributes\fR(5), \fBstreamio\fR(7I), \fBdlpi\fR(7p)
+\fBattributes\fR(5), \fBstreamio\fR(7I), \fBdlpi\fR(7p)
 .sp
 .LP
 \fIIEEE 802.3\fR \(em Institute of Electrical and Electronics Engineers, 2002

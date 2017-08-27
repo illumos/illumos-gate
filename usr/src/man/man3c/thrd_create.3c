@@ -58,7 +58,7 @@ the exit status remains available and the corresponding thread ID will
 not be reused until a process calls
 .Xr thrd_join 3C .
 This is similar to how a parent must call
-.Xr wait 2 ,
+.Xr wait 3C ,
 to clean up a child process that has terminated.
 .Pp
 For a richer interface interface with more control over aspects of the

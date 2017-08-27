@@ -372,7 +372,7 @@ specifying an address.
 .LP
 \fBioctl\fR(2), \fBbind\fR(3SOCKET), \fBconnect\fR(3SOCKET),
 \fBgetipnodebyaddr\fR(3SOCKET),
-\fBgetipnodebyname\fR(3SOCKET),\fBgetprotobyname\fR(3SOCKET),
+\fBgetipnodebyname\fR(3SOCKET), \fBgetprotobyname\fR(3SOCKET),
 \fBgetservbyname\fR(3SOCKET), \fBgetsockopt\fR(3SOCKET), \fBinet\fR(3SOCKET),
 \fBsend\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
 \fBicmp6\fR(7P), \fBip6\fR(7P), \fBtcp\fR(7P), \fBudp\fR(7P)

@@ -140,7 +140,7 @@ multithreaded applications.
 .SH SEE ALSO
 .sp
 .LP
-\fBatohexlabel\fR(1M), \fBhextoalabel\fR(1M),\fBlabel_to_str\fR(3TSOL),
+\fBatohexlabel\fR(1M), \fBhextoalabel\fR(1M), \fBlabel_to_str\fR(3TSOL),
 \fBlibtsol\fR(3LIB), \fBattributes\fR(5), \fBlabels\fR(5)
 .SH NOTES
 .sp

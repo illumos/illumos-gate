@@ -178,7 +178,7 @@ conditions:
 .Bl -bullet
 .It
 A pipe reset request came in from the
-.Xr usba_hcdi_pipe_rest 9E
+.Xr usba_hcdi_pipe_reset 9E
 entry point.
 .It
 A request to stop polling came in from the
@@ -263,7 +263,7 @@ If uncertain, use
 .Sh SEE ALSO
 .Xr usba_hcdi 9E ,
 .Xr usba_hcdi_pipe_close 9E ,
-.Xr usba_hcdi_pipe_rest 9E ,
+.Xr usba_hcdi_pipe_reset 9E ,
 .Xr usba_hcdi_pipe_stop_intr_polling 9E ,
 .Xr allocb 9F ,
 .Xr usba_hcdi_cb 9F ,
