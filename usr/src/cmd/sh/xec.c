@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -124,7 +125,7 @@ int *pf1, *pf2;
 
 		case TCOM:
 			{
-				unsigned char	*a1, *name;
+				unsigned char	*name;
 				int	argn, internal;
 				struct argnod	*schain = gchain;
 				struct ionod	*io = t->treio;
@@ -136,7 +137,6 @@ int *pf1, *pf2;
 				gchain = 0;
 				argn = getarg(t);
 				com = scan(argn);
-				a1 = com[1];
 				gchain = schain;
 
 				if (argn != 0)

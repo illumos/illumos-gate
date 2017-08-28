@@ -20,14 +20,13 @@
  */
 
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpr.c 146 2006-03-24 00:26:54Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,7 +74,6 @@ main(int ac, char *av[])
 	papi_encryption_t encryption = PAPI_ENCRYPT_NEVER;
 	int dump = 0;
 	int validate = 0;
-	int remove = 0;
 	int copy = 1;	/* default is to copy the data */
 	char *document_format = "text/plain";
 	int c;
@@ -170,7 +168,6 @@ main(int ac, char *av[])
 				"rfc-1179-mail", 1);
 			break;
 		case 'r':
-			remove = 1;
 			break;
 		case 's':
 			copy = 0;

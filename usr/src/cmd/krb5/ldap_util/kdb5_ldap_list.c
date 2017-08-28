@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * kadmin/ldap_util/kdb5_ldap_list.c
  */
@@ -164,7 +162,6 @@ void list_modify_str_array(destlist, sourcelist, mode)
     char **dlist = NULL, **tmplist = NULL;
     const char **slist = NULL;
     int dcount = 0, scount = 0, copycount = 0;
-    int found = 0;
 
     if ((destlist == NULL) || (*destlist == NULL) || (sourcelist == NULL))
 	return;
@@ -200,10 +197,8 @@ void list_modify_str_array(destlist, sourcelist, mode)
 	 * from the destination list */
 	for (slist = sourcelist; *slist != NULL; slist++) {
 	    for (dlist = *destlist; *dlist != NULL; dlist++) {
-		found = 0; /* value not found */
 		/* DN is case insensitive string */
 		if (strcasecmp(*dlist, *slist) == 0) {
-		    found = 1;
 		    free(*dlist);
 		    /* Advance the rest of the entries by one */
 		    for (tmplist = dlist; *tmplist != NULL; tmplist++) {

@@ -7,6 +7,7 @@
  * Use is subject to license terms.
  *
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Gary Mills
  */
 
 #include <sys/types.h>
@@ -382,8 +383,8 @@ char *argv[];
 {
 	char *kernel, *core, *poolname;
 	int c, role, type, live_kernel;
-	ip_pool_stat_t *plstp, plstat;
-	iphtstat_t *htstp, htstat;
+	ip_pool_stat_t  plstat;
+	iphtstat_t  htstat;
 	iphtable_t *hptr;
 	iplookupop_t op;
 	ip_pool_t *ptr;
@@ -469,7 +470,6 @@ char *argv[];
 	}
 
 	if (type == IPLT_ALL || type == IPLT_POOL) {
-		plstp = &plstat;
 		op.iplo_type = IPLT_POOL;
 		op.iplo_size = sizeof(plstat);
 		op.iplo_struct = &plstat;
@@ -503,7 +503,6 @@ char *argv[];
 		}
 	}
 	if (type == IPLT_ALL || type == IPLT_HASH) {
-		htstp = &htstat;
 		op.iplo_type = IPLT_HASH;
 		op.iplo_size = sizeof(htstat);
 		op.iplo_struct = &htstat;
@@ -642,15 +641,11 @@ int poolstats(argc, argv)
 int argc;
 char *argv[];
 {
-	int c, type, role, live_kernel;
+	int c, type, role;
 	ip_pool_stat_t plstat;
-	char *kernel, *core;
 	iphtstat_t htstat;
 	iplookupop_t op;
 
-	core = NULL;
-	kernel = NULL;
-	live_kernel = 1;
 	type = IPLT_ALL;
 	role = IPL_LOGALL;
 
@@ -666,12 +661,8 @@ char *argv[];
 			setzonename_global(optarg);
 			break;
 		case 'M' :
-			live_kernel = 0;
-			core = optarg;
 			break;
 		case 'N' :
-			live_kernel = 0;
-			kernel = optarg;
 			break;
 		case 'o' :
 			role = getrole(optarg);

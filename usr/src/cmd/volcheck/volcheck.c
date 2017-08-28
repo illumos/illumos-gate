@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -54,9 +55,6 @@ main(int argc, char **argv)
 {
 	const char	*opts = "itv";
 	int		c;
-	boolean_t	opt_i = B_FALSE;
-	boolean_t	opt_t = B_FALSE;
-	boolean_t	opt_v = B_FALSE;
 	LibHalContext	*hal_ctx;
 	DBusError	error;
 	rmm_error_t	rmm_error;
@@ -67,13 +65,10 @@ main(int argc, char **argv)
 	while ((c = getopt(argc, argv, opts)) != EOF) {
 		switch (c) {
 		case 'i':
-			opt_i = B_TRUE;
 			break;
 		case 't':
-			opt_t = B_TRUE;
 			break;
 		case 'v':
-			opt_v = B_TRUE;
 			break;
 		default:
 			usage();
