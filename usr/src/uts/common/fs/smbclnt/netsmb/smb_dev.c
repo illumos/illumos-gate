@@ -318,7 +318,7 @@ nsmb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
-	cred_t *cr, int *rvalp)
+    cred_t *cr, int *rvalp)
 {
 	smb_dev_t *sdp;
 	int err;
@@ -345,6 +345,18 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 	 * all of these ioctls to fail on such VCs, so no need to
 	 * check the zone status here on every ioctl call.
 	 */
+
+	/*
+	 * Serialize ioctl calls.  The smb_usr_... functions
+	 * don't expect concurrent calls on a given sdp.
+	 */
+	mutex_enter(&sdp->sd_lock);
+	if ((sdp->sd_flags & NSMBFL_IOCTL) != 0) {
+		mutex_exit(&sdp->sd_lock);
+		return (EBUSY);
+	}
+	sdp->sd_flags |= NSMBFL_IOCTL;
+	mutex_exit(&sdp->sd_lock);
 
 	err = 0;
 	switch (cmd) {
@@ -432,6 +444,10 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 		break;
 	}
 
+	mutex_enter(&sdp->sd_lock);
+	sdp->sd_flags &= ~NSMBFL_IOCTL;
+	mutex_exit(&sdp->sd_lock);
+
 	return (err);
 }
 
@@ -475,10 +491,10 @@ found:
 	*dev = makedevice(nsmb_major, m);
 	mutex_exit(&dev_lck);
 
-	sdp->sd_cred = cr;
 	sdp->sd_smbfid = -1;
 	sdp->sd_flags |= NSMBFL_OPEN;
 	sdp->zoneid = crgetzoneid(cr);
+	mutex_init(&sdp->sd_lock, NULL, MUTEX_DRIVER, NULL);
 
 	return (0);
 }
@@ -537,6 +553,7 @@ nsmb_close2(smb_dev_t *sdp, cred_t *cr)
 			smb_iod_disconnect(vcp);
 		smb_vc_rele(vcp);
 	}
+	mutex_destroy(&sdp->sd_lock);
 
 	return (0);
 }
