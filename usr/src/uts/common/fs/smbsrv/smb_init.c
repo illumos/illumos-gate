@@ -261,18 +261,20 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 	boolean_t	copyout = B_FALSE;
 	int		rc = 0;
 
-	if (ddi_copyin((const void *)argp, &ioc_hdr, sizeof (smb_ioc_header_t),
-	    flags) || (ioc_hdr.version != SMB_IOC_VERSION))
+	if (ddi_copyin((void *)argp, &ioc_hdr, sizeof (ioc_hdr), flags))
 		return (EFAULT);
+	if (ioc_hdr.version != SMB_IOC_VERSION ||
+	    ioc_hdr.len > sizeof (smb_ioc_t))
+		return (EINVAL);
 
 	crc = ioc_hdr.crc;
 	ioc_hdr.crc = 0;
 	if (smb_crc_gen((uint8_t *)&ioc_hdr, sizeof (ioc_hdr)) != crc)
-		return (EFAULT);
+		return (EINVAL);
 
-	ioc = kmem_alloc(ioc_hdr.len, KM_SLEEP);
-	if (ddi_copyin((const void *)argp, ioc, ioc_hdr.len, flags)) {
-		kmem_free(ioc, ioc_hdr.len);
+	ioc = kmem_zalloc(sizeof (*ioc), KM_SLEEP);
+	if (ddi_copyin((void *)argp, ioc, ioc_hdr.len, flags)) {
+		kmem_free(ioc, sizeof (*ioc));
 		return (EFAULT);
 	}
 
@@ -325,11 +327,10 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 		break;
 	}
 	if ((rc == 0) && copyout) {
-		if (ddi_copyout((const void *)ioc, (void *)argp, ioc_hdr.len,
-		    flags))
+		if (ddi_copyout(ioc, (void *)argp, ioc_hdr.len, flags))
 			rc = EFAULT;
 	}
-	kmem_free(ioc, ioc_hdr.len);
+	kmem_free(ioc, sizeof (*ioc));
 	return (rc);
 }
 
