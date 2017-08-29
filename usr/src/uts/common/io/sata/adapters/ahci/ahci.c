@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -712,6 +713,16 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
 		    "hba capabilities extended = 0x%x", cap2_status);
+	}
+
+	if (cap_status & AHCI_HBA_CAP_EMS) {
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_EMS;
+		ahci_ctlp->ahcictl_em_loc =
+		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+			(uint32_t *)AHCI_GLOBAL_EM_LOC(ahci_ctlp));
+		ahci_ctlp->ahcictl_em_ctl =
+		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+			(uint32_t *)AHCI_GLOBAL_EM_CTL(ahci_ctlp));
 	}
 
 #if AHCI_DEBUG

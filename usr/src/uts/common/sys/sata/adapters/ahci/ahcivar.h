@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 
@@ -440,6 +441,12 @@ typedef struct ahci_ctl {
 
 	/* FMA capabilities */
 	int			ahcictl_fm_cap;
+
+	/*
+	 * Enclosure information
+	 */
+	uint32_t		ahcictl_em_loc;
+	uint32_t		ahcictl_em_ctl;
 } ahci_ctl_t;
 
 /* Warlock annotation */
@@ -492,6 +499,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_PMULT_FBSS		0x400
 /* Software Reset FIS cannot set pmport with 0xf for direct access device */
 #define	AHCI_CAP_SRST_NO_HOSTPORT	0x800
+/* Enclosure Management Services available */
+#define	AHCI_CAP_EMS			0x1000
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
