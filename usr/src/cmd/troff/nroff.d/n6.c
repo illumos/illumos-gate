@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -201,11 +202,10 @@ setps()
 
 tchar setht()		/* set character height from \H'...' */
 {
-	int	n;
 	tchar c;
 
 	getch();
-	n = inumb(&apts);
+	(void) inumb(&apts);
 	getch();
 	return(0);
 }

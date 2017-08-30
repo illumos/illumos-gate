@@ -1,4 +1,5 @@
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -12,8 +13,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <ctype.h>
@@ -26,17 +25,13 @@ grepcall(char *in, char *out, char *arg)
 	char line[200], *s, argig[100], *cv[50];
 	char *inp, inb[500];
 	FILE *qf, *gf;
-	int c, oldc = 0, alph = 0, nv = 0;
+	int c, alph = 0, nv = 0;
 	int sv0, sv1;
 	strcpy(argig, arg);
 	strcat(argig, ".ig");
 	strcpy(inp = inb, in);
 	if (gfile[0] == 0)
 		sprintf(gfile, "/tmp/rj%dg", getpid());
-#if D1
-	fprintf(stderr, "in grepcall, gfile %s in %o out %o\n",
-	    gfile, in, out);
-#endif
 	for (cv[nv++] = "fgrep"; c = *inp; inp++) {
 		if (c == ' ')
 			c = *inp = 0;
@@ -47,11 +42,7 @@ grepcall(char *in, char *out, char *arg)
 			cv[nv++] = inp;
 		if (alph > 6)
 			*inp = 0;
-		oldc = c;
 	}
-#if D1
-	fprintf(stderr, "%d args set up\n", nv);
-#endif
 	{
 		sv0 = dup(0);
 		close(0);
@@ -62,9 +53,6 @@ grepcall(char *in, char *out, char *arg)
 		if (creat(gfile, 0666) != 1)
 			err("Can't write fgrep output %s", gfile);
 		fgrep(nv, cv);
-#if D1
-		fprintf(stderr, "fgrep returned, output is..\n");
-#endif
 		close(0);
 		dup(sv0);
 		close(sv0);
@@ -73,17 +61,11 @@ grepcall(char *in, char *out, char *arg)
 		close(sv1);
 	}
 
-#if D1
-	fprintf(stderr, "back from fgrep\n");
-#endif
 	gf = fopen(gfile, "r");
 	if (gf == NULL)
 		err("can't read fgrep output %s", gfile);
 	while (fgets(line, 100, gf) == line) {
 		line[100] = 0;
-#if D1
-		fprintf(stderr, "read line as //%s//\n", line);
-#endif
 		for (s = line; *s && (*s != '\t'); s++)
 			;
 		if (*s == '\t') {
@@ -92,23 +74,13 @@ grepcall(char *in, char *out, char *arg)
 		}
 		if (line[0])
 			strcat(out, line);
-#if D1
-		fprintf(stderr, "out now /%s/\n", out);
-#endif
 		while (*s) s++;
-#if D1
-		fprintf(stderr, "line %o s %o s-1 %o\n", line, s, s[-1]);
-#endif
 		if (s[-1] != '\n')
 			while (!feof(gf) && getc(gf) != '\n')
 				;
 	}
 	fclose(gf);
-#if D1
-	fprintf(stderr, "back from reading %, out %s\n", out);
-#else
 	unlink(gfile);
-#endif
 }
 
 void

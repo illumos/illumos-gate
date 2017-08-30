@@ -21,6 +21,7 @@
  */
 
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -92,7 +93,6 @@ main(int ac, char *av[])
 	papi_encryption_t encryption = PAPI_ENCRYPT_NEVER;
 	int exit_status = 0;
 	int cancel = 0;
-	int pending = 0;	/* not implemented */
 	char *reason = NULL;
 	int c;
 
@@ -105,7 +105,6 @@ main(int ac, char *av[])
 			cancel = 1;
 			break;
 		case 'W':	/* wait for active request, not implemented */
-			pending = 1;
 			break;
 		case 'r':	/* reason */
 			reason = optarg;

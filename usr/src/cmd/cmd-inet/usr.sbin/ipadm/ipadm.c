@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2017 Gary Mills
  */
 
 #include <arpa/inet.h>
@@ -507,21 +508,17 @@ print_prop(show_prop_state_t *statep, uint_t flags, char *buf, size_t bufsize)
 	char			*propval = statep->sps_propval;
 	uint_t			proto = statep->sps_proto;
 	size_t			propsize = MAXPROPVALLEN;
-	char			*object;
 	ipadm_status_t		status;
 
 	if (statep->sps_ifprop) {
 		status = ipadm_get_ifprop(iph, ifname, prop_name, propval,
 		    &propsize, proto, flags);
-		object = ifname;
 	} else if (statep->sps_modprop) {
 		status = ipadm_get_prop(iph, prop_name, propval, &propsize,
 		    proto, flags);
-		object = ipadm_proto2str(proto);
 	} else {
 		status = ipadm_get_addrprop(iph, prop_name, propval, &propsize,
 		    statep->sps_aobjname, flags);
-		object = statep->sps_aobjname;
 	}
 
 	if (status != IPADM_SUCCESS) {
