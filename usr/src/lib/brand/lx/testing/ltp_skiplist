@@ -172,6 +172,10 @@ ioctl04
 ioctl05
 ioctl06
 keyctl01
+keyctl02
+keyctl03
+keyctl04
+keyctl05
 kcmp01
 kcmp02
 kcmp03
