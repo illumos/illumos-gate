@@ -88,6 +88,7 @@ static void setenv_(u_char *cp,  u_char *ep, struct dhcp_opt *opts);
 static char expected_dhcpmsgtype = -1, dhcp_ok;
 struct in_addr dhcp_serverip;
 #endif
+struct bootp *bootp_response;
 
 /* Fetch required bootp infomation */
 void
@@ -320,6 +321,18 @@ bootprecv(struct iodesc *d, void *pkt, size_t len, time_t tleft)
 	if (bcmp(vm_rfc1048, bp->bp_vend, sizeof(vm_rfc1048)) == 0) {
 		if(vend_rfc1048(bp->bp_vend, sizeof(bp->bp_vend)) != 0)
 		    goto bad;
+
+		/* Save copy of bootp reply or DHCP ACK message */
+		if (bp->bp_op == BOOTREPLY &&
+		    ((dhcp_ok == 1 && expected_dhcpmsgtype == DHCPACK) ||
+		    dhcp_ok == 0)) {
+			free(bootp_response);
+			bootp_response = malloc(sizeof (*bootp_response));
+			if (bootp_response != NULL) {
+				bcopy(bp, bootp_response,
+				    sizeof (*bootp_response));
+			}
+		}
 	}
 #ifdef BOOTP_VEND_CMU
 	else if (bcmp(vm_cmu, bp->bp_vend, sizeof(vm_cmu)) == 0)

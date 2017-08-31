@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #ifndef	_SYS_TASKQ_IMPL_H
@@ -66,7 +67,6 @@ typedef struct tqstat {
 	uint_t		tqs_tcreates;	/* threads created 	*/
 	uint_t		tqs_tdeaths;	/* threads died		*/
 	uint_t		tqs_maxthreads;	/* max # of alive threads */
-	uint_t		tqs_nomem;	/* # of times there were no memory */
 	uint_t		tqs_disptcreates;
 } tqstat_t;
 
@@ -142,6 +142,7 @@ struct taskq {
 	 */
 	kstat_t		*tq_kstat;	/* Exported statistics */
 	hrtime_t	tq_totaltime;	/* Time spent processing tasks */
+	uint64_t	tq_nomem;	/* # of times there was no memory */
 	uint64_t	tq_tasks;	/* Total # of tasks posted */
 	uint64_t	tq_executed;	/* Total # of tasks executed */
 	int		tq_maxtasks;	/* Max number of tasks in the queue */

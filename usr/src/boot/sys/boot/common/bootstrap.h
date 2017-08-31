@@ -245,15 +245,17 @@ extern u_int64_t __elfN(relocation_offset);
 struct elf_file;
 typedef Elf_Addr (symaddr_fn)(struct elf_file *ef, Elf_Size symidx);
 
-int	__elfN(loadfile)(char *filename, u_int64_t dest, struct preloaded_file **result);
-int	__elfN(obj_loadfile)(char *filename, u_int64_t dest,
-	    struct preloaded_file **result);
+int	elf64_loadfile(char *, uint64_t, struct preloaded_file **);
+int	elf32_loadfile(char *, uint64_t, struct preloaded_file **);
+int	elf64_obj_loadfile(char *, uint64_t, struct preloaded_file **);
+int	elf32_obj_loadfile(char *, uint64_t, struct preloaded_file **);
 int	__elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr,
 	    const void *reldata, int reltype, Elf_Addr relbase,
 	    Elf_Addr dataaddr, void *data, size_t len);
-int __elfN(loadfile_raw)(char *filename, u_int64_t dest,
-	    struct preloaded_file **result, int multiboot);
-int __elfN(load_modmetadata)(struct preloaded_file *fp, u_int64_t dest);
+int	elf64_loadfile_raw(char *, uint64_t, struct preloaded_file **, int);
+int	elf32_loadfile_raw(char *, uint64_t, struct preloaded_file **, int);
+int	elf64_load_modmetadata(struct preloaded_file *, uint64_t);
+int	elf32_load_modmetadata(struct preloaded_file *, uint64_t);
 #endif
 
 /*

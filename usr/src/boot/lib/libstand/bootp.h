@@ -20,6 +20,8 @@
  * without express or implied warranty.
  */
 
+#include <netinet/in.h>
+
 #ifndef _BOOTP_H_
 #define	_BOOTP_H_
 
@@ -144,6 +146,9 @@ struct cmu_vend {
 
 /* v_flags values */
 #define VF_SMASK	1	/* Subnet mask field contains valid data */
+
+/* cached bootp response/dhcp ack */
+extern struct bootp *bootp_response;
 
 int	dhcp_try_rfc1048(uint8_t *cp, size_t len);
 

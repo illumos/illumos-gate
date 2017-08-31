@@ -58,7 +58,7 @@ static char	data_buffer[PXE_BUFFER_SIZE];
 
 static pxenv_t	*pxenv_p = NULL;        /* PXENV+ */
 static pxe_t	*pxe_p   = NULL;	/* !PXE */
-BOOTPLAYER	bootplayer = {0};	/* PXE Cached information. */
+static BOOTPLAYER	bootplayer = {0};	/* PXE Cached information. */
 
 static int 	pxe_debug = 0;
 static int	pxe_sock = -1;
