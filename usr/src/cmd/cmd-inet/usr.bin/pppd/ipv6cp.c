@@ -885,7 +885,7 @@ ipv6cp_reqci(f, p, lenp, dont_nak)
 		/*
 		 * If it has no interface identifier, or if we both
 		 * have same identifier then NAK it with new idea.  In
-		 * particular, if we don't know his identifier, but it
+		 * particular, if we don't know its identifier, but it
 		 * does, then accept that identifier.
 		 */
 		eui64_get(ifaceid, p);

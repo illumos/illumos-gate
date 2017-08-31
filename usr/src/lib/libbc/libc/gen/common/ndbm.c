@@ -495,10 +495,9 @@ dbm_do_nextkey(DBM *db, datum inkey)
 		else key=nullkey;
 
 	/* the keyptr pagbuf have failed us, the user must
-	be an extra clever moron who depends on
-	these variables and their former meaning.
+	depend on these variables and their former meaning.
 	If we set the variables this would have got
-	us the key for sure! So give him the old algorithm.*/
+	us the key for sure! So give the user the old algorithm.*/
 		if (key.dptr == NULL) return (dbm_slow_nextkey(db));
 	}
 

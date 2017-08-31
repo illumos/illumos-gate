@@ -1818,7 +1818,7 @@ force_continue(ulwp_t *ulwp)
 		if (error != 0 && error != EINTR)
 			break;
 		error = 0;
-		if (ulwp->ul_stopping) {	/* it is stopping itsself */
+		if (ulwp->ul_stopping) {	/* it is stopping itself */
 			ts.tv_sec = 0;		/* give it a chance to run */
 			ts.tv_nsec = 100000;	/* 100 usecs or clock tick */
 			(void) __nanosleep(&ts, NULL);
