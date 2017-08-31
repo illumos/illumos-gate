@@ -1465,8 +1465,8 @@ dorep(char *argv[])
  *	endtape checks the entry in dblock.dbuf to see if its the
  *	special EOT entry.  Endtape is usually called after getdir().
  *
- *	endtape used to call backtape; it no longer does, it who
- *	wants it backed up must call backtape himself
+ *	endtape used to call backtape; it no longer does. If the caller
+ *	wants the tape backed up, it must call backtape itself
  *	RETURNS:	0 if not EOT, tape position unaffected
  *			1 if	 EOT, tape position unaffected
  */

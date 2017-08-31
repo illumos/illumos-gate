@@ -245,8 +245,8 @@ extern char *slc_names[];
  */
 #define	AUTH_REJECT	0	/* Rejected */
 #define	AUTH_UNKNOWN	1	/* We don't know who it is, but it's okay */
-#define	AUTH_OTHER	2	/* We know it, but not it's name */
-#define	AUTH_USER	3	/* We know it's name */
+#define	AUTH_OTHER	2	/* We know it, but not its name */
+#define	AUTH_USER	3	/* We know its name */
 #define	AUTH_VALID	4	/* We know it, and it needs no password */
 
 /*
