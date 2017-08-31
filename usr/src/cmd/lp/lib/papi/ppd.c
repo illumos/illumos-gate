@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Gary Mills
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains an extremely rudimentary implementation of PPD file
@@ -90,7 +89,6 @@ PPDFileToAttributesList(papi_attribute_t ***attributes, char *filename)
 	char capability[256];
 	char def[256];
 	char supported[256];
-	char *current_group_name = NULL;
 
 	int ui = 0;
 
@@ -120,7 +118,6 @@ PPDFileToAttributesList(papi_attribute_t ***attributes, char *filename)
 		if (strcasecmp(key, "OpenGroup") == 0) {
 			if (value == NULL)
 				value = "unknown";
-			current_group_name = strdup(value);
 		} else if (strcasecmp(key, "OpenUI") == 0) {
 			if ((strcasecmp(value, "PageSize") == 0) ||
 			    (strcasecmp(value, "InputSlot") == 0))

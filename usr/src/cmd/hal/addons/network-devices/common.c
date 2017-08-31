@@ -1,4 +1,5 @@
 /*
+ * Copyright 2017 Gary Mills
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Licensed under the Academic Free License version 2.1
@@ -113,7 +114,7 @@ addr_to_string(char *prefix, uchar_t *mac, int mac_len, char *buf, int buf_len)
 static char *
 pseudo_serialno_from_addr(char *name)
 {
-	int sd, rc, errnum;
+	int sd, errnum;
 	char buf[128];
 	struct hostent *hp;
 	struct xarpreq ar;
@@ -140,7 +141,7 @@ pseudo_serialno_from_addr(char *name)
 	sd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	ar.xarp_ha.sdl_family = AF_LINK;
-	rc = ioctl(sd, SIOCGXARP, (caddr_t)&ar);
+	(void) ioctl(sd, SIOCGXARP, (caddr_t)&ar);
 
 	close(sd);
 

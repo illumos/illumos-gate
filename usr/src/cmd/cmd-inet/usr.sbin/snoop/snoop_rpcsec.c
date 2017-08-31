@@ -23,6 +23,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2017 Gary Mills
  */
 
 #include <sys/types.h>
@@ -293,22 +294,20 @@ rpcsec_gss_control_proc(int type, int flags, int xid)
 void
 extract_rpcsec_gss_cred_info(int xid)
 {
-	unsigned int seq_num;
 	unsigned int handle_len;
-	unsigned int flavor_len;
 	unsigned int rpcsec_gss_ver;
 	rpc_gss_service_t rpcsec_gss_service;
 	unsigned int rpcsec_gss_proc;
 	struct cache_struct *x;
 
-	flavor_len = getxdr_u_long();
+	(void) getxdr_u_long();
 	rpcsec_gss_ver = getxdr_u_long();
 	/* see if we know this version or not */
 	if (rpcsec_gss_ver != 1) {
 		longjmp(xdr_err, 1);
 	}
 	rpcsec_gss_proc   = getxdr_u_long();
-	seq_num    = getxdr_u_long();
+	(void) getxdr_u_long();
 	rpcsec_gss_service    = getxdr_enum();
 	/* skip the handle */
 	xdr_skip(RNDUP(getxdr_u_long()));
@@ -327,7 +326,7 @@ static void
 print_rpc_gss_init_arg(int flags, struct cache_struct *x)
 {
 
-	char *token, *line;
+	char  *line;
 	unsigned int token_len;
 	int pos = 0;
 
@@ -348,7 +347,7 @@ print_rpc_gss_init_arg(int flags, struct cache_struct *x)
 
 	pos = getxdr_pos();
 	token_len = getxdr_u_long();
-	token = getxdr_hex(token_len);
+	(void) getxdr_hex(token_len);
 	line = get_line(pos, getxdr_pos());
 	sprintf(line, "   gss token: length = %d, data = [%d bytes]",
 	    token_len, token_len);
@@ -363,7 +362,7 @@ void
 print_rpc_gss_init_res(int flags)
 {
 
-	char *handle, *token, *line;
+	char *handle, *line;
 	unsigned int token_len, handle_len;
 	unsigned int major, minor, seq_window;
 
@@ -395,7 +394,7 @@ print_rpc_gss_init_res(int flags)
 	    "   sequence window  = %u", seq_window);
 	pos = getxdr_pos();
 	token_len = getxdr_u_long();
-	token = getxdr_hex(token_len);
+	(void) getxdr_hex(token_len);
 	line = get_line(pos, getxdr_pos());
 	sprintf(line, "   gss token: length = %d, data = [%d bytes]",
 	    token_len, token_len);

@@ -2,6 +2,7 @@
  *
  * addon-storage.c : watch removable media state changes
  *
+ * Copyright 2017 Gary Mills
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
@@ -318,8 +319,6 @@ main (int argc, char *argv[])
 	char *bus;
 	char *drive_type;
 	int state, last_state;
-	char *support_media_changed_str;
-	int support_media_changed;
 	int fd = -1;
 
 	if ((udi = getenv ("UDI")) == NULL)
@@ -340,12 +339,6 @@ main (int argc, char *argv[])
 	setup_logger ();
 
 	sysevent_init ();
-
-	support_media_changed_str = getenv ("HAL_PROP_STORAGE_CDROM_SUPPORT_MEDIA_CHANGED");
-	if (support_media_changed_str != NULL && strcmp (support_media_changed_str, "true") == 0)
-		support_media_changed = TRUE;
-	else
-		support_media_changed = FALSE;
 
 	dbus_error_init (&error);
 

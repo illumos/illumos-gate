@@ -5,6 +5,7 @@
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Gary Mills
  */
 
 #include "ipf.h"
@@ -62,7 +63,6 @@ static	FILE	*cfile = NULL;
 void printc(fr)
 frentry_t *fr;
 {
-	fripf_t *ipf;
 	u_long *ulp;
 	char *and;
 	FILE *fp;
@@ -75,7 +75,6 @@ frentry_t *fr;
 	if ((fr->fr_type == FR_T_IPF) &&
 	    ((fr->fr_datype != FRI_NORMAL) || (fr->fr_satype != FRI_NORMAL)))
 		return;
-	ipf = fr->fr_ipf;
 
 	if (cfile == NULL)
 		cfile = fopen("ip_rules.c", "w");
