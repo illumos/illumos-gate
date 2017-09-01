@@ -61,6 +61,7 @@ UNSHIPPED_SUBDIRS = \
 	man \
 	mandoc \
 	tic \
+	vtfontcvt \
 	zic
 
 sparc_SUBDIRS= \

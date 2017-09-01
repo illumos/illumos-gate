@@ -28,6 +28,18 @@ s bin=usr/bin
 d boot 0755 root sys
 d boot/acpi 0755 root sys
 d boot/acpi/tables 0755 root sys
+d boot/fonts 0755 root sys
+f boot/fonts/10x18.fnt 0444 root bin
+f boot/fonts/10x20.fnt 0444 root bin
+f boot/fonts/11x22.fnt 0444 root bin
+f boot/fonts/12x24.fnt 0444 root bin
+f boot/fonts/14x28.fnt 0444 root bin
+f boot/fonts/16x32.fnt 0444 root bin
+f boot/fonts/6x12.fnt 0444 root bin
+f boot/fonts/8x14.fnt 0444 root bin
+f boot/fonts/8x16.fnt 0444 root bin
+f boot/fonts/Gallant19.fnt 0444 root bin
+f boot/fonts/fonts.dir 0444 root bin
 d boot/solaris 0755 root sys
 f boot/solaris/bootenv.rc 0644 root root
 d boot/solaris/devicedb 0755 root sys
@@ -2401,6 +2413,7 @@ f usr/bin/vfsstat 0555 root bin
 f usr/bin/vgrind 0555 root bin
 f usr/bin/vmstat 0555 root bin
 f usr/bin/vndstat 0555 root bin
+f usr/bin/vtfontcvt 0555 root bin
 h usr/bin/w=usr/lib/isaexec
 h usr/bin/wait=usr/bin/alias
 h usr/bin/wc=usr/bin/alias
@@ -10593,6 +10606,7 @@ f usr/share/hwdata/pci.ids 0444 root bin
 d usr/share/lib 0755 root sys
 d usr/share/lib/dict 0755 root bin
 f usr/share/lib/dict/words 0444 root bin
+s usr/share/lib/fonts=../../../boot/fonts
 d usr/share/lib/idn 0755 root sys
 d usr/share/lib/java 0755 root sys
 d usr/share/lib/keytables 0755 root bin
@@ -11846,6 +11860,7 @@ s usr/share/man/man1/valuid.1=ckuid.1
 s usr/share/man/man1/valyorn.1=ckyorn.1
 s usr/share/man/man1/vedit.1=../../../has/man/man1has/vi.1has
 f usr/share/man/man1/vgrind.1 0444 root bin
+f usr/share/man/man1/vtfontcvt.1 0444 root bin
 f usr/share/man/man1/w.1 0444 root bin
 f usr/share/man/man1/wait.1 0444 root bin
 f usr/share/man/man1/wc.1 0444 root bin

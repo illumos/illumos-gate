@@ -133,6 +133,7 @@ STABS=		$(ONBLD_TOOLS)/bin/$(MACH)/stabs
 ELFEXTRACT=	$(ONBLD_TOOLS)/bin/$(MACH)/elfextract
 MBH_PATCH=	$(ONBLD_TOOLS)/bin/$(MACH)/mbh_patch
 BTXLD=		$(ONBLD_TOOLS)/bin/$(MACH)/btxld
+VTFONTCVT=	$(ONBLD_TOOLS)/bin/$(MACH)/vtfontcvt
 ECHO=		echo
 INS=		install
 TRUE=		true
