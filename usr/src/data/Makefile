@@ -13,7 +13,8 @@
 # Copyright 2017 Nexenta Systems, Inc.
 #
 
-SUBDIRS=	hwdata \
+SUBDIRS=	consfonts \
+		hwdata \
 		locale \
 		terminfo \
 		zoneinfo

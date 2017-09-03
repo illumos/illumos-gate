@@ -99,7 +99,7 @@ __vsincos(int n, double * restrict x, int stridex,
 			*xsave, *ysave, *csave;
 	unsigned	hx0, hx1, hx2, xsb0, xsb1, xsb2;
 	int		i, biguns, nsave, sxsave, sysave, scsave;
-	volatile int	v __GNU_UNUSED;
+	volatile int	v __unused;
 	nsave = n;
 	xsave = x;
 	sxsave = stridex;

@@ -24,7 +24,7 @@
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 
 <include SUNWcs.man1.inc>
@@ -851,6 +851,7 @@ file path=usr/bin/tzselect mode=0555
 file path=usr/bin/userattr mode=0555
 file path=usr/bin/uuidgen mode=0555
 file path=usr/bin/vmstat mode=0555
+file path=usr/bin/vtfontcvt mode=0555
 file path=usr/bin/which mode=0555
 file path=usr/bin/who mode=0555
 file path=usr/bin/wracct mode=0555
@@ -1843,6 +1844,9 @@ depend fmri=runtime/perl$(PERL_PKGVERS)/module/sun-solaris type=require
 # The boot loader package
 #
 depend fmri=system/boot/loader type=require
+#
+# The System Console fonts
+depend fmri=system/data/console/fonts type=require
 #
 # The loadkeys binary needs the keytables.
 #

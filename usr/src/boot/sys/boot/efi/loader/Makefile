@@ -27,9 +27,9 @@ MACHINE=	$(MACH64)
 
 # architecture-specific loader code
 SRCS=	autoload.c bootinfo.c conf.c copy.c devicename.c main.c self_reloc.c \
-	smbios.c acpi.c vers.c
+	smbios.c acpi.c vers.c memmap.c multiboot2.c
 OBJS= autoload.o bootinfo.o conf.o copy.o devicename.o main.o self_reloc.o \
-	smbios.o acpi.o vers.o
+	smbios.o acpi.o vers.o memmap.o multiboot2.o
 
 ASFLAGS=-m64 -fPIC
 CFLAGS=	-O2
@@ -82,6 +82,9 @@ LIBZFSBOOT=	../../zfs/${MACHINE}/libzfsboot.a
 # Always add MI sources
 include	./Makefile.common
 CPPFLAGS +=	-I../../common
+
+# For multiboot2.h, must be last, to avoid conflicts
+CPPFLAGS +=	-I$(SRC)/uts/common
 
 FILES=	loader.efi
 FILEMODE=	0555

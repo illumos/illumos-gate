@@ -399,6 +399,7 @@ MANFILES=	acctcom.1			\
 	 	vgrind.1			\
 	 	volcheck.1			\
 	 	volrmmount.1			\
+		vtfontcvt.1			\
 	 	w.1				\
 	 	wait.1				\
 	 	wc.1				\
