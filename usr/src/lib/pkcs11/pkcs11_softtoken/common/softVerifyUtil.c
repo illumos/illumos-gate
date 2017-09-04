@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -102,6 +101,12 @@ soft_verify_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DES_MAC:
 
 		return (soft_des_sign_verify_init_common(session_p, pMechanism,
+		    key_p, B_FALSE));
+
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+
+		return (soft_aes_sign_verify_init_common(session_p, pMechanism,
 		    key_p, B_FALSE));
 
 	default:
@@ -184,6 +189,32 @@ soft_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 		/* Pass local buffer to avoid overflow. */
 		rv = soft_des_sign_verify_common(session_p, pData,
+		    ulDataLen, signature, &len, B_FALSE, B_FALSE);
+
+		if (rv == CKR_OK) {
+			if (len != ulSignatureLen) {
+				rv = CKR_SIGNATURE_LEN_RANGE;
+			}
+
+			if (memcmp(signature, pSignature, len) != 0) {
+				rv = CKR_SIGNATURE_INVALID;
+			}
+		}
+
+		return (rv);
+	}
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+	{
+		CK_ULONG len;
+		CK_BYTE signature[AES_BLOCK_LEN];
+		soft_aes_ctx_t *aes_ctx;
+
+		aes_ctx = (soft_aes_ctx_t *)session_p->verify.context;
+		len = aes_ctx->mac_len;
+
+		/* Pass local buffer to avoid overflow. */
+		rv = soft_aes_sign_verify_common(session_p, pData,
 		    ulDataLen, signature, &len, B_FALSE, B_FALSE);
 
 		if (rv == CKR_OK) {
@@ -282,6 +313,12 @@ soft_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 		return (soft_des_mac_sign_verify_update(session_p, pPart,
 		    ulPartLen));
 
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+
+		return (soft_aes_mac_sign_verify_update(session_p, pPart,
+		    ulPartLen));
+
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
 	case CKM_SHA256_RSA_PKCS:
@@ -375,6 +412,32 @@ soft_verify_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 
 		/* Pass local buffer to avoid overflow. */
 		rv = soft_des_sign_verify_common(session_p, NULL, 0,
+		    signature, &len, B_FALSE, B_TRUE);
+
+		if (rv == CKR_OK) {
+			if (len != ulSignatureLen) {
+				rv = CKR_SIGNATURE_LEN_RANGE;
+			}
+
+			if (memcmp(signature, pSignature, len) != 0) {
+				rv = CKR_SIGNATURE_INVALID;
+			}
+		}
+
+		return (rv);
+	}
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+	{
+		CK_ULONG len;
+		CK_BYTE signature[AES_BLOCK_LEN];
+		soft_aes_ctx_t *aes_ctx;
+
+		aes_ctx = (soft_aes_ctx_t *)session_p->verify.context;
+		len = aes_ctx->mac_len;
+
+		/* Pass local buffer to avoid overflow. */
+		rv = soft_aes_sign_verify_common(session_p, NULL, 0,
 		    signature, &len, B_FALSE, B_TRUE);
 
 		if (rv == CKR_OK) {

@@ -1,0 +1,82 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
+include $(SRC)/test/Makefile.com
+
+CRYPTO = pkcs kcf
+PROGS = $(CRYPTO:%=$(PROG)_%)
+ROOTOPTPKG = $(ROOT)/opt/crypto-tests
+TESTROOT = $(ROOTOPTPKG)/tests/#$(SUFFIX)/aes
+TESTDIR = $(CRYPTO:%=$(TESTROOT)/%/aes)
+
+COMMONDIR = ../../../common
+OBJS_COMMON = testfuncs.o
+OBJS_COMDIR = $(OBJS_COMMON:%=$(COMMONDIR)/%)
+OBJS_LOCAL = $(PROG:%=%.o)
+OBJS = $(OBJS_LOCAL) $(OBJS_COMDIR)
+OBJS_PKCS = $(OBJS_LOCAL) $(OBJS_COMDIR) $(COMMONDIR)/cryptotest_pkcs.o
+OBJS_KCF = $(OBJS_LOCAL) $(OBJS_COMDIR) $(COMMONDIR)/cryptotest_kcf.o
+SRCS = $(OBJS:%.o=%.c)
+PKCSLIBS = -lpkcs11 -lcryptoutil
+
+C99MODE = -xc99=%all
+
+CMDS = $(TESTDIR:%=%/$(PROG))
+$(CMDS) := FILEMODE = 0555
+
+LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
+LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
+
+CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -I$(COMMONDIR) -I$(SRC)/common/crypto/
+
+all: $(PROGS)
+
+$(PROG)_kcf: $(OBJS_KCF)
+	$(LINK.c) $(OBJS_KCF) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+$(PROG)_pkcs: $(OBJS_PKCS)
+	$(LINK.c) $(OBJS_PKCS) -o $@ $(LDLIBS) $(PKCSLIBS)
+	$(POST_PROCESS)
+
+
+$(COMMONDIR)/%.o:
+
+%.o: %.c
+	$(COMPILE.c) -o $@ $<
+
+install: all $(CMDS)
+
+lint: $(CRYPTO:%=lint_%)
+
+lint_pkcs:
+	$(LINT.c) $(OBJS_PKCS:%.o=%.c) $(LDLIBS) $(PKCSLIBS)
+
+lint_kcf:
+	$(LINT.c) $(OBJS_KCF:%.o=%.c) $(LDLIBS)
+clobber: clean
+	-$(RM) $(PROGS)
+
+clean:
+	-$(RM) $(OBJS_LOCAL)
+
+$(CMDS): $(TESTDIR) $(PROGS)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTROOT)/%/aes/$(PROG): $(PROG)_%
+	$(INS.rename)

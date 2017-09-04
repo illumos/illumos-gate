@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <strings.h>
@@ -103,6 +102,12 @@ soft_sign_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		return (soft_des_sign_verify_init_common(session_p, pMechanism,
 		    key_p, B_TRUE));
 
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+
+		return (soft_aes_sign_verify_init_common(session_p, pMechanism,
+		    key_p, B_TRUE));
+
 	default:
 		return (CKR_MECHANISM_INVALID);
 	}
@@ -179,6 +184,27 @@ soft_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 		} else {
 			/* Pass NULL, let callee to handle it. */
 			rv = soft_des_sign_verify_common(session_p, pData,
+			    ulDataLen, NULL, pulSignatureLen, B_TRUE, B_FALSE);
+		}
+
+		if ((rv == CKR_OK) && (pSignature != NULL))
+			(void) memcpy(pSignature, signature, *pulSignatureLen);
+
+		return (rv);
+	}
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+	{
+		CK_BYTE signature[AES_BLOCK_LEN];
+
+		if (pSignature != NULL) {
+			/* Pass local buffer to avoid overflow. */
+			rv = soft_aes_sign_verify_common(session_p, pData,
+			    ulDataLen, signature, pulSignatureLen, B_TRUE,
+			    B_FALSE);
+		} else {
+			/* Pass NULL, let callee handle it. */
+			rv = soft_aes_sign_verify_common(session_p, pData,
 			    ulDataLen, NULL, pulSignatureLen, B_TRUE, B_FALSE);
 		}
 
@@ -271,6 +297,12 @@ soft_sign_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 		return (soft_des_mac_sign_verify_update(session_p, pPart,
 		    ulPartLen));
 
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+
+		return (soft_aes_mac_sign_verify_update(session_p, pPart,
+		    ulPartLen));
+
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
 	case CKM_SHA256_RSA_PKCS:
@@ -359,6 +391,26 @@ soft_sign_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 		} else {
 			/* Pass NULL, let callee to handle it. */
 			rv = soft_des_sign_verify_common(session_p, NULL, 0,
+			    NULL, pulSignatureLen, B_TRUE, B_TRUE);
+		}
+
+		if ((rv == CKR_OK) && (pSignature != NULL))
+			(void) memcpy(pSignature, signature, *pulSignatureLen);
+
+		return (rv);
+	}
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+	{
+		CK_BYTE signature[AES_BLOCK_LEN]; /* use the maximum size */
+
+		if (pSignature != NULL) {
+			/* Pass local buffer to avoid overflow. */
+			rv = soft_aes_sign_verify_common(session_p, NULL, 0,
+			    signature, pulSignatureLen, B_TRUE, B_TRUE);
+		} else {
+			/* Pass NULL, let callee handle it. */
+			rv = soft_aes_sign_verify_common(session_p, NULL, 0,
 			    NULL, pulSignatureLen, B_TRUE, B_TRUE);
 		}
 
@@ -522,6 +574,17 @@ soft_sign_verify_cleanup(soft_session_t *session_p, boolean_t sign,
 		}
 		if (active_op->context != NULL)
 			bzero(active_op->context, sizeof (soft_des_ctx_t));
+		break;
+
+	case CKM_AES_CMAC_GENERAL:
+	case CKM_AES_CMAC:
+		if (session_p->encrypt.context != NULL) {
+			free(session_p->encrypt.context);
+			session_p->encrypt.context = NULL;
+			session_p->encrypt.flags = 0;
+		}
+		if (active_op->context != NULL)
+			bzero(active_op->context, sizeof (soft_aes_ctx_t));
 		break;
 
 	}

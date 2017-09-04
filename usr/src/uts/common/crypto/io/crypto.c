@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -111,6 +112,12 @@ static int crypto_buffer_check(size_t);
 static int crypto_free_find_ctx(crypto_session_data_t *);
 static int crypto_get_provider_list(crypto_minor_t *, uint_t *,
     crypto_provider_entry_t **, boolean_t);
+
+static int crypto_create_provider_session(crypto_minor_t *,
+    kcf_provider_desc_t *, crypto_session_id_t, crypto_provider_session_t **,
+    kcf_provider_desc_t *);
+static int crypto_create_session_ptr(crypto_minor_t *, kcf_provider_desc_t *,
+    crypto_provider_session_t *, crypto_session_id_t *);
 
 /* number of minor numbers to allocate at a time */
 #define	CRYPTO_MINOR_CHUNK	16
@@ -220,6 +227,10 @@ static kcf_lock_withpad_t *crypto_locks;
 	if ((sp)->sd_verify_recover_ctx != NULL) {		\
 		crypto_cancel_ctx((sp)->sd_verify_recover_ctx);	\
 		(sp)->sd_verify_recover_ctx = NULL;		\
+	}							\
+	if ((sp)->sd_mac_ctx != NULL) {		\
+		crypto_cancel_ctx((sp)->sd_mac_ctx);	\
+		(sp)->sd_mac_ctx = NULL;		\
 	}							\
 }
 
@@ -1700,7 +1711,7 @@ crypto_get_provider_session(crypto_minor_t *cm,
 {
 	kcf_provider_desc_t *pd, *real_provider;
 	kcf_req_params_t params;
-	crypto_provider_session_t *ps, *new_ps;
+	crypto_provider_session_t *ps;
 	crypto_session_id_t provider_session_id = 0;
 	int rv;
 
@@ -1746,9 +1757,6 @@ again:
 		}
 	}
 
-	/* allocate crypto_provider_session structure */
-	new_ps = kmem_zalloc(sizeof (crypto_provider_session_t), KM_SLEEP);
-
 	/*
 	 * Check if someone opened a session to the provider
 	 * while we dropped the lock.
@@ -1757,7 +1765,6 @@ again:
 	for (ps = cm->cm_provider_session; ps != NULL; ps = ps->ps_next) {
 		if (ps->ps_provider == pd) {
 			mutex_exit(&cm->cm_lock);
-			kmem_free(new_ps, sizeof (crypto_provider_session_t));
 			if (real_provider != NULL) {
 				KCF_WRAP_SESSION_OPS_PARAMS(&params,
 				    KCF_OP_SESSION_CLOSE, NULL,
@@ -1773,18 +1780,32 @@ again:
 		}
 	}
 
-	/* increment refcnt and attach to crypto_minor structure */
-	new_ps->ps_session = provider_session_id;
-	new_ps->ps_refcnt = 1;
-	KCF_PROV_REFHOLD(pd);
-	new_ps->ps_provider = pd;
-	if (real_provider != NULL) {
-		new_ps->ps_real_provider = real_provider;
-	}
-	new_ps->ps_next = cm->cm_provider_session;
-	cm->cm_provider_session = new_ps;
+	return (crypto_create_provider_session(cm, pd, provider_session_id,
+	    output_ps, real_provider));
+}
 
-	*output_ps = new_ps;
+static int
+crypto_create_provider_session(crypto_minor_t *cm, kcf_provider_desc_t *pd,
+    crypto_session_id_t sid, crypto_provider_session_t **out_ps,
+    kcf_provider_desc_t *real)
+{
+	crypto_provider_session_t *ps;
+
+	/* allocate crypto_provider_session structure */
+	ps = kmem_zalloc(sizeof (crypto_provider_session_t), KM_SLEEP);
+
+	/* increment refcnt and attach to crypto_minor structure */
+	ps->ps_session = sid;
+	ps->ps_refcnt = 1;
+	KCF_PROV_REFHOLD(pd);
+	ps->ps_provider = pd;
+	if (real != NULL) {
+		ps->ps_real_provider = real;
+	}
+	ps->ps_next = cm->cm_provider_session;
+	cm->cm_provider_session = ps;
+
+	*out_ps = ps;
 	return (CRYPTO_SUCCESS);
 }
 
@@ -1880,7 +1901,7 @@ grow_session_table(crypto_minor_t *cm)
 }
 
 /*
- * Find unused entry in session table and return it's index.
+ * Find unused entry in session table and return its index.
  * Initialize session table entry.
  */
 /* ARGSUSED */
@@ -1888,11 +1909,7 @@ static int
 crypto_open_session(dev_t dev, uint_t flags, crypto_session_id_t *session_index,
     crypto_provider_id_t provider_id)
 {
-	crypto_session_data_t **session_table;
-	crypto_session_data_t *sp;
 	crypto_minor_t *cm;
-	uint_t session_table_count;
-	uint_t i;
 	int rv;
 	crypto_provider_session_t *ps;
 	kcf_provider_desc_t *provider;
@@ -1928,6 +1945,25 @@ crypto_open_session(dev_t dev, uint_t flags, crypto_session_id_t *session_index,
 	}
 	provider = cm->cm_provider_array[provider_id];
 
+	rv = crypto_create_session_ptr(cm, provider, ps, session_index);
+	mutex_exit(&cm->cm_lock);
+	crypto_release_minor(cm);
+	return (rv);
+
+}
+
+static int
+crypto_create_session_ptr(crypto_minor_t *cm, kcf_provider_desc_t *provider,
+    crypto_provider_session_t *ps,  crypto_session_id_t *session_index)
+{
+	crypto_session_data_t **session_table;
+	crypto_session_data_t *sp;
+	uint_t session_table_count;
+	uint_t i;
+	int rv;
+
+	ASSERT(MUTEX_HELD(&cm->cm_lock));
+
 again:
 	session_table_count = cm->cm_session_table_count;
 	session_table = cm->cm_session_table;
@@ -1941,8 +1977,6 @@ again:
 	if (i == session_table_count || session_table_count == 0) {
 		if ((rv = grow_session_table(cm)) != CRYPTO_SUCCESS) {
 			crypto_release_provider_session(cm, ps);
-			mutex_exit(&cm->cm_lock);
-			crypto_release_minor(cm);
 			return (rv);
 		}
 		goto again;
@@ -1956,6 +1990,7 @@ again:
 	sp->sd_decr_ctx = NULL;
 	sp->sd_sign_ctx = NULL;
 	sp->sd_verify_ctx = NULL;
+	sp->sd_mac_ctx = NULL;
 	sp->sd_sign_recover_ctx = NULL;
 	sp->sd_verify_recover_ctx = NULL;
 	mutex_init(&sp->sd_lock, NULL, MUTEX_DRIVER, NULL);
@@ -1973,9 +2008,8 @@ again:
 	}
 
 	cm->cm_session_table[i] = sp;
-	mutex_exit(&cm->cm_lock);
-	crypto_release_minor(cm);
-	*session_index = i;
+	if (session_index != NULL)
+		*session_index = i;
 
 	return (CRYPTO_SUCCESS);
 }
@@ -3123,7 +3157,7 @@ common_final(dev_t dev, caddr_t arg, int mode,
 
 	ASSERT(final == crypto_encrypt_final ||
 	    final == crypto_decrypt_final || final == crypto_sign_final ||
-	    final == crypto_digest_final);
+	    final == crypto_digest_final || final == crypto_mac_final);
 
 	if (final == crypto_encrypt_final) {
 		ctxpp = &sp->sd_encr_ctx;
@@ -3131,6 +3165,8 @@ common_final(dev_t dev, caddr_t arg, int mode,
 		ctxpp = &sp->sd_decr_ctx;
 	} else if (final == crypto_sign_final) {
 		ctxpp = &sp->sd_sign_ctx;
+	} else if (final == crypto_mac_final) {
+		ctxpp = &sp->sd_mac_ctx;
 	} else {
 		ctxpp = &sp->sd_digest_ctx;
 	}
@@ -3420,6 +3456,35 @@ digest(dev_t dev, caddr_t arg, int mode, int *rval)
 	return (common_digest(dev, arg, mode, crypto_digest_single));
 }
 
+static int
+mac_init(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	_NOTE(ARGUNUSED(rval))
+	return (sign_verify_init(dev, arg, mode, crypto_mac_init_prov));
+}
+
+static int
+mac_update(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	_NOTE(ARGUNUSED(rval))
+	return (sign_verify_update(dev, arg, mode, crypto_mac_update));
+}
+
+static int
+mac_final(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	_NOTE(ARGUNUSED(rval))
+	return (common_final(dev, arg, mode, crypto_mac_final));
+}
+
+/* ARGSUSED */
+static int
+mac(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	_NOTE(ARGUNUSED(rval))
+	return (common_digest(dev, arg, mode, crypto_mac_single));
+}
+
 /*
  * ASSUMPTION: crypto_digest, crypto_sign, crypto_sign_recover,
  * and crypto_verify_recover are identical except for field names.
@@ -3456,6 +3521,8 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 
 	data.cd_raw.iov_base = NULL;
 	digest.cd_raw.iov_base = NULL;
+	data.cd_miscdata = NULL;
+	digest.cd_miscdata = NULL;
 
 	datalen = STRUCT_FGET(crypto_digest, cd_datalen);
 	digestlen = STRUCT_FGET(crypto_digest, cd_digestlen);
@@ -3503,7 +3570,8 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 	ASSERT(single == crypto_digest_single ||
 	    single == crypto_sign_single ||
 	    single == crypto_verify_recover_single ||
-	    single == crypto_sign_recover_single);
+	    single == crypto_sign_recover_single ||
+	    single == crypto_mac_single);
 
 	if (single == crypto_digest_single) {
 		ctxpp = &sp->sd_digest_ctx;
@@ -3511,6 +3579,8 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 		ctxpp = &sp->sd_sign_ctx;
 	} else if (single == crypto_verify_recover_single) {
 		ctxpp = &sp->sd_verify_recover_ctx;
+	} else if (single == crypto_mac_single) {
+		ctxpp = &sp->sd_mac_ctx;
 	} else {
 		ctxpp = &sp->sd_sign_recover_ctx;
 	}
@@ -3897,7 +3967,8 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	ASSERT(init == crypto_sign_init_prov ||
 	    init == crypto_verify_init_prov ||
 	    init == crypto_sign_recover_init_prov ||
-	    init == crypto_verify_recover_init_prov);
+	    init == crypto_verify_recover_init_prov ||
+	    init == crypto_mac_init_prov);
 
 	if (init == crypto_sign_init_prov) {
 		fg =  CRYPTO_FG_SIGN;
@@ -3908,6 +3979,9 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	} else if (init == crypto_sign_recover_init_prov) {
 		fg =  CRYPTO_FG_SIGN_RECOVER;
 		ctxpp = &sp->sd_sign_recover_ctx;
+	} else if (init == crypto_mac_init_prov) {
+		fg =  CRYPTO_FG_MAC;
+		ctxpp = &sp->sd_mac_ctx;
 	} else {
 		fg =  CRYPTO_FG_VERIFY_RECOVER;
 		ctxpp = &sp->sd_verify_recover_ctx;
@@ -4134,6 +4208,7 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
 	}
 
 	data.cd_raw.iov_base = NULL;
+	data.cd_miscdata = NULL;
 
 	datalen = STRUCT_FGET(sign_update, su_datalen);
 	if (datalen > crypto_max_buffer_len) {
@@ -4163,8 +4238,16 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	ctxpp = (update == crypto_sign_update) ?
-	    &sp->sd_sign_ctx : &sp->sd_verify_ctx;
+	ASSERT(update == crypto_sign_update ||
+	    update == crypto_verify_update ||
+	    update == crypto_mac_update);
+
+	if (update == crypto_sign_update)
+		ctxpp = &sp->sd_sign_ctx;
+	else if (update == crypto_verify_update)
+		ctxpp = &sp->sd_verify_ctx;
+	else
+		ctxpp = &sp->sd_mac_ctx;
 
 	rv = (update)(*ctxpp, &data, NULL);
 	if (rv != CRYPTO_SUCCESS)
@@ -6550,6 +6633,62 @@ out:
 	return (error);
 }
 
+static int
+get_provider_by_mech(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	_NOTE(ARGUNUSED(mode, rval))
+	kcf_mech_entry_t *me;
+	kcf_provider_desc_t *pd;
+	crypto_key_t key;
+	crypto_by_mech_t mech;
+	crypto_provider_session_t *ps;
+	crypto_minor_t *cm;
+	int rv, error;
+
+	if ((cm = crypto_hold_minor(getminor(dev))) == NULL) {
+		cmn_err(CE_WARN, "get_provider_by_mech: failed holding minor");
+		return (ENXIO);
+	}
+
+	bzero(&key, sizeof (key));
+	key.ck_format = CRYPTO_KEY_RAW;
+
+	if (copyin(arg, &mech, sizeof (mech)) != 0) {
+		crypto_release_minor(cm);
+		return (EFAULT);
+	}
+
+	key.ck_length = mech.mech_keylen;
+	/* pd is returned held */
+	if ((pd = kcf_get_mech_provider(mech.mech_type, &key, &me, &error,
+	    NULL, mech.mech_fg, 0)) == NULL) {
+		rv = error;
+		goto release_minor;
+	}
+
+	/* don't want to allow direct access to software providers */
+	if (pd->pd_prov_type == CRYPTO_SW_PROVIDER) {
+		rv = CRYPTO_MECHANISM_INVALID;
+		KCF_PROV_REFRELE(pd);
+		cmn_err(CE_WARN, "software mech_type given");
+		goto release_minor;
+	}
+
+	mutex_enter(&cm->cm_lock);
+	if ((rv = crypto_create_provider_session(cm, pd, pd->pd_sid, &ps, NULL))
+	    == CRYPTO_SUCCESS)
+		rv = crypto_create_session_ptr(cm, pd, ps, &mech.session_id);
+
+	mutex_exit(&cm->cm_lock);
+release_minor:
+	crypto_release_minor(cm);
+	mech.rv = rv;
+	if (copyout(&mech, arg, sizeof (mech)) != 0)
+		return (EFAULT);
+
+	return (rv);
+}
+
 /* ARGSUSED */
 static int
 crypto_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
@@ -6572,6 +6711,9 @@ crypto_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 
 	case CRYPTO_GET_PROVIDER_LIST:
 		return (get_provider_list(dev, ARG, mode, rval));
+
+	case CRYPTO_GET_PROVIDER_BY_MECH:
+		return (get_provider_by_mech(dev, ARG, mode, rval));
 
 	case CRYPTO_GET_PROVIDER_INFO:
 		return (get_provider_info(dev, ARG, mode, rval));
@@ -6662,6 +6804,18 @@ crypto_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 
 	case CRYPTO_VERIFY_RECOVER:
 		return (verify_recover(dev, ARG, mode, rval));
+
+	case CRYPTO_MAC_INIT:
+		return (mac_init(dev, ARG, mode, rval));
+
+	case CRYPTO_MAC:
+		return (mac(dev, ARG, mode, rval));
+
+	case CRYPTO_MAC_UPDATE:
+		return (mac_update(dev, ARG, mode, rval));
+
+	case CRYPTO_MAC_FINAL:
+		return (mac_final(dev, ARG, mode, rval));
 
 	case CRYPTO_SET_PIN:
 		return (set_pin(dev, ARG, mode, rval));
