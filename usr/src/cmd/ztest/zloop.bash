@@ -189,6 +189,7 @@ while [[ $timeout -eq 0 ]] || [[ $curtime -le $(($starttime + $timeout)) ]]; do
 	$BIN/$cmd >>ztest.out 2>&1
 	ztrc=$?
 	/bin/egrep '===|WARNING' ztest.out >>ztest.history
+	$SBIN/zdb -U $workdir/zpool.cache -DD ztest >>ztest.ddt 2>&1
 
 	store_core
 

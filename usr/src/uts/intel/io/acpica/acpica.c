@@ -253,7 +253,7 @@ acpica_check_bios_date(int yy, int mm, int dd)
 
 	/* If firmware has no bios, skip the check */
 	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), DDI_PROP_DONTPASS,
-	    "bios-free"))
+	    "efi-systab"))
 		return (TRUE);
 
 	/*

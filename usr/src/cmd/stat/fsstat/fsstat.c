@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2017 Jason King
  */
 
 #include <stdio.h>
@@ -41,12 +42,14 @@
 #include <sys/fstyp.h>
 #include <sys/fsid.h>
 #include <sys/mnttab.h>
+#include <sys/debug.h>
 #include <values.h>
 #include <poll.h>
 #include <ctype.h>
 #include <libintl.h>
 #include <locale.h>
 #include <signal.h>
+#include <libcmdutils.h>
 
 #include "statcommon.h"
 
@@ -73,12 +76,7 @@
 #define	HEADERLINES	12	/* Number of lines between display headers */
 
 #define	LBUFSZ		64	/* Generic size for local buffer */
-
-/*
- * The following are used for the nicenum() function
- */
-#define	KILO_VAL	1024
-#define	ONE_INDEX	3
+CTASSERT(LBUFSZ >= NN_NUMBUF_SZ);
 
 #define	NENTITY_INIT	1	/* Initial number of entities to allocate */
 
@@ -112,9 +110,6 @@ typedef struct entity {
 #define	ENTYPE_FSTYPE	1
 #define	ENTYPE_MNTPT	2
 
-/* If more sub-one units are added, make sure to adjust ONE_INDEX above */
-static char units[] = "num KMGTPE";
-
 char		*cmdname;	/* name of this command */
 int		caught_cont = 0;	/* have caught a SIGCONT */
 
@@ -131,70 +126,14 @@ usage()
 	exit(2);
 }
 
-/*
- * Given a 64-bit number and a starting unit (e.g., n - nanoseconds),
- * convert the number to a 5-character representation including any
- * decimal point and single-character unit.  Put that representation
- * into the array "buf" (which had better be big enough).
- */
-char *
-nicenum(uint64_t num, char unit, char *buf)
-{
-	uint64_t n = num;
-	int unit_index;
-	int index;
-	char u;
-
-	/* If the user passed in a NUL/zero unit, use the blank value for 1 */
-	if (unit == '\0')
-		unit = ' ';
-
-	unit_index = 0;
-	while (units[unit_index] != unit) {
-		unit_index++;
-		if (unit_index > sizeof (units) - 1) {
-			(void) sprintf(buf, "??");
-			return (buf);
-		}
-	}
-
-	index = 0;
-	while (n >= KILO_VAL) {
-		n = (n + (KILO_VAL / 2)) / KILO_VAL; /* Round up or down */
-		index++;
-		unit_index++;
-	}
-
-	if (unit_index >= sizeof (units) - 1) {
-		(void) sprintf(buf, "??");
-		return (buf);
-	}
-
-	u = units[unit_index];
-
-	if (unit_index == ONE_INDEX) {
-		(void) sprintf(buf, "%llu", (u_longlong_t)n);
-	} else if (n < 10 && (num & (num - 1)) != 0) {
-		(void) sprintf(buf, "%.2f%c",
-		    (double)num / (1ULL << 10 * index), u);
-	} else if (n < 100 && (num & (num - 1)) != 0) {
-		(void) sprintf(buf, "%.1f%c",
-		    (double)num / (1ULL << 10 * index), u);
-	} else {
-		(void) sprintf(buf, "%llu%c", (u_longlong_t)n, u);
-	}
-
-	return (buf);
-}
-
-
 #define	RAWVAL(ptr, member) ((ptr)->member.value.ui64)
 #define	DELTA(member)	\
 	(newvsp->member.value.ui64 - (oldvsp ? oldvsp->member.value.ui64 : 0))
 
-#define	PRINTSTAT(isnice, nicestring, rawstring, rawval, unit, buf)	\
+#define	PRINTSTAT(isnice, nicestring, rawstring, rawval, buf)		\
 	(isnice) ?	 						\
-		(void) printf((nicestring), nicenum(rawval, unit, buf))	\
+		nicenum(rawval, buf, sizeof (buf)),			\
+		(void) printf((nicestring), (buf))			\
 	:								\
 		(void) printf((rawstring), (rawval))
 
@@ -256,17 +195,17 @@ dflt_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 " file remov  chng   get   set    ops   ops   ops bytes   ops bytes\n");
 	}
 
-	PRINTSTAT(niceflag, "%5s ", "%lld:", nnewfile, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", nnamerm, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", nnamechg, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", nattrret, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", nattrchg, ' ', buf);
-	PRINTSTAT(niceflag, " %5s ", "%lld:", nlookup, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", nreaddir, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", ndataread, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", readthruput, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", ndatawrite, ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", writethruput, ' ', buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", nnewfile, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", nnamerm, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", nnamechg, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", nattrret, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", nattrchg, buf);
+	PRINTSTAT(niceflag, " %5s ", "%lld:", nlookup, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", nreaddir, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", ndataread, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", readthruput, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", ndatawrite, buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", writethruput, buf);
 	(void) printf("%s\n", name);
 }
 
@@ -282,17 +221,17 @@ io_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 "  ops bytes   ops bytes   ops bytes    ops     ops\n");
 	}
 
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nread), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(read_bytes), ' ', buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nread), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(read_bytes), buf);
 
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nwrite), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(write_bytes), ' ', buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nwrite), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(write_bytes), buf);
 
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nreaddir), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(readdir_bytes), ' ', buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nreaddir), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(readdir_bytes), buf);
 
-	PRINTSTAT(niceflag, " %5s   ", "%lld:", DELTA(nrwlock), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nrwunlock), ' ', buf);
+	PRINTSTAT(niceflag, " %5s   ", "%lld:", DELTA(nrwlock), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nrwunlock), buf);
 
 	(void) printf("%s\n", name);
 }
@@ -307,12 +246,12 @@ vm_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 		(void) printf("  map addmap delmap getpag putpag pagio\n");
 	}
 
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nmap), ' ', buf);
-	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(naddmap), ' ', buf);
-	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(ndelmap), ' ', buf);
-	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(ngetpage), ' ', buf);
-	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(nputpage), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(npageio), ' ', buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nmap), buf);
+	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(naddmap), buf);
+	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(ndelmap), buf);
+	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(ngetpage), buf);
+	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(nputpage), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(npageio), buf);
 	(void) printf("%s\n", name);
 }
 
@@ -326,10 +265,10 @@ attr_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 		(void) printf("getattr setattr getsec  setsec\n");
 	}
 
-	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(ngetattr), ' ', buf);
-	PRINTSTAT(niceflag, "  %5s ", "%lld:", DELTA(nsetattr), ' ', buf);
-	PRINTSTAT(niceflag, "  %5s ", "%lld:", DELTA(ngetsecattr), ' ', buf);
-	PRINTSTAT(niceflag, "  %5s ", "%lld:", DELTA(nsetsecattr), ' ', buf);
+	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(ngetattr), buf);
+	PRINTSTAT(niceflag, "  %5s ", "%lld:", DELTA(nsetattr), buf);
+	PRINTSTAT(niceflag, "  %5s ", "%lld:", DELTA(ngetsecattr), buf);
+	PRINTSTAT(niceflag, "  %5s ", "%lld:", DELTA(nsetsecattr), buf);
 
 	(void) printf("%s\n", name);
 }
@@ -345,16 +284,16 @@ naming_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	"lookup creat remov  link renam mkdir rmdir rddir symlnk rdlnk\n");
 	}
 
-	PRINTSTAT(niceflag, "%5s  ", "%lld:", DELTA(nlookup), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(ncreate), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nremove), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nlink), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nrename), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nmkdir), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nrmdir), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nreaddir), ' ', buf);
-	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(nsymlink), ' ', buf);
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nreadlink), ' ', buf);
+	PRINTSTAT(niceflag, "%5s  ", "%lld:", DELTA(nlookup), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(ncreate), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nremove), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nlink), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nrename), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nmkdir), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nrmdir), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nreaddir), buf);
+	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(nsymlink), buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nreadlink), buf);
 	(void) printf("%s\n", name);
 }
 
@@ -362,7 +301,7 @@ naming_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 #define	PRINT_VOPSTAT_CMN(niceflag, vop)				\
 	if (niceflag)							\
 		(void) printf("%10s ", #vop);				\
-	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(n##vop), ' ', buf);
+	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(n##vop), buf);
 
 #define	PRINT_VOPSTAT(niceflag, vop) 					\
 	PRINT_VOPSTAT_CMN(niceflag, vop);				\
@@ -372,7 +311,7 @@ naming_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 #define	PRINT_VOPSTAT_IO(niceflag, vop)					\
 	PRINT_VOPSTAT_CMN(niceflag, vop);				\
 	PRINTSTAT(niceflag, " %5s\n", "%lld:",				\
-		DELTA(vop##_bytes), ' ', buf);
+		DELTA(vop##_bytes), buf);
 
 static void
 vop_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)

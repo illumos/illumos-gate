@@ -41,7 +41,6 @@
 #include <efigpt.h>
 
 #include <uuid.h>
-#include <stdbool.h>
 
 #include <bootstrap.h>
 #include <smbios.h>
@@ -61,10 +60,8 @@ EFI_GUID imgid = LOADED_IMAGE_PROTOCOL;
 EFI_GUID smbios = SMBIOS_TABLE_GUID;
 EFI_GUID smbios3 = SMBIOS3_TABLE_GUID;
 EFI_GUID inputid = SIMPLE_TEXT_INPUT_PROTOCOL;
-EFI_GUID serial_io = SERIAL_IO_PROTOCOL;
 
 extern void acpi_detect(void);
-void efi_serial_init(void);
 extern void efi_getsmap(void);
 #ifdef EFI_ZFS_BOOT
 static void efi_zfs_probe(void);
@@ -415,7 +412,6 @@ main(int argc, CHAR16 *argv[])
 		ptr = efi_get_table(&smbios);
 	smbios_detect(ptr);
 
-	efi_serial_init();		/* detect and set up serial ports */
 	interact(NULL);			/* doesn't return */
 
 	return (EFI_SUCCESS);		/* keep compiler happy */
@@ -424,8 +420,7 @@ main(int argc, CHAR16 *argv[])
 COMMAND_SET(reboot, "reboot", "reboot the system", command_reboot);
 
 static int
-command_reboot(int argc __attribute((unused)),
-    char *argv[] __attribute((unused)))
+command_reboot(int argc __unused, char *argv[] __unused)
 {
 	int i;
 
@@ -442,8 +437,7 @@ command_reboot(int argc __attribute((unused)),
 COMMAND_SET(memmap, "memmap", "print memory map", command_memmap);
 
 static int
-command_memmap(int argc __attribute((unused)),
-    char *argv[] __attribute((unused)))
+command_memmap(int argc __unused, char *argv[] __unused)
 {
 	UINTN sz;
 	EFI_MEMORY_DESCRIPTOR *map, *p;
@@ -523,8 +517,7 @@ COMMAND_SET(configuration, "configuration", "print configuration tables",
     command_configuration);
 
 static int
-command_configuration(int argc __attribute((unused)),
-    char *argv[] __attribute((unused)))
+command_configuration(int argc __unused, char *argv[] __unused)
 {
 	UINTN i;
 	char *name;
@@ -608,8 +601,7 @@ command_mode(int argc, char *argv[])
 COMMAND_SET(lsefi, "lsefi", "list EFI handles", command_lsefi);
 
 static int
-command_lsefi(int argc __attribute((unused)),
-    char *argv[] __attribute((unused)))
+command_lsefi(int argc __unused, char *argv[] __unused)
 {
 	char *name;
 	EFI_HANDLE *buffer = NULL;
@@ -729,53 +721,6 @@ command_reloadbe(int argc, char *argv[])
 	return (CMD_OK);
 }
 #endif /* __FreeBSD__ */
-
-void
-efi_serial_init(void)
-{
-	EFI_HANDLE *buffer = NULL;
-	UINTN bufsz = 0, i;
-	EFI_STATUS status;
-	int serial = 0;
-
-	/*
-	 * get buffer size
-	 */
-	status = BS->LocateHandle(ByProtocol, &serial_io, NULL, &bufsz, buffer);
-	if (status != EFI_BUFFER_TOO_SMALL) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
-		    "unexpected error: %lld", (long long)status);
-		return;
-	}
-	if ((buffer = malloc(bufsz)) == NULL) {
-		sprintf(command_errbuf, "out of memory");
-		return;
-	}
-
-	/*
-	 * get handle array
-	 */
-	status = BS->LocateHandle(ByProtocol, &serial_io, NULL, &bufsz, buffer);
-	if (EFI_ERROR(status)) {
-		free(buffer);
-		snprintf(command_errbuf, sizeof (command_errbuf),
-		    "LocateHandle() error: %lld", (long long)status);
-		return;
-	}
-
-	for (i = 0; i < (bufsz / sizeof (EFI_HANDLE)); i++) {
-		SERIAL_IO_INTERFACE *sio;
-		status = BS->OpenProtocol(buffer[i], &serial_io, (void**)&sio,
-		    IH, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
-		if (EFI_ERROR(status)) {
-			snprintf(command_errbuf, sizeof (command_errbuf),
-			    "OpenProtocol() error: %lld", (long long)status);
-		}
-		printf("serial# %d\n", serial++);
-	}
-
-	free(buffer);
-}
 
 #ifdef LOADER_FDT_SUPPORT
 extern int command_fdt_internal(int argc, char *argv[]);
