@@ -1,0 +1,47 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2017, Toomas Soome <tsoome@me.com>
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/data/console/fonts@$(PKGVERS)
+set name=pkg.description \
+    value="System Console Unicode bitmap fonts, including Gallant and Terminus"
+set name=pkg.summary value="System Console Unicode fonts"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=$(ARCH)
+dir path=boot group=sys
+dir path=boot/fonts group=sys
+dir path=usr group=sys
+dir path=usr/share
+dir path=usr/share/lib
+file path=boot/fonts/10x18.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/10x20.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/11x22.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/12x24.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/14x28.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/16x32.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/6x12.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/8x14.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/8x16.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/Gallant19.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/fonts.dir group=bin mode=0444 owner=root
+license lic_CDDL license=lic_CDDL
+license usr/src/data/consfonts/THIRDPARTYLICENSE \
+    license=usr/src/data/consfonts/THIRDPARTYLICENSE
+link path=usr/share/lib/fonts target=../../../boot/fonts

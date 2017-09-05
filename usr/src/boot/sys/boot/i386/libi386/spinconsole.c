@@ -55,15 +55,15 @@ static int	spinc_getchar(struct console *cp);
 static int	spinc_ischar(struct console *cp);
 
 struct console spinconsole = {
-	"spin",
-	"spin port",
-	0,
-	spinc_probe,
-	spinc_init,
-	spinc_putchar,
-	spinc_getchar,
-	spinc_ischar,
-	NULL
+	.c_name = "spin",
+	.c_desc = "spin port",
+	.c_flags = 0,
+	.c_probe = spinc_probe,
+	.c_init = spinc_init,
+	.c_out = spinc_putchar,
+	.c_in = spinc_getchar,
+	.c_ready = spinc_ischar,
+	.c_private = NULL
 };
 
 static void

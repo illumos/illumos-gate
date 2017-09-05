@@ -76,6 +76,10 @@ pci_bios_get_irq_routing(pci_irq_route_t *routes, int nroutes, int *nneededp)
 	if (nneededp)
 		*nneededp = 0;
 
+	/* in UEFI system, there is no BIOS data */
+	if (BOP_GETPROPLEN(bootops, "efi-systab") > 0)
+		return (0);
+
 	/*
 	 * Set up irq routing header with the size and address
 	 * of some useable low-memory data addresses.  Initalize

@@ -60,6 +60,7 @@ UNSHIPPED_SUBDIRS = \
 	localedef \
 	mandoc \
 	tic \
+	vtfontcvt \
 	zic
 
 sparc_SUBDIRS= \
