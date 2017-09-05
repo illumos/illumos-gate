@@ -22,6 +22,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -61,7 +62,6 @@
 #if FIFODEBUG
 int Fifo_fastmode = 1;		/* pipes/fifos will be opened in fast mode */
 int Fifo_verbose = 0;		/* msg when switching out of fast mode */
-int Fifohiwat = FIFOHIWAT;	/* Modifiable FIFO high water mark */
 #endif
 
 /*
@@ -196,6 +196,7 @@ fnode_constructor(void *buf, void *cdrarg, int kmflags)
 		fnp->fn_dest = fnp;
 		fnp->fn_mp = NULL;
 		fnp->fn_count = 0;
+		fnp->fn_hiwat = FIFOHIWAT;
 		fnp->fn_rsynccnt = 0;
 		fnp->fn_wsynccnt = 0;
 		fnp->fn_wwaitcnt = 0;
@@ -388,11 +389,7 @@ fifoinit(int fstype, char *name)
 	    pipe_constructor, pipe_destructor, NULL,
 	    (void *)(sizeof (fifodata_t)), NULL, 0);
 
-#if FIFODEBUG
-	if (Fifohiwat < FIFOHIWAT)
-		Fifohiwat = FIFOHIWAT;
-#endif /* FIFODEBUG */
-	fifo_strdata.qi_minfo->mi_hiwat = Fifohiwat;
+	fifo_strdata.qi_minfo->mi_hiwat = FIFOHIWAT;
 
 	return (0);
 }
@@ -1164,7 +1161,8 @@ fifo_wakewriter(fifonode_t *fn_dest, fifolock_t *fn_lock)
 	int fn_dflag = fn_dest->fn_flag;
 
 	ASSERT(MUTEX_HELD(&fn_lock->flk_lock));
-	ASSERT(fn_dest->fn_dest->fn_count < Fifohiwat);
+	ASSERT(fn_dest->fn_dest->fn_count < fn_dest->fn_dest->fn_hiwat);
+
 	if ((fn_dflag & FIFOWANTW)) {
 		cv_broadcast(&fn_dest->fn_wait_cv);
 	}

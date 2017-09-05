@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -83,6 +84,7 @@ struct fifonode {
 	struct msgb	*fn_tail;	/* last message to read */
 	fifolock_t	*fn_lock;	/* pointer to per fifo lock */
 	uint_t		fn_count;	/* Number of bytes on fn_mp */
+	uint_t		fn_hiwat;	/* pipe (fifofast) high water */
 	kcondvar_t	fn_wait_cv;	/* fifo conditional variable */
 	ushort_t	fn_wcnt;	/* number of writers */
 	ushort_t	fn_rcnt;	/* number of readers */
@@ -146,16 +148,6 @@ typedef struct fifodata {
 #define	FTOV(fp) ((fp)->fn_vnode)
 
 #if defined(_KERNEL)
-
-/*
- * Fifohiwat defined as a variable is to allow tuning of the high
- * water mark if needed. It is not meant to be released.
- */
-#if FIFODEBUG
-extern int Fifohiwat;
-#else /* FIFODEBUG */
-#define	Fifohiwat	FIFOHIWAT
-#endif /* FIFODEBUG */
 
 extern struct vnodeops *fifo_vnodeops;
 extern const struct fs_operation_def fifo_vnodeops_template[];

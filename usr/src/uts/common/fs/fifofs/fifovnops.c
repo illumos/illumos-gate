@@ -28,7 +28,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -787,11 +787,11 @@ trywake:
 	/*
 	 * wake up any blocked writers, processes
 	 * sleeping on POLLWRNORM, or processes waiting for SIGPOLL
-	 * Note: checking for fn_count < Fifohiwat emulates
+	 * Note: checking for fn_count < fn_hiwat emulates
 	 * STREAMS functionality when low water mark is 0
 	 */
 	if (fn_dest->fn_flag & (FIFOWANTW | FIFOHIWATW) &&
-	    fnp->fn_count < Fifohiwat) {
+	    fnp->fn_count < fn_dest->fn_hiwat) {
 		fifo_wakewriter(fn_dest, fn_lock);
 	}
 	goto done;
@@ -904,7 +904,7 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 		/*
 		 * check to make sure we are not over high water mark
 		 */
-		while (fn_dest->fn_count >= Fifohiwat) {
+		while (fn_dest->fn_count >= fn_dest->fn_hiwat) {
 			/*
 			 * Indicate that we have gone over high
 			 * water mark
@@ -962,7 +962,7 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 		 * then we must break the message up into PIPE_BUF
 		 * chunks to stay compliant with STREAMS
 		 */
-		if (uiop->uio_resid + fn_dest->fn_count > Fifohiwat)
+		if (uiop->uio_resid + fn_dest->fn_count > fn_dest->fn_hiwat)
 			size = MIN(uiop->uio_resid, PIPE_BUF);
 		else
 			size = uiop->uio_resid;
@@ -1198,7 +1198,8 @@ fifo_fastioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
 		if (arg != 0) {
 			goto turn_fastoff;
 		}
-		*rvalp = (fnp->fn_dest->fn_count < Fifohiwat) ? 1 : 0;
+		*rvalp = (fnp->fn_dest->fn_count < fnp->fn_dest->fn_hiwat) ?
+		    1 : 0;
 		mutex_exit(&fn_lock->flk_lock);
 		return (0);
 
@@ -1817,7 +1818,7 @@ fifo_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 			retevents = POLLHUP;
 	} else if (events & (POLLWRNORM | POLLWRBAND)) {
 		if (events & POLLWRNORM) {
-			if (fn_dest->fn_count < Fifohiwat)
+			if (fn_dest->fn_count < fn_dest->fn_hiwat)
 				retevents = POLLWRNORM;
 			else
 				fnp->fn_flag |= FIFOHIWATW;

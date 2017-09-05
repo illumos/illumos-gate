@@ -65,7 +65,7 @@ lx_pipe_setsz(stdata_t *str, uint_t size, boolean_t is_init)
 	stdata_t *mate;
 	lx_zone_data_t *lxzd = ztolxzd(curzone);
 	uint_t max_size = lxzd->lxzd_pipe_max_sz;
-
+	fifonode_t *fnp1, *fnp2;
 
 	size = P2ROUNDUP(size, PAGESIZE);
 	if (size == 0) {
@@ -94,7 +94,14 @@ lx_pipe_setsz(stdata_t *str, uint_t size, boolean_t is_init)
 	}
 
 	if (!STRMATED(str)) {
-		return (strqset(RD(str->sd_wrq), QHIWAT, 0, (intptr_t)size));
+		err = strqset(RD(str->sd_wrq), QHIWAT, 0, (intptr_t)size);
+		if (err == 0) {
+			fnp1 = VTOF(str->sd_vnode);
+			mutex_enter(&fnp1->fn_lock->flk_lock);
+			fnp1->fn_hiwat = size;
+			mutex_exit(&fnp1->fn_lock->flk_lock);
+		}
+		return (err);
 	}
 
 	/*
@@ -116,6 +123,28 @@ lx_pipe_setsz(stdata_t *str, uint_t size, boolean_t is_init)
 	if ((err = strqset(RD(str->sd_wrq), QHIWAT, 0, (intptr_t)size)) == 0) {
 		err = strqset(RD(mate->sd_wrq), QHIWAT, 0, (intptr_t)size);
 	}
+
+	if (err == 0) {
+		fnp1 = VTOF(str->sd_vnode);
+		fnp2 = VTOF(str->sd_mate->sd_vnode);
+
+		/*
+		 * See fnode_constructor. Both sides should have the same
+		 * lock. We expect our callers to ensure that the vnodes
+		 * are VFIFO and have v_op == fifovnops.
+		 */
+		ASSERT(str->sd_vnode->v_type == VFIFO);
+		ASSERT(str->sd_mate->sd_vnode->v_type == VFIFO);
+		ASSERT(fnp1->fn_lock == fnp2->fn_lock);
+
+		mutex_enter(&fnp1->fn_lock->flk_lock);
+
+		fnp1->fn_hiwat = size;
+		fnp2->fn_hiwat = size;
+
+		mutex_exit(&fnp1->fn_lock->flk_lock);
+	}
+
 	return (err);
 }
 
