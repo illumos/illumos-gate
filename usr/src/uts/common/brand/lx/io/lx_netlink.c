@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -292,6 +292,7 @@
  */
 #define	SOL_LX_NETLINK	270
 
+/* See Linux include/uapi/linux/netlink.h */
 #define	LX_NETLINK_SO_ADD_MEMBERSHIP	1
 #define	LX_NETLINK_SO_DROP_MEMBERSHIP	2
 #define	LX_NETLINK_SO_PKTINFO		3
@@ -299,6 +300,9 @@
 #define	LX_NETLINK_SO_NO_ENOBUFS	5
 #define	LX_NETLINK_SO_RX_RING		6
 #define	LX_NETLINK_SO_TX_RING		7
+#define	LX_NETLINK_SO_LISTEN_ALL_NSID	8
+#define	LX_NETLINK_SO_LIST_MEMBERSHIPS	9
+#define	LX_NETLINK_SO_CAP_ACK 		10
 
 /* Internal socket flags */
 #define	LXNLF_RECVUCRED			0x1
@@ -503,6 +507,24 @@ lx_netlink_setsockopt(sock_lower_handle_t handle, int level,
 	case LX_NETLINK_SO_RX_RING:
 	case LX_NETLINK_SO_TX_RING:
 		/* Blatant lie */
+		return (0);
+	default:
+		return (EINVAL);
+	}
+}
+
+static int
+lx_netlink_getsockopt(sock_lower_handle_t handle, int level,
+    int option_name, void *optval, socklen_t *optlen, cred_t *cr)
+{
+	if (level != SOL_LX_NETLINK) {
+		return (EOPNOTSUPP);
+	}
+
+	switch (option_name) {
+	case LX_NETLINK_SO_LIST_MEMBERSHIPS:
+		/* Report that we have 0 members to allow systemd to proceed. */
+		*optlen = 0;
 		return (0);
 	default:
 		return (EINVAL);
@@ -1609,7 +1631,7 @@ static sock_downcalls_t sock_lx_netlink_downcalls = {
 	sock_connect_notsupp,		/* sd_connect */
 	sock_getpeername_notsupp,	/* sd_getpeername */
 	lx_netlink_getsockname,		/* sd_getsockname */
-	sock_getsockopt_notsupp,	/* sd_getsockopt */
+	lx_netlink_getsockopt,		/* sd_getsockopt */
 	lx_netlink_setsockopt,		/* sd_setsockopt */
 	lx_netlink_send,		/* sd_send */
 	NULL,				/* sd_send_uio */
