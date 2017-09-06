@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -22,7 +23,8 @@ MANSECT= 	7
 MANFILES= 	FSS.7	\
 		Intro.7	\
 		cpr.7	\
-		ibmf.7
+		ibmf.7	\
+		swap.7
 
 MANLINKS=	intro.7
 

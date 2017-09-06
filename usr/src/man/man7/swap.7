@@ -1,0 +1,92 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2017, Joyent, Inc.
+.\"
+.Dd Aug 14, 2017
+.Dt SWAP 7
+.Os
+.Sh NAME
+.Nm swap
+.Nd swap space
+.Sh DESCRIPTION
+The operating system uses demand paging as the primary mechanism to implement
+virtual memory.
+The system can also use traditional swapping, wherein an entire process state
+is moved between physical memory and swap space on disk, but it is very rare
+for the system to actually swap an entire process out to disk.
+A system which is swapping does not have enough enough physical memory to
+support the workload on the machine.
+In this case, work should be reduced or more memory added.
+.Pp
+Given that the system rarely, if ever, swaps, but still has swap space
+configured, the question arises as to what this space is for?
+.Pp
+In a demand paged virtual memory system, every page mapped by a process is
+backed by some object.
+For the actual program code used by the process, the backing objects are the
+underlying files in the filesystem for the program's binary, and any
+dynamically linked libraries.
+The portions of a process that are not backed by a named file, including its
+stack and its heap, are called anonymous memory.
+The system uses the swap space as the backing store for these pages.
+When the system determines that it needs to page out one of the anonymous pages,
+the swap space is where that page is written.
+.Pp
+Unlike some other operating systems, illumos reserves the backing storage
+space for anonymous memory at the time of allocation.
+For example, if a process asks for more heap space, the total size of the
+swap allocation that may be required to store the new pages if they need to
+be paged out is reserved at that time.
+This does not mean that anything is written to the swap space, but simply that
+the space is reserved for the entire allocation.
+Thus, a process will always get a correct error from the
+.Xr sbrk 2
+system call if swap space is unavailable.
+Some other operating systems don't allocate backing store for anonymous memory
+until it is used, so the error handling when space is not available can be
+complex or problematic on those systems.
+.Pp
+The
+.Xr vmstat 1m
+command can be used to monitor swap and paging activity.
+The
+.Xr pmap 1
+command can be used to inspect all of the mappings in a process address space,
+and their backing objects.
+The
+.Xr swap 1m
+command can be used to monitor, add and remove swap space.
+.Pp
+The operating system provides the
+.Ql zone.max-swap
+resource control to limit the amount of
+anonymous memory used by all of the processes within a zone.
+This resource control can also be configured under the
+.Xr capped-memory 2
+setting for a zone.
+See the
+.Xr prctl 1
+and
+.Xr zonecfg 1m
+man pages for information on setting this limit.
+The zone's usage against this resource control can be seen using the
+.Ql swapresv_zone_{zoneid}
+kstat.
+.Sh SEE ALSO
+.Xr pmap 1 ,
+.Xr prctl 1 ,
+.Xr kstat 1m ,
+.Xr swap 1m ,
+.Xr vmstat 1m ,
+.Xr zonecfg 1m ,
+.Xr sbrk 2 ,
+.Xr resource_controls 5

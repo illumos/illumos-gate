@@ -18733,6 +18733,7 @@ f usr/share/man/man7/FSS.7 0444 root bin
 f usr/share/man/man7/Intro.7 0444 root bin
 f usr/share/man/man7/cpr.7 0444 root bin
 s usr/share/man/man7/intro.7=Intro.7
+f usr/share/man/man7/swap.7 0444 root bin
 d usr/share/man/man7d 0755 root bin
 s usr/share/man/man7d/1394.7d=ieee1394.7d
 f usr/share/man/man7d/aac.7d 0444 root bin
