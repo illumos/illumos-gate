@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -1004,7 +1004,8 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	crfree(cr);
 
 	as = p->p_as;
-	if ((p->p_stat != SZOMB) && !(p->p_flag & SSYS) && (as != &kas)) {
+	if ((p->p_stat != SZOMB) && !(p->p_flag & (SSYS | SEXITING)) &&
+	    (as != &kas)) {
 		mutex_exit(&p->p_lock);
 		AS_LOCK_ENTER(as, RW_READER);
 		vsize = as->a_resvsize;
@@ -2283,8 +2284,8 @@ lxpr_lookup_not_a_dir(vnode_t *dp, char *comp)
 /* ARGSUSED */
 static int
 lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
-	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
-	int *direntflags, pathname_t *realpnp)
+    int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+    int *direntflags, pathname_t *realpnp)
 {
 	lxpr_node_t *lxpnp = VTOLXP(dp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -2416,7 +2417,8 @@ lxpr_lookup_fddir(vnode_t *dp, char *comp)
 	 * If the process is a zombie or system process
 	 * it can't have any open files.
 	 */
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas)) {
+	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
+	    (p->p_as == &kas)) {
 		lxpr_unlock(p);
 		return (NULL);
 	}
@@ -2550,7 +2552,7 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
 /* ARGSUSED */
 static int
 lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
-	caller_context_t *ct, int flags)
+    caller_context_t *ct, int flags)
 {
 	lxpr_node_t *lxpnp = VTOLXP(dp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -2889,7 +2891,8 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	if (p == NULL)
 		return (ENOENT);
 
-	if ((p->p_stat == SZOMB) || (p->p_flag & SSYS) || (p->p_as == &kas))
+	if ((p->p_stat == SZOMB) || (p->p_flag & (SSYS | SEXITING)) ||
+	    (p->p_as == &kas))
 		fddirsize = 0;
 
 	/*

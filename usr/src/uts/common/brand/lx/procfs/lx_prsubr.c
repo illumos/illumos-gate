@@ -530,7 +530,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 		 * ignores nodes in the SIDL state so we'll never get a node
 		 * that isn't already in the SRUN state.
 		 */
-		if (p->p_stat == SZOMB) {
+		if (p->p_stat == SZOMB || (p->p_flag & SEXITING) != 0) {
 			lxpnp->lxpr_realvp = NULL;
 		} else {
 			ASSERT(MUTEX_HELD(&p->p_lock));
@@ -546,7 +546,7 @@ lxpr_getnode(vnode_t *dp, lxpr_nodetype_t type, proc_t *p, int desc)
 	case LXPR_PID_ROOTDIR:
 		ASSERT(p != NULL);
 		/* Zombie check.  see locking comment above */
-		if (p->p_stat == SZOMB) {
+		if (p->p_stat == SZOMB || (p->p_flag & SEXITING) != 0) {
 			lxpnp->lxpr_realvp = NULL;
 		} else {
 			ASSERT(MUTEX_HELD(&p->p_lock));
