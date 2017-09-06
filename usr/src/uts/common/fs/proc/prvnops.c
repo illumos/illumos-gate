@@ -3596,7 +3596,7 @@ pr_lookup_procdir(vnode_t *dp, char *comp)
 		/* initialize the new prcommon struct */
 		if ((p->p_flag & SSYS) || p->p_as == &kas)
 			pcp->prc_flags |= PRC_SYS;
-		if (p->p_stat == SZOMB)
+		if (p->p_stat == SZOMB || (p->p_flag & SEXITING) != 0)
 			pcp->prc_flags |= PRC_DESTROY;
 		pcp->prc_proc = p;
 		pcp->prc_datamodel = p->p_model;
