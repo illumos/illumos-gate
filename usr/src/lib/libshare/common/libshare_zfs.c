@@ -997,17 +997,27 @@ sa_get_one_zfs_share(sa_handle_t handle, char *groupname,
 		return (SA_OK);
 
 	*paths_len = sharearg->zhandle_len;
-	*paths = malloc(sizeof (char *) * (*paths_len));
+	*paths = calloc(*paths_len, sizeof (char *));
 	for (int i = 0; i < sharearg->zhandle_len; ++i) {
 		zfs_handle_t *fs_handle =
 		    ((zfs_handle_t **)(sharearg->zhandle_arr))[i];
 		if (fs_handle == NULL) {
+			/* Free non-null elements of the paths array */
+			for (int free_idx = 0; free_idx < *paths_len;
+			    ++free_idx) {
+				if ((*paths)[free_idx] != NULL)
+					free((*paths)[free_idx]);
+			}
+			free(*paths);
+			*paths = NULL;
+			*paths_len = 0;
 			return (SA_SYSTEM_ERR);
 		}
 		(*paths)[i] = malloc(sizeof (char) * ZFS_MAXPROPLEN);
 		err |= sa_get_zfs_share_common(handle, fs_handle, (*paths)[i],
 		    zfsgroup);
 	}
+
 	return (err);
 }
 
