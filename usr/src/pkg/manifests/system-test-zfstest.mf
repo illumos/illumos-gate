@@ -605,6 +605,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.snapshot_simple.zcp \
     mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/synctask_core/tst.terminate_by_signal \
+    mode=0555
 $(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.amd64 \
     mode=0555
 $(i386_ONLY)file path=opt/zfs-tests/tests/functional/checksum/edonr_test.i386 \
