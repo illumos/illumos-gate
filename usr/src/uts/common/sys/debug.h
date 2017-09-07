@@ -134,7 +134,7 @@ _NOTE(CONSTCOND) } while (0)
 #define	CTASSERT(x)		_CTASSERT(x, __LINE__)
 #define	_CTASSERT(x, y)		__CTASSERT(x, y)
 #define	__CTASSERT(x, y) \
-	typedef char __compile_time_assertion__ ## y [(x) ? 1 : -1]
+	typedef char __compile_time_assertion__ ## y [(x) ? 1 : -1] __unused
 
 #ifdef	_KERNEL
 
