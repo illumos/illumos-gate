@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -227,7 +228,8 @@ _cvtDN(const char *service, const char *dn) {
 	if ((rdns = ldap_explode_dn(dn, 0)) == NULL)
 		return (NULL);
 
-	for (nRdn = 0; rdns[nRdn] != NULL; nRdn++);
+	for (nRdn = 0; rdns[nRdn] != NULL; nRdn++)
+		;
 
 	if ((mapped_rdns = (char **)calloc(nRdn, sizeof (char *))) == NULL) {
 		ldap_value_free(rdns);
@@ -4231,6 +4233,85 @@ __ns_ldap_uid2dn(const char *uid,
 	return (NS_LDAP_SUCCESS);
 }
 
+#define	_P_UID	"uid"
+static const char *dn2uid_attrs[] = {
+	_P_CN,
+	_P_UID,
+	(char *)NULL
+};
+
+/*ARGSUSED*/
+int
+__ns_ldap_dn2uid(const char *dn,
+		char **userID,
+		const ns_cred_t *cred,	/* cred is ignored */
+		ns_ldap_error_t **errorp)
+{
+	ns_ldap_result_t	*result = NULL;
+	char		*filter, *userdata;
+	char		errstr[MAXERROR];
+	char		**value;
+	int		rc = 0;
+	size_t		len;
+
+	*errorp = NULL;
+	*userID = NULL;
+	if ((dn == NULL) || (dn[0] == '\0'))
+		return (NS_LDAP_INVALID_PARAM);
+
+	len = strlen(UIDDNFILTER) + strlen(dn) + 1;
+	filter = (char *)malloc(len);
+	if (filter == NULL) {
+		return (NS_LDAP_MEMORY);
+	}
+	(void) snprintf(filter, len, UIDDNFILTER, dn);
+
+	len = strlen(UIDDNFILTER_SSD) + strlen(dn) + 1;
+	userdata = (char *)malloc(len);
+	if (userdata == NULL) {
+		return (NS_LDAP_MEMORY);
+	}
+	(void) snprintf(userdata, len, UIDDNFILTER_SSD, dn);
+
+	/*
+	 * Unlike uid2dn, we DO want attribute mapping, so that
+	 * "uid" is mapped to/from samAccountName, for example.
+	 */
+	rc = __ns_ldap_list("passwd", filter,
+	    __s_api_merge_SSD_filter,
+	    dn2uid_attrs, cred, 0,
+	    &result, errorp, NULL,
+	    userdata);
+	free(filter);
+	filter = NULL;
+	free(userdata);
+	userdata = NULL;
+	if (rc != NS_LDAP_SUCCESS)
+		goto out;
+
+	if (result->entries_count > 1) {
+		(void) sprintf(errstr,
+		    gettext("Too many entries are returned for %s"), dn);
+		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
+		    NULL);
+		rc = NS_LDAP_INTERNAL;
+		goto out;
+	}
+
+	value = __ns_ldap_getAttr(result->entry, _P_UID);
+	if (value == NULL || value[0] == NULL) {
+		rc = NS_LDAP_NOTFOUND;
+		goto out;
+	}
+
+	*userID = strdup(value[0]);
+	rc = NS_LDAP_SUCCESS;
+
+out:
+	(void) __ns_ldap_freeResult(&result);
+	result = NULL;
+	return (rc);
+}
 
 /*ARGSUSED*/
 int

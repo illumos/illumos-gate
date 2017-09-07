@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LDAP_COMMON_H
@@ -139,7 +140,7 @@ nss_backend_t		*_nss_ldap_constr(ldap_backend_op_t ops[], int nops,
 			char *tablename, const char **attrs, fnf ldapobj2str);
 extern nss_status_t	_nss_ldap_nocb_lookup(ldap_backend_ptr be,
 			nss_XbyY_args_t *argp, char *database,
-			char *searchfilter, char *domain,
+			char *searchfilter, const char * const *attrs,
 			int (*init_filter_cb)(
 				const ns_ldap_search_desc_t *desc,
 				char **realfilter, const void *userdata),

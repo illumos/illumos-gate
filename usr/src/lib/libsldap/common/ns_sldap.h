@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -811,6 +812,12 @@ int __ns_ldap_freeError(
 int  __ns_ldap_uid2dn(
 	const char *uid,
 	char **userDN,
+	const ns_cred_t *cred,
+	ns_ldap_error_t ** errorp);
+
+int  __ns_ldap_dn2uid(
+	const char *dn,
+	char **userID,
 	const ns_cred_t *cred,
 	ns_ldap_error_t ** errorp);
 
