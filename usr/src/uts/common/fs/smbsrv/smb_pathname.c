@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -154,7 +154,7 @@ smb_pathname_reduce(
 	pathname_t	ppn;
 	char		*usepath;
 	int		lookup_flags = FOLLOW;
-	int 		trailing_slash = 0;
+	int		trailing_slash = 0;
 	int		err = 0;
 	int		len;
 	smb_node_t	*vss_cur_node;
@@ -422,6 +422,10 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 
 		if ((err = pn_set(&pn, namep)) != 0)
 			break;
+
+		/* We want the DOS attributes. */
+		bzero(&attr, sizeof (attr));
+		attr.sa_mask = SMB_AT_DOSATTR;
 
 		local_flags = flags & FIGNORECASE;
 		err = smb_pathname_lookup(&pn, &rpn, local_flags,
@@ -1066,6 +1070,27 @@ smb_is_stream_name(char *path)
 }
 
 /*
+ * Is this stream node a "restricted" type?
+ */
+boolean_t
+smb_strname_restricted(char *strname)
+{
+	char *stype;
+
+	stype = strrchr(strname, ':');
+	if (stype == NULL)
+		return (B_FALSE);
+
+	/*
+	 * Only ":$CA" is restricted (for now).
+	 */
+	if (strcmp(stype, ":$CA") == 0)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/*
  * smb_validate_stream_name
  *
  * B_FALSE will be returned, and the error status ser in the sr, if:
@@ -1079,6 +1104,7 @@ boolean_t
 smb_validate_stream_name(smb_request_t *sr, smb_pathname_t *pn)
 {
 	static char *strmtype[] = {
+		"$CA",
 		"$DATA",
 		"$INDEX_ALLOCATION"
 	};

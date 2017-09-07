@@ -179,6 +179,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_GUEST,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_DFSROOT,	OPT_TYPE_BOOLEAN },
 	{ SHOPT_DESCRIPTION,	OPT_TYPE_STRING },
+	{ SHOPT_CA,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_FSO,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_QUOTAS,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_ENCRYPT,	OPT_TYPE_STRING },
@@ -2194,6 +2195,9 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 
 	if (smb_saprop_getbool(opts, SHOPT_DFSROOT, B_FALSE))
 		si->shr_flags |= SMB_SHRF_DFSROOT;
+
+	if (smb_saprop_getbool(opts, SHOPT_CA, B_FALSE))
+		si->shr_flags |= SMB_SHRF_CA;
 
 	if (smb_saprop_getbool(opts, SHOPT_FSO, B_FALSE))
 		si->shr_flags |= SMB_SHRF_FSO;

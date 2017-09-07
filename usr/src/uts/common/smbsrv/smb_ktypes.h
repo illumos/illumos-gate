@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -61,6 +61,7 @@ extern "C" {
 
 struct __door_handle;	/* <sys/door.h> */
 struct edirent;		/* <sys/extdirent.h> */
+struct nvlist;
 
 struct smb_disp_entry;
 struct smb_request;
@@ -476,7 +477,6 @@ typedef struct {
 typedef struct smb_export {
 	kmutex_t	e_mutex;
 	boolean_t	e_ready;
-	smb_llist_t	e_vfs_list;
 	smb_avl_t	e_share_avl;
 	smb_slist_t	e_unexport_list;
 	smb_thread_t	e_unexport_thread;
@@ -629,16 +629,6 @@ typedef struct smb_lease {
 	uint8_t			ls_clnt[SMB_LEASE_KEY_SZ];
 } smb_lease_t;
 
-#define	SMB_VFS_MAGIC	0x534D4256	/* 'SMBV' */
-
-typedef struct smb_vfs {
-	list_node_t		sv_lnd;
-	uint32_t		sv_magic;
-	uint32_t		sv_refcnt;
-	vfs_t			*sv_vfsp;
-	vnode_t			*sv_rootvp;
-} smb_vfs_t;
-
 #define	SMB_NODE_MAGIC		0x4E4F4445	/* 'NODE' */
 #define	SMB_NODE_VALID(p)	ASSERT((p)->n_magic == SMB_NODE_MAGIC)
 
@@ -703,6 +693,9 @@ typedef struct smb_node {
 
 typedef struct smb_kshare {
 	uint32_t	shr_magic;
+	avl_node_t	shr_link;
+	kmutex_t	shr_mutex;
+	kcondvar_t	shr_cv;
 	char		*shr_name;
 	char		*shr_path;
 	char		*shr_cmnt;
@@ -717,8 +710,9 @@ typedef struct smb_kshare {
 	char		*shr_access_none;
 	char		*shr_access_ro;
 	char		*shr_access_rw;
-	avl_node_t	shr_link;
-	kmutex_t	shr_mutex;
+	smb_node_t	*shr_root_node;
+	smb_node_t	*shr_ca_dir;
+	void		*shr_import_busy;
 	smb_cfg_val_t	shr_encrypt; /* Share.EncryptData */
 } smb_kshare_t;
 
@@ -984,7 +978,7 @@ typedef struct smb_session {
 	unsigned char		MAC_key[44];
 	char			ip_addr_str[INET6_ADDRSTRLEN];
 	uint8_t			clnt_uuid[16];
-	char 			workstation[SMB_PI_MAX_HOST];
+	char			workstation[SMB_PI_MAX_HOST];
 } smb_session_t;
 
 /*
@@ -1100,6 +1094,7 @@ typedef struct smb_user {
 #define	SMB_TREE_SPARSE			0x00040000
 #define	SMB_TREE_TRAVERSE_MOUNTS	0x00080000
 #define	SMB_TREE_FORCE_L2_OPLOCK	0x00100000
+#define	SMB_TREE_CA			0x00200000
 /* Note: SMB_TREE_... in the mdb module too. */
 
 /*
@@ -1166,15 +1161,15 @@ typedef struct smb_tree {
 	(((sr) && (sr)->tid_tree) ?					\
 	(((sr)->tid_tree->t_access) & (acemask)) : 0)))
 
-#define	SMB_TREE_SUPPORTS_CATIA(sr)            				\
+#define	SMB_TREE_SUPPORTS_CATIA(sr)					\
 	(((sr) && (sr)->tid_tree) ?                                     \
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_CATIA) : 0)
 
-#define	SMB_TREE_SUPPORTS_ABE(sr)            				\
+#define	SMB_TREE_SUPPORTS_ABE(sr)					\
 	(((sr) && (sr)->tid_tree) ?                                     \
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_ABE) : 0)
 
-#define	SMB_TREE_IS_DFSROOT(sr)            				\
+#define	SMB_TREE_IS_DFSROOT(sr)						\
 	(((sr) && (sr)->tid_tree) ?                                     \
 	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_DFSROOT) : 0)
 
@@ -1202,7 +1197,7 @@ typedef struct smb_tree {
 	(SMB_TREE_IS_READONLY((sr)) ||				\
 	smb_node_file_is_readonly((node)))
 
-#define	SMB_ODIR_MAGIC 		0x4F444952	/* 'ODIR' */
+#define	SMB_ODIR_MAGIC		0x4F444952	/* 'ODIR' */
 #define	SMB_ODIR_VALID(p)	\
     ASSERT((p != NULL) && ((p)->d_magic == SMB_ODIR_MAGIC))
 
@@ -1332,7 +1327,7 @@ typedef struct smb_opipe {
 #define	SMB_OFLAGS_SET_DELETE_ON_CLOSE	0x0004
 #define	SMB_OFLAGS_LLF_POS_VALID	0x0008
 
-#define	SMB_OFILE_MAGIC 	0x4F464C45	/* 'OFLE' */
+#define	SMB_OFILE_MAGIC		0x4F464C45	/* 'OFLE' */
 #define	SMB_OFILE_VALID(p)	\
     ASSERT((p != NULL) && ((p)->f_magic == SMB_OFILE_MAGIC))
 
@@ -1416,6 +1411,10 @@ typedef struct smb_ofile {
 	hrtime_t		dh_timeout_offset; /* time offset for timeout */
 	hrtime_t		dh_expire_time; /* time the handle expires */
 	boolean_t		dh_persist;
+	kmutex_t		dh_nvlock;
+	struct nvlist		*dh_nvlist;
+	smb_node_t		*dh_nvfile;
+
 	uint8_t			dh_create_guid[16];
 	char			f_quota_resume[SMB_SID_STRSZ];
 	uint8_t			f_lock_seq[SMB_OFILE_LSEQ_MAX];
@@ -1441,7 +1440,7 @@ typedef struct smb_streaminfo {
 	char		si_name[MAXPATHLEN];
 } smb_streaminfo_t;
 
-#define	SMB_LOCK_MAGIC 	0x4C4F434B	/* 'LOCK' */
+#define	SMB_LOCK_MAGIC	0x4C4F434B	/* 'LOCK' */
 
 typedef struct smb_lock {
 	list_node_t		l_lnd;
@@ -1472,7 +1471,7 @@ typedef struct smb_lock {
 typedef struct vardata_block {
 	uint8_t			vdb_tag;
 	uint32_t		vdb_len;
-	struct uio 		vdb_uio;
+	struct uio		vdb_uio;
 	struct iovec		vdb_iovec[MAX_IOVEC];
 } smb_vdb_t;
 
@@ -1760,7 +1759,7 @@ typedef struct smb_arg_olbrk {
  *
  */
 
-#define	SMB_REQ_MAGIC 		0x534D4252	/* 'SMBR' */
+#define	SMB_REQ_MAGIC		0x534D4252	/* 'SMBR' */
 #define	SMB_REQ_VALID(p)	ASSERT((p)->sr_magic == SMB_REQ_MAGIC)
 
 typedef enum smb_req_state {
@@ -1810,7 +1809,7 @@ typedef struct smb_request {
 	list_t			sr_storage;
 	struct smb_xa		*r_xa;
 	int			andx_prev_wct;
-	int 			cur_reply_offset;
+	int			cur_reply_offset;
 	int			orig_request_hdr;
 	unsigned int		reply_seqnum;	/* reply sequence number */
 	unsigned char		first_smb_com;	/* command code */
@@ -1868,6 +1867,7 @@ typedef struct smb_request {
 	uint8_t			nonce[16];
 
 	boolean_t		encrypted;
+	boolean_t		dh_nvl_dirty;
 
 	boolean_t		smb2_async;
 	uint64_t		smb2_async_id;
@@ -2068,7 +2068,7 @@ typedef enum smb_server_state {
 typedef struct {
 	/* protected by sv_mutex */
 	kcondvar_t		sp_cv;
-	uint32_t 		sp_cnt;
+	uint32_t		sp_cnt;
 	smb_llist_t		sp_list;
 	smb_llist_t		sp_fidlist;
 } smb_spool_t;
@@ -2094,11 +2094,12 @@ typedef struct smb_server {
 	krwlock_t		sv_cfg_lock;
 	smb_kmod_cfg_t		sv_cfg;
 	smb_session_t		*sv_session;
+	smb_user_t		*sv_rootuser;
 	smb_llist_t		sv_session_list;
 	smb_hash_t		*sv_persistid_ht;
 	smb_hash_t		*sv_lease_ht;
 
-	struct smb_export	sv_export;
+	smb_export_t		sv_export;
 	struct __door_handle	*sv_lmshrd;
 
 	/* Internal door for up-calls to smbd */

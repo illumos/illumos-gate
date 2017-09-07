@@ -770,6 +770,10 @@ smb_shr_modify(smb_share_t *new_si)
 	si->shr_flags &= ~SMB_SHRF_DFSROOT;
 	si->shr_flags |= flag;
 
+	flag = (new_si->shr_flags & SMB_SHRF_CA);
+	si->shr_flags &= ~SMB_SHRF_CA;
+	si->shr_flags |= flag;
+
 	flag = (new_si->shr_flags & SMB_SHRF_FSO);
 	si->shr_flags &= ~SMB_SHRF_FSO;
 	si->shr_flags |= flag;
@@ -1822,6 +1826,12 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		free(val);
 	}
 
+	val = smb_shr_sa_getprop(opts, SHOPT_CA);
+	if (val != NULL) {
+		smb_shr_sa_setflag(val, si, SMB_SHRF_CA);
+		free(val);
+	}
+
 	val = smb_shr_sa_getprop(opts, SHOPT_FSO);
 	if (val != NULL) {
 		smb_shr_sa_setflag(val, si, SMB_SHRF_FSO);
@@ -2611,6 +2621,8 @@ smb_shr_encode(smb_share_t *si, nvlist_t **nvlist)
 		rc |= nvlist_add_string(smb, SHOPT_GUEST, "true");
 	if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
 		rc |= nvlist_add_string(smb, SHOPT_DFSROOT, "true");
+	if ((si->shr_flags & SMB_SHRF_CA) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_CA, "true");
 	if ((si->shr_flags & SMB_SHRF_FSO) != 0)
 		rc |= nvlist_add_string(smb, SHOPT_FSO, "true");
 	if ((si->shr_flags & SMB_SHRF_QUOTAS) != 0)

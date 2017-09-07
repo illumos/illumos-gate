@@ -142,6 +142,10 @@ smb2_lock(smb_request_t *sr)
 		status = smb2_locks(sr);
 	}
 
+	if (sr->fid_ofile->dh_persist) {
+		smb2_dh_update_locks(sr, sr->fid_ofile);
+	}
+
 errout:
 	sr->smb2_status = status;
 	DTRACE_SMB2_DONE(op__Lock, smb_request_t *, sr);

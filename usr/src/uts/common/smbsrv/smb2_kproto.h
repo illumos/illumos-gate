@@ -32,6 +32,7 @@ extern uint32_t smb2_dh_def_timeout;
 extern uint32_t smb2_dh_max_timeout;
 extern uint32_t smb2_res_def_timeout;
 extern uint32_t smb2_res_max_timeout;
+extern uint32_t smb2_persist_timeout;
 extern int smb2_enable_dh;
 
 #define	SMB3_CLIENT_ENCRYPTS(sr) \
@@ -131,7 +132,7 @@ uint32_t smb2_setinfo_quota(smb_request_t *, smb_setinfo_t *);
 void smb2_oplock_acquire(smb_request_t *sr);
 void smb2_oplock_reconnect(smb_request_t *sr);
 void smb2_lease_acquire(smb_request_t *sr);
-uint32_t smb2_lease_create(smb_request_t *sr);
+uint32_t smb2_lease_create(smb_request_t *sr, uint8_t *);
 void smb2_lease_rele(smb_lease_t *);
 void smb2_lease_init(void);
 void smb2_lease_fini(void);
@@ -142,6 +143,15 @@ void smb2_durable_timers(smb_server_t *);
 uint32_t smb2_dh_reconnect(smb_request_t *);
 boolean_t smb_dh_should_save(smb_ofile_t *);
 extern void smb2_dh_shutdown(smb_server_t *);
+int smb2_dh_new_ca_share(smb_server_t *, smb_kshare_t *);
+void smb2_dh_close_persistent(smb_ofile_t *);
+void smb2_dh_close_my_orphans(smb_request_t *, smb_ofile_t *);
+int smb2_dh_make_persistent(smb_request_t *, smb_ofile_t *);
+void smb2_dh_setdoc_persistent(smb_ofile_t *);
+void smb2_dh_update_nvfile(smb_request_t *);
+void smb2_dh_update_oplock(smb_request_t *, smb_ofile_t *);
+void smb2_dh_update_locks(smb_request_t *, smb_ofile_t *);
+void smb2_dh_update_times(smb_request_t *, smb_ofile_t *, smb_attr_t *);
 
 #ifdef	__cplusplus
 }

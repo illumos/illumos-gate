@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -48,6 +48,14 @@ cred_t *
 smb_cred_create(smb_token_t *token)
 {
 	_NOTE(ARGUNUSED(token))
+	cred_t *cr;
+	cr = CRED();
+	return (cr);
+}
+
+cred_t *
+smb_kcred_create(void)
+{
 	cred_t *cr;
 	cr = CRED();
 	return (cr);

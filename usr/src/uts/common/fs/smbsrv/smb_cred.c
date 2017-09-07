@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -171,4 +171,20 @@ smb_cred_set_sidlist(smb_ids_t *token_grps)
 	}
 
 	return (lp);
+}
+
+/*
+ * Special variant of smb_cred_create() used when we need an
+ * SMB kcred (e.g. DH import).  The returned cred must be
+ * from crget() so it can be passed to smb_user_setcred().
+ */
+cred_t *
+smb_kcred_create(void)
+{
+	cred_t	*cr;
+
+	cr = crget();
+	ASSERT(cr != NULL);
+
+	return (cr);
 }

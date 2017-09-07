@@ -19,6 +19,8 @@
 
 #include <smbsrv/smb2_kproto.h>
 
+#define	SMB2_SHARE_CAP_CA SMB2_SHARE_CAP_CONTINUOUS_AVAILABILITY
+
 smb_sdrc_t
 smb2_tree_connect(smb_request_t *sr)
 {
@@ -114,6 +116,10 @@ smb2_tree_connect(smb_request_t *sr)
 		ShareFlags = 0;
 
 	Capabilities = 0;
+	if ((tree->t_flags & SMB_TREE_DFSROOT) != 0)
+		Capabilities |= SMB2_SHARE_CAP_DFS;
+	if ((tree->t_flags & SMB_TREE_CA) != 0)
+		Capabilities |= SMB2_SHARE_CAP_CA;
 
 	/*
 	 * SMB2 Tree Connect reply

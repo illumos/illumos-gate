@@ -365,6 +365,9 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
  * because we want to set the UID and GID on the named
  * stream in this case for consistency with the (unnamed
  * stream) file (see comments for smb_vop_setattr()).
+ *
+ * Note that some stream "types" are "restricted" and only
+ * internal callers (cr == kcred) can create those.
  */
 static int
 smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
@@ -378,6 +381,9 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 	cred_t		*kcr = zone_kcred();
 	int		rc = 0;
 	boolean_t	fcreate = B_FALSE;
+
+	if (cr != kcr && smb_strname_restricted(sname))
+		return (EACCES);
 
 	/* Look up / create the unnamed stream, fname */
 	rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
@@ -663,6 +669,9 @@ smb_fsop_mkdir(
  * It is assumed that a reference exists on snode coming into this routine.
  *
  * A null smb_request might be passed to this function.
+ *
+ * Note that some stream "types" are "restricted" and only
+ * internal callers (cr == kcred) can remove those.
  */
 int
 smb_fsop_remove(
@@ -698,6 +707,11 @@ smb_fsop_remove(
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	if (dnode->flags & NODE_XATTR_DIR) {
+		if (cr != zone_kcred() && smb_strname_restricted(name)) {
+			rc = EACCES;
+			goto out;
+		}
+
 		fnode = dnode->n_dnode;
 		rc = smb_vop_stream_remove(fnode->vp, name, flags, cr);
 
@@ -709,6 +723,11 @@ smb_fsop_remove(
 	} else if (smb_is_stream_name(name)) {
 		smb_stream_parse_name(name, fname, sname);
 
+		if (cr != zone_kcred() && smb_strname_restricted(sname)) {
+			rc = EACCES;
+			goto out;
+		}
+
 		/*
 		 * Look up the unnamed stream (i.e. fname).
 		 * Unmangle processing will be done on fname
@@ -719,9 +738,7 @@ smb_fsop_remove(
 		    sr->tid_tree->t_snode, dnode, fname, &fnode);
 
 		if (rc != 0) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (rc);
+			goto out;
 		}
 
 		/*
@@ -744,9 +761,7 @@ smb_fsop_remove(
 		if (rc == ENOENT) {
 			if (!SMB_TREE_SUPPORTS_SHORTNAMES(sr) ||
 			    !smb_maybe_mangled(name)) {
-				kmem_free(fname, MAXNAMELEN);
-				kmem_free(sname, MAXNAMELEN);
-				return (rc);
+				goto out;
 			}
 			longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
@@ -776,6 +791,7 @@ smb_fsop_remove(
 		}
 	}
 
+out:
 	kmem_free(fname, MAXNAMELEN);
 	kmem_free(sname, MAXNAMELEN);
 
@@ -1609,6 +1625,9 @@ smb_fsop_statfs(
  * check is performed on the named stream in case it has been
  * quarantined.  kcred is used to avoid issues with the permissions
  * set on the extended attribute file representing the named stream.
+ *
+ * Note that some stream "types" are "restricted" and only
+ * internal callers (cr == kcred) can access those.
  */
 int
 smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
@@ -1639,8 +1658,13 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	unnamed_node = SMB_IS_STREAM(snode);
 	if (unnamed_node) {
+		cred_t *kcr = zone_kcred();
+
 		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
 		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
+
+		if (cr != kcr && smb_strname_restricted(snode->od_name))
+			return (NT_STATUS_ACCESS_DENIED);
 
 		/*
 		 * Perform VREAD access check on the named stream in case it
@@ -1649,7 +1673,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		 */
 		if (faccess & (FILE_READ_DATA | FILE_EXECUTE)) {
 			error = smb_vop_access(snode->vp, VREAD,
-			    0, NULL, zone_kcred());
+			    0, NULL, kcr);
 			if (error)
 				return (NT_STATUS_ACCESS_DENIED);
 		}

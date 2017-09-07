@@ -278,6 +278,7 @@ usr/lib/libmlrpc.so.2
 usr/lib/smbsrv/libmlsvc.so.1
 usr/lib/smbsrv/libsmb.so.1
 usr/lib/smbsrv/libsmbns.so.1
+usr/lib/smbsrv/nvlprint
 usr/lib/smbsrv/smbd
 usr/sbin/smbadm
 usr/sbin/smbstat

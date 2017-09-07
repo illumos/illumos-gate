@@ -141,9 +141,12 @@ fksmbsrv_drv_open(void)
 int
 fksmbsrv_drv_close(void)
 {
+	smb_server_t *sv;
 	int rc;
 
-	rc = smb_server_delete();
+	rc = smb_server_lookup(&sv);
+	if (rc == 0)
+		rc = smb_server_delete(sv);
 
 	if (g_init_done != 0) {
 		smb_server_g_fini();

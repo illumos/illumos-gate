@@ -346,6 +346,11 @@ smb_oplock_async_break(void *arg)
 		break;
 	}
 
+	if (sr->dh_nvl_dirty) {
+		sr->dh_nvl_dirty = B_FALSE;
+		smb2_dh_update_nvfile(sr);
+	}
+
 	sr->sr_state = SMB_REQ_STATE_COMPLETED;
 	smb_request_free(sr);
 }
@@ -444,6 +449,10 @@ smb_oplock_send_brk(smb_request_t *sr)
 		if (lease != NULL)
 			lease->ls_state = NewLevel & CACHE_RWH;
 		ofile->f_oplock.og_state = NewLevel;
+
+		if (ofile->dh_persist) {
+			smb2_dh_update_oplock(sr, ofile);
+		}
 	}
 
 	/*
@@ -582,6 +591,10 @@ smb_oplock_send_brk(smb_request_t *sr)
 	ofile->f_oplock.og_state = NewLevel;
 	if (lease != NULL) {
 		lease->ls_state = NewLevel & CACHE_RWH;
+	}
+
+	if (ofile->dh_persist) {
+		smb2_dh_update_oplock(sr, ofile);
 	}
 }
 

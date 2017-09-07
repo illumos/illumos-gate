@@ -26,7 +26,11 @@ uint32_t smb2srv_capabilities =
 	SMB2_CAP_DFS |
 	SMB2_CAP_LEASING |
 	SMB2_CAP_LARGE_MTU |
+	SMB2_CAP_PERSISTENT_HANDLES |
 	SMB2_CAP_ENCRYPTION;
+
+/* These are the only capabilities defined for SMB2.X */
+#define	SMB_2X_CAPS (SMB2_CAP_DFS | SMB2_CAP_LEASING | SMB2_CAP_LARGE_MTU)
 
 /*
  * These are not intended as customer tunables, but dev. & test folks
@@ -350,16 +354,26 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 	/*
 	 * [MS-SMB2] 3.3.5.4 Receiving an SMB2 NEGOTIATE Request
 	 *
-	 * Only set CAP_ENCRYPTION if this is 3.0 or 3.0.2 and
-	 * the client has it set.
+	 * The SMB2.x capabilities are returned without regard for
+	 * what capabilities the client provided in the request.
+	 * The SMB3.x capabilities returned are the traditional
+	 * logical AND of server and client capabilities.
+	 *
+	 * One additional check: If KCF is missing something we
+	 * require for encryption, turn off that capability.
 	 */
-
-	if (s->dialect < SMB_VERS_3_0 ||
-	    !SMB3_CLIENT_ENCRYPTS(sr) ||
-	    smb3_encrypt_init_mech(s) != 0)
-		s->srv_cap = smb2srv_capabilities & ~SMB2_CAP_ENCRYPTION;
-	else
-		s->srv_cap = smb2srv_capabilities;
+	if (s->dialect < SMB_VERS_3_0) {
+		/* SMB 2.x */
+		s->srv_cap = smb2srv_capabilities & SMB_2X_CAPS;
+	} else {
+		/* SMB 3.0 or later */
+		s->srv_cap = smb2srv_capabilities &
+		    (SMB_2X_CAPS | s->capabilities);
+		if ((s->srv_cap & SMB2_CAP_ENCRYPTION) != 0 &&
+		    smb3_encrypt_init_mech(s) != 0) {
+			s->srv_cap &= ~SMB2_CAP_ENCRYPTION;
+		}
+	}
 
 	/*
 	 * See notes above smb2_max_rwsize, smb2_old_rwsize

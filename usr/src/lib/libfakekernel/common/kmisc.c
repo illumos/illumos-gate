@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 RackTop Systems.
  */
 
@@ -95,6 +95,7 @@ highbit64(uint64_t i)
 int
 ddi_strtoul(const char *str, char **endp, int base, unsigned long *res)
 {
+	errno = 0;
 	*res = strtoul(str, endp, base);
 	if (*res == 0)
 		return (errno);

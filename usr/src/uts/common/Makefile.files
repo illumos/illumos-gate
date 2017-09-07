@@ -1193,7 +1193,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_tree_connect.o			\
 		smb_unlock_byte_range.o			\
 		smb_user.o				\
-		smb_vfs.o				\
 		smb_vops.o				\
 		smb_vss.o				\
 		smb_write.o				\

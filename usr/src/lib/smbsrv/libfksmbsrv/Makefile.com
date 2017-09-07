@@ -119,7 +119,6 @@ OBJS_FS_SMBSRV = \
 		smb_tree_connect.o			\
 		smb_unlock_byte_range.o			\
 		smb_user.o				\
-		smb_vfs.o				\
 		smb_vops.o				\
 		smb_vss.o				\
 		smb_write.o				\
@@ -210,8 +209,10 @@ STRIP_STABS	= :
 
 
 # Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.
+# Also, like Makefile.uts, reset CPPFLAGS
 CPPFLAGS.first += -I../../../libfakekernel/common
 CPPFLAGS.first += -I../common
+CPPFLAGS	= $(CPPFLAGS.first)
 
 INCS += -I$(SRC)/uts/common
 INCS += -I$(SRC)/common/smbsrv

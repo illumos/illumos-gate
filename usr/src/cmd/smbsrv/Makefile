@@ -26,7 +26,7 @@
 #
 
 SUBDIRS = smbadm smbd smbstat dtrace fksmbd bind-helper \
-	test-msgbuf testoplock
+	nvlprint testoplock test-msgbuf
 MSGSUBDIRS = smbadm smbstat
 
 include ../Makefile.cmd
