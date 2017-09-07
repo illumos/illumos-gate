@@ -123,6 +123,8 @@
  * caller), the function ofmt_update_winsize(handle) may be called.
  */
 
+#include <sys/types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
