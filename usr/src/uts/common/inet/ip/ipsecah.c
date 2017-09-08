@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -173,8 +174,8 @@ ah_kstat_init(ipsecah_stack_t *ahstack, netstackid_t stackid)
 	ipsec_stack_t	*ipss = ahstack->ipsecah_netstack->netstack_ipsec;
 
 	ahstack->ah_ksp = kstat_create_netstack("ipsecah", 0, "ah_stat", "net",
-	    KSTAT_TYPE_NAMED, sizeof (ah_kstats_t) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_PERSISTENT, stackid);
+	    KSTAT_TYPE_NAMED, sizeof (ah_kstats_t) / sizeof (kstat_named_t), 0,
+	    stackid);
 
 	if (ahstack->ah_ksp == NULL || ahstack->ah_ksp->ks_data == NULL)
 		return (B_FALSE);
