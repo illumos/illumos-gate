@@ -513,6 +513,7 @@ lx_netlink_setsockopt(sock_lower_handle_t handle, int level,
 	}
 }
 
+/*ARGSUSED*/
 static int
 lx_netlink_getsockopt(sock_lower_handle_t handle, int level,
     int option_name, void *optval, socklen_t *optlen, cred_t *cr)
