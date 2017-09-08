@@ -2866,6 +2866,9 @@ lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
 {
 	int error;
 	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
+	cred_t *cr = CRED();
+	uint32_t rto_max, abrt_thresh;
+	boolean_t abrt_changed = B_FALSE, rto_max_changed = B_FALSE;
 
 	if (optname == LX_TCP_DEFER_ACCEPT) {
 		int *intval;
@@ -2890,13 +2893,13 @@ lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
 
 		if (*intval > 0) {
 			error = socket_setsockopt(so, SOL_FILTER, FIL_ATTACH,
-			    dfp, 9, CRED());
+			    dfp, 9, cr);
 			if (error == EEXIST) {
 				error = 0;
 			}
 		} else {
 			error = socket_setsockopt(so, SOL_FILTER, FIL_DETACH,
-			    dfp, 9, CRED());
+			    dfp, 9, cr);
 			if (error == ENXIO) {
 				error = 0;
 			}
@@ -2909,8 +2912,79 @@ lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
 		return (ENOPROTOOPT);
 	}
 
-	error = socket_setsockopt(so, IPPROTO_TCP, optname, optval, optlen,
-	    CRED());
+	if (optname == TCP_KEEPINTVL) {
+		/*
+		 * When setting TCP_KEEPINTVL there is an unfortunate set of
+		 * dependencies. TCP_KEEPINTVL must be <= TCP_RTO_MAX and
+		 * TCP_RTO_MAX must be <= TCP_ABORT_THRESHOLD. Thus, we may
+		 * have to increase one or both of these in order to increase
+		 * TCP_KEEPINTVL. Note that TCP_KEEPINTVL is passed in seconds
+		 * but TCP_RTO_MAX and TCP_ABORT_THRESHOLD are in milliseconds.
+		 * Also note that we currently make no attempt to handle
+		 * concurrent application threads simultaneously changing
+		 * TCP_KEEPINTVL, since that is unlikely. We could revisit
+		 * locking if it ever becomes an issue.
+		 */
+		uint32_t new_val = *(uint_t *)optval * 1000;
+		uint32_t len;
+
+		/*
+		 * Linux limits this to 32k, so we do too. However, anything
+		 * over 2 hours (7200000 ms) will fail anyway due to the
+		 * system-wide default (see "_rexmit_interval_max" in
+		 * tcp_tunables.c). Our 2 hour default seems reasonable as a
+		 * practical limit for now.
+		 */
+		if (*(uint_t *)optval > SHRT_MAX)
+			return (EINVAL);
+
+		len = sizeof (rto_max);
+		if ((error = socket_getsockopt(so, IPPROTO_TCP, TCP_RTO_MAX,
+		    &rto_max, &len, 0, cr)) != 0)
+			return (error);
+		len = sizeof (abrt_thresh);
+		if ((error = socket_getsockopt(so, IPPROTO_TCP,
+		    TCP_ABORT_THRESHOLD, &abrt_thresh, &len, 0, cr)) != 0)
+			return (error);
+
+		if (new_val > abrt_thresh) {
+			error = socket_setsockopt(so, IPPROTO_TCP,
+			    TCP_ABORT_THRESHOLD, &new_val, sizeof (new_val),
+			    cr);
+			if (error != 0)
+				goto fail;
+			abrt_changed = B_TRUE;
+		}
+		if (new_val > rto_max) {
+			error = socket_setsockopt(so, IPPROTO_TCP,
+			    TCP_RTO_MAX, &new_val, sizeof (new_val), cr);
+			if (error != 0)
+				goto fail;
+			rto_max_changed = B_TRUE;
+		}
+	}
+
+	error = socket_setsockopt(so, IPPROTO_TCP, optname, optval, optlen, cr);
+
+fail:
+	if (error != 0 && optname == TCP_KEEPINTVL) {
+		/*
+		 * If changing TCP_KEEPINTVL failed then we may need to
+		 * restore the previous values for TCP_ABORT_THRESHOLD and
+		 * TCP_RTO_MAX.
+		 */
+		if (rto_max_changed) {
+			(void) socket_setsockopt(so, IPPROTO_TCP,
+			    TCP_RTO_MAX, &rto_max,
+			    sizeof (rto_max), cr);
+		}
+		if (abrt_changed) {
+			(void) socket_setsockopt(so, IPPROTO_TCP,
+			    TCP_ABORT_THRESHOLD, &abrt_thresh,
+			    sizeof (abrt_thresh), cr);
+		}
+	}
+
 	return (error);
 }
 
