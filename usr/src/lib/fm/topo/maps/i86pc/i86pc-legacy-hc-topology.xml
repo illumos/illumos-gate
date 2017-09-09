@@ -86,6 +86,9 @@ Copyright (c) 2018, Joyent, Inc. All rights reserved.
       <range name='sp' min='0' max='0'>
         <enum-method name='ipmi' version='1' />
       </range>
+      <range name='usb-mobo' min='0' max='100'>
+        <enum-method name='usb' version='1' />
+      </range>
     </dependents>
 
   </range>
@@ -179,6 +182,9 @@ Copyright (c) 2018, Joyent, Inc. All rights reserved.
        </range>
        <range name='bay' min='0' max='1024'>
 	<enum-method name='ses' version='1' />
+       </range>
+       <range name='usb-chassis' min='0' max='1024'>
+          <enum-method name='usb' version='1' />
        </range>
     </set>
 

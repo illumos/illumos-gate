@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2013 Joyent Inc., All rights reserved.
+ * Copyright (c) 2018 Joyent Inc., All rights reserved.
  */
 
 #include <sys/types.h>
@@ -137,6 +137,7 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 
 	pnp = topo_node_parent(np);
 	ppnp = topo_node_parent(pnp);
+	pp->dp_chassis = topo_node_instance(ppnp);
 	if (strcmp(topo_node_name(pnp), BAY) == 0) {
 		if (topo_node_facility(hp, pnp, TOPO_FAC_TYPE_INDICATOR,
 		    TOPO_FAC_TYPE_ANY, &fl, &err) == 0) {
@@ -177,9 +178,19 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		}
 
 		pp->dp_slot = topo_node_instance(pnp);
-	}
+	} else if (strcmp(topo_node_name(pnp), USB_DEVICE) == 0) {
+		if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
+		    TOPO_PROP_LABEL, &slotname, &err) == 0) {
+			pp->dp_slotname = slotname;
+		}
 
-	pp->dp_chassis = topo_node_instance(ppnp);
+		/*
+		 * Override dp_chassis for USB devices since they show up
+		 * everywhere in the name space and may not be under a logical
+		 * bay.
+		 */
+		pp->dp_chassis = -1;
+	}
 
 	return (TOPO_WALK_TERMINATE);
 }
@@ -327,9 +338,12 @@ enumerate_disks(di_opts_t *opts)
 		if (opts->di_parseable) {
 			(void) snprintf(slotname, sizeof (slotname), "%d,%d",
 			    phys.dp_chassis, phys.dp_slot);
-		} else if (phys.dp_slotname != NULL) {
+		} else if (phys.dp_slotname != NULL && phys.dp_chassis != -1) {
 			(void) snprintf(slotname, sizeof (slotname),
 			    "[%d] %s", phys.dp_chassis, phys.dp_slotname);
+		} else if (phys.dp_slotname != NULL) {
+			(void) snprintf(slotname, sizeof (slotname),
+			    "%s", phys.dp_slotname);
 		} else {
 			slotname[0] = '-';
 			slotname[1] = '\0';

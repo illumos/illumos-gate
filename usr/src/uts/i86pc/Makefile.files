@@ -226,6 +226,7 @@ ACPIDEV_OBJS += acpidev_drv.o \
 	acpidev_memory.o \
 	acpidev_pci.o \
 	acpidev_resource.o \
+	acpidev_usbport.o \
 	acpidev_util.o
 
 DRMACH_ACPI_OBJS += drmach_acpi.o dr_util.o drmach_err.o

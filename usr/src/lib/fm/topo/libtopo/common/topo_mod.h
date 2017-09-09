@@ -247,7 +247,7 @@ extern void topo_node_setspecific(tnode_t *, void *);
 extern void *topo_node_getspecific(tnode_t *);
 extern int topo_node_asru_set(tnode_t *node, nvlist_t *, int, int *);
 extern int topo_node_fru_set(tnode_t *node, nvlist_t *, int, int *);
-extern int topo_node_label_set(tnode_t *node, char *, int *);
+extern int topo_node_label_set(tnode_t *node, const char *, int *);
 
 #define	TOPO_ASRU_COMPUTE	0x0001	/* Compute ASRU dynamically */
 #define	TOPO_FRU_COMPUTE	0x0002	/* Compute FRU dynamically */
@@ -293,6 +293,11 @@ typedef enum topo_mod_errno {
 } topo_mod_errno_t;
 
 extern int topo_mod_seterrno(topo_mod_t *, int);
+
+/*
+ * Function used by a module to try and open a file based on FM's search path.
+ */
+extern int topo_mod_file_search(topo_mod_t *, const char *file, int oflags);
 
 #ifdef	__cplusplus
 }

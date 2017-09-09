@@ -61,6 +61,9 @@
         <enum-method name='smbios' version='1' />
         <propmap name='SSG-6049P-E1CR36L-slot' />
       </range>
+      <range name='usb-mobo' min='0' max='256'>
+        <enum-method name='usb' version='1' />
+      </range>
     </dependents>
 
   </range>
@@ -76,7 +79,9 @@
        <range name='fan' min='0' max='7'>
           <enum-method name='ipmi' version='1' />
        </range>
-
+      <range name='usb-chassis' min='0' max='256'>
+        <enum-method name='usb' version='1' />
+      </range>
     </dependents>
   </range>
 

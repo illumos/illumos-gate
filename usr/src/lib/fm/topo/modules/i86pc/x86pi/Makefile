@@ -34,6 +34,7 @@ TOPODIR		= ../../../libtopo/common
 
 UTILDIR		= ../../common/pcibus
 BRDIR		= ../../common/hostbridge
+USBDIR		= ../../common/usb
 UTILSRCS	= did.c did_hash.c did_props.c
 X86PISRCS	= x86pi.c x86pi_bay.c x86pi_bboard.c x86pi_chassis.c \
 		  x86pi_generic.c x86pi_hostbridge.c x86pi_subr.c
@@ -44,7 +45,7 @@ include ../../Makefile.plugin
 LDLIBS += -lsmbios -ldevinfo -luutil -lpcidb
 
 CPPFLAGS += -I. -I$(ROOT)/usr/platform/i86pc/include -I$(TOPODIR)
-CPPFLAGS += -I$(UTILDIR) -I$(BRDIR)
+CPPFLAGS += -I$(UTILDIR) -I$(BRDIR) -I$(USBDIR)
 
 %.o: $(UTILDIR)/%.c
 	$(COMPILE.c) -o $@ $<

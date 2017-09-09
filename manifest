@@ -5675,6 +5675,7 @@ f usr/lib/fm/topo/plugins/ipmi.so 0555 root bin
 f usr/lib/fm/topo/plugins/nic.so 0555 root bin
 f usr/lib/fm/topo/plugins/ses.so 0555 root bin
 f usr/lib/fm/topo/plugins/smbios.so 0555 root bin
+f usr/lib/fm/topo/plugins/usb.so 0555 root bin
 f usr/lib/fm/topo/plugins/xfp.so 0555 root bin
 d usr/lib/fs 0755 root sys
 d usr/lib/fs/autofs 0755 root sys
@@ -10383,27 +10384,34 @@ d usr/platform/i86pc/lib/fm/topo 0755 root sys
 d usr/platform/i86pc/lib/fm/topo/maps 0755 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-1101-disk-hc-topology.xml 0444 root sys
 s usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-hc-topology.xml=./SSG-2028R-ACR24L-hc-topology.xml
+s usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-usb.usbtopo=./SSG-2028R-ACR24L-usb.usbtopo
 s usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-hc-topology.xml=./SSG-2028R-ACR24L-hc-topology.xml
+s usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-usb.usbtopo=./SSG-2028R-ACR24L-usb.usbtopo
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3301-hc-topology.xml 0444 root sys
 s usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3302-hc-topology.xml=./Joyent-Compute-Platform-3301-hc-topology.xml
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-fan-hc-topology.xml 0444 root sys
 s usr/platform/i86pc/lib/fm/topo/maps/Joyent-M12G5-hc-topology.xml=./SSG-2029P-ACR24L-hc-topology.xml
+s usr/platform/i86pc/lib/fm/topo/maps/Joyent-M12G5-usb.usbtopo=./SSG-2029P-ACR24L-usb.usbtopo
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Storage-Platform-7001-slot-hc-topology.xml 0444 root sys
 s usr/platform/i86pc/lib/fm/topo/maps/Joyent-S10G5-hc-topology.xml=./SSG-6049P-E1CR36L-hc-topology.xml
+s usr/platform/i86pc/lib/fm/topo/maps/Joyent-S10G5-usb.usbtopo=./SSG-6049P-E1CR36L-usb.usbtopo
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-slot-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-usb.usbtopo 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-disk-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-slot-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-usb.usbtopo 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-disk-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-slot-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-usb.usbtopo 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/fan-hc-topology.xml 0444 root sys

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -159,6 +160,9 @@ static void
 acpidev_class_list_fini(void)
 {
 	acpidev_unload_plat_modules();
+
+	(void) acpidev_unregister_class(&acpidev_class_list_usbport,
+	    &acpidev_class_usbport);
 
 	if ((acpidev_options & ACPIDEV_OUSER_NO_PCI) == 0) {
 		(void) acpidev_unregister_class(&acpidev_class_list_scope,
@@ -303,6 +307,13 @@ acpidev_class_list_init(uint64_t *fp)
 		*fp |= ACPI_DEVCFG_PCI;
 	}
 
+	/* Check support of USB port enumeration */
+	if (ACPI_FAILURE(acpidev_register_class(&acpidev_class_list_usbport,
+	    &acpidev_class_usbport, B_TRUE))) {
+		goto error_usbport;
+	}
+
+
 	/* Check blacklist and load platform specific modules. */
 	rc = acpidev_load_plat_modules();
 	if (ACPI_FAILURE(rc)) {
@@ -318,6 +329,11 @@ error_plat:
 		(void) acpidev_unregister_class(&acpidev_class_list_scope,
 		    &acpidev_class_pci);
 	}
+
+error_usbport:
+	(void) acpidev_unregister_class(&acpidev_class_list_usbport,
+	    &acpidev_class_usbport);
+
 error_scope_pci:
 	if ((acpidev_options & ACPIDEV_OUSER_NO_PCI) == 0) {
 		(void) acpidev_unregister_class(&acpidev_class_list_device,

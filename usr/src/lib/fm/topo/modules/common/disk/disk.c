@@ -22,7 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <strings.h>
@@ -78,9 +78,8 @@ disk_enum(topo_mod_t *mod, tnode_t *baynode,
     const char *name, topo_instance_t min, topo_instance_t max,
     void *arg, void *notused)
 {
-	char		*device, *driver;
+	char		*device, *driver, *pname;
 	int		err;
-	nvlist_t	*fmri;
 	topo_list_t	*dlistp = topo_mod_getspecific(mod);
 
 	if (strcmp(name, DISK) != 0) {
@@ -89,19 +88,28 @@ disk_enum(topo_mod_t *mod, tnode_t *baynode,
 		return (-1);
 	}
 
-	/* set the parent fru */
-	if (topo_node_resource(baynode, &fmri, &err) != 0) {
-		topo_mod_dprintf(mod, "disk_enum: "
-		    "topo_node_resource error %s\n", topo_strerror(err));
-		return (-1);
-	}
-	if (topo_node_fru_set(baynode, fmri, 0, &err) != 0) {
-		topo_mod_dprintf(mod, "disk_enum: "
-		    "topo_node_fru error %s\n", topo_strerror(err));
+	/*
+	 * Historically we've always set the parent FRU on nodes; however, it's
+	 * not clear why. Certain node types like USB don't want this, so we
+	 * only do this if the parent is actually a bay.
+	 */
+	pname = topo_node_name(baynode);
+	if (strcmp(pname, BAY) == 0) {
+		nvlist_t	*fmri;
+		if (topo_node_resource(baynode, &fmri, &err) != 0) {
+			topo_mod_dprintf(mod, "disk_enum: "
+			    "topo_node_resource error %s\n",
+			    topo_strerror(err));
+			return (-1);
+		}
+		if (topo_node_fru_set(baynode, fmri, 0, &err) != 0) {
+			topo_mod_dprintf(mod, "disk_enum: "
+			    "topo_node_fru error %s\n", topo_strerror(err));
+			nvlist_free(fmri);
+			return (-1);
+		}
 		nvlist_free(fmri);
-		return (-1);
 	}
-	nvlist_free(fmri);
 
 	/*
 	 * For internal storage, first check to see if we need to
