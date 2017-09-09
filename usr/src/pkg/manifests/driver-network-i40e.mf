@@ -10,13 +10,13 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2017 Joyent, Inc.
 #
 
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/network/i40e@$(PKGVERS)
-set name=pkg.description value="Intel 710 Ethernet Driver"
-set name=pkg.summary value="Intel 710 Ethernet Driver"
+set name=pkg.description value="Intel 710/722 Ethernet Driver"
+set name=pkg.summary value="Intel 710/722 Ethernet Driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:Drivers/Networking
 set name=variant.arch value=i386
@@ -35,7 +35,13 @@ driver name=i40e clone_perms="i40e 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,1586 \
     alias=pciex8086,1589 \
     alias=pciex8086,158a \
-    alias=pciex8086,158b
+    alias=pciex8086,158b \
+    alias=pciex8086,37ce \
+    alias=pciex8086,37cf \
+    alias=pciex8086,37d0 \
+    alias=pciex8086,37d1 \
+    alias=pciex8086,37d2 \
+    alias=pciex8086,37d3
 file path=kernel/drv/$(ARCH64)/i40e group=sys
 file path=kernel/drv/i40e group=sys
 file path=kernel/drv/i40e.conf group=sys
