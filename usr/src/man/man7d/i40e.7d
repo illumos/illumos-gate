@@ -9,16 +9,16 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017 Joyent, Inc.
 .\"
-.Dd December 16, 2016
+.Dd September 8, 2017
 .Dt I40E 7D
 .Os
 .Sh NAME
 .Nm i40e
-.Nd Intel 710 Ethernet Device Driver
+.Nd Intel 710/722 Ethernet Device Driver
 .Sh SYNOPSIS
-.Pa /dev/i40e*
+.Pa /dev/net/i40e*
 .Sh DESCRIPTION
 The
 .Nm
@@ -27,9 +27,9 @@ supports the Data Link Provider Interface,
 .Xr dlpi 7P .
 The
 .Nm
-driver supports the Intel XL710 Ethernet Controller family of networking
-interface cards which come in 1 GbE, 10 GbE, 25 GbE, and 40 GbE
-variants.
+driver supports the Intel 710 and 722 Ethernet Controller families of
+networking interface cards which come in 1 GbE, 10 GbE, 25 GbE, and 40
+GbE variants.
 .Pp
 In addition to basic device initialization and the sending and receiving
 of frames, it supports the following features:
@@ -71,7 +71,7 @@ For example, the first instance enumerated in the system, with id 0, would be
 named
 .Sy i40e0 .
 It exists in the file system at
-.Pa /dev/i40e0 .
+.Pa /dev/net/i40e0 .
 .Sh CONFIGURATION
 The
 .Nm i40e
@@ -282,7 +282,7 @@ driver is only supported on
 systems at this time.
 .Sh FILES
 .Bl -tag -width Pa
-.It Pa /dev/i40e*
+.It Pa /dev/net/i40e*
 Per-instance character device.
 .It Pa /kernel/drv/i40e
 32-bit device driver (x86).
