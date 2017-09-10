@@ -72,6 +72,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	list_remove_head;
 	list_remove_tail;
 	list_tail;
+	nicenum;
+	nicenum_scale;
 	tnode_compare;
 	sysattr_type;
 	sysattr_support;

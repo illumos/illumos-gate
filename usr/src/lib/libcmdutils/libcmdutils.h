@@ -216,6 +216,14 @@ extern void custr_reset(custr_t *);
  */
 extern const char *custr_cstr(custr_t *str);
 
+#define	NN_DIVISOR_1000		(1U << 0)
+
+/* Minimum size for the output of nicenum, including NULL */
+#define	NN_NUMBUF_SZ		(6)
+
+void nicenum(uint64_t, char *, size_t);
+void nicenum_scale(uint64_t, size_t, char *, size_t, uint32_t);
+
 #ifdef	__cplusplus
 }
 #endif
