@@ -33,7 +33,7 @@ include $(SRC)/cmd/stat/Makefile.stat
 COMMON_OBJS = common.o timestamp.o
 COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 
-LDLIBS += -lkstat
+LDLIBS += -lkstat -lcmdutils
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
 CERRWARN += -_gcc=-Wno-parentheses
 FILEMODE= 0555

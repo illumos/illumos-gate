@@ -27,6 +27,7 @@
  */
 /*
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -1235,6 +1236,14 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *usage)
 
 		case 'z':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
+
+			/*
+			 * Skip comma that might be present between -z and its
+			 * argument (e.g. if -Wl,-z,assert-deflib was passed).
+			 */
+			if (strncmp(optarg, MSG_ORIG(MSG_STR_COMMA),
+			    MSG_STR_COMMA_SIZE) == 0)
+				optarg++;
 
 			/*
 			 * For specific help, print our usage message and exit

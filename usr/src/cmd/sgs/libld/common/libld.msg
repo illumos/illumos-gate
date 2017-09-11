@@ -25,6 +25,7 @@
 
 #
 # Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+# Copyright 2017 RackTop Systems.
 #
 
 @ _START_
@@ -730,6 +731,7 @@
 @ MSG_QSTR_STAR		"'*'"
 @ MSG_STR_DOT		"."
 @ MSG_STR_SLASH		"/"
+@ MSG_STR_COMMA		","
 @ MSG_STR_DYNAMIC	"(.dynamic)"
 @ MSG_STR_ORIGIN	"$ORIGIN"
 @ MSG_STR_MACHINE	"$MACHINE"
