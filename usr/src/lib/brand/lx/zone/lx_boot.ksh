@@ -10,18 +10,19 @@
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
-#    
+#
 # When distributing Covered Code, include this CDDL HEADER in each
 # file and include the License file at usr/src/OPENSOLARIS.LICENSE.
 # If applicable, add the following below this CDDL HEADER, with the
 # fields enclosed by brackets "[]" replaced with your own identifying
 # information: Portions Copyright [yyyy] [name of copyright owner]
-#    
+#
 # CDDL HEADER END
 #
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, Joyent, Inc.
+# Copyright 2017 ASS-Einrichtungssysteme GmbH, Inc.
 #
 # lx boot script.
 #
@@ -80,6 +81,8 @@ elif [[ -f $ZONEROOT/etc/debian_version ]]; then
 	distro="debian"
 elif [[ -f $ZONEROOT/etc/alpine-release ]]; then
 	distro="busybox"
+elif [[ -f $ZONEROOT/etc/SuSE-release ]]; then
+	distro="suse"
 fi
 
 [[ -z $distro ]] && fatal "Unsupported distribution!"

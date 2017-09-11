@@ -22,11 +22,12 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Copyright 2015 Joyent, Inc.  All rights reserved.
+# Copyright 2017 ASS-Einrichtungssysteme GmbH, Inc.  All rights reserved.
 #
 
 PROGS =	lx_boot
 PROGS += lx_boot_zone_redhat lx_boot_zone_ubuntu lx_boot_zone_debian
-PROGS += lx_boot_zone_busybox
+PROGS += lx_boot_zone_busybox lx_boot_zone_suse
 XMLDOCS =	config.xml platform.xml
 TEMPLATES =	SUNWlx.xml SUNWlx26.xml
 

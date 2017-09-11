@@ -20,6 +20,7 @@
 #
 #
 # Copyright 2017 Joyent, Inc.
+# Copyright 2017 ASS-Einrichtungssysteme GmbH
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
 # Keep this sorted as by LC_ALL=C sort -u -k2.
@@ -5096,9 +5097,10 @@ f usr/lib/brand/lx/ld/64/ld.config 0755 root root
 f usr/lib/brand/lx/ltp_skiplist 0444 root root
 f usr/lib/brand/lx/ltp_tests 0444 root root
 f usr/lib/brand/lx/lx_boot 0755 root root
+f usr/lib/brand/lx/lx_boot_zone_busybox 0755 root root
 f usr/lib/brand/lx/lx_boot_zone_debian 0755 root root
 f usr/lib/brand/lx/lx_boot_zone_redhat 0755 root root
-f usr/lib/brand/lx/lx_boot_zone_busybox 0755 root root
+f usr/lib/brand/lx/lx_boot_zone_suse 0755 root root
 f usr/lib/brand/lx/lx_boot_zone_ubuntu 0755 root root
 f usr/lib/brand/lx/lxinit 0755 root root
 f usr/lib/brand/lx/lx_librtld_db.so.1 0755 root root
