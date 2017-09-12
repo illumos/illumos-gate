@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
 
 #ifndef	_NET_PFKEYV2_H
 #define	_NET_PFKEYV2_H
@@ -477,10 +480,11 @@ typedef struct sadb_x_kmc {
 			uint32_t sadb_x_kmc_ucookie;	/* KMP-specific */
 			uint32_t sadb_x_kmc_ureserved;	/* Must be zero */
 		} sadb_x_kmc_actual;
-		uint64_t sadb_x_kmc_alignment;
+		uint64_t sadb_x_kmc_ucookie64;
 	} sadb_x_kmc_u;
 #define	sadb_x_kmc_cookie sadb_x_kmc_u.sadb_x_kmc_actual.sadb_x_kmc_ucookie
 #define	sadb_x_kmc_reserved sadb_x_kmc_u.sadb_x_kmc_actual.sadb_x_kmc_ureserved
+#define	sadb_x_kmc_cookie64 sadb_x_kmc_u.sadb_x_kmc_ucookie64
 } sadb_x_kmc_t;
 
 typedef struct sadb_x_pair {
@@ -834,7 +838,7 @@ typedef struct sadb_x_edump {
 
 /* Key management protocol for sadb_x_kmc above... */
 
-#define	SADB_X_KMP_MANUAL	0
+#define	SADB_X_KMP_MANUAL	0	/* Cookie is ignored. */
 #define	SADB_X_KMP_IKE		1
 #define	SADB_X_KMP_KINK		2
 
