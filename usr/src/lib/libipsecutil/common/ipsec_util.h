@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
 
 #ifndef	_IPSEC_UTIL_H
 #define	_IPSEC_UTIL_H
@@ -225,7 +228,7 @@ void libssl_load(void);
 void libcrypto_load(void);
 
 /*
- * functions to manipulate the kmcookie-label mapping file
+ * functions to manipulate the IKEv1 kmcookie-label mapping file
  */
 
 #define	KMCFILE		"/var/run/ipsec_kmc_map"

@@ -236,7 +236,7 @@ typedef struct ipsec_prot
 	uint16_t	ipp_espa_minbits;	 /* ESP auth: min keylen */
 	uint16_t	ipp_espa_maxbits;	 /* ESP auth: max keylen */
 	uint32_t	ipp_km_proto;		 /* key mgmt protocol */
-	uint32_t	ipp_km_cookie;		 /* key mgmt cookie */
+	uint64_t	ipp_km_cookie;		 /* key mgmt cookie */
 	uint32_t	ipp_replay_depth;	 /* replay window */
 	/* XXX add lifetimes */
 } ipsec_prot_t;
