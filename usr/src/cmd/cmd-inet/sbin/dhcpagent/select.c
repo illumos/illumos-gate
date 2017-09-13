@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  *
  * SELECTING state of the client state machine.
  */
@@ -29,7 +30,6 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <time.h>
-#include <limits.h>
 #include <netinet/in.h>
 #include <net/route.h>
 #include <net/if.h>
@@ -106,8 +106,6 @@ void
 dhcp_selecting(dhcp_smach_t *dsmp)
 {
 	dhcp_pkt_t		*dpkt;
-	const char		*reqhost;
-	char			hostfile[PATH_MAX + 1];
 
 	/*
 	 * We first set up to collect OFFER/Advertise packets as they arrive.
@@ -201,27 +199,9 @@ dhcp_selecting(dhcp_smach_t *dsmp)
 		}
 		(void) add_pkt_prl(dpkt, dsmp);
 
-		if (df_get_bool(dsmp->dsm_name, dsmp->dsm_isv6,
-		    DF_REQUEST_HOSTNAME)) {
-			dhcpmsg(MSG_DEBUG,
-			    "dhcp_selecting: DF_REQUEST_HOSTNAME");
-			(void) snprintf(hostfile, sizeof (hostfile),
-			    "/etc/hostname.%s", dsmp->dsm_name);
+		if (!dhcp_add_fqdn_opt(dpkt, dsmp))
+			(void) dhcp_add_hostname_opt(dpkt, dsmp);
 
-			if ((reqhost = iffile_to_hostname(hostfile)) != NULL) {
-				dhcpmsg(MSG_DEBUG, "dhcp_selecting: host %s",
-				    reqhost);
-				dsmp->dsm_reqhost = strdup(reqhost);
-				if (dsmp->dsm_reqhost != NULL)
-					(void) add_pkt_opt(dpkt, CD_HOSTNAME,
-					    dsmp->dsm_reqhost,
-					    strlen(dsmp->dsm_reqhost));
-				else
-					dhcpmsg(MSG_WARNING,
-					    "dhcp_selecting: cannot allocate "
-					    "memory for host name option");
-			}
-		}
 		(void) add_pkt_opt(dpkt, CD_END, NULL, 0);
 
 		(void) send_pkt(dsmp, dpkt, htonl(INADDR_BROADCAST),

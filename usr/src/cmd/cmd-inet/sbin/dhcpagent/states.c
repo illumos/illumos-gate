@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  *
  * This module contains core functions for managing DHCP state machine
  * instances.
@@ -332,6 +333,8 @@ free_smach(dhcp_smach_t *dsmp)
 	free(dsmp->dsm_pil);
 	free(dsmp->dsm_routers);
 	free(dsmp->dsm_reqhost);
+	free(dsmp->dsm_msg_reqhost);
+	free(dsmp->dsm_dhcp_domainname);
 	free(dsmp);
 
 	/* no big deal if this fails */
@@ -1049,14 +1052,17 @@ no_specified_id:
 	 * unable to parse it.  We need to determine if a Client ID is required
 	 * and, if so, generate one.
 	 *
-	 * If it's IPv4, not in an IPMP group, and not a logical interface,
+	 * If it's IPv4, not in an IPMP group, not a logical interface,
+	 * and a DHCP default for DF_V4_DEFAULT_IAID_DUID is not affirmative,
 	 * then we need to preserve backward-compatibility by avoiding
 	 * new-fangled DUID/IAID construction.  (Note: even for IPMP test
 	 * addresses, we construct a DUID/IAID since we may renew a lease for
 	 * an IPMP test address on any functioning IP interface in the group.)
 	 */
 	if (!pif->pif_isv6 && pif->pif_grifname[0] == '\0' &&
-	    strchr(dsmp->dsm_name, ':') == NULL) {
+	    strchr(dsmp->dsm_name, ':') == NULL &&
+	    !df_get_bool(dsmp->dsm_name, pif->pif_isv6,
+	    DF_V4_DEFAULT_IAID_DUID)) {
 		if (pif->pif_hwtype == ARPHRD_IB) {
 			/*
 			 * This comes from the DHCP over IPoIB specification.
@@ -1217,6 +1223,15 @@ reset_smach(dhcp_smach_t *dsmp)
 
 	free(dsmp->dsm_reqhost);
 	dsmp->dsm_reqhost = NULL;
+
+	/*
+	 * Do not reset dsm_msg_reqhost here. Unlike dsm_reqhost coming from
+	 * /etc/host.*, dsm_msg_reqhost comes externally, and it survives until
+	 * it is reset from another external message.
+	 */
+
+	free(dsmp->dsm_dhcp_domainname);
+	dsmp->dsm_dhcp_domainname = NULL;
 
 	cancel_smach_timers(dsmp);
 

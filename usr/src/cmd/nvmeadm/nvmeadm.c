@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*

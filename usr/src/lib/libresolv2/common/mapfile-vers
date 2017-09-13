@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 #
 
 #
@@ -104,6 +105,7 @@ SYMBOL_VERSION SUNWprivate_2.2 {
 	isc_puthexstring;
 	__log_close_debug_channels;
 	__memactive;
+	__ns_name_pton2;
 	p_sockun;
 	res_gethostbyname2;
 	res_getservers;

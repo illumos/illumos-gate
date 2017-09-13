@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #include <assert.h>
@@ -39,6 +40,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <libdladm.h>
+#include <libipadm.h>
 
 #include "libnwam_impl.h"
 #include <libnwam_priv.h>
@@ -73,6 +75,7 @@ static nwam_error_t valid_link_mtu(nwam_value_t);
 static nwam_error_t valid_ip_version(nwam_value_t);
 static nwam_error_t valid_addrsrc_v4(nwam_value_t);
 static nwam_error_t valid_addrsrc_v6(nwam_value_t);
+static nwam_error_t valid_reqhost(nwam_value_t);
 
 struct nwam_prop_table_entry ncu_prop_table_entries[] = {
 	{NWAM_NCU_PROP_TYPE, NWAM_VALUE_TYPE_UINT64, B_FALSE, 1, 1, valid_type,
@@ -149,7 +152,16 @@ struct nwam_prop_table_entry ncu_prop_table_entries[] = {
 	{NWAM_NCU_PROP_IPV6_DEFAULT_ROUTE, NWAM_VALUE_TYPE_STRING, B_FALSE, 0,
 	    1, nwam_valid_route_v6,
 	    "specifies per-interface default IPv6 route",
-	    NWAM_FLAG_NCU_TYPE_INTERFACE, NWAM_FLAG_NCU_CLASS_ALL_INTERFACE}
+	    NWAM_FLAG_NCU_TYPE_INTERFACE, NWAM_FLAG_NCU_CLASS_ALL_INTERFACE},
+	{NWAM_NCU_PROP_IP_PRIMARY, NWAM_VALUE_TYPE_BOOLEAN, B_FALSE, 0,
+	    1, nwam_valid_boolean,
+	    "specifies the status of an interface as primary for the delivery"
+	    " of client-wide configuration data",
+	    NWAM_FLAG_NCU_TYPE_INTERFACE, NWAM_FLAG_NCU_CLASS_ALL_INTERFACE},
+	{NWAM_NCU_PROP_IP_REQHOST, NWAM_VALUE_TYPE_STRING, B_FALSE, 0,
+	    1, valid_reqhost,
+	    "specifies a requested hostname for the interface",
+	    NWAM_FLAG_NCU_TYPE_INTERFACE, NWAM_FLAG_NCU_CLASS_ALL_INTERFACE},
 };
 
 #define	NWAM_NUM_NCU_PROPS	(sizeof (ncu_prop_table_entries) / \
@@ -1646,6 +1658,17 @@ valid_addrsrc_v6(nwam_value_t value)
 		return (NWAM_SUCCESS);
 	else
 		return (NWAM_ENTITY_INVALID_VALUE);
+}
+
+static nwam_error_t
+valid_reqhost(nwam_value_t value)
+{
+	char *hostname;
+
+	if (nwam_value_get_string(value, &hostname) != NWAM_SUCCESS)
+		return (NWAM_ENTITY_INVALID_VALUE);
+	return (ipadm_is_valid_hostname(hostname) ? NWAM_SUCCESS
+	    : NWAM_ENTITY_INVALID_VALUE);
 }
 
 /* ARGSUSED0 */
