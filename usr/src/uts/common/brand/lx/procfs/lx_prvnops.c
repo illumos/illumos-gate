@@ -259,6 +259,7 @@ static void lxpr_read_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *,
 static void lxpr_read_sys_net_ipv4_tcp_rwmem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_vm_dirty(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_max_map_cnt(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_minfr_kb(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -617,6 +618,13 @@ static lxpr_dirent_t sys_net_ipv4dir[] = {
  * contents of /proc/sys/vm directory
  */
 static lxpr_dirent_t sys_vmdir[] = {
+	{ LXPR_SYS_VM_DIRTY_BG_BYTES,	"dirty_background_bytes" },
+	{ LXPR_SYS_VM_DIRTY_BG_RATIO,	"dirty_background_ratio" },
+	{ LXPR_SYS_VM_DIRTY_BYTES,	"dirty_bytes" },
+	{ LXPR_SYS_VM_DIRTY_EXP_CS,	"dirty_expire_centisecs" },
+	{ LXPR_SYS_VM_DIRTY_RATIO,	"dirty_ratio" },
+	{ LXPR_SYS_VM_DIRTYTIME_EXP_SEC, "dirtytime_expire_seconds" },
+	{ LXPR_SYS_VM_DIRTY_WB_CS,	"dirty_writeback_centisecs" },
 	{ LXPR_SYS_VM_MAX_MAP_CNT,	"max_map_count" },
 	{ LXPR_SYS_VM_MINFR_KB,		"min_free_kbytes" },
 	{ LXPR_SYS_VM_NHUGEP,		"nr_hugepages" },
@@ -662,6 +670,13 @@ static wftab_t wr_tab[] = {
 	{LXPR_SYS_NET_IPV4_TCP_SACK, lxpr_write_sys_net_ipv4_tcp_sack},
 	{LXPR_SYS_NET_IPV4_TCP_WINSCALE, lxpr_write_sys_net_ipv4_tcp_winscale},
 	{LXPR_SYS_NET_IPV4_TCP_WMEM, lxpr_write_sys_net_ipv4_tcp_rwmem},
+	{LXPR_SYS_VM_DIRTY_BG_BYTES, NULL},
+	{LXPR_SYS_VM_DIRTY_BG_RATIO, NULL},
+	{LXPR_SYS_VM_DIRTY_BYTES, NULL},
+	{LXPR_SYS_VM_DIRTY_EXP_CS, NULL},
+	{LXPR_SYS_VM_DIRTY_RATIO, NULL},
+	{LXPR_SYS_VM_DIRTYTIME_EXP_SEC, NULL},
+	{LXPR_SYS_VM_DIRTY_WB_CS, NULL},
 	{LXPR_SYS_VM_OVERCOMMIT_MEM, NULL},
 	{LXPR_SYS_VM_SWAPPINESS, NULL},
 	{LXPR_INVALID, NULL}
@@ -902,6 +917,13 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_net_ipv4_tcp_winscale, /* .../ipv4/tcp_window_scaling */
 	lxpr_read_sys_net_ipv4_tcp_rwmem, /* .../ipv4/tcp_wmem */
 	lxpr_read_invalid,		/* /proc/sys/vm	*/
+	lxpr_read_sys_vm_dirty,		/* .../vm/dirty_background_bytes */
+	lxpr_read_sys_vm_dirty,		/* .../vm/dirty_background_ratio */
+	lxpr_read_sys_vm_dirty,		/* .../vm/dirty_bytes */
+	lxpr_read_sys_vm_dirty,		/* .../vm/dirty_expire_centisecs */
+	lxpr_read_sys_vm_dirty,		/* .../vm/dirty_ratio */
+	lxpr_read_sys_vm_dirty,		/* .../vm/dirtytime_expire_seconds */
+	lxpr_read_sys_vm_dirty,		/* .../vm/dirty_writeback_centisecs */
 	lxpr_read_sys_vm_max_map_cnt,	/* /proc/sys/vm/max_map_count */
 	lxpr_read_sys_vm_minfr_kb,	/* /proc/sys/vm/min_free_kbytes */
 	lxpr_read_sys_vm_nhpages,	/* /proc/sys/vm/nr_hugepages */
@@ -1053,6 +1075,13 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_window_scaling */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_wmem */
 	lxpr_lookup_sys_vmdir,		/* /proc/sys/vm */
+	lxpr_lookup_not_a_dir,		/* .../vm/dirty_background_bytes */
+	lxpr_lookup_not_a_dir,		/* .../vm/dirty_background_ratio */
+	lxpr_lookup_not_a_dir,		/* .../vm/dirty_bytes */
+	lxpr_lookup_not_a_dir,		/* .../vm/dirty_expire_centisecs */
+	lxpr_lookup_not_a_dir,		/* .../vm/dirty_ratio */
+	lxpr_lookup_not_a_dir,		/* .../vm/dirtytime_expire_seconds */
+	lxpr_lookup_not_a_dir,		/* .../vm/dirty_writeback_centisecs */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/max_map_count */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
@@ -1204,6 +1233,13 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_window_scaling */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_wmem */
 	lxpr_readdir_sys_vmdir,		/* /proc/sys/vm */
+	lxpr_readdir_not_a_dir,		/* .../vm/dirty_background_bytes */
+	lxpr_readdir_not_a_dir,		/* .../vm/dirty_background_ratio */
+	lxpr_readdir_not_a_dir,		/* .../vm/dirty_bytes */
+	lxpr_readdir_not_a_dir,		/* .../vm/dirty_expire_centisecs */
+	lxpr_readdir_not_a_dir,		/* .../vm/dirty_ratio */
+	lxpr_readdir_not_a_dir,		/* .../vm/dirtytime_expire_seconds */
+	lxpr_readdir_not_a_dir,		/* .../vm/dirty_writeback_centisecs */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/max_map_count */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/min_free_kbytes */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/vm/nr_hugepages */
@@ -5102,6 +5138,50 @@ lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	tcps = ns->netstack_tcp;
 	lxpr_uiobuf_printf(uiobuf, "%d\n", tcps->tcps_wscale_always);
 	netstack_rele(ns);
+}
+
+/*
+ * The /proc/sys/vm/dirty* files are (poorly) documented in the Linux
+ * source file Documentation/sysctl/vm.txt. These are various VM tunables
+ * that we'll never support, but that a few misguided apps want to inspect and
+ * modify. We simply hardcode some default values and we'll lie about write
+ * success to these files.
+ */
+static void
+lxpr_read_sys_vm_dirty(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	uint_t val;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_VM_DIRTY_BG_BYTES ||
+	    lxpnp->lxpr_type == LXPR_SYS_VM_DIRTY_BG_RATIO ||
+	    lxpnp->lxpr_type == LXPR_SYS_VM_DIRTY_BYTES ||
+	    lxpnp->lxpr_type == LXPR_SYS_VM_DIRTY_EXP_CS ||
+	    lxpnp->lxpr_type == LXPR_SYS_VM_DIRTY_RATIO ||
+	    lxpnp->lxpr_type == LXPR_SYS_VM_DIRTYTIME_EXP_SEC ||
+	    lxpnp->lxpr_type == LXPR_SYS_VM_DIRTY_WB_CS);
+
+	switch (lxpnp->lxpr_type) {
+	case LXPR_SYS_VM_DIRTY_BG_RATIO:
+		val = 10;
+		break;
+	case LXPR_SYS_VM_DIRTY_EXP_CS:
+		val = 3000;
+		break;
+	case LXPR_SYS_VM_DIRTY_RATIO:
+		val = 20;
+		break;
+	case LXPR_SYS_VM_DIRTYTIME_EXP_SEC:
+		val = 43200;
+		break;
+	case LXPR_SYS_VM_DIRTY_WB_CS:
+		val = 500;
+		break;
+	default:
+		val = 0;
+		break;
+	}
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", val);
 }
 
 /* ARGSUSED */

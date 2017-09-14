@@ -244,6 +244,13 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_NET_IPV4_TCP_WINSCALE,	/* .../net/ipv4/tcp_window_scaling */
 	LXPR_SYS_NET_IPV4_TCP_WMEM,	/* /proc/sys/net/ipv4/tcp_wmem */
 	LXPR_SYS_VMDIR,			/* /proc/sys/vm			*/
+	LXPR_SYS_VM_DIRTY_BG_BYTES,	/* .../vm/dirty_background_bytes */
+	LXPR_SYS_VM_DIRTY_BG_RATIO,	/* .../vm/dirty_background_ratio */
+	LXPR_SYS_VM_DIRTY_BYTES,	/* /proc/sys/vm/dirty_bytes */
+	LXPR_SYS_VM_DIRTY_EXP_CS,	/* .../vm/dirty_expire_centisecs */
+	LXPR_SYS_VM_DIRTY_RATIO,	/* /proc/sys/vm/dirty_ratio */
+	LXPR_SYS_VM_DIRTYTIME_EXP_SEC,	/* .../vm/dirtytime_expire_seconds */
+	LXPR_SYS_VM_DIRTY_WB_CS,	/* .../vm/dirty_writeback_centisecs */
 	LXPR_SYS_VM_MAX_MAP_CNT,	/* /proc/sys/vm/max_map_count	*/
 	LXPR_SYS_VM_MINFR_KB,		/* /proc/sys/vm/min_free_kbytes	*/
 	LXPR_SYS_VM_NHUGEP,		/* /proc/sys/vm/nr_hugepages	*/
