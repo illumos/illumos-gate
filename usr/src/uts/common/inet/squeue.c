@@ -140,6 +140,7 @@ static void squeue_drain(squeue_t *, uint_t, hrtime_t);
 static void squeue_worker(squeue_t *sqp);
 static void squeue_polling_thread(squeue_t *sqp);
 static void squeue_worker_wakeup(squeue_t *sqp);
+static void squeue_try_drain_one(squeue_t *, conn_t *);
 
 kmem_cache_t *squeue_cache;
 
@@ -433,6 +434,15 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 			sqp->sq_run = NULL;
 			if (sqp->sq_first == NULL ||
 			    process_flag == SQ_NODRAIN) {
+				/*
+				 * Even if SQ_NODRAIN was specified, it may
+				 * still be best to process a single queued
+				 * item if it matches the active connection.
+				 */
+				if (sqp->sq_first != NULL && sqp->sq_isip) {
+					squeue_try_drain_one(sqp, connp);
+				}
+
 				/*
 				 * If work or control actions are pending, wake
 				 * up the worker thread.
@@ -1406,33 +1416,106 @@ again:
 	}
 }
 
+/*
+ * If possible, attempt to immediately process a single queued request, should
+ * it match the supplied conn_t reference.  This is primarily intended to elide
+ * squeue worker thread wake-ups during local TCP connect() or close()
+ * operations where the response is placed on the squeue during processing.
+ */
+static void
+squeue_try_drain_one(squeue_t *sqp, conn_t *compare_conn)
+{
+	mblk_t *next, *mp = sqp->sq_first;
+	conn_t *connp;
+	sqproc_t proc = (sqproc_t)mp->b_queue;
+	ip_recv_attr_t iras, *ira = NULL;
+
+	ASSERT(MUTEX_HELD(&sqp->sq_lock));
+	ASSERT((sqp->sq_state & SQS_PROC) == 0);
+	ASSERT(sqp->sq_run == NULL);
+	ASSERT(sqp->sq_isip);
+	VERIFY(mp != NULL);
+
+	/*
+	 * There is no guarantee that compare_conn references a valid object at
+	 * this time, so under no circumstance may it be deferenced unless it
+	 * matches the squeue entry.
+	 */
+	connp = (conn_t *)mp->b_prev;
+	if (connp != compare_conn) {
+		return;
+	}
+
+	next = mp->b_next;
+	proc = (sqproc_t)mp->b_queue;
+
+	ASSERT(proc != NULL);
+	ASSERT(sqp->sq_count > 0);
+
+	/* Dequeue item from squeue */
+	if (next == NULL) {
+		sqp->sq_first = NULL;
+		sqp->sq_last = NULL;
+	} else {
+		sqp->sq_first = next;
+	}
+	sqp->sq_count--;
+
+	sqp->sq_state |= SQS_PROC;
+	sqp->sq_run = curthread;
+	mutex_exit(&sqp->sq_lock);
+
+	/* Prep mblk_t and retrieve ira if needed */
+	mp->b_prev = NULL;
+	mp->b_queue = NULL;
+	mp->b_next = NULL;
+	if (ip_recv_attr_is_mblk(mp)) {
+		mblk_t	*attrmp = mp;
+
+		ASSERT(attrmp->b_cont != NULL);
+
+		mp = attrmp->b_cont;
+		attrmp->b_cont = NULL;
+
+		ASSERT(mp->b_queue == NULL);
+		ASSERT(mp->b_prev == NULL);
+
+		if (!ip_recv_attr_from_mblk(attrmp, &iras)) {
+			/* ill_t or ip_stack_t disappeared */
+			ip_drop_input("ip_recv_attr_from_mblk", mp, NULL);
+			ira_cleanup(&iras, B_TRUE);
+			CONN_DEC_REF(connp);
+			goto done;
+		}
+		ira = &iras;
+	}
+
+	SQUEUE_DBG_SET(sqp, mp, proc, connp, mp->b_tag);
+	connp->conn_on_sqp = B_TRUE;
+	DTRACE_PROBE3(squeue__proc__start, squeue_t *, sqp, mblk_t *, mp,
+	    conn_t *, connp);
+	(*proc)(connp, mp, sqp, ira);
+	DTRACE_PROBE2(squeue__proc__end, squeue_t *, sqp, conn_t *, connp);
+	connp->conn_on_sqp = B_FALSE;
+	CONN_DEC_REF(connp);
+	SQUEUE_DBG_CLEAR(sqp);
+
+done:
+	mutex_enter(&sqp->sq_lock);
+	sqp->sq_state &= ~(SQS_PROC);
+	sqp->sq_run = NULL;
+}
+
 void
-squeue_synch_exit(conn_t *connp)
+squeue_synch_exit(conn_t *connp, int flag)
 {
 	squeue_t *sqp = connp->conn_sqp;
+
 	VERIFY(sqp->sq_isip == B_TRUE);
+	ASSERT(flag == SQ_NODRAIN || flag == SQ_PROCESS);
 
 	mutex_enter(&sqp->sq_lock);
-	if (sqp->sq_run == curthread) {
-		ASSERT(sqp->sq_state & SQS_PROC);
-
-		sqp->sq_state &= ~SQS_PROC;
-		sqp->sq_run = NULL;
-		connp->conn_on_sqp = B_FALSE;
-
-		if (sqp->sq_first != NULL) {
-			/*
-			 * If this was a normal thread, then it would
-			 * (most likely) continue processing the pending
-			 * requests. Since the just completed operation
-			 * was executed synchronously, the thread should
-			 * not be delayed. To compensate, wake up the
-			 * worker thread right away when there are outstanding
-			 * requests.
-			 */
-			squeue_worker_wakeup(sqp);
-		}
-	} else {
+	if (sqp->sq_run != curthread) {
 		/*
 		 * The caller doesn't own the squeue, clear the SQS_PAUSE flag,
 		 * and wake up the squeue owner, such that owner can continue
@@ -1443,6 +1526,24 @@ squeue_synch_exit(conn_t *connp)
 
 		/* There should be only one thread blocking on sq_synch_cv. */
 		cv_signal(&sqp->sq_synch_cv);
+		mutex_exit(&sqp->sq_lock);
+		return;
+	}
+
+	ASSERT(sqp->sq_state & SQS_PROC);
+
+	sqp->sq_state &= ~SQS_PROC;
+	sqp->sq_run = NULL;
+	connp->conn_on_sqp = B_FALSE;
+
+	/* If the caller opted in, attempt to process the head squeue item. */
+	if (flag == SQ_PROCESS && sqp->sq_first != NULL) {
+		squeue_try_drain_one(sqp, connp);
+	}
+
+	/* Wake up the worker if further requests are pending. */
+	if (sqp->sq_first != NULL) {
+		squeue_worker_wakeup(sqp);
 	}
 	mutex_exit(&sqp->sq_lock);
 }

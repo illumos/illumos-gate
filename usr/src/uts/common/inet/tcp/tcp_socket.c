@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /* This file contains all TCP kernel socket related functions. */
@@ -222,7 +222,7 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 		error = tcp_do_bind(connp, sa, len, cr, B_TRUE);
 	}
 
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	if (error < 0) {
 		if (error == -TOUTSTATE)
@@ -269,7 +269,7 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 		else
 			error = proto_tlitosyserr(-error);
 	}
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 	return (error);
 }
 
@@ -333,7 +333,13 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		    connp->conn_upper_handle, &sopp);
 	}
 done:
-	squeue_synch_exit(connp);
+	/*
+	 * Indicate (via SQ_PROCESS) that it is acceptable for the squeue to
+	 * attempt to drain a pending request relevant to this connection when
+	 * exiting the synchronous context.  This can improve the performance
+	 * and efficiency of TCP connect(2) operations to localhost.
+	 */
+	squeue_synch_exit(connp, SQ_PROCESS);
 
 	return ((error == 0) ? EINPROGRESS : error);
 }
@@ -402,7 +408,7 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	}
 
 	len = tcp_opt_get(connp, level, option_name, optvalp_buf);
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	if (len == -1) {
 		kmem_free(optvalp_buf, max_optbuf_len);
@@ -463,14 +469,14 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 		if (error < 0) {
 			error = proto_tlitosyserr(-error);
 		}
-		squeue_synch_exit(connp);
+		squeue_synch_exit(connp, SQ_NODRAIN);
 		return (error);
 	}
 
 	error = tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, level, option_name,
 	    optlen, (uchar_t *)optvalp, (uint_t *)&optlen, (uchar_t *)optvalp,
 	    NULL, cr);
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	ASSERT(error >= 0);
 
@@ -646,7 +652,7 @@ tcp_clr_flowctrl(sock_lower_handle_t proto_handle)
 		}
 	}
 
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 }
 
 /* ARGSUSED */
@@ -1028,7 +1034,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	if (tcp->tcp_rg_bind != NULL) {
 		freeb(stropt_mp);
 		freeb(ordrel_mp);
-		squeue_synch_exit(connp);
+		squeue_synch_exit(connp, SQ_NODRAIN);
 		return (EINVAL);
 	}
 
@@ -1062,7 +1068,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	 * There should be atleast two ref's (IP + TCP)
 	 */
 	ASSERT(connp->conn_ref >= 2);
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	return (0);
 }
