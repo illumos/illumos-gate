@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /* This file contains all TCP kernel socket related functions. */
@@ -198,7 +199,7 @@ static int
 tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t len, cred_t *cr)
 {
-	int 		error;
+	int		error;
 	conn_t		*connp = (conn_t *)proto_handle;
 
 	/* All Solaris components should pass a cred for this operation. */
@@ -221,7 +222,7 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 		error = tcp_do_bind(connp, sa, len, cr, B_TRUE);
 	}
 
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	if (error < 0) {
 		if (error == -TOUTSTATE)
@@ -239,7 +240,7 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
 	tcp_t	*tcp = connp->conn_tcp;
-	int 	error;
+	int	error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
@@ -268,7 +269,7 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 		else
 			error = proto_tlitosyserr(-error);
 	}
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 	return (error);
 }
 
@@ -332,7 +333,13 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		    connp->conn_upper_handle, &sopp);
 	}
 done:
-	squeue_synch_exit(connp);
+	/*
+	 * Indicate (via SQ_PROCESS) that it is acceptable for the squeue to
+	 * attempt to drain a pending request relevant to this connection when
+	 * exiting the synchronous context.  This can improve the performance
+	 * and efficiency of TCP connect(2) operations to localhost.
+	 */
+	squeue_synch_exit(connp, SQ_PROCESS);
 
 	return ((error == 0) ? EINPROGRESS : error);
 }
@@ -401,7 +408,7 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	}
 
 	len = tcp_opt_get(connp, level, option_name, optvalp_buf);
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	if (len == -1) {
 		kmem_free(optvalp_buf, max_optbuf_len);
@@ -462,14 +469,14 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 		if (error < 0) {
 			error = proto_tlitosyserr(-error);
 		}
-		squeue_synch_exit(connp);
+		squeue_synch_exit(connp, SQ_NODRAIN);
 		return (error);
 	}
 
 	error = tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, level, option_name,
 	    optlen, (uchar_t *)optvalp, (uint_t *)&optlen, (uchar_t *)optvalp,
 	    NULL, cr);
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	ASSERT(error >= 0);
 
@@ -645,7 +652,7 @@ tcp_clr_flowctrl(sock_lower_handle_t proto_handle)
 		}
 	}
 
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 }
 
 /* ARGSUSED */
@@ -653,7 +660,7 @@ static int
 tcp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
     int mode, int32_t *rvalp, cred_t *cr)
 {
-	conn_t  	*connp = (conn_t *)proto_handle;
+	conn_t		*connp = (conn_t *)proto_handle;
 	int		error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
@@ -818,7 +825,7 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	struct stroptions	*stropt;
 	struct T_capability_ack tca;
 	struct sockaddr_in6	laddr, faddr;
-	socklen_t 		laddrlen, faddrlen;
+	socklen_t		laddrlen, faddrlen;
 	short			opts;
 	int			error;
 	mblk_t			*mp, *mpnext;
@@ -992,7 +999,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
     sock_quiesce_arg_t *arg)
 {
 	tcp_t			*tcp;
-	conn_t 			*connp = (conn_t *)proto_handle;
+	conn_t			*connp = (conn_t *)proto_handle;
 	int			error;
 	mblk_t			*stropt_mp;
 	mblk_t			*ordrel_mp;
@@ -1051,7 +1058,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	 * There should be atleast two ref's (IP + TCP)
 	 */
 	ASSERT(connp->conn_ref >= 2);
-	squeue_synch_exit(connp);
+	squeue_synch_exit(connp, SQ_NODRAIN);
 
 	return (0);
 }

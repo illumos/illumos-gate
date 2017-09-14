@@ -86,7 +86,7 @@ extern uintptr_t *squeue_getprivate(squeue_t *, sqprivate_t);
 
 struct conn_s;
 extern int squeue_synch_enter(struct conn_s *, mblk_t *);
-extern void squeue_synch_exit(struct conn_s *);
+extern void squeue_synch_exit(struct conn_s *, int);
 
 #ifdef	__cplusplus
 }
