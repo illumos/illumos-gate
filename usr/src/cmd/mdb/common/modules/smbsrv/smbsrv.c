@@ -495,54 +495,6 @@ static int smb_req_dump(struct mbuf_chain *, int32_t,
 static int smb_req_dump_m(uintptr_t, const void *, void *);
 
 /*
- * Until the mdb on our customer machines has the fix for:
- * NEX-3907 mdb_ctf_vread fails in dcmds run via mdb_pwalk_dcmd
- * (a.k.a.  https://www.illumos.org/issues/5998)
- * we need to avoid mdb_pwalk_dcmd here or mdb_ctf_vread fails.
- * Using mdb_pwalk instead works OK.
- *
- * Please remove this work-around once the mdb fix is rolled out.
- */
-#ifndef	ILLUMOS_5998_FIXED
-#define	mdb_pwalk_dcmd(walker, dcmd, argc, argv, addr) \
-	smb_pwalk_dcmd(walker, dcmd, argc, argv, addr)
-
-struct smb_pwalk_dcmd_cb {
-	const char *cmd;
-	int flags;
-	int argc;
-	const mdb_arg_t *argv;
-};
-
-static int
-pwalk_dcmd(uintptr_t addr, const void *data, void *varg)
-{
-	struct smb_pwalk_dcmd_cb *cb = varg;
-	int ret;
-	_NOTE(ARGUNUSED(data));
-
-	ret = mdb_call_dcmd(cb->cmd, addr, cb->flags, cb->argc, cb->argv);
-	cb->flags &= ~DCMD_LOOPFIRST;
-
-	return (ret);
-}
-
-static int
-smb_pwalk_dcmd(const char *wname, const char *dcname,
-    int argc, const mdb_arg_t *argv, uintptr_t addr)
-{
-	struct smb_pwalk_dcmd_cb cb;
-
-	cb.cmd = dcname;
-	cb.flags = DCMD_LOOP | DCMD_LOOPFIRST | DCMD_ADDRSPEC;
-	cb.argc = argc;
-	cb.argv = argv;
-
-	return (mdb_pwalk(wname, pwalk_dcmd, &cb, addr));
-}
-#endif	/* !ILLUMOS_5998_FIXED */
-
-/*
  * *****************************************************************************
  * ****************************** Top level DCMD *******************************
  * *****************************************************************************
@@ -727,14 +679,37 @@ smbsrv_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  * *****************************************************************************
  */
 
+/*
+ * After some changes merged from upstream, "::smblist" was failing with
+ * "inexact match for union au_addr (au_addr)" because the CTF data for
+ * the target vs mdb were apparently not exactly the same (unknown why).
+ *
+ * As described above mdb_ctf_vread(), the recommended way to read a
+ * union is to use an mdb struct with only the union "arm" appropriate
+ * to the given type instance.  That's difficult in this case, so we
+ * use a local union with only the in6_addr_t union arm (otherwise
+ * identical to smb_inaddr_t) and just cast it to an smb_inaddr_t
+ */
+
+typedef struct mdb_smb_inaddr {
+	union {
+#if 0	/* The real smb_inaddr_t has these too. */
+		in_addr_t au_ipv4;
+		in6_addr_t au_ipv6;
+#endif
+		in6_addr_t au_ip;
+	} au_addr;
+	int a_family;
+} mdb_smb_inaddr_t;
+
 typedef struct mdb_smb_session {
 	uint64_t		s_kid;
 	smb_session_state_t	s_state;
 	uint32_t		s_flags;
 	uint16_t		s_local_port;
 	uint16_t		s_remote_port;
-	smb_inaddr_t		ipaddr;
-	smb_inaddr_t		local_ipaddr;
+	mdb_smb_inaddr_t	ipaddr;
+	mdb_smb_inaddr_t	local_ipaddr;
 	int			dialect;
 
 	smb_slist_t		s_req_list;
@@ -855,8 +830,10 @@ smbsess_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "smb_session_state_t", se->s_state,
 		    "SMB_SESSION_STATE_");
 
-		smb_inaddr_ntop(&se->ipaddr, cipaddr, ipaddrstrlen);
-		smb_inaddr_ntop(&se->local_ipaddr, lipaddr, ipaddrstrlen);
+		smb_inaddr_ntop((smb_inaddr_t *)&se->ipaddr,
+		    cipaddr, ipaddrstrlen);
+		smb_inaddr_ntop((smb_inaddr_t *)&se->local_ipaddr,
+		    lipaddr, ipaddrstrlen);
 
 		if (opts & SMB_OPT_VERBOSE) {
 			mdb_printf("%<b>%<u>SMB session information "
@@ -1196,8 +1173,8 @@ smbreq_dump_dcmd(uintptr_t rqaddr, uint_t flags, int argc,
 		 * src=remote, dst=local
 		 */
 		rc = dump_func(&sr->command, sr->command.max_bytes,
-		    &ssn->ipaddr, ssn->s_remote_port,
-		    &ssn->local_ipaddr, ssn->s_local_port,
+		    (smb_inaddr_t *)&ssn->ipaddr, ssn->s_remote_port,
+		    (smb_inaddr_t *)&ssn->local_ipaddr, ssn->s_local_port,
 		    sr->sr_time_submitted, B_FALSE);
 	}
 
@@ -1208,8 +1185,8 @@ smbreq_dump_dcmd(uintptr_t rqaddr, uint_t flags, int argc,
 		 * src=local, dst=remote
 		 */
 		rc = dump_func(&sr->reply, sr->reply.chain_offset,
-		    &ssn->local_ipaddr, ssn->s_local_port,
-		    &ssn->ipaddr, ssn->s_remote_port,
+		    (smb_inaddr_t *)&ssn->local_ipaddr, ssn->s_local_port,
+		    (smb_inaddr_t *)&ssn->ipaddr, ssn->s_remote_port,
 		    sr->sr_time_start, B_TRUE);
 	}
 
@@ -2221,9 +2198,9 @@ smbnode_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (mdb_vread(&vnode, sizeof (vnode_t),
 		    (uintptr_t)node.vp) == sizeof (vnode_t)) {
 			if (mdb_readstr(path_name, sizeof (path_name),
-			    (uintptr_t)vnode.v_path) != 0) {
-				(void) mdb_snprintf(od_name,
-				    sizeof (od_name), "N/A");
+			    (uintptr_t)vnode.v_path) <= 0) {
+				(void) mdb_snprintf(path_name,
+				    sizeof (path_name), "N/A");
 			}
 		}
 	}
