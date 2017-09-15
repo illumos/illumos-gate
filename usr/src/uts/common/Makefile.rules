@@ -23,7 +23,7 @@
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright (c) 2016 by Delphix. All rights reserved.
 #
@@ -2511,6 +2511,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sdcard/impl/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sdcard/targets/sdcard/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/gsqueue/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/sfe/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -2518,6 +2521,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/simnet/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/softmac/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/vnd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/uath/%.c

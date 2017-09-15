@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -59,7 +59,7 @@ frameio_alloc(int kmflags)
 void
 frameio_free(frameio_t *fio)
 {
-	return (kmem_cache_free(frameio_cache, fio));
+	kmem_cache_free(frameio_cache, fio);
 }
 
 /*
@@ -324,7 +324,8 @@ framevec_write_mblk_part(framevec_t *fv, mblk_t *mp, size_t len, size_t moff,
 	ASSERT(len <= fv->fv_buflen - fv->fv_actlen);
 	cpf = cpf != 0 ? FKIOCTL : 0;
 
-	if (ddi_copyout(mp->b_rptr + moff, fv->fv_buf + foff, len, cpf) != 0)
+	if (ddi_copyout(mp->b_rptr + moff, (caddr_t)fv->fv_buf + foff, len,
+	    cpf) != 0)
 		return (EFAULT);
 	fv->fv_actlen += len;
 

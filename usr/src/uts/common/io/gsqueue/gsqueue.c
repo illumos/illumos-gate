@@ -505,6 +505,7 @@ gsqueue_set_cache_construct(void *buf, void *arg, int kmflags)
 	return (0);
 }
 
+/* ARGSUSED */
 static void
 gsqueue_set_cache_destruct(void *buf, void *arg)
 {

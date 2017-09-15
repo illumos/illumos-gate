@@ -1267,12 +1267,14 @@ vnd_drop_hook_out(vnd_str_t *vsp, mblk_t *mp, const char *reason)
 	VND_STAT_INC(vsp, vks_tdrops, 1);
 }
 
+/* ARGSUSED */
 static void
 vnd_drop_panic(vnd_str_t *vsp, mblk_t *mp, const char *reason)
 {
 	panic("illegal vnd drop");
 }
 
+/* ARGSUSED */
 static void
 vnd_mac_drop_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
     mac_header_info_t *mhip)
@@ -1391,7 +1393,7 @@ vnd_dev_free(vnd_dev_t *vdp)
 	 * read(),write() or one of the frameio ioctls.
 	 */
 	if (vdp->vdd_flags & VND_D_ATTACHED) {
-		ldi_close(vdp->vdd_ldih, FREAD | FWRITE, vdp->vdd_cr);
+		(void) ldi_close(vdp->vdd_ldih, FREAD | FWRITE, vdp->vdd_cr);
 		crfree(vdp->vdd_cr);
 		vdp->vdd_cr = NULL;
 
@@ -1689,7 +1691,6 @@ vnd_hook(vnd_str_t *vsp, mblk_t **mpp, net_handle_t netiv4, hook_event_t hev4,
     hook_event_token_t hetv6, vnd_dropper_f hdrop, vnd_dropper_f ddrop)
 {
 	uint16_t etype;
-	int vlan = 0;
 	hook_pkt_event_t info;
 	size_t offset, mblen;
 	uint8_t *dstp;
@@ -1711,7 +1712,6 @@ vnd_hook(vnd_str_t *vsp, mblk_t **mpp, net_handle_t netiv4, hook_event_t hev4,
 	}
 
 	if (etype == ETHERTYPE_VLAN) {
-		vlan = 1;
 		/* Actual ethertype is another four bytes in */
 		if (vnd_mbc_getu16(*mpp, 16, &etype) != 0) {
 			ddrop(vsp, *mpp,
@@ -2130,6 +2130,7 @@ vnd_st_scapabq(vnd_str_t *vsp)
 	return (0);
 }
 
+/* ARGSUSED */
 static void
 vnd_mac_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
     mac_header_info_t *mhip)
@@ -2165,7 +2166,7 @@ vnd_mac_input(vnd_str_t *vsp, mac_resource_t *unused, mblk_t *mp_chain,
 			/*
 			 * This is an overlapping copy. Do not use bcopy(9F).
 			 */
-			memmove(mp->b_rptr + 4, mp->b_rptr, 12);
+			(void) memmove(mp->b_rptr + 4, mp->b_rptr, 12);
 			mp->b_rptr += 4;
 		}
 
@@ -2217,7 +2218,7 @@ static void
 vnd_mac_flow_control(void *arg, vnd_mac_cookie_t cookie)
 {
 	vnd_str_t *vsp = arg;
-	hrtime_t now, diff;
+	hrtime_t now;
 
 	mutex_enter(&vsp->vns_lock);
 	now = gethrtime();
@@ -2238,7 +2239,6 @@ vnd_mac_flow_control(void *arg, vnd_mac_cookie_t cookie)
 	ASSERT(vsp->vns_caps.vsc_fc_cookie == cookie);
 	vsp->vns_flags &= ~VNS_F_FLOW_CONTROLLED;
 	vsp->vns_caps.vsc_fc_cookie = NULL;
-	diff = now - vsp->vns_fclatch;
 	vsp->vns_fclatch = 0;
 	DTRACE_VND3(flow__resumed, vnd_str_t *, vsp, uint64_t,
 	    vsp->vns_dq_write.vdq_cur, uintptr_t, cookie);
@@ -2766,24 +2766,28 @@ vnd_dlpi_taskq_dispatch(void *arg)
 	}
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_getifname(net_handle_t neti, phy_if_t phy, char *buf, const size_t len)
 {
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_getmtu(net_handle_t neti, phy_if_t phy, lif_if_t ifdata)
 {
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_getptmue(net_handle_t neti)
 {
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_getlifaddr(net_handle_t neti, phy_if_t phy, lif_if_t ifdata,
     size_t nelem, net_ifaddr_t type[], void *storage)
@@ -2791,6 +2795,7 @@ vnd_neti_getlifaddr(net_handle_t neti, phy_if_t phy, lif_if_t ifdata,
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_getlifzone(net_handle_t neti, phy_if_t phy, lif_if_t ifdata,
     zoneid_t *zid)
@@ -2798,6 +2803,7 @@ vnd_neti_getlifzone(net_handle_t neti, phy_if_t phy, lif_if_t ifdata,
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_getlifflags(net_handle_t neti, phy_if_t phy, lif_if_t ifdata,
     uint64_t *flags)
@@ -2805,30 +2811,35 @@ vnd_neti_getlifflags(net_handle_t neti, phy_if_t phy, lif_if_t ifdata,
 	return (-1);
 }
 
+/* ARGSUSED */
 static phy_if_t
 vnd_neti_phygetnext(net_handle_t neti, phy_if_t phy)
 {
-	return (-1);
+	return ((phy_if_t)-1);
 }
 
+/* ARGSUSED */
 static phy_if_t
 vnd_neti_phylookup(net_handle_t neti, const char *name)
 {
-	return (-1);
+	return ((phy_if_t)-1);
 }
 
+/* ARGSUSED */
 static lif_if_t
 vnd_neti_lifgetnext(net_handle_t neti, phy_if_t phy, lif_if_t ifdata)
 {
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_inject(net_handle_t neti, inject_t style, net_inject_t *packet)
 {
 	return (-1);
 }
 
+/* ARGSUSED */
 static phy_if_t
 vnd_neti_route(net_handle_t neti, struct sockaddr *address,
     struct sockaddr *next)
@@ -2836,12 +2847,14 @@ vnd_neti_route(net_handle_t neti, struct sockaddr *address,
 	return ((phy_if_t)-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_ispchksum(net_handle_t neti, mblk_t *mp)
 {
 	return (-1);
 }
 
+/* ARGSUSED */
 static int
 vnd_neti_isvchksum(net_handle_t neti, mblk_t *mp)
 {
@@ -2900,8 +2913,8 @@ vnd_netinfo_init(vnd_pnsd_t *nsp)
 	nsp->vpnd_family_v4.hf_name = "vnd_inet";
 
 	if (net_family_register(nsp->vpnd_neti_v4, &nsp->vpnd_family_v4) != 0) {
-		net_protocol_unregister(nsp->vpnd_neti_v4);
-		net_protocol_unregister(nsp->vpnd_neti_v6);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v4);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v6);
 		cmn_err(CE_NOTE, "vnd_netinfo_init: net_family_register "
 		    "failed for stack %d", nsp->vpnd_nsid);
 		return (1);
@@ -2911,9 +2924,10 @@ vnd_netinfo_init(vnd_pnsd_t *nsp)
 	nsp->vpnd_family_v6.hf_name = "vnd_inet6";
 
 	if (net_family_register(nsp->vpnd_neti_v6, &nsp->vpnd_family_v6) != 0) {
-		net_family_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_family_v4);
-		net_protocol_unregister(nsp->vpnd_neti_v4);
-		net_protocol_unregister(nsp->vpnd_neti_v6);
+		(void) net_family_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_family_v4);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v4);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v6);
 		cmn_err(CE_NOTE, "vnd_netinfo_init: net_family_register "
 		    "failed for stack %d", nsp->vpnd_nsid);
 		return (1);
@@ -2927,10 +2941,12 @@ vnd_netinfo_init(vnd_pnsd_t *nsp)
 	nsp->vpnd_token_in_v4 = net_event_register(nsp->vpnd_neti_v4,
 	    &nsp->vpnd_event_in_v4);
 	if (nsp->vpnd_token_in_v4 == NULL) {
-		net_family_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_family_v4);
-		net_family_unregister(nsp->vpnd_neti_v6, &nsp->vpnd_family_v6);
-		net_protocol_unregister(nsp->vpnd_neti_v4);
-		net_protocol_unregister(nsp->vpnd_neti_v6);
+		(void) net_family_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_family_v4);
+		(void) net_family_unregister(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_family_v6);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v4);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v6);
 		cmn_err(CE_NOTE, "vnd_netinfo_init: net_event_register "
 		    "failed for stack %d", nsp->vpnd_nsid);
 		return (1);
@@ -2944,12 +2960,16 @@ vnd_netinfo_init(vnd_pnsd_t *nsp)
 	nsp->vpnd_token_in_v6 = net_event_register(nsp->vpnd_neti_v6,
 	    &nsp->vpnd_event_in_v6);
 	if (nsp->vpnd_token_in_v6 == NULL) {
-		net_event_shutdown(nsp->vpnd_neti_v4, &nsp->vpnd_event_in_v4);
-		net_event_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_event_in_v4);
-		net_family_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_family_v4);
-		net_family_unregister(nsp->vpnd_neti_v6, &nsp->vpnd_family_v6);
-		net_protocol_unregister(nsp->vpnd_neti_v4);
-		net_protocol_unregister(nsp->vpnd_neti_v6);
+		(void) net_event_shutdown(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_event_in_v4);
+		(void) net_event_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_event_in_v4);
+		(void) net_family_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_family_v4);
+		(void) net_family_unregister(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_family_v6);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v4);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v6);
 		cmn_err(CE_NOTE, "vnd_netinfo_init: net_event_register "
 		    "failed for stack %d", nsp->vpnd_nsid);
 		return (1);
@@ -2963,14 +2983,20 @@ vnd_netinfo_init(vnd_pnsd_t *nsp)
 	nsp->vpnd_token_out_v4 = net_event_register(nsp->vpnd_neti_v4,
 	    &nsp->vpnd_event_out_v4);
 	if (nsp->vpnd_token_out_v4 == NULL) {
-		net_event_shutdown(nsp->vpnd_neti_v6, &nsp->vpnd_event_in_v6);
-		net_event_unregister(nsp->vpnd_neti_v6, &nsp->vpnd_event_in_v6);
-		net_event_shutdown(nsp->vpnd_neti_v4, &nsp->vpnd_event_in_v4);
-		net_event_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_event_in_v4);
-		net_family_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_family_v4);
-		net_family_unregister(nsp->vpnd_neti_v6, &nsp->vpnd_family_v6);
-		net_protocol_unregister(nsp->vpnd_neti_v4);
-		net_protocol_unregister(nsp->vpnd_neti_v6);
+		(void) net_event_shutdown(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_event_in_v6);
+		(void) net_event_unregister(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_event_in_v6);
+		(void) net_event_shutdown(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_event_in_v4);
+		(void) net_event_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_event_in_v4);
+		(void) net_family_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_family_v4);
+		(void) net_family_unregister(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_family_v6);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v4);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v6);
 		cmn_err(CE_NOTE, "vnd_netinfo_init: net_event_register "
 		    "failed for stack %d", nsp->vpnd_nsid);
 		return (1);
@@ -2984,16 +3010,24 @@ vnd_netinfo_init(vnd_pnsd_t *nsp)
 	nsp->vpnd_token_out_v6 = net_event_register(nsp->vpnd_neti_v6,
 	    &nsp->vpnd_event_out_v6);
 	if (nsp->vpnd_token_out_v6 == NULL) {
-		net_event_shutdown(nsp->vpnd_neti_v6, &nsp->vpnd_event_in_v6);
-		net_event_unregister(nsp->vpnd_neti_v6, &nsp->vpnd_event_in_v6);
-		net_event_shutdown(nsp->vpnd_neti_v6, &nsp->vpnd_event_in_v6);
-		net_event_unregister(nsp->vpnd_neti_v6, &nsp->vpnd_event_in_v6);
-		net_event_shutdown(nsp->vpnd_neti_v4, &nsp->vpnd_event_in_v4);
-		net_event_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_event_in_v4);
-		net_family_unregister(nsp->vpnd_neti_v4, &nsp->vpnd_family_v4);
-		net_family_unregister(nsp->vpnd_neti_v6, &nsp->vpnd_family_v6);
-		net_protocol_unregister(nsp->vpnd_neti_v4);
-		net_protocol_unregister(nsp->vpnd_neti_v6);
+		(void) net_event_shutdown(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_event_in_v6);
+		(void) net_event_unregister(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_event_in_v6);
+		(void) net_event_shutdown(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_event_in_v6);
+		(void) net_event_unregister(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_event_in_v6);
+		(void) net_event_shutdown(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_event_in_v4);
+		(void) net_event_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_event_in_v4);
+		(void) net_family_unregister(nsp->vpnd_neti_v4,
+		    &nsp->vpnd_family_v4);
+		(void) net_family_unregister(nsp->vpnd_neti_v6,
+		    &nsp->vpnd_family_v6);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v4);
+		(void) net_protocol_unregister(nsp->vpnd_neti_v6);
 		cmn_err(CE_NOTE, "vnd_netinfo_init: net_event_register "
 		    "failed for stack %d", nsp->vpnd_nsid);
 		return (1);
@@ -3040,6 +3074,7 @@ vnd_netinfo_fini(vnd_pnsd_t *nsp)
 	VERIFY(ret == 0);
 }
 
+/* ARGSUSED */
 static void
 vnd_strbarrier_cb(void *arg, mblk_t *bmp, gsqueue_t *gsp, void *dummy)
 {
@@ -3141,6 +3176,7 @@ vnd_s_rput(queue_t *q, mblk_t *mp)
 	return (0);
 }
 
+/* ARGSUSED */
 static void
 vnd_strioctl(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct iocblk *iocp)
 {
@@ -3193,7 +3229,6 @@ nak:
 static void
 vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 {
-	int error;
 	vnd_str_state_t state;
 	struct copyreq *crp;
 	vnd_strioc_associate_t *vss;
@@ -3236,14 +3271,12 @@ vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 	vss = (vnd_strioc_associate_t *)mp->b_cont->b_rptr;
 	vdp = vnd_dev_lookup(vss->vsa_minor);
 	if (vdp == NULL) {
-		error = EIO;
 		vss->vsa_errno = VND_E_NODEV;
 		goto nak;
 	}
 
 	nsp = vnd_nsd_lookup(vss->vsa_nsid);
 	if (nsp == NULL) {
-		error = EIO;
 		vss->vsa_errno = VND_E_NONETSTACK;
 		goto nak;
 	}
@@ -3251,7 +3284,6 @@ vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 	mutex_enter(&vsp->vns_lock);
 	if (!(vsp->vns_flags & VNS_F_NEED_ZONE)) {
 		mutex_exit(&vsp->vns_lock);
-		error = EEXIST;
 		vss->vsa_errno = VND_E_ASSOCIATED;
 		goto nak;
 	}
@@ -3274,7 +3306,6 @@ vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 
 	if (state == VNS_S_ZOMBIE) {
 		vss->vsa_errno = vsp->vns_errno;
-		error = EIO;
 		goto nak;
 	}
 
@@ -3291,7 +3322,6 @@ vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 	    KSTAT_TYPE_NAMED, sizeof (vnd_str_stat_t) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL, GLOBAL_ZONEID);
 	if (vsp->vns_kstat == NULL) {
-		error = EIO;
 		vss->vsa_errno = VND_E_KSTATCREATE;
 		mutex_exit(&vsp->vns_lock);
 		mutex_exit(&vdp->vdd_lock);
@@ -3306,7 +3336,6 @@ vnd_striocdata(queue_t *q, vnd_str_t *vsp, mblk_t *mp, struct copyresp *csp)
 	 * should make sure that we're ready.
 	 */
 	if (vnd_dld_cap_enable(vsp, vnd_mac_input) != 0) {
-		error = EIO;
 		vss->vsa_errno = VND_E_DIRECTFAIL;
 		vdp->vdd_str = NULL;
 		vsp->vns_dev = NULL;
@@ -3418,6 +3447,7 @@ vnd_s_wput(queue_t *q, mblk_t *mp)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 vnd_s_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 {
@@ -3512,6 +3542,7 @@ vnd_s_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 vnd_s_close(queue_t *q, int flag, cred_t *credp)
 {
@@ -3642,6 +3673,7 @@ vnd_squeue_tx_one(vnd_str_t *vsp, mblk_t *mp)
 	return (vc);
 }
 
+/* ARGSUSED */
 static void
 vnd_squeue_tx_drain(void *arg, mblk_t *drain_mp, gsqueue_t *gsp, void *dummy)
 {
@@ -3725,6 +3757,7 @@ vnd_squeue_tx_drain(void *arg, mblk_t *drain_mp, gsqueue_t *gsp, void *dummy)
 	}
 }
 
+/* ARGSUSED */
 static void
 vnd_squeue_tx_append(void *arg, mblk_t *mp, gsqueue_t *gsp, void *dummy)
 {
@@ -4244,7 +4277,7 @@ vnd_ioctl_setrxbuf(vnd_dev_t *vdp, intptr_t arg, int cpflag)
 
 	mutex_exit(&vdp->vdd_str->vns_lock);
 	mutex_enter(&vdp->vdd_str->vns_dq_read.vdq_lock);
-	vdp->vdd_str->vns_dq_read.vdq_max = vib.vib_size;
+	vdp->vdd_str->vns_dq_read.vdq_max = (size_t)vib.vib_size;
 	mutex_exit(&vdp->vdd_str->vns_dq_read.vdq_lock);
 	mutex_exit(&vdp->vdd_lock);
 	ret = 0;
@@ -4283,6 +4316,7 @@ err:
 	return (ret);
 }
 
+/* ARGSUSED */
 static int
 vnd_ioctl_getmaxbuf(vnd_dev_t *vdp, intptr_t arg, int cpflag)
 {
@@ -4362,7 +4396,7 @@ vnd_ioctl_settxbuf(vnd_dev_t *vdp, intptr_t arg, int cpflag)
 	mutex_exit(&vdp->vdd_str->vns_lock);
 
 	mutex_enter(&vdp->vdd_str->vns_dq_write.vdq_lock);
-	vdp->vdd_str->vns_dq_write.vdq_max = vib.vib_size;
+	vdp->vdd_str->vns_dq_write.vdq_max = (size_t)vib.vib_size;
 	mutex_exit(&vdp->vdd_str->vns_dq_write.vdq_lock);
 	mutex_exit(&vdp->vdd_lock);
 	ret = 0;
@@ -4658,6 +4692,7 @@ vnd_ioctl_list(intptr_t arg, cred_t *credp, int mode)
 }
 
 
+/* ARGSUSED */
 static int
 vnd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
@@ -4894,6 +4929,7 @@ vnd_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 vnd_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
@@ -4921,6 +4957,7 @@ vnd_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 vnd_read(dev_t dev, struct uio *uiop, cred_t *credp)
 {
@@ -4998,6 +5035,7 @@ err:
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 vnd_write(dev_t dev, struct uio *uiop, cred_t *credp)
 {
@@ -5086,7 +5124,7 @@ static int
 vnd_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
     struct pollhead **phpp)
 {
-	int ready = 0;
+	short ready = 0;
 	vnd_dev_t *vdp;
 	vnd_data_queue_t *vqp;
 
@@ -5126,6 +5164,7 @@ vnd_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	return (0);
 }
 
+/* ARGSUSED */
 static void *
 vnd_stack_init(netstackid_t stackid, netstack_t *ns)
 {
@@ -5149,6 +5188,7 @@ vnd_stack_init(netstackid_t stackid, netstack_t *ns)
 	return (nsp);
 }
 
+/* ARGSUSED */
 static void
 vnd_stack_shutdown(netstackid_t stackid, void *arg)
 {
@@ -5222,6 +5262,7 @@ restart:
 	mutex_exit(&nsp->vpnd_lock);
 }
 
+/* ARGSUSED */
 static void
 vnd_stack_destroy(netstackid_t stackid, void *arg)
 {
@@ -5359,6 +5400,7 @@ vnd_sdev_validate(sdev_ctx_t ctx)
  * This function is a no-op. sdev never has holds on our devices as they can go
  * away at any time and specfs has to deal with that fact.
  */
+/* ARGSUSED */
 static void
 vnd_sdev_inactive(sdev_ctx_t ctx)
 {
@@ -5540,6 +5582,7 @@ vnd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+/* ARGSUSED */
 static int
 vnd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
@@ -5556,6 +5599,7 @@ vnd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_FAILURE);
 }
 
+/* ARGSUSED */
 static int
 vnd_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {

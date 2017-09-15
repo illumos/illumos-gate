@@ -22,7 +22,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/file.h>
@@ -942,5 +942,5 @@ ksocket_krecv_set(ksocket_t ks, ksocket_krecv_f cb, void *arg)
 void
 ksocket_krecv_unblock(ksocket_t ks)
 {
-	return (so_krecv_unblock(KSTOSO(ks)));
+	so_krecv_unblock(KSTOSO(ks));
 }

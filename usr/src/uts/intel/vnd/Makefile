@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2017 Joyent, Inc.
 #
 
 UTSBASE	= ../..
@@ -21,6 +21,8 @@ LINTS		= $(VND_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 include $(UTSBASE)/intel/Makefile.intel
+
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
