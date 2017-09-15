@@ -2071,6 +2071,7 @@ file path=opt/SUNWdtrt/tst/common/usdt/tst.args.d mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.args.exe mode=0555
 file path=opt/SUNWdtrt/tst/common/usdt/tst.badguess.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.corruptenv.ksh mode=0444
+file path=opt/SUNWdtrt/tst/common/usdt/tst.deadstub.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose1.ksh mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose1.ksh.out mode=0444
 file path=opt/SUNWdtrt/tst/common/usdt/tst.dlclose2.ksh mode=0444

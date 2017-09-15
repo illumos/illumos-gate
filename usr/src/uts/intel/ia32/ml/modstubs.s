@@ -143,7 +143,7 @@ fcnname/**/_info:							\
 	.long	weak;			/* 0x20 */			\
 	SET_SIZE(fcnname/**/_info)
 
-#define STUB_UNLOADABLE(module, fcnname, install_fcn, retfcn, weak)	\
+#define STUB_NO_UNLOADABLE(module, fcnname, install_fcn, retfcn, weak)	\
 	ENTRY(fcnname);							\
 	leaq	fcnname/**/_info(%rip), %rax;				\
 	testb	$MODS_INSTALLED, MODS_FLAG(%rax); /* installed? */	\
@@ -294,7 +294,7 @@ fcnname/**/_info:							\
 	.long   weak;							\
 	SET_SIZE(fcnname/**/_info)
 	
-#define STUB_UNLOADABLE(module, fcnname, install_fcn, retfcn, weak)	\
+#define STUB_NO_UNLOADABLE(module, fcnname, install_fcn, retfcn, weak)	\
 	ENTRY(fcnname);							\
 	leal	fcnname/**/_info, %eax;					\
 	testb	$MODS_INSTALLED, MODS_FLAG(%eax); /* installed? */	\
@@ -377,13 +377,13 @@ fcnname/**/_info:							\
  * User *MUST* guarantee the module is not unloadable (no _fini routine).
  */
 #define NO_UNLOAD_STUB(module, fcnname, retfcn) \
-    STUB_UNLOADABLE(module, fcnname,  retfcn, retfcn, MODS_NOUNLOAD)
+    STUB_NO_UNLOADABLE(module, fcnname,  retfcn, retfcn, MODS_NOUNLOAD)
 
 /*
  * "weak stub" for non-unloadable module, don't load on account of this call
  */
 #define NO_UNLOAD_WSTUB(module, fcnname, retfcn) \
-    STUB_UNLOADABLE(module, fcnname, retfcn, retfcn, MODS_NOUNLOAD|MODS_WEAK)
+    STUB_NO_UNLOADABLE(module, fcnname, retfcn, retfcn, MODS_NOUNLOAD|MODS_WEAK)
 
 /*
  * this is just a marker for the beginning area of text that contains stubs
@@ -720,9 +720,9 @@ fcnname/**/_info:							\
  */
 #ifndef FIFO_MODULE
 	MODULE(fifofs,fs);
-	STUB(fifofs, fifovp,      	0);
-	STUB(fifofs, fifo_getinfo,	0);
-	STUB(fifofs, fifo_vfastoff,	0);
+	NO_UNLOAD_STUB(fifofs, fifovp,      	nomod_zero);
+	NO_UNLOAD_STUB(fifofs, fifo_getinfo,	nomod_zero);
+	NO_UNLOAD_STUB(fifofs, fifo_vfastoff,	nomod_zero);
 	END_MODULE(fifofs);
 #endif
 
@@ -868,8 +868,8 @@ fcnname/**/_info:							\
  */
 #ifndef SYSACCT_MODULE
 	MODULE(sysacct,sys);
-	WSTUB(sysacct, acct,  		nomod_zero);
-	WSTUB(sysacct, acct_fs_in_use, 	nomod_zero);
+	NO_UNLOAD_WSTUB(sysacct, acct,  		nomod_zero);
+	NO_UNLOAD_WSTUB(sysacct, acct_fs_in_use, 	nomod_zero);
 	END_MODULE(sysacct);
 #endif
 
@@ -878,7 +878,7 @@ fcnname/**/_info:							\
  */
 #ifndef SEMSYS_MODULE
 	MODULE(semsys,sys);
-	WSTUB(semsys, semexit,		nomod_zero);
+	NO_UNLOAD_WSTUB(semsys, semexit,		nomod_zero);
 	END_MODULE(semsys);
 #endif
 
@@ -887,9 +887,9 @@ fcnname/**/_info:							\
  */
 #ifndef SHMSYS_MODULE
 	MODULE(shmsys,sys);
-	WSTUB(shmsys, shmexit,		nomod_zero);
-	WSTUB(shmsys, shmfork,		nomod_zero);
-	WSTUB(shmsys, shmgetid,		nomod_minus_one);
+	NO_UNLOAD_WSTUB(shmsys, shmexit,		nomod_zero);
+	NO_UNLOAD_WSTUB(shmsys, shmfork,		nomod_zero);
+	NO_UNLOAD_WSTUB(shmsys, shmgetid,		nomod_minus_one);
 	END_MODULE(shmsys);
 #endif
 
@@ -898,19 +898,19 @@ fcnname/**/_info:							\
  */
 #ifndef DOOR_MODULE
 	MODULE(doorfs,sys);
-	WSTUB(doorfs, door_slam,			nomod_zero);
-	WSTUB(doorfs, door_exit,			nomod_zero);
-	WSTUB(doorfs, door_revoke_all,			nomod_zero);
-	WSTUB(doorfs, door_fork,			nomod_zero);
+	NO_UNLOAD_WSTUB(doorfs, door_slam,		nomod_zero);
+	NO_UNLOAD_WSTUB(doorfs, door_exit,		nomod_zero);
+	NO_UNLOAD_WSTUB(doorfs, door_revoke_all,	nomod_zero);
+	NO_UNLOAD_WSTUB(doorfs, door_fork,		nomod_zero);
 	NO_UNLOAD_STUB(doorfs, door_upcall,		nomod_einval);
 	NO_UNLOAD_STUB(doorfs, door_ki_create,		nomod_einval);
 	NO_UNLOAD_STUB(doorfs, door_ki_open,		nomod_einval);
 	NO_UNLOAD_STUB(doorfs, door_ki_lookup,		nomod_zero);
-	WSTUB(doorfs, door_ki_upcall,			nomod_einval);
-	WSTUB(doorfs, door_ki_upcall_limited,		nomod_einval);
-	WSTUB(doorfs, door_ki_hold,			nomod_zero);
-	WSTUB(doorfs, door_ki_rele,			nomod_zero);
-	WSTUB(doorfs, door_ki_info,			nomod_einval);
+	NO_UNLOAD_WSTUB(doorfs, door_ki_upcall,		nomod_einval);
+	NO_UNLOAD_WSTUB(doorfs, door_ki_upcall_limited,	nomod_einval);
+	NO_UNLOAD_WSTUB(doorfs, door_ki_hold,		nomod_zero);
+	NO_UNLOAD_WSTUB(doorfs, door_ki_rele,		nomod_zero);
+	NO_UNLOAD_WSTUB(doorfs, door_ki_info,		nomod_einval);
 	END_MODULE(doorfs);
 #endif
 
