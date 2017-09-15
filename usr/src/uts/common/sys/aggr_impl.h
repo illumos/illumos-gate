@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
- * Copyright (c) 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_AGGR_IMPL_H
@@ -56,6 +56,15 @@ extern "C" {
  */
 #define	MAC_PSEUDO_RING_INUSE	0x01
 
+/*
+ * VLAN filters placed on the Rx pseudo group.
+ */
+typedef struct aggr_vlan {
+	list_node_t	av_link;
+	uint16_t	av_vid;		/* VLAN ID */
+	uint_t		av_refs;	/* num aggr clients using this VID */
+} aggr_vlan_t;
+
 typedef struct aggr_unicst_addr_s {
 	uint8_t				aua_addr[ETHERADDRL];
 	struct aggr_unicst_addr_s	*aua_next;
@@ -75,6 +84,8 @@ typedef struct aggr_pseudo_rx_group_s {
 	aggr_unicst_addr_t	*arg_macaddr;
 	aggr_pseudo_rx_ring_t	arg_rings[MAX_RINGS_PER_GROUP];
 	uint_t			arg_ring_cnt;
+	uint_t			arg_untagged; /* num clients untagged */
+	list_t			arg_vlans;    /* VLANs on this group */
 } aggr_pseudo_rx_group_t;
 
 typedef struct aggr_pseudo_tx_ring_s {
@@ -348,6 +359,9 @@ extern void aggr_grp_port_wait(aggr_grp_t *);
 
 extern int aggr_port_addmac(aggr_port_t *, const uint8_t *);
 extern void aggr_port_remmac(aggr_port_t *, const uint8_t *);
+
+extern int aggr_port_addvlan(aggr_port_t *, uint16_t);
+extern int aggr_port_remvlan(aggr_port_t *, uint16_t);
 
 extern mblk_t *aggr_ring_tx(void *, mblk_t *);
 extern mblk_t *aggr_find_tx_ring(void *, mblk_t *,

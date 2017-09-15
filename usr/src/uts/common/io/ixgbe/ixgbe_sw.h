@@ -27,7 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_IXGBE_SW_H
@@ -91,6 +91,8 @@ extern "C" {
 
 #define	MAX_NUM_UNICAST_ADDRESSES 	0x80
 #define	MAX_NUM_MULTICAST_ADDRESSES 	0x1000
+#define	MAX_NUM_VLAN_FILTERS		0x40
+
 #define	IXGBE_INTR_NONE			0
 #define	IXGBE_INTR_MSIX			1
 #define	IXGBE_INTR_MSI			2
@@ -387,6 +389,15 @@ typedef union ixgbe_ether_addr {
 	} mac;
 } ixgbe_ether_addr_t;
 
+/*
+ * The list of VLANs an Rx group will accept.
+ */
+typedef struct ixgbe_vlan {
+	list_node_t		ixvl_link;
+	uint16_t		ixvl_vid;   /* The VLAN ID */
+	uint_t			ixvl_refs;  /* Number of users of this VLAN */
+} ixgbe_vlan_t;
+
 typedef enum {
 	USE_NONE,
 	USE_COPY,
@@ -589,6 +600,7 @@ typedef struct ixgbe_rx_ring {
 
 	struct ixgbe		*ixgbe;		/* Pointer to ixgbe struct */
 } ixgbe_rx_ring_t;
+
 /*
  * Software Receive Ring Group
  */
@@ -596,6 +608,8 @@ typedef struct ixgbe_rx_group {
 	uint32_t		index;		/* Group index */
 	mac_group_handle_t	group_handle;   /* call back group handle */
 	struct ixgbe		*ixgbe;		/* Pointer to ixgbe struct */
+	boolean_t		aupe;		/* AUPE bit */
+	list_t			vlans;		/* list of VLANs to allow */
 } ixgbe_rx_group_t;
 
 /*
@@ -662,6 +676,7 @@ typedef struct ixgbe {
 	 */
 	ixgbe_rx_group_t	*rx_groups;	/* Array of rx groups */
 	uint32_t		num_rx_groups;	/* Number of rx groups in use */
+	uint32_t		rx_def_group;	/* Default Rx group index */
 
 	/*
 	 * Transmit Rings
@@ -714,6 +729,9 @@ typedef struct ixgbe {
 	ixgbe_ether_addr_t	unicst_addr[MAX_NUM_UNICAST_ADDRESSES];
 	uint32_t		mcast_count;
 	struct ether_addr	mcast_table[MAX_NUM_MULTICAST_ADDRESSES];
+
+	boolean_t		vlft_enabled; /* VLAN filtering enabled? */
+	boolean_t		vlft_init;    /* VLAN filtering initialized? */
 
 	ulong_t			sys_page_size;
 

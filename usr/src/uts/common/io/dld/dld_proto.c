@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -1410,24 +1410,22 @@ dld_capab_direct(dld_str_t *dsp, void *data, uint_t flags)
 }
 
 /*
- * dld_capab_poll_enable()
+ * This function is misnamed. All polling and fanouts are run out of
+ * the lower MAC for VNICs and out of the MAC for NICs. The
+ * availability of Rx rings and promiscous mode is taken care of
+ * between the soft ring set (mac_srs), the Rx ring, and the SW
+ * classifier. Fanout, if necessary, is done by the soft rings that
+ * are part of the SRS. By default the SRS divvies up the packets
+ * based on protocol: TCP, UDP, or Other (OTH).
  *
- * This function is misnamed. All polling  and fanouts are run out of the
- * lower mac (in case of VNIC and the only mac in case of NICs). The
- * availability of Rx ring and promiscous mode is all taken care between
- * the soft ring set (mac_srs), the Rx ring, and S/W classifier. Any
- * fanout necessary is done by the soft rings that are part of the
- * mac_srs (by default mac_srs sends the packets up via a TCP and
- * non TCP soft ring).
- *
- * The mac_srs (or its associated soft rings) always store the ill_rx_ring
+ * The SRS (or its associated soft rings) always store the ill_rx_ring
  * (the cookie returned when they registered with IP during plumb) as their
  * 2nd argument which is passed up as mac_resource_handle_t. The upcall
  * function and 1st argument is what the caller registered when they
  * called mac_rx_classify_flow_add() to register the flow. For VNIC,
  * the function is vnic_rx and argument is vnic_t. For regular NIC
  * case, it mac_rx_default and mac_handle_t. As explained above, the
- * mac_srs (or its soft ring) will add the ill_rx_ring (mac_resource_handle_t)
+ * SRS (or its soft ring) will add the ill_rx_ring (mac_resource_handle_t)
  * from its stored 2nd argument.
  */
 static int
@@ -1440,11 +1438,11 @@ dld_capab_poll_enable(dld_str_t *dsp, dld_capab_poll_t *poll)
 		return (ENOTSUP);
 
 	/*
-	 * Enable client polling if and only if DLS bypass is possible.
-	 * Special cases like VLANs need DLS processing in the Rx data path.
-	 * In such a case we can neither allow the client (IP) to directly
-	 * poll the softring (since DLS processing hasn't been done) nor can
-	 * we allow DLS bypass.
+	 * Enable client polling if and only if DLS bypass is
+	 * possible. Some traffic requires DLS processing in the Rx
+	 * data path. In such a case we can neither allow the client
+	 * (IP) to directly poll the soft ring (since DLS processing
+	 * hasn't been done) nor can we allow DLS bypass.
 	 */
 	if (!mac_rx_bypass_set(dsp->ds_mch, dsp->ds_rx, dsp->ds_rx_arg))
 		return (ENOTSUP);

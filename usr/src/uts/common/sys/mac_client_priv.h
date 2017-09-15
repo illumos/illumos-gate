@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -144,6 +144,10 @@ extern void mac_hwring_set_default(mac_handle_t, mac_ring_handle_t);
 
 extern int mac_hwgroup_addmac(mac_group_handle_t, const uint8_t *);
 extern int mac_hwgroup_remmac(mac_group_handle_t, const uint8_t *);
+extern int mac_hwgroup_addvlan(mac_group_handle_t, uint16_t);
+extern int mac_hwgroup_remvlan(mac_group_handle_t, uint16_t);
+
+extern boolean_t mac_has_hw_vlan(mac_handle_t);
 
 extern void mac_set_upper_mac(mac_client_handle_t, mac_handle_t,
     mac_resource_props_t *);

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1197,7 +1197,7 @@ mac_srs_fanout_list_alloc(mac_soft_ring_set_t *mac_srs)
 		mac_srs->srs_tx_soft_rings = (mac_soft_ring_t **)
 		    kmem_zalloc(sizeof (mac_soft_ring_t *) *
 		    MAX_RINGS_PER_GROUP, KM_SLEEP);
-		if (mcip->mci_state_flags & MCIS_IS_AGGR) {
+		if (mcip->mci_state_flags & MCIS_IS_AGGR_CLIENT) {
 			mac_srs_tx_t *tx = &mac_srs->srs_tx;
 
 			tx->st_soft_rings = (mac_soft_ring_t **)
@@ -1606,13 +1606,13 @@ mac_srs_update_bwlimit(flow_entry_t *flent, mac_resource_props_t *mrp)
 
 /*
  * When the first sub-flow is added to a link, we disable polling on the
- * link and also modify the entry point to mac_rx_srs_subflow_process.
+ * link and also modify the entry point to mac_rx_srs_subflow_process().
  * (polling is disabled because with the subflow added, accounting
  * for polling needs additional logic, it is assumed that when a subflow is
  * added, we can take some hit as a result of disabling polling rather than
  * adding more complexity - if this becomes a perf. issue we need to
  * re-rvaluate this logic).  When the last subflow is removed, we turn back
- * polling and also reset the entry point to mac_rx_srs_process.
+ * polling and also reset the entry point to mac_rx_srs_process().
  *
  * In the future if there are multiple SRS, we can simply
  * take one and give it to the flow rather than disabling polling and
@@ -1657,7 +1657,7 @@ mac_client_update_classifier(mac_client_impl_t *mcip, boolean_t enable)
 	 * Change the S/W classifier so that we can land in the
 	 * correct processing function with correct argument.
 	 * If all subflows have been removed we can revert to
-	 * mac_rx_srsprocess, else we need mac_rx_srs_subflow_process.
+	 * mac_rx_srs_process(), else we need mac_rx_srs_subflow_process().
 	 */
 	mutex_enter(&flent->fe_lock);
 	flent->fe_cb_fn = (flow_fn_t)rx_func;
@@ -2198,7 +2198,7 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 	 *    find nothing plus we have an existing backlog
 	 *    (sr_poll_pkt_cnt > 0), we stay in polling mode but don't poll
 	 *    the H/W for packets anymore (let the polling thread go to sleep).
-	 * 5) Once the backlog is relived (packets are processed) we reenable
+	 * 5) Once the backlog is relieved (packets are processed) we reenable
 	 *    polling (by signalling the poll thread) only when the backlog
 	 *    dips below sr_poll_thres.
 	 * 6) sr_hiwat is used exclusively when we are not polling capable
@@ -2276,8 +2276,8 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		/*
 		 * Some drivers require serialization and don't send
 		 * packet chains in interrupt context. For such
-		 * drivers, we should always queue in soft ring
-		 * so that we get a chance to switch into a polling
+		 * drivers, we should always queue in the soft ring
+		 * so that we get a chance to switch into polling
 		 * mode under backlog.
 		 */
 		ring_info = mac_hwring_getinfo((mac_ring_handle_t)ring);
@@ -2384,9 +2384,11 @@ mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 }
 
 /*
- * Set up the RX SRSs. If the S/W SRS is not set, set  it up, if there
- * is a group associated with this MAC client, set up SRSs for individual
- * h/w rings.
+ * Set up the Rx SRSes. If there is no group associated with the
+ * client, then only setup SW classification. If the client has
+ * exlusive (MAC_GROUP_STATE_RESERVED) use of the group, then create an
+ * SRS for each HW ring. If the client is sharing a group, then make
+ * sure to teardown the HW SRSes.
  */
 void
 mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
@@ -2397,13 +2399,14 @@ mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	mac_ring_t 		*ring;
 	uint32_t		fanout_type;
 	mac_group_t		*rx_group = flent->fe_rx_ring_group;
+	boolean_t		no_unicast;
 
 	fanout_type = mac_find_fanout(flent, link_type);
+	no_unicast = (mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR) != 0;
 
-	/* Create the SRS for S/W classification if none exists */
+	/* Create the SRS for SW classification if none exists */
 	if (flent->fe_rx_srs[0] == NULL) {
 		ASSERT(flent->fe_rx_srs_cnt == 0);
-		/* Setup the Rx SRS */
 		mac_srs = mac_srs_create(mcip, flent, fanout_type | link_type,
 		    mac_rx_deliver, mcip, NULL, NULL);
 		mutex_enter(&flent->fe_lock);
@@ -2415,15 +2418,17 @@ mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 
 	if (rx_group == NULL)
 		return;
+
 	/*
-	 * fanout for default SRS is done when default SRS are created
-	 * above. As each ring is added to the group, we setup the
-	 * SRS and fanout to it.
+	 * If the group is marked RESERVED then setup an SRS and
+	 * fanout for each HW ring.
 	 */
 	switch (rx_group->mrg_state) {
 	case MAC_GROUP_STATE_RESERVED:
 		for (ring = rx_group->mrg_rings; ring != NULL;
 		    ring = ring->mr_next) {
+			uint16_t vid = i_mac_flow_vid(mcip->mci_flent);
+
 			switch (ring->mr_state) {
 			case MR_INUSE:
 			case MR_FREE:
@@ -2433,20 +2438,23 @@ mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 					(void) mac_start_ring(ring);
 
 				/*
-				 * Since the group is exclusively ours create
-				 * an SRS for this ring to allow the
-				 * individual SRS to dynamically poll the
-				 * ring. Do this only if the  client is not
-				 * a VLAN MAC client, since for VLAN we do
-				 * s/w classification for the VID check, and
-				 * if it has a unicast address.
+				 * If a client requires SW VLAN
+				 * filtering or has no unicast address
+				 * then we don't create any HW ring
+				 * SRSes.
 				 */
-				if ((mcip->mci_state_flags &
-				    MCIS_NO_UNICAST_ADDR) ||
-				    i_mac_flow_vid(mcip->mci_flent) !=
-				    VLAN_ID_NONE) {
+				if ((!MAC_GROUP_HW_VLAN(rx_group) &&
+				    vid != VLAN_ID_NONE) || no_unicast)
 					break;
-				}
+
+				/*
+				 * When a client has exclusive use of
+				 * a group, and that group's traffic
+				 * is fully HW classified, we create
+				 * an SRS for each HW ring in order to
+				 * make use of dynamic polling of said
+				 * HW rings.
+				 */
 				mac_srs = mac_srs_create(mcip, flent,
 				    fanout_type | link_type,
 				    mac_rx_deliver, mcip, NULL, ring);
@@ -2462,14 +2470,9 @@ mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		break;
 	case MAC_GROUP_STATE_SHARED:
 		/*
-		 * Set all rings of this group to software classified.
-		 *
-		 * If the group is current RESERVED, the existing mac
-		 * client (the only client on this group) is using
-		 * this group exclusively.  In that case we need to
-		 * disable polling on the rings of the group (if it
-		 * was enabled), and free the SRS associated with the
-		 * rings.
+		 * When a group is shared by multiple clients, we must
+		 * use SW classifiction to ensure packets are
+		 * delivered to the correct client.
 		 */
 		mac_rx_switch_grp_to_sw(rx_group);
 		break;
@@ -2522,10 +2525,11 @@ mac_tx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 }
 
 /*
- * Remove all the RX SRSs. If we want to remove only the SRSs associated
- * with h/w rings, leave the S/W SRS alone. This is used when we want to
- * move the MAC client from one group to another, so we need to teardown
- * on the h/w SRSs.
+ * Teardown all the Rx SRSes. Unless hwonly is set, then only teardown
+ * the Rx HW SRSes and leave the SW SRS alone. The hwonly flag is set
+ * when we wish to move a MAC client from one group to another. In
+ * that case, we need to release the current HW SRSes but keep the SW
+ * SRS for continued traffic classifiction.
  */
 void
 mac_rx_srs_group_teardown(flow_entry_t *flent, boolean_t hwonly)
@@ -2543,8 +2547,16 @@ mac_rx_srs_group_teardown(flow_entry_t *flent, boolean_t hwonly)
 		flent->fe_rx_srs[i] = NULL;
 		flent->fe_rx_srs_cnt--;
 	}
-	ASSERT(!hwonly || flent->fe_rx_srs_cnt == 1);
-	ASSERT(hwonly || flent->fe_rx_srs_cnt == 0);
+
+	/*
+	 * If we are only tearing down the HW SRSes then there must be
+	 * one SRS left for SW classification. Otherwise we are tearing
+	 * down both HW and SW and there should be no SRSes left.
+	 */
+	if (hwonly)
+		VERIFY3S(flent->fe_rx_srs_cnt, ==, 1);
+	else
+		VERIFY3S(flent->fe_rx_srs_cnt, ==, 0);
 }
 
 /*
@@ -2846,6 +2858,7 @@ mac_group_next_state(mac_group_t *grp, mac_client_impl_t **group_only_mcip,
  * even if this is the only client in the default group, we will
  * leave group as shared).
  */
+
 int
 mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
     uint32_t link_type)
@@ -2857,6 +2870,7 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	mac_group_t		*default_tgroup;
 	int			err;
 	uint8_t 		*mac_addr;
+	uint16_t		vid;
 	mac_group_state_t	next_state;
 	mac_client_impl_t	*group_only_mcip;
 	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
@@ -2868,6 +2882,7 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	boolean_t		no_unicast;
 	boolean_t		isprimary = flent->fe_type & FLOW_PRIMARY_MAC;
 	mac_client_impl_t	*reloc_pmcip = NULL;
+	boolean_t		use_hw;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
@@ -2899,15 +2914,19 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		    (mrp->mrp_mask & MRP_TXRINGS_UNSPEC));
 
 		/*
-		 * By default we have given the primary all the rings
-		 * i.e. the default group. Let's see if the primary
-		 * needs to be relocated so that the addition of this
-		 * client doesn't impact the primary's performance,
-		 * i.e. if the primary is in the default group and
-		 * we add this client, the primary will lose polling.
-		 * We do this only for NICs supporting dynamic ring
-		 * grouping and only when this is the first client
-		 * after the primary (i.e. nactiveclients is 2)
+		 * All the rings initially belong to the default group
+		 * under dynamic grouping. The primary client uses the
+		 * default group when it is the only client. The
+		 * default group is also used as the destination for
+		 * all multicast and broadcast traffic of all clients.
+		 * Therefore, the primary client loses its ability to
+		 * poll the softrings on addition of a second client.
+		 * To avoid a performance penalty, MAC will move the
+		 * primary client to a dedicated group when it can.
+		 *
+		 * When using static grouping, the primary client
+		 * begins life on a non-default group. There is
+		 * no moving needed upon addition of a second client.
 		 */
 		if (!isprimary && mip->mi_nactiveclients == 2 &&
 		    (group_only_mcip = mac_primary_client_handle(mip)) !=
@@ -2915,6 +2934,7 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 			reloc_pmcip = mac_check_primary_relocation(
 			    group_only_mcip, rxhw);
 		}
+
 		/*
 		 * Check to see if we can get an exclusive group for
 		 * this mac address or if there already exists a
@@ -2928,6 +2948,26 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		} else if (rgroup == NULL) {
 			rgroup = default_rgroup;
 		}
+
+		/*
+		 * If we are adding a second client to a
+		 * non-default group then we need to move the
+		 * existing client to the default group and
+		 * add the new client to the default group as
+		 * well.
+		 */
+		if (rgroup != default_rgroup &&
+		    rgroup->mrg_state == MAC_GROUP_STATE_RESERVED) {
+			group_only_mcip = MAC_GROUP_ONLY_CLIENT(rgroup);
+			err = mac_rx_switch_group(group_only_mcip, rgroup,
+			    default_rgroup);
+
+			if (err != 0)
+				goto setup_failed;
+
+			rgroup = default_rgroup;
+		}
+
 		/*
 		 * Check to see if we can get an exclusive group for
 		 * this mac client. If no groups are available, use
@@ -2959,14 +2999,17 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 					    rgroup->mrg_cur_count);
 				}
 			}
+
 			flent->fe_rx_ring_group = rgroup;
 			/*
-			 * Add the client to the group. This could cause
-			 * either this group to move to the shared state or
-			 * cause the default group to move to the shared state.
-			 * The actions on this group are done here, while the
-			 * actions on the default group are postponed to
-			 * the end of this function.
+			 * Add the client to the group and update the
+			 * group's state. If rgroup != default_group
+			 * then the rgroup should only ever have one
+			 * client and be in the RESERVED state. But no
+			 * matter what, the default_rgroup will enter
+			 * the SHARED state since it has to receive
+			 * all broadcast and multicast traffic. This
+			 * case is handled later in the function.
 			 */
 			mac_group_add_client(rgroup, mcip);
 			next_state = mac_group_next_state(rgroup,
@@ -2991,28 +3034,37 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 			    &group_only_mcip, default_tgroup, B_FALSE);
 			tgroup->mrg_state = next_state;
 		}
-		/*
-		 * Setup the Rx and Tx SRSes. If we got a pristine group
-		 * exclusively above, mac_srs_group_setup would simply create
-		 * the required SRSes. If we ended up sharing a previously
-		 * reserved group, mac_srs_group_setup would also dismantle the
-		 * SRSes of the previously exclusive group
-		 */
-		mac_srs_group_setup(mcip, flent, link_type);
 
 		/* We are setting up minimal datapath only */
-		if (no_unicast)
+		if (no_unicast) {
+			mac_srs_group_setup(mcip, flent, link_type);
 			break;
-		/* Program the S/W Classifer */
+		}
+
+		/* Program software classification. */
 		if ((err = mac_flow_add(mip->mi_flow_tab, flent)) != 0)
 			goto setup_failed;
 
-		/* Program the H/W Classifier */
-		if ((err = mac_add_macaddr(mip, rgroup, mac_addr,
-		    (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0)) != 0)
+		/* Program hardware classification. */
+		vid = i_mac_flow_vid(flent);
+		use_hw = (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0;
+		err = mac_add_macaddr_vlan(mip, rgroup, mac_addr, vid, use_hw);
+
+		if (err != 0)
 			goto setup_failed;
+
 		mcip->mci_unicast = mac_find_macaddr(mip, mac_addr);
-		ASSERT(mcip->mci_unicast != NULL);
+		VERIFY3P(mcip->mci_unicast, !=, NULL);
+
+		/*
+		 * Setup the Rx and Tx SRSes. If the client has a
+		 * reserved group, then mac_srs_group_setup() creates
+		 * the required SRSes for the HW rings. If we have a
+		 * shared group, mac_srs_group_setup() dismantles the
+		 * HW SRSes of the previously exclusive group.
+		 */
+		mac_srs_group_setup(mcip, flent, link_type);
+
 		/* (Re)init the v6 token & local addr used by link protection */
 		mac_protect_update_mac_token(mcip);
 		break;
@@ -3056,17 +3108,23 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 			ASSERT(default_rgroup->mrg_state ==
 			    MAC_GROUP_STATE_SHARED);
 		}
+
 		/*
-		 * If we get an exclusive group for a VLAN MAC client we
-		 * need to take the s/w path to make the additional check for
-		 * the vid. Disable polling and set it to s/w classification.
-		 * Similarly for clients that don't have a unicast address.
+		 * A VLAN MAC client on a reserved group still
+		 * requires SW classification if the MAC doesn't
+		 * provide VLAN HW filtering.
+		 *
+		 * Clients with no unicast address also require SW
+		 * classification.
 		 */
 		if (rgroup->mrg_state == MAC_GROUP_STATE_RESERVED &&
-		    (i_mac_flow_vid(flent) != VLAN_ID_NONE || no_unicast)) {
+		    ((!MAC_GROUP_HW_VLAN(rgroup) && vid != VLAN_ID_NONE) ||
+		    no_unicast)) {
 			mac_rx_switch_grp_to_sw(rgroup);
 		}
+
 	}
+
 	mac_set_rings_effective(mcip);
 	return (0);
 
@@ -3092,6 +3150,7 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 	boolean_t		check_default_group = B_FALSE;
 	mac_group_state_t	next_state;
 	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	uint16_t		vid;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
@@ -3104,16 +3163,24 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 	case SRST_LINK:
 		/* Stop sending packets */
 		mac_tx_client_block(mcip);
+		group = flent->fe_rx_ring_group;
+		vid = i_mac_flow_vid(flent);
 
-		/* Stop the packets coming from the H/W */
+		/*
+		 * Stop the packet flow from the hardware by disabling
+		 * any hardware filters assigned to this client.
+		 */
 		if (mcip->mci_unicast != NULL) {
 			int err;
-			err = mac_remove_macaddr(mcip->mci_unicast);
+
+			err = mac_remove_macaddr_vlan(mcip->mci_unicast, vid);
+
 			if (err != 0) {
-				cmn_err(CE_WARN, "%s: failed to remove a MAC"
-				    " address because of error 0x%x",
+				cmn_err(CE_WARN, "%s: failed to remove a MAC HW"
+				    " filters because of error 0x%x",
 				    mip->mi_name, err);
 			}
+
 			mcip->mci_unicast = NULL;
 		}
 
@@ -3134,17 +3201,17 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 		 * left who can use it exclusively. Also, if we
 		 * were the last client, release the group.
 		 */
-		group = flent->fe_rx_ring_group;
 		default_group = MAC_DEFAULT_RX_GROUP(mip);
 		if (group != NULL) {
 			mac_group_remove_client(group, mcip);
 			next_state = mac_group_next_state(group,
 			    &grp_only_mcip, default_group, B_TRUE);
+
 			if (next_state == MAC_GROUP_STATE_RESERVED) {
 				/*
 				 * Only one client left on this RX group.
 				 */
-				ASSERT(grp_only_mcip != NULL);
+				VERIFY3P(grp_only_mcip, !=, NULL);
 				mac_set_group_state(group,
 				    MAC_GROUP_STATE_RESERVED);
 				group_only_flent = grp_only_mcip->mci_flent;
@@ -3169,7 +3236,7 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 				 * to see if the primary client can get
 				 * exclusive access to the default group.
 				 */
-				ASSERT(group != MAC_DEFAULT_RX_GROUP(mip));
+				VERIFY3P(group, !=, MAC_DEFAULT_RX_GROUP(mip));
 				if (mrp->mrp_mask & MRP_RX_RINGS) {
 					MAC_RX_GRP_RELEASED(mip);
 					if (mip->mi_rx_group_type ==
@@ -3183,7 +3250,8 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 				    MAC_GROUP_STATE_REGISTERED);
 				check_default_group = B_TRUE;
 			} else {
-				ASSERT(next_state == MAC_GROUP_STATE_SHARED);
+				VERIFY3S(next_state, ==,
+				    MAC_GROUP_STATE_SHARED);
 				mac_set_group_state(group,
 				    MAC_GROUP_STATE_SHARED);
 				mac_rx_group_unmark(group, MR_CONDEMNED);
@@ -3272,12 +3340,12 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 	 */
 	if (check_default_group) {
 		default_group = MAC_DEFAULT_RX_GROUP(mip);
-		ASSERT(default_group->mrg_state == MAC_GROUP_STATE_SHARED);
+		VERIFY3S(default_group->mrg_state, ==, MAC_GROUP_STATE_SHARED);
 		next_state = mac_group_next_state(default_group,
 		    &grp_only_mcip, default_group, B_TRUE);
 		if (next_state == MAC_GROUP_STATE_RESERVED) {
-			ASSERT(grp_only_mcip != NULL &&
-			    mip->mi_nactiveclients == 1);
+			VERIFY3P(grp_only_mcip, !=, NULL);
+			VERIFY3U(mip->mi_nactiveclients, ==, 1);
 			mac_set_group_state(default_group,
 			    MAC_GROUP_STATE_RESERVED);
 			mac_rx_srs_group_setup(grp_only_mcip,
@@ -3801,7 +3869,7 @@ mac_tx_srs_del_ring(mac_soft_ring_set_t *mac_srs, mac_ring_t *tx_ring)
 	 * is also stored in st_soft_rings[] array. That entry should
 	 * be removed.
 	 */
-	if (mcip->mci_state_flags & MCIS_IS_AGGR) {
+	if (mcip->mci_state_flags & MCIS_IS_AGGR_CLIENT) {
 		mac_srs_tx_t *tx = &mac_srs->srs_tx;
 
 		ASSERT(tx->st_soft_rings[tx_ring->mr_index] == remove_sring);
@@ -3830,7 +3898,7 @@ mac_tx_srs_setup(mac_client_impl_t *mcip, flow_entry_t *flent)
 	boolean_t		is_aggr;
 	uint_t			ring_info = 0;
 
-	is_aggr = (mcip->mci_state_flags & MCIS_IS_AGGR) != 0;
+	is_aggr = (mcip->mci_state_flags & MCIS_IS_AGGR_CLIENT) != 0;
 	grp = flent->fe_tx_ring_group;
 	if (grp == NULL) {
 		ring = (mac_ring_t *)mip->mi_default_tx_ring;

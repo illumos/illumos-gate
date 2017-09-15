@@ -321,15 +321,16 @@ static s32 ixgbe_mta_vector(struct ixgbe_hw *hw, u8 *mc_addr)
 	return vector;
 }
 
-static void ixgbevf_write_msg_read_ack(struct ixgbe_hw *hw,
-					u32 *msg, u16 size)
+static s32 ixgbevf_write_msg_read_ack(struct ixgbe_hw *hw, u32 *msg,
+				      u32 *retmsg, u16 size)
 {
 	struct ixgbe_mbx_info *mbx = &hw->mbx;
-	u32 retmsg[IXGBE_VFMAILBOX_SIZE];
 	s32 retval = mbx->ops.write_posted(hw, msg, size, 0);
 
-	if (!retval)
-		mbx->ops.read_posted(hw, retmsg, size, 0);
+	if (retval)
+		return retval;
+
+	return mbx->ops.read_posted(hw, retmsg, size, 0);
 }
 
 /**
@@ -415,29 +416,29 @@ s32 ixgbe_update_mc_addr_list_vf(struct ixgbe_hw *hw, u8 *mc_addr_list,
 	return mbx->ops.write_posted(hw, msgbuf, IXGBE_VFMAILBOX_SIZE, 0);
 }
 
-/**
+/*
  *  ixgbe_set_vfta_vf - Set/Unset vlan filter table address
  *  @hw: pointer to the HW structure
  *  @vlan: 12 bit VLAN ID
  *  @vind: unused by VF drivers
  *  @vlan_on: if TRUE then set bit, else clear bit
+ *  @vlvf_bypass: boolean flag indicating updating default pool is okay
+ *
+ *  Turn on/off specified VLAN in the VLAN filter table.
  **/
-s32 ixgbe_set_vfta_vf(struct ixgbe_hw *hw, u32 vlan, u32 vind, bool vlan_on)
+s32 ixgbe_set_vfta_vf(struct ixgbe_hw *hw, u32 vlan, u32 vind,
+		      bool vlan_on, bool vlvf_bypass)
 {
-	struct ixgbe_mbx_info *mbx = &hw->mbx;
 	u32 msgbuf[2];
 	s32 ret_val;
-	UNREFERENCED_1PARAMETER(vind);
+	UNREFERENCED_2PARAMETER(vind, vlvf_bypass);
 
 	msgbuf[0] = IXGBE_VF_SET_VLAN;
 	msgbuf[1] = vlan;
 	/* Setting the 8 bit field MSG INFO to TRUE indicates "add" */
 	msgbuf[0] |= vlan_on << IXGBE_VT_MSGINFO_SHIFT;
 
-	ret_val = mbx->ops.write_posted(hw, msgbuf, 2, 0);
-	if (!ret_val)
-		ret_val = mbx->ops.read_posted(hw, msgbuf, 1, 0);
-
+	ret_val = ixgbevf_write_msg_read_ack(hw, msgbuf, msgbuf, 2);
 	if (!ret_val && (msgbuf[0] & IXGBE_VT_MSGTYPE_ACK))
 		return IXGBE_SUCCESS;
 
@@ -628,7 +629,7 @@ void ixgbevf_rlpml_set_vf(struct ixgbe_hw *hw, u16 max_size)
 
 	msgbuf[0] = IXGBE_VF_SET_LPE;
 	msgbuf[1] = max_size;
-	ixgbevf_write_msg_read_ack(hw, msgbuf, 2);
+	ixgbevf_write_msg_read_ack(hw, msgbuf, msgbuf, 2);
 }
 
 /**

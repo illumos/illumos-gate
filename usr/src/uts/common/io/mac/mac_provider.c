@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -57,6 +57,7 @@
 #include <sys/sdt.h>
 #include <sys/pattr.h>
 #include <sys/strsun.h>
+#include <sys/vlan.h>
 
 /*
  * MAC Provider Interface.

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -460,7 +460,7 @@ mac_init(void)
 	mac_logging_interval = 20;
 	mac_flow_log_enable = B_FALSE;
 	mac_link_log_enable = B_FALSE;
-	mac_logging_timer = 0;
+	mac_logging_timer = NULL;
 
 	/* Register to be notified of noteworthy pools events */
 	mac_pool_event_reg.pec_func =  mac_pool_event_cb;
@@ -1115,9 +1115,10 @@ mac_start(mac_handle_t mh)
 
 		if ((defgrp = MAC_DEFAULT_RX_GROUP(mip)) != NULL) {
 			/*
-			 * Start the default ring, since it will be needed
-			 * to receive broadcast and multicast traffic for
-			 * both primary and non-primary MAC clients.
+			 * Start the default group which is responsible
+			 * for receiving broadcast and multicast
+			 * traffic for both primary and non-primary
+			 * MAC clients.
 			 */
 			ASSERT(defgrp->mrg_state == MAC_GROUP_STATE_REGISTERED);
 			err = mac_start_group_and_rings(defgrp);
@@ -1727,6 +1728,47 @@ mac_hwgroup_remmac(mac_group_handle_t gh, const uint8_t *addr)
 	mac_group_t *group = (mac_group_t *)gh;
 
 	return (mac_group_remmac(group, addr));
+}
+
+/*
+ * Program the group's HW VLAN filter if it has such support.
+ * Otherwise, the group will implicitly accept tagged traffic and
+ * there is nothing to do.
+ */
+int
+mac_hwgroup_addvlan(mac_group_handle_t gh, uint16_t vid)
+{
+	mac_group_t *group = (mac_group_t *)gh;
+
+	if (!MAC_GROUP_HW_VLAN(group))
+		return (0);
+
+	return (mac_group_addvlan(group, vid));
+}
+
+int
+mac_hwgroup_remvlan(mac_group_handle_t gh, uint16_t vid)
+{
+	mac_group_t *group = (mac_group_t *)gh;
+
+	if (!MAC_GROUP_HW_VLAN(group))
+		return (0);
+
+	return (mac_group_remvlan(group, vid));
+}
+
+/*
+ * Determine if a MAC has HW VLAN support. This is a private API
+ * consumed by aggr. In the future it might be nice to have a bitfield
+ * in mac_capab_rings_t to track which forms of HW filtering are
+ * supported by the MAC.
+ */
+boolean_t
+mac_has_hw_vlan(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	return (MAC_GROUP_HW_VLAN(mip->mi_rx_groups));
 }
 
 /*
@@ -2416,7 +2458,6 @@ mac_disable(mac_handle_t mh)
 /*
  * Called when the MAC instance has a non empty flow table, to de-multiplex
  * incoming packets to the right flow.
- * The MAC's rw lock is assumed held as a READER.
  */
 /* ARGSUSED */
 static mblk_t *
@@ -2427,14 +2468,14 @@ mac_rx_classify(mac_impl_t *mip, mac_resource_handle_t mrh, mblk_t *mp)
 	int		err;
 
 	/*
-	 * If the mac is a port of an aggregation, pass FLOW_IGNORE_VLAN
+	 * If the MAC is a port of an aggregation, pass FLOW_IGNORE_VLAN
 	 * to mac_flow_lookup() so that the VLAN packets can be successfully
 	 * passed to the non-VLAN aggregation flows.
 	 *
 	 * Note that there is possibly a race between this and
 	 * mac_unicast_remove/add() and VLAN packets could be incorrectly
-	 * classified to non-VLAN flows of non-aggregation mac clients. These
-	 * VLAN packets will be then filtered out by the mac module.
+	 * classified to non-VLAN flows of non-aggregation MAC clients. These
+	 * VLAN packets will be then filtered out by the MAC module.
 	 */
 	if ((mip->mi_state_flags & MIS_EXCLUSIVE) != 0)
 		flags |= FLOW_IGNORE_VLAN;
@@ -4077,12 +4118,15 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 
 
 		/*
-		 * Driver must register group->mgi_addmac/remmac() for rx groups
-		 * to support multiple MAC addresses.
+		 * The driver must register some form of hardware MAC
+		 * filter in order for Rx groups to support multiple
+		 * MAC addresses.
 		 */
 		if (rtype == MAC_RING_TYPE_RX &&
-		    ((group_info.mgi_addmac == NULL) ||
-		    (group_info.mgi_remmac == NULL))) {
+		    (group_info.mgi_addmac == NULL ||
+		    group_info.mgi_remmac == NULL)) {
+			DTRACE_PROBE1(mac__init__rings__no__mac__filter,
+			    char *, mip->mi_name);
 			err = EINVAL;
 			goto bail;
 		}
@@ -4129,8 +4173,9 @@ mac_init_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 
 		/* Update this group's status */
 		mac_set_group_state(group, MAC_GROUP_STATE_REGISTERED);
-	} else
+	} else {
 		group->mrg_rings = NULL;
+	}
 
 	ASSERT(ring_left == 0);
 
@@ -4320,6 +4365,38 @@ mac_free_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 }
 
 /*
+ * Associate the VLAN filter to the receive group.
+ */
+int
+mac_group_addvlan(mac_group_t *group, uint16_t vlan)
+{
+	VERIFY3S(group->mrg_type, ==, MAC_RING_TYPE_RX);
+	VERIFY3P(group->mrg_info.mgi_addvlan, !=, NULL);
+
+	if (vlan > VLAN_ID_MAX)
+		return (EINVAL);
+
+	vlan = MAC_VLAN_UNTAGGED_VID(vlan);
+	return (group->mrg_info.mgi_addvlan(group->mrg_info.mgi_driver, vlan));
+}
+
+/*
+ * Dissociate the VLAN from the receive group.
+ */
+int
+mac_group_remvlan(mac_group_t *group, uint16_t vlan)
+{
+	VERIFY3S(group->mrg_type, ==, MAC_RING_TYPE_RX);
+	VERIFY3P(group->mrg_info.mgi_remvlan, !=, NULL);
+
+	if (vlan > VLAN_ID_MAX)
+		return (EINVAL);
+
+	vlan = MAC_VLAN_UNTAGGED_VID(vlan);
+	return (group->mrg_info.mgi_remvlan(group->mrg_info.mgi_driver, vlan));
+}
+
+/*
  * Associate a MAC address with a receive group.
  *
  * The return value of this function should always be checked properly, because
@@ -4335,8 +4412,8 @@ mac_free_rings(mac_impl_t *mip, mac_ring_type_t rtype)
 int
 mac_group_addmac(mac_group_t *group, const uint8_t *addr)
 {
-	ASSERT(group->mrg_type == MAC_RING_TYPE_RX);
-	ASSERT(group->mrg_info.mgi_addmac != NULL);
+	VERIFY3S(group->mrg_type, ==, MAC_RING_TYPE_RX);
+	VERIFY3P(group->mrg_info.mgi_addmac, !=, NULL);
 
 	return (group->mrg_info.mgi_addmac(group->mrg_info.mgi_driver, addr));
 }
@@ -4347,8 +4424,8 @@ mac_group_addmac(mac_group_t *group, const uint8_t *addr)
 int
 mac_group_remmac(mac_group_t *group, const uint8_t *addr)
 {
-	ASSERT(group->mrg_type == MAC_RING_TYPE_RX);
-	ASSERT(group->mrg_info.mgi_remmac != NULL);
+	VERIFY3S(group->mrg_type, ==, MAC_RING_TYPE_RX);
+	VERIFY3P(group->mrg_info.mgi_remmac, !=, NULL);
 
 	return (group->mrg_info.mgi_remmac(group->mrg_info.mgi_driver, addr));
 }
@@ -4523,28 +4600,20 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 	switch (ring->mr_type) {
 	case MAC_RING_TYPE_RX:
 		/*
-		 * Setup SRS on top of the new ring if the group is
-		 * reserved for someones exclusive use.
+		 * Setup an SRS on top of the new ring if the group is
+		 * reserved for someone's exclusive use.
 		 */
 		if (group->mrg_state == MAC_GROUP_STATE_RESERVED) {
-			mac_client_impl_t *mcip;
+			mac_client_impl_t *mcip =  MAC_GROUP_ONLY_CLIENT(group);
 
-			mcip = MAC_GROUP_ONLY_CLIENT(group);
-			/*
-			 * Even though this group is reserved we migth still
-			 * have multiple clients, i.e a VLAN shares the
-			 * group with the primary mac client.
-			 */
-			if (mcip != NULL) {
-				flent = mcip->mci_flent;
-				ASSERT(flent->fe_rx_srs_cnt > 0);
-				mac_rx_srs_group_setup(mcip, flent, SRST_LINK);
-				mac_fanout_setup(mcip, flent,
-				    MCIP_RESOURCE_PROPS(mcip), mac_rx_deliver,
-				    mcip, NULL, NULL);
-			} else {
-				ring->mr_classify_type = MAC_SW_CLASSIFIER;
-			}
+			VERIFY3P(mcip, !=, NULL);
+			flent = mcip->mci_flent;
+			VERIFY3S(flent->fe_rx_srs_cnt, >, 0);
+			mac_rx_srs_group_setup(mcip, flent, SRST_LINK);
+			mac_fanout_setup(mcip, flent, MCIP_RESOURCE_PROPS(mcip),
+			    mac_rx_deliver, mcip, NULL, NULL);
+		} else {
+			ring->mr_classify_type = MAC_SW_CLASSIFIER;
 		}
 		break;
 	case MAC_RING_TYPE_TX:
@@ -4570,7 +4639,7 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 
 			mcip = mgcp->mgc_client;
 			flent = mcip->mci_flent;
-			is_aggr = (mcip->mci_state_flags & MCIS_IS_AGGR);
+			is_aggr = (mcip->mci_state_flags & MCIS_IS_AGGR_CLIENT);
 			mac_srs = MCIP_TX_SRS(mcip);
 			tx = &mac_srs->srs_tx;
 			mac_tx_client_quiesce((mac_client_handle_t)mcip);
@@ -4714,7 +4783,7 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 
 			mcip = MAC_GROUP_ONLY_CLIENT(group);
 			ASSERT(mcip != NULL);
-			ASSERT(mcip->mci_state_flags & MCIS_IS_AGGR);
+			ASSERT(mcip->mci_state_flags & MCIS_IS_AGGR_CLIENT);
 			mac_srs = MCIP_TX_SRS(mcip);
 			ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_AGGR ||
 			    mac_srs->srs_tx.st_mode == SRS_TX_BW_AGGR);
@@ -4922,12 +4991,12 @@ mac_free_macaddr(mac_address_t *map)
 	mac_impl_t *mip = map->ma_mip;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
-	ASSERT(mip->mi_addresses != NULL);
+	VERIFY3P(mip->mi_addresses, !=, NULL);
 
-	map = mac_find_macaddr(mip, map->ma_addr);
-
-	ASSERT(map != NULL);
-	ASSERT(map->ma_nusers == 0);
+	VERIFY3P(map, ==, mac_find_macaddr(mip, map->ma_addr));
+	VERIFY3P(map, !=, NULL);
+	VERIFY3S(map->ma_nusers, ==, 0);
+	VERIFY3P(map->ma_vlans, ==, NULL);
 
 	if (map == mip->mi_addresses) {
 		mip->mi_addresses = map->ma_next;
@@ -4943,85 +5012,201 @@ mac_free_macaddr(mac_address_t *map)
 	kmem_free(map, sizeof (mac_address_t));
 }
 
+static mac_vlan_t *
+mac_find_vlan(mac_address_t *map, uint16_t vid)
+{
+	mac_vlan_t *mvp;
+
+	for (mvp = map->ma_vlans; mvp != NULL; mvp = mvp->mv_next) {
+		if (mvp->mv_vid == vid)
+			return (mvp);
+	}
+
+	return (NULL);
+}
+
+static mac_vlan_t *
+mac_add_vlan(mac_address_t *map, uint16_t vid)
+{
+	mac_vlan_t *mvp;
+
+	/*
+	 * We should never add the same {addr, VID} tuple more
+	 * than once, but let's be sure.
+	 */
+	for (mvp = map->ma_vlans; mvp != NULL; mvp = mvp->mv_next)
+		VERIFY3U(mvp->mv_vid, !=, vid);
+
+	/* Add the VLAN to the head of the VLAN list. */
+	mvp = kmem_zalloc(sizeof (mac_vlan_t), KM_SLEEP);
+	mvp->mv_vid = vid;
+	mvp->mv_next = map->ma_vlans;
+	map->ma_vlans = mvp;
+
+	return (mvp);
+}
+
+static void
+mac_rem_vlan(mac_address_t *map, mac_vlan_t *mvp)
+{
+	mac_vlan_t *pre;
+
+	if (map->ma_vlans == mvp) {
+		map->ma_vlans = mvp->mv_next;
+	} else {
+		pre = map->ma_vlans;
+		while (pre->mv_next != mvp) {
+			pre = pre->mv_next;
+
+			/*
+			 * We've reached the end of the list without
+			 * finding mvp.
+			 */
+			VERIFY3P(pre, !=, NULL);
+		}
+		pre->mv_next = mvp->mv_next;
+	}
+
+	kmem_free(mvp, sizeof (mac_vlan_t));
+}
+
 /*
- * Add a MAC address reference for a client. If the desired MAC address
- * exists, add a reference to it. Otherwise, add the new address by adding
- * it to a reserved group or setting promiscuous mode. Won't try different
- * group is the group is non-NULL, so the caller must explictly share
- * default group when needed.
- *
- * Note, the primary MAC address is initialized at registration time, so
- * to add it to default group only need to activate it if its reference
- * count is still zero. Also, some drivers may not have advertised RINGS
- * capability.
+ * Create a new mac_address_t if this is the first use of the address
+ * or add a VID to an existing address. In either case, the
+ * mac_address_t acts as a list of {addr, VID} tuples where each tuple
+ * shares the same addr. If group is non-NULL then attempt to program
+ * the MAC's HW filters for this group. Otherwise, if group is NULL,
+ * then the MAC has no rings and there is nothing to program.
  */
 int
-mac_add_macaddr(mac_impl_t *mip, mac_group_t *group, uint8_t *mac_addr,
-    boolean_t use_hw)
+mac_add_macaddr_vlan(mac_impl_t *mip, mac_group_t *group, uint8_t *addr,
+    uint16_t vid, boolean_t use_hw)
 {
-	mac_address_t *map;
-	int err = 0;
-	boolean_t allocated_map = B_FALSE;
+	mac_address_t	*map;
+	mac_vlan_t	*mvp;
+	int		err = 0;
+	boolean_t	allocated_map = B_FALSE;
+	boolean_t	hw_mac = B_FALSE;
+	boolean_t	hw_vlan = B_FALSE;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 
-	map = mac_find_macaddr(mip, mac_addr);
+	map = mac_find_macaddr(mip, addr);
 
 	/*
-	 * If the new MAC address has not been added. Allocate a new one
-	 * and set it up.
+	 * If this is the first use of this MAC address then allocate
+	 * and initialize a new structure.
 	 */
 	if (map == NULL) {
 		map = kmem_zalloc(sizeof (mac_address_t), KM_SLEEP);
 		map->ma_len = mip->mi_type->mt_addr_length;
-		bcopy(mac_addr, map->ma_addr, map->ma_len);
+		bcopy(addr, map->ma_addr, map->ma_len);
 		map->ma_nusers = 0;
 		map->ma_group = group;
 		map->ma_mip = mip;
+		map->ma_untagged = B_FALSE;
 
-		/* add the new MAC address to the head of the address list */
+		/* Add the new MAC address to the head of the address list. */
 		map->ma_next = mip->mi_addresses;
 		mip->mi_addresses = map;
 
 		allocated_map = B_TRUE;
 	}
 
-	ASSERT(map->ma_group == NULL || map->ma_group == group);
+	VERIFY(map->ma_group == NULL || map->ma_group == group);
 	if (map->ma_group == NULL)
 		map->ma_group = group;
 
+	if (vid == VLAN_ID_NONE) {
+		map->ma_untagged = B_TRUE;
+		mvp = NULL;
+	} else {
+		mvp = mac_add_vlan(map, vid);
+	}
+
 	/*
-	 * If the MAC address is already in use, simply account for the
-	 * new client.
+	 * Set the VLAN HW filter if:
+	 *
+	 * o the MAC's VLAN HW filtering is enabled, and
+	 * o the address does not currently rely on promisc mode.
+	 *
+	 * This is called even when the client specifies an untagged
+	 * address (VLAN_ID_NONE) because some MAC providers require
+	 * setting additional bits to accept untagged traffic when
+	 * VLAN HW filtering is enabled.
 	 */
-	if (map->ma_nusers++ > 0)
+	if (MAC_GROUP_HW_VLAN(group) &&
+	    map->ma_type != MAC_ADDRESS_TYPE_UNICAST_PROMISC) {
+		if ((err = mac_group_addvlan(group, vid)) != 0)
+			goto bail;
+
+		hw_vlan = B_TRUE;
+	}
+
+	VERIFY3S(map->ma_nusers, >=, 0);
+	map->ma_nusers++;
+
+	/*
+	 * If this MAC address already has a HW filter then simply
+	 * increment the counter.
+	 */
+	if (map->ma_nusers > 1)
 		return (0);
+
+	/*
+	 * All logic from here on out is executed during initial
+	 * creation only.
+	 */
+	VERIFY3S(map->ma_nusers, ==, 1);
 
 	/*
 	 * Activate this MAC address by adding it to the reserved group.
 	 */
 	if (group != NULL) {
-		err = mac_group_addmac(group, (const uint8_t *)mac_addr);
-		if (err == 0) {
-			map->ma_type = MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED;
-			return (0);
+		err = mac_group_addmac(group, (const uint8_t *)addr);
+
+		/*
+		 * If the driver is out of filters then we can
+		 * continue and use promisc mode. For any other error,
+		 * assume the driver is in a state where we can't
+		 * program the filters or use promisc mode; so we must
+		 * bail.
+		 */
+		if (err != 0 && err != ENOSPC) {
+			map->ma_nusers--;
+			goto bail;
 		}
+
+		hw_mac = (err == 0);
+	}
+
+	if (hw_mac) {
+		map->ma_type = MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED;
+		return (0);
 	}
 
 	/*
 	 * The MAC address addition failed. If the client requires a
-	 * hardware classified MAC address, fail the operation.
+	 * hardware classified MAC address, fail the operation. This
+	 * feature is only used by sun4v vsw.
 	 */
-	if (use_hw) {
+	if (use_hw && !hw_mac) {
 		err = ENOSPC;
+		map->ma_nusers--;
 		goto bail;
 	}
 
 	/*
-	 * Try promiscuous mode.
-	 *
-	 * For drivers that don't advertise RINGS capability, do
-	 * nothing for the primary address.
+	 * If we reach this point then either the MAC doesn't have
+	 * RINGS capability or we are out of MAC address HW filters.
+	 * In any case we must put the MAC into promiscuous mode.
+	 */
+	VERIFY(group == NULL || !hw_mac);
+
+	/*
+	 * The one exception is the primary address. A non-RINGS
+	 * driver filters the primary address by default; promisc mode
+	 * is not needed.
 	 */
 	if ((group == NULL) &&
 	    (bcmp(map->ma_addr, mip->mi_addr, map->ma_len) == 0)) {
@@ -5030,53 +5215,76 @@ mac_add_macaddr(mac_impl_t *mip, mac_group_t *group, uint8_t *mac_addr,
 	}
 
 	/*
-	 * Enable promiscuous mode in order to receive traffic
-	 * to the new MAC address.
+	 * Enable promiscuous mode in order to receive traffic to the
+	 * new MAC address. All existing HW filters still send their
+	 * traffic to their respective group/SRSes. But with promisc
+	 * enabled all unknown traffic is delivered to the default
+	 * group where it is SW classified via mac_rx_classify().
 	 */
 	if ((err = i_mac_promisc_set(mip, B_TRUE)) == 0) {
 		map->ma_type = MAC_ADDRESS_TYPE_UNICAST_PROMISC;
 		return (0);
 	}
 
-	/*
-	 * Free the MAC address that could not be added. Don't free
-	 * a pre-existing address, it could have been the entry
-	 * for the primary MAC address which was pre-allocated by
-	 * mac_init_macaddr(), and which must remain on the list.
-	 */
 bail:
-	map->ma_nusers--;
+	if (hw_vlan) {
+		int err2 = mac_group_remvlan(group, vid);
+
+		if (err2 != 0) {
+			cmn_err(CE_WARN, "Failed to remove VLAN %u from group"
+			    " %d on MAC %s: %d.", vid, group->mrg_index,
+			    mip->mi_name, err2);
+		}
+	}
+
+	if (mvp != NULL)
+		mac_rem_vlan(map, mvp);
+
 	if (allocated_map)
 		mac_free_macaddr(map);
+
 	return (err);
 }
 
-/*
- * Remove a reference to a MAC address. This may cause to remove the MAC
- * address from an associated group or to turn off promiscuous mode.
- * The caller needs to handle the failure properly.
- */
 int
-mac_remove_macaddr(mac_address_t *map)
+mac_remove_macaddr_vlan(mac_address_t *map, uint16_t vid)
 {
-	mac_impl_t *mip = map->ma_mip;
-	int err = 0;
+	mac_vlan_t	*mvp;
+	mac_impl_t	*mip = map->ma_mip;
+	mac_group_t	*group = map->ma_group;
+	int		err = 0;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
+	VERIFY3P(map, ==, mac_find_macaddr(mip, map->ma_addr));
 
-	ASSERT(map == mac_find_macaddr(mip, map->ma_addr));
+	if (vid == VLAN_ID_NONE) {
+		map->ma_untagged = B_FALSE;
+		mvp = NULL;
+	} else {
+		mvp = mac_find_vlan(map, vid);
+		VERIFY3P(mvp, !=, NULL);
+	}
+
+	if (MAC_GROUP_HW_VLAN(group) &&
+	    map->ma_type == MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED &&
+	    ((err = mac_group_remvlan(group, vid)) != 0))
+		return (err);
+
+	if (mvp != NULL)
+		mac_rem_vlan(map, mvp);
 
 	/*
 	 * If it's not the last client using this MAC address, only update
 	 * the MAC clients count.
 	 */
-	if (--map->ma_nusers > 0)
+	map->ma_nusers--;
+	if (map->ma_nusers > 0)
 		return (0);
 
 	/*
-	 * The MAC address is no longer used by any MAC client, so remove
-	 * it from its associated group, or turn off promiscuous mode
-	 * if it was enabled for the MAC address.
+	 * The MAC address is no longer used by any MAC client, so
+	 * remove it from its associated group. Turn off promiscuous
+	 * mode if this is the last address relying on it.
 	 */
 	switch (map->ma_type) {
 	case MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED:
@@ -5084,18 +5292,44 @@ mac_remove_macaddr(mac_address_t *map)
 		 * Don't free the preset primary address for drivers that
 		 * don't advertise RINGS capability.
 		 */
-		if (map->ma_group == NULL)
+		if (group == NULL)
 			return (0);
 
-		err = mac_group_remmac(map->ma_group, map->ma_addr);
-		if (err == 0)
-			map->ma_group = NULL;
+		if ((err = mac_group_remmac(group, map->ma_addr)) != 0) {
+			if (vid == VLAN_ID_NONE)
+				map->ma_untagged = B_TRUE;
+			else
+				(void) mac_add_vlan(map, vid);
+
+			/*
+			 * If we fail to remove the MAC address HW
+			 * filter but then also fail to re-add the
+			 * VLAN HW filter then we are in a busted
+			 * state and should just crash.
+			 */
+			if (MAC_GROUP_HW_VLAN(group)) {
+				int err2;
+
+				err2 = mac_group_addvlan(group, vid);
+				if (err2 != 0) {
+					cmn_err(CE_WARN, "Failed to readd VLAN"
+					    " %u to group %d on MAC %s: %d.",
+					    vid, group->mrg_index, mip->mi_name,
+					    err2);
+				}
+			}
+
+			return (err);
+		}
+
+		map->ma_group = NULL;
 		break;
 	case MAC_ADDRESS_TYPE_UNICAST_PROMISC:
 		err = i_mac_promisc_set(mip, B_FALSE);
 		break;
 	default:
-		ASSERT(B_FALSE);
+		panic("Unexpected ma_type 0x%x, file: %s, line %d",
+		    map->ma_type, __FILE__, __LINE__);
 	}
 
 	if (err != 0)
@@ -5252,8 +5486,9 @@ mac_fini_macaddr(mac_impl_t *mip)
 	 * If mi_addresses is initialized, there should be exactly one
 	 * entry left on the list with no users.
 	 */
-	ASSERT(map->ma_nusers == 0);
-	ASSERT(map->ma_next == NULL);
+	VERIFY3S(map->ma_nusers, ==, 0);
+	VERIFY3P(map->ma_next, ==, NULL);
+	VERIFY3P(map->ma_vlans, ==, NULL);
 
 	kmem_free(map, sizeof (mac_address_t));
 	mip->mi_addresses = NULL;
@@ -5815,7 +6050,7 @@ mac_stop_logusage(mac_logtype_t type)
 	mod_hash_walk(i_mac_impl_hash, i_mac_fastpath_walker, &estate);
 
 	(void) untimeout(mac_logging_timer);
-	mac_logging_timer = 0;
+	mac_logging_timer = NULL;
 
 	/* Write log entries for each mac_impl in the list */
 	i_mac_log_info(&net_log_list, &lstate);
@@ -5933,7 +6168,7 @@ mac_reserve_tx_ring(mac_impl_t *mip, mac_ring_t *desired_ring)
 }
 
 /*
- * For a reserved group with multiple clients, return the primary client.
+ * For a non-default group with multiple clients, return the primary client.
  */
 static mac_client_impl_t *
 mac_get_grp_primary(mac_group_t *grp)
@@ -6292,13 +6527,12 @@ mac_group_add_client(mac_group_t *grp, mac_client_impl_t *mcip)
 			break;
 	}
 
-	VERIFY(mgcp == NULL);
+	ASSERT(mgcp == NULL);
 
 	mgcp = kmem_zalloc(sizeof (mac_grp_client_t), KM_SLEEP);
 	mgcp->mgc_client = mcip;
 	mgcp->mgc_next = grp->mrg_clients;
 	grp->mrg_clients = mgcp;
-
 }
 
 void
@@ -6319,8 +6553,27 @@ mac_group_remove_client(mac_group_t *grp, mac_client_impl_t *mcip)
 }
 
 /*
- * mac_reserve_rx_group()
- *
+ * Return true if any client on this group explicitly asked for HW
+ * rings (of type mask) or have a bound share.
+ */
+static boolean_t
+i_mac_clients_hw(mac_group_t *grp, uint32_t mask)
+{
+	mac_grp_client_t	*mgcip;
+	mac_client_impl_t	*mcip;
+	mac_resource_props_t	*mrp;
+
+	for (mgcip = grp->mrg_clients; mgcip != NULL; mgcip = mgcip->mgc_next) {
+		mcip = mgcip->mgc_client;
+		mrp = MCIP_RESOURCE_PROPS(mcip);
+		if (mcip->mci_share != NULL || (mrp->mrp_mask & mask) != 0)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
  * Finds an available group and exclusively reserves it for a client.
  * The group is chosen to suit the flow's resource controls (bandwidth and
  * fanout requirements) and the address type.
@@ -6343,7 +6596,6 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 	int			need_rings = 0;
 	mac_group_t		*candidate_grp = NULL;
 	mac_client_impl_t	*gclient;
-	mac_resource_props_t	*gmrp;
 	mac_group_t		*donorgrp = NULL;
 	boolean_t		rxhw = mrp->mrp_mask & MRP_RX_RINGS;
 	boolean_t		unspec = mrp->mrp_mask & MRP_RXRINGS_UNSPEC;
@@ -6354,18 +6606,20 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 	isprimary = mcip->mci_flent->fe_type & FLOW_PRIMARY_MAC;
 
 	/*
-	 * Check if a group already has this mac address (case of VLANs)
+	 * Check if a group already has this MAC address (case of VLANs)
 	 * unless we are moving this MAC client from one group to another.
 	 */
 	if (!move && (map = mac_find_macaddr(mip, mac_addr)) != NULL) {
 		if (map->ma_group != NULL)
 			return (map->ma_group);
 	}
+
 	if (mip->mi_rx_groups == NULL || mip->mi_rx_group_count == 0)
 		return (NULL);
+
 	/*
-	 * If exclusive open, return NULL which will enable the
-	 * caller to use the default group.
+	 * If this client is requesting exclusive MAC access then
+	 * return NULL to ensure the client uses the default group.
 	 */
 	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
 		return (NULL);
@@ -6375,6 +6629,7 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 	    mip->mi_rx_group_type == MAC_GROUP_TYPE_DYNAMIC) {
 		mrp->mrp_nrxrings = 1;
 	}
+
 	/*
 	 * For static grouping we allow only specifying rings=0 and
 	 * unspecified
@@ -6383,6 +6638,7 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 	    mip->mi_rx_group_type == MAC_GROUP_TYPE_STATIC) {
 		return (NULL);
 	}
+
 	if (rxhw) {
 		/*
 		 * We have explicitly asked for a group (with nrxrings,
@@ -6444,25 +6700,19 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 		 * that didn't ask for an exclusive group, but got
 		 * one and it has enough rings (combined with what
 		 * the donor group can donate) for the new MAC
-		 * client
+		 * client.
 		 */
 		if (grp->mrg_state >= MAC_GROUP_STATE_RESERVED) {
 			/*
-			 * If the primary/donor group is not the default
-			 * group, don't bother looking for a candidate group.
-			 * If we don't have enough rings we will check
-			 * if the primary group can be vacated.
+			 * If the donor group is not the default
+			 * group, don't bother looking for a candidate
+			 * group. If we don't have enough rings we
+			 * will check if the primary group can be
+			 * vacated.
 			 */
 			if (candidate_grp == NULL &&
 			    donorgrp == MAC_DEFAULT_RX_GROUP(mip)) {
-				ASSERT(!MAC_GROUP_NO_CLIENT(grp));
-				gclient = MAC_GROUP_ONLY_CLIENT(grp);
-				if (gclient == NULL)
-					gclient = mac_get_grp_primary(grp);
-				ASSERT(gclient != NULL);
-				gmrp = MCIP_RESOURCE_PROPS(gclient);
-				if (gclient->mci_share == NULL &&
-				    (gmrp->mrp_mask & MRP_RX_RINGS) == 0 &&
+				if (!i_mac_clients_hw(grp, MRP_RX_RINGS) &&
 				    (unspec ||
 				    (grp->mrg_cur_count + donor_grp_rcnt >=
 				    need_rings))) {
@@ -6528,6 +6778,7 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 		 */
 		mac_stop_group(grp);
 	}
+
 	/* We didn't find an exclusive group for this MAC client */
 	if (i >= mip->mi_rx_group_count) {
 
@@ -6535,12 +6786,12 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 			return (NULL);
 
 		/*
-		 * If we found a candidate group then we switch the
-		 * MAC client from the candidate_group to the default
-		 * group and give the group to this MAC client. If
-		 * we didn't find a candidate_group, check if the
-		 * primary is in its own group and if it can make way
-		 * for this MAC client.
+		 * If we found a candidate group then move the
+		 * existing MAC client from the candidate_group to the
+		 * default group and give the candidate_group to the
+		 * new MAC client. If we didn't find a candidate
+		 * group, then check if the primary is in its own
+		 * group and if it can make way for this MAC client.
 		 */
 		if (candidate_grp == NULL &&
 		    donorgrp != MAC_DEFAULT_RX_GROUP(mip) &&
@@ -6551,15 +6802,15 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 			boolean_t	prim_grp = B_FALSE;
 
 			/*
-			 * Switch the MAC client from the candidate group
-			 * to the default group.. If this group was the
-			 * donor group, then after the switch we need
-			 * to update the donor group too.
+			 * Switch the existing MAC client from the
+			 * candidate group to the default group. If
+			 * the candidate group is the donor group,
+			 * then after the switch we need to update the
+			 * donor group too.
 			 */
 			grp = candidate_grp;
-			gclient = MAC_GROUP_ONLY_CLIENT(grp);
-			if (gclient == NULL)
-				gclient = mac_get_grp_primary(grp);
+			gclient = grp->mrg_clients->mgc_client;
+			VERIFY3P(gclient, !=, NULL);
 			if (grp == mip->mi_rx_donor_grp)
 				prim_grp = B_TRUE;
 			if (mac_rx_switch_group(gclient, grp,
@@ -6571,7 +6822,6 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 				    MAC_DEFAULT_RX_GROUP(mip);
 				donorgrp = MAC_DEFAULT_RX_GROUP(mip);
 			}
-
 
 			/*
 			 * Now give this group with the required rings
@@ -6620,10 +6870,10 @@ mac_reserve_rx_group(mac_client_impl_t *mcip, uint8_t *mac_addr, boolean_t move)
 /*
  * mac_rx_release_group()
  *
- * This is called when there are no clients left for the group.
- * The group is stopped and marked MAC_GROUP_STATE_REGISTERED,
- * and if it is a non default group, the shares are removed and
- * all rings are assigned back to default group.
+ * Release the group when it has no remaining clients. The group is
+ * stopped and its shares are removed and all rings are assigned back
+ * to default group. This should never be called against the default
+ * group.
  */
 void
 mac_release_rx_group(mac_client_impl_t *mcip, mac_group_t *group)
@@ -6632,6 +6882,7 @@ mac_release_rx_group(mac_client_impl_t *mcip, mac_group_t *group)
 	mac_ring_t		*ring;
 
 	ASSERT(group != MAC_DEFAULT_RX_GROUP(mip));
+	ASSERT(MAC_GROUP_NO_CLIENT(group) == B_TRUE);
 
 	if (mip->mi_rx_donor_grp == group)
 		mip->mi_rx_donor_grp = MAC_DEFAULT_RX_GROUP(mip);
@@ -6683,56 +6934,7 @@ mac_release_rx_group(mac_client_impl_t *mcip, mac_group_t *group)
 }
 
 /*
- * When we move the primary's mac address between groups, we need to also
- * take all the clients sharing the same mac address along with it (VLANs)
- * We remove the mac address for such clients from the group after quiescing
- * them. When we add the mac address we restart the client. Note that
- * the primary's mac address is removed from the group after all the
- * other clients sharing the address are removed. Similarly, the primary's
- * mac address is added before all the other client's mac address are
- * added. While grp is the group where the clients reside, tgrp is
- * the group where the addresses have to be added.
- */
-static void
-mac_rx_move_macaddr_prim(mac_client_impl_t *mcip, mac_group_t *grp,
-    mac_group_t *tgrp, uint8_t *maddr, boolean_t add)
-{
-	mac_impl_t		*mip = mcip->mci_mip;
-	mac_grp_client_t	*mgcp = grp->mrg_clients;
-	mac_client_impl_t	*gmcip;
-	boolean_t		prim;
-
-	prim = (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0;
-
-	/*
-	 * If the clients are in a non-default group, we just have to
-	 * walk the group's client list. If it is in the default group
-	 * (which will be shared by other clients as well, we need to
-	 * check if the unicast address matches mcip's unicast.
-	 */
-	while (mgcp != NULL) {
-		gmcip = mgcp->mgc_client;
-		if (gmcip != mcip &&
-		    (grp != MAC_DEFAULT_RX_GROUP(mip) ||
-		    mcip->mci_unicast == gmcip->mci_unicast)) {
-			if (!add) {
-				mac_rx_client_quiesce(
-				    (mac_client_handle_t)gmcip);
-				(void) mac_remove_macaddr(mcip->mci_unicast);
-			} else {
-				(void) mac_add_macaddr(mip, tgrp, maddr, prim);
-				mac_rx_client_restart(
-				    (mac_client_handle_t)gmcip);
-			}
-		}
-		mgcp = mgcp->mgc_next;
-	}
-}
-
-
-/*
- * Move the MAC address from fgrp to tgrp. If this is the primary client,
- * we need to take any VLANs etc. together too.
+ * Move the MAC address from fgrp to tgrp.
  */
 static int
 mac_rx_move_macaddr(mac_client_impl_t *mcip, mac_group_t *fgrp,
@@ -6741,56 +6943,86 @@ mac_rx_move_macaddr(mac_client_impl_t *mcip, mac_group_t *fgrp,
 	mac_impl_t		*mip = mcip->mci_mip;
 	uint8_t			maddr[MAXMACADDRLEN];
 	int			err = 0;
-	boolean_t		prim;
-	boolean_t		multiclnt = B_FALSE;
+	uint16_t		vid;
+	mac_unicast_impl_t	*muip;
+	boolean_t		use_hw;
 
 	mac_rx_client_quiesce((mac_client_handle_t)mcip);
-	ASSERT(mcip->mci_unicast != NULL);
+	VERIFY3P(mcip->mci_unicast, !=, NULL);
 	bcopy(mcip->mci_unicast->ma_addr, maddr, mcip->mci_unicast->ma_len);
 
-	prim = (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0;
-	if (mcip->mci_unicast->ma_nusers > 1) {
-		mac_rx_move_macaddr_prim(mcip, fgrp, NULL, maddr, B_FALSE);
-		multiclnt = B_TRUE;
-	}
-	ASSERT(mcip->mci_unicast->ma_nusers == 1);
-	err = mac_remove_macaddr(mcip->mci_unicast);
+	/*
+	 * Does the client require MAC address hardware classifiction?
+	 */
+	use_hw = (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0;
+	vid = i_mac_flow_vid(mcip->mci_flent);
+
+	/*
+	 * You can never move an address that is shared by multiple
+	 * clients. mac_datapath_setup() ensures that clients sharing
+	 * an address are placed on the default group. This guarantees
+	 * that a non-default group will only ever have one client and
+	 * thus make full use of HW filters.
+	 */
+	if (mac_check_macaddr_shared(mcip->mci_unicast))
+		return (EINVAL);
+
+	err = mac_remove_macaddr_vlan(mcip->mci_unicast, vid);
+
 	if (err != 0) {
 		mac_rx_client_restart((mac_client_handle_t)mcip);
-		if (multiclnt) {
-			mac_rx_move_macaddr_prim(mcip, fgrp, fgrp, maddr,
-			    B_TRUE);
-		}
 		return (err);
 	}
+
 	/*
-	 * Program the H/W Classifier first, if this fails we need
-	 * not proceed with the other stuff.
+	 * If this isn't the primary MAC address then the
+	 * mac_address_t has been freed by the last call to
+	 * mac_remove_macaddr_vlan(). In any case, NULL the reference
+	 * to avoid a dangling pointer.
 	 */
-	if ((err = mac_add_macaddr(mip, tgrp, maddr, prim)) != 0) {
+	mcip->mci_unicast = NULL;
+
+	/*
+	 * We also have to NULL all the mui_map references -- sun4v
+	 * strikes again!
+	 */
+	rw_enter(&mcip->mci_rw_lock, RW_WRITER);
+	for (muip = mcip->mci_unicast_list; muip != NULL; muip = muip->mui_next)
+		muip->mui_map = NULL;
+	rw_exit(&mcip->mci_rw_lock);
+
+	/*
+	 * Program the H/W Classifier first, if this fails we need not
+	 * proceed with the other stuff.
+	 */
+	if ((err = mac_add_macaddr_vlan(mip, tgrp, maddr, vid, use_hw)) != 0) {
+		int err2;
+
 		/* Revert back the H/W Classifier */
-		if ((err = mac_add_macaddr(mip, fgrp, maddr, prim)) != 0) {
-			/*
-			 * This should not fail now since it worked earlier,
-			 * should we panic?
-			 */
-			cmn_err(CE_WARN,
-			    "mac_rx_switch_group: switching %p back"
-			    " to group %p failed!!", (void *)mcip,
-			    (void *)fgrp);
+		err2 = mac_add_macaddr_vlan(mip, fgrp, maddr, vid, use_hw);
+
+		if (err2 != 0) {
+			cmn_err(CE_WARN, "Failed to revert HW classification"
+			    " on MAC %s, for client %s: %d.", mip->mi_name,
+			    mcip->mci_name, err2);
 		}
+
 		mac_rx_client_restart((mac_client_handle_t)mcip);
-		if (multiclnt) {
-			mac_rx_move_macaddr_prim(mcip, fgrp, fgrp, maddr,
-			    B_TRUE);
-		}
 		return (err);
 	}
+
+	/*
+	 * Get a reference to the new mac_address_t and update the
+	 * client's reference. Then restart the client and add the
+	 * other clients of this MAC addr (if they exsit).
+	 */
 	mcip->mci_unicast = mac_find_macaddr(mip, maddr);
+	rw_enter(&mcip->mci_rw_lock, RW_WRITER);
+	for (muip = mcip->mci_unicast_list; muip != NULL; muip = muip->mui_next)
+		muip->mui_map = mcip->mci_unicast;
+	rw_exit(&mcip->mci_rw_lock);
 	mac_rx_client_restart((mac_client_handle_t)mcip);
-	if (multiclnt)
-		mac_rx_move_macaddr_prim(mcip, fgrp, tgrp, maddr, B_TRUE);
-	return (err);
+	return (0);
 }
 
 /*
@@ -6811,19 +7043,34 @@ mac_rx_switch_group(mac_client_impl_t *mcip, mac_group_t *fgrp,
 	mac_impl_t		*mip = mcip->mci_mip;
 	mac_grp_client_t	*mgcp;
 
-	ASSERT(fgrp == mcip->mci_flent->fe_rx_ring_group);
+	VERIFY3P(fgrp, ==, mcip->mci_flent->fe_rx_ring_group);
 
 	if ((err = mac_rx_move_macaddr(mcip, fgrp, tgrp)) != 0)
 		return (err);
 
 	/*
-	 * The group might be reserved, but SRSs may not be set up, e.g.
-	 * primary and its vlans using a reserved group.
+	 * If the group is marked as reserved and in use by a single
+	 * client, then there is an SRS to teardown.
 	 */
 	if (fgrp->mrg_state == MAC_GROUP_STATE_RESERVED &&
 	    MAC_GROUP_ONLY_CLIENT(fgrp) != NULL) {
 		mac_rx_srs_group_teardown(mcip->mci_flent, B_TRUE);
 	}
+
+	/*
+	 * If we are moving the client from a non-default group, then
+	 * we know that any additional clients on this group share the
+	 * same MAC address. Since we moved the MAC address filter, we
+	 * need to move these clients too.
+	 *
+	 * If we are moving the client from the default group and its
+	 * MAC address has VLAN clients, then we must move those
+	 * clients as well.
+	 *
+	 * In both cases the idea is the same: we moved the MAC
+	 * address filter to the tgrp, so we must move all clients
+	 * using that MAC address to tgrp as well.
+	 */
 	if (fgrp != MAC_DEFAULT_RX_GROUP(mip)) {
 		mgcp = fgrp->mrg_clients;
 		while (mgcp != NULL) {
@@ -6834,20 +7081,21 @@ mac_rx_switch_group(mac_client_impl_t *mcip, mac_group_t *fgrp,
 			gmcip->mci_flent->fe_rx_ring_group = tgrp;
 		}
 		mac_release_rx_group(mcip, fgrp);
-		ASSERT(MAC_GROUP_NO_CLIENT(fgrp));
+		VERIFY3B(MAC_GROUP_NO_CLIENT(fgrp), ==, B_TRUE);
 		mac_set_group_state(fgrp, MAC_GROUP_STATE_REGISTERED);
 	} else {
 		mac_group_remove_client(fgrp, mcip);
 		mac_group_add_client(tgrp, mcip);
 		mcip->mci_flent->fe_rx_ring_group = tgrp;
+
 		/*
 		 * If there are other clients (VLANs) sharing this address
-		 * we should be here only for the primary.
+		 * then move them too.
 		 */
-		if (mcip->mci_unicast->ma_nusers > 1) {
+		if (mac_check_macaddr_shared(mcip->mci_unicast)) {
 			/*
 			 * We need to move all the clients that are using
-			 * this h/w address.
+			 * this MAC address.
 			 */
 			mgcp = fgrp->mrg_clients;
 			while (mgcp != NULL) {
@@ -6861,20 +7109,24 @@ mac_rx_switch_group(mac_client_impl_t *mcip, mac_group_t *fgrp,
 				}
 			}
 		}
+
 		/*
-		 * The default group will still take the multicast,
-		 * broadcast traffic etc., so it won't go to
+		 * The default group still handles multicast and
+		 * broadcast traffic; it won't transition to
 		 * MAC_GROUP_STATE_REGISTERED.
 		 */
 		if (fgrp->mrg_state == MAC_GROUP_STATE_RESERVED)
 			mac_rx_group_unmark(fgrp, MR_CONDEMNED);
 		mac_set_group_state(fgrp, MAC_GROUP_STATE_SHARED);
 	}
+
 	next_state = mac_group_next_state(tgrp, &group_only_mcip,
 	    MAC_DEFAULT_RX_GROUP(mip), B_TRUE);
 	mac_set_group_state(tgrp, next_state);
+
 	/*
-	 * If the destination group is reserved, setup the SRSs etc.
+	 * If the destination group is reserved, then setup the SRSes.
+	 * Otherwise make sure to use SW classification.
 	 */
 	if (tgrp->mrg_state == MAC_GROUP_STATE_RESERVED) {
 		mac_rx_srs_group_setup(mcip, mcip->mci_flent, SRST_LINK);
@@ -6885,6 +7137,7 @@ mac_rx_switch_group(mac_client_impl_t *mcip, mac_group_t *fgrp,
 	} else {
 		mac_rx_switch_grp_to_sw(tgrp);
 	}
+
 	return (0);
 }
 
@@ -6915,6 +7168,7 @@ mac_reserve_tx_group(mac_client_impl_t *mcip, boolean_t move)
 	boolean_t		isprimary;
 
 	isprimary = mcip->mci_flent->fe_type & FLOW_PRIMARY_MAC;
+
 	/*
 	 * When we come here for a VLAN on the primary (dladm create-vlan),
 	 * we need to pair it along with the primary (to keep it consistent
@@ -6996,8 +7250,7 @@ mac_reserve_tx_group(mac_client_impl_t *mcip, boolean_t move)
 			if (grp->mrg_state == MAC_GROUP_STATE_RESERVED &&
 			    candidate_grp == NULL) {
 				gclient = MAC_GROUP_ONLY_CLIENT(grp);
-				if (gclient == NULL)
-					gclient = mac_get_grp_primary(grp);
+				VERIFY3P(gclient, !=, NULL);
 				gmrp = MCIP_RESOURCE_PROPS(gclient);
 				if (gclient->mci_share == NULL &&
 				    (gmrp->mrp_mask & MRP_TX_RINGS) == 0 &&
@@ -7034,13 +7287,14 @@ mac_reserve_tx_group(mac_client_impl_t *mcip, boolean_t move)
 		 */
 		if (need_exclgrp && candidate_grp != NULL) {
 			/*
-			 * Switch the MAC client from the candidate group
-			 * to the default group.
+			 * Switch the MAC client from the candidate
+			 * group to the default group. We know the
+			 * candidate_grp came from a reserved group
+			 * and thus only has one client.
 			 */
 			grp = candidate_grp;
 			gclient = MAC_GROUP_ONLY_CLIENT(grp);
-			if (gclient == NULL)
-				gclient = mac_get_grp_primary(grp);
+			VERIFY3P(gclient, !=, NULL);
 			mac_tx_client_quiesce((mac_client_handle_t)gclient);
 			mac_tx_switch_group(gclient, grp, defgrp);
 			mac_tx_client_restart((mac_client_handle_t)gclient);
@@ -7208,7 +7462,7 @@ mac_tx_switch_group(mac_client_impl_t *mcip, mac_group_t *fgrp,
 		 */
 		mac_group_remove_client(fgrp, mcip);
 		mac_tx_dismantle_soft_rings(fgrp, flent);
-		if (mcip->mci_unicast->ma_nusers > 1) {
+		if (mac_check_macaddr_shared(mcip->mci_unicast)) {
 			mgcp = fgrp->mrg_clients;
 			while (mgcp != NULL) {
 				gmcip = mgcp->mgc_client;
@@ -7454,7 +7708,7 @@ mac_no_active(mac_handle_t mh)
  * changes and update the mac_resource_props_t for the VLAN's client.
  * We need to do this since we don't support setting these properties
  * on the primary's VLAN clients, but the VLAN clients have to
- * follow the primary w.r.t the rings property;
+ * follow the primary w.r.t the rings property.
  */
 void
 mac_set_prim_vlan_rings(mac_impl_t  *mip, mac_resource_props_t *mrp)
@@ -7603,13 +7857,10 @@ mac_group_ring_modify(mac_client_impl_t *mcip, mac_group_t *group,
 				    MAC_GROUP_STATE_RESERVED) {
 					continue;
 				}
-				mcip = MAC_GROUP_ONLY_CLIENT(tgrp);
-				if (mcip == NULL)
-					mcip = mac_get_grp_primary(tgrp);
-				ASSERT(mcip != NULL);
-				mrp = MCIP_RESOURCE_PROPS(mcip);
-				if ((mrp->mrp_mask & MRP_RX_RINGS) != 0)
+				if (i_mac_clients_hw(tgrp, MRP_RX_RINGS))
 					continue;
+				mcip = tgrp->mrg_clients->mgc_client;
+				VERIFY3P(mcip, !=, NULL);
 				if ((tgrp->mrg_cur_count +
 				    defgrp->mrg_cur_count) < (modify + 1)) {
 					continue;
@@ -7624,12 +7875,10 @@ mac_group_ring_modify(mac_client_impl_t *mcip, mac_group_t *group,
 				    MAC_GROUP_STATE_RESERVED) {
 					continue;
 				}
-				mcip = MAC_GROUP_ONLY_CLIENT(tgrp);
-				if (mcip == NULL)
-					mcip = mac_get_grp_primary(tgrp);
-				mrp = MCIP_RESOURCE_PROPS(mcip);
-				if ((mrp->mrp_mask & MRP_TX_RINGS) != 0)
+				if (i_mac_clients_hw(tgrp, MRP_TX_RINGS))
 					continue;
+				mcip = tgrp->mrg_clients->mgc_client;
+				VERIFY3P(mcip, !=, NULL);
 				if ((tgrp->mrg_cur_count +
 				    defgrp->mrg_cur_count) < (modify + 1)) {
 					continue;
@@ -7899,10 +8148,10 @@ mac_pool_event_cb(pool_event_t what, poolid_t id, void *arg)
  * Set effective rings property. This could be called from datapath_setup/
  * datapath_teardown or set-linkprop.
  * If the group is reserved we just go ahead and set the effective rings.
- * Additionally, for TX this could mean the default  group has lost/gained
+ * Additionally, for TX this could mean the default group has lost/gained
  * some rings, so if the default group is reserved, we need to adjust the
  * effective rings for the default group clients. For RX, if we are working
- * with the non-default group, we just need * to reset the effective props
+ * with the non-default group, we just need to reset the effective props
  * for the default group clients.
  */
 void
@@ -8032,6 +8281,7 @@ mac_check_primary_relocation(mac_client_impl_t *mcip, boolean_t rxhw)
 	 * the first non-primary.
 	 */
 	ASSERT(mip->mi_nactiveclients == 2);
+
 	/*
 	 * OK, now we have the primary that needs to be relocated.
 	 */

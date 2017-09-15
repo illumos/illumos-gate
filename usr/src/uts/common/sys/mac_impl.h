@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_IMPL_H
@@ -255,8 +255,8 @@ struct mac_ring_s {
 }
 
 /*
- * Per mac client flow information associated with a RX group.
- * The entire structure is SL protected.
+ * Used to attach MAC clients to an Rx group. The members are SL
+ * protected.
  */
 typedef struct mac_grp_client {
 	struct mac_grp_client		*mgc_next;
@@ -270,15 +270,20 @@ typedef struct mac_grp_client {
 	((g)->mrg_clients->mgc_next == NULL)) ?		\
 	(g)->mrg_clients->mgc_client : NULL)
 
+#define	MAC_GROUP_HW_VLAN(g)				\
+	(((g) != NULL) &&				\
+	((g)->mrg_info.mgi_addvlan != NULL) &&		\
+	((g)->mrg_info.mgi_remvlan != NULL))
+
 /*
  * Common ring group data structure for ring control and management.
- * The entire structure is SL protected
+ * The entire structure is SL protected.
  */
 struct mac_group_s {
 	int			mrg_index;	/* index in the list */
 	mac_ring_type_t		mrg_type;	/* ring type */
 	mac_group_state_t	mrg_state;	/* state of the group */
-	mac_group_t		*mrg_next;	/* next ring in the chain */
+	mac_group_t		*mrg_next;	/* next group in the chain */
 	mac_handle_t		mrg_mh;		/* reference to MAC */
 	mac_ring_t		*mrg_rings;	/* grouped rings */
 	uint_t			mrg_cur_count;	/* actual size of group */
@@ -360,17 +365,23 @@ typedef struct mac_mcast_addrs_s {
 } mac_mcast_addrs_t;
 
 typedef enum {
-	MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED = 1,	/* hardware steering */
+	MAC_ADDRESS_TYPE_UNICAST_CLASSIFIED = 1,	/* HW classification */
 	MAC_ADDRESS_TYPE_UNICAST_PROMISC		/* promiscuous mode */
 } mac_address_type_t;
 
+typedef struct mac_vlan_s {
+	struct mac_vlan_s	*mv_next;
+	uint16_t		mv_vid;
+} mac_vlan_t;
+
 typedef struct mac_address_s {
 	mac_address_type_t	ma_type;		/* address type */
-	int			ma_nusers;		/* number of users */
-							/* of that address */
+	int			ma_nusers;		/* num users of addr */
 	struct mac_address_s	*ma_next;		/* next address */
 	uint8_t			ma_addr[MAXMACADDRLEN];	/* address value */
 	size_t			ma_len;			/* address length */
+	mac_vlan_t		*ma_vlans;		/* VLANs on this addr */
+	boolean_t		ma_untagged;		/* accept untagged? */
 	mac_group_t		*ma_group;		/* asscociated group */
 	mac_impl_t		*ma_mip;		/* MAC handle */
 } mac_address_t;
@@ -487,7 +498,7 @@ struct mac_impl_s {
 	mac_capab_led_t		mi_led;
 
 	/*
-	 * MAC address list. SL protected.
+	 * MAC address and VLAN lists. SL protected.
 	 */
 	mac_address_t		*mi_addresses;
 
@@ -760,6 +771,8 @@ extern void mac_client_bcast_refresh(mac_client_impl_t *, mac_multicst_t,
  */
 extern int mac_group_addmac(mac_group_t *, const uint8_t *);
 extern int mac_group_remmac(mac_group_t *, const uint8_t *);
+extern int mac_group_addvlan(mac_group_t *, uint16_t);
+extern int mac_group_remvlan(mac_group_t *, uint16_t);
 extern int mac_rx_group_add_flow(mac_client_impl_t *, flow_entry_t *,
     mac_group_t *);
 extern mblk_t *mac_hwring_tx(mac_ring_handle_t, mblk_t *);
@@ -780,6 +793,7 @@ extern void mac_rx_switch_grp_to_sw(mac_group_t *);
  * MAC address functions are used internally by MAC layer.
  */
 extern mac_address_t *mac_find_macaddr(mac_impl_t *, uint8_t *);
+extern mac_address_t *mac_find_macaddr_vlan(mac_impl_t *, uint8_t *, uint16_t);
 extern boolean_t mac_check_macaddr_shared(mac_address_t *);
 extern int mac_update_macaddr(mac_address_t *, uint8_t *);
 extern void mac_freshen_macaddr(mac_address_t *, uint8_t *);
@@ -864,8 +878,9 @@ extern int mac_start_group(mac_group_t *);
 extern void mac_stop_group(mac_group_t *);
 extern int mac_start_ring(mac_ring_t *);
 extern void mac_stop_ring(mac_ring_t *);
-extern int mac_add_macaddr(mac_impl_t *, mac_group_t *, uint8_t *, boolean_t);
-extern int mac_remove_macaddr(mac_address_t *);
+extern int mac_add_macaddr_vlan(mac_impl_t *, mac_group_t *, uint8_t *,
+    uint16_t, boolean_t);
+extern int mac_remove_macaddr_vlan(mac_address_t *, uint16_t);
 
 extern void mac_set_group_state(mac_group_t *, mac_group_state_t);
 extern void mac_group_add_client(mac_group_t *, mac_client_impl_t *);

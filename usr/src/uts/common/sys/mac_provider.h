@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_PROVIDER_H
@@ -282,6 +282,28 @@ typedef enum {
 } mac_ring_type_t;
 
 /*
+ * The value VLAN_ID_NONE (VID 0) means a client does not have
+ * membership to any VLAN. However, this statement is true for both
+ * untagged packets and priority tagged packets leading to confusion
+ * over what semantic is intended. To the provider, VID 0 is a valid
+ * VID when priority tagging is in play. To MAC and everything above
+ * VLAN_ID_NONE almost universally implies untagged traffic. Thus, we
+ * convert VLAN_ID_NONE to a sentinel value (MAC_VLAN_UNTAGGED) at the
+ * border between MAC and MAC provider. This informs the provider that
+ * the client is interested in untagged traffic and the provider
+ * should set any relevant bits to receive such traffic.
+ *
+ * Currently, the API between MAC and the provider passes the VID as a
+ * unit16_t. In the future this could actually be the entire TCI mask
+ * (PCP, DEI, and VID). This current scheme is safe in that potential
+ * future world as well; as 0xFFFF is not a valid TCI (the 0xFFF VID
+ * is reserved and never transmitted across networks).
+ */
+#define	MAC_VLAN_UNTAGGED		UINT16_MAX
+#define	MAC_VLAN_UNTAGGED_VID(vid)	\
+	(((vid) == VLAN_ID_NONE) ? MAC_VLAN_UNTAGGED : (vid))
+
+/*
  * Grouping type of a ring group
  *
  * MAC_GROUP_TYPE_STATIC: The ring group can not be re-grouped.
@@ -359,6 +381,8 @@ typedef struct mac_ring_info_s {
  * #defines for mri_flags. The flags are temporary flags that are provided
  * only to workaround issues in specific drivers, and they will be
  * removed in the future.
+ *
+ * These are consumed only by sun4v and neptune (nxge).
  */
 #define	MAC_RING_TX_SERIALIZE		0x1
 #define	MAC_RING_RX_ENQUEUE		0x2
@@ -367,6 +391,8 @@ typedef	int	(*mac_group_start_t)(mac_group_driver_t);
 typedef	void	(*mac_group_stop_t)(mac_group_driver_t);
 typedef	int	(*mac_add_mac_addr_t)(void *, const uint8_t *);
 typedef	int	(*mac_rem_mac_addr_t)(void *, const uint8_t *);
+typedef int	(*mac_add_vlan_filter_t)(mac_group_driver_t, uint16_t);
+typedef int	(*mac_rem_vlan_filter_t)(mac_group_driver_t, uint16_t);
 
 struct mac_group_info_s {
 	mac_group_driver_t	mgi_driver;	/* Driver reference */
@@ -375,9 +401,11 @@ struct mac_group_info_s {
 	uint_t			mgi_count;	/* Count of rings */
 	mac_intr_t		mgi_intr;	/* Optional per-group intr */
 
-	/* Only used for rx groups */
+	/* Only used for Rx groups */
 	mac_add_mac_addr_t	mgi_addmac;	/* Add a MAC address */
 	mac_rem_mac_addr_t	mgi_remmac;	/* Remove a MAC address */
+	mac_add_vlan_filter_t	mgi_addvlan;	/* Add a VLAN filter */
+	mac_rem_vlan_filter_t	mgi_remvlan;	/* Remove a VLAN filter */
 };
 
 /*
