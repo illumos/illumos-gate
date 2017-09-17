@@ -145,6 +145,7 @@ int biospci_write_config(uint32_t locator, int offset, int width, uint32_t val);
 void	biosacpi_detect(void);
 
 int	i386_autoload(void);
+vm_offset_t i386_loadaddr(u_int type, void *data, vm_offset_t addr);
 
 int	bi_getboothowto(char *kargs);
 void	bi_setboothowto(int howto);
