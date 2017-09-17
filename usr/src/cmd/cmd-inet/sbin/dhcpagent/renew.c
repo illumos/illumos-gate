@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
 
 #include <sys/types.h>
@@ -490,7 +491,8 @@ dhcp_extending(dhcp_smach_t *dsmp)
 		 * dhcp_selecting() if the REQUEST_HOSTNAME option was set and
 		 * a host name was found.
 		 */
-		if (dsmp->dsm_reqhost != NULL) {
+		if (!dhcp_add_fqdn_opt(dpkt, dsmp) &&
+		    dsmp->dsm_reqhost != NULL) {
 			(void) add_pkt_opt(dpkt, CD_HOSTNAME, dsmp->dsm_reqhost,
 			    strlen(dsmp->dsm_reqhost));
 		}

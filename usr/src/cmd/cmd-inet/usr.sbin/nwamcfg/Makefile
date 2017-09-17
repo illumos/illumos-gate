@@ -22,6 +22,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 #
 # cmd/cmd-inet/usr.sbin/nwamcfg/Makefile
 
@@ -56,7 +57,7 @@ install: all $(ROOTUSRSBINPROG)
 nwamcfg_lex.c:	nwamcfg_lex.l nwamcfg_grammar.tab.h nwamcfg.h
 	$(LEX) $(LFLAGS) nwamcfg_lex.l > $@
 
-nwamcfg_grammar.tab.h nwamcfg_grammar.tab.c:	nwamcfg_grammar.y nwamcfg.h
+nwamcfg_grammar.tab.h + nwamcfg_grammar.tab.c:	nwamcfg_grammar.y nwamcfg.h
 	$(YACC) $(YFLAGS) nwamcfg_grammar.y
 
 nwamcfg_lex.o nwamcfg_grammar.tab.o := CCVERBOSE =

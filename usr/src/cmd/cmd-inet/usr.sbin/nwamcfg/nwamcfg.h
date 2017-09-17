@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef _NWAMCFG_H
@@ -133,12 +134,14 @@ extern "C" {
 #define	PT_WLAN_KEYNAME		42
 #define	PT_WLAN_KEYSLOT		43
 #define	PT_WLAN_SECURITY_MODE	44
+#define	PT_IP_PRIMARY		45
+#define	PT_IP_REQHOST		46
 /*
  * If any new PT_ are defined here, make sure it is added in the same
  * order into the pt_types array in nwamcfg.c
  */
 #define	PT_MIN			PT_UNKNOWN
-#define	PT_MAX			PT_WLAN_SECURITY_MODE
+#define	PT_MAX			PT_IP_REQHOST
 
 #define	MAX_SUBCMD_ARGS	3
 

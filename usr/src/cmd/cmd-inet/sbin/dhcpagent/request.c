@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  *
  * REQUESTING state of the client state machine.
  */
@@ -245,6 +246,8 @@ dhcp_requesting(iu_tq_t *tqp, void *arg)
 		return;
 	}
 
+	save_domainname(dsmp, offer);
+
 	if (isv6) {
 		const char *estr, *msg;
 		const dhcpv6_option_t *d6o;
@@ -313,7 +316,8 @@ dhcp_requesting(iu_tq_t *tqp, void *arg)
 		 * dhcp_selecting() if the DF_REQUEST_HOSTNAME option set and a
 		 * host name was found
 		 */
-		if (dsmp->dsm_reqhost != NULL) {
+		if (!dhcp_add_fqdn_opt(dpkt, dsmp) &&
+		    dsmp->dsm_reqhost != NULL) {
 			(void) add_pkt_opt(dpkt, CD_HOSTNAME, dsmp->dsm_reqhost,
 			    strlen(dsmp->dsm_reqhost));
 		}

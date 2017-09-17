@@ -1746,12 +1746,6 @@ struct sd_fm_internal {
 #endif
 
 /*
- * 60 seconds is what we will wait for to reset the
- * throttle back to it SD_MAX_THROTTLE.
- */
-#define	SD_RESET_THROTTLE_TIMEOUT	60
-
-/*
  * Number of times we'll retry a normal operation.
  *
  * This includes retries due to transport failure

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Pluribus Networks, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -40,6 +41,8 @@
 #include <sys/pci.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/apic_common.h>
+
+#define	UCHAR_MAX	UINT8_MAX
 
 extern struct av_head autovect[];
 
@@ -226,8 +229,10 @@ apic_find_multi_vectors(int pri, int count)
 			if (APIC_CHECK_RESERVE_VECTORS(i))
 				break;
 			navail++;
-			if (navail >= count)
-				return (start);
+			if (navail >= count) {
+				ASSERT(start >= 0 && start <= UCHAR_MAX);
+				return ((uchar_t)start);
+			}
 			i++;
 		}
 	}
@@ -505,9 +510,9 @@ apic_grp_set_cpu(int irqno, int new_cpu, int *result)
 	apic_irq_t *irqps[PCI_MSI_MAX_INTRS];
 	int i;
 	int cap_ptr;
-	int msi_mask_off;
+	int msi_mask_off = 0;
 	ushort_t msi_ctrl;
-	uint32_t msi_pvm;
+	uint32_t msi_pvm = 0;
 	ddi_acc_handle_t handle;
 	int num_vectors = 0;
 	uint32_t vector;
@@ -641,7 +646,7 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 {
 	struct autovec *av_dev;
 	uchar_t irqno;
-	int i;
+	uint_t i;
 	apic_irq_t *irq_p;
 
 	/* Sanity check the vector/irq argument. */
@@ -657,7 +662,7 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 	    PSMGI_INTRBY_VEC)
 		irqno = apic_vector_to_irq[vecirq];
 	else
-		irqno = vecirq;
+		irqno = (uchar_t)vecirq;
 
 	irq_p = apic_irq_table[irqno];
 
@@ -700,7 +705,7 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 				if (av_dev->av_vector && av_dev->av_dip)
 					i++;
 			intr_params_p->avgi_num_devs =
-			    MIN(intr_params_p->avgi_num_devs, i);
+			    (uchar_t)MIN(intr_params_p->avgi_num_devs, i);
 		}
 
 		/* There are no viable dips to return. */

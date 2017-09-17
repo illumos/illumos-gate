@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
  *
  * BOUND state of the DHCP client state machine.
  */
@@ -106,6 +107,8 @@ dhcp_bound(dhcp_smach_t *dsmp, PKT_LIST *ack)
 		/* Save the first ack as the original */
 		if (dsmp->dsm_orig_ack == NULL)
 			dsmp->dsm_orig_ack = ack;
+
+		save_domainname(dsmp, ack);
 	}
 
 	oldstate = dsmp->dsm_state;

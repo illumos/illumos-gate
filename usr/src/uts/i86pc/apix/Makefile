@@ -22,7 +22,7 @@
 # uts/i86pc/apix/Makefile
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2016, Joyent, Inc.
+# Copyright 2017, Joyent, Inc.
 #
 #	This makefile drives the production of the pcplusmp "mach"
 #	kernel module.
@@ -62,9 +62,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 # Depends on ACPI CA interpreter
 #
 LDFLAGS		+= -dy -N misc/acpica
-
-CERRWARN	+= -_gcc=-Wno-uninitialized
-CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.

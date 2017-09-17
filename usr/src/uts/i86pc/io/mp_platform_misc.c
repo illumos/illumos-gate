@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -644,7 +645,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 			ASSERT(hwpri >= 0);
 			ASSERT(hwpri < MAXIPL);
 			max_ipl = apic_vectortoipl[hwpri];
-			apic_ipls[apic_ipls_index] = max_ipl;
+			apic_ipls[apic_ipls_index] = (uchar_t)max_ipl;
 
 			irqp = irqheadptr;
 			while (irqp) {
@@ -945,7 +946,7 @@ defconf:
  */
 static int
 apic_share_vector(int irqno, iflag_t *intr_flagp, short intr_index, int ipl,
-	uchar_t ioapicindex, uchar_t ipin, apic_irq_t **irqptrp)
+    uchar_t ioapicindex, uchar_t ipin, apic_irq_t **irqptrp)
 {
 #ifdef DEBUG
 	apic_irq_t *tmpirqp = NULL;
@@ -1050,18 +1051,21 @@ static int
 apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
     struct intrspec *ispec, iflag_t *intr_flagp, int type)
 {
-	int origirq = ispec->intrspec_vec;
-	uchar_t ipl = ispec->intrspec_pri;
+	int origirq;
+	uchar_t ipl;
 	int	newirq, intr_index;
 	uchar_t	ipin, ioapic, ioapicindex, vector;
 	apic_irq_t *irqptr;
 	major_t	major;
 	dev_info_t	*sdip;
 
+	ASSERT(ispec != NULL);
+
+	origirq = ispec->intrspec_vec;
+	ipl = ispec->intrspec_pri;
+
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_setup_irq_table: dip=0x%p type=%d "
 	    "irqno=0x%x origirq=0x%x\n", (void *)dip, type, irqno, origirq));
-
-	ASSERT(ispec != NULL);
 
 	major =  (dip != NULL) ? ddi_driver_major(dip) : 0;
 
@@ -1121,10 +1125,7 @@ apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
 		intr_index = DEFAULT_INDEX;
 	}
 
-	if (ispec == NULL) {
-		APIC_VERBOSE_IOAPIC((CE_WARN, "No intrspec for irqno = %x\n",
-		    irqno));
-	} else if ((vector = apic_allocate_vector(ipl, irqno, 0)) == 0) {
+	if ((vector = apic_allocate_vector(ipl, irqno, 0)) == 0) {
 		if ((newirq = apic_share_vector(irqno, intr_flagp, intr_index,
 		    ipl, ioapicindex, ipin, &irqptr)) != -1) {
 			irqptr->airq_ipl = ipl;
@@ -1228,60 +1229,72 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 	if (apic_nproc == 1)
 		return (0);
 
-	drv_name = NULL;
-	rc = DDI_PROP_NOT_FOUND;
-	major = (major_t)-1;
-	if (dip != NULL) {
-		name = ddi_get_name(dip);
-		major = ddi_name_to_major(name);
-		drv_name = ddi_major_to_name(major);
-		instance = ddi_get_instance(dip);
-		if (apic_intr_policy == INTR_ROUND_ROBIN_WITH_AFFINITY) {
-			i = apic_min_device_irq;
-			for (; i <= apic_max_device_irq; i++) {
+	/*
+	 * dip may be NULL for interrupts not associated with a device driver,
+	 * such as the ACPI SCI or HPET interrupts. In that case just use the
+	 * next CPU and return.
+	 */
+	if (dip == NULL) {
+		iflag = intr_clear();
+		lock_set(&apic_ioapic_lock);
+		bind_cpu = apic_get_next_bind_cpu();
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
 
-				if ((i == irq) || (apic_irq_table[i] == NULL) ||
-				    (apic_irq_table[i]->airq_mps_intr_index
-				    == FREE_INDEX))
-					continue;
+		cmn_err(CE_CONT, "!%s: irq 0x%x "
+		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
+		    psm_name, irq, apic_irq_table[irq]->airq_vector, ioapicid,
+		    intin, bind_cpu & ~IRQ_USER_BOUND);
 
-				if ((apic_irq_table[i]->airq_major == major) &&
-				    (!(apic_irq_table[i]->airq_cpu &
-				    IRQ_USER_BOUND))) {
+		return ((uint32_t)bind_cpu);
+	}
 
-					cpu = apic_irq_table[i]->airq_cpu;
+	name = ddi_get_name(dip);
+	major = ddi_name_to_major(name);
+	drv_name = ddi_major_to_name(major);
+	instance = ddi_get_instance(dip);
+	if (apic_intr_policy == INTR_ROUND_ROBIN_WITH_AFFINITY) {
+		i = apic_min_device_irq;
+		for (; i <= apic_max_device_irq; i++) {
+			if ((i == irq) || (apic_irq_table[i] == NULL) ||
+			    (apic_irq_table[i]->airq_mps_intr_index
+			    == FREE_INDEX))
+				continue;
 
-					cmn_err(CE_CONT,
-					    "!%s: %s (%s) instance #%d "
-					    "irq 0x%x vector 0x%x ioapic 0x%x "
-					    "intin 0x%x is bound to cpu %d\n",
-					    psm_name,
-					    name, drv_name, instance, irq,
-					    apic_irq_table[irq]->airq_vector,
-					    ioapicid, intin, cpu);
-					return (cpu);
-				}
+			if ((apic_irq_table[i]->airq_major == major) &&
+			    (!(apic_irq_table[i]->airq_cpu & IRQ_USER_BOUND))) {
+				cpu = apic_irq_table[i]->airq_cpu;
+
+				cmn_err(CE_CONT,
+				    "!%s: %s (%s) instance #%d "
+				    "irq 0x%x vector 0x%x ioapic 0x%x "
+				    "intin 0x%x is bound to cpu %d\n",
+				    psm_name,
+				    name, drv_name, instance, irq,
+				    apic_irq_table[irq]->airq_vector,
+				    ioapicid, intin, cpu);
+				return (cpu);
 			}
 		}
-		/*
-		 * search for "drvname"_intpt_bind_cpus property first, the
-		 * syntax of the property should be "a[,b,c,...]" where
-		 * instance 0 binds to cpu a, instance 1 binds to cpu b,
-		 * instance 3 binds to cpu c...
-		 * ddi_getlongprop() will search /option first, then /
-		 * if "drvname"_intpt_bind_cpus doesn't exist, then find
-		 * intpt_bind_cpus property.  The syntax is the same, and
-		 * it applies to all the devices if its "drvname" specific
-		 * property doesn't exist
-		 */
-		(void) strcpy(prop_name, drv_name);
-		(void) strcat(prop_name, "_intpt_bind_cpus");
-		rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, 0, prop_name,
-		    (caddr_t)&prop_val, &prop_len);
-		if (rc != DDI_PROP_SUCCESS) {
-			rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, 0,
-			    "intpt_bind_cpus", (caddr_t)&prop_val, &prop_len);
-		}
+	}
+	/*
+	 * search for "drvname"_intpt_bind_cpus property first, the
+	 * syntax of the property should be "a[,b,c,...]" where
+	 * instance 0 binds to cpu a, instance 1 binds to cpu b,
+	 * instance 3 binds to cpu c...
+	 * ddi_getlongprop() will search /option first, then /
+	 * if "drvname"_intpt_bind_cpus doesn't exist, then find
+	 * intpt_bind_cpus property.  The syntax is the same, and
+	 * it applies to all the devices if its "drvname" specific
+	 * property doesn't exist
+	 */
+	(void) strcpy(prop_name, drv_name);
+	(void) strcat(prop_name, "_intpt_bind_cpus");
+	rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, 0, prop_name,
+	    (caddr_t)&prop_val, &prop_len);
+	if (rc != DDI_PROP_SUCCESS) {
+		rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, 0,
+		    "intpt_bind_cpus", (caddr_t)&prop_val, &prop_len);
 	}
 	if (rc == DDI_PROP_SUCCESS) {
 		for (i = count = 0; i < (prop_len - 1); i++)
@@ -1317,6 +1330,7 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 		 * not up, then post_cpu_start will handle it.
 		 */
 	}
+
 	if (rc != DDI_PROP_SUCCESS) {
 		iflag = intr_clear();
 		lock_set(&apic_ioapic_lock);
@@ -1325,17 +1339,11 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 		intr_restore(iflag);
 	}
 
-	if (drv_name != NULL)
-		cmn_err(CE_CONT, "!%s: %s (%s) instance %d irq 0x%x "
-		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
-		    psm_name, name, drv_name, instance, irq,
-		    apic_irq_table[irq]->airq_vector, ioapicid, intin,
-		    bind_cpu & ~IRQ_USER_BOUND);
-	else
-		cmn_err(CE_CONT, "!%s: irq 0x%x "
-		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
-		    psm_name, irq, apic_irq_table[irq]->airq_vector, ioapicid,
-		    intin, bind_cpu & ~IRQ_USER_BOUND);
+	cmn_err(CE_CONT, "!%s: %s (%s) instance %d irq 0x%x "
+	    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
+	    psm_name, name, drv_name, instance, irq,
+	    apic_irq_table[irq]->airq_vector, ioapicid, intin,
+	    bind_cpu & ~IRQ_USER_BOUND);
 
 	return ((uint32_t)bind_cpu);
 }

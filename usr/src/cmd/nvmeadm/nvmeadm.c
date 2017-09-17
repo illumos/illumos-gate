@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -54,7 +55,8 @@ struct nvme_process_arg {
 	int npa_argc;
 	char **npa_argv;
 	char *npa_name;
-	uint32_t npa_nsid;
+	char *npa_nsid;
+	int npa_found;
 	boolean_t npa_isns;
 	const nvmeadm_cmd_t *npa_cmd;
 	di_node_t npa_node;
@@ -121,7 +123,6 @@ static void usage_attach_detach(const char *);
 
 int verbose;
 int debug;
-int found;
 static int exitcode;
 
 static const nvmeadm_cmd_t nvmeadm_cmds[] = {
@@ -313,21 +314,8 @@ main(int argc, char **argv)
 		if (npa.npa_name != NULL) {
 			tmp = strchr(npa.npa_name, '/');
 			if (tmp != NULL) {
-				unsigned long nsid;
 				*tmp++ = '\0';
-				errno = 0;
-				nsid = strtoul(tmp, NULL, 10);
-				if (nsid >= UINT32_MAX || errno != 0) {
-					warn("invalid namespace %s", tmp);
-					exitcode--;
-					continue;
-				}
-				if (nsid == 0) {
-					warnx("invalid namespace %s", tmp);
-					exitcode--;
-					continue;
-				}
-				npa.npa_nsid = nsid;
+				npa.npa_nsid = tmp;
 				npa.npa_isns = B_TRUE;
 			}
 		}
@@ -337,18 +325,18 @@ main(int argc, char **argv)
 		nvme_walk(&npa, node);
 		di_fini(node);
 
-		if (found == 0) {
+		if (npa.npa_found == 0) {
 			if (npa.npa_name != NULL) {
-				warnx("%s%.*s%.*d: no such controller or "
+				warnx("%s%.*s%.*s: no such controller or "
 				    "namespace", npa.npa_name,
-				    npa.npa_nsid > 0 ? -1 : 0, "/",
-				    npa.npa_nsid > 0 ? -1 : 0, npa.npa_nsid);
+				    npa.npa_isns ? -1 : 0, "/",
+				    npa.npa_isns ? -1 : 0, npa.npa_nsid);
 			} else {
 				warnx("no controllers found");
 			}
 			exitcode--;
 		}
-		found = 0;
+		npa.npa_found = 0;
 		npa.npa_name = strtok_r(NULL, ",", &lasts);
 	} while (npa.npa_name != NULL);
 
@@ -388,7 +376,7 @@ static boolean_t
 nvme_match(nvme_process_arg_t *npa)
 {
 	char *name;
-	uint32_t nsid = 0;
+	char *nsid = NULL;
 
 	if (npa->npa_name == NULL)
 		return (B_TRUE);
@@ -405,13 +393,14 @@ nvme_match(nvme_process_arg_t *npa)
 	free(name);
 
 	if (npa->npa_isns) {
-		if (npa->npa_nsid == 0)
+		if (npa->npa_nsid == NULL)
 			return (B_TRUE);
-		nsid = strtoul(di_minor_name(npa->npa_minor), NULL, 10);
-	}
 
-	if (npa->npa_isns && npa->npa_nsid != nsid)
-		return (B_FALSE);
+		nsid = di_minor_name(npa->npa_minor);
+
+		if (nsid == NULL || strcmp(npa->npa_nsid, nsid) != 0)
+			return (B_FALSE);
+	}
 
 	return (B_TRUE);
 }
@@ -443,21 +432,29 @@ nvme_dskname(const nvme_process_arg_t *npa)
 		path = di_dim_path_dev(dim, di_driver_name(child),
 		    di_instance(child), "c");
 
-		if (path != NULL) {
-			path[strlen(path) - 2] = '\0';
-			path = strrchr(path, '/') + 1;
-			if (path != NULL) {
-				path = strdup(path);
-				if (path == NULL)
-					err(-1, "nvme_dskname");
-			}
-		}
+		/*
+		 * Error out if we didn't get a path, or if it's too short for
+		 * the following operations to be safe.
+		 */
+		if (path == NULL || strlen(path) < 2)
+			goto fail;
+
+		/* Chop off 's0' and get everything past the last '/' */
+		path[strlen(path) - 2] = '\0';
+		path = strrchr(path, '/');
+		if (path == NULL)
+			goto fail;
+		path++;
 
 		break;
 	}
 
 	di_dim_fini(dim);
+
 	return (path);
+
+fail:
+	err(-1, "nvme_dskname");
 }
 
 static int
@@ -475,7 +472,7 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 	if ((fd = nvme_open(minor)) < 0)
 		return (DI_WALK_CONTINUE);
 
-	found++;
+	npa->npa_found++;
 
 	npa->npa_path = di_devfs_path(node);
 	if (npa->npa_path == NULL)
@@ -539,6 +536,15 @@ static int
 do_list_nsid(int fd, const nvme_process_arg_t *npa)
 {
 	_NOTE(ARGUNUSED(fd));
+	const uint_t format = npa->npa_idns->id_flbas.lba_format;
+	const uint_t bshift = npa->npa_idns->id_lbaf[format].lbaf_lbads;
+
+	/*
+	 * Some devices have extra namespaces with illegal block sizes and
+	 * zero blocks. Don't list them when verbose operation isn't requested.
+	 */
+	if ((bshift < 9 || npa->npa_idns->id_nsize == 0) && verbose == 0)
+		return (0);
 
 	(void) printf("  %s/%s (%s): ", npa->npa_name,
 	    di_minor_name(npa->npa_minor),
@@ -589,7 +595,7 @@ usage_identify(const char *c_name)
 static int
 do_identify(int fd, const nvme_process_arg_t *npa)
 {
-	if (npa->npa_nsid == 0) {
+	if (!npa->npa_isns) {
 		nvme_capabilities_t *cap;
 
 		cap = nvme_capabilities(fd);
@@ -627,7 +633,7 @@ do_get_logpage_error(int fd, const nvme_process_arg_t *npa)
 	size_t bufsize = sizeof (nvme_error_log_entry_t) * nlog;
 	nvme_error_log_entry_t *elog;
 
-	if (npa->npa_nsid != 0)
+	if (npa->npa_isns)
 		errx(-1, "Error Log not available on a per-namespace basis");
 
 	elog = nvme_get_logpage(fd, NVME_LOGPAGE_ERROR, &bufsize);
@@ -651,7 +657,7 @@ do_get_logpage_health(int fd, const nvme_process_arg_t *npa)
 	size_t bufsize = sizeof (nvme_health_log_t);
 	nvme_health_log_t *hlog;
 
-	if (npa->npa_nsid != 0) {
+	if (npa->npa_isns) {
 		if (npa->npa_idctl->id_lpa.lp_smart == 0)
 			errx(-1, "SMART/Health information not available "
 			    "on a per-namespace basis on this controller");
@@ -676,7 +682,7 @@ do_get_logpage_fwslot(int fd, const nvme_process_arg_t *npa)
 	size_t bufsize = sizeof (nvme_fwslot_log_t);
 	nvme_fwslot_log_t *fwlog;
 
-	if (npa->npa_nsid != 0)
+	if (npa->npa_isns)
 		errx(-1, "Firmware Slot information not available on a "
 		    "per-namespace basis");
 
@@ -805,9 +811,9 @@ do_get_features(int fd, const nvme_process_arg_t *npa)
 	if (npa->npa_argc == 0) {
 		(void) printf("%s: Get Features\n", npa->npa_name);
 		for (feat = &features[0]; feat->f_feature != 0; feat++) {
-			if ((npa->npa_nsid != 0 &&
+			if ((npa->npa_isns &&
 			    (feat->f_getflags & NVMEADM_NS) == 0) ||
-			    (npa->npa_nsid == 0 &&
+			    (!npa->npa_isns &&
 			    (feat->f_getflags & NVMEADM_CTRL) == 0))
 				continue;
 
@@ -841,9 +847,9 @@ do_get_features(int fd, const nvme_process_arg_t *npa)
 			continue;
 		}
 
-		if ((npa->npa_nsid != 0 &&
+		if ((npa->npa_isns &&
 		    (feat->f_getflags & NVMEADM_NS) == 0) ||
-		    (npa->npa_nsid == 0 &&
+		    (!npa->npa_isns &&
 		    (feat->f_getflags & NVMEADM_CTRL) == 0)) {
 			warnx("feature %s %s supported for namespaces",
 			    feat->f_name, (feat->f_getflags & NVMEADM_NS) != 0 ?

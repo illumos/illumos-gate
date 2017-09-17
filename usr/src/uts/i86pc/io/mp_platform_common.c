@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -330,9 +331,9 @@ apic_probe_common(char *modname)
 {
 	uint32_t mpct_addr, ebda_start = 0, base_mem_end;
 	caddr_t	biosdatap;
-	caddr_t	mpct = 0;
+	caddr_t	mpct = NULL;
 	caddr_t	fptr;
-	int	i, mpct_size, mapsize, retval = PSM_FAILURE;
+	int	i, mpct_size = 0, mapsize, retval = PSM_FAILURE;
 	ushort_t	ebda_seg, base_mem_size;
 	struct	apic_mpfps_hdr	*fpsp;
 	struct	apic_mp_cnf_hdr	*hdrp;

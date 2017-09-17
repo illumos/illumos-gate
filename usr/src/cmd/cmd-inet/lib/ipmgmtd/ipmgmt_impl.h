@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef	_IPMGMT_IMPL_H
@@ -103,8 +104,11 @@ extern db_wfunc_t	ipmgmt_db_initif;
  *	  of `aobjname'.
  *	- address type (static, dhcp or addrconf)
  *	- `am_flags' indicates if this addrobj in active and/or persist config
- *	- if `am_atype' is IPADM_ADDR_IPV6_ADDRCONF then `am_ifid' holds the
- *	  interface-id used to configure auto-configured addresses
+ *	- other, ipadm_addr_type_t-specific values are cached in
+ *	  am_addr_cache (see type ipmgmt_addr_cache_u):
+ *	  -	ipv6: ipmgmt_am_linklocal (macro)
+ *	  -	ipv6: ipmgmt_am_ifid (macro)
+ *	  -	dhcp: ipmgmt_am_reqhost (macro)
  */
 typedef struct ipmgmt_aobjmap_s {
 	struct ipmgmt_aobjmap_s	*am_next;
@@ -115,9 +119,15 @@ typedef struct ipmgmt_aobjmap_s {
 	ipadm_addr_type_t	am_atype;
 	uint32_t		am_nextnum;
 	uint32_t		am_flags;
-	boolean_t		am_linklocal;
-	struct sockaddr_storage	am_ifid;
+	ipmgmt_addr_type_cache_u	am_atype_cache;
 } ipmgmt_aobjmap_t;
+
+#define	ipmgmt_am_linklocal \
+    am_atype_cache.ipmgmt_ipv6_cache_s.ipmgmt_linklocal
+#define	ipmgmt_am_ifid \
+    am_atype_cache.ipmgmt_ipv6_cache_s.ipmgmt_ifid
+#define	ipmgmt_am_reqhost \
+    am_atype_cache.ipmgmt_dhcp_cache_s.ipmgmt_reqhost
 
 /* linked list of `aobjmap' nodes, protected by RW lock */
 typedef struct ipmgmt_aobjmap_list_s {
