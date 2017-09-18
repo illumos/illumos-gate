@@ -1229,6 +1229,11 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 	if (apic_nproc == 1)
 		return (0);
 
+	/*
+	 * dip may be NULL for interrupts not associated with a device driver,
+	 * such as the ACPI SCI or HPET interrupts. In that case just use the
+	 * next CPU and return.
+	 */
 	if (dip == NULL) {
 		iflag = intr_clear();
 		lock_set(&apic_ioapic_lock);

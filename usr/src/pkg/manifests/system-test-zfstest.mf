@@ -403,6 +403,11 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.divide_by_zero.zcp \
     mode=0444
+file path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.exists \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.exists.zcp \
+    mode=0444
 file \
     path=opt/zfs-tests/tests/functional/channel_program/lua_core/tst.integer_illegal \
     mode=0555

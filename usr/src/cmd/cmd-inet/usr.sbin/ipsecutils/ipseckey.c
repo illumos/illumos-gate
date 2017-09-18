@@ -1728,7 +1728,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			switch (token) {
 			case TOK_SPI:
 				/*
-				 * If some cretin types in "spi 0" then they
+				 * If they type in "spi 0" then they
 				 * can type in another SPI.
 				 */
 				if (assoc->sadb_sa_spi != 0) {

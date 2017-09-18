@@ -492,7 +492,7 @@ init_globals(disk)
 			fmt_print("]");
 		/*
 		 * Drive wasn't formatted.  Tell the user in case they
-		 * disagrees.
+		 * disagree.
 		 */
 		} else if (EMBEDDED_SCSI) {
 			fmt_print("[disk unformatted]");

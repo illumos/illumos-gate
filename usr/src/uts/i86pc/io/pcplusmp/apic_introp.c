@@ -646,7 +646,7 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 {
 	struct autovec *av_dev;
 	uchar_t irqno;
-	uint i;
+	uint_t i;
 	apic_irq_t *irq_p;
 
 	/* Sanity check the vector/irq argument. */
