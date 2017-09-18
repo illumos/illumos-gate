@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -72,8 +72,9 @@
 static void lxi_err(char *msg, ...) __NORETURN;
 static void lxi_err(char *msg, ...);
 
-#define	IPMGMTD_PATH	"/lib/inet/ipmgmtd"
-#define	IN_NDPD_PATH	"/usr/lib/inet/in.ndpd"
+#define	IPMGMTD_PATH		"/lib/inet/ipmgmtd"
+#define	IN_NDPD_PATH		"/usr/lib/inet/in.ndpd"
+#define	HOOK_POSTNET_PATH	"/usr/lib/brand/lx/lx_hook_postnet"
 
 #define	PREFIX_LOG_WARN	"lx_init warn: "
 #define	PREFIX_LOG_ERR	"lx_init err: "
@@ -818,6 +819,65 @@ lxi_config_close(zone_dochandle_t handle)
 }
 
 static void
+lxi_hook_postnet()
+{
+	char cmd[MAXPATHLEN];
+	const char *zroot = zone_get_nroot();
+	pid_t pid;
+	int status;
+
+	(void) snprintf(cmd, sizeof (cmd), "%s%s", zroot, HOOK_POSTNET_PATH);
+	if (access(cmd, X_OK) != 0) {
+		/* If no suitable script is present, soldier on. */
+		return;
+	}
+
+	if ((pid = fork()) < 0) {
+		lxi_err("fork() failed: %s", strerror(errno));
+	}
+	if (pid == 0) {
+		char *const argv[] = { cmd, NULL };
+		char *const envp[] = { NULL };
+
+		/* wire up stderr first, in case the hook wishes to use it */
+		if (dup2(1, 2) < 0) {
+			lxi_err("dup2() failed: %s", cmd, strerror(errno));
+		}
+
+		/* child executes the hook */
+		execve(cmd, argv, envp);
+
+		/*
+		 * Since this is running as root, access(2) is less strict than
+		 * necessary to ensure a successful exec.  If the permissions
+		 * on the hook are busted, ignore the failure and move on.
+		 */
+		if (errno == EACCES) {
+			exit(0);
+		}
+
+		lxi_err("execve(%s) failed: %s", cmd, strerror(errno));
+		/* NOTREACHED */
+	}
+
+	/* Parent waits for the hook to complete */
+	while (wait(&status) != pid) {
+		/* EMPTY */;
+	}
+	if (WIFEXITED(status)) {
+		if (WEXITSTATUS(status) != 0) {
+			lxi_err("%s[%d] exited: %d", cmd, (int)pid,
+			    WEXITSTATUS(status));
+		}
+	} else if (WIFSIGNALED(status)) {
+		lxi_err("%s[%d] died on signal: %d", cmd, (int)pid,
+		    WTERMSIG(status));
+	} else {
+		lxi_err("%s[%d] failed in unknown way", cmd, (int)pid);
+	}
+}
+
+static void
 lxi_init_exec(char **argv)
 {
 	const char *cmd = "/sbin/init";
@@ -862,6 +922,8 @@ main(int argc, char *argv[])
 	lxi_net_static_routes();
 
 	lxi_net_ipadm_close();
+
+	lxi_hook_postnet();
 
 	lxi_log_close();
 
