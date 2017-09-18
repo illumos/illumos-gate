@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 1992-1996 Competitive Automation, Inc. Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
+.\"  Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DHCPAGENT 1M "Dec 11, 2015"
+.TH DHCPAGENT 1M "Jun 30, 2017"
 .SH NAME
 dhcpagent \- Dynamic Host Configuration Protocol (DHCP) client daemon
 .SH SYNOPSIS
@@ -15,7 +16,7 @@ dhcpagent \- Dynamic Host Configuration Protocol (DHCP) client daemon
 .SH DESCRIPTION
 .LP
 \fBdhcpagent\fR implements the client half of the Dynamic Host Configuration
-Protocol \fB(DHCP)\fR for machines running Solaris software.
+Protocol \fB(DHCP)\fR for machines running illumos software.
 .sp
 .LP
 The \fBdhcpagent\fR daemon obtains configuration parameters for the client
@@ -28,11 +29,12 @@ it must negotiate an extension using \fBDHCP\fR. For this reason,
 powers down.
 .sp
 .LP
-For IPv4, the \fBdhcpagent\fR daemon is controlled through \fBifconfig\fR(1M)
-in much the same way that the \fBinit\fR(1M) daemon is controlled by
-\fBtelinit\fR(1M). \fBdhcpagent\fR can be invoked as a user process, albeit one
-requiring root privileges, but this is not necessary, as \fBifconfig\fR(1M)
-will start it automatically.
+For IPv4, the \fBdhcpagent\fR daemon is controlled through \fBipadm\fR(1M),
+\fBnwamcfg\fR(1M), or \fBifconfig\fR(1M) in much the same way that the
+\fBinit\fR(1M) daemon is controlled by \fBtelinit\fR(1M). \fBdhcpagent\fR can
+be invoked as a user process, albeit one requiring root privileges, but this is
+not necessary, as \fBipadm\fR(1M), \fBnwamcfg\fR(1M), or \fBifconfig\fR(1M)
+will start \fBdhcpagent\fR automatically.
 .sp
 .LP
 For IPv6, the \fBdhcpagent\fR daemon is invoked automatically by
@@ -41,16 +43,20 @@ necessary.
 .sp
 .LP
 When invoked, \fBdhcpagent\fR enters a passive state while it awaits
-instructions from \fBifconfig\fR(1M) or \fBin.ndpd\fR(1M). When it receives a
-command to configure an interface, it brings up the interface (if necessary)
-and starts DHCP. Once DHCP is complete, \fBdhcpagent\fR can be queried for the
-values of the various network parameters. In addition, if DHCP was used to
-obtain a lease on an address for an interface, it configures the address for
-use. When a lease is obtained, it is automatically renewed as necessary. If the
+instructions from \fBipadm\fR(1M), \fBnwamcfg\fR(1M), \fBifconfig\fR(1M), or
+\fBin.ndpd\fR(1M). When \fBdhcpagent\fR receives a command to configure an
+interface, \fBdhcpagent\fR brings up the interface (if necessary) and starts
+DHCP. Once DHCP is complete, \fBdhcpagent\fR can be queried for the values of
+the various network parameters. In addition, if DHCP was used to obtain a lease
+on an address for an interface, \fBdhcpagent\fR configures the address for use.
+When a lease is obtained, it is automatically renewed as necessary. If the
 lease cannot be renewed, \fBdhcpagent\fR will unconfigure the address, but the
-interface will be left up and \fBdhcpagent\fR will attempt to acquire a new
-address lease. \fBdhcpagent\fR monitors system suspend/resume events and will
-validate any non-permanent leases with the DHCP server upon resume. Similarly,
+interface will be left up, and \fBdhcpagent\fR will attempt to acquire a new
+address lease.
+.sp
+.LP
+\fBdhcpagent\fR monitors system suspend/resume events and will validate any
+non-permanent leases with the DHCP server upon resume. Similarly,
 \fBdhcpagent\fR monitors link up/down events and will validate any
 non-permanent leases with the DHCP server when the downed link is brought back
 up. The lease validation mechanism will restart DHCP if the server indicates
@@ -102,10 +108,10 @@ parameters in the case where no specific interface is requested. See
 .sp
 .LP
 For IPv4, the \fBdhcpagent\fR daemon can be configured to request a particular
-host name. See the \fBREQUEST_HOSTNAME\fR description in the \fBFILES\fR
-section. When first configuring a client to request a host name, you must
-perform the following steps as root to ensure that the full DHCP negotiation
-takes place:
+Fully Qualified Domain Name (FQDN) or host name. See the \fBREQUEST_FQDN\fR or
+\fBREQUEST_HOSTNAME\fR description in the \fBFILES\fR section. When first
+configuring a client to request an FQDN or host name, you must perform the
+following steps as root to ensure that the full DHCP negotiation takes place:
 .sp
 .in +2
 .nf
@@ -494,9 +500,14 @@ using REQUEST (for DHCPv4) or Confirm (DHCPv6).
 .ad
 .sp .6
 .RS 4n
-Contains persistent storage for DUID (DHCP Unique Identifier) and IAID
-(Identity Association Identifier) values. The format of these files is
-undocumented, and applications should not read from or write to them.
+Contains persistent storage for system-generated DUID (DHCP Unique Identifier)
+and interface-specific IAID (Identity Association Identifier) values which are
+used if no \fBCLIENT_ID\fR is defined (see below). The format of these files is
+undocumented, and applications should not read from or write to them.  Instead,
+\fBdhcpinfo\fR(1) can be used to query the \fBdhcpagent\fR for \fIClientID\fR.
+For DHCPv6 interfaces, the result will contain the DUID. For DHCPv4 interfaces
+with \fBV4_DEFAULT_IAID_DUID\fR enabled (see below), the result will contain
+the IAID and DUID.
 .RE
 
 .sp
@@ -536,6 +547,8 @@ remaining) and a new one obtained.
 .sp
 Enabling this option is often desirable on mobile systems, such as laptops, to
 allow the system to recover quickly from moves.
+.sp
+Default value of this option is \fIno\fR.
 .RE
 
 .sp
@@ -545,9 +558,11 @@ allow the system to recover quickly from moves.
 .ad
 .sp .6
 .RS 4n
-Indicates how long to wait between checking for valid \fBOFFER\fRs after
-sending a \fBDISCOVER\fR. For DHCPv6, sets the time to wait between checking
-for valid Advertisements after sending a Solicit.
+Indicates how long to wait in seconds between checking for valid
+\fBOFFER\fRs after sending a \fBDISCOVER\fR. For DHCPv6, sets the time to
+wait between checking for valid Advertisements after sending a Solicit.
+.sp
+Default value of this option is \fI3\fR.
 .RE
 
 .sp
@@ -630,6 +645,26 @@ format. Thus, "\fBSun\fR" and \fB0x53756E\fR are equivalent.
 .sp
 .ne 2
 .na
+\fB\fBV4_DEFAULT_IAID_DUID\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates whether to use, when CLIENT_ID is not defined, a system-managed,
+RFC 3315-style (i.e., DHCPv6-style) binding identifier as documented in
+RFC 4361, "Node-specific Client Identifiers for DHCPv4," for IPv4
+interfaces which for purposes of backward compatibility do not normally get
+default binding identifiers.
+.sp
+An IPv4 interface that is not in an IP network multipathing (IPMP) group,
+that is not IP over InfiniBand (IPoIB), and that is not a logical interface
+does not normally get a default binding identifier.
+.sp
+Default value of this option is \fIno\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBPARAM_REQUEST_LIST\fR\fR
 .ad
 .sp .6
@@ -658,13 +693,106 @@ default router.
 .sp
 .ne 2
 .na
+\fB\fBREQUEST_FQDN\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates the client requests the DHCP server to map the client's leased
+IPv4 address to the Fully Qualified Domain Name (FQDN) associated with the
+network interface that performs DHCP on the client and to collaborate with
+a compatible DNS server to manage A and PTR resource records for the FQDN
+for the life of the lease.
+.sp .6
+The \fIhostname\fR in the FQDN is determined from the following possible
+configurations:
+.sp
+.ne 2
+.na
+1.  \fBipadm\fR(1M): include the \fB-1,--primary\fR flag when creating an
+address that uses DHCP so that \fBnodename\fR(4) is used as the
+\fIhostname\fR.
+.ad
+.sp
+.ne 2
+.na
+2.  \fBipadm\fR(1M): include the \fB-h,--reqhost\fR \fIhostname\fR switch
+when executing the \fBcreate-addr -T dhcp\fR subcommand, or use the
+\fBset-addrprop -p reqhost=\fR\fIhostname\fR subcommand for any existing
+DHCP address.
+.ad
+.sp
+.ne 2
+.na
+3.  \fBnwamcfg\fR(1M): set a property,
+\fBip-primary=\fR\fIon\fR, for an ncu ip that uses DHCP so that
+\fBnodename\fR(4) is used as the \fIhostname\fR.
+.ad
+.sp
+.ne 2
+.na
+4.  \fBnwamcfg\fR(1M): set a property,
+\fBip-reqhost=\fR\fIhostname\fR, for an ncu ip that uses DHCP.
+.ad
+.sp
+The \fIhostname\fR value is either a Partially Qualified Domain Name (PQDN)
+or an FQDN (i.e., a "rooted" domain name ending with a '.' or one inferred
+to be an FQDN if it contains at least three DNS labels such as
+srv.example.com).  If a PQDN is specified, then an FQDN is constructed if
+\fBDNS_DOMAINNAME\fR is defined or if \fBADOPT_DOMAINNAME\fR is set to
+\fIyes\fR and an eligible domain name (as described below) is available.
+.sp
+If an FQDN is sent, \fBREQUEST_HOSTNAME\fR processing will not be done,
+per RFC 4702 (3.1):  "clients that send the Client FQDN option in their
+messages MUST NOT also send the Host Name."
+.sp
+Default value of this option is \fIyes\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBDNS_DOMAINNAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates the value that should be appended to a PQDN specified by the
+\fB-h,--reqhost\fR option of \fBipadm\fR(1M), by the ncu \fBip-reqhost\fR
+property of \fBnwamcfg\fR(1M), or by \fBnodename\fR(4) to construct an FQDN
+for \fBREQUEST_FQDN\fR processing.
+If the \fIhostname\fR value is already an FQDN, then the value of this
+option is not used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBADOPT_DOMAINNAME\fR\fR
+.ad
+.sp .6
+.RS 4n
+Indicates that a domain name returned by the DHCP server or the \fBdomain\fR
+from \fBresolv.conf\fR(4) should be adopted if needed to construct an FQDN
+from a PQDN specified by the \fB-h,--reqhost\fR option of \fBipadm\fR(1M),
+by the ncu \fBip-reqhost\fR property of \fBnwamcfg\fR(1M), or by
+\fBnodename\fR(4).
+If the \fIhostname\fR value is already an FQDN, then the value of this
+option is not applicable.
+The eligible DHCP option for domain name is DHCPv4 \fBDNSdmain\fR.
+.sp
+Default value of this option is \fIno\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBREQUEST_HOSTNAME\fR\fR
 .ad
 .sp .6
 .RS 4n
 Indicates the client requests the DHCP server to map the client's leased IPv4
 address to the host name associated with the network interface that performs
-DHCP on the client. The host name must be specified in the
+DHCP on the client. The host name must be specified as documented for a
+PQDN in \fBREQUEST_FQDN\fR above or specified in the
 \fB/etc/hostname.\fIinterface\fR\fR file for the relevant interface on a line
 of the form
 .sp
@@ -678,6 +806,8 @@ inet \fIhostname\fR
 where \fIhostname\fR is the host name requested.
 .sp
 This option works with DHCPv4 only.
+.sp
+Default value of this option is \fIyes\fR.
 .RE
 
 .RE
@@ -710,7 +840,8 @@ Interface Stability	Committed
 .SH SEE ALSO
 .LP
 \fBdhcpinfo\fR(1), \fBifconfig\fR(1M), \fBinit\fR(1M), \fBin.mpathd\fR(1M),
-\fBin.ndpd\fR(1M), \fBsyslog\fR(3C), \fBattributes\fR(5), \fBdhcp\fR(5)
+\fBin.ndpd\fR(1M), \fBipadm\fR(1M), \fBnwamcfg\fR(1M), \fBsyslog\fR(3C),
+\fBnodename\fR(4), \fBresolv.conf\fR(4), \fBattributes\fR(5), \fBdhcp\fR(5)
 .sp
 .LP
 \fI\fR

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #ifndef _NCU_H
@@ -225,6 +226,8 @@ extern nwam_error_t nwamd_get_ncu_uint(nwam_ncu_handle_t, nwam_value_t *,
     uint64_t **, uint_t *, const char *);
 extern nwam_error_t nwamd_get_ncu_string(nwam_ncu_handle_t, nwam_value_t *,
     char ***, uint_t *, const char *);
+extern nwam_error_t nwamd_get_ncu_boolean(nwam_ncu_handle_t, nwam_value_t *,
+    boolean_t **, uint_t *, const char *);
 
 extern void nwamd_walk_physical_configuration(void);
 

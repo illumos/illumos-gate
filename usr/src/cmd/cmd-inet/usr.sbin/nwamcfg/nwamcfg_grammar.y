@@ -23,6 +23,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #include <stdio.h>
@@ -67,6 +68,7 @@ extern boolean_t newline_terminated;
 %token LOC_IPF_CONFIG LOC_IPF_V6_CONFIG
 %token LOC_IPNAT_CONFIG LOC_IPPOOL_CONFIG LOC_IKE_CONFIG LOC_IPSECPOL_CONFIG
 %token WLAN_BSSIDS WLAN_PRIORITY WLAN_KEYNAME WLAN_KEYSLOT WLAN_SECURITY_MODE
+%token IP_PRIMARY IP_REQHOST
 
 %type <strval> TOKEN EQUAL OPTION
 %type <ival> resource1_type LOC NCP ENM WLAN
@@ -86,6 +88,7 @@ extern boolean_t newline_terminated;
     LOC_IPF_CONFIG LOC_IPF_V6_CONFIG
     LOC_IPNAT_CONFIG LOC_IPPOOL_CONFIG LOC_IKE_CONFIG LOC_IPSECPOL_CONFIG
     WLAN_BSSIDS WLAN_PRIORITY WLAN_KEYNAME WLAN_KEYSLOT WLAN_SECURITY_MODE
+    IP_PRIMARY IP_REQHOST
 %type <cmd> command
 %type <cmd> cancel_command CANCEL
 %type <cmd> clear_command CLEAR
@@ -617,7 +620,22 @@ list_command:	LIST
 		command_usage(CMD_LIST);
 		YYERROR;
 	}
+	|	LIST OPTION resource1_type
+	{
+		command_usage(CMD_LIST);
+		YYERROR;
+	}
 	|	LIST resource2_type
+	{
+		command_usage(CMD_LIST);
+		YYERROR;
+	}
+	|	LIST OPTION resource2_type
+	{
+		command_usage(CMD_LIST);
+		YYERROR;
+	}
+	|	LIST OPTION resource2_type ncu_class_type
 	{
 		command_usage(CMD_LIST);
 		YYERROR;
@@ -739,6 +757,11 @@ select_command:	SELECT
 		YYERROR;
 	}
 	|	SELECT resource2_type
+	{
+		command_usage(CMD_SELECT);
+		YYERROR;
+	}
+	|	SELECT resource2_type ncu_class_type
 	{
 		command_usage(CMD_SELECT);
 		YYERROR;
@@ -900,5 +923,7 @@ property_type:	UNKNOWN			{ $$ = PT_UNKNOWN; }
 	|	WLAN_KEYNAME		{ $$ = PT_WLAN_KEYNAME; }
 	|	WLAN_KEYSLOT		{ $$ = PT_WLAN_KEYSLOT; }
 	|	WLAN_SECURITY_MODE	{ $$ = PT_WLAN_SECURITY_MODE; }
+	|	IP_PRIMARY		{ $$ = PT_IP_PRIMARY; }
+	|	IP_REQHOST		{ $$ = PT_IP_REQHOST; }
 
 %%

@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <sys/types.h>
@@ -106,8 +105,10 @@ ipc_action_start(dhcp_smach_t *dsmp, ipc_action_t *iareq)
 	/* We've taken ownership, so the input request is now invalid */
 	ipc_action_init(iareq);
 
-	dhcpmsg(MSG_DEBUG, "ipc_action_start: started %s (command %d) on %s",
-	    dhcp_ipc_type_to_string(ia->ia_cmd), ia->ia_cmd, dsmp->dsm_name);
+	dhcpmsg(MSG_DEBUG, "ipc_action_start: started %s (command %d) on %s,"
+	    " buffer length %u",
+	    dhcp_ipc_type_to_string(ia->ia_cmd), ia->ia_cmd, dsmp->dsm_name,
+	    ia->ia_request == NULL ? 0 : ia->ia_request->data_length);
 
 	dsmp->dsm_dflags |= DHCP_IF_BUSY;
 

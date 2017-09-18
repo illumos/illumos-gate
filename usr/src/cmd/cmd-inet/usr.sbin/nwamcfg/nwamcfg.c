@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 /*
@@ -198,7 +199,9 @@ static char *pt_types[] = {
 	NWAM_KNOWN_WLAN_PROP_PRIORITY,
 	NWAM_KNOWN_WLAN_PROP_KEYNAME,
 	NWAM_KNOWN_WLAN_PROP_KEYSLOT,
-	NWAM_KNOWN_WLAN_PROP_SECURITY_MODE
+	NWAM_KNOWN_WLAN_PROP_SECURITY_MODE,
+	NWAM_NCU_PROP_IP_PRIMARY,
+	NWAM_NCU_PROP_IP_REQHOST
 };
 
 /* properties table: maps PT_* constants to property names */
@@ -226,6 +229,8 @@ static prop_table_entry_t ncu_prop_table[] = {
 	{ PT_IPV6_ADDRSRC, 		NWAM_NCU_PROP_IPV6_ADDRSRC },
 	{ PT_IPV6_ADDR, 		NWAM_NCU_PROP_IPV6_ADDR },
 	{ PT_IPV6_DEFAULT_ROUTE,	NWAM_NCU_PROP_IPV6_DEFAULT_ROUTE },
+	{ PT_IP_PRIMARY,		NWAM_NCU_PROP_IP_PRIMARY },
+	{ PT_IP_REQHOST,		NWAM_NCU_PROP_IP_REQHOST },
 	{ 0, NULL }
 };
 
@@ -626,7 +631,8 @@ rt2_to_str(int res_type)
 
 /* Returns "ncp, "ncu", "loc", "enm", or "wlan" according to the scope */
 static const char *
-scope_to_str(int scope) {
+scope_to_str(int scope)
+{
 	switch (scope) {
 	case NWAM_SCOPE_GBL:
 		return ("global");
@@ -664,11 +670,15 @@ pt_to_str(int prop_type)
 	return (pt_types[prop_type]);
 }
 
-/* Return B_TRUE if string starts with "t" or is 1, B_FALSE otherwise */
+/*
+ * Return B_TRUE if string starts with "t" or "on" or is 1;
+ * B_FALSE otherwise
+ */
 static boolean_t
 str_to_boolean(const char *str)
 {
-	if (strncasecmp(str, "t", 1) == 0 || atoi(str) == 1)
+	if (strncasecmp(str, "t", 1) == 0 || strncasecmp(str, "on", 2) == 0 ||
+	    atoi(str) == 1)
 		return (B_TRUE);
 	else
 		return (B_FALSE);
@@ -2197,6 +2207,12 @@ static prop_display_entry_t ncu_prop_display_entry_table[] = {
 	/* show ipv6-default-route if ip-version == ipv6 */
 	{ NWAM_NCU_PROP_IPV6_DEFAULT_ROUTE, NWAM_NCU_PROP_IP_VERSION,
 	    { IPV6_VERSION, -1 } },
+	/* show ip-primary if ipv4-addrsrc == dhcp */
+	{ NWAM_NCU_PROP_IP_PRIMARY, NWAM_NCU_PROP_IPV4_ADDRSRC,
+	    { NWAM_ADDRSRC_DHCP, -1 } },
+	/* show ip-reqhost if ipv4-addrsrc == dhcp */
+	{ NWAM_NCU_PROP_IP_REQHOST, NWAM_NCU_PROP_IPV4_ADDRSRC,
+	    { NWAM_ADDRSRC_DHCP, -1 } },
 	{ NULL, NULL, { -1 } }
 };
 

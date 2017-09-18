@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (C) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DHCP_INITTAB 4 "Aug 31, 2009"
+.TH DHCP_INITTAB 4 "Oct 31, 2016"
 .SH NAME
 dhcp_inittab \- information repository for DHCP options
 .SH DESCRIPTION
-.sp
 .LP
 The \fB/etc/dhcp/inittab\fR and the \fB/etc/dhcp/inittab6\fR files contain
 information about the Dynamic Host Configuration Protocol (\fBDHCP\fR) options,
@@ -123,7 +123,6 @@ be further defined.
 .RE
 
 .SS "DHCP \fBinittab\fR and \fBinittab6\fR Format"
-.sp
 .LP
 Data entries are written one per line and have seven fields; each entry
 provides information for one option. Each field is separated by a comma, except
@@ -361,7 +360,6 @@ this information, and should always be defined as \fBsdmi\fR for newly added
 options.
 .RE
 .SS "Mnemonic Identifiers for IPv4 Options"
-.sp
 .LP
 The following table maps the mnemonic identifiers used in Solaris DHCP to
 \fIRFC 2132\fR options:
@@ -377,7 +375,7 @@ _
 Subnet Mask, dotted Internet address (IP).
 T}
 \fBUTCoffst\fR	\fB2\fR	T{
-Coordinated Universal time offset (seconds).
+Coordinated Universal time offset (seconds) [deprecated].
 T}
 \fBRouter\fR	\fB3\fR	List of Routers, IP.
 \fBTimeserv\fR	\fB4\fR	List of RFC-868 servers, IP.
@@ -475,6 +473,7 @@ T}
 \fBUserClas\fR	\fB77\fR	User class information, ASCII.
 \fBSLP_DA\fR	\fB78\fR	Directory agent, OCTET.
 \fBSLP_SS\fR	\fB79\fR	Service scope, OCTET.
+\fBClientFQDN\fR	\fB81\fR	Fully Qualified Domain Name, OCTET.
 \fBAgentOpt\fR	\fB82\fR	Agent circuit ID, OCTET.
 \fBFQDN\fR	\fB89\fR	Fully Qualified Domain Name, OCTET.
 \fBPXEarch\fR	\fB93\fR	Client system architecture, NUMBER.
@@ -491,7 +490,6 @@ T}
 .TE
 
 .SS "Mnemonic Identifiers for IPv6 Options"
-.sp
 .LP
 The following table maps the mnemonic identifiers used in Solaris DHCP to RFC
 3315, 3319, 3646, 3898, 4075, and 4280 options:
@@ -559,7 +557,6 @@ is of type \fBIP\fR Address, consisting  of a potentially infinite number of
 pairs of \fBIP\fR addresses.
 
 .SH FILES
-.br
 .in +2
 \fB/etc/dhcp/inittab\fR
 .in -2
@@ -568,7 +565,6 @@ pairs of \fBIP\fR addresses.
 \fB/etc/dhcp/inittabv6\fR
 .in -2
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -584,7 +580,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdhcpinfo\fR(1), \fBdhcpagent\fR(1M), \fBisspace\fR(3C), \fBdhcptab\fR(4),
 \fBattributes\fR(5), \fBdhcp\fR(5), \fBdhcp_modules\fR(5)

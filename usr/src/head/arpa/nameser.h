@@ -1,6 +1,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 /*
@@ -576,6 +577,7 @@ typedef enum __ns_cert_types {
 #define	ns_name_ntol		__ns_name_ntol
 #define	ns_name_ntop		__ns_name_ntop
 #define	ns_name_pton		__ns_name_pton
+#define	ns_name_pton2		__ns_name_pton2
 #define	ns_name_unpack		__ns_name_unpack
 #define	ns_name_pack		__ns_name_pack
 #define	ns_name_compress	__ns_name_compress
@@ -632,6 +634,7 @@ uint32_t	ns_datetosecs(const char *cp, int *errp);
 int		ns_name_ntol(const uchar_t *, uchar_t *, size_t);
 int		ns_name_ntop(const uchar_t *, char *, size_t);
 int		ns_name_pton(const char *, uchar_t *, size_t);
+int		ns_name_pton2(const char *, uchar_t *, size_t, size_t *);
 int		ns_name_unpack(const uchar_t *, const uchar_t *,
 				    const uchar_t *, uchar_t *, size_t);
 int		ns_name_pack(const uchar_t *, uchar_t *, int,

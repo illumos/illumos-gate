@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #include <arpa/inet.h>
@@ -33,6 +34,7 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -126,6 +128,17 @@ nwamd_get_ncu_uint(nwam_ncu_handle_t ncuh, nwam_value_t *val,
 	if ((err = nwam_ncu_get_prop_value(ncuh, prop, val)) != NWAM_SUCCESS)
 		return (err);
 	return (nwam_value_get_uint64_array(*val, uintval, cnt));
+}
+
+nwam_error_t
+nwamd_get_ncu_boolean(nwam_ncu_handle_t ncuh, nwam_value_t *val,
+    boolean_t **boolval, uint_t *cnt, const char *prop)
+{
+	nwam_error_t err;
+
+	if ((err = nwam_ncu_get_prop_value(ncuh, prop, val)) != NWAM_SUCCESS)
+		return (err);
+	return (nwam_value_get_boolean_array(*val, boolval, cnt));
 }
 
 /*
@@ -733,13 +746,13 @@ populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 {
 	nwamd_if_t *nif = &ncu_data->ncu_if;
 	struct nwamd_if_address **nifa, *nifai, *nifait;
-	boolean_t static_addr = B_FALSE;
+	boolean_t static_addr = B_FALSE, *boolvalue, dhcp_primary = B_FALSE;
 	uint64_t *addrsrcvalue;
 	nwam_value_t ncu_prop;
 	nwam_error_t err;
 	ipadm_addrobj_t ipaddr;
 	ipadm_status_t ipstatus;
-	char **addrvalue;
+	char **addrvalue, ipreqhost[MAXNAMELEN];
 	uint_t numvalues;
 	uint64_t *ipversion;
 	int i;
@@ -772,6 +785,39 @@ populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 				    ipversion[i]);
 				break;
 			}
+		}
+		nwam_value_free(ncu_prop);
+	}
+
+	/* ip-primary */
+	if ((err = nwamd_get_ncu_boolean(ncuh, &ncu_prop, &boolvalue,
+	    &numvalues, NWAM_NCU_PROP_IP_PRIMARY)) != NWAM_SUCCESS) {
+		/* ip-primary is optional, so do not LOG_ERR */
+		nlog(LOG_DEBUG, "populate_ip_ncu_properties: "
+		    "could not get %s value: %s",
+		    NWAM_NCU_PROP_IP_PRIMARY, nwam_strerror(err));
+	} else {
+		if (numvalues > 0)
+			dhcp_primary = boolvalue[0];
+		nwam_value_free(ncu_prop);
+	}
+
+	/* ip-reqhost */
+	*ipreqhost = '\0';
+
+	if ((err = nwamd_get_ncu_string(ncuh, &ncu_prop, &addrvalue,
+	    &numvalues, NWAM_NCU_PROP_IP_REQHOST)) != NWAM_SUCCESS) {
+		/* ip-reqhost is optional, so do not LOG_ERR */
+		nlog(LOG_DEBUG, "populate_ip_ncu_properties: "
+		    "could not get %s value: %s",
+		    NWAM_NCU_PROP_IP_REQHOST, nwam_strerror(err));
+	} else {
+		if (numvalues > 0 && strlcpy(ipreqhost, addrvalue[0],
+		    sizeof (ipreqhost)) >= sizeof (ipreqhost)) {
+			nlog(LOG_WARNING, "populate_ip_ncu_properties: "
+			    "too long %s value: %s",
+			    NWAM_NCU_PROP_IP_REQHOST, addrvalue[0]);
+			*ipreqhost = '\0';
 		}
 		nwam_value_free(ncu_prop);
 	}
@@ -828,6 +874,22 @@ populate_ip_ncu_properties(nwam_ncu_handle_t ncuh, nwamd_ncu_t *ncu_data)
 			ipadm_destroy_addrobj(ipaddr);
 			goto skip_ipv4_dhcp;
 		}
+		ipstatus = ipadm_set_primary(ipaddr, dhcp_primary);
+		if (ipstatus != IPADM_SUCCESS) {
+			nlog(LOG_ERR, "populate_ip_ncu_properties: "
+			    "ipadm_set_primary failed for v4 dhcp: %s",
+			    ipadm_status2str(ipstatus));
+			ipadm_destroy_addrobj(ipaddr);
+			goto skip_ipv4_dhcp;
+		}
+		ipstatus = ipadm_set_reqhost(ipaddr, ipreqhost);
+		if (ipstatus != IPADM_SUCCESS) {
+			nlog(LOG_ERR, "populate_ip_ncu_properties: "
+			    "ipadm_set_reqhost failed for v4 dhcp: %s",
+			    ipadm_status2str(ipstatus));
+			ipadm_destroy_addrobj(ipaddr);
+			goto skip_ipv4_dhcp;
+		}
 		if ((*nifa = calloc(sizeof (**nifa), 1)) != NULL) {
 			(*nifa)->family = AF_INET;
 			(*nifa)->ipaddr_atype = IPADM_ADDR_DHCP;
@@ -848,7 +910,7 @@ skip_ipv4_dhcp:
 		if ((err = nwamd_get_ncu_string(ncuh, &ncu_prop, &addrvalue,
 		    &numvalues, NWAM_NCU_PROP_IPV4_ADDR)) != NWAM_SUCCESS) {
 			nlog(LOG_ERR, "populate_ip_ncu_properties: "
-			    "could not get %s value; %s",
+			    "could not get %s value: %s",
 			    NWAM_NCU_PROP_IPV4_ADDR, nwam_strerror(err));
 		} else {
 			for (i = 0; i < numvalues; i++) {
@@ -995,7 +1057,7 @@ skip_ipv6_addrconf:
 		if ((err = nwamd_get_ncu_string(ncuh, &ncu_prop, &addrvalue,
 		    &numvalues, NWAM_NCU_PROP_IPV6_ADDR)) != NWAM_SUCCESS) {
 			nlog(LOG_ERR, "populate_ip_ncu_properties: "
-			    "could not get %s value; %s",
+			    "could not get %s value: %s",
 			    NWAM_NCU_PROP_IPV6_ADDR, nwam_strerror(err));
 		} else {
 			for (i = 0; i < numvalues; i++) {

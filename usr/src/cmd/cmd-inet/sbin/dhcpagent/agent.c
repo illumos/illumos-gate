@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
 
 #include <sys/types.h>
@@ -36,6 +37,8 @@
 #include <dhcpagent_ipc.h>
 #include <dhcpagent_util.h>
 #include <dhcpmsg.h>
+#include <dhcp_inittab.h>
+#include <dhcp_symbol.h>
 #include <netinet/dhcp.h>
 #include <net/route.h>
 #include <sys/sockio.h>
@@ -70,6 +73,10 @@ static boolean_t	shutdown_started = B_FALSE;
 static boolean_t	do_adopt = B_FALSE;
 static unsigned int	debug_level = 0;
 static iu_eh_callback_t	accept_event, ipc_event, rtsock_event;
+static void dhcp_smach_set_msg_reqhost(dhcp_smach_t *dsmp,
+		ipc_action_t *iap);
+static DHCP_OPT * dhcp_get_ack_or_state(const dhcp_smach_t *dsmp,
+		const PKT_LIST *plp, uint_t codenum, boolean_t *did_alloc);
 
 /*
  * The ipc_cmd_allowed[] table indicates which IPC commands are allowed in
@@ -754,6 +761,7 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		break;		/* not an immediate function */
 
 	case DHCP_EXTEND:
+		dhcp_smach_set_msg_reqhost(dsmp, iap);
 		(void) dhcp_extending(dsmp);
 		break;
 
@@ -793,8 +801,8 @@ load_option:
 				opt = dhcpv6_pkt_option(ack, NULL, optnum.code,
 				    NULL);
 			} else {
-				if (optnum.code <= DHCP_LAST_OPT)
-					opt = ack->opts[optnum.code];
+				opt = dhcp_get_ack_or_state(dsmp, ack,
+				    optnum.code, &did_alloc);
 			}
 			break;
 
@@ -876,11 +884,7 @@ load_option:
 				if (optnum.code + optnum.size > sizeof (PKT))
 					break;
 
-				/*
-				 * + 2 to account for option code and length
-				 * byte
-				 */
-				opt = malloc(optnum.size + 2);
+				opt = malloc(optnum.size + DHCP_OPT_META_LEN);
 				if (opt != NULL) {
 					DHCP_OPT *v4opt = opt;
 
@@ -905,8 +909,7 @@ load_option:
 		}
 
 		/*
-		 * return the option payload, if there was one.  the "+ 2"
-		 * accounts for the option code number and length byte.
+		 * return the option payload, if there was one.
 		 */
 
 		if (opt != NULL) {
@@ -916,7 +919,8 @@ load_option:
 				(void) memcpy(&d6ov, opt, sizeof (d6ov));
 				optlen = ntohs(d6ov.d6o_len) + sizeof (d6ov);
 			} else {
-				optlen = ((DHCP_OPT *)opt)->len + 2;
+				optlen = ((DHCP_OPT *)opt)->len +
+				    DHCP_OPT_META_LEN;
 			}
 			send_data_reply(iap, 0, DHCP_TYPE_OPTION, opt, optlen);
 
@@ -971,6 +975,7 @@ load_option:
 		PKT_LIST *plp[2];
 
 		deprecate_leases(dsmp);
+		dhcp_smach_set_msg_reqhost(dsmp, iap);
 
 		/*
 		 * if we have a valid hostconf lying around, then jump
@@ -1056,6 +1061,147 @@ load_option:
 		break;
 	}
 	}
+}
+
+/*
+ * dhcp_smach_set_msg_reqhost(): set dsm_msg_reqhost based on the message
+ * content of a DHCP IPC message
+ *
+ *   input: dhcp_smach_t *: the state machine instance;
+ *	    ipc_action_t *: the decoded DHCP IPC message;
+ *  output: void
+ */
+
+static void
+dhcp_smach_set_msg_reqhost(dhcp_smach_t *dsmp, ipc_action_t *iap)
+{
+	DHCP_OPT	*d4o;
+	dhcp_symbol_t	*entry;
+	char		*value;
+
+	if (dsmp->dsm_msg_reqhost != NULL) {
+		dhcpmsg(MSG_DEBUG,
+		    "dhcp_smach_set_msg_reqhost: nullify former value, %s",
+		    dsmp->dsm_msg_reqhost);
+		free(dsmp->dsm_msg_reqhost);
+		dsmp->dsm_msg_reqhost = NULL;
+	}
+
+	/*
+	 * if a STANDARD/HOSTNAME was sent in the IPC request, then copy that
+	 * value into the state machine data if decoding succeeds. Otherwise,
+	 * log to indicate at what step the decoding stopped.
+	 */
+
+	if (dsmp->dsm_isv6) {
+		dhcpmsg(MSG_DEBUG, "dhcp_smach_set_msg_reqhost: ipv6 is not"
+		    " handled");
+		return;
+	} else if (iap->ia_request->data_type != DHCP_TYPE_OPTION) {
+		dhcpmsg(MSG_DEBUG, "dhcp_smach_set_msg_reqhost: request type"
+		    " %d is not DHCP_TYPE_OPTION", iap->ia_request->data_type);
+		return;
+	}
+
+	if (iap->ia_request->buffer == NULL ||
+	    iap->ia_request->data_length <= DHCP_OPT_META_LEN) {
+		dhcpmsg(MSG_WARNING, "dhcp_smach_set_msg_reqhost:"
+		    " DHCP_TYPE_OPTION ia_request buffer is NULL (0) or"
+		    " short (1): %d",
+		    iap->ia_request->buffer == NULL ? 0 : 1);
+		return;
+	}
+
+	d4o = (DHCP_OPT *)iap->ia_request->buffer;
+	if (d4o->code != CD_HOSTNAME) {
+		dhcpmsg(MSG_DEBUG,
+		    "dhcp_smach_set_msg_reqhost: ignoring DHCPv4"
+		    " option %u", d4o->code);
+		return;
+	} else if (iap->ia_request->data_length - DHCP_OPT_META_LEN
+	    != d4o->len) {
+		dhcpmsg(MSG_WARNING, "dhcp_smach_set_msg_reqhost:"
+		    " unexpected DHCP_OPT buffer length %u for CD_HOSTNAME"
+		    " option length %u", iap->ia_request->data_length,
+		    d4o->len);
+		return;
+	}
+
+	entry = inittab_getbycode(ITAB_CAT_STANDARD, ITAB_CONS_INFO,
+	    CD_HOSTNAME);
+	if (entry == NULL) {
+		dhcpmsg(MSG_WARNING,
+		    "dhcp_smach_set_msg_reqhost: error getting"
+		    " ITAB_CAT_STANDARD ITAB_CONS_INFO"
+		    " CD_HOSTNAME entry");
+		return;
+	}
+
+	value = inittab_decode(entry, d4o->value, d4o->len,
+	    /* just_payload */ B_TRUE);
+	if (value == NULL) {
+		dhcpmsg(MSG_WARNING,
+		    "dhcp_smach_set_msg_reqhost: error decoding"
+		    " CD_HOSTNAME value from DHCP_OPT");
+	} else {
+		dhcpmsg(MSG_DEBUG,
+		    "dhcp_smach_set_msg_reqhost: host %s", value);
+		free(dsmp->dsm_msg_reqhost);
+		dsmp->dsm_msg_reqhost = value;
+	}
+	free(entry);
+}
+
+/*
+ * dhcp_get_ack_or_state(): get a v4 option from the ACK or from the state
+ * machine state for certain codes that are not ACKed (e.g., CD_CLIENT_ID)
+ *
+ *   input: dhcp_smach_t *: the state machine instance;
+ *	    PKT_LIST *: the decoded DHCP IPC message;
+ *	    uint_t: the DHCP client option code;
+ *	    boolean_t *: a pointer to a value that will be set to B_TRUE if
+ *	        the return value must be freed (or else set to B_FALSE);
+ *  output: the option if found or else NULL.
+ */
+
+static DHCP_OPT *
+dhcp_get_ack_or_state(const dhcp_smach_t *dsmp, const PKT_LIST *plp,
+    uint_t codenum, boolean_t *did_alloc)
+{
+	DHCP_OPT *opt;
+
+	*did_alloc = B_FALSE;
+
+	if (codenum > DHCP_LAST_OPT)
+		return (NULL);
+
+	/* check the ACK first for all codes */
+	opt = plp->opts[codenum];
+	if (opt != NULL)
+		return (opt);
+
+	/* check the machine state also for certain codes */
+	switch (codenum) {
+	case CD_CLIENT_ID:
+		/*
+		 * CD_CLIENT_ID is not sent in an ACK, but it's possibly
+		 * available from the state machine data
+		 */
+
+		if (dsmp->dsm_cidlen > 0) {
+			if ((opt = malloc(dsmp->dsm_cidlen + DHCP_OPT_META_LEN))
+			    != NULL) {
+				*did_alloc = B_TRUE;
+				(void) encode_dhcp_opt(opt,
+				    B_FALSE /* is IPv6 */, CD_CLIENT_ID,
+				    dsmp->dsm_cid, dsmp->dsm_cidlen);
+			}
+		}
+		break;
+	default:
+		break;
+	}
+	return (opt);
 }
 
 /*

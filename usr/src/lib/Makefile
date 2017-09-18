@@ -28,6 +28,7 @@
 # Copyright (c) 2015 Gary Mills
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 #
 
 include ../Makefile.master
@@ -619,7 +620,7 @@ $(INTEL_BLD)libgrubmgmt: libfdisk
 libidmap:	libavl libuutil
 libinetsvc:	libscf
 libinstzones:	libzonecfg libcontract
-libipadm:	libinetutil libdlpi libdhcpagent libdladm libsecdb
+libipadm:	libinetutil libdlpi libdhcpagent libdladm libsecdb libdhcputil
 libipmp:	libinetutil
 libipsecutil:	libtecla libtsol
 libiscsit:	libstmf libuuid
@@ -629,7 +630,7 @@ libldap5:	libsasl
 libmapid:	libresolv2 libscf
 libndmp:	libscf
 libnisdb:	libldap5
-libnwam:	libscf libbsm libdladm
+libnwam:	libscf libbsm libdladm libipadm
 libpcp:		libumem libdevinfo
 libpctx:	libproc
 libpkg:		libwanboot libscf libadm

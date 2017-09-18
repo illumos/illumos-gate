@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
 
 #include <stdio.h>
@@ -728,12 +729,13 @@ i_ipadm_init_ifobj(ipadm_handle_t iph, const char *ifname, nvlist_t *ifnvl)
 		} else if (nvlist_lookup_string(nvl, IPADM_NVP_AOBJNAME,
 		    &aobjstr) == 0) {
 			/*
-			 * For a static address, we need to search for
-			 * the prefixlen in the nvlist `ifnvl'.
+			 * For addresses, we need to relocate addrprops from the
+			 * nvlist `ifnvl'.
 			 */
 			if (nvlist_exists(nvl, IPADM_NVP_IPV4ADDR) ||
-			    nvlist_exists(nvl, IPADM_NVP_IPV6ADDR)) {
-				status = i_ipadm_merge_prefixlen_from_nvl(ifnvl,
+			    nvlist_exists(nvl, IPADM_NVP_IPV6ADDR) ||
+			    nvlist_exists(nvl, IPADM_NVP_DHCP)) {
+				status = i_ipadm_merge_addrprops_from_nvl(ifnvl,
 				    nvl, aobjstr);
 				if (status != IPADM_SUCCESS)
 					continue;
@@ -955,4 +957,81 @@ reopen:
 			err = EBADE;
 	}
 	return (err);
+}
+
+/*
+ * ipadm_is_nil_hostname() : Determine if the `hostname' is nil: i.e.,
+ *			NULL, empty, or a single space (e.g., as returned by
+ *			domainname(1M)/sysinfo).
+ *
+ *   input: const char *: the hostname to inspect;
+ *  output: boolean_t: B_TRUE if `hostname' is not NULL satisfies the
+ *			criteria above; otherwise, B_FALSE;
+ */
+
+boolean_t
+ipadm_is_nil_hostname(const char *hostname)
+{
+	return (hostname == NULL || *hostname == '\0' ||
+	    (*hostname == ' ' && hostname[1] == '\0'));
+}
+
+/*
+ * ipadm_is_valid_hostname(): check whether a string is a valid hostname
+ *
+ *   input: const char *: the string to verify as a hostname
+ *  output: boolean_t: B_TRUE if the string is a valid hostname
+ *
+ * Note that we accept host names beginning with a digit, which is not
+ * strictly legal according to the RFCs but is in common practice, so we
+ * endeavour to not break what customers are using.
+ *
+ * RFC 1035 limits a wire-format domain name to 255 octets. For a printable
+ * `hostname' as we have, the limit is therefore 253 characters (excluding
+ * the terminating '\0'--or 254 characters if the last character of
+ * `hostname' is a '.'.
+ *
+ * Excerpt from section 2.3.1., Preferred name syntax:
+ *
+ * <domain> ::= <subdomain> | " "
+ * <subdomain> ::= <label> | <subdomain> "." <label>
+ * <label> ::= <letter> [ [ <ldh-str> ] <let-dig> ]
+ * <ldh-str> ::= <let-dig-hyp> | <let-dig-hyp> <ldh-str>
+ * <let-dig-hyp> ::= <let-dig> | "-"
+ * <let-dig> ::= <letter> | <digit>
+ */
+boolean_t
+ipadm_is_valid_hostname(const char *hostname)
+{
+	const size_t MAX_READABLE_NAME_LEN = 253;
+	char last_char;
+	size_t has_last_dot, namelen, i;
+
+	if (hostname == NULL)
+		return (B_FALSE);
+
+	namelen = strlen(hostname);
+	if (namelen < 1)
+		return (B_FALSE);
+
+	last_char = hostname[namelen - 1];
+	has_last_dot = last_char == '.';
+
+	if (namelen > MAX_READABLE_NAME_LEN + has_last_dot ||
+	    last_char == '-')
+		return (B_FALSE);
+
+	for (i = 0; hostname[i] != '\0'; i++) {
+		/*
+		 * As noted above, this deviates from RFC 1035 in that it
+		 * allows a leading digit.
+		 */
+		if (isalpha(hostname[i]) || isdigit(hostname[i]) ||
+		    (((hostname[i] == '-') || (hostname[i] == '.')) && (i > 0)))
+			continue;
+
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
