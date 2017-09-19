@@ -113,6 +113,12 @@ xdr_sizeof(xdrproc_t func, void *data)
 	XDR x;
 	struct xdr_ops ops;
 	bool_t stat;
+	/* to stop ANSI-C compiler from complaining */
+	typedef  bool_t (* dummyfunc1)(XDR *, caddr_t, int);
+	typedef	 bool_t (* dummyfunc2)(XDR *, int, void *);
+#if defined(_LP64) || defined(_KERNEL)
+	typedef  bool_t (* dummyfunc3)(XDR *, int32_t *);
+#endif
 
 	ops.x_putbytes = x_putbytes;
 	ops.x_inline = x_inline;
@@ -121,13 +127,13 @@ xdr_sizeof(xdrproc_t func, void *data)
 	ops.x_destroy = x_destroy;
 
 #if defined(_LP64) || defined(_KERNEL)
-	ops.x_getint32 = (void *)harmless;
+	ops.x_getint32 = (dummyfunc3)harmless;
 	ops.x_putint32 = x_putint32_t;
 #endif
 
 	/* the other harmless ones */
-	ops.x_getbytes = (void *)harmless;
-	ops.x_control = (void *)harmless;
+	ops.x_getbytes = (dummyfunc1)harmless;
+	ops.x_control = (dummyfunc2)harmless;
 
 	x.x_op = XDR_ENCODE;
 	x.x_ops = &ops;
