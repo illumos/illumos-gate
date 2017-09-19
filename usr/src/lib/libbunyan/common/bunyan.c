@@ -559,7 +559,7 @@ bunyan_dup(const bunyan_t *b)
 int
 bunyan_child(const bunyan_logger_t *bhp, bunyan_logger_t **outp, ...)
 {
-	bunyan_t *b = (bunyan_t *)bhp;
+	const bunyan_t *b = (const bunyan_t *)bhp;
 	bunyan_t *n;
 	va_list ap;
 	int ret;
@@ -569,7 +569,7 @@ bunyan_child(const bunyan_logger_t *bhp, bunyan_logger_t **outp, ...)
 		return (ENOMEM);
 
 	va_start(ap, outp);
-	ret = bunyan_key_vadd(b, &ap);
+	ret = bunyan_key_vadd(n, &ap);
 	va_end(ap);
 
 	if (ret != 0)

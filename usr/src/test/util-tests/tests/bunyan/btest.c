@@ -247,6 +247,8 @@ child_log(void)
 	    BUNYAN_T_INT64STR, "i64s", (uint64_t)12345,
 	    BUNYAN_T_UINT64STR, "u64s", (uint64_t)54321, BUNYAN_T_END) == 0);
 
+	assert(bunyan_key_remove(a, "p") == ENOENT);
+
 	bunyan_fini(a);
 	assert(bunyan_trace(child, "trace", BUNYAN_T_END) == 0);
 	assert(bunyan_debug(child, "debug", BUNYAN_T_END) == 0);
@@ -254,6 +256,8 @@ child_log(void)
 	assert(bunyan_warn(child, "warn", BUNYAN_T_END) == 0);
 	assert(bunyan_error(child, "error", BUNYAN_T_END) == 0);
 	assert(bunyan_fatal(child, "fatal", BUNYAN_T_END) == 0);
+
+	assert(bunyan_key_remove(child, "p") == 0);
 
 	bunyan_fini(child);
 }
