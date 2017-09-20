@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -682,7 +683,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	case DL_PROMISC_SAP:
 		if (!(dsp->ds_promisc & DLS_PROMISC_SAP)) {
 			dl_err = DL_NOTENAB;
-			goto failed;
+			goto failed2;
 		}
 		new_flags &= ~DLS_PROMISC_SAP;
 		break;
@@ -690,7 +691,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	case DL_PROMISC_MULTI:
 		if (!(dsp->ds_promisc & DLS_PROMISC_MULTI)) {
 			dl_err = DL_NOTENAB;
-			goto failed;
+			goto failed2;
 		}
 		new_flags &= ~DLS_PROMISC_MULTI;
 		break;
@@ -698,7 +699,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	case DL_PROMISC_PHYS:
 		if (!(dsp->ds_promisc & DLS_PROMISC_PHYS)) {
 			dl_err = DL_NOTENAB;
-			goto failed;
+			goto failed2;
 		}
 		new_flags &= ~DLS_PROMISC_PHYS;
 		break;
@@ -706,7 +707,7 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	case DL_PROMISC_RX_ONLY:
 		if (!(dsp->ds_promisc & DLS_PROMISC_RX_ONLY)) {
 			dl_err = DL_NOTENAB;
-			goto failed;
+			goto failed2;
 		}
 		new_flags &= ~DLS_PROMISC_RX_ONLY;
 		break;
@@ -714,15 +715,14 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	case DL_PROMISC_FIXUPS:
 		if (!(dsp->ds_promisc & DLS_PROMISC_FIXUPS)) {
 			dl_err = DL_NOTENAB;
-			goto failed;
+			goto failed2;
 		}
 		new_flags &= ~DLS_PROMISC_FIXUPS;
 		break;
 
 	default:
 		dl_err = DL_NOTSUPPORTED;
-		mac_perim_exit(mph);
-		goto failed;
+		goto failed2;
 	}
 
 	/*
@@ -731,9 +731,8 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 	err = dls_promisc(dsp, new_flags);
 
 	if (err != 0) {
-		mac_perim_exit(mph);
 		dl_err = DL_SYSERR;
-		goto failed;
+		goto failed2;
 	}
 
 	ASSERT(dsp->ds_promisc == new_flags);
@@ -744,6 +743,8 @@ proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 
 	dlokack(q, mp, DL_PROMISCOFF_REQ);
 	return;
+failed2:
+	mac_perim_exit(mph);
 failed:
 	dlerrorack(q, mp, DL_PROMISCOFF_REQ, dl_err, (t_uscalar_t)err);
 }
