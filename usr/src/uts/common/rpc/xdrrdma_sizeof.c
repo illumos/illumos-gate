@@ -276,6 +276,12 @@ xdrrdma_xops(void)
 {
 	static struct xdr_ops ops;
 
+	/* to stop ANSI-C compiler from complaining */
+	typedef  bool_t (* dummyfunc1)(XDR *, caddr_t, int);
+#if defined(_LP64) || defined(_KERNEL)
+	typedef  bool_t (* dummyfunc2)(XDR *, int32_t *);
+#endif
+
 	ops.x_putbytes = x_putbytes;
 	ops.x_inline = x_inline;
 	ops.x_getpostn = x_getpostn;
@@ -284,12 +290,12 @@ xdrrdma_xops(void)
 	ops.x_control = x_control;
 
 #if defined(_LP64) || defined(_KERNEL)
-	ops.x_getint32 = (void *)harmless;
+	ops.x_getint32 = (dummyfunc2)harmless;
 	ops.x_putint32 = x_putint32_t;
 #endif
 
 	/* the other harmless ones */
-	ops.x_getbytes = (void *)harmless;
+	ops.x_getbytes = (dummyfunc1)harmless;
 
 	return (&ops);
 }
