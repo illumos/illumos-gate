@@ -27,6 +27,7 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/printf_test]
 [/opt/util-tests/tests/allowed-ips]
 [/opt/util-tests/tests/set-linkprop]
+[/opt/util-tests/tests/libsff/libsff]
 
 [/opt/util-tests/tests/xargs_test]
 

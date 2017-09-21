@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -1309,6 +1310,103 @@ drv_ioc_secobj_unset(void *karg, intptr_t arg, int mode, cred_t *cred,
 	return (0);
 }
 
+/* ARGSUSED */
+static int
+drv_ioc_gettran(void *karg, intptr_t arg, int mode, cred_t *cred,
+    int *rvalp)
+{
+	int			ret = 0;
+	mac_perim_handle_t	mph = NULL;
+	dls_dl_handle_t 	dlh = NULL;
+	dls_link_t		*dlp = NULL;
+	dld_ioc_gettran_t	*dgt = karg;
+
+	if ((ret = mac_perim_enter_by_linkid(dgt->dgt_linkid, &mph)) != 0)
+		goto done;
+
+	if ((ret = dls_devnet_hold_link(dgt->dgt_linkid, &dlh, &dlp)) != 0)
+		goto done;
+
+	/*
+	 * Make sure that this link belongs to the zone.
+	 */
+	if (crgetzoneid(cred) != dls_devnet_getownerzid(dlh)) {
+		ret = ENOENT;
+		goto done;
+	}
+
+	if (dgt->dgt_tran_id == DLDIOC_GETTRAN_GETNTRAN) {
+		ret = mac_transceiver_count(dlp->dl_mh, &dgt->dgt_tran_id);
+	} else {
+		ret = mac_transceiver_info(dlp->dl_mh, dgt->dgt_tran_id,
+		    &dgt->dgt_present, &dgt->dgt_usable);
+	}
+
+done:
+	if (dlh != NULL && dlp != NULL) {
+		dls_devnet_rele_link(dlh, dlp);
+	}
+
+	if (mph != NULL) {
+		mac_perim_exit(mph);
+	}
+
+	return (ret);
+}
+
+/* ARGSUSED */
+static int
+drv_ioc_readtran(void *karg, intptr_t arg, int mode, cred_t *cred,
+    int *rvalp)
+{
+	int			ret = 0;
+	mac_perim_handle_t	mph = NULL;
+	dls_dl_handle_t 	dlh = NULL;
+	dls_link_t		*dlp = NULL;
+	dld_ioc_tranio_t	*dti = karg;
+	uint8_t			buf[256];
+	size_t			nr;
+
+	/*
+	 * Be strict for the moment
+	 */
+	if (dti->dti_nbytes != 256 || dti->dti_off != 0)
+		return (EINVAL);
+
+	if ((ret = mac_perim_enter_by_linkid(dti->dti_linkid, &mph)) != 0)
+		goto done;
+
+	if ((ret = dls_devnet_hold_link(dti->dti_linkid, &dlh, &dlp)) != 0)
+		goto done;
+
+	/*
+	 * Make sure that this link belongs to the zone.
+	 */
+	if (crgetzoneid(cred) != dls_devnet_getownerzid(dlh)) {
+		ret = ENOENT;
+		goto done;
+	}
+
+	bzero(buf, sizeof (buf));
+	if ((ret = mac_transceiver_read(dlp->dl_mh, dti->dti_tran_id,
+	    dti->dti_page, buf, dti->dti_nbytes, dti->dti_off, &nr)) == 0) {
+		dti->dti_nbytes = nr;
+		ret = ddi_copyout(buf, (void *)(uintptr_t)dti->dti_buf,
+		    sizeof (buf), mode);
+	}
+
+done:
+	if (dlh != NULL && dlp != NULL) {
+		dls_devnet_rele_link(dlh, dlp);
+	}
+
+	if (mph != NULL) {
+		mac_perim_exit(mph);
+	}
+
+	return (ret);
+}
+
 /*
  * Note that ioctls that modify links have a NULL di_priv_func(), as
  * privileges can only be checked after we know the class of the link being
@@ -1348,6 +1446,10 @@ static dld_ioc_info_t drv_ioc_list[] = {
 	    drv_ioc_getprop, NULL},
 	{DLDIOC_GETHWGRP, DLDCOPYINOUT, sizeof (dld_ioc_hwgrpget_t),
 	    drv_ioc_hwgrpget, NULL},
+	{DLDIOC_GETTRAN, DLDCOPYINOUT, sizeof (dld_ioc_gettran_t),
+	    drv_ioc_gettran, NULL },
+	{DLDIOC_READTRAN, DLDCOPYINOUT, sizeof (dld_ioc_tranio_t),
+	    drv_ioc_readtran, NULL }
 };
 
 typedef struct dld_ioc_modentry {

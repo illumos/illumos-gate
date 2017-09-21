@@ -1,0 +1,407 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Mar 24, 2017
+.Dt MAC_CAPAB_TRANSCEIVER 9E
+.Os
+.Sh NAME
+.Nm mac_capab_transciever ,
+.Nm mct_info ,
+.Nm mct_read
+.Nd MAC capability for networking transceivers
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Vt typedef struct mac_capab_transceiver mac_capab_transceiver_t;
+.Ft int
+.Fo "mct_info"
+.Fa "void *driver"
+.Fa "uint_t id"
+.Fa "mac_transceiver_info_t *infop"
+.Fc
+.Ft int
+.Fo mct_read
+.Fa "void *driver"
+.Fa "uint_t id"
+.Fa "uint_t page"
+.Fa "void *buf"
+.Fa "size_t nbytes"
+.Fa "off_t offset"
+.Fa "size_t *nread"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa id
+An integer value indicating which transceiver is being inquired about.
+.It Fa infop
+An opaque structure which is used to set information about the
+transceiver.
+.It Fa page
+A value that indicates which page from the i2c bus is being requested.
+.It Fa buf
+A pointer to which data should be written to when reading from the
+device.
+.It Fa nbytes
+A value indicating the number of bytes being asked to read into
+.Fa buf .
+.It Fa offset
+A value indicating the offset into the page to start reading data.
+.It Fa nread
+A value to be updated by the driver with the number of successfully read
+bytes.
+.El
+.Sh DESCRIPTION
+The
+.Sy MAC_CAPAB_TRANSCEIVER
+capability allows for GLDv3 networking device drivers to provide
+information to the system about their transceiver.
+Implementing this capability is optional.
+For more information on how to handle capabilities and how to indicate
+that a capability is not supported, see
+.Xr mc_getcapab 9E .
+.Pp
+This capability should be implemented if the device in question supports
+a Small Form Factor (SFF) transceiver.
+These are more commonly known by names such as SFP, SFP+, SFP28, QSFP+,
+and QSFP28.
+This interface does not apply to traditional copper Ethernet phys.
+These transceivers provide standardized information over the i2c bus at
+specific pages.
+.Ss Supported Standards
+.Bl -tag -width Sy
+.It Sy INF-8074
+The
+.Sy INF-8084
+standard was the original multiple source agreement (MSA) for SFP
+devices.
+It proposed the original series of management pages at i2c page 0xa0.
+This page contained up to 512 bytes, however, only the first
+96 bytes are standardized.
+Bytes 97 to 127 are reserved for the vendor.
+The remaining bytes are reserved by the specification.
+The management page was subsequently adopted by SFP+ devices.
+.It Sy SFF-8472
+The
+.Sy SFF-8472
+standard extended the original SFP MSA.
+This standard added a second i2c page at 0xa2, while maintaining the
+original page at 0xa0.
+The page at 0xa0 is now explicitly 256 bytes.
+The page at 0xa2 is also 256 bytes.
+This standard was also adopted for all SFP28 parts, which are commonly
+used in transceivers for 25 Gb/s Ethernet.
+.It Sy SFF-8436
+The
+.Sy SFF-8436
+standard was developed for QSFP+ transceivers, which involve the
+bonding of 4 SFP+ links.
+QSFP+ is commonly used in the transceivers for 40 Gb/s Ethernet.
+This standard uses i2c page 0xa0 for read-only identification purposes.
+The lower half of the page is used for control, while the upper 128
+bytes is similar to the
+.Sy INF-8084
+and
+.Sy SFF-8472
+standards.
+.It Sy SFF-8636
+The
+.Sy SFF-8636
+standard is a common management standard which is shared between both
+SAS and QSFP+ 28 Gb/s transceivers.
+The latter transceiver is commonly found in 100 Gb/s Ethernet.
+The transceiver's memory map is similar to that found in the
+.Sy SFF-8436
+specification.
+The identification information is found in the upper 128
+bytes of page 0xa0, while the lower part of the page is used for
+control, among other purposes.
+.El
+.Pp
+The following table summarizes the above information.
+.Bl -column "Sy SFF-8636" "1 Gb/s, 10 Gb/s, 25 Gb/s" "256 bytes" "0xa0, 0xa2" -offset indent
+.Em "Standard" Ta Em Speeds Ta Em Size Ta Em i2c pages
+.It INF-8074 Ta 1 Gb/s, 10 Gb/s Ta 128 bytes Ta 0xa0
+.It SFF-8472 Ta 1 Gb/s, 10 Gb/s, 25 GB/s Ta 512 bytes Ta 0xa0, 0xa2
+.It SFF-8436 Ta 40 Gb/s Ta 256 bytes Ta 0xa0
+.It SFF-8636 Ta 100 Gb/s Ta 256 bytes Ta 0xa0
+.El
+.Ss MAC Capability Structure
+When the device driver's
+.Xr mc_getcapab 9E
+function entry point is called with the capability requested set to
+.Sy MAC_CAPAB_TRANSCEIVER ,
+then the value of the capability structure is the following structure:
+.Bd -literal -offset indent
+typedef struct mac_capab_transceiver {
+	uint_t	mct_flags;
+	uint_t	mct_ntransceiveres;
+	int	(*mct_info)(void *driver, uint_t id,
+		    mac_transceiver_info_t *infop),
+	int	(*mct_read)(void *driver, uint_t id, uint_t page,
+		    void *buf, size_t nbytes, off_t offset,
+		    size_t *nread)
+} mac_capab_transceiver_t;
+.Ed
+.Pp
+If the device driver supports the
+.Sy MAC_CAPAB_TRANSCEIVER
+capability, it should fill in this structure, based on the following
+rules:
+.Bl -tag -width Sy
+.It Sy mct_flags
+The
+.Vt mct_flags
+member is used to negotiate extensions with the driver.
+MAC will set the value of
+.Vt mct_flags
+to include all of the currently known extensions.
+The driver should intersect this list with the set that they actually
+support.
+At this time, no such features are defined and the driver should set the
+member to
+.Sy 0 .
+.It Sy mct_ntransceivers
+The value of
+.Sy mct_ntransceivers
+indicates that the number of transceivers present in the device.
+For most devices, it is expected that this value will be set to one.
+However, some devices do support multiple transceivers and PHYs that
+show up behind a single logical MAC.
+.Pp
+It is expected that this value will not change across the lifetime of
+the device being attached.
+It is important to remember that this represents the total possible
+number of transceivers in the device, not how many are currently present
+and powered on.
+.Pp
+The number of transceivers will influence the
+.Fa id
+argument used in the
+.Fn mct_info
+and
+.Fn mct_read
+entry points.
+The transceiver IDs will start at zero and go to the value of
+.Fa mct_ntransceivers - 1 .
+It is up to the driver to keep the mapping between actual transceivers
+and the transceiver identifiers consistent.
+.It Sy mct_info
+The
+.Fn mct_info
+entry point is used to set basic information about the transceiver.
+This entry point is
+.Em required .
+If the device driver cannot implement this entry point, then it should
+not indicate that it supports the capability.
+.Pp
+The
+.Fn mct_info
+entry point should fill in information about the transceiver with an
+identifier of
+.Fa id .
+See the description above of
+.Sy mct_ntransceivers
+for more information on how the IDs are determined.
+.Pp
+The driver should then proceed to fill in basic information by calling
+the functions described in the section
+.Sx Information Functions .
+After successfully calling all of the functions, the driver should
+return
+.Sy 0 .
+Othewrise, it should return the appropriate error number.
+For a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EINVAL
+The transceiver identifier
+.Fa id
+was invalid.
+.It Er ENOTSUP
+This instance of the devices does not support a transceiver.
+For example, a device which sometimes has copper PHYs and therefore this
+instance does not have any PHYs.
+.It Er EIO
+An error occurred while trying to read device registers.
+For example, an FM-aware device had an error.
+.El
+.It Sy mct_read
+The
+.Fn mct_read
+function is used to read information from a transceiver's i2c bus.
+The
+.Fn mct_read
+entry point is an
+.Em optional
+entry point.
+.Pp
+The transceiver should first check the value of
+.Fa id ,
+which indicates which transceiver information is being requested.
+See the description above of
+.Sy mct_ntransceivers
+for more information on how the IDs are determined.
+.Pp
+The driver should try to read up to
+.Fa nbytes
+of data from the i2c bus at page
+.Fa page .
+The driver should start reading at offset
+.Fa offset .
+Finally, it should update the value in
+.Fa nread
+with the number of bytes written to the buffer
+.Fa buf .
+.Pp
+If for some reason the driver cannot read all of the requested bytes,
+that is acceptable.
+Instead it should perform a short read.
+This may occur because the transceiver does not allow reads at a
+requested region or the region is shorter than is common for most
+devices.
+.Pp
+Upon successful completion, the driver should ensure that
+.Fa nread
+has been updated and then return
+.Sy 0 .
+Otherwise, the driver should return the appropriate error number.
+For
+a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EINVAL
+The value of
+.Fa id
+represented an invalid transceiver identifier.
+The transceiver i2c page
+.Fa page
+is not valid for this type of device.
+The value of
+.Fa offset
+is beyond the range supported for this
+.Fa page .
+.It Er EIO
+An error occurred while trying to read the device i2c pages.
+.El
+.El
+.Ss Transceiver Information Functions
+The
+.Fn mct_info
+entry point is the primary required entry point for a device driver
+which supports this capability.
+The information structure is opaque to the device driver.
+Instead, a series of informational functions is
+available to the device driver to call on the transceiver.
+The device drivers should try to call and fill in as many of these as
+possible.
+There are two different properties that a driver can set:
+.Bl -enum -offset indent
+.It
+Whether the transceiver is present.
+.It
+Whether the transceiver is usable.
+.El
+.Pp
+To set whether or not the transceiver is present, the driver should call
+.Xr mac_transceiver_info_set_present 9F .
+This is used to indicate whether the transceiver is plugged in or not.
+If the transceiver is a part of the NIC, then this function should
+always be called with the value set to
+.Dv B_TRUE .
+.Pp
+Finally, the driver has the ability to provide information about whether
+or not the transceiver is usable or not.
+A transceiver may be present, but not usable, if the hardware and
+firmware support a limited number of transceivers.
+To set this information, the driver should call
+.Xr mac_transceiver_info_set_usable 9F .
+If the transceiver is not present, then the driver should not call this
+function.
+.Ss Opaque Transceivers
+Some devices abstract the nature of the transceiver and do not allow
+direct access to the transceiver.
+In this case, if the device driver still has access to enough
+information to know if the transceiver is at least present, then it
+should still implement the
+.Fn mct_info
+entry point.
+.Ss Locking and Data Access
+Calls to get information about the transceivers may come at the same
+time as general I/O requests to the device to send or receive data.
+The driver should make sure that reading data from the i2c bus of the
+transceiver does not interfere with the device's functionality in this
+regard.
+Different locks should be used.
+.Pp
+On some devices, reading from the transceiver's i2c bus might cause a
+disruption of service to the device.
+For example, on some devices a phy reset may be required or come about
+as a side effect of trying to read the device.
+If any kind of disruption would be caused, then the driver
+must not implement the
+.Ft mct_read
+entry point.
+.Sh CONTEXT
+The various callback functions will be called from
+.Sy kernel
+context.
+These functions will never be called from
+.Sy interrupt
+context.
+.Sh SEE ALSO
+.Xr Intro 2 ,
+.Xr mac 9E ,
+.Xr mc_getcapab 9E ,
+.Xr mac_register 9F ,
+.Xr mac_transceiver_info_set_present 9F ,
+.Xr mac_transceiver_info_set_usable 9F ,
+.Xr mac_register 9S
+.Rs
+.%N INF-8074i
+.%T SFP (Small Formfactor Pluggable) Interface
+.%Q SFF Committee
+.%O Revision 1.0
+.%D May 12, 2001
+.Re
+.Rs
+.%N SFF-8472
+.%T Diagnostic Monitoring Interface for Optical Transceivers
+.%O Revision 12.2
+.%D November 21, 2014
+.Re
+.Rs
+.%N SFF-8436
+.%T QSFP+ 10 Gbs 4X PLUGGABLE TRANSCEIVER
+.%O Revision 4.8
+.%D October 31, 2013
+.Re
+.Rs
+.%N SFF-8636
+.%T Management Interface for Cabled Environments
+.%O Revision 2.7
+.%D January 26, 2016
+.Re

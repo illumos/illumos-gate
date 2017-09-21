@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
@@ -3747,6 +3747,7 @@ ixgbe_sfp_check(void *arg)
 	struct ixgbe_hw *hw = &ixgbe->hw;
 
 	mutex_enter(&ixgbe->gen_lock);
+	(void) hw->phy.ops.identify_sfp(hw);
 	if (eicr & IXGBE_EICR_GPI_SDP1_BY_MAC(hw)) {
 		/* clear the interrupt */
 		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP1_BY_MAC(hw));

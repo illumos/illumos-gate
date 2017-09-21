@@ -1,0 +1,130 @@
+10G+ Ethernet Compliance Codes
+	0	10G Base-SR
+	1	10G Base-LR
+	2	10G Base-LRM
+	3	10G Base-ER
+Infiniband Compliance Codes
+	0	1X Copper Passive
+	1	1X Copper Active
+	2	1X LX
+	3	1X SX
+ESCON Compliance Codes
+	0	ESCON SMF, 1310nm Laser
+	1	ESCON MMF, 1310nm LED
+SONET Compliance Codes
+	0	OC-48, short reach
+	1	OC-48, intermediate reach
+	2	OC-48, long reach
+	3	ONET reach specifier bit 2
+	4	SONET reach specifier bit 1
+	5	OC-192, short reach
+	6	OC-3, short reach
+	7	OC-3, single mode, inter. reach
+	8	OC-3, single mode, long reach
+	9	OC-12, short reach
+	10	OC-12, single mode, inter. reach
+	11	OC-12, single mode, long reach
+Ethernet Compliance Codes
+	0	1000BASE-SX
+	1	1000BASE-LX
+	2	1000BASE-CX
+	3	1000BASE-T
+	4	100BASE-LX/LX10
+	5	100BASE-FX
+	6	BASE-BX10
+	7	BASE-PX
+Fibre Channel Link Lengths
+	0	medium distance (M)
+	1	long distance (L)
+	2	intermeddiate distance (I)
+	3	short distance (S)
+	4	very long distance (V)
+Fibre Channel Technology
+	0	Electrical inter-enclosure (EL)
+	1	Longwave laser (LC)
+	2	Shortwave laser, linear Rx (SA)
+	3	Longwave laser (LL)
+	4	Shortwave laser with OFC (SL)
+	5	Shortwave laser w/o OFC (SN)
+	6	Electrical intra-enclosure (EL)
+SFP+ Cable Technology
+	0	Passive Cable
+	1	Active Cable
+Fibre Channel Transmission Media
+	0	Single Mode (SM)
+	1	Multimode, 50um (M5, M5E)
+	2	Multimode, 62.5um (M6)
+	3	Video Coax (TV)
+	4	Miniature Coax (MI)
+	5	Twisted Pair (TP)
+	6	Twin Axial Pair (TW)
+Fibre Channel Speed
+	0	100 MBytes/sec
+	1	200 MBytes/sec
+	2	3200 MBytes/sec
+	3	400 MBytes/sec
+	4	1600 MBytes/sec
+	5	800 MBytes/sec
+	6	1200 MBytes/sec
+
+
+QSFP
+
+10G+ Ethernet Compliance Codes
+	0	40G Active Cable (XLPPI)
+	1	40GBASE-LR4
+	2	40GBASE-SR4
+	3	40GBASE-CR4
+	4	10GBASE-SR
+	5	10GBASE-LR
+	6	10GBASE-LRM
+SONET Compliance Codes
+	0	OC 48 short reach
+	1	OC 48, intermediate reach
+	2	OC 48, long reach
+SAS Compliance Codes
+	0	SAS 3.0 Gb/s
+	1	SAS 6.0 Gb/s
+	2	SAS 12.0 Gb/s
+	3	SAS 24.0 Gb/s
+Ethernet Compliance Codes
+	0	1000BASE-SX
+	1	1000BASE-LX
+	2	1000BASE-CX
+	3	1000BASE-T
+Fibre Channel Link Lengths
+	0	medium distance (M)
+	1	long distance (L)
+	2	intermeddiate distance (I)
+	3	short distance (S)
+	4	very long distance (V)
+Fibre Channel Technology
+	0	Electrical inter-enclosure (EL)
+	1	Longwave laser (LC)
+	2	Longwave laser (LL)
+	3	Shortwave laser with OFC (SL)
+	4	Shortwave laser w/o OFC (SN)
+	5	Electrical intra-enclosure (EL)
+Fibre Channel Transmission Media
+	0	Single Mode (SM)
+	1	Multimode, 50um (OM3)
+	2	Multimode, 50m (M5)
+	3	Multimode, 62.5um (M6)
+	4	Video Coax (TV)
+	5	Miniature Coax (MI)
+	6	Twisted Pair (TP)
+	7	Twin Axial Pair (TW)
+Fibre Channel Speed
+	0	100 MBytes/sec
+	1	200 MBytes/sec
+	2	3200 MBytes/sec
+	3	400 MBytes/sec
+	4	1600 MBytes/sec
+	5	800 MBytes/sec
+	6	1200 MBytes/sec
+Extended Module Codes
+	0	SDR
+	1	DDR
+	2	QDR
+	3	FDR
+	4	EDR

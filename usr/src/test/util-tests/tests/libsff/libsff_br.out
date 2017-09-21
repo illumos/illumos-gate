@@ -1,0 +1,8 @@
+nominal: 6600 MBd
+max: 20000 MBd
+min: 4000 MBd
+
+
+QSFP
+
+nominal: 6600 Mbps

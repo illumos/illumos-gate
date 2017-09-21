@@ -1,0 +1,96 @@
+Transmitter Technology
+	0	850 nm VCSEL
+	1	No Wavelength Control
+	2	Uncooled Transmitter
+	3	Pin Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	1310 nm VCSEL
+	1	No Wavelength Control
+	2	Uncooled Transmitter
+	3	Pin Detector
+	4	Transmitter Tunable
+Transmitter Technology
+	0	1550 nm VCSEL
+	1	No Wavelength Control
+	2	Uncooled Transmitter
+	3	APD Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	1310 nm FP
+	1	No Wavelength Control
+	2	Uncooled Transmitter
+	3	APD Detector
+	4	Transmitter Tunable
+Transmitter Technology
+	0	1310 nm DFB
+	1	No Wavelength Control
+	2	Cooled Transmitter
+	3	Pin Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	1550 nm DFB
+	1	No Wavelength Control
+	2	Cooled Transmitter
+	3	Pin Detector
+	4	Transmitter Tunable
+Transmitter Technology
+	0	1310 nm EML
+	1	No Wavelength Control
+	2	Cooled Transmitter
+	3	APD Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	1550 nm EML
+	1	No Wavelength Control
+	2	Cooled Transmitter
+	3	APD Detector
+	4	Transmitter Tunable
+Transmitter Technology
+	0	Other / Undefined
+	1	Active Wavelength Control
+	2	Uncooled Transmitter
+	3	Pin Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	1490 nm DFB
+	1	Active Wavelength Control
+	2	Uncooled Transmitter
+	3	Pin Detector
+	4	Transmitter Tunable
+Transmitter Technology
+	0	Copper cable unequalized
+	1	Active Wavelength Control
+	2	Uncooled Transmitter
+	3	APD Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	Copper cable passive equalized
+	1	Active Wavelength Control
+	2	Uncooled Transmitter
+	3	APD Detector
+	4	Transmitter Tunable
+Transmitter Technology
+	0	Copper cable, near and far end limiting active equalizers
+	1	Active Wavelength Control
+	2	Cooled Transmitter
+	3	Pin Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	Copper cable, far end limiting active equalizers
+	1	Active Wavelength Control
+	2	Cooled Transmitter
+	3	Pin Detector
+	4	Transmitter Tunable
+Transmitter Technology
+	0	Copper cable, near end limiting active equalizers
+	1	Active Wavelength Control
+	2	Cooled Transmitter
+	3	APD Detector
+	4	Transmitter Not Tunable
+Transmitter Technology
+	0	Copper cable, linear active equalizers
+	1	Active Wavelength Control
+	2	Cooled Transmitter
+	3	APD Detector
+	4	Transmitter Tunable

@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SYS_DLD_H
@@ -29,7 +30,7 @@
 /*
  * Data-Link Driver ioctl interfaces.
  *
- * Note that the datastructures defined here define an ioctl interface
+ * Note that the data structures defined here define an ioctl interface
  * that is shared betwen user and kernel space.  The dld driver thus
  * assumes that the structures have identical layout and size when
  * compiled in either IPL32 or LP64.
@@ -313,6 +314,27 @@ typedef struct dld_hwgrpinfo {
 	uint_t	dhi_rings[MAX_RINGS_PER_GROUP];
 	char	dhi_clnts[MAXCLIENTNAMELEN];
 } dld_hwgrpinfo_t;
+
+#define	DLDIOC_GETTRAN		DLDIOC(0x1e)
+
+#define	DLDIOC_GETTRAN_GETNTRAN	UINT32_MAX
+
+typedef struct dld_ioc_gettran {
+	datalink_id_t		dgt_linkid;
+	uint_t			dgt_tran_id;
+	boolean_t		dgt_present;
+	boolean_t		dgt_usable;
+} dld_ioc_gettran_t;
+
+#define	DLDIOC_READTRAN		DLDIOC(0x1f)
+typedef struct dld_ioc_tranio {
+	datalink_id_t	dti_linkid;
+	uint_t		dti_tran_id;
+	uint_t		dti_page;
+	uint_t		dti_nbytes;
+	uint_t		dti_off;
+	uint64_t	dti_buf;
+} dld_ioc_tranio_t;
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()

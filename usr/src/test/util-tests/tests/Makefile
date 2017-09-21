@@ -15,6 +15,6 @@
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
-SUBDIRS = dis dladm iconv libnvpair_json printf xargs grep_xpg4
+SUBDIRS = dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
 
 include $(SRC)/test/Makefile.com

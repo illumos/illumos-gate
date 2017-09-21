@@ -1,0 +1,50 @@
+Options
+	0	Rx_LOS implemented
+	1	Rx_LOS inverted
+	2	TX_FAULT implemented
+	3	TX_DISABLE implemented
+	4	RATE_SELECT implemented
+	5	Tunable transmitter
+	6	Receiver decision threshold implemented
+	7	Linear Receiver Output Implemented
+	8	Power Level 2 Requirement
+	9	Cooled Transceiver Implemented
+	10	Retimer or CDR implemented
+	11	Paging Implemented
+	12	Power Level 3 Requirement
+Extended Options
+	0	Soft Rate Select Control Implemented
+	1	Application Select implemented
+	2	Soft RATE_SELECT implemented
+	3	Soft RX_LOS implemented
+	4	Soft TX_FAULT implemented
+	5	Soft TX_DISABLE implemented
+	6	Alarm/Warning flags implemented
+
+
+QSFP
+
+Options
+	0	Tx Loss of Signal implemented
+	1	Tx Squelch for Pave
+	2	Tx_FAULT implemented
+	3	Tx_DISABLE implemented
+	4	Rate Select implemented
+	5	Memory page 01h provided
+	6	Memory page 02h provided
+	7	Tx Squelch implemented
+	8	Tx Squelch Disable implemented
+	9	Rx Output Disable capable
+	10	Rx Squelch Disable implemented
+	11	Rx CDR Loss of Lock Flag implemented
+	12	Tx CDR Loss of Lock Flag implemented
+	13	RX CDR On/Off Control implemented
+	14	TX CDR On/Off Control implemented
+	15	RX Output Amplitude Fixed Programmable Settings
+	16	RX Output Emphasis Fixed Programmable Settings
+	17	TX Input Equalization Fixed Programmable
+	18	TX Input Equalization Auto Adaptive Capable
+Enhanced Options
+	0	Application Select Table Supported
+	1	Extended Rate Selection Supported
+	2	Initialization Complete Flag Implemented

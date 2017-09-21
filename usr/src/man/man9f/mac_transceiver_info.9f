@@ -1,0 +1,95 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Feb 21, 2017
+.Dt MAC_TRANSCEIVER_INFO 9F
+.Os
+.Sh NAME
+.Nm mac_transceiver_info ,
+.Nm mac_transceiver_info_set_present ,
+.Nm mac_transceiver_info_set_usable
+.Nd set MAC transceiver property information
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Ft void
+.Fo mac_transceiver_info_set_present
+.Fa "mac_transceiver_info_t *infop"
+.Fa "boolean_t present"
+.Fc
+.Ft void
+.Fo mac_transceiver_info_set_usable
+.Fa "mac_transceiver_info_t *infop"
+.Fa "boolean_t usable"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Volatile -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa infop
+A pointer to an opaque structure obtained as an argument to the
+.Xr mct_info 9E
+entry point.
+.It Fa present
+A boolean that indicates whether the transceiver is present.
+.It Fa usable
+A boolean that indicates whether the transceiver is usable.
+.El
+.Sh DESCRIPTION
+The
+.Fn mac_transceiver_set_present
+and
+.Fn mac_transceiver_set_usable
+functions are used to set information about a transceiver as part of the
+.Xr mct_info 9E
+entry point to obtain information about a MAC transceiver.
+For more information and background, see the
+.Sy Transceiver Information Functions
+section of
+.Xr mac_capab_transceiver 9E .
+.Pp
+The
+.Fn mct_transceiver_set_present
+function sets whether or not the transceiver is present and plugged into
+the system.
+If the transceiver is not plugged in, then the function
+should be called with
+.Fa present set to
+.Dv B_FALSE ,
+otehrwise it should use
+.Dv B_TRUE .
+.Pp
+The
+.Fn mct_transceiver_set_usable
+function determines whether or not the device can use the transceiver.
+If the device cannot use the transceiver, then it should call the
+function with
+.Fa usable
+set to
+.Dv B_FALSE .
+Otherwise, it should use
+.Dv B_TRUE .
+If the transceiver is not present, then this function should not be
+called.
+.Sh CONTEXT
+These functions should be called in response to handling the
+.Fn mct_info 9E
+entry point for transceivers in
+.Sy kernel
+context.
+.Sh SEE ALSO
+.Xr mac 9E ,
+.Xr mac_capab_transceiver 9E ,
+.Xr mct_info 9E

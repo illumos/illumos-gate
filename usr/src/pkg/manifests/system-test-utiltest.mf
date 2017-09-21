@@ -31,6 +31,7 @@ dir path=opt/util-tests/tests/dis/i386
 dir path=opt/util-tests/tests/dis/sparc
 dir path=opt/util-tests/tests/files
 dir path=opt/util-tests/tests/libnvpair_json
+dir path=opt/util-tests/tests/libsff
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
@@ -237,6 +238,36 @@ file path=opt/util-tests/tests/libnvpair_json/json_05_strings mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_06_nested mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_07_nested_arrays mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_common mode=0555
+file path=opt/util-tests/tests/libsff/libsff mode=0555
+file path=opt/util-tests/tests/libsff/libsff_8472 mode=0555
+file path=opt/util-tests/tests/libsff/libsff_8472.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_8636_diag mode=0555
+file path=opt/util-tests/tests/libsff/libsff_8636_diag.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_8636_extspec mode=0555
+file path=opt/util-tests/tests/libsff/libsff_8636_extspec.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_8636_tech mode=0555
+file path=opt/util-tests/tests/libsff/libsff_8636_tech.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_8636_temp mode=0555
+file path=opt/util-tests/tests/libsff/libsff_8636_temp.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_br mode=0555
+file path=opt/util-tests/tests/libsff/libsff_br.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_compliance mode=0555
+file path=opt/util-tests/tests/libsff/libsff_compliance.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_conn mode=0555
+file path=opt/util-tests/tests/libsff/libsff_conn.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_efault mode=0555
+file path=opt/util-tests/tests/libsff/libsff_einval mode=0555
+file path=opt/util-tests/tests/libsff/libsff_enc mode=0555
+file path=opt/util-tests/tests/libsff/libsff_enc.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_ident mode=0555
+file path=opt/util-tests/tests/libsff/libsff_ident.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_lengths mode=0555
+file path=opt/util-tests/tests/libsff/libsff_lengths.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_opts mode=0555
+file path=opt/util-tests/tests/libsff/libsff_opts.out mode=0444
+file path=opt/util-tests/tests/libsff/libsff_strings mode=0555
+file path=opt/util-tests/tests/libsff/libsff_wave mode=0555
+file path=opt/util-tests/tests/libsff/libsff_wave.out mode=0444
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555

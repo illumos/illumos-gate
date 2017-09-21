@@ -22,6 +22,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2017, Joyent, Inc.
 #
 
 SUBDIRS =		\
@@ -29,6 +30,7 @@ SUBDIRS =		\
 	fac_prov_ipmi	\
 	fac_prov_mptsas	\
 	ipmi		\
+	nic		\
 	ses		\
 	xfp
 
