@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -43,7 +44,7 @@ static uint_t		i_dls_link_count;
 #define		IMPL_HASHSZ	67	/* prime */
 
 /*
- * Construct a hash key encompassing both DLSAP value and VLAN idenitifier.
+ * Construct a hash key from the DLSAP value.
  */
 #define	MAKE_KEY(_sap)						\
 	((mod_hash_key_t)(uintptr_t)((_sap) << VLAN_ID_SIZE))
@@ -262,10 +263,12 @@ i_dls_head_free(dls_head_t *dhp)
 }
 
 /*
- * Try to send mp up to the streams of the given sap and vid. Return B_TRUE
- * if this message is sent to any streams.
- * Note that this function will copy the message chain and the original
- * mp will remain valid after this function
+ * Try to send mp up to the streams of the given sap. Return the
+ * number of streams which accepted this message, or 0 if no streams
+ * accepted the message.
+ *
+ * Note that this function copies the message chain and the original
+ * mp remains valid after this function returns.
  */
 static uint_t
 i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
@@ -283,25 +286,24 @@ i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
 	int		rval;
 
 	/*
-	 * Construct a hash key from the VLAN identifier and the
-	 * DLSAP that represents dld_str_t in promiscuous mode.
+	 * Construct a hash key from the DLSAP.
 	 */
 	key = MAKE_KEY(sap);
 
 	/*
-	 * Search the hash table for dld_str_t eligible to receive
-	 * a packet chain for this DLSAP/VLAN combination. The mod hash's
-	 * internal lock serializes find/insert/remove from the mod hash list.
-	 * Incrementing the dh_ref (while holding the mod hash lock) ensures
-	 * dls_link_remove will wait for the upcall to finish.
+	 * Search the hash table for a dld_str_t eligible to receive a
+	 * packet chain for this DLSAP. The mod hash's internal lock
+	 * serializes find/insert/remove from the mod hash list.
+	 * Incrementing the dh_ref (while holding the mod hash lock)
+	 * ensures dls_link_remove will wait for the upcall to finish.
 	 */
 	if (mod_hash_find_cb_rval(hash, key, (mod_hash_val_t *)&dhp,
 	    i_dls_head_hold, &rval) != 0 || (rval != 0)) {
-		return (B_FALSE);
+		return (0);
 	}
 
 	/*
-	 * Find dld_str_t that will accept the sub-chain.
+	 * Find all dld_str_t that will accept the sub-chain.
 	 */
 	for (dsp = dhp->dh_list; dsp != NULL; dsp = dsp->ds_next) {
 		if (!acceptfunc(dsp, mhip, &ds_rx, &ds_rx_arg))
@@ -313,7 +315,7 @@ i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
 		naccepted++;
 
 		/*
-		 * There will normally be at least more dld_str_t
+		 * There will normally be at least one more dld_str_t
 		 * (since we've yet to check for non-promiscuous
 		 * dld_str_t) so dup the sub-chain.
 		 */
@@ -407,14 +409,13 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		}
 
 		/*
-		 * Construct a hash key from the VLAN identifier and the
-		 * DLSAP.
+		 * Construct a hash key from the DLSAP.
 		 */
 		key = MAKE_KEY(mhi.mhi_bindsap);
 
 		/*
-		 * Search the has table for dld_str_t eligible to receive
-		 * a packet chain for this DLSAP/VLAN combination.
+		 * Search the hash table for dld_str_t eligible to receive
+		 * a packet chain for this DLSAP.
 		 */
 		if (mod_hash_find_cb_rval(hash, key, (mod_hash_val_t *)&dhp,
 		    i_dls_head_hold, &rval) != 0 || (rval != 0)) {
