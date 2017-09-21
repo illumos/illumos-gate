@@ -668,17 +668,6 @@ typedef struct mac_notify_task_arg {
 } mac_notify_task_arg_t;
 
 /*
- * XXX All MAC_DBG_PRTs must be replaced with call to dtrace probes. For now
- * it may be easier to have these printfs for easier debugging
- */
-#ifdef DEBUG
-extern int mac_dbg;
-#define	MAC_DBG_PRT(a)	if (mac_dbg > 0) {(void) printf a; }
-#else
-#define	MAC_DBG_PRT(a)
-#endif
-
-/*
  * The mac_perim_handle_t is an opaque type that encodes the 'mip' pointer
  * and whether internally a mac_open was done when acquiring the perimeter.
  */
