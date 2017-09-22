@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1092,26 +1093,22 @@ sosdp_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 	 * Check for errors
 	 */
 	if (so->so_error != 0 &&
-	    ((POLLIN|POLLRDNORM|POLLOUT) & origevents)  != 0) {
+	    ((POLLIN|POLLRDNORM|POLLOUT) & origevents) != 0) {
 		*reventsp = (POLLIN|POLLRDNORM|POLLOUT) & origevents;
-		return (0);
+		goto done;
 	}
 
 	*reventsp = 0;
+	if (so->so_type != SOCK_STREAM) {
+		goto done;
+	}
 
 	/*
-	 * Don't mark socket as writable until TX queued data is
-	 * below watermark.
+	 * Don't mark socket writable until TX queued data is below watermark.
 	 */
-	if (so->so_type == SOCK_STREAM) {
-		if (sdp_polldata(
-		    (struct sdp_conn_struct_t *)so->so_proto_handle,
-		    SDP_XMIT)) {
-			*reventsp |= POLLOUT & events;
-		}
-	} else {
-		*reventsp = 0;
-		goto done;
+	if (sdp_polldata((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    SDP_XMIT)) {
+		*reventsp |= POLLOUT & events;
 	}
 
 	if (sdp_polldata((struct sdp_conn_struct_t *)so->so_proto_handle,
@@ -1124,7 +1121,7 @@ sosdp_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 	}
 
 done:
-	if (!*reventsp && !anyyet) {
+	if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
 		*phpp = &so->so_poll_list;
 	}
 

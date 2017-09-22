@@ -22,12 +22,11 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_1394_TARGETS_DCAM1394_DCAM_H
 #define	_SYS_1394_TARGETS_DCAM1394_DCAM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/ksynch.h>
@@ -120,7 +119,6 @@ typedef struct dcam_state_s {
 	int				cur_frame_rate;
 	int				cur_ring_buff_capacity;
 	int				param_status;
-	struct pollhead			dcam_pollhead;
 	int				camera_online;
 	int				pm_open_count;
 	int				pm_cable_power;

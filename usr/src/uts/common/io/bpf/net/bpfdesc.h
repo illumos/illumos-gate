@@ -149,7 +149,6 @@ struct bpf_d {
 	int		bd_nonblock;	/* non-zero for non-blocking read */
 	pid_t		bd_pgid;	/* process or group id for signal */
 	int		bd_timedout;
-	struct pollhead	bd_poll;
 	timeout_id_t	bd_callout;	/* for BPF timeouts with select */
 	pid_t		bd_pid;		/* corresponding PID */
 	void		*bd_sih;	/* soft interrupt handle */
