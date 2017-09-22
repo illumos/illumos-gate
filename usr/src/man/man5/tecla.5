@@ -59,7 +59,7 @@ the 'A' key.
 .sp
 .ne 2
 .na
-\fB\fB\E\fR or \fBM-\fR\fR
+\fB\eE\fR or \fBM-\fR
 .ad
 .RS 13n
 In key sequences, both of these notations can be entered either by pressing the
@@ -977,7 +977,7 @@ Entering Repeat Counts section.
 Terminate and return the current contents of the line, after appending a
 newline character. The newline character is normally '\en', but will be the
 first character of the key sequence that invoked the newline action, if this
-happens to be a printable character. If the action was invoked by the '\n'
+happens to be a printable character. If the action was invoked by the '\en'
 newline character or the '\er' carriage return character, the line is appended
 to the history buffer.
 .RE
@@ -1524,7 +1524,7 @@ user-interrupt
 .sp
 .ne 2
 .na
-\fB\fB^\\fR\fR
+\fB^\e\fR
 .ad
 .RS 6n
 abort
@@ -2037,7 +2037,7 @@ user-interrupt
 .sp
 .ne 2
 .na
-\fB\fB^\\fR\fR
+\fB^\e\fR
 .ad
 .RS 8n
 abort
@@ -2091,7 +2091,7 @@ user-interrupt
 .sp
 .ne 2
 .na
-\fB\fBM-^\\fR\fR
+\fBM-^\e\fR
 .ad
 .RS 8n
 abort
@@ -2343,7 +2343,7 @@ active.
 .sp
 .ne 2
 .na
-\fB\fBM-\\fR\fR
+\fBM-<space>\fR
 .ad
 .RS 21n
 cursor-right (META-space)
@@ -2667,7 +2667,7 @@ vi-forward-change-char
 .sp
 .ne 2
 .na
-\fB\fBM-c\\fR\fR
+\fBM-c<space>\fR
 .ad
 .RS 21n
 vi-forward-change-char (META-c-space)
@@ -2757,7 +2757,7 @@ forward-delete-char
 .sp
 .ne 2
 .na
-\fB\fBM-d\fR\fR
+\fBM-d<space>\fR
 .ad
 .RS 21n
 forward-delete-char (META-d-space)
@@ -3243,7 +3243,7 @@ forward-copy-char
 .sp
 .ne 2
 .na
-\fB\fBM-y\\fR\fR
+\fBM-y<space>\fR
 .ad
 .RS 21n
 forward-copy-char (META-y-space)
@@ -3504,7 +3504,7 @@ complete-word
 .sp
 .ne 2
 .na
-\fB\fBM-\r\fR\fR
+\fBM-\er\fR
 .ad
 .RS 21n
 newline

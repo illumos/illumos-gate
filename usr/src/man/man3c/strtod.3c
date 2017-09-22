@@ -230,12 +230,12 @@ what_kind_of_number (char *s)
      double d;
      long l;
      d = strtod(s, &endp);
-     if (s != endp && *endp == `\0')
+     if (s != endp && *endp == '\e0')
          printf("It's a float with value %g\en", d);
      else
      {
          l = strtol(s, &endp, 0);
-         if (s != endp && *endp == `\e0')
+         if (s != endp && *endp == '\e0')
              printf("It's an integer with value %ld\en", 1);
          else
              return 1;

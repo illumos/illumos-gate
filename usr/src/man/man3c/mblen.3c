@@ -33,7 +33,7 @@ If \fIs\fR is not a null pointer, \fBmblen()\fR and \fBmblen_l()\fR
 determine the number of bytes constituting the character pointed to by
 \fIs\fR. The call
 .IP
-\fBmblen(\fIs\fR, \fIn\fR)\fR;
+\fBmblen\fR(\fIs\fR, \fIn\fR);
 .LP
 is equivalent to:
 .IP

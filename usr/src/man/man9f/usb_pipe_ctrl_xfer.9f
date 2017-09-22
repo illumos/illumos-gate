@@ -449,7 +449,7 @@ Interface stability	Committed
 .SH SEE ALSO
 .LP
 \fBattributes\fR(5), \fBusb_alloc_request\fR(9F), \fBusb_get_cfg\fR(9F),
-\fBusb_get_status\fR(9F). \fBusb_pipe_bulk_xfer\fR(9F),
+\fBusb_get_status\fR(9F), \fBusb_pipe_bulk_xfer\fR(9F),
 \fBusb_pipe_intr_xfer\fR(9F), \fBusb_pipe_isoc_xfer\fR(9F),
 \fBusb_pipe_xopen\fR(9F), \fBusb_pipe_reset\fR(9F),
 \fBusb_pipe_get_state\fR(9F), \fBusb_bulk_request\fR(9S),

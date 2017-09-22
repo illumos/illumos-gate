@@ -14,7 +14,7 @@ Thermal zones are logical regions  within a computer system for which ACPI
 performs temperature monitoring and control functions. The number of thermal
 zones on a system with ACPI support varies. For example, some systems may have
 one or more thermal zones, while others may have none. See the \fIAdvanced
-Configuration and Power Interface Specification, (ACPI) Version 3.0A.\fR for
+Configuration and Power Interface Specification, (ACPI) Version 3.0A\fR, for
 more details.
 .sp
 .LP

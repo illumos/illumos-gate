@@ -65,7 +65,7 @@ invalid.
 .sp
 .ne 2
 .na
-\fB\fBpush\fR \fImodule1\fR[, \fImodule2\fR, \fImodule3\fR, . . .]\fR
+\fB\fBpush\fR \fImodule1\fR[, \fImodule2\fR, \fImodule3\fR, ...]\fR
 .ad
 .sp .6
 .RS 4n

@@ -33,9 +33,9 @@ pathname for the message catalog; otherwise, the environment variable
 \fBNLSPATH\fR is used and  \fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES\fR
 must exist. If \fBNLSPATH\fR does not exist in the environment, or if a message
 catalog cannot be opened in any of the paths specified by \fBNLSPATH\fR, then
-the default path \fB/usr/lib/locale/\fIlocale\fR/LC_MESSAGES\fR is used. In the
-"C" locale,  \fBcatopen()\fR will always succeed without checking the default
-search path.
+the default path \fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES\fR is used.
+In the "C" locale,  \fBcatopen()\fR will always succeed without checking the
+default search path.
 .sp
 .LP
 The names of message catalogs and their location in the filesystem can vary

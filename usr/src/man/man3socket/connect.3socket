@@ -130,7 +130,7 @@ main(int argc, char *argv[])
 
 	errno = 0;
 	port = strtol(argv[2], &eptr, 10);
-	if (errno != 0 || *eptr != '\0') {
+	if (errno != 0 || *eptr != '\e0') {
 		fprintf(stderr, "failed to parse port %s\\n", argv[2]);
 		return (1);
 	}

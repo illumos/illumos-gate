@@ -223,7 +223,7 @@ accepted.
 
 .sp
 .LP
-\fBAdditionally, \fBaccept4()\fR will fail if:
+Additionally, \fBaccept4()\fR will fail if:
 .sp
 .ne 2
 .na

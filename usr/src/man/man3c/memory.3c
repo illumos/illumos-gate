@@ -96,7 +96,7 @@ overlap, the behavior is undefined.
 .sp
 .LP
 The \fBmemmem()\fR function searches for the \fIs_len\fR long byte pattern
-\fIs\fR in the memory region starting at \fBl\fR for \fl_len\fR bytes. If a
+\fIs\fR in the memory region starting at \fIl\fR for \fIl_len\fR bytes. If a
 match is found, a pointer to the starting location in \fIl\fR is returned. If no
 match is found, \fIl_len\fR is zero, \fIs_len\fR is zero, or \fIl_len\fR is less
 than \fIs_len\fR, then a null pointer is return.

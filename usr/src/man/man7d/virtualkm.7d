@@ -257,7 +257,7 @@ debugger mode. As a result, the keyboard is not available.
 .sp
 .ne 2
 .na
-\fBFailed to relink the mouse <\fIdevice_path\fR> underneath virtual mouse\fR
+\fBFailed to relink the mouse <\fR\fIdevice_path\fR\fB> underneath virtual mouse\fR
 .ad
 .sp .6
 .RS 4n

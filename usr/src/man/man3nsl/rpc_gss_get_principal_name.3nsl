@@ -34,8 +34,8 @@ mechanism-dependent principal name of the \fBrpc_gss_principal_t\fR structure
 type.
 .SH PARAMETERS
 .LP
-How many of the identifying parameters  (\fIname \fR,  \fInode\fR, and \fI
-\fRdomain\fI)\fR are necessary to specify depends on the mechanism being used.
+How many of the identifying parameters (\fIname\fR, \fInode\fR, and
+\fIdomain\fR) are necessary to specify depends on the mechanism being used.
 For example, Kerberos V5 requires only a user name but can accept a node and
 domain name. An application can choose to set unneeded parameters to
 \fINULL.\fR

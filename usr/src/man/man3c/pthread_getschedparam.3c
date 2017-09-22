@@ -178,7 +178,7 @@ Standard	See \fBstandards\fR(5).
 .sp
 .LP
 \fBpthread_attr_init\fR(3C), \fBsched_getparam\fR(3C),
-\fBsched_get_priority_max\fR(3C)\fBsched_get_priority_max\fR(3C),
+\fBsched_get_priority_max\fR(3C), \fBsched_get_priority_max\fR(3C),
 \fBsched_get_priority_min\fR(3C), \fBsched_setparam\fR(3C),
 \fBsched_getscheduler\fR(3C), \fBsched_setscheduler\fR(3C),
 \fBattributes\fR(5), \fBpthreads\fR(5), \fBstandards\fR(5)

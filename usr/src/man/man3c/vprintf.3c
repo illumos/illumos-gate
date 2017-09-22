@@ -106,7 +106,7 @@ routine:
 .nf
 #include <stdio.h>
 #include <stdarg.h>
-\&. . .
+\&.\|.\|.
 /*
  *   error should be called like
  *         error(function_name, format, arg1, \&.\|.\|.);

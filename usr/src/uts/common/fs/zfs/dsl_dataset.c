@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 RackTop Systems.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
@@ -1081,13 +1081,6 @@ dsl_dataset_snapshot_reserve_space(dsl_dataset_t *ds, dmu_tx_t *tx)
 	return (0);
 }
 
-typedef struct dsl_dataset_snapshot_arg {
-	nvlist_t *ddsa_snaps;
-	nvlist_t *ddsa_props;
-	nvlist_t *ddsa_errors;
-	cred_t *ddsa_cr;
-} dsl_dataset_snapshot_arg_t;
-
 int
 dsl_dataset_snapshot_check_impl(dsl_dataset_t *ds, const char *snapname,
     dmu_tx_t *tx, boolean_t recv, uint64_t cnt, cred_t *cr)
@@ -1147,7 +1140,7 @@ dsl_dataset_snapshot_check_impl(dsl_dataset_t *ds, const char *snapname,
 	return (0);
 }
 
-static int
+int
 dsl_dataset_snapshot_check(void *arg, dmu_tx_t *tx)
 {
 	dsl_dataset_snapshot_arg_t *ddsa = arg;
@@ -1422,7 +1415,7 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 	spa_history_log_internal_ds(ds->ds_prev, "snapshot", tx, "");
 }
 
-static void
+void
 dsl_dataset_snapshot_sync(void *arg, dmu_tx_t *tx)
 {
 	dsl_dataset_snapshot_arg_t *ddsa = arg;
@@ -2452,14 +2445,7 @@ dsl_dataset_handoff_check(dsl_dataset_t *ds, void *owner, dmu_tx_t *tx)
 	return (0);
 }
 
-typedef struct dsl_dataset_rollback_arg {
-	const char *ddra_fsname;
-	const char *ddra_tosnap;
-	void *ddra_owner;
-	nvlist_t *ddra_result;
-} dsl_dataset_rollback_arg_t;
-
-static int
+int
 dsl_dataset_rollback_check(void *arg, dmu_tx_t *tx)
 {
 	dsl_dataset_rollback_arg_t *ddra = arg;
@@ -2567,7 +2553,7 @@ dsl_dataset_rollback_check(void *arg, dmu_tx_t *tx)
 	return (0);
 }
 
-static void
+void
 dsl_dataset_rollback_sync(void *arg, dmu_tx_t *tx)
 {
 	dsl_dataset_rollback_arg_t *ddra = arg;

@@ -36,8 +36,8 @@ profiles in the \fBuser_attr\fR(4) database file.
 .LP
 Each entry in the \fBexec_attr\fR database consists of one line of text
 containing seven fields separated by colons (\fB:\fR). Line continuations using
-the backslash (\fB\\fR) character are permitted. The basic format of each entry
-is:
+the backslash (\fB\e\fR) character are permitted. The basic format of each
+entry is:
 .sp
 .LP
 \fIname\fR:\fIpolicy\fR:\fItype\fR:\fIres1\fR:\fIres2\fR:\fIid\fR:\fIattr\fR
@@ -218,7 +218,7 @@ conflicts.
 .LP
 The following characters are used in describing the database format and must be
 escaped with a backslash if used as data: colon (\fB:\fR), semicolon (\fB;\fR),
-equals (\fB=\fR), and backslash (\fB\\fR).
+equals (\fB=\fR), and backslash (\fB\e\fR).
 .SH SEE ALSO
 .LP
 \fBauths\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),

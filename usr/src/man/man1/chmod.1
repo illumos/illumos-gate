@@ -17,22 +17,22 @@ chmod \- change the permissions mode of a file
 .SH SYNOPSIS
 .LP
 .nf
-\fBchmod\fR [\fB-fR\fR] \fIabsolute-mode\fR \fIfile\fR...
+\fBchmod\fR [\fB-fR\fR] \fIabsolute-mode\fR \fIfile\fR ...
 .fi
 
 .LP
 .nf
-\fBchmod\fR [\fB-fR\fR] \fIsymbolic-mode-list\fR \fIfile\fR...
+\fBchmod\fR [\fB-fR\fR] \fIsymbolic-mode-list\fR \fIfile\fR ...
 .fi
 
 .LP
 .nf
-\fBchmod\fR [\fB-fR\fR] \fIacl_operation\fR \fIfile\fR...
+\fBchmod\fR [\fB-fR\fR] \fIacl_operation\fR \fIfile\fR ...
 .fi
 
 .LP
 .nf
-\fBchmod\fR [\fB-fR\fR] [\fB-@\fR \fInamed_attribute\fR]...\fIattribute_specification_list\fR \fIfile\fR...
+\fBchmod\fR [\fB-fR\fR] [\fB-@\fR \fInamed_attribute\fR]...\fIattribute_specification_list\fR \fIfile\fR ...
 .fi
 
 .SH DESCRIPTION
@@ -48,7 +48,7 @@ files, directories, and opaque extended attribute files.
 An absolute mode command line has the following format:
 .sp
 .LP
-\fBchmod\fR [\fIoptions\fR] \fIabsolute-mode\fR \fIfile\fR . . .
+\fBchmod\fR [\fIoptions\fR] \fIabsolute-mode\fR \fIfile\fR ...
 .sp
 .LP
 where \fIabsolute-mode\fR is specified using octal numbers \fInnnn\fR defined
@@ -216,7 +216,7 @@ mode; it must be set (or cleared) in symbolic mode using \fBg+s\fR (or
 A symbolic mode command line has the following format:
 .sp
 .LP
-\fBchmod\fR [\fIoptions\fR] \fIsymbolic-mode-list\fR \fIfile\fR . . .
+\fBchmod\fR [\fIoptions\fR] \fIsymbolic-mode-list\fR \fIfile\fR ...
 .sp
 .LP
 where \fIsymbolic-mode-list\fR is a comma-separated list (with no intervening

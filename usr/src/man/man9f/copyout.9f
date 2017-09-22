@@ -121,7 +121,7 @@ returned.
  6  };
  7
  8  extern struct device xx_addr[]; /* phys. device regs. location */
- 9    . . .
+ 9    ...
 10  xx_ioctl(dev_t dev, int cmd, int arg, int mode,
 11      cred_t *cred_p, int *rval_p)
 12               ...

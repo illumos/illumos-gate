@@ -1697,8 +1697,8 @@ zero, minutes, and seconds of the form \fIHHhMMmSS.FFs\fR. The value of \fIp\fR
 determines whether or not the fraction is included.
 .sp
 All other characters are output without change and a trailing NEWLINE is added.
-If unset, the default value, \fB$'\enreal\t%2lR\nuser\t%2lU\nsys%2lS'\fR, is
-used. If the value is null, no timing information is displayed.
+If unset, the default value, \fB$'\enreal\et%2lR\enuser\et%2lU\ensys%2lS'\fR,
+is used. If the value is null, no timing information is displayed.
 .RE
 
 .sp
@@ -6941,7 +6941,7 @@ The scripting interface is Uncommitted. The environment variables,
 \fBprintf\fR(1), \fBstty\fR(1), \fBtest\fR(1), \fBumask\fR(1), \fBvi\fR(1),
 \fBdup\fR(2), \fBexec\fR(2), \fBfork\fR(2), \fBioctl\fR(2), \fBlseek\fR(2),
 \fBpathconf\fR(2), \fBpipe\fR(2), \fBsysconf\fR(3C), \fBulimit\fR(2),
-\fBumask\fR(2), \fBrand\fR(3C)\fBtcgetattr\fR(3C), \fBwait\fR(3C),
+\fBumask\fR(2), \fBrand\fR(3C), \fBtcgetattr\fR(3C), \fBwait\fR(3C),
 \fBa.out\fR(4), \fBprofile\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBlargefile\fR(5), \fBstandards\fR(5)
 .sp

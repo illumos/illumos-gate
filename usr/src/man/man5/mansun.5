@@ -71,7 +71,7 @@ Change to default type size.
 c c c c
 c c c c .
 \fIRequest\fR	\fICause\fR	\fIIf no\fR	\fIExplanation\fR
-	\fIBreak\fR	\fIArgument\fR	
+	\fIBreak\fR	\fIArgument\fR
 \fB\&.B \fR\fIt\fR	no	\fIt\fR=n.t.l.*	Text is in bold font.
 \fB\&.BI \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and italic.
 \fB\&.BR \fR\fIt\fR	no	\fIt\fR=n.t.l.	Join words, alternating bold and Roman.
@@ -110,7 +110,7 @@ T}
 \fB\&.SH \fR\fIt\fR	yes	-	Section Heading.
 \fB\&.SM \fR\fIt\fR	no	\fIt\fR=n.t.l.	Reduce size of text by 1 point.
 \fB\&.SS \fR\fIt\fR	yes	\fIt\fR=n.t.l.	Section Subheading.
-\fB\&.TH \FR\FIN S "f d, m\fR"
+\fB\&.TH \fR\fIN S "f d, m\fR"
 \fB\&.TH \fR\fIn s d f m\fR	yes	-	T{
 Begin reference page \fIn\fR, of of section \fIs\fR; \fId\fR is the date of the most recent change. If present, \fIf\fR is the left page footer; \fIm\fR is the main page (center) header. Sets prevailing indent and tabs to .5i.
 T}
@@ -140,7 +140,7 @@ A typical manual page for a command or function is laid out as follows:
 .sp
 .ne 2
 .na
-\fB\&.TH\fI TITLE \FR[1-8]\FR " , "
+\fB\&.TH\fI TITLE \fR[1-8]\fR " , "
 .ad
 .RS 21n
 The name of the command or function, which serves as the title of the manual

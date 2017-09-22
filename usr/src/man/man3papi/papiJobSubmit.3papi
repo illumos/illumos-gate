@@ -454,11 +454,11 @@ main(int ac, char *av[])
                                     "printer-name", &name);
                (void) papiAttributeListGetInteger(list, NULL,
                                     "job-id", &id);
-                while (papiAttributeListToString(list, "\n\t", buffer,
+                while (papiAttributeListToString(list, "\en\et", buffer,
                             size) != PAPI_OK)
                     buffer = realloc(buffer, size += BUFSIZ);
 
-                printf("%s-%d:\en\t%s\en", name, id, buffer);
+                printf("%s-%d:\en\et%s\en", name, id, buffer);
                 free(buffer);
             }
         }
@@ -572,7 +572,7 @@ main(int ac, char *av[])
                             != PAPI_OK)
                 buffer = realloc(buffer, size += BUFSIZ);
 
-            printf("%s-%d:\en\et%s\n", name, id, buffer);
+            printf("%s-%d:\en\et%s\en", name, id, buffer);
             free(buffer);
         }
     } else
@@ -698,11 +698,11 @@ main(int ac, char *av[])
                                     "printer-name", &name);
             (void) papiAttributeListGetInteger(list, NULL,
                                     "job-id", &id);
-            while (papiAttributeListToString(list, "\n\t", buffer, size)
+            while (papiAttributeListToString(list, "\en\et", buffer, size)
                             != PAPI_OK)
                 buffer = realloc(buffer, size += BUFSIZ);
 
-            printf("%s-%d:\en\t%s\en", name, id, buffer);
+            printf("%s-%d:\en\et%s\en", name, id, buffer);
             free(buffer);
         }
     } else

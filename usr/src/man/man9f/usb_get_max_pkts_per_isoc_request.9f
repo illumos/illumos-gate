@@ -116,5 +116,5 @@ Interface stability	Committed
 .SH SEE ALSO
 .LP
 \fBattributes\fR(5), \fBusb_pipe_isoc_xfer\fR(9F), \fBusb_alloc_request\fR(9F),
-\fBusb_get_current_frame_number\fR(9F). \fBusb_ep_descr\fR(9S),
+\fBusb_get_current_frame_number\fR(9F), \fBusb_ep_descr\fR(9S),
 \fBusb_isoc_request\fR(9S)
