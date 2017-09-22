@@ -21,6 +21,7 @@
  */
 /*
  * Copyright (c) 1991-1994 Sun Microsystems, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_DDIMAPREQ_H
@@ -74,7 +75,7 @@ typedef struct {
 	ddi_map_op_t map_op;
 	ddi_map_type_t map_type;
 	ddi_map_obj_t map_obj;
-	int map_flags;	/* See below... */
+	uint_t map_flags; /* See below... */
 	int map_prot;	/* Prot bits (see sys/mman.h) */
 	ddi_acc_hdl_t *map_handlep;
 	int map_vers;
@@ -99,6 +100,19 @@ typedef struct {
 			 */
 #define	DDI_MF_KERNEL_MAPPING	0x2
 #define	DDI_MF_DEVICE_MAPPING	0x4
+
+/*
+ * The upper bits of map_flags are reserved for platform-specific flags. These
+ * start with the highest bit and then work their way down. Currently only one
+ * bit is used, and only on x86.
+ */
+			/*
+			 * Indicates that there is an extended register
+			 * specification (fully 64-bit aware) being used. This
+			 * should only be used by children of the x86 root nexus
+			 * driver.
+			 */
+#define	DDI_MF_EXT_REGSPEC	0x80000000
 
 #endif	/* _KERNEL */
 
