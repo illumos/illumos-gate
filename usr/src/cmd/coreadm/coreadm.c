@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -240,6 +242,12 @@ main(int argc, char **argv)
 	if (modify && npids != 0) {
 		(void) fprintf(stderr, gettext(
 		    "%s: -[GIgied] options cannot have a process-id list\n"),
+		    command);
+		usage();
+	}
+	if (glob_pattern != NULL && glob_pattern[0] != '/') {
+		(void) fprintf(stderr, gettext(
+		    "%s: The -g option must specify an absolute path\n"),
 		    command);
 		usage();
 	}
