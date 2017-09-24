@@ -164,7 +164,7 @@ followed by \fBPRNIOC_GET_IFCAP\fR.
 .RS 21n
 This command can be used to retrieve printer interface info string, which is an
 arbitrary format string usually describing the bus type. The argument is a
-pointer to \fBstruct prn_interface_info\fR as described below.\f(CW\fR
+pointer to \fBstruct prn_interface_info\fR as described below.
 .RE
 
 .sp

@@ -128,8 +128,6 @@ extern void cmi_cmci_trap(void);
 kmutex_t cmci_cpu_setup_lock;	/* protects cmci_cpu_setup_registered */
 int cmci_cpu_setup_registered;
 
-/* number of CPUs in power-on transition state */
-static int apic_poweron_cnt = 0;
 lock_t apic_mode_switch_lock;
 
 /*
@@ -1454,45 +1452,6 @@ apic_find_cpu(int flag)
 
 	ASSERT((apic_cpus[acid].aci_status & flag) != 0);
 	return (acid);
-}
-
-/*
- * Switch between safe and x2APIC IPI sending method.
- * CPU may power on in xapic mode or x2apic mode. If CPU needs to send IPI to
- * other CPUs before entering x2APIC mode, it still needs to xAPIC method.
- * Before sending StartIPI to target CPU, psm_send_ipi will be changed to
- * apic_common_send_ipi, which detects current local APIC mode and use right
- * method to send IPI. If some CPUs fail to start up, apic_poweron_cnt
- * won't return to zero, so apic_common_send_ipi will always be used.
- * psm_send_ipi can't be simply changed back to x2apic_send_ipi if some CPUs
- * failed to start up because those failed CPUs may recover itself later at
- * unpredictable time.
- */
-void
-apic_switch_ipi_callback(boolean_t enter)
-{
-	ulong_t iflag;
-	struct psm_ops *pops = psmops;
-
-	iflag = intr_clear();
-	lock_set(&apic_mode_switch_lock);
-	if (enter) {
-		ASSERT(apic_poweron_cnt >= 0);
-		if (apic_poweron_cnt == 0) {
-			pops->psm_send_ipi = apic_common_send_ipi;
-			send_dirintf = pops->psm_send_ipi;
-		}
-		apic_poweron_cnt++;
-	} else {
-		ASSERT(apic_poweron_cnt > 0);
-		apic_poweron_cnt--;
-		if (apic_poweron_cnt == 0) {
-			pops->psm_send_ipi = x2apic_send_ipi;
-			send_dirintf = pops->psm_send_ipi;
-		}
-	}
-	lock_clear(&apic_mode_switch_lock);
-	intr_restore(iflag);
 }
 
 void

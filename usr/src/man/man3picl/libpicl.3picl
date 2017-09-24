@@ -68,7 +68,7 @@ has a handle to a node in the tree as its value. A \fBreference\fR property may
 be used to establish an association between any two nodes in the tree. A
 \fBtimestamp\fR property type has the value of time in seconds since Epoch. A
 \fBbytearray\fR property type has an array of bytes as its value. A
-\fBcharstring\fR property type has a nul ('\0') terminated sequence of ASCII
+\fBcharstring\fR property type has a nul ('\e0') terminated sequence of ASCII
 characters. The size of a property specifies the size of its value in bytes. A
 \fBvoid\fR property type denotes a property that exists but has no value.
 .sp

@@ -27,7 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include "ixgbe_sw.h"
@@ -465,6 +465,9 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	kstat_named_init(&ixgbe_ks->rnbc, "recv_no_buffer",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->lroc, "lro_pkt_count",
+	    KSTAT_DATA_UINT64);
+
+	kstat_named_init(&ixgbe_ks->dev_gone, "device_gone",
 	    KSTAT_DATA_UINT64);
 	/*
 	 * Function to provide kernel stat update on demand

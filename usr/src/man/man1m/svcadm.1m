@@ -21,7 +21,7 @@ svcadm \- manipulate service instances
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] restart [\fB-d\fR] 
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] restart [\fB-d\fR]
      [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
@@ -121,7 +121,7 @@ non-zero exit status.
 .sp
 .ne 2
 .na
-\fB\fBenable\fR \fB[\fR\fB-rst\fR\fB]\fR {\fIFMRI\fR | \fIpattern\fR}. . .\fR
+\fB\fBenable\fR \fB[\fR\fB-rst\fR\fB]\fR {\fIFMRI\fR | \fIpattern\fR}...\fR
 .ad
 .sp .6
 .RS 4n
@@ -148,7 +148,7 @@ persistent across reboot.
 .sp
 .ne 2
 .na
-\fB\fBdisable\fR [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}. . .\fR
+\fB\fBdisable\fR [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...\fR
 .ad
 .sp .6
 .RS 4n
@@ -172,7 +172,7 @@ persistent across reboot.
 .sp
 .ne 2
 .na
-\fB\fBrestart\fR [\fB-d\fR] {\fIFMRI\fR | \fIpattern\fR}. . .\fR
+\fB\fBrestart\fR [\fB-d\fR] {\fIFMRI\fR | \fIpattern\fR}...\fR
 .ad
 .sp .6
 .RS 4n
@@ -191,7 +191,7 @@ the service.
 .sp
 .ne 2
 .na
-\fB\fBrefresh\fR {\fIFMRI\fR | \fIpattern\fR}. . .\fR
+\fB\fBrefresh\fR {\fIFMRI\fR | \fIpattern\fR}...\fR
 .ad
 .sp .6
 .RS 4n
@@ -213,7 +213,7 @@ group of the service instance (see \fBsmf_security\fR(5)).
 .sp
 .ne 2
 .na
-\fB\fBclear\fR {\fIFMRI\fR | \fIpattern\fR}. . .\fR
+\fB\fBclear\fR {\fIFMRI\fR | \fIpattern\fR}...\fR
 .ad
 .sp .6
 .RS 4n
@@ -234,7 +234,7 @@ administrative manipulation.
 .ne 2
 .na
 \fB\fBmark [\fR\fB-It\fR\fB]\fR \fIinstance_state\fR {\fIFMRI\fR |
-\fIpattern\fR}. . .\fR
+\fIpattern\fR}...\fR
 .ad
 .sp .6
 .RS 4n

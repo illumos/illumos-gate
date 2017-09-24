@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fex_set_handling 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.TH FEX_SET_HANDLING 3M "Jul 12, 2006" "SunOS 5.11" "Mathematical Library Functions"
 .SH NAME
 fex_set_handling, fex_get_handling, fex_getexcepthandler, fex_setexcepthandler
 \- control floating point exception handling modes
@@ -11,7 +11,7 @@ fex_set_handling, fex_get_handling, fex_getexcepthandler, fex_setexcepthandler
 .LP
 .nf
 c99 [ \fIflag\fR... ] \fIfile\fR... -lm [ \fIlibrary\fR... ]
-#include <fenv.h> 
+#include <fenv.h>
 
 \fBint\fR \fBfex_set_handling\fR(\fBint\fR \fIex\fR, \fBint\fR \fImode\fR, \fBvoid(*\fR\fIhandler\fR);
 .fi
@@ -44,7 +44,7 @@ by a bitwise-OR of any of the following values defined in <\fBfenv.h\fR>:
 \fB\fBFEX_INEXACT\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 
 .RE
 
@@ -55,7 +55,7 @@ by a bitwise-OR of any of the following values defined in <\fBfenv.h\fR>:
 \fB\fBFEX_UNDERFLOW\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 
 .RE
 
@@ -66,7 +66,7 @@ by a bitwise-OR of any of the following values defined in <\fBfenv.h\fR>:
 \fB\fBFEX_OVERFLOW\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 
 .RE
 
@@ -77,7 +77,7 @@ by a bitwise-OR of any of the following values defined in <\fBfenv.h\fR>:
 \fB\fBFEX_DIVBYZERO\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 division by zero
 .RE
 
@@ -88,7 +88,7 @@ division by zero
 \fB\fBFEX_INV_ZDZ\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 0/0 invalid operation
 .RE
 
@@ -99,7 +99,7 @@ division by zero
 \fB\fBFEX_INV_IDI\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 infinity/infinity invalid operation
 .RE
 
@@ -110,7 +110,7 @@ infinity/infinity invalid operation
 \fB\fBFEX_INV_ISI\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 infinity-infinity invalid operation
 .RE
 
@@ -121,7 +121,7 @@ infinity-infinity invalid operation
 \fB\fBFEX_INV_ZMI\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 0*infinity invalid operation
 .RE
 
@@ -132,7 +132,7 @@ infinity-infinity invalid operation
 \fB\fBFEX_INV_SQRT\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 square root of negative operand
 .RE
 
@@ -143,7 +143,7 @@ square root of negative operand
 \fB\fBFEX_INV_SNAN\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 signaling NaN
 .RE
 
@@ -154,7 +154,7 @@ signaling NaN
 \fB\fBFEX_INV_INT\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 invalid integer conversion
 .RE
 
@@ -165,7 +165,7 @@ invalid integer conversion
 \fB\fBFEX_INV_CMP\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 invalid comparison
 .RE
 
@@ -179,7 +179,7 @@ For convenience, the following combinations of values are also defined:
 \fB\fBFEX_NONE\fR\fR
 .ad
 .RS 15n
-.rt  
+.rt
 no exceptions
 .RE
 
@@ -190,7 +190,7 @@ no exceptions
 \fB\fBFEX_INVALID\fR\fR
 .ad
 .RS 15n
-.rt  
+.rt
 all invalid operation exceptions
 .RE
 
@@ -201,7 +201,7 @@ all invalid operation exceptions
 \fB\fBFEX_COMMON\fR\fR
 .ad
 .RS 15n
-.rt  
+.rt
 overflow, division by zero, and invalid operation
 .RE
 
@@ -212,7 +212,7 @@ overflow, division by zero, and invalid operation
 \fB\fBFEX_ALL\fR\fR
 .ad
 .RS 15n
-.rt  
+.rt
 all exceptions
 .RE
 
@@ -229,7 +229,7 @@ exceptions occurs.  It must be one of the following values:
 \fB\fBFEX_NOHANDLER\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 Trap but do not otherwise handle the exception, evoking instead whatever
 ambient behavior would normally be in effect.  This is the default behavior
 when the exception's trap is enabled. The \fIhandler\fR parameter is ignored.
@@ -242,7 +242,7 @@ when the exception's trap is enabled. The \fIhandler\fR parameter is ignored.
 \fB\fBFEX_NONSTOP\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 Provide the IEEE 754 default result for the operation that caused the
 exception, set the exception's flag, and continue execution. This is the
 default behavior when the exception's trap is disabled.  The \fIhandler\fR
@@ -256,7 +256,7 @@ parameter is ignored.
 \fB\fBFEX_ABORT\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 Call \fBabort\fR(3C). The \fIhandler\fR parameter is ignored.
 .RE
 
@@ -267,7 +267,7 @@ Call \fBabort\fR(3C). The \fIhandler\fR parameter is ignored.
 \fB\fBFEX_SIGNAL\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 Invoke the function *\fIhandler\fR with the parameters normally supplied to a
 signal handler installed with \fBsigfpe\fR(3C).
 .RE
@@ -279,7 +279,7 @@ signal handler installed with \fBsigfpe\fR(3C).
 \fB\fBFEX_CUSTOM\fR\fR
 .ad
 .RS 17n
-.rt  
+.rt
 Invoke the function *\fIhandler\fR as described in the next paragraph.
 .RE
 
@@ -378,7 +378,7 @@ int main() {
  * save current 0/0 handler
  */
 	(void) fex_getexcepthandler(&buf, FEX_INV_ZDZ);
-/* 
+/*
  * set up presubstitution handler for 0/0
  */
 	(void) fex_set_handling(FEX_INV_ZDZ, FEX_CUSTOM, presub);
@@ -393,7 +393,7 @@ int main() {
 	        (void) printf("\etx=%3.3f\et f(x) = % 1.20e\en", x, w);
 	}
 /*
- * restore old 0/0 handler 
+ * restore old 0/0 handler
  */
 	(void) fex_setexcepthandler(&buf, FEX_INV_ZDZ);
 	return 0;
@@ -431,14 +431,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
+tab(	) box;
+lw(2.75i) lw(2.75i)
+lw(2.75i) lw(2.75i)
 .
-ATTRIBUTE TYPEATTRIBUTE VALUE
-AvailabilitySUNWlibms, SUNWlmxs
-Interface StabilityStable
-MT-LevelMT-Safe (see Notes)
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Availability	SUNWlibms, SUNWlmxs
+Interface Stability	Stable
+MT-Level	MT-Safe (see Notes)
 .TE
 
 .SH SEE ALSO

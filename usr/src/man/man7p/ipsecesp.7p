@@ -77,5 +77,5 @@ Interface Stability	Evolving
 \fBgetipsecalgbyname\fR(3NSL), \fBip\fR(7P), \fBipsec\fR(7P), \fBipsecah\fR(7P)
 .sp
 .LP
-Kent, S. and Atkinson, R.\fIRFC 2406, IP Encapsulating Security Payload
+Kent, S. and Atkinson, R. \fIRFC 2406, IP Encapsulating Security Payload
 (ESP)\fR, The Internet Society, 1998.

@@ -35,16 +35,16 @@ with the \fBmount at boot\fR field set to \fByes\fR in the
 .sp
 .LP
 For each file system in the file system table, the following logic is executed:
-if there exists a file\fB/usr/lib/fs/\fIFSType\fR/fsckall\fR, where
+if there exists a file \fB/usr/lib/fs/\fR\fIFSType\fR\fB/fsckall\fR, where
 \fIFSType\fR is the type of the file system, save that file system in a list to
 be passed later, and all at once, as arguments to the
-\fB/usr/lib/fs/\fIFSType\fR/fsckall\fR script. The
-\fB/usr/lib/fs/\fIFSType\fR/fsckall\fR script checks all of the file systems in
-its argument list to determine whether they can be safely mounted. If no
-\fB/usr/lib/fs/\fIFSType\fR/fsckall\fR script exists for the \fIFSType\fR of
-the file system, the file system is individually checked using \fBfsck\fR(1M).
-If the file system does not appear mountable, it is fixed using \fBfsck\fR
-before the mount is attempted. File systems with a \(mi entry in the
+\fB/usr/lib/fs/\fR\fIFSType\fR\fB/fsckall\fR script. The
+\fB/usr/lib/fs/\fR\fIFSType\fR\fB/fsckall\fR script checks all of the file
+systems in its argument list to determine whether they can be safely mounted.
+If no \fB/usr/lib/fs/\fR\fIFSType\fR\fB/fsckall\fR script exists for the
+\fIFSType\fR of the file system, the file system is individually checked using
+\fBfsck\fR(1M). If the file system does not appear mountable, it is fixed using
+\fBfsck\fR before the mount is attempted. File systems with a \(mi entry in the
 \fBfsckdev\fR field are mounted without first being checked.
 .sp
 .LP

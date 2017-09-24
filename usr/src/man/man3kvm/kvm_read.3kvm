@@ -66,5 +66,5 @@ MT-Level	Unsafe
 .SH SEE ALSO
 .sp
 .LP
-\fBkvm_getu\fR(3KVM), \fBkvm_kread\fR(3KVM)\fBkvm_nlist\fR(3KVM),
+\fBkvm_getu\fR(3KVM), \fBkvm_kread\fR(3KVM), \fBkvm_nlist\fR(3KVM),
 \fBkvm_open\fR(3KVM), \fBattributes\fR(5)

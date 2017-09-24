@@ -123,7 +123,7 @@ returned.
  6  };
  7
  8  extern struct device xx_addr[];   /* phys. device regs. location */
- 9    . . .
+ 9    ...
 10  xx_ioctl(dev_t dev, int cmd, int arg, int mode,
 11      cred_t *cred_p, int *rval_p)
 12               ...
@@ -162,7 +162,7 @@ Stability Level	Obsolete
 .sp
 .LP
 \fBattributes\fR(5), \fBioctl\fR(9E), \fBbcopy\fR(9F), \fBcopyout\fR(9F),
-\fBddi_copyin\fR(9F), \fBddi_copyout\fR(9F), \fBuiomove\fR(9F).
+\fBddi_copyin\fR(9F), \fBddi_copyout\fR(9F), \fBuiomove\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

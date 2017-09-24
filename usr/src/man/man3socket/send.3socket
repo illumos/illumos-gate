@@ -263,7 +263,7 @@ The \fBsend()\fR function returns errors under the following conditions:
 The socket is shut down for writing, or the socket is connection-mode and is no
 longer connected. In the latter case, if the socket is of type
 \fBSOCK_STREAM\fR, the \fBSIGPIPE\fR signal is generated to the calling thread
-unless the \fB\fBMSG_NOSIGNAL\fR flag is set.
+unless the \fBMSG_NOSIGNAL\fR flag is set.
 .RE
 
 .SH ATTRIBUTES

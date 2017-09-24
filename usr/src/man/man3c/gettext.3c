@@ -282,8 +282,7 @@ system default location for file containing messages for  language
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_XXX/\fR\fIdomainname\fR\fB\&.mo\fR\
-fR
+\fB\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_XXX/\fR\fIdomainname\fR\fB\&.mo\fR\fR
 .ad
 .sp .6
 .RS 4n

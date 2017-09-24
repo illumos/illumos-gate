@@ -457,7 +457,7 @@ if (data_xfered != sizeof (request)) {
                 ...
         }
 
-   }
+}
 .fi
 .in -2
 
@@ -518,7 +518,7 @@ void init_cntrl_req(
         req[5] = 0xFF & (wIndex >> 8);
         req[6] = 0xFF & wLength;
         req[7] = 0xFF & (wLength >> 8);
- }
+}
 
  ....
 
@@ -669,7 +669,7 @@ configuration.  For sake of brevity, uninteresting parts are omitted.
    init_cntrl_req(&setup_data, USB_DEV_REQ_DEV_TO_HOST, USB_REQ_GET_DESCR,
                    USB_DESCR_TYPE_SETUP_CFG, 0, totalLength);
 
-   count = write(ctrl_fd, &setup_data, sizeof (setup_data));                                                                                          	
+   count = write(ctrl_fd, &setup_data, sizeof (setup_data));
    if (count != sizeof (setup_data)) {
            /* Error recovery. */
    } else {
@@ -1061,7 +1061,7 @@ The following example shows how to read an isochronous-IN endpoint:
 		char rdbuf[5000];
 
 		pktcnt = 4; /* 4 packets in this request */
- 	
+
 		len = sizeof(int) +
 			sizeof(ugen_isoc_pkt_descr_t) * pktcount;
 
@@ -1166,13 +1166,13 @@ endpoint:
 
 		len = sizeof(int) +
 			sizeof(ugen_isoc_pkt_descr_t) * pktcount;
- 	
+
 		len += pktlen * pktcnt;
 
 		buf = malloc(len);
 		if (!buf) {
 			/* Error recovery. */
- 	    }
+		}
 
 		req = (ugen_isoc_req_head_t *)buf;
 		req->req_isoc_pkts_count = pktcnt;
@@ -1184,8 +1184,8 @@ endpoint:
 			pktdesc[i].dsc_isoc_pkt_len = pktlen;
 			pktdesc[i].dsc_isoc_pkt_actual_len = 0;
 			pktdesc[i].dsc_isoc_pkt_status = 0;
- 	    }
- 	
+		}
+
 		/* moving to beginning of payload data */
 		p = buf + sizeof(int) + sizeof(*pktdesc) * pktcnt;
 		for (i = 0; i < pktcnt; i++) {
@@ -1193,17 +1193,17 @@ endpoint:
 			/* fill in the data buffer */
 
 			p += pktlen;
-     }
+		}
 
 		/*
-		* write packet request information and data to ugen driver
-		*
-		* len should be the exact value of sizeof(int) +
-		*    sizeof(ugen_isoc_pkt_descr_t) * pktcnt + payload length
-		*/
+		 * write packet request information and data to ugen driver
+		 *
+		 * len should be the exact value of sizeof(int) +
+		 *    sizeof(ugen_isoc_pkt_descr_t) * pktcnt + payload length
+		 */
 		if (write(fd, buf, len) < 0) {
 			/* Error recovery. */
- 	    }
+		}
 
 		/* read packet status */
 		if (read(fd, rdbuf, sizeof(*pktdesc) * pktcnt) < 0) {
@@ -1214,7 +1214,7 @@ endpoint:
 
 			/* Parse every packet's transfer status */
 
-  	    }
+		}
 .fi
 .in -2
 
@@ -1655,7 +1655,7 @@ Architecture	SPARC & x86, PCI-based systems
 .LP
 \fBclose\fR(2), \fBpoll\fR(2), \fBread\fR(2),
 \fBwrite\fR(2), \fBaioread\fR(3C), \fBaiowrite\fR(3C), \fBusba\fR(7D),
-\fBusb_dev_descr\fR(9S).
+\fBusb_dev_descr\fR(9S)
 .SH DIAGNOSTICS
 .LP
 In addition to being logged, the following messages may appear on the system

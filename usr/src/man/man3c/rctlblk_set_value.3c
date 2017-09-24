@@ -409,7 +409,7 @@ main()
 	    raction, raction == RCTL_LOCAL_SIGNAL ? rsignal : 0);
 	(void) printf("Value:          %llu\en",
 	    rctlblk_get_value(rblk));
-	(void) printf("\tEnforced value: %llu\en",
+	(void) printf("\etEnforced value: %llu\en",
 	    rctlblk_get_enforced_value(rblk));
 
 	return (0);

@@ -18,16 +18,16 @@ bases
 .LP
 The \fBsrchtxt\fR utility is used to display all the text strings in message
 data bases, or to search for a text string in message data bases (see
-\fBmkmsgs\fR(1)). These data bases are files in the directory\fB
-/usr/lib/locale/\fIlocale\fR/LC_MESSAGES\fR (see \fBsetlocale\fR(3C)), unless a
-file name given with the \fB-m\fR option contains a \fB/\fR. The directory
-\fBlocale\fR can be viewed as the name of the language in which the text
-strings are written. If the \fB-l\fR option is not specified, the files
+\fBmkmsgs\fR(1)). These data bases are files in the directory
+\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES\fR (see \fBsetlocale\fR(3C)),
+unless a file name given with the \fB-m\fR option contains a \fB/\fR. The
+directory \fBlocale\fR can be viewed as the name of the language in which the
+text strings are written. If the \fB-l\fR option is not specified, the files
 accessed will be determined by the value of the environment variable
 \fBLC_MESSAGES\fR. If \fBLC_MESSAGES\fR is not set, the files accessed will be
 determined by the value of the environment variable \fBLANG\fR. If \fBLANG\fR
 is not set, the files accessed will be in the directory
-\fB/usr/lib/locale//C/LC_MESSAGES \fR, which contains default strings.
+\fB/usr/lib/locale/C/LC_MESSAGES\fR, which contains default strings.
 .sp
 .LP
 If no \fItext\fR argument is present, then all the text strings in the files
@@ -75,9 +75,10 @@ displayed.
 \fB\fB-l\fR\fI locale\fR \fR
 .ad
 .RS 14n
-Access files in the directory \fB/usr/lib/locale/\fIlocale\fR/LC_MESSAGES\fR.
-If \fB-m\fR \fImsgfile\fR is also supplied, \fIlOCALE\fR is ignored for
-\fImsgfile\fRs containing a \fB/\fR.
+Access files in the directory
+\fB/usr/lib/locale/\fR\fIlocale\fR\fB/LC_MESSAGES\fR. If \fB-m\fR \fImsgfile\fR
+is also supplied, \fIlOCALE\fR is ignored for \fImsgfile\fRs containing a
+\fB/\fR.
 .RE
 
 .sp
@@ -111,7 +112,7 @@ matches. \fItext\fR can take the form of a regular expression; see
 .LP
 If message files have been installed in a locale named \fBfrench\fR by using
 \fBmkmsgs\fR(1), then you could display the entire set of text strings in the
-\fBfrench\fR locale (\fB/usr/lib/locale/french/LC_MESSAGES/* \fR) by typing:
+\fBfrench\fR locale (\fB/usr/lib/locale/french/LC_MESSAGES/*\fR) by typing:
 
 .sp
 .in +2
@@ -127,7 +128,7 @@ example% srchtxt \(mil french
 .LP
 If a set of error messages associated with the operating system have been
 installed in the file \fBUX\fR in the \fBfrench\fR locale
-(\fB/usr/lib/locale/french/LC_MESSAGE/UX \fR), then, using the value of the
+(\fB/usr/lib/locale/french/LC_MESSAGE/UX\fR), then, using the value of the
 \fBLANG\fR environment variable to determine the locale to be searched, you
 could search that file in that locale for all error messages dealing with files
 by typing:
@@ -143,7 +144,7 @@ example% srchtxt -m UX "[Ff]ichier"
 
 .sp
 .LP
-If \fB/usr/lib/locale/french/LC_MESSAGES/UX \fR contained the following
+If \fB/usr/lib/locale/french/LC_MESSAGES/UX\fR contained the following
 strings:
 
 .sp

@@ -276,7 +276,7 @@ partition \fIn\fR (0-7)
 .LP
 \fBsar\fR(1), \fBformat\fR(1M), \fBiostat\fR(1M), \fBioctl\fR(2),
 \fBlseek\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBscsi\fR(4)\fBdriver.conf\fR(4), \fBcdio\fR(7I), \fBdkio\fR(7I)
+\fBscsi\fR(4), \fBdriver.conf\fR(4), \fBcdio\fR(7I), \fBdkio\fR(7I)
 .sp
 .LP
 \fIANSI Small Computer System Interface-2 (SCSI-2)\fR

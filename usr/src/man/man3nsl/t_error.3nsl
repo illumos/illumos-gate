@@ -144,4 +144,4 @@ MT Level	Safe
 .SH SEE ALSO
 .sp
 .LP
-\fBt_errno\fR(3NSL)\fBstrerror\fR(3C), \fBattributes\fR(5)
+\fBt_errno\fR(3NSL), \fBstrerror\fR(3C), \fBattributes\fR(5)

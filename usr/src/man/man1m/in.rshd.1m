@@ -75,7 +75,7 @@ and port number (in decimal) are the arguments passed to \fBin.rshd\fR.
 .RS +4
 .TP
 2.
-The server reads characters from the socket up to a null (\fB\0\fR) byte.
+The server reads characters from the socket up to a null (\fB\e0\fR) byte.
 The resultant string is interpreted as an \fBASCII\fR number, base 10.
 .RE
 .RS +4
@@ -272,11 +272,11 @@ module.
 l l l l
 l l l l .
 rsh	auth	required	pam_rhosts_auth.so.1
-			
+
 rsh	account	required	pam_unix_roles.so.1
 rsh	session	required	pam_unix_projects.so.1
 rsh	session	required	pam_unix_account.so.1
-			
+
 rsh	session	required	pam_unix_session.so.1
 .TE
 
@@ -319,7 +319,7 @@ Kerberos configuration file.
 \fBrsh\fR(1), \fBsvcs\fR(1), \fBinetadm\fR(1M),
 \fBinetd\fR(1M), \fBkadmin\fR(1M), \fBsvcadm\fR(1M), \fBpam\fR(3PAM),
 \fBgetnameinfo\fR(3SOCKET), \fBhosts\fR(4), \fBkrb5.conf\fR(4),
-\fBpam.conf\fR(4), \fB attributes\fR(5), \fBenviron\fR(5),
+\fBpam.conf\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBkrb5_auth_rules\fR(5), \fBpam_authtok_check\fR(5), \fBpam_authtok_get\fR(5),
 \fBpam_authtok_store\fR(5), \fBpam_dhkeys\fR(5), \fBpam_passwd_auth\fR(5),
 \fBpam_rhosts_auth\fR(5), \fBpam_unix_account\fR(5), \fBpam_unix_auth\fR(5),

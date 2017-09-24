@@ -25,6 +25,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -2171,7 +2172,7 @@ out:
 	 */
 	if ((sinfo->si_copybuf_req == 0) &&
 	    (sinfo->si_sgl_size <= (unsigned)attr->dma_attr_sgllen) &&
-	    (dmao->dmao_size < dma->dp_maxxfer)) {
+	    (dmao->dmao_size <= dma->dp_maxxfer)) {
 fast:
 		/*
 		 * If the driver supports FMA, insert the handle in the FMA DMA
@@ -2336,7 +2337,7 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	rootnex_teardown_windows(dma);
 
 #if defined(__amd64) && !defined(__xpv)
-	if (IOMMU_USED(rdip))
+	if (IOMMU_USED(rdip) && dma->dp_dvma_used)
 		(void) iommulib_nexdma_unmapobject(dip, rdip, handle,
 		    &dma->dp_dvma);
 #endif

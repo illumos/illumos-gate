@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH fex_set_log 3M "12 Jul 2006" "SunOS 5.11" "Mathematical Library Functions"
+.TH FEX_SET_LOG 3M "Jul 12, 2006" "SunOS 5.11" "Mathematical Library Functions"
 .SH NAME
 fex_set_log, fex_get_log, fex_set_log_depth, fex_get_log_depth, fex_log_entry
 \- log retrospective diagnostics for floating point exceptions
@@ -11,7 +11,7 @@ fex_set_log, fex_get_log, fex_set_log_depth, fex_get_log_depth, fex_log_entry
 .LP
 .nf
 c99 [ \fIflag\fR... ] \fIfile\fR... -lm [ \fIlibrary\fR... ]
-#include <fenv.h> 
+#include <fenv.h>
 
 \fBint\fR \fBfex_set_log\fR(\fBFILE *\fR\fIfp\fR);
 .fi
@@ -125,7 +125,7 @@ main() {
  * establish default handling for overflows
  */
 	(void) fex_set_handling(FEX_OVERFLOW, FEX_NONSTOP, NULL);
-/* 
+/*
  * trigger an overflow in sscanf
  */
 	(void) sscanf("1.0e+400", "%lf", &x);
@@ -163,14 +163,14 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-lw(2.75i) lw(2.75i) 
-lw(2.75i) lw(2.75i) 
+tab(	) box;
+lw(2.75i) lw(2.75i)
+lw(2.75i) lw(2.75i)
 .
-ATTRIBUTE TYPEATTRIBUTE VALUE
-AvailabilitySUNWlibms, SUNWlmxs
-Interface StabilityStable
-MT-LevelMT-Safe (see NOTES)
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+Availability	SUNWlibms, SUNWlmxs
+Interface Stability	Stable
+MT-Level	MT-Safe (see NOTES)
 .TE
 
 .SH SEE ALSO

@@ -41,7 +41,7 @@ The \fBdup2()\fR function is equivalent to  \fBfcntl\fR(\fIfildes\fR,
 Ths \fBdup3()\fR function works similarly to the \fBdup2()\fR function with
 two exceptions.  If \fIfildes\fR and \fIfildes2\fR point to the same file
 descriptor, -1 is returned and errno set to \fBEINVAL\fR.  If \fIflags\fR
-is \fBO_CLOEXEC\fR, then \fIfiledes2\fB will have the \fBFD_CLOEXEC\fR flag
+is \fBO_CLOEXEC\fR, then \fIfiledes2\fR will have the \fBFD_CLOEXEC\fR flag
 set causing the file descriptor to be closed during any future call of
 \fBexec\fR(2).
 .SH RETURN VALUES
@@ -100,7 +100,8 @@ Additionally, the \fBdup3()\fR function will fail if:
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-\fIflags\fR has a value other than 0 or \fBO_CLOEXEC\fR or \fIfildes\fR and \fIfildes2\fB point to the same file descriptor.
+\fIflags\fR has a value other than 0 or \fBO_CLOEXEC\fR or \fIfildes\fR and
+\fIfildes2\fR point to the same file descriptor.
 .RE
 
 .SH ATTRIBUTES
