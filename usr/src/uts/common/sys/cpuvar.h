@@ -388,7 +388,6 @@ extern cpu_core_t cpu_core[];
 #define	CPU_DISP_HALTED		0x02	/* CPU halted waiting for interrupt */
 
 /* Note: inside ifdef: _KERNEL || _KMEMUSER || _BOOT */
-#if defined(_MACHDEP)
 
 /*
  * Macros for manipulating sets of CPUs as a bitmap.  Note that this
@@ -502,12 +501,7 @@ extern	void	cpuset_zero(cpuset_t *);
 
 #define	CPUSET_ZERO(set)	cpuset_zero(&(set))
 
-#endif /* defined(_MACHDEP) */
-
-
-extern cpuset_t cpu_seqid_inuse;
-
-#endif	/* _MACHDEP */
+#endif /* _MACHDEP */
 #endif /* _KERNEL || _KMEMUSER || _BOOT */
 
 #define	CPU_CPR_OFFLINE		0x0
@@ -517,6 +511,8 @@ extern cpuset_t cpu_seqid_inuse;
 #define	CPU_SET_CPR_FLAGS(cpu, flag)	((cpu)->cpu_cpr_flags |= flag)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
+
+extern cpuset_t cpu_seqid_inuse;
 
 extern struct cpu	*cpu[];		/* indexed by CPU number */
 extern struct cpu	**cpu_seq;	/* indexed by sequential CPU id */
@@ -584,12 +580,6 @@ extern struct cpu *curcpup(void);
 #define	CPU_NEW_GENERATION(cp)	((cp)->cpu_generation++)
 
 #endif /* defined(_KERNEL) || defined(_KMEMUSER) */
-
-#define	CPU_CPR_OFFLINE		0x0
-#define	CPU_CPR_ONLINE		0x1
-#define	CPU_CPR_IS_OFFLINE(cpu)	(((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE) == 0)
-#define	CPU_CPR_IS_ONLINE(cpu)	((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE)
-#define	CPU_SET_CPR_FLAGS(cpu, flag)	((cpu)->cpu_cpr_flags |= flag)
 
 /*
  * CPU support routines.
