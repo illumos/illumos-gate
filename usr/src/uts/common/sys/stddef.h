@@ -36,18 +36,17 @@ extern "C" {
 #endif
 #endif /* !offsetof */
 
-#if !defined(container_of)
 
 /*
  * We must not expose container_of() to userland, but we want it
- * to be available for early boot and for the kernel.
+ * to be available for kernel and boot programs.
  */
-#if ((defined(_KERNEL) || defined(_FAKE_KERNEL)) && !defined(_KMEMUSER)) || \
-	(defined(_BOOT) && defined(_KMEMUSER))
+#if defined(_KERNEL) || defined(_BOOT)
+#if !defined(container_of)
 #define	container_of(m, s, name)			\
 	(void *)((uintptr_t)(m) - (uintptr_t)offsetof(s, name))
 #endif
-#endif /* !container_of */
+#endif
 
 #ifdef __cplusplus
 }

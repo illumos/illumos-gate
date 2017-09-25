@@ -164,14 +164,15 @@
  * Each queue pair has its own nq_mutex, which must be held when accessing the
  * associated queue registers or the shared state of the queue pair. Callers of
  * nvme_unqueue_cmd() must make sure that nq_mutex is held, while
- * nvme_submit_cmd() and nvme_retrieve_cmd() take care of this themselves.
+ * nvme_submit_{admin,io}_cmd() and nvme_retrieve_cmd() take care of this
+ * themselves.
  *
  * Each command also has its own nc_mutex, which is associated with the
  * condition variable nc_cv. It is only used on admin commands which are run
- * synchronously. In that case it must be held across calls to nvme_submit_cmd()
- * and nvme_wait_cmd(), which is taken care of by nvme_admin_cmd(). It must also
- * be held whenever the completion state of the command is changed or while a
- * admin command timeout is handled.
+ * synchronously. In that case it must be held across calls to
+ * nvme_submit_{admin,io}_cmd() and nvme_wait_cmd(), which is taken care of by
+ * nvme_admin_cmd(). It must also be held whenever the completion state of the
+ * command is changed or while a admin command timeout is handled.
  *
  * If both nc_mutex and nq_mutex must be held, nc_mutex must be acquired first.
  * More than one nc_mutex may only be held when aborting commands. In this case,
@@ -284,7 +285,9 @@ static void nvme_free_cmd(nvme_cmd_t *);
 static nvme_cmd_t *nvme_create_nvm_cmd(nvme_namespace_t *, uint8_t,
     bd_xfer_t *);
 static void nvme_admin_cmd(nvme_cmd_t *, int);
-static void nvme_submit_cmd(nvme_qpair_t *, nvme_cmd_t *);
+static void nvme_submit_admin_cmd(nvme_qpair_t *, nvme_cmd_t *);
+static int nvme_submit_io_cmd(nvme_qpair_t *, nvme_cmd_t *);
+static void nvme_submit_cmd_common(nvme_qpair_t *, nvme_cmd_t *);
 static nvme_cmd_t *nvme_unqueue_cmd(nvme_t *, nvme_qpair_t *, int);
 static nvme_cmd_t *nvme_retrieve_cmd(nvme_t *, nvme_qpair_t *);
 static void nvme_wait_cmd(nvme_cmd_t *, uint_t);
@@ -867,11 +870,27 @@ nvme_free_cmd(nvme_cmd_t *cmd)
 }
 
 static void
-nvme_submit_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
+nvme_submit_admin_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
+{
+	sema_p(&qp->nq_sema);
+	nvme_submit_cmd_common(qp, cmd);
+}
+
+static int
+nvme_submit_io_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
+{
+	if (sema_tryp(&qp->nq_sema) == 0)
+		return (EAGAIN);
+
+	nvme_submit_cmd_common(qp, cmd);
+	return (0);
+}
+
+static void
+nvme_submit_cmd_common(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 {
 	nvme_reg_sqtdbl_t tail = { 0 };
 
-	sema_p(&qp->nq_sema);
 	mutex_enter(&qp->nq_mutex);
 	cmd->nc_completed = B_FALSE;
 
@@ -1435,7 +1454,7 @@ nvme_async_event_task(void *arg)
 
 	/* Clear CQE and re-submit the async request. */
 	bzero(&cmd->nc_cqe, sizeof (nvme_cqe_t));
-	nvme_submit_cmd(nvme->n_adminq, cmd);
+	nvme_submit_admin_cmd(nvme->n_adminq, cmd);
 
 	switch (event.b.ae_type) {
 	case NVME_ASYNC_TYPE_ERROR:
@@ -1549,7 +1568,7 @@ static void
 nvme_admin_cmd(nvme_cmd_t *cmd, int sec)
 {
 	mutex_enter(&cmd->nc_mutex);
-	nvme_submit_cmd(cmd->nc_nvme->n_adminq, cmd);
+	nvme_submit_admin_cmd(cmd->nc_nvme->n_adminq, cmd);
 	nvme_wait_cmd(cmd, sec);
 	mutex_exit(&cmd->nc_mutex);
 }
@@ -1563,7 +1582,7 @@ nvme_async_event(nvme_t *nvme)
 	cmd->nc_sqe.sqe_opc = NVME_OPC_ASYNC_EVENT;
 	cmd->nc_callback = nvme_async_event_task;
 
-	nvme_submit_cmd(nvme->n_adminq, cmd);
+	nvme_submit_admin_cmd(nvme->n_adminq, cmd);
 }
 
 static int
@@ -3254,9 +3273,10 @@ static int
 nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 {
 	nvme_t *nvme = ns->ns_nvme;
-	nvme_cmd_t *cmd, *ret;
+	nvme_cmd_t *cmd;
 	nvme_qpair_t *ioq;
 	boolean_t poll;
+	int ret;
 
 	if (nvme->n_dead)
 		return (EIO);
@@ -3276,15 +3296,18 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	 */
 	poll = (xfer->x_flags & BD_XFER_POLL) != 0;
 
-	nvme_submit_cmd(ioq, cmd);
+	ret = nvme_submit_io_cmd(ioq, cmd);
+
+	if (ret != 0)
+		return (ret);
 
 	if (!poll)
 		return (0);
 
 	do {
-		ret = nvme_retrieve_cmd(nvme, ioq);
-		if (ret != NULL)
-			nvme_bd_xfer_done(ret);
+		cmd = nvme_retrieve_cmd(nvme, ioq);
+		if (cmd != NULL)
+			nvme_bd_xfer_done(cmd);
 		else
 			drv_usecwait(10);
 	} while (ioq->nq_active_cmds != 0);

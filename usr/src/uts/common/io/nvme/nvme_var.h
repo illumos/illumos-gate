@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _NVME_VAR_H
