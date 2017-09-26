@@ -1,0 +1,77 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2013 Pluribus Networks Inc.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+SUNWprivate_1.0 {
+    global:
+	vcpu_reset;
+	vm_activate_cpu;
+	vm_apicid2vcpu;
+	vm_capability_name2type;
+	vm_capability_type2name;
+	vm_copy_setup;
+	vm_copy_teardown;
+	vm_copyin;
+	vm_copyout;
+	vm_create;
+	vm_destroy;
+	vm_get_capability;
+	vm_get_desc;
+	vm_get_highmem_size;
+	vm_get_lowmem_limit;
+	vm_get_lowmem_size;
+	vm_get_memory_seg;
+	vm_get_register;
+	vm_get_seg_desc;
+	vm_get_x2apic_state;
+	vm_gla2gpa;
+	vm_inject_exception;
+	vm_isa_assert_irq;
+	vm_isa_deassert_irq;
+	vm_isa_pulse_irq;
+	vm_isa_set_irq_trigger;
+	vm_ioapic_assert_irq;
+	vm_ioapic_deassert_irq;
+	vm_ioapic_pincount;
+	vm_ioapic_pulse_irq;
+	vm_lapic_irq;
+	vm_lapic_msi;
+	vm_map_gpa;
+	vm_open;
+	vm_parse_memsize;
+	vm_restart_instruction;
+	vm_run;
+	vm_set_capability;
+	vm_set_desc;
+	vm_set_register;
+	vm_set_x2apic_state;
+	vm_setup_memory;
+	vm_setup_rom;
+    local:
+        *;
+};
