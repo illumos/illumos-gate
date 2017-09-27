@@ -1862,7 +1862,7 @@ adjoin_table[] = {
 	{ SMB_ADS_KRB5_PARSE_PRINCIPAL,
 	    "Failed parsing the user principal name." },
 	{ SMB_ADS_KRB5_GET_INIT_CREDS_PW,
-	    "Failed getting initial credentials.  (Wrong password?)" },
+	    "Failed getting initial credentials. (Check your local system time. Wrong password?)" },
 	{ SMB_ADS_KRB5_CC_INITIALIZE,
 	    "Failed initializing the credential cache." },
 	{ SMB_ADS_KRB5_CC_STORE_CRED,
