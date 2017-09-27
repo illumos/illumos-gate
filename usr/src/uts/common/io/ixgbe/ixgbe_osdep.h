@@ -27,7 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -65,6 +65,7 @@ extern "C" {
 struct ixgbe_hw;
 uint16_t ixgbe_read_pci_cfg(struct ixgbe_hw *, uint32_t);
 void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
+boolean_t ixgbe_removed(struct ixgbe_hw *);
 
 #define	usec_delay(x)		drv_usecwait(x)
 #define	msec_delay(x)		drv_usecwait(x * 1000)
@@ -128,6 +129,7 @@ void ixgbe_write_pci_cfg(struct ixgbe_hw *, uint32_t, uint32_t);
 #define	UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q,_r, _s))
 
 
+#define	IXGBE_REMOVED(hw) ixgbe_removed(hw)
 
 typedef	int8_t		s8;
 typedef	int16_t		s16;

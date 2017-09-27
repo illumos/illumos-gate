@@ -42,7 +42,7 @@ The option context from the callback record.
 .ad
 .RS 15n
 The name of the plug-in. If the value of \fIplugin_name\fR is \fINULL\fR, the
-the plug-in is a general SASL option.
+plug-in is a general SASL option.
 .RE
 
 .sp

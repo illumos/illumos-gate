@@ -103,7 +103,7 @@ for drivers.
      13             flushq(q, FLUSHALL);
      14        putnext(q, mp);
      15        break;
-               . . .
+               ...
      16   }
      17  }
 .fi

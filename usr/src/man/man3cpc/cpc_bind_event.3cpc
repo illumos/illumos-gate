@@ -306,7 +306,7 @@ Interface Stability	Obsolete
 .SH SEE ALSO
 .sp
 .LP
-\fBcpustat\fR(1M), \fBcputrack\fR(1), \fBwrite\fR(2). \fBcpc\fR(3CPC),
+\fBcpustat\fR(1M), \fBcputrack\fR(1), \fBwrite\fR(2), \fBcpc\fR(3CPC),
 \fBcpc_access\fR(3CPC), \fBcpc_bind_curlwp\fR(3CPC),
 \fBcpc_set_sample\fR(3CPC), \fBcpc_strtoevent\fR(3CPC), \fBcpc_unbind\fR(3CPC),
 \fBlibcpc\fR(3LIB), \fBattributes\fR(5)

@@ -170,7 +170,7 @@ or
 		<non-motion time-out>, <I/O time-out>,
 		<rewind time-out>, <space time-out>,
 		<load time-out>, <unload time-out>,
-		<erase time-out>;   		
+		<erase time-out>;
 .fi
 .in -2
 .sp
@@ -194,7 +194,7 @@ information.)
 \fBSCSI\fR inquiry command. This string may contain any character in the range
 \fB0x20-0x7e\fR. Characters such as " " " (double quote) or " ' " (single
 quote), which are not permitted in property value strings, are represented by
-their octal equivalent (for example, \fB\042\fR and \fB\047\fR). Trailing
+their octal equivalent (for example, \fB\e042\fR and \fB\e047\fR). Trailing
 spaces may be truncated.
 .sp
 .LP

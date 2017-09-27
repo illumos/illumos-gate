@@ -1,8 +1,8 @@
 '\" te
-.\" Copyright 1989 AT&T 
+.\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved  
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at 
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
 .\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
 .\"  This notice shall appear on any product containing this material.
@@ -16,25 +16,25 @@ make \- maintain, update, and regenerate related programs and files
 .LP
 .nf
 \fB/usr/bin/make\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
-     [\fB-i\fR] [\fB-j\fR \FImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
-     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] 
-     [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]... 
+     [\fB-i\fR] [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
+     [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]...
      [\fImacro\fR = \fIvalue\fR...]
 .fi
 
 .nf
 \fB/usr/bin/dmake\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
-     [\fB-i\fR] [\fB-j\fR \FImaxjobs\fR] [\fB-k\fR]  [\fB-m\fR \fI{serial | parallel}\fR]
-     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] 
-     [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]... 
+     [\fB-i\fR] [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR]  [\fB-m\fR \fI{serial | parallel}\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
+     [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]...
      [\fImacro\fR = \fIvalue\fR...]
 .fi
 
 .LP
 .nf
 \fB/usr/xpg4/bin/make\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR]
-     [\fB-e\fR] [\fB-i\fR]  [\fB-j\fR \FImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
-     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR] 
+     [\fB-e\fR] [\fB-i\fR]  [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
+     [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
      [\fB-f\fR \fImakefile\fR]... [\fItarget\fR]... [\fImacro\fR = \fIvalue\fR...]
 .fi
 
@@ -465,8 +465,8 @@ A target entry has the following format:
 .sp
 .in +2
 .nf
-       \fItarget\fR [\fB:\fR|\fB::\fR] [\fIdependency\fR] ... [\fB;\fR \fBcommand\fR] ... 
-                      [\fBcommand\fR] 
+       \fItarget\fR [\fB:\fR|\fB::\fR] [\fIdependency\fR] ... [\fB;\fR \fBcommand\fR] ...
+                      [\fBcommand\fR]
                       ...
 .fi
 .in -2
@@ -519,7 +519,7 @@ follows the \fBTAB\fR in a command line, that line is passed to the shell
 If the word \fBinclude\fR appears as the first seven letters of a line and is
 followed by a \fBSPACE\fR or \fBTAB\fR, the string that follows is taken as a
 filename to interpolate at that line. \fBinclude\fR files can be nested to a
-depth of no more than 38 nested makefiles . If \fIfilename\fR is a macro
+depth of no more than 38 nested makefiles. If \fIfilename\fR is a macro
 reference, it is expanded.
 .RE
 
@@ -1045,7 +1045,7 @@ carried forward from the value being replaced. For example:
 .sp
 .in +2
 .nf
-\fBPROGRAM=fabricate 
+\fBPROGRAM=fabricate
 DEBUG= $(PROGRAM:%=tmp/%\(mig)\fR
 .fi
 .in -2
@@ -1088,7 +1088,7 @@ is referred to. This allows nested invocations of \fBmake\fR written as:
 .sp
 .in +2
 .nf
-     \fB$(MAKE)\fR .\|.\|. 
+     \fB$(MAKE)\fR .\|.\|.
 .fi
 .in -2
 
@@ -1341,39 +1341,39 @@ _
 Library	\fBAR\fR	\fBar\fR
 Archives	\fBARFLAGS\fR	\fBrv\fR
 _
-		
+
 Assembler	\fBAS\fR	\fBas\fR
-Commands	\fBASFLAGS\fR	
+Commands	\fBASFLAGS\fR
 	\fBCOMPILE.s\fR	\fB$(AS) $(ASFLAGS)\fR
 	\fBCOMPILE.S\fR	\fB$(CC) $(ASFLAGS) $(CPPFLAGS)\fR \fB-c\fR
 _
-		
+
 C	\fBCC\fR	\fBcc\fR
-Compiler	\fBCFLAGS\fR	
-Commands	\fBCPPFLAGS\fR	
+Compiler	\fBCFLAGS\fR
+Commands	\fBCPPFLAGS\fR
 	\fBCOMPILE.c\fR	\fB$(CC) $(CFLAGS) $(CPPFLAGS)\fR \fB-c\fR
 	\fBLINK.c\fR	\fB$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
 _
-		
+
 C++	\fBCCC\fR	\fBCC\fR
 Compiler	\fBCCFLAGS\fR	\fBCFLAGS\fR
-Commands	\fBCPPFLAGS\fR	
+Commands	\fBCPPFLAGS\fR
 	\fBCOMPILE.cc\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS)\fR \fB-c\fR
 	\fBLINK.cc\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
 	\fBCOMPILE.C\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS)\fR \fB-c\fR
 	\fBLINK.C\fR	\fB$(CCC) $(CCFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
 _
-		
+
 FORTRAN 77	\fBFC\fR	\fBf77\fR
-Compiler	\fBFFLAGS\fR	
+Compiler	\fBFFLAGS\fR
 Commands	\fBCOMPILE.f\fR	\fB$(FC) $(FFLAGS)\fR \fB-c\fR
 	\fBLINK.f\fR	\fB$(FC) $(FFLAGS) $(LDFLAGS)\fR
 	\fBCOMPILE.F\fR	\fB$(FC) $(FFLAGS) $(CPPFLAGS)\fR \fB-c\fR
 	\fBLINK.F\fR	\fB$(FC) $(FFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
 _
-		
+
 FORTRAN 90	\fBFC\fR	\fBf90\fR
-Compiler	\fBF90FLAGS\fR	
+Compiler	\fBF90FLAGS\fR
 Commands	\fBCOMPILE.f90\fR	\fB$(F90C) $(F90FLAGS)\fR \fB-c\fR
 	\fBLINK.f90\fR	\fB$(F90C) $(F90FLAGS) $(LDFLAGS)\fR
 	\fBCOMPILE.ftn\fR	\fB$(F90C) $(F90FLAGS) $(CPPFLAGS)\fR \fB-c\fR
@@ -1381,52 +1381,52 @@ Commands	\fBCOMPILE.f90\fR	\fB$(F90C) $(F90FLAGS)\fR \fB-c\fR
 \fB$(F90C) $(F90FLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
 T}
 _
-		
+
 Link Editor	\fBLD\fR	\fBld\fR
-Command	\fBLDFLAGS\fR	
+Command	\fBLDFLAGS\fR
 _
-		
+
 lex	\fBLEX\fR	\fBlex\fR
-Command	\fBLFLAGS\fR	
+Command	\fBLFLAGS\fR
 	\fBLEX.l\fR	\fB$(LEX) $(LFLAGS)\fR \fB-t\fR
 _
-		
+
 lint	\fBLINT\fR	\fBlint\fR
-Command	\fBLINTFLAGS\fR	
+Command	\fBLINTFLAGS\fR
 	\fBLINT.c\fR	\fB$(LINT) $(LINTFLAGS) $(CPPFLAGS)\fR
 _
-		
+
 Modula 2	\fBM2C\fR	\fBm2c\fR
-Commands	\fBM2FLAGS\fR	
-	\fBMODFLAGS\fR	
-	\fBDEFFLAGS\fR	
+Commands	\fBM2FLAGS\fR
+	\fBMODFLAGS\fR
+	\fBDEFFLAGS\fR
 	\fBCOMPILE.def\fR	\fB$(M2C) $(M2FLAGS) $(DEFFLAGS)\fR
 	\fBCOMPILE.mod\fR	\fB$(M2C) $(M2FLAGS) $(MODFLAGS)\fR
 _
-		
+
 Pascal	\fBPC\fR	\fBpc\fR
-Compiler	\fBPFLAGS\fR	
+Compiler	\fBPFLAGS\fR
 Commands	\fBCOMPILE.p\fR	\fB$(PC) $(PFLAGS) $(CPPFLAGS)\fR \fB-c\fR
 	\fBLINK.p\fR	\fB$(PC) $(PFLAGS) $(CPPFLAGS) $(LDFLAGS)\fR
 _
-		
-Ratfor	\fBRFLAGS\fR	
+
+Ratfor	\fBRFLAGS\fR
 Compilation	\fBCOMPILE.r\fR	\fB$(FC) $(FFLAGS) $(RFLAGS)\fR \fB-c\fR
 Commands	\fBLINK.r\fR	\fB$(FC) $(FFLAGS) $(RFLAGS) $(LDFLAGS)\fR
 _
-		
+
 rm Command	\fBRM\fR	\fBrm\fR \fB-f\fR
 _
-		
-sccs	\fBSCCSFLAGS\fR	
+
+sccs	\fBSCCSFLAGS\fR
 Command	\fBSCCSGETFLAGS\fR	\fB-s\fR
 _
-		
+
 yacc	\fBYACC\fR	\fByacc\fR
-Command	\fBYFLAGS\fR	
+Command	\fBYFLAGS\fR
 	\fBYACC.y\fR	\fB$(YACC) $(YFLAGS)\fR
 _
-		
+
 Suffixes List	\fBSUFFIXES\fR	T{
 \fB\&.o .c .c~ .cc .cc~ .y .y~ .l .l~ .s .s~ .sh .sh~ .S .S~ .ln .h .h~ .f .f~ .F .F~  .mod .mod~ .sym .def .def~ .p .p~ .r .r~ .cps .cps~ .C .C~ .Y .Y~ .L .L .f90 .f90~ .ftn .ftn~\fR
 T}
@@ -1470,7 +1470,7 @@ form:
 .sp
 .in +2
 .nf
-\fItp\fR%\fIts\fR:\|[\fIdependency .\|.\|.\fR\|] \fIdp\fR%\fIds\fR\|[\fIdependency .\|.\|.\fR\|] 
+\fItp\fR%\fIts\fR:\|[\fIdependency .\|.\|.\fR\|] \fIdp\fR%\fIds\fR\|[\fIdependency .\|.\|.\fR\|]
      \fIrule\fR
 .fi
 .in -2
@@ -1515,7 +1515,7 @@ suffix rule.
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for Assembly Files\fR
@@ -1525,28 +1525,28 @@ _
 _
 \fB\&.s.o\fR	\fB$(COMPILE.s)\fR \fB-o\fR \fB$@ $<\fR
 _
-	
+
 \fB\&.s.a\fR	\fB$(COMPILE.s)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.s~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.s\fR
 	\fB$(COMPILE.s)\fR \fB-o\fR \fB$@ $*.s\fR
 _
-	
+
 \fB\&.S.o\fR	\fB$(COMPILE.S)\fR \fB-o\fR \fB$@ $<\fR
 _
-	
+
 \fB\&.S.a\fR	\fB$(COMPILE.S)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.S~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.S\fR
 	\fB$(COMPILE.S)\fR \fB-o\fR \fB$@ $*.S\fR
 _
-	
+
 \fB\&.S~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.S\fR
 	\fB$(COMPILE.S)\fR \fB-o\fR \fB$% $*.S\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1558,7 +1558,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for C Files\fR
@@ -1568,30 +1568,30 @@ _
 _
 \fB\&.c\fR	\fB$(LINK.c)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.c.ln\fR	\fB$(LINT.c) $(OUTPUT_OPTION)\fR \fB-i\fR \fB$<\fR
 _
-	
+
 \fB\&.c.o\fR	\fB$(COMPILE.c) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.c.a\fR	\fB$(COMPILE.c)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.c~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
 	\fB$(CC) $(CFLAGS) $(LDFLAGS)\fR \fB-o\fR \fB$@ $*.c\fR
 _
-	
+
 \fB\&.c~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
 	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fB$*.c\fR
 _
-	
+
 \fB\&.c~.ln\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
 	\fB$(LINT.c) $(OUTPUT_OPTION)\fR \fB-c\fR \fB$*.c\fR
 _
-	
+
 \fB\&.c~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.c\fR
 	\fB$(COMPILE.c)\fR \fB-o\fR \fB$% $*.c\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1603,7 +1603,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for C++ Files\fR
@@ -1613,56 +1613,56 @@ _
 _
 \fB\&.cc\fR	\fB$(LINK.cc)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.cc.o\fR	\fB$(COMPILE.cc) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.cc.a\fR	\fB$(COMPILE.cc)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.cc~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.cc\fR
 	\fB$(LINK.cc)\fR \fB-o\fR \fB$@ $*.cc $(LDLIBS)\fR
 _
-	
+
 \fB\&.cc.o\fR	\fB$(COMPILE.cc) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.cc~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.cc\fR
 	\fB$(COMPILE.cc) $(OUTPUT_OPTION) $*.cc\fR
 _
-	
+
 \fB\&.cc.a\fR	\fB$(COMPILE.cc)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.cc~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.cc\fR
 	\fB$(COMPILE.cc)\fR \fB-o\fR \fB$% $*.cc\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.C\fR	\fB$(LINK.C)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.C~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.C\fR
 	\fB$(LINK.C)\fR \fB-o\fR \fB$@ $*.C $(LDLIBS)\fR
 _
-	
+
 \fB\&.C.o\fR	\fB$(COMPILE.C) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.C~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.C\fR
 	\fB$(COMPILE.C) $(OUTPUT_OPTION) $*.C\fR
 _
-	
+
 \fB\&.C.a\fR	\fB$(COMPILE.C)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.C~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.C\fR
 	\fB$(COMPILE.C)\fR \fB-o\fR \fB$% $*.C\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1674,7 +1674,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for FORTRAN 77 Files\fR
@@ -1684,51 +1684,51 @@ _
 _
 \fB\&.f\fR	\fB$(LINK.f)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.f.o\fR	\fB$(COMPILE.f) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.f.a\fR	\fB$(COMPILE.f)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.f\fR	\fB$(LINK.f)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.f~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f\fR
 	\fB$(FC) $(FFLAGS) $(LDFLAGS)\fR \fB-o\fR \fB$@ $*.f\fR
 _
-	
+
 \fB\&.f~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f\fR
 	\fB$(FC) $(FFLAGS)\fR \fB-c\fR \fB$*.f\fR
 _
-	
+
 \fB\&.f~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f\fR
 	\fB$(COMPILE.f)\fR \fB-o\fR \fB$% $*.f\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.F\fR	\fB$(LINK.F)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.F.o\fR	\fB$(COMPILE.F) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.F.a\fR	\fB$(COMPILE.F)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.F~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.F\fR
 	\fB$(FC) $(FFLAGS) $(LDFLAGS)\fR \fB-o\fR \fB$@ $*.F\fR
 _
-	
+
 \fB\&.F~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.F\fR
 	\fB$(FC) $(FFLAGS)\fR \fB-c\fR \fB$*.F\fR
 _
-	
+
 \fB\&.F~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.F\fR
 	\fB$(COMPILE.F)\fR \fB-o\fR \fB$% $*.F\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1740,7 +1740,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for FORTRAN 90 Files\fR
@@ -1750,48 +1750,48 @@ _
 _
 \fB\&.f90\fR	\fB$(LINK.f90)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.f90~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f90\fR
 	\fB$(LINK.f90)\fR \fB-o\fR \fB$@ $*.f90 $(LDLIBS)\fR
 _
-	
+
 \fB\&.f90.o\fR	\fB$(COMPILE.f90) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.f90~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f90\fR
 	\fB$(COMPILE.f90) $(OUTPUT_OPTION) $*.f90\fR
 _
-	
+
 \fB\&.f90.a\fR	\fB$(COMPILE.f90)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.f90~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.f90\fR
 	\fB$(COMPILE.f90)\fR \fB-o\fR \fB$% $*.f90\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.ftn\fR	\fB$(LINK.ftn)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.ftn~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.ftn\fR
 	\fB$(LINK.ftn)\fR \fB-o\fR \fB$@ $*.ftn $(LDLIBS)\fR
 _
-	
+
 \fB\&.ftn.o\fR	\fB$(COMPILE.ftn) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.ftn~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.ftn\fR
 	\fB$(COMPILE.ftn) $(OUTPUT_OPTION) $*.ftn\fR
 _
-	
+
 \fB\&.ftn.a\fR	\fB$(COMPILE.ftn)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.ftn~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.ftn\fR
 	\fB$(COMPILE.ftn)\fR \fB-o\fR \fB$% $*.ftn\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1803,7 +1803,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for lex Files\fR
@@ -1816,42 +1816,42 @@ _
 	\fB$(LINK.c)\fR \fB-o\fR \fB$@ $*.c $(LDLIBS)\fR
 	\fB$(RM) $*.c\fR
 _
-	
+
 \fB\&.l.c\fR	\fB$(RM) $@\fR
 	\fB$(LEX.l) $< > $@\fR
 _
-	
+
 \fB\&.l.ln\fR	\fB$(RM) $*.c\fR
 	\fB$(LEX.l) $< > $*.c\fR
 	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fB$*.c\fR
 	\fB$(RM) $*.c\fR
 _
-	
+
 \fB\&.l.o\fR	\fB$(RM) $*.c\fR
 	\fB$(LEX.l) $< > $*.c\fR
 	\fB$(COMPILE.c)\fR \fB-o\fR \fB$@ $*.c\fR
 	\fB$(RM) $*.c\fR
 _
-	
+
 \fB\&.l~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
 	\fB$(LEX) $(LFLAGS) $*.l\fR
 	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fBlex.yy.c\fR
 	\fBrm\fR \fB-f\fR \fBlex.yy.c\fR
 	\fBmv lex.yy.c $@\fR
 _
-	
+
 \fB\&.l~.c\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
 	\fB$(LEX) $(LFLAGS) $*.l\fR
 	\fBmv lex.yy.c $@\fR
 _
-	
+
 \fB\&.l~.ln\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
 	\fB$(RM) $*.c\fR
 	\fB$(LEX.l) $*.l > $*.c\fR
 	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fB$*.c\fR
 	\fB$(RM) $*.c\fR
 _
-	
+
 \fB\&.l~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.l\fR
 	\fB$(LEX) $(LFLAGS) $*.l\fR
 	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fBlex.yy.c\fR
@@ -1864,7 +1864,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i)  .
 T{
 \fITable of Standard Implicit (Suffix) Rules for Modula 2 Files\fR
@@ -1874,25 +1874,25 @@ _
 _
 \fB\&.mod\fR	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@\fR \fB-e\fR \fB$@ $<\fR
 _
-	
+
 \fB\&.mod.o\fR	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@ $<\fR
 _
-	
+
 \fB\&.def.sym\fR	\fB$(COMPILE.def)\fR \fB-o\fR \fB$@ $<\fR
 _
-	
+
 \fB\&.def~.sym\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.def\fR
 	\fB$(COMPILE.def)\fR \fB-o\fR\fB$@ $*.def\fR
 _
-	
+
 \fB\&.mod~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.mod\fR
 	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@\fR \fB-e\fR \fB$@ $*.mod\fR
 _
-	
+
 \fB\&.mod~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.mod\fR
 	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$@ $*.mod\fR
 _
-	
+
 \fB\&.mod~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.mod\fR
 	\fB$(COMPILE.mod)\fR \fB-o\fR \fB$% $*.mod\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1904,7 +1904,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for NeWS Files\fR
@@ -1923,7 +1923,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for Pascal Files\fR
@@ -1933,18 +1933,18 @@ _
 _
 \fB\&.p\fR	\fB$(LINK.p)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.p.o\fR	\fB$(COMPILE.p) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.p~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.p\fR
 	\fB$(LINK.p)\fR \fB-o\fR \fB$@ $*.p $(LDLIBS)\fR
 _
-	
+
 \fB\&.p~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.p\fR
 	\fB$(COMPILE.p) $(OUTPUT_OPTION) $*.p\fR
 _
-	
+
 \fB\&.p~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.p\fR
 	\fB$(COMPILE.p)\fR \fB-o\fR \fB$% $*.p\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1956,7 +1956,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for Ratfor Files\fR
@@ -1966,23 +1966,23 @@ _
 _
 \fB\&.r\fR	\fB$(LINK.r)\fR \fB-o\fR \fB$@ $< $(LDLIBS)\fR
 _
-	
+
 \fB\&.r.o\fR	\fB$(COMPILE.r) $(OUTPUT_OPTION) $<\fR
 _
-	
+
 \fB\&.r.a\fR	\fB$(COMPILE.r)\fR \fB-o\fR \fB$% $<\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
 	\fB$(RM) $%\fR
 _
-	
+
 \fB\&.r~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.r\fR
 	\fB$(LINK.r)\fR \fB-o\fR \fB$@ $*.r $(LDLIBS)\fR
 _
-	
+
 \fB\&.r~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.r\fR
 	\fB$(COMPILE.r) $(OUTPUT_OPTION) $*.r\fR
 _
-	
+
 \fB\&.r~.a\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.r\fR
 	\fB$(COMPILE.r)\fR \fB-o\fR \fB$% $*.r\fR
 	\fB$(AR) $(ARFLAGS) $@ $%\fR
@@ -1994,7 +1994,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for SCCS Files\fR
@@ -2005,12 +2005,12 @@ _
 \fB\&.SCCS_GET\fR	T{
 \fBsccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@\fR \fB-G\fR\fB$@\fR
 T}
-	
+
 _
-	
+
 \fB\&.SCCS_GET_POSIX\fR	\fBsccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@\fR
 _
-	
+
 \fB\&.GET_POSIX\fR	\fB$(GET) $(GFLAGS) s.$@\fR
 .TE
 
@@ -2019,7 +2019,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for Shell Scripts\fR
@@ -2030,7 +2030,7 @@ _
 \fB\&.sh\fR	\fBcat $< >$@\fR
 	\fBchmod +x $@\fR
 _
-	
+
 \fB\&.sh~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.sh\fR
 	\fBcp $*.sh $@\fR
 	\fBchmod a+x $@\fR
@@ -2041,7 +2041,7 @@ _
 .sp
 .TS
 box;
-cw(1.57i) |cw(3.93i) 
+cw(1.57i) |cw(3.93i)
 cw(1.57i) |cw(3.93i) .
 T{
 \fITable of Standard Implicit (Suffix) Rules for yacc Files\fR
@@ -2053,38 +2053,38 @@ _
 	\fB$(LINK.c)\fR \fB-o\fR \fB$@ y.tab.c $(LDLIBS)\fR
 	\fB$(RM) y.tab.c\fR
 _
-	
+
 \fB\&.y.c\fR	\fB$(YACC.y) $<\fR
 	\fBmv y.tab.c $@\fR
 _
-	
+
 \fB\&.y.ln\fR	\fB$(YACC.y) $<\fR
 	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fBy.tab.c\fR
 	\fB$(RM) y.tab.c\fR
 _
-	
+
 \fB\&.y.o\fR	\fB$(YACC.y) $<\fR
 	\fB$(COMPILE.c)\fR \fB-o\fR \fB$@ y.tab.c\fR
 	\fB$(RM) y.tab.c\fR
 _
-	
+
 \fB\&.y~\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
 	\fB$(YACC) $(YFLAGS) $*.y\fR
 	\fB$(COMPILE.c)\fR \fB-o\fR \fB$@ y.tab.c\fR
 	\fB$(RM) y.tab.c\fR
 _
-	
+
 \fB\&.y~.c\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
 	\fB$(YACC) $(YFLAGS) $*.y\fR
 	\fBmv y.tab.c $@\fR
 _
-	
+
 \fB\&.y~.ln\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
 	\fB$(YACC.y) $*.y\fR
 	\fB$(LINT.c)\fR \fB-o\fR \fB$@\fR \fB-i\fR \fBy.tab.c\fR
 	\fB$(RM) y.tab.c\fR
 _
-	
+
 \fB\&.y~.o\fR	\fB$(GET) $(GFLAGS)\fR \fB-p\fR \fB$< > $*.y\fR
 	\fB$(YACC) $(YFLAGS) $*.y\fR
 	\fB$(CC) $(CFLAGS)\fR \fB-c\fR \fBy.tab.c\fR
@@ -2158,7 +2158,7 @@ A target name of the form:
 .sp
 .in +2
 .nf
-   \fIlib\fR((\fIsymbol\fR)) 
+   \fIlib\fR((\fIsymbol\fR))
 .fi
 .in -2
 
@@ -2198,7 +2198,7 @@ then \fIcommand\fR ; \e
      ... ; \e
 else \fIcommand\fR; \e
      ... ; \e
-fi 
+fi
 .fi
 .in -2
 
@@ -2246,7 +2246,7 @@ of the form:
 .sp
 .in +2
 .nf
-$(\fIMACRO\|\fR:sh) 
+$(\fIMACRO\|\fR:sh)
 .fi
 .in -2
 
@@ -2284,7 +2284,7 @@ pgm:  a.o  b.o
 a.o:  incl.h  a.c
      cc -c a.c
 b.o:  incl.h  b.c
-     cc -c b.c 
+     cc -c b.c
 .fi
 .in -2
 
@@ -2351,7 +2351,7 @@ output only once, when execution is complete.
 .ad
 .RS 17n
 Specify whether jobs should be executed in serial, or parallel.  Equivalent to
-passing the \fB-m\FR option.
+passing the \fB-m\fR option.
 .RE
 
 .sp
@@ -2567,7 +2567,7 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/xpg4/bin/make"
 .TS
 box;
-cw(2.75i) |cw(2.75i) 
+cw(2.75i) |cw(2.75i)
 lw(2.75i) |lw(2.75i) .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
@@ -2634,18 +2634,18 @@ for the indicated reason.
 .sp
 .ne 2
 .na
-\fB\fBRead of include file\fR \fBfile\fR \fBfailed\fR\fR
+\fBRead of include file `\fR\fIfile\fR\fB' failed\fR
 .ad
 .sp .6
 .RS 4n
-The makefile indicated in an \fBinclude\fR directive was not found, or was
+The makefile indicated in an \fBinclude\fR directive was not found or was
 inaccessible.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBLoop detected when expanding macro value\fR \fImacro\fR\fB\&'\fR\fR
+\fBLoop detected when expanding macro value `\fR\fImacro\fR\fB'\fR
 .ad
 .sp .6
 .RS 4n
@@ -2654,13 +2654,14 @@ A reference to the macro being defined was found in the definition.
 
 .sp
 .ne 2
-.na
-\fB\fBCould not write state file\fR \fIfile\fR\fB\fR\fR
-.ad
+.nf
+\fBCould not open temporary statefile `\fR\fIfile\fR\fB'\fR
+\fBCould not delete old statefile `\fR\fIfile\fR\fB'\fR
+.fi
 .sp .6
 .RS 4n
-You used the \fB\&.KEEP_STATE:\fR target, but do not have write permission on
-the state file.
+You used the \fB\&.KEEP_STATE:\fR target, but you do not have write permission
+on the state file or on a temporary version of the file written first.
 .RE
 
 .sp

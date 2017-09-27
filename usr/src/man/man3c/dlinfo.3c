@@ -460,7 +460,7 @@ MT-Level	MT-Safe
 \fBld\fR(1), \fBld.so.1\fR(1), \fBexec\fR(2), \fBioctl\fR(2), \fBmmapobj\fR(2),
 \fBdirname\fR(3C), \fBdlclose\fR(3C), \fBdldump\fR(3C), \fBdlerror\fR(3C),
 \fBdlopen\fR(3C), \fBdlsym\fR(3C), \fBputenv\fR(3C), \fBrealpath\fR(3C),
-\fBthr_kill\fR(3C), \fBattributes\fR(5).
+\fBthr_kill\fR(3C), \fBattributes\fR(5)
 .sp
 .LP
 \fILinker and Libraries Guide\fR

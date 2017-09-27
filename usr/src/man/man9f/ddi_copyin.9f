@@ -140,7 +140,7 @@ specified argument contains an invalid address, an error code is returned.
  7  struct device_state {
  8     volatile struct device *regsp;   /* pointer to device registers */
  9     kmutex_t reg_mutex;              /* protect device registers */
-       . . .
+       ...
 10  };
 
 11  static void *statep;	/* for soft state routines */
@@ -158,7 +158,7 @@ specified argument contains an invalid address, an error code is returned.
 21      if (sp == NULL)
 22          return (ENXIO);
 23      rp = sp->regsp;
-        . . .
+        ...
 24      switch (cmd)  {
 
 25      case XX_GETREGS:	/* copy data to temp. regs. buf */

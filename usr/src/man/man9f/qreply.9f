@@ -87,7 +87,7 @@ bit is off, then the message is freed (line 15). See the example for
 15	                 freemsg(mp);
 16	          }
 17           break;
-	      . . .
+	      ...
 18     }
 19  }
 .fi

@@ -104,7 +104,7 @@ occurs.
 .LP
 The event types that can be specified at \fBport_associate()\fR time for
 \fBPORT_SOURCE_FILE\fR are \fBFILE_ACCESS\fR, \fBFILE_MODIFIED\fR,
-\fBFILE_ATTRIB\fR, and \fbFILE_TRUNC\fR. The first three of these correspond
+\fBFILE_ATTRIB\fR, and \fBFILE_TRUNC\fR. The first three of these correspond
 to the three time stamps: an \fBfo_atime\fR change results in the
 \fBFILE_ACCESS\fR event, an \fBfo_mtime\fR change results in the
 \fBFILE_MODIFIED\fR event, and an \fBfo_ctime\fR change results in the

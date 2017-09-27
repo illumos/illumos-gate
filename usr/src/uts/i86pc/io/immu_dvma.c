@@ -28,6 +28,7 @@
  */
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -58,7 +59,8 @@
 #define	IMMU_PCI_CLASS2SUB(c)   (((c) >> 8) & 0xff); /* classcode */
 
 #define	IMMU_CONTIG_PADDR(d, p) \
-	((d).dck_paddr && ((d).dck_paddr + IMMU_PAGESIZE) == (p))
+	((d).dck_paddr && ((d).dck_paddr + (d).dck_npages * IMMU_PAGESIZE) \
+	    == (p))
 
 typedef struct dvma_arg {
 	immu_t *dva_immu;
@@ -2125,6 +2127,7 @@ PTE_set_all(immu_t *immu, domain_t *domain, xlate_t *xlate,
 		nvpages -= dcookies[j].dck_npages;
 	}
 
+	VERIFY(j >= 0);
 	nppages = nvpages;
 	paddr = dcookies[j].dck_paddr +
 	    (dcookies[j].dck_npages - nppages) * IMMU_PAGESIZE;
@@ -2666,10 +2669,8 @@ immu_map_dvmaseg(dev_info_t *rdip, ddi_dma_handle_t handle,
 			vaddr += psize;
 		}
 
-		npages++;
-
 		if (ihp->ihp_npremapped > 0) {
-			*ihp->ihp_preptes[npages - 1] =
+			*ihp->ihp_preptes[npages] =
 			    PDTE_PADDR(paddr) | rwmask;
 		} else if (IMMU_CONTIG_PADDR(dcookies[dmax], paddr)) {
 			dcookies[dmax].dck_npages++;
@@ -2691,12 +2692,15 @@ immu_map_dvmaseg(dev_info_t *rdip, ddi_dma_handle_t handle,
 				dvma += (npages << IMMU_PAGESHIFT);
 				npages = 0;
 				dmax = 0;
-			} else
+			} else {
 				dmax++;
+			}
 			dcookies[dmax].dck_paddr = paddr;
 			dcookies[dmax].dck_npages = 1;
 		}
 		size -= psize;
+		if (npages != 0)
+			npages++;
 	}
 
 	/*

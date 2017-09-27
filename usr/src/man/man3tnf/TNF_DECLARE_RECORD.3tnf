@@ -139,7 +139,7 @@ pal_free(pal_header_t *header_p)
                 "sunw%debug entering pal_free",
                 tnf_long,       state_var,  state,
                 pal_tnf_header, header_var, header_p);
-        . . .
+        ...
 }
 .fi
 .in -2

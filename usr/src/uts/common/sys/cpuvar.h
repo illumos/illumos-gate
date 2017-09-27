@@ -295,7 +295,7 @@ extern cpu_core_t cpu_core[];
  */
 #define	CPU_PSEUDO_RANDOM() (CPU->cpu_rotor++)
 
-#if defined(_KERNEL) || defined(_KMEMUSER)
+#if defined(_KERNEL) || defined(_KMEMUSER) || defined(_BOOT)
 
 #define	INTR_STACK_SIZE	MAX(DEFAULTSTKSZ, PAGESIZE)
 
@@ -386,9 +386,8 @@ extern cpu_core_t cpu_core[];
 #define	CPU_DISP_DONTSTEAL	0x01	/* CPU undergoing context swtch */
 #define	CPU_DISP_HALTED		0x02	/* CPU halted waiting for interrupt */
 
-#endif /* _KERNEL || _KMEMUSER */
-
-#if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
+/* Note: inside ifdef: _KERNEL || _KMEMUSER || _BOOT */
+#if defined(_MACHDEP)
 
 /*
  * Macros for manipulating sets of CPUs as a bitmap.  Note that this
@@ -538,7 +537,8 @@ typedef	ulong_t	cpuset_t;	/* a set of CPUs */
 
 extern cpuset_t cpu_seqid_inuse;
 
-#endif	/* (_KERNEL || _KMEMUSER) && _MACHDEP */
+#endif	/* _MACHDEP */
+#endif /* _KERNEL || _KMEMUSER || _BOOT */
 
 #define	CPU_CPR_OFFLINE		0x0
 #define	CPU_CPR_ONLINE		0x1

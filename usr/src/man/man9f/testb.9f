@@ -90,13 +90,13 @@ the amount of time spent in a \fBtimeout()\fR routine.
  3  {
  4	mblk_t *mp;
  5	mblk_t *nmp;
-        . . .
+        ...
  6	if ((nmp = copymsg(mp)) == NULL) {
  7		putbq(q, mp);
  8		timeout(tryagain, (intptr_t)q, drv_usectohz(100000));
  9		return;
 10	}
-	. . .
+	...
 11  }
 12
 13  tryagain(q)

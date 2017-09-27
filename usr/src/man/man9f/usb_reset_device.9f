@@ -272,7 +272,7 @@ WARNING: \fIdev_path\fR hubd\fIinstance_num\fR \fIdriver_name\fR Error message .
 .sp
 .ne 2
 .na
-\fB\fIdriver_name\fR \fIinstance_num\fR is under bus power management, cannot
+\fIdriver_name instance_num\fR \fBis under bus power management, cannot
 be reset. Please disconnect and reconnect this device.\fR
 .ad
 .sp .6
@@ -285,7 +285,7 @@ reconnect it to system.
 .sp
 .ne 2
 .na
-\fBTime out when resetting the device \fIdriver_name\fR \fIinstance_num\fR.
+\fBTime out when resetting the device\fR \fIdriver_name instance_num\fR\fB.
 Please disconnect and reconnect it to system.\fR
 .ad
 .sp .6
@@ -298,7 +298,7 @@ while and reconnect it to system.
 .sp
 .ne 2
 .na
-\fB\fIdriver_name\fR \fIinstance_num\fR cannot be reset due to other
+\fIdriver_name instance_num\fR \fBcannot be reset due to other
 applications are using it, please first close these applications, then
 disconnect and reconnect the device.\fR
 .ad

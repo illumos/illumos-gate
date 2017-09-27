@@ -74,15 +74,15 @@ displayed on the system console (line 14). The driver waits an allotted time
  5  };
  6
  7
-       . . .
- 9	/* get device registers  */
+    ...
+ 9      /* get device registers */
 10      register struct device *rp = ...
 11
-12      while (rp->status & NOPAPER) { 	/* while printer is out of paper */
-13	    /* display message and ring bell */
-  	    /* on system console */
+12      while (rp->status & NOPAPER) {  /* while printer is out of paper */
+13                                      /* display message and ring bell */
+                                        /* on system console */
 14          cmn_err(CE_WARN, "^\e007",
-15                            (getminor(dev) & 0xf));
+15              (getminor(dev) & 0xf));
 16          /* wait one minute and try again */
 17          delay(60 * drv_usectohz(1000000));
 18      }

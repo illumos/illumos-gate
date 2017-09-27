@@ -37,6 +37,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/errno.h>
 #ifndef __xpv
 #include <sys/xpv_support.h>
 #else

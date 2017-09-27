@@ -37,8 +37,8 @@ localedef \- define locale environment
 .SH SYNOPSIS
 .LP
 .nf
-\fBlocaledef\fR [\fB-c\fR] [\fB-v\fR] [\fB-U\fR\] [\fB-f\fR \fIcharmap\fR] 
-     [\fB-w\fR \fIwidthfile\fR] [\fB-i\fR \fIsourcefile\fR] 
+\fBlocaledef\fR [\fB-c\fR] [\fB-v\fR] [\fB-U\fR\] [\fB-f\fR \fIcharmap\fR]
+     [\fB-w\fR \fIwidthfile\fR] [\fB-i\fR \fIsourcefile\fR]
      [\fB-u\fR \fIcode_set_name\fR] \fIlocalename\fR
 .fi
 
@@ -273,7 +273,7 @@ If an error is detected, no permanent output will be created.
 .SH FILES
 .ne 2
 .na
-\fB\fB/usr/lib/locale/\fIlocalename\fR/
+\fB/usr/lib/locale/\fR\fIlocalename\fR\fB/\fR
 .ad
 .sp .6
 .RS 4n

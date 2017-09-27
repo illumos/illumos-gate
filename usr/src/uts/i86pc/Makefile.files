@@ -23,7 +23,7 @@
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2010, Intel Corporation.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
@@ -200,7 +200,7 @@ PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o	\
 			hpet_acpi.o apic_common.o apic_timer.o
 APIX_OBJS += apix.o apic_regops.o psm_common.o apix_intr.o apix_utils.o \
 		apix_irm.o mp_platform_common.o hpet_acpi.o apic_common.o \
-		apic_timer.o
+		apic_timer.o apix_regops.o
 
 
 ACPI_DRV_OBJS	+= acpi_drv.o acpi_video.o

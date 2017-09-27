@@ -101,7 +101,7 @@ processing messages on the queue.
 23                    }
 24	                   freemsg(mp);
 25	                   break;
-     	 . . .
+	            ...
 26		        }
 27	    }
 28 }

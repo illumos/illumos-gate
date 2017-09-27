@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH matherr 3M "23 Sep 1997" "SunOS 5.11" "Mathematical Library Functions"
+.TH MATHERR 3M "Sep 23, 1997" "SunOS 5.11" "Mathematical Library Functions"
 .SH NAME
 matherr \- math library exception-handling function
 .SH SYNOPSIS
@@ -47,7 +47,7 @@ occurred, from the following list of constants (defined in the header file):
 \fB\fBDOMAIN\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 argument domain exception
 .RE
 
@@ -58,7 +58,7 @@ argument domain exception
 \fB\fBSING\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 argument singularity
 .RE
 
@@ -69,7 +69,7 @@ argument singularity
 \fB\fBOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 overflow range exception
 .RE
 
@@ -80,7 +80,7 @@ overflow range exception
 \fB\fBUNDERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 underflow range exception
 .RE
 
@@ -91,7 +91,7 @@ underflow range exception
 \fB\fBTLOSS\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 total loss of significance
 .RE
 
@@ -102,7 +102,7 @@ total loss of significance
 \fB\fBPLOSS\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 partial loss of significance
 .RE
 
@@ -138,7 +138,7 @@ are invoked upon exception:
 \fB\fBDOMAIN\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 0.0 is usually returned, \fBerrno\fR is set to \fBEDOM\fR and a message is
 usually printed on standard error.
 .RE
@@ -150,7 +150,7 @@ usually printed on standard error.
 \fB\fBSING\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 The largest finite single-precision number, \fBHUGE\fR of appropriate sign, is
 returned, \fBerrno\fR is set to \fBEDOM\fR, and a message is printed on
 standard error.
@@ -163,7 +163,7 @@ standard error.
 \fB\fBOVERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 The largest finite single-precision number, \fBHUGE\fR of appropriate sign, is
 usually returned and \fBerrno\fR is set to \fBERANGE\fR.
 .RE
@@ -175,7 +175,7 @@ usually returned and \fBerrno\fR is set to \fBERANGE\fR.
 \fB\fBUNDERFLOW\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 0.0 is returned and \fBerrno\fR is set to \fBERANGE\fR.
 .RE
 
@@ -186,7 +186,7 @@ usually returned and \fBerrno\fR is set to \fBERANGE\fR.
 \fB\fBTLOSS\fR\fR
 .ad
 .RS 13n
-.rt  
+.rt
 0.0 is returned, \fBerrno\fR is set to \fBERANGE\fR, and a message is printed
 on standard error.
 .RE
@@ -200,58 +200,58 @@ unexpectedly set by a function in a handler for an asynchronous signal.
 
 .sp
 .TS
-tab() box;
-cw(1.29i) |cw(.81i) |cw(.79i) |cw(.87i) |cw(1.03i) |cw(.71i) 
-lw(1.29i) |lw(.81i) |lw(.79i) |lw(.87i) |lw(1.03i) |lw(.71i) 
+tab(	) box;
+cw(1.29i) |cw(.81i) |cw(.79i) |cw(.87i) |cw(1.03i) |cw(.71i)
+lw(1.29i) |lw(.81i) |lw(.79i) |lw(.87i) |lw(1.03i) |lw(.71i)
 .
-<math.h> typeDOMAINSINGOVERFLOWUNDERFLOWTLOSS
+<math.h> type	DOMAIN	SING	OVERFLOW	UNDERFLOW	TLOSS
 _
-\fBerrno\fREDOMEDOMERANGEERANGEERANGE
+\fBerrno\fR	EDOM	EDOM	ERANGE	ERANGE	ERANGE
 _
-IEEE ExceptionInvalid OperationDivision by ZeroOverflowUnderflow\(mi
+IEEE Exception	Invalid Operation	Division by Zero	Overflow	Underflow	\(mi
 _
-fp_exception_typefp_invalidfp_divisionfp_overflowfp_underflow\(mi
+fp_exception_type	fp_invalid	fp_division	fp_overflow	fp_underflow	\(mi
 _
-ACOS, ASIN\|(|x| > 1):Md, 0.0\(mi\(mi\(mi\(mi
+ACOS, ASIN\|(|x| > 1):	Md, 0.0	\(mi	\(mi	\(mi	\(mi
 _
-ACOSH\|(x < 1), ATANH\|(|x| > 1):NaN\(mi\(mi\(mi\(mi
+ACOSH\|(x < 1), ATANH\|(|x| > 1):	NaN	\(mi	\(mi	\(mi	\(mi
 _
-ATAN2\|(0,0):Md, 0.0\(mi\(mi\(mi\(mi
+ATAN2\|(0,0):	Md, 0.0	\(mi	\(mi	\(mi	\(mi
 _
-COSH, SINH:\(mi\(mi\(+-HUGE\(mi\(mi
+COSH, SINH:	\(mi	\(mi	\(+-HUGE	\(mi	\(mi
 _
-EXP:\(mi\(mi+HUGE0.0\(mi
+EXP:	\(mi	\(mi	+HUGE	0.0	\(mi
 _
-FMOD\|(x,0):x\(mi\(mi\(mi\(mi
+FMOD\|(x,0):	x	\(mi	\(mi	\(mi	\(mi
 _
-HYPOT:\(mi\(mi+HUGE\(mi\(mi
+HYPOT:	\(mi	\(mi	+HUGE	\(mi	\(mi
 _
-J0, J1, JN\|(|x| > X_TLOSS):\(mi\(mi\(mi\(miMt, 0.0
+J0, J1, JN\|(|x| > X_TLOSS):	\(mi	\(mi	\(mi	\(mi	Mt, 0.0
 _
-LGAMMA:
- usual cases\(mi\(mi+HUGE\(mi\(mi
- (x = 0 or \(miinteger) \(miMs, +HUGE\(mi\(mi\(mi
+LGAMMA:
+ usual cases	\(mi	\(mi	+HUGE	\(mi	\(mi
+ (x = 0 or \(miinteger)	\(mi	Ms, +HUGE	\(mi	\(mi	\(mi
 _
-LOG, LOG10:
- (x < 0)Md, \(miHUGE\(mi \(mi\(mi\(mi
- (x = 0)\(miMs, \(miHUGE\(mi\(mi\(mi
+LOG, LOG10:
+ (x < 0)	Md, \(miHUGE	\(mi	 \(mi	\(mi	\(mi
+ (x = 0)	\(mi	Ms, \(miHUGE	\(mi	\(mi	\(mi
 _
-POW:
- usual cases\(mi\(mi\(+-HUGE\(+-0.0\(mi
- (x < 0) ** (y not an integer)Md, 0.0\(mi\(mi\(mi\(mi
- 0 ** 0Md, 0.0\(mi\(mi\(mi\(mi
- 0 ** (y < 0)Md, 0.0\(mi\(mi\(mi
+POW:
+ usual cases	\(mi	\(mi	\(+-HUGE	\(+-0.0	\(mi
+ (x < 0) ** (y not an integer)	Md, 0.0	\(mi	\(mi	\(mi	\(mi
+ 0 ** 0	Md, 0.0	\(mi	\(mi	\(mi	\(mi
+ 0 ** (y < 0)	Md, 0.0	\(mi	\(mi	\(mi
 _
-REMAINDER\|(x,0):NaN\(mi\(mi\(mi\(mi
+REMAINDER\|(x,0):	NaN	\(mi	\(mi	\(mi	\(mi
 _
-SCALB:\(mi\(mi\(+-HUGE_VAL\(+-0.0\(mi
+SCALB:	\(mi	\(mi	\(+-HUGE_VAL	\(+-0.0	\(mi
 _
-SQRT\|(x < 0):Md, 0.0\(mi\(mi\(mi\(mi
+SQRT\|(x < 0):	Md, 0.0	\(mi	\(mi	\(mi	\(mi
 _
-Y0, Y1, YN:
- (x < 0)Md, \(miHUGE\(mi\(mi\(mi\(mi
- (x = 0)\(miMd, \(miHUGE\(mi\(mi\(mi
- (x > X_TLOSS)\(mi\(mi\(mi\(miMt, 0.0
+Y0, Y1, YN:
+ (x < 0)	Md, \(miHUGE	\(mi	\(mi	\(mi	\(mi
+ (x = 0)	\(mi	Md, \(miHUGE	\(mi	\(mi	\(mi
+ (x > X_TLOSS)	\(mi	\(mi	\(mi	\(mi	Mt, 0.0
 .TE
 
 .SS "Abbreviations"
@@ -262,7 +262,7 @@ Y0, Y1, YN:
 \fBMd\fR
 .ad
 .RS 12n
-.rt  
+.rt
 Message is printed (DOMAIN error).
 .RE
 
@@ -273,7 +273,7 @@ Message is printed (DOMAIN error).
 \fBMs\fR
 .ad
 .RS 12n
-.rt  
+.rt
 Message is printed (SING error).
 .RE
 
@@ -284,7 +284,7 @@ Message is printed (SING error).
 \fBMt\fR
 .ad
 .RS 12n
-.rt  
+.rt
 Message is printed (TLOSS error).
 .RE
 
@@ -295,7 +295,7 @@ Message is printed (TLOSS error).
 \fBNaN\fR
 .ad
 .RS 12n
-.rt  
+.rt
 IEEE NaN result and invalid operation exception.
 .RE
 
@@ -306,7 +306,7 @@ IEEE NaN result and invalid operation exception.
 \fBHUGE\fR
 .ad
 .RS 12n
-.rt  
+.rt
 Maximum finite single-precision floating-point number.
 .RE
 
@@ -317,7 +317,7 @@ Maximum finite single-precision floating-point number.
 \fBHUGE_VAL\fR
 .ad
 .RS 12n
-.rt  
+.rt
 IEEE \(if result and division-by-zero exception.
 .RE
 
@@ -328,7 +328,7 @@ IEEE \(if result and division-by-zero exception.
 \fBX_TLOSS\fR
 .ad
 .RS 12n
-.rt  
+.rt
 The value X_TLOSS is defined in <values.h>.
 .RE
 
@@ -351,48 +351,48 @@ NaN is returned. In particular, \fBpow(NaN,0)\fR = NaN.
 
 .sp
 .TS
-tab() box;
-cw(.82i) |cw(1.03i) |cw(1i) |cw(.97i) |cw(.96i) |cw(.72i) 
-lw(.82i) |lw(1.03i) |lw(1i) |lw(.97i) |lw(.96i) |lw(.72i) 
+tab(	) box;
+cw(.82i) |cw(1.03i) |cw(1i) |cw(.97i) |cw(.96i) |cw(.72i)
+lw(.82i) |lw(1.03i) |lw(1i) |lw(.97i) |lw(.96i) |lw(.72i)
 .
-<math.h> typeDOMAINSINGOVERFLOWUNDERFLOWTLOSS
+<math.h> type	DOMAIN	SING	OVERFLOW	UNDERFLOW	TLOSS
 _
-\fBerrno\fREDOMEDOMERANGEERANGEERANGE
+\fBerrno\fR	EDOM	EDOM	ERANGE	ERANGE	ERANGE
 _
-ACOS, ASIN\|(|x| > 1):0.0\(mi\(mi\(mi\(mi
+ACOS, ASIN\|(|x| > 1):	0.0	\(mi	\(mi	\(mi	\(mi
 _
-ATAN2\|(0,0):0.0\(mi\(mi\(mi\(mi
+ATAN2\|(0,0):	0.0	\(mi	\(mi	\(mi	\(mi
 _
-COSH, SINH:\(mi\(mi{\(+-HUGE_VAL}\(mi\(mi
+COSH, SINH:	\(mi	\(mi	{\(+-HUGE_VAL}	\(mi	\(mi
 _
-EXP:\(mi\(mi{+HUGE_VAL}{0.0}\(mi
+EXP:	\(mi	\(mi	{+HUGE_VAL}	{0.0}	\(mi
 _
-FMOD\|(x,0):{NaN}\(mi\(mi\(mi\(mi
+FMOD\|(x,0):	{NaN}	\(mi	\(mi	\(mi	\(mi
 _
-HYPOT:\(mi\(mi{+HUGE_VAL}\(mi\(mi
+HYPOT:	\(mi	\(mi	{+HUGE_VAL}	\(mi	\(mi
 _
-J0, J1, JN\|(|x| > X_TLOSS):\(mi\(mi\(mi\(mi{0.0}
+J0, J1, JN\|(|x| > X_TLOSS):	\(mi	\(mi	\(mi	\(mi	{0.0}
 _
-LGAMMA:
- usual cases\(mi\(mi{+HUGE_VAL}\(mi\(mi
- (x = 0 or \(miinteger) \(mi+HUGE_VAL\(mi\(mi\(mi
+LGAMMA:
+ usual cases	\(mi	\(mi	{+HUGE_VAL}	\(mi	\(mi
+ (x = 0 or \(miinteger)	\(mi	+HUGE_VAL	\(mi	\(mi	\(mi
 _
-LOG, LOG10:
- (x < 0)\fB-HUGE_VAL\fR\(mi\(mi\(mi\(mi
- (x = 0)\(mi\fB-HUGE_VAL\fR\(mi\(mi\(mi
+LOG, LOG10:
+ (x < 0)	\fB-HUGE_VAL\fR	\(mi	\(mi	\(mi	\(mi
+ (x = 0)	\(mi	\fB-HUGE_VAL\fR	\(mi	\(mi	\(mi
 _
-POW:
- usual cases\(mi\(mi\(+-HUGE_VAL\(+-0.0\(mi
- (x < 0) ** (y not an integer)0.0\(mi\(mi\(mi\(mi
- 0 ** 0{1.0}\(mi\(mi\(mi\(mi
- 0 ** (y < 0){\fB-HUGE_VAL\fR}\(mi\(mi\(mi\(mi
+POW:
+ usual cases	\(mi	\(mi	\(+-HUGE_VAL	\(+-0.0	\(mi
+ (x < 0) ** (y not an integer)	0.0	\(mi	\(mi	\(mi	\(mi
+ 0 ** 0	{1.0}	\(mi	\(mi	\(mi	\(mi
+ 0 ** (y < 0)	{\fB-HUGE_VAL\fR}	\(mi	\(mi	\(mi	\(mi
 _
-SQRT\|(x < 0):0.0\(mi\(mi\(mi\(mi
+SQRT\|(x < 0):	0.0	\(mi	\(mi	\(mi	\(mi
 _
-Y0, Y1, YN:
- (x < 0){\fB-HUGE_VAL\fR}\(mi\(mi\(mi\(mi
- (x = 0)\(mi{\fB-HUGE_VAL\fR}\(mi\(mi\(mi
- (x > X_TLOSS)\(mi\(mi\(mi\(mi0.0
+Y0, Y1, YN:
+ (x < 0)	{\fB-HUGE_VAL\fR}	\(mi	\(mi	\(mi	\(mi
+ (x = 0)	\(mi	{\fB-HUGE_VAL\fR}	\(mi	\(mi	\(mi
+ (x > X_TLOSS)	\(mi	\(mi	\(mi	\(mi	0.0
 .TE
 
 .SS "Abbreviations"
@@ -403,7 +403,7 @@ Y0, Y1, YN:
 \fB{...}\fR
 .ad
 .RS 12n
-.rt  
+.rt
 \fBerrno\fR is not to be relied upon in all braced cases.
 .RE
 
@@ -414,7 +414,7 @@ Y0, Y1, YN:
 \fBNaN\fR
 .ad
 .RS 12n
-.rt  
+.rt
 IEEE NaN result and invalid operation exception.
 .RE
 
@@ -425,7 +425,7 @@ IEEE NaN result and invalid operation exception.
 \fBHUGE_VAL\fR
 .ad
 .RS 12n
-.rt  
+.rt
 IEEE \(if result and division-by-zero exception.
 .RE
 
@@ -436,7 +436,7 @@ IEEE \(if result and division-by-zero exception.
 \fBX_TLOSS\fR
 .ad
 .RS 12n
-.rt  
+.rt
 The value X_TLOSS is defined in <\fBvalues.h\fR>.
 .RE
 
@@ -452,32 +452,32 @@ The following table summarizes the values returned in the exceptional cases.
 
 .sp
 .TS
-tab() box;
-cw(1.1i) |cw(1.1i) |cw(1.1i) |cw(1.1i) |cw(1.11i) 
-lw(1.1i) |lw(1.1i) |lw(1.1i) |lw(1.1i) |lw(1.11i) 
+tab(	) box;
+cw(1.1i) |cw(1.1i) |cw(1.1i) |cw(1.1i) |cw(1.11i)
+lw(1.1i) |lw(1.1i) |lw(1.1i) |lw(1.1i) |lw(1.11i)
 .
-<math.h> typeDOMAINSINGOVERFLOWUNDERFLOW
+<math.h> type	DOMAIN	SING	OVERFLOW	UNDERFLOW
 _
-\fBerrno\fREDOMEDOMERANGEERANGE
+\fBerrno\fR	EDOM	EDOM	ERANGE	ERANGE
 _
-ACOS, ASIN\|(|x| > 1):0.0\(mi\(mi\(mi
+ACOS, ASIN\|(|x| > 1):	0.0	\(mi	\(mi	\(mi
 _
-ATAN2\|(0,0):0.0\(mi\(mi\(mi
+ATAN2\|(0,0):	0.0	\(mi	\(mi	\(mi
 _
-EXP:\(mi\(mi+HUGE_VAL0.0
+EXP:	\(mi	\(mi	+HUGE_VAL	0.0
 _
-FMOD\|(x,0):NaN\(mi\(mi\(mi
+FMOD\|(x,0):	NaN	\(mi	\(mi	\(mi
 _
-LOG, LOG10:
- (x < 0)\fB-HUGE_VAL\fR\(mi\(mi\(mi
- (x = 0)\(mi\fB-HUGE_VAL\fR\(mi\(mi
+LOG, LOG10:
+ (x < 0)	\fB-HUGE_VAL\fR	\(mi	\(mi	\(mi
+ (x = 0)	\(mi	\fB-HUGE_VAL\fR	\(mi	\(mi
 _
-POW:
- usual cases\(mi\(mi\(+-HUGE_VAL\(+-0.0
- (x < 0) ** (y not an integer)0.0\(mi\(mi\(mi
- 0 ** (y < 0)\fB-HUGE_VAL\fR\(mi\(mi\(mi
+POW:
+ usual cases	\(mi	\(mi	\(+-HUGE_VAL	\(+-0.0
+ (x < 0) ** (y not an integer)	0.0	\(mi	\(mi	\(mi
+ 0 ** (y < 0)	\fB-HUGE_VAL\fR	\(mi	\(mi	\(mi
 _
-SQRT\|(x < 0):0.0\(mi\(mi\(mi
+SQRT\|(x < 0):	0.0	\(mi	\(mi	\(mi
 .TE
 
 .SS "ABBREVIATIONS"
@@ -488,7 +488,7 @@ SQRT\|(x < 0):0.0\(mi\(mi\(mi
 \fBNaN\fR
 .ad
 .RS 12n
-.rt  
+.rt
 IEEE NaN result and invalid operation exception.
 .RE
 
@@ -499,7 +499,7 @@ IEEE NaN result and invalid operation exception.
 \fBHUGE_VAL\fR
 .ad
 .RS 12n
-.rt  
+.rt
 IEEE \(if result and division-by-zero.
 .RE
 
@@ -542,13 +542,13 @@ See \fBattributes\fR(5) for descriptions of the following attributes:
 
 .sp
 .TS
-tab() box;
-cw(2.75i) |cw(2.75i) 
-lw(2.75i) |lw(2.75i) 
+tab(	) box;
+cw(2.75i) |cw(2.75i)
+lw(2.75i) |lw(2.75i)
 .
-ATTRIBUTE TYPEATTRIBUTE VALUE
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-MT-LevelMT-Safe
+MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO

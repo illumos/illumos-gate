@@ -327,7 +327,7 @@ identical to \fBstrdup()\fR, execept it copies at most \fIn\fR bytes from
 \fBs1\fR and ensures the copied string is awlays null terminated.
 .LP
 The functions \fBstrdupa()\fR and \fBstrndupa()\fR behave identically to
-\fBstrdup()\fr and \fBstrndup()\fR respectively; however, instead of allocating
+\fBstrdup()\fR and \fBstrndup()\fR respectively; however, instead of allocating
 memory using \fBmalloc\fR(3C), they use \fBalloca\fR(3C). These functions are
 provided for compatibility only, their use is strongly discouraged due to their
 use of \fBalloca\fR(3C).
@@ -559,8 +559,8 @@ For all except \fBstrlcat()\fR, \fBstrlcpy()\fR, and \fBstrsep()\fR, see
 .SH SEE ALSO
 .LP
 \fBmalloc\fR(3C),
-\fBnewlocale(3C), \fBsetlocale\fR(3C), \fBstrxfrm\fR(3C), \fBuselocale\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBstrxfrm\fR(3C),
+\fBuselocale\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
 .LP
 When compiling multithreaded applications, the \fB_REENTRANT\fR flag must be

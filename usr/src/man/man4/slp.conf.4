@@ -59,7 +59,7 @@ sother        =  %x21-%x29 / %x2a-%x2b /
                  %x5b-%x60 / %7b-%7e
                  ; i.e., all characters except `,'
 allchar       =  DIGIT / ALPHA / HTAB / SP
-escape        =  "\" HEXDIG HEXDIG
+escape        =  "\e" HEXDIG HEXDIG
                  ; Used for reserved characters
 .fi
 .in -2
@@ -1137,11 +1137,11 @@ Interface Stability	Standard
 \fISystem Administration Guide: Network Services\fR
 .sp
 .LP
-Alvestrand, H.\fIRFC 1766: Tags for the Identification of Languages\fR. Network
-Working Group. March 1995.
+Alvestrand, H. \fIRFC 1766: Tags for the Identification of Languages\fR.
+Network Working Group. March 1995.
 .sp
 .LP
-Crocker, D., Overell, P.\fIRFC 2234, Augmented BNF for Syntax Specifications:
+Crocker, D., Overell, P. \fIRFC 2234, Augmented BNF for Syntax Specifications:
 ABNF\fR. The Internet Society. 1997.
 .sp
 .LP

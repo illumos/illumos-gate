@@ -2,7 +2,6 @@
 #define _OSDEP_H
 
 #define __unused __attribute__((unused))
-#define __aligned __attribute__((aligned(16)))
 
 #include "io.h"
 #include "byteswap.h"
