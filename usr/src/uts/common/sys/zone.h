@@ -22,7 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #ifndef _SYS_ZONE_H
@@ -51,15 +51,27 @@ extern "C" {
  * NOTE
  *
  * The contents of this file are private to the implementation of
- * Solaris and are subject to change at any time without notice.
+ * illumos and are subject to change at any time without notice.
  * Applications and drivers using these interfaces may fail to
  * run on future releases.
  */
 
 /* Available both in kernel and for user space */
 
-/* zone id restrictions and special ids */
-#define	MAX_ZONEID	9999
+/*
+ * zone id restrictions and special ids.
+ * See 'maxzones' for run-time zone limit.
+ *
+ * The current 8k value for MAX_ZONES was originally derived from the virtual
+ * interface limit in IP when "shared-stack" was the only supported networking
+ * for zones. The virtual interface limit is the number of addresses allowed
+ * on an interface (see MAX_ADDRS_PER_IF). Even with exclusive stacks, an 8k
+ * zone limit is still a reasonable choice at this time, given other limits
+ * within the kernel. Since we only support 8192 zones (which includes GZ),
+ * there is no point in allowing MAX_ZONEID > 8k.
+ */
+#define	MAX_ZONES	8192
+#define	MAX_ZONEID	(MAX_ZONES - 1)
 #define	MIN_USERZONEID	1	/* lowest user-creatable zone ID */
 #define	MIN_ZONEID	0	/* minimum zone ID on system */
 #define	GLOBAL_ZONEID	0
@@ -647,7 +659,7 @@ typedef struct zone {
 	zone_zfs_kstat_t *zone_zfs_stats;
 
 	/*
-	 * Solaris Auditing per-zone audit context
+	 * illumos Auditing per-zone audit context
 	 */
 	struct au_kcontext	*zone_audit_kctxt;
 	/*
@@ -962,6 +974,14 @@ extern void mount_in_progress(zone_t *);
 extern void mount_completed(zone_t *);
 
 extern int zone_walk(int (*)(zone_t *, void *), void *);
+
+struct page;
+extern void zone_add_page(struct page *);
+extern void zone_rm_page(struct page *);
+
+/* Interfaces for page scanning */
+extern uint_t zone_num_over_cap;
+extern uint8_t zone_over_cap[MAX_ZONES];
 
 extern rctl_hndl_t rc_zone_locked_mem;
 extern rctl_hndl_t rc_zone_max_swap;

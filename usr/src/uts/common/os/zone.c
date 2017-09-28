@@ -328,8 +328,8 @@ static list_t zone_active;
 static list_t zone_deathrow;
 static kmutex_t zone_deathrow_lock;
 
-/* number of zones is limited by virtual interface limit in IP */
-uint_t maxzones = 8192;
+/* This can be dynamically reduced if various subsystems hit internal limits. */
+uint_t maxzones = MAX_ZONES;
 
 /* Event channel to sent zone state change notifications */
 evchan_t *zone_event_chan;
@@ -3059,22 +3059,6 @@ zone_set_page_fault_delay(zone_t *zone, const uint32_t *pfdelay)
 
 	if ((err = copyin(pfdelay, &dusec, sizeof (uint32_t))) == 0)
 		zone->zone_pg_flt_delay = dusec;
-
-	return (err);
-}
-
-/*
- * The zone_set_rss function is used to set the zone's RSS when we do the
- * fast, approximate calculation in user-land.
- */
-static int
-zone_set_rss(zone_t *zone, const uint64_t *prss)
-{
-	uint64_t rss;
-	int err;
-
-	if ((err = copyin(prss, &rss, sizeof (uint64_t))) == 0)
-		zone->zone_phys_mem = rss;
 
 	return (err);
 }
@@ -6228,6 +6212,14 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		    bufsize) != 0)
 			error = EFAULT;
 		break;
+	case ZONE_ATTR_RSS:
+		size = sizeof (zone->zone_phys_mem);
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL &&
+		    copyout(&zone->zone_phys_mem, buf, bufsize) != 0)
+			error = EFAULT;
+		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
 			size = bufsize;
@@ -6281,8 +6273,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	 */
 	zone_status = zone_status_get(zone);
 	if (attr != ZONE_ATTR_PMCAP_NOVER && attr != ZONE_ATTR_PMCAP_PAGEOUT &&
-	    attr != ZONE_ATTR_PG_FLT_DELAY && attr != ZONE_ATTR_RSS &&
-	    zone_status > ZONE_IS_READY) {
+	    attr != ZONE_ATTR_PG_FLT_DELAY && zone_status > ZONE_IS_READY) {
 		err = EINVAL;
 		goto done;
 	}
@@ -6312,9 +6303,6 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		break;
 	case ZONE_ATTR_PG_FLT_DELAY:
 		err = zone_set_page_fault_delay(zone, (const uint32_t *)buf);
-		break;
-	case ZONE_ATTR_RSS:
-		err = zone_set_rss(zone, (const uint64_t *)buf);
 		break;
 	case ZONE_ATTR_SECFLAGS:
 		err = zone_set_secflags(zone, (psecflags_t *)buf);
@@ -8073,4 +8061,206 @@ done:
 		return (set_errno(err));
 	else
 		return (0);
+}
+
+/*
+ * "zone_over_cap" is an array indexed by zoneid, indicating which zones are
+ * over their physical memory cap. This is the interface for the page scanner
+ * to use when reclaiming pages for zones that are over their cap.
+ *
+ * The page scanner can run when "zone_num_over_cap" is non-zero. It can
+ * do a direct lookup of a zoneid into the "zone_over_cap" array to determine
+ * if that zone is over its cap.
+ *
+ * There is no locking for the page scanner to perform these two checks.
+ * We cannot have the page scanner blocking normal paging activity for
+ * running processes. Because the physical memory cap is a soft cap, it is
+ * fine for the scanner to simply read the current state of the counter and
+ * the zone's entry in the array. The scanner should never modify either of
+ * these items. Internally the entries and the counter are managed with the
+ * "zone_physcap_lock" mutex as we add/remove mappings to pages. We take care
+ * to ensure that we only take the zone_physcap_lock mutex when a zone is
+ * transitioning over/under its physical memory cap.
+ *
+ * The "zone_incr_capped", "zone_decr_capped" and "zone_clr_capped" functions
+ * are used manage the "zone_over_cap" array and associated counter.
+ */
+uint8_t zone_over_cap[MAX_ZONES];
+uint_t zone_num_over_cap;
+static kmutex_t zone_physcap_lock;
+
+static void
+zone_incr_capped(zone_t *zone)
+{
+	/* See if over (unlimited is UINT64_MAX), or already marked that way. */
+	if (zone->zone_phys_mem <= zone->zone_phys_mem_ctl ||
+	    zone_over_cap[zone->zone_id] == 1) {
+		return;
+	}
+
+	mutex_enter(&zone_physcap_lock);
+	/* Recheck setting under mutex */
+	if (zone->zone_phys_mem > zone->zone_phys_mem_ctl &&
+	    zone_over_cap[zone->zone_id] == 0) {
+		zone_over_cap[zone->zone_id] = 1;
+		zone_num_over_cap++;
+		DTRACE_PROBE1(zone__over__pcap, zone_t *, zone);
+	}
+	mutex_exit(&zone_physcap_lock);
+}
+
+static void
+zone_decr_capped(zone_t *zone)
+{
+	/*
+	 * See if under, or already marked that way. There is no need to
+	 * check for an unlimited cap (zone_phys_mem_ctl == UINT64_MAX)
+	 * since we'll never add the zone in zone_incr_capped_zone().
+	 */
+	if (zone_over_cap[zone->zone_id] == 0 ||
+	    zone->zone_phys_mem >= zone->zone_phys_mem_ctl) {
+		return;
+	}
+
+	mutex_enter(&zone_physcap_lock);
+	/* Recheck setting under mutex */
+	if (zone->zone_phys_mem < zone->zone_phys_mem_ctl &&
+	    zone_over_cap[zone->zone_id] == 1) {
+		ASSERT(zone_num_over_cap > 0);
+		zone_over_cap[zone->zone_id] = 0;
+		zone_num_over_cap--;
+		DTRACE_PROBE1(zone__under__pcap, zone_t *, zone);
+	}
+	mutex_exit(&zone_physcap_lock);
+}
+
+/* Clear out an entry for a zone which no longer exists. */
+static void
+zone_clr_capped(zoneid_t zid)
+{
+	if (zone_over_cap[zid] == 0)
+		return;
+
+	mutex_enter(&zone_physcap_lock);
+	/* Recheck setting under mutex */
+	if (zone_over_cap[zid] == 1) {
+		ASSERT(zone_num_over_cap > 0);
+		zone_over_cap[zid] = 0;
+		zone_num_over_cap--;
+	}
+	mutex_exit(&zone_physcap_lock);
+}
+
+/*
+ * For zone_add_page() and zone_rm_page(), access to the page we're touching is
+ * controlled by our caller's locking.
+ * On x86 our callers already did: ASSERT(x86_hm_held(pp))
+ * On SPARC our callers already did: ASSERT(sfmmu_mlist_held(pp))
+ */
+void
+zone_add_page(page_t *pp)
+{
+	int64_t psize;
+	zone_t *zone;
+
+	/* Skip pages in segkmem, etc. (KV_KVP, ...) */
+	if (PP_ISKAS(pp))
+		return;
+
+	ASSERT(!PP_ISFREE(pp));
+
+	zone = curzone;
+	if (pp->p_zoneid == zone->zone_id) {
+		/* Another mapping to this page for this zone, do nothing */
+		return;
+	}
+
+	if (pp->p_szc == 0) {
+		psize = (int64_t)PAGESIZE;
+	} else {
+		/* large page */
+		psize = (int64_t)page_get_pagesize(pp->p_szc);
+	}
+
+	if (pp->p_share == 0) {
+		/* First mapping to this page. */
+		pp->p_zoneid = zone->zone_id;
+		atomic_add_64((uint64_t *)&zone->zone_phys_mem, psize);
+		zone_incr_capped(zone);
+		return;
+	}
+
+	if (pp->p_zoneid != ALL_ZONES) {
+		/*
+		 * The page is now being shared across a different zone.
+		 * Decrement the original zone's usage.
+		 */
+		zoneid_t id;
+
+		id = pp->p_zoneid;
+		pp->p_zoneid = ALL_ZONES;
+		if ((zone = zone_find_by_id(id)) == NULL) {
+			/*
+			 * Perhaps the zone has halted but since we have the
+			 * page locked down, the page hasn't been freed yet.
+			 * In any case, there is no zone RSS to update.
+			 */
+			zone_clr_capped(id);
+			return;
+		}
+
+		atomic_add_64((uint64_t *)&zone->zone_phys_mem, -psize);
+		if ((int64_t)zone->zone_phys_mem < 0) {
+			DTRACE_PROBE1(zone__ap__neg, zoneid_t, id);
+			cmn_err(CE_WARN, "zone %d: RSS negative", id);
+			zone->zone_phys_mem = 0;
+		}
+		zone_decr_capped(zone);
+		zone_rele(zone);
+	}
+}
+
+void
+zone_rm_page(page_t *pp)
+{
+	zone_t *zone;
+	boolean_t do_rele = B_FALSE;
+	int64_t psize;
+
+	/* Skip pages in segkmem, etc. (KV_KVP, ...) */
+	if (PP_ISKAS(pp))
+		return;
+
+	if (pp->p_zoneid == ALL_ZONES || pp->p_share != 0)
+		return;
+
+	/* This is the last mapping to the page for a zone. */
+	if (pp->p_szc == 0) {
+		psize = (int64_t)PAGESIZE;
+	} else {
+		/* large page */
+		psize = (int64_t)page_get_pagesize(pp->p_szc);
+	}
+
+	if (pp->p_zoneid == curzone->zone_id) {
+		zone = curzone;
+	} else if ((zone = zone_find_by_id(pp->p_zoneid)) != NULL) {
+		do_rele = B_TRUE;
+	}
+
+	if (zone != NULL) {
+		atomic_add_64((uint64_t *)&zone->zone_phys_mem, -psize);
+		if ((int64_t)zone->zone_phys_mem < 0) {
+			DTRACE_PROBE1(zone__rp__neg, zoneid_t, zone->zone_id);
+			cmn_err(CE_WARN, "zone %d: RSS negative",
+			    zone->zone_id);
+			zone->zone_phys_mem = 0;
+		}
+		zone_decr_capped(zone);
+		if (do_rele)
+			zone_rele(zone);
+	} else {
+		zone_clr_capped(pp->p_zoneid);
+	}
+	pp->p_zoneid = ALL_ZONES;
 }

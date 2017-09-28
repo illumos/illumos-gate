@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -229,6 +230,7 @@ struct as;
  *				p_nrm
  *				p_mapping
  *				p_share
+ *				p_zoneid
  *
  * The following field is file system dependent.  How it is used and
  * the locking strategies applied are up to the individual file system
@@ -527,9 +529,8 @@ typedef struct page {
 	pfn_t		p_pagenum;	/* physical page number */
 
 	uint_t		p_share;	/* number of translations */
-#if defined(_LP64)
-	uint_t		p_sharepad;	/* pad for growing p_share */
-#endif
+	short		p_zoneid;	/* zone page use tracking */
+	short		p_pad1;		/* TBD */
 	uint_t		p_slckcnt;	/* number of softlocks */
 #if defined(__sparc)
 	uint_t		p_kpmref;	/* number of kpm mapping sharers */

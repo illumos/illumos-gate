@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 /*
@@ -1792,28 +1792,6 @@ vmu_cache_rele(vmu_cache_t *cache)
 }
 
 /*
- * When new data is calculated, update the phys_mem rctl usage value in the
- * zones.
- */
-static void
-vmu_update_zone_rctls(vmu_cache_t *cache)
-{
-	vmusage_t	*rp;
-	size_t		i = 0;
-	zone_t		*zp;
-
-	for (rp = cache->vmc_results; i < cache->vmc_nresults; rp++, i++) {
-		if (rp->vmu_type == VMUSAGE_ZONE &&
-		    rp->vmu_zoneid != ALL_ZONES) {
-			if ((zp = zone_find_by_id(rp->vmu_zoneid)) != NULL) {
-				zp->zone_phys_mem = rp->vmu_rss_all;
-				zone_rele(zp);
-			}
-		}
-	}
-}
-
-/*
  * Copy out the cached results to a caller.  Inspect the callers flags
  * and zone to determine which cached results should be copied.
  */
@@ -2112,8 +2090,6 @@ start:
 
 		mutex_exit(&vmu_data.vmu_lock);
 
-		/* update zone's phys. mem. rctl usage */
-		vmu_update_zone_rctls(cache);
 		/* copy cache */
 		ret = vmu_copyout_results(cache, buf, nres, flags_orig,
 		    req_zone_id, cpflg);
