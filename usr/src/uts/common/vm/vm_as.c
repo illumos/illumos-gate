@@ -2330,7 +2330,7 @@ retry:
 		}
 
 		for (seg = AS_SEGFIRST(as); seg; seg = AS_SEGNEXT(as, seg)) {
-			if (seg->s_flags & S_HOLE != 0) {
+			if ((seg->s_flags & S_HOLE) != 0) {
 				continue;
 			}
 			error = SEGOP_LOCKOP(seg, seg->s_base,
@@ -2362,7 +2362,7 @@ retry:
 		mutex_exit(&as->a_contents);
 
 		for (seg = AS_SEGFIRST(as); seg; seg = AS_SEGNEXT(as, seg)) {
-			if (seg->s_flags & S_HOLE != 0) {
+			if ((seg->s_flags & S_HOLE) != 0) {
 				continue;
 			}
 			error = SEGOP_LOCKOP(seg, seg->s_base,
