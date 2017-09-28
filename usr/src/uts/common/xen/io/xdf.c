@@ -599,15 +599,9 @@ xdf_cmlb_attach(xdf_t *vdp)
 
 	return (cmlb_attach(dip, &xdf_lb_ops,
 	    XD_IS_CD(vdp) ? DTYPE_RODIRECT : DTYPE_DIRECT,
-	    XD_IS_RM(vdp),
-	    B_TRUE,
+	    XD_IS_RM(vdp), B_TRUE,
 	    XD_IS_CD(vdp) ? DDI_NT_CD_XVMD : DDI_NT_BLOCK_XVMD,
-#ifdef XPV_HVM_DRIVER
-	    (XD_IS_CD(vdp) ? 0 : CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT),
-#else /* XPV_HVM_DRIVER */
-	    0,
-#endif /* XPV_HVM_DRIVER */
-	    vdp->xdf_vd_lbl, NULL));
+	    0, vdp->xdf_vd_lbl, NULL));
 }
 
 static void
@@ -1665,23 +1659,20 @@ xdf_get_flush_block(xdf_t *vdp)
 static void
 xdf_setstate_ready(void *arg)
 {
-	xdf_t	*vdp = (xdf_t *)arg;
+	xdf_t		*vdp = (xdf_t *)arg;
+	dev_info_t	*dip = vdp->xdf_dip;
 
 	vdp->xdf_ready_tq_thread = curthread;
 
-	/*
-	 * We've created all the minor nodes via cmlb_attach() using default
-	 * value in xdf_attach() to make it possible to block in xdf_open(),
-	 * in case there's anyone (say, booting thread) ever trying to open
-	 * it before connected to backend. We will refresh all those minor
-	 * nodes w/ latest info we've got now when we are almost connected.
-	 */
+	/* Create minor nodes now when we are almost connected */
 	mutex_enter(&vdp->xdf_dev_lk);
-	if (vdp->xdf_cmbl_reattach) {
-		vdp->xdf_cmbl_reattach = B_FALSE;
-
+	if (vdp->xdf_cmlb_reattach) {
+		vdp->xdf_cmlb_reattach = B_FALSE;
 		mutex_exit(&vdp->xdf_dev_lk);
 		if (xdf_cmlb_attach(vdp) != 0) {
+			cmn_err(CE_WARN,
+			    "xdf@%s: cmlb attach failed",
+			    ddi_get_name_addr(dip));
 			xdf_disconnect(vdp, XD_UNKNOWN, B_FALSE);
 			return;
 		}
@@ -1863,7 +1854,7 @@ xdf_setstate_connected(xdf_t *vdp)
 	if ((vdp->xdf_dinfo != dinfo) ||
 	    (!vdp->xdf_pgeom_fixed &&
 	    (memcmp(&vdp->xdf_pgeom, &pgeom, sizeof (pgeom)) != 0))) {
-		vdp->xdf_cmbl_reattach = B_TRUE;
+		vdp->xdf_cmlb_reattach = B_TRUE;
 
 		vdp->xdf_dinfo = dinfo;
 		if (!vdp->xdf_pgeom_fixed)
@@ -3476,7 +3467,7 @@ xdf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&vdp->xdf_dev_lk, NULL, MUTEX_DRIVER, (void *)ibc);
 	mutex_init(&vdp->xdf_cb_lk, NULL, MUTEX_DRIVER, (void *)ibc);
 	mutex_init(&vdp->xdf_iostat_lk, NULL, MUTEX_DRIVER, (void *)ibc);
-	vdp->xdf_cmbl_reattach = B_TRUE;
+	vdp->xdf_cmlb_reattach = B_TRUE;
 	if (dev_iscd) {
 		vdp->xdf_dinfo |= VDISK_CDROM;
 		vdp->xdf_mstate = DKIO_EJECTED;
@@ -3510,21 +3501,10 @@ xdf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vdp->xdf_pgeom_fixed = B_FALSE;
 
 	/*
-	 * Create default device minor nodes: non-removable disk.
-	 * We will adjust minor nodes after we are connected w/ backend.
-	 *
-	 * FIXME creating device minor nodes is currently disabled for CD
-	 * devices, re-enable once the issues with xdf CD devices are fixed.
+	 * Allocate the cmlb handle, minor nodes will be created once
+	 * the device is connected with backend.
 	 */
-	if (!dev_iscd) {
-		cmlb_alloc_handle(&vdp->xdf_vd_lbl);
-		if (xdf_cmlb_attach(vdp) != 0) {
-			cmn_err(CE_WARN,
-			    "xdf@%s: attach failed, cmlb attach failed",
-			    ddi_get_name_addr(dip));
-			goto errout0;
-		}
-	}
+	cmlb_alloc_handle(&vdp->xdf_vd_lbl);
 
 	/* We ship with cache-enabled disks */
 	vdp->xdf_wce = B_TRUE;
@@ -3653,7 +3633,6 @@ errout1:
 	xvdi_remove_event_handler(dip, XS_OE_STATE);
 errout0:
 	if (vdp->xdf_vd_lbl != NULL) {
-		cmlb_detach(vdp->xdf_vd_lbl, NULL);
 		cmlb_free_handle(&vdp->xdf_vd_lbl);
 		vdp->xdf_vd_lbl = NULL;
 	}
