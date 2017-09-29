@@ -265,11 +265,6 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 
 	if (ddi_copyin((void *)argp, &ioc_hdr, sizeof (ioc_hdr), flags))
 		return (EFAULT);
-	/* SMB_IOC_SVCENUM can be quite large.  See libsmb's smb_kmod.c. */
-	ioclen = MAX(ioc_hdr.len, sizeof (*ioc));
-	if (ioc_hdr.version != SMB_IOC_VERSION ||
-	    ioclen > sizeof (smb_ioc_svcenum_t) + SMB_IOC_DATA_SIZE)
-		return (EINVAL);
 
 	/*
 	 * Check version and length.
