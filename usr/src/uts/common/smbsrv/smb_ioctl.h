@@ -119,7 +119,7 @@ typedef	struct smb_ioc_opennum {
 #define	SMB_SVCENUM_TYPE_FILE	0x46494C45	/* 'FILE' */
 #define	SMB_SVCENUM_TYPE_SHARE	0x53484152	/* 'SHAR' */
 
-/* The enumeration ioctl needs a LOT of space.  We cap it here. */
+/* Maximum size of payload data an smbsrv ioctl may use. */
 #define	SMB_IOC_DATA_SIZE		(256 * 1024)
 
 typedef struct smb_svcenum {

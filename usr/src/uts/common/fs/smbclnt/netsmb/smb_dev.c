@@ -318,7 +318,7 @@ nsmb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
-	cred_t *cr, int *rvalp)
+    cred_t *cr, int *rvalp)
 {
 	smb_dev_t *sdp;
 	int err;
