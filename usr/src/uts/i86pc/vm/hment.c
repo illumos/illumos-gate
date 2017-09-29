@@ -21,8 +21,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -36,7 +37,6 @@
 #include <vm/hat_i86.h>
 #include <sys/cmn_err.h>
 #include <sys/avl.h>
-#include <sys/zone.h>
 
 
 /*
@@ -323,8 +323,6 @@ hment_insert(hment_t *hm, page_t *pp)
 		((hment_t *)pp->p_mapping)->hm_prev = hm;
 	pp->p_mapping = hm;
 
-	zone_add_page(pp);
-
 	/*
 	 * Add the hment to the system-wide hash table.
 	 */
@@ -466,7 +464,6 @@ hment_assign(htable_t *htable, uint_t entry, page_t *pp, hment_t *hm)
 		pp->p_embed = 1;
 		pp->p_mapping = htable;
 		pp->p_mlentry = entry;
-		zone_add_page(pp);
 		return;
 	}
 
@@ -548,7 +545,6 @@ hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 		pp->p_mapping = NULL;
 		pp->p_mlentry = 0;
 		pp->p_embed = 0;
-		zone_rm_page(pp);
 		return (NULL);
 	}
 
@@ -584,7 +580,6 @@ hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 	hm->hm_hashlink = null_avl_link;
 	hm->hm_next = NULL;
 	hm->hm_prev = NULL;
-	zone_rm_page(pp);
 
 	return (hm);
 }

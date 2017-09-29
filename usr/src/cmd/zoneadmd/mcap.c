@@ -28,18 +28,29 @@
  * the associated zone's physical memory.  A thread to do this is started
  * when the zone boots and is halted when the zone shuts down.
  *
- * The code obtains the accurate in-kernel RSS for the zone.
+ * Because of the way that the VM system is currently implemented, there is no
+ * way to go from the bottom up (page to process to zone).  Thus, there is no
+ * obvious way to hook an rctl into the kernel's paging code to enforce a hard
+ * memory cap.  Instead, we implement a soft physical memory cap which looks
+ * at the zone's overall rss and once it is over the cap, works from the top
+ * down (zone to process to page), looking at zone processes, to determine
+ * what to try to pageout to get the zone under its memory cap.
+ *
+ * The code uses the fast, cheap, but potentially very inaccurate sum of the
+ * rss values from psinfo_t to first approximate the zone's rss and will
+ * fallback to the vm_getusage syscall to determine the zone's rss if needed.
  * It then checks the rss against the zone's zone.max-physical-memory rctl.
  * Once the zone goes over its cap, then this thread will work through the
  * zone's /proc process list, Pgrab-bing each process and stepping through the
- * address space segments, using a private option (_RUSAGESYS_INVALMAP) to the
- * private SYS_rusagesys syscall to attempt to unload page translations, until
- * the zone is again under its cap.
+ * address space segments attempting to use pr_memcntl(...MS_INVALCURPROC...)
+ * to pageout pages, until the zone is again under its cap.
  *
  * Although zone memory capping is implemented as a soft cap by this user-level
  * thread, the interfaces around memory caps that are exposed to the user are
  * the standard ones; an rctl and kstats.  This thread uses the rctl value
- * to obtain the cap.
+ * to obtain the cap and works with the zone kernel code to update the kstats.
+ * If the implementation ever moves into the kernel, these exposed interfaces
+ * do not need to change.
  *
  * The thread adaptively sleeps, periodically checking the state of the
  * zone.  As the zone's rss gets closer to the cap, the thread will wake up
@@ -118,6 +129,14 @@
 #define	TUNE_NPAGE	"phys-mcap-no-pageout"
 #define	TUNE_NPFTHROT	"phys-mcap-no-pf-throttle"
 
+/*
+ * These are only used in get_mem_info but global. We always need scale_rss and
+ * prev_fast_rss to be persistent but we also have the other two global so we
+ * can easily see these with mdb.
+ */
+uint64_t	scale_rss = 0;
+uint64_t	prev_fast_rss = 0;
+uint64_t	fast_rss = 0;
 uint64_t	accurate_rss = 0;
 
 /*
@@ -140,6 +159,8 @@ static char	over_cmd[2 * BUFSIZ];	/* same size as zone_attr_value */
 static boolean_t skip_vmusage = B_FALSE;
 static boolean_t skip_pageout = B_FALSE;
 static boolean_t skip_pf_throttle = B_FALSE;
+
+static zlog_t	*logp;
 
 static int64_t check_suspend();
 static void get_mcap_tunables();
@@ -514,12 +535,127 @@ done:
 static uint64_t
 get_mem_info()
 {
+	uint64_t		n = 1;
+	zsd_vmusage64_t		buf;
+	uint64_t		tmp_rss;
+	DIR			*pdir = NULL;
+	struct dirent		*dent;
+
+	/*
+	 * Start by doing the fast, cheap RSS calculation using the rss value
+	 * in psinfo_t.  Because that's per-process, it can lead to double
+	 * counting some memory and overestimating how much is being used, but
+	 * as long as that's not over the cap, then we don't need do the
+	 * expensive calculation.
+	 *
+	 * If we have to do the expensive calculation, we remember the scaling
+	 * factor so that we can try to use that on subsequent iterations for
+	 * the fast rss.
+	 */
 	if (shutting_down)
 		return (0);
 
-	(void) zone_getattr(zid, ZONE_ATTR_RSS, &accurate_rss,
-	    sizeof (accurate_rss));
-	accurate_rss /= 1024;
+	if ((pdir = opendir(zoneproc)) == NULL)
+		return (0);
+
+	accurate_rss = 0;
+	fast_rss = 0;
+	while (!shutting_down && (dent = readdir(pdir)) != NULL) {
+		pid_t		pid;
+		int		psfd;
+		int64_t		rss;
+		char		pathbuf[MAXPATHLEN];
+		psinfo_t	psinfo;
+
+		if (strcmp(".", dent->d_name) == 0 ||
+		    strcmp("..", dent->d_name) == 0)
+			continue;
+
+		pid = atoi(dent->d_name);
+		if (pid == 0 || pid == 1)
+			continue;
+
+		(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%d/psinfo",
+		    zoneproc, pid);
+
+		rss = 0;
+		if ((psfd = open(pathbuf, O_RDONLY, 0000)) != -1) {
+			if (pread(psfd, &psinfo, sizeof (psinfo), 0) ==
+			    sizeof (psinfo))
+				rss = (int64_t)psinfo.pr_rssize;
+
+			(void) close(psfd);
+		}
+
+		fast_rss += rss;
+	}
+
+	(void) closedir(pdir);
+
+	if (shutting_down)
+		return (0);
+
+	debug("fast rss: %lluKB, scale: %llu, prev: %lluKB\n", fast_rss,
+	    scale_rss, prev_fast_rss);
+
+	/* see if we can get by with a scaled fast rss */
+	tmp_rss = fast_rss;
+	if (scale_rss > 1 && prev_fast_rss > 0) {
+		/*
+		 * Only scale the fast value if it hasn't ballooned too much
+		 * to trust.
+		 */
+		if (fast_rss / prev_fast_rss < 2) {
+			fast_rss /= scale_rss;
+			debug("scaled fast rss: %lluKB\n", fast_rss);
+		}
+	}
+
+	if (fast_rss <= zone_rss_cap || skip_vmusage) {
+		uint64_t zone_rss_bytes;
+
+		zone_rss_bytes = fast_rss * 1024;
+		/* Use the zone's approx. RSS in the kernel */
+		(void) zone_setattr(zid, ZONE_ATTR_RSS, &zone_rss_bytes, 0);
+		return (fast_rss);
+	}
+
+	buf.vmu_id = zid;
+
+	/* get accurate usage (cached data may be up to 5 seconds old) */
+	if (syscall(SYS_rusagesys, _RUSAGESYS_GETVMUSAGE, VMUSAGE_A_ZONE, 5,
+	    (uintptr_t)&buf, (uintptr_t)&n) != 0) {
+		debug("vmusage failed\n");
+		(void) sleep_shutdown(1);
+		return (0);
+	}
+
+	if (n > 1) {
+		/* This should never happen */
+		debug("vmusage returned more than one result\n");
+		(void) sleep_shutdown(1);
+		return (0);
+	}
+
+	if (buf.vmu_id != zid) {
+		/* This should never happen */
+		debug("vmusage returned the incorrect zone\n");
+		(void) sleep_shutdown(1);
+		return (0);
+	}
+
+	accurate_rss = buf.vmu_rss_all / 1024;
+
+	/* calculate scaling factor to use for fast_rss from now on */
+	if (accurate_rss > 0) {
+		scale_rss = fast_rss / accurate_rss;
+		debug("new scaling factor: %llu\n", scale_rss);
+		/* remember the fast rss when we had to get the accurate rss */
+		prev_fast_rss = tmp_rss;
+	}
+
+	debug("accurate rss: %lluKB, scale: %llu, prev: %lluKB\n", accurate_rss,
+	    scale_rss, prev_fast_rss);
 	return (accurate_rss);
 }
 
@@ -852,6 +988,75 @@ has_proc()
 }
 
 /*
+ * We run this loop for brands with no /proc to simply update the RSS, using
+ * the cheap GZ /proc data, every 5 minutes.
+ */
+static void
+no_procfs()
+{
+	DIR			*pdir = NULL;
+	struct dirent		*dent;
+	uint64_t		zone_rss_bytes;
+
+	(void) sleep_shutdown(30);
+	while (!shutting_down) {
+		/*
+		 * Just do the fast, cheap RSS calculation using the rss value
+		 * in psinfo_t.  Because that's per-process, it can lead to
+		 * double counting some memory and overestimating how much is
+		 * being used. Since there is no /proc in the zone, we use the
+		 * GZ /proc and check for the correct zone.
+		 */
+		if ((pdir = opendir("/proc")) == NULL)
+			return;
+
+		fast_rss = 0;
+		while (!shutting_down && (dent = readdir(pdir)) != NULL) {
+			pid_t		pid;
+			int		psfd;
+			int64_t		rss;
+			char		pathbuf[MAXPATHLEN];
+			psinfo_t	psinfo;
+
+			if (strcmp(".", dent->d_name) == 0 ||
+			    strcmp("..", dent->d_name) == 0)
+				continue;
+
+			pid = atoi(dent->d_name);
+			if (pid == 0 || pid == 1)
+				continue;
+
+			(void) snprintf(pathbuf, sizeof (pathbuf),
+			    "/proc/%d/psinfo", pid);
+
+			rss = 0;
+			if ((psfd = open(pathbuf, O_RDONLY, 0000)) != -1) {
+				if (pread(psfd, &psinfo, sizeof (psinfo), 0) ==
+				    sizeof (psinfo)) {
+					if (psinfo.pr_zoneid == zid)
+						rss = (int64_t)psinfo.pr_rssize;
+				}
+
+				(void) close(psfd);
+			}
+
+			fast_rss += rss;
+		}
+
+		(void) closedir(pdir);
+
+		if (shutting_down)
+			return;
+
+		zone_rss_bytes = fast_rss * 1024;
+		/* Use the zone's approx. RSS in the kernel */
+		(void) zone_setattr(zid, ZONE_ATTR_RSS, &zone_rss_bytes, 0);
+
+		(void) sleep_shutdown(300);
+	}
+}
+
+/*
  * Thread that checks zone's memory usage and when over the cap, goes through
  * the zone's process list trying to pageout processes to get under the cap.
  */
@@ -861,16 +1066,20 @@ mcap_zone()
 	DIR *pdir = NULL;
 	int64_t excess;
 
+	debug("thread startup\n");
+
+	get_mcap_tunables();
+
 	/*
-	 * If the zone has no /proc filesystem (e.g. KVM), we can't pageout any
-	 * processes. Terminate this thread.
+	 * If the zone has no /proc filesystem, we can't use the fast algorithm
+	 * to check RSS or pageout any processes. All we can do is periodically
+	 * update it's RSS kstat using the expensive sycall.
 	 */
 	if (!has_proc()) {
+		no_procfs();
+		debug("thread shutdown\n");
 		return;
 	}
-
-	debug("thread startup\n");
-	get_mcap_tunables();
 
 	/*
 	 * When first starting it is likely lots of other zones are starting
@@ -963,6 +1172,7 @@ create_mcap_thread(zlog_t *zlogp, zoneid_t id)
 
 	shutting_down = 0;
 	zid = id;
+	logp = zlogp;
 
 	/* all but the lx brand currently use /proc */
 	if (strcmp(brand_name, "lx") == 0) {

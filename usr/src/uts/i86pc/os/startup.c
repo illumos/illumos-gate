@@ -22,7 +22,7 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 /*
@@ -2603,7 +2603,6 @@ add_physmem_cb(page_t *pp, pfn_t pnum)
 	pp->p_mapping = NULL;
 	pp->p_embed = 0;
 	pp->p_share = 0;
-	pp->p_zoneid = ALL_ZONES;
 	pp->p_mlentry = 0;
 }
 

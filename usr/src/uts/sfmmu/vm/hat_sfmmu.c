@@ -24,7 +24,6 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Gary Mills
- * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -86,7 +85,6 @@
 #include <sys/fpu/fpusystm.h>
 #include <vm/mach_kpm.h>
 #include <sys/callb.h>
-#include <sys/zone.h>
 
 #ifdef	DEBUG
 #define	SFMMU_VALIDATE_HMERID(hat, rid, saddr, len)			\
@@ -935,7 +933,6 @@ static kphysm_setup_vector_t sfmmu_update_vec = {
 	}							\
 	pp->p_mapping = hme;					\
 	pp->p_share++;						\
-	zone_add_page(pp);					\
 }
 
 /*
@@ -956,7 +953,6 @@ static kphysm_setup_vector_t sfmmu_update_vec = {
 								\
 	ASSERT(pp->p_share > 0);				\
 	pp->p_share--;						\
-	zone_rm_page(pp);					\
 								\
 	if (hme->hme_prev) {					\
 		ASSERT(pp->p_mapping != hme);			\
@@ -7354,8 +7350,6 @@ retry:
 	tpp->p_mapping = NULL;
 	dpp->p_share = tpp->p_share;
 	tpp->p_share = 0;
-	dpp->p_zoneid = tpp->p_zoneid;
-	tpp->p_zoneid = ALL_ZONES;
 
 	while (index != 0) {
 		index = index >> 1;

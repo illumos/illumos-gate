@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -186,6 +186,8 @@ sysconfig(int which)
 		 * the phys. memory cap - zone's rss.  We always
 		 * report the system-wide value for the global zone, even
 		 * though memory capping can be used on the global zone too.
+		 * We use the cached value for the RSS since vm_getusage()
+		 * is so expensive and we don't need this value to be exact.
 		 */
 		if (!INGLOBALZONE(curproc) &&
 		    curproc->p_zone->zone_phys_mem_ctl != UINT64_MAX) {
