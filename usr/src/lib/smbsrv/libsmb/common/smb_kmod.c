@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -42,7 +43,6 @@
 #include <smbsrv/libsmb.h>
 
 #define	SMBDRV_DEVICE_PATH		"/dev/smbsrv"
-#define	SMB_IOC_DATA_SIZE		(256 * 1024)
 
 int smb_kmod_ioctl(int, smb_ioc_header_t *, uint32_t);
 

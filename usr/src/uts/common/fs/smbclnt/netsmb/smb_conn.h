@@ -275,8 +275,7 @@ void smb_fscb_set(smb_fscb_t *);
  * Mostly used in: smb_dev.c, smb_usr.c
  */
 typedef struct smb_dev {
-	dev_info_t	*sd_dip;	/* ptr to dev_info node */
-	struct cred	*sd_cred;	/* per dev credentails */
+	kmutex_t	sd_lock;
 	struct smb_vc	*sd_vc;		/* Reference to VC */
 	struct smb_share *sd_share;	/* Reference to share if any */
 	int		sd_level;	/* SMBL_VC, ... */
@@ -285,6 +284,7 @@ typedef struct smb_dev {
 	int		sd_flags;	/* State of connection */
 #define	NSMBFL_OPEN		0x0001
 #define	NSMBFL_IOD		0x0002
+#define	NSMBFL_IOCTL		0x0004
 	int		sd_smbfid;	/* library read/write */
 	zoneid_t	zoneid;		/* Zone id */
 } smb_dev_t;
