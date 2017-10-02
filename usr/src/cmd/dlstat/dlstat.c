@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
+
 #include <stdio.h>
 #include <ctype.h>
 #include <locale.h>
@@ -87,8 +91,6 @@ typedef struct show_history_state_s {
  * callback functions for printing output and error diagnostics.
  */
 static ofmt_cb_t print_default_cb;
-
-static void dlstat_ofmt_check(ofmt_status_t, boolean_t, ofmt_handle_t);
 
 typedef void cmdfunc_t(int, char **, const char *);
 
@@ -779,7 +781,7 @@ do_show_history(int argc, char *argv[], const char *use)
 		    &ofmt);
 
 	}
-	dlstat_ofmt_check(oferr, state.hs_parsable, ofmt);
+	ofmt_check(oferr, state.hs_parsable, ofmt, die, warn);
 	state.hs_ofmt = ofmt;
 
 	if (d_arg) {
@@ -1800,7 +1802,7 @@ do_show(int argc, char *argv[], const char *use)
 	}
 
 	oferr = ofmt_open(fields_str, oftemplate, ofmtflags, 0, &ofmt);
-	dlstat_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	show_link_stats(linkid, state, interval);
@@ -1979,7 +1981,7 @@ do_show_phys(int argc, char *argv[], const char *use)
 	}
 
 	oferr = ofmt_open(fields_str, oftemplate, ofmtflags, 0, &ofmt);
-	dlstat_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	show_link_stats(linkid, state, interval);
@@ -2189,7 +2191,7 @@ do_show_link(int argc, char *argv[], const char *use)
 	}
 
 	oferr = ofmt_open(fields_str, oftemplate, ofmtflags, 0, &ofmt);
-	dlstat_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 
 	state.ls_ofmt = ofmt;
 
@@ -2326,7 +2328,7 @@ do_show_aggr(int argc, char *argv[], const char *use)
 	}
 
 	oferr = ofmt_open(fields_str, oftemplate, ofmtflags, 0, &ofmt);
-	dlstat_ofmt_check(oferr, state.ls_parsable, ofmt);
+	ofmt_check(oferr, state.ls_parsable, ofmt, die, warn);
 	state.ls_ofmt = ofmt;
 
 	show_link_stats(linkid, state, interval);
@@ -2431,27 +2433,4 @@ print_default_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	value = (char *)ofarg->ofmt_cbarg + ofarg->ofmt_id;
 	(void) strlcpy(buf, value, bufsize);
 	return (B_TRUE);
-}
-
-static void
-dlstat_ofmt_check(ofmt_status_t oferr, boolean_t parsable,
-    ofmt_handle_t ofmt)
-{
-	char buf[OFMT_BUFSIZE];
-
-	if (oferr == OFMT_SUCCESS)
-		return;
-	(void) ofmt_strerror(ofmt, oferr, buf, sizeof (buf));
-	/*
-	 * All errors are considered fatal in parsable mode.
-	 * NOMEM errors are always fatal, regardless of mode.
-	 * For other errors, we print diagnostics in human-readable
-	 * mode and processs what we can.
-	 */
-	if (parsable || oferr == OFMT_ENOFIELDS) {
-		ofmt_close(ofmt);
-		die(buf);
-	} else {
-		warn(buf);
-	}
 }

@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _NVME_VAR_H
@@ -21,6 +22,7 @@
 #include <sys/sunddi.h>
 #include <sys/blkdev.h>
 #include <sys/taskq_impl.h>
+#include <sys/list.h>
 
 /*
  * NVMe driver state
@@ -70,6 +72,8 @@ struct nvme_dma {
 };
 
 struct nvme_cmd {
+	struct list_node nc_list;
+
 	nvme_sqe_t nc_sqe;
 	nvme_cqe_t nc_cqe;
 
@@ -109,6 +113,7 @@ struct nvme_qpair {
 	int nq_phase;
 
 	kmutex_t nq_mutex;
+	ksema_t nq_sema;
 };
 
 struct nvme {
@@ -158,7 +163,7 @@ struct nvme {
 	int n_pagesize;
 
 	int n_namespace_count;
-	int n_ioq_count;
+	uint16_t n_ioq_count;
 
 	nvme_identify_ctrl_t *n_idctl;
 
@@ -186,11 +191,9 @@ struct nvme {
 	uint32_t n_abort_failed;
 	uint32_t n_cmd_timeout;
 	uint32_t n_cmd_aborted;
-	uint32_t n_async_resubmit_failed;
 	uint32_t n_wrong_logpage;
 	uint32_t n_unknown_logpage;
 	uint32_t n_too_many_cookies;
-	uint32_t n_admin_queue_full;
 
 	/* errors detected by hardware */
 	uint32_t n_data_xfr_err;

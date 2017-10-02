@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
+
 #ifndef _OFMT_H
 #define	_OFMT_H
 
@@ -123,6 +127,8 @@
  * caller), the function ofmt_update_winsize(handle) may be called.
  */
 
+#include <sys/types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -202,6 +208,10 @@ extern void ofmt_update_winsize(ofmt_handle_t);
  * ofmt_strerror() provides error diagnostics in the buffer that it is passed.
  */
 extern char *ofmt_strerror(ofmt_handle_t, ofmt_status_t, char *, uint_t);
+
+extern void ofmt_check(ofmt_status_t oferr, boolean_t parsable,
+    ofmt_handle_t ofmt,
+    void (*die)(const char *, ...), void (*warn)(const char *, ...));
 
 #ifdef __cplusplus
 }

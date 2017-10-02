@@ -32,6 +32,7 @@
 #include <sys/disklabel.h>
 #include <sys/param.h>
 #include <bootstrap.h>
+#include <disk.h>
 #include <libzfs.h>
 
 #include <efi.h>
@@ -85,9 +86,9 @@ efi_parsedev(struct devdesc **dev, const char *devspec, const char **path)
 {
 	struct devdesc *idev;
 	struct devsw *dv;
+	int i, unit, err;
 	char *cp;
 	const char *np;
-	int i;
 
 	/* minimum length check */
 	if (strlen(devspec) < 2)
@@ -103,50 +104,73 @@ efi_parsedev(struct devdesc **dev, const char *devspec, const char **path)
 		return (ENOENT);
 
 	np = devspec + strlen(dv->dv_name);
+	idev = NULL;
+	err = 0;
 
-	if (dv->dv_type == DEVT_ZFS) {
-		int err;
+	switch (dv->dv_type) {
+	case DEVT_NONE:
+		break;
 
+	case DEVT_DISK:
+		idev = malloc(sizeof (struct disk_devdesc));
+		if (idev == NULL)
+			return (ENOMEM);
+
+		err = disk_parsedev((struct disk_devdesc *)idev, np, path);
+		if (err != 0)
+			goto fail;
+		break;
+
+	case DEVT_ZFS:
 		idev = malloc(sizeof (struct zfs_devdesc));
 		if (idev == NULL)
 			return (ENOMEM);
 
 		err = zfs_parsedev((struct zfs_devdesc *)idev, np, path);
-		if (err != 0) {
-			free(idev);
-			return (err);
-		}
-		cp = strchr(np + 1, ':');
-	} else {
+		if (err != 0)
+			goto fail;
+		break;
+
+	default:
 		idev = malloc(sizeof (struct devdesc));
 		if (idev == NULL)
 			return (ENOMEM);
 
-		idev->d_dev = dv;
-		idev->d_type = dv->dv_type;
-		idev->d_unit = -1;
+		unit = 0;
+		cp = (char *)np;
+
 		if (*np != '\0' && *np != ':') {
-			idev->d_unit = strtol(np, &cp, 0);
-			if (cp == np) {
-				idev->d_unit = -1;
-				free(idev);
-				return (EUNIT);
+			/* get unit number if present */
+			errno = 0;
+			unit = strtol(np, &cp, 0);
+			if (errno != 0 || cp == np) {
+				err = EUNIT;
+				goto fail;
 			}
 		}
+		if (*cp != '\0' && *cp != ':') {
+			err = EINVAL;
+			goto fail;
+		}
+
+		idev->d_unit = unit;
+		if (path != NULL)
+			*path = (*cp == '\0') ? cp : cp + 1;
+		break;
 	}
 
-	if (*cp != '\0' && *cp != ':') {
-		free(idev);
-		return (EINVAL);
-	}
+	idev->d_dev = dv;
+	idev->d_type = dv->dv_type;
 
-	if (path != NULL)
-		*path = (*cp == '\0') ? cp : cp + 1;
 	if (dev != NULL)
 		*dev = idev;
 	else
 		free(idev);
 	return (0);
+
+fail:
+	free(idev);
+	return (err);
 }
 
 char *
@@ -156,11 +180,15 @@ efi_fmtdev(void *vdev)
 	static char buf[SPECNAMELEN + 1];
 
 	switch (dev->d_type) {
-	case DEVT_ZFS:
-		return (zfs_fmtdev(dev));
 	case DEVT_NONE:
 		strlcpy(buf, "(no device)", sizeof (buf));
 		break;
+
+	case DEVT_DISK:
+		return (disk_fmtdev(vdev));
+
+	case DEVT_ZFS:
+		return (zfs_fmtdev(dev));
 
 	default:
 		snprintf(buf, sizeof (buf), "%s%d:", dev->d_dev->dv_name,

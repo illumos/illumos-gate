@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -260,19 +261,42 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 	uint32_t	crc;
 	boolean_t	copyout = B_FALSE;
 	int		rc = 0;
+	size_t		alloclen;
 
-	if (ddi_copyin((const void *)argp, &ioc_hdr, sizeof (smb_ioc_header_t),
-	    flags) || (ioc_hdr.version != SMB_IOC_VERSION))
+	if (ddi_copyin((void *)argp, &ioc_hdr, sizeof (ioc_hdr), flags))
 		return (EFAULT);
+
+	/*
+	 * Check version and length.
+	 *
+	 * Note that some ioctls (i.e. SMB_IOC_SVCENUM) have payload
+	 * data after the ioctl struct, in which case they specify a
+	 * length much larger than sizeof smb_ioc_t.  The theoretical
+	 * largest ioctl data is therefore the size of the union plus
+	 * the max size of the payload (which is SMB_IOC_DATA_SIZE).
+	 */
+	if (ioc_hdr.version != SMB_IOC_VERSION ||
+	    ioc_hdr.len < sizeof (ioc_hdr) ||
+	    ioc_hdr.len > (sizeof (*ioc) + SMB_IOC_DATA_SIZE))
+		return (EINVAL);
 
 	crc = ioc_hdr.crc;
 	ioc_hdr.crc = 0;
 	if (smb_crc_gen((uint8_t *)&ioc_hdr, sizeof (ioc_hdr)) != crc)
-		return (EFAULT);
+		return (EINVAL);
 
-	ioc = kmem_alloc(ioc_hdr.len, KM_SLEEP);
-	if (ddi_copyin((const void *)argp, ioc, ioc_hdr.len, flags)) {
-		kmem_free(ioc, ioc_hdr.len);
+	/*
+	 * Note that smb_ioc_t is a union, and callers set ioc_hdr.len
+	 * to the size of the actual union arm.  If some caller were to
+	 * set that size too small, we could end up passing under-sized
+	 * memory to one of the type-specific handler functions.  Avoid
+	 * that problem by allocating at least the size of the union,
+	 * (zeroed out) and then copy in the caller specified length.
+	 */
+	alloclen = MAX(ioc_hdr.len, sizeof (*ioc));
+	ioc = kmem_zalloc(alloclen, KM_SLEEP);
+	if (ddi_copyin((void *)argp, ioc, ioc_hdr.len, flags)) {
+		kmem_free(ioc, alloclen);
 		return (EFAULT);
 	}
 
@@ -325,11 +349,10 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 		break;
 	}
 	if ((rc == 0) && copyout) {
-		if (ddi_copyout((const void *)ioc, (void *)argp, ioc_hdr.len,
-		    flags))
+		if (ddi_copyout(ioc, (void *)argp, ioc_hdr.len, flags))
 			rc = EFAULT;
 	}
-	kmem_free(ioc, ioc_hdr.len);
+	kmem_free(ioc, alloclen);
 	return (rc);
 }
 

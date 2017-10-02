@@ -11,6 +11,7 @@
 
 #
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 #
@@ -36,6 +37,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	ofmt_print;
 	ofmt_strerror;
 	ofmt_update_winsize;
+	ofmt_check;
 
     local:
 	*;
