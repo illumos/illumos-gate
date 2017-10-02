@@ -234,11 +234,14 @@ typedef enum lxpr_nodetype {
 	LXPR_SYS_NET_COREDIR,		/* /proc/sys/net/core		*/
 	LXPR_SYS_NET_CORE_SOMAXCON,	/* /proc/sys/net/core/somaxconn	*/
 	LXPR_SYS_NET_IPV4DIR,		/* /proc/sys/net/ipv4		*/
+	LXPR_SYS_NET_IPV4_ICMP_EIB,	/* .../icmp_echo_ignore_broadcasts */
+	LXPR_SYS_NET_IPV4_IP_FORWARD,	/* .../net/ipv4/ip_forward */
 	LXPR_SYS_NET_IPV4_IP_LPORT_RANGE, /* .../net/ipv4/ip_local_port_range */
 	LXPR_SYS_NET_IPV4_TCP_FIN_TO,	/* /proc/sys/net/ipv4/tcp_fin_timeout */
 	LXPR_SYS_NET_IPV4_TCP_KA_INT,	/* .../net/ipv4/tcp_keepalive_intvl */
 	LXPR_SYS_NET_IPV4_TCP_KA_TIM,	/* .../net/ipv4/tcp_keepalive_time */
 	LXPR_SYS_NET_IPV4_TCP_MAX_SYN_BL, /* .../net/ipv4/tcp_max_syn_backlog */
+	LXPR_SYS_NET_IPV4_TCP_RETRY2,	/* /proc/sys/net/ipv4/tcp_retries2 */
 	LXPR_SYS_NET_IPV4_TCP_RMEM,	/* /proc/sys/net/ipv4/tcp_rmem */
 	LXPR_SYS_NET_IPV4_TCP_SACK,	/* /proc/sys/net/ipv4/tcp_sack */
 	LXPR_SYS_NET_IPV4_TCP_WINSCALE,	/* .../net/ipv4/tcp_window_scaling */

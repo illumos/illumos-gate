@@ -249,6 +249,8 @@ static void lxpr_read_sys_kernel_shmmax(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_shmmni(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_kernel_threads_max(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_core_somaxc(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_icmp_eib(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_ip_forward(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *,
     lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -256,6 +258,7 @@ static void lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *,
     lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_retry2(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_rwmem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_sack(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_winscale(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -272,6 +275,8 @@ static int lxpr_write_sys_fs_pipe_max(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 static int lxpr_write_sys_net_core_somaxc(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
+static int lxpr_write_sys_net_ipv4_icmp_eib(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *, uio_t *,
     cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, uio_t *, cred_t *,
@@ -281,6 +286,8 @@ static int lxpr_write_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, uio_t *,
 static int lxpr_write_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *, uio_t *,
     cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *, uio_t *,
+    cred_t *, caller_context_t *);
+static int lxpr_write_sys_net_ipv4_tcp_retry2(lxpr_node_t *, uio_t *,
     cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_rwmem(lxpr_node_t *, uio_t *,
     cred_t *, caller_context_t *);
@@ -600,11 +607,14 @@ static lxpr_dirent_t sys_net_coredir[] = {
  * ip(7p) & tcp(7p) man pages for the native descriptions.
  */
 static lxpr_dirent_t sys_net_ipv4dir[] = {
+	{ LXPR_SYS_NET_IPV4_ICMP_EIB,	"icmp_echo_ignore_broadcasts" },
+	{ LXPR_SYS_NET_IPV4_IP_FORWARD, "ip_forward" },
 	{ LXPR_SYS_NET_IPV4_IP_LPORT_RANGE, "ip_local_port_range" },
 	{ LXPR_SYS_NET_IPV4_TCP_FIN_TO,	"tcp_fin_timeout" },
 	{ LXPR_SYS_NET_IPV4_TCP_KA_INT,	"tcp_keepalive_intvl" },
 	{ LXPR_SYS_NET_IPV4_TCP_KA_TIM,	"tcp_keepalive_time" },
 	{ LXPR_SYS_NET_IPV4_TCP_MAX_SYN_BL, "tcp_max_syn_backlog" },
+	{ LXPR_SYS_NET_IPV4_TCP_RETRY2,	"tcp_retries2" },
 	{ LXPR_SYS_NET_IPV4_TCP_RMEM,	"tcp_rmem" },
 	{ LXPR_SYS_NET_IPV4_TCP_SACK,	"tcp_sack" },
 	{ LXPR_SYS_NET_IPV4_TCP_WINSCALE, "tcp_window_scaling" },
@@ -659,6 +669,8 @@ static wftab_t wr_tab[] = {
 	{LXPR_SYS_KERNEL_SHMMAX, NULL},
 	{LXPR_SYS_FS_PIPE_MAX, lxpr_write_sys_fs_pipe_max},
 	{LXPR_SYS_NET_CORE_SOMAXCON, lxpr_write_sys_net_core_somaxc},
+	{LXPR_SYS_NET_IPV4_ICMP_EIB, lxpr_write_sys_net_ipv4_icmp_eib},
+	{LXPR_SYS_NET_IPV4_IP_FORWARD, NULL},
 	{LXPR_SYS_NET_IPV4_IP_LPORT_RANGE,
 	    lxpr_write_sys_net_ipv4_ip_lport_range},
 	{LXPR_SYS_NET_IPV4_TCP_FIN_TO, lxpr_write_sys_net_ipv4_tcp_fin_to},
@@ -666,6 +678,7 @@ static wftab_t wr_tab[] = {
 	{LXPR_SYS_NET_IPV4_TCP_KA_TIM, lxpr_write_sys_net_ipv4_tcp_ka_tim},
 	{LXPR_SYS_NET_IPV4_TCP_MAX_SYN_BL,
 	    lxpr_write_sys_net_ipv4_tcp_max_syn_bl},
+	{LXPR_SYS_NET_IPV4_TCP_RETRY2, lxpr_write_sys_net_ipv4_tcp_retry2},
 	{LXPR_SYS_NET_IPV4_TCP_RMEM, lxpr_write_sys_net_ipv4_tcp_rwmem},
 	{LXPR_SYS_NET_IPV4_TCP_SACK, lxpr_write_sys_net_ipv4_tcp_sack},
 	{LXPR_SYS_NET_IPV4_TCP_WINSCALE, lxpr_write_sys_net_ipv4_tcp_winscale},
@@ -907,11 +920,14 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_invalid,		/* /proc/sys/net/core	*/
 	lxpr_read_sys_net_core_somaxc,	/* /proc/sys/net/core/somaxconn	*/
 	lxpr_read_invalid,		/* /proc/sys/net/ipv4	*/
+	lxpr_read_sys_net_ipv4_icmp_eib, /* .../icmp_echo_ignore_broadcasts */
+	lxpr_read_sys_net_ipv4_ip_forward, /* .../ipv4/ip_forward */
 	lxpr_read_sys_net_ipv4_ip_lport_range, /* ../ipv4/ip_local_port_range */
 	lxpr_read_sys_net_ipv4_tcp_fin_to, /* .../ipv4/tcp_fin_timeout */
 	lxpr_read_sys_net_ipv4_tcp_ka_int, /* .../ipv4/tcp_keepalive_intvl */
 	lxpr_read_sys_net_ipv4_tcp_ka_tim, /* .../ipv4/tcp_keepalive_time */
 	lxpr_read_sys_net_ipv4_tcp_max_syn_bl, /* ../ipv4/tcp_max_syn_backlog */
+	lxpr_read_sys_net_ipv4_tcp_retry2, /* .../ipv4/tcp_retries2 */
 	lxpr_read_sys_net_ipv4_tcp_rwmem, /* .../ipv4/tcp_rmem */
 	lxpr_read_sys_net_ipv4_tcp_sack, /* .../ipv4/tcp_sack */
 	lxpr_read_sys_net_ipv4_tcp_winscale, /* .../ipv4/tcp_window_scaling */
@@ -1065,11 +1081,14 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_lookup_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_lookup_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
+	lxpr_lookup_not_a_dir,		/* .../icmp_echo_ignore_broadcasts */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/ip_forward */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/ip_local_port_range */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_max_syn_backlog */
+	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_retries2 */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_rmem */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_sack */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_window_scaling */
@@ -1223,11 +1242,14 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_sys_net_coredir,	/* /proc/sys/net/core */
 	lxpr_readdir_not_a_dir,		/* /proc/sys/net/core/somaxconn */
 	lxpr_readdir_sys_net_ipv4dir,	/* /proc/sys/net/ipv4 */
+	lxpr_readdir_not_a_dir,		/* .../icmp_echo_ignore_broadcasts */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/ip_forward */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/ip_local_port_range */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_max_syn_backlog */
+	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_retries2 */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_rmem */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_sack */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_window_scaling */
@@ -4883,6 +4905,55 @@ lxpr_read_sys_net_core_somaxc(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
+ * icmp_echo_ignore_broadcasts
+ * integer; 0 or 1
+ *
+ * illumos: ndd /dev/ip ip_respond_to_echo_broadcast
+ * From the tunable guide: Control whether IPv4 responds to broadcast ICMPv4
+ * echo request. default: 1 (enabled)
+ * Not in ip(7p) man page.
+ *
+ * Note that the Linux setting is the inverse of the illumos value.
+ */
+/* ARGSUSED */
+static void
+lxpr_read_sys_net_ipv4_icmp_eib(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	ip_stack_t *ipst;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_ICMP_EIB);
+
+	ns = lxpr_netstack(lxpnp);
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	ipst = ns->netstack_ip;
+	lxpr_uiobuf_printf(uiobuf, "%d\n", !ipst->ips_ip_g_resp_to_echo_bcast);
+	netstack_rele(ns);
+}
+
+/*
+ * ip_forward
+ * integer; default: 0
+ *
+ * illumos: ndd /dev/ip ip_forwarding
+ * default: 0 (disabled)
+ * Forwarding is described in the ip(7p) man page. We do not support forwarding
+ * in lx at this time, thus we do not support Linux-ABI methods for
+ * enabling/disabling forwarding, and this is always 0.
+ */
+/* ARGSUSED */
+static void
+lxpr_read_sys_net_ipv4_ip_forward(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_IP_FORWARD);
+	lxpr_uiobuf_printf(uiobuf, "0\n");
+}
+
+/*
  * ip_local_port_range
  *
  * The low & high port number range.
@@ -5037,6 +5108,57 @@ lxpr_read_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	tcps = ns->netstack_tcp;
 	lxpr_uiobuf_printf(uiobuf, "%d\n", tcps->tcps_conn_req_max_q0);
 	netstack_rele(ns);
+}
+
+/*
+ * tcp_retries2
+ *
+ * Controls number of TCP retries for data packets. Often tuned down for HA
+ * configurations. RFC 1122 recommends at least 100 seconds for the timeout,
+ * which, for Linux, corresponds to a value of ~8. Oracle suggests a value of
+ * 3 for a RAC configuration, as do various HA tuning guides.
+ * integer; Ubuntu 16.04 default: 15
+ *
+ * illumos: There are 4 ndd parameters that are related to this:
+ *	tcp_rexmit_interval_initial:	 1000
+ *	tcp_rexmit_interval_min:	  400
+ *	tcp_rexmit_interval_max:	60000
+ * 	tcp_rexmit_interval_extra:	    0
+ * Not in tcp(7p) man page.
+ *
+ * From the tunables guide:
+ * tcp_rexmit_interval_initial is the initial retransmission timeout (RTO) for
+ * a TCP connection in milliseconds (ms).
+ * The interval_min value is the minimum RTO in ms.
+ * The interval_max value is the maximum RTO in ms.
+ * The extra value is an extra time (in ms) to add in to the RTO.
+ */
+/* ARGSUSED */
+static void
+lxpr_read_sys_net_ipv4_tcp_retry2(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t *tcps;
+	uint_t i, retry, rx_min, rx_max;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_RETRY2);
+
+	ns = lxpr_netstack(lxpnp);
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	rx_min = tcps->tcps_rexmit_interval_min;
+	rx_max = tcps->tcps_rexmit_interval_max;
+	netstack_rele(ns);
+
+	for (i = rx_min, retry = 0; i < rx_max; retry++) {
+		i *= 2;
+	}
+
+	lxpr_uiobuf_printf(uiobuf, "%u\n", retry);
 }
 
 /*
@@ -7191,6 +7313,45 @@ lxpr_xlate_ka_intvl(char *val, int size)
 	return (0);
 }
 
+/*
+ * Approximately translate the input count value into a reasonable
+ * _rexmit_interval_max timeout.
+ */
+static int
+lxpr_xlate_retry2(char *val, int size)
+{
+	long cnt;
+	char *ep;
+	uint_t i, rx_max;
+
+	if (lxpr_tokenize_num(val, &cnt, &ep) != 0)
+		return (EINVAL);
+	if (*ep != '\0')
+		return (EINVAL);
+
+	/*
+	 * The _rexmit_interval_max is limited to 2 hours, so a count of 15
+	 * or more will exceed that due to exponential backoff.
+	 */
+	if (cnt > 15)
+		cnt = 15;
+
+	rx_max = 400;	/* Start with default _rexmit_interval_min in ms */
+	for (i = 0; i < cnt; i++)
+		rx_max *= 2;
+
+	/*
+	 * The _rexmit_interval_max is limited to 2 hours, so if we went over
+	 * the limit, just use 2 hours (in ms).
+	 */
+	if (rx_max > (7200 * 1000))
+		rx_max = 7200 * 1000;
+
+	if (snprintf(val, size, "%u", rx_max) >= size)
+		return (EINVAL);
+	return (0);
+}
+
 static int
 lxpr_xlate_sack(char *val, int size)
 {
@@ -7206,6 +7367,63 @@ lxpr_xlate_sack(char *val, int size)
 	/* see comment on lxpr_read_sys_net_ipv4_tcp_sack */
 	if (snprintf(val, size, "%d", (flag == 0 ? 0 : 2)) >= size)
 		return (EINVAL);
+	return (0);
+}
+
+/*
+ * We're updating a property on the ip stack so we can't reuse
+ * lxpr_write_tcp_property.
+ */
+/* ARGSUSED */
+static int
+lxpr_write_sys_net_ipv4_icmp_eib(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	int error;
+	size_t olen;
+	char val[16];	/* big enough for a uint numeric string */
+	long flag;
+	char *ep;
+	netstack_t *ns;
+	ip_stack_t *ipst;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_ICMP_EIB);
+
+	if (uio->uio_loffset != 0)
+		return (EINVAL);
+
+	if (uio->uio_resid == 0)
+		return (0);
+
+	olen = uio->uio_resid;
+	if (olen > sizeof (val) - 1)
+		return (EINVAL);
+
+	bzero(val, sizeof (val));
+	error = uiomove(val, olen, UIO_WRITE, uio);
+	if (error != 0)
+		return (error);
+
+	if (val[olen - 1] == '\n')
+		val[olen - 1] = '\0';
+
+	if (val[0] == '\0') /* no input */
+		return (EINVAL);
+
+	if (lxpr_tokenize_num(val, &flag, &ep) != 0)
+		return (EINVAL);
+
+	if (*ep != '\0' || (flag != 0 && flag != 1))
+		return (EINVAL);
+
+	ns = lxpr_netstack(lxpnp);
+	if (ns == NULL)
+		return (EINVAL);
+
+	ipst = ns->netstack_ip;
+	ipst->ips_ip_g_resp_to_echo_bcast = !flag;
+
+	netstack_rele(ns);
 	return (0);
 }
 
@@ -7426,6 +7644,15 @@ lxpr_write_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *lxpnp, struct uio *uio,
 	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_MAX_SYN_BL);
 	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
 	    "_conn_req_max_q0", NULL));
+}
+
+static int
+lxpr_write_sys_net_ipv4_tcp_retry2(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_RETRY2);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    "_rexmit_interval_max", lxpr_xlate_retry2));
 }
 
 static int
