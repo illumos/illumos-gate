@@ -18,10 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  */
@@ -1776,14 +1777,13 @@ startup_modules(void)
 #else
 	/*
 	 * Initialize a handle for the boot cpu - others will initialize
-	 * as they startup.  Do not do this if we know we are in an HVM domU.
+	 * as they startup.
 	 */
-	if ((get_hwenv() & HW_XEN_HVM) == 0 &&
-	    (hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
-	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL &&
-	    is_x86_feature(x86_featureset, X86FSET_MCA)) {
+	if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
+	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL) {
+		if (is_x86_feature(x86_featureset, X86FSET_MCA))
 			cmi_mca_init(hdl);
-			CPU->cpu_m.mcpu_cmi_hdl = hdl;
+		CPU->cpu_m.mcpu_cmi_hdl = hdl;
 	}
 #endif	/* __xpv */
 
