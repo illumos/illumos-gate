@@ -53,6 +53,7 @@
 #include <netinet/tcp.h>
 #include <netinet/igmp.h>
 #include <netinet/icmp6.h>
+#include <inet/tcp_impl.h>
 #include <lx_errno.h>
 
 #include <sys/lx_brand.h>
@@ -2558,26 +2559,52 @@ static const lx_sockopt_map_t ltos_icmpv6_sockopts[LX_ICMP6_FILTER + 1] = {
 	{ ICMP6_FILTER, 0 }	/* ICMP6_FILTER	*/
 };
 
+/*
+ * Options marked as "in code" in their comment are handled in the
+ * lx_setsockopt_tcp() and lx_getsockopt_tcp() functions.
+ *
+ * For the Linux TCP_SYNCNT option (the number of SYN retransmits) we emulate
+ * that by interpreting the two connection interval settings:
+ *    TCP_CONN_NOTIFY_THRESHOLD
+ *	tcp_first_ctimer_threshold = tcps->tcps_ip_notify_cinterval
+ *    TCP_CONN_ABORT_THRESHOLD
+ *	tcp_second_ctimer_threshold = tcps->tcps_ip_abort_cinterval
+ * The system (re)transmits a SYN and performs a doubling backoff from the
+ * first timer until it passes the second timer. We determine the SYN count
+ * from these two values. Normally it will be 5. Also see the TCPS_SYN_SENT
+ * case in tcp_timer(); a tcp_second_ctimer_threshold value of 0 means to
+ * retransmit SYN indefinitely.
+ *
+ * For the Linux TCP_USER_TIMEOUT option we use our TCP_ABORT_THRESHOLD since
+ * this seems to be the closest match. This value is the
+ * tcp_second_timer_threshold, which gets initialized to the
+ * tcp_ip_abort_interval value. The tunable guide describes this as:
+ *     For a given TCP connection, if TCP has been retransmitting for
+ *     tcp_ip_abort_interval period of time and it has not received any
+ *     acknowledgment from the other endpoint during this period, TCP closes
+ *     this connection.
+ * The value is in milliseconds, which matches TCP_USER_TIMEOUT.
+ */
 static const lx_sockopt_map_t ltos_tcp_sockopts[LX_TCP_NOTSENT_LOWAT + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ TCP_NODELAY, sizeof (int) },		/* TCP_NODELAY		*/
-	{ TCP_MAXSEG, sizeof (int) },		/* TCP_MAXSEG		*/
+	{ TCP_MAXSEG, sizeof (int) },		/* TCP_MAXSEG - in code	*/
 	{ TCP_CORK, sizeof (int) },		/* TCP_CORK		*/
 	{ TCP_KEEPIDLE, sizeof (int) },		/* TCP_KEEPIDLE		*/
 	{ TCP_KEEPINTVL, sizeof (int) },	/* TCP_KEEPINTVL	*/
 	{ TCP_KEEPCNT, sizeof (int) },		/* TCP_KEEPCNT		*/
-	{ OPTNOTSUP, 0 },			/* TCP_SYNCNT		*/
+	{ OPTNOTSUP, 0 },			/* TCP_SYNCNT - in code	*/
 	{ TCP_LINGER2, sizeof (int) },		/* TCP_LINGER2		*/
-	{ OPTNOTSUP, 0 },			/* TCP_DEFER_ACCEPT	*/
-	{ OPTNOTSUP, 0 },			/* TCP_WINDOW_CLAMP	*/
+	{ OPTNOTSUP, 0 },			/* TCP_DEFER_ACCEPT - in code */
+	{ OPTNOTSUP, 0 },			/* TCP_WINDOW_CLAMP - in code */
 	{ OPTNOTSUP, 0 },			/* TCP_INFO		*/
-	{ OPTNOTSUP, 0 },			/* TCP_QUICKACK		*/
+	{ OPTNOTSUP, 0 },			/* TCP_QUICKACK - in code */
 	{ OPTNOTSUP, 0 },			/* TCP_CONGESTION	*/
 	{ OPTNOTSUP, 0 },			/* TCP_MD5SIG		*/
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },			/* TCP_THIN_LINEAR_TIMEOUTS */
 	{ OPTNOTSUP, 0 },			/* TCP_THIN_DUPACK	*/
-	{ OPTNOTSUP, 0 },			/* TCP_USER_TIMEOUT	*/
+	{ TCP_ABORT_THRESHOLD, sizeof (int) },	/* TCP_USER_TIMEOUT	*/
 	{ OPTNOTSUP, 0 },			/* TCP_REPAIR		*/
 	{ OPTNOTSUP, 0 },			/* TCP_REPAIR_QUEUE	*/
 	{ OPTNOTSUP, 0 },			/* TCP_QUEUE_SEQ	*/
@@ -2869,6 +2896,63 @@ lx_setsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t optlen)
 	cred_t *cr = CRED();
 	uint32_t rto_max, abrt_thresh;
 	boolean_t abrt_changed = B_FALSE, rto_max_changed = B_FALSE;
+
+	if (optname == LX_TCP_WINDOW_CLAMP || optname == LX_TCP_QUICKACK) {
+		/* It appears safe to lie and say we did these. */
+		return (0);
+	}
+
+	if (optname == LX_TCP_MAXSEG) {
+		/*
+		 * We can get, but not set, TCP_MAXSEG. However, it appears
+		 * safe to lie and say we did this. A future extension might
+		 * be to allow setting this before a connection is established.
+		 */
+		return (0);
+	}
+
+	if (optname == LX_TCP_SYNCNT) {
+		int intval;
+		uint64_t syn_last_backoff;
+		uint_t syn_cnt, syn_backoff, len;
+
+		/*
+		 * See the comment above the ltos_tcp_sockopts table for an
+		 * explanation of the TCP_SYNCNT emulation.
+		 */
+		if (optlen != sizeof (int)) {
+			return (EINVAL);
+		}
+		intval = *(int *)optval;
+		if (intval > 255) {
+			return (EINVAL);
+		}
+
+		len = sizeof (syn_backoff);
+		error = socket_getsockopt(so, IPPROTO_TCP,
+		    TCP_CONN_NOTIFY_THRESHOLD, &syn_backoff, &len, 0, cr);
+		if (error != 0)
+			return (error);
+
+		syn_last_backoff = syn_backoff;
+		for (syn_cnt = 0; syn_cnt < intval; syn_cnt++) {
+			syn_last_backoff *= 2;
+			/*
+			 * Since the tcps_ip_abort_cinterval is milliseconds and
+			 * stored as a uint_t, it's basically impossible to get
+			 * up to the Linux limit of 255 SYN retries due to the
+			 * doubling on the backoff.
+			 */
+			if (syn_last_backoff > UINT_MAX) {
+				return (EINVAL);
+			}
+		}
+
+		syn_backoff = (uint_t)syn_last_backoff;
+		error = socket_setsockopt(so, IPPROTO_TCP,
+		    TCP_CONN_ABORT_THRESHOLD, &syn_backoff, len, cr);
+		return (error);
+	}
 
 	if (optname == LX_TCP_DEFER_ACCEPT) {
 		int *intval;
@@ -3236,16 +3320,19 @@ static int
 lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 {
 	int error = 0;
+	cred_t *cr = CRED();
 	int *intval = (int *)optval;
 	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_tcp_sockopts);
 
 	switch (optname) {
-	case LX_TCP_CORK:
+	case LX_TCP_WINDOW_CLAMP:
+	case LX_TCP_QUICKACK:
 		/*
-		 * We do not support TCP_CORK but some apps rely on it.  Rather
-		 * than return an error we just return 0.  This isn't exactly a
-		 * lie, since this option really isn't set, but it's not the
-		 * whole truth either. Fortunately, we aren't under oath.
+		 * We do not support these options but some apps rely on them.
+		 * Rather than return an error we just return 0.  This isn't
+		 * exactly a lie, since the options really aren't set, but it's
+		 * not the whole truth either. Fortunately, we aren't under
+		 * oath.
 		 */
 		if (*optlen < sizeof (int)) {
 			error = EINVAL;
@@ -3253,6 +3340,42 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			*intval = 0;
 		}
 		*optlen = sizeof (int);
+		return (error);
+
+	case LX_TCP_SYNCNT:
+		/*
+		 * See the comment above the ltos_tcp_sockopts table for an
+		 * explanation of the TCP_SYNCNT emulation.
+		 */
+		if (*optlen < sizeof (int)) {
+			error = EINVAL;
+		} else {
+			uint_t syn_cnt, syn_backoff, syn_abortconn, len;
+
+			len = sizeof (syn_backoff);
+			error = socket_getsockopt(so, IPPROTO_TCP,
+			    TCP_CONN_NOTIFY_THRESHOLD, &syn_backoff, &len, 0,
+			    cr);
+			if (error != 0)
+				return (error);
+			error = socket_getsockopt(so, IPPROTO_TCP,
+			    TCP_CONN_ABORT_THRESHOLD, &syn_abortconn, &len, 0,
+			    cr);
+			if (error != 0)
+				return (error);
+
+			syn_cnt = 0;
+			while (syn_backoff < syn_abortconn) {
+				syn_cnt++;
+				syn_backoff *= 2;
+			}
+			if (syn_cnt > 255)	/* clamp to Linux limit */
+				syn_cnt = 255;
+
+			*intval = syn_cnt;
+			*optlen = sizeof (int);
+		}
+
 		return (error);
 
 	case LX_TCP_DEFER_ACCEPT:
@@ -3269,7 +3392,7 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			socklen_t len = sizeof (fi);
 
 			if ((error = socket_getsockopt(so, SOL_FILTER,
-			    FIL_LIST, fi, &len, 0, CRED())) != 0) {
+			    FIL_LIST, fi, &len, 0, cr)) != 0) {
 				*optlen = sizeof (int);
 				return (error);
 			}
@@ -3295,7 +3418,7 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 	}
 
 	error = socket_getsockopt(so, IPPROTO_TCP, optname, optval, optlen, 0,
-	    CRED());
+	    cr);
 	return (error);
 }
 
