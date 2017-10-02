@@ -381,20 +381,22 @@ main(int argc, CHAR16 *argv[])
 				case 'S':
 					if (argv[i][j + 1] == 0) {
 						if (i + 1 == argc) {
-							setenv("comconsole_speed", "115200", 1);
-						} else {
-							cpy16to8(&argv[i + 1][0], var,
+							strncpy(var, "115200",
 							    sizeof(var));
-							setenv("comconsole_speedspeed", var, 1);
+						} else {
+							CHAR16 *ptr;
+							ptr = &argv[i + 1][0];
+							cpy16to8(ptr, var,
+							    sizeof(var));
 						}
 						i++;
-						break;
 					} else {
 						cpy16to8(&argv[i][j + 1], var,
 						    sizeof(var));
-						setenv("comconsole_speed", var, 1);
-						break;
 					}
+					strncat(var, ",8,n,1,-", sizeof(var));
+					setenv("ttya-mode", var, 1);
+					break;
 				case 'v':
 					howto |= RB_VERBOSE;
 					break;
