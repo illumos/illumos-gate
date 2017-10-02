@@ -21,7 +21,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -160,8 +160,15 @@ ps_threadprint(uintptr_t addr, const void *data, void *private)
 	if (prt_flags & PS_PRTTHREADS)
 		mdb_printf("\tT  %?a <%b>\n", addr, t->t_state, t_state_bits);
 
-	if (prt_flags & PS_PRTLWPS)
-		mdb_printf("\tL  %?a ID: %u\n", t->t_lwp, t->t_tid);
+	if (prt_flags & PS_PRTLWPS) {
+		char name[THREAD_NAME_MAX];
+
+		mdb_printf("\tL  %?a ID: %u", t->t_lwp, t->t_tid);
+		if (thread_getname(addr, name, sizeof (name))) {
+			mdb_printf(" NAME: %s", name);
+		}
+		mdb_printf("\n");
+	}
 
 	return (WALK_NEXT);
 }

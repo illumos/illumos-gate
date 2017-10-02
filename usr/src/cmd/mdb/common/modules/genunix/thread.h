@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_THREAD_H
@@ -57,6 +59,8 @@ void stackinfo_help(void);
 void thread_state_to_text(uint_t, char *, size_t);
 int thread_text_to_state(const char *, uint_t *);
 void thread_walk_states(void (*)(uint_t, const char *, void *), void *);
+
+boolean_t thread_getname(uintptr_t, char *, size_t);
 
 #ifdef	__cplusplus
 }

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -133,29 +133,76 @@ lx_prctl(int opt, uintptr_t data)
 		return (0);
 	}
 
+	case LX_PR_GET_NAME: {
+		/*
+		 * We allow longer thread names than Linux for compatibility
+		 * with other OSes (Solaris, NetBSD) that also allow larger
+		 * names.  We just truncate (with NUL termination) if
+		 * the name is longer.
+		 */
+		char name[LX_PR_SET_NAME_NAMELEN] = { 0 };
+		kthread_t *t = curthread;
+
+		mutex_enter(&ttoproc(t)->p_lock);
+		if (t->t_name != NULL) {
+			(void) strlcpy(name, t->t_name, sizeof (name));
+		}
+		mutex_exit(&ttoproc(t)->p_lock);
+
+		/*
+		 * FWIW, the prctl(2) manpage says that the user-supplied
+		 * buffer should be at least 16 (LX_PR_SET_NAME_NAMELEN) bytes
+		 * long.
+		 */
+		if (copyout(name, (void *)data, LX_PR_SET_NAME_NAMELEN) != 0) {
+			return (set_errno(EFAULT));
+		}
+		return (0);
+	}
+
 	case LX_PR_SET_NAME: {
-		char name[LX_PR_SET_NAME_NAMELEN + 1];
-		proc_t *p = curproc;
+		char name[LX_PR_SET_NAME_NAMELEN] = { 0 };
+		kthread_t *t = curthread;
+		proc_t *p = ttoproc(t);
+		int ret;
+
+		ret = copyinstr((const char *)data, name, sizeof (name), NULL);
+		/*
+		 * prctl(2) explicitly states that over length strings are
+		 * silently truncated
+		 */
+		if (ret != 0 && ret != ENAMETOOLONG) {
+			return (set_errno(EFAULT));
+		}
+		name[LX_PR_SET_NAME_NAMELEN - 1] = '\0';
+
+		thread_setname(t, name);
+
 		/*
 		 * In Linux, PR_SET_NAME sets the name of the thread, not the
 		 * process.  Due to the historical quirks of Linux's asinine
 		 * thread model, this name is effectively the name of the
 		 * process (as visible via ps(1)) if the thread is the first of
 		 * its task group.  The first thread is therefore special, and
-		 * to best mimic Linux semantics (and absent a notion of
-		 * per-LWP names), we do nothing (but return success) on LWPs
-		 * other than LWP 1.
+		 * to best mimic Linux semantics we set the thread name, and if
+		 * we are setting LWP 1, we also update the name of the process.
 		 */
-		if (curthread->t_tid != 1) {
+		if (t->t_tid != 1) {
 			return (0);
 		}
-		if (copyin((void *)data, name, LX_PR_SET_NAME_NAMELEN) != 0) {
-			return (set_errno(EFAULT));
-		}
-		name[LX_PR_SET_NAME_NAMELEN] = '\0';
+
+		/*
+		 * We explicitly use t->t_name here instead of name in case
+		 * a thread has come in between the above thread_setname()
+		 * call and the setting of u_comm/u_psargs below.  On Linux,
+		 * one can also change the name of a thread (either itself or
+		 * another thread in the same process) via writing to /proc, so
+		 * while racy, this is no worse than what might happen on
+		 * Linux.
+		 */
 		mutex_enter(&p->p_lock);
-		(void) strncpy(p->p_user.u_comm, name, MAXCOMLEN + 1);
-		(void) strncpy(p->p_user.u_psargs, name, PSARGSZ);
+		(void) strncpy(p->p_user.u_comm, t->t_name, MAXCOMLEN + 1);
+		(void) strncpy(p->p_user.u_psargs, t->t_name, PSARGSZ);
 		mutex_exit(&p->p_lock);
 		return (0);
 	}

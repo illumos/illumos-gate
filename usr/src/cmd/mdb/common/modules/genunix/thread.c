@@ -24,11 +24,13 @@
  */
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
+#include <mdb/mdb_ctf.h>
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/lwp.h>
@@ -38,6 +40,7 @@
 #include <sys/disp.h>
 #include <sys/taskq_impl.h>
 #include <sys/stack.h>
+#include "thread.h"
 
 #ifndef	STACK_BIAS
 #define	STACK_BIAS	0
@@ -659,7 +662,12 @@ threadlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			else
 				mdb_printf(" %a()\n", t.t_startpc);
 		} else {
-			mdb_printf(" %s/%u\n", p.p_user.u_comm, t.t_tid);
+			char name[THREAD_NAME_MAX];
+
+			mdb_printf(" %s/%u", p.p_user.u_comm, t.t_tid);
+			if (thread_getname(addr, name, sizeof (name)))
+				mdb_printf(" [%s]", name);
+			mdb_printf("\n");
 		}
 	}
 
@@ -1002,6 +1010,49 @@ stackinfo_help(void)
 	    "-h shows history, dead kthreads that used their "
 	    "kernel stack the most\n");
 	mdb_printf(
-	    "\nSee Solaris Modular Debugger Guide for detailed usage.\n");
+	    "\nSee illumos Modular Debugger Guide for detailed usage.\n");
 	mdb_flush();
+}
+
+/* If the field is not present in the target, return an empty (0 length) name */
+boolean_t
+thread_getname(uintptr_t addr, char *namep, size_t namelen)
+{
+	mdb_ctf_id_t id;
+	ulong_t offset;
+	uintptr_t nameaddr;
+
+	bzero(namep, namelen);
+
+	if (mdb_ctf_lookup_by_name("kthread_t", &id) == -1)
+		return (B_FALSE);
+
+	if (mdb_ctf_offsetof(id, "t_name", &offset) == -1)
+		return (B_FALSE);
+
+	if (offset % 8 != 0) {
+		mdb_warn("kthread_t.t_name is not on a byte boundary");
+		return (B_FALSE);
+	}
+	offset /= 8;
+
+	if (mdb_vread(&nameaddr, sizeof (nameaddr), addr + offset) !=
+	    sizeof (nameaddr)) {
+		mdb_warn("could not read address of thread name buffer");
+		return (B_FALSE);
+	}
+
+	if (nameaddr != 0 && mdb_readstr(namep, namelen, addr + offset) == -1) {
+		mdb_warn("error reading thread name");
+		/*
+		 * Just to be safe -- if mdb_readstr() succeeds, it always
+		 * NUL terminates the output, but is unclear what it does
+		 * on failure.  In that case we attempt to show any partial
+		 * content w/ the warning in case it's useful, but explicity
+		 * NUL terminate to be safe.
+		 */
+		namep[namelen - 1] = '\0';
+	}
+
+	return (strlen(namep) > 0 ? B_TRUE : B_FALSE);
 }
