@@ -28,4 +28,4 @@ find_files "s.*" usr/src/common/atomic
 find_files "s.*" usr/src/common/dtrace
 find_files "s.*" usr/src/common/secflags
 find_files "s.*" usr/src/common/util
-find_files "s.*" usr/src/lib/common
+find_files "s.*" usr/src/lib/crt

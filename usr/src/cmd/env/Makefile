@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG= env
 XPG4PROG= env
@@ -44,8 +42,8 @@ $(PROG) $(XPG4): $$(OBJS)
 
 install: all $(ROOTPROG) $(ROOTXPG4PROG)
 
-values-xpg4.o: ../../lib/common/common/values-xpg4.c
-	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+values-xpg4.o: ../../lib/crt/common/values-xpg4.c
+	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg4.c
 
 clean:
 	$(RM) $(OBJS)

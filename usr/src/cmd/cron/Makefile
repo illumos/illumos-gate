@@ -184,8 +184,8 @@ objs.xpg4/%.o:		%.c
 objs.xpg4:
 	-@mkdir -p $@
 
-objs.xpg4/values-xpg4.o:	../../lib/common/common/values-xpg4.c
-	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+objs.xpg4/values-xpg4.o:	../../lib/crt/common/values-xpg4.c
+	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg4.c
 	$(POST_PROCESS_O)
 
 %.o:			$(SRC)/common/util/%.c

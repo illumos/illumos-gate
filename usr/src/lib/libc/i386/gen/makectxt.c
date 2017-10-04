@@ -64,8 +64,8 @@
  * files as well:
  *
  *  - lib/libc/i386/threads/machdep.c
- *  - lib/common/i386/crti.s
- *  - lib/common/i386/crt1.s
+ *  - lib/crt/i386/crti.s
+ *  - lib/crt/i386/crt1.s
  */
 #undef	STACK_ALIGN
 #define	STACK_ALIGN	16

@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -21,10 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-echo_file usr/src/lib/common/common/values-xpg4.c
+include ../Makefile.com
+
+install:	$(ROOTOBJECTS)

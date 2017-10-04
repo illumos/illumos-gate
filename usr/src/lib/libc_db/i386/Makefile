@@ -23,10 +23,8 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-CRTSRCS= ../../common/i386
+CRTSRCS= ../../crt/i386
 
 include ../Makefile.com
 

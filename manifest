@@ -4700,7 +4700,7 @@ f usr/lib/amd64/crt1.o 0644 root bin
 f usr/lib/amd64/crti.o 0644 root bin
 f usr/lib/amd64/crtn.o 0644 root bin
 f usr/lib/amd64/libficl-sys.so.4.1.0 0755 root bin
-f usr/lib/amd64/gcrt1.o 0644 root bin
+h usr/lib/amd64/gcrt1.o=usr/lib/amd64/crt1.o
 d usr/lib/amd64/gss 0755 root bin
 f usr/lib/amd64/gss/dh1024-0.so.1 0755 root bin
 s usr/lib/amd64/gss/dh1024-0.so=dh1024-0.so.1
@@ -5533,7 +5533,7 @@ f usr/lib/fwflash/verify/ses-SUN.so 0755 root bin
 s usr/lib/fwflash/verify/sgen-LSILOGIC.so=ses-SUN.so
 s usr/lib/fwflash/verify/sgen-SUN.so=ses-SUN.so
 f usr/lib/fwflash/verify/tavor-MELLANOX.so 0755 root bin
-f usr/lib/gcrt1.o 0644 root bin
+h usr/lib/gcrt1.o=usr/lib/crt1.o
 f usr/lib/getoptcvt 0555 root bin
 f usr/lib/gmsgfmt 0555 root bin
 d usr/lib/gss 0755 root bin

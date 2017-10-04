@@ -24,24 +24,32 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#include <sys/types.h>
-#include <math.h>
-
 /*
- * variables which differ depending on the
- * compilation mode
+ * __xpg6 (C99/SUSv3) was first introduced in Solaris 10.
  *
- * C Issue 4.2 compatibility mode
- * This file is linked into the a.out by default if
- * no compilation mode was specified or if the -Xt option
- * was specified - the linking occurs if there is an unresolved
- * reference to _lib_version
+ * This file is NOT linked into libc.  See xpg6.c.
+ * This value is linked into an application when the application is
+ * requesting conforming C99/SUSv3 behavior.  This is usually done
+ * with the c99 utility.
+ *
+ * __xpg6 is used to control certain behaviors between the C99 standard,
+ * the SUSv3 standard, and Solaris.  More explanation in inc/xpg6.h.
+ * The XPG6 C compiler utility (c99) will add an object file that contains an
+ * alternate definition for __xpg6.  The symbol interposition provided
+ * by the linker will allow libc to find that symbol instead.
+ *
+ * Possible settings are available and documented in inc/xpg6.h.
  */
 
-const enum version _lib_version = c_issue_4;
+/*
+ * This setting enables strictly conforming C99/SUSv3 behavior.
+ */
+
+#include "xpg6.h"
+
+unsigned int __xpg6 = _C99SUSv3_mode_ON;
+
+/*
+ * Also turn on XPG4 mode.
+ */
+int __xpg4 = 1;

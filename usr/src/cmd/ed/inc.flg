@@ -24,9 +24,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 echo_file usr/src/cmd/expr/compile.c
 echo_file usr/src/cmd/expr/mapfile-intf
-echo_file usr/src/lib/common/common/values-xpg4.c
-echo_file usr/src/lib/common/common/values-xpg6.c
