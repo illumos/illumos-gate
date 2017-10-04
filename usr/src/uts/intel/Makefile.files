@@ -353,6 +353,7 @@ LX_BRAND_OBJS  =		\
 	lx_signal.o		\
 	lx_signum.o		\
 	lx_socket.o		\
+	lx_splice.o		\
 	lx_stat.o		\
 	lx_sync.o		\
 	lx_syscall.o		\

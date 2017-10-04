@@ -103,7 +103,7 @@ lx_iovec_copyin(void *uiovp, int iovcnt, iovec_t *kiovp, ssize_t *count)
 	return (0);
 }
 
-static int
+int
 lx_read_common(file_t *fp, uio_t *uiop, size_t *nread, boolean_t positioned)
 {
 	vnode_t *vp = fp->f_vnode;
@@ -205,7 +205,7 @@ out:
 	return (error);
 }
 
-static int
+int
 lx_write_common(file_t *fp, uio_t *uiop, size_t *nwrite, boolean_t positioned)
 {
 	vnode_t *vp = fp->f_vnode;

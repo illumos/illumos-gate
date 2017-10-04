@@ -121,6 +121,9 @@ extern void lx_check_strict_failure(lx_lwp_data_t *);
 
 extern boolean_t lx_is_eventfd(file_t *);
 
+extern int lx_read_common(file_t *, uio_t *, size_t *, boolean_t);
+extern int lx_write_common(file_t *, uio_t *, size_t *, boolean_t);
+
 #endif
 
 #ifdef	__cplusplus

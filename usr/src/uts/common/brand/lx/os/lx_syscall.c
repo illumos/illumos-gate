@@ -836,7 +836,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"unshare",	lx_unshare,		0,		1}, /* 310 */
 	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 311 */
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 312 */
-	{"splice",	NULL,			NOSYS_NULL,	0}, /* 313 */
+	{"splice",	lx_splice,		LX_SYS_EBPARG6,	6}, /* 313 */
 	{"sync_file_range", lx_sync_file_range,	0,		4}, /* 314 */
 	{"tee",		NULL,			NOSYS_NULL,	0}, /* 315 */
 	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 316 */
@@ -1165,7 +1165,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"unshare",	lx_unshare,		0,		1}, /* 272 */
 	{"set_robust_list", lx_set_robust_list,	0,		2}, /* 273 */
 	{"get_robust_list", lx_get_robust_list,	0,		3}, /* 274 */
-	{"splice",	NULL,			NOSYS_NULL,	0}, /* 275 */
+	{"splice",	lx_splice,		0,		6}, /* 275 */
 	{"tee",		NULL,			NOSYS_NULL,	0}, /* 276 */
 	{"sync_file_range", lx_sync_file_range,	0,		4}, /* 277 */
 	{"vmsplice",	NULL,			NOSYS_NULL,	0}, /* 278 */

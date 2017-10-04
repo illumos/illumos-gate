@@ -104,10 +104,6 @@ static int fifo_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 static int fifo_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 	caller_context_t *);
 
-/* functions local to this file */
-static boolean_t fifo_stayfast_enter(fifonode_t *);
-static void fifo_stayfast_exit(fifonode_t *);
-
 /*
  * Define the data structures external to this file.
  */
@@ -645,7 +641,7 @@ fifo_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
  *    (3) write-only FIFO with no data
  *    (4) no data and FNDELAY flag is set.
  * Otherwise return
- *	EAGAIN if FNONBLOCK is set and no data to read
+ *	EAGAIN if FNONBLOCK is set and no data to read or FIFORDBLOCK is set
  *	EINTR if signal received while waiting for data
  *
  * While there is no data to read....
@@ -681,7 +677,7 @@ fifo_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *crp,
 	 * Check for data on our input queue
 	 */
 
-	while (fnp->fn_count == 0) {
+	while (fnp->fn_count == 0 || (fnp->fn_flag & FIFORDBLOCK) != 0) {
 		/*
 		 * No data on first attempt and no writer, then EOF
 		 */
@@ -731,6 +727,7 @@ fifo_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *crp,
 	}
 
 	ASSERT(fnp->fn_mp != NULL);
+	VERIFY((fnp->fn_flag & FIFORDBLOCK) == 0);
 
 	/* For pipes copy should not bypass cache */
 	uiop->uio_extflg |= UIO_COPY_CACHED;
@@ -771,6 +768,18 @@ fifo_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *crp,
 				if (!cv_wait_sig(&fnp->fn_wait_cv,
 				    &fn_lock->flk_lock))
 					goto trywake;
+
+				/*
+				 * If another thread snuck in and started to
+				 * consume data using read-blocking out of
+				 * the pipe while we were blocked in the
+				 * cv_wait, then since we have already consumed
+				 * some of the data out of the pipe we need
+				 * to return with a short read.
+				 */
+				if ((fnp->fn_flag & FIFORDBLOCK) != 0) {
+					goto trywake;
+				}
 
 				if (!(fnp->fn_flag & FIFOFAST))
 					goto stream_mode;
@@ -1987,7 +1996,7 @@ fifo_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp,
  * the lock.
  * If the fifo switches into stream mode while we are waiting, return failure.
  */
-static boolean_t
+boolean_t
 fifo_stayfast_enter(fifonode_t *fnp)
 {
 	ASSERT(MUTEX_HELD(&fnp->fn_lock->flk_lock));
@@ -2009,7 +2018,7 @@ fifo_stayfast_enter(fifonode_t *fnp)
  *	- threads wanting to turn into stream mode waiting in fifo_fastoff(),
  *	- other writers threads waiting in fifo_stayfast_enter().
  */
-static void
+void
 fifo_stayfast_exit(fifonode_t *fnp)
 {
 	fifonode_t *fn_dest = fnp->fn_dest;

@@ -137,6 +137,8 @@ typedef struct fifodata {
 #define	FIFOPOLLRBAND	0x20000
 #define	FIFOSTAYFAST	0x40000	/* don't turn into stream mode */
 #define	FIFOWAITMODE	0x80000	/* waiting for the possibility to change mode */
+/* Data on loan, block reads. Use in conjunction with FIFOSTAYFAST. */
+#define	FIFORDBLOCK	0x100000
 
 #define	FIFOHIWAT	(16 * 1024)
 #define	FIFOLOWAT	(0)
@@ -173,6 +175,8 @@ extern void	fifo_fastoff(fifonode_t *);
 extern struct streamtab *fifo_getinfo();
 extern void	fifo_wakereader(fifonode_t *, fifolock_t *);
 extern void	fifo_wakewriter(fifonode_t *, fifolock_t *);
+extern boolean_t fifo_stayfast_enter(fifonode_t *);
+extern void	fifo_stayfast_exit(fifonode_t *);
 
 #endif /* _KERNEL */
 

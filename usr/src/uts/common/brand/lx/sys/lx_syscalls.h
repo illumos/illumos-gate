@@ -239,6 +239,7 @@ extern long lx_shutdown();
 extern long lx_socket();
 extern long lx_socketcall();
 extern long lx_socketpair();
+extern long lx_splice();
 extern long lx_stat32();
 extern long lx_stat64();
 extern long lx_stime();
