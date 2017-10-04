@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -526,9 +526,9 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 	else
 		oprintf(fp, "  Current Speed: Unknown\n");
 
-	id_printf(fp, "	 L1 Cache: ", p.smbp_l1cache);
-	id_printf(fp, "	 L2 Cache: ", p.smbp_l2cache);
-	id_printf(fp, "	 L3 Cache: ", p.smbp_l3cache);
+	id_printf(fp, "  L1 Cache: ", p.smbp_l1cache);
+	id_printf(fp, "  L2 Cache: ", p.smbp_l2cache);
+	id_printf(fp, "  L3 Cache: ", p.smbp_l3cache);
 }
 
 static void
@@ -768,11 +768,11 @@ print_bytes(const uint8_t *data, size_t size, FILE *fp)
 	char buf[17];
 	uint8_t x;
 
-	oprintf(fp, "\n	 offset:   0 1 2 3  4 5 6 7  8 9 a b  c d e f  "
+	oprintf(fp, "\n  offset:   0 1 2 3  4 5 6 7  8 9 a b  c d e f  "
 	    "0123456789abcdef\n");
 
 	for (row = 0; row < rows; row++) {
-		oprintf(fp, "	 %#4lx: ", (ulong_t)row * 16);
+		oprintf(fp, "  %#6lx: ", (ulong_t)row * 16);
 		cols = MIN(size - row * 16, 16);
 
 		for (col = 0; col < cols; col++) {
@@ -814,7 +814,7 @@ print_memarray(smbios_hdl_t *shp, id_t id, FILE *fp)
 	    fp, "  ECC: %u", ma.smbma_ecc);
 
 	oprintf(fp, "  Number of Slots/Sockets: %u\n", ma.smbma_ndevs);
-	id_printf(fp, "	 Memory Error Data: ", ma.smbma_err);
+	id_printf(fp, "  Memory Error Data: ", ma.smbma_err);
 	oprintf(fp, "  Max Capacity: %llu bytes\n",
 	    (u_longlong_t)ma.smbma_size);
 }
@@ -826,8 +826,8 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_memdevice(shp, id, &md);
 
-	id_printf(fp, "	 Physical Memory Array: ", md.smbmd_array);
-	id_printf(fp, "	 Memory Error Data: ", md.smbmd_error);
+	id_printf(fp, "  Physical Memory Array: ", md.smbmd_array);
+	id_printf(fp, "  Memory Error Data: ", md.smbmd_error);
 
 	if (md.smbmd_twidth != -1u)
 		oprintf(fp, "  Total Width: %u bits\n", md.smbmd_twidth);
@@ -916,7 +916,7 @@ print_memarrmap(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_memarrmap(shp, id, &ma);
 
-	id_printf(fp, "	 Physical Memory Array: ", ma.smbmam_array);
+	id_printf(fp, "  Physical Memory Array: ", ma.smbmam_array);
 	oprintf(fp, "  Devices per Row: %u\n", ma.smbmam_width);
 
 	oprintf(fp, "  Physical Address: 0x%llx\n  Size: %llu bytes\n",
@@ -930,8 +930,8 @@ print_memdevmap(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	(void) smbios_info_memdevmap(shp, id, &md);
 
-	id_printf(fp, "	 Memory Device: ", md.smbmdm_device);
-	id_printf(fp, "	 Memory Array Mapped Address: ", md.smbmdm_arrmap);
+	id_printf(fp, "  Memory Device: ", md.smbmdm_device);
+	id_printf(fp, "  Memory Array Mapped Address: ", md.smbmdm_arrmap);
 
 	oprintf(fp, "  Physical Address: 0x%llx\n  Size: %llu bytes\n",
 	    (u_longlong_t)md.smbmdm_addr, (u_longlong_t)md.smbmdm_size);
