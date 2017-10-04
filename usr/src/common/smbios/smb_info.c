@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1262,6 +1262,59 @@ smbios_info_extmemdevice(smbios_hdl_t *shp, id_t id,
 	emdp->smbmdeve_drch = exmd.smbmdeve_dchan;
 	emdp->smbmdeve_ncs  = exmd.smbmdeve_ncs;
 	emdp->smbmdeve_cs = exmd.smbmdeve_cs;
+
+	return (0);
+}
+
+int
+smbios_info_powersup(smbios_hdl_t *shp, id_t id, smbios_powersup_t *psup)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_powersup_t psu;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_POWERSUP)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	/* The minimum length required by the spec is 0x10. */
+	if (stp->smbst_hdr->smbh_len < 0x10)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	bzero(psup, sizeof (*psup));
+	smb_info_bcopy(stp->smbst_hdr, &psu, sizeof (psu));
+	psup->smbps_group = psu.smbpsup_group;
+	psup->smbps_maxout = psu.smbpsup_max;
+
+	if (SMB_PSU_CHARS_ISHOT(psu.smbpsup_char))
+		psup->smbps_flags |= SMB_POWERSUP_F_HOT;
+	if (SMB_PSU_CHARS_ISPRES(psu.smbpsup_char))
+		psup->smbps_flags |= SMB_POWERSUP_F_PRESENT;
+	if (SMB_PSU_CHARS_ISUNPLUG(psu.smbpsup_char))
+		psup->smbps_flags |= SMB_POWERSUP_F_UNPLUG;
+
+	psup->smbps_ivrs = SMB_PSU_CHARS_IVRS(psu.smbpsup_char);
+	psup->smbps_status = SMB_PSU_CHARS_STATUS(psu.smbpsup_char);
+	psup->smbps_pstype = SMB_PSU_CHARS_TYPE(psu.smbpsup_char);
+
+	if (stp->smbst_hdr->smbh_len >= 0x12) {
+		psup->smbps_vprobe = psu.smbpsup_vprobe;
+	} else {
+		psup->smbps_vprobe = 0xffff;
+	}
+
+	if (stp->smbst_hdr->smbh_len >= 0x14) {
+		psup->smbps_cooldev = psu.smbpsup_cooldev;
+	} else {
+		psup->smbps_cooldev = 0xffff;
+	}
+
+	if (stp->smbst_hdr->smbh_len >= 0x16) {
+		psup->smbps_iprobe = psu.smbpsup_iprobe;
+	} else {
+		psup->smbps_iprobe = 0xffff;
+	}
 
 	return (0);
 }
