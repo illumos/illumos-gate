@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -397,6 +397,13 @@ typedef struct smb_powersup {
 	uint16_t smbpsup_cooldev;	/* cooling device handle */
 	uint16_t smbpsup_iprobe;	/* current probe handle */
 } smb_powersup_t;
+
+#define	SMB_PSU_CHARS_ISHOT(x)		((x) & 0x01)
+#define	SMB_PSU_CHARS_ISPRES(x)		((x) & 0x02)
+#define	SMB_PSU_CHARS_ISUNPLUG(x)	((x) & 0x04)
+#define	SMB_PSU_CHARS_IVRS(x)		(((x) >> 3) & 0xf)
+#define	SMB_PSU_CHARS_STATUS(x)		(((x) >> 7) & 0x7)
+#define	SMB_PSU_CHARS_TYPE(x)		(((x) >> 10) & 0xf)
 
 typedef struct smb_obdev_ext {
 	smb_header_t smbobe_hdr;	/* structure header */

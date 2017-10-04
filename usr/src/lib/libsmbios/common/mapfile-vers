@@ -20,6 +20,7 @@
 #
 #
 # Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright (c) 2017, Joyent, Inc.
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -98,6 +99,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_obdevs_ext;
 	smbios_info_port;
 	smbios_info_extport;
+	smbios_info_powersup;
 	smbios_info_processor;
 	smbios_info_extprocessor;
 	smbios_info_slot;
@@ -124,6 +126,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_onboard_type_desc;
 	smbios_port_conn_desc;
 	smbios_port_type_desc;
+	smbios_powersup_flag_desc;
+	smbios_powersup_flag_name;
+	smbios_powersup_input_desc;
+	smbios_powersup_status_desc;
+	smbios_powersup_type_desc;
 	smbios_processor_family_desc;
 	smbios_processor_status_desc;
 	smbios_processor_type_desc;

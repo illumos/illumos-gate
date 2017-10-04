@@ -22,6 +22,7 @@
 #
 #
 # Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright (c) 2017, Joyent, Inc.
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -47,6 +48,7 @@ SMB_CAT_	smbios_cache_ctype_name		uint_t
 SMB_CAF_	smbios_cache_flag_name		uint_t
 SMB_EVFL_	smbios_evlog_flag_name		uint_t
 SMB_IPMI_F_	smbios_ipmi_flag_name		uint_t
+SMB_POWERSUP_F_	smbios_powersup_flag_name	uint_t
 SMB_MDF_	smbios_memdevice_flag_name	uint_t
 SMB_PRC_	smbios_processor_core_flag_name	uint_t
 SMB_TYPE_ 	smbios_type_name		uint_t
@@ -76,6 +78,10 @@ SMB_EVM_	smbios_evlog_method_desc	uint_t
 SMB_HWSEC_PS_	smbios_hwsec_desc		uint_t
 SMB_IPMI_F_	smbios_ipmi_flag_desc		uint_t
 SMB_IPMI_T_	smbios_ipmi_type_desc		uint_t
+SMB_POWERSUP_F_	smbios_powersup_flag_desc	uint_t
+SMB_POWERSUP_I_	smbios_powersup_input_desc	uint_t
+SMB_POWERSUP_S_	smbios_powersup_status_desc	uint_t
+SMB_POWERSUP_T_	smbios_powersup_type_desc	uint_t
 SMB_MAL_	smbios_memarray_loc_desc	uint_t
 SMB_MAU_	smbios_memarray_use_desc	uint_t
 SMB_MAE_	smbios_memarray_ecc_desc	uint_t

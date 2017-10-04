@@ -57,6 +57,24 @@ static int opt_x;
 
 /*PRINTFLIKE2*/
 static void
+smbios_warn(smbios_hdl_t *shp, const char *format, ...)
+{
+	va_list ap;
+
+	va_start(ap, format);
+	(void) vfprintf(stderr, format, ap);
+	va_end(ap);
+
+	if (shp != NULL) {
+		(void) fprintf(stderr, ": %s",
+		    smbios_errmsg(smbios_errno(shp)));
+	}
+
+	(void) fprintf(stderr, "\n");
+}
+
+/*PRINTFLIKE2*/
+static void
 oprintf(FILE *fp, const char *format, ...)
 {
 	va_list ap;
@@ -526,9 +544,9 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 	else
 		oprintf(fp, "  Current Speed: Unknown\n");
 
-	id_printf(fp, "  L1 Cache: ", p.smbp_l1cache);
-	id_printf(fp, "  L2 Cache: ", p.smbp_l2cache);
-	id_printf(fp, "  L3 Cache: ", p.smbp_l3cache);
+	id_printf(fp, "  L1 Cache Handle: ", p.smbp_l1cache);
+	id_printf(fp, "  L2 Cache Handle: ", p.smbp_l2cache);
+	id_printf(fp, "  L3 Cache Handle: ", p.smbp_l3cache);
 }
 
 static void
@@ -998,6 +1016,47 @@ print_ipmi(smbios_hdl_t *shp, FILE *fp)
 }
 
 static void
+print_powersup(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_powersup_t p;
+
+	if (smbios_info_powersup(shp, id, &p) != 0) {
+		smbios_warn(shp, "failed to read power supply information");
+		return;
+	}
+
+	oprintf(fp, "  Power Supply Group: %u\n", p.smbps_group);
+	if (p.smbps_maxout != 0x8000) {
+		oprintf(fp, "  Maximum Output: %llu mW\n", p.smbps_maxout);
+	} else {
+		oprintf(fp, "  Maximum Output: unknown\n");
+	}
+
+	flag_printf(fp, "Characteristics", p.smbps_flags,
+	    sizeof (p.smbps_flags) * NBBY, smbios_powersup_flag_name,
+	    smbios_powersup_flag_desc);
+
+	desc_printf(smbios_powersup_input_desc(p.smbps_ivrs),
+	    fp, "  Input Voltage Range Switching: %u", p.smbps_ivrs);
+	desc_printf(smbios_powersup_status_desc(p.smbps_status),
+	    fp, "  Status: %u", p.smbps_status);
+	desc_printf(smbios_powersup_type_desc(p.smbps_pstype),
+	    fp, "  Type: %u", p.smbps_pstype);
+
+	if (p.smbps_vprobe != 0xffff) {
+		oprintf(fp, "  Voltage Probe Handle: %lu\n", p.smbps_vprobe);
+	}
+
+	if (p.smbps_cooldev != 0xffff) {
+		oprintf(fp, "  Cooling Device Handle: %lu\n", p.smbps_cooldev);
+	}
+
+	if (p.smbps_iprobe != 0xffff) {
+		oprintf(fp, "  Current Probe Handle: %lu\n", p.smbps_iprobe);
+	}
+}
+
+static void
 print_extprocessor(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	int i;
@@ -1203,6 +1262,10 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	case SMB_TYPE_IPMIDEV:
 		oprintf(fp, "\n");
 		print_ipmi(shp, fp);
+		break;
+	case SMB_TYPE_POWERSUP:
+		oprintf(fp, "\n");
+		print_powersup(shp, sp->smbstr_id, fp);
 		break;
 	case SMB_TYPE_OBDEVEXT:
 		oprintf(fp, "\n");
