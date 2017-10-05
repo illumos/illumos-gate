@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include "libscf_impl.h"
@@ -199,7 +200,7 @@ scf_get_msg(scf_msg_t msg)
 
 	case SCF_MSG_PATTERN_MULTIPARTIAL:
 		return (dgettext(TEXT_DOMAIN,
-		    "Partial FMRI matches multiple instances\n"));
+		    "Partial FMRI '%s' matches multiple instances:\n"));
 
 	default:
 		abort();
