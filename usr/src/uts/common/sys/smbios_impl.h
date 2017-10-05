@@ -67,6 +67,9 @@ typedef struct smb_header {
 	uint16_t smbh_hdl;		/* structure handle */
 } smb_header_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_BIOS.
+ */
 typedef struct smb_bios {
 	smb_header_t smbbi_hdr;		/* structure header */
 	uint8_t smbbi_vendor;		/* bios vendor string */
@@ -78,6 +81,9 @@ typedef struct smb_bios {
 	uint8_t smbbi_xcflags[1];	/* bios characteristics extensions */
 } smb_bios_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_SYSTEM.
+ */
 typedef struct smb_system {
 	smb_header_t smbsi_hdr;		/* structure header */
 	uint8_t smbsi_manufacturer;	/* manufacturer */
@@ -90,6 +96,9 @@ typedef struct smb_system {
 	uint8_t smbsi_family;		/* family */
 } smb_system_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_BASEBOARD.
+ */
 typedef struct smb_bboard {
 	smb_header_t smbbb_hdr;		/* structure header */
 	uint8_t smbbb_manufacturer;	/* manufacturer */
@@ -105,6 +114,9 @@ typedef struct smb_bboard {
 	uint16_t smbbb_cv[1];		/* array of contained handles */
 } smb_bboard_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_CHASSIS.
+ */
 typedef struct smb_chassis {
 	smb_header_t smbch_hdr;		/* structure header */
 	uint8_t smbch_manufacturer;	/* manufacturer */
@@ -129,6 +141,9 @@ typedef struct smb_chassis {
 	(smbcp)->smbch_cv + ((smbcp)->smbch_cn * (smbcp)->smbch_cm))
 #define	SMB_CHT_LOCK	0x80		/* lock bit within smbch_type */
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_PROCESSOR.
+ */
 typedef struct smb_processor {
 	smb_header_t smbpr_hdr;		/* structure header */
 	uint8_t smbpr_socket;		/* socket designation */
@@ -159,6 +174,9 @@ typedef struct smb_processor {
 	uint16_t smbpr_threadcount2;	/* second number of enabled threads */
 } smb_processor_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_CACHE.
+ */
 typedef struct smb_cache {
 	smb_header_t smbca_hdr;		/* structure header */
 	uint8_t smbca_socket;		/* socket designation */
@@ -193,6 +211,9 @@ typedef struct smb_cache {
 #define	SMB_CACHE_CFG_SOCKETED(c)	(((c) >> 3) & 1)
 #define	SMB_CACHE_CFG_LEVEL(c)		(((c) & 7) + 1)
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_PORT.
+ */
 typedef struct smb_port {
 	smb_header_t smbpo_hdr;		/* structure header */
 	uint8_t smbpo_iref;		/* internal reference designator */
@@ -202,6 +223,9 @@ typedef struct smb_port {
 	uint8_t smbpo_ptype;		/* port type */
 } smb_port_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_SLOT.
+ */
 typedef struct smb_slot {
 	smb_header_t smbsl_hdr;		/* structure header */
 	uint8_t smbsl_name;		/* reference designation */
@@ -217,6 +241,9 @@ typedef struct smb_slot {
 	uint8_t smbsl_df;		/* device/function number */
 } smb_slot_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_OBDEVS.
+ */
 typedef struct smb_obdev {
 	uint8_t smbob_type;		/* encoded type and enable bit */
 	uint8_t smbob_name;		/* description string */
@@ -224,11 +251,18 @@ typedef struct smb_obdev {
 
 #define	SMB_OBT_ENABLED		0x80	/* enable bit within smbob_type */
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_OEMSTR, SMB_TYPE_SYSCONFSTR,
+ * and SMB_TYPE_LANG.
+ */
 typedef struct smb_strtab {
 	smb_header_t smbtb_hdr;		/* structure header */
 	uint8_t smbtb_count;		/* number of strings */
 } smb_strtab_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_LANG.
+ */
 typedef struct smb_lang {
 	smb_header_t smblang_hdr;	/* structure header */
 	uint8_t smblang_num;		/* number of installed languages */
@@ -237,6 +271,9 @@ typedef struct smb_lang {
 	uint8_t smblang_cur;		/* current language string */
 } smb_lang_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_EVENTLOG.
+ */
 typedef struct smb_sel {
 	smb_header_t smbsel_hdr;	/* structure header */
 	uint16_t smbsel_len;		/* log area length */
@@ -252,6 +289,9 @@ typedef struct smb_sel {
 	uint8_t smbsel_typev[1];	/* array of type descriptors */
 } smb_sel_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_MEMARRAY.
+ */
 typedef struct smb_memarray {
 	smb_header_t smbmarr_hdr;	/* structure header */
 	uint8_t smbmarr_loc;		/* location */
@@ -263,6 +303,9 @@ typedef struct smb_memarray {
 	uint64_t smbmarr_extcap;	/* extended maximum capacity */
 } smb_memarray_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_MEMARRAYMAP.
+ */
 typedef struct smb_memarrmap {
 	smb_header_t smbamap_hdr;	/* structure header */
 	uint32_t smbamap_start;		/* starting address in kilobytes */
@@ -273,6 +316,9 @@ typedef struct smb_memarrmap {
 	uint64_t smbamap_extend;	/* extended ending address in bytes */
 } smb_memarrmap_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_MEMDEVICE.
+ */
 typedef struct smb_memdevice {
 	smb_header_t smbmdev_hdr;	/* structure header */
 	uint16_t smbmdev_array;		/* array handle */
@@ -301,6 +347,9 @@ typedef struct smb_memdevice {
 
 #define	SMB_MDS_KBYTES		0x8000	/* size in specified in kilobytes */
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_MEMDEVICEMAP.
+ */
 typedef struct smb_memdevmap {
 	smb_header_t smbdmap_hdr;	/* structure header */
 	uint32_t smbdmap_start;		/* starting address in kilobytes */
@@ -314,6 +363,9 @@ typedef struct smb_memdevmap {
 	uint64_t smbdmap_extend;	/* extended ending address */
 } smb_memdevmap_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_BATTERY.
+ */
 typedef struct smb_battery {
 	smb_header_t smbbat_hdr;	/* structure header */
 	uint8_t smbbat_loc;		/* location */
@@ -333,6 +385,9 @@ typedef struct smb_battery {
 	uint32_t smbbat_oemdata;	/* OEM-specific data */
 } smb_battery_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_SECURITY.
+ */
 typedef struct smb_hwsec {
 	smb_header_t smbhs_hdr;		/* structure header */
 	uint8_t smbhs_settings;		/* settings byte */
@@ -343,12 +398,104 @@ typedef struct smb_hwsec {
 #define	SMB_HWS_ADM_PS(x)	(((x) & 0x0C) >> 2)
 #define	SMB_HWS_PAN_PS(x)	(((x) & 0x03) >> 0)
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_VPROBE.
+ */
+typedef struct smb_vprobe {
+	smb_header_t smbvpr_hdr;	/* structure header */
+	uint8_t smbvpr_descr;		/* description string */
+	uint8_t smbvpr_locstat;		/* location and status */
+	uint16_t smbvpr_maxval;		/* maximum voltage */
+	uint16_t smbvpr_minval;		/* minimum voltage */
+	uint16_t smbvpr_resolution;	/* probe resolution */
+	uint16_t smbvpr_tolerance;	/* probe tolerance */
+	uint16_t smbvpr_accuracy;	/* probe accuracy */
+	uint32_t smbvpr_oem;		/* vendor-specific data */
+	uint16_t smbvpr_nominal;	/* nominal value */
+} smb_vprobe_t;
+
+#define	SMB_VPROBE_MINLEN		0x14
+#define	SMB_VPROBE_NOMINAL_MINLEN	0x16
+
+#define	SMB_VPROBE_LOCATION(x)	((x) & 0x1f)
+#define	SMB_VPROBE_STATUS(x)	(((x) >> 5) & 0x7)
+
+/*
+ * SMBIOS implementation structure for SMB_TYPE_COOLDEV.
+ */
+typedef struct smb_cooldev {
+	smb_header_t smbcdev_hdr;	/* structure header */
+	uint16_t smbcdev_tprobe;	/* temperature probe */
+	uint8_t smbcdev_typstat;	/* type and status */
+	uint8_t smbcdev_group;		/* group identifier */
+	uint32_t smbcdev_oem;		/* vendor-specific data */
+	uint16_t smbcdev_nominal;	/* nominal value */
+	uint8_t smbcdev_descr;		/* description string */
+} smb_cooldev_t;
+
+#define	SMB_COOLDEV_MINLEN		0x0c
+#define	SMB_COOLDEV_NOMINAL_MINLEN	0x0e
+#define	SMB_COOLDEV_DESCR_MINLEN	0x0f
+
+#define	SMB_COOLDEV_TYPE(x)	((x) & 0x1f)
+#define	SMB_COOLDEV_STATUS(x)	(((x) >> 5) & 0x7)
+
+/*
+ * SMBIOS implementation structure for SMB_TYPE_TPROBE.
+ */
+typedef struct smb_tprobe {
+	smb_header_t smbtpr_hdr;	/* structure header */
+	uint8_t smbtpr_descr;		/* description string */
+	uint8_t smbtpr_locstat;		/* location and status */
+	uint16_t smbtpr_maxval;		/* maximum temperature */
+	uint16_t smbtpr_minval;		/* minimum temperature */
+	uint16_t smbtpr_resolution;	/* probe resolution */
+	uint16_t smbtpr_tolerance;	/* probe tolerance */
+	uint16_t smbtpr_accuracy;	/* probe accuracy */
+	uint32_t smbtpr_oem;		/* vendor-specific data */
+	uint16_t smbtpr_nominal;	/* nominal value */
+} smb_tprobe_t;
+
+#define	SMB_TPROBE_MINLEN		0x14
+#define	SMB_TPROBE_NOMINAL_MINLEN	0x16
+
+#define	SMB_TPROBE_LOCATION(x)	((x) & 0x1f)
+#define	SMB_TPROBE_STATUS(x)	(((x) >> 5) & 0x7)
+
+/*
+ * SMBIOS implementation structure for SMB_TYPE_IPROBE.
+ */
+typedef struct smb_iprobe {
+	smb_header_t smbipr_hdr;	/* structure header */
+	uint8_t smbipr_descr;		/* description string */
+	uint8_t smbipr_locstat;		/* location and status */
+	uint16_t smbipr_maxval;		/* maximum current */
+	uint16_t smbipr_minval;		/* minimum current */
+	uint16_t smbipr_resolution;	/* probe resolution */
+	uint16_t smbipr_tolerance;	/* probe tolerance */
+	uint16_t smbipr_accuracy;	/* probe accuracy */
+	uint32_t smbipr_oem;		/* vendor-specific data */
+	uint16_t smbipr_nominal;	/* nominal value */
+} smb_iprobe_t;
+
+#define	SMB_IPROBE_MINLEN		0x14
+#define	SMB_IPROBE_NOMINAL_MINLEN	0x16
+
+#define	SMB_IPROBE_LOCATION(x)	((x) & 0x1f)
+#define	SMB_IPROBE_STATUS(x)	(((x) >> 5) & 0x7)
+
+/*
+ * SMBIOS implementation structure for SMB_TYPE_BOOT.
+ */
 typedef struct smb_boot {
 	smb_header_t smbbo_hdr;		/* structure header */
 	uint8_t smbbo_pad[6];		/* reserved for future use */
 	uint8_t smbbo_status[1];	/* variable-length status buffer */
 } smb_boot_t;
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_IPMIDEV.
+ */
 typedef struct smb_ipmi {
 	smb_header_t smbipm_hdr;	/* structure header */
 	uint8_t smbipm_type;		/* interface type */
@@ -381,6 +528,9 @@ typedef struct smb_ipmi {
 #define	SMB_IPM_IMODE_EDGE	0
 #define	SMB_IPM_IMODE_LEVEL	1
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_POWERSUP.
+ */
 typedef struct smb_powersup {
 	smb_header_t smbpsup_hdr;	/* structure header */
 	uint8_t smbpsup_group;		/* group id */
@@ -405,6 +555,9 @@ typedef struct smb_powersup {
 #define	SMB_PSU_CHARS_STATUS(x)		(((x) >> 7) & 0x7)
 #define	SMB_PSU_CHARS_TYPE(x)		(((x) >> 10) & 0xf)
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_OBDEVEXT.
+ */
 typedef struct smb_obdev_ext {
 	smb_header_t smbobe_hdr;	/* structure header */
 	uint8_t smbobe_name;		/* reference designation */
@@ -415,6 +568,9 @@ typedef struct smb_obdev_ext {
 	uint8_t smbobe_df;		/* device/function number */
 } smb_obdev_ext_t;
 
+/*
+ * SMBIOS implementation structure for SUN_OEM_EXT_PROCESSOR.
+ */
 typedef struct smb_processor_ext {
 	smb_header_t smbpre_hdr;	/* structure header */
 	uint16_t smbpre_processor;	/* processor handle */
@@ -423,6 +579,9 @@ typedef struct smb_processor_ext {
 	uint16_t smbpre_apicid[1];	/* strand initial apic id */
 } smb_processor_ext_t;
 
+/*
+ * SMBIOS implementation structure for SUN_OEM_EXT_PORT.
+ */
 typedef struct smb_port_ext {
 	smb_header_t smbpoe_hdr;	/* structure header */
 	uint16_t smbpoe_chassis;	/* chassis handle */
@@ -432,12 +591,18 @@ typedef struct smb_port_ext {
 	uint8_t smbpoe_phy;		/* PHY number */
 } smb_port_ext_t;
 
+/*
+ * SMBIOS implementation structure for SUN_OEM_PCIEXRC.
+ */
 typedef struct smb_pciexrc {
 	smb_header_t smbpciexrc_hdr;	/* structure header */
 	uint16_t smbpciexrc_bboard;	/* base board handle */
 	uint16_t smbpciexrc_bdf;	/* PCI Bus/Dev/Func */
 } smb_pciexrc_t;
 
+/*
+ * SMBIOS implementation structure for SUN_OEM_EXT_MEMARRAY.
+ */
 typedef struct smb_memarray_ext {
 	smb_header_t smbmarre_hdr;	/* structure header */
 	uint16_t smbmarre_ma;		/* memory array handle */
@@ -445,6 +610,9 @@ typedef struct smb_memarray_ext {
 	uint16_t smbmarre_bdf;		/* PCI bus/dev/funct */
 } smb_memarray_ext_t;
 
+/*
+ * SMBIOS implementation structure for SUN_OEM_EXT_MEMDEVICE.
+ */
 typedef struct smb_memdevice_ext {
 	smb_header_t smbmdeve_hdr;	/* structure header */
 	uint16_t smbmdeve_mdev;		/* memory device handle */
@@ -491,7 +659,7 @@ struct smbios_hdl {
 #define	SMB_RANGE_LIMIT	0xFFFFF		/* limit of physical address range */
 #define	SMB_SCAN_STEP	16		/* stepping by paragraph */
 
-#define	SMB_MAJMIN(M, m)	((((M) & 0xFF) << 16) | ((m) & 0xFF))
+#define	SMB_MAJMIN(M, m)	((((M) & 0xFF) << 8) | ((m) & 0xFF))
 #define	SMB_MAJOR(v)		(((v) & 0xFF00) >> 8)
 #define	SMB_MINOR(v)		(((v) & 0x00FF))
 

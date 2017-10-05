@@ -1297,6 +1297,156 @@ typedef struct smbios_hwsec {
 #define	SMB_HWSEC_PS_UNKNOWN	0x03	/* password status unknown */
 
 /*
+ * This value is used to represent a probe that has an unknown value.
+ */
+#define	SMB_PROBE_UNKNOWN_VALUE	0x8000
+
+/*
+ * SMBIOS Voltage Probe.  See DSP0134 Section 7.27 for more information.
+ * Please see the specification for the units of each value.
+ */
+typedef struct smbios_vprobe {
+	const char *smbvp_description;	/* description information */
+	uint8_t smbvp_location;		/* probe location */
+	uint8_t smbvp_status;		/* probe status */
+	uint16_t smbvp_maxval;		/* maximum voltage */
+	uint16_t smbvp_minval;		/* minimum voltage */
+	uint16_t smbvp_resolution;	/* probe resolution */
+	uint16_t smbvp_tolerance;	/* probe tolerance */
+	uint16_t smbvp_accuracy;	/* probe accuracy */
+	uint32_t smbvp_oem;		/* vendor-specific data */
+	uint16_t smbvp_nominal;		/* nominal value */
+} smbios_vprobe_t;
+
+#define	SMB_VPROBE_S_OTHER	0x01	/* other */
+#define	SMB_VPROBE_S_UNKNOWN	0x02	/* unknown */
+#define	SMB_VPROBE_S_OK		0x03	/* OK */
+#define	SMB_VPROBE_S_NONCRIT	0x04	/* non-critical */
+#define	SMB_VPROBE_S_CRIT	0x05	/* critical */
+#define	SMB_VPROBE_S_NONRECOV	0x06	/* non-recoverable */
+
+#define	SMB_VPROBE_L_OTHER	0x01	/* other */
+#define	SMB_VPROBE_L_UNKNOWN	0x02	/* unknown */
+#define	SMB_VPROBE_L_PROC	0x03	/* processor */
+#define	SMB_VPROBE_L_DISK	0x04	/* disk */
+#define	SMB_VPROBE_L_PBAY	0x05	/* peripheral bay */
+#define	SMB_VPROBE_L_MGMT	0x06	/* system management module */
+#define	SMB_VPROBE_L_MOBO	0x07	/* motherboard */
+#define	SMB_VPROBE_L_MEMMOD	0x08	/* memory module */
+#define	SMB_VPROBE_L_PROCMOD	0x09	/* processor module */
+#define	SMB_VPROBE_L_POWER	0x0a	/* power unit */
+#define	SMB_VPROBE_L_AIC	0x0b	/* add-in card */
+
+/*
+ * SMBIOS Cooling Device.  See DSP0134 Section 7.28 for more information.
+ * Please see the specification for the units of each value.
+ */
+typedef struct smbios_cooldev {
+	id_t smbcd_tprobe;		/* temperature probe handle */
+	uint8_t smbcd_type;		/* cooling device type */
+	uint8_t smbcd_status;		/* status */
+	uint8_t smbcd_group;		/* group ID */
+	uint32_t smbcd_oem;		/* vendor-specific data */
+	uint16_t smbcd_nominal;		/* nominal speed */
+	const char *smbcd_descr;	/* device description */
+} smbios_cooldev_t;
+
+#define	SMB_COOLDEV_S_OTHER	0x01	/* other */
+#define	SMB_COOLDEV_S_UNKNOWN	0x02	/* unknown */
+#define	SMB_COOLDEV_S_OK	0x03	/* OK */
+#define	SMB_COOLDEV_S_NONCRIT	0x04	/* non-critical */
+#define	SMB_COOLDEV_S_CRIT	0x05	/* critical */
+#define	SMB_COOLDEV_S_NONRECOV	0x06	/* non-recoverable */
+
+#define	SMB_COOLDEV_T_OTHER	0x01	/* other */
+#define	SMB_COOLDEV_T_UNKNOWN	0x02	/* unknown */
+#define	SMB_COOLDEV_T_FAN	0x03	/* fan */
+#define	SMB_COOLDEV_T_BLOWER	0x04	/* centrifugal blower */
+#define	SMB_COOLDEV_T_CHIPFAN	0x05	/* chip fan */
+#define	SMB_COOLDEV_T_CABFAN	0x06	/* cabinet fan */
+#define	SMB_COOLDEV_T_PSFAN	0x07	/* power supply fan */
+#define	SMB_COOLDEV_T_HEATPIPE	0x08	/* head pipe */
+#define	SMB_COOLDEV_T_IREFRIG	0x09	/* integrated refrigeration */
+#define	SMB_COOLDEV_T_ACTCOOL	0x10	/* active cooling */
+#define	SMB_COOLDEV_T_PASSCOOL	0x11	/* passive cooling */
+
+/*
+ * SMBIOS Temperature Probe.  See DSP0134 Section 7.29 for more information.
+ * Please see the specification for the units of each value.
+ */
+typedef struct smbios_tprobe {
+	const char *smbtp_description;	/* description information */
+	uint8_t smbtp_location;		/* probe location */
+	uint8_t smbtp_status;		/* probe status */
+	uint16_t smbtp_maxval;		/* maximum temperature */
+	uint16_t smbtp_minval;		/* minimum temperature */
+	uint16_t smbtp_resolution;	/* probe resolution */
+	uint16_t smbtp_tolerance;	/* probe tolerance */
+	uint16_t smbtp_accuracy;	/* probe accuracy */
+	uint32_t smbtp_oem;		/* vendor-specific data */
+	uint16_t smbtp_nominal;		/* nominal value */
+} smbios_tprobe_t;
+
+#define	SMB_TPROBE_S_OTHER	0x01	/* other */
+#define	SMB_TPROBE_S_UNKNOWN	0x02	/* unknown */
+#define	SMB_TPROBE_S_OK		0x03	/* OK */
+#define	SMB_TPROBE_S_NONCRIT	0x04	/* non-critical */
+#define	SMB_TPROBE_S_CRIT	0x05	/* critical */
+#define	SMB_TPROBE_S_NONRECOV	0x06	/* non-recoverable */
+
+#define	SMB_TPROBE_L_OTHER	0x01	/* other */
+#define	SMB_TPROBE_L_UNKNOWN	0x02	/* unknown */
+#define	SMB_TPROBE_L_PROC	0x03	/* processor */
+#define	SMB_TPROBE_L_DISK	0x04	/* disk */
+#define	SMB_TPROBE_L_PBAY	0x05	/* peripheral bay */
+#define	SMB_TPROBE_L_MGMT	0x06	/* system management module */
+#define	SMB_TPROBE_L_MOBO	0x07	/* motherboard */
+#define	SMB_TPROBE_L_MEMMOD	0x08	/* memory module */
+#define	SMB_TPROBE_L_PROCMOD	0x09	/* processor module */
+#define	SMB_TPROBE_L_POWER	0x0a	/* power unit */
+#define	SMB_TPROBE_L_AIC	0x0b	/* add-in card */
+#define	SMB_TPROBE_L_FPBOARD	0x0c	/* front panel board */
+#define	SMB_TPROBE_L_BPBOARD	0x0d	/* rear panel board */
+#define	SMB_TPROBE_L_PSBOARD	0x0e	/* power system board */
+#define	SMB_TPROBE_L_DBPANE	0x0f	/* drive back plane */
+
+/*
+ * SMBIOS Current Probe.  See DSP0134 Section 7.30 for more information.
+ * Please see the specification for the units of each value.
+ */
+typedef struct smbios_iprobe {
+	const char *smbip_description;	/* description information */
+	uint8_t smbip_location;		/* probe location */
+	uint8_t smbip_status;		/* probe status */
+	uint16_t smbip_maxval;		/* maximum current */
+	uint16_t smbip_minval;		/* minimum current */
+	uint16_t smbip_resolution;	/* probe resolution */
+	uint16_t smbip_tolerance;	/* probe tolerance */
+	uint16_t smbip_accuracy;	/* probe accuracy */
+	uint32_t smbip_oem;		/* vendor-specific data */
+	uint16_t smbip_nominal;		/* nominal value */
+} smbios_iprobe_t;
+
+#define	SMB_IPROBE_S_OTHER	0x01	/* other */
+#define	SMB_IPROBE_S_UNKNOWN	0x02	/* unknown */
+#define	SMB_IPROBE_S_OK		0x03	/* OK */
+#define	SMB_IPROBE_S_NONCRIT	0x04	/* non-critical */
+#define	SMB_IPROBE_S_CRIT	0x05	/* critical */
+#define	SMB_IPROBE_S_NONRECOV	0x06	/* non-recoverable */
+
+#define	SMB_IPROBE_L_OTHER	0x01	/* other */
+#define	SMB_IPROBE_L_UNKNOWN	0x02	/* unknown */
+#define	SMB_IPROBE_L_PROC	0x03	/* processor */
+#define	SMB_IPROBE_L_DISK	0x04	/* disk */
+#define	SMB_IPROBE_L_PBAY	0x05	/* peripheral bay */
+#define	SMB_IPROBE_L_MGMT	0x06	/* system management module */
+#define	SMB_IPROBE_L_MOBO	0x07	/* motherboard */
+#define	SMB_IPROBE_L_MEMMOD	0x08	/* memory module */
+#define	SMB_IPROBE_L_PROCMOD	0x09	/* processor module */
+#define	SMB_IPROBE_L_POWER	0x0a	/* power unit */
+#define	SMB_IPROBE_L_AIC	0x0b	/* add-in card */
+
+/*
  * SMBIOS System Boot Information.  See DSP0134 Section 7.33 for more
  * information.  The contents of the data varies by type and is undocumented
  * from the perspective of DSP0134 -- it seems to be left as vendor-specific.
@@ -1549,10 +1699,15 @@ extern int smbios_info_extmemdevice(smbios_hdl_t *, id_t,
     smbios_memdevice_ext_t *);
 extern int smbios_info_memdevmap(smbios_hdl_t *, id_t, smbios_memdevmap_t *);
 extern id_t smbios_info_hwsec(smbios_hdl_t *, smbios_hwsec_t *);
+extern int smbios_info_vprobe(smbios_hdl_t *, id_t, smbios_vprobe_t *);
+extern int smbios_info_cooldev(smbios_hdl_t *, id_t, smbios_cooldev_t *);
+extern int smbios_info_tprobe(smbios_hdl_t *, id_t, smbios_tprobe_t *);
+extern int smbios_info_iprobe(smbios_hdl_t *, id_t, smbios_iprobe_t *);
 extern id_t smbios_info_boot(smbios_hdl_t *, smbios_boot_t *);
 extern id_t smbios_info_ipmi(smbios_hdl_t *, smbios_ipmi_t *);
 extern int smbios_info_powersup(smbios_hdl_t *, id_t, smbios_powersup_t *);
 extern int smbios_info_pciexrc(smbios_hdl_t *, id_t, smbios_pciexrc_t *);
+
 
 extern const char *smbios_psn(smbios_hdl_t *);
 extern const char *smbios_csn(smbios_hdl_t *);
@@ -1595,6 +1750,18 @@ extern const char *smbios_evlog_flag_desc(uint_t);
 extern const char *smbios_evlog_flag_name(uint_t);
 extern const char *smbios_evlog_format_desc(uint_t);
 extern const char *smbios_evlog_method_desc(uint_t);
+
+extern const char *smbios_vprobe_loc_desc(uint_t);
+extern const char *smbios_vprobe_status_desc(uint_t);
+
+extern const char *smbios_cooldev_status_desc(uint_t);
+extern const char *smbios_cooldev_type_desc(uint_t);
+
+extern const char *smbios_tprobe_loc_desc(uint_t);
+extern const char *smbios_tprobe_status_desc(uint_t);
+
+extern const char *smbios_iprobe_loc_desc(uint_t);
+extern const char *smbios_iprobe_status_desc(uint_t);
 
 extern const char *smbios_ipmi_flag_name(uint_t);
 extern const char *smbios_ipmi_flag_desc(uint_t);

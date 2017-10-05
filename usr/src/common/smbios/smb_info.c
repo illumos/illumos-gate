@@ -1318,3 +1318,155 @@ smbios_info_powersup(smbios_hdl_t *shp, id_t id, smbios_powersup_t *psup)
 
 	return (0);
 }
+
+int
+smbios_info_vprobe(smbios_hdl_t *shp, id_t id, smbios_vprobe_t *vprobe)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_vprobe_t vp;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_VPROBE)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	if (stp->smbst_hdr->smbh_len < SMB_VPROBE_MINLEN)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	bzero(vprobe, sizeof (*vprobe));
+	smb_info_bcopy(stp->smbst_hdr, &vp, sizeof (vp));
+	vprobe->smbvp_description = smb_strptr(stp, vp.smbvpr_descr);
+	vprobe->smbvp_location = SMB_VPROBE_LOCATION(vp.smbvpr_locstat);
+	vprobe->smbvp_status = SMB_VPROBE_STATUS(vp.smbvpr_locstat);
+	vprobe->smbvp_maxval = vp.smbvpr_maxval;
+	vprobe->smbvp_minval = vp.smbvpr_minval;
+	vprobe->smbvp_resolution = vp.smbvpr_resolution;
+	vprobe->smbvp_tolerance	= vp.smbvpr_tolerance;
+	vprobe->smbvp_accuracy = vp.smbvpr_accuracy;
+
+	if (stp->smbst_hdr->smbh_len >= SMB_VPROBE_NOMINAL_MINLEN) {
+		vprobe->smbvp_nominal = vp.smbvpr_nominal;
+	} else {
+		vprobe->smbvp_nominal = SMB_PROBE_UNKNOWN_VALUE;
+	}
+
+	return (0);
+}
+
+int
+smbios_info_cooldev(smbios_hdl_t *shp, id_t id, smbios_cooldev_t *cooldev)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_cooldev_t cd;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_COOLDEV)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	if (stp->smbst_hdr->smbh_len < SMB_COOLDEV_MINLEN)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	bzero(cooldev, sizeof (*cooldev));
+	smb_info_bcopy(stp->smbst_hdr, &cd, sizeof (cd));
+	cooldev->smbcd_tprobe = cd.smbcdev_tprobe;
+	cooldev->smbcd_type = SMB_COOLDEV_TYPE(cd.smbcdev_typstat);
+	cooldev->smbcd_status = SMB_COOLDEV_STATUS(cd.smbcdev_typstat);
+	cooldev->smbcd_group = cd.smbcdev_group;
+	cooldev->smbcd_oem = cd.smbcdev_oem;
+
+	if (stp->smbst_hdr->smbh_len >= SMB_COOLDEV_NOMINAL_MINLEN) {
+		cooldev->smbcd_nominal = cd.smbcdev_nominal;
+	} else {
+		cooldev->smbcd_nominal = SMB_PROBE_UNKNOWN_VALUE;
+	}
+
+	/*
+	 * The description field was added in SMBIOS version 2.7. The
+	 * SMB_TYPE_COOLDEV support was only added after all of the 2.7+ fields
+	 * were added in the spec. So while a user may request an older version,
+	 * we don't have to worry about old structures and just simply skip it
+	 * if they're not asking for it.
+	 */
+	if (smb_libgteq(shp, SMB_VERSION_27) &&
+	    smb_gteq(shp, SMB_VERSION_27) &&
+	    stp->smbst_hdr->smbh_len >= SMB_COOLDEV_DESCR_MINLEN) {
+		cooldev->smbcd_descr = smb_strptr(stp, cd.smbcdev_descr);
+	} else {
+		cooldev->smbcd_descr = NULL;
+	}
+
+	return (0);
+}
+
+int
+smbios_info_tprobe(smbios_hdl_t *shp, id_t id, smbios_tprobe_t *tprobe)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_tprobe_t tp;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_TPROBE)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	if (stp->smbst_hdr->smbh_len < SMB_TPROBE_MINLEN)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	bzero(tprobe, sizeof (*tprobe));
+	smb_info_bcopy(stp->smbst_hdr, &tp, sizeof (tp));
+	tprobe->smbtp_description = smb_strptr(stp, tp.smbtpr_descr);
+	tprobe->smbtp_location = SMB_TPROBE_LOCATION(tp.smbtpr_locstat);
+	tprobe->smbtp_status = SMB_TPROBE_STATUS(tp.smbtpr_locstat);
+	tprobe->smbtp_maxval = tp.smbtpr_maxval;
+	tprobe->smbtp_minval = tp.smbtpr_minval;
+	tprobe->smbtp_resolution = tp.smbtpr_resolution;
+	tprobe->smbtp_tolerance	= tp.smbtpr_tolerance;
+	tprobe->smbtp_accuracy = tp.smbtpr_accuracy;
+
+	if (stp->smbst_hdr->smbh_len >= SMB_TPROBE_NOMINAL_MINLEN) {
+		tprobe->smbtp_nominal = tp.smbtpr_nominal;
+	} else {
+		tprobe->smbtp_nominal = SMB_PROBE_UNKNOWN_VALUE;
+	}
+
+	return (0);
+}
+
+int
+smbios_info_iprobe(smbios_hdl_t *shp, id_t id, smbios_iprobe_t *iprobe)
+{
+	const smb_struct_t *sip = smb_lookup_id(shp, id);
+	smb_iprobe_t ip;
+
+	if (sip == NULL)
+		return (-1); /* errno is set for us */
+
+	if (sip->smbst_hdr->smbh_type != SMB_TYPE_IPROBE)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	if (sip->smbst_hdr->smbh_len < SMB_IPROBE_MINLEN)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	bzero(iprobe, sizeof (*iprobe));
+	smb_info_bcopy(sip->smbst_hdr, &ip, sizeof (ip));
+	iprobe->smbip_description = smb_strptr(sip, ip.smbipr_descr);
+	iprobe->smbip_location = SMB_IPROBE_LOCATION(ip.smbipr_locstat);
+	iprobe->smbip_status = SMB_IPROBE_STATUS(ip.smbipr_locstat);
+	iprobe->smbip_maxval = ip.smbipr_maxval;
+	iprobe->smbip_minval = ip.smbipr_minval;
+	iprobe->smbip_resolution = ip.smbipr_resolution;
+	iprobe->smbip_tolerance	= ip.smbipr_tolerance;
+	iprobe->smbip_accuracy = ip.smbipr_accuracy;
+
+	if (sip->smbst_hdr->smbh_len >= SMB_IPROBE_NOMINAL_MINLEN) {
+		iprobe->smbip_nominal = ip.smbipr_nominal;
+	} else {
+		iprobe->smbip_nominal = SMB_PROBE_UNKNOWN_VALUE;
+	}
+
+	return (0);
+}
