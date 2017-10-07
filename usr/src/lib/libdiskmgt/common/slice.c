@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2017 Nexenta Systems, Inc.
+ */
+
 #include <fcntl.h>
 #include <libdevinfo.h>
 #include <stdio.h>
@@ -193,7 +197,6 @@ nvlist_t *
 slice_get_stats(descriptor_t *dp, int stat_type, int *errp)
 {
 	nvlist_t	*stats;
-	char		*str;
 
 	if (stat_type != DM_SLICE_STAT_USE) {
 	    *errp = EINVAL;
@@ -210,54 +213,6 @@ slice_get_stats(descriptor_t *dp, int stat_type, int *errp)
 	if ((*errp = add_inuse(dp->name, stats)) != 0) {
 		nvlist_free(stats);
 		return (NULL);
-	}
-
-	/* if no cluster use, check for a use of the local name */
-	if (nvlist_lookup_string(stats, DM_USED_BY, &str) != 0) {
-	    disk_t	*diskp;
-
-	    diskp = dp->p.disk;
-	    if (diskp->aliases != NULL && diskp->aliases->cluster) {
-		slice_t		*sp;
-		int		snum = -1;
-		struct dk_minfo	minfo;
-		struct dk_cinfo	dkinfo;
-		char		devpath[MAXPATHLEN];
-		int		fd;
-
-		/* dp->name is /dev/dsk, need to convert back to /dev/rdsk */
-		dsk2rdsk(dp->name, devpath, sizeof (devpath));
-		fd = open(devpath, O_RDONLY|O_NDELAY);
-
-		if (fd >= 0 && media_read_info(fd, &minfo) &&
-		    ioctl(fd, DKIOCINFO, &dkinfo) >= 0) {
-		    snum = dkinfo.dki_partition;
-		}
-
-		if (fd >= 0) {
-		    (void) close(fd);
-		}
-
-		if (snum >= 0) {
-		    for (sp = diskp->aliases->orig_paths; sp != NULL;
-			sp = sp->next) {
-
-			if (sp->slice_num == snum) {
-			    char	localpath[MAXPATHLEN];
-
-			    slice_rdsk2dsk(sp->devpath, localpath,
-				sizeof (localpath));
-
-			    if ((*errp = add_inuse(localpath, stats)) != 0) {
-				nvlist_free(stats);
-				return (NULL);
-			    }
-
-			    break;
-			}
-		    }
-		}
-	    }
 	}
 
 	return (stats);
@@ -404,11 +359,8 @@ get_attrs(descriptor_t *dp, int fd,  nvlist_t *attrs)
 	struct extvtoc	vtoc;
 	struct dk_gpt	*efip;
 	struct dk_cinfo	dkinfo;
-	disk_t		*diskp;
-	char		localpath[MAXPATHLEN];
 	int		cooked_fd;
 	struct stat	buf;
-	int		mntpnt = 0;
 
 	if (fd < 0) {
 	    return (ENODEV);
@@ -511,55 +463,8 @@ get_attrs(descriptor_t *dp, int fd,  nvlist_t *attrs)
 	}
 
 	if (inuse_mnt(dp->name, attrs, &error)) {
-	    if (error != 0) {
+	    if (error != 0)
 		return (error);
-	    }
-	    mntpnt = 1;
-	}
-
-	/*
-	 * Some extra attrs for cluster slices.
-	 *
-	 * get localname and possible mnt point for localpath
-	 */
-	localpath[0] = 0;
-	diskp = dp->p.disk;
-	if (diskp->aliases != NULL && diskp->aliases->cluster) {
-	    slice_t *sp;
-
-	    for (sp = diskp->aliases->orig_paths; sp != NULL; sp = sp->next) {
-		if (sp->slice_num == -1) {
-		    /* determine the slice number for this path */
-		    int			sfd;
-		    struct dk_cinfo	dkinfo;
-
-		    if ((sfd = open(sp->devpath, O_RDONLY|O_NDELAY)) >= 0) {
-			if (ioctl(sfd, DKIOCINFO, &dkinfo) >= 0) {
-			    sp->slice_num = dkinfo.dki_partition;
-			}
-			(void) close(sfd);
-		    }
-		}
-
-		if (sp->slice_num == snum) {
-		    slice_rdsk2dsk(sp->devpath, localpath, sizeof (localpath));
-
-		    if (nvlist_add_string(attrs, DM_LOCALNAME, localpath)
-			!= 0) {
-			return (ENOMEM);
-		    }
-
-		    if (mntpnt == 0) {
-			if (inuse_mnt(localpath, attrs, &error)) {
-			    if (error != 0) {
-				return (error);
-			    }
-			}
-		    }
-
-		    break;
-		}
-	    }
 	}
 
 	if (fstat(fd, &buf) != -1) {
@@ -570,15 +475,9 @@ get_attrs(descriptor_t *dp, int fd,  nvlist_t *attrs)
 
 	/*
 	 * We need to open the cooked slice (not the raw one) to get the
-	 * correct devid.  Also see if we need to read the localpath for the
-	 * cluster disk, since the minor name is unavailable for the did pseudo
-	 * device.
+	 * correct devid.
 	 */
-	if (localpath[0] != 0) {
-	    cooked_fd = open(localpath, O_RDONLY|O_NDELAY);
-	} else {
-	    cooked_fd = open(dp->name, O_RDONLY|O_NDELAY);
-	}
+	cooked_fd = open(dp->name, O_RDONLY|O_NDELAY);
 
 	if (cooked_fd >= 0) {
 	    int		no_mem = 0;
