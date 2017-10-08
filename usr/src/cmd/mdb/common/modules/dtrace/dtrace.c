@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -2583,7 +2583,7 @@ pid2state_init(mdb_walk_state_t *wsp)
 		return (DCMD_ERR);
 	}
 
-	if ((proc = mdb_pid2proc(pid, NULL)) == NULL) {
+	if ((proc = mdb_pid2proc(pid, NULL)) == 0) {
 		mdb_warn("PID 0t%d not found\n", pid);
 		return (DCMD_ERR);
 	}

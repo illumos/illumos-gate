@@ -103,11 +103,11 @@ install: all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTXPG6PROG)
 	$(RM) $(ROOTBIN)/red
 	$(LN) $(ROOTBIN)/ed $(ROOTBIN)/red
 
-values-xpg4.o: ../../lib/common/common/values-xpg4.c
-	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+values-xpg4.o: ../../lib/crt/common/values-xpg4.c
+	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg4.c
 
-values-xpg6.o: ../../lib/common/common/values-xpg6.c
-	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg6.c
+values-xpg6.o: ../../lib/crt/common/values-xpg6.c
+	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg6.c
 
 clean:
 	-@rm -rf $(OBJS) $(XPG4) $(XPG6) edobjs.xpg4 edobjs.xpg6 \

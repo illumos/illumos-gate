@@ -48,7 +48,7 @@ P_ASOBJS=	boot.o		boot_elf.o	caller.o
 
 S_ASOBJS=	
 
-CRTSRCS=	../../../../lib/common/amd64
+CRTSRCS=	../../../../lib/crt/amd64
 CRTI=		pics/crti.o
 CRTN=		pics/crtn.o
 CRTS=		$(CRTI)		$(CRTN)

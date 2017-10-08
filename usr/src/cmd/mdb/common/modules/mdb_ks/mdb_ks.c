@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -557,30 +558,30 @@ mdb_pid2proc(pid_t pid, proc_t *proc)
 	struct pid pidp;
 
 	if (mdb_readvar(&pidhash, "pidhash") == -1)
-		return (NULL);
+		return (0);
 
 	if (mdb_readvar(&pid_hashsz, "pid_hashsz") == -1)
-		return (NULL);
+		return (0);
 
 	if (mdb_readvar(&procdir, "procdir") == -1)
-		return (NULL);
+		return (0);
 
 	hash = pid & (pid_hashsz - 1);
 
 	if (mdb_vread(&paddr, sizeof (paddr),
 	    pidhash + (hash * sizeof (paddr))) == -1)
-		return (NULL);
+		return (0);
 
 	while (paddr != 0) {
 		if (mdb_vread(&pidp, sizeof (pidp), paddr) == -1)
-			return (NULL);
+			return (0);
 
 		if (pidp.pid_id == pid) {
 			uintptr_t procp;
 
 			if (mdb_vread(&procp, sizeof (procp), procdir +
 			    (pidp.pid_prslot * sizeof (procp))) == -1)
-				return (NULL);
+				return (0);
 
 			if (proc != NULL)
 				(void) mdb_vread(proc, sizeof (proc_t), procp);
@@ -589,7 +590,7 @@ mdb_pid2proc(pid_t pid, proc_t *proc)
 		}
 		paddr = (uintptr_t)pidp.pid_link;
 	}
-	return (NULL);
+	return (0);
 }
 
 int

@@ -21,7 +21,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -170,10 +170,17 @@ ps_threadprint(uintptr_t addr, const void *data, void *private)
 	return (WALK_NEXT);
 }
 
+typedef struct mdb_pflags_proc {
+	struct pid 	*p_pidp;
+	ushort_t	p_pidflag;
+	uint_t		p_proc_flag;
+	uint_t		p_flag;
+} mdb_pflags_proc_t;
+
 static int
 pflags(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	proc_t pr;
+	mdb_pflags_proc_t pr;
 	struct pid pid;
 
 	static const mdb_bitmask_t p_flag_bits[] = {
@@ -235,7 +242,7 @@ pflags(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	if (mdb_vread(&pr, sizeof (pr), addr) == -1 ||
+	if (mdb_ctf_vread(&pr, "proc_t", "mdb_pflags_proc_t", addr, 0) == -1 ||
 	    mdb_vread(&pid, sizeof (pid), (uintptr_t)pr.p_pidp) == -1) {
 		mdb_warn("cannot read proc_t or pid");
 		return (DCMD_ERR);
@@ -252,11 +259,27 @@ pflags(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct mdb_ps_proc {
+	char		p_stat;
+	struct pid 	*p_pidp;
+	struct pid 	*p_pgidp;
+	struct cred	*p_cred;
+	struct sess	*p_sessp;
+	struct task	*p_task;
+	struct zone	*p_zone;
+	pid_t		p_ppid;
+	uint_t		p_flag;
+	struct {
+		char		u_comm[MAXCOMLEN + 1];
+		char		u_psargs[PSARGSZ];
+	} p_user;
+} mdb_ps_proc_t;
+
 int
 ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint_t prt_flags = 0;
-	proc_t pr;
+	mdb_ps_proc_t pr;
 	struct pid pid, pgid, sid;
 	sess_t session;
 	cred_t cred;
@@ -294,7 +317,9 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "UID", "FLAGS", "ADDR", "NAME");
 	}
 
-	mdb_vread(&pr, sizeof (pr), addr);
+	if (mdb_ctf_vread(&pr, "proc_t", "mdb_ps_proc_t", addr, 0) == -1)
+		return (DCMD_ERR);
+
 	mdb_vread(&pid, sizeof (pid), (uintptr_t)pr.p_pidp);
 	mdb_vread(&pgid, sizeof (pgid), (uintptr_t)pr.p_pgidp);
 	mdb_vread(&cred, sizeof (cred), (uintptr_t)pr.p_cred);
@@ -305,7 +330,7 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (prt_flags & PS_PROJECTS)
 		mdb_vread(&pj, sizeof (pj), (uintptr_t)tk.tk_proj);
 	if (prt_flags & PS_ZONES)
-		mdb_vread(&zn, sizeof (zone_t), (uintptr_t)pr.p_zone);
+		mdb_vread(&zn, sizeof (zn), (uintptr_t)pr.p_zone);
 
 	mdb_printf("%c %6d %6d %6d %6d ",
 	    pstat2ch(pr.p_stat), pid.pid_id, pr.p_ppid, pgid.pid_id,
@@ -342,15 +367,25 @@ typedef struct pgrep_data {
 #endif
 } pgrep_data_t;
 
+typedef struct mdb_pgrep_proc {
+	struct {
+		timestruc_t	u_start;
+		char		u_comm[MAXCOMLEN + 1];
+	} p_user;
+} mdb_pgrep_proc_t;
+
 /*ARGSUSED*/
 static int
-pgrep_cb(uintptr_t addr, const void *pdata, void *data)
+pgrep_cb(uintptr_t addr, const void *ignored, void *data)
 {
-	const proc_t *prp = pdata;
+	mdb_pgrep_proc_t p;
 	pgrep_data_t *pgp = data;
 #ifndef _KMDB
 	regmatch_t pmatch;
 #endif
+
+	if (mdb_ctf_vread(&p, "proc_t", "mdb_pgrep_proc_t", addr, 0) == -1)
+		return (WALK_ERR);
 
 	/*
 	 * kmdb doesn't have access to the reg* functions, so we fall back
@@ -358,23 +393,23 @@ pgrep_cb(uintptr_t addr, const void *pdata, void *data)
 	 */
 #ifdef _KMDB
 	if ((pgp->pg_flags & PG_EXACT_MATCH) ?
-	    (strcmp(prp->p_user.u_comm, pgp->pg_pat) != 0) :
-	    (strstr(prp->p_user.u_comm, pgp->pg_pat) == NULL))
+	    (strcmp(p.p_user.u_comm, pgp->pg_pat) != 0) :
+	    (strstr(p.p_user.u_comm, pgp->pg_pat) == NULL))
 		return (WALK_NEXT);
 #else
-	if (regexec(&pgp->pg_reg, prp->p_user.u_comm, 1, &pmatch, 0) != 0)
+	if (regexec(&pgp->pg_reg, p.p_user.u_comm, 1, &pmatch, 0) != 0)
 		return (WALK_NEXT);
 
 	if ((pgp->pg_flags & PG_EXACT_MATCH) &&
-	    (pmatch.rm_so != 0 || prp->p_user.u_comm[pmatch.rm_eo] != '\0'))
+	    (pmatch.rm_so != 0 || p.p_user.u_comm[pmatch.rm_eo] != '\0'))
 		return (WALK_NEXT);
 #endif
 
 	if (pgp->pg_flags & (PG_NEWEST | PG_OLDEST)) {
 		hrtime_t start;
 
-		start = (hrtime_t)prp->p_user.u_start.tv_sec * NANOSEC +
-		    prp->p_user.u_start.tv_nsec;
+		start = (hrtime_t)p.p_user.u_start.tv_sec * NANOSEC +
+		    p.p_user.u_start.tv_nsec;
 
 		if (pgp->pg_flags & PG_NEWEST) {
 			if (pgp->pg_xaddr == NULL || start > pgp->pg_xstart) {
@@ -1898,22 +1933,33 @@ lg_walk_step(mdb_walk_state_t *wsp)
 #define	LM_VNPATHLEN	30
 #endif
 
+typedef struct mdb_lminfo_proc {
+	struct {
+		char		u_comm[MAXCOMLEN + 1];
+	} p_user;
+} mdb_lminfo_proc_t;
+
 /*ARGSUSED*/
 static int
 lminfo_cb(uintptr_t addr, const void *data, void *priv)
 {
 	const lock_descriptor_t *ld = data;
 	char buf[LM_VNPATHLEN];
-	proc_t p;
+	mdb_lminfo_proc_t p;
+	uintptr_t paddr = 0;
+
+	if (ld->l_flock.l_pid != 0)
+		paddr = mdb_pid2proc(ld->l_flock.l_pid, NULL);
+
+	if (paddr != 0)
+		mdb_ctf_vread(&p, "proc_t", "mdb_lminfo_proc_t", paddr, 0);
 
 	mdb_printf("%-?p %2s %04x %6d %-16s %-?p ",
 	    addr, ld->l_type == F_RDLCK ? "RD" :
 	    ld->l_type == F_WRLCK ? "WR" : "??",
 	    ld->l_state, ld->l_flock.l_pid,
 	    ld->l_flock.l_pid == 0 ? "<kernel>" :
-	    mdb_pid2proc(ld->l_flock.l_pid, &p) == NULL ?
-	    "<defunct>" : p.p_user.u_comm,
-	    ld->l_vnode);
+	    paddr == 0 ? "<defunct>" : p.p_user.u_comm, ld->l_vnode);
 
 	mdb_vnode2path((uintptr_t)ld->l_vnode, buf,
 	    sizeof (buf));
@@ -2416,11 +2462,20 @@ typedef struct file_walk_data {
 	int fw_nofiles;
 } file_walk_data_t;
 
+typedef struct mdb_file_proc {
+	struct {
+		struct {
+			int			fi_nfiles;
+			uf_entry_t *volatile	fi_list;
+		} u_finfo;
+	} p_user;
+} mdb_file_proc_t;
+
 int
 file_walk_init(mdb_walk_state_t *wsp)
 {
 	file_walk_data_t *fw;
-	proc_t p;
+	mdb_file_proc_t p;
 
 	if (wsp->walk_addr == NULL) {
 		mdb_warn("file walk doesn't support global walks\n");
@@ -2429,7 +2484,8 @@ file_walk_init(mdb_walk_state_t *wsp)
 
 	fw = mdb_alloc(sizeof (file_walk_data_t), UM_SLEEP);
 
-	if (mdb_vread(&p, sizeof (p), wsp->walk_addr) == -1) {
+	if (mdb_ctf_vread(&p, "proc_t", "mdb_file_proc_t",
+	    wsp->walk_addr, 0) == -1) {
 		mdb_free(fw, sizeof (file_walk_data_t));
 		mdb_warn("failed to read proc structure at %p", wsp->walk_addr);
 		return (WALK_ERR);
@@ -2663,17 +2719,22 @@ proc_walk_init(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
+typedef struct mdb_walk_proc {
+	struct proc	*p_child;
+	struct proc	*p_sibling;
+} mdb_walk_proc_t;
+
 int
 proc_walk_step(mdb_walk_state_t *wsp)
 {
 	proc_walk_data_t *pw = wsp->walk_data;
 	uintptr_t addr = wsp->walk_addr;
 	uintptr_t cld, sib;
-
 	int status;
-	proc_t pr;
+	mdb_walk_proc_t pr;
 
-	if (mdb_vread(&pr, sizeof (proc_t), addr) == -1) {
+	if (mdb_ctf_vread(&pr, "proc_t", "mdb_walk_proc_t",
+	    addr, 0) == -1) {
 		mdb_warn("failed to read proc at %p", addr);
 		return (WALK_DONE);
 	}
@@ -2686,13 +2747,20 @@ proc_walk_step(mdb_walk_state_t *wsp)
 		goto sib;
 	}
 
-	status = wsp->walk_callback(addr, &pr, wsp->walk_cbdata);
+	/*
+	 * Always pass NULL as the local copy pointer. Consumers
+	 * should use mdb_ctf_vread() to read their own minimal
+	 * version of proc_t. Thus minimizing the chance of breakage
+	 * with older crash dumps.
+	 */
+	status = wsp->walk_callback(addr, NULL, wsp->walk_cbdata);
 
 	if (status != WALK_NEXT)
 		return (status);
 
 	if ((wsp->walk_addr = cld) != NULL) {
-		if (mdb_vread(&pr, sizeof (proc_t), cld) == -1) {
+		if (mdb_ctf_vread(&pr, "proc_t", "mdb_walk_proc_t",
+		    cld, 0) == -1) {
 			mdb_warn("proc %p has invalid p_child %p; skipping\n",
 			    addr, cld);
 			goto sib;
@@ -2716,7 +2784,8 @@ sib:
 	if (pw->pw_depth == 0)
 		return (WALK_DONE);
 
-	if (sib != NULL && mdb_vread(&pr, sizeof (proc_t), sib) == -1) {
+	if (sib != NULL && mdb_ctf_vread(&pr, "proc_t", "mdb_walk_proc_t",
+	    sib, 0) == -1) {
 		mdb_warn("proc %p has invalid p_sibling %p; skipping\n",
 		    addr, sib);
 		sib = NULL;
@@ -2756,13 +2825,18 @@ task_walk_init(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
+typedef struct mdb_task_proc {
+	struct proc	*p_tasknext;
+} mdb_task_proc_t;
+
 int
 task_walk_step(mdb_walk_state_t *wsp)
 {
-	proc_t proc;
+	mdb_task_proc_t proc;
 	int status;
 
-	if (mdb_vread(&proc, sizeof (proc_t), wsp->walk_addr) == -1) {
+	if (mdb_ctf_vread(&proc, "proc_t", "mdb_task_proc_t",
+	    wsp->walk_addr, 0) == -1) {
 		mdb_warn("failed to read proc at %p", wsp->walk_addr);
 		return (WALK_DONE);
 	}
@@ -3000,12 +3074,18 @@ cpuinfo_walk_ithread(uintptr_t addr, const kthread_t *thr, cpuinfo_data_t *cid)
 #define	CPUINFO_INDENT	mdb_printf("%*s", CPUINFO_THRDELT, \
     flagline < nflaglines ? flagbuf[flagline++] : "")
 
+typedef struct mdb_cpuinfo_proc {
+	struct {
+		char		u_comm[MAXCOMLEN + 1];
+	} p_user;
+} mdb_cpuinfo_proc_t;
+
 int
 cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 {
 	kthread_t t;
 	disp_t disp;
-	proc_t p;
+	mdb_cpuinfo_proc_t p;
 	uintptr_t pinned;
 	char **flagbuf;
 	int nflaglines = 0, flagline = 0, bspl, rval = WALK_NEXT;
@@ -3069,7 +3149,8 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 	else if (cpu->cpu_thread == NULL)
 		mdb_printf(" -\n");
 	else {
-		if (mdb_vread(&p, sizeof (p), (uintptr_t)t.t_procp) != -1) {
+		if (mdb_ctf_vread(&p, "proc_t", "mdb_cpuinfo_proc_t",
+		    (uintptr_t)t.t_procp, 0) != -1) {
 			mdb_printf(" %s\n", p.p_user.u_comm);
 		} else {
 			mdb_printf(" ?\n");
@@ -3160,8 +3241,8 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 				    pinned);
 				return (WALK_ERR);
 			}
-			if (mdb_vread(&p, sizeof (p),
-			    (uintptr_t)t.t_procp) == -1) {
+			if (mdb_ctf_vread(&p, "proc_t", "mdb_cpuinfo_proc_t",
+			    (uintptr_t)t.t_procp, 0) == -1) {
 				mdb_warn("failed to read proc_t at %p",
 				    t.t_procp);
 				return (WALK_ERR);
@@ -3205,8 +3286,9 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 					    "at %p", taddr);
 					return (WALK_ERR);
 				}
-				if (mdb_vread(&p, sizeof (p),
-				    (uintptr_t)t.t_procp) == -1) {
+				if (mdb_ctf_vread(&p, "proc_t",
+				    "mdb_cpuinfo_proc_t",
+				    (uintptr_t)t.t_procp, 0) == -1) {
 					mdb_warn("failed to read proc_t at %p",
 					    t.t_procp);
 					return (WALK_ERR);
@@ -3318,10 +3400,19 @@ flipone(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct mdb_as2proc_proc {
+	struct as *p_as;
+} mdb_as2proc_proc_t;
+
+/*ARGSUSED*/
 int
-as2proc_walk(uintptr_t addr, const proc_t *p, struct as **asp)
+as2proc_walk(uintptr_t addr, const void *ignored, struct as **asp)
 {
-	if (p->p_as == *asp)
+	mdb_as2proc_proc_t p;
+
+	mdb_ctf_vread(&p, "proc_t", "mdb_as2proc_proc_t", addr, 0);
+
+	if (p.p_as == *asp)
 		mdb_printf("%p\n", addr);
 	return (WALK_NEXT);
 }
@@ -3341,21 +3432,31 @@ as2proc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct mdb_ptree_proc {
+	struct proc	*p_parent;
+	struct {
+		char		u_comm[MAXCOMLEN + 1];
+	} p_user;
+} mdb_ptree_proc_t;
+
 /*ARGSUSED*/
 int
-ptree_walk(uintptr_t addr, const proc_t *p, void *ignored)
+ptree_walk(uintptr_t addr, const void *ignored, void *data)
 {
-	proc_t parent;
+	mdb_ptree_proc_t proc;
+	mdb_ptree_proc_t parent;
 	int ident = 0;
 	uintptr_t paddr;
 
-	for (paddr = (uintptr_t)p->p_parent; paddr != NULL; ident += 5) {
-		mdb_vread(&parent, sizeof (parent), paddr);
+	mdb_ctf_vread(&proc, "proc_t", "mdb_ptree_proc_t", addr, 0);
+
+	for (paddr = (uintptr_t)proc.p_parent; paddr != NULL; ident += 5) {
+		mdb_ctf_vread(&parent, "proc_t", "mdb_ptree_proc_t", paddr, 0);
 		paddr = (uintptr_t)parent.p_parent;
 	}
 
 	mdb_inc_indent(ident);
-	mdb_printf("%0?p  %s\n", addr, p->p_user.u_comm);
+	mdb_printf("%0?p  %s\n", addr, proc.p_user.u_comm);
 	mdb_dec_indent(ident);
 
 	return (WALK_NEXT);
@@ -3364,9 +3465,9 @@ ptree_walk(uintptr_t addr, const proc_t *p, void *ignored)
 void
 ptree_ancestors(uintptr_t addr, uintptr_t start)
 {
-	proc_t p;
+	mdb_ptree_proc_t p;
 
-	if (mdb_vread(&p, sizeof (p), addr) == -1) {
+	if (mdb_ctf_vread(&p, "proc_t", "mdb_ptree_proc_t", addr, 0) == -1) {
 		mdb_warn("couldn't read ancestor at %p", addr);
 		return;
 	}
@@ -3395,13 +3496,22 @@ ptree(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+typedef struct mdb_fd_proc {
+	struct {
+		struct {
+			int			fi_nfiles;
+			uf_entry_t *volatile	fi_list;
+		} u_finfo;
+	} p_user;
+} mdb_fd_proc_t;
+
 /*ARGSUSED*/
 static int
 fd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	int fdnum;
 	const mdb_arg_t *argp = &argv[0];
-	proc_t p;
+	mdb_fd_proc_t p;
 	uf_entry_t uf;
 
 	if ((flags & DCMD_ADDRSPEC) == 0) {
@@ -3416,7 +3526,7 @@ fd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	else
 		fdnum = mdb_strtoull(argp->a_un.a_str);
 
-	if (mdb_vread(&p, sizeof (struct proc), addr) == -1) {
+	if (mdb_ctf_vread(&p, "proc_t", "mdb_fd_proc_t", addr, 0) == -1) {
 		mdb_warn("couldn't read proc_t at %p", addr);
 		return (DCMD_ERR);
 	}
@@ -3445,7 +3555,7 @@ pid2proc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc != 0)
 		return (DCMD_USAGE);
 
-	if ((addr = mdb_pid2proc(pid, NULL)) == NULL) {
+	if ((addr = mdb_pid2proc(pid, NULL)) == 0) {
 		mdb_warn("PID 0t%d not found\n", pid);
 		return (DCMD_ERR);
 	}

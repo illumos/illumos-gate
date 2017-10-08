@@ -117,11 +117,11 @@ ex.xpg6: $(XD6) $(XPG6EXOBJS)
 $(XD4)/compile.o $(XD6)/compile.o: ../../expr/compile.c
 	$(COMPILE.c) -o $@ ../../expr/compile.c
 
-%values-xpg4.o: ../../../lib/common/common/values-xpg4.c
-	$(COMPILE.c) -o $@ ../../../lib/common/common/values-xpg4.c
+%values-xpg4.o: ../../../lib/crt/common/values-xpg4.c
+	$(COMPILE.c) -o $@ ../../../lib/crt/common/values-xpg4.c
 
-%values-xpg6.o: ../../../lib/common/common/values-xpg6.c
-	$(COMPILE.c) -o $@ ../../../lib/common/common/values-xpg6.c
+%values-xpg6.o: ../../../lib/crt/common/values-xpg6.c
+	$(COMPILE.c) -o $@ ../../../lib/crt/common/values-xpg6.c
 
 $(XPG4EXOBJS): $(XD4)
 

@@ -111,8 +111,8 @@ $(X6):
 
 install: all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTXPG6PROG)
 
-values-xpg4.o: ../../lib/common/common/values-xpg4.c
-	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+values-xpg4.o: ../../lib/crt/common/values-xpg4.c
+	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg4.c
 
 clean:
 	-@rm -rf $(OBJS) $(XPG4EXOBJS) $(XPG6EXOBJS) $(X4) $(X6) \

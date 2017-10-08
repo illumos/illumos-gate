@@ -8,9 +8,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.Dd Aug 2, 2016
+.Dd May 12, 2017
 .Dt ACPIDUMP 1M
 .Os
 .Sh NAME
@@ -66,5 +66,18 @@ Do not use the
 .It Fl z
 Verbose.
 .El
+.Sh EXAMPLES
+.Sy Example 1
+Dump all ACPI Tables
+.Pp
+The following example dumps all of the ACPI tables from the system.
+This can then be used with
+.Xr acpixtract 1M
+and the iasl utility to decode the ACPI tables from the system.
+In this example, all of the tables are written to the file
+.Pa acpi.out .
+.Bd -literal -offset width
+# acpidump -o acpi.dat
+.Ed
 .Sh SEE ALSO
 .Xr acpixtract 1M

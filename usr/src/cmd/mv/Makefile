@@ -76,8 +76,8 @@ xpg4_%.o:    $(SRC)/common/util/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-%values-xpg4.o:		../../lib/common/common/values-xpg4.c
-	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+%values-xpg4.o:		../../lib/crt/common/values-xpg4.c
+	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg4.c
 
 $(CPFILE):	$(PROG)
 	@$(RM) $(CPFILE); $(LN) $(PROG) $(CPFILE)

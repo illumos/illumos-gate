@@ -83,6 +83,12 @@ struct boot_modules {
 	boot_module_type_t	bm_type;
 };
 
+/* To help to identify UEFI system. */
+typedef enum uefi_arch_type {
+	XBI_UEFI_ARCH_NONE,
+	XBI_UEFI_ARCH_32,
+	XBI_UEFI_ARCH_64
+} uefi_arch_type_t;
 /*
  *
  */
@@ -112,7 +118,10 @@ struct xboot_info {
 	int		bi_mb_version;		/* multiboot version */
 	native_ptr_t	bi_acpi_rsdp;
 	native_ptr_t	bi_smbios;
+	native_ptr_t	bi_uefi_systab;
+	uefi_arch_type_t bi_uefi_arch;
 #endif
+	native_ptr_t	bi_framebuffer;
 };
 #pragma pack()
 

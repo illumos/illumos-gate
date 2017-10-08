@@ -23,10 +23,8 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-CRTSRCS= ../../common/sparcv9
+CRTSRCS= ../../crt/sparc
 
 include ../Makefile.com
 include ../../Makefile.lib.64

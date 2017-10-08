@@ -22,9 +22,8 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -142,7 +141,7 @@ ptms(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (pt.pt_pid != 0) {
-		if (mdb_pid2proc(pt.pt_pid, &p) == NULL)
+		if (mdb_pid2proc(pt.pt_pid, &p) == 0)
 			(void) strcpy(c, "<defunct>");
 		else
 			(void) strcpy(c, p.p_user.u_comm);
@@ -184,7 +183,7 @@ ptms_qinfo(const queue_t *q, char *buf, size_t nbytes, int ismaster)
 	(void) mdb_vread(&pt, sizeof (pt), (uintptr_t)q->q_ptr);
 
 	if (pt.pt_pid != 0) {
-		if (mdb_pid2proc(pt.pt_pid, &p) == NULL)
+		if (mdb_pid2proc(pt.pt_pid, &p) == 0)
 			(void) strcpy(c, "<defunct>");
 		else
 			(void) strcpy(c, p.p_user.u_comm);

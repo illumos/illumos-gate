@@ -50,8 +50,8 @@ install: all $(ROOTUSRSBINPROG) $(ROOTXPG4PROG)
 	-$(RM) $(ROOTETCPROG)
 	-$(SYMLINK) ../usr/sbin/$(PROG) $(ROOTETCPROG)
 
-values-xpg4.o: ../../lib/common/common/values-xpg4.c
-	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
+values-xpg4.o: ../../lib/crt/common/values-xpg4.c
+	$(COMPILE.c) -o $@ ../../lib/crt/common/values-xpg4.c
 
 clean:
 	$(RM) $(OBJS)
