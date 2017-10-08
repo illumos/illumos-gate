@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.Dd May 31, 2016
+.Dd September 22, 2017
 .Dt MAC_REGISTER 9F
 .Os
 .Sh NAME
@@ -195,7 +195,7 @@ example_register_mac(example_t *ep)
 	if (mac == NULL)
 		return (B_FALSE);
 
-	mac->m_type_indent = MAC_PLUGIN_IDENT_ETHER;
+	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	mac->m_driver = ep;
 	mac->m_dip = ep->ep_dev_info;
 	mac->m_src_addr = ep->ep_mac_addr;

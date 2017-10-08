@@ -13,6 +13,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 #
 
 import ConfigParser
@@ -153,7 +154,7 @@ class Cmd(object):
             self.timeout = 60
 
     def __str__(self):
-        return "Pathname: %s\nOutputdir: %s\nTimeout: %d\nUser: %s\n" % \
+        return "Pathname: %s\nOutputdir: %s\nTimeout: %s\nUser: %s\n" % \
             (self.pathname, self.outputdir, self.timeout, self.user)
 
     def kill_cmd(self, proc):
@@ -700,10 +701,11 @@ class TestRun(object):
         """
         Walk through all the Tests and TestGroups, calling run().
         """
-        try:
-            os.chdir(self.outputdir)
-        except OSError:
-            fail('Could not change to directory %s' % self.outputdir)
+        if not options.dryrun:
+            try:
+                os.chdir(self.outputdir)
+            except OSError:
+                fail('Could not change to directory %s' % self.outputdir)
         for test in sorted(self.tests.keys()):
             self.tests[test].run(self.logger, options)
         for testgroup in sorted(self.testgroups.keys()):
