@@ -303,7 +303,7 @@ int zfs_arc_evict_batch_limit = 10;
 static int		arc_grow_retry = 60;
 
 /* shift of arc_c for calculating overflow limit in arc_get_data_impl */
-int		zfs_arc_overflow_shift = 8;
+int		zfs_arc_overflow_shift = 3;
 
 /* shift of arc_c for calculating both min and max arc_p */
 static int		arc_p_min_shift = 4;
