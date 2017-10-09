@@ -65,8 +65,12 @@ uint32_t acpi_strtoul(const char *, char **, int);
 
 #define	ACPI_CAST_PTHREAD_T(pthread)	((ACPI_THREAD_ID) (pthread))
 
-#define	ACPI_PRINTF_LIKE_FUNC
-#define	ACPI_UNUSED_VAR
+/*
+ * We should use acgcc.h, but lint does not like it. Until lint is removed
+ * we need to have private definitions here.
+ */
+#define	ACPI_PRINTF_LIKE(c)	__PRINTFLIKE(c)
+#define	ACPI_UNUSED_VAR		__unused
 #define	ACPI_USE_NATIVE_DIVIDE
 #define	ACPI_FLUSH_CPU_CACHE()	(__acpi_wbinvd())
 
