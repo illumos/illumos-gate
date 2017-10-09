@@ -6038,9 +6038,16 @@ lxpr_doaccess(lxpr_node_t *lxpnp, boolean_t shallow, int mode, int flags,
 	int shift = 0;
 	proc_t *tp;
 
-	/* lx /proc is primarily a read only file system */
+	/*
+	 * lx /proc is primarily a read only file system
+	 * We handle LXPR_SYSDIR as a special case. At least 'systemd' expects
+	 * access() to report /proc/sys is writable, but we can't do that in
+	 * lxpr_is_writable since it breaks other code paths that check if they
+	 * can write there.
+	 */
 	if ((mode & VWRITE) && !lxpr_is_writable(type)) {
-		return (EROFS);
+		if (type != LXPR_SYSDIR)
+			return (EROFS);
 	}
 
 	if (type == LXPR_PIDDIR) {
