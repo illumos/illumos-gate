@@ -23,6 +23,7 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 Alexey Zaytsev <alexey.zaytsev@gmail.com>
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -984,9 +985,9 @@ virtio_register_intx(struct virtio_softc *sc,
     struct virtio_int_handler vq_handlers[])
 {
 	int vq_handler_count;
-	int config_handler_count = 0;
 	int actual;
 	struct virtio_handler_container *vhc;
+	size_t vhc_sz;
 	int ret = DDI_FAILURE;
 
 	/* Walk the handler table to get the number of handlers. */
@@ -995,11 +996,9 @@ virtio_register_intx(struct virtio_softc *sc,
 	    vq_handler_count++)
 		;
 
-	if (config_handler != NULL)
-		config_handler_count = 1;
-
-	vhc = kmem_zalloc(sizeof (struct virtio_handler_container) +
-	    sizeof (struct virtio_int_handler) * vq_handler_count, KM_SLEEP);
+	vhc_sz = sizeof (struct virtio_handler_container) +
+	    sizeof (struct virtio_int_handler) * vq_handler_count;
+	vhc = kmem_zalloc(vhc_sz, KM_SLEEP);
 
 	vhc->nhandlers = vq_handler_count;
 	(void) memcpy(vhc->vq_handlers, vq_handlers,
@@ -1046,8 +1045,7 @@ out_prio:
 	(void) ddi_intr_free(sc->sc_intr_htable[0]);
 out_int_alloc:
 	kmem_free(sc->sc_intr_htable, sizeof (ddi_intr_handle_t));
-	kmem_free(vhc, sizeof (struct virtio_int_handler) *
-	    (vq_handler_count + config_handler_count));
+	kmem_free(vhc, vhc_sz);
 	return (ret);
 }
 
