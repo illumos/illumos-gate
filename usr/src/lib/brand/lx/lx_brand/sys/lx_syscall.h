@@ -97,7 +97,6 @@ extern long lx_setgroups16(uintptr_t, uintptr_t);
 extern long lx_query_module(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     uintptr_t);
 
-extern long lx_times(uintptr_t);
 extern long lx_setitimer(uintptr_t, uintptr_t, uintptr_t);
 
 extern long lx_clone(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);

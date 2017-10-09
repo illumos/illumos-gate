@@ -73,6 +73,7 @@
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
 #include <lx_auxv.h>
+#include <sys/lx_userhz.h>
 
 /*
  * There is a block comment in "uts/common/brand/lx/os/lx_brand.c" that
@@ -134,6 +135,8 @@ int lx_debug_enabled = 0;	/* debugging output enabled if non-zero */
 pid_t zoneinit_pid;		/* zone init PID */
 
 thread_key_t lx_tsd_key;
+
+uint_t lx_hz_scale;		/* USER_HZ scaling factor */
 
 int
 uucopy_unsafe(const void *src, void *dst, size_t n)
@@ -626,6 +629,8 @@ lx_init(int argc, char *argv[], char *envp[])
 	bzero(&reg, sizeof (reg));
 	stack_size = 2 * sysconf(_SC_PAGESIZE);
 
+	lx_hz_scale = sysconf(_SC_CLK_TCK) / LX_USERHZ;
+
 	/*
 	 * We need to shutdown all libc stdio.  libc stdio normally goes to
 	 * file descriptors, but since we're actually part of a linux
@@ -1110,7 +1115,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  97: getrlimit */
 	NULL,				/*  98: getrusage */
 	NULL,				/*  99: sysinfo */
-	lx_times,			/* 100: times */
+	NULL,				/* 100: times */
 	NULL,				/* 101: ptrace */
 	NULL,				/* 102: getuid */
 	NULL,				/* 103: syslog */
@@ -1384,7 +1389,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_rmdir,			/*  40: rmdir */
 	NULL,				/*  41: dup */
 	NULL,				/*  42: pipe */
-	lx_times,			/*  43: times */
+	NULL,				/*  43: times */
 	NULL,				/*  44: prof */
 	NULL,				/*  45: brk */
 	NULL,				/*  46: setgid16 */

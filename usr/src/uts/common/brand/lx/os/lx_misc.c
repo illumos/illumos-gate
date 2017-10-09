@@ -40,6 +40,7 @@
 #include <sys/lx_siginfo.h>
 #include <sys/lx_futex.h>
 #include <lx_errno.h>
+#include <sys/lx_userhz.h>
 #include <sys/cmn_err.h>
 #include <sys/siginfo.h>
 #include <sys/contract/process_impl.h>
@@ -713,6 +714,10 @@ lx_winfo(proc_t *pp, k_siginfo_t *ip, struct lx_proc_data *dat)
 	ip->si_ctid = PRCTID(pp);
 	ip->si_zoneid = pp->p_zone->zone_id;
 	ip->si_status = pp->p_wdata;
+	/*
+	 * These siginfo values are converted to USER_HZ in the user-land
+	 * brand signal code.
+	 */
 	ip->si_stime = pp->p_stime;
 	ip->si_utime = pp->p_utime;
 }
@@ -961,8 +966,8 @@ stol_ksiginfo_copyout(k_siginfo_t *sip, void *ulxsip)
 			lsi.lsi_status = lx_stol_status(sip->si_status,
 			    SIGKILL);
 		}
-		lsi.lsi_utime = sip->si_utime;
-		lsi.lsi_stime = sip->si_stime;
+		lsi.lsi_utime = HZ_TO_LX_USERHZ(sip->si_utime);
+		lsi.lsi_stime = HZ_TO_LX_USERHZ(sip->si_stime);
 		break;
 
 	case LX_SIGILL:
@@ -1009,8 +1014,8 @@ stol_ksiginfo32_copyout(k_siginfo_t *sip, void *ulxsip)
 			lsi.lsi_status = lx_stol_status(sip->si_status,
 			    SIGKILL);
 		}
-		lsi.lsi_utime = sip->si_utime;
-		lsi.lsi_stime = sip->si_stime;
+		lsi.lsi_utime = HZ_TO_LX_USERHZ(sip->si_utime);
+		lsi.lsi_stime = HZ_TO_LX_USERHZ(sip->si_stime);
 		break;
 
 	case LX_SIGILL:

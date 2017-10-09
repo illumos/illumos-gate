@@ -359,6 +359,7 @@ LX_BRAND_OBJS  =		\
 	lx_syscall.o		\
 	lx_sysinfo.o		\
 	lx_thread_area.o	\
+	lx_time.o		\
 	lx_timer.o		\
 	lx_umask.o		\
 	lx_uname.o		\

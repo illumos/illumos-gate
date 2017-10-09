@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.  All rights reserved.
  */
 
 #include <errno.h>
@@ -32,25 +32,6 @@
 #include <sys/times.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_misc.h>
-
-/*
- * times() - The Linux implementation avoids writing to NULL, while Illumos
- *	     returns EFAULT.
- */
-long
-lx_times(uintptr_t p1)
-{
-	clock_t ret;
-	struct tms buf, *tp = (struct tms *)p1;
-
-	ret = times(&buf);
-
-	if ((ret == -1) ||
-	    ((tp != NULL) && uucopy((void *)&buf, tp, sizeof (buf)) != 0))
-		return (-errno);
-
-	return ((ret == -1) ? -errno : ret);
-}
 
 /*
  * setitimer() - the Linux implementation can handle tv_usec values greater

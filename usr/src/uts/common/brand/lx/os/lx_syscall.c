@@ -562,7 +562,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"rmdir",	NULL,			0,		1}, /* 40 */
 	{"dup",		lx_dup,			0,		1}, /* 41 */
 	{"pipe",	lx_pipe,		0,		1}, /* 42 */
-	{"times",	NULL,			0,		1}, /* 43 */
+	{"times",	lx_times,		0,		1}, /* 43 */
 	{"prof",	NULL,			NOSYS_OBSOLETE,	0}, /* 44 */
 	{"brk",		lx_brk,			0,		1}, /* 45 */
 	{"setgid16",	lx_setgid16,		0,		1}, /* 46 */
@@ -990,7 +990,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"getrlimit",	lx_getrlimit,		0,		2}, /* 97 */
 	{"getrusage",	lx_getrusage,		0,		2}, /* 98 */
 	{"sysinfo",	lx_sysinfo64,		0,		1}, /* 99 */
-	{"times",	NULL,			0,		1}, /* 100 */
+	{"times",	lx_times,		0,		1}, /* 100 */
 	{"ptrace",	lx_ptrace,		0,		4}, /* 101 */
 	{"getuid",	lx_getuid,		0,		0}, /* 102 */
 	{"syslog",	lx_syslog,		0,		3}, /* 103 */

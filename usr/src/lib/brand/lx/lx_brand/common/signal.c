@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -40,6 +40,7 @@
 #include <sys/lx_sigstack.h>
 #include <sys/lx_syscall.h>
 #include <sys/lx_thread.h>
+#include <sys/lx_userhz.h>
 #include <sys/syscall.h>
 #include <lx_provider_impl.h>
 #include <sys/stack.h>
@@ -473,8 +474,10 @@ stol_siginfo(siginfo_t *siginfop, lx_siginfo_t *lx_siginfop)
 				lx_siginfo.lsi_status = lx_stol_status(
 				    siginfop->si_status, -1);
 			}
-			lx_siginfo.lsi_utime = siginfop->si_utime;
-			lx_siginfo.lsi_stime = siginfop->si_stime;
+			lx_siginfo.lsi_utime =
+			    HZ_TO_LX_USERHZ(siginfop->si_utime);
+			lx_siginfo.lsi_stime =
+			    HZ_TO_LX_USERHZ(siginfop->si_stime);
 			break;
 
 		case LX_SIGILL:
