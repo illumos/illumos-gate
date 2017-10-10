@@ -11,6 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 #
@@ -22,7 +23,7 @@ UTSBASE	= ../..
 # Define the module and object file sets.
 #
 MODULE		= viona
-OBJECTS		= $(VIONA_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS	= $(VIONA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(VIONA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io/viona
@@ -42,6 +43,12 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # Overrides
 #
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LINTTAGS	+= -erroff=E_FUNC_ARG_UNUSED
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
+LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls -Ndrv/vmm
 

@@ -1,5 +1,8 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
+ * Copyright 2018 Joyent, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +34,9 @@
 
 #define	RFB_PORT	5900
 
-int	rfb_init(int port);
+int	rfb_init(char *hostname, int port, int wait, char *password);
+#ifndef __FreeBSD__
+int	rfb_init_unix(char *path, int wait, char *password);
+#endif
 
 #endif /* _RFB_H_ */

@@ -11,76 +11,79 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _VMM_IMPL_H_
-#define _VMM_IMPL_H_
+#define	_VMM_IMPL_H_
 
 #include <sys/mutex.h>
 #include <sys/queue.h>
 #include <sys/varargs.h>
-
-/*
- * /dev names:
- *      /dev/vmmctl         - control device
- *      /dev/vmm/<name>     - vm devices
- */
-#define	VMM_DRIVER_NAME		"vmm"
-
-#define	VMM_CTL_MINOR_NODE	"ctl"
-#define	VMM_CTL_MINOR_NAME	VMM_DRIVER_NAME VMM_CTL_NODE
-#define	VMM_CTL_MINOR		0
-
-#define	VMM_IOC_BASE		(('V' << 16) | ('M' << 8))
-
-#define	VMM_CREATE_VM		(VMM_IOC_BASE | 0x01)
-#define	VMM_DESTROY_VM		(VMM_IOC_BASE | 0x02)
-
-struct vmm_ioctl {
-	char vmm_name[VM_MAX_NAMELEN];
-};
+#include <sys/zone.h>
 
 #ifdef	_KERNEL
-struct vmm_softc {
-	boolean_t			open;
-	minor_t				minor;
-	struct vm			*vm;
-	char				name[VM_MAX_NAMELEN];
-	SLIST_ENTRY(vmm_softc)		link;
+
+#define	VMM_CTL_MINOR	0
+
+/*
+ * Rather than creating whole character devices for devmem mappings, they are
+ * available by mmap(2)ing the vmm handle at a specific offset.  These offsets
+ * begin just above the maximum allow guest physical address.
+ */
+#include <vm/vm_param.h>
+#define	VM_DEVMEM_START	(VM_MAXUSER_ADDRESS + 1)
+
+struct vmm_devmem_entry {
+	list_node_t	vde_node;
+	int		vde_segid;
+	char		vde_name[SPECNAMELEN + 1];
+	size_t		vde_len;
+	off_t		vde_off;
 };
-#endif
+typedef struct vmm_devmem_entry vmm_devmem_entry_t;
 
-/*
- * VMM trace ring buffer constants
- */
-#define	VMM_DMSG_RING_SIZE		0x100000	/* 1MB */
-#define	VMM_DMSG_BUF_SIZE		256
+typedef struct vmm_zsd vmm_zsd_t;
 
-/*
- * VMM trace ring buffer content
- */
-typedef struct vmm_trace_dmsg {
-	timespec_t		timestamp;
-	char			buf[VMM_DMSG_BUF_SIZE];
-	struct vmm_trace_dmsg	*next;
-} vmm_trace_dmsg_t;
+enum vmm_softc_state {
+	VMM_HELD	= 1,	/* external driver(s) possess hold on the VM */
+	VMM_CLEANUP	= 2,	/* request that holds are released */
+	VMM_PURGED	= 4,	/* all hold have been released */
+	VMM_BLOCK_HOOK	= 8,	/* mem hook install temporarily blocked */
+	VMM_DESTROY	= 16	/* VM is destroyed, softc still around */
+};
 
-/*
- * VMM trace ring buffer header
- */
-typedef struct vmm_trace_rbuf {
-	kmutex_t		lock;		/* lock to avoid clutter */
-	int			looped;		/* completed ring */
-	int			allocfailed;	/* dmsg mem alloc failed */
-	size_t			size;		/* current size */
-	size_t			maxsize;	/* max size */
-	vmm_trace_dmsg_t	*dmsgh;		/* messages head */
-	vmm_trace_dmsg_t	*dmsgp;		/* ptr to last message */
-} vmm_trace_rbuf_t;
+struct vmm_softc {
+	list_node_t	vmm_node;
+	struct vm	*vmm_vm;
+	minor_t		vmm_minor;
+	char		vmm_name[VM_MAX_NAMELEN];
+	list_t		vmm_devmem_list;
 
-/*
- * VMM trace ring buffer interfaces
- */
-void vmm_trace_log(const char *fmt, ...);
+	kcondvar_t	vmm_cv;
+	list_t		vmm_holds;
+	uint_t		vmm_flags;
+	boolean_t	vmm_is_open;
+
+	kmutex_t	vmm_lease_lock;
+	list_t		vmm_lease_list;
+	uint_t		vmm_lease_blocker;
+	kcondvar_t	vmm_lease_cv;
+	krwlock_t	vmm_rwlock;
+
+	/* For zone specific data */
+	list_node_t	vmm_zsd_linkage;
+	zone_t		*vmm_zone;
+	vmm_zsd_t	*vmm_zsd;
+};
+typedef struct vmm_softc vmm_softc_t;
+
+void vmm_zsd_init(void);
+void vmm_zsd_fini(void);
+int vmm_zsd_add_vm(vmm_softc_t *sc);
+void vmm_zsd_rem_vm(vmm_softc_t *sc);
+int vmm_do_vm_destroy(vmm_softc_t *, boolean_t);
+
+#endif /* _KERNEL */
 
 #endif	/* _VMM_IMPL_H_ */

@@ -34,6 +34,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -289,6 +290,8 @@ pci_viona_tx_thread(void *param)
 		sc->vsc_tx_kick_lock_held = B_FALSE;
 	}
 	pthread_mutex_unlock(&sc->tx_mtx);
+
+	return (NULL);
 }
 
 static void
@@ -347,8 +350,10 @@ static int
 pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 {
 	vioc_create_t		vna_create;
+#if notyet
 	char			devname[MAXNAMELEN];
 	int			ctlfd;
+#endif
 	int			error;
 
 	sc->vsc_vnafd = open("/devices/pseudo/viona@0:ctl", O_RDWR | O_EXCL);
@@ -360,10 +365,12 @@ pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 	vna_create.c_linkid = sc->vsc_linkid;
 	strlcpy(vna_create.c_vmname, vmname,
 	    sizeof (vna_create.c_vmname));
+#if notyet
 	vm_get_memory_seg(ctx, 1 * (1024 * 1024UL), &vna_create.c_lomem_size,
 	    NULL);
 	vm_get_memory_seg(ctx, 4 * (1024 * 1024 * 1024UL),
 	    &vna_create.c_himem_size, NULL);
+#endif
 	error = ioctl(sc->vsc_vnafd, VNA_IOC_CREATE, &vna_create);
 	if (error != 0) {
 		WPRINTF(("ioctl viona create failed %d\n", error));
@@ -495,7 +502,7 @@ viona_adjust_offset(struct pci_devinst *pi, uint64_t offset)
 
 static void
 pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-		int baridx, uint64_t offset, int size, uint64_t value)
+    int baridx, uint64_t offset, int size, uint64_t value)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;
 	void *ptr;

@@ -12,11 +12,12 @@
 #
 # Copyright 2013 Pluribus Networks Inc.
 #
+# Copyright 2019 Joyent, Inc.
 
-LIBRARY		= libvmmapi.a
+LIBRARY	= libvmmapi.a
 VERS		= .1
 
-OBJECTS		= vmmapi.o expand_number.o
+OBJECTS	= vmmapi.o expand_number.o
 
 # include library definitions
 include ../../Makefile.lib
@@ -24,16 +25,19 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-SRCDIR		=	../common
+SRCDIR		= ../common
 
-LIBS		=	$(DYNLIB) $(LINTLIB)
+LIBS		= $(DYNLIB) $(LINTLIB)
 
-CPPFLAGS	=	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
+CPPFLAGS	= -I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc
+
+# not linted
+SMATCH=off
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-LDLIBS		+=	-lc
+LDLIBS		+= -lc
 
 .KEEP_STATE:
 

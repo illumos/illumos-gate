@@ -39,6 +39,11 @@ struct malloc_type {
 void	free(void *addr, struct malloc_type *type);
 void	*malloc(unsigned long size, struct malloc_type *type, int flags);
 void	*old_malloc(unsigned long size, struct malloc_type *type , int flags);
+void	*contigmalloc(unsigned long, struct malloc_type *, int, vm_paddr_t,
+    vm_paddr_t, unsigned long, vm_paddr_t);
+void	contigfree(void *, unsigned long, struct malloc_type *);
+
+
 #endif	/* _KERNEL */
 
 #endif	/* _COMPAT_FREEBSD_SYS_MALLOC_H_ */

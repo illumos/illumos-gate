@@ -41,9 +41,11 @@ typedef __int64_t	__register_t;
 typedef __uint64_t	__vm_offset_t;
 typedef __uint64_t	__vm_paddr_t;
 typedef __int64_t	__vm_ooffset_t;
+typedef __uint64_t	__vm_size_t;
 #else
 typedef __int32_t	__register_t;
 typedef __uint32_t	__vm_paddr_t;
+typedef __uint32_t	__vm_size_t;
 #endif
 
 #endif	/* _FREEBSD_X86__TYPES_H_ */

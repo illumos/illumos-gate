@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013  Chris Torek <torek @ torek net>
  * All rights reserved.
  *
@@ -23,11 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/virtio.h 268276 2014-07-05 02:38:53Z grehan $
+ * $FreeBSD$
  */
 
 #ifndef	_VIRTIO_H_
 #define	_VIRTIO_H_
+
+#include <pthread_np.h>
 
 /*
  * These are derived from several virtio specifications.
@@ -184,7 +188,7 @@ struct vring_used {
 /*
  * PFN register shift amount
  */
-#define VRING_PFN               12
+#define	VRING_PFN		12
 
 /*
  * Virtio device types
@@ -209,7 +213,9 @@ struct vring_used {
 #define	VIRTIO_VENDOR		0x1AF4
 #define	VIRTIO_DEV_NET		0x1000
 #define	VIRTIO_DEV_BLOCK	0x1001
-#define	VIRTIO_DEV_RANDOM	0x1002
+#define	VIRTIO_DEV_CONSOLE	0x1003
+#define	VIRTIO_DEV_RANDOM	0x1005
+#define	VIRTIO_DEV_SCSI		0x1008
 
 /*
  * PCI config space constants.
@@ -220,19 +226,19 @@ struct vring_used {
  * If MSI-X is not enabled, those two registers disappear and
  * the remaining configuration registers start at offset 20.
  */
-#define VTCFG_R_HOSTCAP		0
-#define VTCFG_R_GUESTCAP	4
-#define VTCFG_R_PFN		8
-#define VTCFG_R_QNUM		12
-#define VTCFG_R_QSEL		14
-#define VTCFG_R_QNOTIFY		16
-#define VTCFG_R_STATUS		18
-#define VTCFG_R_ISR		19
-#define VTCFG_R_CFGVEC		20
-#define VTCFG_R_QVEC		22
-#define VTCFG_R_CFG0		20	/* No MSI-X */
-#define VTCFG_R_CFG1		24	/* With MSI-X */
-#define VTCFG_R_MSIX		20
+#define	VTCFG_R_HOSTCAP		0
+#define	VTCFG_R_GUESTCAP	4
+#define	VTCFG_R_PFN		8
+#define	VTCFG_R_QNUM		12
+#define	VTCFG_R_QSEL		14
+#define	VTCFG_R_QNOTIFY		16
+#define	VTCFG_R_STATUS		18
+#define	VTCFG_R_ISR		19
+#define	VTCFG_R_CFGVEC		20
+#define	VTCFG_R_QVEC		22
+#define	VTCFG_R_CFG0		20	/* No MSI-X */
+#define	VTCFG_R_CFG1		24	/* With MSI-X */
+#define	VTCFG_R_MSIX		20
 
 /*
  * Bits in VTCFG_R_STATUS.  Guests need not actually set any of these,
@@ -251,7 +257,7 @@ struct vring_used {
 #define	VTCFG_ISR_QUEUES	0x01	/* re-scan queues */
 #define	VTCFG_ISR_CONF_CHANGED	0x80	/* configuration changed */
 
-#define VIRTIO_MSI_NO_VECTOR	0xFFFF
+#define	VIRTIO_MSI_NO_VECTOR	0xFFFF
 
 /*
  * Feature flags.
@@ -352,6 +358,8 @@ struct virtio_consts {
 					/* called to read config regs */
 	int	(*vc_cfgwrite)(void *, int, int, uint32_t);
 					/* called to write config regs */
+	void    (*vc_apply_features)(void *, uint64_t);
+				/* called to apply negotiated features */
 	uint64_t vc_hv_caps;		/* hypervisor-provided capabilities */
 };
 
@@ -423,20 +431,6 @@ vq_has_descs(struct vqueue_info *vq)
 }
 
 /*
- * Called by virtio driver as it starts processing chains.  Each
- * completed chain (obtained from vq_getchain()) is released by
- * calling vq_relchain(), then when all are done, vq_endchains()
- * can tell if / how-many chains were processed and know whether
- * and how to generate an interrupt.
- */
-static inline void
-vq_startchains(struct vqueue_info *vq)
-{
-
-	vq->vq_save_used = vq->vq_used->vu_idx;
-}
-
-/*
  * Deliver an interrupt to guest on the given virtual queue
  * (if possible, or a generic MSI interrupt if not using MSI-X).
  */
@@ -447,11 +441,25 @@ vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 	if (pci_msix_enabled(vs->vs_pi))
 		pci_generate_msix(vs->vs_pi, vq->vq_msix_idx);
 	else {
+#ifndef __FreeBSD__
+		boolean_t unlock = B_FALSE;
+
+		if (vs->vs_mtx && !pthread_mutex_isowned_np(vs->vs_mtx)) {
+			unlock = B_TRUE;
+			pthread_mutex_lock(vs->vs_mtx);
+		}
+#else
 		VS_LOCK(vs);
+#endif
 		vs->vs_isr |= VTCFG_ISR_QUEUES;
 		pci_generate_msi(vs->vs_pi, 0);
 		pci_lintr_assert(vs->vs_pi);
+#ifndef __FreeBSD__
+		if (unlock)
+			pthread_mutex_unlock(vs->vs_mtx);
+#else
 		VS_UNLOCK(vs);
+#endif
 	}
 }
 
@@ -463,9 +471,10 @@ int	vi_intr_init(struct virtio_softc *vs, int barnum, int use_msix);
 void	vi_reset_dev(struct virtio_softc *);
 void	vi_set_io_bar(struct virtio_softc *, int);
 
-int	vq_getchain(struct vqueue_info *vq,
+int	vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 		    struct iovec *iov, int n_iov, uint16_t *flags);
-void	vq_relchain(struct vqueue_info *vq, uint32_t iolen);
+void	vq_retchain(struct vqueue_info *vq);
+void	vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen);
 void	vq_endchains(struct vqueue_info *vq, int used_all_avail);
 
 uint64_t vi_pci_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,

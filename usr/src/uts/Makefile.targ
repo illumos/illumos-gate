@@ -23,6 +23,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright (c) 2017 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
@@ -51,7 +52,7 @@ $(OBJECTS): $(INLINES)
 #	Partially link .o files to generate the kmod. The fake dependency
 #	on modstubs simplifies things...
 #
-$(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE)
+$(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE) $(MAPFILE)
 	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)

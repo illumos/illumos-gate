@@ -17,6 +17,8 @@
 #define	_COMPAT_FREEBSD_SYS_IOCTL_H_
 
 #include <sys/ioccom.h>
+/* Get BSD compatibility from the ioctl header */
+#define	BSD_COMP
 #include_next <sys/ioctl.h>
 
 #endif	/* _COMPAT_FREEBSD_SYS_IOCTL_H_ */

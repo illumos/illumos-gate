@@ -58,6 +58,12 @@ $(NO_ADJUNCT_PROTO)HAVE_ADJUNCT_PROTO=$(POUND_SIGN)
 NATIVE_ADJUNCT=	/usr
 
 #
+# Compatibility code for FreeBSD etc.
+#
+COMPAT=	$(SRC)/compat
+CONTRIB= $(SRC)/../contrib
+
+#
 # RELEASE_BUILD should be cleared for final release builds.
 # NOT_RELEASE_BUILD is exactly what the name implies.
 #

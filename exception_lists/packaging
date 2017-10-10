@@ -817,6 +817,12 @@ usr/lib/sparcv9/libsff.so		sparc
 usr/lib/libsff.so
 
 #
+# private bhyve files
+#
+lib/amd64/libvmmapi.so			i386
+usr/include/vmmapi.h			i386
+
+#
 # libcustr is private
 #
 usr/include/libcustr.h

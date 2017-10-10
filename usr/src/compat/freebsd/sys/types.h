@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_TYPES_H_
@@ -53,6 +54,16 @@ typedef __vm_ooffset_t	vm_ooffset_t;
 typedef __vm_paddr_t	vm_paddr_t;
 #endif
 
+#ifndef	__VM_PINDEX_T_DEFINED
+#define	__VM_PINDEX_T_DEFINED
+typedef __uint64_t	vm_pindex_t;
+#endif
+
+#ifndef	__VM_SIZE_T_DEFINED
+#define	__VM_SIZE_T_DEFINED
+typedef __vm_size_t	vm_size_t;
+#endif
+
 #ifndef	__VM_MEMATTR_T_DEFINED
 #define	__VM_MEMATTR_T_DEFINED
 typedef char		vm_memattr_t;
@@ -65,8 +76,8 @@ typedef char		vm_memattr_t;
 typedef _Bool bool;
 #endif
 
-#if defined(_KERNEL) && !defined(offsetof)
-#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
+#if defined(_KERNEL)
+typedef struct __dev_info **device_t;
 #endif
 
 #include_next <sys/types.h>

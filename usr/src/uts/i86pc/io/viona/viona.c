@@ -34,6 +34,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/conf.h>
@@ -194,8 +195,8 @@ static void			*viona_state;
 static dev_info_t		*viona_dip;
 static id_space_t		*viona_minor_ids;
 /*
- * copy tx mbufs from virtio ring to avoid necessitating a wait 
- * for packet transmission to free resources.
+ * copy tx mbufs from virtio ring to avoid necessitating a wait for packet
+ * transmission to free resources.
  */
 static boolean_t		copy_tx_mblks = B_TRUE;
 
@@ -914,7 +915,7 @@ viona_ioc_tx_intr_clear(viona_link_t *link)
 
 static int
 vq_popchain(viona_link_t *link, viona_vring_hqueue_t *hq, struct iovec *iov,
-int n_iov, uint16_t *cookie)
+    int n_iov, uint16_t *cookie)
 {
 	int			i;
 	int			ndesc, nindir;
@@ -1139,10 +1140,12 @@ viona_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		size_t			mblklen;
 		int			n, i = 0;
 		uint16_t		cookie;
-		struct virtio_net_hdr	*vrx;
-		struct virtio_net_mrgrxhdr *vmrgrx;
+		struct virtio_net_hdr	*vrx = NULL;
+		struct virtio_net_mrgrxhdr *vmrgrx = NULL;
+#if notyet
 		mblk_t			*ml;
-		caddr_t			buf;
+#endif
+		caddr_t			buf = NULL;
 		int			total_len = 0;
 		int			copied_buf = 0;
 		int			num_bufs = 0;
@@ -1312,8 +1315,10 @@ viona_desb_free(viona_desb_t *dp)
 {
 	viona_link_t		*link;
 	viona_vring_hqueue_t	*hq;
+#if notyet
 	struct virtio_used	*vu;
 	int			uidx;
+#endif
 	uint_t			ref;
 
 	ref = atomic_dec_uint_nv(&dp->d_ref);

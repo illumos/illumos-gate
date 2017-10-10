@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2012 NetApp, Inc.
  * All rights reserved.
  *
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_host.h 242275 2012-10-29 01:51:24Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -36,6 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_VMM_HOST_H_
@@ -46,8 +49,14 @@
 #endif
 
 #ifndef	_KERNEL
-#error "no user-servicable parts inside"
+#error "no user-serviceable parts inside"
 #endif
+
+struct xsave_limits {
+	int		xsave_enabled;
+	uint64_t	xcr0_allowed;
+	uint32_t	xsave_max_size;
+};
 
 void vmm_host_state_init(void);
 
@@ -55,11 +64,13 @@ uint64_t vmm_get_host_pat(void);
 uint64_t vmm_get_host_efer(void);
 uint64_t vmm_get_host_cr0(void);
 uint64_t vmm_get_host_cr4(void);
+uint64_t vmm_get_host_xcr0(void);
 uint64_t vmm_get_host_datasel(void);
 uint64_t vmm_get_host_codesel(void);
 uint64_t vmm_get_host_tsssel(void);
 uint64_t vmm_get_host_fsbase(void);
 uint64_t vmm_get_host_idtrbase(void);
+const struct xsave_limits *vmm_get_xsave_limits(void);
 
 /*
  * Inline access to host state that is used on every VM entry
@@ -89,8 +100,10 @@ vmm_get_host_gdtrbase(void)
 #endif
 }
 
+#ifdef	__FreeBSD__
 struct pcpu;
 extern struct pcpu __pcpu[];
+#endif
 
 static __inline uint64_t
 vmm_get_host_gsbase(void)

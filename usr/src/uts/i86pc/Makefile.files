@@ -23,8 +23,8 @@
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2010, Intel Corporation.
-# Copyright 2018 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Joyent, Inc.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
@@ -237,6 +237,46 @@ UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o
 AMD_IOMMU_OBJS +=	amd_iommu.o amd_iommu_impl.o amd_iommu_acpi.o \
 			amd_iommu_cmd.o amd_iommu_log.o amd_iommu_page_tables.o
+VMM_OBJS += vmm.o \
+	vmm_sol_dev.o \
+	vmm_host.o \
+	vmm_instruction_emul.o \
+	vmm_ioport.o \
+	vmm_lapic.o \
+	vmm_mem.o \
+	vmm_stat.o \
+	vmm_util.o \
+	x86.o \
+	vdev.o \
+	vatpic.o \
+	vatpit.o \
+	vhpet.o \
+	vioapic.o \
+	vlapic.o \
+	vrtc.o \
+	vpmtmr.o \
+	ept.o \
+	vmcs.o \
+	vmx_msr.o \
+	vmx.o \
+	vmx_support.o \
+	svm.o \
+	svm_msr.o \
+	npt.o \
+	vmcb.o \
+	svm_support.o \
+	amdv.o \
+	sol_iommu.o \
+	sol_ppt.o \
+	gipt.o \
+	vmm_sol_vm.o \
+	vmm_sol_glue.o \
+	vmm_sol_ept.o \
+	vmm_sol_rvi.o \
+	vmm_support.o \
+	vmm_zsd.o
+
+VIONA_OBJS += viona.o
 
 #
 #	Build up defines and paths.

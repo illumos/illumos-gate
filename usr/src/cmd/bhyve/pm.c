@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2013 Advanced Computing Technologies LLC
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2013 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -24,14 +26,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/pm.c 266125 2014-05-15 14:16:55Z jhb $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <machine/vmm.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <pthread.h>
 #ifndef	__FreeBSD__
 #include <stdlib.h>
@@ -51,6 +57,8 @@ static pthread_mutex_t pm_lock = PTHREAD_MUTEX_INITIALIZER;
 #ifdef	__FreeBSD__
 static struct mevent *power_button;
 static sig_t old_power_handler;
+#else
+struct vmctx *pwr_ctx;
 #endif
 
 /*
@@ -63,6 +71,8 @@ static int
 reset_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
     uint32_t *eax, void *arg)
 {
+	int error;
+
 	static uint8_t reset_control;
 
 	if (bytes != 1)
@@ -74,12 +84,8 @@ reset_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 
 		/* Treat hard and soft resets the same. */
 		if (reset_control & 0x4) {
-#ifdef	__FreeBSD__
 			error = vm_suspend(ctx, VM_SUSPEND_RESET);
 			assert(error == 0 || errno == EALREADY);
-#else
-			exit(0);
-#endif
 		}
 	}
 	return (0);
@@ -220,6 +226,34 @@ power_button_handler(int signal, enum ev_type type, void *arg)
 	}
 	pthread_mutex_unlock(&pm_lock);
 }
+
+#else
+/*
+ * Initiate graceful power off.
+ */
+/*ARGSUSED*/
+static void
+power_button_handler(int signal, siginfo_t *type, void *cp)
+{
+	/*
+	 * In theory, taking the 'pm_lock' mutex from within this signal
+	 * handler could lead to deadlock if the main thread already held this
+	 * mutex. In reality, this mutex is local to this file and all of the
+	 * other usage in this file only occurs in functions which are FreeBSD
+	 * specific (and thus currently not used). Thus, for consistency with
+	 * the other code in this file, we take the mutex, but in the future,
+	 * if these other functions are ever enabled for use on non-FreeBSD
+	 * systems and these functions could be called directly by a thread
+	 * (which would then hold the mutex), then we need to revisit the use
+	 * of this mutex in this signal handler.
+	 */
+	pthread_mutex_lock(&pm_lock);
+	if (!(pm1_status & PM1_PWRBTN_STS)) {
+		pm1_status |= PM1_PWRBTN_STS;
+		sci_update(pwr_ctx);
+	}
+	pthread_mutex_unlock(&pm_lock);
+}
 #endif
 
 /*
@@ -239,6 +273,7 @@ static int
 pm1_control_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
     uint32_t *eax, void *arg)
 {
+	int error;
 
 	if (bytes != 2)
 		return (-1);
@@ -259,12 +294,8 @@ pm1_control_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 		 */
 		if (*eax & PM1_SLP_EN) {
 			if ((pm1_control & PM1_SLP_TYP) >> 10 == 5) {
-#ifdef	__FreeBSD__
 				error = vm_suspend(ctx, VM_SUSPEND_POWEROFF);
 				assert(error == 0 || errno == EALREADY);
-#else
-				exit(0);
-#endif
 			}
 		}
 	}
@@ -330,4 +361,18 @@ sci_init(struct vmctx *ctx)
 	 */
 	pci_irq_use(SCI_INT);
 	vm_isa_set_irq_trigger(ctx, SCI_INT, LEVEL_TRIGGER);
+
+#ifndef	__FreeBSD__
+	{
+		/*
+		 * Install SIGTERM signal handler for graceful power off.
+		 */
+		struct sigaction act;
+
+		pwr_ctx = ctx;
+		act.sa_flags = 0;
+		act.sa_sigaction = power_button_handler;
+		(void) sigaction(SIGTERM, &act, NULL);
+	}
+#endif
 }

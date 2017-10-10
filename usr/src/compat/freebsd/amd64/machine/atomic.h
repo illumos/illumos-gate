@@ -11,31 +11,20 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_
 #define	_COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_
 
-static __inline u_char
-atomic_load_acq_char(volatile u_char *p)
-{
-	u_char res;
-
-	__asm volatile("lock ; " "cmpxchgb %b0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p) : "memory", "cc");
-	return (res);
-}
-
-static __inline u_short
+static __inline u_int
 atomic_load_acq_short(volatile u_short *p)
 {
 	u_short res;
 
-	__asm volatile("lock ; " "cmpxchgw %w0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p)
-		       : "memory", "cc");
+	res = *p;
+	__asm volatile("" : : : "memory");
+
 	return (res);
 }
 
@@ -44,10 +33,9 @@ atomic_load_acq_int(volatile u_int *p)
 {
 	u_int res;
 
-	__asm volatile("lock ; " "cmpxchgl %0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p)
-		       : "memory", "cc");
+	res = *p;
+	__asm volatile("" : : : "memory");
+
 	return (res);
 }
 
@@ -56,25 +44,10 @@ atomic_load_acq_long(volatile u_long *p)
 {
 	u_long res;
 
-	__asm volatile("lock ; " "cmpxchgq %0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p)
-		       : "memory", "cc");
+	res = *p;
+	__asm volatile("" : : : "memory");
+
 	return (res);
-}
-
-static __inline void
-atomic_store_rel_char(volatile u_char *p, u_char v)
-{
-	__asm volatile("" : : : "memory");
-	*p = v;
-}
-
-static __inline void
-atomic_store_rel_short(volatile u_short *p, u_short v)
-{
-	__asm volatile("" : : : "memory");
-	*p = v;
 }
 
 static __inline void
@@ -131,6 +104,23 @@ atomic_cmpset_long(volatile u_long *dst, u_long expect, u_long src)
 	  "+a" (expect)			/* 2 */
 	: "r" (src)			/* 3 */
 	: "memory", "cc");
+	return (res);
+}
+
+static __inline int
+atomic_testandset_int(volatile u_int *p, u_int v)
+{
+	u_char res;
+
+	__asm __volatile(
+	"	lock ;			"
+	"	btsl	%2,%1 ;		"
+	"	setc	%0 ;		"
+	"# atomic_testandset_int"
+	: "=q" (res),		/* 0 */
+	"+m" (*p)		/* 1 */
+	: "Ir" (v & 0x1f)	/* 2 */
+	: "cc");
 	return (res);
 }
 
@@ -226,6 +216,13 @@ atomic_swap_long(volatile u_long *p, u_long v)
 	return (v);
 }
 
+
+#define	atomic_store_short(p, v)	\
+	    (*(volatile u_short *)(p) = (u_short)(v))
+#define	atomic_store_int(p, v)		\
+	    (*(volatile u_int *)(p) = (u_int)(v))
+
+
 #define	atomic_readandclear_int(p)	atomic_swap_int(p, 0)
 #define	atomic_readandclear_long(p)	atomic_swap_long(p, 0)
 
@@ -240,5 +237,26 @@ atomic_swap_long(volatile u_long *p, u_long v)
 
 /* Operations on pointers. */
 #define	atomic_cmpset_ptr	atomic_cmpset_long
+
+/* Needed for the membar functions */
+#include_next <sys/atomic.h>
+
+static __inline void
+atomic_thread_fence_rel(void)
+{
+	/* Equivalent to their __compiler_membar() */
+	__asm __volatile(" " : : : "memory");
+}
+
+static __inline void
+atomic_thread_fence_seq_cst(void)
+{
+	/* Equivalent to their !KERNEL storeload_barrer() */
+	__asm __volatile("lock; addl $0,-8(%%rsp)" : : : "memory", "cc");
+}
+
+#define	mb()			membar_enter()
+#define	rmb()			membar_consumer()
+#define	wmb()			membar_producer()
 
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_ */

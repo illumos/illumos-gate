@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2014 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * All rights reserved.
  *
@@ -25,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/smbiostbl.c 272007 2014-09-23 01:17:22Z grehan $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 
@@ -33,6 +35,7 @@ __FBSDID("$FreeBSD: head/usr.sbin/bhyve/smbiostbl.c 272007 2014-09-23 01:17:22Z 
 #include <errno.h>
 #include <md5.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <uuid.h>
@@ -321,8 +324,8 @@ struct smbios_table_type0 smbios_type0_template = {
 
 const char *smbios_type0_strings[] = {
 	"BHYVE",	/* vendor string */
-	__TIME__,	/* bios version string */
-	__DATE__,	/* bios release date string */
+	"1.00",		/* bios version string */
+	"03/14/2014",	/* bios release date string */
 	NULL
 };
 
@@ -634,7 +637,7 @@ smbios_type4_initializer(struct smbios_structure *template_entry,
 {
 	int i;
 
-	for (i = 0; i < guest_ncpus; i++) {
+	for (i = 0; i < sockets; i++) {
 		struct smbios_table_type4 *type4;
 		char *p;
 		int nstrings, len;
@@ -653,6 +656,16 @@ smbios_type4_initializer(struct smbios_structure *template_entry,
 		*(*endaddr) = '\0';
 		(*endaddr)++;
 		type4->socket = nstrings + 1;
+		/* Revise cores and threads after update to smbios 3.0 */
+		if (cores > 254)
+			type4->cores = 0;
+		else
+			type4->cores = cores;
+		/* This threads is total threads in a socket */
+		if ((cores * threads) > 254)
+			type4->threads = 0;
+		else
+			type4->threads = (cores * threads);
 		curaddr = *endaddr;
 	}
 
@@ -824,4 +837,81 @@ smbios_build(struct vmctx *ctx)
 	smbios_ep_finalizer(smbios_ep, curaddr - ststartaddr, n, maxssize);
 
 	return (0);
+}
+
+int
+smbios_parse(const char *opts)
+{
+	char *buf;
+	char *lasts;
+	char *token;
+	char *end;
+	long type;
+	struct {
+		const char *key;
+		const char **targetp;
+	} type1_map[] = {
+		{ "manufacturer", &smbios_type1_strings[0] },
+		{ "product", &smbios_type1_strings[1] },
+		{ "version", &smbios_type1_strings[2] },
+		{ "serial", &smbios_type1_strings[3] },
+		{ "sku", &smbios_type1_strings[4] },
+		{ "family", &smbios_type1_strings[5] },
+		{ "uuid", (const char **)&guest_uuid_str },
+		{ 0 }
+	};
+
+	if ((buf = strdup(opts)) == NULL) {
+		(void) fprintf(stderr, "out of memory\n");
+		return (-1);
+	}
+
+	if ((token = strtok_r(buf, ",", &lasts)) == NULL) {
+		(void) fprintf(stderr, "too few fields\n");
+		goto fail;
+	}
+
+	errno = 0;
+	type = strtol(token, &end, 10);
+	if (errno != 0 || *end != '\0') {
+		(void) fprintf(stderr, "first token '%s' is not an integer\n",
+		    token);
+		goto fail;
+	}
+
+	/* For now, only type 1 is supported. */
+	if (type != 1) {
+		(void) fprintf(stderr, "unsupported type %d\n", type);
+		goto fail;
+	}
+
+	while ((token = strtok_r(NULL, ",", &lasts)) != NULL) {
+		char *val;
+		int i;
+
+		if ((val = strchr(token, '=')) == NULL) {
+			(void) fprintf(stderr, "invalid key=value: '%s'\n",
+			    token);
+			goto fail;
+		}
+		*val = '\0';
+		val++;
+
+		for (i = 0; type1_map[i].key != NULL; i++) {
+			if (strcmp(token, type1_map[i].key) == 0) {
+				break;
+			}
+		}
+		if (type1_map[i].key == NULL) {
+			(void) fprintf(stderr, "invalid key '%s'\n", token);
+			goto fail;
+		}
+		*type1_map[i].targetp = val;
+	}
+
+	return (0);
+
+fail:
+	free(buf);
+	return (-1);
 }

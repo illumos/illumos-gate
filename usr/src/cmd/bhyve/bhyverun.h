@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/bhyverun.h 277310 2015-01-18 03:08:30Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -41,17 +43,12 @@
 #ifndef	_FBSDRUN_H_
 #define	_FBSDRUN_H_
 
-#ifndef CTASSERT		/* Allow lint to override */
-#define	CTASSERT(x)		_CTASSERT(x, __LINE__)
-#define	_CTASSERT(x, y)		__CTASSERT(x, y)
-#define	__CTASSERT(x, y)	typedef char __assert ## y[(x) ? 1 : -1]
-#endif
-
 #define	VMEXIT_CONTINUE		(0)
 #define	VMEXIT_ABORT		(-1)
 
 struct vmctx;
 extern int guest_ncpus;
+extern uint16_t cores, sockets, threads;
 extern char *guest_uuid_str;
 extern char *vmname;
 #ifndef	__FreeBSD__

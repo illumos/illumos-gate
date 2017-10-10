@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/x86.h 255287 2013-09-06 05:16:10Z grehan $
+ * $FreeBSD$
  */
 
 #ifndef _X86_H_
@@ -47,6 +49,8 @@
 #define CPUID_8000_0006	(0x80000006)
 #define CPUID_8000_0007	(0x80000007)
 #define CPUID_8000_0008	(0x80000008)
+#define CPUID_8000_001D	(0x8000001D)
+#define CPUID_8000_001E	(0x8000001E)
 
 /*
  * CPUID instruction Fn0000_0001:
@@ -62,4 +66,17 @@
 int x86_emulate_cpuid(struct vm *vm, int vcpu_id, uint32_t *eax, uint32_t *ebx,
 		      uint32_t *ecx, uint32_t *edx);
 
+enum vm_cpuid_capability {
+	VCC_NONE,
+	VCC_NO_EXECUTE,
+	VCC_FFXSR,
+	VCC_TCE,
+	VCC_LAST
+};
+
+/*
+ * Return 'true' if the capability 'cap' is enabled in this virtual cpu
+ * and 'false' otherwise.
+ */
+bool vm_cpuid_capability(struct vm *vm, int vcpuid, enum vm_cpuid_capability);
 #endif

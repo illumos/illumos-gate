@@ -11,9 +11,14 @@
 
 /*
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_LIMITS_H_
 #define	_COMPAT_FREEBSD_SYS_LIMITS_H_
+
+#include_next <limits.h>
+
+#define	OFF_MAX		((off_t)-1)
 
 #endif	/* _COMPAT_FREEBSD_SYS_LIMITS_H_ */

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -10,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -26,15 +28,24 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_stat.h 250427 2013-05-10 02:59:49Z neel $
+ * $FreeBSD$
+ */
+/*
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _VMM_STAT_H_
 #define	_VMM_STAT_H_
 
+#include <machine/vmm.h>
+
 struct vm;
 
-#define	MAX_VMM_STAT_ELEMS	64		/* arbitrary */
+#ifdef __FreeBSD__
+#define	MAX_VMM_STAT_ELEMS	64			/* arbitrary */
+#else
+#define	MAX_VMM_STAT_ELEMS	(64 + VM_MAXCPU)	/* arbitrary */
+#endif
 
 enum vmm_stat_scope {
 	VMM_STAT_SCOPE_ANY,
@@ -42,20 +53,28 @@ enum vmm_stat_scope {
 	VMM_STAT_SCOPE_AMD,		/* AMD SVM specific statistic */
 };
 
+struct vmm_stat_type;
+typedef void (*vmm_stat_func_t)(struct vm *vm, int vcpu,
+    struct vmm_stat_type *stat);
+
 struct vmm_stat_type {
 	int	index;			/* position in the stats buffer */
 	int	nelems;			/* standalone or array */
 	const char *desc;		/* description of statistic */
+	vmm_stat_func_t func;
 	enum vmm_stat_scope scope;
 };
 
-void	vmm_stat_init(void *arg);
+void	vmm_stat_register(void *arg);
 
-#define	VMM_STAT_DEFINE(type, nelems, desc, scope)			\
+#define	VMM_STAT_FDEFINE(type, nelems, desc, func, scope)		\
 	struct vmm_stat_type type[1] = {				\
-		{ -1, nelems, desc, scope }				\
+		{ -1, nelems, desc, func, scope }			\
 	};								\
-	SYSINIT(type##_stat, SI_SUB_KLD, SI_ORDER_ANY, vmm_stat_init, type)
+	SYSINIT(type##_stat, SI_SUB_KLD, SI_ORDER_ANY, vmm_stat_register, type)
+
+#define VMM_STAT_DEFINE(type, nelems, desc, scope) 			\
+	VMM_STAT_FDEFINE(type, nelems, desc, NULL, scope)
 
 #define	VMM_STAT_DECLARE(type)						\
 	extern struct vmm_stat_type type[1]
@@ -67,10 +86,14 @@ void	vmm_stat_init(void *arg);
 #define	VMM_STAT_AMD(type, desc)	\
 	VMM_STAT_DEFINE(type, 1, desc, VMM_STAT_SCOPE_AMD)
 
+#define	VMM_STAT_FUNC(type, desc, func)	\
+	VMM_STAT_FDEFINE(type, 1, desc, func, VMM_STAT_SCOPE_ANY)
+
 #define	VMM_STAT_ARRAY(type, nelems, desc)	\
 	VMM_STAT_DEFINE(type, nelems, desc, VMM_STAT_SCOPE_ANY)
 
 void	*vmm_stat_alloc(void);
+void	vmm_stat_init(void *vp);
 void 	vmm_stat_free(void *vp);
 
 /*
@@ -79,7 +102,7 @@ void 	vmm_stat_free(void *vp);
 int	vmm_stat_copy(struct vm *vm, int vcpu, int *num_stats, uint64_t *buf);
 int	vmm_stat_desc_copy(int index, char *buf, int buflen);
 
-static void __inline
+static __inline void
 vmm_stat_array_incr(struct vm *vm, int vcpu, struct vmm_stat_type *vst,
 		    int statidx, uint64_t x)
 {
@@ -92,14 +115,36 @@ vmm_stat_array_incr(struct vm *vm, int vcpu, struct vmm_stat_type *vst,
 		stats[vst->index + statidx] += x;
 #endif
 }
-		   
 
-static void __inline
+static __inline void
+vmm_stat_array_set(struct vm *vm, int vcpu, struct vmm_stat_type *vst,
+		   int statidx, uint64_t val)
+{
+#ifdef VMM_KEEP_STATS
+	uint64_t *stats;
+	
+	stats = vcpu_stats(vm, vcpu);
+
+	if (vst->index >= 0 && statidx < vst->nelems)
+		stats[vst->index + statidx] = val;
+#endif
+}
+
+static __inline void
 vmm_stat_incr(struct vm *vm, int vcpu, struct vmm_stat_type *vst, uint64_t x)
 {
 
 #ifdef VMM_KEEP_STATS
 	vmm_stat_array_incr(vm, vcpu, vst, 0, x);
+#endif
+}
+
+static __inline void
+vmm_stat_set(struct vm *vm, int vcpu, struct vmm_stat_type *vst, uint64_t val)
+{
+
+#ifdef VMM_KEEP_STATS
+	vmm_stat_array_set(vm, vcpu, vst, 0, val);
 #endif
 }
 
@@ -121,7 +166,7 @@ VMM_STAT_DECLARE(VMEXIT_INST_EMUL);
 VMM_STAT_DECLARE(VMEXIT_UNKNOWN);
 VMM_STAT_DECLARE(VMEXIT_ASTPENDING);
 VMM_STAT_DECLARE(VMEXIT_USERSPACE);
-VMM_STAT_DECLARE(VMEXIT_RENDEZVOUS);
-VMM_STAT_DECLARE(VMEXIT_USERSPACE);
+VMM_STAT_DECLARE(VMEXIT_RUNBLOCK);
 VMM_STAT_DECLARE(VMEXIT_EXCEPTION);
+VMM_STAT_DECLARE(VMEXIT_REQIDLE);
 #endif

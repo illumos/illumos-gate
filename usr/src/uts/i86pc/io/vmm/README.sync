@@ -1,0 +1,18 @@
+The bhyve kernel module and its associated userland consumers have been updated
+to the latest upstream FreeBSD sources as of:
+
+
+commit 3b9cb80b242682690203709aaff4eafae41c138f
+Author: jhb <jhb@FreeBSD.org>
+Date:   Mon Jun 3 23:17:35 2019 +0000
+
+    Emulate the AMD MSR_LS_CFG MSR used for various Ryzen errata.
+
+    Writes are ignored and reads always return zero.
+
+    Submitted by:   José Albornoz <jojo@eljojo.net> (write-only version)
+    Reviewed by:    Patrick Mooney, cem
+    MFC after:      2 weeks
+    Differential Revision:  https://reviews.freebsd.org/D19506
+
+Which corresponds to SVN revision: 348592

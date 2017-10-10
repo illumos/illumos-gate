@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2014 Advanced Computing Technologies LLC
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2014 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -27,7 +29,7 @@
 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/pci_irq.c 266125 2014-05-15 14:16:55Z jhb $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <machine/vmm.h>
@@ -115,7 +117,7 @@ void
 pci_irq_reserve(int irq)
 {
 
-	assert(irq < nitems(irq_counts));
+	assert(irq >= 0 && irq < nitems(irq_counts));
 	assert(pirq_cold);
 	assert(irq_counts[irq] == 0 || irq_counts[irq] == IRQ_DISABLED);
 	irq_counts[irq] = IRQ_DISABLED;
@@ -125,10 +127,10 @@ void
 pci_irq_use(int irq)
 {
 
-	assert(irq < nitems(irq_counts));
+	assert(irq >= 0 && irq < nitems(irq_counts));
 	assert(pirq_cold);
-	if (irq_counts[irq] != IRQ_DISABLED)
-		irq_counts[irq]++;
+	assert(irq_counts[irq] != IRQ_DISABLED);
+	irq_counts[irq]++;
 }
 
 void
@@ -193,19 +195,25 @@ pci_irq_deassert(struct pci_devinst *pi)
 }
 
 int
-pirq_alloc_pin(struct vmctx *ctx)
+pirq_alloc_pin(struct pci_devinst *pi)
 {
+	struct vmctx *ctx = pi->pi_vmctx;
 	int best_count, best_irq, best_pin, irq, pin;
 
-	pirq_cold = 1;
+	pirq_cold = 0;
 
-	/* First, find the least-used PIRQ pin. */
-	best_pin = 0;
-	best_count = pirqs[0].use_count;
-	for (pin = 1; pin < nitems(pirqs); pin++) {
-		if (pirqs[pin].use_count < best_count) {
-			best_pin = pin;
-			best_count = pirqs[pin].use_count;
+	if (lpc_bootrom()) {
+		/* For external bootrom use fixed mapping. */
+		best_pin = (4 + pi->pi_slot + pi->pi_lintr.pin) % 8;
+	} else {
+		/* Find the least-used PIRQ pin. */
+		best_pin = 0;
+		best_count = pirqs[0].use_count;
+		for (pin = 1; pin < nitems(pirqs); pin++) {
+			if (pirqs[pin].use_count < best_count) {
+				best_pin = pin;
+				best_count = pirqs[pin].use_count;
+			}
 		}
 	}
 	pirqs[best_pin].use_count++;
@@ -222,7 +230,7 @@ pirq_alloc_pin(struct vmctx *ctx)
 				best_count = irq_counts[irq];
 			}
 		}
-		assert(best_irq != 0);
+		assert(best_irq >= 0);
 		irq_counts[best_irq]++;
 		pirqs[best_pin].reg = best_irq;
 		vm_isa_set_irq_trigger(ctx, best_irq, LEVEL_TRIGGER);
@@ -234,16 +242,12 @@ pirq_alloc_pin(struct vmctx *ctx)
 int
 pirq_irq(int pin)
 {
-
-	if (pin == -1)
-		return (255);
 	assert(pin > 0 && pin <= nitems(pirqs));
 	return (pirqs[pin - 1].reg & PIRQ_IRQ);
 }
 
 /* XXX: Generate $PIR table. */
 
-#ifdef	__FreeBSD__
 static void
 pirq_dsdt(void)
 {
@@ -348,4 +352,3 @@ pirq_dsdt(void)
 	free(irq_prs);
 }
 LPC_DSDT(pirq_dsdt);
-#endif

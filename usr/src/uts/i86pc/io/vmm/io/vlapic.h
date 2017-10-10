@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -23,7 +25,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/io/vlapic.h 262281 2014-02-21 06:03:54Z neel $
+ * $FreeBSD$
+ */
+
+/*
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _VLAPIC_H_
@@ -69,7 +75,6 @@ int vlapic_set_intr_ready(struct vlapic *vlapic, int vector, bool level);
  */
 void vlapic_post_intr(struct vlapic *vlapic, int hostcpu, int ipinum);
 
-void vlapic_set_error(struct vlapic *vlapic, uint32_t mask);
 void vlapic_fire_cmci(struct vlapic *vlapic);
 int vlapic_trigger_lvt(struct vlapic *vlapic, int vector);
 
@@ -81,16 +86,11 @@ bool vlapic_enabled(struct vlapic *vlapic);
 void vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
     int delmode, int vec);
 
-/* Reset the trigger-mode bits for all vectors to be edge-triggered */
-void vlapic_reset_tmr(struct vlapic *vlapic);
+void vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
+    bool lowprio, bool x2apic_dest);
 
-/*
- * Set the trigger-mode bit associated with 'vector' to level-triggered if
- * the (dest,phys,delmode) tuple resolves to an interrupt being delivered to
- * this 'vlapic'.
- */
-void vlapic_set_tmr_level(struct vlapic *vlapic, uint32_t dest, bool phys,
-    int delmode, int vector);
+void vlapic_tmr_update(struct vlapic *vlapic);
+void vlapic_tmr_set(struct vlapic *vlapic, uint8_t vector, bool active);
 
 void vlapic_set_cr8(struct vlapic *vlapic, uint64_t val);
 uint64_t vlapic_get_cr8(struct vlapic *vlapic);
@@ -106,4 +106,9 @@ void vlapic_icrtmr_write_handler(struct vlapic *vlapic);
 void vlapic_dcr_write_handler(struct vlapic *vlapic);
 void vlapic_lvt_write_handler(struct vlapic *vlapic, uint32_t offset);
 void vlapic_self_ipi_handler(struct vlapic *vlapic, uint64_t val);
+
+#ifndef __FreeBSD__
+void vlapic_localize_resources(struct vlapic *vlapic);
+#endif
+
 #endif	/* _VLAPIC_H_ */

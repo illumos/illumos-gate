@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_lapic.c 264509 2014-04-15 17:06:26Z tychon $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -39,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/amd64/vmm/vmm_lapic.c 264509 2014-04-15 17:06:26Z tychon $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,7 +51,6 @@ __FBSDID("$FreeBSD: head/sys/amd64/vmm/vmm_lapic.c 264509 2014-04-15 17:06:26Z t
 #include <x86/apicreg.h>
 
 #include <machine/vmm.h>
-#include "vmm_ipi.h"
 #include "vmm_ktr.h"
 #include "vmm_lapic.h"
 #include "vlapic.h"
@@ -67,10 +68,14 @@ lapic_set_intr(struct vm *vm, int cpu, int vector, bool level)
 {
 	struct vlapic *vlapic;
 
-	if (cpu < 0 || cpu >= VM_MAXCPU)
+	if (cpu < 0 || cpu >= vm_get_maxcpus(vm))
 		return (EINVAL);
 
-	if (vector < 32 || vector > 255)
+	/*
+	 * According to section "Maskable Hardware Interrupts" in Intel SDM
+	 * vectors 16 through 255 can be delivered through the local APIC.
+	 */
+	if (vector < 16 || vector > 255)
 		return (EINVAL);
 
 	vlapic = vm_lapic(vm, cpu);
@@ -86,7 +91,7 @@ lapic_set_local_intr(struct vm *vm, int cpu, int vector)
 	cpuset_t dmask;
 	int error;
 
-	if (cpu < -1 || cpu >= VM_MAXCPU)
+	if (cpu < -1 || cpu >= vm_get_maxcpus(vm))
 		return (EINVAL);
 
 	if (cpu == -1)

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_MUTEX_H_
@@ -28,15 +29,11 @@ struct mtx;
 void mtx_init(struct mtx *, char *name, const char *type_name, int opts);
 void mtx_destroy(struct mtx *);
 
-int mtx_sleep(void *chan, struct mtx *mtx, int priority, const char *wmesg,
-    int timo);
-
 #endif	/* KERNEL */
 #include_next <sys/mutex.h>
 #ifdef	_KERNEL
 
 struct mtx {
-	kmutex_type_t	t;
 	kmutex_t	m;
 };
 

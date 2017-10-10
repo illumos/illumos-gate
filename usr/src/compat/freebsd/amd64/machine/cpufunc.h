@@ -16,6 +16,8 @@
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_
 #define	_COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_
 
+#include <sys/types.h>
+
 static __inline u_long
 bsfq(u_long mask)
 {
@@ -66,6 +68,12 @@ cpuid_count(u_int ax, u_int cx, u_int *p)
 }
 
 static __inline void
+disable_intr(void)
+{
+	__asm __volatile("cli");
+}
+
+static __inline void
 enable_intr(void)
 {
 	__asm __volatile("sti");
@@ -95,6 +103,15 @@ flsll(long long mask)
 	return (flsl((long)mask));
 }
 
+static __inline u_long
+read_rflags(void)
+{
+	u_long  rf;
+
+	__asm __volatile("pushfq; popq %0" : "=r" (rf));
+	return (rf);
+}
+
 static __inline uint64_t
 rdmsr(u_int msr)
 {
@@ -107,10 +124,10 @@ rdmsr(u_int msr)
 static __inline uint64_t
 rdtsc(void)
 {
-	uint32_t low, high;
- 
-	__asm __volatile("rdtsc" : "=a" (low), "=d" (high));
-	return (low | ((uint64_t)high << 32));
+	extern hrtime_t tsc_gethrtimeunscaled_delta(void);
+
+	/* Get the TSC reading with any needed synch offset applied */
+	return ((uint64_t)tsc_gethrtimeunscaled_delta());
 }
 
 static __inline void
@@ -161,5 +178,134 @@ rcr4(void)
 	__asm __volatile("movq %%cr4,%0" : "=r" (data));
 	return (data);
 }
+
+static __inline u_long
+rxcr(u_int reg)
+{
+	u_int low, high;
+
+	__asm __volatile("xgetbv" : "=a" (low), "=d" (high) : "c" (reg));
+	return (low | ((uint64_t)high << 32));
+}
+
+static __inline void
+load_xcr(u_int reg, u_long val)
+{
+	u_int low, high;
+
+	low = val;
+	high = val >> 32;
+	__asm __volatile("xsetbv" : : "c" (reg), "a" (low), "d" (high));
+}
+
+static __inline void
+write_rflags(u_long rf)
+{
+	__asm __volatile("pushq %0;  popfq" : : "r" (rf));
+}
+
+static __inline uint64_t
+rdr0(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr0,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr0(uint64_t dr0)
+{
+	__asm __volatile("movq %0,%%dr0" : : "r" (dr0));
+}
+
+static __inline uint64_t
+rdr1(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr1,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr1(uint64_t dr1)
+{
+	__asm __volatile("movq %0,%%dr1" : : "r" (dr1));
+}
+
+static __inline uint64_t
+rdr2(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr2,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr2(uint64_t dr2)
+{
+	__asm __volatile("movq %0,%%dr2" : : "r" (dr2));
+}
+
+static __inline uint64_t
+rdr3(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr3,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr3(uint64_t dr3)
+{
+	__asm __volatile("movq %0,%%dr3" : : "r" (dr3));
+}
+
+static __inline uint64_t
+rdr6(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr6,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr6(uint64_t dr6)
+{
+	__asm __volatile("movq %0,%%dr6" : : "r" (dr6));
+}
+
+static __inline uint64_t
+rdr7(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr7,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr7(uint64_t dr7)
+{
+	__asm __volatile("movq %0,%%dr7" : : "r" (dr7));
+}
+
+#ifdef _KERNEL
+/*
+ * Including the native sys/segments.h in userspace seriously conflicts with
+ * the FreeBSD compat/contrib headers.
+ */
+#include <sys/segments.h>
+
+static __inline void
+lldt(u_short sel)
+{
+	wr_ldtr(sel);
+}
+
+static __inline u_short
+sldt()
+{
+	return (rd_ldtr());
+}
+#endif /* _KERNEL */
 
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_ */

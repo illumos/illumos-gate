@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2014 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * All rights reserved.
  *
@@ -23,7 +25,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/smbiostbl.h 262744 2014-03-04 17:12:06Z tychon $
+ * $FreeBSD$
+ */
+
+/*
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SMBIOSTBL_H_
@@ -32,5 +38,6 @@
 struct vmctx;
 
 int	smbios_build(struct vmctx *ctx);
+int	smbios_parse(const char *opts);
 
 #endif /* _SMBIOSTBL_H_ */

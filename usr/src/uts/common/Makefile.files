@@ -1924,9 +1924,9 @@ LINT_DEFS	+= -Dunix
 #	It is a bug in the current compilation system that the assember
 #	can't process the -Y I, flag.
 #
-NATIVE_INC_PATH += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
-AS_INC_PATH	+= $(INC_PATH) -I$(UTSBASE)/common
-INCLUDE_PATH    += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
+NATIVE_INC_PATH += $(PRE_INC_PATH) $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
+AS_INC_PATH	+= $(PRE_INC_PATH) $(INC_PATH) -I$(UTSBASE)/common
+INCLUDE_PATH    += $(PRE_INC_PATH) $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
 
 PCIEB_OBJS += pcieb.o
 

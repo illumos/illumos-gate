@@ -1,0 +1,36 @@
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
+#include <sys/types.h>
+
+#include "amd/svm.h"
+
+svm_regctx
+	sctx_rbx	SCTX_RBX
+	sctx_rcx	SCTX_RCX
+	sctx_rbp	SCTX_RBP
+	sctx_rdx	SCTX_RDX
+	sctx_rdi	SCTX_RDI
+	sctx_rsi	SCTX_RSI
+	sctx_r8		SCTX_R8
+	sctx_r9		SCTX_R9
+	sctx_r10	SCTX_R10
+	sctx_r11	SCTX_R11
+	sctx_r12	SCTX_R12
+	sctx_r13	SCTX_R13
+	sctx_r14	SCTX_R14
+	sctx_r15	SCTX_R15
+
+/* Pull in definition for MSR_GSBASE */
+\#include <machine/specialreg.h>
