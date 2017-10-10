@@ -25,13 +25,16 @@
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 # include global definitions
 include ../Makefile.master
 
 sparc_HDRS=
-i386_HDRS=	stack_unwind.h
+i386_HDRS=		\
+	stack_unwind.h	\
+	bhyve.h
 
 KRB5HDRS=		\
 	mit_copyright.h	\

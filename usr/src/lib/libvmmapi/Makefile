@@ -19,11 +19,13 @@ HDRS =		vmmapi.h
 
 HDRDIR =	common
 
+CHECKHDRS =
+
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all:=		TARGET= all
 install:=	TARGET= install
-clean:=		TARGET= clean
+clean:=	TARGET= clean
 clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 _msg:=		TARGET= _msg

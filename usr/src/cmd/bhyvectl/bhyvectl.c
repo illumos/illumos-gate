@@ -38,6 +38,7 @@
 
 /*
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -398,7 +399,7 @@ enum {
 int
 main(int argc, char *argv[])
 {
-	char *vmname;
+	char *vmname = NULL;
 	int error, ch, vcpu;
 	vm_paddr_t gpa;
 	size_t len;

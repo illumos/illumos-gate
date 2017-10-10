@@ -237,6 +237,30 @@ UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o
 AMD_IOMMU_OBJS +=	amd_iommu.o amd_iommu_impl.o amd_iommu_acpi.o \
 			amd_iommu_cmd.o amd_iommu_log.o amd_iommu_page_tables.o
+VMM_OBJS += vmm.o \
+	vmm_sol_dev.o \
+	vmm_host.o \
+	vmm_instruction_emul.o \
+	vmm_ioport.o \
+	vmm_lapic.o \
+	vmm_sol_mem.o \
+	vmm_util.o \
+	x86.o \
+	vdev.o \
+	vatpic.o \
+	vatpit.o \
+	vhpet.o \
+	vioapic.o \
+	vlapic.o \
+	ept.o \
+	vmcs.o \
+	vmx_msr.o \
+	vmx.o \
+	vmx_support.o \
+	amdv.o \
+	vmm_sol_glue.o
+
+VIONA_OBJS += viona.o
 
 #
 #	Build up defines and paths.

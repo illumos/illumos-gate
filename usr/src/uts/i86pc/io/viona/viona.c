@@ -34,6 +34,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/conf.h>
@@ -1139,10 +1140,12 @@ viona_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		size_t			mblklen;
 		int			n, i = 0;
 		uint16_t		cookie;
-		struct virtio_net_hdr	*vrx;
-		struct virtio_net_mrgrxhdr *vmrgrx;
+		struct virtio_net_hdr	*vrx = NULL;
+		struct virtio_net_mrgrxhdr *vmrgrx = NULL;
+#if notyet
 		mblk_t			*ml;
-		caddr_t			buf;
+#endif
+		caddr_t			buf = NULL;
 		int			total_len = 0;
 		int			copied_buf = 0;
 		int			num_bufs = 0;
@@ -1312,8 +1315,10 @@ viona_desb_free(viona_desb_t *dp)
 {
 	viona_link_t		*link;
 	viona_vring_hqueue_t	*hq;
+#if notyet
 	struct virtio_used	*vu;
 	int			uidx;
+#endif
 	uint_t			ref;
 
 	ref = atomic_dec_uint_nv(&dp->d_ref);

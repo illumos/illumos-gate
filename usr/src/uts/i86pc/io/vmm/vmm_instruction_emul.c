@@ -37,6 +37,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -1636,11 +1637,13 @@ int
 vm_gla2gpa(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
     uint64_t gla, int prot, uint64_t *gpa)
 {
-	int nlevels, pfcode, ptpshift, ptpindex, retval, usermode, writable;
+	int ptpshift = 0, ptpindex = 0;
+	uint64_t *ptpbase = NULL, pte = 0, pgsize = 0;
+	int nlevels, pfcode, retval, usermode, writable;
 #ifdef	__FreeBSD__
-#endif
 	u_int retries;
-	uint64_t *ptpbase, ptpphys, pte, pgsize;
+#endif
+	uint64_t ptpphys;
 	uint32_t *ptpbase32, pte32;
 	void *cookie;
 

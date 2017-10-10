@@ -63,6 +63,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -553,7 +554,7 @@ int
 msleep_spin(void *chan, struct mtx *mtx, const char *wmesg, int ticks)
 {
 	struct sleepqueue	*sq;
-	int			error;
+	int			error = 0;
 
 	sleepq_lock(chan);
 	sq = sleepq_add(chan);
@@ -641,13 +642,21 @@ fpu_save_area_cleanup(void)
 struct savefpu *
 fpu_save_area_alloc(void)
 {
-	return (vmem_alloc(fpu_save_area_arena, sizeof (struct savefpu),
-			   VM_SLEEP));
+	struct savefpu *fsa = vmem_alloc(fpu_save_area_arena,
+	    sizeof (struct savefpu), VM_SLEEP);
+
+	bzero(fsa, sizeof (struct savefpu));
+	fsa->fsa_fp_ctx.fpu_regs.kfpu_u.kfpu_generic =
+	    kmem_cache_alloc(fpsave_cachep, KM_SLEEP);
+
+	return (fsa);
 }
 
 void
 fpu_save_area_free(struct savefpu *fsa)
 {
+	kmem_cache_free(fpsave_cachep,
+	    fsa->fsa_fp_ctx.fpu_regs.kfpu_u.kfpu_generic);
 	vmem_free(fpu_save_area_arena, fsa, sizeof (struct savefpu));
 }
 
@@ -667,13 +676,13 @@ fpu_save_area_reset(struct savefpu *fsa)
 
 	switch (fp_save_mech) {
 	case FP_FXSAVE:
-		fx = &fp->fpu_regs.kfpu_u.kfpu_fx;
+		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
 		bcopy(&sse_initial, fx, sizeof (*fx));
 		break;
 	case FP_XSAVE:
 		fp->fpu_xsave_mask = (XFEATURE_ENABLED_X87 |
 		    XFEATURE_ENABLED_SSE | XFEATURE_ENABLED_AVX);
-		xs = &fp->fpu_regs.kfpu_u.kfpu_xs;
+		xs = fp->fpu_regs.kfpu_u.kfpu_xs;
 		bcopy(&avx_initial, xs, sizeof (*xs));
 		break;
 	default:
@@ -731,10 +740,10 @@ fpurestore(void *arg)
 
 	switch (fp_save_mech) {
 	case FP_FXSAVE:
-		vmm_fxrstor(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		vmm_fxrstor(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
 	case FP_XSAVE:
-		vmm_xrstor(&fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
+		vmm_xrstor(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -752,10 +761,10 @@ fpusave(void *arg)
 
 	switch (fp_save_mech) {
 	case FP_FXSAVE:
-		vmm_fxsave(&fp->fpu_regs.kfpu_u.kfpu_fx);
+		vmm_fxsave(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
 	case FP_XSAVE:
-		vmm_xsave(&fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
+		vmm_xsave(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
 		break;
 	default:
 		panic("Invalid fp_save_mech");

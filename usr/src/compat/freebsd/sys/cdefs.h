@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_CDEFS_H_
@@ -24,11 +25,11 @@
 #define	__GNUCLIKE___SECTION		1
 
 #define	__dead2		__attribute__((__noreturn__))
-#define	__unused	__attribute__((__unused__))
 #define	__used		__attribute__((__used__))
 #define	__packed	__attribute__((__packed__))
 #define	__aligned(x)	__attribute__((__aligned__(x)))
 #define	__section(x)	__attribute__((__section__(x)))
+#define	__weak_symbol   __attribute__((__weak__))
 #endif
 
 /*

@@ -1137,7 +1137,7 @@ static void
 atapi_mode_sense(struct ahci_port *p, int slot, uint8_t *cfis)
 {
 	uint8_t *acmd;
-	uint32_t tfd;
+	uint32_t tfd = 0;
 	uint8_t pc, code;
 	int len;
 

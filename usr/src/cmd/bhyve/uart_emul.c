@@ -37,6 +37,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -277,15 +278,17 @@ fifo_available(struct fifo *fifo)
 static void
 uart_opentty(struct uart_softc *sc)
 {
+#ifdef	__FreeBSD__
 	struct mevent *mev;
+#endif
 
 	assert(!sc->opened && sc->stdio);
 
 	ttyopen();
 #ifdef	__FreeBSD__
 	mev = mevent_add(STDIN_FILENO, EVF_READ, uart_drain, sc);
-#endif
 	assert(mev);
+#endif
 }
 
 /*
@@ -838,7 +841,9 @@ uart_bcons_client_event(struct uart_softc *sc)
 static void
 uart_bcons_server_event(struct uart_softc *sc)
 {
+#if notyet
 	int clifd;
+#endif
 
 	if (sc->usc_bcons.clifd != -1) {
 		/* we're already handling a client */

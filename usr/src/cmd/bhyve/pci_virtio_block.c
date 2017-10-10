@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -188,9 +189,9 @@ pci_vtblk_proc(struct pci_vtblk_softc *sc, struct vqueue_info *vq)
 
 	assert((flags[0] & VRING_DESC_F_WRITE) == 0);
 	assert(iov[0].iov_len == sizeof(struct virtio_blk_hdr));
-	vbh = (struct virtio_block_hdr *)iov[0].iov_base;
+	vbh = (struct virtio_blk_hdr *)iov[0].iov_base;
 
-	status = iov[--n].iov_base;
+	status = (uint8_t *)iov[--n].iov_base;
 	assert(iov[n].iov_len == 1);
 	assert(flags[n] & VRING_DESC_F_WRITE);
 

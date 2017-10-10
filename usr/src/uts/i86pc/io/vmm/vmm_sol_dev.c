@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -20,11 +21,6 @@
 #include <sys/stat.h>
 #include <sys/vmsystm.h>
 #include <sys/ddi.h>
-/*
- * struct modctl in <sys/modctl.h> contains "void *__unused".  
- * Do this ugly workaround to avoid it.
- */
-#undef	__unused
 #include <sys/sunddi.h>
 #include <sys/fs/dv_node.h>
 
@@ -55,7 +51,9 @@ static	vmm_trace_rbuf_t *vmm_debug_rbuf;
 static	vmm_trace_dmsg_t *vmm_trace_dmsg_alloc(void);
 static	void vmm_trace_dmsg_free(void);
 static	void vmm_trace_rbuf_alloc(void);
+#if notyet
 static	void vmm_trace_rbuf_free(void);
+#endif
 
 /*
  * This routine is used to manage debug messages
@@ -149,7 +147,7 @@ vmm_trace_rbuf_alloc(void)
 	}
 }
 
-
+#if notyet
 static void
 vmm_trace_rbuf_free(void)
 {
@@ -157,6 +155,7 @@ vmm_trace_rbuf_free(void)
 	mutex_destroy(&vmm_debug_rbuf->lock);
 	kmem_free(vmm_debug_rbuf, sizeof (vmm_trace_rbuf_t));
 }
+#endif
 
 static void
 vmm_vtrace_log(const char *fmt, va_list ap)
@@ -235,18 +234,15 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 	struct vm_register vmreg;
 	struct vm_seg_desc vmsegdesc;
 	struct vm_run vmrun;
-	struct vm_exception vmexc;
 	struct vm_lapic_irq vmirq;
 	struct vm_lapic_msi vmmsi;
 	struct vm_ioapic_irq ioapic_irq;
 	struct vm_isa_irq isa_irq;
 	struct vm_capability vmcap;
-	struct vm_nmi vmnmi;
 	struct vm_x2apic x2apic;
 	struct vm_gla2gpa gg;
 	struct vm_activate_cpu vac;
 	int pincount;
-	int i;
 
 	vcpu = -1;
 	state_changed = 0;
@@ -885,12 +881,6 @@ vmm_segmap(dev_t dev, off_t off, struct as *as,
 	as_rangeunlock(as);
 
 	return (error);
-}
-
-static int
-vmm_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
-{
-	return (0);
 }
 
 static int

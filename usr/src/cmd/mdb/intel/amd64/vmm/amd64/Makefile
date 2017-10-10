@@ -29,4 +29,7 @@ CPPFLAGS += -I$(CONTRIB)/freebsd -I$(CONTRIB)/freebsd/amd64
 CPPFLAGS += -I$(SRC)/uts/common -I$(SRC)/uts/i86pc
 CPPFLAGS += -I$(SRC)/cmd/mdb/common
 
-CPPFLAGS += -_cc=-xdryrun
+#CPPFLAGS += -_cc=-xdryrun
+
+LINTTAGS += -erroff=E_FUNC_ARG_UNUSED
+LINTTAGS += -erroff=E_STATIC_UNUSED

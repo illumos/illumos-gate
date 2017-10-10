@@ -404,7 +404,10 @@ atkbdc_sts_ctl_handler(struct vmctx *ctx, int vcpu, int in, int port,
     int bytes, uint32_t *eax, void *arg)
 {
 	struct atkbdc_softc *sc;
-	int	error, retval;
+#ifdef	__FreeBSD__
+	int	error;
+#endif
+	int	retval;
 
 	if (bytes != 1)
 		return (-1);

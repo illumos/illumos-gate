@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -350,9 +351,13 @@ vm_create(const char *name, struct vm **retvm)
 {
 	int i;
 	struct vm *vm;
+#ifdef	__FreeBSD__
 	vm_paddr_t maxaddr;
+#endif
 
+#if notyet
 	const int BSP = 0;
+#endif
 
 	/*
 	 * If vmm.ko could not be successfully initialized then don't attempt
@@ -391,9 +396,9 @@ vm_free_mem_seg(struct vm *vm, struct vm_memory_segment *seg)
 {
 	size_t len;
 	vm_paddr_t hpa;
+#ifdef	__FreeBSD__
 	void *host_domain;
 
-#ifdef	__FreeBSD__
 	host_domain = iommu_host_domain();
 #endif
 
@@ -515,7 +520,9 @@ vm_malloc(struct vm *vm, vm_paddr_t gpa, size_t len)
 	int error, available, allocated;
 	struct vm_memory_segment *seg;
 	vm_paddr_t g, hpa;
+#ifdef	__FreeBSD__
 	void *host_domain;
+#endif
 
 	const boolean_t spok = TRUE;	/* superpage mappings are ok */
 
@@ -894,7 +901,9 @@ vcpu_require_state_locked(struct vcpu *vcpu, enum vcpu_state newstate)
 static int
 vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled, bool *retu)
 {
+#ifdef	__FreeBSD__
 	struct vm_exit *vmexit;
+#endif
 	struct vcpu *vcpu;
 	int t, timo, spindown;
 
@@ -1037,7 +1046,9 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 {
 	int error, vcpuid;
 	struct vcpu *vcpu;
+#ifdef	__FreeBSD__
 	struct pcb *pcb;
+#endif
 	uint64_t tscval;
 	struct vm_exit *vme;
 	bool retu, intr_disabled;
@@ -1803,9 +1814,9 @@ void
 vm_copy_teardown(struct vm *vm, int vcpuid, struct vm_copyinfo *copyinfo,
     int num_copyinfo)
 {
+#ifdef	__FreeBSD__
 	int idx;
 
-#ifdef	__FreeBSD__
 	for (idx = 0; idx < num_copyinfo; idx++) {
 		if (copyinfo[idx].cookie != NULL)
 			vm_gpa_release(copyinfo[idx].cookie);

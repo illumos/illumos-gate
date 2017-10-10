@@ -1000,3 +1000,12 @@ usr/lib/sparcv9/llib-lsff.ln		sparc
 usr/lib/libsff.so
 usr/lib/llib-lsff
 usr/lib/llib-lsff.ln
+
+#
+# private bhyve header files
+#
+usr/include/bhyve.h
+usr/include/vmmapi.h
+usr/platform/i86pc/include/sys/vmm.h
+usr/platform/i86pc/include/sys/vmm_impl.h
+usr/platform/i86pc/include/sys/vmm_instruction_emul.h

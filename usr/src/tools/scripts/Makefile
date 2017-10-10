@@ -22,6 +22,7 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright 2010, Richard Lowe
+# Copyright 2017 Joyent, Inc.
 
 SHELL=/usr/bin/ksh93
 
@@ -47,6 +48,7 @@ SHFILES= \
 PERLFILES= \
 	check_rtime \
 	find_elf \
+	gensetdefs \
 	interface_check \
 	interface_cmp \
 	jstyle \

@@ -36,9 +36,40 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <machine/asmacros.h>
+
+#if defined(lint)
+
+struct vmxctx;
+
+/*ARGSUSED*/
+int
+vmx_setjmp(struct vmxctx *ctx)
+{ return (0); }
+
+/*ARGSUSED*/
+void
+vmx_return(struct vmxctx *ctxp, int retval)
+{}
+
+void
+vmx_longjmp(void)
+{}
+
+/*ARGSUSED*/
+void
+vmx_launch(struct vmxctx *ctx)
+{}
+
+/*ARGSUSED*/
+void
+vmx_resume(struct vmxctx *ctx)
+{}
+
+#else /* lint */
 
 #include "vmx_assym.s"
 
@@ -269,3 +300,5 @@ ENTRY(vmx_launch)
 	addq	$VMXCTX_TMPSTKTOP,%rsp
 	callq	vmx_return
 END(vmx_launch)
+
+#endif /* lint */

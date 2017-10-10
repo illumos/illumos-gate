@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _VMM_H_
@@ -232,7 +233,7 @@ int vcpu_set_state(struct vm *vm, int vcpu, enum vcpu_state state,
     bool from_idle);
 enum vcpu_state vcpu_get_state(struct vm *vm, int vcpu, int *hostcpu);
 
-static int __inline
+static __inline int
 vcpu_is_running(struct vm *vm, int vcpu, int *hostcpu)
 {
 	return (vcpu_get_state(vm, vcpu, hostcpu) == VCPU_RUNNING);

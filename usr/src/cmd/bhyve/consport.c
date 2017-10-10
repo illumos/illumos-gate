@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD: head/usr.sbin/bhyve/consport.c 264277 2014-04-08 21:02:03Z j
 #define	BVM_CONSOLE_PORT	0x220
 #define	BVM_CONS_SIG		('b' << 8 | 'v')
 
+#ifdef	__FreeBSD__
 static struct termios tio_orig, tio_new;
 
 static void
@@ -51,6 +52,7 @@ ttyclose(void)
 {
 	tcsetattr(STDIN_FILENO, TCSANOW, &tio_orig);
 }
+#endif
 
 static void
 ttyopen(void)

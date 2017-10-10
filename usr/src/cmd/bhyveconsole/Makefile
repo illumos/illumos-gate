@@ -11,9 +11,12 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 include ../Makefile.cmd
+
+PROG=	bhyveconsole
 
 SUBDIRS= $(MACH)
 

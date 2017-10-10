@@ -25,7 +25,7 @@
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
@@ -1986,9 +1986,9 @@ LINT_DEFS	+= -Dunix
 #	It is a bug in the current compilation system that the assember
 #	can't process the -Y I, flag.
 #
-NATIVE_INC_PATH += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
-AS_INC_PATH	+= $(INC_PATH) -I$(UTSBASE)/common
-INCLUDE_PATH    += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
+NATIVE_INC_PATH += $(PRE_INC_PATH) $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
+AS_INC_PATH	+= $(PRE_INC_PATH) $(INC_PATH) -I$(UTSBASE)/common
+INCLUDE_PATH    += $(PRE_INC_PATH) $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
 
 PCIEB_OBJS += pcieb.o
 

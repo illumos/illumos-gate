@@ -47,6 +47,12 @@ ADJUNCT_PROTO=
 NATIVE_ADJUNCT=	/usr
 
 #
+# Compatibility code for FreeBSD etc.
+#
+COMPAT=	$(SRC)/compat
+CONTRIB= $(SRC)/../contrib
+
+#
 # RELEASE_BUILD should be cleared for final release builds.
 # NOT_RELEASE_BUILD is exactly what the name implies.
 #
@@ -184,6 +190,7 @@ CTFSTABS=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstabs
 CTFSTRIP=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstrip
 NDRGEN=		$(ONBLD_TOOLS)/bin/$(MACH)/ndrgen
 GENOFFSETS=	$(ONBLD_TOOLS)/bin/genoffsets
+GENSETDEFS=	$(ONBLD_TOOLS)/bin/gensetdefs
 XREF=		$(ONBLD_TOOLS)/bin/xref
 FIND=		/usr/bin/find
 PERL=		/usr/bin/perl

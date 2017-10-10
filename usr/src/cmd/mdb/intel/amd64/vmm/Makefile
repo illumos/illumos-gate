@@ -11,10 +11,11 @@
 
 #
 # Copyright 2014 Pluribus Networks Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
-MAKEVARS = CW_NO_SHADOW=true __GNUC=
+#MAKEVARS = CW_NO_SHADOW=true __GNUC=
 
 include $(SRC)/Makefile.master
-$(BUILD64)SUBDIRS += 	$(MACH64)
+$(BUILD64)SUBDIRS +=	$(MACH64)
 include ../../../Makefile.subdirs

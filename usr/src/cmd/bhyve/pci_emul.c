@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -570,8 +571,10 @@ int
 pci_emul_alloc_pbar(struct pci_devinst *pdi, int idx, uint64_t hostbase,
 		    enum pcibar_type type, uint64_t size)
 {
+	uint64_t *baseptr = NULL;
+	uint64_t limit = 0, lobits = 0;
+	uint64_t addr, mask, bar;
 	int error;
-	uint64_t *baseptr, limit, addr, mask, lobits, bar;
 
 	assert(idx >= 0 && idx <= PCI_BARMAX);
 
@@ -1737,8 +1740,8 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 	struct slotinfo *si;
 	struct pci_devinst *pi;
 	struct pci_devemu *pe;
-	int idx, needcfg;
-	uint64_t addr, bar, mask;
+	uint64_t addr, mask;
+	uint64_t bar = 0;
 
 	if ((bi = pci_businfo[bus]) != NULL) {
 		si = &bi->slotinfo[slot];
@@ -1782,6 +1785,8 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 	 * Config read
 	 */
 	if (in) {
+		int needcfg;
+
 		/* Let the device emulation override the default handler */
 		if (pe->pe_cfgread != NULL) {
 			needcfg = pe->pe_cfgread(ctx, vcpu, pi, coff, bytes,
@@ -1810,6 +1815,7 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 		 * Special handling for write to BAR registers
 		 */
 		if (coff >= PCIR_BAR(0) && coff < PCIR_BAR(PCI_BARMAX + 1)) {
+			int idx;
 			/*
 			 * Ignore writes to BAR registers that are not
 			 * 4-byte aligned.
@@ -2043,7 +2049,7 @@ pci_emul_dior(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 	      uint64_t offset, int size)
 {
 	struct pci_emul_dsoftc *sc = pi->pi_arg;
-	uint32_t value;
+	uint32_t value = 0;
 
 	if (baridx == 0) {
 		if (offset + size > DIOSZ) {

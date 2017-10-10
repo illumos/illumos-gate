@@ -535,6 +535,8 @@ vm_run(struct vmctx *ctx, int vcpu, struct vm_exit *vmexit)
 	return (error);
 }
 
+/* XXX: unused static */
+#if notyet
 static int
 vm_inject_exception_real(struct vmctx *ctx, int vcpu, int vector,
     int error_code, int error_code_valid)
@@ -549,6 +551,7 @@ vm_inject_exception_real(struct vmctx *ctx, int vcpu, int vector,
 
 	return (ioctl(ctx->fd, VM_INJECT_EXCEPTION, &exc));
 }
+#endif
 
 int
 vm_inject_exception(struct vmctx *ctx, int vcpu, int vector, int errcode_valid,

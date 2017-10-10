@@ -115,7 +115,6 @@ int
 vmm_dmsg_dump(vmm_trace_dmsg_t *addr, int print_pathname, uint_t *printed)
 {
 	vmm_trace_dmsg_t	dmsg, *dmsgh = addr;
-	char			pathname[MAXPATHLEN];
 	char			merge[1024];
 
 	while (addr != NULL) {

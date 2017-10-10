@@ -207,6 +207,7 @@ rfb_recv_set_encodings_msg(struct rfb_softc *rc, int cfd)
 	}
 }
 
+#if notyet
 static void
 rfb_resize_update(struct rfb_softc *rc, int fd)
 {
@@ -227,6 +228,7 @@ rfb_resize_update(struct rfb_softc *rc, int fd)
 	srect_hdr.encoding = ntohl(RFB_ENCODING_RESIZE);
 	write(fd, &srect_hdr, sizeof (struct rfb_srvr_rect_hdr));
 }
+#endif
 
 static void
 rfb_recv_update_msg(struct rfb_softc *rc, int cfd)

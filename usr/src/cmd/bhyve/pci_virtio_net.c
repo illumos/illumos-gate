@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -392,7 +393,7 @@ pci_vtnet_tap_rx(struct pci_vtnet_softc *sc)
 			int num_segs;
 			num_segs = vq_getchain(vq, iov,
 			    VTNET_MAXSEGS, NULL);
-			vrx = (struct virtio_net_rxhrd *)iov[0].iov_base;
+			vrx = (struct virtio_net_rxhdr *)iov[0].iov_base;
 			total_len = iov[0].iov_len;
 			for (i = 1; i < num_segs; i++) {
 				buf = (uint8_t *)iov[i].iov_base;
@@ -480,6 +481,8 @@ pci_vtnet_poll_thread(void *param)
 		pci_vtnet_tap_rx(sc);
 		pthread_mutex_unlock(&sc->vsc_mtx);
 	}
+
+	return (NULL);
 }
 #endif
 
@@ -597,6 +600,7 @@ pci_vtnet_tx_thread(void *param)
 
 		pthread_mutex_lock(&sc->tx_mtx);
 	}
+	return (NULL);
 }
 
 #ifdef notyet
@@ -640,12 +644,12 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 #ifdef	__FreeBSD__
 	MD5_CTX mdctx;
 	unsigned char digest[16];
+	char nstr[80];
 #else
 	uchar_t physaddr[DLPI_PHYSADDR_MAX];
 	size_t physaddrlen = DLPI_PHYSADDR_MAX;
 	int error;
 #endif
-	char nstr[80];
 	char tname[MAXCOMLEN + 1];
 	struct pci_vtnet_softc *sc;
 	const char *env_msi;
@@ -688,7 +692,9 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 #endif
 	if (opts != NULL) {
 		char tbuf[80];
+#ifdef	__FreeBSD__
 		int err;
+#endif
 
 		devname = vtopts = strdup(opts);
 		(void) strsep(&vtopts, ",");

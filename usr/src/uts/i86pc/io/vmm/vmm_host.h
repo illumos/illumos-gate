@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_VMM_HOST_H_
@@ -89,8 +90,10 @@ vmm_get_host_gdtrbase(void)
 #endif
 }
 
+#ifdef	__FreeBSD__
 struct pcpu;
 extern struct pcpu __pcpu[];
+#endif
 
 static __inline uint64_t
 vmm_get_host_gsbase(void)
