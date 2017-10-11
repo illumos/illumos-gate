@@ -946,6 +946,7 @@ HBA_LoadLibrary()
 	if (lib_infop == NULL) {
 		(void) fprintf(stderr, "HBA_LoadLibrary: out of memeory\n");
 		RELEASE_MUTEX(&_hbaapi_LL_mutex);
+		fclose(hbaconf);
 		return (HBA_STATUS_ERROR);
 	}
 	lib_infop->status = HBA_LIBRARY_NOT_LOADED;
@@ -1085,6 +1086,7 @@ HBA_LoadLibrary()
 	/* successfully loaded library */
 	lib_infop->status = HBA_LIBRARY_LOADED;
 	}
+	fclose(hbaconf);
 #endif /* WIN32 or UNIX */
 #ifdef POSIX_THREADS
 	/*
