@@ -1675,6 +1675,7 @@ apic_check_msi_support()
 	dev_info_t *cdip;
 	char dev_type[16];
 	int dev_len;
+	int hwenv = get_hwenv();
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support:\n"));
 
@@ -1696,7 +1697,8 @@ apic_check_msi_support()
 			continue;
 		if (strcmp(dev_type, "pciex") == 0)
 			return (PSM_SUCCESS);
-		if (strcmp(dev_type, "pci") == 0 && get_hwenv() == HW_KVM)
+		if (strcmp(dev_type, "pci") == 0 &&
+		    (hwenv == HW_KVM || hwenv == HW_BHYVE))
 			return (PSM_SUCCESS);
 	}
 

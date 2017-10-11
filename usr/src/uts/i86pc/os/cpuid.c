@@ -718,6 +718,10 @@ determine_platform(void)
 			platform_type = HW_KVM;
 			return;
 		}
+		if (strcmp(hvstr, HVSIG_BHYVE) == 0) {
+			platform_type = HW_BHYVE;
+			return;
+		}
 		if (strcmp(hvstr, HVSIG_MICROSOFT) == 0)
 			platform_type = HW_MICROSOFT;
 	} else {

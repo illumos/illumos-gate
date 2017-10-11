@@ -947,6 +947,7 @@ extern void reset_gdtr_limit(void);
 #define	HVSIG_VMWARE	"VMwareVMware"
 #define	HVSIG_KVM	"KVMKVMKVM"
 #define	HVSIG_MICROSOFT	"Microsoft Hv"
+#define	HVSIG_BHYVE	"bhyve bhyve "
 
 /*
  * Defined hardware environments
@@ -958,8 +959,10 @@ extern void reset_gdtr_limit(void);
 #define	HW_VMWARE	(1 << 3)	/* Running on VMware hypervisor */
 #define	HW_KVM		(1 << 4)	/* Running on KVM hypervisor */
 #define	HW_MICROSOFT	(1 << 5)	/* Running on Microsoft hypervisor */
+#define	HW_BHYVE	(1 << 6)	/* Running on bhyve hypervisor */
 
-#define	HW_VIRTUAL	(HW_XEN_HVM | HW_VMWARE | HW_KVM | HW_MICROSOFT)
+#define	HW_VIRTUAL	(HW_XEN_HVM | HW_VMWARE | HW_KVM | HW_MICROSOFT | \
+	    HW_BHYVE)
 
 #endif	/* _KERNEL */
 
