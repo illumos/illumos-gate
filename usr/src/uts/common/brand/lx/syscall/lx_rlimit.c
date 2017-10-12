@@ -158,7 +158,11 @@ lx_getrlimit_common(int lx_resource, uint64_t *rlim_curp, uint64_t *rlim_maxp)
 
 	case LX_RLIMIT_RSS:
 		/* zone.max-physical-memory */
-		rlim64.rlim_cur = rlim64.rlim_max = curzone->zone_phys_mem_ctl;
+		zone_get_physmem_data(curzone->zone_id,
+		    (pgcnt_t *)&rlim64.rlim_cur,
+		    (pgcnt_t *)&rlim64.rlim_max); /* max is dummy variable */
+		rlim64.rlim_cur = rlim64.rlim_max = ptob(rlim64.rlim_cur);
+
 		break;
 
 	case LX_RLIMIT_NPROC:

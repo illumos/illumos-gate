@@ -328,8 +328,8 @@ static list_t zone_active;
 static list_t zone_deathrow;
 static kmutex_t zone_deathrow_lock;
 
-/* number of zones is limited by virtual interface limit in IP */
-uint_t maxzones = 8192;
+/* This can be dynamically reduced if various subsystems hit internal limits. */
+uint_t maxzones = MAX_ZONES;
 
 /* Event channel to sent zone state change notifications */
 evchan_t *zone_event_chan;
@@ -427,6 +427,55 @@ static boolean_t zsd_wait_for_inprogress(zone_t *, struct zsd_entry *,
  * Version 7 adds the requested zoneid to zone_create.
  */
 static const int ZONE_SYSCALL_API_VERSION = 7;
+
+/*
+ * "zone_pcap_data" is an array indexed by zoneid. Each member stores the zone's
+ * current page usage, its page limit, a flag indicating if the zone is
+ * over its physical memory cap and various statistics. The zpcap_over flag is
+ * the interface for the page scanner to use when reclaiming pages for zones
+ * that are over their cap.
+ *
+ * All zone physical memory cap data is stored in this array instead of within
+ * the zone structure itself. This is because zone structures come and go, but
+ * paging-related work can be asynchronous to any particular zone. In,
+ * particular:
+ * 1) Page scanning to reclaim pages occurs from a kernel thread that is not
+ *    associated with any zone.
+ * 2) Freeing segkp pages can occur long after the zone which first
+ *    instantiated those pages has gone away.
+ * We want to be able to account for pages/zone without constantly having to
+ * take extra locks and finding the relevant zone structure, particularly during
+ * page scanning.
+ *
+ * The page scanner can run when "zone_num_over_cap" is non-zero. It can
+ * do a direct lookup of a zoneid into the "zone_pcap_data" array to determine
+ * if that zone is over its cap.
+ *
+ * There is no locking for the page scanner to perform these two checks.
+ * We cannot have the page scanner blocking normal paging activity for
+ * running processes. Because the physical memory cap is a soft cap, it is
+ * fine for the scanner to simply read the current state of the counter and
+ * the zone's zpcap_over entry in the array. The scanner should never modify
+ * either of these items. Internally the entries and the counter are managed
+ * with the "zone_physcap_lock" mutex as we add/remove mappings to pages. We
+ * take care to ensure that we only take the zone_physcap_lock mutex when a
+ * zone is transitioning over/under its physical memory cap.
+ *
+ * The "zone_incr_capped" and "zone_decr_capped" functions are used manage
+ * the "zone_pcap_data" array and associated counter.
+ *
+ * The zone_pcap_t structure tracks the zone's physical cap and phyiscal usage
+ * in terms of pages. These values are currently defined as uint32. Thus, the
+ * maximum number of pages we can track is a UINT_MAX-1 (4,294,967,295) since
+ * UINT_MAX means the zone's RSS is unlimited. Assuming a 4k page size, a
+ * zone's maximum RSS is limited to 17.5 TB and twice that with an 8k page size.
+ * In the future we may need to expand these counters to 64-bit, but for now
+ * we're using 32-bit to conserve memory, since this array is statically
+ * allocatd within the kernel based on the maximum number of zones supported.
+ */
+uint_t zone_num_over_cap;
+zone_pcap_t zone_pcap_data[MAX_ZONES];
+static kmutex_t zone_physcap_lock;
 
 /*
  * Certain filesystems (such as NFS and autofs) need to know which zone
@@ -1822,11 +1871,10 @@ static rctl_qty_t
 zone_phys_mem_usage(rctl_t *rctl, struct proc *p)
 {
 	rctl_qty_t q;
-	zone_t *z = p->p_zone;
+	zone_pcap_t *zp = &zone_pcap_data[p->p_zone->zone_id];
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	/* No additional lock because not enforced in the kernel */
-	q = z->zone_phys_mem;
+	q = ptob(zp->zpcap_pg_cnt);
 	return (q);
 }
 
@@ -1835,11 +1883,30 @@ static int
 zone_phys_mem_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
     rctl_qty_t nv)
 {
+	zoneid_t zid;
+	uint_t pg_val;
+
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(e->rcep_t == RCENTITY_ZONE);
 	if (e->rcep_p.zone == NULL)
 		return (0);
-	e->rcep_p.zone->zone_phys_mem_ctl = nv;
+	zid = e->rcep_p.zone->zone_id;
+	if (nv == UINT64_MAX) {
+		pg_val = UINT32_MAX;
+	} else {
+		uint64_t pages = btop(nv);
+
+		/*
+		 * Return from RCTLOP_SET is always ignored so just clamp an
+		 * out-of-range value to our largest "limited" value.
+		 */
+		if (pages >= UINT32_MAX) {
+			pg_val = UINT32_MAX - 1;
+		} else {
+			pg_val = (uint_t)pages;
+		}
+	}
+	zone_pcap_data[zid].zpcap_pg_limit = pg_val;
 	return (0);
 }
 
@@ -1949,12 +2016,13 @@ zone_physmem_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
 	zone_kstat_t *zk = ksp->ks_data;
+	zone_pcap_t *zp = &zone_pcap_data[zone->zone_id];
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	zk->zk_usage.value.ui64 = zone->zone_phys_mem;
-	zk->zk_value.value.ui64 = zone->zone_phys_mem_ctl;
+	zk->zk_usage.value.ui64 = ptob(zp->zpcap_pg_cnt);
+	zk->zk_value.value.ui64 = ptob(zp->zpcap_pg_limit);
 	return (0);
 }
 
@@ -2172,16 +2240,24 @@ zone_mcap_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
 	zone_mcap_kstat_t *zmp = ksp->ks_data;
+	zone_pcap_t *zp;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	zmp->zm_rss.value.ui64 = zone->zone_phys_mem;
-	zmp->zm_phys_cap.value.ui64 = zone->zone_phys_mem_ctl;
+	zp = &zone_pcap_data[zone->zone_id];
+
+	zmp->zm_rss.value.ui64 = ptob(zp->zpcap_pg_cnt);
+	zmp->zm_phys_cap.value.ui64 = ptob(zp->zpcap_pg_limit);
 	zmp->zm_swap.value.ui64 = zone->zone_max_swap;
 	zmp->zm_swap_cap.value.ui64 = zone->zone_max_swap_ctl;
-	zmp->zm_nover.value.ui64 = zone->zone_mcap_nover;
-	zmp->zm_pagedout.value.ui64 = zone->zone_mcap_pagedout;
+	zmp->zm_nover.value.ui64 = zp->zpcap_nover;
+#ifndef DEBUG
+	zmp->zm_pagedout.value.ui64 = ptob(zp->zpcap_pg_out);
+#else
+	zmp->zm_pagedout.value.ui64 = ptob(zp->zpcap_pg_fsdirty +
+	    zp->zpcap_pg_fs + zp->zpcap_pg_anon + zp->zpcap_pg_anondirty);
+#endif
 	zmp->zm_pgpgin.value.ui64 = zone->zone_pgpgin;
 	zmp->zm_anonpgin.value.ui64 = zone->zone_anonpgin;
 	zmp->zm_execpgin.value.ui64 = zone->zone_execpgin;
@@ -2427,8 +2503,6 @@ zone_zsd_init(void)
 	zone0.zone_locked_mem_ctl = UINT64_MAX;
 	ASSERT(zone0.zone_max_swap == 0);
 	zone0.zone_max_swap_ctl = UINT64_MAX;
-	zone0.zone_phys_mem = 0;
-	zone0.zone_phys_mem_ctl = UINT64_MAX;
 	zone0.zone_max_lofi = 0;
 	zone0.zone_max_lofi_ctl = UINT64_MAX;
 	zone0.zone_shmmax = 0;
@@ -2770,6 +2844,9 @@ zone_free(zone_t *zone)
 	 */
 	cpucaps_zone_remove(zone);
 
+	/* Clear physical memory capping data. */
+	bzero(&zone_pcap_data[zone->zone_id], sizeof (zone_pcap_t));
+
 	ASSERT(zone->zone_cpucap == NULL);
 
 	/* remove from deathrow list */
@@ -3020,16 +3097,14 @@ zone_set_initname(zone_t *zone, const char *zone_initname)
  * The zone_set_mcap_nover and zone_set_mcap_pageout functions are used
  * to provide the physical memory capping kstats.  Since physical memory
  * capping is currently implemented in userland, that code uses the setattr
- * entry point to increment the kstats.  We always simply increment nover
- * every time that setattr is called and we always add in the input value
- * to zone_mcap_pagedout every time that is called.
+ * entry point to increment the kstats.  We ignore nover when that setattr is
+ * called and we always add in the input value to zone_mcap_pagedout every
+ * time that is called.
  */
 /*ARGSUSED*/
 static int
 zone_set_mcap_nover(zone_t *zone, const uint64_t *zone_nover)
 {
-	zone->zone_mcap_nover++;
-
 	return (0);
 }
 
@@ -3039,8 +3114,17 @@ zone_set_mcap_pageout(zone_t *zone, const uint64_t *zone_pageout)
 	uint64_t pageout;
 	int err;
 
-	if ((err = copyin(zone_pageout, &pageout, sizeof (uint64_t))) == 0)
-		zone->zone_mcap_pagedout += pageout;
+	if ((err = copyin(zone_pageout, &pageout, sizeof (uint64_t))) == 0) {
+		zone_pcap_t *zp = &zone_pcap_data[zone->zone_id];
+		uint64_t pages;
+
+		pages = btop(pageout);
+#ifndef DEBUG
+		atomic_add_64(&zp->zpcap_pg_out, pages);
+#else
+		atomic_add_64(&zp->zpcap_pg_fs, pages);
+#endif
+	}
 
 	return (err);
 }
@@ -3059,22 +3143,6 @@ zone_set_page_fault_delay(zone_t *zone, const uint32_t *pfdelay)
 
 	if ((err = copyin(pfdelay, &dusec, sizeof (uint32_t))) == 0)
 		zone->zone_pg_flt_delay = dusec;
-
-	return (err);
-}
-
-/*
- * The zone_set_rss function is used to set the zone's RSS when we do the
- * fast, approximate calculation in user-land.
- */
-static int
-zone_set_rss(zone_t *zone, const uint64_t *prss)
-{
-	uint64_t rss;
-	int err;
-
-	if ((err = copyin(prss, &rss, sizeof (uint64_t))) == 0)
-		zone->zone_phys_mem = rss;
 
 	return (err);
 }
@@ -5077,8 +5145,6 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_locked_mem_ctl = UINT64_MAX;
 	zone->zone_max_swap = 0;
 	zone->zone_max_swap_ctl = UINT64_MAX;
-	zone->zone_phys_mem = 0;
-	zone->zone_phys_mem_ctl = UINT64_MAX;
 	zone->zone_max_lofi = 0;
 	zone->zone_max_lofi_ctl = UINT64_MAX;
 	zone->zone_lockedmem_kstat = NULL;
@@ -5090,6 +5156,13 @@ zone_create(const char *zone_name, const char *zone_root,
 	 * Zsched initializes the rctls.
 	 */
 	zone->zone_rctls = NULL;
+
+	/*
+	 * Ensure page count is 0 (in case zoneid has wrapped).
+	 * Initialize physical memory cap as unlimited.
+	 */
+	zone_pcap_data[zoneid].zpcap_pg_cnt = 0;
+	zone_pcap_data[zoneid].zpcap_pg_limit = UINT32_MAX;
 
 	if ((error = parse_rctls(rctlbuf, rctlbufsz, &rctls)) != 0) {
 		zone_free(zone);
@@ -6228,6 +6301,19 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		    bufsize) != 0)
 			error = EFAULT;
 		break;
+	case ZONE_ATTR_RSS: {
+		zone_pcap_t *zp = &zone_pcap_data[zone->zone_id];
+		uint64_t phys_mem;
+
+		phys_mem = ptob(zp->zpcap_pg_cnt);
+		size = sizeof (phys_mem);
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL &&
+		    copyout(&phys_mem, buf, bufsize) != 0)
+			error = EFAULT;
+		}
+		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
 			size = bufsize;
@@ -6281,8 +6367,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	 */
 	zone_status = zone_status_get(zone);
 	if (attr != ZONE_ATTR_PMCAP_NOVER && attr != ZONE_ATTR_PMCAP_PAGEOUT &&
-	    attr != ZONE_ATTR_PG_FLT_DELAY && attr != ZONE_ATTR_RSS &&
-	    zone_status > ZONE_IS_READY) {
+	    attr != ZONE_ATTR_PG_FLT_DELAY && zone_status > ZONE_IS_READY) {
 		err = EINVAL;
 		goto done;
 	}
@@ -6312,9 +6397,6 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		break;
 	case ZONE_ATTR_PG_FLT_DELAY:
 		err = zone_set_page_fault_delay(zone, (const uint32_t *)buf);
-		break;
-	case ZONE_ATTR_RSS:
-		err = zone_set_rss(zone, (const uint64_t *)buf);
 		break;
 	case ZONE_ATTR_SECFLAGS:
 		err = zone_set_secflags(zone, (psecflags_t *)buf);
@@ -8073,4 +8155,232 @@ done:
 		return (set_errno(err));
 	else
 		return (0);
+}
+
+static void
+zone_incr_capped(zoneid_t zid)
+{
+	zone_pcap_t *zp = &zone_pcap_data[zid];
+
+	/* See if over (unlimited is UINT32_MAX), or already marked that way. */
+	if (zp->zpcap_pg_cnt <= zp->zpcap_pg_limit || zp->zpcap_over == 1) {
+		return;
+	}
+
+	mutex_enter(&zone_physcap_lock);
+	/* Recheck setting under mutex */
+	if (zp->zpcap_pg_cnt > zp->zpcap_pg_limit && zp->zpcap_over == 0) {
+		zp->zpcap_over = 1;
+		zp->zpcap_nover++;
+		zone_num_over_cap++;
+		DTRACE_PROBE1(zone__over__pcap, zoneid_t, zid);
+	}
+	mutex_exit(&zone_physcap_lock);
+}
+
+/*
+ * We want some hysteresis when the zone is going under its cap so that we're
+ * not continuously toggling page scanning back and forth by a single page
+ * around the cap. Using ~1% of the zone's page limit seems to be a good
+ * quantity. This table shows some various zone memory caps and the number of
+ * pages (assuming a 4k page size). Given this, we choose to shift the page
+ * limit by 7 places to get a hysteresis that is slightly less than 1%.
+ *
+ *   cap    pages     pages     1% shift7  shift7
+ *  128M    32768 0x0008000    327    256 0x00100
+ *  512M   131072 0x0020000   1310   1024 0x00400
+ *    1G   262144 0x0040000   2621   2048 0x00800
+ *    4G  1048576 0x0100000  10485   8192 0x02000
+ *    8G  2097152 0x0200000  20971  16384 0x04000
+ *   16G  4194304 0x0400000  41943  32768 0x08000
+ *   32G  8388608 0x0800000  83886  65536 0x10000
+ *   64G 16777216 0x1000000 167772 131072 0x20000
+ */
+static void
+zone_decr_capped(zoneid_t zid)
+{
+	zone_pcap_t *zp = &zone_pcap_data[zid];
+	uint32_t adjusted_limit;
+
+	/*
+	 * See if under, or already marked that way. There is no need to
+	 * check for an unlimited cap (zpcap_pg_limit == UINT32_MAX)
+	 * since we'll never set zpcap_over in zone_incr_capped().
+	 */
+	if (zp->zpcap_over == 0 || zp->zpcap_pg_cnt >= zp->zpcap_pg_limit) {
+		return;
+	}
+
+	adjusted_limit = zp->zpcap_pg_limit - (zp->zpcap_pg_limit >> 7);
+
+	/* Recheck, accounting for our hysteresis. */
+	if (zp->zpcap_pg_cnt >= adjusted_limit) {
+		return;
+	}
+
+	mutex_enter(&zone_physcap_lock);
+	/* Recheck under mutex. */
+	if (zp->zpcap_pg_cnt < adjusted_limit && zp->zpcap_over == 1) {
+		zp->zpcap_over = 0;
+		ASSERT(zone_num_over_cap > 0);
+		zone_num_over_cap--;
+		DTRACE_PROBE1(zone__under__pcap, zoneid_t, zid);
+	}
+	mutex_exit(&zone_physcap_lock);
+}
+
+/*
+ * For zone_add_page() and zone_rm_page(), access to the page we're touching is
+ * controlled by our caller's locking.
+ * On x86 our callers already did: ASSERT(x86_hm_held(pp))
+ * On SPARC our callers already did: ASSERT(sfmmu_mlist_held(pp))
+ */
+void
+zone_add_page(page_t *pp)
+{
+	uint_t pcnt;
+	zone_pcap_t *zp;
+	zoneid_t zid;
+
+	/* Skip pages in segkmem, etc. (KV_KVP, ...) */
+	if (PP_ISKAS(pp))
+		return;
+
+	ASSERT(!PP_ISFREE(pp));
+
+	zid = curzone->zone_id;
+	if (pp->p_zoneid == zid) {
+		/* Another mapping to this page for this zone, do nothing */
+		return;
+	}
+
+	if (pp->p_szc == 0) {
+		pcnt = 1;
+	} else {
+		/* large page */
+		pcnt = page_get_pagecnt(pp->p_szc);
+	}
+
+	if (pp->p_share == 0) {
+		/* First mapping to this page. */
+		pp->p_zoneid = zid;
+		zp = &zone_pcap_data[zid];
+		ASSERT(zp->zpcap_pg_cnt + pcnt < UINT32_MAX);
+		atomic_add_32((uint32_t *)&zp->zpcap_pg_cnt, pcnt);
+		zone_incr_capped(zid);
+		return;
+	}
+
+	if (pp->p_zoneid != ALL_ZONES) {
+		/*
+		 * The page is now being shared across a different zone.
+		 * Decrement the original zone's usage.
+		 */
+		zid = pp->p_zoneid;
+		pp->p_zoneid = ALL_ZONES;
+		ASSERT(zid >= 0 && zid <= MAX_ZONEID);
+		zp = &zone_pcap_data[zid];
+
+		if (zp->zpcap_pg_cnt > 0) {
+			atomic_add_32((uint32_t *)&zp->zpcap_pg_cnt, -pcnt);
+		}
+		zone_decr_capped(zid);
+	}
+}
+
+void
+zone_rm_page(page_t *pp)
+{
+	uint_t pcnt;
+	zone_pcap_t *zp;
+	zoneid_t zid;
+
+	/* Skip pages in segkmem, etc. (KV_KVP, ...) */
+	if (PP_ISKAS(pp))
+		return;
+
+	zid = pp->p_zoneid;
+	if (zid == ALL_ZONES || pp->p_share != 0)
+		return;
+
+	/* This is the last mapping to the page for a zone. */
+	if (pp->p_szc == 0) {
+		pcnt = 1;
+	} else {
+		/* large page */
+		pcnt = (int64_t)page_get_pagecnt(pp->p_szc);
+	}
+
+	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
+	zp = &zone_pcap_data[zid];
+	if (zp->zpcap_pg_cnt > 0) {
+		atomic_add_32((uint32_t *)&zp->zpcap_pg_cnt, -pcnt);
+	}
+	zone_decr_capped(zid);
+	pp->p_zoneid = ALL_ZONES;
+}
+
+void
+zone_pageout_stat(int zid, zone_pageout_op_t op)
+{
+	zone_pcap_t *zp;
+
+	if (zid == ALL_ZONES)
+		return;
+
+	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
+	zp = &zone_pcap_data[zid];
+
+#ifndef DEBUG
+	atomic_add_64(&zp->zpcap_pg_out, 1);
+#else
+	switch (op) {
+	case ZPO_DIRTY:
+		atomic_add_64(&zp->zpcap_pg_fsdirty, 1);
+		break;
+	case ZPO_FS:
+		atomic_add_64(&zp->zpcap_pg_fs, 1);
+		break;
+	case ZPO_ANON:
+		atomic_add_64(&zp->zpcap_pg_anon, 1);
+		break;
+	case ZPO_ANONDIRTY:
+		atomic_add_64(&zp->zpcap_pg_anondirty, 1);
+		break;
+	default:
+		cmn_err(CE_PANIC, "Invalid pageout operator %d", op);
+		break;
+	}
+#endif
+}
+
+/*
+ * Return the zone's physical memory cap and current free memory (in pages).
+ */
+void
+zone_get_physmem_data(int zid, pgcnt_t *memcap, pgcnt_t *free)
+{
+	zone_pcap_t *zp;
+
+	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
+	zp = &zone_pcap_data[zid];
+
+	/*
+	 * If memory or swap limits are set on the zone, use those, otherwise
+	 * use the system values. physmem and freemem are also in pages.
+	 */
+	if (zp->zpcap_pg_limit == UINT32_MAX) {
+		*memcap = physmem;
+		*free = freemem;
+	} else {
+		int64_t freemem;
+
+		*memcap = (pgcnt_t)zp->zpcap_pg_limit;
+		freemem = zp->zpcap_pg_limit - zp->zpcap_pg_cnt;
+		if (freemem > 0) {
+			*free = (pgcnt_t)freemem;
+		} else {
+			*free = (pgcnt_t)0;
+		}
+	}
 }

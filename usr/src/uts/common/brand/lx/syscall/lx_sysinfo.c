@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <vm/anon.h>
@@ -75,8 +75,9 @@ extern pgcnt_t swapfs_minfree;
 static void
 lx_sysinfo_common(lx_sysinfo_t *si)
 {
-	zone_t *zone = curthread->t_procp->p_zone;
-	uint64_t zphysmem, zfreemem, ztotswap, zfreeswap;
+	zone_t *zone = curzone;
+	pgcnt_t zphysmem, zfreemem;
+	ulong_t ztotswap, zfreeswap;
 
 	si->si_uptime = gethrestime_sec() - zone->zone_boot_time;
 
@@ -90,26 +91,7 @@ lx_sysinfo_common(lx_sysinfo_t *si)
 	 */
 	si->si_procs = (int32_t)zone->zone_nlwps;
 
-	/*
-	 * If memory or swap limits are set on the zone, use those, otherwise
-	 * use the system values. physmem and freemem are in pages, but the
-	 * zone values are in bytes. Likewise, ani_max and ani_free are in
-	 * pages.
-	 */
-	if (zone->zone_phys_mem_ctl == UINT64_MAX) {
-		zphysmem = physmem;
-		zfreemem = freemem;
-	} else {
-		int64_t freemem;
-
-		zphysmem = btop(zone->zone_phys_mem_ctl);
-		freemem = zone->zone_phys_mem_ctl - zone->zone_phys_mem;
-		if (freemem > 0) {
-			zfreemem = btop(freemem);
-		} else {
-			zfreemem = 0;
-		}
-	}
+	zone_get_physmem_data(zone->zone_id, &zphysmem, &zfreemem);
 
 	if (zone->zone_max_swap_ctl == UINT64_MAX) {
 		ztotswap = k_anoninfo.ani_max;

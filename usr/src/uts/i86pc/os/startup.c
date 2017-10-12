@@ -2611,6 +2611,7 @@ add_physmem_cb(page_t *pp, pfn_t pnum)
 	pp->p_mapping = NULL;
 	pp->p_embed = 0;
 	pp->p_share = 0;
+	pp->p_zoneid = ALL_ZONES;
 	pp->p_mlentry = 0;
 }
 

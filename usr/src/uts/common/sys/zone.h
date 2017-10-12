@@ -22,7 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #ifndef _SYS_ZONE_H
@@ -51,15 +51,27 @@ extern "C" {
  * NOTE
  *
  * The contents of this file are private to the implementation of
- * Solaris and are subject to change at any time without notice.
+ * illumos and are subject to change at any time without notice.
  * Applications and drivers using these interfaces may fail to
  * run on future releases.
  */
 
 /* Available both in kernel and for user space */
 
-/* zone id restrictions and special ids */
-#define	MAX_ZONEID	9999
+/*
+ * zone id restrictions and special ids.
+ * See 'maxzones' for run-time zone limit.
+ *
+ * The current 8k value for MAX_ZONES was originally derived from the virtual
+ * interface limit in IP when "shared-stack" was the only supported networking
+ * for zones. The virtual interface limit is the number of addresses allowed
+ * on an interface (see MAX_ADDRS_PER_IF). Even with exclusive stacks, an 8k
+ * zone limit is still a reasonable choice at this time, given other limits
+ * within the kernel. Since we only support 8192 zones (which includes GZ),
+ * there is no point in allowing MAX_ZONEID > 8k.
+ */
+#define	MAX_ZONES	8192
+#define	MAX_ZONEID	(MAX_ZONES - 1)
 #define	MIN_USERZONEID	1	/* lowest user-creatable zone ID */
 #define	MIN_ZONEID	0	/* minimum zone ID on system */
 #define	GLOBAL_ZONEID	0
@@ -563,7 +575,6 @@ typedef struct zone {
 	int		zone_init_status;	/* init's exit status */
 	int		zone_boot_err;  /* for zone_boot() if boot fails */
 	char		*zone_bootargs;	/* arguments passed via zone_boot() */
-	rctl_qty_t	zone_phys_mem_ctl;	/* current phys. memory limit */
 	/*
 	 * zone_kthreads is protected by zone_status_lock.
 	 */
@@ -647,7 +658,7 @@ typedef struct zone {
 	zone_zfs_kstat_t *zone_zfs_stats;
 
 	/*
-	 * Solaris Auditing per-zone audit context
+	 * illumos Auditing per-zone audit context
 	 */
 	struct au_kcontext	*zone_audit_kctxt;
 	/*
@@ -667,11 +678,8 @@ typedef struct zone {
 	/*
 	 * kstats and counters for physical memory capping.
 	 */
-	rctl_qty_t	zone_phys_mem;	/* current bytes of phys. mem. (RSS) */
 	kstat_t		*zone_physmem_kstat;
-	uint64_t	zone_mcap_nover;	/* # of times over phys. cap */
-	uint64_t	zone_mcap_pagedout;	/* bytes of mem. paged out */
-	kmutex_t	zone_mcap_lock;	/* protects mcap statistics */
+	kmutex_t	zone_mcap_lock;		/* protects mcap statistics */
 	kstat_t		*zone_mcap_ksp;
 	zone_mcap_kstat_t *zone_mcap_stats;
 	uint64_t	zone_pgpgin;		/* pages paged in */
@@ -738,6 +746,30 @@ typedef struct zone {
 	kcondvar_t	zone_mount_cv;
 	kmutex_t	zone_mount_lock;
 } zone_t;
+
+/* zpcap_over is treated as a boolean but is 32 bits for alignment. */
+typedef struct zone_pcap {
+	uint32_t	zpcap_over;	/* currently over cap */
+	uint32_t	zpcap_pg_cnt;	/* current RSS in pages */
+	uint32_t	zpcap_pg_limit;	/* current RRS limit in pages */
+	uint32_t	zpcap_nover;	/* # of times over phys. cap */
+#ifndef DEBUG
+	uint64_t	zpcap_pg_out;	/* # pages flushed */
+#else
+	/*
+	 * To conserve memory, detailed pageout stats are only kept for DEBUG
+	 * builds.
+	 */
+	uint64_t	zpcap_pg_anon;		/* # clean anon pages flushed */
+	uint64_t	zpcap_pg_anondirty;	/* # dirty anon pages flushed */
+	uint64_t	zpcap_pg_fs;		/* # clean fs pages flushed */
+	uint64_t	zpcap_pg_fsdirty;	/* # dirty fs pages flushed */
+#endif
+} zone_pcap_t;
+
+typedef enum zone_pageout_op {
+	ZPO_DIRTY, ZPO_FS, ZPO_ANON, ZPO_ANONDIRTY
+} zone_pageout_op_t;
 
 /*
  * Special value of zone_psetid to indicate that pools are disabled.
@@ -962,6 +994,16 @@ extern void mount_in_progress(zone_t *);
 extern void mount_completed(zone_t *);
 
 extern int zone_walk(int (*)(zone_t *, void *), void *);
+
+struct page;
+extern void zone_add_page(struct page *);
+extern void zone_rm_page(struct page *);
+extern void zone_pageout_stat(int, zone_pageout_op_t);
+extern void zone_get_physmem_data(int, pgcnt_t *, pgcnt_t *);
+
+/* Interfaces for page scanning */
+extern uint_t zone_num_over_cap;
+extern zone_pcap_t zone_pcap_data[MAX_ZONES];
 
 extern rctl_hndl_t rc_zone_locked_mem;
 extern rctl_hndl_t rc_zone_max_swap;

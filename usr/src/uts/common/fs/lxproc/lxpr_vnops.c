@@ -1449,23 +1449,18 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	zone_t *zone = LXPTOZ(lxpnp);
 	int global = zone == global_zone;
-	long total_mem, free_mem, total_swap, used_swap;
+	ulong_t total_mem, free_mem, total_swap, used_swap;
 
 	ASSERT(lxpnp->lxpr_type == LXPR_MEMINFO);
 
-	if (global || zone->zone_phys_mem_ctl == UINT64_MAX) {
-		total_mem = physmem * PAGESIZE;
-		free_mem = freemem * PAGESIZE;
-	} else {
-		total_mem = zone->zone_phys_mem_ctl;
-		free_mem = zone->zone_phys_mem_ctl - zone->zone_phys_mem;
-		if (free_mem < 0)
-			free_mem = 0;
-	}
+	zone_get_physmem_data(zone->zone_id, (pgcnt_t *)&total_mem,
+	    (pgcnt_t *)&free_mem);
+	total_mem = ptob(total_mem);
+	free_mem = ptob(free_mem);
 
 	if (global || zone->zone_max_swap_ctl == UINT64_MAX) {
-		total_swap = k_anoninfo.ani_max * PAGESIZE;
-		used_swap = k_anoninfo.ani_phys_resv * PAGESIZE;
+		total_swap = ptob(k_anoninfo.ani_max);
+		used_swap = ptob(k_anoninfo.ani_phys_resv);
 	} else {
 		mutex_enter(&zone->zone_mem_lock);
 		total_swap = zone->zone_max_swap_ctl;

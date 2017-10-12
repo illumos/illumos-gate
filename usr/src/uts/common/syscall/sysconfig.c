@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -171,41 +171,29 @@ sysconfig(int which)
 		/*
 		 * If the non-global zone has a phys. memory cap, use that.
 		 * We always report the system-wide value for the global zone,
-		 * even though rcapd can be used on the global zone too.
+		 * even though memory capping can be used on the global zone
+		 * too.
 		 */
-		if (!INGLOBALZONE(curproc) &&
-		    curproc->p_zone->zone_phys_mem_ctl != UINT64_MAX)
-			return (MIN(btop(curproc->p_zone->zone_phys_mem_ctl),
-			    physinstalled));
+		if (!INGLOBALZONE(curproc)) {
+			pgcnt_t cap, free;
+
+			zone_get_physmem_data(curzone->zone_id, &cap, &free);
+			return (MIN(cap, physinstalled));
+		}
 
 		return (physinstalled);
 
 	case _CONFIG_AVPHYS_PAGES:
 		/*
-		 * If the non-global zone has a phys. memory cap, use
-		 * the phys. memory cap - zone's rss.  We always
-		 * report the system-wide value for the global zone, even
-		 * though memory capping can be used on the global zone too.
-		 * We use the cached value for the RSS since vm_getusage()
-		 * is so expensive and we don't need this value to be exact.
+		 * If the non-global zone has a phys. memory cap, use its
+		 * free value. We always report the system-wide value for the
+		 * global zone, even though memory capping can be used on the
+		 * global zone too.
 		 */
-		if (!INGLOBALZONE(curproc) &&
-		    curproc->p_zone->zone_phys_mem_ctl != UINT64_MAX) {
-			pgcnt_t cap, rss, free;
+		if (!INGLOBALZONE(curproc)) {
+			pgcnt_t cap, free;
 
-			cap = btop(curproc->p_zone->zone_phys_mem_ctl);
-			if (cap > physinstalled)
-				return (freemem);
-
-			rss = btop(curproc->p_zone->zone_phys_mem);
-			/*
-			 * Because this is a soft cap, it is possible
-			 * for rss to be temporarily over the cap.
-			 */
-			if (cap > rss)
-				free = cap - rss;
-			else
-				free = 0;
+			zone_get_physmem_data(curzone->zone_id, &cap, &free);
 			return (MIN(free, freemem));
 		}
 
