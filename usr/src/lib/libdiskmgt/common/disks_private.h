@@ -22,7 +22,10 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Nexenta Systems, Inc.
+ */
+
+/*
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #ifndef _DISKS_PRIVATE_H
@@ -54,7 +57,6 @@ typedef struct alias_info {
 	slice_t		*devpaths;
 	slice_t		*orig_paths;
 	char		*wwn;
-	int		cluster;
 	int		lun;
 	int		target;
 	struct alias_info *next;
