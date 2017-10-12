@@ -21,6 +21,7 @@
 #include <sys/cmn_err.h>
 #include <sys/lx_brand.h>
 #include <sys/lx_impl.h>
+#include <sys/lx_misc.h>
 #include <lx_signum.h>
 
 #define	LX_PR_SET_PDEATHSIG		1
@@ -63,8 +64,6 @@
 #define	LX_PR_GET_TID_ADDRESS		40
 #define	LX_PR_SET_THP_DISABLE		41
 #define	LX_PR_GET_THP_DISABLE		42
-
-#define	LX_PR_SET_NAME_NAMELEN	16
 
 long
 lx_prctl(int opt, uintptr_t data)

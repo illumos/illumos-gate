@@ -185,7 +185,6 @@ static void lxpr_read_vmstat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_auxv(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_cgroup(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_cmdline(lxpr_node_t *, lxpr_uiobuf_t *);
-static void lxpr_read_pid_comm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_env(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_id_map(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_limits(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -196,6 +195,7 @@ static void lxpr_read_pid_oom_scr_adj(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_personality(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_statm(lxpr_node_t *, lxpr_uiobuf_t *);
 
+static void lxpr_read_pid_tid_comm(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_tid_stat(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_pid_tid_status(lxpr_node_t *, lxpr_uiobuf_t *);
 
@@ -269,6 +269,8 @@ static void lxpr_read_sys_vm_nhpages(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_overcommit_mem(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_vm_swappiness(lxpr_node_t *, lxpr_uiobuf_t *);
 
+static int lxpr_write_pid_tid_comm(lxpr_node_t *, uio_t *, cred_t *,
+    caller_context_t *);
 static int lxpr_write_pid_loginuid(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 static int lxpr_write_sys_fs_pipe_max(lxpr_node_t *, uio_t *, cred_t *,
@@ -658,9 +660,11 @@ typedef struct wftab {
 } wftab_t;
 
 static wftab_t wr_tab[] = {
+	{LXPR_PID_COMM, lxpr_write_pid_tid_comm},
 	{LXPR_PID_FD_FD, NULL},
 	{LXPR_PID_LOGINUID, lxpr_write_pid_loginuid},
 	{LXPR_PID_OOM_SCR_ADJ, NULL},
+	{LXPR_PID_TID_COMM, lxpr_write_pid_tid_comm},
 	{LXPR_PID_TID_FD_FD, NULL},
 	{LXPR_PID_TID_OOM_SCR_ADJ, NULL},
 	{LXPR_SYS_FS_FILEMAX, NULL},
@@ -799,7 +803,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_auxv,		/* /proc/<pid>/auxv	*/
 	lxpr_read_pid_cgroup,		/* /proc/<pid>/cgroup	*/
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/cmdline	*/
-	lxpr_read_pid_comm,		/* /proc/<pid>/comm	*/
+	lxpr_read_pid_tid_comm,		/* /proc/<pid>/comm	*/
 	lxpr_read_empty,		/* /proc/<pid>/cpu	*/
 	lxpr_read_invalid,		/* /proc/<pid>/cwd	*/
 	lxpr_read_pid_env,		/* /proc/<pid>/environ	*/
@@ -825,7 +829,7 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_pid_auxv,		/* /proc/<pid>/task/<tid>/auxv	*/
 	lxpr_read_pid_cgroup,		/* /proc/<pid>/task/<tid>/cgroup */
 	lxpr_read_pid_cmdline,		/* /proc/<pid>/task/<tid>/cmdline */
-	lxpr_read_pid_comm,		/* /proc/<pid>/task/<tid>/comm	*/
+	lxpr_read_pid_tid_comm,		/* /proc/<pid>/task/<tid>/comm	*/
 	lxpr_read_empty,		/* /proc/<pid>/task/<tid>/cpu	*/
 	lxpr_read_invalid,		/* /proc/<pid>/task/<tid>/cwd	*/
 	lxpr_read_pid_env,		/* /proc/<pid>/task/<tid>/environ */
@@ -1574,28 +1578,123 @@ lxpr_read_pid_cmdline(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 }
 
 /*
- * lxpr_read_pid_comm(): read command from process
+ * lxpr_read_pid_tid_comm(): read command name from thread
  */
 static void
-lxpr_read_pid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+lxpr_read_pid_tid_comm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	proc_t *p;
-	char buf[MAXCOMLEN + 1];
+	kthread_t *t;
+	pid_t tid;
+	char buf[LX_PR_SET_NAME_NAMELEN], *pnm;
 
 	VERIFY(lxpnp->lxpr_type == LXPR_PID_COMM ||
 	    lxpnp->lxpr_type == LXPR_PID_TID_COMM);
 
-	/*
-	 * Because prctl(PR_SET_NAME) does not set custom names for threads
-	 * (vs processes), there is no need for special handling here.
-	 */
-	if ((p = lxpr_lock(lxpnp, ZOMB_OK)) == NULL) {
+	tid = (lxpnp->lxpr_desc == 0) ? lxpnp->lxpr_pid : lxpnp->lxpr_desc;
+	p = lxpr_lock_pid(lxpnp, tid, ZOMB_OK, &t);
+	if (p == NULL) {
 		lxpr_uiobuf_seterr(uiobuf, EINVAL);
 		return;
 	}
-	(void) strlcpy(buf, p->p_user.u_comm, sizeof (buf));
+	if (t == NULL) {
+		lxpr_unlock(p);
+		lxpr_uiobuf_seterr(uiobuf, EINVAL);
+		return;
+	}
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	/*
+	 * If a thread name has not been set, use the process command name.
+	 * This also covers the /proc/{pid}/comm case.
+	 */
+	if (t->t_name == NULL) {
+		pnm = p->p_user.u_comm;
+	} else {
+		pnm = t->t_name;
+	}
+
+	/* Truncate with NUL if the name is longer than the Linux size. */
+	(void) strlcpy(buf, pnm, sizeof (buf));
+
 	lxpr_unlock(p);
 	lxpr_uiobuf_printf(uiobuf, "%s\n", buf);
+}
+
+/* ARGSUSED */
+static int
+lxpr_write_pid_tid_comm(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
+    caller_context_t *ct)
+{
+	int error;
+	size_t olen;
+	char *buf;
+	proc_t *p;
+	kthread_t *t;
+	pid_t tid;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_PID_COMM ||
+	    lxpnp->lxpr_type == LXPR_PID_TID_COMM);
+
+	/*
+	 * Only a thread in the process can update one of the thread names. Not
+	 * even a process with root privileges. Linux returns EINVAL (not EPERM)
+	 * for this case.
+	 */
+	if (lxpnp->lxpr_pid != curproc->p_pid)
+		return (EINVAL);
+
+	if (uio->uio_loffset != 0)
+		return (EINVAL);
+
+	if (uio->uio_resid == 0)
+		return (0);
+
+	olen = uio->uio_resid;
+	if (olen > LX_PR_SET_NAME_NAMELEN - 1)
+		olen = LX_PR_SET_NAME_NAMELEN - 1;
+
+	buf = kmem_zalloc(THREAD_NAME_MAX, KM_SLEEP);
+
+	error = uiomove(buf, olen, UIO_WRITE, uio);
+	if (error != 0) {
+		kmem_free(buf, THREAD_NAME_MAX);
+		return (error);
+	}
+	buf[LX_PR_SET_NAME_NAMELEN - 1] = '\0';
+
+	tid = (lxpnp->lxpr_desc == 0) ? lxpnp->lxpr_pid : lxpnp->lxpr_desc;
+	p = lxpr_lock_pid(lxpnp, tid, NO_ZOMB, &t);
+	if (p == NULL) {
+		kmem_free(buf, THREAD_NAME_MAX);
+		return (ENXIO);
+	}
+	if (t == NULL) {
+		lxpr_unlock(p);
+		kmem_free(buf, THREAD_NAME_MAX);
+		return (ENXIO);
+	}
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	/*
+	 * See comments for thread_setname() and prctl(LX_PR_SET_NAME) handling.
+	 */
+	if (t->t_name == NULL) {
+		t->t_name = buf;
+	} else {
+		(void) strlcpy(t->t_name, buf, THREAD_NAME_MAX);
+		kmem_free(buf, THREAD_NAME_MAX);
+	}
+
+	if (t->t_tid == 1) {
+		(void) strncpy(p->p_user.u_comm, t->t_name, MAXCOMLEN + 1);
+		(void) strncpy(p->p_user.u_psargs, t->t_name, PSARGSZ);
+	}
+
+	lxpr_unlock(p);
+	return (0);
 }
 
 /*
