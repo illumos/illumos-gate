@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_HMA_H
@@ -29,6 +29,39 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+/*
+ * Register a hypervisor with HMA.  On success, a pointer to the opaque
+ * registration token will be returned, indicating that proper host setup has
+ * occurred for further hypervisor actions.
+ */
+typedef struct hma_reg hma_reg_t;
+extern hma_reg_t *hma_register(const char *);
+extern void hma_unregister(hma_reg_t *);
+
+/*
+ * Allocate or free a VPID for use with VMX.
+ *
+ * This must not be performed by a hypervisor until it has successfully
+ * registered via hma_register().
+ */
+extern uint16_t hma_vmx_vpid_alloc(void);
+extern void hma_vmx_vpid_free(uint16_t);
+
+/*
+ * On all active CPUs, perform a single-context INVEPT on the given EPTP.
+ */
+extern void hma_vmx_invept_allcpus(uintptr_t);
+
+struct hma_svm_asid {
+	uint64_t hsa_gen;
+	uint32_t hsa_asid;
+};
+typedef struct hma_svm_asid hma_svm_asid_t;
+
+extern void hma_svm_asid_init(hma_svm_asid_t *);
+extern uint8_t hma_svm_asid_update(hma_svm_asid_t *, boolean_t, boolean_t);
 
 /*
  * FPU related management. These functions provide a set of APIs to manage the
@@ -95,6 +128,9 @@ extern void hma_fpu_stop_guest(hma_fpu_t *);
  */
 extern void hma_fpu_get_fxsave_state(const hma_fpu_t *, struct fxsave_state *);
 extern int hma_fpu_set_fxsave_state(hma_fpu_t *, const struct fxsave_state *);
+
+/* Perform HMA initialization steps during boot-up. */
+extern void hma_init(void);
 
 #ifdef __cplusplus
 }

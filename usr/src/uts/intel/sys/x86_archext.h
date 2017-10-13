@@ -215,6 +215,18 @@ extern "C" {
 #define	CPUID_AMD_EBX_SSB_NO		0x004000000 /* AMD: SSB Fixed */
 
 /*
+ * AMD SVM features (extended function 0x8000000A).
+ */
+#define	CPUID_AMD_EDX_NESTED_PAGING	0x000000001 /* AMD: SVM NP */
+#define	CPUID_AMD_EDX_LBR_VIRT		0x000000002 /* AMD: LBR virt. */
+#define	CPUID_AMD_EDX_SVML		0x000000004 /* AMD: SVM lock */
+#define	CPUID_AMD_EDX_NRIPS		0x000000008 /* AMD: NRIP save */
+#define	CPUID_AMD_EDX_TSC_RATE_MSR	0x000000010 /* AMD: MSR TSC ctrl */
+#define	CPUID_AMD_EDX_VMCB_CLEAN	0x000000020 /* AMD: VMCB clean bits */
+#define	CPUID_AMD_EDX_FLUSH_ASID	0x000000040 /* AMD: flush by ASID */
+#define	CPUID_AMD_EDX_DECODE_ASSISTS	0x000000080 /* AMD: decode assists */
+
+/*
  * Intel now seems to have claimed part of the "extended" function
  * space that we previously for non-Intel implementors to use.
  * More excitingly still, they've claimed bit 20 to mean LAHF/SAHF
@@ -490,6 +502,31 @@ extern "C" {
 
 #define	MSR_IA32_FLUSH_CMD	0x10b
 #define	IA32_FLUSH_CMD_L1D	0x01
+
+/*
+ * Intel VMX related MSRs
+ */
+#define	MSR_IA32_FEAT_CTRL	0x03a
+#define	IA32_FEAT_CTRL_LOCK	0x1
+#define	IA32_FEAT_CTRL_SMX_EN	0x2
+#define	IA32_FEAT_CTRL_VMX_EN	0x4
+
+#define	MSR_IA32_VMX_BASIC		0x480
+#define	IA32_VMX_BASIC_INS_OUTS		(1UL << 54)
+#define	IA32_VMX_BASIC_TRUE_CTRLS	(1UL << 55)
+
+#define	MSR_IA32_VMX_PROCBASED_CTLS		0x482
+#define	MSR_IA32_VMX_TRUE_PROCBASED_CTLS	0x48e
+#define	IA32_VMX_PROCBASED_2ND_CTLS	(1UL << 31)
+
+#define	MSR_IA32_VMX_PROCBASED2_CTLS	0x48b
+#define	IA32_VMX_PROCBASED2_EPT		(1UL << 1)
+#define	IA32_VMX_PROCBASED2_VPID	(1UL << 5)
+
+#define	MSR_IA32_VMX_EPT_VPID_CAP	0x48c
+#define	IA32_VMX_EPT_VPID_INVEPT	(1UL << 20)
+#define	IA32_VMX_EPT_VPID_INVEPT_SINGLE	(1UL << 25)
+#define	IA32_VMX_EPT_VPID_INVEPT_ALL	(1UL << 26)
 
 /*
  * Intel TSX Control MSRs

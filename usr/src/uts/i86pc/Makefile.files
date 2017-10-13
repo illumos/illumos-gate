@@ -65,6 +65,8 @@ CORE_OBJS +=			\
 	hardclk.o		\
 	hat_i86.o		\
 	hat_kdi.o		\
+	hma.o			\
+	hma_asm.o		\
 	hma_fpu.o		\
 	hment.o			\
 	hold_page.o		\

@@ -77,6 +77,8 @@
 #include <sys/sysmacros.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
+#else
+#include <sys/hma.h>
 #endif
 #include <sys/cpu_module.h>
 #include <sys/ontrap.h>
@@ -1614,6 +1616,14 @@ done:
 	if (get_hwenv() == HW_NATIVE)
 		workaround_errata_end();
 	cmi_post_mpstartup();
+
+#if !defined(__xpv)
+	/*
+	 * Once other CPUs have completed startup procedures, perform
+	 * initialization of hypervisor resources for HMA.
+	 */
+	hma_init();
+#endif
 
 	if (use_mp && ncpus != boot_max_ncpus) {
 		cmn_err(CE_NOTE,

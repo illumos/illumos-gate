@@ -194,6 +194,18 @@ extern "C" {
 #define	MSR_AMD_KGSBASE	0xc0000102	/* swapgs swaps this with gsbase */
 #define	MSR_AMD_TSCAUX	0xc0000103	/* %ecx value on rdtscp insn */
 
+
+/* AMD's SVM MSRs */
+
+#define	MSR_AMD_VM_CR		0xc0010114 /* SVM global control */
+#define	MSR_AMD_VM_HSAVE_PA	0xc0010117 /* SVM host save area address */
+
+#define	AMD_VM_CR_DPD		(1 << 0)
+#define	AMD_VM_CR_R_INIT	(1 << 1)
+#define	AMD_VM_CR_DIS_A20M	(1 << 2)
+#define	AMD_VM_CR_LOCK		(1 << 3)
+#define	AMD_VM_CR_SVMDIS	(1 << 4)
+
 /* AMD's configuration MSRs, weakly documented in the revision guide */
 
 #define	MSR_AMD_DC_CFG	0xc0011022
