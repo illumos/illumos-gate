@@ -27,6 +27,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  */
 
@@ -1914,18 +1915,29 @@ hat_unlock_region(struct hat *hat, caddr_t addr, size_t len,
 	panic("No shared region support on x86");
 }
 
+/*
+ * A range of virtual pages for purposes of demapping.
+ */
+typedef struct range_info {
+	uintptr_t	rng_va; 	/* address of page */
+	ulong_t		rng_cnt; 	/* number of pages in range */
+	level_t		rng_level; 	/* page table level */
+} range_info_t;
+
 #if !defined(__xpv)
 /*
- * Cross call service routine to demap a virtual page on
- * the current CPU or flush all mappings in TLB.
+ * Cross call service routine to demap a range of virtual
+ * pages on the current CPU or flush all mappings in TLB.
  */
 /*ARGSUSED*/
 static int
 hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 {
-	hat_t	*hat = (hat_t *)a1;
-	caddr_t	addr = (caddr_t)a2;
-	size_t len = (size_t)a3;
+	hat_t		*hat = (hat_t *)a1;
+	range_info_t	*range = (range_info_t *)a2;
+	size_t		len = (size_t)a3;
+	caddr_t		addr = (caddr_t)range->rng_va;
+	size_t		pgsz = LEVEL_SIZE(range->rng_level);
 
 	/*
 	 * If the target hat isn't the kernel and this CPU isn't operating
@@ -1938,7 +1950,7 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 	 * For a normal address, we flush a range of contiguous mappings
 	 */
 	if ((uintptr_t)addr != DEMAP_ALL_ADDR) {
-		for (size_t i = 0; i < len; i += MMU_PAGESIZE)
+		for (size_t i = 0; i < len; i += pgsz)
 			mmu_tlbflush_entry(addr + i);
 		return (0);
 	}
@@ -2034,11 +2046,13 @@ tlb_service(void)
  * all CPUs using a given hat.
  */
 void
-hat_tlb_inval_range(hat_t *hat, uintptr_t va, size_t len)
+hat_tlb_inval_range(hat_t *hat, range_info_t *range)
 {
 	extern int	flushes_require_xcalls;	/* from mp_startup.c */
 	cpuset_t	justme;
 	cpuset_t	cpus_to_shootdown;
+	uintptr_t	va = range->rng_va;
+	size_t		len = range->rng_cnt << LEVEL_SHIFT(range->rng_level);
 #ifndef __xpv
 	cpuset_t	check_cpus;
 	cpu_t		*cpup;
@@ -2075,7 +2089,7 @@ hat_tlb_inval_range(hat_t *hat, uintptr_t va, size_t len)
 		}
 #else
 		(void) hati_demap_func((xc_arg_t)hat,
-		    (xc_arg_t)va, (xc_arg_t)len);
+		    (xc_arg_t)range, (xc_arg_t)len);
 #endif
 		return;
 	}
@@ -2134,7 +2148,7 @@ hat_tlb_inval_range(hat_t *hat, uintptr_t va, size_t len)
 		}
 #else
 		(void) hati_demap_func((xc_arg_t)hat,
-		    (xc_arg_t)va, (xc_arg_t)len);
+		    (xc_arg_t)range, (xc_arg_t)len);
 #endif
 
 	} else {
@@ -2150,7 +2164,7 @@ hat_tlb_inval_range(hat_t *hat, uintptr_t va, size_t len)
 			}
 		}
 #else
-		xc_call((xc_arg_t)hat, (xc_arg_t)va, (xc_arg_t)len,
+		xc_call((xc_arg_t)hat, (xc_arg_t)range, (xc_arg_t)len,
 		    CPUSET2BV(cpus_to_shootdown), hati_demap_func);
 #endif
 
@@ -2161,7 +2175,15 @@ hat_tlb_inval_range(hat_t *hat, uintptr_t va, size_t len)
 void
 hat_tlb_inval(hat_t *hat, uintptr_t va)
 {
-	hat_tlb_inval_range(hat, va, MMU_PAGESIZE);
+	/*
+	 * Create range for a single page.
+	 */
+	range_info_t range;
+	range.rng_va = va;
+	range.rng_cnt = 1; /* one page */
+	range.rng_level = MIN_PAGE_LEVEL; /* pages are MMU_PAGESIZE */
+
+	hat_tlb_inval_range(hat, &range);
 }
 
 /*
@@ -2328,15 +2350,6 @@ hat_unload(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
 }
 
 /*
- * Do the callbacks for ranges being unloaded.
- */
-typedef struct range_info {
-	uintptr_t	rng_va;
-	ulong_t		rng_cnt;
-	level_t		rng_level;
-} range_info_t;
-
-/*
  * Invalidate the TLB, and perform the callback to the upper level VM system,
  * for the specified ranges of contiguous pages.
  */
@@ -2344,16 +2357,14 @@ static void
 handle_ranges(hat_t *hat, hat_callback_t *cb, uint_t cnt, range_info_t *range)
 {
 	while (cnt > 0) {
-		size_t len;
-
 		--cnt;
-		len = range[cnt].rng_cnt << LEVEL_SHIFT(range[cnt].rng_level);
-		hat_tlb_inval_range(hat, (uintptr_t)range[cnt].rng_va, len);
+		hat_tlb_inval_range(hat, &range[cnt]);
 
 		if (cb != NULL) {
 			cb->hcb_start_addr = (caddr_t)range[cnt].rng_va;
 			cb->hcb_end_addr = cb->hcb_start_addr;
-			cb->hcb_end_addr += len;
+			cb->hcb_end_addr += range[cnt].rng_cnt <<
+			    LEVEL_SHIFT(range[cnt].rng_level);
 			cb->hcb_function(cb);
 		}
 	}
