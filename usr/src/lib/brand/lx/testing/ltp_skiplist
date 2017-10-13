@@ -171,6 +171,7 @@ ioctl03
 ioctl04
 ioctl05
 ioctl06
+ioctl07			# OS-6397
 keyctl01
 keyctl02
 keyctl03
