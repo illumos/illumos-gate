@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  */
 
@@ -333,7 +333,8 @@ extern void kstat_runq_back_to_waitq(kstat_io_t *);
 #define	kmem_cache_alloc(_c, _f) umem_cache_alloc(_c, _f)
 #define	kmem_cache_free(_c, _b)	umem_cache_free(_c, _b)
 #define	kmem_debugging()	0
-#define	kmem_cache_reap_now(_c)		/* nothing */
+#define	kmem_cache_reap_active()	(B_FALSE)
+#define	kmem_cache_reap_soon(_c)	/* nothing */
 #define	kmem_cache_set_move(_c, _cb)	/* nothing */
 #define	vmem_qcache_reap(_v)		/* nothing */
 #define	POINTER_INVALIDATE(_pp)		/* nothing */
@@ -391,6 +392,7 @@ extern taskqid_t taskq_dispatch(taskq_t *, task_func_t, void *, uint_t);
 extern void	taskq_dispatch_ent(taskq_t *, task_func_t, void *, uint_t,
     taskq_ent_t *);
 extern void	taskq_destroy(taskq_t *);
+extern boolean_t taskq_empty(taskq_t *);
 extern void	taskq_wait(taskq_t *);
 extern int	taskq_member(taskq_t *, void *);
 extern void	system_taskq_init(void);

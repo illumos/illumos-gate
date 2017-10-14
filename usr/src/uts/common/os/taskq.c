@@ -26,6 +26,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -1317,6 +1318,22 @@ taskq_dispatch_ent(taskq_t *tq, task_func_t func, void *arg, uint_t flags,
 		TQ_ENQUEUE(tq, tqe, func, arg);
 	}
 	mutex_exit(&tq->tq_lock);
+}
+
+/*
+ * Allow our caller to ask if there are tasks pending on the queue.
+ */
+boolean_t
+taskq_empty(taskq_t *tq)
+{
+	boolean_t rv;
+
+	ASSERT3P(tq, !=, curthread->t_taskq);
+	mutex_enter(&tq->tq_lock);
+	rv = (tq->tq_task.tqent_next == &tq->tq_task) && (tq->tq_active == 0);
+	mutex_exit(&tq->tq_lock);
+
+	return (rv);
 }
 
 /*
