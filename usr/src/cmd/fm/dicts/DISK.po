@@ -1,6 +1,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -104,3 +105,19 @@ msgid "DISK-8000-4Q.impact"
 msgstr "It is likely that continued operation will result in data corruption, which may eventually cause the loss of service or the service degradation.\n"
 msgid "DISK-8000-4Q.action"
 msgstr "Schedule a repair procedure to replace the affected device. Use 'fmadm faulty' to find the affected disk.\n"
+#
+# code: DISK-8000-8D
+# keys: fault.io.disk.ssm-wearout
+#
+msgid "DISK-8000-8D.type"
+msgstr "Fault"
+msgid "DISK-8000-8D.severity"
+msgstr "Major"
+msgid "DISK-8000-8D.description"
+msgstr "A solid state media device is nearing end of life as projected by the manufacturer."
+msgid "DISK-8000-8D.response"
+msgstr "None."
+msgid "DISK-8000-8D.impact"
+msgstr "Performance degradation is likely and continued operation of this device will cause drive failure and potential data loss."
+msgid "DISK-8000-8D.action"
+msgstr "Schedule a repair procedure to replace the affected drive.\nUse fmdump -V -u <EVENT_ID> to identify the drive."

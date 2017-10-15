@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Disk status library
@@ -33,9 +32,10 @@
  * SCSI (and therefore SATA) disks are currently supported.  The library is
  * capable of detecting the following status conditions:
  *
- * 	- Predictive failure
- * 	- Overtemp
- * 	- Self-test failure
+ *	- Predictive failure
+ *	- Overtemp
+ *	- Self-test failure
+ *	- Solid State Media wearout
  */
 
 #include <assert.h>
@@ -131,6 +131,7 @@ disk_status_close(disk_status_t *dsp)
 	nvlist_free(dsp->ds_predfail);
 	nvlist_free(dsp->ds_overtemp);
 	nvlist_free(dsp->ds_testfail);
+	nvlist_free(dsp->ds_ssmwearout);
 	if (dsp->ds_data)
 		dsp->ds_transport->dt_close(dsp->ds_data);
 	(void) close(dsp->ds_fd);
@@ -172,6 +173,8 @@ disk_status_get(disk_status_t *dsp)
 	nvlist_free(dsp->ds_testfail);
 	nvlist_free(dsp->ds_predfail);
 	nvlist_free(dsp->ds_overtemp);
+	nvlist_free(dsp->ds_ssmwearout);
+	dsp->ds_ssmwearout = NULL;
 	dsp->ds_testfail = dsp->ds_overtemp = dsp->ds_predfail = NULL;
 	dsp->ds_faults = 0;
 
@@ -220,6 +223,15 @@ disk_status_get(disk_status_t *dsp)
 		    (dsp->ds_faults & DS_FAULT_OVERTEMP) != 0)) != 0 ||
 		    (err = nvlist_add_nvlist(nvl, FM_EREPORT_SCSI_OVERTEMP,
 		    dsp->ds_overtemp)) != 0)
+			goto nverror;
+	}
+
+	if (dsp->ds_ssmwearout != NULL) {
+		if ((err = nvlist_add_boolean_value(faults,
+		    FM_EREPORT_SCSI_SSMWEAROUT,
+		    (dsp->ds_faults & DS_FAULT_SSMWEAROUT) != 0)) != 0 ||
+		    (err = nvlist_add_nvlist(nvl, FM_EREPORT_SCSI_SSMWEAROUT,
+		    dsp->ds_ssmwearout)) != 0)
 			goto nverror;
 	}
 
