@@ -23,8 +23,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 /*
@@ -268,6 +270,14 @@ xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 	if (ndi_event_bind_set(xpvd_ndi_event_handle, &xpvd_ndi_events,
 	    NDI_SLEEP) != NDI_SUCCESS) {
+		(void) ndi_event_free_hdl(xpvd_ndi_event_handle);
+		xpvd_dip = NULL;
+		return (DDI_FAILURE);
+	}
+	if (ddi_create_minor_node(devi, "devctl", S_IFCHR,
+	    ddi_get_instance(devi), DDI_PSEUDO, 0) != DDI_SUCCESS) {
+		(void) ndi_event_unbind_set(xpvd_ndi_event_handle,
+		    &xpvd_ndi_events, NDI_SLEEP);
 		(void) ndi_event_free_hdl(xpvd_ndi_event_handle);
 		xpvd_dip = NULL;
 		return (DDI_FAILURE);

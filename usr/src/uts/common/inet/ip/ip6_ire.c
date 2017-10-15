@@ -687,7 +687,6 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
     const in6_addr_t *gateway, int type, const ill_t *ill, zoneid_t zoneid,
     const ts_label_t *tsl, int match_flags)
 {
-	in6_addr_t masked_addr;
 	in6_addr_t gw_addr_v6;
 	ill_t *ire_ill = NULL, *dst_ill;
 	ip_stack_t *ipst = ire->ire_ipst;
@@ -850,7 +849,6 @@ matchit:
 	/* No ire_addr_v6 bits set past the mask */
 	ASSERT(V6_MASK_EQ(ire->ire_addr_v6, ire->ire_mask_v6,
 	    ire->ire_addr_v6));
-	V6_MASK_COPY(*addr, *mask, masked_addr);
 	if (V6_MASK_EQ(*addr, *mask, ire->ire_addr_v6) &&
 	    ((!(match_flags & MATCH_IRE_GW)) ||
 	    ((!(match_flags & MATCH_IRE_DIRECT)) ||

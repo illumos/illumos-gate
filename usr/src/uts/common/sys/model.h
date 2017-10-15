@@ -156,20 +156,17 @@ typedef unsigned int model_t;
 #define	STRUCT_HANDLE(struct_type, handle)				\
 	struct {							\
 		struct struct_type *ptr;				\
-	} handle = { NULL }
+		model_t	model;						\
+	} handle = { NULL, DATAMODEL_ILP32 }
 
 #define	STRUCT_DECL(struct_type, handle)				\
 	struct struct_type __##handle##_buf;				\
 	STRUCT_HANDLE(struct_type, handle)
 
-#ifdef	__lint
 #define	STRUCT_SET_HANDLE(handle, umodel, addr)				\
-	(void) (umodel);						\
+	(handle).model = (model_t)(umodel) & DATAMODEL_MASK;		\
+	ASSERT(((umodel) & DATAMODEL_MASK) == DATAMODEL_ILP32);		\
 	(handle).ptr = (addr)
-#else
-#define	STRUCT_SET_HANDLE(handle, umodel, addr)				\
-	(handle).ptr = (addr)
-#endif	/* __lint */
 
 #define	STRUCT_INIT(handle, umodel)					\
 	STRUCT_SET_HANDLE(handle, umodel, &__##handle##_buf)

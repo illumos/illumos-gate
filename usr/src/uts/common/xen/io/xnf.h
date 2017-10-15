@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
+ */
+
 #ifndef _SYS_XNF_H
 #define	_SYS_XNF_H
 
@@ -31,15 +35,36 @@
 extern "C" {
 #endif
 
+/*
+ * As of April 2017, TX and RX ring sizes are fixed to 1 page in
+ * size and Xen doesn't support changing it.
+ * This represents 256 entries.
+ */
 #define	NET_TX_RING_SIZE  __CONST_RING_SIZE(netif_tx, PAGESIZE)
 #define	NET_RX_RING_SIZE  __CONST_RING_SIZE(netif_rx, PAGESIZE)
 
-#define	XNF_MAXPKT	1500		/* MTU size */
+/*
+ * There is no MTU limit, however for all practical purposes hardware won't
+ * support anything much larger than 9k. We put an arbitrary 16k limit.
+ */
+#define	XNF_MAXPKT	16384
 #define	XNF_FRAMESIZE	1514		/* frame size including MAC header */
 
 /* DEBUG flags */
 #define	XNF_DEBUG_DDI		0x01
 #define	XNF_DEBUG_TRACE		0x02
+
+/*
+ * Based on XEN_NETIF_NR_SLOTS_MIN in Linux. Packets that span more pages
+ * than this must be defragmented or dropped.
+ */
+#define	XEN_MAX_TX_DATA_PAGES	18
+/*
+ * We keep one extra slot for LSO
+ */
+#define	XEN_MAX_SLOTS_PER_TX	(XEN_MAX_TX_DATA_PAGES + 1)
+
+#define	XEN_DATA_BOUNDARY	0x1000
 
 /*
  * Information about each receive buffer and any transmit look-aside
@@ -63,22 +88,40 @@ typedef struct xnf_buf {
 /*
  * Information about each transmit buffer.
  */
+typedef enum xnf_txbuf_type {
+	TX_DATA = 1,
+	TX_MCAST_REQ,
+	TX_MCAST_RSP
+} xnf_txbuf_type_t;
+
+/*
+ * A xnf_txbuf is used to store ancillary data for a netif_tx_request_t.
+ * A tx packet can span multiple xnf_txbuf's, linked together through tx_next
+ * and tx_prev; tx_head points to the head of the chain.
+ */
 typedef struct xnf_txbuf {
 	struct xnf_txbuf	*tx_next;
-	mblk_t			*tx_mp;	/* mblk associated with packet */
+	struct xnf_txbuf	*tx_prev;
+	struct xnf_txbuf	*tx_head;
+	xnf_txbuf_type_t	tx_type;
 	netif_tx_request_t	tx_txreq;
-	caddr_t			tx_bufp;
+	netif_extra_info_t	tx_extra;
+	/* Used for TX_DATA types */
 	ddi_dma_handle_t	tx_dma_handle;
-	mfn_t			tx_mfn;
+	boolean_t		tx_handle_bound;
+	mblk_t			*tx_mp;
 	xnf_buf_t		*tx_bdesc; /* Look-aside buffer, if used. */
-	unsigned char		tx_type;
+	int			tx_frags_to_ack;
+	/* Used for TX_MCAST types */
 	int16_t			tx_status;
+	/* Used for debugging */
+	mfn_t			tx_mfn;
 	RING_IDX		tx_slot;
-
-#define	TX_DATA		1
-#define	TX_MCAST_REQ	2
-#define	TX_MCAST_RSP	3
 } xnf_txbuf_t;
+
+#define	TXBUF_SETNEXT(head, next)	\
+	head->tx_next = next;		\
+	next->tx_prev = head;
 
 /*
  * Information about each outstanding transmit operation.
@@ -97,6 +140,7 @@ typedef struct xnf {
 	dev_info_t		*xnf_devinfo;
 	mac_handle_t		xnf_mh;
 	unsigned char		xnf_mac_addr[ETHERADDRL];
+	uint32_t		xnf_mtu;
 
 	unsigned int		xnf_gen;	/* Increments on resume. */
 
@@ -105,17 +149,20 @@ typedef struct xnf {
 
 	boolean_t		xnf_be_rx_copy;
 	boolean_t		xnf_be_mcast_control;
+	boolean_t		xnf_be_tx_sg;
+	boolean_t		xnf_be_lso;
 
 	uint64_t		xnf_stat_interrupts;
 	uint64_t		xnf_stat_unclaimed_interrupts;
 	uint64_t		xnf_stat_norxbuf;
-	uint64_t		xnf_stat_drop;
+	uint64_t		xnf_stat_rx_drop;
 	uint64_t		xnf_stat_errrx;
 
-	uint64_t		xnf_stat_tx_attempt;
 	uint64_t		xnf_stat_tx_pullup;
-	uint64_t		xnf_stat_tx_pagebndry;
+	uint64_t		xnf_stat_tx_lookaside;
 	uint64_t		xnf_stat_tx_defer;
+	uint64_t		xnf_stat_tx_drop;
+	uint64_t		xnf_stat_tx_eth_hdr_split;
 	uint64_t		xnf_stat_mac_rcv_error;
 	uint64_t		xnf_stat_runt;
 
@@ -145,7 +192,7 @@ typedef struct xnf {
 	paddr_t			xnf_tx_ring_phys_addr;
 	grant_ref_t		xnf_tx_ring_ref;
 
-	xnf_txid_t		xnf_tx_pkt_id[NET_TX_RING_SIZE];
+	xnf_txid_t		*xnf_tx_pkt_id;
 	uint16_t		xnf_tx_pkt_id_head;
 	kmutex_t		xnf_txlock;
 	kmutex_t		xnf_schedlock;
@@ -159,7 +206,7 @@ typedef struct xnf {
 	paddr_t			xnf_rx_ring_phys_addr;
 	grant_ref_t		xnf_rx_ring_ref;
 
-	xnf_buf_t		*xnf_rx_pkt_info[NET_RX_RING_SIZE];
+	xnf_buf_t		**xnf_rx_pkt_info;
 	kmutex_t		xnf_rxlock;
 	mblk_t			*xnf_rx_head;
 	mblk_t			*xnf_rx_tail;

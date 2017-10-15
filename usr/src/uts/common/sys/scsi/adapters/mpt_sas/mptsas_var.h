@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
@@ -79,15 +79,13 @@ extern "C" {
 
 #define	MPTSAS_INITIAL_SOFT_SPACE	4
 
-#define	MAX_MPI_PORTS		16
-
 /*
  * Note below macro definition and data type definition
  * are used for phy mask handling, it should be changed
  * simultaneously.
  */
-#define	MPTSAS_MAX_PHYS		16
-typedef uint16_t		mptsas_phymask_t;
+#define	MPTSAS_MAX_PHYS		24
+typedef uint32_t		mptsas_phymask_t;
 
 #define	MPTSAS_INVALID_DEVHDL	0xffff
 #define	MPTSAS_SATA_GUID	"sata-guid"
