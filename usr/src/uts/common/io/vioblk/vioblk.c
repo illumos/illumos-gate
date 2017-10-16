@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
+ * Copyright 2017, Joyent Inc.
  */
 
 
@@ -829,13 +830,11 @@ vioblk_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	case DDI_RESUME:
 	case DDI_PM_RESUME:
 		dev_err(devinfo, CE_WARN, "resume not supported yet");
-		ret = DDI_FAILURE;
-		goto exit;
+		return (DDI_FAILURE);
 
 	default:
 		dev_err(devinfo, CE_WARN, "cmd 0x%x not recognized", cmd);
-		ret = DDI_FAILURE;
-		goto exit;
+		return (DDI_FAILURE);
 	}
 
 	sc = kmem_zalloc(sizeof (struct vioblk_softc), KM_SLEEP);
@@ -1029,8 +1028,7 @@ exit_intrstat:
 	mutex_destroy(&sc->lock_devid);
 	cv_destroy(&sc->cv_devid);
 	kmem_free(sc, sizeof (struct vioblk_softc));
-exit:
-	return (ret);
+	return (DDI_FAILURE);
 }
 
 static int
