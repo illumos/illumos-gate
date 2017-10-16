@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <smbsrv/smb_door.h>
@@ -361,6 +362,31 @@ smb_kshare_g_fini(void)
 	kmem_cache_destroy(smb_kshare_cache_vfs);
 }
 
+
+/*
+ * Reality check for smb_ioc_share_t parameters.
+ */
+static boolean_t
+smb_shrlen_bad_lengths(smb_ioc_share_t *ioc)
+{
+	uint32_t shrlen_adjusted;
+
+	shrlen_adjusted = ioc->shrlen + offsetof(smb_ioc_share_t, shr);
+
+	/* uint32_t overflow check 1. */
+	if (shrlen_adjusted < ioc->shrlen)
+		return (B_TRUE);
+	/* uint32_t overflow check 2. */
+	if (shrlen_adjusted < offsetof(smb_ioc_share_t, shr))
+		return (B_TRUE);
+	/* Does the shrlen make the share nvlist exceed the ioctl length? */
+	if (shrlen_adjusted > ioc->hdr.len)
+		return (B_TRUE);
+
+	/* All good, the lengths are not bad. */
+	return (B_FALSE);
+}
+
 /*
  * A list of shares in nvlist format can be sent down
  * from userspace thourgh the IOCTL interface. The nvlist
@@ -386,6 +412,15 @@ smb_kshare_export_list(smb_ioc_share_t *ioc)
 		goto out;
 	}
 
+	/*
+	 * Reality check that the nvlist's reported length doesn't exceed the
+	 * ioctl's total length.  We then assume the nvlist_unpack() will
+	 * sanity check the nvlist itself.
+	 */
+	if (smb_shrlen_bad_lengths(ioc)) {
+		rc = EINVAL;
+		goto out;
+	}
 	rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, KM_SLEEP);
 	if (rc != 0)
 		goto out;
@@ -463,6 +498,15 @@ smb_kshare_unexport_list(smb_ioc_share_t *ioc)
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
 
+	/*
+	 * Reality check that the nvlist's reported length doesn't exceed the
+	 * ioctl's total length.  We then assume the nvlist_unpack() will
+	 * sanity check the nvlist itself.
+	 */
+	if (smb_shrlen_bad_lengths(ioc)) {
+		rc = EINVAL;
+		goto out;
+	}
 	if ((rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, 0)) != 0)
 		goto out;
 
