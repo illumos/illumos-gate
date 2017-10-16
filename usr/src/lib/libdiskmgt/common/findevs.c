@@ -18,11 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
  * Copyright (c) 2011 by Delphix. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #include <fcntl.h>
@@ -43,12 +47,9 @@
 #include "libdiskmgt.h"
 #include "disks_private.h"
 
-#define	CLUSTER_DEV	"did"
-
 /* specify which disk links to use in the /dev directory */
 #define	DEVLINK_REGEX		"rdsk/.*"
 #define	DEVLINK_FLOPPY_REGEX	"rdiskette[0-9]"
-#define	DEVLINK_DID_REGEX	"did/rdsk/.*"
 
 #define	FLOPPY_NAME	"rdiskette"
 
@@ -64,9 +65,12 @@
 #define	WWN_PROP		"node-wwn"
 
 static char *ctrltypes[] = {
-	DDI_NT_SCSI_NEXUS,
-	DDI_NT_SCSI_ATTACHMENT_POINT,
 	DDI_NT_FC_ATTACHMENT_POINT,
+	DDI_NT_NVME_ATTACHMENT_POINT,
+	DDI_NT_SATA_ATTACHMENT_POINT,
+	DDI_NT_SATA_NEXUS,
+	DDI_NT_SCSI_ATTACHMENT_POINT,
+	DDI_NT_SCSI_NEXUS,
 	NULL
 };
 
@@ -79,8 +83,6 @@ static char *bustypes[] = {
 
 static bus_t		*add_bus(struct search_args *args, di_node_t node,
 			    di_minor_t minor, controller_t *cp);
-static int		add_cluster_devs(di_node_t node, di_minor_t minor,
-			    void *arg);
 static controller_t	*add_controller(struct search_args *args,
 			    di_node_t node, di_minor_t minor);
 static int		add_devpath(di_devlink_t devlink, void *arg);
@@ -103,7 +105,6 @@ static boolean_t	disk_is_cdrom(const char *type);
 static alias_t		*find_alias(disk_t *diskp, char *kernel_name);
 static bus_t		*find_bus(struct search_args *args, char *name);
 static controller_t	*find_controller(struct search_args *args, char *name);
-static int		fix_cluster_devpath(di_devlink_t devlink, void *arg);
 static disk_t		*get_disk_by_deviceid(disk_t *listp, char *devid);
 static void		get_disk_name_from_path(char *path, char *name,
 			    int size);
@@ -118,11 +119,10 @@ static int		get_prop(char *prop_name, di_node_t node);
 static char		*get_str_prop(char *prop_name, di_node_t node);
 static int		have_disk(struct search_args *args, char *devid,
 			    char *kernel_name, disk_t **diskp);
-static int		is_cluster_disk(di_node_t node, di_minor_t minor);
 static int		is_ctds(char *name);
 static int		is_drive(di_minor_t minor);
 static int		is_zvol(di_node_t node, di_minor_t minor);
-static int		is_HBA(di_node_t node, di_minor_t minor);
+static int		is_ctrl(di_node_t node, di_minor_t minor);
 static int		new_alias(disk_t *diskp, char *kernel_path,
 			    char *devlink_path, struct search_args *args);
 static int		new_devpath(alias_t *ap, char *devpath);
@@ -130,7 +130,6 @@ static path_t		*new_path(controller_t *cp, disk_t *diskp,
 			    di_node_t node, di_path_state_t st, char *wwn);
 static void		remove_invalid_controller(char *name,
 			    controller_t *currp, struct search_args *args);
-static char		*str_case_index(register char *s1, register char *s2);
 
 /*
  * The functions in this file do a dev tree walk to build up a model of the
@@ -144,39 +143,27 @@ static char		*str_case_index(register char *s1, register char *s2);
 void
 findevs(struct search_args *args)
 {
-	uint_t			flags;
 	di_node_t		di_root;
 
-	args->dev_walk_status = 0;
-	args->disk_listp = NULL;
-	args->controller_listp = NULL;
 	args->bus_listp = NULL;
+	args->controller_listp = NULL;
+	args->disk_listp = NULL;
 
+	args->dev_walk_status = 0;
 	args->handle = di_devlink_init(NULL, 0);
 
 	/*
 	 * Have to make several passes at this with the new devfs caching.
 	 * First, we find non-mpxio devices. Then we find mpxio/multipath
-	 * devices. Finally, we get cluster devices.
+	 * devices.
 	 */
-	flags = DINFOCACHE;
-	di_root = di_init("/", flags);
+	di_root = di_init("/", DINFOCACHE);
 	args->ph = di_prom_init();
 	(void) di_walk_minor(di_root, NULL, 0, args, add_devs);
 	di_fini(di_root);
 
-	flags = DINFOCPYALL | DINFOPATH;
-	di_root = di_init("/", flags);
+	di_root = di_init("/", DINFOCPYALL|DINFOPATH);
 	(void) di_walk_minor(di_root, NULL, 0, args, add_devs);
-	di_fini(di_root);
-
-	/* do another pass to clean up cluster devpaths */
-	flags = DINFOCACHE;
-	di_root = di_init("/", flags);
-	(void) di_walk_minor(di_root, DDI_PSEUDO, 0, args, add_cluster_devs);
-	if (args->ph != DI_PROM_HANDLE_NIL) {
-		(void) di_prom_fini(args->ph);
-	}
 	di_fini(di_root);
 
 	(void) di_devlink_fini(&(args->handle));
@@ -190,7 +177,7 @@ findevs(struct search_args *args)
 
 static bus_t *
 add_bus(struct search_args *args, di_node_t node, di_minor_t minor,
-	controller_t *cp)
+    controller_t *cp)
 {
 	char		*btype;
 	char		*devpath;
@@ -297,58 +284,6 @@ add_bus(struct search_args *args, di_node_t node, di_minor_t minor,
 	args->bus_listp = bp;
 
 	return (bp);
-}
-
-static int
-add_cluster_devs(di_node_t node, di_minor_t minor, void *arg)
-{
-	struct search_args	*args;
-	char			*devpath;
-	char			slice_path[MAXPATHLEN];
-	int			result = DI_WALK_CONTINUE;
-
-	if (!is_cluster_disk(node, minor)) {
-		return (DI_WALK_CONTINUE);
-	}
-
-	args = (struct search_args *)arg;
-
-	if (dm_debug > 1) {
-		/* This is all just debugging code */
-		char	*devpath;
-		char	dev_name[MAXPATHLEN];
-
-		devpath = di_devfs_path(node);
-		(void) snprintf(dev_name, sizeof (dev_name), "%s:%s", devpath,
-		    di_minor_name(minor));
-		di_devfs_path_free((void *) devpath);
-
-		(void) fprintf(stderr, "INFO: cluster dev: %s\n", dev_name);
-	}
-
-	args->node = node;
-	args->minor = minor;
-	args->dev_walk_status = 0;
-
-	/*
-	 * Fix the devpaths for the cluster drive.
-	 *
-	 * We will come through here once for each raw slice device name.
-	 */
-	devpath = di_devfs_path(node);
-	(void) snprintf(slice_path, sizeof (slice_path), "%s:%s", devpath,
-	    di_minor_name(minor));
-	di_devfs_path_free((void *) devpath);
-
-	/* Walk the /dev tree to get the cluster devlinks. */
-	(void) di_devlink_walk(args->handle, DEVLINK_DID_REGEX, slice_path,
-	    DI_PRIMARY_LINK, arg, fix_cluster_devpath);
-
-	if (args->dev_walk_status != 0) {
-		result = DI_WALK_TERMINATE;
-	}
-
-	return (result);
 }
 
 static controller_t *
@@ -547,7 +482,7 @@ add_devs(di_node_t node, di_minor_t minor, void *arg)
 			result = DI_WALK_TERMINATE;
 		}
 
-	} else if (is_HBA(node, minor)) {
+	} else if (is_ctrl(node, minor)) {
 		if (add_controller(args, node, minor) == NULL) {
 			args->dev_walk_status = ENOMEM;
 			result = DI_WALK_TERMINATE;
@@ -688,12 +623,12 @@ add_disk2controller(disk_t *diskp, struct search_args *args)
 
 	/* this is a new controller for this disk */
 
-	/* add the disk to the controlller */
+	/* add the disk to the controller */
 	if (add_ptr2array(diskp, (void ***)&cp->disks) != 0) {
 		return (ENOMEM);
 	}
 
-	/* add the controlller to the disk */
+	/* add the controller to the disk */
 	if (add_ptr2array(cp, (void ***)&diskp->controllers) != 0) {
 		return (ENOMEM);
 	}
@@ -1037,7 +972,7 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 	 * DVD, CD-ROM, CD-RW, MO, etc. are all reported as CD-ROMS.
 	 * We try to use uscsi later to determine the real type.
 	 * The cd_rom flag tells us that the kernel categorized the drive
-	 * as a CD-ROM.  We leave the drv_type as UKNOWN for now.
+	 * as a CD-ROM.  We leave the drv_type as UNKNOWN for now.
 	 * The combination of the cd_rom flag being set with the drv_type of
 	 * unknown is what triggers the uscsi probe in drive.c.
 	 */
@@ -1049,49 +984,11 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 		diskp->drv_type = DM_DT_FLOPPY;
 		diskp->removable = 1;
 	} else {
-		/* not a "CD-ROM" or Floppy */
+		/* not a CD-ROM or Floppy */
 		diskp->removable = get_prop(REMOVABLE_PROP, args->node);
 
 		if (diskp->removable == -1) {
 			diskp->removable = 0;
-#if defined(i386) || defined(__amd64)
-			/*
-			 * x86 does not have removable property.
-			 * Check for common removable drives, zip & jaz,
-			 * and mark those correctly.
-			 */
-			if (vendor_id != NULL && prod_id != NULL) {
-				if (str_case_index(vendor_id,
-				    "iomega") != NULL) {
-					if (str_case_index(prod_id,
-					    "jaz") != NULL) {
-						diskp->removable = 1;
-					} else if (str_case_index(prod_id,
-					    "zip") != NULL) {
-						diskp->removable = 1;
-					}
-				}
-			}
-#endif
-		}
-
-		if (diskp->removable) {
-			/*
-			 * For removable jaz or zip drives there is no way
-			 * to get the drive type unless media is inserted,so
-			 * we look at the product-id for a hint.
-			 */
-			diskp->drv_type = DM_DT_UNKNOWN;
-
-			if (prod_id != NULL) {
-				if (str_case_index(prod_id, "jaz") != NULL) {
-					diskp->drv_type = DM_DT_JAZ;
-				} else if (str_case_index(prod_id,
-				    "zip") != NULL) {
-					diskp->drv_type = DM_DT_ZIP;
-				}
-			}
-		} else {
 			diskp->drv_type = DM_DT_FIXED;
 		}
 	}
@@ -1112,31 +1009,37 @@ ctype(di_node_t node, di_minor_t minor)
 	name = di_node_name(node);
 
 	/* IDE disks use SCSI nexus as the type, so handle this special case */
-	if (libdiskmgt_str_eq(name, "ide")) {
+	if ((libdiskmgt_str_eq(type, DDI_NT_SCSI_NEXUS) ||
+	    libdiskmgt_str_eq(type, DDI_PSEUDO)) &&
+	    libdiskmgt_str_eq(name, "ide"))
 		return (DM_CTYPE_ATA);
-	}
 
-	if (libdiskmgt_str_eq(di_minor_name(minor), "scsa2usb")) {
-		return (DM_CTYPE_USB);
-	}
+	if (libdiskmgt_str_eq(type, DDI_NT_FC_ATTACHMENT_POINT) ||
+	    (libdiskmgt_str_eq(type, DDI_NT_NEXUS) &&
+	    libdiskmgt_str_eq(name, "fp")))
+		return (DM_CTYPE_FIBRE);
+
+	if (libdiskmgt_str_eq(type, DDI_NT_NVME_ATTACHMENT_POINT))
+		return (DM_CTYPE_NVME);
+
+	if (libdiskmgt_str_eq(type, DDI_NT_SATA_NEXUS) ||
+	    libdiskmgt_str_eq(type, DDI_NT_SATA_ATTACHMENT_POINT))
+		return (DM_CTYPE_SATA);
 
 	if (libdiskmgt_str_eq(type, DDI_NT_SCSI_NEXUS) ||
-	    libdiskmgt_str_eq(type, DDI_NT_SCSI_ATTACHMENT_POINT)) {
-			return (DM_CTYPE_SCSI);
-	}
+	    libdiskmgt_str_eq(type, DDI_NT_SCSI_ATTACHMENT_POINT))
+		return (DM_CTYPE_SCSI);
 
-	if (libdiskmgt_str_eq(type, DDI_NT_FC_ATTACHMENT_POINT)) {
-		return (DM_CTYPE_FIBRE);
-	}
-
-	if (libdiskmgt_str_eq(type, DDI_NT_NEXUS) &&
-	    libdiskmgt_str_eq(name, "fp")) {
-		return (DM_CTYPE_FIBRE);
-	}
+	if (libdiskmgt_str_eq(di_minor_name(minor), "scsa2usb"))
+		return (DM_CTYPE_USB);
 
 	if (libdiskmgt_str_eq(type, DDI_PSEUDO) &&
-	    libdiskmgt_str_eq(name, "ide")) {
-		return (DM_CTYPE_ATA);
+	    libdiskmgt_str_eq(name, "xpvd"))
+		return (DM_CTYPE_XEN);
+
+	if (dm_debug) {
+		(void) fprintf(stderr,
+		    "INFO: unknown controller type=%s name=%s\n", type, name);
 	}
 
 	return (DM_CTYPE_UNKNOWN);
@@ -1194,147 +1097,6 @@ find_controller(struct search_args *args, char *name)
 	}
 
 	return (NULL);
-}
-
-static int
-fix_cluster_devpath(di_devlink_t devlink, void *arg)
-{
-	int			fd;
-	struct search_args	*args;
-	char			*devlink_path;
-	disk_t			*diskp = NULL;
-	alias_t			*ap = NULL;
-
-	/*
-	 * The devlink_path is of the form /dev/did/rdsk/d1s0.
-	 */
-
-	args =	(struct search_args *)arg;
-
-	/* Find the disk by the deviceid we read from the cluster disk. */
-	devlink_path = (char *)di_devlink_path(devlink);
-	if (devlink_path == NULL) {
-		return (DI_WALK_CONTINUE);
-	}
-
-	if ((fd = open(devlink_path, O_RDONLY|O_NDELAY)) >= 0) {
-		ddi_devid_t	devid;
-
-		if (dm_debug > 1) {
-			(void) fprintf(stderr, "INFO:     cluster devpath %s\n",
-			    devlink_path);
-		}
-
-		if (devid_get(fd, &devid) == 0) {
-			char *minor;
-			char *devidstr;
-
-			minor = di_minor_name(args->minor);
-
-			if ((devidstr =
-			    devid_str_encode(devid, minor)) != NULL) {
-				diskp = get_disk_by_deviceid(args->disk_listp,
-				    devidstr);
-				/*
-				 * This really shouldn't happen, since
-				 * we should have found all of the disks
-				 * during our first pass through
-				 * the dev tree, but just in case...
-				 */
-				if (diskp == NULL) {
-					if (dm_debug > 1) {
-						(void) fprintf(stderr,
-						    "INFO:    cluster create"
-						    " disk\n");
-					}
-
-					diskp = create_disk(devidstr,
-					    NULL, args);
-					if (diskp == NULL) {
-						args->dev_walk_status = ENOMEM;
-					}
-
-					/* add the controller relationship */
-					if (args->dev_walk_status == 0) {
-						if (add_disk2controller(diskp,
-						    args) != 0) {
-							args->dev_walk_status
-							    = ENOMEM;
-						}
-					}
-
-					if (new_alias(diskp, NULL,
-					    devlink_path, args) != 0) {
-						args->dev_walk_status = ENOMEM;
-					}
-				}
-				devid_str_free(devidstr);
-			}
-			devid_free(devid);
-		}
-		(void) close(fd);
-	}
-
-
-	if (diskp != NULL) {
-		if (dm_debug > 1) {
-			(void) fprintf(stderr, "INFO:     cluster found"
-			    " disk\n");
-		}
-		ap = diskp->aliases;
-	}
-
-	if (ap != NULL) {
-		/*
-		 * NOTE: if ap->next != NULL have cluster
-		 * disks w/ multiple paths.
-		 */
-
-		if (!ap->cluster) {
-			char	*basep;
-			char	*namep;
-			int	cnt = 0;
-			int	size;
-			char	alias[MAXPATHLEN];
-
-			/*
-			 * First time; save the /dev/rdsk devpaths and
-			 * update the alias info with the new alias name.
-			 */
-			ap->orig_paths = ap->devpaths;
-			ap->devpaths = NULL;
-
-			free(ap->alias);
-
-			/* get the new cluster alias name */
-			basep = strrchr(devlink_path, '/');
-			if (basep == NULL) {
-				basep = devlink_path;
-			} else {
-				basep++;
-			}
-			size = sizeof (alias) - 1;
-			namep = alias;
-
-			while (*basep != 0 && *basep != 's' && cnt < size) {
-				*namep++ = *basep++;
-				cnt++;
-			}
-			*namep = 0;
-
-			if ((ap->alias = strdup(alias)) == NULL) {
-				args->dev_walk_status = ENOMEM;
-			}
-
-			ap->cluster = 1;
-		}
-
-		if (new_devpath(ap, devlink_path) != 0) {
-			args->dev_walk_status = ENOMEM;
-		}
-	}
-
-	return (DI_WALK_CONTINUE);
 }
 
 /*
@@ -1564,18 +1326,6 @@ bus_type(di_node_t node, di_minor_t minor, di_prom_handle_t ph)
 	return (NULL);
 }
 
-static int
-is_cluster_disk(di_node_t node, di_minor_t minor)
-{
-	if (di_minor_spectype(minor) == S_IFCHR &&
-	    libdiskmgt_str_eq(di_minor_nodetype(minor), DDI_PSEUDO) &&
-	    libdiskmgt_str_eq(di_node_name(node), CLUSTER_DEV)) {
-		return (1);
-	}
-
-	return (0);
-}
-
 /*
  * If the input name is in c[t]ds format then return 1, otherwise return 0.
  */
@@ -1643,7 +1393,7 @@ is_zvol(di_node_t node, di_minor_t minor)
 }
 
 static int
-is_HBA(di_node_t node, di_minor_t minor)
+is_ctrl(di_node_t node, di_minor_t minor)
 {
 	char	*type;
 	char	*name;
@@ -1661,16 +1411,16 @@ is_HBA(di_node_t node, di_minor_t minor)
 
 	name = di_node_name(node);
 	if (libdiskmgt_str_eq(type, DDI_PSEUDO) &&
-	    libdiskmgt_str_eq(name, "ide")) {
+	    (libdiskmgt_str_eq(name, "ide") ||
+	    libdiskmgt_str_eq(name, "xpvd")))
 		return (1);
-	}
 
 	return (0);
 }
 
 static int
 new_alias(disk_t *diskp, char *kernel_name, char *devlink_path,
-	struct search_args *args)
+    struct search_args *args)
 {
 	alias_t		*aliasp;
 	char		alias[MAXPATHLEN];
@@ -1705,7 +1455,6 @@ new_alias(disk_t *diskp, char *kernel_name, char *devlink_path,
 		aliasp->kstat_name = NULL;
 	}
 
-	aliasp->cluster = 0;
 	aliasp->lun = get_prop(DM_LUN, args->node);
 	aliasp->target = get_prop(DM_TARGET, args->node);
 	aliasp->wwn = get_byte_prop(WWN_PROP, args->node);
@@ -1791,7 +1540,7 @@ new_devpath(alias_t *ap, char *devpath)
 
 static path_t *
 new_path(controller_t *cp, disk_t *dp, di_node_t node, di_path_state_t st,
-	char *wwn)
+    char *wwn)
 {
 	char		*devpath;
 	path_t		*pp;
@@ -1936,26 +1685,4 @@ remove_invalid_controller(char *name, controller_t *currp,
 		prevp = cp;
 		cp = cp->next;
 	}
-}
-
-/*
- * This is the standard strstr code modified for case independence.
- */
-static char *
-str_case_index(register char *s1, register char *s2)
-{
-	uint_t s2len = strlen(s2); /* length of the second string */
-
-	/* If the length of the second string is 0, return the first arg. */
-	if (s2len == 0) {
-		return (s1);
-	}
-
-	while (strlen(s1) >= s2len) {
-		if (strncasecmp(s1, s2, s2len) == 0) {
-			return (s1);
-		}
-		s1++;
-	}
-	return (NULL);
 }

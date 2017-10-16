@@ -22,8 +22,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #ifndef _LIBDISKMGT_H
@@ -309,7 +312,6 @@ typedef enum {
 #define	DM_DISK_UP		1
 #define	DM_DISK_DOWN		0
 
-#define	DM_CLUSTERED		"clustered"
 #define	DM_DRVTYPE		"drvtype"
 #define	DM_FAILING		"failing"
 #define	DM_LOADED		"loaded"	/* also in media */
@@ -351,9 +353,12 @@ typedef enum {
 #define	DM_PATH_STATE		"path_state"
 
 #define	DM_CTYPE_ATA		"ata"
+#define	DM_CTYPE_FIBRE		"fibre"
+#define	DM_CTYPE_NVME		"nvme"
+#define	DM_CTYPE_SATA		"sata"
 #define	DM_CTYPE_SCSI		"scsi"
-#define	DM_CTYPE_FIBRE		"fibre channel"
 #define	DM_CTYPE_USB		"usb"
+#define	DM_CTYPE_XEN		"xen"
 #define	DM_CTYPE_UNKNOWN	"unknown"
 
 /* media */

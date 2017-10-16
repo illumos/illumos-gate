@@ -70,7 +70,9 @@ driver name=mpt_sas class=scsi-self-identifying \
     alias=pciex1000,94 \
     alias=pciex1000,95 \
     alias=pciex1000,96 \
-    alias=pciex1000,97
+    alias=pciex1000,97 \
+    alias=pciex1000,c4 \
+    alias=pciex1000,c9
 file path=kernel/drv/$(ARCH64)/mpt_sas group=sys
 $(i386_ONLY)file path=kernel/drv/mpt_sas group=sys
 file path=kernel/drv/mpt_sas.conf group=sys \

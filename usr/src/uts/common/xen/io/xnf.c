@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
+ */
+
+/*
  *
  * Copyright (c) 2004 Christian Limpach.
  * All rights reserved.
@@ -122,6 +126,8 @@
 #include <sys/pattr.h>
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
+#include <inet/tcp.h>
+#include <netinet/udp.h>
 #include <sys/gld.h>
 #include <sys/modctl.h>
 #include <sys/mac_provider.h>
@@ -162,13 +168,41 @@ xnf_t *xnf_debug_instance = NULL;
  */
 #define	xnf_btop(addr)	((addr) >> PAGESHIFT)
 
-unsigned int	xnf_max_tx_frags = 1;
+/*
+ * The parameters below should only be changed in /etc/system, never in mdb.
+ */
 
 /*
  * Should we use the multicast control feature if the backend provides
  * it?
  */
 boolean_t xnf_multicast_control = B_TRUE;
+
+/*
+ * Should we allow scatter-gather for tx if backend allows it?
+ */
+boolean_t xnf_enable_tx_sg = B_TRUE;
+
+/*
+ * Should we allow scatter-gather for rx if backend allows it?
+ */
+boolean_t xnf_enable_rx_sg = B_TRUE;
+
+/*
+ * Should we allow lso for tx sends if backend allows it?
+ * Requires xnf_enable_tx_sg to be also set to TRUE.
+ */
+boolean_t xnf_enable_lso = B_TRUE;
+
+/*
+ * Should we allow lro on rx if backend supports it?
+ * Requires xnf_enable_rx_sg to be also set to TRUE.
+ *
+ * !! WARNING !!
+ * LRO is not yet supported in the OS so this should be left as FALSE.
+ * !! WARNING !!
+ */
+boolean_t xnf_enable_lro = B_FALSE;
 
 /*
  * Received packets below this size are copied to a new streams buffer
@@ -194,7 +228,14 @@ size_t xnf_rx_copy_limit = 64;
 #define	INVALID_TX_ID		((uint16_t)-1)
 
 #define	TX_ID_TO_TXID(p, id) (&((p)->xnf_tx_pkt_id[(id)]))
-#define	TX_ID_VALID(i) (((i) != INVALID_TX_ID) && ((i) < NET_TX_RING_SIZE))
+#define	TX_ID_VALID(i) \
+	(((i) != INVALID_TX_ID) && ((i) < NET_TX_RING_SIZE))
+
+/*
+ * calculate how many pages are spanned by an mblk fragment
+ */
+#define	xnf_mblk_pages(mp)	(MBLKL(mp) == 0 ? 0 : \
+    xnf_btop((uintptr_t)mp->b_wptr - 1) - xnf_btop((uintptr_t)mp->b_rptr) + 1)
 
 /* Required system entry points */
 static int	xnf_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -210,6 +251,11 @@ static mblk_t	*xnf_send(void *, mblk_t *);
 static uint_t	xnf_intr(caddr_t);
 static int	xnf_stat(void *, uint_t, uint64_t *);
 static boolean_t xnf_getcapab(void *, mac_capab_t, void *);
+static int xnf_getprop(void *, const char *, mac_prop_id_t, uint_t, void *);
+static int xnf_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
+static void xnf_propinfo(void *, const char *, mac_prop_id_t,
+    mac_prop_info_handle_t);
 
 /* Driver private functions */
 static int xnf_alloc_dma_resources(xnf_t *);
@@ -229,17 +275,16 @@ static void xnf_buf_recycle(xnf_buf_t *);
 static int xnf_tx_buf_constructor(void *, void *, int);
 static void xnf_tx_buf_destructor(void *, void *);
 
-static grant_ref_t gref_get(xnf_t *);
-#pragma inline(gref_get)
-static void gref_put(xnf_t *, grant_ref_t);
-#pragma inline(gref_put)
+static grant_ref_t xnf_gref_get(xnf_t *);
+#pragma inline(xnf_gref_get)
+static void xnf_gref_put(xnf_t *, grant_ref_t);
+#pragma inline(xnf_gref_put)
 
-static xnf_txid_t *txid_get(xnf_t *);
-#pragma inline(txid_get)
-static void txid_put(xnf_t *, xnf_txid_t *);
-#pragma inline(txid_put)
+static xnf_txid_t *xnf_txid_get(xnf_t *);
+#pragma inline(xnf_txid_get)
+static void xnf_txid_put(xnf_t *, xnf_txid_t *);
+#pragma inline(xnf_txid_put)
 
-void xnf_send_driver_status(int, int);
 static void xnf_rxbuf_hang(xnf_t *, xnf_buf_t *);
 static int xnf_tx_clean_ring(xnf_t  *);
 static void oe_state_change(dev_info_t *, ddi_eventcookie_t,
@@ -247,50 +292,69 @@ static void oe_state_change(dev_info_t *, ddi_eventcookie_t,
 static boolean_t xnf_kstat_init(xnf_t *);
 static void xnf_rx_collect(xnf_t *);
 
+#define	XNF_CALLBACK_FLAGS	(MC_GETCAPAB | MC_PROPERTIES)
+
 static mac_callbacks_t xnf_callbacks = {
-	MC_GETCAPAB,
-	xnf_stat,
-	xnf_start,
-	xnf_stop,
-	xnf_set_promiscuous,
-	xnf_set_multicast,
-	xnf_set_mac_addr,
-	xnf_send,
-	NULL,
-	NULL,
-	xnf_getcapab
+	.mc_callbacks = XNF_CALLBACK_FLAGS,
+	.mc_getstat = xnf_stat,
+	.mc_start = xnf_start,
+	.mc_stop = xnf_stop,
+	.mc_setpromisc = xnf_set_promiscuous,
+	.mc_multicst = xnf_set_multicast,
+	.mc_unicst = xnf_set_mac_addr,
+	.mc_tx = xnf_send,
+	.mc_getcapab = xnf_getcapab,
+	.mc_setprop = xnf_setprop,
+	.mc_getprop = xnf_getprop,
+	.mc_propinfo = xnf_propinfo,
 };
 
 /* DMA attributes for network ring buffer */
 static ddi_dma_attr_t ringbuf_dma_attr = {
-	DMA_ATTR_V0,		/* version of this structure */
-	0,			/* lowest usable address */
-	0xffffffffffffffffULL,	/* highest usable address */
-	0x7fffffff,		/* maximum DMAable byte count */
-	MMU_PAGESIZE,		/* alignment in bytes */
-	0x7ff,			/* bitmap of burst sizes */
-	1,			/* minimum transfer */
-	0xffffffffU,		/* maximum transfer */
-	0xffffffffffffffffULL,	/* maximum segment length */
-	1,			/* maximum number of segments */
-	1,			/* granularity */
-	0,			/* flags (reserved) */
+	.dma_attr_version = DMA_ATTR_V0,
+	.dma_attr_addr_lo = 0,
+	.dma_attr_addr_hi = 0xffffffffffffffffULL,
+	.dma_attr_count_max = 0x7fffffff,
+	.dma_attr_align = MMU_PAGESIZE,
+	.dma_attr_burstsizes = 0x7ff,
+	.dma_attr_minxfer = 1,
+	.dma_attr_maxxfer = 0xffffffffU,
+	.dma_attr_seg = 0xffffffffffffffffULL,
+	.dma_attr_sgllen = 1,
+	.dma_attr_granular = 1,
+	.dma_attr_flags = 0
 };
 
-/* DMA attributes for transmit and receive data */
-static ddi_dma_attr_t buf_dma_attr = {
-	DMA_ATTR_V0,		/* version of this structure */
-	0,			/* lowest usable address */
-	0xffffffffffffffffULL,	/* highest usable address */
-	0x7fffffff,		/* maximum DMAable byte count */
-	MMU_PAGESIZE,		/* alignment in bytes */
-	0x7ff,			/* bitmap of burst sizes */
-	1,			/* minimum transfer */
-	0xffffffffU,		/* maximum transfer */
-	0xffffffffffffffffULL,	/* maximum segment length */
-	1,			/* maximum number of segments */
-	1,			/* granularity */
-	0,			/* flags (reserved) */
+/* DMA attributes for receive data */
+static ddi_dma_attr_t rx_buf_dma_attr = {
+	.dma_attr_version = DMA_ATTR_V0,
+	.dma_attr_addr_lo = 0,
+	.dma_attr_addr_hi = 0xffffffffffffffffULL,
+	.dma_attr_count_max = MMU_PAGEOFFSET,
+	.dma_attr_align = MMU_PAGESIZE, /* allocation alignment */
+	.dma_attr_burstsizes = 0x7ff,
+	.dma_attr_minxfer = 1,
+	.dma_attr_maxxfer = 0xffffffffU,
+	.dma_attr_seg = 0xffffffffffffffffULL,
+	.dma_attr_sgllen = 1,
+	.dma_attr_granular = 1,
+	.dma_attr_flags = 0
+};
+
+/* DMA attributes for transmit data */
+static ddi_dma_attr_t tx_buf_dma_attr = {
+	.dma_attr_version = DMA_ATTR_V0,
+	.dma_attr_addr_lo = 0,
+	.dma_attr_addr_hi = 0xffffffffffffffffULL,
+	.dma_attr_count_max = MMU_PAGEOFFSET,
+	.dma_attr_align = 1,
+	.dma_attr_burstsizes = 0x7ff,
+	.dma_attr_minxfer = 1,
+	.dma_attr_maxxfer = 0xffffffffU,
+	.dma_attr_seg = XEN_DATA_BOUNDARY - 1, /* segment boundary */
+	.dma_attr_sgllen = XEN_MAX_TX_DATA_PAGES, /* max number of segments */
+	.dma_attr_granular = 1,
+	.dma_attr_flags = 0
 };
 
 /* DMA access attributes for registers and descriptors */
@@ -349,7 +413,7 @@ _info(struct modinfo *modinfop)
  * Acquire a grant reference.
  */
 static grant_ref_t
-gref_get(xnf_t *xnfp)
+xnf_gref_get(xnf_t *xnfp)
 {
 	grant_ref_t gref;
 
@@ -379,7 +443,7 @@ gref_get(xnf_t *xnfp)
  * Release a grant reference.
  */
 static void
-gref_put(xnf_t *xnfp, grant_ref_t gref)
+xnf_gref_put(xnf_t *xnfp, grant_ref_t gref)
 {
 	ASSERT(gref != INVALID_GRANT_REF);
 
@@ -394,7 +458,7 @@ gref_put(xnf_t *xnfp, grant_ref_t gref)
  * Acquire a transmit id.
  */
 static xnf_txid_t *
-txid_get(xnf_t *xnfp)
+xnf_txid_get(xnf_t *xnfp)
 {
 	xnf_txid_t *tidp;
 
@@ -418,7 +482,7 @@ txid_get(xnf_t *xnfp)
  * Release a transmit id.
  */
 static void
-txid_put(xnf_t *xnfp, xnf_txid_t *tidp)
+xnf_txid_put(xnf_t *xnfp, xnf_txid_t *tidp)
 {
 	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
 	ASSERT(TX_ID_VALID(tidp->id));
@@ -429,6 +493,93 @@ txid_put(xnf_t *xnfp, xnf_txid_t *tidp)
 	xnfp->xnf_tx_pkt_id_head = tidp->id;
 }
 
+static void
+xnf_data_txbuf_free(xnf_t *xnfp, xnf_txbuf_t *txp)
+{
+	ASSERT3U(txp->tx_type, ==, TX_DATA);
+
+	/*
+	 * We are either using a lookaside buffer or we are mapping existing
+	 * buffers.
+	 */
+	if (txp->tx_bdesc != NULL) {
+		ASSERT(!txp->tx_handle_bound);
+		xnf_buf_put(xnfp, txp->tx_bdesc, B_TRUE);
+	} else {
+		if (txp->tx_txreq.gref != INVALID_GRANT_REF) {
+			if (gnttab_query_foreign_access(txp->tx_txreq.gref) !=
+			    0) {
+				cmn_err(CE_PANIC, "tx grant %d still in use by "
+				    "backend domain", txp->tx_txreq.gref);
+			}
+			(void) gnttab_end_foreign_access_ref(
+			    txp->tx_txreq.gref, 1);
+			xnf_gref_put(xnfp, txp->tx_txreq.gref);
+		}
+
+		if (txp->tx_handle_bound)
+			(void) ddi_dma_unbind_handle(txp->tx_dma_handle);
+	}
+
+	if (txp->tx_mp != NULL)
+		freemsg(txp->tx_mp);
+
+	if (txp->tx_prev != NULL) {
+		ASSERT3P(txp->tx_prev->tx_next, ==, txp);
+		txp->tx_prev->tx_next = NULL;
+	}
+
+	if (txp->tx_txreq.id != INVALID_TX_ID) {
+		/*
+		 * This should be only possible when resuming from a suspend.
+		 */
+		ASSERT(!xnfp->xnf_connected);
+		xnf_txid_put(xnfp, TX_ID_TO_TXID(xnfp, txp->tx_txreq.id));
+		txp->tx_txreq.id = INVALID_TX_ID;
+	}
+
+	kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+}
+
+static void
+xnf_data_txbuf_free_chain(xnf_t *xnfp, xnf_txbuf_t *txp)
+{
+	if (txp == NULL)
+		return;
+
+	while (txp->tx_next != NULL)
+		txp = txp->tx_next;
+
+	/*
+	 * We free the chain in reverse order so that grants can be released
+	 * for all dma chunks before unbinding the dma handles. The mblk is
+	 * freed last, after all its fragments' dma handles are unbound.
+	 */
+	xnf_txbuf_t *prev;
+	for (; txp != NULL; txp = prev) {
+		prev = txp->tx_prev;
+		xnf_data_txbuf_free(xnfp, txp);
+	}
+}
+
+static xnf_txbuf_t *
+xnf_data_txbuf_alloc(xnf_t *xnfp)
+{
+	xnf_txbuf_t *txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, KM_SLEEP);
+	txp->tx_type = TX_DATA;
+	txp->tx_next = NULL;
+	txp->tx_prev = NULL;
+	txp->tx_head = txp;
+	txp->tx_frags_to_ack = 0;
+	txp->tx_mp = NULL;
+	txp->tx_bdesc = NULL;
+	txp->tx_handle_bound = B_FALSE;
+	txp->tx_txreq.gref = INVALID_GRANT_REF;
+	txp->tx_txreq.id = INVALID_TX_ID;
+
+	return (txp);
+}
+
 /*
  * Get `wanted' slots in the transmit ring, waiting for at least that
  * number if `wait' is B_TRUE. Force the ring to be cleaned by setting
@@ -437,7 +588,7 @@ txid_put(xnf_t *xnfp, xnf_txid_t *tidp)
  * Return the number of slots available.
  */
 static int
-tx_slots_get(xnf_t *xnfp, int wanted, boolean_t wait)
+xnf_tx_slots_get(xnf_t *xnfp, int wanted, boolean_t wait)
 {
 	int slotsfree;
 	boolean_t forced_clean = (wanted == 0);
@@ -513,45 +664,24 @@ xnf_setup_rings(xnf_t *xnfp)
 	mutex_enter(&xnfp->xnf_txlock);
 
 	/*
-	 * Setup/cleanup the TX ring.  Note that this can lose packets
-	 * after a resume, but we expect to stagger on.
+	 * We first cleanup the TX ring in case we are doing a resume.
+	 * Note that this can lose packets, but we expect to stagger on.
 	 */
 	xnfp->xnf_tx_pkt_id_head = INVALID_TX_ID; /* I.e. emtpy list. */
 	for (i = 0, tidp = &xnfp->xnf_tx_pkt_id[0];
 	    i < NET_TX_RING_SIZE;
 	    i++, tidp++) {
-		xnf_txbuf_t *txp;
-
-		tidp->id = i;
-
-		txp = tidp->txbuf;
-		if (txp == NULL) {
-			tidp->next = INVALID_TX_ID; /* Appease txid_put(). */
-			txid_put(xnfp, tidp);
+		xnf_txbuf_t *txp = tidp->txbuf;
+		if (txp == NULL)
 			continue;
-		}
-
-		ASSERT(txp->tx_txreq.gref != INVALID_GRANT_REF);
-		ASSERT(txp->tx_mp != NULL);
 
 		switch (txp->tx_type) {
 		case TX_DATA:
-			VERIFY(gnttab_query_foreign_access(txp->tx_txreq.gref)
-			    == 0);
-
-			if (txp->tx_bdesc == NULL) {
-				(void) gnttab_end_foreign_access_ref(
-				    txp->tx_txreq.gref, 1);
-				gref_put(xnfp, txp->tx_txreq.gref);
-				(void) ddi_dma_unbind_handle(
-				    txp->tx_dma_handle);
-			} else {
-				xnf_buf_put(xnfp, txp->tx_bdesc, B_TRUE);
-			}
-
-			freemsg(txp->tx_mp);
-			txid_put(xnfp, tidp);
-			kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+			/*
+			 * txid_put() will be called for each txbuf's txid in
+			 * the chain which will result in clearing tidp->txbuf.
+			 */
+			xnf_data_txbuf_free_chain(xnfp, txp);
 
 			break;
 
@@ -566,13 +696,25 @@ xnf_setup_rings(xnf_t *xnfp)
 			 * over the empty slot.
 			 */
 			i++;
-			ASSERT(i < NET_TX_RING_SIZE);
-
+			ASSERT3U(i, <, NET_TX_RING_SIZE);
 			break;
 
 		case TX_MCAST_RSP:
 			break;
 		}
+	}
+
+	/*
+	 * Now purge old list and add each txid to the new free list.
+	 */
+	xnfp->xnf_tx_pkt_id_head = INVALID_TX_ID; /* I.e. emtpy list. */
+	for (i = 0, tidp = &xnfp->xnf_tx_pkt_id[0];
+	    i < NET_TX_RING_SIZE;
+	    i++, tidp++) {
+		tidp->id = i;
+		ASSERT3P(tidp->txbuf, ==, NULL);
+		tidp->next = INVALID_TX_ID; /* Appease txid_put(). */
+		xnf_txid_put(xnfp, tidp);
 	}
 
 	/* LINTED: constant in conditional context */
@@ -708,6 +850,27 @@ again:
 		}
 	}
 
+	/*
+	 * Tell backend if we support scatter-gather lists on the rx side.
+	 */
+	err = xenbus_printf(xbt, xsname, "feature-sg", "%d",
+	    xnf_enable_rx_sg ? 1 : 0);
+	if (err != 0) {
+		message = "writing feature-sg";
+		goto abort_transaction;
+	}
+
+	/*
+	 * Tell backend if we support LRO for IPv4. Scatter-gather on rx is
+	 * a prerequisite.
+	 */
+	err = xenbus_printf(xbt, xsname, "feature-gso-tcpv4", "%d",
+	    (xnf_enable_rx_sg && xnf_enable_lro) ? 1 : 0);
+	if (err != 0) {
+		message = "writing feature-gso-tcpv4";
+		goto abort_transaction;
+	}
+
 	err = xvdi_switch_state(xnfp->xnf_devinfo, xbt, XenbusStateConnected);
 	if (err != 0) {
 		message = "switching state to XenbusStateConnected";
@@ -778,6 +941,43 @@ xnf_read_config(xnf_t *xnfp)
 	if (err != 0)
 		be_cap = 0;
 	xnfp->xnf_be_mcast_control = (be_cap != 0) && xnf_multicast_control;
+
+	/*
+	 * See if back-end supports scatter-gather for transmits. If not,
+	 * we will not support LSO and limit the mtu to 1500.
+	 */
+	err = xenbus_scanf(XBT_NULL, oename, "feature-sg", "%d", &be_cap);
+	if (err != 0) {
+		be_cap = 0;
+		dev_err(xnfp->xnf_devinfo, CE_WARN, "error reading "
+		    "'feature-sg' from backend driver");
+	}
+	if (be_cap == 0) {
+		dev_err(xnfp->xnf_devinfo, CE_WARN, "scatter-gather is not "
+		    "supported for transmits in the backend driver. LSO is "
+		    "disabled and MTU is restricted to 1500 bytes.");
+	}
+	xnfp->xnf_be_tx_sg = (be_cap != 0) && xnf_enable_tx_sg;
+
+	if (xnfp->xnf_be_tx_sg) {
+		/*
+		 * Check if LSO is supported. Currently we only check for
+		 * IPv4 as Illumos doesn't support LSO for IPv6.
+		 */
+		err = xenbus_scanf(XBT_NULL, oename, "feature-gso-tcpv4", "%d",
+		    &be_cap);
+		if (err != 0) {
+			be_cap = 0;
+			dev_err(xnfp->xnf_devinfo, CE_WARN, "error reading "
+			    "'feature-gso-tcpv4' from backend driver");
+		}
+		if (be_cap == 0) {
+			dev_err(xnfp->xnf_devinfo, CE_WARN, "LSO is not "
+			    "supported by the backend driver. Performance "
+			    "will be affected.");
+		}
+		xnfp->xnf_be_lso = (be_cap != 0) && xnf_enable_lso;
+	}
 }
 
 /*
@@ -829,6 +1029,12 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	xnfp = kmem_zalloc(sizeof (*xnfp), KM_SLEEP);
 
+	xnfp->xnf_tx_pkt_id =
+	    kmem_zalloc(sizeof (xnf_txid_t) * NET_TX_RING_SIZE, KM_SLEEP);
+
+	xnfp->xnf_rx_pkt_info =
+	    kmem_zalloc(sizeof (xnf_buf_t *) * NET_RX_RING_SIZE, KM_SLEEP);
+
 	macp->m_dip = devinfo;
 	macp->m_driver = xnfp;
 	xnfp->xnf_devinfo = devinfo;
@@ -837,7 +1043,8 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp->m_src_addr = xnfp->xnf_mac_addr;
 	macp->m_callbacks = &xnf_callbacks;
 	macp->m_min_sdu = 0;
-	macp->m_max_sdu = XNF_MAXPKT;
+	xnfp->xnf_mtu = ETHERMTU;
+	macp->m_max_sdu = xnfp->xnf_mtu;
 
 	xnfp->xnf_running = B_FALSE;
 	xnfp->xnf_connected = B_FALSE;
@@ -1156,11 +1363,11 @@ xnf_set_multicast(void *arg, boolean_t add, const uint8_t *mca)
 	 * 5. Wait for the response via xnf_tx_clean_ring().
 	 */
 
-	n_slots = tx_slots_get(xnfp, 2, B_TRUE);
+	n_slots = xnf_tx_slots_get(xnfp, 2, B_TRUE);
 	ASSERT(n_slots >= 2);
 
 	slot = xnfp->xnf_tx_ring.req_prod_pvt;
-	tidp = txid_get(xnfp);
+	tidp = xnf_txid_get(xnfp);
 	VERIFY(tidp != NULL);
 
 	txp->tx_type = TX_MCAST_REQ;
@@ -1196,10 +1403,9 @@ xnf_set_multicast(void *arg, boolean_t add, const uint8_t *mca)
 		ec_notify_via_evtchn(xnfp->xnf_evtchn);
 
 	while (txp->tx_type == TX_MCAST_REQ)
-		cv_wait(&xnfp->xnf_cv_multicast,
-		    &xnfp->xnf_txlock);
+		cv_wait(&xnfp->xnf_cv_multicast, &xnfp->xnf_txlock);
 
-	ASSERT(txp->tx_type == TX_MCAST_RSP);
+	ASSERT3U(txp->tx_type, ==, TX_MCAST_RSP);
 
 	mutex_enter(&xnfp->xnf_schedlock);
 	xnfp->xnf_pending_multicast--;
@@ -1207,7 +1413,7 @@ xnf_set_multicast(void *arg, boolean_t add, const uint8_t *mca)
 
 	result = (txp->tx_status == NETIF_RSP_OKAY);
 
-	txid_put(xnfp, tidp);
+	xnf_txid_put(xnfp, tidp);
 
 	mutex_exit(&xnfp->xnf_txlock);
 
@@ -1261,39 +1467,44 @@ loop:
 			xnf_txbuf_t *txp;
 
 			trp = RING_GET_RESPONSE(&xnfp->xnf_tx_ring, i);
+			/*
+			 * if this slot was occupied by netif_extra_info_t,
+			 * then the response will be NETIF_RSP_NULL. In this
+			 * case there are no resources to clean up.
+			 */
+			if (trp->status == NETIF_RSP_NULL)
+				continue;
+
 			ASSERT(TX_ID_VALID(trp->id));
 
 			tidp = TX_ID_TO_TXID(xnfp, trp->id);
-			ASSERT(tidp->id == trp->id);
-			ASSERT(tidp->next == INVALID_TX_ID);
+			ASSERT3U(tidp->id, ==, trp->id);
+			ASSERT3U(tidp->next, ==, INVALID_TX_ID);
 
 			txp = tidp->txbuf;
 			ASSERT(txp != NULL);
-			ASSERT(txp->tx_txreq.id == trp->id);
+			ASSERT3U(txp->tx_txreq.id, ==, trp->id);
 
 			switch (txp->tx_type) {
 			case TX_DATA:
-				if (gnttab_query_foreign_access(
-				    txp->tx_txreq.gref) != 0)
-					cmn_err(CE_PANIC,
-					    "tx grant %d still in use by "
-					    "backend domain",
-					    txp->tx_txreq.gref);
+				/*
+				 * We must put the txid for each response we
+				 * acknowledge to make sure that we never have
+				 * more free slots than txids. Because of this
+				 * we do it here instead of waiting for it to
+				 * be done in xnf_data_txbuf_free_chain().
+				 */
+				xnf_txid_put(xnfp, tidp);
+				txp->tx_txreq.id = INVALID_TX_ID;
+				ASSERT3S(txp->tx_head->tx_frags_to_ack, >, 0);
+				txp->tx_head->tx_frags_to_ack--;
 
-				if (txp->tx_bdesc == NULL) {
-					(void) gnttab_end_foreign_access_ref(
-					    txp->tx_txreq.gref, 1);
-					gref_put(xnfp, txp->tx_txreq.gref);
-					(void) ddi_dma_unbind_handle(
-					    txp->tx_dma_handle);
-				} else {
-					xnf_buf_put(xnfp, txp->tx_bdesc,
-					    B_TRUE);
-				}
-
-				freemsg(txp->tx_mp);
-				txid_put(xnfp, tidp);
-				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+				/*
+				 * We clean the whole chain once we got a
+				 * response for each fragment.
+				 */
+				if (txp->tx_head->tx_frags_to_ack == 0)
+					xnf_data_txbuf_free_chain(xnfp, txp);
 
 				break;
 
@@ -1302,9 +1513,6 @@ loop:
 				txp->tx_status = trp->status;
 				cv_broadcast(&xnfp->xnf_cv_multicast);
 
-				break;
-
-			case TX_MCAST_RSP:
 				break;
 
 			default:
@@ -1336,7 +1544,7 @@ loop:
  * within a single page.
  */
 static xnf_buf_t *
-xnf_tx_pullup(xnf_t *xnfp, mblk_t *mp)
+xnf_tx_get_lookaside(xnf_t *xnfp, mblk_t *mp, size_t *plen)
 {
 	xnf_buf_t *bd;
 	caddr_t bp;
@@ -1355,68 +1563,101 @@ xnf_tx_pullup(xnf_t *xnfp, mblk_t *mp)
 		mp = mp->b_cont;
 	}
 
-	ASSERT((bp - bd->buf) <= PAGESIZE);
+	*plen = bp - bd->buf;
+	ASSERT3U(*plen, <=, PAGESIZE);
 
-	xnfp->xnf_stat_tx_pullup++;
+	xnfp->xnf_stat_tx_lookaside++;
 
 	return (bd);
 }
 
 /*
- * Insert the pseudo-header checksum into the packet `buf'.
+ * Insert the pseudo-header checksum into the packet.
+ * Assumes packet is IPv4, TCP/UDP since we only advertised support for
+ * HCKSUM_INET_FULL_V4.
  */
-void
-xnf_pseudo_cksum(caddr_t buf, int length)
+int
+xnf_pseudo_cksum(mblk_t *mp)
 {
 	struct ether_header *ehp;
-	uint16_t sap, len, *stuff;
+	uint16_t sap, iplen, *stuff;
 	uint32_t cksum;
-	size_t offset;
+	size_t len;
 	ipha_t *ipha;
 	ipaddr_t src, dst;
+	uchar_t *ptr;
 
-	ASSERT(length >= sizeof (*ehp));
-	ehp = (struct ether_header *)buf;
+	ptr = mp->b_rptr;
+	len = MBLKL(mp);
+
+	/* Each header must fit completely in an mblk. */
+	ASSERT3U(len, >=, sizeof (*ehp));
+
+	ehp = (struct ether_header *)ptr;
 
 	if (ntohs(ehp->ether_type) == VLAN_TPID) {
 		struct ether_vlan_header *evhp;
-
-		ASSERT(length >= sizeof (*evhp));
-		evhp = (struct ether_vlan_header *)buf;
+		ASSERT3U(len, >=, sizeof (*evhp));
+		evhp = (struct ether_vlan_header *)ptr;
 		sap = ntohs(evhp->ether_type);
-		offset = sizeof (*evhp);
+		ptr += sizeof (*evhp);
+		len -= sizeof (*evhp);
 	} else {
 		sap = ntohs(ehp->ether_type);
-		offset = sizeof (*ehp);
+		ptr += sizeof (*ehp);
+		len -= sizeof (*ehp);
 	}
 
-	ASSERT(sap == ETHERTYPE_IP);
+	ASSERT3U(sap, ==, ETHERTYPE_IP);
 
-	/* Packet should have been pulled up by the caller. */
-	if ((offset + sizeof (ipha_t)) > length) {
-		cmn_err(CE_WARN, "xnf_pseudo_cksum: no room for checksum");
-		return;
+	/*
+	 * Ethernet and IP headers may be in different mblks.
+	 */
+	ASSERT3P(ptr, <=, mp->b_wptr);
+	if (ptr == mp->b_wptr) {
+		mp = mp->b_cont;
+		ptr = mp->b_rptr;
+		len = MBLKL(mp);
 	}
 
-	ipha = (ipha_t *)(buf + offset);
+	ASSERT3U(len, >=, sizeof (ipha_t));
+	ipha = (ipha_t *)ptr;
 
-	ASSERT(IPH_HDR_LENGTH(ipha) == IP_SIMPLE_HDR_LENGTH);
+	/*
+	 * We assume the IP header has no options. (This is enforced in
+	 * ire_send_wire_v4() -- search for IXAF_NO_HW_CKSUM).
+	 */
+	ASSERT3U(IPH_HDR_LENGTH(ipha), ==, IP_SIMPLE_HDR_LENGTH);
+	iplen = ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH;
 
-	len = ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH;
+	ptr += IP_SIMPLE_HDR_LENGTH;
+	len -= IP_SIMPLE_HDR_LENGTH;
+
+	/*
+	 * IP and L4 headers may be in different mblks.
+	 */
+	ASSERT3P(ptr, <=, mp->b_wptr);
+	if (ptr == mp->b_wptr) {
+		mp = mp->b_cont;
+		ptr = mp->b_rptr;
+		len = MBLKL(mp);
+	}
 
 	switch (ipha->ipha_protocol) {
 	case IPPROTO_TCP:
-		stuff = IPH_TCPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		ASSERT3U(len, >=, sizeof (tcph_t));
+		stuff = (uint16_t *)(ptr + TCP_CHECKSUM_OFFSET);
 		cksum = IP_TCP_CSUM_COMP;
 		break;
 	case IPPROTO_UDP:
-		stuff = IPH_UDPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		ASSERT3U(len, >=, sizeof (struct udphdr));
+		stuff = (uint16_t *)(ptr + UDP_CHECKSUM_OFFSET);
 		cksum = IP_UDP_CSUM_COMP;
 		break;
 	default:
 		cmn_err(CE_WARN, "xnf_pseudo_cksum: unexpected protocol %d",
 		    ipha->ipha_protocol);
-		return;
+		return (EINVAL);
 	}
 
 	src = ipha->ipha_src;
@@ -1424,7 +1665,7 @@ xnf_pseudo_cksum(caddr_t buf, int length)
 
 	cksum += (dst >> 16) + (dst & 0xFFFF);
 	cksum += (src >> 16) + (src & 0xFFFF);
-	cksum += htons(len);
+	cksum += htons(iplen);
 
 	cksum = (cksum >> 16) + (cksum & 0xFFFF);
 	cksum = (cksum >> 16) + (cksum & 0xFFFF);
@@ -1432,40 +1673,38 @@ xnf_pseudo_cksum(caddr_t buf, int length)
 	ASSERT(cksum <= 0xFFFF);
 
 	*stuff = (uint16_t)(cksum ? cksum : ~cksum);
+
+	return (0);
 }
 
 /*
- * Push a list of prepared packets (`txp') into the transmit ring.
+ * Push a packet into the transmit ring.
+ *
+ * Note: the format of a tx packet that spans multiple slots is similar to
+ * what is described in xnf_rx_one_packet().
  */
-static xnf_txbuf_t *
-tx_push_packets(xnf_t *xnfp, xnf_txbuf_t *txp)
+static void
+xnf_tx_push_packet(xnf_t *xnfp, xnf_txbuf_t *head)
 {
-	int slots_free;
+	int nslots = 0;
+	int extras = 0;
 	RING_IDX slot;
 	boolean_t notify;
 
-	mutex_enter(&xnfp->xnf_txlock);
-
+	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
 	ASSERT(xnfp->xnf_running);
-
-	/*
-	 * Wait until we are connected to the backend.
-	 */
-	while (!xnfp->xnf_connected)
-		cv_wait(&xnfp->xnf_cv_state, &xnfp->xnf_txlock);
-
-	slots_free = tx_slots_get(xnfp, 1, B_FALSE);
-	DTRACE_PROBE1(xnf_send_slotsfree, int, slots_free);
 
 	slot = xnfp->xnf_tx_ring.req_prod_pvt;
 
-	while ((txp != NULL) && (slots_free > 0)) {
+	/*
+	 * The caller has already checked that we have enough slots to proceed.
+	 */
+	for (xnf_txbuf_t *txp = head; txp != NULL; txp = txp->tx_next) {
 		xnf_txid_t *tidp;
 		netif_tx_request_t *txrp;
 
-		tidp = txid_get(xnfp);
+		tidp = xnf_txid_get(xnfp);
 		VERIFY(tidp != NULL);
-
 		txrp = RING_GET_REQUEST(&xnfp->xnf_tx_ring, slot);
 
 		txp->tx_slot = slot;
@@ -1473,15 +1712,32 @@ tx_push_packets(xnf_t *xnfp, xnf_txbuf_t *txp)
 		*txrp = txp->tx_txreq;
 
 		tidp->txbuf = txp;
-
-		xnfp->xnf_stat_opackets++;
-		xnfp->xnf_stat_obytes += txp->tx_txreq.size;
-
-		txp = txp->tx_next;
-		slots_free--;
 		slot++;
+		nslots++;
 
+		/*
+		 * When present, LSO info is placed in a slot after the first
+		 * data segment, and doesn't require a txid.
+		 */
+		if (txp->tx_txreq.flags & NETTXF_extra_info) {
+			netif_extra_info_t *extra;
+			ASSERT3U(nslots, ==, 1);
+
+			extra = (netif_extra_info_t *)
+			    RING_GET_REQUEST(&xnfp->xnf_tx_ring, slot);
+			*extra = txp->tx_extra;
+			slot++;
+			nslots++;
+			extras = 1;
+		}
 	}
+
+	ASSERT3U(nslots, <=, XEN_MAX_SLOTS_PER_TX);
+
+	/*
+	 * Store the number of data fragments.
+	 */
+	head->tx_frags_to_ack = nslots - extras;
 
 	xnfp->xnf_tx_ring.req_prod_pvt = slot;
 
@@ -1489,265 +1745,320 @@ tx_push_packets(xnf_t *xnfp, xnf_txbuf_t *txp)
 	 * Tell the peer that we sent something, if it cares.
 	 */
 	/* LINTED: constant in conditional context */
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_tx_ring,
-	    notify);
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_tx_ring, notify);
 	if (notify)
 		ec_notify_via_evtchn(xnfp->xnf_evtchn);
+}
 
-	mutex_exit(&xnfp->xnf_txlock);
+static xnf_txbuf_t *
+xnf_mblk_copy(xnf_t *xnfp, mblk_t *mp)
+{
+	xnf_txbuf_t *txp = xnf_data_txbuf_alloc(xnfp);
+	size_t length;
+
+	txp->tx_bdesc = xnf_tx_get_lookaside(xnfp, mp, &length);
+	if (txp->tx_bdesc == NULL) {
+		xnf_data_txbuf_free(xnfp, txp);
+		return (NULL);
+	}
+	txp->tx_mfn = txp->tx_bdesc->buf_mfn;
+	txp->tx_txreq.gref = txp->tx_bdesc->grant_ref;
+	txp->tx_txreq.size = length;
+	txp->tx_txreq.offset = (uintptr_t)txp->tx_bdesc->buf & PAGEOFFSET;
+	txp->tx_txreq.flags = 0;
 
 	return (txp);
 }
 
+static xnf_txbuf_t *
+xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
+{
+	xnf_txbuf_t *head = NULL;
+	xnf_txbuf_t *tail = NULL;
+	domid_t oeid;
+	int nsegs = 0;
+
+	oeid = xvdi_get_oeid(xnfp->xnf_devinfo);
+
+	for (mblk_t *ml = mp; ml != NULL; ml = ml->b_cont) {
+		ddi_dma_handle_t dma_handle;
+		ddi_dma_cookie_t dma_cookie;
+		uint_t ncookies;
+		xnf_txbuf_t *txp;
+
+		if (MBLKL(ml) == 0)
+			continue;
+
+		txp = xnf_data_txbuf_alloc(xnfp);
+
+		if (head == NULL) {
+			head = txp;
+		} else {
+			ASSERT(tail != NULL);
+			TXBUF_SETNEXT(tail, txp);
+			txp->tx_head = head;
+		}
+
+		/*
+		 * The necessary segmentation rules (e.g. not crossing a page
+		 * boundary) are enforced by the dma attributes of the handle.
+		 */
+		dma_handle = txp->tx_dma_handle;
+		int ret = ddi_dma_addr_bind_handle(dma_handle,
+		    NULL, (char *)ml->b_rptr, MBLKL(ml),
+		    DDI_DMA_WRITE | DDI_DMA_STREAMING,
+		    DDI_DMA_DONTWAIT, 0, &dma_cookie,
+		    &ncookies);
+		if (ret != DDI_DMA_MAPPED) {
+			if (ret != DDI_DMA_NORESOURCES) {
+				dev_err(xnfp->xnf_devinfo, CE_WARN,
+				    "ddi_dma_addr_bind_handle() failed "
+				    "[dma_error=%d]", ret);
+			}
+			goto error;
+		}
+		txp->tx_handle_bound = B_TRUE;
+
+		ASSERT(ncookies > 0);
+		for (int i = 0; i < ncookies; i++) {
+			if (nsegs == XEN_MAX_TX_DATA_PAGES) {
+				dev_err(xnfp->xnf_devinfo, CE_WARN,
+				    "xnf_dmamap_alloc() failed: "
+				    "too many segments");
+				goto error;
+			}
+			if (i > 0) {
+				txp = xnf_data_txbuf_alloc(xnfp);
+				ASSERT(tail != NULL);
+				TXBUF_SETNEXT(tail, txp);
+				txp->tx_head = head;
+			}
+
+			txp->tx_mfn =
+			    xnf_btop(pa_to_ma(dma_cookie.dmac_laddress));
+			txp->tx_txreq.gref = xnf_gref_get(xnfp);
+			if (txp->tx_txreq.gref == INVALID_GRANT_REF) {
+				dev_err(xnfp->xnf_devinfo, CE_WARN,
+				    "xnf_dmamap_alloc() failed: "
+				    "invalid grant ref");
+				goto error;
+			}
+			gnttab_grant_foreign_access_ref(txp->tx_txreq.gref,
+			    oeid, txp->tx_mfn, 1);
+			txp->tx_txreq.offset =
+			    dma_cookie.dmac_laddress & PAGEOFFSET;
+			txp->tx_txreq.size = dma_cookie.dmac_size;
+			txp->tx_txreq.flags = 0;
+
+			ddi_dma_nextcookie(dma_handle, &dma_cookie);
+			nsegs++;
+
+			if (tail != NULL)
+				tail->tx_txreq.flags = NETTXF_more_data;
+			tail = txp;
+		}
+	}
+
+	*countp = nsegs;
+	return (head);
+
+error:
+	xnf_data_txbuf_free_chain(xnfp, head);
+	return (NULL);
+}
+
+static void
+xnf_tx_setup_offload(xnf_t *xnfp, xnf_txbuf_t *head,
+    uint32_t cksum_flags, uint32_t lso_flags, uint32_t mss)
+{
+	if (lso_flags != 0) {
+		ASSERT3U(lso_flags, ==, HW_LSO);
+		ASSERT3P(head->tx_bdesc, ==, NULL);
+
+		head->tx_txreq.flags |= NETTXF_extra_info;
+		netif_extra_info_t *extra = &head->tx_extra;
+		extra->type = XEN_NETIF_EXTRA_TYPE_GSO;
+		extra->flags = 0;
+		extra->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+		extra->u.gso.size = mss;
+		extra->u.gso.features = 0;
+		extra->u.gso.pad = 0;
+	} else if (cksum_flags != 0) {
+		ASSERT3U(cksum_flags, ==, HCK_FULLCKSUM);
+		/*
+		 * If the local protocol stack requests checksum
+		 * offload we set the 'checksum blank' flag,
+		 * indicating to the peer that we need the checksum
+		 * calculated for us.
+		 *
+		 * We _don't_ set the validated flag, because we haven't
+		 * validated that the data and the checksum match.
+		 *
+		 * Note: we already called xnf_pseudo_cksum() in
+		 * xnf_send(), so we just set the txreq flag here.
+		 */
+		head->tx_txreq.flags |= NETTXF_csum_blank;
+		xnfp->xnf_stat_tx_cksum_deferred++;
+	}
+}
+
 /*
- * Send the chain of packets `mp'. Called by the MAC framework.
+ * Send packet mp. Called by the MAC framework.
  */
 static mblk_t *
 xnf_send(void *arg, mblk_t *mp)
 {
 	xnf_t *xnfp = arg;
-	domid_t oeid;
-	xnf_txbuf_t *head, *tail;
+	xnf_txbuf_t *head;
 	mblk_t *ml;
-	int prepared;
+	int length;
+	int pages, chunks, slots, slots_free;
+	uint32_t cksum_flags, lso_flags, mss;
+	boolean_t pulledup = B_FALSE;
+	boolean_t force_copy = B_FALSE;
 
-	oeid = xvdi_get_oeid(xnfp->xnf_devinfo);
+	ASSERT3P(mp->b_next, ==, NULL);
+
+	mutex_enter(&xnfp->xnf_txlock);
 
 	/*
-	 * Prepare packets for transmission.
+	 * Wait until we are connected to the backend.
 	 */
-	head = tail = NULL;
-	prepared = 0;
-	while (mp != NULL) {
-		xnf_txbuf_t *txp;
-		int n_chunks, length;
-		boolean_t page_oops;
-		uint32_t pflags;
+	while (!xnfp->xnf_connected)
+		cv_wait(&xnfp->xnf_cv_state, &xnfp->xnf_txlock);
 
-		for (ml = mp, n_chunks = length = 0, page_oops = B_FALSE;
-		    ml != NULL;
-		    ml = ml->b_cont, n_chunks++) {
-
-			/*
-			 * Test if this buffer includes a page
-			 * boundary. The test assumes that the range
-			 * b_rptr...b_wptr can include only a single
-			 * boundary.
-			 */
-			if (xnf_btop((size_t)ml->b_rptr) !=
-			    xnf_btop((size_t)ml->b_wptr)) {
-				xnfp->xnf_stat_tx_pagebndry++;
-				page_oops = B_TRUE;
-			}
-
-			length += MBLKL(ml);
-		}
-		DTRACE_PROBE1(xnf_send_b_cont, int, n_chunks);
-
+	/*
+	 * To simplify logic and be in sync with the rescheduling mechanism,
+	 * we require the maximum amount of slots that could be used by a
+	 * transaction to be free before proceeding. The only downside of doing
+	 * this is that it slightly reduces the effective size of the ring.
+	 */
+	slots_free = xnf_tx_slots_get(xnfp, XEN_MAX_SLOTS_PER_TX, B_FALSE);
+	if (slots_free < XEN_MAX_SLOTS_PER_TX) {
 		/*
-		 * Make sure packet isn't too large.
+		 * We need to ask for a re-schedule later as the ring is full.
 		 */
-		if (length > XNF_FRAMESIZE) {
-			cmn_err(CE_WARN,
-			    "xnf%d: oversized packet (%d bytes) dropped",
-			    ddi_get_instance(xnfp->xnf_devinfo), length);
-			freemsg(mp);
-			continue;
-		}
-
-		txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, KM_SLEEP);
-
-		txp->tx_type = TX_DATA;
-
-		if ((n_chunks > xnf_max_tx_frags) || page_oops) {
-			/*
-			 * Loan a side buffer rather than the mblk
-			 * itself.
-			 */
-			txp->tx_bdesc = xnf_tx_pullup(xnfp, mp);
-			if (txp->tx_bdesc == NULL) {
-				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
-				break;
-			}
-
-			txp->tx_bufp = txp->tx_bdesc->buf;
-			txp->tx_mfn = txp->tx_bdesc->buf_mfn;
-			txp->tx_txreq.gref = txp->tx_bdesc->grant_ref;
-
-		} else {
-			int rc;
-			ddi_dma_cookie_t dma_cookie;
-			uint_t ncookies;
-
-			rc = ddi_dma_addr_bind_handle(txp->tx_dma_handle,
-			    NULL, (char *)mp->b_rptr, length,
-			    DDI_DMA_WRITE | DDI_DMA_STREAMING,
-			    DDI_DMA_DONTWAIT, 0, &dma_cookie,
-			    &ncookies);
-			if (rc != DDI_DMA_MAPPED) {
-				ASSERT(rc != DDI_DMA_INUSE);
-				ASSERT(rc != DDI_DMA_PARTIAL_MAP);
-
-#ifdef XNF_DEBUG
-				if (rc != DDI_DMA_NORESOURCES)
-					cmn_err(CE_WARN,
-					    "xnf%d: bind_handle failed (%x)",
-					    ddi_get_instance(xnfp->xnf_devinfo),
-					    rc);
-#endif
-				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
-				break;
-			}
-			ASSERT(ncookies == 1);
-
-			txp->tx_bdesc = NULL;
-			txp->tx_bufp = (caddr_t)mp->b_rptr;
-			txp->tx_mfn =
-			    xnf_btop(pa_to_ma(dma_cookie.dmac_laddress));
-			txp->tx_txreq.gref = gref_get(xnfp);
-			if (txp->tx_txreq.gref == INVALID_GRANT_REF) {
-				(void) ddi_dma_unbind_handle(
-				    txp->tx_dma_handle);
-				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
-				break;
-			}
-			gnttab_grant_foreign_access_ref(txp->tx_txreq.gref,
-			    oeid, txp->tx_mfn, 1);
-		}
-
-		txp->tx_next = NULL;
-		txp->tx_mp = mp;
-		txp->tx_txreq.size = length;
-		txp->tx_txreq.offset = (uintptr_t)txp->tx_bufp & PAGEOFFSET;
-		txp->tx_txreq.flags = 0;
-		mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
-		if (pflags != 0) {
-			/*
-			 * If the local protocol stack requests checksum
-			 * offload we set the 'checksum blank' flag,
-			 * indicating to the peer that we need the checksum
-			 * calculated for us.
-			 *
-			 * We _don't_ set the validated flag, because we haven't
-			 * validated that the data and the checksum match.
-			 */
-			xnf_pseudo_cksum(txp->tx_bufp, length);
-			txp->tx_txreq.flags |= NETTXF_csum_blank;
-
-			xnfp->xnf_stat_tx_cksum_deferred++;
-		}
-
-		if (head == NULL) {
-			ASSERT(tail == NULL);
-
-			head = txp;
-		} else {
-			ASSERT(tail != NULL);
-
-			tail->tx_next = txp;
-		}
-		tail = txp;
-
-		mp = mp->b_next;
-		prepared++;
-
-		/*
-		 * There is no point in preparing more than
-		 * NET_TX_RING_SIZE, as we won't be able to push them
-		 * into the ring in one go and would hence have to
-		 * un-prepare the extra.
-		 */
-		if (prepared == NET_TX_RING_SIZE)
-			break;
-	}
-
-	DTRACE_PROBE1(xnf_send_prepared, int, prepared);
-
-	if (mp != NULL) {
-#ifdef XNF_DEBUG
-		int notprepared = 0;
-		mblk_t *l = mp;
-
-		while (l != NULL) {
-			notprepared++;
-			l = l->b_next;
-		}
-
-		DTRACE_PROBE1(xnf_send_notprepared, int, notprepared);
-#else /* !XNF_DEBUG */
-		DTRACE_PROBE1(xnf_send_notprepared, int, -1);
-#endif /* XNF_DEBUG */
-	}
-
-	/*
-	 * Push the packets we have prepared into the ring. They may
-	 * not all go.
-	 */
-	if (head != NULL)
-		head = tx_push_packets(xnfp, head);
-
-	/*
-	 * If some packets that we prepared were not sent, unprepare
-	 * them and add them back to the head of those we didn't
-	 * prepare.
-	 */
-	{
-		xnf_txbuf_t *loop;
-		mblk_t *mp_head, *mp_tail;
-		int unprepared = 0;
-
-		mp_head = mp_tail = NULL;
-		loop = head;
-
-		while (loop != NULL) {
-			xnf_txbuf_t *next = loop->tx_next;
-
-			if (loop->tx_bdesc == NULL) {
-				(void) gnttab_end_foreign_access_ref(
-				    loop->tx_txreq.gref, 1);
-				gref_put(xnfp, loop->tx_txreq.gref);
-				(void) ddi_dma_unbind_handle(
-				    loop->tx_dma_handle);
-			} else {
-				xnf_buf_put(xnfp, loop->tx_bdesc, B_TRUE);
-			}
-
-			ASSERT(loop->tx_mp != NULL);
-			if (mp_head == NULL)
-				mp_head = loop->tx_mp;
-			mp_tail = loop->tx_mp;
-
-			kmem_cache_free(xnfp->xnf_tx_buf_cache, loop);
-			loop = next;
-			unprepared++;
-		}
-
-		if (mp_tail == NULL) {
-			ASSERT(mp_head == NULL);
-		} else {
-			ASSERT(mp_head != NULL);
-
-			mp_tail->b_next = mp;
-			mp = mp_head;
-		}
-
-		DTRACE_PROBE1(xnf_send_unprepared, int, unprepared);
-	}
-
-	/*
-	 * If any mblks are left then we have deferred for some reason
-	 * and need to ask for a re-schedule later. This is typically
-	 * due to the ring filling.
-	 */
-	if (mp != NULL) {
 		mutex_enter(&xnfp->xnf_schedlock);
 		xnfp->xnf_need_sched = B_TRUE;
 		mutex_exit(&xnfp->xnf_schedlock);
 
 		xnfp->xnf_stat_tx_defer++;
+		mutex_exit(&xnfp->xnf_txlock);
+		return (mp);
 	}
 
-	return (mp);
+	/*
+	 * Get hw offload parameters.
+	 * This must be done before pulling up the mp as those parameters
+	 * are not copied over.
+	 */
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &cksum_flags);
+	mac_lso_get(mp, &mss, &lso_flags);
+
+	/*
+	 * XXX: fix MAC framework so that we can advertise support for
+	 * partial checksum for IPv4 only. This way we won't need to calculate
+	 * the pseudo header checksum ourselves.
+	 */
+	if (cksum_flags != 0) {
+		ASSERT3U(cksum_flags, ==, HCK_FULLCKSUM);
+		(void) xnf_pseudo_cksum(mp);
+	}
+
+pulledup:
+	for (ml = mp, pages = 0, chunks = 0, length = 0; ml != NULL;
+	    ml = ml->b_cont, chunks++) {
+		pages += xnf_mblk_pages(ml);
+		length += MBLKL(ml);
+	}
+	DTRACE_PROBE3(packet, int, length, int, chunks, int, pages);
+	DTRACE_PROBE3(lso, int, length, uint32_t, lso_flags, uint32_t, mss);
+
+	/*
+	 * If the ethernet header crosses a page boundary the packet
+	 * will be dropped by the backend. In practice it seems like
+	 * this happens fairly rarely so we'll do nothing unless the
+	 * packet is small enough to fit in a look-aside buffer.
+	 */
+	if (((uintptr_t)mp->b_rptr & PAGEOFFSET) +
+	    sizeof (struct ether_header) > PAGESIZE) {
+		xnfp->xnf_stat_tx_eth_hdr_split++;
+		if (length <= PAGESIZE)
+			force_copy = B_TRUE;
+	}
+
+	if (force_copy || (pages > 1 && !xnfp->xnf_be_tx_sg)) {
+		/*
+		 * If the packet spans several pages and scatter-gather is not
+		 * supported then use a look-aside buffer.
+		 */
+		ASSERT3U(length, <=, PAGESIZE);
+		head = xnf_mblk_copy(xnfp, mp);
+		if (head == NULL) {
+			dev_err(xnfp->xnf_devinfo, CE_WARN,
+			    "xnf_mblk_copy() failed");
+			goto drop;
+		}
+	} else {
+		/*
+		 * There's a limit for how many pages can be passed to the
+		 * backend. If we pass that limit, the packet will be dropped
+		 * and some backend implementations (e.g. Linux) could even
+		 * offline the interface.
+		 */
+		if (pages > XEN_MAX_TX_DATA_PAGES) {
+			if (pulledup) {
+				dev_err(xnfp->xnf_devinfo, CE_WARN,
+				    "too many pages, even after pullup: %d.",
+				    pages);
+				goto drop;
+			}
+
+			/*
+			 * Defragment packet if it spans too many pages.
+			 */
+			mblk_t *newmp = msgpullup(mp, -1);
+			freemsg(mp);
+			mp = newmp;
+			xnfp->xnf_stat_tx_pullup++;
+			pulledup = B_TRUE;
+			goto pulledup;
+		}
+
+		head = xnf_mblk_map(xnfp, mp, &slots);
+		if (head == NULL)
+			goto drop;
+
+		IMPLY(slots > 1, xnfp->xnf_be_tx_sg);
+	}
+
+	/*
+	 * Set tx_mp so that mblk is freed when the txbuf chain is freed.
+	 */
+	head->tx_mp = mp;
+
+	xnf_tx_setup_offload(xnfp, head, cksum_flags, lso_flags, mss);
+
+	/*
+	 * The first request must store the total length of the packet.
+	 */
+	head->tx_txreq.size = length;
+
+	/*
+	 * Push the packet we have prepared into the ring.
+	 */
+	xnf_tx_push_packet(xnfp, head);
+	xnfp->xnf_stat_opackets++;
+	xnfp->xnf_stat_obytes += length;
+
+	mutex_exit(&xnfp->xnf_txlock);
+	return (NULL);
+
+drop:
+	freemsg(mp);
+	xnfp->xnf_stat_tx_drop++;
+	mutex_exit(&xnfp->xnf_txlock);
+	return (NULL);
 }
 
 /*
@@ -1834,9 +2145,9 @@ xnf_intr(caddr_t arg)
 		int free_slots;
 
 		mutex_enter(&xnfp->xnf_txlock);
-		free_slots = tx_slots_get(xnfp, 0, B_FALSE);
+		free_slots = xnf_tx_slots_get(xnfp, 0, B_FALSE);
 
-		if (need_sched && (free_slots > 0)) {
+		if (need_sched && (free_slots >= XEN_MAX_SLOTS_PER_TX)) {
 			mutex_enter(&xnfp->xnf_schedlock);
 			xnfp->xnf_need_sched = B_FALSE;
 			mutex_exit(&xnfp->xnf_schedlock);
@@ -1922,74 +2233,126 @@ xnf_rxbuf_hang(xnf_t *xnfp, xnf_buf_t *bdesc)
 }
 
 /*
- * Collect packets from the RX ring, storing them in `xnfp' for later
- * use.
+ * Receive an entire packet from the ring, starting from slot *consp.
+ * prod indicates the slot of the latest response.
+ * On return, *consp will point to the head of the next packet.
+ *
+ * Note: If slot prod was reached before we could gather a full packet, we will
+ * drop the partial packet; this would most likely indicate a bug in either
+ * the front-end or the back-end driver.
+ *
+ * An rx packet can consist of several fragments and thus span multiple slots.
+ * Each fragment can contain up to 4k of data.
+ *
+ * A typical 9000 MTU packet with look like this:
+ * +------+---------------------+-------------------+-----------------------+
+ * | SLOT | TYPE                | CONTENTS          | FLAGS                 |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 1    | netif_rx_response_t | 1st data fragment | more_data             |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 2    | netif_rx_response_t | 2nd data fragment | more_data             |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 3    | netif_rx_response_t | 3rd data fragment | [none]                |
+ * +------+---------------------+-------------------+-----------------------+
+ *
+ * Fragments are chained by setting NETRXF_more_data in the previous
+ * response's flags. If there are additional flags, such as
+ * NETRXF_data_validated or NETRXF_extra_info, those should be set on the
+ * first fragment.
+ *
+ * Sometimes extra info can be present. If so, it will follow the first
+ * fragment, and NETRXF_extra_info flag will be set on the first response.
+ * If LRO is set on a packet, it will be stored in the extra info. Conforming
+ * to the spec, extra info can also be chained, but must all be present right
+ * after the first fragment.
+ *
+ * Example of a packet with 2 extra infos:
+ * +------+---------------------+-------------------+-----------------------+
+ * | SLOT | TYPE                | CONTENTS          | FLAGS                 |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 1    | netif_rx_response_t | 1st data fragment | extra_info, more_data |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 2    | netif_extra_info_t  | 1st extra info    | EXTRA_FLAG_MORE       |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 3    | netif_extra_info_t  | 2nd extra info    | [none]                |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 4    | netif_rx_response_t | 2nd data fragment | more_data             |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 5    | netif_rx_response_t | 3rd data fragment | more_data             |
+ * +------+---------------------+-------------------+-----------------------+
+ * | 6    | netif_rx_response_t | 4th data fragment | [none]                |
+ * +------+---------------------+-------------------+-----------------------+
+ *
+ * In practice, the only extra we expect is for LRO, but only if we advertise
+ * that we support it to the backend (xnf_enable_lro == TRUE).
  */
-static void
-xnf_rx_collect(xnf_t *xnfp)
+static int
+xnf_rx_one_packet(xnf_t *xnfp, RING_IDX prod, RING_IDX *consp, mblk_t **mpp)
 {
-	mblk_t *head, *tail;
+	mblk_t *head = NULL;
+	mblk_t *tail = NULL;
+	mblk_t *mp;
+	int error = 0;
+	RING_IDX cons = *consp;
+	netif_extra_info_t lro;
+	boolean_t is_lro = B_FALSE;
+	boolean_t is_extra = B_FALSE;
 
-	ASSERT(MUTEX_HELD(&xnfp->xnf_rxlock));
+	netif_rx_response_t rsp = *RING_GET_RESPONSE(&xnfp->xnf_rx_ring, cons);
 
-	/*
-	 * Loop over unconsumed responses:
-	 * 1. get a response
-	 * 2. take corresponding buffer off recv. ring
-	 * 3. indicate this by setting slot to NULL
-	 * 4. create a new message and
-	 * 5. copy data in, adjust ptr
-	 */
+	boolean_t hwcsum = (rsp.flags & NETRXF_data_validated) != 0;
+	boolean_t more_data = (rsp.flags & NETRXF_more_data) != 0;
+	boolean_t more_extra = (rsp.flags & NETRXF_extra_info) != 0;
 
-	head = tail = NULL;
+	IMPLY(more_data, xnf_enable_rx_sg);
 
-	while (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_rx_ring)) {
-		netif_rx_response_t *rxpkt;
+	while (cons != prod) {
 		xnf_buf_t *bdesc;
-		ssize_t len;
-		size_t off;
-		mblk_t *mp = NULL;
-		boolean_t hwcsum = B_FALSE;
-		grant_ref_t ref;
+		int len, off;
+		int rxidx = cons & (NET_RX_RING_SIZE - 1);
 
-		/* 1. */
-		rxpkt = RING_GET_RESPONSE(&xnfp->xnf_rx_ring,
-		    xnfp->xnf_rx_ring.rsp_cons);
+		bdesc = xnfp->xnf_rx_pkt_info[rxidx];
+		xnfp->xnf_rx_pkt_info[rxidx] = NULL;
 
-		DTRACE_PROBE4(xnf_rx_got_rsp, int, (int)rxpkt->id,
-		    int, (int)rxpkt->offset,
-		    int, (int)rxpkt->flags,
-		    int, (int)rxpkt->status);
+		if (is_extra) {
+			netif_extra_info_t *extra = (netif_extra_info_t *)&rsp;
+			/*
+			 * The only extra we expect is for LRO, and it should
+			 * only be present once.
+			 */
+			if (extra->type == XEN_NETIF_EXTRA_TYPE_GSO &&
+			    !is_lro) {
+				ASSERT(xnf_enable_lro);
+				lro = *extra;
+				is_lro = B_TRUE;
+				DTRACE_PROBE1(lro, netif_extra_info_t *, &lro);
+			} else {
+				dev_err(xnfp->xnf_devinfo, CE_WARN, "rx packet "
+				    "contains unexpected extra info of type %d",
+				    extra->type);
+				error = EINVAL;
+			}
+			more_extra =
+			    (extra->flags & XEN_NETIF_EXTRA_FLAG_MORE) != 0;
+
+			goto hang_buf;
+		}
+
+		ASSERT3U(bdesc->id, ==, rsp.id);
 
 		/*
-		 * 2.
+		 * status stores packet length when >= 0, or errors when < 0.
 		 */
-		bdesc = xnfp->xnf_rx_pkt_info[rxpkt->id];
+		len = rsp.status;
+		off = rsp.offset;
+		more_data = (rsp.flags & NETRXF_more_data) != 0;
 
 		/*
-		 * 3.
+		 * sanity checks.
 		 */
-		xnfp->xnf_rx_pkt_info[rxpkt->id] = NULL;
-		ASSERT(bdesc->id == rxpkt->id);
-
-		ref = bdesc->grant_ref;
-		off = rxpkt->offset;
-		len = rxpkt->status;
-
 		if (!xnfp->xnf_running) {
-			DTRACE_PROBE4(xnf_rx_not_running,
-			    int, rxpkt->status,
-			    char *, bdesc->buf, int, rxpkt->offset,
-			    char *, ((char *)bdesc->buf) + rxpkt->offset);
-
-			xnfp->xnf_stat_drop++;
-
+			error = EBUSY;
 		} else if (len <= 0) {
-			DTRACE_PROBE4(xnf_rx_pkt_status_negative,
-			    int, rxpkt->status,
-			    char *, bdesc->buf, int, rxpkt->offset,
-			    char *, ((char *)bdesc->buf) + rxpkt->offset);
-
 			xnfp->xnf_stat_errrx++;
 
 			switch (len) {
@@ -2003,148 +2366,204 @@ xnf_rx_collect(xnf_t *xnfp)
 				xnfp->xnf_stat_norxbuf++;
 				break;
 			}
-
+			error = EINVAL;
 		} else if (bdesc->grant_ref == INVALID_GRANT_REF) {
-			cmn_err(CE_WARN, "Bad rx grant reference %d "
-			    "from domain %d", ref,
-			    xvdi_get_oeid(xnfp->xnf_devinfo));
-
+			dev_err(xnfp->xnf_devinfo, CE_WARN,
+			    "Bad rx grant reference, rsp id %d", rsp.id);
+			error = EINVAL;
 		} else if ((off + len) > PAGESIZE) {
-			cmn_err(CE_WARN, "Rx packet overflows page "
-			    "(offset %ld, length %ld) from domain %d",
-			    off, len, xvdi_get_oeid(xnfp->xnf_devinfo));
+			dev_err(xnfp->xnf_devinfo, CE_WARN, "Rx packet crosses "
+			    "page boundary (offset %d, length %d)", off, len);
+			error = EINVAL;
+		}
+
+		if (error != 0) {
+			/*
+			 * If an error has been detected, we do not attempt
+			 * to read the data but we still need to replace
+			 * the rx bufs.
+			 */
+			goto hang_buf;
+		}
+
+		xnf_buf_t *nbuf = NULL;
+
+		/*
+		 * If the packet is below a pre-determined size we will
+		 * copy data out of the buf rather than replace it.
+		 */
+		if (len > xnf_rx_copy_limit)
+			nbuf = xnf_buf_get(xnfp, KM_NOSLEEP, B_FALSE);
+
+		if (nbuf != NULL) {
+			mp = desballoc((unsigned char *)bdesc->buf,
+			    bdesc->len, 0, &bdesc->free_rtn);
+
+			if (mp == NULL) {
+				xnfp->xnf_stat_rx_desballoc_fail++;
+				xnfp->xnf_stat_norxbuf++;
+				error = ENOMEM;
+				/*
+				 * we free the buf we just allocated as we
+				 * will re-hang the old buf.
+				 */
+				xnf_buf_put(xnfp, nbuf, B_FALSE);
+				goto hang_buf;
+			}
+
+			mp->b_rptr = mp->b_rptr + off;
+			mp->b_wptr = mp->b_rptr + len;
+
+			/*
+			 * Release the grant as the backend doesn't need to
+			 * access this buffer anymore and grants are scarce.
+			 */
+			(void) gnttab_end_foreign_access_ref(bdesc->grant_ref,
+			    0);
+			xnf_gref_put(xnfp, bdesc->grant_ref);
+			bdesc->grant_ref = INVALID_GRANT_REF;
+
+			bdesc = nbuf;
 		} else {
-			xnf_buf_t *nbuf = NULL;
-
-			DTRACE_PROBE4(xnf_rx_packet, int, len,
-			    char *, bdesc->buf, int, off,
-			    char *, ((char *)bdesc->buf) + off);
-
-			ASSERT(off + len <= PAGEOFFSET);
-
-			if (rxpkt->flags & NETRXF_data_validated)
-				hwcsum = B_TRUE;
-
 			/*
-			 * If the packet is below a pre-determined
-			 * size we will copy data out rather than
-			 * replace it.
+			 * We failed to allocate a new buf or decided to reuse
+			 * the old one. In either case we copy the data off it
+			 * and put it back into the ring.
 			 */
-			if (len > xnf_rx_copy_limit)
-				nbuf = xnf_buf_get(xnfp, KM_NOSLEEP, B_FALSE);
-
-			/*
-			 * If we have a replacement buffer, attempt to
-			 * wrap the existing one with an mblk_t in
-			 * order that the upper layers of the stack
-			 * might use it directly.
-			 */
-			if (nbuf != NULL) {
-				mp = desballoc((unsigned char *)bdesc->buf,
-				    bdesc->len, 0, &bdesc->free_rtn);
-				if (mp == NULL) {
-					xnfp->xnf_stat_rx_desballoc_fail++;
-					xnfp->xnf_stat_norxbuf++;
-
-					xnf_buf_put(xnfp, nbuf, B_FALSE);
-					nbuf = NULL;
-				} else {
-					mp->b_rptr = mp->b_rptr + off;
-					mp->b_wptr = mp->b_rptr + len;
-
-					/*
-					 * Release the grant reference
-					 * associated with this buffer
-					 * - they are scarce and the
-					 * upper layers of the stack
-					 * don't need it.
-					 */
-					(void) gnttab_end_foreign_access_ref(
-					    bdesc->grant_ref, 0);
-					gref_put(xnfp, bdesc->grant_ref);
-					bdesc->grant_ref = INVALID_GRANT_REF;
-
-					bdesc = nbuf;
-				}
+			mp = allocb(len, 0);
+			if (mp == NULL) {
+				xnfp->xnf_stat_rx_allocb_fail++;
+				xnfp->xnf_stat_norxbuf++;
+				error = ENOMEM;
+				goto hang_buf;
 			}
-
-			if (nbuf == NULL) {
-				/*
-				 * No replacement buffer allocated -
-				 * attempt to copy the data out and
-				 * re-hang the existing buffer.
-				 */
-
-				/* 4. */
-				mp = allocb(len, BPRI_MED);
-				if (mp == NULL) {
-					xnfp->xnf_stat_rx_allocb_fail++;
-					xnfp->xnf_stat_norxbuf++;
-				} else {
-					/* 5. */
-					bcopy(bdesc->buf + off, mp->b_wptr,
-					    len);
-					mp->b_wptr += len;
-				}
-			}
+			bcopy(bdesc->buf + off, mp->b_wptr, len);
+			mp->b_wptr += len;
 		}
 
-		/* Re-hang the buffer. */
+		if (head == NULL)
+			head = mp;
+		else
+			tail->b_cont = mp;
+		tail = mp;
+
+hang_buf:
+		/*
+		 * No matter what happens, for each response we need to hang
+		 * a new buf on the rx ring. Put either the old one, or a new
+		 * one if the old one is borrowed by the kernel via desballoc().
+		 */
 		xnf_rxbuf_hang(xnfp, bdesc);
+		cons++;
 
-		if (mp != NULL) {
-			if (hwcsum) {
-				/*
-				 * If the peer says that the data has
-				 * been validated then we declare that
-				 * the full checksum has been
-				 * verified.
-				 *
-				 * We don't look at the "checksum
-				 * blank" flag, and hence could have a
-				 * packet here that we are asserting
-				 * is good with a blank checksum.
-				 */
-				mac_hcksum_set(mp, 0, 0, 0, 0,
-				    HCK_FULLCKSUM_OK);
-				xnfp->xnf_stat_rx_cksum_no_need++;
-			}
-			if (head == NULL) {
-				ASSERT(tail == NULL);
+		/* next response is an extra */
+		is_extra = more_extra;
 
-				head = mp;
-			} else {
-				ASSERT(tail != NULL);
+		if (!more_data && !more_extra)
+			break;
 
-				tail->b_next = mp;
-			}
-			tail = mp;
-
-			ASSERT(mp->b_next == NULL);
-
-			xnfp->xnf_stat_ipackets++;
-			xnfp->xnf_stat_rbytes += len;
-		}
-
-		xnfp->xnf_rx_ring.rsp_cons++;
+		/*
+		 * Note that since requests and responses are union'd on the
+		 * same ring, we copy the response to a local variable instead
+		 * of keeping a pointer. Otherwise xnf_rxbuf_hang() would have
+		 * overwritten contents of rsp.
+		 */
+		rsp = *RING_GET_RESPONSE(&xnfp->xnf_rx_ring, cons);
 	}
 
 	/*
-	 * Store the mblks we have collected.
+	 * Check that we do not get stuck in a loop.
 	 */
-	if (head != NULL) {
-		ASSERT(tail != NULL);
+	ASSERT3U(*consp, !=, cons);
+	*consp = cons;
 
-		if (xnfp->xnf_rx_head == NULL) {
-			ASSERT(xnfp->xnf_rx_tail == NULL);
+	/*
+	 * We ran out of responses but the flags indicate there is more data.
+	 */
+	if (more_data) {
+		dev_err(xnfp->xnf_devinfo, CE_WARN, "rx: need more fragments.");
+		error = EINVAL;
+	}
+	if (more_extra) {
+		dev_err(xnfp->xnf_devinfo, CE_WARN, "rx: need more fragments "
+		    "(extras).");
+		error = EINVAL;
+	}
 
-			xnfp->xnf_rx_head = head;
-		} else {
-			ASSERT(xnfp->xnf_rx_tail != NULL);
+	/*
+	 * An error means the packet must be dropped. If we have already formed
+	 * a partial packet, then discard it.
+	 */
+	if (error != 0) {
+		if (head != NULL)
+			freemsg(head);
+		xnfp->xnf_stat_rx_drop++;
+		return (error);
+	}
 
-			xnfp->xnf_rx_tail->b_next = head;
+	ASSERT(head != NULL);
+
+	if (hwcsum) {
+		/*
+		 * If the peer says that the data has been validated then we
+		 * declare that the full checksum has been verified.
+		 *
+		 * We don't look at the "checksum blank" flag, and hence could
+		 * have a packet here that we are asserting is good with
+		 * a blank checksum.
+		 */
+		mac_hcksum_set(head, 0, 0, 0, 0, HCK_FULLCKSUM_OK);
+		xnfp->xnf_stat_rx_cksum_no_need++;
+	}
+
+	/* XXX: set lro info for packet once LRO is supported in OS. */
+
+	*mpp = head;
+
+	return (0);
+}
+
+/*
+ * Collect packets from the RX ring, storing them in `xnfp' for later use.
+ */
+static void
+xnf_rx_collect(xnf_t *xnfp)
+{
+	RING_IDX prod;
+
+	ASSERT(MUTEX_HELD(&xnfp->xnf_rxlock));
+
+	prod = xnfp->xnf_rx_ring.sring->rsp_prod;
+	/*
+	 * Ensure we see queued responses up to 'prod'.
+	 */
+	membar_consumer();
+
+	while (xnfp->xnf_rx_ring.rsp_cons != prod) {
+		mblk_t *mp;
+
+		/*
+		 * Collect a packet.
+		 * rsp_cons is updated inside xnf_rx_one_packet().
+		 */
+		int error = xnf_rx_one_packet(xnfp, prod,
+		    &xnfp->xnf_rx_ring.rsp_cons, &mp);
+		if (error == 0) {
+			xnfp->xnf_stat_ipackets++;
+			xnfp->xnf_stat_rbytes += xmsgsize(mp);
+
+			/*
+			 * Append the mblk to the rx list.
+			 */
+			if (xnfp->xnf_rx_head == NULL) {
+				ASSERT3P(xnfp->xnf_rx_tail, ==, NULL);
+				xnfp->xnf_rx_head = mp;
+			} else {
+				ASSERT(xnfp->xnf_rx_tail != NULL);
+				xnfp->xnf_rx_tail->b_next = mp;
+			}
+			xnfp->xnf_rx_tail = mp;
 		}
-		xnfp->xnf_rx_tail = tail;
 	}
 }
 
@@ -2306,7 +2725,7 @@ xnf_release_mblks(xnf_t *xnfp)
 			ASSERT(txp->tx_mp != NULL);
 			freemsg(txp->tx_mp);
 
-			txid_put(xnfp, tidp);
+			xnf_txid_put(xnfp, tidp);
 			kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
 		}
 	}
@@ -2326,7 +2745,7 @@ xnf_buf_constructor(void *buf, void *arg, int kmflag)
 		ddiflags = DDI_DMA_DONTWAIT;
 
 	/* Allocate a DMA access handle for the buffer. */
-	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &buf_dma_attr,
+	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &rx_buf_dma_attr,
 	    ddiflags, 0, &bdesc->dma_handle) != DDI_SUCCESS)
 		goto failure;
 
@@ -2391,17 +2810,17 @@ xnf_buf_get(xnf_t *xnfp, int flags, boolean_t readonly)
 	 * Usually grant references are more scarce than memory, so we
 	 * attempt to acquire a grant reference first.
 	 */
-	gref = gref_get(xnfp);
+	gref = xnf_gref_get(xnfp);
 	if (gref == INVALID_GRANT_REF)
 		return (NULL);
 
 	bufp = kmem_cache_alloc(xnfp->xnf_buf_cache, flags);
 	if (bufp == NULL) {
-		gref_put(xnfp, gref);
+		xnf_gref_put(xnfp, gref);
 		return (NULL);
 	}
 
-	ASSERT(bufp->grant_ref == INVALID_GRANT_REF);
+	ASSERT3U(bufp->grant_ref, ==, INVALID_GRANT_REF);
 
 	bufp->grant_ref = gref;
 
@@ -2423,7 +2842,7 @@ xnf_buf_put(xnf_t *xnfp, xnf_buf_t *bufp, boolean_t readonly)
 	if (bufp->grant_ref != INVALID_GRANT_REF) {
 		(void) gnttab_end_foreign_access_ref(
 		    bufp->grant_ref, readonly ? 1 : 0);
-		gref_put(xnfp, bufp->grant_ref);
+		xnf_gref_put(xnfp, bufp->grant_ref);
 		bufp->grant_ref = INVALID_GRANT_REF;
 	}
 
@@ -2464,7 +2883,7 @@ xnf_tx_buf_constructor(void *buf, void *arg, int kmflag)
 	if (kmflag & KM_NOSLEEP)
 		ddiflags = DDI_DMA_DONTWAIT;
 
-	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &buf_dma_attr,
+	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &tx_buf_dma_attr,
 	    ddiflags, 0, &txp->tx_dma_handle) != DDI_SUCCESS) {
 		ASSERT(kmflag & KM_NOSLEEP); /* Cannot fail for KM_SLEEP. */
 		return (-1);
@@ -2491,8 +2910,9 @@ static char *xnf_aux_statistics[] = {
 	"interrupts",
 	"unclaimed_interrupts",
 	"tx_pullup",
-	"tx_pagebndry",
-	"tx_attempt",
+	"tx_lookaside",
+	"tx_drop",
+	"tx_eth_hdr_split",
 	"buf_allocated",
 	"buf_outstanding",
 	"gref_outstanding",
@@ -2524,8 +2944,9 @@ xnf_kstat_aux_update(kstat_t *ksp, int flag)
 	(knp++)->value.ui64 = xnfp->xnf_stat_interrupts;
 	(knp++)->value.ui64 = xnfp->xnf_stat_unclaimed_interrupts;
 	(knp++)->value.ui64 = xnfp->xnf_stat_tx_pullup;
-	(knp++)->value.ui64 = xnfp->xnf_stat_tx_pagebndry;
-	(knp++)->value.ui64 = xnfp->xnf_stat_tx_attempt;
+	(knp++)->value.ui64 = xnfp->xnf_stat_tx_lookaside;
+	(knp++)->value.ui64 = xnfp->xnf_stat_tx_drop;
+	(knp++)->value.ui64 = xnfp->xnf_stat_tx_eth_hdr_split;
 
 	(knp++)->value.ui64 = xnfp->xnf_stat_buf_allocated;
 	(knp++)->value.ui64 = xnfp->xnf_stat_buf_outstanding;
@@ -2629,10 +3050,94 @@ xnf_stat(void *arg, uint_t stat, uint64_t *val)
 	return (0);
 }
 
+static int
+xnf_change_mtu(xnf_t *xnfp, uint32_t mtu)
+{
+	if (mtu > ETHERMTU) {
+		if (!xnf_enable_tx_sg) {
+			dev_err(xnfp->xnf_devinfo, CE_WARN, "MTU limited to %d "
+			    "because scatter-gather is disabled for transmit "
+			    "in driver settings", ETHERMTU);
+			return (EINVAL);
+		} else if (!xnf_enable_rx_sg) {
+			dev_err(xnfp->xnf_devinfo, CE_WARN, "MTU limited to %d "
+			    "because scatter-gather is disabled for receive "
+			    "in driver settings", ETHERMTU);
+			return (EINVAL);
+		} else if (!xnfp->xnf_be_tx_sg) {
+			dev_err(xnfp->xnf_devinfo, CE_WARN, "MTU limited to %d "
+			    "because backend doesn't support scatter-gather",
+			    ETHERMTU);
+			return (EINVAL);
+		}
+		if (mtu > XNF_MAXPKT)
+			return (EINVAL);
+	}
+	int error = mac_maxsdu_update(xnfp->xnf_mh, mtu);
+	if (error == 0)
+		xnfp->xnf_mtu = mtu;
+
+	return (error);
+}
+
+/*ARGSUSED*/
+static int
+xnf_getprop(void *data, const char *prop_name, mac_prop_id_t prop_id,
+    uint_t prop_val_size, void *prop_val)
+{
+	xnf_t *xnfp = data;
+
+	switch (prop_id) {
+	case MAC_PROP_MTU:
+		ASSERT(prop_val_size >= sizeof (uint32_t));
+		bcopy(&xnfp->xnf_mtu, prop_val, sizeof (uint32_t));
+		break;
+	default:
+		return (ENOTSUP);
+	}
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+xnf_setprop(void *data, const char *prop_name, mac_prop_id_t prop_id,
+    uint_t prop_val_size, const void *prop_val)
+{
+	xnf_t *xnfp = data;
+	uint32_t new_mtu;
+	int error;
+
+	switch (prop_id) {
+	case MAC_PROP_MTU:
+		ASSERT(prop_val_size >= sizeof (uint32_t));
+		bcopy(prop_val, &new_mtu, sizeof (new_mtu));
+		error = xnf_change_mtu(xnfp, new_mtu);
+		break;
+	default:
+		return (ENOTSUP);
+	}
+
+	return (error);
+}
+
+/*ARGSUSED*/
+static void
+xnf_propinfo(void *data, const char *prop_name, mac_prop_id_t prop_id,
+    mac_prop_info_handle_t prop_handle)
+{
+	switch (prop_id) {
+	case MAC_PROP_MTU:
+		mac_prop_info_set_range_uint32(prop_handle, 0, XNF_MAXPKT);
+		break;
+	default:
+		break;
+	}
+}
+
 static boolean_t
 xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	_NOTE(ARGUNUSED(arg));
+	xnf_t *xnfp = arg;
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
@@ -2656,6 +3161,21 @@ xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		 * before passing the packet to the IO domain.
 		 */
 		*capab = HCKSUM_INET_FULL_V4;
+
+		/*
+		 * TODO: query the "feature-ipv6-csum-offload" capability.
+		 * If enabled, that could allow us to use HCKSUM_INET_PARTIAL.
+		 */
+
+		break;
+	}
+	case MAC_CAPAB_LSO: {
+		if (!xnfp->xnf_be_lso)
+			return (B_FALSE);
+
+		mac_capab_lso_t *lso = cap_data;
+		lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+		lso->lso_basic_tcp_ipv4.lso_max = IP_MAXPACKET;
 		break;
 	}
 	default:
@@ -2709,6 +3229,13 @@ oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 		 * Our MAC address as discovered by xnf_read_config().
 		 */
 		mac_unicst_update(xnfp->xnf_mh, xnfp->xnf_mac_addr);
+
+		/*
+		 * We do not know if some features such as LSO are supported
+		 * until we connect to the backend. We request the MAC layer
+		 * to poll our capabilities again.
+		 */
+		mac_capab_update(xnfp->xnf_mh);
 
 		break;
 

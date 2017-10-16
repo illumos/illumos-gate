@@ -24,7 +24,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -1944,10 +1944,21 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 	uint32_t		readpage1 = 0, retrypage0 = 0;
 	uint16_t		iocstatus;
 	uint8_t			port_flags, page_number, action;
-	uint32_t		reply_size = 256; /* Big enough for any page */
+	uint32_t		reply_size;
 	uint_t			state;
 	int			rval = DDI_FAILURE;
 	boolean_t		free_recv = B_FALSE, free_page = B_FALSE;
+
+	/*
+	 * We want to find a reply_size that's large enough for the page0 and
+	 * page1 sizes and resistant to increase in the number of phys.
+	 */
+	reply_size = MAX(page0_size, page1_size);
+	if (P2ROUNDUP(reply_size, 256) <= reply_size) {
+		mptsas_log(mpt, CE_WARN, "mptsas_get_sas_io_unit_page_hndsk: "
+		    "cannot size reply size");
+		goto cleanup;
+	}
 
 	/*
 	 * Initialize our "state machine".  This is a bit convoluted,

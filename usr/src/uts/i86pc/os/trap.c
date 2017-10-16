@@ -32,7 +32,7 @@
 /*								*/
 
 /*
- * Copyright 2012 Joyent, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -213,7 +213,7 @@ die(uint_t type, struct regs *rp, caddr_t addr, processorid_t cpuid)
 
 	curthread->t_panic_trap = &ti;
 
-	if (type == T_PGFLT && addr < (caddr_t)KERNELBASE) {
+	if (type == T_PGFLT && addr < (caddr_t)kernelbase) {
 		panic("BAD TRAP: type=%x (#%s %s) rp=%p addr=%p "
 		    "occurred in module \"%s\" due to %s",
 		    type, trap_mnemonic, trap_name, (void *)rp, (void *)addr,
