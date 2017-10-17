@@ -2106,18 +2106,13 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	zfs_acl_t	*aclp;
 	int		error;
-	uid_t		uid = crgetuid(cr);
-	uint64_t	who;
+	uint64_t	who;		/* FUID from the ACE */
 	uint16_t	type, iflags;
 	uint16_t	entry_type;
 	uint32_t	access_mask;
 	uint32_t	deny_mask = 0;
 	zfs_ace_hdr_t	*acep = NULL;
-	boolean_t	checkit;
-	uid_t		gowner;
-	uid_t		fowner;
-
-	zfs_fuid_map_ids(zp, cr, &fowner, &gowner);
+	boolean_t	checkit;	/* ACE ID matches */
 
 	mutex_enter(&zp->z_acl_lock);
 
@@ -2150,11 +2145,13 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 
 		switch (entry_type) {
 		case ACE_OWNER:
-			if (uid == fowner)
-				checkit = B_TRUE;
+			who = zp->z_uid;
+			/*FALLTHROUGH*/
+		case 0:	/* USER Entry */
+			checkit = zfs_user_in_cred(zfsvfs, who, cr);
 			break;
 		case OWNING_GROUP:
-			who = gowner;
+			who = zp->z_gid;
 			/*FALLTHROUGH*/
 		case ACE_IDENTIFIER_GROUP:
 			checkit = zfs_groupmember(zfsvfs, who, cr);
@@ -2163,21 +2160,13 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 			checkit = B_TRUE;
 			break;
 
-		/* USER Entry */
 		default:
-			if (entry_type == 0) {
-				uid_t newid;
-
-				newid = zfs_fuid_map_id(zfsvfs, who, cr,
-				    ZFS_ACE_USER);
-				if (newid != IDMAP_WK_CREATOR_OWNER_UID &&
-				    uid == newid)
-					checkit = B_TRUE;
-				break;
-			} else {
-				mutex_exit(&zp->z_acl_lock);
-				return (SET_ERROR(EIO));
-			}
+			/*
+			 * The zfs_acl_valid_ace_type check above
+			 * should make this case impossible.
+			 */
+			mutex_exit(&zp->z_acl_lock);
+			return (SET_ERROR(EIO));
 		}
 
 		if (checkit) {

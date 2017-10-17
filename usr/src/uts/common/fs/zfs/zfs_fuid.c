@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -492,7 +493,7 @@ zfs_fuid_create_cred(zfsvfs_t *zfsvfs, zfs_fuid_type_t type,
 	uint64_t	idx;
 	ksid_t		*ksid;
 	uint32_t	rid;
-	char 		*kdomain;
+	char		*kdomain;
 	const char	*domain;
 	uid_t		id;
 
@@ -685,6 +686,57 @@ zfs_fuid_info_free(zfs_fuid_info_t *fuidp)
 }
 
 /*
+ * Check to see if user ID is in the list of SIDs in CR.
+ */
+boolean_t
+zfs_user_in_cred(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
+{
+	ksid_t		*ksid = crgetsid(cr, KSID_USER);
+	ksidlist_t	*ksidlist = crgetsidlist(cr);
+	uid_t		uid;
+
+	/* Check for match with cred->cr_uid */
+	uid = zfs_fuid_map_id(zfsvfs, id, cr, ZFS_ACE_USER);
+	if (uid != IDMAP_WK_CREATOR_OWNER_UID &&
+	    uid == crgetuid(cr))
+		return (B_TRUE);
+
+	/* Check for any match in the ksidlist */
+	if (ksid && ksidlist) {
+		int		i;
+		ksid_t		*ksid_vec;
+		uint32_t	idx = FUID_INDEX(id);
+		uint32_t	rid = FUID_RID(id);
+		const char	*domain;
+
+		if (idx == 0) {
+			/*
+			 * The ID passed in has idx zero, which means
+			 * it's just a Unix UID.  That can never match
+			 * anything in ksid_vec[] because those all
+			 * have ksid->ks_id set to a Group ID.
+			 */
+			return (B_FALSE);
+		}
+
+		domain = zfs_fuid_find_by_idx(zfsvfs, idx);
+		ASSERT(domain != NULL);
+
+		if (strcmp(domain, IDMAP_WK_CREATOR_SID_AUTHORITY) == 0)
+			return (B_FALSE);
+
+		ksid_vec = ksidlist->ksl_sids;
+		for (i = 0; i != ksidlist->ksl_nsid; i++) {
+			if ((strcmp(domain,
+			    ksid_vec[i].ks_domain->kd_name) == 0) &&
+			    rid == ksid_vec[i].ks_rid)
+				return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+/*
  * Check to see if id is a groupmember.  If cred
  * has ksid info then sidlist is checked first
  * and if still not found then POSIX groups are checked
@@ -699,7 +751,7 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 	uid_t		gid;
 
 	if (ksid && ksidlist) {
-		int 		i;
+		int		i;
 		ksid_t		*ksid_groups;
 		uint32_t	idx = FUID_INDEX(id);
 		uint32_t	rid = FUID_RID(id);
