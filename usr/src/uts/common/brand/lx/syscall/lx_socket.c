@@ -82,6 +82,31 @@ typedef struct lx_socket_aux_data
 	uint_t lxsad_flags;
 } lx_socket_aux_data_t;
 
+#define	LX_SS_MAXSIZE	128
+
+typedef struct lx_sockaddr_storage {
+	unsigned short	lxss_family;
+	char		lxdata[LX_SS_MAXSIZE - sizeof (unsigned short)];
+} lx_sockaddr_storage_t;
+
+typedef struct lx_group_req {
+	uint32_t	lxgr_interface;
+#ifdef _LP64
+	/* On 64-bit linux kernels, gr_interface is padded by 4 bytes. */
+	uint32_t	_lxgr_pad;
+#endif
+	lx_sockaddr_storage_t	lxgr_group;
+} lx_group_req_t;
+
+#if defined(_SYSCALL32_IMPL)
+
+typedef struct lx_group_req32 {
+	uint32_t		lxgr_interface;
+	lx_sockaddr_storage_t	lxgr_group;
+} lx_group_req32_t;
+
+#endif /* defined(_SYSCALL32_IMPL) */
+
 /* lxsad_flags */
 #define	LXSAD_FL_STRCRED	0x1
 #define	LXSAD_FL_EMULSEQPKT	0x2
@@ -2469,10 +2494,10 @@ static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
 	{ IP_ADD_SOURCE_MEMBERSHIP, 0 },	/* IP_ADD_SOURCE_MEMBERSHIP */
 	{ OPTNOTSUP, 0 },			/* IP_DROP_SOURCE_MEMBERSHIP */
 	{ OPTNOTSUP, 0 },			/* IP_MSFILTER		*/
-	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_GROUP	*/
+	{ MCAST_JOIN_GROUP, 0 },		/* MCAST_JOIN_GROUP	*/
 	{ OPTNOTSUP, 0 },			/* MCAST_BLOCK_SOURCE	*/
 	{ OPTNOTSUP, 0 },			/* MCAST_UNBLOCK_SOURCE	*/
-	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_GROUP	*/
+	{ MCAST_LEAVE_GROUP, 0 },		/* MCAST_LEAVE_GROUP	*/
 	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_SOURCE_GROUP */
 	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_SOURCE_GROUP */
 	{ OPTNOTSUP, 0 },			/* MCAST_MSFILTER	*/
@@ -2526,10 +2551,10 @@ static const lx_sockopt_map_t ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_GROUP	*/
+	{ MCAST_JOIN_GROUP, 0 },		/* MCAST_JOIN_GROUP	*/
 	{ OPTNOTSUP, 0 },			/* MCAST_BLOCK_SOURCE	*/
 	{ OPTNOTSUP, 0 },			/* MCAST_UNBLOCK_SOURCE	*/
-	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_GROUP	*/
+	{ MCAST_LEAVE_GROUP, 0 },		/* MCAST_LEAVE_GROUP	*/
 	{ OPTNOTSUP, 0 },			/* MCAST_JOIN_SOURCE_GROUP */
 	{ OPTNOTSUP, 0 },			/* MCAST_LEAVE_SOURCE_GROUP */
 	{ OPTNOTSUP, 0 },			/* MCAST_MSFILTER	*/
@@ -2754,6 +2779,63 @@ lx_sockopt_lookup(lx_proto_opts_t tbl, int *optname, socklen_t *optlen)
 }
 
 static int
+lx_mcast_common(sonode_t *so, int level, int optname, void *optval,
+    socklen_t optlen)
+{
+	int error;
+	struct group_req gr;
+	lx_sockaddr_storage_t *lxss;
+
+	ASSERT(optname == LX_MCAST_JOIN_GROUP ||
+	    optname == LX_MCAST_LEAVE_GROUP);
+
+	/*
+	 * For MCAST_JOIN_GROUP and MCAST_LEAVE_GROUP, Linux uses a
+	 * gr_group that has a different size from the native gr_group.
+	 * We need to translate to the native gr_group taking special
+	 * care to do the right thing when dealing with a 32-bit program
+	 * making a call into a 64-bit kernel.
+	 */
+
+	bzero(&gr, sizeof (gr));
+
+#if defined(_SYSCALL32_IMPL)
+	if (get_udatamodel() != DATAMODEL_NATIVE) {
+		if (optlen != sizeof (lx_group_req32_t)) {
+			return (EINVAL);
+		}
+
+		lx_group_req32_t *lxgr = optval;
+
+		/* use the 32-bit type */
+		gr.gr_interface = lxgr->lxgr_interface;
+		lxss = &lxgr->lxgr_group;
+	} else
+#endif /* defined(_SYSCALL32_IMPL) */
+	{
+		if (optlen != sizeof (lx_group_req_t)) {
+			return (EINVAL);
+		}
+
+		lx_group_req_t *lxgr = optval;
+
+		gr.gr_interface = lxgr->lxgr_interface;
+		lxss = &lxgr->lxgr_group;
+	}
+
+	bcopy(lxss, &gr.gr_group, sizeof (*lxss));
+	gr.gr_group.ss_family = LTOS_FAMILY(lxss->lxss_family);
+
+	optlen = sizeof (gr);
+	optname = (optname == LX_MCAST_JOIN_GROUP) ?
+	    MCAST_JOIN_GROUP : MCAST_LEAVE_GROUP;
+
+	error = socket_setsockopt(so, level, optname, &gr,
+	    optlen, CRED());
+	return (error);
+}
+
+static int
 lx_setsockopt_ip(sonode_t *so, int optname, void *optval, socklen_t optlen)
 {
 	int error;
@@ -2827,6 +2909,11 @@ lx_setsockopt_ip(sonode_t *so, int optname, void *optval, socklen_t optlen)
 		optlen = sizeof (uchar_t);
 		break;
 
+	case LX_MCAST_JOIN_GROUP:
+	case LX_MCAST_LEAVE_GROUP:
+		error = lx_mcast_common(so, IPPROTO_IP, optname, optval,
+		    optlen);
+		return (error);
 	default:
 		break;
 	}
@@ -2846,13 +2933,21 @@ lx_setsockopt_ipv6(sonode_t *so, int optname, void *optval, socklen_t optlen)
 	int error;
 	lx_proto_opts_t sockopts_tbl = PROTO_SOCKOPTS(ltos_ipv6_sockopts);
 
-	if (optname == LX_IPV6_MTU) {
+	switch (optname) {
+	case LX_IPV6_MTU:
 		/*
 		 * There isn't a good translation for IPV6_MTU and certain apps
 		 * such as bind9 will bail if it cannot be set.
 		 * We just lie about the success for now.
 		 */
 		return (0);
+	case LX_MCAST_JOIN_GROUP:
+	case LX_MCAST_LEAVE_GROUP:
+		error = lx_mcast_common(so, IPPROTO_IPV6, optname, optval,
+		    optlen);
+		return (error);
+	default:
+		break;
 	}
 
 	if (!lx_sockopt_lookup(sockopts_tbl, &optname, &optlen)) {
