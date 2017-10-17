@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -264,12 +264,7 @@ list_getsize(list_t *list)
 	size_t i;
 	uint_t flags = 0;
 	int ret;
-	size_t physmem;
-
-	if (!(opts.o_outpmode & OPT_VMUSAGE))
-		return;
-
-	physmem = sysconf(_SC_PHYS_PAGES) * pagesize;
+	size_t physmem = sysconf(_SC_PHYS_PAGES) * pagesize;
 
 	/*
 	 * Determine what swap/rss results to calculate.  getvmusage() will
@@ -1501,7 +1496,7 @@ main(int argc, char **argv)
 				add_uid(&ruid_tbl, p);
 			break;
 		case 'V':
-			opts.o_outpmode |= OPT_VMUSAGE;
+			/* obsolete argument - accepted for compatability */
 			break;
 		case 'p':
 			fill_table(&pid_tbl, optarg, 'p');

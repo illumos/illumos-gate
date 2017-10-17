@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_PRSTAT_H
@@ -73,7 +73,7 @@ extern "C" {
 #define	OPT_ZONES	0x2000		/* report about zones */
 #define	OPT_PSETS	0x4000		/* report for specified psets */
 #define	OPT_LGRP	0x8000		/* report home lgroups */
-#define	OPT_VMUSAGE	0x10000		/* print accurate, but expensive RSS */
+					/* 0x10000 available for re-use */
 #define	OPT_UDATE	0x20000		/* print unix timestamp */
 #define	OPT_DDATE	0x40000		/* print timestamp in date(1) format */
 #define	OPT_NORESOLVE	0x80000		/* no nsswitch lookups */

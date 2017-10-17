@@ -1669,13 +1669,42 @@ vmu_free_extra()
 
 extern kcondvar_t *pr_pid_cv;
 
+static void
+vmu_get_zone_rss(zoneid_t zid)
+{
+	vmu_zone_t *zone;
+	zone_t *zp;
+	int ret;
+	uint_t pgcnt;
+
+	if ((zp = zone_find_by_id(zid)) == NULL)
+		return;
+
+	ret = i_mod_hash_find_nosync(vmu_data.vmu_zones_hash,
+	    (mod_hash_key_t)(uintptr_t)zid, (mod_hash_val_t *)&zone);
+	if (ret != 0) {
+		zone = vmu_alloc_zone(zid);
+		ret = i_mod_hash_insert_nosync(vmu_data.vmu_zones_hash,
+		    (mod_hash_key_t)(uintptr_t)zid,
+		    (mod_hash_val_t)zone, (mod_hash_hndl_t)0);
+		ASSERT(ret == 0);
+	}
+
+	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
+	pgcnt = zone_pcap_data[zid].zpcap_pg_cnt;
+	zone->vmz_zone->vme_result.vmu_rss_all = (size_t)ptob(pgcnt);
+	zone->vmz_zone->vme_result.vmu_swap_all = zp->zone_max_swap;
+
+	zone_rele(zp);
+}
+
 /*
  * Determine which entity types are relevant and allocate the hashes to
- * track them.  Then walk the process table and count rss and swap
- * for each process'es address space.  Address space object such as
- * vnodes, amps and anons are tracked per entity, so that they are
- * not double counted in the results.
- *
+ * track them.  First get the zone rss using the data we already have. Then,
+ * if necessary, walk the process table and count rss and swap for each
+ * process'es address space.  Address space object such as vnodes, amps and
+ * anons are tracked per entity, so that they are not double counted in the
+ * results.
  */
 static void
 vmu_calculate()
@@ -1683,6 +1712,7 @@ vmu_calculate()
 	int i = 0;
 	int ret;
 	proc_t *p;
+	uint_t	zone_flags = 0;
 
 	vmu_clear_calc();
 
@@ -1690,8 +1720,33 @@ vmu_calculate()
 		vmu_data.vmu_system = vmu_alloc_entity(0, VMUSAGE_SYSTEM,
 		    ALL_ZONES);
 
+	zone_flags = vmu_data.vmu_calc_flags & VMUSAGE_ZONE_FLAGS;
+	if (zone_flags != 0) {
+		/*
+		 * Use the accurate zone RSS data we already keep track of.
+		 */
+		int i;
+
+		for (i = 0; i <= MAX_ZONEID; i++) {
+			if (zone_pcap_data[i].zpcap_pg_cnt > 0) {
+				vmu_get_zone_rss(i);
+			}
+		}
+	}
+
+	/* If only neeeded zone data, we're done. */
+	if ((vmu_data.vmu_calc_flags & ~VMUSAGE_ZONE_FLAGS) == 0) {
+		return;
+	}
+
+	DTRACE_PROBE(vmu__calculate__all);
+	vmu_data.vmu_calc_flags &= ~VMUSAGE_ZONE_FLAGS;
+
 	/*
 	 * Walk process table and calculate rss of each proc.
+	 *
+	 * Since we already obtained all zone rss above, the following loop
+	 * executes with the VMUSAGE_ZONE_FLAGS cleared.
 	 *
 	 * Pidlock and p_lock cannot be held while doing the rss calculation.
 	 * This is because:
@@ -1747,6 +1802,12 @@ again:
 	mutex_exit(&pidlock);
 
 	vmu_free_extra();
+
+	/*
+	 * Restore any caller-supplied zone flags we blocked during
+	 * the process-table walk.
+	 */
+	vmu_data.vmu_calc_flags |= zone_flags;
 }
 
 /*
