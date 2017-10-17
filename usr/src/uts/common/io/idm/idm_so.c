@@ -2317,7 +2317,7 @@ idm_i_so_tx(idm_pdu_t *pdu)
 		/* Write of immediate data */
 		if (ic->ic_ffp &&
 		    (IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_CMD ||
-		    (IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA)) {
+		    IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA)) {
 			idt = idm_task_find(ic, ihp->itt, ihp->ttt);
 			if (idt) {
 				mutex_enter(&idt->idt_mutex);
