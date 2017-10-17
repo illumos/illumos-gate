@@ -348,7 +348,8 @@ __divmoddi4(quad_t a, quad_t b, quad_t *r)
 	quad_t d;
 
 	d = __divdi3(a, b);
-	*r = a - (b * d);
+	if (r != NULL)
+		*r = a - (b * d);
 
 	return (d);
 }
