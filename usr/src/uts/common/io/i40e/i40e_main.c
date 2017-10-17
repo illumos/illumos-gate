@@ -2007,7 +2007,7 @@ i40e_config_rss_key(i40e_t *i40e, i40e_hw_t *hw)
 		const char *u8seed = (char *)seed;
 		enum i40e_status_code status;
 
-		ASSERT(sizeof (key) >= (sizeof (key.standard_rss_key) +
+		CTASSERT(sizeof (key) >= (sizeof (key.standard_rss_key) +
 		    sizeof (key.extended_hash_key)));
 
 		bcopy(u8seed, key.standard_rss_key,

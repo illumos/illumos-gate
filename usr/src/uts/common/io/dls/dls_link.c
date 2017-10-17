@@ -266,10 +266,12 @@ i_dls_head_free(dls_head_t *dhp)
 }
 
 /*
- * Try to send mp up to the streams of the given sap. Return B_TRUE if
- * this message is sent to any streams. Note that this function will
- * copy the message chain and the original mp will remain valid after
- * this function
+ * Try to send mp up to the streams of the given sap. Return the
+ * number of streams which accepted this message, or 0 if no streams
+ * accepted the message.
+ *
+ * Note that this function copies the message chain and the original
+ * mp remains valid after this function returns.
  */
 static uint_t
 i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
@@ -292,7 +294,7 @@ i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
 	key = MAKE_KEY(sap);
 
 	/*
-	 * Search the hash table for dld_str_t eligible to receive a
+	 * Search the hash table for a dld_str_t eligible to receive a
 	 * packet chain for this DLSAP. The mod hash's internal lock
 	 * serializes find/insert/remove from the mod hash list.
 	 * Incrementing the dh_ref (while holding the mod hash lock)
@@ -300,11 +302,11 @@ i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
 	 */
 	if (mod_hash_find_cb_rval(hash, key, (mod_hash_val_t *)&dhp,
 	    i_dls_head_hold, &rval) != 0 || (rval != 0)) {
-		return (B_FALSE);
+		return (0);
 	}
 
 	/*
-	 * Find dld_str_t that will accept the sub-chain.
+	 * Find all dld_str_t that will accept the sub-chain.
 	 */
 	for (dsp = dhp->dh_list; dsp != NULL; dsp = dsp->ds_next) {
 		if (!acceptfunc(dsp, mhip, &ds_rx, &ds_rx_arg))
@@ -316,7 +318,7 @@ i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
 		naccepted++;
 
 		/*
-		 * There will normally be at least more dld_str_t
+		 * There will normally be at least one more dld_str_t
 		 * (since we've yet to check for non-promiscuous
 		 * dld_str_t) so dup the sub-chain.
 		 */

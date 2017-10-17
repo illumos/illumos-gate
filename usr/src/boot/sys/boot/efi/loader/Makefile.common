@@ -14,8 +14,8 @@ SRCS +=	load_elf64.c load_elf64_obj.c reloc_elf64.c
 OBJS += load_elf32.o load_elf32_obj.o reloc_elf32.o \
 	load_elf64.o load_elf64_obj.o reloc_elf64.o
 
-SRCS +=	disk.c part.c
-OBJS += disk.o part.o
+SRCS +=	disk.c part.c dev_net.c
+OBJS += disk.o part.o dev_net.o
 CFLAGS += -DLOADER_DISK_SUPPORT
 SRCS +=	crc32.c
 OBJS +=	crc32.o

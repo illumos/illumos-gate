@@ -384,12 +384,12 @@ multiboot_exec(struct preloaded_file *fp)
 	mb_info->mmap_addr = VTOP(mmap);
 	mb_info->flags |= MULTIBOOT_INFO_MEM_MAP;
 
-	if (strstr(getenv("loaddev"), "pxe") != NULL &&
+	if (strstr(getenv("loaddev"), "net") != NULL &&
 	    bootp_response != NULL) {
-		mb_info->drives_length = sizeof (*bootp_response);
-		mb_info->drives_addr = mb_malloc(mb_info->drives_length);
+		mb_info->drives_length = bootp_response_size;
+		mb_info->drives_addr = mb_malloc(bootp_response_size);
 		i386_copyin(bootp_response, mb_info->drives_addr,
-		    mb_info->drives_length);
+		    bootp_response_size);
 		mb_info->flags &= ~MULTIBOOT_INFO_DRIVE_INFO;
 	}
 	/*
