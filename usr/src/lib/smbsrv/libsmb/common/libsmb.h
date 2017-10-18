@@ -457,6 +457,7 @@ typedef struct smb_passwd {
 #define	SMB_PWC_DISABLE	0x01
 #define	SMB_PWC_ENABLE	0x02
 #define	SMB_PWC_NOLM	0x04
+#define	SMB_PWC_DELETE	0x08
 
 #define	SMB_PWE_SUCCESS		0
 #define	SMB_PWE_USER_UNKNOWN	1

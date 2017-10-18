@@ -524,6 +524,12 @@ smb_pwd_update(const char *name, const char *password, int control)
 	 */
 	while (smb_pwd_fgetent(src, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
 		if (strcmp(smbpw.pw_name, name) == 0) {
+			if ((control & SMB_PWC_DELETE) != 0) {
+				/* exclude the entry from the new passwd file */
+				newent = B_FALSE;
+				err = SMB_PWE_SUCCESS;
+				continue;
+			}
 			err = smb_pwd_chgpwent(&smbpw, password, control);
 			if (err == SMB_PWE_USER_DISABLE)
 				user_disable = B_TRUE;

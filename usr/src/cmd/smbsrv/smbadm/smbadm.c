@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -65,7 +65,8 @@ typedef enum {
 	HELP_SET,
 	HELP_SHOW,
 	HELP_USER_DISABLE,
-	HELP_USER_ENABLE
+	HELP_USER_ENABLE,
+	HELP_USER_DELETE
 } smbadm_help_t;
 
 #define	SMBADM_CMDF_NONE	0x00
@@ -118,6 +119,7 @@ static int smbadm_group_addmember(int, char **);
 static int smbadm_group_delmember(int, char **);
 static int smbadm_group_add_del_member(char *, char *, smbadm_grp_action_t);
 
+static int smbadm_user_delete(int, char **);
 static int smbadm_user_disable(int, char **);
 static int smbadm_user_enable(int, char **);
 
@@ -129,6 +131,8 @@ static smbadm_cmdinfo_t smbadm_cmdtable[] =
 		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
 	{ "delete",		smbadm_group_delete,	HELP_DELETE,
 		SMBADM_CMDF_GROUP,	SMBADM_ACTION_AUTH },
+	{ "delete-user",	smbadm_user_delete,	HELP_USER_DELETE,
+		SMBADM_CMDF_USER,	SMBADM_ACTION_AUTH },
 	{ "disable-user",	smbadm_user_disable,	HELP_USER_DISABLE,
 		SMBADM_CMDF_USER,	SMBADM_ACTION_AUTH },
 	{ "enable-user",	smbadm_user_enable,	HELP_USER_ENABLE,
@@ -181,8 +185,8 @@ static int smbadm_setprop_desc(char *gname, smbadm_prop_t *prop);
 static int smbadm_getprop_desc(char *gname, smbadm_prop_t *prop);
 
 static smbadm_prop_handle_t smbadm_ptable[] = {
-	{"backup",	"on | off", 	smbadm_setprop_backup,
-	smbadm_getprop_backup,	smbadm_chkprop_priv 	},
+	{"backup",	"on | off",	smbadm_setprop_backup,
+	smbadm_getprop_backup,	smbadm_chkprop_priv	},
 	{"restore",	"on | off",	smbadm_setprop_restore,
 	smbadm_getprop_restore,	smbadm_chkprop_priv	},
 	{"take-ownership", "on | off",	smbadm_setprop_tkowner,
@@ -219,6 +223,7 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 		(void) fprintf(fp, gettext("\t%s group\n"), cmd->name);
 		return;
 
+	case HELP_USER_DELETE:
 	case HELP_USER_DISABLE:
 	case HELP_USER_ENABLE:
 		(void) fprintf(fp, gettext("\t%s user\n"), cmd->name);
@@ -1394,7 +1399,7 @@ smbadm_group_delmember(int argc, char **argv)
 
 static int
 smbadm_group_add_del_member(char *gname, char *mname,
-	smbadm_grp_action_t act)
+    smbadm_grp_action_t act)
 {
 	lsa_account_t	acct;
 	smb_gsid_t msid;
@@ -1456,6 +1461,27 @@ smbadm_group_add_del_member(char *gname, char *mname,
 		return (1);
 	}
 	return (0);
+}
+
+static int
+smbadm_user_delete(int argc, char **argv)
+{
+	int error;
+	char *user = NULL;
+
+	user = argv[optind];
+	if (optind >= argc || user == NULL || *user == '\0') {
+		(void) fprintf(stderr, gettext("missing user name\n"));
+		smbadm_usage(B_FALSE);
+	}
+
+	error = smb_pwd_setcntl(user, SMB_PWC_DELETE);
+	if (error == SMB_PWE_SUCCESS)
+		(void) printf(gettext("%s has been deleted.\n"), user);
+	else
+		(void) fprintf(stderr, "%s\n", smbadm_pwd_strerror(error));
+
+	return (error);
 }
 
 static int
