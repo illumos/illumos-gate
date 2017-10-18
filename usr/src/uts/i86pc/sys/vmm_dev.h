@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_VMM_DEV_H_
@@ -43,7 +44,7 @@
 
 #ifdef _KERNEL
 void	vmmdev_init(void);
-int	vmmdev_cleanup(void);
+void	vmmdev_cleanup(void);
 #endif
 
 struct vm_memory_segment {

@@ -23,6 +23,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/fs/dv_node.h>
+#include <sys/pc_hvm.h>
 
 #include <sys/vmm.h>
 #include <sys/vmm_instruction_emul.h>
@@ -42,6 +43,10 @@ static void *vmm_statep;
 static SLIST_HEAD(, vmm_softc) head;
 
 static kmutex_t vmmdev_mtx;
+static uint_t vmmdev_inst_count = 0;
+static boolean_t vmmdev_load_failure;
+
+static const char *vmmdev_hvm_name = "bhyve";
 
 /*
  * vmm trace ring
@@ -209,20 +214,12 @@ vmmdev_init(void)
 	vmm_trace_rbuf_alloc();
 }
 
-int
+void
 vmmdev_cleanup(void)
 {
-	int	error;
+	VERIFY(SLIST_EMPTY(&head));
 
-	if (SLIST_EMPTY(&head))
-		error = 0;
-	else
-		error = EBUSY;
-
-	if (error == 0)
-		vmm_trace_dmsg_free();
-
-	return (error);
+	vmm_trace_dmsg_free();
 }
 
 int
@@ -605,8 +602,8 @@ done:
 	return (error);
 }
 
-static
-minor_t vmm_find_free_minor(void)
+static minor_t
+vmm_find_free_minor(void)
 {
 	minor_t		minor;
 
@@ -618,53 +615,96 @@ minor_t vmm_find_free_minor(void)
 	return (minor);
 }
 
-int
+
+static boolean_t
+vmmdev_mod_incr()
+{
+	ASSERT(MUTEX_HELD(&vmmdev_mtx));
+
+	if (vmmdev_inst_count == 0) {
+		/*
+		 * If the HVM portions of the module failed initialize on a
+		 * previous attempt, do not bother with a retry.  This tracker
+		 * is cleared on module attach, allowing subsequent attempts if
+		 * desired by the user.
+		 */
+		if (vmmdev_load_failure) {
+			return (B_FALSE);
+		}
+
+		if (!hvm_excl_hold(vmmdev_hvm_name)) {
+			return (B_FALSE);
+		}
+		if (vmm_mod_load() != 0) {
+			hvm_excl_rele(vmmdev_hvm_name);
+			vmmdev_load_failure = B_TRUE;
+			return (B_FALSE);
+		}
+	}
+
+	vmmdev_inst_count++;
+	return (B_TRUE);
+}
+
+static void
+vmmdev_mod_decr(void)
+{
+	ASSERT(MUTEX_HELD(&vmmdev_mtx));
+	ASSERT(vmmdev_inst_count > 0);
+
+	vmmdev_inst_count--;
+	if (vmmdev_inst_count == 0) {
+		VERIFY0(vmm_mod_unload());
+		hvm_excl_rele(vmmdev_hvm_name);
+	}
+}
+
+static int
 vmmdev_do_vm_create(dev_info_t *dip, char *name)
 {
-	struct vmm_softc	*sc;
+	struct vmm_softc	*sc = NULL;
 	minor_t			minor;
-	int			error;
-
-	mutex_enter(&vmmdev_mtx);
+	int			error = ENOMEM;
 
 	if (strlen(name) >= VM_MAX_NAMELEN) {
-		mutex_exit(&vmmdev_mtx);
 		return (EINVAL);
 	}
 
+	mutex_enter(&vmmdev_mtx);
+	if (!vmmdev_mod_incr()) {
+		mutex_exit(&vmmdev_mtx);
+		return (ENXIO);
+	}
+
 	minor = vmm_find_free_minor();
-	if (ddi_soft_state_zalloc(vmm_statep, minor) == DDI_FAILURE) {
-		mutex_exit(&vmmdev_mtx);
-		return (DDI_FAILURE);
-	}
-
-	if ((sc = ddi_get_soft_state(vmm_statep, minor)) == NULL) {
+	if (ddi_soft_state_zalloc(vmm_statep, minor) != DDI_SUCCESS) {
+		goto fail;
+	} else if ((sc = ddi_get_soft_state(vmm_statep, minor)) == NULL) {
 		ddi_soft_state_free(vmm_statep, minor);
-		mutex_exit(&vmmdev_mtx);
-		return (DDI_FAILURE);
-	}
-	strcpy(sc->name, name);
-	sc->minor = minor;
-
-	if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-	    DDI_PSEUDO, 0) == DDI_FAILURE) {
-		ddi_soft_state_free(vmm_statep, minor);
-		mutex_exit(&vmmdev_mtx);
-		return (DDI_FAILURE);
+		goto fail;
+	} else if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
+	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+		goto fail;
 	}
 
 	error = vm_create(name, &sc->vm);
-	if (error != 0) {
-		ddi_soft_state_free(vmm_statep, minor);
-		ddi_remove_minor_node(dip, name);
+	if (error == 0) {
+		/* Complete VM intialization and report success. */
+		strcpy(sc->name, name);
+		sc->minor = minor;
+		SLIST_INSERT_HEAD(&head, sc, link);
 		mutex_exit(&vmmdev_mtx);
-		return (error);
+		return (0);
 	}
-	SLIST_INSERT_HEAD(&head, sc, link);
 
+	ddi_remove_minor_node(dip, name);
+fail:
+	vmmdev_mod_decr();
+	if (sc != NULL) {
+		ddi_soft_state_free(vmm_statep, minor);
+	}
 	mutex_exit(&vmmdev_mtx);
-
-	return (0);
+	return (error);
 }
 
 static struct vmm_softc *
@@ -699,11 +739,11 @@ vm_lookup_by_name(char *name)
 	return (sc->vm);
 }
 
-int
+static int
 vmmdev_do_vm_destroy(dev_info_t *dip, char *name)
 {
 	struct vmm_softc	*sc;
-	dev_info_t      *pdip = ddi_get_parent(dip);
+	dev_info_t		*pdip = ddi_get_parent(dip);
 
 	mutex_enter(&vmmdev_mtx);
 
@@ -711,7 +751,6 @@ vmmdev_do_vm_destroy(dev_info_t *dip, char *name)
 		mutex_exit(&vmmdev_mtx);
 		return (ENOENT);
 	}
-
 	if (sc->open) {
 		mutex_exit(&vmmdev_mtx);
 		return (EBUSY);
@@ -722,6 +761,7 @@ vmmdev_do_vm_destroy(dev_info_t *dip, char *name)
 	ddi_remove_minor_node(dip, name);
 	ddi_soft_state_free(vmm_statep, sc->minor);
 	(void) devfs_clean(pdip, NULL, DV_CLEAN_FORCE);
+	vmmdev_mod_decr();
 
 	mutex_exit(&vmmdev_mtx);
 
@@ -851,9 +891,8 @@ vmm_mmap(dev_t dev, off_t off, int prot)
 }
 
 static int
-vmm_segmap(dev_t dev, off_t off, struct as *as,
-		  caddr_t *addrp, off_t len, unsigned int prot,
-		  unsigned int maxprot, unsigned int flags, cred_t *credp)
+vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
+   unsigned int prot, unsigned int maxprot, unsigned int flags, cred_t *credp)
 {
 	struct segdev_crargs	dev_a;
 	int			error;
@@ -884,17 +923,6 @@ vmm_segmap(dev_t dev, off_t off, struct as *as,
 }
 
 static int
-vmm_probe(dev_info_t *dip)
-{
-	if (driver_installed(ddi_name_to_major("kvm"))) {
-		cmn_err(CE_WARN, "kvm is installed\n");
-		return (DDI_PROBE_FAILURE);
-	}
-
-	return (DDI_PROBE_SUCCESS);
-}
-
-static int
 vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	switch (cmd) {
@@ -904,10 +932,8 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if (vmm_mod_load()) {
-		return (DDI_FAILURE);
-	}
-
+	vmm_sol_glue_init();
+	vmmdev_load_failure = B_FALSE;
 	vmm_dip = dip;
 
 	/*
@@ -933,15 +959,18 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if (vmm_mod_unload()) {;
+	/* Ensure that all resources have been cleaned up */
+	mutex_enter(&vmmdev_mtx);
+	if (!SLIST_EMPTY(&head) || vmmdev_inst_count != 0) {
+		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * Remove the control node.
-	 */
+	/* Remove the control node. */
 	ddi_remove_minor_node(dip, VMM_CTL_MINOR_NODE);
 	vmm_dip = NULL;
+	vmm_sol_glue_cleanup();
+	mutex_exit(&vmmdev_mtx);
 
 	return (DDI_SUCCESS);
 }
@@ -969,7 +998,7 @@ static struct dev_ops vmm_ops = {
 	0,
 	ddi_no_info,
 	nulldev,	/* identify */
-	vmm_probe,
+	nulldev,	/* probe */
 	vmm_attach,
 	vmm_detach,
 	nodev,		/* reset */

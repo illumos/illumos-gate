@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _VMM_IMPL_H_
@@ -28,7 +29,7 @@
 #define	VMM_DRIVER_NAME		"vmm"
 
 #define	VMM_CTL_MINOR_NODE	"ctl"
-#define	VMM_CTL_MINOR_NAME	VMM_DRIVER_NAME VMM_CTL_NODE
+#define	VMM_CTL_MINOR_NAME	VMM_DRIVER_NAME VMM_CTL_MINOR_NODE
 #define	VMM_CTL_MINOR		0
 
 #define	VMM_IOC_BASE		(('V' << 16) | ('M' << 8))
