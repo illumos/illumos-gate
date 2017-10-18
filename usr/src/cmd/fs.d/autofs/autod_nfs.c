@@ -3982,7 +3982,6 @@ trace_host_cache()
 static void
 read_default_nfs(void)
 {
-	static time_t lastread = 0;
 	struct stat buf;
 	char defval[4];
 	int errno, bufsz;
@@ -4009,8 +4008,6 @@ read_default_nfs(void)
 			vers_max_default = tmp;
 		}
 	}
-
-	lastread = buf.st_mtime;
 
 	/*
 	 * Quick sanity check on the values picked up from the
