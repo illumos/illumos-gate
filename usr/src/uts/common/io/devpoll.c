@@ -371,19 +371,6 @@ repoll:
 				 * is no good way to communicate this fact to
 				 * the consumer.
 				 *
-				 * If the file struct is also reused, we may
-				 * not be able to detect the fd reuse at all.
-				 * As long as this does not cause system
-				 * failure and/or memory leaks, we will play
-				 * along.  The man page states that if the user
-				 * does not clean up closed fds, polling
-				 * results will be indeterministic.
-				 *
-				 * XXX: perhaps log the detection of fd reuse?
-				 */
-				pdp->pd_fp = fp;
-
-				/*
 				 * When this situation has been detected, it's
 				 * likely that any existing pollhead is
 				 * ill-suited to perform proper wake-ups.
@@ -395,6 +382,29 @@ repoll:
 				if (pdp->pd_php != NULL) {
 					pollhead_delete(pdp->pd_php, pdp);
 					pdp->pd_php = NULL;
+				}
+
+				/*
+				 * Since epoll is expected to act on the
+				 * underlying 'struct file' (in Linux terms,
+				 * our vnode_t would be a closer analog) rather
+				 * than the fd itself, an implicit remove
+				 * is necessary under these circumstances to
+				 * suppress any results (or errors) from the
+				 * new resource occupying the fd.
+				 */
+				if (is_epoll) {
+					pdp->pd_fp = NULL;
+					pdp->pd_events = 0;
+					BT_CLEAR(pcp->pc_bitmap, fd);
+					releasef(fd);
+					continue;
+				} else {
+					/*
+					 * Regular /dev/poll is unbothered
+					 * about the fd reassignment.
+					 */
+					pdp->pd_fp = fp;
 				}
 			}
 			/*
