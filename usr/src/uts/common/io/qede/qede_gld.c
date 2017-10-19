@@ -575,6 +575,97 @@ qede_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 	}
 }
 
+#ifdef ILLUMOS
+static int
+qede_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
+{
+	qede_t *qede = arg;
+	struct ecore_dev *edev = &qede->edev;
+	struct ecore_hwfn *hwfn;
+	struct ecore_ptt *ptt;
+	uint32_t transceiver_state;
+
+	if (id >= edev->num_hwfns || arg == NULL || infop == NULL)
+		return (EINVAL);
+
+	hwfn = &edev->hwfns[id];
+	ptt = ecore_ptt_acquire(hwfn);
+	if (ptt == NULL) {
+		return (EIO);
+	}
+
+	/*
+	 * Use the underlying raw API to get this information. While the
+	 * ecore_phy routines have some ways of getting to this information, it
+	 * ends up writing the raw data as ASCII characters which doesn't help
+	 * us one bit.
+	 */
+	transceiver_state = ecore_rd(hwfn, ptt, hwfn->mcp_info->port_addr +
+	    OFFSETOF(struct public_port, transceiver_data));
+	transceiver_state = GET_FIELD(transceiver_state, ETH_TRANSCEIVER_STATE);
+	ecore_ptt_release(hwfn, ptt);
+
+	if ((transceiver_state & ETH_TRANSCEIVER_STATE_PRESENT) != 0) {
+		mac_transceiver_info_set_present(infop, B_TRUE);
+		/*
+		 * Based on our testing, the ETH_TRANSCEIVER_STATE_VALID flag is
+		 * not set, so we cannot rely on it. Instead, we have found that
+		 * the ETH_TRANSCEIVER_STATE_UPDATING will be set when we cannot
+		 * use the transceiver.
+		 */
+		if ((transceiver_state & ETH_TRANSCEIVER_STATE_UPDATING) != 0) {
+			mac_transceiver_info_set_usable(infop, B_FALSE);
+		} else {
+			mac_transceiver_info_set_usable(infop, B_TRUE);
+		}
+	} else {
+		mac_transceiver_info_set_present(infop, B_FALSE);
+		mac_transceiver_info_set_usable(infop, B_FALSE);
+	}
+
+	return (0);
+}
+
+static int
+qede_transceiver_read(void *arg, uint_t id, uint_t page, void *buf,
+    size_t nbytes, off_t offset, size_t *nread)
+{
+	qede_t *qede = arg;
+	struct ecore_dev *edev = &qede->edev;
+	struct ecore_hwfn *hwfn;
+	uint32_t port, lane;
+	struct ecore_ptt *ptt;
+	enum _ecore_status_t ret;
+
+	if (id >= edev->num_hwfns || buf == NULL || nbytes == 0 || nread == NULL ||
+	    (page != 0xa0 && page != 0xa2) || offset < 0)
+		return (EINVAL);
+
+	/*
+	 * Both supported pages have a length of 256 bytes, ensure nothing asks
+	 * us to go beyond that.
+	 */
+	if (nbytes > 256 || offset >= 256 || (offset + nbytes > 256)) {
+		return (EINVAL);
+	}
+
+	hwfn = &edev->hwfns[id];
+	ptt = ecore_ptt_acquire(hwfn);
+	if (ptt == NULL) {
+		return (EIO);
+	}
+
+	ret = ecore_mcp_phy_sfp_read(hwfn, ptt, hwfn->port_id, page, offset,
+	    nbytes, buf);
+	ecore_ptt_release(hwfn, ptt);
+	if (ret != ECORE_SUCCESS) {
+		return (EIO);
+	}
+	*nread = nbytes;
+	return (0);
+}
+#endif /* ILLUMOS */
+
 static int
 qede_mac_stats(void *     arg,
                         uint_t     stat,
@@ -1989,6 +2080,19 @@ qede_mac_get_capability(void *arg,
 #endif
 		break; /* CASE MAC_CAPAB_RINGS */
 	}
+#ifdef ILLUMOS
+	case MAC_CAPAB_TRANSCEIVER: {
+		mac_capab_transceiver_t *mct = cap_data;
+
+		mct->mct_flags = 0;
+		mct->mct_ntransceivers = qede->edev.num_hwfns;
+		mct->mct_info = qede_transceiver_info;
+		mct->mct_read = qede_transceiver_read;
+
+		ret = B_TRUE;
+		break;
+	}
+#endif
 	default:
 		break;
 	}
