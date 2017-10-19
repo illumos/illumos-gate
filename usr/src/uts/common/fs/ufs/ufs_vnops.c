@@ -5741,10 +5741,10 @@ ufs_poll(vnode_t *vp, short ev, int any, short *revp, struct pollhead **phpp,
 	struct ufsvfs	*ufsvfsp;
 
 	/*
-	 * Regular files reject epollers (and edge-triggered pollers).
+	 * Regular files reject edge-triggered pollers.
 	 * See the comment in fs_poll() for a more detailed explanation.
 	 */
-	if (fs_reject_epoll() || (ev & POLLET) != 0) {
+	if (ev & POLLET) {
 		return (EPERM);
 	}
 

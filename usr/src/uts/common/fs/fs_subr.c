@@ -430,12 +430,13 @@ fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
     struct pollhead **phpp, caller_context_t *ct)
 {
 	/*
-	 * Regular filesystems should reject epollers.  On the off chance that
-	 * a non-epoll consumer expresses the desire for edge-triggered
-	 * polling, we reject them too.  Yes, the expected error for this
-	 * really is EPERM.
+	 * Reject all attempts for edge-triggered polling.  These should only
+	 * occur when regular files are added to a /dev/poll handle which is in
+	 * epoll mode.  The Linux epoll does not allow epoll-ing on regular
+	 * files at all, so rejecting EPOLLET requests is congruent with those
+	 * expectations.
 	 */
-	if (fs_reject_epoll() || (events & POLLET) != 0) {
+	if (events & POLLET) {
 		return (EPERM);
 	}
 
@@ -450,7 +451,15 @@ fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 		*reventsp |= POLLOUT;
 	if (events & POLLWRBAND)
 		*reventsp |= POLLWRBAND;
-
+	/*
+	 * Emitting a pollhead without the intention of issuing pollwakeup()
+	 * calls against it is a recipe for trouble.  It's only acceptable in
+	 * this case since the above logic matches practically all useful
+	 * events.
+	 */
+	if (*reventsp == 0 && !anyyet) {
+		*phpp = &fs_pollhd;
+	}
 	return (0);
 }
 
