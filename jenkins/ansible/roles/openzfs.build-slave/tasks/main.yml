@@ -14,6 +14,14 @@
 #
 
 ---
+#
+# The VM we use to do builds will generally be outdated, so before we
+# attempt to install any new packages, we want to ensure the IPS
+# repository index is updated
+#
+- name: refresh IPS repository index
+  command: pkg refresh
+
 - name: install build tools meta package (OmniOS)
   pkg5:
     name:
