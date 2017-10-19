@@ -250,11 +250,7 @@ smb_com_delete_directory(smb_request_t *sr)
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
 	    tnode, fqi->fq_dnode, fqi->fq_last_comp, &fqi->fq_fnode);
 	if (rc != 0) {
-		if (rc == ENOENT)
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		else
-			smbsr_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		smb_node_release(fqi->fq_dnode);
 		return (SDRC_ERROR);
 	}
@@ -414,11 +410,7 @@ smb_com_check_directory(smb_request_t *sr)
 	    tnode, fqi->fq_dnode, fqi->fq_last_comp, &fqi->fq_fnode);
 	smb_node_release(fqi->fq_dnode);
 	if (rc != 0) {
-		if (rc == ENOENT)
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_PATH_NOT_FOUND);
-		else
-			smbsr_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 

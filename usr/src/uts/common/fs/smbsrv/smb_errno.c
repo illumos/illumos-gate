@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -47,9 +47,9 @@ struct errno2status {
 static const struct errno2status
 smb_errno2status_map[] = {
 	{ EPERM,	NT_STATUS_ACCESS_DENIED },
-	{ ENOENT,	NT_STATUS_NO_SUCH_FILE },
-	/* NB: ESRCH is used to represent stream lookup failures. */
-	{ ESRCH,	NT_STATUS_OBJECT_NAME_NOT_FOUND },
+	{ ENOENT,	NT_STATUS_OBJECT_NAME_NOT_FOUND },
+	/* NB: ESRCH is used in rename and stream ops. */
+	{ ESRCH,	NT_STATUS_NO_SUCH_FILE },
 	{ EINTR,	NT_STATUS_CANCELLED },
 	{ EIO,		NT_STATUS_IO_DEVICE_ERROR },
 	{ ENXIO,	NT_STATUS_BAD_DEVICE_TYPE },
@@ -60,9 +60,8 @@ smb_errno2status_map[] = {
 	{ EACCES,	NT_STATUS_ACCESS_DENIED },
 	/* EFAULT, ENOTBLK, EBUSY */
 	{ EEXIST,	NT_STATUS_OBJECT_NAME_COLLISION },
-	{ EXDEV, 	NT_STATUS_NOT_SAME_DEVICE },
+	{ EXDEV,	NT_STATUS_NOT_SAME_DEVICE },
 	{ ENODEV,	NT_STATUS_NO_SUCH_DEVICE },
-	/* ENOTDIR should be: NT_STATUS_NOT_A_DIRECTORY, but not yet */
 	{ ENOTDIR,	NT_STATUS_OBJECT_PATH_NOT_FOUND },
 	{ EISDIR,	NT_STATUS_FILE_IS_A_DIRECTORY },
 	{ EINVAL,	NT_STATUS_INVALID_PARAMETER },
@@ -81,7 +80,7 @@ smb_errno2status_map[] = {
 	/* ENOMSG, EIDRM, ... */
 	{ ENOTSUP,	NT_STATUS_NOT_SUPPORTED },
 	{ EDQUOT,	NT_STATUS_DISK_FULL },
-	{ EREMOTE, 	NT_STATUS_PATH_NOT_COVERED},
+	{ EREMOTE,	NT_STATUS_PATH_NOT_COVERED},
 	{ ENAMETOOLONG,	NT_STATUS_OBJECT_NAME_INVALID },
 	{ EILSEQ,	NT_STATUS_OBJECT_NAME_INVALID },
 	{ ENOTEMPTY,	NT_STATUS_DIRECTORY_NOT_EMPTY },

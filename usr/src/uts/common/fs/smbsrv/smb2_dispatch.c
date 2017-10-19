@@ -723,11 +723,8 @@ cmd_done:
 	/*
 	 * Pad the reply to align(8) if necessary.
 	 */
-	if (sr->reply.chain_offset & 7) {
-		int padsz = 8 - (sr->reply.chain_offset & 7);
-		(void) smb_mbc_encodef(&sr->reply, "#.", padsz);
-	}
-	ASSERT((sr->reply.chain_offset & 7) == 0);
+	if (sr->smb2_next_command != 0)
+		(void) smb_mbc_put_align(&sr->reply, 8);
 
 	/*
 	 * Record some statistics: latency, rx bytes, tx bytes.

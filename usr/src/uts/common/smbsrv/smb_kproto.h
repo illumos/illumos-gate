@@ -370,6 +370,7 @@ int	smb_mbc_peek(mbuf_chain_t *, int, const char *, ...);
 int	smb_mbc_poke(mbuf_chain_t *, int, const char *, ...);
 int	smb_mbc_put_mem(mbuf_chain_t *, void *, int);
 int	smb_mbc_copy(mbuf_chain_t *, const mbuf_chain_t *, int, int);
+int	smb_mbc_put_align(mbuf_chain_t *, int);
 
 void	smbsr_encode_header(smb_request_t *sr, int wct,
 		    int bcc, const char *fmt, ...);

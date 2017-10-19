@@ -611,40 +611,47 @@ smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
  * and check for anything other than "." or ".." in the readdir buf.
  */
 static uint32_t
-smb_rmdir_possible(smb_node_t *n, uint32_t flags)
+smb_rmdir_possible(smb_node_t *n)
 {
 	ASSERT(n->vp->v_type == VDIR);
-	char buf[512]; /* Only large enough to see if the dir is empty. */
-	int eof, bsize = sizeof (buf), reclen = 0;
-	char *name;
-	boolean_t edp = vfs_has_feature(n->vp->v_vfsp, VFSFT_DIRENTFLAGS);
+	char *buf;
+	char *bufptr;
+	struct dirent64	*dp;
+	uint32_t status = NT_STATUS_SUCCESS;
+	int bsize = SMB_ODIR_BUFSIZE;
+	int eof = 0;
 
-	union {
-		char		*u_bufptr;
-		struct edirent	*u_edp;
-		struct dirent64	*u_dp;
-	} u;
-#define	bufptr	u.u_bufptr
-#define	extdp	u.u_edp
-#define	dp	u.u_dp
+	buf = kmem_alloc(SMB_ODIR_BUFSIZE, KM_SLEEP);
 
-	if (smb_vop_readdir(n->vp, 0, buf, &bsize, &eof, flags, zone_kcred()))
-		return (NT_STATUS_INTERNAL_ERROR);
-	if (bsize == 0)
-		return (0); /* empty dir */
-	bufptr = buf;
-	while ((bufptr += reclen) < buf + bsize) {
-		if (edp) {
-			reclen = extdp->ed_reclen;
-			name = extdp->ed_name;
-		} else {
-			reclen = dp->d_reclen;
-			name = dp->d_name;
-		}
-		if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0)
-			return (NT_STATUS_DIRECTORY_NOT_EMPTY);
+	/* Flags zero: no edirent, no ABE wanted here */
+	if (smb_vop_readdir(n->vp, 0, buf, &bsize, &eof, 0, zone_kcred())) {
+		status = NT_STATUS_INTERNAL_ERROR;
+		goto out;
 	}
-	return (0);
+
+	bufptr = buf;
+	while (bsize > 0) {
+		/* LINTED pointer alignment */
+		dp = (struct dirent64 *)bufptr;
+
+		bufptr += dp->d_reclen;
+		bsize  -= dp->d_reclen;
+		if (bsize < 0) {
+			/* partial record */
+			status = NT_STATUS_DIRECTORY_NOT_EMPTY;
+			break;
+		}
+
+		if (strcmp(dp->d_name, ".") != 0 &&
+		    strcmp(dp->d_name, "..") != 0) {
+			status = NT_STATUS_DIRECTORY_NOT_EMPTY;
+			break;
+		}
+	}
+
+out:
+	kmem_free(buf, SMB_ODIR_BUFSIZE);
+	return (status);
 }
 
 /*
@@ -672,7 +679,7 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 	 * "File System Behavior Overview" doc section 4.3.2
 	 */
 	if (smb_node_is_dir(node)) {
-		status = smb_rmdir_possible(node, flags);
+		status = smb_rmdir_possible(node);
 		if (status != 0) {
 			return (status);
 		}

@@ -985,6 +985,7 @@ smb2_encode_create_ctx_elem(mbuf_chain_t *out_mbc,
 	 *	a: this header (16 bytes)
 	 *	b: the name (4 bytes, 4 pad)
 	 *	c: the payload (variable)
+	 *	d: padding (to align 8)
 	 *
 	 * Note that "Next elem." is filled in later.
 	 */
@@ -1007,6 +1008,8 @@ smb2_encode_create_ctx_elem(mbuf_chain_t *out_mbc,
 	    cc_name.ch,		/* 4c4. */
 	    cce->cce_len,	/* # */
 	    &cce->cce_mbc);	/* C */
+
+	(void) smb_mbc_put_align(out_mbc, 8);
 
 	return (rc);
 }

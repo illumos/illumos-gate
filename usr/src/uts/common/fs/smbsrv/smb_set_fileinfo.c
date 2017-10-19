@@ -293,12 +293,7 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 	kmem_free(name, MAXNAMELEN);
 
 	if (rc != 0) {
-		if (rc == ENOENT) {
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		} else {
-			smbsr_errno(sr, rc);
-		}
+		smbsr_errno(sr, rc);
 		return (-1);
 	}
 

@@ -820,6 +820,7 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 	switch (status) {
 	case 0:
 		break;
+	case NT_STATUS_OBJECT_NAME_NOT_FOUND:
 	case NT_STATUS_NO_SUCH_FILE:
 	case NT_STATUS_NOT_SUPPORTED:
 		/* No streams to remove. */
@@ -2541,6 +2542,15 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	if (access & VWRITE)
 		*eaccess |= FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES |
 		    FILE_WRITE_EA | FILE_APPEND_DATA | FILE_DELETE_CHILD;
+
+	if (access & (VREAD | VWRITE))
+		*eaccess |= SYNCHRONIZE;
+
+#ifdef	_FAKE_KERNEL
+	/* Should be: if (we are the owner)... */
+	if (access & VWRITE)
+		*eaccess |= DELETE | WRITE_DAC | WRITE_OWNER;
+#endif
 }
 
 /*

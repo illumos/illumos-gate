@@ -300,6 +300,7 @@ smb_com_search(smb_request_t *sr)
 				    ERRDOS, ERROR_NO_MORE_FILES);
 			return (SDRC_ERROR);
 		}
+		odid = od->d_odid;
 	} else {
 		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
 		    &resume_char, &index, &odid, &client_key) != 0) {
@@ -455,6 +456,7 @@ smb_com_find(smb_request_t *sr)
 			smbsr_error(sr, status, 0, 0);
 			return (SDRC_ERROR);
 		}
+		odid = od->d_odid;
 	} else {
 		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
 		    &resume_char, &index, &odid, &client_key) != 0) {
@@ -691,8 +693,8 @@ smb_com_find_unique(struct smb_request *sr)
 		smb_name83(fileinfo.fi_shortname, name83, SMB_SHORTNAMELEN);
 
 		(void) smb_mbc_encodef(&sr->reply, "b11c.wwlbYl13c",
-		    resume_char, name83, index, od->d_odid,
-		    client_key, fileinfo.fi_dosattr & 0xff,
+		    resume_char, name83, index, od->d_odid, client_key,
+		    fileinfo.fi_dosattr & 0xff,
 		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
 		    fileinfo.fi_shortname);

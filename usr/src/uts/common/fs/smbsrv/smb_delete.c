@@ -544,18 +544,12 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	rc = smb_fsop_remove(sr, sr->user_cr, node->n_dnode,
 	    node->od_name, flags);
 	if (rc != 0) {
-		if (rc == ENOENT)
-			smb_delete_error(err, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		else
-			smbsr_map_errno(rc, err);
-
-		smb_node_end_crit(node);
-		return (-1);
+		smbsr_map_errno(rc, err);
+		rc = -1;
 	}
 
 	smb_node_end_crit(node);
-	return (0);
+	return (rc);
 }
 
 
