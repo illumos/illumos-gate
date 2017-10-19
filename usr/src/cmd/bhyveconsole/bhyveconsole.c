@@ -276,11 +276,12 @@ static void
 doio(void)
 {
 	struct pollfd pollfds[2];
+	const short read_ev = POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI;
 	int res;
 
 	/* read from vm and write to stdout */
 	pollfds[0].fd = masterfd;
-	pollfds[0].events = POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI;
+	pollfds[0].events = read_ev;
 
 	/* read from stdin and write to vm */
 	pollfds[1].fd = STDIN_FILENO;
@@ -312,11 +313,9 @@ doio(void)
 
 		/* event from user stdin side */
 		if (pollfds[1].revents) {
-			if (pollfds[1].revents &
-			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-			  if (process_user_input(masterfd, STDIN_FILENO)
-				    != 0)
-					break;
+			if ((pollfds[1].revents & read_ev) != 0 &&
+			    process_user_input(masterfd, STDIN_FILENO) == 0) {
+				continue;
 			} else {
 				break;
 			}

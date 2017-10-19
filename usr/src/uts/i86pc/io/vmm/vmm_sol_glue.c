@@ -25,7 +25,7 @@
  *
  * $FreeBSD: head/sys/kern/subr_sleepqueue.c 261520 2014-02-05 18:13:27Z jhb $
  */
-/*-
+/*
  * Copyright (c) 2004 Poul-Henning Kamp
  * All rights reserved.
  *
@@ -111,15 +111,13 @@ cpusetobj_ffs(const cpuset_t *set)
 	}
 	return (cbit);
 #else
-	return(ffsl(*set));
+	return (ffsl(*set));
 #endif
 }
 
 void
-smp_rendezvous(void (* setup_func)(void *),
-	       void (* action_func)(void *),
-	       void (* teardown_func)(void *),
-	       void *arg)
+smp_rendezvous(void (* setup_func)(void *), void (* action_func)(void *),
+    void (* teardown_func)(void *), void *arg)
 {
 	cpuset_t cpuset;
 
@@ -149,9 +147,9 @@ malloc(unsigned long size, struct malloc_type *mtp, int flags)
 		kmem_flag = KM_NOSLEEP;
 
 	if (flags & M_ZERO) {
-		p = kmem_zalloc(size + sizeof(struct kmem_item), kmem_flag);
+		p = kmem_zalloc(size + sizeof (struct kmem_item), kmem_flag);
 	} else {
-		p = kmem_alloc(size + sizeof(struct kmem_item), kmem_flag);
+		p = kmem_alloc(size + sizeof (struct kmem_item), kmem_flag);
 	}
 
 	mutex_enter(&kmem_items_lock);
@@ -179,7 +177,7 @@ free(void *addr, struct malloc_type *mtp)
 	LIST_REMOVE(i, next);
 	mutex_exit(&kmem_items_lock);
 
-	kmem_free(addr, i->size + sizeof(struct kmem_item));
+	kmem_free(addr, i->size + sizeof (struct kmem_item));
 }
 
 void
@@ -324,7 +322,7 @@ free_unr(struct unrhdr *uh, u_int item)
 	unr = *unrp;
 	*unrp = unr->link;
 	mutex_exit(&uh->mtx->m);
-	kmem_free(unr, sizeof(struct unr));
+	kmem_free(unr, sizeof (struct unr));
 }
 
 
@@ -410,8 +408,7 @@ ipi_cpu(int cpu, u_int ipi)
 	cpuset_t	set;
 
 	CPUSET_ONLY(set, cpu);
-	xc_call_nowait(NULL, NULL, NULL, CPUSET2BV(set),
-		       ipi_cpu_justreturn);
+	xc_call_nowait(NULL, NULL, NULL, CPUSET2BV(set), ipi_cpu_justreturn);
 }
 
 #define	SC_TABLESIZE	256			/* Must be power of 2. */
@@ -464,7 +461,7 @@ init_sleepqueues(void)
         for (i = 0; i < SC_TABLESIZE; i++) {
 		LIST_INIT(&sleepq_chains[i].sc_queues);
 		mtx_init(&sleepq_chains[i].sc_lock, "sleepq chain", NULL,
-			 MTX_SPIN);
+		    MTX_SPIN);
 	}
 
 	vmm_sleepq_cache = kmem_cache_create("vmm_sleepq_cache",
@@ -534,7 +531,7 @@ sleepq_add(void *wchan)
 		sq->sq_wchan = wchan;
 	}
 
-        sq->sq_blockedcnt++;
+	sq->sq_blockedcnt++;
 
 	return (sq);
 }
@@ -575,7 +572,7 @@ wakeup(void *chan)
 	struct sleepqueue	*sq;
 
 	sleepq_lock(chan);
-        sq = sleepq_lookup(chan);
+	sq = sleepq_lookup(chan);
 	if (sq != NULL) {
 		cv_broadcast(&sq->sq_cv);
 	}
@@ -588,7 +585,7 @@ wakeup_one(void *chan)
 	struct sleepqueue	*sq;
 
 	sleepq_lock(chan);
-        sq = sleepq_lookup(chan);
+	sq = sleepq_lookup(chan);
 	if (sq != NULL) {
 		cv_signal(&sq->sq_cv);
 	}

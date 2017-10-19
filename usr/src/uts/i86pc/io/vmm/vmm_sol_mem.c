@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -39,7 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/amd64/vmm/vmm_mem.c 245678 2013-01-20 03:42:49Z neel $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -92,7 +91,7 @@ vmm_mem_free(vm_paddr_t base, size_t length)
 
 	if (base & PAGE_MASK) {
 		panic("vmm_mem_free: base 0x%0lx must be aligned on a "
-		      "0x%0x boundary\n", base, PAGE_SIZE);
+		    "0x%0x boundary\n", base, PAGE_SIZE);
 	}
 
 	if (length != PAGE_SIZE) {
@@ -106,6 +105,5 @@ vmm_mem_free(vm_paddr_t base, size_t length)
 vm_paddr_t
 vmm_mem_maxaddr(void)
 {
-
 	return (ptob(physmax + 1));
 }

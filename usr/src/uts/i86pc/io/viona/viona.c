@@ -195,8 +195,8 @@ static void			*viona_state;
 static dev_info_t		*viona_dip;
 static id_space_t		*viona_minor_ids;
 /*
- * copy tx mbufs from virtio ring to avoid necessitating a wait 
- * for packet transmission to free resources.
+ * copy tx mbufs from virtio ring to avoid necessitating a wait for packet
+ * transmission to free resources.
  */
 static boolean_t		copy_tx_mblks = B_TRUE;
 
@@ -915,7 +915,7 @@ viona_ioc_tx_intr_clear(viona_link_t *link)
 
 static int
 vq_popchain(viona_link_t *link, viona_vring_hqueue_t *hq, struct iovec *iov,
-int n_iov, uint16_t *cookie)
+    int n_iov, uint16_t *cookie)
 {
 	int			i;
 	int			ndesc, nindir;

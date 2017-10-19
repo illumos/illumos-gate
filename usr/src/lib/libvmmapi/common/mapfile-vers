@@ -11,6 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 #
@@ -27,51 +28,53 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.0 {
-    global:
-	vcpu_reset;
-	vm_activate_cpu;
-	vm_apicid2vcpu;
-	vm_capability_name2type;
-	vm_capability_type2name;
-	vm_copy_setup;
-	vm_copy_teardown;
-	vm_copyin;
-	vm_copyout;
-	vm_create;
-	vm_destroy;
-	vm_get_capability;
-	vm_get_desc;
-	vm_get_highmem_size;
-	vm_get_lowmem_limit;
-	vm_get_lowmem_size;
-	vm_get_memory_seg;
-	vm_get_register;
-	vm_get_seg_desc;
-	vm_get_x2apic_state;
-	vm_gla2gpa;
-	vm_inject_exception;
-	vm_isa_assert_irq;
-	vm_isa_deassert_irq;
-	vm_isa_pulse_irq;
-	vm_isa_set_irq_trigger;
-	vm_ioapic_assert_irq;
-	vm_ioapic_deassert_irq;
-	vm_ioapic_pincount;
-	vm_ioapic_pulse_irq;
-	vm_lapic_irq;
-	vm_lapic_msi;
-	vm_map_gpa;
-	vm_open;
-	vm_parse_memsize;
-	vm_restart_instruction;
-	vm_run;
-	vm_set_capability;
-	vm_set_desc;
-	vm_set_register;
-	vm_set_x2apic_state;
-	vm_setup_memory;
-	vm_setup_rom;
-    local:
-        *;
+$mapfile_version 2
+
+SYMBOL_VERSION ILLUMOSprivate {
+	global:
+		vcpu_reset;
+		vm_activate_cpu;
+		vm_apicid2vcpu;
+		vm_capability_name2type;
+		vm_capability_type2name;
+		vm_copy_setup;
+		vm_copy_teardown;
+		vm_copyin;
+		vm_copyout;
+		vm_create;
+		vm_destroy;
+		vm_get_capability;
+		vm_get_desc;
+		vm_get_highmem_size;
+		vm_get_lowmem_limit;
+		vm_get_lowmem_size;
+		vm_get_memory_seg;
+		vm_get_register;
+		vm_get_seg_desc;
+		vm_get_x2apic_state;
+		vm_gla2gpa;
+		vm_inject_exception;
+		vm_isa_assert_irq;
+		vm_isa_deassert_irq;
+		vm_isa_pulse_irq;
+		vm_isa_set_irq_trigger;
+		vm_ioapic_assert_irq;
+		vm_ioapic_deassert_irq;
+		vm_ioapic_pincount;
+		vm_ioapic_pulse_irq;
+		vm_lapic_irq;
+		vm_lapic_msi;
+		vm_map_gpa;
+		vm_open;
+		vm_parse_memsize;
+		vm_restart_instruction;
+		vm_run;
+		vm_set_capability;
+		vm_set_desc;
+		vm_set_register;
+		vm_set_x2apic_state;
+		vm_setup_memory;
+		vm_setup_rom;
+	local:
+		*;
 };

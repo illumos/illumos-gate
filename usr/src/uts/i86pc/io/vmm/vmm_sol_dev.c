@@ -305,7 +305,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 		break;
 	}
 
-	switch(cmd) {
+	switch (cmd) {
 	case VM_RUN:
 		if (ddi_copyin((void *)arg, &vmrun,
 		    sizeof (struct vm_run), mode)) {
@@ -355,7 +355,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 		    sizeof (struct vm_ioapic_irq), mode)) {
 			return (EFAULT);
 		}
-		error = vioapic_assert_irq(sc->vm, ioapic_irq.irq);;
+		error = vioapic_assert_irq(sc->vm, ioapic_irq.irq);
 		if (ddi_copyout(&ioapic_irq, (void *)arg,
 		    sizeof (struct vm_ioapic_irq), mode)) {
 			return (EFAULT);
@@ -402,7 +402,6 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 		if (ddi_copyout(&isa_irq, (void *)arg,
 		    sizeof (struct vm_isa_irq), mode)) {
 			return (EFAULT);
-		
 		}
 		break;
 	case VM_ISA_DEASSERT_IRQ:
@@ -417,7 +416,6 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 		if (ddi_copyout(&isa_irq, (void *)arg,
 		    sizeof (struct vm_isa_irq), mode)) {
 			return (EFAULT);
-		
 		}
 		break;
 	case VM_ISA_PULSE_IRQ:
@@ -431,7 +429,6 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 		if (ddi_copyout(&isa_irq, (void *)arg,
 		    sizeof (struct vm_isa_irq), mode)) {
 			return (EFAULT);
-		
 		}
 		break;
 	case VM_MAP_MEMORY:
@@ -447,7 +444,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 			return (EFAULT);
 		}
 		seg.len = 0;
-		(void)vm_gpabase2memseg(sc->vm, seg.gpa, &seg);
+		(void) vm_gpabase2memseg(sc->vm, seg.gpa, &seg);
 		if (ddi_copyout(&seg, (void *)arg,
 		    sizeof (struct vm_memory_segment), mode)) {
 			return (EFAULT);
@@ -460,10 +457,10 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 			return (EFAULT);
 		}
 		error = vm_get_register(sc->vm, vmreg.cpuid, vmreg.regnum,
-					&vmreg.regval);
+		    &vmreg.regval);
 		if (!error) {
 			if (ddi_copyout(&vmreg, (void *)arg,
-				 sizeof (struct vm_register), mode)) {
+			    sizeof (struct vm_register), mode)) {
 				return (EFAULT);
 			}
 		}
@@ -474,7 +471,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 			return (EFAULT);
 		}
 		error = vm_set_register(sc->vm, vmreg.cpuid, vmreg.regnum,
-					vmreg.regval);
+		    vmreg.regval);
 		break;
 	case VM_SET_SEGMENT_DESCRIPTOR:
 		if (ddi_copyin((void *)arg, &vmsegdesc,
@@ -482,8 +479,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 			return (EFAULT);
 		}
 		error = vm_set_seg_desc(sc->vm, vmsegdesc.cpuid,
-					vmsegdesc.regnum,
-					&vmsegdesc.desc);
+		    vmsegdesc.regnum, &vmsegdesc.desc);
 		break;
 	case VM_GET_SEGMENT_DESCRIPTOR:
 		if (ddi_copyin((void *)arg, &vmsegdesc,
@@ -491,8 +487,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 			return (EFAULT);
 		}
 		error = vm_get_seg_desc(sc->vm, vmsegdesc.cpuid,
-					vmsegdesc.regnum,
-					&vmsegdesc.desc);
+		    vmsegdesc.regnum, &vmsegdesc.desc);
 		if (!error) {
 			if (ddi_copyout(&vmsegdesc, (void *)arg,
 			    sizeof (struct vm_seg_desc), mode)) {
@@ -506,8 +501,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 			return (EFAULT);
 		}
 		error = vm_get_capability(sc->vm, vmcap.cpuid,
-					  vmcap.captype,
-					  &vmcap.capval);
+		    vmcap.captype, &vmcap.capval);
 		if (!error) {
 			if (ddi_copyout(&vmcap, (void *)arg,
 			    sizeof (struct vm_capability), mode)) {
@@ -521,24 +515,22 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 			return (EFAULT);
 		}
 		error = vm_set_capability(sc->vm, vmcap.cpuid,
-					  vmcap.captype,
-					  vmcap.capval);
+		    vmcap.captype, vmcap.capval);
 		break;
 	case VM_SET_X2APIC_STATE:
 		if (ddi_copyin((void *)arg, &x2apic,
 		    sizeof (struct vm_x2apic), mode)) {
 			return (EFAULT);
 		}
-		error = vm_set_x2apic_state(sc->vm,
-					    x2apic.cpuid, x2apic.state);
+		error = vm_set_x2apic_state(sc->vm, x2apic.cpuid, x2apic.state);
 		break;
 	case VM_GET_X2APIC_STATE:
 		if (ddi_copyin((void *)arg, &x2apic,
 		    sizeof (struct vm_x2apic), mode)) {
 			return (EFAULT);
 		}
-		error = vm_get_x2apic_state(sc->vm,
-					    x2apic.cpuid, &x2apic.state);
+		error = vm_get_x2apic_state(sc->vm, x2apic.cpuid,
+		    &x2apic.state);
 		if (!error) {
 			if (ddi_copyout(&x2apic, (void *)arg,
 			    sizeof (struct vm_x2apic), mode)) {
@@ -550,6 +542,7 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 		CTASSERT(PROT_READ == VM_PROT_READ);
 		CTASSERT(PROT_WRITE == VM_PROT_WRITE);
 		CTASSERT(PROT_EXEC == VM_PROT_EXECUTE);
+
 		if (ddi_copyin((void *)arg, &gg,
 		    sizeof (struct vm_gla2gpa), mode)) {
 			return (EFAULT);
@@ -592,8 +585,9 @@ vmmdev_do_ioctl(struct vmm_softc *sc, int cmd, intptr_t arg, int mode,
 	if (state_changed == 1) {
 		vcpu_set_state(sc->vm, vcpu, VCPU_IDLE, false);
 	} else if (state_changed == 2) {
-		for (vcpu = 0; vcpu < VM_MAXCPU; vcpu++)
+		for (vcpu = 0; vcpu < VM_MAXCPU; vcpu++) {
 			vcpu_set_state(sc->vm, vcpu, VCPU_IDLE, false);
+		}
 	}
 
 done:
@@ -892,7 +886,7 @@ vmm_mmap(dev_t dev, off_t off, int prot)
 
 static int
 vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
-   unsigned int prot, unsigned int maxprot, unsigned int flags, cred_t *credp)
+    unsigned int prot, unsigned int maxprot, unsigned int flags, cred_t *credp)
 {
 	struct segdev_crargs	dev_a;
 	int			error;

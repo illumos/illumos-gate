@@ -500,7 +500,7 @@ viona_adjust_offset(struct pci_devinst *pi, uint64_t offset)
 
 static void
 pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-		int baridx, uint64_t offset, int size, uint64_t value)
+    int baridx, uint64_t offset, int size, uint64_t value)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;
 	void *ptr;

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -72,13 +73,13 @@ static void
 usage(void)
 {
 	printf("usage: %s "
-	       "[-c vcpus] [-m mem-size] [-b bootorder]"
-	       "<vmname>\n", progname);
+	    "[-c vcpus] [-m mem-size] [-b bootorder]"
+	    "<vmname>\n", progname);
 	exit(1);
 }
 
 int
-main(int argc, char** argv)
+main(int argc, char **argv)
 {
 	int opt, error, fd;
 	int guest_ncpus;
@@ -107,10 +108,10 @@ main(int argc, char** argv)
 			guest_bootorder = atoi(optarg);
 			if (guest_bootorder < 0 || guest_bootorder > 11) {
 				errx(EX_USAGE, "Invalid bootoption: %d\n"
-		 		    "\tBoot order code:\n"
- 				    "\t0 - EFI_CD_HD\n"
- 				    "\t1 - EFI_CD\n"
- 				    "\t2 - EFI_HD_CD\n"
+				    "\tBoot order code:\n"
+				    "\t0 - EFI_CD_HD\n"
+				    "\t1 - EFI_CD\n"
+				    "\t2 - EFI_HD_CD\n"
 				    "\t3 - EFI_HD\n"
 				    "\t4 - EFI_NET\n"
 				    "\t5 - EFI_NET_CD_HD\n"
@@ -119,7 +120,7 @@ main(int argc, char** argv)
 				    "\t8 - LEGACY_CD\n"
 				    "\t9 - LEGACY_HD_CD\n"
 				    "\t10 - LEGACY_HD\n"
- 				    "\t11 - EFI_SHELL\n", guest_bootorder);
+				    "\t11 - EFI_SHELL\n", guest_bootorder);
 				exit(1);
 			}
 			break;
