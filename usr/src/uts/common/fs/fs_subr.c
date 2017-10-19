@@ -424,6 +424,12 @@ fs_reject_epoll()
 	    (curthread->t_pollcache->pc_flag & PC_EPOLL) != 0);
 }
 
+/*
+ * Return the answer requested to poll() for non-device files.
+ * Only POLLIN, POLLRDNORM, and POLLOUT are recognized.
+ */
+struct pollhead fs_pollhd;
+
 /* ARGSUSED */
 int
 fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
