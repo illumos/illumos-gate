@@ -39,8 +39,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * clnt_tcp.c, Implements a TCP/IP based, client side RPC.
  *
@@ -72,13 +70,13 @@
 
 extern int errno;
 
-static int	readtcp();
-static int	writetcp();
+static int readtcp(void *, caddr_t, int);
+static int writetcp(void *, caddr_t, int);
 extern int _socket(int, int, int);
-extern pid_t getpid();
+extern pid_t getpid(void);
 extern int bindresvport(int, struct sockaddr_in *);
-extern bool_t   xdr_opaque_auth(XDR *, struct opaque_auth *);
-static struct clnt_ops *clnttcp_ops();
+extern bool_t xdr_opaque_auth(XDR *, struct opaque_auth *);
+static struct clnt_ops *clnttcp_ops(void);
 
 struct ct_data {
 	int		ct_sock;
@@ -88,7 +86,7 @@ struct ct_data {
 	struct sockaddr_in ct_addr;
 	struct rpc_err	ct_error;
 	char		ct_mcall[MCALL_MSG_SIZE];	/* marshalled callmsg */
-	u_int		ct_mpos;			/* pos after marshal */
+	uint_t		ct_mpos;			/* pos after marshal */
 	XDR		ct_xdrs;
 };
 
@@ -107,16 +105,11 @@ struct ct_data {
  * set this something more useful.
  */
 CLIENT *
-clnttcp_create(raddr, prog, vers, sockp, sendsz, recvsz)
-	struct sockaddr_in *raddr;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	register int *sockp;
-	u_int sendsz;
-	u_int recvsz;
+clnttcp_create(struct sockaddr_in *raddr, rpcprog_t prog, rpcvers_t vers,
+    int *sockp, uint_t sendsz, uint_t recvsz)
 {
 	CLIENT *h;
-	register struct ct_data *ct;
+	struct ct_data *ct;
 	struct timeval now;
 	struct rpc_msg call_msg;
 
@@ -139,7 +132,7 @@ clnttcp_create(raddr, prog, vers, sockp, sendsz, recvsz)
 	 * If no port number given ask the pmap for one
 	 */
 	if (raddr->sin_port == 0) {
-		u_short port;
+		ushort_t port;
 		if ((port = pmap_getport(raddr, prog, vers, IPPROTO_TCP))
 		    == 0) {
 			mem_free((caddr_t)ct, sizeof (struct ct_data));
@@ -156,8 +149,8 @@ clnttcp_create(raddr, prog, vers, sockp, sendsz, recvsz)
 		*sockp = _socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		(void) bindresvport(*sockp, (struct sockaddr_in *)0);
 		if ((*sockp < 0)||
-			(connect(*sockp, (struct sockaddr *)raddr,
-			sizeof (*raddr)) < 0)) {
+		    (connect(*sockp, (struct sockaddr *)raddr,
+		    sizeof (*raddr)) < 0)) {
 			rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 			rpc_createerr.cf_error.re_errno = errno;
 			(void) close(*sockp);
@@ -207,7 +200,7 @@ clnttcp_create(raddr, prog, vers, sockp, sendsz, recvsz)
 	xdrrec_create(&(ct->ct_xdrs), sendsz, recvsz,
 	    (caddr_t)ct, readtcp, writetcp);
 	h->cl_ops = clnttcp_ops();
-	h->cl_private = (caddr_t) ct;
+	h->cl_private = (caddr_t)ct;
 	h->cl_auth = authnone_create();
 	return (h);
 
@@ -217,26 +210,25 @@ fooy:
 	 */
 	mem_free((caddr_t)ct, sizeof (struct ct_data));
 	mem_free((caddr_t)h, sizeof (CLIENT));
-	return ((CLIENT *)NULL);
+	return (NULL);
 }
 
 static enum clnt_stat
-clnttcp_call(h, proc, xdr_args, args_ptr, xdr_results, results_ptr, timeout)
-	register CLIENT *h;
-	rpcproc_t proc;
-	xdrproc_t xdr_args;
-	caddr_t args_ptr;
-	xdrproc_t xdr_results;
-	caddr_t results_ptr;
-	struct timeval timeout;
+clnttcp_call(CLIENT *h, rpcproc_t proc, xdrproc_t xdr_args, caddr_t args_ptr,
+    xdrproc_t xdr_results, caddr_t results_ptr, struct timeval timeout)
 {
-	register struct ct_data *ct = (struct ct_data *) h->cl_private;
-	register XDR *xdrs = &(ct->ct_xdrs);
+	struct ct_data *ct;
+	XDR *xdrs;
 	struct rpc_msg reply_msg;
 	uint32_t x_id;
-	uint32_t *msg_x_id = (uint32_t *)(ct->ct_mcall);	/* yuk */
-	register bool_t shipnow;
-	int refreshes = 2;
+	uint32_t *msg_x_id;
+	bool_t shipnow;
+	int refreshes;
+
+	ct = (struct ct_data *)h->cl_private;
+	xdrs = &(ct->ct_xdrs);
+	msg_x_id = (uint32_t *)(ct->ct_mcall);	/* yuk */
+	refreshes = 2;
 
 	if (!ct->ct_waitset) {
 		ct->ct_wait = timeout;
@@ -320,42 +312,37 @@ call_again:
 }
 
 static void
-clnttcp_geterr(h, errp)
-	CLIENT *h;
-	struct rpc_err *errp;
+clnttcp_geterr(CLIENT *h, struct rpc_err *errp)
 {
-	register struct ct_data *ct =
-	    (struct ct_data *) h->cl_private;
+	struct ct_data *ct;
 
+	ct = (struct ct_data *)h->cl_private;
 	*errp = ct->ct_error;
 }
 
 static bool_t
-clnttcp_freeres(cl, xdr_res, res_ptr)
-	CLIENT *cl;
-	xdrproc_t xdr_res;
-	caddr_t res_ptr;
+clnttcp_freeres(CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 {
-	register struct ct_data *ct = (struct ct_data *)cl->cl_private;
-	register XDR *xdrs = &(ct->ct_xdrs);
+	struct ct_data *ct;
+	XDR *xdrs;
 
+	ct = (struct ct_data *)cl->cl_private;
+	xdrs = &(ct->ct_xdrs);
 	xdrs->x_op = XDR_FREE;
 	return ((*xdr_res)(xdrs, res_ptr));
 }
 
 static void
-clnttcp_abort()
+clnttcp_abort(void)
 {
 }
 
 static bool_t
-clnttcp_control(cl, request, info)
-	CLIENT *cl;
-	int request;
-	char *info;
+clnttcp_control(CLIENT *cl, int request, char *info)
 {
-	register struct ct_data *ct = (struct ct_data *)cl->cl_private;
+	struct ct_data *ct;
 
+	ct = (struct ct_data *)cl->cl_private;
 	switch (request) {
 	case CLSET_TIMEOUT:
 		ct->ct_wait = *(struct timeval *)info;
@@ -384,12 +371,11 @@ clnttcp_control(cl, request, info)
 
 
 static void
-clnttcp_destroy(h)
-	CLIENT *h;
+clnttcp_destroy(CLIENT *h)
 {
-	register struct ct_data *ct =
-	    (struct ct_data *) h->cl_private;
+	struct ct_data *ct;
 
+	ct = (struct ct_data *)h->cl_private;
 	if (ct->ct_closeit) {
 		(void) close(ct->ct_sock);
 	}
@@ -404,16 +390,16 @@ clnttcp_destroy(h)
  * around for the rpc level.
  */
 static int
-readtcp(ct, buf, len)
-	register struct ct_data *ct;
-	caddr_t buf;
-	register int len;
+readtcp(void *data, caddr_t buf, int len)
 {
 	fd_set mask;
 	fd_set readfds;
+	struct ct_data *ct;
 
 	if (len == 0)
 		return (0);
+
+	ct = data;
 	FD_ZERO(&mask);
 	FD_SET(ct->ct_sock, &mask);
 	while (TRUE) {
@@ -451,13 +437,12 @@ readtcp(ct, buf, len)
 }
 
 static int
-writetcp(ct, buf, len)
-	struct ct_data *ct;
-	caddr_t buf;
-	int len;
+writetcp(void *data, caddr_t buf, int len)
 {
-	register int i, cnt;
+	struct ct_data *ct;
+	int i, cnt;
 
+	ct = data;
 	for (cnt = len; cnt > 0; cnt -= i, buf += i) {
 		if ((i = write(ct->ct_sock, buf, cnt)) == -1) {
 			ct->ct_error.re_errno = errno;
@@ -469,7 +454,7 @@ writetcp(ct, buf, len)
 }
 
 static struct clnt_ops *
-clnttcp_ops()
+clnttcp_ops(void)
 {
 	static struct clnt_ops ops;
 

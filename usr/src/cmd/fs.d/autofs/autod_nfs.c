@@ -177,8 +177,8 @@ static void cache_enter(char *, rpcvers_t, rpcvers_t, char *, int);
 void destroy_auth_client_handle(CLIENT *cl);
 
 #ifdef CACHE_DEBUG
-static void trace_host_cache();
-static void trace_portmap_cache();
+static void trace_host_cache(void);
+static void trace_portmap_cache(void);
 #endif /* CACHE_DEBUG */
 
 static int rpc_timeout = 20;
@@ -224,13 +224,8 @@ static int is_v4_mount(char *);
 static void start_nfs4cbd(void);
 
 int
-mount_nfs(
-	struct mapent *me,
-	char *mntpnt,
-	char *prevhost,
-	int overlay,
-	uid_t uid,
-	action_list **alpp)
+mount_nfs(struct mapent *me, char *mntpnt, char *prevhost, int overlay,
+    uid_t uid, action_list **alpp)
 {
 	struct mapfs *mfs, *mp;
 	int err = -1;
@@ -439,7 +434,7 @@ sort_servers(struct mapfs *mfs_in, int timeout)
  */
 struct mapfs *
 add_mfs(struct mapfs *mfs, int distance, struct mapfs **mfs_head,
-	struct mapfs **mfs_tail)
+    struct mapfs **mfs_tail)
 {
 	struct mapfs *tmp, *new;
 
@@ -2448,7 +2443,7 @@ ret:
  */
 static int
 get_pathconf(CLIENT *cl, char *path, char *fsname, struct pathcnf **pcnf,
-	int cretries)
+    int cretries)
 {
 	struct ppathcnf *p = NULL;
 	enum clnt_stat rpc_stat;
@@ -2484,13 +2479,11 @@ get_pathconf(CLIENT *cl, char *path, char *fsname, struct pathcnf **pcnf,
 }
 
 void
-netbuf_free(nb)
-	struct netbuf *nb;
+netbuf_free(struct netbuf *nb)
 {
 	if (nb == NULL)
 		return;
-	if (nb->buf)
-		free(nb->buf);
+	free(nb->buf);
 	free(nb);
 }
 
@@ -2518,7 +2511,7 @@ struct portmap_cache *portmap_cache_head, *portmap_cache_tail;
 
 #ifdef MALLOC_DEBUG
 void
-portmap_cache_flush()
+portmap_cache_flush(void)
 {
 	struct  portmap_cache *next = NULL, *cp;
 
@@ -2547,12 +2540,8 @@ portmap_cache_flush()
  * Returns 1 if the entry is found in the cache, 0 otherwise.
  */
 static int
-portmap_cache_lookup(hostname, prog, vers, nconf, addrp)
-	char *hostname;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	struct netconfig *nconf;
-	struct netbuf *addrp;
+portmap_cache_lookup(char *hostname, rpcprog_t prog, rpcvers_t vers,
+    struct netconfig *nconf, struct netbuf *addrp)
 {
 	struct	portmap_cache *cachep, *prev, *next = NULL, *cp;
 	int	retval = 0;
@@ -2575,7 +2564,7 @@ portmap_cache_lookup(hostname, prog, vers, nconf, addrp)
 #endif /* CACHE_DEBUG */
 
 	for (cachep = portmap_cache_head; cachep;
-		cachep = cachep->cache_next) {
+	    cachep = cachep->cache_next) {
 		if (timenow > cachep->cache_time) {
 			/*
 			 * We stumbled across an entry in the cache which
@@ -2589,8 +2578,8 @@ portmap_cache_lookup(hostname, prog, vers, nconf, addrp)
 			(void) rw_unlock(&portmap_cache_lock);
 			(void) rw_wrlock(&portmap_cache_lock);
 			for (cp = portmap_cache_head;
-				cp && (cp->cache_time >= timenow);
-				cp = cp->cache_next)
+			    cp && (cp->cache_time >= timenow);
+			    cp = cp->cache_next)
 				;
 			if (cp == NULL)
 				goto done;
@@ -2645,12 +2634,8 @@ done:
 }
 
 static void
-portmap_cache_enter(hostname, prog, vers, nconf, addrp)
-	char *hostname;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	struct netconfig *nconf;
-	struct netbuf *addrp;
+portmap_cache_enter(char *hostname, rpcprog_t prog, rpcvers_t vers,
+    struct netconfig *nconf, struct netbuf *addrp)
 {
 	struct portmap_cache *cachep;
 	int protofmlylen;
@@ -2734,7 +2719,7 @@ nomem:
 
 static int
 get_cached_srv_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
-	struct netconfig *nconf, struct netbuf *addrp)
+    struct netconfig *nconf, struct netbuf *addrp)
 {
 	if (portmap_cache_lookup(hostname, prog, vers, nconf, addrp))
 		return (1);
@@ -2761,20 +2746,19 @@ get_cached_srv_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
 
 static struct netbuf *
 get_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
-	struct netconfig **nconfp, char *proto, ushort_t port,
-	struct t_info *tinfo)
-
+    struct netconfig **nconfp, char *proto, ushort_t port,
+    struct t_info *tinfo)
 {
 	enum clnt_stat cstat;
 
 	return (get_server_netinfo(SERVER_ADDR, hostname, prog, vers, NULL,
-		nconfp, proto, port, tinfo, NULL, FALSE, NULL, &cstat));
+	    nconfp, proto, port, tinfo, NULL, FALSE, NULL, &cstat));
 }
 
 static struct netbuf *
 get_pubfh(char *hostname, rpcvers_t vers, mfs_snego_t *mfssnego,
-	struct netconfig **nconfp, char *proto, ushort_t port,
-	struct t_info *tinfo, caddr_t *fhp, bool_t get_pubfh, char *fspath)
+    struct netconfig **nconfp, char *proto, ushort_t port,
+    struct t_info *tinfo, caddr_t *fhp, bool_t get_pubfh, char *fspath)
 {
 	enum clnt_stat cstat;
 
@@ -2785,7 +2769,7 @@ get_pubfh(char *hostname, rpcvers_t vers, mfs_snego_t *mfssnego,
 
 static enum clnt_stat
 get_ping(char *hostname, rpcprog_t prog, rpcvers_t vers,
-	struct netconfig **nconfp, ushort_t port, bool_t direct_to_server)
+    struct netconfig **nconfp, ushort_t port, bool_t direct_to_server)
 {
 	enum clnt_stat cstat;
 
@@ -2948,9 +2932,9 @@ done:
 
 void *
 get_server_fh(char *hostname, rpcprog_t	prog, rpcvers_t	vers,
-	mfs_snego_t *mfssnego, struct netconfig *nconf, ushort_t port,
-	struct t_info *tinfo, struct t_bind *tbind, caddr_t *fhp,
-	bool_t direct_to_server, char *fspath, enum clnt_stat *cstat)
+    mfs_snego_t *mfssnego, struct netconfig *nconf, ushort_t port,
+    struct t_info *tinfo, struct t_bind *tbind, caddr_t *fhp,
+    bool_t direct_to_server, char *fspath, enum clnt_stat *cstat)
 {
 	AUTH *ah = NULL;
 	AUTH *new_ah = NULL;
@@ -3470,11 +3454,7 @@ pingnfs(
 #define	MNTTYPE_LOFS	"lofs"
 
 int
-loopbackmount(fsname, dir, mntopts, overlay)
-	char *fsname;		/* Directory being mounted */
-	char *dir;		/* Directory being mounted on */
-	char *mntopts;
-	int overlay;
+loopbackmount(char *fsname, char *dir, char *mntopts, int overlay)
 {
 	struct mnttab mnt;
 	int flags = 0;
@@ -3488,10 +3468,10 @@ loopbackmount(fsname, dir, mntopts, overlay)
 		dirlen--;
 
 	if (dirlen == strlen(fsname) &&
-		strncmp(fsname, dir, dirlen) == 0) {
+	    strncmp(fsname, dir, dirlen) == 0) {
 		syslog(LOG_ERR,
-			"Mount of %s on %s would result in deadlock, aborted\n",
-			fsname, dir);
+		    "Mount of %s on %s would result in deadlock, aborted\n",
+		    fsname, dir);
 		return (RET_ERR);
 	}
 	mnt.mnt_mntopts = mntopts;
@@ -3503,10 +3483,10 @@ loopbackmount(fsname, dir, mntopts, overlay)
 	if (overlay)
 		flags |= MS_OVERLAY;
 
-	if (trace > 1)
-		trace_prt(1,
-			"  loopbackmount: fsname=%s, dir=%s, flags=%d\n",
-			fsname, dir, flags);
+	if (trace > 1) {
+		trace_prt(1, "  loopbackmount: fsname=%s, dir=%s, flags=%d\n",
+		    fsname, dir, flags);
+	}
 
 	if (is_system_labeled()) {
 		if (create_homedir((const char *)fsname,
@@ -3545,10 +3525,7 @@ loopbackmount(fsname, dir, mntopts, overlay)
  */
 
 int
-nopt(mnt, opt, valp)
-	struct mnttab *mnt;
-	char *opt;
-	int *valp;			/* OUT */
+nopt(struct mnttab *mnt, char *opt, int *valp)
 {
 	char *equal;
 	char *str;
@@ -3575,8 +3552,7 @@ nopt(mnt, opt, valp)
 }
 
 int
-nfsunmount(mnt)
-	struct mnttab *mnt;
+nfsunmount(struct mnttab *mnt)
 {
 	struct timeval timeout;
 	CLIENT *cl;
@@ -3590,9 +3566,10 @@ nfsunmount(mnt)
 		trace_prt(1, "	nfsunmount: umount %s\n", mnt->mnt_mountp);
 
 	if (umount(mnt->mnt_mountp) < 0) {
-		if (trace > 1)
+		if (trace > 1) {
 			trace_prt(1, "	nfsunmount: umount %s FAILED\n",
-				mnt->mnt_mountp);
+			    mnt->mnt_mountp);
+		}
 		if (errno)
 			return (errno);
 	}
@@ -3602,9 +3579,10 @@ nfsunmount(mnt)
 	 * so we just return.
 	 */
 	if (isv4mount) {
-		if (trace > 1)
+		if (trace > 1) {
 			trace_prt(1, "	nfsunmount: umount %s OK\n",
-				mnt->mnt_mountp);
+			    mnt->mnt_mountp);
+		}
 		return (0);
 	}
 
@@ -3624,8 +3602,7 @@ nfsunmount(mnt)
 	list = parse_replica(mnt->mnt_special, &count);
 	if (!list) {
 		if (count >= 0)
-			syslog(LOG_ERR,
-			    "Memory allocation failed: %m");
+			syslog(LOG_ERR, "Memory allocation failed: %m");
 		return (ENOMEM);
 	}
 
@@ -3646,14 +3623,13 @@ nfsunmount(mnt)
 			break;
 #ifdef MALLOC_DEBUG
 		add_alloc("CLNT_HANDLE", cl, 0, __FILE__, __LINE__);
-		add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-			__FILE__, __LINE__);
+		add_alloc("AUTH_HANDLE", cl->cl_auth, 0, __FILE__, __LINE__);
 #endif
 		if (__clnt_bindresvport(cl) < 0) {
-			if (verbose)
-				syslog(LOG_ERR, "umount %s:%s: %s",
-					host, path,
-					"Couldn't bind to reserved port");
+			if (verbose) {
+				syslog(LOG_ERR, "umount %s:%s: %s", host, path,
+				    "Couldn't bind to reserved port");
+			}
 			destroy_auth_client_handle(cl);
 			continue;
 		}
@@ -3662,10 +3638,10 @@ nfsunmount(mnt)
 #endif
 		AUTH_DESTROY(cl->cl_auth);
 		if ((cl->cl_auth = authsys_create_default()) == NULL) {
-			if (verbose)
-				syslog(LOG_ERR, "umount %s:%s: %s",
-					host, path,
-					"Failed creating default auth handle");
+			if (verbose) {
+				syslog(LOG_ERR, "umount %s:%s: %s", host, path,
+				    "Failed creating default auth handle");
+			}
 			destroy_auth_client_handle(cl);
 			continue;
 		}
@@ -3675,10 +3651,11 @@ nfsunmount(mnt)
 		timeout.tv_usec = 0;
 		timeout.tv_sec = 5;
 		rpc_stat = clnt_call(cl, MOUNTPROC_UMNT, xdr_dirpath,
-			    (caddr_t)&path, xdr_void, (char *)NULL, timeout);
-		if (verbose && rpc_stat != RPC_SUCCESS)
-			syslog(LOG_ERR, "%s: %s",
-				host, clnt_sperror(cl, "unmount"));
+		    (caddr_t)&path, xdr_void, (char *)NULL, timeout);
+		if (verbose && rpc_stat != RPC_SUCCESS) {
+			syslog(LOG_ERR, "%s: %s", host,
+			    clnt_sperror(cl, "unmount"));
+		}
 		destroy_auth_client_handle(cl);
 	}
 
@@ -3696,12 +3673,8 @@ done:
  * If there isn't enough memory then just give up.
  */
 static void
-cache_enter(host, reqvers, outvers, proto, state)
-	char *host;
-	rpcvers_t reqvers;
-	rpcvers_t outvers;
-	char *proto;
-	int state;
+cache_enter(char *host, rpcvers_t reqvers, rpcvers_t outvers, char *proto,
+    int state)
 {
 	struct cache_entry *entry;
 	int cache_time = 30;	/* sec */
@@ -3732,10 +3705,7 @@ cache_enter(host, reqvers, outvers, proto, state)
 }
 
 static int
-cache_check(host, versp, proto)
-	char *host;
-	rpcvers_t *versp;
-	char *proto;
+cache_check(char *host, rpcvers_t *versp, char *proto)
 {
 	int state = NOHOST;
 	struct cache_entry *ce, *prev;
@@ -3757,7 +3727,7 @@ cache_check(host, versp, proto)
 			(void) rw_unlock(&cache_lock);
 			(void) rw_wrlock(&cache_lock);
 			for (prev = NULL, ce = cache_head; ce;
-				prev = ce, ce = ce->cache_next) {
+			    prev = ce, ce = ce->cache_next) {
 				if (timenow > ce->cache_time) {
 					cache_free(ce);
 					if (prev)
@@ -3780,21 +3750,21 @@ cache_check(host, versp, proto)
 			continue;
 
 		if (versp == NULL ||
-			(versp != NULL && *versp == ce->cache_reqvers) ||
-			(versp != NULL && *versp == ce->cache_outvers)) {
-				if (versp != NULL)
-					*versp = ce->cache_outvers;
-				state = ce->cache_state;
+		    (versp != NULL && *versp == ce->cache_reqvers) ||
+		    (versp != NULL && *versp == ce->cache_outvers)) {
+			if (versp != NULL)
+				*versp = ce->cache_outvers;
+			state = ce->cache_state;
 
-				/* increment the host cache hit counters */
+			/* increment the host cache hit counters */
 #ifdef CACHE_DEBUG
-				if (state == GOODHOST)
-					goodhost_cache_hits++;
-				if (state == DEADHOST)
-					deadhost_cache_hits++;
+			if (state == GOODHOST)
+				goodhost_cache_hits++;
+			if (state == DEADHOST)
+				deadhost_cache_hits++;
 #endif /* CACHE_DEBUG */
-				(void) rw_unlock(&cache_lock);
-				return (state);
+			(void) rw_unlock(&cache_lock);
+			return (state);
 		}
 	}
 	(void) rw_unlock(&cache_lock);
@@ -3807,8 +3777,7 @@ cache_check(host, versp, proto)
  * will also be expired.
  */
 static void
-cache_free(entry)
-	struct cache_entry *entry;
+cache_free(struct cache_entry *entry)
 {
 	struct cache_entry *ce, *next = NULL;
 
@@ -3824,7 +3793,7 @@ cache_free(entry)
 
 #ifdef MALLOC_DEBUG
 void
-cache_flush()
+cache_flush(void)
 {
 	(void) rw_wrlock(&cache_lock);
 	cache_free(cache_head);
@@ -3833,7 +3802,7 @@ cache_flush()
 }
 
 void
-flush_caches()
+flush_caches(void)
 {
 	mutex_lock(&cleanup_lock);
 	cond_signal(&cleanup_start_cv);
@@ -3950,7 +3919,7 @@ set_versrange(rpcvers_t nfsvers, rpcvers_t *vers, rpcvers_t *versmin)
  * traces the portmap cache values at desired points
  */
 static void
-trace_portmap_cache()
+trace_portmap_cache(void)
 {
 	syslog(LOG_ERR, "portmap_cache: accesses=%d lookups=%d hits=%d\n",
 	    portmap_cache_accesses, portmap_cache_lookups,
@@ -3962,7 +3931,7 @@ trace_portmap_cache()
  * traces the host cache values at desired points
  */
 static void
-trace_host_cache()
+trace_host_cache(void)
 {
 	syslog(LOG_ERR,
 	    "host_cache: accesses=%d lookups=%d deadhits=%d goodhits=%d\n",
@@ -3992,7 +3961,7 @@ read_default_nfs(void)
 	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
 	if (ret == SA_OK) {
 		errno = 0;
-		tmp = strtol(defval, (char **)NULL, 10);
+		tmp = strtol(defval, NULL, 10);
 		if (errno == 0) {
 			vers_min_default = tmp;
 		}
@@ -4003,7 +3972,7 @@ read_default_nfs(void)
 	    SCF_TYPE_INTEGER, SVC_NFS_CLIENT, &bufsz);
 	if (ret == SA_OK) {
 		errno = 0;
-		tmp = strtol(defval, (char **)NULL, 10);
+		tmp = strtol(defval, NULL, 10);
 		if (errno == 0) {
 			vers_max_default = tmp;
 		}
@@ -4039,8 +4008,7 @@ read_default_nfs(void)
  *  Return the last entry in the file that matches.
  */
 static struct extmnttab *
-mnttab_find(dirname)
-	char *dirname;
+mnttab_find(char *dirname)
 {
 	FILE *fp;
 	struct extmnttab mnt;
@@ -4064,9 +4032,10 @@ mnttab_find(dirname)
 	resetmnttab(fp);
 	fclose(fp);
 	if (res == NULL) {
-		if (trace > 1)
+		if (trace > 1) {
 			trace_prt(1, "	mnttab_find: unable to find %s\n",
-				dirname);
+			    dirname);
+		}
 	}
 	return (res);
 }
@@ -4120,7 +4089,8 @@ is_v4_mount(char *mntpath)
 }
 
 static int
-create_homedir(const char *src, const char *dst) {
+create_homedir(const char *src, const char *dst)
+{
 
 	struct stat stbuf;
 	char *dst_username;
@@ -4171,9 +4141,10 @@ create_homedir(const char *src, const char *dst) {
 	/* Check that source is an home directory entry */
 	if (src_dir_len < 0 ||
 	    (strcmp(pwd->pw_dir, src + src_dir_len) != 0)) {
-		if (trace > 1)
+		if (trace > 1) {
 			trace_prt(1, "	homedir (2) doesn't match %s\n",
-		src+src_dir_len);
+			    src+src_dir_len);
+		}
 		return (0);
 	}
 
@@ -4268,10 +4239,10 @@ free_nfs_args(struct nfs_args *argp)
 
 void *
 get_netconfig_info(enum type_of_stuff type_of_stuff, char *hostname,
-	rpcprog_t prog, rpcvers_t vers, struct netconfig *nconf,
-	ushort_t port, struct t_info *tinfo, struct t_bind *tbind,
-	caddr_t *fhp, bool_t direct_to_server, char *fspath,
-	enum clnt_stat *cstat, mfs_snego_t *mfssnego)
+    rpcprog_t prog, rpcvers_t vers, struct netconfig *nconf,
+    ushort_t port, struct t_info *tinfo, struct t_bind *tbind,
+    caddr_t *fhp, bool_t direct_to_server, char *fspath,
+    enum clnt_stat *cstat, mfs_snego_t *mfssnego)
 {
 	struct netconfig *nb = NULL;
 	int ping_server = 0;
@@ -4306,9 +4277,9 @@ get_netconfig_info(enum type_of_stuff type_of_stuff, char *hostname,
  */
 void *
 get_server_addrorping(char *hostname, rpcprog_t prog, rpcvers_t vers,
-	struct netconfig *nconf, ushort_t port, struct t_info *tinfo,
-	struct t_bind *tbind, caddr_t *fhp, bool_t direct_to_server,
-	char *fspath, enum clnt_stat *cstat, int ping_server)
+    struct netconfig *nconf, ushort_t port, struct t_info *tinfo,
+    struct t_bind *tbind, caddr_t *fhp, bool_t direct_to_server,
+    char *fspath, enum clnt_stat *cstat, int ping_server)
 {
 	struct timeval tv;
 	enum clnt_stat cs = RPC_TIMEDOUT;
