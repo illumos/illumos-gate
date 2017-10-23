@@ -1,2421 +1,2179 @@
-'\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
-.\" Copyright (c) 2014, Joyent, Inc.  All Rights Reserved.
+.\" Copyright 2019, Joyent, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TERMIO 7I "Dec 30, 2016"
-.SH NAME
-termio \- general terminal interface
-.SH SYNOPSIS
-.LP
-.nf
-#include <termio.h>
-
-\fB\fR\fBioctl\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIrequest\fR, \fBstruct termio *\fR\fIarg\fR);
-.fi
-
-.LP
-.nf
-\fB\fR\fBioctl\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIrequest\fR, \fBint\fR \fIarg\fR);
-.fi
-
-.LP
-.nf
-#include <termios.h>
-
-\fB\fR\fBioctl\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIrequest\fR, \fBstruct termios *\fR\fIarg\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd March 17, 2019
+.Dt TERMIO 7I
+.Os
+.Sh NAME
+.Nm termio
+.Nd general terminal interface
+.Sh SYNOPSIS
+.In termio.h
+.Fn ioctl "int fildes" "int request" "struct termio *arg"
+.Fn ioctl "int fildes" "int request" "int arg"
+.Pp
+.In termios.h
+.Fn ioctl "int fildes" "int request" "struct termios *arg"
+.Sh DESCRIPTION
 This release supports a general interface for asynchronous communications ports
-that is hardware-independent. The user interface to this functionality is using
-function calls (the preferred interface) described in \fBtermios\fR(3C) or
-\fBioctl\fR commands described in this section. This section also discusses the
-common features of the  terminal subsystem which are relevant with both user
+that is hardware-independent.
+The user interface to this functionality is using
+function calls (the preferred interface) described in
+.Xr termios 3C
+or
+.Fn ioctl
+commands described in this section.
+This section also discusses the
+common features of the terminal subsystem which are relevant with both user
 interfaces.
-.sp
-.LP
+.Pp
 When a terminal file is opened, it normally causes the process to wait until a
-connection is established. In practice, user programs seldom open terminal
+connection is established.
+In practice, user programs seldom open terminal
 files; they are opened by the system and become a user's standard input,
-output, and error files. The first terminal file opened by the session leader
+output, and error files.
+The first terminal file opened by the session leader
 that is not already associated with a session becomes the controlling terminal
-for that session. The controlling terminal plays a special role in handling
-quit and interrupt signals, as discussed below. The controlling terminal is
-inherited by a child process during a \fBfork\fR(2). A process can break this
-association by changing its session using \fBsetsid()\fR (see \fBsetsid\fR(2)).
-.sp
-.LP
+for that session.
+The controlling terminal plays a special role in handling
+quit and interrupt signals, as discussed below.
+The controlling terminal is
+inherited by a child process during a
+.Xr fork 2 .
+A process can break this
+association by changing its session using
+.Xr setsid 2 .
+.Pp
 A terminal associated with one of these files ordinarily operates in
-full-duplex mode. Characters may be typed at any time, even while output is
+full-duplex mode.
+Characters may be typed at any time, even while output is
 occurring, and are only lost when the character input buffers of the system
-become completely full, which is rare. For example, the number of characters in
-the line discipline buffer may exceed {\fBMAX_CANON\fR}  and  \fBIMAXBEL\fR
-(see below) is not set, or the user may accumulate { \fBMAX_INPUT\fR} number of
-input characters that have not yet been read by some program. When the input
+become completely full, which is rare.
+For example, the number of characters in
+the line discipline buffer may exceed
+.Brq Dv MAX_CANON
+and
+.Dv IMAXBEL
+(see below) is not set, or the user may accumulate
+.Brq Dv MAX_INPUT
+number of input characters that have not yet been read by some program.
+When the input
 limit is reached, all the characters saved in the buffer up to that point are
 thrown away without notice.
-.SS "Session Management (Job Control)"
-.LP
+.Ss "Session Management (Job Control)"
 A control terminal will distinguish one of the process groups in the session
-associated with it to be the  foreground process group. All other process
-groups in the session are designated as background process groups. This
-foreground process group plays a special role in handling signal-generating
-input characters, as discussed below. By default, when a controlling terminal
-is allocated, the controlling process's process group is assigned  as
+associated with it to be the foreground process group.
+All other process
+groups in the session are designated as background process groups.
+This foreground process group plays a special role in handling signal-generating
+input characters, as discussed below.
+By default, when a controlling terminal
+is allocated, the controlling process's process group is assigned as
 foreground process group.
-.sp
-.LP
+.Pp
 Background process groups in the controlling process's session are subject to a
 job control line discipline when they attempt to access their controlling
-terminal. Process groups can be sent signals that will cause them to stop,
-unless they have made other arrangements. An exception is made for members of
+terminal.
+Process groups can be sent signals that will cause them to stop,
+unless they have made other arrangements.
+An exception is made for members of
 orphaned process groups.
-.sp
-.LP
-An orphaned process group is one where the process group (see \fBgetpgid\fR(2))
+.Pp
+An orphaned process group is one where the process group (see
+.Xr getpgid 2 )
 has no members with a parent in a different process group but sharing the same
-controlling terminal. When a member of an orphaned process group attempts to
+controlling terminal.
+When a member of an orphaned process group attempts to
 access its controlling terminal, EIO is returned because there would be no way
 to restart the process if it were stopped on one of these signals.
-.sp
-.LP
+.Pp
 If a member of a background process group attempts to read its controlling
-terminal, its process group will be sent a  \fBSIGTTIN\fR signal, which will
-normally cause the members of that process group to stop. If, however, the
-process is ignoring or holding \fBSIGTTIN\fR, or is a member of an orphaned
-process group, the read will fail with \fBerrno\fR set to  \fBEIO\fR, and no
-signal is sent.
-.sp
-.LP
+terminal, its process group will be sent a
+.Dv SIGTTIN
+signal, which will
+normally cause the members of that process group to stop.
+If, however, the
+process is ignoring or holding
+.Dv SIGTTIN ,
+or is a member of an orphaned
+process group, the read will fail with
+.Va errno
+set to
+.Er EIO ,
+and no signal is sent.
+.Pp
 If a member of a background process group attempts to write its controlling
-terminal and the \fBTOSTOP\fR bit is set in the \fBc_lflag\fR field, its
-process group is sent a \fBSIGTTOU\fR signal, which will normally cause the
-members of that process group to stop. If, however, the process is ignoring or
-holding \fBSIGTTOU\fR, the write will succeed. If the process is not ignoring
-or holding \fBSIGTTOU\fR and is a member of an orphaned process group, the
-write will fail with  \fBerrno\fR set to  \fBEIO\fR, and no signal will be
-sent.
-.sp
-.LP
-If \fBTOSTOP\fR is set and a member of a background process group attempts  to
-\fBioctl\fR its controlling terminal, and that \fBioctl\fR will modify terminal
-parameters (for example, \fBTCSETA\fR, \fBTCSETAW\fR, \fBTCSETAF\fR, or
-\fBTIOCSPGRP)\fR, its process group will be sent a \fBSIGTTOU\fR signal, which
-will normally cause the members of that process group to stop. If, however, the
-process is ignoring or holding \fBSIGTTOU\fR, the ioctl will succeed. If the
-process is not ignoring or holding \fBSIGTTOU\fR and is a member of an orphaned
-process group, the write will fail with  \fBerrno\fR set to \fBEIO\fR, and no
-signal will be sent.
-.SS "Canonical Mode Input Processing"
-.LP
-Normally, terminal input is processed in units of lines. A line is delimited by
-a newline (\fBASCII LF\fR) character, an end-of-file (\fBASCII EOT\fR)
-character, or an end-of-line character. This means that a program attempting to
-read will block until an entire line has been typed. Also, no matter how many
+terminal and the
+.Dv TOSTOP
+bit is set in the
+.Fa c_lflag
+field, its process group is sent a
+.Dv SIGTTOU
+signal, which will normally cause the
+members of that process group to stop.
+If, however, the process is ignoring or
+holding
+.Dv SIGTTOU ,
+the write will succeed.
+If the process is not ignoring
+or holding
+.Dv SIGTTOU
+and is a member of an orphaned process group, the
+write will fail with
+.Va errno
+set to
+.Er EIO ,
+and no signal will be sent.
+.Pp
+If
+.Dv TOSTOP
+is set and a member of a background process group attempts to
+.Fn ioctl
+its controlling terminal, and that
+.Fn ioctl
+will modify terminal parameters (for example,
+.Dv TCSETA ,
+.Dv TCSETAW ,
+.Dv TCSETAF ,
+or
+.Dv TIOCSPGRP ) ,
+its process group will be sent a
+.Dv SIGTTOU
+signal, which will normally cause the members of that process group to stop.
+If, however, the process is ignoring or holding
+.Dv SIGTTOU ,
+the ioctl will succeed.
+If the process is not ignoring or holding
+.Dv SIGTTOU
+and is a member of an orphaned
+process group, the write will fail with
+.Va errno
+set to
+.Er EIO ,
+and no signal will be sent.
+.Ss "Canonical Mode Input Processing"
+Normally, terminal input is processed in units of lines.
+A line is delimited by
+a newline
+.Po
+.Sy ASCII LF
+.Pc
+character, an end-of-file
+.Po
+.Sy ASCII EOT
+.Pc
+character, or an end-of-line character.
+This means that a program attempting to
+read will block until an entire line has been typed.
+Also, no matter how many
 characters are requested in the read call, at most one line will be returned.
 It is not necessary, however, to read a whole line at once; any number of
 characters may be requested in a read, even one, without losing information.
-.sp
-.LP
-During input, erase, erase2, and kill processing is normally done. The
-\fBERASE\fR and \fBERASE2\fR character (by default, the character \fBDEL\fR for \fBERASE\fR and \fBControl-h\fR for \fBERASE2\fR) erases the last character
-typed. The \fBWERASE\fR character (the character  \fBControl-w\fR) erases the
+.Pp
+During input, erase, erase2, and kill processing is normally done.
+The
+.Sy ERASE
+and
+.Sy ERASE2
+character (by default, the character
+.Sy DEL
+for
+.Sy ERASE
+and
+.Sy Control-h
+for
+.Sy ERASE2 )
+erases the last character typed.
+The
+.Sy WERASE
+character (the character
+.Sy Control-w )
+erases the
 last "word" typed in the current input line (but not any preceding spaces or
-tabs). A "word" is defined as a sequence of non-blank characters, with tabs
-counted as blanks. None of \fBERASE\fR or \fBERASE2\fR or \fBWERASE\fR will
-erase beyond the beginning of the line.  The \fBKILL\fR character (by default,
-the character \fBNAK\fR) kills (deletes) the entire input line, and optionally
-outputs a newline character. All these characters operate on a key stroke basis,
-independent of any backspacing or tabbing that may have been done. The
-\fBREPRINT\fR character (the character Control-r) prints a newline followed by
-all characters that have not been read. Reprinting also occurs automatically if
+tabs).
+A
+.Dq word
+is defined as a sequence of non-blank characters, with tabs counted as blanks.
+None of
+.Sy ERASE
+or
+.Sy ERASE2
+or
+.Sy WERASE
+will erase beyond the beginning of the line.
+The
+.Sy KILL
+character (by default,
+the character
+.Sy NAK )
+kills (deletes) the entire input line, and optionally
+outputs a newline character.
+All these characters operate on a key stroke basis,
+independent of any backspacing or tabbing that may have been done.
+The
+.Sy REPRINT
+character (the character
+.Sy Control-r )
+prints a newline followed by all characters that have not been read.
+Reprinting also occurs automatically if
 characters that would normally be erased from the screen are fouled by program
-output. The characters are reprinted as if they were being echoed;
-consequencely, if \fBECHO\fR is not set, they are not printed.
-.sp
-.LP
-The \fBERASE\fR, \fBERASE2\fR, and \fBKILL\fR characters may be entered
-literally by preceding them with the escape character. In this case, the
-escape character is not read.  The erase, erase2, and kill characters may be
-changed.
-.SS "Non-canonical Mode Input Processing"
-.LP
+output.
+The characters are reprinted as if they were being echoed;
+consequencely, if
+.Dv ECHO
+is not set, they are not printed.
+.Pp
+The
+.Sy ERASE ,
+.Sy ERASE2 ,
+and
+.Sy KILL
+characters may be entered literally by preceding them with the escape character.
+In this case, the escape character is not read.
+The erase, erase2, and kill characters may be changed.
+.Ss "Non-canonical Mode Input Processing"
 In non-canonical mode input processing, input characters are not assembled into
-lines, and erase and kill processing does not occur. The \fBMIN\fR and
-\fBTIME\fR values are used to determine how to process the characters received.
-.sp
-.LP
-\fBMIN\fR represents the minimum number of characters that should be received
+lines, and erase and kill processing does not occur.
+The
+.Sy MIN
+and
+.Sy TIME
+values are used to determine how to process the characters received.
+.Pp
+.Sy MIN
+represents the minimum number of characters that should be received
 when the read is satisfied (that is, when the characters are returned to the
-user). \fBTIME\fR is a timer of 0.10-second granularity that is used to timeout
-bursty and short-term data transmissions. The four possible values for
-\fBMIN\fR and \fBTIME\fR and their interactions are described below.
-.sp
-.ne 2
-.na
-\fBCase A: MIN > 0, TIME > 0\fR
-.ad
-.RS 29n
-In this case, \fBTIME\fR serves as an intercharacter timer and is activated
-after the first character is received.  Since it is an intercharacter timer, it
-is reset after a character is received. The interaction between \fBMIN\fR and
-\fBTIME\fR is as follows: as soon as one character is received, the
-intercharacter timer is started. If  \fBMIN\fR characters are received before
+user).
+.Sy TIME
+is a timer of 0\&.10-second granularity that is used to timeout
+bursty and short-term data transmissions.
+The four possible values for
+.Sy MIN
+and
+.Sy TIME
+and their interactions are described below.
+.Bl -tag -width "Case A: Min > 0, Time > 0"
+.It Sy Case A: MIN > 0, TIME > 0
+In this case,
+.Sy TIME
+serves as an intercharacter timer and is activated
+after the first character is received.
+Since it is an intercharacter timer, it
+is reset after a character is received.
+The interaction between
+.Sy MIN
+and
+.Sy TIME
+is as follows: as soon as one character is received, the
+intercharacter timer is started.
+If
+.Sy MIN
+characters are received before
 the intercharacter timer expires (note that the timer is reset upon receipt of
-each character), the read is satisfied.  If the timer expires before \fBMIN\fR
+each character), the read is satisfied.
+If the timer expires before
+.Sy MIN
 characters are received, the characters received to that point are returned to
-the user. Note that if  \fBTIME\fR expires, at least one character will be
-returned because  the timer would not have been enabled unless a character was
-received. In this case (MIN > 0, TIME > 0), the read sleeps until the \fBMIN\fR
-and \fBTIME\fR mechanisms are activated by the receipt of the first character.
+the user.
+Note that if
+.Sy TIME
+expires, at least one character will be
+returned because the timer would not have been enabled unless a character was
+received.
+In this case (MIN > 0, TIME > 0), the read sleeps until the
+.Sy MIN
+and
+.Sy TIME
+mechanisms are activated by the receipt of the first character.
 If the number of characters read is less than the number of characters
 available, the timer is not reactivated and the subsequent read is satisfied
 immediately.
-.RE
-
-.sp
-.ne 2
-.na
-\fBCase B: MIN > 0, TIME = 0\fR
-.ad
-.RS 29n
-In this case, since the value of \fBTIME\fR is zero, the timer plays no role
-and only \fBMIN\fR is significant.  A pending read is not satisfied until
-\fBMIN\fR characters are received (the pending read sleeps until  \fBMIN\fR
-characters are received). A program that uses this case to read record based
-terminal \fBI/O\fR may block indefinitely in the read operation.
-.RE
-
-.sp
-.ne 2
-.na
-\fBCase C: MIN = 0, TIME > 0\fR
-.ad
-.RS 29n
-In this case, since \fBMIN\fR = 0,  \fBTIME\fR no longer represents an
+.It Sy Case B: MIN > 0, TIME = 0
+In this case, since the value of
+.Sy TIME
+is zero, the timer plays no role
+and only
+.Sy MIN
+is significant.
+A pending read is not satisfied until
+.Sy MIN
+characters are received (the pending read sleeps until
+.Sy MIN
+characters are received).
+A program that uses this case to read record based
+terminal
+.Sy I/O
+may block indefinitely in the read operation.
+.It Sy Case C: MIN = 0, TIME > 0
+In this case, since
+.Sy MIN
+0,
+.Sy TIME
+no longer represents an
 intercharacter timer: it now serves as a read timer that is activated as soon
-as a \fBread\fR is done.  A read is satisfied as soon as a single character is
-received or the read timer expires. Note that, in this case, if the timer
-expires, no character is returned. If the timer does not expire, the only way
-the read can be satisfied is if a  character is received. In this case, the
+as a
+.Xr read  2
+is done.
+A read is satisfied as soon as a single character is
+received or the read timer expires.
+Note that, in this case, if the timer
+expires, no character is returned.
+If the timer does not expire, the only way
+the read can be satisfied is if a character is received.
+In this case, the
 read will not block indefinitely waiting for a character; if no character is
-received within \fBTIME\fR *.10 seconds after the read is initiated, the read
+received within
+.Sy TIME
+*\&.10 seconds after the read is initiated, the read
 returns with zero characters.
-.RE
-
-.sp
-.ne 2
-.na
-\fBCase D: MIN = 0, TIME = 0\fR
-.ad
-.RS 29n
-In this case, return is immediate. The minimum of either the number of
+.It Sy Case D: MIN = 0, TIME = 0
+In this case, return is immediate.
+The minimum of either the number of
 characters requested or the number of characters currently available is
 returned without waiting for more characters to be input.
-.RE
-
-.SS "Comparing Different Cases of MIN, TIME Interaction"
-.LP
-Some points to note about  \fBMIN\fR and  \fBTIME\fR :
-.RS +4
-.TP
-.ie t \(bu
-.el o
-In the following explanations, note that the interactions of \fBMIN\fR and
-\fBTIME\fR are not symmetric.  For example, when  \fBMIN\fR > 0 and  \fBTIME\fR
-= 0,  \fBTIME\fR has no effect. However, in the opposite case, where  \fBMIN\fR
-= 0 and \fBTIME\fR > 0, both  \fBMIN\fR and  \fBTIME\fR play a role in that
-\fBMIN\fR is satisfied with the receipt of a single character.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Also note that in case A (\fBMIN\fR > 0, \fBTIME\fR > 0), \fBTIME\fR represents
-an intercharacter timer,  whereas in case C ( \fBMIN\fR = 0, \fBTIME\fR > 0),
-\fBTIME\fR represents a read timer.
-.RE
-.sp
-.LP
-These two points highlight the dual purpose of the  \fBMIN/TIME\fR feature.
-Cases A and B, where  \fBMIN\fR > 0, exist to handle burst mode activity (for
+.El
+.Ss "Comparing Different Cases of MIN, TIME Interaction"
+Some points to note about
+.Sy MIN
+and
+.Sy TIME :
+.Bl -bullet -offset 2n
+.It
+In the following explanations, note that the interactions of
+.Sy MIN
+and
+.Sy TIME
+are not symmetric.
+For example, when
+.Sy MIN
+> 0 and
+.Sy TIME
+= 0,
+.Sy TIME
+has no effect.
+However, in the opposite case, where
+.Sy MIN
+= 0 and
+.Sy TIME
+> 0, both
+.Sy MIN
+and
+.Sy TIME
+play a role in that
+.Sy MIN
+is satisfied with the receipt of a single character.
+.It
+Also note that in case A
+.Po
+.Sy MIN
+> 0,
+.Sy TIME
+> 0
+.Pc ,
+.Sy TIME
+represents
+an intercharacter timer, whereas in case C
+.Po
+.Sy MIN
+= 0,
+.Sy TIME
+> 0
+.Pc ,
+.Sy TIME
+represents a read timer.
+.El
+.Pp
+These two points highlight the dual purpose of the
+.Sy MIN/TIME
+feature.
+Cases A and B, where
+.Sy MIN
+> 0, exist to handle burst mode activity (for
 example, file transfer programs), where a program would like to process at
-least \fBMIN\fR characters at a time. In case A, the intercharacter timer is
+least
+.Sy MIN
+characters at a time.
+In case A, the inteercharacter timer is
 activated by a user as a safety measure; in case B, the timer is turned off.
-.sp
-.LP
-Cases C and D exist to handle single character, timed transfers. These cases
+.Pp
+Cases C and D exist to handle single character, timed transfers.
+These cases
 are readily adaptable to screen-based applications that need to know if a
-character is present in the input queue before refreshing the screen. In case
+character is present in the input queue before refreshing the screen.
+In case
 C, the read is timed, whereas in case D, it is not.
-.sp
-.LP
-Another important note is that \fBMIN\fR is always just a minimum.  It does not
-denote a record length. For example, if a program does a read of 20 bytes,
-\fBMIN\fR is 10, and 25 characters are present, then 20 characters will be
+.Pp
+Another important note is that
+.Sy MIN
+is always just a minimum.
+It does not
+denote a record length.
+For example, if a program does a read of 20 bytes,
+.Sy MIN
+is 10, and 25 characters are present, then 20 characters will be
 returned to the user.
-.SS "Writing Characters"
-.LP
+.Ss "Writing Characters"
 When one or more characters are written, they are transmitted to the terminal
-as soon as previously written characters have finished typing. Input characters
-are echoed as they are typed if echoing has been enabled. If a process produces
+as soon as previously written characters have finished typing.
+nputt characters
+are echoed as they are typed if echoing has been enabled.
+If a process produces
 characters more rapidly than they can be typed, it will be suspended when its
-output queue exceeds some limit. When the queue is drained down to some
+output queue exceeds some limit.
+When the queue is drained down to some
 threshold, the program is resumed.
-.SS "Special Characters"
-.LP
-Certain characters have special functions on input. These functions and their
-default character values are summarized as follows:
-.sp
-.ne 2
-.na
-\fB\fBINTR\fR\fR
-.ad
-.RS 11n
-(Control-c or \fBASCII ETX\fR) generates a \fBSIGINT\fR signal. \fBSIGINT\fR is
-sent to all foreground processes associated with the controlling terminal.
+.Ss "Special Characters"
+Certain characters have special functions on input.
+These functions and their default character values are summarized as follows:
+.Bl -tag -width REPRINT
+.It Sy INTR
+(Control-c or
+.Sy ASCII ETX )
+generates a
+.Dv SIGINT
+signal.
+.Dv SIGINT
+is sent to all foreground processes associated with the controlling terminal.
 Normally, each such process is forced to terminate, but arrangements may be
 made either to ignore the signal or to receive a trap to an agreed upon
-location. (See  \fBsignal.h\fR(3HEAD)).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBQUIT\fR\fR
-.ad
-.RS 11n
-(Control-| or \fBASCII FS\fR) generates a \fBSIGQUIT\fR signal.  Its treatment
+location.
+(See
+.Xr signal.h 3HEAD ) .
+.It Sy QUIT
+(Control-| or
+.Sy ASCII FS )
+generates a
+.Dv SIGQUIT
+signal.
+Its treatment
 is identical to the interrupt signal except that, unless a receiving process
 has made other arrangements, it will not only be terminated but a core image
-file (called  \fBcore\fR) will be created in the current working directory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBERASE\fR\fR
-.ad
-.RS 11n
-(DEL) erases the preceding character. It does not erase beyond
-the start of a line, as delimited by a \fBNL\fR, \fBEOF\fR, \fBEOL\fR, or
-\fBEOL2\fR character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBERASE2\fR\fR
-.ad
-.RS 11n
-(Control-h or \fBASCII BS\fR) erases the preceding character, with behaviour
-identical to that of ERASE.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBWERASE\fR\fR
-.ad
-.RS 11n
-(Control-w or \fBASCII ETX\fR) erases the preceding "word". It does not erase
-beyond the start of a line, as delimited by a \fBNL\fR, \fBEOF\fR, \fBEOL\fR,
-or \fBEOL2\fR character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBKILL\fR\fR
-.ad
-.RS 11n
-(Control-u or \fBASCII NAK\fR) deletes the entire line, as delimited by a
-\fBNL\fR, \fBEOF\fR, \fBEOL\fR, or \fBEOL2\fR character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBREPRINT\fR\fR
-.ad
-.RS 11n
-(Control-r or \fBASCII DC2\fR) reprints all characters, preceded by a newline,
-that have not been read.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOF\fR\fR
-.ad
-.RS 11n
-(Control-d or \fBASCII EOT\fR) may be used to generate an end-of-file  from a
-terminal. When received, all the characters waiting to be read are immediately
-passed to the program, without waiting for a newline, and the \fBEOF\fR is
-discarded.  Thus, if no characters are waiting (that is, the \fBEOF\fR occurred
+file (called
+.Pa core )
+will be created in the current working directory.
+.It Sy ERASE
+(DEL) erases the preceding character.
+It does not erase beyond
+the start of a line, as delimited by a
+.Sy NL ,
+.Sy EOF ,
+.Sy EOL ,
+or
+.Sy EOL2
+character.
+.It Sy ERASE2
+(Control-h or
+.Sy ASCII BS )
+erases the preceding character, with behaviour identical to that of ERASE.
+.It Sy WERASE
+(Control-w or
+.Sy ASCII ETX )
+erases the preceding
+.Dq word .
+It does not erase beyond the start of a line, as delimited by a
+.Sy NL ,
+.Sy EOF ,
+.Sy EOL ,
+or
+.Sy EOL2
+character.
+.It Sy KILL
+(Control-u or
+.Sy ASCII NAK )
+deletes the entire line, as delimited by a
+.Sy NL ,
+.Sy EOF ,
+.Sy EOL ,
+or
+.Sy EOL2
+character.
+.It Sy REPRINT
+(Control-r or
+.Sy ASCII DC2 )
+reprints all characters, preceded by a newline, that have not been read.
+.It Sy EOF
+(Control-d or
+.Sy ASCII EOT )
+may be used to generate an end-of-file from a terminal.
+When received, all the characters waiting to be read are immediately
+passed to the program, without waiting for a newline, and the
+.Sy EOF
+is discarded.
+Thus, if no characters are waiting (that is, the
+.Sy EOF
+occurred
 at the beginning of a line) zero characters are passed back, which is the
-standard end-of-file indication. Unless escaped, the \fBEOF\fR character is not
-echoed. Because \fBEOT\fR is the default \fBEOF\fR character, this prevents
-terminals that respond to \fBEOT\fR from hanging up.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNL\fR\fR
-.ad
-.RS 11n
-(ASCII LF) is the normal line delimiter. It cannot be changed or escaped.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOL\fR\fR
-.ad
-.RS 11n
-(ASCII NULL) is an additional line delimiter, like \fBNL\fR . It is not
-normally used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOL2\fR\fR
-.ad
-.RS 11n
+standard end-of-file indication.
+Unless escaped, the
+.Sy EOF
+character is not
+echoed.
+Because
+.Sy EOT
+is the default
+.Sy EOF
+character, this prevents
+terminals that respond to
+.Sy EOT
+from hanging up.
+.It Sy NL
+.Pq Sy ASCII LF
+is the normal line delimiter.
+It cannot be changed or escaped.
+.It Sy EOL
+.Pq Sy ASCII NULL
+is an additional line delimiter, like
+.Sy NL .
+It is not normally used.
+.It Sy EOL2
 is another additional line delimiter.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSWTCH\fR\fR
-.ad
-.RS 11n
-(Control-z or \fBASCII EM\fR) Header file symbols related to this special
+.It Sy SWTCH
+(Control-z or
+.Sy ASCII EM )
+Header file symbols related to this special
 character are present for compatibility purposes only and the kernel takes no
 special action on matching SWTCH (except to discard the character).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSUSP\fR\fR
-.ad
-.RS 11n
-(Control-z or \fBASCII SUB\fR) generates a  \fBSIGTSTP\fR signal. \fBSIGTSTP\fR
+.It Sy SUSP
+(Control-z or
+.Sy ASCII SUB )
+generates a
+.Dv SIGTSTP
+signal.
+.Dv SIGTSTP
 stops all processes in the foreground process group for that terminal.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDSUSP\fR\fR
-.ad
-.RS 11n
-(Control-y or \fBASCII EM\fR). It generates a \fBSIGTSTP\fR signal as
-\fBSUSP\fR does, but the signal is sent when a process in the foreground
-process group attempts to read the \fBDSUSP\fR character, rather than when it
-is typed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTOP\fR\fR
-.ad
-.RS 11n
-(Control-s or \fBASCII DC3\fR) can be used to suspend output temporarily. It is
-useful with \fBCRT\fR terminals to prevent output from disappearing before it
-can be read. While output is suspended, \fBSTOP\fR characters are ignored and
+.It Sy DSUSP
+(Control-y or
+.Sy ASCII EM ) .
+It generates a
+.Dv SIGTSTP
+signal as
+.Sy SUSP
+does, but the signal is sent when a process in the foreground
+process group attempts to read the
+.Sy DSUSP
+character, rather than when it is typed.
+.It Sy STOP
+(Control-s or
+.Sy ASCII DC3 )
+can be used to suspend output temporarily.
+It is useful with
+.Sy CRT
+terminals to prevent output from disappearing before it can be read.
+While output is suspended,
+.Sy STOP
+characters are ignored and
 not read.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTART\fR\fR
-.ad
-.RS 11n
-(Control-q or \fBASCII DC1\fR) is used to resume output. Output has been
-suspended by a \fBSTOP\fR character.  While output is not suspended,
-\fBSTART\fR characters are ignored and not read.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDISCARD\fR\fR
-.ad
-.RS 11n
-(Control-o or \fBASCII SI\fR) causes subsequent output to be discarded. Output
-is discarded until another \fBDISCARD\fR character is typed, more input
+.It Sy START
+(Control-q or
+.Sy ASCII DC1 )
+is used to resume output.
+Output has been suspended by a
+.Sy STOP
+character.
+While output is not suspended,
+.Sy START
+characters are ignored and not read.
+.It Sy DISCARD
+(Control-o or
+.Sy ASCII SI )
+causes subsequent output to be discarded.
+Output is discarded until another
+.Sy DISCARD
+character is typed, more input
 arrives, or the condition is cleared by a program.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSTATUS\fR\fR
-.ad
-.RS 11n
-(Control-t or \fBASCII DC4\fR) generates a \fBSIGINFO\fR signal. Processes with
-a handler will output status information when they receive \fBSIGINFO\fR, for
-example, \fBdd\fR(1M). If a process does not have a \fBSIGINFO\fR handler, the
+.It Sy STATUS
+(Control-t or
+.Sy ASCII DC4 )
+generates a
+.Dv SIGINFO
+signal.
+Processes with a handler will output status information when they receive
+.Dv SIGINFO ,
+for
+example,
+.Xr dd 1M .
+If a process does not have a
+.Dv SIGINFO
+handler, the
 signal will be ignored.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLNEXT\fR\fR
-.ad
-.RS 11n
-(Control-v or \fBASCII SYN\fR) causes the special meaning of the next character
-to be ignored.  This works for all the special characters mentioned above. It
+.It Sy LNEXT
+(Control-v or
+.Sy ASCII SYN )
+causes the special meaning of the next character to be ignored.
+This works for all the special characters mentioned above.
+It
 allows characters to be input that would otherwise be interpreted by the system
-(for example \fBKILL, QUIT\fR).  The character values for \fBINTR\fR,
-\fBQUIT\fR, \fBERASE\fR, \fBERASE2\fR, \fBWERASE\fR, \fBKILL\fR, \fBREPRINT\fR,
-\fBEOF\fR, \fBEOL\fR, \fBEOL2\fR, \fBSWTCH\fR, \fBSUSP\fR, \fBDSUSP\fR,
-\fBSTOP\fR, \fBSTART\fR, \fBDISCARD\fR, \fBSTATUS\fR, and \fBLNEXT\fR may be
-changed to suit individual tastes. If the value of a special control character
-is _POSIX_VDISABLE (0), the function of that special control character is
-disabled.
-The \fBERASE\fR, \fBERASE2\fR, \fBKILL\fR, and \fBEOF\fR characters may be
+(for example
+.Sy KILL ,
+.Sy QUIT ) .
+The character values for
+.Sy INTR ,
+.Sy QUIT ,
+.Sy ERASE ,
+.Sy ERASE2 ,
+.Sy WERASE ,
+.Sy KILL ,
+.Sy REPRINT ,
+.Sy EOF ,
+.Sy EOL ,
+.Sy EOL2 ,
+.Sy SWTCH ,
+.Sy SUSP ,
+.Sy DSUSP ,
+.Sy STOP ,
+.Sy START ,
+.Sy DISCARD ,
+.Sy STATUS ,
+and
+.Sy LNEXT
+may be changed to suit individual tastes.
+If the value of a special control character
+is
+.Dv _POSIX_VDISABLE
+(0), the function of that special control character is disabled.
+The
+.Sy ERASE ,
+.Sy ERASE2 ,
+.Sy KILL ,
+and
+.Sy EOF
+characters may be
 escaped by a preceding backslash (\e) character, in which case no special
 function is done.
-Any of the special characters may be preceded by the \fBLNEXT\fR character, in
+Any of the special characters may be preceded by the
+.Sy LNEXT
+character, in
 which case no special function is done.
-.RE
-
-.SS "Modem Disconnect"
-.LP
-When a modem disconnect is detected, a \fBSIGHUP\fR signal is sent to the
-terminal's controlling process. Unless other arrangements have been made, these
-signals cause the process to terminate. If  \fBSIGHUP\fR is ignored or caught,
+.El
+.Ss "Modem Disconnect"
+When a modem disconnect is detected, a
+.Dv SIGHUP
+signal is sent to the
+terminal's controlling process.
+Unless other arrangements have been made, these
+signals cause the process to terminate.
+If
+.Dv SIGHUP
+is ignored or caught,
 any subsequent read returns with an end-of-file indication until the terminal
 is closed.
-.sp
-.LP
-If the controlling process is not in the  foreground process group of the
-terminal, a \fBSIGTSTP\fR is sent to the terminal's foreground process group.
+.Pp
+If the controlling process is not in the foreground process group of the
+terminal, a
+.Dv SIGTSTP
+is sent to the terminal's foreground process group.
 Unless other arrangements have been made, these signals cause the processes to
 stop.
-.sp
-.LP
+.Pp
 Processes in background process groups that attempt to access the controlling
 terminal after modem disconnect while the terminal is still allocated to the
-session will receive  appropriate \fBSIGTTOU\fR and  \fBSIGTTIN\fR signals.
-Unless other arrangements have  been made, this signal causes the processes to
+session will receive appropriate
+.Dv SIGTTOU
+and
+.Dv SIGTTIN
+signals.
+Unless other arrangements have been made, this signal causes the processes to
 stop.
-.sp
-.LP
-The controlling terminal will remain in this state until it is  reinitialized
-with a successful open by the controlling process, or deallocated by the
+.Pp
+The controlling terminal will remain in this state until it is reinitialized
+ithh a successful open by the controlling process, or deallocated by the
 controlling process.
-.SS "Terminal Parameters"
-.LP
+.Ss "Terminal Parameters"
 The parameters that control the behavior of devices and modules providing the
-\fBtermios\fR interface are specified by the \fBtermios\fR structure defined by
-\fBtermios.h\fR. Several  \fBioctl\fR(2) system calls that fetch or change
+.Vt termios
+interface are specified by the
+.Vt termios
+structure defined by
+.In termios.h .
+Several
+.Xr ioctl 2
+system calls that fetch or change
 these parameters use this structure that contains the following members:
-.sp
-.in +2
-.nf
- tcflag_t c_iflag;  /* input modes */
-	tcflag_t	c_oflag;  /* output modes */
-	tcflag_t	c_cflag;  /* control modes */
-	tcflag_t	c_lflag;  /* local modes */
-	cc_t  c_cc[NCCS];  /* control chars */
-.fi
-.in -2
-
-.sp
-.LP
-The special control characters are defined by the array \fBc_cc\fR. The
-symbolic name \fBNCCS\fR is the size of the Control-character array and is also
-defined by \fB<termios.h>\fR\&. The relative positions, subscript names, and
-typical default values  for each function are as follows:
-.sp
-
-.sp
-.TS
-box;
-c | c | c
-l | l | l .
-Relative Position	Subscript Name	Typical Default Value
-_
-0	VINTR	ETX
-_
-1 	VQUIT	FS
-_
-2	VERASE	DEL
-_
-3	VKILL	NAK
-_
-4	VEOF	EOT
-_
-5	VEOL	NUL
-_
-6	VEOL2	NUL
-_
-7	VWSTCH	NUL
-_
-8	VSTART	NUL
-_
-9	VSTOP	DC3
-_
-10	VSUSP	SUB
-_
-11	VDSUSP	EM
-_
-12	VREPRINT	DC2
-_
-13	VDISCARD	SI
-_
-14	VWERASE	ETB
-_
-15	VLNEXT	SYN
-_
-16	VSTATUS	DC4
-_
-17	VERASE2	BS
-_
-18-19	Reserved
-.TE
-
-.SS "Input Modes"
-.LP
-The \fBc_iflag\fR field describes the basic terminal input control:
-.sp
-.ne 2
-.na
-\fB\fBIGNBRK\fR\fR
-.ad
-.RS 11n
- Ignore break condition.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBBRKINT\fR\fR
-.ad
-.RS 11n
+.Bd -literal -offset 2n
+tcflag_t	c_iflag;	/* input modes */
+tcflag_t	c_oflag;	/* output modes */
+tcflag_t	c_cflag;	/* control modes */
+tcflag_t	c_lflag;	/* local modes */
+cc_t		c_cc[NCCS];	/* control chars */
+.Ed
+.Pp
+The special control characters are defined by the array
+.Fa c_cc .
+The symbolic name
+.Dv NCCS
+is the size of the Control-character array and is also
+defined by
+.In termios.h .
+The relative positions, subscript names, and
+typical default values for each function are as follows:
+.Bl -column "Relative Position" "Subscript Name" "Typical Default Value"
+.It Relative Position Ta Subscript Name Ta Typical Default Value
+.It 0 Ta Dv VINTR Ta Sy ETX
+.It 1 Ta Dv VQUIT Ta Sy FS
+.It 2 Ta Dv VERASE Ta Sy DEL
+.It 3 Ta Dv VKILL Ta Sy NAK
+.It 4 Ta Dv VEOF Ta Sy EOT
+.It 5 Ta Dv VEOL Ta Sy NUL
+.It 6 Ta Dv VEOL2 Ta Sy NUL
+.It 7 Ta Dv VWSTCH Ta Sy NUL
+.It 8 Ta Dv VSTART Ta Sy NUL
+.It 9 Ta Dv VSTOP Ta Sy DC3
+.It 10 Ta Dv VSUSP Ta Sy SUB
+.It 11 Ta Dv VDSUSP Ta Sy EM
+.It 12 Ta Dv VREPRINT Ta Sy DC2
+.It 13 Ta Dv VDISCARD Ta Sy SI
+.It 14 Ta Dv VWERASE Ta Sy ETB
+.It 15 Ta Dv VLNEXT Ta Sy SYN
+.It 16 Ta Dv VSTATUS Ta Sy DC4
+.It 17 Ta Dv VERASE2 Ta Sy BS
+.It 18-19 Ta Reserved Ta
+.El
+.Ss "Input Modes"
+The
+.Fa c_iflag
+field describes the basic terminal input control:
+.Pp
+.Bl -tag -width "IMAXBEL" -offset 2n -compact
+.It Dv IGNBRK
+Ignore break condition.
+.It Dv BRKINT
 Signal interrupt on break.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIGNPAR\fR\fR
-.ad
-.RS 11n
+.It Dv IGNPAR
 Ignore characters with parity errors.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPARMRK\fR\fR
-.ad
-.RS 11n
+.It Dv PARMRK
 Mark parity errors.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBINPCK\fR\fR
-.ad
-.RS 11n
+.It Dv INPCK
 Enable input parity check.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBISTRIP\fR\fR
-.ad
-.RS 11n
+.It Dv ISTRIP
 Strip character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBINLCR\fR\fR
-.ad
-.RS 11n
+.It Dv INLCR
 Map NL to CR on input.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIGNCR\fR\fR
-.ad
-.RS 11n
+.It Dv IGNCR
 Ignore CR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBICRNL\fR\fR
-.ad
-.RS 11n
+.It Dv ICRNL
 Map CR to NL on input.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIUCLC\fR\fR
-.ad
-.RS 11n
+.It Dv IUCLC
 Map upper-case to lower-case on input.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIXON\fR\fR
-.ad
-.RS 11n
+.It Dv IXON
 Enable start/stop output control.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIXANY\fR\fR
-.ad
-.RS 11n
+.It Dv IXANY
 Enable any character to restart output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIXOFF\fR\fR
-.ad
-.RS 11n
+.It Dv IXOFF
 Enable start/stop input control.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIMAXBEL\fR\fR
-.ad
-.RS 11n
-Echo  \fBBEL\fR on input line too long.
-.RE
-
-.sp
-.LP
-If \fBIGNBRK\fR is set, a break condition (a character framing error with data
+.It Dv IMAXBEL
+Echo
+.Sy BEL
+on input line too long.
+.El
+.Pp
+If
+.Dv IGNBRK
+is set, a break condition (a character framing error with data
 all zeros) detected on input is ignored, that is, not put on the input queue
-and therefore not read by any process. If \fBIGNBRK\fR is not set and
-\fBBRKINT\fR is set, the break condition shall flush the input and output
+and therefore not read by any process.
+If
+.Dv IGNBRK
+is not set and
+.Dv BRKINT
+is set, the break condition shall flush the input and output
 queues and if the terminal is the controlling terminal of a foreground process
-group, the break condition generates a single \fBSIGINT\fR signal to that
-foreground process group. If neither \fBIGNBRK\fR nor \fBBRKINT\fR is set, a
-break condition is read as a single '\e0' (\fBASCII NULL\fR) character, or if
-\fBPARMRK\fR is set, as '\e377', '\e0', c, where '\e377' is a single character
-with value 377 octal (0xff hex, 255 decimal), '\e0' is a single character with
-value 0, and c is the errored character received.
-.sp
-.LP
-If  \fBIGNPAR\fR is set, a byte with framing or parity errors (other than
-break)  is ignored.
-.sp
-.LP
-If \fBPARMRK\fR is set, and \fBIGNPAR\fR is not set, a byte with a framing or
+group, the break condition generates a single
+.Dv SIGINT
+signal to that
+foreground process group.
+If neither
+.Dv IGNBRK
+nor
+.Dv BRKINT
+is set, a
+break condition is read as a single
+.Ql \e0
+.Pq Sy ASCII NULL
+character, or if
+.Dv PARMRK
+is set, as
+.Ql \e377 ,
+.Ql \e0 ,
+.Em c ,
+where
+.Ql \e377
+is a single character
+with value 377 octal (0xff hex, 255 decimal),
+.Ql \e0
+is a single character with value
+.Sy 0 ,
+and
+.Em c
+is the errored character received.
+.Pp
+If
+.Dv IGNPAR
+is set, a byte with framing or parity errors (other than
+break) is ignored.
+.Pp
+If
+.Dv PARMRK
+is set, and
+.Dv IGNPAR
+is not set, a byte with a framing or
 parity error (other than break) is given to the application as the
-three-character sequence: '\e377', '\e0', c, where '\e377' is a single
-character with value 377 octal (0xff hex, 255 decimal), '\e0' is a single
-character with value 0, and c is the errored character received. To avoid
-ambiguity in this case, if \fBISTRIP\fR is not set, a valid character
-of '\e377' is given to the  application as `\e377.' If neither \fBIGNPAR\fR nor
-\fBPARMRK\fR is set, a framing or parity error (other than break) is given to
-the application as a single '\e0' (\fBASCII NULL\fR) character.
-.sp
-.LP
-If \fBINPCK\fR is set, input parity checking is enabled. If \fBINPCK\fR is not
-set, input parity checking is disabled. This allows output parity generation
-without input parity errors.  Note that whether input parity checking is
+three-character sequence:
+.Ql \e377 ,
+.Ql \e0 ,
+c, where
+.Ql \e377
+is a single character with value 377 octal (0xff hex, 255 decimal),
+.Ql \e0
+is a single character with value 0, and c is the errored character received.
+To avoid ambiguity in this case, if
+.Dv ISTRIP
+is not set, a valid character
+of
+.Ql \e377
+is given to the application as
+.Ql \e377 .
+If neither
+.Dv IGNPAR
+nor
+.Dv PARMRK
+is set, a framing or parity error (other than break) is given to
+the application as a single
+.Ql \e0
+.Po
+.Sy ASCII NULL
+.Pc
+character.
+.Pp
+If
+.Dv INPCK
+is set, input parity checking is enabled.
+If
+.Dv INPCK
+is not
+set, input parity checking is disabled.
+This allows output parity generation
+without input parity errors.
+Note that whether input parity checking is
 enabled or disabled is independent of whether parity detection is enabled or
-disabled.  If parity detection is enabled but input parity checking is
+disabled.
+If parity detection is enabled but input parity checking is
 disabled, the hardware to which the terminal is connected will recognize the
 parity bit, but the terminal special file will not check whether this is set
 correctly or not.
-.sp
-.LP
-If \fBISTRIP\fR is set, valid input characters are first stripped to seven
+.Pp
+If
+.Dv ISTRIP
+is set, valid input characters are first stripped to seven
 bits, otherwise all eight bits are processed.
-.sp
-.LP
-If \fBINLCR\fR is set, a received \fBNL\fR character is translated into a
-\fBCR\fR character.  If  \fBIGNCR\fR is set, a received \fBCR\fR character is
-ignored (not read).  Otherwise, if \fBICRNL\fR is set, a received \fBCR\fR
-character is translated into a \fBNL\fR character.
-.sp
-.LP
-If \fBIUCLC\fR is set, a received upper case, alphabetic character is
+.Pp
+If
+.Dv INLCR
+is set, a received
+.Sy NL
+character is translated into a
+.Sy CR
+character.
+If
+.Dv IGNCR
+is set, a received
+.Sy CR
+character is ignored (not read).
+Otherwise, if
+.Dv ICRNL
+is set, a received
+.Sy CR
+character is translated into a
+.Sy NL
+character.
+.Pp
+If
+.Dv IUCLC
+is set, a received upper case, alphabetic character is
 translated into the corresponding lower case character.
-.sp
-.LP
-If \fBIXON\fR is set, start/stop output control is enabled. A received
-\fBSTOP\fR character suspends output and a received \fBSTART\fR character
-restarts output. The \fBSTOP\fR and \fBSTART\fR characters will not be read,
-but will merely perform  flow control functions. If \fBIXANY\fR is set, any
+.Pp
+If
+.Dv IXON
+is set, start/stop output control is enabled.
+A received
+.Sy STOP
+character suspends output and a received
+.Sy START
+character
+restarts output.
+The
+.Sy STOP
+and
+.Sy START
+characters will not be read,
+but will merely perform flow control functions.
+If
+.Dv IXANY
+is set, any
 input character restarts output that has been suspended.
-.sp
-.LP
-If \fBIXOFF\fR is set, the system transmits a \fBSTOP\fR character when the
-input queue is nearly full, and a \fBSTART\fR character when enough input has
+.Pp
+If
+.Dv IXOFF
+is set, the system transmits a
+.Sy STOP
+character when the
+input queue is nearly full, and a
+.Sy START
+character when enough input has
 been read so that the input queue is nearly empty again.
-.sp
-.LP
-If \fBIMAXBEL\fR is set, the \fBASCII BEL\fR character is echoed if the input
-stream overflows. Further input is not stored, but any input already present in
-the input stream is not disturbed.  If  \fBIMAXBEL\fR is not set, no \fBBEL\fR
+.Pp
+If
+.Dv IMAXBEL
+is set, the
+.Sy ASCII BEL
+character is echoed if the input stream overflows.
+Further input is not stored, but any input already present in
+the input stream is not disturbed.
+If
+.Dv IMAXBEL
+is not set, no
+.Sy BEL
 character is echoed, and all input present in the input queue is discarded if
 the input stream overflows.
-.SS "Output Modes"
-.LP
-The  \fBc_oflag\fR field specifies the  system treatment of output:
-.sp
-.ne 2
-.na
-\fB\fBOPOST\fR\fR
-.ad
-.RS 10n
+.Ss "Output Modes"
+The
+.Fa c_oflag
+field specifies the system treatment of output:
+.Pp
+.Bl -tag -width ONLRET -offset 2n -compact
+.It Dv OPOST
 Post-process output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBOLCUC\fR\fR
-.ad
-.RS 10n
+.It Dv OLCUC
 Map lower case to upper on output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBONLCR\fR\fR
-.ad
-.RS 10n
+.It Dv ONLCR
 Map NL to CR-NL on output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBOCRNL\fR\fR
-.ad
-.RS 10n
+.It Dv OCRNL
 Map CR to NL on output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBONOCR\fR\fR
-.ad
-.RS 10n
-No \fBCR\fR output at column 0.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBONLRET\fR\fR
-.ad
-.RS 10n
-\fBNL\fR performs \fBCR\fR function.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBOFILL\fR\fR
-.ad
-.RS 10n
+.It Dv ONOCR
+No
+.Sy CR
+output at column 0.
+.It Dv ONLRET
+.Sy NL
+performs
+.Sy CR
+function.
+.It Dv OFILL
 Use fill characters for delay.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBOFDEL\fR\fR
-.ad
-.RS 10n
-Fill is \fBDEL\fR, else \fINULL\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNLDLY\fR\fR
-.ad
-.RS 10n
+.It Dv OFDEL
+Fill is
+.Sy DEL ,
+else
+.Sy INULL .
+.It Dv NLDLY
 Select newline delays:
-.br
-.in +2
-\fBNL0\fR
-.in -2
-.br
-.in +2
-\fBNL1\fR
-.in -2
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCRDLY\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width NL0 -compact -offset 2n
+.It Sy NL0
+.It Sy NL1
+.El
+.It Dv CRDLY
 Select carriage-return delays:
-.br
-.in +2
-\fBCR0\fR
-.in -2
-.br
-.in +2
-\fBCR1\fR
-.in -2
-.br
-.in +2
-\fBCR2\fR
-.in -2
-.br
-.in +2
-\fBCR3\fR
-.in -2
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTABDLY\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width CR0 -compact -offset 2n
+.It Dv CR0
+.It Dv CR1
+.It Dv CR2
+.It Dv CR3
+.El
+.It Dv TABDLY
 Select horizontal tab delays or tab expansion:
-.sp
-.ne 2
-.na
-\fB\fBTAB0\fR\fR
-.ad
-.RS 9n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTAB1\fR\fR
-.ad
-.RS 9n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTAB2\fR\fR
-.ad
-.RS 9n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTAB3\fR\fR
-.ad
-.RS 9n
+.Bl -tag -width XTABS -compact -offset 2n
+.It Dv TAB0
+.It Dv TAB1
+.It Dv TAB2
+.It Dv TAB3
 Expand tabs to spaces
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBXTABS\fR\fR
-.ad
-.RS 9n
+.It Dv XTABS
 Expand tabs to spaces
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBBSDLY\fR\fR
-.ad
-.RS 10n
+.El
+.It Dv BSDLY
 Select backspace delays:
-.br
-.in +2
-\fBBS0\fR
-.in -2
-.br
-.in +2
-\fBBS1\fR
-.in -2
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVTDLY\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width BS0 -offset 2n -compact
+.It Dv BS0
+.It Dv BS1
+.El
+.It Dv VTDLY
 Select vertical tab delays:
-.br
-.in +2
-\fBVT0\fR
-.in -2
-.br
-.in +2
-\fBVT1\fR
-.in -2
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFFDLY\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width VT0 -offset 2n -compact
+.It Dv VT0
+.It Dv VT1
+.El
+.It Dv FFDLY
 Select form feed delays:
-.br
-.in +2
-\fBFF0\fR
-.in -2
-.br
-.in +2
-\fBFF1\fR
-.in -2
-.RE
-
-.sp
-.LP
-If \fBOPOST\fR is set, output characters are post-processed as indicated by the
+.Bl -tag -width FF0 -offset 2n -compact
+.It Dv FF0
+.It Dv FF1
+.El
+.El
+.Pp
+If
+.Dv OPOST
+is set, output characters are post-processed as indicated by the
 remaining flags; otherwise, characters are transmitted without change.
-.sp
-.LP
-If \fBOLCUC\fR is set, a lower case alphabetic character is transmitted as the
-corresponding upper case character. This function is often used in conjunction
-with \fBIUCLC.\fR
-.sp
-.LP
-If \fBONLCR\fR is set, the \fBNL\fR character is transmitted as the \fBCR-NL\fR
-character pair.  If  \fBOCRNL\fR is set, the \fBCR\fR character is transmitted
-as the \fBNL\fR character.  If \fBONOCR\fR is set, no \fBCR\fR character is
-transmitted when at column 0 (first position). If  \fBONRET\fR is set, the
-\fBNL\fR character is assumed to do the carriage-return function; the column
-pointer is set to 0 and the delays specified for \fBCR\fR are used.  Otherwise,
-the \fBNL\fR character is assumed to do just the line-feed function; the column
-pointer remains unchanged. The column pointer is also set to 0 if the \fBCR\fR
+.Pp
+If
+.Dv OLCUC
+is set, a lower case alphabetic character is transmitted as the
+corresponding upper case character.
+This function is often used in conjunction
+with
+.Dv IUCLC .
+.Pp
+If
+.Dv ONLCR
+is set, the
+.Sy NL
+character is transmitted as the
+.Sy CR-NL
+character pair.
+If
+.Dv OCRNL
+is set, the
+.Sy CR
+character is transmitted as the
+.Sy NL
+character.
+If
+.Dv ONOCR
+is set, no
+.Sy CR
+character is transmitted when at column 0 (first position).
+If
+.Dv ONRET
+is set, the
+.Sy NL
+character is assumed to do the carriage-return function; the column
+pointer is set to 0 and the delays specified for
+.Sy CR
+are used.
+Otherwise, the
+.Sy NL
+character is assumed to do just the line-feed function; the column
+pointer remains unchanged.
+The column pointer is also set to 0 if the
+.Sy CR
 character is actually transmitted.
-.sp
-.LP
+.Pp
 The delay bits specify how long transmission stops to allow for mechanical or
-other movement when certain characters are sent to the terminal. In all cases,
-a value of 0 indicates no delay. If  \fBOFILL\fR is set, fill characters are
-transmitted for delay instead of a timed delay. This is useful for high baud
-rate terminals that need only a minimal delay.  If  \fBOFDEL\fR is set, the
-fill character is \fBDEL\fR ; otherwise it is  \fINULL\fR.
-.sp
-.LP
+other movement when certain characters are sent to the terminal.
+In all cases, a value of 0 indicates no delay.
+If
+.Dv OFILL
+is set, fill characters are transmitted for delay instead of a timed delay.
+This is useful for high baud rate terminals that need only a minimal delay.
+If
+.Dv OFDEL
+is set, the
+fill character is
+.Sy DEL ;
+otherwise it is
+.Sy NULL .
+.Pp
 If a form-feed or vertical-tab delay is specified, it lasts for about 2
 seconds.
-.sp
-.LP
-Newline delay lasts about 0.10 seconds. If \fBONLRET\fR is set, the
-carriage-return delays are used instead of the newline delays. If \fBOFILL\fR
+.Pp
+Newline delay lasts about 0\&.10 seconds.
+If
+.Dv ONLRET
+is set, the carriage-return delays are used instead of the newline delays.
+If
+.Dv OFILL
 is set, two fill characters are transmitted.
-.sp
-.LP
+.Pp
 Carriage-return delay type 1 is dependent on the current column position, type
-2 is about 0.10 seconds, and type 3 is about 0.15 seconds. If  \fBOFILL\fR is
-set, delay type 1 transmits two fill characters, and type 2 transmits four fill
-characters.
-.sp
-.LP
-Horizontal-tab delay type 1 is dependent on the current column position. Type 2
-is about 0.10 seconds. Type 3 specifies that tabs are to be expanded into
-spaces. If \fBOFILL\fR is set, two fill characters are transmitted for any
-delay.
-.sp
-.LP
-Backspace delay lasts about 0.05 seconds. If  \fBOFILL\fR is set, one fill
-character is transmitted.
-.sp
-.LP
+2 is about 0\&.10 seconds, and type 3 is about 0\&.15 seconds.
+If
+.Dv OFILL
+is set, delay type 1 transmits two fill characters, and type 2 transmits four
+fill characters.
+.Pp
+Horizontal-tab delay type 1 is dependent on the current column position.
+Type 2 is about 0\&.10 seconds.
+Type 3 specifies that tabs are to be expanded into spaces.
+If
+.Dv OFILL
+is set, two fill characters are transmitted for any delay.
+.Pp
+Backspace delay lasts about 0\&.05 seconds.
+If
+.Dv OFILL
+is set, one fill character is transmitted.
+.Pp
 The actual delays depend on line speed and system load.
-.SS "Control Modes"
-.LP
-The \fBc_cflag\fR field describes the hardware control of the terminal:
-.sp
-.ne 2
-.na
-\fB\fBCBAUD\fR\fR
-.ad
-.RS 13n
+.Ss "Control Modes"
+The
+.Fa c_cflag
+field describes the hardware control of the terminal:
+.Bl -tag -width CIBAUDEXT -offset 2n
+.It Dv CBAUD
 Baud rate:
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB0\fR\fR
-.ad
-.RS 13n
+.Bl -tag -width B460800 -compact
+.It Dv B0
 Hang up
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB50\fR\fR
-.ad
-.RS 13n
+.It Dv B50
 50 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB75\fR\fR
-.ad
-.RS 13n
+.It Dv B75
 75 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB110\fR\fR
-.ad
-.RS 13n
+.It Dv B110
 110 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB134\fR\fR
-.ad
-.RS 13n
+.It Dv B134
 134 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB150\fR\fR
-.ad
-.RS 13n
+.It Dv B150
 150 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB200\fR\fR
-.ad
-.RS 13n
+.It Dv B200
 200 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB300\fR\fR
-.ad
-.RS 13n
+.It Dv B300
 300 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB600\fR\fR
-.ad
-.RS 13n
+.It Dv B600
 600 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB1200\fR\fR
-.ad
-.RS 13n
+.It Dv B1200
 1200 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB1800\fR\fR
-.ad
-.RS 13n
+.It Dv B1800
 1800 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB2400\fR\fR
-.ad
-.RS 13n
+.It Dv B2400
 2400 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB4800\fR\fR
-.ad
-.RS 13n
+.It Dv B4800
 4800 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB9600\fR\fR
-.ad
-.RS 13n
+.It Dv B9600
 9600 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB19200\fR\fR
-.ad
-.RS 13n
+.It Dv B19200
 19200 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEXTA\fR\fR
-.ad
-.RS 13n
+.It Dv EXTA
 External A
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB38400\fR\fR
-.ad
-.RS 13n
+.It Dv B38400
 38400 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEXTB\fR\fR
-.ad
-.RS 13n
+.It Dv EXTB
 External B
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB57600\fR\fR
-.ad
-.RS 13n
+.It Dv B57600
 57600 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB76800\fR\fR
-.ad
-.RS 13n
+.It Dv B76800
 76800 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB115200\fR\fR
-.ad
-.RS 13n
+.It Dv B115200
 115200 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB153600\fR\fR
-.ad
-.RS 13n
+.It Dv B153600
 153600 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB230400\fR\fR
-.ad
-.RS 13n
+.It Dv B230400
 230400 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB307200\fR\fR
-.ad
-.RS 13n
+.It Dv B307200
 307200 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB460800\fR\fR
-.ad
-.RS 13n
+.It Dv B460800
 460800 baud
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCSIZE\fR\fR
-.ad
-.RS 13n
+.El
+.It Dv CSIZE
 Character size:
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCS5\fR\fR
-.ad
-.RS 13n
+.Bl -tag -width CIBAUDEXT -compact
+.It Dv CS5
 5 bits
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCS6\fR\fR
-.ad
-.RS 13n
+.It Dv CS6
 6 bits
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCS7\fR\fR
-.ad
-.RS 13n
+.It Dv CS7
 7 bits
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCS8\fR\fR
-.ad
-.RS 13n
+.It Dv CS8
 8 bits
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCSTOPB\fR\fR
-.ad
-.RS 13n
+.It Dv CSTOPB
 Send two stop bits, else one
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCREAD\fR\fR
-.ad
-.RS 13n
+.It Dv CREAD
 Enable receiver
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPARENB\fR\fR
-.ad
-.RS 13n
+.It Dv PARENB
 Parity enable
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPARODD\fR\fR
-.ad
-.RS 13n
+.It Dv PARODD
 Odd parity, else even
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBHUPCL\fR\fR
-.ad
-.RS 13n
+.It Dv HUPCL
 Hang up on last close
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCLOCAL\fR\fR
-.ad
-.RS 13n
+.It Dv CLOCAL
 Local line, else dial-up
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCIBAUD\fR\fR
-.ad
-.RS 13n
+.It Dv CIBAUD
 Input baud rate, if different from output rate
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPAREXT\fR\fR
-.ad
-.RS 13n
+.It Dv PAREXT
 Extended parity for mark and space parity
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCRTSXOFF\fR\fR
-.ad
-.RS 13n
+.It Dv CRTSXOFF
 Enable inbound hardware flow control
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCRTSCTS\fR\fR
-.ad
-.RS 13n
+.It Dv CRTSCTS
 Enable outbound hardware flow control
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCBAUDEXT\fR\fR
-.ad
-.RS 13n
+.It Dv CBAUDEXT
 Bit to indicate output speed > B38400
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBCIBAUDEXT\fR\fR
-.ad
-.RS 13n
+.It Dv CIBAUDEXT
 Bit to indicate input speed > B38400
-.RE
-
-.sp
-.LP
-The \fBCBAUD\fR bits together with the \fBCBAUDEXT\fR bit specify the output
-baud rate. To retrieve the output speed from the \fBtermios\fR structure
-pointed to by \fBtermios_p\fR see the following code segment.
-.sp
-.in +2
-.nf
+.El
+.El
+.Pp
+The
+.Dv CBAUD
+bits together with the
+.Dv CBAUDEXT
+bit specify the output baud rate.
+To retrieve the output speed from the
+.Vt termios
+structure pointed to by
+.Fa termios_p
+see the following code segment.
+.Bd -literal -offset 2n
 speed_t ospeed;
 if (termios_p->c_cflag & CBAUDEXT)
-   ospeed = (termios_p->c_cflag & CBAUD) + CBAUD + 1;
+ ospeed = (termios_p->c_cflag & CBAUD) + CBAUD + 1;
 else
-   ospeed = termios_p->c_cflag & CBAUD;
-.fi
-.in -2
-
-.sp
-.LP
+ ospeed = termios_p->c_cflag & CBAUD;
+.Ed
+.Pp
 To store the output speed in the termios structure pointed to by
-\fBtermios_p\fR see the following code segment.
-.sp
-.in +2
-.nf
+.Fa termios_p
+see the following code segment.
+.Bd -literal -offset 2n
 speed_t ospeed;
 if (ospeed > CBAUD) {
-   termios_p->c_cflag |= CBAUDEXT;
-   ospeed -= (CBAUD + 1);
-} else
-   termios_p->c_cflag &= ~CBAUDEXT;
- termios_p->c_cflag =
-	(termios_p->c_cflag & ~CBAUD) | (ospeed & CBAUD);
-.fi
-.in -2
-
-.sp
-.LP
-The zero baud rate, B0, is used to hang up the connection. If B0 is specified,
-the data-terminal-ready signal is not asserted. Normally, this disconnects the
-line.
-.sp
-.LP
-If the \fBCIBAUDEXT\fR or \fBCIBAUD\fR bits are not zero, they specify the
-input baud rate, with the \fBCBAUDEXT\fR and \fBCBAUD\fR bits specifying the
-output baud rate; otherwise, the output and input baud rates are both specified
-by the \fBCBAUDEXT\fR and  \fBCBAUD\fR bits.  The values for the \fBCIBAUD\fR
-bits are the same as the values for the \fBCBAUD\fR bits, shifted left
-\fBIBSHIFT\fR bits. For any particular hardware, impossible speed changes are
-ignored. To retrieve the input speed in the  \fBtermios\fR structure pointed to
-by  \fBtermios_p\fR see the following code segment.
-.sp
-.in +2
-.nf
+ termios_p->c_cflag |= CBAUDEXT;
+ ospeed -= (CBAUD + 1);
+} else {
+ termios_p->c_cflag &= ~CBAUDEXT;
+}
+termios_p->c_cflag =
+  (termios_p->c_cflag & ~CBAUD) | (ospeed & CBAUD);
+.Ed
+.Pp
+The zero baud rate,
+.Dv B0 ,
+is used to hang up the connection.
+If
+.Dv B0
+is specified, the data-terminal-ready signal is not asserted.
+Normally, this disconnects the line.
+.Pp
+If the
+.Dv CIBAUDEXT
+or
+.Dv CIBAUD
+bits are not zero, they specify the input baud rate, with the
+.Dv CBAUDEXT
+and
+.Dv CBAUD
+bits specifying the output baud rate; otherwise, the output and input baud
+rates are both specified by the
+.Dv CBAUDEXT
+and
+.Dv CBAUD
+bits.
+The values for the
+.Dv CIBAUD
+bits are the same as the values for the
+.Dv CBAUD
+bits, shifted left
+.Dv IBSHIFT
+bits.
+For any particular hardware, impossible speed changes are
+ignored.
+To retrieve the input speed in the
+.Vt termios
+structure pointed to
+by
+.Fa termios_p
+see the following code segment.
+.Bd -literal -offset 2n
 speed_t ispeed;
-if (termios_p->c_cflag & CIBAUDEXT)
-   ispeed = ((termios_p->c_cflag & CIBAUD) >> IBSHIFT)
-   + (CIBAUD >> IBSHIFT) + 1;
-else
-   ispeed = (termios_p->c_cflag & CIBAUD) >> IBSHIFT;
-.fi
-.in -2
-
-.sp
-.LP
-To store the input speed in the  \fBtermios\fR structure pointed to by
-\fBtermios_p\fR see the following code segment.
-.sp
-.in +2
-.nf
+if (termios_p->c_cflag & CIBAUDEXT) {
+ ispeed = ((termios_p->c_cflag & CIBAUD) >> IBSHIFT)
+ + (CIBAUD >> IBSHIFT) + 1;
+} else {
+ ispeed = (termios_p->c_cflag & CIBAUD) >> IBSHIFT;
+}
+.Ed
+.Pp
+To store the input speed in the
+.Vt termios
+structure pointed to by
+.Fa termios_p
+see the following code segment.
+.Bd -literal -offset 2n
 speed_t ispeed;
 if (ispeed == 0) {
-   ispeed = termios_p->c_cflag & CBAUD;
-if (termios_p->c_cflag & CBAUDEXT)
-   ispeed += (CBAUD + 1);
+ ispeed = termios_p->c_cflag & CBAUD;
+ if (termios_p->c_cflag & CBAUDEXT)
+     ispeed += (CBAUD + 1);
 }
- if ((ispeed << IBSHIFT) > CIBAUD) {
-    termios_p->c_cflag |= CIBAUDEXT;
-    ispeed -= ((CIBAUD >> IBSHIFT) + 1);
-} else
-    termios_p->c_cflag &= ~CIBAUDEXT;
-    termios_p->c_cflag =
-    (termios_p->c_cflag & ~CIBAUD) |
-           ((ispeed << IBSHIFT) & CIBAUD);
-.fi
-.in -2
-
-.sp
-.LP
-The \fBCSIZE\fR bits specify the character size in bits for both transmission
-and reception. This size does not include the parity bit, if any. If
-\fBCSTOPB\fR is set, two stop bits are used; otherwise, one stop bit is used.
+if ((ispeed << IBSHIFT) > CIBAUD) {
+  termios_p->c_cflag |= CIBAUDEXT;
+  ispeed -= ((CIBAUD >> IBSHIFT) + 1);
+} else {
+  termios_p->c_cflag &= ~CIBAUDEXT;
+}
+termios_p->c_cflag =
+  (termios_p->c_cflag & ~CIBAUD) | ((ispeed << IBSHIFT) & CIBAUD);
+.Ed
+.Pp
+The
+.Dv CSIZE
+bits specify the character size in bits for both transmission and reception.
+This size does not include the parity bit, if any.
+If
+.Dv CSTOPB
+is set, two stop bits are used; otherwise, one stop bit is used.
 For example, at 110 baud, two stops bits are required.
-.sp
-.LP
-If \fBPARENB\fR is set, parity generation and detection is enabled, and a
-parity bit is added to each character. If parity is enabled, the \fBPARODD\fR
+.Pp
+If
+.Dv PARENB
+is set, parity generation and detection is enabled, and a
+parity bit is added to each character.
+If parity is enabled, the
+.Dv PARODD
 flag specifies odd parity if set; otherwise, even parity is used.
-.sp
-.LP
-If \fBCREAD\fR is set, the receiver is enabled. Otherwise, no characters are
-received.
-.sp
-.LP
-If \fBHUPCL\fR is set, the line is disconnected when the last process with the
-line open closes it or terminates. That is, the data-terminal-ready signal is
-not asserted.
-.sp
-.LP
-If \fBCLOCAL\fR is set, the line is assumed to be a local, direct connection
+.Pp
+If
+.Dv CREAD
+is set, the receiver is enabled.
+Otherwise, no characters are received.
+.Pp
+If
+.Dv HUPCL
+is set, the line is disconnected when the last process with the
+line open closes it or terminates.
+That is, the data-terminal-ready signal is not asserted.
+.Pp
+If
+.Dv CLOCAL
+is set, the line is assumed to be a local, direct connection
 with no modem control; otherwise, modem control is assumed.
-.sp
-.LP
-If \fBCRTSXOFF\fR is set, inbound hardware flow control is enabled.
-.sp
-.LP
-If  \fBCRTSCTS\fR is set, outbound hardware flow control is enabled.
-.sp
-.LP
-The four possible combinations for the state of \fBCRTSCTS\fR and
-\fBCRTSXOFF\fR bits and their interactions are described below.
-.sp
-.ne 2
-.na
-\fBCase A:\fR
-.ad
-.RS 11n
-\fBCRTSCTS\fR off, \fBCRTSXOFF\fR off. In this case the hardware flow control
-is disabled.
-.RE
-
-.sp
-.ne 2
-.na
-\fBCase B:\fR
-.ad
-.RS 11n
-\fBCRTSCTS\fR on, \fBCRTSXOFF\fR off. In this case only outbound hardware flow
-control is enabled. The state of CTS signal is used to do outbound flow
-control. It is expected that output will be suspended if CTS is low and resumed
+.Pp
+If
+.Dv CRTSXOFF
+is set, inbound hardware flow control is enabled.
+.Pp
+If
+.Dv CRTSCTS
+is set, outbound hardware flow control is enabled.
+.Pp
+The four possible combinations for the state of
+.Dv CRTSCTS
+and
+.Dv CRTSXOFF
+bits and their interactions are described below.
+.Bl -tag -width "Case C:"
+.It Sy Case A :
+.Dv CRTSCTS
+off,
+.Dv CRTSXOFF
+off.
+In this case the hardware flow control is disabled.
+.It Sy Case B :
+.Dv CRTSCTS
+on,
+.Dv CRTSXOFF
+off.
+In this case only outbound hardware flow control is enabled.
+The state of CTS signal is used to do outbound flow control.
+It is expected that output will be suspended if CTS is low and resumed
 when CTS is high.
-.RE
-
-.sp
-.ne 2
-.na
-\fBCase C:\fR
-.ad
-.RS 11n
-\fBCRTSCTS\fR off, \fBCRTSXOFF\fR on. In this case only inbound hardware flow
-control is enabled. The state of RTS signal is used to do inbound flow control.
+.It Sy Case C :
+.Dv CRTSCTS
+off,
+.Dv CRTSXOFF
+on.
+In this case only inbound hardware flow control is enabled.
+The state of RTS signal is used to do inbound flow control.
 It is expected that input will be suspended if RTS is low and resumed when RTS
 is high.
-.RE
-
-.sp
-.ne 2
-.na
-\fBCase D:\fR
-.ad
-.RS 11n
-\fBCRTSCTS\fR on, \fBCRTSXOFF\fR on. In this case both inbound and outbound
-hardware flow control are enabled. Uses the state of CTS signal to do outbound
+.It Sy Case D :
+.Dv CRTSCTS
+on,
+.Dv CRTSXOFF
+on.
+In this case both inbound and outbound hardware flow control are enabled.
+Uses the state of CTS signal to do outbound
 flow control and RTS signal to do inbound flow control.
-.RE
-
-.SS "Local Modes"
-.LP
-The \fBc_lflag\fR field of the argument structure is used by the line
-discipline to control terminal functions. The basic line discipline provides
-the following:
-.sp
-.ne 2
-.na
-\fB\fBISIG\fR\fR
-.ad
-.RS 11n
- Enable signals.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBICANON\fR\fR
-.ad
-.RS 11n
+.El
+.Ss "Local Modes"
+The
+.Fa c_lflag
+field of the argument structure is used by the line
+discipline to control terminal functions.
+The basic line discipline provides the following:
+.Pp
+.Bl -tag -offset 2n -width SIGTTOU -compact
+.It Dv ISIG
+Enable signals.
+.It Dv ICANON
 Canonical input (erase and kill processing).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBXCASE\fR\fR
-.ad
-.RS 11n
+.It Dv XCASE
 Canonical upper/lower presentation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECHO\fR\fR
-.ad
-.RS 11n
+.It Dv ECHO
 Enable echo.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECHOE\fR\fR
-.ad
-.RS 11n
-Echo erase character as \fBBS-SP-BS\fR &.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECHOK\fR\fR
-.ad
-.RS 11n
-Echo  \fBNL\fR after kill character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECHONL\fR\fR
-.ad
-.RS 11n
-Echo  \fBNL\fR .
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNOFLSH\fR\fR
-.ad
-.RS 11n
+.It Dv ECHOE
+Echo erase character as
+.Sy BS Ns - Ns Sy SP Ns - Ns Sy BS
+&.
+.It Dv ECHOK
+Echo
+.Sy NL
+after kill character.
+.It Dv ECHONL
+Echo
+.Sy NL .
+.It Dv NOFLSH
 Disable flush after interrupt or quit.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTOSTOP\fR\fR
-.ad
-.RS 11n
-Send  \fBSIGTTOU\fR for background output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECHOCTL\fR\fR
-.ad
-.RS 11n
-Echo control characters as  \fIchar,\fR delete as ^?.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECHOPRT\fR\fR
-.ad
-.RS 11n
+.It Dv TOSTOP
+Send
+.It Dv SIGTTOU
+for background output.
+.It Dv ECHOCTL
+Echo control characters as
+.Em char ,
+delete as ^?.
+.It Dv ECHOPRT
 Echo erase character as character erased.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECHOKE\fR\fR
-.ad
-.RS 11n
-\fBBS-SP-BS\fR erase entire line on line kill.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFLUSHO\fR\fR
-.ad
-.RS 11n
+.It Dv ECHOKE
+.Sy BS Ns - Ns Sy SP Ns - Ns Sy BS
+erase entire line on line kill.
+.It Dv FLUSHO
 Output is being flushed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPENDIN\fR\fR
-.ad
-.RS 11n
-Retype pending input at next read or  input character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEXTEN\fR\fR
-.ad
-.RS 11n
+.It Dv PENDIN
+Retype pending input at next read or input character.
+.It Dv IEXTEN
 Enable extended (implementation-defined) functions.
-.RE
-
-.sp
-.LP
-If \fBISIG\fR is set, each input character is checked against the special
-control characters INTR, QUIT, SWTCH,  SUSP, STATUS, and \fBDSUSP\fR. If an
-input character matches one of these control characters, the function
-associated with that character is performed. (Note: If SWTCH is set and the
-character matches, the character is simply discarded. No other action is
-taken.) If \fBISIG\fR is not set, no checking is done.  Thus, these special
-input functions are possible only if \fBISIG\fR is set.
-.sp
-.LP
-If \fBICANON\fR is set, canonical processing is enabled. This enables the erase
+.El
+.Pp
+If
+.Dv ISIG
+is set, each input character is checked against the special
+control characters
+.Sy INTR ,
+.Sy QUIT ,
+.Sy SWTCH ,
+.Sy SUSP ,
+.Sy STATUS ,
+and
+.Sy DSUSP .
+If an input character matches one of these control characters, the function
+associated with that character is performed.
+.Po
+Note: If
+.Sy SWTCH
+is set and the character matches, the character is simply discarded.
+No other action is taken.
+.Pc
+If
+.Dv ISIG
+is not set, no checking is done.
+Thus, these special
+input functions are possible only if
+.Dv ISIG
+is set.
+.Pp
+If
+.Dv ICANON
+is set, canonical processing is enabled.
+This enables the erase
 and kill edit functions, and the assembly of input characters into lines
-delimited by \fBNL-c\fR, \fBEOF\fR, \fBEOL\fR, and \fBEOL\fR . If  \fBICANON\fR
-is not set, read requests are satisfied directly from the input queue. A read
-is not satisfied until at least \fBMIN\fR characters have been  received or the
-timeout value \fBTIME\fR has expired between characters. This allows fast
-bursts of input to be read efficiently while still allowing single character
-input. The time value represents tenths of seconds.
-.sp
-.LP
-If  \fBXCASE\fR is set and \fBICANON\fR is set, an upper case letter is
-accepted on input if preceded by a backslash \fB(\e)\fR character, and is
-output preceded by a  backslash \fB(\e)\fR character. In this mode, the
+delimited by
+.Sy NL-c ,
+.Sy EOF ,
+.Sy EOL ,
+and
+.Sy EOL .
+If
+.Dv ICANON
+is not set, read requests are satisfied directly from the input queue.
+A read is not satisfied until at least
+.Sy MIN
+characters have been received or the timeout value
+.Sy TIME
+has expired between characters.
+This allows fast bursts of input to be read efficiently while still allowing
+single character input.
+The time value represents tenths of seconds.
+.Pp
+If
+.Dv XCASE
+is set and
+.Dv ICANON
+is set, an upper case letter is
+accepted on input if preceded by a backslash
+.Ql \e
+character, and is output preceded by a backslash
+.Ql \e
+character.
+In this mode, the
 following escape sequences are generated on output and accepted on input:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-FOR:	USE:
-_
-`	\e'
-_
-|	\e!
-_
-\(ap	\e^
-_
-{	\e(
-_
-}	\e)
-_
-\e	\e\e
-.TE
-
-.sp
-.LP
+.Bl -column "FOR:" "USE:" -offset 2n
+.It FOR: Ta USE:
+.It ` Ta \e'
+.It | Ta \e!
+.It \(ap Ta \e^
+.It { Ta \e(
+.It } Ta \e)
+.It \e Ta \e\e
+.El
+.Pp
 For example, input A as \ea, \en as \e\en, and \eN as \e\e\en.
-.sp
-.LP
-If \fBECHO\fR is set, characters are echoed as received.
-.sp
-.LP
-When \fBICANON\fR is set, the following echo functions are possible.
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If \fBECHO\fR and \fBECHOE\fR are set, and  \fBECHOPRT\fR is not set,  the
-\fBERASE\fR, \fBERASE2\fR, and \fBWERASE\fR characters are echoed as one or
-more ASCII BS SP BS, which clears the last character(s) from a \fBCRT\fR screen.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If \fBECHO\fR, \fBECHOPRT\fR, and \fBIEXTEN\fR are set, the first \fBERASE\fR,
-\fBERASE2\fR, and \fBWERASE\fR character in a sequence echoes as a backslash
-(\fB\e\fR), followed by the characters being erased.  Subsequent \fBERASE\fR and
-\fBWERASE\fR characters echo the characters being erased, in reverse order. The
-next non-erase character causes a `/' (slash) to be typed before it is echoed.
-\fBECHOPRT\fR should be used for hard copy terminals.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If  \fBECHOKE\fR and \fBIEXTEN\fR are set, the kill character is echoed by
-erasing each  character on the line from the screen (using the mechanism
-selected by \fBECHOE\fR and \fBECHOPR\fRa).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If  \fBECHOK\fR is set, and \fBECHOKE\fR is not set, the \fBNL\fR character is
-echoed after the kill character to emphasize that the line is deleted. Note
-that a `\' (escape) character or an \fBLNEXT\fR character preceding the erase
+.Pp
+If
+.Dv ECHO
+is set, characters are echoed as received.
+.Pp
+When
+.Dv ICANON
+is set, the following echo functions are possible.
+.Bl -bullet -offset indent
+.It
+If
+.Dv ECHO
+and
+.Dv ECHOE
+are set, and
+.Dv ECHOPRT
+is not set, the
+.Sy ERASE ,
+.Sy ERASE2 ,
+and
+.Sy WERASE
+characters are echoed as one or
+more ASCII BS SP BS, which clears the last character(s) from a
+.Sy CRT
+screen.
+.It
+If
+.Dv ECHO ,
+.Dv ECHOPRT ,
+and
+.Dv IEXTEN
+are set, the first
+.Sy ERASE ,
+.Sy ERASE2 ,
+and
+.Sy WERASE
+character in a sequence echoes as a backslash
+.Ql \e ,
+followed by the characters being erased.
+Subsequent
+.Sy ERASE
+and
+.Sy WERASE
+characters echo the characters being erased, in reverse order.
+The
+next non-erase character causes a
+.Ql /
+(slash) to be typed before it is echoed.
+.Dv ECHOPRT
+should be used for hard copy terminals.
+.It
+If
+.Dv ECHOKE
+and
+.Dv IEXTEN
+are set, the kill character is echoed by
+erasing each character on the line from the screen (using the mechanism
+selected by
+.Dv ECHOE
+and
+.Dv ECHOPR ) .
+.It
+If
+.Dv ECHOK
+is set, and
+.Dv ECHOKE
+is not set, the
+.Sy NL
+character is
+echoed after the kill character to emphasize that the line is deleted.
+Note
+that a
+.Ql \e
+(escape) character or an
+.Sy LNEXT
+character preceding the erase
 or kill character removes any special function.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If  \fBECHONL\fR is set, the \fBNL\fR character is echoed even if  \fBECHO\fR
-is not set.  This is useful for terminals set to local echo (so called
+.It
+If
+.Dv ECHONL
+is set, the
+.Sy NL
+character is echoed even if
+.Dv ECHO
+is not set.
+This is useful for terminals set to local echo (so called
 half-duplex).
-.RE
-.sp
-.LP
-If \fBECHOCTL\fR and \fBIEXTEN\fR are set, all control characters (characters
-with codes between 0 and 37 octal) other than  \fBASCII TAB\fR, \fBASCII NL\fR,
-the \fBSTART\fR character, and the \fBSTOP\fR character,  \fBASCII CR\fR, and
-\fBASCII BS\fR are echoed as ^ \fBX,\fR where \fBX\fR is the character given by
-adding 100 octal to the code of the  control character (so that the character
-with octal code 1 is echoed as ^ \fBA),\fR and the \fBASCII DEL\fR character,
-with code 177 octal, is echoed as ^ \fB?\fR.
-.sp
-.LP
-If  \fBNOFLSH\fR is set, the normal flush of the input and output queues
-associated with the \fBINTR\fR, \fBQUIT\fR, \fBSTATUS\fR, and \fBSUSP\fR
-characters is not done.  This bit should be set when restarting system calls
-that read from or write to a terminal (see  \fBsigaction\fR(2)\|).
-.sp
-.LP
-If  \fBTOSTOP\fR and \fBIEXTEN\fR are set, the signal  \fBSIGTTOU\fR is sent to
+.El
+.Pp
+If
+.Dv ECHOCTL
+and
+.Dv IEXTEN
+are set, all control characters (characters
+with codes between 0 and 37 octal) other than
+.Sy ASCII TAB ,
+.Sy ASCII NL ,
+the
+.Sy START
+character, and the
+.Sy STOP
+character,
+.Sy ASCII CR ,
+and
+.Sy ASCII BS
+are echoed as
+.No ^ Ns Em X ,
+where
+.Em X
+is the character given by adding
+.Ql 100
+octal to the code of the control character (so
+that the character with octal code
+.Ql 1
+is echoed as
+.No ^ Ns Sy A ) ,
+and the
+.Sy ASCII DEL
+character,
+with code
+.Ql 177
+octal, is echoed as
+.No ^ Ns Sy \&? .
+.Pp
+If
+.Dv NOFLSH
+is set, the normal flush of the input and output queues
+associated with the
+.Sy INTR ,
+.Sy QUIT ,
+.Sy STATUS ,
+and
+.Sy SUSP
+characters is not done.
+This bit should be set when restarting system calls
+that read from or write to a terminal
+.Po
+see
+.Xr sigaction 2
+.Pc .
+.Pp
+If
+.Dv TOSTOP
+and
+.Dv IEXTEN
+are set, the signal
+.Dv SIGTTOU
+is sent to
 a process that tries to write to its controlling terminal if it is not in the
-foreground process group for that terminal. This signal normally stops the
-process. Otherwise, the output generated by that process is output to the
-current output stream. Processes that are blocking or ignoring  \fBSIGTTOU\fR
+foreground process group for that terminal.
+This signal normally stops the process.
+Otherwise, the output generated by that process is output to the
+current output stream.
+Processes that are blocking or ignoring
+.Dv SIGTTOU
 signals are excepted and allowed to produce output, if any.
-.sp
-.LP
-If \fBFLUSHO\fR and \fBIEXTEN\fR are set, data written to the terminal is
-discarded. This bit is set when the \fBFLUSH\fR character is typed. A program
-can cancel the effect of typing the \fBFLUSH\fR character by clearing
-\fBFLUSHO\fR.
-.sp
-.LP
-If \fBPENDIN\fR and  \fBIEXTEN\fR are set, any input that has not yet been read
-is reprinted when the next character arrives as input. \fBPENDIN\fR is then
+.Pp
+If
+.Dv FLUSHO
+and
+.Dv IEXTEN
+are set, data written to the terminal is
+discarded.
+This bit is set when the
+.Sy FLUSH
+character is typed.
+A program can cancel the effect of typing the
+.Sy FLUSH
+character by clearing
+.Dv FLUSHO .
+.Pp
+If
+.Dv PENDIN
+and
+.Dv IEXTEN
+are set, any input that has not yet been read
+is reprinted when the next character arrives as input.
+.Dv PENDIN
+is then
 automatically cleared.
-.sp
-.LP
-If \fBIEXTEN\fR is set, the following implementation-defined functions are
-enabled:  special characters ( \fBWERASE\fR, \fBREPRINT\fR, \fBDISCARD\fR, and
-\fBLNEXT\fR) and local flags ( \fBTOSTOP\fR, \fBECHOCTL\fR, \fBECHOPRT\fR,
-\fBECHOKE\fR, \fBFLUSHO\fR, and \fBPENDIN\fR).
-.SS "Minimum and Timeout"
-.LP
-The \fBMIN\fR and \fBTIME\fR values were described previously, in the
-subsection, \fBNon-canonical Mode Input Processing\fR. The initial value of
-\fBMIN\fR is 1, and the initial value of \fBTIME\fR is 0.
-.SS "Terminal Size"
-.LP
+.Pp
+If
+.Dv IEXTEN
+is set, the following implementation-defined functions are
+enabled: special characters (
+.Sy WERASE ,
+.Sy REPRINT ,
+.Sy DISCARD ,
+and
+.Sy LNEXT )
+and local flags (
+.Dv TOSTOP ,
+.Dv ECHOCTL ,
+.Dv ECHOPRT ,
+.Dv ECHOKE ,
+.Dv FLUSHO ,
+and
+.Dv PENDIN ) .
+.Ss "Minimum and Timeout"
+The
+.Sy MIN
+and
+.Sy TIME
+values were described previously, in the
+subsection,
+.Sy Non-canonical Mode Input Processing .
+The initial value of
+.Sy MIN
+is 1, and the initial value of
+.Sy TIME
+is 0.
+.Ss "Terminal Size"
 The number of lines and columns on the terminal's display is specified in the
-\fBwinsize\fR structure defined by  \fBsys/termios.h\fR and includes the
-following members:
-.sp
-.in +2
-.nf
+.Vt winsize
+structure defined by
+.In sys/termios.h
+and includes the following members:
+.Bd -literal -offset 2n
 unsigned	short ws_row;  /* rows, in characters */
-unsigned short	ws_col;    /* columns, in characters */
-unsigned short	ws_xpixel; /* horizontal size, in pixels */
-unsigned short	ws_ypixel; /* vertical size, in pixels */
-.fi
-.in -2
-
-.SS "Termio Structure"
-.LP
-The SunOS/SVR4 \fBtermio\fR structure is used by some \fBioctl\fRs; it is
-defined by \fBsys/termio.h\fR and includes the following members:
-.sp
-.in +2
-.nf
-unsigned	 short	c_iflag;  /* input modes */
-unsigned	 short	c_oflag;  /* output modes */
-unsigned	 short	c_cflag;  /* control modes */
-unsigned	 short c_lflag; /* local modes */
-char c_line;			  /* line discipline */
-unsigned	 char  c_cc[NCC];  /* control chars */
-.fi
-.in -2
-
-.sp
-.LP
-The special control characters are defined by the array \fBc_cc\fR. The
-symbolic name \fBNCC\fR is the size of the Control-character array and is also
-defined by \fBtermio.h\fR. The relative positions, subscript names, and typical
-default values  for each function are as follows:
-.sp
-
-.sp
-.TS
-box;
-c | c | c
-l | l | l .
-Relative Positions	Subscript Names	Typical Default Values
-_
-0	VINTR	EXT
-_
-1	VQUIT	FS
-_
-2	VERASE	DEL
-_
-3	VKILL	NAK
-_
-4	VEOF	EOT
-_
-5	VEOL	NUL
-_
-6	VEOL2	NUL
-_
-7	Reserved	
-.TE
-
-.sp
-.LP
-The \fBMIN\fR values is stored in the \fBVMIN\fR element of the \fBc_cc\fR
-array; the \fBTIME\fR value is stored in the  \fBVTIME\fR element of the
-\fBc_cc\fR array. The  \fBVMIN\fR element is the same element as the
-\fBVEOF\fR element; the \fBVTIME\fR element is the same element as the
-\fBVEOL\fR element.
-.sp
-.LP
-The calls that use the \fBtermio\fR structure only affect the flags and control
-characters that can be stored in the \fBtermio\fR structure; all other flags
-and control characters are unaffected.
-.SS "Modem Lines"
-.LP
+unsigned short	ws_col;        /* columns, in characters */
+unsigned short	ws_xpixel;     /* horizontal size, in pixels */
+unsigned short	ws_ypixel;     /* vertical size, in pixels */
+.Ed
+.Ss "Termio Structure"
+The SunOS/SVR4
+.Vt termio
+structure is used by some
+.Fn ioctl Ns s ;
+it is defined by
+.In sys/termio.h
+and includes the following members:
+.Bd -literal -offset 2n
+unsigned	short	c_iflag;    /* input modes */
+unsigned	short	c_oflag;    /* output modes */
+unsigned	short	c_cflag;    /* control modes */
+unsigned	short	c_lflag;    /* local modes */
+char			c_line;     /* line discipline */
+unsigned	char	c_cc[NCC];  /* control chars */
+.Ed
+.Pp
+The special control characters are defined by the array
+.Fa c_cc .
+The symbolic name
+.Dv NCC
+is the size of the Control-character array and is also
+defined by
+.In termio.h .
+The relative positions, subscript names, and typical
+default values for each function are as follows:
+.Bl -column "Relative Positions" "Subscript Names" "Typical Default Values"
+.It Relative Positions Ta Subscript Names Ta Typical Default Values
+.It 0 Ta VINTR Ta EXT
+.It 1 Ta VQUIT Ta FS
+.It 2 Ta VERASE Ta DEL
+.It 3 Ta VKILL Ta NAK
+.It 4 Ta VEOF Ta EOT
+.It 5 Ta VEOL Ta NUL
+.It 6 Ta VEOL2 Ta NUL
+.It 7 Ta Reserved Ta
+.El
+.Pp
+The
+.Sy MIN
+values is stored in the
+.Dv VMIN
+element of the
+.Fa c_cc
+array; the
+.Sy TIME
+value is stored in the
+.Dv VTIME
+element of the
+.Fa c_cc
+array.
+The
+.Dv VMIN
+element is the same element as the
+.Dv VEOF
+element; the
+.Dv VTIME
+element is the same element as the
+.Dv VEOL
+element.
+.Pp
+The calls that use the
+.Va termio
+structure only affect the flags and control
+characters that can be stored in the
+.Vt termio
+structure; all other flags and control characters are unaffected.
+.Ss "Modem Lines"
 On special files representing serial ports, modem control lines can be read.
-Control lines  (if the underlying hardware supports it) may also be changed.
-Status lines are read-only. The following modem control and status lines may be
-supported by a device; they are defined by \fBsys/termios.h\fR:
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_LE\fR\fR
-.ad
-.RS 13n
- line enable
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_DTR\fR\fR
-.ad
-.RS 13n
+Control lines (if the underlying hardware supports it) may also be changed.
+Status lines are read-only.
+The following modem control and status lines may be
+supported by a device; they are defined by
+.In sys/termios.h :
+.Pp
+.Bl -tag -width "TIOCM_DTR" -compact -offset 2n
+.It Dv TIOCM_LE
+line enable
+.It Dv TIOCM_DTR
 data terminal ready
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_RTS\fR\fR
-.ad
-.RS 13n
+.It Dv TIOCM_RTS
 request to send
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_ST\fR\fR
-.ad
-.RS 13n
+.It Dv TIOCM_ST
 secondary transmit
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_SR\fR\fR
-.ad
-.RS 13n
+.It Dv TIOCM_SR
 secondary receive
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_CTS\fR\fR
-.ad
-.RS 13n
+.It Dv TIOCM_CTS
 clear to send
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_CAR\fR\fR
-.ad
-.RS 13n
+.It Dv TIOCM_CAR
 carrier detect
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_RNG\fR\fR
-.ad
-.RS 13n
+.It Dv TIOCM_RNG
 ring
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCM_DSR\fR\fR
-.ad
-.RS 13n
+.It Dv TIOCM_DSR
 data set ready
-.RE
-
-.sp
-.LP
-\fBTIOCM_CD\fR is a synonym for \fBTIOCM_CAR\fR, and \fBTIOCM_RI\fR is a
-synonym for \fBTIOCM_RNG\fR. Not all of these are necessarily supported by any
+.El
+.Pp
+.Dv TIOCM_CD
+is a synonym for
+.Dv TIOCM_CAR ,
+and
+.Dv TIOCM_RI
+is a synonym for
+.Dv TIOCM_RNG .
+Not all of these are necessarily supported by any
 particular device; check the manual page for the device in question.
-.sp
-.LP
+.Pp
 The software carrier mode can be enabled or disabled using the
-\fBTIOCSSOFTCAR\fR \fBioctl\fR. If the software carrier flag for a line is off,
-the line pays attention to the hardware carrier detect (DCD) signal. The
-\fBtty\fR device associated with the line cannot be opened until \fBDCD\fR is
-asserted. If the software carrier flag is on, the line behaves as if \fBDCD\fR
+.Dv TIOCSSOFTCAR
+.Fn ioctl .
+If the software carrier flag for a line is off,
+the line pays attention to the hardware carrier detect (DCD) signal.
+The
+.Sy tty
+device associated with the line cannot be opened until
+.Sy DCD
+is asserted.
+If the software carrier flag is on, the line behaves as if
+.Sy DCD
 is always asserted.
-.sp
-.LP
+.Pp
 The software carrier flag is usually turned on for locally connected terminals
 or other devices, and is off for lines with modems.
-.sp
-.LP
-To be able to issue the \fBTIOCGSOFTCAR\fR and \fBTIOCSSOFTCAR\fR \fBioctl\fR
-calls, the \fBtty\fR line should be opened with \fBO_NDELAY\fR so that the
-\fBopen\fR(2) will not wait for the carrier.
-.SS "Default Values"
-.LP
-The initial  \fBtermios\fR values upon driver open is configurable. This is
-accomplished by setting the "ttymodes" property in the file
-\fB/kernel/drv/options.conf\fR. Since this property is assigned during system
-initialization,  any change to the "ttymodes" property will not take effect
-until the next reboot.  The string value assigned to this property should be in
-the same format as the output of the \fBstty\fR(1) command with the -g option.
-.sp
-.LP
-If this property is undefined, the following  \fBtermios\fR modes are in
-effect.  The initial input control value is \fBBRKINT\fR, \fBICRNL\fR,
-\fBIXON\fR, \fBIMAXBEL\fR. The initial output control value is \fBOPOST\fR,
-\fBONLCR\fR, \fBTAB3\fR. The initial hardware control value is \fBB9600\fR,
-\fBCS8\fR, \fBCREAD\fR. The initial line-discipline control value is
-\fBISIG\fR, \fBICANON\fR, \fBIEXTEN\fR, \fBECHO\fR, \fBECHOK\fR, \fBECHOE\fR,
-\fBECHOKE\fR, \fBECHOCTL\fR.
-.SH IOCTLS
-.LP
-The \fBioctl\fRs supported by devices and \fBSTREAMS\fR modules providing the
-\fBtermios\fR(3C) interface are listed below. Some calls may not be supported
-by all devices or modules.  The functionality provided by these calls is also
+.Pp
+To be able to issue the
+.Dv TIOCGSOFTCAR
+and
+.Dv TIOCSSOFTCAR
+.Fn ioctl
+calls, the
+.Sy tty
+line should be opened with
+.Dv O_NDELAY
+so that the
+.Xr open 2
+will not wait for the carrier.
+.Ss "Default Values"
+The initial
+.Vt termios
+values upon driver open is configurable.
+This is accomplished by setting the "ttymodes" property in the file
+.Pa /kernel/drv/options.conf .
+Since this property is assigned during system
+initialization, any change to the "ttymodes" property will not take effect
+until the next reboot.
+The string value assigned to this property should be in
+the same format as the output of the
+.Xr stty 1
+command with the -g option.
+.Pp
+If this property is undefined, the following
+.Vt termios
+modes are in effect.
+The initial input control value is
+.Dv BRKINT ,
+.Dv ICRNL ,
+.Dv IXON ,
+.Dv IMAXBEL .
+The initial output control value is
+.Dv OPOST ,
+.Dv ONLCR ,
+.Dv TAB3 .
+The initial hardware control value is
+.Dv B9600 ,
+.Dv CS8 ,
+.Dv CREAD .
+The initial line-discipline control value is
+.Dv ISIG ,
+.Dv ICANON ,
+.Dv IEXTEN ,
+.Dv ECHO ,
+.Dv ECHOK ,
+.Dv ECHOE ,
+.Dv ECHOKE ,
+.Dv ECHOCTL .
+.Sh IOCTLS
+The
+.Fn ioctl Ns s
+supported by devices and
+.Sy STREAMS
+modules providing the
+.Xr termios 3C
+interface are listed below.
+Some calls may not be supported by all devices or modules.
+The functionality provided by these calls is also
 available through the preferred function call interface specified on
-\fBtermios\fR.
-.sp
-.ne 2
-.na
-\fB\fBTCGETS\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBtermios\fR structure. The current terminal
-parameters are fetched and stored into that structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCSETS\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBtermios\fR structure. The current terminal
-parameters are set from the values stored in that structure. The change is
-immediate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCSETSW\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBtermios\fR structure. The current terminal
-parameters are set from the values stored in that structure. The change occurs
-after all characters queued for output have been transmitted. This form should
-be used when changing parameters that affect output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCSETSF\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBtermios\fR structure. The current terminal
-parameters are set from the values stored in that structure. The change occurs
-after all characters queued for output have been transmitted; all characters
-queued for input are discarded and then the change occurs.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCGETA\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBtermio\fR structure. The current terminal
-parameters are fetched, and those parameters that can be stored in a
-\fBtermio\fR structure are stored into that structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCSETA\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a  \fBtermio\fR structure. Those terminal
-parameters that can be stored in a \fBtermio\fR structure are set from the
-values stored in that structure. The change is immediate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCSETAW\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBtermio\fR structure. Those terminal
-parameters that can be stored in a \fBtermio\fR structure are set from the
-values stored in that structure. The change occurs after all characters queued
-for output have been transmitted. This form should be used when changing
-parameters that affect output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCSETAF\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBtermio\fR structure.  Those terminal
-parameters that can be stored in a \fBtermio\fR structure are set from the
-values stored in that structure. The change occurs after all characters queued
+.Nm termios .
+.Bl -tag -width TIOCSSOFTCAR
+.It Dv TCGETS
+The argument is a pointer to a
+.Vt termios
+structure.
+The current terminal parameters are fetched and stored into that structure.
+.It Dv TCSETS
+The argument is a pointer to a
+.Vt termios
+structure.
+The current terminal parameters are set from the values stored in that structure.
+The change is immediate.
+.It Dv TCSETSW
+The argument is a pointer to a
+.Vt termios
+structure.
+The current terminal parameters are set from the values stored in that structure.
+The change occurs after all characters queued for output have been transmitted.
+This form should be used when changing parameters that affect output.
+.It Dv TCSETSF
+The argument is a pointer to a
+.Vt termios
+structure.
+The current terminal parameters are set from the values stored in that structure.
+The change occurs after all characters queued for output have been transmitted;
+all characters queued for input are discarded and then the change occurs.
+.It Dv TCGETA
+The argument is a pointer to a
+.Vt termio
+structure.
+The current terminal parameters are fetched, and those parameters that can be
+stored in a
+.Vt termio
+structure are stored into that structure.
+.It Dv TCSETA
+The argument is a pointer to a
+.Vt termio
+structure.
+Those terminal parameters that can be stored in a
+.Vt termio
+structure are set from the values stored in that structure.
+The change is immediate.
+.It Dv TCSETAW
+The argument is a pointer to a
+.Vt termio
+structure.
+Those terminal parameters that can be stored in a
+.Vt termio
+structure are set from
+the values stored in that structure.
+The change occurs after all characters queued for output have been transmitted.
+This form should be used when changing parameters that affect output.
+.It Dv TCSETAF
+The argument is a pointer to a
+.Vt termio
+structure.
+Those terminal parameters that can be stored in a
+.Vt termio
+structure are set from the values stored in that structure.
+The change occurs after all characters queued
 for output have been transmitted; all characters queued for input are discarded
 and then the change occurs.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCSBRK\fR\fR
-.ad
-.RS 16n
-The argument is an \fBint\fR value. Wait for the output to drain. If the
-argument is \fB0\fR, then send a break (zero valued bits for 0.25 seconds).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCXONC\fR\fR
-.ad
-.RS 16n
-Start/stop control. The argument is an \fBint\fR value. If the argument is
-\fB0\fR, suspend output; if \fB1\fR, restart suspended output; if \fB2\fR,
-suspend input; if \fB3\fR, restart suspended input.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTCFLSH\fR\fR
-.ad
-.RS 16n
-The argument is an \fBint\fR value. If the argument is \fB0\fR, flush the input
-queue; if \fB1\fR, flush the output queue; if \fB2\fR, flush both the input and
-output queues.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCGPGRP\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBpid_t\fR. Set the value of that  \fBpid_t\fR
-to the process group \fBID\fR of the foreground process group associated with
-the terminal. See  \fBtermios\fR(3C) for a description of  \fBTCGETPGRP\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCSPGRP\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBpid_t\fR. Associate the process group whose
-process group \fBID\fR is specified by the value of that  \fBpid_t\fR with the
-terminal. The new process group value must be in the range of valid process
-group \fBID\fR values.  Otherwise, the error  \fBEPERM\fR is returned.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCGSID\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBpid_t\fR. The session ID of the terminal is
-fetched  and stored in the  \fBpid_t\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCGWINSZ\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBwinsize\fR structure. The terminal driver's
+.It Dv TCSBRK
+The argument is an
+.Vt int
+value.
+Wait for the output to drain.
+If the argument is
+.Sy 0 ,
+then send a break (zero valued bits for 0\&.25 seconds).
+.It Dv TCXONC
+Start/stop control.
+The argument is an
+.Vt int
+value.
+If the argument is
+.Sy 0 ,
+suspend output; if
+.Sy 1 ,
+restart suspended output; if
+.Sy 2 ,
+suspend input; if
+.Sy 3 ,
+restart suspended input.
+.It Dv TCFLSH
+The argument is an
+.Vt int
+value.
+If the argument is
+.Sy 0 ,
+flush the input queue; if
+.Sy 1 ,
+flush the output queue; if
+.Sy 2 ,
+flush both the input and output queues.
+.It Dv TIOCGPGRP
+The argument is a pointer to a
+.Vt pid_t .
+Set the value of that
+.Vt pid_t
+to the process group
+.Sy ID
+of the foreground process group associated with the terminal.
+See
+.Xr termios 3C
+for a description of
+.Dv TCGETPGRP .
+.It Dv TIOCSPGRP
+The argument is a pointer to a
+.Vt pid_t .
+Associate the process group whose
+process group
+.Sy ID
+is specified by the value of that
+.Vt pid_t
+with the terminal.
+The new process group value must be in the range of valid process
+group
+.Sy ID
+values.
+Otherwise, the error
+.Er EPERM
+is returned.
+.It Dv TIOCGSID
+The argument is a pointer to a
+.Vt pid_t .
+The session ID of the terminal is fetched and stored in the
+.Vt pid_t .
+.It Dv TIOCGWINSZ
+The argument is a pointer to a
+.Vt winsize
+structure.
+The terminal driver's
 notion of the terminal size is stored into that structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCSWINSZ\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBwinsize\fR structure. The terminal driver's
+.It Dv TIOCSWINSZ
+The argument is a pointer to a
+.Vt winsize
+structure.
+The terminal driver's
 notion of the terminal size is set from the values specified in that structure.
-If the new sizes are different from the old sizes, a \fBSIGWINCH\fR signal is
-set to the process group of the terminal.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCMBIS\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an \fBint\fR whose value is a mask containing
-modem control lines to be turned on. The control lines whose bits are set in
+If the new sizes are different from the old sizes, a
+.Dv SIGWINCH
+signal is set to the process group of the terminal.
+.It Dv TIOCMBIS
+The argument is a pointer to an
+.Vt int
+whose value is a mask containing modem control lines to be turned on.
+The control lines whose bits are set in
 the argument are turned on; no other control lines are affected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCMBIC\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an \fBint\fR whose value is a mask containing
-modem control lines to be turned off. The control lines whose bits are set in
+.It Dv TIOCMBIC
+The argument is a pointer to an
+.Vt int
+whose value is a mask containing modem control lines to be turned off.
+The control lines whose bits are set in
 the argument are turned off; no other control lines are affected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCMGET\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an  \fBint\fR. The current state of the modem
-status lines is fetched and stored in the  \fBint\fR pointed to by the
-argument.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCMSET\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an  \fBint\fR containing a new set of modem
-control lines. The modem control lines are turned on or off, depending on
+.It Dv TIOCMGET
+The argument is a pointer to an
+.Vt int .
+The current state of the modem
+status lines is fetched and stored in the
+.Vt int
+pointed to by the argument.
+.It Dv TIOCMSET
+The argument is a pointer to an
+.Vt int
+containing a new set of modem control lines.
+The modem control lines are turned on or off, depending on
 whether the bit for that mode is set or clear.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCSPPS\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an \fBint\fR that determines whether
-pulse-per-second event handling is to be enabled (non-zero) or disabled (zero).
+.It Dv TIOCSPPS
+The argument is a pointer to an
+.Vt int
+that determines whether pulse-per-second event handling is to be enabled
+(non-zero) or disabled (zero).
 If a one-pulse-per-second reference clock is attached to the serial line's data
-carrier detect input, the local system clock will be calibrated to it. A clock
-with a high error, that is, a deviation of more than 25 microseconds per tick,
-is ignored.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCGPPS\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an \fBint\fR, in which the state of the even
-handling is returned. The \fBint\fR is set to a non-zero value if
-pulse-per-second (PPS) handling has been enabled. Otherwise, it is set to zero.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCGSOFTCAR\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an \fBint\fR whose value is \fB1\fR or \fB0\fR,
+carrier detect input, the local system clock will be calibrated to it.
+A clock with a high error, that is, a deviation of more than 25 microseconds
+per tick, is ignored.
+.It Dv TIOCGPPS
+The argument is a pointer to an
+.Vt int ,
+in which the state of the even handling is returned.
+The
+.Vt int
+is set to a non-zero value if pulse-per-second (PPS) handling has been enabled.
+Otherwise, it is set to zero.
+.It Dv TIOCGSOFTCAR
+The argument is a pointer to an
+.Vt int
+whose value is
+.Sy 1
+or
+.Sy 0 ,
 depending on whether the software carrier detect is turned on or off.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCSSOFTCAR\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to an \fBint\fR whose value is \fB1\fR or \fB0\fR.
-The value of the integer should be \fB0\fR to turn off software carrier, or
-\fB1\fR to turn it on.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBTIOCGPPSEV\fR\fR
-.ad
-.RS 16n
-The argument is a pointer to a \fBstruct\fR \fBppsclockev\fR. This structure
-contains the following members:
-.sp
-.in +2
-.nf
+.It Dv TIOCSSOFTCAR
+The argument is a pointer to an
+.Vt int
+whose value is
+.Sy 1
+or
+.Sy 0 .
+The value of the integer should be
+.Sy 0
+to turn off software carrier, or
+.Sy 1
+to turn it on.
+.It Dv TIOCGPPSEV
+The argument is a pointer to a
+.Vt "struct ppsclockev" .
+This structure contains the following members:
+.Bd -literal -offset 2n
 struct timeval tv;
 uint32_t serial;
-.fi
-.in -2
-
-"tv" is the system clock timestamp when the event (pulse on the \fBDCD\fR pin)
-occurred. "serial" is the ordinal of the event, which each consecutive event
-being assigned the next ordinal. The first event registered gets a "serial"
-value of \fB1\fR. The \fBTIOCGPPSEV\fR returns the last event registered;
-multiple calls will persistently return the same event until a new one is
-registered. In addition to time stamping and saving the event, if it is of
+.Ed
+.Pp
+.Fa tv
+is the system clock timestamp when the event (pulse on the
+.Sy DCD
+pin) occurred.
+.Fa serial
+is the ordinal of the event, which each consecutive event
+being assigned the next ordinal.
+The first event registered gets a
+.Fa serial
+value of
+.Sy 1 .
+The
+.Dv TIOCGPPSEV
+returns the last event registered; multiple calls will persistently return the
+same event until a new one is registered.
+In addition to time stamping and saving the event, if it is of
 one-second period and of consistently high accuracy, the local system clock
 will automatically calibrate to it.
-.RE
-
-.SH FILES
-.LP
-Files in or under /\fBdev\fR
-.SH SEE ALSO
-.LP
-\fBstty\fR(1), \fBfork\fR(2), \fBgetpgid\fR(2), \fBgetsid\fR(2),
-\fBioctl\fR(2), \fBsetsid\fR(2), \fBsigaction\fR(2), \fBsignal\fR(3C),
-\fBtcsetpgrp\fR(3C), \fBtermios\fR(3C), \fBsignal.h\fR(3HEAD),
-\fBstreamio\fR(7I)
+.El
+.Sh FILES
+Files in or under
+.Pa /dev
+.Sh SEE ALSO
+.Xr stty 1 ,
+.Xr fork 2 ,
+.Xr getpgid 2 ,
+.Xr getsid 2 ,
+.Xr ioctl 2 ,
+.Xr setsid 2 ,
+.Xr sigaction 2 ,
+.Xr signal 3C ,
+.Xr tcsetpgrp 3C ,
+.Xr termios 3C ,
+.Xr signal.h 3HEAD ,
+.Xr streamio 7I

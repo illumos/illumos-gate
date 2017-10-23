@@ -1,87 +1,160 @@
-'\" te
 .\" Copyright (c) 2003, Sun Microsystems, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FBIO 7I "May 12, 2003"
-.SH NAME
-fbio \- frame buffer control operations
-.SH DESCRIPTION
-.sp
-.LP
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd October 22, 2017
+.Dt FBIO 7I
+.Os
+.Sh NAME
+.Nm fbio
+.Nd frame buffer control operations
+.Sh DESCRIPTION
 The frame buffers provided with this release support the same general interface
-that is defined by \fB<sys/fbio.h>\fR\&. Each responds to an \fBFBIOGTYPE\fR
-\fBioctl\fR(2) request which returns information in a \fBfbtype\fR structure.
-.sp
-.LP
-Each device has an \fBFBTYPE\fR which is used by higher-level software to
-determine how to perform graphics functions. Each device is used by opening it,
-doing an \fBFBIOGTYPE\fR \fBioctl()\fR to see which frame buffer type is
+that is defined by
+.In sys/fbio.h .
+Each responds to an
+.Dv FBIOGTYPE
+.Xr ioctl 2
+request which returns information in a
+.Vt fbtype
+structure.
+.Pp
+Each device has an
+.\" FBTYPE isn't macro, enum, or type, just used to describe a number of
+.\" CPP-macros of the form #define FBTYPE_xxxx
+.Sy FBTYPE
+which is used by higher-level software to
+determine how to perform graphics functions.
+Each device is used by opening it, doing an
+.Dv FBIOGTYPE
+.Xr ioctl 2
+to see which frame buffer type is
 present, and thereby selecting the appropriate device-management routines.
-.sp
-.LP
-\fBFBIOGINFO\fR returns information specific to the GS accelerator.
-.sp
-.LP
-\fBFBIOSVIDEO\fR and \fBFBIOGVIDEO\fR are general-purpose \fBioctl()\fR
-requests for controlling possible video features of frame buffers. These
-\fBioctl()\fR requests either set or return the value of a flags integer. At
-this point, only the \fBFBVIDEO_ON\fR option is available, controlled by
-\fBFBIOSVIDEO\fR. \fBFBIOGVIDEO\fR returns the current video state.
-.sp
-.LP
-The \fBFBIOSATTR\fR and \fBFBIOGATTR\fR \fBioctl()\fR requests allow access to
-special features of newer frame buffers. They use the  \fBfbsattr\fR and
-\fBfbgattr\fR structures.
-.sp
-.LP
-Some color frame buffers support the \fBFBIOPUTCMAP\fR and \fBFBIOGETCMAP\fR
-\fBioctl()\fR requests, which provide access to the colormap. They use the
-\fBfbcmap\fR structure.
-.sp
-.LP
+.Pp
+.Dv FBIOGINFO
+returns information specific to the GS accelerator.
+.Pp
+.Dv FBIOSVIDEO
+and
+.Dv FBIOGVIDEO
+are general-purpose
+.Xr ioctl 2
+requests for controlling possible video features of frame buffers.
+These
+.Xr ioctl 2
+requests either set or return the value of a flags integer.
+At this point, only the
+.Dv FBVIDEO_ON
+option is available, controlled by
+.Dv FBIOSVIDEO .
+.Dv FBIOGVIDEO
+returns the current video state.
+.Pp
+The
+.Dv FBIOSATTR
+and
+.Dv FBIOGATTR
+.Xr ioctl 2
+requests allow access to special features of newer frame buffers.
+They use the
+.Vt fbsattr
+and
+.Vt fbgattr
+structures.
+.Pp
+Some color frame buffers support the
+.Dv FBIOPUTCMAP
+and
+.Dv FBIOGETCMAP
+.Xr ioctl 2
+requests, which provide access to the colormap.
+They use the
+.Vt fbcmap
+structure.
+.Pp
 Also, some framebuffers with multiple colormaps will either encode the colormap
-identifier in the high-order bits of the "index" field in the fbcmap structure,
-or use the \fBFBIOPUTCMAPI\fR and \fBFBIOGETCMAPI\fR \fBioctl()\fR requests.
-.sp
-.LP
-\fBFBIOVERTICAL\fR is used to wait for the start of the next vertical retrace
+identifier in the high-order bits of the
+.Dq index
+field in the
+.Vt fbcmap
+structure, or use the
+.Dv FBIOPUTCMAPI
+and
+.Dv FBIOGETCMAPI
+.Xr ioctl 2
+requests.
+.Pp
+.Dv FBIOVERTICAL
+is used to wait for the start of the next vertical retrace
 period.
-.sp
-.LP
-\fBFBIOVRTOFFSET\fR Returns the offset to a read-only \fIvertical retrace
-page\fR for those framebuffers that support it.  This vertical retrace page may
-be mapped into user space with \fBmmap\fR(2). The first word of the vertical
-retrace page (type unsigned int) is a counter that is incremented every time
-there is a vertical retrace.  The user process can use this counter in a
-variety of ways.
-.sp
-.LP
-\fBFBIOMONINFO\fR returns a mon_info structure which contains information about
+.Pp
+.Dv FBIOVRTOFFSET
+Returns the offset to a read-only
+.Dq Em vertical retrace page
+for those framebuffers that support it.
+This vertical retrace page may be mapped into user space with
+.Xr mmap 2 .
+The first word of the vertical
+retrace page (type
+.Vt "unsigned int" )
+is a counter that is incremented every time there is a vertical retrace.
+The user process can use this counter in a variety of ways.
+.Pp
+.Dv FBIOMONINFO
+returns a
+.Vt mon_info
+structure which contains information about
 the monitor attached to the framebuffer, if available.
-.sp
-.LP
-\fBFBIOSCURSOR\fR, \fBFBIOGCURSOR\fR, \fBFBIOSCURPOS\fR and \fBFBIOGCURPOS\fR
+.Pp
+.Dv FBIOSCURSOR ,
+.Dv FBIOGCURSOR ,
+.Dv FBIOSCURPOS
+and
+.Dv FBIOGCURPOS
 are used to control the hardware cursor for those framebuffers that have this
-feature. \fBFBIOGCURMAX\fR returns the maximum sized cursor supported by the
-framebuffer.  Attempts to create a cursor larger than this will fail.
-.sp
-.LP
-Finally \fBFBIOSDEVINFO\fR and \fBFBIOGDEVINFO\fR are used to transfer
+feature.
+.Dv FBIOGCURMAX
+returns the maximum sized cursor supported by the framebuffer.
+Attempts to create a cursor larger than this will fail.
+.Pp
+Finally
+.Dv FBIOSDEVINFO
+and
+.Dv FBIOGDEVINFO
+are used to transfer
 variable-length, device-specific information into and out of framebuffers.
-.SH SEE ALSO
-.sp
-.LP
-\fBioctl\fR(2), \fBmmap\fR(2), \fBcgsix\fR(7D)
-.SH BUGS
-.sp
-.LP
-The \fBFBIOSATTR\fR and \fBFBIOGATTR\fR \fBioctl()\fR requests are only
-supported by frame buffers which emulate older frame buffer types. If a frame
-buffer emulates another frame buffer, \fBFBIOGTYPE\fR returns the emulated
-type. To get the real type, use \fBFBIOGATTR\fR.
-.sp
-.LP
-The \fBFBIOGCURPOS\fR ioctl was incorrectly defined in previous operating
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr mmap 2 ,
+.Xr cgsix 7D
+.Sh BUGS
+The
+.Dv FBIOSATTR
+and
+.Dv FBIOGATTR
+.Xr ioctl 2
+requests are only
+supported by frame buffers which emulate older frame buffer types.
+If a frame buffer emulates another frame buffer,
+.Dv FBIOGTYPE
+returns the emulated type.
+To get the real type, use
+.Dv FBIOGATTR .
+.Pp
+The
+.Dv FBIOGCURPOS
+ioctl was incorrectly defined in previous operating
 systems, and older code running in binary compatibility mode may get incorrect
 results.

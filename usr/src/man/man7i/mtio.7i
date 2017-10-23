@@ -1,308 +1,421 @@
-'\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MTIO 7I "April 9, 2016"
-.SH NAME
-mtio \- general magnetic tape interface
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/types.h>
-#include <sys/ioctl.h>
-#include <sys/mtio.h>
-.fi
-
-.SH DESCRIPTION
-.LP
+.\" Copyright 2018, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd August 31, 2018
+.Dt MTIO 7I
+.Os
+.Sh NAME
+.Nm mtio
+.Nd general magnetic tape interface
+.Sh SYNOPSIS
+.In sys/types.h
+.In sys/ioctl.h
+.In sys/mtio.h
+.Sh DESCRIPTION
 1/2", 1/4", 4mm, and 8mm magnetic tape drives all share the same general
 character device interface.
-.sp
-.LP
+.Pp
 There are two types of tape records: data records and end-of-file (EOF)
-records. S\fBEOF\fR records are also known as tape marks and file marks. A
-record is separated by interrecord (or tape) gaps on a tape.
-.sp
-.LP
-End-of-recorded-media (EOM) is indicated by two \fBEOF\fR marks on 1/2" tape;
-by one \fBEOF\fR mark on 1/4", 4mm, and 8mm cartridge tapes.
-.SS "1/2" Reel Tape"
-.LP
-Data bytes are recorded in parallel onto the 9-track tape. Since it is a
-variable-length tape device, the number of bytes in a  physical record may
-vary.
-.sp
-.LP
-The recording formats available (check specific tape drive) are 800 \fBBPI,\fR
-1600 \fBBPI,\fR 6250 \fBBPI,\fR and data compression. Actual storage capacity
-is a function of the recording format and the length of the tape reel. For
-example, using a 2400 foot tape, 20 Mbyte can be stored using 800 \fBBPI,\fR 40
-Mbyte using 1600 \fBBPI,\fR 140 Mbyte using 6250 \fBBPI,\fR or up to 700 Mbyte
-using data compression.
-.SS "1/4" Cartridge Tape"
-.LP
-Data is recorded serially onto 1/4" cartridge tape. The number of bytes per
-record is determined by the physical record size of the device. The I/O request
-size must be a multiple of the physical record size of the device. For
-\fBQIC-11,\fR \fBQIC-24,\fR and \fBQIC-150\fR tape drives, the block size is
-512 bytes.
-.sp
-.LP
-The records are recorded on tracks in a serpentine motion. As one track is
+records.
+.Sy EOF
+records are also known as tape marks and file marks.
+A record is separated by interrecord (or tape) gaps on a tape.
+.Pp
+End-of-recorded-media (EOM) is indicated by two
+.Sy EOF
+marks on 1/2\(dq tape; by one
+.Sy EOF
+mark on 1/4\(dq, 4mm, and 8mm cartridge tapes.
+.Ss "1/2\(dq Reel Tape"
+Data bytes are recorded in parallel onto the 9-track tape.
+Since it is a
+variable-length tape device, the number of bytes in a physical record may vary.
+.Pp
+The recording formats available (check specific tape drive) are 800
+.Sy BPI ,
+1600
+.Sy BPI ,
+6250
+.Sy BPI ,
+and data compression.
+Actual storage capacity is a function of the recording format and the length of the tape reel.
+For example, using a 2400 foot tape, 20 Mbyte can be stored using 800
+.Sy BPI ,
+40 Mbyte using 1600
+.Sy BPI ,
+140 Mbyte using 6250
+.Sy BPI ,
+or up to 700 Mbyte using data compression.
+.Ss "1/4\(dq Cartridge Tape"
+Data is recorded serially onto 1/4\(dq cartridge tape.
+The number of bytes per
+record is determined by the physical record size of the device.
+The I/O request
+size must be a multiple of the physical record size of the device.
+For
+.Sy QIC-11 ,
+.Sy QIC-24 ,
+and
+.Sy QIC-150
+tape drives, the block size is 512 bytes.
+.Pp
+The records are recorded on tracks in a serpentine motion.
+As one track is
 completed, the drive switches to the next and begins writing in the opposite
-direction, eliminating the wasted motion of rewinding. Each file, including the
-last, ends with one file mark.
-.sp
-.LP
+direction, eliminating the wasted motion of rewinding.
+Each file, including the last, ends with one file mark.
+.Pp
 Storage capacity is based on the number of tracks the drive is capable of
-recording. For example, 4-track drives can only record 20 Mbyte of data on a
+recording.
+For example, 4-track drives can only record 20 Mbyte of data on a
 450 foot tape; 9-track drives can record up to 45 Mbyte of data on a tape of
-the same length. \fBQIC-11\fR is the only tape format available for 4-track
-tape drives. In contrast, 9-track tape drives can use either \fBQIC-24\fR or
-\fBQIC-11.\fR Storage capacity is not appreciably affected by using either
-format. \fBQIC-24\fR is preferable to \fBQIC-11\fR because it records a
+the same length.
+.Sy QIC-11
+is the only tape format available for 4-track
+tape drives.
+In contrast, 9-track tape drives can use either
+.Sy QIC-24
+or
+.Sy QIC-11 .
+Storage capacity is not appreciably affected by using either format.
+.Sy QIC-24
+is preferable to
+.Sy QIC-11
+because it records a
 reference signal to mark the position of the first track on the tape, and each
 block has a unique block number.
-.sp
-.LP
-The \fBQIC-150\fR tape drives require \fBDC-6150\fR (or equivalent) tape
-cartridges for writing. However, they can read other tape cartridges in
-\fBQIC-11,\fR \fBQIC-24,\fR or \fBQIC-120\fR tape formats.
-.SS "8mm Cartridge Tape"
-.LP
-Data is recorded serially onto 8mm helical scan cartridge tape. Since it is a
-variable-length tape device, the number of bytes in a  physical record may
-vary. The recording formats available (check specific tape drive) are standard
+.Pp
+The
+.Sy QIC-150
+tape drives require
+.Sy DC-6150
+(or equivalent) tape cartridges for writing.
+However, they can read other tape cartridges in
+.Sy QIC-11 ,
+.Sy QIC-24 ,
+or
+.Sy QIC-120
+tape formats.
+.Ss "8mm Cartridge Tape"
+Data is recorded serially onto 8mm helical scan cartridge tape.
+Since it is a
+variable-length tape device, the number of bytes in a physical record may
+vary.
+The recording formats available (check specific tape drive) are standard
 2Gbyte, 5Gbyte, and compressed format.
-.SS "4mm DAT Tape"
-.LP
+.Ss "4mm DAT Tape"
 Data is recorded either in Digital Data Storage (DDS) tape format or in Digital
-Data Storage, Data Compressed (DDS-DC) tape format. Since it is a
-variable-length tape device, the number of bytes in a  physical record may
-vary. The recording formats available are standard 2Gbyte and compressed
-format.
-.SS "Persistent Error Handling"
-.LP
+Data Storage, Data Compressed (DDS-DC) tape format.
+Since it is a
+variable-length tape device, the number of bytes in a physical record may vary.
+The recording formats available are standard 2Gbyte and compressed format.
+.Ss "Persistent Error Handling"
 Persistent error handling is a modification of the current error handling
-behaviors, BSD and SVR4. With persistent error handling enabled, all tape
+behaviors, BSD and SVR4.
+With persistent error handling enabled, all tape
 operations after an error or exception will return immediately with an error.
 Persistent error handling can be most useful with asynchronous tape operations
-that use the \fBaioread\fR(3C) and \fBaiowrite\fR(3C) functions.
-.sp
-.LP
-To enable persistent error handling, the ioctl \fBMTIOCPERSISTENT\fR must be
-issued. If this ioctl succeeds, then persistent error handling is enabled and
-changes the current error behavior. This ioctl will fail if the device driver
+that use the
+.Xr aioread 3C
+and
+.Xr aiowrite 3C
+functions.
+.Pp
+To enable persistent error handling, the ioctl
+.Dv MTIOCPERSISTENT
+must be issued.
+If this ioctl succeeds, then persistent error handling is enabled and
+changes the current error behavior.
+This ioctl will fail if the device driver
 does not support persistent error handling.
-.sp
-.LP
+.Pp
 With persistent error handling enabled, all tape operations after an exception
 or error will return with the same error as the first command that failed; the
-operations will not be executed. An exception is some event that might stop
-normal tape operations, such as an End Of File (EOF) mark or  an End Of Tape
-(EOT) mark. An example of an error is a media error. The \fBMTIOCLRERR\fR ioctl
-must be issued to allow normal tape operations to continue and to clear the
-error.
-.sp
-.LP
+operations will not be executed.
+An exception is some event that might stop
+normal tape operations, such as an End Of File (EOF) mark or an End Of Tape
+(EOT) mark.
+An example of an error is a media error.
+The
+.Dv MTIOCLRERR
+ioctl must be issued to allow normal tape operations to continue and to clear
+the error.
+.Pp
 Disabling persistent error handling returns the error behavior to normal SVR4
 error handling, and will not occur until all outstanding operations are
-completed. Applications should wait for all outstanding operations to complete
-before disabling persistent error handling. Closing the device will also
+completed.
+Applications should wait for all outstanding operations to complete
+before disabling persistent error handling.
+Closing the device will also
 disable persistent error handling and clear any errors or exceptions.
-.sp
-.LP
-The \fBRead Operation\fR and \fBWrite Operation\fR subsections contain more
-pertinent information reguarding persistent error handling.
-.SS "Read Operation"
-.LP
-The \fBread\fR(2) function reads the next record on the tape. The record size
-is passed back as the number of bytes read, provided it is not greater than the
-number requested. When a tape mark or end of data is read, a zero byte count is
+.Pp
+The
+.Sx Read Operation
+and
+.Sx Write Operation
+subsections contain more pertinent information reguarding persistent error handling.
+.Ss "Read Operation"
+The
+.Xr read 2
+function reads the next record on the tape.
+The record size is passed back as the number of bytes read, provided it is not
+greater than the number requested.
+When a tape mark or end of data is read, a zero byte count is
 returned; all successive reads after the zero read will return an error and
-\fBerrno\fR will be set to \fBEIO\fR. To move to the next file, an \fBMTFSF\fR
-ioctl can be issued before or after the read causing the error. This error
-handling behavior is different from the older \fBBSD\fR behavior, where another
-read will fetch the first record of the next tape file. If the \fBBSD\fR
-behavior is required, device names containing the letter \fBb\fR (for \fBBSD\fR
-behavior) in the final component should be used. If persistent error handling
+.Va errno
+will be set to
+.Er EIO .
+To move to the next file, an
+.Dv MTFSF
+ioctl can be issued before or after the read causing the error.
+This error
+handling behavior is different from the older
+.Sy BSD
+behavior, where another read will fetch the first record of the next tape file.
+If the
+.Sy BSD
+behavior is required, device names containing the letter
+.Ql b
+(for
+.Sy BSD
+behavior) in the final component should be used.
+If persistent error handling
 was enabled with either the BSD or SVR4 tape device behavior, all operations
-after this read error will return \fBEIO\fR errors until the \fBMTIOCLRERR\fR
-ioctl is issued. An \fBMTFSF\fR ioctl can then he issued.
-.sp
-.LP
+after this read error will return
+.Er EIO
+errors until the
+.Dv MTIOCLRERR
+ioctl is issued.
+An
+.Dv MTFSF
+ioctl can then he issued.
+.Pp
 Two successful successive reads that both return zero byte counts indicate
-\fBEOM\fR on the tape. No further reading should be performed past the
-\fBEOM.\fR
-.sp
-.LP
+.Sy EOM
+on the tape.
+No further reading should be performed past the
+.Sy EOM .
+.Pp
 Fixed-length I/O tape devices require the number of bytes read to be a multiple
-of the physical record size. For example, 1/4" cartridge tape devices only read
-multiples of 512 bytes. If the blocking factor is greater than 64,512 bytes
+of the physical record size.
+For example, 1/4\(dq cartridge tape devices only read
+multiples of 512 bytes.
+If the blocking factor is greater than 64,512 bytes
 (minphys limit), fixed-length I/O tape devices read multiple records.
-.sp
-.LP
+.Pp
 Most tape devices which support variable-length I/O operations may read a range
-of 1 to 65,535 bytes. If the record size exceeds 65,535 bytes, the driver reads
-multiple records to satisfy the request. These multiple records are limited to
-65,534 bytes. Newer variable-length tape drivers may relax the above limitation
-and allow applications to read record sizes larger than 65,534. Refer to the
+of 1 to 65,535 bytes.
+If the record size exceeds 65,535 bytes, the driver reads
+multiple records to satisfy the request.
+These multiple records are limited to
+65,534 bytes.
+Newer variable-length tape drivers may relax the above limitation
+and allow applications to read record sizes larger than 65,534.
+Refer to the
 specific tape driver man page for details.
-.sp
-.LP
-Reading past logical \fBEOT\fR is transparent to the user. A read operation
+.Pp
+Reading past logical
+.Sy EOT
+is transparent to the user.
+A read operation
 should never hit physical EOT.
-.sp
-.LP
+.Pp
 Read requests that are lesser than a physical tape record are not allowed.
 Appropriate error is returned.
-.SS "Write Operation"
-.LP
-The \fBwrite\fR(2) function writes the next record on the tape. The record has
+.Ss "Write Operation"
+The
+.Xr write 2
+function writes the next record on the tape.
+The record has
 the same length as the given buffer.
-.sp
-.LP
+.Pp
 Writing is allowed on 1/4" tape at either the beginning of tape or after the
-last written file on the tape. With the Exabyte 8200, data may be appended only
+last written file on the tape.
+With the Exabyte 8200, data may be appended only
 at the beginning of tape, before a filemark, or after the last written file on
 the tape.
-.sp
-.LP
-Writing is not so restricted on 1/2", 4mm, and the other 8mm cartridge tape
-drives. Care should be used when appending files onto 1/2" reel tape devices,
-since an extra file mark is appended after the last file to mark the \fBEOM.\fR
-This extra file mark must be overwritten to prevent the creation of a null
-file. To facilitate write append operations, a space to the \fBEOM\fR ioctl is
-provided. Care should be taken when overwriting records; the erase head is just
+.Pp
+Writing is not so restricted on 1/2\(dq, 4mm, and the other 8mm cartridge tape
+drives.
+Care should be used when appending files onto 1/2\(dq reel tape devices,
+since an extra file mark is appended after the last file to mark the
+.Sy EOM .
+This extra file mark must be overwritten to prevent the creation of a null file.
+To facilitate write append operations, a space to the
+.Sy EOM
+ioctl is provided.
+Care should be taken when overwriting records; the erase head is just
 forward of the write head and any following records will also be erased.
-.sp
-.LP
+.Pp
 Fixed-length I/O tape devices require the number of bytes written to be a
-multiple of the physical record size. For example, 1/4" cartridge tape devices
+multiple of the physical record size.
+For example, 1/4\(dq cartridge tape devices
 only write multiples of 512 bytes.
-.sp
-.LP
+.Pp
 Fixed-length I/O tape devices write multiple records if the blocking factor is
-greater than 64,512 bytes (minphys limit). These multiple writes are limited to
-64,512 bytes. For example, if a write request is issued for 65,536 bytes using
-a 1/4" cartridge tape, two writes are issued; the first for 64,512 bytes and
+greater than 64,512 bytes (minphys limit).
+These multiple writes are limited to
+64,512 bytes.
+For example, if a write request is issued for 65,536 bytes using
+a 1/4\(dq cartridge tape, two writes are issued; the first for 64,512 bytes and
 the second for 1024 bytes.
-.sp
-.LP
+.Pp
 Most tape devices which support variable-length I/O operations may write a
-range of 1 to 65,535 bytes. If the record size exceeds 65,535 bytes, the driver
-writes multiple records to satisfy the request. These multiple records are
-limited to 65,534 bytes. As an example, if a write request for 65,540 bytes is
+range of 1 to 65,535 bytes.
+If the record size exceeds 65,535 bytes, the driver
+writes multiple records to satisfy the request.
+These multiple records are
+limited to 65,534 bytes.
+As an example, if a write request for 65,540 bytes is
 issued, two records are written; one for 65,534 bytes followed by another
-record for 6 bytes. Newer variable-length tape drivers may relax the above
-limitation and allow applications to write record sizes larger  than 65,534.
-Refer to the specific tape driver man page for details.
-.sp
-.LP
-When logical \fBEOT\fR is encountered during a write, that write operation
+record for 6 bytes.
+Newer variable-length tape drivers may relax the above
+limitation and allow applications to write record sizes larger than 65,534.
+effer to the specific tape driver man page for details.
+.Pp
+When logical
+.Sy EOT
+is encountered during a write, that write operation
 completes and the number of bytes successfully transferred is returned (note
 that a 'short write' may have occurred and not all the requested bytes would
-have been transferred. The actual amount of data written will depend on the
-type of device being used). The next write will return a zero byte count. A
-third write will successfully transfer some bytes (as indicated by the returned
-byte count, which again could be a short write); the fourth will transfer zero
-bytes, and so on, until the physical \fBEOT\fR is reached and all writes will
-fail with \fBEIO\fR.
-.sp
-.LP
-When logical \fBEOT\fR is encountered with persistent error handling enabled,
-the current write may complete or be a short write. The next write will return
-a zero byte count. At this point an application should act appropriately for
+have been transferred.
+The actual amount of data written will depend on the
+type of device being used).
+The next write will return a zero byte count.
+A third write will successfully transfer some bytes (as indicated by the
+returned byte count, which again could be a short write); the fourth will
+transfer zero bytes, and so on, until the physical
+.Sy EOT
+is reached and all writes will
+fail with
+.Er EIO .
+.Pp
+When logical
+.Sy EOT
+is encountered with persistent error handling enabled,
+the current write may complete or be a short write.
+The next write will return a zero byte count.
+At this point an application should act appropriately for
 end of tape cleanup or issue yet another write, which will return the error
-\fBENOSPC\fR. After clearing the exception with \fBMTIOCLRERR\fR, the next
-write will succeed (possibly short), followed by another zero byte write count,
-and then another \fBENOSPC\fR error.
-.sp
-.LP
-Allowing writes after \fBLEOT\fR has been encountered enables the flushing of
-buffers. However, it is strongly recommended to terminate the writing and close
+.Er ENOSPC .
+After clearing the exception with
+.Dv MTIOCLRERR ,
+the next write will succeed (possibly short), followed by another zero byte
+write count, and then another
+.Er ENOSPC
+error.
+.Pp
+Allowing writes after
+.Sy EOT
+has been encountered enables the flushing of buffers.
+However, it is strongly recommended to terminate the writing and close
 the file as soon as possible.
-.sp
-.LP
+.Pp
 Seeks are ignored in tape I/O.
-.SS "Close Operation"
-.LP
+.Ss "Close Operation"
 Magnetic tapes are rewound when closed, except when the "no-rewind" devices
-have been specified. The names of no-rewind device files use the letter \fBn\fR
-as the end of the final component. The no-rewind version of \fB/dev/rmt/0l\fR
-is \fB/dev/rmt/0ln\fR. In case of error for a no-rewind device, the next open
-rewinds the device.
-.sp
-.LP
+have been specified.
+The names of no-rewind device files use the letter
+.Ql n
+as the end of the final component.
+The no-rewind version of
+.Pa /dev/rmt/0l
+is
+.Pa /dev/rmt/0ln .
+In case of error for a no-rewind device, the next open rewinds the device.
+.Pp
 If the driver was opened for reading and a no-rewind device has been specified,
 the close advances the tape past the next filemark (unless the current file
-position is at \fBEOM),\fR leaving the tape correctly positioned to read the
-first record of the next file. However, if the tape is at the first record of a
-file it doesn't advance again to the first record of the next file. These
-semantics are different from the older \fBBSD\fR behavior. If \fBBSD\fR
+position is at
+.Sy EOM ) ,
+leaving the tape correctly positioned to read the first record of the next file.
+However, if the tape is at the first record of a
+file it doesn't advance again to the first record of the next file.
+These semantics are different from the older
+.Sy BSD
+behavior.
+If
+.Sy BSD
 behavior is required where no implicit space operation is executed on close,
-the non-rewind device name containing the letter \fBb\fR (for \fBBSD\fR
+the non-rewind device name containing the letter
+.Ql b
+(for
+.Sy BSD
 behavior) in the final component should be specified.
-.sp
-.LP
+.Pp
 If data was written, a file mark is automatically written by the driver upon
-close. If the rewinding device was specified, the tape will be rewound after
-the file mark is written. If the user wrote a file mark prior to closing, then
-no file mark is written upon close. If a file positioning ioctl, like rewind,
+close.
+If the rewinding device was specified, the tape will be rewound after
+the file mark is written.
+If the user wrote a file mark prior to closing, then
+no file mark is written upon close.
+If a file positioning ioctl, like rewind,
 is issued after writing, a file mark is written before repositioning the tape.
-.sp
-.LP
-All buffers are flushed on closing a tape device. Hence, it is strongly
-recommended that the application wait for all buffers to be flushed before
-closing the device. This can be done by writing a filemark via \fBMTWEOF,\fR
+.Pp
+All buffers are flushed on closing a tape device.
+Hence, it is strongly recommended that the application wait for all buffers to
+be flushed before closing the device.
+This can be done by writing a filemark via
+.Dv MTWEOF ,
 even with a zero count.
-.sp
-.LP
-Note that for 1/2" reel tape devices, two file marks are written to mark the
-\fBEOM\fR before rewinding or performing a file positioning ioctl. If the user
-wrote a file mark before closing a 1/2" reel tape device, the driver will
+.Pp
+Note that for 1/2\(dq reel tape devices, two file marks are written to mark the
+.Sy EOM
+before rewinding or performing a file positioning ioctl.
+If the user
+wrote a file mark before closing a 1/2\(dq reel tape device, the driver will
 always write a file mark before closing to insure that the end of recorded
-media is marked properly. If the non-rewinding device was specified, two file
+media is marked properly.
+If the non-rewinding device was specified, two file
 marks are written and the tape is left positioned between the two so that the
-second one is overwritten on a subsequent \fBopen\fR(2) and \fBwrite\fR(2).
-.sp
-.LP
-If no data was written and the driver was opened for \fBWRITE-ONLY\fR access,
-one or two file marks are written, thus creating a null file.
-.sp
-.LP
+second one is overwritten on a subsequent
+.Xr open 2
+and
+.Xr write 2 .
+.Pp
+If no data was written and the driver was opened for
+.Sy WRITE-ONLY
+access, one or two file marks are written, thus creating a null file.
+.Pp
 After closing the device, persistent error handling will be disabled and any
 error or exception will be cleared.
-.SH IOCTLS
-.LP
-Not all devices support all \fBioctls\fR. The driver returns an \fBENOTTY\fR
+.Sh IOCTLS
+Not all devices support all
+.Sy ioctls .
+The driver returns an
+.Er ENOTTY
 error on unsupported ioctls.
-.sp
-.LP
-The following structure definitions for magnetic tape \fBioctl \fRcommands are
-from \fB<sys/mtio.h>\fR\&.
-.sp
-.LP
-The minor device byte structure is::
-.sp
-.in +2
-.nf
+.Pp
+The following structure definitions for magnetic tape
+.Xr ioctl 2
+commands are from
+.In sys/mtio.h .
+.Pp
+The minor device byte structure is:
+.Bd -literal
 15      7      6          5          4         3          2       1   0
 ________________________________________________________________________
 Unit #       BSD      Reserved   Density   Density   No rewind    Unit #
 Bits 7-15   behavior              Select    Select    on Close    Bits 0-1
-.fi
-.in -2
-
-.sp
-.in +2
-.nf
+.Ed
+.Bd -literal
 /*
  * Layout of minor device byte:
  */
-#define MTUNIT(dev)	(((minor(dev) & 0xff80) >> 5) +
-(minor(dev) & 0x3))
+#define MTUNIT(dev)   (((minor(dev) & 0xff80) >> 5) + (minor(dev) & 0x3))
 #define MT_NOREWIND	(1 <<2)
 #define MT_DENSITY_MASK	(3 <<3)
 #define MT_DENSITY1	(0 <<3)	/* Lowest density/format */
@@ -310,251 +423,95 @@ Bits 7-15   behavior              Select    Select    on Close    Bits 0-1
 #define MT_DENSITY3	(2 <<3)
 #define MT_DENSITY4	(3 <<3)	/* Highest density/format */
 #define MTMINOR(unit)	(((unit & 0x7fc) << 5) + (unit & 0x3))
-#define MT_BSD	(1 <<6)       /* BSD behavior on close */
+#define MT_BSD	(1 <<6)         /* BSD behavior on close */
 
+/* Structure for MTIOCTOP - magnetic tape operation command */
 
-/* Structure for MTIOCTOP \(mi magnetic tape operation command */
-
-struct  mtop {
+struct mtop {
   short   mt_op;       /* operation */
   daddr_t mt_count;    /* number of operations */
 };
-.fi
-.in -2
 
-.sp
-.in +2
-.nf
 /* Structure for MTIOCLTOP - magnetic tape operation command */
 Works exactly like MTIOCTOP except passes 64 bit mt_count values.
-struct  mtlop    {
+struct mtlop {
         short           mt_op;
         short           pad[3];
         int64_t         mt_count;
 };
-.fi
-.in -2
-
-.sp
-.LP
-The following operations of \fBMTIOCTOP\fR and \fBMTIOCLTOP\fR ioctls are
-supported:
-.sp
-.ne 2
-.na
-\fBMTWEOF\fR
-.ad
-.RS 17n
-write an end-of-file record
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTFSF\fR
-.ad
-.RS 17n
-forward space over file mark
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTBSF\fR
-.ad
-.RS 17n
-backward space over file mark (1/2", 8mm only)
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTFSR\fR
-.ad
-.RS 17n
-forward space to inter-record gap
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTBSR\fR
-.ad
-.RS 17n
-backward space to inter-record gap
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTREW\fR
-.ad
-.RS 17n
-rewind
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTOFFL\fR
-.ad
-.RS 17n
-rewind and take the drive off-line
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTNOP\fR
-.ad
-.RS 17n
-no operation, sets status only
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTRETEN\fR
-.ad
-.RS 17n
-retension the tape (cartridge tape only)
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTERASE\fR
-.ad
-.RS 17n
-erase the entire tape and rewind
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTEOM\fR
-.ad
-.RS 17n
-position to EOM
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTNBSF\fR
-.ad
-.RS 17n
-backward space file to beginning of file
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTSRSZ\fR
-.ad
-.RS 17n
-set record size
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTGRSZ\fR
-.ad
-.RS 17n
-get record size
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTTELL\fR
-.ad
-.RS 17n
-get current position
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTSEEK\fR
-.ad
-.RS 17n
-go to  requested  position
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTFSSF\fR
-.ad
-.RS 17n
-forward to requested number of sequential file marks
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTBSSF\fR
-.ad
-.RS 17n
-backward to requested number of sequential file marks
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTLOCK\fR
-.ad
-.RS 17n
-prevent media removal
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTUNLOCK\fR
-.ad
-.RS 17n
-allow media removal
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTLOAD\fR
-.ad
-.RS 17n
-load the next tape cartridge into the tape drive
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCGETERROR\fR
-.ad
-.RS 17n
-retrieve error records from the st driver
-.RE
-
-.sp
-.in +2
-.nf
-/* structure for MTIOCGET \(mi magnetic tape get status command */
+.Ed
+.Pp
+The following operations of
+.Dv MTIOCTOP
+and
+.Dv MTIOCLTOP
+ioctls are supported:
+.Pp
+.Bl -tag -width MTIOCGETERROR -compact -offset 2n
+.It Dv MTWEOF
+Write an end-of-file record
+.It Dv MTFSF
+Forward space over file mark
+.It Dv MTBSF
+Backward space over file mark (1/2", 8mm only)
+.It Dv MTFSR
+Forward space to inter-record gap
+.It Dv MTBSR
+Backward space to inter-record gap
+.It Dv MTREW
+Rewind
+.It Dv MTOFFL
+Rewind and take the drive off-line
+.It Dv MTNOP
+No operation, sets status only
+.It Dv MTRETEN
+Retension the tape (cartridge tape only)
+.It Dv MTERASE
+Erase the entire tape and rewind
+.It Dv MTEOM
+Position to EOM
+.It Dv MTNBSF
+Backward space file to beginning of file
+.It Dv MTSRSZ
+Set record size
+.It Dv MTGRSZ
+Get record size
+.It Dv MTTELL
+Get current position
+.It Dv MTSEEK
+Go to requested position
+.It Dv MTFSSF
+Forward to requested number of sequential file marks
+.It Dv MTBSSF
+Backward to requested number of sequential file marks
+.It Dv MTLOCK
+Prevent media removal
+.It Dv MTUNLOCK
+Allow media removal
+.It Dv MTLOAD
+Load the next tape cartridge into the tape drive
+.It Dv MTIOCGETERROR
+Retrieve error records from the st driver
+.El
+.Bd -literal -offset 2n
+/* structure for MTIOCGET - magnetic tape get status command */
 
 struct  mtget {
   short	mt_type;	/* type of magtape device */
-/* the following two registers are device dependent */
+
+  /* the following two registers are device dependent */
   short  mt_dsreg;      /* "drive status" register */
   short  mt_erreg;      /* "error" register */
-/* optional error info. */
+
+  /* optional error info.  */
   daddr_t   mt_resid;   /* residual count */
   daddr_t   mt_fileno;  /* file number of current position */
   daddr_t   mt_blkno;   /* block number of current position */
   ushort_t  mt_flags;
   short     mt_bf;      /* optimum blocking factor */
 };
-/* structure for MTIOCGETDRIVETYPE \(mi get tape config data command */
+
+/* structure for MTIOCGETDRIVETYPE - get tape config data command */
 struct mtdrivetype_request {
   int  size;
   struct  mtdrivetype	*mtdtp;
@@ -578,516 +535,618 @@ struct mtdrivetype {
   ushort_t unload_timeout;           /* Seconds to unload */
   ushort_t erase_timeout;            /* Seconds to do long erase */
 };
-.fi
-.in -2
-
-.sp
-.in +2
-.nf
+.Ed
+.Bd -literal -offset 2n
 /* structure for MTIOCGETPOS and MTIOCRESTPOS - get/set tape position */
- 	/*
-  * eof/eot/eom codes.
- 	 */
+/*
+ * eof/eot/eom codes.
+ */
  typedef enum {
        ST_NO_EOF,
        ST_EOF_PENDING,         /* filemrk pending */
        ST_EOF,                 /* at filemark */
-       ST_EOT_PENDING,         /* logical eot pend. */
+       ST_EOT_PENDING,         /* logical eot pend.  */
        ST_EOT,                 /* at logical eot */
        ST_EOM,                 /* at physical eot */
        ST_WRITE_AFTER_EOM      /* flag allowing writes after EOM */
- 	}pstatus;
+} pstatus;
 
- 	typedef enum { invalid, legacy, logical } posmode;
+typedef enum { invalid, legacy, logical } posmode;
 
- 	typedef struct tapepos {
- 		   uint64_t lgclblkno;	/* Blks from start of partition */
- 		   int32_t fileno;		/* Num. of current file */
- 		   int32_t blkno;		/* Blk  number in current file */
- 		   int32_t partition; 	/* Current partition */
- 		   pstatus eof;         /* eof states */
- 		   posmode pmode;		 /* which pos. data is valid */
- 		   char    pad[4];
- 	}tapepos_t;
-
-     If the pmode is legacy,fileno and blkno fields are valid.
-     If the pmode is logical, lgclblkno field is valid.
-.fi
-.in -2
-
-.sp
-.LP
-The \fBMTWEOF\fR ioctl is used for writing file marks to tape. Not only does
+typedef struct tapepos {
+   uint64_t lgclblkno;	/* Blks from start of partition */
+   int32_t fileno;	/* Num. of current file */
+   int32_t blkno;	/* Blk  number in current file */
+   int32_t partition;	/* Current partition */
+   pstatus eof;         /* eof states */
+   posmode pmode;	/* which pos. data is valid */
+   char    pad[4];
+} tapepos_t;
+.Ed
+.Pp
+.Bd -ragged -compact
+If the
+.Fa pmode
+is legacy,
+.Fa fileno
+and
+.Fa blkno
+fields are valid.
+.Pp
+If the
+.Fa pmode
+is logical,
+.Fa lgclblkno
+field is valid.
+.Ed
+.Pp
+The
+.Dv MTWEOF
+ioctl is used for writing file marks to tape.
+Not only does
 this signify the end of a file, but also usually has the side effect of
-flushing all buffers in the tape drive to the tape medium. A zero count
-\fBMTWEOF\fR will just flush all the buffers and will not write any file marks.
+flushing all buffers in the tape drive to the tape medium.
+A zero count
+.Dv MTWEOF
+will just flush all the buffers and will not write any file marks.
 Because a successful completion of this tape operation will guarantee that all
 tape data has been written to the tape medium, it is recommended that this tape
 operation be issued before closing a tape device.
-.sp
-.LP
-When spacing forward over a record (either data or \fBEOF),\fR the tape head is
+.Pp
+When spacing forward over a record (either data or
+.Sy EOF ) ,
+the tape head is
 positioned in the tape gap between the record just skipped and the next record.
 When spacing forward over file marks (EOF records), the tape head is positioned
-in the tape gap between the next \fBEOF\fR record and the record that follows
-it.
-.sp
-.LP
-When spacing backward over a record (either data or \fBEOF),\fR the tape head
-is positioned in the tape gap immediately preceding the tape record where the
-tape head is currently positioned. When spacing backward over file marks (EOF
-records), the tape head is positioned in the tape gap preceding the \fBEOF.\fR
-Thus the next read would fetch the \fBEOF.\fR
-.sp
-.LP
+in the tape gap between the next
+.Sy EOF
+record and the record that follows it.
+.Pp
+When spacing backward over a record (either data or
+.Sy EOF ) ,
+the tape head is positioned in the tape gap immediately preceding the tape
+record where the tape head is currently positioned.
+When spacing backward over file marks (EOF records), the tape head is
+positioned in the tape gap preceding the
+.Sy EOF .
+Thus the next read would fetch the
+.Sy EOF .
+.Pp
 Record skipping does not go past a file mark; file skipping does not go past
-the \fBEOM.\fR After an \fBMTFSR\fR <huge number> command, the driver leaves
-the tape logically positioned \fIbefore\fR the \fBEOF.\fR A related feature is
-that \fBEOFs\fR remain pending until the tape is closed. For example, a program
+the
+.Sy EOM .
+After an
+.Dv MTFSR
+<huge number> command, the driver leaves
+the tape logically positioned
+.Em before
+the
+.Sy EOF .
+A related feature is that
+.Sy EOF Ns s
+remain pending until the tape is closed.
+For example, a program
 which first reads all the records of a file up to and including the \fBEOF\fR
-and then performs an \fBMTFSF\fR command will leave the tape positioned just
-after that same \fBEOF,\fR rather than skipping the next file.
-.sp
-.LP
-The \fBMTNBSF\fR and \fBMTFSF\fR operations are inverses. Thus, an "
-\fBMTFSF\fR \(mi1" is equivalent to an " \fBMTNBSF\fR 1". An " \fBMTNBSF\fR 0"
-is the same as " \fBMTFSF\fR 0"; both position the tape device at the beginning
-of the current file.
-.sp
-.LP
-\fBMTBSF\fR moves the tape backwards by file marks. The tape position will end
-on the beginning of the tape side of the desired file mark. An " \fBMTBSF\fR 0"
+and then performs an
+.Dv MTFSF
+command will leave the tape positioned just
+after that same
+.Sy EOF ,
+rather than skipping the next file.
+.Pp
+The
+.Dv MTNBSF
+and
+.Dv MTFSF
+operations are inverses.
+Thus, an
+.Dq Dv MTFSF \(mi1
+is equivalent to an
+.Dq Dv MTNBSF 1 .
+An
+.Dq Dv MTNBSF 0
+is the same as
+.Dq Dv MTFSF 0 ;
+both position the tape device at the beginning of the current file.
+.Pp
+.Dv MTBSF
+moves the tape backwards by file marks.
+The tape position will end
+on the beginning of the tape side of the desired file mark.
+An
+.Dq Dv MTBSF 0
 will position the tape at the end of the current file, before the filemark.
-.sp
-.LP
-\fBMTBSR\fR and \fBMTFSR\fR operations perform much like space file operations,
-except that they move by records instead of files. Variable-length I/O devices
-(1/2" reel, for example) space actual records; fixed-length I/O devices space
-physical records (blocks). 1/4" cartridge tape, for example, spaces 512 byte
-physical records. The status ioctl residual count contains the number of files
+.Pp
+.Dv MTBSR
+and
+.Dv MTFSR
+operations perform much like space file operations,
+except that they move by records instead of files.
+Variable-length I/O devices
+(1/2\(dq reel, for example) space actual records; fixed-length I/O devices space
+physical records (blocks).
+1/4\(dq cartridge tape, for example, spaces 512 byte
+physical records.
+The status ioctl residual count contains the number of files
 or records not skipped.
-.sp
-.LP
-MTFSSF and MTBSSF space forward or backward, respectively, to the next
-occurrence of the requested number of file marks, one following another. If
-there are more sequential file marks on tape than were requested, it spaces
-over the requested number and positions after the requested file mark. Note
-that not all drives support this command and if a request is sent to a drive
-that does not, \fBENOTTY\fR is returned.
-.sp
-.LP
-\fBMTOFFL\fR rewinds and, if appropriate, takes the device off-line by
-unloading the tape. It is recommended that the device be closed after offlining
+.Pp
+.Dv MTFSSF
+and
+.Dv MTBSSF
+space forward or backward, respectively, to the next
+occurrence of the requested number of file marks, one following another.
+If there are more sequential file marks on tape than were requested, it spaces
+over the requested number and positions after the requested file mark.
+Note that not all drives support this command and if a request is sent to a
+drive that does not,
+.Er ENOTTY
+is returned.
+.Pp
+.Dv MTOFFL
+rewinds and, if appropriate, takes the device off-line by unloading the tape.
+It is recommended that the device be closed after offlining
 and then re-opened after a tape has been inserted to facilitate portability to
-other platforms and other operating systems. Attempting to re-open the device
-with no tape will result in an error unless the \fBO_NDELAY\fR flag is used.
-(See \fBopen\fR(2).)
-.sp
-.LP
-The \fBMTRETEN\fR retension ioctl applies only to 1/4" cartridge tape devices.
+other platforms and other operating systems.
+Attempting to re-open the device
+with no tape will result in an error unless the
+.Dv O_NDELAY
+flag is used.
+.Po
+See
+.Xr open 2 .
+.Pc
+.Pp
+The
+.Dv MTRETEN
+retension ioctl applies only to 1/4\(dq cartridge tape devices.
 It is used to restore tape tension, improving the tape's soft error rate after
 extensive start-stop operations or long-term storage.
-.sp
-.LP
-\fBMTERASE\fR rewinds the tape, erases it completely, and returns to the
-beginning of tape. Erasing may take a long time depending on the device and/or
-tapes. For time details, refer to the drive specific manual.
-.sp
-.LP
-\fBMTEOM\fR positions the tape at a location just after the last file written
-on the tape. For 1/4" cartridge and 8mm tape, this is after the last file mark
-on the tape. For 1/2" reel tape, this is just after the first file mark but
-before the second (and last) file mark on the tape. Additional files can then
+.Pp
+.Dv MTERASE
+rewinds the tape, erases it completely, and returns to the
+beginning of tape.
+Erasing may take a long time depending on the device and/or
+tapes.
+For time details, refer to the drive specific manual.
+.Pp
+.Dv MTEOM
+positions the tape at a location just after the last file written
+on the tape.
+For 1/4\(dq cartridge and 8mm tape, this is after the last file mark
+on the tape.
+For 1/2\(dq reel tape, this is just after the first file mark but
+before the second (and last) file mark on the tape.
+Additional files can then
 be appended onto the tape from that point.
-.sp
-.LP
-Note the difference between \fBMTBSF\fR (backspace over file mark) and
-\fBMTNBSF\fR (backspace file to beginning of file). The former moves the tape
-backward until it crosses an \fBEOF\fR mark, leaving the tape positioned
-\fIbefore\fR the file mark. The latter leaves the tape positioned \fIafter\fR
-the file mark. Hence, "\fBMTNBSF\fR n" is equivalent to "\fBMTBSF\fR (n+1)"
-followed by "\fBMTFSF\fR 1". The 1/4" cartridge tape devices do not support
-\fBMTBSF.\fR
-.sp
-.LP
-\fBMTSRSZ\fR and \fBMTGRSZ\fR are used to set and get fixed record lengths. The
-\fBMTSRSZ\fR ioctl allows variable length and fixed length tape drives that
-support multiple record sizes to set the record length. The \fBmt_count\fR
-field of the  \fBmtop\fR struct is used to pass the record size to/from the
-\fBst\fR driver. A value of \fB0\fR indicates variable record size. The
-\fBMTSRSZ\fR ioctl makes a variable-length tape device behave like a
-fixed-length tape device. Refer to the specific tape driver man page for
+.Pp
+Note the difference between
+.Dv MTBSF
+(backspace over file mark) and
+.Dv MTNBSF
+(backspace file to beginning of file).
+The former moves the tape
+backward until it crosses an
+.Sy EOF
+mark, leaving the tape positioned
+.Em before
+the file mark.
+The latter leaves the tape positioned
+.Em after
+the file mark.
+Hence,
+.Dq Dv MTNBSF n
+is equivalent to
+.Dq Dv MTBSF (n+1)
+followed by
+.Dq Dv MTFSF 1 .
+The 1/4\(dq cartridge tape devices do not support
+.Dv MTBSF .
+.Pp
+.Dv MTSRSZ
+and
+.Dv MTGRSZ
+are used to set and get fixed record lengths.
+The
+.Dv MTSRSZ
+ioctl allows variable length and fixed length tape drives that
+support multiple record sizes to set the record length.
+The
+.Fa mt_count
+field of the
+.Vt mtop
+struct is used to pass the record size to/from the
+.Xr st 7D
+driver.
+A value of
+.Ql 0
+indicates variable record size.
+The
+.Dv MTSRSZ
+ioctl makes a variable-length tape device behave like a
+fixed-length tape device.
+Refer to the specific tape driver man page for
 details.
-.sp
-.LP
-\fBMTLOAD\fR loads the next tape cartridge into the tape drive. This is
-generally only used with stacker and tower type tape drives which handle
-multiple tapes per tape drive. A tape device without a tape inserted can be
-opened with the \fBO_NDELAY\fR flag, in order to execute this operation.
-.sp
-.LP
-\fBMTIOCGETERROR\fR allows user-level applications to retrieve error records
-from the \fBst\fR driver. An error record consists of the SCSI command cdb
-which causes the error and a \fBscsi_arq_status\fR(9S) structure if available.
+.Pp
+.Dv MTLOAD
+loads the next tape cartridge into the tape drive.
+This is generally only used with stacker and tower type tape drives which handle
+multiple tapes per tape drive.
+A tape device without a tape inserted can be
+opened with the
+.Dv O_NDELAY
+flag, in order to execute this operation.
+.Pp
+.Dv MTIOCGETERROR
+allows user-level applications to retrieve error records
+from the
+.Xr st 7D
+driver.
+An error record consists of the SCSI command cdb
+which causes the error and a
+.Xr scsi_arq_status 9S
+structure if available.
 The user-level application is responsible for allocating and releasing the
-memory for mtee_cdb_buf and scsi_arq_status of each mterror_entry. Before
-issuing the ioctl, the mtee_arq_status_len value should be at least equal to
-"sizeof(struct scsi_arq_status)." If more sense data than the size of
-\fBscsi_arq_status\fR(9S) is desired, the mtee_arq_status_len may be larger
-than "sizeof(struct scsi_arq_status)" by the amount of additional extended
-sense data desired.  The es_add_len field of \fBscsi_extended_sense\fR(9S) can
-be used to determine the amount of valid sense data returned by the device.
-.sp
-.LP
-The \fBMTIOCGET\fR get status \fBioctl\fR call returns the drive ID
-(\fImt_type\fR), sense key error (\fImt_erreg\fR), file  number
-(\fImt_fileno\fR), optimum blocking factor (\fImt_bf\fR) and record number
-(\fImt_blkno\fR) of the last error. The residual count (\fImt_resid\fR) is set
-to the number of bytes not transferred or files/records not spaced. The flags
-word (\fImt_flags\fR) contains information indicating if the device is SCSI, if
-the device is a reel device and whether the device supports absolute file
-positioning. The \fImt_flags\fR also indicates if the device is requesting
-cleaning media be used, whether the device is capable of reporting the
-requirement of cleaning media and if the currently loaded media is WORM (Write
-Once Read Many) media.
-.LP
-Note -
-.sp
-.RS 2
-When tape alert cleaning is managed by the st driver, the tape target driver
-may continue to return a "drive needs cleaning" status unless an MTIOCGET
-ioctl() call is made while the cleaning media is in the drive.
-.RE
-.sp
-.LP
-The  \fBMTIOCGETDRIVETYPE\fR get drivetype ioctl call returns the name of the
-tape drive as defined in  \fBst.conf\fR (\fIname\fR), Vendor \fBID\fR and model
-(\fIproduct\fR), \fBID\fR (\fIvid\fR), type of tape device (\fBtype\fR), block
-size  (\fIbsize\fR), drive options  (\fIoptions\fR), maximum read retry count
-(\fImax_rretries\fR), maximum write retry count (\fImax_wretries\fR), densities
-supported by the drive (\fIdensities\fR), and default density of the tape drive
-(\fIdefault_density\fR).
-.sp
-.LP
-The MTIOCGETPOS ioctl returns the current tape position of the drive. It is
-returned in struct tapepos as defined in
-\fB/usr/include/sys/scsi/targets/stdef.h\fR.
-.sp
-.LP
-The  MTIOCRESTPOS ioctl restores a saved position from the MTIOCGETPOS.
-.SS "Persistent Error Handling IOCTLs and Asynchronous Tape Operations"
-.ne 2
-.na
-\fBMTIOCPERSISTENT\fR
-.ad
-.RS 25n
+memory for
+.Fa mtee_cdb_buf
+and
+.Fa scsi_arq_status of each
+.Vt mterror_entry .
+Before issuing the ioctl, the
+.Fa mtee_arq_status_len
+value should be at least equal to
+.Ql sizeof (struct scsi_arq_status) .
+If more sense data than the size of
+.Xr scsi_arq_status 9S
+is desired, the
+.Fa mtee_arq_status_len
+may be larger than
+.Ql sizeof (struct scsi_arq_status)
+by the amount of additional extended sense data desired.
+The
+.Fa es_add_len
+field of
+.Xr scsi_extended_sense 9S
+can be used to determine the amount of valid sense data returned by the device.
+.Pp
+The
+.Dv MTIOCGET
+get status
+.Xr ioctl 2
+call returns the drive ID
+.Pq Fa mt_type ,
+sense key error
+.Pq Fa mt_erreg ,
+file number
+.Pq Fa mt_fileno ,
+optimum blocking factor
+.Pq Fa mt_bf
+and record number
+.Pq Fa mt_blkno
+of the last error.
+The residual count
+.Pq Fa mt_resid
+is set to the number of bytes not transferred or files/records not spaced.
+The flags word
+.Pq Fa mt_flags
+contains information indicating if the device is SCSI, if the device is a reel
+device and whether the device supports absolute file positioning.
+The
+.Fa mt_flags
+also indicates if the device is requesting cleaning media be used, whether the
+device is capable of reporting the requirement of cleaning media and if the
+currently loaded media is WORM (Write Once Read Many) media.
+.Pp
+Note \(em When tape alert cleaning is managed by the st driver, the tape
+target driver may continue to return a
+.Dq drive needs cleaning
+status unless an
+.Dv MTIOCGE
+.Xr ioct 2
+call is made while the cleaning media is in the drive.
+.Pp
+The
+.Dv MTIOCGETDRIVETYPE
+get drivetype ioctl call returns the name of the
+tape drive as defined in
+.Pa st.conf
+.Pq Fa name ,
+Vendor
+.Sy ID
+and model
+.Pq Fa product ,
+.Sy ID
+.Pq Fa vid ,
+type of tape device
+.Pq Fa type ,
+block size
+.Pq Fa size ,
+drive options
+.Pq Fa options ,
+maximum read retry count
+.Pq Fa max_rretries ,
+maximum write retry count
+.Pq Fa max_wretries ,
+densities supported by the drive
+.Pq Fa densities ,
+and default density of the tape drive
+.Pq Fa default_density .
+.Pp
+The
+.Dv MTIOCGETPOS
+ioctl returns the current tape position of the drive.
+It is returned in struct tapepos as defined in
+.Pa /usr/include/sys/scsi/targets/stdef.h .
+.Pp
+The
+.Dv MTIOCRESTPOS
+ioctl restores a saved position from the
+.Dv MTIOCGETPOS .
+.Ss "Persistent Error Handling IOCTLs and Asynchronous Tape Operations"
+.Bl -tag -width MTIOCPERSISTENTSTATUS -compact
+.It Dv MTIOCPERSISTENT
 enables/disables persistent error handling
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCPERSISTENTSTATUS\fR
-.ad
-.RS 25n
+.It Dv MTIOCPERSISTENTSTATUS
 queries for persistent error handling
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCLRERR\fR
-.ad
-.RS 25n
+.It Dv MTIOCLRERR
 clears persistent error handling
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCGUARANTEEDORDER\fR
-.ad
-.RS 25n
+.It Dv MTIOCGUARANTEEDORDER
 checks whether driver guarantees order of I/O's
-.RE
-
-.sp
-.LP
-The \fBMTIOCPERSISTENT\fR ioctl enables or disables persistent error handling.
+.El
+.Pp
+The
+.Dv MTIOCPERSISTENT
+ioctl enables or disables persistent error handling.
 It takes as an argument a pointer to an integer that turns it either on or off.
-If the ioctl succeeds, the desired operation was successful. It will wait for
+If the ioctl succeeds, the desired operation was successful.
+It will wait for
 all outstanding I/O's to complete before changing the persistent error handling
-status. For example,
-.sp
-.in +2
-.nf
+status.
+For example,
+.Bd -literal -offset 2n
 int on = 1;
 ioctl(fd, MTIOCPERSISTENT, &on);
 int off = 0;
 ioctl(fd, MTIOCPERSISTENT, &off);
-.fi
-.in -2
-
-.sp
-.LP
-The \fBMTIOCPERSISTENTSTATUS\fR ioctl enables or disables persistent error
-handling. It takes as an argument a pointer to an integer inserted by the
-driver. The integer can be either 1 if persistent error handling is 'on', or 0
-if persistent error handling is 'off'. It will not wait for outstanding I/O's.
+.Ed
+.Pp
+The
+.Dv MTIOCPERSISTENTSTATUS
+ioctl enables or disables persistent error
+handling.
+It takes as an argument a pointer to an integer inserted by the
+driver.
+The integer can be either 1 if persistent error handling is
+.Sq on ,
+or 0 if persistent error handling is
+.Sq off .
+It will not wait for outstanding I/O's.
 For example,
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 int query;
 ioctl(fd, MTIOCPERSISTENTSTATUS, &query);
-.fi
-.in -2
-
-.sp
-.LP
-The \fBMTIOCLRERR\fR ioctl clears persistent error handling and allows tape
-operations to continual normally. This ioctl requires no argument and will
-always succeed, even if persistent error handling has not been enabled. It will
-wait for any outstanding I/O's before it clears the error.
-.sp
-.LP
-The \fBMTIOCGUARANTEEDORDER\fR ioctl is used to determine whether the driver
-guarantees the order of I/O's. It takes no argument. If the ioctl succeeds, the
-driver will support guaranteed order. If the driver does not support guaranteed
-order, then it should not be used for asynchronous I/O with \fBlibaio\fR. It
-will wait for any outstanding I/O's before it returns. For example,
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+The
+.Dv MTIOCLRERR
+ioctl clears persistent error handling and allows tape
+operations to continual normally.
+This ioctl requires no argument and will
+always succeed, even if persistent error handling has not been enabled.
+It will wait for any outstanding I/O's before it clears the error.
+.Pp
+The
+.Dv MTIOCGUARANTEEDORDER
+ioctl is used to determine whether the driver
+guarantees the order of I/O's.
+It takes no argument.
+If the ioctl succeeds, the driver will support guaranteed order.
+If the driver does not support guaranteed order, then it should not be used
+for asynchronous I/O with
+.Xr libaio 3lib .
+It will wait for any outstanding I/O's before it returns.
+For example,
+.Bd -literal -offset 2n
 ioctl(fd, MTIOCGUARANTEEDORDER)
-.fi
-.in -2
-
-.sp
-.LP
-See the \fBPersistent Error Handling\fR subsection above for more information
-on persistent error handling.
-.SS "Asynchronous and State Change IOCTLS"
-.ne 2
-.na
-\fB\fBMTIOCSTATE\fR\fR
-.ad
-.RS 14n
+.Ed
+.Pp
+See the
+.Sx Persistent Error Handling
+subsection above for more information on persistent error handling.
+.Ss "Asynchronous and State Change IOCTLS"
+.Bl -tag -width 1n
+.It Dv MTIOCSTATE
 This ioctl blocks until the state of the drive, inserted or ejected, is
-changed. The argument is a pointer to a \fBmtio_state\fR, \fBenum\fR, whose
-possible enumerations are listed below. The initial value should be either the
-last reported state of the drive, or \fBMTIO_NONE\fR. Upon return, the
-\fBenum\fR pointed to by the argument is updated with the current state of the
-drive.
-.RE
-
-.sp
-.in +2
-.nf
+changed.
+The argument is a pointer to a
+.Vt enum mtio_state ,
+whose possible enumerations are listed below.
+The initial value should be either the last reported state of the drive, or
+.Dv MTIO_NONE .
+Upon return, the
+enum pointed to by the argument is updated with the current state of the drive.
+.Bd -literal -offset 2n
 enum mtio_state {
-MTIO_NONE      /* Return tape's current state */
-MTIO_EJECTED   /* Tape state is "ejected" */
-MTIO_INSERTED  /* Tape state is "inserted" */
-;
-.fi
-.in -2
-
-.sp
-.LP
+    MTIO_NONE      /* Return tape's current state */
+    MTIO_EJECTED   /* Tape state is "ejected" */
+    MTIO_INSERTED  /* Tape state is "inserted" */
+};
+.Ed
+.El
+.Pp
 When using asynchronous operations, most ioctls will wait for all outstanding
 commands to complete before they are executed.
-.SS "IOCTLS for Multi-initiator Configurations"
-.ne 2
-.na
-\fBMTIOCRESERVE\fR
-.ad
-.RS 21n
+.Ss "IOCTLS for Multi-initiator Configurations"
+.Bl -tag -width MTIOCFORCERESERVE -compact
+.It Dv MTIOCRESERVE
 reserve the tape drive
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCRELEASE\fR
-.ad
-.RS 21n
+.It Dv MTIOCRELEASE
 revert back to the default behavior of reserve on open/release on close
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCFORCERESERVE\fR
-.ad
-.RS 21n
+.It Dv MTIOCFORCERESERVE
 reserve the tape unit by breaking reservation held by another host
-.RE
-
-.sp
-.LP
-The \fBMTIOCRESERVE\fR ioctl reserves the tape drive such that it does not
-release the tape drive at close. This changes the default behavior of releasing
-the device upon close. Reserving the tape drive that is already reserved has no
-effect. For example,
-.sp
-.LP
-\fBioctl(fd, MTIOCRESERVE);\fR
-.sp
-.LP
-The \fBMTIOCRELEASE\fR ioctl reverts back to the default behavior of reserve on
+.El
+.Pp
+The
+.Dv MTIOCRESERVE
+ioctl reserves the tape drive such that it does not
+release the tape drive at close.
+This changes the default behavior of releasing the device upon close.
+Reserving the tape drive that is already reserved has no effect.
+For example,
+.Bd -literal -offset 2n
+ioctl(fd, MTIOCRESERVE);
+.Ed
+.Pp
+The
+.Dv MTIOCRELEASE
+ioctl reverts back to the default behavior of reserve on
 open/release on close operation, and a release will occur during the next
-close. Releasing the tape drive that is already released has no effect. For
-example,
-.sp
-.LP
-\fBioctl(fd, MTIOCRELEASE);\fR
-.sp
-.LP
-The \fBMTIOCFORCERESERVE\fR ioctl breaks a reservation held by another host,
-interrupting any I/O in progress by that other host, and then reserves the tape
-unit. This ioctl can be executed only with super-user privileges. It is
-recommended to open the tape device in \fBO_NDELAY\fR mode when this ioctl
-needs to be executed, otherwise the open will fail if another host indeed has
-it reserved. For example,
-.sp
-.in +2
-.nf
+close.
+Releasing the tape drive that is already released has no effect.
+For example,
+.Bd -literal -offset 2n
+ioctl(fd, MTIOCRELEASE);
+.Ed
+.Pp
+The
+.Dv MTIOCFORCERESERVE
+ioctl breaks a reservation held by another host, interrupting any I/O in
+progress by that other host, and then reserves the tape unit.
+This ioctl can be executed only with super-user privileges.
+It is recommended to open the tape device in
+.Dv O_NDELAY
+mode when this ioctl needs to be executed, otherwise the open will fail if
+another host indeed has it reserved.
+For example,
+.Bd -literal -offset 2n
 ioctl(fd, MTIOCFORCERESERVE);
-.fi
-.in -2
-
-.SS "IOCTLS for Handling Tape Configuration Options"
-.ne 2
-.na
-\fBMTIOCSHORTFMK\fR
-.ad
-.RS 23n
-enables/disables support for writing short filemarks. This is specific to
-Exabyte drives.
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCREADIGNOREILI\fR
-.ad
-.RS 23n
+.Ed
+.Ss "IOCTLS for Handling Tape Configuration Options"
+.Bl -tag -width MTIOCREADIGNOREEOFS
+.It Dv MTIOCSHORTFMK
+enables/disables support for writing short filemarks.
+This is specific to Exabyte drives.
+.It Dv MTIOCREADIGNOREILI
 enables/disables suppress incorrect length indicator (SILI) support during reads
-.RE
-
-.sp
-.ne 2
-.na
-\fBMTIOCREADIGNOREEOFS\fR
-.ad
-.RS 23n
+.It Dv MTIOCREADIGNOREEOFS
 enables/disables support for reading past two EOF marks which otherwise indicate
-End-Of-recording-Media (EOM) in the case of 1/2" reel tape drives
-.RE
-
-.sp
-.LP
-The \fBMTIOCSHORTFMK\fR ioctl enables or disables support for short filemarks.
+End-Of-recording-Media (EOM) in the case of 1/2\(dq reel tape drives
+.El
+.Pp
+The
+.Dv MTIOCSHORTFMK
+ioctl enables or disables support for short filemarks.
 This ioctl is only applicable to Exabyte drives which support short filemarks.
-As an argument, it takes a pointer to an integer.  If 0 (zero) is the
-specified integer, then long filemarks will be written. If 1 is the  specified
-integer, then short filemarks will be written. The specified tape behavior will
-be in effect until the device is closed.
-.sp
-.LP
+As an argument, it takes a pointer to an integer.
+If 0 (zero) is the specified integer, then long filemarks will be written.
+If 1 is the specified integer, then short filemarks will be written.
+The specified tape behavior will be in effect until the device is closed.
+.Pp
 For example:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 int on = 1;
 int off = 0;
 /* enable short filemarks */
 ioctl(fd, MTIOSHORTFMK, &on);
 /* disable short filemarks */
 ioctl(fd, MTIOCSHORTFMK, &off);
-.fi
-.in -2
-
-.sp
-.LP
-Tape drives which do not support short filemarks will return an \fBerrno\fR of
-\fBENOTTY.\fR
-.sp
-.LP
-The \fBMTIOCREADIGNOREILI\fR ioctl enables or disables the suppress incorrect
-length indicator (SILI) support during reads.  As an argument, it takes a
-pointer to an integer.   If 0 (zero) is the specified integer, SILI will not be
-used during reads and incorrect length indicator will not be suppressed.  If 1
-is  the specified integer, SILI will be used during reads and incorrect length
-indicator will be suppressed.  The specified  tape behavior will be in effect
-until the device is closed.
-.sp
-.LP
+.Ed
+.Pp
+Tape drives which do not support short filemarks will return an
+.Va errno
+of
+.Er ENOTTY .
+.Pp
+The
+.Dv MTIOCREADIGNOREILI
+ioctl enables or disables the suppress incorrect
+length indicator (SILI) support during reads.
+As an argument, it takes a pointer to an integer.
+If 0 (zero) is the specified integer, SILI will not be
+used during reads and incorrect length indicator will not be suppressed.
+If 1 is the specified integer, SILI will be used during reads and incorrect
+length indicator will be suppressed.
+The specified tape behavior will be in effect until the device is closed.
+.Pp
 For example:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 int on = 1;
 int off = 0;
 ioctl(fd, MTIOREADIGNOREILI, &on);
 ioctl(fd, MTIOREADIGNOREILI, &off);
-.fi
-.in -2
-
-.sp
-.LP
-The \fBMTIOCREADIGNOREEOFS\fR ioctl enables or disables support for reading
+.Ed
+.Pp
+The
+.Dv MTIOCREADIGNOREEOFS
+ioctl enables or disables support for reading
 past double EOF marks which otherwise indicate End-Of-recorded-media (EOM) in
-the case of 1/2" reel tape drives.  As an argument, it takes a pointer to an
-integer.   If 0 (zero) is the specified integer, then double EOF marks indicate
-End-Of-recodred-media (EOD). If 1 is the specified integer, the double EOF
-marks no longer indicate EOM, thus allowing applications to read past two EOF
-marks.  In this case it is the responsibility of the application to detect
-end-of-recorded-media (EOM).  The specified  tape behavior will be in effect
-until the device is closed.
-.sp
-.LP
+the case of 1/2\(dq reel tape drives.
+As an argument, it takes a pointer to an integer.
+If 0 (zero) is the specified integer, then double EOF marks indicate
+End-Of-recodred-media (EOD).
+If 1 is the specified integer, the double EOF marks no longer indicate EOM,
+thus allowing applications to read past two EOF marks.
+In this case it is the responsibility of the application to detect
+end-of-recorded-media (EOM).
+The specified tape behavior will be in effect until the device is closed.
+.Pp
 For example:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 int on = 1;
 int off = 0;
 ioctl(fd, MTIOREADIGNOREEOFS, &on);
 ioctl(fd, MTIOREADIGNOREEOFS, &off);
-.fi
-.in -2
-
-.sp
-.LP
-Tape drives other than 1/2" reel tapes will return an \fBerrno\fR of
-\fBENOTTY.\fR
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRTape Positioning and Tape Drives
-.sp
-.LP
-Suppose you have written three files to the non-rewinding 1/2" tape device,
-\fB/dev/rmt/0ln,\fR and that you want to go back and \fBdd\fR(1M) the second
-file off the tape. The commands to do this are:
-
-.sp
-.in +2
-.nf
-mt \fB-F\fR /dev/rmt/0lbn bsf 3
-mt \fB-F\fR /dev/rmt/0lbn fsf 1
+.Ed
+.Pp
+Tape drives other than 1/2\(dq reel tapes will return an
+.Va errno
+of
+.Er ENOTTY .
+.Sh FILES
+.Pa /dev/rmt/ Ns Ao unit number Ac \
+    Ns Ao density Ac \
+    Ns Bo Ao BSD behavior Ac Bc \
+    Ns Bo Ao no rewind Ac Bc
+.Pp
+Where
+.Aq density
+can be
+.Ql l ,
+.Ql m ,
+.Ql h ,
+.Ql u/c
+(low, medium, high, ultra/compressed, respectively), the
+.Aq BSD behavior
+option is
+.Ql b , and the
+.Aq no rewind
+option is
+.Ql n .
+.Pp
+For example,
+.Pa /dev/rmt/0hbn
+specifies unit 0, high density,
+.Sy BSD
+behavior and no rewind.
+.Sh EXAMPLES
+.Bl -inset
+.It Sy Example 1
+Tape Positioning and Tape Drives
+.Pp
+Suppose you have written three files to the non-rewinding 1/2\(dq tape device,
+.Pa /dev/rmt/0ln ,
+and that you want to go back and
+.Xr dd 1M
+the second file off the tape.
+The commands to do this are:
+.Bd -literal -offset 2n
+mt -F /dev/rmt/0lbn bsf 3
+mt -F /dev/rmt/0lbn fsf 1
 dd if=/dev/rmt/0ln
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 To accomplish the same tape positioning in a C program, followed by a get
 status ioctl:
-
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 struct mtop mt_command;
 struct mtget mt_status;
 mt_command.mt_op = MTBSF;
@@ -1097,56 +1156,35 @@ mt_command.mt_op = MTFSF;
 mt_command.mt_count = 1;
 ioctl(fd, MTIOCTOP, &mt_command);
 ioctl(fd, MTIOCGET, (char *)&mt_status);
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 or
-
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 mt_command.mt_op = MTNBSF;
 mt_command.mt_count = 2;
 ioctl(fd, MTIOCTOP, &mt_command);
 ioctl(fd, MTIOCGET, (char *)&mt_status);
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 To get information about the tape drive:
-
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 struct mtdrivetype mtdt;
 struct mtdrivetype_request mtreq;
 mtreq.size = sizeof(struct mtdrivetype);
 mtreq.mtdtp = &mtdt;
 ioctl(fd, MTIOCGETDRIVETYPE, &mtreq);
-.fi
-.in -2
-
-.SH FILES
-.LP
-\fB/dev/rmt/\fR\fI<unit number><density>\fR[\fI<BSD behavior>\fR][\fI<no
-rewind>\fR]
-.sp
-.LP
-Where \fIdensity\fR can be \fBl,\fR \fBm,\fR \fBh,\fR \fBu/c\fR (low, medium,
-high, ultra/compressed, respectively), the \fIBSD behavior \fR option is
-\fBb\fR, and the \fIno rewind \fR option is \fBn\fR.
-.sp
-.LP
-For example, \fB/dev/rmt/0hbn\fR specifies unit 0, high density, \fBBSD\fR
-behavior and no rewind.
-.SH SEE ALSO
-.LP
-\fBmt\fR(1), \fBtar\fR(1), \fBdd\fR(1M), \fBopen\fR(2), \fBread\fR(2),
-\fBwrite\fR(2), \fBaioread\fR(3C), \fBaiowrite\fR(3C), \fBar.h\fR(3HEAD),
-\fBst\fR(7D)
-.sp
-.LP
-\fI1/4 Inch Tape Drive Tutorial\fR
+.Ed
+.El
+.Sh SEE ALSO
+.Xr mt 1 ,
+.Xr tar 1 ,
+.Xr dd 1M ,
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr aioread 3C ,
+.Xr aiowrite 3C ,
+.Xr ar.h 3HEAD ,
+.Xr st 7D
+.Pp
+.%T 1/4 Inch Tape Drive Tutorial

@@ -1,49 +1,89 @@
-'\" te
 .\" Copyright (c) 2007 by Sun Microsystems, Inc.  All rights reserved.
-.\" Copyright 2016 Joyent, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USCSI 7I "Sep 23, 2016"
-.SH NAME
-uscsi \- user SCSI command interface
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/scsi/impl/uscsi.h>
-
-\fB\fR\fBioctl\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIrequest\fR, \fBstruct uscsi_cmd *\fR\fIcmd\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBuscsi\fR command is very powerful and somewhat dangerous; therefore it
-has some permission restrictions. See \fBWARNINGS\fR for more details.
-.sp
-.LP
-Drivers supporting this \fBioctl\fR(2) provide a general interface allowing
-user-level applications to cause individual \fBSCSI\fR commands to be directed
-to a particular \fBSCSI\fR or \fBATAPI\fR device under control of that driver.
-The \fBuscsi\fR command is supported by the \fBsd\fR driver for \fBSCSI\fR
-disks and \fBATAPI\fR CD-ROM drives, and by the \fBst\fR driver for \fBSCSI\fR
-tape drives. \fBuscsi\fR may also be supported by other device drivers; see the
+.\" Copyright 2017 Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd October 23, 2017
+.Dt USCSI 7I
+.Os
+.Sh NAME
+.Nm uscsi
+.Nd user SCSI command interface
+.Sh SYNOPSIS
+.In sys/scsi/impl/uscsi.h
+.Fo ioctl
+.Fa "int filedes"
+.Fa "int request"
+.Fa "struct uscsi_cmd *cmd"
+.Fc
+.Sh DESCRIPTION
+The
+.Nm
+command is very powerful and somewhat dangerous; therefore it
+has some permission restrictions.
+See
+.Sx WARNINGS
+for more details.
+.Pp
+Drivers supporting this
+.Xr ioctl 2
+provide a general interface allowing user-level applications to cause individual
+.Sy SCSI
+commands to be directed to a particular
+.Sy SCSI
+or
+.Sy ATAPI
+device under control of that driver.
+The
+.Nm
+command is supported by the
+.Xr sd 7D
+driver for
+.Sy SCSI
+disks and
+.Sy ATAPI
+CD-ROM drives, and by the
+.Xr st 7D
+driver for
+.Sy SCSI
+tape drives.
+.Nm
+may also be supported by other device drivers; see the
 specific device driver manual page for complete information.
-.sp
-.LP
+.Pp
 Applications must not assume that all Solaris disk device drivers support the
-\fBuscsi\fR ioctl command. The \fBSCSI\fR command may include a data transfer
-to or from that device, if appropriate for that command. Upon completion of the
-command, the user application can determine how many bytes were transferred and
-the status returned by the device. Also, optionally, if the command returns a
+.Nm
+ioctl command.
+The
+.Sy SCSI
+command may include a data transfer
+to or from that device, if appropriate for that command.
+Upon completion of the command, the user application can determine how many
+bytes were transferred and the status returned by the device.
+Also, optionally, if the command returns a
 Check Condition status, the driver will automatically issue a Request Sense
-command and return the sense data along with the original status. See the
-\fBUSCSI_RQENABLE\fR flag below for this Request Sense processing. The
-\fBuscsi_cmd\fR structure is defined in \fB<sys/scsi/impl/uscsi.h>\fR and
-includes the following members:
-.sp
-.in +2
-.nf
-int uscsi_flags;               /* read, write, etc. see below */
+command and return the sense data along with the original status.
+See the
+.Sy USCSI_RQENABLE
+flag below for this Request Sense processing.
+The
+.Vt uscsi_cmd
+structure is defined in
+.In sys/scsi/impl/uscsi.h
+and includes the following members:
+.Bd -literal -offset 2n
+int uscsi_flags;              /* read, write, etc. see below */
 short uscsi_status;           /* resulting status */
 short uscsi_timeout;          /* Command Timeout */
 caddr_t uscsi_cdb             /* CDB to send to target */
@@ -56,143 +96,66 @@ uchar_t uscsi_rqstatus;       /* status of request sense cmd */
 uchar_t uscsi_rqresid;        /* resid of request sense cmd */
 caddr_t uscsi_rqbuf;          /* request sense buffer */
 void *uscsi_reserved_5;       /* Reserved for future use */
-.fi
-.in -2
-
-.sp
-.LP
-The fields of the \fBuscsi_cmd\fR structure have the following meanings:
-.sp
-.ne 2
-.na
-\fB\fBuscsi_flags\fR\fR
-.ad
-.RS 20n
-The \fBI/O\fR direction and other details of how to carry out the \fBSCSI\fR
-command. Possible values are described below.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_status\fR\fR
-.ad
-.RS 20n
-The \fBSCSI\fR status byte returned by the device is returned in this field.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_timeout\fR\fR
-.ad
-.RS 20n
+.Ed
+.Pp
+The fields of the
+.Vt uscsi_cmd
+structure have the following meanings:
+.Bl -tag -width uscsi_reserved_5
+.It Sy uscsi_flags
+The
+.Sy I/O
+direction and other details of how to carry out the
+.Sy SCSI
+command.
+Possible values are described below.
+.It Fa uscsi_status
+The
+.Sy SCSI
+status byte returned by the device is returned in this field.
+.It Fa uscsi_timeout
 Time in seconds to allow for completion of the command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_cdb\fR\fR
-.ad
-.RS 20n
-A pointer to the \fBSCSI\fR CDB (command descriptor block) to be transferred to
-the device in command phase.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_bufaddr\fR\fR
-.ad
-.RS 20n
+.It Fa uscsi_cdb
+A pointer to the
+.Sy SCSI
+CDB (command descriptor block) to be transferred to the device in command phase.
+.It Fa uscsi_bufaddr
 The user buffer containing the data to be read from or written to the device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_buflen\fR\fR
-.ad
-.RS 20n
-The length of \fBuscsi_bufaddr\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_resid\fR\fR
-.ad
-.RS 20n
+.It Sy uscsi_buflen
+The length of
+.Fa uscsi_bufaddr .
+.It Fa uscsi_resid
 If a data transfer terminates without transferring the entire requested amount,
 the remainder, or residue, is returned in this field.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_cdblen\fR\fR
-.ad
-.RS 20n
-The length of the \fBSCSI\fR CDB to be transferred to the device in command
-phase.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_rqlen\fR\fR
-.ad
-.RS 20n
-The length of \fBuscsi_rqbuf\fR, the application's Request Sense buffer.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_rqstatus\fR\fR
-.ad
-.RS 20n
-The \fBSCSI\fR status byte returned for the Request Sense command executed
+.It Fa uscsi_cdblen
+The length of the
+.Sy SCSI
+CDB to be transferred to the device in command phase.
+.It Fa uscsi_rqlen
+The length of
+.Fa uscsi_rqbuf ,
+the application's Request Sense buffer.
+.It Fa uscsi_rqstatus
+The
+.Sy SCSI
+status byte returned for the Request Sense command executed
 automatically by the driver in response to a Check Condition status return.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_rqresid\fR\fR
-.ad
-.RS 20n
+.It Fa uscsi_rqresid
 The residue, or untransferred data length, of the Request Sense data transfer
-(the number of bytes, less than or equal to \fBuscsi_rqlen\fR, which were not
-filled with sense data).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_rqbuf\fR\fR
-.ad
-.RS 20n
+(the number of bytes, less than or equal to
+.Fa uscsi_rqlen ,
+which were not filled with sense data).
+.It Fa uscsi_rqbuf
 Points to a buffer in application address space to which the results of an
 automatic Request Sense command are written.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBuscsi_reserved_5\fR\fR
-.ad
-.RS 20n
+.It Fa uscsi_reserved_5
 Reserved for future use.
-.RE
-
-.sp
-.LP
-The \fBuscsi_flags\fR field defines the following:
-.sp
-.in +2
-.nf
+.El
+.Pp
+The
+.Fa uscsi_flags
+field defines the following:
+.Bd -literal -offset 2n
 USCSI_WRITE                   /* send data to device */
 USCSI_SILENT                  /* no error messages */
 USCSI_DIAGNOSE                /* fail if any error occurs */
@@ -206,272 +169,227 @@ USCSI_RESET_LUN               /* reset logical unit */
 USCSI_RESET_ALL               /* reset all targets */
 USCSI_RQENABLE                /* enable request sense extensions */
 USCSI_RENEGOT                 /* renegotiate wide/sync on next I/O */
-.fi
-.in -2
-
-.sp
-.LP
-The \fBuscsi_flags\fR bits have the following interpretation:
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_WRITE\fR\fR
-.ad
-.RS 22n
+.Ed
+.Pp
+The
+.Fa uscsi_flags
+bits have the following interpretation:
+.Bl -tag -width USCSI_RESET_TARGET
+.It Dv USCSI_WRITE
 Data will be written from the initiator to the target.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_SILENT\fR\fR
-.ad
-.RS 22n
+.It Dv USCSI_SILENT
 The driver should not print any console error messages or warnings regarding
-failures associated with this \fBSCSI\fR command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_DIAGNOSE\fR\fR
-.ad
-.RS 22n
+failures associated with this
+.Sy SCSI
+command.
+.It Dv USCSI_DIAGNOSE
 The driver should not attempt any retries or other recovery mechanisms if this
-\fBSCSI\fR command terminates abnormally in any way.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_ISOLATE\fR\fR
-.ad
-.RS 22n
-This \fBSCSI\fR command should not be executed with other commands.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_READ\fR\fR
-.ad
-.RS 22n
+.Sy SCSI
+command terminates abnormally in any way.
+.It Dv USCSI_ISOLATE
+This
+.Sy SCSI
+command should not be executed with other commands.
+.It Dv USCSI_READ
 Data will be read from the target to the initiator.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_ASYNC\fR\fR
-.ad
-.RS 22n
-Set the \fBSCSI\fR bus to asynchronous mode before running this command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_SYNC\fR\fR
-.ad
-.RS 22n
-Set the \fBSCSI\fR bus to synchronous mode before running this command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_RESET\fR\fR
-.ad
-.RS 22n
-Send a \fBSCSI\fR bus device reset message to this target.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_RESET_TARGET\fR\fR
-.ad
-.RS 22n
-Same as USCSI_RESET. Use this flag to request TARGET RESET. (USCSI_RESET is
-maintained only for compatibility with old applications).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_RESET_LUN\fR\fR
-.ad
-.RS 22n
-Send a \fBSCSI\fR logical unit reset message to this target.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_RESET_ALL\fR\fR
-.ad
-.RS 22n
-USCSI_RESET_ALL, USCSI_RESET/USCSI_RESET_TARGET and USCSI_RESET_LUN are
+.It Dv USCSI_ASYNC
+Set the
+.Sy SCSI
+bus to asynchronous mode before running this command.
+.It Dv USCSI_SYNC
+Set the
+.Sy SCSI
+bus to synchronous mode before running this command.
+.It Dv USCSI_RESET
+Send a
+.Sy SCSI
+bus device reset message to this target.
+.It Dv USCSI_RESET_TARGET
+Same as USCSI_RESET.
+Use this flag to request TARGET RESET.
+.Po
+.Dv USCSI_RESET
+is maintained only for compatibility with old applications
+.Pc .
+.It Dv USCSI_RESET_LUN
+Send a
+.Sy SCSI
+logical unit reset message to this target.
+.It Dv USCSI_RESET_ALL
+.Dv USCSI_RESET_ALL ,
+.Dv USCSI_RESET/USCSI_RESET_TARGET ,
+and
+.Dv USCSI_RESET_LUN
+are
 mutually exclusive options and issuing them in any simultaneous combination
 will result in implementation-dependent behavior
-.sp
-When a USCSI reset request is combined with other \fBSCSI\fR commands, the
-following semantics take effect:
-.sp
-If the USCSI RESET flag is specified, the other fields (other than uscsi_flags)
-in the uscsi_cmd are ignored. The uscsi_cdblen \fBmust\fR be set to zero.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_RQENABLE\fR\fR
-.ad
-.RS 22n
-Enable Request Sense extensions. If the user application is prepared to receive
-sense data, this bit must be set, the fields \fBuscsi_rqbuf\fR and
-\fBuscsi_rqbuflen\fR must be non-zero, and the \fBuscsi_rqbuf\fR must point to
-memory writable by the application.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBUSCSI_RENEGOT\fR\fR
-.ad
-.RS 22n
+When a USCSI reset request is combined with other
+.Sy SCSI
+commands, the following semantics take effect:
+If the
+.Dv USCSI RESET
+flag is specified, the other fields (other than
+.Fa uscsi_flags )
+in the
+.Vt uscsi_cmd
+are ignored.
+The
+.Fa uscsi_cdblen
+field
+.Em must
+be set to zero.
+.It Dv USCSI_RQENABLE
+Enable Request Sense extensions.
+If the user application is prepared to receive
+sense data, this bit must be set, the fields
+.Fa uscsi_rqbuf
+and
+.Fa uscsi_rqbuflen
+must be non-zero, and the
+.Fa uscsi_rqbuf
+must point to memory writable by the application.
+.It Dv USCSI_RENEGOT
 Tells USCSI to renegotiate wide mode and synchronous transfer speed before the
-transmitted SCSI command is executed. This flag in effects tells the target
-driver to pass the \fBFLAG_RENEGOTIATE_WIDE_SYNC\fR flag in the SCSI packet
+transmitted SCSI command is executed.
+This flag in effects tells the target driver to pass the
+.Dv FLAG_RENEGOTIATE_WIDE_SYNC
+flag in the SCSI packet
 before passing the command to an adapter driver for transport.
-.sp
-See the \fBscsi_pkt\fR(9S) flag \fBFLAG_RENEGOTIATE_WIDE_SYNC\fR for more
-information.
-.RE
-
-The \fBuscsi_xfer_t\fR is a type definition that corresponds to a 64-bit
-unsigned integer. It should be used for the \fBUSCSIMAXXFER\fR ioctls. This is
+See the
+.Xr scsi_pkt 9S
+flag
+.Dv FLAG_RENEGOTIATE_WIDE_SYNC
+for more information.
+.El
+.Pp
+The
+.Vt uscsi_xfer_t
+is a type definition that corresponds to a 64-bit unsigned integer.
+It should be used for the
+.Dv USCSIMAXXFER
+ioctls.
+This is
 used for determining the maximum transfer size that can be performed in a single
-\fBUSCSICMD\fR ioctl. If the SCSI request is larger than the specified size,
+.Dv USCSICMD
+ioctl.
+If the SCSI request is larger than the specified size,
 then it may not work, depending on the hardware platform.
-
-.SH IOCTLS
-.LP
-The \fBioctl\fR supported by drivers providing the \fBuscsi\fR interface is:
-.sp
-.ne 2
-.na
-\fB\fBUSCSICMD\fR\fR
-.ad
-.RS 12n
-The argument is a pointer to a \fBuscsi_cmd\fR structure. The \fBSCSI\fR device
-addressed by that driver is selected, and given the \fBSCSI\fR command
-addressed by \fBuscsi_cdb\fR. If this command requires a data phase, the
-\fBuscsi_buflen\fR and \fBuscsi_bufaddr\fR fields must be set appropriately; if
-data phase occurs, the \fBuscsi_resid\fR is returned as the number of bytes not
-transferred. The status of the command, as returned by the device, is returned
-in the \fBuscsi_status\fR field. If the command terminates with Check Condition
+.Sh IOCTLS
+The
+.Fn ioctl
+supported by drivers providing the
+.Nm
+interface is:
+.Bl -tag -width USCSIMAXXFER
+.It Dv USCSICMD
+The argument is a pointer to a
+.Vt uscsi_cmd
+structure.
+The
+.Sy SCSI
+device addressed by that driver is selected, and given the
+.Sy SCSI
+command addressed by
+.Fa uscsi_cdb .
+If this command requires a data phase, the
+.Fa uscsi_buflen
+and
+.Fa uscsi_bufaddr
+fields must be set appropriately; if data phase occurs, the
+.Fa uscsi_resid
+is returned as the number of bytes not transferred.
+The status of the command, as returned by the device, is returned in the
+.Fa uscsi_status
+field.
+If the command terminates with Check Condition
 status, and Request Sense is enabled, the sense data itself is returned in
-\fBuscsi_rqbuf\fR. The \fBuscsi_rqresid\fR provides the residue of the Request
-Sense data transfer.
-.RE
-
-.sp
-.ne 2
-.na
-.B USCSIMAXXFER
-.ad
-.RS 12n
-The argument is a pointer to a \fBuscsi_xfer_t\fR value. The maximum transfer
-size that can be used with the \fBUSCSICMD\fR ioctl for the current device will
-be returned in the \fBuscsi_xfer_t\fR.
-.sp
-.LP
-Not all devices which support the \fBUSCSICMD\fR ioctl also support the
-\fBUSCSIMAXXFER\fR ioctl.
-.RE
-
-.SH ERRORS
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.Fa uscsi_rqbuf .
+The
+.Fa uscsi_rqresid
+provides the residue of the Request Sense data transfer.
+.It Dv USCSIMAXXFER
+The argument is a pointer to a
+.Vt uscsi_xfer_t
+value.
+The maximum transfer size that can be used with the
+.Dv USCSICMD
+ioctl for the current device will be returned in the
+.Vt uscsi_xfer_t .
+.Pp
+Not all devices which support the
+.Dv USCSICMD
+ioctl also support the
+.Dv USCSIMAXXFER
+ioctl.
+.El
+.Sh ERRORS
+.Bl -tag -width EINVAL
+.It Er EINVAL
 A parameter has an incorrect, or unsupported, value.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEIO\fR\fR
-.ad
-.RS 10n
+.It Er EIO
 An error occurred during the execution of the command.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 10n
-A process without root credentials tried to execute the \fBUSCSICMD\fR or
-\fBUSCSIMAXXFER\fR ioctl.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-The \fBuscsi_cmd\fR itself, the \fBuscsi_cdb\fR, the \fBuscsi_buf\fR, the
-\fBuscsi_rqbuf\fR, or the \fBuscsi_xfer_t\fR point to an invalid address.
-.RE
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability 	Committed
-.TE
-
-.SH SEE ALSO
-.LP
-\fBioctl\fR(2), \fBattributes\fR(5), \fBsd\fR(7D), \fBst\fR(7D)
-.sp
-.LP
-\fIANSI Small Computer System Interface-2 (SCSI-2)\fR
-.SH WARNINGS
-.LP
-The \fBuscsi\fR command is very powerful, but somewhat dangerous, and so its
+.It Er EPERM
+A process without root credentials tried to execute the
+.Dv USCSICMD
+or
+.Dv USCSIMAXXFER
+ioctl.
+.It Er EFAULT
+The
+.Vt uscsi_cmd
+itself, the
+.Fa uscsi_cdb ,
+the
+.Fa uscsi_buf ,
+the
+.Fa uscsi_rqbuf ,
+or the
+.Vt uscsi_xfer_t
+point to an invalid address.
+.El
+.Sh STABILITY
+Committed
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr attributes 5 ,
+.Xr sd 7D ,
+.Xr st 7D
+.Rs
+.%T ANSI Small Computer System Interface-2 (SCSI-2)
+.Re
+.Sh WARNINGS
+The
+.Nm
+command is very powerful, but somewhat dangerous, and so its
 use is restricted to processes running as root, regardless of the file
-permissions on the device node. The device driver code expects to own the
-device state, and \fBuscsi\fR commands can change the state of the device and
-confuse the device driver. It is best to use \fBuscsi\fR commands only with no
-side effects, and avoid commands such as Mode Select, as they may cause damage
-to data stored on the drive or system panics. Also, as the commands are not
-checked in any way by the device driver, any block may be overwritten, and the
-block numbers are absolute block numbers on the drive regardless of which slice
-number is used to send the command.
-.sp
-.LP
-The \fBuscsi\fR interface is not recommended for very large data transfers
-(typically more than 16MB). If the requested transfer size exceeds the maximum
-transfer size of the DMA engine, it will not be broken up into multiple
-transfers and DMA errors may result. The \fBUSCSIMAXXFER\fR ioctl can be used
-to determine the maximum transfer size.
-.sp
-.LP
-The \fBUSCSICMD\fR ioctl associates a \fBstruct uscsi_cmd\fR with a device by
-using an open file descriptor to the device. Other APIs might provide the same
-\fBstruct uscsi_cmd\fR programming interface, but perform device association in
-some other manner.
+permissions on the device node.
+The device driver code expects to own the device state, and
+.Nm
+commands can change the state of the device and confuse the device driver.
+It is best to use
+.Nm
+commands only with no side effects, and avoid commands such as Mode Select, as
+they may cause damage to data stored on the drive or system panics.
+Also, as the commands are not checked in any way by the device driver, any block
+may be overwritten, and the block numbers are absolute block numbers on the
+drive regardless of which slice number is used to send the command.
+.Pp
+The
+.Nm
+interface is not recommended for very large data transfers
+(typically more than 16MB).
+If the requested transfer size exceeds the maximum transfer size of the DMA
+engine, it will not be broken up into multiple transfers and DMA errors may
+result.
+The
+.Dv USCSIMAXXFER
+ioctl can be used to determine the maximum transfer size.
+.Pp
+The
+.Dv USCSICMD
+ioctl associates a
+.Vt struct uscsi_cmd
+with a device by using an open file descriptor to the device.
+Other APIs might provide the same
+.Vt struct uscsi_cmd
+programming interface, but perform device association in some other manner.
