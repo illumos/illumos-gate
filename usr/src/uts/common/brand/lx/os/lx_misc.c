@@ -183,6 +183,26 @@ lx_cleanlwp(klwp_t *lwp, proc_t *p)
 	if (rb_list != NULL) {
 		lx_futex_robust_exit((uintptr_t)rb_list, lwpd->br_pid);
 	}
+
+	/*
+	 * We need to run our context exit operation (lx_save) here to ensure
+	 * we don't leave any garbage around. This is necessary to handle the
+	 * following calling sequence:
+	 *    exit -> proc_exit -> lx_freelwp -> removectx
+	 * That is, when our branded process exits, proc_exit will call our
+	 * lx_freelwp brand hook which does call this function (lx_cleanlwp),
+	 * but lx_freelwp also removes our context exit operation. The context
+	 * exit functions are run by exitctx, which is called by either
+	 * lwp_exit or thread_exit. The thread_exit function is called at the
+	 * end of proc_exit when we'll swtch() to another thread, but by then
+	 * our context exit function has been removed.
+	 *
+	 * It's ok if this function happens to be called more than once (for
+	 * example, if we exec a native binary).
+	 */
+	kpreempt_disable();
+	lx_save(lwp);
+	kpreempt_enable();
 }
 
 void
