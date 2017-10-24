@@ -11,37 +11,50 @@
 
 #
 # Copyright 2015 Pluribus Networks Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 PROG= bhyve
 
-SRCS =	atkbdc.c		\
+SRCS =	acpi.c			\
+	atkbdc.c		\
 	bhyvegc.c		\
 	bhyverun.c		\
 	block_if.c		\
+	bootrom.c		\
 	console.c		\
 	consport.c		\
+	dbgport.c		\
+	fwctl.c			\
 	inout.c			\
 	ioapic.c		\
 	mem.c			\
 	mptbl.c			\
 	pci_ahci.c		\
+	pci_e82545.c		\
 	pci_emul.c		\
+	pci_fbuf.c		\
 	pci_hostbridge.c	\
 	pci_irq.c		\
 	pci_lpc.c		\
+	pci_passthru.c		\
+	pci_uart.c		\
 	pci_virtio_block.c	\
 	pci_virtio_net.c	\
-	pci_virtio_viona.c	\
+	pci_virtio_rnd.c	\
+	pci_xhci.c		\
 	pm.c			\
-	pmtmr.c			\
 	post.c			\
 	ps2kbd.c		\
 	ps2mouse.c		\
 	rfb.c			\
 	rtc.c			\
 	smbiostbl.c		\
+	sockstream.c		\
+	task_switch.c		\
 	uart_emul.c		\
+	usb_emul.c		\
+	usb_mouse.c		\
 	vga.c			\
 	virtio.c		\
 	vmm_instruction_emul.c	\
@@ -52,18 +65,24 @@ SRCS =	atkbdc.c		\
 OBJS = $(SRCS:.c=.o)
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 
 .KEEP_STATE:
 
-CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration
-CFLAGS64 +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration
-CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd $(CPPFLAGS.master) \
+CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
+CFLAGS64 +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
+CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
+		-I$(CONTRIB)/freebsd/dev/usb/controller \
+		-I$(CONTRIB)/freebsd/dev/mii \
+		-I$(SRC)/uts/common/io/e1000api \
+		$(CPPFLAGS.master) \
 		-I$(ROOT)/usr/platform/i86pc/include \
 		-I$(SRC)/uts/i86pc/io/vmm \
 		-I$(SRC)/uts/common \
 		-I$(SRC)/uts/i86pc \
-		-I$(SRC)/lib/libdladm/common
-LDLIBS +=	-lsocket -lnsl -ldlpi -ldladm -lkstat -lmd -luuid -lvmmapi
+		-I$(SRC)/lib/libdladm/common \
+		-DWITHOUT_CAPSICUM
+LDLIBS +=	-lsocket -lnsl -ldlpi -ldladm -lkstat -lmd -luuid -lvmmapi -lz
 
 POST_PROCESS += ; $(GENSETDEFS) $@
 

@@ -33,6 +33,6 @@ struct atkbdc_softc;
 struct vmctx;
 
 void atkbdc_init(struct vmctx *ctx);
-void atkbdc_event(struct atkbdc_softc *sc);
+void atkbdc_event(struct atkbdc_softc *sc, int iskbd);
 
 #endif /* _ATKBDC_H_ */

@@ -23,11 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/pci_hostbridge.c 283264 2015-05-21 20:11:52Z tychon $
+ * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/pci_hostbridge.c 283264 2015-05-21 20:11:52Z tychon $");
+__FBSDID("$FreeBSD$");
 
 #include "pci_emul.h"
 

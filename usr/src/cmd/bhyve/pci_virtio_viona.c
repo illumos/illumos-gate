@@ -365,10 +365,12 @@ pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 	vna_create.c_linkid = sc->vsc_linkid;
 	strlcpy(vna_create.c_vmname, vmname,
 	    sizeof (vna_create.c_vmname));
+#if notyet
 	vm_get_memory_seg(ctx, 1 * (1024 * 1024UL), &vna_create.c_lomem_size,
 	    NULL);
 	vm_get_memory_seg(ctx, 4 * (1024 * 1024 * 1024UL),
 	    &vna_create.c_himem_size, NULL);
+#endif
 	error = ioctl(sc->vsc_vnafd, VNA_IOC_CREATE, &vna_create);
 	if (error != 0) {
 		WPRINTF(("ioctl viona create failed %d\n", error));

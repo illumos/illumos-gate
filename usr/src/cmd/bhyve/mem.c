@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/mem.c 269700 2014-08-08 03:49:01Z neel $
+ * $FreeBSD$
  */
 
 /*
@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/mem.c 269700 2014-08-08 03:49:01Z neel $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/tree.h>

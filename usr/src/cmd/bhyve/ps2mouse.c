@@ -62,6 +62,16 @@ __FBSDID("$FreeBSD$");
 /* mouse device id */
 #define	PS2MOUSE_DEV_ID		0x0
 
+/* mouse data bits */
+#define	PS2M_DATA_Y_OFLOW	0x80
+#define	PS2M_DATA_X_OFLOW	0x40
+#define	PS2M_DATA_Y_SIGN	0x20
+#define	PS2M_DATA_X_SIGN	0x10
+#define	PS2M_DATA_AONE		0x08
+#define	PS2M_DATA_MID_BUTTON	0x04
+#define	PS2M_DATA_RIGHT_BUTTON	0x02
+#define	PS2M_DATA_LEFT_BUTTON	0x01
+
 /* mouse status bits */
 #define	PS2M_STS_REMOTE_MODE	0x40
 #define	PS2M_STS_ENABLE_DEV	0x20
@@ -87,6 +97,7 @@ struct ps2mouse_softc {
 	uint8_t		status;
 	uint8_t		resolution;
 	uint8_t		sampling_rate;
+	int		ctrlenable;
 	struct fifo	fifo;
 
 	uint8_t		curcmd;	/* current command for next byte */
@@ -168,19 +179,20 @@ movement_get(struct ps2mouse_softc *sc)
 
 	assert(pthread_mutex_isowned_np(&sc->mtx));
 
-	val0 = 	sc->status & (PS2M_STS_LEFT_BUTTON |
-	    PS2M_STS_RIGHT_BUTTON | PS2M_STS_MID_BUTTON);
+	val0 = PS2M_DATA_AONE;
+	val0 |= sc->status & (PS2M_DATA_LEFT_BUTTON |
+	    PS2M_DATA_RIGHT_BUTTON | PS2M_DATA_MID_BUTTON);
 
 	if (sc->delta_x >= 0) {
 		if (sc->delta_x > 255) {
-			val0 |= (1 << 6);
+			val0 |= PS2M_DATA_X_OFLOW;
 			val1 = 255;
 		} else
 			val1 = sc->delta_x;
 	} else {
-		val0 |= (1 << 4);
+		val0 |= PS2M_DATA_X_SIGN;
 		if (sc->delta_x < -255) {
-			val0 |= (1 << 6);
+			val0 |= PS2M_DATA_X_OFLOW;
 			val1 = 255;
 		} else
 			val1 = sc->delta_x;
@@ -189,23 +201,25 @@ movement_get(struct ps2mouse_softc *sc)
 
 	if (sc->delta_y >= 0) {
 		if (sc->delta_y > 255) {
-			val0 |= (1 << 7);
+			val0 |= PS2M_DATA_Y_OFLOW;
 			val2 = 255;
 		} else
 			val2 = sc->delta_y;
 	} else {
-		val0 |= (1 << 5);
+		val0 |= PS2M_DATA_Y_SIGN;
 		if (sc->delta_y < -255) {
-			val0 |= (1 << 7);
+			val0 |= PS2M_DATA_Y_OFLOW;
 			val2 = 255;
 		} else
 			val2 = sc->delta_y;
 	}
 	sc->delta_y = 0;
 
-	fifo_put(sc, val0);
-	fifo_put(sc, val1);
-	fifo_put(sc, val2);
+	if (sc->fifo.num < (sc->fifo.size - 3)) {
+		fifo_put(sc, val0);
+		fifo_put(sc, val1);
+		fifo_put(sc, val2);
+	}
 }
 
 static void
@@ -214,7 +228,7 @@ ps2mouse_reset(struct ps2mouse_softc *sc)
 	assert(pthread_mutex_isowned_np(&sc->mtx));
 	fifo_reset(sc);
 	movement_reset(sc);
-	sc->status = 0x8;
+	sc->status = PS2M_STS_ENABLE_DEV;
 	sc->resolution = 4;
 	sc->sampling_rate = 100;
 
@@ -236,10 +250,32 @@ ps2mouse_read(struct ps2mouse_softc *sc, uint8_t *val)
 	return (retval);
 }
 
+int
+ps2mouse_fifocnt(struct ps2mouse_softc *sc)
+{
+	return (sc->fifo.num);
+}
+
 void
-ps2mouse_write(struct ps2mouse_softc *sc, uint8_t val)
+ps2mouse_toggle(struct ps2mouse_softc *sc, int enable)
 {
 	pthread_mutex_lock(&sc->mtx);
+	if (enable)
+		sc->ctrlenable = 1;
+	else {
+		sc->ctrlenable = 0;
+		sc->fifo.rindex = 0;
+		sc->fifo.windex = 0;
+		sc->fifo.num = 0;
+	}
+	pthread_mutex_unlock(&sc->mtx);
+}
+
+void
+ps2mouse_write(struct ps2mouse_softc *sc, uint8_t val, int insert)
+{
+	pthread_mutex_lock(&sc->mtx);
+	fifo_reset(sc);
 	if (sc->curcmd) {
 		switch (sc->curcmd) {
 		case PS2MC_SET_SAMPLING_RATE:
@@ -256,8 +292,14 @@ ps2mouse_write(struct ps2mouse_softc *sc, uint8_t val)
 			break;
 		}
 		sc->curcmd = 0;
+
+	} else if (insert) {
+		fifo_put(sc, val);
 	} else {
 		switch (val) {
+		case 0x00:
+			fifo_put(sc, PS2MC_ACK);
+			break;
 		case PS2MC_RESET_DEV:
 			ps2mouse_reset(sc);
 			fifo_put(sc, PS2MC_ACK);
@@ -313,6 +355,7 @@ ps2mouse_write(struct ps2mouse_softc *sc, uint8_t val)
 			fifo_put(sc, PS2MC_ACK);
 			break;
 		default:
+			fifo_put(sc, PS2MC_ACK);
 			fprintf(stderr, "Unhandled ps2 mouse command "
 			    "0x%02x\n", val);
 			break;
@@ -338,7 +381,7 @@ ps2mouse_event(uint8_t button, int x, int y, void *arg)
 	if (button & (1 << 2))
 		sc->status |= PS2M_STS_RIGHT_BUTTON;
 
-	if ((sc->status & PS2M_STS_ENABLE_DEV) == 0) {
+	if ((sc->status & PS2M_STS_ENABLE_DEV) == 0 || !sc->ctrlenable) {
 		/* no data reporting */
 		pthread_mutex_unlock(&sc->mtx);
 		return;
@@ -347,7 +390,8 @@ ps2mouse_event(uint8_t button, int x, int y, void *arg)
 	movement_get(sc);
 	pthread_mutex_unlock(&sc->mtx);
 
-	atkbdc_event(sc->atkbdc_sc);
+	if (sc->fifo.num > 0)
+		atkbdc_event(sc->atkbdc_sc, 0);
 }
 
 struct ps2mouse_softc *
@@ -364,8 +408,9 @@ ps2mouse_init(struct atkbdc_softc *atkbdc_sc)
 	ps2mouse_reset(sc);
 	pthread_mutex_unlock(&sc->mtx);
 
-	console_ptr_register(ps2mouse_event, sc);
+	console_ptr_register(ps2mouse_event, sc, 1);
 
 	return (sc);
 }
+
 

@@ -17,9 +17,30 @@
 #ifndef _COMPAT_FREEBSD_SYS_CDEFS_H_
 #define	_COMPAT_FREEBSD_SYS_CDEFS_H_
 
+/*
+ * Testing against Clang-specific extensions.
+ */
+#ifndef __has_extension
+#define	__has_extension		__has_feature
+#endif
+#ifndef __has_feature
+#define	__has_feature(x)	0
+#endif
+
+/*
+ * Macro to test if we're using a specific version of gcc or later.
+ */
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+#define __GNUC_PREREQ__(ma, mi) \
+	(__GNUC__ > (ma) || __GNUC__ == (ma) && __GNUC_MINOR__ >= (mi))
+#else
+#define __GNUC_PREREQ__(ma, mi) 0
+#endif
+
 #define	__FBSDID(s)
 
 #ifdef	__GNUC__
+#define	asm		__asm
 #define	inline		__inline
 
 #define	__GNUCLIKE___SECTION		1
@@ -55,5 +76,26 @@
 #define	__CONCAT(x,y)	x/**/y
 #define	__STRING(x)	"x"
 #endif	/* !(__STDC__ || __cplusplus) */
+
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 201112L || defined(lint)
+
+#if !__has_extension(c_static_assert)
+#if (defined(__cplusplus) && __cplusplus >= 201103L) || \
+    __has_extension(cxx_static_assert)
+#define _Static_assert(x, y)    static_assert(x, y)
+#elif __GNUC_PREREQ__(4,6)
+/* Nothing, gcc 4.6 and higher has _Static_assert built-in */
+#elif defined(__COUNTER__)
+#define _Static_assert(x, y)    __Static_assert(x, __COUNTER__)
+#define __Static_assert(x, y)   ___Static_assert(x, y)
+#define ___Static_assert(x, y)  typedef char __assert_ ## y[(x) ? 1 : -1] \
+                                __unused
+#else
+#define _Static_assert(x, y)    struct __hack
+#endif
+#endif
+#define	static_assert(x, y)	_Static_assert(x, y)
+
+#endif /* __STDC_VERSION__ || __STDC_VERSION__ < 201112L */
 
 #endif	/* _COMPAT_FREEBSD_SYS_CDEFS_H_ */

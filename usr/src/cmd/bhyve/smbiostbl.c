@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/smbiostbl.c 272007 2014-09-23 01:17:22Z grehan $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 
@@ -321,8 +321,8 @@ struct smbios_table_type0 smbios_type0_template = {
 
 const char *smbios_type0_strings[] = {
 	"BHYVE",	/* vendor string */
-	__TIME__,	/* bios version string */
-	__DATE__,	/* bios release date string */
+	"1.00",		/* bios version string */
+	"03/14/2014",	/* bios release date string */
 	NULL
 };
 

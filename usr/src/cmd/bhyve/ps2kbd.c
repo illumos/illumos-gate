@@ -93,17 +93,6 @@ fifo_reset(struct ps2kbd_softc *sc)
 	fifo->size = sizeof(((struct fifo *)0)->buf);
 }
 
-#if notyet
-static int
-fifo_available(struct ps2kbd_softc *sc)
-{
-	struct fifo *fifo;
-
-	fifo = &sc->fifo;
-	return (fifo->num < fifo->size);
-}
-#endif
-
 static void
 fifo_put(struct ps2kbd_softc *sc, uint8_t val)
 {
@@ -168,6 +157,9 @@ ps2kbd_write(struct ps2kbd_softc *sc, uint8_t val)
 		sc->curcmd = 0;
 	} else {
 		switch (val) {
+		case 0x00:
+			fifo_put(sc, PS2KC_ACK);
+			break;
 		case PS2KC_RESET_DEV:
 			fifo_reset(sc);
 			fifo_put(sc, PS2KC_ACK);
@@ -266,6 +258,12 @@ ps2kbd_keysym_queue(struct ps2kbd_softc *sc,
 			fifo_put(sc, 0xf0);
 		fifo_put(sc, 0x76);
 		break;
+	case 0xff50:	/* Home */
+		fifo_put(sc, 0xe0);
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x6c);
+		break;
 	case 0xff51:	/* Left arrow */
 		fifo_put(sc, 0xe0);
 		if (!down)
@@ -290,65 +288,35 @@ ps2kbd_keysym_queue(struct ps2kbd_softc *sc,
 			fifo_put(sc, 0xf0);
 		fifo_put(sc, 0x72);
 		break;
-	case 0xffbe:	/* F1 */
+	case 0xff55:	/* PgUp */
+		fifo_put(sc, 0xe0);
 		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x05);
+			fifo_put(sc, 0xf0);	
+		fifo_put(sc, 0x7d);
 		break;
-	case 0xffbf:	/* F2 */
+	case 0xff56:	/* PgDwn */
+		fifo_put(sc, 0xe0);
 		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x06);
+			fifo_put(sc, 0xf0);	
+		fifo_put(sc, 0x7a);
 		break;
-	case 0xffc0:	/* F3 */
+	case 0xff57:	/* End */
+		fifo_put(sc, 0xe0);
 		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x04);
+			fifo_put(sc, 0xf0);	
+		fifo_put(sc, 0x69);
 		break;
-	case 0xffc1:	/* F4 */
+	case 0xff63:	/* Ins */
+		fifo_put(sc, 0xe0);
 		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x0c);
+			fifo_put(sc, 0xf0);	
+		fifo_put(sc, 0x70);
 		break;
-	case 0xffc2:	/* F5 */
+	case 0xff8d:	/* Keypad Enter */
+		fifo_put(sc, 0xe0);
 		if (!down)
 			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x03);
-		break;
-	case 0xffc3:	/* F6 */
-		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x0b);
-		break;
-	case 0xffc4:	/* F7 */
-		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x83);
-		break;
-	case 0xffc5:	/* F8 */
-		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x0a);
-		break;
-	case 0xffc6:	/* F9 */
-		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x01);
-		break;
-	case 0xffc7:	/* F10 */
-		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x09);
-		break;
-	case 0xffc8:	/* F11 */
-		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x78);
-		break;
-	case 0xffc9:	/* F12 */
-		if (!down)
-			fifo_put(sc, 0xf0);
-		fifo_put(sc, 0x07);
+		fifo_put(sc, 0x5a);
 		break;
 	case 0xffe1:	/* Left shift */
 		if (!down)
@@ -356,7 +324,9 @@ ps2kbd_keysym_queue(struct ps2kbd_softc *sc,
 		fifo_put(sc, 0x12);
 		break;
 	case 0xffe2:	/* Right shift */
-		/* XXX */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x59);
 		break;
 	case 0xffe3:	/* Left control */
 		if (!down)
@@ -364,7 +334,10 @@ ps2kbd_keysym_queue(struct ps2kbd_softc *sc,
 		fifo_put(sc, 0x14);
 		break;
 	case 0xffe4:	/* Right control */
-		/* XXX */
+		fifo_put(sc, 0xe0);
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x14);
 		break;
 	case 0xffe7:	/* Left meta */
 		/* XXX */
@@ -377,8 +350,90 @@ ps2kbd_keysym_queue(struct ps2kbd_softc *sc,
 			fifo_put(sc, 0xf0);
 		fifo_put(sc, 0x11);
 		break;
+	case 0xfe03:	/* AltGr */
 	case 0xffea:	/* Right alt */
-		/* XXX */
+		fifo_put(sc, 0xe0);
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x11);
+		break;
+	case 0xffeb:	/* Left Windows */
+		fifo_put(sc, 0xe0);
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x1f);
+		break;
+	case 0xffec:	/* Right Windows */
+		fifo_put(sc, 0xe0);
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x27);
+		break;
+	case 0xffbe:    /* F1 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x05);
+		break;
+	case 0xffbf:    /* F2 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x06);
+		break;
+	case 0xffc0:    /* F3 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x04);
+		break;
+	case 0xffc1:    /* F4 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x0C);
+		break;
+	case 0xffc2:    /* F5 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x03);
+		break;
+	case 0xffc3:    /* F6 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x0B);
+		break;
+	case 0xffc4:    /* F7 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x83);
+		break;
+	case 0xffc5:    /* F8 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x0A);
+		break;
+	case 0xffc6:    /* F9 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x01);
+		break;
+	case 0xffc7:    /* F10 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x09);
+		break;
+	case 0xffc8:    /* F11 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x78);
+		break;
+	case 0xffc9:    /* F12 */
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x07);
+		break;
+	case 0xffff:    /* Del */
+		fifo_put(sc, 0xe0);
+		if (!down)
+			fifo_put(sc, 0xf0);
+		fifo_put(sc, 0x71);
 		break;
 	default:
 		fprintf(stderr, "Unhandled ps2 keyboard keysym 0x%x\n",
@@ -391,17 +446,19 @@ static void
 ps2kbd_event(int down, uint32_t keysym, void *arg)
 {
 	struct ps2kbd_softc *sc = arg;
+	int fifo_full;
 
 	pthread_mutex_lock(&sc->mtx);
 	if (!sc->enabled) {
 		pthread_mutex_unlock(&sc->mtx);
 		return;
 	}
-
+	fifo_full = sc->fifo.num == PS2KBD_FIFOSZ;
 	ps2kbd_keysym_queue(sc, down, keysym);
 	pthread_mutex_unlock(&sc->mtx);
 
-	atkbdc_event(sc->atkbdc_sc);
+	if (!fifo_full)
+		atkbdc_event(sc->atkbdc_sc, 1);
 }
 
 struct ps2kbd_softc *
@@ -414,7 +471,8 @@ ps2kbd_init(struct atkbdc_softc *atkbdc_sc)
 	fifo_init(sc);
 	sc->atkbdc_sc = atkbdc_sc;
 
-	console_kbd_register(ps2kbd_event, sc);
+	console_kbd_register(ps2kbd_event, sc, 1);
 
 	return (sc);
 }
+

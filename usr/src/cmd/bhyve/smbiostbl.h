@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/smbiostbl.h 262744 2014-03-04 17:12:06Z tychon $
+ * $FreeBSD$
  */
 
 #ifndef _SMBIOSTBL_H_

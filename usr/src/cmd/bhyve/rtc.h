@@ -23,12 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/rtc.h 253181 2013-07-11 03:54:35Z grehan $
+ * $FreeBSD$
  */
 
 #ifndef _RTC_H_
 #define _RTC_H_
 
-void	rtc_init(struct vmctx *ctx);
+void	rtc_init(struct vmctx *ctx, int use_localtime);
 
 #endif /* _RTC_H_ */

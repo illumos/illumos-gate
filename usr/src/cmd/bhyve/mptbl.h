@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/mptbl.h 257423 2013-10-31 05:44:45Z neel $
+ * $FreeBSD$
  */
 
 #ifndef _MPTBL_H_

@@ -155,6 +155,6 @@
 #define	DAC_IDX_WR_PORT			0x3c8
 #define	DAC_DATA_PORT			0x3c9
 
-int	vga_init(void);
+void	*vga_init(int io_only);
 
 #endif /* _VGA_H_ */

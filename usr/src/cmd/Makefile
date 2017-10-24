@@ -480,6 +480,8 @@ i386_SUBDIRS=		\
 	acpi		\
 	acpihpd		\
 	addbadsec	\
+	bhyve		\
+	bhyveconsole	\
 	bhyvectl	\
 	biosdev		\
 	diskscan	\

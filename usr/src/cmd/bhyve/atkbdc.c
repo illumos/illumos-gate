@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/atkbdc.c 267611 2014-06-18 17:20:02Z neel $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 
@@ -99,19 +99,21 @@ __FBSDID("$FreeBSD: head/usr.sbin/bhyve/atkbdc.c 267611 2014-06-18 17:20:02Z nee
 #define	KBDO_AUX_OUTFULL	0x20
 
 #define	RAMSZ			32
+#define	FIFOSZ			15
+#define	CTRL_CMD_FLAG		0x8000
 
 struct kbd_dev {
 	bool	irq_active;
 	int	irq;
 
-	uint8_t	buffer;
+	uint8_t	buffer[FIFOSZ];
+	int	brd, bwr;
+	int	bcnt;
 };
 
 struct aux_dev {
 	bool	irq_active;
 	int	irq;
-
-	uint8_t	buffer;
 };
 
 struct atkbdc_softc {
@@ -126,6 +128,7 @@ struct atkbdc_softc {
 	uint8_t	ram[RAMSZ];	/* byte0 = controller config */
 
 	uint32_t curcmd;	/* current command for next byte */
+	uint32_t  ctrlbyte;
 
 	struct kbd_dev kbd;
 	struct aux_dev aux;
@@ -134,72 +137,37 @@ struct atkbdc_softc {
 static void
 atkbdc_assert_kbd_intr(struct atkbdc_softc *sc)
 {
-	if (!sc->kbd.irq_active &&
-	    (sc->ram[0] & KBD_ENABLE_KBD_INT) != 0) {
+	if ((sc->ram[0] & KBD_ENABLE_KBD_INT) != 0) {
 		sc->kbd.irq_active = true;
-		vm_isa_assert_irq(sc->ctx, sc->kbd.irq, sc->kbd.irq);
-	}
-}
-
-static void
-atkbdc_deassert_kbd_intr(struct atkbdc_softc *sc)
-{
-	if (sc->kbd.irq_active) {
-		vm_isa_deassert_irq(sc->ctx, sc->kbd.irq, sc->kbd.irq);
-		sc->kbd.irq_active = false;
+		vm_isa_pulse_irq(sc->ctx, sc->kbd.irq, sc->kbd.irq);
 	}
 }
 
 static void
 atkbdc_assert_aux_intr(struct atkbdc_softc *sc)
 {
-	if (!sc->aux.irq_active &&
-	    (sc->ram[0] & KBD_ENABLE_AUX_INT) != 0) {
+	if ((sc->ram[0] & KBD_ENABLE_AUX_INT) != 0) {
 		sc->aux.irq_active = true;
-		vm_isa_assert_irq(sc->ctx, sc->aux.irq, sc->aux.irq);
+		vm_isa_pulse_irq(sc->ctx, sc->aux.irq, sc->aux.irq);
 	}
 }
 
-static void
-atkbdc_deassert_aux_intr(struct atkbdc_softc *sc)
-{
-	if (sc->aux.irq_active) {
-		vm_isa_deassert_irq(sc->ctx, sc->aux.irq, sc->aux.irq);
-		sc->aux.irq_active = false;
-	}
-}
-
-static void
-atkbdc_aux_queue_data(struct atkbdc_softc *sc, uint8_t val)
-{
-	assert(pthread_mutex_isowned_np(&sc->mtx));
-
-	sc->aux.buffer = val;
-	sc->status |= (KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL);
-	sc->outport |= KBDO_AUX_OUTFULL;
-	atkbdc_assert_aux_intr(sc);
-}
-
-static void
+static int
 atkbdc_kbd_queue_data(struct atkbdc_softc *sc, uint8_t val)
 {
 	assert(pthread_mutex_isowned_np(&sc->mtx));
 
-	sc->kbd.buffer = val;
-	sc->status |= KBDS_KBD_BUFFER_FULL;
-	sc->outport |= KBDO_KBD_OUTFULL;
-	atkbdc_assert_kbd_intr(sc);
-}
+	if (sc->kbd.bcnt < FIFOSZ) {
+		sc->kbd.buffer[sc->kbd.bwr] = val;
+		sc->kbd.bwr = (sc->kbd.bwr + 1) % FIFOSZ;
+		sc->kbd.bcnt++;
+		sc->status |= KBDS_KBD_BUFFER_FULL;
+		sc->outport |= KBDO_KBD_OUTFULL;
+	} else {
+		printf("atkbd data buffer full\n");
+	}
 
-static void
-atkbdc_aux_read(struct atkbdc_softc *sc)
-{
-	uint8_t val;
-
-        assert(pthread_mutex_isowned_np(&sc->mtx));
-
-	if (ps2mouse_read(sc->ps2mouse_sc, &val) != -1)
-		atkbdc_aux_queue_data(sc, val);
+	return (sc->kbd.bcnt < FIFOSZ);
 }
 
 static void
@@ -252,21 +220,31 @@ atkbdc_kbd_read(struct atkbdc_softc *sc)
 			} else {
 				val = translation[val] | release;
 			}
-
 			atkbdc_kbd_queue_data(sc, val);
 			break;
 		}
 	} else {
-		if (ps2kbd_read(sc->ps2kbd_sc, &val) != -1)
-			atkbdc_kbd_queue_data(sc, val);
+		while (sc->kbd.bcnt < FIFOSZ) {
+			if (ps2kbd_read(sc->ps2kbd_sc, &val) != -1)
+				atkbdc_kbd_queue_data(sc, val);
+			else
+				break;
+		}
 	}
+
+	if (((sc->ram[0] & KBD_DISABLE_AUX_PORT) ||
+	    ps2mouse_fifocnt(sc->ps2mouse_sc) == 0) && sc->kbd.bcnt > 0)
+		atkbdc_assert_kbd_intr(sc);
 }
 
 static void
 atkbdc_aux_poll(struct atkbdc_softc *sc)
 {
-	if ((sc->outport & KBDO_AUX_OUTFULL) == 0)
-		atkbdc_aux_read(sc);
+	if (ps2mouse_fifocnt(sc->ps2mouse_sc) > 0) {
+		sc->status |= KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL;
+		sc->outport |= KBDO_AUX_OUTFULL;
+		atkbdc_assert_aux_intr(sc);
+	}
 }
 
 static void
@@ -274,8 +252,7 @@ atkbdc_kbd_poll(struct atkbdc_softc *sc)
 {
 	assert(pthread_mutex_isowned_np(&sc->mtx));
 
-	if ((sc->outport & KBDO_KBD_OUTFULL) == 0)
-		atkbdc_kbd_read(sc);
+	atkbdc_kbd_read(sc);
 }
 
 static void
@@ -290,22 +267,35 @@ atkbdc_dequeue_data(struct atkbdc_softc *sc, uint8_t *buf)
 {
 	assert(pthread_mutex_isowned_np(&sc->mtx));
 
-	if (sc->outport & KBDO_AUX_OUTFULL) {
-		*buf = sc->aux.buffer;
-		sc->status &= ~(KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL);
-		sc->outport &= ~KBDO_AUX_OUTFULL;
-		atkbdc_deassert_aux_intr(sc);
+	if (ps2mouse_read(sc->ps2mouse_sc, buf) == 0) {
+		if (ps2mouse_fifocnt(sc->ps2mouse_sc) == 0) {
+			if (sc->kbd.bcnt == 0)
+				sc->status &= ~(KBDS_AUX_BUFFER_FULL |
+				                KBDS_KBD_BUFFER_FULL);
+			else
+				sc->status &= ~(KBDS_AUX_BUFFER_FULL);
+			sc->outport &= ~KBDO_AUX_OUTFULL;
+		}
 
 		atkbdc_poll(sc);
 		return;
 	}
 
-	*buf = sc->kbd.buffer;
-	sc->status &= ~KBDS_KBD_BUFFER_FULL;
-	sc->outport &= ~KBDO_KBD_OUTFULL;
-	atkbdc_deassert_kbd_intr(sc);
+	if (sc->kbd.bcnt > 0) {
+		*buf = sc->kbd.buffer[sc->kbd.brd];
+		sc->kbd.brd = (sc->kbd.brd + 1) % FIFOSZ;
+		sc->kbd.bcnt--;
+		if (sc->kbd.bcnt == 0) {
+			sc->status &= ~KBDS_KBD_BUFFER_FULL;
+			sc->outport &= ~KBDO_KBD_OUTFULL;
+		}
 
-	atkbdc_poll(sc);
+		atkbdc_poll(sc);
+	}
+
+	if (ps2mouse_fifocnt(sc->ps2mouse_sc) == 0 && sc->kbd.bcnt == 0) {
+		sc->status &= ~(KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL);
+	}
 }
 
 static int
@@ -318,19 +308,22 @@ atkbdc_data_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 
 	if (bytes != 1)
 		return (-1);
-
 	sc = arg;
 	retval = 0;
 
 	pthread_mutex_lock(&sc->mtx);
 	if (in) {
 		sc->curcmd = 0;
+		if (sc->ctrlbyte != 0) {
+			*eax = sc->ctrlbyte & 0xff;
+			sc->ctrlbyte = 0;
+		} else {
+			/* read device buffer; includes kbd cmd responses */
+			atkbdc_dequeue_data(sc, &buf);
+			*eax = buf;
+		}
+
 		sc->status &= ~KBDS_CTRL_FLAG;
-
-		/* read device buffer; includes kbd cmd responses */
-		atkbdc_dequeue_data(sc, &buf);
-		*eax = buf;
-
 		pthread_mutex_unlock(&sc->mtx);
 		return (retval);
 	}
@@ -345,29 +338,22 @@ atkbdc_data_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 			if (sc->ram[0] & KBD_SYS_FLAG_BIT)
 				sc->status |= KBDS_SYS_FLAG;
 			else
-				sc->status &= KBDS_SYS_FLAG;
-			if (sc->outport & KBDO_AUX_OUTFULL)
-				atkbdc_assert_aux_intr(sc);
-			else if (sc->outport & KBDO_KBD_OUTFULL)
-				atkbdc_assert_kbd_intr(sc);
+				sc->status &= ~KBDS_SYS_FLAG;
 			break;
 		case KBDC_WRITE_OUTPORT:
 			sc->outport = *eax;
-			if (sc->outport & KBDO_AUX_OUTFULL)
-				sc->status |= (KBDS_AUX_BUFFER_FULL |
-					       KBDS_KBD_BUFFER_FULL);
-			if (sc->outport & KBDO_KBD_OUTFULL)
-				sc->status |= KBDS_KBD_BUFFER_FULL;
 			break;
 		case KBDC_WRITE_TO_AUX:
-			ps2mouse_write(sc->ps2mouse_sc, *eax);
+			ps2mouse_write(sc->ps2mouse_sc, *eax, 0);
 			atkbdc_poll(sc);
 			break;
 		case KBDC_WRITE_KBD_OUTBUF:
 			atkbdc_kbd_queue_data(sc, *eax);
 			break;
 		case KBDC_WRITE_AUX_OUTBUF:
-			atkbdc_aux_queue_data(sc, *eax);
+			ps2mouse_write(sc->ps2mouse_sc, *eax, 1);
+			sc->status |= (KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL);
+			atkbdc_aux_poll(sc);
 			break;
 		default:
 			/* write to particular RAM byte */
@@ -398,16 +384,12 @@ atkbdc_data_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 	return (retval);
 }
 
-
 static int
 atkbdc_sts_ctl_handler(struct vmctx *ctx, int vcpu, int in, int port,
     int bytes, uint32_t *eax, void *arg)
 {
 	struct atkbdc_softc *sc;
-#ifdef	__FreeBSD__
-	int	error;
-#endif
-	int	retval;
+	int	error, retval;
 
 	if (bytes != 1)
 		return (-1);
@@ -424,25 +406,27 @@ atkbdc_sts_ctl_handler(struct vmctx *ctx, int vcpu, int in, int port,
 		return (retval);
 	}
 
+
 	sc->curcmd = 0;
 	sc->status |= KBDS_CTRL_FLAG;
+	sc->ctrlbyte = 0;
 
 	switch (*eax) {
 	case KBDC_GET_COMMAND_BYTE:
-		atkbdc_kbd_queue_data(sc, sc->ram[0]);
+		sc->ctrlbyte = CTRL_CMD_FLAG | sc->ram[0];
 		break;
 	case KBDC_TEST_CTRL:
-		atkbdc_kbd_queue_data(sc, 0x55);
+		sc->ctrlbyte = CTRL_CMD_FLAG | 0x55;
 		break;
 	case KBDC_TEST_AUX_PORT:
 	case KBDC_TEST_KBD_PORT:
-		atkbdc_kbd_queue_data(sc, 0);
+		sc->ctrlbyte = CTRL_CMD_FLAG | 0;
 		break;
 	case KBDC_READ_INPORT:
-		atkbdc_kbd_queue_data(sc, 0);
+		sc->ctrlbyte = CTRL_CMD_FLAG | 0;
 		break;
 	case KBDC_READ_OUTPORT:
-		atkbdc_kbd_queue_data(sc, sc->outport);
+		sc->ctrlbyte = CTRL_CMD_FLAG | sc->outport;
 		break;
 	case KBDC_SET_COMMAND_BYTE:
 	case KBDC_WRITE_OUTPORT:
@@ -455,6 +439,8 @@ atkbdc_sts_ctl_handler(struct vmctx *ctx, int vcpu, int in, int port,
 		break;
 	case KBDC_ENABLE_KBD_PORT:
 		sc->ram[0] &= ~KBD_DISABLE_KBD_PORT;
+		if (sc->kbd.bcnt > 0)
+			sc->status |= KBDS_KBD_BUFFER_FULL;
 		atkbdc_poll(sc);
 		break;
 	case KBDC_WRITE_TO_AUX:
@@ -462,17 +448,19 @@ atkbdc_sts_ctl_handler(struct vmctx *ctx, int vcpu, int in, int port,
 		break;
 	case KBDC_DISABLE_AUX_PORT:
 		sc->ram[0] |= KBD_DISABLE_AUX_PORT;
+		ps2mouse_toggle(sc->ps2mouse_sc, 0);
+		sc->status &= ~(KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL);
+		sc->outport &= ~KBDS_AUX_BUFFER_FULL;
 		break;
 	case KBDC_ENABLE_AUX_PORT:
 		sc->ram[0] &= ~KBD_DISABLE_AUX_PORT;
+		ps2mouse_toggle(sc->ps2mouse_sc, 1);
+		if (ps2mouse_fifocnt(sc->ps2mouse_sc) > 0)
+			sc->status |= KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL;
 		break;
 	case KBDC_RESET:		/* Pulse "reset" line */
-#ifdef	__FreeBSD__
 		error = vm_suspend(ctx, VM_SUSPEND_RESET);
 		assert(error == 0 || errno == EALREADY);
-#else
-		exit(0);
-#endif
 		break;
 	default:
 		if (*eax >= 0x21 && *eax <= 0x3f) {
@@ -480,21 +468,38 @@ atkbdc_sts_ctl_handler(struct vmctx *ctx, int vcpu, int in, int port,
 			int	byten;
 
 			byten = (*eax - 0x20) & 0x1f;
-			atkbdc_kbd_queue_data(sc, sc->ram[byten]);
+			sc->ctrlbyte = CTRL_CMD_FLAG | sc->ram[byten];
 		}
 		break;
 	}
 
 	pthread_mutex_unlock(&sc->mtx);
 
+	if (sc->ctrlbyte != 0) {
+		sc->status |= KBDS_KBD_BUFFER_FULL;
+		sc->status &= ~KBDS_AUX_BUFFER_FULL;
+		atkbdc_assert_kbd_intr(sc);
+	} else if (ps2mouse_fifocnt(sc->ps2mouse_sc) > 0 &&
+	           (sc->ram[0] & KBD_DISABLE_AUX_PORT) == 0) {
+		sc->status |= KBDS_AUX_BUFFER_FULL | KBDS_KBD_BUFFER_FULL;
+		atkbdc_assert_aux_intr(sc);
+	} else if (sc->kbd.bcnt > 0 && (sc->ram[0] & KBD_DISABLE_KBD_PORT) == 0) {
+		sc->status |= KBDS_KBD_BUFFER_FULL;
+		atkbdc_assert_kbd_intr(sc);
+	}
+
 	return (retval);
 }
 
 void
-atkbdc_event(struct atkbdc_softc *sc)
+atkbdc_event(struct atkbdc_softc *sc, int iskbd)
 {
 	pthread_mutex_lock(&sc->mtx);
-	atkbdc_poll(sc);
+
+	if (iskbd)
+		atkbdc_kbd_poll(sc);
+	else
+		atkbdc_aux_poll(sc);
 	pthread_mutex_unlock(&sc->mtx);
 }
 
@@ -542,7 +547,6 @@ atkbdc_init(struct vmctx *ctx)
 	sc->ps2mouse_sc = ps2mouse_init(sc);
 }
 
-#ifdef	__FreeBSD__
 static void
 atkbdc_dsdt(void)
 {
@@ -576,4 +580,4 @@ atkbdc_dsdt(void)
 	dsdt_line("}");
 }
 LPC_DSDT(atkbdc_dsdt);
-#endif
+

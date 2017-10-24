@@ -31,6 +31,6 @@
 
 #define	RFB_PORT	5900
 
-int	rfb_init(int port);
+int	rfb_init(char *hostname, int port, int wait);
 
 #endif /* _RFB_H_ */

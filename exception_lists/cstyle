@@ -1390,26 +1390,36 @@ usr/src/uts/intel/sys/acpi/platform/acwin64.h
 
 # bhyve sources
 syntax: glob
-usr/src/cmd/bhyve/acpi.h
+usr/src/cmd/bhyve/acpi.[ch]
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.[ch]
 usr/src/cmd/bhyve/bhyvegc.[ch]
 usr/src/cmd/bhyve/bhyverun.[ch]
 usr/src/cmd/bhyve/block_if.[ch]
+usr/src/cmd/bhyve/bootrom.[ch]
 usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/consport.c
-usr/src/cmd/bhyve/dbgport.h
+usr/src/cmd/bhyve/dbgport.[ch]
+usr/src/cmd/bhyve/fwctl.[ch]
 usr/src/cmd/bhyve/inout.[ch]
 usr/src/cmd/bhyve/ioapic.[ch]
 usr/src/cmd/bhyve/mem.[ch]
+usr/src/cmd/bhyve/mevent.[ch]
+usr/src/cmd/bhyve/mevent_test.c
 usr/src/cmd/bhyve/mptbl.[ch]
 usr/src/cmd/bhyve/pci_ahci.c
+usr/src/cmd/bhyve/pci_e82545.c
 usr/src/cmd/bhyve/pci_emul.[ch]
+usr/src/cmd/bhyve/pci_fbuf.c
 usr/src/cmd/bhyve/pci_hostbridge.c
 usr/src/cmd/bhyve/pci_irq.[ch]
 usr/src/cmd/bhyve/pci_lpc.[ch]
+usr/src/cmd/bhyve/pci_passthru.c
+usr/src/cmd/bhyve/pci_uart.c
 usr/src/cmd/bhyve/pci_virtio_block.c
 usr/src/cmd/bhyve/pci_virtio_net.c
+usr/src/cmd/bhyve/pci_virtio_rnd.c
+usr/src/cmd/bhyve/pci_xhci.[ch]
 usr/src/cmd/bhyve/pm.c
 usr/src/cmd/bhyve/pmtmr.c
 usr/src/cmd/bhyve/post.c
@@ -1418,8 +1428,12 @@ usr/src/cmd/bhyve/ps2mouse.[ch]
 usr/src/cmd/bhyve/rfb.[ch]
 usr/src/cmd/bhyve/rtc.[ch]
 usr/src/cmd/bhyve/smbiostbl.[ch]
+usr/src/cmd/bhyve/sockstream.[ch]
 usr/src/cmd/bhyve/spinup_ap.[ch]
+usr/src/cmd/bhyve/task_switch.c
 usr/src/cmd/bhyve/uart_emul.[ch]
+usr/src/cmd/bhyve/usb_emul.[ch]
+usr/src/cmd/bhyve/usb_mouse.c
 usr/src/cmd/bhyve/vga.[ch]
 usr/src/cmd/bhyve/virtio.[ch]
 usr/src/cmd/bhyve/xmsr.[ch]
@@ -1430,10 +1444,10 @@ usr/src/compat/freebsd/*/*.h
 usr/src/compat/freebsd/amd64/machine/*.h
 usr/contrib/freebsd/*/*.h
 usr/contrib/freebsd/*/*/*.h
-usr/contrib/freebsd/lib/libutil/expand_number.c
+usr/contrib/freebsd/lib/libutil/*.c
 usr/src/head/bhyve.h
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
-usr/src/uts/i86pc/io/vmm/amd/*.c
+usr/src/uts/i86pc/io/vmm/amd/*.[ch]
 usr/src/uts/i86pc/io/vmm/intel/*.[chs]
 usr/src/uts/i86pc/io/vmm/io/*.[ch]
 usr/src/uts/i86pc/io/vmm/vmm.c
@@ -1443,9 +1457,9 @@ usr/src/uts/i86pc/io/vmm/vmm_ioport.[ch]
 usr/src/uts/i86pc/io/vmm/vmm_ipi.h
 usr/src/uts/i86pc/io/vmm/vmm_ktr.h
 usr/src/uts/i86pc/io/vmm/vmm_lapic.[ch]
-usr/src/uts/i86pc/io/vmm/vmm_mem.h
+usr/src/uts/i86pc/io/vmm/vmm_mem.[ch]
 usr/src/uts/i86pc/io/vmm/vmm_sol_glue.c
-usr/src/uts/i86pc/io/vmm/vmm_stat.h
+usr/src/uts/i86pc/io/vmm/vmm_stat.[ch]
 usr/src/uts/i86pc/io/vmm/vmm_util.[ch]
 usr/src/uts/i86pc/io/vmm/vmx_assym.s
 usr/src/uts/i86pc/io/vmm/x86.[ch]

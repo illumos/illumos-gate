@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 Advanced Computing Technologies LLC
+ * Copyright (c) 2013 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -26,12 +26,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/pm.c 266125 2014-05-15 14:16:55Z jhb $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <machine/vmm.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <pthread.h>
 #ifndef	__FreeBSD__
 #include <stdlib.h>
@@ -63,6 +64,8 @@ static int
 reset_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
     uint32_t *eax, void *arg)
 {
+	int error;
+
 	static uint8_t reset_control;
 
 	if (bytes != 1)
@@ -74,12 +77,8 @@ reset_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 
 		/* Treat hard and soft resets the same. */
 		if (reset_control & 0x4) {
-#ifdef	__FreeBSD__
 			error = vm_suspend(ctx, VM_SUSPEND_RESET);
 			assert(error == 0 || errno == EALREADY);
-#else
-			exit(0);
-#endif
 		}
 	}
 	return (0);
@@ -239,6 +238,7 @@ static int
 pm1_control_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
     uint32_t *eax, void *arg)
 {
+	int error;
 
 	if (bytes != 2)
 		return (-1);
@@ -259,12 +259,8 @@ pm1_control_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 		 */
 		if (*eax & PM1_SLP_EN) {
 			if ((pm1_control & PM1_SLP_TYP) >> 10 == 5) {
-#ifdef	__FreeBSD__
 				error = vm_suspend(ctx, VM_SUSPEND_POWEROFF);
 				assert(error == 0 || errno == EALREADY);
-#else
-				exit(0);
-#endif
 			}
 		}
 	}

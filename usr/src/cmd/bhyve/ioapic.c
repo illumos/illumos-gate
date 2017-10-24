@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Advanced Computing Technologies LLC
+ * Copyright (c) 2014 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/ioapic.c 261268 2014-01-29 14:56:48Z jhb $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 

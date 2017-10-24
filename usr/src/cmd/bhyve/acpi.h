@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/acpi.h 266125 2014-05-15 14:16:55Z jhb $
+ * $FreeBSD$
  */
 
 #ifndef _ACPI_H_

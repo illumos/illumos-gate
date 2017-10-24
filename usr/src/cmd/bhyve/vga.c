@@ -24,6 +24,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2017 Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -161,10 +165,10 @@ struct vga_softc {
 	 */
 	struct {
 		uint8_t		dac_state;
-		int		dac_rd_index;
-		int		dac_rd_subindex;
-		int		dac_wr_index;
-		int		dac_wr_subindex;
+		uint8_t		dac_rd_index;
+		uint8_t		dac_rd_subindex;
+		uint8_t		dac_wr_index;
+		uint8_t		dac_wr_subindex;
 		uint8_t		dac_palette[3 * 256];
 		uint32_t	dac_palette_rgb[256];
 	} vga_dac;
@@ -187,8 +191,10 @@ vga_check_size(struct bhyvegc *gc, struct vga_softc *sc)
 	if (vga_in_reset(sc))
 		return;
 
-	old_width = sc->gc_width;
-	old_height = sc->gc_height;
+	//old_width = sc->gc_width;
+	//old_height = sc->gc_height;
+	old_width = sc->gc_image->width;
+	old_height = sc->gc_image->height;
 
 	/*
 	 * Horizontal Display End: For text modes this is the number
@@ -263,7 +269,7 @@ vga_get_text_pixel(struct vga_softc *sc, int x, int y)
 	offset = 2 * sc->vga_crtc.crtc_start_addr;
 	offset += (y / 16 * sc->gc_width / dots) * 2 + (x / dots) * 2;
 
-	bit = 7 - (x % dots);
+	bit = 7 - (x % dots > 7 ? 7 : x % dots);
 
 	ch = sc->vga_ram[offset + 0 * 64*KB];
 	attr = sc->vga_ram[offset + 1 * 64*KB];
@@ -291,7 +297,7 @@ vga_get_text_pixel(struct vga_softc *sc, int x, int y)
 
 	font = sc->vga_ram[font_offset + 2 * 64*KB];
 
-	if ((bit > 0) && (font & (1 << bit)))
+	if (font & (1 << bit))
 		idx = sc->vga_atc.atc_palette[attr & 0xf];
 	else
 		idx = sc->vga_atc.atc_palette[attr >> 4];
@@ -314,7 +320,7 @@ vga_render_text(struct vga_softc *sc)
 	}
 }
 
-static void
+void
 vga_render(struct bhyvegc *gc, void *arg)
 {
 	struct vga_softc *sc = arg;
@@ -858,6 +864,7 @@ vga_port_in_handler(struct vmctx *ctx, int in, int port, int bytes,
 			assert(0);
 			break;
 		}
+		break;
 	case DAC_DATA_PORT:
 		*val = sc->vga_dac.dac_palette[3 * sc->vga_dac.dac_rd_index +
 					       sc->vga_dac.dac_rd_subindex];
@@ -914,15 +921,33 @@ vga_port_in_handler(struct vmctx *ctx, int in, int port, int bytes,
 	case GEN_INPUT_STS1_MONO_PORT:
 	case GEN_INPUT_STS1_COLOR_PORT:
 		sc->vga_atc.atc_flipflop = 0;
+#ifdef __FreeBSD__
+		sc->vga_sts1 = GEN_IS1_VR | GEN_IS1_DE;
+		//sc->vga_sts1 ^= (GEN_IS1_VR | GEN_IS1_DE);
+#else
+		/*
+		 * During the bhyve bring-up process, a guest image was failing
+		 * to successfully boot.  It appeared to be spinning, waiting
+		 * for this value to be toggled.  Until it can be ruled out
+		 * that this is unnecessary (and documentation seems to
+		 * indicate that it should be present),  the toggle should
+		 * remain.
+		 */
 		sc->vga_sts1 ^= (GEN_IS1_VR | GEN_IS1_DE);
+#endif
 		*val = sc->vga_sts1;
 		break;
 	case GEN_FEATURE_CTRL_PORT:
-		assert(0);
+		// OpenBSD calls this with bytes = 1
+		//assert(0);
+		*val = 0;
+		break;
+	case 0x3c3:
+		*val = 0;
 		break;
 	default:
 		printf("XXX vga_port_in_handler() unhandled port 0x%x\n", port);
-		assert(0);
+		//assert(0);
 		return (-1);
 	}
 
@@ -1095,7 +1120,8 @@ vga_port_out_handler(struct vmctx *ctx, int in, int port, int bytes,
 			break;
 		case SEQ_MEMORY_MODE:
 			sc->vga_seq.seq_mm = val;
-			assert((sc->vga_seq.seq_mm & SEQ_MM_C4) == 0);
+			/* Windows queries Chain4 */
+			//assert((sc->vga_seq.seq_mm & SEQ_MM_C4) == 0);
 			break;
 		default:
 			//printf("XXX VGA SEQ: outb 0x%04x, 0x%02x at index %d\n", port, val, sc->vga_seq.seq_index);
@@ -1161,6 +1187,9 @@ vga_port_out_handler(struct vmctx *ctx, int in, int port, int bytes,
 			sc->vga_gc.gc_mode_oe = (val & GC_MODE_OE) != 0;
 			sc->vga_gc.gc_mode_rm = (val >> 3) & 0x1;
 			sc->vga_gc.gc_mode_wm = val & 0x3;
+
+			if (sc->gc_image)
+				sc->gc_image->vgamode = 1;
 			break;
 		case GC_MISCELLANEOUS:
 			sc->vga_gc.gc_misc = val;
@@ -1188,8 +1217,10 @@ vga_port_out_handler(struct vmctx *ctx, int in, int port, int bytes,
 	case GEN_INPUT_STS1_COLOR_PORT:
 		/* write to Feature Control Register */
 		break;
+//	case 0x3c3:
+//		break;
 	default:
-		printf("XXX vga_port_out_handler() unhandled port 0x%x\n", port);
+		printf("XXX vga_port_out_handler() unhandled port 0x%x, val 0x%x\n", port, val);
 		//assert(0);
 		return (-1);
 	}
@@ -1248,8 +1279,8 @@ vga_port_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 	return (error);
 }
 
-int
-vga_init(void)
+void *
+vga_init(int io_only)
 {
 	struct inout_port iop;
 	struct vga_softc *sc;
@@ -1270,6 +1301,12 @@ vga_init(void)
 		assert(error == 0);
 	}
 
+	sc->gc_image = console_get_image();
+
+	/* only handle io ports; vga graphics is disabled */
+	if (io_only)
+		return(sc);
+
 	sc->mr.name = "VGA memory";
 	sc->mr.flags = MEM_F_RW;
 	sc->mr.base = 640 * KB;
@@ -1282,8 +1319,29 @@ vga_init(void)
 	sc->vga_ram = malloc(256 * KB);
 	memset(sc->vga_ram, 0, 256 * KB);
 
-	sc->gc_image = console_get_image();
-	console_fb_register(vga_render, sc);
+	{
+		static uint8_t palette[] = {
+			0x00,0x00,0x00, 0x00,0x00,0x2a, 0x00,0x2a,0x00, 0x00,0x2a,0x2a,
+			0x2a,0x00,0x00, 0x2a,0x00,0x2a, 0x2a,0x2a,0x00, 0x2a,0x2a,0x2a,
+			0x00,0x00,0x15, 0x00,0x00,0x3f, 0x00,0x2a,0x15, 0x00,0x2a,0x3f,
+			0x2a,0x00,0x15, 0x2a,0x00,0x3f, 0x2a,0x2a,0x15, 0x2a,0x2a,0x3f,
+		};
+		int i;
 
-	return (0);
+		memcpy(sc->vga_dac.dac_palette, palette, 16 * 3 * sizeof (uint8_t));
+		for (i = 0; i < 16; i++) {
+			sc->vga_dac.dac_palette_rgb[i] =
+				((((sc->vga_dac.dac_palette[3*i + 0] << 2) |
+				   ((sc->vga_dac.dac_palette[3*i + 0] & 0x1) << 1) |
+				   (sc->vga_dac.dac_palette[3*i + 0] & 0x1)) << 16) |
+				 (((sc->vga_dac.dac_palette[3*i + 1] << 2) |
+				   ((sc->vga_dac.dac_palette[3*i + 1] & 0x1) << 1) |
+				   (sc->vga_dac.dac_palette[3*i + 1] & 0x1)) << 8) |
+				 (((sc->vga_dac.dac_palette[3*i + 2] << 2) |
+				   ((sc->vga_dac.dac_palette[3*i + 2] & 0x1) << 1) |
+				   (sc->vga_dac.dac_palette[3*i + 2] & 0x1)) << 0));
+		}
+	}
+
+	return (sc);
 }

@@ -40,15 +40,23 @@ static struct {
 
 	kbd_event_func_t	kbd_event_cb;
 	void			*kbd_arg;
+	int			kbd_priority;
 
 	ptr_event_func_t	ptr_event_cb;
 	void			*ptr_arg;
+	int			ptr_priority;
 } console;
 
 void
-console_init(void)
+console_init(int w, int h, void *fbaddr)
 {
-	console.gc = bhyvegc_init(640, 400);
+	console.gc = bhyvegc_init(w, h, fbaddr);
+}
+
+void
+console_set_fbaddr(void *fbaddr)
+{
+	bhyvegc_set_fbaddr(console.gc, fbaddr);
 }
 
 struct bhyvegc_image *
@@ -71,31 +79,40 @@ console_fb_register(fb_render_func_t render_cb, void *arg)
 void
 console_refresh(void)
 {
-	(*console.fb_render_cb)(console.gc, console.fb_arg);
+	if (console.fb_render_cb)
+		(*console.fb_render_cb)(console.gc, console.fb_arg);
 }
 
 void
-console_kbd_register(kbd_event_func_t event_cb, void *arg)
+console_kbd_register(kbd_event_func_t event_cb, void *arg, int pri)
 {
-	console.kbd_event_cb = event_cb;
-	console.kbd_arg = arg;
+	if (pri > console.kbd_priority) {
+		console.kbd_event_cb = event_cb;
+		console.kbd_arg = arg;
+		console.kbd_priority = pri;
+	}
 }
 
 void
-console_ptr_register(ptr_event_func_t event_cb, void *arg)
+console_ptr_register(ptr_event_func_t event_cb, void *arg, int pri)
 {
-	console.ptr_event_cb = event_cb;
-	console.ptr_arg = arg;
+	if (pri > console.ptr_priority) {
+		console.ptr_event_cb = event_cb;
+		console.ptr_arg = arg;
+		console.ptr_priority = pri;
+	}
 }
 
 void
 console_key_event(int down, uint32_t keysym)
 {
-	(*console.kbd_event_cb)(down, keysym, console.kbd_arg);
+	if (console.kbd_event_cb)
+		(*console.kbd_event_cb)(down, keysym, console.kbd_arg);
 }
 
 void
 console_ptr_event(uint8_t button, int x, int y)
 {
-	(*console.ptr_event_cb)(button, x, y, console.ptr_arg);
+	if (console.ptr_event_cb)
+		(*console.ptr_event_cb)(button, x, y, console.ptr_arg);
 }

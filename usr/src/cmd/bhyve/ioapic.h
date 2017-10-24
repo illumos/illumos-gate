@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Advanced Computing Technologies LLC
+ * Copyright (c) 2014 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
  *
@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/ioapic.h 261268 2014-01-29 14:56:48Z jhb $
+ * $FreeBSD$
  */
 
 #ifndef _IOAPIC_H_

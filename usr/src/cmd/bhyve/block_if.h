@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/block_if.h 268638 2014-07-15 00:25:54Z grehan $
+ * $FreeBSD$
  */
 
 /*
@@ -40,15 +40,16 @@
 #include <sys/unistd.h>
 
 #ifdef	__FreeBSD__
-#define BLOCKIF_IOV_MAX		32	/* not practical to be IOV_MAX */
+#define BLOCKIF_IOV_MAX		33	/* not practical to be IOV_MAX */
 #else
-#define BLOCKIF_IOV_MAX		16	/* not practical to be IOV_MAX */
+#define BLOCKIF_IOV_MAX		17	/* not practical to be IOV_MAX */
 #endif
 
 struct blockif_req {
 	struct iovec	br_iov[BLOCKIF_IOV_MAX];
 	int		br_iovcnt;
 	off_t		br_offset;
+	ssize_t		br_resid;
 	void		(*br_callback)(struct blockif_req *req, int err);
 	void		*br_param;
 };
@@ -59,11 +60,14 @@ off_t	blockif_size(struct blockif_ctxt *bc);
 void	blockif_chs(struct blockif_ctxt *bc, uint16_t *c, uint8_t *h,
     uint8_t *s);
 int	blockif_sectsz(struct blockif_ctxt *bc);
+void	blockif_psectsz(struct blockif_ctxt *bc, int *size, int *off);
 int	blockif_queuesz(struct blockif_ctxt *bc);
 int	blockif_is_ro(struct blockif_ctxt *bc);
+int	blockif_candelete(struct blockif_ctxt *bc);
 int	blockif_read(struct blockif_ctxt *bc, struct blockif_req *breq);
 int	blockif_write(struct blockif_ctxt *bc, struct blockif_req *breq);
 int	blockif_flush(struct blockif_ctxt *bc, struct blockif_req *breq);
+int	blockif_delete(struct blockif_ctxt *bc, struct blockif_req *breq);
 int	blockif_cancel(struct blockif_ctxt *bc, struct blockif_req *breq);
 int	blockif_close(struct blockif_ctxt *bc);
 

@@ -23,11 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/post.c 260206 2014-01-02 21:26:59Z jhb $
+ * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/post.c 260206 2014-01-02 21:26:59Z jhb $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 

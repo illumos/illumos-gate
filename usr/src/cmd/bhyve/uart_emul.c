@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/usr.sbin/bhyve/uart_emul.c 257293 2013-10-29 00:18:11Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -41,10 +41,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/usr.sbin/bhyve/uart_emul.c 257293 2013-10-29 00:18:11Z neel $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <dev/ic/ns16550.h>
+#ifndef WITHOUT_CAPSICUM
+#include <sys/capsicum.h>
+#endif
 
 #ifndef	__FreeBSD__
 #include <sys/socket.h>
@@ -53,11 +56,15 @@ __FBSDID("$FreeBSD: head/usr.sbin/bhyve/uart_emul.c 257293 2013-10-29 00:18:11Z 
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <err.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <string.h>
 #include <pthread.h>
+#include <sysexits.h>
 #ifndef	__FreeBSD__
 #include <errno.h>
 #include <fcntl.h>
@@ -96,6 +103,8 @@ __FBSDID("$FreeBSD: head/usr.sbin/bhyve/uart_emul.c 257293 2013-10-29 00:18:11Z 
 #define	FIFOSZ	16
 
 static bool uart_stdio;		/* stdio in use for i/o */
+static struct termios tio_stdio_orig;
+
 #ifndef	__FreeBSD__
 static bool uart_bcons;		/* bhyveconsole in use for i/o */
 #endif
@@ -119,6 +128,12 @@ struct fifo {
 	int	size;		/* size of the fifo */
 };
 
+struct ttyfd {
+	bool	opened;
+	int	fd;		/* tty device file descriptor */
+	struct termios tio_orig, tio_new;    /* I/O Terminals */
+};
+
 struct uart_softc {
 	pthread_mutex_t mtx;	/* protects all softc elements */
 	uint8_t data;		/* Data register (R/W) */
@@ -134,9 +149,11 @@ struct uart_softc {
 	uint8_t dlh;		/* Baudrate divisor latch MSB */
 
 	struct fifo rxfifo;
+#ifdef	__FreeBSD__
+	struct mevent *mev;
+#endif
 
-	bool	opened;
-	bool	stdio;
+	struct ttyfd tty;
 #ifndef	__FreeBSD__
 	bool	bcons;
 	struct {
@@ -160,63 +177,46 @@ static void uart_tty_drain(struct uart_softc *sc);
 static int uart_bcons_drain(struct uart_softc *sc);
 #endif
 
-static struct termios tio_orig, tio_new;	/* I/O Terminals */
-
 static void
 ttyclose(void)
 {
 
-	tcsetattr(STDIN_FILENO, TCSANOW, &tio_orig);
+	tcsetattr(STDIN_FILENO, TCSANOW, &tio_stdio_orig);
 }
 
 static void
-ttyopen(void)
+ttyopen(struct ttyfd *tf)
 {
 
-	tcgetattr(STDIN_FILENO, &tio_orig);
+	tcgetattr(tf->fd, &tf->tio_orig);
 
-	tio_new = tio_orig;
-	cfmakeraw(&tio_new);
-	tcsetattr(STDIN_FILENO, TCSANOW, &tio_new);
+	tf->tio_new = tf->tio_orig;
+	cfmakeraw(&tf->tio_new);
+	tf->tio_new.c_cflag |= CLOCAL;
+	tcsetattr(tf->fd, TCSANOW, &tf->tio_new);
 
-	atexit(ttyclose);
-}
-
-static bool
-tty_char_available(void)
-{
-	fd_set rfds;
-	struct timeval tv;
-
-	FD_ZERO(&rfds);
-	FD_SET(STDIN_FILENO, &rfds);
-	tv.tv_sec = 0;
-	tv.tv_usec = 0;
-	if (select(STDIN_FILENO + 1, &rfds, NULL, NULL, &tv) > 0 ) {
-		return (true);
-	} else {
-		return (false);
+	if (tf->fd == STDIN_FILENO) {
+		tio_stdio_orig = tf->tio_orig;
+		atexit(ttyclose);
 	}
 }
 
 static int
-ttyread(void)
+ttyread(struct ttyfd *tf)
 {
-	char rb;
+	unsigned char rb;
 
-	if (tty_char_available()) {
-		read(STDIN_FILENO, &rb, 1);
-		return (rb & 0xff);
-	} else {
+	if (read(tf->fd, &rb, 1) == 1)
+		return (rb);
+	else
 		return (-1);
-	}
 }
 
 static void
-ttywrite(unsigned char wb)
+ttywrite(struct ttyfd *tf, unsigned char wb)
 {
 
-	(void)write(STDIN_FILENO, &wb, 1);
+	(void)write(tf->fd, &wb, 1);
 }
 
 #ifndef	__FreeBSD__
@@ -228,67 +228,156 @@ bconswrite(struct uart_softc *sc, unsigned char wb)
 #endif
 
 static void
-fifo_reset(struct fifo *fifo, int size)
+rxfifo_reset(struct uart_softc *sc, int size)
 {
+	char flushbuf[32];
+	struct fifo *fifo;
+	ssize_t nread;
+#ifdef	__FreeBSD__
+	int error;
+#endif
+ 
+	fifo = &sc->rxfifo;
 	bzero(fifo, sizeof(struct fifo));
 	fifo->size = size;
+
+	if (sc->tty.opened) {
+		/*
+		 * Flush any unread input from the tty buffer.
+		 */
+		while (1) {
+			nread = read(sc->tty.fd, flushbuf, sizeof(flushbuf));
+			if (nread != sizeof(flushbuf))
+				break;
+		}
+
+#ifdef	__FreeBSD__
+		/*
+		 * Enable mevent to trigger when new characters are available
+		 * on the tty fd.
+		 */
+		error = mevent_enable(sc->mev);
+		assert(error == 0);
+#endif
+	}
 }
 
 static int
-fifo_putchar(struct fifo *fifo, uint8_t ch)
+rxfifo_available(struct uart_softc *sc)
 {
+	struct fifo *fifo;
+
+	fifo = &sc->rxfifo;
+	return (fifo->num < fifo->size);
+}
+
+static int
+rxfifo_putchar(struct uart_softc *sc, uint8_t ch)
+{
+	struct fifo *fifo;
+#ifdef	__FreeBSD__
+	int error;
+#endif
+
+	fifo = &sc->rxfifo;
 
 	if (fifo->num < fifo->size) {
 		fifo->buf[fifo->windex] = ch;
 		fifo->windex = (fifo->windex + 1) % fifo->size;
 		fifo->num++;
+		if (!rxfifo_available(sc)) {
+			if (sc->tty.opened) {
+#ifdef	__FreeBSD__
+				/*
+				 * Disable mevent callback if the FIFO is full.
+				 */
+				error = mevent_disable(sc->mev);
+				assert(error == 0);
+#endif
+			}
+		}
 		return (0);
 	} else
 		return (-1);
 }
 
 static int
-fifo_getchar(struct fifo *fifo)
+rxfifo_getchar(struct uart_softc *sc)
 {
-	int c;
+	struct fifo *fifo;
+	int c, wasfull;
+#ifdef	__FreeBSD__
+	int error;
+#endif
 
+	wasfull = 0;
+	fifo = &sc->rxfifo;
 	if (fifo->num > 0) {
+		if (!rxfifo_available(sc))
+			wasfull = 1;
 		c = fifo->buf[fifo->rindex];
 		fifo->rindex = (fifo->rindex + 1) % fifo->size;
 		fifo->num--;
+		if (wasfull) {
+			if (sc->tty.opened) {
+#ifdef	__FreeBSD__
+				error = mevent_enable(sc->mev);
+				assert(error == 0);
+#endif
+			}
+		}
 		return (c);
 	} else
 		return (-1);
 }
 
 static int
-fifo_numchars(struct fifo *fifo)
+rxfifo_numchars(struct uart_softc *sc)
 {
+	struct fifo *fifo = &sc->rxfifo;
 
 	return (fifo->num);
-}
-
-static int
-fifo_available(struct fifo *fifo)
-{
-
-	return (fifo->num < fifo->size);
 }
 
 static void
 uart_opentty(struct uart_softc *sc)
 {
+	ttyopen(&sc->tty);
 #ifdef	__FreeBSD__
-	struct mevent *mev;
+	sc->mev = mevent_add(sc->tty.fd, EVF_READ, uart_drain, sc);
+	assert(sc->mev != NULL);
 #endif
+}
 
-	assert(!sc->opened && sc->stdio);
+static uint8_t
+modem_status(uint8_t mcr)
+{
+	uint8_t msr;
 
-	ttyopen();
-#ifdef	__FreeBSD__
-	mev = mevent_add(STDIN_FILENO, EVF_READ, uart_drain, sc);
-	assert(mev);
-#endif
+	if (mcr & MCR_LOOPBACK) {
+		/*
+		 * In the loopback mode certain bits from the MCR are
+		 * reflected back into MSR.
+		 */
+		msr = 0;
+		if (mcr & MCR_RTS)
+			msr |= MSR_CTS;
+		if (mcr & MCR_DTR)
+			msr |= MSR_DSR;
+		if (mcr & MCR_OUT1)
+			msr |= MSR_RI;
+		if (mcr & MCR_OUT2)
+			msr |= MSR_DCD;
+	} else {
+		/*
+		 * Always assert DCD and DSR so tty open doesn't block
+		 * even if CLOCAL is turned off.
+		 */
+		msr = MSR_DCD | MSR_DSR;
+	}
+	assert((msr & MSR_DELTA_MASK) == 0);
+
+	return (msr);
 }
 
 /*
@@ -305,7 +394,7 @@ uart_intr_reason(struct uart_softc *sc)
 
 	if ((sc->lsr & LSR_OE) != 0 && (sc->ier & IER_ERLS) != 0)
 		return (IIR_RLS);
-	else if (fifo_numchars(&sc->rxfifo) > 0 && (sc->ier & IER_ERXRDY) != 0)
+	else if (rxfifo_numchars(sc) > 0 && (sc->ier & IER_ERXRDY) != 0)
 		return (IIR_RXTOUT);
 	else if (sc->thre_int_pending && (sc->ier & IER_ETXRDY) != 0)
 		return (IIR_TXRDY);
@@ -323,8 +412,9 @@ uart_reset(struct uart_softc *sc)
 	divisor = DEFAULT_RCLK / DEFAULT_BAUD / 16;
 	sc->dll = divisor;
 	sc->dlh = divisor >> 16;
+	sc->msr = modem_status(sc->mcr);
 
-	fifo_reset(&sc->rxfifo, 1);	/* no fifo until enabled by software */
+	rxfifo_reset(sc, 1);	/* no fifo until enabled by software */
 }
 
 /*
@@ -353,7 +443,7 @@ uart_drain(int fd, enum ev_type ev, void *arg)
 
 	sc = arg;
 
-	assert(fd == STDIN_FILENO);
+	assert(fd == sc->tty.fd);
 	assert(ev == EVF_READ);
 
 	/*
@@ -364,11 +454,11 @@ uart_drain(int fd, enum ev_type ev, void *arg)
 	pthread_mutex_lock(&sc->mtx);
 
 	if ((sc->mcr & MCR_LOOPBACK) != 0) {
-		(void) ttyread();
+		(void) ttyread(&sc->tty);
 	} else {
-		while (fifo_available(&sc->rxfifo) &&
-		       ((ch = ttyread()) != -1)) {
-			fifo_putchar(&sc->rxfifo, ch);
+		while (rxfifo_available(sc) &&
+		       ((ch = ttyread(&sc->tty)) != -1)) {
+			rxfifo_putchar(sc, ch);
 		}
 		uart_toggle_intr(sc);
 	}
@@ -388,11 +478,11 @@ uart_tty_drain(struct uart_softc *sc)
 	pthread_mutex_lock(&sc->mtx);
 
 	if ((sc->mcr & MCR_LOOPBACK) != 0) {
-		(void) ttyread();
+		(void) ttyread(&sc->tty);
 	} else {
-		while (fifo_available(&sc->rxfifo) &&
-		       ((ch = ttyread()) != -1)) {
-			fifo_putchar(&sc->rxfifo, ch);
+		while (rxfifo_available(sc) &&
+		       ((ch = ttyread(&sc->tty)) != -1)) {
+			rxfifo_putchar(sc, ch);
 		}
 		uart_toggle_intr(sc);
 	}
@@ -431,8 +521,8 @@ uart_bcons_drain(struct uart_softc *sc)
 				break;
 			}
 
-			if (fifo_available(&sc->rxfifo)) {
-				fifo_putchar(&sc->rxfifo, ch);
+			if (rxfifo_available(sc)) {
+				rxfifo_putchar(sc, ch);
 			}
 		}
 		uart_toggle_intr(sc);
@@ -452,12 +542,6 @@ uart_write(struct uart_softc *sc, int offset, uint8_t value)
 
 	pthread_mutex_lock(&sc->mtx);
 
-	/* Open terminal */
-	if (!sc->opened && sc->stdio) {
-		uart_opentty(sc);
-		sc->opened = true;
-	}
-
 	/*
 	 * Take care of the special case DLAB accesses first
 	 */
@@ -476,10 +560,10 @@ uart_write(struct uart_softc *sc, int offset, uint8_t value)
         switch (offset) {
 	case REG_DATA:
 		if (sc->mcr & MCR_LOOPBACK) {
-			if (fifo_putchar(&sc->rxfifo, value) != 0)
+			if (rxfifo_putchar(sc, value) != 0)
 				sc->lsr |= LSR_OE;
-		} else if (sc->stdio) {
-			ttywrite(value);
+		} else if (sc->tty.opened) {
+			ttywrite(&sc->tty, value);
 #ifndef	__FreeBSD__
 		} else if (sc->bcons) {
 				bconswrite(sc, value);
@@ -501,7 +585,7 @@ uart_write(struct uart_softc *sc, int offset, uint8_t value)
 			 */
 			if ((sc->fcr & FCR_ENABLE) ^ (value & FCR_ENABLE)) {
 				fifosz = (value & FCR_ENABLE) ? FIFOSZ : 1;
-				fifo_reset(&sc->rxfifo, fifosz);
+				rxfifo_reset(sc, fifosz);
 			}
 
 			/*
@@ -512,7 +596,7 @@ uart_write(struct uart_softc *sc, int offset, uint8_t value)
 				sc->fcr = 0;
 			} else {
 				if ((value & FCR_RCV_RST) != 0)
-					fifo_reset(&sc->rxfifo, FIFOSZ);
+					rxfifo_reset(sc, FIFOSZ);
 
 				sc->fcr = value &
 					 (FCR_ENABLE | FCR_DMA | FCR_RX_MASK);
@@ -524,22 +608,7 @@ uart_write(struct uart_softc *sc, int offset, uint8_t value)
 		case REG_MCR:
 			/* Apply mask so that bits 5-7 are 0 */
 			sc->mcr = value & 0x1F;
-
-			msr = 0;
-			if (sc->mcr & MCR_LOOPBACK) {
-				/*
-				 * In the loopback mode certain bits from the
-				 * MCR are reflected back into MSR
-				 */
-				if (sc->mcr & MCR_RTS)
-					msr |= MSR_CTS;
-				if (sc->mcr & MCR_DTR)
-					msr |= MSR_DSR;
-				if (sc->mcr & MCR_OUT1)
-					msr |= MSR_RI;
-				if (sc->mcr & MCR_OUT2)
-					msr |= MSR_DCD;
-			}
+			msr = modem_status(sc->mcr);
 
 			/*
 			 * Detect if there has been any change between the
@@ -592,12 +661,6 @@ uart_read(struct uart_softc *sc, int offset)
 
 	pthread_mutex_lock(&sc->mtx);
 
-	/* Open terminal */
-	if (!sc->opened && sc->stdio) {
-		uart_opentty(sc);
-		sc->opened = true;
-	}
-
 	/*
 	 * Take care of the special case DLAB accesses first
 	 */
@@ -615,7 +678,7 @@ uart_read(struct uart_softc *sc, int offset)
 
 	switch (offset) {
 	case REG_DATA:
-		reg = fifo_getchar(&sc->rxfifo);
+		reg = rxfifo_getchar(sc);
 		break;
 	case REG_IER:
 		reg = sc->ier;
@@ -646,7 +709,7 @@ uart_read(struct uart_softc *sc, int offset)
 		sc->lsr |= LSR_TEMT | LSR_THRE;
 
 		/* Check for new receive data */
-		if (fifo_numchars(&sc->rxfifo) > 0)
+		if (rxfifo_numchars(sc) > 0)
 			sc->lsr |= LSR_RXRDY;
 		else
 			sc->lsr &= ~LSR_RXRDY;
@@ -685,7 +748,7 @@ uart_tty_thread(void *param)
 	struct uart_softc *sc = param;
 	pollfd_t pollset;
 
-	pollset.fd = STDIN_FILENO;
+	pollset.fd = sc->tty.fd;
 	pollset.events = POLLIN | POLLPRI | POLLRDNORM | POLLRDBAND;
 
 	for (;;) {
@@ -983,8 +1046,7 @@ uart_init(uart_intr_func_t intr_assert, uart_intr_func_t intr_deassert,
 {
 	struct uart_softc *sc;
 
-	sc = malloc(sizeof(struct uart_softc));
-	bzero(sc, sizeof(struct uart_softc));
+	sc = calloc(1, sizeof(struct uart_softc));
 
 	sc->arg = arg;
 	sc->intr_assert = intr_assert;
@@ -997,32 +1059,51 @@ uart_init(uart_intr_func_t intr_assert, uart_intr_func_t intr_deassert,
 	return (sc);
 }
 
+static int
+uart_tty_backend(struct uart_softc *sc, const char *opts)
+{
+	int fd;
+	int retval;
+
+	retval = -1;
+
+	fd = open(opts, O_RDWR | O_NONBLOCK);
+	if (fd > 0 && isatty(fd)) {
+		sc->tty.fd = fd;
+		sc->tty.opened = true;
+		retval = 0;
+	}
+
+	return (retval);
+}
+
 int
 uart_set_backend(struct uart_softc *sc, const char *opts)
 {
 #ifndef	__FreeBSD__
 	int error;
 #endif
-	/*
-	 * XXX one stdio backend supported at this time.
-	 */
+	int retval;
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_t rights;
+	cap_ioctl_t cmds[] = { TIOCGETA, TIOCSETA, TIOCGWINSZ };
+	cap_ioctl_t sicmds[] = { TIOCGETA, TIOCGWINSZ };
+#endif
+
+	retval = -1;
+
 	if (opts == NULL)
 		return (0);
 
-#ifdef	__FreeBSD__
-	if (strcmp("stdio", opts) == 0 && !uart_stdio) {
-		sc->stdio = true;
-		uart_stdio = true;
-		return (0);
-#else
-	if (strcmp("stdio", opts) == 0 && !uart_stdio && !uart_bcons) {
-		sc->stdio = true;
-		uart_stdio = true;
-
-		error = pthread_create(NULL, NULL, uart_tty_thread, sc);
-		assert(error == 0);
-
-		return (0);
+	if (strcmp("stdio", opts) == 0) {
+		if (!uart_stdio && !uart_bcons) {
+			sc->tty.fd = STDIN_FILENO;
+			sc->tty.opened = true;
+			uart_stdio = true;
+			retval = 0;
+		}
+	} else if (uart_tty_backend(sc, opts) == 0) {
+		retval = 0;
 	} else if (strstr(opts, "bcons") != 0 && !uart_stdio && !uart_bcons) {
 		sc->bcons = true;
 		uart_bcons= true;
@@ -1041,7 +1122,36 @@ uart_set_backend(struct uart_softc *sc, const char *opts)
 		assert(error == 0);
 
 		return (0);
+	}
+
+	/* Make the backend file descriptor non-blocking */
+	if (retval == 0)
+		retval = fcntl(sc->tty.fd, F_SETFL, O_NONBLOCK);
+
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_init(&rights, CAP_EVENT, CAP_IOCTL, CAP_READ, CAP_WRITE);
+	if (cap_rights_limit(sc->tty.fd, &rights) == -1 && errno != ENOSYS)
+		errx(EX_OSERR, "Unable to apply rights for sandbox");
+	if (cap_ioctls_limit(sc->tty.fd, cmds, nitems(cmds)) == -1 && errno != ENOSYS)
+		errx(EX_OSERR, "Unable to apply rights for sandbox");
+	if (!uart_stdio) {
+		cap_rights_init(&rights, CAP_FCNTL, CAP_FSTAT, CAP_IOCTL, CAP_READ);
+		if (cap_rights_limit(STDIN_FILENO, &rights) == -1 && errno != ENOSYS)
+			errx(EX_OSERR, "Unable to apply rights for sandbox");
+		if (cap_ioctls_limit(STDIN_FILENO, sicmds, nitems(sicmds)) == -1 && errno != ENOSYS)
+			errx(EX_OSERR, "Unable to apply rights for sandbox");
+		if (cap_fcntls_limit(STDIN_FILENO, CAP_FCNTL_GETFL) == -1 && errno != ENOSYS)
+			errx(EX_OSERR, "Unable to apply rights for sandbox");
+	}
 #endif
-	} else
-		return (-1);
+
+	if (retval == 0) {
+		uart_opentty(sc);
+#ifndef	__FreeBSD__
+		error = pthread_create(NULL, NULL, uart_tty_thread, sc);
+		assert(error == 0);
+#endif
+	}
+
+	return (retval);
 }
