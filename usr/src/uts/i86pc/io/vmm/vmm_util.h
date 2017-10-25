@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_util.h 245678 2013-01-20 03:42:49Z neel $
+ * $FreeBSD$
  */
 
 #ifndef _VMM_UTIL_H_

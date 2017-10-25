@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_ktr.h 258699 2013-11-27 22:18:08Z neel $
+ * $FreeBSD$
  */
 
 #ifndef _VMM_KTR_H_

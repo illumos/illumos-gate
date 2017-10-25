@@ -23,19 +23,40 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/intel/vmcs.h 276098 2014-12-23 02:14:49Z neel $
+ * $FreeBSD$
+ */
+
+/*
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _VMCS_H_
 #define	_VMCS_H_
 
 #ifdef _KERNEL
+#ifndef _ASM
 struct vmcs {
 	uint32_t	identifier;
 	uint32_t	abort_code;
 	char		_impl_specific[PAGE_SIZE - sizeof(uint32_t) * 2];
+#ifndef __FreeBSD__
+	/*
+	 * Keep the physical address of the VMCS cached adjacent for the
+	 * structure so it can be referenced in contexts which are too delicate
+	 * for a call into the HAT.  For the moment it means wasting a whole
+	 * page on padding for the PA value to maintain alignment, but it
+	 * allows the consumers of 'struct vmcs *' to easily access the value
+	 * without a significant change to the interface.
+	 */
+	uint64_t	vmcs_pa;
+	char		_pa_pad[PAGE_SIZE - sizeof (vm_paddr_t)];
+#endif
 };
+#ifdef __FreeBSD__
 CTASSERT(sizeof(struct vmcs) == PAGE_SIZE);
+#else
+CTASSERT(sizeof(struct vmcs) == (2*PAGE_SIZE));
+#endif
 
 /* MSR save region is composed of an array of 'struct msr_entry' */
 struct msr_entry {
@@ -47,15 +68,6 @@ struct msr_entry {
 
 int vmcs_set_msr_save(struct vmcs *vmcs, u_long g_area, u_int g_count);
 int	vmcs_init(struct vmcs *vmcs);
-#ifndef	__FreeBSD__
-int vmcs_set_host_msr_save(struct vmcs *vmcs, u_long h_area, u_int h_count);
-#endif
-int	vmcs_set_defaults(struct vmcs *vmcs, u_long host_rip, u_long host_rsp,
-			  u_long ept_pml4,
-			  uint32_t pinbased_ctls, uint32_t procbased_ctls,
-			  uint32_t procbased_ctls2, uint32_t exit_ctls,
-			  uint32_t entry_ctls, u_long msr_bitmap,
-			  uint16_t vpid);
 int	vmcs_getreg(struct vmcs *vmcs, int running, int ident, uint64_t *rv);
 int	vmcs_setreg(struct vmcs *vmcs, int running, int ident, uint64_t val);
 int	vmcs_getdesc(struct vmcs *vmcs, int running, int ident,
@@ -86,6 +98,65 @@ vmcs_write(uint32_t encoding, uint64_t val)
 	error = vmwrite(encoding, val);
 	KASSERT(error == 0, ("vmcs_write(%u) error %d", encoding, error));
 }
+
+#ifndef __FreeBSD__
+/*
+ * Due to header complexity combined with the need to cache the physical
+ * address for the VMCS, these must be defined here rather than vmx_cpufunc.h.
+ */
+static __inline int
+vmclear(struct vmcs *vmcs)
+{
+	int error;
+	uint64_t addr = vmcs->vmcs_pa;
+
+	__asm __volatile("vmclear %[addr];"
+			 VMX_SET_ERROR_CODE
+			 : [error] "=r" (error)
+			 : [addr] "m" (*(uint64_t *)&addr)
+			 : "memory");
+	return (error);
+}
+
+static __inline int
+vmptrld(struct vmcs *vmcs)
+{
+	int error;
+	uint64_t addr = vmcs->vmcs_pa;
+
+	__asm __volatile("vmptrld %[addr];"
+			 VMX_SET_ERROR_CODE
+			 : [error] "=r" (error)
+			 : [addr] "m" (*(uint64_t *)&addr)
+			 : "memory");
+	return (error);
+}
+
+static __inline void
+VMCLEAR(struct vmcs *vmcs)
+{
+	int err;
+
+	err = vmclear(vmcs);
+	if (err != 0)
+		panic("%s: vmclear(%p) error %d", __func__, vmcs, err);
+
+	critical_exit();
+}
+
+static __inline void
+VMPTRLD(struct vmcs *vmcs)
+{
+	int err;
+
+	critical_enter();
+
+	err = vmptrld(vmcs);
+	if (err != 0)
+		panic("%s: vmptrld(%p) error %d", __func__, vmcs, err);
+}
+#endif /* __FreeBSD__ */
+
 #endif	/* _VMX_CPUFUNC_H_ */
 
 #define	vmexit_instruction_length()	vmcs_read(VMCS_EXIT_INSTRUCTION_LENGTH)
@@ -99,6 +170,7 @@ vmcs_write(uint32_t encoding, uint64_t val)
 #define	vmcs_idt_vectoring_info()	vmcs_read(VMCS_IDT_VECTORING_INFO)
 #define	vmcs_idt_vectoring_err()	vmcs_read(VMCS_IDT_VECTORING_ERROR)
 
+#endif	/* _ASM */
 #endif	/* _KERNEL */
 
 #define	VMCS_INITIAL			0xffffffffffffffff

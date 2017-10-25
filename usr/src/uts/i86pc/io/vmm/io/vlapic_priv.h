@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/io/vlapic_priv.h 263211 2014-03-15 23:09:34Z tychon $
+ * $FreeBSD$
  */
 
 #ifndef _VLAPIC_PRIV_H_

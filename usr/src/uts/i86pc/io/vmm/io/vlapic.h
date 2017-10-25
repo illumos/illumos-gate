@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/io/vlapic.h 262281 2014-02-21 06:03:54Z neel $
+ * $FreeBSD$
  */
 
 #ifndef _VLAPIC_H_

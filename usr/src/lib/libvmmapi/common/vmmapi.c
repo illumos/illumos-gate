@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/lib/libvmmapi/vmmapi.c 280929 2015-04-01 00:15:31Z tychon $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/lib/libvmmapi/vmmapi.c 280929 2015-04-01 00:15:31Z tychon $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/sysctl.h>
@@ -48,11 +48,10 @@ __FBSDID("$FreeBSD: head/lib/libvmmapi/vmmapi.c 280929 2015-04-01 00:15:31Z tych
 #include <sys/_iovec.h>
 #include <sys/cpuset.h>
 
+#include <x86/segments.h>
 #include <machine/specialreg.h>
 
-#ifndef	__FreeBSD__
 #include <errno.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -70,23 +69,32 @@ __FBSDID("$FreeBSD: head/lib/libvmmapi/vmmapi.c 280929 2015-04-01 00:15:31Z tych
 
 #include "vmmapi.h"
 
-#define	KB	(1024UL)
 #define	MB	(1024 * 1024UL)
 #define	GB	(1024 * 1024 * 1024UL)
+
+#ifndef __FreeBSD__
+/* shim to no-op for now */
+#define MAP_NOCORE 0
+#define MAP_ALIGNED_SUPER 0
+#endif
+
+/*
+ * Size of the guard region before and after the virtual address space
+ * mapping the guest physical memory. This must be a multiple of the
+ * superpage size for performance reasons.
+ */
+#define	VM_MMAP_GUARD_SIZE	(4 * MB)
+
+#define	PROT_RW		(PROT_READ | PROT_WRITE)
+#define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
 
 struct vmctx {
 	int	fd;
 	uint32_t lowmem_limit;
-	enum vm_mmap_style vms;
-	char	*lowermem_addr;
-	char	*biosmem_addr;
+	int	memflags;
 	size_t	lowmem;
-	char	*lowmem_addr;
 	size_t	highmem;
-	char	*highmem_addr;
-	uint64_t rombase;
-	uint64_t romlimit;
-	char	*rom_addr;
+	char	*baseaddr;
 	char	*name;
 };
 
@@ -94,8 +102,32 @@ struct vmctx {
 #define	CREATE(x)  sysctlbyname("hw.vmm.create", NULL, NULL, (x), strlen((x)))
 #define	DESTROY(x) sysctlbyname("hw.vmm.destroy", NULL, NULL, (x), strlen((x)))
 #else
-#define	CREATE(x)	vmm_vm_create(x)
-#define	DESTROY(x)	vmm_vm_destroy(x)
+#define	CREATE(x)	vm_do_ctl(VMM_CREATE_VM, (x))
+#define	DESTROY(x)	vm_do_ctl(VMM_DESTROY_VM, (x))
+
+static int
+vm_do_ctl(int cmd, const char *name)
+{
+	const char vmm_ctl[] = "/devices/pseudo/vmm@0:ctl";
+	int ctl_fd;
+
+	ctl_fd = open(vmm_ctl, O_EXCL | O_RDWR);
+	if (ctl_fd < 0) {
+		return (-1);
+	}
+
+	if (ioctl(ctl_fd, cmd, name) == -1) {
+		int err = errno;
+
+		/* Do not lose ioctl errno through the close(2) */
+		(void) close(ctl_fd);
+		errno = err;
+		return (-1);
+	}
+	(void) close(ctl_fd);
+
+	return (0);
+}
 #endif
 
 static int
@@ -124,39 +156,6 @@ vm_device_open(const char *name)
         return (fd);
 }
 
-#ifndef	__FreeBSD__
-static int
-vmm_vm_create(const char *name)
-{
-	const char vmm_ctl[] = "/devices/pseudo/vmm@0:ctl";
-	struct vmm_ioctl vi;
-	int err = 0;
-	int ctl_fd;
-
-	(void) strlcpy(vi.vmm_name, name, sizeof (vi.vmm_name) - 1);
-
-	ctl_fd = open(vmm_ctl, O_EXCL | O_RDWR);
-	if (ctl_fd == -1) {
-		err = errno;
-		if ((errno == EPERM) || (errno == EACCES)) {
-			fprintf(stderr, "you do not have permission to "
-				"perform that operation.\n");
-		} else {
-			fprintf(stderr, "open: %s: %s\n", vmm_ctl,
-				strerror(errno));
-		}
-		return (err);
-	}
-	if (ioctl(ctl_fd, VMM_CREATE_VM, &vi) == -1) {
-		err = errno;
-		fprintf(stderr, "couldn't create vm \"%s\"", name);
-	}
-	close (ctl_fd);
-
-	return (err);
-}
-#endif
-
 int
 vm_create(const char *name)
 {
@@ -173,6 +172,7 @@ vm_open(const char *name)
 	assert(vm != NULL);
 
 	vm->fd = -1;
+	vm->memflags = 0;
 	vm->lowmem_limit = 3 * GB;
 	vm->name = (char *)(vm + 1);
 	strcpy(vm->name, name);
@@ -182,54 +182,20 @@ vm_open(const char *name)
 
 	return (vm);
 err:
-	(void) vm_destroy(vm);
+	vm_destroy(vm);
 	return (NULL);
 }
 
-#ifndef	__FreeBSD__
-static int
-vmm_vm_destroy(const char *name)
-{
-	const char vmm_ctl[] = "/devices/pseudo/vmm@0:ctl";
-	struct vmm_ioctl vi;	
-	int ctl_fd;
-	int err = 0;
-
-	(void) strlcpy(vi.vmm_name, name, sizeof (vi.vmm_name) - 1);
-
-	ctl_fd = open(vmm_ctl, O_EXCL | O_RDWR);
-	if (ctl_fd == -1) {
-		err = errno;
-		if ((errno == EPERM) || (errno == EACCES)) {
-			fprintf(stderr, "you do not have permission to "
-				"perform that operation.\n");
-		} else {
-			fprintf(stderr, "open: %s: %s\n", vmm_ctl,
-				strerror(errno));
-		}
-		return (err);
-	}
-	if (ioctl(ctl_fd, VMM_DESTROY_VM, &vi) == -1) {
-		err = errno;
-		fprintf(stderr, "couldn't destroy vm \"%s\"", name);
-	}
-	close (ctl_fd);
-	return (err);
-}
-#endif
-
-int
+void
 vm_destroy(struct vmctx *vm)
 {
-	int err;
 	assert(vm != NULL);
 
 	if (vm->fd >= 0)
 		close(vm->fd);
-	err = DESTROY(vm->name);
+	DESTROY(vm->name);
 
 	free(vm);
-	return (err);
 }
 
 int
@@ -256,48 +222,6 @@ vm_parse_memsize(const char *optarg, size_t *ret_memsize)
 	return (error);
 }
 
-#ifdef	__FreeBSD__
-size_t
-vmm_get_mem_total(void)
-{
-	size_t mem_total = 0;
-	size_t oldlen = sizeof(mem_total);
-	int error;
-	error = sysctlbyname("hw.vmm.mem_total", &mem_total, &oldlen, NULL, 0);
-	if (error)
-		return -1;
-	return mem_total;
-}
-
-size_t
-vmm_get_mem_free(void)
-{
-	size_t mem_free = 0;
-	size_t oldlen = sizeof(mem_free);
-	int error;
-	error = sysctlbyname("hw.vmm.mem_free", &mem_free, &oldlen, NULL, 0);
-	if (error)
-		return -1;
-	return mem_free;
-}
-#endif
-
-int
-vm_get_memory_seg(struct vmctx *ctx, vm_paddr_t gpa, size_t *ret_len,
-		  int *wired)
-{
-	int error;
-	struct vm_memory_segment seg;
-
-	bzero(&seg, sizeof(seg));
-	seg.gpa = gpa;
-	error = ioctl(ctx->fd, VM_GET_MEMORY_SEG, &seg);
-	*ret_len = seg.len;
-	if (wired != NULL)
-		*wired = seg.wired;
-	return (error);
-}
-
 uint32_t
 vm_get_lowmem_limit(struct vmctx *ctx)
 {
@@ -312,36 +236,191 @@ vm_set_lowmem_limit(struct vmctx *ctx, uint32_t limit)
 	ctx->lowmem_limit = limit;
 }
 
-static int
-setup_memory_segment(struct vmctx *ctx, vm_paddr_t gpa, size_t len, char **addr)
+void
+vm_set_memflags(struct vmctx *ctx, int flags)
 {
-	int error;
-	struct vm_memory_segment seg;
+
+	ctx->memflags = flags;
+}
+
+int
+vm_get_memflags(struct vmctx *ctx)
+{
+
+	return (ctx->memflags);
+}
+
+/*
+ * Map segment 'segid' starting at 'off' into guest address range [gpa,gpa+len).
+ */
+int
+vm_mmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, int segid, vm_ooffset_t off,
+    size_t len, int prot)
+{
+	struct vm_memmap memmap;
+	int error, flags;
+
+	memmap.gpa = gpa;
+	memmap.segid = segid;
+	memmap.segoff = off;
+	memmap.len = len;
+	memmap.prot = prot;
+	memmap.flags = 0;
+
+	if (ctx->memflags & VM_MEM_F_WIRED)
+		memmap.flags |= VM_MEMMAP_F_WIRED;
 
 	/*
-	 * Create and optionally map 'len' bytes of memory at guest
-	 * physical address 'gpa'
+	 * If this mapping already exists then don't create it again. This
+	 * is the common case for SYSMEM mappings created by bhyveload(8).
 	 */
-	bzero(&seg, sizeof(seg));
-	seg.gpa = gpa;
-	seg.len = len;
-	error = ioctl(ctx->fd, VM_MAP_MEMORY, &seg);
-	if (error == 0 && addr != NULL) {
-		*addr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED,
-				ctx->fd, gpa);
+	error = vm_mmap_getnext(ctx, &gpa, &segid, &off, &len, &prot, &flags);
+	if (error == 0 && gpa == memmap.gpa) {
+		if (segid != memmap.segid || off != memmap.segoff ||
+		    prot != memmap.prot || flags != memmap.flags) {
+			errno = EEXIST;
+			return (-1);
+		} else {
+			return (0);
+		}
+	}
+
+	error = ioctl(ctx->fd, VM_MMAP_MEMSEG, &memmap);
+	return (error);
+}
+
+int
+vm_mmap_getnext(struct vmctx *ctx, vm_paddr_t *gpa, int *segid,
+    vm_ooffset_t *segoff, size_t *len, int *prot, int *flags)
+{
+	struct vm_memmap memmap;
+	int error;
+
+	bzero(&memmap, sizeof(struct vm_memmap));
+	memmap.gpa = *gpa;
+	error = ioctl(ctx->fd, VM_MMAP_GETNEXT, &memmap);
+	if (error == 0) {
+		*gpa = memmap.gpa;
+		*segid = memmap.segid;
+		*segoff = memmap.segoff;
+		*len = memmap.len;
+		*prot = memmap.prot;
+		*flags = memmap.flags;
 	}
 	return (error);
+}
+
+/*
+ * Return 0 if the segments are identical and non-zero otherwise.
+ *
+ * This is slightly complicated by the fact that only device memory segments
+ * are named.
+ */
+static int
+cmpseg(size_t len, const char *str, size_t len2, const char *str2)
+{
+
+	if (len == len2) {
+		if ((!str && !str2) || (str && str2 && !strcmp(str, str2)))
+			return (0);
+	}
+	return (-1);
+}
+
+static int
+vm_alloc_memseg(struct vmctx *ctx, int segid, size_t len, const char *name)
+{
+	struct vm_memseg memseg;
+	size_t n;
+	int error;
+
+	/*
+	 * If the memory segment has already been created then just return.
+	 * This is the usual case for the SYSMEM segment created by userspace
+	 * loaders like bhyveload(8).
+	 */
+	error = vm_get_memseg(ctx, segid, &memseg.len, memseg.name,
+	    sizeof(memseg.name));
+	if (error)
+		return (error);
+
+	if (memseg.len != 0) {
+		if (cmpseg(len, name, memseg.len, VM_MEMSEG_NAME(&memseg))) {
+			errno = EINVAL;
+			return (-1);
+		} else {
+			return (0);
+		}
+	}
+
+	bzero(&memseg, sizeof(struct vm_memseg));
+	memseg.segid = segid;
+	memseg.len = len;
+	if (name != NULL) {
+		n = strlcpy(memseg.name, name, sizeof(memseg.name));
+		if (n >= sizeof(memseg.name)) {
+			errno = ENAMETOOLONG;
+			return (-1);
+		}
+	}
+
+	error = ioctl(ctx->fd, VM_ALLOC_MEMSEG, &memseg);
+	return (error);
+}
+
+int
+vm_get_memseg(struct vmctx *ctx, int segid, size_t *lenp, char *namebuf,
+    size_t bufsize)
+{
+	struct vm_memseg memseg;
+	size_t n;
+	int error;
+
+	memseg.segid = segid;
+	error = ioctl(ctx->fd, VM_GET_MEMSEG, &memseg);
+	if (error == 0) {
+		*lenp = memseg.len;
+		n = strlcpy(namebuf, memseg.name, bufsize);
+		if (n >= bufsize) {
+			errno = ENAMETOOLONG;
+			error = -1;
+		}
+	}
+	return (error);
+}
+
+static int
+setup_memory_segment(struct vmctx *ctx, vm_paddr_t gpa, size_t len, char *base)
+{
+	char *ptr;
+	int error, flags;
+
+	/* Map 'len' bytes starting at 'gpa' in the guest address space */
+	error = vm_mmap_memseg(ctx, gpa, VM_SYSMEM, gpa, len, PROT_ALL);
+	if (error)
+		return (error);
+
+	flags = MAP_SHARED | MAP_FIXED;
+	if ((ctx->memflags & VM_MEM_F_INCORE) == 0)
+		flags |= MAP_NOCORE;
+
+	/* mmap into the process address space on the host */
+	ptr = mmap(base + gpa, len, PROT_RW, flags, ctx->fd, gpa);
+	if (ptr == MAP_FAILED)
+		return (-1);
+
+	return (0);
 }
 
 int
 vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 {
-	char **addr;
-	int error;
+	size_t objsize, len;
+	vm_paddr_t gpa;
+	char *baseaddr, *ptr;
+	int error, flags;
 
-	/* XXX VM_MMAP_SPARSE not implemented yet */
-	assert(vms == VM_MMAP_NONE || vms == VM_MMAP_ALL);
-	ctx->vms = vms;
+	assert(vms == VM_MMAP_ALL);
 
 	/*
 	 * If 'memsize' cannot fit entirely in the 'lowmem' segment then
@@ -349,81 +428,74 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	 */
 	if (memsize > ctx->lowmem_limit) {
 		ctx->lowmem = ctx->lowmem_limit;
-		ctx->highmem = memsize - ctx->lowmem;
+		ctx->highmem = memsize - ctx->lowmem_limit;
+		objsize = 4*GB + ctx->highmem;
 	} else {
 		ctx->lowmem = memsize;
 		ctx->highmem = 0;
+		objsize = ctx->lowmem;
+	}
+
+	error = vm_alloc_memseg(ctx, VM_SYSMEM, objsize, NULL);
+	if (error)
+		return (error);
+
+	/*
+	 * Stake out a contiguous region covering the guest physical memory
+	 * and the adjoining guard regions.
+	 */
+	len = VM_MMAP_GUARD_SIZE + objsize + VM_MMAP_GUARD_SIZE;
+	flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE | MAP_ALIGNED_SUPER;
+	ptr = mmap(NULL, len, PROT_NONE, flags, -1, 0);
+	if (ptr == MAP_FAILED)
+		return (-1);
+
+	baseaddr = ptr + VM_MMAP_GUARD_SIZE;
+	if (ctx->highmem > 0) {
+		gpa = 4*GB;
+		len = ctx->highmem;
+		error = setup_memory_segment(ctx, gpa, len, baseaddr);
+		if (error)
+			return (error);
 	}
 
 	if (ctx->lowmem > 0) {
-		addr = (vms == VM_MMAP_ALL) ? &ctx->lowermem_addr : NULL;
-		error = setup_memory_segment(ctx, 0, 640*KB, addr);
-		if (error)
-			return (error);
-
-		addr = (vms == VM_MMAP_ALL) ? &ctx->biosmem_addr : NULL;
-		error = setup_memory_segment(ctx, 768*KB, 256*KB, addr);
-		if (error)
-			return (error);
-
-		addr = (vms == VM_MMAP_ALL) ? &ctx->lowmem_addr : NULL;
-		error = setup_memory_segment(ctx, 1*MB, ctx->lowmem - 1*MB, addr);
+		gpa = 0;
+		len = ctx->lowmem;
+		error = setup_memory_segment(ctx, gpa, len, baseaddr);
 		if (error)
 			return (error);
 	}
 
-	if (ctx->highmem > 0) {
-		addr = (vms == VM_MMAP_ALL) ? &ctx->highmem_addr : NULL;
-		error = setup_memory_segment(ctx, 4*GB, ctx->highmem, addr);
-		if (error)
-			return (error);
-	}
+	ctx->baseaddr = baseaddr;
 
 	return (0);
 }
 
-int
-vm_setup_rom(struct vmctx *ctx, vm_paddr_t gpa, size_t len)
-{
-	ctx->rombase = gpa;
-	ctx->romlimit = gpa + len;
-
-	return (setup_memory_segment(ctx, gpa, len, &ctx->rom_addr));
-}
-
+/*
+ * Returns a non-NULL pointer if [gaddr, gaddr+len) is entirely contained in
+ * the lowmem or highmem regions.
+ *
+ * In particular return NULL if [gaddr, gaddr+len) falls in guest MMIO region.
+ * The instruction emulation code depends on this behavior.
+ */
 void *
 vm_map_gpa(struct vmctx *ctx, vm_paddr_t gaddr, size_t len)
 {
 
-	/* XXX VM_MMAP_SPARSE not implemented yet */
-	assert(ctx->vms == VM_MMAP_ALL);
+	if (ctx->lowmem > 0) {
+		if (gaddr < ctx->lowmem && len <= ctx->lowmem &&
+		    gaddr + len <= ctx->lowmem)
+			return (ctx->baseaddr + gaddr);
+	}
 
-	if (gaddr + len <= 1*MB) {
-		if (gaddr + len <= 640*KB)
-			return ((void *)(ctx->lowermem_addr + gaddr));
-
-		if (768*KB <= gaddr && gaddr + len <= 1*MB) {
-			gaddr -= 768*KB;
-			return ((void *)(ctx->biosmem_addr + gaddr));
+	if (ctx->highmem > 0) {
+                if (gaddr >= 4*GB) {
+			if (gaddr < 4*GB + ctx->highmem &&
+			    len <= ctx->highmem &&
+			    gaddr + len <= 4*GB + ctx->highmem)
+				return (ctx->baseaddr + gaddr);
 		}
-
-		return (NULL);
-	}
-
-	if (gaddr < ctx->lowmem && gaddr + len <= ctx->lowmem) {
-		gaddr -= 1*MB;
-		return ((void *)(ctx->lowmem_addr + gaddr));
-	}
-
-	if (ctx->rombase <= gaddr && gaddr + len <= ctx->romlimit) {
-		gaddr -= ctx->rombase;
-		return ((void *)(ctx->rom_addr + gaddr));
-	}
-
-	if (gaddr >= 4*GB) {
-		gaddr -= 4*GB;
-		if (gaddr < ctx->highmem && gaddr + len <= ctx->highmem)
-			return ((void *)(ctx->highmem_addr + gaddr));
 	}
 
 	return (NULL);
@@ -441,6 +513,79 @@ vm_get_highmem_size(struct vmctx *ctx)
 {
 
 	return (ctx->highmem);
+}
+
+void *
+vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
+{
+#ifdef	__FreeBSD__
+	char pathname[MAXPATHLEN];
+#endif
+	size_t len2;
+	char *base, *ptr;
+	int fd, error, flags;
+	off_t mapoff;
+
+	fd = -1;
+	ptr = MAP_FAILED;
+	if (name == NULL || strlen(name) == 0) {
+		errno = EINVAL;
+		goto done;
+	}
+
+	error = vm_alloc_memseg(ctx, segid, len, name);
+	if (error)
+		goto done;
+
+#ifdef	__FreeBSD__
+	strlcpy(pathname, "/dev/vmm.io/", sizeof(pathname));
+	strlcat(pathname, ctx->name, sizeof(pathname));
+	strlcat(pathname, ".", sizeof(pathname));
+	strlcat(pathname, name, sizeof(pathname));
+
+	fd = open(pathname, O_RDWR);
+	if (fd < 0)
+		goto done;
+#else
+	{
+		struct vm_devmem_offset vdo;
+
+		vdo.segid = segid;
+		error = ioctl(ctx->fd, VM_DEVMEM_GETOFFSET, &vdo);
+		if (error == 0) {
+			mapoff = vdo.offset;
+		} else {
+			goto done;
+		}
+	}
+#endif
+
+	/*
+	 * Stake out a contiguous region covering the device memory and the
+	 * adjoining guard regions.
+	 */
+	len2 = VM_MMAP_GUARD_SIZE + len + VM_MMAP_GUARD_SIZE;
+	flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE | MAP_ALIGNED_SUPER;
+	base = mmap(NULL, len2, PROT_NONE, flags, -1, 0);
+	if (base == MAP_FAILED)
+		goto done;
+
+	flags = MAP_SHARED | MAP_FIXED;
+	if ((ctx->memflags & VM_MEM_F_INCORE) == 0)
+		flags |= MAP_NOCORE;
+
+#ifdef	__FreeBSD__
+	/* mmap the devmem region in the host address space */
+	ptr = mmap(base + VM_MMAP_GUARD_SIZE, len, PROT_RW, flags, fd, 0);
+#else
+	/* mmap the devmem region in the host address space */
+	ptr = mmap(base + VM_MMAP_GUARD_SIZE, len, PROT_RW, flags, ctx->fd,
+	    mapoff);
+#endif
+done:
+	if (fd >= 0)
+		close(fd);
+	return (ptr);
 }
 
 int
@@ -535,23 +680,22 @@ vm_run(struct vmctx *ctx, int vcpu, struct vm_exit *vmexit)
 	return (error);
 }
 
-/* XXX: unused static */
-#if notyet
-static int
-vm_inject_exception_real(struct vmctx *ctx, int vcpu, int vector,
-    int error_code, int error_code_valid)
+int
+vm_suspend(struct vmctx *ctx, enum vm_suspend_how how)
 {
-	struct vm_exception exc;
+	struct vm_suspend vmsuspend;
 
-	bzero(&exc, sizeof(exc));
-	exc.cpuid = vcpu;
-	exc.vector = vector;
-	exc.error_code = error_code;
-	exc.error_code_valid = error_code_valid;
-
-	return (ioctl(ctx->fd, VM_INJECT_EXCEPTION, &exc));
+	bzero(&vmsuspend, sizeof(vmsuspend));
+	vmsuspend.how = how;
+	return (ioctl(ctx->fd, VM_SUSPEND, &vmsuspend));
 }
-#endif
+
+int
+vm_reinit(struct vmctx *ctx)
+{
+
+	return (ioctl(ctx->fd, VM_REINIT, 0));
+}
 
 int
 vm_inject_exception(struct vmctx *ctx, int vcpu, int vector, int errcode_valid,
@@ -861,7 +1005,6 @@ vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int bus, int slot, int func,
 	return ioctl(ctx->fd, VM_PPTDEV_MSIX, &pptmsix);
 }
 
-#ifdef	__FreeBSD__
 uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
 	     int *ret_entries)
@@ -872,7 +1015,7 @@ vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
 
 	vmstats.cpuid = vcpu;
 
-	error = ioctl(ctx->fd, VM_STATS, &vmstats);
+	error = ioctl(ctx->fd, VM_STATS_IOC, &vmstats);
 	if (error == 0) {
 		if (ret_entries)
 			*ret_entries = vmstats.num_entries;
@@ -894,7 +1037,6 @@ vm_get_stat_desc(struct vmctx *ctx, int index)
 	else
 		return (NULL);
 }
-#endif
 
 int
 vm_get_x2apic_state(struct vmctx *ctx, int vcpu, enum x2apic_state *state)
@@ -1115,9 +1257,9 @@ vm_get_hpet_capabilities(struct vmctx *ctx, uint32_t *capabilities)
 	return (error);
 }
 
-static int
-gla2gpa(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
-    uint64_t gla, int prot, int *fault, uint64_t *gpa)
+int
+vm_gla2gpa(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
+    uint64_t gla, int prot, uint64_t *gpa, int *fault)
 {
 	struct vm_gla2gpa gg;
 	int error;
@@ -1136,29 +1278,18 @@ gla2gpa(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 	return (error);
 }
 
-int
-vm_gla2gpa(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
-    uint64_t gla, int prot, uint64_t *gpa)
-{
-	int error, fault;
-
-	error = gla2gpa(ctx, vcpu, paging, gla, prot, &fault, gpa);
-	if (fault)
-		error = fault;
-	return (error);
-}
-
 #ifndef min
 #define	min(a,b)	(((a) < (b)) ? (a) : (b))
 #endif
 
 int
 vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
-    uint64_t gla, size_t len, int prot, struct iovec *iov, int iovcnt)
+    uint64_t gla, size_t len, int prot, struct iovec *iov, int iovcnt,
+    int *fault)
 {
 	void *va;
 	uint64_t gpa;
-	int error, fault, i, n, off;
+	int error, i, n, off;
 
 	for (i = 0; i < iovcnt; i++) {
 		iov[i].iov_base = 0;
@@ -1167,18 +1298,16 @@ vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 
 	while (len) {
 		assert(iovcnt > 0);
-		error = gla2gpa(ctx, vcpu, paging, gla, prot, &fault, &gpa);
-		if (error)
-			return (-1);
-		if (fault)
-			return (1);
+		error = vm_gla2gpa(ctx, vcpu, paging, gla, prot, &gpa, fault);
+		if (error || *fault)
+			return (error);
 
 		off = gpa & PAGE_MASK;
 		n = min(len, PAGE_SIZE - off);
 
 		va = vm_map_gpa(ctx, gpa, n);
 		if (va == NULL)
-			return (-1);
+			return (EFAULT);
 
 		iov->iov_base = va;
 		iov->iov_len = n;
@@ -1239,6 +1368,35 @@ vm_copyout(struct vmctx *ctx, int vcpu, const void *vp, struct iovec *iov,
 	}
 }
 
+static int
+vm_get_cpus(struct vmctx *ctx, int which, cpuset_t *cpus)
+{
+	struct vm_cpuset vm_cpuset;
+	int error;
+
+	bzero(&vm_cpuset, sizeof(struct vm_cpuset));
+	vm_cpuset.which = which;
+	vm_cpuset.cpusetsize = sizeof(cpuset_t);
+	vm_cpuset.cpus = cpus;
+
+	error = ioctl(ctx->fd, VM_GET_CPUS, &vm_cpuset);
+	return (error);
+}
+
+int
+vm_active_cpus(struct vmctx *ctx, cpuset_t *cpus)
+{
+
+	return (vm_get_cpus(ctx, VM_ACTIVE_CPUS, cpus));
+}
+
+int
+vm_suspended_cpus(struct vmctx *ctx, cpuset_t *cpus)
+{
+
+	return (vm_get_cpus(ctx, VM_SUSPENDED_CPUS, cpus));
+}
+
 int
 vm_activate_cpu(struct vmctx *ctx, int vcpu)
 {
@@ -1252,9 +1410,134 @@ vm_activate_cpu(struct vmctx *ctx, int vcpu)
 }
 
 int
+vm_get_intinfo(struct vmctx *ctx, int vcpu, uint64_t *info1, uint64_t *info2)
+{
+	struct vm_intinfo vmii;
+	int error;
+
+	bzero(&vmii, sizeof(struct vm_intinfo));
+	vmii.vcpuid = vcpu;
+	error = ioctl(ctx->fd, VM_GET_INTINFO, &vmii);
+	if (error == 0) {
+		*info1 = vmii.info1;
+		*info2 = vmii.info2;
+	}
+	return (error);
+}
+
+int
+vm_set_intinfo(struct vmctx *ctx, int vcpu, uint64_t info1)
+{
+	struct vm_intinfo vmii;
+	int error;
+
+	bzero(&vmii, sizeof(struct vm_intinfo));
+	vmii.vcpuid = vcpu;
+	vmii.info1 = info1;
+	error = ioctl(ctx->fd, VM_SET_INTINFO, &vmii);
+	return (error);
+}
+
+int
+vm_rtc_write(struct vmctx *ctx, int offset, uint8_t value)
+{
+	struct vm_rtc_data rtcdata;
+	int error;
+
+	bzero(&rtcdata, sizeof(struct vm_rtc_data));
+	rtcdata.offset = offset;
+	rtcdata.value = value;
+	error = ioctl(ctx->fd, VM_RTC_WRITE, &rtcdata);
+	return (error);
+}
+
+int
+vm_rtc_read(struct vmctx *ctx, int offset, uint8_t *retval)
+{
+	struct vm_rtc_data rtcdata;
+	int error;
+
+	bzero(&rtcdata, sizeof(struct vm_rtc_data));
+	rtcdata.offset = offset;
+	error = ioctl(ctx->fd, VM_RTC_READ, &rtcdata);
+	if (error == 0)
+		*retval = rtcdata.value;
+	return (error);
+}
+
+int
+vm_rtc_settime(struct vmctx *ctx, time_t secs)
+{
+	struct vm_rtc_time rtctime;
+	int error;
+
+	bzero(&rtctime, sizeof(struct vm_rtc_time));
+	rtctime.secs = secs;
+	error = ioctl(ctx->fd, VM_RTC_SETTIME, &rtctime);
+	return (error);
+}
+
+int
+vm_rtc_gettime(struct vmctx *ctx, time_t *secs)
+{
+	struct vm_rtc_time rtctime;
+	int error;
+
+	bzero(&rtctime, sizeof(struct vm_rtc_time));
+	error = ioctl(ctx->fd, VM_RTC_GETTIME, &rtctime);
+	if (error == 0)
+		*secs = rtctime.secs;
+	return (error);
+}
+
+int
 vm_restart_instruction(void *arg, int vcpu)
 {
 	struct vmctx *ctx = arg;
 
 	return (ioctl(ctx->fd, VM_RESTART_INSTRUCTION, &vcpu));
 }
+
+int
+vm_get_device_fd(struct vmctx *ctx)
+{
+
+	return (ctx->fd);
+}
+
+#ifdef __FreeBSD__
+const cap_ioctl_t *
+vm_get_ioctls(size_t *len)
+{
+	cap_ioctl_t *cmds;
+	/* keep in sync with machine/vmm_dev.h */
+	static const cap_ioctl_t vm_ioctl_cmds[] = { VM_RUN, VM_SUSPEND, VM_REINIT,
+	    VM_ALLOC_MEMSEG, VM_GET_MEMSEG, VM_MMAP_MEMSEG, VM_MMAP_MEMSEG,
+	    VM_MMAP_GETNEXT, VM_SET_REGISTER, VM_GET_REGISTER,
+	    VM_SET_SEGMENT_DESCRIPTOR, VM_GET_SEGMENT_DESCRIPTOR,
+	    VM_INJECT_EXCEPTION, VM_LAPIC_IRQ, VM_LAPIC_LOCAL_IRQ,
+	    VM_LAPIC_MSI, VM_IOAPIC_ASSERT_IRQ, VM_IOAPIC_DEASSERT_IRQ,
+	    VM_IOAPIC_PULSE_IRQ, VM_IOAPIC_PINCOUNT, VM_ISA_ASSERT_IRQ,
+	    VM_ISA_DEASSERT_IRQ, VM_ISA_PULSE_IRQ, VM_ISA_SET_IRQ_TRIGGER,
+	    VM_SET_CAPABILITY, VM_GET_CAPABILITY, VM_BIND_PPTDEV,
+	    VM_UNBIND_PPTDEV, VM_MAP_PPTDEV_MMIO, VM_PPTDEV_MSI,
+	    VM_PPTDEV_MSIX, VM_INJECT_NMI, VM_STATS, VM_STAT_DESC,
+	    VM_SET_X2APIC_STATE, VM_GET_X2APIC_STATE,
+	    VM_GET_HPET_CAPABILITIES, VM_GET_GPA_PMAP, VM_GLA2GPA,
+	    VM_ACTIVATE_CPU, VM_GET_CPUS, VM_SET_INTINFO, VM_GET_INTINFO,
+	    VM_RTC_WRITE, VM_RTC_READ, VM_RTC_SETTIME, VM_RTC_GETTIME,
+	    VM_RESTART_INSTRUCTION };
+
+	if (len == NULL) {
+		cmds = malloc(sizeof(vm_ioctl_cmds));
+		if (cmds == NULL)
+			return (NULL);
+		bcopy(vm_ioctl_cmds, cmds, sizeof(vm_ioctl_cmds));
+		return (cmds);
+	}
+
+	*len = nitems(vm_ioctl_cmds);
+	return (NULL);
+}
+#endif /* __FreeBSD__ */
+

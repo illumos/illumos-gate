@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/include/vmm_instruction_emul.h 276479 2014-12-31 20:31:32Z dim $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -93,17 +93,19 @@ int vie_calculate_gla(enum vm_cpu_mode cpu_mode, enum vm_reg_name seg,
  */
 int vmm_fetch_instruction(struct vm *vm, int cpuid,
 			  struct vm_guest_paging *guest_paging,
-			  uint64_t rip, int inst_length, struct vie *vie);
+			  uint64_t rip, int inst_length, struct vie *vie,
+			  int *is_fault);
 
 /*
  * Translate the guest linear address 'gla' to a guest physical address.
  *
- * Returns 0 on success and '*gpa' contains the result of the translation.
- * Returns 1 if an exception was injected into the guest.
- * Returns -1 otherwise.
+ * retval	is_fault	Interpretation
+ *   0		   0		'gpa' contains result of the translation
+ *   0		   1		An exception was injected into the guest
+ * EFAULT	  N/A		An unrecoverable hypervisor error occurred
  */
 int vm_gla2gpa(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
-    uint64_t gla, int prot, uint64_t *gpa);
+    uint64_t gla, int prot, uint64_t *gpa, int *is_fault);
 
 void vie_init(struct vie *vie, const char *inst_bytes, int inst_length);
 

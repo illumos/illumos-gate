@@ -25,4 +25,7 @@ x:
 #define	END(x) \
 	.size x, [.-x]
 
+#define	ALIGN_TEXT \
+	.p2align 4,0x90; /* 16-byte alignment, nop filled */
+
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_ASMACROS_H_ */

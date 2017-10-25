@@ -23,28 +23,23 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/intel/vmx_msr.c 284174 2015-06-09 00:14:47Z tychon $
+ * $FreeBSD$
  */
 /*
  * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/amd64/vmm/intel/vmx_msr.c 284174 2015-06-09 00:14:47Z tychon $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/cpuset.h>
 
 #include <machine/clock.h>
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
-
-#ifndef	__FreeBSD__
-#include <vm/pmap.h>
-#endif
 
 #include "vmx.h"
 #include "vmx_msr.h"
@@ -187,9 +182,9 @@ msr_bitmap_change_access(char *bitmap, u_int msr, int access)
 static uint64_t misc_enable;
 static uint64_t platform_info;
 static uint64_t turbo_ratio_limit;
-#ifdef	__FreeBSD__
+#ifdef __FreeBSD__
 static uint64_t host_msrs[GUEST_MSR_NUM];
-#endif
+#endif /* __FreeBSD__ */
 
 static bool
 nehalem_cpu(void)
@@ -239,13 +234,33 @@ westmere_cpu(void)
 	return (false);
 }
 
+static bool
+pat_valid(uint64_t val)
+{
+	int i, pa;
+
+	/*
+	 * From Intel SDM: Table "Memory Types That Can Be Encoded With PAT"
+	 *
+	 * Extract PA0 through PA7 and validate that each one encodes a
+	 * valid memory type.
+	 */
+	for (i = 0; i < 8; i++) {
+		pa = (val >> (i * 8)) & 0xff;
+		if (pa == 2 || pa == 3 || pa >= 8)
+			return (false);
+	}
+	return (true);
+}
+
 void
 vmx_msr_init(void)
 {
 	uint64_t bus_freq, ratio;
 	int i;
 
-#ifdef	__FreeBSD__
+#ifdef __FreeBSD__
+	/* XXXJOY: Do we want to do this caching? */
 	/*
 	 * It is safe to cache the values of the following MSRs because
 	 * they don't change based on curcpu, curproc or curthread.
@@ -254,7 +269,7 @@ vmx_msr_init(void)
 	host_msrs[IDX_MSR_CSTAR] = rdmsr(MSR_CSTAR);
 	host_msrs[IDX_MSR_STAR] = rdmsr(MSR_STAR);
 	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
-#endif
+#endif /* __FreeBSD__ */
 
 	/*
 	 * Initialize emulated MSRs
@@ -313,6 +328,10 @@ vmx_msr_init(void)
 void
 vmx_msr_guest_init(struct vmx *vmx, int vcpuid)
 {
+	uint64_t *guest_msrs;
+
+	guest_msrs = vmx->guest_msrs[vcpuid];
+
 	/*
 	 * The permissions bitmap is shared between all vcpus so initialize it
 	 * once when initializing the vBSP.
@@ -324,14 +343,36 @@ vmx_msr_guest_init(struct vmx *vmx, int vcpuid)
 		guest_msr_rw(vmx, MSR_SF_MASK);
 		guest_msr_rw(vmx, MSR_KGSBASE);
 	}
+
+	/*
+	 * Initialize guest IA32_PAT MSR with default value after reset.
+	 */
+	guest_msrs[IDX_MSR_PAT] = PAT_VALUE(0, PAT_WRITE_BACK) |
+	    PAT_VALUE(1, PAT_WRITE_THROUGH)	|
+	    PAT_VALUE(2, PAT_UNCACHED)		|
+	    PAT_VALUE(3, PAT_UNCACHEABLE)	|
+	    PAT_VALUE(4, PAT_WRITE_BACK)	|
+	    PAT_VALUE(5, PAT_WRITE_THROUGH)	|
+	    PAT_VALUE(6, PAT_UNCACHED)		|
+	    PAT_VALUE(7, PAT_UNCACHEABLE);
+
 	return;
 }
 
 void
 vmx_msr_guest_enter(struct vmx *vmx, int vcpuid)
 {
-#ifdef	__FreeBSD__
 	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
+
+#ifndef __FreeBSD__
+	uint64_t *host_msrs = vmx->host_msrs[vcpuid];
+
+	/* Save host MSRs */
+	host_msrs[IDX_MSR_LSTAR] = rdmsr(MSR_LSTAR);
+	host_msrs[IDX_MSR_CSTAR] = rdmsr(MSR_CSTAR);
+	host_msrs[IDX_MSR_STAR] = rdmsr(MSR_STAR);
+	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
+#endif /* __FreeBSD__ */
 
 	/* Save host MSRs (if any) and restore guest MSRs */
 	wrmsr(MSR_LSTAR, guest_msrs[IDX_MSR_LSTAR]);
@@ -339,14 +380,15 @@ vmx_msr_guest_enter(struct vmx *vmx, int vcpuid)
 	wrmsr(MSR_STAR, guest_msrs[IDX_MSR_STAR]);
 	wrmsr(MSR_SF_MASK, guest_msrs[IDX_MSR_SF_MASK]);
 	wrmsr(MSR_KGSBASE, guest_msrs[IDX_MSR_KGSBASE]);
-#endif
 }
 
 void
 vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
 {
-#ifdef	__FreeBSD__
 	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
+#ifndef __FreeBSD__
+	uint64_t *host_msrs = vmx->host_msrs[vcpuid];
+#endif
 
 	/* Save guest MSRs */
 	guest_msrs[IDX_MSR_LSTAR] = rdmsr(MSR_LSTAR);
@@ -362,13 +404,16 @@ vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
 	wrmsr(MSR_SF_MASK, host_msrs[IDX_MSR_SF_MASK]);
 
 	/* MSR_KGSBASE will be restored on the way back to userspace */
-#endif
 }
 
 int
 vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val, bool *retu)
 {
-	int error = 0;
+	const uint64_t *guest_msrs;
+	int error;
+
+	guest_msrs = vmx->guest_msrs[vcpuid];
+	error = 0;
 
 	switch (num) {
 	case MSR_MCG_CAP:
@@ -392,6 +437,9 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val, bool *retu)
 	case MSR_TURBO_RATIO_LIMIT1:
 		*val = turbo_ratio_limit;
 		break;
+	case MSR_PAT:
+		*val = guest_msrs[IDX_MSR_PAT];
+		break;
 	default:
 		error = EINVAL;
 		break;
@@ -402,10 +450,13 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val, bool *retu)
 int
 vmx_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val, bool *retu)
 {
+	uint64_t *guest_msrs;
 	uint64_t changed;
 	int error;
 	
+	guest_msrs = vmx->guest_msrs[vcpuid];
 	error = 0;
+
 	switch (num) {
 	case MSR_MCG_CAP:
 	case MSR_MCG_STATUS:
@@ -437,6 +488,12 @@ vmx_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val, bool *retu)
 		if (changed)
 			error = EINVAL;
 
+		break;
+	case MSR_PAT:
+		if (pat_valid(val))
+			guest_msrs[IDX_MSR_PAT] = val;
+		else
+			vm_inject_gp(vmx->vm, vcpuid);
 		break;
 	case MSR_TSC:
 		error = vmx_set_tsc_offset(vmx, vcpuid, val - rdtsc());

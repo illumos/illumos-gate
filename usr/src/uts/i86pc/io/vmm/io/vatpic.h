@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/io/vatpic.h 273706 2014-10-26 19:03:06Z neel $
+ * $FreeBSD$
  */
 
 #ifndef _VATPIC_H_

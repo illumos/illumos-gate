@@ -10,12 +10,14 @@
  */
 
 /*
- * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
-#ifndef _COMPAT_FREEBSD_VM_PMAP_H_
-#define	_COMPAT_FREEBSD_VM_PMAP_H_
+#ifndef	_VM_PAGER_
+#define	_VM_PAGER_
 
-#include <machine/pmap.h>
+vm_object_t vm_pager_allocate(objtype_t, void *, vm_ooffset_t, vm_prot_t,
+    vm_ooffset_t, void *);
 
-#endif	/* _COMPAT_FREEBSD_VM_PMAP_H_ */
+
+#endif /* _VM_PAGER_ */

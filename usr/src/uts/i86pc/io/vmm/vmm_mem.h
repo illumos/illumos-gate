@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_mem.h 245678 2013-01-20 03:42:49Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -41,9 +41,13 @@
 #ifndef	_VMM_MEM_H_
 #define	_VMM_MEM_H_
 
+struct vmspace;
+struct vm_object;
+
 int		vmm_mem_init(void);
-vm_paddr_t	vmm_mem_alloc(size_t size);
-void		vmm_mem_free(vm_paddr_t start, size_t size);
+struct vm_object *vmm_mmio_alloc(struct vmspace *, vm_paddr_t gpa, size_t len,
+				 vm_paddr_t hpa);
+void		vmm_mmio_free(struct vmspace *, vm_paddr_t gpa, size_t size);
 vm_paddr_t	vmm_mem_maxaddr(void);
 
 #endif

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/io/vioapic.h 258699 2013-11-27 22:18:08Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -44,10 +44,6 @@
 
 #define	VIOAPIC_BASE	0xFEC00000
 #define	VIOAPIC_SIZE	4096
-
-#include "vdev.h"
-
-struct vm;
 
 struct vioapic *vioapic_init(struct vm *vm);
 void	vioapic_cleanup(struct vioapic *vioapic);

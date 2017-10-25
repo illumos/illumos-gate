@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_lapic.h 259863 2013-12-25 06:46:31Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the

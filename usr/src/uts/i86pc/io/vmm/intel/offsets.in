@@ -1,0 +1,62 @@
+/*
+ * COPYRIGHT 2014 Pluribus Networks Inc.
+ *
+ * All rights reserved. This copyright notice is Copyright Management
+ * Information under 17 USC 1202 and is included to protect this work and
+ * deter copyright infringement.  Removal or alteration of this Copyright
+ * Management Information without the express written permission from
+ * Pluribus Networks Inc is prohibited, and any such unauthorized removal
+ * or alteration will be a violation of federal law.
+ */
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/cpuvar.h>
+
+#include <machine/pmap.h>
+#include <machine/vmm.h>
+
+#include "intel/vmx_cpufunc.h"
+#include "intel/vmx.h"
+#include "vm/vm_glue.h"
+
+vmxctx
+	guest_rdi		VMXCTX_GUEST_RDI
+	guest_rsi		VMXCTX_GUEST_RSI
+	guest_rdx		VMXCTX_GUEST_RDX
+	guest_rcx		VMXCTX_GUEST_RCX
+	guest_r8		VMXCTX_GUEST_R8
+	guest_r9		VMXCTX_GUEST_R9
+	guest_rax		VMXCTX_GUEST_RAX
+	guest_rbx		VMXCTX_GUEST_RBX
+	guest_rbp		VMXCTX_GUEST_RBP
+	guest_r10		VMXCTX_GUEST_R10
+	guest_r11		VMXCTX_GUEST_R11
+	guest_r12		VMXCTX_GUEST_R12
+	guest_r13		VMXCTX_GUEST_R13
+	guest_r14		VMXCTX_GUEST_R14
+	guest_r15		VMXCTX_GUEST_R15
+	guest_cr2		VMXCTX_GUEST_CR2
+	inst_fail_status	VMXCTX_INST_FAIL_STATUS
+	pmap			VMXCTX_PMAP
+
+vmx
+	eptgen		VMX_EPTGEN
+	eptp		VMX_EPTP
+
+pmap
+	pm_active	PM_ACTIVE
+	pm_eptgen	PM_EPTGEN
+
+cpu
+	cpu_id
+
+\#define	VM_SUCCESS		0
+\#define	VM_FAIL_INVALID		1
+\#define	VM_FAIL_VALID		2
+
+\#define	VMX_GUEST_VMEXIT	0
+\#define	VMX_VMRESUME_ERROR	1
+\#define	VMX_VMLAUNCH_ERROR	2
+\#define	VMX_INVEPT_ERROR	3
+\#define	VMX_VMWRITE_ERROR	4

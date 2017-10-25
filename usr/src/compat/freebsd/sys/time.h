@@ -50,7 +50,13 @@ binuptime(struct bintime *bt)
 	    ((a)->frac cmp (b)->frac) :					\
 	    ((a)->sec cmp (b)->sec))
 
-#define	SBT_1US	(1000)
+#define SBT_1S  ((sbintime_t)1 << 32)
+#define SBT_1M  (SBT_1S * 60)
+#define SBT_1MS (SBT_1S / 1000)
+#define SBT_1US (SBT_1S / 1000000)
+#define SBT_1NS (SBT_1S / 1000000000)
+#define SBT_MAX 0x7fffffffffffffffLL
+
 
 static __inline void
 bintime_add(struct bintime *bt, const struct bintime *bt2)
@@ -91,14 +97,18 @@ bintime_mul(struct bintime *bt, u_int x)
 static __inline sbintime_t
 bttosbt(const struct bintime bt)
 {
-	return ((bt.sec * 1000000000) +
-	    (((uint64_t)1000000000 * (uint32_t)(bt.frac >> 32)) >> 32));
+	return (((sbintime_t)bt.sec << 32) + (bt.frac >> 32));
 }
 
 static __inline sbintime_t
 sbinuptime(void)
 {
-	return (gethrtime());
+	hrtime_t hrt = gethrtime();
+	uint64_t sec = hrt / NANOSEC;
+	uint64_t nsec = hrt % NANOSEC;
+
+	return (((sbintime_t)sec << 32) +
+	    (nsec * (((uint64_t)1 << 63) / 500000000) >> 32));
 }
 
 #endif	/* _COMPAT_FREEBSD_SYS_TIME_H_ */

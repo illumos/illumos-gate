@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/include/vmm_dev.h 268889 2014-07-19 20:59:08Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -44,13 +44,25 @@
 
 #ifdef _KERNEL
 void	vmmdev_init(void);
-void	vmmdev_cleanup(void);
+int	vmmdev_cleanup(void);
 #endif
 
-struct vm_memory_segment {
-	vm_paddr_t	gpa;	/* in */
+struct vm_memmap {
+	vm_paddr_t	gpa;
+	int		segid;		/* memory segment */
+	vm_ooffset_t	segoff;		/* offset into memory segment */
+	size_t		len;		/* mmap length */
+	int		prot;		/* RWX */
+	int		flags;
+};
+#define	VM_MEMMAP_F_WIRED	0x01
+#define	VM_MEMMAP_F_IOMMU	0x02
+
+#define	VM_MEMSEG_NAME(m)	((m)->name[0] != '\0' ? (m)->name : NULL)
+struct vm_memseg {
+	int		segid;
 	size_t		len;
-	int		wired;
+	char		name[SPECNAMELEN + 1];
 };
 
 struct vm_register {
@@ -130,7 +142,7 @@ struct vm_pptdev_msi {
 	int		slot;
 	int		func;
 	int		numvec;		/* 0 means disabled */
-	uint32_t	msg;
+	uint64_t	msg;
 	uint64_t	addr;
 };
 
@@ -140,7 +152,7 @@ struct vm_pptdev_msix {
 	int		slot;
 	int		func;
 	int		idx;
-	uint32_t	msg;
+	uint64_t	msg;
 	uint32_t	vector_control;
 	uint64_t	addr;
 };
@@ -177,8 +189,8 @@ struct vm_hpet_cap {
 	uint32_t	capabilities;	/* lower 32 bits of HPET capabilities */
 };
 
-struct vm_activate_cpu {
-	int		vcpuid;
+struct vm_suspend {
+	enum vm_suspend_how how;
 };
 
 struct vm_gla2gpa {
@@ -190,13 +202,43 @@ struct vm_gla2gpa {
 	uint64_t	gpa;
 };
 
+struct vm_activate_cpu {
+	int		vcpuid;
+};
+
 struct vm_cpuset {
 	int		which;
 	int		cpusetsize;
+#ifndef _KERNEL
 	cpuset_t	*cpus;
+#else
+	void		*cpus;
+#endif
 };
 #define	VM_ACTIVE_CPUS		0
 #define	VM_SUSPENDED_CPUS	1
+
+struct vm_intinfo {
+	int		vcpuid;
+	uint64_t	info1;
+	uint64_t	info2;
+};
+
+struct vm_rtc_time {
+	time_t		secs;
+};
+
+struct vm_rtc_data {
+	int		offset;
+	uint8_t		value;
+};
+
+#ifndef __FreeBSD__
+struct vm_devmem_offset {
+	int		segid;
+	off_t		offset;
+};
+#endif
 
 enum {
 	/* general routines */
@@ -204,12 +246,18 @@ enum {
 	IOCNUM_RUN = 1,
 	IOCNUM_SET_CAPABILITY = 2,
 	IOCNUM_GET_CAPABILITY = 3,
+	IOCNUM_SUSPEND = 4,
+	IOCNUM_REINIT = 5,
 
 	/* memory apis */
-	IOCNUM_MAP_MEMORY = 10,
-	IOCNUM_GET_MEMORY_SEG = 11,
+	IOCNUM_MAP_MEMORY = 10,			/* deprecated */
+	IOCNUM_GET_MEMORY_SEG = 11,		/* deprecated */
 	IOCNUM_GET_GPA_PMAP = 12,
 	IOCNUM_GLA2GPA = 13,
+	IOCNUM_ALLOC_MEMSEG = 14,
+	IOCNUM_GET_MEMSEG = 15,
+	IOCNUM_MMAP_MEMSEG = 16,
+	IOCNUM_MMAP_GETNEXT = 17,
 
 	/* register/state accessors */
 	IOCNUM_SET_REGISTER = 20,
@@ -218,6 +266,8 @@ enum {
 	IOCNUM_GET_SEGMENT_DESCRIPTOR = 23,
 
 	/* interrupt injection */
+	IOCNUM_GET_INTINFO = 28,
+	IOCNUM_SET_INTINFO = 29,
 	IOCNUM_INJECT_EXCEPTION = 30,
 	IOCNUM_LAPIC_IRQ = 31,
 	IOCNUM_INJECT_NMI = 32,
@@ -254,14 +304,33 @@ enum {
 	/* vm_cpuset */
 	IOCNUM_ACTIVATE_CPU = 90,
 	IOCNUM_GET_CPUSET = 91,
+
+	/* RTC */
+	IOCNUM_RTC_READ = 100,
+	IOCNUM_RTC_WRITE = 101,
+	IOCNUM_RTC_SETTIME = 102,
+	IOCNUM_RTC_GETTIME = 103,
+
+#ifndef __FreeBSD__
+	/* illumos-custom ioctls */
+	IOCNUM_DEVMEM_GETOFFSET = 256,
+#endif
 };
 
 #define	VM_RUN		\
 	_IOWR('v', IOCNUM_RUN, struct vm_run)
-#define	VM_MAP_MEMORY	\
-	_IOWR('v', IOCNUM_MAP_MEMORY, struct vm_memory_segment)
-#define	VM_GET_MEMORY_SEG \
-	_IOWR('v', IOCNUM_GET_MEMORY_SEG, struct vm_memory_segment)
+#define	VM_SUSPEND	\
+	_IOW('v', IOCNUM_SUSPEND, struct vm_suspend)
+#define	VM_REINIT	\
+	_IO('v', IOCNUM_REINIT)
+#define	VM_ALLOC_MEMSEG	\
+	_IOW('v', IOCNUM_ALLOC_MEMSEG, struct vm_memseg)
+#define	VM_GET_MEMSEG	\
+	_IOWR('v', IOCNUM_GET_MEMSEG, struct vm_memseg)
+#define	VM_MMAP_MEMSEG	\
+	_IOW('v', IOCNUM_MMAP_MEMSEG, struct vm_memmap)
+#define	VM_MMAP_GETNEXT	\
+	_IOWR('v', IOCNUM_MMAP_GETNEXT, struct vm_memmap)
 #define	VM_SET_REGISTER \
 	_IOW('v', IOCNUM_SET_REGISTER, struct vm_register)
 #define	VM_GET_REGISTER \
@@ -310,10 +379,8 @@ enum {
 	_IOW('v', IOCNUM_PPTDEV_MSIX, struct vm_pptdev_msix)
 #define VM_INJECT_NMI \
 	_IOW('v', IOCNUM_INJECT_NMI, struct vm_nmi)
-#ifdef	__FreeBSD__
-#define	VM_STATS \
+#define	VM_STATS_IOC \
 	_IOWR('v', IOCNUM_VM_STATS, struct vm_stats)
-#endif
 #define	VM_STAT_DESC \
 	_IOWR('v', IOCNUM_VM_STAT_DESC, struct vm_stat_desc)
 #define	VM_SET_X2APIC_STATE \
@@ -330,6 +397,30 @@ enum {
 	_IOW('v', IOCNUM_ACTIVATE_CPU, struct vm_activate_cpu)
 #define	VM_GET_CPUS	\
 	_IOW('v', IOCNUM_GET_CPUSET, struct vm_cpuset)
+#define	VM_SET_INTINFO	\
+	_IOW('v', IOCNUM_SET_INTINFO, struct vm_intinfo)
+#define	VM_GET_INTINFO	\
+	_IOWR('v', IOCNUM_GET_INTINFO, struct vm_intinfo)
+#define VM_RTC_WRITE \
+	_IOW('v', IOCNUM_RTC_WRITE, struct vm_rtc_data)
+#define VM_RTC_READ \
+	_IOWR('v', IOCNUM_RTC_READ, struct vm_rtc_data)
+#define VM_RTC_SETTIME	\
+	_IOW('v', IOCNUM_RTC_SETTIME, struct vm_rtc_time)
+#define VM_RTC_GETTIME	\
+	_IOR('v', IOCNUM_RTC_GETTIME, struct vm_rtc_time)
 #define	VM_RESTART_INSTRUCTION \
 	_IOW('v', IOCNUM_RESTART_INSTRUCTION, int)
+
+#ifndef __FreeBSD__
+#define	VM_DEVMEM_GETOFFSET \
+	_IOW('v', IOCNUM_DEVMEM_GETOFFSET, struct vm_devmem_offset)
+
+/* ioctls used against ctl device for vm create/destroy */
+#define	VMM_IOC_BASE		(('V' << 16) | ('M' << 8))
+#define	VMM_CREATE_VM		(VMM_IOC_BASE | 0x01)
+#define	VMM_DESTROY_VM		(VMM_IOC_BASE | 0x02)
+
+#endif
+
 #endif

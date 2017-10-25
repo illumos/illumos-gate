@@ -16,6 +16,8 @@
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_
 #define	_COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_
 
+#include <sys/types.h>
+
 static __inline u_long
 bsfq(u_long mask)
 {
@@ -66,6 +68,12 @@ cpuid_count(u_int ax, u_int cx, u_int *p)
 }
 
 static __inline void
+disable_intr(void)
+{
+	__asm __volatile("cli");
+}
+
+static __inline void
 enable_intr(void)
 {
 	__asm __volatile("sti");
@@ -95,6 +103,15 @@ flsll(long long mask)
 	return (flsl((long)mask));
 }
 
+static __inline u_long
+read_rflags(void)
+{
+	u_long  rf;
+
+	__asm __volatile("pushfq; popq %0" : "=r" (rf));
+	return (rf);
+}
+
 static __inline uint64_t
 rdmsr(u_int msr)
 {
@@ -107,10 +124,10 @@ rdmsr(u_int msr)
 static __inline uint64_t
 rdtsc(void)
 {
-	uint32_t low, high;
- 
-	__asm __volatile("rdtsc" : "=a" (low), "=d" (high));
-	return (low | ((uint64_t)high << 32));
+	extern hrtime_t tsc_gethrtimeunscaled_delta(void);
+
+	/* Get the TSC reading with any needed synch offset applied */
+	return ((uint64_t)tsc_gethrtimeunscaled_delta());
 }
 
 static __inline void
@@ -160,6 +177,25 @@ rcr4(void)
  
 	__asm __volatile("movq %%cr4,%0" : "=r" (data));
 	return (data);
+}
+
+static __inline u_long
+rxcr(u_int reg)
+{
+	u_int low, high;
+
+	__asm __volatile("xgetbv" : "=a" (low), "=d" (high) : "c" (reg));
+	return (low | ((uint64_t)high << 32));
+}
+
+static __inline void
+load_xcr(u_int reg, u_long val)
+{
+	u_int low, high;
+
+	low = val;
+	high = val >> 32;
+	__asm __volatile("xsetbv" : : "c" (reg), "a" (low), "d" (high));
 }
 
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_ */

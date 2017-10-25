@@ -16,4 +16,23 @@
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_SMP_H_
 #define	_COMPAT_FREEBSD_AMD64_MACHINE_SMP_H_
 
+#ifdef _KERNEL
+
+/*
+ * APIC-related definitions would normally be stored in x86/include/apicvar.h,
+ * accessed here via x86/include/x86_smp.h.  Until it becomes necessary to
+ * implment that whole chain of includes, those definitions are short-circuited
+ * into this file.
+ */
+
+#define	IDTVEC(name)	idtvec_ ## name
+
+extern int idtvec_justreturn;
+
+extern int lapic_ipi_alloc(int *);
+extern void lapic_ipi_free(int vec);
+
+
+#endif /* _KERNEL */
+
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_SMP_H_ */

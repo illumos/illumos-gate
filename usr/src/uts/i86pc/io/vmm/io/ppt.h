@@ -23,15 +23,32 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/vmm_ipi.h 260466 2014-01-09 03:25:54Z neel $
+ * $FreeBSD$
  */
 
-#ifndef _VMM_IPI_H_
-#define _VMM_IPI_H_
+#ifndef _IO_PPT_H_
+#define	_IO_PPT_H_
 
-#ifdef	__FreeBSD__
-int	vmm_ipi_alloc(void);
-void	vmm_ipi_free(int num);
-#endif
+int	ppt_unassign_all(struct vm *vm);
+int	ppt_map_mmio(struct vm *vm, int bus, int slot, int func,
+		     vm_paddr_t gpa, size_t len, vm_paddr_t hpa);
+int	ppt_setup_msi(struct vm *vm, int vcpu, int bus, int slot, int func,
+		      uint64_t addr, uint64_t msg, int numvec);
+int	ppt_setup_msix(struct vm *vm, int vcpu, int bus, int slot, int func,
+		int idx, uint64_t addr, uint64_t msg, uint32_t vector_control);
+int	ppt_assigned_devices(struct vm *vm);
+boolean_t ppt_is_mmio(struct vm *vm, vm_paddr_t gpa);
 
+/*
+ * Returns the number of devices sequestered by the ppt driver for assignment
+ * to virtual machines.
+ */
+int	ppt_avail_devices(void);
+
+/*
+ * The following functions should never be called directly.
+ * Use 'vm_assign_pptdev()' and 'vm_unassign_pptdev()' instead.
+ */
+int	ppt_assign_device(struct vm *vm, int bus, int slot, int func);
+int	ppt_unassign_device(struct vm *vm, int bus, int slot, int func);
 #endif

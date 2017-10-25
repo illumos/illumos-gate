@@ -31,11 +31,6 @@ struct mtx;
 void	critical_enter(void);
 void	critical_exit(void);
 
-int	msleep_spin(void *chan, struct mtx *mutex, const char *wmesg,
-    int ticks);
-void	wakeup(void *chan);
-void	wakeup_one(void *chan);
-
 struct unrhdr *new_unrhdr(int low, int high, struct mtx *mutex);
 void delete_unrhdr(struct unrhdr *uh);
 int alloc_unr(struct unrhdr *uh);

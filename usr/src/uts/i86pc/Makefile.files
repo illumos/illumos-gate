@@ -243,7 +243,8 @@ VMM_OBJS += vmm.o \
 	vmm_instruction_emul.o \
 	vmm_ioport.o \
 	vmm_lapic.o \
-	vmm_sol_mem.o \
+	vmm_mem.o \
+	vmm_stat.o \
 	vmm_util.o \
 	x86.o \
 	vdev.o \
@@ -252,12 +253,22 @@ VMM_OBJS += vmm.o \
 	vhpet.o \
 	vioapic.o \
 	vlapic.o \
+	vrtc.o \
+	vpmtmr.o \
 	ept.o \
 	vmcs.o \
 	vmx_msr.o \
 	vmx.o \
 	vmx_support.o \
+	svm.o \
+	svm_msr.o \
+	npt.o \
+	vmcb.o \
+	svm_support.o \
 	amdv.o \
+	sol_iommu.o \
+	sol_ppt.o \
+	vmm_sol_vm.o \
 	vmm_sol_glue.o
 
 VIONA_OBJS += viona.o

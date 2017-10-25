@@ -32,23 +32,44 @@
 #define	VMM_CTL_MINOR_NAME	VMM_DRIVER_NAME VMM_CTL_MINOR_NODE
 #define	VMM_CTL_MINOR		0
 
-#define	VMM_IOC_BASE		(('V' << 16) | ('M' << 8))
-
-#define	VMM_CREATE_VM		(VMM_IOC_BASE | 0x01)
-#define	VMM_DESTROY_VM		(VMM_IOC_BASE | 0x02)
-
-struct vmm_ioctl {
-	char vmm_name[VM_MAX_NAMELEN];
-};
-
 #ifdef	_KERNEL
-struct vmm_softc {
-	boolean_t			open;
-	minor_t				minor;
-	struct vm			*vm;
-	char				name[VM_MAX_NAMELEN];
-	SLIST_ENTRY(vmm_softc)		link;
+
+/*
+ * Rather than creating whole character devices for devmem mappings, they are
+ * available by mmap(2)ing the vmm handle at a specific offset.  These offsets
+ * begin just above the maximum allow guest physical address.
+ */
+#include <vm/vm_param.h>
+#define	VM_DEVMEM_START	(VM_MAXUSER_ADDRESS + 1)
+
+struct vmm_devmem_entry {
+	list_node_t	vde_node;
+	int		vde_segid;
+	char		vde_name[SPECNAMELEN + 1];
+	size_t		vde_len;
+	off_t		vde_off;
 };
+typedef struct vmm_devmem_entry vmm_devmem_entry_t;
+
+enum vmm_softc_state {
+	VMM_HELD	= 1,	/* external driver(s) possess hold on VM */
+	VMM_CLEANUP	= 2,	/* request that holds are released */
+	VMM_PURGED	= 4,	/* all hold have been released */
+	VMM_BLOCK_HOOK	= 8	/* mem hook install temporarily blocked */
+};
+
+struct vmm_softc {
+	list_node_t	vmm_node;
+	struct vm	*vmm_vm;
+	minor_t		vmm_minor;
+	char		vmm_name[VM_MAX_NAMELEN];
+	uint_t		vmm_flags;
+	boolean_t	vmm_is_open;
+	list_t		vmm_devmem_list;
+	list_t		vmm_holds;
+	kcondvar_t	vmm_cv;
+};
+typedef struct vmm_softc vmm_softc_t;
 #endif
 
 /*

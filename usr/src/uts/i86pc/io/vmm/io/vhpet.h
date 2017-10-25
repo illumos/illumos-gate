@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/io/vhpet.h 258579 2013-11-25 19:04:51Z neel $
+ * $FreeBSD$
  */
 
 #ifndef _VHPET_H_

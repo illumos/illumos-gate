@@ -72,6 +72,9 @@ LINTTAGS	+= -erroff=E_FUNC_DECL_VAR_ARG2
 LINTTAGS	+= -erroff=E_ASM_IMPOSSIBLE_CONSTRAINT
 LINTTAGS	+= -erroff=E_ASM_UNUSED_PARAM
 LINTTAGS	+= -erroff=E_NOP_IF_STMT
+LINTTAGS	+= -erroff=E_ZERO_OR_NEGATIVE_SUBSCRIPT
+
+CERRWARN	+= -_gcc=-Wno-empty-body
 
 # These sources only compile with gcc.  Workaround a confluence of cruft
 # regarding dmake and shadow compilation by neutering the sun compiler.
@@ -86,9 +89,17 @@ INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(UTSBASE)/i86pc/io/vmm/io
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 
 CFLAGS		+= -_gcc=-Wimplicit-function-declaration
+# The FreeBSD %# notation makes gcc gripe
+CFLAGS		+= -_gcc=-Wno-format
 
-OFFSETS_SRC	= $(CONF_SRCDIR)/offsets.in
-ASSYM_H		= $(OBJS_DIR)/vmx_assym.h
+$(OBJS_DIR)/vmm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
+$(OBJS_DIR)/svm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
+
+OFFSETS_VMX	= $(CONF_SRCDIR)/intel/offsets.in
+OFFSETS_SVM	= $(CONF_SRCDIR)/amd/offsets.in
+ASSYM_VMX	= $(OBJS_DIR)/vmx_assym.h
+ASSYM_SVM	= $(OBJS_DIR)/svm_assym.h
+ASSYM_H		= $(ASSYM_VMX) $(ASSYM_SVM)
 
 CLEANFILES	+= $(ASSYM_H)
 
@@ -118,7 +129,10 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/i86pc/Makefile.targ
 
-$(OBJECTS): $(ASSYM_H)
+$(ASSYM_VMX): $(OFFSETS_VMX) $(GENASSYM)
+	$(OFFSETS_CREATE) -I../../i86pc/io/vmm < $(OFFSETS_VMX) >$@
+$(ASSYM_SVM): $(OFFSETS_SVM) $(GENASSYM)
+	$(OFFSETS_CREATE) -I../../i86pc/io/vmm < $(OFFSETS_SVM) >$@
 
-$(ASSYM_H): $(OFFSETS_SRC) $(GENASSYM)
-	$(OFFSETS_CREATE) -I../../i86pc/io/vmm < $(OFFSETS_SRC) >$@
+$(OBJS_DIR)/vmx_support.o:  $(ASSYM_VMX)
+$(OBJS_DIR)/svm_support.o:  $(ASSYM_SVM)

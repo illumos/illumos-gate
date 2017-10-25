@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/intel/vmx_cpufunc.h 245678 2013-01-20 03:42:49Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -72,7 +72,12 @@ vmxon(char *region)
 	int error;
 	uint64_t addr;
 
+#ifdef __FreeBSD__
 	addr = vtophys(region);
+#else
+	/* This is pre-translated in illumos */
+	addr = (uint64_t)region;
+#endif
 	__asm __volatile("vmxon %[addr];"
 			 VMX_SET_ERROR_CODE
 			 : [error] "=r" (error)
@@ -82,21 +87,7 @@ vmxon(char *region)
 	return (error);
 }
 
-/* returns 0 on success and non-zero on failure */
-static __inline int
-vmxon_pa(vm_paddr_t addr)
-{
-	int error;
-
-	__asm __volatile("vmxon %[addr];"
-			 VMX_SET_ERROR_CODE
-			 : [error] "=r" (error)
-			 : [addr] "m" (*(uint64_t *)&addr)
-			 : "memory");
-
-	return (error);
-}
-
+#ifdef __FreeBSD__
 /* returns 0 on success and non-zero on failure */
 static __inline int
 vmclear(struct vmcs *vmcs)
@@ -112,6 +103,7 @@ vmclear(struct vmcs *vmcs)
 			 : "memory");
 	return (error);
 }
+#endif /* __FreeBSD__ */
 
 static __inline void
 vmxoff(void)
@@ -127,6 +119,7 @@ vmptrst(uint64_t *addr)
 	__asm __volatile("vmptrst %[addr]" :: [addr]"m" (*addr) : "memory");
 }
 
+#ifdef __FreeBSD__
 static __inline int
 vmptrld(struct vmcs *vmcs)
 {
@@ -141,6 +134,7 @@ vmptrld(struct vmcs *vmcs)
 			 : "memory");
 	return (error);
 }
+#endif /* __FreeBSD__ */
 
 static __inline int
 vmwrite(uint64_t reg, uint64_t val)
@@ -170,6 +164,7 @@ vmread(uint64_t r, uint64_t *addr)
 	return (error);
 }
 
+#ifdef __FreeBSD__
 static __inline void
 VMCLEAR(struct vmcs *vmcs)
 {
@@ -193,6 +188,7 @@ VMPTRLD(struct vmcs *vmcs)
 	if (err != 0)
 		panic("%s: vmptrld(%p) error %d", __func__, vmcs, err);
 }
+#endif /* __FreeBSD__ */
 
 #define	INVVPID_TYPE_ADDRESS		0UL
 #define	INVVPID_TYPE_SINGLE_CONTEXT	1UL

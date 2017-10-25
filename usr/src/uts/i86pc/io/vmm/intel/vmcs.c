@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/intel/vmcs.c 266550 2014-05-22 17:22:37Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -44,7 +44,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/amd64/vmm/intel/vmcs.c 266550 2014-05-22 17:22:37Z neel $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,6 +118,14 @@ vmcs_field_encoding(int ident)
 		return (VMCS_GUEST_LDTR_SELECTOR);
 	case VM_REG_GUEST_EFER:
 		return (VMCS_GUEST_IA32_EFER);
+	case VM_REG_GUEST_PDPTE0:
+		return (VMCS_GUEST_PDPTE0);
+	case VM_REG_GUEST_PDPTE1:
+		return (VMCS_GUEST_PDPTE1);
+	case VM_REG_GUEST_PDPTE2:
+		return (VMCS_GUEST_PDPTE2);
+	case VM_REG_GUEST_PDPTE3:
+		return (VMCS_GUEST_PDPTE3);
 	default:
 		return (-1);
 	}
@@ -333,43 +341,15 @@ done:
 	return (error);
 }
 
-#ifndef	__FreeBSD__
 int
-vmcs_set_host_msr_save(struct vmcs *vmcs, u_long h_area, u_int h_count)
-{
-	int error;
-
-	VMPTRLD(vmcs);
-
-	/*
-	 * Host MSRs are loaded from the VM-exit MSR-load area.
-	 */
-	if ((error = vmwrite(VMCS_EXIT_MSR_LOAD, h_area)) != 0)
-		goto done;
-	if ((error = vmwrite(VMCS_EXIT_MSR_LOAD_COUNT, h_count)) != 0)
-		goto done;
-
-	error = 0;
-done:
-	VMCLEAR(vmcs);
-	return (error);
-}
-#endif
-
-int
-vmcs_set_defaults(struct vmcs *vmcs,
-		  u_long host_rip, u_long host_rsp, u_long ept_pml4,
-		  uint32_t pinbased_ctls, uint32_t procbased_ctls,
-		  uint32_t procbased_ctls2, uint32_t exit_ctls,
-		  uint32_t entry_ctls, u_long msr_bitmap, uint16_t vpid)
+vmcs_init(struct vmcs *vmcs)
 {
 	int error, codesel, datasel, tsssel;
 	u_long cr0, cr4, efer;
-	uint64_t eptp, pat, idtrbase;
+	uint64_t pat;
 #ifdef	__FreeBSD__
-	uint64_t fsbase;
+	uint64_t fsbase, idtrbase;
 #endif
-	uint32_t exc_bitmap;
 
 	codesel = vmm_get_host_codesel();
 	datasel = vmm_get_host_datasel();
@@ -379,34 +359,6 @@ vmcs_set_defaults(struct vmcs *vmcs,
 	 * Make sure we have a "current" VMCS to work with.
 	 */
 	VMPTRLD(vmcs);
-
-	/*
-	 * Load the VMX controls
-	 */
-	if ((error = vmwrite(VMCS_PIN_BASED_CTLS, pinbased_ctls)) != 0)
-		goto done;
-	if ((error = vmwrite(VMCS_PRI_PROC_BASED_CTLS, procbased_ctls)) != 0)
-		goto done;
-	if ((error = vmwrite(VMCS_SEC_PROC_BASED_CTLS, procbased_ctls2)) != 0)
-		goto done;
-	if ((error = vmwrite(VMCS_EXIT_CTLS, exit_ctls)) != 0)
-		goto done;
-	if ((error = vmwrite(VMCS_ENTRY_CTLS, entry_ctls)) != 0)
-		goto done;
-
-	/* Guest state */
-
-	/* Initialize guest IA32_PAT MSR with the default value */
-	pat = PAT_VALUE(0, PAT_WRITE_BACK)	|
-	      PAT_VALUE(1, PAT_WRITE_THROUGH)	|
-	      PAT_VALUE(2, PAT_UNCACHED)	|
-	      PAT_VALUE(3, PAT_UNCACHEABLE)	|
-	      PAT_VALUE(4, PAT_WRITE_BACK)	|
-	      PAT_VALUE(5, PAT_WRITE_THROUGH)	|
-	      PAT_VALUE(6, PAT_UNCACHED)	|
-	      PAT_VALUE(7, PAT_UNCACHEABLE);
-	if ((error = vmwrite(VMCS_GUEST_IA32_PAT, pat)) != 0)
-		goto done;
 
 	/* Host state */
 
@@ -470,36 +422,27 @@ vmcs_set_defaults(struct vmcs *vmcs,
 	fsbase = vmm_get_host_fsbase();
 	if ((error = vmwrite(VMCS_HOST_FS_BASE, fsbase)) != 0)
 		goto done;
-#endif
 
 	idtrbase = vmm_get_host_idtrbase();
 	if ((error = vmwrite(VMCS_HOST_IDTR_BASE, idtrbase)) != 0)
 		goto done;
 
+#else /* __FreeBSD__ */
+	/*
+	 * Configure host sysenter MSRs to be restored on VM exit.
+	 * The thread-specific MSR_INTC_SEP_ESP value is loaded in vmx_run.
+	 */
+	if ((error = vmwrite(VMCS_HOST_IA32_SYSENTER_CS, KCS_SEL)) != 0)
+		goto done;
+	/* Natively defined as MSR_INTC_SEP_EIP */
+	if ((error = vmwrite(VMCS_HOST_IA32_SYSENTER_EIP,
+	    rdmsr(MSR_SYSENTER_EIP_MSR))) != 0)
+		goto done;
+
+#endif /* __FreeBSD__ */
+
 	/* instruction pointer */
-	if ((error = vmwrite(VMCS_HOST_RIP, host_rip)) != 0)
-		goto done;
-
-	/* stack pointer */
-	if ((error = vmwrite(VMCS_HOST_RSP, host_rsp)) != 0)
-		goto done;
-
-	/* eptp */
-	eptp = EPTP(ept_pml4);
-	if ((error = vmwrite(VMCS_EPTP, eptp)) != 0)
-		goto done;
-
-	/* vpid */
-	if ((error = vmwrite(VMCS_VPID, vpid)) != 0)
-		goto done;
-
-	/* msr bitmap */
-	if ((error = vmwrite(VMCS_MSR_BITMAP, msr_bitmap)) != 0)
-		goto done;
-
-	/* exception bitmap */
-	exc_bitmap = 1 << IDT_MC;
-	if ((error = vmwrite(VMCS_EXCEPTION_BITMAP, exc_bitmap)) != 0)
+	if ((error = vmwrite(VMCS_HOST_RIP, (u_long)vmx_exit_guest)) != 0)
 		goto done;
 
 	/* link pointer */

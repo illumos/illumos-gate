@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/amd64/vmm/io/vioapic.c 262139 2014-02-17 22:57:51Z neel $
+ * $FreeBSD$
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -41,11 +41,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/amd64/vmm/io/vioapic.c 262139 2014-02-17 22:57:51Z neel $");
+__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/queue.h>
-#include <sys/cpuset.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
@@ -239,7 +238,6 @@ vioapic_pulse_irq(struct vm *vm, int irq)
  * Reset the vlapic's trigger-mode register to reflect the ioapic pin
  * configuration.
  */
-#if 0	/* XXX */
 static void
 vioapic_update_tmr(struct vm *vm, int vcpuid, void *arg)
 {
@@ -279,7 +277,6 @@ vioapic_update_tmr(struct vm *vm, int vcpuid, void *arg)
 	}
 	VIOAPIC_UNLOCK(vioapic);
 }
-#endif
 
 static uint32_t
 vioapic_read(struct vioapic *vioapic, int vcpuid, uint32_t addr)
@@ -322,9 +319,7 @@ vioapic_write(struct vioapic *vioapic, int vcpuid, uint32_t addr, uint32_t data)
 	uint64_t data64, mask64;
 	uint64_t last, changed;
 	int regnum, pin, lshift;
-#if 0	/* XXX */
 	cpuset_t allvcpus;
-#endif
 
 	regnum = addr & 0xff;
 	switch (regnum) {
@@ -368,11 +363,9 @@ vioapic_write(struct vioapic *vioapic, int vcpuid, uint32_t addr, uint32_t data)
 			VIOAPIC_CTR1(vioapic, "ioapic pin%d: recalculate "
 			    "vlapic trigger-mode register", pin);
 			VIOAPIC_UNLOCK(vioapic);
-#if 0	/* XXX */
 			allvcpus = vm_active_cpus(vioapic->vm);
 			vm_smp_rendezvous(vioapic->vm, vcpuid, allvcpus,
 			    vioapic_update_tmr, NULL);
-#endif
 			VIOAPIC_LOCK(vioapic);
 		}
 
