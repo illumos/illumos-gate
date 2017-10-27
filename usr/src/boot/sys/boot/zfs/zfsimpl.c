@@ -59,6 +59,7 @@ static const char *features_for_read[] = {
 	"org.open-zfs:large_blocks",
 	"org.illumos:sha512",
 	"org.zfsonlinux:large_dnode",
+	"com.joyent:multi_vdev_crash_dump",
 	NULL
 };
 
