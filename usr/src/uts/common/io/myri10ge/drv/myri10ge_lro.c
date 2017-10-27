@@ -24,11 +24,6 @@
  * Use is subject to license terms.
  */
 
-#ifndef lint
-static const char __idstring[] =
-	"@(#)$Id: myri10ge_lro.c,v 1.7 2009-06-29 13:47:22 gallatin Exp $";
-#endif
-
 #include "myri10ge_var.h"
 
 #define	IP_OFFMASK 0x1fff
@@ -73,7 +68,7 @@ myri10ge_in_pseudo(unsigned int a, unsigned int b,
 
 void
 myri10ge_lro_flush(struct myri10ge_slice_state *ss, struct lro_entry *lro,
-	struct myri10ge_mblk_list *mbl)
+    struct myri10ge_mblk_list *mbl)
 {
 	struct ip *ip;
 	struct tcphdr *tcp;
@@ -134,7 +129,7 @@ myri10ge_lro_flush(struct myri10ge_slice_state *ss, struct lro_entry *lro,
 
 int
 myri10ge_lro_rx(struct myri10ge_slice_state *ss, mblk_t *m_head,
-		uint32_t csum, struct myri10ge_mblk_list *mbl)
+    uint32_t csum, struct myri10ge_mblk_list *mbl)
 {
 	struct ether_header *eh;
 	struct ip *ip;
