@@ -23,6 +23,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef _SYS_VM_MACHPARAM_H
@@ -133,7 +134,8 @@ extern "C" {
 
 /*
  * The maximum value for handspreadpages which is the the distance
- * between the two clock hands in pages.
+ * between the two clock hands in pages. This is only used when the page
+ * scanner is first started.
  */
 #define	MAXHANDSPREADPAGES	((64 * 1024 * 1024) / PAGESIZE)
 

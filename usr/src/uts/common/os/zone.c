@@ -461,7 +461,7 @@ static const int ZONE_SYSCALL_API_VERSION = 7;
  * take care to ensure that we only take the zone_physcap_lock mutex when a
  * zone is transitioning over/under its physical memory cap.
  *
- * The "zone_incr_capped" and "zone_decr_capped" functions are used manage
+ * The "zone_incr_capped" and "zone_decr_capped" functions are used to manage
  * the "zone_pcap_data" array and associated counter.
  *
  * The zone_pcap_t structure tracks the zone's physical cap and phyiscal usage
@@ -471,7 +471,7 @@ static const int ZONE_SYSCALL_API_VERSION = 7;
  * zone's maximum RSS is limited to 17.5 TB and twice that with an 8k page size.
  * In the future we may need to expand these counters to 64-bit, but for now
  * we're using 32-bit to conserve memory, since this array is statically
- * allocatd within the kernel based on the maximum number of zones supported.
+ * allocated within the kernel based on the maximum number of zones supported.
  */
 uint_t zone_num_over_cap;
 zone_pcap_t zone_pcap_data[MAX_ZONES];
@@ -2263,8 +2263,6 @@ zone_mcap_kstat_update(kstat_t *ksp, int rw)
 	zmp->zm_execpgin.value.ui64 = zone->zone_execpgin;
 	zmp->zm_fspgin.value.ui64 = zone->zone_fspgin;
 	zmp->zm_anon_alloc_fail.value.ui64 = zone->zone_anon_alloc_fail;
-	zmp->zm_pf_throttle.value.ui64 = zone->zone_pf_throttle;
-	zmp->zm_pf_throttle_usec.value.ui64 = zone->zone_pf_throttle_usec;
 
 	return (0);
 }
@@ -2303,10 +2301,6 @@ zone_mcap_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_execpgin, "execpgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_fspgin, "fspgin", KSTAT_DATA_UINT64);
 	kstat_named_init(&zmp->zm_anon_alloc_fail, "anon_alloc_fail",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_pf_throttle, "n_pf_throttle",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&zmp->zm_pf_throttle_usec, "n_pf_throttle_usec",
 	    KSTAT_DATA_UINT64);
 
 	ksp->ks_update = zone_mcap_kstat_update;
@@ -3091,60 +3085,6 @@ zone_set_initname(zone_t *zone, const char *zone_initname)
 	zone->zone_initname = kmem_alloc(strlen(initname) + 1, KM_SLEEP);
 	(void) strcpy(zone->zone_initname, initname);
 	return (0);
-}
-
-/*
- * The zone_set_mcap_nover and zone_set_mcap_pageout functions are used
- * to provide the physical memory capping kstats.  Since physical memory
- * capping is currently implemented in userland, that code uses the setattr
- * entry point to increment the kstats.  We ignore nover when that setattr is
- * called and we always add in the input value to zone_mcap_pagedout every
- * time that is called.
- */
-/*ARGSUSED*/
-static int
-zone_set_mcap_nover(zone_t *zone, const uint64_t *zone_nover)
-{
-	return (0);
-}
-
-static int
-zone_set_mcap_pageout(zone_t *zone, const uint64_t *zone_pageout)
-{
-	uint64_t pageout;
-	int err;
-
-	if ((err = copyin(zone_pageout, &pageout, sizeof (uint64_t))) == 0) {
-		zone_pcap_t *zp = &zone_pcap_data[zone->zone_id];
-		uint64_t pages;
-
-		pages = btop(pageout);
-#ifndef DEBUG
-		atomic_add_64(&zp->zpcap_pg_out, pages);
-#else
-		atomic_add_64(&zp->zpcap_pg_fs, pages);
-#endif
-	}
-
-	return (err);
-}
-
-/*
- * The zone_set_page_fault_delay function is used to set the number of usecs
- * to throttle page faults.  This is normally 0 but can be set to a non-0 value
- * by the user-land memory capping code when the zone is over its physcial
- * memory cap.
- */
-static int
-zone_set_page_fault_delay(zone_t *zone, const uint32_t *pfdelay)
-{
-	uint32_t dusec;
-	int err;
-
-	if ((err = copyin(pfdelay, &dusec, sizeof (uint32_t))) == 0)
-		zone->zone_pg_flt_delay = dusec;
-
-	return (err);
 }
 
 static int
@@ -6301,19 +6241,6 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		    bufsize) != 0)
 			error = EFAULT;
 		break;
-	case ZONE_ATTR_RSS: {
-		zone_pcap_t *zp = &zone_pcap_data[zone->zone_id];
-		uint64_t phys_mem;
-
-		phys_mem = ptob(zp->zpcap_pg_cnt);
-		size = sizeof (phys_mem);
-		if (bufsize > size)
-			bufsize = size;
-		if (buf != NULL &&
-		    copyout(&phys_mem, buf, bufsize) != 0)
-			error = EFAULT;
-		}
-		break;
 	default:
 		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
 			size = bufsize;
@@ -6345,11 +6272,9 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		return (set_errno(EPERM));
 
 	/*
-	 * Only the ZONE_ATTR_PMCAP_NOVER and ZONE_ATTR_PMCAP_PAGEOUT
-	 * attributes can be set on the global zone.
+	 * No attributes can be set on the global zone.
 	 */
-	if (zoneid == GLOBAL_ZONEID &&
-	    attr != ZONE_ATTR_PMCAP_NOVER && attr != ZONE_ATTR_PMCAP_PAGEOUT) {
+	if (zoneid == GLOBAL_ZONEID) {
 		return (set_errno(EINVAL));
 	}
 
@@ -6362,12 +6287,11 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	mutex_exit(&zonehash_lock);
 
 	/*
-	 * At present most attributes can only be set on non-running,
+	 * At present attributes can only be set on non-running,
 	 * non-global zones.
 	 */
 	zone_status = zone_status_get(zone);
-	if (attr != ZONE_ATTR_PMCAP_NOVER && attr != ZONE_ATTR_PMCAP_PAGEOUT &&
-	    attr != ZONE_ATTR_PG_FLT_DELAY && zone_status > ZONE_IS_READY) {
+	if (zone_status > ZONE_IS_READY) {
 		err = EINVAL;
 		goto done;
 	}
@@ -6388,15 +6312,6 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		break;
 	case ZONE_ATTR_FS_ALLOWED:
 		err = zone_set_fs_allowed(zone, (const char *)buf);
-		break;
-	case ZONE_ATTR_PMCAP_NOVER:
-		err = zone_set_mcap_nover(zone, (const uint64_t *)buf);
-		break;
-	case ZONE_ATTR_PMCAP_PAGEOUT:
-		err = zone_set_mcap_pageout(zone, (const uint64_t *)buf);
-		break;
-	case ZONE_ATTR_PG_FLT_DELAY:
-		err = zone_set_page_fault_delay(zone, (const uint32_t *)buf);
 		break;
 	case ZONE_ATTR_SECFLAGS:
 		err = zone_set_secflags(zone, (psecflags_t *)buf);

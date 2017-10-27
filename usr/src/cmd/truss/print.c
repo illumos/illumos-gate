@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -2547,9 +2547,6 @@ prt_zga(private_t *pri, int raw, long val)
 		case ZONE_ATTR_BRAND:	s = "ZONE_ATTR_BRAND"; break;
 		case ZONE_ATTR_FLAGS:	s = "ZONE_ATTR_FLAGS"; break;
 		case ZONE_ATTR_DID:	s = "ZONE_ATTR_DID"; break;
-		case ZONE_ATTR_PMCAP_NOVER: s = "ZONE_ATTR_PMCAP_NOVER"; break;
-		case ZONE_ATTR_PMCAP_PAGEOUT: s = "ZONE_ATTR_PMCAP_PAGEOUT";
-					break;
 		}
 	}
 

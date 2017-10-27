@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -61,6 +61,7 @@ extern pgcnt_t	desscan;	/* desired pages scanned per second */
 extern pgcnt_t	slowscan;
 extern pgcnt_t	fastscan;
 extern pgcnt_t	pushes;		/* number of pages pushed to swap device */
+extern uint64_t	zone_cap_scan;	/* num times page scan due to zone cap */;
 
 /* writable copies of tunables */
 extern pgcnt_t	maxpgio;	/* max paging i/o per sec before start swaps */

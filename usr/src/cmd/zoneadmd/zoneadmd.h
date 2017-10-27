@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_ZONEADMD_H
@@ -158,12 +158,6 @@ extern void resolve_lofs(zlog_t *zlogp, char *path, size_t pathlen);
 extern int init_console(zlog_t *);
 extern void serve_console(zlog_t *);
 extern void zcons_statechanged();
-
-/*
- * Memory capping thread creation.
- */
-extern void create_mcap_thread(zlog_t *, zoneid_t);
-extern void destroy_mcap_thread();
 
 /*
  * Zone FD log thread creation.

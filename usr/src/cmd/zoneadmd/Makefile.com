@@ -20,7 +20,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 
 PROG= zoneadmd
@@ -30,7 +30,7 @@ include ../../Makefile.ctf
 
 ROOTCMDDIR=	$(ROOTLIB)/zones
 
-OBJS= zoneadmd.o zcons.o zfd.o vplat.o mcap.o
+OBJS= zoneadmd.o zcons.o zfd.o vplat.o
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \

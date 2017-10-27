@@ -856,7 +856,6 @@ as_fault(struct hat *hat, struct as *as, caddr_t addr, size_t size,
 	struct seg *segsav;
 	int as_lock_held;
 	klwp_t *lwp = ttolwp(curthread);
-	zone_t *zonep = curzone;
 
 retry:
 	/*
@@ -892,22 +891,6 @@ retry:
 		if (as == &kas)
 			CPU_STATS_ADDQ(CPU, vm, kernel_asflt, 1);
 		CPU_STATS_EXIT_K();
-		if (zonep->zone_pg_flt_delay != 0) {
-			/*
-			 * The zone in which this process is running is
-			 * currently over it's physical memory cap. Throttle
-			 * page faults to help the user-land memory capper
-			 * catch up. Note that drv_usectohz() rounds up.
-			 */
-			atomic_add_64(&zonep->zone_pf_throttle, 1);
-			atomic_add_64(&zonep->zone_pf_throttle_usec,
-			    zonep->zone_pg_flt_delay);
-			if (zonep->zone_pg_flt_delay < TICK_TO_USEC(1)) {
-				drv_usecwait(zonep->zone_pg_flt_delay);
-			} else {
-				delay(drv_usectohz(zonep->zone_pg_flt_delay));
-			}
-		}
 		break;
 	}
 

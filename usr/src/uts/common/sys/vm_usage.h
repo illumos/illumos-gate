@@ -113,7 +113,6 @@ extern int getvmusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres);
 
 int vm_getusage(uint_t, time_t, vmusage_t *, size_t *, int);
 void vm_usage_init();
-int vm_map_inval(pid_t, caddr_t, size_t);
 
 #endif	/* _KERNEL */
 

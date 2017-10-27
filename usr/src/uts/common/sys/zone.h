@@ -110,20 +110,16 @@ extern "C" {
 #define	ZONE_ATTR_INITNAME	9
 #define	ZONE_ATTR_BOOTARGS	10
 #define	ZONE_ATTR_BRAND		11
-#define	ZONE_ATTR_PMCAP_NOVER	12
-#define	ZONE_ATTR_SCHED_CLASS	13
-#define	ZONE_ATTR_FLAGS		14
-#define	ZONE_ATTR_HOSTID	15
-#define	ZONE_ATTR_FS_ALLOWED	16
-#define	ZONE_ATTR_NETWORK	17
-#define	ZONE_ATTR_DID		18
-#define	ZONE_ATTR_PMCAP_PAGEOUT	19
-#define	ZONE_ATTR_INITNORESTART	20
-#define	ZONE_ATTR_PG_FLT_DELAY	21
-#define	ZONE_ATTR_RSS		22
-#define	ZONE_ATTR_APP_SVC_CT	23
-#define	ZONE_ATTR_SCHED_FIXEDHI	24
-#define	ZONE_ATTR_SECFLAGS	25
+#define	ZONE_ATTR_SCHED_CLASS	12
+#define	ZONE_ATTR_FLAGS		13
+#define	ZONE_ATTR_HOSTID	14
+#define	ZONE_ATTR_FS_ALLOWED	15
+#define	ZONE_ATTR_NETWORK	16
+#define	ZONE_ATTR_DID		17
+#define	ZONE_ATTR_INITNORESTART	18
+#define	ZONE_ATTR_APP_SVC_CT	19
+#define	ZONE_ATTR_SCHED_FIXEDHI	20
+#define	ZONE_ATTR_SECFLAGS	21
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -687,11 +683,6 @@ typedef struct zone {
 	uint64_t	zone_execpgin;		/* exec pages paged in */
 	uint64_t	zone_fspgin;		/* fs pages paged in */
 	uint64_t	zone_anon_alloc_fail;	/* cnt of anon alloc fails */
-	uint64_t	zone_pf_throttle;	/* cnt of page flt throttles */
-	uint64_t	zone_pf_throttle_usec;	/* time of page flt throttles */
-
-	/* Num usecs to throttle page fault when zone is over phys. mem cap */
-	uint32_t	zone_pg_flt_delay;
 
 	psecflags_t	zone_secflags; /* default zone security-flags */
 

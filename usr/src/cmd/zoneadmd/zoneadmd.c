@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -1230,9 +1230,6 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	/* Startup a thread to perform zfd logging/tty svc for the zone. */
 	create_log_thread(zlogp, zone_id);
 
-	/* Startup a thread to perform memory capping for the zone. */
-	create_mcap_thread(zlogp, zone_id);
-
 	return (0);
 
 bad:
@@ -1258,9 +1255,6 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate,
 	if (unmount_cmd == B_FALSE &&
 	    brand_prestatechg(zlogp, zstate, Z_HALT, debug) != 0)
 		return (-1);
-
-	/* Shutting down, stop the memcap thread */
-	destroy_mcap_thread();
 
 	if (vplat_teardown(zlogp, unmount_cmd, rebooting, debug) != 0) {
 		if (!bringup_failure_recovery)
@@ -2101,13 +2095,11 @@ top:
 
 			/*
 			 * Startup a thread to perform the zfd logging/tty svc
-			 * and a thread to perform memory capping for the
-			 * zone. zlogp won't be valid for much longer so use
-			 * logsys.
+			 * for the zone. zlogp won't be valid for much longer
+			 * so use logsys.
 			 */
 			if ((zid = getzoneidbyname(zone_name)) != -1) {
 				create_log_thread(&logsys, zid);
-				create_mcap_thread(&logsys, zid);
 			}
 
 			/* recover the global configuration snapshot */
