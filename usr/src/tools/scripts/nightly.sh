@@ -25,6 +25,7 @@
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+# Copyright (c) 2017 by Delphix. All rights reserved.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -196,11 +197,13 @@ function build {
 
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
-		egrep -e "(^${MAKE}:|[ 	]error[: 	\n])" | \
-		egrep -v "Ignoring unknown host" | \
-		egrep -v "cc .* -o error " | \
-		egrep -v "warning" | tee $TMPDIR/build_errs${SUFFIX} \
-		>> $mail_msg_file
+	    egrep -e "(^${MAKE}:|[ 	]error[: 	\n])" | \
+	    egrep -v "Ignoring unknown host" | \
+	    egrep -v "cc .* -o error " | \
+	    egrep -v "warning" | tee $TMPDIR/build_errs${SUFFIX} \
+	    >> $mail_msg_file
+	    sed -n "/^Undefined[ 	]*first referenced$/,/^ld: fatal:/p" \
+	    < $SRC/${INSTALLOG}.out >> $mail_msg_file
 	if [[ -s $TMPDIR/build_errs${SUFFIX} ]]; then
 		build_ok=n
 		this_build_ok=n
