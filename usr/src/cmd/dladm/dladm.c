@@ -3706,6 +3706,7 @@ print_phys_default(show_state_t *state, datalink_id_t linkid,
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
+	bzero(&pattr, sizeof (pattr));
 	(void) snprintf(pattr.link_phys_device,
 	    sizeof (pattr.link_phys_device), "%s", dpa.dp_dev);
 	(void) dladm_media2str(media, pattr.link_phys_media);
