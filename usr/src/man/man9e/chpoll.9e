@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
+.\" Copyright 2017 Joyent, Inc
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CHPOLL 9E "May 7, 2008"
+.TH CHPOLL 9E "Jan 18, 2017"
 .SH NAME
 chpoll \- poll entry point for a non-STREAMS character driver
 .SH SYNOPSIS
@@ -182,12 +183,25 @@ if (specified_events_are_satisfied_now) {
       *reventsp = satisfied_events & events;
 } else {
       *reventsp = 0;
-      if (!anyyet)
-            *phpp = &my_local_pollhead_structure;
 }
+if ((*reventsp == 0 && !anyyet) || (events & POLLET))
+      *phpp = &my_local_pollhead_structure;
 return (0);
 .fi
 .in -2
+
+Note: Prior to the integration of \fBepoll\fR(5), which included
+edge-triggering via the \fBPOLLET\fR flag, standard chpoll mechanisms would
+only provide a pollhead in \fBphpp\fR if there were no matching events.
+Edge-triggered polling requires that \fBpollwakeup()\fR always be called for a
+resource, so if \fBPOLLET\fR is set in the \fBevents\fR of interest, the chpoll
+method must yield a pollhead and prepare to issue \fBpollwakeup()\fR calls on
+it.
+
+Drivers which are not wired up to make \fBpollwakeup()\fR calls on a pollhead
+when their status changes should emit one from their \fBchpoll\fR routine.
+This will exclude the resource from caching by pollers, since it cannot alert
+them to new events without \fBpollwakeup()\fR notification.
 
 .RE
 .RS +4
@@ -252,7 +266,7 @@ associated with the \fBpollhead\fR is about to be deallocated by the
 number.
 .SH SEE ALSO
 .LP
-\fBpoll\fR(2), \fBnochpoll\fR(9F), \fBpollwakeup\fR(9F)
+\fBpoll\fR(2), \fBepoll\fR(5), \fBnochpoll\fR(9F), \fBpollwakeup\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR

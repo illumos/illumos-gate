@@ -759,8 +759,7 @@ mbi_size(struct preloaded_file *fp, char *cmdline)
 	size = roundup2(size, MULTIBOOT_TAG_ALIGN);
 
 	if (bootp_response != NULL) {
-		size += sizeof(multiboot_tag_network_t) +
-		    sizeof (*bootp_response);
+		size += sizeof(multiboot_tag_network_t) + bootp_response_size;
 		size = roundup2(size, MULTIBOOT_TAG_ALIGN);
 	}
 
@@ -1002,12 +1001,11 @@ multiboot2_exec(struct preloaded_file *fp)
 	if (bootp_response != NULL) {
 		multiboot_tag_network_t *tag;
 		tag = (multiboot_tag_network_t *)
-		    mb_malloc(sizeof (*tag) + sizeof (*bootp_response));
+		    mb_malloc(sizeof(*tag) + bootp_response_size);
 
 		tag->mb_type = MULTIBOOT_TAG_TYPE_NETWORK;
-		tag->mb_size = sizeof (*tag) + sizeof (*bootp_response);
-		memcpy(tag->mb_dhcpack, bootp_response,
-		    sizeof (*bootp_response));
+		tag->mb_size = sizeof(*tag) + bootp_response_size;
+		memcpy(tag->mb_dhcpack, bootp_response, bootp_response_size);
 	}
 
 	if (rsdp != NULL) {

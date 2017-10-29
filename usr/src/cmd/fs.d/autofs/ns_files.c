@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -48,10 +46,8 @@
 #include <strings.h>
 #include "automount.h"
 
-static int read_execout(char *key, char **lp, char *fname, char *line,
-			int linesz);
-static int call_read_execout(char *key, char **lp, char *fname, char *line,
-			int linesz);
+static int read_execout(char *, char **, char *, char *, int);
+static int call_read_execout(char *, char *, char *, int);
 static FILE *file_open(char *, char *, char **, char ***);
 
 /*
@@ -71,13 +67,8 @@ init_files(char **stack, char ***stkptr)
 }
 
 int
-getmapent_files(key, mapname, ml, stack, stkptr, iswildcard, isrestricted)
-	char *key;
-	char *mapname;
-	struct mapline *ml;
-	char **stack, ***stkptr;
-	bool_t *iswildcard;
-	bool_t isrestricted;
+getmapent_files(char *key, char *mapname, struct mapline *ml,
+    char **stack, char ***stkptr, bool_t *iswildcard, bool_t isrestricted)
 {
 	int nserr;
 	FILE *fp;
@@ -111,12 +102,11 @@ getmapent_files(key, mapname, ml, stack, stkptr, iswildcard, isrestricted)
 		int rc;
 
 		if (trace > 1) {
-			trace_prt(1,
-				"\tExecutable map: map=%s key=%s\n",
-				fname, key);
+			trace_prt(1, "\tExecutable map: map=%s key=%s\n",
+			    fname, key);
 		}
 
-		rc = call_read_execout(key, &lp, fname, ml->linebuf, LINESZ);
+		rc = call_read_execout(key, fname, ml->linebuf, LINESZ);
 
 		if (rc != 0) {
 			nserr = __NSW_UNAVAIL;
@@ -147,13 +137,13 @@ getmapent_files(key, mapname, ml, stack, stkptr, iswildcard, isrestricted)
 		if (verbose && syntaxok && isspace(*(uchar_t *)lp)) {
 			syntaxok = 0;
 			syslog(LOG_ERR,
-				"leading space in map entry \"%s\" in %s",
-				lp, mapname);
+			    "leading space in map entry \"%s\" in %s",
+			    lp, mapname);
 		}
 		lq = lineqbuf;
 		unquote(lp, lq);
 		if ((getword(word, wordq, &lp, &lq, ' ', sizeof (word))
-			== -1) || (word[0] == '\0'))
+		    == -1) || (word[0] == '\0'))
 			continue;
 		if (strcmp(word, key) == 0)
 			break;
@@ -164,7 +154,7 @@ getmapent_files(key, mapname, ml, stack, stkptr, iswildcard, isrestricted)
 		}
 		if (word[0] == '+') {
 			nserr = getmapent(key, word+1, ml, stack, stkptr,
-						iswildcard, isrestricted);
+			    iswildcard, isrestricted);
 			if (nserr == __NSW_SUCCESS)
 				goto done;
 			continue;
@@ -178,16 +168,14 @@ getmapent_files(key, mapname, ml, stack, stkptr, iswildcard, isrestricted)
 			if (*key == '/') {
 				if (*word != '/') {
 					syntaxok = 0;
-					syslog(LOG_ERR,
-					"bad key \"%s\" in direct map %s\n",
-					word, mapname);
+					syslog(LOG_ERR, "bad key \"%s\" in "
+					    "direct map %s\n", word, mapname);
 				}
 			} else {
 				if (strchr(word, '/')) {
 					syntaxok = 0;
-					syslog(LOG_ERR,
-					"bad key \"%s\" in indirect map %s\n",
-					word, mapname);
+					syslog(LOG_ERR, "bad key \"%s\" in "
+					    "indirect map %s\n", word, mapname);
 				}
 			}
 		}
@@ -207,12 +195,8 @@ done:
 }
 
 int
-getmapkeys_files(mapname, list, error, cache_time, stack, stkptr)
-	char *mapname;
-	struct dir_entry **list;
-	int *error;
-	int *cache_time;
-	char **stack, ***stkptr;
+getmapkeys_files(char *mapname, struct dir_entry **list, int *error,
+    int *cache_time, char **stack, char ***stkptr)
 {
 	FILE *fp = NULL;
 	char word[MAXPATHLEN+1], wordq[MAXPATHLEN+1];
@@ -269,13 +253,13 @@ getmapkeys_files(mapname, list, error, cache_time, stack, stkptr)
 		if (syntaxok && isspace(*(uchar_t *)lp)) {
 			syntaxok = 0;
 			syslog(LOG_ERR,
-				"leading space in map entry \"%s\" in %s",
-				lp, mapname);
+			    "leading space in map entry \"%s\" in %s",
+			    lp, mapname);
 		}
 		lq = lineqbuf;
 		unquote(lp, lq);
 		if ((getword(word, wordq, &lp, &lq, ' ', MAXFILENAMELEN)
-				== -1) || (word[0] == '\0'))
+		    == -1) || (word[0] == '\0'))
 			continue;
 		/*
 		 * Wildcard entries should be ignored and this should be
@@ -289,7 +273,7 @@ getmapkeys_files(mapname, list, error, cache_time, stack, stkptr)
 			 * Name switch here
 			 */
 			getmapkeys(word+1, list, error, cache_time,
-				stack, stkptr, 0);
+			    stack, stkptr, 0);
 			/*
 			 * the list may have been updated, therefore
 			 * our 'last' may no longer be valid
@@ -322,10 +306,7 @@ done:
 }
 
 int
-loadmaster_files(mastermap, defopts, stack, stkptr)
-	char *mastermap;
-	char *defopts;
-	char **stack, ***stkptr;
+loadmaster_files(char *mastermap, char *defopts, char **stack, char ***stkptr)
 {
 	FILE *fp;
 	int done = 0;
@@ -339,12 +320,11 @@ loadmaster_files(mastermap, defopts, stack, stkptr)
 		return (__NSW_UNAVAIL);
 
 	while ((line = get_line(fp, fname, linebuf,
-				sizeof (linebuf))) != NULL) {
+	    sizeof (linebuf))) != NULL) {
 		unquote(line, lineq);
 		if (macro_expand("", line, lineq, LINESZ)) {
-			syslog(LOG_ERR,
-				"map %s: line too long (max %d chars)",
-				mastermap, LINESZ - 1);
+			syslog(LOG_ERR, "map %s: line too long (max %d chars)",
+			    mastermap, LINESZ - 1);
 			continue;
 		}
 		dir = line;
@@ -414,9 +394,8 @@ pr_msg("Warning: invalid entry for %s in %s ignored.\n", dir, fname);
 }
 
 int
-loaddirect_files(map, local_map, opts, stack, stkptr)
-	char *map, *local_map, *opts;
-	char **stack, ***stkptr;
+loaddirect_files(char *map, char *local_map, char *opts,
+    char **stack, char ***stkptr)
 {
 	FILE *fp;
 	int done = 0;
@@ -428,7 +407,7 @@ loaddirect_files(map, local_map, opts, stack, stkptr)
 		return (__NSW_UNAVAIL);
 
 	while ((line = get_line(fp, fname, linebuf,
-				sizeof (linebuf))) != NULL) {
+	    sizeof (linebuf))) != NULL) {
 		p1 = line;
 		while (*p1 && isspace(*p1))
 			p1++;
@@ -441,7 +420,7 @@ loaddirect_files(map, local_map, opts, stack, stkptr)
 		if (*p1 == '+') {
 			p1++;
 			(void) loaddirect_map(p1, local_map, opts, stack,
-					stkptr);
+			    stkptr);
 		} else {
 			dirinit(p1, local_map, opts, 1, stack, stkptr);
 		}
@@ -460,9 +439,7 @@ loaddirect_files(map, local_map, opts, stack, stkptr)
  * it pushed onto the stack
  */
 static FILE *
-file_open(map, fname, stack, stkptr)
-	char *map, *fname;
-	char **stack, ***stkptr;
+file_open(char *map, char *fname, char **stack, char ***stkptr)
 {
 	FILE *fp;
 
@@ -470,8 +447,9 @@ file_open(map, fname, stack, stkptr)
 		/* prepend an "/etc" */
 		(void) strcpy(fname, "/etc/");
 		(void) strcat(fname, map);
-	} else
+	} else {
 		(void) strcpy(fname, map);
+	}
 
 	fp = fopen(fname, "r");
 
@@ -488,10 +466,7 @@ file_open(map, fname, stack, stkptr)
  * reimplemnted to be MT-HOT.
  */
 int
-stack_op(op, name, stack, stkptr)
-	int op;
-	char *name;
-	char **stack, ***stkptr;
+stack_op(int op, char *name, char **stack, char ***stkptr)
 {
 	char **ptr = NULL;
 	char **stk_top = &stack[STACKSIZ - 1];
@@ -576,7 +551,7 @@ read_execout(char *key, char **lp, char *fname, char *line, int linesz)
 
 	/* setup args for execv */
 	if (((args[0] = strdup(fname)) == NULL) ||
-		((args[1] = strdup(key)) == NULL)) {
+	    ((args[1] = strdup(key)) == NULL)) {
 		if (args[0] != NULL)
 			free(args[0]);
 		syslog(LOG_ERR, "read_execout: Memory allocation failed");
@@ -638,9 +613,10 @@ read_execout(char *key, char **lp, char *fname, char *line, int linesz)
 		free(args[0]);
 		free(args[1]);
 
-		if (trace > 3)
+		if (trace > 3) {
 			trace_prt(1, "\tread_execout: map=%s key=%s line=%s\n",
-			fname, key, line);
+			    fname, key, line);
+		}
 
 		return (status);
 	}
@@ -648,7 +624,7 @@ read_execout(char *key, char **lp, char *fname, char *line, int linesz)
 
 void
 automountd_do_exec_map(void *cookie, char *argp, size_t arg_size,
-		door_desc_t *dfd, uint_t n_desc)
+    door_desc_t *dfd, uint_t n_desc)
 {
 	command_t	*command;
 	char	line[LINESZ];
@@ -680,9 +656,8 @@ automountd_do_exec_map(void *cookie, char *argp, size_t arg_size,
 	door_return(NULL, 0, NULL, 0);
 }
 
-int
-call_read_execout(char *key, char **lp, char *fname, char *line,
-			int linesz)
+static int
+call_read_execout(char *key, char *fname, char *line, int linesz)
 {
 	command_t command;
 	door_arg_t darg;
@@ -703,6 +678,5 @@ call_read_execout(char *key, char **lp, char *fname, char *line,
 
 	ret = door_call(did_exec_map, &darg);
 
-	lp = &line;
 	return (ret);
 }

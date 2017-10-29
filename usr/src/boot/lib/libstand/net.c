@@ -36,7 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -70,10 +69,10 @@ __FBSDID("$FreeBSD$");
  */
 ssize_t
 sendrecv(struct iodesc *d,
-	ssize_t (*sproc)(struct iodesc *, void *, size_t),
-	void *sbuf, size_t ssize,
-	ssize_t (*rproc)(struct iodesc *, void *, size_t, time_t),
-	void *rbuf, size_t rsize)
+    ssize_t (*sproc)(struct iodesc *, void *, size_t),
+    void *sbuf, size_t ssize,
+    ssize_t (*rproc)(struct iodesc *, void **, void**, time_t),
+    void **pkt, void **payload)
 {
 	ssize_t cc;
 	time_t t, tmo, tlast;
@@ -116,7 +115,7 @@ sendrecv(struct iodesc *d,
 		}
 
 		/* Try to get a packet and process it. */
-		cc = (*rproc)(d, rbuf, rsize, tleft);
+		cc = (*rproc)(d, pkt, payload, tleft);
 		/* Return on data, EOF or real error. */
 		if (cc != -1 || errno != 0)
 			return (cc);

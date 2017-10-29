@@ -617,7 +617,7 @@ output_data(void)
 	else
 		fmtstr = (const char *)"const";
 
-	if (fprintf(fddata, "\n%s char __%s[%ld] = { ",
+	if (fprintf(fddata, "\n%s char __%s[%ld] __attribute__((unused)) = { ",
 	    fmtstr, interface, stbufsize) < 0) {
 		(void) fprintf(stderr, Errmsg_wrte, fldata, strerror(errno));
 		return (1);

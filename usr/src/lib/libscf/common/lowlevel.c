@@ -24,6 +24,7 @@
  * Copyright 2013, Joyent, Inc. All rights reserved.
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2017 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -6274,6 +6275,42 @@ scf_pattern_match(scf_matchkey_t **htable, char *fmri, const char *legacy,
 }
 
 /*
+ * Construct an error message from a provided format string and include all
+ * of the matched FMRIs.
+ */
+static char *
+scf_multiple_match_error(scf_pattern_t *pattern, const char *format)
+{
+	scf_match_t *match;
+	size_t len, off;
+	char *msg;
+
+	/*
+	 * Note that strlen(format) includes the length of '%s', which
+	 * accounts for the terminating null byte.
+	 */
+	assert(strstr(format, "%s") != NULL);
+	len = strlen(format) + strlen(pattern->sp_arg);
+	for (match = pattern->sp_matches; match != NULL;
+	    match = match->sm_next)
+		len += strlen(match->sm_key->sk_fmri) + 2;
+
+	if ((msg = malloc(len)) == NULL)
+		return (NULL);
+
+	(void) snprintf(msg, len, format, pattern->sp_arg);
+	off = strlen(msg);
+	for (match = pattern->sp_matches; match != NULL;
+	    match = match->sm_next) {
+		assert(off < len);
+		off += snprintf(msg + off, len - off, "\t%s\n",
+		    match->sm_key->sk_fmri);
+	}
+
+	return (msg);
+}
+
+/*
  * Fails with _INVALID_ARGUMENT, _HANDLE_DESTROYED, _INTERNAL (bad server
  * response or id in use), _NO_MEMORY, _HANDLE_MISMATCH, _CONSTRAINT_VIOLATED,
  * _NOT_FOUND, _NOT_BOUND, _CONNECTION_BROKEN, _NOT_SET, _DELETED,
@@ -6301,8 +6338,6 @@ scf_walk_fmri(scf_handle_t *h, int argc, char **argv, int flags,
 	ssize_t max_name_length;
 	char *pgname = NULL;
 	scf_walkinfo_t info;
-	boolean_t partial_fmri = B_FALSE;
-	boolean_t wildcard_fmri = B_FALSE;
 
 #ifndef NDEBUG
 	if (flags & SCF_WALK_EXPLICIT)
@@ -6510,7 +6545,6 @@ scf_walk_fmri(scf_handle_t *h, int argc, char **argv, int flags,
 			goto error;
 		}
 		pattern[i].sp_type = PATTERN_EXACT;
-		partial_fmri = B_TRUE;	/* we just iterated all instances */
 
 		continue;
 
@@ -6535,7 +6569,6 @@ badfmri:
 			 * Prepend svc:/ to patterns which don't begin with * or
 			 * svc: or lrc:.
 			 */
-			wildcard_fmri = B_TRUE;
 			pattern[i].sp_type = PATTERN_GLOB;
 			if (argv[i][0] == '*' ||
 			    (strlen(argv[i]) >= 4 && argv[i][3] == ':'))
@@ -6548,7 +6581,6 @@ badfmri:
 					    argv[i]);
 			}
 		} else {
-			partial_fmri = B_TRUE;
 			pattern[i].sp_type = PATTERN_PARTIAL;
 			pattern[i].sp_arg = strdup(argv[i]);
 		}
@@ -6789,44 +6821,55 @@ nolegacy:
 				*err = UU_EXIT_FATAL;
 		} else if (!(flags & SCF_WALK_MULTIPLE) &&
 		    pattern[i].sp_matchcount > 1) {
-			size_t len, off;
 			char *msg;
 
-			/*
-			 * Construct a message with all possible FMRIs before
-			 * passing off to error handling function.
-			 *
-			 * Note that strlen(scf_get_msg(...)) includes the
-			 * length of '%s', which accounts for the terminating
-			 * null byte.
-			 */
-			len = strlen(scf_get_msg(SCF_MSG_PATTERN_MULTIMATCH)) +
-			    strlen(pattern[i].sp_arg);
-			for (match = pattern[i].sp_matches; match != NULL;
-			    match = match->sm_next) {
-				len += strlen(match->sm_key->sk_fmri) + 2;
-			}
-			if ((msg = malloc(len)) == NULL) {
+			msg = scf_multiple_match_error(&pattern[i],
+			    scf_get_msg(SCF_MSG_PATTERN_MULTIMATCH));
+
+			if (msg == NULL) {
 				ret = SCF_ERROR_NO_MEMORY;
 				goto error;
 			}
 
-			/* LINTED - format argument */
-			(void) snprintf(msg, len,
-			    scf_get_msg(SCF_MSG_PATTERN_MULTIMATCH),
-			    pattern[i].sp_arg);
-			off = strlen(msg);
-			for (match = pattern[i].sp_matches; match != NULL;
-			    match = match->sm_next) {
-				off += snprintf(msg + off, len - off, "\t%s\n",
-				    match->sm_key->sk_fmri);
-			}
-
 			errfunc(msg);
+
 			if (err != NULL)
 				*err = UU_EXIT_FATAL;
 
 			free(msg);
+
+			/*
+			 * Set matchcount to 0 so the callback is not
+			 * performed for this pattern.
+			 */
+			pattern[i].sp_matchcount = 0;
+
+		} else if ((flags & SCF_WALK_UNIPARTIAL) &&
+		    pattern[i].sp_type == PATTERN_PARTIAL &&
+		    pattern[i].sp_matchcount > 1) {
+			char *msg;
+
+			msg = scf_multiple_match_error(&pattern[i],
+			    scf_get_msg(SCF_MSG_PATTERN_MULTIPARTIAL));
+
+			if (msg == NULL) {
+				ret = SCF_ERROR_NO_MEMORY;
+				goto error;
+			}
+
+			errfunc(msg);
+
+			if (err != NULL)
+				*err = UU_EXIT_FATAL;
+
+			free(msg);
+
+			/*
+			 * Set matchcount to 0 so the callback is not
+			 * performed for this pattern.
+			 */
+			pattern[i].sp_matchcount = 0;
+
 		} else {
 			for (match = pattern[i].sp_matches; match != NULL;
 			    match = match->sm_next) {
@@ -6834,26 +6877,6 @@ nolegacy:
 					info.count++;
 				match->sm_key->sk_seen = 1;
 			}
-		}
-	}
-
-	if (flags & SCF_WALK_UNIPARTIAL && info.count > 1) {
-		/*
-		 * If the SCF_WALK_UNIPARTIAL flag was passed in and we have
-		 * more than one fmri, then this is an error if we matched
-		 * because of a partial fmri parameter, unless we also matched
-		 * more than one fmri because of wildcards in the parameters.
-		 * That is, the presence of wildcards indicates that it is ok
-		 * to match more than one fmri in this case.
-		 * For example, a parameter of 'foo' that matches more than
-		 * one fmri is an error, but parameters of 'foo *bar*' that
-		 * matches more than one is fine.
-		 */
-		if (partial_fmri && !wildcard_fmri) {
-			errfunc(scf_get_msg(SCF_MSG_PATTERN_MULTIPARTIAL));
-			if (err != NULL)
-				*err = UU_EXIT_FATAL;
-			goto error;
 		}
 	}
 
@@ -6875,12 +6898,11 @@ nolegacy:
 		scf_matchkey_t *key;
 
 		/*
-		 * Ignore patterns which didn't match anything or matched too
-		 * many FMRIs.
+		 * Ignore patterns which didn't match anything or
+		 * for which the matchcount has been set to 0 due to an
+		 * error detected above.
 		 */
-		if (pattern[i].sp_matchcount == 0 ||
-		    (!(flags & SCF_WALK_MULTIPLE) &&
-		    pattern[i].sp_matchcount > 1))
+		if (pattern[i].sp_matchcount == 0)
 			continue;
 
 		for (match = pattern[i].sp_matches; match != NULL;

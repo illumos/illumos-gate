@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -2545,40 +2546,31 @@ done:
  *	is true if a message has been queued for the user context receive list.
  */
 static int
-umad_poll(
-	dev_t dev,
-	short events,
-	int anyyet,
-	short *reventsp,
-	struct pollhead **phpp)
+umad_poll(dev_t dev, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp)
 {
-	int			rc = 0;
-	int			minor;
-	umad_uctx_t		*uctx;
-	umad_port_info_t	*port;
-	umad_info_t		*info;
-	short			revent = 0;
+	int		minor;
+	umad_uctx_t	*uctx;
+	umad_info_t	*info;
+	short		revent = 0;
 
 	info = ddi_get_soft_state(umad_statep, UMAD_INSTANCE);
 	if (info == NULL) {
-		rc = ENXIO;
-		goto err1;
+		return (ENXIO);
 	}
 
 	/* lookup the node and port #s */
 	minor = getminor(dev);
 
 	if (ISSM_MINOR(minor)) {
-		rc = ENXIO;
-		goto err1;
+		return (ENXIO);
 	}
 
 	mutex_enter(&info->info_mutex);
 	uctx = info->info_uctx[GET_UCTX(minor)];
 	mutex_exit(&info->info_mutex);
 	ASSERT(uctx != NULL);
-	port = uctx->uctx_port;
-	ASSERT(port != NULL);
+	ASSERT(uctx->uctx_port != NULL);
 
 	/*
 	 * Always signal ready for POLLOUT / POLLWRNORM.
@@ -2595,15 +2587,11 @@ umad_poll(
 		mutex_exit(&uctx->uctx_recv_lock);
 	}
 
-	if (revent == 0) {
-		if (! anyyet)
-			*phpp = &uctx->uctx_pollhead;
+	if ((revent == 0 && !anyyet) || (events & POLLET)) {
+		*phpp = &uctx->uctx_pollhead;
 	}
-
 	*reventsp = revent;
-err1:
-
-	return (rc);
+	return (0);
 }
 
 /*

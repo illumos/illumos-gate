@@ -24,6 +24,11 @@
 
 $mapfile_version 2
 
+SYMBOL_VERSION ILLUMOS_0.2 {
+	global:
+		resident		{ FLAGS = NODIRECT; };
+} ILLUMOS_0.1;
+
 SYMBOL_VERSION ILLUMOS_0.1 {
 	global:
 		allow_severity		{ FLAGS = NODIRECT; };

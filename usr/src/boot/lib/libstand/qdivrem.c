@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include <sys/stddef.h>
 
 /*
  * Multiprecision divide.  This algorithm is from Knuth vol. 2 (2nd ed),
@@ -70,7 +70,7 @@ shl(digit *p, int len, int sh)
 }
 
 /*
- * __qdivrem(u, v, rem) returns u/v and, optionally, sets *rem to u%v.
+ * __udivmoddi4(u, v, rem) returns u/v and, optionally, sets *rem to u%v.
  *
  * We do this in base 2-sup-HALF_BITS, so that all intermediate products
  * fit within u_int.  As a consequence, the maximum length dividend and
@@ -78,8 +78,7 @@ shl(digit *p, int len, int sh)
  * leading zeros).
  */
 u_quad_t
-__qdivrem(uq, vq, arq)
-	u_quad_t uq, vq, *arq;
+__udivmoddi4(u_quad_t uq, u_quad_t vq, u_quad_t *arq)
 {
 	union uu tmp;
 	digit *u, *v, *q;
@@ -279,23 +278,21 @@ __qdivrem(uq, vq, arq)
  */
 
 u_quad_t
-__udivdi3(a, b)
-	u_quad_t a, b;
+__udivdi3(u_quad_t a, u_quad_t b)
 {
 
-	return (__qdivrem(a, b, (u_quad_t *)0));
+	return (__udivmoddi4(a, b, NULL));
 }
 
 /*
  * Return remainder after dividing two unsigned quads.
  */
 u_quad_t
-__umoddi3(a, b)
-	u_quad_t a, b;
+__umoddi3(u_quad_t a, u_quad_t b)
 {
 	u_quad_t r;
 
-	(void)__qdivrem(a, b, &r);
+	(void)__udivmoddi4(a, b, &r);
 	return (r);
 }
 
@@ -304,8 +301,7 @@ __umoddi3(a, b)
  * ??? if -1/2 should produce -1 on this machine, this code is wrong
  */
 quad_t
-__divdi3(a, b)
-        quad_t a, b;
+__divdi3(quad_t a, quad_t b)
 {
 	u_quad_t ua, ub, uq;
 	int neg;
@@ -318,7 +314,7 @@ __divdi3(a, b)
 		ub = -(u_quad_t)b, neg ^= 1;
 	else
 		ub = b;
-	uq = __qdivrem(ua, ub, (u_quad_t *)0);
+	uq = __udivmoddi4(ua, ub, NULL);
 	return (neg ? -uq : uq);
 }
 
@@ -329,8 +325,7 @@ __divdi3(a, b)
  * If -1/2 should produce -1 on this machine, this code is wrong.
  */
 quad_t
-__moddi3(a, b)
-        quad_t a, b;
+__moddi3(quad_t a, quad_t b)
 {
 	u_quad_t ua, ub, ur;
 	int neg;
@@ -343,6 +338,18 @@ __moddi3(a, b)
 		ub = -(u_quad_t)b;
 	else
 		ub = b;
-	(void)__qdivrem(ua, ub, &ur);
+	(void)__udivmoddi4(ua, ub, &ur);
 	return (neg ? -ur : ur);
+}
+
+quad_t
+__divmoddi4(quad_t a, quad_t b, quad_t *r)
+{
+	quad_t d;
+
+	d = __divdi3(a, b);
+	if (r != NULL)
+		*r = a - (b * d);
+
+	return (d);
 }
