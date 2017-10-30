@@ -176,7 +176,7 @@ RUNTIME_FIXUP:
 #define	_CHECK_STACK(stack, top, pop, push)	\
 	ficlStackCheckNospill(stack, top, pop, push)
 
-FICL_PLATFORM_INLINE void
+static FICL_PLATFORM_INLINE void
 ficlStackCheckNospill(ficlStack *stack, ficlCell *top, int popCells,
     int pushCells)
 {

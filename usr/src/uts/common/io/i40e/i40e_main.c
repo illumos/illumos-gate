@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -447,6 +447,18 @@ i40e_notice(i40e_t *i40e, const char *fmt, ...)
 	va_start(ap, fmt);
 	i40e_dev_err(i40e, CE_NOTE, B_TRUE, fmt, ap);
 	va_end(ap);
+}
+
+/*
+ * Various parts of the driver need to know if the controller is from the X722
+ * family, which has a few additional capabilities and different programming
+ * means. We don't consider virtual functions as part of this as they are quite
+ * different and will require substantially more work.
+ */
+static boolean_t
+i40e_is_x722(i40e_t *i40e)
+{
+	return (i40e->i40e_hw_space.mac.type == I40E_MAC_X722);
 }
 
 static void
@@ -1700,6 +1712,13 @@ static boolean_t
 i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 {
 	int intr_types, rc;
+	uint_t max_trqpairs;
+
+	if (i40e_is_x722(i40e)) {
+		max_trqpairs = I40E_722_MAX_TC_QUEUES;
+	} else {
+		max_trqpairs = I40E_710_MAX_TC_QUEUES;
+	}
 
 	rc = ddi_intr_get_supported_types(devinfo, &intr_types);
 	if (rc != DDI_SUCCESS) {
@@ -1715,8 +1734,7 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 		if (i40e_alloc_intr_handles(i40e, devinfo,
 		    DDI_INTR_TYPE_MSIX)) {
 			i40e->i40e_num_trqpairs =
-			    MIN(i40e->i40e_intr_count - 1,
-			    I40E_AQ_VSI_TC_QUE_SIZE_MAX);
+			    MIN(i40e->i40e_intr_count - 1, max_trqpairs);
 			return (B_TRUE);
 		}
 	}
@@ -1934,8 +1952,9 @@ i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 	context.info.queue_mapping[0] = I40E_ASSIGN_ALL_QUEUES;
 
 	/*
-	 * tc_queues determines the size of the traffic class, where the
-	 * size is 2^^tc_queues to a maximum of 64.
+	 * tc_queues determines the size of the traffic class, where the size is
+	 * 2^^tc_queues to a maximum of 64 for the X710 and 128 for the X722.
+	 *
 	 * Some examples:
 	 * 	i40e_num_trqpairs == 1 =>  tc_queues = 0, 2^^0 = 1.
 	 * 	i40e_num_trqpairs == 7 =>  tc_queues = 3, 2^^3 = 8.
@@ -1972,73 +1991,156 @@ i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 }
 
 /*
+ * Configure the RSS key. For the X710 controller family, this is set on a
+ * per-PF basis via registers. For the X722, this is done on a per-VSI basis
+ * through the admin queue.
+ */
+static boolean_t
+i40e_config_rss_key(i40e_t *i40e, i40e_hw_t *hw)
+{
+	uint32_t seed[I40E_PFQF_HKEY_MAX_INDEX + 1];
+
+	(void) random_get_pseudo_bytes((uint8_t *)seed, sizeof (seed));
+
+	if (i40e_is_x722(i40e)) {
+		struct i40e_aqc_get_set_rss_key_data key;
+		const char *u8seed = (char *)seed;
+		enum i40e_status_code status;
+
+		CTASSERT(sizeof (key) >= (sizeof (key.standard_rss_key) +
+		    sizeof (key.extended_hash_key)));
+
+		bcopy(u8seed, key.standard_rss_key,
+		    sizeof (key.standard_rss_key));
+		bcopy(&u8seed[sizeof (key.standard_rss_key)],
+		    key.extended_hash_key, sizeof (key.extended_hash_key));
+
+		status = i40e_aq_set_rss_key(hw, i40e->i40e_vsi_num, &key);
+		if (status != I40E_SUCCESS) {
+			i40e_error(i40e, "failed to set rss key: %d", status);
+			return (B_FALSE);
+		}
+	} else {
+		uint_t i;
+		for (i = 0; i <= I40E_PFQF_HKEY_MAX_INDEX; i++)
+			i40e_write_rx_ctl(hw, I40E_PFQF_HKEY(i), seed[i]);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Populate the LUT. The size of each entry in the LUT depends on the controller
+ * family, with the X722 using a known 7-bit width. On the X710 controller, this
+ * is programmed through its control registers where as on the X722 this is
+ * configured through the admin queue. Also of note, the X722 allows the LUT to
+ * be set on a per-PF or VSI basis. At this time, as we only have a single VSI,
+ * we use the PF setting as it is the primary VSI.
+ *
+ * We populate the LUT in a round robin fashion with the rx queue indices from 0
+ * to i40e_num_trqpairs - 1.
+ */
+static boolean_t
+i40e_config_rss_hlut(i40e_t *i40e, i40e_hw_t *hw)
+{
+	uint32_t *hlut;
+	uint8_t lut_mask;
+	uint_t i;
+	boolean_t ret = B_FALSE;
+
+	/*
+	 * We always configure the PF with a table size of 512 bytes in
+	 * i40e_chip_start().
+	 */
+	hlut = kmem_alloc(I40E_HLUT_TABLE_SIZE, KM_NOSLEEP);
+	if (hlut == NULL) {
+		i40e_error(i40e, "i40e_config_rss() buffer allocation failed");
+		return (B_FALSE);
+	}
+
+	/*
+	 * The width of the X722 is apparently defined to be 7 bits, regardless
+	 * of the capability.
+	 */
+	if (i40e_is_x722(i40e)) {
+		lut_mask = (1 << 7) - 1;
+	} else {
+		lut_mask = (1 << hw->func_caps.rss_table_entry_width) - 1;
+	}
+
+	for (i = 0; i < I40E_HLUT_TABLE_SIZE; i++)
+		((uint8_t *)hlut)[i] = (i % i40e->i40e_num_trqpairs) & lut_mask;
+
+	if (i40e_is_x722(i40e)) {
+		enum i40e_status_code status;
+		status = i40e_aq_set_rss_lut(hw, i40e->i40e_vsi_num, B_TRUE,
+		    (uint8_t *)hlut, I40E_HLUT_TABLE_SIZE);
+		if (status != I40E_SUCCESS) {
+			i40e_error(i40e, "failed to set RSS LUT: %d", status);
+			goto out;
+		}
+	} else {
+		for (i = 0; i < I40E_HLUT_TABLE_SIZE >> 2; i++) {
+			I40E_WRITE_REG(hw, I40E_PFQF_HLUT(i), hlut[i]);
+		}
+	}
+	ret = B_TRUE;
+out:
+	kmem_free(hlut, I40E_HLUT_TABLE_SIZE);
+	return (ret);
+}
+
+/*
  * Set up RSS.
  * 	1. Seed the hash key.
  *	2. Enable PCTYPEs for the hash filter.
  *	3. Populate the LUT.
- *
- * Note: When/if X722 support is added the hash key is seeded via a call
- *	 to i40e_aq_set_rss_key(), and the LUT is populated using
- *	 i40e_aq_set_rss_lut().
  */
 static boolean_t
 i40e_config_rss(i40e_t *i40e, i40e_hw_t *hw)
 {
-	int i;
-	uint8_t lut_mask;
-	uint32_t *hlut;
 	uint64_t hena;
-	boolean_t rv = B_TRUE;
-	uint32_t seed[I40E_PFQF_HKEY_MAX_INDEX + 1];
 
 	/*
 	 * 1. Seed the hash key
 	 */
-	(void) random_get_pseudo_bytes((uint8_t *)seed, sizeof (seed));
-
-	for (i = 0; i <= I40E_PFQF_HKEY_MAX_INDEX; i++)
-		i40e_write_rx_ctl(hw, I40E_PFQF_HKEY(i), seed[i]);
+	if (!i40e_config_rss_key(i40e, hw))
+		return (B_FALSE);
 
 	/*
 	 * 2. Configure PCTYPES
 	 */
 	hena = (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_OTHER) |
 	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_TCP) |
+	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_SCTP) |
 	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_UDP) |
 	    (1ULL << I40E_FILTER_PCTYPE_FRAG_IPV4) |
 	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_OTHER) |
 	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_TCP) |
+	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_SCTP) |
 	    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_UDP) |
 	    (1ULL << I40E_FILTER_PCTYPE_FRAG_IPV6) |
 	    (1ULL << I40E_FILTER_PCTYPE_L2_PAYLOAD);
+
+	/*
+	 * Add additional types supported by the X722 controller.
+	 */
+	if (i40e_is_x722(i40e)) {
+		hena |= (1ULL << I40E_FILTER_PCTYPE_NONF_UNICAST_IPV4_UDP) |
+		    (1ULL << I40E_FILTER_PCTYPE_NONF_MULTICAST_IPV4_UDP) |
+		    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV4_TCP_SYN_NO_ACK) |
+		    (1ULL << I40E_FILTER_PCTYPE_NONF_UNICAST_IPV6_UDP) |
+		    (1ULL << I40E_FILTER_PCTYPE_NONF_MULTICAST_IPV6_UDP) |
+		    (1ULL << I40E_FILTER_PCTYPE_NONF_IPV6_TCP_SYN_NO_ACK);
+	}
 
 	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(0), (uint32_t)hena);
 	i40e_write_rx_ctl(hw, I40E_PFQF_HENA(1), (uint32_t)(hena >> 32));
 
 	/*
 	 * 3. Populate LUT
-	 *
-	 * Each entry in the LUT is 8 bits and is used to index
-	 * the rx queue. Populate the LUT in a round robin fashion
-	 * with rx queue indices from 0 to i40e_num_trqpairs - 1.
 	 */
-	hlut = kmem_alloc(hw->func_caps.rss_table_size, KM_NOSLEEP);
-	if (hlut == NULL) {
-		i40e_error(i40e, "i40e_config_rss() buffer allocation failed");
-		return (B_FALSE);
-	}
-
-	lut_mask = (1 << hw->func_caps.rss_table_entry_width) - 1;
-
-	for (i = 0; i < hw->func_caps.rss_table_size; i++)
-		((uint8_t *)hlut)[i] = (i % i40e->i40e_num_trqpairs) & lut_mask;
-
-	for (i = 0; i < hw->func_caps.rss_table_size >> 2; i++)
-		I40E_WRITE_REG(hw, I40E_PFQF_HLUT(i), hlut[i]);
-
-	kmem_free(hlut, hw->func_caps.rss_table_size);
-
-	return (rv);
+	return (i40e_config_rss_hlut(i40e, hw));
 }
 
 /*
@@ -2069,7 +2171,9 @@ i40e_chip_start(i40e_t *i40e)
 	i40e_init_macaddrs(i40e, hw);
 
 	/*
-	 * Set up the filter control.
+	 * Set up the filter control. If the hash lut size is changed from
+	 * I40E_HASH_LUT_SIZE_512 then I40E_HLUT_TABLE_SIZE and
+	 * i40e_config_rss_hlut() will need to be updated.
 	 */
 	bzero(&filter, sizeof (filter));
 	filter.enable_ethtype = TRUE;

@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -732,6 +733,103 @@ n2h24(const uchar_t *ptr)
 	return ((ptr[0] << 16) | (ptr[1] << 8) | ptr[2]);
 }
 
+static boolean_t
+idm_dataseglenokay(idm_conn_t *ic, idm_pdu_t *pdu)
+{
+	iscsi_hdr_t	*bhs;
+
+	if (ic->ic_conn_type == CONN_TYPE_TGT &&
+	    pdu->isp_datalen > ic->ic_conn_params.max_recv_dataseglen) {
+		IDM_CONN_LOG(CE_WARN,
+		    "idm_dataseglenokay: exceeded the max data segment length");
+		return (B_FALSE);
+	}
+
+	bhs = pdu->isp_hdr;
+	/*
+	 * Filter out any RFC3720 data-size violations.
+	 */
+	switch (IDM_PDU_OPCODE(pdu)) {
+	case ISCSI_OP_SCSI_TASK_MGT_MSG:
+	case ISCSI_OP_SCSI_TASK_MGT_RSP:
+	case ISCSI_OP_RTT_RSP:
+	case ISCSI_OP_LOGOUT_CMD:
+		/*
+		 * Data-segment not allowed and additional headers not allowed.
+		 * (both must be zero according to the RFC3720.)
+		 */
+		if (bhs->hlength != 0 || pdu->isp_datalen != 0)
+			return (B_FALSE);
+		break;
+	case ISCSI_OP_NOOP_OUT:
+	case ISCSI_OP_LOGIN_CMD:
+	case ISCSI_OP_TEXT_CMD:
+	case ISCSI_OP_SNACK_CMD:
+	case ISCSI_OP_NOOP_IN:
+	case ISCSI_OP_SCSI_RSP:
+	case ISCSI_OP_LOGIN_RSP:
+	case ISCSI_OP_TEXT_RSP:
+	case ISCSI_OP_SCSI_DATA_RSP:
+	case ISCSI_OP_LOGOUT_RSP:
+	case ISCSI_OP_ASYNC_EVENT:
+	case ISCSI_OP_REJECT_MSG:
+		/*
+		 * Additional headers not allowed.
+		 * (must be zero according to RFC3720.)
+		 */
+		if (bhs->hlength)
+			return (B_FALSE);
+		break;
+	case ISCSI_OP_SCSI_CMD:
+		/*
+		 * See RFC3720, section 10.3
+		 *
+		 * For pure read cmds, data-segment-length must be zero.
+		 * For non-final transfers, data-size must be even number of
+		 * 4-byte words.
+		 * For any transfer, an expected byte count must be provided.
+		 * For bidirectional transfers, an additional-header must be
+		 * provided (for the read byte-count.)
+		 */
+		if (pdu->isp_datalen) {
+			if ((bhs->flags & (ISCSI_FLAG_CMD_READ |
+			    ISCSI_FLAG_CMD_WRITE)) == ISCSI_FLAG_CMD_READ)
+				return (B_FALSE);
+			if ((bhs->flags & ISCSI_FLAG_FINAL) == 0 &&
+			    ((pdu->isp_datalen & 0x3) != 0))
+				return (B_FALSE);
+		}
+		if (bhs->flags & (ISCSI_FLAG_CMD_READ |
+		    ISCSI_FLAG_CMD_WRITE)) {
+			iscsi_scsi_cmd_hdr_t *cmdhdr =
+			    (iscsi_scsi_cmd_hdr_t *)bhs;
+			/*
+			 * we're transfering some data, we must have a
+			 * byte count
+			 */
+			if (cmdhdr->data_length == 0)
+				return (B_FALSE);
+		}
+		break;
+	case ISCSI_OP_SCSI_DATA:
+		/*
+		 * See RFC3720, section 10.7
+		 *
+		 * Additional headers aren't allowed, and the data-size must
+		 * be an even number of 4-byte words (unless the final bit
+		 * is set.)
+		 */
+		if (bhs->hlength)
+			return (B_FALSE);
+		if ((bhs->flags & ISCSI_FLAG_FINAL) == 0 &&
+		    ((pdu->isp_datalen & 0x3) != 0))
+			return (B_FALSE);
+		break;
+	default:
+		break;
+	}
+	return (B_TRUE);
+}
 
 static idm_status_t
 idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
@@ -764,10 +862,10 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	pdu->isp_hdrlen = sizeof (iscsi_hdr_t) +
 	    (bhs->hlength * sizeof (uint32_t));
 	pdu->isp_datalen = n2h24(bhs->dlength);
-	if (ic->ic_conn_type == CONN_TYPE_TGT &&
-	    pdu->isp_datalen > ic->ic_conn_params.max_recv_dataseglen) {
+
+	if (!idm_dataseglenokay(ic, pdu)) {
 		IDM_CONN_LOG(CE_WARN,
-		    "idm_sorecvhdr: exceeded the max data segment length");
+		    "idm_sorecvhdr: invalid data segment length");
 		return (IDM_STATUS_FAIL);
 	}
 	if (bhs->hlength > IDM_SORX_CACHE_AHSLEN) {
@@ -1550,12 +1648,11 @@ idm_so_rx_datain(idm_conn_t *ic, idm_pdu_t *pdu)
 
 	ASSERT(ic != NULL);
 	ASSERT(pdu != NULL);
+	ASSERT(IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA_RSP);
 
 	bhs	= (iscsi_data_hdr_t *)pdu->isp_hdr;
 	datasn	= ntohl(bhs->datasn);
 	offset	= ntohl(bhs->offset);
-
-	ASSERT(bhs->opcode == ISCSI_OP_SCSI_DATA_RSP);
 
 	/*
 	 * Look up the task corresponding to the initiator task tag
@@ -1611,7 +1708,7 @@ idm_so_rx_datain(idm_conn_t *ic, idm_pdu_t *pdu)
 	 * Revisit, need to provide an explicit client entry point for
 	 * phase collapse completions.
 	 */
-	if (((ihp->opcode & ISCSI_OPCODE_MASK) == ISCSI_OP_SCSI_DATA_RSP) &&
+	if ((IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA_RSP) &&
 	    (idrhp->flags & ISCSI_FLAG_DATA_STATUS)) {
 		(*ic->ic_conn_ops.icb_rx_scsi_rsp)(ic, pdu);
 	}
@@ -1638,10 +1735,10 @@ idm_so_rx_dataout(idm_conn_t *ic, idm_pdu_t *pdu)
 
 	ASSERT(ic != NULL);
 	ASSERT(pdu != NULL);
+	ASSERT(IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA);
 
 	bhs = (iscsi_data_hdr_t *)pdu->isp_hdr;
 	offset = ntohl(bhs->offset);
-	ASSERT(bhs->opcode == ISCSI_OP_SCSI_DATA);
 
 	/*
 	 * Look up the task corresponding to the initiator task tag
@@ -1686,6 +1783,32 @@ idm_so_rx_dataout(idm_conn_t *ic, idm_pdu_t *pdu)
 	 * state change).
 	 */
 	if (bhs->flags & ISCSI_FLAG_FINAL) {
+		/*
+		 * We have gotten the last data-message for the current
+		 * transfer.  idb_xfer_len represents the data that the
+		 * command intended to transfer, it does not represent the
+		 * actual number of bytes transferred. If we have not
+		 * transferred the expected number of bytes something is
+		 * wrong.
+		 *
+		 * We have two options, when there is a mismatch, we can
+		 * regard the transfer as invalid -- or we can modify our
+		 * notion of "xfer_len." In order to be as stringent as
+		 * possible, here we regard this transfer as in error; and
+		 * bail out.
+		 */
+		if (idb->idb_buflen == idb->idb_xfer_len &&
+		    idb->idb_buflen !=
+		    (idb->idb_exp_offset - idb->idb_bufoffset)) {
+			printf("idm_so_rx_dataout: incomplete transfer, "
+			    "protocol err");
+			IDM_CONN_LOG(CE_NOTE,
+			    "idm_so_rx_dataout: incomplete transfer: %ld, %d",
+			    offset, (int)(idb->idb_exp_offset - offset));
+			idm_task_rele(idt);
+			idm_pdu_rx_protocol_error(ic, pdu);
+			return;
+		}
 		/*
 		 * We only want to call idm_buf_rx_from_ini_done once
 		 * per transfer.  It's possible that this task has
@@ -1884,7 +2007,7 @@ idm_sorecv_scsidata(idm_conn_t *ic, idm_pdu_t *pdu)
 	bhs	= (iscsi_data_hdr_t *)pdu->isp_hdr;
 
 	offset	= ntohl(bhs->offset);
-	opcode	= bhs->opcode;
+	opcode	= IDM_PDU_OPCODE(pdu);
 	dlength = n2h24(bhs->dlength);
 
 	ASSERT((opcode == ISCSI_OP_SCSI_DATA_RSP) ||
@@ -2196,8 +2319,8 @@ idm_i_so_tx(idm_pdu_t *pdu)
 		ihp = (iscsi_data_hdr_t *)pdu->isp_hdr;
 		/* Write of immediate data */
 		if (ic->ic_ffp &&
-		    (ihp->opcode == ISCSI_OP_SCSI_CMD ||
-		    ihp->opcode == ISCSI_OP_SCSI_DATA)) {
+		    (IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_CMD ||
+		    IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA)) {
 			idt = idm_task_find(ic, ihp->itt, ihp->ttt);
 			if (idt) {
 				mutex_enter(&idt->idt_mutex);

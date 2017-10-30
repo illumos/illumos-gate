@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -450,7 +451,6 @@ evtchndrv_poll(dev_t dev, short ev, int anyyet, short *revp, pollhead_t **phpp)
 	short mask = 0;
 
 	ep = EVTCHNDRV_INST2SOFTS(EVTCHNDRV_MINOR2INST(minor));
-	*phpp = (struct pollhead *)NULL;
 
 	if (ev & POLLOUT)
 		mask |= POLLOUT;
@@ -458,12 +458,13 @@ evtchndrv_poll(dev_t dev, short ev, int anyyet, short *revp, pollhead_t **phpp)
 		mask |= POLLERR;
 	if (ev & (POLLIN | POLLRDNORM)) {
 		mutex_enter(&ep->evtchn_lock);
-		if (ep->ring_cons != ep->ring_prod)
+		if (ep->ring_cons != ep->ring_prod) {
 			mask |= (POLLIN | POLLRDNORM) & ev;
-		else
-			if (mask == 0 && !anyyet)
-				*phpp = &ep->evtchn_pollhead;
+		}
 		mutex_exit(&ep->evtchn_lock);
+	}
+	if ((mask == 0 && !anyyet) || (ev & POLLET)) {
+		*phpp = &ep->evtchn_pollhead;
 	}
 	*revp = mask;
 	return (0);

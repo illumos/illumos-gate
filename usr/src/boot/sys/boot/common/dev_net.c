@@ -57,6 +57,7 @@
 #include <netinet/in_systm.h>
 
 #include <stand.h>
+#include <stddef.h>
 #include <string.h>
 #include <net.h>
 #include <netif.h>
@@ -244,6 +245,8 @@ net_getparams(int sock)
 {
 	char buf[MAXHOSTNAMELEN];
 	n_long rootaddr, smask;
+	struct iodesc *d = socktodesc(sock);
+	extern struct in_addr servip;
 
 #ifdef	SUPPORT_BOOTP
 	/*
@@ -252,8 +255,26 @@ net_getparams(int sock)
 	 * be initialized.  If any remain uninitialized, we will
 	 * use RARP and RPC/bootparam (the Sun way) to get them.
 	 */
-	if (try_bootp)
-		bootp(sock, BOOTP_NONE);
+	if (try_bootp) {
+		int rc = -1;
+		if (bootp_response != NULL) {
+			rc = dhcp_try_rfc1048(bootp_response->bp_vend,
+			    bootp_response_size -
+			    offsetof(struct bootp, bp_vend));
+
+			if (servip.s_addr == 0)
+				servip = bootp_response->bp_siaddr;
+			if (rootip.s_addr == 0)
+				rootip = bootp_response->bp_siaddr;
+			if (gateip.s_addr == 0)
+				gateip = bootp_response->bp_giaddr;
+			if (myip.s_addr == 0)
+				myip = bootp_response->bp_yiaddr;
+			d->myip = myip;
+		}
+		if (rc < 0)
+			bootp(sock, BOOTP_NONE);
+	}
 	if (myip.s_addr != 0)
 		goto exit;
 #ifdef	NETIF_DEBUG

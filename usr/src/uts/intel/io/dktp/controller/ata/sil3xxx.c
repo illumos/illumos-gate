@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").  
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -36,8 +36,6 @@
  * 6. Hot Plug Support
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ata_common.h"
 #include "sil3xxx.h"
 #include <sys/pci.h>
@@ -48,10 +46,9 @@ int sfiscfg[] = {SFISCFG_0, SFISCFG_1, SFISCFG_2, SFISCFG_3};
 /*
  * Controller specific initialization
  */
+/* ARGSUSED */
 uint_t
-sil3xxx_init_controller(dev_info_t *dip,
-	/* LINTED */
-	ushort_t vendor_id, ushort_t device_id)
+sil3xxx_init_controller(dev_info_t *dip, ushort_t vendor_id, ushort_t device_id)
 {
 	ddi_acc_handle_t  pci_conf_handle; /* pci config space handle */
 	uint8_t cache_lnsz, frrc = 0;
@@ -60,7 +57,7 @@ sil3xxx_init_controller(dev_info_t *dip,
 
 #ifdef	DEBUG
 	/* LINTED */
-	ushort_t sfiscfg_val;
+	ushort_t sfiscfg_val __unused;
 #endif
 
 	/*
@@ -69,7 +66,7 @@ sil3xxx_init_controller(dev_info_t *dip,
 	 * pciide controller (all channels)
 	 */
 	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_get_parent(dip),
-		DDI_PROP_DONTPASS, "sil3xxx-initialized")) {
+	    DDI_PROP_DONTPASS, "sil3xxx-initialized")) {
 		return (TRUE);
 	}
 
@@ -103,7 +100,7 @@ sil3xxx_init_controller(dev_info_t *dip,
 	 */
 	if (cache_lnsz != 0) {
 		frrc = (cache_lnsz * 4 / 32) +
-			(((cache_lnsz * 4) % 32) ? 1 : 0) - 1;
+		    (((cache_lnsz * 4) % 32) ? 1 : 0) - 1;
 	}
 
 	if (device_id == SIL3114_DEVICE_ID) {
@@ -127,17 +124,17 @@ sil3xxx_init_controller(dev_info_t *dip,
 		 */
 #ifdef	DEBUG
 		GET_BAR5_INDIRECT(pci_conf_handle, sfiscfg[i],
-			sfiscfg_val);
+		    sfiscfg_val);
 		ADBG_WARN(("sil3xxx_init_controller: old val SFISCfg "
-			"ch%d: %x\n", i, sfiscfg_val));
+		    "ch%d: %x\n", i, sfiscfg_val));
 #endif
 		PUT_BAR5_INDIRECT(pci_conf_handle, sfiscfg[i],
-			SFISCFG_ERRATA);
+		    SFISCFG_ERRATA);
 #ifdef	DEBUG
 		GET_BAR5_INDIRECT(pci_conf_handle, sfiscfg[i],
-			sfiscfg_val);
+		    sfiscfg_val);
 		ADBG_WARN(("sil3xxx_init_controller: new val SFISCfg "
-			"ch%d: %x\n", i, sfiscfg_val));
+		    "ch%d: %x\n", i, sfiscfg_val));
 #endif
 	}
 
@@ -146,7 +143,7 @@ sil3xxx_init_controller(dev_info_t *dip,
 
 	/* Create property indicating that initialization was done */
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ddi_get_parent(dip),
-		"sil3xxx-initialized", 1);
+	    "sil3xxx-initialized", 1);
 
 	return (TRUE);
 }

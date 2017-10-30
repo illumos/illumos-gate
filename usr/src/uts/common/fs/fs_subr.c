@@ -25,7 +25,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -416,6 +416,17 @@ int
 fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
     struct pollhead **phpp, caller_context_t *ct)
 {
+	/*
+	 * Reject all attempts for edge-triggered polling.  These should only
+	 * occur when regular files are added to a /dev/poll handle which is in
+	 * epoll mode.  The Linux epoll does not allow epoll-ing on regular
+	 * files at all, so rejecting EPOLLET requests is congruent with those
+	 * expectations.
+	 */
+	if (events & POLLET) {
+		return (EPERM);
+	}
+
 	*reventsp = 0;
 	if (events & POLLIN)
 		*reventsp |= POLLIN;
@@ -427,7 +438,15 @@ fs_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 		*reventsp |= POLLOUT;
 	if (events & POLLWRBAND)
 		*reventsp |= POLLWRBAND;
-	*phpp = !anyyet && !*reventsp ? &fs_pollhd : (struct pollhead *)NULL;
+	/*
+	 * Emitting a pollhead without the intention of issuing pollwakeup()
+	 * calls against it is a recipe for trouble.  It's only acceptable in
+	 * this case since the above logic matches practically all useful
+	 * events.
+	 */
+	if (*reventsp == 0 && !anyyet) {
+		*phpp = &fs_pollhd;
+	}
 	return (0);
 }
 

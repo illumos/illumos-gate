@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -560,7 +560,6 @@ signalfd_sig_pending(proc_t *p, kthread_t *t, k_sigset_t set)
 	    set.__sigbits[2]) & FILLSET2));
 }
 
-_NOTE(ARGSUSED(4))
 static int
 signalfd_poll(dev_t dev, short events, int anyyet, short *reventsp,
     struct pollhead **phpp)
@@ -581,7 +580,8 @@ signalfd_poll(dev_t dev, short events, int anyyet, short *reventsp,
 
 	mutex_exit(&state->sfd_lock);
 
-	if (!(*reventsp = revents & events) && !anyyet) {
+	*reventsp = revents & events;
+	if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
 		sigfd_proc_state_t *pstate;
 		sigfd_poll_waiter_t *pw;
 

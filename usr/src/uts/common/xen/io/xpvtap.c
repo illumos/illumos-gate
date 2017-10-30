@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -656,7 +657,6 @@ xpvtap_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	}
 
 	if (((events & (POLLIN | POLLRDNORM)) == 0) && !anyyet) {
-		*reventsp = 0;
 		return (EINVAL);
 	}
 
@@ -664,6 +664,7 @@ xpvtap_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	 * if we pushed requests on the user ring since the last poll, wakeup
 	 * the user app
 	 */
+	*reventsp = 0;
 	usring = &state->bt_user_ring;
 	if (usring->ur_prod_polled != usring->ur_ring.req_prod_pvt) {
 
@@ -677,13 +678,10 @@ xpvtap_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 
 		usring->ur_prod_polled = usring->ur_ring.sring->req_prod;
 		*reventsp =  POLLIN | POLLRDNORM;
+	}
 
-	/* no new requests */
-	} else {
-		*reventsp = 0;
-		if (!anyyet) {
-			*phpp = &state->bt_pollhead;
-		}
+	if ((*reventsp == 0 && !anyyet) || (events & POLLET)) {
+		*phpp = &state->bt_pollhead;
 	}
 
 	return (0);

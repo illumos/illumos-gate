@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -766,8 +767,8 @@ sol_ucma_write(dev_t dev, struct uio *uio,  cred_t *credp)
 }
 
 static int
-sol_ucma_poll(dev_t dev, short events, int anyyet,
-    short *reventsp, struct pollhead **phpp)
+sol_ucma_poll(dev_t dev, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp)
 {
 	minor_t		minor = getminor(dev);
 	sol_ucma_file_t	*filep;
@@ -785,8 +786,9 @@ sol_ucma_poll(dev_t dev, short events, int anyyet,
 		*reventsp = POLLIN | POLLRDNORM;
 	} else {
 		*reventsp = 0;
-		if (!anyyet)
-			*phpp = filep->file_pollhead;
+	}
+	if ((*reventsp == 0 && !anyyet) || (events && POLLET)) {
+		*phpp = filep->file_pollhead;
 	}
 	sol_ofs_uobj_put(&filep->file_uobj);
 

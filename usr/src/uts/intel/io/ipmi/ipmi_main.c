@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -460,10 +460,8 @@ ipmi_poll(dev_t dv, short events, int anyyet, short *reventsp,
 			revent |= POLLERR;
 	}
 
-	if (revent == 0) {
-		/* nothing has occurred */
-		if (!anyyet)
-			*phpp = dev->ipmi_pollhead;
+	if ((revent == 0 && !anyyet) || (events & POLLET)) {
+		*phpp = dev->ipmi_pollhead;
 	}
 
 	*reventsp = revent;

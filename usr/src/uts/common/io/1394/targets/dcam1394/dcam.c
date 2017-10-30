@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 
@@ -1040,68 +1041,54 @@ done:
 }
 
 
-/*
- * dcam_chpoll
- */
 /* ARGSUSED */
 int
 dcam_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
     struct pollhead **phpp)
 {
 	dcam_state_t	*softc_p;
-	int		 instance, ring_buff_has_data, read_ptr_id;
-	size_t		 read_ptr_pos, write_ptr_pos;
-	short		 revent;
+	int		instance;
+	short		revent = 0;
+
+	/*
+	 * Without the logic to perform wakeups (see comment below), reject
+	 * attempts at edge-triggered polling.
+	 */
+	if (events & POLLET) {
+		return (EPERM);
+	}
 
 	instance = DEV_TO_INSTANCE(dev);
-
 	softc_p = (dcam_state_t *)ddi_get_soft_state(dcam_state_p, instance);
 	if (softc_p == NULL) {
 		return (ENXIO);
 	}
 
-	read_ptr_id	= 0;
-	revent		= 0;
+	if (softc_p->ring_buff_p != NULL) {
+		size_t read_ptr_pos, write_ptr_pos;
 
-	if (softc_p->ring_buff_p == NULL) {
-		ring_buff_has_data = 0;
-	} else {
 		mutex_enter(&softc_p->dcam_frame_is_done_mutex);
-
 		read_ptr_pos =
-		    ring_buff_read_ptr_pos_get(softc_p->ring_buff_p,
-		    read_ptr_id);
-
+		    ring_buff_read_ptr_pos_get(softc_p->ring_buff_p, 0);
 		write_ptr_pos =
 		    ring_buff_write_ptr_pos_get(softc_p->ring_buff_p);
-
-		if (read_ptr_pos != write_ptr_pos) {
-			ring_buff_has_data = 1;
-		} else {
-			ring_buff_has_data = 0;
-		}
-
 		mutex_exit(&softc_p->dcam_frame_is_done_mutex);
-	}
 
-	/*
-	 * now check for events
-	 */
-	if ((events & POLLRDNORM) && ring_buff_has_data) {
-		revent |= POLLRDNORM;
+		if ((events & POLLRDNORM) && read_ptr_pos != write_ptr_pos) {
+			revent |= POLLRDNORM;
+		}
 	}
 
 	if ((events & POLLPRI) && softc_p->param_status) {
 		revent |= POLLPRI;
 	}
 
-	/* if no events have occurred */
-	if (revent == 0) {
-		if (!anyyet) {
-			*phpp = &softc_p->dcam_pollhead;
-		}
-	}
-
+	/*
+	 * No portion of this driver was ever wired up to perform a
+	 * pollwakeup() on an associated pollhead.  The lack of an emitted
+	 * pollhead informs poll/devpoll that the event status of this resource
+	 * is not cacheable.
+	 */
 	*reventsp = revent;
 
 	return (0);

@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  * Copyright 2017 James S Blachly, MD <james.blachly@gmail.com>
  */
 
@@ -259,10 +259,11 @@ mmchpoll(dev_t dev, short events, int anyyet, short *reventsp,
 		    POLLWRNORM | POLLRDBAND | POLLWRBAND);
 		/*
 		 * A non NULL pollhead pointer should be returned in case
-		 * user polls for 0 events.
+		 * user polls for 0 events or is doing an edge-triggerd poll.
 		 */
-		*phpp = !anyyet && !*reventsp ?
-		    &mm_pollhd : (struct pollhead *)NULL;
+		if ((!*reventsp && !anyyet) || (events & POLLET)) {
+			*phpp = &mm_pollhd;
+		}
 		return (0);
 	default:
 		/* no other devices currently support polling */

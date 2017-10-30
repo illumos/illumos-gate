@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -922,7 +922,7 @@ kcf_rnd_chpoll(short events, int anyyet, short *reventsp,
 			*reventsp |= (events & (POLLIN | POLLRDNORM));
 	}
 
-	if (*reventsp == 0 && !anyyet)
+	if ((*reventsp == 0 && !anyyet) || (events & POLLET))
 		*phpp = &rnd_pollhead;
 }
 

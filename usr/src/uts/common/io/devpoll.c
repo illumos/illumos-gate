@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -366,21 +366,36 @@ repoll:
 
 			if (fp != pdp->pd_fp) {
 				/*
-				 * user is polling on a cached fd which was
-				 * closed and then reused. Unfortunately
-				 * there is no good way to inform user.
-				 * If the file struct is also reused, we
-				 * may not be able to detect the fd reuse
-				 * at all.  As long as this does not
-				 * cause system failure and/or memory leak,
-				 * we will play along. Man page states if
-				 * user does not clean up closed fds, polling
+				 * The user is polling on a cached fd which was
+				 * closed and then reused.  Unfortunately there
+				 * is no good way to communicate this fact to
+				 * the consumer.
+				 *
+				 * If the file struct is also reused, we may
+				 * not be able to detect the fd reuse at all.
+				 * As long as this does not cause system
+				 * failure and/or memory leaks, we will play
+				 * along.  The man page states that if the user
+				 * does not clean up closed fds, polling
 				 * results will be indeterministic.
 				 *
-				 * XXX - perhaps log the detection of fd
-				 *	 reuse?
+				 * XXX: perhaps log the detection of fd reuse?
 				 */
 				pdp->pd_fp = fp;
+
+				/*
+				 * When this situation has been detected, it's
+				 * likely that any existing pollhead is
+				 * ill-suited to perform proper wake-ups.
+				 *
+				 * Clean up the old entry under the expectation
+				 * that a valid one will be provided as part of
+				 * the later VOP_POLL.
+				 */
+				if (pdp->pd_php != NULL) {
+					pollhead_delete(pdp->pd_php, pdp);
+					pdp->pd_php = NULL;
+				}
 			}
 			/*
 			 * XXX - pollrelock() logic needs to know which
@@ -396,6 +411,27 @@ repoll:
 			curthread->t_pollcache = pcp;
 			error = VOP_POLL(fp->f_vnode, pdp->pd_events, 0,
 			    &revent, &php, NULL);
+
+			/*
+			 * Recheck edge-triggered descriptors which lack a
+			 * pollhead.  While this check is performed when an fd
+			 * is added to the pollcache in dpwrite(), subsequent
+			 * descriptor manipulation could cause a different
+			 * resource to be present now.
+			 */
+			if ((pdp->pd_events & POLLET) && error == 0 &&
+			    pdp->pd_php == NULL && php == NULL && revent != 0) {
+				short levent = 0;
+
+				/*
+				 * The same POLLET-only VOP_POLL is used in an
+				 * attempt to coax a pollhead from older
+				 * driver logic.
+				 */
+				error = VOP_POLL(fp->f_vnode, POLLET,
+				    0, &levent, &php, NULL);
+			}
+
 			curthread->t_pollcache = NULL;
 			releasef(fd);
 			if (error != 0) {
@@ -429,6 +465,16 @@ repoll:
 
 					ASSERT(epoll != NULL);
 					ep->data.u64 = pdp->pd_epolldata;
+
+					/*
+					 * Since POLLNVAL is a legal event for
+					 * VOP_POLL handlers to emit, it must
+					 * be translated epoll-legal.
+					 */
+					if (revent & POLLNVAL) {
+						revent &= ~POLLNVAL;
+						revent |= POLLERR;
+					}
 
 					/*
 					 * If any of the event bits are set for
@@ -488,19 +534,12 @@ repoll:
 					}
 				}
 
-				/*
-				 * If POLLET is set, clear the bit in the
-				 * bitmap -- which effectively latches the
-				 * edge on a pollwakeup() from the driver.
-				 */
-				if (pdp->pd_events & POLLET)
-					BT_CLEAR(pcp->pc_bitmap, fd);
-
-				/*
-				 * If POLLONESHOT is set, perform the implicit
-				 * POLLREMOVE.
-				 */
+				/* Handle special polling modes. */
 				if (pdp->pd_events & POLLONESHOT) {
+					/*
+					 * If POLLONESHOT is set, perform the
+					 * implicit POLLREMOVE.
+					 */
 					pdp->pd_fp = NULL;
 					pdp->pd_events = 0;
 
@@ -511,6 +550,28 @@ repoll:
 					}
 
 					BT_CLEAR(pcp->pc_bitmap, fd);
+				} else if (pdp->pd_events & POLLET) {
+					/*
+					 * Wire up the pollhead which should
+					 * have been provided.  Edge-triggered
+					 * polling cannot function properly
+					 * with drivers which do not emit one.
+					 */
+					if (php != NULL &&
+					    pdp->pd_php == NULL) {
+						pollhead_insert(php, pdp);
+						pdp->pd_php = php;
+					}
+
+					/*
+					 * If the driver has emitted a pollhead,
+					 * clear the bit in the bitmap which
+					 * effectively latches the edge on a
+					 * pollwakeup() from the driver.
+					 */
+					if (pdp->pd_php != NULL) {
+						BT_CLEAR(pcp->pc_bitmap, fd);
+					}
 				}
 
 				fdcnt++;
@@ -917,6 +978,32 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			curthread->t_pollcache = pcp;
 			error = VOP_POLL(fp->f_vnode, pfdp->events, 0,
 			    &pfdp->revents, &php, NULL);
+
+			/*
+			 * Edge-triggered polling requires a pollhead in order
+			 * to initiate wake-ups properly.  Drivers which are
+			 * savvy to POLLET presence, which should include
+			 * everything in-gate, will always emit one, regardless
+			 * of revent status.  Older drivers which only emit a
+			 * pollhead if 'revents == 0' are given a second chance
+			 * here via a second VOP_POLL, with only POLLET set in
+			 * the events of interest.  These circumstances should
+			 * induce any cacheable drivers to emit a pollhead for
+			 * wake-ups.
+			 *
+			 * Drivers which never emit a pollhead will simply
+			 * disobey the exectation of edge-triggered behavior.
+			 * This includes recursive epoll which, even on Linux,
+			 * yields its events in a level-triggered fashion only.
+			 */
+			if ((pdp->pd_events & POLLET) && error == 0 &&
+			    php == NULL) {
+				short levent = 0;
+
+				error = VOP_POLL(fp->f_vnode, POLLET, 0,
+				    &levent, &php, NULL);
+			}
+
 			curthread->t_pollcache = NULL;
 			/*
 			 * We always set the bit when this fd is cached;
@@ -1458,9 +1545,21 @@ dppoll(dev_t dev, short events, int anyyet, short *reventsp,
 		int		fdcnt = 0;
 		pollstate_t	*ps = curthread->t_pollstate;
 
-		rc = dp_pcache_poll(dpep, NULL, pcp, nfds, &fdcnt);
-		if (rc == 0) {
-			*reventsp = (fdcnt > 0) ? POLLIN : 0;
+		/*
+		 * Recursive polling will only emit certain events.  Skip a
+		 * scan of the pollcache if those events are not of interest.
+		 */
+		if (events & (POLLIN|POLLRDNORM)) {
+			rc = dp_pcache_poll(dpep, NULL, pcp, nfds, &fdcnt);
+		} else {
+			rc = 0;
+			fdcnt = 0;
+		}
+
+		if (rc == 0 && fdcnt > 0) {
+			*reventsp = POLLIN|POLLRDNORM;
+		} else {
+			*reventsp = 0;
 		}
 		pcachelink_assoc(pcp, ps->ps_pc_stack[0]);
 		pollstate_exit(pcp);

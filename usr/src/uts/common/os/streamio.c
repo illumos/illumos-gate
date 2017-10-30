@@ -24,7 +24,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -8174,12 +8174,8 @@ out:
  * an M_PROTO/M_PCPROTO part).
  */
 int
-strpoll(
-	struct stdata *stp,
-	short events_arg,
-	int anyyet,
-	short *reventsp,
-	struct pollhead **phpp)
+strpoll(struct stdata *stp, short events_arg, int anyyet, short *reventsp,
+    struct pollhead **phpp)
 {
 	int events = (ushort_t)events_arg;
 	int retevents = 0;
@@ -8316,8 +8312,7 @@ chkrd:
 				retevents |= (events & (POLLIN | POLLRDBAND));
 			break;
 		}
-		if (! (retevents & normevents) &&
-		    (stp->sd_wakeq & RSLEEP)) {
+		if (!(retevents & normevents) && (stp->sd_wakeq & RSLEEP)) {
 			/*
 			 * Sync stream barrier read queue has data.
 			 */
@@ -8328,19 +8323,11 @@ chkrd:
 			retevents |= normevents;
 	}
 
-	*reventsp = (short)retevents;
-	if (retevents && !(events & POLLET)) {
-		if (headlocked)
-			mutex_exit(&stp->sd_lock);
-		return (0);
-	}
-
 	/*
-	 * If poll() has not found any events yet, set up event cell
-	 * to wake up the poll if a requested event occurs on this
-	 * stream.  Check for collisions with outstanding poll requests.
+	 * Pass back a pollhead if no events are pending or if edge-triggering
+	 * has been configured on this resource.
 	 */
-	if (!anyyet) {
+	if ((retevents == 0 && !anyyet) || (events & POLLET)) {
 		*phpp = &stp->sd_pollist;
 		if (headlocked == 0) {
 			if (polllock(&stp->sd_pollist, &stp->sd_lock) != 0) {
@@ -8351,6 +8338,8 @@ chkrd:
 		}
 		stp->sd_rput_opt |= SR_POLLIN;
 	}
+
+	*reventsp = (short)retevents;
 	if (headlocked)
 		mutex_exit(&stp->sd_lock);
 	return (0);
