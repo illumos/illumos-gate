@@ -1544,7 +1544,7 @@ iscsit_xfer_scsi_data(scsi_task_t *task, stmf_data_buf_t *dbuf,
 	 */
 	if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {
 		if (ibuf->ibuf_is_immed)
-			return(iscsit_idm_to_stmf(IDM_STATUS_SUCCESS));
+			return (iscsit_idm_to_stmf(IDM_STATUS_SUCCESS));
 		/*
 		 * The DB_SEND_STATUS_GOOD flag in the STMF data buffer allows
 		 * the port provider to phase-collapse, i.e. send the status

@@ -736,7 +736,7 @@ n2h24(const uchar_t *ptr)
 static boolean_t
 idm_dataseglenokay(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_hdr_t     *bhs;
+	iscsi_hdr_t	*bhs;
 
 	if (ic->ic_conn_type == CONN_TYPE_TGT &&
 	    pdu->isp_datalen > ic->ic_conn_params.max_recv_dataseglen) {
@@ -758,7 +758,7 @@ idm_dataseglenokay(idm_conn_t *ic, idm_pdu_t *pdu)
 		 * Data-segment not allowed and additional headers not allowed.
 		 * (both must be zero according to the RFC3720.)
 		 */
-		if (bhs->hlength || pdu->isp_datalen)
+		if (bhs->hlength != 0 || pdu->isp_datalen != 0)
 			return (B_FALSE);
 		break;
 	case ISCSI_OP_NOOP_OUT:
@@ -1798,10 +1798,13 @@ idm_so_rx_dataout(idm_conn_t *ic, idm_pdu_t *pdu)
 		 * bail out.
 		 */
 		if (idb->idb_buflen == idb->idb_xfer_len &&
-		    idb->idb_buflen != (idb->idb_exp_offset - idb->idb_bufoffset)) {
-			printf("idm_so_rx_dataout: incomplete transfer, protocol err");
-			IDM_CONN_LOG(CE_NOTE, "idm_so_rx_dataout: incomplete transfer: "
-			    "%ld, %d", offset, (int)(idb->idb_exp_offset - offset));
+		    idb->idb_buflen !=
+		    (idb->idb_exp_offset - idb->idb_bufoffset)) {
+			printf("idm_so_rx_dataout: incomplete transfer, "
+			    "protocol err");
+			IDM_CONN_LOG(CE_NOTE,
+			    "idm_so_rx_dataout: incomplete transfer: %ld, %d",
+			    offset, (int)(idb->idb_exp_offset - offset));
 			idm_task_rele(idt);
 			idm_pdu_rx_protocol_error(ic, pdu);
 			return;
