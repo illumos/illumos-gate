@@ -1592,6 +1592,11 @@ pr_read_spymaster(prnode_t *pnp, uio_t *uiop)
 	if ((error = prlock(pnp, ZNO)) != 0)
 		return (error);
 
+	if (pnp->pr_common->prc_thread == NULL) {
+		prunlock(pnp);
+		return (0);
+	}
+
 	lwp = pnp->pr_common->prc_thread->t_lwp;
 
 	if (lwp->lwp_spymaster == NULL) {
@@ -2621,6 +2626,11 @@ pr_read_spymaster_32(prnode_t *pnp, uio_t *uiop)
 	if ((error = prlock(pnp, ZNO)) != 0)
 		return (error);
 
+	if (pnp->pr_common->prc_thread == NULL) {
+		prunlock(pnp);
+		return (0);
+	}
+
 	lwp = pnp->pr_common->prc_thread->t_lwp;
 
 	if (lwp->lwp_spymaster == NULL) {
@@ -3147,7 +3157,8 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			vap->va_size = 0;
 		break;
 	case PR_SPYMASTER:
-		if (pnp->pr_common->prc_thread->t_lwp->lwp_spymaster != NULL) {
+		if (pnp->pr_common->prc_thread != NULL &&
+		    pnp->pr_common->prc_thread->t_lwp->lwp_spymaster != NULL) {
 			vap->va_size = PR_OBJSIZE(psinfo32_t, psinfo_t);
 		} else {
 			vap->va_size = 0;
