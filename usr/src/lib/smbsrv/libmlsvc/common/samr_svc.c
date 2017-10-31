@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -70,16 +70,16 @@ typedef struct samr_keydata {
 
 /*
  * DomainDisplayUser	All user objects (or those derived from user) with
- * 			userAccountControl containing the UF_NORMAL_ACCOUNT bit.
+ *			userAccountControl containing the UF_NORMAL_ACCOUNT bit.
  *
  * DomainDisplayMachine	All user objects (or those derived from user) with
- * 			userAccountControl containing the
- * 			UF_WORKSTATION_TRUST_ACCOUNT or UF_SERVER_TRUST_ACCOUNT
- * 			bit.
+ *			userAccountControl containing the
+ *			UF_WORKSTATION_TRUST_ACCOUNT or UF_SERVER_TRUST_ACCOUNT
+ *			bit.
  *
  * DomainDisplayGroup	All group objects (or those derived from group) with
- * 			groupType equal to GROUP_TYPE_SECURITY_UNIVERSAL or
- * 			GROUP_TYPE_SECURITY_ACCOUNT.
+ *			groupType equal to GROUP_TYPE_SECURITY_UNIVERSAL or
+ *			GROUP_TYPE_SECURITY_ACCOUNT.
  *
  * DomainDisplayOemUser	Same as DomainDisplayUser with OEM strings
  *
@@ -102,6 +102,7 @@ static ndr_hdid_t *samr_hdalloc(ndr_xa_t *, samr_key_t, smb_domain_type_t,
     DWORD);
 static void samr_hdfree(ndr_xa_t *, ndr_hdid_t *);
 static ndr_handle_t *samr_hdlookup(ndr_xa_t *, ndr_hdid_t *, samr_key_t);
+static ndr_handle_t *samr_hdlookup_any(ndr_xa_t *, ndr_hdid_t *);
 static int samr_call_stub(ndr_xa_t *mxa);
 static DWORD samr_s_enum_local_domains(struct samr_EnumLocalDomain *,
     ndr_xa_t *);
@@ -214,6 +215,24 @@ samr_hdlookup(ndr_xa_t *mxa, ndr_hdid_t *id, samr_key_t key)
 }
 
 /*
+ * Handle lookup wrapper to validate the local context,
+ * but don't limit to one type.
+ */
+static ndr_handle_t *
+samr_hdlookup_any(ndr_xa_t *mxa, ndr_hdid_t *id)
+{
+	ndr_handle_t *hd;
+
+	if ((hd = ndr_hdlookup(mxa, id)) == NULL)
+		return (NULL);
+
+	if (hd->nh_data == NULL)
+		return (NULL);
+
+	return (hd);
+}
+
+/*
  * samr_s_Connect
  *
  * This is a request to connect to the local SAM database. We don't
@@ -257,6 +276,49 @@ samr_s_CloseHandle(void *arg, ndr_xa_t *mxa)
 
 	bzero(&param->result_handle, sizeof (samr_handle_t));
 	param->status = 0;
+	return (NDR_DRC_OK);
+}
+
+/*
+ * samr_s_QuerySecObject
+ */
+static int
+samr_s_QuerySecObject(void *arg, ndr_xa_t *mxa)
+{
+	struct samr_QuerySecObject	*param = arg;
+	ndr_hdid_t			*id;
+	uint32_t			status;
+	struct samr_sec_desc		*sd;
+
+	id = (ndr_hdid_t *)&param->obj_handle;
+	if (samr_hdlookup_any(mxa, id) == NULL) {
+		status = NT_STATUS_INVALID_HANDLE;
+		goto QuerySecObjectError;
+	}
+
+	param->sd = NDR_MALLOC(mxa, sizeof (samr_sd_t));
+	if (param->sd == NULL) {
+		status = NT_STATUS_NO_MEMORY;
+		goto QuerySecObjectError;
+	}
+	param->sd->length = sizeof (struct samr_sec_desc);
+
+	sd = NDR_MALLOC(mxa, param->sd->length);
+	if (sd == NULL) {
+		status = NT_STATUS_NO_MEMORY;
+		goto QuerySecObjectError;
+	}
+	bzero(sd, param->sd->length);
+	sd->Revision = 1;
+	sd->Control = SE_SELF_RELATIVE;
+
+	param->sd->data = (void *)sd;
+	param->status = NT_STATUS_SUCCESS;
+	return (NDR_DRC_OK);
+
+QuerySecObjectError:
+	bzero(param, sizeof (struct samr_QuerySecObject));
+	param->status = NT_SC_ERROR(status);
 	return (NDR_DRC_OK);
 }
 
@@ -689,8 +751,6 @@ samr_s_DeleteUser(void *arg, ndr_xa_t *mxa)
 static int
 samr_s_QueryUserInfo(void *arg, ndr_xa_t *mxa)
 {
-	static uint16_t			owf_buf[8];
-	static uint8_t			hour_buf[SAMR_SET_USER_HOURS_SZ];
 	struct samr_QueryUserInfo	*param = arg;
 	struct samr_QueryUserInfo21	*all_info;
 	ndr_hdid_t			*id;
@@ -732,20 +792,22 @@ samr_s_QueryUserInfo(void *arg, ndr_xa_t *mxa)
 	all_info = &param->ru.info21;
 	bzero(all_info, sizeof (struct samr_QueryUserInfo21));
 
-	all_info->WhichFields = SAMR_USER_ALL_USERNAME | SAMR_USER_ALL_USERID;
+	all_info->WhichFields = SAMR_USER_ALL_USERNAME | SAMR_USER_ALL_USERID |
+	    SAMR_USER_ALL_FULLNAME | SAMR_USER_ALL_USERACCOUNTCONTROL |
+	    SAMR_USER_ALL_ADMINCOMMENT;
 
 	(void) NDR_MSTRING(mxa, account.a_name,
 	    (ndr_mstring_t *)&all_info->UserName);
-	all_info->UserId = data->kd_rid;
+	(void) NDR_MSTRING(mxa, account.a_name,
+	    (ndr_mstring_t *)&all_info->FullName);
+	(void) NDR_MSTRING(mxa, "",
+	    (ndr_mstring_t *)&all_info->AdminComment);
 
-	all_info->LmOwfPassword.length = 16;
-	all_info->LmOwfPassword.maxlen = 16;
-	all_info->LmOwfPassword.buf = owf_buf;
-	all_info->NtOwfPassword.length = 16;
-	all_info->NtOwfPassword.maxlen = 16;
-	all_info->NtOwfPassword.buf = owf_buf;
-	all_info->LogonHours.units_per_week = SAMR_HOURS_PER_WEEK;
-	all_info->LogonHours.hours = hour_buf;
+	all_info->UserId = data->kd_rid;
+	all_info->UserAccountControl = SAMR_AF_NORMAL_ACCOUNT |
+	    SAMR_AF_DONT_EXPIRE_PASSWD;
+	if ((account.a_flags & SMB_PWF_DISABLE) != 0)
+		all_info->UserAccountControl |= SAMR_AF_ACCOUNTDISABLE;
 
 	param->address = 1;
 	param->switch_index = SAMR_QUERY_USER_ALL_INFO;
@@ -1851,6 +1913,7 @@ samr_s_Connect5(void *arg, ndr_xa_t *mxa)
 static ndr_stub_table_t samr_stub_table[] = {
 	{ samr_s_Connect,		SAMR_OPNUM_Connect },
 	{ samr_s_CloseHandle,		SAMR_OPNUM_CloseHandle },
+	{ samr_s_QuerySecObject,	SAMR_OPNUM_QuerySecObject },
 	{ samr_s_LookupDomain,		SAMR_OPNUM_LookupDomain },
 	{ samr_s_EnumLocalDomains,	SAMR_OPNUM_EnumLocalDomains },
 	{ samr_s_OpenDomain,		SAMR_OPNUM_OpenDomain },

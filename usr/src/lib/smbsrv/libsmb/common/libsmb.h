@@ -868,6 +868,7 @@ typedef struct smb_account {
 	smb_sid_t	*a_sid;
 	smb_sid_t	*a_domsid;
 	uint32_t	a_rid;
+	uint32_t	a_flags;
 } smb_account_t;
 
 uint32_t smb_sam_lookup_name(char *, char *, uint16_t, smb_account_t *);
