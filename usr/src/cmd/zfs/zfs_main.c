@@ -5605,8 +5605,13 @@ print_holds(boolean_t scripted, size_t nwidth, size_t tagwidth, nvlist_t *nvl)
 			(void) strftime(tsbuf, DATETIME_BUF_LEN,
 			    gettext(STRFTIME_FMT_STR), &t);
 
-			(void) printf("%-*s%*c%-*s%*c%s\n", nwidth, zname,
-			    sepnum, sep, tagwidth, tagname, sepnum, sep, tsbuf);
+			if (scripted)
+				(void) printf("%s%c%s%c%s\n", zname,
+				    sep, tagname, sep, tsbuf);
+			else
+				(void) printf("%-*s%*c%-*s%*c%s\n", nwidth,
+				    zname, sepnum, sep, tagwidth, tagname,
+				    sepnum, sep, tsbuf);
 		}
 	}
 }
