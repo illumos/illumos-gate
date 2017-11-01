@@ -2464,7 +2464,7 @@ multilist_walk_init(mdb_walk_state_t *wsp)
 
 typedef struct mdb_txg_list {
 	size_t		tl_offset;
-	txg_node_t	*tl_head[TXG_SIZE];
+	uintptr_t	tl_head[TXG_SIZE];
 } mdb_txg_list_t;
 
 typedef struct txg_list_walk_data {
@@ -2490,7 +2490,7 @@ txg_list_walk_init_common(mdb_walk_state_t *wsp, int txg, int maxoff)
 	}
 
 	for (i = 0; i < TXG_SIZE; i++)
-		lwd->lw_head[i] = (uintptr_t)list.tl_head[i];
+		lwd->lw_head[i] = list.tl_head[i];
 	lwd->lw_offset = list.tl_offset;
 	lwd->lw_obj = mdb_alloc(lwd->lw_offset + sizeof (txg_node_t),
 	    UM_SLEEP | UM_GC);

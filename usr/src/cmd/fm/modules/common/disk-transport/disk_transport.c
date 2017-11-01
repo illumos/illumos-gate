@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Disk error transport module
@@ -32,17 +31,18 @@
  * and FMA ereports.  It is a read-only transport module, and checks for the
  * following failures:
  *
- * 	- overtemp
- * 	- predictive failure
- * 	- self-test failure
+ *	- overtemp
+ *	- predictive failure
+ *	- self-test failure
+ *	- solid state media wearout
  *
  * These failures are detected via the TOPO_METH_DISK_STATUS method, which
  * leverages libdiskstatus to do the actual analysis.  This transport module is
  * in charge of the following tasks:
  *
- * 	- discovering available devices
- * 	- periodically checking devices
- * 	- managing device addition/removal
+ *	- discovering available devices
+ *	- periodically checking devices
+ *	- managing device addition/removal
  */
 
 #include <ctype.h>
@@ -113,7 +113,6 @@ dt_analyze_disk(topo_hdl_t *thp, tnode_t *node, void *arg)
 	char *protocol;
 	int err;
 	disk_monitor_t *dmp = arg;
-	uint64_t ena;
 	nvpair_t *elem;
 	boolean_t fault;
 	nvlist_t *details;
@@ -152,10 +151,8 @@ dt_analyze_disk(topo_hdl_t *thp, tnode_t *node, void *arg)
 
 	nvlist_free(in);
 
-	ena = fmd_event_ena_create(dmp->dm_hdl);
-
 	/*
-	 * Add any faults.
+	 * Check for faults and post ereport(s) if needed
 	 */
 	if (nvlist_lookup_nvlist(result, "faults", &faults) == 0 &&
 	    nvlist_lookup_string(result, "protocol", &protocol) == 0) {
@@ -170,8 +167,15 @@ dt_analyze_disk(topo_hdl_t *thp, tnode_t *node, void *arg)
 			    &details) != 0)
 				continue;
 
+			if (strcmp(nvpair_name(elem),
+			    FM_EREPORT_SCSI_SSMWEAROUT) == 0 &&
+			    fmd_prop_get_int32(dmp->dm_hdl,
+			    "ignore-ssm-wearout") == FMD_B_TRUE)
+				continue;
+
 			dt_post_ereport(dmp->dm_hdl, dmp->dm_xprt, protocol,
-			    nvpair_name(elem), ena, fmri, details);
+			    nvpair_name(elem),
+			    fmd_event_ena_create(dmp->dm_hdl), fmri, details);
 		}
 	}
 
@@ -248,6 +252,7 @@ static const fmd_prop_t fmd_props[] = {
 	{ "interval", FMD_TYPE_TIME, "1h" },
 	{ "min-interval", FMD_TYPE_TIME, "1min" },
 	{ "simulate", FMD_TYPE_STRING, "" },
+	{ "ignore-ssm-wearout", FMD_TYPE_BOOL, "false"},
 	{ NULL, 0, NULL }
 };
 
@@ -262,7 +267,7 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"Disk Transport Agent", "1.0", &fmd_ops, fmd_props
+	"Disk Transport Agent", "1.1", &fmd_ops, fmd_props
 };
 
 void
@@ -289,7 +294,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	 * the developer to substitute a faulty device based off all or part of
 	 * an FMRI string.  For example, one could do:
 	 *
-	 * 	setprop simulate "bay=4/disk=4	/path/to/sim.so"
+	 *	setprop simulate "bay=4/disk=4	/path/to/sim.so"
 	 *
 	 * When the transport module encounters an FMRI containing the given
 	 * string, then it will open the simulator file instead of the
