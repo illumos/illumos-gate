@@ -724,7 +724,7 @@ dsl_pool_undirty_space(dsl_pool_t *dp, int64_t space, uint64_t txg)
 	}
 	ASSERT3U(dp->dp_dirty_pertxg[txg & TXG_MASK], >=, space);
 	dp->dp_dirty_pertxg[txg & TXG_MASK] -= space;
-	ASSERT3U(dp->dp_dirty_total, >=, space);
+	VERIFY3U(dp->dp_dirty_total, >=, space);
 	dsl_pool_dirty_delta(dp, -space);
 	mutex_exit(&dp->dp_lock);
 }
