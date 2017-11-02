@@ -21,11 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_FM_IO_DISK_H
 #define	_SYS_FM_IO_DISK_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -36,7 +37,6 @@ extern "C" {
 #define	FM_FAULT_DISK_PREDFAIL		"predictive-failure"
 #define	FM_FAULT_DISK_OVERTEMP		"over-temperature"
 #define	FM_FAULT_DISK_TESTFAIL		"self-test-failure"
-#define	FM_FAULT_SSM_WEAROUT		"ssm-wearout"
 
 #ifdef	__cplusplus
 }
