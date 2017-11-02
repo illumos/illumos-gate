@@ -73,60 +73,62 @@ node('master') {
             }
 
             def build_workspace = null
-            node(env.BUILD_INSTANCE_ID) {
-                build_workspace = pwd()
+            try {
+                node(env.BUILD_INSTANCE_ID) {
+                    build_workspace = pwd()
 
-                stage('unstash repository') {
-                    unstash('openzfs')
-                }
-
-                stage('build') {
-                    shscript('nightly-build', false, [
-                        ['BUILD_NONDEBUG', 'yes'],
-                        ['BUILD_DEBUG', 'yes'],
-                        ['RUN_LINT', 'yes']
-                    ])
-                }
-
-                try {
-                    stage('nits') {
-                        shscript('nightly-nits', false, [])
+                    stage('unstash repository') {
+                        unstash('openzfs')
                     }
-                } catch (e) {
-                    // If nits fails, don't propagate the failure to the job's result.
-                }
 
-                stage('install') {
-                    shscript('nightly-install', false, [
-                        ['INSTALL_DEBUG', 'yes']
+                    stage('build') {
+                        shscript('nightly-build', false, [
+                            ['BUILD_NONDEBUG', 'yes'],
+                            ['BUILD_DEBUG', 'yes'],
+                            ['RUN_LINT', 'yes']
+                        ])
+                    }
+
+                    try {
+                        stage('nits') {
+                            shscript('nightly-nits', false, [])
+                        }
+                    } catch (e) {
+                        // If nits fails, don't propagate the failure to the job's result.
+                    }
+
+                    stage('install') {
+                        shscript('nightly-install', false, [
+                            ['INSTALL_DEBUG', 'yes']
+                        ])
+                    }
+                }
+            } finally {
+                if (build_workspace == null)
+                    error('could not determine the workspace used to perform the build')
+
+                stage('archive build artifacts') {
+                    shscript('download-remote-file', false, [
+                        ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
+                        ['REMOTE_FILE', "${build_workspace}/log/*/nightly.log"],
+                        ['LOCAL_FILE', 'nightly.log']
                     ])
+                    archive(includes: 'nightly.log')
+
+                    shscript('download-remote-file', false, [
+                        ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
+                        ['REMOTE_FILE', "${build_workspace}/log/*/mail_msg"],
+                        ['LOCAL_FILE', 'nightly-mail.log']
+                    ])
+                    archive(includes: 'nightly-mail.log')
+
+                    shscript('download-remote-directory', false, [
+                        ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
+                        ['REMOTE_DIRECTORY', "${build_workspace}/packages"],
+                        ['LOCAL_FILE', 'nightly-packages.tar.xz']
+                    ])
+                    archive(includes: 'nightly-packages.tar.xz')
                 }
-            }
-
-            if (build_workspace == null)
-                error('could not determine the workspace used to perform the build')
-
-            stage('archive build artifacts') {
-                shscript('download-remote-file', false, [
-                    ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
-                    ['REMOTE_FILE', "${build_workspace}/log/*/nightly.log"],
-                    ['LOCAL_FILE', 'nightly.log']
-                ])
-                archive(includes: 'nightly.log')
-
-                shscript('download-remote-file', false, [
-                    ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
-                    ['REMOTE_FILE', "${build_workspace}/log/*/mail_msg"],
-                    ['LOCAL_FILE', 'nightly-mail.log']
-                ])
-                archive(includes: 'nightly-mail.log')
-
-                shscript('download-remote-directory', false, [
-                    ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
-                    ['REMOTE_DIRECTORY', "${build_workspace}/packages"],
-                    ['LOCAL_FILE', 'nightly-packages.tar.xz']
-                ])
-                archive(includes: 'nightly-packages.tar.xz')
             }
         }
 
