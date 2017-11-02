@@ -1210,10 +1210,10 @@ logpage_ssm_analyze(ds_scsi_info_t *sip, scsi_log_parameter_header_t *lphp,
 	nvlist_t *nvl;
 	int i, plen = 0;
 
-	assert(sip->si_dsp->ds_overtemp == NULL);
-	if (nvlist_alloc(&sip->si_dsp->ds_overtemp, NV_UNIQUE_NAME, 0) != 0)
+	assert(sip->si_dsp->ds_ssmwearout == NULL);
+	if (nvlist_alloc(&sip->si_dsp->ds_ssmwearout, NV_UNIQUE_NAME, 0) != 0)
 		return (scsi_set_errno(sip, EDS_NOMEM));
-	nvl = sip->si_dsp->ds_overtemp;
+	nvl = sip->si_dsp->ds_ssmwearout;
 
 	for (i = 0; i < log_length; i += plen) {
 		lphp = (scsi_log_parameter_header_t *)((uint8_t *)lphp + plen);
