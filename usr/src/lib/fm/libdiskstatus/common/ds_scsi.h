@@ -21,12 +21,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_DS_SCSI_H
 #define	_DS_SCSI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/byteorder.h>
@@ -50,12 +49,14 @@ extern "C" {
 typedef struct scsi_log_header {
 #if defined(_BIT_FIELDS_LTOH)
 	uint8_t		lh_code : 6,
-			__reserved : 2;
+			lh_spf : 1,
+			lh_ds : 1;
 #else
-	uint8_t		__reserved : 2,
+	uint8_t		lh_ds : 1,
+			lh_spf : 1,
 			lh_code : 6;
 #endif
-	uint8_t		__reserved2;
+	uint8_t		lh_subpage;
 	uint16_t	lh_length;
 } scsi_log_header_t;
 
@@ -156,6 +157,20 @@ typedef struct scsi_selftest_log_param {
 #define	LOGPARAM_TEMP_LEN	\
 	(sizeof (scsi_temp_log_param_t) - \
 	    sizeof (scsi_log_parameter_header_t))
+
+/*
+ * Described in SBC3
+ */
+typedef struct scsi_ssm_log_param {
+	scsi_log_parameter_header_t ssm_hdr;
+	uint16_t		__reserved2;
+	uint8_t			__reserved1;
+	uchar_t			ssm_prcnt_used;
+} scsi_ssm_log_param_t;
+
+#define	LOGPARAM_PRCNT_USED		0x0001
+#define	LOGPARAM_PRCNT_USED_PARAM_LEN	0x04
+#define	PRCNT_USED_FAULT_THRSH		90
 
 /*
  * Mode sense/select page header information
@@ -278,6 +293,8 @@ typedef struct scsi_ie_page {
 #define	LOGPAGE_TEMP		0x0d
 #define	LOGPAGE_SELFTEST	0x10
 #define	LOGPAGE_IE		0x2f
+/* Solid State Media log page code */
+#define	LOGPAGE_SSM		0x11
 
 /* ASC constants */
 #define	ASC_INVALID_OPCODE				0x20
@@ -307,6 +324,7 @@ typedef struct scsi_ie_page {
 #define	LOGPAGE_SUPP_IE			0x1
 #define	LOGPAGE_SUPP_TEMP		0x2
 #define	LOGPAGE_SUPP_SELFTEST		0x4
+#define	LOGPAGE_SUPP_SSM		0x8
 
 #define	MSG_BUFLEN	256
 
