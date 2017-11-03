@@ -1145,6 +1145,65 @@ logpage_selftest_analyze(ds_scsi_info_t *sip, scsi_log_parameter_header_t *lphp,
 }
 
 /*
+ * Analyze the contents of the Solid State Media (SSM) log page's
+ * "Percentage Used Endurance Indicator" log parameter.
+ * We generate a fault if the percentage used is equal to or over
+ * PRCNT_USED_FAULT_THRSH
+ */
+static int
+logpage_ssm_analyze(ds_scsi_info_t *sip, scsi_log_parameter_header_t *lphp,
+    int log_length)
+{
+	uint16_t param_code;
+	scsi_ssm_log_param_t *ssm;
+	nvlist_t *nvl;
+	int i, plen = 0;
+
+	assert(sip->si_dsp->ds_ssmwearout == NULL);
+	if (nvlist_alloc(&sip->si_dsp->ds_ssmwearout, NV_UNIQUE_NAME, 0) != 0)
+		return (scsi_set_errno(sip, EDS_NOMEM));
+	nvl = sip->si_dsp->ds_ssmwearout;
+
+	for (i = 0; i < log_length; i += plen) {
+		lphp = (scsi_log_parameter_header_t *)((uint8_t *)lphp + plen);
+		param_code = BE_16(lphp->lph_param);
+		ssm = (scsi_ssm_log_param_t *)lphp;
+
+		switch (param_code) {
+		case LOGPARAM_PRCNT_USED:
+			if (lphp->lph_length != LOGPARAM_PRCNT_USED_PARAM_LEN)
+				break;
+
+			if ((nvlist_add_uint8(nvl,
+			    FM_EREPORT_PAYLOAD_SCSI_CURSSMWEAROUT,
+			    ssm->ssm_prcnt_used) != 0) ||
+			    (nvlist_add_uint8(nvl,
+			    FM_EREPORT_PAYLOAD_SCSI_THRSHSSMWEAROUT,
+			    PRCNT_USED_FAULT_THRSH) != 0))
+				return (scsi_set_errno(sip, EDS_NOMEM));
+
+			if (ssm->ssm_prcnt_used >= PRCNT_USED_FAULT_THRSH)
+				sip->si_dsp->ds_faults |= DS_FAULT_SSMWEAROUT;
+
+			return (0);
+		}
+
+		plen = lphp->lph_length +
+		    sizeof (scsi_log_parameter_header_t);
+	}
+
+	/*
+	 * If we got this far we didn't see LOGPARAM_PRCNT_USED
+	 * which is strange since we verified that it's there
+	 */
+	dprintf("solid state media logpage analyze failed\n");
+#if DEBUG
+	abort();
+#endif
+	return (scsi_set_errno(sip, EDS_NOT_SUPPORTED));
+}
+
+/*
  * Analyze the IE mode sense page explicitly.  This is only needed if the IE log
  * page is not supported.
  */
