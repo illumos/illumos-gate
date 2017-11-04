@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2017 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -24,6 +25,7 @@ outputdir = /var/tmp/test_results
 
 [/opt/util-tests/tests/printf_test]
 [/opt/util-tests/tests/allowed-ips]
+[/opt/util-tests/tests/set-linkprop]
 
 [/opt/util-tests/tests/xargs_test]
 
