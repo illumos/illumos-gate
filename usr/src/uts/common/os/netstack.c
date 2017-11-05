@@ -123,6 +123,8 @@ static boolean_t wait_for_zone_creator(netstack_t *, kmutex_t *);
 static boolean_t wait_for_nms_inprogress(netstack_t *, nm_state_t *,
     kmutex_t *);
 
+static void netstack_hold_locked(netstack_t *);
+
 static ksema_t netstack_reap_limiter;
 /*
  * Hard-coded constant, but since this is not tunable in real-time, it seems
@@ -927,12 +929,7 @@ netstack_get_current(void)
 
 	ns = curproc->p_zone->zone_netstack;
 	ASSERT(ns != NULL);
-	if (ns->netstack_flags & (NSF_UNINIT|NSF_CLOSING))
-		return (NULL);
-
-	netstack_hold(ns);
-
-	return (ns);
+	return (netstack_hold_if_active(ns));
 }
 
 /*
@@ -964,7 +961,7 @@ netstack_find_by_cred(const cred_t *cr)
  * If there is no exact match then assume the shared stack instance
  * matches.
  *
- * Skip the unitialized ones.
+ * Skip the uninitialized and closing ones.
  */
 netstack_t *
 netstack_find_by_zoneid(zoneid_t zoneid)
@@ -977,12 +974,8 @@ netstack_find_by_zoneid(zoneid_t zoneid)
 	if (zone == NULL)
 		return (NULL);
 
-	ns = zone->zone_netstack;
-	ASSERT(ns != NULL);
-	if (ns->netstack_flags & (NSF_UNINIT|NSF_CLOSING))
-		ns = NULL;
-	else
-		netstack_hold(ns);
+	ASSERT(zone->zone_netstack != NULL);
+	ns = netstack_hold_if_active(zone->zone_netstack);
 
 	zone_rele(zone);
 	return (ns);
@@ -1004,7 +997,6 @@ netstack_find_by_zoneid(zoneid_t zoneid)
 netstack_t *
 netstack_find_by_zoneid_nolock(zoneid_t zoneid)
 {
-	netstack_t *ns;
 	zone_t *zone;
 
 	zone = zone_find_by_id_nolock(zoneid);
@@ -1012,16 +1004,9 @@ netstack_find_by_zoneid_nolock(zoneid_t zoneid)
 	if (zone == NULL)
 		return (NULL);
 
-	ns = zone->zone_netstack;
-	ASSERT(ns != NULL);
-
-	if (ns->netstack_flags & (NSF_UNINIT|NSF_CLOSING))
-		ns = NULL;
-	else
-		netstack_hold(ns);
-
+	ASSERT(zone->zone_netstack != NULL);
 	/* zone_find_by_id_nolock does not have a hold on the zone */
-	return (ns);
+	return (netstack_hold_if_active(zone->zone_netstack));
 }
 
 /*
@@ -1038,11 +1023,12 @@ netstack_find_by_stackid(netstackid_t stackid)
 
 	mutex_enter(&netstack_g_lock);
 	for (ns = netstack_head; ns != NULL; ns = ns->netstack_next) {
+		/* Can't use hold_if_active because of stackid check. */
 		mutex_enter(&ns->netstack_lock);
 		if (ns->netstack_stackid == stackid &&
 		    !(ns->netstack_flags & (NSF_UNINIT|NSF_CLOSING))) {
+			netstack_hold_locked(ns);
 			mutex_exit(&ns->netstack_lock);
-			netstack_hold(ns);
 			mutex_exit(&netstack_g_lock);
 			return (ns);
 		}
@@ -1172,14 +1158,43 @@ netstack_rele(netstack_t *ns)
 	}
 }
 
+static void
+netstack_hold_locked(netstack_t *ns)
+{
+	ASSERT(MUTEX_HELD(&ns->netstack_lock));
+	ns->netstack_refcnt++;
+	ASSERT(ns->netstack_refcnt > 0);
+	DTRACE_PROBE1(netstack__inc__ref, netstack_t *, ns);
+}
+
+/*
+ * If the passed-in netstack isn't active (i.e. it's uninitialized or closing),
+ * return NULL, otherwise return it with its reference held.  Common code
+ * for many netstack_find*() functions.
+ */
+netstack_t *
+netstack_hold_if_active(netstack_t *ns)
+{
+	netstack_t *retval;
+
+	mutex_enter(&ns->netstack_lock);
+	if (ns->netstack_flags & (NSF_UNINIT | NSF_CLOSING)) {
+		retval = NULL;
+	} else {
+		netstack_hold_locked(ns);
+		retval = ns;
+	}
+	mutex_exit(&ns->netstack_lock);
+
+	return (retval);
+}
+
 void
 netstack_hold(netstack_t *ns)
 {
 	mutex_enter(&ns->netstack_lock);
-	ns->netstack_refcnt++;
-	ASSERT(ns->netstack_refcnt > 0);
+	netstack_hold_locked(ns);
 	mutex_exit(&ns->netstack_lock);
-	DTRACE_PROBE1(netstack__inc__ref, netstack_t *, ns);
 }
 
 /*
@@ -1420,20 +1435,21 @@ netstack_next(netstack_handle_t *handle)
 			break;
 		ns = ns->netstack_next;
 	}
-	/* skip those with that aren't really here */
+	/*
+	 * Skip those that aren't really here (uninitialized or closing).
+	 * Can't use hold_if_active because of "end" tracking.
+	 */
 	while (ns != NULL) {
 		mutex_enter(&ns->netstack_lock);
 		if ((ns->netstack_flags & (NSF_UNINIT|NSF_CLOSING)) == 0) {
+			*handle = end + 1;
+			netstack_hold_locked(ns);
 			mutex_exit(&ns->netstack_lock);
 			break;
 		}
 		mutex_exit(&ns->netstack_lock);
 		end++;
 		ns = ns->netstack_next;
-	}
-	if (ns != NULL) {
-		*handle = end + 1;
-		netstack_hold(ns);
 	}
 	mutex_exit(&netstack_g_lock);
 	return (ns);
