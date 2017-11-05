@@ -32,6 +32,8 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-but-set-parameter
+CERRWARN +=	-_gcc=-Wno-unused-but-set-variable
 DBMDEF=		-DNDBM -DNEWDB -DNIS -DUSERDB -DMAP_REGEX -DLDAPMAP
 
 ROOTLIBSMTPSM = $(ROOTLIB)/smtp/sendmail
