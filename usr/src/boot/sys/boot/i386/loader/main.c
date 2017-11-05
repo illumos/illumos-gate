@@ -40,7 +40,6 @@
 #include <sys/disk.h>
 #include <sys/param.h>
 #include <sys/reboot.h>
-#include <sys/multiboot2.h>
 
 #include "bootstrap.h"
 #include "common/bootargs.h"
@@ -82,18 +81,6 @@ extern char end[];
 
 static void *heap_top;
 static void *heap_bottom;
-
-static uint64_t
-i386_loadaddr(u_int type, void *data, uint64_t addr)
-{
-	/*
-	 * Our modules are page aligned.
-	 */
-	if (type == LOAD_RAW || type == LOAD_MEM)
-                return (roundup2(addr, MULTIBOOT_MOD_ALIGN));
-
-        return (addr);
-}
 
 int
 main(void)

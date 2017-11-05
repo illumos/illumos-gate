@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #pragma dictionary "DISK"
@@ -44,7 +45,8 @@ asru P;
  * to trigger a fault when recovery/relocation is not possible.
  *
  * We let the engine propagate one error only once every 1 minute and then if we
- * still get 2 or more * errors within 24 hours for the same LBA, there is a fault.
+ * still get 2 or more errors within 24 hours for the same LBA,
+ * there is a fault.
  */
 engine serd.io.scsi.cmd.disk.dev.rqs.merr@P, N=1, T=24h;
 
@@ -185,6 +187,7 @@ event fault.io.disk.predictive-failure@P, FITrate=10,
     FITrate=10, FRU=P, ASRU=P;
 event fault.io.disk.self-test-failure@P, FITrate=10,
     FITrate=10, FRU=P, ASRU=P;
+event fault.io.disk.ssm-wearout@P;
 
 /*
  * ereports.
@@ -192,6 +195,7 @@ event fault.io.disk.self-test-failure@P, FITrate=10,
 event ereport.io.scsi.disk.over-temperature@P;
 event ereport.io.scsi.disk.predictive-failure@P;
 event ereport.io.scsi.disk.self-test-failure@P;
+event ereport.io.scsi.disk.ssm-wearout@P;
 
 /*
  * Propagations.
@@ -206,3 +210,10 @@ prop fault.io.disk.predictive-failure@P ->
     ereport.io.scsi.disk.predictive-failure@P {
     setpayloadprop("asc", payloadprop("additional-sense-code")) &&
     setpayloadprop("ascq", payloadprop("additional-sense-code-qualifier")) };
+
+prop fault.io.disk.ssm-wearout@P ->
+    ereport.io.scsi.disk.ssm-wearout@P {
+    setpayloadprop("current-wearout-percentage",
+    payloadprop("current-ssm-wearout"))
+    && setpayloadprop("threshold-wearout-percentage",
+    payloadprop("threshold-ssm-wearout")) };

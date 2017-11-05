@@ -790,13 +790,13 @@ multiboot2_exec(struct preloaded_file *fp)
 	int rootfs = 0;
 	size_t size;
 	struct bios_smap *smap;
-	vm_offset_t tmp;
 #if defined (EFI)
 	multiboot_tag_module_t *module;
 	EFI_MEMORY_DESCRIPTOR *map;
 	struct relocator *relocator;
 	struct chunk_head *head;
 	struct chunk *chunk;
+	vm_offset_t tmp;
 
 	efi_getdev((void **)(&rootdev), NULL, NULL);
 #else
@@ -856,7 +856,7 @@ multiboot2_exec(struct preloaded_file *fp)
 	last_addr = (vm_offset_t)mbi->mbi_tags;
 #else
 	/* Start info block from the new page. */
-	last_addr = roundup(mfp->f_addr + mfp->f_size, MULTIBOOT_MOD_ALIGN);
+	last_addr = i386_loadaddr(LOAD_MEM, &size, mfp->f_addr + mfp->f_size);
 
 	/* Do we have space for multiboot info? */
 	if (last_addr + size >= memtop_copyin) {
@@ -927,8 +927,8 @@ multiboot2_exec(struct preloaded_file *fp)
 	 * - Set the tmp to point to physical address of the first module.
 	 * - tmp != mfp->f_addr only in case of EFI.
 	 */
-	tmp = roundup2(load_addr + fp->f_size, MULTIBOOT_MOD_ALIGN);
 #if defined (EFI)
+	tmp = roundup2(load_addr + fp->f_size, MULTIBOOT_MOD_ALIGN);
 	module = (multiboot_tag_module_t *)last_addr;
 #endif
 
@@ -957,9 +957,14 @@ multiboot2_exec(struct preloaded_file *fp)
 
 		tag->mb_type = MULTIBOOT_TAG_TYPE_MODULE;
 		tag->mb_size = sizeof (*tag) + num;
+#if defined (EFI)
 		tag->mb_mod_start = tmp;
 		tag->mb_mod_end = tmp + mfp->f_size;
-		tmp = roundup2(tag->mb_mod_end, MULTIBOOT_MOD_ALIGN);
+		tmp = roundup2(tag->mb_mod_end + 1, MULTIBOOT_MOD_ALIGN);
+#else
+		tag->mb_mod_start = mfp->f_addr;
+		tag->mb_mod_end = mfp->f_addr + mfp->f_size;
+#endif
 		memcpy(tag->mb_cmdline, cmdline, num);
 		free(cmdline);
 		cmdline = NULL;

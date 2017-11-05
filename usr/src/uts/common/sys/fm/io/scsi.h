@@ -21,12 +21,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_FM_IO_SCSI_H
 #define	_SYS_FM_IO_SCSI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,6 +46,10 @@ extern "C" {
 #define	FM_EREPORT_SCSI_OVERTEMP		"over-temperature"
 #define	FM_EREPORT_PAYLOAD_SCSI_CURTEMP		"current-temperature"
 #define	FM_EREPORT_PAYLOAD_SCSI_THRESHTEMP	"threshold-temperature"
+
+#define	FM_EREPORT_SCSI_SSMWEAROUT		"ssm-wearout"
+#define	FM_EREPORT_PAYLOAD_SCSI_CURSSMWEAROUT	"current-ssm-wearout"
+#define	FM_EREPORT_PAYLOAD_SCSI_THRSHSSMWEAROUT	"threshold-ssm-wearout"
 
 #define	FM_EREPORT_SCSI_TESTFAIL		"self-test-failure"
 #define	FM_EREPORT_PAYLOAD_SCSI_RESULTCODE	"result-code"
