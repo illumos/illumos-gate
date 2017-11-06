@@ -37,6 +37,7 @@ dir path=usr/share/man/man7d
 driver name=iwn clone_perms="iwn 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,422b \
     alias=pciex8086,422c \
+    alias=pciex8086,4236 \
     alias=pciex8086,4238 \
     alias=pciex8086,4239 \
     alias=pciex8086,82 \
