@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -157,6 +158,10 @@ dm_fault_execute_actions(fmd_hdl_t *hdl, diskmon_t *diskp, nvlist_t *nvl)
 	if (fmd_nvl_class_match(hdl, nvl,
 	    DISK_ERROR_CLASS "." FM_FAULT_DISK_TESTFAIL))
 		action_prop = DISK_PROP_STFAILACTION;
+
+	if (fmd_nvl_class_match(hdl, nvl,
+	    DISK_ERROR_CLASS "." FM_FAULT_SSM_WEAROUT))
+		action_prop = DISK_PROP_SSMWEAROUTACTION;
 
 	dm_fault_indicator_set(diskp, INDICATOR_ON);
 

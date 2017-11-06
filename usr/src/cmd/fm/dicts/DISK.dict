@@ -1,6 +1,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -32,3 +33,4 @@ fault.io.disk.over-temperature=1
 fault.io.disk.self-test-failure=2
 fault.io.scsi.cmd.disk.dev.rqs.derr=3
 fault.io.scsi.cmd.disk.dev.rqs.merr=4
+fault.io.disk.ssm-wearout=8

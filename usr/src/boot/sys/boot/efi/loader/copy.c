@@ -54,7 +54,7 @@ efi_loadaddr(u_int type, void *data, uint64_t addr)
 {
 	EFI_PHYSICAL_ADDRESS paddr;
 	struct stat st;
-	int size;
+	size_t size;
 	uint64_t pages;
 	EFI_STATUS status;
 
@@ -65,7 +65,7 @@ efi_loadaddr(u_int type, void *data, uint64_t addr)
 		return (0);	/* not supported */
 
 	if (type == LOAD_MEM)
-		size = *(int *)data;
+		size = *(size_t *)data;
 	else {
 		stat(data, &st);
 		size = st.st_size;
@@ -79,7 +79,7 @@ efi_loadaddr(u_int type, void *data, uint64_t addr)
 	    pages, &paddr);
 
 	if (EFI_ERROR(status)) {
-		printf("failed to allocate %d bytes for staging area: %lu\n",
+		printf("failed to allocate %zu bytes for staging area: %lu\n",
 		    size, EFI_ERROR_CODE(status));
 		return (0);
 	}

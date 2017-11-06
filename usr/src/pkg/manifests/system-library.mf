@@ -261,7 +261,7 @@ file path=lib/libadm.so.1
 file path=lib/libaio.so.1
 file path=lib/libavl.so.1
 file path=lib/libbsm.so.1
-file path=lib/libc.so.1 reboot-needed=true
+file path=lib/libc.so.1 mountpoint=true reboot-needed=true
 file path=lib/libc_db.so.1
 file path=lib/libcmdutils.so.1
 file path=lib/libcontract.so.1

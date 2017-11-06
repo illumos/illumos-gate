@@ -22,12 +22,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _DISKMOND_CONF_H
 #define	_DISKMOND_CONF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Configuration File data
@@ -62,6 +61,7 @@ extern "C" {
 #define	DISK_PROP_FRUACTION		"fru-update-action"
 #define	DISK_PROP_OTEMPACTION		"overtemp-action"
 #define	DISK_PROP_STFAILACTION		"selftest-fail-action"
+#define	DISK_PROP_SSMWEAROUTACTION	"ssm-wearout-action"
 
 /* Properties for the "ap" subentity */
 #define	DISK_AP_PROP_APID "path"

@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <errno.h>
@@ -77,12 +76,16 @@ static int logpage_temp_verify(ds_scsi_info_t *,
     scsi_log_parameter_header_t *, int, nvlist_t *);
 static int logpage_selftest_verify(ds_scsi_info_t *,
     scsi_log_parameter_header_t *, int, nvlist_t *);
+static int logpage_ssm_verify(ds_scsi_info_t *,
+    scsi_log_parameter_header_t *, int, nvlist_t *);
 
 static int logpage_ie_analyze(ds_scsi_info_t *,
     scsi_log_parameter_header_t *, int);
 static int logpage_temp_analyze(ds_scsi_info_t *,
     scsi_log_parameter_header_t *, int);
 static int logpage_selftest_analyze(ds_scsi_info_t *,
+    scsi_log_parameter_header_t *, int);
+static int logpage_ssm_analyze(ds_scsi_info_t *,
     scsi_log_parameter_header_t *, int);
 
 static struct logpage_validation_entry log_validation[] = {
@@ -94,7 +97,10 @@ static struct logpage_validation_entry log_validation[] = {
 	    logpage_temp_verify, logpage_temp_analyze },
 	{ LOGPAGE_SELFTEST,	LOGPAGE_SUPP_SELFTEST,
 	    "self-test",
-	    logpage_selftest_verify, logpage_selftest_analyze }
+	    logpage_selftest_verify, logpage_selftest_analyze },
+	{ LOGPAGE_SSM,		LOGPAGE_SUPP_SSM,
+	    FM_EREPORT_SCSI_SSMWEAROUT,
+	    logpage_ssm_verify, logpage_ssm_analyze }
 };
 
 #define	NLOG_VALIDATION	(sizeof (log_validation) / sizeof (log_validation[0]))
@@ -757,6 +763,51 @@ logpage_selftest_verify(ds_scsi_info_t *sip,
 }
 
 /*
+ * Verify the contents of the Solid State Media (SSM) log page.
+ * As of SBC3r36 SSM log page contains one log parameter:
+ * "Percentage Used Endurance Indicator" which is mandatory.
+ * For the verification phase, we sanity check this parameter
+ * by making sure it's present and it's length is set to 0x04.
+ */
+static int
+logpage_ssm_verify(ds_scsi_info_t *sip,
+    scsi_log_parameter_header_t *lphp, int log_length, nvlist_t *nvl)
+{
+	ushort_t param_code;
+	int i, plen = 0;
+
+	for (i = 0; i < log_length; i += plen) {
+		lphp = (scsi_log_parameter_header_t *)((char *)lphp + plen);
+		param_code = BE_16(lphp->lph_param);
+
+		switch (param_code) {
+		case LOGPARAM_PRCNT_USED:
+			if (nvlist_add_boolean_value(nvl,
+			    FM_EREPORT_SCSI_SSMWEAROUT, B_TRUE) != 0)
+				return (scsi_set_errno(sip, EDS_NOMEM));
+			if (lphp->lph_length != LOGPARAM_PRCNT_USED_PARAM_LEN) {
+				if (nvlist_add_uint8(nvl,
+				    "invalid-length", lphp->lph_length) != 0)
+					return (scsi_set_errno(sip, EDS_NOMEM));
+
+				dprintf("solid state media logpage bad len\n");
+				break;
+			}
+
+			/* verification succeded */
+			return (0);
+		}
+
+		plen = lphp->lph_length +
+		    sizeof (scsi_log_parameter_header_t);
+	}
+
+	/* verification failed */
+	sip->si_supp_log &= ~LOGPAGE_SUPP_SSM;
+	return (0);
+}
+
+/*
  * Load the current IE mode pages
  */
 static int
@@ -1142,6 +1193,65 @@ logpage_selftest_analyze(ds_scsi_info_t *sip, scsi_log_parameter_header_t *lphp,
 	}
 
 	return (0);
+}
+
+/*
+ * Analyze the contents of the Solid State Media (SSM) log page's
+ * "Percentage Used Endurance Indicator" log parameter.
+ * We generate a fault if the percentage used is equal to or over
+ * PRCNT_USED_FAULT_THRSH
+ */
+static int
+logpage_ssm_analyze(ds_scsi_info_t *sip, scsi_log_parameter_header_t *lphp,
+    int log_length)
+{
+	uint16_t param_code;
+	scsi_ssm_log_param_t *ssm;
+	nvlist_t *nvl;
+	int i, plen = 0;
+
+	assert(sip->si_dsp->ds_ssmwearout == NULL);
+	if (nvlist_alloc(&sip->si_dsp->ds_ssmwearout, NV_UNIQUE_NAME, 0) != 0)
+		return (scsi_set_errno(sip, EDS_NOMEM));
+	nvl = sip->si_dsp->ds_ssmwearout;
+
+	for (i = 0; i < log_length; i += plen) {
+		lphp = (scsi_log_parameter_header_t *)((uint8_t *)lphp + plen);
+		param_code = BE_16(lphp->lph_param);
+		ssm = (scsi_ssm_log_param_t *)lphp;
+
+		switch (param_code) {
+		case LOGPARAM_PRCNT_USED:
+			if (lphp->lph_length != LOGPARAM_PRCNT_USED_PARAM_LEN)
+				break;
+
+			if ((nvlist_add_uint8(nvl,
+			    FM_EREPORT_PAYLOAD_SCSI_CURSSMWEAROUT,
+			    ssm->ssm_prcnt_used) != 0) ||
+			    (nvlist_add_uint8(nvl,
+			    FM_EREPORT_PAYLOAD_SCSI_THRSHSSMWEAROUT,
+			    PRCNT_USED_FAULT_THRSH) != 0))
+				return (scsi_set_errno(sip, EDS_NOMEM));
+
+			if (ssm->ssm_prcnt_used >= PRCNT_USED_FAULT_THRSH)
+				sip->si_dsp->ds_faults |= DS_FAULT_SSMWEAROUT;
+
+			return (0);
+		}
+
+		plen = lphp->lph_length +
+		    sizeof (scsi_log_parameter_header_t);
+	}
+
+	/*
+	 * If we got this far we didn't see LOGPARAM_PRCNT_USED
+	 * which is strange since we verified that it's there
+	 */
+	dprintf("solid state media logpage analyze failed\n");
+#if DEBUG
+	abort();
+#endif
+	return (scsi_set_errno(sip, EDS_NOT_SUPPORTED));
 }
 
 /*
