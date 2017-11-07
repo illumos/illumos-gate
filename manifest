@@ -602,7 +602,10 @@ f kernel/drv/amd64/ehci 0755 root sys
 f kernel/drv/amd64/eibnx 0755 root sys
 f kernel/drv/amd64/fasttrap 0755 root sys
 f kernel/drv/amd64/fbt 0755 root sys
+f kernel/drv/amd64/fcp 0755 root sys
+f kernel/drv/amd64/fcsm 0755 root sys
 f kernel/drv/amd64/fm 0755 root sys
+f kernel/drv/amd64/fp 0755 root sys
 f kernel/drv/amd64/hid 0755 root sys
 f kernel/drv/amd64/hubd 0755 root sys
 f kernel/drv/amd64/hxge 0755 root sys
@@ -771,7 +774,10 @@ f kernel/drv/ehci.conf 0644 root sys
 f kernel/drv/eibnx.conf 0644 root sys
 f kernel/drv/fasttrap.conf 0644 root sys
 f kernel/drv/fbt.conf 0644 root sys
+f kernel/drv/fcp.conf 0644 root sys
+f kernel/drv/fcsm.conf 0644 root sys
 f kernel/drv/fm.conf 0644 root sys
+f kernel/drv/fp.conf 0644 root sys
 f kernel/drv/hxge.conf 0644 root sys
 f kernel/drv/i40e.conf 0644 root sys
 f kernel/drv/icmp.conf 0644 root sys
@@ -941,6 +947,7 @@ f kernel/kmdb/amd64/cpu.generic 0555 root sys
 f kernel/kmdb/amd64/cpu_ms.AuthenticAMD.15 0555 root sys
 f kernel/kmdb/amd64/crypto 0555 root sys
 f kernel/kmdb/amd64/emlxs 0555 root sys
+f kernel/kmdb/amd64/fcp 0555 root sys
 f kernel/kmdb/amd64/fctl 0555 root sys
 f kernel/kmdb/amd64/genunix 0555 root sys
 f kernel/kmdb/amd64/hook 0555 root sys
@@ -18704,10 +18711,12 @@ f usr/share/man/man7d/dtrace.7d 0444 root bin
 f usr/share/man/man7d/ehci.7d 0444 root bin
 f usr/share/man/man7d/fasttrap.7d 0444 root bin
 f usr/share/man/man7d/fbt.7d 0444 root bin
+f usr/share/man/man7d/fcp.7d 0444 root bin
 f usr/share/man/man7d/fctl.7d 0444 root bin
 f usr/share/man/man7d/fd.7d 0444 root bin
 s usr/share/man/man7d/fdc.7d=fd.7d
 s usr/share/man/man7d/firewire.7d=ieee1394.7d
+f usr/share/man/man7d/fp.7d 0444 root bin
 f usr/share/man/man7d/full.7d 0444 root bin
 f usr/share/man/man7d/qede.7d 0444 root bin
 f usr/share/man/man7d/gld.7d 0444 root bin
