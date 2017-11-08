@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SENDFILEV 3EXT "Feb 25, 2009"
+.TH SENDFILEV 3EXT "Nov 3, 2017"
 .SH NAME
 sendfilev \- send a file
 .SH SYNOPSIS
@@ -17,7 +17,6 @@ sendfilev \- send a file
 .fi
 
 .SH PARAMETERS
-.sp
 .LP
 The \fBsendfilev()\fR function supports the following parameters:
 .sp
@@ -38,7 +37,7 @@ For \fBAF_NCA\fR, the protocol type should be zero.
 .ad
 .RS 11n
 An array of \fBSENDFILEVEC_T\fR, as defined in the \fBsendfilevec\fR structure
-above.
+below.
 .RE
 
 .sp
@@ -60,7 +59,6 @@ The total number of bytes written to \fBout_fd\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsendfilev()\fR function attempts to write data from the \fIsfvcnt\fR
 buffers specified by the members of \fIvec\fR array: \fBvec[0], vec[1], ... ,
@@ -110,7 +108,6 @@ To send data directly from the address space of the process, set \fBsfv_fd\fR
 to \fBSFV_FD_SELF\fR. \fBsfv_off\fR should point to the data, with
 \fBsfv_len\fR containing the length of the buffer.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the \fBsendfilev()\fR function returns total number
 of bytes written to \fBout_fd\fR. Otherwise, it returns \fB-1\fR, and
@@ -118,7 +115,6 @@ of bytes written to \fBout_fd\fR. Otherwise, it returns \fB-1\fR, and
 the amount of data successfuly transferred, which can be used to discover the
 error vector.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEACCES\fR\fR
@@ -209,6 +205,9 @@ An I/O error occurred while accessing the file system.
 .ad
 .RS 16n
 The \fIfildes\fR argument is a socket that has been shut down for writing.
+The \fBSIGPIPE\fR signal is generated to the calling thread.
+The process dies unless special provisions were taken to catch or ignore
+the signal.
 .RE
 
 .sp
@@ -221,12 +220,10 @@ The socket type is not supported.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fBsendfilev()\fR function has a transitional interface for 64-bit file
 offsets. See \fBlf64\fR(5).
 .SH EXAMPLES
-.sp
 .LP
 The following example sends 2 vectors, one of HEADER data and a file of length
 100 over \fBsockfd\fR. \fBsockfd\fR is in a connected state, that is,
@@ -265,7 +262,6 @@ main (int argc, char *argv[]){
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -283,7 +279,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBopen\fR(2), \fBwritev\fR(2), \fBlibsendfile\fR(3LIB), \fBsendfile\fR(3EXT),
 \fBsocket\fR(3SOCKET), \fBattributes\fR(5)

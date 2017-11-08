@@ -34,11 +34,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#ifndef	lint
-static const char __idstring[] =
-	"@(#)$Id: myri10ge.c,v 1.186 2009-06-29 13:47:22 gallatin Exp $";
-#endif
-
 #define	MXGEFW_NDIS
 #include "myri10ge_var.h"
 #include "rss_eth_z8e.h"
@@ -1210,7 +1205,7 @@ abort:
 
 int
 myri10ge_send_cmd(struct myri10ge_priv *mgp, uint32_t cmd,
-		myri10ge_cmd_t *data)
+    myri10ge_cmd_t *data)
 {
 	mcp_cmd_t *buf;
 	char buf_bytes[sizeof (*buf) + 8];
@@ -5005,7 +5000,6 @@ myri10ge_watchdog(void *arg)
 /*ARGSUSED*/
 static int
 myri10ge_get_coalesce(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
-
 {
 	struct myri10ge_priv *mgp = (struct myri10ge_priv *)(void *)cp;
 	(void) mi_mpprintf(mp, "%d", mgp->intr_coal_delay);
@@ -5016,7 +5010,6 @@ myri10ge_get_coalesce(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 static int
 myri10ge_set_coalesce(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *credp)
-
 {
 	struct myri10ge_priv *mgp = (struct myri10ge_priv *)(void *)cp;
 	char *end;
@@ -5036,7 +5029,6 @@ myri10ge_set_coalesce(queue_t *q, mblk_t *mp, char *value,
 /*ARGSUSED*/
 static int
 myri10ge_get_pauseparam(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
-
 {
 	struct myri10ge_priv *mgp = (struct myri10ge_priv *)(void *)cp;
 	(void) mi_mpprintf(mp, "%d", mgp->pause);
@@ -5046,8 +5038,7 @@ myri10ge_get_pauseparam(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 /*ARGSUSED*/
 static int
 myri10ge_set_pauseparam(queue_t *q, mblk_t *mp, char *value,
-			caddr_t cp, cred_t *credp)
-
+    caddr_t cp, cred_t *credp)
 {
 	struct myri10ge_priv *mgp = (struct myri10ge_priv *)(void *)cp;
 	char *end;
@@ -5070,7 +5061,6 @@ myri10ge_set_pauseparam(queue_t *q, mblk_t *mp, char *value,
 /*ARGSUSED*/
 static int
 myri10ge_get_int(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
-
 {
 	(void) mi_mpprintf(mp, "%d", *(int *)(void *)cp);
 	return (0);
@@ -5080,7 +5070,6 @@ myri10ge_get_int(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 static int
 myri10ge_set_int(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *credp)
-
 {
 	char *end;
 	size_t new_value;
