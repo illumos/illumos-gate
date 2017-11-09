@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -737,4 +738,16 @@ _nss_files_check_name_aliases(nss_XbyY_args_t *argp, const char *line,
 			return (1);
 	}
 	return (0);
+}
+
+/*
+ * A few NSS modules hold onto data for the duration of their module. In this
+ * case, when that module goes away, we must free that data. This is a place
+ * that allows for modules to register items to take care of.
+ */
+#pragma fini(_nss_files_fini)
+static void
+_nss_files_fini(void)
+{
+	getexecattr_fini();
 }
