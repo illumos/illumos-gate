@@ -311,6 +311,15 @@ typedef struct {
 #define	LX_CLGRP_FS	0
 #define	LX_CLGRP_MAX	1
 
+/* See explanation in lx_mem.c about lx_mremap */
+#define	LX_REMAP_ANONCACHE_NENTRIES	4
+typedef struct lx_segmap {
+	uintptr_t lxsm_vaddr;	/* virtual address of mapping */
+	size_t	lxsm_size;	/* size of mapping in bytes */
+	uint64_t lxsm_lru;	/* LRU field for cache */
+	uint_t	lxsm_flags;	/* protection and attribute flags */
+} lx_segmap_t;
+
 typedef struct lx_proc_data {
 	uintptr_t l_handler;	/* address of user-space handler */
 	pid_t l_ppid;		/* pid of originating parent proc */
@@ -348,6 +357,11 @@ typedef struct lx_proc_data {
 
 	/* VDSO location */
 	uintptr_t l_vdso;
+
+	/* mremap anon cache */
+	kmutex_t l_remap_anoncache_lock;
+	uint64_t l_remap_anoncache_generation;
+	lx_segmap_t l_remap_anoncache[LX_REMAP_ANONCACHE_NENTRIES];
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */

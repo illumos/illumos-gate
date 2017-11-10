@@ -284,12 +284,6 @@ lx_mincore(caddr_t addr, size_t len, char *vec)
 }
 
 long
-lx_munmap(void *addr, size_t len)
-{
-	return (munmap(addr, len));
-}
-
-long
 lx_nice(int incr)
 {
 	return (nice(incr));

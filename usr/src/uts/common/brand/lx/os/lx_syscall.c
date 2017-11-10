@@ -609,7 +609,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"swapon",	lx_swapon,		0,		2}, /* 87 */
 	{"reboot",	lx_reboot,		0,		4}, /* 88 */
 	{"readdir",	NULL,			0,		3}, /* 89 */
-	{"mmap",	NULL,			0,		6}, /* 90 */
+	{"mmap",	lx_mmap,		0,		6}, /* 90 */
 	{"munmap",	lx_munmap,		0,		2}, /* 91 */
 	{"truncate",	NULL,			0,		2}, /* 92 */
 	{"ftruncate",	NULL,			0,		2}, /* 93 */
@@ -682,7 +682,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"sched_get_priority_min", lx_sched_get_priority_min, 0, 1}, /* 160 */
 	{"sched_rr_get_interval", lx_sched_rr_get_interval,  0,	 2}, /* 161 */
 	{"nanosleep",	lx_nanosleep,		0,		2}, /* 162 */
-	{"mremap",	NULL,			0,		5}, /* 163 */
+	{"mremap",	lx_mremap,		0,		5}, /* 163 */
 	{"setresuid16",	lx_setresuid16,		0,		3}, /* 164 */
 	{"getresuid16",	lx_getresuid16,		0,		3}, /* 165 */
 	{"vm86",	NULL,			NOSYS_NO_EQUIV,	0}, /* 166 */
@@ -711,7 +711,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"putpmsg",	NULL,			NOSYS_OBSOLETE,	0}, /* 189 */
 	{"vfork",	NULL,			0,		0}, /* 190 */
 	{"getrlimit",	lx_getrlimit,		0,		2}, /* 191 */
-	{"mmap2",	NULL,			LX_SYS_EBPARG6,	6}, /* 192 */
+	{"mmap2",	lx_mmap2,		LX_SYS_EBPARG6,	6}, /* 192 */
 	{"truncate64",	NULL,			0,		3}, /* 193 */
 	{"ftruncate64",	NULL,			0,		3}, /* 194 */
 	{"stat64",	lx_stat64,		0,		2}, /* 195 */
@@ -899,7 +899,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"lstat",	lx_lstat64,		0,		2}, /* 6 */
 	{"poll",	lx_poll,		0,		3}, /* 7 */
 	{"lseek",	lx_lseek64,		0,		3}, /* 8 */
-	{"mmap",	NULL,			0,		6}, /* 9 */
+	{"mmap",	lx_mmap,		0,		6}, /* 9 */
 	{"mprotect",	lx_mprotect,		0,		3}, /* 10 */
 	{"munmap",	lx_munmap,		0,		2}, /* 11 */
 	{"brk",		lx_brk,			0,		1}, /* 12 */
@@ -915,7 +915,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"pipe",	lx_pipe,		0,		1}, /* 22 */
 	{"select",	lx_select,		0,		5}, /* 23 */
 	{"sched_yield",	lx_sched_yield,		0,		0}, /* 24 */
-	{"mremap",	NULL,			0,		5}, /* 25 */
+	{"mremap",	lx_mremap,		0,		5}, /* 25 */
 	{"msync",	lx_msync,		0,		3}, /* 26 */
 	{"mincore",	lx_mincore,		0,		3}, /* 27 */
 	{"madvise",	lx_madvise,		0,		3}, /* 28 */

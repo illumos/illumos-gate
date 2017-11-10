@@ -56,11 +56,7 @@ move_pages08
 move_pages09
 move_pages10
 move_pages11
-mremap01
-mremap02
-mremap03
-mremap04
-mremap05
+mremap04		# we don't yet support remapping shm
 open01
 open11
 ptrace04

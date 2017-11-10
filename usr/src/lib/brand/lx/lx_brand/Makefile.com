@@ -37,7 +37,6 @@ COBJS	=	capabilities.o		\
 		fcntl.o			\
 		fork.o			\
 		lx_brand.o		\
-		mem.o			\
 		misc.o			\
 		module.o		\
 		mount.o			\

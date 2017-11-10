@@ -1024,7 +1024,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*   6: lstat */
 	NULL,				/*   7: poll */
 	NULL,				/*   8: lseek */
-	lx_mmap,			/*   9: mmap */
+	NULL,				/*   9: mmap */
 	NULL,				/*  10: mprotect */
 	NULL,				/*  11: munmap */
 	NULL,				/*  12: brk */
@@ -1040,7 +1040,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  22: pipe */
 	NULL,				/*  23: select */
 	NULL,				/*  24: sched_yield */
-	lx_remap,			/*  25: mremap */
+	NULL,				/*  25: mremap */
 	NULL,				/*  26: msync */
 	NULL,				/*  27: mincore */
 	NULL,				/*  28: madvise */
@@ -1436,7 +1436,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/*  87: swapon */
 	NULL,				/*  88: reboot */
 	lx_readdir,			/*  89: readdir */
-	lx_mmap,			/*  90: mmap */
+	NULL,				/*  90: mmap */
 	NULL,				/*  91: munmap */
 	lx_truncate,			/*  92: truncate */
 	lx_ftruncate,			/*  93: ftruncate */
@@ -1509,7 +1509,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 160: sched_get_priority_min */
 	NULL,				/* 161: sched_rr_get_interval */
 	NULL,				/* 162: nanosleep */
-	lx_remap,			/* 163: mremap */
+	NULL,				/* 163: mremap */
 	NULL,				/* 164: setresuid16 */
 	NULL,				/* 165: getresuid16 */
 	NULL,				/* 166: vm86 */
@@ -1538,7 +1538,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 189: putpmsg */
 	lx_vfork,			/* 190: vfork */
 	NULL,				/* 191: getrlimit */
-	lx_mmap2,			/* 192: mmap2 */
+	NULL,				/* 192: mmap2 */
 	lx_truncate64,			/* 193: truncate64 */
 	lx_ftruncate64,			/* 194: ftruncate64 */
 	NULL,				/* 195: stat64 */
