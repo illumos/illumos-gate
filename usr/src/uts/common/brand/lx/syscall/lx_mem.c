@@ -1047,10 +1047,10 @@ lx_u2u_copy(void *src, void *dst, size_t len)
 	struct as *p_as = curproc->p_as;
 
 	/* Both sides should be page aligned since they're from smmap64 */
-	ASSERT((src & PAGEOFFSET) == 0);
-	ASSERT((dst & PAGEOFFSET) == 0);
+	ASSERT(((uintptr_t)src & PAGEOFFSET) == 0);
+	ASSERT(((uintptr_t)dst & PAGEOFFSET) == 0);
 	/* Both came from mmap, so they should be valid user pointers */
-	ASSERT(src < USERLIMIT && dst < USERLIMIT);
+	ASSERT((uintptr_t)src < USERLIMIT && (uintptr_t)dst < USERLIMIT);
 
 	sp = src;
 	dp = dst;
