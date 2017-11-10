@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2017 Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -163,6 +164,7 @@ file path=opt/util-tests/tests/libnvpair_json/json_06_nested mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_07_nested_arrays mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_common mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
+file path=opt/util-tests/tests/set-linkprop mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
 license lic_CDDL license=lic_CDDL
 depend fmri=system/library/iconv/utf-8 type=require
