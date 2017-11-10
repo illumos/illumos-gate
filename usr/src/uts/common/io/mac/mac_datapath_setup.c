@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -3438,10 +3439,13 @@ mac_srs_soft_rings_quiesce(mac_soft_ring_set_t *mac_srs, uint_t s_ring_flag)
 	mutex_exit(&mac_srs->srs_lock);
 
 	for (softring = mac_srs->srs_soft_ring_head; softring != NULL;
-	    softring = softring->s_ring_next)
+	    softring = softring->s_ring_next) {
 		(void) untimeout(softring->s_ring_tid);
+		softring->s_ring_tid = NULL;
+	}
 
 	(void) untimeout(mac_srs->srs_tid);
+	mac_srs->srs_tid = NULL;
 
 	mutex_enter(&mac_srs->srs_lock);
 }

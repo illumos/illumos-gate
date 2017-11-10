@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -324,12 +325,12 @@ mac_soft_ring_fire(void *arg)
 	mac_soft_ring_t	*ringp = arg;
 
 	mutex_enter(&ringp->s_ring_lock);
-	if (ringp->s_ring_tid == 0) {
+	if (ringp->s_ring_tid == NULL) {
 		mutex_exit(&ringp->s_ring_lock);
 		return;
 	}
 
-	ringp->s_ring_tid = 0;
+	ringp->s_ring_tid = NULL;
 
 	if (!(ringp->s_ring_state & S_RING_PROC)) {
 		cv_signal(&ringp->s_ring_async);
@@ -363,8 +364,8 @@ mac_rx_soft_ring_drain(mac_soft_ring_t *ringp)
 	ASSERT(mutex_owned(&ringp->s_ring_lock));
 	ASSERT(!(ringp->s_ring_state & S_RING_PROC));
 
-	if ((tid = ringp->s_ring_tid) != 0)
-		ringp->s_ring_tid = 0;
+	if ((tid = ringp->s_ring_tid) != NULL)
+		ringp->s_ring_tid = NULL;
 
 	ringp->s_ring_state |= S_RING_PROC;
 
@@ -383,9 +384,9 @@ mac_rx_soft_ring_drain(mac_soft_ring_t *ringp)
 		ringp->s_ring_size = 0;
 		mutex_exit(&ringp->s_ring_lock);
 
-		if (tid != 0) {
+		if (tid != NULL) {
 			(void) untimeout(tid);
-			tid = 0;
+			tid = NULL;
 		}
 
 		(*proc)(arg1, arg2, mp, NULL);
