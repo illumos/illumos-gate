@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef _VM_SEG_KMEM_H
@@ -43,7 +44,7 @@ extern "C" {
  * VM - Kernel Segment Driver
  */
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern char *kernelheap;	/* start of primary kernel heap */
 extern char *ekernelheap;	/* end of primary kernel heap */
@@ -139,7 +140,7 @@ extern size_t	segkmem_kmemlp_max;
 
 extern struct seg_ops segkmem_ops;
 
-#endif	/* _KERNEL */
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
 #ifdef	__cplusplus
 }

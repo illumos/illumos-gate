@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2017 RackTop Systems.
 #
 
 PROG= ztest
@@ -35,12 +36,13 @@ INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../uts/common/fs/zfs/lua
 INCS += -I../../../common/zfs
 
-LDLIBS += -lumem -lzpool -lcmdutils -lm -lnvpair
+LDLIBS += -lumem -lzpool -lcmdutils -lm -lnvpair -lfakekernel
 
 C99MODE= -xc99=%all
 C99LMODE= -Xc99=%all
 CFLAGS += -g $(CCVERBOSE)
 CFLAGS64 += -g $(CCVERBOSE)
+CPPFLAGS.first = -I$(SRC)/lib/libfakekernel/common -D_FAKE_KERNEL
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS) -DDEBUG
 
 # lint complains about unused _umem_* functions

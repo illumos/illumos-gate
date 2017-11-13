@@ -11,19 +11,22 @@
 
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 RackTop Systems.
 #
 
 LIBRARY =	libfakekernel.a
 VERS =		.1
 
 COBJS = \
-	cred.o \
 	clock.o \
 	cond.o \
 	copy.o \
+	cred.o \
+	cyclic.o \
 	kiconv.o \
 	kmem.o \
 	kmisc.o \
+	ksid.o \
 	ksocket.o \
 	kstat.o \
 	mutex.o \
@@ -31,6 +34,7 @@ COBJS = \
 	random.o \
 	rwlock.o \
 	sema.o \
+	strext.o \
 	taskq.o \
 	thread.o \
 	uio.o
@@ -38,6 +42,9 @@ COBJS = \
 OBJECTS=	$(COBJS)
 
 include ../../Makefile.lib
+
+# libfakekernel must be installed in the root filesystem for libzpool
+include ../../Makefile.rootfs
 
 SRCDIR=		../common
 

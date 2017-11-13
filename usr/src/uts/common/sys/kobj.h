@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef _SYS_KOBJ_H
 #define	_SYS_KOBJ_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/elf.h>
@@ -158,7 +158,7 @@ typedef struct {
 
 #define	F_BLKS(file, size)	((size / (file)->_bsize) * (file)->_bsize)
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern int kobj_load_module(struct modctl *, int);
 extern void kobj_unload_module(struct modctl *);
@@ -202,7 +202,7 @@ extern void kobj_stat_get(kobj_stat_t *);
 extern void kobj_textwin_alloc(struct module *);
 extern void kobj_textwin_free(struct module *);
 
-#endif	/* defined(_KERNEL) */
+#endif	/* defined(_KERNEL) || defined(_FAKE_KERNEL) */
 
 #ifdef	__cplusplus
 }

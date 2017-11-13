@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef	_BITSET_H
@@ -29,7 +30,7 @@
 extern "C" {
 #endif
 
-#if (defined(_KERNEL) || defined(_KMEMUSER))
+#if defined(_KERNEL) || defined(_FAKE_KERNEL) || defined(_KMEMUSER)
 #include <sys/bitmap.h>
 #include <sys/types.h>
 
@@ -87,7 +88,7 @@ void		bitset_zero(bitset_t *);
 void		bitset_copy(bitset_t *, bitset_t *);
 int		bitset_match(bitset_t *, bitset_t *);
 
-#endif	/* !_KERNEL && !_KMEMUSER */
+#endif	/* _KERNEL || _FAKE_KERNEL || _KMEMUSER */
 
 #ifdef	__cplusplus
 }

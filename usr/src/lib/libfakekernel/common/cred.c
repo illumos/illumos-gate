@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 
@@ -50,6 +51,34 @@ uid_t
 crgetuid(const cred_t *cr)
 {
 	return (0);
+}
+
+/*ARGSUSED*/
+uid_t
+crgetruid(const cred_t *cr)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+uid_t
+crgetgid(const cred_t *cr)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+crgetngroups(const cred_t *cr)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+const gid_t *
+crgetgroups(const cred_t *cr)
+{
+	return (NULL);
 }
 
 cred_t *

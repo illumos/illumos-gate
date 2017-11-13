@@ -26,6 +26,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2017 Toomas Soome <tsoome@me.com>
+# Copyright 2017 RackTop Systems.
 #
 
 #
@@ -721,19 +722,19 @@ usr/include/sys/srn.h
 usr/include/smb
 usr/include/smbsrv
 #
-# Private/Internal libraries for smbsrv in user space
+# Private/Internal files for libfakekernel. Do not ship.
 #
+lib/amd64/libfakekernel.so			i386
+lib/amd64/llib-lfakekernel.ln			i386
+lib/sparcv9/libfakekernel.so			sparc
+lib/sparcv9/llib-lfakekernel.ln			sparc
+lib/libfakekernel.so
+lib/llib-lfakekernel
+lib/llib-lfakekernel.ln
 usr/include/libfakekernel
 usr/lib/libfakekernel.so
-usr/lib/libfakekernel.so.1
-usr/lib/llib-lfakekernel
-usr/lib/llib-lfakekernel.ln
-usr/lib/amd64/llib-lfakekernel.ln		i386
-usr/lib/sparcv9/llib-lfakekernel.ln		sparc
 usr/lib/amd64/libfakekernel.so			i386
-usr/lib/amd64/libfakekernel.so.1		i386
 usr/lib/sparcv9/libfakekernel.so		sparc
-usr/lib/sparcv9/libfakekernel.so.1		sparc
 #
 # Private/Internal libraries of smbsrv. Do not ship.
 #

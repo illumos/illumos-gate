@@ -25,6 +25,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef _SYS_ACL_H
@@ -158,7 +159,7 @@ typedef struct acl_info acl_t;
 
 #define	ACE_ALL_TYPES	0x001F
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 typedef struct ace_object {
 	uid_t		a_who;		/* uid or gid */

@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2017 RackTop Systems.
 #
 
 MODULE = libzpool.so
@@ -39,6 +40,7 @@ include ../../../common/modules/zfs/Makefile.zfs
 MODSRCS_DIR = ../../../common/modules/zfs
 GENUNIX_DIR = ../../../common/modules/genunix
 
+CPPFLAGS.first = -I$(SRC)/lib/libfakekernel/common -D_FAKE_KERNEL
 CPPFLAGS += -I../../../../../lib/libzpool/common \
 	-I../../../../../uts/common/fs/zfs \
 	-I../../../../../uts/common/fs/zfs/lua

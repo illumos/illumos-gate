@@ -24,10 +24,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright (c) 2013 RackTop Systems.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 RackTop Systems.
 #
 
 #
@@ -848,6 +848,8 @@ $(ROOT)/usr/lib/libefi.so.1:=		REALPATH=../../lib/libefi.so.1
 $(ROOT)/usr/lib/libefi.so:=		REALPATH=../../lib/libefi.so.1
 $(ROOT)/usr/lib/libelf.so.1:=		REALPATH=../../lib/libelf.so.1
 $(ROOT)/usr/lib/libelf.so:=		REALPATH=../../lib/libelf.so.1
+$(ROOT)/usr/lib/libfakekernel.so.1:=	REALPATH=../../lib/libfakekernel.so.1
+$(ROOT)/usr/lib/libfakekernel.so:=	REALPATH=../../lib/libfakekernel.so.1
 $(ROOT)/usr/lib/libfdisk.so.1:=		REALPATH=../../lib/libfdisk.so.1
 $(ROOT)/usr/lib/libfdisk.so:=		REALPATH=../../lib/libfdisk.so.1
 $(ROOT)/usr/lib/libgen.so.1:=		REALPATH=../../lib/libgen.so.1
@@ -1305,6 +1307,10 @@ $(ROOT)/usr/lib/$(MACH64)/libzfs_core.so:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs_core.so.1
 $(ROOT)/usr/lib/$(MACH64)/libzfs_core.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs_core.so.1
+$(ROOT)/usr/lib/$(MACH64)/libfakekernel.so:= \
+	REALPATH=../../../lib/$(MACH64)/libfakekernel.so.1
+$(ROOT)/usr/lib/$(MACH64)/libfakekernel.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libfakekernel.so.1
 $(ROOT)/usr/lib/$(MACH64)/libfdisk.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libfdisk.so.1
 $(ROOT)/usr/lib/$(MACH64)/libfdisk.so:= \
@@ -1481,6 +1487,8 @@ SYM.USRLIB= \
 	/usr/lib/libefi.so.1 \
 	/usr/lib/libelf.so \
 	/usr/lib/libelf.so.1 \
+	/usr/lib/libfakekernel.so \
+	/usr/lib/libfakekernel.so.1 \
 	/usr/lib/libgen.so \
 	/usr/lib/libgen.so.1 \
 	/usr/lib/libinetutil.so \
@@ -1730,6 +1738,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libefi.so.1 \
 	/usr/lib/$(MACH64)/libelf.so \
 	/usr/lib/$(MACH64)/libelf.so.1 \
+	/usr/lib/$(MACH64)/libfakekernel.so \
+	/usr/lib/$(MACH64)/libfakekernel.so.1 \
 	/usr/lib/$(MACH64)/libgen.so \
 	/usr/lib/$(MACH64)/libgen.so.1 \
 	/usr/lib/$(MACH64)/libinetutil.so \

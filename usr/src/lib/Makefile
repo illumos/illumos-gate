@@ -29,6 +29,7 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+# Copyright 2017 RackTop Systems.
 #
 
 include ../Makefile.master
@@ -681,7 +682,7 @@ libzfs_jni:	libdiskmgt libzfs
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb
 libzonestat:	libcmdutils libumem
-libzpool:	libavl libumem libcmdutils libsysevent
+libzpool:	libavl libumem libcmdutils libsysevent libfakekernel
 madv:		libgen
 mpapi:		libpthread libdevinfo libsysevent
 mpss:		libgen

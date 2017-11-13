@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #include <sys/param.h>
@@ -71,7 +72,7 @@ fakekernel_putlog(char *msg, size_t len, int flags)
  */
 void
 fakekernel_cprintf(const char *fmt, va_list adx, int flags,
-	const char *prefix, const char *suffix)
+    const char *prefix, const char *suffix)
 {
 	size_t bufsize = LOG_MSGSIZE;
 	char buf[LOG_MSGSIZE];
@@ -121,6 +122,16 @@ vpanic(const char *fmt, va_list adx)
 
 void
 panic(const char *fmt, ...)
+{
+	va_list adx;
+
+	va_start(adx, fmt);
+	vpanic(fmt, adx);
+	va_end(adx);
+}
+
+void
+fm_panic(const char *fmt, ...)
 {
 	va_list adx;
 
