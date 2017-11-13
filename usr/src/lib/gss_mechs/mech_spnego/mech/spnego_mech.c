@@ -1115,8 +1115,6 @@ cleanup:
 /* We don't want to import KRB5 headers here */
 static const gss_OID_desc gss_mech_krb5_oid =
 	{ 9, "\052\206\110\206\367\022\001\002\002" };
-static const gss_OID_desc gss_mech_krb5_wrong_oid =
-	{ 9, "\052\206\110\202\367\022\001\002\002" };
 
 /*
  * verify that the input token length is not 0. If it is, just return.
@@ -1167,7 +1165,6 @@ make_NegHints(OM_uint32 *minor_status,
 	OM_uint32 minor;
 	unsigned int tlen = 0;
 	unsigned int hintNameSize = 0;
-	unsigned int negHintsSize = 0;
 	unsigned char *ptr;
 	unsigned char *t;
 
@@ -1251,7 +1248,6 @@ make_NegHints(OM_uint32 *minor_status,
 
 	/* Length of DER encoded hintName */
 	tlen += 1 + gssint_der_length_size(hintNameSize);
-	negHintsSize = tlen;
 
 	t = (unsigned char *)malloc(tlen);
 	if (t == NULL) {
@@ -1855,7 +1851,6 @@ spnego_gss_accept_sec_context(
 	gss_buffer_t mechtok_in, mic_in, mic_out;
 	gss_buffer_desc mechtok_out = GSS_C_EMPTY_BUFFER;
 	spnego_gss_ctx_id_t sc = NULL;
-	OM_uint32 mechstat = GSS_S_FAILURE;
 	int sendTokenInit = 0, tmpret;
 
 	mechtok_in = mic_in = mic_out = GSS_C_NO_BUFFER;
@@ -1929,7 +1924,6 @@ spnego_gss_accept_sec_context(
 	 * round-trip.  RET is set to a default value according to
 	 * whether it is the first round-trip.
 	 */
-	mechstat = GSS_S_FAILURE;
 	if (negState != REQUEST_MIC && mechtok_in != GSS_C_NO_BUFFER) {
 		ret = acc_ctx_call_acc(minor_status, sc,
 				       verifier_cred_handle, mechtok_in,
@@ -1937,8 +1931,6 @@ spnego_gss_accept_sec_context(
 				       ret_flags, time_rec,
 				       delegated_cred_handle,
 				       &negState, &return_token);
-	} else if (negState == REQUEST_MIC) {
-		mechstat = GSS_S_CONTINUE_NEEDED;
 	}
 
 	/* Solaris SPNEGO */
