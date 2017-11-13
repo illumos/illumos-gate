@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef	_LGRP_H
@@ -39,11 +41,11 @@ extern "C" {
 
 #define	LGRP_NONE	(-1)		/* non-existent lgroup ID */
 
-#if (!defined(_KERNEL) && !defined(_KMEMUSER))
+#if !defined(_KERNEL) && !defined(_FAKE_KERNEL) && !defined(_KMEMUSER)
 typedef struct lgrp_mem_policy_info { int opaque[2]; }	lgrp_mem_policy_info_t;
-#endif	/* !_KERNEL && !_KMEMUSER */
+#endif	/* !_KERNEL && !_FAKE_KERNEL && !_KMEMUSER */
 
-#if (defined(_KERNEL) || defined(_KMEMUSER))
+#if defined(_KERNEL) || defined(_FAKE_KERNEL) || defined(_KMEMUSER)
 #include <sys/cpuvar.h>
 #include <sys/bitmap.h>
 #include <sys/vnode.h>
@@ -631,7 +633,7 @@ extern uint32_t		lgrp_loadavg_max_effect;
 extern uint32_t		lgrp_load_thresh;
 extern lgrp_mem_policy_t lgrp_mem_policy_root;
 
-#endif	/* _KERNEL && _KMEMUSER */
+#endif	/* _KERNEL || _FAKE_KERNEL || _KMEMUSER */
 
 #ifdef	__cplusplus
 }

@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 RackTop Systems.
 #
 
 #
@@ -43,8 +44,16 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	copyinstr;
 	copystr;
 
+	cyclic_add;
+	cyclic_remove;
+	cyclic_reprogram;
+
 	crfree;
 	crgetuid;
+	crgetruid;
+	crgetgid;
+	crgetngroups;
+	crgetgroups;
 	crhold;
 
 	cv_broadcast;
@@ -55,6 +64,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	cv_signal;
 	cv_timedwait;
 	cv_timedwait_sig;
+	cv_timedwait_hires;
 	cv_wait;
 	cv_wait_sig;
 
@@ -62,8 +72,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ddi_get_lbolt;
 	ddi_get_pid;
 	ddi_strtoul;
+	ddi_strtoull;
 
 	delay;
+
+	fm_panic;
 
 	fakekernel_cprintf	{ FLAGS = NODIRECT };
 	fakekernel_init;
@@ -75,12 +88,17 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 
 	hz;
 
+	highbit64;
+
+	issig;
+
 	kcred;
 	kiconv;
 	kiconv_close;
 	kiconv_open;
 
 	kmem_alloc;
+	kmem_asprintf;
 	kmem_cache_alloc;
 	kmem_cache_create;
 	kmem_cache_destroy;
@@ -93,9 +111,14 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 
 	kmutex_destroy;
 	kmutex_init;
+	kmutex_enter;
+	kmutex_exit;
 
 	ksema_destroy;
 	ksema_init;
+
+	ksid_lookupdomain;
+	ksiddomain_rele;
 
 	ksocket_accept;
 	ksocket_bind;
@@ -120,13 +143,18 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 
 	kstat_create;
 	kstat_create_zone;
+	kstat_named_init;
 	kstat_delete;
 	kstat_install;
+	kstat_waitq_enter;
+	kstat_waitq_exit;
+	kstat_runq_enter;
+	kstat_runq_exit;
+	kstat_waitq_to_runq;
+	kstat_runq_back_to_waitq;
 
 	msec_per_tick;
 
-	mutex_enter;
-	mutex_exit;
 	mutex_owned;
 	mutex_owner;
 	mutex_tryenter;
@@ -165,17 +193,26 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 
 	strfree;
 
+	system_taskq;
 	system_taskq_fini;	
 	system_taskq_init;
 	taskq_create;
 	taskq_create_proc;
+	taskq_create_sysdc;
 	taskq_destroy;
 	taskq_dispatch;
 	taskq_dispatch_ent;
 	taskq_member;
 	taskq_wait;
 
+	thread_create;
 	thread_join;
+	thread_exit;
+
+	tsd_get;
+	tsd_set;
+	tsd_create;
+	tsd_destroy;
 
 	tick_per_msec;
 	tsignal;

@@ -11,11 +11,13 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #include <sys/cmn_err.h>
 #include <sys/thread.h>
 #include <sys/zone.h>
+#include <sys/proc.h>
 
 #define	_SYNCH_H	/* keep out <synch.h> */
 #include <thread.h>
@@ -122,4 +124,29 @@ zthread_exit(void)
 {
 	thread_exit();
 	/* NOTREACHED */
+}
+
+void
+tsd_create(uint_t *keyp, void (*destructor)(void *))
+{
+	VERIFY0(thr_keycreate(keyp, destructor));
+}
+
+/*ARGSUSED*/
+void
+tsd_destroy(uint_t *keyp)
+{}
+
+void *
+tsd_get(uint_t key)
+{
+	void *value;
+
+	return (thr_getspecific(key, &value) ? NULL : value);
+}
+
+int
+tsd_set(uint_t key, void *value)
+{
+	return (thr_setspecific(key, value));
 }

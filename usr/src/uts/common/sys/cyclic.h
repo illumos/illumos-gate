@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef _SYS_CYCLIC_H
@@ -72,7 +74,7 @@ typedef struct cyc_omni_handler {
 
 #define	CY_INFINITY	INT64_MAX
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern cyclic_id_t cyclic_add(cyc_handler_t *, cyc_time_t *);
 extern cyclic_id_t cyclic_add_omni(cyc_omni_handler_t *);
@@ -92,7 +94,7 @@ extern void cyclic_resume();
 extern void cyclic_fire(cpu_t *cpu);
 extern void cyclic_softint(cpu_t *cpu, cyc_level_t level);
 
-#endif /* _KERNEL */
+#endif /* _KERNEL || _FAKE_KERNEL */
 
 #endif /* !_ASM */
 

@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -78,6 +79,8 @@ extern time_res_t time_res[];
 
 #define	TIME_RES_VALID(tr)	(tr >= TR_NANOSEC && tr < TR_COUNT)
 
+#define	CALLOUT_FLAG_ABSOLUTE	0x2
+
 /*
  * condition variable function prototypes
  */
@@ -87,6 +90,8 @@ extern  void	cv_destroy(kcondvar_t *);
 extern	void	cv_wait(kcondvar_t *, kmutex_t *);
 extern	void	cv_wait_stop(kcondvar_t *, kmutex_t *, int);
 extern	clock_t	cv_timedwait(kcondvar_t *, kmutex_t *, clock_t);
+extern	clock_t	cv_timedwait_hires(kcondvar_t *, kmutex_t *, hrtime_t, hrtime_t,
+    int);
 extern	clock_t	cv_reltimedwait(kcondvar_t *, kmutex_t *, clock_t, time_res_t);
 extern	int	cv_wait_sig(kcondvar_t *, kmutex_t *);
 extern	clock_t	cv_timedwait_sig(kcondvar_t *, kmutex_t *, clock_t);

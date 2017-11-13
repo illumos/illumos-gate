@@ -25,6 +25,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #include <sys/taskq_impl.h>
@@ -37,6 +38,9 @@
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/unistd.h>
+
+/* avoid <sys/disp.h> */
+#define	maxclsyspri	99
 
 /* avoid <unistd.h> */
 extern long sysconf(int);
@@ -265,8 +269,17 @@ taskq_create(const char *name, int nthr, pri_t pri, int minalloc,
 
 /*ARGSUSED*/
 taskq_t *
+taskq_create_sysdc(const char *name, int nthr, int minalloc,
+    int maxalloc, proc_t *proc, uint_t dc, uint_t flags)
+{
+	return (taskq_create_proc(name, nthr, maxclsyspri,
+	    minalloc, maxalloc, proc, flags));
+}
+
+/*ARGSUSED*/
+taskq_t *
 taskq_create_proc(const char *name, int nthreads, pri_t pri,
-	int minalloc, int maxalloc, proc_t *proc, uint_t flags)
+    int minalloc, int maxalloc, proc_t *proc, uint_t flags)
 {
 	taskq_t *tq = kmem_zalloc(sizeof (taskq_t), KM_SLEEP);
 	int t;

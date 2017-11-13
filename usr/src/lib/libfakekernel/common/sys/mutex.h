@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef _SYS_MUTEX_H
@@ -73,6 +74,8 @@ typedef struct pad_mutex {
 } pad_mutex_t;
 #endif	/* _KERNEL */
 
+extern char *volatile panicstr;  /* panic string pointer */
+
 #define	MUTEX_HELD(x)		(mutex_owned(x))
 #define	MUTEX_NOT_HELD(x)	(!mutex_owned(x) || panicstr)
 
@@ -83,12 +86,20 @@ typedef struct pad_mutex {
 #define	mutex_init	kmutex_init
 #define	mutex_destroy	kmutex_destroy
 
+/*
+ * We want to avoid binding against the versions of these
+ * functions in libc which causes bad things to happen.
+ */
+#define	mutex_enter	kmutex_enter
+#define	mutex_exit	kmutex_exit
+
 extern	void	kmutex_init(kmutex_t *, char *, kmutex_type_t, void *);
 extern	void	kmutex_destroy(kmutex_t *);
 
-extern	void	mutex_enter(kmutex_t *);
+extern	void	kmutex_enter(kmutex_t *);
+extern	void	kmutex_exit(kmutex_t *);
+
 extern	int	mutex_tryenter(kmutex_t *);
-extern	void	mutex_exit(kmutex_t *);
 extern	int	mutex_owned(const kmutex_t *);
 
 extern	void *mutex_owner(const kmutex_t *);

@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 RackTop Systems.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -292,7 +294,7 @@ struct	dwbuf {
 	(bp)->av_forw = (bp)->av_back = NULL; \
 }
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 /*
  * Macros to avoid the extra function call needed for binary compat.
  *
@@ -397,7 +399,7 @@ void bioreset(struct buf *bp);
 struct buf *bioclone(struct buf *, off_t, size_t, dev_t, daddr_t,
 	int (*)(struct buf *), struct buf *, int);
 size_t	biosize(void);
-#endif	/* defined(_KERNEL) */
+#endif	/* defined(_KERNEL) || defined(_FAKE_KERNEL) */
 
 #ifdef	__cplusplus
 }
