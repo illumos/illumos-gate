@@ -1457,22 +1457,15 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 static void
 xattr_dir_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
-	gfs_file_t *fp;
-	xattr_dir_t *xattr_dir;
-	vnode_t *real_vp = NULL;
+	xattr_dir_t *dp;
 
-	mutex_enter(&vp->v_lock);
-	xattr_dir = vp->v_data;
-	if (xattr_dir->xattr_realvp) {
-		real_vp = xattr_dir->xattr_realvp;
-		xattr_dir->xattr_realvp = NULL;
-	}
-	mutex_exit(&vp->v_lock);
-	if (real_vp != NULL)
-		VN_RELE(real_vp);
-	fp = gfs_dir_inactive(vp);
-	if (fp != NULL) {
-		kmem_free(fp, fp->gfs_size);
+	dp = gfs_dir_inactive(vp);	/* will track v_count */
+	if (dp != NULL) {
+		/* vp was freed */
+		if (dp->xattr_realvp != NULL)
+			VN_RELE(dp->xattr_realvp);
+
+		kmem_free(dp, ((gfs_file_t *)dp)->gfs_size);
 	}
 }
 
