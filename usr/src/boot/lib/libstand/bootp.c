@@ -1,5 +1,3 @@
-/*	$NetBSD: bootp.c,v 1.14 1998/02/16 11:10:54 drochner Exp $	*/
-
 /*
  * Copyright (c) 1992 Regents of the University of California.
  * All rights reserved.
@@ -16,7 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -31,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * @(#) Header: bootp.c,v 1.4 93/09/11 03:13:51 leres Exp  (LBL)
  */
 
 #include <sys/cdefs.h>
@@ -145,16 +141,22 @@ bootp(int sock, int flag)
 		bp->bp_vend[7] = TAG_CLASSID;
 		bp->bp_vend[8] = 9;
 		bcopy("PXEClient", &bp->bp_vend[9], 9);
-		bp->bp_vend[18] = TAG_PARAM_REQ;
-		bp->bp_vend[19] = 7;
-		bp->bp_vend[20] = TAG_ROOTPATH;
-		bp->bp_vend[21] = TAG_HOSTNAME;
-		bp->bp_vend[22] = TAG_SWAPSERVER;
-		bp->bp_vend[23] = TAG_GATEWAY;
-		bp->bp_vend[24] = TAG_SUBNET_MASK;
-		bp->bp_vend[25] = TAG_INTF_MTU;
-		bp->bp_vend[26] = TAG_SERVERID;
-		bp->bp_vend[27] = TAG_END;
+		bp->bp_vend[18] = TAG_USER_CLASS;
+		/* len of each user class + number of user class */
+		bp->bp_vend[19] = 8;
+		/* len of the first user class */
+		bp->bp_vend[20] = 7;
+		bcopy("illumos", &bp->bp_vend[21], 7);
+		bp->bp_vend[28] = TAG_PARAM_REQ;
+		bp->bp_vend[29] = 7;
+		bp->bp_vend[30] = TAG_ROOTPATH;
+		bp->bp_vend[31] = TAG_HOSTNAME;
+		bp->bp_vend[32] = TAG_SWAPSERVER;
+		bp->bp_vend[33] = TAG_GATEWAY;
+		bp->bp_vend[34] = TAG_SUBNET_MASK;
+		bp->bp_vend[35] = TAG_INTF_MTU;
+		bp->bp_vend[36] = TAG_SERVERID;
+		bp->bp_vend[37] = TAG_END;
 	} else
 		bp->bp_vend[7] = TAG_END;
 #else
