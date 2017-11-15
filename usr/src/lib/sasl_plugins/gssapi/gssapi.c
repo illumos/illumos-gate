@@ -644,33 +644,33 @@ static context_t *gss_new_context(const sasl_utils_t *utils)
 
 static void sasl_gss_free_context_contents(context_t *text)
 {
-    OM_uint32 maj_stat, min_stat;
+    OM_uint32 min_stat;
     
     if (!text) return;
     
     if (text->gss_ctx != GSS_C_NO_CONTEXT) {
-	maj_stat = gss_delete_sec_context (&min_stat,&text->gss_ctx,GSS_C_NO_BUFFER);
+	(void) gss_delete_sec_context(&min_stat,&text->gss_ctx,GSS_C_NO_BUFFER);
 	text->gss_ctx = GSS_C_NO_CONTEXT;
     }
     
     if (text->client_name != GSS_C_NO_NAME) {
-	maj_stat = gss_release_name(&min_stat,&text->client_name);
+	(void) gss_release_name(&min_stat,&text->client_name);
 	text->client_name = GSS_C_NO_NAME;
     }
     
     if (text->server_name != GSS_C_NO_NAME) {
-	maj_stat = gss_release_name(&min_stat,&text->server_name);
+	(void) gss_release_name(&min_stat,&text->server_name);
 	text->server_name = GSS_C_NO_NAME;
     }
     
     if ( text->server_creds != GSS_C_NO_CREDENTIAL) {
-	maj_stat = gss_release_cred(&min_stat, &text->server_creds);
+	(void) gss_release_cred(&min_stat, &text->server_creds);
 	text->server_creds = GSS_C_NO_CREDENTIAL;
     }
 
 #ifdef _SUN_SDK_
     if ( text->client_creds != GSS_C_NO_CREDENTIAL) {
-	maj_stat = gss_release_cred(&min_stat, &text->client_creds);
+	(void) gss_release_cred(&min_stat, &text->client_creds);
 	text->client_creds = GSS_C_NO_CREDENTIAL;
     }
 
