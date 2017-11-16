@@ -569,6 +569,7 @@ file path=usr/lib/fm/topo/plugins/disk.so mode=0555
 file path=usr/lib/fm/topo/plugins/fac_prov_ipmi.so mode=0555
 file path=usr/lib/fm/topo/plugins/fac_prov_mptsas.so mode=0555
 file path=usr/lib/fm/topo/plugins/ipmi.so mode=0555
+file path=usr/lib/fm/topo/plugins/nic.so mode=0555
 file path=usr/lib/fm/topo/plugins/ses.so mode=0555
 file path=usr/lib/fm/topo/plugins/xfp.so mode=0555
 #

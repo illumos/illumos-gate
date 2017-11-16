@@ -8139,8 +8139,8 @@ mac_transceiver_read(mac_handle_t mh, uint_t tranid, uint_t page, void *buf,
 	ret = mip->mi_transceiver.mct_read(mip->mi_driver, tranid, page, buf,
 	    nbytes, offset, nread);
 	if (ret == 0 && *nread > nbytes) {
-		dev_err(mip->mi_dip, CE_PANIC, "driver wrote %ld bytes into "
-		    "%ld byte sized buffer, possible memory corruption",
+		dev_err(mip->mi_dip, CE_PANIC, "driver wrote %lu bytes into "
+		    "%lu byte sized buffer, possible memory corruption",
 		    *nread, nbytes);
 	}
 

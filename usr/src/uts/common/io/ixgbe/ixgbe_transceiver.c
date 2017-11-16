@@ -149,13 +149,13 @@ ixgbe_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
 		return (EINVAL);
 	}
 
-	for (i = 0; i < nbytes; i++, offset++, bp++) {
+	for (i = 0; i < nbytes; i++, offset++, buf++) {
 		int32_t ret;
 
 		if (page == 0xa0) {
-			ret = hw->phy.ops.read_i2c_eeprom(hw, offset, bp);
+			ret = hw->phy.ops.read_i2c_eeprom(hw, offset, buf);
 		} else {
-			ret = hw->phy.ops.read_i2c_sff8472(hw, offset, bp);
+			ret = hw->phy.ops.read_i2c_sff8472(hw, offset, buf);
 		}
 		if (ret != 0) {
 			mutex_exit(&ixgbe->gen_lock);

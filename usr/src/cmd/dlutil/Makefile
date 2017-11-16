@@ -14,6 +14,7 @@
 #
 
 PROG= dltraninfo dlsend dlrecv dlled
+LINTPROGS= $(PROG:%=%.ln)
 
 include ../Makefile.cmd
 
@@ -21,6 +22,7 @@ ROOTCMDDIR = $(ROOTLIB)/dl
 CFLAGS += $(CCVERBOSE)
 
 dltraninfo :=	LDLIBS += -ldladm -lsff -lnvpair
+dltraninfo.ln :=   LDLIBS += -ldladm -lsff -lnvpair
 dlled :=	LDLIBS += -ldladm
 dlsend :=	LDLIBS += -ldlpi -lsocket -lmd
 dlrecv :=	LDLIBS += -ldlpi
@@ -35,6 +37,9 @@ install: all $(ROOTCMD)
 
 clean:
 
-lint:	lint_PROG
+%.ln: %.c
+	$(LINT.c) $< $(LDLIBS)
+
+lint:	$(LINTPROGS)
 
 include ../Makefile.targ

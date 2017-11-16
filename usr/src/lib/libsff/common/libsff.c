@@ -33,6 +33,7 @@
 #include <strings.h>
 #include <libsff.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "sff.h"
 
@@ -852,7 +853,8 @@ sff_parse_string(const uint8_t *buf, uint_t start, uint_t len,
 	 * characters that aren't, don't include this string.
 	 */
 	for (i = 0; i < len; i++) {
-		if (buf[start + i] < ' ' || buf[start + i] > '~') {
+		if (isascii(buf[start + i]) == 0 ||
+		    isprint(buf[start + i]) == 0) {
 			return (0);
 		}
 	}

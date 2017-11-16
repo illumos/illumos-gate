@@ -113,7 +113,7 @@ error:
 	nvlist_free(fmri);
 	nvlist_free(auth);
 	nvlist_free(presource);
-	return (tn);
+	return (NULL);
 }
 
 int

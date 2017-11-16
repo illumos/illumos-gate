@@ -1000,3 +1000,15 @@ usr/lib/sparcv9/libficl-sys.so		sparc
 usr/lib/llib-lficl-sys
 usr/lib/llib-lficl-sys.ln
 usr/lib/libficl-sys.so
+
+#
+# libsff is private
+#
+usr/include/libsff.h
+usr/lib/amd64/libsff.so			i386
+usr/lib/amd64/llib-lsff.ln		i386
+usr/lib/sparcv9/libsff.so		sparc
+usr/lib/sparcv9/llib-lsff.ln		sparc
+usr/lib/libsff.so
+usr/lib/llib-lsff
+usr/lib/llib-lsff.ln
