@@ -44,7 +44,6 @@ PROGS = $(DIFF_PROGS) \
 SCRIPTS = libsff
 
 include $(SRC)/cmd/Makefile.cmd
-include $(SRC)/cmd/Makefile.ctf
 include $(SRC)/test/Makefile.com
 
 CMDS = $(PROGS:%=$(TESTDIR)/%) $(SCRIPTS:%=$(TESTDIR)/%)
