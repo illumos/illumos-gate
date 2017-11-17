@@ -44,13 +44,13 @@ main(void)
 		buf[SFF_8636_MAX_CASE_TEMP] = i;
 		if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, &nvl)) != 0) {
 			errx(1, "TEST FAILED: failed to parse QSFP connector "
-			    "%d: %s\n", i, strerror(errno));
+			    "%d: %s\n", i, strerror(ret));
 		}
 
 		if ((ret = nvlist_lookup_string(nvl, LIBSFF_KEY_MAX_CASE_TEMP,
 		    &val)) != 0) {
 			errx(1, "TEST FAILED: failed to find connector when "
-			    "parsing key %d: %s\n", i, strerror(errno));
+			    "parsing key %d: %s\n", i, strerror(ret));
 		}
 
 		(void) puts(val);

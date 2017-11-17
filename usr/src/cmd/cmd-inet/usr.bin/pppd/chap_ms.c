@@ -40,9 +40,6 @@
  *	Added MS-CHAPv2 support.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#define RCSID	"$Id: chap_ms.c,v 1.15 1999/08/13 06:46:12 paulus Exp $"
-
 #if defined(CHAPMS) || defined(CHAPMSV2)
 
 #include <stdio.h>
@@ -68,10 +65,6 @@
 #include "chap.h"
 #include "chap_ms.h"
 #include "md4.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 typedef struct {
     u_char LANManResp[24];

@@ -68,7 +68,7 @@ main(void)
 
 		if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, &nvl)) != 0) {
 			errx(1, "TEST FAILED: failed to parse QSFP device tech "
-			    "%d: %s\n", i, strerror(errno));
+			    "%d: %s\n", i, strerror(ret));
 		}
 
 		lst_print_array(nvl, LIBSFF_KEY_TRAN_TECH);

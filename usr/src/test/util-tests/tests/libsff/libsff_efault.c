@@ -28,10 +28,10 @@
 int
 main(void)
 {
-	int ret;
 	void *addr;
 	nvlist_t *nvl;
 	size_t len = getpagesize();
+	int ret;
 
 	/*
 	 * Get an unreadable page
@@ -46,8 +46,8 @@ main(void)
 	}
 
 	if ((ret = libsff_parse(addr, 128, 0xa0, &nvl)) != EFAULT) {
-		errx(1, "TEST FAILED: failed to return EFAULT on bad"
-		    "data buffer\n");
+		errx(1, "TEST FAILED: failed to return EFAULT on bad "
+		    "data buffer (%s instead)\n", strerror(ret));
 	}
 
 	return (0);

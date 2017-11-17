@@ -41,6 +41,8 @@ PROGS = $(DIFF_PROGS) \
 	$(ERR_PROGS) \
 	libsff_strings
 
+LINTS = $(PROGS:%=%.ln)
+
 SCRIPTS = libsff
 
 include $(SRC)/cmd/Makefile.cmd
@@ -60,15 +62,21 @@ CPPFLAGS += -I$(SRC)/lib/libsff/common
 $(ERR_PROGS)	:= LDLIBS += -lsff
 $(DIFF_PROGS)	:= LDLIBS += -lsff -lnvpair
 libsff_strings	:= LDLIBS += -lsff -lnvpair
+$(ERR_PROGS).ln	:= LDLIBS += -lsff
+$(DIFF_PROGS).ln	:= LDLIBS += -lsff -lnvpair
+libsff_strings.ln	:= LDLIBS += -lsff -lnvpair
 
 all: $(PROGS)
 
 install: all $(CMDS) $(OUTFILES)
 
-lint: lint_SRCS
+lint: $(LINTS)
+
+%.ln: %.c
+	$(LINT.c) -erroff=E_NAME_USED_NOT_DEF2 $< $(LDLIBS)
 
 clobber: clean
-	-$(RM) $(PROGS)
+	-$(RM) $(PROGS) $(LINTS)
 
 clean:
 

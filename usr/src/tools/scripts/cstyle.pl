@@ -384,7 +384,7 @@ line: while (<$filehandle>) {
 
 	# is this the beginning or ending of a function?
 	# (not if "struct foo\n{\n")
-	if (/^{$/ && $prev =~ /\)\s*(const\s*)?(\/\*.*\*\/\s*)?\\?$/) {
+	if (/^\{$/ && $prev =~ /\)\s*(const\s*)?(\/\*.*\*\/\s*)?\\?$/) {
 		$in_function = 1;
 		$in_declaration = 1;
 		$in_function_header = 0;
@@ -392,7 +392,7 @@ line: while (<$filehandle>) {
 		$prev = $line;
 		next line;
 	}
-	if (/^}\s*(\/\*.*\*\/\s*)*$/) {
+	if (/^\}\s*(\/\*.*\*\/\s*)*$/) {
 		if ($prev =~ /^\s*return\s*;/) {
 			err_prev("unneeded return at end of function");
 		}
@@ -402,7 +402,7 @@ line: while (<$filehandle>) {
 		next line;
 	}
 	if ($in_function_header && ! /^    (\w|\.)/ ) {
-		if (/^{}$/) {
+		if (/^\{\}$/) {
 			$in_function_header = 0;
 			$function_header_full_indent = 0;
 		} elsif ($picky && ! (/^\t/ && $function_header_full_indent != 0)) {
@@ -421,7 +421,7 @@ line: while (<$filehandle>) {
 			$function_header_full_indent = 1;
 		}
 	}
-	if ($in_function_header && /^{$/) {
+	if ($in_function_header && /^\{$/) {
 		$in_function_header = 0;
 		$function_header_full_indent = 0;
 		$in_function = 1;
@@ -430,7 +430,7 @@ line: while (<$filehandle>) {
 		$in_function_header = 0;
 		$function_header_full_indent = 0;
 	}
-	if ($in_function_header && /{$/ ) {
+	if ($in_function_header && /\{$/ ) {
 		if ($picky) {
 			err("opening brace on same line as function header");
 		}
@@ -659,14 +659,14 @@ line: while (<$filehandle>) {
 	if (/\S\{/ && !/\{\{/) {
 		err("missing space before left brace");
 	}
-	if ($in_function && /^\s+{/ &&
+	if ($in_function && /^\s+\{/ &&
 	    ($prev =~ /\)\s*$/ || $prev =~ /\bstruct\s+\w+$/)) {
 		err("left brace starting a line");
 	}
-	if (/}(else|while)/) {
+	if (/\}(else|while)/) {
 		err("missing space after right brace");
 	}
-	if (/}\s\s+(else|while)/) {
+	if (/\}\s\s+(else|while)/) {
 		err("extra space after right brace");
 	}
 	if (/\b_VOID\b|\bVOID\b|\bSTATIC\b/) {
@@ -719,18 +719,18 @@ line: while (<$filehandle>) {
 	if ($heuristic) {
 		# cannot check this everywhere due to "struct {\n...\n} foo;"
 		if ($in_function && !$in_declaration &&
-		    /}./ && !/}\s+=/ && !/{.*}[;,]$/ && !/}(\s|)*$/ &&
-		    !/} (else|while)/ && !/}}/) {
+		    /\}./ && !/\}\s+=/ && !/\{.*\}[;,]$/ && !/\}(\s|)*$/ &&
+		    !/\} (else|while)/ && !/\}\}/) {
 			err("possible bad text following right brace");
 		}
 		# cannot check this because sub-blocks in
 		# the middle of code are ok
-		if ($in_function && /^\s+{/) {
+		if ($in_function && /^\s+\{/) {
 			err("possible left brace starting a line");
 		}
 	}
 	if (/^\s*else\W/) {
-		if ($prev =~ /^\s*}$/) {
+		if ($prev =~ /^\s*\}$/) {
 			err_prefix($prev,
 			    "else and right brace should be on same line");
 		}
@@ -816,8 +816,8 @@ process_indent($)
 
 	# skip over enumerations, array definitions, initializers, etc.
 	if ($cont_off <= 0 && !/^\s*$special/ &&
-	    (/(?:(?:\b(?:enum|struct|union)\s*[^\{]*)|(?:\s+=\s*)){/ ||
-	    (/^\s*{/ && $prev =~ /=\s*(?:\/\*.*\*\/\s*)*$/))) {
+	    (/(?:(?:\b(?:enum|struct|union)\s*[^\{]*)|(?:\s+=\s*))\{/ ||
+	    (/^\s*\{/ && $prev =~ /=\s*(?:\/\*.*\*\/\s*)*$/))) {
 		$cont_in = 0;
 		$cont_off = tr/{/{/ - tr/}/}/;
 		return;
@@ -840,14 +840,14 @@ process_indent($)
 		return		if (/^\s*\}?$/);
 		return		if (/^\s*\}?\s*else\s*\{?$/);
 		return		if (/^\s*do\s*\{?$/);
-		return		if (/{$/);
-		return		if (/}[,;]?$/);
+		return		if (/\{$/);
+		return		if (/\}[,;]?$/);
 
 		# Allow macros on their own lines
 		return		if (/^\s*[A-Z_][A-Z_0-9]*$/);
 
 		# cases we don't deal with, generally non-kosher
-		if (/{/) {
+		if (/\{/) {
 			err("stuff after {");
 			return;
 		}
@@ -916,7 +916,7 @@ process_indent($)
 			#
 			next		if (@cont_paren != 0);
 			if ($cont_special) {
-				if ($rest =~ /^\s*{?$/) {
+				if ($rest =~ /^\s*\{?$/) {
 					$cont_in = 0;
 					last;
 				}

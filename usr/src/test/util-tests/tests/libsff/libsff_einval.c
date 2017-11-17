@@ -28,9 +28,9 @@
 int
 main(void)
 {
-	int ret;
 	uint8_t buf[256];
 	nvlist_t *nvl;
+	int ret;
 
 	bzero(buf, sizeof (buf));
 	if ((ret = libsff_parse(NULL, sizeof (buf), 0xa0, &nvl)) != EINVAL) {
@@ -38,50 +38,54 @@ main(void)
 	}
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xa0, NULL)) != EINVAL) {
-		errx(1, "TEST FAILED: failed to return EINVAL on NULL nvl");
+		errx(1, "TEST FAILED: failed to return EINVAL on NULL nvl "
+		    "(%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xa1, &nvl)) != EINVAL) {
-		errx(1, "TEST FAILED: failed to return EINVAL on bad page");
+		errx(1, "TEST FAILED: failed to return EINVAL on bad page "
+		    "(%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0, &nvl)) != EINVAL) {
-		errx(1, "TEST FAILED: failed to return EINVAL on bad page");
+		errx(1, "TEST FAILED: failed to return EINVAL on bad page "
+		    "(%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, sizeof (buf), 0xff, &nvl)) != EINVAL) {
-		errx(1, "TEST FAILED: failed to return EINVAL on bad page");
+		errx(1, "TEST FAILED: failed to return EINVAL on bad page "
+		    "(%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, 0, 0xa0, &nvl)) != EINVAL) {
 		errx(1, "TEST FAILED: failed to return EINVAL on bad 8476 "
-		    "size");
+		    "size (%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, 50, 0xa0, &nvl)) != EINVAL) {
 		errx(1, "TEST FAILED: failed to return EINVAL on bad 8476 "
-		    "size");
+		    "size (%s instead)", strerror(ret));
 	}
 
 	buf[SFF_8472_IDENTIFIER] = SFF_8024_ID_QSFP;
 	if ((ret = libsff_parse(buf, 0, 0xa0, &nvl)) != EINVAL) {
 		errx(1, "TEST FAILED: failed to return EINVAL on bad 8476 "
-		    "size");
+		    "size (%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, 50, 0xa0, &nvl)) != EINVAL) {
 		errx(1, "TEST FAILED: failed to return EINVAL on bad 8476 "
-		    "size");
+		    "size (%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, 96, 0xa0, &nvl)) != EINVAL) {
 		errx(1, "TEST FAILED: failed to return EINVAL on bad 8635 "
-		    "size");
+		    "size (%s instead)", strerror(ret));
 	}
 
 	if ((ret = libsff_parse(buf, 128, 0xa0, &nvl)) != EINVAL) {
 		errx(1, "TEST FAILED: failed to return EINVAL on bad 8635 "
-		    "size");
+		    "size (%s instead)", strerror(ret));
 	}
 
 	return (0);

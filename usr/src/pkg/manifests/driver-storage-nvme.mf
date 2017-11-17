@@ -38,7 +38,9 @@ dir path=usr/sbin
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man7d
-driver name=nvme alias=pciexclass,010802 class=disk perms="* 0600 root sys"
+driver name=nvme class=disk perms="* 0600 root sys" \
+    alias=pciclass,010802 \
+    alias=pciexclass,010802
 file path=kernel/drv/$(ARCH64)/nvme group=sys
 file path=kernel/drv/nvme group=sys
 file path=kernel/drv/nvme.conf group=sys

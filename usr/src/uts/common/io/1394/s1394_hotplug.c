@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s1394_hotplug.c
  *    1394 Services Layer Hotplug Routines
@@ -143,7 +141,7 @@ s1394_create_devinfo(s1394_hal_t *hal, s1394_node_t *node, uint32_t *unit_dir,
 	int node_ven, node_hw, node_spec, node_sw;
 
 	/*LINTED type is unused*/
-	uint32_t type, key, value;
+	uint32_t type __unused, key, value;
 	uint32_t unit_spec_id, unit_sw_version;
 	uint32_t node_spec_id, node_sw_version;
 	uint32_t node_vendor_id, node_hw_version;
@@ -690,7 +688,7 @@ s1394_offline_node(s1394_hal_t *hal, s1394_node_t *node)
 	while (t != NULL) {
 		TNF_PROBE_2(s1394_process_old_tree_mark,
 		    S1394_TNF_SL_HOTPLUG_STACK, "", tnf_int, node_num, node_num,
-			tnf_opaque, target, t);
+		    tnf_opaque, target, t);
 		t->target_state |= S1394_TARG_GONE;
 		t->on_node = NULL;
 		t = t->target_sibling;
@@ -1004,17 +1002,20 @@ s1394_process_old_tree(s1394_hal_t *hal)
 		    cur_node) == B_FALSE)))) {
 
 			if (onode->cur_node != NULL && CFGROM_VALID(onode) ==
-			    B_TRUE && CFGROM_VALID(onode->cur_node) == B_FALSE)
-				TNF_PROBE_1_DEBUG
-				    (s1394_process_old_tree_invalid_cfgrom,
+			    B_TRUE &&
+			    CFGROM_VALID(onode->cur_node) == B_FALSE) {
+				TNF_PROBE_1_DEBUG(
+				    s1394_process_old_tree_invalid_cfgrom,
 				    S1394_TNF_SL_HOTPLUG_STACK, "",
 				    tnf_int, node_num, i);
+			}
 			if (onode->cur_node != NULL && LINK_ACTIVE(onode) ==
-			    B_TRUE && LINK_ACTIVE(onode->cur_node) == B_FALSE)
-				TNF_PROBE_1_DEBUG
-				    (s1394_process_old_tree_link_off,
+			    B_TRUE && LINK_ACTIVE(onode->cur_node) == B_FALSE) {
+				TNF_PROBE_1_DEBUG(
+				    s1394_process_old_tree_link_off,
 				    S1394_TNF_SL_HOTPLUG_STACK,
 				    "", tnf_int, node_num, i);
+			}
 			if (s1394_offline_node(hal, onode) != DDI_SUCCESS) {
 				TNF_PROBE_2(s1394_process_old_tree,
 				    S1394_TNF_SL_HOTPLUG_ERROR, "", tnf_string,

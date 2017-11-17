@@ -17,9 +17,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#define RCSID	"$Id: $"
-
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -34,9 +31,6 @@
 
 #ifdef HAVE_MULTILINK
 #include "tdb.h"
-#endif
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
 #endif
 
 #define set_ip_epdisc(ep, addr) (	\

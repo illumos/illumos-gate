@@ -1071,7 +1071,7 @@ device_set_multiple_properties (DBusConnection *connection, DBusMessage *message
 		DBusMessageIter dict_entry_iter, var_iter, array_iter;
 		const char *key;
 		int change_type;
-		dbus_bool_t rc;
+		dbus_bool_t rc __unused;
 
 		dbus_message_iter_recurse (&dict_iter, &dict_entry_iter);
 		dbus_message_iter_get_basic (&dict_entry_iter, &key);
