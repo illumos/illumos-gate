@@ -1,574 +1,457 @@
-'\" te
-.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMBADM 1M "April 9, 2016"
-.SH NAME
-smbadm \- configure and manage CIFS local groups and users, and manage domain
+.\" Copyright 2017 Nexenta Systems, Inc.
+.\"
+.Dd November 18, 2017
+.Dt SMBADM 1M
+.Os
+.Sh NAME
+.Nm smbadm
+.Nd configure and manage SMB local groups and users, and manage domain
 membership
-.SH SYNOPSIS
-.LP
-.nf
-\fBsmbadm add-member\fR -m \fImember\fR [[-m \fImember\fR] \&.\|.\|.] \fIgroup\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm create\fR [-d \fIdescription\fR] \fIgroup\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm delete\fR \fIgroup\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm disable-user\fR \fIusername\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm enable-user\fR \fIusername\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm get\fR [[-p \fIproperty\fR] \&.\|.\|.] \fIgroup\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm join\fR [-y] -u \fIusername\fR \fIdomain\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm join\fR [-y] -w \fIworkgroup\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm list\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm lookup\fR \fIaccount-name\fR [\fIaccount-name\fR [\&.\|.\|.]]
-.fi
-
-.LP
-.nf
-\fBsmbadm remove-member\fR -m \fImember\fR [[-m \fImember\fR] \&.\|.\|.] \fIgroup\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm rename\fR \fIgroup\fR \fInew-group\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm set\fR -p \fIproperty\fR=\fIvalue\fR [[-p \fIproperty\fR=\fIvalue\fR] \&.\|.\|.] \fIgroup\fR
-.fi
-
-.LP
-.nf
-\fBsmbadm show\fR [-m] [-p] [\fIgroup\fR]
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBsmbadm\fR command is used to configure \fBCIFS\fR local groups and to
-manage domain membership. You can also use the \fBsmbadm\fR command to enable
-or disable SMB password generation for individual local users.
-.sp
-.LP
-\fBCIFS\fR local groups can be used when Windows accounts must be members of
-some local groups and when Windows style privileges must be granted. Solaris
-local groups cannot provide these functions.
-.sp
-.LP
-There are two types of local groups: user defined and built-in. Built-in local
-groups are predefined local groups to support common administration tasks.
-.sp
-.LP
-In order to provide proper identity mapping between \fBCIFS\fR local groups and
-Solaris groups, a \fBCIFS\fR local group must have a corresponding Solaris
-group. This requirement has two consequences: first, the group name must
-conform to the intersection of the Windows and Solaris group name rules. Thus,
-a \fBCIFS\fR local group name can be up to eight (8) characters long and
-contain only lowercase characters and numbers. Second, a Solaris local group
-has to be created before a \fBCIFS\fR local group can be created.
-.sp
-.LP
-Built-in groups are standard Windows groups and are predefined by the
-\fBCIFS\fR service. The built-in groups cannot be added, removed, or renamed,
-and these groups do not follow the \fBCIFS\fR local group naming conventions.
-.sp
-.LP
-When the \fBCIFS\fR server is started, the following built-in groups are
-available:
-.sp
-.ne 2
-.na
-\fBAdministrators\fR
-.ad
-.sp .6
-.RS 4n
+.Sh SYNOPSIS
+.Nm
+.Cm create
+.Op Fl d Ar description
+.Ar group
+.Nm
+.Cm delete
+.Ar group
+.Nm
+.Cm rename
+.Ar group new-group
+.Nm
+.Cm show
+.Op Fl mp
+.Op Ar group
+.Nm
+.Cm get
+.Oo Fl p Ar property Oc Ns ...
+.Ar group
+.Nm
+.Cm set
+.Fl p Ar property Ns = Ns Ar value
+.Oo Fl p Ar property Ns = Ns Ar value Oc Ns ...
+.Ar group
+.Nm
+.Cm add-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Nm
+.Cm remove-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Nm
+.Cm delete-user
+.Ar username
+.Nm
+.Cm disable-user
+.Ar username
+.Nm
+.Cm enable-user
+.Ar username
+.Nm
+.Cm join
+.Op Fl y
+.Fl u Ar username
+.Ar domain
+.Nm
+.Cm join
+.Op Fl y
+.Fl w Ar workgroup
+.Nm
+.Cm list
+.Nm
+.Cm lookup
+.Ar account-name Oo Ar account-name Oc Ns ...
+.Sh DESCRIPTION
+The
+.Nm
+command is used to configure SMB local groups and users, and to manage domain
+membership.
+You can also use the
+.Nm
+command to enable or disable SMB password generation for individual local users.
+.Pp
+SMB local groups can be used when Windows accounts must be members of some local
+groups and when Windows style privileges must be granted.
+System local groups cannot provide these functions.
+.Pp
+There are two types of local groups: user defined and built-in.
+Built-in local groups are predefined local groups to support common
+administration tasks.
+.Pp
+In order to provide proper identity mapping between SMB local groups and
+system groups, a SMB local group must have a corresponding system group.
+This requirement has two consequences: first, the group name must conform to the
+intersection of the Windows and system group name rules.
+Thus, a SMB local group name can be up to eight (8) characters long and contain
+only lowercase characters and numbers.
+Second, a system local group has to be created before a SMB local group can
+be created.
+.Pp
+Built-in groups are standard Windows groups and are predefined by the SMB
+service.
+The built-in groups cannot be added, removed, or renamed, and these groups do
+not follow the SMB local group naming conventions.
+.Pp
+When the SMB server is started, the following built-in groups are available:
+.Bl -tag -width "Backup Operators"
+.It Sy Administrators
 Group members can administer the system.
-.RE
-
-.sp
-.ne 2
-.na
-\fBBackup Operators\fR
-.ad
-.sp .6
-.RS 4n
+.It Sy Backup Operators
 Group members can bypass file access controls to back up and restore files.
-.RE
-
-.sp
-.ne 2
-.na
-\fBPower Users\fR
-.ad
-.sp .6
-.RS 4n
+.It Sy Power Users
 Group members can share directories.
-.RE
-
-.sp
-.LP
-Solaris local users must have an SMB password for authentication and to gain
-access to CIFS resources. This password is created by using the \fBpasswd\fR(1)
-command when the \fBpam_smb_password\fR module is added to the system's PAM
-configuration. See the \fBpam_smb_passwd\fR(5) man page.
-.sp
-.LP
-The \fBdisable-user\fR and \fBenable-user\fR subcommands control SMB
-password-generation for a specified local user. When disabled, the user is
-prevented from connecting to the Solaris CIFS service. By default, SMB
-password-generation is enabled for all local users.
-.sp
-.LP
-To reenable a disabled user, you must use the \fBenable-user\fR subcommand and
-then reset the user's password by using the \fBpasswd\fR command. The
-\fBpam_smb_passwd.so.1\fR module must be added to the system's PAM
-configuration to generate an SMB password.
-.SS "Escaping Backslash Character"
-.LP
-For the \fBadd-member\fR, \fBremove-member\fR, and \fBjoin\fR (with \fB-u\fR)
-subcommands, the backslash character (\fB\e\fR) is a valid separator between
-member or user names and domain names. The backslash character is a shell
-special character and must be quoted. For example, you might escape the
-backslash character with another backslash character:
-\fIdomain\fR\fB\e\e\fR\fIusername\fR. For more information about handling shell
-special characters, see the man page for your shell.
-.SH OPERANDS
-.LP
-The \fBsmbadm\fR command uses the following operands:
-.sp
-.ne 2
-.na
-\fB\fIdomain\fR\fR
-.ad
-.sp .6
-.RS 4n
+.El
+.Pp
+System local users must have an SMB password for authentication and to gain
+access to SMB resources.
+This password is created by using the
+.Xr passwd 1
+command when the
+.Sy pam_smb_password
+module is added to the system's PAM configuration.
+See the
+.Xr pam_smb_passwd 5
+man page.
+.Pp
+The
+.Cm disable-user
+and
+.Cm enable-user
+subcommands control SMB password-generation for a specified local user.
+When disabled, the user is prevented from connecting to the SMB service.
+By default, SMB password-generation is enabled for all local users.
+.Pp
+To reenable a disabled user, you must use the
+.Cm enable-user
+subcommand and then reset the user's password by using the
+.Nm passwd
+command.
+The
+.Pa pam_smb_passwd.so.1
+module must be added to the system's PAM configuration to generate an SMB
+password.
+.Ss Escaping Backslash Character
+For the
+.Cm add-member ,
+.Cm remove-member ,
+and
+.Cm join
+.Po with
+.Fl u
+.Pc
+subcommands, the backslash character
+.Pq Qq \e
+is a valid separator between member or user names and domain names.
+The backslash character is a shell special character and must be quoted.
+For example, you might escape the backslash character with another backslash
+character:
+.Ar domain Ns \e\e Ns Ar username .
+For more information about handling shell special characters, see the man page
+for your shell.
+.Sh OPERANDS
+The
+.Nm
+command uses the following operands:
+.Bl -tag -width "username"
+.It Ar domain
 Specifies the name of an existing Windows domain to join.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the name of the \fBCIFS\fR local group.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIusername\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the name of a Solaris local user.
-.RE
-
-.SH SUBCOMMANDS
-.LP
-The \fBsmbadm\fR command includes these subcommands:
-.sp
-.ne 2
-.na
-\fB\fBadd-member\fR -m \fImember\fR [[-m \fImember\fR] \&.\|.\|.]
-\fIgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Adds the specified member to the specified \fBCIFS\fR local group. The \fB-m\fR
-\fImember\fR option specifies the name of a \fBCIFS\fR local group member. The
-member name must include an existing user name and an optional domain name.
-.sp
-Specify the member name in either of the following formats:
-.sp
-.in +2
-.nf
-[\fIdomain\fR\e]\fIusername\fR
-[\fIdomain\fR/]\fIusername\fR
-.fi
-.in -2
-.sp
-
-For example, a valid member name might be \fBsales\eterry\fR or
-\fBsales/terry\fR, where \fBsales\fR is the Windows domain name and \fBterry\fR
-is the name of a user in the \fBsales\fR domain.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcreate\fR [\fB-d\fR \fIdescription\fR] \fIgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Creates a \fBCIFS\fR local group with the specified name. You can optionally
-specify a description of the group by using the \fB-d\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdelete\fR \fIgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Deletes the specified \fBCIFS\fR local group. The built-in groups cannot be
-deleted.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdisable\fR \fIusername\fR\fR
-.ad
-.sp .6
-.RS 4n
-Disables SMB password-generation capabilities for the specified local user. A
-disabled local user is prevented from accessing the system by means of the CIFS
-service. When a local user account is disabled, you cannot use the \fBpasswd\fR
-command to modify the user's SMB password until the user account is reenabled.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBenable\fR \fIusername\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables SMB password-generation capabilities for the specified local user.
-After the password-generation capabilities are reenabled, you must use the
-\fBpasswd\fR command to generate the SMB password for the local user before he
-can connect to the CIFS service.
-.sp
-The \fBpasswd\fR command manages both the Solaris password and SMB password for
-this user if the \fBpam_smb_passwd\fR module has been added to the system's PAM
-configuration.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBget\fR [[\fB-p\fR \fIproperty\fR=\fIvalue\fR] \&.\|.\|.] \fIgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Retrieves property values for the specified group. If no property is specified,
-all property values are shown.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBjoin\fR \fB[-y] -u\fR \fIusername\fR \fIdomain\fR\fR
-.ad
-.sp .6
-.RS 4n
-Joins a Windows domain or a workgroup.
-.sp
-The default mode for the \fBCIFS\fR service is workgroup mode, which uses the
-default workgroup name, \fBWORKGROUP\fR.
-.sp
-An authenticated user account is required to join a domain, so you must specify
-the Windows administrative user name with the \fB-u\fR option. If the password
-is not specified on the command line, the user is prompted for it. This user
-should be the domain administrator or any user who has administrative
-privileges for the target domain.
-.sp
-\fIusername\fR and \fIdomain\fR can be entered in any of the following formats:
-.sp
-.in +2
-.nf
-\fIusername\fR[+\fIpassword\fR] \fIdomain\fR
-\fIdomain\fR\e\fIusername\fR[+\fIpassword\fR]
-\fIdomain\fR/\fIusername\fR[+\fIpassword\fR]
-\fIusername\fR@\fIdomain\fR
-.fi
-.in -2
-.sp
-
-\&...where \fIdomain\fR can be the NetBIOS or DNS domain name.
-.sp
-If a machine trust account for the system already exists on a domain
-controller, any authenticated user account can be used when joining the domain.
-However, if the machine trust account does \fBnot\fR already exist, an account
-that has administrative privileges on the domain is required to join the
-domain.
-Specifying \fB-y\fR will bypass the smb service restart prompt.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBjoin\fR \fB[-y] -w\fR \fIworkgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Joins a Windows domain or a workgroup.
-.sp
-The \fB-w\fR \fIworkgroup\fR option specifies the name of the workgroup to join
-when using the \fBjoin\fR subcommand.
-Specifying \fB-y\fR will bypass the smb service restart prompt.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBlist\fR\fR
-.ad
-.sp .6
-.RS 4n
-Shows information about the current workgroup or domain. The information
-typically includes the workgroup name or the primary domain name. When in
-domain mode, the information includes domain controller names and trusted
-domain names.
-.sp
-Each entry in the output is identified by one of the following tags:
-.sp
-.ne 2
-.na
-\fB\fB- [*] -\fR\fR
-.ad
-.RS 11n
-Primary domain
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB- [.] -\fR\fR
-.ad
-.RS 11n
-Local domain
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB- [-] -\fR\fR
-.ad
-.RS 11n
-Other domains
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB- [+] -\fR\fR
-.ad
-.RS 11n
-Selected domain controller
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBlookup\fR\fR \fIaccount-name\fR [\fIaccount-name\fR [\&.\|.\|.]]
-
-.ad
-.sp .6
-.RS 4n
-Lookup the SID for the given \fIaccount-name\fR, or lookup the
-\fIaccount-name\fR for the given SID.  This subcommand is
-primarily for diagnostic use, to confirm whether the server
-can lookup domain accounts and/or SIDs.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBremove-member\fR -m \fImember\fR [[-m \fImember\fR] \&.\|.\|.]
-\fIgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Removes the specified member from the specified \fBCIFS\fR local group. The
-\fB-m\fR \fImember\fR option specifies the name of a \fBCIFS\fR local group
-member. The member name must include an existing user name and an optional
-domain name.
-.sp
-Specify the member name in either of the following formats:
-.sp
-.in +2
-.nf
-[\fIdomain\fR\e]\fIusername\fR
-[\fIdomain\fR/]\fIusername\fR
-.fi
-.in -2
-.sp
-
-For example, a valid member name might be \fBsales\eterry\fR or
-\fBsales/terry\fR, where \fBsales\fR is the Windows domain name and \fBterry\fR
-is the name of a user in the \fBsales\fR domain.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBrename\fR \fIgroup\fR \fInew-group\fR\fR
-.ad
-.sp .6
-.RS 4n
-Renames the specified \fBCIFS\fR local group. The group must already exist. The
-built-in groups cannot be renamed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBset\fR \fB-p\fR \fIproperty\fR=\fIvalue\fR [[\fB-p\fR
-\fIproperty\fR=\fIvalue\fR] \&.\|.\|.] \fIgroup\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sets configuration properties for a \fBCIFS\fR local group. The description and
-the privileges for the built-in groups cannot be changed.
-.sp
-The \fB-p\fR \fIproperty\fR\fB=\fR\fIvalue\fR option specifies the list of
-properties to be set on the specified group.
-.sp
+.It Ar group
+Specifies the name of the SMB local group.
+.It Ar username
+Specifies the name of a system local user.
+.El
+.Sh SUBCOMMANDS
+The
+.Nm
+command includes these subcommands:
+.Bl -tag -width Ds
+.It Xo
+.Cm create
+.Op Fl d Ar description
+.Ar group
+.Xc
+Creates a SMB local group with the specified name.
+You can optionally specify a description of the group by using the
+.Fl d
+option.
+.It Xo
+.Cm delete
+.Ar group
+.Xc
+Deletes the specified SMB local group.
+The built-in groups cannot be deleted.
+.It Xo
+.Cm rename
+.Ar group new-group
+.Xc
+Renames the specified SMB local group.
+The group must already exist.
+The built-in groups cannot be renamed.
+.It Xo
+.Cm show
+.Op Fl mp
+.Op Ar group
+.Xc
+Shows information about the specified SMB local group or groups.
+If no group is specified, information is shown for all groups.
+If the
+.Fl m
+option is specified, the group members are also shown.
+If the
+.Fl p
+option is specified, the group privileges are also shown.
+.It Xo
+.Cm get
+.Oo Fl p Ar property Ns = Ns Ar value Oc Ns ...
+.Ar group
+.Xc
+Retrieves property values for the specified group.
+If no property is specified, all property values are shown.
+.It Xo
+.Cm set
+.Fl p Ar property Ns = Ns Ar value
+.Oo Fl p Ar property Ns = Ns Ar value Oc Ns ...
+.Ar group
+.Xc
+Sets configuration properties for a SMB local group.
+The description and the privileges for the built-in groups cannot be changed.
+.Pp
+The
+.Fl p Ar property Ns = Ns Ar value
+option specifies the list of properties to be set on the specified group.
+.Pp
 The group-related properties are as follows:
-.sp
-.ne 2
-.na
-\fB\fBbackup=[on|off]\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies whether members of the \fBCIFS\fR local group can bypass file access
-controls to back up file system objects.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdescription=\fR\fIdescription-text\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies a text description for the \fBCIFS\fR local group.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBrestore=[on|off]\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies whether members of the \fBCIFS\fR local group can bypass file access
-controls to restore file system objects.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBtake-ownership=[on|off]\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies whether members of the \fBCIFS\fR local group can take ownership of
-file system objects.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBshow\fR [\fB-m\fR] [\fB-p\fR] [\fIgroup\fR]\fR
-.ad
-.sp .6
-.RS 4n
-Shows information about the specified \fBCIFS\fR local group or groups. If no
-group is specified, information is shown for all groups. If the \fB-m\fR option
-is specified, the group members are also shown. If the \fB-p\fR option is
-specified, the group privileges are also shown.
-.RE
-
-.SH EXIT STATUS
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB0\fR
-.ad
-.RS 13n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB>0\fR
-.ad
-.RS 13n
-An error occurred.
-.RE
-
-.SH ATTRIBUTES
-.LP
-See the \fBattributes\fR(5) man page for descriptions of the following
-attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Utility Name and Options	Uncommitted
-_
-Utility Output Format	Not-An-Interface
-_
-\fBsmbadm join\fR	Obsolete
-.TE
-
-.SH SEE ALSO
-.LP
-\fBpasswd\fR(1), \fBgroupadd\fR(1M), \fBidmap\fR(1M), \fBidmapd\fR(1M),
-\fBkclient\fR(1M), \fBshare\fR(1M), \fBsharectl\fR(1M), \fBsharemgr\fR(1M),
-\fBsmbd\fR(1M), \fBsmbstat\fR(1M), \fBsmb\fR(4), \fBsmbautohome\fR(4),
-\fBattributes\fR(5), \fBpam_smb_passwd\fR(5), \fBsmf\fR(5)
+.Bl -tag -width Ds
+.It Cm backup Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can bypass file access controls
+to back up file system objects.
+.It Cm description Ns = Ns Ar description-text
+Specifies a text description for the SMB local group.
+.It Cm restore Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can bypass file access controls
+to restore file system objects.
+.It Cm take-ownership Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can take ownership of file
+system objects.
+.El
+.It Xo
+.Cm add-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Xc
+Adds the specified member to the specified SMB local group.
+The
+.Fl m Ar member
+option specifies the name of a SMB local group member.
+The member name must include an existing user name and an optional domain name.
+.Pp
+Specify the member name in either of the following formats:
+.Bd -literal -offset indent
+[domain\e]username
+[domain/]username
+.Ed
+.Pp
+For example, a valid member name might be
+.Sy sales\eterry
+or
+.Sy sales/terry ,
+where
+.Sy sales
+is the Windows domain name and
+.Sy terry
+is the name of a user in the
+.Sy sales
+domain.
+.It Xo
+.Cm remove-member
+.Fl m Ar member Oo Fl m Ar member Oc Ns ...
+.Ar group
+.Xc
+Removes the specified member from the specified SMB local group.
+The
+.Fl m Ar member
+option specifies the name of a SMB local group member.
+The member name must include an existing user name and an optional domain name.
+.Pp
+Specify the member name in either of the following formats:
+.Bd -literal -offset indent
+[domain\e]username
+[domain/]username
+.Ed
+.Pp
+For example, a valid member name might be
+.Sy sales\eterry
+or
+.Sy sales/terry ,
+where
+.Sy sales
+is the Windows domain name and
+.Sy terry
+is the name of a user in the
+.Sy sales
+domain.
+.It Xo
+.Cm delete-user
+.Ar username
+.Xc
+Deletes SMB password for the specified local user effectively preventing the
+access by means of the SMB service.
+Use
+.Nm passwd
+command to create the SMB password and re-enable access.
+.It Xo
+.Cm disable-user
+.Ar username
+.Xc
+Disables SMB password-generation capabilities for the specified local user
+effectively preventing access by means of the SMB service.
+When a local user account is disabled, you cannot use the
+.Nm passwd
+command to modify the user's SMB password until the user account is re-enabled.
+.It Xo
+.Cm enable-user
+.Ar username
+.Xc
+Enables SMB password-generation capabilities for the specified local user and
+re-enables access.
+After the password-generation capabilities are re-enabled, use the
+.Nm passwd
+command to generate the SMB password for the local user.
+.Pp
+The
+.Nm passwd
+command manages both the system password and SMB password for this user if the
+.Pa pam_smb_passwd
+module has been added to the system's PAM configuration.
+.It Xo
+.Cm join
+.Op Fl y
+.Fl u Ar username
+.Ar domain
+.Xc
+Joins a Windows domain.
+.Pp
+An authenticated user account is required to join a domain, so you must specify
+the Windows administrative user name with the
+.Fl u
+option.
+If the password is not specified on the command line, the user is prompted for
+it.
+This user should be the domain administrator or any user who has administrative
+privileges for the target domain.
+.Pp
+.Ar username
+and
+.Ar domain
+can be entered in any of the following formats:
+.Bd -literal -offset indent
+username[+password] domain
+domain\eusername[+password]
+domain/username[+password]
+username@domain
+.Ed
+.Pp
+\&...where
+.Ar domain
+can be the NetBIOS or DNS domain name.
+.Pp
+If a machine trust account for the system already exists on a domain controller,
+any authenticated user account can be used when joining the domain.
+However, if the machine trust account does
+.Em not
+already exist, an account that has administrative privileges on the domain is
+required to join the domain.
+Specifying
+.Fl y
+will bypass the SMB service restart prompt.
+.It Xo
+.Cm join
+.Op Fl y
+.Fl w Ar workgroup
+.Xc
+Joins a Windows workgroup.
+.Pp
+The default mode for the SMB service is workgroup mode, which uses the default
+workgroup name,
+.Qq WORKGROUP .
+.Pp
+The
+.Fl w Ar workgroup
+option specifies the name of the workgroup to join when using the
+.Cm join
+subcommand.
+Specifying
+.Fl y
+will bypass the SMB service restart prompt.
+.It Cm list
+Shows information about the current workgroup or domain.
+The information typically includes the workgroup name or the primary domain
+name.
+When in domain mode, the information includes domain controller names and
+trusted domain names.
+.Pp
+Each entry in the output is identified by one of the following tags:
+.Bl -tag -width "[*]"
+.It Sy [*]
+Primary domain
+.It Sy [.]
+Local domain
+.It Sy [-]
+Other domains
+.It Sy [+]
+Selected domain controller
+.El
+.It Xo
+.Cm lookup
+.Ar account-name Oo Ar account-name Oc Ns ...
+.Xc
+Lookup the SID for the given
+.Ar account-name ,
+or lookup the
+.Ar account-name
+for the given SID.
+This subcommand is primarily for diagnostic use, to confirm whether the server
+can lookup domain accounts and/or SIDs.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh INTERFACE STABILITY
+Utility name and options are
+.Sy Uncommitted .
+Utility output format is
+.Sy Not-An-Interface .
+.Sh SEE ALSO
+.Xr passwd 1 ,
+.Xr groupadd 1M ,
+.Xr idmap 1M ,
+.Xr idmapd 1M ,
+.Xr kclient 1M ,
+.Xr share 1M ,
+.Xr sharectl 1M ,
+.Xr sharemgr 1M ,
+.Xr smbd 1M ,
+.Xr smbstat 1M ,
+.Xr smb 4 ,
+.Xr smbautohome 4 ,
+.Xr attributes 5 ,
+.Xr pam_smb_passwd 5 ,
+.Xr smf 5
