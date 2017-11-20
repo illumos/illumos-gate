@@ -2476,7 +2476,6 @@ hermon_flash_cfi_init(hermon_state_t *state, uint32_t *cfi_info,
 	uint32_t	sector_sz_bytes;
 	uint32_t	bit_count;
 	uint8_t		cfi_ch_info[HERMON_CFI_INFO_SIZE];
-	uint32_t	cfi_dw_info[HERMON_CFI_INFO_QSIZE];
 	int		i;
 	int		status;
 
@@ -2529,7 +2528,6 @@ hermon_flash_cfi_init(hermon_state_t *state, uint32_t *cfi_info,
 		if (status != 0) {
 			return (status);
 		}
-		cfi_dw_info[i >> 2] = data;
 		hermon_flash_cfi_byte(cfi_ch_info, data, i);
 	}
 

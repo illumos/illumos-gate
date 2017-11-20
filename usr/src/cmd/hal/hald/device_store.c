@@ -73,7 +73,7 @@ hal_device_store_class_init (HalDeviceStoreClass *klass)
 			      G_STRUCT_OFFSET (HalDeviceStoreClass,
 					       store_changed),
 			      NULL, NULL,
-			      hald_marshal_VOID__OBJECT_BOOL,
+			      hald_marshal_VOID__OBJECT_BOOLEAN,
 			      G_TYPE_NONE, 2,
 			      G_TYPE_OBJECT,
 			      G_TYPE_BOOLEAN);
@@ -85,7 +85,7 @@ hal_device_store_class_init (HalDeviceStoreClass *klass)
 			      G_STRUCT_OFFSET (HalDeviceStoreClass,
 					       device_property_changed),
 			      NULL, NULL,
-			      hald_marshal_VOID__OBJECT_STRING_BOOL_BOOL,
+			      hald_marshal_VOID__OBJECT_STRING_BOOLEAN_BOOLEAN,
 			      G_TYPE_NONE, 4,
 			      G_TYPE_OBJECT,
 			      G_TYPE_STRING,
