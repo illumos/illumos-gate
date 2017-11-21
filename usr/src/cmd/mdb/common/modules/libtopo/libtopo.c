@@ -23,8 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 2017, Joyent, Inc.
+ */
 #include <sys/mdb_modapi.h>
 #include <libelf.h>
 #include <sys/fm/protocol.h>
@@ -890,6 +891,50 @@ tnh_walk_fini(mdb_walk_state_t *wsp)
 	mdb_free(wsp->walk_data, sizeof (tnwalk_state_t));
 }
 
+static int
+tlist_walk_init(mdb_walk_state_t *wsp)
+{
+	topo_list_t tl;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("NULL topo_list_t passed in\n");
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&tl, sizeof (tl), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read topo_list_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)tl.l_next;
+	wsp->walk_data = mdb_alloc(sizeof (topo_list_t), UM_SLEEP | UM_GC);
+
+	return (WALK_NEXT);
+}
+
+static int
+tlist_walk_step(mdb_walk_state_t *wsp)
+{
+	int rv;
+	topo_list_t *tl;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(wsp->walk_data, sizeof (topo_list_t), wsp->walk_addr) ==
+	    -1) {
+		mdb_warn("failed to read topo_list_t at %p", wsp->walk_addr);
+		return (WALK_DONE);
+	}
+	tl = (topo_list_t *)wsp->walk_data;
+
+	rv = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)tl->l_next;
+
+	return (rv);
+}
 
 static const mdb_dcmd_t dcmds[] = {
 	{ "topo_handle", "", "print contents of a topo handle", topo_handle,
@@ -913,6 +958,8 @@ static const mdb_walker_t walkers[] = {
 		tpl_walk_init, tpl_walk_step, tpl_walk_fini, NULL },
 	{ "topo_nodehash", "walk the child nodehash for a given topo node",
 		tnh_walk_init, tnh_walk_step, tnh_walk_fini, NULL },
+	{ "topo_list", "walk a topo_list_t linked list",
+		tlist_walk_init, tlist_walk_step, NULL, NULL },
 	{ NULL }
 };
 
