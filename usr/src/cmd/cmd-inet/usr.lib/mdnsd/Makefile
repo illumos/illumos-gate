@@ -26,19 +26,13 @@
 PROG=		mdnsd
 MANIFEST=	multicast.xml
 
-CMN_DIR=	$(SRC)/lib/libdns_sd/common
-CMN_OBJS=	dnssd_ipc.o
-CMN_SRCS=	$(CMN_OBJS:%.o=$(CMN_DIR)/%.c)
+SRCDIR=		$(SRC)/contrib/mDNSResponder
 
-LOCAL_OBJS=	DNSCommon.o DNSDigest.o GenLinkedList.o \
+OBJS=		DNSCommon.o DNSDigest.o GenLinkedList.o \
 		PlatformCommon.o PosixDaemon.o \
 		mDNS.o mDNSDebug.o mDNSPosix.o mDNSUNP.o \
-		uDNS.o uds_daemon.o CryptoAlg.o anonymous.o
-LOCAL_SRCS=     $(LOCAL_OBJS:%.o=%.c)
-
-SRCS=		$(LOCAL_SRCS) $(CMN_SRCS)
-OBJS=	 	$(LOCAL_OBJS) $(CMN_OBJS)	
-
+		uDNS.o uds_daemon.o CryptoAlg.o anonymous.o dnssd_ipc.o
+SRCS=		$(OBJS:%.o=%.c)
 
 MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
 		-DLOG_PERROR=0 -DHAVE_SOLARIS -DTARGET_OS_SOLARIS \
@@ -49,14 +43,10 @@ MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
 
 include	../../../Makefile.cmd
 
-CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-uninitialized
-
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKDNS)
 $(ROOTMANIFEST)		:= FILEMODE= 444
 
-.PARALLEL:      $(LOCAL_OBJS)
+.PARALLEL:      $(OBJS)
 .WAIT:          $(PROG)
 .KEEP_STATE:
 
@@ -69,12 +59,22 @@ $(PROG): $(OBJS)
 include ../Makefile.lib
 
 CSTD = $(CSTD_GNU99)
-CPPFLAGS += -D_REENTRANT $(MDNSFLAGS) -I$(CMN_DIR)
+CPPFLAGS += -D_REENTRANT $(MDNSFLAGS)
+CPPFLAGS += -I$(SRCDIR)/mDNSShared -I$(SRCDIR)/mDNSPosix
+CPPFLAGS += -I$(SRCDIR)/mDNSCore
 LDLIBS += -lsocket -lnsl
 
 install:	all $(ROOTLIBINETPROG) $(ROOTMANIFEST)
 
-%.o:		$(CMN_DIR)/%.c
+%.o:		$(SRCDIR)/mDNSCore/%.c
+		$(COMPILE.c) $(OUTPUT_OPTION) $<
+		$(POST_PROCESS_O)
+
+%.o:		$(SRCDIR)/mDNSShared/%.c
+		$(COMPILE.c) $(OUTPUT_OPTION) $<
+		$(POST_PROCESS_O)
+
+%.o:		$(SRCDIR)/mDNSPosix/%.c
 		$(COMPILE.c) $(OUTPUT_OPTION) $<
 		$(POST_PROCESS_O)
 
@@ -82,7 +82,5 @@ check:		$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:		lint_SRCS
 
 include ../../../Makefile.targ
