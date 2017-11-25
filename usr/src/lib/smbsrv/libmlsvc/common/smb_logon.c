@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <unistd.h>
@@ -417,6 +417,7 @@ smb_logon_fini(void)
  * attempt to authenticate the user.
  *
  * On success, a pointer to a new access token is returned.
+ * On failure, NULL return and status in user_info->lg_status
  */
 smb_token_t *
 smb_logon(smb_logon_t *user_info)
@@ -433,7 +434,6 @@ smb_logon(smb_logon_t *user_info)
 	int			i;
 
 	user_info->lg_secmode = smb_config_get_secmode();
-	user_info->lg_status = NT_STATUS_NO_SUCH_USER;
 
 	if (smb_domain_lookup_name(user_info->lg_e_domain, &domain))
 		user_info->lg_domain_type = domain.di_type;
@@ -446,6 +446,12 @@ smb_logon(smb_logon_t *user_info)
 		return (NULL);
 	}
 
+	/*
+	 * If any logonop function takes significant action
+	 * (logon or authoratative failure) it will change
+	 * this status field to something else.
+	 */
+	user_info->lg_status = NT_STATUS_NO_SUCH_USER;
 	for (i = 0; i < n_op; ++i) {
 		(*ops[i])(user_info, token);
 
@@ -455,10 +461,25 @@ smb_logon(smb_logon_t *user_info)
 
 	if (user_info->lg_status == NT_STATUS_SUCCESS) {
 		if (smb_token_setup_common(token))
-			return (token);
+			return (token); /* success */
+		/*
+		 * (else) smb_token_setup_common failed, which usually
+		 * means smb_token_sids2ids() failed to map some SIDs to
+		 * Unix IDs.  This indicates an idmap config problem.
+		 */
+		user_info->lg_status = NT_STATUS_INTERNAL_ERROR;
 	}
 
 	smb_token_destroy(token);
+
+	/*
+	 * Any unknown user or bad password should result in
+	 * NT_STATUS_LOGON_FAILURE (so we don't give hints).
+	 */
+	if (user_info->lg_status == NT_STATUS_NO_SUCH_USER ||
+	    user_info->lg_status == NT_STATUS_WRONG_PASSWORD)
+		user_info->lg_status = NT_STATUS_LOGON_FAILURE;
+
 	return (NULL);
 }
 

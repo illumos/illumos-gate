@@ -129,6 +129,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_ctxbuf_printf;
 	smb_dlclose;
 	smb_dlopen;
+	smb_domain_bad_dc;
 	smb_domain_current_dc;
 	smb_domain_end_update;
 	smb_domain_fini;

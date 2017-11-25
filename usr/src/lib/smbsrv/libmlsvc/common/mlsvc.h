@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_MLSVC_H
@@ -62,6 +62,8 @@ DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
 int netr_setup_authenticator(struct netr_info *, struct netr_authenticator *,
     struct netr_authenticator *);
 DWORD netr_validate_chain(struct netr_info *, struct netr_authenticator *);
+
+uint32_t smb_netlogon_check(char *, char *);
 
 int srvsvc_gettime(unsigned long *);
 void srvsvc_timecheck(char *, char *);
