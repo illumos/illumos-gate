@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.Dd Feb 21, 2017
+.Dd Nov 26, 2017
 .Dt MAC_TRANSCEIVER_INFO 9F
 .Os
 .Sh NAME
@@ -68,7 +68,7 @@ If the transceiver is not plugged in, then the function
 should be called with
 .Fa present set to
 .Dv B_FALSE ,
-otehrwise it should use
+otherwise it should use
 .Dv B_TRUE .
 .Pp
 The

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Dec 20, 2016
+.Dd Nov 26, 2017
 .Dt USBA_HCDI_PIPE_OPEN 9E
 .Os
 .Sh NAME
@@ -97,12 +97,12 @@ See
 for more information on how to determine which descriptors are present
 and get the information encoded in them.
 .Pp
-Host controller drviers should check the USB address of the
+Host controller drivers should check the USB address of the
 USB device that
 .Fa ph
 belongs to.
 The driver may be asked to open a pipe to the root hub.
-As the root hub is often sythetic, the driver man need to take a different
+As the root hub is often synthetic, the driver may need to take a different
 path than normal.
 .Ss Pipe open specifics
 A given endpoint on a device can only be opened once.

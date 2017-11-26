@@ -1,10 +1,10 @@
 '\" te
-.\"  opyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
+.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DRV_GETPARM 9F "Jan 16, 2006"
+.TH DRV_GETPARM 9F "Nov 26, 2017"
 .SH NAME
 drv_getparm \- retrieve kernel state information
 .SH SYNOPSIS
@@ -18,11 +18,9 @@ drv_getparm \- retrieve kernel state information
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIparm\fR\fR
@@ -115,7 +113,6 @@ copied.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 Since the release of the Solaris 2.6 operating environment, the
 \fBdrv_getparm()\fR function has been replaced by \fBddi_get_lbolt\fR(9F),
@@ -136,7 +133,6 @@ does not check for correct alignment in the data space pointed to by
 function only when it is appropriate to do so and to correctly declare the data
 space needed by the driver.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBdrv_getparm()\fR function returns \fB0\fR to indicate success, \fB-1\fR
 to indicate failure. The value stored in the space pointed to by \fIvalue_p\fR
@@ -145,14 +141,12 @@ is returned. \fB-1\fR is returned if you specify a value other than
 \fBLBOLT\fR, \fBPPGRP\fR, \fBPPID\fR, \fBPSID\fR, \fBTIME\fR, \fBUCRED\fR, or
 \fBUPROCP\fR. Always check the return code when using this function.
 .SH CONTEXT
-.sp
 .LP
 The \fBdrv_getparm()\fR function can be called from user context only when
 using \fBPPGRP\fR, \fBPPID\fR, \fBPSID\fR, \fBUCRED\fR, or \fBUPROCP\fR. It can
 be called from user, interrupt, or kernel context when using the \fBLBOLT\fR or
 \fBTIME\fR argument.
 .SH SEE ALSO
-.sp
 .LP
 \fBddi_get_lbolt\fR(9F), \fBddi_get_pid\fR(9F), \fBddi_get_time\fR(9F),
 \fBbuf\fR(9S)

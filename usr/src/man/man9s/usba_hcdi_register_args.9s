@@ -11,13 +11,13 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Sep 20, 2016
+.Dd Nov 26, 2017
 .Dt USBA_HCDI_REGISTER_ARGS 9S
 .Os
 .Sh NAME
 .Nm usba_hcdi_register_args ,
 .Nm usba_hcdi_register_args_t
-.Nd USB HCD driver registeration
+.Nd USB HCD driver registration
 .Sh SYNOPSIS
 .In sys/usb/usba/hcdi.h
 .Sh INTERFACE LEVEL
@@ -80,7 +80,7 @@ It should be allocated with a call to
 .Xr usba_alloc_hcdi_ops 9F
 and released with a call to
 .Xr usba_free_hcdi_ops 9F ,
-after the drive has called
+after the driver has called
 .Xr usba_hcdi_register 9F .
 .Pp
 Please see

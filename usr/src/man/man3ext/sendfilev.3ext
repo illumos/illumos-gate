@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SENDFILEV 3EXT "Nov 3, 2017"
+.TH SENDFILEV 3EXT "Nov 26, 2017"
 .SH NAME
 sendfilev \- send a file
 .SH SYNOPSIS
@@ -112,7 +112,7 @@ to \fBSFV_FD_SELF\fR. \fBsfv_off\fR should point to the data, with
 Upon successful completion, the \fBsendfilev()\fR function returns total number
 of bytes written to \fBout_fd\fR. Otherwise, it returns \fB-1\fR, and
 \fBerrno\fR is set to indicate the error. The \fIxferred\fR argument contains
-the amount of data successfuly transferred, which can be used to discover the
+the amount of data successfully transferred, which can be used to discover the
 error vector.
 .SH ERRORS
 .ne 2

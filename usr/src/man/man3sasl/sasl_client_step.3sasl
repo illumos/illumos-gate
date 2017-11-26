@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SASL_CLIENT_STEP 3SASL "Aug 28, 2003"
+.TH SASL_CLIENT_STEP 3SASL "Nov 26, 2017"
 .SH NAME
 sasl_client_step \- acquire an auxiliary property context
 .SH SYNOPSIS
@@ -20,12 +20,11 @@ sasl_client_step \- acquire an auxiliary property context
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Use the \fBsasl_client_step()\fR interface performs a step in the
 authentication negotiation. \fBsasl_client_step()\fR returns \fBSASL_OK\fR if
 the complete negotiation is successful. If the negotiation on step is completed
-successfuly, but at least one more step is required, \fBsasl_client_step()\fR
+successfully, but at least one more step is required, \fBsasl_client_step()\fR
 returns \fBSASL_CONTINUE\fR. A client should not assume an authentication
 negotiaion is successful because the server signaled success through the
 protocol. For example, if the server signaled \fBOK Authentication succeeded\fR
@@ -40,7 +39,6 @@ should fulfull these requests and call \fBsasl_client_step()\fR again with
 identical parameters. The \fIprompt_need\fR parameter will be the same pointer
 as before, but it will have been filled in by the application.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIconn\fR\fR
@@ -94,12 +92,10 @@ A list of prompts that are needed to continue, if necessary.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 \fBsasl_client_step()\fR returns an integer that corresponds to a SASL error
 code.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBSASL_OK\fR\fR
@@ -134,7 +130,6 @@ All other error codes indicate an error situation that must be handled, or the
 authentication session should be quit. See \fBsasl_errors\fR(3SASL) for
 information on SASL error codes.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -152,6 +147,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsasl_errors\fR(3SASL), \fBattributes\fR(5)
