@@ -52,9 +52,9 @@ pam_sm_acct_mgmt(
 	char	*pg;
 	int	i;
 	/*LINTED - set but not used. Would be used in a real module. */
-	int	debug = 0;
+	int	debug __unused = 0;
 	/*LINTED - set but not used. Would be used in a real module. */
-	int	nowarn = 0;
+	int	nowarn __unused = 0;
 	int	error = 0;
 
 	if (argc == 0)
