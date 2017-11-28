@@ -116,8 +116,8 @@ static DEFINE_NSS_DB_ROOT(db_root);
  */
 /* ARGSUSED */
 static int
-str2key(const char *instr, int lenstr,
-			void *ent, char *buffer, int buflen) {
+str2key(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
+{
 	if (lenstr + 1 > buflen)
 		return (NSS_STR_PARSE_ERANGE);
 	/*
@@ -342,20 +342,19 @@ getsecretkey(const char *netname, char *skey, const char *passwd)
  */
 static int
 extract_secret_g(
-	char		*raw,		/* in  */
-	char		*private,	/* out */
-	int		prilen,		/* in  */
-	char		*passwd,	/* in  */
-	char		*netname,	/* in  */
-	keylen_t	keylen,		/* in  */
-	algtype_t	algtype)	/* in  */
-
+    char	*raw,		/* in  */
+    char	*private,	/* out */
+    int		prilen,		/* in  */
+    char	*passwd,	/* in  */
+    char	*netname,	/* in  */
+    keylen_t	keylen,		/* in  */
+    algtype_t	algtype)	/* in  */
 {
 	char	*buf = malloc(strlen(raw) + 1); /* private tmp buf */
 	char	*p;
 
 	if (!buf || !passwd || !raw || !private || !prilen ||
-			!VALID_KEYALG(keylen, algtype)) {
+	    !VALID_KEYALG(keylen, algtype)) {
 		if (private)
 			*private = NUL;
 		if (buf)
@@ -535,8 +534,10 @@ netname2hashname(
 void
 __getpublickey_flush_g(const char *netname, keylen_t keylen, algtype_t algtype)
 {
-	char	*p, hashname[MAXNETNAMELEN+1];
-	p = netname2hashname(netname, hashname, MAXNETNAMELEN, keylen, algtype);
+	char	hashname[MAXNETNAMELEN+1];
+
+	(void) netname2hashname(netname, hashname, MAXNETNAMELEN, keylen,
+	    algtype);
 }
 
 /*
@@ -544,11 +545,11 @@ __getpublickey_flush_g(const char *netname, keylen_t keylen, algtype_t algtype)
  */
 int
 __getpublickey_cached_g(const char netname[],	/* in  */
-			keylen_t keylen,	/* in  */
-			algtype_t algtype,	/* in  */
-			char *pkey,		/* out */
-			size_t pkeylen,		/* in  */
-			int *from_cache)	/* in/out  */
+    keylen_t keylen,	/* in  */
+    algtype_t algtype,	/* in  */
+    char *pkey,		/* out */
+    size_t pkeylen,	/* in  */
+    int *from_cache)	/* in/out  */
 {
 	int	needfree = 1, res, err;
 	struct __nsw_switchconfig *conf;

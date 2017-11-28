@@ -29,8 +29,6 @@
  * PROTOMAIN is coded for minimal library support
  */
 
-static const char id[] = "\n@(#)$Id: proto (AT&T Research) 2008-05-11 $\0\n";
-
 #if PROTOMAIN
 
 #include "ppfsm.c"

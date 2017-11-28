@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * s_generic.c :
  *      This file contains generic SCSI related functions for scsi plug-in
@@ -74,9 +72,8 @@ _m_get_media_info(rmedia_handle_t *handle, void *ip)
 	}
 	if (handle->sm_signature != (int32_t)LIBSMEDIA_SIGNATURE) {
 		DPRINTF("Invalid signature in handle.\n");
-		DPRINTF2(
-		"Signature expected=0x%x, found=0x%x\n",
-			LIBSMEDIA_SIGNATURE, handle->sm_signature);
+		DPRINTF2("Signature expected=0x%x, found=0x%x\n",
+		    LIBSMEDIA_SIGNATURE, handle->sm_signature);
 		DPRINTF1("fd=%d\n", handle->sm_fd);
 		errno = EINVAL;
 		return (-1);
@@ -97,7 +94,7 @@ _m_get_media_info(rmedia_handle_t *handle, void *ip)
 		return (-1);
 	}
 	retget_medium_property =
-		(smedia_retget_medium_property_t *)((void *)door_args.data_ptr);
+	    (smedia_retget_medium_property_t *)((void *)door_args.data_ptr);
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
 		DPRINTF1(
@@ -174,11 +171,11 @@ _m_get_device_info(rmedia_handle_t *handle, void *ip)
 		return (-1);
 	}
 	retget_device_info = (smedia_retget_device_info_t *)
-		((void *)door_args.data_ptr);
+	    ((void *)door_args.data_ptr);
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
-		DPRINTF1(
-	"Error in get_device_info. errnum = 0x%x \n", reterror->errnum);
+		DPRINTF1("Error in get_device_info. errnum = 0x%x \n",
+		    reterror->errnum);
 		errno = reterror->errnum;
 		free(vendor_name);
 		free(product_name);
@@ -192,13 +189,13 @@ _m_get_device_info(rmedia_handle_t *handle, void *ip)
 
 
 	(void) strlcpy(dev_info->sm_vendor_name,
-		retget_device_info->sm_vendor_name, 8);
+	    retget_device_info->sm_vendor_name, 8);
 	dev_info->sm_vendor_name[8] = 0;
 	(void) strlcpy(dev_info->sm_product_name,
-		retget_device_info->sm_product_name, 16);
+	    retget_device_info->sm_product_name, 16);
 	dev_info->sm_product_name[16] = 0;
 	(void) strlcpy(dev_info->sm_firmware_version,
-		retget_device_info->sm_firmware_version, 17);
+	    retget_device_info->sm_firmware_version, 17);
 	dev_info->sm_firmware_version[17] = 0;
 
 	dev_info->sm_interface_type = retget_device_info->sm_interface_type;
@@ -279,9 +276,9 @@ _m_raw_write(rmedia_handle_t *handle, void *i_p)
 	retraw_write = (smedia_retraw_write_t *)((void *)door_args.data_ptr);
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
-		DPRINTF3(
-	"Error in raw write. errnum = 0x%x blk_num = 0x%x(%d)\n",
-		reterror->errnum, r_p->offset, r_p->offset);
+		DPRINTF3("Error in raw write. errnum = 0x%x "
+		    "blk_num = 0x%x(%d)\n", reterror->errnum, r_p->offset,
+		    r_p->offset);
 		errno = reterror->errnum;
 		goto error;
 	}
@@ -343,9 +340,9 @@ _m_raw_read(rmedia_handle_t *handle, void *i_p)
 		/*
 		 * free(rbuf);
 		 */
-		DPRINTF3(
-	"Error in raw read. errnum = 0x%x blk_num = 0x%x(%d)\n",
-		reterror->errnum, r_p->offset, r_p->offset);
+		DPRINTF3("Error in raw read. errnum = 0x%x "
+		    "blk_num = 0x%x(%d)\n", reterror->errnum, r_p->offset,
+		    r_p->offset);
 		errno = reterror->errnum;
 		goto error;
 	}
@@ -366,7 +363,6 @@ _m_media_format(rmedia_handle_t *handle, void *ip)
 	int32_t ret_val;
 	struct format_flags *ffl = (struct format_flags *)ip;
 	smedia_reqformat_t	reqformat;
-	smedia_retformat_t	*retformat;
 	smedia_reterror_t	*reterror;
 	door_arg_t	door_args;
 	char	rbuf[sizeof (smedia_services_t) + sizeof (door_desc_t)];
@@ -397,10 +393,6 @@ _m_media_format(rmedia_handle_t *handle, void *ip)
 		perror("door_call");
 		return (size_t)(-1);
 	}
-	retformat = (smedia_retformat_t *)((void *)door_args.data_ptr);
-#ifdef lint
-	retformat = retformat;
-#endif
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
 		DPRINTF1("Error in format. errnum = 0x%x \n", reterror->errnum);
@@ -445,23 +437,23 @@ _m_get_media_status(rmedia_handle_t *handle, void *ip)
 		perror("door_call");
 		return (-1);
 	}
-	retget_protection_status =
-		(smedia_retget_protection_status_t *)
-		((void *)door_args.data_ptr);
+	retget_protection_status = (smedia_retget_protection_status_t *)
+	    ((void *)door_args.data_ptr);
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
-		DPRINTF1(
-	"Error in get_protection-status. errnum = 0x%x \n", reterror->errnum);
+		DPRINTF1("Error in get_protection-status. errnum = 0x%x \n",
+		    reterror->errnum);
 		errno = reterror->errnum;
 		return (-1);
 	}
 	(void) memcpy((char *)wp, (char *)&retget_protection_status->prot_state,
-		sizeof (smwp_state_t));
+	    sizeof (smwp_state_t));
 	return (0);
 }
 
 int32_t
-_m_set_media_status(rmedia_handle_t *handle, void *ip) {
+_m_set_media_status(rmedia_handle_t *handle, void *ip)
+{
 
 	smwp_state_t	*wp = ip;
 	int32_t ret_val;
@@ -545,9 +537,8 @@ _m_reassign_block(rmedia_handle_t *handle, void *ip)
 	}
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
-		DPRINTF2(
-		"Error in reassign_block. block = 0x%x errnum = 0x%x \n",
-			block, reterror->errnum);
+		DPRINTF2("Error in reassign_block. block = 0x%x "
+		    "errnum = 0x%x \n", block, reterror->errnum);
 		errno = reterror->errnum;
 		return (-1);
 	}
@@ -579,8 +570,8 @@ int32_t
 _m_device_type(ushort_t ctype, ushort_t mtype)
 {
 	if ((ctype == DKC_SCSI_CCS) ||
-		(ctype == DKC_MD21) ||
-		(ctype == DKC_CDROM)) {
+	    (ctype == DKC_MD21) ||
+	    (ctype == DKC_CDROM)) {
 		if (mtype == 0)
 			return (0);
 	}
@@ -631,11 +622,11 @@ _m_check_format_status(rmedia_handle_t *handle, void *ip)
 		return (-1);
 	}
 	retcheck_format_status =
-		(smedia_retcheck_format_status_t *)((void *)door_args.data_ptr);
+	    (smedia_retcheck_format_status_t *)((void *)door_args.data_ptr);
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
-		DPRINTF1(
-	"Error in check_format_status. errnum = 0x%x \n", reterror->errnum);
+		DPRINTF1("Error in check_format_status. errnum = 0x%x \n",
+		    reterror->errnum);
 		errno = reterror->errnum;
 		return (-1);
 	}
@@ -700,7 +691,7 @@ _m_uscsi_cmd(rmedia_handle_t *handle, struct uscsi_cmd *ucmd)
 	 */
 	(void) mutex_lock(&handle->sm_bufmutex);
 	ret_val = remap_shared_buf(handle, ucmd->uscsi_buflen,
-			ucmd->uscsi_bufaddr);
+	    ucmd->uscsi_bufaddr);
 	if (ret_val != 0) {
 		DPRINTF("remap of shared buf failed.\n");
 		goto error;
@@ -749,9 +740,9 @@ _m_uscsi_cmd(rmedia_handle_t *handle, struct uscsi_cmd *ucmd)
 	ucmd->uscsi_rqstatus = retuscsi_cmd->uscsi_rqstatus;
 	ucmd->uscsi_rqresid = retuscsi_cmd->uscsi_rqresid;
 	if ((ucmd->uscsi_flags & USCSI_RQENABLE) &&
-		(ucmd->uscsi_rqbuf != NULL)) {
-		bcopy(retuscsi_cmd->uscsi_rqbuf,
-			ucmd->uscsi_rqbuf, ucmd->uscsi_rqlen);
+	    (ucmd->uscsi_rqbuf != NULL)) {
+		bcopy(retuscsi_cmd->uscsi_rqbuf, ucmd->uscsi_rqbuf,
+		    ucmd->uscsi_rqlen);
 	}
 	errno = retuscsi_cmd->uscsi_errno;
 	if (errno) {
@@ -767,14 +758,13 @@ _m_uscsi_cmd(rmedia_handle_t *handle, struct uscsi_cmd *ucmd)
 	}
 	if (ucmd->uscsi_flags & USCSI_READ) {
 		(void) memcpy(ucmd->uscsi_bufaddr,
-				handle->sm_buf,
-				ucmd->uscsi_buflen - ucmd->uscsi_resid);
+		    handle->sm_buf, ucmd->uscsi_buflen - ucmd->uscsi_resid);
 	}
 	(void) mutex_unlock(&handle->sm_bufmutex);
 #ifdef DEBUG
 	if (retuscsi_cmd->uscsi_retval || ucmd->uscsi_status)
 		DPRINTF2("Error in uscsi_cmd: retval=0x%x uscsi_status=0x%x\n",
-			retuscsi_cmd->uscsi_retval, ucmd->uscsi_status);
+		    retuscsi_cmd->uscsi_retval, ucmd->uscsi_status);
 #endif
 	return (retuscsi_cmd->uscsi_retval);
 error:
@@ -799,7 +789,7 @@ remap_shared_buf(rmedia_handle_t *handle, size_t buf_size, char *buffer)
 	if (handle->sm_bufsize >= buf_size)
 		return (0);
 	shared_bufsize = ((buf_size + BUF_SIZE_MULTIPLE - 1)/BUF_SIZE_MULTIPLE)
-		* BUF_SIZE_MULTIPLE;
+	    * BUF_SIZE_MULTIPLE;
 	if (handle->sm_buffd != -1) {
 		/* extend the file and re-map */
 		fd = handle->sm_buffd;
@@ -851,8 +841,8 @@ remap_shared_buf(rmedia_handle_t *handle, size_t buf_size, char *buffer)
 		}
 		file_size += buf_size;
 	}
-	fbuf = (char *)mmap(0, shared_bufsize, PROT_READ | PROT_WRITE,
-		MAP_SHARED, fd, 0);
+	fbuf = mmap(NULL, shared_bufsize, PROT_READ | PROT_WRITE,
+	    MAP_SHARED, fd, 0);
 	if (fbuf == (char *)-1) {
 		perror("mmap failed");
 		(void) close(fd);
@@ -879,7 +869,7 @@ remap_shared_buf(rmedia_handle_t *handle, size_t buf_size, char *buffer)
 	reterror = (smedia_reterror_t *)((void *)door_args.data_ptr);
 	if (reterror->cnum == SMEDIA_CNUM_ERROR) {
 		DPRINTF1("Error in set shfd. errnum = 0x%x\n",
-			reterror->errnum);
+		    reterror->errnum);
 		errno = reterror->errnum;
 		(void) close(fd);
 		return (errno);

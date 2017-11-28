@@ -30,11 +30,10 @@
 
 /* This is a private header file.				*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.4	*/
 /* extensible strings */
 
 #ifndef _S_STRING_H
-#define _S_STRING_H
+#define	_S_STRING_H
 
 #include <string.h>
 
@@ -50,25 +49,27 @@ typedef struct string {
  * to lint, but causes the last expression to be evaluated as an int (didn't
  * change this).
  */
-#define s_clone(s)	s_copy((s)->ptr)
-#define s_curlen(s)	((s)->ptr - (s)->base)
-#define s_dup(s)	s_copy((s)->base)
-#define s_getc(s)	(*((s)->ptr++))
-#define s_peek(s)	(*((s)->ptr))
-#define s_putc(s,c)     (((s)->ptr < (s)->end) ? (*((s)->ptr)++ = (char)(c)) : s_grow((s),(c)))
-#define s_reset(s)	((s) ? (*((s)->ptr = (s)->base) = '\0' , (s)) : s_new())
-#define s_restart(s)	((s)->ptr = (s)->base , (s))
-#define s_skipc(s)	((s)->ptr++)
-#define s_space(s)	((s)->end - (s)->base)
-#define s_terminate(s)  (((s)->ptr < (s)->end) ? (*(s)->ptr = 0) : (s_grow((s),0), (s)->ptr--, 0))
-#define s_to_c(s)	((s)->base)
-#define s_ptr_to_c(s)	((s)->ptr)
+#define	s_clone(s)	s_copy((s)->ptr)
+#define	s_curlen(s)	((s)->ptr - (s)->base)
+#define	s_dup(s)	s_copy((s)->base)
+#define	s_getc(s)	(*((s)->ptr++))
+#define	s_peek(s)	(*((s)->ptr))
+#define	s_putc(s, c)	(((s)->ptr < (s)->end) ? \
+	(*((s)->ptr)++ = (char)(c)) : s_grow((s), (c)))
+#define	s_reset(s)	((s) ? (*((s)->ptr = (s)->base) = '\0', (s)) : s_new())
+#define	s_restart(s)	((s)->ptr = (s)->base)
+#define	s_skipc(s)	((s)->ptr++)
+#define	s_space(s)	((s)->end - (s)->base)
+#define	s_terminate(s)  (((s)->ptr < (s)->end) ? \
+	(*(s)->ptr = 0) : (s_grow((s), 0), (s)->ptr--, 0))
+#define	s_to_c(s)	((s)->base)
+#define	s_ptr_to_c(s)	((s)->ptr)
 
 #ifdef __STDC__
 extern string *s_append(string *to, char *from);
 extern string *s_array(char *, size_t len);
 extern string *s_copy(char *);
-extern void s_free(string*);
+extern void s_free(string *);
 extern int s_grow(string *sp, int c);
 extern string *s_new(void);
 extern string *s_parse(string *from, string *to);
@@ -76,8 +77,8 @@ extern char *s_read_line(FILE *fp, string *to);
 extern size_t s_read_to_eof(FILE *fp, string *to);
 extern string *s_seq_read(FILE *fp, string *to, int lineortoken);
 extern void s_skipwhite(string *from);
-extern string *s_tok(string*, char*);
-extern void s_tolower(string*);
+extern string *s_tok(string *, char *);
+extern void s_tolower(string *);
 #else
 extern string *s_append();
 extern string *s_array();
@@ -95,9 +96,9 @@ extern void s_tolower();
 #endif
 
 /* controlling the action of s_seq_read */
-#define TOKEN 0		/* read the next whitespace delimited token */
-#define LINE 1		/* read the next logical input line */
-#define s_getline(a,b) s_seq_read(a,b,LINE)
-#define s_gettoken(a,b) s_seq_read(a,b,TOKEN)
+#define	TOKEN 0		/* read the next whitespace delimited token */
+#define	LINE 1		/* read the next logical input line */
+#define	s_getline(a, b) s_seq_read(a, b, LINE)
+#define	s_gettoken(a, b) s_seq_read(a, b, TOKEN)
 
 #endif /* _S_STRING_H */
