@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCHED_SETSCHEDULER 3C "Apr 1, 2008"
+.TH SCHED_SETSCHEDULER 3C "Nov 26, 2017"
 .SH NAME
 sched_setscheduler \- set scheduling policy and scheduling parameters
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ sched_setscheduler \- set scheduling policy and scheduling parameters
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsched_setscheduler()\fR function sets the scheduling policy and
 scheduling parameters of the process specified by \fIpid\fR to \fIpolicy\fR and
@@ -62,14 +61,12 @@ in setting the scheduling policy and scheduling parameters of the process
 specified by \fIpid\fR to the values specified by \fIpolicy\fR and the
 structure pointed to by \fIparam\fR, respectively.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, the function returns the former scheduling policy
 of the specified process. If the \fBsched_setscheduler()\fR function fails to
-complete successfully, the policy and scheduling paramenters remain unchanged,
+complete successfully, the policy and scheduling parameters remain unchanged,
 and the function returns \(mi1 and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBsched_setscheduler()\fR function will fail if:
 .sp
@@ -103,7 +100,6 @@ No process can be found corresponding to that specified by \fIpid.\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -123,7 +119,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpriocntl\fR(1), \fBIntro\fR(2), \fBexec\fR(2), \fBpriocntl\fR(2),
 \fBlibrt\fR(3LIB), \fBsched.h\fR(3HEAD), \fBsched_get_priority_max\fR(3C),

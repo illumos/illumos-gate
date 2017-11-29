@@ -10,7 +10,7 @@
 .\"
 .\" Copyright 2014 Nexenta Systems, Inc.
 .\"
-.Dd Aug 20, 2014
+.Dd Nov 26, 2017
 .Dt PAM_TIMESTAMP 5
 .Os
 .Sh NAME
@@ -59,7 +59,7 @@ debugging information at the
 .Sy LOG_AUTH | LOG_DEBUG
 level.
 .It Dv timeout
-Specifies the period (in miniutes) for which the timestamp file is valid.
+Specifies the period (in minutes) for which the timestamp file is valid.
 The default value is 5 minutes.
 .El
 .Sh FILES
@@ -82,7 +82,7 @@ or timestamp file is expired or corrupt.
 .
 The following example is a
 .Xr pam.conf 4
-fragment that illustartes a default settings for allowing
+fragment that illustrates default settings for allowing
 .Xr su 1M
 authentication:
 .Bd -literal -offset indent

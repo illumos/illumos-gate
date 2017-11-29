@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KRB5.CONF 4 "April 9, 2016"
+.TH KRB5.CONF 4 "Nov 26, 2017"
 .SH NAME
 krb5.conf \- Kerberos configuration file
 .SH SYNOPSIS
@@ -1588,7 +1588,7 @@ contain the private key. If no such file is found, then the certificate in the
 .sp
 .ne 2
 .na
-\fB\fBpkintit_anchors\fR\fR
+\fB\fBpkinit_anchors\fR\fR
 .ad
 .br
 .na
@@ -1597,7 +1597,7 @@ contain the private key. If no such file is found, then the certificate in the
 .RS 21n
 \fIdirectory-name\fR is assumed to be an OpenSSL-style hashed CA directory
 where each CA cert is stored in a file named \fBhash-of-ca-cert\fR.\fI#\fR.
-This infrastructure is encouraged, but all files in the directory is examined
+This infrastructure is encouraged, but all files in the directory are examined
 and if they contain certificates (in PEM format), they are used.
 .RE
 

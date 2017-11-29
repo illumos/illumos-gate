@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_SENSE_KEY 9F "Jun 28, 2006"
+.TH SCSI_SENSE_KEY 9F "Nov 26, 2017"
 .SH NAME
 scsi_sense_key, scsi_sense_asc, scsi_sense_ascq \- retrieve fields from SCSI
 sense data
@@ -28,11 +28,9 @@ sense data
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsense_buffer\fR\fR
@@ -44,7 +42,6 @@ fixed or descriptor format.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBscsi_sense_key()\fR function returns the sense key value from the sense
 data contained in the sense_buffer.
@@ -59,26 +56,23 @@ qualifier (\fBASCQ\fR) value from the sense data contained in the sense_buffer.
 .sp
 .LP
 The \fBscsi_sense_key()\fR, \fBscsi_sense_asc()\fR, and \fBscsi_sense_ascq()\fR
-functions are used to retrieve values from \fBSCSI\fR sense data, regardles of
+functions are used to retrieve values from \fBSCSI\fR sense data, regardless of
 whether the sense data is in fixed format or descriptor format.
 .sp
 .LP
 Drivers should use \fBscsi_validate_sense\fR(9F) to ensure that valid sense
 key, \fBasc\fR, and \fBascq\fR values are present in the sense data.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBscsi_sense_key()\fR function returns the sense key value from the sense
 buffer. The \fBscsi_sense_asc()\fR function returns the additional sense code
 (\fBASC\fR) from the sense buffer and the \fBscsi_sense_ascq()\fR function
 returns the additional sense code qualifier (\fBASCQ\fR) from the sense buffer.
 .SH CONTEXT
-.sp
 .LP
 The \fBscsi_sense_key()\fR, \fBscsi_sense_asc()\fR, and \fBscsi_sense_ascq()\fR
 functions can be called from user or interrupt context.
 .SH SEE ALSO
-.sp
 .LP
 \fBscsi_ext_sense_fields\fR(9F), \fBscsi_find_sense_descr\fR(9F),
 \fBscsi_sense_cmdspecific_uint64\fR(9F), \fBscsi_sense_info_uint64\fR(9F),

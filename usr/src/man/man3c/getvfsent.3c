@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETVFSENT 3C "Mar 12, 1997"
+.TH GETVFSENT 3C "Nov 26, 2017"
 .SH NAME
 getvfsent, getvfsfile, getvfsspec, getvfsany \- get vfstab file entry
 .SH SYNOPSIS
@@ -31,7 +31,6 @@ getvfsent, getvfsfile, getvfsspec, getvfsany \- get vfstab file entry
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetvfsent()\fR, \fBgetvfsfile()\fR, \fBgetvfsspec()\fR, and
 \fBgetvfsany()\fR functions each fill in the structure pointed to by \fIvp\fR
@@ -72,13 +71,12 @@ it cannot match in this manner, then it compares the strings.
 .sp
 .LP
 The \fBgetvfsany()\fR function searches the file referenced by \fIfp\fR until a
-match is found between a line in the file and \fIvref\fR. A match occurrs if
+match is found between a line in the file and \fIvref\fR. A match occurs if
 all non-null entries in \fIvref\fR match the corresponding fields in the file.
 .sp
 .LP
 Note that these functions do not open, close, or rewind the file.
 .SH RETURN VALUES
-.sp
 .LP
 If the next entry is successfully read by \fBgetvfsent()\fR or a match is found
 with \fBgetvfsfile()\fR, \fBgetvfsspec()\fR, or \fBgetvfsany()\fR, \fB0\fR is
@@ -113,11 +111,9 @@ A line in the file contains too few fields.
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/etc/vfstab\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -133,11 +129,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBvfstab\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The members of the \fBvfstab\fR structure point to information contained in a
 static area, so it must be copied if it is to be saved.

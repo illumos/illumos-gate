@@ -13,7 +13,7 @@
 .\" Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.TH NEWLOCALE 3C "Jun 23, 2014"
+.TH NEWLOCALE 3C "Nov 26, 2017"
 .SH NAME
 duplocale, freelocale, newlocale \- create, duplicate, and destroy locale objects
 .SH SYNOPSIS
@@ -70,7 +70,7 @@ following three locales may always be passed in as the string
 Specifies the traditional UNIX system behavior.
 .TP
 "POSIX"
-An alternate name fo the locale "C".
+An alternate name for the locale "C".
 .TP
 ""
 Indicates that the locale should be processed based in the values in the

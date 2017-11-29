@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IIADM 1M "Mar 6, 2014"
+.TH IIADM 1M "Nov 26, 2017"
 .SH NAME
 iiadm \- command-line interface to control Sun StorageTek Availability Suite
 Point-in-Time Copy operations
@@ -79,7 +79,6 @@ Point-in-Time Copy operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Point-in-Time Copy software is a point-in-time snapshot feature of the Solaris
 operating system.
@@ -184,7 +183,6 @@ redirected to the associated overflow volume. To facilitate efficient usage of
 this overflow volume, it can be associated with multiple Point-in-Time Copy
 volume sets on an as-needed basis.
 .SS "Considerations"
-.sp
 .LP
 Prior to invoking an Point-in-Time Copy \fBenable\fR, \fBcopy\fR or
 \fBupdate\fR operation, Point-in-Time Copy assures that the shadow volume is
@@ -205,7 +203,6 @@ occurs only when a system crashes, so the file system attempts to validate the
 integrity of the volume assuming a system failure occurred, not an
 Point-in-Time Copy.
 .SS "ENVIRONMENT OPTIONS"
-.sp
 .LP
 The \fBii_bitmap\fR variable in the \fB/usr/kernel/drv/ii.conf\fR configuration
 file determines the bitmap volume operational semantics as follows:
@@ -230,7 +227,7 @@ default value.
 
 .sp
 .LP
-If a system failure occurrs while using \fBii_bitmap=0\fR, the shadow volume
+If a system failure occurs while using \fBii_bitmap=0\fR, the shadow volume
 might be inconsistent and fast resynchronization would not be possible.
 .sp
 .LP
@@ -269,7 +266,6 @@ Indicates that developmental logging is sent to the system console.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The \fBiiadm\fR utility supports the following options.
 .sp
@@ -982,7 +978,6 @@ point-in-time volume updates.
 .RE
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -1001,7 +996,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1017,7 +1011,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdscfg\fR(1M), \fBsvadm\fR(1M), \fBds.log\fR(4), \fBrdc.cf\fR(4),
 \fBattributes\fR(5), \fBii\fR(7D), \fBsv\fR(7D)

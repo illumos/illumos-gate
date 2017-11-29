@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Sep 16, 2016
+.Dd Nov 26, 2017
 .Dt USBA_HCDI_REGISTER 9F
 .Os
 .Sh NAME
@@ -63,7 +63,7 @@ The
 function is called during a device driver's
 .Xr attach 9E
 entry point after it has finished initializing the device.
-After this function successfuly returns, device drivers should assume that the
+After this function successfully returns, device drivers should assume that the
 .Xr usba_hcdi_ops 9S
 functions may be called at any time.
 .Pp

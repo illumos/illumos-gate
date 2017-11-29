@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CLOCK_SETTIME 3C "Feb 5, 2008"
+.TH CLOCK_SETTIME 3C "Nov 26, 2017"
 .SH NAME
 clock_settime, clock_gettime, clock_getres \- high-resolution clock operations
 .SH SYNOPSIS
@@ -31,7 +31,6 @@ clock_settime, clock_gettime, clock_getres \- high-resolution clock operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBclock_settime()\fR function sets the specified clock, \fIclock_id\fR, to
 the value specified by \fItp\fR. Time values that are between two consecutive
@@ -52,7 +51,7 @@ is not a multiple of \fIres\fR, then the value is truncated to a multiple of
 \fIres\fR.
 .sp
 .LP
-A clock may be systemwide (that is, visible to all processes) or per-process
+A clock may be system wide (that is, visible to all processes) or per-process
 (measuring time that is meaningful only within a process).
 .sp
 .LP
@@ -77,12 +76,10 @@ of \fBadjtime\fR(2), \fBntp_adjtime\fR(2), \fBsettimeofday\fR(3C), or
 Additional clocks may also be supported. The interpretation of time values for
 these clocks is unspecified.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fB0\fR  is returned. Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBclock_settime()\fR, \fBclock_gettime()\fR and \fBclock_getres()\fR
 functions will fail if:
@@ -133,7 +130,6 @@ specified clock.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -153,7 +149,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBtime\fR(2), \fBctime\fR(3C), \fBgethrtime\fR(3C), \fBtime.h\fR(3HEAD),
 \fBtimer_gettime\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
