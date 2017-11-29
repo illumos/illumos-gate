@@ -31,6 +31,7 @@
 #
 
 . $STF_SUITE/include/libtest.shlib
+. $STF_SUITE/include/math.shlib
 . $STF_SUITE/tests/functional/userquota/userquota_common.kshlib
 
 #
@@ -57,10 +58,15 @@ function cleanup
 function group_object_count
 {
 	typeset fs=$1
-	typeset user=$2
-	typeset cnt=$(zfs groupspace -oname,objused $fs | grep $user |
-			awk '{print $2}')
-	echo $cnt
+	typeset group=$2
+	typeset -i groupspacecnt=$(zfs groupspace -Hp -oname,objused $fs |
+	    awk -v group="$group" '$1 == group {print $2}')
+	typeset -i zfsgetcnt=$(zfs get -Hp -ovalue groupobjused@$group $fs)
+
+	# 'zfs groupspace' and 'zfs get groupobjused@' should be equal
+	verify_eq "$groupspacecnt" "$zfsgetcnt" "groupobjused@$group"
+
+	echo $groupspacecnt
 }
 
 log_onexit cleanup
@@ -86,7 +92,7 @@ log_must eval "zfs groupspace $snapfs >/dev/null 2>&1"
 
 for fs in "$QFS" "$snapfs"; do
 	log_note "check the object count in zfs groupspace $fs"
-        [[ $(group_object_count $fs $QGROUP) -eq $grp_cnt ]] ||
+        (( $(group_object_count $fs $QGROUP) == grp_cnt )) ||
                 log_fail "expected $grp_cnt"
 done
 
@@ -94,10 +100,10 @@ log_note "file removal"
 log_must rm ${QFILE}_*
 sync_pool
 
-[[ $(group_object_count $QFS $QGROUP) -eq 0 ]] ||
+(( $(group_object_count $QFS $QGROUP) == 0 )) ||
         log_fail "expected 0 files for $QGROUP"
 
-[[ $(group_object_count $snapfs $QGROUP) -eq $grp_cnt ]] ||
+(( $(group_object_count $snapfs $QGROUP) == grp_cnt )) ||
         log_fail "expected $grp_cnt files for $QGROUP"
 
 cleanup
