@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_IGB_SW_H
@@ -643,6 +644,11 @@ typedef struct igb {
 	uint32_t		mcast_alloc_count;
 	uint32_t		mcast_max_num;
 	struct ether_addr	*mcast_table;
+
+	/*
+	 * LED related functions
+	 */
+	boolean_t		igb_led_setup;
 
 	/*
 	 * Kstat definitions

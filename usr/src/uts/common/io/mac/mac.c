@@ -8146,3 +8146,111 @@ mac_transceiver_read(mac_handle_t mh, uint_t tranid, uint_t page, void *buf,
 
 	return (ret);
 }
+
+void
+mac_led_init(mac_impl_t *mip)
+{
+	mip->mi_led_modes = MAC_LED_DEFAULT;
+
+	if (!mac_capab_get((mac_handle_t)mip, MAC_CAPAB_LED, &mip->mi_led)) {
+		bzero(&mip->mi_led, sizeof (mac_capab_led_t));
+		return;
+	}
+
+	if (mip->mi_led.mcl_flags != 0) {
+		dev_err(mip->mi_dip, CE_WARN, "driver set led capability "
+		    "flags to invalid value: 0x%x, ignoring "
+		    "capability", mip->mi_transceiver.mct_flags);
+		bzero(&mip->mi_led, sizeof (mac_capab_led_t));
+		return;
+	}
+
+	if ((mip->mi_led.mcl_modes & ~MAC_LED_ALL) != 0) {
+		dev_err(mip->mi_dip, CE_WARN, "driver set led capability "
+		    "supported modes to invalid value: 0x%x, ignoring "
+		    "capability", mip->mi_transceiver.mct_flags);
+		bzero(&mip->mi_led, sizeof (mac_capab_led_t));
+		return;
+	}
+}
+
+int
+mac_led_get(mac_handle_t mh, mac_led_mode_t *supported, mac_led_mode_t *active)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+
+	if (mip->mi_led.mcl_set == NULL)
+		return (ENOTSUP);
+
+	*supported = mip->mi_led.mcl_modes;
+	*active = mip->mi_led_modes;
+
+	return (0);
+}
+
+/*
+ * Update and multiplex the various LED requests. We only ever send one LED to
+ * the underlying driver at a time. As such, we end up multiplexing all
+ * requested states and picking one to send down to the driver.
+ */
+int
+mac_led_set(mac_handle_t mh, mac_led_mode_t desired)
+{
+	int ret;
+	mac_led_mode_t driver;
+
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+
+	/*
+	 * If we've been passed a desired value of zero, that indicates that
+	 * we're basically resetting to the value of zero, which is our default
+	 * value.
+	 */
+	if (desired == 0)
+		desired = MAC_LED_DEFAULT;
+
+	if (mip->mi_led.mcl_set == NULL)
+		return (ENOTSUP);
+
+	/*
+	 * Catch both values that we don't know about and those that the driver
+	 * doesn't support.
+	 */
+	if ((desired & ~MAC_LED_ALL) != 0)
+		return (EINVAL);
+
+	if ((desired & ~mip->mi_led.mcl_modes) != 0)
+		return (ENOTSUP);
+
+	/*
+	 * If we have the same value, then there is nothing to do.
+	 */
+	if (desired == mip->mi_led_modes)
+		return (0);
+
+	/*
+	 * Based on the desired value, determine what to send to the driver. We
+	 * only will send a single bit to the driver at any given time. IDENT
+	 * takes priority over OFF or ON. We also let OFF take priority over the
+	 * rest.
+	 */
+	if (desired & MAC_LED_IDENT) {
+		driver = MAC_LED_IDENT;
+	} else if (desired & MAC_LED_OFF) {
+		driver = MAC_LED_OFF;
+	} else if (desired & MAC_LED_ON) {
+		driver = MAC_LED_ON;
+	} else {
+		driver = MAC_LED_DEFAULT;
+	}
+
+	if ((ret = mip->mi_led.mcl_set(mip->mi_driver, driver, 0)) == 0) {
+		mip->mi_led_modes = desired;
+	}
+
+	return (ret);
+}

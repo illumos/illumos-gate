@@ -1407,6 +1407,99 @@ done:
 	return (ret);
 }
 
+/* ARGSUSED */
+static int
+drv_ioc_getled(void *karg, intptr_t arg, int mode, cred_t *cred,
+    int *rvalp)
+{
+	int			ret = 0;
+	mac_perim_handle_t	mph = NULL;
+	dls_dl_handle_t 	dlh = NULL;
+	dls_link_t		*dlp = NULL;
+	dld_ioc_led_t		*dil = karg;
+
+	if ((mode & FREAD) == 0)
+		return (EBADF);
+
+	if ((ret = dls_devnet_hold_tmp(dil->dil_linkid, &dlh)) != 0)
+		goto done;
+
+	if ((ret = mac_perim_enter_by_macname(dls_devnet_mac(dlh), &mph)) != 0)
+		goto done;
+
+	if ((ret = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
+		goto done;
+
+	/*
+	 * Make sure that this link belongs to the zone.
+	 */
+	if (crgetzoneid(cred) != dls_devnet_getownerzid(dlh)) {
+		ret = ENOENT;
+		goto done;
+	}
+
+	ret = mac_led_get(dlp->dl_mh, &dil->dil_supported, &dil->dil_active);
+
+done:
+	if (dlp != NULL)
+		dls_link_rele(dlp);
+
+	if (mph != NULL)
+		mac_perim_exit(mph);
+
+	if (dlh != NULL)
+		dls_devnet_rele_tmp(dlh);
+
+	return (ret);
+}
+
+/* ARGSUSED */
+static int
+drv_ioc_setled(void *karg, intptr_t arg, int mode, cred_t *cred,
+    int *rvalp)
+{
+	int			ret = 0;
+	mac_perim_handle_t	mph = NULL;
+	dls_dl_handle_t 	dlh = NULL;
+	dls_link_t		*dlp = NULL;
+	dld_ioc_led_t		*dil = karg;
+
+	if ((mode & FWRITE) == 0)
+		return (EBADF);
+
+	if ((ret = dls_devnet_hold_tmp(dil->dil_linkid, &dlh)) != 0)
+		goto done;
+
+	if ((ret = mac_perim_enter_by_macname(dls_devnet_mac(dlh), &mph)) != 0)
+		goto done;
+
+	if ((ret = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
+		goto done;
+
+	/*
+	 * Make sure that this link belongs to the zone.
+	 */
+	if (crgetzoneid(cred) != dls_devnet_getownerzid(dlh)) {
+		ret = ENOENT;
+		goto done;
+	}
+
+	ret = mac_led_set(dlp->dl_mh, dil->dil_active);
+
+done:
+	if (dlp != NULL)
+		dls_link_rele(dlp);
+
+	if (mph != NULL)
+		mac_perim_exit(mph);
+
+	if (dlh != NULL)
+		dls_devnet_rele_tmp(dlh);
+
+	return (ret);
+}
+
+
 /*
  * Note that ioctls that modify links have a NULL di_priv_func(), as
  * privileges can only be checked after we know the class of the link being
@@ -1449,7 +1542,11 @@ static dld_ioc_info_t drv_ioc_list[] = {
 	{DLDIOC_GETTRAN, DLDCOPYINOUT, sizeof (dld_ioc_gettran_t),
 	    drv_ioc_gettran, NULL },
 	{DLDIOC_READTRAN, DLDCOPYINOUT, sizeof (dld_ioc_tranio_t),
-	    drv_ioc_readtran, NULL }
+	    drv_ioc_readtran, NULL },
+	{DLDIOC_GETLED, DLDCOPYINOUT, sizeof (dld_ioc_led_t),
+	    drv_ioc_getled, NULL },
+	{DLDIOC_SETLED, DLDCOPYIN, sizeof (dld_ioc_led_t),
+	    drv_ioc_setled, secpolicy_dl_config}
 };
 
 typedef struct dld_ioc_modentry {

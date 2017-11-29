@@ -481,6 +481,12 @@ struct mac_impl_s {
 	mac_capab_transceiver_t	mi_transceiver;
 
 	/*
+	 * LED Capability information. SL protected.
+	 */
+	mac_led_mode_t		mi_led_modes;
+	mac_capab_led_t		mi_led;
+
+	/*
 	 * MAC address list. SL protected.
 	 */
 	mac_address_t		*mi_addresses;
@@ -917,6 +923,15 @@ extern int mac_transceiver_count(mac_handle_t, uint_t *);
 extern int mac_transceiver_info(mac_handle_t, uint_t, boolean_t *, boolean_t *);
 extern int mac_transceiver_read(mac_handle_t, uint_t, uint_t, void *, size_t,
     off_t, size_t *);
+
+/*
+ * MAC LED related functions
+ */
+#define	MAC_LED_ALL	(MAC_LED_DEFAULT | MAC_LED_OFF | MAC_LED_IDENT | \
+			    MAC_LED_ON)
+extern void mac_led_init(mac_impl_t *);
+extern int mac_led_get(mac_handle_t, mac_led_mode_t *, mac_led_mode_t *);
+extern int mac_led_set(mac_handle_t, mac_led_mode_t);
 
 #ifdef	__cplusplus
 }
