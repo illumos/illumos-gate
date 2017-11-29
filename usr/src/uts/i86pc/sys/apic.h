@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 /*
@@ -832,6 +832,7 @@ extern void apic_change_eoi();
 extern void apic_send_EOI(uint32_t);
 extern void apic_send_directed_EOI(uint32_t);
 extern uint64_t apic_calibrate();
+extern void x2apic_send_pir_ipi(processorid_t);
 
 extern volatile uint32_t *apicadr;	/* virtual addr of local APIC   */
 extern int apic_forceload;
@@ -878,6 +879,7 @@ extern void apic_change_ops();
 extern void apic_common_send_ipi(int, int);
 extern void apic_set_directed_EOI_handler();
 extern int apic_directed_EOI_supported();
+extern void apic_common_send_pir_ipi(processorid_t);
 
 extern apic_intrmap_ops_t *apic_vt_ops;
 

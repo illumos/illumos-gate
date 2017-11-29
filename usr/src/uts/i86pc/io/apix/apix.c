@@ -25,9 +25,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
- */
-/*
- * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -167,6 +165,9 @@ static struct	psm_ops apix_ops = {
 	apix_intr_ops,		/* Advanced DDI Interrupt framework */
 	apic_state,		/* save, restore apic state for S3 */
 	apic_cpu_ops,		/* CPU control interface. */
+
+	apic_get_pir_ipivect,
+	apic_send_pir_ipi,
 };
 
 struct psm_ops *psmops = &apix_ops;
@@ -383,6 +384,8 @@ apix_init()
 	if (cpuid_have_cr8access(CPU))
 		apic_have_32bit_cr8 = 1;
 #endif
+
+	apic_pir_vect = apix_get_ipivect(XC_CPUPOKE_PIL, -1);
 
 	/*
 	 * Initialize IRM pool parameters
@@ -1127,8 +1130,10 @@ x2apic_update_psm()
 	 * being apix_foo as opposed to apic_foo and x2apic_foo.
 	 */
 	pops->psm_send_ipi = x2apic_send_ipi;
-
 	send_dirintf = pops->psm_send_ipi;
+
+	pops->psm_send_pir_ipi = x2apic_send_pir_ipi;
+	psm_send_pir_ipi = pops->psm_send_pir_ipi;
 
 	apic_mode = LOCAL_X2APIC;
 	apic_change_ops();
@@ -2588,6 +2593,8 @@ apic_switch_ipi_callback(boolean_t enter)
 		if (apic_poweron_cnt == 0) {
 			pops->psm_send_ipi = apic_common_send_ipi;
 			send_dirintf = pops->psm_send_ipi;
+			pops->psm_send_pir_ipi = apic_common_send_pir_ipi;
+			psm_send_pir_ipi = pops->psm_send_pir_ipi;
 		}
 		apic_poweron_cnt++;
 	} else {
@@ -2596,6 +2603,8 @@ apic_switch_ipi_callback(boolean_t enter)
 		if (apic_poweron_cnt == 0) {
 			pops->psm_send_ipi = x2apic_send_ipi;
 			send_dirintf = pops->psm_send_ipi;
+			pops->psm_send_pir_ipi = x2apic_send_pir_ipi;
+			psm_send_pir_ipi = pops->psm_send_pir_ipi;
 		}
 	}
 	lock_clear(&apic_mode_switch_lock);

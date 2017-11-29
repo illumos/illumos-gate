@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_SMP_IMPLDEFS_H
@@ -64,6 +65,7 @@ extern void (*psm_enable_intr)(processorid_t); /* enable intr to cpu	*/
 extern int (*psm_get_clockirq)(int); /* get clock vector		*/
 extern int (*psm_get_ipivect)(int, int); /* get interprocessor intr vec */
 extern int (*psm_clkinit)(int);	/* timer init entry point		*/
+extern int (*psm_cached_ipivect)(int, int); /* get cached ipi vec	*/
 extern void (*psm_timer_reprogram)(hrtime_t); /* timer reprogram	*/
 extern void (*psm_timer_enable)(void);		/* timer enable		*/
 extern void (*psm_timer_disable)(void);		/* timer disable	*/
@@ -72,6 +74,8 @@ extern int (*psm_state)(psm_state_request_t *); /* psm state save/restore */
 extern uchar_t (*psm_get_ioapicid)(uchar_t);	/* get io-apic id */
 extern uint32_t (*psm_get_localapicid)(uint32_t);	/* get local-apic id */
 extern uchar_t (*psm_xlate_vector_by_irq)(uchar_t); /* get vector for an irq */
+extern int (*psm_get_pir_ipivect)(void); /* get PIR (for VMM) ipi vect	*/
+extern void (*psm_send_pir_ipi)(processorid_t);	/* send PIR ipi		*/
 
 extern int (*slvltovect)(int);	/* ipl interrupt priority level		*/
 extern int (*setlvl)(int, int *); /* set intr pri represented by vect	*/

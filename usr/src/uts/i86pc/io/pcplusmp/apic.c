@@ -25,9 +25,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
- */
-/*
- * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -202,6 +200,9 @@ static struct	psm_ops apic_ops = {
 	apic_intr_ops,			/* Advanced DDI Interrupt framework */
 	apic_state,			/* save, restore apic state for S3 */
 	apic_cpu_ops,			/* CPU control interface. */
+
+	apic_get_pir_ipivect,
+	apic_send_pir_ipi,
 };
 
 struct psm_ops *psmops = &apic_ops;
@@ -297,6 +298,8 @@ apic_init(void)
 		/* fill up any empty ipltopri slots */
 		apic_ipltopri[j] = (i << APIC_IPL_SHIFT) + APIC_BASE_VECT;
 	apic_init_common();
+
+	apic_pir_vect = apic_get_ipivect(XC_CPUPOKE_PIL, -1);
 
 #if !defined(__amd64)
 	if (cpuid_have_cr8access(CPU))

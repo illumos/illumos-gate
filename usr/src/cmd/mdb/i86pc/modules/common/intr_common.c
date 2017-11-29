@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include "intr_common.h"
@@ -29,6 +30,7 @@
 
 int		option_flags;
 uintptr_t	gld_intr_addr;
+int		apic_pir_vect;
 static struct av_head softvec_tbl[LOCK_LEVEL + 1];
 
 static char *businfo_array[] = {
@@ -302,11 +304,16 @@ apic_interrupt_dump(apic_irq_t *irqp, struct av_head *avp,
 
 	} else {
 		if (irqp->airq_mps_intr_index == RESERVE_INDEX &&
-		    !irqp->airq_share)
-			mdb_printf("poke_cpu");
-		else if (mdb_vread(&avhp, sizeof (struct autovec),
-		    (uintptr_t)avp->avh_link) != -1)
+		    !irqp->airq_share) {
+			if (irqp->airq_vector == apic_pir_vect) {
+				mdb_printf("pir_ipi");
+			} else {
+				mdb_printf("poke_cpu");
+			}
+		} else if (mdb_vread(&avhp, sizeof (struct autovec),
+		    (uintptr_t)avp->avh_link) != -1) {
 			mdb_printf("%a", avhp.av_vector);
+		}
 	}
 	mdb_printf("\n");
 }
@@ -446,10 +453,15 @@ apix_interrupt_ipi_dump(apix_vector_t *vectp, struct autovec *avp,
 		mdb_printf("%-9s %-3s %s%-3s %-6s %-3s %-6s %-3d   %-9s ",
 		    cpu_vector, "-  ", evtchn, ipl, "-   ", "Edg",
 		    intr_type, vectp->v_share, ioapic_iline);
-	if (!vectp->v_share)
-		mdb_printf("poke_cpu");
-	else
+	if (!vectp->v_share) {
+		if (vectp->v_vector == apic_pir_vect) {
+			mdb_printf("pir_ipi");
+		} else {
+			mdb_printf("poke_cpu");
+		}
+	} else {
 		mdb_printf("%a", avp->av_vector);
+	}
 
 	mdb_printf("\n");
 }
