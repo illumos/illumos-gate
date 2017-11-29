@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_SMP_IMPLDEFS_H
@@ -64,6 +65,7 @@ extern void (*psm_enable_intr)(processorid_t); /* enable intr to cpu	*/
 extern int (*psm_get_clockirq)(int); /* get clock vector		*/
 extern int (*psm_get_ipivect)(int, int); /* get interprocessor intr vec */
 extern int (*psm_clkinit)(int);	/* timer init entry point		*/
+extern int (*psm_cached_ipivect)(int, int); /* get cached ipi vec	*/
 extern void (*psm_timer_reprogram)(hrtime_t); /* timer reprogram	*/
 extern void (*psm_timer_enable)(void);		/* timer enable		*/
 extern void (*psm_timer_disable)(void);		/* timer disable	*/

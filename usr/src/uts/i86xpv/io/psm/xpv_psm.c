@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #define	PSMI_1_7
@@ -1673,7 +1674,9 @@ static struct psm_ops xen_psm_ops = {
 	(void (*)(int, int))NULL,		/* psm_preshutdown	*/
 	xen_intr_ops,			/* Advanced DDI Interrupt framework */
 	(int (*)(psm_state_request_t *))NULL,	/* psm_state		*/
-	(int (*)(psm_cpu_request_t *))NULL	/* psm_cpu_ops		*/
+	(int (*)(psm_cpu_request_t *))NULL,	/* psm_cpu_ops		*/
+
+	(int (*)(int, int))NULL,		/* psm_cached_ipivect	*/
 };
 
 static struct psm_info xen_psm_info = {

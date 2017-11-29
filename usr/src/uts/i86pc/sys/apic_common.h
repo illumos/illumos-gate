@@ -22,7 +22,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_APIC_COMMON_H
@@ -182,6 +182,7 @@ extern void	apic_shutdown(int cmd, int fcn);
 extern void	apic_preshutdown(int cmd, int fcn);
 extern processorid_t	apic_get_next_processorid(processorid_t cpun);
 extern uint_t	apic_calibrate(volatile uint32_t *, uint16_t *);
+extern int	apic_cached_ipivect(int, int);
 
 extern int apic_error_intr();
 extern void apic_cpcovf_mask_clear(void);

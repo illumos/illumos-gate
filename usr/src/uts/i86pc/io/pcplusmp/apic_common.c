@@ -23,7 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -1706,4 +1706,15 @@ apic_get_ioapicid(uchar_t ioapicindex)
 	ASSERT(ioapicindex < MAX_IO_APIC);
 
 	return (apic_io_id[ioapicindex]);
+}
+
+int
+apic_cached_ipivect(int ipl, int type)
+{
+	uchar_t vector = 0;
+
+	if (type != -1 && ipl >= 0 && ipl <= MAXIPL) {
+		vector = apic_resv_vector[ipl];
+	}
+	return ((vector != 0) ? vector : -1);
 }

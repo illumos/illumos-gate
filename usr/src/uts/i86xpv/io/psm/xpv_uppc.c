@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #define	PSMI_1_7
@@ -892,7 +893,9 @@ static struct psm_ops xen_uppc_ops = {
 	(int (*)(dev_info_t *, ddi_intr_handle_impl_t *,
 	    psm_intr_op_t, int *))NULL,		/* psm_intr_ops		*/
 	(int (*)(psm_state_request_t *))NULL,	/* psm_state		*/
-	(int (*)(psm_cpu_request_t *))NULL	/* psm_cpu_ops		*/
+	(int (*)(psm_cpu_request_t *))NULL,	/* psm_cpu_ops		*/
+
+	(int (*)(int, int))NULL,		/* psm_cached_ipivect	*/
 };
 
 static struct psm_info xen_uppc_info = {

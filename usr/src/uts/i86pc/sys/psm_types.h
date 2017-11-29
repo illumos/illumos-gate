@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_PSM_TYPES_H
@@ -190,6 +191,8 @@ struct 	psm_ops {
 #endif
 #if defined(PSMI_1_7)
 	int	(*psm_cpu_ops)(psm_cpu_request_t *reqp);
+
+	int	(*psm_cached_ipivect)(int ipl, int type);
 #endif
 };
 
