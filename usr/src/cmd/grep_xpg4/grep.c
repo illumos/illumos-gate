@@ -87,7 +87,7 @@ static int	matched = 0;		/* return of the grep() */
 static int	errors = 0;		/* count of errors */
 static uchar_t	fgrep = 0;		/* Invoked as fgrep */
 static uchar_t	egrep = 0;		/* Invoked as egrep */
-static uchar_t	nvflag = 1;		/* Print matching lines */
+static boolean_t	nvflag = B_TRUE;	/* Print matching lines */
 static uchar_t	cflag;			/* Count of matches */
 static uchar_t	iflag;			/* Case insensitve matching */
 static uchar_t	Hflag;			/* Precede lines by file name */
@@ -204,7 +204,7 @@ main(int argc, char **argv)
 		unsigned long tval;
 		switch (c) {
 		case 'v':	/* POSIX: negate matches */
-			nvflag = 0;
+			nvflag = B_FALSE;
 			break;
 
 		case 'c':	/* POSIX: write count */
@@ -344,9 +344,9 @@ main(int argc, char **argv)
 				exit(2);
 			}
 			if (tval) {
-				if (!(conflag & BEFORE))
+				if ((conflag & BEFORE) == 0)
 					conblen = tval;
-				if (!(conflag & AFTER))
+				if ((conflag & AFTER) == 0)
 					conalen = tval;
 				conflag = CONTEXT;
 			}
@@ -810,13 +810,14 @@ fixpatterns(void)
 	 * - no negating the output	(nvflag)
 	 * - only one pattern		(npatterns == 1)
 	 * - non zero length pattern	(strlen(patterns->pattern) != 0)
-	 * - no context required	(!conflag)
+	 * - no context required	(conflag == 0)
 	 *
 	 * It's guaranteed patterns->pattern is still alive
 	 * when Fflag && !mblocale.
 	 */
 	use_bmg = Fflag && !mblocale && !iflag && !nflag && nvflag &&
-	    (npatterns == 1) && (strlen(patterns->pattern) != 0) && !conflag;
+	    (npatterns == 1) && (strlen(patterns->pattern) != 0) &&
+	    conflag == 0;
 }
 
 /*
@@ -908,6 +909,7 @@ grep(int fd, const char *fn)
 	char	*matchptr = NULL;
 	int	conaprnt = 0, conbprnt = 0, lastmatch = 0;
 	boolean_t	nearmatch; /* w/in N+1 of last match */
+	boolean_t	havematch = B_FALSE; /* have a match in context */
 	size_t	prntlen;
 
 	if (patterns == NULL)
@@ -938,7 +940,7 @@ grep(int fd, const char *fn)
 		}
 	}
 
-	if (conflag && (conbuf == NULL)) {
+	if (conflag != 0 && (conbuf == NULL)) {
 		conbuflen = BUFSIZE;
 		if ((conbuf = malloc(BUFSIZE+1)) == NULL) {
 			(void) fprintf(stderr, gettext("%s: out of memory\n"),
@@ -956,7 +958,6 @@ grep(int fd, const char *fn)
 	for (; ; ) {
 		long	count;
 		off_t	offset = 0;
-		int	rv = REG_NOMATCH;
 		char	separate;
 		boolean_t	last_ctx = B_FALSE, eof = B_FALSE;
 
@@ -965,8 +966,10 @@ grep(int fd, const char *fn)
 			 * If no data in the buffer, reset ptr
 			 */
 			ptr = prntbuf;
-			if (conptr == NULL)
-				conptrend = conptr = conbuf;
+			if (conflag != 0 && conptr == NULL) {
+				conptr = conbuf;
+				conptrend = conptr - 1;
+			}
 		}
 		if (ptr == prntbuf) {
 			/*
@@ -995,8 +998,9 @@ grep(int fd, const char *fn)
 
 				if (data_len == 0) {
 					/* end of file already reached */
-					if (conflag) {
-						*conptrend = '\n';
+					if (conflag != 0) {
+						if (conptrend >= conptr)
+							*conptrend = '\n';
 						last_ctx = B_TRUE;
 						goto L_next_line;
 					} else {
@@ -1060,6 +1064,10 @@ L_start_process:
 		 * End of the chunk:		ptr + data_len
 		 * Beginning of the line:	ptr
 		 * End of the line:		ptrend
+		 *
+		 * conptr:	Beginning of the context.
+		 * conptrend: If context is empty, conptr - 1 (invalid memory).
+		 *	Otherwise, Last newline in the context.
 		 */
 
 		if (use_bmg) {
@@ -1172,7 +1180,6 @@ L_start_process:
 					    wcscmp(outline,
 					    pp->wpattern) == 0) {
 						/* matched */
-						rv = REG_OK;
 						break;
 					}
 				}
@@ -1181,7 +1188,6 @@ L_start_process:
 					if (wcswcs(outline, pp->wpattern)
 					    != NULL) {
 						/* matched */
-						rv = REG_OK;
 						break;
 					}
 				}
@@ -1200,7 +1206,6 @@ L_start_process:
 					if (fptr[0] == pp->pattern[0] &&
 					    strcmp(fptr, pp->pattern) == 0) {
 						/* matched */
-						rv = REG_OK;
 						break;
 					}
 				}
@@ -1208,7 +1213,6 @@ L_start_process:
 				for (pp = patterns; pp; pp = pp->next) {
 					if (strstr(fptr, pp->pattern) != NULL) {
 						/* matched */
-						rv = REG_OK;
 						break;
 					}
 				}
@@ -1216,6 +1220,8 @@ L_start_process:
 		} else {
 			/* grep or egrep */
 			for (pp = patterns; pp; pp = pp->next) {
+				int	rv;
+
 				rv = regexec(&pp->re, ptr, 0, NULL, 0);
 				if (rv == REG_OK) {
 					/* matched */
@@ -1271,11 +1277,12 @@ L_start_process:
 		 * logic.
 		 */
 
-		if (!conflag)
+		if (conflag == 0)
 			goto L_next_line;
 
 		/* Do we have room to add this line to the context buffer? */
-		if (line_len > conbuflen - (conptrend - conbuf)) {
+		if ((line_len + 1) > (conbuflen -
+		    (conptrend >= conptr) ? conptrend - conbuf : 0)) {
 			char *oldconbuf = conbuf;
 			char *oldconptr = conptr;
 			long tmp = matchptr - conptr;
@@ -1301,15 +1308,14 @@ L_start_process:
 			if (matchptr)
 				matchptr = conptr + tmp;
 		}
-		(void) memcpy((conptrend > conptr) ?
-		    conptrend + 1 : conptrend, ptr, line_len);
-		conptrend += line_len + (conptrend > conptr);
+		(void) memcpy(conptrend + 1, ptr, line_len);
+		conptrend += line_len + 1;
 		*conptrend = '\n';
 
-		if (!nvflag == rv) {
+		if (nvflag == (pp != NULL)) {
 			/* matched */
-			if (lastmatch) {
-				if (conflag & AFTER) {
+			if (havematch) {
+				if ((conflag & AFTER) != 0) {
 					conaprnt = 1;
 					nextend = conptrend;
 					conptrend = conptr + lastmatch;
@@ -1329,11 +1335,12 @@ L_start_process:
 				conbprnt = 1;
 
 			lastmatch = conptrend - conptr;
+			havematch = B_TRUE;
 			goto L_next_line;
 		}
 
-		if (!lastmatch) {
-			if (conflag & BEFORE) {
+		if (!havematch) {
+			if ((conflag & BEFORE) != 0) {
 				if (conbcnt >= conblen) {
 					char *tmp = conptr;
 					conptr = find_nl(conptr,
@@ -1363,7 +1370,7 @@ L_next_line:
 		if (!last_ctx && nvflag == (pp != NULL)) {
 			matches++;
 			if (!nextend)
-				matchptr = conflag ? conptrend : ptrend;
+				matchptr = (conflag != 0) ? conptrend : ptrend;
 		}
 
 		/*
@@ -1375,7 +1382,7 @@ L_next_line:
 		 * either at the end of the data stream, or we've previously
 		 * declared that we want to print for a particular context.
 		 */
-		if (lastmatch && (eof || conaprnt || conbprnt)) {
+		if (havematch && (eof || conaprnt || conbprnt)) {
 
 			/*
 			 * We'd normally do this earlier, but we had to
@@ -1385,13 +1392,13 @@ L_next_line:
 				conptrend = nextend;
 
 			prntlen = conptrend - conptr + 1;
-			prntptrend = prntptr = conptr;
+			prntptr = conptr;
 			if (conmatches++ && nearmatch && !cflag)
 				(void) fwrite("--\n", 1, 3, stdout);
-		} else if (!conflag && nvflag == (pp != NULL)) {
+		} else if (conflag == 0 && nvflag == (pp != NULL)) {
 			*ptrend = '\n';
 			prntlen = line_len + 1;
-			prntptrend = prntptr = ptr;
+			prntptr = ptr;
 			linenum = lineno;
 			blkoffset = line_offset;
 		} else if (eof) {
@@ -1402,7 +1409,9 @@ L_next_line:
 			goto L_skip_line;
 		}
 
-		while ((prntptrend = find_nl(prntptrend+1, prntlen)) != NULL) {
+		prntptrend = prntptr - 1;
+		while ((prntptrend = find_nl(prntptrend + 1,
+		    prntlen)) != NULL) {
 
 			/*
 			 * GNU grep uses '-' for context lines and ':' for
@@ -1468,7 +1477,7 @@ L_next_line:
 		/*
 		 * Update context buffer and variables post-print
 		 */
-		if (conflag) {
+		if (conflag != 0) {
 			conptr = conbuf;
 			conaprnt = conbprnt = 0;
 			nearmatch = B_FALSE;
@@ -1482,10 +1491,12 @@ L_next_line:
 				matchptr = conptrend;
 				linenum = lineno;
 				lastmatch = conptrend - conptr;
+				havematch = B_TRUE;
 			} else {
-				conptrend = conptr;
+				conptrend = conptr - 1;
 				conacnt = 0;
 				lastmatch = 0;
+				havematch = B_FALSE;
 			}
 			nextptr = nextend = NULL;
 		}
