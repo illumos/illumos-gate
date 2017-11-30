@@ -71,7 +71,7 @@
 
 - name: download swarm client
   get_url:
-    url: "https://repo.jenkins-ci.org/releases/org/jenkins-ci/plugins/swarm-client/3.3/swarm-client-3.3.jar"
+    url: "https://repo.jenkins-ci.org/releases/org/jenkins-ci/plugins/swarm-client/3.6/swarm-client-3.6.jar"
     dest: "{{ jenkins_directory }}/swarm-client.jar"
     owner: "{{ jenkins_user }}"
     group: "{{ jenkins_group }}"
