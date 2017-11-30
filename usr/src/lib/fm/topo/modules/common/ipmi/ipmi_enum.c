@@ -21,7 +21,6 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -33,7 +32,6 @@
 #define	TOPO_PGROUP_IPMI 		"ipmi"
 #define	TOPO_PROP_IPMI_ENTITY_REF	"entity_ref"
 #define	TOPO_PROP_IPMI_ENTITY_PRESENT	"entity_present"
-#define	FAC_PROV_IPMI			"fac_prov_ipmi"
 
 typedef struct ipmi_enum_data {
 	topo_mod_t	*ed_mod;
@@ -212,7 +210,6 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 	ipmi_enum_data_t cdata;
 	tnode_t *pnode = edp->ed_pnode;
 	topo_mod_t *mod = edp->ed_mod;
-	topo_mod_t *fmod = topo_mod_getspecific(mod);
 	nvlist_t *auth, *fmri;
 	tnode_t *tn;
 	topo_pgroup_info_t pgi;
@@ -316,34 +313,8 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 		}
 	}
 
-	/*
-	 * Add properties to contain the IPMI entity id and instance.  This
-	 * will be used by the fac_prov_ipmi module to discover and enumerate
-	 * facility nodes for any associated sensors.
-	 */
-	if (topo_prop_set_uint32(tn, TOPO_PGROUP_IPMI, TOPO_PROP_IPMI_ENTITY_ID,
-	    TOPO_PROP_IMMUTABLE, ep->ie_type, &err) != 0 ||
-	    topo_prop_set_uint32(tn, TOPO_PGROUP_IPMI,
-	    TOPO_PROP_IPMI_ENTITY_INST, TOPO_PROP_IMMUTABLE, ep->ie_instance,
-	    &err) != 0) {
-		topo_mod_dprintf(mod, "failed to add ipmi properties (%s)",
-		    topo_strerror(err));
-		return (1);
-	}
 	if (topo_method_register(mod, tn, ipmi_methods) != 0) {
 		topo_mod_dprintf(mod, "topo_method_register() failed: %s",
-		    topo_mod_errmsg(mod));
-		return (1);
-	}
-
-	/*
-	 * Invoke the tmo_enum callback from the fac_prov_ipmi module on this
-	 * node.  This will have the effect of registering a method on this node
-	 * for enumerating sensors.
-	 */
-	if (topo_mod_enumerate(fmod, tn, FAC_PROV_IPMI, FAC_PROV_IPMI, 0, 0,
-	    NULL) != 0) {
-		topo_mod_dprintf(mod, "facility provider enum failed (%s)",
 		    topo_mod_errmsg(mod));
 		return (1);
 	}
@@ -508,24 +479,14 @@ ipmi_post_process(topo_mod_t *mod, tnode_t *tn)
 int
 _topo_init(topo_mod_t *mod, topo_version_t version)
 {
-	topo_mod_t *fmod;
-
 	if (getenv("TOPOIPMIDEBUG") != NULL)
 		topo_mod_setdebug(mod);
 
 	if (topo_mod_register(mod, &ipmi_info, TOPO_VERSION) != 0) {
-		topo_mod_dprintf(mod, "module registration failed: %s\n",
-		    topo_mod_errmsg(mod));
+		topo_mod_dprintf(mod, "%s registration failed: %s\n",
+		    DISK, topo_mod_errmsg(mod));
 		return (-1); /* mod errno already set */
 	}
-
-	if ((fmod = topo_mod_load(mod, FAC_PROV_IPMI, TOPO_VERSION)) == NULL) {
-		topo_mod_dprintf(mod, "failed to load %s: %s",
-		    FAC_PROV_IPMI, topo_mod_errmsg(mod));
-		return (-1);
-	}
-
-	topo_mod_setspecific(mod, fmod);
 
 	topo_mod_dprintf(mod, "IPMI enumerator initialized\n");
 	return (0);
@@ -534,16 +495,5 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 void
 _topo_fini(topo_mod_t *mod)
 {
-	/*
-	 * This is the logical, and probably only safe spot where we could
-	 * unload fac_prov_ipmi.  But unfortunately, calling topo_mod_unload()
-	 * in the context of a module's _topo_fini entry point would result
-	 * in recursively grabbing the modhash lock and we'd deadlock.
-	 *
-	 * Unfortunately, libtopo doesn't currently have a mechanism for
-	 * expressing and handling intermodule dependencies, so we're left
-	 * with this situation where once a module loads another module,
-	 * it's going to be with us until we teardown the process.
-	 */
 	topo_mod_unregister(mod);
 }

@@ -22,9 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/*
- * Copyright (c) 2017, Joyent, Inc.
- */
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1439,19 +1437,27 @@ sdr_callback(ipmi_handle_t *hdl, const char *id, ipmi_sdr_t *sdr, void *data)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-get_entity_info(topo_mod_t *mod, tnode_t *node, ipmi_handle_t *hdl,
-    struct entity_info *ei)
+ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
 {
 	char **entity_refs;
 	int err;
 	uint_t nelems;
+	struct entity_info ei;
 	ipmi_sdr_t *ref_sdr;
+	ipmi_handle_t *hdl;
 	ipmi_sdr_full_sensor_t *fsensor;
 	ipmi_sdr_compact_sensor_t *csensor;
 	ipmi_sdr_fru_locator_t *floc;
 	ipmi_sdr_generic_locator_t *gloc;
 	boolean_t found_sdr = B_FALSE;
+
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
+		return (-1);
+	}
 
 	/*
 	 * Use the entity ref to lookup the SDR, which will have the entity ID
@@ -1484,60 +1490,30 @@ get_entity_info(topo_mod_t *mod, tnode_t *node, ipmi_handle_t *hdl,
 	switch (ref_sdr->is_type) {
 		case IPMI_SDR_TYPE_FULL_SENSOR:
 			fsensor = (ipmi_sdr_full_sensor_t *)ref_sdr->is_record;
-			ei->ei_id = fsensor->is_fs_entity_id;
-			ei->ei_inst = fsensor->is_fs_entity_instance;
+			ei.ei_id = fsensor->is_fs_entity_id;
+			ei.ei_inst = fsensor->is_fs_entity_instance;
 			break;
 		case IPMI_SDR_TYPE_COMPACT_SENSOR:
 			csensor
 			    = (ipmi_sdr_compact_sensor_t *)ref_sdr->is_record;
-			ei->ei_id = csensor->is_cs_entity_id;
-			ei->ei_inst = csensor->is_cs_entity_instance;
+			ei.ei_id = csensor->is_cs_entity_id;
+			ei.ei_inst = csensor->is_cs_entity_instance;
 			break;
 		case IPMI_SDR_TYPE_FRU_LOCATOR:
 			floc = (ipmi_sdr_fru_locator_t *)ref_sdr->is_record;
-			ei->ei_id = floc->is_fl_entity;
-			ei->ei_inst = floc->is_fl_instance;
+			ei.ei_id = floc->is_fl_entity;
+			ei.ei_inst = floc->is_fl_instance;
 			break;
 		case IPMI_SDR_TYPE_GENERIC_LOCATOR:
 			gloc = (ipmi_sdr_generic_locator_t *)ref_sdr->is_record;
-			ei->ei_id = gloc->is_gl_entity;
-			ei->ei_inst = gloc->is_gl_instance;
+			ei.ei_id = gloc->is_gl_entity;
+			ei.ei_inst = gloc->is_gl_instance;
 			break;
 		default:
 			topo_mod_dprintf(mod, "Failed to determine entity id "
 			    "and instance\n", ipmi_errmsg(hdl));
 			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-	}
-	return (0);
-}
-
-/* ARGSUSED */
-static int
-ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
-    nvlist_t *in, nvlist_t **out)
-{
-	int err;
-	struct entity_info ei;
-	ipmi_handle_t *hdl;
-
-	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
-		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
-		return (-1);
-	}
-
-	/*
-	 * First check if properties for the associated IPMI entity ID and
-	 * instance exist.  If not, we check for a property referencing
-	 * an IPMI entity name on which we can lookup the entity ID and
-	 * instance.  If neither exist then we bail out.
-	 */
-	if (topo_prop_get_uint32(node, TOPO_PGROUP_IPMI,
-	    TOPO_PROP_IPMI_ENTITY_ID, &ei.ei_id, &err) != 0 ||
-	    topo_prop_get_uint32(node, TOPO_PGROUP_IPMI,
-	    TOPO_PROP_IPMI_ENTITY_INST, &ei.ei_inst, &err) != 0) {
-		if (get_entity_info(mod, node, hdl, &ei) != 0)
-			goto out;
 	}
 	ei.ei_node = node;
 	ei.ei_mod = mod;
@@ -1552,7 +1528,7 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
-out:
+
 	topo_mod_ipmi_rele(mod);
 
 	return (0);
