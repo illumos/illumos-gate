@@ -59,12 +59,13 @@ ARCFOURDIR=	$(SRC)/common/crypto/arcfour
 BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 DESDIR=		$(SRC)/common/crypto/des
 ECCDIR=		$(SRC)/common/crypto/ecc
+CRYPTDIR=	$(SRC)/common/crypto
 ST_DIR=		$(SRC)/lib/pkcs11/pkcs11_softtoken/common
 
 lint \
 pics/kernelAttributeUtil.o := \
 	CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
-	-I$(ECCDIR)
+	-I$(ECCDIR) -I$(CRYPTDIR)
 pics/kernelKeys.o := \
 	CPPFLAGS += -I$(ECCDIR)
 pics/kernelSoftCommon.o := \

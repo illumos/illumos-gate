@@ -93,7 +93,7 @@ aes_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
 		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);
 #endif
-	} else if (aes_ctx->ac_flags & CBC_MODE) {
+	} else if (aes_ctx->ac_flags & (CBC_MODE|CMAC_MODE)) {
 		rv = cbc_encrypt_contiguous_blocks(ctx,
 		    data, length, out, AES_BLOCK_LEN, aes_encrypt_block,
 		    aes_copy_block, aes_xor_block);

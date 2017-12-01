@@ -510,6 +510,7 @@ typedef struct crypto_session_data {
 	crypto_ctx_t			*sd_digest_ctx;
 	crypto_ctx_t			*sd_encr_ctx;
 	crypto_ctx_t			*sd_decr_ctx;
+	crypto_ctx_t			*sd_mac_ctx;
 	crypto_ctx_t			*sd_sign_ctx;
 	crypto_ctx_t			*sd_verify_ctx;
 	crypto_ctx_t			*sd_sign_recover_ctx;

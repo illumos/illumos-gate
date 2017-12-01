@@ -49,6 +49,7 @@ SYMBOL_VERSION SUNWprivate {
 	aes_encrypt_block;
 	aes_encrypt_contiguous_blocks;
 	aes_init_keysched;
+	aes_xor_block;
 	arcfour_crypt;
 	arcfour_key_init;
 	big_One;
@@ -76,6 +77,9 @@ SYMBOL_VERSION SUNWprivate {
 	blowfish_encrypt_contiguous_blocks;
 	blowfish_init_keysched;
 	bytestring2bignum;
+	cbc_alloc_ctx;
+	cmac_init_ctx;
+	cmac_mode_final;
 	ctr_mode_final;
 	ctr_init_ctx;
 	des3_crunch_block;

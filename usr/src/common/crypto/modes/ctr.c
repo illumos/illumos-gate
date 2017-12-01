@@ -169,13 +169,9 @@ ctr_mode_final(ctr_ctx_t *ctx, crypto_data_t *out,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *))
 {
 	uint8_t *lastp;
-	void *iov_or_mp;
-	offset_t offset;
-	uint8_t *out_data_1;
-	uint8_t *out_data_2;
-	size_t out_data_1_len;
 	uint8_t *p;
 	int i;
+	int rv;
 
 	if (out->cd_length < ctx->ctr_remainder_len)
 		return (CRYPTO_DATA_LEN_RANGE);
@@ -189,23 +185,17 @@ ctr_mode_final(ctr_ctx_t *ctx, crypto_data_t *out,
 		p[i] ^= lastp[i];
 	}
 
-	crypto_init_ptrs(out, &iov_or_mp, &offset);
-	crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
-	    &out_data_1_len, &out_data_2, ctx->ctr_remainder_len);
-
-	bcopy(p, out_data_1, out_data_1_len);
-	if (out_data_2 != NULL) {
-		bcopy((uint8_t *)p + out_data_1_len,
-		    out_data_2, ctx->ctr_remainder_len - out_data_1_len);
+	rv = crypto_put_output_data(p, out, ctx->ctr_remainder_len);
+	if (rv == CRYPTO_SUCCESS) {
+		out->cd_offset += ctx->ctr_remainder_len;
+		ctx->ctr_remainder_len = 0;
 	}
-	out->cd_offset += ctx->ctr_remainder_len;
-	ctx->ctr_remainder_len = 0;
-	return (CRYPTO_SUCCESS);
+	return (rv);
 }
 
 int
 ctr_init_ctx(ctr_ctx_t *ctr_ctx, ulong_t count, uint8_t *cb,
-void (*copy_block)(uint8_t *, uint8_t *))
+    void (*copy_block)(uint8_t *, uint8_t *))
 {
 	uint64_t upper_mask = 0;
 	uint64_t lower_mask = 0;

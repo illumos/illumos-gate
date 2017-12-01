@@ -1483,6 +1483,17 @@ typedef struct crypto_get_all_mechanism_info32 {
 #define	CRYPTO_GET_MECHANISM_LIST		CRYPTO(140)
 #define	CRYPTO_GET_ALL_MECHANISM_INFO		CRYPTO(141)
 
+#define	CRYPTO_GET_PROVIDER_BY_MECH		CRYPTO(142)
+
+typedef struct crypto_by_mech {
+	int rv;
+	int res;
+	crypto_mech_type_t mech_type;
+	uint_t mech_keylen;
+	crypto_func_group_t mech_fg;
+	crypto_session_id_t session_id;
+} crypto_by_mech_t;
+
 #ifdef	__cplusplus
 }
 #endif
