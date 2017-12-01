@@ -4468,7 +4468,9 @@ sadb_check_kmc(ipsa_query_t *sq, ipsa_t *sa, int *diagnostic)
 		return (EINVAL);
 	}
 
-	if ((kmc != 0) && (sa->ipsa_kmc != 0) && (sa->ipsa_kmc != kmc)) {
+	/* Allow IKEv2 KMCs to update the kmc value for rekeying */
+	if ((kmp != SADB_X_KMP_IKEV2) && (kmc != 0) && (sa->ipsa_kmc != 0) &&
+	    (sa->ipsa_kmc != kmc)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_DUPLICATE_KMC;
 		return (EINVAL);
 	}

@@ -2612,7 +2612,9 @@ print_kmc(FILE *file, char *prefix, struct sadb_x_kmc *kmc)
 	case SADB_X_KMP_MANUAL:
 		cookie_label = dgettext(TEXT_DOMAIN, "Manual SA with cookie:");
 		break;
-	/* case SADB_X_KMP_IKEV2: */
+	case SADB_X_KMP_IKEV2:
+		cookie_label = dgettext(TEXT_DOMAIN, "IKEV2:");
+		break;
 	default:
 		cookie_label =
 		    dgettext(TEXT_DOMAIN, "<unknown KM protocol>");

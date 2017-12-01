@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef	_NET_PFKEYV2_H
@@ -841,8 +841,9 @@ typedef struct sadb_x_edump {
 #define	SADB_X_KMP_MANUAL	0	/* Cookie is ignored. */
 #define	SADB_X_KMP_IKE		1
 #define	SADB_X_KMP_KINK		2
+#define	SADB_X_KMP_IKEV2	3
 
-#define	SADB_X_KMP_MAX		2
+#define	SADB_X_KMP_MAX		SADB_X_KMP_IKEV2
 
 /*
  * Handy conversion macros.  Not part of the PF_KEY spec...
