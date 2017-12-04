@@ -143,6 +143,8 @@ extern "C" {
 #define	PCIE_DEVCAP_PLMT_SCL_1_BY_1000	0xC000000	/* 0.001x Scale */
 #define	PCIE_DEVCAP_PLMT_SCL_MASK	0xC000000	/* Power Limit Scale */
 
+#define	PCIE_DEVCAP_FLR			0x10000000 /* Function Level Reset */
+
 /*
  * Device Control Register (2 bytes)
  */
@@ -176,6 +178,8 @@ extern "C" {
 #define	PCIE_DEVCTL_MAX_READ_REQ_4096	0x5000
 #define	PCIE_DEVCTL_MAX_READ_REQ_MASK	0x7000	/* Max_Read_Request_Size */
 #define	PCIE_DEVCTL_MAX_READ_REQ_SHIFT	0xC
+
+#define	PCIE_DEVCTL_INITIATE_FLR	0x8000
 
 /*
  * Device Status Register (2 bytes)
@@ -398,6 +402,7 @@ extern "C" {
 /*
  * Device Control 2 Register (2 bytes)
  */
+#define	PCIE_DEVCTL2_COM_TO_RANGE_MASK	0xf
 #define	PCIE_DEVCTL2_COM_TO_RANGE_0	0x0
 #define	PCIE_DEVCTL2_COM_TO_RANGE_1	0x1
 #define	PCIE_DEVCTL2_COM_TO_RANGE_2	0x2

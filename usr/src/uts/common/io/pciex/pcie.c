@@ -1490,14 +1490,15 @@ pcie_get_rc_dip(dev_info_t *dip)
 	return (rcdip);
 }
 
-static boolean_t
+boolean_t
 pcie_is_pci_device(dev_info_t *dip)
 {
 	dev_info_t	*pdip;
 	char		*device_type;
 
 	pdip = ddi_get_parent(dip);
-	ASSERT(pdip);
+	if (pdip == NULL)
+		return (B_FALSE);
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
 	    "device_type", &device_type) != DDI_PROP_SUCCESS)
