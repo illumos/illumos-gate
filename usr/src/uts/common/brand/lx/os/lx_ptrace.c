@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -621,7 +621,7 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 
 	/*
 	 * We must drop our process lock to take "pidlock".  The
-	 * LX_PTF_STOPPING flag protects us from an exiting tracer.
+	 * LX_PTF_STOPPING flag protects us from an exiting or detaching tracer.
 	 */
 	mutex_exit(&p->p_lock);
 
@@ -632,7 +632,7 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 
 	/*
 	 * We take pidlock now, which excludes all callers of waitid() and
-	 * prevents a detaching tracer from clearing critical accord members.
+	 * prevents an exiting tracer from clearing critical accord members.
 	 */
 	mutex_enter(&pidlock);
 	mutex_enter(&p->p_lock);
@@ -707,9 +707,9 @@ lx_stop_notify(proc_t *p, klwp_t *lwp, ushort_t why, ushort_t what)
 	}
 
 	/*
-	 * If lx_ptrace_exit_tracer() is trying to detach our tracer, it will
-	 * be sleeping on this CV until LX_PTF_STOPPING is clear.  Wake it
-	 * now.
+	 * If lx_ptrace_exit_tracer(), or a detach operation, is trying to
+	 * detach our tracer, it will be sleeping on this CV until
+	 * LX_PTF_STOPPING is clear.  Wake it now.
 	 */
 	cv_broadcast(&lx_ptrace_busy_cv);
 
@@ -927,7 +927,8 @@ lx_ptrace_detach(lx_ptrace_accord_t *accord, lx_lwp_data_t *remote, int signo,
 	klwp_t *rlwp = remote->br_lwp;
 
 	/*
-	 * The tracee LWP was in "ptrace-stop" and we now hold its p_lock.
+	 * The tracee LWP may have been in "ptrace-stop" (restart is true if
+	 * that was the case). We now hold the tracee's p_lock.
 	 * Detach the LWP from the accord and set it running.
 	 */
 	VERIFY(!TRACEE_BUSY(remote));
@@ -1259,9 +1260,9 @@ lx_ptrace_inherit_tracer(lx_lwp_data_t *src, lx_lwp_data_t *dst)
 	ptolxproc(dstp)->l_ptrace++;
 
 	/*
-	 * If lx_ptrace_exit_tracer() is trying to detach our tracer, it will
-	 * be sleeping on this CV until LX_PTF_CLONING is clear.  Wake it
-	 * now.
+	 * If lx_ptrace_exit_tracer(), or a detach operation, is trying to
+	 * detach our tracer, it will be sleeping on this CV until
+	 * LX_PTF_CLONING is clear.  Wake it now.
 	 */
 	cv_broadcast(&lx_ptrace_busy_cv);
 
@@ -2437,6 +2438,7 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	/*
 	 * Does the tracee list contain the pid in question?
 	 */
+retry:
 	mutex_enter(&accord->lxpa_tracees_lock);
 	for (remote = list_head(&accord->lxpa_tracees); remote != NULL;
 	    remote = list_next(&accord->lxpa_tracees, remote)) {
@@ -2490,8 +2492,35 @@ lx_ptrace_kernel(int ptrace_op, pid_t lxpid, uintptr_t addr, uintptr_t data)
 	rlwp = remote->br_lwp;
 	rproc = lwptoproc(rlwp);
 
-
 	if (ptrace_op == LX_PTRACE_DETACH) {
+		if (TRACEE_BUSY(remote)) {
+			kmutex_t *rmp;
+
+			/*
+			 * There is a tricky race condition we have to watch
+			 * out for here (for example, if a tracee is in the
+			 * kernel in the middle of a syscall). When the tracee
+			 * is leaving the kernel, it will set LX_PTF_STOPPING.
+			 * In lx_stop_notify() the tracee has to drop its
+			 * p_lock, take pidlock, then reacquire p_lock, before
+			 * it will clear LX_PTF_STOPPING and set LX_PTF_STOPPED.
+			 * During that window, if this tracer is trying to
+			 * detach, we have to make sure the tracee is restarted.
+			 * We handle this case in the same way we handle
+			 * the tracer exiting in lx_ptrace_exit_tracer().
+			 */
+			rmp = &rproc->p_lock;
+			mutex_exit(&accord->lxpa_tracees_lock);
+			(void) cv_wait_sig(&lx_ptrace_busy_cv, rmp);
+
+			/*
+			 * While we were waiting, state will have changed, so
+			 * retry.
+			 */
+			mutex_exit(rmp);
+			goto retry;
+		}
+
 		lx_ptrace_detach(accord, remote, (int)data, restart);
 		/*
 		 * Drop the lock on both the tracee process and the tracee list.
