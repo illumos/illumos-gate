@@ -556,6 +556,7 @@ extern void pcie_enable_errors(dev_info_t *dip);
 extern void pcie_disable_errors(dev_info_t *dip);
 extern int pcie_enable_ce(dev_info_t *dip);
 extern boolean_t pcie_bridge_is_link_disabled(dev_info_t *);
+extern boolean_t pcie_is_pci_device(dev_info_t *dip);
 
 extern pcie_bus_t *pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf,
     uint8_t flags);
