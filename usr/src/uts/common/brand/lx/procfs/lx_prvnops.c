@@ -2017,6 +2017,8 @@ typedef struct lxpr_mount_entry {
 	uint_t		lme_parent_id;
 	refstr_t	*lme_mntpt;
 	refstr_t	*lme_resource;
+	uint_t		lme_mntopts_len;
+	char		*lme_mntopts;
 	uint_t		lme_flag;
 	int		lme_fstype;
 	dev_t		lme_dev;
@@ -2026,6 +2028,78 @@ typedef struct lxpr_mount_entry {
 static int lxpr_zfs_fstype = -1;
 
 #define	LXPR_ROOT_MOUNT_ID	15
+#define	LXPR_MNT_OPT_CHUNK	128
+
+static void
+lxpr_append_mntopt(lxpr_mount_entry_t *lme, char *s)
+{
+	while (strlcat(lme->lme_mntopts, s, lme->lme_mntopts_len) >=
+	    lme->lme_mntopts_len) {
+		/* expand option string */
+		uint_t tlen = lme->lme_mntopts_len + LXPR_MNT_OPT_CHUNK;
+		char *t = kmem_alloc(tlen, KM_SLEEP);
+
+		(void) strlcpy(t, lme->lme_mntopts, tlen);
+		kmem_free(lme->lme_mntopts, lme->lme_mntopts_len);
+		lme->lme_mntopts_len = tlen;
+		lme->lme_mntopts = t;
+	}
+}
+
+/*
+ * Perform the somewhat complicated work of getting the mount options string
+ * for the mount.
+ */
+static void
+lxpr_get_mntopts(vfs_t *vfsp, lxpr_mount_entry_t *lme)
+{
+	uint_t i;
+	mntopt_t *mop;
+	boolean_t have_nosuid = B_FALSE, have_nodev = B_FALSE;
+
+	lme->lme_mntopts_len = LXPR_MNT_OPT_CHUNK;
+	lme->lme_mntopts = kmem_alloc(lme->lme_mntopts_len, KM_SLEEP);
+	lme->lme_mntopts[0] = '\0';
+
+	/* Always show rw/ro option */
+	lxpr_append_mntopt(lme,
+	    (lme->lme_flag & VFS_RDONLY) == 0 ? "rw" : "ro");
+
+	for (i = 0; i < vfsp->vfs_mntopts.mo_count; i++) {
+		mop = &vfsp->vfs_mntopts.mo_list[i];
+		if ((mop->mo_flags & MO_NODISPLAY) || !(mop->mo_flags & MO_SET))
+			continue;
+
+		if (strcmp(mop->mo_name, "ro") == 0 ||
+		    strcmp(mop->mo_name, "rw") == 0)
+			continue;
+
+		if (strcmp(mop->mo_name, "nosuid") == 0)
+			have_nosuid = B_TRUE;
+		/* sigh, either option string is used */
+		if (strcmp(mop->mo_name, "nodev") == 0 ||
+		    strcmp(mop->mo_name, "nodevices") == 0)
+			have_nodev = B_TRUE;
+
+		lxpr_append_mntopt(lme, ",");
+		lxpr_append_mntopt(lme, mop->mo_name);
+		if (mop->mo_arg != NULL) {
+			lxpr_append_mntopt(lme, "=");
+			lxpr_append_mntopt(lme, mop->mo_arg);
+		}
+	}
+
+	/*
+	 * Sometimes nosuid is an explicit string, other times it's a flag.
+	 * The same is true for nodevices.
+	 */
+	if (!have_nosuid && (lme->lme_flag & VFS_NOSETUID)) {
+		lxpr_append_mntopt(lme, ",nosuid");
+	}
+	if (!have_nodev && (lme->lme_flag & VFS_NODEVICES)) {
+		lxpr_append_mntopt(lme, ",nodevices");
+	}
+}
 
 static list_t *
 lxpr_enumerate_mounts(zone_t *zone)
@@ -2071,6 +2145,7 @@ lxpr_enumerate_mounts(zone_t *zone)
 	lme->lme_flag = rvfsp->vfs_flag;
 	lme->lme_fstype = rvfsp->vfs_fstype;
 	lme->lme_force = B_TRUE;
+	lxpr_get_mntopts(rvfsp, lme);
 
 	lme->lme_resource = NULL;
 	vd = list_head(lxzd->lxzd_vdisks);
@@ -2109,6 +2184,7 @@ lxpr_enumerate_mounts(zone_t *zone)
 		lme->lme_flag = vfsp->vfs_flag;
 		lme->lme_fstype = vfsp->vfs_fstype;
 		lme->lme_force = B_FALSE;
+		lxpr_get_mntopts(vfsp, lme);
 
 		lme->lme_resource = NULL;
 		vd = list_head(lxzd->lxzd_vdisks);
@@ -2147,6 +2223,9 @@ lxpr_enumerate_mounts(zone_t *zone)
 	    "%snative/usr", zone->zone_rootpath);
 	lme->lme_mntpt = refstr_alloc(tmppath);
 	lme->lme_resource = lme->lme_mntpt;
+	lme->lme_mntopts_len = 3;
+	lme->lme_mntopts = kmem_alloc(lme->lme_mntopts_len, KM_SLEEP);
+	(void) strlcpy(lme->lme_mntopts, "ro", lme->lme_mntopts_len);
 	refstr_hold(lme->lme_mntpt);
 	if (lxpr_zfs_fstype == -1) {
 		vfssw_t *zfssw = vfs_getvfssw("zfs");
@@ -2228,11 +2307,12 @@ lxpr_read_pid_mountinfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    "%d %d %d:%d / %s %s - %s %s %s\n",
 		    lme->lme_id, lme->lme_parent_id,
 		    getmajor(lme->lme_dev), getminor(lme->lme_dev),
-		    mntpt, rwflag, fstype, resource, rwflag);
+		    mntpt, rwflag, fstype, resource, lme->lme_mntopts);
 
 nextp:
 		refstr_rele(lme->lme_mntpt);
 		refstr_rele(lme->lme_resource);
+		kmem_free(lme->lme_mntopts, lme->lme_mntopts_len);
 		kmem_free(lme, sizeof (lxpr_mount_entry_t));
 		lme = (lxpr_mount_entry_t *)list_remove_head(mounts);
 	}
@@ -3960,7 +4040,7 @@ lxpr_read_mounts(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 */
 	lme = list_remove_head(mounts);
 	while (lme != NULL) {
-		char *resource, *mntpt, *fstype, *rwflag;
+		char *resource, *mntpt, *fstype;
 		vnode_t *vp;
 		int error;
 
@@ -3995,14 +4075,14 @@ lxpr_read_mounts(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		    !lme->lme_force) {
 			goto nextp;
 		}
-		rwflag = ((lme->lme_flag & VFS_RDONLY) == 0) ? "rw" : "ro";
 
 		lxpr_uiobuf_printf(uiobuf, "%s %s %s %s 0 0\n",
-		    resource, mntpt, fstype, rwflag);
+		    resource, mntpt, fstype, lme->lme_mntopts);
 
 nextp:
 		refstr_rele(lme->lme_mntpt);
 		refstr_rele(lme->lme_resource);
+		kmem_free(lme->lme_mntopts, lme->lme_mntopts_len);
 		kmem_free(lme, sizeof (lxpr_mount_entry_t));
 		lme = list_remove_head(mounts);
 	}
