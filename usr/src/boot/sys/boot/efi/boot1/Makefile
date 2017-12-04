@@ -33,7 +33,7 @@ OBJS=	multiboot.o boot1.o self_reloc.o start.o ufs_module.o zfs_module.o \
 
 ASFLAGS=-m64 -fPIC
 CFLAGS= -O2
-CPPFLAGS=	-nostdinc
+CPPFLAGS=	-nostdinc -D_STANDALONE
 CPPFLAGS +=	-I.
 CPPFLAGS +=	-I./../include
 CPPFLAGS +=	-I./../include/${MACHINE}
@@ -50,6 +50,9 @@ CPPFLAGS +=	-I./../../../cddl/boot/zfs/
 
 # Always add MI sources and REGULAR efi loader bits
 CPPFLAGS +=	-I./../../common
+
+# For sys/skein.h
+CPPFLAGS +=	-I$(SRC)/uts/common
 
 include ../Makefile.inc
 

@@ -36,7 +36,9 @@
 #ifndef _SYS_DEBUG_H
 #define	_SYS_DEBUG_H
 
+#if !defined(_STANDALONE)
 #include <sys/isa_defs.h>
+#endif
 #include <sys/types.h>
 #include <sys/note.h>
 

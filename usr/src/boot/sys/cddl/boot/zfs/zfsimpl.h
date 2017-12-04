@@ -1073,6 +1073,8 @@ typedef enum dmu_objset_type {
 	DMU_OST_NUMTYPES
 } dmu_objset_type_t;
 
+#define	ZAP_MAXVALUELEN	(1024 * 8)
+
 /*
  * header for all bonus and spill buffers.
  * The header has a fixed portion with a variable number
@@ -1208,6 +1210,7 @@ typedef struct dsl_dataset_phys {
 #define	DMU_POOL_DEFLATE		"deflate"
 #define	DMU_POOL_HISTORY		"history"
 #define	DMU_POOL_PROPS			"pool_props"
+#define	DMU_POOL_CHECKSUM_SALT		"org.illumos:checksum_salt"
 
 #define	ZAP_MAGIC 0x2F52AB2ABULL
 
@@ -1513,6 +1516,7 @@ typedef struct znode_phys {
  * In-core vdev representation.
  */
 struct vdev;
+struct spa;
 typedef int vdev_phys_read_t(struct vdev *vdev, void *priv,
     off_t offset, void *buf, size_t bytes);
 typedef int vdev_read_t(struct vdev *vdev, const blkptr_t *bp,
@@ -1537,6 +1541,7 @@ typedef struct vdev {
 	vdev_phys_read_t *v_phys_read;	/* read from raw leaf vdev */
 	vdev_read_t	*v_read;	/* read from vdev */
 	void		*v_read_priv;	/* private data for read function */
+	struct spa	*spa;		/* link to spa */
 } vdev_t;
 
 /*
@@ -1552,6 +1557,8 @@ typedef struct spa {
 	struct uberblock spa_uberblock;	/* best uberblock so far */
 	vdev_list_t	spa_vdevs;	/* list of all toplevel vdevs */
 	objset_phys_t	spa_mos;	/* MOS for this pool */
+	zio_cksum_salt_t spa_cksum_salt;	/* secret salt for cksum */
+	void		*spa_cksum_tmpls[ZIO_CHECKSUM_FUNCTIONS];
 	int		spa_inited;	/* initialized */
 	vdev_t		*spa_boot_vdev;	/* boot device for kernel */
 } spa_t;

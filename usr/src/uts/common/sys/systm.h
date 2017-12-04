@@ -31,15 +31,21 @@
 #ifndef _SYS_SYSTM_H
 #define	_SYS_SYSTM_H
 
+#if defined(_STANDALONE)
+#include <sys/cdefs.h>
+#include <string.h>
+#else
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/proc.h>
 #include <sys/dditypes.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+#if !defined(_STANDALONE)
 /*
  * The pc_t is the type of the kernel's program counter.  In general, a
  * pc_t is a uintptr_t -- except for a sparcv9 kernel, in which case all
@@ -508,6 +514,7 @@ extern	int	__lintzero;	/* for spoofing lint */
 #define	__lintzero 0
 #endif	/* __lint */
 #endif /* _KERNEL || _BOOT */
+#endif /* !_STANDALONE */
 
 #ifdef	__cplusplus
 }

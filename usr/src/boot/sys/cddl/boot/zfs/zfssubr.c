@@ -105,6 +105,8 @@ typedef struct zio_checksum_info {
 
 #include "fletcher.c"
 #include "sha256.c"
+#include "skein_zfs.c"
+#include "edonr_zfs.c"
 
 static zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{NULL, NULL}, NULL, NULL, 0, "inherit"},
@@ -131,11 +133,14 @@ static zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	    NULL, NULL, ZCHECKSUM_FLAG_METADATA | ZCHECKSUM_FLAG_DEDUP |
 	    ZCHECKSUM_FLAG_NOPWRITE, "SHA512"},
 	/* no skein and edonr for now */
-	{{NULL, NULL}, NULL, NULL, ZCHECKSUM_FLAG_METADATA |
-	    ZCHECKSUM_FLAG_DEDUP | ZCHECKSUM_FLAG_SALTED |
-	    ZCHECKSUM_FLAG_NOPWRITE, "skein"},
-	{{NULL, NULL}, NULL, NULL, ZCHECKSUM_FLAG_METADATA |
-	    ZCHECKSUM_FLAG_SALTED | ZCHECKSUM_FLAG_NOPWRITE, "edonr"},
+	{{zio_checksum_skein_native, zio_checksum_skein_byteswap},
+	    zio_checksum_skein_tmpl_init, zio_checksum_skein_tmpl_free,
+	    ZCHECKSUM_FLAG_METADATA | ZCHECKSUM_FLAG_DEDUP |
+	    ZCHECKSUM_FLAG_SALTED | ZCHECKSUM_FLAG_NOPWRITE, "skein"},
+	{{zio_checksum_edonr_native, zio_checksum_edonr_byteswap},
+	    zio_checksum_edonr_tmpl_init, zio_checksum_edonr_tmpl_free,
+	    ZCHECKSUM_FLAG_METADATA | ZCHECKSUM_FLAG_SALTED |
+	    ZCHECKSUM_FLAG_NOPWRITE, "edonr"},
 };
 
 /*
@@ -228,33 +233,48 @@ zio_checksum_label_verifier(zio_cksum_t *zcp, uint64_t offset)
  * templates and installs the template into the spa_t.
  */
 static void
-zio_checksum_template_init(enum zio_checksum checksum, const spa_t *spa)
+zio_checksum_template_init(enum zio_checksum checksum, spa_t *spa)
 {
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
 
 	if (ci->ci_tmpl_init == NULL)
 		return;
-#if 0	/* for now we dont have anything here */
+
 	if (spa->spa_cksum_tmpls[checksum] != NULL)
 		return;
 
-	VERIFY(ci->ci_tmpl_free != NULL);
-	mutex_enter(&spa->spa_cksum_tmpls_lock);
 	if (spa->spa_cksum_tmpls[checksum] == NULL) {
 		spa->spa_cksum_tmpls[checksum] =
 		    ci->ci_tmpl_init(&spa->spa_cksum_salt);
-		VERIFY(spa->spa_cksum_tmpls[checksum] != NULL);
 	}
-	mutex_exit(&spa->spa_cksum_tmpls_lock);
-#endif
+}
+
+/*
+ * Called by a spa_t that's about to be deallocated. This steps through
+ * all of the checksum context templates and deallocates any that were
+ * initialized using the algorithm-specific template init function.
+ */
+void
+zio_checksum_templates_free(spa_t *spa)
+{
+	for (enum zio_checksum checksum = 0;
+	    checksum < ZIO_CHECKSUM_FUNCTIONS; checksum++) {
+		if (spa->spa_cksum_tmpls[checksum] != NULL) {
+			zio_checksum_info_t *ci = &zio_checksum_table[checksum];
+
+			ci->ci_tmpl_free(spa->spa_cksum_tmpls[checksum]);
+			spa->spa_cksum_tmpls[checksum] = NULL;
+		}
+	}
 }
 
 static int
-zio_checksum_verify(const blkptr_t *bp, void *data)
+zio_checksum_verify(const spa_t *spa, const blkptr_t *bp, void *data)
 {
 	uint64_t size;
 	unsigned int checksum;
 	zio_checksum_info_t *ci;
+	void *ctx = NULL;
 	zio_cksum_t actual_cksum, expected_cksum, verifier;
 	int byteswap;
 
@@ -267,7 +287,11 @@ zio_checksum_verify(const blkptr_t *bp, void *data)
 	if (ci->ci_func[0] == NULL || ci->ci_func[1] == NULL)
 		return (EINVAL);
 
-	zio_checksum_template_init(checksum, NULL);
+	if (spa != NULL) {
+		zio_checksum_template_init(checksum, (spa_t *) spa);
+		ctx = spa->spa_cksum_tmpls[checksum];
+	}
+
 	if (ci->ci_flags & ZCHECKSUM_FLAG_EMBEDDED) {
 		zio_eck_t *eck;
 
@@ -291,7 +315,7 @@ zio_checksum_verify(const blkptr_t *bp, void *data)
 
 		expected_cksum = eck->zec_cksum;
 		eck->zec_cksum = verifier;
-		ci->ci_func[byteswap](data, size, NULL, &actual_cksum);
+		ci->ci_func[byteswap](data, size, ctx, &actual_cksum);
 		eck->zec_cksum = expected_cksum;
 
 		if (byteswap)
@@ -299,11 +323,11 @@ zio_checksum_verify(const blkptr_t *bp, void *data)
 			    sizeof (zio_cksum_t));
 	} else {
 		expected_cksum = bp->blk_cksum;
-		ci->ci_func[0](data, size, NULL, &actual_cksum);
+		ci->ci_func[0](data, size, ctx, &actual_cksum);
 	}
 
 	if (!ZIO_CHECKSUM_EQUAL(actual_cksum, expected_cksum)) {
-		/*printf("ZFS: read checksum failed\n");*/
+		/* printf("ZFS: read checksum %s failed\n", ci->ci_name); */
 		return (EIO);
 	}
 
@@ -1313,10 +1337,11 @@ vdev_child(vdev_t *pvd, uint64_t devidx)
  * any ereports we generate can note it.
  */
 static int
-raidz_checksum_verify(const blkptr_t *bp, void *data, uint64_t size)
+raidz_checksum_verify(const spa_t *spa, const blkptr_t *bp, void *data,
+    uint64_t size)
 {
 
-	return (zio_checksum_verify(bp, data));
+	return (zio_checksum_verify(spa, bp, data));
 }
 
 /*
@@ -1365,8 +1390,8 @@ raidz_parity_verify(raidz_map_t *rm)
  * cases we'd only use parity information in column 0.
  */
 static int
-vdev_raidz_combrec(raidz_map_t *rm, const blkptr_t *bp, void *data,
-    off_t offset, uint64_t bytes, int total_errors, int data_errors)
+vdev_raidz_combrec(const spa_t *spa, raidz_map_t *rm, const blkptr_t *bp,
+    void *data, off_t offset, uint64_t bytes, int total_errors, int data_errors)
 {
 	raidz_col_t *rc;
 	void *orig[VDEV_RAIDZ_MAXPARITY];
@@ -1445,7 +1470,7 @@ vdev_raidz_combrec(raidz_map_t *rm, const blkptr_t *bp, void *data,
 			 * success.
 			 */
 			code = vdev_raidz_reconstruct(rm, tgts, n);
-			if (raidz_checksum_verify(bp, data, bytes) == 0) {
+			if (raidz_checksum_verify(spa, bp, data, bytes) == 0) {
 				for (i = 0; i < n; i++) {
 					c = tgts[i];
 					rc = &rm->rm_col[c];
@@ -1616,7 +1641,7 @@ reconstruct:
 	 */
 	if (total_errors <= rm->rm_firstdatacol - parity_untried) {
 		if (data_errors == 0) {
-			if (raidz_checksum_verify(bp, data, bytes) == 0) {
+			if (raidz_checksum_verify(vd->spa, bp, data, bytes) == 0) {
 				/*
 				 * If we read parity information (unnecessarily
 				 * as it happens since no reconstruction was
@@ -1661,7 +1686,7 @@ reconstruct:
 
 			code = vdev_raidz_reconstruct(rm, tgts, n);
 
-			if (raidz_checksum_verify(bp, data, bytes) == 0) {
+			if (raidz_checksum_verify(vd->spa, bp, data, bytes) == 0) {
 				/*
 				 * If we read more parity disks than were used
 				 * for reconstruction, confirm that the other
@@ -1735,7 +1760,7 @@ reconstruct:
 	if (total_errors > rm->rm_firstdatacol) {
 		error = EIO;
 	} else if (total_errors < rm->rm_firstdatacol &&
-	    (code = vdev_raidz_combrec(rm, bp, data, offset, bytes,
+	    (code = vdev_raidz_combrec(vd->spa, rm, bp, data, offset, bytes,
 	     total_errors, data_errors)) != 0) {
 		/*
 		 * If we didn't use all the available parity for the
