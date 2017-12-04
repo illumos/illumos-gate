@@ -140,7 +140,7 @@
 extern "C" {
 #endif
 
-#ifdef STAND
+#ifdef _STANDALONE
 #include <stand.h>
 #include <sys/stdint.h>
 #include <sys/linker_set.h>
@@ -1794,13 +1794,13 @@ FICL_PLATFORM_EXTERN long ficlFileSize(ficlFile *ff);
 #endif
 
 /* Support for linker set inclusions. */
-#ifdef STAND
+#ifdef _STANDALONE
 typedef void ficlCompileFcn(ficlSystem *);
 
 #define	FICL_COMPILE_SET(func)  \
 	DATA_SET(Xficl_compile_set, func)
 SET_DECLARE(Xficl_compile_set, ficlCompileFcn);
-#endif	/* STAND */
+#endif	/* _STANDALONE */
 
 #ifdef __cplusplus
 }

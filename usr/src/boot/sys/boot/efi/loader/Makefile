@@ -62,7 +62,7 @@ CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
 LIBSTAND=	../../libstand/${MACHINE}/libstand.a
 
 BOOT_FORTH=	yes
-CPPFLAGS +=	-DBOOT_FORTH -DSTAND
+CPPFLAGS +=	-DBOOT_FORTH -D_STANDALONE
 CPPFLAGS +=	-I$(SRC)/common/ficl
 CPPFLAGS +=	-I../../ficl
 LIBFICL=	../../ficl/${MACHINE}/libficl.a
