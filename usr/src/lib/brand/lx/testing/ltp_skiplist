@@ -59,6 +59,7 @@ move_pages11
 mremap04		# we don't yet support remapping shm
 open01
 open11
+open12			# needs a device
 ptrace04
 quotactl01
 quotactl02
