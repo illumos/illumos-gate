@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -24,6 +25,7 @@ MANFILES=	blcompare.3tsol		\
 	 	bltos.3tsol		\
 	 	btohex.3tsol		\
 	 	getdevicerange.3tsol	\
+	 	getlabel.3tsol		\
 	 	getpathbylabel.3tsol	\
 	 	getplabel.3tsol		\
 	 	getuserrange.3tsol	\
@@ -31,8 +33,6 @@ MANFILES=	blcompare.3tsol		\
 	 	getzonerootbyid.3tsol	\
 	 	hextob.3tsol		\
 	 	label_to_str.3tsol	\
-	 	labelbuilder.3tsol	\
-	 	labelclipping.3tsol	\
 	 	m_label.3tsol		\
 	 	sbltos.3tsol		\
 	 	setflabel.3tsol		\
@@ -40,9 +40,7 @@ MANFILES=	blcompare.3tsol		\
 	 	str_to_label.3tsol	\
 	 	tsol_getrhtype.3tsol
 
-MANLINKS=	Xbcleartos.3tsol		\
-		Xbsltos.3tsol			\
-		bcleartoh.3tsol			\
+MANLINKS=	bcleartoh.3tsol			\
 		bcleartoh_r.3tsol		\
 		bcleartos.3tsol			\
 		bldominates.3tsol		\
@@ -55,6 +53,7 @@ MANLINKS=	Xbcleartos.3tsol		\
 		bsltoh.3tsol			\
 		bsltoh_r.3tsol			\
 		bsltos.3tsol			\
+	 	fgetlabel.3tsol			\
 		getzoneidbylabel.3tsol		\
 		getzonelabelbyname.3tsol	\
 		getzonerootbylabel.3tsol	\
@@ -91,6 +90,8 @@ bsltoh_r.3tsol			:= LINKSRC = btohex.3tsol
 h_alloc.3tsol			:= LINKSRC = btohex.3tsol
 h_free.3tsol			:= LINKSRC = btohex.3tsol
 
+fgetlabel.3tsol			:= LINKSRC = getlabel.3tsol
+
 getzoneidbylabel.3tsol		:= LINKSRC = getzonelabelbyid.3tsol
 getzonelabelbyname.3tsol	:= LINKSRC = getzonelabelbyid.3tsol
 
@@ -99,9 +100,6 @@ getzonerootbyname.3tsol		:= LINKSRC = getzonerootbyid.3tsol
 
 htobclear.3tsol			:= LINKSRC = hextob.3tsol
 htobsl.3tsol			:= LINKSRC = hextob.3tsol
-
-Xbcleartos.3tsol		:= LINKSRC = labelclipping.3tsol
-Xbsltos.3tsol			:= LINKSRC = labelclipping.3tsol
 
 m_label_alloc.3tsol		:= LINKSRC = m_label.3tsol
 m_label_dup.3tsol		:= LINKSRC = m_label.3tsol
