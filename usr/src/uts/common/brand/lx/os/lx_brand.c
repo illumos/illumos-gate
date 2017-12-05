@@ -667,6 +667,20 @@ lx_restorecontext(ucontext_t *ucp)
 	uintptr_t flags = (uintptr_t)ucp->uc_brand_data[0];
 	caddr_t sp = ucp->uc_brand_data[1];
 
+	if (lwpd->br_stack_mode == LX_STACK_MODE_PREINIT) {
+		/*
+		 * Since we're here with stack_mode as LX_STACK_MODE_PREINIT,
+		 * that can only mean we took a signal really early in this
+		 * thread's lifetime, before we had a chance to setup a native
+		 * stack and start running the thread's code. Since we're still
+		 * handling everything on the single stack, we can't do any of
+		 * the usual work below. Note: this means we cannot look at
+		 * "flags" since the uc_brand_data may not have been properly
+		 * set, depending on where we were when we took the signal.
+		 */
+		return;
+	}
+
 	/*
 	 * We have a saved native stack pointer value that we must restore
 	 * into the per-LWP data.
@@ -684,7 +698,9 @@ lx_restorecontext(ucontext_t *ucp)
 	}
 
 	/*
-	 * Restore the stack mode:
+	 * Set or restore the stack mode. Usually this restores the mode, but
+	 * the lx_runexe code flow also uses this to set the mode from
+	 * LX_STACK_MODE_INIT to LX_UC_STACK_BRAND.
 	 */
 	if (flags & LX_UC_STACK_NATIVE) {
 		lwpd->br_stack_mode = LX_STACK_MODE_NATIVE;
