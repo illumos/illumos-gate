@@ -10,11 +10,31 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2017 Joyent, Inc.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
+PROG = date_test
+
+ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
+
+all:
+
+install: $(ROOTPROG)
+
+lint:
+
+clobber: clean
+
+clean:
+
+$(CMDS): $(TESTDIR)
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(ROOTOPTPKG)/%: %.ksh $(ROOTOPTPKG)
+	$(INS.rename)
