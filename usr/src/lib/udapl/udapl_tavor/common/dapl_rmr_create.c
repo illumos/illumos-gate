@@ -61,7 +61,7 @@
  */
 DAT_RETURN
 dapl_rmr_create(IN DAT_PZ_HANDLE pz_handle,
-		OUT DAT_RMR_HANDLE * rmr_handle)
+    OUT DAT_RMR_HANDLE * rmr_handle)
 {
 	DAPL_PZ *pz;
 	DAPL_RMR *rmr;
@@ -94,7 +94,7 @@ dapl_rmr_create(IN DAT_PZ_HANDLE pz_handle,
 		goto bail;
 	}
 
-	(void) dapl_os_atomic_inc(&pz->pz_ref_count);
+	dapl_os_atomic_inc(&pz->pz_ref_count);
 
 	*rmr_handle = rmr;
 

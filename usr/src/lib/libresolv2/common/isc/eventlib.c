@@ -19,10 +19,6 @@
  * vix 09sep95 [initial]
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: eventlib.c,v 1.10 2006/03/09 23:57:56 marka Exp $";
-#endif
-
 #include "port_before.h"
 #include "fd_setsize.h"
 

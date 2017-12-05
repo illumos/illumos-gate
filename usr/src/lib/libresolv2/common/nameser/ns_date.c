@@ -15,12 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef lint
-static const char rcsid[] = "$Id: ns_date.c,v 1.6 2005/04/27 04:56:39 sra Exp $";
-#endif
-
-/* Import. */
-
 #include "port_before.h"
 
 #include <arpa/nameser.h>

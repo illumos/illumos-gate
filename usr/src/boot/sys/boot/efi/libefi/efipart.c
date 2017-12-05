@@ -239,6 +239,16 @@ efipart_hdd(EFI_DEVICE_PATH *dp)
 		    !blkio->Media->MediaPresent) {
 			return (false);
 		}
+
+		/*
+		 * We assume the block size 512 or greater power of 2.
+		 * iPXE is known to insert stub BLOCK IO device with
+		 * BlockSize 1.
+		 */
+		if (blkio->Media->BlockSize < 512 ||
+		    !powerof2(blkio->Media->BlockSize)) {
+			return (false);
+		}
 	}
 	return (true);
 }

@@ -15,10 +15,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: bitncmp.c,v 1.5 2008/11/14 02:36:51 marka Exp $";
-#endif
-
 #include "port_before.h"
 
 #include <sys/types.h>

@@ -119,21 +119,19 @@ typedef volatile DAT_COUNT DAPL_ATOMIC;
  * except that a DAT_COUNT might be 32 bits, rather than 64
  * and it occurs in local memory.
  *
- * DAT_COUNT dapl_os_atomic_inc(INOUT	DAPL_ATOMIC *v)
+ * void dapl_os_atomic_inc(INOUT	DAPL_ATOMIC *v)
  */
-#define	dapl_os_atomic_inc(v)	((DAT_COUNT)			\
-				(atomic_add_32_nv((uint32_t *)(v), 1) - 1))
+#define	dapl_os_atomic_inc(v)	atomic_add_32((uint32_t *)(v), 1)
 
 /*
  * dapl_os_atomic_dec
  *
  * decrement the current value of '*v'. No return value is required.
  *
- * DAT_COUNT dapl_os_atomic_dec(INOUT	DAPL_ATOMIC *v)
+ * void dapl_os_atomic_dec(INOUT	DAPL_ATOMIC *v)
  */
 #define	dapl_os_atomic_dec(v)	assert(*v != 0);		\
-				((DAT_COUNT)			\
-				(atomic_add_32_nv((uint32_t *)(v), -1) + 1))
+				atomic_add_32((uint32_t *)(v), -1)
 
 /*
  * dapl_os_atomic_assign

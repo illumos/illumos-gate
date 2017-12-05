@@ -48,12 +48,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: lcl_pr.c,v 1.4 2006/03/09 23:57:56 marka Exp $";
-#endif /* LIBC_SCCS and not lint */
-
-/* extern */
-
 #include "port_before.h"
 
 #include <sys/types.h>

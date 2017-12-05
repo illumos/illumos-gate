@@ -1,7 +1,3 @@
-#ifndef LINT
-static const char rcsid[] = "$Id: tree.c,v 1.4 2005/04/27 04:56:39 sra Exp $";
-#endif
-
 /*%
  * tree - balanced binary tree library
  *

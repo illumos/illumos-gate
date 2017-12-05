@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,8 +91,8 @@ static const char *_inet_ntop_native();
  */
 int
 getnameinfo(const struct sockaddr *sa, socklen_t salen,
-	    char *host, socklen_t hostlen,
-	    char *serv, socklen_t servlen, int flags)
+    char *host, socklen_t hostlen,
+    char *serv, socklen_t servlen, int flags)
 {
 	char		*addr;
 	size_t		alen, slen;
@@ -240,7 +238,7 @@ getnameinfo(const struct sockaddr *sa, socklen_t salen,
 			 * specified port for udp.
 			 */
 			sp = getservbyport(port,
-				flags & NI_DGRAM ? "udp" : "tcp");
+			    flags & NI_DGRAM ? "udp" : "tcp");
 			if (sp != NULL) {
 				if (servlen < strlen(sp->s_name) + 1)
 					return (EAI_OVERFLOW);
@@ -312,7 +310,6 @@ addzoneid(const struct sockaddr_in6 *sa, char *host, size_t hostlen)
 static size_t
 getzonestr(const struct sockaddr_in6 *sa, char *zonestr, size_t zonelen)
 {
-	const in6_addr_t *addr;
 	uint32_t ifindex;
 	char *retstr;
 
@@ -320,7 +317,6 @@ getzonestr(const struct sockaddr_in6 *sa, char *zonestr, size_t zonelen)
 		return (0);
 	}
 
-	addr = &sa->sin6_addr;
 	/*
 	 * Since this implementation only supports link scope addresses,
 	 * there is a one-to-one mapping between interface index and

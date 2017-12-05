@@ -98,7 +98,7 @@ dapl_lmr_free(IN DAT_LMR_HANDLE lmr_handle)
 
 		if (dat_status == DAT_SUCCESS) {
 			pz = (DAPL_PZ *) lmr->param.pz_handle;
-			(void) dapl_os_atomic_dec(&pz->pz_ref_count);
+			dapl_os_atomic_dec(&pz->pz_ref_count);
 
 			dapl_lmr_dealloc(lmr);
 		} else {

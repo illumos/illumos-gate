@@ -1,8 +1,3 @@
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char sccsid[] = "@(#)strtoul.c	8.1 (Berkeley) 6/4/93";
-static const char rcsid[] = "$Id: strtoul.c,v 1.4 2008/02/18 03:49:08 marka Exp $";
-#endif /* LIBC_SCCS and not lint */
-
 /*
  * Copyright (c) 1990, 1993
  *    The Regents of the University of California.  All rights reserved.

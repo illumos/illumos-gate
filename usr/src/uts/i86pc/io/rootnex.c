@@ -819,7 +819,7 @@ static int
 rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
     off_t len, caddr_t *vaddrp)
 {
-	struct regspec *orp;
+	struct regspec *orp = NULL;
 	struct regspec64 rp = { 0 };
 	ddi_map_req_t mr = *mp;		/* Get private copy of request */
 
@@ -846,10 +846,10 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 	}
 
 	/*
-	 * First, if given an rnumber, convert it to a regspec...
-	 * (Presumably, this is on behalf of a child of the root node?)
+	 * First, we need to get the original regspec out before we convert it
+	 * to the extended format. If we have a register number, then we need to
+	 * convert that to a regspec.
 	 */
-
 	if (mp->map_type == DDI_MT_RNUMBER)  {
 
 		int rnumber = mp->map_obj.rnumber;
@@ -859,43 +859,36 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 #endif	/* DDI_MAP_DEBUG */
 
 		orp = i_ddi_rnumber_to_regspec(rdip, rnumber);
-		if (orp == NULL)  {
+		if (orp == NULL) {
 #ifdef	DDI_MAP_DEBUG
 			cmn_err(CE_WARN, out_of_range, rnumber,
 			    ddi_get_name(rdip));
 #endif	/* DDI_MAP_DEBUG */
 			return (DDI_ME_RNUMBER_RANGE);
 		}
-
-		rp.regspec_bustype = orp->regspec_bustype;
-		rp.regspec_addr = orp->regspec_addr;
-		rp.regspec_size = orp->regspec_size;
-		mp->map_type = DDI_MT_REGSPEC;
-		mp->map_flags |= DDI_MF_EXT_REGSPEC;
-		mp->map_obj.rp = (struct regspec *)&rp;
+	} else if (!(mp->map_flags & DDI_MF_EXT_REGSPEC)) {
+		orp = mp->map_obj.rp;
 	}
 
 	/*
-	 * Ensure that we are always using a 64-bit regspec regardless of what
-	 * was passed into us. If the child driver is using a 64-bit regspec,
-	 * then we need to make sure that we copy this to the local regspec64,
-	 * rp.
+	 * Ensure that we are always using a 64-bit extended regspec regardless
+	 * of what was passed into us. If the child driver is using a 64-bit
+	 * regspec, then we need to make sure that we copy this to the local
+	 * regspec64, rp.
 	 */
-	if (!(mp->map_flags & DDI_MF_EXT_REGSPEC)) {
-		orp = mp->map_obj.rp;
-
+	if (orp != NULL) {
 		rp.regspec_bustype = orp->regspec_bustype;
 		rp.regspec_addr = orp->regspec_addr;
 		rp.regspec_size = orp->regspec_size;
-
-		mp->map_obj.rp = (struct regspec *)&rp;
-		mp->map_flags |= DDI_MF_EXT_REGSPEC;
-	} else if (mp->map_type != DDI_MT_RNUMBER) {
+	} else {
 		struct regspec64 *rp64;
 		rp64 = (struct regspec64 *)mp->map_obj.rp;
 		rp = *rp64;
-		mp->map_obj.rp = (struct regspec *)&rp;
 	}
+
+	mp->map_type = DDI_MT_REGSPEC;
+	mp->map_flags |= DDI_MF_EXT_REGSPEC;
+	mp->map_obj.rp = (struct regspec *)&rp;
 
 	/*
 	 * Adjust offset and length correspnding to called values...
