@@ -32,12 +32,33 @@
 ARCH = i86pc
 CLASS = arch
 DTDFILE = topology.dtd.1
-TOPOFILE = Joyent-Compute-Platform-3101-disk-hc-topology.xml
-SRCDIR = ../Joyent,Joyent-Compute-Platform-3101
+JOYENT_PLATFORMS = \
+	Joyent-Compute-Platform-3101-hc-topology.xml \
+	Joyent-Compute-Platform-3102-hc-topology.xml
 
-PLATFORM = Joyent-Compute-Platform-3101
-TOPOBASE = ../i86pc/i86pc-hc-topology.xml
+ROOTJOYENTMAPS = $(JOYENT_PLATFORMS:%=$(arch_ROOTTOPOROOT)/%)
 
-CLOBBERFILES +=	$(TOPOFILE)
+TOPOFILE = \
+	SSG-2028R-ACR24L-hc-topology.xml \
+	SSG-2028R-ACR24L-chassis-hc-topology.xml \
+	SSG-2028R-ACR24L-disk-hc-topology.xml
+
+SRCDIR = ../SMCI,SSG-2028R-ACR24L
+
+PLATFORM = SSG-2028R-ACR24L
+
+CLOBBERFILES +=	$(ROOTJOYENTMAPS) SSG-2028R-ACR24L-disk-hc-topology.xml
 
 include ../Makefile.map
+
+install: $(ROOTJOYENTMAPS)
+
+#
+# Note, the Joyent Compute Platform 310x is based on the SuperMicro
+# SSG-2028R-ACR24L. Because of that, the topo map used here will work for all
+# such systems.
+#
+$(ROOTJOYENTMAPS): SSG-2028R-ACR24L-hc-topology.xml
+	$(RM) $@
+	$(SYMLINK) ./$? $@
+

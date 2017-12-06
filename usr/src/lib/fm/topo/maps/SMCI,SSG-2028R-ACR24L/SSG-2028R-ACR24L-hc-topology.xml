@@ -1,0 +1,90 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+Copyright (c) 2017, Joyent, Inc.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+-->
+
+<topology name='i86pc' scheme='hc'>
+
+  <range name='motherboard' min='0' max='0'>
+    <node instance='0'>
+        <fac-enum provider='fac_prov_ipmi' />
+        <propgroup name='protocol' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='label' type='string' value='MB' />
+        </propgroup>
+        <propgroup name='ipmi' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='entity-list' type='string_array' >
+                <propitem value='MB_10G Temp' />
+                <propitem value='PCH Temp' />
+                <propitem value='Peripheral Temp' />
+                <propitem value='5VSB' />
+                <propitem value='5VSB' />
+                <propitem value='3.3VSB' />
+                <propitem value='3.3VCC' />
+                <propitem value='1.5V PCH' />
+                <propitem value='1.2V BMC' />
+                <propitem value='1.05V PCH' />
+                <propitem value='12V' />
+                <propitem value='5VCC' />
+                <propitem value='VBAT' />
+                <propitem value='VDIMMAB' />
+                <propitem value='VDIMMCD' />
+                <propitem value='VDIMMEF' />
+                <propitem value='VDIMMGH' />
+           </propval>
+        </propgroup>
+    </node>
+
+    <dependents grouping='children'>
+      <range name='chip' min='0' max='100'>
+        <enum-method name='chip' version='1' />
+      </range>
+      <range name='hostbridge' min='0' max='254'>
+        <enum-method name='hostbridge' version='1' />
+      </range>
+    </dependents>
+
+  </range>
+
+  <range name='chassis' min='0' max='0'>
+    <propmap name='SSG-2028R-ACR24L-chassis' />
+
+    <dependents grouping='children'>
+
+       <range name='psu' min='0' max='1'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='fan' min='0' max='100'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='bay' min='0' max='23'>
+          <propmap name='SSG-2028R-ACR24L-disk' />
+       </range>
+
+    </dependents>
+
+  </range>
+
+</topology>

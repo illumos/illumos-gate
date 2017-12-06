@@ -164,23 +164,6 @@ Copyright (c) 2017, Joyent, Inc.
        </range>
     </set>
 
-    <!--
-     Note, the Joyent Compute Platform 310x is based on the SuperMicro
-     SSG-2028R-ACR24L. Because of that, the topo map used here will work
-     for all such systems. Hence why it is included in the setlist.
-    -->
-    <set type='product' setlist='Joyent-Compute-Platform-3101|Joyent-Compute-Platform-3102|SSG-2028R-ACR24L'>
-       <range name='psu' min='0' max='1'>
-          <enum-method name='ipmi' version='1' />
-       </range>
-       <range name='fan' min='0' max='100'>
-          <enum-method name='ipmi' version='1' />
-       </range>
-       <range name='bay' min='0' max='23'>
-          <propmap name='Joyent-Compute-Platform-3101-disk' />
-       </range>
-    </set>
-
     <set type='product' setlist='default'>
        <range name='psu' min='0' max='100'>
    	  <enum-method name='ipmi' version='1' />

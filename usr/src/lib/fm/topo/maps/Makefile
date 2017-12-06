@@ -51,7 +51,7 @@ i386_SUBDIRS = i86pc \
 		SUNW,Sun-Fire-X4540 \
 		SUNW,Sun-Fire-X4600-M2 \
 		Joyent,Joyent-Compute-Platform-1101 \
-		Joyent,Joyent-Compute-Platform-3101
+		SMCI,SSG-2028R-ACR24L
 
 SUBDIRS = $($(MACH)_SUBDIRS)
 

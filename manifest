@@ -10204,7 +10204,11 @@ f usr/platform/i86pc/lib/fm/eft/intel.eft 0444 root sys
 d usr/platform/i86pc/lib/fm/topo 0755 root sys
 d usr/platform/i86pc/lib/fm/topo/maps 0755 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-1101-disk-hc-topology.xml 0444 root sys
-f usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-disk-hc-topology.xml 0444 root sys
+s usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-hc-topology.xml=./SSG-2028R-ACR24L-hc-topology.xml
+s usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-hc-topology.xml=./SSG-2028R-ACR24L-hc-topology.xml 
+f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-chassis-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-disk-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/fan-hc-topology.xml 0444 root sys

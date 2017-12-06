@@ -3253,6 +3253,7 @@ usr/src/lib/fm/topo/libtopo/common/topo_error.c
 usr/src/lib/fm/topo/libtopo/common/topo_tables.c
 usr/src/lib/fm/topo/libtopo/i386/lint.out
 usr/src/lib/fm/topo/libtopo/i386/llib-ltopo.ln
+usr/src/lib/fm/topo/maps/SMCI,SSG-2028R-ACR24L/SSG-2028R-ACR24L-disk-hc-topology.xml
 usr/src/lib/fm/topo/maps/SUNW,Netra-X4200-M2/Netra-X4200-M2-disk-hc-topology.xml
 usr/src/lib/fm/topo/maps/SUNW,Sun-Fire-X4200-M2/Sun-Fire-X4200-M2-disk-hc-topology.xml
 usr/src/lib/fm/topo/maps/SUNW,Sun-Fire-X4200-Server/Sun-Fire-X4200-Server-disk-hc-topology.xml
