@@ -2361,7 +2361,7 @@ ip_fanout_v4(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 	 */
 	if (IPP_ENABLED(IPP_LOCAL_IN, ipst) &&
 	    !(iraflags & IRAF_LOOPBACK) &&
-	    (protocol != IPPROTO_ESP || protocol != IPPROTO_AH)) {
+	    (protocol != IPPROTO_ESP && protocol != IPPROTO_AH)) {
 		/*
 		 * Use the interface on which the packet arrived - not where
 		 * the IP address is hosted.

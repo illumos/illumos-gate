@@ -2021,8 +2021,8 @@ repeat:
 	 */
 	if (IPP_ENABLED(IPP_LOCAL_IN, ipst) &&
 	    !(iraflags & IRAF_LOOPBACK) &&
-	    (protocol != IPPROTO_ESP || protocol != IPPROTO_AH ||
-	    protocol != IPPROTO_DSTOPTS || protocol != IPPROTO_ROUTING ||
+	    (protocol != IPPROTO_ESP && protocol != IPPROTO_AH &&
+	    protocol != IPPROTO_DSTOPTS && protocol != IPPROTO_ROUTING &&
 	    protocol != IPPROTO_FRAGMENT)) {
 		/*
 		 * Use the interface on which the packet arrived - not where
