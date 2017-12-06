@@ -18,7 +18,7 @@ include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
 
 CFLAGS=		-O2
-CPPFLAGS=	-DSTAND -nostdinc -I../../../../include -I../../..
+CPPFLAGS=	-D_STANDALONE -nostdinc -I../../../../include -I../../..
 CPPFLAGS +=	-I$(SRC)/uts/intel/sys/acpi
 LOADER=		zfsloader
 NEWVERSWHAT=	"ZFS enabled bootstrap loader" x86

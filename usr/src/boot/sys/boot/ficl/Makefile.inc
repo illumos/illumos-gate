@@ -20,7 +20,8 @@ FICLDIR=	$(SRC)/common/ficl
 
 all: lib
 
-CPPFLAGS= -DSTAND -I. -I.. -I../../../../include -I../../../../lib/libstand
+CPPFLAGS= -D_STANDALONE -I. -I.. -I../../../../include
+CPPFLAGS += -I../../../../lib/libstand
 CPPFLAGS += -I../../..  -I$(FICLDIR) -I../../common
 CFLAGS= -O2 -Wall -nostdinc
 
