@@ -57,7 +57,8 @@ TYPELIST =	overlay_ioc_create_t \
 		overlay_ioc_delete_t \
 		overlay_ioc_nprops_t \
 		overlay_ioc_propinfo_t \
-		overlay_ioc_prop_t
+		overlay_ioc_prop_t \
+		mac_protect_t
 
 all :=		TARGET = all
 clean :=	TARGET = clean

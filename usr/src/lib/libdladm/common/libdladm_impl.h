@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #ifndef _LIBDLADM_IMPL_H
@@ -147,10 +147,10 @@ extern dladm_status_t	dladm_flow_proplist_extract(dladm_arg_list_t *,
  * by the pd_check function.
  */
 typedef	dladm_status_t	rp_extractf_t(val_desc_t *, uint_t, void *);
-extern rp_extractf_t	extract_maxbw, extract_priority,
-			extract_cpus, extract_protection,
-			extract_allowedips, extract_allowedcids,
-			extract_rxrings, extract_txrings, extract_pool;
+extern rp_extractf_t	extract_priority, extract_cpus,
+			extract_protection, extract_allowallcids, extract_pool,
+			extract_allowedips, extract_allowedcids, extract_maxbw,
+			extract_rxrings, extract_txrings;
 
 typedef struct resource_prop_s {
 	/*

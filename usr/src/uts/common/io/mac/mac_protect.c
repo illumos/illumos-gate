@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2017, Joyent, Inc.  All rights reserved.
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
@@ -2025,6 +2025,9 @@ dhcpnospoof_check_cid(mac_protect_t *p, uchar_t *cid, uint_t cidlen)
 		    bcmp(dcid->dc_id, cid, cidlen) == 0)
 			return (B_TRUE);
 	}
+
+	DTRACE_PROBE3(missing__cid, mac_protect_t *, p,
+	    uchar_t *, cid, uint_t, cidlen);
 	return (B_FALSE);
 }
 
@@ -2046,6 +2049,12 @@ dhcpnospoof_check_v4(mac_client_impl_t *mcip, mac_protect_t *p,
 	    bcmp(mcip->mci_unicast->ma_addr, dh4->chaddr, maclen) != 0) {
 		return (B_FALSE);
 	}
+
+	/* Everything after here is checking the Client Identifier */
+	if (p->mp_allcids == MPT_TRUE) {
+		return (B_TRUE);
+	}
+
 	if (get_dhcpv4_option(dh4, end, CD_CLIENT_ID, &cid, &optlen) == 0)
 		cidlen = optlen;
 
@@ -2081,6 +2090,11 @@ dhcpnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *p,
 	if (mtype == DHCPV6_MSG_ADVERTISE || mtype == DHCPV6_MSG_REPLY ||
 	    mtype == DHCPV6_MSG_RECONFIGURE)
 		return (B_TRUE);
+
+	/* Everything after here is checking the Client Identifier */
+	if (p->mp_allcids == MPT_TRUE) {
+		return (B_TRUE);
+	}
 
 	d6o = get_dhcpv6_option(&dh6[1], end - (uchar_t *)&dh6[1], NULL,
 	    DHCPV6_OPT_CLIENTID, &cidlen);
@@ -2159,7 +2173,6 @@ dhcpnospoof_check(mac_client_impl_t *mcip, mac_protect_t *protect,
 	return (0);
 
 fail:
-	/* increment dhcpnospoof stat here */
 	freemsg(nmp);
 	return (err);
 }
@@ -2487,6 +2500,11 @@ mac_protect_validate(mac_resource_props_t *mrp)
 	if ((err = validate_cids(p)) != 0)
 		return (err);
 
+	if (p->mp_allcids != MPT_FALSE && p->mp_allcids != MPT_TRUE &&
+	    p->mp_allcids != MPT_RESET) {
+		return (EINVAL);
+	}
+
 	return (0);
 }
 
@@ -2553,6 +2571,11 @@ mac_protect_update(mac_resource_props_t *new, mac_resource_props_t *curr)
 			bzero(cp->mp_cids, sizeof (cp->mp_cids));
 			cp->mp_cidcnt = 0;
 		}
+	}
+	if (np->mp_allcids == MPT_RESET) {
+		cp->mp_allcids = MPT_FALSE;
+	} else if (np->mp_allcids != 0) {
+		cp->mp_allcids = MPT_TRUE;
 	}
 }
 

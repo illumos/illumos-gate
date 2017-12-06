@@ -41,9 +41,9 @@
 .\"
 .\"
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2017 Joyent, Inc.
 .\"
-.TH DLADM 1M "Dec 16, 2016"
+.TH DLADM 1M "Dec 6, 2017"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
@@ -4893,6 +4893,43 @@ The following general link properties are supported:
 .sp
 .ne 2
 .na
+\fB\fBallow-all-dhcp-cids\fR\fR
+.ad
+.sp .6
+.RS 4n
+One of \fBtrue\fR or \fBfalse\fR, to indicate whether or not all DHCP Client
+Identifiers should be permitted on this interface when DHCP spoofing protection
+is being used. This can be useful in cases where a DHCP client is using RFC
+4361-style Client Identifiers, which are based on a value that is opaque to the
+Global Zone, but enforcement of MAC addresses in DHCP packets is still desired.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBallowed-dhcp-cids\fR\fR
+.ad
+.sp .6
+.RS 4n
+A comma-separated list of DHCP Client Identifiers that are allowed on the
+interface.
+.sp
+Client identifiers can be written in three different formats: a string of
+hexadecimal characters prefixed by \fB0x\fR, indicating the exact bytes used in
+the Client Identifier; an RFC 3315 DUID of the form
+"1.<hardware\ type>.<time>.<link-layer\ address>" (DUID-LLT),
+"2.<enterprise\ number>.<hex\ string>" (DUID-EN), or
+"3.<hardware\ type>.<link-layer\ address>" (DUID-LL); or a string of characters
+whose byte values should be used as the Client Identifier.
+.sp
+When specifying a string of hexadecimal characters prefixed by \fB0x\fR or as
+part of a DUID-EN string, an even number of hexadecimal characters must be
+provided in order to fully specify each byte.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBallowed-ips\fR\fR
 .ad
 .sp .6
@@ -5965,6 +6002,16 @@ Interface Stability	Committed
 \fBacctadm\fR(1M), \fBautopush\fR(1M), \fBifconfig\fR(1M), \fBipsecconf\fR(1M),
 \fBndd\fR(1M), \fBpsrset\fR(1M), \fBwpad\fR(1M), \fBzonecfg\fR(1M),
 \fBattributes\fR(5), \fBieee802.3\fR(5), \fBoverlay\fR(5), \fBdlpi\fR(7P)
+.sp
+.LP
+R. Droms, Ed., J. Bound, B. Volz, T. Lemon, C. Perkins, M. Carney. \fIRFC 3315:
+Dynamic Host Configuration Protocol for IPv6 (DHCPv6)\fR. The Internet Society.
+July 2003.
+.sp
+.LP
+T. Lemon, B. Sommerfeld. February 2006. \fIRFC 4361: Node-specific Client
+Identifiers for Dynamic Host Configuration Protocol Version Four (DHCPv4)\fR.
+The Internet Society. January 2006.
 .SH NOTES
 .LP
 The preferred method of referring to an aggregation in the aggregation

@@ -77,6 +77,9 @@ octet_to_hexascii(const void *nump, uint_t nlen, char *bufp, uint_t *blen)
  * Converts an ASCII string into an octet string.
  *
  * Returns 0 for success, errno otherwise.
+ *
+ * If the string contains invalid hexadecimal characters, or an odd number of
+ * characters then this function returns EINVAL.
  */
 int
 hexascii_to_octet(const char *asp, uint_t alen, void *bufp, uint_t *blen)

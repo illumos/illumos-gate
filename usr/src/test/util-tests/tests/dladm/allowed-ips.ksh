@@ -11,47 +11,12 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 
-ai_arg0="$(basename $0)"
-ai_stub="teststub$$"
-ai_vnic="testvnic$$"
+source ./common.ksh
 
-function fatal
-{
-	typeset msg="$*"
-	[[ -z "$msg" ]] && msg="failed"
-	echo "TEST_FAIL: $vt_arg0: $msg" >&2
-	exit 1
-}
-
-function setup
-{
-	dladm create-etherstub $ai_stub || fatal "failed to create etherstub"
-	dladm create-vnic -l $ai_stub $ai_vnic || fatal "failed to create vnic"
-}
-
-function cleanup
-{
-	dladm delete-vnic $ai_vnic || fatal "failed to remove vnic"
-	dladm delete-etherstub $ai_stub || fatal "failed to remove etherstub"
-}
-
-function runtest
-{
-	dladm set-linkprop -p allowed-ips="$@" $ai_vnic 2>/dev/null
-}
-
-function epass
-{
-	runtest $* || fatal "allowed-ips=$* failed, expected success\n"
-}
-
-function efail
-{
-	runtest $* && fatal "allowed-ips=$* succeeded, expected failure\n"
-}
+property="allowed-ips"
 
 #
 # Run through all IPv6 prefixes for validity with a token prefix
@@ -204,4 +169,4 @@ epass fe80::/15
 epass fe82::/15
 
 cleanup
-printf "TEST PASS: $ai_arg0"
+printf "TEST PASS: $ai_arg0\n"
