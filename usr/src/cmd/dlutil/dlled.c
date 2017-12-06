@@ -268,7 +268,7 @@ main(int argc, char *argv[])
 			if ((status = dladm_name2info(dlled_hdl, argv[i],
 			    &linkid, NULL, NULL, NULL)) != DLADM_STATUS_OK) {
 				(void) fprintf(stderr, "failed to get link "
-				    "id for link %s: %s\n", link,
+				    "id for link %s: %s\n", argv[i],
 				    dladm_status2str(status, dlled_dlerrmsg));
 				return (1);
 			}
