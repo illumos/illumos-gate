@@ -5061,6 +5061,67 @@ tokens \fBhigh\fR, \fBmedium\fR, or \fBlow\fR. The default is \fBhigh\fR.
 .sp
 .ne 2
 .na
+\fB\fBprotection\fR\fR
+.ad
+.sp .6
+.RS 4n
+This property enables various forms of link protections, which prevent sending
+applicable traffic out of this link. Note that since this enforcement happens
+late in the networking stack, some observability tools like \fBsnoop\fR(1M) may
+still see dropped outbound packets.
+
+This property should be set to a comma-separated list of protections to enable
+on this link, where available protections are:
+.sp
+.ne 2
+.na
+\fBip-nospoof\fR
+.ad
+.sp .6
+.RS 4n
+Prevents sending from IPv4 and IPv6 addresses that have not been permitted
+over the NIC. Addresses can be learned dynamically (see \fBdynamic-methods\fR)
+or specified explicitly (see \fBallowed-ips\fR).
+.RE
+.sp
+.ne 2
+.na
+\fBdhcp-nospoof\fR
+.ad
+.sp .6
+.RS 4n
+Prevents sending DHCP packets whose client hardware address
+(CHADDR) field differs from the link-layer address, or from using a Client
+Identifier whose value cannot be confirmed to be derived from the link-layer
+address. Additional Client Identifiers can be permitted through the
+\fBallowed-dhcp-cids\fR and \fBallow-all-dhcp-cids\fR link properties.
+.RE
+.sp
+.ne 2
+.na
+\fBmac-nospoof\fR
+.ad
+.sp .6
+.RS 4n
+Prevents sending packets with a link-layer address that differs from the one
+associated with the NIC. Additional addresses to allow can be added using the
+\fBseconday-macs\fR property.
+.RE
+.sp
+.ne 2
+.na
+\fBrestricted\fR
+.ad
+.sp .6
+.RS 4n
+Prevents using a VLAN ID not associated with the NIC and sending packets that
+are not IPv4, IPv6 or ARP.
+.RE
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBstp\fR\fR
 .ad
 .sp .6
