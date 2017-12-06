@@ -4129,6 +4129,8 @@ ip_modclose(ill_t *ill)
 	rw_destroy(&ill->ill_mcast_lock);
 	mutex_destroy(&ill->ill_mcast_serializer);
 	list_destroy(&ill->ill_nce);
+	cv_destroy(&ill->ill_dlpi_capab_cv);
+	mutex_destroy(&ill->ill_dlpi_capab_lock);
 
 	/*
 	 * Now we are done with the module close pieces that
@@ -8200,7 +8202,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	conn_t		*connp = NULL;
 	t_uscalar_t	paddrreq;
 	mblk_t		*mp_hw;
-	boolean_t	success;
 	boolean_t	ioctl_aborted = B_FALSE;
 	boolean_t	log = B_TRUE;
 
@@ -8300,7 +8301,8 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
 			mutex_exit(&ill->ill_lock);
 			/*
-			 * Something went wrong with the bind.  We presumably
+			 * Something went wrong with the bind. If this was the
+			 * result of a DL_NOTE_REPLUMB, then we presumably
 			 * have an IOCTL hanging out waiting for completion.
 			 * Find it, take down the interface that was coming
 			 * up, and complete the IOCTL with the error noted.
@@ -8317,6 +8319,15 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 				(void) ipif_down(ipif, NULL, NULL);
 				/* error is set below the switch */
+			} else {
+				/*
+				 * There's no pending IOCTL, so the bind was
+				 * most likely started by ill_dl_up(). We save
+				 * the error and let it take care of responding
+				 * to the IOCTL.
+				 */
+				ill->ill_dl_bind_err = dlea->dl_unix_errno ?
+				    dlea->dl_unix_errno : ENXIO;
 			}
 			break;
 		case DL_ENABMULTI_REQ:
@@ -8440,55 +8451,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		DTRACE_PROBE1(ip__rput__dlpi__bind__ack, ill_t *, ill);
 		ill_nic_event_dispatch(ill, 0, NE_UP, NULL, 0);
 
-		/*
-		 * Now bring up the resolver; when that is complete, we'll
-		 * create IREs.  Note that we intentionally mirror what
-		 * ipif_up() would have done, because we got here by way of
-		 * ill_dl_up(), which stopped ipif_up()'s processing.
-		 */
-		if (ill->ill_isv6) {
-			/*
-			 * v6 interfaces.
-			 * Unlike ARP which has to do another bind
-			 * and attach, once we get here we are
-			 * done with NDP
-			 */
-			(void) ipif_resolver_up(ipif, Res_act_initial);
-			if ((err = ipif_ndp_up(ipif, B_TRUE)) == 0)
-				err = ipif_up_done_v6(ipif);
-		} else if (ill->ill_net_type == IRE_IF_RESOLVER) {
-			/*
-			 * ARP and other v4 external resolvers.
-			 * Leave the pending mblk intact so that
-			 * the ioctl completes in ip_rput().
-			 */
-			if (connp != NULL)
-				mutex_enter(&connp->conn_lock);
-			mutex_enter(&ill->ill_lock);
-			success = ipsq_pending_mp_add(connp, ipif, q, mp1, 0);
-			mutex_exit(&ill->ill_lock);
-			if (connp != NULL)
-				mutex_exit(&connp->conn_lock);
-			if (success) {
-				err = ipif_resolver_up(ipif, Res_act_initial);
-				if (err == EINPROGRESS) {
-					freemsg(mp);
-					return;
-				}
-				mp1 = ipsq_pending_mp_get(ipsq, &connp);
-			} else {
-				/* The conn has started closing */
-				err = EINTR;
-			}
-		} else {
-			/*
-			 * This one is complete. Reply to pending ioctl.
-			 */
-			(void) ipif_resolver_up(ipif, Res_act_initial);
-			err = ipif_up_done(ipif);
-		}
-
-		if ((err == 0) && (ill->ill_up_ipifs)) {
+		if (ill->ill_up_ipifs) {
 			err = ill_up_ipifs(ill, q, mp1);
 			if (err == EINPROGRESS) {
 				freemsg(mp);
@@ -8496,25 +8459,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			}
 		}
 
-		/*
-		 * If we have a moved ipif to bring up, and everything has
-		 * succeeded to this point, bring it up on the IPMP ill.
-		 * Otherwise, leave it down -- the admin can try to bring it
-		 * up by hand if need be.
-		 */
-		if (ill->ill_move_ipif != NULL) {
-			if (err != 0) {
-				ill->ill_move_ipif = NULL;
-			} else {
-				ipif = ill->ill_move_ipif;
-				ill->ill_move_ipif = NULL;
-				err = ipif_up(ipif, q, mp1);
-				if (err == EINPROGRESS) {
-					freemsg(mp);
-					return;
-				}
-			}
-		}
 		break;
 
 	case DL_NOTIFY_IND: {

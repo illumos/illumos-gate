@@ -147,7 +147,7 @@ extern dladm_status_t	dladm_flow_proplist_extract(dladm_arg_list_t *,
  * by the pd_check function.
  */
 typedef	dladm_status_t	rp_extractf_t(val_desc_t *, uint_t, void *);
-extern rp_extractf_t	extract_priority, extract_cpus,
+extern rp_extractf_t	extract_dynamic_methods, extract_priority, extract_cpus,
 			extract_protection, extract_allowallcids, extract_pool,
 			extract_allowedips, extract_allowedcids, extract_maxbw,
 			extract_rxrings, extract_txrings;

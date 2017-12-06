@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2017, Joyent, Inc. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
@@ -1415,6 +1415,7 @@ typedef union ill_g_head_u {
 #define	ILL_CAPAB_DLD		0x20		/* DLD capabilities */
 #define	ILL_CAPAB_DLD_POLL	0x40		/* Polling */
 #define	ILL_CAPAB_DLD_DIRECT	0x80		/* Direct function call */
+#define	ILL_CAPAB_DLD_IPCHECK	0x100		/* Check if IPs are permitted */
 
 /*
  * Per-ill Hardware Checksumming capbilities.
@@ -1728,6 +1729,8 @@ typedef struct ill_s {
 	 * Capabilities related fields.
 	 */
 	uint_t  ill_dlpi_capab_state;	/* State of capability query, IDCS_* */
+	kcondvar_t ill_dlpi_capab_cv;	/* CV for broadcasting state changes */
+	kmutex_t ill_dlpi_capab_lock;	/* Lock for accessing above Cond Var */
 	uint_t	ill_capab_pending_cnt;
 	uint64_t ill_capabilities;	/* Enabled capabilities, ILL_CAPAB_* */
 	ill_hcksum_capab_t *ill_hcksum_capab; /* H/W cksumming capabilities */
@@ -1769,6 +1772,10 @@ typedef struct ill_s {
 	 * Used to save errors that occur during plumbing
 	 */
 	uint_t		ill_ifname_pending_err;
+	/*
+	 * Used to save errors that occur during binding
+	 */
+	uint_t		ill_dl_bind_err;
 	avl_node_t	ill_avl_byppa; /* avl node based on ppa */
 	list_t		ill_nce; /* pointer to nce_s list */
 	uint_t		ill_refcnt;	/* active refcnt by threads */
@@ -1934,6 +1941,7 @@ typedef struct ill_s {
  * ill_nd_lla_len		ipsq + down ill		only when ill is up
  * ill_phys_addr_pend		ipsq + down ill		only when ill is up
  * ill_ifname_pending_err	ipsq			ipsq
+ * ill_dl_bind_err		ipsq			ipsq
  * ill_avl_byppa		ipsq, ill_g_lock	write once
  *
  * ill_fastpath_list		ill_lock		ill_lock
@@ -3575,6 +3583,8 @@ typedef	void			(*ip_flow_enable_t)(void *, ip_mac_tx_cookie_t);
 typedef void			*(*ip_dld_callb_t)(void *,
     ip_flow_enable_t, void *);
 typedef boolean_t		(*ip_dld_fctl_t)(void *, ip_mac_tx_cookie_t);
+typedef boolean_t		(*ip_mac_ipcheck_t)(void *, boolean_t,
+    in6_addr_t *);
 typedef int			(*ip_capab_func_t)(void *, uint_t,
     void *, uint_t);
 
@@ -3627,6 +3637,12 @@ typedef struct ill_dld_direct_s {		/* DLD provided driver Tx */
 	void			*idd_tx_fctl_dh;	/* mac_client_handle */
 } ill_dld_direct_t;
 
+/* IP - DLD direct function call to check if an IP is allowed */
+typedef struct ill_dld_ipcheck_s {
+	ip_mac_ipcheck_t	idi_allowed_df;
+	void			*idi_allowed_dh;
+} ill_dld_ipcheck_t;
+
 /* IP - DLD polling capability */
 typedef struct ill_dld_poll_s {
 	ill_rx_ring_t		idp_ring_tbl[ILL_MAX_RINGS];
@@ -3638,6 +3654,7 @@ struct ill_dld_capab_s {
 	void			*idc_capab_dh;	/* dld_str_t *dsp */
 	ill_dld_direct_t	idc_direct;
 	ill_dld_poll_t		idc_poll;
+	ill_dld_ipcheck_t	idc_ipcheck;
 };
 
 /*

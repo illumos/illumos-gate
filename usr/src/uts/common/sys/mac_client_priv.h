@@ -58,6 +58,9 @@ extern const mac_info_t *mac_info(mac_handle_t);
 extern boolean_t mac_info_get(const char *, mac_info_t *);
 extern boolean_t mac_promisc_get(mac_handle_t);
 
+extern boolean_t mac_protect_check_addr(mac_client_handle_t, boolean_t,
+    in6_addr_t *);
+
 extern int mac_start(mac_handle_t);
 extern void mac_stop(mac_handle_t);
 

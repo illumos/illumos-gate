@@ -4991,6 +4991,24 @@ is not bound to any specific processor or processor set.
 .sp
 .ne 2
 .na
+\fB\fBdynamic-methods\fR\fR
+.ad
+.sp .6
+.RS 4n
+When using IP spoofing protection (see \fBprotection\fR), addresses can be
+learned dynamically by monitoring certain network traffic, like DHCP
+transactions or IPv6 Stateless Address Autoconfiguration (SLAAC). By default,
+all learning methods are permitted, but if \fBallowed-ips\fR contains any
+addresses, then all methods are disabled, and any packets sent from addresses
+previously learned will be dropped. This property allows selecting which ones
+are re-enabled, where valid options are \fBdhcpv4\fR, \fBdhcpv6\fR, and
+\fBslaac\fR. \fBaddrconf\fR is available as an alias for enabling both
+\fBdhcpv6\fR and \fBslaac\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBlearn_limit\fR\fR
 .ad
 .sp .6

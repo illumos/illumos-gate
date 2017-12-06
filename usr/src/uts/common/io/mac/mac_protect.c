@@ -209,7 +209,7 @@ typedef struct slaac_addr {
 } slaac_addr_t;
 
 static void	start_txn_cleanup_timer(mac_client_impl_t *);
-static boolean_t allowed_ips_set(mac_resource_props_t *, uint32_t);
+static boolean_t dynamic_method_set(mac_protect_t *, uint32_t);
 
 #define	BUMP_STAT(m, s)	(m)->mci_misc_stat.mms_##s++
 
@@ -580,8 +580,7 @@ intercept_dhcpv4_outbound(mac_client_impl_t *mcip, ipha_t *ipha, uchar_t *end)
 	if (get_dhcpv4_info(ipha, end, &dh4) != 0)
 		return (B_TRUE);
 
-	/* ip_nospoof/allowed-ips and DHCP are mutually exclusive by default */
-	if (allowed_ips_set(mrp, IPV4_VERSION))
+	if (!dynamic_method_set(&mrp->mrp_protect, MPT_DYN_DHCPV4))
 		return (B_FALSE);
 
 	if (get_dhcpv4_option(dh4, end, CD_DHCP_TYPE, &opt, &opt_len) != 0 ||
@@ -1310,8 +1309,7 @@ intercept_dhcpv6_outbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end)
 	if (get_dhcpv6_info(ip6h, end, &dh6) != 0)
 		return (B_TRUE);
 
-	/* ip_nospoof/allowed-ips and DHCP are mutually exclusive by default */
-	if (allowed_ips_set(mrp, IPV6_VERSION))
+	if (!dynamic_method_set(&mrp->mrp_protect, MPT_DYN_DHCPV6))
 		return (B_FALSE);
 
 	/*
@@ -1517,6 +1515,10 @@ intercept_ra_inbound(mac_client_impl_t *mcip, ip6_t *ip6h, uchar_t *end,
 {
 	struct nd_opt_hdr *opt;
 	int len, optlen;
+	mac_protect_t *protect = &MCIP_RESOURCE_PROPS(mcip)->mrp_protect;
+
+	if (!dynamic_method_set(protect, MPT_DYN_SLAAC))
+		return;
 
 	if (ip6h->ip6_hlim != 255) {
 		DTRACE_PROBE1(invalid__hoplimit, uint8_t, ip6h->ip6_hlim);
@@ -1755,6 +1757,7 @@ ipnospoof_check_v4(mac_client_impl_t *mcip, mac_protect_t *protect,
 	if (*addr == INADDR_ANY)
 		return (B_TRUE);
 
+	/* If any specific addresses or subnets are allowed, check them */
 	for (i = 0; i < protect->mp_ipaddrcnt; i++) {
 		mac_ipaddr_t	*v4addr = &protect->mp_ipaddrs[i];
 
@@ -1775,14 +1778,19 @@ ipnospoof_check_v4(mac_client_impl_t *mcip, mac_protect_t *protect,
 				return (B_TRUE);
 		}
 	}
-	return (protect->mp_ipaddrcnt == 0 ?
-	    check_dhcpv4_dyn_ip(mcip, *addr) : B_FALSE);
+
+	if (dynamic_method_set(protect, MPT_DYN_DHCPV4)) {
+		return (check_dhcpv4_dyn_ip(mcip, *addr));
+	}
+
+	return (B_FALSE);
 }
 
 static boolean_t
 ipnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *protect,
     in6_addr_t *addr)
 {
+	boolean_t slaac_enabled, dhcpv6_enabled;
 	uint_t	i;
 
 	/*
@@ -1793,7 +1801,7 @@ ipnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *protect,
 	    IN6_ARE_ADDR_EQUAL(&mcip->mci_v6_local_addr, addr)))
 		return (B_TRUE);
 
-
+	/* If any specific addresses or subnets are allowed, check them */
 	for (i = 0; i < protect->mp_ipaddrcnt; i++) {
 		mac_ipaddr_t	*v6addr = &protect->mp_ipaddrs[i];
 
@@ -1804,12 +1812,15 @@ ipnospoof_check_v6(mac_client_impl_t *mcip, mac_protect_t *protect,
 			return (B_TRUE);
 	}
 
-	if (protect->mp_ipaddrcnt == 0) {
-		return (check_slaac_ip(mcip, addr) ||
-		    check_dhcpv6_dyn_ip(mcip, addr));
-	} else {
-		return (B_FALSE);
-	}
+	slaac_enabled = dynamic_method_set(protect, MPT_DYN_SLAAC);
+	if (slaac_enabled && check_slaac_ip(mcip, addr))
+		return (B_TRUE);
+
+	dhcpv6_enabled = dynamic_method_set(protect, MPT_DYN_DHCPV6);
+	if (dhcpv6_enabled && check_dhcpv6_dyn_ip(mcip, addr))
+		return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 /*
@@ -2577,6 +2588,11 @@ mac_protect_update(mac_resource_props_t *new, mac_resource_props_t *curr)
 	} else if (np->mp_allcids != 0) {
 		cp->mp_allcids = MPT_TRUE;
 	}
+	if (np->mp_dynamic == MPT_RESET) {
+		cp->mp_dynamic = 0;
+	} else if (np->mp_dynamic != 0) {
+		cp->mp_dynamic = np->mp_dynamic;
+	}
 }
 
 void
@@ -2620,15 +2636,50 @@ mac_protect_fini(mac_client_impl_t *mcip)
 }
 
 static boolean_t
-allowed_ips_set(mac_resource_props_t *mrp, uint32_t af)
+dynamic_method_set(mac_protect_t *mpt, uint32_t method)
 {
-	int i;
-
-	for (i = 0; i < mrp->mrp_protect.mp_ipaddrcnt; i++) {
-		if (mrp->mrp_protect.mp_ipaddrs[i].ip_version == af)
-			return (B_TRUE);
+	if (mpt->mp_dynamic != 0) {
+		return ((mpt->mp_dynamic & method) != 0);
+	} else {
+		return (mpt->mp_ipaddrcnt == 0);
 	}
-	return (B_FALSE);
+}
+
+boolean_t
+mac_protect_check_addr(mac_client_handle_t mch, boolean_t isv6,
+    in6_addr_t *v6addr)
+{
+	mac_perim_handle_t	perim;
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	mac_handle_t		mh = (mac_handle_t)mcip->mci_mip;
+
+	mac_perim_enter_by_mh(mh, &perim);
+
+	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);
+	mac_protect_t		*p;
+	boolean_t		allowed;
+
+	ASSERT(mrp != NULL);
+
+	p = &mrp->mrp_protect;
+
+	/* If mac protection/ipnospoof isn't enabled, return true */
+	if ((mrp->mrp_mask & MRP_PROTECT) == 0 ||
+	    (p->mp_types & MPT_IPNOSPOOF) == 0) {
+		allowed = B_TRUE;
+		goto done;
+	}
+
+	if (isv6) {
+		allowed = ipnospoof_check_v6(mcip, p, v6addr);
+	} else {
+		in_addr_t *v4addr = &V4_PART_OF_V6((*v6addr));
+		allowed = ipnospoof_check_v4(mcip, p, v4addr);
+	}
+
+done:
+	mac_perim_exit(perim);
+	return (allowed);
 }
 
 mac_protect_t *

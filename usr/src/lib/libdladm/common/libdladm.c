@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 #include <unistd.h>
@@ -98,6 +98,18 @@ static link_protect_t link_protect_types[] = {
 	{ MPT_DHCPNOSPOOF, "dhcp-nospoof" }
 };
 #define	LPTYPES	(sizeof (link_protect_types) / sizeof (link_protect_t))
+
+typedef struct {
+	uint32_t	ld_type;
+	char		*ld_name;
+} link_dynamic_t;
+
+static link_dynamic_t link_dynamic_types[] = {
+	{ MPT_DYN_DHCPV4, "dhcpv4" },
+	{ MPT_DYN_DHCPV6, "dhcpv6" },
+	{ MPT_DYN_SLAAC, "slaac" },
+};
+#define	DYNTYPES	(sizeof (link_dynamic_types) / sizeof (link_dynamic_t))
 
 dladm_status_t
 dladm_open(dladm_handle_t *handle)
@@ -951,6 +963,28 @@ dladm_protect2str(uint32_t ptype, char *buf)
 	return (buf);
 }
 
+
+/*
+ * Convert dynamic address method value to a string.
+ */
+const char *
+dladm_dynamic2str(uint32_t dtype, char *buf, size_t size)
+{
+	const char	*s = "--";
+	link_dynamic_t	*ld;
+	int		i;
+
+	for (i = 0; i < DYNTYPES; i++) {
+		ld = &link_dynamic_types[i];
+		if (ld->ld_type == dtype) {
+			s = ld->ld_name;
+			break;
+		}
+	}
+	(void) snprintf(buf, size, "%s", dgettext(TEXT_DOMAIN, s));
+	return (buf);
+}
+
 /*
  * Convert an IPv4 address to/from a string.
  */
@@ -1092,8 +1126,8 @@ fail:
  * is allocated here but should be freed by the caller.
  */
 dladm_status_t
-dladm_strs2range(char **prop_val, uint_t val_cnt, mac_propval_type_t type,
-    mac_propval_range_t **range)
+dladm_strs2range(char **prop_val, uint_t val_cnt,
+    mac_propval_type_t type, mac_propval_range_t **range)
 {
 	int			i;
 	char			*endp;
