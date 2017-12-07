@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2016, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -37,6 +37,7 @@
 #include <sys/mutex.h>
 #include <sys/bitmap.h>
 #include <sys/atomic.h>
+#include <sys/sunddi.h>
 #include <sys/kobj.h>
 #include <sys/disp.h>
 #include <vm/seg_kmem.h>
@@ -122,11 +123,21 @@ static boolean_t wait_for_zone_creator(netstack_t *, kmutex_t *);
 static boolean_t wait_for_nms_inprogress(netstack_t *, nm_state_t *,
     kmutex_t *);
 
+static ksema_t netstack_reap_limiter;
+/*
+ * Hard-coded constant, but since this is not tunable in real-time, it seems
+ * making it an /etc/system tunable is better than nothing.
+ */
+uint_t netstack_outstanding_reaps = 1024;
+
 void
 netstack_init(void)
 {
 	mutex_init(&netstack_g_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&netstack_shared_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	sema_init(&netstack_reap_limiter, netstack_outstanding_reaps, NULL,
+	    SEMA_DRIVER, NULL);
 
 	netstack_initialized = 1;
 
@@ -1061,13 +1072,61 @@ netstack_inuse_by_stackid(netstackid_t stackid)
 	return (rval);
 }
 
+
+static void
+netstack_reap(void *arg)
+{
+	netstack_t **nsp, *ns = (netstack_t *)arg;
+	boolean_t found;
+	int i;
+
+	/*
+	 * Time to call the destroy functions and free up
+	 * the structure
+	 */
+	netstack_stack_inactive(ns);
+
+	/* Make sure nothing increased the references */
+	ASSERT(ns->netstack_refcnt == 0);
+	ASSERT(ns->netstack_numzones == 0);
+
+	/* Finally remove from list of netstacks */
+	mutex_enter(&netstack_g_lock);
+	found = B_FALSE;
+	for (nsp = &netstack_head; *nsp != NULL;
+	    nsp = &(*nsp)->netstack_next) {
+		if (*nsp == ns) {
+			*nsp = ns->netstack_next;
+			ns->netstack_next = NULL;
+			found = B_TRUE;
+			break;
+		}
+	}
+	ASSERT(found);
+	mutex_exit(&netstack_g_lock);
+
+	/* Make sure nothing increased the references */
+	ASSERT(ns->netstack_refcnt == 0);
+	ASSERT(ns->netstack_numzones == 0);
+
+	ASSERT(ns->netstack_flags & NSF_CLOSING);
+
+	for (i = 0; i < NS_MAX; i++) {
+		nm_state_t *nms = &ns->netstack_m_state[i];
+
+		cv_destroy(&nms->nms_cv);
+	}
+	mutex_destroy(&ns->netstack_lock);
+	cv_destroy(&ns->netstack_cv);
+	kmem_free(ns, sizeof (*ns));
+	/* Allow another reap to be scheduled. */
+	sema_v(&netstack_reap_limiter);
+}
+
 void
 netstack_rele(netstack_t *ns)
 {
-	netstack_t **nsp;
-	boolean_t found;
 	int refcnt, numzones;
-	int i;
 
 	mutex_enter(&ns->netstack_lock);
 	ASSERT(ns->netstack_refcnt > 0);
@@ -1085,44 +1144,31 @@ netstack_rele(netstack_t *ns)
 
 	if (refcnt == 0 && numzones == 0) {
 		/*
-		 * Time to call the destroy functions and free up
-		 * the structure
+		 * Because there are possibilities of re-entrancy in various
+		 * netstack structures by callers, which might cause a lock up
+		 * due to odd reference models, or other factors, we choose to
+		 * schedule the actual deletion of this netstack as a deferred
+		 * task on the system taskq.  This way, any such reference
+		 * models won't trip over themselves.
+		 *
+		 * Assume we aren't in a high-priority interrupt context, so
+		 * we can use KM_SLEEP and semaphores.
 		 */
-		netstack_stack_inactive(ns);
+		if (sema_tryp(&netstack_reap_limiter) == 0) {
+			/*
+			 * Indicate we're slamming against a limit.
+			 */
+			hrtime_t measurement = gethrtime();
 
-		/* Make sure nothing increased the references */
-		ASSERT(ns->netstack_refcnt == 0);
-		ASSERT(ns->netstack_numzones == 0);
-
-		/* Finally remove from list of netstacks */
-		mutex_enter(&netstack_g_lock);
-		found = B_FALSE;
-		for (nsp = &netstack_head; *nsp != NULL;
-		    nsp = &(*nsp)->netstack_next) {
-			if (*nsp == ns) {
-				*nsp = ns->netstack_next;
-				ns->netstack_next = NULL;
-				found = B_TRUE;
-				break;
-			}
+			sema_p(&netstack_reap_limiter);
+			/* Capture delay in ns. */
+			DTRACE_PROBE1(netstack__reap__rate__limited,
+			    hrtime_t, gethrtime() - measurement);
 		}
-		ASSERT(found);
-		mutex_exit(&netstack_g_lock);
 
-		/* Make sure nothing increased the references */
-		ASSERT(ns->netstack_refcnt == 0);
-		ASSERT(ns->netstack_numzones == 0);
-
-		ASSERT(ns->netstack_flags & NSF_CLOSING);
-
-		for (i = 0; i < NS_MAX; i++) {
-			nm_state_t *nms = &ns->netstack_m_state[i];
-
-			cv_destroy(&nms->nms_cv);
-		}
-		mutex_destroy(&ns->netstack_lock);
-		cv_destroy(&ns->netstack_cv);
-		kmem_free(ns, sizeof (*ns));
+		/* TQ_SLEEP should prevent taskq_dispatch() from failing. */
+		(void) taskq_dispatch(system_taskq, netstack_reap, ns,
+		    TQ_SLEEP);
 	}
 }
 
