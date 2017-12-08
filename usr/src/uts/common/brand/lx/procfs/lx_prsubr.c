@@ -284,15 +284,7 @@ retry:
 netstack_t *
 lxpr_netstack(lxpr_node_t *lxpnp)
 {
-	netstack_t *ns;
-
-	ns = LXPTOZ(lxpnp)->zone_netstack;
-	ASSERT(ns != NULL);
-	if (ns->netstack_flags & (NSF_UNINIT | NSF_CLOSING))
-		return (NULL);
-
-	netstack_hold(ns);
-	return (ns);
+	return (netstack_hold_if_active(LXPTOZ(lxpnp)->zone_netstack));
 }
 
 /*

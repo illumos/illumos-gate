@@ -281,17 +281,8 @@ netstack_t *
 lxsys_netstack(lxsys_node_t *lnp)
 {
 	zone_t *zone = VTOLXSM(LXSTOV(lnp))->lxsysm_zone;
-	netstack_t *ns = zone->zone_netstack;
 
-	VERIFY(ns != NULL);
-
-	if (ns->netstack_flags & (NSF_UNINIT|NSF_CLOSING)) {
-		ns = NULL;
-	} else {
-		netstack_hold(ns);
-	}
-
-	return (ns);
+	return (netstack_hold_if_active(zone->zone_netstack));
 }
 
 ill_t *
