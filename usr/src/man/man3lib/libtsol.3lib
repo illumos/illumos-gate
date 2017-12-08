@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2017 Peter Tribble.
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBTSOL 3LIB "Jul 20, 2007"
+.TH LIBTSOL 3LIB "Dec 3, 2017"
 .SH NAME
 libtsol \- Solaris Trusted Extensions library
 .SH SYNOPSIS
@@ -14,41 +15,33 @@ libtsol \- Solaris Trusted Extensions library
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Functions in this library provide programmatic access to Solaris Trusted
 Extensions features such as labels and Mandatory Access Policy (MAC) on systems
 that are configured with Trusted Extensions software.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibtsol.so.2\fR provides the public interfaces that are
 defined below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
 .SS "Committed Functions"
-.sp
-
-.sp
 .TS
 l l
 l l .
 \fBbldominates\fR	\fBblequal\fR
-\fBblstrictdom\fR	\fBgetpathbylabel\fR
+\fBblstrictdom\fR	\fBfgetlabel\fR
+\fBgetlabel\fR	\fBgetpathbylabel\fR
 \fBgetplabel\fR	\fBgetdevicerange\fR
 \fBgetuserrange\fR	\fBgetzoneidbylabel\fR
-\fBgetzonelabelbyid\fR	\fBgetzonerootbyid\fR
-\fBgetzonerootbylabel\fR	\fBgetzonerootbyname\fR
-\fBlabel_to_str\fR	\fBlabelbuilder\fR
-\fBlabelclipping\fR	\fBm_label_alloc\fR
-\fBm_label_dup\fR	\fBm_label_free\fR
-\fBsetflabel\fR	\fBstr_to_label\fR
-\fBtsol_lbuild_create\fR	\fBtsol_lbuild_destroy\fR
-\fBtsol_lbuild_get\fR	\fBtsol_lbuild_set\fR
-\fBXbcleartos\fR	\fBXbsltos\fR
+\fBgetzonelabelbyid\fR	\fBgetzonelabelbyname\fR
+\fBgetzonerootbyid\fR	\fBgetzonerootbylabel\fR
+\fBgetzonerootbyname\fR	\fBlabel_to_str\fR
+\fBm_label_alloc\fR	\fBm_label_dup\fR
+\fBm_label_free\fR	\fBsetflabel\fR
+\fBstr_to_label\fR
 .TE
 
 .SS "Obsolete Functions"
-.sp
 .LP
 The following functions are preserved to aid porting.
 .sp
@@ -77,7 +70,6 @@ Function	Committed Replacement
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libtsol.so.2\fR\fR
@@ -96,7 +88,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -116,11 +107,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBlibtsnet\fR(3LIB), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The functionality described on this manual page is available only if the system
 has been configured with Trusted Extensions.

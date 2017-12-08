@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETLABEL 2 "Jul 20, 2007"
+.TH GETLABEL 3TSOL "Dec 3, 2017"
 .SH NAME
 getlabel, fgetlabel \- get file sensitivity label
 .SH SYNOPSIS
@@ -25,7 +25,6 @@ getlabel, fgetlabel \- get file sensitivity label
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetlabel()\fR function obtains the sensitivity label of the file that is
 named by \fIpath\fR. Discretionary read, write or execute permission to the
@@ -42,12 +41,10 @@ The \fIlabel_p\fR argument is a pointer to an opaque label structure. The
 caller must allocate space for \fIlabel_p\fR by using
 \fBm_label_alloc\fR(3TSOL).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBgetlabel()\fR and \fBfgetlabel()\fR return 0.
 Otherwise they return \(mi1 and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBgetlabel()\fR function will fail if:
 .sp
@@ -148,7 +145,6 @@ An \fBI/O\fR error occurred while reading from or writing to the file system.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -164,7 +160,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBopen\fR(2), \fBpathconf\fR(2), \fBm_label_alloc\fR(3TSOL),
 \fBattributes\fR(5), \fBlabels\fR(5)
@@ -173,7 +168,6 @@ Interface Stability	Committed
 \fIObtaining a File Label\fR in \fISolaris Trusted Extensions Developer\&'s
 Guide\fR
 .SH NOTES
-.sp
 .LP
 The functionality described on this manual page is available only if the system
 is configured with Trusted Extensions.
