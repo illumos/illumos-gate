@@ -5051,7 +5051,6 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 {
 	uint16_t	flags = 0;
 	uint32_t	i;
-	uint32_t	context;
 	uint32_t	sge_bytes;
 	uint32_t	tmp_data_xfer_len;
 	ddi_acc_handle_t acc_handle;
@@ -5166,7 +5165,7 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 				mfi_sgl = (struct mrsas_sge64	*)&ldio->sgl;
 			}
 
-			context = ddi_get32(acc_handle, &ldio->context);
+			(void) ddi_get32(acc_handle, &ldio->context);
 
 			if (acmd->cmd_cdblen == CDB_GROUP0) {
 				/* 6-byte cdb */
@@ -5281,15 +5280,13 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 		ddi_put32(acc_handle, &pthru->sense_buf_phys_addr_lo,
 		    cmd->sense_phys_addr);
 
-		context = ddi_get32(acc_handle, &pthru->context);
+		(void) ddi_get32(acc_handle, &pthru->context);
 		ddi_rep_put8(acc_handle, (uint8_t *)pkt->pkt_cdbp,
 		    (uint8_t *)pthru->cdb, acmd->cmd_cdblen, DDI_DEV_AUTOINCR);
 
 		break;
 	}
-#ifdef lint
-	context = context;
-#endif
+
 	/* prepare the scatter-gather list for the firmware */
 	if (instance->flag_ieee) {
 		for (i = 0; i < acmd->cmd_cookiecnt; i++, mfi_sgl_ieee++) {
@@ -6838,8 +6835,6 @@ enable_intr_ppc(struct mrsas_instance *instance)
 static void
 disable_intr_ppc(struct mrsas_instance *instance)
 {
-	uint32_t	mask;
-
 	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: called"));
 
 	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: before : "
@@ -6853,10 +6848,7 @@ disable_intr_ppc(struct mrsas_instance *instance)
 	    "outbound_intr_mask = 0x%x", RD_OB_INTR_MASK(instance)));
 
 	/* dummy read to force PCI flush */
-	mask = RD_OB_INTR_MASK(instance);
-#ifdef lint
-	mask = mask;
-#endif
+	(void) RD_OB_INTR_MASK(instance);
 }
 
 static int

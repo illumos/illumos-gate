@@ -71,7 +71,7 @@ tanhl(long double x) {
 	long double t, y, z;
 	int signx;
 #ifndef lint
-	volatile long double dummy;
+	volatile long double dummy __unused;
 #endif
 
 	if (isnanl(x))

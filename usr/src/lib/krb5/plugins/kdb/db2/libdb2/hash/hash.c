@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1990, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -33,10 +33,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)hash.c	8.12 (Berkeley) 11/7/95";
-#endif /* LIBC_SCCS and not lint */
 
 #undef _TS_ERRNO_
 #include <sys/param.h>
@@ -329,9 +325,7 @@ init_hash(hashp, file, info)
 	const HASHINFO *info;
 {
 	struct stat statbuf;
-	int32_t nelem;
 
-	nelem = 1;
 	hashp->hdr.nkeys = 0;
 	hashp->hdr.lorder = DB_BYTE_ORDER;
 	hashp->hdr.bsize = DEF_BUCKET_SIZE;
@@ -436,11 +430,10 @@ hget_header(hashp, page_size)
 	HTAB *hashp;
 	u_int32_t page_size;
 {
-	u_int32_t num_copied, i;
+	u_int32_t num_copied;
 	u_int8_t *hdr_dest;
 
 	num_copied = 0;
-	i = 0;
 
 	hdr_dest = (u_int8_t *)&hashp->hdr;
 

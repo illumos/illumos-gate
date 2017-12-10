@@ -104,7 +104,7 @@ static const float
 float
 atanf(float xx) {
 	float x, y, z, r, p, s;
-	volatile double dummy;
+	volatile double dummy __unused;
 	int ix, iy, sign, j;
 
 	x = xx;

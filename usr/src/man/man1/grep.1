@@ -1,5 +1,5 @@
 '\" te
-.\" Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2017 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
@@ -10,7 +10,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GREP 1 "May 3, 2013"
+.TH GREP 1 "June 5, 2017"
 .SH NAME
 grep \- search a file for a pattern
 .SH SYNOPSIS
@@ -23,25 +23,24 @@ grep \- search a file for a pattern
 .LP
 .nf
 \fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bHhinsvwx\fR] \fB-e\fR \fIpattern_list\fR... [\fB-f\fR \fIpattern_file\fR]...
+    [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] \fB-e\fR \fIpattern_list\fR... [\fB-f\fR \fIpattern_file\fR]...
     [\fIfile\fR]...
 .fi
 
 .LP
 .nf
 \fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bHhinsvwx\fR] [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR...
+    [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR...
     [\fIfile\fR]...
 .fi
 
 .LP
 .nf
 \fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bHhinsvwx\fR] \fIpattern\fR [\fIfile\fR]...
+    [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] \fIpattern\fR [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgrep\fR utility searches text files for a pattern and prints all lines
 that contain that pattern.  It uses a compact non-deterministic algorithm.
@@ -50,19 +49,17 @@ that contain that pattern.  It uses a compact non-deterministic algorithm.
 Be careful using the characters \fB$\fR, \fB*\fR, \fB[\fR, \fB^\fR, \fB|\fR,
 \fB(\fR, \fB)\fR, and \fB\e\fR in the \fIpattern_list\fR because they are also
 meaningful to the shell. It is safest to enclose the entire \fIpattern_list\fR
-in single quotes \fBa\'\fR\&...\fBa\'\fR\&.
+in single quotes \fB\'\fR\&...\fB\'\fR\&.
 .sp
 .LP
 If no files are specified, \fBgrep\fR assumes standard input. Normally, each
 line found is copied to standard output. The file name is printed before each
 line found if there is more than one input file.
 .SS "/usr/bin/grep"
-.sp
 .LP
 The \fB/usr/bin/grep\fR utility uses limited regular expressions like those
 described on the \fBregexp\fR(5) manual page to match the patterns.
 .SS "/usr/xpg4/bin/grep"
-.sp
 .LP
 The options \fB-E\fR and \fB-F\fR affect the way \fB/usr/xpg4/bin/grep\fR
 interprets \fIpattern_list\fR. If \fB-E\fR is specified,
@@ -72,7 +69,6 @@ expression (see \fB-E\fR for description).  If \fB-F\fR is specified,
 specified, \fBgrep\fR interprets \fIpattern_list\fR as a basic regular
 expression as described on \fBregex\fR(5) manual page.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported for both \fB/usr/bin/grep\fR and
 \fB/usr/xpg4/bin/grep\fR:
@@ -202,9 +198,46 @@ Searches for the expression as a word as if surrounded by \fB\e<\fR and
 .RE
 
 .SS "/usr/xpg4/bin/grep"
-.sp
 .LP
 The following options are supported for \fB/usr/xpg4/bin/grep\fR only:
+.sp
+.ne 2
+.na
+\fB\fB-A\fR \fInumber\fR\fR
+.ad
+.RS 19n
+Prints \fInumber\fR input lines of context after each matching line. If there
+are multiple matching lines, their context lines are separated by a \fB--\fR
+delimiter line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-B\fR \fInumber\fR\fR
+.ad
+.RS 19n
+Prints \fInumber\fR input lines of context before each matching line. If there
+are multiple matching lines, their context lines are separated by a \fB--\fR
+delimiter line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-\fR\fInumber\fR\fR
+.ad
+.br
+.na
+\fB\fB-C\fR \fInumber\fR\fR
+.ad
+.RS 19n
+Prints \fInumber\fR input lines of context before and \fInumber\fR input lines
+of context after each matching line. If there are multiple matching lines,
+their context lines are separated by a \fB--\fR delimiter line.
+.RE
+
+
 .sp
 .ne 2
 .na
@@ -296,7 +329,6 @@ entire fixed string or regular expression to be matching lines.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -310,7 +342,6 @@ operands are specified, the standard input is used.
 .RE
 
 .SS "/usr/bin/grep"
-.sp
 .ne 2
 .na
 \fB\fIpattern\fR\fR
@@ -320,7 +351,6 @@ Specifies a pattern to be used during the search for input.
 .RE
 
 .SS "/usr/xpg4/bin/grep"
-.sp
 .ne 2
 .na
 \fB\fIpattern\fR\fR
@@ -331,7 +361,6 @@ operand is treated as if it were specified as \fB-e\fR \fIpattern_list\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The \fB-e\fR \fIpattern_list\fR option has the same effect as the
 \fIpattern_list\fR operand, but is useful when \fIpattern_list\fR begins with
@@ -353,7 +382,6 @@ the first match) and requires less care by the user in choosing the set of
 files to supply as arguments (because it exits zero if it finds a match even if
 \fBgrep\fR detected an access or read error on earlier file operands).
 .SS "Large File Behavior"
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBgrep\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
@@ -447,13 +475,11 @@ example% \fB/usr/xpg4/bin/grep -F -x 'abc def'\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBgrep\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -484,13 +510,10 @@ Syntax errors or inaccessible files (even if matches were found).
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/bin/grep"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -501,9 +524,7 @@ CSI	Not Enabled
 .TE
 
 .SS "/usr/xpg4/bin/grep"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -518,20 +539,17 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBegrep\fR(1), \fBfgrep\fR(1), \fBsed\fR(1), \fBsh\fR(1), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBlargefile\fR(5), \fBregex\fR(5), \fBregexp\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
 .SS "/usr/bin/grep"
-.sp
 .LP
 Lines are limited only by the size of the available virtual memory. If there is
 a line with embedded nulls, \fBgrep\fR only matches up to the first null. If
 the line matches, the entire line is printed.
 .SS "/usr/xpg4/bin/grep"
-.sp
 .LP
 The results are unspecified if input files contain lines longer than
 \fBLINE_MAX\fR bytes or contain binary data. \fBLINE_MAX\fR is defined in

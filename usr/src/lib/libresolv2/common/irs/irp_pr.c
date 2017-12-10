@@ -15,12 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: irp_pr.c,v 1.3 2005/04/27 04:56:29 sra Exp $";
-#endif /* LIBC_SCCS and not lint */
-
-/* extern */
-
 #include "port_before.h"
 
 #include <syslog.h>

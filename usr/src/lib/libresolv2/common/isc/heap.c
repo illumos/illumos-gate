@@ -25,10 +25,6 @@
  *	ISBN 0-201-06673-4, chapter 11.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: heap.c,v 1.4 2006/03/09 23:57:56 marka Exp $";
-#endif /* not lint */
-
 #include "port_before.h"
 
 #include <stddef.h>

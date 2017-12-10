@@ -215,7 +215,7 @@ struct connection {
    : 0)
 
 #define DEL(set, idx) \
-  (set.data[idx] = set.data[--set.n], 0)
+  (set.data[idx] = set.data[--set.n])
 
 #define FREE_SET_DATA(set) if(set.data) free(set.data);                 \
    (set.data = 0, set.max = 0)

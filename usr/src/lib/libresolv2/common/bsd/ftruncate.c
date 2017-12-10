@@ -1,7 +1,3 @@
-#ifndef LINT
-static const char rcsid[] = "$Id: ftruncate.c,v 1.3 2005/04/27 18:16:45 sra Exp $";
-#endif
-
 /*! \file
  * \brief
  * ftruncate - set file size, BSD Style

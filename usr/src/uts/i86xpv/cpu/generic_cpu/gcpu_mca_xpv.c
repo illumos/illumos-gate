@@ -76,10 +76,9 @@ gcpu_xpv_proxy_logout(int what, struct mc_info *mi, struct mcinfo_common **micp,
 	struct mcinfo_bank *mib;
 	cmi_hdl_t hdl = NULL;
 	cmi_mca_regs_t *mcrp;
-	gcpu_data_t *gcpu;
 	int idx = *idxp;
 	int tried = 0;
-	int nbanks, j;
+	int j;
 
 	/* Skip over the MC_TYPE_GLOBAL record */
 	ASSERT(mgi->common.type == MC_TYPE_GLOBAL);
@@ -110,8 +109,6 @@ gcpu_xpv_proxy_logout(int what, struct mc_info *mi, struct mcinfo_common **micp,
 				gcpu_xpv_hdl_lookupfails++;
 				goto next_record;
 			} else {
-				gcpu = cmi_hdl_getcmidata(hdl);
-				nbanks = gcpu->gcpu_mca.gcpu_mca_nbanks;
 				bzero(bankregs, bankregs_sz);
 				mcrp = bankregs;
 			}

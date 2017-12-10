@@ -2574,7 +2574,6 @@ load_db(argc, argv)
     char		buf[BUFSIZ];
     dump_version	*load;
     int			update, verbose;
-    krb5_int32		crflags;
     int			aindex;
     bool_t		add_update = TRUE;
     char		iheader[MAX_HEADER];
@@ -2596,7 +2595,6 @@ load_db(argc, argv)
     load = NULL;
     update = 0;
     verbose = 0;
-    crflags = KRB5_KDB_CREATE_BTREE;
     exit_status = 0;
     dbname_tmp = (char *) NULL;
     log_ctx = util_context->kdblog_context;

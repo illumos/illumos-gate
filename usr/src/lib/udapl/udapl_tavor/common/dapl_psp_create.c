@@ -161,7 +161,7 @@ dapl_psp_create(
 	/*
 	 * Take a reference on the EVD handle
 	 */
-	(void) dapl_os_atomic_inc(&((DAPL_EVD *)evd_handle)->evd_ref_count);
+	dapl_os_atomic_inc(&((DAPL_EVD *)evd_handle)->evd_ref_count);
 
 	/*
 	 * Set up a listener for a connection. Connections can arrive

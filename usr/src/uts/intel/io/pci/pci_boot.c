@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1082,8 +1082,16 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	 */
 	io_base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
 	io_limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
-	io_base = (io_base & 0xf0) << 8;
-	io_limit = ((io_limit & 0xf0) << 8) | 0xfff;
+	io_base = (io_base & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT;
+	io_limit = ((io_limit & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT) | 0xfff;
+	if ((io_base & PCI_BCNF_ADDR_MASK) == PCI_BCNF_IO_32BIT) {
+		uint16_t io_base_hi, io_limit_hi;
+		io_base_hi = pci_getw(bus, dev, func, PCI_BCNF_IO_BASE_HI);
+		io_limit_hi = pci_getw(bus, dev, func, PCI_BCNF_IO_LIMIT_HI);
+
+		io_base |= (uint_t)io_base_hi << 16;
+		io_limit |= (uint_t)io_limit_hi << 16;
+	}
 
 	/* Form list of all resources passed (avail + used) */
 	scratch_list = memlist_dup(pci_bus_res[secbus].io_avail);
@@ -2770,7 +2778,8 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 {
 	char *dev_type;
 	int i;
-	uint_t val, io_range[2], mem_range[2], pmem_range[2];
+	uint_t val;
+	uint64_t io_range[2], mem_range[2], pmem_range[2];
 	uchar_t secbus = pci_getb(bus, dev, func, PCI_BCNF_SECBUS);
 	uchar_t subbus = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
 	uchar_t progclass;
@@ -2853,9 +2862,20 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	val = (uint_t)pci_getw(bus, dev, func, PCI_CONF_COMM);
 	if (val & PCI_COMM_IO) {
 		val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
-		io_range[0] = ((val & 0xf0) << 8);
+		io_range[0] = ((val & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT);
 		val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
-		io_range[1]  = ((val & 0xf0) << 8) | 0xFFF;
+		io_range[1]  = ((val & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT) |
+		    0xfff;
+		if ((io_range[0] & PCI_BCNF_ADDR_MASK) == PCI_BCNF_IO_32BIT) {
+			uint16_t io_base_hi, io_limit_hi;
+			io_base_hi = pci_getw(bus, dev, func,
+			    PCI_BCNF_IO_BASE_HI);
+			io_limit_hi = pci_getw(bus, dev, func,
+			    PCI_BCNF_IO_LIMIT_HI);
+
+			io_range[0] |= (uint32_t)io_base_hi << 16;
+			io_range[1] |= (uint32_t)io_limit_hi << 16;
+		}
 	} else {
 		io_range[0] = 0x9fff;
 		io_range[1] = 0x1000;
@@ -2869,31 +2889,23 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 	if (io_range[0] != 0 && io_range[0] < io_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].io_avail,
-		    (uint64_t)io_range[0],
-		    (uint64_t)(io_range[1] - io_range[0] + 1));
+		    io_range[0], (io_range[1] - io_range[0] + 1));
 		memlist_insert(&pci_bus_res[bus].io_used,
-		    (uint64_t)io_range[0],
-		    (uint64_t)(io_range[1] - io_range[0] + 1));
+		    io_range[0], (io_range[1] - io_range[0] + 1));
 		if (pci_bus_res[bus].io_avail != NULL) {
 			(void) memlist_remove(&pci_bus_res[bus].io_avail,
-			    (uint64_t)io_range[0],
-			    (uint64_t)(io_range[1] - io_range[0] + 1));
+			    io_range[0], (io_range[1] - io_range[0] + 1));
 		}
-		dcmn_err(CE_NOTE, "bus %d io-range: 0x%x-%x",
+		dcmn_err(CE_NOTE, "bus %d io-range: 0x%" PRIx64 "-%" PRIx64,
 		    secbus, io_range[0], io_range[1]);
-		/* if 32-bit supported, make sure upper bits are not set */
-		if ((val & 0xf) == 1 &&
-		    pci_getw(bus, dev, func, PCI_BCNF_IO_BASE_HI)) {
-			cmn_err(CE_NOTE, "unsupported 32-bit IO address on"
-			    " pci-pci bridge [%d/%d/%d]", bus, dev, func);
-		}
 	}
 
 	/* mem range */
 	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_BASE);
-	mem_range[0] = ((val & 0xFFF0) << 16);
+	mem_range[0] = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT);
 	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_LIMIT);
-	mem_range[1] = ((val & 0xFFF0) << 16) | 0xFFFFF;
+	mem_range[1] = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT) |
+	    0xfffff;
 	if (mem_range[0] != 0 && mem_range[0] < mem_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].mem_avail,
 		    (uint64_t)mem_range[0],
@@ -2908,15 +2920,23 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,
 		    (uint64_t)mem_range[0],
 		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
-		dcmn_err(CE_NOTE, "bus %d mem-range: 0x%x-%x",
+		dcmn_err(CE_NOTE, "bus %d mem-range: 0x%" PRIx64 "-%" PRIx64,
 		    secbus, mem_range[0], mem_range[1]);
 	}
 
 	/* prefetchable memory range */
 	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_BASE_LOW);
-	pmem_range[0] = ((val & 0xFFF0) << 16);
+	pmem_range[0] = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT);
 	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW);
-	pmem_range[1] = ((val & 0xFFF0) << 16) | 0xFFFFF;
+	pmem_range[1] = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT) |
+	    0xfffff;
+	if ((pmem_range[0] & PCI_BCNF_ADDR_MASK) == PCI_BCNF_PF_MEM_64BIT) {
+		uint32_t pf_addr_hi, pf_limit_hi;
+		pf_addr_hi = pci_getl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH);
+		pf_limit_hi = pci_getl(bus, dev, func, PCI_BCNF_PF_LIMIT_HIGH);
+		pmem_range[0] |= (uint64_t)pf_addr_hi << 32;
+		pmem_range[1] |= (uint64_t)pf_limit_hi << 32;
+	}
 	if (pmem_range[0] != 0 && pmem_range[0] < pmem_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].pmem_avail,
 		    (uint64_t)pmem_range[0],
@@ -2931,14 +2951,8 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		(void) memlist_remove(&pci_bus_res[bus].mem_avail,
 		    (uint64_t)pmem_range[0],
 		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
-		dcmn_err(CE_NOTE, "bus %d pmem-range: 0x%x-%x",
+		dcmn_err(CE_NOTE, "bus %d pmem-range: 0x%" PRIx64 "-%" PRIx64,
 		    secbus, pmem_range[0], pmem_range[1]);
-		/* if 64-bit supported, make sure upper bits are not set */
-		if ((val & 0xf) == 1 &&
-		    pci_getl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH)) {
-			cmn_err(CE_NOTE, "unsupported 64-bit prefetch memory on"
-			    " pci-pci bridge [%d/%d/%d]", bus, dev, func);
-		}
 	}
 
 	/*
@@ -3091,30 +3105,37 @@ add_bus_slot_names_prop(int bus)
  * non-zero 'ppb' argument select PCI-PCI bridges versus root.
  */
 static void
-memlist_to_ranges(void **rp, struct memlist *entry, int type, int ppb)
+memlist_to_ranges(void **rp, struct memlist *entry, uint_t type, int ppb)
 {
 	ppb_ranges_t *ppb_rp = *rp;
 	pci_ranges_t *pci_rp = *rp;
 
 	while (entry != NULL) {
+		uint_t atype = type;
+		if ((type & PCI_REG_ADDR_M) == PCI_ADDR_MEM32 &&
+		    (entry->ml_address >= UINT32_MAX ||
+		    entry->ml_size >= UINT32_MAX)) {
+			atype &= ~PCI_ADDR_MEM32;
+			atype |= PCI_ADDR_MEM64;
+		}
 		if (ppb) {
-			ppb_rp->child_high = ppb_rp->parent_high = type;
+			ppb_rp->child_high = ppb_rp->parent_high = atype;
 			ppb_rp->child_mid = ppb_rp->parent_mid =
-			    (uint32_t)(entry->ml_address >> 32); /* XXX */
+			    (uint32_t)(entry->ml_address >> 32);
 			ppb_rp->child_low = ppb_rp->parent_low =
 			    (uint32_t)entry->ml_address;
 			ppb_rp->size_high =
-			    (uint32_t)(entry->ml_size >> 32); /* XXX */
+			    (uint32_t)(entry->ml_size >> 32);
 			ppb_rp->size_low = (uint32_t)entry->ml_size;
 			*rp = ++ppb_rp;
 		} else {
-			pci_rp->child_high = type;
+			pci_rp->child_high = atype;
 			pci_rp->child_mid = pci_rp->parent_high =
-			    (uint32_t)(entry->ml_address >> 32); /* XXX */
+			    (uint32_t)(entry->ml_address >> 32);
 			pci_rp->child_low = pci_rp->parent_low =
 			    (uint32_t)entry->ml_address;
 			pci_rp->size_high =
-			    (uint32_t)(entry->ml_size >> 32); /* XXX */
+			    (uint32_t)(entry->ml_size >> 32);
 			pci_rp->size_low = (uint32_t)entry->ml_size;
 			*rp = ++pci_rp;
 		}

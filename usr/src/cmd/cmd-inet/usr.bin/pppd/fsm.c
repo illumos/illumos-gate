@@ -20,9 +20,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#define RCSID	"$Id: fsm.c,v 1.17 1999/08/13 06:46:12 paulus Exp $"
-
 /*
  * TODO:
  * Randomize fsm id on link/init.
@@ -38,10 +35,6 @@
 
 #include "pppd.h"
 #include "fsm.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 static void fsm_timeout __P((void *));
 static void fsm_rconfreq __P((fsm *, int, u_char *, int));

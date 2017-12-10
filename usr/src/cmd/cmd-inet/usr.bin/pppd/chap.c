@@ -36,12 +36,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#define RCSID	"$Id: chap.c,v 1.24 1999/11/15 01:51:50 paulus Exp $"
-
-/*
- * TODO:
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -53,10 +47,6 @@
 #include "md5.h"
 #if defined(CHAPMS) || defined(CHAPMSV2)
 #include "chap_ms.h"
-#endif
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
 #endif
 
 /*

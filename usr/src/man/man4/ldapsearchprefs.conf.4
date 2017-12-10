@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDAPSEARCHPREFS.CONF 4 "Jul 9, 2003"
+.TH LDAPSEARCHPREFS.CONF 4 "Nov 26, 2017"
 .SH NAME
 ldapsearchprefs.conf \- configuration file for LDAP search preference routines
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ ldapsearchprefs.conf \- configuration file for LDAP search preference routines
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBldapsearchprefs.conf\fR file contains information used by LDAP when
 searching the directory. Blank lines and lines that start with a hash ('#')
@@ -73,7 +72,7 @@ using the \fBLDAP_IS_SEARCHOBJ_OPTION_SET()\fR macro. Use "" if no special
 options are required.
 .sp
 .LP
-The next line specifes a label to use for "Fewer Choices" searches. "Fewer
+The next line specifies a label to use for "Fewer Choices" searches. "Fewer
 Choices" searches are those where the user's input is fed to the ldap_filter
 routines to determine an appropriate filter to use. This contrasts with
 explicitly-constructed LDAP filters, or "More Choices" searches, where the user
@@ -262,7 +261,6 @@ END
 In this example, the user may search for People. For "fewer choices" searching,
 the tag for the \fBldapfilter.conf\fR(4) file is "x500-People".
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -277,6 +275,5 @@ Stability Level	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBldap_searchprefs\fR(3LDAP) , \fBattributes\fR(5)
+\fBldap_searchprefs\fR(3LDAP), \fBattributes\fR(5)

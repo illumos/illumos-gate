@@ -278,11 +278,13 @@ static IMA_STATUS setSolarisSharedNodeAlias(const IMA_NODE_ALIAS alias) {
  * "__attribute__ ((constructor))" and "__attribute__ ((destructor))"
  * are used with gcc
  */
-__attribute__((constructor)) void init() {
+__attribute__((constructor)) void init()
+{
 	InitLibrary();
 }
 
-__attribute__((destructor)) void fini() {
+__attribute__((destructor)) void fini()
+{
 	ExitLibrary();
 }
 
@@ -352,35 +354,35 @@ static int os_createmutex(int *semid) {
 	return (1);
 }
 
-static void os_obtainmutex(int semid) {
-	int retVal;
+static void
+os_obtainmutex(int semid)
+{
 	struct sembuf sem_b;
 
 	sem_b.sem_num = 0;
 	sem_b.sem_op = -1;
 	sem_b.sem_flg = SEM_UNDO;
-	retVal = semop(semid, &sem_b, 1);
-
+	(void) semop(semid, &sem_b, 1);
 }
 
-static void os_releasemutex(int semid) {
-	int retVal;
+static void
+os_releasemutex(int semid)
+{
 	struct sembuf sem_b;
 
 	sem_b.sem_num = 0;
 	sem_b.sem_op = 1;
 	sem_b.sem_flg = SEM_UNDO;
-	retVal = semop(semid, &sem_b, 1);
-
+	(void) semop(semid, &sem_b, 1);
 }
 
 /* Destroy the SNMP semaphore. */
-static void os_destroymutex(int semid) {
-	int retVal;
+static void
+os_destroymutex(int semid)
+{
 	union semun sem_union;
 
-	retVal = semctl(semid, 0, IPC_RMID, sem_union);
-
+	(void) semctl(semid, 0, IPC_RMID, sem_union);
 }
 #endif
 
@@ -394,8 +396,6 @@ void InitLibrary() {
 	char imaConfFilePath[256];
 	char systemPath[256];
 	char *charPtr;
-	IMA_UINT dwStrLength;
-
 	IMA_UINT i = 0;
 
 	if (number_of_plugins != -1)
@@ -409,9 +409,6 @@ void InitLibrary() {
 	os_obtainmutex(libMutex);
 
 	sharedNodeAlias[0] = 0;
-	dwStrLength = 255;
-
-
 
 	/* Open configuration file from known location */
 #ifdef WIN32
@@ -475,7 +472,6 @@ void InitLibrary() {
 			if (plugintable[i].hPlugin != NULL) {
 				typedef int (*InitializeFn)();
 				InitializeFn PassFunc;
-				IMA_STATUS status;
 
 				memcpy((char *)&plugintable[i].PluginName,
 				    (char *)&pluginname, 64);
@@ -494,8 +490,7 @@ void InitLibrary() {
 				    plugintable[i].hPlugin, "Initialize");
 #endif
 				if (PassFunc != NULL) {
-					status =
-					    PassFunc(plugintable[i].ownerId);
+					(void) PassFunc(plugintable[i].ownerId);
 				}
 
 				plugintable[i].number_of_vbcallbacks = 0;

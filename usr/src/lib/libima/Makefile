@@ -39,8 +39,6 @@ lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-install_h: $(ROOTHDRS)
-
 all clean clobber install lint: $(SUBDIRS)
 
 install_h:      $(ROOTHDRS)

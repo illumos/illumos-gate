@@ -27,6 +27,7 @@ MODULE = pcibus
 CLASS = arch
 SUN4DIR = ../../sun4/$(MODULE)
 UTILDIR = ../../common/pcibus
+NICDIR = ../../common/nic
 HBDIR = ../../common/hostbridge
 UTILSRCS = did.c did_hash.c did_props.c util.c
 PCISRCS = pcibus.c pcibus_labels.c pci_sun4.c pcibus_hba.c
@@ -36,7 +37,7 @@ MODULESRCS = $(PCISRCS) $(UTILSRCS) pci_$(ARCH).c
 include ../../Makefile.plugin
 
 LDLIBS += -ldevinfo -lsmbios
-CPPFLAGS += -I$(SUN4DIR) -I$(UTILDIR) -I$(HBDIR)
+CPPFLAGS += -I$(SUN4DIR) -I$(UTILDIR) -I$(HBDIR) -I$(NICDIR)
 
 %.o: $(SUN4DIR)/%.c
 	$(COMPILE.c) -o $@ $<

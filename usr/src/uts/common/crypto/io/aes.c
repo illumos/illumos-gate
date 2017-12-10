@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -69,6 +70,11 @@ static crypto_mech_info_t aes_mech_info_tab[] = {
 	{SUN_CKM_AES_CBC, AES_CBC_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
+	    AES_MIN_KEY_BYTES, AES_MAX_KEY_BYTES, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* AES_CMAC */
+	{SUN_CKM_AES_CMAC, AES_CMAC_MECH_INFO_TYPE,
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
+	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC |
 	    AES_MIN_KEY_BYTES, AES_MAX_KEY_BYTES, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* AES_CTR */
 	{SUN_CKM_AES_CTR, AES_CTR_MECH_INFO_TYPE,
@@ -148,6 +154,14 @@ static crypto_cipher_ops_t aes_cipher_ops = {
 	aes_decrypt_atomic
 };
 
+static int aes_mac_init(crypto_ctx_t *, crypto_mechanism_t *,
+    crypto_key_t *, crypto_spi_ctx_template_t, crypto_req_handle_t);
+static int aes_mac(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
+    crypto_req_handle_t);
+static int aes_mac_update(crypto_ctx_t *, crypto_data_t *,
+    crypto_req_handle_t);
+static int aes_mac_final(crypto_ctx_t *, crypto_data_t *,
+    crypto_req_handle_t);
 static int aes_mac_atomic(crypto_provider_handle_t, crypto_session_id_t,
     crypto_mechanism_t *, crypto_key_t *, crypto_data_t *, crypto_data_t *,
     crypto_spi_ctx_template_t, crypto_req_handle_t);
@@ -156,10 +170,10 @@ static int aes_mac_verify_atomic(crypto_provider_handle_t, crypto_session_id_t,
     crypto_spi_ctx_template_t, crypto_req_handle_t);
 
 static crypto_mac_ops_t aes_mac_ops = {
-	NULL,
-	NULL,
-	NULL,
-	NULL,
+	aes_mac_init,
+	aes_mac,
+	aes_mac_update,
+	aes_mac_final,
 	aes_mac_atomic,
 	aes_mac_verify_atomic
 };
@@ -264,6 +278,10 @@ aes_check_mech_param(crypto_mechanism_t *mechanism, aes_ctx_t **ctx, int kmflag)
 		param_len = AES_BLOCK_LEN;
 		alloc_fun = cbc_alloc_ctx;
 		break;
+	case AES_CMAC_MECH_INFO_TYPE:
+		param_required = B_FALSE;
+		alloc_fun = cmac_alloc_ctx;
+		break;
 	case AES_CTR_MECH_INFO_TYPE:
 		param_len = sizeof (CK_AES_CTR_PARAMS);
 		alloc_fun = ctr_alloc_ctx;
@@ -336,14 +354,16 @@ aes_provider_status(crypto_provider_handle_t provider, uint_t *status)
 static int
 aes_encrypt_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
     crypto_key_t *key, crypto_spi_ctx_template_t template,
-    crypto_req_handle_t req) {
+    crypto_req_handle_t req)
+{
 	return (aes_common_init(ctx, mechanism, key, template, req, B_TRUE));
 }
 
 static int
 aes_decrypt_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
     crypto_key_t *key, crypto_spi_ctx_template_t template,
-    crypto_req_handle_t req) {
+    crypto_req_handle_t req)
+{
 	return (aes_common_init(ctx, mechanism, key, template, req, B_FALSE));
 }
 
@@ -417,8 +437,9 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	 * For block ciphers, plaintext must be a multiple of AES block size.
 	 * This test is only valid for ciphers whose blocksize is a power of 2.
 	 */
-	if (((aes_ctx->ac_flags & (CTR_MODE|CCM_MODE|GCM_MODE|GMAC_MODE))
-	    == 0) && (plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
+	if (((aes_ctx->ac_flags & (CMAC_MODE|CTR_MODE|CCM_MODE|
+	    GCM_MODE|GMAC_MODE)) == 0) &&
+	    (plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
 		return (CRYPTO_DATA_LEN_RANGE);
 
 	AES_ARG_INPLACE(plaintext, ciphertext);
@@ -427,12 +448,15 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	 * We need to just return the length needed to store the output.
 	 * We should not destroy the context for the following case.
 	 */
-	switch (aes_ctx->ac_flags & (CCM_MODE|GCM_MODE|GMAC_MODE)) {
+	switch (aes_ctx->ac_flags & (CMAC_MODE|CCM_MODE|GCM_MODE|GMAC_MODE)) {
 	case CCM_MODE:
 		length_needed = plaintext->cd_length + aes_ctx->ac_mac_len;
 		break;
 	case GCM_MODE:
 		length_needed = plaintext->cd_length + aes_ctx->ac_tag_len;
+		break;
+	case CMAC_MODE:
+		length_needed = AES_BLOCK_LEN;
 		break;
 	case GMAC_MODE:
 		if (plaintext->cd_length != 0)
@@ -507,6 +531,12 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 			    ciphertext->cd_offset - saved_offset;
 		}
 		ciphertext->cd_offset = saved_offset;
+	} else if (aes_ctx->ac_flags & CMAC_MODE) {
+		/* cmac_update doesn't store data */
+		ciphertext->cd_length = saved_length;
+		ret = cmac_mode_final((cbc_ctx_t *)aes_ctx, ciphertext,
+		    aes_encrypt_block, aes_xor_block);
+		aes_ctx->ac_remainder_len = 0;
 	}
 
 	ASSERT(aes_ctx->ac_remainder_len == 0);
@@ -650,8 +680,12 @@ aes_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	out_len += plaintext->cd_length;
 	out_len &= ~(AES_BLOCK_LEN - 1);
 
-	/* return length needed to store the output */
-	if (ciphertext->cd_length < out_len) {
+	/*
+	 * return length needed to store the output.
+	 * CMAC stores its output in a local buffer until *_final.
+	 */
+	if ((aes_ctx->ac_flags & CMAC_MODE) == 0 &&
+	    ciphertext->cd_length < out_len) {
 		ciphertext->cd_length = out_len;
 		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
@@ -833,6 +867,12 @@ aes_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 		}
 		data->cd_length = data->cd_offset - saved_offset;
 		data->cd_offset = saved_offset;
+	} else if (aes_ctx->ac_flags & CMAC_MODE) {
+		ret = cmac_mode_final((cbc_ctx_t *)aes_ctx, data,
+		    aes_encrypt_block, aes_xor_block);
+		if (ret != CRYPTO_SUCCESS)
+			return (ret);
+		data->cd_length = AES_BLOCK_LEN;
 	} else {
 		/*
 		 * There must be no unprocessed plaintext.
@@ -970,7 +1010,7 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	AES_ARG_INPLACE(plaintext, ciphertext);
 
 	/*
-	 * CTR, CCM, GCM, and GMAC modes do not require that plaintext
+	 * CTR, CCM, CMAC, GCM, and GMAC modes do not require that plaintext
 	 * be a multiple of AES block size.
 	 */
 	switch (mechanism->cm_type) {
@@ -978,6 +1018,7 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	case AES_CCM_MECH_INFO_TYPE:
 	case AES_GCM_MECH_INFO_TYPE:
 	case AES_GMAC_MECH_INFO_TYPE:
+	case AES_CMAC_MECH_INFO_TYPE:
 		break;
 	default:
 		if ((plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
@@ -1004,6 +1045,9 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 		/* FALLTHRU */
 	case AES_GCM_MECH_INFO_TYPE:
 		length_needed = plaintext->cd_length + aes_ctx.ac_tag_len;
+		break;
+	case AES_CMAC_MECH_INFO_TYPE:
+		length_needed = AES_BLOCK_LEN;
 		break;
 	default:
 		length_needed = plaintext->cd_length;
@@ -1062,6 +1106,12 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 				if (ret != CRYPTO_SUCCESS)
 					goto out;
 			}
+		} else if (mechanism->cm_type == AES_CMAC_MECH_INFO_TYPE) {
+			ret = cmac_mode_final((cbc_ctx_t *)&aes_ctx,
+			    ciphertext, aes_encrypt_block,
+			    aes_xor_block);
+			if (ret != CRYPTO_SUCCESS)
+				goto out;
 		} else {
 			ASSERT(aes_ctx.ac_remainder_len == 0);
 		}
@@ -1262,6 +1312,7 @@ aes_create_ctx_template(crypto_provider_handle_t provider,
 
 	if (mechanism->cm_type != AES_ECB_MECH_INFO_TYPE &&
 	    mechanism->cm_type != AES_CBC_MECH_INFO_TYPE &&
+	    mechanism->cm_type != AES_CMAC_MECH_INFO_TYPE &&
 	    mechanism->cm_type != AES_CTR_MECH_INFO_TYPE &&
 	    mechanism->cm_type != AES_CCM_MECH_INFO_TYPE &&
 	    mechanism->cm_type != AES_GCM_MECH_INFO_TYPE &&
@@ -1342,6 +1393,9 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 	case AES_CBC_MECH_INFO_TYPE:
 		rv = cbc_init_ctx((cbc_ctx_t *)aes_ctx, mechanism->cm_param,
 		    mechanism->cm_param_len, AES_BLOCK_LEN, aes_copy_block64);
+		break;
+	case AES_CMAC_MECH_INFO_TYPE:
+		rv = cmac_init_ctx((cbc_ctx_t *)aes_ctx, AES_BLOCK_LEN);
 		break;
 	case AES_CTR_MECH_INFO_TYPE: {
 		CK_AES_CTR_PARAMS *pp;
@@ -1428,6 +1482,44 @@ process_gmac_mech(crypto_mechanism_t *mech, crypto_data_t *data,
 }
 
 static int
+aes_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
+    crypto_key_t *key, crypto_spi_ctx_template_t template,
+    crypto_req_handle_t req)
+{
+	return (aes_encrypt_init(ctx, mechanism,
+	    key, template, req));
+}
+
+static int
+aes_mac(crypto_ctx_t *ctx, crypto_data_t *plaintext, crypto_data_t *ciphertext,
+    crypto_req_handle_t req)
+{
+	return (aes_encrypt(ctx, plaintext, ciphertext, req));
+}
+
+static int
+aes_mac_update(crypto_ctx_t *ctx, crypto_data_t *data,
+    crypto_req_handle_t req)
+{
+	crypto_data_t out;
+	uint8_t block[AES_BLOCK_LEN];
+	out.cd_format = CRYPTO_DATA_RAW;
+	out.cd_offset = 0;
+	out.cd_length = sizeof (block);
+	out.cd_miscdata = NULL;
+	out.cd_raw.iov_base = (void *)block;
+	out.cd_raw.iov_len = sizeof (block);
+
+	return (aes_encrypt_update(ctx, data, &out, req));
+}
+
+static int
+aes_mac_final(crypto_ctx_t *ctx, crypto_data_t *mac, crypto_req_handle_t req)
+{
+	return (aes_encrypt_final(ctx, mac, req));
+}
+
+static int
 aes_mac_atomic(crypto_provider_handle_t provider,
     crypto_session_id_t session_id, crypto_mechanism_t *mechanism,
     crypto_key_t *key, crypto_data_t *data, crypto_data_t *mac,
@@ -1437,16 +1529,21 @@ aes_mac_atomic(crypto_provider_handle_t provider,
 	crypto_mechanism_t gcm_mech;
 	int rv;
 
-	if ((rv = process_gmac_mech(mechanism, data, &gcm_params))
-	    != CRYPTO_SUCCESS)
-		return (rv);
+	if (mechanism->cm_type == AES_GMAC_MECH_INFO_TYPE) {
+		if ((rv = process_gmac_mech(mechanism, data, &gcm_params))
+		    != CRYPTO_SUCCESS)
+			return (rv);
 
-	gcm_mech.cm_type = AES_GCM_MECH_INFO_TYPE;
-	gcm_mech.cm_param_len = sizeof (CK_AES_GCM_PARAMS);
-	gcm_mech.cm_param = (char *)&gcm_params;
+		gcm_mech.cm_type = AES_GCM_MECH_INFO_TYPE;
+		gcm_mech.cm_param_len = sizeof (CK_AES_GCM_PARAMS);
+		gcm_mech.cm_param = (char *)&gcm_params;
 
-	return (aes_encrypt_atomic(provider, session_id, &gcm_mech,
-	    key, &null_crypto_data, mac, template, req));
+		return (aes_encrypt_atomic(provider, session_id, &gcm_mech,
+		    key, &null_crypto_data, mac, template, req));
+	}
+	/* CMAC */
+	return (aes_encrypt_atomic(provider, session_id, mechanism,
+	    key, data, mac, template, req));
 }
 
 static int
@@ -1457,16 +1554,42 @@ aes_mac_verify_atomic(crypto_provider_handle_t provider,
 {
 	CK_AES_GCM_PARAMS gcm_params;
 	crypto_mechanism_t gcm_mech;
+	crypto_data_t data_mac;
+	char buf[AES_BLOCK_LEN];
 	int rv;
 
-	if ((rv = process_gmac_mech(mechanism, data, &gcm_params))
-	    != CRYPTO_SUCCESS)
+	if (mechanism->cm_type == AES_GMAC_MECH_INFO_TYPE) {
+		if ((rv = process_gmac_mech(mechanism, data, &gcm_params))
+		    != CRYPTO_SUCCESS)
+			return (rv);
+
+		gcm_mech.cm_type = AES_GCM_MECH_INFO_TYPE;
+		gcm_mech.cm_param_len = sizeof (CK_AES_GCM_PARAMS);
+		gcm_mech.cm_param = (char *)&gcm_params;
+
+		return (aes_decrypt_atomic(provider, session_id, &gcm_mech,
+		    key, mac, &null_crypto_data, template, req));
+	}
+
+	/* CMAC */
+
+	data_mac.cd_format = CRYPTO_DATA_RAW;
+	data_mac.cd_offset = 0;
+	data_mac.cd_length = AES_BLOCK_LEN;
+	data_mac.cd_miscdata = NULL;
+	data_mac.cd_raw.iov_base = (void *) buf;
+	data_mac.cd_raw.iov_len = AES_BLOCK_LEN;
+
+	rv = aes_encrypt_atomic(provider, session_id, &gcm_mech,
+	    key, data, &data_mac, template, req);
+
+	if (rv != CRYPTO_SUCCESS)
 		return (rv);
 
-	gcm_mech.cm_type = AES_GCM_MECH_INFO_TYPE;
-	gcm_mech.cm_param_len = sizeof (CK_AES_GCM_PARAMS);
-	gcm_mech.cm_param = (char *)&gcm_params;
+	/* should use get_input_data for mac? */
+	if (bcmp(buf, mac->cd_raw.iov_base + mac->cd_offset,
+	    AES_BLOCK_LEN) != 0)
+		return (CRYPTO_INVALID_MAC);
 
-	return (aes_decrypt_atomic(provider, session_id, &gcm_mech,
-	    key, mac, &null_crypto_data, template, req));
+	return (CRYPTO_SUCCESS);
 }

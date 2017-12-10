@@ -192,7 +192,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 		Sym_desc	*sdp;
 		const char	*name = vdp->vd_name;
 		uchar_t		bind;
-		Ver_desc	*_vdp;
+		Ver_desc	*_vdp __unused;
 		avl_index_t	where;
 		Aliste		idx2;
 

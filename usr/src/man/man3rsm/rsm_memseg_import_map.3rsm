@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RSM_MEMSEG_IMPORT_MAP 3RSM "Nov 13, 2002"
+.TH RSM_MEMSEG_IMPORT_MAP 3RSM "Nov 26, 2017"
 .SH NAME
 rsm_memseg_import_map, rsm_memseg_import_unmap \- map or unmap imported segment
 .SH SYNOPSIS
@@ -23,7 +23,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lrsm [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrsm_memseg_import_map()\fR and \fBrsm_memseg_import_unmap()\fR functions
 provide for mapping and unmapping operations on imported segments. The mapping
@@ -38,8 +37,8 @@ The \fBrsm_memseg_import_map()\fR function maps an import segment into caller's
 address space for the segment to be accessed by CPU memory operations.  The
 \fIim_memseg\fR argument represents the import segment that is being mapped.
 The location where the process's address space is mapped to the segment is
-pointed to by the  \fIaddress\fR argument. The \fIattr\fR argiment can be one
-fo the following:
+pointed to by the  \fIaddress\fR argument. The \fIattr\fR argument can be one
+of the following:
 .sp
 .ne 2
 .na
@@ -75,12 +74,10 @@ number of bytes from offset to be mapped.
 The \fBrsm_memseg_import_unmap()\fR function unmaps a previously mapped import
 segment.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, these functions return 0. Otherwise, an error value
 is returned to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBrsm_memseg_import_map()\fR and \fBrsm_memseg_import_unmap()\fR functions
 can return the following errors:
@@ -178,7 +175,6 @@ Segment not connected.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -196,7 +192,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrsm_memseg_import_connect\fR(3RSM), \fBrsm_memseg_import_get\fR(3RSM),
 \fBrsm_memseg_import_put\fR(3RSM), \fBrsm_memseg_get_pollfd\fR(3RSM),

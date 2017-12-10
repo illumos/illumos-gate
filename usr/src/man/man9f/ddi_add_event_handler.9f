@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_ADD_EVENT_HANDLER 9F "Nov 2, 2003"
+.TH DDI_ADD_EVENT_HANDLER 9F "Nov 26, 2017"
 .SH NAME
 ddi_add_event_handler \- add an NDI event service callback handler
 .SH SYNOPSIS
@@ -18,11 +18,9 @@ ddi_add_event_handler \- add an NDI event service callback handler
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fBdev_info_t *\fR\fIdip\fR\fR
@@ -77,10 +75,9 @@ Registration ID must be saved and used when calling
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBddi_add_event_handler()\fR function adds a callback handler to be
-invoked in the face of the event specifed by \fIcookie\fR. The process of
+invoked in the face of the event specified by \fIcookie\fR. The process of
 adding a callback handler is also known as subscribing to an event. Upon
 successful subscription, the handler will be invoked by the system when the
 event occurs. The handler can be unregistered by using
@@ -131,7 +128,6 @@ callback function.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -151,12 +147,10 @@ or a bad cookie.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 The \fBddi_add_event_handler()\fR and \fBhandler()\fR function can be called
 from user and kernel contexts only.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -172,7 +166,6 @@ Stability Level	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5), \fBddi_get_eventcookie\fR(9F),
 \fBddi_remove_event_handler\fR(9F)
@@ -180,7 +173,6 @@ Stability Level	Committed
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
 .LP
 Drivers must remove all registered callback handlers for a device instance by
 calling \fBddi_remove_event_handler\fR(9F) before detach completes.

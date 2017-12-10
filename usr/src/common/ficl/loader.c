@@ -31,7 +31,7 @@
  * Additional FICL words designed for FreeBSD's loader
  */
 
-#ifndef STAND
+#ifndef _STANDALONE
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -48,7 +48,7 @@
 #endif
 #include "bootstrap.h"
 #endif
-#ifdef STAND
+#ifdef _STANDALONE
 #include <uuid.h>
 #else
 #include <uuid/uuid.h>
@@ -186,7 +186,7 @@ ficlUnsetenv(ficlVm *pVM)
 void
 ficlCopyin(ficlVm *pVM)
 {
-#ifdef STAND
+#ifdef _STANDALONE
 	void*		src;
 	vm_offset_t	dest;
 	size_t		len;
@@ -194,7 +194,7 @@ ficlCopyin(ficlVm *pVM)
 
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 3, 0);
 
-#ifdef STAND
+#ifdef _STANDALONE
 	len = ficlStackPopInteger(ficlVmGetDataStack(pVM));
 	dest = ficlStackPopInteger(ficlVmGetDataStack(pVM));
 	src = ficlStackPopPointer(ficlVmGetDataStack(pVM));
@@ -209,7 +209,7 @@ ficlCopyin(ficlVm *pVM)
 void
 ficlCopyout(ficlVm *pVM)
 {
-#ifdef STAND
+#ifdef _STANDALONE
 	void*		dest;
 	vm_offset_t	src;
 	size_t		len;
@@ -217,7 +217,7 @@ ficlCopyout(ficlVm *pVM)
 
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 3, 0);
 
-#ifdef STAND
+#ifdef _STANDALONE
 	len = ficlStackPopInteger(ficlVmGetDataStack(pVM));
 	dest = ficlStackPopPointer(ficlVmGetDataStack(pVM));
 	src = ficlStackPopInteger(ficlVmGetDataStack(pVM));
@@ -232,7 +232,7 @@ ficlCopyout(ficlVm *pVM)
 void
 ficlFindfile(ficlVm *pVM)
 {
-#ifdef STAND
+#ifdef _STANDALONE
 	char	*name, *type;
 	char	*namep, *typep;
 	int	names, types;
@@ -241,7 +241,7 @@ ficlFindfile(ficlVm *pVM)
 
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 4, 1);
 
-#ifdef STAND
+#ifdef _STANDALONE
 	types = ficlStackPopInteger(ficlVmGetDataStack(pVM));
 	typep = (char *)ficlStackPopPointer(ficlVmGetDataStack(pVM));
 	names = ficlStackPopInteger(ficlVmGetDataStack(pVM));
@@ -300,7 +300,7 @@ ficlUuidFromString(ficlVm *pVM)
 	char	*uuid_ptr;
 	int	uuid_size;
 	uuid_t	*u;
-#ifdef STAND
+#ifdef _STANDALONE
 	uint32_t status;
 #else
 	int status;
@@ -318,7 +318,7 @@ ficlUuidFromString(ficlVm *pVM)
 	uuid[uuid_size] = '\0';
 
 	u = ficlMalloc(sizeof (*u));
-#ifdef STAND
+#ifdef _STANDALONE
 	uuid_from_string(uuid, u, &status);
 	ficlFree(uuid);
 	if (status != uuid_s_ok) {
@@ -341,14 +341,14 @@ ficlUuidToString(ficlVm *pVM)
 {
 	char	*uuid;
 	uuid_t	*u;
-#ifdef STAND
+#ifdef _STANDALONE
 	uint32_t status;
 #endif
 
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 1, 0);
 
 	u = ficlStackPopPointer(ficlVmGetDataStack(pVM));
-#ifdef STAND
+#ifdef _STANDALONE
 	uuid_to_string(u, &uuid, &status);
 	if (status == uuid_s_ok) {
 		ficlStackPushPointer(ficlVmGetDataStack(pVM), uuid);
@@ -476,7 +476,7 @@ pfopen(ficlVm *pVM)
 {
 	int mode, fd, count;
 	char *ptr, *name;
-#ifndef STAND
+#ifndef _STANDALONE
 	char *tmp;
 #endif
 
@@ -495,7 +495,7 @@ pfopen(ficlVm *pVM)
 	name = (char *)malloc(count+1);
 	bcopy(ptr, name, count);
 	name[count] = 0;
-#ifndef STAND
+#ifndef _STANDALONE
 	tmp = get_dev(name);
 	free(name);
 	name = tmp;
@@ -552,7 +552,7 @@ pfread(ficlVm *pVM)
  */
 static void pfopendir(ficlVm *pVM)
 {
-#ifndef STAND
+#ifndef _STANDALONE
 	DIR *dir;
 	char *tmp;
 #else
@@ -576,7 +576,7 @@ static void pfopendir(ficlVm *pVM)
 	name = (char *)malloc(count+1);
 	bcopy(ptr, name, count);
 	name[count] = 0;
-#ifndef STAND
+#ifndef _STANDALONE
 	tmp = get_dev(name);
 	free(name);
 	name = tmp;
@@ -602,7 +602,7 @@ static void pfopendir(ficlVm *pVM)
 	ficlStackPushInteger(ficlVmGetDataStack(pVM), flag);
 		return;
 #endif
-#ifndef STAND
+#ifndef _STANDALONE
 	dir = opendir(name);
 	if (dir == NULL) {
 		ficlStackPushInteger(ficlVmGetDataStack(pVM), flag);
@@ -622,7 +622,7 @@ static void pfopendir(ficlVm *pVM)
 static void
 pfreaddir(ficlVm *pVM)
 {
-#ifndef STAND
+#ifndef _STANDALONE
 	static DIR *dir = NULL;
 #else
 	int fd;
@@ -634,7 +634,7 @@ pfreaddir(ficlVm *pVM)
 	 * libstand readdir does not always return . nor .. so filter
 	 * them out to have consistent behaviour.
 	 */
-#ifndef STAND
+#ifndef _STANDALONE
 	dir = ficlStackPopPointer(ficlVmGetDataStack(pVM));
 	if (dir != NULL)
 		do {
@@ -675,7 +675,7 @@ pfreaddir(ficlVm *pVM)
 static void
 pfclosedir(ficlVm *pVM)
 {
-#ifndef STAND
+#ifndef _STANDALONE
 	DIR *dir;
 #else
 	int fd;
@@ -683,7 +683,7 @@ pfclosedir(ficlVm *pVM)
 
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 1, 0);
 
-#ifndef STAND
+#ifndef _STANDALONE
 	dir = ficlStackPopPointer(ficlVmGetDataStack(pVM)); /* get dir */
 	if (dir != NULL)
 		closedir(dir);
@@ -771,7 +771,7 @@ key(ficlVm *pVM)
 static void
 keyQuestion(ficlVm *pVM)
 {
-#ifndef STAND
+#ifndef _STANDALONE
 	char ch = -1;
 	struct termios oldt;
 	struct termios newt;
@@ -779,7 +779,7 @@ keyQuestion(ficlVm *pVM)
 
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 0, 1);
 
-#ifndef STAND
+#ifndef _STANDALONE
 	tcgetattr(STDIN_FILENO, &oldt);
 	newt = oldt;
 	newt.c_lflag &= ~(ICANON | ECHO);
@@ -828,7 +828,7 @@ ms(ficlVm *pVM)
 {
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 1, 0);
 
-#ifndef STAND
+#ifndef _STANDALONE
 	usleep(ficlStackPopUnsigned(ficlVmGetDataStack(pVM)) * 1000);
 #else
 	delay(ficlStackPopUnsigned(ficlVmGetDataStack(pVM)) * 1000);
@@ -853,7 +853,7 @@ fkey(ficlVm *pVM)
 }
 
 
-#ifdef STAND
+#ifdef _STANDALONE
 #ifdef __i386__
 
 /*
@@ -907,7 +907,7 @@ ficlSystemCompilePlatform(ficlSystem *pSys)
 {
 	ficlDictionary *dp = ficlSystemGetDictionary(pSys);
 	ficlDictionary *env = ficlSystemGetEnvironment(pSys);
-#ifdef STAND
+#ifdef _STANDALONE
 	ficlCompileFcn **fnpp;
 #endif
 
@@ -953,7 +953,7 @@ ficlSystemCompilePlatform(ficlSystem *pSys)
 	    FICL_WORD_DEFAULT);
 	ficlDictionarySetPrimitive(dp, "uuid-to-string", ficlUuidToString,
 	    FICL_WORD_DEFAULT);
-#ifdef STAND
+#ifdef _STANDALONE
 #ifdef __i386__
 	ficlDictionarySetPrimitive(dp, "outb", ficlOutb, FICL_WORD_DEFAULT);
 	ficlDictionarySetPrimitive(dp, "inb", ficlInb, FICL_WORD_DEFAULT);

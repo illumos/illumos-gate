@@ -12,8 +12,9 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
-SUBDIRS = dis dladm iconv libnvpair_json printf xargs
+SUBDIRS = dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
 
 include $(SRC)/test/Makefile.com

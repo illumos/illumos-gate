@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright (c) 1983 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
-.TH LPRM 1B "Feb 25, 2017"
+.TH LPRM 1B "Nov 26, 2017"
 .SH NAME
 lprm \- remove print requests from the print queue
 .SH SYNOPSIS
@@ -186,9 +186,9 @@ requests on the host from which the print request was submitted. Superusers can
 also remove print requests from the print server.
 .sp
 .LP
-Some print servers send cancelation notification to job owners when their print
-jobs have been cancelled. This notification usually comes in the form of an
-email message. Cancelation notices cannot be disabled on a Solaris server.
+Some print servers send cancellation notifications to job owners when their
+print jobs have been cancelled. This notification usually comes in the form of
+an email message. Cancellation notices cannot be disabled on a Solaris server.
 .SH NOTES
 .LP
 When IPP is in use, the user is prompted for a passphrase if the remote print

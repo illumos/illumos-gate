@@ -332,7 +332,6 @@ init_realm(krb5_context kcontext, char *progname, kdc_realm_t *rdp, char *realm,
     }
 
     if (!rkey_init_done) {
-	krb5_data seed;
 #ifdef KRB5_KRB4_COMPAT
 	krb5_keyblock temp_key;
 #endif
@@ -340,16 +339,6 @@ init_realm(krb5_context kcontext, char *progname, kdc_realm_t *rdp, char *realm,
 	 * If all that worked, then initialize the random key
 	 * generators.
 	 */
-
-	seed.length = rdp->realm_mkey.length;
-	seed.data = (char *)rdp->realm_mkey.contents;
-/* SUNW14resync - XXX */
-#if 0
-	if ((kret = krb5_c_random_add_entropy(rdp->realm_context,
-					     KRB5_C_RANDSOURCE_TRUSTEDPARTY, &seed)))
-	    goto whoops;
-#endif
-
 #ifdef KRB5_KRB4_COMPAT
 	if ((kret = krb5_c_make_random_key(rdp->realm_context,
 					   ENCTYPE_DES_CBC_CRC, &temp_key))) {
@@ -451,7 +440,7 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
     int 		c;
     char		*db_name = (char *) NULL;
     char		*mkey_name = (char *) NULL;
-    char		*rcname = KDCRCACHE;
+    char		*rcname __unused;
     char		*lrealm = NULL;
     krb5_error_code	retval;
     krb5_enctype	menctype = ENCTYPE_UNKNOWN;
@@ -468,6 +457,8 @@ initialize_realms(krb5_context kcontext, int argc, char **argv)
     char                *v4mode = 0;
 #endif
     extern char *optarg;
+
+    rcname = KDCRCACHE;
 
     if (!krb5_aprof_init(DEFAULT_KDC_PROFILE, KDC_PROFILE_ENV, &aprof)) {
 	hierarchy[0] = "kdcdefaults";

@@ -20,8 +20,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#define RCSID	"$Id: demand.c,v 1.13 2000/04/15 01:27:11 masputra Exp $"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,10 +42,6 @@
 #include "pppd.h"
 #include "fsm.h"
 #include "lcp.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 static char *frame;
 static int framelen;

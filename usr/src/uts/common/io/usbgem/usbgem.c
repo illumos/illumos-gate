@@ -31,8 +31,6 @@
  * DAMAGE.
  */
 
-#pragma	ident	"@(#)usbgem.c 1.6     12/02/09"
-
 /*
  * Change log
  */
@@ -922,13 +920,12 @@ err:
 static void
 usbgem_tx_timeout(struct usbgem_dev *dp)
 {
-	int	ret;
 	uint_t	rwlock;
 	clock_t	now;
 
 	for (; ; ) {
 		mutex_enter(&dp->tx_watcher_lock);
-		ret = cv_timedwait(&dp->tx_watcher_cv, &dp->tx_watcher_lock,
+		(void) cv_timedwait(&dp->tx_watcher_cv, &dp->tx_watcher_lock,
 		    dp->tx_watcher_interval + ddi_get_lbolt());
 		mutex_exit(&dp->tx_watcher_lock);
 
@@ -3875,7 +3872,6 @@ usbgem_mac_ioctl(struct usbgem_dev *dp, queue_t *wq, mblk_t *mp)
 {
 	struct iocblk	*iocp;
 	enum ioc_reply	status;
-	int		cmd;
 
 	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
 
@@ -3884,12 +3880,12 @@ usbgem_mac_ioctl(struct usbgem_dev *dp, queue_t *wq, mblk_t *mp)
 	 */
 	iocp = (void *)mp->b_rptr;
 	iocp->ioc_error = 0;
-	cmd = iocp->ioc_cmd;
 
-	DPRINTF(1, (CE_CONT, "%s: %s cmd:0x%x", dp->name, __func__, cmd));
+	DPRINTF(1, (CE_CONT, "%s: %s cmd:0x%x", dp->name, __func__,
+	    iocp->ioc_cmd));
 
 #ifdef USBGEM_CONFIG_ND
-	switch (cmd) {
+	switch (iocp->ioc_cmd) {
 	default:
 		_NOTE(NOTREACHED)
 		status = IOC_INVAL;
@@ -4203,7 +4199,6 @@ usbgem_m_setpromisc(void *arg, boolean_t on)
 int
 usbgem_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 {
-	int	ret;
 	uint64_t	val;
 	struct usbgem_dev	*dp = arg;
 	struct usbgem_stats	*gstp = &dp->stats;
@@ -4215,15 +4210,16 @@ usbgem_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 		rw_exit(&dp->dev_state_lock);
 		return (0);
 	}
-	ret = usbgem_hal_get_stats(dp);
-	rw_exit(&dp->dev_state_lock);
 
+	/* LINTED */
+	if (usbgem_hal_get_stats(dp) != USB_SUCCESS) {
 #ifdef GEM_CONFIG_FMA
-	if (ret != USB_SUCCESS) {
+		rw_exit(&dp->dev_state_lock);
 		ddi_fm_service_impact(dp->dip, DDI_SERVICE_DEGRADED);
 		return (EIO);
-	}
 #endif
+	}
+	rw_exit(&dp->dev_state_lock);
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
@@ -4565,13 +4561,11 @@ usbgem_m_tx(void *arg, mblk_t *mp_head)
 	int	limit;
 	mblk_t	*mp;
 	mblk_t	*nmp;
-	uint32_t	flags;
 	struct usbgem_dev	*dp = arg;
 
 	DPRINTF(4, (CE_CONT, "!%s: %s: called", dp->name, __func__));
 
 	mp = mp_head;
-	flags = 0;
 
 	rw_enter(&dp->dev_state_lock, RW_READER);
 
@@ -5454,8 +5448,8 @@ usbgem_kstat_init(struct usbgem_dev *dp)
 /* ======================================================================== */
 int
 usbgem_ctrl_out(struct usbgem_dev *dp,
-	uint8_t reqt, uint8_t req, uint16_t val, uint16_t ix, uint16_t len,
-	void *bp, int size)
+    uint8_t reqt, uint8_t req, uint16_t val, uint16_t ix, uint16_t len,
+    void *bp, int size)
 {
 	mblk_t			*data;
 	usb_ctrl_setup_t	setup;
@@ -5523,8 +5517,8 @@ usbgem_ctrl_out(struct usbgem_dev *dp,
 
 int
 usbgem_ctrl_in(struct usbgem_dev *dp,
-	uint8_t reqt, uint8_t req, uint16_t val, uint16_t ix, uint16_t len,
-	void *bp, int size)
+    uint8_t reqt, uint8_t req, uint16_t val, uint16_t ix, uint16_t len,
+    void *bp, int size)
 {
 	mblk_t			*data;
 	usb_ctrl_setup_t	setup;
@@ -5962,7 +5956,7 @@ usbgem_resume(dev_info_t *dip)
 
 struct usbgem_dev *
 usbgem_do_attach(dev_info_t *dip,
-	struct usbgem_conf *gc, void *lp, int lmsize)
+    struct usbgem_conf *gc, void *lp, int lmsize)
 {
 	struct usbgem_dev	*dp;
 	int			i;

@@ -9,7 +9,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FORK 2 "Oct 28, 2008"
+.TH FORK 2 "Nov 26, 2017"
 .SH NAME
 fork, fork1, forkall, forkx, forkallx \- create a new process
 .SH SYNOPSIS
@@ -44,7 +44,6 @@ fork, fork1, forkall, forkx, forkallx \- create a new process
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfork()\fR, \fBfork1()\fR, \fBforkall()\fR, \fBforkx()\fR, and
 \fBforkallx()\fR functions create a new process. The address space of the new
@@ -298,7 +297,7 @@ child.
 .TP
 .ie t \(bu
 .el o
-Any preferred hardware address tranlsation sizes (see \fBmemcntl\fR(2)) are
+Any preferred hardware address translation sizes (see \fBmemcntl\fR(2)) are
 inherited by the child.
 .RE
 .RS +4
@@ -319,7 +318,6 @@ descriptor is open in the child. If a descriptor is closed in the parent,
 attempts to operate on the door descriptor will fail even if it is still open
 in the child.
 .SS "Threads"
-.sp
 .LP
 A call to \fBforkall()\fR or \fBforkallx()\fR replicates in the child process
 all of the threads (see \fBthr_create\fR(3C) and \fBpthread_create\fR(3C)) in
@@ -346,7 +344,6 @@ provides all threading support for both sets of application programming
 interfaces.  Applications that require replicate-all fork semantics must call
 \fBforkall()\fR or \fBforkallx()\fR.
 .SS "Fork Extensions"
-.sp
 .LP
 The \fBforkx()\fR and \fBforkallx()\fR functions accept a \fIflags\fR argument
 consisting of a bitwise inclusive-OR of zero or more of the following flags,
@@ -385,7 +382,6 @@ exits.
 If the \fIflags\fR argument is 0 \fBforkx()\fR is identical to \fBfork()\fR and
 \fBforkallx()\fR is identical to \fBforkall()\fR.
 .SS "\fBfork()\fR Safety"
-.sp
 .LP
 If a multithreaded application calls \fBfork()\fR, \fBfork1()\fR, or
 \fBforkx()\fR, and the child does more than simply call one of the
@@ -416,7 +412,6 @@ specification: "To avoid errors, the child process may only execute
 Async-Signal-Safe operations until such time as one of the \fBexec\fR(2)
 functions is called."
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBfork()\fR, \fBfork1()\fR, \fBforkall()\fR,
 \fBforkx()\fR, and \fBforkallx()\fR return \fB0\fR to the child process and
@@ -424,7 +419,6 @@ return the process \fBID\fR of the child process to the parent process.
 Otherwise, \fB(pid_t)\(mi1\fR is returned to the parent process, no child
 process is created, and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBfork()\fR, \fBfork1()\fR, \fBforkall()\fR, \fBforkx()\fR, and
 \fBforkallx()\fR functions will fail if:
@@ -472,7 +466,6 @@ The \fIflags\fR argument is invalid.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -495,7 +488,6 @@ Standard	See below.
 .LP
 For \fBfork()\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
 \fBalarm\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfcntl\fR(2),
 \fBgetitimer\fR(2), \fBgetrlimit\fR(2), \fBmemcntl\fR(2), \fBmmap\fR(2),
@@ -506,7 +498,6 @@ For \fBfork()\fR, see \fBstandards\fR(5).
 \fBthr_create\fR(3C) \fBtimer_create\fR(3C), \fBwait\fR(3C), \fBcontract\fR(4),
 \fBprocess\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 An application should call \fB_exit()\fR rather than \fBexit\fR(3C) if it
 cannot \fBexecve()\fR, since \fBexit()\fR will flush and close standard I/O

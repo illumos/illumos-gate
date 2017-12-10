@@ -85,7 +85,7 @@ aintf(float x) {
 
 float
 anintf(float x) {
-	volatile float dummy;
+	volatile float dummy __unused;
 	int hx, k, j, ix;
 
 	hx = *(int *) &x;
@@ -122,7 +122,7 @@ irintf(float x) {
 int
 nintf(float x) {
 	int hx, ix, k, j, m;
-	volatile float dummy;
+	volatile float dummy __unused;
 
 	hx = *(int *) &x;
 	k = (hx & ~0x80000000) >> 23;

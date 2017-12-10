@@ -5,8 +5,6 @@
  * Licensed under the Academic Free License version 2.1
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -52,7 +50,6 @@ hrDeviceDesc_to_info(char *string, char **manufacturer, char **model,
 static struct snmp_pdu *
 snmp_get_item(char *host, char *community, char *mib_item)
 {
-	int status;
 	struct snmp_session session, *ss;
 	struct snmp_pdu *request = NULL, *result = NULL;
 	oid Oid[MAX_OID_LEN];
@@ -77,7 +74,7 @@ snmp_get_item(char *host, char *community, char *mib_item)
 	request = snmp_pdu_create(SNMP_MSG_GET);
 	snmp_add_null_var(request, Oid, oid_len);
 
-	status = snmp_synch_response(ss, request, &result);
+	(void) snmp_synch_response(ss, request, &result);
 
 	snmp_close(ss);
 

@@ -43,6 +43,7 @@ dir path=etc/nwam group=netadm owner=netadm
 dir path=etc/nwam/loc group=netadm owner=netadm
 dir path=etc/nwam/loc/NoNet group=netadm owner=netadm
 dir path=sbin group=sys
+dir path=usr/lib/dl
 dir path=usr/share/man
 dir path=usr/share/man/man1m
 file path=etc/default/dhcpagent group=sys \
@@ -82,6 +83,7 @@ file path=sbin/dlstat mode=0555
 file path=sbin/flowadm mode=0555
 file path=sbin/flowstat mode=0555
 file path=sbin/ipadm mode=0555
+file path=usr/lib/dl/dltraninfo mode=0555
 file path=usr/share/man/man1m/dladm.1m
 file path=usr/share/man/man1m/flowadm.1m
 file path=usr/share/man/man1m/ipadm.1m

@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HOSTS.EQUIV 4 "Jun 23, 1997"
+.TH HOSTS.EQUIV 4 "Nov 26, 2017"
 .SH NAME
 hosts.equiv, rhosts \- trusted remote hosts and users
 .SH DESCRIPTION
-.sp
 .LP
 The \fB/etc/hosts.equiv\fR and \fB\&.rhosts\fR files provide the "remote
 authentication" database for \fBrlogin\fR(1), \fBrsh\fR(1), \fBrcp\fR(1), and
@@ -59,7 +58,6 @@ Hostnames must be the official name of the host, not one of its nicknames.
 Negative entries are differentiated from positive entries by a `\(mi' character
 preceding either the  \fIhostname\fR or \fIusername\fR field.
 .SS "Positive Entries"
-.sp
 .LP
 If the form:
 .sp
@@ -173,7 +171,6 @@ will allow the named user from any remote host to access the system. The entry
 .LP
 will allow any user from the named host to access the system as the local user.
 .SS "Negative Entries"
-.sp
 .LP
 Negative entries are preceded by a `\(mi' sign. The form:
 .sp
@@ -222,7 +219,6 @@ disallows access by the named user only from the named host, while the form:
 .LP
 will disallow access by all of the users in the named netgroup from all hosts.
 .SS "Search Sequence"
-.sp
 .LP
 To help maintain system security, the \fB/etc/hosts.equiv\fR file is not
 checked when access is being attempted for super-user. If the user attempting
@@ -256,7 +252,7 @@ following order:
 .RE
 .sp
 .LP
-The user is granted access if a positive match occurrs.  Negative entries apply
+The user is granted access if a positive match occurs.  Negative entries apply
 only to \fB/etc/hosts.equiv\fR and may be overridden by subsequent
 \fB\&.rhosts\fR entries.
 .sp
@@ -292,7 +288,6 @@ are made for lines in \fB\&.rhosts\fR in the following order:
 \fIhostname\fR
 .RE
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/hosts.equiv\fR\fR
@@ -311,12 +306,10 @@ user's trusted hosts and users
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBrcp\fR(1), \fBrlogin\fR(1), \fBrsh\fR(1), \fBrcmd\fR(3SOCKET),
 \fBhosts\fR(4), \fBnetgroup\fR(4), \fBpasswd\fR(4)
 .SH WARNINGS
-.sp
 .LP
 Positive entries in \fB/etc/hosts.equiv\fR that include a \fIusername\fR field
 (either an individual named user, a netgroup, or `\fB+\fR' sign)  should be

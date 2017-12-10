@@ -261,7 +261,6 @@ void InitLibrary()
 
 		if (plugintable[i].hdlPlugin != NULL) {
 		    InitializeFn PassFunc;
-		    MP_STATUS status;
 
                     wcsncpy(plugintable[i].pluginName,
                         name, MAX_NAME_SIZE);
@@ -273,7 +272,7 @@ void InitLibrary()
 		    PassFunc = (InitializeFn)
 			 dlsym(plugintable[i].hdlPlugin, "Initialize");
 		    if (PassFunc != NULL) {
-			status = PassFunc(plugintable[i].ownerId);
+			(void) PassFunc(plugintable[i].ownerId);
 		    }
 
 		    i++;

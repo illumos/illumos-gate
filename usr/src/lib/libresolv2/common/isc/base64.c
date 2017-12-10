@@ -46,10 +46,6 @@
  * IF IBM IS APPRISED OF THE POSSIBILITY OF SUCH DAMAGES.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: base64.c,v 1.4 2005/04/27 04:56:34 sra Exp $";
-#endif /* not lint */
-
 #include "port_before.h"
 
 #include <sys/types.h>

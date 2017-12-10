@@ -224,7 +224,7 @@ kcf_init_mech_tabs()
 	kcf_cipher_mechs_tab[8].me_threshold = kcf_rc4_threshold;
 
 
-	/* 5 HMACs */
+	/* 6 HMACs */
 	(void) strncpy(kcf_mac_mechs_tab[0].me_name, SUN_CKM_MD5_HMAC,
 	    CRYPTO_MAX_MECH_NAME);
 	kcf_mac_mechs_tab[0].me_threshold = kcf_md5_threshold;
@@ -244,6 +244,10 @@ kcf_init_mech_tabs()
 	(void) strncpy(kcf_mac_mechs_tab[4].me_name, SUN_CKM_AES_GMAC,
 	    CRYPTO_MAX_MECH_NAME);
 	kcf_mac_mechs_tab[4].me_threshold = kcf_sha1_threshold;
+
+	(void) strncpy(kcf_mac_mechs_tab[5].me_name, SUN_CKM_AES_CMAC,
+	    CRYPTO_MAX_MECH_NAME);
+	kcf_mac_mechs_tab[5].me_threshold = kcf_sha1_threshold;
 
 	/* 1 random number generation pseudo mechanism */
 	(void) strncpy(kcf_misc_mechs_tab[0].me_name, SUN_RANDOM,

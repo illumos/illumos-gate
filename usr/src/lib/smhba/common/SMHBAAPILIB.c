@@ -1157,7 +1157,7 @@ HBA_STATUS
 HBA_FreeLibrary() {
     HBAFreeLibraryFunc	FreeLibraryFunc;
 /* LINTED E_FUNC_SET_NOT_USED */
-    HBA_STATUS		status;
+    HBA_STATUS		status __unused;
     HBA_LIBRARY_INFO	*lib_infop;
     HBA_LIBRARY_INFO	*lib_next;
     HBA_ADAPTERCALLBACK_ELEM

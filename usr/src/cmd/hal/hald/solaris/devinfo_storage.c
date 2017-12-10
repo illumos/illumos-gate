@@ -1576,14 +1576,12 @@ devinfo_volume_force_unmount_cb (HalDevice *d, guint32 exit_type,
 static void
 devinfo_volume_force_unmount (HalDevice *d, void *end_token)
 {
-	const char *device_file;
 	const char *mount_point;
 	char *unmount_stdin;
 	char *extra_env[2];
 	extra_env[0] = "HAL_METHOD_INVOKED_BY_UID=0";
 	extra_env[1] = NULL;
 
-	device_file = hal_device_property_get_string (d, "block.device");
 	mount_point = hal_device_property_get_string (d, "volume.mount_point");
 
 	if (mount_point == NULL || strlen (mount_point) == 0 || !hal_util_is_mounted_by_hald (mount_point)) {

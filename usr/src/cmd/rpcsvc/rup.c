@@ -19,7 +19,6 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
@@ -81,7 +80,6 @@ main(int argc, char *argv[])
 	statsvar sv;
 	statstime st;
 	int single, nfailed;
-	enum clnt_stat bstat;
 
 	/*
 	 * set number of slots to be 256 to begin with,
@@ -158,24 +156,13 @@ main(int argc, char *argv[])
 	sv.dk_xfer.dk_xfer_val = (int *)NULL;
 
 	vers = RSTATVERS_VAR;
-	bstat = rpc_broadcast(RSTATPROG, RSTATVERS_VAR, RSTATPROC_STATS,
+	(void) rpc_broadcast(RSTATPROG, RSTATVERS_VAR, RSTATPROC_STATS,
 			xdr_void, NULL, xdr_statsvar, (caddr_t)&sv,
 			(resultproc_t)collectnames, (char *)0);
-#ifdef TESTING
-	if (bstat != RPC_SUCCESS)
-		printf("rpc_broadcast for rstat version %d returned %s\n",
-			vers, clnt_sperrno(bstat));
-	fprintf(stderr, "starting second round of broadcasting\n");
-#endif
 	vers = RSTATVERS_TIME;
-	bstat = rpc_broadcast(RSTATPROG, RSTATVERS_TIME, RSTATPROC_STATS,
+	(void) rpc_broadcast(RSTATPROG, RSTATVERS_TIME, RSTATPROC_STATS,
 			xdr_void, NULL, xdr_statstime, (caddr_t)&st,
 			(resultproc_t)collectnames, (char *)0);
-#ifdef	TESTING
-	if (bstat != RPC_SUCCESS)
-		printf("rpc_broadcast for rstat version %d returned %s\n",
-			vers, clnt_sperrno(bstat));
-#endif
 	if (hflag || tflag || lflag)
 		printnames();
 

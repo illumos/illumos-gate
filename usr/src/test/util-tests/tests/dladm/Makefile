@@ -10,18 +10,18 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc. All rights reserved.
+# Copyright 2017 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
-PROG = allowed-ips
+PROG = allowed-ips set-linkprop
 
 ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
 
-all: 
+all:
 
 install: $(ROOTPROG)
 

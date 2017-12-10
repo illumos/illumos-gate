@@ -588,6 +588,8 @@ typedef union crypto_provider_dev {
 	dev_info_t		*pd_hw; /* for CRYPTO_HW_PROVIDER */
 } crypto_provider_dev_t;
 
+#endif /* _KERNEL */
+
 /*
  * The mechanism info structure crypto_mech_info_t contains a function group
  * bit mask cm_func_group_mask. This field, of type crypto_func_group_t,
@@ -596,8 +598,6 @@ typedef union crypto_provider_dev {
  */
 
 typedef uint32_t crypto_func_group_t;
-
-#endif /* _KERNEL */
 
 #define	CRYPTO_FG_ENCRYPT		0x00000001 /* encrypt_init() */
 #define	CRYPTO_FG_DECRYPT		0x00000002 /* decrypt_init() */

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,6 +229,7 @@ typedef enum dprov_mech_type {
 	BLOWFISH_CBC_MECH_INFO_TYPE,	/* SUN_CKM_BLOWFISH_CBC */
 	BLOWFISH_ECB_MECH_INFO_TYPE,	/* SUN_CKM_BLOWFISH_ECB */
 	AES_CBC_MECH_INFO_TYPE,		/* SUN_CKM_AES_CBC */
+	AES_CMAC_MECH_INFO_TYPE,	/* SUN_CKM_AES_CMAC */
 	AES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_AES_ECB */
 	AES_CTR_MECH_INFO_TYPE,		/* SUN_CKM_AES_CTR */
 	AES_CCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_CCM */
@@ -475,6 +477,14 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
 	    CRYPTO_FG_MAC_DECRYPT_ATOMIC,
+	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* AES-CMAC */
+	{SUN_CKM_AES_CMAC, AES_CMAC_MECH_INFO_TYPE,
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_MAC |
+	    CRYPTO_FG_ENCRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
+	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC |
+	    CRYPTO_FG_SIGN | CRYPTO_FG_SIGN_ATOMIC |
+	    CRYPTO_FG_VERIFY | CRYPTO_FG_VERIFY_ATOMIC,
 	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* AES-ECB */
 	{SUN_CKM_AES_ECB, AES_ECB_MECH_INFO_TYPE,
@@ -2110,7 +2120,8 @@ dprov_valid_mac_mech(crypto_mech_type_t mech_type)
 	    mech_type == SHA384_HMAC_GEN_MECH_INFO_TYPE ||
 	    mech_type == SHA512_HMAC_MECH_INFO_TYPE ||
 	    mech_type == SHA512_HMAC_GEN_MECH_INFO_TYPE ||
-	    mech_type == AES_GMAC_MECH_INFO_TYPE);
+	    mech_type == AES_GMAC_MECH_INFO_TYPE ||
+	    mech_type == AES_CMAC_MECH_INFO_TYPE);
 }
 
 static int
@@ -2302,6 +2313,7 @@ dprov_valid_cipher_mech(crypto_mech_type_t mech_type)
 	    mech_type == BLOWFISH_CBC_MECH_INFO_TYPE ||
 	    mech_type == BLOWFISH_ECB_MECH_INFO_TYPE ||
 	    mech_type == AES_CBC_MECH_INFO_TYPE ||
+	    mech_type == AES_CMAC_MECH_INFO_TYPE ||
 	    mech_type == AES_ECB_MECH_INFO_TYPE ||
 	    mech_type == AES_CTR_MECH_INFO_TYPE ||
 	    mech_type == AES_CCM_MECH_INFO_TYPE ||
@@ -9498,7 +9510,7 @@ dprov_object_is_token(dprov_object_t *object)
  */
 static int
 dprov_get_object_attr_scalar_common(dprov_object_t *object, uint64_t attr_type,
-				    void *value, size_t value_len)
+    void *value, size_t value_len)
 {
 	int attr_idx;
 	size_t oa_value_len;

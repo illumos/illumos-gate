@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Sep 16, 2016
+.Dd Nov 26, 2017
 .Dt USBA_HCDI_CB 9F
 .Os
 .Sh NAME
@@ -86,7 +86,7 @@ argument is one of the four request structures,
 or
 .Xr usb_isoc_req 9S ,
 which have been cast to the type
-.Ft usb_oapque_t .
+.Ft usb_opaque_t .
 The caller should ensure that all appropriate members of the request
 structure have been filled in.
 For example, if expecting data from the device and the request has completed

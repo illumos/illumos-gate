@@ -449,7 +449,6 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	size_t bpsize;
 	wchar_t	*p;
 	char	*cbp;
-	char	*cp;
 
 #else  /* _WIDE */
 	/* Starting and ending points for value to be printed */
@@ -460,7 +459,6 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	int	prec = 0;
 	ssize_t width;
 	ssize_t num;
-	ssize_t sec_display;
 	wchar_t *wp;
 	ssize_t preco;
 	ssize_t wcount = 0;
@@ -470,13 +468,13 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 	int quote;		/* ' */
 	int	retcode;
 
-
 #ifdef	_WIDE
 	/* Format code */
 	wchar_t	fcode;
 #else  /* _WIDE */
 	/* Format code */
 	char	fcode;
+	ssize_t sec_display;
 #endif /* _WIDE */
 
 	/* Number of padding zeroes required on the left and right */
@@ -714,8 +712,10 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 		format++;
 		wflag = 0;
 		lflag = 0;
-		sec_display = 0;
 		quote = 0;
+#ifndef	_WIDE
+		sec_display = 0;
+#endif
 
 	charswitch:
 
@@ -1840,7 +1840,6 @@ wide_S:
 						return (EOF);
 					}
 					nwc = mbstowcs(wstr, cbp, nwc);
-					cp = cbp + strlen(cbp);
 					wcount = nwc;
 					bp = wstr;
 					p = wstr + nwc;

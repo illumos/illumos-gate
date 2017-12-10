@@ -31,9 +31,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#define RCSID	"$Id: utils.c,v 1.10 2000/03/27 01:36:48 paulus Exp $"
-
 #ifdef __linux__
 #define	_GNU_SOURCE
 #endif
@@ -62,10 +59,6 @@
 #endif
 
 #include "pppd.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 #if defined(SUNOS4)
 extern char *strerror();

@@ -1918,12 +1918,12 @@ static SRes LzmaEnc_CodeOneBlock(CLzmaEnc *p, Bool useLimits, UInt32 maxPackSize
 static SRes LzmaEnc_Alloc(CLzmaEnc *p, UInt32 keepWindowSize, ISzAlloc *alloc, ISzAlloc *allocBig)
 {
   UInt32 beforeSize = kNumOpts;
-  Bool btMode;
+
   if (!RangeEnc_Alloc(&p->rc, alloc))
     return SZ_ERROR_MEM;
-  btMode = (p->matchFinderBase.btMode != 0);
   #ifdef COMPRESS_MF_MT
-  p->mtMode = (p->multiThread && !p->fastMode && btMode);
+  p->mtMode = (p->multiThread && !p->fastMode &&
+    (p->matchFinderBase.btMode != 0));
   #endif
 
   {

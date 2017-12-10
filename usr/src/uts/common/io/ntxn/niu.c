@@ -228,9 +228,8 @@ unm_niu_macaddr_set(struct unm_adapter_s *adapter, unm_ethernet_macaddr_t addr)
 }
 
 /* Enable a GbE interface */
-/* ARGSUSED */
-native_t unm_niu_enable_gbe_port(struct unm_adapter_s *adapter,
-		unm_niu_gbe_ifmode_t mode_dont_care)
+native_t
+unm_niu_enable_gbe_port(struct unm_adapter_s *adapter)
 {
 	unm_niu_gb_mac_config_0_t mac_cfg0;
 	unm_niu_gb_mac_config_1_t mac_cfg1;
@@ -239,8 +238,6 @@ native_t unm_niu_enable_gbe_port(struct unm_adapter_s *adapter,
 	int zero = 0;
 	int one = 1;
 	u32 port_mode = 0;
-
-	mode_dont_care = 0;
 
 	if ((port < 0) || (port > UNM_NIU_MAX_GBE_PORTS)) {
 		return (-1);
@@ -251,11 +248,11 @@ native_t unm_niu_enable_gbe_port(struct unm_adapter_s *adapter,
 	    adapter->link_speed != MBPS_1000) {
 
 		if (NX_IS_REVISION_P3(adapter->ahw.revision_id)) {
-/*
- * Do NOT fail this call because the cable is unplugged.
- * Updated when the link comes up...
- */
-		adapter->link_speed = MBPS_1000;
+			/*
+			 * Do NOT fail this call because the cable is unplugged.
+			 * Updated when the link comes up...
+			 */
+			adapter->link_speed = MBPS_1000;
 		} else {
 			return (-1);
 		}
@@ -479,7 +476,7 @@ unm_niu_set_promiscuous_mode(struct unm_adapter_s *adapter,
  */
 int
 unm_niu_xg_macaddr_set(struct unm_adapter_s *adapter,
-		unm_ethernet_macaddr_t addr)
+    unm_ethernet_macaddr_t addr)
 {
 	int		phy = adapter->physical_port;
 	unm_crbword_t	temp = 0;

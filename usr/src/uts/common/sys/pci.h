@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef	_SYS_PCI_H
@@ -105,7 +106,13 @@ extern "C" {
 #define	PCI_BCNF_BCNTRL_B2B_ENAB	0x0080
 
 #define	PCI_BCNF_IO_MASK	0xf0
+#define	PCI_BCNF_IO_SHIFT	8
 #define	PCI_BCNF_MEM_MASK	0xfff0
+#define	PCI_BCNF_MEM_SHIFT	16
+#define	PCI_BCNF_ADDR_MASK	0x000f
+
+#define	PCI_BCNF_IO_32BIT	0x01
+#define	PCI_BCNF_PF_MEM_64BIT	0x01
 
 /*
  * Header type 2 (Cardbus) offsets

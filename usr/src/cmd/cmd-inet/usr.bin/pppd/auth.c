@@ -35,9 +35,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#define RCSID	"$Id: auth.c,v 1.65 2000/04/15 01:27:10 masputra Exp $"
-
 /* Pull in crypt() definition. */
 #define __EXTENSIONS__
 
@@ -91,10 +88,6 @@
 #include "cbcp.h"
 #endif
 #include "pathnames.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 /* Bits in scan_authfile return value */
 #define NONWILD_SERVER	1

@@ -98,8 +98,6 @@
  * $Id: ipv6cp.c,v 1.9 2000/04/15 01:27:11 masputra Exp $
  */
 
-#define RCSID	"$Id: ipv6cp.c,v 1.9 2000/04/15 01:27:11 masputra Exp $"
-
 /*
  * TODO:
  *
@@ -128,10 +126,6 @@
 #include "ipv6cp.h"
 #include "magic.h"
 #include "pathnames.h"
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 /* global vars */
 ipv6cp_options ipv6cp_wantoptions[NUM_PPP];     /* Options that we want to request */

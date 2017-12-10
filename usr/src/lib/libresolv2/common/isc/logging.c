@@ -15,10 +15,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: logging.c,v 1.9 2008/11/14 02:36:51 marka Exp $";
-#endif /* not lint */
-
 #include "port_before.h"
 
 #include <sys/types.h>

@@ -15,10 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: nul_ng.c,v 1.3 2005/04/27 04:56:34 sra Exp $";
-#endif
-
 /*! \file
  * \brief
  * nul_ng.c - the netgroup accessor null map

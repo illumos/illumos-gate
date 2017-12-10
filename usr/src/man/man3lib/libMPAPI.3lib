@@ -4,9 +4,9 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBMPAPI 3LIB "Dec 12, 2006"
+.TH LIBMPAPI 3LIB "Nov 26, 2017"
 .SH NAME
-libMPAPI, libmpapi \- Common Mulitipath Management library
+libMPAPI, libmpapi \- Common Multipath Management library
 .SH SYNOPSIS
 .LP
 .nf
@@ -16,13 +16,11 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lMPAPI\fR  [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The functions in this library allow a management application to administer the
 multipath devices and associated resources through standard interfaces,
 independent of a vendor-unique multipathing solution.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibMPAPI.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -208,7 +206,6 @@ interfaces.
 \fBSun_MP_SendScsiCmd\fR
 .in -2
 .SH USAGE
-.sp
 .LP
 Client applications link with the Common Library (using \fB-lMPAPI\fR) to
 access  the  interfaces.  The Common Library dynamically loads an individual
@@ -470,7 +467,6 @@ resources by calling:
 .RE
 .RE
 .SH ERRORS
-.sp
 .LP
 Errors are generally returned from the underlying VSL and can include any of
 the following values:
@@ -623,7 +619,6 @@ permitted in other configurations.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/libMPAPI.so\fR\fR
@@ -642,7 +637,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -663,7 +657,6 @@ T}
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBMP_RegisterPlugin\fR(3MPAPI), \fBattributes\fR(5)
 .sp

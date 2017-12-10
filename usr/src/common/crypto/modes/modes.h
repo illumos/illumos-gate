@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_COMMON_CRYPTO_MODES_H
@@ -46,6 +48,7 @@ extern "C" {
 #define	CCM_MODE			0x00000010
 #define	GCM_MODE			0x00000020
 #define	GMAC_MODE			0x00000040
+#define	CMAC_MODE			0x00000080
 
 /*
  * cc_keysched:		Pointer to key schedule.
@@ -100,9 +103,13 @@ typedef struct ecb_ctx {
 #define	ecb_copy_to		ecb_common.cc_copy_to
 #define	ecb_flags		ecb_common.cc_flags
 
+/*
+ * max_remain			max bytes in cbc_remainder
+ */
 typedef struct cbc_ctx {
 	struct common_ctx cbc_common;
 	uint64_t cbc_lastblock[2];
+	size_t max_remain;
 } cbc_ctx_t;
 
 #define	cbc_keysched		cbc_common.cc_keysched
@@ -345,11 +352,17 @@ extern int gcm_decrypt_final(gcm_ctx_t *, crypto_data_t *, size_t,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
+extern int cmac_mode_final(cbc_ctx_t *, crypto_data_t *,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *));
+
 extern int ctr_mode_final(ctr_ctx_t *, crypto_data_t *,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *));
 
 extern int cbc_init_ctx(cbc_ctx_t *, char *, size_t, size_t,
     void (*copy_block)(uint8_t *, uint64_t *));
+
+extern int cmac_init_ctx(cbc_ctx_t *, size_t);
 
 extern int ctr_init_ctx(ctr_ctx_t *, ulong_t, uint8_t *,
     void (*copy_block)(uint8_t *, uint8_t *));
@@ -379,12 +392,14 @@ extern void crypto_get_ptrs(crypto_data_t *, void **, offset_t *,
 
 extern void *ecb_alloc_ctx(int);
 extern void *cbc_alloc_ctx(int);
+extern void *cmac_alloc_ctx(int);
 extern void *ctr_alloc_ctx(int);
 extern void *ccm_alloc_ctx(int);
 extern void *gcm_alloc_ctx(int);
 extern void *gmac_alloc_ctx(int);
 extern void crypto_free_mode_ctx(void *);
 extern void gcm_set_kmflag(gcm_ctx_t *, int);
+extern int crypto_put_output_data(uchar_t *, crypto_data_t *, int);
 
 #ifdef	__cplusplus
 }

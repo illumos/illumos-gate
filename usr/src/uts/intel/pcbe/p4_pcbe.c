@@ -426,9 +426,6 @@ GEN_EVT_END
  * Indicates whether the "rdpmc" instruction is available on this processor.
  */
 static int p4_rdpmc_avail = 0;
-
-static const uint64_t p4_cccrstop = 0;
-
 static char *p4_eventlist[18];
 
 /*

@@ -93,7 +93,7 @@ hal_device_class_init (HalDeviceClass *klass)
 			      G_STRUCT_OFFSET (HalDeviceClass,
 					       property_changed),
 			      NULL, NULL,
-			      hald_marshal_VOID__STRING_BOOL_BOOL,
+			      hald_marshal_VOID__STRING_BOOLEAN_BOOLEAN,
 			      G_TYPE_NONE, 3,
 			      G_TYPE_STRING,
 			      G_TYPE_BOOLEAN,

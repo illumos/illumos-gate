@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIV_STR_TO_SET 3C "Jan 6, 2004"
+.TH PRIV_STR_TO_SET 3C "Nov 26, 2017"
 .SH NAME
 priv_str_to_set, priv_set_to_str, priv_getbyname, priv_getbynum,
 priv_getsetbyname, priv_getsetbynum, priv_gettext \- privilege name functions
@@ -47,7 +47,6 @@ priv_getsetbyname, priv_getsetbynum, priv_gettext \- privilege name functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpriv_str_to_set()\fR function maps the privilege specification in
 \fIbuf\fR to a privilege set. It returns a privilege set on success or
@@ -108,7 +107,7 @@ be modified and is valid for the lifetime of the process. Both functions return
 .LP
 The \fBpriv_gettext()\fR function returns a pointer to a string consisting of
 one or more newline-separated lines of text describing the privilege. The text
-is localized using {\fBLC_MESSAGES\fR}. The application is responsibe for
+is localized using {\fBLC_MESSAGES\fR}. The application is responsible for
 freeing the memory returned.
 .sp
 .LP
@@ -116,7 +115,6 @@ These functions pick up privileges allocated during the lifetime of the process
 using \fBpriv_getbyname\fR(9F) by refreshing the internal data structures when
 necessary.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBpriv_str_to_set()\fR and \fBpriv_set_to_str()\fR
 return a non-null pointer to allocated memory that should be freed by the
@@ -138,7 +136,6 @@ Upon successful completion, \fBpriv_gettext()\fR returns a non-null value. It
 returns \fINULL\fR if an error occurs or no descriptive text for the specified
 privilege can be found.
 .SH ERRORS
-.sp
 .LP
 The \fBpriv_str_to_set()\fR and \fBpriv_set_to_str()\fR functions will fail if:
 .sp
@@ -202,7 +199,6 @@ for (i = 0; (name = priv_getbynum(i++)) != NULL; )
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -220,7 +216,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfree\fR(3C), \fBpriv_set\fR(3C), \fBattributes\fR(5), \fBprivileges\fR(5),
 \fBpriv_getbyname\fR(9F)

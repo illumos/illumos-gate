@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTREE_GET_PROPVAL 3PICLTREE "Mar 28, 2000"
+.TH PTREE_GET_PROPVAL 3PICLTREE "Nov 26, 2017"
 .SH NAME
 ptree_get_propval, ptree_get_propval_by_name \- get the value of a property
 .SH SYNOPSIS
@@ -23,11 +23,10 @@ ptree_get_propval, ptree_get_propval_by_name \- get the value of a property
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBptree_get_propval()\fR function gets the value of the property specified
 by the handle \fIproph\fR and copies it into the buffer specified by
-\fIvalbuf\fR.  The size of the buffer \fIvalbuf\fR is specifed in \fInbytes\fR.
+\fIvalbuf\fR.  The size of the buffer \fIvalbuf\fR is specified in \fInbytes\fR.
 .sp
 .LP
 The \fBptree_get_propval_by_name()\fR function gets the value of the property,
@@ -39,7 +38,6 @@ The size of the buffer is specified by \fInbytes\fR.
 For volatile properties, the read access function provided by the plug-in
 publishing the property is invoked.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fB0\fR is returned. On failure, a non-negative
 integer is returned to indicate an error.
@@ -51,7 +49,6 @@ occurs if the PICL tree was refreshed or reinitialized.
 .LP
 \fBPICL_INVALIDHANDLE\fR is returned if the specified handle never existed.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBPICL_VALUETOOBIG\fR\fR
@@ -115,7 +112,6 @@ General system failure
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -131,6 +127,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBptree_update_propval\fR(3PICLTREE), \fBattributes\fR(5)

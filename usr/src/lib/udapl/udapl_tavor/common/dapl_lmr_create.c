@@ -50,27 +50,27 @@
 
 static DAT_RETURN
 dapl_lmr_create_virtual(IN DAPL_IA *ia,
-			IN DAT_PVOID virt_addr,
-			IN DAT_VLEN length,
-			IN DAT_LMR_COOKIE shm_cookie,
-			IN DAPL_PZ *pz,
-			IN DAT_MEM_PRIV_FLAGS privileges,
-			OUT DAT_LMR_HANDLE *lmr_handle,
-			OUT DAT_LMR_CONTEXT *lmr_context,
-			OUT DAT_RMR_CONTEXT *rmr_context,
-			OUT DAT_VLEN *registered_length,
-			OUT DAT_VADDR *registered_address);
+    IN DAT_PVOID virt_addr,
+    IN DAT_VLEN length,
+    IN DAT_LMR_COOKIE shm_cookie,
+    IN DAPL_PZ *pz,
+    IN DAT_MEM_PRIV_FLAGS privileges,
+    OUT DAT_LMR_HANDLE *lmr_handle,
+    OUT DAT_LMR_CONTEXT *lmr_context,
+    OUT DAT_RMR_CONTEXT *rmr_context,
+    OUT DAT_VLEN *registered_length,
+    OUT DAT_VADDR *registered_address);
 
 static DAT_RETURN
 dapl_lmr_create_lmr(IN DAPL_IA *ia,
-		    IN DAPL_LMR *original_lmr,
-		    IN DAPL_PZ *pz,
-		    IN DAT_MEM_PRIV_FLAGS privileges,
-		    OUT DAT_LMR_HANDLE *lmr_handle,
-		    OUT DAT_LMR_CONTEXT *lmr_context,
-		    OUT DAT_RMR_CONTEXT *rmr_context,
-		    OUT DAT_VLEN *registered_length,
-		    OUT DAT_VADDR *registered_address);
+    IN DAPL_LMR *original_lmr,
+    IN DAPL_PZ *pz,
+    IN DAT_MEM_PRIV_FLAGS privileges,
+    OUT DAT_LMR_HANDLE *lmr_handle,
+    OUT DAT_LMR_CONTEXT *lmr_context,
+    OUT DAT_RMR_CONTEXT *rmr_context,
+    OUT DAT_VLEN *registered_length,
+    OUT DAT_VADDR *registered_address);
 
 /*
  * Function Definitions
@@ -78,16 +78,16 @@ dapl_lmr_create_lmr(IN DAPL_IA *ia,
 
 static DAT_RETURN
 dapl_lmr_create_virtual(IN DAPL_IA *ia,
-			IN DAT_PVOID virt_addr,
-			IN DAT_VLEN length,
-			IN DAT_LMR_COOKIE shm_cookie,
-			IN DAPL_PZ *pz,
-			IN DAT_MEM_PRIV_FLAGS privileges,
-			OUT DAT_LMR_HANDLE *lmr_handle,
-			OUT DAT_LMR_CONTEXT *lmr_context,
-			OUT DAT_RMR_CONTEXT *rmr_context,
-			OUT DAT_VLEN *registered_length,
-			OUT DAT_VADDR *registered_address)
+    IN DAT_PVOID virt_addr,
+    IN DAT_VLEN length,
+    IN DAT_LMR_COOKIE shm_cookie,
+    IN DAPL_PZ *pz,
+    IN DAT_MEM_PRIV_FLAGS privileges,
+    OUT DAT_LMR_HANDLE *lmr_handle,
+    OUT DAT_LMR_CONTEXT *lmr_context,
+    OUT DAT_RMR_CONTEXT *rmr_context,
+    OUT DAT_VLEN *registered_length,
+    OUT DAT_VADDR *registered_address)
 {
 	DAPL_LMR *lmr;
 	DAT_REGION_DESCRIPTION reg_desc;
@@ -145,7 +145,7 @@ dapl_lmr_create_virtual(IN DAPL_IA *ia,
 		goto bail;
 	}
 
-	(void) dapl_os_atomic_inc(&pz->pz_ref_count);
+	dapl_os_atomic_inc(&pz->pz_ref_count);
 
 	if (NULL != lmr_handle) {
 		*lmr_handle = (DAT_LMR_HANDLE) lmr;
@@ -170,14 +170,14 @@ bail:
 
 static DAT_RETURN
 dapl_lmr_create_lmr(IN DAPL_IA *ia,
-		    IN DAPL_LMR *original_lmr,
-		    IN DAPL_PZ *pz,
-		    IN DAT_MEM_PRIV_FLAGS privileges,
-		    OUT DAT_LMR_HANDLE *lmr_handle,
-		    OUT DAT_LMR_CONTEXT *lmr_context,
-		    OUT DAT_RMR_CONTEXT *rmr_context,
-		    OUT DAT_VLEN *registered_length,
-		    OUT DAT_VADDR *registered_address)
+    IN DAPL_LMR *original_lmr,
+    IN DAPL_PZ *pz,
+    IN DAT_MEM_PRIV_FLAGS privileges,
+    OUT DAT_LMR_HANDLE *lmr_handle,
+    OUT DAT_LMR_CONTEXT *lmr_context,
+    OUT DAT_RMR_CONTEXT *rmr_context,
+    OUT DAT_VLEN *registered_length,
+    OUT DAT_VADDR *registered_address)
 {
 	DAPL_LMR *lmr;
 	DAT_REGION_DESCRIPTION reg_desc;
@@ -246,7 +246,7 @@ dapl_lmr_create_lmr(IN DAPL_IA *ia,
 		goto bail;
 	}
 
-	(void) dapl_os_atomic_inc(&pz->pz_ref_count);
+	dapl_os_atomic_inc(&pz->pz_ref_count);
 
 	if (NULL != lmr_handle) {
 		*lmr_handle = (DAT_LMR_HANDLE)lmr;
@@ -300,16 +300,16 @@ bail:
  */
 DAT_RETURN
 dapl_lmr_create(IN DAT_IA_HANDLE ia_handle,
-		IN DAT_MEM_TYPE mem_type,
-		IN DAT_REGION_DESCRIPTION region_description,
-		IN DAT_VLEN length,
-		IN DAT_PZ_HANDLE pz_handle,
-		IN DAT_MEM_PRIV_FLAGS privileges,
-		OUT DAT_LMR_HANDLE *lmr_handle,
-		OUT DAT_LMR_CONTEXT *lmr_context,
-		OUT DAT_RMR_CONTEXT *rmr_context,
-		OUT DAT_VLEN *registered_length,
-		OUT DAT_VADDR *registered_address)
+    IN DAT_MEM_TYPE mem_type,
+    IN DAT_REGION_DESCRIPTION region_description,
+    IN DAT_VLEN length,
+    IN DAT_PZ_HANDLE pz_handle,
+    IN DAT_MEM_PRIV_FLAGS privileges,
+    OUT DAT_LMR_HANDLE *lmr_handle,
+    OUT DAT_LMR_CONTEXT *lmr_context,
+    OUT DAT_RMR_CONTEXT *rmr_context,
+    OUT DAT_VLEN *registered_length,
+    OUT DAT_VADDR *registered_address)
 {
 	DAPL_IA *ia;
 	DAPL_PZ *pz;
