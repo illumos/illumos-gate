@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCKSTAT 1M "Feb 28, 2008"
+.TH LOCKSTAT 1M "Dec 10, 2017"
 .SH NAME
 lockstat \- report kernel lock and profiling statistics
 .SH SYNOPSIS
@@ -17,7 +17,6 @@ lockstat \- report kernel lock and profiling statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlockstat\fR utility gathers and displays kernel locking and profiling
 statistics. \fBlockstat\fR allows you to specify which events to watch (for
@@ -49,14 +48,12 @@ applicable.
 intercept events of interest. This imposes a small but measurable overhead on
 all system activity, so access to \fBlockstat\fR is restricted to super-user by
 default. The system administrator can permit other users to use \fBlockstat\fR
-by granting them additional DTrace privileges. Refer to the \fISolaris Dynamic
+by granting them additional DTrace privileges. Refer to the \fIDynamic
 Tracing Guide\fR for more information about DTrace security features.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .SS "Event Selection"
-.sp
 .LP
 If no event selection options are specified, the default is \fB-C\fR.
 .sp
@@ -134,7 +131,6 @@ Hz).
 .RE
 
 .SS "Data Gathering"
-.sp
 .ne 2
 .na
 \fB\fB-x\fR \fIarg\fR[=\fIval\fR]\fR
@@ -148,7 +144,6 @@ an equals sign (=).
 .RE
 
 .SS "Data Gathering (Mutually Exclusive)"
-.sp
 .ne 2
 .na
 \fB\fB-b\fR\fR
@@ -189,7 +184,6 @@ Timing: Basic plus timing for all events [default].
 .RE
 
 .SS "Data Filtering"
-.sp
 .ne 2
 .na
 \fB\fB\fR\fB-d\fR \fIduration\fR\fR
@@ -244,7 +238,6 @@ Trace (rather than sample) events [off by default].
 .RE
 
 .SS "Data Reporting"
-.sp
 .ne 2
 .na
 \fB\fB-c\fR\fR
@@ -353,7 +346,6 @@ Wherever: distinguish events only by lock, not by caller.
 .RE
 
 .SH DISPLAY FORMATS
-.sp
 .LP
 The following headers appear over various columns of data.
 .sp
@@ -836,24 +828,22 @@ Count indv cuml rcnt     nsec CPU+PIL          Caller
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdtrace\fR(1M), \fBplockstat\fR(1M), \fBattributes\fR(5), \fBlockstat\fR(7D),
 \fBmutex\fR(9F), \fBrwlock\fR(9F)
 .sp
 .LP
-\fISolaris Dynamic Tracing Guide\fR
-.SH NOTES
+\fIDynamic Tracing Guide\fR:
 .sp
 .LP
-The profiling support provided by \fBlockstat\fR \fB-I\fR replaces the old (and
-undocumented) \fB/usr/bin/kgmon\fR and \fB/dev/profile\fR.
-.sp
+https://illumos.org/books/dtrace/
+
+.SH NOTES
 .LP
 Tail-call elimination can affect call sites. For example, if
 \fBfoo()\fR\fB+0x50\fR calls \fBbar()\fR and the last thing \fBbar()\fR does is
 call \fBmutex_exit()\fR, the compiler can arrange for \fBbar()\fR to branch to
-\fBmutex_exit()\fRwith a return address of \fBfoo()\fR\fB+0x58\fR. Thus, the
+\fBmutex_exit()\fR with a return address of \fBfoo()\fR\fB+0x58\fR. Thus, the
 \fBmutex_exit()\fR in \fBbar()\fR will appear as though it occurred at
 \fBfoo()\fR\fB+0x58\fR.
 .sp
@@ -869,5 +859,5 @@ asynchronously, not by a function call from that \fBPC\fR.
 .sp
 .LP
 The \fBlockstat\fR technology is provided on an as-is basis. The format and
-content of \fBlockstat\fR output reflect the current Solaris kernel
+content of \fBlockstat\fR output reflect the current kernel
 implementation and are therefore subject to change in future releases.

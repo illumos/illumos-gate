@@ -3,14 +3,13 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FBT 7D "Sep 4, 2003"
+.TH FBT 7D "Dec 10, 2017"
 .SH NAME
 fbt \- DTrace function boundary tracing provider
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfbt\fR driver is a DTrace dynamic tracing provider that performs dynamic
-instrumentation at function boundaries in the Solaris kernel.
+instrumentation at function boundaries in the kernel.
 .sp
 .LP
 The function is the fundamental unit of program text. In a well-designed
@@ -25,11 +24,10 @@ offering the instrumentation as a set of DTrace probes.
 .LP
 The \fBfbt\fR driver is not a public interface and you access the
 instrumentation offered by this provider through DTrace. Refer to the
-\fISolaris Dynamic Tracing Guide\fR for a description of the public documented
+\fIDynamic Tracing Guide\fR for a description of the public documented
 interfaces available for the DTrace facility and the probes offered by the
 \fBfbt\fR provider.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -45,9 +43,11 @@ Interface Stability	Private
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdtrace\fR(1M), \fBattributes\fR(5), \fBdtrace\fR(7D)
 .sp
 .LP
-\fISolaris Dynamic Tracing Guide\fR
+\fIDynamic Tracing Guide\fR:
+.sp
+.LP
+https://illumos.org/books/dtrace/
