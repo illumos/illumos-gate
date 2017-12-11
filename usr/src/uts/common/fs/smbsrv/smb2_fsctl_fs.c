@@ -150,8 +150,10 @@ smb2_fsctl_fs(smb_request_t *sr, smb_fsctl_t *fsctl)
 		func = smb2_fsctl_notsup;
 		break;
 	case FSCTL_SET_INTEGRITY_INFORMATION:	/* 160 */
-	case FSCTL_QUERY_FILE_REGIONS:		/* 161 */
 		func = smb2_fsctl_notsup;
+		break;
+	case FSCTL_QUERY_FILE_REGIONS:		/* 161 */
+		func = smb2_fsctl_query_file_regions;
 		break;
 
 	default:

@@ -289,7 +289,9 @@ typedef enum _FILE_FS_INFORMATION_CLASS {
 	FileFsControlInformation,	/* 6 */
 	FileFsFullSizeInformation,	/* 7 */
 	FileFsObjectIdInformation,	/* 8 */
-	FileFsDriverPathInformation	/* 9 */
+	FileFsDriverPathInformation,	/* 9 */
+	FileFsVolumeFlagsInformation,	/* A */
+	FileFsSectorSizeInformation	/* B */
 } FILE_FS_INFORMATION_CLASS;
 
 /*

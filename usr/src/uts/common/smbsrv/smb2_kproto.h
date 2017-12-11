@@ -76,6 +76,7 @@ uint32_t smb2_fsctl_set_resilient(smb_request_t *, smb_fsctl_t *);
 uint32_t smb2_fsctl_set_sparse(smb_request_t *, smb_fsctl_t *);
 uint32_t smb2_fsctl_set_zero_data(smb_request_t *, smb_fsctl_t *);
 uint32_t smb2_fsctl_query_alloc_ranges(smb_request_t *, smb_fsctl_t *);
+uint32_t smb2_fsctl_query_file_regions(smb_request_t *, smb_fsctl_t *);
 uint32_t smb2_sparse_copy(smb_request_t *sr,
     smb_ofile_t *src_ofile, smb_ofile_t *dst_ofile,
     off64_t src_off, off64_t dst_off, uint32_t *residp,

@@ -416,3 +416,276 @@ smb2_sparse_copy(
 
 	return (status);
 }
+
+/*
+ * Not sure what header this might go in.
+ */
+#define	FILE_REGION_USAGE_VALID_CACHED_DATA	1
+#define	FILE_REGION_USAGE_VALID_NONCACHED_DATA	2
+#define	FILE_REGION_USAGE_VALID__MASK		3
+
+typedef struct _FILE_REGION_INFO {
+	uint64_t off;
+	uint64_t len;
+	uint32_t usage;
+	uint32_t reserved;
+} FILE_REGION_INFO;
+
+
+/*
+ * FSCTL_QUERY_FILE_REGIONS
+ *
+ * [MS-FSCC] 2.3.39 FSCTL_QUERY_FILE_REGIONS Request
+ * [MS-FSCC] 2.3.40.1 FILE_REGION_INFO
+ *
+ * Looks like Hyper-V uses this to query the "valid data length",
+ * which to us is the beginning offset of the last "hole".
+ * Similar logic as smb2_sparse_copy()
+ */
+uint32_t
+smb2_fsctl_query_file_regions(smb_request_t *sr, smb_fsctl_t *fsctl)
+{
+	smb_attr_t attr;
+	cred_t *kcr;
+	smb_ofile_t *ofile = sr->fid_ofile;
+	FILE_REGION_INFO arg;
+	off64_t cur_off, end_off, eof;
+	off64_t data, hole;
+	uint32_t tot_regions, put_regions;
+	uint32_t status;
+	int rc;
+
+	if (fsctl->InputCount == 0) {
+		arg.off = 0;
+		arg.len = INT64_MAX;
+		arg.usage = FILE_REGION_USAGE_VALID_CACHED_DATA;
+		arg.reserved = 0;
+	} else {
+		/* min size check: reserved is optional */
+		rc = smb_mbc_decodef(fsctl->in_mbc, "qql",
+		    &arg.off, &arg.len, &arg.usage);
+		if (rc != 0)
+			return (NT_STATUS_BUFFER_TOO_SMALL);
+
+		/*
+		 * The given offset and length are int64_t (signed).
+		 */
+		if (arg.off > INT64_MAX || arg.len > INT64_MAX)
+			return (NT_STATUS_INVALID_PARAMETER);
+		if ((arg.off + arg.len) > INT64_MAX)
+			return (NT_STATUS_INVALID_PARAMETER);
+		if ((arg.usage & FILE_REGION_USAGE_VALID__MASK) == 0)
+			return (NT_STATUS_INVALID_PARAMETER);
+		arg.reserved = 0;
+	}
+
+	if (fsctl->MaxOutputResp < (16 + sizeof (FILE_REGION_INFO)))
+		return (NT_STATUS_BUFFER_TOO_SMALL);
+
+	if (!smb_node_is_file(ofile->f_node))
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	/*
+	 * This operation is effectively a read
+	 */
+	status = smb_ofile_access(ofile, ofile->f_cr, FILE_READ_DATA);
+	if (status != NT_STATUS_SUCCESS)
+		return (status);
+
+	/*
+	 * Need the file size and dosattr
+	 */
+	bzero(&attr, sizeof (attr));
+	attr.sa_mask = SMB_AT_SIZE | SMB_AT_DOSATTR;
+	kcr = zone_kcred();
+	status = smb_node_getattr(sr, ofile->f_node, kcr, ofile, &attr);
+	if (status != NT_STATUS_SUCCESS)
+		return (status);
+
+	cur_off = arg.off;
+	end_off = arg.off + arg.len;
+	eof = attr.sa_vattr.va_size;
+
+	/*
+	 * If (InputRegion.FileOffset > Eof) OR
+	 * ((InputRegion.FileOffset == Eof) AND (Eof > 0)),
+	 * the operation MUST return STATUS_SUCCESS, with
+	 * BytesReturned set to 0 (empty data response)
+	 */
+	if ((arg.off > eof) || (arg.off == eof && eof > 0))
+		return (NT_STATUS_SUCCESS);
+	if (end_off > eof)
+		end_off = eof;
+
+	/*
+	 * We're going to return at least one region.  Put place-holder
+	 * data for the fixed part of the response.  Will overwrite this
+	 * later, when we know how many regions there are and how many
+	 * of those fit in the allowed response buffer space.  These are:
+	 * Flags, TotalRegionEntryCount, RegionEntryCount, Reserved
+	 */
+	rc = smb_mbc_encodef(fsctl->out_mbc, "llll", 0, 0, 0, 0);
+	if (rc != 0)
+		return (NT_STATUS_BUFFER_TOO_SMALL);
+	tot_regions = put_regions = 0;
+
+	/*
+	 * Get the first pair of (data, hole) offsets at or after
+	 * the current offset (cur_off).
+	 */
+	data = hole = cur_off;
+	rc = smb_fsop_next_alloc_range(ofile->f_cr,
+	    ofile->f_node, &data, &hole);
+	switch (rc) {
+	case 0:
+		/* Found (data, hole) */
+		break;
+	case ENXIO:
+		/* No more data after cur_off. */
+		break;
+	default:
+		cmn_err(CE_NOTE, "smb_fsop_next_alloc_range: rc=%d", rc);
+		/* FALLTHROUGH */
+	case ENOSYS:	/* FS does not support VOP_IOCTL... */
+	case ENOTTY:	/* ... or _FIO_SEEK_DATA, _HOLE */
+		data = cur_off;
+		hole = eof;
+		break;
+	}
+	DTRACE_PROBE2(range0, uint64_t, data, uint64_t, hole);
+
+	/*
+	 * Only sparse files should present un-allocated regions.
+	 * If non-sparse, MS-FSA says to just return one region.
+	 * There still can be a "hole" but only one, starting at
+	 * "valid data length" (VDL) and ending at end of file.
+	 * To determine VDL, find the last (data,hole) pair, then
+	 * VDL is the last "hole" offset.  Note that the above
+	 * smb_fsop_next_alloc_range may have set data somewhere
+	 * above cur_off, so we we have to reset that here.
+	 */
+	if ((attr.sa_dosattr & FILE_ATTRIBUTE_SPARSE_FILE) == 0) {
+		/*
+		 * This works, but it's rather inefficient, and
+		 * usually just finds VDL==EOF.  Should look into
+		 * whether there's a faster way to find the VDL.
+		 */
+#if 0
+		off64_t next_data, next_hole;
+		data = cur_off;
+		do {
+			next_data = next_hole = hole;
+			rc = smb_fsop_next_alloc_range(ofile->f_cr,
+			    ofile->f_node, &next_data, &next_hole);
+			if (rc == 0) {
+				hole = next_hole;
+			}
+		} while (rc == 0);
+#else
+		/* Assume no "holes" anywhere (VDL==EOF) */
+		data = cur_off;
+		hole = eof;
+#endif
+		DTRACE_PROBE2(range1, uint64_t, data, uint64_t, hole);
+	}
+
+	/*
+	 * Loop terminates in the middle, continuing
+	 * while (cur_off < end_off)
+	 */
+	for (;;) {
+		/*
+		 * We have a data region that covers (data, hole).
+		 * It could be partially or entirely beyond the range
+		 * the caller asked about (if so trim it).
+		 */
+		if (hole > end_off)
+			hole = end_off;
+		if (data > hole)
+			data = hole;
+
+		/*
+		 * If cur_off < data encode a "hole" region
+		 * (cur_off,data) and advance cur_off.
+		 */
+		if (cur_off < data) {
+			rc = smb_mbc_encodef(fsctl->out_mbc, "qqll",
+			    cur_off,
+			    (data - cur_off),
+			    0, // usage (hole)
+			    0); // reserved
+			cur_off = data;
+			if (rc == 0)
+				put_regions++;
+			tot_regions++;
+		}
+
+		/*
+		 * If cur_off < hole encode a "data" region
+		 * (cur_off,hole) and advance cur_off.
+		 */
+		if (cur_off < hole) {
+			rc = smb_mbc_encodef(fsctl->out_mbc, "qqll",
+			    cur_off,
+			    (hole - cur_off),
+			    FILE_REGION_USAGE_VALID_CACHED_DATA,
+			    0); // reserved
+			cur_off = hole;
+			if (rc == 0)
+				put_regions++;
+			tot_regions++;
+		}
+
+		/*
+		 * Normal loop termination
+		 */
+		if (cur_off >= end_off)
+			break;
+
+		/*
+		 * Get the next region (data, hole) starting on or after
+		 * the current offset (cur_off).
+		 */
+		data = hole = cur_off;
+		rc = smb_fsop_next_alloc_range(ofile->f_cr,
+		    ofile->f_node, &data, &hole);
+		switch (rc) {
+		case 0:
+			/* Found (data, hole) */
+			break;
+		case ENXIO:
+			/*
+			 * No more data after cur_off.
+			 * Will encode one last hole.
+			 */
+			data = hole = eof;
+			break;
+		default:
+			cmn_err(CE_NOTE, "smb_fsop_next_alloc_range: rc=%d",
+			    rc);
+			/* FALLTHROUGH */
+		case ENOSYS:	/* FS does not support VOP_IOCTL... */
+		case ENOTTY:	/* ... or _FIO_SEEK_DATA, _HOLE */
+			data = cur_off;
+			hole = eof;
+			break;
+		}
+		DTRACE_PROBE2(range2, uint64_t, data, uint64_t, hole);
+	}
+
+	/*
+	 * Overwrite the fixed part of the response with the
+	 * final numbers of regions etc.
+	 * Flags, TotalRegionEntryCount, RegionEntryCount, Reserved
+	 */
+	(void) smb_mbc_poke(fsctl->out_mbc, 0, "llll",
+	    0, // flags
+	    tot_regions,
+	    put_regions,
+	    0); // reserved
+
+	if (put_regions < tot_regions)
+		return (NT_STATUS_BUFFER_OVERFLOW);
+
+	return (NT_STATUS_SUCCESS);
+}
