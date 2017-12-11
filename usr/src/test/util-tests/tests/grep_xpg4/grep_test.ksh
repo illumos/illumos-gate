@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc. All rights reserved.
 #
 
 XGREP=${XGREP:=/usr/xpg4/bin/grep}
@@ -93,13 +93,53 @@ cd $FILEDIR
 
 i=0
 while read flags; do
-	print -n "grep $flags: "
+	print -n "test $i: grep $flags: "
 	$XGREP $flags a test0 test1 test2 \
 	    test3 test4 test5 test6 \
 	    test7 > out
-	if [[ $? -ne 0 ]]; then
-		fail "failed on exit"
+	err="$?"
+	if [[ $err -ne 0 ]]; then
+		fail "failed on exit: $err"
 	elif [ -n "$(diff out gout$i)" ]; then
+		print "$(diff out gout$i)"
+		fail "output is different"
+	fi
+	echo "passed"
+	((i++))
+done < /tmp/flags
+
+FLAGS2="-nE"
+
+echo "$FLAGS2" > /tmp/flags
+
+while read flags; do
+	print -n "test $i: grep $flags: "
+	$XGREP $flags ".*" testnl > out
+	err="$?"
+	if [[ $err -ne 0 ]]; then
+		fail "failed on exit: $err"
+	elif [ -n "$(diff out gout$i)" ]; then
+		print "$(diff out gout$i)"
+		fail "output is different"
+	fi
+	echo "passed"
+	((i++))
+done < /tmp/flags
+
+FLAGS3="-B 1
+-vA 1
+-vB 1"
+
+echo "$FLAGS3" > /tmp/flags
+
+while read flags; do
+	print -n "test $i: grep $flags: "
+	$XGREP $flags a testnl > out
+	err="$?"
+	if [[ $err -ne 0 ]]; then
+		fail "failed on exit: $err"
+	elif [ -n "$(diff out gout$i)" ]; then
+		print "$(diff out gout$i)"
 		fail "output is different"
 	fi
 	echo "passed"
