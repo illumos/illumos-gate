@@ -411,7 +411,7 @@ static int
 add_prop_list(const char *propname, char *propval, nvlist_t **props,
     boolean_t poolprop)
 {
-	zpool_prop_t prop = ZPROP_INVAL;
+	zpool_prop_t prop = ZPOOL_PROP_INVAL;
 	zfs_prop_t fprop;
 	nvlist_t *proplist;
 	const char *normnm;
@@ -429,7 +429,7 @@ add_prop_list(const char *propname, char *propval, nvlist_t **props,
 	if (poolprop) {
 		const char *vname = zpool_prop_to_name(ZPOOL_PROP_VERSION);
 
-		if ((prop = zpool_name_to_prop(propname)) == ZPROP_INVAL &&
+		if ((prop = zpool_name_to_prop(propname)) == ZPOOL_PROP_INVAL &&
 		    !zpool_prop_feature(propname)) {
 			(void) fprintf(stderr, gettext("property '%s' is "
 			    "not a valid pool property\n"), propname);
