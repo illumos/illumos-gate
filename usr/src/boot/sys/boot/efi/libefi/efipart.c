@@ -38,6 +38,7 @@
 #include <efi.h>
 #include <efilib.h>
 #include <efiprot.h>
+#include <efichar.h>
 #include <disk.h>
 
 static EFI_GUID blkio_guid = BLOCK_IO_PROTOCOL;
@@ -546,8 +547,7 @@ efipart_hdinfo_add_filepath(EFI_HANDLE disk_handle)
 		unit = 0;
 
 	/* FILEPATH_DEVICE_PATH has 0 terminated string */
-	for (len = 0; node->PathName[len] != 0; len++)
-		;
+	len = ucs2len(node->PathName);
 	if ((pathname = malloc(len + 1)) == NULL) {
 		printf("Failed to add disk, out of memory\n");
 		free(pd);
