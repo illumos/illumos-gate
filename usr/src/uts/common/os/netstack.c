@@ -1080,7 +1080,7 @@ netstack_reap(void *arg)
 	mutex_enter(&netstack_g_lock);
 	found = B_FALSE;
 	for (nsp = &netstack_head; *nsp != NULL;
-	     nsp = &(*nsp)->netstack_next) {
+	    nsp = &(*nsp)->netstack_next) {
 		if (*nsp == ns) {
 			*nsp = ns->netstack_next;
 			ns->netstack_next = NULL;
