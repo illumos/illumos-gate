@@ -63,6 +63,10 @@ pdinfo_list_t *efiblk_get_pdinfo_list(struct devsw *dev);
 
 void *efi_get_table(EFI_GUID *tbl);
 
+int efi_getdev(void **, const char *, const char **);
+char *efi_fmtdev(void *);
+int efi_setcurrdev(struct env_var *, int, const void *);
+
 int efi_register_handles(struct devsw *, EFI_HANDLE *, EFI_HANDLE *, int);
 EFI_HANDLE efi_find_handle(struct devsw *, int);
 int efi_handle_lookup(EFI_HANDLE, struct devsw **, int *,  uint64_t *);

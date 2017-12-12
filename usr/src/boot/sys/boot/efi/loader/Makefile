@@ -26,9 +26,9 @@ PROG=		loader.sym
 MACHINE=	$(MACH64)
 
 # architecture-specific loader code
-SRCS=	autoload.c bootinfo.c conf.c copy.c devicename.c efi_main.c main.c \
+SRCS=	autoload.c bootinfo.c conf.c copy.c efi_main.c main.c \
 	self_reloc.c smbios.c acpi.c vers.c memmap.c multiboot2.c
-OBJS= autoload.o bootinfo.o conf.o copy.o devicename.o efi_main.o main.o \
+OBJS= autoload.o bootinfo.o conf.o copy.o efi_main.o main.o \
 	self_reloc.o smbios.o acpi.o vers.o memmap.o multiboot2.o
 
 ASFLAGS=-m64 -fPIC
