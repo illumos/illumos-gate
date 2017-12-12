@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -821,15 +822,10 @@ cpupart_create(psetid_t *psid)
 	ASSERT(pool_lock_held());
 
 	pp = kmem_zalloc(sizeof (cpupart_t), KM_SLEEP);
-	pp->cp_nlgrploads = lgrp_plat_max_lgrps();
-	pp->cp_lgrploads = kmem_zalloc(sizeof (lpl_t) * pp->cp_nlgrploads,
-	    KM_SLEEP);
 
 	mutex_enter(&cpu_lock);
 	if (cp_numparts == cp_max_numparts) {
 		mutex_exit(&cpu_lock);
-		kmem_free(pp->cp_lgrploads, sizeof (lpl_t) * pp->cp_nlgrploads);
-		pp->cp_lgrploads = NULL;
 		kmem_free(pp, sizeof (cpupart_t));
 		return (ENOMEM);
 	}
