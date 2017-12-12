@@ -25,7 +25,7 @@ all:	lib$(LIB).a
 install:
 
 SRCS=	delay.c devpath.c efi_console.c efinet.c efipart.c env.c errno.c \
-	handles.c libefi.c time.c wchar.c
+	handles.c libefi.c time.c wchar.c efi_driver_utils.c
 
 #.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 #SRCS +=	time.c
