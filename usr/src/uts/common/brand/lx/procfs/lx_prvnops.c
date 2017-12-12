@@ -2030,6 +2030,25 @@ static int lxpr_zfs_fstype = -1;
 #define	LXPR_ROOT_MOUNT_ID	15
 #define	LXPR_MNT_OPT_CHUNK	128
 
+/* List of native, non-Linux mount options we should omit. */
+static const char *lx_invalid_mnt_opts[] = {
+	"xattr",
+	NULL
+};
+
+/* First see if we should omit this option */
+static boolean_t
+lxpr_skip_mntopt(const char *s)
+{
+	uint_t i;
+
+	for (i = 0; lx_invalid_mnt_opts[i] != NULL; i++) {
+		if (strcmp(s, lx_invalid_mnt_opts[i]) == 0)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
 static void
 lxpr_append_mntopt(lxpr_mount_entry_t *lme, char *s)
 {
@@ -2081,11 +2100,13 @@ lxpr_get_mntopts(vfs_t *vfsp, lxpr_mount_entry_t *lme)
 		    strcmp(mop->mo_name, "nodevices") == 0)
 			have_nodev = B_TRUE;
 
-		lxpr_append_mntopt(lme, ",");
-		lxpr_append_mntopt(lme, mop->mo_name);
-		if (mop->mo_arg != NULL) {
-			lxpr_append_mntopt(lme, "=");
-			lxpr_append_mntopt(lme, mop->mo_arg);
+		if (!lxpr_skip_mntopt(mop->mo_name)) {
+			lxpr_append_mntopt(lme, ",");
+			lxpr_append_mntopt(lme, mop->mo_name);
+			if (mop->mo_arg != NULL) {
+				lxpr_append_mntopt(lme, "=");
+				lxpr_append_mntopt(lme, mop->mo_arg);
+			}
 		}
 	}
 

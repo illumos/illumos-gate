@@ -132,6 +132,17 @@ static mount_opt_t lx_autofs_options[] = {
 	{ NULL,			MOUNT_OPT_INVALID }
 };
 
+static const char *lx_common_mnt_opts[] = {
+	"exec",
+	"noexec",
+	"devices",
+	"nodevices",
+	"dev",
+	"nodev",
+	"suid",
+	"nosuid",
+	NULL
+};
 
 /*
  * Check the mount options.
@@ -182,6 +193,12 @@ lx_mnt_opt_verify(char *opts, mount_opt_t *mop)
 	}
 	for (;;) {
 		opt_len = strlen(opt);
+
+		/* Check common options we support on all filesystems */
+		for (i = 0; lx_common_mnt_opts[i] != NULL; i++) {
+			if (strcmp(opt, lx_common_mnt_opts[i]) == 0)
+				goto next_opt;
+		}
 
 		/* Check for matching option/value pair. */
 		for (i = 0; mop[i].mo_name != NULL; i++) {
@@ -252,6 +269,7 @@ lx_mnt_opt_verify(char *opts, mount_opt_t *mop)
 			goto bad;
 		}
 
+next_opt:
 		/*
 		 * This option is ok, either we're done or move on to the next
 		 * option.
