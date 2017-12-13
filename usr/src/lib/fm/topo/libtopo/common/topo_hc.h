@@ -177,6 +177,19 @@ extern "C" {
 #define	TOPO_PORT_SFF_TRANSCEIVER_REV	"revision"
 #define	TOPO_PORT_SFF_TRANSCEIVER_SN	"serial-number"
 
+/*
+ * These properties will exist on nodes enumerated by the ipmi module. They
+ * are consumed by the fac_prov_ipmi module
+ */
+#define	TOPO_PROP_IPMI_ENTITY_ID	"entity-id"
+#define	TOPO_PROP_IPMI_ENTITY_INST	"entity-instance"
+
+/*
+ * This property can be statically set in a map file and is consumed by the
+ * fac_prov_ipmi module.
+ */
+#define	TOPO_PROP_IPMI_ENTITY_LIST	"entity-list"
+
 #ifdef	__cplusplus
 }
 #endif
