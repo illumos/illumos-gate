@@ -22,7 +22,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -191,6 +191,7 @@ static const hcc_t hc_canon[] = {
 	{ SCSI_DEVICE, TOPO_STABILITY_PRIVATE },
 	{ SHELF, TOPO_STABILITY_PRIVATE },
 	{ SES_ENCLOSURE, TOPO_STABILITY_PRIVATE },
+	{ SLOT, TOPO_STABILITY_PRIVATE },
 	{ SMP_DEVICE, TOPO_STABILITY_PRIVATE },
 	{ SP, TOPO_STABILITY_PRIVATE },
 	{ STRAND, TOPO_STABILITY_PRIVATE },

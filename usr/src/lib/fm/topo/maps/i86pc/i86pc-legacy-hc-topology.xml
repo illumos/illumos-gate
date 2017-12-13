@@ -2,7 +2,7 @@
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
 Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright (c) 2017, Joyent, Inc.
+Copyright (c) 2018, Joyent, Inc.
 
  CDDL HEADER START
 
@@ -77,8 +77,14 @@ Copyright (c) 2017, Joyent, Inc.
         <enum-method name='chip' version='1' />
 	<propmap name='chip' />
       </range>
+      <range name='slot' min='0' max='31'>
+        <enum-method name='smbios' version='1' />
+      </range>
       <range name='hostbridge' min='0' max='254'>
         <enum-method name='hostbridge' version='1' />
+      </range>
+      <range name='sp' min='0' max='0'>
+        <enum-method name='ipmi' version='1' />
       </range>
     </dependents>
     

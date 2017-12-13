@@ -22,7 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 MODULE = ipmi
 CLASS = common
@@ -31,4 +32,4 @@ MODULESRCS = ipmi_enum.c ipmi_methods.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -lipmi
+LDLIBS += -lipmi -lnsl

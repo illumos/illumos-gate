@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBIPMI_H
@@ -297,6 +297,9 @@ extern ipmi_channel_info_t *ipmi_get_channel_info(ipmi_handle_t *, int);
  * This can be expanded in the future as needed.
  */
 
+/* We'll return up to a maximum of two static routee + two dynamic routes */
+#define	IPMI_LAN_IPV6_MAX_ROUTES	4
+
 typedef struct ipmi_lan_config {
 	boolean_t	ilc_set_in_progress;
 	uint32_t	ilc_ipaddr;
@@ -304,8 +307,17 @@ typedef struct ipmi_lan_config {
 	uint8_t		ilc_macaddr[6];
 	uint32_t	ilc_subnet;
 	uint32_t	ilc_gateway_addr;
+	uint8_t		ilc_ipv6_source;
+	uint8_t		ilc_ipv6_addr[16];
+	uint8_t		ilc_ipv6_routes[IPMI_LAN_IPV6_MAX_ROUTES][16];
+	uint8_t		ilc_ipv6_nroutes;
+	uint16_t	ilc_vlan_id;
+	boolean_t	ilc_ipv4_enabled;
+	boolean_t	ilc_ipv6_enabled;
+	boolean_t	ilc_vlan_enabled;
 } ipmi_lan_config_t;
 
+/* values for ilc_ipaddr_source */
 #define	IPMI_LAN_SRC_UNSPECIFIED	0x0
 #define	IPMI_LAN_SRC_STATIC		0x1
 #define	IPMI_LAN_SRC_DHCP		0x2

@@ -1,26 +1,17 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
-Copyright (c) 2018, Joyent, Inc.
 
- CDDL HEADER START
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
 
- The contents of this file are subject to the terms of the
- Common Development and Distribution License (the "License").
- You may not use this file except in compliance with the License.
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
 
- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- or http://www.opensolaris.org/os/licensing.
- See the License for the specific language governing permissions
- and limitations under the License.
-
- When distributing Covered Code, include this CDDL HEADER in each
- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- If applicable, add the following below this CDDL HEADER, with the
- fields enclosed by brackets "[]" replaced with your own identifying
- information: Portions Copyright [yyyy] [name of copyright owner]
-
- CDDL HEADER END
+ Copyright (c) 2018, Joyent, Inc.
 
 -->
 
@@ -53,12 +44,12 @@ Copyright (c) 2018, Joyent, Inc.
                 <propitem value='VDIMMCD' />
                 <propitem value='VDIMMEF' />
                 <propitem value='VDIMMGH' />
-           </propval>
+	    </propval>
         </propgroup>
     </node>
 
     <dependents grouping='children'>
-      <range name='chip' min='0' max='100'>
+      <range name='chip' min='0' max='1'>
         <enum-method name='chip' version='1' />
       </range>
       <range name='hostbridge' min='0' max='254'>
@@ -69,29 +60,29 @@ Copyright (c) 2018, Joyent, Inc.
       </range>
       <range name='slot' min='0' max='15'>
         <enum-method name='smbios' version='1' />
-        <propmap name='SSG-2028R-ACR24L-slot' />
+        <propmap name='Joyent-Storage-Platform-7001-slot' />
       </range>
     </dependents>
 
   </range>
 
   <range name='chassis' min='0' max='0'>
-    <propmap name='SSG-2028R-ACR24L-chassis' />
+    <propmap name='Joyent-Storage-Platform-7001-chassis' />
 
     <dependents grouping='children'>
 
        <range name='psu' min='0' max='1'>
           <enum-method name='ipmi' version='1' />
        </range>
-       <range name='fan' min='0' max='100'>
+       <range name='fan' min='0' max='7'>
           <enum-method name='ipmi' version='1' />
-       </range>
-       <range name='bay' min='0' max='23'>
-          <propmap name='SSG-2028R-ACR24L-disk' />
        </range>
 
     </dependents>
+  </range>
 
+  <range name='ses-enclosure' min='0' max='1'>
+     <enum-method name='ses' version='1' />
   </range>
 
 </topology>

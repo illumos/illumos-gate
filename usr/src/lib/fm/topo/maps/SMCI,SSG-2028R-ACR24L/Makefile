@@ -22,7 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 # NOTE: The name of the xml file we are building is 'platform'
@@ -41,7 +41,8 @@ ROOTJOYENTMAPS = $(JOYENT_PLATFORMS:%=$(arch_ROOTTOPOROOT)/%)
 TOPOFILE = \
 	SSG-2028R-ACR24L-hc-topology.xml \
 	SSG-2028R-ACR24L-chassis-hc-topology.xml \
-	SSG-2028R-ACR24L-disk-hc-topology.xml
+	SSG-2028R-ACR24L-disk-hc-topology.xml \
+	SSG-2028R-ACR24L-slot-hc-topology.xml
 
 SRCDIR = ../SMCI,SSG-2028R-ACR24L
 

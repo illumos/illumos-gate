@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _TOPO_HC_H
@@ -87,6 +87,7 @@ extern "C" {
 #define	SHELF		"shelf"
 #define	SCSI_DEVICE	"scsi-device"
 #define	SES_ENCLOSURE	"ses-enclosure"
+#define	SLOT		"slot"
 #define	SMP_DEVICE	"smp-device"
 #define	SP		"sp"
 #define	SUBCHASSIS	"subchassis"
@@ -189,6 +190,47 @@ extern "C" {
  * fac_prov_ipmi module.
  */
 #define	TOPO_PROP_IPMI_ENTITY_LIST	"entity-list"
+
+/*
+ * These properties can be used to describe the network configuration of a
+ * given hardware components.  They're currently used to describe the
+ * network config on the service processor (sp)
+ */
+#define	TOPO_PGROUP_NETCFG		"network-config"
+#define	TOPO_PROP_NETCFG_MACADDR	"mac-address"
+#define	TOPO_PROP_NETCFG_VLAN_ID	"vlan-id"
+#define	TOPO_PROP_NETCFG_IPV4_ADDR	"ipv4-address"
+#define	TOPO_PROP_NETCFG_IPV4_SUBNET	"ipv4-subnet"
+#define	TOPO_PROP_NETCFG_IPV4_GATEWAY	"ipv4-gateway"
+#define	TOPO_PROP_NETCFG_IPV4_TYPE	"ipv4-config-type"
+#define	TOPO_PROP_NETCFG_IPV6_ADDR	"ipv6-address"
+#define	TOPO_PROP_NETCFG_IPV6_ROUTES	"ipv6-routes"
+#define	TOPO_PROP_NETCFG_IPV6_TYPE	"ipv6-config-type"
+
+/* Possible values for TOPO_PROP_NETCFG_TYPE */
+#define	TOPO_NETCFG_TYPE_UNKNOWN	"unknown"
+#define	TOPO_NETCFG_TYPE_STATIC		"static"
+#define	TOPO_NETCFG_TYPE_DHCP		"dhcp"
+
+#define	TOPO_PGROUP_SLOT		"slot"
+#define	TOPO_PROP_SLOT_TYPE		"slot-type"
+
+#define	TOPO_PGROUP_DIMM_SLOT		"dimm-slot"
+#define	TOPO_PROP_DIMM_SLOT_FORM	"form-factor"
+#define	TOPO_DIMM_SLOT_FORM_DIMM	"DIMM"
+#define	TOPO_DIMM_SLOT_FORM_SODIMM	"SODIMM"
+#define	TOPO_DIMM_SLOT_FORM_FBDIMM	"FBDIMM"
+
+#define	TOPO_PROP_DIMM_TYPE
+#define	TOPO_DIMM_TYPE_UNKNOWN		"UNKNOWN"
+#define	TOPO_DIMM_TYPE_DDR		"DDR"
+#define	TOPO_DIMM_TYPE_DDR2		"DDR2"
+#define	TOPO_DIMM_TYPE_DDR3		"DDR3"
+#define	TOPO_DIMM_TYPE_DDR4		"DDR4"
+#define	TOPO_DIMM_TYPE_LPDDR		"LPDDR"
+#define	TOPO_DIMM_TYPE_LPDDR2		"LPDDR2"
+#define	TOPO_DIMM_TYPE_LPDDR3		"LPDDR3"
+#define	TOPO_DIMM_TYPE_LPDDR4		"LPDDR4"
 
 #ifdef	__cplusplus
 }

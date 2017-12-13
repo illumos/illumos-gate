@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -29,6 +29,9 @@
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 #include <string.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 #define	TOPO_PGROUP_IPMI 		"ipmi"
 #define	TOPO_PROP_IPMI_ENTITY_REF	"entity_ref"
@@ -472,6 +475,260 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 	return (0);
 }
 
+static const char *
+ipmi2toposrc(uint8_t ipmi_ip_src)
+{
+	char *cfgtype;
+
+	switch (ipmi_ip_src) {
+	case (IPMI_LAN_SRC_STATIC):
+	case (IPMI_LAN_SRC_BIOS):
+		cfgtype = TOPO_NETCFG_TYPE_STATIC;
+		break;
+	case (IPMI_LAN_SRC_DHCP):
+		cfgtype = TOPO_NETCFG_TYPE_DHCP;
+		break;
+	default:
+		cfgtype = TOPO_NETCFG_TYPE_UNKNOWN;
+		break;
+	}
+	return (cfgtype);
+}
+
+/*
+ * Channel related IPMI commands reserve 4 bits for the channel number.
+ */
+#define	IPMI_MAX_CHANNEL	0xf
+
+static int
+ipmi_enum_sp(topo_mod_t *mod, tnode_t *pnode)
+{
+	ipmi_handle_t *ihp;
+	ipmi_channel_info_t *chinfo;
+	ipmi_lan_config_t lancfg = { 0 };
+	boolean_t found_lan = B_TRUE;
+	char ipv4_addr[INET_ADDRSTRLEN], subnet[INET_ADDRSTRLEN];
+	char gateway[INET_ADDRSTRLEN], macaddr[18];
+	char ipv6_addr[INET6_ADDRSTRLEN];
+	char **ipv6_routes;
+	const char *sp_rev, *ipv4_cfgtype, *ipv6_cfgtype;
+	nvlist_t *auth, *fmri;
+	tnode_t *sp_node;
+	topo_pgroup_info_t pgi;
+	int err, ch, i, ret = -1;
+
+	if ((ihp = topo_mod_ipmi_hold(mod)) == NULL)
+		return (0);
+
+	/*
+	 * If we're able to successfully get the service processor version by
+	 * issuing a GET_DEVICE_ID IPMI command over the KCS interface, then we
+	 * can say with certainty that a service processor exists.  If not,
+	 * then either the SP is unresponsive or one isn't present.  In either
+	 * case, we bail.
+	 */
+	if ((sp_rev = ipmi_firmware_version(ihp)) == NULL) {
+		topo_mod_dprintf(mod, "failed to query SP");
+		topo_mod_ipmi_rele(mod);
+		return (0);
+	}
+
+	if ((auth = topo_mod_auth(mod, pnode)) == NULL) {
+		topo_mod_dprintf(mod, "topo_mod_auth() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		goto out;
+	}
+	if ((fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION,
+	    SP, 0, NULL, auth, NULL, sp_rev, NULL)) == NULL) {
+		nvlist_free(auth);
+		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		goto out;
+	}
+	nvlist_free(auth);
+
+	if ((sp_node = topo_node_bind(mod, pnode, SP, 0, fmri)) == NULL) {
+		nvlist_free(fmri);
+		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		goto out;
+	}
+	nvlist_free(fmri);
+	fmri = NULL;
+
+	if (topo_node_label_set(sp_node, "service-processor", &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set label on %s=%d: %s", SP,
+		    0, topo_strerror(err));
+		(void) topo_mod_seterrno(mod, err);
+		goto out;
+	}
+
+	if (topo_node_fru(pnode, &fmri, NULL, &err) != 0 ||
+	    topo_node_fru_set(sp_node, fmri, NULL, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set FRU on %s=%d: %s", SP, 0,
+		    topo_strerror(err));
+		nvlist_free(fmri);
+		(void) topo_mod_seterrno(mod, err);
+		goto out;
+	}
+	nvlist_free(fmri);
+
+	/*
+	 * Iterate through the channels to find the LAN channel.
+	 */
+	for (ch = 0; ch <= IPMI_MAX_CHANNEL; ch++) {
+		if ((chinfo = ipmi_get_channel_info(ihp, ch)) != NULL &&
+		    chinfo->ici_medium == IPMI_MEDIUM_8023LAN) {
+			found_lan = B_TRUE;
+			break;
+		}
+	}
+	/*
+	 * If we found a LAN channel, look up its configuration so that we can
+	 * expose it via node properties.
+	 */
+	if (found_lan != B_TRUE ||
+	    ipmi_lan_get_config(ihp, ch, &lancfg) != 0) {
+		(void) fprintf(stderr, "failed to get LAN config\n");
+		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
+		goto out;
+	}
+
+	pgi.tpi_name = TOPO_PGROUP_NETCFG;
+	pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_datastab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_version = TOPO_VERSION;
+
+	if (topo_pgroup_create(sp_node, &pgi, &err) != 0) {
+		(void) topo_mod_seterrno(mod, err);
+		goto out;
+	}
+
+	/* Set MAC address property */
+	(void) sprintf(macaddr, "%02x:%02x:%02x:%02x:%02x:%02x",
+	    lancfg.ilc_macaddr[0], lancfg.ilc_macaddr[1],
+	    lancfg.ilc_macaddr[2], lancfg.ilc_macaddr[3],
+	    lancfg.ilc_macaddr[4], lancfg.ilc_macaddr[5]);
+	macaddr[17] = '\0';
+
+	if (topo_prop_set_string(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_MACADDR, TOPO_PROP_IMMUTABLE, macaddr,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set properties on %s=%d: %s",
+		    SP, 0, topo_strerror(err));
+		(void) topo_mod_seterrno(mod, err);
+		goto out;
+	}
+
+	/* Set VLAN ID property, if VLAN is enabled */
+	if (lancfg.ilc_vlan_enabled == B_TRUE &&
+	    topo_prop_set_uint32(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_VLAN_ID, TOPO_PROP_IMMUTABLE, lancfg.ilc_vlan_id,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set properties on %s=%d: %s",
+		    SP, 0, topo_strerror(err));
+		(void) topo_mod_seterrno(mod, err);
+		goto out;
+	}
+
+	/* Set IPv4 configuration properties if IPv4 is enabled */
+	if (lancfg.ilc_ipv4_enabled == B_TRUE &&
+	    (inet_ntop(AF_INET, &lancfg.ilc_ipaddr, ipv4_addr,
+	    sizeof (ipv4_addr)) == NULL ||
+	    inet_ntop(AF_INET, &lancfg.ilc_subnet, subnet,
+	    sizeof (subnet)) == NULL ||
+	    inet_ntop(AF_INET, &lancfg.ilc_gateway_addr, gateway,
+	    sizeof (gateway)) == NULL)) {
+		(void) fprintf(stderr, "failed to convert IP addresses: %s\n",
+		    strerror(errno));
+		(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
+		goto out;
+	}
+	ipv4_cfgtype = ipmi2toposrc(lancfg.ilc_ipaddr_source);
+	if (lancfg.ilc_ipv4_enabled == B_TRUE &&
+	    (topo_prop_set_string(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_IPV4_ADDR, TOPO_PROP_IMMUTABLE, ipv4_addr,
+	    &err) != 0 ||
+	    topo_prop_set_string(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_IPV4_SUBNET, TOPO_PROP_IMMUTABLE, subnet,
+	    &err) != 0 ||
+	    topo_prop_set_string(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_IPV4_GATEWAY, TOPO_PROP_IMMUTABLE, gateway,
+	    &err) != 0 ||
+	    topo_prop_set_string(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_IPV4_TYPE, TOPO_PROP_IMMUTABLE, ipv4_cfgtype,
+	    &err) != 0)) {
+		topo_mod_dprintf(mod, "failed to set properties on %s=%d: %s",
+		    SP, 0, topo_strerror(err));
+		(void) topo_mod_seterrno(mod, err);
+		goto out;
+	}
+
+	/* Set IPv6 configuration properties if IPv6 is enabled */
+	if (lancfg.ilc_ipv6_enabled == B_TRUE) {
+		ipv6_cfgtype = ipmi2toposrc(lancfg.ilc_ipv6_source);
+
+		if (inet_ntop(AF_INET6, &lancfg.ilc_ipv6_addr, ipv6_addr,
+		    sizeof (ipv6_addr)) == NULL) {
+			(void) fprintf(stderr, "failed to convert IPv6 "
+			    "address: %s\n", strerror(errno));
+			(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
+			goto out;
+		}
+
+		/* allocate and populate ipv6-routes string array */
+		if ((ipv6_routes = topo_mod_zalloc(mod,
+		    lancfg.ilc_ipv6_nroutes * sizeof (char *))) == NULL) {
+			/* errno set */
+			goto out;
+		}
+		for (i = 0; i < lancfg.ilc_ipv6_nroutes; i++) {
+			if ((ipv6_routes[i] = topo_mod_alloc(mod,
+			    INET6_ADDRSTRLEN)) == NULL) {
+				/* errno set */
+				goto out;
+			}
+		}
+		for (i = 0; i < lancfg.ilc_ipv6_nroutes; i++) {
+			if (inet_ntop(AF_INET6, &lancfg.ilc_ipv6_routes[i],
+			    ipv6_routes[i], sizeof (ipv6_routes[i])) == NULL) {
+				(void) fprintf(stderr, "failed to convert "
+				    "IPv6 addresses: %s\n", strerror(errno));
+				(void) topo_mod_seterrno(mod, EMOD_UNKNOWN);
+				goto out;
+			}
+		}
+	}
+	if (lancfg.ilc_ipv6_enabled == B_TRUE &&
+	    (topo_prop_set_string(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_IPV6_ADDR, TOPO_PROP_IMMUTABLE, ipv6_addr,
+	    &err) != 0 ||
+	    topo_prop_set_string_array(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_IPV6_ROUTES, TOPO_PROP_IMMUTABLE,
+	    (const char **)ipv6_routes, lancfg.ilc_ipv6_nroutes, &err) != 0 ||
+	    topo_prop_set_string(sp_node, TOPO_PGROUP_NETCFG,
+	    TOPO_PROP_NETCFG_IPV6_TYPE, TOPO_PROP_IMMUTABLE, ipv6_cfgtype,
+	    &err) != 0)) {
+		topo_mod_dprintf(mod, "failed to set properties on %s=%d: %s",
+		    SP, 0, topo_strerror(err));
+		(void) topo_mod_seterrno(mod, err);
+		goto out;
+	}
+	ret = 0;
+out:
+	if (lancfg.ilc_ipv6_nroutes > 0) {
+		for (i = 0; i < lancfg.ilc_ipv6_nroutes; i++)
+			topo_mod_free(mod, ipv6_routes[i], INET6_ADDRSTRLEN);
+		topo_mod_free(mod, ipv6_routes,
+		    lancfg.ilc_ipv6_nroutes * sizeof (char *));
+	}
+	topo_mod_ipmi_rele(mod);
+	return (ret);
+}
+
 /*
  * libtopo enumeration point.  This simply iterates over entities looking for
  * the appropriate type.
@@ -486,14 +743,28 @@ ipmi_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	int ret;
 
 	/*
-	 * If the node being passed in ISN'T the chassis node, then we're being
-	 * asked to post-process a statically defined node.
+	 * If the node being passed in ISN'T the chassis or motherboard node,
+	 * then we're being asked to post-process a statically defined node.
 	 */
-	if (strcmp(topo_node_name(rnode), CHASSIS) != 0) {
+	if (strcmp(topo_node_name(rnode), CHASSIS) != 0 &&
+	    strcmp(topo_node_name(rnode), MOTHERBOARD) != 0) {
 		if (ipmi_post_process(mod, rnode) != 0) {
 			topo_mod_dprintf(mod, "post processing of node %s=%d "
 			    "failed!", topo_node_name(rnode),
 			    topo_node_instance(rnode));
+			return (-1);
+		}
+		return (0);
+	}
+
+	/*
+	 * For service processor enumeration we vector off into a special code
+	 * path.
+	 */
+	if (strcmp(name, SP) == 0) {
+		if (ipmi_enum_sp(mod, rnode) != 0) {
+			topo_mod_dprintf(mod, "failed to enumerate the "
+			    "service-processor");
 			return (-1);
 		}
 		return (0);

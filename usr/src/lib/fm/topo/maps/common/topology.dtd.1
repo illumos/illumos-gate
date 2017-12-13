@@ -3,6 +3,8 @@
  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
+ Copyright (c) 2018, Joyent, Inc.
+ 
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -275,7 +277,8 @@
 	( fac-enum?, facility*, propgroup*, set*, enum-method*, dependents? ) >
 
 <!ATTLIST node
-	instance	CDATA #REQUIRED >
+	instance	CDATA #REQUIRED
+	static		(false|true) "false" >
 
 <!--
   dependents

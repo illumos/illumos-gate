@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _LIBTOPO_H
@@ -1000,6 +1000,10 @@ typedef enum topo_led_type {
 	TOPO_LED_TYPE_OK2RM,
 	TOPO_LED_TYPE_PRESENT
 } topo_led_type_t;
+
+typedef enum topo_slot_type {
+	TOPO_SLOT_TYPE_DIMM = 1
+} topo_slot_type_t;
 
 
 #ifdef __cplusplus
