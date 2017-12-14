@@ -39,7 +39,6 @@ FWFILES	= iwlwifi-100-5.ucode iwlwifi-1000-3.ucode iwlwifi-105-6.ucode \
 #
 MODULE		= iwn
 OBJECTS		= $(IWN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(IWN_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 ROOTFIRMWARE	= $(FWFILES:%=$(ROOT_FIRMWARE_DIR)/$(MODULE)/%)
 
@@ -52,19 +51,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTFIRMWARE)
 
-#
-#	Overrides
-#
-LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-LINTTAGS	+= -erroff=E_INTEGER_OVERFLOW_DETECTED
-
 LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
-
-CERRWARN	+= -erroff=E_INTEGER_OVERFLOW_DETECTED
 
 #
 #	Default build targets.
@@ -79,11 +68,9 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
+lint:
+modlintlib:
+clean.lint:
 
 install:	$(INSTALL_DEPS)
 

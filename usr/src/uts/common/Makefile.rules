@@ -2267,9 +2267,6 @@ $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/iwi/%.c
 $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/iwk/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/iwn/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/iwp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
