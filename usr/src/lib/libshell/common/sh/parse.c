@@ -1285,7 +1285,7 @@ static Shnode_t *simple(Lex_t *lexp,int flag, struct ionod *io)
 	struct argnod	**argtail;
 	struct argnod	**settail;
 	int	cmdarg=0;
-	int	argno = 0, argmax=0;
+	int	argno = 0;
 	int	assignment = 0;
 	int	key_on = (!(flag&SH_NOIO) && sh_isoption(SH_KEYWORD));
 	int	associative=0;
@@ -1347,8 +1347,6 @@ static Shnode_t *simple(Lex_t *lexp,int flag, struct ionod *io)
 		{
 			if(!(argp->argflag&ARG_RAW))
 			{
-				if(argno>0)
-					argmax = argno;
 				argno = -1;
 			}
 			if(argno>=0 && argno++==cmdarg && !(flag&SH_ARRAY) && *argp->argval!='/')
@@ -1388,7 +1386,6 @@ static Shnode_t *simple(Lex_t *lexp,int flag, struct ionod *io)
 		if((tok==IPROCSYM || tok==OPROCSYM))
 		{
 			argp = process_sub(lexp,tok);
-			argmax = 0;
 			argno = -1;
 			*argtail = argp;
 			argtail = &(argp->argnxt.ap);
@@ -1445,8 +1442,6 @@ static Shnode_t *simple(Lex_t *lexp,int flag, struct ionod *io)
 		}
 	}
 	*argtail = 0;
-	if(argno>0)
-		argmax = argno;
 	t->comtyp = TCOM;
 #if SHOPT_KIA
 	if(lexp->kiafile && !(flag&SH_NOIO))

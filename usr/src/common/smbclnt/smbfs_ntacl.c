@@ -66,16 +66,16 @@
 #define	FREESZ(p, sz) kmem_free(p, sz)
 #else	/* _KERNEL */
 #define	MALLOC(size) malloc(size)
-#ifndef lint
-#define	FREESZ(p, sz) free(p)
-#else	/* lint */
+/*
+ * Define FREESZ() as inline function so the compiler will not
+ * trigger variable set but not used warning for sz in calling function.
+ */
 /* ARGSUSED */
-static void
-FREESZ(void *p, size_t sz)
+static inline void
+FREESZ(void *p, size_t sz __unused)
 {
 	free(p);
 }
-#endif	/* lint */
 #endif	/* _KERNEL */
 
 #define	ERRCHK(expr)	if ((error = expr) != 0) goto errout
