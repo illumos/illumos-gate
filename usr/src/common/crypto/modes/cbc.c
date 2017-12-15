@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _KERNEL
@@ -30,10 +31,16 @@
 #include <security/cryptoki.h>
 #endif
 
+#include <sys/debug.h>
 #include <sys/types.h>
 #include <modes/modes.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
+#include <aes/aes_impl.h>
+
+/* These are the CMAC Rb constants from NIST SP 800-38B */
+#define	CONST_RB_128	0x87
+#define	CONST_RB_64	0x1B
 
 /*
  * Algorithm independent CBC functions.
@@ -56,7 +63,7 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 	uint8_t *out_data_2;
 	size_t out_data_1_len;
 
-	if (length + ctx->cbc_remainder_len < block_size) {
+	if (length + ctx->cbc_remainder_len < ctx->max_remain) {
 		/* accumulate bytes here and return */
 		bcopy(datap,
 		    (uint8_t *)ctx->cbc_remainder + ctx->cbc_remainder_len,
@@ -97,7 +104,8 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 			ctx->cbc_lastp = blockp;
 			lastp = blockp;
 
-			if (ctx->cbc_remainder_len > 0) {
+			if ((ctx->cbc_flags & CMAC_MODE) == 0 &&
+			    ctx->cbc_remainder_len > 0) {
 				bcopy(blockp, ctx->cbc_copy_to,
 				    ctx->cbc_remainder_len);
 				bcopy(blockp + ctx->cbc_remainder_len, datap,
@@ -110,22 +118,31 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 			 */
 			xor_block(blockp, lastp);
 			encrypt(ctx->cbc_keysched, lastp, lastp);
-			crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
-			    &out_data_1_len, &out_data_2, block_size);
 
-			/* copy block to where it belongs */
-			if (out_data_1_len == block_size) {
-				copy_block(lastp, out_data_1);
-			} else {
-				bcopy(lastp, out_data_1, out_data_1_len);
-				if (out_data_2 != NULL) {
-					bcopy(lastp + out_data_1_len,
-					    out_data_2,
-					    block_size - out_data_1_len);
+			/*
+			 * CMAC doesn't output until encrypt_final
+			 */
+			if ((ctx->cbc_flags & CMAC_MODE) == 0) {
+				crypto_get_ptrs(out, &iov_or_mp, &offset,
+				    &out_data_1, &out_data_1_len,
+				    &out_data_2, block_size);
+
+				/* copy block to where it belongs */
+				if (out_data_1_len == block_size) {
+					copy_block(lastp, out_data_1);
+				} else {
+					bcopy(lastp, out_data_1,
+					    out_data_1_len);
+					if (out_data_2 != NULL) {
+						bcopy(lastp + out_data_1_len,
+						    out_data_2,
+						    block_size -
+						    out_data_1_len);
+					}
 				}
+				/* update offset */
+				out->cd_offset += block_size;
 			}
-			/* update offset */
-			out->cd_offset += block_size;
 		}
 
 		/* Update pointer to next block of data to be processed. */
@@ -139,7 +156,7 @@ cbc_encrypt_contiguous_blocks(cbc_ctx_t *ctx, char *data, size_t length,
 		remainder = (size_t)&data[length] - (size_t)datap;
 
 		/* Incomplete last block. */
-		if (remainder > 0 && remainder < block_size) {
+		if (remainder > 0 && remainder < ctx->max_remain) {
 			bcopy(datap, ctx->cbc_remainder, remainder);
 			ctx->cbc_remainder_len = remainder;
 			ctx->cbc_copy_to = datap;
@@ -299,14 +316,19 @@ cbc_init_ctx(cbc_ctx_t *cbc_ctx, char *param, size_t param_len,
 
 	cbc_ctx->cbc_lastp = (uint8_t *)&cbc_ctx->cbc_iv[0];
 	cbc_ctx->cbc_flags |= CBC_MODE;
+	cbc_ctx->max_remain = block_size;
 	return (CRYPTO_SUCCESS);
 }
 
 /* ARGSUSED */
-void *
-cbc_alloc_ctx(int kmflag)
+static void *
+cbc_cmac_alloc_ctx(int kmflag, uint32_t mode)
 {
 	cbc_ctx_t *cbc_ctx;
+	uint32_t modeval = mode & (CBC_MODE|CMAC_MODE);
+
+	/* Only one of the two modes can be set */
+	VERIFY(modeval == CBC_MODE || modeval == CMAC_MODE);
 
 #ifdef _KERNEL
 	if ((cbc_ctx = kmem_zalloc(sizeof (cbc_ctx_t), kmflag)) == NULL)
@@ -315,6 +337,136 @@ cbc_alloc_ctx(int kmflag)
 #endif
 		return (NULL);
 
-	cbc_ctx->cbc_flags = CBC_MODE;
+	cbc_ctx->cbc_flags = mode;
 	return (cbc_ctx);
+}
+
+void *
+cbc_alloc_ctx(int kmflag)
+{
+	return (cbc_cmac_alloc_ctx(kmflag, CBC_MODE));
+}
+
+/*
+ * Algorithms for supporting AES-CMAC
+ * NOTE: CMAC is generally just a wrapper for CBC
+ */
+
+void *
+cmac_alloc_ctx(int kmflag)
+{
+	return (cbc_cmac_alloc_ctx(kmflag, CMAC_MODE));
+}
+
+
+/*
+ * Typically max_remain is set to block_size - 1, since we usually
+ * will process the data once we have a full block.  However with CMAC,
+ * we must preprocess the final block of data.  Since we cannot know
+ * when we've received the final block of data until the _final() method
+ * is called, we must not process the last block of data until we know
+ * it is the last block, or we receive a new block of data.  As such,
+ * max_remain for CMAC is block_size + 1.
+ */
+int
+cmac_init_ctx(cbc_ctx_t *cbc_ctx, size_t block_size)
+{
+	/*
+	 * CMAC is only approved for block sizes 64 and 128 bits /
+	 * 8 and 16 bytes.
+	 */
+
+	if (block_size != 16 && block_size != 8)
+		return (CRYPTO_INVALID_CONTEXT);
+
+	/*
+	 * For CMAC, cbc_iv is always 0.
+	 */
+
+	cbc_ctx->cbc_iv[0] = 0;
+	cbc_ctx->cbc_iv[1] = 0;
+
+	cbc_ctx->cbc_lastp = (uint8_t *)&cbc_ctx->cbc_iv[0];
+	cbc_ctx->cbc_flags |= CMAC_MODE;
+
+	cbc_ctx->max_remain = block_size + 1;
+	return (CRYPTO_SUCCESS);
+}
+
+/*
+ * Left shifts blocks by one and returns the leftmost bit
+ */
+static uint8_t
+cmac_left_shift_block_by1(uint8_t *block, size_t block_size)
+{
+	uint8_t carry = 0, old;
+	size_t i;
+	for (i = block_size; i > 0; i--) {
+		old = carry;
+		carry = (block[i - 1] & 0x80) ? 1 : 0;
+		block[i - 1] = (block[i - 1] << 1) | old;
+	}
+	return (carry);
+}
+
+/*
+ * Generate subkeys to preprocess the last block according to RFC 4493.
+ * Store the final block_size MAC generated in 'out'.
+ */
+int
+cmac_mode_final(cbc_ctx_t *cbc_ctx, crypto_data_t *out,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
+    void (*xor_block)(uint8_t *, uint8_t *))
+{
+	uint8_t buf[AES_BLOCK_LEN] = {0};
+	uint8_t *M_last = (uint8_t *)cbc_ctx->cbc_remainder;
+	size_t length = cbc_ctx->cbc_remainder_len;
+	size_t block_size = cbc_ctx->max_remain - 1;
+	uint8_t const_rb;
+
+	if (length > block_size)
+		return (CRYPTO_INVALID_CONTEXT);
+
+	if (out->cd_length < block_size)
+		return (CRYPTO_DATA_LEN_RANGE);
+
+	if (block_size == 16)
+		const_rb = CONST_RB_128;
+	else if (block_size == 8)
+		const_rb = CONST_RB_64;
+	else
+		return (CRYPTO_INVALID_CONTEXT);
+
+	/* k_0 = E_k(0) */
+	encrypt_block(cbc_ctx->cbc_keysched, buf, buf);
+
+	if (cmac_left_shift_block_by1(buf, block_size))
+		buf[block_size - 1] ^= const_rb;
+
+	if (length == block_size) {
+		/* Last block complete, so m_n = k_1 + m_n' */
+		xor_block(buf, M_last);
+		xor_block(cbc_ctx->cbc_lastp, M_last);
+		encrypt_block(cbc_ctx->cbc_keysched, M_last, M_last);
+	} else {
+		/* Last block incomplete, so m_n = k_2 + (m_n' | 100...0_bin) */
+		if (cmac_left_shift_block_by1(buf, block_size))
+			buf[block_size - 1] ^= const_rb;
+
+		M_last[length] = 0x80;
+		bzero(M_last + length + 1, block_size - length - 1);
+		xor_block(buf, M_last);
+		xor_block(cbc_ctx->cbc_lastp, M_last);
+		encrypt_block(cbc_ctx->cbc_keysched, M_last, M_last);
+	}
+
+	/*
+	 * zero out the sub-key.
+	 */
+#ifndef _KERNEL
+	explicit_bzero(&buf, sizeof (buf));
+#else
+	bzero(&buf, sizeof (buf));
+#endif
+	return (crypto_put_output_data(M_last, out, block_size));
 }

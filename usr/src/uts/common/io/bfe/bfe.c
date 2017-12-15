@@ -2551,15 +2551,6 @@ bfe_unmap_regs(bfe_t *bfe)
 static int
 bfe_get_chip_config(bfe_t *bfe)
 {
-	uint32_t	prom[BFE_EEPROM_SIZE];
-	int i;
-
-	/*
-	 * Read EEPROM in prom[]
-	 */
-	for (i = 0; i < BFE_EEPROM_SIZE; i++) {
-		prom[i] = INL(bfe, BFE_EEPROM_BASE + i * sizeof (uint32_t));
-	}
 
 	bfe->bfe_dev_addr[0] = bfe->bfe_ether_addr[0] =
 	    INB(bfe, BFE_EEPROM_BASE + 79);

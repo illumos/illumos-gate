@@ -857,6 +857,10 @@ void ixgbe_fill_group(void *arg, mac_ring_type_t, const int,
 int ixgbe_rx_ring_intr_enable(mac_intr_handle_t);
 int ixgbe_rx_ring_intr_disable(mac_intr_handle_t);
 
+int ixgbe_transceiver_info(void *, uint_t, mac_transceiver_info_t *);
+int ixgbe_transceiver_read(void *, uint_t, uint_t, void *, size_t, off_t,
+    size_t *);
+
 /*
  * Function prototypes in ixgbe_gld.c
  */

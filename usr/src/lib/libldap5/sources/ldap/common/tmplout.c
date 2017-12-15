@@ -3,8 +3,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -448,7 +446,7 @@ do_entry2text_search(
 	char			*urlprefix
 )
 {
-    int				err, freedn, html;
+    int				err, freedn;
     char			*buf, **fetchattrs, **vals;
     LDAPMessage			*ldmp;
     struct ldap_disptmpl	*tmpl;
@@ -463,8 +461,6 @@ do_entry2text_search(
 	LDAP_SET_LDERRNO( ld, err, NULL, NULL );
 	return( err );
     }
-
-    html = ( urlprefix != NULL );
 
     timeout.tv_sec = SEARCH_TIMEOUT_SECS;
     timeout.tv_usec = 0;
@@ -1039,7 +1035,7 @@ searchaction( LDAP *ld, char *buf, char *base, LDAPMessage *entry, char *dn,
 {
     int			err = LDAP_SUCCESS, lderr, i, count, html;
     char		**vals, **members;
-    char		*value, *filtpattern, *attr, *selectname;
+    char		*value, *filtpattern, *attr;
     char		*retattrs[2], filter[ 256 ];
     LDAPMessage		*ldmp;
     struct timeval	timeout;
@@ -1056,7 +1052,6 @@ searchaction( LDAP *ld, char *buf, char *base, LDAPMessage *entry, char *dn,
     filtpattern = tip->ti_args[ 1 ];
     retattrs[ 0 ] = tip->ti_args[ 2 ];
     retattrs[ 1 ] = NULL;
-    selectname = tip->ti_args[ 3 ];
 
     vals = NULL;
     if ( attr == NULL ) {

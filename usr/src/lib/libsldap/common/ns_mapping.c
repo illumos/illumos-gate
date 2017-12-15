@@ -58,7 +58,7 @@ ns_hash(const char *str)
 
 static ns_hash_t *
 ns_scan_hash(ns_hashtype_t type, const char *service,
-		const char *str, ns_hash_t *idx)
+    const char *str, ns_hash_t *idx)
 {
 	while (idx) {
 		if (idx->h_type == type &&
@@ -77,7 +77,7 @@ ns_scan_hash(ns_hashtype_t type, const char *service,
 
 static ns_hash_t *
 ns_get_hash(const ns_config_t *config,
-	    ns_hashtype_t type, const char *service, const char *str)
+    ns_hashtype_t type, const char *service, const char *str)
 {
 	ns_hash_t	*idx, *hashp;
 	unsigned long	hash;
@@ -168,7 +168,7 @@ __s_api_destroy_hash(ns_config_t *config)
 
 int
 __s_api_add_map2hash(ns_config_t *config, ns_hashtype_t type,
-			ns_mapping_t *map)
+    ns_mapping_t *map)
 {
 	ns_hash_t	*idx, *newp;
 	unsigned long	hash;
@@ -324,11 +324,10 @@ typedef enum _ns_parse_state {
 static
 int
 __s_api_parseASearchDesc(const char *service,
-	char **cur, ns_ldap_search_desc_t **ret)
+    char **cur, ns_ldap_search_desc_t **ret)
 {
 	ns_ldap_search_desc_t	*ptr;
 	char			*sptr, *dptr;
-	char			buf[BUFSIZ];
 	int			i, rc;
 	ns_ldap_error_t		**errorp = NULL;
 	ns_ldap_error_t		*error = NULL;
@@ -456,7 +455,6 @@ __s_api_parseASearchDesc(const char *service,
 			state = P_FILTER;
 			break;
 		case P_SCOPE:
-			buf[0] = '\0';
 			if (*sptr == SEMITOK) {
 				/* no more SSD */
 				state = P_EXIT;
@@ -617,7 +615,7 @@ __s_api_parseASearchDesc(const char *service,
 
 static int
 __ns_ldap_saveSearchDesc(ns_ldap_search_desc_t ***sdlist,
-	int *cnt, int *max, ns_ldap_search_desc_t *ret)
+    int *cnt, int *max, ns_ldap_search_desc_t *ret)
 {
 	ns_ldap_search_desc_t	**tmplist;
 

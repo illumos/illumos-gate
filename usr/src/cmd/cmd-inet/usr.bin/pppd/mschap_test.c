@@ -17,8 +17,6 @@
 #include "chap.h"
 #include "chap_ms.h"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 static void
 show_response(chap_state *cstate, const char *str)
 {

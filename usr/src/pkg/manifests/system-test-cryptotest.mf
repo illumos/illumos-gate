@@ -1,0 +1,52 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/test/cryptotest@$(PKGVERS)
+set name=pkg.description value="Miscellaneous KCF/PKCS Unit Tests"
+set name=pkg.summary value="KCF/PKCS Unit Test Suite"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt/crypto-tests
+dir path=opt/crypto-tests/bin
+dir path=opt/crypto-tests/runfiles
+dir path=opt/crypto-tests/tests
+dir path=opt/crypto-tests/tests/kcf
+dir path=opt/crypto-tests/tests/kcf/aes
+dir path=opt/crypto-tests/tests/pkcs
+dir path=opt/crypto-tests/tests/pkcs/aes
+file path=opt/crypto-tests/README mode=0444
+file path=opt/crypto-tests/bin/cryptotest mode=0555
+file path=opt/crypto-tests/runfiles/default.run mode=0444
+file path=opt/crypto-tests/tests/kcf/aes/aes_cbc mode=0555
+file path=opt/crypto-tests/tests/kcf/aes/aes_ccm mode=0555
+file path=opt/crypto-tests/tests/kcf/aes/aes_cmac mode=0555
+file path=opt/crypto-tests/tests/kcf/aes/aes_ctr mode=0555
+file path=opt/crypto-tests/tests/kcf/aes/aes_ecb mode=0555
+file path=opt/crypto-tests/tests/kcf/aes/aes_gcm mode=0555
+file path=opt/crypto-tests/tests/kcf/aes/cleanup mode=0555
+file path=opt/crypto-tests/tests/kcf/aes/setup mode=0555
+file path=opt/crypto-tests/tests/pkcs/aes/aes_cbc mode=0555
+file path=opt/crypto-tests/tests/pkcs/aes/aes_ccm mode=0555
+file path=opt/crypto-tests/tests/pkcs/aes/aes_cmac mode=0555
+file path=opt/crypto-tests/tests/pkcs/aes/aes_ctr mode=0555
+file path=opt/crypto-tests/tests/pkcs/aes/aes_ecb mode=0555
+file path=opt/crypto-tests/tests/pkcs/aes/aes_gcm mode=0555
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+depend fmri=driver/crypto/dprov type=require
+depend fmri=system/test/testrunner type=require

@@ -353,6 +353,8 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 
 	mac_addr_factory_init(mip);
 
+	mac_transceiver_init(mip);
+
 	/*
 	 * Enforce the virtrualization level registered.
 	 */
@@ -1515,4 +1517,18 @@ mac_lso_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
 		if ((*flags != 0) && (mss != NULL))
 			*mss = (uint32_t)DB_LSOMSS(mp);
 	}
+}
+
+void
+mac_transceiver_info_set_present(mac_transceiver_info_t *infop,
+    boolean_t present)
+{
+	infop->mti_present = present;
+}
+
+void
+mac_transceiver_info_set_usable(mac_transceiver_info_t *infop,
+    boolean_t usable)
+{
+	infop->mti_usable = usable;
 }

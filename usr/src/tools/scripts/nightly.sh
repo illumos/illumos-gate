@@ -259,7 +259,6 @@ function build {
 			| egrep -v 'chars, width' \
 			| egrep -v "symbol (\`|')timezone' has differing types:" \
 			| egrep -v 'PSTAMP' \
-			| egrep -v '|%WHOANDWHERE%|' \
 			| egrep -v '^Manifying' \
 			| egrep -v 'Ignoring unknown host' \
 			| egrep -v 'Processing method:' \

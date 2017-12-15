@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2013, OmniTI Computer Consulting, Inc.
+# Copyright 2017 Peter Tribble
 #
 
 file path=usr/share/man/man2/Intro.2
@@ -53,7 +54,6 @@ file path=usr/share/man/man2/getdents.2
 file path=usr/share/man/man2/getgroups.2
 file path=usr/share/man/man2/getisax.2
 file path=usr/share/man/man2/getitimer.2
-file path=usr/share/man/man2/getlabel.2
 file path=usr/share/man/man2/getmsg.2
 file path=usr/share/man/man2/getpflags.2
 file path=usr/share/man/man2/getpid.2
@@ -182,7 +182,6 @@ link path=usr/share/man/man2/fchmodat.2 target=chmod.2
 link path=usr/share/man/man2/fchown.2 target=chown.2
 link path=usr/share/man/man2/fchownat.2 target=chown.2
 link path=usr/share/man/man2/fchroot.2 target=chroot.2
-link path=usr/share/man/man2/fgetlabel.2 target=getlabel.2
 link path=usr/share/man/man2/fork1.2 target=fork.2
 link path=usr/share/man/man2/forkall.2 target=fork.2
 link path=usr/share/man/man2/forkallx.2 target=fork.2

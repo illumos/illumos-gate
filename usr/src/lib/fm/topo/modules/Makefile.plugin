@@ -56,7 +56,7 @@ plat_ROOTCONF = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/topo/plugins/$(CONF)
 ROOTCONF = $($(CLASS)_ROOTCONF)
 
 LINTFLAGS = -msux
-LINTFILES = $(SRCS:%.c=%.ln)
+LINTFILES = $(MODULESRCS:%.c=%.ln) $(SHAREDSRCS:%.c=%.ln)
 
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-parentheses
@@ -103,6 +103,9 @@ clobber: clean
 	$(RM) $(PROG) $(CLOBBERFILES)
 
 %.ln: ../../common/$(MODULE)/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../common/$(SHAREDMODULE)/%.c
 	$(LINT.c) -c $<
 
 %.ln: %.c

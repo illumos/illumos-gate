@@ -293,7 +293,7 @@ exp(double x) {
 	if (hx < 0x3ff0a2b2) {	/* |x| < 3/2 ln 2 */
 		if (hx < 0x3f862e42) {	/* |x| < 1/64 ln 2 */
 			if (hx < 0x3ed00000) {	/* |x| < 2^-18 */
-				volatile int	dummy;
+				volatile int dummy __unused;
 
 				dummy = (int)x;	/* raise inexact if x != 0 */
 #ifdef lint

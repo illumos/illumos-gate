@@ -1354,14 +1354,16 @@ static int
 chg_time(char *to, struct stat ss)
 {
 	struct timespec times[2];
+#ifdef XPG4
 	int rc;
+#endif
 
 	times[0] = ss.st_atim;
 	times[1] = ss.st_mtim;
 
+#ifdef XPG4
 	rc = utimensat(AT_FDCWD, to, times,
 	    ISLNK(s1) ? AT_SYMLINK_NOFOLLOW : 0);
-#ifdef XPG4
 	if ((pflg || mve) && rc != 0) {
 		(void) fprintf(stderr,
 		    gettext("%s: cannot set times for %s: "), cmd, to);
@@ -1369,6 +1371,9 @@ chg_time(char *to, struct stat ss)
 		if (pflg)
 			return (1);
 	}
+#else
+	(void) utimensat(AT_FDCWD, to, times,
+	    ISLNK(s1) ? AT_SYMLINK_NOFOLLOW : 0);
 #endif
 
 	return (0);

@@ -241,7 +241,6 @@ static GIOChannel *sigterm_iochn;
 static void 
 handle_sigterm (int value)
 {
-	ssize_t written;
 	static char marker[1] = {'S'};
 
 	/* write a 'S' character to the other end to tell about
@@ -250,7 +249,7 @@ handle_sigterm (int value)
 	 * defer this since UNIX signal handlers are evil
 	 *
 	 * Oh, and write(2) is indeed reentrant */
-	written = write (sigterm_unix_signal_pipe_fds[1], marker, 1);
+	(void) write (sigterm_unix_signal_pipe_fds[1], marker, 1);
 }
 
 static gboolean
@@ -362,7 +361,6 @@ int
 main (int argc, char *argv[])
 {
 	GMainLoop *loop;
-	guint sigterm_iochn_listener_source_id;
 	char *path;
 	char newpath[512];
 
@@ -475,7 +473,6 @@ main (int argc, char *argv[])
 		int child_pid;
 		int dev_null_fd;
 		int pf;
-		ssize_t written;
 		char pid[9];
 		
 		HAL_INFO (("Will daemonize"));
@@ -529,7 +526,7 @@ main (int argc, char *argv[])
 		/* Make a new one */
 		if ((pf= open (HALD_PID_FILE, O_WRONLY|O_CREAT|O_TRUNC|O_EXCL, 0644)) > 0) {
 			snprintf (pid, sizeof(pid), "%lu\n", (long unsigned) getpid ());
-			written = write (pf, pid, strlen(pid));
+			(void) write (pf, pid, strlen(pid));
 			close (pf);
 			atexit (delete_pid);
 		}
@@ -554,7 +551,7 @@ main (int argc, char *argv[])
 		DIE (("Could not create GIOChannel"));
 	
 	/* get callback when there is data to read */
-	sigterm_iochn_listener_source_id = g_io_add_watch (
+	(void) g_io_add_watch (
 		sigterm_iochn, G_IO_IN, sigterm_iochn_data, NULL);
 	
 	/* Finally, setup unix signal handler for TERM */
@@ -613,7 +610,6 @@ next:
 void 
 osspec_probe_done (void)
 {
-	ssize_t written;
 	char buf[1] = {0};
 
 	HAL_INFO (("Device probing completed"));
@@ -624,7 +620,7 @@ osspec_probe_done (void)
 	}
 
 	/* tell parent to exit */
-	written = write (startup_daemonize_pipe[1], buf, sizeof (buf));
+	(void) write (startup_daemonize_pipe[1], buf, sizeof (buf));
 	close (startup_daemonize_pipe[0]);
 	close (startup_daemonize_pipe[1]);
 

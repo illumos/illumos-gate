@@ -1,7 +1,3 @@
-#ifndef LINT
-static const char rcsid[] = "$Id: putenv.c,v 1.2 2005/04/27 04:56:11 sra Exp $";
-#endif
-
 #include "port_before.h"
 #include "port_after.h"
 

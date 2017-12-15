@@ -1368,7 +1368,6 @@ process_fdi_file (const char *dir, const char *filename,
 	char buf[512];
 	FILE *file;
 	int filesize;
-	size_t read;
 	char *filebuf;
 	dbus_bool_t device_matched;
 	XML_Parser parser;
@@ -1400,7 +1399,7 @@ process_fdi_file (const char *dir, const char *filename,
 		HAL_ERROR (("Could not allocate %d bytes for file %s", filesize, buf));
 		goto out;
 	}
-	read = fread (filebuf, sizeof (char), filesize, file);
+	(void) fread (filebuf, sizeof (char), filesize, file);
 
 	/* initialize parsing context */
 	parsing_context =

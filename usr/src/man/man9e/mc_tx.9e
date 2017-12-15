@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd June 02, 2016
+.Dd Nov 26, 2017
 .Dt MC_TX 9E
 .Os
 .Sh NAME
@@ -49,7 +49,7 @@ The
 .Fn mc_tx
 entry point is called when the system requires a device driver to
 transmit data.
-The device driver will receive a chain of messge blocks.
+The device driver will receive a chain of message blocks.
 The
 .Fa mp_chain
 argument represents the first frame.

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETIPSECALGBYNAME 3NSL "Aug 20, 2003"
+.TH GETIPSECALGBYNAME 3NSL "Nov 26, 2017"
 .SH NAME
 getipsecalgbyname, getipsecalgbynum, freeipsecalgent \- query algorithm mapping
 entries
@@ -31,7 +31,6 @@ entries
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Use the \fBgetipsecalgbyname()\fR, \fBgetipsecalgbynum()\fR,
 \fBfreeipsecalgent()\fR functions to obtain the IPsec algorithm mappings  that
@@ -80,7 +79,6 @@ provide authentication.
 \fBgetipsecalgbyname()\fR looks up the algorithm by its name, while
 \fBgetipsecalgbynum()\fR looks up the algorithm by its assigned number.
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIerrnop\fR\fR
@@ -91,7 +89,6 @@ conditions. See \fBERRORS\fR.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetipsecalgbyname()\fR and \fBgetipsecalgbynum()\fR functions return a
 pointer to the structure \fBipsecalgent_t\fR, defined in <\fBnetdb.h\fR>.   If
@@ -133,7 +130,7 @@ containing a \fINULL\fR pointer. \fBa_name[0]\fR is the  primary name for the
 algorithm.
 .sp
 .LP
-\fBa_proto_num\fR is the protocol identifer of this algorithm. \fBa_alg_num\fR
+\fBa_proto_num\fR is the protocol identifier of this algorithm. \fBa_alg_num\fR
 is the algorithm number. \fBa_mech_name\fR contains the mechanism name
 associated with the algorithm.
 .sp
@@ -142,7 +139,6 @@ associated with the algorithm.
 lengths, in bytes, supported by the algorithm.  The last valid value in the
 array is followed by an element containing the value \fB0\fR.
 .SH ERRORS
-.sp
 .LP
 When the specified algorithm cannot be returned to the caller,
 \fBgetipsecalgbynam()\fR and \fBgetipsecalgbynum()\fR return a value of
@@ -176,7 +172,6 @@ Specified protocol number not found
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -193,7 +188,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcryptoadm\fR(1M), \fBipsecalgs\fR(1M), \fBgetipsecprotobyname\fR(3NSL),
 \fBgetipsecprotobyname\fR(3NSL), \fBattributes\fR(5)

@@ -1,7 +1,3 @@
-#ifndef LINT
-static const char rcsid[] = "$Id: gettimeofday.c,v 1.4 2005/04/27 04:56:11 sra Exp $";
-#endif
-
 #include "port_before.h"
 #include <stdio.h>
 #include <syslog.h>

@@ -56,7 +56,7 @@ static const float xf[] = {
 
 float
 ceilf(float x) {
-	volatile float dummy;
+	volatile float dummy __unused;
 	int hx, k, j, ix;
 
 	hx = *(int *) &x;
@@ -84,7 +84,7 @@ ceilf(float x) {
 
 float
 floorf(float x) {
-	volatile float dummy;
+	volatile float dummy __unused;
 	int hx, k, j, ix;
 
 	hx = *(int *) &x;

@@ -261,7 +261,7 @@ srv_parse(uchar_t *msg, int len, int *scnt, int *maxcnt)
 	uchar_t *end;
 	uint16_t type;
 	/* LINTED  E_FUNC_SET_NOT_USED */
-	uint16_t class;
+	uint16_t class __unused;
 	uint32_t rttl;
 	uint16_t size;
 	char namebuf[NS_MAXDNAME];

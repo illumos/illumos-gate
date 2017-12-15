@@ -206,6 +206,7 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_BLOWFISH_CBC		"CKM_BLOWFISH_CBC"
 #define	SUN_CKM_BLOWFISH_ECB		"CKM_BLOWFISH_ECB"
 #define	SUN_CKM_AES_CBC			"CKM_AES_CBC"
+#define	SUN_CKM_AES_CMAC		"CKM_AES_CMAC"
 #define	SUN_CKM_AES_ECB			"CKM_AES_ECB"
 #define	SUN_CKM_AES_CTR			"CKM_AES_CTR"
 #define	SUN_CKM_AES_CCM			"CKM_AES_CCM"

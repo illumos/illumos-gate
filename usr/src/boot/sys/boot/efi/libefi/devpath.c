@@ -141,7 +141,7 @@ efi_devpath_handle(EFI_DEVICE_PATH *devpath)
 bool
 efi_devpath_match(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2)
 {
-        size_t len;
+	size_t len;
 
 	if (devpath1 == NULL || devpath2 == NULL)
 		return (false);
@@ -162,6 +162,35 @@ efi_devpath_match(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2)
 			break;
 		devpath1 = NextDevicePathNode(devpath1);
 		devpath2 = NextDevicePathNode(devpath2);
+	}
+	return (true);
+}
+
+bool
+efi_devpath_is_prefix(EFI_DEVICE_PATH *prefix, EFI_DEVICE_PATH *path)
+{
+	size_t len;
+
+	if (prefix == NULL || path == NULL)
+		return (false);
+
+	while (1) {
+		if (IsDevicePathEnd(prefix))
+			break;
+
+		if (DevicePathType(prefix) != DevicePathType(path) ||
+		    DevicePathSubType(prefix) != DevicePathSubType(path))
+			return (false);
+
+		len = DevicePathNodeLength(prefix);
+		if (len != DevicePathNodeLength(path))
+			return (false);
+
+		if (memcmp(prefix, path, len) != 0)
+			return (false);
+
+		prefix = NextDevicePathNode(prefix);
+		path = NextDevicePathNode(path);
 	}
 	return (true);
 }

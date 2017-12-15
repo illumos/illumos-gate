@@ -739,8 +739,7 @@ int unm_niu_xg_macaddr_set(struct unm_adapter_s *adapter,
 native_t unm_niu_disable_xg_port(struct unm_adapter_s *adapter);
 
 long unm_niu_gbe_init_port(long port);
-native_t unm_niu_enable_gbe_port(struct unm_adapter_s *adapter,
-    unm_niu_gbe_ifmode_t mode);
+native_t unm_niu_enable_gbe_port(struct unm_adapter_s *adapter);
 native_t unm_niu_disable_gbe_port(struct unm_adapter_s *adapter);
 
 int unm_niu_macaddr_get(struct unm_adapter_s *adapter, unsigned char *addr);

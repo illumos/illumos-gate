@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, Joyent, Inc.
 #
 
 MODULE = pcibus
@@ -28,6 +29,7 @@ ARCH = i86pc
 CLASS = arch
 UTILDIR = ../../common/pcibus
 HBDIR = ../../common/hostbridge
+NICDIR = ../../common/nic
 UTILSRCS = did.c did_hash.c did_props.c util.c
 PCISRCS = pcibus.c pcibus_labels.c pcibus_hba.c
 
@@ -37,4 +39,4 @@ include ../../Makefile.plugin
 
 LDLIBS += -ldevinfo -lsmbios
 
-CPPFLAGS += -I$(UTILDIR) -I$(HBDIR)
+CPPFLAGS += -I$(UTILDIR) -I$(HBDIR) -I $(NICDIR)

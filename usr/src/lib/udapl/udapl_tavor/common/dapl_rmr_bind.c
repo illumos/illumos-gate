@@ -162,11 +162,11 @@ dapli_rmr_bind_fuse(
 		goto bail;
 	}
 
-	(void) dapl_os_atomic_inc(&lmr->lmr_ref_count);
+	dapl_os_atomic_inc(&lmr->lmr_ref_count);
 
 	/* if the RMR was previously bound */
 	if (NULL != rmr->lmr) {
-		(void) dapl_os_atomic_dec(&rmr->lmr->lmr_ref_count);
+		dapl_os_atomic_dec(&rmr->lmr->lmr_ref_count);
 	}
 
 	rmr->param.mem_priv = mem_priv;
@@ -244,7 +244,7 @@ dapli_rmr_bind_unfuse(
 
 	/* if the RMR was previously bound */
 	if (NULL != rmr->lmr) {
-		(void) dapl_os_atomic_dec(&rmr->lmr->lmr_ref_count);
+		dapl_os_atomic_dec(&rmr->lmr->lmr_ref_count);
 	}
 
 	rmr->param.mem_priv = DAT_MEM_PRIV_NONE_FLAG;

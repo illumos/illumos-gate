@@ -80,7 +80,7 @@ dapl_rmr_free(IN DAT_RMR_HANDLE rmr_handle)
 	 * counts here.
 	 */
 	if (rmr->param.lmr_triplet.virtual_address != 0) {
-		(void) dapl_os_atomic_dec(&rmr->lmr->lmr_ref_count);
+		dapl_os_atomic_dec(&rmr->lmr->lmr_ref_count);
 		rmr->param.lmr_triplet.virtual_address = 0;
 	}
 

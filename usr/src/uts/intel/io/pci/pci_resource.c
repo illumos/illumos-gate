@@ -483,15 +483,13 @@ mps_find_bus_res(int bus, int type, struct memlist **res)
 			sasmp = (struct sasm *)extp;
 			if (((int)sasmp->sasm_as_type) == type &&
 			    ((int)sasmp->sasm_bus_id) == bus) {
-				if (sasmp->sasm_as_base_hi != 0 ||
-				    sasmp->sasm_as_len_hi != 0) {
-					printf("64 bits address space\n");
-					extp += SYS_AS_MAPPING_SIZE;
-					break;
-				}
-				memlist_insert(res,
-				    (uint64_t)sasmp->sasm_as_base,
-				    sasmp->sasm_as_len);
+				uint64_t base, len;
+
+				base = (uint64_t)sasmp->sasm_as_base |
+				    (uint64_t)sasmp->sasm_as_base_hi << 32;
+				len = (uint64_t)sasmp->sasm_as_len |
+				    (uint64_t)sasmp->sasm_as_len_hi << 32;
+				memlist_insert(res, base, len);
 				res_cnt++;
 			}
 			extp += SYS_AS_MAPPING_SIZE;

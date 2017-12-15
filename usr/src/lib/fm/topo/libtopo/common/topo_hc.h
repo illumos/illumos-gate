@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef _TOPO_HC_H
@@ -76,6 +76,7 @@ extern "C" {
 #define	PCIEX_ROOT	"pciexrc"
 #define	PCIEX_SWUP	"pciexswu"
 #define	PCIEX_SWDWN	"pciexswd"
+#define	PORT		"port"
 #define	POWERBOARD	"powerboard"
 #define	POWERMODULE	"powermodule"
 #define	PSU		"psu"
@@ -90,6 +91,7 @@ extern "C" {
 #define	SP		"sp"
 #define	SUBCHASSIS	"subchassis"
 #define	SYSTEMBOARD	"systemboard"
+#define	TRANSCEIVER	"transceiver"
 #define	XAUI		"xaui"
 #define	XFP		"xfp"
 
@@ -160,6 +162,20 @@ extern "C" {
 #define	TOPO_PROP_CHASSIS_TYPE	"chassis-type"
 #define	TOPO_PROP_SAS_PHY_MASK	"phy-mask"
 #define	TOPO_PROP_SAS_CONNECTOR_TYPE	"sas-connector-type"
+
+#define	TOPO_PGROUP_PORT	"port"
+#define	TOPO_PROP_PORT_TYPE	"type"
+#define	TOPO_PROP_PORT_TYPE_SFF	"sff"
+
+#define	TOPO_PGROUP_TRANSCEIVER	"transceiver"
+#define	TOPO_PROP_TRANSCEIVER_TYPE	"type"
+#define	TOPO_PROP_TRANSCEIVER_USABLE	"usable"
+
+#define	TOPO_PGROUP_SFF_TRANSCEIVER	"sff-transceiver"
+#define	TOPO_PORT_SFF_TRANSCEIVER_VENDOR	"vendor"
+#define	TOPO_PORT_SFF_TRANSCEIVER_PN	"part-number"
+#define	TOPO_PORT_SFF_TRANSCEIVER_REV	"revision"
+#define	TOPO_PORT_SFF_TRANSCEIVER_SN	"serial-number"
 
 #ifdef	__cplusplus
 }

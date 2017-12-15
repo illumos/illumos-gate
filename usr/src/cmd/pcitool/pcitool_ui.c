@@ -898,10 +898,10 @@ static int
 parse_nexus_opts(char *input, uint64_t *flags_arg, uint8_t *bank_arg,
     uint64_t *base_addr_arg)
 {
-	typedef enum {
+	enum nexus_opts_index {
 		bank = 0,
 		base
-	} nexus_opts_index_t;
+	};
 
 	static char *nexus_opts[] = {
 		"bank",
@@ -1059,7 +1059,7 @@ parse_device_opts(
     uint8_t *func_arg, uint8_t *bank_arg)
 {
 	/* Needed by getsubopt(3C) */
-	typedef enum {
+	enum bdf_opts_index {
 		bus = 0,
 		dev = 1,
 		func = 2,
@@ -1073,7 +1073,7 @@ parse_device_opts(
 		bar4 = 10,
 		bar5 = 11,
 		rom = 12
-	} bdf_opts_index_t;
+	};
 
 	/* Needed by getsubopt(3C) */
 	static char *bdf_opts[] = {
@@ -1436,12 +1436,12 @@ parse_probeone_opts(
     char *input, uint64_t *flags_arg, uint8_t *bus_arg, uint8_t *device_arg,
     uint8_t *func_arg)
 {
-	typedef enum {
+	enum p1_bdf_opts_index {
 		bus = 0,
 		dev = 1,
 		func = 2,
 		bdf = 3
-	} p1_bdf_opts_index_t;
+	};
 
 	/* Needed by getsubopt(3C) */
 	static char *p1_bdf_opts[] = {
@@ -1515,7 +1515,8 @@ parse_probeone_opts(
 #ifdef DEBUG
 
 static void
-dump_struct(pcitool_uiargs_t *dumpthis) {
+dump_struct(pcitool_uiargs_t *dumpthis)
+{
 	(void) printf("flags:0x%x\n", dumpthis->flags);
 	(void) printf("bus:%d (0x%x)\n",
 	    dumpthis->bus, dumpthis->bus);

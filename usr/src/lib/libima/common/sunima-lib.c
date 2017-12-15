@@ -125,24 +125,24 @@ IMA_API IMA_STATUS SUN_IMA_GetTunableProperties(
 	return (status);
 }
 
-static void os_obtainmutex(int semid) {
-	int retVal;
+static void
+os_obtainmutex(int semid)
+{
 	struct sembuf sem_b;
 
 	sem_b.sem_num = 0;
 	sem_b.sem_op = -1;
 	sem_b.sem_flg = SEM_UNDO;
-	retVal = semop(semid, &sem_b, 1);
-
+	(void) semop(semid, &sem_b, 1);
 }
 
-static void os_releasemutex(int semid) {
-	int retVal;
+static void
+os_releasemutex(int semid)
+{
 	struct sembuf sem_b;
 
 	sem_b.sem_num = 0;
 	sem_b.sem_op = 1;
 	sem_b.sem_flg = SEM_UNDO;
-	retVal = semop(semid, &sem_b, 1);
-
+	(void) semop(semid, &sem_b, 1);
 }

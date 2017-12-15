@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  *	Program profiling report generator.
@@ -351,10 +348,6 @@ main(int argc, char **argv)
 	long sf;	/* Scale for index into pcounts: */
 			/*	i(pc) = ((pc - pc_l) * sf)/bias. */
 
-	/* LINTED: set but not used */
-	long s_inv;	/* Inverse: i_inv(i) = */
-			/*		{pc00, pc00+1, ... pc00+s_inv-1}. */
-
 	unsigned pc_m;	/* Range of PCs profiled: pc_m = pc_h - pc_l */
 
 	float	t, t0;
@@ -605,15 +598,13 @@ pc_l, pc_h, pc_m, pc_m, head.nfns, n_cc, n_pc));
 		sf >>= 1;
 		bias >>= 1;
 	}
-	s_inv = pc_m/n_pc;	/* Range of PCs mapped into one index. */
 
 	/* BEGIN CSTYLED */
 OLD_DEBUG(
 	if (debug_value) {
-		Fprint(
-			stderr,
-			"sf = %d, s_inv = %d bias = %d\n",
-			(long)sf, s_inv, bias);
+
+		Fprint(stderr, "sf = %d, s_inv = %d bias = %d\n",
+		    (long)sf, pc_m / n_pc, bias);
 	}
 );
 	/* END CSTYLED */
@@ -1020,8 +1011,8 @@ if (debug_value)  {
 	 * option causes certain additional information to be printed.
 	 */
 
-OLD_DEBUG(if (debug_value) Fprint(stderr,
-"Time unaccounted for: %.7G\n", t_tot - t0));
+	OLD_DEBUG(if (debug_value) Fprint(stderr,
+	    "Time unaccounted for: %.7G\n", t_tot - t0));
 
 	if (sort)	/* If comparison routine given then use it. */
 		qsort((char *)slist, (unsigned)n_syms,
@@ -1219,11 +1210,14 @@ eofon(FILE *iop, char *fn)
 	exit(1);
 }
 
-/* Version of perror() that prints cmdname first. */
+/*
+ * Version of perror() that prints cmdname first.
+ * Print system error message & exit.
+ */
 
 static void
 Perror(char *s)
-{				/* Print system error message & exit. */
+{
 	int err = errno;	/* Save current errno in case */
 
 	Fprint(stderr, "%s: ", cmdname);

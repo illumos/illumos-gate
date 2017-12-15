@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FMD 1M "Nov 17, 2004"
+.TH FMD 1M "Nov 26, 2017"
 .SH NAME
 fmd \- fault manager daemon
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ fmd \- fault manager daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBfmd\fR is a daemon that runs in the background on each system.
 \fBfmd\fR receives telemetry information relating to problems detected by the
@@ -27,7 +26,7 @@ explains more about the problem impact and appropriate responses.
 .sp
 .LP
 Each problem diagnosed by the fault manager is assigned a Universal Unique
-Identifier (\fBUUID\fR). The \fBUUID\fR uniquely identifes this particular
+Identifier (\fBUUID\fR). The \fBUUID\fR uniquely identifies this particular
 problem across any set of systems. The \fBfmdump\fR(1M) utility can be used to
 view the list of problems diagnosed by the fault manager, along with their
 \fBUUID\fRs and knowledge article message identifiers. The \fBfmadm\fR(1M)
@@ -36,7 +35,6 @@ The \fBfmstat\fR(1M) utility can be used to report statistics kept by the fault
 manager. The fault manager is started automatically when the operating system
 boots, so it is not necessary to use the \fBfmd\fR command directly.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported
 .sp
@@ -80,7 +78,6 @@ Print the fault manager's version to stdout and exit.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -112,7 +109,6 @@ Invalid command-line options were specified.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/fm/fmd\fR \fR
@@ -140,7 +136,6 @@ Fault manager log directory
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -156,7 +151,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsvcs\fR(1), \fBfmadm\fR(1M), \fBfmdump\fR(1M), \fBfmstat\fR(1M),
 \fBsyslogd\fR(1M), \fBattributes\fR(5), \fBsmf\fR(5)
@@ -164,7 +158,6 @@ Interface Stability	Evolving
 .LP
 http://illumos.org/msg/
 .SH NOTES
-.sp
 .LP
 The Fault Manager is managed by the service management facility, \fBsmf\fR(5),
 under the service identifier:

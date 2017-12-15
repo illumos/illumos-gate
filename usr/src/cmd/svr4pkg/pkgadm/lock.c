@@ -243,8 +243,6 @@ admin_lock(int argc, char **argv)
 	pid_t			pFlag = 0;	/* process # */
 	struct sigaction	nact;
 	struct sigaction	oact;
-	void			(*funcSighup)();
-	void			(*funcSigint)();
 	zoneid_t		zFlag = -1;	/* zone i.d. */
 
 	while ((c = getopt(argc, argv, ":aek:o:p:qrR:stwW:z:")) != EOF) {
@@ -509,23 +507,15 @@ admin_lock(int argc, char **argv)
 	nact.sa_flags = SA_RESTART;
 	(void) sigemptyset(&nact.sa_mask);
 
-	if (sigaction(SIGINT, &nact, &oact) < 0) {
-		funcSigint = SIG_DFL;
-	} else {
-		funcSigint = oact.sa_handler;
-	}
+	(void) sigaction(SIGINT, &nact, &oact);
 
-	/* connect sighupt_handler() to SIGHUP */
+	/* connect sighup_handler() to SIGHUP */
 
 	nact.sa_handler = sighup_handler;
 	nact.sa_flags = SA_RESTART;
 	(void) sigemptyset(&nact.sa_mask);
 
-	if (sigaction(SIGHUP, &nact, &oact) < 0) {
-		funcSighup = SIG_DFL;
-	} else {
-		funcSighup = oact.sa_handler;
-	}
+	(void) sigaction(SIGHUP, &nact, &oact);
 
 	/* release hold on signals */
 
@@ -1852,15 +1842,11 @@ static boolean_t
 _validateLock(int a_fd, LOCK_T *a_theLock, int a_quiet)
 {
 	ADMINLOCK_T	*pll;
-	char		*pld;
-	long		pls;
 	char		path[MAXPATHLEN];
 
 	/* localize references to lock object */
 
-	pld = &a_theLock->_lrLockData[0];
 	pll = &a_theLock->_lrLock;
-	pls = sizeof (a_theLock->_lrLockData);
 
 	/* return true if no process i.d. associated with lock */
 

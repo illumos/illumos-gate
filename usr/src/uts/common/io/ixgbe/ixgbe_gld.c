@@ -27,6 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include "ixgbe_sw.h"
@@ -279,6 +280,20 @@ ixgbe_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			break;
 		}
 		break;
+	}
+	case MAC_CAPAB_TRANSCEIVER: {
+		mac_capab_transceiver_t *mct = cap_data;
+
+		/*
+		 * Rather than try and guess based on the media type whether or
+		 * not we have a transceiver we can read, we instead will let
+		 * the actual function calls figure that out for us.
+		 */
+		mct->mct_flags = 0;
+		mct->mct_ntransceivers = 1;
+		mct->mct_info = ixgbe_transceiver_info;
+		mct->mct_read = ixgbe_transceiver_read;
+		return (B_TRUE);
 	}
 	default:
 		return (B_FALSE);

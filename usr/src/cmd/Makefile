@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2017, Joyent, Inc.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
@@ -131,6 +131,7 @@ COMMON_SUBDIRS=		\
 	dispadmin	\
 	dladm		\
 	dlstat		\
+	dlutil		\
 	dmesg		\
 	dodatadm	\
 	dtrace		\

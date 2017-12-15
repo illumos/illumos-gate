@@ -20,10 +20,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef lint
-static const char rcsid[] = "$Id: ns_newmsg.c,v 1.3 2009/02/26 10:48:57 marka Exp $";
-#endif
-
 #include <port_before.h>
 
 #include <arpa/nameser.h>

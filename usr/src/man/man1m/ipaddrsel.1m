@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (C) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (C) 2017, Sebastian Wiedenroth
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IPADDRSEL 1M "Feb 6, 2006"
+.TH IPADDRSEL 1M "Nov 4, 2017"
 .SH NAME
 ipaddrsel \- configure IPv6 default address selection
 .SH SYNOPSIS
@@ -23,7 +24,6 @@ ipaddrsel \- configure IPv6 default address selection
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Use the \fBipaddrsel\fR utility to configure the IPv6 default address selection
 policy table. The policy table is a longest-matching-prefix lookup table that
@@ -57,7 +57,6 @@ true for packets that are locally generated and for applications that do not
 choose a non-zero source address using \fBbind\fR(3SOCKET).
 .RE
 .SS "The Configuration File"
-.sp
 .LP
 The configuration file that the \fB-f\fR option accepts can contain either
 comment lines or policy entries. Comment lines have a '\fB#\fR' character as
@@ -102,7 +101,6 @@ The file must contain a default policy entry, which is an entry with
 \fB::0/0\fR as its \fIprefix\fR and \fIprefix_length\fR. This is to ensure that
 all possible addresses match a policy.
 .SH OPTIONS
-.sp
 .LP
 The \fBippadrsel\fR utility supports the following options:
 .sp
@@ -151,11 +149,15 @@ The following example is the default policy that is located in
 .in +2
 .nf
 # Prefix                            Precedence Label
-::1/128                             50 Loopback
-::/96                               20 IPv4_Compatible
-::ffff:0.0.0.0/96                   10 IPv4
-2002::/16                           30 6to4
-::/0                                40 Default
+::1/128                                     50 Loopback
+::/0                                        40 Default
+::ffff:0.0.0.0/96                           35 IPv4
+2002::/16                                   30 6to4
+2001::/32                                    5 Teredo
+fc00::/7                                     3 ULA
+::/96                                        1 IPv4_Compatible
+fec0::/10                                    1 Site_Local
+3ffe::/16                                    1 6bone
 .fi
 .in -2
 .sp
@@ -175,14 +177,14 @@ demonstrates.
 .sp
 .in +2
 .nf
-# Prefix                             Precedence Label
-::1/128                              50 Loopback
-::/0                                 40 Default
-2002::/16                            30 6to4
-fec0::/10                            27 Site-Local
-fe80::/10                            23 Link-Local
-::/96                                20 IPv4_Compatible
-::ffff:0.0.0.0/96                    10 IPv4
+# Prefix                            Precedence Label
+::1/128                                     50 Loopback
+::/0                                        40 Default
+2002::/16                                   30 6to4
+fec0::/10                                   27 Site-Local
+fe80::/10                                   23 Link-Local
+::/96                                       20 IPv4_Compatible
+::ffff:0.0.0.0/96                           10 IPv4
 .fi
 .in -2
 .sp
@@ -192,19 +194,23 @@ fe80::/10                            23 Link-Local
 .sp
 .LP
 By default, IPv6 addresses are ordered in front of IPv4 addresses in name
-lookups. \fB::ffff:0.0.0.0/96\fR has the lowest precedence in the default
-table. In the following example, IPv4 addresses are assigned higher precedence
-and are ordered in front of IPv6 destinations:
+lookups. \fB::ffff:0.0.0.0/96\fR has the precedence of 35 in the default table.
+In the following example, IPv4 addresses are assigned higher precedence and are
+ordered in front of IPv6 destinations:
 
 .sp
 .in +2
 .nf
-# Prefix                             Precedence Label
-::1/128                              50 Loopback
-::/0                                 40 Default
-2002::/16                            30 6to4
-::/96                                20 IPv4_Compatible
-::ffff:0.0.0.0/96                    60 IPv4
+# Prefix                            Precedence Label
+::1/128                                     50 Loopback
+::/0                                        40 Default
+::ffff:0.0.0.0/96                           60 IPv4
+2002::/16                                   30 6to4
+2001::/32                                    5 Teredo
+fc00::/7                                     3 ULA
+::/96                                        1 IPv4_Compatible
+fec0::/10                                    1 Site_Local
+3ffe::/16                                    1 6bone
 .fi
 .in -2
 .sp
@@ -218,10 +224,10 @@ communicating with destinations in a particular network.
 
 .sp
 .LP
-The following policy table assigns a label of 5 to a particular source address
-on the local system, \fB2001:1111:1111::1\fR. The table assigns the same label
-to a network, \fB2001:2222:2222::/48\fR. The result of this policy is that the
-\fB2001:1111:1111::1\fR source address will only be used when communicating
+The following policy table assigns the label "ClientNet" to a particular source
+address on the local system, \fB2001:1111:1111::1\fR. The table assigns the same
+label to a network, \fB2001:2222:2222::/48\fR. The result of this policy is that
+the \fB2001:1111:1111::1\fR source address will only be used when communicating
 with destinations contained in the \fB2001:2222:2222::/48\fR network. For this
 example, this network is the \fBClientNet\fR, which could represent a
 particular client's network.
@@ -229,14 +235,14 @@ particular client's network.
 .sp
 .in +2
 .nf
-# Prefix                              Precedence Label
-::1/128                               50 Loopback
-2001:1111:1111::1/128                 40 ClientNet
-2001:2222:2222::/48                   40 ClientNet
-::/0                                  40 Default
-2002::/16                             30 6to4
-::/96                                 20 IPv4_Compatible
-::ffff:0.0.0.0/96                     10 IPv4
+# Prefix                            Precedence Label
+::1/128                                     50 Loopback
+2001:1111:1111::1/128                       40 ClientNet
+2001:2222:2222::/48                         40 ClientNet
+::/0                                        40 Default
+2002::/16                                   30 6to4
+::/96                                       20 IPv4_Compatible
+::ffff:0.0.0.0/96                           10 IPv4
 .fi
 .in -2
 .sp
@@ -247,7 +253,6 @@ This example assumes that the local system has one physical interface, and that
 all global prefixes are assigned to that physical interface.
 
 .SH EXIT STATUS
-.sp
 .LP
 \fBipaddrsel\fR returns the following exit values:
 .sp
@@ -270,7 +275,6 @@ table is unchanged.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/inet/ipaddrsel.conf\fR\fR
@@ -282,7 +286,6 @@ started.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -298,19 +301,17 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBnscd\fR(1M), \fBinet\fR(3SOCKET), \fBgetaddrinfo\fR(3SOCKET),
 \fBipaddrsel.conf\fR(4), \fBattributes\fR(5), \fBinet6\fR(7P)
 .SH NOTES
-.sp
 .LP
 The ipnodes cache kept by \fBnscd\fR(1M) contains addresses that are ordered
 using the destination address ordering algorithm, which is one of the reasons
 why \fBipaddrsel\fR is called before \fBnscd\fR in the boot sequence. If
 \fBipaddrsel\fR is used to change the address selection policy after \fBnscd\fR
-has started, you should invalidate the \fBnscd\fR ipnodes cache invalidated by
-invoking the following command:
+has started, you should invalidate the \fBnscd\fR ipnodes cache by invoking the
+following command:
 .sp
 .in +2
 .nf

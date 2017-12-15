@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd May 7, 2016
+.Dd Nov 26, 2017
 .Dt USBA_HCDI_CB_OPS 9F
 .Os
 .Sh NAME
@@ -54,7 +54,7 @@ illumos USB HCD private function
 .Pp
 This is a private function that is not part of the stable DDI.
 It may be removed or changed at any time.
-.Sh PARAMATERS
+.Sh PARAMETERS
 .Bl -tag -width Fa
 .It Fa dip
 Pointer to the device's

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd Nov 26, 2017
 .Dt LPROCHANDLE 3PROC
 .Os
 .Sh NAME
@@ -30,7 +30,7 @@ The
 function returns the process handle to which the thread handle
 .Fa L
 belongs.
-This proccess handle may be used with other
+This process handle may be used with other
 .Xr libproc 3LIB
 functions just as if
 .Xr Pgrab 3PROC was called.

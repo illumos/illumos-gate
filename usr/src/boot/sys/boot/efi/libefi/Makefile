@@ -35,7 +35,7 @@ SRCS=	delay.c devpath.c efi_console.c efinet.c efipart.c env.c errno.c \
 
 OBJS=	$(SRCS:%.c=%.o)
 
-CPPFLAGS= -DTERM_EMU -DSTAND
+CPPFLAGS= -DTERM_EMU -D_STANDALONE
 CFLAGS = -O2
 
 #.if ${MACHINE_CPUARCH} == "aarch64"

@@ -164,8 +164,7 @@ esp_kstat_init(ipsecesp_stack_t *espstack, netstackid_t stackid)
 {
 	espstack->esp_ksp = kstat_create_netstack("ipsecesp", 0, "esp_stat",
 	    "net", KSTAT_TYPE_NAMED,
-	    sizeof (esp_kstats_t) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_PERSISTENT, stackid);
+	    sizeof (esp_kstats_t) / sizeof (kstat_named_t), 0, stackid);
 
 	if (espstack->esp_ksp == NULL || espstack->esp_ksp->ks_data == NULL)
 		return (B_FALSE);

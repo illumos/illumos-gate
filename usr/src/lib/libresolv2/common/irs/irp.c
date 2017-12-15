@@ -15,12 +15,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: irp.c,v 1.12 2008/11/14 02:36:51 marka Exp $";
-#endif
-
-/* Imports */
-
 #include "port_before.h"
 
 #include <syslog.h>

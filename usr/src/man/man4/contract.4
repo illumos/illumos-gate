@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CONTRACT 4 "Jul 11, 2005"
+.TH CONTRACT 4 "Nov 26, 2017"
 .SH NAME
 contract \- the contract file system
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ contract \- the contract file system
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fB/system/contract\fR file system acts as the primary interface to the
 contract subsystem. There is a subdirectory of \fB/system/contract\fR for each
@@ -36,13 +35,11 @@ A combination of standard system calls (for example, \fBopen\fR(2),
 Consumers of the contract file system must be large file aware. See
 \fBlargefile\fR(5) and \fBlfcompile64\fR(5).
 .SS "DIRECTORY STRUCTURE"
-.sp
 .LP
 At the top level, the \fB/system/contract\fR directory contains subdirectories
 named with each available contract type, and one special directory, \fBall\fR.
 Each of these directories is world-readable and world-searchable.
 .SS "STRUCTURE OF \fB/system/contract/\fItype\fR\fR"
-.sp
 .LP
 Each \fB/system/contract/\fItype\fR\fR directory contains a fixed number of
 files. It also contains a variable number of subdirectories corresponding to
@@ -115,14 +112,12 @@ receives events from all \fItype\fR contracts held by the opening process. See
 .RE
 
 .SS "STRUCTURE OF /system/contract/all"
-.sp
 .LP
 The \fB/system/contract/all\fR directory contains a numerically named file for
 each contract in the system. Each file is a symbolic link to the type-specific
 directory for that contract, that is \fB/system/contract/all/\fIid\fR\fR points
 to \fB/system/contract/\fItype\fR/\fIid\fR\fR.
 .SS "STRUCTURE OF /system/contract/\fItype\fR/\fIid\fR"
-.sp
 .LP
 Each \fB/system/contract/\fItype\fR/\fIid\fR\fR directory contains the
 following files:
@@ -195,7 +190,6 @@ for a contract.
 .RE
 
 .SS "TERMS"
-.sp
 .LP
 The following terms are defined for all contracts:
 .sp
@@ -229,7 +223,6 @@ Selects which events are delivered as critical events. Use
 .RE
 
 .SS "STATUS"
-.sp
 .LP
 A status object returned by \fBct_status_read\fR(3CONTRACT) contains the
 following pieces of information:
@@ -251,7 +244,7 @@ this information.
 .ad
 .sp .6
 .RS 4n
-The type of the contract, specifed as a string. Obtained using
+The type of the contract, specified as a string. Obtained using
 \fBct_status_get_type\fR(3CONTRACT). The contract type is the same as its
 subdirectory name under \fB/system/contract\fR.
 .RE
@@ -371,7 +364,6 @@ to obtain this information.
 .RE
 
 .SS "EVENTS"
-.sp
 .LP
 All three event endpoints, \fB/system/contract/\fItype\fR/bundle\fR,
 \fB/system/contract/\fItype\fR/pbundle\fR, and
@@ -441,7 +433,6 @@ type's manual page or \fBCT_EV_NEGEND\fR. Use
 .RE
 
 .SS "EVENT TYPES"
-.sp
 .LP
 The following event types are defined:
 .sp
@@ -487,7 +478,6 @@ Use \fBct_event_get_newct\fR(3CONTRACT) to obtain this information.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/system/contract\fR\fR
@@ -608,7 +598,6 @@ Status info for contract ID
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBctrun\fR(1), \fBctstat\fR(1), \fBctwatch\fR(1), \fBchroot\fR(1M),
 \fBclose\fR(2), \fBioctl\fR(2), \fBopen\fR(2), \fBpoll\fR(2),

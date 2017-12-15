@@ -37,6 +37,7 @@ file path=usr/share/man/man9e/ioctl.9e
 file path=usr/share/man/man9e/ks_snapshot.9e
 file path=usr/share/man/man9e/ks_update.9e
 file path=usr/share/man/man9e/mac.9e
+file path=usr/share/man/man9e/mac_capab_transceiver.9e
 file path=usr/share/man/man9e/mc_getcapab.9e
 file path=usr/share/man/man9e/mc_getprop.9e
 file path=usr/share/man/man9e/mc_getstat.9e
@@ -94,6 +95,8 @@ link path=usr/share/man/man9e/gldv3.9e target=mac.9e
 link path=usr/share/man/man9e/intro.9e target=Intro.9e
 link path=usr/share/man/man9e/mc_close.9e target=mc_open.9e
 link path=usr/share/man/man9e/mc_stop.9e target=mc_start.9e
+link path=usr/share/man/man9e/mct_info.9e target=mac_capab_transceiver.9e
+link path=usr/share/man/man9e/mct_read.9e target=mac_capab_transceiver.9e
 link path=usr/share/man/man9e/tran_destroy_pkt.9e target=tran_init_pkt.9e
 link path=usr/share/man/man9e/tran_pkt_constructor.9e target=tran_setup_pkt.9e
 link path=usr/share/man/man9e/tran_pkt_destructor.9e target=tran_setup_pkt.9e

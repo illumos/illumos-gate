@@ -353,21 +353,13 @@ libhal_volume_policy_compute_display_name (LibHalDrive *drive, LibHalVolume *vol
 	char *name;
 	char *size_str;
 	const char *volume_label;
-	const char *model;
-	const char *vendor;
 	LibHalDriveType drive_type;
-	dbus_bool_t drive_is_hotpluggable;
 	dbus_bool_t drive_is_removable;
-	LibHalDriveCdromCaps drive_cdrom_caps;
 	char buf[MAX_STRING_SZ];
 
 	volume_label = libhal_volume_get_label (volume);
-	model = libhal_drive_get_model (drive);
-	vendor = libhal_drive_get_vendor (drive);
 	drive_type = libhal_drive_get_type (drive);
-	drive_is_hotpluggable = libhal_drive_is_hotpluggable (drive);
 	drive_is_removable = libhal_drive_uses_removable_media (drive);
-	drive_cdrom_caps = libhal_drive_get_cdrom_caps (drive);
 
 	size_str = libhal_volume_policy_compute_size_as_string (volume);
 
@@ -1902,7 +1894,7 @@ mopts_collect (LibHalContext *hal_ctx, const char *namespace, int namespace_len,
 		
 		type = libhal_psi_get_type (&it);
 		key = libhal_psi_get_key (&it);
-		if (libhal_psi_get_type (&it) == LIBHAL_PROPERTY_TYPE_BOOLEAN &&
+		if (type == LIBHAL_PROPERTY_TYPE_BOOLEAN &&
 		    strncmp (key, namespace, namespace_len - 1) == 0) {
 			const char *option = key + namespace_len - 1;
 			char *location;

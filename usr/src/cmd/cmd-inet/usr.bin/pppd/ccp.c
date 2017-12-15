@@ -31,9 +31,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#define RCSID	"$Id: ccp.c,v 1.30 2000/04/15 01:27:11 masputra Exp $"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -41,10 +38,6 @@
 #include "fsm.h"
 #include "ccp.h"
 #include <net/ppp-comp.h>
-
-#if !defined(lint) && !defined(_lint)
-static const char rcsid[] = RCSID;
-#endif
 
 /*
  * Command-line options.

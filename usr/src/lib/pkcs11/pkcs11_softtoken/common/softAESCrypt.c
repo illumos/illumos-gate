@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <pthread.h>
@@ -29,10 +30,11 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
+#include <aes_impl.h>
 #include "softSession.h"
 #include "softObject.h"
 #include "softCrypt.h"
-#include <aes_impl.h>
+#include "softOps.h"
 
 /*
  * Allocate context for the active encryption or decryption operation, and
@@ -179,7 +181,8 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	 * AES allows any input length for C_Encrypt function with the
 	 * mechanism CKM_AES_CBC_PAD and for C_EncryptUpdate function.
 	 */
-	if ((!update) && (mechanism != CKM_AES_CBC_PAD)) {
+	if ((!update) && (mechanism != CKM_AES_CBC_PAD) &&
+	    (mechanism != CKM_AES_CMAC)) {
 		if ((ulDataLen % AES_BLOCK_LEN) != 0) {
 			rv = CKR_DATA_LEN_RANGE;
 			goto cleanup;
@@ -201,6 +204,8 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			 */
 			out_len = AES_BLOCK_LEN *
 			    (ulDataLen / AES_BLOCK_LEN + 1);
+		} else if (mechanism == CKM_AES_CMAC) {
+			out_len = AES_BLOCK_LEN;
 		} else {
 			/*
 			 * For non-padding mode, the output length will
@@ -247,6 +252,24 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		 * encryption until when more data comes in next
 		 * C_EncryptUpdate or when C_EncryptFinal is called.
 		 */
+		out_buf = pEncrypted;
+
+		/*
+		 * We prefer to let the underlying implementation of CMAC handle
+		 * the storing of extra bytes, and no data is output until
+		 * *_final, so skip that part of the following validation.
+		 */
+		if (mechanism == CKM_AES_CMAC) {
+			if (pEncrypted == NULL) {
+				*pulEncryptedLen = ulDataLen;
+				return (CKR_OK);
+			}
+
+			remain = 0;
+			in_buf = pData;
+			goto do_encryption;
+		}
+
 		if ((total_len < AES_BLOCK_LEN) ||
 		    ((mechanism == CKM_AES_CBC_PAD) &&
 		    (total_len == AES_BLOCK_LEN))) {
@@ -304,7 +327,6 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		} else {
 			in_buf = pData;
 		}
-		out_buf = pEncrypted;
 	}
 
 do_encryption:
@@ -344,6 +366,9 @@ do_encryption:
 		break;
 	}
 
+	case CKM_AES_CMAC:
+		out_len = ulDataLen;
+		/*FALLTHRU*/
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
 	{
@@ -397,6 +422,13 @@ do_encryption:
 			    (char *)tmpblock, AES_BLOCK_LEN, &out);
 
 			out_len += AES_BLOCK_LEN;
+		} else if (mechanism == CKM_AES_CMAC) {
+			out.cd_length = AES_BLOCK_LEN;
+			out.cd_raw.iov_base = (char *)out_buf;
+			out.cd_raw.iov_len = AES_BLOCK_LEN;
+
+			rc = cmac_mode_final(soft_aes_ctx->aes_cbc, &out,
+			    aes_encrypt_block, aes_xor_block);
 		}
 
 		if (rc == 0) {
@@ -435,6 +467,13 @@ encrypt_failed:
 		if (((aes_ctx_t *)soft_aes_ctx->aes_cbc)->ac_remainder_len > 0)
 			rc = ctr_mode_final(soft_aes_ctx->aes_cbc, &out,
 			    aes_encrypt_block);
+
+		/*
+		 * Even though success means we've encrypted all of the input,
+		 * we should still behave like the other functions and return
+		 * the encrypted length in pulEncryptedLen
+		 */
+		*pulEncryptedLen = ulDataLen;
 	}
 	} /* end switch */
 
@@ -790,6 +829,14 @@ decrypt_failed:
 			if (rc == CRYPTO_DATA_LEN_RANGE)
 				rc = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
 		}
+
+		/*
+		 * Even though success means we've decrypted all of the input,
+		 * we should still behave like the other functions and return
+		 * the decrypted length in pulDataLen
+		 */
+		*pulDataLen = ulEncryptedLen;
+
 	}
 	} /* end switch */
 
@@ -838,6 +885,26 @@ aes_cbc_ctx_init(void *key_sched, size_t size, uint8_t *ivec)
 
 	cbc_ctx->cbc_lastp = (uint8_t *)cbc_ctx->cbc_iv;
 	cbc_ctx->cbc_flags |= CBC_MODE;
+	cbc_ctx->max_remain = AES_BLOCK_LEN;
+
+	return (cbc_ctx);
+}
+
+void *
+aes_cmac_ctx_init(void *key_sched, size_t size)
+{
+
+	cbc_ctx_t *cbc_ctx;
+
+	if ((cbc_ctx = calloc(1, sizeof (cbc_ctx_t))) == NULL)
+		return (NULL);
+
+	cbc_ctx->cbc_keysched = key_sched;
+	cbc_ctx->cbc_keysched_len = size;
+
+	cbc_ctx->cbc_lastp = (uint8_t *)cbc_ctx->cbc_iv;
+	cbc_ctx->cbc_flags |= CMAC_MODE;
+	cbc_ctx->max_remain = AES_BLOCK_LEN + 1;
 
 	return (cbc_ctx);
 }
@@ -868,4 +935,183 @@ aes_ctr_ctx_init(void *key_sched, size_t size, uint8_t *param)
 	}
 
 	return (ctr_ctx);
+}
+
+/*
+ * Allocate and initialize AES contexts for both signing and encrypting,
+ * saving both context pointers in the session struct. For general-length AES
+ * MAC, check the length in the parameter to see if it is in the right range.
+ */
+CK_RV
+soft_aes_sign_verify_init_common(soft_session_t *session_p,
+    CK_MECHANISM_PTR pMechanism, soft_object_t *key_p, boolean_t sign_op)
+{
+	soft_aes_ctx_t	*soft_aes_ctx;
+	CK_MECHANISM	encrypt_mech;
+	CK_RV rv;
+
+	if (key_p->key_type != CKK_AES) {
+		return (CKR_KEY_TYPE_INCONSISTENT);
+	}
+
+	/* allocate memory for the sign/verify context */
+	soft_aes_ctx = malloc(sizeof (soft_aes_ctx_t));
+	if (soft_aes_ctx == NULL) {
+		return (CKR_HOST_MEMORY);
+	}
+
+	/* initialization vector is zero for AES CMAC */
+	bzero(soft_aes_ctx->ivec, AES_BLOCK_LEN);
+
+	switch (pMechanism->mechanism) {
+
+	case CKM_AES_CMAC_GENERAL:
+
+		if (pMechanism->ulParameterLen !=
+		    sizeof (CK_MAC_GENERAL_PARAMS)) {
+			free(soft_aes_ctx);
+			return (CKR_MECHANISM_PARAM_INVALID);
+		}
+
+		if (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
+		    AES_BLOCK_LEN) {
+			free(soft_aes_ctx);
+			return (CKR_MECHANISM_PARAM_INVALID);
+		}
+
+		soft_aes_ctx->mac_len = *((CK_MAC_GENERAL_PARAMS_PTR)
+		    pMechanism->pParameter);
+
+		/*FALLTHRU*/
+	case CKM_AES_CMAC:
+
+		/*
+		 * For non-general AES MAC, output is always block size
+		 */
+		if (pMechanism->mechanism == CKM_AES_CMAC) {
+			soft_aes_ctx->mac_len = AES_BLOCK_LEN;
+		}
+
+		/* allocate a context for AES encryption */
+		encrypt_mech.mechanism = CKM_AES_CMAC;
+		encrypt_mech.pParameter = (void *)soft_aes_ctx->ivec;
+		encrypt_mech.ulParameterLen = AES_BLOCK_LEN;
+		rv = soft_encrypt_init_internal(session_p, &encrypt_mech,
+		    key_p);
+		if (rv != CKR_OK) {
+			free(soft_aes_ctx);
+			return (rv);
+		}
+
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+
+		if (sign_op) {
+			session_p->sign.context = soft_aes_ctx;
+			session_p->sign.mech.mechanism = pMechanism->mechanism;
+		} else {
+			session_p->verify.context = soft_aes_ctx;
+			session_p->verify.mech.mechanism =
+			    pMechanism->mechanism;
+		}
+
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+
+		break;
+	}
+	return (CKR_OK);
+}
+
+/*
+ * Called by soft_sign(), soft_sign_final(), soft_verify() or
+ * soft_verify_final().
+ */
+CK_RV
+soft_aes_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
+    CK_ULONG ulDataLen, CK_BYTE_PTR pSigned, CK_ULONG_PTR pulSignedLen,
+    boolean_t sign_op, boolean_t Final)
+{
+	soft_aes_ctx_t		*soft_aes_ctx_sign_verify;
+	CK_RV			rv;
+	CK_BYTE			*pEncrypted = NULL;
+	CK_ULONG		ulEncryptedLen = AES_BLOCK_LEN;
+	CK_BYTE			last_block[AES_BLOCK_LEN];
+
+	if (sign_op) {
+		soft_aes_ctx_sign_verify =
+		    (soft_aes_ctx_t *)session_p->sign.context;
+
+		if (soft_aes_ctx_sign_verify->mac_len == 0) {
+			*pulSignedLen = 0;
+			goto clean_exit;
+		}
+
+		/* Application asks for the length of the output buffer. */
+		if (pSigned == NULL) {
+			*pulSignedLen = soft_aes_ctx_sign_verify->mac_len;
+			return (CKR_OK);
+		}
+
+		/* Is the application-supplied buffer large enough? */
+		if (*pulSignedLen < soft_aes_ctx_sign_verify->mac_len) {
+			*pulSignedLen = soft_aes_ctx_sign_verify->mac_len;
+			return (CKR_BUFFER_TOO_SMALL);
+		}
+	} else {
+		soft_aes_ctx_sign_verify =
+		    (soft_aes_ctx_t *)session_p->verify.context;
+	}
+
+	if (Final) {
+		rv = soft_encrypt_final(session_p, last_block,
+		    &ulEncryptedLen);
+	} else {
+		rv = soft_encrypt(session_p, pData, ulDataLen,
+		    last_block, &ulEncryptedLen);
+	}
+
+	if (rv == CKR_OK) {
+		*pulSignedLen = soft_aes_ctx_sign_verify->mac_len;
+
+		/* the leftmost mac_len bytes of last_block is our MAC */
+		(void) memcpy(pSigned, last_block, *pulSignedLen);
+	}
+
+clean_exit:
+
+	(void) pthread_mutex_lock(&session_p->session_mutex);
+
+	/* soft_encrypt_common() has freed the encrypt context */
+	if (sign_op) {
+		free(session_p->sign.context);
+		session_p->sign.context = NULL;
+	} else {
+		free(session_p->verify.context);
+		session_p->verify.context = NULL;
+	}
+	session_p->encrypt.flags = 0;
+
+	(void) pthread_mutex_unlock(&session_p->session_mutex);
+
+	if (pEncrypted) {
+		free(pEncrypted);
+	}
+
+	return (rv);
+}
+
+/*
+ * Called by soft_sign_update()
+ */
+CK_RV
+soft_aes_mac_sign_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
+    CK_ULONG ulPartLen)
+{
+	CK_BYTE		buf[AES_BLOCK_LEN];
+	CK_ULONG	ulEncryptedLen = AES_BLOCK_LEN;
+	CK_RV		rv;
+
+	rv = soft_encrypt_update(session_p, pPart, ulPartLen,
+	    buf, &ulEncryptedLen);
+
+	return (rv);
 }

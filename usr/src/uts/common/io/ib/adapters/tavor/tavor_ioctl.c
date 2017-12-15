@@ -2137,7 +2137,6 @@ tavor_flash_cfi_init(tavor_state_t *state, uint32_t *cfi_info, int *intel_xcmd)
 	uint32_t	sector_sz_bytes;
 	uint32_t	bit_count;
 	uint8_t		cfi_ch_info[TAVOR_CFI_INFO_SIZE];
-	uint32_t	cfi_dw_info[TAVOR_CFI_INFO_QSIZE];
 	int		i;
 
 	TAVOR_TNF_ENTER(tavor_flash_cfi_init);
@@ -2160,7 +2159,6 @@ tavor_flash_cfi_init(tavor_state_t *state, uint32_t *cfi_info, int *intel_xcmd)
 	/* Read in CFI data */
 	for (i = 0; i < TAVOR_CFI_INFO_SIZE; i += 4) {
 		data = tavor_flash_read(state, i);
-		cfi_dw_info[i >> 2] = data;
 		tavor_flash_cfi_byte(cfi_ch_info, data, i);
 	}
 

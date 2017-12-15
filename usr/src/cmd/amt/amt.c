@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Abstract Machine Test; executes memory access tests to show
  * compliance with Common Criteria object reuse and process address
@@ -234,7 +232,7 @@ probe_data_area()
 {
 	int *p;
 	/* LINTED */
-	volatile int p1;
+	volatile int p1 __unused;
 	void *address;
 
 	/* set handler status */
@@ -658,7 +656,7 @@ probe_hole(int test_type)
 {
 	long i;
 	/* LINTED */
-	volatile unsigned char probe;
+	volatile unsigned char probe __unused;
 	unsigned char *probe_adr;
 	void *address;
 
@@ -707,7 +705,8 @@ handler(int signal)
  */
 
 static int
-memory_type(const char *path) {
+memory_type(const char *path)
+{
 	char *idarray;
 	Elf *elf;
 	int d;

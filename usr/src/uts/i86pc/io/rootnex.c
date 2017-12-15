@@ -819,9 +819,9 @@ static int
 rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
     off_t len, caddr_t *vaddrp)
 {
-	struct regspec *rp, tmp_reg;
+	struct regspec *orp = NULL;
+	struct regspec64 rp = { 0 };
 	ddi_map_req_t mr = *mp;		/* Get private copy of request */
-	int error;
 
 	mp = &mr;
 
@@ -846,10 +846,10 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 	}
 
 	/*
-	 * First, if given an rnumber, convert it to a regspec...
-	 * (Presumably, this is on behalf of a child of the root node?)
+	 * First, we need to get the original regspec out before we convert it
+	 * to the extended format. If we have a register number, then we need to
+	 * convert that to a regspec.
 	 */
-
 	if (mp->map_type == DDI_MT_RNUMBER)  {
 
 		int rnumber = mp->map_obj.rnumber;
@@ -858,22 +858,37 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 		    "rootnex_map: Out of range rnumber <%d>, device <%s>";
 #endif	/* DDI_MAP_DEBUG */
 
-		rp = i_ddi_rnumber_to_regspec(rdip, rnumber);
-		if (rp == NULL)  {
+		orp = i_ddi_rnumber_to_regspec(rdip, rnumber);
+		if (orp == NULL) {
 #ifdef	DDI_MAP_DEBUG
 			cmn_err(CE_WARN, out_of_range, rnumber,
 			    ddi_get_name(rdip));
 #endif	/* DDI_MAP_DEBUG */
 			return (DDI_ME_RNUMBER_RANGE);
 		}
-
-		/*
-		 * Convert the given ddi_map_req_t from rnumber to regspec...
-		 */
-
-		mp->map_type = DDI_MT_REGSPEC;
-		mp->map_obj.rp = rp;
+	} else if (!(mp->map_flags & DDI_MF_EXT_REGSPEC)) {
+		orp = mp->map_obj.rp;
 	}
+
+	/*
+	 * Ensure that we are always using a 64-bit extended regspec regardless
+	 * of what was passed into us. If the child driver is using a 64-bit
+	 * regspec, then we need to make sure that we copy this to the local
+	 * regspec64, rp.
+	 */
+	if (orp != NULL) {
+		rp.regspec_bustype = orp->regspec_bustype;
+		rp.regspec_addr = orp->regspec_addr;
+		rp.regspec_size = orp->regspec_size;
+	} else {
+		struct regspec64 *rp64;
+		rp64 = (struct regspec64 *)mp->map_obj.rp;
+		rp = *rp64;
+	}
+
+	mp->map_type = DDI_MT_REGSPEC;
+	mp->map_flags |= DDI_MF_EXT_REGSPEC;
+	mp->map_obj.rp = (struct regspec *)&rp;
 
 	/*
 	 * Adjust offset and length correspnding to called values...
@@ -881,13 +896,10 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 	 * XXX: (regardless of what's in the parent's range?)
 	 */
 
-	tmp_reg = *(mp->map_obj.rp);		/* Preserve underlying data */
-	rp = mp->map_obj.rp = &tmp_reg;		/* Use tmp_reg in request */
-
 #ifdef	DDI_MAP_DEBUG
 	cmn_err(CE_CONT, "rootnex: <%s,%s> <0x%x, 0x%x, 0x%d> offset %d len %d "
 	    "handle 0x%x\n", ddi_get_name(dip), ddi_get_name(rdip),
-	    rp->regspec_bustype, rp->regspec_addr, rp->regspec_size, offset,
+	    rp.regspec_bustype, rp.regspec_addr, rp.regspec_size, offset,
 	    len, mp->map_handlep);
 #endif	/* DDI_MAP_DEBUG */
 
@@ -899,50 +911,44 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 	 *	<bustype>1, addr=0, len=x>: x86-compatibility i/o
 	 */
 
-	if (rp->regspec_bustype > 1 && rp->regspec_addr != 0) {
+	if (rp.regspec_bustype > 1 && rp.regspec_addr != 0) {
 		cmn_err(CE_WARN, "<%s,%s> invalid register spec"
-		    " <0x%x, 0x%x, 0x%x>", ddi_get_name(dip),
-		    ddi_get_name(rdip), rp->regspec_bustype,
-		    rp->regspec_addr, rp->regspec_size);
+		    " <0x%" PRIx64 ", 0x%" PRIx64 ", 0x%" PRIx64 ">",
+		    ddi_get_name(dip), ddi_get_name(rdip), rp.regspec_bustype,
+		    rp.regspec_addr, rp.regspec_size);
 		return (DDI_ME_INVAL);
 	}
 
-	if (rp->regspec_bustype > 1 && rp->regspec_addr == 0) {
+	if (rp.regspec_bustype > 1 && rp.regspec_addr == 0) {
 		/*
 		 * compatibility i/o mapping
 		 */
-		rp->regspec_bustype += (uint_t)offset;
+		rp.regspec_bustype += offset;
 	} else {
 		/*
 		 * Normal memory or i/o mapping
 		 */
-		rp->regspec_addr += (uint_t)offset;
+		rp.regspec_addr += offset;
 	}
 
 	if (len != 0)
-		rp->regspec_size = (uint_t)len;
+		rp.regspec_size = len;
 
 #ifdef	DDI_MAP_DEBUG
-	cmn_err(CE_CONT, "             <%s,%s> <0x%x, 0x%x, 0x%d> offset %d "
-	    "len %d handle 0x%x\n", ddi_get_name(dip), ddi_get_name(rdip),
-	    rp->regspec_bustype, rp->regspec_addr, rp->regspec_size,
-	    offset, len, mp->map_handlep);
+	cmn_err(CE_CONT, "             <%s,%s> <0x%" PRIx64 ", 0x%" PRIx64
+	    ", 0x%" PRId64 "> offset %d len %d handle 0x%x\n",
+	    ddi_get_name(dip), ddi_get_name(rdip), rp.regspec_bustype,
+	    rp.regspec_addr, rp.regspec_size, offset, len, mp->map_handlep);
 #endif	/* DDI_MAP_DEBUG */
+
 
 	/*
-	 * Apply any parent ranges at this level, if applicable.
-	 * (This is where nexus specific regspec translation takes place.
-	 * Use of this function is implicit agreement that translation is
-	 * provided via ddi_apply_range.)
+	 * The x86 root nexus does not have any notion of valid ranges of
+	 * addresses. Its children have valid ranges, but because there are none
+	 * for the nexus, we don't need to call i_ddi_apply_range().  Verify
+	 * that is the case.
 	 */
-
-#ifdef	DDI_MAP_DEBUG
-	ddi_map_debug("applying range of parent <%s> to child <%s>...\n",
-	    ddi_get_name(dip), ddi_get_name(rdip));
-#endif	/* DDI_MAP_DEBUG */
-
-	if ((error = i_ddi_apply_range(dip, rdip, mp->map_obj.rp)) != 0)
-		return (error);
+	ASSERT0(sparc_pd_getnrng(dip));
 
 	switch (mp->map_op)  {
 	case DDI_MO_MAP_LOCKED:
@@ -1023,23 +1029,20 @@ rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip, struct hat *hat,
 }
 
 
-/*
- * rootnex_map_regspec()
- *     we don't support mapping of I/O cards above 4Gb
- */
 static int
 rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 {
 	rootnex_addr_t rbase;
 	void *cvaddr;
-	uint_t npages, pgoffset;
-	struct regspec *rp;
+	uint64_t npages, pgoffset;
+	struct regspec64 *rp;
 	ddi_acc_hdl_t *hp;
 	ddi_acc_impl_t *ap;
 	uint_t	hat_acc_flags;
 	paddr_t pbase;
 
-	rp = mp->map_obj.rp;
+	ASSERT(mp->map_flags & DDI_MF_EXT_REGSPEC);
+	rp = (struct regspec64 *)mp->map_obj.rp;
 	hp = mp->map_handlep;
 
 #ifdef	DDI_MAP_DEBUG
@@ -1059,8 +1062,8 @@ rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 
 	if (rp->regspec_bustype > 1 && rp->regspec_addr != 0) {
 		cmn_err(CE_WARN, "rootnex: invalid register spec"
-		    " <0x%x, 0x%x, 0x%x>", rp->regspec_bustype,
-		    rp->regspec_addr, rp->regspec_size);
+		    " <0x%" PRIx64 ", 0x%" PRIx64", 0x%" PRIx64">",
+		    rp->regspec_bustype, rp->regspec_addr, rp->regspec_size);
 		return (DDI_FAILURE);
 	}
 
@@ -1209,21 +1212,18 @@ rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 }
 
 
-/*
- * rootnex_unmap_regspec()
- *
- */
 static int
 rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 {
 	caddr_t addr = (caddr_t)*vaddrp;
-	uint_t npages, pgoffset;
-	struct regspec *rp;
+	uint64_t npages, pgoffset;
+	struct regspec64 *rp;
 
 	if (mp->map_flags & DDI_MF_DEVICE_MAPPING)
 		return (0);
 
-	rp = mp->map_obj.rp;
+	ASSERT(mp->map_flags & DDI_MF_EXT_REGSPEC);
+	rp = (struct regspec64 *)mp->map_obj.rp;
 
 	if (rp->regspec_size == 0) {
 #ifdef  DDI_MAP_DEBUG
@@ -1264,21 +1264,16 @@ rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 	return (DDI_SUCCESS);
 }
 
-
-/*
- * rootnex_map_handle()
- *
- */
 static int
 rootnex_map_handle(ddi_map_req_t *mp)
 {
 	rootnex_addr_t rbase;
 	ddi_acc_hdl_t *hp;
-	uint_t pgoffset;
-	struct regspec *rp;
+	uint64_t pgoffset;
+	struct regspec64 *rp;
 	paddr_t pbase;
 
-	rp = mp->map_obj.rp;
+	rp = (struct regspec64 *)mp->map_obj.rp;
 
 #ifdef	DDI_MAP_DEBUG
 	ddi_map_debug(

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCTP_OPT_INFO 3SOCKET "Feb 25, 2005"
+.TH SCTP_OPT_INFO 3SOCKET "Nov 26, 2017"
 .SH NAME
 sctp_opt_info \- examine SCTP level options for an SCTP endpoint
 .SH SYNOPSIS
@@ -210,7 +210,7 @@ struct sctp_status {
 };
 where:
 
-       sstat_assoc_id          Association ID specifed by the caller
+       sstat_assoc_id          Association ID specified by the caller
        sstat_state             Current state of the association
                                which might be one of the following:
 

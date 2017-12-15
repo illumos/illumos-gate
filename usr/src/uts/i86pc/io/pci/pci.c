@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  */
 
 /*
@@ -330,16 +331,17 @@ pci_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 static int
 pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	off_t offset, off_t len, caddr_t *vaddrp)
+    off_t offset, off_t len, caddr_t *vaddrp)
 {
-	struct regspec reg;
+	struct regspec64 reg;
 	ddi_map_req_t mr;
 	ddi_acc_hdl_t *hp;
 	ddi_acc_impl_t *hdlp;
 	pci_regspec_t pci_reg;
 	pci_regspec_t *pci_rp;
 	int 	rnumber;
-	int	length;
+	uint64_t pci_rlength;
+	uint_t	nelems;
 	pci_acc_cfblk_t *cfp;
 	int	space;
 	pci_state_t *pcip;
@@ -378,15 +380,15 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 * make sure that everything is okay.
 		 */
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, rdip,
-		    DDI_PROP_DONTPASS, "reg", (int **)&pci_rp,
-		    (uint_t *)&length) != DDI_PROP_SUCCESS)
+		    DDI_PROP_DONTPASS, "reg", (int **)&pci_rp, &nelems) !=
+		    DDI_PROP_SUCCESS)
 			return (DDI_FAILURE);
 
 		/*
 		 * validate the register number.
 		 */
-		length /= (sizeof (pci_regspec_t) / sizeof (int));
-		if (rnumber >= length) {
+		nelems /= (sizeof (pci_regspec_t) / sizeof (int));
+		if (rnumber >= nelems) {
 			ddi_prop_free(pci_rp);
 			return (DDI_FAILURE);
 		}
@@ -416,14 +418,6 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	 * check for unmap and unlock of address space
 	 */
 	if ((mp->map_op == DDI_MO_UNMAP) || (mp->map_op == DDI_MO_UNLOCK)) {
-		/*
-		 * Adjust offset and length
-		 * A non-zero length means override the one in the regspec.
-		 */
-		pci_rp->pci_phys_low += (uint_t)offset;
-		if (len != 0)
-			pci_rp->pci_size_low = len;
-
 		switch (space) {
 		case PCI_ADDR_CONFIG:
 			/* No work required on unmap of Config space */
@@ -434,13 +428,6 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			break;
 
 		case PCI_ADDR_MEM64:
-			/*
-			 * MEM64 requires special treatment on map, to check
-			 * that the device is below 4G.  On unmap, however,
-			 * we can assume that everything is OK... the map
-			 * must have succeeded.
-			 */
-			/* FALLTHROUGH */
 		case PCI_ADDR_MEM32:
 			reg.regspec_bustype = 0;
 			break;
@@ -448,10 +435,24 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		default:
 			return (DDI_FAILURE);
 		}
-		reg.regspec_addr = pci_rp->pci_phys_low;
-		reg.regspec_size = pci_rp->pci_size_low;
 
-		mp->map_obj.rp = &reg;
+		reg.regspec_addr = (uint64_t)pci_rp->pci_phys_mid << 32 |
+		    (uint64_t)pci_rp->pci_phys_low;
+		reg.regspec_size = (uint64_t)pci_rp->pci_size_hi << 32 |
+		    (uint64_t)pci_rp->pci_size_low;
+
+		/*
+		 * Adjust offset and length
+		 * A non-zero length means override the one in the regspec.
+		 */
+		if (reg.regspec_addr + offset < MAX(reg.regspec_addr, offset))
+			return (DDI_FAILURE);
+		reg.regspec_addr += offset;
+		if (len != 0)
+			reg.regspec_size = len;
+
+		mp->map_obj.rp = (struct regspec *)&reg;
+		mp->map_flags |= DDI_MF_EXT_REGSPEC;
 		return (ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp));
 
 	}
@@ -486,19 +487,12 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	/*
 	 * range check
 	 */
-	if ((offset >= pci_rp->pci_size_low) ||
-	    (len > pci_rp->pci_size_low) ||
-	    (offset + len > pci_rp->pci_size_low)) {
+	pci_rlength = (uint64_t)pci_rp->pci_size_low |
+	    (uint64_t)pci_rp->pci_size_hi << 32;
+	if ((offset >= pci_rlength) || (len > pci_rlength) ||
+	    (offset + len > pci_rlength) || (offset + len < MAX(offset, len))) {
 		return (DDI_FAILURE);
 	}
-
-	/*
-	 * Adjust offset and length
-	 * A non-zero length means override the one in the regspec.
-	 */
-	pci_rp->pci_phys_low += (uint_t)offset;
-	if (len != 0)
-		pci_rp->pci_size_low = len;
 
 	/*
 	 * convert the pci regsec into the generic regspec used by the
@@ -509,27 +503,29 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		reg.regspec_bustype = 1;
 		break;
 	case PCI_ADDR_MEM64:
-		/*
-		 * We can't handle 64-bit devices that are mapped above
-		 * 4G or that are larger than 4G.
-		 */
-		if (pci_rp->pci_phys_mid != 0 ||
-		    pci_rp->pci_size_hi != 0)
-			return (DDI_FAILURE);
-		/*
-		 * Other than that, we can treat them as 32-bit mappings
-		 */
-		/* FALLTHROUGH */
 	case PCI_ADDR_MEM32:
 		reg.regspec_bustype = 0;
 		break;
 	default:
 		return (DDI_FAILURE);
 	}
-	reg.regspec_addr = pci_rp->pci_phys_low;
-	reg.regspec_size = pci_rp->pci_size_low;
 
-	mp->map_obj.rp = &reg;
+	reg.regspec_addr = (uint64_t)pci_rp->pci_phys_mid << 32 |
+	    (uint64_t)pci_rp->pci_phys_low;
+	reg.regspec_size = pci_rlength;
+
+	/*
+	 * Adjust offset and length
+	 * A non-zero length means override the one in the regspec.
+	 */
+	if (reg.regspec_addr + offset < MAX(reg.regspec_addr, offset))
+		return (DDI_FAILURE);
+	reg.regspec_addr += offset;
+	if (len != 0)
+		reg.regspec_size = len;
+
+	mp->map_obj.rp = (struct regspec *)&reg;
+	mp->map_flags |= DDI_MF_EXT_REGSPEC;
 	return (ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp));
 }
 
@@ -537,11 +533,10 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 /*ARGSUSED*/
 static int
 pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 	pci_regspec_t *drv_regp;
 	uint_t	reglen;
-	int	rn;
 	int	totreg;
 	pci_state_t *pcip;
 	struct  attachspec *asp;
@@ -582,12 +577,27 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		if (ctlop == DDI_CTLOPS_NREGS)
 			*(int *)result = totreg;
 		else if (ctlop == DDI_CTLOPS_REGSIZE) {
+			uint64_t val;
+			int rn;
+
 			rn = *(int *)arg;
 			if (rn >= totreg) {
 				ddi_prop_free(drv_regp);
 				return (DDI_FAILURE);
 			}
-			*(off_t *)result = drv_regp[rn].pci_size_low;
+			val = drv_regp[rn].pci_size_low |
+			    (uint64_t)drv_regp[rn].pci_size_hi << 32;
+			if (val > OFF_MAX) {
+				int ce = CE_NOTE;
+#ifdef DEBUG
+				ce = CE_WARN;
+#endif
+				dev_err(rdip, ce, "failed to get register "
+				    "size, value larger than OFF_MAX: 0x%"
+				    PRIx64 "\n", val);
+				return (DDI_FAILURE);
+			}
+			*(off_t *)result = (off_t)val;
 		}
 		ddi_prop_free(drv_regp);
 
@@ -812,7 +822,7 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 static int
 pci_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-	int flags, char *name, caddr_t valuep, int *lengthp)
+    int flags, char *name, caddr_t valuep, int *lengthp)
 {
 	return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip, prop_op, flags,
 	    name, valuep, lengthp));

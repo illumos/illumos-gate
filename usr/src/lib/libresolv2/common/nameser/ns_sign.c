@@ -15,12 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef lint
-static const char rcsid[] = "$Id: ns_sign.c,v 1.6 2006/03/09 23:57:56 marka Exp $";
-#endif
-
-/* Import. */
-
 #include "port_before.h"
 #include "fd_setsize.h"
 

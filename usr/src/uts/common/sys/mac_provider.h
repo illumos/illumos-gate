@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_PROVIDER_H
@@ -106,7 +107,8 @@ typedef enum {
 	MAC_CAPAB_NO_NATIVEVLAN	= 0x00080000, /* boolean only, no data */
 	MAC_CAPAB_NO_ZCOPY	= 0x00100000, /* boolean only, no data */
 	MAC_CAPAB_LEGACY	= 0x00200000, /* data is mac_capab_legacy_t */
-	MAC_CAPAB_VRRP		= 0x00400000  /* data is mac_capab_vrrp_t */
+	MAC_CAPAB_VRRP		= 0x00400000,  /* data is mac_capab_vrrp_t */
+	MAC_CAPAB_TRANSCEIVER	= 0x01000000  /* mac_capab_transciever_t */
 } mac_capab_t;
 
 /*
@@ -432,6 +434,19 @@ typedef struct mac_capab_vrrp_s {
 } mac_capab_vrrp_t;
 
 /*
+ * Transceiver capability
+ */
+typedef struct mac_transceiver_info mac_transceiver_info_t;
+
+typedef struct mac_capab_transceiver {
+	uint_t	mct_flags;
+	uint_t	mct_ntransceivers;
+	int	(*mct_info)(void *, uint_t, mac_transceiver_info_t *);
+	int	(*mct_read)(void *, uint_t, uint_t, void *, size_t, off_t,
+		    size_t *);
+} mac_capab_transceiver_t;
+
+/*
  * MAC registration interface
  */
 typedef struct mac_register_s {
@@ -540,6 +555,13 @@ extern void			mac_hcksum_set(mblk_t *, uint32_t, uint32_t,
 				    uint32_t, uint32_t, uint32_t);
 
 extern void			mac_lso_get(mblk_t *, uint32_t *, uint32_t *);
+
+extern void			mac_transceiver_info_set_present(
+				    mac_transceiver_info_t *,
+				    boolean_t);
+extern void			mac_transceiver_info_set_usable(
+				    mac_transceiver_info_t *,
+				    boolean_t);
 
 #endif	/* _KERNEL */
 

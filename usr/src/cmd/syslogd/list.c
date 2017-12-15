@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pthread.h>
 #include <malloc.h>
 #include <memory.h>
@@ -32,12 +30,14 @@
 #include <poll.h>
 #include <stdio.h>
 #include "llt.h"
+
 void
 ll_init(llh_t *head)
 {
 	head->back = &head->front;
 	head->front = NULL;
 }
+
 void
 ll_enqueue(llh_t *head, ll_t *data)
 {
@@ -45,6 +45,7 @@ ll_enqueue(llh_t *head, ll_t *data)
 	*head->back = data;
 	head->back = &data->n;
 }
+
 /*
  * apply the function func to every element of the ll in sequence.  Can
  * be used to free up the element, so "n" is computed before func is
@@ -62,11 +63,13 @@ ll_mapf(llh_t *head, void (*func)(void *))
 		t = n;
 	}
 }
+
 ll_t *
 ll_peek(llh_t *head)
 {
 	return (head->front);
 }
+
 ll_t *
 ll_dequeue(llh_t *head)
 {
@@ -76,6 +79,7 @@ ll_dequeue(llh_t *head)
 		head->back = &head->front;
 	return (ptr);
 }
+
 ll_t *
 ll_traverse(llh_t *ptr, int (*func)(void *, void *), void *user)
 {
@@ -99,17 +103,22 @@ ll_traverse(llh_t *ptr, int (*func)(void *, void *), void *user)
 	}
 	return (NULL);
 }
+
 /* Make sure the list isn't corrupt and returns number of list items */
 int
 ll_check(llh_t *head)
 {
 	int i = 0;
 	ll_t *ptr = head->front;
+#ifndef NDEBUG
 	ll_t **prev = &head->front;
+#endif
 
 	while (ptr) {
 		i++;
+#ifndef NDEBUG
 		prev = &ptr->n;
+#endif
 		ptr = ptr->n;
 	}
 	assert(head->back == prev);

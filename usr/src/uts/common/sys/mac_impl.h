@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_IMPL_H
@@ -476,6 +476,11 @@ struct mac_impl_s {
 	mac_ring_handle_t	mi_default_tx_ring;
 
 	/*
+	 * Transceiver capabilities. SL protected.
+	 */
+	mac_capab_transceiver_t	mi_transceiver;
+
+	/*
 	 * MAC address list. SL protected.
 	 */
 	mac_address_t		*mi_addresses;
@@ -910,6 +915,19 @@ extern mac_bridge_rx_t mac_bridge_rx_cb;
 extern mac_bridge_ref_t mac_bridge_ref_cb;
 extern mac_bridge_ls_t mac_bridge_ls_cb;
 
+/*
+ * MAC Transceiver related functions
+ */
+struct mac_transceiver_info {
+	boolean_t		mti_present;
+	boolean_t		mti_usable;
+};
+
+extern void mac_transceiver_init(mac_impl_t *);
+extern int mac_transceiver_count(mac_handle_t, uint_t *);
+extern int mac_transceiver_info(mac_handle_t, uint_t, boolean_t *, boolean_t *);
+extern int mac_transceiver_read(mac_handle_t, uint_t, uint_t, void *, size_t,
+    off_t, size_t *);
 
 #ifdef	__cplusplus
 }

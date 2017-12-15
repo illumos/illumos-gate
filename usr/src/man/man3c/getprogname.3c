@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2014, Joyent, Inc.
 .\"
-.Dd "Dec 22, 2014"
+.Dd "Nov 26, 2017"
 .Dt GETPROGNAME 3C
 .Os
 .Sh NAME
@@ -45,7 +45,7 @@ The
 function is used to change the program name to another value.
 The argument
 .Fa progname
-must contain a null terminatd character string, whose last component
+must contain a null terminated character string, whose last component
 which will become the new program name.
 .Sh RETURN VALUES
 The

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -8046,4 +8046,106 @@ mac_check_primary_relocation(mac_client_impl_t *mcip, boolean_t rxhw)
 		return (NULL);
 	}
 	return (mcip);
+}
+
+void
+mac_transceiver_init(mac_impl_t *mip)
+{
+	if (mac_capab_get((mac_handle_t)mip, MAC_CAPAB_TRANSCEIVER,
+	    &mip->mi_transceiver)) {
+		/*
+		 * The driver set a flag that we don't know about. In this case,
+		 * we need to warn about that case and ignore this capability.
+		 */
+		if (mip->mi_transceiver.mct_flags != 0) {
+			dev_err(mip->mi_dip, CE_WARN, "driver set transceiver "
+			    "flags to invalid value: 0x%x, ignoring "
+			    "capability", mip->mi_transceiver.mct_flags);
+			bzero(&mip->mi_transceiver,
+			    sizeof (mac_capab_transceiver_t));
+		}
+	} else {
+			bzero(&mip->mi_transceiver,
+			    sizeof (mac_capab_transceiver_t));
+	}
+}
+
+int
+mac_transceiver_count(mac_handle_t mh, uint_t *countp)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+
+	if (mip->mi_transceiver.mct_ntransceivers == 0)
+		return (ENOTSUP);
+
+	*countp = mip->mi_transceiver.mct_ntransceivers;
+	return (0);
+}
+
+int
+mac_transceiver_info(mac_handle_t mh, uint_t tranid, boolean_t *present,
+    boolean_t *usable)
+{
+	int ret;
+	mac_transceiver_info_t info;
+
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+
+	if (mip->mi_transceiver.mct_info == NULL ||
+	    mip->mi_transceiver.mct_ntransceivers == 0)
+		return (ENOTSUP);
+
+	if (tranid >= mip->mi_transceiver.mct_ntransceivers)
+		return (EINVAL);
+
+	bzero(&info, sizeof (mac_transceiver_info_t));
+	if ((ret = mip->mi_transceiver.mct_info(mip->mi_driver, tranid,
+	    &info)) != 0) {
+		return (ret);
+	}
+
+	*present = info.mti_present;
+	*usable = info.mti_usable;
+	return (0);
+}
+
+int
+mac_transceiver_read(mac_handle_t mh, uint_t tranid, uint_t page, void *buf,
+    size_t nbytes, off_t offset, size_t *nread)
+{
+	int ret;
+	size_t nr;
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+
+	if (mip->mi_transceiver.mct_read == NULL)
+		return (ENOTSUP);
+
+	if (tranid >= mip->mi_transceiver.mct_ntransceivers)
+		return (EINVAL);
+
+	/*
+	 * All supported pages today are 256 bytes wide. Make sure offset +
+	 * nbytes never exceeds that.
+	 */
+	if (offset < 0 || offset >= 256 || nbytes > 256 ||
+	    offset + nbytes > 256)
+		return (EINVAL);
+
+	if (nread == NULL)
+		nread = &nr;
+	ret = mip->mi_transceiver.mct_read(mip->mi_driver, tranid, page, buf,
+	    nbytes, offset, nread);
+	if (ret == 0 && *nread > nbytes) {
+		dev_err(mip->mi_dip, CE_PANIC, "driver wrote %lu bytes into "
+		    "%lu byte sized buffer, possible memory corruption",
+		    *nread, nbytes);
+	}
+
+	return (ret);
 }
