@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRSTAT 1M "Jun 16, 2009"
+.TH INTRSTAT 1M "Dec 10, 2017"
 .SH NAME
 intrstat \- report interrupt statistics
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ intrstat \- report interrupt statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBintrstat\fR utility gathers and displays run-time interrupt statistics.
 The output is a table of device names and CPU IDs, where each row of the table
@@ -50,11 +49,10 @@ while \fBintrstat\fR is running are not displayed.
 .sp
 .LP
 \fBintrstat\fR induces a small system-wide performance degradation. As a
-result, only the super-user can run \fBintrstat\fR by default. The \fISolaris
-Dynamic Tracing Guide\fR explains how administrators can grant privileges to
+result, only the super-user can run \fBintrstat\fR by default. The
+\fIDynamic Tracing Guide\fR explains how administrators can grant privileges to
 other users to permit them to run \fBintrstat\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -110,13 +108,12 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 .sp .6
 .RS 4n
 Enable or modify a DTrace runtime option or D compiler option. The list of
-options is found in the \fISolaris Dynamic Tracing Guide\fR. A boolean option
+options is found in the \fIDynamic Tracing Guide\fR. A boolean option
 is enabled by specifying its name. Options with values are set by separating
 the option name and value with an equal sign (\fB=\fR)
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -182,7 +179,6 @@ example# intrstat
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -201,10 +197,12 @@ Interface Stability	See below.
 .LP
 The command-line syntax is Evolving. The human-readable output is Unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBdtrace\fR(1M), \fBtrapstat\fR(1M), \fBattributes\fR(5), \fBIntro\fR(7),
 \fBddi_driver_name\fR(9F)
 .sp
 .LP
-\fISolaris Dynamic Tracing Guide\fR
+\fIDynamic Tracing Guide\fR:
+.sp
+.LP
+https://illumos.org/books/dtrace/

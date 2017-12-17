@@ -1102,7 +1102,7 @@ nxge_param_get_rxdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 /* ARGSUSED */
 int
 nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
-	p_mblk_t mp, caddr_t cp)
+    p_mblk_t mp, caddr_t cp)
 {
 	uint_t			print_len, buf_len;
 	p_mblk_t		np;
@@ -1214,7 +1214,7 @@ nxge_mk_mblk_tail_space(p_mblk_t mp, p_mblk_t *nmp, size_t size)
 /* ARGSUSED */
 int
 nxge_param_set_generic(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
-			    char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	char *end;
 	uint32_t new_value;
@@ -1235,7 +1235,7 @@ nxge_param_set_generic(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 int
 nxge_param_set_instance(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
-	char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, " ==> nxge_param_set_instance"));
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, " <== nxge_param_set_instance"));
@@ -1246,7 +1246,7 @@ nxge_param_set_instance(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 int
 nxge_param_set_mac(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
-	char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	new_value;
@@ -1277,7 +1277,7 @@ nxge_param_set_mac(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 int
 nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
-	char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	cfg_value;
@@ -1305,7 +1305,7 @@ nxge_param_rx_intr_pkts(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 int
 nxge_param_rx_intr_time(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
-	char *value, caddr_t cp)
+    char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	cfg_value;
@@ -1333,7 +1333,7 @@ nxge_param_rx_intr_time(p_nxge_t nxgep, queue_t *q, mblk_t *mp,
 /* ARGSUSED */
 static int
 nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char			 *end;
 	uint32_t		status = 0, cfg_value;
@@ -1405,7 +1405,7 @@ nxge_param_set_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
-	mblk_t	*mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char			*end;
 	uint32_t		status = 0, cfg_value;
@@ -1525,7 +1525,7 @@ nxge_param_set_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, caddr_t cp)
+    mblk_t *mp, caddr_t cp)
 {
 
 	uint_t 			print_len, buf_len;
@@ -1597,7 +1597,7 @@ nxge_param_get_vlan_rdcgrp(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_get_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, caddr_t cp)
+    mblk_t *mp, caddr_t cp)
 {
 	uint_t			print_len, buf_len;
 	p_mblk_t		np;
@@ -1653,7 +1653,7 @@ nxge_param_get_mac_rdcgrp(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_tcam_enable(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	uint32_t	status = 0, cfg_value;
 	p_nxge_param_t	pa = (p_nxge_param_t)cp;
@@ -1685,7 +1685,7 @@ nxge_param_tcam_enable(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_hash_lookup_enable(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	uint32_t	status = 0, cfg_value;
 	p_nxge_param_t	pa = (p_nxge_param_t)cp;
@@ -1717,7 +1717,7 @@ nxge_param_hash_lookup_enable(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_llc_snap_enable(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status = 0, cfg_value;
@@ -1749,10 +1749,9 @@ nxge_param_llc_snap_enable(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_ether_usr(p_nxge_t nxgep, queue_t *q,
-	mblk_t	*mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
-	uint8_t		ether_class;
 	uint32_t	status = 0, cfg_value;
 	p_nxge_param_t	pa = (p_nxge_param_t)cp;
 	uint8_t		cfg_it = B_FALSE;
@@ -1772,10 +1771,7 @@ nxge_param_set_ether_usr(p_nxge_t nxgep, queue_t *q,
 
 	/* do the actual hw setup  */
 	if (cfg_it == B_TRUE) {
-		ether_class = mi_strtol(pa->name, &end, 10);
-#ifdef lint
-		ether_class = ether_class;
-#endif
+		(void) mi_strtol(pa->name, &end, BASE_DECIMAL);
 		NXGE_DEBUG_MSG((nxgep, NDD_CTL, " nxge_param_set_ether_usr"));
 	}
 
@@ -1786,7 +1782,7 @@ nxge_param_set_ether_usr(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_ip_usr(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	tcam_class_t	class;
@@ -1837,7 +1833,7 @@ nxge_class_name_2value(p_nxge_t nxgep, char *name)
 /* ARGSUSED */
 int
 nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status, cfg_value;
@@ -1883,7 +1879,7 @@ nxge_param_set_ip_opt(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_get_ip_opt(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, caddr_t cp)
+    mblk_t *mp, caddr_t cp)
 {
 	uint32_t status, cfg_value;
 	p_nxge_param_t pa = (p_nxge_param_t)cp;
@@ -1920,7 +1916,7 @@ nxge_param_get_ip_opt(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_fflp_hash_init(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status, cfg_value;
@@ -1979,7 +1975,7 @@ nxge_param_fflp_hash_init(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_grp_rdc(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char			*end;
 	uint32_t		status = 0, cfg_value;
@@ -2040,7 +2036,7 @@ nxge_param_set_grp_rdc(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_port_rdc(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status = B_TRUE, cfg_value;
@@ -2084,7 +2080,7 @@ nxge_param_set_port_rdc(p_nxge_t nxgep, queue_t *q,
 /* ARGSUSED */
 static int
 nxge_param_set_nxge_debug_flag(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char *end;
 	uint32_t status = 0;
@@ -2137,7 +2133,7 @@ nxge_param_get_debug_flag(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 /* ARGSUSED */
 static int
 nxge_param_set_npi_debug_flag(p_nxge_t nxgep, queue_t *q,
-	mblk_t *mp, char *value, caddr_t cp)
+    mblk_t *mp, char *value, caddr_t cp)
 {
 	char		*end;
 	uint32_t	status = 0;
@@ -2454,7 +2450,7 @@ nxge_get_default(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t data)
 /* ARGSUSED */
 int
 nxge_set_default(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, char *value,
-	caddr_t data)
+    caddr_t data)
 {
 	return (EACCES);
 }

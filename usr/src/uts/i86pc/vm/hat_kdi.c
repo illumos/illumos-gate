@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * HAT interfaces used by the kernel debugger to interact with the VM system.
  * These interfaces are invoked when the world is stopped.  As such, no blocking
@@ -79,7 +77,7 @@ void
 hat_kdi_init(void)
 {
 	/*LINTED:set but not used in function*/
-	htable_t *ht;
+	htable_t *ht __unused;
 
 	/*
 	 * Get an kernel page VA to use for phys mem access. Then make sure

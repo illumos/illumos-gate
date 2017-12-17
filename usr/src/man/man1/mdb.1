@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MDB 1 "May 13, 2017"
+.TH MDB 1 "Dec 9, 2017"
 .SH NAME
 mdb \- modular debugger
 .SH SYNOPSIS
@@ -21,7 +21,7 @@ mdb \- modular debugger
 The \fBmdb\fR utility is an extensible utility for low-level debugging and
 editing of the live operating system, operating system crash dumps, user
 processes, user process core dumps, and object files. For a more detailed
-description of \fBmdb\fR features, refer to the manual, \fISolaris Modular
+description of \fBmdb\fR features, refer to the \fIModular
 Debugger Guide\fR.
 .sp
 .LP
@@ -64,7 +64,7 @@ executes the corresponding dcmds. Each dcmd can also accept a list of string or
 numerical arguments, as shown in the syntax description below. \fBmdb\fR
 contains a set of built-in dcmds, described below, that are always available.
 You can also extend the capabilities of \fBmdb\fR itself by writing your own
-dcmds, as described in the \fISolaris Modular Debugger Guide\fR.
+dcmds, as described in the \fIModular Debugger Guide\fR.
 .sp
 .LP
 A \fIwalker\fR is a set of routines that describe how to walk, or iterate,
@@ -79,16 +79,16 @@ A debugger module, or \fIdmod\fR (pronounced dee-mod), is a dynamically loaded
 library containing a set of dcmds and walkers. During initialization, \fBmdb\fR
 attempts to load dmods corresponding to the load objects present in the target.
 You can subsequently load or unload dmods at any time while running \fBmdb\fR.
-\fBmdb\fR ships with a set of standard dmods for debugging the Solaris kernel.
-The \fISolaris Modular Debugger Guide\fR contains more information on
+\fBmdb\fR ships with a set of standard dmods for debugging the kernel.
+The \fIModular Debugger Guide\fR contains more information on
 developing your own debugger modules.
 .sp
 .LP
 A \fImacro file\fR is a text file containing a set of commands to execute.
 Macro files are typically used to automate the process of displaying a simple
 data structure. \fBmdb\fR provides complete backward compatibility for the
-execution of macro files written for \fBadb\fR(1), and the Solaris installation
-includes a set of macro files for debugging the Solaris kernel that can be used
+execution of macro files written for \fBadb\fR(1), and illumos
+includes a set of macro files for debugging the kernel that can be used
 with either tool.
 .SS "Syntax"
 .LP
@@ -726,7 +726,7 @@ in the target's virtual address space. A target can support multiple symbol
 tables including, but not limited to, a primary executable symbol table, a
 primary dynamic symbol table, a run-time link-editor symbol table, and standard
 and dynamic symbol tables for each of a number of load objects (such as shared
-libraries in a user process, or kernel modules in the Solaris kernel). The
+libraries in a user process, or kernel modules in the kernel). The
 target typically searches the primary executable's symbol tables first, and
 then one or more of the other symbol tables. Notice that \fBELF\fR symbol
 tables only contain entries for external, global, and static symbols; automatic
@@ -1551,9 +1551,9 @@ to the corresponding named variable.
 .sp
 .LP
 The \fBmdb\fR kernel target exports the virtual address of the corresponding
-internal thread structure as the identifier for a given thread. The \fISolaris
-Modular Debugger Guide\fR provides more information on debugging support for
-threads in the Solaris kernel. The \fBmdb\fR process target provides proper
+internal thread structure as the identifier for a given thread. The \fIModular
+Debugger Guide\fR provides more information on debugging support for
+threads in the kernel. The \fBmdb\fR process target provides proper
 support for examination of multi-threaded user processes that use the native
 \fBlwp_*\fR interfaces, \fB/usr/lib/libthread.so\fR or
 \fB/usr/lib/lwp/libthread.so\fR. When debugging a live user process, \fBmdb\fR
@@ -3663,7 +3663,7 @@ List the external data buffers exported by the current target. External data
 buffers represent information associated with the target that can not be
 accessed through standard target facilities (that is, an address space, symbol
 table, or register set). These buffers can be consumed by dcmds; for more
-information, refer to the \fISolaris Modular Debugger Guide\fR.
+information, refer to the \fIModular Debugger Guide\fR.
 .RE
 
 .sp
@@ -4410,7 +4410,7 @@ Interface Stability	Evolving
 
 .SH SEE ALSO
 .LP
-\fBadb\fR(1), \fBcmdtool\fR(1), \fBgcore\fR(1), \fBproc\fR(1), \fBpgrep\fR(1),
+\fBadb\fR(1), \fBgcore\fR(1), \fBproc\fR(1), \fBpgrep\fR(1),
 \fBps\fR(1), \fBstty\fR(1), \fBtruss\fR(1), \fBuname\fR(1), \fBcoreadm\fR(1M),
 \fBdumpadm\fR(1M), \fBlargefile\fR(5), \fBsavecore\fR(1M), \fBexec\fR(2),
 \fBfork\fR(2), \fB_lwp_self\fR(2), \fBpipe\fR(2), \fBvfork\fR(2),
@@ -4423,7 +4423,10 @@ Interface Stability	Evolving
 \fILinker and Libraries Guide\fR
 .sp
 .LP
-\fISolaris Modular Debugger Guide\fR
+\fIModular Debugger Guide\fR:
+.sp
+.LP
+https://illumos.org/books/mdb/
 .SH WARNINGS
 .SS "Use of the Error Recovery Mechanism"
 .LP
@@ -4455,8 +4458,8 @@ Solaris 9, text sections and read-only data are included in core files by
 default. Users can configure their processes to exclude that information from
 core files using \fBcoreadm\fR(1M). Thus, the information presented by
 \fBmdb\fR for those core files can not match the data that was present at the
-time the process dumped core. Core files from Solaris x86 systems can not be
-examined on Solaris SPARC systems, and vice-versa.
+time the process dumped core. Core files from x86 systems can not be
+examined on SPARC systems, and vice-versa.
 .SS "Limitations on Examining Crash Dump Files"
 .LP
 Crash dumps from Solaris 7 and earlier releases can only be examined with the
@@ -4464,8 +4467,8 @@ aid of the libkvm from the corresponding operating system release. If a crash
 dump from one operating system release is examined using the dmods from a
 different operating system release, changes in the kernel implementation can
 prevent some dcmds or walkers from working properly. \fBmdb\fR issues a warning
-message if it detects this condition. Crash dumps from Solaris x86 systems can
-not be examined on Solaris SPARC systems, and vice-versa.
+message if it detects this condition. Crash dumps from x86 systems can
+not be examined on SPARC systems, and vice-versa.
 .SS "Relationship Between 32-bit and 64-bit Debugger"
 .LP
 \fBmdb\fR provides support for debugging both 32-bit and 64-bit programs. Once
@@ -4552,10 +4555,10 @@ left stopped and abandoned using the \fB::release\fR \fB-a\fR option.
 The \fB::list\fR, \fB::offsetof\fR, \fB::print\fR, and \fB::sizeof\fR dcmds
 require that one or more load objects contain compressed symbolic debugging
 information suitable for use with \fBmdb\fR. This information is currently only
-available for certain Solaris kernel modules.
+available for certain kernel modules.
 .SS "Developer Information"
 .LP
-The \fISolaris Modular Debugger Guide\fR provides a more detailed description
+The \fIModular Debugger Guide\fR provides a more detailed description
 of \fBmdb\fR features, as well as information for debugger module developers.
 .sp
 .LP

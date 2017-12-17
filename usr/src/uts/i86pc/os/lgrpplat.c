@@ -3628,7 +3628,7 @@ opt_probe_vendor(int dest_node, int nreads)
 	int		cnt;
 	uint_t		dev;
 	/* LINTED: set but not used in function */
-	volatile uint_t	dev_vendor;
+	volatile uint_t	dev_vendor __unused;
 	hrtime_t	elapsed;
 	hrtime_t	end;
 	int		ipl;

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DTRACE 1M "Aug 4, 2009"
+.TH DTRACE 1M "Dec 10, 2017"
 .SH NAME
 dtrace \- DTrace dynamic tracing compiler and tracing utility
 .SH SYNOPSIS
@@ -21,15 +21,14 @@ dtrace \- DTrace dynamic tracing compiler and tracing utility
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
-DTrace is a comprehensive dynamic tracing framework for the Solaris Operating
-System. DTrace provides a powerful infrastructure that permits administrators,
+DTrace is a comprehensive dynamic tracing framework.
+DTrace provides a powerful infrastructure that permits administrators,
 developers, and service personnel to concisely answer arbitrary questions about
 the behavior of the operating system and user programs.
 .sp
 .LP
-The \fISolaris Dynamic Tracing Guide\fR describes how to use DTrace to observe,
+The \fIDynamic Tracing Guide\fR describes how to use DTrace to observe,
 debug, and tune system behavior. Refer to this book for a detailed description
 of DTrace features, including the bundled DTrace observability tools,
 instrumentation providers, and the D programming language.
@@ -82,10 +81,9 @@ You can use \fBdtrace\fR to create D scripts by using it in a \fB#!\fR
 declaration to create an interpreter file. You can also use \fBdtrace\fR to
 attempt to compile D programs and determine their properties without actually
 enabling tracing using the \fB-e\fR option. See \fBOPTIONS\fR. See the
-\fISolaris Dynamic Tracing Guide\fR for detailed examples of how to use the
+\fIDynamic Tracing Guide\fR for detailed examples of how to use the
 \fBdtrace\fR utility to perform these tasks.
 .SH OPTIONS
-.sp
 .LP
 The arguments accepted by the \fB-P\fR, \fB-m\fR, \fB-f\fR, \fB-n\fR, and
 \fB-i\fR options can include an optional D language \fIpredicate\fR enclosed in
@@ -125,7 +123,7 @@ format (ELF32 or ELF64) produced by the \fB-G\fR option.
 Claim anonymous tracing state and display the traced data. You can combine the
 \fB-a\fR option with the \fB-e\fR option to force \fBdtrace\fR to exit
 immediately after consuming the anonymous tracing state rather than continuing
-to wait for new data. See the \fISolaris Dynamic Tracing Guide\fR for more
+to wait for new data. See the \fIDynamic Tracing Guide\fR for more
 information about anonymous tracing.
 .RE
 
@@ -169,7 +167,7 @@ one \fB-c\fR option is present on the command line, \fBdtrace\fR exits when all
 commands have exited, reporting the exit status for each child process as it
 terminates. The process-ID of the first command is made available to any D
 programs specified on the command line or using the \fB-s\fR option through the
-\fB$target\fR macro variable. Refer to the \fISolaris Dynamic Tracing Guide\fR
+\fB$target\fR macro variable. Refer to the \fIDynamic Tracing Guide\fR
 for more information on macro variables.
 .RE
 
@@ -393,7 +391,7 @@ specified on the command line at a time.
 .ad
 .sp .6
 .RS 4n
-Specify the \fIoutput\fR file for the \fB-A\fR , \fB-G\fR,  \fB-h\fR, and
+Specify the \fIoutput\fR file for the \fB-A\fR, \fB-G\fR, \fB-h\fR, and
 \fB-l\fR options, or for the traced data itself. If the \fB-A\fR option is
 present and \fB-o\fR is not present, the default output file is
 \fB/kernel/drv/dtrace.conf\fR. If the \fB-G\fR option is present and the
@@ -414,8 +412,8 @@ its completion. If more than one \fB-p\fR option is present on the command
 line, \fBdtrace\fR exits when all commands have exited, reporting the exit
 status for each process as it terminates. The first process-ID is made
 available to any D programs specified on the command line or using the \fB-s\fR
-option through the \fB$target\fR macro variable. Refer to the \fISolaris
-Dynamic Tracing Guide\fR for more information on macro variables.
+option through the \fB$target\fR macro variable. Refer to the \fIDynamic
+Tracing Guide\fR for more information on macro variables.
 .RE
 
 .sp
@@ -494,7 +492,7 @@ invocation.
 Set verbose mode. If the \fB-v\fR option is specified, \fBdtrace\fR produces a
 program stability report showing the minimum interface stability and dependency
 level for the specified D programs. DTrace stability levels are explained in
-further detail in the \fISolaris Dynamic Tracing Guide\fR.
+further detail in the \fIDynamic Tracing Guide\fR.
 .RE
 
 .sp
@@ -506,7 +504,7 @@ further detail in the \fISolaris Dynamic Tracing Guide\fR.
 .RS 4n
 Report the highest D programming interface version supported by \fBdtrace\fR.
 The version information is printed to \fBstdout\fR and the \fBdtrace\fR command
-exits. Refer to the \fISolaris Dynamic Tracing Guide\fR for more information
+exits. Refer to the \fIDynamic Tracing Guide\fR for more information
 about DTrace versioning features.
 .RE
 
@@ -531,7 +529,7 @@ enabling of a D program that contains destructive actions.
 .sp .6
 .RS 4n
 Enable or modify a DTrace runtime option or D compiler option. The list of
-options is found in the \fISolaris Dynamic Tracing Guide\fR. Boolean options
+options is found in the \fIDynamic Tracing Guide\fR. Boolean options
 are enabled by specifying their name. Options with values are set by separating
 the option name and value with an equals sign (\fB=\fR).
 .RE
@@ -662,7 +660,7 @@ definitions are always specified and valid in all modes:
 .sp
 Where \fIMM\fR is the major release value in hexadecimal, \fImmm\fR is the
 minor release value in hexadecimal, and \fIuuu\fR is the micro release value in
-hexadecimal. Refer to the \fISolaris Dynamic Tracing Guide\fR for more
+hexadecimal. Refer to the \fIDynamic Tracing Guide\fR for more
 information about DTrace versioning.
 .RE
 .RE
@@ -682,15 +680,13 @@ descriptions that do not match any known probes.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 You can specify zero or more additional arguments on the \fBdtrace\fR command
 line to define a set of macro variables (\fB$1\fR, \fB$2\fR, and so forth). The
 additional arguments can be used in D programs specified using the \fB-s\fR
 option or on the command line. The use of macro variables is described further
-in the \fISolaris Dynamic Tracing Guide\fR.
+in the \fIDynamic Tracing Guide\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -729,7 +725,6 @@ Invalid command line options or arguments were specified.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -748,19 +743,21 @@ Interface Stability	See below.
 .LP
 The command-line syntax is Committed. The human-readable output is Uncommitted.
 .SH SEE ALSO
-.sp
 .LP
 \fBcpp\fR(1), \fBisainfo\fR(1), \fBssh\fR(1), \fBlibdtrace\fR(3LIB),
 \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBdtrace\fR(7D)
 .sp
 .LP
-\fISolaris Dynamic Tracing Guide\fR
-.SH USAGE
+\fIDynamic Tracing Guide\fR:
 .sp
+.LP
+https://illumos.org/books/dtrace/
+
+.SH NOTES
 .LP
 When using the \fB-p\fR flag, \fBdtrace\fR stops the target processes while it
 is inspecting them and reporting results. A process can do nothing while it is
-stopped. This means that, if , for example, the X server is inspected by
+stopped. This means that, if, for example, the X server is inspected by
 \fBdtrace\fR running in a window under the X server's control, the whole window
 system can become deadlocked, because the \fBproc\fR tool would be attempting
 to display its results to a window that cannot be refreshed. In such a case,

@@ -76,7 +76,7 @@ __hal_ring_rxdblock_link(xge_hal_mempool_h mempoolh,
 			 xge_hal_ring_t *ring, int from, int to)
 {
 	xge_hal_ring_block_t *to_item, *from_item;
-	dma_addr_t to_dma, from_dma;
+	dma_addr_t to_dma, from_dma __unused;
 	pci_dma_h to_dma_handle, from_dma_handle;
 
 	/* get "from" RxD block */

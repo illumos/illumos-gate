@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KMDB 1 "May 3, 2007"
+.TH KMDB 1 "Dec 9, 2017"
 .SH NAME
 kmdb \- in situ kernel debugger
 .SH SYNOPSIS
 .SS "Boot-time Loading"
-.sp
 .LP
 SPARC
 .LP
@@ -36,7 +35,6 @@ x86
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBkmdb\fR is an interactive kernel debugger which implements the user
 interface and functionality of \fBmdb\fR(1) in a live kernel context.
@@ -49,9 +47,8 @@ This man page describes the features and functionality that are unique to
 \fBkmdb\fR or different in \fBkmdb\fR as compared to \fBmdb\fR(1). For more
 information on \fBmdb\fR(1) or further details on the features and
 functionality implemented by \fBkmdb\fR, see the \fBmdb\fR(1) man page and the
-\fISolaris Modular Debugger Guide\fR.
+\fIModular Debugger Guide\fR.
 .SS "Loading and Unloading"
-.sp
 .ne 2
 .na
 \fBBoot-time Loading\fR
@@ -107,7 +104,6 @@ the value of the \fBTERM\fR environment variable unless overridden by the
 .RE
 
 .SS "Debugger Entry"
-.sp
 .LP
 Debugger entry can be requested explicitly or implicitly. Implicit entry,
 encountered when breakpoints or other execution control features are used, is
@@ -147,7 +143,6 @@ set nopanicdebug = 1
 This can be useful if you want to keep \fBkmdb\fR loaded, but always want a
 panic to trigger a crash dump without entering the debugger.
 .SS "Execution Control"
-.sp
 .LP
 For the most part, the execution control facilities provided by \fBkmdb\fR for
 the kernel mirror those provided by the \fBmdb\fR(1) process target.
@@ -161,7 +156,6 @@ size, and type of watchpoints allowed. The \fB::wp\fR command does not allow a
 watchpoint to be created if it is incompatible with the watchpoints supported
 by the hardware.
 .SS "Debugger modules (dmods)"
-.sp
 .LP
 As with \fBmdb\fR(1), \fBkmdb\fR is installed with a number of
 subsystem-specific debugger modules, or dmods. The dmods are loaded and
@@ -176,7 +170,6 @@ is complete, the system is stopped and the debugger is automatically
 re-entered. For a dmod load, processing is completed when the load of a
 requested dmod succeeds or fails. Status messages are provided in either case.
 .SS "Processor-specific functionality"
-.sp
 .LP
 Some functionality is specific to an individual processor type. An example of
 such functionality is the branch tracing provided by various x86 processors.
@@ -188,14 +181,12 @@ Even though the debugger might provide support for a given processor type, the
 support is not exposed until the kernel has progressed to the point at which
 processor identification has completed.
 .SS "Kernel Macros"
-.sp
 .LP
 The debugger provides access to a set of macros that are precompiled into the
 debugger. Only the precompiled macros are available . Unlike with \fBmdb\fR(1),
 the \fB$< dcmd\fR may not be used to load macros from arbitrary locations. Use
 the \fB$M\fR command to list the available macros.
 .SS "Built-in dcmds"
-.sp
 .LP
 This section lists dcmds that are unique to \fBkmdb\fR or those with behavior
 that differs in \fBkmdb\fR as compared to \fBmdb\fR(1).
@@ -438,7 +429,6 @@ callback string. If the string contains meta-characters, it must be quoted.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -454,20 +444,17 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBmdb\fR(1), \fBboot\fR(1M), \fBdumpadm\fR(1M), \fBkernel\fR(1M),
+\fBkbd\fR(1), \fBmdb\fR(1), \fBboot\fR(1M), \fBdumpadm\fR(1M), \fBkernel\fR(1M),
 \fBsystem\fR(4), \fBattributes\fR(5)
 .sp
 .LP
-\fISolaris Modular Debugger Guide\fR
-.SS "SPARC Only"
+\fIModular Debugger Guide\fR:
 .sp
 .LP
-\fBkbd\fR(1)
+https://illumos.org/books/mdb/
 .SH NOTES
 .SS "Limitations on Memory Available to the Debugger"
-.sp
 .LP
 The memory region available to the debugger is allocated when the debugger is
 loaded, and is fixed at that point. If dcmds attempt to allocate more memory
@@ -476,7 +463,6 @@ attempt to recover gracefully from an out-of-memory situation, but may be
 unable to, and may be forced to terminate the system. This constraint is
 especially acute on 32-bit x86 systems.
 .SS "Performance Impact"
-.sp
 .LP
 System performance will be negatively impacted by the loading of \fBkmdb\fR, as
 the debugger will consume kernel memory and other limited system resources.
