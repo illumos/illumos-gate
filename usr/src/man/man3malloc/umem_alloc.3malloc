@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UMEM_ALLOC 3MALLOC "Mar 24, 2008"
+.TH UMEM_ALLOC 3MALLOC "Dec 9, 2017"
 .SH NAME
 umem_alloc, umem_zalloc, umem_free, umem_nofail_callback \- fast, scalable
 memory allocation
@@ -63,7 +63,6 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary \&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBumem_alloc()\fR function returns a pointer to a block of \fIsize\fR
 bytes suitably aligned for any variable type. The initial contents of memory
@@ -109,8 +108,8 @@ callback with \fBUMEM_CALLBACK_EXIT\fR(\fIstatus\fR), one will call
 .ie t \(bu
 .el o
 invoking a context-changing function (\fBsetcontext\fR(2)) or a non-local jump
-(\fBlongjmp\fR(3C) or \fBsiglongjmp\fR(3C), or ending the current thread of
-control (\fBthr_exit\fR(3C) or \fBpthread_exit\fR(3C). The application is
+(\fBlongjmp\fR(3C) or \fBsiglongjmp\fR(3C)), or ending the current thread of
+control (\fBthr_exit\fR(3C) or \fBpthread_exit\fR(3C)). The application is
 responsible for any necessary cleanup. The state of \fBlibumem\fR remains
 consistent.
 .RE
@@ -147,7 +146,6 @@ The \fBmalloc()\fR, \fBcalloc()\fR, \fBfree()\fR, \fBmemalign()\fR,
 \fBmalloc\fR(3C). The \fBlibumem\fR library provides these functions for
 backwards-compatibility with the standard functions.
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBumem_debug\fR(3MALLOC) for environment variables that effect the
 debugging features of the \fBlibumem\fR library.
@@ -350,7 +348,6 @@ if (status == NULL) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -374,7 +371,6 @@ Standard	See below.
 For \fBmalloc()\fR, \fBcalloc()\fR, \fBfree()\fR, \fBrealloc()\fR, and
 \fBvalloc()\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
 \fBexit\fR(2), \fBmmap\fR(2), \fBsbrk\fR(2), \fBbsdmalloc\fR(3MALLOC),
 \fBlibumem\fR(3LIB), \fBlongjmp\fR(3C), \fBmalloc\fR(3C),
@@ -384,9 +380,11 @@ For \fBmalloc()\fR, \fBcalloc()\fR, \fBfree()\fR, \fBrealloc()\fR, and
 \fBstandards\fR(5)
 .sp
 .LP
-\fISolaris Modular Debugger Guide\fR
-.SH WARNINGS
+\fIModular Debugger Guide\fR:
 .sp
+.LP
+https://illumos.org/books/mdb/
+.SH WARNINGS
 .LP
 Any of the following can cause undefined results:
 .RS +4
@@ -421,7 +419,6 @@ Performing \fBUMEM_NOFAIL\fR allocations from an \fBatexit\fR(3C) handler.
 If the \fBUMEM_NOFAIL\fR callback performs \fBUMEM_NOFAIL\fR allocations,
 infinite recursion can occur.
 .SH NOTES
-.sp
 .LP
 The following list compares the features of the \fBmalloc\fR(3C),
 \fBbsdmalloc\fR(3MALLOC), \fBmalloc\fR(3MALLOC), \fBmtmalloc\fR(3MALLOC) , and

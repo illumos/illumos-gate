@@ -2346,6 +2346,7 @@ file path=opt/zfs-tests/tests/functional/slog/slog_011_neg mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_012_neg mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_013_pos mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_014_pos mode=0555
+file path=opt/zfs-tests/tests/functional/slog/slog_015_neg mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/clone_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/deadlist_lock mode=0555
