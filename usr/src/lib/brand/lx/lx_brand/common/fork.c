@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <errno.h>
@@ -124,7 +124,7 @@ lx_vfork(void)
 	 * the comments in lx_clone for more detail.
 	 */
 
-	_sigoff();
+	lx_block_all_signals();
 	lx_stack_prefork();
 	lx_sighandlers_save(&saved);
 	lx_tsd->lxtsd_is_vforked++;
@@ -138,7 +138,7 @@ lx_vfork(void)
 	switch (ret) {
 	case -1:
 		lx_stack_postfork();
-		_sigon();
+		lx_unblock_all_signals();
 		return (-errno);
 
 	case 0:
@@ -158,6 +158,8 @@ lx_vfork(void)
 		lx_debug("\tvfork native stack sp %p",
 		    vforkuc.uc_brand_data[1]);
 
+		lx_unblock_all_signals();
+
 		/* Stop for ptrace if required. */
 		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_TRUE, 0,
 		    NULL);
@@ -176,9 +178,9 @@ lx_vfork(void)
 	default:
 		/* parent - child should have exited or exec-ed by now */
 		lx_stack_postfork();
+		lx_unblock_all_signals();
 		lx_ptrace_stop_if_option(LX_PTRACE_O_TRACEVFORK, B_FALSE,
 		    (ulong_t)ret, NULL);
-		_sigon();
 		return (ret);
 	}
 }

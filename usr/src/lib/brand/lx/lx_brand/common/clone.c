@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -391,8 +391,23 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 		/*
 		 * Suspend signal delivery, run the stack management prefork
 		 * handler and perform the actual fork(2) operation.
+		 *
+		 * During vfork, Linux will not deliver any signals to any
+		 * thread in the parent. Some applications (e.g. Go) depend on
+		 * this. For example, we must prevent the following sequence:
+		 * 1) Parent with many threads, one thread calls vfork
+		 * 2) vforked child resets all signal handlers
+		 * 3) a different child of the parent exits and SIGCHLD is sent
+		 *    to parent before the vforked child execs/exits
+		 * The parent cannot receive the SIGCHLD until afer we repair
+		 * the parent's signal handlers in lx_sighandlers_restore, once
+		 * the parent resumes after the vfork.
 		 */
-		_sigoff();
+		if (flags & LX_CLONE_VFORK) {
+			lx_block_all_signals();
+		} else {
+			_sigoff();
+		}
 		lx_stack_prefork();
 		if (flags & LX_CLONE_VFORK) {
 			lx_sighandlers_t saved;
@@ -444,15 +459,19 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 				(void) uucopy(&rval, ptidp, sizeof (int));
 			}
 
+			/*
+			 * Re-enable signal delivery in the parent process.
+			 */
+			if (flags & LX_CLONE_VFORK) {
+				lx_unblock_all_signals();
+			} else {
+				_sigon();
+			}
+
 			if (rval > 0) {
 				lx_ptrace_stop_if_option(ptrace_event, B_FALSE,
 				    (ulong_t)rval, NULL);
 			}
-
-			/*
-			 * Re-enable signal delivery in the parent process.
-			 */
-			_sigon();
 
 			return ((rval < 0) ? -errno : rval);
 		}
@@ -562,14 +581,18 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 		}
 
 		/*
+		 * Re-enable signal delivery in the child process.
+		 */
+		if (flags & LX_CLONE_VFORK) {
+			lx_unblock_all_signals();
+		} else {
+			_sigon();
+		}
+
+		/*
 		 * Stop for ptrace if required.
 		 */
 		lx_ptrace_stop_if_option(ptrace_event, B_TRUE, 0, NULL);
-
-		/*
-		 * Re-enable signal delivery in the child process.
-		 */
-		_sigon();
 
 		/*
 		 * The child process returns via the regular emulated system

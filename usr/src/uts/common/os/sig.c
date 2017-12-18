@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2017, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -640,17 +640,24 @@ issig_forreal(void)
 		}
 
 		/*
+		 * The brand hook name 'b_issig_stop' is a misnomer.
 		 * Allow the brand the chance to alter (or suppress) delivery
 		 * of this signal.
 		 */
 		if (PROC_IS_BRANDED(p) && BROP(p)->b_issig_stop != NULL) {
+			int r;
+
 			/*
 			 * The brand hook will return 0 if it would like
-			 * us to drive on, or -1 if we should restart
-			 * the loop to check other conditions.
+			 * us to drive on, -1 if we should restart
+			 * the loop to check other conditions, or 1 if we
+			 * should terminate the loop.
 			 */
-			if (BROP(p)->b_issig_stop(p, lwp) != 0) {
+			r = BROP(p)->b_issig_stop(p, lwp);
+			if (r < 0) {
 				continue;
+			} else if (r > 0) {
+				break;
 			}
 		}
 

@@ -94,8 +94,8 @@ extern "C" {
 #define	B_GET_CURRENT_CONTEXT	129
 #define	B_EMULATION_DONE	130
 #define	B_START_NFS_LOCKD	131
-/* formerly B_SET_AFFINITY_MASK	132 */
-/* formerly B_GET_AFFINITY_MASK	133 */
+#define	B_BLOCK_ALL_SIGS	132
+#define	B_UNBLOCK_ALL_SIGS	133
 #define	B_PTRACE_CLONE_BEGIN	134
 #define	B_PTRACE_STOP_FOR_OPT	135
 #define	B_UNSUPPORTED		136
@@ -362,6 +362,9 @@ typedef struct lx_proc_data {
 	kmutex_t l_remap_anoncache_lock;
 	uint64_t l_remap_anoncache_generation;
 	lx_segmap_t l_remap_anoncache[LX_REMAP_ANONCACHE_NENTRIES];
+
+	/* Block all signals to all threads; used during vfork */
+	uint_t	 l_block_all_signals;
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */

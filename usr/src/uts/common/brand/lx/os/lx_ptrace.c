@@ -1644,6 +1644,14 @@ lx_ptrace_stop(ushort_t what)
 	return (lx_ptrace_stop_common(p, lwpd, what));
 }
 
+/*
+ * In addition to performing the ptrace sig_stop handling, this function is
+ * also used to block signal from being delivered.
+ *
+ * Return 0 if issig_forreal() should continue on, -1 if issig_forreal should
+ * recheck after we've made changes, or 1 if issig_forreal should stop checking
+ * signals.
+ */
 int
 lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 {
@@ -1651,6 +1659,9 @@ lx_ptrace_issig_stop(proc_t *p, klwp_t *lwp)
 	int lx_sig;
 
 	VERIFY(MUTEX_HELD(&p->p_lock));
+
+	if (ptolxproc(p)->l_block_all_signals != 0)
+		return (1);
 
 	/*
 	 * In very rare circumstances, a process which is almost completely

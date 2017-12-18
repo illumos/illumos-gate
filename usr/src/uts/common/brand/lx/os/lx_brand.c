@@ -1870,6 +1870,27 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		(void) lx_start_nfs_lockd();
 		return (0);
 
+	case B_BLOCK_ALL_SIGS:
+		mutex_enter(&p->p_lock);
+		pd = ptolxproc(p);
+		pd->l_block_all_signals++;
+		mutex_exit(&p->p_lock);
+		return (0);
+
+	case B_UNBLOCK_ALL_SIGS: {
+		uint_t result;
+
+		mutex_enter(&p->p_lock);
+		pd = ptolxproc(p);
+		if (pd->l_block_all_signals == 0) {
+			result = set_errno(EINVAL);
+		} else {
+			pd->l_block_all_signals--;
+			result = 0;
+		}
+		mutex_exit(&p->p_lock);
+		return (result);
+	}
 	}
 
 	return (EINVAL);
