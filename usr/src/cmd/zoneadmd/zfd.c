@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*
@@ -934,7 +934,8 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
 				errno = 0;
 				cc = read(stdoutfd, ibuf, BUFSIZ);
-				if (cc <= 0 && (errno != EINTR) &&
+				/* zfd is a stream, so ignore 0 length read */
+				if (cc < 0 && (errno != EINTR) &&
 				    (errno != EAGAIN))
 					break;
 				if (cc > 0) {
@@ -962,7 +963,8 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
 				errno = 0;
 				cc = read(stderrfd, ibuf, BUFSIZ);
-				if (cc <= 0 && (errno != EINTR) &&
+				/* zfd is a stream, so ignore 0 length read */
+				if (cc < 0 && (errno != EINTR) &&
 				    (errno != EAGAIN))
 					break;
 				if (cc > 0) {
