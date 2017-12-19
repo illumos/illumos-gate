@@ -38,6 +38,8 @@ int	ppt_setup_msix(struct vm *vm, int vcpu, int bus, int slot, int func,
 		int idx, uint64_t addr, uint64_t msg, uint32_t vector_control);
 int	ppt_assigned_devices(struct vm *vm);
 boolean_t ppt_is_mmio(struct vm *vm, vm_paddr_t gpa);
+int	ppt_get_limits(struct vm *vm, int bus, int slot, int func, int *msilimit,
+    int *msixlimit);
 
 /*
  * Returns the number of devices sequestered by the ppt driver for assignment

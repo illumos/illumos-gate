@@ -52,9 +52,12 @@
 #include <sys/psm_defs.h>
 #include <sys/smp_impldefs.h>
 
+#include <sys/x86_archext.h>
+
 #include <machine/cpufunc.h>
 #include <machine/fpu.h>
 #include <machine/md_var.h>
+#include <machine/pmap.h>
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
 #include <sys/vmm_impl.h>
@@ -75,6 +78,18 @@ u_char const bin2bcd_data[] = {
 	0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89,
 	0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99
 };
+
+void
+pmap_invalidate_cache(void)
+{
+	cpuset_t cpuset;
+
+	kpreempt_disable();
+	cpuset_all_but(&cpuset, CPU->cpu_id);
+	xc_call(NULL, NULL, NULL, CPUSET2BV(cpuset), (xc_func_t)invalidate_cache);
+	invalidate_cache();
+	kpreempt_enable();
+}
 
 vm_paddr_t
 pmap_kextract(vm_offset_t va)
@@ -129,6 +144,7 @@ smp_rendezvous(void (* setup_func)(void *), void (* action_func)(void *),
 
 struct kmem_item {
 	void			*addr;
+	void			*paddr;
 	size_t			size;
 	LIST_ENTRY(kmem_item)	next;
 };
@@ -154,6 +170,7 @@ malloc(unsigned long size, struct malloc_type *mtp, int flags)
 	mutex_enter(&kmem_items_lock);
 	i = p + size;
 	i->addr = p;
+	i->paddr = (void *)PHYS_TO_DMAP(vtophys(p));
 	i->size = size;
 
 	LIST_INSERT_HEAD(&kmem_items, i, next);
@@ -169,14 +186,15 @@ free(void *addr, struct malloc_type *mtp)
 
 	mutex_enter(&kmem_items_lock);
 	LIST_FOREACH(i, &kmem_items, next) {
-		if (i->addr == addr)
+		if (i->addr == addr ||
+		    i->paddr == addr)
 			break;
 	}
-	ASSERT(i != NULL);
+	VERIFY(i != NULL);
 	LIST_REMOVE(i, next);
 	mutex_exit(&kmem_items_lock);
 
-	kmem_free(addr, i->size + sizeof (struct kmem_item));
+	kmem_free(i->addr, i->size + sizeof (struct kmem_item));
 }
 
 extern void *contig_alloc(size_t, ddi_dma_attr_t *, uintptr_t, int);

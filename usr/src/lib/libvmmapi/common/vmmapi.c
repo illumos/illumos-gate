@@ -997,6 +997,26 @@ vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int bus, int slot, int func,
 	return ioctl(ctx->fd, VM_PPTDEV_MSIX, &pptmsix);
 }
 
+int
+vm_get_pptdev_limits(struct vmctx *ctx, int bus, int slot, int func,
+    int *msi_limit, int *msix_limit)
+{
+	struct vm_pptdev_limits pptlimits;
+	int error;
+
+	bzero(&pptlimits, sizeof (pptlimits));
+	pptlimits.bus = bus;
+	pptlimits.slot = slot;
+	pptlimits.func = func;
+
+	error = ioctl(ctx->fd, VM_GET_PPTDEV_LIMITS, &pptlimits);
+
+	*msi_limit = pptlimits.msi_limit;
+	*msix_limit = pptlimits.msix_limit;
+
+	return (error);
+}
+
 uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
 	     int *ret_entries)

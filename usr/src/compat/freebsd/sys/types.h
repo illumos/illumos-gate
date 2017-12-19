@@ -79,6 +79,10 @@ typedef _Bool bool;
 #define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 #endif
 
+#if defined(_KERNEL)
+typedef struct __dev_info **device_t;
+#endif
+
 #include_next <sys/types.h>
 
 #endif	/* _COMPAT_FREEBSD_SYS_TYPES_H_ */

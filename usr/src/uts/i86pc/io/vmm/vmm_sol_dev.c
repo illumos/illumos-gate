@@ -38,6 +38,7 @@
 #include <vm/vm.h>
 #include <vm/seg_dev.h>
 
+#include "io/ppt.h"
 #include "io/vatpic.h"
 #include "io/vioapic.h"
 #include "io/vrtc.h"
@@ -606,48 +607,76 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		break;
 	}
 
-	/* XXXJOY: punt on these for now */
 	case VM_PPTDEV_MSI: {
 		struct vm_pptdev_msi pptmsi;
-
 		if (ddi_copyin(datap, &pptmsi, sizeof (pptmsi), md)) {
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = ppt_setup_msi(sc->vmm_vm, pptmsi.vcpu, pptmsi.bus,
+		    pptmsi.slot, pptmsi.func, pptmsi.addr, pptmsi.msg,
+		    pptmsi.numvec);
+		break;
 	}
 	case VM_PPTDEV_MSIX: {
 		struct vm_pptdev_msix pptmsix;
-
 		if (ddi_copyin(datap, &pptmsix, sizeof (pptmsix), md)) {
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = ppt_setup_msix(sc->vmm_vm, pptmsix.vcpu, pptmsix.bus,
+		    pptmsix.slot, pptmsix.func, pptmsix.idx, pptmsix.addr,
+		    pptmsix.msg, pptmsix.vector_control);
+		break;
 	}
 	case VM_MAP_PPTDEV_MMIO: {
 		struct vm_pptdev_mmio pptmmio;
-
 		if (ddi_copyin(datap, &pptmmio, sizeof (pptmmio), md)) {
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = ppt_map_mmio(sc->vmm_vm, pptmmio.bus, pptmmio.slot,
+		    pptmmio.func, pptmmio.gpa, pptmmio.len, pptmmio.hpa);
+		break;
 	}
-	case VM_BIND_PPTDEV:
-	case VM_UNBIND_PPTDEV: {
+	case VM_BIND_PPTDEV: {
 		struct vm_pptdev pptdev;
-
 		if (ddi_copyin(datap, &pptdev, sizeof (pptdev), md)) {
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = vm_assign_pptdev(sc->vmm_vm, pptdev.bus, pptdev.slot,
+		    pptdev.func);
+		break;
 	}
-
+	case VM_UNBIND_PPTDEV: {
+		struct vm_pptdev pptdev;
+		if (ddi_copyin(datap, &pptdev, sizeof (pptdev), md)) {
+			error = EFAULT;
+			break;
+		}
+		error = vm_unassign_pptdev(sc->vmm_vm, pptdev.bus, pptdev.slot,
+		    pptdev.func);
+		break;
+	}
+	case VM_GET_PPTDEV_LIMITS: {
+		struct vm_pptdev_limits pptlimits;
+		if (ddi_copyin(datap, &pptlimits, sizeof (pptlimits), md)) {
+			error = EFAULT;
+			break;
+		}
+		error = ppt_get_limits(sc->vmm_vm, pptlimits.bus,
+		    pptlimits.slot, pptlimits.func, &pptlimits.msi_limit,
+		    &pptlimits.msix_limit);
+		if (error == 0 &&
+		    ddi_copyout(&pptlimits, datap, sizeof (pptlimits), md)) {
+			error = EFAULT;
+			break;
+		}
+		break;
+	}
 	case VM_INJECT_EXCEPTION: {
 		struct vm_exception vmexc;
-
 		if (ddi_copyin(datap, &vmexc, sizeof (vmexc), md)) {
 			error = EFAULT;
 			break;

@@ -1429,6 +1429,24 @@ fcnname/**/_info:							\
 	END_MODULE(apix);
 #endif
 
+/*
+ * Stubs for ppt module (bhyve PCI passthrough driver)
+ */
+#ifndef PPT_MODULE
+	MODULE(ppt,drv);
+	WSTUB(ppt, ppt_unassign_all,		nomod_zero);
+	WSTUB(ppt, ppt_map_mmio,		nomod_einval);
+	WSTUB(ppt, ppt_setup_msi,		nomod_einval);
+	WSTUB(ppt, ppt_setup_msix,		nomod_einval);
+	WSTUB(ppt, ppt_assigned_devices,	nomod_zero);
+	WSTUB(ppt, ppt_is_mmio,			nomod_zero);
+	WSTUB(ppt, ppt_avail_devices,		nomod_zero);
+	WSTUB(ppt, ppt_assign_device,		nomod_einval);
+	WSTUB(ppt, ppt_unassign_device,		nomod_einval);
+	WSTUB(ppt, ppt_get_limits,		nomod_einval);
+	END_MODULE(ppt);
+#endif
+
 / this is just a marker for the area of text that contains stubs 
 
 	ENTRY_NP(stubs_end)

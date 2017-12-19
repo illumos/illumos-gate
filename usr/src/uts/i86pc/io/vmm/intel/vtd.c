@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmparam.h>
 #include <contrib/dev/acpica/include/acpi.h>
 
+#include <sys/sunndi.h>
+
 #include "io/iommu.h"
 
 /*
@@ -235,19 +237,94 @@ vtd_translation_disable(struct vtdmap *vtdmap)
 		;
 }
 
+static void *
+vtd_map(ACPI_DMAR_HARDWARE_UNIT *drhd, int unit)
+{
+	struct ddi_parent_private_data *pdptr;
+	struct regspec reg;
+	dev_info_t *dip;
+	caddr_t regs;
+	ddi_acc_handle_t hdl;
+	int error;
+
+	static ddi_device_acc_attr_t regs_attr = {
+		DDI_DEVICE_ATTR_V0,
+		DDI_NEVERSWAP_ACC,
+		DDI_STRICTORDER_ACC,
+	};
+
+	dip = ddi_add_child(ddi_root_node(), "vtd",
+	    DEVI_SID_NODEID, unit);
+
+#if 0
+	drhd->dr_dip = dip;
+#endif
+
+	reg.regspec_bustype = 0;
+	reg.regspec_addr = drhd->Address;
+	reg.regspec_size = PAGE_SIZE;
+
+	/*
+	 * update the reg properties
+	 *
+	 *   reg property will be used for register
+	 *   set access
+	 *
+	 * refer to the bus_map of root nexus driver
+	 * I/O or memory mapping:
+	 *
+	 * <bustype=0, addr=x, len=x>: memory
+	 * <bustype=1, addr=x, len=x>: i/o
+	 * <bustype>1, addr=0, len=x>: x86-compatibility i/o
+	 */
+	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
+	    dip, "reg", (int *)&reg,
+	    sizeof (struct regspec) / sizeof (int));
+
+	/*
+	 * This is an artificially constructed dev_info, and we
+	 * need to set a few more things to be able to use it
+	 * for ddi_dma_alloc_handle/free_handle.
+	 */
+	ddi_set_driver(dip, ddi_get_driver(ddi_root_node()));
+	DEVI(dip)->devi_bus_dma_allochdl =
+	    DEVI(ddi_get_driver((ddi_root_node())));
+
+	pdptr = kmem_zalloc(sizeof (struct ddi_parent_private_data)
+	    + sizeof (struct regspec), KM_SLEEP);
+	pdptr->par_nreg = 1;
+	pdptr->par_reg = (struct regspec *)(pdptr + 1);
+	pdptr->par_reg->regspec_bustype = 0;
+	pdptr->par_reg->regspec_addr = drhd->Address;
+	pdptr->par_reg->regspec_size = PAGE_SIZE;
+	ddi_set_parent_data(dip, pdptr);
+
+	error = ddi_regs_map_setup(dip, 0, &regs, 0, PAGE_SIZE, &regs_attr,
+	    &hdl);
+
+	if (error != DDI_SUCCESS)
+		return (NULL);
+
+	return (regs);
+}
+
 static int
 vtd_init(void)
 {
 	int i, units, remaining;
 	struct vtdmap *vtdmap;
 	vm_paddr_t ctx_paddr;
-	char *end, envname[32];
+	char *end;
+#ifdef __FreeBSD__
+	char envname[32];
 	unsigned long mapaddr;
+#endif
 	ACPI_STATUS status;
 	ACPI_TABLE_DMAR *dmar;
 	ACPI_DMAR_HEADER *hdr;
 	ACPI_DMAR_HARDWARE_UNIT *drhd;
 
+#ifdef __FreeBSD__
 	/*
 	 * Allow the user to override the ACPI DMAR table by specifying the
 	 * physical address of each remapping unit.
@@ -266,7 +343,9 @@ vtd_init(void)
 
 	if (units > 0)
 		goto skip_dmar;
-
+#else
+	units = 0;
+#endif
 	/* Search for DMAR table. */
 	status = AcpiGetTable(ACPI_SIG_DMAR, 0, (ACPI_TABLE_HEADER **)&dmar);
 	if (ACPI_FAILURE(status))
@@ -289,7 +368,12 @@ vtd_init(void)
 			break;
 
 		drhd = (ACPI_DMAR_HARDWARE_UNIT *)hdr;
+#ifdef __FreeBSD__
 		vtdmaps[units++] = (struct vtdmap *)PHYS_TO_DMAP(drhd->Address);
+#else
+		vtdmaps[units] = (struct vtdmap *)vtd_map(drhd, units);
+		units++;
+#endif
 		if (units >= DRHD_MAX_UNITS)
 			break;
 		remaining -= hdr->Length;
@@ -298,7 +382,9 @@ vtd_init(void)
 	if (units <= 0)
 		return (ENXIO);
 
+#ifdef __FreeBSD__
 skip_dmar:
+#endif
 	drhd_num = units;
 	vtdmap = vtdmaps[0];
 

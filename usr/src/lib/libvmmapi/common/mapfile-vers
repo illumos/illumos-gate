@@ -60,6 +60,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_get_lowmem_size;
 		vm_get_memflags;
 		vm_get_memseg;
+                vm_get_pptdev_limits;
 		vm_get_register;
 		vm_get_seg_desc;
 		vm_get_stat_desc;

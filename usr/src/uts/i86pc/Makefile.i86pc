@@ -267,6 +267,7 @@ DRV_KMODS	+= ioat
 DRV_KMODS	+= fipe
 DRV_KMODS	+= vmm
 DRV_KMODS	+= viona
+DRV_KMODS	+= ppt
 
 DRV_KMODS	+= cpudrv
 

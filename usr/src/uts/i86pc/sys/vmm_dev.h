@@ -157,6 +157,14 @@ struct vm_pptdev_msix {
 	uint64_t	addr;
 };
 
+struct vm_pptdev_limits {
+	int		bus;
+	int		slot;
+	int		func;
+	int		msi_limit;
+	int		msix_limit;
+};
+
 struct vm_nmi {
 	int		cpuid;
 };
@@ -285,6 +293,7 @@ enum {
 	IOCNUM_MAP_PPTDEV_MMIO = 42,
 	IOCNUM_PPTDEV_MSI = 43,
 	IOCNUM_PPTDEV_MSIX = 44,
+	IOCNUM_GET_PPTDEV_LIMITS = 45,
 
 	/* statistics */
 	IOCNUM_VM_STATS = 50, 
@@ -377,6 +386,8 @@ enum {
 	_IOW('v', IOCNUM_PPTDEV_MSI, struct vm_pptdev_msi)
 #define	VM_PPTDEV_MSIX \
 	_IOW('v', IOCNUM_PPTDEV_MSIX, struct vm_pptdev_msix)
+#define	VM_GET_PPTDEV_LIMITS \
+	_IOR('v', IOCNUM_GET_PPTDEV_LIMITS, struct vm_pptdev_limits)
 #define VM_INJECT_NMI \
 	_IOW('v', IOCNUM_INJECT_NMI, struct vm_nmi)
 #define	VM_STATS_IOC \
