@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -557,7 +558,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 	pci_bus_range_t pci_bus_range;
 	int rv;
 	int circ;
-	uint_t highest_bus;
+	uint_t highest_bus, visited = 0;
 	int ari_mode = B_FALSE;
 	int max_function = PCI_MAX_FUNCTIONS;
 	int trans_device;
@@ -669,6 +670,11 @@ pcicfg_configure(dev_info_t *devi, uint_t device, uint_t function,
 				goto cleanup;
 		}
 
+		/*
+		 * Note that we've successfully gone through and visited at
+		 * least one node.
+		 */
+		visited++;
 next:
 		/*
 		 * Determine if ARI Forwarding should be enabled.
@@ -696,7 +702,7 @@ next:
 				goto cleanup;
 
 			/*
-			 * Check if there are more fucntions to probe.
+			 * Check if there are more functions to probe.
 			 */
 			if (next_function == 0) {
 				DEBUG0("Next Function - "
@@ -712,7 +718,7 @@ next:
 
 	ndi_devi_exit(devi, circ);
 
-	if (func == 0)
+	if (visited == 0)
 		return (PCICFG_FAILURE);	/* probe failed */
 	else
 		return (PCICFG_SUCCESS);
