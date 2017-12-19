@@ -1415,7 +1415,7 @@ tearDownZones() {
 			gettext "OK to destroy all zones [y|N]? "
 			read ans
 			printf "%s\n" "$ans" \
-			    | /usr/xpg4/bin/grep -Eq "$(locale yesexpr)"
+			    | /usr/bin/grep -Eq "$(locale yesexpr)"
 			if [ $? -ne 0 ] ; then
 				gettext "canceled.\n"
 				return 1

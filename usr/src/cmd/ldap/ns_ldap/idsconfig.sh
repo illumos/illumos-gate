@@ -984,7 +984,7 @@ init()
     DOM=""              # Set to NULL
     # If DNS domain (resolv.conf) exists use that, otherwise use domainname.
     if [ -f /etc/resolv.conf ]; then
-        DOM=`/usr/xpg4/bin/grep -i -E '^domain|^search' /etc/resolv.conf \
+        DOM=`/usr/bin/grep -i -E '^domain|^search' /etc/resolv.conf \
 	    | awk '{ print $2 }' | tail -1`
     fi
 

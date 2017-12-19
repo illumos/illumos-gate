@@ -52,7 +52,6 @@ file path=usr/xpg4/bin/expr mode=0555
 file path=usr/xpg4/bin/file mode=0555
 file path=usr/xpg4/bin/find mode=0555
 file path=usr/xpg4/bin/getconf mode=0555
-file path=usr/xpg4/bin/grep mode=0555
 file path=usr/xpg4/bin/id mode=0555
 file path=usr/xpg4/bin/link mode=0555
 file path=usr/xpg4/bin/ls mode=0555
@@ -67,9 +66,7 @@ file path=usr/xpg4/bin/rm mode=0555
 file path=usr/xpg4/bin/sort mode=0555
 file path=usr/xpg4/bin/stty mode=0555
 file path=usr/xpg4/bin/who mode=0555
-hardlink path=usr/xpg4/bin/egrep target=../../../usr/xpg4/bin/grep
 hardlink path=usr/xpg4/bin/ex target=../../../usr/xpg4/bin/edit
-hardlink path=usr/xpg4/bin/fgrep target=../../../usr/xpg4/bin/grep
 hardlink path=usr/xpg4/bin/ln target=../../../usr/xpg4/bin/cp
 hardlink path=usr/xpg4/bin/mv target=../../../usr/xpg4/bin/cp
 hardlink path=usr/xpg4/bin/vedit target=../../../usr/xpg4/bin/edit
@@ -88,9 +85,12 @@ link path=usr/xpg4/bin/bg target=../../bin/alias
 link path=usr/xpg4/bin/cd target=../../bin/alias
 link path=usr/xpg4/bin/command target=../../bin/alias
 link path=usr/xpg4/bin/df target=../../sbin/df
+link path=usr/xpg4/bin/egrep target=../../bin/grep
 link path=usr/xpg4/bin/fc target=../../bin/alias
 link path=usr/xpg4/bin/fg target=../../bin/alias
+link path=usr/xpg4/bin/fgrep target=../../bin/grep
 link path=usr/xpg4/bin/getopts target=../../bin/alias
+link path=usr/xpg4/bin/grep target=../../bin/grep
 link path=usr/xpg4/bin/hash target=../../bin/alias
 link path=usr/xpg4/bin/ipcs target=../../bin/ipcs
 link path=usr/xpg4/bin/jobs target=../../bin/alias

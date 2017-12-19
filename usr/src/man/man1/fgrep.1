@@ -9,18 +9,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FGREP 1 "May 3, 2013"
+.TH FGREP 1 "Nov 28, 2017"
 .SH NAME
 fgrep \- search a file for a fixed-character string
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fIfile...\fR]
+\fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR]
+     [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fB-f\fR \fIfile\fR [\fIfile...\fR]
+\fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR
+     [\fIfile...\fR]
 .fi
 
 .LP
@@ -28,25 +30,7 @@ fgrep \- search a file for a fixed-character string
 \fB/usr/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fIpattern\fR [\fIfile...\fR]
 .fi
 
-.LP
-.nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR]
-     [\fIfile...\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR
-     [\fIfile...\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/fgrep\fR [\fB-bcHhilnqsvx\fR] \fIpattern\fR [\fIfile...\fR]
-.fi
-
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfgrep\fR (fast \fBgrep\fR) utility searches files for a character string
 and prints all lines that contain that string. \fBfgrep\fR is different from
@@ -66,16 +50,14 @@ If no files are specified, \fBfgrep\fR assumes standard input. Normally, each
 line that is found is copied to the standard output. The file name is printed
 before each line that is found if there is more than one input file.
 .SH OPTIONS
-.sp
 .LP
-The following options are supported for both \fB/usr/bin/fgrep\fR and
-\fB/usr/xpg4/bin/fgrep\fR:
+The following options are supported:
 .sp
 .ne 2
 .na
 \fB\fB-b\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Precedes each line by the block number on which the line was found. This can be
 useful in locating block numbers by context. The first block is 0.
 .RE
@@ -85,7 +67,7 @@ useful in locating block numbers by context. The first block is 0.
 .na
 \fB\fB-c\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Prints only a count of the lines that contain the pattern.
 .RE
 
@@ -94,7 +76,7 @@ Prints only a count of the lines that contain the pattern.
 .na
 \fB\fB-e\fR \fIpattern_list\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Searches for a \fIstring\fR in \fIpattern-list\fR. This is useful when the
 \fIstring\fR begins with a \fB\(mi\fR\&.
 .RE
@@ -104,7 +86,7 @@ Searches for a \fIstring\fR in \fIpattern-list\fR. This is useful when the
 .na
 \fB\fB-f\fR \fIpattern-file\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Takes the list of patterns from \fIpattern-file\fR.
 .RE
 
@@ -113,7 +95,7 @@ Takes the list of patterns from \fIpattern-file\fR.
 .na
 \fB\fB-H\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Precedes each line by the name of the file containing the matching line.
 .RE
 
@@ -122,7 +104,7 @@ Precedes each line by the name of the file containing the matching line.
 .na
 \fB\fB-h\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Suppresses printing of files when searching multiple files.
 .RE
 
@@ -131,7 +113,7 @@ Suppresses printing of files when searching multiple files.
 .na
 \fB\fB-i\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Ignores upper/lower case distinction during comparisons.
 .RE
 
@@ -140,7 +122,7 @@ Ignores upper/lower case distinction during comparisons.
 .na
 \fB\fB-l\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Prints the names of files with matching lines once, separated by new-lines.
 Does not repeat the names of files when the pattern is found more than once.
 .RE
@@ -150,7 +132,7 @@ Does not repeat the names of files when the pattern is found more than once.
 .na
 \fB\fB-n\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Precedes each line by its line number in the file. The first line is 1.
 .RE
 
@@ -159,7 +141,7 @@ Precedes each line by its line number in the file. The first line is 1.
 .na
 \fB\fB-q\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Quiet. Does not write anything to the standard output, regardless of matching
 lines. Exits with zero status if an input line is selected.
 .RE
@@ -169,7 +151,7 @@ lines. Exits with zero status if an input line is selected.
 .na
 \fB\fB-s\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Legacy equivalent of \fB-q\fR.
 .RE
 
@@ -178,7 +160,7 @@ Legacy equivalent of \fB-q\fR.
 .na
 \fB\fB-v\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Prints all lines except those that contain the pattern.
 .RE
 
@@ -187,12 +169,11 @@ Prints all lines except those that contain the pattern.
 .na
 \fB\fB-x\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Prints only lines that are matched entirely.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -205,40 +186,25 @@ Specifies a path name of a file to be searched for the patterns. If no
 \fIfile\fR operands are specified, the standard input will be used.
 .RE
 
-.SS "/usr/bin/fgrep"
-.sp
 .ne 2
 .na
 \fB\fIpattern\fR\fR
 .ad
-.RS 11n
-Specifies a pattern to be used during the search for input.
-.RE
-
-.SS "/usr/xpg4/bin/fgrep"
-.sp
-.ne 2
-.na
-\fB\fIpattern\fR\fR
-.ad
-.RS 11n
+.RS 8n
 Specifies one or more patterns to be used during the search for input. This
 operand is treated as if it were specified as \fB-e\fR \fIpattern_list\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBfgrep\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBfgrep\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
 \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -268,11 +234,7 @@ If no matches are found
 For syntax errors or inaccessible files, even if matches were found.
 .RE
 
-.SS "/usr/xpg4/bin/fgrep"
-.sp
-
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -286,21 +248,21 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBed\fR(1), \fBegrep\fR(1), \fBgrep\fR(1), \fBsed\fR(1), \fBsh\fR(1),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBXPG4\fR(5)
 .SH NOTES
-.sp
 .LP
 Ideally, there should be only one \fBgrep\fR command, but there is not a single
 algorithm that spans a wide enough range of space-time tradeoffs.
 .sp
 .LP
 Lines are limited only by the size of the available virtual memory.
-.SS "/usr/xpg4/bin/fgrep"
-.sp
 .LP
-The \fB/usr/xpg4/bin/fgrep\fR utility is identical to \fB/usr/xpg4/bin/grep\fR
+The \fB/usr/bin/fgrep\fR utility is identical to \fB/usr/bin/grep\fR
 \fB-F\fR (see \fBgrep\fR(1)). Portable applications should use
-\fB/usr/xpg4/bin/grep\fR \fB-F\fR.
+\fB/usr/bin/grep\fR \fB-F\fR.
+.LP
+In the past the behavior of \fB/usr/xpg4/bin/fgrep\fR and
+\fB/usr/bin/fgrep\fR utilities was different. Now \fB/usr/bin/fgrep\fR
+is replaced by \fB/usr/xpg4/bin/fgrep\fR.

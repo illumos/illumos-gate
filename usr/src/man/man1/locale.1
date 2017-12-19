@@ -7,7 +7,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LOCALE 1 "Dec 20, 1996"
+.TH LOCALE 1 "Nov 28, 2017"
 .SH NAME
 locale \- get locale-specific information
 .SH SYNOPSIS
@@ -22,7 +22,6 @@ locale \- get locale-specific information
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlocale\fR utility writes information about the current locale
 environment, or all public locales, to the standard output. For the purposes of
@@ -52,7 +51,6 @@ Specifying a category name selects the named category and all keywords in that
 category.
 .RE
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -97,7 +95,6 @@ Writes names of available charmaps; see  \fBlocaledef\fR(1).
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -182,7 +179,7 @@ a user-supplied response is affirmative:
 .sp
 .in +2
 .nf
-\fBif printf "%s\en" "$response" | /usr/xpg4/bin/grep -Eq\e
+\fBif printf "%s\en" "$response" | /usr/bin/grep -Eq\e
         "$(locale yesexpr)"
 then
     affirmative processing goes here
@@ -194,7 +191,6 @@ fi\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for the descriptions of  \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
@@ -204,7 +200,6 @@ The \fBLANG\fR, \fBLC_*\fR, and \fBNLSPATH\fR environment variables must
 specify the current locale environment to be written out. These environment
 variables will be used if the \fB-a\fR option is not specified.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -226,7 +221,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -244,12 +238,10 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlocaledef\fR(1), \fBattributes\fR(5), \fBcharmap\fR(5), \fBenviron\fR(5),
 \fBlocale\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 If \fBLC_CTYPE\fR or keywords in the category \fBLC_CTYPE\fR are specified,
 only the values in the range \fB0x00\fR-\fB0x7f\fR are written out.

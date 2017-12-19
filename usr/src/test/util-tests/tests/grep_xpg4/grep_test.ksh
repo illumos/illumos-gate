@@ -15,7 +15,7 @@
 # Copyright 2017 Nexenta Systems, Inc. All rights reserved.
 #
 
-XGREP=${XGREP:=/usr/xpg4/bin/grep}
+XGREP=${XGREP:=/usr/bin/grep}
 FILEDIR=$MY_TESTS/tests/files
 
 fail() {

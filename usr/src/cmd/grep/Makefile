@@ -20,26 +20,54 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1989,1996, by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
-PROG= grep 
+PROG= grep
+FFILE= fgrep
+EFILE= egrep
 
 include ../Makefile.cmd
 
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
-LDLIBS += -lgen
-XGETFLAGS += -a -x grep.xcl
+CERRWARN += -_gcc=-Wno-parentheses
+CERRWARN += -_gcc=-Wno-uninitialized
 
+ROOTXPG4LINKS = $(ROOTXPG4BIN)/$(FFILE)	$(ROOTXPG4BIN)/$(EFILE) $(ROOTXPG4BIN)/$(PROG)
+ROOTLINKS = $(ROOTBIN)/$(FFILE) $(ROOTBIN)/$(EFILE)
+
+CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
+POFILE= grep_xpg4.po
+POFILES= grep.po
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
-install: all $(ROOTPROG)
+install: all $(ROOTPROG) $(ROOTLINKS) $(ROOTXPG4LINKS)
+
+$(ROOTLINKS):	$(ROOTPROG)
+	-$(RM) $@
+	-$(LN) $(ROOTPROG) $@
+
+$(ROOTXPG4LINKS):	$(ROOTPROG)
+	-$(RM) $@
+	-$(SYMLINK) ../../bin/grep $@
+
+$(POFILE): $(POFILES)
+	$(RM) $@
+	$(CP) $(POFILES) $@
+
+# Make the links locally for test purposes
+test:	$(FFILE) $(EFILE)
+
+$(FFILE):      $(PROG)
+		@$(RM) $(FFILE); $(LN) $(PROG) $(FFILE)
+
+$(EFILE):      $(PROG)
+		@$(RM) $(EFILE); $(LN) $(PROG) $(EFILE)
 
 clean:
 
