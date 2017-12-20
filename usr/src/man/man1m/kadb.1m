@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KADB 1M "Jul 2, 2004"
+.TH KADB 1M "Dec 9, 2017"
 .SH NAME
 kadb \- a kernel debugger
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ kadb \- a kernel debugger
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBkadb\fR, an interactive kernel debugger, has been replaced by \fBkmdb\fR(1).
 For backwards compatibility, the methods used to load \fBkadb\fR will be
@@ -36,10 +35,9 @@ differences between \fBmdb\fR and \fBkmdb\fR. This man page describes the major
 changes and incompatibilities between \fBkadb\fR and \fBkmdb\fR.
 .sp
 .LP
-Consult the \fISolaris Modular Debugger Guide\fR for a detailed description of
+Consult the \fIModular Debugger Guide\fR for a detailed description of
 both \fBmdb\fR and \fBkmdb\fR.
 .SS "Major changes"
-.sp
 .LP
 This section briefly lists the major differences between \fBkadb\fR and
 \fBkmdb\fR. It is not intended to be exhaustive.
@@ -72,13 +70,12 @@ been changed.
 .RE
 
 .SS "Significant Incompatibilities"
-.sp
 .LP
 This section lists the significant features that have changed incompatibly
 between \fBkadb\fR and \fBkmdb\fR(1). It is not intended to be exhaustive. All
 \fBkmdb\fR(1) commands referenced here are fully described in the \fBkmdb\fR(1)
-man page. A description as well as examples can be found in the \fISolaris
-Modular Debugger Guide\fR.
+man page. A description as well as examples can be found in the \fIModular
+Debugger Guide\fR.
 .sp
 .ne 2
 .na
@@ -117,9 +114,11 @@ port sizes supported by \fBkadb\fR.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBadb\fR(1), \fBmdb\fR(1), \fBkmdb\fR(1), \fBattributes\fR(5)
 .sp
 .LP
-\fISolaris Modular Debugger Guide\fR
+\fIModular Debugger Guide\fR:
+.sp
+.LP
+https://illumos.org/books/mdb/

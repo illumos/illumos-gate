@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <bsm/adt.h>
@@ -588,12 +589,42 @@ adt_set_mask(const adt_session_data_t *session_data, const au_mask_t *mask)
  * helpers for adt_load_termid
  */
 
+static dev_t
+adt_ports_to_at_port(in_port_t remote, in_port_t local)
+{
+	dev_t port;
+
+#ifdef _LP64
+	dev_t tmp;
+
+	/*
+	 * In 64-bit, at_port is a 64-bit value encoding major/minor
+	 * device numbers as 32-bits each. However when a 32-bit application
+	 * subsequently requests the audit address via getaudit_addr(), this
+	 * value must be capable of being compressed down to a 14-bit major and
+	 * 18-bit minor number or the call will fail.
+	 *
+	 * In order to construct a 32-bit compatible value, the top 14-bits of
+	 * the remote port are used for the major number and the remaining
+	 * 2-bits + local port are used for the minor.
+	 */
+
+	tmp = ((remote<<16) | (local));
+	port = (tmp & MAXMIN32);
+	port |= (((tmp >> NBITSMINOR32) & MAXMAJ32) << NBITSMINOR64);
+#else
+	port = ((remote<<16) | (local));
+#endif
+
+	return (port);
+}
+
 static void
 adt_do_ipv6_address(struct sockaddr_in6 *peer, struct sockaddr_in6 *sock,
     au_tid_addr_t *termid)
 {
-
-	termid->at_port = ((peer->sin6_port<<16) | (sock->sin6_port));
+	termid->at_port =
+	    adt_ports_to_at_port(peer->sin6_port, sock->sin6_port);
 	termid->at_type = AU_IPv6;
 	(void) memcpy(termid->at_addr, &peer->sin6_addr, 4 * sizeof (uint_t));
 }
@@ -602,9 +633,7 @@ static void
 adt_do_ipv4_address(struct sockaddr_in *peer, struct sockaddr_in *sock,
     au_tid_addr_t *termid)
 {
-
-	termid->at_port = ((peer->sin_port<<16) | (sock->sin_port));
-
+	termid->at_port = adt_ports_to_at_port(peer->sin_port, sock->sin_port);
 	termid->at_type = AU_IPv4;
 	termid->at_addr[0] = (uint32_t)peer->sin_addr.s_addr;
 	(void) memset(&(termid->at_addr[1]), 0, 3 * sizeof (uint_t));

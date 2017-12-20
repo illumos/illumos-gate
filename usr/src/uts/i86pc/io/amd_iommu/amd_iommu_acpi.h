@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2017 Gary Mills
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -40,13 +41,16 @@ extern "C" {
 #define	IVRS_SIG	"IVRS"
 
 /*
- * IVINFO settings
+ * IVINFO bit fields
+ * Documented at: http://support.amd.com/TechDocs/48882_IOMMU.pdf
  */
 #define	AMD_IOMMU_ACPI_IVINFO_RSV1	(31 << 16 | 23)
 #define	AMD_IOMMU_ACPI_HT_ATSRSV	(22 << 16 | 22)
 #define	AMD_IOMMU_ACPI_VA_SIZE		(21 << 16 | 15)
 #define	AMD_IOMMU_ACPI_PA_SIZE		(14 << 16 | 8)
-#define	AMD_IOMMU_ACPI_IVINFO_RSV2	(7 << 16 | 0)
+#define	AMD_IOMMU_ACPI_GVA_SIZE		(7 << 16 | 5)
+#define	AMD_IOMMU_ACPI_IVINFO_RSV2	(4 << 16 | 1)
+#define	AMD_IOMMU_ACPI_IVINFO_EFRSUP	(0 << 16 | 0)
 
 /*
  * IVHD Device entry len field

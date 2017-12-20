@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ADB 1 "Nov 29, 2005"
+.TH ADB 1 "Dec 9, 2017"
 .SH NAME
 adb \- general-purpose debugger
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ adb \- general-purpose debugger
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBadb\fR utility is an interactive, general-purpose debugger. It can be
 used to examine files and provides a controlled environment for the execution
@@ -25,14 +24,16 @@ The \fBadb\fR utility is now implemented as a link to the \fBmdb\fR(1) utility.
 processes as well as the live operating system or operating system crash dumps.
 The new \fBmdb\fR(1) utility provides complete backwards compatibility with the
 existing syntax and features of \fBadb\fR, including support for processing
-\fBadb\fR macro files. The \fISolaris Modular Debugger Guide\fR and
-\fBmdb\fR(1) man page describes the features of \fBmdb\fR, including its
+\fBadb\fR macro files. The \fIModular Debugger Guide\fR and
+\fBmdb\fR(1) man page describe the features of \fBmdb\fR, including its
 \fBadb\fR compatibility mode. This mode will be activated by default when the
 \fBadb\fR link is executed.
 .SH SEE ALSO
-.sp
 .LP
 \fBmdb\fR(1), \fBattributes\fR(5)
 .sp
 .LP
-\fISolaris Modular Debugger Guide\fR
+\fIModular Debugger Guide\fR:
+.sp
+.LP
+https://illumos.org/books/mdb/

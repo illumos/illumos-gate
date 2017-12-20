@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PLOCKSTAT 1M "Jan 26, 2009"
+.TH PLOCKSTAT 1M "Dec 10, 2017"
 .SH NAME
 plockstat \- report user-level lock statistics
 .SH SYNOPSIS
@@ -20,7 +20,6 @@ plockstat \- report user-level lock statistics
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBplockstat\fR utility gathers and displays user-level locking statistics.
 By default, \fBplockstat\fR monitors all lock contention events, gathers
@@ -39,7 +38,6 @@ performance overhead on the processes being observed. Users must have the
 with \fBplockstat\fR. Refer to the \fI\fR for more information about DTrace
 security features.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -121,7 +119,7 @@ Print out a message to indicate that tracing has started.
 .ad
 .RS 16n
 Enable or modify a DTrace runtime option or D compiler option. The list of
-options is found in the \fISolaris Dynamic Tracing Guide\fR. Boolean options
+options is found in the \fIDynamic Tracing Guide\fR. Boolean options
 are enabled by specifying their name. Options with values are set by separating
 the option name and value with an equals sign (\fB=\fR).
 .RE
@@ -137,7 +135,6 @@ directly with the \fBdtrace\fR(1M) command.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -186,7 +183,6 @@ Duration specified as a positive integer number of seconds.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -208,7 +204,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -227,7 +222,6 @@ Interface Stability	See below.
 .LP
 The command-line syntax is Evolving. The human-readable output is Unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBdtrace\fR(1M), \fBlockstat\fR(1M), \fBmutex_init\fR(3C),
 \fBpthread_mutex_lock\fR(3C), \fBpthread_rwlock_rdlock\fR(3C),
@@ -235,4 +229,7 @@ The command-line syntax is Evolving. The human-readable output is Unstable.
 \fBrwlock\fR(3C), \fBattributes\fR(5), \fBfasttrap\fR(7D)
 .sp
 .LP
-\fI\fR
+\fIDynamic Tracing Guide\fR:
+.sp
+.LP
+https://illumos.org/books/dtrace/

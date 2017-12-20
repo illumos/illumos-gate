@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2016, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _SYS_NETSTACK_H
@@ -236,6 +236,7 @@ struct netstack_registry {
 
 extern void netstack_init(void);
 extern void netstack_hold(netstack_t *);
+extern netstack_t *netstack_hold_if_active(netstack_t *);
 extern void netstack_rele(netstack_t *);
 extern netstack_t *netstack_find_by_cred(const cred_t *);
 extern netstack_t *netstack_find_by_stackid(netstackid_t);

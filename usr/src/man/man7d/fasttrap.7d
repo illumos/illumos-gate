@@ -3,37 +3,34 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FASTTRAP 7D "Sep 4, 2003"
+.TH FASTTRAP 7D "Dec 10, 2017"
 .SH NAME
 fasttrap \- DTrace user instruction tracing provider
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfasttrap\fR driver is a DTrace dynamic tracing provider that performs
-dynamic instrumentation of arbitrary instructions in Solaris processes. The
+dynamic instrumentation of arbitrary instructions in illumos processes. The
 \fBfasttrap\fR driver implements the DTrace \fBfasttrap\fR and \fBpid\fR
 providers.
 .sp
 .LP
 The \fBfasttrap\fR driver is not a public interface and you access
 instrumentation offered by this provider through DTrace. Refer to the
-\fISolaris Dynamic Tracing Guide\fR for a description of the public documented
+\fIDynamic Tracing Guide\fR for a description of the public documented
 interfaces available for the DTrace facility and the probes offered by the
 \fBfasttrap\fR provider.
 .SH SPARC ONLY
-.sp
 .LP
 The \fBfasttrap\fR provider provides a DTrace probe that fires each time a user
 process executes an instruction. The \fBpid\fR provider allows for the dynamic
 creation of DTrace probes corresponding to instruction locations inside any
 user process specified using a process ID and an instruction address or symbol
 name. Together these providers permit DTrace users to perform instrumentation
-of Solaris user processes and to trace the interactions between processes and
+of user processes and to trace the interactions between processes and
 the operating system. See the chapter entitled "User Process Tracing"  in the
-\fISolaris Dynamic Tracing Guide\fR for information on how to use these
+\fIDynamic Tracing Guide\fR for information on how to use these
 providers to instrument processes.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -49,9 +46,11 @@ Interface Stability	Private
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdtrace\fR(1M), \fBattributes\fR(5), \fBdtrace\fR(7D)
 .sp
 .LP
-\fISolaris Dynamic Tracing Guide\fR
+\fIDynamic Tracing Guide\fR:
+.sp
+.LP
+https://illumos.org/books/dtrace/

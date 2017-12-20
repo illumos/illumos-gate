@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UMEM_DEBUG 3MALLOC "Jul 26, 2002"
+.TH UMEM_DEBUG 3MALLOC "Dec 9, 2017"
 .SH NAME
 umem_debug \- debugging features of the umem library
 .SH SYNOPSIS
@@ -14,7 +14,6 @@ umem_debug \- debugging features of the umem library
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlibumem\fR library provides debugging features that detect memory leaks,
 buffer overruns, multiple frees, use of uninitialized data, use of freed data,
@@ -26,7 +25,6 @@ When the library detects an error, it writes a description of the error to an
 internal buffer that is readable with the \fB::umem_status\fR \fBmdb\fR(1)
 \fIdcmd\fR and then calls \fBabort\fR(3C).
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
 \fB\fBUMEM_DEBUG\fR\fR
@@ -168,7 +166,6 @@ cannot be allocated.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -186,21 +183,21 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmdb\fR(1), \fBabort\fR(3C), \fBsignal\fR(3C),
 \fBumem_cache_create\fR(3MALLOC), \fBattributes\fR(5)
 .sp
 .LP
-\fISolaris Modular Debugger Guide\fR
-.SH WARNINGS
+\fIModular Debugger Guide\fR:
 .sp
+.LP
+https://illumos.org/books/mdb/
+.SH WARNINGS
 .LP
 When \fBlibumem\fR aborts the process using \fBabort\fR(3C), any existing
 signal handler for \fBSIGABRT\fR is called. If the signal handler performs
 allocations, undefined behavior can result.
 .SH NOTES
-.sp
 .LP
 Some of the debugging features work only for allocations smaller than 16
 kilobytes in size. Allocations larger than 16 kilobytes could have reduced

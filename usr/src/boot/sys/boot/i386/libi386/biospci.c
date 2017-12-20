@@ -33,6 +33,7 @@
 
 #include <stand.h>
 #include <machine/stdarg.h>
+#include <machine/cpufunc.h>
 #include <bootstrap.h>
 #include <isapnp.h>
 #include <btxv86.h>
@@ -599,3 +600,46 @@ ficlCompilePciBios(ficlSystem *pSys)
 }
 
 FICL_COMPILE_SET(ficlCompilePciBios);
+
+/*
+ * outb ( port# c -- )
+ * Store a byte to I/O port number port#
+ */
+static void
+ficlOutb(ficlVm *pVM)
+{
+	uint8_t c;
+	uint32_t port;
+
+	port = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	c = ficlStackPopInteger(ficlVmGetDataStack(pVM));
+	outb(port, c);
+}
+
+/*
+ * inb ( port# -- c )
+ * Fetch a byte from I/O port number port#
+ */
+static void
+ficlInb(ficlVm *pVM)
+{
+	uint8_t c;
+	uint32_t port;
+
+	port = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	c = inb(port);
+	ficlStackPushInteger(ficlVmGetDataStack(pVM), c);
+}
+
+static void
+ficlCompileCpufunc(ficlSystem *pSys)
+{
+	ficlDictionary *dp = ficlSystemGetDictionary(pSys);
+
+	FICL_SYSTEM_ASSERT(pSys, dp);
+
+	ficlDictionarySetPrimitive(dp, "outb", ficlOutb, FICL_WORD_DEFAULT);
+	ficlDictionarySetPrimitive(dp, "inb", ficlInb, FICL_WORD_DEFAULT);
+}
+
+FICL_COMPILE_SET(ficlCompileCpufunc);

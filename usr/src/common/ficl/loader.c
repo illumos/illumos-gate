@@ -43,9 +43,6 @@
 #include <termios.h>
 #else
 #include <stand.h>
-#ifdef __i386__
-#include <machine/cpufunc.h>
-#endif
 #include "bootstrap.h"
 #endif
 #ifdef _STANDALONE
@@ -852,42 +849,6 @@ fkey(ficlVm *pVM)
 	ficlStackPushInteger(ficlVmGetDataStack(pVM), i > 0 ? ch : -1);
 }
 
-
-#ifdef _STANDALONE
-#ifdef __i386__
-
-/*
- * outb ( port# c -- )
- * Store a byte to I/O port number port#
- */
-void
-ficlOutb(ficlVm *pVM)
-{
-	uint8_t c;
-	uint32_t port;
-
-	port = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
-	c = ficlStackPopInteger(ficlVmGetDataStack(pVM));
-	outb(port, c);
-}
-
-/*
- * inb ( port# -- c )
- * Fetch a byte from I/O port number port#
- */
-void
-ficlInb(ficlVm *pVM)
-{
-	uint8_t c;
-	uint32_t port;
-
-	port = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
-	c = inb(port);
-	ficlStackPushInteger(ficlVmGetDataStack(pVM), c);
-}
-#endif
-#endif
-
 /*
  * Retrieves free space remaining on the dictionary
  */
@@ -954,10 +915,6 @@ ficlSystemCompilePlatform(ficlSystem *pSys)
 	ficlDictionarySetPrimitive(dp, "uuid-to-string", ficlUuidToString,
 	    FICL_WORD_DEFAULT);
 #ifdef _STANDALONE
-#ifdef __i386__
-	ficlDictionarySetPrimitive(dp, "outb", ficlOutb, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dp, "inb", ficlInb, FICL_WORD_DEFAULT);
-#endif
 	/* Register words from linker set. */
 	SET_FOREACH(fnpp, Xficl_compile_set)
 		(*fnpp)(pSys);

@@ -3427,7 +3427,7 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 	page_t *pp, *randpp, *endpp;
 	uint_t colors, ceq_mask;
 	/* LINTED : set but not used in function */
-	uint_t color_mask;
+	uint_t color_mask __unused;
 	pfn_t hi, lo;
 	uint_t skip;
 	MEM_NODE_ITERATOR_DECL(it);
@@ -3730,7 +3730,7 @@ page_chk_freelist(uint_t szc)
 /*ARGSUSED*/
 page_t *
 page_get_freelist(struct vnode *vp, u_offset_t off, struct seg *seg,
-	caddr_t vaddr, size_t size, uint_t flags, struct lgrp *lgrp)
+    caddr_t vaddr, size_t size, uint_t flags, struct lgrp *lgrp)
 {
 	struct as	*as = seg->s_as;
 	page_t		*pp = NULL;
