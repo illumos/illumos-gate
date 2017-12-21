@@ -22,7 +22,7 @@
 /*
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2017, Joyent, Inc.
  * Copyright 2012 Milan Jurik. All rights reserved.
  */
 
@@ -606,15 +606,26 @@ param_calc(int platform_max_nprocs)
 
 	/*
 	 * We need to dynamically change any variables now so that
-	 * the setting of maxusers and pidmax propagate to the other
+	 * the setting of maxusers and maxpid propagate to the other
 	 * variables that are dependent on them.
 	 */
 	if (reserved_procs == 0)
 		reserved_procs = 5;
-	if (pidmax < reserved_procs || pidmax > MAX_MAXPID)
+	if (pidmax < reserved_procs || pidmax > MAX_MAXPID) {
 		maxpid = MAX_MAXPID;
-	else
+	} else {
+		/*
+		 * If pidmax has not been explicity set in /etc/system, then
+		 * increase it to the maximum on larger machines. We choose a
+		 * 128GB memory size as the threshold to increase pidmax.
+		 */
+		if (pidmax == DEFAULT_MAXPID) {
+			if (physmem > (btop(128ULL * 0x40000000ULL))) {
+				pidmax = MAX_MAXPID;
+			}
+		}
 		maxpid = pidmax;
+	}
 
 	/*
 	 * This allows platform-dependent code to constrain the maximum
