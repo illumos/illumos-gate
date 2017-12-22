@@ -761,23 +761,6 @@ acpi_probe(char *modname)
 		case ACPI_MADT_TYPE_LOCAL_X2APIC:
 			mpx2a = (ACPI_MADT_LOCAL_X2APIC *) ap;
 
-			/*
-			 * All logical processors with APIC ID values
-			 * of 255 and greater will have their APIC
-			 * reported through Processor X2APIC structure.
-			 * All logical processors with APIC ID less than
-			 * 255 will have their APIC reported through
-			 * Processor Local APIC.
-			 *
-			 * Some systems apparently don't care and report all
-			 * processors through Processor X2APIC structures. We
-			 * warn about that but don't ignore those CPUs.
-			 */
-			if (mpx2a->LocalApicId < 255) {
-				cmn_err(CE_WARN, "!%s: ignoring invalid entry "
-				    "in MADT: CPU %d has X2APIC Id %d (< 255)",
-				    psm_name, mpx2a->Uid, mpx2a->LocalApicId);
-			}
 			if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
 				if (mpx2a->LocalApicId == local_ids[0]) {
 					ASSERT(index == 1);
