@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _DID_PROPS_H
@@ -58,15 +59,17 @@ typedef struct txprop {
 	    const char *, const char *, const char *);
 } txprop_t;
 
-#define	DI_DEVTYPPROP	"device_type"
-#define	DI_VENDIDPROP	"vendor-id"
-#define	DI_DEVIDPROP	"device-id"
-#define	DI_CLASSPROP	"class-code"
-#define	DI_REGPROP	"reg"
-#define	DI_CCPROP	"class-code"
-#define	DI_PHYSPROP	"physical-slot#"
-#define	DI_SLOTPROP	"slot-names"
-#define	DI_AADDRPROP	"assigned-addresses"
+#define	DI_DEVTYPPROP		"device_type"
+#define	DI_VENDIDPROP		"vendor-id"
+#define	DI_SUBVENDIDPROP	"subsystem-vendor-id"
+#define	DI_SUBSYSTEMID		"subsystem-id"
+#define	DI_DEVIDPROP		"device-id"
+#define	DI_CLASSPROP		"class-code"
+#define	DI_REGPROP		"reg"
+#define	DI_CCPROP		"class-code"
+#define	DI_PHYSPROP		"physical-slot#"
+#define	DI_SLOTPROP		"slot-names"
+#define	DI_AADDRPROP		"assigned-addresses"
 #define	DI_RECEPTACLE_PHYMASK	"receptacle-pm"
 #define	DI_RECEPTACLE_LABEL	"receptacle-label"
 
