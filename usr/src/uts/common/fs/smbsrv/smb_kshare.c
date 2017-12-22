@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <smbsrv/smb_door.h>
@@ -386,6 +387,15 @@ smb_kshare_export_list(smb_ioc_share_t *ioc)
 		goto out;
 	}
 
+	/*
+	 * Reality check that the nvlist's reported length doesn't exceed the
+	 * ioctl's total length.  We then assume the nvlist_unpack() will
+	 * sanity check the nvlist itself.
+	 */
+	if ((ioc->shrlen + offsetof(smb_ioc_share_t, shr)) > ioc->hdr.len) {
+		rc = EINVAL;
+		goto out;
+	}
 	rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, KM_SLEEP);
 	if (rc != 0)
 		goto out;
@@ -463,6 +473,15 @@ smb_kshare_unexport_list(smb_ioc_share_t *ioc)
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
 
+	/*
+	 * Reality check that the nvlist's reported length doesn't exceed the
+	 * ioctl's total length.  We then assume the nvlist_unpack() will
+	 * sanity check the nvlist itself.
+	 */
+	if ((ioc->shrlen + offsetof(smb_ioc_share_t, shr)) > ioc->hdr.len) {
+		rc = EINVAL;
+		goto out;
+	}
 	if ((rc = nvlist_unpack(ioc->shr, ioc->shrlen, &shrlist, 0)) != 0)
 		goto out;
 

@@ -535,6 +535,12 @@ smb_server_configure(smb_ioc_cfg_t *ioc)
 	int		rc = 0;
 	smb_server_t	*sv;
 
+	/*
+	 * Reality check negotiation token length vs. #define'd maximum.
+	 */
+	if (ioc->negtok_len > SMB_PI_MAX_NEGTOK)
+		return (EINVAL);
+
 	rc = smb_server_lookup(&sv);
 	if (rc)
 		return (rc);
@@ -841,6 +847,13 @@ smb_server_enum(smb_ioc_svcenum_t *ioc)
 	smb_svcenum_t	*svcenum = &ioc->svcenum;
 	smb_server_t	*sv;
 	int		rc;
+
+	/*
+	 * Reality check that the buffer-length insize the enum doesn't
+	 * overrun the ioctl's total length.
+	 */
+	if (svcenum->se_buflen + sizeof (*ioc) > ioc->hdr.len)
+		return (EINVAL);
 
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
