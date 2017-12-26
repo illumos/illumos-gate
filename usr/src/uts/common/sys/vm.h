@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -56,6 +57,8 @@ int	queue_io_request(struct vnode *, u_offset_t);
 
 extern	kmutex_t	memavail_lock;
 extern	kcondvar_t	memavail_cv;
+
+#define	WAKE_PAGEOUT_SCANNER()	cv_broadcast(&proc_pageout->p_cv)
 
 #endif	/* defined(_KERNEL) */
 

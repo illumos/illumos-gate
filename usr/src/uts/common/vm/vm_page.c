@@ -22,6 +22,7 @@
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T	*/
@@ -1460,6 +1461,8 @@ page_create_throttle(pgcnt_t npages, int flags)
 	uint_t	i;
 	pgcnt_t tf;	/* effective value of throttlefree */
 
+	atomic_inc_64(&n_throttle);
+
 	/*
 	 * Normal priority allocations.
 	 */
@@ -1492,7 +1495,7 @@ page_create_throttle(pgcnt_t npages, int flags)
 	tf = throttlefree -
 	    ((flags & PG_PUSHPAGE) ? pageout_reserve : 0);
 
-	cv_signal(&proc_pageout->p_cv);
+	WAKE_PAGEOUT_SCANNER();
 
 	for (;;) {
 		fm = 0;
@@ -1579,7 +1582,7 @@ checkagain:
 	}
 
 	ASSERT(proc_pageout != NULL);
-	cv_signal(&proc_pageout->p_cv);
+	WAKE_PAGEOUT_SCANNER();
 
 	TRACE_2(TR_FAC_VM, TR_PAGE_CREATE_SLEEP_START,
 	    "page_create_sleep_start: freemem %ld needfree %ld",
@@ -2226,7 +2229,7 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	if (nscan < desscan && freemem < minfree) {
 		TRACE_1(TR_FAC_VM, TR_PAGEOUT_CV_SIGNAL,
 		    "pageout_cv_signal:freemem %ld", freemem);
-		cv_signal(&proc_pageout->p_cv);
+		WAKE_PAGEOUT_SCANNER();
 	}
 
 	pp = rootpp;
@@ -2355,7 +2358,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	if (nscan < desscan && freemem < minfree) {
 		TRACE_1(TR_FAC_VM, TR_PAGEOUT_CV_SIGNAL,
 		    "pageout_cv_signal:freemem %ld", freemem);
-		cv_signal(&proc_pageout->p_cv);
+		WAKE_PAGEOUT_SCANNER();
 	}
 
 	/*

@@ -61,7 +61,9 @@ extern pgcnt_t	desscan;	/* desired pages scanned per second */
 extern pgcnt_t	slowscan;
 extern pgcnt_t	fastscan;
 extern pgcnt_t	pushes;		/* number of pages pushed to swap device */
-extern uint64_t	zone_cap_scan;	/* num times page scan due to zone cap */;
+extern uint64_t	low_mem_scan;	/* num times page scan due to low memory */
+extern uint64_t	zone_cap_scan;	/* num times page scan due to zone cap */
+extern uint64_t	n_throttle;	/* num times page create throttled */
 
 /* writable copies of tunables */
 extern pgcnt_t	maxpgio;	/* max paging i/o per sec before start swaps */
