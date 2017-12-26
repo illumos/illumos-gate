@@ -228,22 +228,12 @@ net_strategy(void *devdata, int rw, daddr_t blk, size_t size, char *buf,
 	return (EIO);
 }
 
-#define	SUPPORT_BOOTP
-
 /*
  * Get info for NFS boot: our IP address, our hostname,
  * server IP address, and our root path on the server.
  * There are two ways to do this:  The old, Sun way,
- * and the more modern, BOOTP way. (RFC951, RFC1048)
- *
- * The default is to use the Sun bootparams RPC
- * (because that is what the kernel will do).
- * MD code can make try_bootp initialied data,
- * which will override this common definition.
+ * and the more modern, BOOTP/DHCP way. (RFC951, RFC1048)
  */
-#ifdef	SUPPORT_BOOTP
-int try_bootp = 1;
-#endif
 
 extern n_long ip_convertaddr(char *p);
 
@@ -252,42 +242,19 @@ net_getparams(int sock)
 {
 	char buf[MAXHOSTNAMELEN];
 	n_long rootaddr, smask;
-	struct iodesc *d = socktodesc(sock);
-	extern struct in_addr servip;
 
-#ifdef	SUPPORT_BOOTP
 	/*
-	 * Try to get boot info using BOOTP.  If we succeed, then
+	 * Try to get boot info using BOOTP/DHCP.  If we succeed, then
 	 * the server IP address, gateway, and root path will all
 	 * be initialized.  If any remain uninitialized, we will
 	 * use RARP and RPC/bootparam (the Sun way) to get them.
 	 */
-	if (try_bootp) {
-		int rc = -1;
-		if (bootp_response != NULL) {
-			rc = dhcp_try_rfc1048(bootp_response->bp_vend,
-			    bootp_response_size -
-			    offsetof(struct bootp, bp_vend));
-
-			if (servip.s_addr == 0)
-				servip = bootp_response->bp_siaddr;
-			if (rootip.s_addr == 0)
-				rootip = bootp_response->bp_siaddr;
-			if (gateip.s_addr == 0)
-				gateip = bootp_response->bp_giaddr;
-			if (myip.s_addr == 0)
-				myip = bootp_response->bp_yiaddr;
-			d->myip = myip;
-		}
-		if (rc < 0)
-			bootp(sock);
-	}
+	bootp(sock);
 	if (myip.s_addr != 0)
 		goto exit;
 #ifdef	NETIF_DEBUG
 	if (debug)
 		printf("net_open: BOOTP failed, trying RARP/RPC...\n");
-#endif
 #endif
 
 	/*

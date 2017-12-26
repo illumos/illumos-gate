@@ -417,7 +417,7 @@ smb_kshare_export_list(smb_ioc_share_t *ioc)
 	 * ioctl's total length.  We then assume the nvlist_unpack() will
 	 * sanity check the nvlist itself.
 	 */
-	if (smb_shrlen_bad_lengths(ioc)) {
+	if ((ioc->shrlen + offsetof(smb_ioc_share_t, shr)) > ioc->hdr.len) {
 		rc = EINVAL;
 		goto out;
 	}
@@ -503,7 +503,7 @@ smb_kshare_unexport_list(smb_ioc_share_t *ioc)
 	 * ioctl's total length.  We then assume the nvlist_unpack() will
 	 * sanity check the nvlist itself.
 	 */
-	if (smb_shrlen_bad_lengths(ioc)) {
+	if ((ioc->shrlen + offsetof(smb_ioc_share_t, shr)) > ioc->hdr.len) {
 		rc = EINVAL;
 		goto out;
 	}

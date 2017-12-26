@@ -864,6 +864,13 @@ smb_server_enum(smb_ioc_svcenum_t *ioc)
 		return (EINVAL);
 	}
 
+	/*
+	 * Reality check that the buffer-length insize the enum doesn't
+	 * overrun the ioctl's total length.
+	 */
+	if (svcenum->se_buflen + sizeof (*ioc) > ioc->hdr.len)
+		return (EINVAL);
+
 	if ((rc = smb_server_lookup(&sv)) != 0)
 		return (rc);
 
