@@ -364,30 +364,6 @@ smb_kshare_g_fini(void)
 
 
 /*
- * Reality check for smb_ioc_share_t parameters.
- */
-static boolean_t
-smb_shrlen_bad_lengths(smb_ioc_share_t *ioc)
-{
-	uint32_t shrlen_adjusted;
-
-	shrlen_adjusted = ioc->shrlen + offsetof(smb_ioc_share_t, shr);
-
-	/* uint32_t overflow check 1. */
-	if (shrlen_adjusted < ioc->shrlen)
-		return (B_TRUE);
-	/* uint32_t overflow check 2. */
-	if (shrlen_adjusted < offsetof(smb_ioc_share_t, shr))
-		return (B_TRUE);
-	/* Does the shrlen make the share nvlist exceed the ioctl length? */
-	if (shrlen_adjusted > ioc->hdr.len)
-		return (B_TRUE);
-
-	/* All good, the lengths are not bad. */
-	return (B_FALSE);
-}
-
-/*
  * A list of shares in nvlist format can be sent down
  * from userspace thourgh the IOCTL interface. The nvlist
  * is unpacked here and all the shares in the list will
