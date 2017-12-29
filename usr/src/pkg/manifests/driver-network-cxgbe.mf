@@ -87,7 +87,6 @@ driver name=t4nex clone_perms="t4nex 0666 root sys" \
     alias=pciex1425,549a \
     alias=pciex1425,549b \
     alias=pciex1425,549c \
-    alias=pciex1425,549c \
     alias=pciex1425,549d \
     alias=pciex1425,549e \
     alias=pciex1425,549f \
