@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -5361,8 +5361,8 @@ static sdev_plugin_validate_t
 vnd_sdev_validate(sdev_ctx_t ctx)
 {
 	enum vtype vt;
-	dev_t dev;
 	vnd_dev_t *vdp;
+	minor_t minor;
 
 	vt = sdev_ctx_vtype(ctx);
 	if (vt == VDIR)
@@ -5372,8 +5372,10 @@ vnd_sdev_validate(sdev_ctx_t ctx)
 	if (strcmp("ctl", sdev_ctx_name(ctx)) == 0)
 		return (SDEV_VTOR_VALID);
 
-	dev = (uintptr_t)sdev_ctx_vtype_data(ctx);
-	vdp = vnd_dev_lookup(getminor(dev));
+	if (sdev_ctx_minor(ctx, &minor) != 0)
+		return (SDEV_VTOR_STALE);
+
+	vdp = vnd_dev_lookup(minor);
 	if (vdp == NULL)
 		return (SDEV_VTOR_STALE);
 
