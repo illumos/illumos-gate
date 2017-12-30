@@ -950,6 +950,13 @@ size_t vnd_flush_nburst = 10;			/* 10 frames */
 #define	VND_SDEV_ZROOT	"/dev/vnd/zone"
 
 /*
+ * vnd relies on privileges, not mode bits to limit access.  As such, device
+ * files are read-write to everyone.
+ */
+#define	VND_SDEV_MODE	(S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | \
+			S_IROTH | S_IWOTH)
+
+/*
  * Statistic macros
  */
 #define	VND_STAT_INC(vsp, field, val) \
@@ -5420,8 +5427,8 @@ vnd_sdev_fillzone(vnd_pnsd_t *nsp, sdev_ctx_t ctx)
 		mutex_enter(&vdp->vdd_lock);
 		if ((vdp->vdd_flags & VND_D_LINKED) &&
 		    !(vdp->vdd_flags & (VND_D_CONDEMNED | VND_D_ZONE_DYING))) {
-			ret = sdev_plugin_mknod(ctx, vdp->vdd_lname, S_IFCHR,
-			    vdp->vdd_devid);
+			ret = sdev_plugin_mknod(ctx, vdp->vdd_lname,
+			    VND_SDEV_MODE, vdp->vdd_devid);
 			if (ret != 0 && ret != EEXIST) {
 				mutex_exit(&vdp->vdd_lock);
 				mutex_exit(&nsp->vpnd_lock);
@@ -5465,7 +5472,7 @@ vnd_sdev_filldir_root(sdev_ctx_t ctx)
 	 * Always add a reference to the control node. There's no need to
 	 * reference it since it always exists and is always what we clone from.
 	 */
-	ret = sdev_plugin_mknod(ctx, "ctl", S_IFCHR,
+	ret = sdev_plugin_mknod(ctx, "ctl", VND_SDEV_MODE,
 	    makedevice(ddi_driver_major(vnd_dip), 0));
 	if (ret != 0 && ret != EEXIST)
 		return (ret);

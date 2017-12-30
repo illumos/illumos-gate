@@ -248,28 +248,50 @@ sdev_plugin_mknod(sdev_ctx_t ctx, char *name, mode_t mode, dev_t dev)
 	sdev_node_t *sdvp;
 	timestruc_t now;
 	struct vattr vap;
+	mode_t type = mode & S_IFMT;
+	mode_t access = mode & S_IAMB;
 
 	if (sdev_plugin_name_isvalid(name, SDEV_PLUGIN_NAMELEN) == 0)
 		return (EINVAL);
 
 	sdvp = (sdev_node_t *)ctx;
 	ASSERT(RW_WRITE_HELD(&sdvp->sdev_contents));
-	if (mode != S_IFCHR && mode != S_IFBLK)
+
+	/*
+	 * Ensure only type and user/group/other permission bits are present.
+	 * Do not allow setuid, setgid, etc.
+	 */
+	if ((mode & ~(S_IFMT | S_IAMB)) != 0)
 		return (EINVAL);
+
+	/* Disallow types other than character and block devices */
+	if (type != S_IFCHR && type != S_IFBLK)
+		return (EINVAL);
+
+	/* Disallow execute bits */
+	if ((access & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)
+		return (EINVAL);
+
+	/* No bits other than 0666 in access */
+	ASSERT((access &
+	    ~(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) == 0);
+
+	/* Default to relatively safe access bits if none specified. */
+	if (access == 0)
+		access = 0600;
 
 	ASSERT(sdvp->sdev_private != NULL);
 
-	vap = *sdev_getdefault_attr(mode == S_IFCHR ? VCHR : VBLK);
+	vap = *sdev_getdefault_attr(type == S_IFCHR ? VCHR : VBLK);
 	gethrestime(&now);
 	vap.va_atime = now;
 	vap.va_mtime = now;
 	vap.va_ctime = now;
 	vap.va_rdev = dev;
-	vap.va_mode = mode | 0666;
+	vap.va_mode = type | access;
 
 	/* Despite the similar name, this is in fact a different function */
 	return (sdev_plugin_mknode(sdvp->sdev_private, sdvp, name, &vap));
-
 }
 
 static int
