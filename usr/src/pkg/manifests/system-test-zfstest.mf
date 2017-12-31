@@ -1253,6 +1253,9 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool/zpool_002_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool/zpool_003_pos \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_add/add_nested_replacing_spare \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add.cfg \
