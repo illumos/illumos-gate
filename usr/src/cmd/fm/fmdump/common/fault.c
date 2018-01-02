@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 #include <fmdump.h>
@@ -249,13 +249,17 @@ postprocess_msg(char *msg)
 static int
 flt_msg(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 {
-	char *msg;
+	char *msg, *uuid = "-", *code = "-";
 
 	if ((msg = fmd_msg_gettext_nv(g_msg, NULL, rp->rec_nvl)) == NULL) {
-		(void) fprintf(stderr, "%s: failed to format message: %s\n",
-		    g_pname, strerror(errno));
+		(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_UUID,
+		    &uuid);
+		(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_DIAG_CODE,
+		    &code);
+		(void) fprintf(stderr, "%s: failed to format message for "
+		    "diagcode %s, event %s: %s\n\n", g_pname, code, uuid,
+		    strerror(errno));
 		g_errs++;
-		return (-1);
 	} else {
 		postprocess_msg(msg);
 		fmdump_printf(fp, "%s\n", msg);
