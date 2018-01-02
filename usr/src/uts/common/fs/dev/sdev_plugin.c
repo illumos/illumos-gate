@@ -661,6 +661,8 @@ sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 	rw_exit(&sdp->sdev_contents);
 	VN_RELE(vp);
 
+	*errp = 0;
+
 	return ((sdev_plugin_hdl_t)spp);
 }
 
