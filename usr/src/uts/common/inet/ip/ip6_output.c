@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -866,8 +867,16 @@ ip_output_cksum_v6(iaflags_t ixaflags, mblk_t *mp, ip6_t *ip6h,
 		    ixa->ixa_raw_cksum_offset);
 		cksum = htons(protocol);
 	} else if (protocol == IPPROTO_ICMPV6) {
-		cksump = IPH_ICMPV6_CHECKSUMP(ip6h, ip_hdr_length);
-		cksum = IP_ICMPV6_CSUM_COMP;	/* Pseudo-header cksum */
+		/*
+		 * Currently we assume no HW support for ICMP checksum calc.
+		 *
+		 * When HW support is advertised for ICMP, we'll want the
+		 * following to be set:
+		 * cksump = IPH_ICMPV6_CHECKSUMP(ip6h, ip_hdr_length);
+		 * cksum = IP_ICMPV6_CSUM_COMP;		Pseudo-header cksum
+		 */
+
+		return (ip_output_sw_cksum_v6(mp, ip6h, ixa));
 	} else {
 	ip_hdr_cksum:
 		/* No IP header checksum for IPv6 */

@@ -58,6 +58,7 @@ SRCS =	acpi.c			\
 	pci_virtio_console.c	\
 	pci_virtio_net.c	\
 	pci_virtio_rnd.c	\
+	pci_virtio_viona.c	\
 	pci_xhci.c		\
 	pm.c			\
 	post.c			\
@@ -120,7 +121,7 @@ CSTD=		$(CSTD_GNU99)
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
-$(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -lmd -luuid -lvmmapi -lz
+$(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 
 .KEEP_STATE:

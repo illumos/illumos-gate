@@ -85,6 +85,9 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "ucode",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ln_minor_name,
 	},
+	{ "pseudo", "ddi_pseudo", "viona",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ln_minor_name,
+	},
 	{ "pseudo", "ddi_pseudo", "vmm",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, vmmctl,
 	}
@@ -113,6 +116,9 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	},
 	{ "serial", "^tty[a-z]$", RM_ALWAYS | RM_PRE,
 		ILEVEL_1, devfsadm_rm_all
+	},
+	{ "pseudo", "^viona$", RM_ALWAYS | RM_PRE | RM_HOT,
+		ILEVEL_0, devfsadm_rm_all
 	},
 	{ "pseudo", "^vmmctl$", RM_ALWAYS | RM_PRE | RM_HOT,
 		ILEVEL_0, devfsadm_rm_all

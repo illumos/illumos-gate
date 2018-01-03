@@ -1050,7 +1050,7 @@ hook_family_free(hook_family_int_t *hfi, hook_stack_t *hks)
 	/* Free container */
 	kmem_free(hfi, sizeof (*hfi));
 
-	if (hks->hks_shutdown == 2)
+	if (hks != NULL && hks->hks_shutdown == 2)
 		hook_stack_remove(hks);
 
 	mutex_exit(&hook_stack_lock);

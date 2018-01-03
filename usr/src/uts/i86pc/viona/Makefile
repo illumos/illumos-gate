@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -27,6 +27,7 @@ OBJECTS	= $(VIONA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(VIONA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io/viona
+MAPFILE		= $(UTSBASE)/i86pc/io/viona/viona.mapfile
 
 #
 # Include common rules.
@@ -49,8 +50,16 @@ LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
 LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 
+# needs work
+SMOFF += all_func_returns
+
+ALL_BUILDS	= $(ALL_BUILDSONLY64)
+DEF_BUILDS	= $(DEF_BUILDSONLY64)
+
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls -Ndrv/vmm
+LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls -Ndrv/vmm -Nmisc/neti
+LDFLAGS		+= -Nmisc/hook
+LDFLAGS		+= -M $(MAPFILE)
 
 #
 #	Default build targets.

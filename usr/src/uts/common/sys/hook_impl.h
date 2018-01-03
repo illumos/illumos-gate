@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*
@@ -171,7 +172,7 @@ typedef struct hook_family_int {
 	cvwaitlock_t			hfi_lock;
 	SLIST_ENTRY(hook_family_int)	hfi_entry;
 	hook_event_int_head_t		hfi_head;
-	hook_family_t 			hfi_family;
+	hook_family_t			hfi_family;
 	kstat_t				*hfi_kstat;
 	struct hook_stack		*hfi_stack;
 	hook_notify_head_t		hfi_nhead;
@@ -209,6 +210,7 @@ typedef struct hook_stack_head hook_stack_head_t;
 #define	Hn_ARP	"arp"
 #define	Hn_IPV4	"inet"
 #define	Hn_IPV6	"inet6"
+#define	Hn_VIONA "viona_inet"
 
 extern int hook_run(hook_family_int_t *, hook_event_token_t, hook_data_t);
 extern int hook_register(hook_family_int_t *, char *, hook_t *);

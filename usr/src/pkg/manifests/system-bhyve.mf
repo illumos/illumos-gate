@@ -35,8 +35,11 @@ dir path=usr group=sys
 dir path=usr/kernel/drv group=sys
 dir path=usr/kernel/drv/$(ARCH64) group=sys
 dir path=usr/sbin
+driver name=viona
 driver name=vmm
+file path=usr/kernel/drv/$(ARCH64)/viona
 file path=usr/kernel/drv/$(ARCH64)/vmm
+file path=usr/kernel/drv/viona.conf
 file path=usr/kernel/drv/vmm.conf
 file path=usr/sbin/bhyve mode=0555
 file path=usr/sbin/bhyvectl mode=0555

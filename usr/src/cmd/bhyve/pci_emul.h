@@ -27,6 +27,9 @@
  *
  * $FreeBSD$
  */
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
 
 #ifndef _PCI_EMUL_H_
 #define _PCI_EMUL_H_
@@ -71,6 +74,10 @@ struct pci_devemu {
 	uint64_t  (*pe_barread)(struct vmctx *ctx, int vcpu,
 				struct pci_devinst *pi, int baridx,
 				uint64_t offset, int size);
+
+#ifndef __FreeBSD__
+	void	(*pe_lintrupdate)(struct pci_devinst *pi);
+#endif /* __FreeBSD__ */
 };
 #define PCI_EMUL_SET(x)   DATA_SET(pci_devemu_set, x);
 
