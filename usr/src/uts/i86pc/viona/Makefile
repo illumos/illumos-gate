@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -48,6 +48,9 @@ LINTTAGS	+= -erroff=E_FUNC_ARG_UNUSED
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
 LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+
+ALL_BUILDS	= $(ALL_BUILDSONLY64)
+DEF_BUILDS	= $(DEF_BUILDSONLY64)
 
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls -Ndrv/vmm

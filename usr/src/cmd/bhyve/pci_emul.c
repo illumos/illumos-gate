@@ -1580,6 +1580,11 @@ pci_lintr_update(struct pci_devinst *pi)
 		pci_irq_assert(pi);
 	}
 	pthread_mutex_unlock(&pi->pi_lintr.lock);
+#ifndef __FreeBSD__
+	if (pi->pi_d->pe_lintrupdate != NULL) {
+		pi->pi_d->pe_lintrupdate(pi);
+	}
+#endif /* __FreeBSD__ */
 }
 
 int

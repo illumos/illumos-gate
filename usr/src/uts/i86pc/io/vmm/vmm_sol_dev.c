@@ -1409,6 +1409,17 @@ vmm_drv_ioport_unhook(vmm_hold_t *hold, void **cookie)
 	mutex_exit(&vmmdev_mtx);
 }
 
+int
+vmm_drv_msi(vmm_hold_t *hold, uint64_t addr, uint64_t msg)
+{
+	struct vm *vm;
+
+	ASSERT(hold != NULL);
+
+	vm = hold->vmh_sc->vmm_vm;
+	return (lapic_intr_msi(vm, addr, msg));
+}
+
 static int
 vmm_drv_purge(vmm_softc_t *sc)
 {

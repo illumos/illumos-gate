@@ -42,6 +42,7 @@ SRCS =	acpi.c			\
 	pci_virtio_block.c	\
 	pci_virtio_net.c	\
 	pci_virtio_rnd.c	\
+	pci_virtio_viona.c	\
 	pci_xhci.c		\
 	pm.c			\
 	post.c			\
