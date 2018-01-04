@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_LX_SYSCALL_H
@@ -57,7 +57,6 @@ extern long lx_fstat64(uintptr_t, uintptr_t);
 extern long lx_lstat64(uintptr_t, uintptr_t);
 extern long lx_fcntl(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_fcntl64(uintptr_t, uintptr_t, uintptr_t);
-extern long lx_flock(uintptr_t, uintptr_t);
 extern long lx_readdir(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_execve(uintptr_t, uintptr_t, uintptr_t);
 extern long lx_ioctl(uintptr_t, uintptr_t, uintptr_t);

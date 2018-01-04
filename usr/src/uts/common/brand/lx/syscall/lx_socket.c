@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -1370,6 +1370,23 @@ lx_convert_sock_args(int in_dom, int in_type, int in_proto, int *out_dom,
 	return (0);
 }
 
+/*
+ * For restartable socket syscall handling, the relevant syscalls are only
+ * restarted when a timeout is not set on the socket.
+ */
+static void
+lx_sock_syscall_restart(sonode_t *so, boolean_t recv)
+{
+	if (recv) {
+		if (so->so_rcvtimeo != 0)
+			return;
+	} else {
+		if (so->so_sndtimeo != 0)
+			return;
+	}
+
+	ttolxlwp(curthread)->br_syscall_restart = B_TRUE;
+}
 
 static int
 lx_socket_create(int domain, int type, int protocol, int options, file_t **fpp,
@@ -1574,6 +1591,9 @@ lx_connect(long sock, uintptr_t name, socklen_t namelen)
 	error = socket_connect(so, addr, len, fp->f_flag,
 	    _SOCONNECT_XPG4_2, CRED());
 
+	if (error == EINTR)
+		lx_sock_syscall_restart(so, B_FALSE);
+
 	/*
 	 * Linux connect(2) behavior is rather strange when using the
 	 * O_NONBLOCK flag.  The first call will return EINPROGRESS, as
@@ -1726,6 +1746,8 @@ lx_recv_common(int sock, struct nmsghdr *msg, xuio_t *xuiop, int flags,
 
 	error = lx_socket_recvmsg(so, msg, (struct uio *)xuiop, CRED());
 	if (error) {
+		if (error == EINTR)
+			lx_sock_syscall_restart(so, B_TRUE);
 		releasef(sock);
 		return (set_errno(error));
 	}
@@ -2203,6 +2225,8 @@ lx_send_common(int sock, struct nmsghdr *msg, struct uio *uiop, int flags)
 	nosig = ((flags & LX_MSG_NOSIGNAL) != 0);
 
 	error = lx_socket_sendmsg(so, msg, uiop, CRED(), nosig);
+	if (error == EINTR)
+		lx_sock_syscall_restart(so, B_FALSE);
 done:
 	if (control != NULL) {
 		kmem_free(control, controllen);
@@ -3980,6 +4004,8 @@ lx_accept_common(int sock, struct sockaddr *name, socklen_t *nlp, int flags)
 		return (set_errno(error));
 	}
 	if ((error = socket_accept(so, fp->f_flag, CRED(), &nso)) != 0) {
+		if (error == EINTR)
+			lx_sock_syscall_restart(so, B_TRUE);
 		setf(nfd, NULL);
 		unfalloc(nfp);
 		releasef(sock);

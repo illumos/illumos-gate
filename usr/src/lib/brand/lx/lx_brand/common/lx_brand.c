@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1088,7 +1088,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	lx_msgrcv,			/*  70: msgrcv */
 	lx_msgctl,			/*  71: msgctl */
 	NULL,				/*  72: fcntl */
-	lx_flock,			/*  73: flock */
+	NULL,				/*  73: flock */
 	lx_fsync,			/*  74: fsync */
 	lx_fdatasync,			/*  75: fdatasync */
 	lx_truncate,			/*  76: truncate */
@@ -1489,7 +1489,7 @@ static lx_syscall_handler_t lx_handlers[] = {
 	NULL,				/* 140: llseek */
 	NULL,				/* 141: getdents */
 	NULL,				/* 142: select */
-	lx_flock,			/* 143: flock */
+	NULL,				/* 143: flock */
 	NULL,				/* 144: msync */
 	NULL,				/* 145: readv */
 	NULL,				/* 146: writev */

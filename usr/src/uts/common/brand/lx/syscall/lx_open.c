@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -37,6 +37,7 @@
 #include <sys/lx_types.h>
 #include <sys/lx_fcntl.h>
 #include <sys/lx_misc.h>
+#include <sys/brand.h>
 
 extern int fcntl(int, int, intptr_t);
 extern int openat(int, char *, int, int);
@@ -244,6 +245,10 @@ lx_openat(int atfd, char *path, int fmode, int cmode)
 
 			(void) set_errno(oerror);
 		}
+
+		if (ttolwp(curthread)->lwp_errno == EINTR)
+			ttolxlwp(curthread)->br_syscall_restart = B_TRUE;
+
 		return (ttolwp(curthread)->lwp_errno);
 	}
 

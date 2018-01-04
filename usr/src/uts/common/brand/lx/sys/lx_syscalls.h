@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_LINUX_SYSCALLS_H
@@ -79,6 +79,7 @@ extern long lx_fcntl();
 extern long lx_fcntl64();
 extern long lx_fgetxattr();
 extern long lx_flistxattr();
+extern long lx_flock();
 extern long lx_fremovexattr();
 extern long lx_fsetxattr();
 extern long lx_fstat32();

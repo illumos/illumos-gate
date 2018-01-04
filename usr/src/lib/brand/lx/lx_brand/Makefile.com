@@ -21,7 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 LX_CMN  =	$(SRC)/common/brand/lx
@@ -34,7 +34,6 @@ COBJS	=	capabilities.o		\
 		debug.o			\
 		dir.o			\
 		file.o			\
-		fcntl.o			\
 		fork.o			\
 		lx_brand.o		\
 		misc.o			\

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -32,6 +32,7 @@
 #include <sys/sysmacros.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_ptm.h>
+#include <sys/brand.h>
 #include <sys/sunddi.h>
 #include <sys/thread.h>
 #include <sys/proc.h>
@@ -1749,6 +1750,29 @@ static lx_ioc_cmd_translator_t lx_ioc_xlate_blk[] = {
 	LX_IOC_CMD_TRANSLATOR_END
 };
 
+/*
+ * Linux only restarts ioctls for "slow" devices. This includes terminals,
+ * pipes, and sockets. If additional "slow" devices are discovered in the
+ * future, they can be added here as well.
+ */
+static boolean_t
+lx_ioctl_is_slow_dev(file_t *fp)
+{
+	int rv;
+	struct termio s_tio;
+	vtype_t vt = fp->f_vnode->v_type;
+
+	if (vt == VFIFO || vt == VSOCK)
+		return (B_TRUE);
+
+	/* Check if it's a terminal using the isatty() approach. */
+	if (vt == VCHR && VOP_IOCTL(fp->f_vnode, TCGETA, (intptr_t)&s_tio,
+	    FLFAKE(fp), fp->f_cred, &rv, NULL) == 0)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 static void
 lx_ioctl_vsd_free(void *data)
 {
@@ -1832,6 +1856,10 @@ lx_ioctl(int fdes, int cmd, intptr_t arg)
 	}
 
 	res = ict->lict_func(fp, ict->lict_cmd, arg, ict->lict_lxcmd);
+
+	if (ttolwp(curthread)->lwp_errno == EINTR && lx_ioctl_is_slow_dev(fp))
+		ttolxlwp(curthread)->br_syscall_restart = B_TRUE;
+
 	releasef(fdes);
 	return (res);
 }

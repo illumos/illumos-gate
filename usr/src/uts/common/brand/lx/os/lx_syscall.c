@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/kmem.h>
@@ -662,7 +662,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"llseek",	lx_llseek,		0,		5}, /* 140 */
 	{"getdents",	lx_getdents_32,		0,		3}, /* 141 */
 	{"select",	lx_select,		0,		5}, /* 142 */
-	{"flock",	NULL,			0,		2}, /* 143 */
+	{"flock",	lx_flock,		0,		2}, /* 143 */
 	{"msync",	lx_msync,		0,		3}, /* 144 */
 	{"readv",	lx_readv,		0,		3}, /* 145 */
 	{"writev",	lx_writev,		0,		3}, /* 146 */
@@ -963,7 +963,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"msgrcv",	NULL,			0,		5}, /* 70 */
 	{"msgctl",	NULL,			0,		3}, /* 71 */
 	{"fcntl",	lx_fcntl64,		0,		3}, /* 72 */
-	{"flock",	NULL,			0,		2}, /* 73 */
+	{"flock",	lx_flock,		0,		2}, /* 73 */
 	{"fsync",	NULL,			0,		1}, /* 74 */
 	{"fdatasync",	NULL,			0,		1}, /* 75 */
 	{"truncate",	NULL,			0,		2}, /* 76 */

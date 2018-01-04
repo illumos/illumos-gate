@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -27,9 +27,11 @@
 #include <sys/lx_fcntl.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_socket.h>
+#include <sys/brand.h>
 #include <sys/fs/fifonode.h>
 #include <sys/strsubr.h>
 #include <sys/stream.h>
+#include <sys/flock.h>
 
 extern int fcntl(int, int, intptr_t);
 extern int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
@@ -464,8 +466,13 @@ lx_fcntl_lock(int fd, int lx_cmd, void *arg)
 			break;
 
 		if ((error = VOP_FRLOCK(vp, cmd, &bf, flag, offset, NULL,
-		    fp->f_cred, NULL)) != 0)
+		    fp->f_cred, NULL)) != 0) {
+			if (cmd == F_SETLKW && error == EINTR) {
+				ttolxlwp(curthread)->br_syscall_restart =
+				    B_TRUE;
+			}
 			break;
+		}
 
 		if (cmd != F_GETLK)
 			break;
@@ -626,4 +633,69 @@ lx_fcntl64(int fd, int cmd, intptr_t arg)
 	default:
 		return (lx_fcntl_common(fd, cmd, (ulong_t)arg));
 	}
+}
+
+/*
+ * Apply or remove an advisory lock on the entire file. F_FLOCK and F_FLOCKW
+ * are OFD-style locks. For more information, see the comment on ofdlock().
+ */
+long
+lx_flock(int fd, int op)
+{
+	int cmd;
+	int error;
+	flock64_t bf;
+	file_t *fp;
+
+	if (op & LX_LOCK_NB) {
+		cmd = F_FLOCK;
+		op &= ~LX_LOCK_NB;
+	} else {
+		cmd = F_FLOCKW;
+	}
+
+	switch (op) {
+	case LX_LOCK_UN:
+		bf.l_type = F_UNLCK;
+		break;
+	case LX_LOCK_SH:
+		bf.l_type = F_RDLCK;
+		break;
+	case LX_LOCK_EX:
+		bf.l_type = F_WRLCK;
+		break;
+	default:
+		return (set_errno(EINVAL));
+	}
+
+	bf.l_whence = 0;
+	bf.l_start = 0;
+	bf.l_len = 0;
+	bf.l_sysid = 0;
+	bf.l_pid = 0;
+
+	if ((fp = getf(fd)) == NULL)
+		return (set_errno(EBADF));
+
+	/*
+	 * See the locking comment in fcntl.c. In summary, the *_frlock
+	 * functions in the various file systems basically do some validation,
+	 * then funnel everything through the fs_frlock function. For OFD-style
+	 * locks, fs_frlock will do nothing. Once control returns here, we call
+	 * the ofdlock function to do the actual locking.
+	 */
+	error = VOP_FRLOCK(fp->f_vnode, cmd, &bf, fp->f_flag, fp->f_offset,
+	    NULL, fp->f_cred, NULL);
+	if (error != 0) {
+		releasef(fd);
+		return (set_errno(error));
+	}
+	error = ofdlock(fp, cmd, &bf, fp->f_flag, fp->f_offset);
+	if (error != 0) {
+		if (cmd == F_FLOCKW && error == EINTR)
+			ttolxlwp(curthread)->br_syscall_restart = B_TRUE;
+		(void) set_errno(error);
+	}
+	releasef(fd);
+	return (error);
 }
