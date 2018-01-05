@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -487,7 +487,7 @@ devnet_filldir(struct sdev_node *ddv)
 		/*
 		 * Clean out everything underneath before we remove ourselves.
 		 */
-		if (SDEVTOV(ddv)->v_type == VDIR) {
+		if (SDEVTOV(dv)->v_type == VDIR) {
 			ret = sdev_cleandir(dv, NULL, 0);
 			ASSERT(ret == 0);
 		}
