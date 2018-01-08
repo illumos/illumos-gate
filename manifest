@@ -11025,7 +11025,7 @@ f usr/share/lib/zoneinfo/America/Punta_Arenas 0644 root bin
 f usr/share/lib/zoneinfo/America/Rainy_River 0644 root bin
 f usr/share/lib/zoneinfo/America/Rankin_Inlet 0644 root bin
 f usr/share/lib/zoneinfo/America/Recife 0644 root bin
-h usr/share/lib/zoneinfo/America/Regina=usr/share/lib/zoneinfo/Canada/Saskatchewan
+f usr/share/lib/zoneinfo/America/Regina 0644 root bin
 f usr/share/lib/zoneinfo/America/Resolute 0644 root bin
 h usr/share/lib/zoneinfo/America/Rio_Branco=usr/share/lib/zoneinfo/Brazil/Acre
 h usr/share/lib/zoneinfo/America/Rosario=usr/share/lib/zoneinfo/America/Cordoba
@@ -11220,12 +11220,11 @@ f usr/share/lib/zoneinfo/CST6CDT 0644 root bin
 d usr/share/lib/zoneinfo/Canada 0755 root bin
 f usr/share/lib/zoneinfo/Canada/Atlantic 0644 root bin
 f usr/share/lib/zoneinfo/Canada/Central 0644 root bin
-h usr/share/lib/zoneinfo/Canada/East-Saskatchewan=usr/share/lib/zoneinfo/Canada/Saskatchewan
 f usr/share/lib/zoneinfo/Canada/Eastern 0644 root bin
 f usr/share/lib/zoneinfo/Canada/Mountain 0644 root bin
 f usr/share/lib/zoneinfo/Canada/Newfoundland 0644 root bin
 f usr/share/lib/zoneinfo/Canada/Pacific 0644 root bin
-f usr/share/lib/zoneinfo/Canada/Saskatchewan 0644 root bin
+h usr/share/lib/zoneinfo/Canada/Saskatchewan=usr/share/lib/zoneinfo/America/Regina
 f usr/share/lib/zoneinfo/Canada/Yukon 0644 root bin
 d usr/share/lib/zoneinfo/Chile 0755 root bin
 f usr/share/lib/zoneinfo/Chile/Continental 0644 root bin
