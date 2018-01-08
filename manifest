@@ -11025,6 +11025,7 @@ f usr/share/lib/zoneinfo/America/Punta_Arenas 0644 root bin
 f usr/share/lib/zoneinfo/America/Rainy_River 0644 root bin
 f usr/share/lib/zoneinfo/America/Rankin_Inlet 0644 root bin
 f usr/share/lib/zoneinfo/America/Recife 0644 root bin
+h usr/share/lib/zoneinfo/America/Regina=usr/share/lib/zoneinfo/Canada/Saskatchewan
 f usr/share/lib/zoneinfo/America/Resolute 0644 root bin
 h usr/share/lib/zoneinfo/America/Rio_Branco=usr/share/lib/zoneinfo/Brazil/Acre
 h usr/share/lib/zoneinfo/America/Rosario=usr/share/lib/zoneinfo/America/Cordoba
