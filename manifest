@@ -11143,9 +11143,6 @@ f usr/share/lib/zoneinfo/Asia/Qatar 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Qyzylorda 0644 root bin
 h usr/share/lib/zoneinfo/Asia/Rangoon=usr/share/lib/zoneinfo/Asia/Yangon
 f usr/share/lib/zoneinfo/Asia/Riyadh 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Riyadh87 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Riyadh88 0644 root bin
-f usr/share/lib/zoneinfo/Asia/Riyadh89 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Saigon 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Sakhalin 0644 root bin
 f usr/share/lib/zoneinfo/Asia/Samarkand 0644 root bin
