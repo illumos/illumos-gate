@@ -11025,7 +11025,6 @@ f usr/share/lib/zoneinfo/America/Punta_Arenas 0644 root bin
 f usr/share/lib/zoneinfo/America/Rainy_River 0644 root bin
 f usr/share/lib/zoneinfo/America/Rankin_Inlet 0644 root bin
 f usr/share/lib/zoneinfo/America/Recife 0644 root bin
-h usr/share/lib/zoneinfo/America/Regina=usr/share/lib/zoneinfo/Canada/Saskatchewan
 f usr/share/lib/zoneinfo/America/Resolute 0644 root bin
 h usr/share/lib/zoneinfo/America/Rio_Branco=usr/share/lib/zoneinfo/Brazil/Acre
 h usr/share/lib/zoneinfo/America/Rosario=usr/share/lib/zoneinfo/America/Cordoba
@@ -11372,10 +11371,6 @@ d usr/share/lib/zoneinfo/Mexico 0755 root bin
 h usr/share/lib/zoneinfo/Mexico/BajaNorte=usr/share/lib/zoneinfo/America/Tijuana
 f usr/share/lib/zoneinfo/Mexico/BajaSur 0644 root bin
 f usr/share/lib/zoneinfo/Mexico/General 0644 root bin
-d usr/share/lib/zoneinfo/Mideast 0755 root bin
-f usr/share/lib/zoneinfo/Mideast/Riyadh87 0644 root bin
-f usr/share/lib/zoneinfo/Mideast/Riyadh88 0644 root bin
-f usr/share/lib/zoneinfo/Mideast/Riyadh89 0644 root bin
 f usr/share/lib/zoneinfo/NZ 0644 root bin
 f usr/share/lib/zoneinfo/NZ-CHAT 0644 root bin
 h usr/share/lib/zoneinfo/Navajo=usr/share/lib/zoneinfo/US/Mountain
@@ -11464,9 +11459,6 @@ f usr/share/lib/zoneinfo/src/europe 0644 root bin
 f usr/share/lib/zoneinfo/src/factory 0644 root bin
 f usr/share/lib/zoneinfo/src/northamerica 0644 root bin
 f usr/share/lib/zoneinfo/src/pacificnew 0644 root bin
-f usr/share/lib/zoneinfo/src/solar87 0644 root bin
-f usr/share/lib/zoneinfo/src/solar88 0644 root bin
-f usr/share/lib/zoneinfo/src/solar89 0644 root bin
 f usr/share/lib/zoneinfo/src/southamerica 0644 root bin
 f usr/share/lib/zoneinfo/src/systemv 0644 root bin
 d usr/share/lib/zoneinfo/tab 0755 root bin
