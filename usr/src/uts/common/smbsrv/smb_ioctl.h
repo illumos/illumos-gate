@@ -126,6 +126,7 @@ typedef struct smb_svcenum {
 	uint32_t	se_type;	/* object type to enumerate */
 	uint32_t	se_level;	/* level of detail being requested */
 	uint32_t	se_prefmaxlen;	/* client max size buffer preference */
+					/* (ignored by kernel) */
 	uint32_t	se_resume;	/* client resume handle */
 	uint32_t	se_bavail;	/* remaining buffer space in bytes */
 	uint32_t	se_bused;	/* consumed buffer space in bytes */

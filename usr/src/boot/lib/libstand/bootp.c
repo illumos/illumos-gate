@@ -349,17 +349,6 @@ bad:
 	return (-1);
 }
 
-int
-dhcp_try_rfc1048(uint8_t *cp, size_t len)
-{
-
-	expected_dhcpmsgtype = DHCPACK;
-	if (bcmp(vm_rfc1048, cp, sizeof (vm_rfc1048)) == 0) {
-		return (vend_rfc1048(cp, len));
-	}
-	return (-1);
-}
-
 static int
 vend_rfc1048(u_char *cp, u_int len)
 {

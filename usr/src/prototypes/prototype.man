@@ -9,5 +9,5 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2017 <contributor>
+.\" Copyright 2018 <contributor>
 .\"
