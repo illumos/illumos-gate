@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd May 25, 2017
+.Dd May 28, 2017
 .Dt PXEBOOT 5
 .Os
 .Sh NAME
@@ -37,6 +37,11 @@ configured to run under Intel's Preboot Execution Environment (PXE) system.
 PXE is a form of smart boot ROM, built into Ethernet cards, and
 Ethernet-equipped motherboards.
 PXE supports DHCP configuration and provides low-level NIC access services.
+.Pp
+The DHCP client will set a DHCP user class named
+.Va illumos
+to allow flexible configuration of the DHCP server.
+.Pp
 The
 .Nm
 bootloader retrieves the kernel, modules,
@@ -63,6 +68,9 @@ max-lease-time 120;
 subnet 10.0.0.0 netmask 255.255.255.0 {
        filename "pxeboot";
        range 10.0.0.10 10.0.0.254;
+       if exists user-class and option user-class = "illumos" {
+            option root-path "tftp://10.0.0.1/illumos";
+       }
 }
 
 .Ed
@@ -80,6 +88,33 @@ expects to fetch
 .Pa /boot/loader.rc
 from the specified server before loading any other files.
 .Pp
+Valid
+.Cm option Va root-path
+syntax is
+.Bd -literal -offset indent
+[<scheme>://][<ip-address>/]<path>
+.Ed
+.Pp
+\&...where
+.Qq scheme
+is either
+.Qq nfs
+or
+.Qq tftp ,
+.Qq ip-address
+is the address of the server, and
+.Qq path
+is the path to the root filesystem on the server.
+If
+.Qq scheme
+is not specified,
+.Nm
+defaults to using NFS if the
+.Va root-path
+variable is in the
+.Qq Pa ip-address Ns :/ Ns Pa path
+form, otherwise TFTP is used.
+.Pp
 .Nm
 defaults to a conservative 1024 byte NFS data packet size.
 This may be changed by setting the
@@ -87,17 +122,6 @@ This may be changed by setting the
 variable in
 .Pa /boot/loader.conf .
 Valid values range from 1024 to 16384 bytes.
-.Pp
-.Nm
-chooses NFS or TFTP based on the value of
-.Va root-path
-variable provided by the DHCP server.
-.Nm
-defaults to use NFS if the
-.Va root-path
-variable is in the
-.Qq Pa ip-address Ns :/ Ns Pa path
-form, otherwise TFTP is used.
 .Pp
 TFTP block size can be controlled by setting the
 .Va tftp.blksize

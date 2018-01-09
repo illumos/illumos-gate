@@ -52,8 +52,6 @@ static const boot_module_t *boot_modules[] =
 /* The initial number of handles used to query EFI for partitions. */
 #define NUM_HANDLES_INIT	24
 
-EFI_STATUS efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE* Xsystab);
-
 EFI_SYSTEM_TABLE *systab;
 EFI_BOOT_SERVICES *bs;
 static EFI_HANDLE *image;
@@ -93,7 +91,7 @@ Free(void *buf, const char *file __unused, int line __unused)
 static BOOLEAN
 nodes_match(EFI_DEVICE_PATH *imgpath, EFI_DEVICE_PATH *devpath)
 {
-	int len;
+	size_t len;
 
 	if (imgpath == NULL || imgpath->Type != devpath->Type ||
 	    imgpath->SubType != devpath->SubType)

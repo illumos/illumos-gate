@@ -10,13 +10,13 @@
 #
 
 #
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
 # Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2017.2,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2017.3,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -44,7 +44,6 @@ dir path=usr/share/lib/zoneinfo/Etc
 dir path=usr/share/lib/zoneinfo/Europe
 dir path=usr/share/lib/zoneinfo/Indian
 dir path=usr/share/lib/zoneinfo/Mexico
-dir path=usr/share/lib/zoneinfo/Mideast
 dir path=usr/share/lib/zoneinfo/Pacific
 dir path=usr/share/lib/zoneinfo/US
 dir path=usr/share/lib/zoneinfo/src
@@ -276,9 +275,6 @@ file path=usr/share/lib/zoneinfo/Asia/Pyongyang
 file path=usr/share/lib/zoneinfo/Asia/Qatar
 file path=usr/share/lib/zoneinfo/Asia/Qyzylorda
 file path=usr/share/lib/zoneinfo/Asia/Riyadh
-file path=usr/share/lib/zoneinfo/Asia/Riyadh87
-file path=usr/share/lib/zoneinfo/Asia/Riyadh88
-file path=usr/share/lib/zoneinfo/Asia/Riyadh89
 file path=usr/share/lib/zoneinfo/Asia/Sakhalin
 file path=usr/share/lib/zoneinfo/Asia/Samarkand
 file path=usr/share/lib/zoneinfo/Asia/Seoul
@@ -465,9 +461,6 @@ file path=usr/share/lib/zoneinfo/src/europe
 file path=usr/share/lib/zoneinfo/src/factory
 file path=usr/share/lib/zoneinfo/src/northamerica
 file path=usr/share/lib/zoneinfo/src/pacificnew
-file path=usr/share/lib/zoneinfo/src/solar87
-file path=usr/share/lib/zoneinfo/src/solar88
-file path=usr/share/lib/zoneinfo/src/solar89
 file path=usr/share/lib/zoneinfo/src/southamerica
 file path=usr/share/lib/zoneinfo/src/systemv
 file path=usr/share/lib/zoneinfo/tab/continent.tab
@@ -617,8 +610,6 @@ hardlink path=usr/share/lib/zoneinfo/Brazil/East target=../America/Sao_Paulo
 hardlink path=usr/share/lib/zoneinfo/Brazil/West target=../America/Manaus
 hardlink path=usr/share/lib/zoneinfo/Canada/Atlantic target=../America/Halifax
 hardlink path=usr/share/lib/zoneinfo/Canada/Central target=../America/Winnipeg
-hardlink path=usr/share/lib/zoneinfo/Canada/East-Saskatchewan \
-    target=../America/Regina
 hardlink path=usr/share/lib/zoneinfo/Canada/Eastern target=../America/Toronto
 hardlink path=usr/share/lib/zoneinfo/Canada/Mountain \
     target=../America/Edmonton
@@ -685,9 +676,6 @@ hardlink path=usr/share/lib/zoneinfo/Mexico/BajaNorte \
 hardlink path=usr/share/lib/zoneinfo/Mexico/BajaSur target=../America/Mazatlan
 hardlink path=usr/share/lib/zoneinfo/Mexico/General \
     target=../America/Mexico_City
-hardlink path=usr/share/lib/zoneinfo/Mideast/Riyadh87 target=../Asia/Riyadh87
-hardlink path=usr/share/lib/zoneinfo/Mideast/Riyadh88 target=../Asia/Riyadh88
-hardlink path=usr/share/lib/zoneinfo/Mideast/Riyadh89 target=../Asia/Riyadh89
 hardlink path=usr/share/lib/zoneinfo/NZ target=Pacific/Auckland
 hardlink path=usr/share/lib/zoneinfo/NZ-CHAT target=Pacific/Chatham
 hardlink path=usr/share/lib/zoneinfo/Navajo target=America/Denver
