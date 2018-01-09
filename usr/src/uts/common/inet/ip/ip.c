@@ -22,9 +22,9 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
  * Copyright (c) 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2018 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -5415,6 +5415,7 @@ notfound:
 		}
 		return;
 	}
+	CONN_INC_REF(connp);
 	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
 
 	/*
@@ -5427,7 +5428,6 @@ notfound:
 		conn_t		*next_connp;
 		mblk_t		*mp1;
 
-		CONN_INC_REF(connp);
 		connp = connp->conn_next;
 		for (;;) {
 			while (connp != NULL) {
