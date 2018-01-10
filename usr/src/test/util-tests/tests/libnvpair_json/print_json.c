@@ -814,7 +814,7 @@ main(int argc, char **argv)
 	/*
 	 * Print the resultant list, and a terminating newline:
 	 */
-	if (nvlist_print_json(stdout, lw->lw_nvl[0]) != 0 ||
+	if (nvlist_print_json(stdout, lw->lw_nvl[0]) < 0 ||
 	    fprintf(stdout, "\n") < 0)
 		goto out;
 

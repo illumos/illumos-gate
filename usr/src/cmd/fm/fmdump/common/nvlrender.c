@@ -83,7 +83,7 @@ fmdump_render_nvlist(nvlist_prtctl_t pctl, void *private, nvlist_t *nvl,
 int
 fmdump_print_json(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 {
-	if (nvlist_print_json(fp, rp->rec_nvl) != 0 || fprintf(fp, "\n") < 0 ||
+	if (nvlist_print_json(fp, rp->rec_nvl) < 0 || fprintf(fp, "\n") < 0 ||
 	    fflush(fp) != 0)
 		return (-1);
 
