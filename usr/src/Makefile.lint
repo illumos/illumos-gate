@@ -128,7 +128,6 @@ COMMON_SUBDIRS = \
 	cmd/fdetach \
 	cmd/fdformat \
 	cmd/fdisk \
-	cmd/fgrep \
 	cmd/file \
 	cmd/find \
 	cmd/fmthard \
@@ -156,7 +155,6 @@ COMMON_SUBDIRS = \
 	cmd/getopt \
 	cmd/gettext \
 	cmd/grep \
-	cmd/grep_xpg4 \
 	cmd/groups \
 	cmd/halt \
 	cmd/head \

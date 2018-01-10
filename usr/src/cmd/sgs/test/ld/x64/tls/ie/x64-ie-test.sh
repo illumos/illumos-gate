@@ -16,7 +16,7 @@ function grep_test {
     name=$1
     pattern=$2
 
-    if /usr/xpg4/bin/fgrep -q "${pattern}"; then
+    if /usr/bin/fgrep -q "${pattern}"; then
 	print -u2 "pass: $name"
     else
         print -u2 "FAIL: $name"

@@ -2092,7 +2092,7 @@ f usr/bin/dumpkeys 0555 root bin
 f usr/bin/echo 0555 root bin
 f usr/bin/ed 0555 root bin
 f usr/bin/edit 0555 root bin
-f usr/bin/egrep 0555 root bin
+h usr/bin/egrep=usr/bin/grep
 f usr/bin/eject 0555 root bin
 h usr/bin/elfdump=usr/lib/isaexec
 f usr/bin/elfedit 0555 root bin
@@ -2111,7 +2111,7 @@ h usr/bin/fc=usr/bin/alias
 f usr/bin/fdetach 0555 root bin
 f usr/bin/fdformat 4555 root bin
 h usr/bin/fg=usr/bin/alias
-f usr/bin/fgrep 0555 root bin
+h usr/bin/fgrep=usr/bin/grep
 h usr/bin/ficl-sys=usr/lib/isaexec
 f usr/bin/file 0555 root bin
 f usr/bin/filesync 0555 root bin
@@ -20547,18 +20547,18 @@ f usr/xpg4/bin/df 0555 root bin
 f usr/xpg4/bin/du 0555 root bin
 f usr/xpg4/bin/ed 0555 root bin
 f usr/xpg4/bin/edit 0555 root bin
-h usr/xpg4/bin/egrep=usr/xpg4/bin/grep
+s usr/xpg4/bin/egrep=../../bin/grep
 f usr/xpg4/bin/env 0555 root bin
 h usr/xpg4/bin/ex=usr/xpg4/bin/edit
 f usr/xpg4/bin/expr 0555 root bin
 s usr/xpg4/bin/fc=../../bin/alias
 s usr/xpg4/bin/fg=../../bin/alias
-h usr/xpg4/bin/fgrep=usr/xpg4/bin/grep
+s usr/xpg4/bin/fgrep=../../bin/grep
 f usr/xpg4/bin/file 0555 root bin
 f usr/xpg4/bin/find 0555 root bin
 f usr/xpg4/bin/getconf 0555 root bin
 s usr/xpg4/bin/getopts=../../bin/alias
-f usr/xpg4/bin/grep 0555 root bin
+s usr/xpg4/bin/grep=../../bin/grep
 s usr/xpg4/bin/hash=../../bin/alias
 f usr/xpg4/bin/id 0555 root bin
 s usr/xpg4/bin/ipcs=../../bin/ipcs

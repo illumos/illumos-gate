@@ -27,8 +27,6 @@
 #	Copyright (c) 1999, 2001 by Sun Microsystems, Inc.
 #	All rights reserved.
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
-
 usage="usage: diff3 file1 file2 file3"
 
 # mktmpdir - Create a private (mode 0700) temporary directory inside of /tmp
@@ -80,7 +78,7 @@ fi
 STATUS=$?
 if [ $STATUS -eq 1 ]
 then
-	/usr/xpg4/bin/grep -q "^[<>]" $tmpdir/d3a$$
+	/usr/bin/grep -q "^[<>]" $tmpdir/d3a$$
 	RET=$?
 	if [ $RET -eq 1 ]
 	then
@@ -105,7 +103,7 @@ fi
 STATUS=$?
 if [ $STATUS -eq 1 ]
 then
-	/usr/xpg4/bin/grep -q "^[<>]" $tmpdir/d3b$$
+	/usr/bin/grep -q "^[<>]" $tmpdir/d3b$$
 	RET=$?
 	if [ $RET -eq 1 ]
 	then

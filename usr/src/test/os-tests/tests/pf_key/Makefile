@@ -34,10 +34,6 @@ $(CMDS) := FILEMODE = 0555
 LDLIBS += -lsocket
 kmc-updater := LDLIBS += -lipsecutil
 
-eacq-enabler:
-	$(LINK.c) eacq-enabler.c -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
 all: $(PROG)
 
 install: all $(CMDS)
