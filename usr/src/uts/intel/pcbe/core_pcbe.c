@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -1326,9 +1327,26 @@ core_pcbe_init(void)
 			/* Westmere */
 			case 37:
 			case 44:
+			/* Sandy Bridge */
+			case 42:
+			case 45:
 			/* Nehalem-EX */
 			case 46:
 			case 47:
+			/* Ivy Bridge */
+			case 58:
+			case 62:
+			/* Haswell */
+			case 60:
+			case 63:
+			case 69:
+			case 70:
+			/* Broadwell */
+			case 61:
+			case 71:
+			/* Skylake */
+			case 78:
+			case 85:
 				events_table = events_fam6_nhm;
 				break;
 			case 28:

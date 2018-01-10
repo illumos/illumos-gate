@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2018, Joyent, Inc.
 #
 # This Makefile builds
 # the Intel Core Architecture Performance Counter BackEnd (PCBE).
@@ -42,9 +43,22 @@ SOFTLINKS	= pcbe.GenuineIntel.6.23 \
 			pcbe.GenuineIntel.6.30 \
 			pcbe.GenuineIntel.6.31 \
 			pcbe.GenuineIntel.6.37 \
+			pcbe.GenuineIntel.6.42 \
 			pcbe.GenuineIntel.6.44 \
+			pcbe.GenuineIntel.6.45 \
 			pcbe.GenuineIntel.6.46 \
-			pcbe.GenuineIntel.6.47
+			pcbe.GenuineIntel.6.47 \
+			pcbe.GenuineIntel.6.58 \
+			pcbe.GenuineIntel.6.60 \
+			pcbe.GenuineIntel.6.61 \
+			pcbe.GenuineIntel.6.62 \
+			pcbe.GenuineIntel.6.63 \
+			pcbe.GenuineIntel.6.69 \
+			pcbe.GenuineIntel.6.70 \
+			pcbe.GenuineIntel.6.71 \
+			pcbe.GenuineIntel.6.78 \
+			pcbe.GenuineIntel.6.79 \
+			pcbe.GenuineIntel.6.85
 ROOTSOFTLINKS	= $(SOFTLINKS:%=$(ROOT_PSM_PCBE_DIR)/%)
 
 #
