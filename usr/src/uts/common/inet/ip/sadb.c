@@ -2330,7 +2330,12 @@ sadb_form_query(keysock_in_t *ksi, uint32_t req, uint32_t match,
 
 	if ((match & IPSA_Q_KMC) && (sq->kmcext)) {
 		sq->kmp = sq->kmcext->sadb_x_kmc_proto;
-		/* Be liberal in what we receive.  Special-case IKEv1. */
+		/*
+		 * Be liberal in what we receive.  Special-case the IKEv1
+		 * cookie, which closed-source in.iked assumes is 32 bits.
+		 * Now that we store all 64 bits, we should pre-zero the
+		 * reserved field on behalf of closed-source in.iked.
+		 */
 		if (sq->kmp == SADB_X_KMP_IKE) {
 			/* Just in case in.iked is misbehaving... */
 			sq->kmcext->sadb_x_kmc_reserved = 0;
@@ -3137,7 +3142,12 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 
 	if (kmcext != NULL) {
 		newbie->ipsa_kmp = kmcext->sadb_x_kmc_proto;
-		/* Be liberal in what we receive.  Special-case IKEv1. */
+		/*
+		 * Be liberal in what we receive.  Special-case the IKEv1
+		 * cookie, which closed-source in.iked assumes is 32 bits.
+		 * Now that we store all 64 bits, we should pre-zero the
+		 * reserved field on behalf of closed-source in.iked.
+		 */
 		if (newbie->ipsa_kmp == SADB_X_KMP_IKE) {
 			/* Just in case in.iked is misbehaving... */
 			kmcext->sadb_x_kmc_reserved = 0;
