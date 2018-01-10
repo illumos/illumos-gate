@@ -638,6 +638,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(tlimod,	t_kclose,		nomod_zero);
 	NO_UNLOAD_STUB(tlimod,	t_kspoll,		nomod_zero);
 	NO_UNLOAD_STUB(tlimod,	t_kfree,		nomod_zero);
+	NO_UNLOAD_STUB(tlimod,	t_koptmgmt,		nomod_zero);
 	END_MODULE(tlimod);
 #endif
 
