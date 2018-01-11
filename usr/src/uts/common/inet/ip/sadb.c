@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2017 Joyent, Inc.
+ * Copyright (c) 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -5126,7 +5126,7 @@ sadb_acquire_prop(ipsec_action_t *ap, netstack_t *ns, boolean_t do_esp)
 	sadb_comb_t *comb;
 	ipsec_action_t *walker;
 	int ncombs, allocsize, ealgid, aalgid, aminbits, amaxbits, eminbits,
-	    emaxbits, replay;
+	    emaxbits, esaltlen, replay;
 	uint64_t softbytes, hardbytes, softaddtime, hardaddtime, softusetime,
 	    hardusetime;
 	uint64_t kmc = 0;
@@ -5254,13 +5254,14 @@ sadb_acquire_prop(ipsec_action_t *ap, netstack_t *ns, boolean_t do_esp)
 		}
 
 		if (ealg == NULL) {
-			ealgid = eminbits = emaxbits = 0;
+			ealgid = eminbits = emaxbits = esaltlen = 0;
 		} else {
 			ealgid = ealg->alg_id;
 			eminbits =
 			    MAX(prot->ipp_espe_minbits, ealg->alg_ef_minbits);
 			emaxbits =
 			    MIN(prot->ipp_espe_maxbits, ealg->alg_ef_maxbits);
+			esaltlen = ealg->alg_saltlen;
 		}
 
 		if (aalg == NULL) {
@@ -5278,6 +5279,7 @@ sadb_acquire_prop(ipsec_action_t *ap, netstack_t *ns, boolean_t do_esp)
 		comb->sadb_comb_encrypt = ealgid;
 		comb->sadb_comb_encrypt_minbits = eminbits;
 		comb->sadb_comb_encrypt_maxbits = emaxbits;
+		comb->sadb_x_comb_encrypt_saltbits = SADB_8TO1(esaltlen);
 		comb->sadb_comb_auth = aalgid;
 		comb->sadb_comb_auth_minbits = aminbits;
 		comb->sadb_comb_auth_maxbits = amaxbits;
@@ -5941,7 +5943,7 @@ sadb_new_algdesc(uint8_t *start, uint8_t *limit,
 		maxbits = algp->alg_ef_maxbits;
 	rw_exit(&ipss->ipsec_alg_lock);
 
-	algdesc->sadb_x_algdesc_reserved = SADB_8TO1(algp->alg_saltlen);
+	algdesc->sadb_x_algdesc_saltbits = SADB_8TO1(algp->alg_saltlen);
 	algdesc->sadb_x_algdesc_satype = satype;
 	algdesc->sadb_x_algdesc_algtype = algtype;
 	algdesc->sadb_x_algdesc_alg = alg;

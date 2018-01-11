@@ -290,7 +290,9 @@ typedef struct sadb_comb {
 	uint16_t sadb_comb_auth_maxbits;
 	uint16_t sadb_comb_encrypt_minbits;	/* Bit strengths for encrypt */
 	uint16_t sadb_comb_encrypt_maxbits;
-	uint32_t sadb_comb_reserved;
+	uint8_t sadb_x_comb_encrypt_saltbits;
+	uint8_t sadb_x_comb_reserved;
+	uint16_t sadb_comb_reserved;
 	uint32_t sadb_comb_soft_allocations;	/* Lifetime proposals for */
 	uint32_t sadb_comb_hard_allocations;	/* this combination. */
 	uint64_t sadb_comb_soft_bytes;
@@ -340,7 +342,7 @@ typedef struct sadb_x_algdesc {
 			uint8_t sadb_x_algdesc_usatype;	/* ESP, AH, etc. */
 			uint8_t sadb_x_algdesc_ualgtype; /* AUTH, CRYPT, COMP */
 			uint8_t sadb_x_algdesc_ualg;	/* 3DES, MD5, etc. */
-			uint8_t sadb_x_algdesc_ureserved;
+			uint8_t sadb_x_algdesc_usaltbits;
 			uint16_t sadb_x_algdesc_uminbits; /* Bit strengths. */
 			uint16_t sadb_x_algdesc_umaxbits;
 		} sadb_x_algdesc_actual;
@@ -352,8 +354,8 @@ typedef struct sadb_x_algdesc {
 	sadb_x_algdesc_u.sadb_x_algdesc_actual.sadb_x_algdesc_ualgtype
 #define	sadb_x_algdesc_alg \
 	sadb_x_algdesc_u.sadb_x_algdesc_actual.sadb_x_algdesc_ualg
-#define	sadb_x_algdesc_reserved \
-	sadb_x_algdesc_u.sadb_x_algdesc_actual.sadb_x_algdesc_ureserved
+#define	sadb_x_algdesc_saltbits \
+	sadb_x_algdesc_u.sadb_x_algdesc_actual.sadb_x_algdesc_usaltbits
 #define	sadb_x_algdesc_minbits \
 	sadb_x_algdesc_u.sadb_x_algdesc_actual.sadb_x_algdesc_uminbits
 #define	sadb_x_algdesc_maxbits \
