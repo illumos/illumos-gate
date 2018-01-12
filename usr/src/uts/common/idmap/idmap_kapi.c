@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 /*
@@ -76,8 +78,8 @@ typedef struct idmap_get_res {
 /* Batch mapping handle structure */
 struct idmap_get_handle {
 	struct idmap_zone_specific *zs;
-	int 		mapping_num;
-	int 		mapping_size;
+	int		mapping_num;
+	int		mapping_size;
 	idmap_mapping	*mapping;
 	idmap_get_res	*result;
 };
@@ -88,7 +90,7 @@ typedef struct idmap_zone_specific {
 	zoneid_t	zone_id;
 	kmutex_t	zone_mutex;
 	idmap_cache_t	cache;
-	door_handle_t 	door_handle;
+	door_handle_t	door_handle;
 	int		door_valid;
 	int		door_retried;
 	uint32_t	message_id;
@@ -195,7 +197,7 @@ idmap_get_cache_data(zone_t *zone, size_t *uidbysid, size_t *gidbysid,
 static int
 kidmap_call_door(idmap_zone_specific_t *zs, door_arg_t *arg)
 {
-	door_handle_t 	dh;
+	door_handle_t	dh;
 	door_info_t	di;
 	int		status = 0;
 	int		num_retries = 5;
@@ -819,7 +821,7 @@ kidmap_getsidbygid(zone_t *zone, gid_t gid, const char **sid_prefix,
  * Create handle to get SID to UID/GID mapping entries
  *
  * Input:
- * 	none
+ *	none
  * Return:
  *	get_handle
  *
@@ -898,7 +900,7 @@ kidmap_batch_getuidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
     uint32_t rid, uid_t *uid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
-	idmap_get_res 	*result;
+	idmap_get_res	*result;
 
 	if (get_handle == NULL || sid_prefix == NULL ||
 	    uid == NULL || stat == NULL)
@@ -959,7 +961,7 @@ kidmap_batch_getgidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
     uint32_t rid, uid_t *gid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
-	idmap_get_res 	*result;
+	idmap_get_res	*result;
 
 	if (get_handle == NULL || sid_prefix == NULL ||
 	    gid == NULL || stat == NULL)
@@ -1022,7 +1024,7 @@ kidmap_batch_getpidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
     uint32_t rid, uid_t *pid, int *is_user, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
-	idmap_get_res 	*result;
+	idmap_get_res	*result;
 
 	if (get_handle == NULL || sid_prefix == NULL || pid == NULL ||
 	    is_user == NULL || stat == NULL)
@@ -1081,7 +1083,7 @@ kidmap_batch_getsidbyuid(idmap_get_handle_t *get_handle, uid_t uid,
     const char **sid_prefix, uint32_t *rid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
-	idmap_get_res 	*result;
+	idmap_get_res	*result;
 
 	if (get_handle == NULL || sid_prefix == NULL ||
 	    rid == NULL || stat == NULL)
@@ -1136,7 +1138,7 @@ kidmap_batch_getsidbygid(idmap_get_handle_t *get_handle, gid_t gid,
     const char **sid_prefix, uint32_t *rid, idmap_stat *stat)
 {
 	idmap_mapping	*mapping;
-	idmap_get_res 	*result;
+	idmap_get_res	*result;
 
 	if (get_handle == NULL || sid_prefix == NULL ||
 	    rid == NULL || stat == NULL)
@@ -1307,6 +1309,12 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				*result->sid_prefix = sid_prefix;
 				*result->rid = id->idmap_id_u.sid.rid;
 			}
+			if (*result->stat == IDMAP_ERR_NOTFOUND &&
+			    sid_prefix != NULL) {
+				/* IDMAP generated a local SID. Use it. */
+				*result->stat = IDMAP_SUCCESS;
+			}
+
 			if (*result->stat == IDMAP_SUCCESS &&
 			    request->id1.idtype == IDMAP_UID)
 				kidmap_cache_add_sid2uid(
@@ -1401,11 +1409,11 @@ kidmap_rpc_call(idmap_zone_specific_t *zs, uint32_t op, xdrproc_t xdr_args,
 	char		*inbuf_ptr = NULL;
 	size_t		inbuf_size = 4096;
 	char		*outbuf_ptr = NULL;
-	size_t 		outbuf_size = 4096;
+	size_t		outbuf_size = 4096;
 	size_t		size;
 	int		status = 0;
 	door_arg_t	params;
-	int 		retry = 0;
+	int		retry = 0;
 	struct rpc_msg	call_msg;
 
 	params.rbuf = NULL;
