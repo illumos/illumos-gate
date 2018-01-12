@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Use distributed make (dmake) by default.
@@ -186,6 +186,8 @@ do_tags() {
 do_tar() {
 	git_rev=`git rev-parse --short=8 HEAD`
 	files="
+kernel/misc/idmap
+kernel/misc/amd64/idmap
 lib/svc/manifest/system/idmap.xml
 usr/lib/idmapd
 usr/lib/libads.so.1

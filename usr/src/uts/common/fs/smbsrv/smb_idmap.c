@@ -104,6 +104,14 @@ smb_idmap_getsid(uid_t id, int idtype, smb_sid_t **sid)
 		return (IDMAP_ERR_ARG);
 	}
 
+	/*
+	 * IDMAP_ERR_NOTFOUND is an advisory error
+	 * and idmap will generate a local sid.
+	 */
+	if (sim.sim_stat == IDMAP_ERR_NOTFOUND &&
+	    sim.sim_domsid != NULL)
+		sim.sim_stat = IDMAP_SUCCESS;
+
 	if (sim.sim_stat != IDMAP_SUCCESS)
 		return (sim.sim_stat);
 
