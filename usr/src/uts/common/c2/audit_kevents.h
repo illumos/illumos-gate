@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _BSM_AUDIT_KEVENTS_H
@@ -348,9 +349,10 @@ extern "C" {
 #define	AUE_AUDITON_GETAMASK	310	/* =aa */
 #define	AUE_AUDITON_SETAMASK	311	/* =as */
 #define	AUE_PSECFLAGS		312	/* =pm psecflags */
+#define	AUE_SACL		313	/* =sa SACL auditing */
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
-#define	MAX_KEVENTS		312
+#define	MAX_KEVENTS		313
 
 #ifdef __cplusplus
 }

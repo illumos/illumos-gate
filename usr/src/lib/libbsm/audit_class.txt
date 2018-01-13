@@ -2,6 +2,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -20,8 +22,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # User Level Class Masks
 #
@@ -66,6 +66,7 @@
 0x00800000:xc:X - object create/destroy
 0x01000000:xs:X - operations that always silently fail, if bad
 0x01c00000:xx:X - all X events (meta-class)
+0x02000000:sa:SACL-based File Access Auditing
 0x20000000:io:ioctl
 0x40000000:ex:exec
 0x80000000:ot:other
