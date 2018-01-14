@@ -18,9 +18,12 @@ include $(SRC)/test/Makefile.com
 
 # Shell scripts...
 PROG =	acquire-spray \
-	acquire-compare
+	acquire-compare \
+	kmc-update
 
-PROG += eacq-enabler
+# Binaries
+PROG +=	eacq-enabler \
+	kmc-updater
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests/pf_key
@@ -29,10 +32,6 @@ CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 LDLIBS += -lsocket
-
-eacq-enabler:
-	$(LINK.c) eacq-enabler.c -o $@ $(LDLIBS)
-	$(POST_PROCESS)
 
 all: $(PROG)
 

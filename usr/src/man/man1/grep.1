@@ -10,33 +10,27 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GREP 1 "June 5, 2017"
+.TH GREP 1 "Nov 28, 2017"
 .SH NAME
 grep \- search a file for a pattern
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/grep\fR [\fB-c\fR | \fB-l\fR |\fB-q\fR] [\fB-r\fR | \fB-R\fR] [\fB-bHhinsvw\fR]
-    \fIlimited-regular-expression\fR [\fIfilename\fR]...
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
+\fB/usr/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
     [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] \fB-e\fR \fIpattern_list\fR... [\fB-f\fR \fIpattern_file\fR]...
     [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
+\fB/usr/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
     [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR...
     [\fIfile\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
+\fB/usr/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
     [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] \fIpattern\fR [\fIfile\fR]...
 .fi
 
@@ -55,23 +49,28 @@ in single quotes \fB\'\fR\&...\fB\'\fR\&.
 If no files are specified, \fBgrep\fR assumes standard input. Normally, each
 line found is copied to standard output. The file name is printed before each
 line found if there is more than one input file.
-.SS "/usr/bin/grep"
 .LP
-The \fB/usr/bin/grep\fR utility uses limited regular expressions like those
-described on the \fBregexp\fR(5) manual page to match the patterns.
-.SS "/usr/xpg4/bin/grep"
-.LP
-The options \fB-E\fR and \fB-F\fR affect the way \fB/usr/xpg4/bin/grep\fR
+The options \fB-E\fR and \fB-F\fR affect the way \fBgrep\fR
 interprets \fIpattern_list\fR. If \fB-E\fR is specified,
-\fB/usr/xpg4/bin/grep\fR interprets \fIpattern_list\fR as a full regular
+\fBgrep\fR interprets \fIpattern_list\fR as a full regular
 expression (see \fB-E\fR for description).  If \fB-F\fR is specified,
 \fBgrep\fR interprets \fIpattern_list\fR as a fixed string. If neither are
 specified, \fBgrep\fR interprets \fIpattern_list\fR as a basic regular
 expression as described on \fBregex\fR(5) manual page.
 .SH OPTIONS
 .LP
-The following options are supported for both \fB/usr/bin/grep\fR and
-\fB/usr/xpg4/bin/grep\fR:
+The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-A\fR \fInumber\fR\fR
+.ad
+.RS 6n
+Prints \fInumber\fR input lines of context after each matching line. If there
+are multiple matching lines, their context lines are separated by a \fB--\fR
+delimiter line.
+.RE
+
 .sp
 .ne 2
 .na
@@ -80,6 +79,17 @@ The following options are supported for both \fB/usr/bin/grep\fR and
 .RS 6n
 Precedes each line by the block number on which it was found. This can be
 useful in locating block numbers by context (first block is 0).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-B\fR \fInumber\fR\fR
+.ad
+.RS 6n
+Prints \fInumber\fR input lines of context before each matching line. If there
+are multiple matching lines, their context lines are separated by a \fB--\fR
+delimiter line.
 .RE
 
 .sp
@@ -98,6 +108,86 @@ Prints only a count of the lines that contain the pattern.
 .ad
 .RS 6n
 Precedes each line by the name of the file containing the matching line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-e\fR \fIpattern_list\fR\fR
+.ad
+.RS 6n
+Specifies one or more patterns to be used during the search for input. Patterns
+in \fIpattern_list\fR must be separated by a NEWLINE character. A null pattern
+can be specified by two adjacent newline characters in \fIpattern_list\fR.
+Unless the \fB-E\fR or \fB-F\fR option is also specified, each pattern is
+treated as a basic regular expression.  Multiple \fB-e\fR and \fB-f\fR options
+are accepted by \fBgrep\fR. All of the specified patterns are used when
+matching lines, but the order of evaluation is unspecified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-E\fR\fR
+.ad
+.RS 6n
+Matches using full regular expressions. Treats each pattern specified as a full
+regular expression. If any entire full regular expression pattern matches an
+input line, the line is matched. A null full regular expression matches every
+line. Each pattern is interpreted as a full regular expression as described on
+the \fBregex\fR(5) manual page, except for \fB\e(\fR and \fB\e)\fR, and
+including:
+.RS +4
+.TP
+1.
+A full regular expression followed by \fB+\fR that matches one or more
+occurrences of the full regular expression.
+.RE
+.RS +4
+.TP
+2.
+A full regular expression followed by \fB?\fR that matches 0 or 1
+occurrences of the full regular expression.
+.RE
+.RS +4
+.TP
+3.
+Full regular expressions separated by | or by a new-line that match strings
+that are matched by any of the expressions.
+.RE
+.RS +4
+.TP
+4.
+A full regular expression that is enclosed in parentheses \fB()\fR for
+grouping.
+.RE
+The order of precedence of operators is \fB[\|]\fR, then \fB*\|?\|+\fR, then
+concatenation, then | and new-line.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR \fIpattern_file\fR\fR
+.ad
+.RS 6n
+Reads one or more patterns from the file named by the path name
+\fIpattern_file\fR. Patterns in \fIpattern_file\fR are terminated by a NEWLINE
+character. A null pattern can be specified by an empty line in
+\fIpattern_file\fR. Unless the \fB-E\fR or \fB-F\fR option is also specified,
+each pattern is treated as a basic regular expression.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 6n
+Matches using fixed strings. Treats each pattern specified as a string instead
+of a regular expression. If an input line contains any of the patterns as a
+contiguous sequence of bytes, the line is matched. A null string matches every
+line. See \fBfgrep\fR(1) for more information.
 .RE
 
 .sp
@@ -172,6 +262,21 @@ lines. Exits with zero status if an input line is selected.
 .sp
 .ne 2
 .na
+\fB\fB-\fR\fInumber\fR\fR
+.ad
+.br
+.na
+\fB\fB-C\fR \fInumber\fR\fR
+.ad
+.RS 6n
+Prints \fInumber\fR input lines of context before and \fInumber\fR input lines
+of context after each matching line. If there are multiple matching lines,
+their context lines are separated by a \fB--\fR delimiter line.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-s\fR\fR
 .ad
 .RS 6n
@@ -197,133 +302,12 @@ Searches for the expression as a word as if surrounded by \fB\e<\fR and
 \fB\e>\fR\&.
 .RE
 
-.SS "/usr/xpg4/bin/grep"
-.LP
-The following options are supported for \fB/usr/xpg4/bin/grep\fR only:
-.sp
-.ne 2
-.na
-\fB\fB-A\fR \fInumber\fR\fR
-.ad
-.RS 19n
-Prints \fInumber\fR input lines of context after each matching line. If there
-are multiple matching lines, their context lines are separated by a \fB--\fR
-delimiter line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fInumber\fR\fR
-.ad
-.RS 19n
-Prints \fInumber\fR input lines of context before each matching line. If there
-are multiple matching lines, their context lines are separated by a \fB--\fR
-delimiter line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-\fR\fInumber\fR\fR
-.ad
-.br
-.na
-\fB\fB-C\fR \fInumber\fR\fR
-.ad
-.RS 19n
-Prints \fInumber\fR input lines of context before and \fInumber\fR input lines
-of context after each matching line. If there are multiple matching lines,
-their context lines are separated by a \fB--\fR delimiter line.
-.RE
-
-
-.sp
-.ne 2
-.na
-\fB\fB-e\fR \fIpattern_list\fR\fR
-.ad
-.RS 19n
-Specifies one or more patterns to be used during the search for input. Patterns
-in \fIpattern_list\fR must be separated by a NEWLINE character. A null pattern
-can be specified by two adjacent newline characters in \fIpattern_list\fR.
-Unless the \fB-E\fR or \fB-F\fR option is also specified, each pattern is
-treated as a basic regular expression.  Multiple \fB-e\fR and \fB-f\fR options
-are accepted by \fBgrep\fR. All of the specified patterns are used when
-matching lines, but the order of evaluation is unspecified.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-E\fR\fR
-.ad
-.RS 19n
-Matches using full regular expressions. Treats each pattern specified as a full
-regular expression. If any entire full regular expression pattern matches an
-input line, the line is matched. A null full regular expression matches every
-line. Each pattern is interpreted as a full regular expression as described on
-the \fBregex\fR(5) manual page, except for \fB\e(\fR and \fB\e)\fR, and
-including:
-.RS +4
-.TP
-1.
-A full regular expression followed by \fB+\fR that matches one or more
-occurrences of the full regular expression.
-.RE
-.RS +4
-.TP
-2.
-A full regular expression followed by \fB?\fR that matches 0 or 1
-occurrences of the full regular expression.
-.RE
-.RS +4
-.TP
-3.
-Full regular expressions separated by | or by a new-line that match strings
-that are matched by any of the expressions.
-.RE
-.RS +4
-.TP
-4.
-A full regular expression that is enclosed in parentheses \fB()\fR for
-grouping.
-.RE
-The order of precedence of operators is \fB[\|]\fR, then \fB*\|?\|+\fR, then
-concatenation, then | and new-line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-f\fR \fIpattern_file\fR\fR
-.ad
-.RS 19n
-Reads one or more patterns from the file named by the path name
-\fIpattern_file\fR. Patterns in \fIpattern_file\fR are terminated by a NEWLINE
-character. A null pattern can be specified by an empty line in
-\fIpattern_file\fR. Unless the \fB-E\fR or \fB-F\fR option is also specified,
-each pattern is treated as a basic regular expression.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-F\fR\fR
-.ad
-.RS 19n
-Matches using fixed strings. Treats each pattern specified as a string instead
-of a regular expression. If an input line contains any of the patterns as a
-contiguous sequence of bytes, the line is matched. A null string matches every
-line. See \fBfgrep\fR(1) for more information.
-.RE
-
 .sp
 .ne 2
 .na
 \fB\fB-x\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Considers only input lines that use all characters in the line to match an
 entire fixed string or regular expression to be matching lines.
 .RE
@@ -341,21 +325,11 @@ A path name of a file to be searched for the patterns. If no \fIfile\fR
 operands are specified, the standard input is used.
 .RE
 
-.SS "/usr/bin/grep"
 .ne 2
 .na
 \fB\fIpattern\fR\fR
 .ad
-.RS 11n
-Specifies a pattern to be used during the search for input.
-.RE
-
-.SS "/usr/xpg4/bin/grep"
-.ne 2
-.na
-\fB\fIpattern\fR\fR
-.ad
-.RS 11n
+.RS 8n
 Specifies one or more patterns to be used during the search for input. This
 operand is treated as if it were specified as \fB-e\fR \fIpattern_list\fR.
 .RE
@@ -437,22 +411,22 @@ All of the following commands print all lines containing strings \fBabc\fR or
 .sp
 .in +2
 .nf
-example% \fB/usr/xpg4/bin/grep 'abc
+example% \fB/usr/bin/grep 'abc
 def'\fR
-example% \fB/usr/xpg4/bin/grep -e 'abc
+example% \fB/usr/bin/grep -e 'abc
 def'\fR
-example% \fB/usr/xpg4/bin/grep -e 'abc' -e 'def'\fR
-example% \fB/usr/xpg4/bin/grep -E 'abc|def'\fR
-example% \fB/usr/xpg4/bin/grep -E -e 'abc|def'\fR
-example% \fB/usr/xpg4/bin/grep -E -e 'abc' -e 'def'\fR
-example% \fB/usr/xpg4/bin/grep -E 'abc
+example% \fB/usr/bin/grep -e 'abc' -e 'def'\fR
+example% \fB/usr/bin/grep -E 'abc|def'\fR
+example% \fB/usr/bin/grep -E -e 'abc|def'\fR
+example% \fB/usr/bin/grep -E -e 'abc' -e 'def'\fR
+example% \fB/usr/bin/grep -E 'abc
 def'\fR
-example% \fB/usr/xpg4/bin/grep -E -e 'abc
+example% \fB/usr/bin/grep -E -e 'abc
 def'\fR
-example% \fB/usr/xpg4/bin/grep -F -e 'abc' -e 'def'\fR
-example% \fB/usr/xpg4/bin/grep -F 'abc
+example% \fB/usr/bin/grep -F -e 'abc' -e 'def'\fR
+example% \fB/usr/bin/grep -F 'abc
 def'\fR
-example% \fB/usr/xpg4/bin/grep -F -e 'abc
+example% \fB/usr/bin/grep -F -e 'abc
 def'\fR
 .fi
 .in -2
@@ -468,8 +442,10 @@ Both of the following commands print all lines matching exactly \fBabc\fR or
 .sp
 .in +2
 .nf
-example% \fB/usr/xpg4/bin/grep -E '^abc$ ^def$'\fR
-example% \fB/usr/xpg4/bin/grep -F -x 'abc def'\fR
+example% \fB/usr/bin/grep -E '^abc$
+^def$'\fR
+example% \fB/usr/bin/grep -F -x 'abc
+def'\fR
 .fi
 .in -2
 .sp
@@ -512,18 +488,6 @@ Syntax errors or inaccessible files (even if matches were found).
 .SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.SS "/usr/bin/grep"
-
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Not Enabled
-.TE
-
-.SS "/usr/xpg4/bin/grep"
 
 .TS
 box;
@@ -544,13 +508,11 @@ Standard	See \fBstandards\fR(5).
 \fBenviron\fR(5), \fBlargefile\fR(5), \fBregex\fR(5), \fBregexp\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.SS "/usr/bin/grep"
-.LP
-Lines are limited only by the size of the available virtual memory. If there is
-a line with embedded nulls, \fBgrep\fR only matches up to the first null. If
-the line matches, the entire line is printed.
-.SS "/usr/xpg4/bin/grep"
 .LP
 The results are unspecified if input files contain lines longer than
 \fBLINE_MAX\fR bytes or contain binary data. \fBLINE_MAX\fR is defined in
 \fB/usr/include/limits.h\fR.
+.LP
+In the past the behavior of \fB/usr/xpg4/bin/grep\fR and
+\fB/usr/bin/grep\fR utilities was different. Now \fB/usr/bin/grep\fR
+is replaced by \fB/usr/xpg4/bin/grep\fR.

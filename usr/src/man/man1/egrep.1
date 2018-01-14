@@ -9,44 +9,28 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EGREP 1 "May 3, 2013"
+.TH EGREP 1 "Nov 28, 2017"
 .SH NAME
 egrep \- search a file for a pattern using full regular expressions
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/egrep\fR [\fB-bcHhilnqsv\fR] \fB-e\fR \fIpattern_list\fR [\fIfile...\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/bin/egrep\fR [\fB-bcHhilnqsv\fR] \fB-f\fR \fIfile\fR [\fIfile...\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/bin/egrep\fR [\fB-bcHhilnqsv\fR] \fIpattern\fR [\fIfile...\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/egrep\fR [\fB-bcHhilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR]
+\fB/usr/bin/egrep\fR [\fB-bcHhilnqsvx\fR] \fB-e\fR \fIpattern_list\fR [\fB-f\fR \fIfile\fR]
      [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/egrep\fR [\fB-bcHhilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR
+\fB/usr/bin/egrep\fR [\fB-bcHhilnqsvx\fR] [\fB-e\fR \fIpattern_list\fR] \fB-f\fR \fIfile\fR
      [\fIfile...\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/egrep\fR [\fB-bcHhilnqsvx\fR] \fIpattern\fR [\fIfile...\fR]
+\fB/usr/bin/egrep\fR [\fB-bcHhilnqsvx\fR] \fIpattern\fR [\fIfile...\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBegrep\fR (\fIexpression grep\fR) utility searches files for a pattern of
 characters and prints all lines that contain that pattern. \fBegrep\fR uses
@@ -58,37 +42,9 @@ fast deterministic algorithm that sometimes needs exponential space.
 If no files are specified, \fBegrep\fR assumes standard input. Normally, each
 line found is copied to the standard output. The file name is printed before
 each line found if there is more than one input file.
-.SS "/usr/bin/egrep"
-.sp
 .LP
-The \fB/usr/bin/egrep\fR utility accepts full regular expressions as described
-on the \fBregexp\fR(5) manual page, except for \fB\e(\fR and \fB\e)\fR,
-\fB\e(\fR and \fB\e)\fR, \fB\e{\fR and \fB\e}\fR, \fB\e<\fR and \fB\e>\fR, and
-\fB\en\fR, and with the addition of:
-.RS +4
-.TP
-1.
-A full regular expression followed by \fB+\fR that matches one or more
-occurrences of the full regular expression.
-.RE
-.RS +4
-.TP
-2.
-A full regular expression followed by \fB?\fR that matches 0 or 1
-occurrences of the full regular expression.
-.RE
-.RS +4
-.TP
-3.
-Full regular expressions separated by | or by a \fBNEWLINE\fR that match
-strings that are matched by any of the expressions.
-.RE
-.RS +4
-.TP
-4.
-A full regular expression that can be enclosed in parentheses \fB()\fRfor
-grouping.
-.RE
+The \fBegrep\fR utility accepts the same form of full regular expressions as
+\fBgrep\fR(1) -E option.
 .sp
 .LP
 Be careful using the characters \fB$\fR, \fB*\fR, \fB[\fR, \fB^\fR, |, \fB(\fR,
@@ -99,23 +55,15 @@ expression\fR in single quotes (\fBa\'\fR\fBa\'\fR).
 .LP
 The order of precedence of operators is \fB[\|]\fR, then \fB*\|?\|+\fR, then
 concatenation, then | and NEWLINE.
-.SS "/usr/xpg4/bin/egrep"
-.sp
-.LP
-The \fB/usr/xpg4/bin/egrep\fR utility uses the regular expressions described in
-the \fBEXTENDED REGULAR EXPRESSIONS\fR section of the \fBregex\fR(5) manual
-page.
 .SH OPTIONS
-.sp
 .LP
-The following options are supported for both \fB/usr/bin/egrep\fR and
-\fB/usr/xpg4/bin/egrep\fR:
+The following options are supported:
 .sp
 .ne 2
 .na
 \fB\fB-b\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Precede each line by the block number on which it was found. This can be useful
 in locating block numbers by context (first block is 0).
 .RE
@@ -125,7 +73,7 @@ in locating block numbers by context (first block is 0).
 .na
 \fB\fB-c\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Print only a count of the lines that contain the pattern.
 .RE
 
@@ -134,7 +82,7 @@ Print only a count of the lines that contain the pattern.
 .na
 \fB\fB-e\fR \fIpattern_list\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Search for a \fIpattern_list\fR (\fIfull regular expression\fR that begins with
 a \fB\(mi\fR).
 .RE
@@ -144,7 +92,7 @@ a \fB\(mi\fR).
 .na
 \fB\fB-f\fR \fIfile\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Take the list of \fIfull\fR \fIregular\fR \fIexpressions\fR from \fIfile\fR.
 .RE
 
@@ -153,7 +101,7 @@ Take the list of \fIfull\fR \fIregular\fR \fIexpressions\fR from \fIfile\fR.
 .na
 \fB\fB-H\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Precedes each line by the name of the file containing the matching line.
 .RE
 
@@ -162,7 +110,7 @@ Precedes each line by the name of the file containing the matching line.
 .na
 \fB\fB-h\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Suppress printing of filenames when searching multiple files.
 .RE
 
@@ -171,7 +119,7 @@ Suppress printing of filenames when searching multiple files.
 .na
 \fB\fB-i\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Ignore upper/lower case distinction during comparisons.
 .RE
 
@@ -180,7 +128,7 @@ Ignore upper/lower case distinction during comparisons.
 .na
 \fB\fB-l\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Print the names of files with matching lines once, separated by NEWLINEs. Does
 not repeat the names of files when the pattern is found more than once.
 .RE
@@ -190,7 +138,7 @@ not repeat the names of files when the pattern is found more than once.
 .na
 \fB\fB-n\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Precede each line by its line number in the file (first line is 1).
 .RE
 
@@ -199,7 +147,7 @@ Precede each line by its line number in the file (first line is 1).
 .na
 \fB\fB-q\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Quiet. Does not write anything to the standard output, regardless of matching
 lines. Exits with zero status if an input line is selected.
 .RE
@@ -209,7 +157,7 @@ lines. Exits with zero status if an input line is selected.
 .na
 \fB\fB-s\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Legacy equivalent of \fB-q\fR.
 .RE
 
@@ -218,14 +166,10 @@ Legacy equivalent of \fB-q\fR.
 .na
 \fB\fB-v\fR\fR
 .ad
-.RS 19n
+.RS 6n
 Print all lines except those that contain the pattern.
 .RE
 
-.SS "/usr/xpg4/bin/egrep"
-.sp
-.LP
-The following options are supported for \fB/usr/xpg4/bin/egrep\fR only:
 .sp
 .ne 2
 .na
@@ -237,7 +181,6 @@ entire fixed string or regular expression to be matching lines.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -250,40 +193,25 @@ A path name of a file to be searched for the patterns. If no \fIfile\fR
 operands are specified, the standard input is used.
 .RE
 
-.SS "/usr/bin/egrep"
-.sp
 .ne 2
 .na
 \fB\fIpattern\fR\fR
 .ad
-.RS 11n
-Specify a pattern to be used during the search for input.
-.RE
-
-.SS "/usr/xpg4/bin/egrep"
-.sp
-.ne 2
-.na
-\fB\fIpattern\fR\fR
-.ad
-.RS 11n
+.RS 8n
 Specify one or more patterns to be used during the search for input. This
-operand is treated as if it were specified as \fB-e\fR\fIpattern_list.\fR.
+operand is treated as if it were specified as \fB-e\fR\fIpattern_list\fR.
 .RE
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBegrep\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBegrep\fR: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR,
 \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -314,24 +242,8 @@ For syntax errors or inaccessible files (even if matches were found).
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
-.SS "/usr/bin/egrep"
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Not Enabled
-.TE
-
-.SS "/usr/xpg4/bin/egrep"
-.sp
 
 .sp
 .TS
@@ -344,22 +256,22 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfgrep\fR(1), \fBgrep\fR(1), \fBsed\fR(1), \fBsh\fR(1), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBlargefile\fR(5), \fBregex\fR(5), \fBregexp\fR(5),
 \fBXPG4\fR(5)
 .SH NOTES
-.sp
 .LP
 Ideally there should be only one \fBgrep\fR command, but there is not a single
 algorithm that spans a wide enough range of space-time trade-offs.
 .sp
 .LP
 Lines are limited only by the size of the available virtual memory.
-.SS "/usr/xpg4/bin/egrep"
-.sp
 .LP
-The \fB/usr/xpg4/bin/egrep\fR utility is identical to \fB/usr/xpg4/bin/grep\fR
+The \fB/usr/bin/egrep\fR utility is identical to \fB/usr/bin/grep\fR
 \fB-E\fR. See \fBgrep\fR(1). Portable applications should use
-\fB/usr/xpg4/bin/grep\fR \fB-E\fR.
+\fB/usr/bin/grep\fR \fB-E\fR.
+.LP
+In the past the behavior of \fB/usr/xpg4/bin/egrep\fR and
+\fB/usr/bin/egrep\fR utilities was different. Now \fB/usr/bin/egrep\fR
+is replaced by \fB/usr/xpg4/bin/egrep\fR.

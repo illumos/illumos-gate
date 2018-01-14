@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_INET_SADB_H
@@ -247,7 +248,7 @@ typedef struct ipsa_s {
 	uint32_t ipsa_spi;	/* Security parameters index. */
 	uint32_t ipsa_replay;	/* Highest seen replay value for this SA. */
 	uint32_t ipsa_kmp;	/* key management proto */
-	uint32_t ipsa_kmc;	/* key management cookie */
+	uint64_t ipsa_kmc;	/* key management cookie (now 64-bit) */
 
 	boolean_t ipsa_haspeer;		/* Has peer in another table. */
 
@@ -690,7 +691,8 @@ struct ipsa_query_s {
 	sa_family_t af;
 	uint32_t *srcaddr, *dstaddr;
 	uint32_t ifindex;
-	uint32_t kmc, kmp;
+	uint32_t kmp;
+	uint64_t kmc;
 	char *didstr, *sidstr;
 	uint16_t didtype, sidtype;
 	sadbp_t *spp;

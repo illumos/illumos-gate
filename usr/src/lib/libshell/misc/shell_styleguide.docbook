@@ -352,9 +352,9 @@ done
           At least
           <simplelist type="inline">
               <member>print</member>
-              <member>/usr/bin/fgrep</member><member>/usr/xpg4/bin/fgrep</member>
-              <member>/usr/bin/grep</member> <member>/usr/xpg4/bin/grep</member>
-              <member>/usr/bin/egrep</member><member>/usr/xpg4/bin/egrep</member>
+              <member>/usr/bin/fgrep</member>
+              <member>/usr/bin/grep</member>
+              <member>/usr/bin/egrep</member>
           </simplelist>
           support <literal>--</literal> as "end of arguments"-terminator.
           </para></note>

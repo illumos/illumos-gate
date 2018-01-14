@@ -17,7 +17,7 @@
 
 include $(SRC)/Makefile.master
 
-SUBDIRS = boot1 libefi loader
+SUBDIRS = libefi boot1 loader
 
 #.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm"
 #.if ${MK_FDT} != "no"
@@ -32,6 +32,10 @@ all	:=	TARGET = all
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 install	:=	TARGET = install
+
+# boot1 and loader both link against libefi
+boot1:	libefi
+loader:	libefi
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)

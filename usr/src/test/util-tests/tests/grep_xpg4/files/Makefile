@@ -90,7 +90,12 @@ PROGS = test0 \
 	gout59 \
 	gout60 \
 	gout61 \
-	gout62
+	gout62 \
+	gout63 \
+	gout64 \
+	gout65 \
+	gout66 \
+	testnl
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0444
