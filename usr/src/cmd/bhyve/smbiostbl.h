@@ -26,11 +26,16 @@
  * $FreeBSD$
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #ifndef _SMBIOSTBL_H_
 #define _SMBIOSTBL_H_
 
 struct vmctx;
 
 int	smbios_build(struct vmctx *ctx);
+int	smbios_parse(const char *opts);
 
 #endif /* _SMBIOSTBL_H_ */

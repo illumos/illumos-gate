@@ -28,6 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -47,20 +48,22 @@ $(BUILD64)	TARGETDIRS += $(DIRS64)
 
 TARGETDIRS	+= $(FILELINKS) $(DIRLINKS)
 
-i386_DIRS=			\
-	/boot/acpi		\
-	/boot/acpi/tables	\
-	/boot/grub		\
-	/boot/grub/bin		\
-	/platform/i86pc		\
-	/lib/libmvec		\
-	/usr/lib/brand/lx	\
+i386_DIRS= \
+	/boot/acpi \
+	/boot/acpi/tables \
+	/boot/grub \
+	/boot/grub/bin \
+	/lib/libmvec \
+	/platform/i86pc \
+	/usr/lib/brand/bhyve \
+	/usr/lib/brand/lx \
 	/usr/lib/brand/lx/amd64 \
 	/usr/lib/brand/lx/distros \
-	/usr/lib/xen		\
-	/usr/lib/xen/bin
+	/usr/lib/xen \
+	/usr/lib/xen/bin \
+	/usr/share/bhyve
 
-sparc_DIRS=				\
+sparc_DIRS= \
 	/usr/lib/ldoms
 
 sparc_64ONLY= $(POUND_SIGN)

@@ -136,18 +136,10 @@ vm_device_open(const char *name)
         int fd, len;
         char *vmfile;
 
-#ifdef	__FreeBSD__
 	len = strlen("/dev/vmm/") + strlen(name) + 1;
-#else
-	len = strlen("/devices/pseudo/vmm@0:") + strlen(name) + 1;
-#endif
 	vmfile = malloc(len);
 	assert(vmfile != NULL);
-#ifdef	__FreeBSD__
 	snprintf(vmfile, len, "/dev/vmm/%s", name);
-#else
-	snprintf(vmfile, len, "/devices/pseudo/vmm@0:%s", name);
-#endif
 
         /* Open the device file */
         fd = open(vmfile, O_RDWR, 0);

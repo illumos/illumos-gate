@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 # lib/brand/Makefile
 #
@@ -30,7 +31,7 @@ include ../../Makefile.master
 # Build everything in parallel; use .WAIT for dependencies
 .PARALLEL:
 
-i386_SUBDIRS= lx
+i386_SUBDIRS= lx bhyve
 i386_MSGSUBDIRS= lx
 
 SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled $($(MACH)_SUBDIRS)

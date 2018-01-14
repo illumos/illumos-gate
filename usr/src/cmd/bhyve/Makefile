@@ -11,9 +11,11 @@
 
 #
 # Copyright 2014 Pluribus Networks Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG =		bhyve
+ZHYVE =		$(ROOT)/usr/lib/brand/bhyve/zhyve
 
 include ../Makefile.cmd
 
@@ -29,9 +31,11 @@ lint	:=	TARGET = lint
 
 all clean clobber lint:	$(SUBDIRS)
 
-install: $(SUBDIRS)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+install: $(SUBDIRS) $(USRSHAREFILES)
+	$(RM) $(ROOTUSRSBINPROG)
+	$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+	$(RM) $(ZHYVE)
+	$(LN) $(ROOTUSRSBIN64)/$(PROG) $(ZHYVE)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) CW_NO_SHADOW=true __GNUC= $(TARGET)

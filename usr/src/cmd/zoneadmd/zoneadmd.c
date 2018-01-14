@@ -840,10 +840,14 @@ setup_subproc_env(boolean_t debug)
 	struct zone_attrtab atab;
 	char net_resources[MAXNAMELEN * 2];
 	char dev_resources[MAXNAMELEN * 2];
+	char didstr[16];
 
 	/* snap_hndl is null when called through the set_brand_env code path */
 	if (snap_hndl == NULL)
 		return (Z_OK);
+
+	(void) snprintf(didstr, sizeof (didstr), "%d", zone_did);
+	(void) setenv("_ZONECFG_did", didstr, 1);
 
 	/*
 	 * "net" resources are exported because zoneadmd does not handle

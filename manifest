@@ -525,6 +525,7 @@ d etc/xdg/autostart 0755 root sys
 d etc/zfs 0755 root sys
 d etc/zones 0755 root sys
 f etc/zones/SUNWblank.xml 0444 root bin
+f etc/zones/SYSbhyve.xml 0444 root bin
 f etc/zones/index 0644 root sys
 s etc/zprofile=profile
 d kernel 0755 root sys
@@ -5091,6 +5092,14 @@ f usr/lib/audit/audit_record_attr 0444 root bin
 d usr/lib/autofs 0755 root sys
 f usr/lib/autofs/automountd 0555 root bin
 d usr/lib/brand 0755 root bin
+d usr/lib/brand/bhyve 0555 root sys
+f usr/lib/brand/bhyve/attach 0555 root sys
+f usr/lib/brand/bhyve/boot 0555 root sys
+f usr/lib/brand/bhyve/detach 0555 root sys
+f usr/lib/brand/bhyve/uninstall 0555 root sys
+f usr/lib/brand/bhyve/config.xml 0444 root sys
+f usr/lib/brand/bhyve/platform.xml 0444 root sys
+f usr/lib/brand/bhyve/statechange 0555 root sys
 d usr/lib/brand/lx 0755 root bin
 s usr/lib/brand/lx/64=amd64
 d usr/lib/brand/lx/amd64 0755 root bin
