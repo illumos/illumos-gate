@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -779,6 +779,20 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 }
 
 /*
+ * Replace characters other than [A-Za-z0-9_] with '_' so that the string is a
+ * valid environment variable name.
+ */
+static void
+sanitize_env_var_name(char *var)
+{
+	for (char *p = var; *p != '\0'; p++) {
+		if (!isalnum(*p)) {
+			*p = '_';
+		}
+	}
+}
+
+/*
  * env variable name format
  *	_ZONECFG_{resource name}_{identifying attr. name}_{property name}
  * Any dashes (-) in the property names are replaced with underscore (_).
@@ -786,7 +800,6 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 static void
 set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
 {
-	char *p;
 	/* Enough for maximal name, rsrc + attr, & slop for ZONECFG & _'s */
 	char nm[2 * MAXNAMELEN + 32];
 
@@ -797,19 +810,26 @@ set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
 		(void) snprintf(nm, sizeof (nm), "_ZONECFG_%s_%s_%s", rsrc,
 		    attr, name);
 
-	p = nm;
-	while ((p = strchr(p, '-')) != NULL)
-		*p++ = '_';
+	sanitize_env_var_name(nm);
 
 	(void) setenv(nm, val, 1);
 }
 
 /*
- * Export zonecfg network and device properties into environment for the boot
- * and state change hooks.
- * If debug is true, export the brand hook debug env. variable as well.
+ * Export various zonecfg properties into environment for the boot and state
+ * change hooks.
  *
- * We could export more of the config in the future, as necessary.
+ * If debug is true, _ZONEADMD_brand_debug is set to 1, else it is set to an
+ * empty string.  Brand hooks consider any non-empty string as an indication
+ * that debug output is requested.
+ *
+ * We could export more of the config in the future, as necessary.  A better
+ * solution would be to make it so brand-specific behavior is handled by
+ * brand-specific callbacks written in C.  Then the normal libzonecfg interfaces
+ * can be used for accessing any parts of the configuration that are needed.
+ *
+ * All of the environment variables set by this function are specific to
+ * SmartOS.
  */
 static int
 setup_subproc_env(boolean_t debug)
@@ -825,6 +845,14 @@ setup_subproc_env(boolean_t debug)
 	if (snap_hndl == NULL)
 		return (Z_OK);
 
+	/*
+	 * "net" resources are exported because zoneadmd does not handle
+	 * automatic configuration of vnics and so that the bhyve boot hook
+	 * can generate the argument list for the brand's init program.  At such
+	 * a time as vnic creation is handled in zoneadmd and brand callbacks
+	 * can be executed as part of the zoneadmd process this should be
+	 * removed.
+	 */
 	net_resources[0] = '\0';
 	if ((res = zonecfg_setnwifent(snap_hndl)) != Z_OK)
 		goto done;
@@ -863,26 +891,60 @@ setup_subproc_env(boolean_t debug)
 
 	(void) zonecfg_endnwifent(snap_hndl);
 
+	/*
+	 * "device" resources are exported because the bhyve boot brand callback
+	 * needs them to generate the argument list for the brand's init
+	 * program.  At such a time as brand callbacks can be executed as part
+	 * of the zoneadmd process, this should be removed.
+	 *
+	 * The bhyve brand only supports disk-like devices and does not support
+	 * regular expressions.
+	 */
 	if ((res = zonecfg_setdevent(snap_hndl)) != Z_OK)
 		goto done;
 
+	dev_resources[0] = '\0';
 	while (zonecfg_getdevent(snap_hndl, &dtab) == Z_OK) {
 		struct zone_res_attrtab *rap;
 		char *match;
 
 		match = dtab.zone_dev_match;
 
-		(void) strlcat(dev_resources, match, sizeof (dev_resources));
-		(void) strlcat(dev_resources, " ", sizeof (dev_resources));
+		/*
+		 * In the environment variable name, the value of match will be
+		 * mangled.  Thus, we store the value of match in a "path"
+		 * environment variable.
+		 */
+		set_zonecfg_env(RSRC_DEV, match, "path", match);
 
 		for (rap = dtab.zone_dev_attrp; rap != NULL;
-		    rap = rap->zone_res_attr_next)
+		    rap = rap->zone_res_attr_next) {
 			set_zonecfg_env(RSRC_DEV, match,
 			    rap->zone_res_attr_name, rap->zone_res_attr_value);
-	}
+		}
 
+		/*
+		 * _ZONECFG_device_resources will contain a space separated list
+		 * of devices that have _ZONECFG_device_<device>* environment
+		 * variables.  So that each element of the list matches up with
+		 * <device>, each list item needs to be sanitized in the same
+		 * way that environment variable names are sanitized.
+		 */
+		sanitize_env_var_name(match);
+		(void) strlcat(dev_resources, match, sizeof (dev_resources));
+		(void) strlcat(dev_resources, " ", sizeof (dev_resources));
+	}
 	(void) zonecfg_enddevent(snap_hndl);
 
+	(void) setenv("_ZONECFG_device_resources", dev_resources, 1);
+
+	/*
+	 * "attr" resources are exported because the bhyve brand's boot hook
+	 * needs access to the "ram", "cpu", "bootrom", etc. to form the
+	 * argument list for the brand's init program.  Once the bhyve brand is
+	 * configured via proper resources and properties, this should be
+	 * removed.
+	 */
 	if ((res = zonecfg_setattrent(snap_hndl)) != Z_OK)
 		goto done;
 
