@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -27,6 +27,7 @@
 #include <sys/pc_hvm.h>
 #include <sys/cpuset.h>
 #include <sys/id_space.h>
+#include <sys/fs/sdev_plugin.h>
 
 #include <sys/vmm.h>
 #include <sys/vmm_instruction_emul.h>
@@ -55,6 +56,12 @@ static uint_t		vmmdev_inst_count = 0;
 static boolean_t	vmmdev_load_failure;
 
 static const char *vmmdev_hvm_name = "bhyve";
+
+/*
+ * For sdev plugin (/dev)
+ */
+#define	VMM_SDEV_ROOT "/dev/vmm"
+static sdev_plugin_hdl_t vmm_sdev_hdl;
 
 /*
  * vmm trace ring
@@ -1208,7 +1215,7 @@ vmm_lookup(const char *name)
 }
 
 static int
-vmmdev_do_vm_create(dev_info_t *dip, char *name)
+vmmdev_do_vm_create(char *name, cred_t *cr)
 {
 	vmm_softc_t	*sc = NULL;
 	minor_t		minor;
@@ -1231,13 +1238,25 @@ vmmdev_do_vm_create(dev_info_t *dip, char *name)
 		return (EEXIST);
 	}
 
+	/* Allow only one instance per non-global zone. */
+	if (!INGLOBALZONE(curproc)) {
+		for (sc = list_head(&vmmdev_list); sc != NULL;
+		    sc = list_next(&vmmdev_list, sc)) {
+			if (sc->vmm_zone == curzone) {
+				vmmdev_mod_decr();
+				mutex_exit(&vmmdev_mtx);
+				return (EINVAL);
+			}
+		}
+	}
+
 	minor = id_alloc(vmmdev_minors);
 	if (ddi_soft_state_zalloc(vmm_statep, minor) != DDI_SUCCESS) {
 		goto fail;
 	} else if ((sc = ddi_get_soft_state(vmm_statep, minor)) == NULL) {
 		ddi_soft_state_free(vmm_statep, minor);
 		goto fail;
-	} else if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
+	} else if (ddi_create_minor_node(vmm_dip, name, S_IFCHR, minor,
 	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		goto fail;
 	}
@@ -1252,12 +1271,17 @@ vmmdev_do_vm_create(dev_info_t *dip, char *name)
 		list_create(&sc->vmm_holds, sizeof (vmm_hold_t),
 		    offsetof(vmm_hold_t, vmh_node));
 		cv_init(&sc->vmm_cv, NULL, CV_DEFAULT, NULL);
+
+		sc->vmm_zone = crgetzone(cr);
+		zone_hold(sc->vmm_zone);
+		vmm_zsd_add_vm(sc);
+
 		list_insert_tail(&vmmdev_list, sc);
 		mutex_exit(&vmmdev_mtx);
 		return (0);
 	}
 
-	ddi_remove_minor_node(dip, name);
+	ddi_remove_minor_node(vmm_dip, name);
 fail:
 	id_free(vmmdev_minors, minor);
 	vmmdev_mod_decr();
@@ -1479,24 +1503,22 @@ done:
 }
 
 static int
-vmmdev_do_vm_destroy(dev_info_t *dip, const char *name)
+vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 {
-	vmm_softc_t	*sc;
-	dev_info_t	*pdip = ddi_get_parent(dip);
+	dev_info_t	*pdip = ddi_get_parent(vmm_dip);
 	minor_t		minor;
 
-	mutex_enter(&vmmdev_mtx);
+	ASSERT(MUTEX_HELD(&vmmdev_mtx));
 
-	if ((sc = vmm_lookup(name)) == NULL) {
-		mutex_exit(&vmmdev_mtx);
-		return (ENOENT);
-	}
 	if (sc->vmm_is_open) {
-		mutex_exit(&vmmdev_mtx);
 		return (EBUSY);
 	}
+
+	if (clean_zsd) {
+		vmm_zsd_rem_vm(sc);
+	}
+
 	if (vmm_drv_purge(sc) != 0) {
-		mutex_exit(&vmmdev_mtx);
 		return (EINTR);
 	}
 
@@ -1505,16 +1527,47 @@ vmmdev_do_vm_destroy(dev_info_t *dip, const char *name)
 
 	vm_destroy(sc->vmm_vm);
 	list_remove(&vmmdev_list, sc);
-	ddi_remove_minor_node(dip, sc->vmm_name);
+	ddi_remove_minor_node(vmm_dip, sc->vmm_name);
 	minor = sc->vmm_minor;
+	zone_rele(sc->vmm_zone);
 	ddi_soft_state_free(vmm_statep, minor);
 	id_free(vmmdev_minors, minor);
 	(void) devfs_clean(pdip, NULL, DV_CLEAN_FORCE);
 	vmmdev_mod_decr();
 
+	return (0);
+}
+
+int
+vmm_do_vm_destroy(vmm_softc_t *sc, boolean_t clean_zsd)
+{
+	int 		err;
+
+	mutex_enter(&vmmdev_mtx);
+	err = vmm_do_vm_destroy_locked(sc, clean_zsd);
 	mutex_exit(&vmmdev_mtx);
 
-	return (0);
+	return (err);
+}
+
+/* ARGSUSED */
+static int
+vmmdev_do_vm_destroy(const char *name, cred_t *cr)
+{
+	vmm_softc_t	*sc;
+	int		err;
+
+	mutex_enter(&vmmdev_mtx);
+
+	if ((sc = vmm_lookup(name)) == NULL) {
+		mutex_exit(&vmmdev_mtx);
+		return (ENOENT);
+	}
+	err = vmm_do_vm_destroy_locked(sc, B_TRUE);
+
+	mutex_exit(&vmmdev_mtx);
+
+	return (err);
 }
 
 
@@ -1602,11 +1655,11 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		case VMM_CREATE_VM:
 			if ((mode & FWRITE) == 0)
 				return (EPERM);
-			return (vmmdev_do_vm_create(vmm_dip, name));
+			return (vmmdev_do_vm_create(name, credp));
 		case VMM_DESTROY_VM:
 			if ((mode & FWRITE) == 0)
 				return (EPERM);
-			return (vmmdev_do_vm_destroy(vmm_dip, name));
+			return (vmmdev_do_vm_destroy(name, credp));
 		default:
 			/* No other actions are legal on ctl device */
 			return (ENOTTY);
@@ -1675,6 +1728,117 @@ out:
 	return (err);
 }
 
+static sdev_plugin_validate_t
+vmm_sdev_validate(sdev_ctx_t ctx)
+{
+	const char *name;
+	vmm_softc_t *sc;
+	sdev_plugin_validate_t ret;
+	minor_t minor;
+
+	if (sdev_ctx_vtype(ctx) != VCHR)
+		return (SDEV_VTOR_INVALID);
+
+	VERIFY3S(sdev_ctx_minor(ctx, &minor), ==, 0);
+
+	name = sdev_ctx_name(ctx);
+	if (strcmp(name, VMM_CTL_MINOR_NODE) == 0) {
+		ASSERT3U(minor, ==, VMM_CTL_MINOR);
+		return (SDEV_VTOR_VALID);
+	}
+
+	mutex_enter(&vmmdev_mtx);
+	if ((sc = vmm_lookup(name)) == NULL)
+		ret = SDEV_VTOR_INVALID;
+	else if (sc->vmm_minor != minor)
+		ret = SDEV_VTOR_STALE;
+	else
+		ret = SDEV_VTOR_VALID;
+	mutex_exit(&vmmdev_mtx);
+
+	return (ret);
+}
+
+static int
+vmm_sdev_filldir(sdev_ctx_t ctx)
+{
+	vmm_softc_t *sc;
+	int ret;
+
+	if (strcmp(sdev_ctx_path(ctx), VMM_SDEV_ROOT) != 0) {
+		cmn_err(CE_WARN, "%s: bad path '%s' != '%s'\n", __func__,
+		    sdev_ctx_path(ctx), VMM_SDEV_ROOT);
+		return (EINVAL);
+	}
+
+	/* Driver not initialized, directory empty. */
+	if (vmm_dip == NULL)
+		return (0);
+
+	mutex_enter(&vmmdev_mtx);
+
+	ret = sdev_plugin_mknod(ctx, VMM_CTL_MINOR_NODE, S_IFCHR | 0600,
+	    makedevice(ddi_driver_major(vmm_dip), VMM_CTL_MINOR));
+	if (ret != 0 && ret != EEXIST)
+		goto out;
+
+	for (sc = list_head(&vmmdev_list); sc != NULL;
+	    sc = list_next(&vmmdev_list, sc)) {
+		if (INGLOBALZONE(curproc) || sc->vmm_zone == curzone) {
+			ret = sdev_plugin_mknod(ctx, sc->vmm_name,
+			    S_IFCHR | 0600,
+			    makedevice(ddi_driver_major(vmm_dip),
+			    sc->vmm_minor));
+		} else {
+			continue;
+		}
+		if (ret != 0 && ret != EEXIST)
+			goto out;
+	}
+
+	ret = 0;
+
+out:
+	mutex_exit(&vmmdev_mtx);
+	return (ret);
+}
+
+/* ARGSUSED */
+static void
+vmm_sdev_inactive(sdev_ctx_t ctx)
+{
+}
+
+static sdev_plugin_ops_t vmm_sdev_ops = {
+	.spo_version = SDEV_PLUGIN_VERSION,
+	.spo_flags = SDEV_PLUGIN_SUBDIR,
+	.spo_validate = vmm_sdev_validate,
+	.spo_filldir = vmm_sdev_filldir,
+	.spo_inactive = vmm_sdev_inactive
+};
+
+/* ARGSUSED */
+static int
+vmm_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
+{
+	int error;
+
+	switch (cmd) {
+	case DDI_INFO_DEVT2DEVINFO:
+		*result = (void *)vmm_dip;
+		error = DDI_SUCCESS;
+		break;
+	case DDI_INFO_DEVT2INSTANCE:
+		*result = (void *)0;
+		error = DDI_SUCCESS;
+		break;
+	default:
+		error = DDI_FAILURE;
+		break;
+	}
+	return (error);
+}
+
 static int
 vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -1686,8 +1850,6 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	vmm_sol_glue_init();
-	vmmdev_load_failure = B_FALSE;
-	vmm_dip = dip;
 
 	/*
 	 * Create control node.  Other nodes will be created on demand.
@@ -1697,10 +1859,20 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	if ((vmm_sdev_hdl = sdev_plugin_register("vmm", &vmm_sdev_ops,
+	    NULL)) == NULL) {
+		ddi_remove_minor_node(dip, NULL);
+		dip = NULL;
+		return (DDI_FAILURE);
+	}
+
 	ddi_report_dev(dip);
 
 	/* XXX: This needs updating */
 	vmm_arena_init();
+
+	vmmdev_load_failure = B_FALSE;
+	vmm_dip = dip;
 
 	return (DDI_SUCCESS);
 }
@@ -1717,6 +1889,7 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	/* Ensure that all resources have been cleaned up */
 	mutex_enter(&vmmdev_mtx);
+
 	if (!list_is_empty(&vmmdev_list) || vmmdev_inst_count != 0) {
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
@@ -1727,6 +1900,12 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
+
+	if (vmm_sdev_hdl != NULL && sdev_plugin_unregister(vmm_sdev_hdl) != 0) {
+		mutex_exit(&vmmdev_mtx);
+		return (DDI_FAILURE);
+	}
+	vmm_sdev_hdl = NULL;
 
 	/* Remove the control node. */
 	ddi_remove_minor_node(dip, VMM_CTL_MINOR_NODE);
@@ -1758,7 +1937,7 @@ static struct cb_ops vmm_cb_ops = {
 static struct dev_ops vmm_ops = {
 	DEVO_REV,
 	0,
-	ddi_no_info,
+	vmm_info,
 	nulldev,	/* identify */
 	nulldev,	/* probe */
 	vmm_attach,
@@ -1796,6 +1975,8 @@ _init(void)
 		return (error);
 	}
 
+	vmm_zsd_init();
+
 	error = mod_install(&modlinkage);
 	if (error) {
 		ddi_soft_state_fini(&vmm_statep);
@@ -1813,6 +1994,9 @@ _fini(void)
 	if (error) {
 		return (error);
 	}
+
+	vmm_zsd_fini();
+
 	ddi_soft_state_fini(&vmm_statep);
 
 	return (0);

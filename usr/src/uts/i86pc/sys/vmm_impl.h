@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _VMM_IMPL_H_
@@ -20,6 +20,7 @@
 #include <sys/mutex.h>
 #include <sys/queue.h>
 #include <sys/varargs.h>
+#include <sys/zone.h>
 
 /*
  * /dev names:
@@ -27,9 +28,7 @@
  *      /dev/vmm/<name>     - vm devices
  */
 #define	VMM_DRIVER_NAME		"vmm"
-
 #define	VMM_CTL_MINOR_NODE	"ctl"
-#define	VMM_CTL_MINOR_NAME	VMM_DRIVER_NAME VMM_CTL_MINOR_NODE
 #define	VMM_CTL_MINOR		0
 
 #ifdef	_KERNEL
@@ -51,6 +50,8 @@ struct vmm_devmem_entry {
 };
 typedef struct vmm_devmem_entry vmm_devmem_entry_t;
 
+typedef struct vmm_zsd vmm_zsd_t;
+
 enum vmm_softc_state {
 	VMM_HELD	= 1,	/* external driver(s) possess hold on VM */
 	VMM_CLEANUP	= 2,	/* request that holds are released */
@@ -68,9 +69,21 @@ struct vmm_softc {
 	list_t		vmm_devmem_list;
 	list_t		vmm_holds;
 	kcondvar_t	vmm_cv;
+
+	/* For zone specific data */
+	list_node_t	vmm_zsd_linkage;
+	zone_t		*vmm_zone;
+	vmm_zsd_t	*vmm_zsd;
 };
 typedef struct vmm_softc vmm_softc_t;
-#endif
+
+void vmm_zsd_init(void);
+void vmm_zsd_fini(void);
+int vmm_zsd_add_vm(vmm_softc_t *sc);
+void vmm_zsd_rem_vm(vmm_softc_t *sc);
+int vmm_do_vm_destroy(vmm_softc_t *, boolean_t);
+
+#endif /* _KERNEL */
 
 /*
  * VMM trace ring buffer constants

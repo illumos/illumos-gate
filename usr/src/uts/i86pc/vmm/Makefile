@@ -92,6 +92,8 @@ CFLAGS		+= -_gcc=-Wimplicit-function-declaration
 # The FreeBSD %# notation makes gcc gripe
 CFLAGS		+= -_gcc=-Wno-format
 
+LDFLAGS         += -dy -Nfs/dev
+
 $(OBJS_DIR)/vmm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
 $(OBJS_DIR)/svm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
 

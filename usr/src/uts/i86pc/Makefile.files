@@ -269,7 +269,8 @@ VMM_OBJS += vmm.o \
 	sol_iommu.o \
 	sol_ppt.o \
 	vmm_sol_vm.o \
-	vmm_sol_glue.o
+	vmm_sol_glue.o \
+	vmm_zsd.o
 
 VIONA_OBJS += viona.o
 
