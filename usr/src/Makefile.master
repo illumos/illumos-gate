@@ -27,6 +27,7 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -207,6 +208,7 @@ MSGFMT=		/usr/bin/msgfmt -s
 LCDEF=		$(ONBLD_TOOLS)/bin/$(MACH)/localedef
 TIC=		$(ONBLD_TOOLS)/bin/$(MACH)/tic
 ZIC=		$(ONBLD_TOOLS)/bin/$(MACH)/zic
+OPENSSL=	/usr/bin/openssl
 
 FILEMODE=	644
 DIRMODE=	755

@@ -27,7 +27,7 @@
 LIBRARY=	kmf_openssl.a
 VERS=		.1
 
-OBJECTS=	openssl_spi.o
+OBJECTS=	openssl_spi.o compat.o
 
 include	$(SRC)/lib/Makefile.lib
 

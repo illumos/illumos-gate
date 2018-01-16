@@ -26,6 +26,7 @@
 # Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2017 Joyent, Inc.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -285,4 +286,14 @@ java-version:
 	else						\
 		$(ECHO) No Java compiler found;		\
 		exit 1;					\
+	fi
+
+openssl-version:
+	@if [ -x "$(OPENSSL)" ]; then				\
+		$(ECHO) $(OPENSSL);				\
+		$(OPENSSL) version;				\
+		$(OPENSSL) version -f |				\
+		    $(SED) -n '/_API/{s/.*_API/    API/;s/ -.*//;p;}'; \
+	else							\
+		$(ECHO) No OpenSSL utility found;		\
 	fi

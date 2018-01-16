@@ -2,6 +2,7 @@
  * Copyright (c) 2000-2006, 2008, 2009 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  *
  * By using this file, you agree to the terms and conditions set
  * forth in the LICENSE file which can be found at the top level of
@@ -17,34 +18,66 @@ SM_RCSID("@(#)$Id: tls.c,v 8.114 2009/08/10 15:11:09 ca Exp $")
 #  include <openssl/err.h>
 #  include <openssl/bio.h>
 #  include <openssl/pem.h>
+#  include <openssl/bn.h>
 #  ifndef HASURANDOMDEV
 #   include <openssl/rand.h>
 #  endif /* ! HASURANDOMDEV */
 # if !TLS_NO_RSA
+#  include <openssl/rsa.h>
 static RSA *rsa_tmp = NULL;	/* temporary RSA key */
-static RSA *tmp_rsa_key __P((SSL *, int, int));
 # endif /* !TLS_NO_RSA */
-#  if !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER < 0x00907000L
-static int	tls_verify_cb __P((X509_STORE_CTX *));
-#  else /* !defined() || OPENSSL_VERSION_NUMBER < 0x00907000L */
 static int	tls_verify_cb __P((X509_STORE_CTX *, void *));
-#  endif /* !defined() || OPENSSL_VERSION_NUMBER < 0x00907000L */
-
-# if OPENSSL_VERSION_NUMBER > 0x00907000L
 static int x509_verify_cb __P((int, X509_STORE_CTX *));
-# endif /* OPENSSL_VERSION_NUMBER > 0x00907000L */
 
-# if !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER < 0x00907000L
-#  define CONST097
-# else /* !defined() || OPENSSL_VERSION_NUMBER < 0x00907000L */
 #  define CONST097 const
-# endif /* !defined() || OPENSSL_VERSION_NUMBER < 0x00907000L */
 static void	apps_ssl_info_cb __P((CONST097 SSL *, int , int));
 static bool	tls_ok_f __P((char *, char *, int));
 static bool	tls_safe_f __P((char *, long, bool));
 static int	tls_verify_log __P((int, X509_STORE_CTX *, char *));
 
 # if !NO_DH
+#  include <openssl/dh.h>
+#  include <openssl/dsa.h>
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+
+/*
+ * This compatibility function is taken from
+ * https://wiki.openssl.org/index.php/OpenSSL_1.1.0_Changes
+ *     #Adding_forward-compatible_code_to_older_versions
+ */
+
+#define DH_set0_pqg __DH_set0_pqg
+int __DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+    /* If the fields p and g in d are NULL, the corresponding input
+     * parameters MUST be non-NULL.  q may remain NULL.
+     */
+    if ((dh->p == NULL && p == NULL)
+        || (dh->g == NULL && g == NULL))
+        return 0;
+
+    if (p != NULL) {
+        BN_free(dh->p);
+        dh->p = p;
+    }
+    if (q != NULL) {
+        BN_free(dh->q);
+        dh->q = q;
+    }
+    if (g != NULL) {
+        BN_free(dh->g);
+        dh->g = g;
+    }
+
+    if (q != NULL) {
+        dh->length = BN_num_bits(q);
+    }
+
+    return 1;
+}
+#endif
+
 static DH *get_dh512 __P((void));
 
 static unsigned char dh512_p[] =
@@ -65,13 +98,21 @@ static DH *
 get_dh512()
 {
 	DH *dh = NULL;
+	BIGNUM *p, *g;
 
 	if ((dh = DH_new()) == NULL)
 		return NULL;
-	dh->p = BN_bin2bn(dh512_p, sizeof(dh512_p), NULL);
-	dh->g = BN_bin2bn(dh512_g, sizeof(dh512_g), NULL);
-	if ((dh->p == NULL) || (dh->g == NULL))
+	p = BN_bin2bn(dh512_p, sizeof(dh512_p), NULL);
+	g = BN_bin2bn(dh512_g, sizeof(dh512_g), NULL);
+	if ((p == NULL) || (g == NULL)) {
+		BN_free(p);
+		BN_free(g);
+		DH_free(dh);
 		return NULL;
+	}
+
+	DH_set0_pqg(dh, p, NULL, g);
+
 	return dh;
 }
 # endif /* !NO_DH */
@@ -278,8 +319,11 @@ bool
 init_tls_library()
 {
 	/* basic TLS initialization, ignore result for now */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	/* No longer available (nor necessary) in OpenSSL 1.1 */
 	SSL_library_init();
 	SSL_load_error_strings();
+#endif
 # if 0
 	/* this is currently a macro for SSL_library_init */
 	SSLeay_add_ssl_algorithms();
@@ -508,13 +552,6 @@ tls_safe_f(var, sff, srv)
 
 static char server_session_id_context[] = "sendmail8";
 
-/* 0.9.8a and b have a problem with SSL_OP_TLS_BLOCK_PADDING_BUG */
-#if (OPENSSL_VERSION_NUMBER >= 0x0090800fL)
-# define SM_SSL_OP_TLS_BLOCK_PADDING_BUG	1
-#else
-# define SM_SSL_OP_TLS_BLOCK_PADDING_BUG	0
-#endif
-
 bool
 inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhparam)
 	SSL_CTX **ctx;
@@ -536,15 +573,9 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 #  if SM_CONF_SHM
 	extern int ShmId;
 #  endif /* SM_CONF_SHM */
-# if OPENSSL_VERSION_NUMBER > 0x00907000L
 	BIO *crl_file;
 	X509_CRL *crl;
 	X509_STORE *store;
-# endif /* OPENSSL_VERSION_NUMBER > 0x00907000L */
-#if SM_SSL_OP_TLS_BLOCK_PADDING_BUG
-	long rt_version;
-	STACK_OF(SSL_COMP) *comp_methods;
-#endif
 
 	status = TLS_S_NONE;
 	who = srv ? "server" : "client";
@@ -593,11 +624,8 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 		 TLS_S_CERTP_EX, TLS_T_OTHER);
 	TLS_OK_F(cacertfile, "CACertFile", bitset(TLS_I_CERTF_EX, req),
 		 TLS_S_CERTF_EX, TLS_T_OTHER);
-
-# if OPENSSL_VERSION_NUMBER > 0x00907000L
 	TLS_OK_F(CRLFile, "CRLFile", bitset(TLS_I_CRLF_EX, req),
 		 TLS_S_CRLF_EX, TLS_T_OTHER);
-# endif /* OPENSSL_VERSION_NUMBER > 0x00907000L */
 
 # if _FFR_TLS_1
 	/*
@@ -679,11 +707,9 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 	TLS_SAFE_F(dhparam, sff | TLS_UNR(TLS_I_DHPAR_UNR, req),
 		   bitset(TLS_I_DHPAR_EX, req),
 		   bitset(TLS_S_DHPAR_EX, status), TLS_S_DHPAR_OK, srv);
-# if OPENSSL_VERSION_NUMBER > 0x00907000L
 	TLS_SAFE_F(CRLFile, sff | TLS_UNR(TLS_I_CRLF_UNR, req),
 		   bitset(TLS_I_CRLF_EX, req),
 		   bitset(TLS_S_CRLF_EX, status), TLS_S_CRLF_OK, srv);
-# endif /* OPENSSL_VERSION_NUMBER > 0x00907000L */
 	if (!ok)
 		return ok;
 # if _FFR_TLS_1
@@ -714,12 +740,11 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 		return false;
 	}
 
-# if OPENSSL_VERSION_NUMBER > 0x00907000L
 	if (CRLFile != NULL)
 	{
 		/* get a pointer to the current certificate validation store */
 		store = SSL_CTX_get_cert_store(*ctx);	/* does not fail */
-		crl_file = BIO_new(BIO_s_file_internal());
+		crl_file = BIO_new(BIO_s_file());
 		if (crl_file != NULL)
 		{
 			if (BIO_read_filename(crl_file, CRLFile) >= 0)
@@ -776,7 +801,6 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 			X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
 	}
 #  endif /* _FFR_CRLPATH */
-# endif /* OPENSSL_VERSION_NUMBER > 0x00907000L */
 
 # if TLS_NO_RSA
 	/* turn off backward compatibility, required for no-rsa */
@@ -795,23 +819,33 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 
 	if (bitset(TLS_I_RSA_TMP, req)
 #   if SM_CONF_SHM
-	    && ShmId != SM_SHM_NO_ID &&
-	    (rsa_tmp = RSA_generate_key(RSA_KEYLENGTH, RSA_F4, NULL,
-					NULL)) == NULL
+	    && ShmId != SM_SHM_NO_ID
 #   else /* SM_CONF_SHM */
 	    && 0	/* no shared memory: no need to generate key now */
 #   endif /* SM_CONF_SHM */
-	   )
+	    )
 	{
-		if (LogLevel > 7)
+		BIGNUM *e = BN_new();
+		BN_set_word(e, RSA_F4);
+
+		if ((rsa_tmp = RSA_new()) == NULL || RSA_generate_key_ex(
+		    rsa_tmp, RSA_KEYLENGTH, e, NULL) == 0)
 		{
-			sm_syslog(LOG_WARNING, NOQID,
-				  "STARTTLS=%s, error: RSA_generate_key failed",
-				  who);
-			if (LogLevel > 9)
-				tlslogerr(who);
+			BN_free(e);
+			if (rsa_tmp != NULL)
+				RSA_free(rsa_tmp);
+			rsa_tmp = NULL;
+			if (LogLevel > 7)
+			{
+				sm_syslog(LOG_WARNING, NOQID,
+					  "STARTTLS=%s, error: RSA_generate_key failed",
+					  who);
+				if (LogLevel > 9)
+					tlslogerr(who);
+			}
+			return false;
 		}
-		return false;
+		BN_free(e);
 	}
 # endif /* !TLS_NO_RSA */
 
@@ -919,26 +953,6 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 
 	/* SSL_CTX_set_quiet_shutdown(*ctx, 1); violation of standard? */
 
-#if SM_SSL_OP_TLS_BLOCK_PADDING_BUG
-
-	/*
-	**  In OpenSSL 0.9.8[ab], enabling zlib compression breaks the
-	**  padding bug work-around, leading to false positives and
-	**  failed connections. We may not interoperate with systems
-	**  with the bug, but this is better than breaking on all 0.9.8[ab]
-	**  systems that have zlib support enabled.
-	**  Note: this checks the runtime version of the library, not
-	**  just the compile time version.
-	*/
-
-	rt_version = SSLeay();
-	if (rt_version >= 0x00908000L && rt_version <= 0x0090802fL)
-	{
-		comp_methods = SSL_COMP_get_compression_methods();
-		if (comp_methods != NULL && sk_SSL_COMP_num(comp_methods) > 0)
-			options &= ~SSL_OP_TLS_BLOCK_PADDING_BUG;
-	}
-#endif
 	SSL_CTX_set_options(*ctx, options);
 
 # if !NO_DH
@@ -980,16 +994,19 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 		}
 		if (dh == NULL && bitset(TLS_I_DH1024, req))
 		{
-			DSA *dsa;
+			DSA *dsa = NULL;
 
 			/* this takes a while! (7-130s on a 450MHz AMD K6-2) */
-			dsa = DSA_generate_parameters(1024, NULL, 0, NULL,
-						      NULL, 0, NULL);
-			dh = DSA_dup_DH(dsa);
-			DSA_free(dsa);
+			if ((dsa = DSA_new()) == NULL ||
+			    DSA_generate_parameters_ex(dsa, 1024,
+			    NULL, 0, NULL, 0, NULL) == 0)
+				dh = NULL;
+			else
+				dh = DSA_dup_DH(dsa);
+			if (dsa != NULL)
+				DSA_free(dsa);
 		}
-		else
-		if (dh == NULL && bitset(TLS_I_DH512, req))
+		else if (dh == NULL && bitset(TLS_I_DH512, req))
 			dh = get_dh512();
 
 		if (dh == NULL)
@@ -1046,11 +1063,6 @@ inittls(ctx, req, options, srv, certfile, keyfile, cacertpath, cacertfile, dhpar
 		if ((r = SSL_CTX_load_verify_locations(*ctx, cacertfile,
 						       cacertpath)) == 1)
 		{
-# if !TLS_NO_RSA
-			if (bitset(TLS_I_RSA_TMP, req))
-				SSL_CTX_set_tmp_rsa_callback(*ctx, tmp_rsa_key);
-# endif /* !TLS_NO_RSA */
-
 			/*
 			**  We have to install our own verify callback:
 			**  SSL_VERIFY_PEER requests a client cert but even
@@ -1186,7 +1198,7 @@ tls_get_info(ssl, srv, host, mac, certreq)
 	macdefine(mac, A_TEMP, macid("{cipher_bits}"), bitstr);
 	(void) sm_snprintf(bitstr, sizeof(bitstr), "%d", r);
 	macdefine(mac, A_TEMP, macid("{alg_bits}"), bitstr);
-	s = SSL_CIPHER_get_version(c);
+	s = (char *)SSL_CIPHER_get_version(c);
 	if (s == NULL)
 		s = "UNKNOWN";
 	macdefine(mac, A_TEMP, macid("{tls_version}"), s);
@@ -1380,7 +1392,6 @@ endtls(ssl, side)
 			}
 			ret = EX_SOFTWARE;
 		}
-# if !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER > 0x0090602fL
 
 		/*
 		**  Bug in OpenSSL (at least up to 0.9.6b):
@@ -1429,78 +1440,12 @@ endtls(ssl, side)
 			}
 			ret = EX_SOFTWARE;
 		}
-# endif /* !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER > 0x0090602fL */
 		SSL_free(ssl);
 		ssl = NULL;
 	}
 	return ret;
 }
 
-# if !TLS_NO_RSA
-/*
-**  TMP_RSA_KEY -- return temporary RSA key
-**
-**	Parameters:
-**		s -- TLS connection structure
-**		export --
-**		keylength --
-**
-**	Returns:
-**		temporary RSA key.
-*/
-
-#   ifndef MAX_RSA_TMP_CNT
-#    define MAX_RSA_TMP_CNT	1000	/* XXX better value? */
-#   endif /* ! MAX_RSA_TMP_CNT */
-
-/* ARGUSED0 */
-static RSA *
-tmp_rsa_key(s, export, keylength)
-	SSL *s;
-	int export;
-	int keylength;
-{
-#   if SM_CONF_SHM
-	extern int ShmId;
-	extern int *PRSATmpCnt;
-
-	if (ShmId != SM_SHM_NO_ID && rsa_tmp != NULL &&
-	    ++(*PRSATmpCnt) < MAX_RSA_TMP_CNT)
-		return rsa_tmp;
-#   endif /* SM_CONF_SHM */
-
-	if (rsa_tmp != NULL)
-		RSA_free(rsa_tmp);
-	rsa_tmp = RSA_generate_key(RSA_KEYLENGTH, RSA_F4, NULL, NULL);
-	if (rsa_tmp == NULL)
-	{
-		if (LogLevel > 0)
-			sm_syslog(LOG_ERR, NOQID,
-				  "STARTTLS=server, tmp_rsa_key: RSA_generate_key failed!");
-	}
-	else
-	{
-#   if SM_CONF_SHM
-#    if 0
-		/*
-		**  XXX we can't (yet) share the new key...
-		**	The RSA structure contains pointers hence it can't be
-		**	easily kept in shared memory.  It must be transformed
-		**	into a continous memory region first, then stored,
-		**	and later read out again (each time re-transformed).
-		*/
-
-		if (ShmId != SM_SHM_NO_ID)
-			*PRSATmpCnt = 0;
-#    endif /* 0 */
-#   endif /* SM_CONF_SHM */
-		if (LogLevel > 9)
-			sm_syslog(LOG_ERR, NOQID,
-				  "STARTTLS=server, tmp_rsa_key: new temp RSA key");
-	}
-	return rsa_tmp;
-}
-# endif /* !TLS_NO_RSA */
 /*
 **  APPS_SSL_INFO_CB -- info callback for TLS connections
 **
@@ -1629,14 +1574,9 @@ tls_verify_log(ok, ctx, name)
 */
 
 static int
-#  if !defined(OPENSSL_VERSION_NUMBER) || OPENSSL_VERSION_NUMBER < 0x00907000L
-tls_verify_cb(ctx)
-	X509_STORE_CTX *ctx;
-#  else /* !defined() || OPENSSL_VERSION_NUMBER < 0x00907000L */
 tls_verify_cb(ctx, unused)
 	X509_STORE_CTX *ctx;
 	void *unused;
-#  endif /* !defined() || OPENSSL_VERSION_NUMBER < 0x00907000L */
 {
 	int ok;
 
@@ -1675,7 +1615,11 @@ tlslogerr(who)
 	char buf[256];
 #  define CP (const char **)
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	es = 0;
+#else
 	es = CRYPTO_thread_id();
+#endif
 	while ((l = ERR_get_error_line_data(CP &file, &line, CP &data, &flags))
 		!= 0)
 	{
@@ -1687,7 +1631,6 @@ tlslogerr(who)
 	}
 }
 
-# if OPENSSL_VERSION_NUMBER > 0x00907000L
 /*
 **  X509_VERIFY_CB -- verify callback
 **
@@ -1708,13 +1651,13 @@ x509_verify_cb(ok, ctx)
 	{
 		if (LogLevel > 13)
 			tls_verify_log(ok, ctx, "x509");
-		if (ctx->error == X509_V_ERR_UNABLE_TO_GET_CRL)
+		if (X509_STORE_CTX_get_error(ctx)
+		    == X509_V_ERR_UNABLE_TO_GET_CRL)
 		{
-			ctx->error = 0;
+			X509_STORE_CTX_set_error(ctx, 0);
 			return 1;	/* override it */
 		}
 	}
 	return ok;
 }
-# endif /* OPENSSL_VERSION_NUMBER > 0x00907000L */
 #endif /* STARTTLS */
