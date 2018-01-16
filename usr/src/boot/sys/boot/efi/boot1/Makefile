@@ -66,6 +66,7 @@ all: boot1.efi
 
 install: all $(ROOTBOOTFILES)
 
+LIBEFI=		../libefi/libefi.a
 #
 # Add libstand for the runtime functions used by the compiler - for example
 # __aeabi_* (arm) or __divdi3 (i386).
@@ -73,8 +74,10 @@ install: all $(ROOTBOOTFILES)
 #
 LIBSTAND=	../../libstand/$(MACH64)/libstand.a
 LIBZFSBOOT=	../../zfs/$(MACH64)/libzfsboot.a
-DPADD=		${LIBSTAND} ${LIBZFSBOOT}
-LDADD=		-L../../zfs/$(MACH64) -lzfsboot -L../../libstand/$(MACH64) -lstand
+DPADD=		$(LIBEFI) $(LIBZFSBOOT) $(LIBSTAND)
+LDADD=		-L../libefi -lefi
+LDADD +=	-L../../zfs/$(MACH64) -lzfsboot
+LDADD +=	-L../../libstand/$(MACH64) -lstand
 
 DPADD +=	${LDSCRIPT}
 

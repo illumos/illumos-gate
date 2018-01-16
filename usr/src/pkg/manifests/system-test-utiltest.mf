@@ -216,6 +216,10 @@ file path=opt/util-tests/tests/files/gout6 mode=0444
 file path=opt/util-tests/tests/files/gout60 mode=0444
 file path=opt/util-tests/tests/files/gout61 mode=0444
 file path=opt/util-tests/tests/files/gout62 mode=0444
+file path=opt/util-tests/tests/files/gout63 mode=0444
+file path=opt/util-tests/tests/files/gout64 mode=0444
+file path=opt/util-tests/tests/files/gout65 mode=0444
+file path=opt/util-tests/tests/files/gout66 mode=0444
 file path=opt/util-tests/tests/files/gout7 mode=0444
 file path=opt/util-tests/tests/files/gout8 mode=0444
 file path=opt/util-tests/tests/files/gout9 mode=0444
@@ -227,6 +231,7 @@ file path=opt/util-tests/tests/files/test4 mode=0444
 file path=opt/util-tests/tests/files/test5 mode=0444
 file path=opt/util-tests/tests/files/test6 mode=0444
 file path=opt/util-tests/tests/files/test7 mode=0444
+file path=opt/util-tests/tests/files/testnl mode=0444
 file path=opt/util-tests/tests/grep_test mode=0555
 file path=opt/util-tests/tests/iconv_test mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_00_blank mode=0555

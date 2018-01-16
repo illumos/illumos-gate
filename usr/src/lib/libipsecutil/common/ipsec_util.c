@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Juri. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <unistd.h>
@@ -1152,6 +1153,9 @@ error:
  * not found).  Note that the returned label pointer points to a static
  * string, so the label will be overwritten by a subsequent call to the
  * function; the function is also not thread-safe as a result.
+ *
+ * Because this is possibly publically exported, do not change its name,
+ * but this is for all intents and purposes an IKEv1/in.iked function.
  */
 char *
 kmc_lookup_by_cookie(int cookie)
@@ -2591,13 +2595,32 @@ print_kmc(FILE *file, char *prefix, struct sadb_x_kmc *kmc)
 {
 	char *cookie_label;
 
-	if ((cookie_label = kmc_lookup_by_cookie(kmc->sadb_x_kmc_cookie)) ==
-	    NULL)
-		cookie_label = dgettext(TEXT_DOMAIN, "<Label not found.>");
+	switch (kmc->sadb_x_kmc_proto) {
+	case SADB_X_KMP_IKE:
+		cookie_label = kmc_lookup_by_cookie(kmc->sadb_x_kmc_cookie);
+		if (cookie_label == NULL)
+			cookie_label =
+			    dgettext(TEXT_DOMAIN, "<Label not found.>");
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
+		    kmc->sadb_x_kmc_proto, cookie_label,
+		    kmc->sadb_x_kmc_cookie);
+		return;
+	case SADB_X_KMP_MANUAL:
+		cookie_label = dgettext(TEXT_DOMAIN, "Manual SA with cookie");
+		break;
+	/* case SADB_X_KMP_IKEV2: */
+	default:
+		cookie_label =
+		    dgettext(TEXT_DOMAIN, "<unknown KM protocol>");
+		break;
+	}
 
+	/* XXX KEBE ASKS... htonll() on generic kmc_cookie? */
 	(void) fprintf(file, dgettext(TEXT_DOMAIN,
-	    "%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
-	    kmc->sadb_x_kmc_proto, cookie_label, kmc->sadb_x_kmc_cookie);
+	    "%sProtocol %u, cookie=\"%s\" (0x%"PRIx64"/%"PRIu64")\n"),
+	    prefix, kmc->sadb_x_kmc_proto, cookie_label,
+	    kmc->sadb_x_kmc_cookie64, kmc->sadb_x_kmc_cookie64);
 }
 
 /*

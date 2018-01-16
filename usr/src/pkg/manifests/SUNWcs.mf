@@ -739,14 +739,12 @@ file path=usr/bin/dumpcs mode=0555
 file path=usr/bin/dumpkeys mode=0555
 file path=usr/bin/echo mode=0555
 file path=usr/bin/ed mode=0555
-file path=usr/bin/egrep mode=0555
 file path=usr/bin/eject mode=0555
 file path=usr/bin/env mode=0555
 file path=usr/bin/expr mode=0555
 file path=usr/bin/false mode=0555
 file path=usr/bin/fdetach mode=0555
 file path=usr/bin/fdformat mode=4555
-file path=usr/bin/fgrep mode=0555
 file path=usr/bin/file mode=0555
 file path=usr/bin/find mode=0555
 file path=usr/bin/fmt mode=0555
@@ -1499,9 +1497,11 @@ hardlink path=usr/bin/digest target=../../usr/lib/isaexec
 hardlink path=usr/bin/dispgid target=../../usr/bin/ckgid
 hardlink path=usr/bin/dispuid target=../../usr/bin/ckuid
 hardlink path=usr/bin/edit target=../has/bin/edit
+hardlink path=usr/bin/egrep target=../../usr/bin/grep
 hardlink path=usr/bin/encrypt target=../../usr/lib/isaexec
 hardlink path=usr/bin/fc target=../../usr/bin/alias
 hardlink path=usr/bin/fg target=../../usr/bin/alias
+hardlink path=usr/bin/fgrep target=../../usr/bin/grep
 hardlink path=usr/bin/getopts target=../../usr/bin/alias
 hardlink path=usr/bin/hash target=../../usr/bin/alias
 hardlink path=usr/bin/jobs target=../../usr/bin/alias

@@ -20,7 +20,7 @@ function tester {
 
     ./$prog >/dev/null &
     pid=$!
-    if (/usr/bin/amd64/pstack $pid | /usr/xpg4/bin/grep -q "${pattern}"); then
+    if (/usr/bin/amd64/pstack $pid | /usr/bin/grep -q "${pattern}"); then
         echo "pass: ${prog}"
     else
         echo "FAIL: ${prog}"

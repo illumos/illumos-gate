@@ -1043,7 +1043,7 @@ sadb_make_addr_ext(uint8_t *start, uint8_t *end, uint16_t exttype,
  */
 
 static uint8_t *
-sadb_make_kmc_ext(uint8_t *cur, uint8_t *end, uint32_t kmp, uint32_t kmc)
+sadb_make_kmc_ext(uint8_t *cur, uint8_t *end, uint32_t kmp, uint64_t kmc)
 {
 	sadb_x_kmc_t *kmcext = (sadb_x_kmc_t *)cur;
 
@@ -1058,8 +1058,7 @@ sadb_make_kmc_ext(uint8_t *cur, uint8_t *end, uint32_t kmp, uint32_t kmc)
 	kmcext->sadb_x_kmc_len = SADB_8TO64(sizeof (*kmcext));
 	kmcext->sadb_x_kmc_exttype = SADB_X_EXT_KM_COOKIE;
 	kmcext->sadb_x_kmc_proto = kmp;
-	kmcext->sadb_x_kmc_cookie = kmc;
-	kmcext->sadb_x_kmc_reserved = 0;
+	kmcext->sadb_x_kmc_cookie64 = kmc;
 
 	return (cur);
 }
@@ -2330,8 +2329,13 @@ sadb_form_query(keysock_in_t *ksi, uint32_t req, uint32_t match,
 	sq->kmp = 0;
 
 	if ((match & IPSA_Q_KMC) && (sq->kmcext)) {
-		sq->kmc = sq->kmcext->sadb_x_kmc_cookie;
 		sq->kmp = sq->kmcext->sadb_x_kmc_proto;
+		/* Be liberal in what we receive.  Special-case IKEv1. */
+		if (sq->kmp == SADB_X_KMP_IKE) {
+			/* Just in case in.iked is misbehaving... */
+			sq->kmcext->sadb_x_kmc_reserved = 0;
+		}
+		sq->kmc = sq->kmcext->sadb_x_kmc_cookie64;
 		*mfpp++ = sadb_match_kmc;
 	}
 
@@ -3133,7 +3137,12 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 
 	if (kmcext != NULL) {
 		newbie->ipsa_kmp = kmcext->sadb_x_kmc_proto;
-		newbie->ipsa_kmc = kmcext->sadb_x_kmc_cookie;
+		/* Be liberal in what we receive.  Special-case IKEv1. */
+		if (newbie->ipsa_kmp == SADB_X_KMP_IKE) {
+			/* Just in case in.iked is misbehaving... */
+			kmcext->sadb_x_kmc_reserved = 0;
+		}
+		newbie->ipsa_kmc = kmcext->sadb_x_kmc_cookie64;
 	}
 
 	/*
@@ -4436,7 +4445,7 @@ static int
 sadb_check_kmc(ipsa_query_t *sq, ipsa_t *sa, int *diagnostic)
 {
 	uint32_t kmp = sq->kmp;
-	uint32_t kmc = sq->kmc;
+	uint64_t kmc = sq->kmc;
 
 	if (sa == NULL)
 		return (0);
@@ -4444,12 +4453,12 @@ sadb_check_kmc(ipsa_query_t *sq, ipsa_t *sa, int *diagnostic)
 	if (sa->ipsa_state == IPSA_STATE_DEAD)
 		return (ESRCH);	/* DEAD == Not there, in this case. */
 
-	if ((kmp != 0) && ((sa->ipsa_kmp != 0) || (sa->ipsa_kmp != kmp))) {
+	if ((kmp != 0) && (sa->ipsa_kmp != 0) && (sa->ipsa_kmp != kmp)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_DUPLICATE_KMP;
 		return (EINVAL);
 	}
 
-	if ((kmc != 0) && ((sa->ipsa_kmc != 0) || (sa->ipsa_kmc != kmc))) {
+	if ((kmc != 0) && (sa->ipsa_kmc != 0) && (sa->ipsa_kmc != kmc)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_DUPLICATE_KMC;
 		return (EINVAL);
 	}
@@ -4464,7 +4473,7 @@ static void
 sadb_update_kmc(ipsa_query_t *sq, ipsa_t *sa)
 {
 	uint32_t kmp = sq->kmp;
-	uint32_t kmc = sq->kmc;
+	uint64_t kmc = sq->kmc;
 
 	if (kmp != 0)
 		sa->ipsa_kmp = kmp;
@@ -4501,7 +4510,8 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi, mblk_t **ipkt_lst,
 
 	sq.spp = spp;		/* XXX param */
 	int error = sadb_form_query(ksi, IPSA_Q_SRC|IPSA_Q_DST|IPSA_Q_SA,
-	    IPSA_Q_SRC|IPSA_Q_DST|IPSA_Q_SA|IPSA_Q_INBOUND|IPSA_Q_OUTBOUND,
+	    IPSA_Q_SRC|IPSA_Q_DST|IPSA_Q_SA|IPSA_Q_INBOUND|IPSA_Q_OUTBOUND|
+	    IPSA_Q_KMC,
 	    &sq, diagnostic);
 
 	if (error != 0)
@@ -5107,7 +5117,8 @@ sadb_acquire_prop(ipsec_action_t *ap, netstack_t *ns, boolean_t do_esp)
 	    emaxbits, replay;
 	uint64_t softbytes, hardbytes, softaddtime, hardaddtime, softusetime,
 	    hardusetime;
-	uint32_t kmc = 0, kmp = 0;
+	uint64_t kmc = 0;
+	uint32_t kmp = 0;
 
 	/*
 	 * Since it's an rwlock read, AND writing to the IPsec algorithms is
@@ -5297,7 +5308,6 @@ bail:
 /*
  * Generate an extended ACQUIRE's extended-proposal extension.
  */
-/* ARGSUSED */
 static mblk_t *
 sadb_acquire_extended_prop(ipsec_action_t *ap, netstack_t *ns)
 {
@@ -5305,7 +5315,8 @@ sadb_acquire_extended_prop(ipsec_action_t *ap, netstack_t *ns)
 	uint8_t *cur, *end;
 	mblk_t *mp;
 	int allocsize, numecombs = 0, numalgdescs = 0;
-	uint32_t kmc = 0, kmp = 0, replay = 0;
+	uint32_t kmp = 0, replay = 0;
+	uint64_t kmc = 0;
 	ipsec_action_t *walker;
 
 	allocsize = sizeof (*eprop);

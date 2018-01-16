@@ -24,8 +24,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # elfcmp - compare significant sections in two ELF files
 #
 # usage: elfcmp [-v] [-S] [-s section ...] <f1> <f2>
@@ -82,7 +80,7 @@ list_alloc_sections() {
 }
 
 signing_filter() {
-	/usr/xpg4/bin/grep -v -e \\$SHSTRTAB -e \\.SUNW_signature
+	/usr/bin/grep -v -e \\$SHSTRTAB -e \\.SUNW_signature
 }
 	
 # get section lists for both files into temp files

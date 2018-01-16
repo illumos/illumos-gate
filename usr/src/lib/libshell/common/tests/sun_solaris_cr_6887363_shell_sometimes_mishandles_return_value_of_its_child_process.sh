@@ -172,7 +172,7 @@ out="$(unset VMALLOC_OPTIONS VMDEBUG ; cat_test | ${SHELL} 2>&1)" || err_exit "U
 [[ "${out}" != "" ]] || err_exit "No output from test"
 
 # filter output and check it
-out2="$(/usr/xpg4/bin/egrep -v '^((read-seq|read-rand|syncread-seq|syncread-seq)[[:space:][:blank:]]*)*$' <<<"${out}")"
+out2="$(/usr/bin/egrep -v '^((read-seq|read-rand|syncread-seq|syncread-seq)[[:space:][:blank:]]*)*$' <<<"${out}")"
 [[ "${out2}" == "" ]] || err_exit "Unexpected output '${out2}'"
 
 
