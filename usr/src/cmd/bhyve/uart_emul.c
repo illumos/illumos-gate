@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD$
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * This file and its contents are supplied under the terms of the
@@ -83,7 +85,7 @@ __FBSDID("$FreeBSD$");
 
 #define	COM1_BASE	0x3F8
 #define	COM1_IRQ	4
-#define	COM2_BASE      	0x2F8
+#define	COM2_BASE	0x2F8
 #define COM2_IRQ	3
 
 #define	DEFAULT_RCLK	1843200
@@ -104,10 +106,6 @@ __FBSDID("$FreeBSD$");
 
 static bool uart_stdio;		/* stdio in use for i/o */
 static struct termios tio_stdio_orig;
-
-#ifndef	__FreeBSD__
-static bool uart_bcons;		/* bhyveconsole in use for i/o */
-#endif
 
 static struct {
 	int	baseaddr;
@@ -155,12 +153,11 @@ struct uart_softc {
 
 	struct ttyfd tty;
 #ifndef	__FreeBSD__
-	bool	bcons;
+	bool	sock;
 	struct {
-		pid_t	clipid;
 		int	clifd;		/* console client unix domain socket */
 		int	servfd;		/* console server unix domain socket */
-	} usc_bcons;
+	} usc_sock;
 #endif
 
 	bool	thre_int_pending;	/* THRE interrupt pending */
@@ -174,7 +171,7 @@ struct uart_softc {
 static void uart_drain(int fd, enum ev_type ev, void *arg);
 #else
 static void uart_tty_drain(struct uart_softc *sc);
-static int uart_bcons_drain(struct uart_softc *sc);
+static int uart_sock_drain(struct uart_softc *sc);
 #endif
 
 static void
@@ -221,9 +218,9 @@ ttywrite(struct ttyfd *tf, unsigned char wb)
 
 #ifndef	__FreeBSD__
 static void
-bconswrite(struct uart_softc *sc, unsigned char wb)
+sockwrite(struct uart_softc *sc, unsigned char wb)
 {
-	(void) write(sc->usc_bcons.clifd, &wb, 1);
+	(void) write(sc->usc_sock.clifd, &wb, 1);
 }
 #endif
 
@@ -491,7 +488,7 @@ uart_tty_drain(struct uart_softc *sc)
 }
 
 static int
-uart_bcons_drain(struct uart_softc *sc)
+uart_sock_drain(struct uart_softc *sc)
 {
 	char ch;
 	int nbytes;
@@ -504,10 +501,10 @@ uart_bcons_drain(struct uart_softc *sc)
 	pthread_mutex_lock(&sc->mtx);
 
 	if ((sc->mcr & MCR_LOOPBACK) != 0) {
-		(void) read(sc->usc_bcons.clifd, &ch, 1);
+		(void) read(sc->usc_sock.clifd, &ch, 1);
 	} else {
-		for (;;) {
-			nbytes = read(sc->usc_bcons.clifd, &ch, 1);
+		while (rxfifo_available(sc)) {
+			nbytes = read(sc->usc_sock.clifd, &ch, 1);
 			if (nbytes == 0) {
 				ret = 1;
 				break;
@@ -565,8 +562,8 @@ uart_write(struct uart_softc *sc, int offset, uint8_t value)
 		} else if (sc->tty.opened) {
 			ttywrite(&sc->tty, value);
 #ifndef	__FreeBSD__
-		} else if (sc->bcons) {
-				bconswrite(sc, value);
+		} else if (sc->sock) {
+			sockwrite(sc, value);
 #endif
 		} /* else drop on floor */
 		sc->thre_int_pending = true;
@@ -765,165 +762,77 @@ uart_tty_thread(void *param)
 	return (NULL);
 }
 
-/*
- * Read the "ident" string from the client's descriptor; this routine also
- * tolerates being called with pid=NULL, for times when you want to "eat"
- * the ident string from a client without saving it.
- */
 static int
-get_client_ident(int clifd, pid_t *pid)
-{
-	char buf[BUFSIZ], *bufp;
-	size_t buflen = sizeof (buf);
-	char c = '\0';
-	int i = 0, r;
-
-	/* "eat up the ident string" case, for simplicity */
-	if (pid == NULL) {
-		while (read(clifd, &c, 1) == 1) {
-			if (c == '\n')
-				return (0);
-		}
-	}
-
-	bzero(buf, sizeof (buf));
-	while ((buflen > 1) && (r = read(clifd, &c, 1)) == 1) {
-		buflen--;
-		if (c == '\n')
-			break;
-
-		buf[i] = c;
-		i++;
-	}
-	if (r == -1)
-		return (-1);
-
-	/*
-	 * We've filled the buffer, but still haven't seen \n.  Keep eating
-	 * until we find it; we don't expect this to happen, but this is
-	 * defensive.
-	 */
-	if (c != '\n') {
-		while ((r = read(clifd, &c, sizeof (c))) > 0)
-			if (c == '\n')
-				break;
-	}
-
-	/*
-	 * Parse buffer for message of the form: IDENT <pid>
-	 */
-	bufp = buf;
-	if (strncmp(bufp, "IDENT ", 6) != 0)
-		return (-1);
-	bufp += 6;
-	errno = 0;
-	*pid = strtoll(bufp, &bufp, 10);
-	if (errno != 0)
-		return (-1);
-
-	return (0);
-}
-
-static int
-uart_bcons_accept_client(struct uart_softc *sc)
+uart_sock_accept_client(struct uart_softc *sc)
 {
 	int connfd;
 	struct sockaddr_un cliaddr;
 	socklen_t clilen;
-	pid_t pid;
 
 	clilen = sizeof (cliaddr);
-	connfd = accept(sc->usc_bcons.servfd,
-			(struct sockaddr *)&cliaddr, &clilen);
-	if (connfd == -1)
-		return (-1);
-	if (get_client_ident(connfd, &pid) == -1) {
-		(void) shutdown(connfd, SHUT_RDWR);
-		(void) close(connfd);
+	connfd = accept(sc->usc_sock.servfd, (struct sockaddr *)&cliaddr,
+	    &clilen);
+	if (connfd == -1) {
 		return (-1);
 	}
-
 	if (fcntl(connfd, F_SETFL, O_NONBLOCK) < 0) {
 		(void) shutdown(connfd, SHUT_RDWR);
 		(void) close(connfd);
 		return (-1);
 	}
-	(void) write(connfd, "OK\n", 3);
 
-	sc->usc_bcons.clipid = pid;
-	sc->usc_bcons.clifd = connfd;
-
-	printf("Connection from process ID %lu.\n", pid);
+	sc->usc_sock.clifd = connfd;
 
 	return (0);
 }
 
 static void
-uart_bcons_reject_client(struct uart_softc *sc)
+uart_sock_reject_client(struct uart_softc *sc)
 {
 	int connfd;
 	struct sockaddr_un cliaddr;
 	socklen_t clilen;
-	char nak[MAXPATHLEN];
 
 	clilen = sizeof (cliaddr);
-	connfd = accept(sc->usc_bcons.servfd,
+	connfd = accept(sc->usc_sock.servfd,
 			(struct sockaddr *)&cliaddr, &clilen);
 
-	/*
-	 * After hear its ident string, tell client to get lost.
-	 */
-	if (get_client_ident(connfd, NULL) == 0) {
-		(void) snprintf(nak, sizeof (nak), "%lu\n",
-		    sc->usc_bcons.clipid);
-		(void) write(connfd, nak, strlen(nak));
-	}
+	(void) fprintf(stderr, "Shutting down unexpected client connection\n");
 	(void) shutdown(connfd, SHUT_RDWR);
 	(void) close(connfd);
 }
 
-static int
-uart_bcons_client_event(struct uart_softc *sc)
+static void
+uart_sock_client_event(struct uart_softc *sc)
 {
 	int res;
 
-	res = uart_bcons_drain(sc);
+	res = uart_sock_drain(sc);
 	if (res < 0)
-		return (-1);
+		return;
 
 	if (res > 0) {
-		fprintf(stderr, "Closing connection with bhyve console\n");
-		(void) shutdown(sc->usc_bcons.clifd, SHUT_RDWR);
-		(void) close(sc->usc_bcons.clifd);
-		sc->usc_bcons.clifd = -1;
+		fprintf(stderr, "Closing connection with bhyve socket\n");
+		(void) shutdown(sc->usc_sock.clifd, SHUT_RDWR);
+		(void) close(sc->usc_sock.clifd);
+		sc->usc_sock.clifd = -1;
 	}
-
-	return (0);
 }
 
 static void
-uart_bcons_server_event(struct uart_softc *sc)
+uart_sock_server_event(struct uart_softc *sc)
 {
-#if notyet
-	int clifd;
-#endif
-
-	if (sc->usc_bcons.clifd != -1) {
+	if (sc->usc_sock.clifd != -1) {
 		/* we're already handling a client */
-		uart_bcons_reject_client(sc);
+		uart_sock_reject_client(sc);
 		return;
 	}
 
-	if (uart_bcons_accept_client(sc) == 0) {
-		pthread_mutex_lock(&bcons_wait_lock);
-		bcons_connected = B_TRUE;
-		pthread_cond_signal(&bcons_wait_done);
-		pthread_mutex_unlock(&bcons_wait_lock);
-	}
+	uart_sock_accept_client(sc);
 }
 
 static void *
-uart_bcons_thread(void *param)
+uart_sock_thread(void *param)
 {
 	struct uart_softc *sc = param;
 	struct pollfd pollfds[2];
@@ -937,8 +846,8 @@ uart_bcons_thread(void *param)
 	pollfds[1].events = pollfds[0].events;
 
 	for (;;) {
-		pollfds[0].fd = sc->usc_bcons.clifd;
-		pollfds[1].fd = sc->usc_bcons.servfd;
+		pollfds[0].fd = sc->usc_sock.clifd;
+		pollfds[1].fd = sc->usc_sock.servfd;
 		pollfds[0].revents = pollfds[1].revents = 0;
 
 		res = poll(pollfds,
@@ -954,8 +863,7 @@ uart_bcons_thread(void *param)
 		if (pollfds[0].revents) {
 			if (pollfds[0].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				if (uart_bcons_client_event(sc) < 0)
-					break;
+				uart_sock_client_event(sc);
 			} else {
 				break;
 			}
@@ -964,57 +872,56 @@ uart_bcons_thread(void *param)
 		/* event from server socket */
 		if (pollfds[1].revents) {
 			if (pollfds[1].revents & (POLLIN | POLLRDNORM)) {
-				uart_bcons_server_event(sc);
+				uart_sock_server_event(sc);
 			} else {
 				break;
 			}
 		}
 	}
 
-	if (sc->usc_bcons.clifd != -1) {
+	if (sc->usc_sock.clifd != -1) {
 		fprintf(stderr, "Closing connection with bhyve console\n");
-		(void) shutdown(sc->usc_bcons.clifd, SHUT_RDWR);
-		(void) close(sc->usc_bcons.clifd);
-		sc->usc_bcons.clifd = -1;
+		(void) shutdown(sc->usc_sock.clifd, SHUT_RDWR);
+		(void) close(sc->usc_sock.clifd);
+		sc->usc_sock.clifd = -1;
 	}
 
 	return (NULL);
 }
 
 static int
-init_bcons_sock(void)
+init_sock(const char *path)
 {
 	int servfd;
 	struct sockaddr_un servaddr;
 
-	if (mkdir(BHYVE_TMPDIR, S_IRWXU) < 0 && errno != EEXIST) {
-		fprintf(stderr, "bhyve console setup: "
-		    "could not mkdir %s", BHYVE_TMPDIR, strerror(errno));
+	bzero(&servaddr, sizeof (servaddr));
+	servaddr.sun_family = AF_UNIX;
+
+	if (strlcpy(servaddr.sun_path, path, sizeof (servaddr.sun_path)) >=
+	    sizeof (servaddr.sun_path)) {
+		(void) fprintf(stderr, "bhyve socket setup: path '%s' "
+		    "too long\n", path);
 		return (-1);
 	}
 
-	bzero(&servaddr, sizeof (servaddr));
-	servaddr.sun_family = AF_UNIX;
-	(void) snprintf(servaddr.sun_path, sizeof (servaddr.sun_path),
-	    BHYVE_CONS_SOCKPATH, vmname);
-
 	if ((servfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		fprintf(stderr, "bhyve console setup: "
-		    "could not create socket\n");
+		(void) fprintf(stderr, "bhyve socket setup: "
+		    "could not create socket: %s\n", strerror(errno));
 		return (-1);
 	}
 	(void) unlink(servaddr.sun_path);
 
 	if (bind(servfd, (struct sockaddr *)&servaddr,
 	    sizeof (servaddr)) == -1) {
-		fprintf(stderr, "bhyve console setup: "
-		    "could not bind to socket\n");
+		fprintf(stderr, "bhyve socket setup: "
+		    "could not bind to socket: %s\n", strerror(errno));
 		goto out;
         }
 
-        if (listen(servfd, 4) == -1) {
+        if (listen(servfd, 1) == -1) {
 		fprintf(stderr, "bhyve console setup: "
-		    "could not listen on socket");
+		    "could not listen on socket: %s\n", strerror(errno));
 		goto out;
         }
         return (servfd);
@@ -1024,7 +931,7 @@ out:
         (void) close(servfd);
         return (-1);
 }
-#endif
+#endif /* not __FreeBSD__ */
 
 int
 uart_legacy_alloc(int which, int *baseaddr, int *irq)
@@ -1077,6 +984,55 @@ uart_tty_backend(struct uart_softc *sc, const char *opts)
 	return (retval);
 }
 
+#ifndef __FreeBSD__
+static int
+uart_sock_backend(struct uart_softc *sc, const char *inopts)
+{
+	char *opts;
+	char *opt;
+	char *nextopt;
+	char *path = NULL;
+	int error;
+
+	if (strncmp(inopts, "socket,", 7) != 0) {
+		return (-1);
+	}
+	if ((opts = strdup(inopts + 7)) == NULL) {
+		return (-1);
+	}
+
+	nextopt = opts;
+	for (opt = strsep(&nextopt, ","); opt != NULL;
+	    opt = strsep(&nextopt, ",")) {
+		if (path == NULL && *opt == '/') {
+			path = opt;
+			continue;
+		}
+		/*
+		 * XXX check for server and client options here.  For now,
+		 * everything is a server
+		 */
+		free(opts);
+		return (-1);
+	}
+
+	sc->usc_sock.clifd = -1;
+	if ((sc->usc_sock.servfd = init_sock(path)) == -1) {
+		fprintf(stderr, "bhyve serial setup: socket initialization "
+		    "of '%s' failed\n", path);
+		free(opts);
+		return (-1);
+	}
+	error = pthread_create(NULL, NULL, uart_sock_thread, sc);
+	assert(error == 0);
+
+	sc->sock = true;
+	sc->tty.fd = -1;
+
+	return (0);
+}
+#endif /* not __FreeBSD__ */
+
 int
 uart_set_backend(struct uart_softc *sc, const char *opts)
 {
@@ -1096,36 +1052,22 @@ uart_set_backend(struct uart_softc *sc, const char *opts)
 		return (0);
 
 	if (strcmp("stdio", opts) == 0) {
-		if (!uart_stdio && !uart_bcons) {
+		if (!uart_stdio) {
 			sc->tty.fd = STDIN_FILENO;
 			sc->tty.opened = true;
 			uart_stdio = true;
 			retval = 0;
 		}
+#ifndef __FreeBSD__
+	} else if (strncmp("socket,", opts, 7) == 0) {
+		return (uart_sock_backend(sc, opts));
+#endif
 	} else if (uart_tty_backend(sc, opts) == 0) {
 		retval = 0;
-	} else if (strstr(opts, "bcons") != 0 && !uart_stdio && !uart_bcons) {
-		sc->bcons = true;
-		uart_bcons= true;
-
-		if (strstr(opts, "bcons,wait") != 0) {
-			bcons_wait = true;
-		}
-
-		sc->usc_bcons.clifd = -1;
-		if ((sc->usc_bcons.servfd = init_bcons_sock()) == -1) {
-			fprintf(stderr, "bhyve console setup: "
-			    "socket initialization failed\n");
-			return (-1);
-		}
-		error = pthread_create(NULL, NULL, uart_bcons_thread, sc);
-		assert(error == 0);
-
-		return (0);
 	}
 
 	/* Make the backend file descriptor non-blocking */
-	if (retval == 0)
+	if (retval == 0 && sc->tty.fd != -1)
 		retval = fcntl(sc->tty.fd, F_SETFL, O_NONBLOCK);
 
 #ifndef WITHOUT_CAPSICUM
