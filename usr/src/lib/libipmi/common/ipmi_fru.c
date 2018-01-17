@@ -108,7 +108,7 @@ ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 
 		/*
 		 * The FRU area must be read in chunks as its total size will
-		 * be larger that what would fit in a single message.  The
+		 * be larger than what would fit in a single message.  The
 		 * maximum size of a message can vary between platforms so
 		 * if while attempting to read a chunk we receive an error code
 		 * indicating that the requested chunk size is invalid, we will

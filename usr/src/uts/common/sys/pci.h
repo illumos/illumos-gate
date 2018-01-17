@@ -235,6 +235,7 @@ extern "C" {
 #define	PCI_MASS_ATA		0x5	/* ATA Controller */
 #define	PCI_MASS_SATA		0x6	/* Serial ATA */
 #define	PCI_MASS_SAS		0x7	/* Serial Attached SCSI (SAS) Cntrlr */
+#define	PCI_MASS_NVME		0x8	/* Non-Volatile memory controller */
 #define	PCI_MASS_OTHER		0x80	/* Other Mass Storage Controller */
 
 /*
