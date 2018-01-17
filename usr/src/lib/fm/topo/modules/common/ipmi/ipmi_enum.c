@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -32,15 +33,16 @@
 #define	TOPO_PGROUP_IPMI 		"ipmi"
 #define	TOPO_PROP_IPMI_ENTITY_REF	"entity_ref"
 #define	TOPO_PROP_IPMI_ENTITY_PRESENT	"entity_present"
+#define	FAC_PROV_IPMI			"fac_prov_ipmi"
 
 typedef struct ipmi_enum_data {
-	topo_mod_t	*ed_mod;
-	tnode_t		*ed_pnode;
-	const char	*ed_name;
-	char		*ed_label;
-	uint8_t		ed_entity;
-	topo_instance_t	ed_instance;
-	boolean_t	ed_hasfru;
+	topo_mod_t		*ed_mod;
+	tnode_t			*ed_pnode;
+	const char		*ed_name;
+	char			*ed_label;
+	uint8_t			ed_entity;
+	topo_instance_t		ed_instance;
+	ipmi_sdr_fru_locator_t	*ed_frusdr;
 } ipmi_enum_data_t;
 
 static int ipmi_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
@@ -194,7 +196,7 @@ ipmi_check_sdr(ipmi_handle_t *ihp, ipmi_entity_t *ep, const char *name,
 	ipmi_enum_data_t *edp = data;
 
 	if (sdrp->is_type == IPMI_SDR_TYPE_FRU_LOCATOR)
-		edp->ed_hasfru = B_TRUE;
+		edp->ed_frusdr = (ipmi_sdr_fru_locator_t *)sdrp->is_record;
 
 	return (0);
 }
@@ -210,16 +212,32 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 	ipmi_enum_data_t cdata;
 	tnode_t *pnode = edp->ed_pnode;
 	topo_mod_t *mod = edp->ed_mod;
+	topo_mod_t *fmod = topo_mod_getspecific(mod);
 	nvlist_t *auth, *fmri;
 	tnode_t *tn;
 	topo_pgroup_info_t pgi;
+	char *frudata = NULL, *part = NULL, *rev = NULL, *serial = NULL;
+	ipmi_fru_prod_info_t fruprod = {0};
+	ipmi_fru_brd_info_t frubrd = {0};
 	int err;
 	const char *labelname;
 	char label[64];
 	size_t len;
 
-	if (ep->ie_type != edp->ed_entity)
+	/*
+	 * Some questionable IPMI implementations group psu and fan entities
+	 * under things like motherboard or chassis entities.  So even if this
+	 * entity type isn't typically associated with fans and psus, if it has
+	 * children, then regardless of the type we need to decend down and
+	 * iterate over them.
+	 */
+	if (ep->ie_type != edp->ed_entity) {
+		if (ep->ie_children != 0 &&
+		    ipmi_entity_iter_children(ihp, ep, ipmi_check_entity,
+		    data) != 0)
+			return (1);
 		return (0);
+	}
 
 	/*
 	 * The purpose of power and cooling domains is to group psus and fans
@@ -238,16 +256,45 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 		return (1);
 	}
 
+	/*
+	 * Determine if there's a FRU record associated with this entity.  If
+	 * so, then read in the FRU identity info so that it can be included
+	 * in the authority portion of the FMRI.
+	 *
+	 * topo_mod_hcfmri() will safely except NULL values for the part,
+	 * rev and serial params, so we opt to simply drive on in the face of
+	 * any strdup failures.
+	 */
+	edp->ed_frusdr = NULL;
+	(void) ipmi_entity_iter_sdr(ihp, ep, ipmi_check_sdr, edp);
+	if (edp->ed_frusdr != NULL &&
+	    ipmi_fru_read(ihp, edp->ed_frusdr, &frudata) != -1) {
+		if (ipmi_fru_parse_product(ihp, frudata, &fruprod) == 0) {
+			part = strdup(fruprod.ifpi_part_number);
+			rev = strdup(fruprod.ifpi_product_version);
+			serial = strdup(fruprod.ifpi_product_serial);
+		} else if (ipmi_fru_parse_board(ihp, frudata, &frubrd) == 0) {
+			part = strdup(frubrd.ifbi_part_number);
+			serial = strdup(frubrd.ifbi_product_serial);
+		}
+	}
+	free(frudata);
+
 	if ((fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION,
-	    edp->ed_name, edp->ed_instance, NULL, auth, NULL, NULL,
-	    NULL)) == NULL) {
+	    edp->ed_name, edp->ed_instance, NULL, auth, part, rev,
+	    serial)) == NULL) {
 		nvlist_free(auth);
+		free(part);
+		free(rev);
+		free(serial);
 		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
 		    topo_mod_errmsg(mod));
 		return (1);
 	}
-
 	nvlist_free(auth);
+	free(part);
+	free(rev);
+	free(serial);
 
 	if ((tn = topo_node_bind(mod, pnode, edp->ed_name,
 	    edp->ed_instance, fmri)) == NULL) {
@@ -313,8 +360,42 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 		}
 	}
 
+	/*
+	 * Add properties to contain the IPMI entity id and instance.  This
+	 * will be used by the fac_prov_ipmi module to discover and enumerate
+	 * facility nodes for any associated sensors.
+	 */
+	if (topo_prop_set_uint32(tn, TOPO_PGROUP_IPMI, TOPO_PROP_IPMI_ENTITY_ID,
+	    TOPO_PROP_IMMUTABLE, ep->ie_type, &err) != 0 ||
+	    topo_prop_set_uint32(tn, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_INST, TOPO_PROP_IMMUTABLE, ep->ie_instance,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to add ipmi properties (%s)",
+		    topo_strerror(err));
+		return (1);
+	}
 	if (topo_method_register(mod, tn, ipmi_methods) != 0) {
 		topo_mod_dprintf(mod, "topo_method_register() failed: %s",
+		    topo_mod_errmsg(mod));
+		return (1);
+	}
+
+	/*
+	 * Invoke the tmo_enum callback from the fac_prov_ipmi module on this
+	 * node.  This will have the effect of registering a method on this node
+	 * for enumerating sensors.
+	 */
+	if (fmod == NULL && (fmod = topo_mod_load(mod, FAC_PROV_IPMI,
+	    TOPO_VERSION)) == NULL) {
+		topo_mod_dprintf(mod, "failed to load %s: %s",
+		    FAC_PROV_IPMI, topo_mod_errmsg(mod));
+		return (-1);
+	}
+	topo_mod_setspecific(mod, fmod);
+
+	if (topo_mod_enumerate(fmod, tn, FAC_PROV_IPMI, FAC_PROV_IPMI, 0, 0,
+	    NULL) != 0) {
+		topo_mod_dprintf(mod, "facility provider enum failed (%s)",
 		    topo_mod_errmsg(mod));
 		return (1);
 	}
@@ -324,11 +405,8 @@ ipmi_check_entity(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 	 * FRU locator record, then propagate the parent's FRU.  Otherwise, set
 	 * the FRU to be the same as the resource.
 	 */
-	edp->ed_hasfru = B_FALSE;
-	(void) ipmi_entity_iter_sdr(ihp, ep, ipmi_check_sdr, edp);
-
 	if (strcmp(topo_node_name(pnode), CHASSIS) == 0 ||
-	    edp->ed_hasfru) {
+	    edp->ed_frusdr != NULL) {
 		if (topo_node_resource(tn, &fmri, &err) != 0) {
 			topo_mod_dprintf(mod, "topo_node_resource() failed: %s",
 			    topo_strerror(err));
@@ -483,8 +561,8 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 		topo_mod_setdebug(mod);
 
 	if (topo_mod_register(mod, &ipmi_info, TOPO_VERSION) != 0) {
-		topo_mod_dprintf(mod, "%s registration failed: %s\n",
-		    DISK, topo_mod_errmsg(mod));
+		topo_mod_dprintf(mod, "module registration failed: %s\n",
+		    topo_mod_errmsg(mod));
 		return (-1); /* mod errno already set */
 	}
 
@@ -495,5 +573,16 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 void
 _topo_fini(topo_mod_t *mod)
 {
+	/*
+	 * This is the logical, and probably only safe spot where we could
+	 * unload fac_prov_ipmi.  But unfortunately, calling topo_mod_unload()
+	 * in the context of a module's _topo_fini entry point would result
+	 * in recursively grabbing the modhash lock and we'd deadlock.
+	 *
+	 * Unfortunately, libtopo doesn't currently have a mechanism for
+	 * expressing and handling intermodule dependencies, so we're left
+	 * with this situation where once a module loads another module,
+	 * it's going to be with us until we teardown the process.
+	 */
 	topo_mod_unregister(mod);
 }

@@ -22,7 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright (c) 2017, Joyent, Inc.
+ */
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,6 +60,7 @@
 #define	TOPO_METH_CHASSIS_SERVICE_VERSION	0
 #define	TOPO_METH_IPMI_ENTITY_VERSION		0
 #define	TOPO_METH_DIMM_IPMI_ENTITY_VERSION	0
+#define	TOPO_METH_CHASSIS_IDENT_VERSION		0
 
 static int fac_prov_ipmi_enum(topo_mod_t *, tnode_t *, const char *,
     topo_instance_t, topo_instance_t, void *, void *);
@@ -88,6 +91,8 @@ static int x4500_present_mode(topo_mod_t *, tnode_t *, topo_version_t,
 static int bay_indicator_mode(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int chassis_service_mode(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+static int chassis_ident_mode(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
 const topo_modops_t ipmi_ops = { fac_prov_ipmi_enum, NULL };
@@ -133,6 +138,9 @@ static const topo_method_t ipmi_fac_methods[] = {
 	{ "chassis_service_mode", TOPO_PROP_METH_DESC,
 	    TOPO_METH_CHASSIS_SERVICE_VERSION,
 	    TOPO_STABILITY_INTERNAL, chassis_service_mode },
+	{ "chassis_ident_mode", TOPO_PROP_METH_DESC,
+	    TOPO_METH_CHASSIS_SERVICE_VERSION,
+	    TOPO_STABILITY_INTERNAL, chassis_ident_mode },
 	{ "x4500_present_mode", TOPO_PROP_METH_DESC,
 	    TOPO_METH_CHASSIS_SERVICE_VERSION,
 	    TOPO_STABILITY_INTERNAL, x4500_present_mode },
@@ -153,6 +161,8 @@ struct entity_info {
 	uint32_t ei_inst;
 	topo_mod_t *ei_mod;
 	tnode_t *ei_node;
+	char **ei_list;
+	uint_t ei_listsz;
 };
 
 struct sensor_data {
@@ -1243,6 +1253,102 @@ chassis_service_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	return (0);
 }
 
+/*
+ * This is a property method for controlling the chassis identify LED using
+ * generic IPMI mechanisms.
+ */
+/*ARGSUSED*/
+static int
+chassis_ident_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	ipmi_handle_t *hdl;
+	int ret;
+	uint32_t modeval;
+	boolean_t assert_ident;
+	nvlist_t *pargs, *nvl;
+	ipmi_chassis_status_t *chs;
+
+	if (vers > TOPO_METH_CHASSIS_IDENT_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
+		return (-1);
+	}
+
+	/*
+	 * Now lookup the propmethod argument list and figure out whether we're
+	 * doing a get or a set operation, and then do it.
+	 */
+	if ((nvlist_lookup_nvlist(in, TOPO_PROP_PARGS, &pargs) == 0) &&
+	    nvlist_exists(pargs, TOPO_PROP_VAL_VAL)) {
+		/*
+		 * Set the LED mode
+		 */
+		if ((ret = nvlist_lookup_uint32(pargs, TOPO_PROP_VAL_VAL,
+		    &modeval)) != 0) {
+			topo_mod_dprintf(mod, "Failed to lookup %s nvpair "
+			    "(%s)\n", TOPO_PROP_VAL_VAL, strerror(ret));
+			topo_mod_ipmi_rele(mod);
+			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+		}
+
+		assert_ident = modeval ? B_TRUE : B_FALSE;
+		topo_mod_dprintf(mod, "%s: Setting LED mode to %s\n", __func__,
+		    assert_ident ? "ON" : "OFF");
+		if (ipmi_chassis_identify(hdl, assert_ident) != 0) {
+			topo_mod_ipmi_rele(mod);
+			return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+		}
+
+	} else {
+		/*
+		 * Get the LED mode
+		 */
+		if ((chs = ipmi_chassis_status(hdl)) == NULL ||
+		    !chs->ichs_identify_supported) {
+			free(chs);
+			topo_mod_ipmi_rele(mod);
+			return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+		}
+		/*
+		 * ichs_identify_state is a 2-bit value with the following
+		 * semantics:
+		 * 0 - ident is off
+		 * 1 - ident is temporarily on
+		 * 2 - ident is indefinitely on
+		 * 3 - reserved
+		 */
+		switch (chs->ichs_identify_state) {
+		case 0:
+			modeval = TOPO_LED_STATE_OFF;
+			break;
+		case 1:
+		case 2:
+			modeval = TOPO_LED_STATE_ON;
+			break;
+		default:
+			free(chs);
+			topo_mod_ipmi_rele(mod);
+			return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+		}
+		free(chs);
+	}
+	topo_mod_ipmi_rele(mod);
+
+	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
+	    nvlist_add_string(nvl, TOPO_PROP_VAL_NAME, TOPO_LED_MODE) != 0 ||
+	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, TOPO_TYPE_UINT32) != 0 ||
+	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL, modeval) != 0) {
+		topo_mod_dprintf(mod, "Failed to allocate 'out' nvlist\n");
+		nvlist_free(nvl);
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
+	*out = nvl;
+	return (0);
+}
+
 static int
 make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 {
@@ -1373,6 +1479,15 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 	return (0);
 }
 
+static boolean_t
+seq_search(char *key, char **list, uint_t nelem)
+{
+	for (int i = 0; i < nelem; i++)
+		if (strcmp(key, list[i]) == 0)
+			return (B_TRUE);
+	return (B_FALSE);
+}
+
 /* ARGSUSED */
 static int
 sdr_callback(ipmi_handle_t *hdl, const char *id, ipmi_sdr_t *sdr, void *data)
@@ -1427,37 +1542,33 @@ sdr_callback(ipmi_handle_t *hdl, const char *id, ipmi_sdr_t *sdr, void *data)
 	if (sd.sd_rtype >= 0x1 && sd.sd_rtype <= 0xc)
 		sd.sd_stype = sd.sd_rtype + 0x100;
 
-	if ((sensor_entity == ei->ei_id) && (sensor_inst == ei->ei_inst))
+	if ((ei->ei_list != NULL && seq_search(sd.sd_entity_ref,
+	    ei->ei_list, ei->ei_listsz) == B_TRUE) ||
+	    (sensor_entity == ei->ei_id && sensor_inst == ei->ei_inst)) {
+
 		if (make_sensor_node(ei->ei_mod, ei->ei_node, &sd) != 0) {
 			topo_mod_dprintf(ei->ei_mod, "Failed to create sensor "
 			    "node for %s\n", sd.sd_entity_ref);
 			if (topo_mod_errno(ei->ei_mod) != EMOD_NODE_DUP)
 				return (-1);
 		}
+	}
 	return (0);
 }
 
-/* ARGSUSED */
 static int
-ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
-    nvlist_t *in, nvlist_t **out)
+get_entity_info(topo_mod_t *mod, tnode_t *node, ipmi_handle_t *hdl,
+    struct entity_info *ei)
 {
 	char **entity_refs;
 	int err;
 	uint_t nelems;
-	struct entity_info ei;
 	ipmi_sdr_t *ref_sdr;
-	ipmi_handle_t *hdl;
 	ipmi_sdr_full_sensor_t *fsensor;
 	ipmi_sdr_compact_sensor_t *csensor;
 	ipmi_sdr_fru_locator_t *floc;
 	ipmi_sdr_generic_locator_t *gloc;
 	boolean_t found_sdr = B_FALSE;
-
-	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
-		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
-		return (-1);
-	}
 
 	/*
 	 * Use the entity ref to lookup the SDR, which will have the entity ID
@@ -1490,30 +1601,65 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	switch (ref_sdr->is_type) {
 		case IPMI_SDR_TYPE_FULL_SENSOR:
 			fsensor = (ipmi_sdr_full_sensor_t *)ref_sdr->is_record;
-			ei.ei_id = fsensor->is_fs_entity_id;
-			ei.ei_inst = fsensor->is_fs_entity_instance;
+			ei->ei_id = fsensor->is_fs_entity_id;
+			ei->ei_inst = fsensor->is_fs_entity_instance;
 			break;
 		case IPMI_SDR_TYPE_COMPACT_SENSOR:
 			csensor
 			    = (ipmi_sdr_compact_sensor_t *)ref_sdr->is_record;
-			ei.ei_id = csensor->is_cs_entity_id;
-			ei.ei_inst = csensor->is_cs_entity_instance;
+			ei->ei_id = csensor->is_cs_entity_id;
+			ei->ei_inst = csensor->is_cs_entity_instance;
 			break;
 		case IPMI_SDR_TYPE_FRU_LOCATOR:
 			floc = (ipmi_sdr_fru_locator_t *)ref_sdr->is_record;
-			ei.ei_id = floc->is_fl_entity;
-			ei.ei_inst = floc->is_fl_instance;
+			ei->ei_id = floc->is_fl_entity;
+			ei->ei_inst = floc->is_fl_instance;
 			break;
 		case IPMI_SDR_TYPE_GENERIC_LOCATOR:
 			gloc = (ipmi_sdr_generic_locator_t *)ref_sdr->is_record;
-			ei.ei_id = gloc->is_gl_entity;
-			ei.ei_inst = gloc->is_gl_instance;
+			ei->ei_id = gloc->is_gl_entity;
+			ei->ei_inst = gloc->is_gl_instance;
 			break;
 		default:
 			topo_mod_dprintf(mod, "Failed to determine entity id "
 			    "and instance\n", ipmi_errmsg(hdl));
 			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err, ret = -1;
+	struct entity_info ei = {0};
+	ipmi_handle_t *hdl;
+
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
+		return (-1);
+	}
+
+	/*
+	 * For cases where the records in the SDR are hopelessly broken, then
+	 * we'll resort to hardcoding a list of sensor entities that should be
+	 * bound to this particular node.  Otherwise, we'll first check if the
+	 * properties for the associated IPMI entity id and instance exist.  If
+	 * not, we check for a property referencing an IPMI entity name on which
+	 * we can lookup the entity ID and instance.  If none of the above pans
+	 * out, then we bail out.
+	 */
+	if (topo_prop_get_string_array(node, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_LIST, &ei.ei_list, &ei.ei_listsz, &err)
+	    != 0 && (topo_prop_get_uint32(node, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_ID, &ei.ei_id, &err) != 0 ||
+	    topo_prop_get_uint32(node, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_INST, &ei.ei_inst, &err) != 0)) {
+		if (get_entity_info(mod, node, hdl, &ei) != 0)
+			goto out;
 	}
 	ei.ei_node = node;
 	ei.ei_mod = mod;
@@ -1523,15 +1669,15 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * and create a sensor facility node for each record that matches our
 	 * entity ID and instance
 	 */
-	if (ipmi_sdr_iter(hdl, sdr_callback, &ei) != 0) {
+	if ((ret = ipmi_sdr_iter(hdl, sdr_callback, &ei)) != 0) {
 		topo_mod_dprintf(mod, "ipmi_sdr_iter() failed\n");
-		topo_mod_ipmi_rele(mod);
-		return (-1);
 	}
-
+out:
 	topo_mod_ipmi_rele(mod);
+	if (ei.ei_list != NULL)
+		strarr_free(mod, ei.ei_list, ei.ei_listsz);
 
-	return (0);
+	return (ret);
 }
 
 static int

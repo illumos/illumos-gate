@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
-
 #include <libipmi.h>
 #include <stdio.h>
 #include <string.h>
@@ -221,4 +221,36 @@ ipmi_chassis_identify(ipmi_handle_t *ihp, boolean_t enable)
 		return (-1);
 
 	return (0);
+}
+
+/*
+ * caller is responsible for free'ing returned structure
+ */
+ipmi_chassis_status_t *
+ipmi_chassis_status(ipmi_handle_t *ihp)
+{
+	ipmi_cmd_t cmd, *rsp;
+	ipmi_chassis_status_t *chs;
+
+	cmd.ic_netfn = IPMI_NETFN_CHASSIS;
+	cmd.ic_lun = 0;
+	cmd.ic_cmd = IPMI_CMD_GET_CHASSIS_STATUS;
+	cmd.ic_data = NULL;
+	cmd.ic_dlen = 0;
+
+	if ((rsp = ipmi_send(ihp, &cmd)) == NULL)
+		return (NULL);
+
+	if (rsp->ic_dlen < sizeof (ipmi_chassis_status_t)) {
+		(void) ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL);
+		return (NULL);
+	}
+
+	if ((chs = ipmi_alloc(ihp, sizeof (ipmi_chassis_status_t))) == NULL) {
+		/* ipmi errno set */
+		return (NULL);
+	}
+
+	(void) memcpy(chs, rsp->ic_data, sizeof (ipmi_chassis_status_t));
+	return (chs);
 }
