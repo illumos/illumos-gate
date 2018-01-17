@@ -22,9 +22,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Debugger entry for both master and slave CPUs
@@ -162,15 +162,10 @@
 /*
  * Given the address of the current CPU's cpusave area in %rax, the following
  * macro restores the debugging state to said CPU.  Restored state includes
- * the debug registers from the global %dr variables, and debugging MSRs from
- * the CPU save area.  This code would be in a separate routine, but for the
- * fact that some of the MSRs are jump-sensitive.  As such, we need to minimize
- * the number of jumps taken subsequent to the update of said MSRs.  We can
- * remove one jump (the ret) by using a macro instead of a function for the
- * debugging state restoration code.
+ * the debug registers from the global %dr variables.
  *
- * Takes the cpusave area in %rdi as a parameter, clobbers %rax-%rdx
- */	
+ * Takes the cpusave area in %rdi as a parameter.
+ */
 #define	KDI_RESTORE_DEBUGGING_STATE \
 	pushq	%rdi;						\
 	leaq	kdi_drreg(%rip), %r15;				\
@@ -194,50 +189,7 @@
 	movl	$3, %edi;					\
 	movq	DRADDR_OFF(3)(%r15), %rsi;			\
 	call	kdi_dreg_set;					\
-	popq	%rdi;						\
-								\
-	/*							\
-	 * Write any requested MSRs.				\
-	 */							\
-	movq	KRS_MSR(%rdi), %rbx;				\
-	cmpq	$0, %rbx;					\
-	je	3f;						\
-1:								\
-	movl	MSR_NUM(%rbx), %ecx;				\
-	cmpl	$0, %ecx;					\
-	je	3f;						\
-								\
-	movl	MSR_TYPE(%rbx), %edx;				\
-	cmpl	$KDI_MSR_WRITE, %edx;				\
-	jne	2f;						\
-								\
-	movq	MSR_VALP(%rbx), %rdx;				\
-	movl	0(%rdx), %eax;					\
-	movl	4(%rdx), %edx;					\
-	wrmsr;							\
-2:								\
-	addq	$MSR_SIZE, %rbx;				\
-	jmp	1b;						\
-3:								\
-	/*							\
-	 * We must not branch after re-enabling LBR.  If	\
-	 * kdi_wsr_wrexit_msr is set, it contains the number	\
-	 * of the MSR that controls LBR.  kdi_wsr_wrexit_valp	\
-	 * contains the value that is to be written to enable	\
-	 * LBR.							\
-	 */							\
-	leaq	kdi_msr_wrexit_msr(%rip), %rcx;			\
-	movl	(%rcx), %ecx;					\
-	cmpl	$0, %ecx;					\
-	je	1f;						\
-								\
-	leaq	kdi_msr_wrexit_valp(%rip), %rdx;		\
-	movq	(%rdx), %rdx;					\
-	movl	0(%rdx), %eax;					\
-	movl	4(%rdx), %edx;					\
-								\
-	wrmsr;							\
-1:
+	popq	%rdi;
 
 /*
  * Each cpusave buffer has an area set aside for a ring buffer of breadcrumbs.
@@ -400,20 +352,12 @@ kdi_cmnint(void)
  */
 
 #if defined(__lint)
-char kdi_slave_entry_patch;
-
 void
 kdi_slave_entry(void)
 {
 }
 #else /* __lint */
-	.globl	kdi_slave_entry_patch;
-
 	ENTRY_NP(kdi_slave_entry)
-
-	/* kdi_msr_add_clrentry knows where this is */
-kdi_slave_entry_patch:
-	KDI_MSR_PATCH;
 
 	/*
 	 * Cross calls are implemented as function calls, so our stack currently
@@ -537,37 +481,6 @@ kdi_slave_entry_patch:
 
 	movq	%r15, %rax	/* restore cpu save area to rax */
 
-	/*
-	 * Save any requested MSRs.
-	 */
-	movq	KRS_MSR(%rax), %rcx
-	cmpq	$0, %rcx
-	je	no_msr
-
-	pushq	%rax		/* rdmsr clobbers %eax */
-	movq	%rcx, %rbx
-
-1:
-	movl	MSR_NUM(%rbx), %ecx
-	cmpl	$0, %ecx
-	je	msr_done
-
-	movl	MSR_TYPE(%rbx), %edx
-	cmpl	$KDI_MSR_READ, %edx
-	jne	msr_next
-
-	rdmsr			/* addr in %ecx, value into %edx:%eax */
-	movl	%eax, MSR_VAL(%rbx)
-	movl	%edx, _CONST(MSR_VAL + 4)(%rbx)
-
-msr_next:
-	addq	$MSR_SIZE, %rbx
-	jmp	1b
-
-msr_done:
-	popq	%rax
-
-no_msr:
 	clrq	%rbp		/* stack traces should end here */
 
 	pushq	%rax

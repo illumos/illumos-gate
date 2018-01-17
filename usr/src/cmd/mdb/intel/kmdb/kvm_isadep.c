@@ -21,16 +21,15 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * isa-dependent portions of the kmdb target
  */
 
 #include <kmdb/kvm.h>
-#include <kmdb/kvm_cpu.h>
 #include <kmdb/kmdb_kdi.h>
 #include <kmdb/kmdb_asmutil.h>
 #include <mdb/mdb_debug.h>
@@ -99,14 +98,6 @@ kmt_step_out(mdb_tgt_t *t, uintptr_t *p)
 		return (set_errno(EMDB_TGTNOTSUP));
 
 	return (mdb_isa_step_out(t, p, pc, fp, sp, instr));
-}
-
-int
-kmt_step_branch(mdb_tgt_t *t)
-{
-	kmt_data_t *kmt = t->t_data;
-
-	return (kmt_cpu_step_branch(t, kmt->kmt_cpu));
 }
 
 /*
@@ -354,19 +345,6 @@ kmt_wrmsr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	return (DCMD_OK);
-}
-
-int
-kmt_msr_validate(const kdi_msr_t *msr)
-{
-	uint64_t val;
-
-	for (/* */; msr->msr_num != 0; msr++) {
-		if (kmt_rwmsr(msr->msr_num, &val, rdmsr) < 0)
-			return (0);
-	}
-
-	return (1);
 }
 
 /*ARGSUSED*/

@@ -22,12 +22,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _AMD64_SYS_KDI_REGS_H
 #define	_AMD64_SYS_KDI_REGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,21 +74,6 @@ extern "C" {
 #define	KDIREG_PC	KDIREG_RIP
 #define	KDIREG_SP	KDIREG_RSP
 #define	KDIREG_FP	KDIREG_RBP
-
-#ifdef _ASM
-
-/* Patch point for MSR clearing. */
-#define	KDI_MSR_PATCH \
-	nop; nop; nop; nop; \
-	nop; nop; nop; nop; \
-	nop; nop; nop; nop; \
-	nop; nop; nop; nop; \
-	nop
-
-#endif	/* _ASM */
-
-#define	KDI_MSR_PATCHOFF	8	/* bytes of code before patch point */
-#define	KDI_MSR_PATCHSZ		17	/* bytes in KDI_MSR_PATCH, above */
 
 #ifdef __cplusplus
 }

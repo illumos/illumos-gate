@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -100,9 +102,6 @@ uint32_t	kdi_fs;
 uint32_t	kdi_gs;
 #endif
 
-uint_t		kdi_msr_wrexit_msr;
-uint64_t	*kdi_msr_wrexit_valp;
-
 uintptr_t	kdi_kernel_handler;
 
 int		kdi_trap_switch;
@@ -121,7 +120,6 @@ extern idt_hdlr_f kdi_traperr13, kdi_traperr14, kdi_trap16, kdi_trap17;
 extern idt_hdlr_f kdi_trap18, kdi_trap19, kdi_trap20, kdi_ivct32;
 extern idt_hdlr_f kdi_invaltrap;
 extern size_t kdi_ivct_size;
-extern char kdi_slave_entry_patch;
 
 typedef struct kdi_gate_spec {
 	uint_t kgs_vec;
@@ -194,46 +192,6 @@ kdi_idt_init(selector_t sel)
 	}
 }
 
-/*
- * Patch caller-provided code into the debugger's IDT handlers.  This code is
- * used to save MSRs that must be saved before the first branch.  All handlers
- * are essentially the same, and end with a branch to kdi_cmnint.  To save the
- * MSR, we need to patch in before the branch.  The handlers have the following
- * structure: KDI_MSR_PATCHOFF bytes of code, KDI_MSR_PATCHSZ bytes of
- * patchable space, followed by more code.
- */
-void
-kdi_idt_patch(caddr_t code, size_t sz)
-{
-	int i;
-
-	ASSERT(sz <= KDI_MSR_PATCHSZ);
-
-	for (i = 0; i < sizeof (kdi_idt) / sizeof (struct gate_desc); i++) {
-		gate_desc_t *gd;
-		uchar_t *patch;
-
-		if (i == T_DBLFLT)
-			continue;	/* uses kernel's handler */
-
-		gd = &kdi_idt[i];
-		patch = ((uchar_t *)(uintptr_t)GATESEG_GETOFFSET(gd)) +
-		    KDI_MSR_PATCHOFF;
-
-		/*
-		 * We can't ASSERT that there's a nop here, because this may be
-		 * a debugger restart.  In that case, we're copying the new
-		 * patch point over the old one.
-		 */
-		/* FIXME: dtrace fbt ... */
-		bcopy(code, patch, sz);
-
-		/* Fill the rest with nops to be sure */
-		while (sz < KDI_MSR_PATCHSZ)
-			patch[sz++] = 0x90; /* nop */
-	}
-}
-
 static void
 kdi_idt_gates_install(selector_t sel, int saveold)
 {
@@ -279,79 +237,6 @@ kdi_idt_sync(void)
 	kdi_idt_gates_install(KCS_SEL, KDI_IDT_SAVE);
 }
 
-/*
- * On some processors, we'll need to clear a certain MSR before proceeding into
- * the debugger.  Complicating matters, this MSR must be cleared before we take
- * any branches.  We have patch points in every trap handler, which will cover
- * all entry paths for master CPUs.  We also have a patch point in the slave
- * entry code.
- */
-static void
-kdi_msr_add_clrentry(uint_t msr)
-{
-#ifdef __amd64
-	uchar_t code[] = {
-		0x51, 0x50, 0x52,		/* pushq %rcx, %rax, %rdx */
-		0xb9, 0x00, 0x00, 0x00, 0x00,	/* movl $MSRNUM, %ecx */
-		0x31, 0xc0,			/* clr %eax */
-		0x31, 0xd2,			/* clr %edx */
-		0x0f, 0x30,			/* wrmsr */
-		0x5a, 0x58, 0x59		/* popq %rdx, %rax, %rcx */
-	};
-	uchar_t *patch = &code[4];
-#else
-	uchar_t code[] = {
-		0x60,				/* pushal */
-		0xb9, 0x00, 0x00, 0x00, 0x00,	/* movl $MSRNUM, %ecx */
-		0x31, 0xc0,			/* clr %eax */
-		0x31, 0xd2,			/* clr %edx */
-		0x0f, 0x30,			/* wrmsr */
-		0x61				/* popal */
-	};
-	uchar_t *patch = &code[2];
-#endif
-
-	bcopy(&msr, patch, sizeof (uint32_t));
-
-	kdi_idt_patch((caddr_t)code, sizeof (code));
-
-	bcopy(code, &kdi_slave_entry_patch, sizeof (code));
-}
-
-static void
-kdi_msr_add_wrexit(uint_t msr, uint64_t *valp)
-{
-	kdi_msr_wrexit_msr = msr;
-	kdi_msr_wrexit_valp = valp;
-}
-
-void
-kdi_set_debug_msrs(kdi_msr_t *msrs)
-{
-	int nmsrs, i;
-
-	ASSERT(kdi_cpusave[0].krs_msr == NULL);
-
-	/* Look in CPU0's MSRs for any special MSRs. */
-	for (nmsrs = 0; msrs[nmsrs].msr_num != 0; nmsrs++) {
-		switch (msrs[nmsrs].msr_type) {
-		case KDI_MSR_CLEARENTRY:
-			kdi_msr_add_clrentry(msrs[nmsrs].msr_num);
-			break;
-
-		case KDI_MSR_WRITEDELAY:
-			kdi_msr_add_wrexit(msrs[nmsrs].msr_num,
-			    msrs[nmsrs].kdi_msr_valp);
-			break;
-		}
-	}
-
-	nmsrs++;
-
-	for (i = 0; i < kdi_ncpusave; i++)
-		kdi_cpusave[i].krs_msr = &msrs[nmsrs * i];
-}
-
 void
 kdi_update_drreg(kdi_drreg_t *drreg)
 {
@@ -395,7 +280,7 @@ void
 kdi_cpu_init(void)
 {
 	kdi_idt_gates_install(KCS_SEL, KDI_IDT_NOSAVE);
-	/* Load the debug registers and MSRs */
+	/* Load the debug registers. */
 	kdi_cpu_debug_init(&kdi_cpusave[CPU->cpu_id]);
 }
 
@@ -448,9 +333,6 @@ kdi_activate(kdi_main_t main, kdi_cpusave_t *cpusave, uint_t ncpusave)
 
 	kdi_drreg.dr_ctl = KDIREG_DRCTL_RESERVED;
 	kdi_drreg.dr_stat = KDIREG_DRSTAT_RESERVED;
-
-	kdi_msr_wrexit_msr = 0;
-	kdi_msr_wrexit_valp = NULL;
 
 	if (boothowto & RB_KMDB) {
 		kdi_idt_gates_install(KMDBCODE_SEL, KDI_IDT_NOSAVE);

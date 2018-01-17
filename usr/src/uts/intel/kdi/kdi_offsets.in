@@ -2,6 +2,8 @@
 \ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
+\ Copyright 2018 Joyent, Inc.
+\
 \ CDDL HEADER START
 \
 \ The contents of this file are subject to the terms of the
@@ -20,8 +22,6 @@
 \ information: Portions Copyright [yyyy] [name of copyright owner]
 \
 \ CDDL HEADER END
-\
-\ ident	"%Z%%M%	%I%	%E% SMI"
 \
 \ CPU-save structure offsets for use in assembly code.
 \
@@ -47,12 +47,6 @@ kdi_drreg_t
 		dr_stat
 		dr_addr
 
-kdi_msr_t	MSR_SIZE
-		msr_num
-		msr_type
-		_u._msr_valp			MSR_VALP
-		_u._msr_val			MSR_VAL
-
 kdi_cpusave_t	KRS_SIZE
 		krs_gregs
 		krs_dr
@@ -61,7 +55,6 @@ kdi_cpusave_t	KRS_SIZE
 		krs_gdt
 		krs_idt
 		krs_cr0
-		krs_msr
 		krs_cpu_state
 		krs_curcrumbidx
 		krs_curcrumb

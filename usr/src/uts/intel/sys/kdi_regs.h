@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_KDI_REGS_H
 #define	_SYS_KDI_REGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <sys/types.h>
@@ -55,11 +55,6 @@ extern "C" {
 #define	KDIREG_DRSTAT_RESERVED		0xffff0ff0
 #define	KDIREG_DRCTL_RESERVED		0x00000700
 
-#define	KDI_MSR_READ		0x1	/* read during entry (unlimited) */
-#define	KDI_MSR_WRITE		0x2	/* write during exit (unlimited) */
-#define	KDI_MSR_WRITEDELAY	0x4	/* write after last branch (<= 1) */
-#define	KDI_MSR_CLEARENTRY	0x3	/* clear before 1st branch (<= 1) */
-
 #ifndef _ASM
 
 /*
@@ -86,18 +81,6 @@ typedef struct kdi_drreg {
 	greg_t			dr_addr[KDI_MAXWPIDX + 1];
 } kdi_drreg_t;
 
-typedef struct kdi_msr {
-	uint_t		msr_num;
-	uint_t		msr_type;
-	union {
-		uint64_t *_msr_valp;
-		uint64_t _msr_val;
-	} _u;
-} kdi_msr_t;
-
-#define	kdi_msr_val	_u._msr_val
-#define	kdi_msr_valp	_u._msr_valp
-
 /*
  * Data structure used to hold all of the state for a given CPU.
  */
@@ -110,8 +93,6 @@ typedef struct kdi_cpusave {
 	gate_desc_t		*krs_idt;	/* IDT address */
 
 	greg_t			krs_cr0;	/* saved %cr0 */
-
-	kdi_msr_t		*krs_msr;	/* ptr to MSR save area */
 
 	uint_t			krs_cpu_state;	/* KDI_CPU_STATE_* mstr/slv */
 	uint_t			krs_cpu_flushed; /* Have caches been flushed? */
