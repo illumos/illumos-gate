@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _KMDB_DPI_ISADEP_H
 #define	_KMDB_DPI_ISADEP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <mdb/mdb_isautil.h>
@@ -42,10 +42,6 @@ extern "C" {
 extern void kmdb_dpi_handle_fault(kreg_t, kreg_t, kreg_t, int);
 
 extern void kmdb_dpi_reboot(void) __NORETURN;
-
-extern void kmdb_dpi_msr_add(const kdi_msr_t *);
-extern uint64_t kmdb_dpi_msr_get(uint_t);
-extern uint64_t kmdb_dpi_msr_get_by_cpu(int, uint_t);
 
 #endif /* _ASM */
 

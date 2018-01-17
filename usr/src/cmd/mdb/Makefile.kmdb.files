@@ -25,7 +25,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2012 Joyent, Inc. All rights reserved.
+# Copyright (c) 2018 Joyent, Inc. All rights reserved.
 #
 
 KMDBSRCS += \
@@ -37,7 +37,6 @@ KMDBSRCS += \
 	mdb_callb.c \
 	mdb_cmdbuf.c \
 	mdb_cmds.c \
-	kvm_cpu.c \
 	kmdb_conf.c \
 	kmdb_context.c \
 	kmdb_create.c \

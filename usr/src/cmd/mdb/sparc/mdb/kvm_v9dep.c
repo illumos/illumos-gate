@@ -21,9 +21,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Libkvm Kernel Target SPARC v9 component
@@ -217,7 +217,6 @@ const mdb_tgt_ops_t kt_sparcv9_ops = {
 	(int (*)()) mdb_tgt_notsup,		/* t_run */
 	(int (*)()) mdb_tgt_notsup,		/* t_step */
 	(int (*)()) mdb_tgt_notsup,		/* t_step_out */
-	(int (*)()) mdb_tgt_notsup,		/* t_step_branch */
 	(int (*)()) mdb_tgt_notsup,		/* t_next */
 	(int (*)()) mdb_tgt_notsup,		/* t_cont */
 	(int (*)()) mdb_tgt_notsup,		/* t_signal */

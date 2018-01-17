@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_KDI_MACHIMPL_H
 #define	_SYS_KDI_MACHIMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The Kernel/Debugger interface.  The operations provided by the kdi_t,
@@ -59,7 +59,6 @@ typedef struct kdi_mach {
 	void (*mkdi_idt_switch)(kdi_cpusave_t *);
 
 	void (*mkdi_update_drreg)(kdi_drreg_t *);
-	void (*mkdi_set_debug_msrs)(kdi_msr_t *);
 
 	uintptr_t (*mkdi_get_userlimit)(void);
 
@@ -80,7 +79,6 @@ typedef struct kdi_mach {
 #define	mkdi_deactivate			kdi_mach.mkdi_deactivate
 #define	mkdi_idt_switch			kdi_mach.mkdi_idt_switch
 #define	mkdi_update_drreg		kdi_mach.mkdi_update_drreg
-#define	mkdi_set_debug_msrs		kdi_mach.mkdi_set_debug_msrs
 #define	mkdi_get_userlimit		kdi_mach.mkdi_get_userlimit
 #define	mkdi_get_cpuinfo		kdi_mach.mkdi_get_cpuinfo
 #define	mkdi_stop_slaves		kdi_mach.mkdi_stop_slaves
@@ -98,7 +96,6 @@ extern void kdi_setdr3(ulong_t), kdi_setdr6(ulong_t), kdi_setdr7(ulong_t);
 extern ulong_t kdi_dreg_get(int);
 extern void kdi_dreg_set(int, ulong_t);
 extern void kdi_update_drreg(kdi_drreg_t *);
-extern void kdi_set_debug_msrs(kdi_msr_t *);
 extern void kdi_cpu_debug_init(kdi_cpusave_t *);
 
 extern void kdi_cpu_init(void);

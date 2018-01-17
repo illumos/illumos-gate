@@ -21,9 +21,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Companion to kdi_idt.c - the implementation of the trap and interrupt
@@ -39,32 +39,12 @@
 /* Nothing in this file is of interest to lint. */
 #if !defined(__lint)
 
-/* 
+/*
  * The default ASM_ENTRY_ALIGN (16) wastes far too much space.  Pay no
  * attention to the fleet of nop's we're adding to each handler.
  */
 #undef	ASM_ENTRY_ALIGN
 #define	ASM_ENTRY_ALIGN	8
-
-/*
- * We need the .align in ENTRY_NP (defined to be ASM_ENTRY_ALIGN) to match our
- * manual .align (KDI_MSR_PATCHOFF) in order to ensure that the space reserved
- * at the beginning of the handler for code is exactly KDI_MSR_PATCHOFF bytes
- * long.  Note that the #error below isn't supported by the preprocessor invoked
- * by as(1), and won't stop the build, but it'll emit a noticeable error message
- * which won't escape the filters.
- */
-#if ASM_ENTRY_ALIGN != KDI_MSR_PATCHOFF
-#error "ASM_ENTRY_ALIGN != KDI_MSR_PATCHOFF"
-this won't assemble
-#endif
-
-/*
- * kdi_idt_patch will, on certain processors, replace the patch points below
- * with MSR-clearing code.  kdi_id_patch has intimate knowledge of the size of
- * the nop hole, as well as the structure of the handlers.  Do not change
- * anything here without also changing kdi_idt_patch.
- */
 
 /*
  * Generic trap and interrupt handlers.
@@ -102,40 +82,30 @@ this won't assemble
 #define	MKIVCT(n) \
 	ENTRY_NP(kdi_ivct/**/n/**/);	\
 	TRAP_ERR(n);			\
-	.align	KDI_MSR_PATCHOFF;	\
-	KDI_MSR_PATCH;			\
 	jmp	kdi_cmnint;		\
 	SET_SIZE(kdi_ivct/**/n/**/)
 
 #define	MKTRAPHDLR(n) \
 	ENTRY_NP(kdi_trap/**/n);	\
 	TRAP_ERR(n);			\
-	.align	KDI_MSR_PATCHOFF;	\
-	KDI_MSR_PATCH;			\
 	jmp	kdi_cmnint;		\
 	SET_SIZE(kdi_trap/**/n/**/)
 
 #define	MKTRAPERRHDLR(n) \
 	ENTRY_NP(kdi_traperr/**/n);	\
 	TRAP_NOERR(n);			\
-	.align	KDI_MSR_PATCHOFF;	\
-	KDI_MSR_PATCH;			\
 	jmp	kdi_cmnint;		\
 	SET_SIZE(kdi_traperr/**/n)
 
 #define	MKNMIHDLR \
 	ENTRY_NP(kdi_int2);		\
 	TRAP_NOERR(2);			\
-	.align	KDI_MSR_PATCHOFF;	\
-	KDI_MSR_PATCH;			\
 	jmp	kdi_nmiint;		\
 	SET_SIZE(kdi_int2)
 
 #define	MKINVALHDLR \
 	ENTRY_NP(kdi_invaltrap);	\
 	TRAP_NOERR(255);		\
-	.align	KDI_MSR_PATCHOFF;	\
-	KDI_MSR_PATCH;			\
 	jmp	kdi_cmnint;		\
 	SET_SIZE(kdi_invaltrap)
 

@@ -21,9 +21,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kdi_impl.h>
@@ -101,12 +101,6 @@ void
 kmdb_kdi_update_drreg(kdi_drreg_t *drreg)
 {
 	mdb.m_kdi->mkdi_update_drreg(drreg);
-}
-
-void
-kmdb_kdi_set_debug_msrs(kdi_msr_t *msrs)
-{
-	mdb.m_kdi->mkdi_set_debug_msrs(msrs);
 }
 
 void

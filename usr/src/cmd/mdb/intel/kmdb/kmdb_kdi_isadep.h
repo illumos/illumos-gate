@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _KMDB_KDI_ISADEP_H
 #define	_KMDB_KDI_ISADEP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kdi_machimpl.h>
@@ -45,7 +45,6 @@ extern void kmdb_kdi_deactivate(void);
 extern void kmdb_kdi_idt_switch(kdi_cpusave_t *);
 
 extern void kmdb_kdi_update_drreg(kdi_drreg_t *);
-extern void kmdb_kdi_set_debug_msrs(kdi_msr_t *);
 
 extern uintptr_t kmdb_kdi_get_userlimit(void);
 

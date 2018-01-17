@@ -22,9 +22,9 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * isa-dependent portions of the kmdb target
@@ -375,13 +375,6 @@ kmt_step_out(mdb_tgt_t *t, uintptr_t *p)
 	}
 
 	return (0);
-}
-
-/*ARGSUSED*/
-int
-kmt_step_branch(mdb_tgt_t *t)
-{
-	return (set_errno(EMDB_TGTHWNOTSUP));
 }
 
 static const char *

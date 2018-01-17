@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _KMDB_DPI_IMPL_H
 #define	_KMDB_DPI_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <setjmp.h>
 #ifdef	__sparc
@@ -86,18 +86,10 @@ struct dpi_ops {
 	int (*dpo_wapt_match)(kmdb_wapt_t *);
 
 	int (*dpo_step)(void);
-#if defined(__i386) || defined(__amd64)
-	void (*dpo_step_branch)(void);
-#endif
 
 	uintptr_t (*dpo_call)(uintptr_t, uint_t, const uintptr_t *);
 
 	void (*dpo_dump_crumbs)(uintptr_t, int);
-
-#if defined(__i386) || defined(__amd64)
-	void (*dpo_msr_add)(const kdi_msr_t *);
-	uint64_t (*dpo_msr_get)(int, uint_t);
-#endif
 
 #ifdef __sparc
 	void (*dpo_kernpanic)(int);

@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _KVM_H
 #define	_KVM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The kmdb target
@@ -36,7 +36,6 @@
 #include <mdb/mdb_target.h>
 #include <kmdb/kmdb_dpi.h>
 #include <kmdb/kvm_isadep.h>
-#include <kmdb/kvm_cpu.h>
 
 #include <sys/kobj.h>
 
@@ -86,8 +85,6 @@ typedef struct kmt_data {
 	mdb_map_t	kmt_map;		/* Persistant map for callers */
 	ulong_t		*kmt_trapmap;
 	size_t		kmt_trapmax;
-	kmt_cpu_t	*kmt_cpu;		/* CPU-specific plugin */
-	int		kmt_cpu_retry;		/* Try CPU detect again? */
 	int		kmt_symavail;		/* Symbol resolution allowed */
 	uint_t		kmt_narmedbpts;		/* Number of armed brkpts */
 #if defined(__i386) || defined(__amd64)
@@ -143,7 +140,6 @@ extern ssize_t kmt_ioread(mdb_tgt_t *, void *, size_t, uintptr_t);
 extern ssize_t kmt_iowrite(mdb_tgt_t *, const void *, size_t, uintptr_t);
 
 extern int kmt_step_out(mdb_tgt_t *, uintptr_t *);
-extern int kmt_step_branch(mdb_tgt_t *);
 extern int kmt_next(mdb_tgt_t *, uintptr_t *);
 
 extern int kmt_stack(uintptr_t, uint_t, int, const mdb_arg_t *);
