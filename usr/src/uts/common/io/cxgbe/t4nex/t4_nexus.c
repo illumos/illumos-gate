@@ -369,6 +369,20 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sc->fw_msg_handler[i] = fw_msg_not_handled;
 	}
  
+	for (i = 0; i < NCHAN; i++) {
+		(void) snprintf(name, sizeof (name), "%s-%d",
+				"reclaim", i);
+		sc->tq[i] = ddi_taskq_create(sc->dip,
+		   name, 1, TASKQ_DEFAULTPRI, 0);
+
+		if (sc->tq[i] == NULL) {
+			cxgb_printf(dip, CE_WARN,
+				   "failed to create task queues");
+			rc = DDI_FAILURE;
+			goto done;
+		}
+	}
+
 	/*
 	 * Prepare the adapter for operation.
 	 */
@@ -835,6 +849,13 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* Safe to call no matter what */
 	ddi_prop_remove_all(dip);
 	ddi_remove_minor_node(dip, NULL);
+
+	for (i = 0; i < NCHAN; i++) {
+		if (sc->tq[i]) {
+			ddi_taskq_wait(sc->tq[i]);
+			ddi_taskq_destroy(sc->tq[i]);
+		}
+	}
 
 	if (sc->ksp != NULL)
 		kstat_delete(sc->ksp);
