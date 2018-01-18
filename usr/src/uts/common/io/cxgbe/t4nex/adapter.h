@@ -507,6 +507,7 @@ struct adapter {
 	struct sge sge;
 
 	struct port_info *port[MAX_NPORTS];
+	ddi_taskq_t *tq[NCHAN];
 	uint8_t chan_map[NCHAN];
 	uint32_t filter_mode;
 
