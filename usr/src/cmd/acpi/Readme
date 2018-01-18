@@ -1,7 +1,48 @@
-The ACPI utilities are based on the Intel ACPI source code drops. No changes
-are made to Intel-provided source code. Most of the ACPI lives in the kernel
-under usr/src/uts/intel/io/acpica and usr/src/uts/intel/sys/acpi.
+This file and its contents are supplied under the terms of the
+Common Development and Distribution License ("CDDL"), version 1.0.
+You may only use this file in accordance with the terms of version
+1.0 of the CDDL.
 
-The assembler/disassembler (iasl) is currently not being built here, but it
-can be used on the dumped tables from within a non-native environment, such
-as within an lx-branded zone.
+A full copy of the text of the CDDL should have accompanied this
+source.  A copy of the CDDL is also available via the Internet at
+http://www.illumos.org/license/CDDL.
+
+Copyright (c) 2018, Joyent, Inc.
+
+---
+
+The ACPI utilities are based on the Intel ACPI source code drops.  Aside from
+notes in Readme.resync files, no changes are made to Intel-provided source code.
+Most of the ACPI source code lives in
+the following directories:
+
+   usr/src/uts/common/acpica		Common to kernel and commands
+   usr/src/uts/intel/io/acpica		Kernel
+   usr/src/uts/intel/sys/acpi		Headers
+   usr/src/cmd/acpi			Commands
+
+The acpica-update script in this directory can serve as a guide for performing
+updates.  It is expected that it will need to be tweaked as the upstream acpica
+software evolves.
+
+The expected workflow for updating is
+
+1. Clone the appropriate acpica workspace from github.  Until such a time
+   as Joyent's changes to acpica are in the Intel distribution, this probably
+   means:
+
+     git clone -b smartos git@github.com:joyent/acpica.git
+
+2. Do any required development work in the workspace checked out in step 1.
+   This probably includes rebasing Joyent's changes on the latest release.
+   Don't forget to push these to github and submit a pull request if
+   appropriate.
+
+3. Build and test the modified acpica disto as described in the documentation
+   in that workspace.
+
+4. Run acpica-update from within an illumos workspace.  That is:
+
+     ./acpica-update ~/acpica
+
+5. Build, test, code review, etc.

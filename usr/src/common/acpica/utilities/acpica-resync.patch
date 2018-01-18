@@ -1,0 +1,72 @@
+
+
+This file and its contents are supplied under the terms of the
+Common Development and Distribution License ("CDDL"), version 1.0.
+You may only use this file in accordance with the terms of version
+1.0 of the CDDL.
+
+A full copy of the text of the CDDL should have accompanied this
+source.  A copy of the CDDL is also available via the Internet at
+http://www.illumos.org/license/CDDL.
+
+Copyright (c) 2018, Joyent, Inc.
+
+---
+
+There is a bug in the interaction of acpidump and acpixtract when the table
+size is greater than 1MB. The acpixtract code will stop parsing a table if
+the first character on a line is not a space (' '). The acpidump code will
+overflow the offset into the first character after 1MB. Until this is fixed
+upstream, the following patch can be used against new versions of the acpi
+source.
+
+
+diff --git a/usr/src/common/acpica/utilities/utbuffer.c b/usr/src/common/acpica/utilities/utbuffer.c
+index 2f97c64..863055f 100644
+--- a/usr/src/common/acpica/utilities/utbuffer.c
++++ b/usr/src/common/acpica/utilities/utbuffer.c
+@@ -97,7 +97,7 @@ AcpiUtDumpBuffer (
+     {
+         /* Print current offset */
+ 
+-        AcpiOsPrintf ("%6.4X: ", (BaseOffset + i));
++        AcpiOsPrintf ("%7.4X: ", (BaseOffset + i));
+ 
+         /* Print 16 hex chars */
+ 
+@@ -279,7 +279,7 @@ AcpiUtDumpBufferToFile (
+     {
+         /* Print current offset */
+ 
+-        AcpiUtFilePrintf (File, "%6.4X: ", (BaseOffset + i));
++        AcpiUtFilePrintf (File, "%7.4X: ", (BaseOffset + i));
+ 
+         /* Print 16 hex chars */
+ 
+diff --git a/usr/src/common/acpica/utilities/utosi.c b/usr/src/common/acpica/utilities/utosi.c
+index 674fe36..18656fa 100644
+--- a/usr/src/common/acpica/utilities/utosi.c
++++ b/usr/src/common/acpica/utilities/utosi.c
+@@ -103,9 +103,19 @@ static ACPI_INTERFACE_INFO    AcpiDefaultSupportedInterfaces[] =
+     {"Windows 2006 SP1",    NULL, 0, ACPI_OSI_WIN_VISTA_SP1},    /* Windows Vista SP1 - Added 09/2009 */
+     {"Windows 2006 SP2",    NULL, 0, ACPI_OSI_WIN_VISTA_SP2},    /* Windows Vista SP2 - Added 09/2010 */
+     {"Windows 2009",        NULL, 0, ACPI_OSI_WIN_7},            /* Windows 7 and Server 2008 R2 - Added 09/2009 */
+-    {"Windows 2012",        NULL, 0, ACPI_OSI_WIN_8},            /* Windows 8 and Server 2012 - Added 08/2012 */
+-    {"Windows 2013",        NULL, 0, ACPI_OSI_WIN_8},            /* Windows 8.1 and Server 2012 R2 - Added 01/2014 */
+-    {"Windows 2015",        NULL, 0, ACPI_OSI_WIN_10},           /* Windows 10 - Added 03/2015 */
++	/*
++	 * XXX
++	 * The following OSes are temporarily disabled. Windows introduced
++	 * support for xhci (USB 3.0) in Windows 8. When we advertise Windows 8
++	 * and newer support, some vendors use that as a key to automatically
++	 * transition all USB ports to the xhci controller. Until we have
++	 * support for the xhci controller, we should not advertise these
++	 * operating systems. From a brief survey, there isn't too much other
++	 * AML that this impacts at this time.
++	 */
++/*    {"Windows 2012",        NULL, 0, ACPI_OSI_WIN_8},*/            /* Windows 8 and Server 2012 - Added 08/2012 */
++/*    {"Windows 2013",        NULL, 0, ACPI_OSI_WIN_8},*/            /* Windows 8.1 and Server 2012 R2 - Added 01/2014 */
++/*    {"Windows 2015",        NULL, 0, ACPI_OSI_WIN_10},*/           /* Windows 10 - Added 03/2015 */
+ 
+     /* Feature Group Strings */
+ 

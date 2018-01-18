@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2017 Joyent, Inc.
 #
 set name=pkg.fmri value=pkg:/developer/acpi@$(PKGVERS)
 set name=pkg.description value="ACPI utilities"
@@ -21,6 +21,7 @@ set name=variant.arch value=i386
 dir path=usr/share/man/man1m
 file path=usr/sbin/acpidump mode=0555
 file path=usr/sbin/acpixtract mode=0555
+file path=usr/sbin/iasl mode=0555
 file path=usr/share/man/man1m/acpidump.1m
 file path=usr/share/man/man1m/acpixtract.1m
 depend fmri=driver/x11/xsvc type=require

@@ -27,6 +27,7 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2017 Joyent, Inc.
 #
 
 #
@@ -164,10 +165,12 @@ MCS=		/usr/ccs/bin/mcs
 CAT=            /usr/bin/cat
 ELFDUMP=	/usr/ccs/bin/elfdump
 M4=		/usr/bin/m4
+GM4=		/usr/bin/gm4
 STRIP=		/usr/ccs/bin/strip
 LEX=		/usr/ccs/bin/lex
 FLEX=		/usr/bin/flex
 YACC=		/usr/ccs/bin/yacc
+BISON=		/usr/bin/bison
 CPP=		/usr/lib/cpp
 JAVAC=		$(JAVA_ROOT)/bin/javac
 JAVAH=		$(JAVA_ROOT)/bin/javah

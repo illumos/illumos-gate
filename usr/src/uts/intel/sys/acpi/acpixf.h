@@ -349,6 +349,7 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
 
 #endif /* ACPI_NO_ERROR_MESSAGES */
 
+
 /*
  * Debugging output prototypes (default: no debug output).
  *
@@ -404,11 +405,6 @@ ACPI_GLOBAL (BOOLEAN,               AcpiGbl_SystemAwakeAndRunning);
 
 #endif /* ACPI_DEBUGGER */
 
-/*****************************************************************************
- *
- * ACPICA public interface prototypes
- *
- ****************************************************************************/
 
 /*****************************************************************************
  *

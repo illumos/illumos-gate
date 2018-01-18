@@ -10342,6 +10342,7 @@ f usr/sbin/gsscred 0555 root sys
 f usr/sbin/halt 0755 root bin
 s usr/sbin/hostconfig=../../sbin/hostconfig
 f usr/sbin/hotplug 0555 root bin
+f usr/sbin/iasl 0555 root bin
 d usr/sbin/i86 0755 root bin
 f usr/sbin/idmap 0555 root bin
 f usr/sbin/if_mpadm 0555 root bin
