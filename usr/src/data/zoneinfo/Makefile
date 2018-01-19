@@ -13,7 +13,6 @@ TZFILES=	africa \
 		europe \
 		factory \
 		northamerica \
-		pacificnew \
 		southamerica \
 		backward
 
