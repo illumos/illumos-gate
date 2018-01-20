@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -148,10 +148,6 @@ dump_ctx_flags(int flags)
 		printf("AUTHREQ ");
 	if (flags & SMBCF_KCSAVE)
 		printf("KCSAVE  ");
-	if (flags & SMBCF_XXX)
-		printf("XXX ");
-	if (flags & SMBCF_SSNACTIVE)
-		printf("SSNACTIVE ");
 	if (flags & SMBCF_KCDOMAIN)
 		printf("KCDOMAIN ");
 	printf("\n");
@@ -254,13 +250,12 @@ smb_ctx_init(struct smb_ctx *ctx)
 
 	ctx->ct_dev_fd = -1;
 	ctx->ct_door_fd = -1;
-	ctx->ct_tran_fd = -1;
 	ctx->ct_parsedlevel = SMBL_NONE;
 	ctx->ct_minlevel = SMBL_NONE;
 	ctx->ct_maxlevel = SMBL_PATH;
 
 	/* Fill in defaults */
-	ctx->ct_vopt = SMBVOPT_EXT_SEC;
+	ctx->ct_vopt = SMBVOPT_SIGNING_ENABLED;
 	ctx->ct_owner = SMBM_ANY_OWNER;
 	ctx->ct_authflags = SMB_AT_DEFAULT;
 	ctx->ct_minauth = SMB_AT_MINAUTH;
@@ -410,10 +405,6 @@ smb_ctx_done(struct smb_ctx *ctx)
 		close(ctx->ct_door_fd);
 		ctx->ct_door_fd = -1;
 	}
-	if (ctx->ct_tran_fd != -1) {
-		close(ctx->ct_tran_fd);
-		ctx->ct_tran_fd = -1;
-	}
 	if (ctx->ct_srvaddr_s) {
 		free(ctx->ct_srvaddr_s);
 		ctx->ct_srvaddr_s = NULL;
@@ -446,17 +437,9 @@ smb_ctx_done(struct smb_ctx *ctx)
 		free(ctx->ct_rpath);
 		ctx->ct_rpath = NULL;
 	}
-	if (ctx->ct_srv_OS) {
-		free(ctx->ct_srv_OS);
-		ctx->ct_srv_OS = NULL;
-	}
-	if (ctx->ct_srv_LM) {
-		free(ctx->ct_srv_LM);
-		ctx->ct_srv_LM = NULL;
-	}
-	if (ctx->ct_mackey) {
-		free(ctx->ct_mackey);
-		ctx->ct_mackey = NULL;
+	if (ctx->ct_ssnkey_buf) {
+		free(ctx->ct_ssnkey_buf);
+		ctx->ct_ssnkey_buf = NULL;
 	}
 }
 
@@ -904,12 +887,11 @@ smb_parse_owner(char *pair, uid_t *uid, gid_t *gid)
 }
 
 /*
- * Suport a securty options arg, i.e. -S noext,lm,ntlm
+ * Suport a securty options arg, i.e. -S lm,ntlm
  * for testing various type of authenticators.
  */
 static struct nv
 sectype_table[] = {
-	/* noext - handled below */
 	{ "anon",	SMB_AT_ANON },
 	{ "lm",		SMB_AT_LM1 },
 	{ "ntlm",	SMB_AT_NTLM1 },
@@ -934,13 +916,6 @@ smb_parse_secopts(struct smb_ctx *ctx, const char *arg)
 		nlen = strcspn(p, sep);
 		if (nlen == 0)
 			break;
-
-		if (nlen == 5 && 0 == strncmp(p, "noext", nlen)) {
-			/* Don't offer extended security. */
-			ctx->ct_vopt &= ~SMBVOPT_EXT_SEC;
-			p += nlen;
-			continue;
-		}
 
 		/* This is rarely called, so not optimized. */
 		for (nv = sectype_table; nv->name; nv++) {
@@ -1122,6 +1097,19 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	assert(ctx->ct_addrinfo != NULL);
 
 	/*
+	 * Empty user name means an explicit request for
+	 * NULL session setup, which is a special case.
+	 * (No SMB signing, per [MS-SMB] 3.3.5.3)
+	 */
+	if (ctx->ct_user[0] == '\0') {
+		/* Null user should have null domain too. */
+		ctx->ct_domain[0] = '\0';
+		ctx->ct_authflags = SMB_AT_ANON;
+		ctx->ct_vopt |= SMBVOPT_ANONYMOUS;
+		ctx->ct_vopt &= ~SMBVOPT_SIGNING_REQUIRED;
+	}
+
+	/*
 	 * If we have a user name but no password,
 	 * check for a keychain entry.
 	 * XXX: Only for auth NTLM?
@@ -1139,6 +1127,7 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 		 */
 		ctx->ct_authflags &= ctx->ct_minauth;
 	}
+
 	if (ctx->ct_authflags == 0) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "no valid auth. types"), 0);
@@ -1195,7 +1184,6 @@ smb_ctx_gethandle(struct smb_ctx *ctx)
 		rpc_cleanup_smbctx(ctx);
 		nsmb_close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
-		ctx->ct_flags &= ~SMBCF_SSNACTIVE;
 	}
 
 	fd = smb_open_driver();

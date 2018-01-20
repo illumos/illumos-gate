@@ -34,7 +34,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -62,7 +62,7 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/thread.h>
-#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/zone.h>
 
 #include <netsmb/smb_osdep.h>
@@ -87,6 +87,10 @@
 
 /* for version checks */
 const uint32_t nsmb_version = NSMB_VERSION;
+
+/* for smb_nbst_create() */
+dev_t nsmb_dev_tcp = NODEV;
+dev_t nsmb_dev_tcp6 = NODEV;
 
 static void *statep;
 static major_t nsmb_major;
@@ -221,6 +225,9 @@ _init(void)
 	streams_msg_init();
 	/* No attach, so need to set major. */
 	nsmb_major = 1;
+	/* And these, for smb_nbst_create() */
+	nsmb_dev_tcp = AF_INET;
+	nsmb_dev_tcp6 = AF_INET6;
 #endif	/* _KERNEL */
 
 	return (0);
@@ -296,6 +303,7 @@ nsmb_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static int
 nsmb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	major_t tmaj;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -319,6 +327,20 @@ nsmb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * i.e. in smb_dev2share()
 	 */
 	nsmb_major = ddi_name_to_major(NSMB_NAME);
+
+	/*
+	 * We also need major numbers for t_kopen
+	 */
+	tmaj = ddi_name_to_major("tcp");
+	if (tmaj == DDI_MAJOR_T_NONE)
+		cmn_err(CE_NOTE, "no tcp major?");
+	else
+		nsmb_dev_tcp = makedevice(tmaj, 0);
+	tmaj = ddi_name_to_major("tcp6");
+	if (tmaj == DDI_MAJOR_T_NONE)
+		cmn_err(CE_NOTE, "no tcp6 major?");
+	else
+		nsmb_dev_tcp6 = makedevice(tmaj, 0);
 
 	nsmb_dip = dip;
 	ddi_report_dev(dip);
@@ -431,107 +453,7 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 	 * check the zone status here on every ioctl call.
 	 */
 
-	/*
-	 * Serialize ioctl calls.  The smb_usr_... functions
-	 * don't expect concurrent calls on a given sdp.
-	 */
-	mutex_enter(&sdp->sd_lock);
-	if ((sdp->sd_flags & NSMBFL_IOCTL) != 0) {
-		mutex_exit(&sdp->sd_lock);
-		return (EBUSY);
-	}
-	sdp->sd_flags |= NSMBFL_IOCTL;
-	mutex_exit(&sdp->sd_lock);
-
-	err = 0;
-	switch (cmd) {
-	case SMBIOC_GETVERS:
-		(void) ddi_copyout(&nsmb_version, (void *)arg,
-		    sizeof (nsmb_version), flags);
-		break;
-
-	case SMBIOC_FLAGS2:
-		err = smb_usr_get_flags2(sdp, arg, flags);
-		break;
-
-	case SMBIOC_GETSSNKEY:
-		err = smb_usr_get_ssnkey(sdp, arg, flags);
-		break;
-
-	case SMBIOC_DUP_DEV:
-		err = smb_usr_dup_dev(sdp, arg, flags);
-		break;
-
-	case SMBIOC_REQUEST:
-		err = smb_usr_simplerq(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_T2RQ:
-		err = smb_usr_t2request(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_READ:
-	case SMBIOC_WRITE:
-		err = smb_usr_rw(sdp, cmd, arg, flags, cr);
-		break;
-
-	case SMBIOC_NTCREATE:
-		err = smb_usr_ntcreate(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_PRINTJOB:
-		err = smb_usr_printjob(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_CLOSEFH:
-		err = smb_usr_closefh(sdp, cr);
-		break;
-
-	case SMBIOC_SSN_CREATE:
-	case SMBIOC_SSN_FIND:
-		err = smb_usr_get_ssn(sdp, cmd, arg, flags, cr);
-		break;
-
-	case SMBIOC_SSN_KILL:
-	case SMBIOC_SSN_RELE:
-		err = smb_usr_drop_ssn(sdp, cmd);
-		break;
-
-	case SMBIOC_TREE_CONNECT:
-	case SMBIOC_TREE_FIND:
-		err = smb_usr_get_tree(sdp, cmd, arg, flags, cr);
-		break;
-
-	case SMBIOC_TREE_KILL:
-	case SMBIOC_TREE_RELE:
-		err = smb_usr_drop_tree(sdp, cmd);
-		break;
-
-	case SMBIOC_IOD_WORK:
-		err = smb_usr_iod_work(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_IOD_IDLE:
-	case SMBIOC_IOD_RCFAIL:
-		err = smb_usr_iod_ioctl(sdp, cmd, arg, flags);
-		break;
-
-	case SMBIOC_PK_ADD:
-	case SMBIOC_PK_DEL:
-	case SMBIOC_PK_CHK:
-	case SMBIOC_PK_DEL_OWNER:
-	case SMBIOC_PK_DEL_EVERYONE:
-		err = smb_pkey_ioctl(cmd, arg, flags, cr);
-		break;
-
-	default:
-		err = ENOTTY;
-		break;
-	}
-
-	mutex_enter(&sdp->sd_lock);
-	sdp->sd_flags &= ~NSMBFL_IOCTL;
-	mutex_exit(&sdp->sd_lock);
+	err = smb_usr_ioctl(sdp, cmd, arg, flags, cr);
 
 	return (err);
 }

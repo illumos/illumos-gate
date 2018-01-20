@@ -32,6 +32,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -90,7 +91,7 @@ extern MECH_OID g_stcMechOIDList [];
 typedef struct krb5ssp_state {
 	/* Filled in by krb5ssp_init_client */
 	krb5_context ss_krb5ctx;	/* krb5 context (ptr) */
-	krb5_ccache ss_krb5cc; 		/* credentials cache (ptr) */
+	krb5_ccache ss_krb5cc;		/* credentials cache (ptr) */
 	krb5_principal ss_krb5clp;	/* client principal (ptr) */
 	/* Filled in by krb5ssp_get_tkt */
 	krb5_auth_context ss_auth;	/* auth ctx. w/ server (ptr) */
@@ -107,8 +108,8 @@ krb5ssp_tkt2gtok(uchar_t *tkt, ulong_t tktlen,
 	ulong_t		len;
 	ulong_t		bloblen = tktlen;
 	uchar_t		krbapreq[2] = {	KRB_AP_REQ, 0 };
-	uchar_t 	*blob = NULL;		/* result */
-	uchar_t 	*b;
+	uchar_t		*blob = NULL;		/* result */
+	uchar_t		*b;
 
 	bloblen += sizeof (krbapreq);
 	bloblen += g_stcMechOIDList[spnego_mech_oid_Kerberos_V5].iLen;
@@ -168,7 +169,7 @@ krb5ssp_get_tkt(krb5ssp_state_t *ss, char *server,
 	krb5_data	outdata = {0};
 	krb5_error_code	kerr = 0;
 	const char	*fn = NULL;
-	uchar_t 	*tkt;
+	uchar_t		*tkt;
 
 	/* Should have these from krb5ssp_init_client. */
 	if (kctx == NULL || kcc == NULL) {
@@ -252,9 +253,9 @@ krb5ssp_put_request(struct ssp_ctx *sp, struct mbdata *out_mb)
 	int err;
 	struct smb_ctx *ctx = sp->smb_ctx;
 	krb5ssp_state_t *ss = sp->sp_private;
-	uchar_t 	*tkt = NULL;
+	uchar_t		*tkt = NULL;
 	ulong_t		tktlen;
-	uchar_t 	*gtok = NULL;		/* gssapi token */
+	uchar_t		*gtok = NULL;		/* gssapi token */
 	ulong_t		gtoklen;		/* gssapi token length */
 	char		*prin = ctx->ct_srvname;
 
@@ -267,9 +268,6 @@ krb5ssp_put_request(struct ssp_ctx *sp, struct mbdata *out_mb)
 		goto out;
 	if ((err = mb_put_mem(out_mb, gtok, gtoklen, MB_MSYSTEM)) != 0)
 		goto out;
-
-	if (ctx->ct_vcflags & SMBV_WILL_SIGN)
-		ctx->ct_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
 
 out:
 	if (gtok)
@@ -383,7 +381,7 @@ krb5ssp_final(struct ssp_ctx *sp)
 	struct smb_ctx *ctx = sp->smb_ctx;
 	krb5ssp_state_t *ss = sp->sp_private;
 	krb5_keyblock	*ssn_key = NULL;
-	int err, len;
+	int err;
 
 	/*
 	 * Save the session key, used for SMB signing
@@ -398,35 +396,32 @@ krb5ssp_final(struct ssp_ctx *sp)
 			err = EAUTH;
 		goto out;
 	}
-	memset(ctx->ct_ssn_key, 0, SMBIOC_HASH_SZ);
-	if ((len = ssn_key->length) > SMBIOC_HASH_SZ)
-		len = SMBIOC_HASH_SZ;
-	memcpy(ctx->ct_ssn_key, ssn_key->contents, len);
+
+	/* Sanity check the length */
+	if (ssn_key->length > 1024) {
+		DPRINT("session key too long");
+		err = EAUTH;
+		goto out;
+	}
 
 	/*
-	 * Set the MAC key on the first successful auth.
+	 * Update/save the session key.
 	 */
-	if ((ctx->ct_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) &&
-	    (ctx->ct_mackey == NULL)) {
-		ctx->ct_mackeylen = ssn_key->length;
-		ctx->ct_mackey = malloc(ctx->ct_mackeylen);
-		if (ctx->ct_mackey == NULL) {
-			ctx->ct_mackeylen = 0;
-			err = ENOMEM;
-			goto out;
-		}
-		memcpy(ctx->ct_mackey, ssn_key->contents,
-		    ctx->ct_mackeylen);
-		/*
-		 * Apparently, the server used seq. no. zero
-		 * for our previous message, so next is two.
-		 */
-		ctx->ct_mac_seqno = 2;
+	if (ctx->ct_ssnkey_buf != NULL) {
+		free(ctx->ct_ssnkey_buf);
+		ctx->ct_ssnkey_buf = NULL;
 	}
+	ctx->ct_ssnkey_buf = malloc(ssn_key->length);
+	if (ctx->ct_ssnkey_buf == NULL) {
+		err = ENOMEM;
+		goto out;
+	}
+	ctx->ct_ssnkey_len = ssn_key->length;
+	memcpy(ctx->ct_ssnkey_buf, ssn_key->contents, ctx->ct_ssnkey_len);
 	err = 0;
 
 out:
-	if (ssn_key)
+	if (ssn_key != NULL)
 		krb5_free_keyblock(ss->ss_krb5ctx, ssn_key);
 
 	return (err);
@@ -508,7 +503,7 @@ krb5ssp_init_client(struct ssp_ctx *sp)
 	krb5ssp_state_t *ss;
 	krb5_error_code	kerr;
 	krb5_context	kctx = NULL;
-	krb5_ccache 	kcc = NULL;
+	krb5_ccache	kcc = NULL;
 	krb5_principal	kprin = NULL;
 
 	if ((sp->smb_ctx->ct_authflags & SMB_AT_KRB5) == 0) {

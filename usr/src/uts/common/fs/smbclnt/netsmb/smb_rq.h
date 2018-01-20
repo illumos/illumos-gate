@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_RQ_H_
@@ -54,7 +55,7 @@
 #define	SMBR_NOINTR_RECV	0x0200	/* no interrupt in recv wait */
 #define	SMBR_SENDWAIT		0x0400	/* waiting for send to complete */
 #define	SMBR_NORECONNECT	0x0800	/* do not reconnect for this */
-/* 	SMBR_VCREF		0x4000	 * took vc reference (obsolete) */
+/*	SMBR_VCREF		0x4000	 * took vc reference (obsolete) */
 #define	SMBR_MOREDATA		0x8000	/* our buffer was too small */
 
 #define	SMBT2_ALLSENT		0x0001	/* all data and params are sent */
@@ -64,7 +65,7 @@
 #define	SMBT2_NORESTART		0x0010
 #define	SMBT2_MOREDATA		0x8000	/* our buffer was too small */
 
-#define	SMBRQ_LOCK(rqp) 	mutex_enter(&(rqp)->sr_lock)
+#define	SMBRQ_LOCK(rqp)		mutex_enter(&(rqp)->sr_lock)
 #define	SMBRQ_UNLOCK(rqp)	mutex_exit(&(rqp)->sr_lock)
 
 enum smbrq_state {
@@ -83,7 +84,7 @@ struct smb_rq {
 	enum smbrq_state	sr_state;
 	struct smb_vc		*sr_vc;
 	struct smb_share	*sr_share;
-	struct _kthread 	*sr_owner;
+	struct _kthread		*sr_owner;
 	uint32_t		sr_seqno;	/* Seq. no. of request */
 	uint32_t		sr_rseqno;	/* Seq. no. of reply */
 	struct mbchain		sr_rq;
@@ -105,7 +106,7 @@ struct smb_rq {
 	int			sr_timo;
 	int			sr_rexmit; /* how many more retries.  dflt 0 */
 	int			sr_sendcnt;
-	struct timespec 	sr_timesent;
+	struct timespec		sr_timesent;
 	int			sr_lerror;
 	uint8_t			sr_errclass;
 	uint16_t		sr_serror;
@@ -124,7 +125,7 @@ struct smb_t2rq {
 	kcondvar_t	t2_cond;
 	uint16_t	t2_setupcount;
 	uint16_t	*t2_setupdata;
-	uint16_t	t2_setup[SMBIOC_T2RQ_MAXSETUP];
+	uint16_t	t2_setup[4];
 	uint8_t		t2_maxscount;	/* max setup words to return */
 	uint16_t	t2_maxpcount;	/* max param bytes to return */
 	uint16_t	t2_maxdcount;	/* max data bytes to return */
@@ -193,6 +194,7 @@ void smb_rq_bend(struct smb_rq *rqp);
 int  smb_rq_intr(struct smb_rq *rqp);
 int  smb_rq_simple(struct smb_rq *rqp);
 int  smb_rq_simple_timed(struct smb_rq *rqp, int timeout);
+int  smb_rq_internal(struct smb_rq *rqp, int timeout);
 
 int  smb_t2_alloc(struct smb_connobj *layer, ushort_t setup,
 	struct smb_cred *scred, struct smb_t2rq **rqpp);

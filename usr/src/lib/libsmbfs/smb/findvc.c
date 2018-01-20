@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -121,7 +121,6 @@ smb_ctx_findvc(struct smb_ctx *ctx)
 
 		if (err == 0) {
 			/* re-use an existing VC */
-			ctx->ct_flags |= SMBCF_SSNACTIVE;
 			return (0);
 		}
 	}

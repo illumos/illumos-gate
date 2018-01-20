@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_LIB_H_
@@ -103,28 +103,21 @@ struct smb_ctx {
 	struct addrinfo *ct_addrinfo;	/* IP addresses of the server */
 	struct nb_ctx	*ct_nb;		/* NetBIOS info. */
 	char		*ct_locname;	/* local (machine) name */
-	smb_iod_ssn_t	ct_iod_ssn;
-	/* smbioc_oshare_t	ct_sh; XXX */
 	int		ct_minauth;
 	int		ct_shtype_req;	/* share type wanted */
 	char		*ct_origshare;
 	char		*ct_home;
 	char		*ct_rpath;	/* remote file name */
 
-	/* Connection setup SMB stuff. */
-	/* Strings from the SMB negotiate response. */
-	char		*ct_srv_OS;
-	char		*ct_srv_LM;
-	uint32_t	ct_clnt_caps;
+	/* See ssp.c */
+	void		*ct_ssp_ctx;
+	smbioc_ssn_work_t ct_work;
+	smb_iod_ssn_t	ct_iod_ssn;
 
 	/* NTLM auth. stuff */
 	uchar_t		ct_clnonce[NTLM_CHAL_SZ];
 	uchar_t		ct_srv_chal[NTLM_CHAL_SZ];
 	char		ct_password[SMBIOC_MAX_NAME];
-
-	/* See ssp.c */
-	void		*ct_ssp_ctx;
-	smbioc_ssn_work_t ct_work;
 };
 
 
@@ -142,16 +135,9 @@ struct smb_ctx {
 #define	ct_nthash	ct_iod_ssn.iod_nthash
 #define	ct_lmhash	ct_iod_ssn.iod_lmhash
 
-#define	ct_sopt		ct_work.wk_sopt
-#define	ct_iods		ct_work.wk_iods
-#define	ct_tran_fd	ct_work.wk_iods.is_tran_fd
-#define	ct_hflags	ct_work.wk_iods.is_hflags
-#define	ct_hflags2	ct_work.wk_iods.is_hflags2
-#define	ct_vcflags	ct_work.wk_iods.is_vcflags
-#define	ct_ssn_key	ct_work.wk_iods.is_ssn_key
-#define	ct_mac_seqno	ct_work.wk_iods.is_next_seq
-#define	ct_mackeylen	ct_work.wk_iods.is_u_maclen
-#define	ct_mackey	ct_work.wk_iods.is_u_mackey.lp_ptr
+#define	ct_vcflags	ct_work.wk_vcflags
+#define	ct_ssnkey_len	ct_work.wk_u_ssnkey_len
+#define	ct_ssnkey_buf	ct_work.wk_u_ssnkey_buf.lp_ptr
 
 
 /*
@@ -169,9 +155,7 @@ struct smb_ctx {
 #define	SMBCF_BROWSEOK		0x00200000 /* browser dialogue may be used */
 #define	SMBCF_AUTHREQ		0x00400000 /* auth. dialog requested */
 #define	SMBCF_KCSAVE		0x00800000 /* add to keychain requested */
-#define	SMBCF_XXX		0x01000000 /* mount-all, a very bad thing */
-#define	SMBCF_SSNACTIVE		0x02000000 /* session setup succeeded */
-#define	SMBCF_KCDOMAIN		0x04000000 /* use domain in KC lookup */
+#define	SMBCF_KCDOMAIN		0x01000000 /* use domain in KC lookup */
 
 
 /*

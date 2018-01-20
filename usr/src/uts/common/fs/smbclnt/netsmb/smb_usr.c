@@ -33,9 +33,10 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -61,28 +62,6 @@
 static int smb_cpdatain(struct mbchain *mbp, int len, char *data, int seg);
 
 /*
- * Ioctl function for SMBIOC_FLAGS2
- */
-int
-smb_usr_get_flags2(smb_dev_t *sdp, intptr_t arg, int flags)
-{
-	struct smb_vc *vcp = NULL;
-
-	/* This ioctl requires a session. */
-	if ((vcp = sdp->sd_vc) == NULL)
-		return (ENOTCONN);
-
-	/*
-	 * Return the flags2 value.
-	 */
-	if (ddi_copyout(&vcp->vc_hflags2, (void *)arg,
-	    sizeof (u_int16_t), flags))
-		return (EFAULT);
-
-	return (0);
-}
-
-/*
  * Ioctl function for SMBIOC_GETSSNKEY
  * Size copied out is SMBIOC_HASH_SZ.
  *
@@ -105,7 +84,10 @@ smb_usr_get_ssnkey(smb_dev_t *sdp, intptr_t arg, int flags)
 	/*
 	 * Return the session key.
 	 */
-	if (ddi_copyout(vcp->vc_ssn_key, (void *)arg,
+	if (vcp->vc_ssnkey == NULL ||
+	    vcp->vc_ssnkeylen < SMBIOC_HASH_SZ)
+		return (EINVAL);
+	if (ddi_copyout(vcp->vc_ssnkey, (void *)arg,
 	    SMBIOC_HASH_SZ, flags))
 		return (EFAULT);
 
@@ -113,112 +95,18 @@ smb_usr_get_ssnkey(smb_dev_t *sdp, intptr_t arg, int flags)
 }
 
 /*
- * Ioctl function for SMBIOC_REQUEST
+ * Ioctl function for SMBIOC_XACTNP (transact named pipe)
  */
 int
-smb_usr_simplerq(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
+smb_usr_xnp(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 {
 	struct smb_cred scred;
 	struct smb_share *ssp;
-	smbioc_rq_t *ioc = NULL;
-	struct smb_rq *rqp = NULL;
-	struct mbchain *mbp;
-	struct mdchain *mdp;
-	uint32_t rsz;
-	int err, mbseg;
-
-	/* This ioctl requires a share. */
-	if ((ssp = sdp->sd_share) == NULL)
-		return (ENOTCONN);
-
-	smb_credinit(&scred, cr);
-	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
-	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
-		err = EFAULT;
-		goto out;
-	}
-
-	/* See ddi_copyin, ddi_copyout */
-	mbseg = (flags & FKIOCTL) ? MB_MSYSTEM : MB_MUSER;
-
-	/*
-	 * Lots of SMB commands could be safe, but
-	 * these are the only ones used by libsmbfs.
-	 */
-	switch (ioc->ioc_cmd) {
-		/* These are OK */
-	case SMB_COM_CLOSE:
-	case SMB_COM_FLUSH:
-	case SMB_COM_NT_CREATE_ANDX:
-	case SMB_COM_OPEN_PRINT_FILE:
-	case SMB_COM_CLOSE_PRINT_FILE:
-		break;
-
-	default:
-		err = EPERM;
-		goto out;
-	}
-
-	err = smb_rq_alloc(SSTOCP(ssp), ioc->ioc_cmd, &scred, &rqp);
-	if (err)
-		goto out;
-
-	mbp = &rqp->sr_rq;
-	err = mb_put_mem(mbp, ioc->ioc_tbuf, ioc->ioc_tbufsz, mbseg);
-
-	err = smb_rq_simple(rqp);
-	if (err == 0) {
-		/*
-		 * This may have been an open, so save the
-		 * generation ID of the share, which we
-		 * check before trying read or write.
-		 */
-		sdp->sd_vcgenid = ssp->ss_vcgenid;
-
-		/*
-		 * Have reply data. to copyout.
-		 * SMB header already parsed.
-		 */
-		mdp = &rqp->sr_rp;
-		rsz = msgdsize(mdp->md_top) - SMB_HDRLEN;
-		if (ioc->ioc_rbufsz < rsz) {
-			err = EOVERFLOW;
-			goto out;
-		}
-		ioc->ioc_rbufsz = rsz;
-		err = md_get_mem(mdp, ioc->ioc_rbuf, rsz, mbseg);
-		if (err)
-			goto out;
-
-	}
-
-	ioc->ioc_errclass = rqp->sr_errclass;
-	ioc->ioc_serror = rqp->sr_serror;
-	ioc->ioc_error = rqp->sr_error;
-	(void) ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
-
-out:
-	if (rqp != NULL)
-		smb_rq_done(rqp); /* free rqp */
-	kmem_free(ioc, sizeof (*ioc));
-	smb_credrele(&scred);
-
-	return (err);
-
-}
-
-/*
- * Ioctl function for SMBIOC_T2RQ
- */
-int
-smb_usr_t2request(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
-{
-	struct smb_cred scred;
-	struct smb_share *ssp;
-	smbioc_t2rq_t *ioc = NULL;
+	smbioc_xnp_t *ioc = NULL;
 	struct smb_t2rq *t2p = NULL;
 	struct mdchain *mdp;
 	int err, len, mbseg;
+	uint16_t setup[2];
 
 	/* This ioctl requires a share. */
 	if ((ssp = sdp->sd_share) == NULL)
@@ -233,92 +121,65 @@ smb_usr_t2request(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 
 	/* See ddi_copyin, ddi_copyout */
 	mbseg = (flags & FKIOCTL) ? MB_MSYSTEM : MB_MUSER;
-
-	if (ioc->ioc_setupcnt > SMBIOC_T2RQ_MAXSETUP) {
-		err = EINVAL;
-		goto out;
-	}
 
 	/*
 	 * Fill in the FID for libsmbfs transact named pipe.
 	 */
-	if (ioc->ioc_setupcnt > 1 && ioc->ioc_setup[1] == 0xFFFF) {
+	if (ioc->ioc_fh == -1) {
 		if (sdp->sd_vcgenid != ssp->ss_vcgenid) {
 			err = ESTALE;
 			goto out;
 		}
-		ioc->ioc_setup[1] = (uint16_t)sdp->sd_smbfid;
+		ioc->ioc_fh = sdp->sd_smbfid;
 	}
+
+	setup[0] = TRANS_TRANSACT_NAMED_PIPE;
+	setup[1] = (uint16_t)ioc->ioc_fh;
 
 	t2p = kmem_alloc(sizeof (*t2p), KM_SLEEP);
-	err = smb_t2_init(t2p, SSTOCP(ssp),
-	    ioc->ioc_setup, ioc->ioc_setupcnt, &scred);
+	err = smb_t2_init(t2p, SSTOCP(ssp), setup, 2, &scred);
 	if (err)
 		goto out;
-	t2p->t2_setupcount = ioc->ioc_setupcnt;
-	t2p->t2_setupdata  = ioc->ioc_setup;
+	t2p->t2_setupcount = 2;
+	t2p->t2_setupdata  = setup;
 
-	/* This ioc member is a fixed-size array. */
-	if (ioc->ioc_name[0]) {
-		/* Get the name length - carefully! */
-		ioc->ioc_name[SMBIOC_T2RQ_MAXNAME-1] = '\0';
-		t2p->t_name_len = strlen(ioc->ioc_name);
-		t2p->t_name = ioc->ioc_name;
-	}
+	t2p->t_name = "\\PIPE\\";
+	t2p->t_name_len = 6;
+
 	t2p->t2_maxscount = 0;
-	t2p->t2_maxpcount = ioc->ioc_rparamcnt;
-	t2p->t2_maxdcount = ioc->ioc_rdatacnt;
+	t2p->t2_maxpcount = 0;
+	t2p->t2_maxdcount = ioc->ioc_rdlen;
 
-	/* Transmit parameters */
-	err = smb_cpdatain(&t2p->t2_tparam,
-	    ioc->ioc_tparamcnt, ioc->ioc_tparam, mbseg);
-	if (err)
-		goto out;
+	/* Transmit parameters (none) */
 
 	/* Transmit data */
 	err = smb_cpdatain(&t2p->t2_tdata,
-	    ioc->ioc_tdatacnt, ioc->ioc_tdata, mbseg);
+	    ioc->ioc_tdlen, ioc->ioc_tdata, mbseg);
 	if (err)
 		goto out;
 
 	err = smb_t2_request(t2p);
 
-	/* Copyout returned parameters. */
-	mdp = &t2p->t2_rparam;
-	if (err == 0 && mdp->md_top != NULL) {
-		/* User's buffer large enough? */
-		len = m_fixhdr(mdp->md_top);
-		if (len > ioc->ioc_rparamcnt) {
-			err = EMSGSIZE;
-			goto out;
-		}
-		ioc->ioc_rparamcnt = (ushort_t)len;
-		err = md_get_mem(mdp, ioc->ioc_rparam, len, mbseg);
-		if (err)
-			goto out;
-	} else
-		ioc->ioc_rparamcnt = 0;
+	/* No returned parameters. */
 
 	/* Copyout returned data. */
 	mdp = &t2p->t2_rdata;
 	if (err == 0 && mdp->md_top != NULL) {
 		/* User's buffer large enough? */
 		len = m_fixhdr(mdp->md_top);
-		if (len > ioc->ioc_rdatacnt) {
+		if (len > ioc->ioc_rdlen) {
 			err = EMSGSIZE;
 			goto out;
 		}
-		ioc->ioc_rdatacnt = (ushort_t)len;
+		ioc->ioc_rdlen = (ushort_t)len;
 		err = md_get_mem(mdp, ioc->ioc_rdata, len, mbseg);
 		if (err)
 			goto out;
 	} else
-		ioc->ioc_rdatacnt = 0;
+		ioc->ioc_rdlen = 0;
 
-	ioc->ioc_errclass = t2p->t2_sr_errclass;
-	ioc->ioc_serror = t2p->t2_sr_serror;
-	ioc->ioc_error = t2p->t2_sr_error;
-	ioc->ioc_rpflags2 = t2p->t2_sr_rpflags2;
+	if (t2p->t2_sr_error == NT_STATUS_BUFFER_OVERFLOW)
+		ioc->ioc_more = 1;
 
 	(void) ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
 
@@ -825,24 +686,22 @@ smb_usr_drop_tree(smb_dev_t *sdp, int cmd)
 	return (0);
 }
 
-
 /*
- * Ioctl function: SMBIOC_IOD_WORK
- *
- * Become the reader (IOD) thread, until either the connection is
- * reset by the server, or until the connection is idle longer than
- * some max time. (max idle time not yet implemented)
+ * Ioctl handler for all SMBIOC_IOD_...
  */
 int
-smb_usr_iod_work(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
+smb_usr_iod_ioctl(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 {
-	struct smb_vc *vcp = NULL;
+	struct smb_vc *vcp;
 	int err = 0;
 
-	/* Must have a valid session. */
+	/* Must be the IOD. */
+	if ((sdp->sd_flags & NSMBFL_IOD) == 0)
+		return (EINVAL);
+	/* Must have a VC and no share. */
 	if ((vcp = sdp->sd_vc) == NULL)
 		return (EINVAL);
-	if (vcp->vc_flags & SMBV_GONE)
+	if (sdp->sd_share != NULL)
 		return (EINVAL);
 
 	/*
@@ -859,38 +718,52 @@ smb_usr_iod_work(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 		return (err);
 
 	/*
-	 * Copy the "work" state, etc. into the VC
-	 * The MAC key is copied separately.
+	 * Copy the "work" state, etc. into the VC,
+	 * and back to the caller on the way out.
+	 * Clear the "out only" part.
 	 */
 	if (ddi_copyin((void *)arg, &vcp->vc_work,
 	    sizeof (smbioc_ssn_work_t), flags)) {
 		err = EFAULT;
 		goto out;
 	}
-	if (vcp->vc_u_maclen) {
-		vcp->vc_mackeylen = vcp->vc_u_maclen;
-		vcp->vc_mackey = kmem_alloc(vcp->vc_mackeylen, KM_SLEEP);
-		if (ddi_copyin(vcp->vc_u_mackey.lp_ptr, vcp->vc_mackey,
-		    vcp->vc_mackeylen, flags)) {
-			err = EFAULT;
-			goto out;
-		}
+	vcp->vc_work.wk_out_state = 0;
+
+	switch (cmd) {
+
+	case SMBIOC_IOD_CONNECT:
+		err = nsmb_iod_connect(vcp);
+		break;
+
+	case SMBIOC_IOD_NEGOTIATE:
+		err = nsmb_iod_negotiate(vcp, cr);
+		break;
+
+	case SMBIOC_IOD_SSNSETUP:
+		err = nsmb_iod_ssnsetup(vcp, cr);
+		break;
+
+	case SMBIOC_IOD_WORK:
+		err = smb_iod_vc_work(vcp, flags, cr);
+		break;
+
+	case SMBIOC_IOD_IDLE:
+		err = smb_iod_vc_idle(vcp);
+		break;
+
+	case SMBIOC_IOD_RCFAIL:
+		err = smb_iod_vc_rcfail(vcp);
+		break;
+
+	default:
+		err = ENOTTY;
+		break;
 	}
-
-	err = smb_iod_vc_work(vcp, cr);
-
-	/* Caller wants state here. */
-	vcp->vc_work.wk_out_state = vcp->vc_state;
-
-	(void) ddi_copyout(&vcp->vc_work, (void *)arg,
-	    sizeof (smbioc_ssn_work_t), flags);
 
 out:
-	if (vcp->vc_mackey) {
-		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
-		vcp->vc_mackey = NULL;
-		vcp->vc_mackeylen = 0;
-	}
+	vcp->vc_work.wk_out_state = vcp->vc_state;
+	(void) ddi_copyout(&vcp->vc_work, (void *)arg,
+	    sizeof (smbioc_ssn_work_t), flags);
 
 	/*
 	 * The IOD thread is leaving the driver.  Clear iod_thr,
@@ -904,67 +777,104 @@ out:
 	return (err);
 }
 
-/*
- * Ioctl functions: SMBIOC_IOD_IDLE, SMBIOC_IOD_RCFAIL
- *
- * Wait for user-level requests to be enqueued on this session,
- * and then return to the user-space helper, which will then
- * initiate a reconnect, etc.
- */
 int
-smb_usr_iod_ioctl(smb_dev_t *sdp, int cmd, intptr_t arg, int flags)
+smb_usr_ioctl(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 {
-	struct smb_vc *vcp = NULL;
-	int err = 0;
-
-	/* Must have a valid session. */
-	if ((vcp = sdp->sd_vc) == NULL)
-		return (EINVAL);
-	if (vcp->vc_flags & SMBV_GONE)
-		return (EINVAL);
+	int err;
 
 	/*
-	 * Is there already an IOD for this VC?
-	 * (Should never happen.)
+	 * Serialize ioctl calls.  The smb_usr_... functions
+	 * don't expect concurrent calls on a given sdp.
 	 */
-	SMB_VC_LOCK(vcp);
-	if (vcp->iod_thr == NULL)
-		vcp->iod_thr = curthread;
-	else
-		err = EEXIST;
-	SMB_VC_UNLOCK(vcp);
-	if (err)
-		return (err);
+	mutex_enter(&sdp->sd_lock);
+	if ((sdp->sd_flags & NSMBFL_IOCTL) != 0) {
+		mutex_exit(&sdp->sd_lock);
+		return (EBUSY);
+	}
+	sdp->sd_flags |= NSMBFL_IOCTL;
+	mutex_exit(&sdp->sd_lock);
 
-	/* nothing to copyin */
-
+	err = 0;
 	switch (cmd) {
-	case SMBIOC_IOD_IDLE:
-		err = smb_iod_vc_idle(vcp);
+	case SMBIOC_GETVERS:
+		(void) ddi_copyout(&nsmb_version, (void *)arg,
+		    sizeof (nsmb_version), flags);
 		break;
 
+	case SMBIOC_GETSSNKEY:
+		err = smb_usr_get_ssnkey(sdp, arg, flags);
+		break;
+
+	case SMBIOC_DUP_DEV:
+		err = smb_usr_dup_dev(sdp, arg, flags);
+		break;
+
+	case SMBIOC_XACTNP:
+		err = smb_usr_xnp(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_READ:
+	case SMBIOC_WRITE:
+		err = smb_usr_rw(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_NTCREATE:
+		err = smb_usr_ntcreate(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_PRINTJOB:
+		err = smb_usr_printjob(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_CLOSEFH:
+		err = smb_usr_closefh(sdp, cr);
+		break;
+
+	case SMBIOC_SSN_CREATE:
+	case SMBIOC_SSN_FIND:
+		err = smb_usr_get_ssn(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_SSN_KILL:
+	case SMBIOC_SSN_RELE:
+		err = smb_usr_drop_ssn(sdp, cmd);
+		break;
+
+	case SMBIOC_TREE_CONNECT:
+	case SMBIOC_TREE_FIND:
+		err = smb_usr_get_tree(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_TREE_KILL:
+	case SMBIOC_TREE_RELE:
+		err = smb_usr_drop_tree(sdp, cmd);
+		break;
+
+	case SMBIOC_IOD_CONNECT:
+	case SMBIOC_IOD_NEGOTIATE:
+	case SMBIOC_IOD_SSNSETUP:
+	case SMBIOC_IOD_WORK:
+	case SMBIOC_IOD_IDLE:
 	case SMBIOC_IOD_RCFAIL:
-		err = smb_iod_vc_rcfail(vcp);
+		err = smb_usr_iod_ioctl(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_PK_ADD:
+	case SMBIOC_PK_DEL:
+	case SMBIOC_PK_CHK:
+	case SMBIOC_PK_DEL_OWNER:
+	case SMBIOC_PK_DEL_EVERYONE:
+		err = smb_pkey_ioctl(cmd, arg, flags, cr);
 		break;
 
 	default:
 		err = ENOTTY;
-		goto out;
+		break;
 	}
 
-	/* Both of these ioctls copy out the new state. */
-	(void) ddi_copyout(&vcp->vc_state, (void *)arg,
-	    sizeof (int), flags);
-
-out:
-	/*
-	 * The IOD thread is leaving the driver.  Clear iod_thr,
-	 * and wake up anybody waiting for us to quit.
-	 */
-	SMB_VC_LOCK(vcp);
-	vcp->iod_thr = NULL;
-	cv_broadcast(&vcp->vc_statechg);
-	SMB_VC_UNLOCK(vcp);
+	mutex_enter(&sdp->sd_lock);
+	sdp->sd_flags &= ~NSMBFL_IOCTL;
+	mutex_exit(&sdp->sd_lock);
 
 	return (err);
 }
