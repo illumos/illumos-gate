@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -331,6 +332,34 @@ ok_out:
 }
 
 /*
+ * Used by the IOD thread during connection setup.
+ */
+int
+smb_rq_internal(struct smb_rq *rqp, int timeout)
+{
+	struct smb_vc *vcp = rqp->sr_vc;
+	int err;
+
+	rqp->sr_flags &= ~SMBR_RESTART;
+	rqp->sr_timo = timeout;	/* in seconds */
+	rqp->sr_state = SMBRQ_NOTSENT;
+
+	/*
+	 * Skip smb_rq_enqueue(rqp) here, as we don't want it
+	 * trying to reconnect etc.  We're doing that.
+	 */
+	rqp->sr_rquid = vcp->vc_smbuid;
+	rqp->sr_rqtid = SMB_TID_UNKNOWN;
+	err = smb_iod_addrq(rqp);
+	if (err != 0)
+		return (err);
+
+	err = smb_rq_reply(rqp);
+
+	return (err);
+}
+
+/*
  * Mark location of the word count, which is filled in later by
  * smb_rw_wend().  Also initialize the counter that it uses
  * to figure out what value to fill in.
@@ -495,7 +524,20 @@ smb_rq_reply(struct smb_rq *rqp)
 	error = md_get_uint32le(mdp, &rqp->sr_error);
 	error = md_get_uint8(mdp, &rqp->sr_rpflags);
 	error = md_get_uint16le(mdp, &rqp->sr_rpflags2);
-	if (rqp->sr_rpflags2 & SMB_FLAGS2_ERR_STATUS) {
+
+	if (rqp->sr_error != 0) {
+		if (rqp->sr_rpflags2 & SMB_FLAGS2_ERR_STATUS) {
+			rperror = smb_maperr32(rqp->sr_error);
+		} else {
+			uint8_t errClass = rqp->sr_error & 0xff;
+			uint16_t errCode = rqp->sr_error >> 16;
+			/* Convert to NT status */
+			rqp->sr_error = smb_doserr2status(errClass, errCode);
+			rperror = smb_maperror(errClass, errCode);
+		}
+	}
+
+	if (rperror) {
 		/*
 		 * Do a special check for STATUS_BUFFER_OVERFLOW;
 		 * it's not an error.
@@ -506,23 +548,13 @@ smb_rq_reply(struct smb_rq *rqp)
 			 * they can look at rqp->sr_error if they
 			 * need to know whether we got a
 			 * STATUS_BUFFER_OVERFLOW.
-			 * XXX - should we do that for all errors
-			 * where (error & 0xC0000000) is 0x80000000,
-			 * i.e. all warnings?
 			 */
+			rqp->sr_flags |= SMBR_MOREDATA;
 			rperror = 0;
-		} else
-			rperror = smb_maperr32(rqp->sr_error);
+		}
 	} else {
-		rqp->sr_errclass = rqp->sr_error & 0xff;
-		rqp->sr_serror = rqp->sr_error >> 16;
-		rperror = smb_maperror(rqp->sr_errclass, rqp->sr_serror);
-	}
-	if (rperror == EMOREDATA) {
-		rperror = E2BIG;
-		rqp->sr_flags |= SMBR_MOREDATA;
-	} else
 		rqp->sr_flags &= ~SMBR_MOREDATA;
+	}
 
 	error = md_get_uint32le(mdp, NULL);
 	error = md_get_uint32le(mdp, NULL);

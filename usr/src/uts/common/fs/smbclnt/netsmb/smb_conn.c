@@ -34,6 +34,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -105,7 +107,7 @@ void
 smb_sm_done(void)
 {
 	/*
-	 * XXX Q4BP why are we not iterating on smb_vclist here?
+	 * Why are we not iterating on smb_vclist here?
 	 * Because the caller has just called smb_sm_idle() to
 	 * make sure we have no VCs before calling this.
 	 */
@@ -365,6 +367,8 @@ smb_vc_free(struct smb_connobj *cp)
 
 	if (vcp->vc_mackey != NULL)
 		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
+	if (vcp->vc_ssnkey != NULL)
+		kmem_free(vcp->vc_ssnkey, vcp->vc_ssnkeylen);
 
 	cv_destroy(&vcp->iod_idle);
 	rw_destroy(&vcp->iod_rqlock);
@@ -399,7 +403,8 @@ smb_vc_create(smbioc_ossn_t *ossn, smb_cred_t *scred, smb_vc_t **vcpp)
 	/* Expanded TAILQ_HEAD_INITIALIZER */
 	vcp->iod_rqlist.tqh_last = &vcp->iod_rqlist.tqh_first;
 
-	vcp->vc_state = SMBIOD_ST_IDLE;
+	/* A brand new VC should connect. */
+	vcp->vc_state = SMBIOD_ST_RECONNECT;
 
 	/*
 	 * These identify the connection.

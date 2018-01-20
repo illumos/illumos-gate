@@ -33,8 +33,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_SUBR_H_
@@ -117,6 +117,8 @@ extern int smb_timo_open;
 extern int smb_timo_read;
 extern int smb_timo_write;
 extern int smb_timo_append;
+extern dev_t nsmb_dev_tcp;
+extern dev_t nsmb_dev_tcp6;
 
 #define	EMOREDATA (0x7fff)
 
@@ -133,6 +135,7 @@ int  smb_ntlmv2response(const uchar_t *hash, const uchar_t *C8,
     const uchar_t *blob, size_t bloblen, uchar_t **RN, size_t *RNlen);
 int  smb_maperror(int eclass, int eno);
 int  smb_maperr32(uint32_t eno);
+uint_t smb_doserr2status(int, int);
 int  smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp,
     const char *src, int len, int caseopt, int *lenp);
 int  smb_put_dstring(struct mbchain *mbp, struct smb_vc *vcp,
@@ -144,8 +147,8 @@ int  smb_checksmp(void);
 int smb_cmp_sockaddr(struct sockaddr *, struct sockaddr *);
 struct sockaddr *smb_dup_sockaddr(struct sockaddr *sa);
 void smb_free_sockaddr(struct sockaddr *sa);
-int smb_toupper(const char *, char *, size_t);
 
+int smb_sign_init(struct smb_vc *);
 void smb_rq_sign(struct smb_rq *);
 int smb_rq_verify(struct smb_rq *);
 int smb_calcv2mackey(struct smb_vc *, const uchar_t *,
@@ -158,6 +161,8 @@ void smb_crypto_mech_init(void);
 /*
  * SMB protocol level functions
  */
+int  smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred);
+int  smb_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred);
 int  smb_smb_echo(smb_vc_t *vcp, smb_cred_t *scred, int timo);
 int  smb_smb_treeconnect(smb_share_t *ssp, smb_cred_t *scred);
 int  smb_smb_treedisconnect(smb_share_t *ssp, smb_cred_t *scred);

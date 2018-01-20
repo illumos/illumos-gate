@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_RQ_H_
@@ -124,7 +125,7 @@ struct smb_t2rq {
 	kcondvar_t	t2_cond;
 	uint16_t	t2_setupcount;
 	uint16_t	*t2_setupdata;
-	uint16_t	t2_setup[SMBIOC_T2RQ_MAXSETUP];
+	uint16_t	t2_setup[4];
 	uint8_t		t2_maxscount;	/* max setup words to return */
 	uint16_t	t2_maxpcount;	/* max param bytes to return */
 	uint16_t	t2_maxdcount;	/* max data bytes to return */
@@ -193,6 +194,7 @@ void smb_rq_bend(struct smb_rq *rqp);
 int  smb_rq_intr(struct smb_rq *rqp);
 int  smb_rq_simple(struct smb_rq *rqp);
 int  smb_rq_simple_timed(struct smb_rq *rqp, int timeout);
+int  smb_rq_internal(struct smb_rq *rqp, int timeout);
 
 int  smb_t2_alloc(struct smb_connobj *layer, ushort_t setup,
 	struct smb_cred *scred, struct smb_t2rq **rqpp);

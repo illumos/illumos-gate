@@ -33,8 +33,9 @@
  */
 
 /*
+ * Portions Copyright (C) 2001 - 2014 Apple Inc. All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -71,12 +72,38 @@
  */
 #define	SMB_MAX_LARGE_RW_SIZE (60*1024)
 
+struct smb_dialect {
+	int		d_id;
+	const char 	*d_name;
+};
+
+static struct smb_dialect smb_dialects[] = {
+	{SMB_DIALECT_CORE,	"PC NETWORK PROGRAM 1.0"},
+	{SMB_DIALECT_COREPLUS,	"MICROSOFT NETWORKS 1.03"},
+	{SMB_DIALECT_LANMAN1_0,	"MICROSOFT NETWORKS 3.0"},
+	{SMB_DIALECT_LANMAN1_0,	"LANMAN1.0"},
+	{SMB_DIALECT_LANMAN2_0,	"LM1.2X002"},
+	{SMB_DIALECT_LANMAN2_1,	"LANMAN2.1"},
+	{SMB_DIALECT_NTLM0_12,	"NT LANMAN 1.0"},
+	{SMB_DIALECT_NTLM0_12,	"NT LM 0.12"},
+};
+static uint_t smb_ndialect =
+    sizeof (smb_dialects) / sizeof (smb_dialects[0]);
+
+static const uint32_t smb_clnt_caps_mask =
+    SMB_CAP_UNICODE |
+    SMB_CAP_LARGE_FILES |
+    SMB_CAP_NT_SMBS |
+    SMB_CAP_STATUS32 |
+    SMB_CAP_EXT_SECURITY;
+
 /*
  * Default timeout values, all in seconds.
  * Make these tunable (only via mdb for now).
  */
 int smb_timo_notice = 15;
 int smb_timo_default = 30;	/* was SMB_DEFRQTIMO */
+int smb_timo_logon = 45;
 int smb_timo_open = 45;
 int smb_timo_read = 45;
 int smb_timo_write = 60;	/* was SMBWRTTIMO */
@@ -91,6 +118,443 @@ static int smb_smb_readx(struct smb_share *ssp, uint16_t fid,
 	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
 static int smb_smb_writex(struct smb_share *ssp, uint16_t fid,
 	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
+
+int
+smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
+{
+	smb_sopt_t *sv = &vcp->vc_sopt;
+	smbioc_ssn_work_t *wk = &vcp->vc_work;
+	struct smb_rq *rqp = NULL;
+	struct mbchain *mbp = NULL;
+	struct mdchain *mdp = NULL;
+	struct smb_dialect *dp;
+	int err, sblen, tlen;
+	uint8_t wc, eklen;
+	uint16_t dindex, bc;
+	boolean_t will_sign = B_FALSE;
+
+	/*
+	 * Initialize: vc_hflags and vc_hflags2.
+	 * Note: vcp->vc_hflags* are copied into the
+	 * (per request) rqp->rq_hflags* by smb_rq_init.
+	 *
+	 * Like Windows, set FLAGS2_UNICODE in our first request,
+	 * even though technically we don't yet know whether the
+	 * server supports Unicode.  Will clear this flag below
+	 * if we find out it doesn't.  Need to do this because
+	 * some servers reject all non-Unicode requests.
+	 */
+	vcp->vc_hflags =
+	    SMB_FLAGS_CASELESS |
+	    SMB_FLAGS_CANONICAL_PATHNAMES;
+	vcp->vc_hflags2 =
+	    SMB_FLAGS2_KNOWS_LONG_NAMES |
+	    SMB_FLAGS2_KNOWS_EAS |
+	    SMB_FLAGS2_IS_LONG_NAME |
+	    SMB_FLAGS2_EXT_SEC |
+	    SMB_FLAGS2_ERR_STATUS |
+	    SMB_FLAGS2_UNICODE;
+
+	/*
+	 * The initial UID needs to be zero,
+	 */
+	vcp->vc_smbuid = 0;
+
+	/*
+	 * (Re)init negotiated values
+	 */
+	bzero(sv, sizeof (*sv));
+	sv->sv_maxmux = 1;
+	sv->sv_maxvcs = 1;
+	sv->sv_maxtx = 1024;
+
+	err = smb_rq_alloc(VCTOCP(vcp), SMB_COM_NEGOTIATE, scred, &rqp);
+	if (err)
+		return (err);
+
+	/*
+	 * Build the SMB request.
+	 */
+	smb_rq_getrequest(rqp, &mbp);
+	smb_rq_wstart(rqp);
+	smb_rq_wend(rqp);
+	smb_rq_bstart(rqp);
+	for (dindex = 0; dindex < smb_ndialect; dindex++) {
+		dp = &smb_dialects[dindex];
+		mb_put_uint8(mbp, SMB_DT_DIALECT);
+		tlen = strlen(dp->d_name) + 1;
+		mb_put_mem(mbp, dp->d_name, tlen, MB_MSYSTEM);
+	}
+	smb_rq_bend(rqp);
+
+	/*
+	 * Do the OTW call.
+	 */
+	err = smb_rq_internal(rqp, smb_timo_default);
+	if (err) {
+		SMBSDEBUG("smb_rq_internal, err %d", err);
+		goto errout;
+	}
+
+	/*
+	 * Decode the response
+	 *
+	 * Comments to right show names as described in
+	 * The Microsoft SMB Protocol spec. [MS-SMB]
+	 * section 2.2.3
+	 */
+	smb_rq_getreply(rqp, &mdp);
+	(void) md_get_uint8(mdp, &wc);
+	err = md_get_uint16le(mdp, &dindex);
+	if (err != 0)
+		goto errout;
+	if (dindex >= smb_ndialect) {
+		SMBERROR("Invalid dialect index from server: %s\n",
+		    vcp->vc_srvname);
+		err = EBADRPC;
+		goto errout;
+	}
+	dp = smb_dialects + dindex;
+	sv->sv_proto = dp->d_id;
+	SMBSDEBUG("Dialect %s", dp->d_name);
+	if (dp->d_id < SMB_DIALECT_NTLM0_12) {
+		SMBSDEBUG("old dialect %s", dp->d_name);
+		goto errout;
+	}
+	if (wc != 17) {
+		SMBSDEBUG("bad wc %d", (int)wc);
+		goto errout;
+	}
+	md_get_uint8(mdp, &sv->sv_sm);		/* SecurityMode */
+	md_get_uint16le(mdp, &sv->sv_maxmux);	/* MaxMpxCount */
+	md_get_uint16le(mdp, &sv->sv_maxvcs);	/* MaxCountVCs */
+	md_get_uint32le(mdp, &sv->sv_maxtx);	/* MaxBufferSize */
+	md_get_uint32le(mdp, &sv->sv_maxraw);	/* MaxRawSize */
+	md_get_uint32le(mdp, &sv->sv_skey);	/* SessionKey */
+	md_get_uint32le(mdp, &sv->sv_caps);	/* Capabilities */
+	md_get_mem(mdp, NULL, 8, MB_MSYSTEM);	/* SystemTime(s) */
+	md_get_uint16le(mdp, (uint16_t *)&sv->sv_tz);
+	md_get_uint8(mdp, &eklen);	/* EncryptionKeyLength */
+	err = md_get_uint16le(mdp, &bc);	/* ByteCount */
+	if (err)
+		goto errout;
+
+	/* BEGIN CSTYLED */
+	/*
+	 * Will we do SMB signing?  Or block the connection?
+	 * The table below describes this logic.  References:
+	 * [Windows Server Protocols: MS-SMB, sec. 3.2.4.2.3]
+	 * http://msdn.microsoft.com/en-us/library/cc212511.aspx
+	 * http://msdn.microsoft.com/en-us/library/cc212929.aspx
+	 *
+	 * Srv/Cli     | Required | Enabled    | If Required | Disabled
+	 * ------------+----------+------------+-------------+-----------
+	 * Required    | Signed   | Signed     | Signed      | Blocked [1]
+	 * ------------+----------+------------+-------------+-----------
+	 * Enabled     | Signed   | Signed     | Not Signed  | Not Signed
+	 * ------------+----------+------------+-------------+-----------
+	 * If Required | Signed   | Not Signed | Not Signed  | Not Signed
+	 * ------------+----------+------------+-------------+-----------
+	 * Disabled    | Blocked  | Not Signed | Not Signed  | Not Signed
+	 *
+	 * [1] Like Windows 2003 and later, we don't really implement
+	 * the "Disabled" setting.  Instead we implement "If Required",
+	 * so we always sign if the server requires signing.
+	 */
+	/* END CSTYLED */
+
+	if (sv->sv_sm & SMB_SM_SIGS_REQUIRE) {
+		/*
+		 * Server requires signing.  We will sign,
+		 * even if local setting is "disabled".
+		 */
+		will_sign = B_TRUE;
+	} else if (sv->sv_sm & SMB_SM_SIGS) {
+		/*
+		 * Server enables signing (client's option).
+		 * If enabled locally, do signing.
+		 */
+		if (vcp->vc_vopt & SMBVOPT_SIGNING_ENABLED)
+			will_sign = B_TRUE;
+		/* else not signing. */
+	} else {
+		/*
+		 * Server does not support signing.
+		 * If we "require" it, bail now.
+		 */
+		if (vcp->vc_vopt & SMBVOPT_SIGNING_REQUIRED) {
+			SMBERROR("Client requires signing "
+			    "but server has it disabled.");
+			err = EBADRPC;
+			goto errout;
+		}
+	}
+
+	/*
+	 * Anonymous sessions can't sign.
+	 */
+	if (vcp->vc_vopt & SMBVOPT_ANONYMOUS) {
+		will_sign = B_FALSE;
+	}
+
+	SMBSDEBUG("Security signatures: %d", (int)will_sign);
+	if (will_sign) {
+		vcp->vc_flags |= SMBV_WILL_SIGN;
+		vcp->vc_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
+
+		/*
+		 * MS-SMB 2.2.4.5 says that when SMB signing is enabled,
+		 * we should NOT use "large read/write" even though the
+		 * server might offer those capabilities.
+		 */
+		sv->sv_caps &= ~(SMB_CAP_LARGE_READX | SMB_CAP_LARGE_WRITEX);
+	}
+
+	/* See comment above re. FLAGS2_UNICODE */
+	if ((sv->sv_caps & SMB_CAP_UNICODE) != 0)
+		vcp->vc_flags |= SMBV_UNICODE;
+	else
+		vcp->vc_hflags2 &= ~SMB_FLAGS2_UNICODE;
+
+	if ((sv->sv_caps & SMB_CAP_STATUS32) == 0) {
+		/* They don't do NT error codes. */
+		vcp->vc_hflags2 &= ~SMB_FLAGS2_ERR_STATUS;
+	}
+
+	/*
+	 * The rest of the message varies depending on
+	 * whether we've negotiated "extended security".
+	 *
+	 * With extended security, we have:
+	 *	Server_GUID	(length 16)
+	 *	Security_BLOB
+	 * Otherwise we have:
+	 *	EncryptionKey (length is eklen)
+	 *	PrimaryDomain
+	 */
+	if (sv->sv_caps & SMB_CAP_EXT_SECURITY) {
+		SMBSDEBUG("Ext.Security: yes");
+
+		/*
+		 * Skip the server GUID.
+		 */
+		err = md_get_mem(mdp, NULL, SMB_GUIDLEN, MB_MSYSTEM);
+		if (err)
+			goto errout;
+		/*
+		 * Remainder is the security blob.
+		 * Note: eklen "must be ignored" [MS-SMB]
+		 */
+		sblen = (int)bc - SMB_GUIDLEN;
+		if (sblen < 0)
+			goto errout;
+		/* Security blob (hint) is next */
+	} else {
+		SMBSDEBUG("Ext.Security: no");
+		err = ENOTSUP;
+		goto errout;
+	}
+
+	/*
+	 * Copy the security blob out to user space.
+	 * Buffer addr,size in vc_auth_rbuf,rlen
+	 */
+	if (wk->wk_u_auth_rlen < sblen) {
+		SMBSDEBUG("vc_auth_rbuf too small");
+		/* Give caller required size. */
+		wk->wk_u_auth_rlen = sblen;
+		err = EMSGSIZE;
+		goto errout;
+	}
+	wk->wk_u_auth_rlen = sblen;
+	err = md_get_mem(mdp, wk->wk_u_auth_rbuf.lp_ptr, sblen, MB_MUSER);
+	if (err)
+		goto errout;
+
+	/*
+	 * A few sanity checks on what we received,
+	 * becuse we will send these in ssnsetup.
+	 *
+	 * Maximum outstanding requests (we care),
+	 * and Max. VCs (we only use one).  Also,
+	 * MaxBufferSize lower limit per spec.
+	 */
+	if (sv->sv_maxmux < 1)
+		sv->sv_maxmux = 1;
+	if (sv->sv_maxvcs < 1)
+		sv->sv_maxvcs = 1;
+	if (sv->sv_maxtx < 1024)
+		sv->sv_maxtx = 1024;
+
+	/*
+	 * Maximum transfer size.
+	 * Sanity checks:
+	 *
+	 * Let's be conservative about an upper limit here.
+	 * Win2k uses 16644 (and others) so 32k should be a
+	 * reasonable sanity limit for this value.
+	 *
+	 * Note that this limit does NOT affect READX/WRITEX
+	 * with CAP_LARGE_..., which we nearly always use.
+	 */
+	vcp->vc_txmax = sv->sv_maxtx;
+	if (vcp->vc_txmax > 0x8000)
+		vcp->vc_txmax = 0x8000;
+
+	/*
+	 * Max read/write sizes, WITHOUT overhead.
+	 * This is just the payload size, so we must
+	 * leave room for the SMB headers, etc.
+	 * This is just the ct_txmax value, but
+	 * reduced and rounded down.  Tricky bit:
+	 *
+	 * Servers typically give us a value that's
+	 * some nice "round" number, i.e 0x4000 plus
+	 * some overhead, i.e. Win2k: 16644==0x4104
+	 * Subtract for the SMB header (32) and the
+	 * SMB command word and byte vectors (34?),
+	 * then round down to a 512 byte multiple.
+	 */
+	tlen = vcp->vc_txmax - 68;
+	tlen &= 0xFE00;
+
+	vcp->vc_rwmax = tlen;
+	vcp->vc_rxmax = tlen;
+	vcp->vc_wxmax = tlen;
+
+	/*
+	 * Most of the "capability" bits we offer in session setup
+	 * are just copied from those offered by the server.
+	 */
+	sv->sv_caps &= smb_clnt_caps_mask;
+
+	smb_rq_done(rqp);
+	return (0);
+
+errout:
+	smb_rq_done(rqp);
+	if (err == 0)
+		err = EBADRPC;
+	return (err);
+}
+
+static const char NativeOS[] = "illumos";
+static const char LanMan[] = "NETSMB";
+
+int
+smb_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
+{
+	smb_sopt_t *sv = &vcp->vc_sopt;
+	smbioc_ssn_work_t *wk = &vcp->vc_work;
+	struct smb_rq *rqp = NULL;
+	struct mbchain *mbp = NULL;
+	struct mdchain *mdp = NULL;
+	char *sb;
+	int err, ret;
+	uint32_t caps;
+	uint16_t action, bc, sblen;
+	uint8_t wc;
+
+	caps = sv->sv_caps;
+	sb = wk->wk_u_auth_wbuf.lp_ptr;
+	sblen = (uint16_t)wk->wk_u_auth_wlen;
+
+	err = smb_rq_alloc(VCTOCP(vcp), SMB_COM_SESSION_SETUP_ANDX,
+	    scred, &rqp);
+	if (err != 0) {
+		ret = err;
+		goto out;
+	}
+
+	/*
+	 * Build the SMB Session Setup request.
+	 * Always extended security form.
+	 */
+	mbp = &rqp->sr_rq;
+	smb_rq_wstart(rqp);
+	mb_put_uint16le(mbp, 0xff);		/* 0: AndXCommand */
+	mb_put_uint16le(mbp, 0);		/* 1: AndXOffset */
+	mb_put_uint16le(mbp, sv->sv_maxtx);	/* 2: MaxBufferSize */
+	mb_put_uint16le(mbp, sv->sv_maxmux);	/* 3: MaxMpxCount */
+	mb_put_uint16le(mbp, 1);		/* 4: VcNumber */
+	mb_put_uint32le(mbp, sv->sv_skey);	/* 5,6: Session Key */
+	mb_put_uint16le(mbp, sblen);	/* 7: Sec. Blob Len */
+	mb_put_uint32le(mbp, 0);	/* 8,9: reserved */
+	mb_put_uint32le(mbp, caps);	/* 10,11: Capabilities */
+	smb_rq_wend(rqp);		/* 12: Byte Count */
+	smb_rq_bstart(rqp);
+	err = mb_put_mem(mbp, sb, sblen, MB_MUSER);
+	if (err != 0) {
+		ret = err;
+		goto out;
+	}
+	(void) smb_put_dstring(mbp, vcp, NativeOS, SMB_CS_NONE);
+	(void) smb_put_dstring(mbp, vcp, LanMan, SMB_CS_NONE);
+	smb_rq_bend(rqp);
+
+	/*
+	 * Run the request.  The return value here should be the
+	 * return from this function, unless we fail decoding.
+	 * Note: NT_STATUS_MORE_PROCESSING_REQUIRED is OK.
+	 */
+	ret = smb_rq_internal(rqp, smb_timo_logon);
+	if (ret != 0 && rqp->sr_error !=
+	    NT_STATUS_MORE_PROCESSING_REQUIRED) {
+		/* UID no longer valid. */
+		vcp->vc_smbuid = 0;
+		goto out;
+	}
+
+	if (vcp->vc_smbuid == 0)
+		vcp->vc_smbuid = rqp->sr_rpuid;
+
+	/*
+	 * Parse the reply
+	 */
+	smb_rq_getreply(rqp, &mdp);
+
+	err = md_get_uint8(mdp, &wc);
+	if (err != 0)
+		wc = 0;
+	if (wc != 4) {
+		ret = EBADRPC;
+		goto out;
+	}
+	md_get_uint16le(mdp, NULL);	/* secondary cmd */
+	md_get_uint16le(mdp, NULL);	/* andxoffset */
+	md_get_uint16le(mdp, &action);	/* action XXX */
+	md_get_uint16le(mdp, &sblen);	/* sec. blob len */
+	md_get_uint16le(mdp, &bc);	/* byte count */
+	/*
+	 * Get the security blob, after
+	 * sanity-checking the length.
+	 */
+	if (sblen == 0 || sblen > bc) {
+		ret = EBADRPC;
+		goto out;
+	}
+	if (sblen > wk->wk_u_auth_rlen) {
+		ret = EBADRPC;
+		goto out;
+	}
+	sb = wk->wk_u_auth_rbuf.lp_ptr;
+	err = md_get_mem(mdp, sb, sblen, MB_MUSER);
+	if (err) {
+		ret = EBADRPC;
+		goto out;
+	}
+
+	/*
+	 * Native OS, LANMGR, & Domain follow here.
+	 * We don't need them and don't parse them.
+	 */
+
+out:
+	if (rqp)
+		smb_rq_done(rqp);
+
+	return (ret);
+}
 
 /*
  * Get the string representation of a share "use" type,

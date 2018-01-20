@@ -33,9 +33,10 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -62,9 +63,15 @@
 
 #include "private.h"
 
+/*
+ * It's not actually necessary to call the CLOSEFH ioctl, but doing it
+ * makes debugging a little easier.  If we were to skip the ioctl,
+ * nsmb_close would cleanup the handle, here or in process exit.
+ */
 int
 smb_fh_close(int fd)
 {
+	(void) nsmb_ioctl(fd, SMBIOC_CLOSEFH, NULL);
 	return (nsmb_close(fd));
 }
 
@@ -251,21 +258,24 @@ smb_fh_xactnp(int fd,
 	int *rdlen, char *rdata,	/* receive */
 	int *more)
 {
-	int		err, rparamcnt;
-	uint16_t	setup[2];
+	smbioc_xnp_t	ioc;
 
-	setup[0] = TRANS_TRANSACT_NAMED_PIPE;
-	setup[1] = 0xFFFF; /* driver replaces this */
-	rparamcnt = 0;
+	/* this gets copyin & copyout */
+	bzero(&ioc, sizeof (ioc));
+	ioc.ioc_fh = -1;	/* tell driver to supply this */
+	ioc.ioc_tdlen = tdlen;
+	ioc.ioc_rdlen = *rdlen;
+	ioc.ioc_more = 0;
+	ioc.ioc_tdata = (char *)tdata;
+	ioc.ioc_rdata = rdata;
 
-	err = smb_t2_request(fd, 2, setup, "\\PIPE\\",
-	    0, NULL,	/* TX paramcnt, params */
-	    tdlen, (void *)tdata,
-	    &rparamcnt, NULL,	/* no RX params */
-	    rdlen, rdata, more);
-
-	if (err)
+	if (nsmb_ioctl(fd, SMBIOC_XACTNP, &ioc) == -1) {
 		*rdlen = 0;
+		return (-1);
+	}
 
-	return (err);
+	*rdlen = ioc.ioc_rdlen;
+	*more  = ioc.ioc_more;
+
+	return (0);
 }

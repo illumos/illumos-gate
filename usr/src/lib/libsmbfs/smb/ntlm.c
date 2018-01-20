@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -184,7 +184,8 @@ ntlm_v1_session_key(uchar_t *ssn_key, const uchar_t *nt_hash)
  */
 int
 ntlm_put_v1_responses(struct smb_ctx *ctx,
-	struct mbdata *lm_mbp, struct mbdata *nt_mbp)
+	struct mbdata *lm_mbp, struct mbdata *nt_mbp,
+	uchar_t *ssn_key)
 {
 	uchar_t *lmresp, *ntresp;
 	int err;
@@ -229,7 +230,7 @@ ntlm_put_v1_responses(struct smb_ctx *ctx,
 	/*
 	 * Compute the session key
 	 */
-	ntlm_v1_session_key(ctx->ct_ssn_key, ctx->ct_nthash);
+	ntlm_v1_session_key(ssn_key, ctx->ct_nthash);
 
 	return (err);
 }
@@ -245,7 +246,8 @@ ntlm_put_v1_responses(struct smb_ctx *ctx,
  */
 int
 ntlm_put_v1x_responses(struct smb_ctx *ctx,
-	struct mbdata *lm_mbp, struct mbdata *nt_mbp)
+	struct mbdata *lm_mbp, struct mbdata *nt_mbp,
+	uchar_t *ssn_key)
 {
 	MD5_CTX context;
 	uchar_t challenges[2 * NTLM_CHAL_SZ];
@@ -299,7 +301,7 @@ ntlm_put_v1x_responses(struct smb_ctx *ctx,
 	/*
 	 * Compute the session key
 	 */
-	ntlm_v1_session_key(ctx->ct_ssn_key, ctx->ct_nthash);
+	ntlm_v1_session_key(ssn_key, ctx->ct_nthash);
 
 	return (err);
 }
@@ -477,7 +479,8 @@ ntlm_v2_session_key(uchar_t *ssn_key,
  */
 int
 ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
-	struct mbdata *lm_mbp, struct mbdata *nt_mbp)
+	struct mbdata *lm_mbp, struct mbdata *nt_mbp,
+	uchar_t *ssn_key)
 {
 	uchar_t *lmresp, *ntresp;
 	int err;
@@ -547,7 +550,7 @@ ntlm_put_v2_responses(struct smb_ctx *ctx, struct mbdata *ti_mbp,
 	/*
 	 * Compute the session key
 	 */
-	ntlm_v2_session_key(ctx->ct_ssn_key, v2hash, ntresp);
+	ntlm_v2_session_key(ssn_key, v2hash, ntresp);
 
 out:
 	if (err) {
@@ -650,37 +653,13 @@ out:
 }
 
 /*
- * Build the MAC key (for SMB signing)
- */
-int
-ntlm_build_mac_key(struct smb_ctx *ctx, struct mbdata *ntresp_mbp)
-{
-	struct mbuf *m;
-	size_t len;
-	char *p;
-
-	/*
-	 * MAC_key = concat(session_key, nt_response)
-	 */
-	m = ntresp_mbp->mb_top;
-	len = NTLM_HASH_SZ + m->m_len;
-	if ((p = malloc(len)) == NULL)
-		return (ENOMEM);
-	ctx->ct_mackeylen = len;
-	ctx->ct_mackey = p;
-	memcpy(p, ctx->ct_ssn_key, NTLM_HASH_SZ);
-	memcpy(p + NTLM_HASH_SZ, m->m_data, m->m_len);
-
-	return (0);
-}
-
-/*
  * Helper for ntlmssp_put_type3 - Build the "key exchange key"
  * used when we have both NTLM(v1) and NTLMSSP_NEGOTIATE_NTLM2.
  * HMAC_MD5(SessionBaseKey, concat(ServerChallenge, LmResponse[0..7]))
  */
 void
-ntlm2_kxkey(struct smb_ctx *ctx, struct mbdata *lm_mbp, uchar_t *kxkey)
+ntlm2_kxkey(struct smb_ctx *ctx, struct mbdata *lm_mbp,
+	uchar_t *ssn_key, uchar_t *kxkey)
 {
 	uchar_t data[NTLM_HASH_SZ];
 	uchar_t *p = mtod(lm_mbp->mb_top, uchar_t *);
@@ -690,6 +669,6 @@ ntlm2_kxkey(struct smb_ctx *ctx, struct mbdata *lm_mbp, uchar_t *kxkey)
 	memcpy(data + NTLM_CHAL_SZ, p, NTLM_CHAL_SZ);
 
 	/* HMAC_MD5(SessionBaseKey, concat(...)) */
-	HMACT64(kxkey, ctx->ct_ssn_key, NTLM_HASH_SZ,
+	HMACT64(kxkey, ssn_key, NTLM_HASH_SZ,
 	    data, NTLM_HASH_SZ);
 }

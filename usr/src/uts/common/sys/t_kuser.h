@@ -98,6 +98,7 @@ extern int	t_kconnect(TIUSER *, struct t_call *, struct t_call *);
 extern int	t_kfree(TIUSER *, char *, int);
 extern int	t_kgetstate(TIUSER *, int *);
 extern int	t_kopen(struct file *, dev_t, int, TIUSER **, struct cred *);
+extern int	t_koptmgmt(TIUSER *, struct t_optmgmt *, struct t_optmgmt *);
 extern int	t_krcvudata(TIUSER *, struct t_kunitdata *, int *, int *);
 extern int	t_ksndudata(TIUSER *, struct t_kunitdata *, frtn_t *);
 extern int	t_kspoll(TIUSER *, int, int, int *);

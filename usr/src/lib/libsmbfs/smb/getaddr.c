@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -56,6 +57,8 @@
 
 #include "charsets.h"
 #include "private.h"
+
+static char smb_port[16] = "445";
 
 void
 dump_addrinfo(struct addrinfo *ai)
@@ -118,7 +121,7 @@ smb_ctx_getaddr(struct smb_ctx *ctx)
 	struct nb_ctx	*nbc = ctx->ct_nb;
 	struct addrinfo hints, *res;
 	char *srvaddr_str;
-	int gaierr, gaierr2;
+	int gaierr;
 
 	if (ctx->ct_fullserver == NULL || ctx->ct_fullserver[0] == '\0')
 		return (EAI_NONAME);
@@ -154,19 +157,26 @@ smb_ctx_getaddr(struct smb_ctx *ctx)
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	gaierr = getaddrinfo(srvaddr_str, NULL, &hints, &res);
+	gaierr = getaddrinfo(srvaddr_str, smb_port, &hints, &res);
 	if (gaierr == 0) {
 		ctx->ct_addrinfo = res;
 		return (0);
 	}
 
 	/*
+	 * If we really want to support NetBIOS, we should add
+	 * an AF_NETBIOS entry to the address list here.
+	 * For now, let's just skip NetBIOS.
+	 * (Can we just kill NetBIOS?  Please? :)
+	 */
+#if 0	/* XXX Just kill NetBIOS? */
+	/*
 	 * If regular IP name lookup failed, try NetBIOS,
 	 * but only if given a valid NetBIOS name and if
 	 * NetBIOS name lookup is enabled.
 	 */
 	if (nbc->nb_flags & NBCF_NS_ENABLE) {
-		gaierr2 = nbns_getaddrinfo(ctx->ct_fullserver, nbc, &res);
+		int gaierr2 = nbns_getaddrinfo(ctx->ct_fullserver, nbc, &res);
 		if (gaierr2 == 0) {
 			if (res->ai_canonname)
 				strlcpy(ctx->ct_srvname,
@@ -176,6 +186,7 @@ smb_ctx_getaddr(struct smb_ctx *ctx)
 			return (0);
 		}
 	}
+#endif
 
 	/*
 	 * Return the original error from getaddrinfo

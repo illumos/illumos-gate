@@ -31,9 +31,10 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _PRIVATE_H
@@ -59,60 +60,6 @@ extern void dprint(const char *, const char *, ...)
 #else
 #define	DPRINT(...) ((void)0)
 #endif
-
-/*
- * Flags bits in ct_vcflags (copied from smb_conn.h)
- * Pass these to the driver?
- */
-#define	SMBV_RECONNECTING	0x0002	/* conn in process of reconnection */
-#define	SMBV_LONGNAMES		0x0004	/* conn configured to use long names */
-#define	SMBV_ENCRYPT		0x0008	/* server demands encrypted password */
-#define	SMBV_WIN95		0x0010	/* used to apply bugfixes for this OS */
-#define	SMBV_NT4		0x0020	/* used when NT4 issues invalid resp */
-#define	SMBV_UNICODE		0x0040	/* conn configured to use Unicode */
-#define	SMBV_EXT_SEC		0x0080	/* conn to use extended security */
-#define	SMBV_WILL_SIGN		0x0100	/* negotiated signing */
-
-/*
- * request handling structures
- */
-struct smb_rq {
-	struct smb_ctx *rq_ctx;
-	struct mbdata	rq_rq;
-	struct mbdata	rq_rp;
-	int		rq_rpbufsz;
-	uint8_t		rq_cmd;
-	uint8_t		rq_hflags;
-	uint16_t	rq_hflags2;
-	uint32_t	rq_status;
-	uint16_t	rq_uid;
-	uint16_t	rq_tid;
-	uint16_t	rq_mid;
-	uint32_t	rq_seqno;
-	/* See rq_[bw]{start,end} functions */
-	char		*rq_wcntp;
-	int		rq_wcbase;
-	char		*rq_bcntp;
-	int		rq_bcbase;
-};
-typedef struct smb_rq smb_rq_t;
-
-#define	smb_rq_getrequest(rqp)	(&(rqp)->rq_rq)
-#define	smb_rq_getreply(rqp)	(&(rqp)->rq_rp)
-
-int  smb_rq_init(struct smb_ctx *, uchar_t, struct smb_rq **);
-void smb_rq_done(struct smb_rq *);
-void smb_rq_bstart(struct smb_rq *);
-void smb_rq_bend(struct smb_rq *);
-void smb_rq_wstart(struct smb_rq *);
-void smb_rq_wend(struct smb_rq *);
-int  smb_rq_simple(struct smb_rq *);
-int  smb_rq_dmem(struct mbdata *, const char *, size_t);
-int  smb_rq_internal(struct smb_ctx *, struct smb_rq *);
-void smb_rq_sign(struct smb_rq *);
-int  smb_rq_verify(struct smb_rq *);
-int  smb_t2_request(int, int, uint16_t *, const char *,
-	int, void *, int, void *, int *, void *, int *, void *, int *);
 
 /*
  * This library extends the mchain.h function set a little.
@@ -174,16 +121,7 @@ int smb_ctx_getaddr(struct smb_ctx *ctx);
 int smb_ctx_gethandle(struct smb_ctx *ctx);
 
 int  smb_iod_start(struct smb_ctx *);
-
-int smb_ssn_send(struct smb_ctx *, struct mbdata *);
-int smb_ssn_recv(struct smb_ctx *, struct mbdata *);
-
-int smb_negprot(struct smb_ctx *, struct mbdata *);
-
-int smb_ssnsetup_null(struct smb_ctx *);
-int smb_ssnsetup_ntlm1(struct smb_ctx *);
-int smb_ssnsetup_ntlm2(struct smb_ctx *);
-int smb_ssnsetup_spnego(struct smb_ctx *, struct mbdata *);
+const char *smb_iod_state_name(enum smbiod_state st);
 
 void smb_time_local2server(struct timeval *, int, long *);
 void smb_time_server2local(ulong_t, int, struct timeval *);

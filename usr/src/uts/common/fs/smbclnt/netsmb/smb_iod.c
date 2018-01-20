@@ -36,7 +36,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifdef DEBUG
@@ -74,6 +74,14 @@
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_tran.h>
 #include <netsmb/smb_trantcp.h>
+
+/*
+ * SMB messages are up to 64K.
+ * Let's leave room for two.
+ */
+static int smb_tcpsndbuf = 0x20000;
+static int smb_tcprcvbuf = 0x20000;
+static int smb_connect_timeout = 10; /* seconds */
 
 int smb_iod_send_echo(smb_vc_t *);
 
@@ -203,13 +211,14 @@ smb_iod_sendrq(struct smb_rq *rqp)
 	ASSERT(RW_READ_HELD(&vcp->iod_rqlock));
 
 	/*
-	 * Note: Anything special for SMBR_INTERNAL here?
+	 * Internal requests are allowed in any state;
+	 * otherwise should be active.
 	 */
-	if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
+	if ((rqp->sr_flags & SMBR_INTERNAL) == 0 &&
+	    vcp->vc_state != SMBIOD_ST_VCACTIVE) {
 		SMBIODEBUG("bad vc_state=%d\n", vcp->vc_state);
 		return (ENOTCONN);
 	}
-
 
 	/*
 	 * On the first send, set the MID and (maybe)
@@ -220,12 +229,16 @@ smb_iod_sendrq(struct smb_rq *rqp)
 
 		rqp->sr_mid = vcp->vc_next_mid++;
 
-		if (rqp->sr_rqflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+		if (vcp->vc_mackey != NULL && (rqp->sr_rqflags2 &
+		    SMB_FLAGS2_SECURITY_SIGNATURE) != 0) {
 			/*
 			 * We're signing requests and verifying
 			 * signatures on responses.  Set the
 			 * sequence numbers of the request and
 			 * response here, used in smb_rq_verify.
+			 * Note we have the signing flag during
+			 * session setup but no key yet, and
+			 * don't want sequence numbers there.
 			 */
 			rqp->sr_seqno = vcp->vc_next_seq++;
 			rqp->sr_rseqno = vcp->vc_next_seq++;
@@ -258,12 +271,8 @@ smb_iod_sendrq(struct smb_rq *rqp)
 	 */
 	m = copymsg(rqp->sr_rq.mb_top);
 
-#ifdef DTRACE_PROBE
 	DTRACE_PROBE2(smb_iod_sendrq,
 	    (smb_rq_t *), rqp, (mblk_t *), m);
-#else
-	SMBIODEBUG("M:%04x, P:%04x, U:%04x, T:%04x\n", rqp->sr_mid, 0, 0, 0);
-#endif
 	m_dumpm(m);
 
 	if (m != NULL) {
@@ -294,12 +303,6 @@ smb_iod_sendrq(struct smb_rq *rqp)
 	}
 	if (error)
 		SMBSDEBUG("TRAN_SEND returned non-fatal error %d\n", error);
-
-#ifdef APPLE
-	/* If proc waiting on rqp was signaled... */
-	if (smb_rq_intr(rqp))
-		smb_iod_rqprocessed(rqp, EINTR, 0);
-#endif
 
 	return (0);
 }
@@ -341,15 +344,14 @@ top:
 /*
  * Process incoming packets
  *
- * This is the "reader" loop, run by the IOD thread
- * while in state SMBIOD_ST_VCACTIVE.  The loop now
- * simply blocks in the socket recv until either a
- * message arrives, or a disconnect.
+ * This is the "reader" loop, run by the IOD thread.  Normally we're in
+ * state SMBIOD_ST_VCACTIVE here, but during reconnect we're called in
+ * other states with poll==TRUE
  *
- * Any non-zero error means the IOD should terminate.
+ * A non-zero error return here causes the IOD work loop to terminate.
  */
 int
-smb_iod_recvall(struct smb_vc *vcp)
+smb_iod_recvall(struct smb_vc *vcp, boolean_t poll)
 {
 	struct smb_rq *rqp;
 	mblk_t *m;
@@ -364,12 +366,6 @@ smb_iod_recvall(struct smb_vc *vcp)
 		 * or is asking the IOD to terminate.
 		 */
 
-		if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
-			SMBIODEBUG("bad vc_state=%d\n", vcp->vc_state);
-			error = 0;
-			break;
-		}
-
 		if (vcp->iod_flags & SMBIOD_SHUTDOWN) {
 			SMBIODEBUG("SHUTDOWN set\n");
 			/* This IOD thread will terminate. */
@@ -383,6 +379,13 @@ smb_iod_recvall(struct smb_vc *vcp)
 
 		m = NULL;
 		error = smb_iod_recv1(vcp, &m);
+
+		/*
+		 * Internal requests (reconnecting) call this in a loop
+		 * (with poll==TRUE) until the request completes.
+		 */
+		if (error == ETIME && poll)
+			break;
 
 		if (error == ETIME &&
 		    vcp->iod_rqlist.tqh_first != NULL) {
@@ -417,16 +420,17 @@ smb_iod_recvall(struct smb_vc *vcp)
 			continue;
 		} /* ETIME && requests in queue */
 
-		if (error == ETIME) {
+		if (error == ETIME) {	/* and req list empty */
 			/*
 			 * If the IOD thread holds the last reference
-			 * to this VC, let the IOD thread terminate.
+			 * to this VC, let it become IDLE, and then
+			 * let it be destroyed if not used.
 			 */
 			if (vcp->vc_co.co_usecount > 1)
 				continue;
 			SMB_VC_LOCK(vcp);
 			if (vcp->vc_co.co_usecount == 1) {
-				smb_iod_newstate(vcp, SMBIOD_ST_DEAD);
+				smb_iod_newstate(vcp, SMBIOD_ST_IDLE);
 				SMB_VC_UNLOCK(vcp);
 				error = 0;
 				break;
@@ -442,17 +446,16 @@ smb_iod_recvall(struct smb_vc *vcp)
 			 * It's dangerous to continue here.
 			 * (possible infinite loop!)
 			 *
-			 * If we have requests enqueued, next
-			 * state is reconnecting, else idle.
+			 * If this VC has shares, try reconnect;
+			 * otherwise let this VC die now.
 			 */
-			int state;
 			SMB_VC_LOCK(vcp);
-			state = (vcp->iod_rqlist.tqh_first != NULL) ?
-			    SMBIOD_ST_RECONNECT : SMBIOD_ST_IDLE;
-			smb_iod_newstate(vcp, state);
+			if (vcp->vc_co.co_usecount > 1)
+				smb_iod_newstate(vcp, SMBIOD_ST_RECONNECT);
+			else
+				smb_iod_newstate(vcp, SMBIOD_ST_DEAD);
 			cv_broadcast(&vcp->vc_statechg);
 			SMB_VC_UNLOCK(vcp);
-			error = 0;
 			break;
 		}
 
@@ -514,11 +517,18 @@ smb_iod_recvall(struct smb_vc *vcp)
 			if (cmd != SMB_COM_ECHO)
 				SMBSDEBUG("drop resp: mid %d, cmd %d\n",
 				    (uint_t)mid, cmd);
-/*			smb_printrqlist(vcp); */
 			m_freem(m);
 		}
 		rw_exit(&vcp->iod_rqlock);
 
+		/*
+		 * Reconnect calls this in a loop with poll=TRUE
+		 * We've received a response, so break now.
+		 */
+		if (poll) {
+			error = 0;
+			break;
+		}
 	}
 
 	return (error);
@@ -565,21 +575,11 @@ smb_iod_addrq(struct smb_rq *rqp)
 	ASSERT(rqp->sr_cred);
 
 	/*
-	 * State should be correct after the check in
-	 * smb_rq_enqueue(), but we dropped locks...
-	 */
-	if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
-		SMBIODEBUG("bad vc_state=%d\n", vcp->vc_state);
-		return (ENOTCONN);
-	}
-
-	/*
 	 * Requests from the IOD itself are marked _INTERNAL,
 	 * and get some special treatment to avoid blocking
 	 * the reader thread (so we don't deadlock).
 	 * The request is not yet on the queue, so we can
 	 * modify it's state here without locks.
-	 * Only thing using this now is ECHO.
 	 */
 	rqp->sr_owner = curthread;
 	if (rqp->sr_owner == vcp->iod_thr) {
@@ -619,6 +619,15 @@ smb_iod_addrq(struct smb_rq *rqp)
 			smb_iod_removerq(rqp);
 
 		return (error);
+	} else {
+		/*
+		 * State should be correct after the check in
+		 * smb_rq_enqueue(), but we dropped locks...
+		 */
+		if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
+			SMBIODEBUG("bad vc_state=%d\n", vcp->vc_state);
+			return (ENOTCONN);
+		}
 	}
 
 	rw_enter(&vcp->iod_rqlock, RW_WRITER);
@@ -722,9 +731,24 @@ smb_iod_waitrq(struct smb_rq *rqp)
 	int error, rc;
 
 	if (rqp->sr_flags & SMBR_INTERNAL) {
+		int timeleft = rqp->sr_timo;
+
 		ASSERT((rqp->sr_flags & SMBR_MULTIPACKET) == 0);
+	again:
+		smb_iod_sendall(vcp);
+		error = smb_iod_recvall(vcp, B_TRUE);
+		if (error == ETIME) {
+			/* We waited SMB_NBTIMO sec. */
+			timeleft -= SMB_NBTIMO;
+			if (timeleft > 0)
+				goto again;
+		}
+
 		smb_iod_removerq(rqp);
-		return (EAGAIN);
+		if (rqp->sr_state != SMBRQ_NOTIFIED)
+			error = ETIME;
+
+		return (error);
 	}
 
 	/*
@@ -797,17 +821,8 @@ smb_iod_waitrq(struct smb_rq *rqp)
 			goto out;
 		}
 		if (tr < 0) {
-#ifdef DTRACE_PROBE1
 			DTRACE_PROBE1(smb_iod_waitrq1,
 			    (smb_rq_t *), rqp);
-#endif
-#ifdef NOT_YET
-			/* Want this to go ONLY to the user. */
-			uprintf("SMB server %s has not responded"
-			    " to request %d after %d seconds..."
-			    " (still waiting).\n", vcp->vc_srvname,
-			    rqp->sr_mid, smb_timo_notice);
-#endif
 		}
 	}
 
@@ -826,17 +841,8 @@ smb_iod_waitrq(struct smb_rq *rqp)
 			goto out;
 		}
 		if (tr < 0) {
-#ifdef DTRACE_PROBE
 			DTRACE_PROBE1(smb_iod_waitrq2,
 			    (smb_rq_t *), rqp);
-#endif
-#ifdef NOT_YET
-			/* Want this to go ONLY to the user. */
-			uprintf("SMB server %s has not responded"
-			    " to request %d after %d seconds..."
-			    " (giving up).\n", vcp->vc_srvname,
-			    rqp->sr_mid, rqp->sr_timo);
-#endif
 			error = ETIME;
 			goto out;
 		}
@@ -930,11 +936,6 @@ smb_iod_sendall(smb_vc_t *vcp)
 	error = muxcnt = 0;
 	TAILQ_FOREACH(rqp, &vcp->iod_rqlist, sr_link) {
 
-		if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
-			error = ENOTCONN; /* stop everything! */
-			break;
-		}
-
 		if (rqp->sr_state == SMBRQ_NOTSENT) {
 			error = smb_iod_sendrq(rqp);
 			if (error)
@@ -960,10 +961,180 @@ smb_iod_sendall(smb_vc_t *vcp)
 	rw_exit(&vcp->iod_rqlock);
 }
 
+/*
+ * Ioctl functions called by the user-level I/O Deamon (IOD)
+ * to bring up and service a connection to some SMB server.
+ */
+
 int
-smb_iod_vc_work(struct smb_vc *vcp, cred_t *cr)
+nsmb_iod_connect(struct smb_vc *vcp)
 {
-	struct file *fp = NULL;
+	int err, val;
+
+	ASSERT(vcp->iod_thr == curthread);
+
+	if (vcp->vc_state != SMBIOD_ST_RECONNECT) {
+		cmn_err(CE_NOTE, "iod_connect: bad state %d", vcp->vc_state);
+		return (EINVAL);
+	}
+
+	/*
+	 * Set various options on this endpoint.
+	 * Keep going in spite of errors.
+	 */
+	val = smb_tcpsndbuf;
+	err = SMB_TRAN_SETPARAM(vcp, SMBTP_SNDBUF, &val);
+	if (err != 0) {
+		cmn_err(CE_NOTE, "iod_connect: setopt SNDBUF, err=%d", err);
+	}
+	val = smb_tcprcvbuf;
+	err = SMB_TRAN_SETPARAM(vcp, SMBTP_RCVBUF, &val);
+	if (err != 0) {
+		cmn_err(CE_NOTE, "iod_connect: setopt RCVBUF, err=%d", err);
+	}
+	val = 1;
+	err = SMB_TRAN_SETPARAM(vcp, SMBTP_KEEPALIVE, &val);
+	if (err != 0) {
+		cmn_err(CE_NOTE, "iod_connect: setopt KEEPALIVE, err=%d", err);
+	}
+	val = 1;
+	err = SMB_TRAN_SETPARAM(vcp, SMBTP_TCP_NODELAY, &val);
+	if (err != 0) {
+		cmn_err(CE_NOTE, "iod_connect: setopt TCP_NODELAY, err=%d", err);
+	}
+	val = smb_connect_timeout * 1000;
+	err = SMB_TRAN_SETPARAM(vcp, SMBTP_TCP_CON_TMO, &val);
+	if (err != 0) {
+		cmn_err(CE_NOTE, "iod_connect: setopt TCP con tmo, err=%d", err);
+	}
+
+	/*
+	 * Bind and connect
+	 */
+	err = SMB_TRAN_BIND(vcp, NULL);
+	if (err != 0) {
+		cmn_err(CE_NOTE, "iod_connect: t_kbind: err=%d", err);
+		/* Continue on and try connect. */
+	}
+	err = SMB_TRAN_CONNECT(vcp, &vcp->vc_srvaddr.sa);
+	/*
+	 * No cmn_err here, as connect failures are normal, i.e.
+	 * when a server has multiple addresses and only some are
+	 * routed for us. (libsmbfs tries them all)
+	 */
+	if (err == 0) {
+		SMB_VC_LOCK(vcp);
+		smb_iod_newstate(vcp, SMBIOD_ST_CONNECTED);
+		SMB_VC_UNLOCK(vcp);
+	} /* else stay in state reconnect */
+
+	return (err);
+}
+
+/*
+ * Do the whole SMB1/SMB2 negotiate
+ */
+int
+nsmb_iod_negotiate(struct smb_vc *vcp, cred_t *cr)
+{
+	struct smb_sopt *sv = &vcp->vc_sopt;
+	smb_cred_t scred;
+	int err = 0;
+
+	ASSERT(vcp->iod_thr == curthread);
+
+	if (vcp->vc_state != SMBIOD_ST_CONNECTED) {
+		cmn_err(CE_NOTE, "iod_negotiate: bad state %d", vcp->vc_state);
+		return (EINVAL);
+	}
+
+	/*
+	 * (Re)init negotiated values
+	 */
+	bzero(sv, sizeof (*sv));
+	vcp->vc_next_seq = 0;
+
+	/*
+	 * If this was reconnect, get rid of the old MAC key
+	 * and session key.
+	 */
+	SMB_VC_LOCK(vcp);
+	if (vcp->vc_mackey != NULL) {
+		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
+		vcp->vc_mackey = NULL;
+		vcp->vc_mackeylen = 0;
+	}
+	if (vcp->vc_ssnkey != NULL) {
+		kmem_free(vcp->vc_ssnkey, vcp->vc_ssnkeylen);
+		vcp->vc_ssnkey = NULL;
+		vcp->vc_ssnkeylen = 0;
+	}
+	SMB_VC_UNLOCK(vcp);
+
+	smb_credinit(&scred, cr);
+	err = smb_smb_negotiate(vcp, &scred);
+	smb_credrele(&scred);
+
+	if (err == 0) {
+		SMB_VC_LOCK(vcp);
+		smb_iod_newstate(vcp, SMBIOD_ST_NEGOTIATED);
+		SMB_VC_UNLOCK(vcp);
+	}
+	/*
+	 * (else) leave state as it was.
+	 * User-level will report this error
+	 * and close this device handle.
+	 */
+
+	return (err);
+}
+
+/*
+ * Do either SMB1 or SMB2 session setup.
+ */
+int
+nsmb_iod_ssnsetup(struct smb_vc *vcp, cred_t *cr)
+{
+	smb_cred_t scred;
+	int err;
+
+	ASSERT(vcp->iod_thr == curthread);
+
+	switch (vcp->vc_state) {
+	case SMBIOD_ST_NEGOTIATED:
+	case SMBIOD_ST_AUTHCONT:
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	smb_credinit(&scred, cr);
+	// XXX if SMB1 else ...
+	err = smb_smb_ssnsetup(vcp, &scred);
+	smb_credrele(&scred);
+
+	SMB_VC_LOCK(vcp);
+	switch (err) {
+	case 0:
+		smb_iod_newstate(vcp, SMBIOD_ST_AUTHOK);
+		break;
+	case EINPROGRESS:	/* MORE_PROCESSING_REQUIRED */
+		smb_iod_newstate(vcp, SMBIOD_ST_AUTHCONT);
+		break;
+	default:
+		smb_iod_newstate(vcp, SMBIOD_ST_AUTHFAIL);
+		break;
+	}
+	SMB_VC_UNLOCK(vcp);
+
+	return (err);
+}
+
+/* ARGSUSED */
+int
+smb_iod_vc_work(struct smb_vc *vcp, int flags, cred_t *cr)
+{
+	smbioc_ssn_work_t *wk = &vcp->vc_work;
 	int err = 0;
 
 	/*
@@ -973,19 +1144,54 @@ smb_iod_vc_work(struct smb_vc *vcp, cred_t *cr)
 	ASSERT(vcp->iod_thr == curthread);
 
 	/*
-	 * Get the network transport file pointer,
-	 * and "loan" it to our transport module.
+	 * Should be in state...
 	 */
-	if ((fp = getf(vcp->vc_tran_fd)) == NULL) {
-		err = EBADF;
-		goto out;
+	if (vcp->vc_state != SMBIOD_ST_AUTHOK) {
+		cmn_err(CE_NOTE, "iod_vc_work: bad state %d", vcp->vc_state);
+		return (EINVAL);
 	}
-	if ((err = SMB_TRAN_LOAN_FP(vcp, fp, cr)) != 0)
-		goto out;
 
 	/*
-	 * In case of reconnect, tell any enqueued requests
-	 * then can GO!
+	 * Update the session key and initialize SMB signing.
+	 *
+	 * This implementation does not use multiple SMB sessions per
+	 * TCP connection (where only the first session key is used)
+	 * so we always have a new session key here.  Sanity check the
+	 * length from user space.  Normally 16 or 32.
+	 */
+	if (wk->wk_u_ssnkey_len > 1024) {
+		cmn_err(CE_NOTE, "iod_vc_work: ssn key too long");
+		return (EINVAL);
+	}
+
+	ASSERT(vcp->vc_ssnkey == NULL);
+	SMB_VC_LOCK(vcp);
+	if (wk->wk_u_ssnkey_len != 0 &&
+	    wk->wk_u_ssnkey_buf.lp_ptr != NULL) {
+		vcp->vc_ssnkeylen = wk->wk_u_ssnkey_len;
+		vcp->vc_ssnkey = kmem_alloc(vcp->vc_ssnkeylen, KM_SLEEP);
+		if (ddi_copyin(wk->wk_u_ssnkey_buf.lp_ptr,
+		    vcp->vc_ssnkey, vcp->vc_ssnkeylen, flags) != 0) {
+			err = EFAULT;
+		}
+	}
+	SMB_VC_UNLOCK(vcp);
+	if (err)
+		return (err);
+
+	/*
+	 * If we have a session key, derive the MAC key for SMB signing.
+	 * If this was a NULL session, we might have no session key.
+	 */
+	ASSERT(vcp->vc_mackey == NULL);
+	if (vcp->vc_ssnkey != NULL) {
+		err = smb_sign_init(vcp);
+		if (err != 0)
+			return (err);
+	}
+
+	/*
+	 * Tell any enqueued requests they can start.
 	 */
 	SMB_VC_LOCK(vcp);
 	vcp->vc_genid++;	/* possibly new connection */
@@ -1006,7 +1212,7 @@ smb_iod_vc_work(struct smb_vc *vcp, cred_t *cr)
 	/*
 	 * Run the "reader" loop.
 	 */
-	err = smb_iod_recvall(vcp);
+	err = smb_iod_recvall(vcp, B_FALSE);
 
 	/*
 	 * The reader loop returned, so we must have a
@@ -1026,13 +1232,6 @@ smb_iod_vc_work(struct smb_vc *vcp, cred_t *cr)
 	 * Tell any requests to give up or restart.
 	 */
 	smb_iod_invrq(vcp);
-
-out:
-	/* Recall the file descriptor loan. */
-	(void) SMB_TRAN_LOAN_FP(vcp, NULL, cr);
-	if (fp != NULL) {
-		releasef(vcp->vc_tran_fd);
-	}
 
 	return (err);
 }
@@ -1092,10 +1291,6 @@ smb_iod_vc_rcfail(struct smb_vc *vcp)
 	 * IOD thread for this VC.
 	 */
 	ASSERT(vcp->iod_thr == curthread);
-
-	if (vcp->vc_state != SMBIOD_ST_RECONNECT)
-		return (EINVAL);
-
 	SMB_VC_LOCK(vcp);
 
 	smb_iod_newstate(vcp, SMBIOD_ST_RCFAILED);
@@ -1111,7 +1306,13 @@ smb_iod_vc_rcfail(struct smb_vc *vcp)
 	if (tr == 0)
 		err = EINTR;
 
-	smb_iod_newstate(vcp, SMBIOD_ST_IDLE);
+	/*
+	 * While we were waiting on the CV, the state might have
+	 * changed to reconnect.  If so, leave that; otherwise
+	 * go to state idle until the next request.
+	 */
+	if (vcp->vc_state == SMBIOD_ST_RCFAILED)
+		smb_iod_newstate(vcp, SMBIOD_ST_IDLE);
 	cv_broadcast(&vcp->vc_statechg);
 
 	SMB_VC_UNLOCK(vcp);
@@ -1138,6 +1339,10 @@ again:
 		/* FALLTHROUGH */
 
 	case SMBIOD_ST_RECONNECT:
+	case SMBIOD_ST_CONNECTED:
+	case SMBIOD_ST_NEGOTIATED:
+	case SMBIOD_ST_AUTHCONT:
+	case SMBIOD_ST_AUTHOK:
 		rv = cv_wait_sig(&vcp->vc_statechg, &vcp->vc_lock);
 		if (rv == 0) {
 			err = EINTR;
@@ -1149,6 +1354,7 @@ again:
 		err = 0; /* success! */
 		break;
 
+	case SMBIOD_ST_AUTHFAIL:
 	case SMBIOD_ST_RCFAILED:
 	case SMBIOD_ST_DEAD:
 	default:
