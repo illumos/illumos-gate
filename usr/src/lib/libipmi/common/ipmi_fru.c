@@ -22,9 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 2017, Joyent, Inc.
+ */
 #include <libipmi.h>
 #include <string.h>
 
@@ -35,6 +35,13 @@
  * u, which must be an unsigned integer.
  */
 #define	BITX(u, h, l)	(((u) >> (l)) & ((1LU << ((h) - (l) + 1LU)) - 1LU))
+
+/*
+ * The default and minimum size in bytes that will be used when reading
+ * the FRU inventory area.
+ */
+#define	DEF_CHUNK_SZ	128
+#define	MIN_CHUNK_SZ	16
 
 typedef struct ipmi_fru_read
 {
@@ -52,7 +59,8 @@ int
 ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 {
 	ipmi_cmd_t cmd, *resp;
-	uint8_t count, devid;
+	int ierrno;
+	uint8_t count, devid, chunksz;
 	uint16_t sz, offset = 0;
 	ipmi_fru_read_t cmd_data_in;
 	char *tmp;
@@ -82,14 +90,15 @@ ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 		return (-1);
 	}
 
+	chunksz = DEF_CHUNK_SZ;
 	while (offset < sz) {
 		cmd_data_in.ifr_devid = devid;
 		cmd_data_in.ifr_offset_lsb = BITX(offset, 7, 0);
 		cmd_data_in.ifr_offset_msb = BITX(offset, 15, 8);
-		if ((sz - offset) < 128)
+		if ((sz - offset) < chunksz)
 			cmd_data_in.ifr_count = sz - offset;
 		else
-			cmd_data_in.ifr_count = 128;
+			cmd_data_in.ifr_count = chunksz;
 
 		cmd.ic_netfn = IPMI_NETFN_STORAGE;
 		cmd.ic_cmd = IPMI_CMD_READ_FRU_DATA;
@@ -97,7 +106,24 @@ ipmi_fru_read(ipmi_handle_t *ihp, ipmi_sdr_fru_locator_t *fru_loc, char **buf)
 		cmd.ic_dlen = sizeof (ipmi_fru_read_t);
 		cmd.ic_lun = 0;
 
+		/*
+		 * The FRU area must be read in chunks as its total size will
+		 * be larger than what would fit in a single message.  The
+		 * maximum size of a message can vary between platforms so
+		 * if while attempting to read a chunk we receive an error code
+		 * indicating that the requested chunk size is invalid, we will
+		 * perform a reverse exponential backoff of the chunk size until
+		 * either the read succeeds or we hit bottom, at which point
+		 * we'll fail the operation.
+		 */
 		if ((resp = ipmi_send(ihp, &cmd)) == NULL) {
+			ierrno = ipmi_errno(ihp);
+			if (chunksz > MIN_CHUNK_SZ &&
+			    (ierrno == EIPMI_DATA_LENGTH_EXCEEDED ||
+			    ierrno == EIPMI_INVALID_REQUEST)) {
+				chunksz = chunksz >> 1;
+				continue;
+			}
 			free(tmp);
 			return (-1);
 		}

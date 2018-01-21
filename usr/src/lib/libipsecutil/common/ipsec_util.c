@@ -2602,12 +2602,15 @@ print_kmc(FILE *file, char *prefix, struct sadb_x_kmc *kmc)
 			cookie_label =
 			    dgettext(TEXT_DOMAIN, "<Label not found.>");
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
+		    "%s Protocol %u, cookie=\"%s\" (%u)\n"), prefix,
 		    kmc->sadb_x_kmc_proto, cookie_label,
 		    kmc->sadb_x_kmc_cookie);
 		return;
+	case SADB_X_KMP_KINK:
+		cookie_label = dgettext(TEXT_DOMAIN, "KINK:");
+		break;
 	case SADB_X_KMP_MANUAL:
-		cookie_label = dgettext(TEXT_DOMAIN, "Manual SA with cookie");
+		cookie_label = dgettext(TEXT_DOMAIN, "Manual SA with cookie:");
 		break;
 	/* case SADB_X_KMP_IKEV2: */
 	default:
@@ -2616,9 +2619,12 @@ print_kmc(FILE *file, char *prefix, struct sadb_x_kmc *kmc)
 		break;
 	}
 
-	/* XXX KEBE ASKS... htonll() on generic kmc_cookie? */
+	/*
+	 * Assume native-byte-order printing for now.  Exceptions (like
+	 * byte-swapping) should be handled in per-KM-protocol cases above.
+	 */
 	(void) fprintf(file, dgettext(TEXT_DOMAIN,
-	    "%sProtocol %u, cookie=\"%s\" (0x%"PRIx64"/%"PRIu64")\n"),
+	    "%s Protocol %u, cookie=\"%s\" (0x%"PRIx64"/%"PRIu64")\n"),
 	    prefix, kmc->sadb_x_kmc_proto, cookie_label,
 	    kmc->sadb_x_kmc_cookie64, kmc->sadb_x_kmc_cookie64);
 }

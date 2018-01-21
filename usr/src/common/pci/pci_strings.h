@@ -28,8 +28,6 @@
 #ifndef _PCI_STRINGS_H
 #define	_PCI_STRINGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

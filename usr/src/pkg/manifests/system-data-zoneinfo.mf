@@ -10,13 +10,13 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
 # Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2017.3,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2018.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -64,6 +64,7 @@ file path=usr/share/lib/zoneinfo/Africa/Maputo
 file path=usr/share/lib/zoneinfo/Africa/Monrovia
 file path=usr/share/lib/zoneinfo/Africa/Nairobi
 file path=usr/share/lib/zoneinfo/Africa/Ndjamena
+file path=usr/share/lib/zoneinfo/Africa/Sao_Tome
 file path=usr/share/lib/zoneinfo/Africa/Tripoli
 file path=usr/share/lib/zoneinfo/Africa/Tunis
 file path=usr/share/lib/zoneinfo/Africa/Windhoek
@@ -460,7 +461,6 @@ file path=usr/share/lib/zoneinfo/src/etcetera
 file path=usr/share/lib/zoneinfo/src/europe
 file path=usr/share/lib/zoneinfo/src/factory
 file path=usr/share/lib/zoneinfo/src/northamerica
-file path=usr/share/lib/zoneinfo/src/pacificnew
 file path=usr/share/lib/zoneinfo/src/southamerica
 file path=usr/share/lib/zoneinfo/src/systemv
 file path=usr/share/lib/zoneinfo/tab/continent.tab
@@ -505,7 +505,6 @@ hardlink path=usr/share/lib/zoneinfo/Africa/Nouakchott \
 hardlink path=usr/share/lib/zoneinfo/Africa/Ouagadougou \
     target=../Africa/Abidjan
 hardlink path=usr/share/lib/zoneinfo/Africa/Porto-Novo target=../Africa/Lagos
-hardlink path=usr/share/lib/zoneinfo/Africa/Sao_Tome target=../Africa/Abidjan
 hardlink path=usr/share/lib/zoneinfo/Africa/Timbuktu target=../Africa/Abidjan
 hardlink path=usr/share/lib/zoneinfo/America/Antigua \
     target=../America/Port_of_Spain
@@ -709,8 +708,6 @@ hardlink path=usr/share/lib/zoneinfo/US/Indiana-Starke \
 hardlink path=usr/share/lib/zoneinfo/US/Michigan target=../America/Detroit
 hardlink path=usr/share/lib/zoneinfo/US/Mountain target=../America/Denver
 hardlink path=usr/share/lib/zoneinfo/US/Pacific target=../America/Los_Angeles
-hardlink path=usr/share/lib/zoneinfo/US/Pacific-New \
-    target=../America/Los_Angeles
 hardlink path=usr/share/lib/zoneinfo/US/Samoa target=../Pacific/Pago_Pago
 hardlink path=usr/share/lib/zoneinfo/UTC target=Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/Universal target=Etc/UTC
