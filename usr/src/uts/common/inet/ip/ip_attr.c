@@ -909,6 +909,11 @@ ixa_safe_copy(ip_xmit_attr_t *src, ip_xmit_attr_t *ixa)
 	 */
 	if (ixa->ixa_free_flags & IXA_FREE_CRED)
 		crhold(ixa->ixa_cred);
+
+	/*
+	 * There is no cleanup in progress on this new copy.
+	 */
+	ixa->ixa_tcpcleanup = IXATC_IDLE;
 }
 
 /*

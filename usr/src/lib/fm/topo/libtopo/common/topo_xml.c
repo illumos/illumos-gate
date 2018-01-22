@@ -244,35 +244,7 @@ const char *name)
 	case TOPO_TYPE_UINT32_ARRAY:
 	case TOPO_TYPE_INT64_ARRAY:
 	case TOPO_TYPE_UINT64_ARRAY:
-		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next)
-			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
-			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0))
-				nelems++;
-
-		if (nelems < 1) {
-			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "No <propitem> "
-			    "or <argitem> elements found for array val");
-			return (-1);
-		}
-		if ((arrbuf = topo_mod_alloc(mp, (nelems * sizeof (uint64_t))))
-		    == NULL)
-			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
-		break;
 	case TOPO_TYPE_STRING_ARRAY:
-		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next)
-			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
-			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0))
-				nelems++;
-
-		if (nelems < 1) {
-			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "No <propitem> "
-			    "or <argitem> elements found for array val");
-			return (-1);
-		}
-		if ((strarrbuf = topo_mod_alloc(mp, (nelems * sizeof (char *))))
-		    == NULL)
-			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
-		break;
 	case TOPO_TYPE_FMRI_ARRAY:
 		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next)
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
@@ -281,12 +253,9 @@ const char *name)
 
 		if (nelems < 1) {
 			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "No <propitem> "
-			    "elements found for array prop");
+			    "or <argitem> elements found for array val");
 			return (-1);
 		}
-		if ((nvlarrbuf = topo_mod_alloc(mp, (nelems *
-		    sizeof (nvlist_t *)))) == NULL)
-			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
 		break;
 	default:
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
@@ -296,11 +265,14 @@ const char *name)
 
 	switch (ptype) {
 	case TOPO_TYPE_INT32_ARRAY:
+		if ((arrbuf = topo_mod_alloc(mp, (nelems * sizeof (int32_t))))
+		    == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
 		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				if ((str = xmlGetProp(cn, (xmlChar *)Value))
 				    == NULL)
 					return (-1);
 
@@ -312,14 +284,17 @@ const char *name)
 
 		rv = nvlist_add_int32_array(nvl, name, (int32_t *)arrbuf,
 		    nelems);
-		free(arrbuf);
+		topo_mod_free(mp, arrbuf, (nelems * sizeof (int32_t)));
 		break;
 	case TOPO_TYPE_UINT32_ARRAY:
+		if ((arrbuf = topo_mod_alloc(mp, (nelems * sizeof (uint32_t))))
+		    == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
 		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				if ((str = xmlGetProp(cn, (xmlChar *)Value))
 				    == NULL)
 					return (-1);
 
@@ -331,14 +306,17 @@ const char *name)
 
 		rv = nvlist_add_uint32_array(nvl, name, (uint32_t *)arrbuf,
 		    nelems);
-		free(arrbuf);
+		topo_mod_free(mp, arrbuf, (nelems * sizeof (uint32_t)));
 		break;
 	case TOPO_TYPE_INT64_ARRAY:
+		if ((arrbuf = topo_mod_alloc(mp, (nelems * sizeof (int64_t))))
+		    == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
 		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				if ((str = xmlGetProp(cn, (xmlChar *)Value))
 				    == NULL)
 					return (-1);
 
@@ -350,14 +328,17 @@ const char *name)
 
 		rv = nvlist_add_int64_array(nvl, name, (int64_t *)arrbuf,
 		    nelems);
-		free(arrbuf);
+		topo_mod_free(mp, arrbuf, (nelems * sizeof (int64_t)));
 		break;
 	case TOPO_TYPE_UINT64_ARRAY:
+		if ((arrbuf = topo_mod_alloc(mp, (nelems * sizeof (uint64_t))))
+		    == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
 		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				if ((str = xmlGetProp(cn, (xmlChar *)Value))
 				    == NULL)
 					return (-1);
 
@@ -369,9 +350,12 @@ const char *name)
 
 		rv = nvlist_add_uint64_array(nvl, name, arrbuf,
 		    nelems);
-		free(arrbuf);
+		topo_mod_free(mp, arrbuf, (nelems * sizeof (uint64_t)));
 		break;
 	case TOPO_TYPE_STRING_ARRAY:
+		if ((strarrbuf = topo_mod_alloc(mp, (nelems * sizeof (char *))))
+		    == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
 		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
@@ -390,11 +374,14 @@ const char *name)
 		strarr_free(mp, strarrbuf, nelems);
 		break;
 	case TOPO_TYPE_FMRI_ARRAY:
+		if ((nvlarrbuf = topo_mod_alloc(mp, (nelems *
+		    sizeof (nvlist_t *)))) == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
 		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				if ((str = xmlGetProp(cn, (xmlChar *)Value))
 				    == NULL)
 					return (-1);
 
@@ -409,7 +396,7 @@ const char *name)
 
 		rv = nvlist_add_nvlist_array(nvl, name, nvlarrbuf,
 		    nelems);
-		free(nvlarrbuf);
+		topo_mod_free(mp, nvlarrbuf, (nelems * sizeof (nvlist_t *)));
 		break;
 	}
 

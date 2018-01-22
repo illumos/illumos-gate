@@ -137,8 +137,7 @@ efi_copy_finish(struct relocator *relocator)
 	multiboot2_info_header_t *mbi;
 	struct chunk *chunk, *c;
 	struct chunk_head *head;
-	UINT64 size;
-	int done = 0;
+	bool done = false;
 	void (*move)(void *s1, const void *s2, size_t n);
 
 	move = (void *)relocator->rel_memmove;
@@ -153,18 +152,23 @@ efi_copy_finish(struct relocator *relocator)
 	 * If all chunks are in place, we are done.
 	 */
 	chunk = NULL;
-	while (done == 0) {
-		/* First check if we have anything to do. */
-		if (chunk == NULL) {
-			done = 1;
-			STAILQ_FOREACH(chunk, head, chunk_next) {
-				if (chunk->chunk_paddr != chunk->chunk_vaddr) {
-					done = 0;
-					break;
-				}
+	while (!done) {
+		/* Advance to next item in list. */
+		if (chunk != NULL)
+			chunk = STAILQ_NEXT(chunk, chunk_next);
+
+		/*
+		 * First check if we have anything to do.
+		 * We set chunk to NULL every time we move the data.
+		 */
+		done = true;
+		STAILQ_FOREACH_FROM(chunk, head, chunk_next) {
+			if (chunk->chunk_paddr != chunk->chunk_vaddr) {
+				done = false;
+				break;
 			}
 		}
-		if (done == 1)
+		if (done)
 			break;
 
 		/*
@@ -175,18 +179,24 @@ efi_copy_finish(struct relocator *relocator)
 			/* Moved already? */
 			if (c->chunk_vaddr == c->chunk_paddr)
 				continue;
+
 			/* Is it the chunk itself? */
 			if (c->chunk_vaddr == chunk->chunk_vaddr &&
 			    c->chunk_size == chunk->chunk_size)
 				continue;
+
+			/*
+			 * Check for overlaps.
+			 */
 			if ((c->chunk_vaddr >= chunk->chunk_paddr &&
 			    c->chunk_vaddr <=
 			    chunk->chunk_paddr + chunk->chunk_size) ||
 			    (c->chunk_vaddr + c->chunk_size >=
 			    chunk->chunk_paddr &&
 			    c->chunk_vaddr + c->chunk_size <=
-			    chunk->chunk_paddr + chunk->chunk_size))
+			    chunk->chunk_paddr + chunk->chunk_size)) {
 				break;
+			}
 		}
 		/* If there are no conflicts, move to place and restart. */
 		if (c == NULL) {
@@ -197,7 +207,6 @@ efi_copy_finish(struct relocator *relocator)
 			chunk = NULL;
 			continue;
 		}
-		chunk = STAILQ_NEXT(chunk, chunk_next);
 	}
 
 	return (mbi);

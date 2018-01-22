@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -4123,6 +4123,11 @@ ipsec_in_release_refs(ip_recv_attr_t *ira)
 		IPSA_REFRELE(ira->ira_ipsec_esp_sa);
 		ira->ira_ipsec_esp_sa = NULL;
 	}
+	if (ira->ira_ipsec_action != NULL) {
+		IPACT_REFRELE(ira->ira_ipsec_action);
+		ira->ira_ipsec_action = NULL;
+	}
+
 	ira->ira_flags &= ~IRAF_IPSEC_SECURE;
 }
 
