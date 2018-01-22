@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -36,8 +37,8 @@
 
 CK_RV
 soft_blowfish_crypt_init_common(soft_session_t *session_p,
-    CK_MECHANISM_PTR pMechanism, soft_object_t *key_p, boolean_t encrypt) {
-
+    CK_MECHANISM_PTR pMechanism, soft_object_t *key_p, boolean_t encrypt)
+{
 	size_t size;
 	soft_blowfish_ctx_t *soft_blowfish_ctx;
 
@@ -140,8 +141,8 @@ soft_blowfish_crypt_init_common(soft_session_t *session_p,
 CK_RV
 soft_blowfish_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
     CK_ULONG ulDataLen, CK_BYTE_PTR pEncrypted, CK_ULONG_PTR pulEncryptedLen,
-    boolean_t update) {
-
+    boolean_t update)
+{
 	int rc = 0;
 	CK_RV rv = CKR_OK;
 	soft_blowfish_ctx_t *soft_blowfish_ctx =
@@ -271,8 +272,8 @@ soft_blowfish_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	/* Encrypt multiple blocks of data. */
 	rc = blowfish_encrypt_contiguous_blocks(
-		(blowfish_ctx_t *)soft_blowfish_ctx->blowfish_cbc,
-		    (char *)in_buf, out_len, &out);
+	    (blowfish_ctx_t *)soft_blowfish_ctx->blowfish_cbc,
+	    (char *)in_buf, out_len, &out);
 
 	if (rc == 0) {
 		*pulEncryptedLen = out_len;
@@ -297,15 +298,11 @@ soft_blowfish_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 cleanup:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 	blowfish_ctx = (blowfish_ctx_t *)soft_blowfish_ctx->blowfish_cbc;
-	if (blowfish_ctx != NULL) {
-		bzero(blowfish_ctx->bc_keysched,
-		    blowfish_ctx->bc_keysched_len);
-		free(soft_blowfish_ctx->blowfish_cbc);
-	}
-
-	bzero(soft_blowfish_ctx->key_sched, soft_blowfish_ctx->keysched_len);
-	free(soft_blowfish_ctx->key_sched);
-	free(session_p->encrypt.context);
+	freezero(blowfish_ctx, sizeof (cbc_ctx_t));
+	freezero(soft_blowfish_ctx->key_sched,
+	    soft_blowfish_ctx->keysched_len);
+	freezero(session_p->encrypt.context,
+	    sizeof (soft_blowfish_ctx_t));
 	session_p->encrypt.context = NULL;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 
@@ -316,8 +313,8 @@ cleanup:
 CK_RV
 soft_blowfish_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
     CK_ULONG ulEncryptedLen, CK_BYTE_PTR pData, CK_ULONG_PTR pulDataLen,
-    boolean_t update) {
-
+    boolean_t update)
+{
 	int rc = 0;
 	CK_RV rv = CKR_OK;
 	soft_blowfish_ctx_t *soft_blowfish_ctx =
@@ -438,8 +435,8 @@ soft_blowfish_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 
 	/* Decrypt multiple blocks of data. */
 	rc = blowfish_decrypt_contiguous_blocks(
-		(blowfish_ctx_t *)soft_blowfish_ctx->blowfish_cbc,
-		(char *)in_buf, out_len, &out);
+	    (blowfish_ctx_t *)soft_blowfish_ctx->blowfish_cbc,
+	    (char *)in_buf, out_len, &out);
 
 	if (rc == 0) {
 		*pulDataLen = out_len;
@@ -465,15 +462,11 @@ soft_blowfish_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 cleanup:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 	blowfish_ctx = (blowfish_ctx_t *)soft_blowfish_ctx->blowfish_cbc;
-	if (blowfish_ctx != NULL) {
-		bzero(blowfish_ctx->bc_keysched,
-		    blowfish_ctx->bc_keysched_len);
-		free(soft_blowfish_ctx->blowfish_cbc);
-	}
-
-	bzero(soft_blowfish_ctx->key_sched, soft_blowfish_ctx->keysched_len);
-	free(soft_blowfish_ctx->key_sched);
-	free(session_p->decrypt.context);
+	free(blowfish_ctx);
+	freezero(soft_blowfish_ctx->key_sched,
+	    soft_blowfish_ctx->keysched_len);
+	freezero(session_p->decrypt.context,
+	    sizeof (soft_blowfish_ctx_t));
 	session_p->decrypt.context = NULL;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 

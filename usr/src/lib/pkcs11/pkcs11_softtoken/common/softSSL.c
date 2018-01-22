@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <fcntl.h>
@@ -584,7 +585,7 @@ out:
  * . mech_p:	key derivation mechanism. the mechanism parameter carries the
  *		client and mastter random from the Hello handshake messages,
  *		the specification of the key and IV sizes, and the location
- * 		for the resulting keys and IVs.
+ *		for the resulting keys and IVs.
  * . basekey_p: The master secret key.
  * . pTemplate & ulAttributeCount: Any extra attributes for the key to be
  *		created.
@@ -595,13 +596,13 @@ out:
  *	and server random.
  *	First a keyblock is generated usining the following formula:
  *	key_block =
- *      	MD5(master_secret + SHA(`A' + master_secret +
+ *		MD5(master_secret + SHA(`A' + master_secret +
  *					ServerHello.random +
  *					ClientHello.random)) +
- *      	MD5(master_secret + SHA(`BB' + master_secret +
+ *		MD5(master_secret + SHA(`BB' + master_secret +
  *					ServerHello.random +
  *					ClientHello.random)) +
- *      	MD5(master_secret + SHA(`CCC' + master_secret +
+ *		MD5(master_secret + SHA(`CCC' + master_secret +
  *					ServerHello.random +
  *					ClientHello.random)) + [...];
  *
@@ -865,12 +866,15 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 #ifdef	__sparcv9
 			/* LINTED */
 			soft_ssl_weaken_key(mech, kb, (uint_t)secret_key_bytes,
-#else	/* __sparcv9 */
-			soft_ssl_weaken_key(mech, kb, secret_key_bytes,
-#endif	/* __sparcv9 */
 			    random_data->pClientRandom, ClientRandomLen,
 			    random_data->pServerRandom, ServerRandomLen,
 			    export_keys, B_TRUE);
+#else	/* __sparcv9 */
+			soft_ssl_weaken_key(mech, kb, secret_key_bytes,
+			    random_data->pClientRandom, ClientRandomLen,
+			    random_data->pServerRandom, ServerRandomLen,
+			    export_keys, B_TRUE);
+#endif	/* __sparcv9 */
 			new_tmpl[n].pValue = export_keys;
 			new_tmpl[n].ulValueLen = MD5_HASH_SIZE;
 		} else {
@@ -896,12 +900,15 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 #ifdef	__sparcv9
 			/* LINTED */
 			soft_ssl_weaken_key(mech, kb, (uint_t)secret_key_bytes,
-#else	/* __sparcv9 */
-			soft_ssl_weaken_key(mech, kb, secret_key_bytes,
-#endif	/* __sparcv9 */
 			    random_data->pServerRandom, ServerRandomLen,
 			    random_data->pClientRandom, ClientRandomLen,
 			    export_keys + MD5_HASH_SIZE, B_FALSE);
+#else	/* __sparcv9 */
+			soft_ssl_weaken_key(mech, kb, secret_key_bytes,
+			    random_data->pServerRandom, ServerRandomLen,
+			    random_data->pClientRandom, ClientRandomLen,
+			    export_keys + MD5_HASH_SIZE, B_FALSE);
+#endif	/* __sparcv9 */
 			new_tmpl[n].pValue = export_keys + MD5_HASH_SIZE;
 		} else
 			new_tmpl[n].pValue = kb;
@@ -925,8 +932,7 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 	if (new_tmpl_allocated)
 		free(new_tmpl);
 
-	if (export_keys != NULL)
-		free(export_keys);
+	freezero(export_keys, 2 * MD5_HASH_SIZE);
 
 	return (rv);
 
@@ -955,8 +961,7 @@ out_err:
 	if (new_tmpl_allocated)
 		free(new_tmpl);
 
-	if (export_keys != NULL)
-		free(export_keys);
+	freezero(export_keys, 2 * MD5_HASH_SIZE);
 
 	return (rv);
 }

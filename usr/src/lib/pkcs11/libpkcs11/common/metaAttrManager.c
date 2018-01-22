@@ -22,6 +22,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <string.h>
@@ -32,7 +33,7 @@
 
 static void
 find_attribute(CK_ATTRIBUTE_TYPE attrtype, generic_attr_t *attributes,
-	size_t num_attributes, generic_attr_t **found_attribute);
+    size_t num_attributes, generic_attr_t **found_attribute);
 
 /*
  * get_master_attributes_by_object
@@ -380,7 +381,7 @@ get_master_template_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
  */
 CK_RV
 get_master_attributes_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
-	generic_attr_t **attributes, size_t *num_attributes)
+    generic_attr_t **attributes, size_t *num_attributes)
 {
 	CK_RV rv;
 	generic_attr_t *master_template = NULL;
@@ -526,7 +527,8 @@ dealloc_attributes(generic_attr_t *attributes, size_t num_attributes)
 		 * extra work to just do them all. [Most attributes are just
 		 * 1 or 4 bytes]
 		 */
-		bzero(attr->attribute.pValue, attr->attribute.ulValueLen);
+		explicit_bzero(attr->attribute.pValue,
+		    attr->attribute.ulValueLen);
 
 		if (attr->isMalloced)
 			free(attr->attribute.pValue);
@@ -544,7 +546,7 @@ dealloc_attributes(generic_attr_t *attributes, size_t num_attributes)
  */
 CK_RV
 attribute_set_value(CK_ATTRIBUTE *new_attr,
-	generic_attr_t *attributes, size_t num_attributes)
+    generic_attr_t *attributes, size_t num_attributes)
 {
 	generic_attr_t *attr = NULL;
 
@@ -564,13 +566,15 @@ attribute_set_value(CK_ATTRIBUTE *new_attr,
 		/* Existing storage is sufficient to store new value. */
 
 		/* bzero() out any data that won't be overwritten. */
-		bzero((char *)attr->attribute.pValue + new_attr->ulValueLen,
+		explicit_bzero((char *)attr->attribute.pValue +
+		    new_attr->ulValueLen,
 		    attr->attribute.ulValueLen - new_attr->ulValueLen);
 
 	} else if (new_attr->ulValueLen <= sizeof (attr->generic_data)) {
 		/* Use generic storage to avoid a malloc. */
 
-		bzero(attr->attribute.pValue, attr->attribute.ulValueLen);
+		explicit_bzero(attr->attribute.pValue,
+		    attr->attribute.ulValueLen);
 		if (attr->isMalloced) {
 			/*
 			 * If app sets a large value (triggering a malloc),
@@ -616,7 +620,7 @@ attribute_set_value(CK_ATTRIBUTE *new_attr,
  */
 static void
 find_attribute(CK_ATTRIBUTE_TYPE attrtype, generic_attr_t *attributes,
-	size_t num_attributes, generic_attr_t **found_attribute)
+    size_t num_attributes, generic_attr_t **found_attribute)
 {
 	generic_attr_t *attr;
 	boolean_t found = B_FALSE;
@@ -642,7 +646,7 @@ find_attribute(CK_ATTRIBUTE_TYPE attrtype, generic_attr_t *attributes,
  */
 boolean_t
 get_template_ulong(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
-	CK_ULONG num_attributes, CK_ULONG *result)
+    CK_ULONG num_attributes, CK_ULONG *result)
 {
 	boolean_t found = B_FALSE;
 	CK_ULONG i;
@@ -669,7 +673,7 @@ get_template_ulong(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
  */
 boolean_t
 get_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
-	CK_ULONG num_attributes, boolean_t *result)
+    CK_ULONG num_attributes, boolean_t *result)
 {
 	boolean_t found = B_FALSE;
 	CK_ULONG i;
@@ -706,7 +710,7 @@ get_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
  */
 int
 set_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
-	CK_ULONG num_attributes, boolean_t local, CK_BBOOL *value)
+    CK_ULONG num_attributes, boolean_t local, CK_BBOOL *value)
 {
 	int i;
 

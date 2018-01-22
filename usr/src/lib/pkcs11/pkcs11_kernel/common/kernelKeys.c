@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <strings.h>
@@ -343,21 +344,15 @@ key_gen_by_value(CK_MECHANISM_PTR pMechanism, CK_ATTRIBUTE_PTR pTemplate,
 	}
 	new_objp->is_lib_obj = B_TRUE;
 	new_objp->session_handle = (CK_SESSION_HANDLE)session_p;
-	(void) free(newTemplate);
-	bzero(key_buf, key_len);
-	(void) free(key_buf);
+	free(newTemplate);
+	freezero(key_buf, key_len);
 	return (CKR_OK);
 
 failed_exit:
 	free_attributes(obj_ngk.ngk_in_attributes, &obj_ngk.ngk_in_count);
 	free_attributes(obj_ngk.ngk_out_attributes, &obj_ngk.ngk_out_count);
-	if (key_buf != NULL) {
-		bzero(key_buf, key_len);
-		(void) free(key_buf);
-	}
-	if (newTemplate != NULL) {
-		(void) free(newTemplate);
-	}
+	freezero(key_buf, key_len);
+	free(newTemplate);
 	return (rv);
 }
 
@@ -1757,7 +1752,7 @@ C_UnwrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	CK_MECHANISM_INFO	info;
 	uint32_t		k_mi_flags;
 	CK_BYTE			*clear_key_val = NULL;
-	CK_ULONG 		ulDataLen;
+	CK_ULONG		ulDataLen;
 	CK_ATTRIBUTE_PTR	newTemplate = NULL;
 	crypto_mech_type_t	k_mech_type;
 	crypto_object_unwrap_key_t obj_unwrapkey;

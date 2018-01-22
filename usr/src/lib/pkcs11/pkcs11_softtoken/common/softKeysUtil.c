@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -609,8 +610,7 @@ soft_key_derive_check_length(soft_object_t *secret_key, CK_ULONG max_keylen)
 
 static CK_RV
 soft_pkcs12_pbe(soft_session_t *session_p,
-		CK_MECHANISM_PTR pMechanism,
-		soft_object_t *derived_key)
+    CK_MECHANISM_PTR pMechanism, soft_object_t *derived_key)
 {
 	CK_RV rv = CKR_OK;
 	CK_PBE_PARAMS *params = pMechanism->pParameter;
@@ -822,26 +822,11 @@ digest_done:
 	(void) memcpy(keybuf, A, keysize);
 
 cleanup:
-	if (A) {
-		bzero(A, Alen);
-		free(A);
-	}
-	if (Ai) {
-		bzero(Ai, AiLen);
-		free(Ai);
-	}
-	if (B) {
-		bzero(B, Blen);
-		free(B);
-	}
-	if (D) {
-		bzero(D, Dlen);
-		free(D);
-	}
-	if (I) {
-		bzero(I, Ilen);
-		free(I);
-	}
+	freezero(A, Alen);
+	freezero(Ai, AiLen);
+	freezero(B, Blen);
+	freezero(D, Dlen);
+	freezero(I, Ilen);
 	return (rv);
 }
 
@@ -1165,11 +1150,9 @@ soft_derive_enforce_flags(soft_object_t *basekey, soft_object_t *newkey)
  * Currently, PRF is always SHA_1_HMAC.
  */
 static CK_RV
-do_prf(soft_session_t *session_p,
-	CK_PKCS5_PBKD2_PARAMS_PTR params,
-	soft_object_t *hmac_key,
-	CK_BYTE *newsalt, CK_ULONG saltlen,
-	CK_BYTE *blockdata, CK_ULONG blocklen)
+do_prf(soft_session_t *session_p, CK_PKCS5_PBKD2_PARAMS_PTR params,
+    soft_object_t *hmac_key, CK_BYTE *newsalt, CK_ULONG saltlen,
+    CK_BYTE *blockdata, CK_ULONG blocklen)
 {
 	CK_RV rv = CKR_OK;
 	CK_MECHANISM digest_mech = {CKM_SHA_1_HMAC, NULL, 0};
@@ -1249,7 +1232,7 @@ cleanup:
 
 static CK_RV
 soft_create_hmac_key(soft_session_t *session_p,  CK_BYTE *passwd,
-		CK_ULONG passwd_len, CK_OBJECT_HANDLE_PTR phKey)
+    CK_ULONG passwd_len, CK_OBJECT_HANDLE_PTR phKey)
 {
 	CK_RV rv = CKR_OK;
 	CK_OBJECT_CLASS keyclass = CKO_SECRET_KEY;
@@ -1293,8 +1276,7 @@ soft_create_hmac_key(soft_session_t *session_p,  CK_BYTE *passwd,
 
 CK_RV
 soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
-		CK_MECHANISM_PTR pMechanism,
-		soft_object_t *secret_key)
+    CK_MECHANISM_PTR pMechanism, soft_object_t *secret_key)
 {
 	CK_RV rv = CKR_OK;
 	CK_PKCS5_PBKD2_PARAMS	*params =
@@ -1400,15 +1382,15 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 		keydata += hLen;
 	}
 	(void) soft_delete_object(session_p, hmac_key, B_FALSE, B_FALSE);
-	free(salt);
+	freezero(salt, params->ulSaltSourceDataLen);
 
 	return (rv);
 }
 
 CK_RV
 soft_wrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
-		soft_object_t *wrappingKey_p, soft_object_t *hkey_p,
-		CK_BYTE_PTR pWrappedKey, CK_ULONG_PTR pulWrappedKeyLen)
+    soft_object_t *wrappingKey_p, soft_object_t *hkey_p,
+    CK_BYTE_PTR pWrappedKey, CK_ULONG_PTR pulWrappedKeyLen)
 {
 	CK_RV		rv = CKR_OK;
 	CK_ULONG	plain_len = 0;
@@ -1535,14 +1517,12 @@ soft_wrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 cleanup_wrap:
 	if (padded_data != NULL && padded_len != plain_len) {
 		/* Clear buffer before returning to memory pool. */
-		(void) memset(padded_data, 0x0, padded_len);
-		free(padded_data);
+		freezero(padded_data, padded_len);
 	}
 
 	if ((hkey_p->class != CKO_SECRET_KEY) && (plain_data != NULL)) {
 		/* Clear buffer before returning to memory pool. */
-		(void) memset(plain_data, 0x0, plain_len);
-		free(plain_data);
+		freezero(plain_data, plain_len);
 	}
 
 	return (rv);
@@ -1555,7 +1535,7 @@ cleanup_wrap:
  */
 static CK_RV
 soft_unwrap_secret_len_check(CK_KEY_TYPE keytype, CK_MECHANISM_TYPE mechtype,
-	CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulAttributeCount)
+    CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulAttributeCount)
 {
 	CK_ULONG	i;
 	boolean_t	isValueLen = B_FALSE;
@@ -1628,10 +1608,9 @@ soft_unwrap_secret_len_check(CK_KEY_TYPE keytype, CK_MECHANISM_TYPE mechtype,
 
 CK_RV
 soft_unwrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
-		soft_object_t *unwrappingkey_p,
-		CK_BYTE_PTR pWrappedKey, CK_ULONG ulWrappedKeyLen,
-		CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulAttributeCount,
-		CK_OBJECT_HANDLE_PTR phKey)
+    soft_object_t *unwrappingkey_p, CK_BYTE_PTR pWrappedKey,
+    CK_ULONG ulWrappedKeyLen, CK_ATTRIBUTE_PTR pTemplate,
+    CK_ULONG ulAttributeCount, CK_OBJECT_HANDLE_PTR phKey)
 {
 	CK_RV			rv = CKR_OK;
 	CK_OBJECT_CLASS		new_obj_class = ~0UL;
@@ -1822,8 +1801,7 @@ soft_unwrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	if (new_objp->class != CKO_SECRET_KEY) {
 		/* Clear buffer before returning to memory pool. */
-		(void) memset(plain_data, 0x0, plain_len);
-		free(plain_data);
+		freezero(plain_data, plain_len);
 	}
 
 	*phKey = (CK_OBJECT_HANDLE)new_objp;
@@ -1834,8 +1812,7 @@ cleanup_unwrap:
 	/* The decrypted private key buffer must be freed explicitly. */
 	if ((new_objp->class != CKO_SECRET_KEY) && (plain_data != NULL)) {
 		/* Clear buffer before returning to memory pool. */
-		(void) memset(plain_data, 0x0, plain_len);
-		free(plain_data);
+		freezero(plain_data, plain_len);
 	}
 
 	/* sck and new_objp are indirectly free()d inside these functions */

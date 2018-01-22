@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 
@@ -596,7 +597,8 @@ meta_object_dealloc(meta_session_t *session, meta_object_t *object,
 
 	if (object->clone_template) {
 		for (i = 0; i < object->clone_template_size; i++) {
-			free(((object->clone_template)[i]).pValue);
+			freezero((object->clone_template)[i].pValue,
+			    (object->clone_template)[i].ulValueLen);
 		}
 		free(object->clone_template);
 	}
@@ -617,7 +619,8 @@ meta_object_dealloc(meta_session_t *session, meta_object_t *object,
  * meta_slot_object_alloc
  */
 CK_RV
-meta_slot_object_alloc(slot_object_t **object) {
+meta_slot_object_alloc(slot_object_t **object)
+{
 	slot_object_t *new_object;
 
 	new_object = calloc(1, sizeof (slot_object_t));
@@ -634,7 +637,7 @@ meta_slot_object_alloc(slot_object_t **object) {
  */
 void
 meta_slot_object_activate(slot_object_t *object,
-	slot_session_t *creator_session, boolean_t isToken)
+    slot_session_t *creator_session, boolean_t isToken)
 {
 	object->creator_session = creator_session;
 
@@ -859,7 +862,8 @@ finish:
 	if (attrs_with_val) {
 		for (i = 0; i < num_attrs; i++) {
 			if (attrs_with_val[i].pValue != NULL) {
-				free(attrs_with_val[i].pValue);
+				freezero(attrs_with_val[i].pValue,
+				    attrs_with_val[i].ulValueLen);
 			}
 		}
 		free(attrs_with_val);
@@ -1020,8 +1024,8 @@ clone_by_create(meta_object_t *object, slot_object_t *new_clone,
  */
 static CK_RV
 find_best_match_wrap_mech(wrap_info_t *wrap_info, int num_info,
-	CK_ULONG src_slotnum, CK_ULONG dst_slotnum, int *first_both_mech,
-	int *first_src_mech)
+    CK_ULONG src_slotnum, CK_ULONG dst_slotnum, int *first_both_mech,
+    int *first_src_mech)
 {
 
 	int i;
@@ -1491,7 +1495,7 @@ finish:
 	}
 
 	if (wrappedKey) {
-		free(wrappedKey);
+		freezero(wrappedKey, wrappedKeyLen);
 	}
 
 	if (src_slot_session) {
@@ -1513,8 +1517,7 @@ finish:
  */
 CK_RV
 meta_object_get_clone(meta_object_t *object,
-	CK_ULONG slot_num, slot_session_t *slot_session,
-	slot_object_t **clone)
+    CK_ULONG slot_num, slot_session_t *slot_session, slot_object_t **clone)
 {
 	CK_RV rv = CKR_OK;
 	slot_object_t *newclone = NULL;

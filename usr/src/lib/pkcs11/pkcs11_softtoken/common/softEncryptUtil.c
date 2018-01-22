@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -175,10 +176,10 @@ cbc_common:
 		    soft_des_ctx->ivec, key_p->key_type);
 
 		if (soft_des_ctx->des_cbc == NULL) {
-			bzero(soft_des_ctx->key_sched,
+			freezero(soft_des_ctx->key_sched,
 			    soft_des_ctx->keysched_len);
-			free(soft_des_ctx->key_sched);
-			free(session_p->encrypt.context);
+			freezero(session_p->encrypt.context,
+			    sizeof (soft_des_ctx_t));
 			session_p->encrypt.context = NULL;
 			rv = CKR_HOST_MEMORY;
 		}
@@ -239,10 +240,10 @@ cbc_common:
 			    soft_aes_ctx->ivec);
 		}
 		if (soft_aes_ctx->aes_cbc == NULL) {
-			bzero(soft_aes_ctx->key_sched,
+			freezero(soft_aes_ctx->key_sched,
 			    soft_aes_ctx->keysched_len);
-			free(soft_aes_ctx->key_sched);
-			free(session_p->encrypt.context);
+			freezero(session_p->encrypt.context,
+			    sizeof (soft_aes_ctx_t));
 			session_p->encrypt.context = NULL;
 			rv = CKR_HOST_MEMORY;
 		}
@@ -278,10 +279,10 @@ cbc_common:
 		    pMechanism->pParameter);
 
 		if (soft_aes_ctx->aes_cbc == NULL) {
-			bzero(soft_aes_ctx->key_sched,
+			freezero(soft_aes_ctx->key_sched,
 			    soft_aes_ctx->keysched_len);
-			free(soft_aes_ctx->key_sched);
-			free(session_p->encrypt.context);
+			freezero(session_p->encrypt.context,
+			    sizeof (soft_aes_ctx_t));
 			session_p->encrypt.context = NULL;
 			rv = CKR_HOST_MEMORY;
 		}
@@ -341,10 +342,10 @@ cbc_common:
 		    soft_blowfish_ctx->ivec);
 
 		if (soft_blowfish_ctx->blowfish_cbc == NULL) {
-			bzero(soft_blowfish_ctx->key_sched,
+			freezero(soft_blowfish_ctx->key_sched,
 			    soft_blowfish_ctx->keysched_len);
-			free(soft_blowfish_ctx->key_sched);
-			free(session_p->encrypt.context);
+			freezero(session_p->encrypt.context,
+			    sizeof (soft_blowfish_ctx_t));
 			session_p->encrypt.context = NULL;
 			rv = CKR_HOST_MEMORY;
 		}
@@ -628,9 +629,8 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 			/* Cleanup memory space. */
 			free(soft_des_ctx->des_cbc);
-			bzero(soft_des_ctx->key_sched,
+			freezero(soft_des_ctx->key_sched,
 			    soft_des_ctx->keysched_len);
-			free(soft_des_ctx->key_sched);
 		}
 
 		break;
@@ -659,8 +659,8 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 		/* Cleanup memory space. */
 		free(soft_des_ctx->des_cbc);
-		bzero(soft_des_ctx->key_sched, soft_des_ctx->keysched_len);
-		free(soft_des_ctx->key_sched);
+		freezero(soft_des_ctx->key_sched,
+		    soft_des_ctx->keysched_len);
 
 		break;
 	}
@@ -723,9 +723,8 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 			/* Cleanup memory space. */
 			free(soft_aes_ctx->aes_cbc);
-			bzero(soft_aes_ctx->key_sched,
+			freezero(soft_aes_ctx->key_sched,
 			    soft_aes_ctx->keysched_len);
-			free(soft_aes_ctx->key_sched);
 		}
 
 		break;
@@ -763,9 +762,8 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 			/* Cleanup memory space. */
 			free(soft_aes_ctx->aes_cbc);
-			bzero(soft_aes_ctx->key_sched,
+			freezero(soft_aes_ctx->key_sched,
 			    soft_aes_ctx->keysched_len);
-			free(soft_aes_ctx->key_sched);
 		}
 
 		break;
@@ -791,8 +789,8 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 		/* Cleanup memory space. */
 		free(soft_aes_ctx->aes_cbc);
-		bzero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
-		free(soft_aes_ctx->key_sched);
+		freezero(soft_aes_ctx->key_sched,
+		    soft_aes_ctx->keysched_len);
 
 		break;
 	}
@@ -827,8 +825,8 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 		/* Cleanup memory space. */
 		free(ctr_ctx);
-		bzero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
-		free(soft_aes_ctx->key_sched);
+		freezero(soft_aes_ctx->key_sched,
+		    soft_aes_ctx->keysched_len);
 
 		break;
 	}
@@ -852,9 +850,8 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 		}
 
 		free(soft_blowfish_ctx->blowfish_cbc);
-		bzero(soft_blowfish_ctx->key_sched,
+		freezero(soft_blowfish_ctx->key_sched,
 		    soft_blowfish_ctx->keysched_len);
-		free(soft_blowfish_ctx->key_sched);
 		break;
 	}
 
@@ -865,7 +862,7 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 		*pulLastEncryptedPartLen = 0;
 		if (pLastEncryptedPart == NULL)
 			goto clean1;
-		bzero(key, sizeof (*key));
+		explicit_bzero(key, sizeof (*key));
 		break;
 	}
 	default:
@@ -921,13 +918,12 @@ soft_crypt_cleanup(soft_session_t *session_p, boolean_t encrypt,
 		if (soft_des_ctx != NULL) {
 			des_ctx = (des_ctx_t *)soft_des_ctx->des_cbc;
 			if (des_ctx != NULL) {
-				bzero(des_ctx->dc_keysched,
+				explicit_bzero(des_ctx->dc_keysched,
 				    des_ctx->dc_keysched_len);
 				free(soft_des_ctx->des_cbc);
 			}
-			bzero(soft_des_ctx->key_sched,
+			freezero(soft_des_ctx->key_sched,
 			    soft_des_ctx->keysched_len);
-			free(soft_des_ctx->key_sched);
 		}
 		break;
 	}
@@ -944,13 +940,12 @@ soft_crypt_cleanup(soft_session_t *session_p, boolean_t encrypt,
 		if (soft_aes_ctx != NULL) {
 			aes_ctx = (aes_ctx_t *)soft_aes_ctx->aes_cbc;
 			if (aes_ctx != NULL) {
-				bzero(aes_ctx->ac_keysched,
+				explicit_bzero(aes_ctx->ac_keysched,
 				    aes_ctx->ac_keysched_len);
 				free(soft_aes_ctx->aes_cbc);
 			}
-			bzero(soft_aes_ctx->key_sched,
+			freezero(soft_aes_ctx->key_sched,
 			    soft_aes_ctx->keysched_len);
-			free(soft_aes_ctx->key_sched);
 		}
 		break;
 	}
@@ -965,14 +960,13 @@ soft_crypt_cleanup(soft_session_t *session_p, boolean_t encrypt,
 			blowfish_ctx =
 			    (blowfish_ctx_t *)soft_blowfish_ctx->blowfish_cbc;
 			if (blowfish_ctx != NULL) {
-				bzero(blowfish_ctx->bc_keysched,
+				explicit_bzero(blowfish_ctx->bc_keysched,
 				    blowfish_ctx->bc_keysched_len);
 				free(soft_blowfish_ctx->blowfish_cbc);
 			}
 
-			bzero(soft_blowfish_ctx->key_sched,
+			freezero(soft_blowfish_ctx->key_sched,
 			    soft_blowfish_ctx->keysched_len);
-			free(soft_blowfish_ctx->key_sched);
 		}
 		break;
 	}
@@ -982,7 +976,7 @@ soft_crypt_cleanup(soft_session_t *session_p, boolean_t encrypt,
 		ARCFour_key *key = (ARCFour_key *)active_op->context;
 
 		if (key != NULL)
-			bzero(key, sizeof (*key));
+			explicit_bzero(key, sizeof (*key));
 		break;
 	}
 

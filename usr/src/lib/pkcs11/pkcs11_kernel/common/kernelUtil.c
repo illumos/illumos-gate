@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -480,11 +481,8 @@ free_key_attributes(crypto_key_t *key)
 	if (key->ck_format == CRYPTO_KEY_ATTR_LIST &&
 	    (key->ck_count > 0) && key->ck_attrs != NULL) {
 		for (i = 0; i < key->ck_count; i++) {
-			if (key->ck_attrs[i].oa_value != NULL) {
-				bzero(key->ck_attrs[i].oa_value,
-				    key->ck_attrs[i].oa_value_len);
-				free(key->ck_attrs[i].oa_value);
-			}
+			freezero(key->ck_attrs[i].oa_value,
+			    key->ck_attrs[i].oa_value_len);
 		}
 		free(key->ck_attrs);
 	}
