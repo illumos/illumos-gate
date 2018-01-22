@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -80,10 +80,10 @@
 #include <sys/cpu_module.h>
 #include <sys/ontrap.h>
 
-struct cpu	cpus[1];			/* CPU data */
-struct cpu	*cpu[NCPU] = {&cpus[0]};	/* pointers to all CPUs */
-struct cpu	*cpu_free_list;			/* list for released CPUs */
-cpu_core_t	cpu_core[NCPU];			/* cpu_core structures */
+struct cpu	cpus[1] __aligned(MMU_PAGESIZE);
+struct cpu	*cpu[NCPU] = {&cpus[0]};
+struct cpu	*cpu_free_list;
+cpu_core_t	cpu_core[NCPU];
 
 #define	cpu_next_free	cpu_prev
 
@@ -168,21 +168,21 @@ init_cpu_syscall(struct cpu *cp)
 {
 	kpreempt_disable();
 
-#if defined(__amd64)
 	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
 	    is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
 		uint64_t flags;
 
-#if !defined(__lint)
+#if !defined(__xpv)
 		/*
 		 * The syscall instruction imposes a certain ordering on
 		 * segment selectors, so we double-check that ordering
 		 * here.
 		 */
-		ASSERT(KDS_SEL == KCS_SEL + 8);
-		ASSERT(UDS_SEL == U32CS_SEL + 8);
-		ASSERT(UCS_SEL == U32CS_SEL + 16);
+		CTASSERT(KDS_SEL == KCS_SEL + 8);
+		CTASSERT(UDS_SEL == U32CS_SEL + 8);
+		CTASSERT(UCS_SEL == U32CS_SEL + 16);
 #endif
+
 		/*
 		 * Turn syscall/sysret extensions on.
 		 */
@@ -193,8 +193,17 @@ init_cpu_syscall(struct cpu *cp)
 		 */
 		wrmsr(MSR_AMD_STAR,
 		    ((uint64_t)(U32CS_SEL << 16 | KCS_SEL)) << 32);
-		wrmsr(MSR_AMD_LSTAR, (uint64_t)(uintptr_t)sys_syscall);
-		wrmsr(MSR_AMD_CSTAR, (uint64_t)(uintptr_t)sys_syscall32);
+		if (kpti_enable == 1) {
+			wrmsr(MSR_AMD_LSTAR,
+			    (uint64_t)(uintptr_t)tr_sys_syscall);
+			wrmsr(MSR_AMD_CSTAR,
+			    (uint64_t)(uintptr_t)tr_sys_syscall32);
+		} else {
+			wrmsr(MSR_AMD_LSTAR,
+			    (uint64_t)(uintptr_t)sys_syscall);
+			wrmsr(MSR_AMD_CSTAR,
+			    (uint64_t)(uintptr_t)sys_syscall32);
+		}
 
 		/*
 		 * This list of flags is masked off the incoming
@@ -205,19 +214,15 @@ init_cpu_syscall(struct cpu *cp)
 			flags |= PS_ACHK;
 		wrmsr(MSR_AMD_SFMASK, flags);
 	}
-#endif
 
 	/*
-	 * On 32-bit kernels, we use sysenter/sysexit because it's too
-	 * hard to use syscall/sysret, and it is more portable anyway.
-	 *
 	 * On 64-bit kernels on Nocona machines, the 32-bit syscall
 	 * variant isn't available to 32-bit applications, but sysenter is.
 	 */
 	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
 	    is_x86_feature(x86_featureset, X86FSET_SEP)) {
 
-#if !defined(__lint)
+#if !defined(__xpv)
 		/*
 		 * The sysenter instruction imposes a certain ordering on
 		 * segment selectors, so we double-check that ordering
@@ -225,13 +230,10 @@ init_cpu_syscall(struct cpu *cp)
 		 * Intel Architecture Software Developer's Manual Volume 2:
 		 * Instruction Set Reference"
 		 */
-		ASSERT(KDS_SEL == KCS_SEL + 8);
+		CTASSERT(KDS_SEL == KCS_SEL + 8);
 
-		ASSERT32(UCS_SEL == ((KCS_SEL + 16) | 3));
-		ASSERT32(UDS_SEL == UCS_SEL + 8);
-
-		ASSERT64(U32CS_SEL == ((KCS_SEL + 16) | 3));
-		ASSERT64(UDS_SEL == U32CS_SEL + 8);
+		CTASSERT(U32CS_SEL == ((KCS_SEL + 16) | 3));
+		CTASSERT(UDS_SEL == U32CS_SEL + 8);
 #endif
 
 		cpu_sep_enable();
@@ -241,7 +243,14 @@ init_cpu_syscall(struct cpu *cp)
 		 * via a context handler.
 		 */
 		wrmsr(MSR_INTC_SEP_ESP, 0);
-		wrmsr(MSR_INTC_SEP_EIP, (uint64_t)(uintptr_t)sys_sysenter);
+
+		if (kpti_enable == 1) {
+			wrmsr(MSR_INTC_SEP_EIP,
+			    (uint64_t)(uintptr_t)tr_sys_sysenter);
+		} else {
+			wrmsr(MSR_INTC_SEP_EIP,
+			    (uint64_t)(uintptr_t)sys_sysenter);
+		}
 	}
 
 	kpreempt_enable();
@@ -418,20 +427,20 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 #endif
 
 	/*
-	 * If we have more than one node, each cpu gets a copy of IDT
-	 * local to its node. If this is a Pentium box, we use cpu 0's
-	 * IDT. cpu 0's IDT has been made read-only to workaround the
-	 * cmpxchgl register bug
+	 * Allocate pages for the CPU LDT.
 	 */
-	if (system_hardware.hd_nodes && x86_type != X86_TYPE_P5) {
+	cp->cpu_m.mcpu_ldt = kmem_zalloc(LDT_CPU_SIZE, KM_SLEEP);
+	cp->cpu_m.mcpu_ldt_len = 0;
+
+	/*
+	 * Allocate a per-CPU IDT and initialize the new IDT to the currently
+	 * runing CPU.
+	 */
 #if !defined(__lint)
-		ASSERT((sizeof (*CPU->cpu_idt) * NIDT) <= PAGESIZE);
+	ASSERT((sizeof (*CPU->cpu_idt) * NIDT) <= PAGESIZE);
 #endif
-		cp->cpu_idt = kmem_zalloc(PAGESIZE, KM_SLEEP);
-		bcopy(CPU->cpu_idt, cp->cpu_idt, PAGESIZE);
-	} else {
-		cp->cpu_idt = CPU->cpu_idt;
-	}
+	cp->cpu_idt = kmem_alloc(PAGESIZE, KM_SLEEP);
+	bcopy(CPU->cpu_idt, cp->cpu_idt, PAGESIZE);
 
 	/*
 	 * alloc space for cpuid info
@@ -568,6 +577,10 @@ mp_cpu_unconfigure_common(struct cpu *cp, int error)
 	if (cp->cpu_idt != CPU->cpu_idt)
 		kmem_free(cp->cpu_idt, PAGESIZE);
 	cp->cpu_idt = NULL;
+
+	kmem_free(cp->cpu_m.mcpu_ldt, LDT_CPU_SIZE);
+	cp->cpu_m.mcpu_ldt = NULL;
+	cp->cpu_m.mcpu_ldt_len = 0;
 
 	kmem_free(cp->cpu_gdt, PAGESIZE);
 	cp->cpu_gdt = NULL;
@@ -1782,6 +1795,8 @@ mp_startup_common(boolean_t boot)
 	 * again if it's switched away with CPU_QUIESCED set.
 	 */
 	cp->cpu_flags &= ~(CPU_POWEROFF | CPU_QUIESCED);
+
+	enable_pcid();
 
 	/*
 	 * Setup this processor for XSAVE.

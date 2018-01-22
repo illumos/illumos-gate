@@ -23,7 +23,7 @@
  *
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -147,6 +147,27 @@ mlsetup(struct regs *rp)
 		cpuid_feature_edx_exclude = 0;
 	else
 		cpuid_feature_edx_exclude = (uint32_t)prop_value;
+
+#if !defined(__xpv)
+	/*
+	 * Check to see if KPTI has been explicitly enabled or disabled.
+	 * We have to check this before init_desctbls().
+	 */
+	if (bootprop_getval("kpti", &prop_value) == 0) {
+		kpti_enable = (uint64_t)(prop_value == 1);
+		prom_printf("unix: forcing kpti to %s due to boot argument\n",
+		    (kpti_enable == 1) ? "ON" : "OFF");
+	} else {
+		kpti_enable = 1;
+	}
+
+	if (bootprop_getval("pcid", &prop_value) == 0 && prop_value == 0) {
+		prom_printf("unix: forcing pcid to OFF due to boot argument\n");
+		x86_use_pcid = 0;
+	} else if (kpti_enable != 1) {
+		x86_use_pcid = 0;
+	}
+#endif
 
 	/*
 	 * Initialize idt0, gdt0, ldt0_default, ktss0 and dftss.

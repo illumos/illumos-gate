@@ -22,12 +22,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_MACHPRIVREGS_H
 #define	_SYS_MACHPRIVREGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Platform dependent instruction sequences for manipulating
@@ -77,8 +77,6 @@ extern "C" {
 #define	SYSRETQ	sysretq
 #define	SYSRETL	sysretl
 #define	SWAPGS	swapgs
-#define	XPV_TRAP_POP	/* empty */
-#define	XPV_TRAP_PUSH	/* empty */
 
 #elif defined(__i386)
 
@@ -86,6 +84,8 @@ extern "C" {
 
 #endif	/* __i386 */
 
+#define	XPV_TRAP_POP	/* empty */
+#define	XPV_TRAP_PUSH	/* empty */
 #define	CLEAN_CS	/* empty */
 
 
@@ -129,7 +129,7 @@ extern "C" {
 	movq	REGOFF_RDI(%rsp), %rdi;	\
 	addq	$REGOFF_RIP, %rsp
 
-#define	FAST_INTR_RETURN	iretq
+#define	FAST_INTR_RETURN	jmp tr_iret_user
 
 #elif defined(__i386)
 

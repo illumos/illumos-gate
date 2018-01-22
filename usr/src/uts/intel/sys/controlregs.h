@@ -20,9 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
- *
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef	_SYS_CONTROLREGS_H
@@ -90,8 +88,14 @@ extern "C" {
 
 #define	CR3_PCD	0x00000010		/* cache disable 		*/
 #define	CR3_PWT 0x00000008		/* write through 		*/
-
-#define	FMT_CR3	"\20\5pcd\4pwt"
+#if defined(_ASM)
+#define	CR3_NOINVL_BIT	0x8000000000000000
+#else
+#define	CR3_NOINVL_BIT	0x8000000000000000ULL /* no invalidation	*/
+#endif
+#define	PCID_NONE	0x000		/* generic PCID			*/
+#define	PCID_KERNEL	0x000		/* kernel's PCID		*/
+#define	PCID_USER	0x001		/* user-space PCID		*/
 
 /* CR4 Register */
 

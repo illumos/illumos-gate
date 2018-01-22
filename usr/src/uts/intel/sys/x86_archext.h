@@ -210,6 +210,7 @@ extern "C" {
 #define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
 #define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
 #define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 instrs */
+#define	CPUID_INTC_EBX_7_0_INVPCID	0x00000400	/* invpcid instr */
 #define	CPUID_INTC_EBX_7_0_MPX		0x00004000	/* Mem. Prot. Ext. */
 #define	CPUID_INTC_EBX_7_0_AVX512F	0x00010000	/* AVX512 foundation */
 #define	CPUID_INTC_EBX_7_0_AVX512DQ	0x00020000	/* AVX512DQ */
@@ -433,6 +434,8 @@ extern "C" {
 #define	X86FSET_UMIP		66
 #define	X86FSET_PKU		67
 #define	X86FSET_OSPKE		68
+#define	X86FSET_PCID		69
+#define	X86FSET_INVPCID		70
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -691,7 +694,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	69
+#define	NUM_X86_FEATURES	71
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -724,6 +727,9 @@ struct cpuid_regs {
 	uint32_t	cp_ecx;
 	uint32_t	cp_edx;
 };
+
+extern int x86_use_pcid;
+extern int x86_use_invpcid;
 
 /*
  * Utility functions to get/set extended control registers (XCR)
@@ -869,6 +875,8 @@ extern void determine_platform(void);
 #endif
 extern int get_hwenv(void);
 extern int is_controldom(void);
+
+extern void enable_pcid(void);
 
 extern void xsave_setup_msr(struct cpu *);
 

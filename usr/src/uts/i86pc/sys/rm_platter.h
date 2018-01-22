@@ -26,7 +26,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2011 Joyent, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_RM_PLATTER_H
@@ -113,7 +113,12 @@ typedef	struct rm_platter {
  * Since DEFAULTSTKSIZE is a multiple of PAGESIZE tss will be aligned.
  */
 struct cpu_tables {
-	char		ct_stack[DEFAULTSTKSZ];
+	/* IST stacks */
+	char		ct_stack1[DEFAULTSTKSZ];	/* dblfault */
+#if !defined(__xpv)
+	char		ct_stack2[DEFAULTSTKSZ];	/* nmi */
+	char		ct_stack3[DEFAULTSTKSZ];	/* mce */
+#endif
 	tss_t		ct_tss;
 };
 

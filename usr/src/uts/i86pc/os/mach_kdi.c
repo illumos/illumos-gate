@@ -21,9 +21,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel/Debugger Interface (KDI) routines.  Called during debugger under
@@ -111,12 +111,6 @@ kdi_dreg_set(int reg, ulong_t value)
 		panic("invalid debug register dr%d", reg);
 		/*NOTREACHED*/
 	}
-}
-
-void
-kdi_flush_caches(void)
-{
-	reload_cr3();
 }
 
 extern void kdi_slave_entry(void);

@@ -1,7 +1,7 @@
 \
 \ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 \ Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
-\ Copyright 2016 Joyent, Inc.
+\ Copyright 2018 Joyent, Inc.
 \
 \ CDDL HEADER START
 \
@@ -231,6 +231,44 @@ cpu
 #if defined(__xpv)
 	cpu_m.mcpu_vcpu_info	CPU_VCPU_INFO
 #endif
+
+cpu
+	cpu_m.mcpu_kpti.kf_kernel_cr3	CPU_KPTI_KCR3
+	cpu_m.mcpu_kpti.kf_user_cr3	CPU_KPTI_UCR3
+	cpu_m.mcpu_kpti.kf_tr_rsp	CPU_KPTI_TR_RSP
+	cpu_m.mcpu_kpti.kf_tr_cr3	CPU_KPTI_TR_CR3
+	cpu_m.mcpu_kpti.kf_r13		CPU_KPTI_R13
+	cpu_m.mcpu_kpti.kf_r14		CPU_KPTI_R14
+	cpu_m.mcpu_kpti.kf_tr_ret_rsp	CPU_KPTI_RET_RSP
+
+	cpu_m.mcpu_kpti.kf_ss		CPU_KPTI_SS
+	cpu_m.mcpu_kpti.kf_rsp		CPU_KPTI_RSP
+	cpu_m.mcpu_kpti.kf_rflags	CPU_KPTI_RFLAGS
+	cpu_m.mcpu_kpti.kf_cs		CPU_KPTI_CS
+	cpu_m.mcpu_kpti.kf_rip		CPU_KPTI_RIP
+	cpu_m.mcpu_kpti.kf_err		CPU_KPTI_ERR
+
+	cpu_m.mcpu_pad2			CPU_KPTI_START
+	cpu_m.mcpu_pad3			CPU_KPTI_END
+
+kpti_frame
+	kf_r14		KPTI_R14
+	kf_r13		KPTI_R13
+	kf_err		KPTI_ERR
+	kf_rip		KPTI_RIP
+	kf_cs		KPTI_CS
+	kf_rflags	KPTI_RFLAGS
+	kf_rsp		KPTI_RSP
+	kf_ss		KPTI_SS
+
+	kf_tr_rsp	KPTI_TOP
+
+	kf_kernel_cr3	KPTI_KCR3
+	kf_user_cr3	KPTI_UCR3
+	kf_tr_ret_rsp	KPTI_RET_RSP
+	kf_tr_cr3	KPTI_TR_CR3
+
+	kf_tr_flag	KPTI_FLAG
 
 standard_pic
 	c_curmask

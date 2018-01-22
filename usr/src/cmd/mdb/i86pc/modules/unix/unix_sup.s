@@ -32,6 +32,10 @@ kmdb_unix_getcr0(void)
 { return (0); }
 
 ulong_t
+kmdb_unix_getcr3(void)
+{ return (0); }
+
+ulong_t
 kmdb_unix_getcr4(void)
 { return (0); }
 

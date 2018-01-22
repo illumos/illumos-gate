@@ -50,6 +50,7 @@
 #include <sys/bitmap.h>
 #include <sys/termios.h>
 #include <sys/kdi_impl.h>
+#include <sys/sysmacros.h>
 
 /*
  * This is the area containing the saved state when we enter
@@ -256,10 +257,44 @@ kaif_set_register(const char *regname, kreg_t val)
 	return (0);
 }
 
+/*
+ * Refuse to single-step or break within any stub that loads a user %cr3 value.
+ * As the KDI traps are not careful to restore such a %cr3, this can all go
+ * wrong, both spectacularly and subtly.
+ */
+static boolean_t
+kaif_toxic_text(uintptr_t addr)
+{
+	static GElf_Sym toxic_syms[2] = { 0, };
+	size_t i;
+
+	if (toxic_syms[0].st_name == NULL) {
+		if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+		    "tr_iret_user", &toxic_syms[0], NULL) != 0)
+			warn("couldn't find tr_iret_user\n");
+		if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+		    "tr_mmu_flush_user_range", &toxic_syms[1], NULL) != 0)
+			warn("couldn't find tr_mmu_flush_user_range\n");
+	}
+
+	for (i = 0; i < ARRAY_SIZE(toxic_syms); i++) {
+		if (addr >= toxic_syms[i].st_value &&
+		    addr - toxic_syms[i].st_value < toxic_syms[i].st_size)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static int
 kaif_brkpt_arm(uintptr_t addr, mdb_instr_t *instrp)
 {
 	mdb_instr_t bkpt = KAIF_BREAKPOINT_INSTR;
+
+	if (kaif_toxic_text(addr)) {
+		warn("%a cannot be a breakpoint target\n", addr);
+		return (set_errno(EMDB_TGTNOTSUP));
+	}
 
 	if (mdb_tgt_vread(mdb.m_target, instrp, sizeof (mdb_instr_t), addr) !=
 	    sizeof (mdb_instr_t))
@@ -444,6 +479,11 @@ kaif_step(void)
 	size_t pcoff = 0;
 
 	(void) kmdb_dpi_get_register("pc", &pc);
+
+	if (kaif_toxic_text(pc)) {
+		warn("%a cannot be stepped\n", pc);
+		return (set_errno(EMDB_TGTNOTSUP));
+	}
 
 	if ((npc = mdb_dis_nextins(mdb.m_disasm, mdb.m_target,
 	    MDB_TGT_AS_VIRT, pc)) == pc) {

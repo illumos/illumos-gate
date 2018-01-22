@@ -21,7 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_HAT_PTE_H
@@ -156,9 +156,10 @@ typedef	int8_t level_t;
 #define	PFN_ABOVE64G(pfn) ((pfn) >= PFN_64G)
 
 /*
- * The CR3 register holds the physical address of the top level page table.
+ * The CR3 register holds the physical address of the top level page table,
+ * along with the current PCID if any.
  */
-#define	MAKECR3(pfn)	mmu_ptob(pfn)
+#define	MAKECR3(pfn, pcid)	(mmu_ptob(pfn) | pcid)
 
 /*
  * HAT/MMU parameters that depend on kernel mode and/or processor type
@@ -175,10 +176,16 @@ struct hat_mmu_info {
 	uint_t max_page_level;	/* maximum level at which we can map a page */
 	uint_t umax_page_level; /* max user page map level */
 	uint_t ptes_per_table;	/* # of entries in lower level page tables */
-	uint_t top_level_count;	/* # of entries in top most level page table */
+	uint_t top_level_count;	/* # of entries in top-level page table */
+	uint_t top_level_uslots; /* # of user slots in top-level page table */
+	uint_t num_copied_ents;	/* # of PCP-copied PTEs to create */
+	/* 32-bit versions of values */
+	uint_t top_level_uslots32;
+	uint_t max_level32;
+	uint_t num_copied_ents32;
 
-	uint_t	hash_cnt;	/* cnt of entries in htable_hash_cache */
-	uint_t	vlp_hash_cnt;	/* cnt of entries in vlp htable_hash_cache */
+	uint_t hash_cnt;	/* cnt of entries in htable_hash_cache */
+	uint_t hat32_hash_cnt;	/* cnt of entries in 32-bit htable_hash_cache */
 
 	uint_t pae_hat;		/* either 0 or 1 */
 

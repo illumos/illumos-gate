@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_MDB_KREG_H
 #define	_MDB_KREG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/kdi_regs.h>
 #ifndef _ASM
@@ -75,8 +75,11 @@ typedef uint32_t kreg_t;
 #define	KREG_ES		KDIREG_ES
 #define	KREG_FS		KDIREG_FS
 #define	KREG_GS		KDIREG_GS
+#define	KREG_GSBASE	KDIREG_GSBASE
+#define	KREG_KGSBASE	KDIREG_KGSBASE
 #define	KREG_TRAPNO	KDIREG_TRAPNO
 #define	KREG_ERR	KDIREG_ERR
+#define	KREG_CR2	KDIREG_CR2
 #define	KREG_RIP	KDIREG_RIP
 #define	KREG_CS		KDIREG_CS
 #define	KREG_RFLAGS	KDIREG_RFLAGS

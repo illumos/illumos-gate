@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_GENASSYM
@@ -68,8 +70,6 @@ extern void exit(int);
 int
 main(int argc, char *argv[])
 {
-	printf("#define\tT_AST 0x%x\n", T_AST);
-
 	printf("#define\tLOCK_LEVEL 0x%x\n", LOCK_LEVEL);
 	printf("#define\tCLOCK_LEVEL 0x%x\n", CLOCK_LEVEL);
 	printf("#define\tDISP_LEVEL 0x%x\n", DISP_LEVEL);
@@ -109,20 +109,6 @@ main(int argc, char *argv[])
 
 	printf("#define\tSSE_MXCSR_EFLAGS 0x%x\n", SSE_MXCSR_EFLAGS);
 
-	printf("#define\tFP_487 0x%x\n", FP_487);
-	printf("#define\tFP_486 0x%x\n", FP_486);
-	printf("#define\tFPU_CW_INIT 0x%x\n", FPU_CW_INIT);
-	printf("#define\tFPU_EN 0x%x\n", FPU_EN);
-	printf("#define\tFPU_VALID 0x%x\n", FPU_VALID);
-
-	printf("#define\tFP_NO 0x%x\n", FP_NO);
-	printf("#define\tFP_SW 0x%x\n", FP_SW);
-	printf("#define\tFP_HW 0x%x\n", FP_HW);
-	printf("#define\tFP_287 0x%x\n", FP_287);
-	printf("#define\tFP_387 0x%x\n", FP_387);
-	printf("#define\t__FP_SSE 0x%x\n", __FP_SSE);
-
-	printf("#define\tFP_FNSAVE 0x%x\n", FP_FNSAVE);
 	printf("#define\tFP_FXSAVE 0x%x\n", FP_FXSAVE);
 	printf("#define\tFP_XSAVE 0x%x\n", FP_XSAVE);
 
@@ -153,11 +139,6 @@ main(int argc, char *argv[])
 	printf("#define\tNSEC_PER_CLOCK_TICK 0x%llx\n", NANOSEC / 100);
 
 	printf("#define\tNSEC_PER_COUNTER_TICK 0x%llx\n", NANOSEC / PIT_HZ);
-
-	printf("#define\tPITCTR0_PORT 0x%x\n", PITCTR0_PORT);
-	printf("#define\tPITCTL_PORT 0x%x\n", PITCTL_PORT);
-	printf("#define\tPIT_COUNTDOWN 0x%x\n",
-	    PIT_C0 | PIT_LOADMODE | PIT_NDIVMODE);
 
 	printf("#define\tNBPW 0x%x\n", NBPW);
 
