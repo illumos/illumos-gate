@@ -10891,7 +10891,7 @@ h usr/share/lib/zoneinfo/Africa/Niamey=usr/share/lib/zoneinfo/Africa/Lagos
 h usr/share/lib/zoneinfo/Africa/Nouakchott=usr/share/lib/zoneinfo/Africa/Abidjan
 h usr/share/lib/zoneinfo/Africa/Ouagadougou=usr/share/lib/zoneinfo/Africa/Abidjan
 h usr/share/lib/zoneinfo/Africa/Porto-Novo=usr/share/lib/zoneinfo/Africa/Lagos
-h usr/share/lib/zoneinfo/Africa/Sao_Tome=usr/share/lib/zoneinfo/Africa/Abidjan
+f usr/share/lib/zoneinfo/Africa/Sao_Tome 0644 root bin
 h usr/share/lib/zoneinfo/Africa/Timbuktu=usr/share/lib/zoneinfo/Africa/Abidjan
 f usr/share/lib/zoneinfo/Africa/Tripoli 0644 root bin
 f usr/share/lib/zoneinfo/Africa/Tunis 0644 root bin
@@ -11447,7 +11447,6 @@ h usr/share/lib/zoneinfo/US/Indiana-Starke=usr/share/lib/zoneinfo/America/Knox_I
 f usr/share/lib/zoneinfo/US/Michigan 0644 root bin
 f usr/share/lib/zoneinfo/US/Mountain 0644 root bin
 f usr/share/lib/zoneinfo/US/Pacific 0644 root bin
-h usr/share/lib/zoneinfo/US/Pacific-New=usr/share/lib/zoneinfo/US/Pacific
 f usr/share/lib/zoneinfo/US/Samoa 0644 root bin
 f usr/share/lib/zoneinfo/UTC 0644 root bin
 h usr/share/lib/zoneinfo/Universal=usr/share/lib/zoneinfo/UTC
@@ -11466,7 +11465,6 @@ f usr/share/lib/zoneinfo/src/etcetera 0644 root bin
 f usr/share/lib/zoneinfo/src/europe 0644 root bin
 f usr/share/lib/zoneinfo/src/factory 0644 root bin
 f usr/share/lib/zoneinfo/src/northamerica 0644 root bin
-f usr/share/lib/zoneinfo/src/pacificnew 0644 root bin
 f usr/share/lib/zoneinfo/src/southamerica 0644 root bin
 f usr/share/lib/zoneinfo/src/systemv 0644 root bin
 d usr/share/lib/zoneinfo/tab 0755 root bin
