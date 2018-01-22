@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -357,8 +358,9 @@ devmap_ctxto(void *data)
  * Create a device segment.
  */
 int
-segdev_create(struct seg *seg, void *argsp)
+segdev_create(struct seg **segpp, void *argsp)
 {
+	struct seg *seg = *segpp;
 	struct segdev_data *sdp;
 	struct segdev_crargs *a = (struct segdev_crargs *)argsp;
 	devmap_handle_t *dhp = (devmap_handle_t *)a->devmap_data;

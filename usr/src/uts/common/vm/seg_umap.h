@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_SEG_UMAP_H
@@ -33,7 +33,7 @@ typedef struct segumap_data {
 	size_t		sud_softlockcnt;
 } segumap_data_t;
 
-extern int segumap_create(struct seg *, void *);
+extern int segumap_create(struct seg **, void *);
 
 #ifdef	__cplusplus
 }

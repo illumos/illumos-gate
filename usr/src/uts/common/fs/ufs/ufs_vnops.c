@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1984, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -183,7 +183,6 @@ static	int ufs_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 static	int ufs_priv_access(void *, int, struct cred *);
 static	int ufs_eventlookup(struct vnode *, char *, struct cred *,
     struct vnode **);
-extern int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
 
 /*
  * For lockfs: ulockfs begin/end is now inlined in the ufs_xxx functions.

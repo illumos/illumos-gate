@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_SEG_HOLE_H
@@ -28,10 +28,10 @@ typedef struct seghole_data {
 	const char	*shd_name;
 } seghole_data_t;
 
-extern int seghole_create(struct seg *, void *);
+extern int seghole_create(struct seg **, void *);
 
 #define	AS_MAP_CHECK_SEGHOLE(crfp)		\
-	((crfp) == (int (*)())seghole_create)
+	((crfp) == (segcreate_func_t)seghole_create)
 
 #ifdef	__cplusplus
 }

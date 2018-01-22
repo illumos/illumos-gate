@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -256,6 +256,8 @@ extern struct as kas;		/* kernel's address space */
 #define	AS_SEGNEXT(as, seg)	AVL_NEXT(&(as)->a_segtree, (seg))
 #define	AS_SEGPREV(as, seg)	AVL_PREV(&(as)->a_segtree, (seg))
 
+typedef int (*segcreate_func_t)(struct seg **, void *);
+
 void	as_init(void);
 void	as_avlinit(struct as *);
 struct	seg *as_segat(struct as *as, caddr_t addr);
@@ -273,8 +275,10 @@ faultcode_t as_faulta(struct as *as, caddr_t addr, size_t size);
 int	as_setprot(struct as *as, caddr_t addr, size_t size, uint_t prot);
 int	as_checkprot(struct as *as, caddr_t addr, size_t size, uint_t prot);
 int	as_unmap(struct as *as, caddr_t addr, size_t size);
-int	as_map(struct as *as, caddr_t addr, size_t size, int ((*crfp)()),
-		void *argsp);
+int	as_map(struct as *as, caddr_t addr, size_t size, segcreate_func_t crfp,
+    void *argsp);
+int as_map_locked(struct as *as, caddr_t addr, size_t size,
+    segcreate_func_t crfp, void *argsp);
 void	as_purge(struct as *as);
 int	as_gap(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
 		uint_t flags, caddr_t addr);

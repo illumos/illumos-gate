@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 
@@ -82,8 +82,9 @@ static struct seg_ops seghole_ops = {
  * Create a hole in the AS.
  */
 int
-seghole_create(struct seg *seg, void *argsp)
+seghole_create(struct seg **segpp, void *argsp)
 {
+	struct seg *seg = *segpp;
 	seghole_crargs_t *crargs = argsp;
 	seghole_data_t *data;
 

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_SEG_MF_H
@@ -42,7 +43,7 @@ struct segmf_crargs {
 	uchar_t		maxprot;
 };
 
-extern int segmf_create(struct seg *, void *);
+extern int segmf_create(struct seg **, void *);
 
 extern int segmf_add_mfns(struct seg *, caddr_t, mfn_t, pgcnt_t, domid_t);
 

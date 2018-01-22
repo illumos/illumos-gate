@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -72,7 +72,7 @@ size_t	spt_used;
  */
 pgcnt_t segspt_minfree = 0;
 
-static int segspt_create(struct seg *seg, caddr_t argsp);
+static int segspt_create(struct seg **segpp, void *argsp);
 static int segspt_unmap(struct seg *seg, caddr_t raddr, size_t ssize);
 static void segspt_free(struct seg *seg);
 static void segspt_free_pages(struct seg *seg, caddr_t addr, size_t len);
@@ -369,8 +369,9 @@ segspt_unmap(struct seg *seg, caddr_t raddr, size_t ssize)
 }
 
 int
-segspt_create(struct seg *seg, caddr_t argsp)
+segspt_create(struct seg **segpp, void *argsp)
 {
+	struct seg	*seg = *segpp;
 	int		err;
 	caddr_t		addr = seg->s_base;
 	struct spt_data *sptd;
@@ -1671,8 +1672,9 @@ softlock_decrement:
 }
 
 int
-segspt_shmattach(struct seg *seg, caddr_t *argsp)
+segspt_shmattach(struct seg **segpp, void *argsp)
 {
+	struct seg *seg = *segpp;
 	struct shm_data *shmd_arg = (struct shm_data *)argsp;
 	struct shm_data *shmd;
 	struct anon_map *shm_amp = shmd_arg->shm_amp;
