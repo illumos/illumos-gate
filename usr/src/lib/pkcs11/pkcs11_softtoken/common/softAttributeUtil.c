@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -322,11 +323,8 @@ soft_validate_attr(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 static void
 cleanup_cert_attr(cert_attr_t *attr)
 {
-	if (attr) {
-		if (attr->value) {
-			(void) memset(attr->value, 0, attr->length);
-			free(attr->value);
-		}
+	if (attr != NULL) {
+		freezero(attr->value, attr->length);
 		attr->value = NULL;
 		attr->length = 0;
 	}
@@ -345,8 +343,7 @@ copy_cert_attr(cert_attr_t *src_attr, cert_attr_t **dest_attr)
 
 	/* free memory if its already allocated */
 	if (*dest_attr != NULL) {
-		if ((*dest_attr)->value != (CK_BYTE *)NULL)
-			free((*dest_attr)->value);
+		cleanup_cert_attr(*dest_attr);
 	} else {
 		*dest_attr = malloc(sizeof (cert_attr_t));
 		if (*dest_attr == NULL)
@@ -421,14 +418,16 @@ soft_cleanup_extra_attr(soft_object_t *object_p)
 	extra_attr = object_p->extra_attrlistp;
 	while (extra_attr) {
 		tmp = extra_attr->next;
-		if (extra_attr->attr.pValue)
+		if (extra_attr->attr.pValue != NULL) {
 			/*
 			 * All extra attributes in the extra attribute
 			 * list have pValue points to the value of the
 			 * attribute (with simple byte array type).
 			 * Free the storage for the value of the attribute.
 			 */
-			free(extra_attr->attr.pValue);
+			freezero(extra_attr->attr.pValue,
+			    extra_attr->attr.ulValueLen);
+		}
 
 		/* Free the storage for the attribute_info struct. */
 		free(extra_attr);
@@ -672,9 +671,11 @@ set_extra_attr_to_object(soft_object_t *object_p, CK_ATTRIBUTE_TYPE type,
 	    (template->ulValueLen > 0)) {
 		if (template->ulValueLen > extra_attr->attr.ulValueLen) {
 			/* The old buffer is too small to hold the new value. */
-			if (extra_attr->attr.pValue != NULL)
+			if (extra_attr->attr.pValue != NULL) {
 				/* Free storage for the old attribute value. */
-				free(extra_attr->attr.pValue);
+				freezero(extra_attr->attr.pValue,
+				    extra_attr->attr.ulValueLen);
+			}
 
 			/* Allocate storage for the new attribute value. */
 			extra_attr->attr.pValue = malloc(template->ulValueLen);
@@ -930,11 +931,7 @@ get_cert_attr_from_template(cert_attr_t **dest, CK_ATTRIBUTE_PTR src)
 		 * existing value and release the memory.
 		 */
 		if (*dest != NULL) {
-			if ((*dest)->value != NULL) {
-				(void) memset((*dest)->value, 0,
-				    (*dest)->length);
-				free((*dest)->value);
-			}
+			cleanup_cert_attr(*dest);
 		} else {
 			*dest = malloc(sizeof (cert_attr_t));
 			if (*dest == NULL) {
@@ -987,12 +984,9 @@ get_cert_attr_from_object(cert_attr_t *src, CK_ATTRIBUTE_PTR template)
 void
 string_attr_cleanup(CK_ATTRIBUTE_PTR template)
 {
-
-	if (template->pValue) {
-		free(template->pValue);
-		template->pValue = NULL;
-		template->ulValueLen = 0;
-	}
+	freezero(template->pValue, template->ulValueLen);
+	template->pValue = NULL;
+	template->ulValueLen = 0;
 }
 
 /*
@@ -1006,12 +1000,9 @@ bigint_attr_cleanup(biginteger_t *big)
 	if (big == NULL)
 		return;
 
-	if (big->big_value) {
-		(void) memset(big->big_value, 0, big->big_value_len);
-		free(big->big_value);
-		big->big_value = NULL;
-		big->big_value_len = 0;
-	}
+	freezero(big->big_value, big->big_value_len);
+	big->big_value = NULL;
+	big->big_value_len = 0;
 }
 
 
@@ -1151,16 +1142,14 @@ soft_cleanup_object_bigint_attrs(soft_object_t *object_p)
 			/* cleanup key data area */
 			if (OBJ_SEC_VALUE(object_p) != NULL &&
 			    OBJ_SEC_VALUE_LEN(object_p) > 0) {
-				(void) memset(OBJ_SEC_VALUE(object_p), 0,
+				freezero(OBJ_SEC_VALUE(object_p),
 				    OBJ_SEC_VALUE_LEN(object_p));
-				free(OBJ_SEC_VALUE(object_p));
 			}
 			/* cleanup key schedule data area */
 			if (OBJ_KEY_SCHED(object_p) != NULL &&
 			    OBJ_KEY_SCHED_LEN(object_p) > 0) {
-				(void) memset(OBJ_KEY_SCHED(object_p), 0,
+				freezero(OBJ_KEY_SCHED(object_p),
 				    OBJ_KEY_SCHED_LEN(object_p));
-				free(OBJ_KEY_SCHED(object_p));
 			}
 
 			/* Release Secret Key Object struct. */
@@ -6319,7 +6308,7 @@ soft_copy_secret_key_attr(secret_key_obj_t *old_secret_key_obj_p,
 	(void) memcpy(sk, old_secret_key_obj_p, sizeof (secret_key_obj_t));
 
 	/* copy the secret key value */
-	sk->sk_value = malloc((sizeof (CK_BYTE) * sk->sk_value_len));
+	sk->sk_value = malloc(sk->sk_value_len);
 	if (sk->sk_value == NULL) {
 		free(sk);
 		return (CKR_HOST_MEMORY);
@@ -6334,6 +6323,7 @@ soft_copy_secret_key_attr(secret_key_obj_t *old_secret_key_obj_p,
 	    old_secret_key_obj_p->keysched_len > 0) {
 		sk->key_sched = malloc(old_secret_key_obj_p->keysched_len);
 		if (sk->key_sched == NULL) {
+			freezero(sk->sk_value, sk->sk_value_len);
 			free(sk);
 			return (CKR_HOST_MEMORY);
 		}

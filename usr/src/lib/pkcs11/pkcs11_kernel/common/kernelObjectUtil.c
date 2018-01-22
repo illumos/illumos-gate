@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -77,8 +78,7 @@ kernel_cleanup_object(kernel_object_t *objp)
 	 */
 	if (objp->class == CKO_SECRET_KEY) {
 		if (OBJ_SEC(objp) != NULL && OBJ_SEC_VALUE(objp) != NULL) {
-			bzero(OBJ_SEC_VALUE(objp), OBJ_SEC_VALUE_LEN(objp));
-			free(OBJ_SEC_VALUE(objp));
+			freezero(OBJ_SEC_VALUE(objp), OBJ_SEC_VALUE_LEN(objp));
 			OBJ_SEC_VALUE(objp) = NULL;
 			OBJ_SEC_VALUE_LEN(objp) = 0;
 		}

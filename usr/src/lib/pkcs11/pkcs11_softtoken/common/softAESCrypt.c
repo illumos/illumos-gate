@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -488,14 +489,21 @@ encrypt_failed:
 cleanup:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 	aes_ctx = (aes_ctx_t *)soft_aes_ctx->aes_cbc;
-	if (aes_ctx != NULL) {
-		bzero(aes_ctx->ac_keysched, aes_ctx->ac_keysched_len);
-		free(soft_aes_ctx->aes_cbc);
+	switch (mechanism) {
+	case CKM_AES_ECB:
+		freezero(aes_ctx, sizeof (ecb_ctx_t));
+		break;
+	case CKM_AES_CMAC:
+	case CKM_AES_CBC:
+	case CKM_AES_CBC_PAD:
+		freezero(aes_ctx, sizeof (cbc_ctx_t));
+		break;
+	case CKM_AES_CTR:
+		freezero(aes_ctx, sizeof (ctr_ctx_t));
+		break;
 	}
-
-	bzero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
-	free(soft_aes_ctx->key_sched);
-	free(session_p->encrypt.context);
+	freezero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
+	freezero(session_p->encrypt.context, sizeof (soft_aes_ctx_t));
 	session_p->encrypt.context = NULL;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 
@@ -851,14 +859,9 @@ decrypt_failed:
 cleanup:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 	aes_ctx = (aes_ctx_t *)soft_aes_ctx->aes_cbc;
-	if (aes_ctx != NULL) {
-		bzero(aes_ctx->ac_keysched, aes_ctx->ac_keysched_len);
-		free(soft_aes_ctx->aes_cbc);
-	}
-
-	bzero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
-	free(soft_aes_ctx->key_sched);
-	free(session_p->decrypt.context);
+	free(aes_ctx);
+	freezero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
+	freezero(session_p->decrypt.context, sizeof (soft_aes_ctx_t));
 	session_p->decrypt.context = NULL;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 

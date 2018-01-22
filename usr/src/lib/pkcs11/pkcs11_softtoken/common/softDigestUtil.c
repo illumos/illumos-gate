@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <strings.h>
@@ -302,7 +303,7 @@ soft_digest_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	/* Paranoia on behalf of C_DigestKey callers: bzero the context */
 	if (session_p->digest.flags & CRYPTO_KEY_DIGESTED) {
-		bzero(session_p->digest.context, len);
+		explicit_bzero(session_p->digest.context, len);
 		session_p->digest.flags &= ~CRYPTO_KEY_DIGESTED;
 	}
 	*pulDigestLen = digestLen;

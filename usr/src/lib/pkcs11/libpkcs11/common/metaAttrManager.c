@@ -22,6 +22,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <string.h>
@@ -526,7 +527,8 @@ dealloc_attributes(generic_attr_t *attributes, size_t num_attributes)
 		 * extra work to just do them all. [Most attributes are just
 		 * 1 or 4 bytes]
 		 */
-		bzero(attr->attribute.pValue, attr->attribute.ulValueLen);
+		explicit_bzero(attr->attribute.pValue,
+		    attr->attribute.ulValueLen);
 
 		if (attr->isMalloced)
 			free(attr->attribute.pValue);
@@ -564,13 +566,15 @@ attribute_set_value(CK_ATTRIBUTE *new_attr,
 		/* Existing storage is sufficient to store new value. */
 
 		/* bzero() out any data that won't be overwritten. */
-		bzero((char *)attr->attribute.pValue + new_attr->ulValueLen,
+		explicit_bzero((char *)attr->attribute.pValue +
+		    new_attr->ulValueLen,
 		    attr->attribute.ulValueLen - new_attr->ulValueLen);
 
 	} else if (new_attr->ulValueLen <= sizeof (attr->generic_data)) {
 		/* Use generic storage to avoid a malloc. */
 
-		bzero(attr->attribute.pValue, attr->attribute.ulValueLen);
+		explicit_bzero(attr->attribute.pValue,
+		    attr->attribute.ulValueLen);
 		if (attr->isMalloced) {
 			/*
 			 * If app sets a large value (triggering a malloc),
