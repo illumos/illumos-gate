@@ -136,6 +136,7 @@ const mdb_tgt_regdesc_t mdb_amd64_kregs[] = {
 	{ "gsbase", KREG_GSBASE, MDB_TGT_R_EXPORT },
 	{ "kgsbase", KREG_KGSBASE, MDB_TGT_R_EXPORT },
 	{ "cr2", KREG_CR2, MDB_TGT_R_EXPORT },
+	{ "cr3", KREG_CR3, MDB_TGT_R_EXPORT },
 	{ NULL, 0, 0 }
 };
 
@@ -194,8 +195,9 @@ mdb_amd64_printregs(const mdb_tgt_gregset_t *gregs)
 	    kregs[KREG_ES], kregs[KREG_FS] & 0xffff);
 	mdb_printf("%%gs = 0x%04x\t%%gsbase = 0x%lx\t%%kgsbase = 0x%lx\n",
 	    kregs[KREG_GS] & 0xffff, kregs[KREG_GSBASE], kregs[KREG_KGSBASE]);
-	mdb_printf("%%trapno = 0x%x\t%%err = 0x%x\t%%cr2 = 0x%lx\n",
-	    kregs[KREG_TRAPNO], kregs[KREG_ERR], kregs[KREG_CR2]);
+	mdb_printf("%%trapno = 0x%x\t%%err = 0x%x\t%%cr2 = 0x%lx\t"
+	    "%%cr3 = 0x%lx\n", kregs[KREG_TRAPNO], kregs[KREG_ERR],
+	    kregs[KREG_CR2], kregs[KREG_CR3]);
 }
 
 int

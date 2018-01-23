@@ -284,17 +284,27 @@
 	wrmsr
 
 	/*
+	 * In the trampoline we stashed the incoming %cr3. Copy this into
+	 * the kdiregs for restoration and later use.
+	 */
+	mov	%gs:(CPU_KPTI_DBG+KPTI_TR_CR3), %rdx
+	mov	%rdx, REG_OFF(KDIREG_CR3)(%rsp)
+	/*
 	 * Switch to the kernel's %cr3. From the early interrupt handler
 	 * until now we've been running on the "paranoid" %cr3 (that of kas
 	 * from early in boot).
 	 *
-	 * Hopefully it's not corrupt!
+	 * If we took the interrupt from somewhere already on the kas/paranoid
+	 * %cr3 though, don't change it (this could happen if kcr3 is corrupt
+	 * and we took a gptrap earlier from this very code).
 	 */
+	cmpq	%rdx, kpti_safe_cr3
+	je	.no_kcr3
 	mov	%gs:CPU_KPTI_KCR3, %rdx
-	cmp	$0, %rdx
-	je	.zero_kcr3
+	cmpq	$0, %rdx
+	je	.no_kcr3
 	mov	%rdx, %cr3
-.zero_kcr3:
+.no_kcr3:
 
 #endif	/* __xpv */
 
@@ -391,6 +401,9 @@
 
 	subq	$REG_OFF(KDIREG_TRAPNO), %rsp
 	KDI_SAVE_REGS(%rsp)
+
+	movq	%cr3, %rax
+	movq	%rax, REG_OFF(KDIREG_CR3)(%rsp)
 
 	movq	REG_OFF(KDIREG_SS)(%rsp), %rax
 	xchgq	REG_OFF(KDIREG_RIP)(%rsp), %rax
@@ -519,6 +532,29 @@
 	KDI_RESTORE_DEBUGGING_STATE
 
 	movq	KRS_GREGS(%rdi), %rsp
+
+#if !defined(__xpv)
+	/*
+	 * If we're going back via tr_iret_kdi, then we want to copy the
+	 * final %cr3 we're going to back into the kpti_dbg area now.
+	 *
+	 * Since the trampoline needs to find the kpti_dbg too, we enter it
+	 * with %r13 set to point at that. The real %r13 (to restore before
+	 * the iret) we stash in the kpti_dbg itself.
+	 */
+	movq	%gs:CPU_SELF, %r13	/* can't leaq %gs:*, use self-ptr */
+	addq	$CPU_KPTI_DBG, %r13
+
+	movq	REG_OFF(KDIREG_R13)(%rsp), %rdx
+	movq	%rdx, KPTI_R13(%r13)
+
+	movq	REG_OFF(KDIREG_CR3)(%rsp), %rdx
+	movq	%rdx, KPTI_TR_CR3(%r13)
+
+	/* The trampoline will undo this later. */
+	movq	%r13, REG_OFF(KDIREG_R13)(%rsp)
+#endif
+
 	KDI_RESTORE_REGS(%rsp)
 	addq	$REG_OFF(KDIREG_RIP), %rsp	/* Discard state, trapno, err */
 	/*
@@ -526,7 +562,7 @@
 	 * for either kernel or userland.
 	 */
 #if !defined(__xpv)
-	jmp	tr_iret_auto
+	jmp	tr_iret_kdi
 #else
 	IRET
 #endif

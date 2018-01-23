@@ -251,6 +251,8 @@ cpu
 	cpu_m.mcpu_pad2			CPU_KPTI_START
 	cpu_m.mcpu_pad3			CPU_KPTI_END
 
+	cpu_m.mcpu_kpti_dbg		CPU_KPTI_DBG
+
 kpti_frame
 	kf_r14		KPTI_R14
 	kf_r13		KPTI_R13
