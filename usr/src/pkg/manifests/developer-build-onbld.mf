@@ -47,7 +47,6 @@ dir path=opt/onbld/bin/$(ARCH)
 dir path=opt/onbld/env
 dir path=opt/onbld/etc
 dir path=opt/onbld/etc/exception_lists
-dir path=opt/onbld/gk
 dir path=opt/onbld/lib
 dir path=opt/onbld/lib/$(ARCH)
 dir path=opt/onbld/lib/$(ARCH)/64
@@ -140,9 +139,6 @@ file path=opt/onbld/etc/exception_lists/interface_cmp
 file path=opt/onbld/etc/hgstyle
 file path=opt/onbld/etc/its.conf
 file path=opt/onbld/etc/its.reg
-file path=opt/onbld/gk/.cshrc
-file path=opt/onbld/gk/.login
-file path=opt/onbld/gk/gen_make.machines mode=0755
 file path=opt/onbld/lib/$(ARCH)/64/libmakestate.so.1
 file path=opt/onbld/lib/$(ARCH)/libdwarf.so.1
 file path=opt/onbld/lib/$(ARCH)/libmakestate.so.1

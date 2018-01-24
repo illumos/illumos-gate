@@ -25,13 +25,7 @@
 This directory contains the tools used to do a full build of the
 OS/Net workspace.  They usually live in the /opt/onbld directory on build
 machines. From here, 'make install' will build and install the tools
-in $ROOT/opt/onbld. If you like, 'make pkg' will build the SUNWonbld
-package in $(PKGARCHIVE). Installing that package will populate the
-/opt/onbld directory, and create a root account for building called 'gk',
-which uses csh and has a home directory of /opt/onbld/gk. You can
-use this account to do full builds with 'nightly'. You don't have to,
-but the 'gk' account has the path setup properly, has a .make.machines
-file for dmake, and has a .login that sets up for dmake.
+in $ROOT/opt/onbld.
 
 Layout of /opt/onbld
 --------------------
@@ -39,9 +33,6 @@ Layout of /opt/onbld
 /opt/onbld/etc/abi
 	contains Solaris ABI database (ABI_*.db) and exceptions
 	for ABI Auditing tool (interface_check, interface_cmp).
-
-/opt/onbld/gk
-	gk account's home directory.
 
 /opt/onbld/bin
 	basic bin directory - contains scripts.
@@ -279,8 +270,7 @@ How to do a full build
    edit the file and tailor it to your workspace. Remember that this file
    is a shell script, so it can do more than set environment variables.
 
-2. Login as 'gk' (or root, but your PATH and .make.machines for dmake will
-   not be right). Run 'nightly' and give it your environment file as an
+2. Run 'nightly' and give it your environment file as an
    option. 'nightly' will first look for your environment file in
    /opt/onbld/env, and if it's not there then it will look for it as an
    absolute or relative path. Some people put their environment files in

@@ -42,7 +42,6 @@ COMMON_SUBDIRS= \
 	depcheck \
 	env \
 	findunref \
-	gk \
 	install.bin \
 	lintdump \
 	make \
@@ -109,7 +108,6 @@ ROOTDIRS= \
 	$(ROOTONBLD)/etc \
 	$(ROOTONBLD)/etc/exception_lists \
 	$(ROOTONBLD)/share \
-	$(ROOTONBLD)/gk \
 	$(ROOTONBLD)/man \
 	$(ROOTONBLD)/man/man1onbld
 
