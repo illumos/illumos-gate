@@ -224,7 +224,7 @@ ipmi_chassis_identify(ipmi_handle_t *ihp, boolean_t enable)
 }
 
 /*
- * calller is responsible for free'ing returned structure
+ * caller is responsible for free'ing returned structure
  */
 ipmi_chassis_status_t *
 ipmi_chassis_status(ipmi_handle_t *ihp)
