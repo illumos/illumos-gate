@@ -92,11 +92,6 @@ check_rtime
 	entries, which help detect changes in software dependencies and makes
 	sure objects don't have any strange runpaths like /opt/SUNWspro/lib.
 
-checkproto
-	Runs protocmp and protolist on a workspace (or uses the environment
-	variable CODEMGR_WS to determine the workspace). Checks the proto area
-	against the packages.
-
 codereview
 	Given two filenames, creates a postscript file with the file 
 	differences highlighted.
