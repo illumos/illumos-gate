@@ -217,10 +217,6 @@ nightly
 	env/developer and env/gatekeeper for sample, hopefully well-commented
 	env files.
 
-pmodes
-	enforces proper file ownership and permissions in pkgmap and package
-	prototype* files.  converts files if necessary
-
 protocmp
 	compares proto lists and the package definitions. Used by nightly
 	to determine if the proto area matches the packages, and to detect

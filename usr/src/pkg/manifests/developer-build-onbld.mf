@@ -81,7 +81,6 @@ file path=opt/onbld/bin/$(ARCH)/make mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/mbh_patch mode=0555
 file path=opt/onbld/bin/$(ARCH)/ndrgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/ndrgen1 mode=0555
-file path=opt/onbld/bin/$(ARCH)/pmodes mode=0555
 file path=opt/onbld/bin/$(ARCH)/protocmp mode=0555
 file path=opt/onbld/bin/$(ARCH)/protolist mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/stabs mode=0555

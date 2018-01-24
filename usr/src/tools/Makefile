@@ -47,7 +47,6 @@ COMMON_SUBDIRS= \
 	make \
 	ndrgen \
 	onbld \
-	pmodes \
 	protocmp \
 	protolist \
 	scripts
