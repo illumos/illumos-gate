@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2014 by Saso Kiselkov. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
@@ -6081,6 +6081,10 @@ arc_init(void)
 
 	if (arc_c_min < arc_meta_limit / 2 && zfs_arc_min == 0)
 		arc_c_min = arc_meta_limit / 2;
+
+	/* On larger-memory machines, we clamp the minimum at 1GB */
+	if (zfs_arc_min == 0)
+		arc_c_min = MIN(arc_c_min, (1 << 30));
 
 	if (zfs_arc_meta_min > 0) {
 		arc_meta_min = zfs_arc_meta_min;
