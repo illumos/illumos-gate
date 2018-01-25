@@ -1664,22 +1664,18 @@ xattr_dir_lookup(vnode_t *dvp, vnode_t **vpp, int flags, cred_t *cr)
 
 			ASSERT((*vpp)->v_count == 1);
 			vn_free(*vpp);
+			VN_RELE_LOCKED(dvp);
 
 			mutex_destroy(&dp->gfsd_lock);
 			kmem_free(dp->gfsd_static,
 			    dp->gfsd_nstatic * sizeof (gfs_dirent_t));
 			kmem_free(dp, dp->gfsd_file.gfs_size);
 
-			/*
-			 * There is an implied VN_HOLD(dvp) here.  We should
-			 * be doing a VN_RELE(dvp) to clean up the reference
-			 * from *vpp, and then a VN_HOLD(dvp) for the new
-			 * reference.  Instead, we just leave the count alone.
-			 */
-
+			/* dvp was held by winner in gfs_dir_create */
 			*vpp = dvp->v_xattrdir;
 			VN_HOLD(*vpp);
 		} else {
+			/* winner */
 			(*vpp)->v_flag |= (V_XATTRDIR|V_SYSATTR);
 			dvp->v_xattrdir = *vpp;
 		}

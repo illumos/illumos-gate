@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2018 Gary Mills
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
@@ -46,6 +47,7 @@
 #include <sys/lockstat.h>
 #include <sys/stat.h>
 #include <sys/sunddi.h>
+#include <sys/ddi.h>
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
@@ -88,7 +90,8 @@ static struct rtc_offset pc_rtc_offset = {0, 0, 0, 0};
  * are useful to TOD.
  */
 void
-pc_tod_set_rtc_offsets(ACPI_TABLE_FADT *fadt) {
+pc_tod_set_rtc_offsets(ACPI_TABLE_FADT *fadt)
+{
 	int		ok = 0;
 
 	/*
@@ -330,7 +333,9 @@ todpc_clralarm(tod_ops_t *top)
  * Routine to read contents of real time clock to the specified buffer.
  * Returns ENXIO if clock not valid, or EAGAIN if clock data cannot be read
  * else 0.
- * The routine will busy wait for the Update-In-Progress flag to clear.
+ * Some RTC hardware is very slow at asserting the validity flag on
+ * startup.  The routine will busy wait for the RTC to become valid.
+ * The routine will also busy wait for the Update-In-Progress flag to clear.
  * On completion of the reads the Seconds register is re-read and the
  * UIP flag is rechecked to confirm that an clock update did not occur
  * during the accesses.  Routine will error exit after 256 attempts.
@@ -344,7 +349,8 @@ todpc_rtcget(unsigned char *buf)
 {
 	unsigned char	reg;
 	int		i;
-	int		retries = 256;
+	int		uip_try = 256;
+	int		vrt_try = 512;
 	unsigned char	*rawp;
 	unsigned char	century = RTC_CENTURY;
 	unsigned char	day_alrm;
@@ -358,13 +364,19 @@ todpc_rtcget(unsigned char *buf)
 		century = pc_rtc_offset.century;
 	}
 
-	outb(RTC_ADDR, RTC_D);		/* check if clock valid */
-	reg = inb(RTC_DATA);
-	if ((reg & RTC_VRT) == 0)
-		return (ENXIO);
+	for (;;) {
+		if (vrt_try-- < 0)
+			return (ENXIO);
+		outb(RTC_ADDR, RTC_D);		/* check if clock valid */
+		reg = inb(RTC_DATA);
+		if ((reg & RTC_VRT) != 0)
+			break;
+		drv_usecwait(5000);		/* Delay for 5000 us */
+	}
+
 
 checkuip:
-	if (retries-- < 0)
+	if (uip_try-- < 0)
 		return (EAGAIN);
 	outb(RTC_ADDR, RTC_A);		/* check if update in progress */
 	reg = inb(RTC_DATA);
