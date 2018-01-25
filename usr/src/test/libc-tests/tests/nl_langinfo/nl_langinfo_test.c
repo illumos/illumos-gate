@@ -77,7 +77,7 @@ struct langinfo_test C_data[] = {
 struct langinfo_test en_us_utf8_data[] = {
 	{ CODESET,	"UTF-8" },
 	{ D_T_FMT,	"%B %e, %Y at %I:%M:%S %p %Z" },
-	{ D_FMT,	"%m/%e/%y" },
+	{ D_FMT,	"%m/%d/%y" },
 	{ T_FMT,	"%I:%M:%S %p" },
 	{ T_FMT_AMPM,	"%I:%M:%S %p" },
 	{ AM_STR,	"AM" },
