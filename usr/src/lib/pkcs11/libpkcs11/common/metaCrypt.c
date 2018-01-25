@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Encryption and Decryption Functions
@@ -83,7 +82,18 @@ meta_Encrypt(CK_SESSION_HANDLE hSession,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if (pData == NULL || pulEncryptedDataLen == NULL) {
+	if (pulEncryptedDataLen == NULL) {
+		meta_operation_cleanup(session, CKF_ENCRYPT, FALSE);
+		REFRELEASE(session);
+		return (CKR_ARGUMENTS_BAD);
+	}
+
+	/*
+	 * Allow pData to be NULL as long as the length is 0 in order to
+	 * support ciphers that permit 0 byte inputs (e.g. combined mode
+	 * ciphers), otherwise consider pData being NULL as invalid.
+	 */
+	if (pData == NULL && ulDataLen != 0) {
 		meta_operation_cleanup(session, CKF_ENCRYPT, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);

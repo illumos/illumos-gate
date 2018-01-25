@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -45,6 +46,7 @@ C_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	crypto_encrypt_init_t encrypt_init;
 	crypto_mech_type_t k_mech_type;
 	int r;
+	CK_AES_CCM_PARAMS ccm_params = { 0 };
 
 	if (!kernel_initialized)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
@@ -128,6 +130,23 @@ C_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	encrypt_init.ei_mech.cm_param = pMechanism->pParameter;
 	encrypt_init.ei_mech.cm_param_len = pMechanism->ulParameterLen;
 
+	/*
+	 * PKCS#11 uses CK_CCM_PARAMS as its mechanism parameter, while the
+	 * kernel uses CK_AES_CCM_PARAMS.  Unlike
+	 * CK_GCM_PARAMS / CK_AES_GCM_PARAMS, the two definitions are not
+	 * equivalent -- the fields are defined in different orders, so
+	 * we much translate.
+	 */
+	if (session_p->encrypt.mech.mechanism == CKM_AES_CCM) {
+		if (pMechanism->ulParameterLen != sizeof (CK_CCM_PARAMS)) {
+			rv = CKR_MECHANISM_PARAM_INVALID;
+			goto clean_exit;
+		}
+		p11_to_kernel_ccm_params(pMechanism->pParameter, &ccm_params);
+		encrypt_init.ei_mech.cm_param = (caddr_t)&ccm_params;
+		encrypt_init.ei_mech.cm_param_len = sizeof (ccm_params);
+	}
+
 	while ((r = ioctl(kernel_fd, CRYPTO_ENCRYPT_INIT, &encrypt_init)) < 0) {
 		if (errno != EINTR)
 			break;
@@ -157,6 +176,10 @@ C_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	}
 
 clean_exit:
+	/*
+	 * ccm_params does not contain any key material -- just lengths and
+	 * pointers, therefore it does not need to be zeroed on exit.
+	 */
 	OBJ_REFRELE(key_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
@@ -183,11 +206,6 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if (pData == NULL) {
-		rv = CKR_ARGUMENTS_BAD;
-		goto clean_exit;
-	}
-
 	/*
 	 * Only check if pulEncryptedDataLen is NULL.
 	 * No need to check if pEncryptedData is NULL because
@@ -195,6 +213,15 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	 * the ciphertext.
 	 */
 	if (pulEncryptedDataLen == NULL) {
+		rv = CKR_ARGUMENTS_BAD;
+		goto clean_exit;
+	}
+
+	/*
+	 * Some encryption algs (often combined mode ciphers such as AES-GCM)
+	 * allow 0-byte inputs to encrypt.
+	 */
+	if (pData == NULL && ulDataLen != 0) {
 		rv = CKR_ARGUMENTS_BAD;
 		goto clean_exit;
 	}

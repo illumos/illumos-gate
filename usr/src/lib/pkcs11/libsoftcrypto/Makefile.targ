@@ -21,6 +21,8 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017 Jason King.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 AES_DIR =	$(SRC)/common/crypto/aes
@@ -68,6 +70,10 @@ pics/%.o: $(RSA_DIR)/%.c
 
 pics/%.o: $(PAD_DIR)/%.c
 		$(COMPILE.c) $(PAD_FLAGS) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%.o: $(SRC_DIR)/%.c
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 include		$(SRC)/lib/Makefile.targ

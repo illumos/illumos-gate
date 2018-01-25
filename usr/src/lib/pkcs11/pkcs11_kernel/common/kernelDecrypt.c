@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -45,6 +46,7 @@ kernel_decrypt_init(kernel_session_t *session_p, kernel_object_t *key_p,
 	crypto_mech_type_t k_mech_type;
 	boolean_t ses_lock_held = B_FALSE;
 	int r;
+	CK_AES_CCM_PARAMS ccm_params = { 0 };
 
 	/* Check to see if key object allows for decryption. */
 	if (key_p->is_lib_obj && !(key_p->bool_attr_mask & DECRYPT_BOOL_ON)) {
@@ -109,6 +111,23 @@ kernel_decrypt_init(kernel_session_t *session_p, kernel_object_t *key_p,
 	decrypt_init.di_mech.cm_param = pMechanism->pParameter;
 	decrypt_init.di_mech.cm_param_len = pMechanism->ulParameterLen;
 
+	/*
+	 * PKCS#11 uses CK_CCM_PARAMS as its mechanism parameter, while the
+	 * kernel uses CK_AES_CCM_PARAMS.  Unlike
+	 * CK_GCM_PARAMS / CK_AES_GCM_PARAMS, the two definitions are not
+	 * equivalent -- the fields are defined in different orders, so
+	 * we must translate.
+	 */
+	if (session_p->decrypt.mech.mechanism == CKM_AES_CCM) {
+		if (pMechanism->ulParameterLen != sizeof (CK_CCM_PARAMS)) {
+			rv = CKR_MECHANISM_PARAM_INVALID;
+			goto clean_exit;
+		}
+		p11_to_kernel_ccm_params(pMechanism->pParameter, &ccm_params);
+		decrypt_init.di_mech.cm_param = (caddr_t)&ccm_params;
+		decrypt_init.di_mech.cm_param_len = sizeof (ccm_params);
+	}
+
 	while ((r = ioctl(kernel_fd, CRYPTO_DECRYPT_INIT, &decrypt_init)) < 0) {
 		if (errno != EINTR)
 			break;
@@ -129,7 +148,10 @@ kernel_decrypt_init(kernel_session_t *session_p, kernel_object_t *key_p,
 	}
 
 clean_exit:
-
+	/*
+	 * ccm_params does not contain any key material -- just lengths and
+	 * pointers, therefore it does not need to be zeroed on exit.
+	 */
 	if (!ses_lock_held) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
 		ses_lock_held = B_TRUE;
@@ -240,7 +262,7 @@ kernel_decrypt(kernel_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	decrypt.cd_databuf = (char *)pData;
 	decrypt.cd_encrlen = ulEncryptedData;
 	decrypt.cd_encrbuf = (char *)pEncryptedData;
-	decrypt.cd_flags = 
+	decrypt.cd_flags =
 	    ((inplace && (pData != NULL)) || (pData == pEncryptedData)) &&
 	    (decrypt.cd_datalen == decrypt.cd_encrlen) ?
 	    CRYPTO_INPLACE_OPERATION : 0;

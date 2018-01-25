@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 
@@ -2656,7 +2657,8 @@ dprov_valid_sign_verif_mech(crypto_mech_type_t mech_type)
 	    mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == ECDSA_SHA1_MECH_INFO_TYPE ||
-	    mech_type == ECDSA_MECH_INFO_TYPE);
+	    mech_type == ECDSA_MECH_INFO_TYPE ||
+	    mech_type == AES_CMAC_MECH_INFO_TYPE);
 }
 
 static int

@@ -21,6 +21,8 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2017 Jason King.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 # AES
@@ -55,7 +57,7 @@ BIGNUM_FLAGS =		-I$(BIGNUM_DIR)
 
 # Modes
 MODES_DIR =		$(SRC)/common/crypto/modes
-MODES_COMMON_OBJS =	modes.o ecb.o cbc.o ctr.o
+MODES_COMMON_OBJS =	modes.o ecb.o cbc.o ctr.o ccm.o gcm.o
 MODES_COMMON_SRC =	$(MODES_COMMON_OBJS:%.o=$(MODES_DIR)/%.c)
 MODES_FLAGS =		-I$(MODES_DIR)
 

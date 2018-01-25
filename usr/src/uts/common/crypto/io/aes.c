@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*
@@ -404,22 +405,6 @@ aes_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 
 	return (CRYPTO_SUCCESS);
 }
-
-static void
-aes_copy_block64(uint8_t *in, uint64_t *out)
-{
-	if (IS_P2ALIGNED(in, sizeof (uint64_t))) {
-		/* LINTED: pointer alignment */
-		out[0] = *(uint64_t *)&in[0];
-		/* LINTED: pointer alignment */
-		out[1] = *(uint64_t *)&in[8];
-	} else {
-		uint8_t *iv8 = (uint8_t *)&out[0];
-
-		AES_COPY_BLOCK(in, iv8);
-	}
-}
-
 
 static int
 aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
