@@ -102,7 +102,6 @@ file path=opt/onbld/bin/find_elf mode=0555
 file path=opt/onbld/bin/findcrypto mode=0555
 file path=opt/onbld/bin/flg.flp mode=0555
 file path=opt/onbld/bin/genoffsets mode=0555
-file path=opt/onbld/bin/get_depend_info mode=0555
 file path=opt/onbld/bin/git-pbchk mode=0555
 file path=opt/onbld/bin/hdrchk mode=0555
 file path=opt/onbld/bin/hg-active mode=0555
@@ -110,7 +109,6 @@ file path=opt/onbld/bin/hgsetup mode=0555
 file path=opt/onbld/bin/interface_check mode=0555
 file path=opt/onbld/bin/interface_cmp mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
-file path=opt/onbld/bin/make_pkg_db mode=0555
 file path=opt/onbld/bin/mapfilechk mode=0555
 file path=opt/onbld/bin/nightly mode=0555
 file path=opt/onbld/bin/onu mode=0555
@@ -129,8 +127,6 @@ file path=opt/onbld/bin/wsdiff mode=0555
 file path=opt/onbld/bin/xref mode=0555
 file path=opt/onbld/bin/xref.mk
 file path=opt/onbld/env/illumos
-file path=opt/onbld/etc/SampleLinks
-file path=opt/onbld/etc/SamplePkgLinks
 file path=opt/onbld/etc/exception_lists/check_rtime
 file path=opt/onbld/etc/exception_lists/interface_check
 file path=opt/onbld/etc/exception_lists/interface_cmp
@@ -232,7 +228,6 @@ file path=opt/onbld/man/man1onbld/cw.1onbld
 file path=opt/onbld/man/man1onbld/find_elf.1onbld
 file path=opt/onbld/man/man1onbld/findunref.1onbld
 file path=opt/onbld/man/man1onbld/flg.flp.1onbld
-file path=opt/onbld/man/man1onbld/get_depend_info.1onbld
 file path=opt/onbld/man/man1onbld/git-pbchk.1onbld
 file path=opt/onbld/man/man1onbld/hdrchk.1onbld
 file path=opt/onbld/man/man1onbld/hgsetup.1onbld
@@ -240,7 +235,6 @@ file path=opt/onbld/man/man1onbld/interface_check.1onbld
 file path=opt/onbld/man/man1onbld/interface_cmp.1onbld
 file path=opt/onbld/man/man1onbld/jstyle.1onbld
 file path=opt/onbld/man/man1onbld/lintdump.1onbld
-file path=opt/onbld/man/man1onbld/make_pkg_db.1onbld
 file path=opt/onbld/man/man1onbld/mapfilechk.1onbld
 file path=opt/onbld/man/man1onbld/ndrgen.1onbld
 file path=opt/onbld/man/man1onbld/nightly.1onbld

@@ -39,7 +39,6 @@ COMMON_SUBDIRS= \
 	codesign \
 	cscope-fast \
 	ctf \
-	depcheck \
 	env \
 	findunref \
 	install.bin \

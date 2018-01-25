@@ -128,14 +128,6 @@ ctfdump
 ctfmerge
 	Merge the CTF data from one or more object files.
 
-depcheck
-	A tool to try an assess the dependencies of executables.  This tool 
-	is not a definitive dependency check, but it does use "strings" and 
-	"ldd" to gather as much information as it can.  The dependency check
-	tool can handle filenames and pkgnames.  Before using the dependency
-	checker you must build a database which reflects the properties and
-	files in your system.
-
 elfcmp
 	Compares two ELF modules (e.g. .o files, executables) section by
 	section.  Useful for determining whether "trivial" changes -
