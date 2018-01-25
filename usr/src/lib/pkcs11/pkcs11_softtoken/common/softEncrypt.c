@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -118,12 +120,11 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		return (rv);
 
 	/*
-	 * Only check if input buffer is null.  How to handle zero input
-	 * length depends on the mechanism in use.  For secret key mechanisms,
-	 * unpadded ones yield zero length output, but padded ones always
-	 * result in greater than zero length output.
+	 * How to handle zero input length depends on the mechanism in use.
+	 * For secret key mechanisms, unpadded ones yield zero length output,
+	 * but padded ones always result in greater than zero length output.
 	 */
-	if (pData == NULL) {
+	if (pData == NULL && ulDataLen != 0) {
 		rv = CKR_ARGUMENTS_BAD;
 		goto clean_exit;
 	}

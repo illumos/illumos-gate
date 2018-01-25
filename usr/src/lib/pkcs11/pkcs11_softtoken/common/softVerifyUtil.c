@@ -22,6 +22,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -208,10 +209,10 @@ soft_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 	{
 		CK_ULONG len;
 		CK_BYTE signature[AES_BLOCK_LEN];
-		soft_aes_ctx_t *aes_ctx;
+		aes_ctx_t *aes_ctx;
 
-		aes_ctx = (soft_aes_ctx_t *)session_p->verify.context;
-		len = aes_ctx->mac_len;
+		aes_ctx = (aes_ctx_t *)session_p->verify.context;
+		len = aes_ctx->ac_mac_len;
 
 		/* Pass local buffer to avoid overflow. */
 		rv = soft_aes_sign_verify_common(session_p, pData,
@@ -431,10 +432,10 @@ soft_verify_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	{
 		CK_ULONG len;
 		CK_BYTE signature[AES_BLOCK_LEN];
-		soft_aes_ctx_t *aes_ctx;
+		aes_ctx_t *aes_ctx;
 
-		aes_ctx = (soft_aes_ctx_t *)session_p->verify.context;
-		len = aes_ctx->mac_len;
+		aes_ctx = (aes_ctx_t *)session_p->verify.context;
+		len = aes_ctx->ac_mac_len;
 
 		/* Pass local buffer to avoid overflow. */
 		rv = soft_aes_sign_verify_common(session_p, NULL, 0,

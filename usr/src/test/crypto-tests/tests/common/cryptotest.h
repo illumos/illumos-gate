@@ -107,6 +107,15 @@ extern test_fg_t cryptotest_digest_fg;
 #define	DECR_FG (&cryptotest_decr_fg)
 #define	DIGEST_FG (&cryptotest_digest_fg)
 
+/*
+ * KCF and PKCS11 use different structures for the CCM params (CK_AES_CCM_PARAMS
+ * and CK_CCM_PARAMS respectively.  Each cryptotest_*.c file implements this
+ * for their respective structs.
+ */
+void ccm_init_params(void *, ulong_t, uchar_t *, ulong_t, uchar_t *, ulong_t,
+    ulong_t);
+size_t ccm_param_len(void);
+
 #ifdef __cplusplus
 }
 #endif

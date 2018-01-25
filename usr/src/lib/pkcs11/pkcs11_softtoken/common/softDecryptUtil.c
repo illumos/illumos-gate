@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2017 Jason King.
  */
 
 #include <pthread.h>
@@ -166,100 +167,14 @@ cbc_common:
 		return (rv);
 	}
 	case CKM_AES_ECB:
-
-		if (key_p->key_type != CKK_AES) {
-			return (CKR_KEY_TYPE_INCONSISTENT);
-		}
-
+	case CKM_AES_CBC:
+	case CKM_AES_CBC_PAD:
+	case CKM_AES_CTR:
+	case CKM_AES_GCM:
+	case CKM_AES_CCM:
 		return (soft_aes_crypt_init_common(session_p, pMechanism,
 		    key_p, B_FALSE));
 
-	case CKM_AES_CBC:
-	case CKM_AES_CBC_PAD:
-	{
-		soft_aes_ctx_t *soft_aes_ctx;
-
-		if (key_p->key_type != CKK_AES) {
-			return (CKR_KEY_TYPE_INCONSISTENT);
-		}
-
-		if ((pMechanism->pParameter == NULL) ||
-		    (pMechanism->ulParameterLen != AES_BLOCK_LEN)) {
-			return (CKR_MECHANISM_PARAM_INVALID);
-		}
-
-		rv = soft_aes_crypt_init_common(session_p, pMechanism,
-		    key_p, B_FALSE);
-
-		if (rv != CKR_OK)
-			return (rv);
-
-		(void) pthread_mutex_lock(&session_p->session_mutex);
-
-		soft_aes_ctx = (soft_aes_ctx_t *)session_p->decrypt.context;
-
-		/* Save Initialization Vector (IV) in the context. */
-		(void) memcpy(soft_aes_ctx->ivec, pMechanism->pParameter,
-		    AES_BLOCK_LEN);
-
-		/* Allocate a context for AES cipher-block chaining. */
-		soft_aes_ctx->aes_cbc = (void *)aes_cbc_ctx_init(
-		    soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len,
-		    soft_aes_ctx->ivec);
-
-		if (soft_aes_ctx->aes_cbc == NULL) {
-			freezero(soft_aes_ctx->key_sched,
-			    soft_aes_ctx->keysched_len);
-			freezero(session_p->decrypt.context,
-			    sizeof (soft_aes_ctx_t));
-			session_p->decrypt.context = NULL;
-			(void) pthread_mutex_unlock(&session_p->session_mutex);
-			return (CKR_HOST_MEMORY);
-		}
-
-		(void) pthread_mutex_unlock(&session_p->session_mutex);
-
-		return (rv);
-	}
-	case CKM_AES_CTR:
-	{
-		soft_aes_ctx_t *soft_aes_ctx;
-
-		if (key_p->key_type != CKK_AES) {
-			return (CKR_KEY_TYPE_INCONSISTENT);
-		}
-
-		if (pMechanism->pParameter == NULL ||
-		    pMechanism->ulParameterLen != sizeof (CK_AES_CTR_PARAMS)) {
-			return (CKR_MECHANISM_PARAM_INVALID);
-		}
-
-		rv = soft_aes_crypt_init_common(session_p, pMechanism,
-		    key_p, B_FALSE);
-
-		if (rv != CKR_OK)
-			return (rv);
-
-		(void) pthread_mutex_lock(&session_p->session_mutex);
-
-		soft_aes_ctx = (soft_aes_ctx_t *)session_p->decrypt.context;
-		soft_aes_ctx->aes_cbc = aes_ctr_ctx_init(
-		    soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len,
-		    pMechanism->pParameter);
-
-		if (soft_aes_ctx->aes_cbc == NULL) {
-			freezero(soft_aes_ctx->key_sched,
-			    soft_aes_ctx->keysched_len);
-			freezero(session_p->decrypt.context,
-			    sizeof (soft_aes_ctx_t));
-			session_p->decrypt.context = NULL;
-			rv = CKR_HOST_MEMORY;
-		}
-
-		(void) pthread_mutex_unlock(&session_p->session_mutex);
-
-		return (rv);
-	}
 	case CKM_BLOWFISH_CBC:
 	{
 		soft_blowfish_ctx_t *soft_blowfish_ctx;
@@ -380,17 +295,16 @@ soft_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 	case CKM_AES_ECB:
 	case CKM_AES_CBC:
 	case CKM_AES_CTR:
-
-		if (ulEncryptedLen == 0) {
-			*pulDataLen = 0;
-			return (CKR_OK);
-		}
-		/* FALLTHROUGH */
-
+	case CKM_AES_CCM:
+	case CKM_AES_GCM:
 	case CKM_AES_CBC_PAD:
-
-		return (soft_aes_decrypt_common(session_p, pEncrypted,
-		    ulEncryptedLen, pData, pulDataLen, Update));
+		if (Update) {
+			return (soft_aes_decrypt_update(session_p, pEncrypted,
+			    ulEncryptedLen, pData, pulDataLen));
+		} else {
+			return (soft_aes_decrypt(session_p, pEncrypted,
+			    ulEncryptedLen, pData, pulDataLen));
+		}
 
 	case CKM_BLOWFISH_CBC:
 
@@ -489,6 +403,8 @@ soft_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedPart,
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
 	case CKM_AES_CTR:
+        case CKM_AES_GCM:
+        case CKM_AES_CCM:
 	case CKM_BLOWFISH_CBC:
 	case CKM_RC4:
 
@@ -647,145 +563,15 @@ soft_decrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastPart,
 	}
 
 	case CKM_AES_CBC_PAD:
-	{
-
-		soft_aes_ctx_t *soft_aes_ctx;
-
-		soft_aes_ctx = (soft_aes_ctx_t *)session_p->decrypt.context;
-
-		/*
-		 * We should have only one block of data left in the
-		 * remaining buffer.
-		 */
-		if (soft_aes_ctx->remain_len != AES_BLOCK_LEN) {
-			*pulLastPartLen = 0;
-			rv = CKR_ENCRYPTED_DATA_LEN_RANGE;
-			/* Cleanup memory space. */
-			free(soft_aes_ctx->aes_cbc);
-			freezero(soft_aes_ctx->key_sched,
-			    soft_aes_ctx->keysched_len);
-
-			goto clean1;
-		}
-
-		out_len = AES_BLOCK_LEN;
-
-		/*
-		 * If application asks for the length of the output buffer
-		 * to hold the plaintext?
-		 */
-		if (pLastPart == NULL) {
-			*pulLastPartLen = out_len;
-			rv = CKR_OK;
-			goto clean2;
-		} else {
-			crypto_data_t out;
-
-			/* Copy remaining data to the output buffer. */
-			(void) memcpy(pLastPart, soft_aes_ctx->data,
-			    AES_BLOCK_LEN);
-
-			out.cd_format = CRYPTO_DATA_RAW;
-			out.cd_offset = 0;
-			out.cd_length = AES_BLOCK_LEN;
-			out.cd_raw.iov_base = (char *)pLastPart;
-			out.cd_raw.iov_len = AES_BLOCK_LEN;
-
-			/* Decrypt final block of data. */
-			rc = aes_decrypt_contiguous_blocks(
-			    (aes_ctx_t *)soft_aes_ctx->aes_cbc,
-			    (char *)pLastPart, AES_BLOCK_LEN, &out);
-
-			if (rc == 0) {
-				/*
-				 * Remove padding bytes after decryption of
-				 * ciphertext block to produce the original
-				 * plaintext.
-				 */
-				rv = soft_remove_pkcs7_padding(pLastPart,
-				    AES_BLOCK_LEN, &out_len);
-				if (rv != CKR_OK)
-					*pulLastPartLen = 0;
-				else
-					*pulLastPartLen = out_len;
-			} else {
-				*pulLastPartLen = 0;
-				rv = CKR_FUNCTION_FAILED;
-			}
-
-			/* Cleanup memory space. */
-			free(soft_aes_ctx->aes_cbc);
-			freezero(soft_aes_ctx->key_sched,
-			    soft_aes_ctx->keysched_len);
-
-		}
-
-		break;
-	}
-
 	case CKM_AES_CBC:
 	case CKM_AES_ECB:
-	{
-		soft_aes_ctx_t *soft_aes_ctx;
-
-		soft_aes_ctx = (soft_aes_ctx_t *)session_p->decrypt.context;
-		/*
-		 * CKM_AES_CBC and CKM_AES_ECB does not do any padding,
-		 * so when the final is called, the remaining buffer
-		 * should not contain any more data.
-		 */
-		*pulLastPartLen = 0;
-		if (soft_aes_ctx->remain_len != 0) {
-			rv = CKR_ENCRYPTED_DATA_LEN_RANGE;
-		} else {
-			if (pLastPart == NULL)
-				goto clean2;
-		}
-
-		/* Cleanup memory space. */
-		free(soft_aes_ctx->aes_cbc);
-		freezero(soft_aes_ctx->key_sched,
-		    soft_aes_ctx->keysched_len);
-
-		break;
-	}
 	case CKM_AES_CTR:
-	{
-		crypto_data_t out;
-		soft_aes_ctx_t *soft_aes_ctx;
-		ctr_ctx_t *ctr_ctx;
-		size_t len;
-
-		soft_aes_ctx = (soft_aes_ctx_t *)session_p->decrypt.context;
-		ctr_ctx = soft_aes_ctx->aes_cbc;
-		len = ctr_ctx->ctr_remainder_len;
-		if (pLastPart == NULL) {
-			*pulLastPartLen = len;
-			goto clean1;
-		}
-		if (len > 0) {
-			out.cd_format = CRYPTO_DATA_RAW;
-			out.cd_offset = 0;
-			out.cd_length = len;
-			out.cd_raw.iov_base = (char *)pLastPart;
-			out.cd_raw.iov_len = len;
-
-			rv = ctr_mode_final(ctr_ctx, &out, aes_encrypt_block);
-			if (rv == CRYPTO_DATA_LEN_RANGE)
-				rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
-		}
-		if (rv == CRYPTO_BUFFER_TOO_SMALL) {
-			*pulLastPartLen = len;
-			goto clean1;
-		}
-
-		/* Cleanup memory space. */
-		free(ctr_ctx);
-		freezero(soft_aes_ctx->key_sched,
-		    soft_aes_ctx->keysched_len);
-
+	case CKM_AES_CCM:
+	case CKM_AES_GCM:
+		rv = soft_aes_decrypt_final(session_p, pLastPart,
+		    pulLastPartLen);
 		break;
-	}
+
 	case CKM_BLOWFISH_CBC:
 	{
 		soft_blowfish_ctx_t *soft_blowfish_ctx;

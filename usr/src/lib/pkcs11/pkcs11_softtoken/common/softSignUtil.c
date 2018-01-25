@@ -584,13 +584,13 @@ soft_sign_verify_cleanup(soft_session_t *session_p, boolean_t sign,
 	case CKM_AES_CMAC_GENERAL:
 	case CKM_AES_CMAC:
 		if (session_p->encrypt.context != NULL) {
-			free(session_p->encrypt.context);
+			soft_aes_free_ctx(session_p->encrypt.context);
 			session_p->encrypt.context = NULL;
 			session_p->encrypt.flags = 0;
 		}
 		if (active_op->context != NULL) {
 			explicit_bzero(active_op->context,
-			    sizeof (soft_aes_ctx_t));
+			    sizeof (soft_aes_sign_ctx_t));
 		}
 		break;
 

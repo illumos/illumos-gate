@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef	_AES_IMPL_H
@@ -135,9 +137,10 @@ extern int aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt);
 
 /*
  * AES mode functions.
- * The first 2 functions operate on 16-byte AES blocks.
+ * The first 3 functions operate on 16-byte AES blocks.
  */
 extern void aes_copy_block(uint8_t *in, uint8_t *out);
+extern void aes_copy_block64(uint8_t *in, uint64_t *out);
 extern void aes_xor_block(uint8_t *data, uint8_t *dst);
 
 /* Note: ctx is a pointer to aes_ctx_t defined in modes.h */

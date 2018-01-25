@@ -452,3 +452,23 @@ digest_final(crypto_op_t *op)
 		cryptotest_error("C_DigestFinal", rv);
 	return (rv);
 }
+
+void
+ccm_init_params(void *buf, ulong_t ulDataLen, uchar_t *pNonce,
+    ulong_t ulNonceLen, uchar_t *pAAD, ulong_t ulAADLen, ulong_t ulMACLen)
+{
+	CK_CCM_PARAMS *pp = buf;
+
+	pp->ulDataLen = ulDataLen;
+	pp->pNonce = pNonce;
+	pp->ulNonceLen = ulNonceLen;
+	pp->pAAD = pAAD;
+	pp->ulAADLen = ulAADLen;
+	pp->ulMACLen = ulMACLen;
+}
+
+size_t
+ccm_param_len(void)
+{
+	return (sizeof (CK_CCM_PARAMS));
+}

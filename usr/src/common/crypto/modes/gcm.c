@@ -20,17 +20,17 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 
 #ifndef _KERNEL
 #include <strings.h>
 #include <limits.h>
-#include <assert.h>
 #include <security/cryptoki.h>
 #endif	/* _KERNEL */
 
-
+#include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <modes/modes.h>
@@ -419,7 +419,7 @@ gcm_decrypt_final(gcm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	uint64_t counter_mask = ntohll(0x00000000ffffffffULL);
 	int processed = 0, rv;
 
-	ASSERT(ctx->gcm_processed_data_len == ctx->gcm_pt_buf_len);
+	ASSERT3U(ctx->gcm_processed_data_len, ==, ctx->gcm_pt_buf_len);
 
 	pt_len = ctx->gcm_processed_data_len - ctx->gcm_tag_len;
 	ghash = (uint8_t *)ctx->gcm_ghash;

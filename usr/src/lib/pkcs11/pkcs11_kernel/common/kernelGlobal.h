@@ -98,6 +98,8 @@ CK_RV kernel_decrypt(kernel_session_t *, CK_BYTE_PTR, CK_ULONG, CK_BYTE_PTR,
     CK_ULONG_PTR);
 CK_RV kernel_add_extra_attr(CK_ATTRIBUTE_PTR, kernel_object_t *);
 
+void p11_to_kernel_ccm_params(const CK_CCM_PARAMS *, CK_AES_CCM_PARAMS *);
+
 #ifdef	__cplusplus
 }
 #endif

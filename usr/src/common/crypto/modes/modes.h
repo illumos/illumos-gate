@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef	_COMMON_CRYPTO_MODES_H
@@ -241,15 +242,14 @@ typedef struct aes_ctx {
 		ecb_ctx_t acu_ecb;
 		cbc_ctx_t acu_cbc;
 		ctr_ctx_t acu_ctr;
-#ifdef _KERNEL
 		ccm_ctx_t acu_ccm;
 		gcm_ctx_t acu_gcm;
-#endif
 	} acu;
 } aes_ctx_t;
 
 #define	ac_flags		acu.acu_ecb.ecb_common.cc_flags
 #define	ac_remainder_len	acu.acu_ecb.ecb_common.cc_remainder_len
+#define	ac_remainder		acu.acu_ecb.ecb_common.cc_remainder
 #define	ac_keysched		acu.acu_ecb.ecb_common.cc_keysched
 #define	ac_keysched_len		acu.acu_ecb.ecb_common.cc_keysched_len
 #define	ac_iv			acu.acu_ecb.ecb_common.cc_iv

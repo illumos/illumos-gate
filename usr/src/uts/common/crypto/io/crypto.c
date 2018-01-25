@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 
@@ -157,7 +158,7 @@ size_t crypto_pre_approved_limit = CRYPTO_PRE_APPROVED_LIMIT;
 
 #define	INIT_RAW_CRYPTO_DATA(data, len)				\
 	(data).cd_format = CRYPTO_DATA_RAW;			\
-	(data).cd_raw.iov_base = kmem_alloc(len, KM_SLEEP);	\
+	(data).cd_raw.iov_base = (len > 0) ? kmem_alloc(len, KM_SLEEP) : NULL; \
 	(data).cd_raw.iov_len = len;				\
 	(data).cd_offset = 0;					\
 	(data).cd_length = len;
