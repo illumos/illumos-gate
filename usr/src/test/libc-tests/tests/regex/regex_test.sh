@@ -12,14 +12,17 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 TESTDIR=$(dirname $0)
-HREGEX=${TESTDIR}/h_regex
+TREGEX=${TESTDIR}/testregex
 
-for t in $TESTDIR/data/*.in; do
-	$HREGEX < $t || exit 1
-	$HREGEX -el < $t || exit 1
-	$HREGEX -er < $t || exit 1
+for t in basic categorize forcedassoc leftassoc \
+    nullsubexpr repetition rightassoc; do
+	${TREGEX} -F ${TESTDIR}/data/${t}.dat | \
+	    diff -u - ${TESTDIR}/data/${t}.out || \
+	    exit 1
 done
+
+exit 0
