@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -60,6 +60,8 @@ static	void	flock_cleanup_child(pid_t, int []);
 
 static	void	flock_test_invalid(lockinfo_t *, int, short, short,
 		    off_t, off_t);
+static	void	flock_test_invalid64(lockinfo_t *, int, short, short,
+		    off_t, off_t);
 static	void	flock_test_exclusive(lock_style_t, lock_style_t,
 		    lockinfo_t *, lockinfo_t *, boolean_t);
 static	void	flock_test_shared(lock_style_t, lock_style_t, lockinfo_t *,
@@ -78,6 +80,10 @@ static short cmds[8] = {
 	F_SETLK, F_SETLKW, F_GETLK,
 	F_OFD_SETLK, F_OFD_SETLKW, F_OFD_GETLK,
 	F_FLOCK, F_FLOCKW
+};
+
+static short cmds64[3] = {
+	F_OFD_SETLK64, F_OFD_SETLKW64, F_OFD_GETLK64
 };
 
 
@@ -411,6 +417,23 @@ flock_test_invalid(lockinfo_t *lf, int cmd, short l_type, short l_whence,
 	flock_log(" ok\n");
 }
 
+static void
+flock_test_invalid64(lockinfo_t *lf, int cmd, short l_type, short l_whence,
+    off_t l_start, off_t l_len)
+{
+	struct flock64 fl = {
+		.l_type = l_type,
+		.l_whence = l_whence,
+		.l_start = l_start,
+		.l_len = l_len
+	};
+
+	flock_log("fcntl(fd, %s, { %hd, %hd, %ld, %ld, ... })...",
+	    flock_cmdname(cmd), l_type, l_whence, l_start, l_len);
+	VERIFY3S(fcntl(lf->lf_fd, cmd, &fl), ==, -1);
+	VERIFY3U(errno, ==, EINVAL);
+	flock_log(" ok\n");
+}
 
 static void
 flock_test_exclusive(lock_style_t styleA, lock_style_t styleB,
@@ -601,6 +624,11 @@ flock_runtests(void)
 		flock_test_invalid(&flock_fileA, cmds[i], F_WRLCK, 1, 0, 0);
 		flock_test_invalid(&flock_fileA, cmds[i], F_WRLCK, 0, 1, 0);
 		flock_test_invalid(&flock_fileA, cmds[i], F_WRLCK, 0, 0, 1);
+	}
+	for (i = 0; i < sizeof (cmds64) / sizeof (short); i++) {
+		flock_test_invalid64(&flock_fileA, cmds64[i], F_WRLCK, 1, 0, 0);
+		flock_test_invalid64(&flock_fileA, cmds64[i], F_WRLCK, 0, 1, 0);
+		flock_test_invalid64(&flock_fileA, cmds64[i], F_WRLCK, 0, 0, 1);
 	}
 
 	flock_log("# Testing that multiple OFD locks work in a process\n");

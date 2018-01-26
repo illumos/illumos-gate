@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -168,6 +168,14 @@ flock_cmdname(int cmd)
 		return ("F_FLOCK");
 	case F_FLOCKW:
 		return ("F_FLOCKW");
+#if !defined(_LP64)
+	case F_OFD_SETLK64:
+		return ("F_OFD_SETLK64");
+	case F_OFD_SETLKW64:
+		return ("F_OFD_SETLKW64");
+	case F_OFD_GETLK64:
+		return ("F_OFD_GETLK64");
+#endif
 	default:
 		abort();
 		return ("<unreachable>");
