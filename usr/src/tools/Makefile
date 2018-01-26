@@ -100,7 +100,6 @@ ROOTDIRS= \
 	$(ROOTONBLD)/lib/python$(PYTHON_VERSION) \
 	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld \
 	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Checks \
-	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/hgext \
 	$(ROOTONBLD)/lib/python$(PYTHON_VERSION)/onbld/Scm \
 	$(ROOTONBLD)/env \
 	$(ROOTONBLD)/etc \

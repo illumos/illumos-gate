@@ -55,7 +55,6 @@ dir path=opt/onbld/lib/python$(PYTHON_VERSION)
 dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld
 dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks
 dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm
-dir path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/hgext
 dir path=opt/onbld/man
 dir path=opt/onbld/man/man1onbld
 dir path=opt/onbld/share
@@ -104,8 +103,6 @@ file path=opt/onbld/bin/flg.flp mode=0555
 file path=opt/onbld/bin/genoffsets mode=0555
 file path=opt/onbld/bin/git-pbchk mode=0555
 file path=opt/onbld/bin/hdrchk mode=0555
-file path=opt/onbld/bin/hg-active mode=0555
-file path=opt/onbld/bin/hgsetup mode=0555
 file path=opt/onbld/bin/interface_check mode=0555
 file path=opt/onbld/bin/interface_cmp mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
@@ -130,7 +127,6 @@ file path=opt/onbld/env/illumos
 file path=opt/onbld/etc/exception_lists/check_rtime
 file path=opt/onbld/etc/exception_lists/interface_check
 file path=opt/onbld/etc/exception_lists/interface_cmp
-file path=opt/onbld/etc/hgstyle
 file path=opt/onbld/etc/its.conf
 file path=opt/onbld/etc/its.reg
 file path=opt/onbld/lib/$(ARCH)/64/libmakestate.so.1
@@ -193,28 +189,14 @@ file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/__init__.py \
     mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/__init__.pyc \
     mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Backup.py mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Backup.pyc mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Ignore.py mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Ignore.pyc mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Version.py mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/Version.pyc \
-    mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/WorkSpace.py \
-    mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/WorkSpace.pyc \
-    mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.py \
     mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Scm/__init__.pyc \
     mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/__init__.py mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/__init__.pyc mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/hgext/__init__.py \
-    mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/hgext/__init__.pyc \
-    mode=0444
-file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/hgext/cdm.py mode=0444
 file path=opt/onbld/man/man1onbld/Install.1onbld
 file path=opt/onbld/man/man1onbld/bldenv.1onbld
 file path=opt/onbld/man/man1onbld/bringovercheck.1onbld
@@ -230,7 +212,6 @@ file path=opt/onbld/man/man1onbld/findunref.1onbld
 file path=opt/onbld/man/man1onbld/flg.flp.1onbld
 file path=opt/onbld/man/man1onbld/git-pbchk.1onbld
 file path=opt/onbld/man/man1onbld/hdrchk.1onbld
-file path=opt/onbld/man/man1onbld/hgsetup.1onbld
 file path=opt/onbld/man/man1onbld/interface_check.1onbld
 file path=opt/onbld/man/man1onbld/interface_cmp.1onbld
 file path=opt/onbld/man/man1onbld/jstyle.1onbld

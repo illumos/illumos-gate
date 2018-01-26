@@ -49,15 +49,9 @@ Layout of /opt/onbld
 /opt/onbld/lib/python<version>/
 	python modules used by the build tools.
 
-/opt/onbld/lib/python<version>/onbld/hgext
-	Mercurial extensions.
-
 /opt/onbld/lib/python/ 
         symlink to the modules directory of the currently preferred
-        python version.  This exists to retain compatibility both for
-        tools expecting only one supported version of python, and for
-        user .hgrc files that expect to find cdm.py in
-        /opt/onbld/lib/python/onbld/hgext.
+        python version.
 
 /opt/onbld/man
 	rudimentary man pages for some of the tools.
@@ -78,10 +72,6 @@ bldenv
 build_cscope
 	builds cscope databases in the uts, the platform subdirectories
 	of uts, and in usr/src. Uses cscope-fast.
-
-cdm 
-	A Mercurial extension providing various commands useful for ON
-	development
 
 check_rtime
 	checks ELF attributes used by ELF dynamic objects in the proto area.
@@ -161,13 +151,6 @@ findunref
 hdrchk
 	checks headers for compliance with OS/Net standards (form, includes,
 	C++ guards).
-
-hgsetup
-	creates a basic Mercurial configuration for the user.
-
-hg-active
-	helper used by webrev to generate file lists for Mercurial
-	workspaces.
 
 install.bin
 	binary version of /usr/sbin/install. Used to be vastly faster
