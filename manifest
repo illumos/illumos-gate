@@ -1877,7 +1877,6 @@ s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.85=pcbe.GenuineIntel.6.15
 d platform/i86pc/kernel/sys 0755 root sys
 d platform/i86pc/kernel/sys/amd64 0755 root sys
 f platform/i86pc/kernel/sys/amd64/cpc 0755 root sys
-f platform/i86pc/multiboot 0755 root sys
 d platform/i86pc/ucode 0755 root sys
 f platform/i86pc/ucode/amd-ucode.bin 0444 root sys
 f platform/i86pc/ucode/intel-ucode.txt 0444 root sys
@@ -9601,64 +9600,6 @@ f usr/lib/mdb/kvm/amd64/uhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/usba.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/xhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/zfs.so 0555 root sys
-f usr/lib/mdb/kvm/arp.so 0555 root sys
-f usr/lib/mdb/kvm/cpc.so 0555 root sys
-f usr/lib/mdb/kvm/cpu.generic.so 0555 root sys
-f usr/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so 0555 root sys
-f usr/lib/mdb/kvm/crypto.so 0555 root sys
-f usr/lib/mdb/kvm/dtrace.so 0555 root sys
-f usr/lib/mdb/kvm/emlxs.so 0555 root sys
-f usr/lib/mdb/kvm/fcip.so 0555 root sys
-f usr/lib/mdb/kvm/fcp.so 0555 root sys
-f usr/lib/mdb/kvm/fctl.so 0555 root sys
-f usr/lib/mdb/kvm/genunix.so 0555 root sys
-f usr/lib/mdb/kvm/hook.so 0555 root sys
-f usr/lib/mdb/kvm/i40e.so 0555 root sys
-f usr/lib/mdb/kvm/idm.so 0555 root sys
-f usr/lib/mdb/kvm/ii.so 0555 root sys
-f usr/lib/mdb/kvm/ip.so 0555 root sys
-f usr/lib/mdb/kvm/ipc.so 0555 root sys
-f usr/lib/mdb/kvm/ipp.so 0555 root sys
-f usr/lib/mdb/kvm/krtld.so 0555 root sys
-f usr/lib/mdb/kvm/lofs.so 0555 root sys
-f usr/lib/mdb/kvm/logindmux.so 0555 root sys
-f usr/lib/mdb/kvm/mac.so 0555 root sys
-f usr/lib/mdb/kvm/mdb_kb.so 0555 root sys
-f usr/lib/mdb/kvm/mdb_ks.so 0555 root sys
-f usr/lib/mdb/kvm/mm.so 0555 root sys
-f usr/lib/mdb/kvm/mpt.so 0555 root sys
-f usr/lib/mdb/kvm/mpt_sas.so 0555 root sys
-f usr/lib/mdb/kvm/mr_sas.so 0555 root sys
-f usr/lib/mdb/kvm/nca.so 0555 root sys
-f usr/lib/mdb/kvm/neti.so 0555 root sys
-f usr/lib/mdb/kvm/nfs.so 0555 root sys
-f usr/lib/mdb/kvm/nsctl.so 0555 root sys
-f usr/lib/mdb/kvm/nsmb.so 0555 root sys
-f usr/lib/mdb/kvm/pmcs.so 0555 root sys
-f usr/lib/mdb/kvm/ptm.so 0555 root sys
-f usr/lib/mdb/kvm/qlc.so 0555 root sys
-f usr/lib/mdb/kvm/random.so 0555 root sys
-f usr/lib/mdb/kvm/rdc.so 0555 root sys
-f usr/lib/mdb/kvm/s1394.so 0555 root sys
-f usr/lib/mdb/kvm/sata.so 0555 root sys
-f usr/lib/mdb/kvm/scsi_vhci.so 0555 root sys
-f usr/lib/mdb/kvm/sctp.so 0555 root sys
-f usr/lib/mdb/kvm/sd.so 0555 root sys
-f usr/lib/mdb/kvm/sdbc.so 0555 root sys
-f usr/lib/mdb/kvm/smbfs.so 0555 root sys
-f usr/lib/mdb/kvm/smbsrv.so 0555 root sys
-f usr/lib/mdb/kvm/sockfs.so 0555 root sys
-f usr/lib/mdb/kvm/specfs.so 0555 root sys
-f usr/lib/mdb/kvm/sppp.so 0555 root sys
-f usr/lib/mdb/kvm/srpt.so 0555 root sys
-f usr/lib/mdb/kvm/stmf.so 0555 root sys
-f usr/lib/mdb/kvm/stmf_sbd.so 0555 root sys
-f usr/lib/mdb/kvm/sv.so 0555 root sys
-f usr/lib/mdb/kvm/ufs.so 0555 root sys
-f usr/lib/mdb/kvm/uhci.so 0555 root sys
-f usr/lib/mdb/kvm/usba.so 0555 root sys
-f usr/lib/mdb/kvm/xhci.so 0555 root sys
-f usr/lib/mdb/kvm/zfs.so 0555 root sys
 d usr/lib/mdb/proc 0755 root sys
 d usr/lib/mdb/proc/amd64 0755 root sys
 f usr/lib/mdb/proc/amd64/ld.so 0555 root sys
@@ -10312,10 +10253,9 @@ f usr/sbin/6to4relay 0555 root bin
 f usr/sbin/acctadm 0555 root bin
 f usr/sbin/acpidump 0555 root bin
 f usr/sbin/acpixtract 0555 root bin
-h usr/sbin/add_drv=usr/lib/isaexec
+f usr/sbin/add_drv 0555 root bin
 f usr/sbin/allocate 4555 root bin
 d usr/sbin/amd64 0755 root bin
-f usr/sbin/amd64/add_drv 0555 root sys
 f usr/sbin/amd64/dtrace 0555 root bin
 f usr/sbin/amd64/intrstat 0555 root bin
 f usr/sbin/amd64/ipf 0555 root bin
@@ -10325,18 +10265,7 @@ f usr/sbin/amd64/ipmon 0555 root bin
 f usr/sbin/amd64/ipnat 0555 root bin
 f usr/sbin/amd64/ippool 0555 root bin
 f usr/sbin/amd64/lockstat 0555 root bin
-f usr/sbin/amd64/modinfo 0555 root sys
-f usr/sbin/amd64/modload 0555 root sys
-f usr/sbin/amd64/modunload 0555 root sys
-f usr/sbin/amd64/pbind 0555 root sys
 f usr/sbin/amd64/plockstat 0555 root bin
-f usr/sbin/amd64/prtconf 2555 root sys
-f usr/sbin/amd64/psrset 0555 root sys
-f usr/sbin/amd64/rem_drv 0555 root sys
-f usr/sbin/amd64/swap 2555 root sys
-f usr/sbin/amd64/sysdef 2555 root sys
-f usr/sbin/amd64/update_drv 0555 root sys
-f usr/sbin/amd64/whodo 4555 root bin
 f usr/sbin/amd64/zdb 0555 root bin
 f usr/sbin/arp 0555 root bin
 f usr/sbin/audit 0555 root bin
@@ -10475,9 +10404,9 @@ h usr/sbin/mkdevmaps=usr/sbin/mkdevalloc
 f usr/sbin/mkfile 0555 root bin
 s usr/sbin/mkfs=clri
 f usr/sbin/mknod 0555 root bin
-h usr/sbin/modinfo=usr/lib/isaexec
-h usr/sbin/modload=usr/lib/isaexec
-h usr/sbin/modunload=usr/lib/isaexec
+f usr/sbin/modinfo 0555 root sys
+f usr/sbin/modload 0555 root sys
+f usr/sbin/modunload 0555 root sys
 s usr/sbin/mount=../../sbin/mount
 f usr/sbin/mountall 0555 root sys
 f usr/sbin/mpathadm 0555 root bin
@@ -10496,7 +10425,7 @@ f usr/sbin/nscd 0555 root bin
 f usr/sbin/nvmeadm 0555 root bin
 f usr/sbin/nwamadm 0555 root bin
 f usr/sbin/nwamcfg 0555 root bin
-h usr/sbin/pbind=usr/lib/isaexec
+f usr/sbin/pbind 0555 root sys
 f usr/sbin/pcitool 0555 root bin
 f usr/sbin/ping 4555 root bin
 h usr/sbin/plockstat=usr/lib/isaexec
@@ -10511,13 +10440,13 @@ f usr/sbin/praudit 0555 root bin
 f usr/sbin/projadd 0555 root sys
 f usr/sbin/projdel 0555 root sys
 f usr/sbin/projmod 0555 root sys
-h usr/sbin/prtconf=usr/lib/isaexec
+f usr/sbin/prtconf 2555 root sys
 f usr/sbin/prtdiag 2755 root sys
 f usr/sbin/prtpicl 0755 root bin
 f usr/sbin/prtvtoc 0555 root sys
 f usr/sbin/psradm 0555 root sys
 f usr/sbin/psrinfo 0555 root sys
-h usr/sbin/psrset=usr/lib/isaexec
+f usr/sbin/psrset 0555 root sys
 f usr/sbin/pwck 0555 root bin
 f usr/sbin/pwconv 0555 root sys
 s usr/sbin/quot=../lib/fs/ufs/quot
@@ -10530,7 +10459,7 @@ f usr/sbin/ramdiskadm 0555 root bin
 f usr/sbin/rcapadm 0555 root bin
 f usr/sbin/rctladm 0555 root bin
 h usr/sbin/reboot=usr/sbin/halt
-h usr/sbin/rem_drv=usr/lib/isaexec
+f usr/sbin/rem_drv 0555 root sys
 s usr/sbin/repquota=../lib/fs/ufs/repquota
 f usr/sbin/rmt 0555 root bin
 f usr/sbin/roleadd 0555 root sys
@@ -10566,12 +10495,12 @@ f usr/sbin/strerr 0555 root sys
 f usr/sbin/sttydefs 0755 root sys
 s usr/sbin/svcadm=../../sbin/svcadm
 f usr/sbin/svccfg 0555 root bin
-h usr/sbin/swap=usr/lib/isaexec
+f usr/sbin/swap 2555 root sys
 s usr/sbin/sync=../../sbin/sync
 f usr/sbin/syncinit 0555 root bin
 f usr/sbin/syncloop 0555 root bin
 f usr/sbin/syncstat 0555 root bin
-h usr/sbin/sysdef=usr/lib/isaexec
+f usr/sbin/sysdef 2555 root sys
 f usr/sbin/syseventadm 0555 root sys
 f usr/sbin/syslogd 0555 root sys
 h usr/sbin/tapes=usr/sbin/devfsadm
@@ -10594,7 +10523,7 @@ f usr/sbin/umountall 0555 root sys
 f usr/sbin/unlink 0555 root bin
 h usr/sbin/unshare=usr/sbin/sharemgr
 f usr/sbin/unshareall 0555 root bin
-h usr/sbin/update_drv=usr/lib/isaexec
+f usr/sbin/update_drv 0555 root sys
 h usr/sbin/useradd=usr/sbin/roleadd
 h usr/sbin/userdel=usr/sbin/roledel
 h usr/sbin/usermod=usr/sbin/rolemod
@@ -10602,7 +10531,7 @@ f usr/sbin/vndadm 0555 root bin
 f usr/sbin/volcopy 0555 root bin
 f usr/sbin/vrrpadm 0555 root bin
 f usr/sbin/wall 2555 root tty
-h usr/sbin/whodo=usr/lib/isaexec
+f usr/sbin/whodo 4555 root bin
 f usr/sbin/ypalias 0555 root bin
 f usr/sbin/ypinit 0555 root bin
 f usr/sbin/yppoll 0555 root bin
