@@ -46,7 +46,6 @@ driver name=usbvc perms="* 0666 root sys" \
     alias=usbia46d,8c3.config1.0 \
     alias=usbia46d,8c5.config1.0
 file path=kernel/drv/$(ARCH64)/usbvc group=sys
-$(i386_ONLY)file path=kernel/drv/usbvc group=sys
 file path=usr/share/man/man7d/usbvc.7d
 legacy pkg=SUNWusbvc desc="usbvc (USB Video Class Driver)" \
     name="USB Video Class Driver"

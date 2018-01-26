@@ -72,16 +72,11 @@ driver name=oce perms="* 0666 root sys" \
     alias=pciex19a2,710
 file path=kernel/drv/$(ARCH64)/emlxs group=sys
 file path=kernel/drv/$(ARCH64)/oce group=sys
-$(i386_ONLY)file path=kernel/drv/emlxs group=sys
 file path=kernel/drv/emlxs.conf group=sys \
     original_name=SUNWemlxs:kernel/drv/emlxs.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/oce group=sys
 file path=kernel/kmdb/$(ARCH64)/emlxs group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/emlxs group=sys mode=0555
 file path=kernel/misc/emlxs/$(ARCH64)/emlxs_fw group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/emlxs/emlxs_fw group=sys mode=0755
 file path=usr/lib/mdb/kvm/$(ARCH64)/emlxs.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/emlxs.so group=sys mode=0555
 legacy pkg=SUNWemlxs \
     desc="Device driver kit for Emulex-Sun FC, FCoE, and NIC adapters" \
     name="Emulex-Sun driver kit for Fibre Channel and Converged Network Adapters (root)" \

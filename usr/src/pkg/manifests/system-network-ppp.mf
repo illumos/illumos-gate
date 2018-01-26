@@ -67,14 +67,10 @@ file path=usr/bin/pppd mode=4555
 file path=usr/bin/pppstats mode=0555
 file path=usr/kernel/drv/$(ARCH64)/sppp group=sys
 file path=usr/kernel/drv/$(ARCH64)/sppptun group=sys
-$(i386_ONLY)file path=usr/kernel/drv/sppp group=sys
 file path=usr/kernel/drv/sppp.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/sppptun group=sys
 file path=usr/kernel/drv/sppptun.conf group=sys
 file path=usr/kernel/strmod/$(ARCH64)/spppasyn group=sys mode=0755
 file path=usr/kernel/strmod/$(ARCH64)/spppcomp group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/strmod/spppasyn group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/strmod/spppcomp group=sys mode=0755
 file path=usr/sbin/asppp2pppd mode=0550
 file path=usr/share/man/man1m/chat.1m
 file path=usr/share/man/man1m/pppd.1m
@@ -86,7 +82,6 @@ hardlink path=etc/rc2.d/S47pppd target=../../etc/init.d/pppd
 hardlink path=etc/rcS.d/K50pppd target=../../etc/init.d/pppd
 hardlink path=usr/kernel/strmod/$(ARCH64)/sppptun \
     target=../../drv/$(ARCH64)/sppptun
-$(i386_ONLY)hardlink path=usr/kernel/strmod/sppptun target=../drv/sppptun
 legacy pkg=SUNWpppd \
     desc="Device drivers implementing point-to-point protocol (PPP)" \
     name="Solaris PPP Device Drivers"

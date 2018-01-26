@@ -36,7 +36,6 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 file path=usr/lib/mdb/kvm/$(ARCH64)/qlc.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/qlc.so group=sys mode=0555
 legacy pkg=SUNWqlcu \
     desc="Utilties associated with the Qlogic Fibre Channel Adapter" \
     name="Qlogic Fibre Channel Adapter Utilities (usr)"

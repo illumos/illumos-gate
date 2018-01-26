@@ -54,7 +54,6 @@ driver name=nv_sata class=scsi-self-identifying perms="* 0644 root sys" \
     alias=pci10de,54 \
     alias=pci10de,55
 file path=kernel/drv/$(ARCH64)/nv_sata group=sys
-file path=kernel/drv/nv_sata group=sys
 file path=kernel/drv/nv_sata.conf group=sys
 file path=usr/share/man/man7d/nv_sata.7d
 legacy pkg=SUNWnvsata desc="Nvidia ck804 pro / mcp55 pro combo SATA driver" \

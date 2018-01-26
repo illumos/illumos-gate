@@ -38,7 +38,6 @@ dir path=usr/lib/class/FSS
 dir path=usr/share/man
 dir path=usr/share/man/man7
 file path=usr/kernel/sched/$(ARCH64)/FSS group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/sched/FSS group=sys mode=0755
 file path=usr/lib/class/FSS/FSSdispadmin mode=0555
 file path=usr/lib/class/FSS/FSSpriocntl mode=0555
 file path=usr/share/man/man7/FSS.7

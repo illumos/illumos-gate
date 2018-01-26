@@ -50,9 +50,7 @@ driver name=uath clone_perms="uath 0666 root sys" perms="* 0666 root sys" \
     alias=usbcf3,2 \
     alias=usbcf3,3
 file path=kernel/drv/$(ARCH64)/uath group=sys
-file path=kernel/drv/uath group=sys
 file path=kernel/misc/$(ARCH64)/uathfw group=sys mode=0755
-file path=kernel/misc/uathfw group=sys mode=0755
 file path=usr/share/man/man7d/uath.7d
 legacy pkg=SUNWuath \
     desc="Atheros AR5523 USB IEEE802.11b/g Wireless Network Driver" \

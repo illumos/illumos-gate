@@ -70,7 +70,6 @@ driver name=usbser_edge perms="* 0666 root sys" \
     alias=usbif1608,e.config1.0 \
     alias=usbif1608,f.config1.0
 file path=kernel/drv/$(ARCH64)/usbser_edge group=sys
-$(i386_ONLY)file path=kernel/drv/usbser_edge group=sys
 file path=kernel/drv/usbser_edge.conf group=sys \
     original_name=SUNWuedg:kernel/drv/usbser_edge.conf preserve=true
 legacy pkg=SUNWuedg desc="USB Digi Edgeport serial driver" \

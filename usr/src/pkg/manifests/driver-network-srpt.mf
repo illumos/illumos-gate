@@ -53,10 +53,8 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=srpt perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/srpt group=sys
-$(i386_ONLY)file path=kernel/drv/srpt group=sys
 file path=kernel/drv/srpt.conf group=sys
 file path=kernel/kmdb/$(ARCH64)/srpt group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/srpt group=sys mode=0555
 file path=lib/svc/manifest/system/ibsrp/target.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-srpt mode=0555 variant.opensolaris.zone=global
@@ -67,7 +65,6 @@ file path=usr/lib/libsrpt.so.1
 file path=usr/lib/llib-lsrpt
 file path=usr/lib/llib-lsrpt.ln
 file path=usr/lib/mdb/kvm/$(ARCH64)/srpt.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/srpt.so group=sys mode=0555
 file path=usr/sbin/srptadm mode=0555
 file path=usr/share/man/man7d/srpt.7d
 legacy pkg=SUNWsrptr desc="Sun SRP COMSTAR Port Provider (Root)" \

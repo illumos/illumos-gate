@@ -45,7 +45,6 @@ driver name=marvell88sx class=scsi-self-identifying perms="* 0644 root sys" \
     alias=pci11ab,6041.9 \
     alias=pci11ab,6081.9
 file path=kernel/drv/$(ARCH64)/marvell88sx group=sys
-file path=kernel/drv/marvell88sx group=sys
 legacy pkg=SUNWmv88sx desc="Marvell 88sx sata driver" \
     name="Marvell 88sx sata driver"
 license cr_Sun license=cr_Sun

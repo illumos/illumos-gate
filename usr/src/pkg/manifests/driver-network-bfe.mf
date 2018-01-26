@@ -45,7 +45,6 @@ driver name=bfe \
     alias=pci14e4,4401 \
     alias=pci14e4,4402
 file path=kernel/drv/$(ARCH64)/bfe group=sys
-file path=kernel/drv/bfe group=sys
 file path=usr/share/man/man7d/bfe.7d
 legacy pkg=SUNWbfe desc="Broadcom BCM4401 Fast Ethernet Driver" \
     name="Broadcom BCM4401 Fast Ethernet Driver"

@@ -105,8 +105,7 @@ clean:		$(CLEAN_DEPS) $(SISCLEAN_DEPS)
 
 # Need to clobber all build types due to ipctf.a
 clobber:	$(CLOBBER_DEPS) $(SISCLEAN_DEPS) \
-		clobber.obj32 clobber.obj64 \
-		clobber.debug32 clobber.debug64
+		clobber.obj64 clobber.debug64
 
 lint:		$(LINT_DEPS)
 
@@ -138,12 +137,6 @@ $(OBJS_DIR)/ipctf.a: $(OBJECTS)
 $(OBJECTS): $(OBJS_DIR)
 
 CLOBBERFILES += $(OBJS_DIR)/ipctf.a
-
-ipctf.obj32: FRC
-	@BUILD_TYPE=OBJ32 VERSION='$(VERSION)' $(MAKE) obj32/ipctf.a
-
-ipctf.debug32: FRC
-	@BUILD_TYPE=DBG32 VERSION='$(VERSION)' $(MAKE) debug32/ipctf.a
 
 ipctf.obj64: FRC
 	@BUILD_TYPE=OBJ64 VERSION='$(VERSION)' $(MAKE) obj64/ipctf.a

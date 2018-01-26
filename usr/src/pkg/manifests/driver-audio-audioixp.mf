@@ -45,7 +45,6 @@ driver name=audioixp \
     alias=pci1002,4361 \
     alias=pci1002,4370
 file path=kernel/drv/$(ARCH64)/audioixp group=sys
-file path=kernel/drv/audioixp group=sys
 file path=usr/share/man/man7d/audioixp.7d
 legacy pkg=SUNWadixp \
     desc="SunOS audio device driver for ATI IXP integrated audio hardware" \

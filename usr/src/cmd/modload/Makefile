@@ -31,15 +31,12 @@ PROG = $(MODPROG) $(DRVPROG)
 
 include ../Makefile.cmd
 
-ROOTUSRSBINLINKS=	$(PROG:%=$(ROOTUSRSBIN)/%)
-
 ETCSEC = $(ROOTETC)/security
 XPRIV = $(ETCSEC)/extra_privs
 
 $(XPRIV) := FILEMODE = 644
 
-$(64ONLY)SUBDIRS=	$(MACH)
-$(BUILD64)SUBDIRS += 	$(MACH64)
+SUBDIRS += 	$(MACH64)
 
 all	:=	TARGET = all
 install	:=	TARGET = install
@@ -53,13 +50,10 @@ all:	$(SUBDIRS)
 
 clean clobber lint:	$(SUBDIRS)
 
-install:	$(SUBDIRS) $(XPRIV) $(ROOTUSRSBINLINKS)
+install:	$(SUBDIRS) $(XPRIV)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-$(ROOTUSRSBINLINKS): FRC
-	-$(RM) $@; $(LN) $(ISAEXEC) $@
 
 FRC:
 

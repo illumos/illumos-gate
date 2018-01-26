@@ -42,7 +42,6 @@ driver name=nvme class=disk perms="* 0600 root sys" \
     alias=pciclass,010802 \
     alias=pciexclass,010802
 file path=kernel/drv/$(ARCH64)/nvme group=sys
-file path=kernel/drv/nvme group=sys
 file path=kernel/drv/nvme.conf group=sys
 file path=usr/sbin/nvmeadm mode=0555
 file path=usr/share/man/man1m/nvmeadm.1m

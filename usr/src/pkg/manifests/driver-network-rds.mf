@@ -45,9 +45,7 @@ driver name=rdsib perms="* 0644 root sys"
 file path=etc/sock2path.d/driver%2Fnetwork%2Frds group=sys
 file path=kernel/drv/$(ARCH64)/rds group=sys
 file path=kernel/drv/$(ARCH64)/rdsib group=sys
-$(i386_ONLY)file path=kernel/drv/rds group=sys
 file path=kernel/drv/rds.conf group=sys
-$(i386_ONLY)file path=kernel/drv/rdsib group=sys
 file path=kernel/drv/rdsib.conf group=sys
 legacy pkg=SUNWrds desc="Sun Reliable Datagram Sockets" \
     name="Sun Reliable Datagram Sockets"

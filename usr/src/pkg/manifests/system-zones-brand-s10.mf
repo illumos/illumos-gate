@@ -62,7 +62,6 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/brand/$(ARCH64)/s10_brand \
 $(sparc_ONLY)file path=platform/sun4v/kernel/brand/$(ARCH64)/s10_brand \
     group=sys mode=0755
 $(i386_ONLY)file path=usr/kernel/brand/$(ARCH64)/s10_brand group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/brand/s10_brand group=sys mode=0755
 file path=usr/lib/$(ARCH64)/s10_brand.so.1
 file path=usr/lib/$(ARCH64)/s10_npreload.so.1
 file path=usr/lib/brand/solaris10/$(ARCH64)/solaris10_librtld_db.so.1

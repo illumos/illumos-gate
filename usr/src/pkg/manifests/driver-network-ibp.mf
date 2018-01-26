@@ -49,7 +49,6 @@ dir path=usr/share/man/man7d
 driver name=ibp alias=ib.ipib clone_perms="ibp 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/ibp group=sys
-$(i386_ONLY)file path=kernel/drv/ibp group=sys
 file path=kernel/drv/ibp.conf group=sys \
     original_name=SUNWipoib:kernel/drv/ibd.conf preserve=renameold
 file path=lib/svc/manifest/network/ibd-post-upgrade.xml group=sys mode=0444

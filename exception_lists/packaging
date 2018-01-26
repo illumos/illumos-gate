@@ -131,7 +131,6 @@ usr/include/libsocket_priv.h
 usr/include/errfp.h
 usr/include/ikedoor.h
 usr/include/ipsec_util.h
-usr/lib/libike.so
 usr/lib/amd64/libike.so			i386
 usr/lib/sparcv9/libike.so		sparc
 usr/lib/libipsecutil.so
@@ -467,7 +466,6 @@ usr/include/aclutils.h
 #
 # USB skeleton driver stays in sync with the rest of USB but doesn't ship.
 #
-kernel/drv/usbskel		i386
 kernel/drv/amd64/usbskel	i386
 kernel/drv/sparcv9/usbskel	sparc
 kernel/drv/usbskel.conf
@@ -814,16 +812,12 @@ usr/lib/fs/smbfs/lsacl
 opt/smbcl-tests
 #
 # FC related files
-kernel/kmdb/fcip		i386
 kernel/kmdb/amd64/fcip		i386
 kernel/kmdb/sparcv9/fcip	sparc
-kernel/kmdb/fcp			i386
 kernel/kmdb/amd64/fcp		i386
 kernel/kmdb/sparcv9/fcp		sparc
-kernel/kmdb/fctl		i386
 kernel/kmdb/amd64/fctl		i386
 kernel/kmdb/sparcv9/fctl	sparc
-kernel/kmdb/qlc			i386
 kernel/kmdb/amd64/qlc		i386
 kernel/kmdb/sparcv9/qlc		sparc
 lib/llib-la5k			sparc

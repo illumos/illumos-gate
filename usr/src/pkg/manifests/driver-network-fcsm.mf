@@ -40,7 +40,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=fcsm perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/fcsm group=sys
-$(i386_ONLY)file path=kernel/drv/fcsm group=sys
 file path=kernel/drv/fcsm.conf group=sys
 legacy pkg=SUNWfcsm desc="Provides the FCSM driver" name="FCSM driver"
 license cr_Sun license=cr_Sun

@@ -44,7 +44,6 @@ driver name=si3124 class=scsi-self-identifying perms="* 0644 root sys" \
     alias=pci1095,3132 \
     alias=pci1095,3531
 file path=kernel/drv/$(ARCH64)/si3124 group=sys
-file path=kernel/drv/si3124 group=sys
 file path=usr/share/man/man7d/si3124.7d
 legacy pkg=SUNWsi3124 desc="SiliconImage 3124 sata driver" \
     name="SiliconImage 3124 sata driver"

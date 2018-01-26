@@ -42,7 +42,6 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=audiovia823x alias=pci1106,3059
 file path=kernel/drv/$(ARCH64)/audiovia823x group=sys
-file path=kernel/drv/audiovia823x group=sys
 file path=usr/share/man/man7d/audiovia823x.7d
 legacy pkg=SUNWvia823x \
     desc="SunOS audio device driver for VIA VT823x south bridges" \

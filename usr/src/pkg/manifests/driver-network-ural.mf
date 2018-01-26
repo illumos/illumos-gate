@@ -46,7 +46,6 @@ driver name=ural clone_perms="ural 0666 root sys" perms="* 0666 root sys" \
     alias=usb2001,3c00 \
     alias=usb411,67
 file path=kernel/drv/$(ARCH64)/ural group=sys
-file path=kernel/drv/ural group=sys
 file path=usr/share/man/man7d/ural.7d
 legacy pkg=SUNWural desc="Ralink RT2500USB 802.11b/g Wireless Driver" \
     name="Ralink RT2500USB 802.11b/g Wireless Driver"

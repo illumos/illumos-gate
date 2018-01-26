@@ -822,20 +822,8 @@ $(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel \
 $(i386_ONLY)file \
     path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.46 \
     group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu.generic group=sys \
-    mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD group=sys \
-    mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD.15 \
-    group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel group=sys \
-    mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.46 \
-    group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/dacf/$(ARCH64)/consconfig_dacf \
     group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/dacf/consconfig_dacf group=sys \
-    mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/acpinex group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/acpippm group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/amd_iommu group=sys
@@ -846,20 +834,10 @@ $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/pci group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/pit_beep group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/ppm group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/rootnex group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/acpinex group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/acpippm group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/acpippm.conf group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/amd_iommu group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/amd_iommu.conf group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/cpudrv group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/isa group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/npe group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/pci group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/pit_beep group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/pit_beep.conf group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/ppm group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/ppm.conf group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/rootnex.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/apix group=sys \
     mode=0755
@@ -867,19 +845,10 @@ $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/pcplusmp group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/mach/$(ARCH64)/uppc group=sys \
     mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/mach/apix group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/mach/pcplusmp group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/mach/uppc group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/acpidev group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/gfx_private \
     group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/misc/acpidev group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/misc/gfx_private group=sys \
-    mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/unix group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/multiboot group=sys mode=0755 \
-    reboot-needed=true
 $(i386_ONLY)file path=platform/i86pc/ucode/amd-ucode.bin group=sys mode=0444 \
     original_name=SUNWcakr:platform/i86pc/ucode/amd-ucode.bin preserve=true \
     reboot-needed=true
@@ -897,18 +866,8 @@ $(i386_ONLY)file \
     group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel \
     group=sys mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu.generic group=sys \
-    mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu_ms.AuthenticAMD group=sys \
-    mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu_ms.AuthenticAMD.15 \
-    group=sys mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/cpu/cpu_ms.GenuineIntel group=sys \
-    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/dacf/$(ARCH64)/consconfig_dacf \
     group=sys mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/dacf/consconfig_dacf group=sys \
-    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/balloon group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/domcaps group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/evtchn group=sys
@@ -928,42 +887,20 @@ $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/xnbu group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/xnf group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/xpvd group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/$(ARCH64)/xpvtap group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/balloon group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/domcaps group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/evtchn group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/isa group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/npe group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/pci group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/pit_beep group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/pit_beep.conf group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/privcmd group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/rootnex group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/xdf group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/xenbus group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/xencons group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/drv/xencons.conf group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/xnf group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/drv/xpvd group=sys
 $(i386_ONLY)file path=platform/i86xpv/kernel/mach/$(ARCH64)/xpv_psm group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/mach/$(ARCH64)/xpv_uppc group=sys \
     mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/mach/xpv_psm group=sys mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/mach/xpv_uppc group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/$(ARCH64)/gfx_private \
     group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/$(ARCH64)/xnb group=sys \
     mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/misc/$(ARCH64)/xpv_autoconfig \
     group=sys mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/misc/gfx_private group=sys \
-    mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/misc/xpv_autoconfig group=sys \
-    mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/tod/$(ARCH64)/xpvtod group=sys \
     mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/tod/xpvtod group=sys mode=0755
-$(i386_ONLY)file path=platform/i86xpv/kernel/unix group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u-us3/kernel/crypto/$(ARCH64)/aes \
     group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/bootlst group=sys reboot-needed=true
@@ -1179,8 +1116,6 @@ $(sparc_ONLY)file path=usr/share/man/man7d/zsh.7d
 $(sparc_ONLY)file path=usr/share/man/man7m/kb.7m
 $(i386_ONLY)hardlink \
     path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.47 \
-    target=cpu_ms.GenuineIntel.6.46
-$(i386_ONLY)hardlink path=platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.47 \
     target=cpu_ms.GenuineIntel.6.46
 $(sparc_ONLY)hardlink path=platform/sun4u/kernel/misc/$(ARCH64)/md5 \
     target=../../../kernel/crypto/$(ARCH64)/md5

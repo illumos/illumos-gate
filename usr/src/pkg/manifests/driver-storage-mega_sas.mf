@@ -145,7 +145,6 @@ driver name=mega_sas class=scsi \
     alias=pci1028,15.1028.1f02 \
     alias=pci1028,15.1028.1f03
 file path=kernel/drv/$(ARCH64)/mega_sas group=sys
-file path=kernel/drv/mega_sas group=sys
 file path=kernel/drv/mega_sas.conf group=sys
 file path=usr/share/man/man7d/mega_sas.7d
 legacy pkg=SUNWmegasas desc="LSI MegaSAS RAID Controller HBA Driver" \

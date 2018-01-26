@@ -52,7 +52,6 @@ driver name=atge \
     alias=pciex1969,2060 \
     alias=pciex1969,2062
 file path=kernel/drv/$(ARCH64)/atge group=sys
-file path=kernel/drv/atge group=sys
 file path=usr/share/man/man7d/atge.7d
 legacy pkg=SUNWatge desc="Atheros/Attansic L1E Gigabit Ethernet" \
     name="Atheros/Attansic L1E Gigabit Ethernet 10/100/1000 Base (AR8121/AR8113)"

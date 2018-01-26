@@ -46,7 +46,6 @@ driver name=vr perms="* 0666 root sys" \
     alias=pci1106,3065 \
     alias=pci1106,3106
 file path=kernel/drv/$(ARCH64)/vr group=sys
-$(i386_ONLY)file path=kernel/drv/vr group=sys
 file path=usr/share/man/man7d/vr.7d
 legacy pkg=SUNWvr desc="VIA Rhine Fast Ethernet driver" \
     name="VIA Rhine Fast Ethernet driver"

@@ -38,7 +38,6 @@ dir path=kernel group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/rpcsec_gss group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/rpcsec_gss group=sys mode=0755
 legacy pkg=SUNWrsgk desc="kernel GSS-API services for ONC RPC" \
     name="kernel RPCSEC_GSS"
 license cr_Sun license=cr_Sun

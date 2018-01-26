@@ -41,7 +41,6 @@ dir path=kernel/misc/$(ARCH64) group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man7d
 file path=kernel/misc/$(ARCH64)/ibdma group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ibdma group=sys mode=0755
 file path=usr/share/man/man7d/ibdma.7d
 legacy pkg=SUNWibdmar desc="Sun InfiniBand Device Management Agent (Root)" \
     name="Sun InfiniBand Device Management Agent (Root)"

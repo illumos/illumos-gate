@@ -30,7 +30,6 @@ driver name=udmf clone_perms="udmf 0666 root sys" perms="* 0666 root sys" \
     alias=usba46,9601 \
     alias=usbfe6,8101
 file path=kernel/drv/$(ARCH64)/udmf group=sys
-file path=kernel/drv/udmf group=sys
 license usr/src/uts/common/io/udmf/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/udmf/THIRDPARTYLICENSE
 depend fmri=driver/usb/usbgem type=require

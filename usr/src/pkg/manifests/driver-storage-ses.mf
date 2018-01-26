@@ -43,7 +43,6 @@ driver name=ses perms="* 0666 bin bin" \
     alias=scsiclass,03S \
     alias=scsiclass,0d
 file path=kernel/drv/$(ARCH64)/ses group=sys
-$(i386_ONLY)file path=kernel/drv/ses group=sys
 file path=kernel/drv/ses.conf group=sys
 file path=usr/share/man/man7d/ses.7d
 legacy pkg=SUNWses desc="SCSI Enclosure Services (ses) Device Driver" \

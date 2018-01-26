@@ -47,7 +47,6 @@ driver name=amr class=scsi \
     alias=pci1028,e \
     alias=pci1028,f
 file path=kernel/drv/$(ARCH64)/amr group=sys
-file path=kernel/drv/amr group=sys
 file path=kernel/drv/amr.conf group=sys
 file path=usr/share/man/man7d/amr.7d
 legacy pkg=SUNWamr desc="LSI MegaRAID SCSI HBA Driver" \

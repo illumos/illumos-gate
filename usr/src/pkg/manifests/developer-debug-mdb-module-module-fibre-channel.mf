@@ -38,9 +38,6 @@ dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 file path=usr/lib/mdb/kvm/$(ARCH64)/fcip.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/fcp.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/fctl.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/fcip.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/fcp.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/fctl.so group=sys mode=0555
 legacy pkg=SUNWfcmdb desc="Fibre Channel adb macros and mdb modules" \
     name="Fibre Channel adb macros and mdb modules"
 license cr_Sun license=cr_Sun

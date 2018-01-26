@@ -54,7 +54,6 @@ CPPFLAGS += -D_MDB -D_KMDB $(INCDIRS:%=-I%) $(ARCHOPTS)
 
 #
 # kmdb is a kernel module, so we'll use the kernel's build flags.
-CFLAGS += $(STAND_FLAGS_32)
 CFLAGS64 += $(STAND_FLAGS_64)
 
 ASFLAGS += -P -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)

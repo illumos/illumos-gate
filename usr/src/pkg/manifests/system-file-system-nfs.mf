@@ -67,13 +67,9 @@ file path=etc/fs/nfs/mount mode=0555
 file path=etc/nfssec.conf group=sys original_name=SUNWnfsc:etc/nfssec.conf \
     preserve=true
 file path=kernel/fs/$(ARCH64)/nfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/nfs group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/klmmod group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/klmops group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/nfs_dlboot group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/klmmod group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/klmops group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/nfs_dlboot group=sys mode=0755
 file path=lib/svc/manifest/network/nfs/cbd.xml group=sys mode=0444
 file path=lib/svc/manifest/network/nfs/client.xml group=sys mode=0444
 file path=lib/svc/manifest/network/nfs/mapid.xml group=sys mode=0444
@@ -104,7 +100,6 @@ file path=usr/share/man/man4/nfs.4
 file path=usr/share/man/man4/nfssec.conf.4
 group groupname=unknown gid=96
 hardlink path=kernel/sys/$(ARCH64)/nfs target=../../../kernel/fs/$(ARCH64)/nfs
-$(i386_ONLY)hardlink path=kernel/sys/nfs target=../../kernel/fs/nfs
 legacy pkg=SUNWnfsckr \
     desc="Network File System (NFS) client kernel support (Root)" \
     name="Network File System (NFS) client kernel support (Root)"

@@ -50,7 +50,6 @@ driver name=bnx perms="* 0644 root sys" \
     alias=pci14e4,16aa \
     alias=pci14e4,16ac
 file path=kernel/drv/$(ARCH64)/bnx group=sys
-file path=kernel/drv/bnx group=sys
 file path=kernel/drv/bnx.conf group=sys \
     original_name=BRCMbnx:kernel/drv/bnx.conf preserve=renamenew
 legacy pkg=BRCMbnx \

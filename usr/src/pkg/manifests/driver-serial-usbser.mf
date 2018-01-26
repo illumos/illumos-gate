@@ -39,7 +39,6 @@ dir path=kernel group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/usbser group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/usbser group=sys mode=0755
 legacy pkg=SUNWusbs desc="USB generic serial module" \
     name="USB generic serial module"
 license cr_Sun license=cr_Sun

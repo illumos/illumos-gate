@@ -46,7 +46,6 @@ driver name=audiohd \
     alias=pciclass,0403 \
     alias=pciexclass,0403
 file path=kernel/drv/$(ARCH64)/audiohd group=sys
-file path=kernel/drv/audiohd group=sys
 file path=kernel/drv/audiohd.conf group=sys
 file path=usr/share/man/man7d/audiohd.7d
 legacy pkg=SUNWaudiohd desc="SunOS audio device driver for Munich workstation" \

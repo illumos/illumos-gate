@@ -44,7 +44,6 @@ driver name=pcn clone_perms="pcn 0666 root sys" perms="* 0666 root sys" \
     alias=pci1022,2000 \
     alias=pci103c,104c
 file path=kernel/drv/$(ARCH64)/pcn group=sys
-$(i386_ONLY)file path=kernel/drv/pcn group=sys
 file path=usr/share/man/man7d/pcn.7d
 license license_in_headers license=license_in_headers
 license usr/src/uts/common/io/pcn/THIRDPARTYLICENSE \

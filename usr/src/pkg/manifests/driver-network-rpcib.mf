@@ -41,7 +41,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=rpcib perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/rpcib group=sys
-$(i386_ONLY)file path=kernel/drv/rpcib group=sys
 file path=kernel/drv/rpcib.conf group=sys \
     original_name=SUNWrpcib:kernel/drv/rpcib.conf preserve=true
 legacy pkg=SUNWrpcib desc="InfiniBand plugin implementation of RPC over RDMA" \

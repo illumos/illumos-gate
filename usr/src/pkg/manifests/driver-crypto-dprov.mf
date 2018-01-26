@@ -35,7 +35,6 @@ dir path=kernel/crypto/$(ARCH64) group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 file path=kernel/drv/$(ARCH64)/dprov group=sys
-$(i386_ONLY)file path=kernel/drv/dprov group=sys
 file path=kernel/drv/dprov.conf group=sys
 legacy pkg=SUNWcryptoint desc="Kernel Crypto Framework Test Driver" \
     name="Kernel Crypto Framework Test Driver"
@@ -43,4 +42,3 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 link path=kernel/crypto/$(ARCH64)/dprov \
     target=../../../kernel/drv/$(ARCH64)/dprov
-$(i386_ONLY)link path=kernel/crypto/dprov target=../../kernel/drv/dprov

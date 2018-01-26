@@ -49,7 +49,6 @@ driver name=iwh clone_perms="iwh 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,423c \
     alias=pciex8086,423d
 file path=kernel/drv/$(ARCH64)/iwh group=sys
-file path=kernel/drv/iwh group=sys
 file path=usr/share/man/man7d/iwh.7d
 legacy pkg=SUNWiwh desc="Intel(R) WiFi Link 5100/5300 driver" \
     name="Intel(R) WiFi Link 5100/5300 driver"

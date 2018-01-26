@@ -111,7 +111,5 @@ driver name=t4nex clone_perms="t4nex 0666 root sys" \
     alias=pciex1425,6481
 file path=kernel/drv/$(ARCH64)/cxgbe group=sys
 file path=kernel/drv/$(ARCH64)/t4nex group=sys
-$(i386_ONLY)file path=kernel/drv/cxgbe group=sys
-$(i386_ONLY)file path=kernel/drv/t4nex group=sys
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

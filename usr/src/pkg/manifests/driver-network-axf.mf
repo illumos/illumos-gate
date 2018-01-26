@@ -44,7 +44,6 @@ driver name=axf clone_perms="axf 0666 root sys" perms="* 0666 root sys" \
     alias=usbb95,7720 \
     alias=usbb95,772a
 file path=kernel/drv/$(ARCH64)/axf group=sys
-file path=kernel/drv/axf group=sys
 license usr/src/uts/common/io/axf/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/axf/THIRDPARTYLICENSE
 depend fmri=driver/usb/usbgem type=require

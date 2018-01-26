@@ -52,7 +52,6 @@ driver name=dca \
     alias=pci14e4,5822 \
     alias=pci14e4,5825
 file path=kernel/drv/$(ARCH64)/dca group=sys
-$(i386_ONLY)file path=kernel/drv/dca group=sys
 file path=kernel/drv/dca.conf group=sys \
     original_name=SUNWdcaf:kernel/drv/dca.conf preserve=true
 file path=usr/lib/fm/dict/SCA1000.dict mode=0444
