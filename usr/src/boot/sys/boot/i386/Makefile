@@ -29,9 +29,11 @@ clobber:=	TARGET= clobber
 
 .KEEP_STATE:
 
+pxeldr: loader
+
 all clean clobber: $(SUBDIRS)
 
-install: all $(INSTDIRS)
+install: all .WAIT $(INSTDIRS)
 
 FRC:
 
