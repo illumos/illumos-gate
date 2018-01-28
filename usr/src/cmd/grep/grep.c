@@ -34,9 +34,8 @@
  *
  */
 
-/* Copyright 2017 Nexenta Systems, Inc.  All rights reserved. */
-
 /*
+ * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2013 Damian Bogel. All rights reserved.
  */
 
@@ -284,7 +283,6 @@ main(int argc, char **argv)
 
 		case 'x':	/* POSIX: full line matches */
 			xflag++;
-			regflags |= REG_ANCHOR;
 			break;
 
 		case 'E':	/* POSIX: Extended RE's */
@@ -704,9 +702,7 @@ fixpatterns(void)
 	int	rv, fix_pattern, npatterns;
 
 	/*
-	 * As REG_ANCHOR flag is not supported in the current Solaris,
-	 * need to fix the specified pattern if -x is specified with
-	 * grep or egrep
+	 * Fix the specified pattern if -x is specified.
 	 */
 	fix_pattern = !Fflag && xflag;
 
