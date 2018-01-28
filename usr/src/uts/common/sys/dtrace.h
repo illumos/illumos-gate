@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -189,6 +189,7 @@ typedef enum dtrace_probespec {
 #define	DIF_OP_RLDX	77		/* rldx  [r1], rd */
 #define	DIF_OP_XLATE	78		/* xlate xlrindex, rd */
 #define	DIF_OP_XLARG	79		/* xlarg xlrindex, rd */
+#define	DIF_OP_STGA	80		/* stga var, ri, rd */
 
 #define	DIF_INTOFF_MAX		0xffff	/* highest integer table offset */
 #define	DIF_STROFF_MAX		0xffff	/* highest string table offset */

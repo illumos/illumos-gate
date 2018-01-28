@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2016, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
@@ -3545,6 +3545,34 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 	}
 }
 
+static void
+dtrace_dif_variable_write(dtrace_mstate_t *mstate, dtrace_state_t *state,
+    uint64_t v, uint64_t ndx, uint64_t data)
+{
+	switch (v) {
+	case DIF_VAR_UREGS: {
+		klwp_t *lwp;
+
+		if (dtrace_destructive_disallow ||
+		    !dtrace_priv_proc_control(state, mstate)) {
+			return;
+		}
+
+		if ((lwp = curthread->t_lwp) == NULL) {
+			DTRACE_CPUFLAG_SET(CPU_DTRACE_BADADDR);
+			cpu_core[CPU->cpu_id].cpuc_dtrace_illval = NULL;
+			return;
+		}
+
+		dtrace_setreg(lwp->lwp_regs, ndx, data);
+		return;
+	}
+
+	default:
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+		return;
+	}
+}
 
 typedef enum dtrace_json_state {
 	DTRACE_JSON_REST = 1,
@@ -6022,6 +6050,11 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			}
 
 			regs[rd] = dtrace_dif_variable(mstate, state, id, 0);
+			break;
+
+		case DIF_OP_STGA:
+			dtrace_dif_variable_write(mstate, state, r1, regs[r2],
+			    regs[rd]);
 			break;
 
 		case DIF_OP_STGS:
@@ -9392,6 +9425,15 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd == 0)
 				err += efunc(pc, "cannot write to %r0\n");
 			break;
+		case DIF_OP_STGA:
+			if (r1 > DIF_VAR_ARRAY_MAX)
+				err += efunc(pc, "invalid array %u\n", r1);
+			if (r2 >= nregs)
+				err += efunc(pc, "invalid register %u\n", r2);
+			if (rd >= nregs)
+				err += efunc(pc, "invalid register %u\n", rd);
+			dp->dtdo_destructive = 1;
+			break;
 		case DIF_OP_LDGS:
 		case DIF_OP_LDTS:
 		case DIF_OP_LDLS:
@@ -9737,12 +9779,23 @@ dtrace_difo_validate_helper(dtrace_difo_t *dp)
 			break;
 
 		case DIF_OP_LDTA:
+			if (v < DIF_VAR_OTHER_UBASE) {
+				err += efunc(pc, "illegal variable load\n");
+				break;
+			}
+			/* FALLTHROUGH */
 		case DIF_OP_LDTS:
 		case DIF_OP_LDGAA:
 		case DIF_OP_LDTAA:
 			err += efunc(pc, "illegal dynamic variable load\n");
 			break;
 
+		case DIF_OP_STGA:
+			if (v < DIF_VAR_OTHER_UBASE) {
+				err += efunc(pc, "illegal variable store\n");
+				break;
+			}
+			/* FALLTHROUGH */
 		case DIF_OP_STTS:
 		case DIF_OP_STGAA:
 		case DIF_OP_STTAA:

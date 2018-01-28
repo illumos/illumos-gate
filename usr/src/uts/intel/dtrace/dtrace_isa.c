@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  */
 
 #include <sys/dtrace_impl.h>
@@ -546,39 +547,42 @@ dtrace_getstackdepth(int aframes)
 	return (depth - aframes);
 }
 
+#if defined(__amd64)
+static const int dtrace_regmap[] = {
+	REG_GS,		/* GS */
+	REG_FS,		/* FS */
+	REG_ES,		/* ES */
+	REG_DS,		/* DS */
+	REG_RDI,	/* EDI */
+	REG_RSI,	/* ESI */
+	REG_RBP,	/* EBP */
+	REG_RSP,	/* ESP */
+	REG_RBX,	/* EBX */
+	REG_RDX,	/* EDX */
+	REG_RCX,	/* ECX */
+	REG_RAX,	/* EAX */
+	REG_TRAPNO,	/* TRAPNO */
+	REG_ERR,	/* ERR */
+	REG_RIP,	/* EIP */
+	REG_CS,		/* CS */
+	REG_RFL,	/* EFL */
+	REG_RSP,	/* UESP */
+	REG_SS		/* SS */
+};
+#endif
+
+
 ulong_t
 dtrace_getreg(struct regs *rp, uint_t reg)
 {
 #if defined(__amd64)
-	int regmap[] = {
-		REG_GS,		/* GS */
-		REG_FS,		/* FS */
-		REG_ES,		/* ES */
-		REG_DS,		/* DS */
-		REG_RDI,	/* EDI */
-		REG_RSI,	/* ESI */
-		REG_RBP,	/* EBP */
-		REG_RSP,	/* ESP */
-		REG_RBX,	/* EBX */
-		REG_RDX,	/* EDX */
-		REG_RCX,	/* ECX */
-		REG_RAX,	/* EAX */
-		REG_TRAPNO,	/* TRAPNO */
-		REG_ERR,	/* ERR */
-		REG_RIP,	/* EIP */
-		REG_CS,		/* CS */
-		REG_RFL,	/* EFL */
-		REG_RSP,	/* UESP */
-		REG_SS		/* SS */
-	};
-
 	if (reg <= SS) {
-		if (reg >= sizeof (regmap) / sizeof (int)) {
+		if (reg >= sizeof (dtrace_regmap) / sizeof (int)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
 			return (0);
 		}
 
-		reg = regmap[reg];
+		reg = dtrace_regmap[reg];
 	} else {
 		reg -= SS + 1;
 	}
@@ -649,6 +653,105 @@ dtrace_getreg(struct regs *rp, uint_t reg)
 
 	return ((&rp->r_gs)[reg]);
 #endif
+}
+
+void
+dtrace_setreg(struct regs *rp, uint_t reg, ulong_t val)
+{
+#if defined(__amd64)
+	if (reg <= SS) {
+		ASSERT(reg < (sizeof (dtrace_regmap) / sizeof (int)));
+
+		reg = dtrace_regmap[reg];
+	} else {
+		reg -= SS + 1;
+	}
+
+	switch (reg) {
+	case REG_RDI:
+		rp->r_rdi = val;
+		break;
+	case REG_RSI:
+		rp->r_rsi = val;
+		break;
+	case REG_RDX:
+		rp->r_rdx = val;
+		break;
+	case REG_RCX:
+		rp->r_rcx = val;
+		break;
+	case REG_R8:
+		rp->r_r8 = val;
+		break;
+	case REG_R9:
+		rp->r_r9 = val;
+		break;
+	case REG_RAX:
+		rp->r_rax = val;
+		break;
+	case REG_RBX:
+		rp->r_rbx = val;
+		break;
+	case REG_RBP:
+		rp->r_rbp = val;
+		break;
+	case REG_R10:
+		rp->r_r10 = val;
+		break;
+	case REG_R11:
+		rp->r_r11 = val;
+		break;
+	case REG_R12:
+		rp->r_r12 = val;
+		break;
+	case REG_R13:
+		rp->r_r13 = val;
+		break;
+	case REG_R14:
+		rp->r_r14 = val;
+		break;
+	case REG_R15:
+		rp->r_r15 = val;
+		break;
+	case REG_RSP:
+		rp->r_rsp = val;
+		break;
+	default:
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+		return;
+	}
+
+#else /* defined(__amd64) */
+	switch (reg) {
+	case EAX:
+		rp->r_eax = val;
+		break;
+	case ECX:
+		rp->r_ecx = val;
+		break;
+	case EDX:
+		rp->r_edx = val;
+		break;
+	case EBX:
+		rp->r_ebx = val;
+		break;
+	case ESP:
+		rp->r_esp = val;
+		break;
+	case EBP:
+		rp->r_ebp = val;
+		break;
+	case ESI:
+		rp->r_esi = val;
+		break;
+	case EDI:
+		rp->r_edi = val;
+		break;
+	default:
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+		return;
+	}
+#endif /* defined(__amd64) */
 }
 
 static int

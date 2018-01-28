@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -1262,6 +1262,7 @@ extern void dtrace_copyoutstr(uintptr_t, uintptr_t, size_t,
     volatile uint16_t *);
 extern void dtrace_getpcstack(pc_t *, int, int, uint32_t *);
 extern ulong_t dtrace_getreg(struct regs *, uint_t);
+extern void dtrace_setreg(struct regs *, uint_t, ulong_t);
 extern uint64_t dtrace_getvmreg(uint_t, volatile uint16_t *);
 extern int dtrace_getstackdepth(int);
 extern void dtrace_getupcstack(uint64_t *, int);

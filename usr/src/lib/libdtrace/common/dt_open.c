@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  */
 
@@ -427,8 +427,8 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_type, "uid_t" },
 { "umod", DT_IDENT_ACTFUNC, 0, DT_ACT_UMOD, DT_ATTR_STABCMN,
 	DT_VERS_1_2, &dt_idops_func, "_usymaddr(uintptr_t)" },
-{ "uregs", DT_IDENT_ARRAY, 0, DIF_VAR_UREGS, DT_ATTR_STABCMN, DT_VERS_1_0,
-	&dt_idops_regs, NULL },
+{ "uregs", DT_IDENT_ARRAY, DT_IDFLG_WRITE, DIF_VAR_UREGS, DT_ATTR_STABCMN,
+	DT_VERS_1_0, &dt_idops_regs, NULL },
 { "ustack", DT_IDENT_ACTFUNC, 0, DT_ACT_USTACK, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "stack(...)" },
 { "ustackdepth", DT_IDENT_SCALAR, 0, DIF_VAR_USTACKDEPTH,

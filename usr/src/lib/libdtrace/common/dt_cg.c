@@ -27,6 +27,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1115,23 +1116,14 @@ dt_cg_asgn_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 	}
 
 	/*
-	 * If we are storing to a variable, generate an stv instruction from
-	 * the variable specified by the identifier.  If we are storing to a
-	 * memory address, generate code again for the left-hand side using
-	 * DT_NF_REF to get the address, and then generate a store to it.
-	 * In both paths, we assume dnp->dn_reg already has the new value.
+	 * If we are storing to a memory address, generate code again for the
+	 * left-hand side using DT_NF_REF to get the address, and then generate
+	 * a store to it.
+	 *
+	 * Both here and the other variable-store paths, we assume dnp->dn_reg
+	 * already has the new value.
 	 */
-	if (dnp->dn_left->dn_kind == DT_NODE_VAR) {
-		idp = dt_ident_resolve(dnp->dn_left->dn_ident);
-
-		if (idp->di_kind == DT_IDENT_ARRAY)
-			dt_cg_arglist(idp, dnp->dn_left->dn_args, dlp, drp);
-
-		idp->di_flags |= DT_IDFLG_DIFW;
-		instr = DIF_INSTR_STV(dt_cg_stvar(idp),
-		    idp->di_id, dnp->dn_reg);
-		dt_irlist_append(dlp, dt_cg_node_alloc(DT_LBL_NONE, instr));
-	} else {
+	if (dnp->dn_left->dn_kind != DT_NODE_VAR) {
 		uint_t rbit = dnp->dn_left->dn_flags & DT_NF_REF;
 
 		assert(dnp->dn_left->dn_flags & DT_NF_WRITABLE);
@@ -1145,7 +1137,33 @@ dt_cg_asgn_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 
 		dnp->dn_left->dn_flags &= ~DT_NF_REF;
 		dnp->dn_left->dn_flags |= rbit;
+		return;
 	}
+
+	idp = dt_ident_resolve(dnp->dn_left->dn_ident);
+	idp->di_flags |= DT_IDFLG_DIFW;
+
+	/*
+	 * Storing to an array variable is a special case.
+	 * Only 'uregs[]' supports this for the time being.
+	 */
+	if (idp->di_kind == DT_IDENT_ARRAY &&
+	    idp->di_id <= DIF_VAR_ARRAY_MAX) {
+		dt_node_t *idx = dnp->dn_left->dn_args;
+
+		dt_cg_node(idx, dlp, drp);
+		instr = DIF_INSTR_FMT(DIF_OP_STGA, idp->di_id, idx->dn_reg,
+		    dnp->dn_reg);
+		dt_irlist_append(dlp, dt_cg_node_alloc(DT_LBL_NONE, instr));
+		dt_regset_free(drp, idx->dn_reg);
+		return;
+	}
+
+	if (idp->di_kind == DT_IDENT_ARRAY)
+		dt_cg_arglist(idp, dnp->dn_left->dn_args, dlp, drp);
+
+	instr = DIF_INSTR_STV(dt_cg_stvar(idp), idp->di_id, dnp->dn_reg);
+	dt_irlist_append(dlp, dt_cg_node_alloc(DT_LBL_NONE, instr));
 }
 
 static void
