@@ -751,7 +751,6 @@ vi_compile(int eof, int oknl)
 #ifdef XPG4
 	/*
 	 * reset cflags to plain BRE
-	 * if \< and/or \> is specified, REG_WORDS is set.
 	 */
 	regcomp_flags = 0;
 #endif /* XPG4 */
@@ -843,15 +842,11 @@ complex:
 				}
 				(void) getchar();
 			}
-				
+
 			switch (c) {
 
 			case '<':
 			case '>':
-#ifdef XPG4
-				regcomp_flags = REG_WORDS;
-				/*FALLTHRU*/
-#endif /* XPG4 */
 			case '(':
 			case ')':
 			case '{':
@@ -862,7 +857,7 @@ complex:
 				*gp++ = '\\';
 				*gp++ = c;
 				continue;
-			
+
 			case 'n':
 				*gp++ = c;
 				continue;
