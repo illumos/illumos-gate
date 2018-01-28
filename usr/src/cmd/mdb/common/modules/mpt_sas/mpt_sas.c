@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
@@ -715,6 +715,46 @@ display_deviceinfo(struct mptsas *mp)
 		case MPI25_MFGPAGE_DEVID_SAS3108_5:
 		case MPI25_MFGPAGE_DEVID_SAS3108_6:
 			mdb_printf("(SAS3108) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3216:
+		case MPI26_MFGPAGE_DEVID_SAS3316_1:
+		case MPI26_MFGPAGE_DEVID_SAS3316_2:
+		case MPI26_MFGPAGE_DEVID_SAS3316_3:
+		case MPI26_MFGPAGE_DEVID_SAS3316_4:
+			mdb_printf("(SAS3216) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3224:
+		case MPI26_MFGPAGE_DEVID_SAS3324_1:
+		case MPI26_MFGPAGE_DEVID_SAS3324_2:
+		case MPI26_MFGPAGE_DEVID_SAS3324_3:
+		case MPI26_MFGPAGE_DEVID_SAS3324_4:
+			mdb_printf("(SAS3224) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3408:
+			mdb_printf("(SAS3408) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3416:
+			mdb_printf("(SAS3416) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3508:
+		case MPI26_MFGPAGE_DEVID_SAS3508_1:
+			mdb_printf("(SAS3508) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3516:
+		case MPI26_MFGPAGE_DEVID_SAS3516_1:
+			mdb_printf("(SAS3516) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3616:
+			mdb_printf("(SAS3616) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3708:
+			mdb_printf("(SAS3708) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS3716:
+			mdb_printf("(SAS3716) ");
+			break;
+		case MPI26_MFGPAGE_DEVID_SAS4008:
+			mdb_printf("(SAS4008) ");
 			break;
 		default:
 			mdb_printf("(SAS????) ");
