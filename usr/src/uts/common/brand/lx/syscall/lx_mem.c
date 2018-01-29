@@ -12,7 +12,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -43,6 +43,8 @@ extern uint_t pr_getprot(struct seg *, int, void **, caddr_t *, caddr_t *,
 extern struct seg_ops segspt_shmops;
 /* From uts/common/syscall/memcntl.c */
 extern int memcntl(caddr_t, size_t, int, caddr_t, int, int);
+/* From uts/common/os/grow.c */
+extern int smmap_common(caddr_t *, size_t, int, int, struct file *, offset_t);
 
 /*
  * After Linux 2.6.8, an unprivileged process can lock memory up to its
@@ -513,7 +515,8 @@ lx_get_mapping(uintptr_t find_addr, size_t find_size, lx_segmap_t *mp,
 	uint_t prot;
 	caddr_t saddr, eaddr, naddr;
 
-	AS_LOCK_ENTER(as, RW_READER);
+	/* pr_getprot asserts that the as is held as a writer */
+	AS_LOCK_ENTER(as, RW_WRITER);
 
 	seg = as_segat(as, (caddr_t)find_addr);
 	if (seg == NULL || (seg->s_flags & S_HOLE) != 0) {
@@ -865,13 +868,14 @@ long
 lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
     uintptr_t new_addr)
 {
-	int prot = 0, oflags, mflags = 0, i, fd, res;
+	int prot = 0, oflags, mflags = 0, i, res;
 	lx_segmap_t map, *mp;
-	long rval = 0;
+	int rval = 0;
 	lx_proc_data_t *lxpd;
 	offset_t off;
 	struct vnode *vp = NULL;
 	file_t *fp;
+	caddr_t naddr;
 
 	if (flags & LX_MREMAP_FIXED) {
 		/* MREMAP_FIXED requires MREMAP_MAYMOVE */
@@ -905,6 +909,8 @@ lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
 	mutex_enter(&lxpd->l_remap_anoncache_lock);
 
 	for (i = 0; i < LX_REMAP_ANONCACHE_NENTRIES; i++) {
+		long rv;
+
 		mp = &lxpd->l_remap_anoncache[i];
 
 		if (mp->lxsm_vaddr != old_addr)
@@ -919,9 +925,9 @@ lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
 		 * b) relocate & expand the mapping, returning a new address
 		 * c) there will be an error of some sort and errno will be set
 		 */
-		rval = lx_remap_anon(mp, new_size, flags, new_addr);
+		rv = lx_remap_anon(mp, new_size, flags, new_addr);
 		mutex_exit(&lxpd->l_remap_anoncache_lock);
-		return (rval);
+		return (rv);
 	}
 
 	mutex_exit(&lxpd->l_remap_anoncache_lock);
@@ -952,12 +958,14 @@ lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
 		 * This is an anonymous mapping -- which is the one case in
 		 * which we perform something that approaches a true remap.
 		 */
+		long rv;
+
 		if (vp != NULL)
 			VN_RELE(vp);
 		mutex_enter(&lxpd->l_remap_anoncache_lock);
-		rval = lx_remap_anon(mp, new_size, flags, new_addr);
+		rv = lx_remap_anon(mp, new_size, flags, new_addr);
 		mutex_exit(&lxpd->l_remap_anoncache_lock);
-		return (rval);
+		return (rv);
 	}
 
 	/* The rest of the code is for a 'named' mapping */
@@ -979,19 +987,19 @@ lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
 		goto out;
 	}
 
-	oflags = (mp->lxsm_flags & LX_SM_WRITE) ? FWRITE | FREAD : FREAD;
-	if (vp == NULL || falloc(vp, oflags, &fp, &fd) != 0) {
+	oflags = (mp->lxsm_flags & LX_SM_WRITE) ? (FWRITE | FREAD) : FREAD;
+	if (vp == NULL) {
 		/*
-		 * If we failed the path might not exist, or we had an issue
-		 * in falloc. Either way we're going to kick it back with
-		 * EINVAL.
+		 * If vp is NULL, the path might not exist. We're going to kick
+		 * it back with EINVAL.
 		 */
 		rval = set_errno(EINVAL);
 		goto out;
 	}
+
+	/* falloc cannot fail with a NULL fdp. */
+	VERIFY0(falloc(vp, oflags, &fp, NULL));
 	mutex_exit(&fp->f_tlock);
-	setf(fd, fp);
-	vp = NULL;	/* VN_RELE handled in close() */
 
 	if (mp->lxsm_flags & LX_SM_WRITE)
 		prot |= PROT_WRITE;
@@ -1004,13 +1012,22 @@ lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
 
 	mflags |= MAP_SHARED;
 
-	rval = (long)smmap64((void *)new_addr, new_size, prot, mflags, fd, off);
-	if (ttolwp(curthread)->lwp_errno != 0) {
-		(void) close(fd);
+	/*
+	 * We're using smmap_common to pass the fp directly, instead of
+	 * initializing a temporary file descriptor for smmap64(), so as to
+	 * prevent any inadvertent use of that temporary fd within the
+	 * application.
+	 */
+	naddr = (caddr_t)new_addr;
+	rval = smmap_common(&naddr, new_size, prot, mflags, fp, off);
+
+	mutex_enter(&fp->f_tlock);
+	unfalloc(fp);
+
+	if (rval != 0) {
 		rval = set_errno(ENOMEM);
 		goto out;
 	}
-	(void) close(fd);
 
 	/*
 	 * Our mapping succeeded; we're now going to rip down the old mapping.
@@ -1020,7 +1037,10 @@ lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
 out:
 	if (vp != NULL)
 		VN_RELE(vp);
-	return (rval);
+
+	if (rval == 0)
+		return ((long)naddr);
+	return ((long)rval);
 }
 
 #pragma GCC diagnostic ignored "-Wclobbered"
@@ -1083,7 +1103,7 @@ lx_u2u_copy(void *src, void *dst, size_t len)
 			as_pageunlock(p_as, ppa_src, sp, mlen, S_READ);
 			return (EFAULT);
 		}
-		bcopy(sp, dp, mlen);
+		ucopy(sp, dp, mlen);
 		no_fault();		/* calls smap_enable */
 
 		as_pageunlock(p_as, ppa_dst, dp, mlen, S_WRITE);

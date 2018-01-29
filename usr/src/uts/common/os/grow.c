@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -650,7 +650,7 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
 #define	RANDOMIZABLE_MAPPING(addr, flags) (((flags & MAP_FIXED) == 0) && \
 	!(((flags & MAP_ALIGN) == 0) && (addr != 0) && aslr_respect_mmap_hint))
 
-static int
+int
 smmap_common(caddr_t *addrp, size_t len,
     int prot, int flags, struct file *fp, offset_t pos)
 {
