@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright (c) 2016, 2018 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/acl/acl_common.kshlib
@@ -53,8 +53,7 @@ function cleanup
 	if datasetexists $TESTPOOL/$TESTFS1; then
 		log_must zfs destroy -f $TESTPOOL/$TESTFS1
 	fi
-	[[ -d $TESTDIR1 ]] && log_must rm -rf $TESTDIR1
-	[[ -d $TESTDIR ]] && log_must rm -rf $TESTDIR/*
+	log_must rm -rf $TESTDIR1 $TESTDIR/* $mytestfile
 }
 
 log_assert "Verify that 'cp [-p]' supports ZFS ACLs."
@@ -68,7 +67,9 @@ log_must chmod 777 $TESTDIR1
 
 # Define target directory.
 dstdir=$TESTDIR1/dstdir.$$
-mytestfile=/kernel/drv/zfs
+mytestfile=$(mktemp -t file.XXXX)
+log_must dd if=/dev/urandom of=$mytestfile bs=1024k count=1
+log_must chmod 644 $mytestfile
 
 for user in root $ZFS_ACL_STAFF1; do
 	# Set the current user
