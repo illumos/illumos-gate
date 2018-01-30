@@ -36,16 +36,6 @@ prefix=/usr
 exec_prefix=${prefix}
 includedir=${prefix}/include/kerberosv5
 libdir=${exec_prefix}/lib
-CC_LINK='$(PURE) $(CC) $(PROG_LIBPATH) $(RPATH_FLAG)$(PROG_RPATH) $(CFLAGS) $(LDFLAGS)'
-#KRB4_LIB=-lkrb4
-#DES425_LIB=-ldes425
-KDB5_DB_LIB=
-LDFLAGS=''
-RPATH_FLAG='-R'
-PTHREAD_CFLAGS='-D_REENTRANT '
-
-#LIBS='-lresolv -lsocket -lnsl '
-GEN_LIB=
 
 # Defaults for program
 library=krb5
@@ -87,6 +77,9 @@ while test $# != 0; do
 	krb5)
 	    library=krb5
 	    ;;
+	gssapi)
+	    library=gssapi
+	    ;;
 	*)
 	    echo "$0: Unknown option \`$1' -- use \`--help' for usage"
 	    exit 1
@@ -113,6 +106,7 @@ if test -n "$do_help"; then
     echo "        [--libs]          List libraries required to link [LIBRARIES]"
     echo "Libraries:"
     echo "        krb5              Kerberos 5 application"
+    echo "        gssapi            GSSAPI application"
  
     exit 0
 fi
@@ -155,53 +149,19 @@ if test -n "$do_cflags"; then
     echo "-I${includedir}"
 fi
 
-
 if test -n "$do_libs"; then
-    # Ugly gross hack for our build tree
-    lib_flags=`echo $CC_LINK | sed -e 's/\$(CC)//' \
-	    -e 's/\$(PURE)//' \
-	    -e 's#\$(PROG_RPATH)#'$libdir'#' \
-	    -e 's#\$(PROG_LIBPATH)#-L'$libdir'#' \
-	    -e 's#\$(RPATH_FLAG)#'"$RPATH_FLAG"'#' \
-	    -e 's#\$(LDFLAGS)#'"$LDFLAGS"'#' \
-	    -e 's#\$(PTHREAD_CFLAGS)#'"$PTHREAD_CFLAGS"'#' \
-	    -e 's#\$(CFLAGS)#'"$CFLAGS"'#'`
-
-    if test $library = 'kdb'; then
-	lib_flags="$lib_flags -lkdb5 $KDB5_DB_LIB"
-	library=krb5
-    fi
-
-    if test $library = 'kadm_server'; then
-	lib_flags="$lib_flags -lkadm5srv -lkdb5 $KDB5_DB_LIB"
-	library=kadm_common
-    fi
-
-    if test $library = 'kadm_client'; then
-	lib_flags="$lib_flags -lkadm5clnt"
-	library=kadm_common
-    fi
-
-    if test $library = 'kadm_common'; then
-	lib_flags="$lib_flags -lgssrpc"
-	library=gssapi
-    fi
+    lib_flags="-L$libdir"
 
     if test $library = 'gssapi'; then
-	lib_flags="$lib_flags -lgssapi_krb5"
-	library=krb5
-    fi
-
-    if test $library = 'krb4'; then
-	lib_flags="$lib_flags $KRB4_LIB $DES425_LIB"
-	library=krb5
+       lib_flags="$lib_flags -lgss"
+       library=krb5
     fi
 
     if test $library = 'krb5'; then
-	lib_flags="$lib_flags -lkrb5  $LIBS $GEN_LIB"
+       lib_flags="$lib_flags -lkrb5"
     fi
 
-    echo $lib_flags
+    echo "$lib_flags"
 fi
 
 exit 0
