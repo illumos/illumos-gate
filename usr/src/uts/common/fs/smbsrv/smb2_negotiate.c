@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 RackTop Systems.
  */
 
@@ -472,8 +472,7 @@ smb2_nego_validate(smb_request_t *sr, smb_fsctl_t *fsctl)
 	/*
 	 * The spec. says to parse the VALIDATE_NEGOTIATE_INFO here
 	 * and verify that the original negotiate was not modified.
-	 * The only tampering we need worry about is secmode, and
-	 * we're not taking that from the client, so don't bother.
+	 * The request MUST be signed, and we MUST validate the signature.
 	 *
 	 * One interesting requirement here is that we MUST reply
 	 * with exactly the same information as we returned in our
@@ -485,6 +484,9 @@ smb2_nego_validate(smb_request_t *sr, smb_fsctl_t *fsctl)
 	uint32_t capabilities;
 	uint16_t secmode, num_dialects, dialects[8];
 	uint8_t clnt_guid[16];
+
+	if ((sr->smb2_hdr_flags & SMB2_FLAGS_SIGNED) == 0)
+		goto drop;
 
 	if (fsctl->InputCount < 24)
 		goto drop;
