@@ -1440,7 +1440,6 @@ fcnname/**/_info:							\
 	WSTUB(ppt, ppt_setup_msix,		nomod_einval);
 	WSTUB(ppt, ppt_assigned_devices,	nomod_zero);
 	WSTUB(ppt, ppt_is_mmio,			nomod_zero);
-	WSTUB(ppt, ppt_avail_devices,		nomod_zero);
 	WSTUB(ppt, ppt_assign_device,		nomod_einval);
 	WSTUB(ppt, ppt_unassign_device,		nomod_einval);
 	WSTUB(ppt, ppt_get_limits,		nomod_einval);

@@ -162,6 +162,7 @@ int	vm_get_capability(struct vmctx *ctx, int vcpu, enum vm_cap_type cap,
 			  int *retval);
 int	vm_set_capability(struct vmctx *ctx, int vcpu, enum vm_cap_type cap,
 			  int val);
+#ifdef __FreeBSD__
 int	vm_assign_pptdev(struct vmctx *ctx, int bus, int slot, int func);
 int	vm_unassign_pptdev(struct vmctx *ctx, int bus, int slot, int func);
 int	vm_map_pptdev_mmio(struct vmctx *ctx, int bus, int slot, int func,
@@ -173,6 +174,18 @@ int	vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int bus, int slot,
 	    uint32_t vector_control);
 int	vm_get_pptdev_limits(struct vmctx *ctx, int bus, int slot, int func,
     int *msi_limit, int *msix_limit);
+#else /* __FreeBSD__ */
+int	vm_assign_pptdev(struct vmctx *ctx, int pptfd);
+int	vm_unassign_pptdev(struct vmctx *ctx, int pptfd);
+int	vm_map_pptdev_mmio(struct vmctx *ctx, int pptfd, vm_paddr_t gpa,
+    size_t len, vm_paddr_t hpa);
+int	vm_setup_pptdev_msi(struct vmctx *ctx, int vcpu, int pptfd,
+    uint64_t addr, uint64_t msg, int numvec);
+int	vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int pptfd,
+    int idx, uint64_t addr, uint64_t msg, uint32_t vector_control);
+int	vm_get_pptdev_limits(struct vmctx *ctx, int pptfd, int *msi_limit,
+    int *msix_limit);
+#endif /* __FreeBSD__ */
 
 int	vm_get_intinfo(struct vmctx *ctx, int vcpu, uint64_t *i1, uint64_t *i2);
 int	vm_set_intinfo(struct vmctx *ctx, int vcpu, uint64_t exit_intinfo);

@@ -198,8 +198,13 @@ int vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem);
 void vm_free_memseg(struct vm *vm, int ident);
 int vm_map_mmio(struct vm *vm, vm_paddr_t gpa, size_t len, vm_paddr_t hpa);
 int vm_unmap_mmio(struct vm *vm, vm_paddr_t gpa, size_t len);
+#ifdef __FreeBSD__
 int vm_assign_pptdev(struct vm *vm, int bus, int slot, int func);
 int vm_unassign_pptdev(struct vm *vm, int bus, int slot, int func);
+#else
+int vm_assign_pptdev(struct vm *vm, int pptfd);
+int vm_unassign_pptdev(struct vm *vm, int pptfd);
+#endif /* __FreeBSD__ */
 
 /*
  * APIs that inspect the guest memory map require only a *single* vcpu to

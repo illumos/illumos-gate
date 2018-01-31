@@ -922,10 +922,14 @@ vm_iommu_modify(struct vm *vm, boolean_t map)
 			hpa = DMAP_TO_PHYS((uintptr_t)vp);
 			if (map) {
 				iommu_create_mapping(vm->iommu, gpa, hpa, sz);
+#ifdef __FreeBSD__
 				iommu_remove_mapping(host_domain, hpa, sz);
+#endif
 			} else {
 				iommu_remove_mapping(vm->iommu, gpa, sz);
+#ifdef __FreeBSD__
 				iommu_create_mapping(host_domain, hpa, hpa, sz);
+#endif
 			}
 
 			gpa += PAGE_SIZE;
@@ -936,21 +940,34 @@ vm_iommu_modify(struct vm *vm, boolean_t map)
 	 * Invalidate the cached translations associated with the domain
 	 * from which pages were removed.
 	 */
+#ifdef __FreeBSD__
 	if (map)
 		iommu_invalidate_tlb(host_domain);
 	else
 		iommu_invalidate_tlb(vm->iommu);
+#else
+	iommu_invalidate_tlb(vm->iommu);
+#endif
 }
 
 #define	vm_iommu_unmap(vm)	vm_iommu_modify((vm), FALSE)
 #define	vm_iommu_map(vm)	vm_iommu_modify((vm), TRUE)
 
+#ifdef __FreeBSD__
 int
 vm_unassign_pptdev(struct vm *vm, int bus, int slot, int func)
+#else
+int
+vm_unassign_pptdev(struct vm *vm, int pptfd)
+#endif /* __FreeBSD__ */
 {
 	int error;
 
+#ifdef __FreeBSD__
 	error = ppt_unassign_device(vm, bus, slot, func);
+#else
+	error = ppt_unassign_device(vm, pptfd);
+#endif /* __FreeBSD__ */
 	if (error)
 		return (error);
 
@@ -960,8 +977,13 @@ vm_unassign_pptdev(struct vm *vm, int bus, int slot, int func)
 	return (0);
 }
 
+#ifdef __FreeBSD__
 int
 vm_assign_pptdev(struct vm *vm, int bus, int slot, int func)
+#else
+int
+vm_assign_pptdev(struct vm *vm, int pptfd)
+#endif /* __FreeBSD__ */
 {
 	int error;
 	vm_paddr_t maxaddr;
@@ -977,7 +999,11 @@ vm_assign_pptdev(struct vm *vm, int bus, int slot, int func)
 		vm_iommu_map(vm);
 	}
 
+#ifdef __FreeBSD__
 	error = ppt_assign_device(vm, bus, slot, func);
+#else
+	error = ppt_assign_device(vm, pptfd);
+#endif /* __FreeBSD__ */
 	return (error);
 }
 

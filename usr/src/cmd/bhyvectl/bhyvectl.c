@@ -166,7 +166,9 @@ usage(bool cpu_intel)
 	"       [--get-ldtr]\n"
 	"       [--set-x2apic-state=<state>]\n"
 	"       [--get-x2apic-state]\n"
+#ifdef __FreeBSD__
 	"       [--unassign-pptdev=<bus/slot/func>]\n"
+#endif
 	"       [--set-mem=<memory in units of MB>]\n"
 	"       [--get-lowmem]\n"
 	"       [--get-highmem]\n"
@@ -278,7 +280,9 @@ static int set_cs, set_ds, set_es, set_fs, set_gs, set_ss, set_tr, set_ldtr;
 static int get_cs, get_ds, get_es, get_fs, get_gs, get_ss, get_tr, get_ldtr;
 static int set_x2apic_state, get_x2apic_state;
 enum x2apic_state x2apic_state;
+#ifdef __FreeBSD__
 static int unassign_pptdev, bus, slot, func;
+#endif
 static int run;
 
 /*
@@ -1763,11 +1767,13 @@ main(int argc, char *argv[])
 		case CAPNAME:
 			capname = optarg;
 			break;
+#ifdef __FreeBSD__
 		case UNASSIGN_PPTDEV:
 			unassign_pptdev = 1;
 			if (sscanf(optarg, "%d/%d/%d", &bus, &slot, &func) != 3)
 				usage(cpu_intel);
 			break;
+#endif
 		case ASSERT_LAPIC_LVT:
 			assert_lapic_lvt = atoi(optarg);
 			break;
@@ -1903,8 +1909,10 @@ main(int argc, char *argv[])
 	if (!error && set_x2apic_state)
 		error = vm_set_x2apic_state(ctx, vcpu, x2apic_state);
 
+#ifdef __FreeBSD__
 	if (!error && unassign_pptdev)
 		error = vm_unassign_pptdev(ctx, bus, slot, func);
+#endif /* __FreeBSD__ */
 
 	if (!error && set_exception_bitmap) {
 		if (cpu_intel)

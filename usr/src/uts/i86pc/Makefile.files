@@ -274,7 +274,7 @@ VMM_OBJS += vmm.o \
 
 VIONA_OBJS += viona.o
 
-PPT_OBJS += ppt.o ppt_sol_glue.o
+PPT_OBJS += ppt.o
 
 #
 #	Build up defines and paths.

@@ -917,6 +917,7 @@ vm_set_capability(struct vmctx *ctx, int vcpu, enum vm_cap_type cap, int val)
 	return (ioctl(ctx->fd, VM_SET_CAPABILITY, &vmcap));
 }
 
+#ifdef __FreeBSD__
 int
 vm_assign_pptdev(struct vmctx *ctx, int bus, int slot, int func)
 {
@@ -978,7 +979,7 @@ vm_setup_pptdev_msi(struct vmctx *ctx, int vcpu, int bus, int slot, int func,
 	return (ioctl(ctx->fd, VM_PPTDEV_MSI, &pptmsi));
 }
 
-int	
+int
 vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int bus, int slot, int func,
     int idx, uint64_t addr, uint64_t msg, uint32_t vector_control)
 {
@@ -1016,6 +1017,83 @@ vm_get_pptdev_limits(struct vmctx *ctx, int bus, int slot, int func,
 
 	return (error);
 }
+#else /* __FreeBSD__ */
+int
+vm_assign_pptdev(struct vmctx *ctx, int pptfd)
+{
+	struct vm_pptdev pptdev;
+
+	pptdev.pptfd = pptfd;
+	return (ioctl(ctx->fd, VM_BIND_PPTDEV, &pptdev));
+}
+
+int
+vm_unassign_pptdev(struct vmctx *ctx, int pptfd)
+{
+	struct vm_pptdev pptdev;
+
+	pptdev.pptfd = pptfd;
+	return (ioctl(ctx->fd, VM_UNBIND_PPTDEV, &pptdev));
+}
+
+int
+vm_map_pptdev_mmio(struct vmctx *ctx, int pptfd, vm_paddr_t gpa, size_t len,
+    vm_paddr_t hpa)
+{
+	struct vm_pptdev_mmio pptmmio;
+
+	pptmmio.pptfd = pptfd;
+	pptmmio.gpa = gpa;
+	pptmmio.len = len;
+	pptmmio.hpa = hpa;
+	return (ioctl(ctx->fd, VM_MAP_PPTDEV_MMIO, &pptmmio));
+}
+
+int
+vm_setup_pptdev_msi(struct vmctx *ctx, int vcpu, int pptfd, uint64_t addr,
+    uint64_t msg, int numvec)
+{
+	struct vm_pptdev_msi pptmsi;
+
+	pptmsi.vcpu = vcpu;
+	pptmsi.pptfd = pptfd;
+	pptmsi.msg = msg;
+	pptmsi.addr = addr;
+	pptmsi.numvec = numvec;
+	return (ioctl(ctx->fd, VM_PPTDEV_MSI, &pptmsi));
+}
+
+int
+vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int pptfd, int idx,
+    uint64_t addr, uint64_t msg, uint32_t vector_control)
+{
+	struct vm_pptdev_msix pptmsix;
+
+	pptmsix.vcpu = vcpu;
+	pptmsix.pptfd = pptfd;
+	pptmsix.idx = idx;
+	pptmsix.msg = msg;
+	pptmsix.addr = addr;
+	pptmsix.vector_control = vector_control;
+	return ioctl(ctx->fd, VM_PPTDEV_MSIX, &pptmsix);
+}
+
+int
+vm_get_pptdev_limits(struct vmctx *ctx, int pptfd, int *msi_limit,
+    int *msix_limit)
+{
+	struct vm_pptdev_limits pptlimits;
+	int error;
+
+	bzero(&pptlimits, sizeof (pptlimits));
+	pptlimits.pptfd = pptfd;
+	error = ioctl(ctx->fd, VM_GET_PPTDEV_LIMITS, &pptlimits);
+
+	*msi_limit = pptlimits.msi_limit;
+	*msix_limit = pptlimits.msix_limit;
+	return (error);
+}
+#endif /* __FreeBSD__ */
 
 uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_DEV_PCI_PCIVAR_H
@@ -33,19 +33,6 @@ pci_get_bdf(device_t dev)
 	return (bdf);
 }
 
-#define PCIE_REQ_ID(val, what)	(((val) & PCIE_REQ_ID_##what##_MASK) >>\
-    PCIE_REQ_ID_##what##_SHIFT)
-
-#define	pci_get_bus(dev)	(PCIE_REQ_ID(pci_get_bdf(dev), BUS))
-#define	pci_get_slot(dev)	(PCIE_REQ_ID(pci_get_bdf(dev), DEV))
-#define	pci_get_function(dev)	(PCIE_REQ_ID(pci_get_bdf(dev), FUNC))
 #define	pci_get_rid(dev)	(pci_get_bdf(dev))
-
-#define	pci_save_state(dev)	pci_save_config_regs(dev)
-#define	pci_restore_state(dev)	pci_restore_config_regs(dev)
-
-bool pcie_flr(device_t, u_int, bool);
-int pcie_get_max_completion_timeout(device_t);
-
 
 #endif /* _COMPAT_FREEBSD_DEV_PCI_PCIVAR_H */
