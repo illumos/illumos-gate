@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2017 RackTop Systems.
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -36,14 +37,14 @@
 extern "C" {
 #endif
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 extern char architecture[];
 extern char architecture_32[];
 extern char hw_serial[];	/* machine's 32-bit hostid; a decimal string */
 extern char hw_provider[];
 extern char srpc_domain[];
 extern char platform[];
-#endif	/* _KERNEL */
+#endif	/* _KERNEL || _FAKE_KERNEL */
 
 /*
  * Commands to sysinfo(2)

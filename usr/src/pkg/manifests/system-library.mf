@@ -24,6 +24,7 @@
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2017 RackTop Systems.
 #
 
 <include system-library.man3.inc>
@@ -202,6 +203,7 @@ file path=lib/$(ARCH64)/libdlpi.so.1
 file path=lib/$(ARCH64)/libdoor.so.1
 file path=lib/$(ARCH64)/libefi.so.1
 file path=lib/$(ARCH64)/libelf.so.1
+file path=lib/$(ARCH64)/libfakekernel.so.1
 $(i386_ONLY)file path=lib/$(ARCH64)/libfdisk.so.1
 file path=lib/$(ARCH64)/libgen.so.1
 file path=lib/$(ARCH64)/libinetutil.so.1
@@ -280,6 +282,7 @@ file path=lib/libdoor.so.1
 file path=lib/libefi.so.1
 file path=lib/libelf.so.1
 file path=lib/libelfsign.so.1
+file path=lib/libfakekernel.so.1
 $(i386_ONLY)file path=lib/libfdisk.so.1
 file path=lib/libgen.so.1
 file path=lib/libinetutil.so.1
@@ -855,6 +858,8 @@ link path=usr/lib/$(ARCH64)/libelf.so \
 link path=usr/lib/$(ARCH64)/libelf.so.1 \
     target=../../../lib/$(ARCH64)/libelf.so.1
 link path=usr/lib/$(ARCH64)/libexacct.so target=libexacct.so.1
+link path=usr/lib/$(ARCH64)/libfakekernel.so.1 \
+    target=../../../lib/$(ARCH64)/libfakekernel.so.1
 $(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so \
     target=../../../lib/$(ARCH64)/libfdisk.so.1
 $(i386_ONLY)link path=usr/lib/$(ARCH64)/libfdisk.so.1 \
@@ -1108,6 +1113,7 @@ link path=usr/lib/libefi.so.1 target=../../lib/libefi.so.1
 link path=usr/lib/libelf.so target=../../lib/libelf.so.1
 link path=usr/lib/libelf.so.1 target=../../lib/libelf.so.1
 link path=usr/lib/libexacct.so target=./libexacct.so.1
+link path=usr/lib/libfakekernel.so.1 target=../../lib/libfakekernel.so.1
 $(i386_ONLY)link path=usr/lib/libfdisk.so target=../../lib/libfdisk.so.1
 $(i386_ONLY)link path=usr/lib/libfdisk.so.1 target=../../lib/libfdisk.so.1
 link path=usr/lib/libform.so target=./libform.so.1

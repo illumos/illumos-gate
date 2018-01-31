@@ -25,6 +25,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 #ifndef	_SYS_TASKQ_IMPL_H
@@ -35,6 +36,7 @@
 #include <sys/vmem.h>
 #include <sys/list.h>
 #include <sys/kstat.h>
+#include <sys/rwlock.h>
 
 #ifdef	__cplusplus
 extern "C" {

@@ -29,7 +29,7 @@ VERS= .1
 
 # include the list of ZFS sources
 include ../../../uts/common/Makefile.files
-KERNEL_OBJS = kernel.o taskq.o util.o
+KERNEL_OBJS = kernel.o util.o
 DTRACE_OBJS = zfs.o
 
 OBJECTS=$(LUA_OBJS) $(ZFS_COMMON_OBJS) $(ZFS_SHARED_OBJS) $(KERNEL_OBJS)
@@ -67,8 +67,13 @@ C99LMODE=	-Xc99=%all
 
 CFLAGS +=	-g $(CCVERBOSE) $(CNOGLOBAL)
 CFLAGS64 +=	-g $(CCVERBOSE)	$(CNOGLOBAL)
-LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lsysevent -lmd
-CPPFLAGS +=	$(INCS)	-DDEBUG
+LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lsysevent -lmd \
+		-lfakekernel
+CPPFLAGS.first =	-I$(SRC)/lib/libfakekernel/common
+CPPFLAGS +=	$(INCS)	-DDEBUG -D_FAKE_KERNEL
+
+LINTFLAGS +=	-erroff=E_STATIC_UNUSED $(INCS)
+LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED $(INCS)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch

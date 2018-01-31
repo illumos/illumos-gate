@@ -56,13 +56,6 @@ ddi_get_lbolt64(void)
 	return (hrt / nsec_per_tick);
 }
 
-void
-clock2ts(clock_t clk, timespec_t *ts)
-{
-	ts->tv_sec = clk / hz;
-	ts->tv_nsec = (clk % hz) * (NANOSEC / hz);
-}
-
 hrtime_t
 gethrtime_unscaled(void)
 {

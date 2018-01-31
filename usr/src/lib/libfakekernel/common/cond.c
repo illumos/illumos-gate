@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*
@@ -23,6 +24,7 @@
 #include <sys/errno.h>
 #include <sys/debug.h>
 #include <sys/thread.h>
+#include <sys/systm.h>
 
 /* avoiding synch.h */
 int	_lwp_cond_wait(lwp_cond_t *, lwp_mutex_t *);
@@ -33,10 +35,9 @@ int	_lwp_cond_broadcast(lwp_cond_t *);
 
 
 extern clock_t ddi_get_lbolt(void);
-extern void clock2ts(clock_t, timespec_t *);
 
 static int cv__wait(kcondvar_t *, kmutex_t *, int);
-static clock_t cv__twait(kcondvar_t *, kmutex_t *, clock_t, int);
+static clock_t cv__twait(kcondvar_t *, kmutex_t *, clock_t, int, int);
 
 static const lwp_cond_t  default_cv =
 	{{{0, 0, 0, 0}, USYNC_THREAD, _COND_MAGIC}, 0};
@@ -106,7 +107,7 @@ cv_timedwait(kcondvar_t *cv, kmutex_t *mp, clock_t abstime)
 	clock_t delta;
 
 	delta = abstime - ddi_get_lbolt();
-	return (cv__twait(cv, mp, delta, 0));
+	return (cv__twait(cv, mp, delta, 0, 0));
 }
 
 clock_t
@@ -115,7 +116,20 @@ cv_timedwait_sig(kcondvar_t *cv, kmutex_t *mp, clock_t abstime)
 	clock_t delta;
 
 	delta = abstime - ddi_get_lbolt();
-	return (cv__twait(cv, mp, delta, 1));
+	return (cv__twait(cv, mp, delta, 1, 0));
+}
+
+/*ARGSUSED*/
+clock_t
+cv_timedwait_hires(kcondvar_t *cv, kmutex_t *mp, hrtime_t tim, hrtime_t res,
+    int flag)
+{
+	clock_t delta;
+
+	delta = tim;
+	if (flag & CALLOUT_FLAG_ABSOLUTE)
+		delta -= gethrtime();
+	return (cv__twait(cv, mp, delta, 0, 1));
 }
 
 clock_t
@@ -123,7 +137,7 @@ cv_reltimedwait(kcondvar_t *cv, kmutex_t *mp, clock_t delta, time_res_t res)
 {
 	_NOTE(ARGUNUSED(res))
 
-	return (cv__twait(cv, mp, delta, 0));
+	return (cv__twait(cv, mp, delta, 0, 0));
 }
 
 clock_t
@@ -132,7 +146,7 @@ cv_reltimedwait_sig(kcondvar_t *cv, kmutex_t *mp, clock_t delta,
 {
 	_NOTE(ARGUNUSED(res))
 
-	return (cv__twait(cv, mp, delta, 1));
+	return (cv__twait(cv, mp, delta, 1, 0));
 }
 
 /*
@@ -143,7 +157,7 @@ cv_reltimedwait_sig(kcondvar_t *cv, kmutex_t *mp, clock_t delta,
  * which (NB!) decrements that delta in-place!
  */
 static clock_t
-cv__twait(kcondvar_t *cv, kmutex_t *mp, clock_t delta, int sigok)
+cv__twait(kcondvar_t *cv, kmutex_t *mp, clock_t delta, int sigok, int hires)
 {
 	timestruc_t ts;
 	int err;
@@ -151,7 +165,13 @@ cv__twait(kcondvar_t *cv, kmutex_t *mp, clock_t delta, int sigok)
 	if (delta <= 0)
 		return (-1);
 
-	clock2ts(delta, &ts);
+	if (hires) {
+		ts.tv_sec = delta / NANOSEC;
+		ts.tv_nsec = delta % NANOSEC;
+	} else {
+		ts.tv_sec = delta / hz;
+		ts.tv_nsec = (delta % hz) * (NANOSEC / hz);
+	}
 
 top:
 	if (ts.tv_sec == 0 && ts.tv_nsec == 0)

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 RackTop Systems.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -110,6 +111,18 @@ extern proc_t p0;		/* process 0 */
 extern struct plock p0lock;	/* p0's plock */
 extern struct pid pid0;		/* p0's pid */
 
+extern int issig(int);
+#define	ISSIG(thr, why)	issig(why)
+
+/* Reasons for calling issig() */
+
+#define	FORREAL		0	/* Usual side-effects */
+#define	JUSTLOOKING	1	/* Don't stop the process */
+
+extern	void	tsd_create(uint_t *, void (*)(void *));
+extern	void	tsd_destroy(uint_t *);
+extern	void	*tsd_get(uint_t);
+extern	int	tsd_set(uint_t, void *);
 
 /*
  * This is normally in sunddi.h but

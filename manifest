@@ -1209,6 +1209,7 @@ f lib/amd64/libefi.so.1 0755 root bin
 s lib/amd64/libefi.so=libefi.so.1
 f lib/amd64/libelf.so.1 0755 root bin
 s lib/amd64/libelf.so=libelf.so.1
+f lib/amd64/libfakekernel.so.1 0755 root bin
 f lib/amd64/libfdisk.so.1 0755 root bin
 s lib/amd64/libfdisk.so=libfdisk.so.1
 f lib/amd64/libgen.so.1 0755 root bin
@@ -1397,6 +1398,7 @@ f lib/libelf.so.1 0755 root bin
 s lib/libelf.so=libelf.so.1
 f lib/libelfsign.so.1 0755 root bin
 s lib/libelfsign.so=libelfsign.so.1
+f lib/libfakekernel.so.1 0755 root bin
 f lib/libfdisk.so.1 0755 root bin
 s lib/libfdisk.so=libfdisk.so.1
 f lib/libgen.so.1 0755 root bin
@@ -4817,6 +4819,7 @@ s usr/lib/amd64/libelf.so.1=../../../lib/amd64/libelf.so.1
 s usr/lib/amd64/libelf.so=../../../lib/amd64/libelf.so.1
 f usr/lib/amd64/libexacct.so.1 0755 root bin
 s usr/lib/amd64/libexacct.so=libexacct.so.1
+s usr/lib/amd64/libfakekernel.so.1=../../../lib/amd64/libfakekernel.so.1
 f usr/lib/amd64/libfcoe.so.1 0755 root bin
 s usr/lib/amd64/libfcoe.so=libfcoe.so.1
 s usr/lib/amd64/libfdisk.so.1=../../../lib/amd64/libfdisk.so.1
@@ -6219,6 +6222,7 @@ s usr/lib/libelfsign.so.1=../../lib/libelfsign.so.1
 s usr/lib/libelfsign.so=../../lib/libelfsign.so.1
 f usr/lib/libexacct.so.1 0755 root bin
 s usr/lib/libexacct.so=libexacct.so.1
+s usr/lib/libfakekernel.so.1=../../../lib/libfakekernel.so.1
 f usr/lib/libfcoe.so.1 0755 root bin
 s usr/lib/libfcoe.so=libfcoe.so.1
 s usr/lib/libfdisk.so.1=../../lib/libfdisk.so.1
