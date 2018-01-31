@@ -186,7 +186,7 @@ void BnxeLogWarn(void * pDev,
 }
 
 
-#ifdef DBG
+#ifdef DEBUG
 
 void BnxeLogDbg(void * pDev,
                 char * pFmt,
@@ -209,7 +209,7 @@ void BnxeLogDbg(void * pDev,
     cmn_err(CE_WARN, "!%s: %s", BnxeDevName(pUM), buf);
 }
 
-#endif /* DBG */
+#endif /* DEBUG */
 
 
 void BnxeDumpMem(um_device_t * pUM,
