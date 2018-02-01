@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 LIBRARY= libzpool.a
@@ -74,6 +74,11 @@ CPPFLAGS +=	$(INCS)	-DDEBUG -D_FAKE_KERNEL
 
 LINTFLAGS +=	-erroff=E_STATIC_UNUSED $(INCS)
 LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED $(INCS)
+
+# The following is needed to fix the SmartOS build; see OS-6582. We cannot do
+# a conditional appendage to INCS, since that breaks the lint build.
+CFLAGS += -isystem $(ROOT)/usr/include
+CFLAGS64 += -isystem $(ROOT)/usr/include
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch
