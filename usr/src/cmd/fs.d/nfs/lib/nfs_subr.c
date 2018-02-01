@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -34,6 +32,8 @@
 #include "nfs_subr.h"
 #include <errno.h>
 #include <deflt.h>
+#include <rpcsvc/daemon_utils.h>
+#include "smfcfg.h"
 
 #include <nfs/nfssys.h>
 extern int _nfssys(enum nfssys_op, void *);
@@ -121,7 +121,7 @@ URLparse(char *str)
  */
 int
 convert_special(char **specialp, char *host, char *oldpath, char *newpath,
-	char *cur_special)
+    char *cur_special)
 {
 
 	char *url;
@@ -245,32 +245,25 @@ convert_special(char **specialp, char *host, char *oldpath, char *newpath,
 	return (0);
 }
 
-/*
- * Solaris autofs configuration file location
- */
-#define	AUTOFSADMIN		"/etc/default/autofs"
 #define	AUTOFS_MOUNT_TIMEOUT	600	/* default min time mount will */
 
 void
 set_nfsv4_ephemeral_mount_to(void)
 {
-	char	*defval;
+	char valbuf[6];
+	int bufsz = sizeof (valbuf);
 
-	uint_t	mount_to = AUTOFS_MOUNT_TIMEOUT;
+	uint_t mount_to = AUTOFS_MOUNT_TIMEOUT;
 
 	/*
-	 * Get the value from /etc/default/autofs
+	 * Get the value from SMF
 	 */
-	if ((defopen(AUTOFSADMIN)) == 0) {
-		if ((defval = defread("AUTOMOUNT_TIMEOUT=")) != NULL) {
-			errno = 0;
-			mount_to = strtoul(defval, (char **)NULL, 10);
-			if (errno != 0)
-				mount_to = AUTOFS_MOUNT_TIMEOUT;
-		}
-
-		/* close defaults file */
-		defopen(NULL);
+	if (autofs_smf_get_prop("timeout", valbuf, DEFAULT_INSTANCE,
+	    SCF_TYPE_INTEGER, AUTOMOUNTD, &bufsz) == SA_OK) {
+		const char *errstr;
+		uint_t val = strtonum(valbuf, 0, UINT_MAX, &errstr);
+		if (errstr == NULL)
+			mount_to = val;
 	}
 
 	(void) _nfssys(NFS4_EPHEMERAL_MOUNT_TO, &mount_to);
