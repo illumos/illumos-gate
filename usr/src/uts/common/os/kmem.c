@@ -22,6 +22,7 @@
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*
@@ -3249,10 +3250,27 @@ kmem_cache_magazine_enable(kmem_cache_t *cp)
 }
 
 /*
- * Reap (almost) everything right now.
+ * Allow our caller to determine if there are running reaps.
+ *
+ * This call is very conservative and may return B_TRUE even when
+ * reaping activity isn't active. If it returns B_FALSE, then reaping
+ * activity is definitely inactive.
+ */
+boolean_t
+kmem_cache_reap_active(void)
+{
+	return (!taskq_empty(kmem_taskq));
+}
+
+/*
+ * Reap (almost) everything soon.
+ *
+ * Note: this does not wait for the reap-tasks to complete. Caller
+ * should use kmem_cache_reap_active() (above) and/or moderation to
+ * avoid scheduling too many reap-tasks.
  */
 void
-kmem_cache_reap_now(kmem_cache_t *cp)
+kmem_cache_reap_soon(kmem_cache_t *cp)
 {
 	ASSERT(list_link_active(&cp->cache_link));
 
@@ -3260,7 +3278,6 @@ kmem_cache_reap_now(kmem_cache_t *cp)
 
 	(void) taskq_dispatch(kmem_taskq,
 	    (task_func_t *)kmem_depot_ws_reap, cp, TQ_SLEEP);
-	taskq_wait(kmem_taskq);
 }
 
 /*

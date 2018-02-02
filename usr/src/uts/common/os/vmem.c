@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -1745,7 +1745,7 @@ vmem_qcache_reap(vmem_t *vmp)
 	 */
 	for (i = 0; i < VMEM_NQCACHE_MAX; i++)
 		if (vmp->vm_qcache[i])
-			kmem_cache_reap_now(vmp->vm_qcache[i]);
+			kmem_cache_reap_soon(vmp->vm_qcache[i]);
 }
 
 /*

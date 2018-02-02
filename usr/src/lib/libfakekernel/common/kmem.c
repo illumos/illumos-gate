@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <sys/kmem.h>
@@ -125,13 +126,19 @@ kmem_cache_free(kmem_cache_t *kc, void *p)
 /* ARGSUSED */
 void
 kmem_cache_set_move(kmem_cache_t *kc,
-	kmem_cbrc_t (*fun)(void *, void *, size_t, void *))
+    kmem_cbrc_t (*fun)(void *, void *, size_t, void *))
 {
+}
+
+boolean_t
+kmem_cache_reap_active(void)
+{
+	return (B_FALSE);
 }
 
 /* ARGSUSED */
 void
-kmem_cache_reap_now(kmem_cache_t *kc)
+kmem_cache_reap_soon(kmem_cache_t *kc)
 {
 }
 
