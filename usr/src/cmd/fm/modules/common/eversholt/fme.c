@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  *
  * fme.c -- fault management exercise module
  *
@@ -350,6 +351,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 			out(O_ALTFP|O_VERB2, "Unable to map \"%s\" ereport "
 			    "to component path, but silent discard allowed.",
 			    e0class);
+			fmd_case_close(hdl, fmcase);
 		} else {
 			Undiag_reason = UD_VAL_BADEVENTPATH;
 			(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR,
