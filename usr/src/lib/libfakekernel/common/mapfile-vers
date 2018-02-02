@@ -12,6 +12,7 @@
 #
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2017 RackTop Systems.
+# Copyright 2018, Joyent, Inc.
 #
 
 #
@@ -202,6 +203,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	taskq_destroy;
 	taskq_dispatch;
 	taskq_dispatch_ent;
+	taskq_empty;
 	taskq_member;
 	taskq_wait;
 

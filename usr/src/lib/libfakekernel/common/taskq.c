@@ -26,6 +26,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <sys/taskq_impl.h>
@@ -210,6 +211,18 @@ taskq_dispatch_ent(taskq_t *tq, task_func_t func, void *arg, uint_t flags,
 	t->tqent_arg = arg;
 	cv_signal(&tq->tq_dispatch_cv);
 	mutex_exit(&tq->tq_lock);
+}
+
+boolean_t
+taskq_empty(taskq_t *tq)
+{
+	boolean_t rv;
+
+	mutex_enter(&tq->tq_lock);
+	rv = (tq->tq_task.tqent_next == &tq->tq_task) && (tq->tq_active == 0);
+	mutex_exit(&tq->tq_lock);
+
+	return (rv);
 }
 
 void
