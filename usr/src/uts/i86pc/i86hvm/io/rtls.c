@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -32,7 +33,7 @@
 #include <sys/errno.h>
 #include <sys/modctl.h>
 
-struct dev_ops pv_rtls_ops = {
+static struct dev_ops stub_ops = {
 	DEVO_REV,
 	0,
 	NULL,
@@ -44,16 +45,13 @@ struct dev_ops pv_rtls_ops = {
 	NULL,
 	NULL,
 	NULL,
-	ddi_quiesce_not_needed,		/* quiesce */
+	ddi_quiesce_not_needed
 };
 
-/*
- * Module linkage information for the kernel.
- */
 static struct modldrv modldrv = {
 	&mod_driverops,
 	"xVM rtls stub",
-	&pv_rtls_ops
+	&stub_ops
 };
 
 static struct modlinkage modlinkage = {

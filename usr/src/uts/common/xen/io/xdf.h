@@ -314,7 +314,7 @@ typedef struct xdf {
 #define	SUSRES_DBG	0x40
 #define	LBL_DBG		0x80
 
-#if defined(XPV_HVM_DRIVER)
+#ifdef XPV_HVM_DRIVER
 extern int xdf_lb_getinfo(dev_info_t *, int, void *, void *);
 extern int xdf_lb_rdwr(dev_info_t *, uchar_t, void *, diskaddr_t, size_t,
     void *);
@@ -322,8 +322,6 @@ extern void xdfmin(struct buf *bp);
 extern dev_info_t *xdf_hvm_hold(const char *);
 extern boolean_t xdf_hvm_connect(dev_info_t *);
 extern int xdf_hvm_setpgeom(dev_info_t *, cmlb_geom_t *);
-extern int xdf_kstat_create(dev_info_t *, char *, int);
-extern void xdf_kstat_delete(dev_info_t *);
 extern boolean_t xdf_is_cd(dev_info_t *);
 extern boolean_t xdf_is_rm(dev_info_t *);
 extern boolean_t xdf_media_req_supported(dev_info_t *);

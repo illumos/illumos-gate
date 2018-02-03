@@ -18,14 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
-# uts/i86pc/Makefile.hvm
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#	This makefile provides support for building PV drivers that run
-#	in an HVM environment.
 #
 
 ROOT_HVM_DIR		= $(ROOT_PLAT_DIR)/i86hvm
@@ -43,9 +39,9 @@ HVM_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/i86hvm/lint-libs/$(OBJS_DIR)
 #
 #       Define modules.
 #
-HVM_DRV_KMODS	= pv_cmdk pv_sd pv_rtls xdf xnf xpv xpvd
-HVM_MISC_KMODS	= hvm_bootstrap hvm_cmdk hvm_sd
-HVM_KMODS	= $(HVM_DRV_KMODS) $(HVM_MISC_KMODS)
+HVM_DRV_KMODS=	cmdk rtls xdf xnf xpv xpvd
+HVM_MISC_KMODS=	hvm_bootstrap
+HVM_KMODS=	$(HVM_DRV_KMODS) $(HVM_MISC_KMODS)
 
 include $(UTSBASE)/i86pc/i86hvm/Makefile.files
 #

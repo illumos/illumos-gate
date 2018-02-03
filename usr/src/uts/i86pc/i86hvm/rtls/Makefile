@@ -20,20 +20,43 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-# Define objects
-HVM_BOOTSTRAP_OBJS += hvm_bootstrap.o
-PV_CMDK_OBJS +=	cmdk.o
-PV_RTLS_OBJS +=	rtls.o
-PV_SD_OBJS +=	sd.o
-XDF_OBJS +=	xdf.o
-XNF_OBJS +=	xnf.o
-XPV_OBJS +=	xpv_support.o xvdi.o gnttab.o evtchn.o xenbus_comms.o \
-		xenbus_client.o xenbus_probe.o xenbus_xs.o
-XPVD_OBJS +=	xpvd.o
+UTSBASE=	$(SRC)/uts
 
-# Include i86hvm header files
-INC_PATH +=	-I$(UTSBASE)/common/xen -I$(UTSBASE)/i86pc/i86hvm
+MODULE=		rtls
+OBJECTS=	$(PV_RTLS_OBJS:%=$(OBJS_DIR)/%)
+LINTS=		$(PV_RTLS_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE=	$(ROOT_HVM_DRV_DIR)/$(MODULE)
+
+include		$(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+
+LINT_MODULE=	pv_rtls
+
+ALL_TARGET=	$(BINARY)
+LINT_TARGET=	$(LINT_MODULE).lint
+INSTALL_TARGET=	$(BINARY) $(ROOTMODULE)
+
+LDFLAGS +=	-dy
+
+.KEEP_STATE:
+
+def:		$(DEF_DEPS)
+
+all:		$(ALL_DEPS)
+
+clean:		$(CLEAN_DEPS)
+
+clobber:	$(CLOBBER_DEPS)
+
+lint:		$(LINT_DEPS)
+
+modlintlib:	$(MODLINTLIB_DEPS)
+
+clean.lint:	$(CLEAN_LINT_DEPS)
+
+install:	$(INSTALL_DEPS)
+
+include		$(UTSBASE)/i86pc/i86hvm/Makefile.targ
