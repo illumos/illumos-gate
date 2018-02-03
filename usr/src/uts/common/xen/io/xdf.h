@@ -24,6 +24,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2014 by Delphix. All rights reserved.
+ */
 
 #ifndef _SYS_XDF_H
 #define	_SYS_XDF_H
@@ -251,6 +254,7 @@ typedef struct xdf {
 	ddi_taskq_t	*xdf_ready_tq;
 	kthread_t	*xdf_ready_tq_thread;
 	struct buf	*xdf_ready_tq_bp;
+	ddi_devid_t	xdf_tgt_devid;
 #ifdef	DEBUG
 	int		xdf_dmacallback_num;
 	kthread_t	*xdf_oe_change_thread;

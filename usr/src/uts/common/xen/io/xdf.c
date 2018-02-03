@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
+ */
+
+/*
  * xdf.c - Xen Virtual Block Device Driver
  * TODO:
  *	- support alternate block size (currently only DEV_BSIZE supported)
@@ -100,6 +104,7 @@
 
 #define	XDF_DRAIN_MSEC_DELAY		(50*1000)	/* 00.05 sec */
 #define	XDF_DRAIN_RETRY_COUNT		200		/* 10.00 sec */
+#define	XDF_STATE_TIMEOUT		(30*1000*1000)	/* 30.00 sec */
 
 #define	INVALID_DOMID	((domid_t)-1)
 #define	FLUSH_DISKCACHE	0x1
@@ -144,6 +149,7 @@ int xdf_lb_getinfo(dev_info_t *, int, void *, void *);
 
 /*  misc private functions */
 static void xdf_io_start(xdf_t *);
+static void xdf_devid_setup(xdf_t *);
 
 /* callbacks from commmon label */
 static cmlb_tg_ops_t xdf_lb_ops = {
@@ -598,7 +604,7 @@ xdf_cmlb_attach(xdf_t *vdp)
 #if defined(XPV_HVM_DRIVER)
 	    (XD_IS_CD(vdp) ? 0 : CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT),
 #else /* !XPV_HVM_DRIVER */
-	    XD_IS_CD(vdp) ? 0 : CMLB_FAKE_LABEL_ONE_PARTITION,
+	    0,
 #endif /* !XPV_HVM_DRIVER */
 	    vdp->xdf_vd_lbl, NULL));
 }
@@ -2590,8 +2596,29 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case DKIOCSETEFI:
 	case DKIOCSETEXTPART:
 	case DKIOCPARTITION:
-		return (cmlb_ioctl(vdp->xdf_vd_lbl, dev, cmd, arg, mode, credp,
-		    rvalp, NULL));
+		rv = cmlb_ioctl(vdp->xdf_vd_lbl, dev, cmd, arg, mode, credp,
+		    rvalp, NULL);
+		if (rv != 0)
+			return (rv);
+		/*
+		 * If we're labelling the disk, we have to update the geometry
+		 * in the cmlb data structures, and we also have to write a new
+		 * devid to the disk.  Note that writing an EFI label currently
+		 * requires 4 ioctls, and devid setup will fail on all but the
+		 * last.
+		 */
+		if (cmd == DKIOCSEXTVTOC || cmd == DKIOCSVTOC ||
+		    cmd == DKIOCSETEFI) {
+			rv = cmlb_validate(vdp->xdf_vd_lbl, 0, 0);
+			if (rv == 0) {
+				xdf_devid_setup(vdp);
+			} else {
+				cmn_err(CE_WARN,
+				    "xdf@%s, labeling failed on validate",
+				    vdp->xdf_addr);
+			}
+		}
+		return (rv);
 	case FDEJECT:
 	case DKIOCEJECT:
 	case CDROMEJECT:
@@ -3221,6 +3248,149 @@ err:
 	return (DDI_FAILURE);
 }
 
+/*
+ * xdf_devid_fabricate() is a local copy of xdfs_devid_fabricate() that has been
+ * modified to use xdf functions, and uses the in-memory devid if one exists.
+ *
+ * Create a devid and write it on the first block of the last track of
+ * the last cylinder.
+ * Return DDI_SUCCESS or DDI_FAILURE.
+ */
+static int
+xdf_devid_fabricate(xdf_t *vdp)
+{
+	ddi_devid_t	devid = vdp->xdf_tgt_devid; /* null if no devid */
+	struct dk_devid *dkdevidp = NULL; /* devid struct stored on disk */
+	diskaddr_t	blk;
+	uint_t		*ip, chksum;
+	int		i, devid_size;
+
+	if (cmlb_get_devid_block(vdp->xdf_vd_lbl, &blk, NULL) != 0)
+		goto err;
+
+	if (devid == NULL && ddi_devid_init(vdp->xdf_dip, DEVID_FAB, 0,
+	    NULL, &devid) != DDI_SUCCESS)
+		goto err;
+
+	/* allocate a buffer */
+	dkdevidp = (struct dk_devid *)kmem_zalloc(NBPSCTR, KM_SLEEP);
+
+	/* Fill in the revision */
+	dkdevidp->dkd_rev_hi = DK_DEVID_REV_MSB;
+	dkdevidp->dkd_rev_lo = DK_DEVID_REV_LSB;
+
+	/* Copy in the device id */
+	devid_size = ddi_devid_sizeof(devid);
+	if (devid_size > DK_DEVID_SIZE)
+		goto err;
+	bcopy(devid, dkdevidp->dkd_devid, devid_size);
+
+	/* Calculate the chksum */
+	chksum = 0;
+	ip = (uint_t *)dkdevidp;
+	for (i = 0; i < (NBPSCTR / sizeof (int)) - 1; i++)
+		chksum ^= ip[i];
+
+	/* Fill in the checksum */
+	DKD_FORMCHKSUM(chksum, dkdevidp);
+
+	if (xdf_lb_rdwr(vdp->xdf_dip, TG_WRITE, dkdevidp, blk,
+	    NBPSCTR, NULL) != 0)
+		goto err;
+
+	kmem_free(dkdevidp, NBPSCTR);
+
+	vdp->xdf_tgt_devid = devid;
+	return (DDI_SUCCESS);
+
+err:
+	if (dkdevidp != NULL)
+		kmem_free(dkdevidp, NBPSCTR);
+	if (devid != NULL && vdp->xdf_tgt_devid == NULL)
+		ddi_devid_free(devid);
+	return (DDI_FAILURE);
+}
+
+/*
+ * xdf_devid_read() is a local copy of xdfs_devid_read(), modified to use xdf
+ * functions.
+ *
+ * Read a devid from on the first block of the last track of
+ * the last cylinder.  Make sure what we read is a valid devid.
+ * Return DDI_SUCCESS or DDI_FAILURE.
+ */
+static int
+xdf_devid_read(xdf_t *vdp)
+{
+	diskaddr_t	blk;
+	struct dk_devid *dkdevidp;
+	uint_t		*ip, chksum;
+	int		i;
+
+	if (cmlb_get_devid_block(vdp->xdf_vd_lbl, &blk, NULL) != 0)
+		return (DDI_FAILURE);
+
+	dkdevidp = kmem_zalloc(NBPSCTR, KM_SLEEP);
+	if (xdf_lb_rdwr(vdp->xdf_dip, TG_READ, dkdevidp, blk,
+	    NBPSCTR, NULL) != 0)
+		goto err;
+
+	/* Validate the revision */
+	if ((dkdevidp->dkd_rev_hi != DK_DEVID_REV_MSB) ||
+	    (dkdevidp->dkd_rev_lo != DK_DEVID_REV_LSB))
+		goto err;
+
+	/* Calculate the checksum */
+	chksum = 0;
+	ip = (uint_t *)dkdevidp;
+	for (i = 0; i < (NBPSCTR / sizeof (int)) - 1; i++)
+		chksum ^= ip[i];
+	if (DKD_GETCHKSUM(dkdevidp) != chksum)
+		goto err;
+
+	/* Validate the device id */
+	if (ddi_devid_valid((ddi_devid_t)dkdevidp->dkd_devid) != DDI_SUCCESS)
+		goto err;
+
+	/* keep a copy of the device id */
+	i = ddi_devid_sizeof((ddi_devid_t)dkdevidp->dkd_devid);
+	vdp->xdf_tgt_devid = kmem_alloc(i, KM_SLEEP);
+	bcopy(dkdevidp->dkd_devid, vdp->xdf_tgt_devid, i);
+	kmem_free(dkdevidp, NBPSCTR);
+	return (DDI_SUCCESS);
+
+err:
+	kmem_free(dkdevidp, NBPSCTR);
+	return (DDI_FAILURE);
+}
+
+/*
+ * xdf_devid_setup() is a modified copy of cmdk_devid_setup().
+ *
+ * This function creates a devid if we don't already have one, and
+ * registers it.  If we already have one, we make sure that it can be
+ * read from the disk, otherwise we write it to the disk ourselves.  If
+ * we didn't already have a devid, and we create one, we also need to
+ * register it.
+ */
+void
+xdf_devid_setup(xdf_t *vdp)
+{
+	int rc;
+	boolean_t existed = vdp->xdf_tgt_devid != NULL;
+
+	/* Read devid from the disk, if present */
+	rc = xdf_devid_read(vdp);
+
+	/* Otherwise write a devid (which we create if necessary) on the disk */
+	if (rc != DDI_SUCCESS)
+		rc = xdf_devid_fabricate(vdp);
+
+	/* If we created a devid or found it on the disk, register it */
+	if (rc == DDI_SUCCESS && !existed)
+		(void) ddi_devid_register(vdp->xdf_dip, vdp->xdf_tgt_devid);
+}
+
 static int
 xdf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -3229,6 +3399,8 @@ xdf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	boolean_t		dev_iscd = B_FALSE;
 	xdf_t			*vdp;
 	char			*oename, *xsname, *str;
+	clock_t			timeout;
+	int			err = 0;
 
 	if ((n = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_NOTPROM,
 	    "xdf_debug", 0)) != 0)
@@ -3361,7 +3533,71 @@ xdf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_exit(&vdp->xdf_cb_lk);
 		goto errout1;
 	}
+
+	/*
+	 * In order to do cmlb_validate, we have to wait for the disk to
+	 * acknowledge the attach, so we can query the backend for the disk
+	 * geometry (see xdf_setstate_connected).
+	 *
+	 * We only wait 30 seconds; if this is the root disk, the boot
+	 * will fail, but it would fail anyway if the device never
+	 * connected.  If this is a non-boot disk, that disk will fail
+	 * to connect, but again, it would fail anyway.
+	 */
+	timeout = ddi_get_lbolt() + drv_usectohz(XDF_STATE_TIMEOUT);
+	while (vdp->xdf_state != XD_CONNECTED && vdp->xdf_state != XD_READY) {
+		if (cv_timedwait(&vdp->xdf_dev_cv, &vdp->xdf_cb_lk, timeout) <
+		    0) {
+			cmn_err(CE_WARN, "xdf@%s: disk failed to connect",
+			    ddi_get_name_addr(dip));
+			mutex_exit(&vdp->xdf_cb_lk);
+			goto errout1;
+		}
+	}
 	mutex_exit(&vdp->xdf_cb_lk);
+
+	/*
+	 * We call cmlb_validate so that the geometry information in
+	 * vdp->xdf_vd_lbl is correct; this fills out the number of
+	 * alternate cylinders so that we have a place to write the
+	 * devid.
+	 */
+	if ((err = cmlb_validate(vdp->xdf_vd_lbl, 0, NULL)) != 0) {
+		cmn_err(CE_NOTE,
+		    "xdf@%s: cmlb_validate failed: %d",
+		    ddi_get_name_addr(dip), err);
+		/*
+		 * We can carry on even if cmlb_validate() returns EINVAL here,
+		 * as we'll rewrite the disk label anyway.
+		 */
+		if (err != EINVAL)
+			goto errout1;
+	}
+
+	/*
+	 * xdf_devid_setup will only write a devid if one isn't
+	 * already present.  If it fails to find or create one, we
+	 * create one in-memory so that when we label the disk later,
+	 * it will have a devid to use.  This is helpful to deal with
+	 * cases where people use the devids of their disks before
+	 * labelling them; note that this does cause problems if
+	 * people rely on the devids of unlabelled disks to persist
+	 * across reboot.
+	 */
+	xdf_devid_setup(vdp);
+	if (vdp->xdf_tgt_devid == NULL) {
+		if (ddi_devid_init(vdp->xdf_dip, DEVID_FAB, 0, NULL,
+		    &vdp->xdf_tgt_devid) != DDI_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "xdf@%s_ attach failed, devid_init failed",
+			    ddi_get_name_addr(dip));
+			goto errout1;
+		} else {
+			(void) ddi_devid_register(vdp->xdf_dip,
+			    vdp->xdf_tgt_devid);
+		}
+	}
+
 
 #if defined(XPV_HVM_DRIVER)
 
