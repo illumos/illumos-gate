@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -64,6 +64,7 @@
 #include <sys/kstat.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_types.h>
+#include <sys/lx_userhz.h>
 #include <sys/brand.h>
 #include <sys/cred_impl.h>
 #include <sys/tihdr.h>
@@ -2843,6 +2844,13 @@ lxpr_read_pid_tid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ticks -= boottime;
 	lxpr_unlock(p);
 
+	/* Adjust hz for relevant fields */
+	utime = HZ_TO_LX_USERHZ(utime);
+	stime = HZ_TO_LX_USERHZ(stime);
+	cutime = HZ_TO_LX_USERHZ(cutime);
+	cstime = HZ_TO_LX_USERHZ(cstime);
+	ticks = HZ_TO_LX_USERHZ(ticks);
+
 	lxpr_uiobuf_printf(uiobuf,
 	    "%d "					/* 1 */
 	    "(%s) %c %d %d %d %d %d "			/* 2-8 */
@@ -4497,6 +4505,12 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		fmtstr1 = "cpu%d %lu 0 %lu %lu\n";
 	}
 
+	/* Adjust hz */
+	user_cum = HZ_TO_LX_USERHZ(user_cum);
+	sys_cum = HZ_TO_LX_USERHZ(sys_cum);
+	idle_cum = HZ_TO_LX_USERHZ(idle_cum);
+	irq_cum = HZ_TO_LX_USERHZ(irq_cum);
+
 	lxpr_uiobuf_printf(uiobuf, fmtstr0,
 	    user_cum, sys_cum, idle_cum, irq_cum);
 
@@ -4519,18 +4533,19 @@ lxpr_read_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 
 		get_cpu_mstate(cp, msnsecs);
 
-		idle_ticks = NSEC_TO_TICK(msnsecs[CMS_IDLE]);
-		sys_ticks  = NSEC_TO_TICK(msnsecs[CMS_SYSTEM]);
-		user_ticks = NSEC_TO_TICK(msnsecs[CMS_USER]);
+		idle_ticks = HZ_TO_LX_USERHZ(NSEC_TO_TICK(msnsecs[CMS_IDLE]));
+		sys_ticks  = HZ_TO_LX_USERHZ(NSEC_TO_TICK(msnsecs[CMS_SYSTEM]));
+		user_ticks = HZ_TO_LX_USERHZ(NSEC_TO_TICK(msnsecs[CMS_USER]));
 
 		for (i = 0; i < NCMSTATES; i++) {
 			tmptime = cp->cpu_intracct[i];
 			scalehrtime(&tmptime);
 			irq_ticks += NSEC_TO_TICK(tmptime);
 		}
+		irq_ticks = HZ_TO_LX_USERHZ(irq_ticks);
 
-		lxpr_uiobuf_printf(uiobuf, fmtstr1,
-		    cp->cpu_id, user_ticks, sys_ticks, idle_ticks, irq_ticks);
+		lxpr_uiobuf_printf(uiobuf, fmtstr1, HZ_TO_LX_USERHZ(cp->cpu_id),
+		    user_ticks, sys_ticks, idle_ticks, irq_ticks);
 
 		if (pools_enabled)
 			cp = cp->cpu_next_part;

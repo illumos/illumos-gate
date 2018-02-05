@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _LX_USERHZ_H
@@ -46,6 +46,8 @@ extern "C" {
  *    testing on Linux seems to show that these fields are not consistent
  *    with the corresponding times(2) data for the process, even for the
  *    SIGCHLD sigaction handler case.
+ * 4) Some fields in /proc/stat and /proc/pid/stat. See the Linux proc man
+ *    page for references to sysconf(_SC_CLK_TCK).
  *
  * Although the siginfo_t si_stime and si_utime data for cases #2 and #3 is not
  * consistent on Linux, we populate these fields correctly to be on the safe
