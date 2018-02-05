@@ -45,7 +45,6 @@ dir path=platform/$(ARCH32)hvm/kernel/misc/$(ARCH64) group=sys
 driver name=xpv alias=pci5853,1.1
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/cmdk group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/rtls group=sys
-file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/sd group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xdf group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xnf group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xpv group=sys
@@ -53,10 +52,6 @@ file path=platform/$(ARCH32)hvm/kernel/drv/$(ARCH64)/xpvd group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/xpv.conf group=sys
 file path=platform/$(ARCH32)hvm/kernel/drv/xpvd.conf group=sys
 file path=platform/$(ARCH32)hvm/kernel/misc/$(ARCH64)/hvm_bootstrap group=sys \
-    mode=0755
-file path=platform/$(ARCH32)hvm/kernel/misc/$(ARCH64)/hvm_cmdk group=sys \
-    mode=0755
-file path=platform/$(ARCH32)hvm/kernel/misc/$(ARCH64)/hvm_sd group=sys \
     mode=0755
 legacy pkg=SUNWxvmpv desc="xVM Paravirtualized Drivers" \
     name="xVM Paravirtualized Drivers"

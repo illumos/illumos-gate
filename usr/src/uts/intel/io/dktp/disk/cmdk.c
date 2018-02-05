@@ -186,7 +186,6 @@ struct dev_ops cmdk_ops = {
  */
 #include <sys/modctl.h>
 
-#ifndef XPV_HVM_DRIVER
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
 	"Common Direct Access Disk",
@@ -196,19 +195,6 @@ static struct modldrv modldrv = {
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modldrv, NULL
 };
-
-
-#else /* XPV_HVM_DRIVER */
-static struct modlmisc modlmisc = {
-	&mod_miscops,		/* Type of module. This one is a misc */
-	"HVM Common Direct Access Disk",
-};
-
-static struct modlinkage modlinkage = {
-	MODREV_1, (void *)&modlmisc, NULL
-};
-
-#endif /* XPV_HVM_DRIVER */
 
 /* Function prototypes for cmlb callbacks */
 
@@ -255,17 +241,13 @@ _init(void)
 {
 	int 	rval;
 
-#ifndef XPV_HVM_DRIVER
 	if (rval = ddi_soft_state_init(&cmdk_state, sizeof (struct cmdk), 7))
 		return (rval);
-#endif /* !XPV_HVM_DRIVER */
 
 	mutex_init(&cmdk_attach_mutex, NULL, MUTEX_DRIVER, NULL);
 	if ((rval = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&cmdk_attach_mutex);
-#ifndef XPV_HVM_DRIVER
 		ddi_soft_state_fini(&cmdk_state);
-#endif /* !XPV_HVM_DRIVER */
 	}
 	return (rval);
 }
@@ -294,13 +276,11 @@ cmdkprobe(dev_info_t *dip)
 
 	instance = ddi_get_instance(dip);
 
-#ifndef XPV_HVM_DRIVER
 	if (ddi_get_soft_state(cmdk_state, instance))
 		return (DDI_PROBE_PARTIAL);
 
 	if (ddi_soft_state_zalloc(cmdk_state, instance) != DDI_SUCCESS)
 		return (DDI_PROBE_PARTIAL);
-#endif /* !XPV_HVM_DRIVER */
 
 	if ((dkp = ddi_get_soft_state(cmdk_state, instance)) == NULL)
 		return (DDI_PROBE_PARTIAL);
@@ -318,9 +298,7 @@ cmdkprobe(dev_info_t *dip)
 		mutex_exit(&dkp->dk_mutex);
 		mutex_destroy(&dkp->dk_mutex);
 		rw_destroy(&dkp->dk_bbh_mutex);
-#ifndef XPV_HVM_DRIVER
 		ddi_soft_state_free(cmdk_state, instance);
-#endif /* !XPV_HVM_DRIVER */
 		return (DDI_PROBE_PARTIAL);
 	}
 
@@ -330,9 +308,7 @@ cmdkprobe(dev_info_t *dip)
 		mutex_exit(&dkp->dk_mutex);
 		mutex_destroy(&dkp->dk_mutex);
 		rw_destroy(&dkp->dk_bbh_mutex);
-#ifndef XPV_HVM_DRIVER
 		ddi_soft_state_free(cmdk_state, instance);
-#endif /* !XPV_HVM_DRIVER */
 		return (status);
 	}
 
@@ -454,9 +430,7 @@ fail2:
 	rw_destroy(&dkp->dk_bbh_mutex);
 	mutex_exit(&dkp->dk_mutex);
 	mutex_destroy(&dkp->dk_mutex);
-#ifndef XPV_HVM_DRIVER
 	ddi_soft_state_free(cmdk_state, instance);
-#endif /* !XPV_HVM_DRIVER */
 	return (DDI_FAILURE);
 }
 
@@ -531,9 +505,7 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	rw_destroy(&dkp->dk_bbh_mutex);
 	mutex_destroy(&dkp->dk_pm_mutex);
 	cv_destroy(&dkp->dk_suspend_cv);
-#ifndef XPV_HVM_DRIVER
 	ddi_soft_state_free(cmdk_state, instance);
-#endif /* !XPV_HVM_DRIVER */
 
 	return (DDI_SUCCESS);
 }

@@ -1,0 +1,13 @@
+NOTE	ASSOCIATIVITY=bug
+NOTE	SUBEXPRESSION=bug
+NOTE	REPEAT_LONGEST=bug
+NOTE	BUG=alternation-order-UNKNOWN
+NOTE	BUG=unknown-match
+NOTE	BUG=nomatch-match-UNKNOWN
+NOTE	BUG=range-null-UNKNOWN
+NOTE	BUG=repeat-any-UNKNOWN
+NOTE	BUG=repeat-null-UNKNOWN
+NOTE	BUG=repeat-short-UNKNOWN
+NOTE	BUG=repeat-artifact-UNKNOWN
+NOTE	BUG=repeat-artifact-nomatch-UNKNOWN
+NOTE	BUG=subexpression-first-UNKNOWN

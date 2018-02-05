@@ -20,41 +20,43 @@
 #
 
 #
-# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
-include $(SRC)/Makefile.master
-include ../Makefile.tools
+UTSBASE=	$(SRC)/uts
 
-SUBDIRS= \
-	Checks	\
-	Scm
+MODULE=		rtls
+OBJECTS=	$(PV_RTLS_OBJS:%=$(OBJS_DIR)/%)
+LINTS=		$(PV_RTLS_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE=	$(ROOT_HVM_DRV_DIR)/$(MODULE)
 
-PYSRCS = \
-	__init__.py
+include		$(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
-PYOBJS =	$(PYSRCS:%.py=%.pyc)
-PYTOPDIR = 	$(ROOTONBLDLIB)
-PYMODDIR =	onbld
+LINT_MODULE=	pv_rtls
 
-all	:= TARGET = all
-install := TARGET = install
-clean	:= TARGET = clean
-clobber := TARGET = clobber
+ALL_TARGET=	$(BINARY)
+LINT_TARGET=	$(LINT_MODULE).lint
+INSTALL_TARGET=	$(BINARY) $(ROOTMODULE)
 
-include ../Makefile.python
+LDFLAGS +=	-dy
 
 .KEEP_STATE:
 
-all: $(PYVERSOBJS) $(SUBDIRS)
+def:		$(DEF_DEPS)
 
-install: all $(ROOTPYFILES) $(SUBDIRS)
+all:		$(ALL_DEPS)
 
-clean: $(SUBDIRS)
+clean:		$(CLEAN_DEPS)
 
-clobber: clean pyclobber $(SUBDIRS)
+clobber:	$(CLOBBER_DEPS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+lint:		$(LINT_DEPS)
 
-FRC:
+modlintlib:	$(MODLINTLIB_DEPS)
+
+clean.lint:	$(CLEAN_LINT_DEPS)
+
+install:	$(INSTALL_DEPS)
+
+include		$(UTSBASE)/i86pc/i86hvm/Makefile.targ

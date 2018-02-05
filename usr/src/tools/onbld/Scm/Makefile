@@ -29,10 +29,7 @@ include ../../Makefile.tools
 
 PYSRCS = \
 	__init__.py	\
-	Backup.py	\
-	Ignore.py	\
-	Version.py	\
-	WorkSpace.py
+	Ignore.py
 
 PYOBJS =	$(PYSRCS:%.py=%.pyc)
 PYTOPDIR =	$(ROOTONBLDLIB)
