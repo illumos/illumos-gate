@@ -27,7 +27,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2015 Gary Mills
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 # Copyright 2017 RackTop Systems.
 #
@@ -677,7 +677,7 @@ libvrrpadm:	libdladm libscf
 libvscan:	libscf libsecdb
 libwanboot:	libresolv2 libdevinfo libinetutil libdhcputil
 libzfs:		libdevid libgen libuutil libadm libavl libefi libidmap \
-		libumem libtsol libzfs_core
+		libumem libtsol libzfs_core libcmdutils
 libzfs_jni:	libdiskmgt libzfs
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb
