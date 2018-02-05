@@ -35,7 +35,7 @@ LDLIBS +=	-lscf -lc -lsocket -lnsl -lmd -luutil
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-CFLAGS +=			$(CCVERBOSE) -Wp,-xc99=%all
+CFLAGS +=			$(CCVERBOSE) -Wp,$(CSTD_GNU99)
 CPPFLAGS +=			-I../common -D_REENTRANT
 $(RELEASE_BUILD)CPPFLAGS +=     -DNDEBUG
 

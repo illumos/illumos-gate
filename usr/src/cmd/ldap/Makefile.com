@@ -112,9 +112,9 @@ ldaplist :=	LDLIBS += -lsldap
 ldapaddent :=	LDLIBS += -lsldap -lnsl -lsecdb
 ldapclient :=	LDLIBS += -lsldap -lscf
 
-ldaplist :=	C99MODE = $(C99_ENABLE)
-ldapaddent :=	C99MODE = $(C99_ENABLE)
-ldapclient :=	C99MODE = $(C99_ENABLE)
+ldaplist :=	CSTD = $(CSTD_GNU99)
+ldapaddent :=	CSTD = $(CSTD_GNU99)
+ldapclient :=	CSTD = $(CSTD_GNU99)
 
 lint :=		LDLIBS += -lldap
 
@@ -177,18 +177,18 @@ clean:
 # Not linted Mozilla upstream commands
 lint: lintns_ldaplist lintns_ldapaddent lintns_ldapclient
 
-lintns_ldaplist := C99MODE = $(C99_ENABLE)
+lintns_ldaplist := CSTD = $(CSTD_GNU99)
 
 lintns_ldaplist:
 	$(LINT.c) $(LDAPLISTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap
 
-lintns_ldapaddent := C99MODE = $(C99_ENABLE)
+lintns_ldapaddent := CSTD = $(CSTD_GNU99)
 
 lintns_ldapaddent:
 	$(LINT.c) $(LDAPADDENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lnsl \
 		-lsecdb
 
-lintns_ldapclient := C99MODE = $(C99_ENABLE)
+lintns_ldapclient := CSTD = $(CSTD_GNU99)
 
 lintns_ldapclient:
 	$(LINT.c) $(LDAPCLIENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lscf

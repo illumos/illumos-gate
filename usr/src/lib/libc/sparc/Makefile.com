@@ -1150,7 +1150,7 @@ BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 # Override this top level flag so the compiler builds in its native
 # C99 mode.  This has been enabled to support the complex arithmetic
 # added to libc.
-C99MODE=	$(C99_ENABLE)
+CSTD=	$(CSTD_GNU99)
 
 # libc method of building an archive
 # The "$(GREP) -v ' L '" part is necessary only until

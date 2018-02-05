@@ -47,7 +47,7 @@ include ../Makefile.rootfs
 
 SRCDIR =	.
 
-C99MODE=	$(C99_DISABLE)
+CSTD=	$(CSTD_GNU89)
 
 # We really want to say this:
 #	CPPFLAGS += -DDEBUG -DSYSV -D_REENTRANT -I. -I../common/inc

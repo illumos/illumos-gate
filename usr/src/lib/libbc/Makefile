@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libc.a
 VERS= .1.9
@@ -34,7 +32,7 @@ include ../Makefile.lib
 # There should be a mapfile here
 MAPFILES =
 
-C99MODE=	$(C99_DISABLE)
+CSTD=	$(CSTD_GNU89)
 
 # the bcp libraries go in /usr/4lib. override ROOTLIBDIR from ../Makefile.lib
 ROOTLIBDIR=     $(ROOT)/usr/4lib

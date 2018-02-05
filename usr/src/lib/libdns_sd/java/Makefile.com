@@ -34,7 +34,7 @@ LIBS =		$(DYNLIB)
 
 SRCDIR =	../common
 
-C99MODE =       $(C99_ENABLE)
+CSTD =       $(CSTD_GNU99)
 CPPFLAGS +=	-I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris
 CPPFLAGS +=	-I../com/apple/dnssd
 CPPFLAGS +=	-D_REENTRANT

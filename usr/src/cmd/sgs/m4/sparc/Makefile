@@ -55,7 +55,7 @@ CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-uninitialized
-C99MODE=	$(C99_ENABLE)
+CSTD=	$(CSTD_GNU99)
 
 LINTFLAGS +=	$(LDLIBS)
 CLEANFILES +=	$(LINTOUT) $(BLTSRCS)

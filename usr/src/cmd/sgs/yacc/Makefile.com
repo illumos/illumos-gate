@@ -68,7 +68,7 @@ BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
 
 LINTPOUT=	lint.out
 
-C99MODE= $(C99_ENABLE)
+CSTD= $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses

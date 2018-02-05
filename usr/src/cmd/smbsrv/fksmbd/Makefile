@@ -66,7 +66,7 @@ INCS +=	-I../../../common/smbsrv
 # Should not have to do this, but the Kerberos includes are a mess.
 INCS += -I $(ROOT)/usr/include/kerberosv5
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 CFLAGS += $(CCVERBOSE)

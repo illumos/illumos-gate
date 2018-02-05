@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -60,7 +59,7 @@ DMODLINTFILES = $(DMOD_SRCS:%.c=%.ln)
 
 APIMAP = ../../../../../libscsi/libscsi_api.map
 
-C99MODE = $(C99_ENABLE)
+CSTD = $(CSTD_GNU99)
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG) 
 CFLAGS64 += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)

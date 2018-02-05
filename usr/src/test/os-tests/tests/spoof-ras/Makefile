@@ -21,7 +21,7 @@ OBJS = $(PROG:%=%.o)
 SRCS = $(OBJS:%.o=%.c)
 
 LDLIBS += -lsocket -lnsl
-C99MODE = -xc99=%all
+CSTD = $(CSTD_GNU99)
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests

@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	librestart.a
 VERS =		.1
@@ -40,7 +38,7 @@ LDLIBS +=	-lpool -lproject -lsecdb -lnvpair -lsysevent -lscf -luutil -lc
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-CFLAGS +=	$(CCVERBOSE) -Wp,-xc99=%all
+CFLAGS +=	$(CCVERBOSE) -Wp,$(CSTD_GNU99)
 
 CPPFLAGS +=
 

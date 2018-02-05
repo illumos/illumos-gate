@@ -85,7 +85,7 @@ SRCS =		$(CMNOBJS:%.o=../common/%.c) $(ISAOBJS:%.o=%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lrtld_db -lelf -lctf -lc
-C99MODE =	$(C99_ENABLE)
+CSTD =	$(CSTD_GNU99)
 CPPFLAGS +=	$($(MACH64)_CPPFLAGS)
 
 SRCDIR =	../common

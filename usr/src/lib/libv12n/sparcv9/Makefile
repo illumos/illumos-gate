@@ -41,7 +41,7 @@ OBJS += $(CMNOBJS)
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-C99MODE =	$(C99_ENABLE)
+CSTD =	$(CSTD_GNU99)
 
 LDLIBS += -luuid -lc
 

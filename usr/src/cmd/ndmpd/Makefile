@@ -51,7 +51,7 @@ CPPFLAGS += $(LFLAGS64)
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DDEBUG
 CPPFLAGS += -I. -Iinclude
 
-C99MODE = $(C99_ENABLE)
+CSTD = $(CSTD_GNU99)
 
 # lint does not like unused _umem_*_init
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 

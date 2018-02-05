@@ -43,7 +43,7 @@ CPPFLAGS += -I../../../../../lib/libzpool/common \
 	-I../../../../../uts/common/fs/zfs \
 	-I../../../../../uts/common/fs/zfs/lua
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 CERRWARN 	+= -_gcc=-Wno-type-limits

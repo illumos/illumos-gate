@@ -22,7 +22,7 @@ PROGS = \
 	runtests \
 	acquire-lock
 
-C99MODE = -xc99=%all
+CSTD = $(CSTD_GNU99)
 
 SRCS = $(PROGS:%=%.c) $(UTILS)
 PROGS32 = $(PROGS:%=%.32)
