@@ -22,7 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef _SYS_ZONE_H
@@ -624,20 +624,6 @@ typedef struct zone {
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
 
 	/*
-	 * Data and counters used for ZFS fair-share disk IO.
-	 */
-	rctl_qty_t	zone_zfs_io_pri;	/* ZFS IO priority */
-	uint_t		zone_zfs_queued[2];	/* sync I/O enqueued count */
-	uint64_t	zone_zfs_weight;	/* used to prevent starvation */
-	uint64_t	zone_io_util;		/* IO utilization metric */
-	boolean_t	zone_io_util_above_avg;	/* IO util percent > avg. */
-	uint16_t	zone_io_delay;		/* IO delay on logical r/w */
-	kmutex_t	zone_stg_io_lock;	/* protects IO window data */
-	sys_zio_cntr_t	zone_rd_ops;		/* Counters for ZFS reads, */
-	sys_zio_cntr_t	zone_wr_ops;		/* writes and */
-	sys_zio_cntr_t	zone_lwr_ops;		/* logical writes. */
-
-	/*
 	 * kstats and counters for VFS ops and bytes.
 	 */
 	kmutex_t	zone_vfs_lock;		/* protects VFS statistics */
@@ -650,7 +636,6 @@ typedef struct zone {
 	 */
 	kmutex_t	zone_zfs_lock;		/* protects ZFS statistics */
 	kstat_t		*zone_zfs_ksp;
-	kstat_io_t	zone_zfs_rwstats;
 	zone_zfs_kstat_t *zone_zfs_stats;
 
 	/*
@@ -738,25 +723,48 @@ typedef struct zone {
 	kmutex_t	zone_mount_lock;
 } zone_t;
 
-/* zpcap_over is treated as a boolean but is 32 bits for alignment. */
-typedef struct zone_pcap {
-	uint32_t	zpcap_over;	/* currently over cap */
-	uint32_t	zpcap_pg_cnt;	/* current RSS in pages */
-	uint32_t	zpcap_pg_limit;	/* current RRS limit in pages */
-	uint32_t	zpcap_nover;	/* # of times over phys. cap */
+/*
+ * Data and counters used for ZFS fair-share disk IO.
+ */
+typedef struct zone_zfs_io {
+	uint16_t	zpers_zfs_io_pri;	/* ZFS IO priority - 16k max */
+	uint_t		zpers_zfs_queued[2];	/* sync I/O enqueued count */
+	sys_zio_cntr_t	zpers_rd_ops;		/* Counters for ZFS reads, */
+	sys_zio_cntr_t	zpers_wr_ops;		/* writes, and */
+	sys_zio_cntr_t	zpers_lwr_ops;		/* logical writes. */
+	kstat_io_t	zpers_zfs_rwstats;
+	uint64_t	zpers_io_util;		/* IO utilization metric */
+	uint64_t	zpers_zfs_rd_waittime;
+	uint8_t		zpers_io_delay;		/* IO delay on logical r/w */
+	uint8_t		zpers_zfs_weight;	/* used to prevent starvation */
+	uint8_t		zpers_io_util_above_avg; /* IO util percent > avg. */
+} zone_zfs_io_t;
+
+/*
+ * "Persistent" zone data which can be accessed idependently of the zone_t.
+ */
+typedef struct zone_persist {
+	kmutex_t	zpers_zfs_lock;	/* Protects zpers_zfsp references */
+	zone_zfs_io_t	*zpers_zfsp;	/* ZFS fair-share IO data */
+	uint8_t		zpers_over;	/* currently over cap */
+	uint32_t	zpers_pg_cnt;	/* current RSS in pages */
+	uint32_t	zpers_pg_limit;	/* current RRS limit in pages */
+	uint32_t	zpers_nover;	/* # of times over phys. cap */
 #ifndef DEBUG
-	uint64_t	zpcap_pg_out;	/* # pages flushed */
+	uint64_t	zpers_pg_out;	/* # pages flushed */
 #else
 	/*
-	 * To conserve memory, detailed pageout stats are only kept for DEBUG
+	 * To conserve memory, some detailed kstats are only kept for DEBUG
 	 * builds.
 	 */
-	uint64_t	zpcap_pg_anon;		/* # clean anon pages flushed */
-	uint64_t	zpcap_pg_anondirty;	/* # dirty anon pages flushed */
-	uint64_t	zpcap_pg_fs;		/* # clean fs pages flushed */
-	uint64_t	zpcap_pg_fsdirty;	/* # dirty fs pages flushed */
+	uint64_t	zpers_zfs_rd_waittime;
+
+	uint64_t	zpers_pg_anon;		/* # clean anon pages flushed */
+	uint64_t	zpers_pg_anondirty;	/* # dirty anon pages flushed */
+	uint64_t	zpers_pg_fs;		/* # clean fs pages flushed */
+	uint64_t	zpers_pg_fsdirty;	/* # dirty fs pages flushed */
 #endif
-} zone_pcap_t;
+} zone_persist_t;
 
 typedef enum zone_pageout_op {
 	ZPO_DIRTY, ZPO_FS, ZPO_ANON, ZPO_ANONDIRTY
@@ -994,7 +1002,7 @@ extern void zone_get_physmem_data(int, pgcnt_t *, pgcnt_t *);
 
 /* Interfaces for page scanning */
 extern uint_t zone_num_over_cap;
-extern zone_pcap_t zone_pcap_data[MAX_ZONES];
+extern zone_persist_t zone_pdata[MAX_ZONES];
 
 extern rctl_hndl_t rc_zone_locked_mem;
 extern rctl_hndl_t rc_zone_max_swap;

@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*
@@ -1691,7 +1691,7 @@ vmu_get_zone_rss(zoneid_t zid)
 	}
 
 	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
-	pgcnt = zone_pcap_data[zid].zpcap_pg_cnt;
+	pgcnt = zone_pdata[zid].zpers_pg_cnt;
 	zone->vmz_zone->vme_result.vmu_rss_all = (size_t)ptob(pgcnt);
 	zone->vmz_zone->vme_result.vmu_swap_all = zp->zone_max_swap;
 
@@ -1728,7 +1728,7 @@ vmu_calculate()
 		int i;
 
 		for (i = 0; i <= MAX_ZONEID; i++) {
-			if (zone_pcap_data[i].zpcap_pg_cnt > 0) {
+			if (zone_pdata[i].zpers_pg_cnt > 0) {
 				vmu_get_zone_rss(i);
 			}
 		}

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent Inc.
+ * Copyright 2018, Joyent Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -313,6 +313,7 @@ static id_space_t *zoneid_space;
  * 'global_zone'.
  */
 zone_t zone0;
+zone_zfs_io_t zone0_zp_zfs;
 zone_t *global_zone = NULL;	/* Set when the global zone is initialized */
 
 /*
@@ -429,11 +430,18 @@ static boolean_t zsd_wait_for_inprogress(zone_t *, struct zsd_entry *,
 static const int ZONE_SYSCALL_API_VERSION = 7;
 
 /*
- * "zone_pcap_data" is an array indexed by zoneid. Each member stores the zone's
- * current page usage, its page limit, a flag indicating if the zone is
- * over its physical memory cap and various statistics. The zpcap_over flag is
- * the interface for the page scanner to use when reclaiming pages for zones
- * that are over their cap.
+ * "zone_pdata" is an array indexed by zoneid. It is used to store "persistent"
+ * data which can be referenced independently of the zone_t structure. This
+ * data falls into two categories;
+ *   1) pages and RSS data associated with processes inside a zone
+ *   2) in-flight ZFS I/O data
+ *
+ * Each member of zone_persist_t stores the zone's current page usage, its page
+ * limit, a flag indicating if the zone is over its physical memory cap and
+ * various page-related statistics. The zpers_over flag is the interface for
+ * the page scanner to use when reclaiming pages for zones that are over their
+ * cap. The zone_persist_t structure also includes a mutex and a reference to a
+ * zone_zfs_io_t structure used for tracking the zone's ZFS I/O data.
  *
  * All zone physical memory cap data is stored in this array instead of within
  * the zone structure itself. This is because zone structures come and go, but
@@ -448,33 +456,40 @@ static const int ZONE_SYSCALL_API_VERSION = 7;
  * page scanning.
  *
  * The page scanner can run when "zone_num_over_cap" is non-zero. It can
- * do a direct lookup of a zoneid into the "zone_pcap_data" array to determine
+ * do a direct lookup of a zoneid into the "zone_pdata" array to determine
  * if that zone is over its cap.
  *
  * There is no locking for the page scanner to perform these two checks.
  * We cannot have the page scanner blocking normal paging activity for
  * running processes. Because the physical memory cap is a soft cap, it is
  * fine for the scanner to simply read the current state of the counter and
- * the zone's zpcap_over entry in the array. The scanner should never modify
+ * the zone's zpers_over entry in the array. The scanner should never modify
  * either of these items. Internally the entries and the counter are managed
  * with the "zone_physcap_lock" mutex as we add/remove mappings to pages. We
  * take care to ensure that we only take the zone_physcap_lock mutex when a
  * zone is transitioning over/under its physical memory cap.
  *
  * The "zone_incr_capped" and "zone_decr_capped" functions are used to manage
- * the "zone_pcap_data" array and associated counter.
+ * the "zone_pdata" array and associated counter.
  *
- * The zone_pcap_t structure tracks the zone's physical cap and phyiscal usage
- * in terms of pages. These values are currently defined as uint32. Thus, the
- * maximum number of pages we can track is a UINT_MAX-1 (4,294,967,295) since
- * UINT_MAX means the zone's RSS is unlimited. Assuming a 4k page size, a
+ * The zone_persist_t structure tracks the zone's physical cap and phyiscal
+ * usage in terms of pages. These values are currently defined as uint32. Thus,
+ * the maximum number of pages we can track is a UINT_MAX-1 (4,294,967,295)
+ * since UINT_MAX means the zone's RSS is unlimited. Assuming a 4k page size, a
  * zone's maximum RSS is limited to 17.5 TB and twice that with an 8k page size.
  * In the future we may need to expand these counters to 64-bit, but for now
  * we're using 32-bit to conserve memory, since this array is statically
  * allocated within the kernel based on the maximum number of zones supported.
+ *
+ * With respect to the zone_zfs_io_t referenced by the zone_persist_t, under
+ * a heavy I/O workload, the "zonehash_lock" would become extremely hot if we
+ * had to continuously find the zone structure associated with an I/O that has
+ * just completed. To avoid that overhead, we track the I/O data within the
+ * zone_zfs_io_t instead. We can directly access that data without having to
+ * lookup the full zone_t structure.
  */
 uint_t zone_num_over_cap;
-zone_pcap_t zone_pcap_data[MAX_ZONES];
+zone_persist_t zone_pdata[MAX_ZONES];
 static kmutex_t zone_physcap_lock;
 
 /*
@@ -1509,8 +1524,16 @@ static rctl_ops_t zone_cpu_burst_time_ops = {
 static rctl_qty_t
 zone_zfs_io_pri_get(rctl_t *rctl, struct proc *p)
 {
+	zone_persist_t *zp = &zone_pdata[p->p_zone->zone_id];
+	rctl_qty_t r = 0;
+
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	return (p->p_zone->zone_zfs_io_pri);
+	mutex_enter(&zp->zpers_zfs_lock);
+	if (zp->zpers_zfsp != NULL)
+		r = (rctl_qty_t)zp->zpers_zfsp->zpers_zfs_io_pri;
+	mutex_exit(&zp->zpers_zfs_lock);
+
+	return (r);
 }
 
 /*ARGSUSED*/
@@ -1519,6 +1542,7 @@ zone_zfs_io_pri_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
     rctl_qty_t nv)
 {
 	zone_t *zone = e->rcep_p.zone;
+	zone_persist_t *zp;
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(e->rcep_t == RCENTITY_ZONE);
@@ -1529,7 +1553,11 @@ zone_zfs_io_pri_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
 	/*
 	 * set priority to the new value.
 	 */
-	zone->zone_zfs_io_pri = nv;
+	zp = &zone_pdata[zone->zone_id];
+	mutex_enter(&zp->zpers_zfs_lock);
+	if (zp->zpers_zfsp != NULL)
+		zp->zpers_zfsp->zpers_zfs_io_pri = (uint16_t)nv;
+	mutex_exit(&zp->zpers_zfs_lock);
 	return (0);
 }
 
@@ -1871,10 +1899,10 @@ static rctl_qty_t
 zone_phys_mem_usage(rctl_t *rctl, struct proc *p)
 {
 	rctl_qty_t q;
-	zone_pcap_t *zp = &zone_pcap_data[p->p_zone->zone_id];
+	zone_persist_t *zp = &zone_pdata[p->p_zone->zone_id];
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	q = ptob(zp->zpcap_pg_cnt);
+	q = ptob(zp->zpers_pg_cnt);
 	return (q);
 }
 
@@ -1906,7 +1934,7 @@ zone_phys_mem_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
 			pg_val = (uint_t)pages;
 		}
 	}
-	zone_pcap_data[zid].zpcap_pg_limit = pg_val;
+	zone_pdata[zid].zpers_pg_limit = pg_val;
 	return (0);
 }
 
@@ -2016,13 +2044,13 @@ zone_physmem_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
 	zone_kstat_t *zk = ksp->ks_data;
-	zone_pcap_t *zp = &zone_pcap_data[zone->zone_id];
+	zone_persist_t *zp = &zone_pdata[zone->zone_id];
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	zk->zk_usage.value.ui64 = ptob(zp->zpcap_pg_cnt);
-	zk->zk_value.value.ui64 = ptob(zp->zpcap_pg_limit);
+	zk->zk_usage.value.ui64 = ptob(zp->zpers_pg_cnt);
+	zk->zk_value.value.ui64 = ptob(zp->zpers_pg_limit);
 	return (0);
 }
 
@@ -2170,26 +2198,42 @@ zone_zfs_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
 	zone_zfs_kstat_t *zzp = ksp->ks_data;
-	kstat_io_t *kiop = &zone->zone_zfs_rwstats;
+	zone_persist_t *zp = &zone_pdata[zone->zone_id];
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	/*
-	 * Extract the ZFS statistics from the kstat_io_t structure used by
-	 * kstat_runq_enter() and related functions.  Since the I/O throttle
-	 * counters are updated directly by the ZFS layer, there's no need to
-	 * copy those statistics here.
-	 *
-	 * Note that kstat_runq_enter() and the related functions use
-	 * gethrtime_unscaled(), so scale the time here.
-	 */
-	zzp->zz_nread.value.ui64 = kiop->nread;
-	zzp->zz_reads.value.ui64 = kiop->reads;
-	zzp->zz_rtime.value.ui64 = kiop->rtime;
-	zzp->zz_rlentime.value.ui64 = kiop->rlentime;
-	zzp->zz_nwritten.value.ui64 = kiop->nwritten;
-	zzp->zz_writes.value.ui64 = kiop->writes;
+	mutex_enter(&zp->zpers_zfs_lock);
+	if (zp->zpers_zfsp == NULL) {
+		zzp->zz_nread.value.ui64 = 0;
+		zzp->zz_reads.value.ui64 = 0;
+		zzp->zz_rtime.value.ui64 = 0;
+		zzp->zz_rlentime.value.ui64 = 0;
+		zzp->zz_nwritten.value.ui64 = 0;
+		zzp->zz_writes.value.ui64 = 0;
+		zzp->zz_waittime.value.ui64 = 0;
+	} else {
+		kstat_io_t *kiop = &zp->zpers_zfsp->zpers_zfs_rwstats;
+
+		/*
+		 * Extract the ZFS statistics from the kstat_io_t structure
+		 * used by kstat_runq_enter() and related functions. Since the
+		 * I/O throttle counters are updated directly by the ZFS layer,
+		 * there's no need to copy those statistics here.
+		 *
+		 * Note that kstat_runq_enter() and the related functions use
+		 * gethrtime_unscaled(), so scale the time here.
+		 */
+		zzp->zz_nread.value.ui64 = kiop->nread;
+		zzp->zz_reads.value.ui64 = kiop->reads;
+		zzp->zz_rtime.value.ui64 = kiop->rtime;
+		zzp->zz_rlentime.value.ui64 = kiop->rlentime;
+		zzp->zz_nwritten.value.ui64 = kiop->nwritten;
+		zzp->zz_writes.value.ui64 = kiop->writes;
+		zzp->zz_waittime.value.ui64 =
+		    zp->zpers_zfsp->zpers_zfs_rd_waittime;
+	}
+	mutex_exit(&zp->zpers_zfs_lock);
 
 	scalehrtime((hrtime_t *)&zzp->zz_rtime.value.ui64);
 	scalehrtime((hrtime_t *)&zzp->zz_rlentime.value.ui64);
@@ -2240,23 +2284,23 @@ zone_mcap_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
 	zone_mcap_kstat_t *zmp = ksp->ks_data;
-	zone_pcap_t *zp;
+	zone_persist_t *zp;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	zp = &zone_pcap_data[zone->zone_id];
+	zp = &zone_pdata[zone->zone_id];
 
-	zmp->zm_rss.value.ui64 = ptob(zp->zpcap_pg_cnt);
-	zmp->zm_phys_cap.value.ui64 = ptob(zp->zpcap_pg_limit);
+	zmp->zm_rss.value.ui64 = ptob(zp->zpers_pg_cnt);
+	zmp->zm_phys_cap.value.ui64 = ptob(zp->zpers_pg_limit);
 	zmp->zm_swap.value.ui64 = zone->zone_max_swap;
 	zmp->zm_swap_cap.value.ui64 = zone->zone_max_swap_ctl;
-	zmp->zm_nover.value.ui64 = zp->zpcap_nover;
+	zmp->zm_nover.value.ui64 = zp->zpers_nover;
 #ifndef DEBUG
-	zmp->zm_pagedout.value.ui64 = ptob(zp->zpcap_pg_out);
+	zmp->zm_pagedout.value.ui64 = ptob(zp->zpers_pg_out);
 #else
-	zmp->zm_pagedout.value.ui64 = ptob(zp->zpcap_pg_fsdirty +
-	    zp->zpcap_pg_fs + zp->zpcap_pg_anon + zp->zpcap_pg_anondirty);
+	zmp->zm_pagedout.value.ui64 = ptob(zp->zpers_pg_fsdirty +
+	    zp->zpers_pg_fs + zp->zpers_pg_anon + zp->zpers_pg_anondirty);
 #endif
 	zmp->zm_pgpgin.value.ui64 = zone->zone_pgpgin;
 	zmp->zm_anonpgin.value.ui64 = zone->zone_anonpgin;
@@ -2523,10 +2567,12 @@ zone_zsd_init(void)
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_physmem_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
-	zone0.zone_zfs_io_pri = 1;
 	zone0.zone_stime = 0;
 	zone0.zone_utime = 0;
 	zone0.zone_wtime = 0;
+
+	zone_pdata[0].zpers_zfsp = &zone0_zp_zfs;
+	zone_pdata[0].zpers_zfsp->zpers_zfs_io_pri = 1;
 
 	list_create(&zone0.zone_ref_list, sizeof (zone_ref_t),
 	    offsetof(zone_ref_t, zref_linkage));
@@ -2839,7 +2885,7 @@ zone_free(zone_t *zone)
 	cpucaps_zone_remove(zone);
 
 	/* Clear physical memory capping data. */
-	bzero(&zone_pcap_data[zone->zone_id], sizeof (zone_pcap_t));
+	bzero(&zone_pdata[zone->zone_id], sizeof (zone_persist_t));
 
 	ASSERT(zone->zone_cpucap == NULL);
 
@@ -5090,7 +5136,10 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_lockedmem_kstat = NULL;
 	zone->zone_swapresv_kstat = NULL;
 	zone->zone_physmem_kstat = NULL;
-	zone->zone_zfs_io_pri = 1;
+
+	zone_pdata[zoneid].zpers_zfsp =
+	    kmem_zalloc(sizeof (zone_zfs_io_t), KM_SLEEP);
+	zone_pdata[zoneid].zpers_zfsp->zpers_zfs_io_pri = 1;
 
 	/*
 	 * Zsched initializes the rctls.
@@ -5101,8 +5150,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	 * Ensure page count is 0 (in case zoneid has wrapped).
 	 * Initialize physical memory cap as unlimited.
 	 */
-	zone_pcap_data[zoneid].zpcap_pg_cnt = 0;
-	zone_pcap_data[zoneid].zpcap_pg_limit = UINT32_MAX;
+	zone_pdata[zoneid].zpers_pg_cnt = 0;
+	zone_pdata[zoneid].zpers_pg_limit = UINT32_MAX;
 
 	if ((error = parse_rctls(rctlbuf, rctlbufsz, &rctls)) != 0) {
 		zone_free(zone);
@@ -5741,6 +5790,7 @@ zone_destroy(zoneid_t zoneid)
 	zone_status_t status;
 	clock_t wait_time;
 	boolean_t log_refcounts;
+	zone_persist_t *zp;
 
 	if (secpolicy_zone_config(CRED()) != 0)
 		return (set_errno(EPERM));
@@ -5773,6 +5823,12 @@ zone_destroy(zoneid_t zoneid)
 	mutex_exit(&zone_status_lock);
 	zone_hold(zone);
 	mutex_exit(&zonehash_lock);
+
+	zp = &zone_pdata[zoneid];
+	mutex_enter(&zp->zpers_zfs_lock);
+	kmem_free(zp->zpers_zfsp, sizeof (zone_zfs_io_t));
+	zp->zpers_zfsp = NULL;
+	mutex_exit(&zp->zpers_zfs_lock);
 
 	/*
 	 * wait for zsched to exit
@@ -8075,18 +8131,18 @@ done:
 static void
 zone_incr_capped(zoneid_t zid)
 {
-	zone_pcap_t *zp = &zone_pcap_data[zid];
+	zone_persist_t *zp = &zone_pdata[zid];
 
 	/* See if over (unlimited is UINT32_MAX), or already marked that way. */
-	if (zp->zpcap_pg_cnt <= zp->zpcap_pg_limit || zp->zpcap_over == 1) {
+	if (zp->zpers_pg_cnt <= zp->zpers_pg_limit || zp->zpers_over == 1) {
 		return;
 	}
 
 	mutex_enter(&zone_physcap_lock);
 	/* Recheck setting under mutex */
-	if (zp->zpcap_pg_cnt > zp->zpcap_pg_limit && zp->zpcap_over == 0) {
-		zp->zpcap_over = 1;
-		zp->zpcap_nover++;
+	if (zp->zpers_pg_cnt > zp->zpers_pg_limit && zp->zpers_over == 0) {
+		zp->zpers_over = 1;
+		zp->zpers_nover++;
 		zone_num_over_cap++;
 		DTRACE_PROBE1(zone__over__pcap, zoneid_t, zid);
 	}
@@ -8114,29 +8170,29 @@ zone_incr_capped(zoneid_t zid)
 static void
 zone_decr_capped(zoneid_t zid)
 {
-	zone_pcap_t *zp = &zone_pcap_data[zid];
+	zone_persist_t *zp = &zone_pdata[zid];
 	uint32_t adjusted_limit;
 
 	/*
 	 * See if under, or already marked that way. There is no need to
-	 * check for an unlimited cap (zpcap_pg_limit == UINT32_MAX)
-	 * since we'll never set zpcap_over in zone_incr_capped().
+	 * check for an unlimited cap (zpers_pg_limit == UINT32_MAX)
+	 * since we'll never set zpers_over in zone_incr_capped().
 	 */
-	if (zp->zpcap_over == 0 || zp->zpcap_pg_cnt >= zp->zpcap_pg_limit) {
+	if (zp->zpers_over == 0 || zp->zpers_pg_cnt >= zp->zpers_pg_limit) {
 		return;
 	}
 
-	adjusted_limit = zp->zpcap_pg_limit - (zp->zpcap_pg_limit >> 7);
+	adjusted_limit = zp->zpers_pg_limit - (zp->zpers_pg_limit >> 7);
 
 	/* Recheck, accounting for our hysteresis. */
-	if (zp->zpcap_pg_cnt >= adjusted_limit) {
+	if (zp->zpers_pg_cnt >= adjusted_limit) {
 		return;
 	}
 
 	mutex_enter(&zone_physcap_lock);
 	/* Recheck under mutex. */
-	if (zp->zpcap_pg_cnt < adjusted_limit && zp->zpcap_over == 1) {
-		zp->zpcap_over = 0;
+	if (zp->zpers_pg_cnt < adjusted_limit && zp->zpers_over == 1) {
+		zp->zpers_over = 0;
 		ASSERT(zone_num_over_cap > 0);
 		zone_num_over_cap--;
 		DTRACE_PROBE1(zone__under__pcap, zoneid_t, zid);
@@ -8154,7 +8210,7 @@ void
 zone_add_page(page_t *pp)
 {
 	uint_t pcnt;
-	zone_pcap_t *zp;
+	zone_persist_t *zp;
 	zoneid_t zid;
 
 	/* Skip pages in segkmem, etc. (KV_KVP, ...) */
@@ -8179,9 +8235,9 @@ zone_add_page(page_t *pp)
 	if (pp->p_share == 0) {
 		/* First mapping to this page. */
 		pp->p_zoneid = zid;
-		zp = &zone_pcap_data[zid];
-		ASSERT(zp->zpcap_pg_cnt + pcnt < UINT32_MAX);
-		atomic_add_32((uint32_t *)&zp->zpcap_pg_cnt, pcnt);
+		zp = &zone_pdata[zid];
+		ASSERT(zp->zpers_pg_cnt + pcnt < UINT32_MAX);
+		atomic_add_32((uint32_t *)&zp->zpers_pg_cnt, pcnt);
 		zone_incr_capped(zid);
 		return;
 	}
@@ -8194,10 +8250,10 @@ zone_add_page(page_t *pp)
 		zid = pp->p_zoneid;
 		pp->p_zoneid = ALL_ZONES;
 		ASSERT(zid >= 0 && zid <= MAX_ZONEID);
-		zp = &zone_pcap_data[zid];
+		zp = &zone_pdata[zid];
 
-		if (zp->zpcap_pg_cnt > 0) {
-			atomic_add_32((uint32_t *)&zp->zpcap_pg_cnt, -pcnt);
+		if (zp->zpers_pg_cnt > 0) {
+			atomic_add_32((uint32_t *)&zp->zpers_pg_cnt, -pcnt);
 		}
 		zone_decr_capped(zid);
 	}
@@ -8207,7 +8263,7 @@ void
 zone_rm_page(page_t *pp)
 {
 	uint_t pcnt;
-	zone_pcap_t *zp;
+	zone_persist_t *zp;
 	zoneid_t zid;
 
 	/* Skip pages in segkmem, etc. (KV_KVP, ...) */
@@ -8227,9 +8283,9 @@ zone_rm_page(page_t *pp)
 	}
 
 	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
-	zp = &zone_pcap_data[zid];
-	if (zp->zpcap_pg_cnt > 0) {
-		atomic_add_32((uint32_t *)&zp->zpcap_pg_cnt, -pcnt);
+	zp = &zone_pdata[zid];
+	if (zp->zpers_pg_cnt > 0) {
+		atomic_add_32((uint32_t *)&zp->zpers_pg_cnt, -pcnt);
 	}
 	zone_decr_capped(zid);
 	pp->p_zoneid = ALL_ZONES;
@@ -8238,29 +8294,29 @@ zone_rm_page(page_t *pp)
 void
 zone_pageout_stat(int zid, zone_pageout_op_t op)
 {
-	zone_pcap_t *zp;
+	zone_persist_t *zp;
 
 	if (zid == ALL_ZONES)
 		return;
 
 	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
-	zp = &zone_pcap_data[zid];
+	zp = &zone_pdata[zid];
 
 #ifndef DEBUG
-	atomic_add_64(&zp->zpcap_pg_out, 1);
+	atomic_add_64(&zp->zpers_pg_out, 1);
 #else
 	switch (op) {
 	case ZPO_DIRTY:
-		atomic_add_64(&zp->zpcap_pg_fsdirty, 1);
+		atomic_add_64(&zp->zpers_pg_fsdirty, 1);
 		break;
 	case ZPO_FS:
-		atomic_add_64(&zp->zpcap_pg_fs, 1);
+		atomic_add_64(&zp->zpers_pg_fs, 1);
 		break;
 	case ZPO_ANON:
-		atomic_add_64(&zp->zpcap_pg_anon, 1);
+		atomic_add_64(&zp->zpers_pg_anon, 1);
 		break;
 	case ZPO_ANONDIRTY:
-		atomic_add_64(&zp->zpcap_pg_anondirty, 1);
+		atomic_add_64(&zp->zpers_pg_anondirty, 1);
 		break;
 	default:
 		cmn_err(CE_PANIC, "Invalid pageout operator %d", op);
@@ -8275,23 +8331,23 @@ zone_pageout_stat(int zid, zone_pageout_op_t op)
 void
 zone_get_physmem_data(int zid, pgcnt_t *memcap, pgcnt_t *free)
 {
-	zone_pcap_t *zp;
+	zone_persist_t *zp;
 
 	ASSERT(zid >= 0 && zid <= MAX_ZONEID);
-	zp = &zone_pcap_data[zid];
+	zp = &zone_pdata[zid];
 
 	/*
 	 * If memory or swap limits are set on the zone, use those, otherwise
 	 * use the system values. physmem and freemem are also in pages.
 	 */
-	if (zp->zpcap_pg_limit == UINT32_MAX) {
+	if (zp->zpers_pg_limit == UINT32_MAX) {
 		*memcap = physmem;
 		*free = freemem;
 	} else {
 		int64_t freemem;
 
-		*memcap = (pgcnt_t)zp->zpcap_pg_limit;
-		freemem = zp->zpcap_pg_limit - zp->zpcap_pg_cnt;
+		*memcap = (pgcnt_t)zp->zpers_pg_limit;
+		freemem = zp->zpers_pg_limit - zp->zpers_pg_cnt;
 		if (freemem > 0) {
 			*free = (pgcnt_t)freemem;
 		} else {

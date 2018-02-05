@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1249,7 +1249,7 @@ checkpage(struct page *pp, int whichhand)
 		ASSERT(pp->p_zoneid == ALL_ZONES ||
 		    pp->p_zoneid >= 0 && pp->p_zoneid <= MAX_ZONEID);
 		if (pp->p_zoneid == ALL_ZONES ||
-		    zone_pcap_data[pp->p_zoneid].zpcap_over == 0) {
+		    zone_pdata[pp->p_zoneid].zpers_over == 0) {
 			/*
 			 * Cross-zone shared page, or zone not over it's cap.
 			 * Leave the page alone.

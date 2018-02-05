@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2018, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -166,8 +166,8 @@ zfs_zone_txg_delay()
  * over the previous window.
  */
 boolean_t	zfs_zone_delay_enable = B_TRUE;	/* enable IO throttle */
-uint16_t	zfs_zone_delay_step = 5;	/* usec amnt to change delay */
-uint16_t	zfs_zone_delay_ceiling = 100;	/* usec delay max */
+uint8_t		zfs_zone_delay_step = 5;	/* usec amnt to change delay */
+uint8_t		zfs_zone_delay_ceiling = 100;	/* usec delay max */
 
 boolean_t	zfs_zone_priority_enable = B_TRUE;  /* enable IO priority */
 
@@ -238,9 +238,9 @@ uint_t 		zfs_zone_adjust_time = 250000;		/* 250 ms */
 
 typedef struct {
 	hrtime_t	cycle_start;
-	int		cycle_cnt;
 	hrtime_t	cycle_lat;
 	hrtime_t	sys_avg_lat;
+	uint_t		cycle_cnt;
 } sys_lat_cycle_t;
 
 typedef struct {
@@ -275,6 +275,7 @@ hrtime_t	zfs_disk_rlastupdate = 0; /* time last IO dispatched */
 
 hrtime_t	zfs_disk_last_rtime = 0; /* prev. cycle's zfs_disk_rtime val */
 /* time that we last updated per-zone throttle info */
+kmutex_t	zfs_last_check_lock;	/* protects zfs_zone_last_checked */
 hrtime_t	zfs_zone_last_checked = 0;
 hrtime_t	zfs_disk_last_laggard = 0;
 
@@ -412,22 +413,32 @@ compute_historical_zone_cnt(hrtime_t unow, sys_zio_cntr_t *cp)
  * Add IO op data to the zone.
  */
 static void
-add_zone_iop(zone_t *zonep, hrtime_t unow, zfs_zone_iop_type_t op)
+add_zone_iop(zone_persist_t *zpd, hrtime_t unow, zfs_zone_iop_type_t op)
 {
+	zone_zfs_io_t *iop;
+
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop == NULL) {
+		mutex_exit(&zpd->zpers_zfs_lock);
+		return;
+	}
+
 	switch (op) {
 	case ZFS_ZONE_IOP_READ:
-		(void) compute_historical_zone_cnt(unow, &zonep->zone_rd_ops);
-		zonep->zone_rd_ops.cycle_cnt++;
+		(void) compute_historical_zone_cnt(unow, &iop->zpers_rd_ops);
+		iop->zpers_rd_ops.cycle_cnt++;
 		break;
 	case ZFS_ZONE_IOP_WRITE:
-		(void) compute_historical_zone_cnt(unow, &zonep->zone_wr_ops);
-		zonep->zone_wr_ops.cycle_cnt++;
+		(void) compute_historical_zone_cnt(unow, &iop->zpers_wr_ops);
+		iop->zpers_wr_ops.cycle_cnt++;
 		break;
 	case ZFS_ZONE_IOP_LOGICAL_WRITE:
-		(void) compute_historical_zone_cnt(unow, &zonep->zone_lwr_ops);
-		zonep->zone_lwr_ops.cycle_cnt++;
+		(void) compute_historical_zone_cnt(unow, &iop->zpers_lwr_ops);
+		iop->zpers_lwr_ops.cycle_cnt++;
 		break;
 	}
+	mutex_exit(&zpd->zpers_zfs_lock);
 }
 
 /*
@@ -502,13 +513,13 @@ add_sys_iop(hrtime_t unow, int op, int lat)
 	switch (op) {
 	case ZFS_ZONE_IOP_READ:
 		(void) compute_new_sys_avg(unow, &rd_lat);
-		rd_lat.cycle_cnt++;
-		rd_lat.cycle_lat += lat;
+		atomic_inc_uint(&rd_lat.cycle_cnt);
+		atomic_add_64((uint64_t *)&rd_lat.cycle_lat, (int64_t)lat);
 		break;
 	case ZFS_ZONE_IOP_WRITE:
 		(void) compute_new_sys_avg(unow, &wr_lat);
-		wr_lat.cycle_cnt++;
-		wr_lat.cycle_lat += lat;
+		atomic_inc_uint(&wr_lat.cycle_cnt);
+		atomic_add_64((uint64_t *)&wr_lat.cycle_lat, (int64_t)lat);
 		break;
 	}
 }
@@ -575,10 +586,11 @@ calc_avg_lat(hrtime_t unow, sys_lat_cycle_t *cp)
  * The latency parameter is in usecs.
  */
 static void
-add_iop(zone_t *zonep, hrtime_t unow, zfs_zone_iop_type_t op, hrtime_t lat)
+add_iop(zone_persist_t *zpd, hrtime_t unow, zfs_zone_iop_type_t op,
+    hrtime_t lat)
 {
 	/* Add op to zone */
-	add_zone_iop(zonep, unow, op);
+	add_zone_iop(zpd, unow, op);
 
 	/* Track system latency */
 	if (op != ZFS_ZONE_IOP_LOGICAL_WRITE)
@@ -591,14 +603,16 @@ add_iop(zone_t *zonep, hrtime_t unow, zfs_zone_iop_type_t op, hrtime_t lat)
  * return a non-zero value, otherwise return 0.
  */
 static int
-get_zone_io_cnt(hrtime_t unow, zone_t *zonep, uint_t *rops, uint_t *wops,
+get_zone_io_cnt(hrtime_t unow, zone_zfs_io_t *zpd, uint_t *rops, uint_t *wops,
     uint_t *lwops)
 {
-	*rops = calc_zone_cnt(unow, &zonep->zone_rd_ops);
-	*wops = calc_zone_cnt(unow, &zonep->zone_wr_ops);
-	*lwops = calc_zone_cnt(unow, &zonep->zone_lwr_ops);
+	ASSERT3P(zpd, !=, NULL);
 
-	DTRACE_PROBE4(zfs__zone__io__cnt, uintptr_t, zonep->zone_id,
+	*rops = calc_zone_cnt(unow, &zpd->zpers_rd_ops);
+	*wops = calc_zone_cnt(unow, &zpd->zpers_wr_ops);
+	*lwops = calc_zone_cnt(unow, &zpd->zpers_lwr_ops);
+
+	DTRACE_PROBE4(zfs__zone__io__cnt, uintptr_t, zpd,
 	    uintptr_t, *rops, uintptr_t, *wops, uintptr_t, *lwops);
 
 	return (*rops | *wops | *lwops);
@@ -637,20 +651,24 @@ zfs_zone_wait_adjust_calculate_cb(zone_t *zonep, void *arg)
 {
 	zoneio_stats_t *sp = arg;
 	uint_t rops, wops, lwops;
+	zone_persist_t *zpd = &zone_pdata[zonep->zone_id];
+	zone_zfs_io_t *iop = zpd->zpers_zfsp;
+
+	ASSERT(MUTEX_HELD(&zpd->zpers_zfs_lock));
+	ASSERT3P(iop, !=, NULL);
 
 	if (zonep->zone_id == GLOBAL_ZONEID ||
-	    get_zone_io_cnt(sp->zi_now, zonep, &rops, &wops, &lwops) == 0) {
-		zonep->zone_io_util = 0;
+	    get_zone_io_cnt(sp->zi_now, iop, &rops, &wops, &lwops) == 0) {
 		return (0);
 	}
 
-	zonep->zone_io_util = (rops * sp->zi_avgrlat) +
-	    (wops * sp->zi_avgwlat) + (lwops * sp->zi_avgwlat);
-	sp->zi_totutil += zonep->zone_io_util;
+	iop->zpers_io_util = (rops * sp->zi_avgrlat) + (wops * sp->zi_avgwlat) +
+	    (lwops * sp->zi_avgwlat);
+	sp->zi_totutil += iop->zpers_io_util;
 
-	if (zonep->zone_io_util > 0) {
+	if (iop->zpers_io_util > 0) {
 		sp->zi_active++;
-		sp->zi_totpri += zonep->zone_zfs_io_pri;
+		sp->zi_totpri += iop->zpers_zfs_io_pri;
 	}
 
 	/*
@@ -665,23 +683,27 @@ zfs_zone_wait_adjust_calculate_cb(zone_t *zonep, void *arg)
 	 */
 	DTRACE_PROBE6(zfs__zone__utilization, uint_t, zonep->zone_id,
 	    uint_t, rops, uint_t, wops, uint_t, lwops,
-	    uint_t, zonep->zone_io_util, uint_t, zonep->zone_zfs_io_pri);
+	    uint64_t, iop->zpers_io_util, uint16_t, iop->zpers_zfs_io_pri);
 
 	return (0);
 }
 
 static void
-zfs_zone_delay_inc(zone_t *zonep)
+zfs_zone_delay_inc(zone_zfs_io_t *zpd)
 {
-	if (zonep->zone_io_delay < zfs_zone_delay_ceiling)
-		zonep->zone_io_delay += zfs_zone_delay_step;
+	ASSERT3P(zpd, !=, NULL);
+
+	if (zpd->zpers_io_delay < zfs_zone_delay_ceiling)
+		zpd->zpers_io_delay += zfs_zone_delay_step;
 }
 
 static void
-zfs_zone_delay_dec(zone_t *zonep)
+zfs_zone_delay_dec(zone_zfs_io_t *zpd)
 {
-	if (zonep->zone_io_delay > 0)
-		zonep->zone_io_delay -= zfs_zone_delay_step;
+	ASSERT3P(zpd, !=, NULL);
+
+	if (zpd->zpers_io_delay > 0)
+		zpd->zpers_io_delay -= zfs_zone_delay_step;
 }
 
 /*
@@ -691,18 +713,24 @@ zfs_zone_delay_dec(zone_t *zonep)
 static int
 zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 {
+	zone_persist_t *zpd = &zone_pdata[zonep->zone_id];
+	zone_zfs_io_t *iop = zpd->zpers_zfsp;
 	zoneio_stats_t *sp = arg;
-	uint16_t delay = zonep->zone_io_delay;
+	uint8_t delay;
 	uint_t fairutil = 0;
 
-	zonep->zone_io_util_above_avg = B_FALSE;
+	ASSERT(MUTEX_HELD(&zpd->zpers_zfs_lock));
+	ASSERT3P(iop, !=, NULL);
+
+	delay = iop->zpers_io_delay;
+	iop->zpers_io_util_above_avg = 0;
 
 	/*
 	 * Given the calculated total utilitzation for all zones, calculate the
 	 * fair share of I/O for this zone.
 	 */
 	if (zfs_zone_priority_enable && sp->zi_totpri > 0) {
-		fairutil = (sp->zi_totutil * zonep->zone_zfs_io_pri) /
+		fairutil = (sp->zi_totutil * iop->zpers_zfs_io_pri) /
 		    sp->zi_totpri;
 	} else if (sp->zi_active > 0) {
 		fairutil = sp->zi_totutil / sp->zi_active;
@@ -712,14 +740,14 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 	 * Adjust each IO's delay.  If the overall delay becomes too high, avoid
 	 * increasing beyond the ceiling value.
 	 */
-	if (zonep->zone_io_util > fairutil && sp->zi_overutil) {
-		zonep->zone_io_util_above_avg = B_TRUE;
+	if (iop->zpers_io_util > fairutil && sp->zi_overutil) {
+		iop->zpers_io_util_above_avg = 1;
 
 		if (sp->zi_active > 1)
-			zfs_zone_delay_inc(zonep);
-	} else if (zonep->zone_io_util < fairutil || sp->zi_underutil ||
+			zfs_zone_delay_inc(iop);
+	} else if (iop->zpers_io_util < fairutil || sp->zi_underutil ||
 	    sp->zi_active <= 1) {
-		zfs_zone_delay_dec(zonep);
+		zfs_zone_delay_dec(iop);
 	}
 
 	/*
@@ -732,8 +760,8 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 	 *	arg4: actual I/O utilization
 	 */
 	DTRACE_PROBE5(zfs__zone__throttle, uintptr_t, zonep->zone_id,
-	    uintptr_t, delay, uintptr_t, zonep->zone_io_delay,
-	    uintptr_t, fairutil, uintptr_t, zonep->zone_io_util);
+	    uintptr_t, delay, uintptr_t, iop->zpers_io_delay,
+	    uintptr_t, fairutil, uintptr_t, iop->zpers_io_util);
 
 	return (0);
 }
@@ -823,10 +851,20 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 	uint_t cnt;
 	zone_q_bump_t *qbp = arg;
 	zio_priority_t p = qbp->zq_queue;
+	zone_persist_t *zpd = &zone_pdata[zonep->zone_id];
+	zone_zfs_io_t *iop;
 
-	cnt = zonep->zone_zfs_queued[p];
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop == NULL) {
+		mutex_exit(&zpd->zpers_zfs_lock);
+		return (0);
+	}
+
+	cnt = iop->zpers_zfs_queued[p];
 	if (cnt == 0) {
-		zonep->zone_zfs_weight = 0;
+		iop->zpers_zfs_weight = 0;
+		mutex_exit(&zpd->zpers_zfs_lock);
 		return (0);
 	}
 
@@ -837,8 +875,8 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 	 * done any IO over several iterations will see their weight max
 	 * out.
 	 */
-	if (zonep->zone_zfs_weight < SCHED_WEIGHT_MAX)
-		zonep->zone_zfs_weight++;
+	if (iop->zpers_zfs_weight < SCHED_WEIGHT_MAX)
+		iop->zpers_zfs_weight++;
 
 	/*
 	 * This zone's IO priority is the inverse of the number of IOs
@@ -852,7 +890,7 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 	 * which haven't done IO in a while aren't getting starved.
 	 */
 	pri = (qbp->zq_qdepth / cnt) *
-	    zonep->zone_zfs_io_pri * zonep->zone_zfs_weight;
+	    iop->zpers_zfs_io_pri * iop->zpers_zfs_weight;
 
 	/*
 	 * If this zone has a higher priority than what we found so far,
@@ -861,8 +899,9 @@ get_sched_pri_cb(zone_t *zonep, void *arg)
 	if (pri > qbp->zq_priority) {
 		qbp->zq_zoneid = zonep->zone_id;
 		qbp->zq_priority = pri;
-		qbp->zq_wt = zonep->zone_zfs_weight;
+		qbp->zq_wt = iop->zpers_zfs_weight;
 	}
+	mutex_exit(&zpd->zpers_zfs_lock);
 	return (0);
 }
 
@@ -996,8 +1035,10 @@ zfs_zone_zio_init(zio_t *zp)
 void
 zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 {
-	zone_t *zonep = curzone;
-	hrtime_t unow, last_checked;
+	zoneid_t zid = curzone->zone_id;
+	zone_persist_t *zpd = &zone_pdata[zid];
+	zone_zfs_io_t *iop;
+	hrtime_t unow;
 	uint16_t wait;
 
 	unow = GET_USEC_TIME;
@@ -1007,34 +1048,60 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 	 * tracking physical IO operations are handled in zfs_zone_zio_done.
 	 */
 	if (type == ZFS_ZONE_IOP_LOGICAL_WRITE) {
-		mutex_enter(&zonep->zone_stg_io_lock);
-		add_iop(zonep, unow, type, 0);
-		mutex_exit(&zonep->zone_stg_io_lock);
+		add_iop(zpd, unow, type, 0);
 	}
 
 	if (!zfs_zone_delay_enable)
 		return;
 
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop == NULL) {
+		mutex_exit(&zpd->zpers_zfs_lock);
+		return;
+	}
+
 	/*
 	 * If the zone's I/O priority is set to zero, don't throttle that zone's
 	 * operations at all.
 	 */
-	if (zonep->zone_zfs_io_pri == 0)
+	if (iop->zpers_zfs_io_pri == 0) {
+		mutex_exit(&zpd->zpers_zfs_lock);
 		return;
-
-	/*
-	 * XXX There's a potential race here in that more than one thread may
-	 * update the zone delays concurrently.  The worst outcome is corruption
-	 * of our data to track each zone's IO, so the algorithm may make
-	 * incorrect throttling decisions until the data is refreshed.
-	 */
-	last_checked = zfs_zone_last_checked;
-	if ((unow - last_checked) > zfs_zone_adjust_time) {
-		zfs_zone_last_checked = unow;
-		zfs_zone_wait_adjust(unow, last_checked);
 	}
 
-	if ((wait = zonep->zone_io_delay) > 0) {
+	/* Handle periodically updating the per-zone I/O parameters */
+	if ((unow - zfs_zone_last_checked) > zfs_zone_adjust_time) {
+		hrtime_t last_checked;
+		boolean_t do_update = B_FALSE;
+
+		/* Recheck under mutex */
+		mutex_enter(&zfs_last_check_lock);
+		last_checked = zfs_zone_last_checked;
+		if ((unow - last_checked) > zfs_zone_adjust_time) {
+			zfs_zone_last_checked = unow;
+			do_update = B_TRUE;
+		}
+		mutex_exit(&zfs_last_check_lock);
+
+		if (do_update) {
+			mutex_exit(&zpd->zpers_zfs_lock);
+
+			zfs_zone_wait_adjust(unow, last_checked);
+
+			mutex_enter(&zpd->zpers_zfs_lock);
+			iop = zpd->zpers_zfsp;
+			if (iop == NULL) {
+				mutex_exit(&zpd->zpers_zfs_lock);
+				return;
+			}
+		}
+	}
+
+	wait = iop->zpers_io_delay;
+	mutex_exit(&zpd->zpers_zfs_lock);
+
+	if (wait > 0) {
 		/*
 		 * If this is a write and we're doing above normal TXG
 		 * syncing, then throttle for longer than normal.
@@ -1050,15 +1117,15 @@ zfs_zone_io_throttle(zfs_zone_iop_type_t type)
 		 *	arg1: type of IO operation
 		 *	arg2: time to delay (in us)
 		 */
-		DTRACE_PROBE3(zfs__zone__wait, uintptr_t, zonep->zone_id,
+		DTRACE_PROBE3(zfs__zone__wait, uintptr_t, zid,
 		    uintptr_t, type, uintptr_t, wait);
 
 		drv_usecwait(wait);
 
-		if (zonep->zone_vfs_stats != NULL) {
-			atomic_inc_64(&zonep->zone_vfs_stats->
+		if (curzone->zone_vfs_stats != NULL) {
+			atomic_inc_64(&curzone->zone_vfs_stats->
 			    zv_delay_cnt.value.ui64);
-			atomic_add_64(&zonep->zone_vfs_stats->
+			atomic_add_64(&curzone->zone_vfs_stats->
 			    zv_delay_time.value.ui64, wait);
 		}
 	}
@@ -1100,8 +1167,23 @@ zfs_zone_report_txg_sync(void *dp)
 hrtime_t
 zfs_zone_txg_delay()
 {
-	if (curzone->zone_io_util_above_avg)
+	zone_persist_t *zpd = &zone_pdata[curzone->zone_id];
+	zone_zfs_io_t *iop;
+	uint8_t above;
+
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop == NULL) {
+		mutex_exit(&zpd->zpers_zfs_lock);
+		return (0);
+	}
+
+	above = iop->zpers_io_util_above_avg;
+	mutex_exit(&zpd->zpers_zfs_lock);
+
+	if (above) {
 		return (zfs_zone_txg_delay_nsec);
+	}
 
 	return (MSEC2NSEC(10));
 }
@@ -1114,7 +1196,8 @@ zfs_zone_txg_delay()
 void
 zfs_zone_zio_start(zio_t *zp)
 {
-	zone_t	*zonep;
+	zone_persist_t *zpd = &zone_pdata[zp->io_zoneid];
+	zone_zfs_io_t *iop;
 
 	/*
 	 * I/Os of type ZIO_TYPE_IOCTL are used to flush the disk cache, not for
@@ -1124,14 +1207,14 @@ zfs_zone_zio_start(zio_t *zp)
 	if (zp->io_type == ZIO_TYPE_IOCTL)
 		return;
 
-	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
-		return;
-
-	mutex_enter(&zonep->zone_zfs_lock);
-	if (zp->io_type == ZIO_TYPE_READ)
-		kstat_runq_enter(&zonep->zone_zfs_rwstats);
-	zonep->zone_zfs_weight = 0;
-	mutex_exit(&zonep->zone_zfs_lock);
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop != NULL) {
+		if (zp->io_type == ZIO_TYPE_READ)
+			kstat_runq_enter(&iop->zpers_zfs_rwstats);
+		iop->zpers_zfs_weight = 0;
+	}
+	mutex_exit(&zpd->zpers_zfs_lock);
 
 	mutex_enter(&zfs_disk_lock);
 	zp->io_dispatched = gethrtime();
@@ -1140,8 +1223,6 @@ zfs_zone_zio_start(zio_t *zp)
 		zfs_disk_rtime += (zp->io_dispatched - zfs_disk_rlastupdate);
 	zfs_disk_rlastupdate = zp->io_dispatched;
 	mutex_exit(&zfs_disk_lock);
-
-	zone_rele(zonep);
 }
 
 /*
@@ -1152,7 +1233,8 @@ zfs_zone_zio_start(zio_t *zp)
 void
 zfs_zone_zio_done(zio_t *zp)
 {
-	zone_t	*zonep;
+	zone_persist_t *zpd;
+	zone_zfs_io_t *iop;
 	hrtime_t now, unow, udelta;
 
 	if (zp->io_type == ZIO_TYPE_IOCTL)
@@ -1161,34 +1243,33 @@ zfs_zone_zio_done(zio_t *zp)
 	if (zp->io_dispatched == 0)
 		return;
 
-	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
-		return;
+	zpd = &zone_pdata[zp->io_zoneid];
 
 	now = gethrtime();
 	unow = NANO_TO_MICRO(now);
 	udelta = unow - NANO_TO_MICRO(zp->io_dispatched);
 
-	mutex_enter(&zonep->zone_zfs_lock);
-
-	/*
-	 * To calculate the wsvc_t average, keep a cumulative sum of all the
-	 * wait time before each I/O was dispatched.  Since most writes are
-	 * asynchronous, only track the wait time for read I/Os.
-	 */
-	if (zp->io_type == ZIO_TYPE_READ) {
-		zonep->zone_zfs_rwstats.reads++;
-		zonep->zone_zfs_rwstats.nread += zp->io_size;
-
-		zonep->zone_zfs_stats->zz_waittime.value.ui64 +=
-		    zp->io_dispatched - zp->io_timestamp;
-
-		kstat_runq_exit(&zonep->zone_zfs_rwstats);
-	} else {
-		zonep->zone_zfs_rwstats.writes++;
-		zonep->zone_zfs_rwstats.nwritten += zp->io_size;
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop != NULL) {
+		/*
+		 * To calculate the wsvc_t average, keep a cumulative sum of
+		 * all the wait time before each I/O was dispatched. Since most
+		 * writes are asynchronous, only track the wait time for
+		 * read I/Os.
+		 */
+		if (zp->io_type == ZIO_TYPE_READ) {
+			iop->zpers_zfs_rwstats.reads++;
+			iop->zpers_zfs_rwstats.nread += zp->io_size;
+			iop->zpers_zfs_rd_waittime +=
+			    zp->io_dispatched - zp->io_timestamp;
+			kstat_runq_exit(&iop->zpers_zfs_rwstats);
+		} else {
+			iop->zpers_zfs_rwstats.writes++;
+			iop->zpers_zfs_rwstats.nwritten += zp->io_size;
+		}
 	}
-
-	mutex_exit(&zonep->zone_zfs_lock);
+	mutex_exit(&zpd->zpers_zfs_lock);
 
 	mutex_enter(&zfs_disk_lock);
 	zfs_disk_rcnt--;
@@ -1201,13 +1282,9 @@ zfs_zone_zio_done(zio_t *zp)
 	mutex_exit(&zfs_disk_lock);
 
 	if (zfs_zone_delay_enable) {
-		mutex_enter(&zonep->zone_stg_io_lock);
-		add_iop(zonep, unow, zp->io_type == ZIO_TYPE_READ ?
+		add_iop(zpd, unow, zp->io_type == ZIO_TYPE_READ ?
 		    ZFS_ZONE_IOP_READ : ZFS_ZONE_IOP_WRITE, udelta);
-		mutex_exit(&zonep->zone_stg_io_lock);
 	}
-
-	zone_rele(zonep);
 
 	/*
 	 * sdt:::zfs-zone-latency
@@ -1224,7 +1301,8 @@ void
 zfs_zone_zio_dequeue(zio_t *zp)
 {
 	zio_priority_t p;
-	zone_t	*zonep;
+	zone_persist_t *zpd = &zone_pdata[zp->io_zoneid];
+	zone_zfs_io_t *iop;
 
 	p = zp->io_priority;
 	if (p != ZIO_PRIORITY_SYNC_READ && p != ZIO_PRIORITY_SYNC_WRITE)
@@ -1233,24 +1311,25 @@ zfs_zone_zio_dequeue(zio_t *zp)
 	/* We depend on p being defined as either 0 or 1 */
 	ASSERT(p < 2);
 
-	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
-		return;
-
-	mutex_enter(&zonep->zone_stg_io_lock);
-	ASSERT(zonep->zone_zfs_queued[p] > 0);
-	if (zonep->zone_zfs_queued[p] == 0)
-		cmn_err(CE_WARN, "zfs_zone_zio_dequeue: count==0");
-	else
-		zonep->zone_zfs_queued[p]--;
-	mutex_exit(&zonep->zone_stg_io_lock);
-	zone_rele(zonep);
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop != NULL) {
+		ASSERT(iop->zpers_zfs_queued[p] > 0);
+		if (iop->zpers_zfs_queued[p] == 0) {
+			cmn_err(CE_WARN, "zfs_zone_zio_dequeue: count==0");
+		} else {
+			iop->zpers_zfs_queued[p]--;
+		}
+	}
+	mutex_exit(&zpd->zpers_zfs_lock);
 }
 
 void
 zfs_zone_zio_enqueue(zio_t *zp)
 {
 	zio_priority_t p;
-	zone_t	*zonep;
+	zone_persist_t *zpd = &zone_pdata[zp->io_zoneid];
+	zone_zfs_io_t *iop;
 
 	p = zp->io_priority;
 	if (p != ZIO_PRIORITY_SYNC_READ && p != ZIO_PRIORITY_SYNC_WRITE)
@@ -1259,13 +1338,12 @@ zfs_zone_zio_enqueue(zio_t *zp)
 	/* We depend on p being defined as either 0 or 1 */
 	ASSERT(p < 2);
 
-	if ((zonep = zone_find_by_id(zp->io_zoneid)) == NULL)
-		return;
-
-	mutex_enter(&zonep->zone_stg_io_lock);
-	zonep->zone_zfs_queued[p]++;
-	mutex_exit(&zonep->zone_stg_io_lock);
-	zone_rele(zonep);
+	mutex_enter(&zpd->zpers_zfs_lock);
+	iop = zpd->zpers_zfsp;
+	if (iop != NULL) {
+		iop->zpers_zfs_queued[p]++;
+	}
+	mutex_exit(&zpd->zpers_zfs_lock);
 }
 
 /*
