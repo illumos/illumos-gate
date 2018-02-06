@@ -1220,7 +1220,9 @@ main(int argc, char** argv)
 	int		cflags;
 	int		eflags;
 	int		nmatch;
+#if _REG_nexec
 	int		nexec;
+#endif
 	int		nstr;
 	int		cret;
 	int		eret;
@@ -1258,7 +1260,9 @@ main(int argc, char** argv)
 	static char	strbuf[32 * 1024];
 
 	int		nonosub = REG_NOSUB == 0;
+#if _REG_nexec
 	int		nonexec = 0;
+#endif
 
 	unsigned long	test = 0;
 
@@ -1291,7 +1295,9 @@ main(int argc, char** argv)
 				help(p[1] == 'h');
 				return 2;
 			case 'n':
+#if _REG_nexec
 				nonexec = 1;
+#endif
 				continue;
 			case 'o':
 				test |= TEST_IGNORE_OVER;
@@ -1921,10 +1927,8 @@ main(int argc, char** argv)
 #if _REG_nexec
 			if (nstr >= 0 && nstr != strlen(s))
 				nexec = nstr;
-
-			else
 #endif
-				nexec = -1;
+
 			if (state.extracted || (skip & level))
 				continue;
 			if (!(test & TEST_QUERY))
@@ -2117,7 +2121,7 @@ main(int argc, char** argv)
 			else
 #endif
 				fun = "regexec";
-			
+
 			for (i = 0; i < elementsof(match); i++)
 				match[i] = state.NOMATCH;
 
