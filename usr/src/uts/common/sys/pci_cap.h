@@ -46,7 +46,7 @@ int pci_htcap_locate(ddi_acc_handle_t h, uint16_t reg_mask, uint16_t reg_val,
 /* Extract the lower 8 bits Extended CFG SPACE */
 #define	PCI_CAP_ID_MASK		0xff
 
-#define	PCI_CAP_XCFG_SPC(i) 	((i) ? (i) | PCI_CAP_XCFG_FLAG : 0)
+#define	PCI_CAP_XCFG_SPC(i)	((i) ? (i) | PCI_CAP_XCFG_FLAG : 0)
 
 #ifdef DEBUG
 #define	PCI_CAP_DBG		if (pci_cap_debug) printf
@@ -64,7 +64,7 @@ int pci_htcap_locate(ddi_acc_handle_t h, uint16_t reg_mask, uint16_t reg_val,
  */
 
 typedef enum {
-	PCI_CAP_CFGSZ_8 	= 0,
+	PCI_CAP_CFGSZ_8		= 0,
 	PCI_CAP_CFGSZ_16	= 1,
 	PCI_CAP_CFGSZ_32	= 2
 } pci_cap_config_size_t;
@@ -82,12 +82,12 @@ typedef enum {
 #define	PCI_CAP_GET32(h, i, b, o) ((uint32_t) \
 	pci_cap_get(h, PCI_CAP_CFGSZ_32, i, b, o))
 
-#define	PCI_CAP_PUT8(h, i, b, o, d) ((uint8_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_8, i, b, o, d))
-#define	PCI_CAP_PUT16(h, i, b, o, d) ((uint16_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_16, i, b, o, d))
-#define	PCI_CAP_PUT32(h, i, b, o, d) ((uint32_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_32, i, b, o, d))
+#define	PCI_CAP_PUT8(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_8, i, b, o, d)
+#define	PCI_CAP_PUT16(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_16, i, b, o, d)
+#define	PCI_CAP_PUT32(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_32, i, b, o, d)
 
 #define	PCI_XCAP_GET8(h, i, b, o) ((uint8_t) \
 	pci_cap_get(h, PCI_CAP_CFGSZ_8, PCI_CAP_XCFG_SPC(i), b, o))
@@ -96,12 +96,12 @@ typedef enum {
 #define	PCI_XCAP_GET32(h, i, b, o) ((uint32_t) \
 	pci_cap_get(h, PCI_CAP_CFGSZ_32, PCI_CAP_XCFG_SPC(i), b, o))
 
-#define	PCI_XCAP_PUT8(h, i, b, o, d) ((uint8_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_8, PCI_CAP_XCFG_SPC(i), b, o, d))
-#define	PCI_XCAP_PUT16(h, i, b, o, d) ((uint16_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_16, PCI_CAP_XCFG_SPC(i), b, o, d))
-#define	PCI_XCAP_PUT32(h, i, b, o, d) ((uint32_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_32, PCI_CAP_XCFG_SPC(i), b, o, d))
+#define	PCI_XCAP_PUT8(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_8, PCI_CAP_XCFG_SPC(i), b, o, d)
+#define	PCI_XCAP_PUT16(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_16, PCI_CAP_XCFG_SPC(i), b, o, d)
+#define	PCI_XCAP_PUT32(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_32, PCI_CAP_XCFG_SPC(i), b, o, d)
 
 
 extern int pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
