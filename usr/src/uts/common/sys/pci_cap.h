@@ -82,12 +82,12 @@ typedef enum {
 #define	PCI_CAP_GET32(h, i, b, o) ((uint32_t) \
 	pci_cap_get(h, PCI_CAP_CFGSZ_32, i, b, o))
 
-#define	PCI_CAP_PUT8(h, i, b, o, d) ((uint8_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_8, i, b, o, d))
-#define	PCI_CAP_PUT16(h, i, b, o, d) ((uint16_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_16, i, b, o, d))
-#define	PCI_CAP_PUT32(h, i, b, o, d) ((uint32_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_32, i, b, o, d))
+#define	PCI_CAP_PUT8(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_8, i, b, o, d)
+#define	PCI_CAP_PUT16(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_16, i, b, o, d)
+#define	PCI_CAP_PUT32(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_32, i, b, o, d)
 
 #define	PCI_XCAP_GET8(h, i, b, o) ((uint8_t) \
 	pci_cap_get(h, PCI_CAP_CFGSZ_8, PCI_CAP_XCFG_SPC(i), b, o))
@@ -96,12 +96,12 @@ typedef enum {
 #define	PCI_XCAP_GET32(h, i, b, o) ((uint32_t) \
 	pci_cap_get(h, PCI_CAP_CFGSZ_32, PCI_CAP_XCFG_SPC(i), b, o))
 
-#define	PCI_XCAP_PUT8(h, i, b, o, d) ((uint8_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_8, PCI_CAP_XCFG_SPC(i), b, o, d))
-#define	PCI_XCAP_PUT16(h, i, b, o, d) ((uint16_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_16, PCI_CAP_XCFG_SPC(i), b, o, d))
-#define	PCI_XCAP_PUT32(h, i, b, o, d) ((uint32_t) \
-	pci_cap_put(h, PCI_CAP_CFGSZ_32, PCI_CAP_XCFG_SPC(i), b, o, d))
+#define	PCI_XCAP_PUT8(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_8, PCI_CAP_XCFG_SPC(i), b, o, d)
+#define	PCI_XCAP_PUT16(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_16, PCI_CAP_XCFG_SPC(i), b, o, d)
+#define	PCI_XCAP_PUT32(h, i, b, o, d) \
+	pci_cap_put(h, PCI_CAP_CFGSZ_32, PCI_CAP_XCFG_SPC(i), b, o, d)
 
 
 extern int pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
