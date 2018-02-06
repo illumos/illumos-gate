@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -582,6 +582,15 @@ i40e_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
 		return (EINVAL);
 
 	mutex_enter(&i40e->i40e_general_lock);
+	switch (i40e->i40e_hw_space.phy.link_info.module_type[0]) {
+	case I40E_MODULE_TYPE_SFP:
+	case I40E_MODULE_TYPE_QSFP:
+		break;
+	default:
+		mutex_exit(&i40e->i40e_general_lock);
+		return (ENOTSUP);
+	}
+
 	present = !!(i40e->i40e_hw_space.phy.link_info.link_info &
 	    I40E_AQ_MEDIA_AVAILABLE);
 	if (present) {
@@ -594,6 +603,69 @@ i40e_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
 
 	mac_transceiver_info_set_usable(infop, usable);
 	mac_transceiver_info_set_present(infop, present);
+
+	return (0);
+}
+
+static int
+i40e_transceiver_read(void *arg, uint_t id, uint_t page, void *buf,
+    size_t nbytes, off_t offset, size_t *nread)
+{
+	i40e_t *i40e = arg;
+	struct i40e_hw *hw = &i40e->i40e_hw_space;
+	uint8_t *buf8 = buf;
+	size_t i;
+
+	if (id != 0 || buf == NULL || nbytes == 0 || nread == NULL ||
+	    (page != 0xa0 && page != 0xa2) || offset < 0)
+		return (EINVAL);
+
+	/*
+	 * Both supported pages have a length of 256 bytes, ensure nothing asks
+	 * us to go beyond that.
+	 */
+	if (nbytes > 256 || offset >= 256 || (offset + nbytes > 256)) {
+		return (EINVAL);
+	}
+
+	mutex_enter(&i40e->i40e_general_lock);
+	switch (i40e->i40e_hw_space.phy.link_info.module_type[0]) {
+	case I40E_MODULE_TYPE_SFP:
+	case I40E_MODULE_TYPE_QSFP:
+		break;
+	default:
+		mutex_exit(&i40e->i40e_general_lock);
+		return (ENOTSUP);
+	}
+
+	/*
+	 * Make sure we have a sufficiently new firmware version to run this
+	 * command. This was introduced in firmware API 1.7. This is apparently
+	 * only supported on the XL710 MAC, not the XL722.
+	 */
+	if (hw->mac.type != I40E_MAC_XL710 || hw->aq.api_maj_ver != 1 ||
+	    hw->aq.api_min_ver < 7) {
+		mutex_exit(&i40e->i40e_general_lock);
+		return (ENOTSUP);
+	}
+
+	for (i = 0; i < nbytes; i++, offset++) {
+		enum i40e_status_code status;
+		uint32_t val;
+
+		status = i40e_aq_get_phy_register(hw,
+		    I40E_AQ_PHY_REG_ACCESS_EXTERNAL_MODULE, page, offset,
+		    &val, NULL);
+		if (status != I40E_SUCCESS) {
+			mutex_exit(&i40e->i40e_general_lock);
+			return (EIO);
+		}
+
+		buf8[i] = (uint8_t)val;
+	}
+
+	mutex_exit(&i40e->i40e_general_lock);
+	*nread = nbytes;
 
 	return (0);
 }
@@ -702,7 +774,7 @@ i40e_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		mct->mct_flags = 0;
 		mct->mct_ntransceivers = 1;
 		mct->mct_info = i40e_transceiver_info;
-		mct->mct_read = NULL;
+		mct->mct_read = i40e_transceiver_read;
 
 		return (B_TRUE);
 	case MAC_CAPAB_LED:
