@@ -597,7 +597,7 @@ iwn_kstat_init_4965(struct iwn_softc *sc)
 		kstat_named_init(&sc->sc_txpower->txchain[i].tcomp,
 		    tmp, KSTAT_DATA_LONG);
 
-		for (r = 0; r != IWN_RIDX_MAX; r++) {
+		for (r = 0; r <= IWN_RIDX_MAX; r++) {
 			(void) snprintf(tmp, KSTAT_STRLEN - 1,
 			    "Ant %d Rate %d RF gain", i, r);
 			kstat_named_init(
