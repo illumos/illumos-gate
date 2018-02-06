@@ -123,7 +123,7 @@ UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
 UNUSED_RPATH	/usr/gcc/.*/lib.*\ from\ .*
 
 # Unused runpaths for reasons not captured above
-UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs
+UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1	# future needs
 
 # Unreferenced objects of non-OSnet objects we can't change
 UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
@@ -157,6 +157,7 @@ UNREF_OBJ	/libgcc_s.*\ of\ .*libgmodule-2\.0\.so\.0
 # Unreferenced object of objects we can't change for other reasons
 UNREF_OBJ	/libmapmalloc\.so\.1;\ unused\ dependency\ of	# interposer
 UNREF_OBJ	/libstdc\+\+\.so\.6;\ unused\ dependency\ of	# gcc build
+UNREF_OBJ	/libgcc_s\.so\.1;\ unused\ dependency\ of	# gcc build
 UNREF_OBJ	/libgcc_s\.so\.1.*\ of\ .*libstdc\+\+\.so\.6	# omnios gcc mix
 UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
@@ -193,8 +194,11 @@ OLDDEP		libw\.so\.1			# on297 build 7
 #
 NOSYMSORT	opt/SUNWdtrt/tst/common/pid/tst.weak2.exe	# DTrace test
 NOSYMSORT	ld\.so\.1					# libc_pic.a user
+NOSYMSORT	usr/bin/audioconvert				# C++
+NOSYMSORT	usr/bin/make					# C++
 NOSYMSORT	usr/MACH(lib)/libsun_fc\.so\.1			# C++
 NOSYMSORT	usr/MACH(lib)/libfru\.so\.1			# C++
+NOSYMSORT	usr/lib/libnisdb\.so\.2				# C++
 
 # The majority of illumos deliverables should not depend on the GCC runtime
 # (any necessary runtime symbol should be provided by libc.so, instead).
