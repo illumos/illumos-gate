@@ -340,8 +340,6 @@ $(sparc_ONLY)dir path=platform/sun4u/kernel/drv group=sys
 $(sparc_ONLY)dir path=platform/sun4u/kernel/drv/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/sun4u/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/sun4u/kernel/misc/$(ARCH64) group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/strmod group=sys
-$(sparc_ONLY)dir path=platform/sun4u/kernel/strmod/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/sun4u/kernel/tod group=sys
 $(sparc_ONLY)dir path=platform/sun4u/kernel/tod/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/sun4v group=sys
@@ -1018,8 +1016,6 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/sbd group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/vis group=sys \
     mode=0755
-$(sparc_ONLY)file path=platform/sun4u/kernel/strmod/$(ARCH64)/kb group=sys \
-    mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todblade group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todbq4802 group=sys \
@@ -1113,7 +1109,6 @@ $(sparc_ONLY)file path=usr/share/man/man7d/todopl.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/tsalarm.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/zs.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/zsh.7d
-$(sparc_ONLY)file path=usr/share/man/man7m/kb.7m
 $(i386_ONLY)hardlink \
     path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.GenuineIntel.6.47 \
     target=cpu_ms.GenuineIntel.6.46

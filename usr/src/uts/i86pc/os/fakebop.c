@@ -207,15 +207,6 @@ do_bop_phys_alloc(uint64_t size, uint64_t align)
 		high_phys = pfn_to_pa(physmem);
 
 	/*
-	 * find the lowest or highest available memory in physinstalled
-	 * On 32 bit avoid physmem above 4Gig if PAE isn't enabled
-	 */
-#if defined(__i386)
-	if (xbootp->bi_use_pae == 0 && high_phys > FOUR_GIG)
-		high_phys = FOUR_GIG;
-#endif
-
-	/*
 	 * find the highest available memory in physinstalled
 	 */
 	size = P2ROUNDUP(size, align);
@@ -1817,17 +1808,6 @@ relocate_boot_archive(struct xboot_info *xbp)
 
 #if !defined(__xpv)
 /*
- * Install a temporary IDT that lets us catch errors in the boot time code.
- * We shouldn't get any faults at all while this is installed, so we'll
- * just generate a traceback and exit.
- */
-#ifdef __amd64
-static const int bcode_sel = B64CODE_SEL;
-#else
-static const int bcode_sel = B32CODE_SEL;
-#endif
-
-/*
  * simple description of a stack frame (args are 32 bit only currently)
  */
 typedef struct bop_frame {
@@ -1843,9 +1823,6 @@ bop_traceback(bop_frame_t *frame)
 	int cnt;
 	char *ksym;
 	ulong_t off;
-#if defined(__i386)
-	int a;
-#endif
 
 	bop_printf(NULL, "Stack traceback:\n");
 	for (cnt = 0; cnt < 30; ++cnt) {	/* up to 30 frames */
@@ -1863,18 +1840,6 @@ bop_traceback(bop_frame_t *frame)
 			bop_printf(NULL, "\n");
 			break;
 		}
-#if defined(__i386)
-		for (a = 0; a < 6; ++a) {	/* try for 6 args */
-			if ((void *)&frame->arg[a] == (void *)frame->old_frame)
-				break;
-			if (a == 0)
-				bop_printf(NULL, "(");
-			else
-				bop_printf(NULL, ",");
-			bop_printf(NULL, "0x%lx", frame->arg[a]);
-		}
-		bop_printf(NULL, ")");
-#endif
 		bop_printf(NULL, "\n");
 	}
 }
@@ -1884,10 +1849,8 @@ struct trapframe {
 	ulong_t inst_ptr;
 	ulong_t code_seg;
 	ulong_t flags_reg;
-#ifdef __amd64
 	ulong_t stk_ptr;
 	ulong_t stk_seg;
-#endif
 };
 
 void
@@ -1908,7 +1871,7 @@ bop_trap(ulong_t *tfp)
 	/*
 	 * adjust the tf for optional error_code by detecting the code selector
 	 */
-	if (tf->code_seg != bcode_sel)
+	if (tf->code_seg != B64CODE_SEL)
 		tf = (struct trapframe *)(tfp - 1);
 	else
 		bop_printf(NULL, "error code           0x%lx\n",
@@ -1917,10 +1880,8 @@ bop_trap(ulong_t *tfp)
 	bop_printf(NULL, "instruction pointer  0x%lx\n", tf->inst_ptr);
 	bop_printf(NULL, "code segment         0x%lx\n", tf->code_seg & 0xffff);
 	bop_printf(NULL, "flags register       0x%lx\n", tf->flags_reg);
-#ifdef __amd64
 	bop_printf(NULL, "return %%rsp          0x%lx\n", tf->stk_ptr);
 	bop_printf(NULL, "return %%ss           0x%lx\n", tf->stk_seg & 0xffff);
-#endif
 
 	/* grab %[er]bp pushed by our code from the stack */
 	fakeframe.old_frame = (bop_frame_t *)*(tfp - 3);
@@ -1936,6 +1897,11 @@ static gate_desc_t *bop_idt;
 
 static desctbr_t bop_idt_info;
 
+/*
+ * Install a temporary IDT that lets us catch errors in the boot time code.
+ * We shouldn't get any faults at all while this is installed, so we'll
+ * just generate a traceback and exit.
+ */
 static void
 bop_idt_init(void)
 {
@@ -1947,10 +1913,9 @@ bop_idt_init(void)
 	for (t = 0; t < NIDT; ++t) {
 		/*
 		 * Note that since boot runs without a TSS, the
-		 * double fault handler cannot use an alternate stack
-		 * (64-bit) or a task gate (32-bit).
+		 * double fault handler cannot use an alternate stack (64-bit).
 		 */
-		set_gatesegd(&bop_idt[t], &bop_trap_handler, bcode_sel,
+		set_gatesegd(&bop_idt[t], &bop_trap_handler, B64CODE_SEL,
 		    SDT_SYSIGT, TRP_KPL, 0);
 	}
 	bop_idt_info.dtr_limit = (NIDT * sizeof (gate_desc_t)) - 1;

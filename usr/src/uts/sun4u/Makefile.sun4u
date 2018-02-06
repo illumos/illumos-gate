@@ -411,11 +411,6 @@ SCHED_KMODS	+=
 FS_KMODS	+=
 
 #
-#	Streams Modules (/kernel/strmod):
-#
-STRMOD_KMODS	+= kb
-
-#
 #	'System' Modules (/kernel/sys):
 #
 SYS_KMODS	+=

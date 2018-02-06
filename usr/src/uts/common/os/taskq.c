@@ -26,7 +26,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*
@@ -200,6 +200,10 @@
  *	until the function (func) is called.  (However, func itself
  *	may safely modify or free this memory, once it is called.)
  *	Note that the taskq framework will NOT free this memory.
+ *
+ * boolean_t taskq_empty(tq)
+ *
+ *	Queries if there are tasks pending on the queue.
  *
  * void taskq_wait(tq):
  *
