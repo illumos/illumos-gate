@@ -654,11 +654,12 @@ zfs_zone_wait_adjust_calculate_cb(zone_t *zonep, void *arg)
 	zone_persist_t *zpd = &zone_pdata[zonep->zone_id];
 	zone_zfs_io_t *iop = zpd->zpers_zfsp;
 
-	ASSERT(MUTEX_HELD(&zpd->zpers_zfs_lock));
 	ASSERT3P(iop, !=, NULL);
 
+	mutex_enter(&zpd->zpers_zfs_lock);
 	if (zonep->zone_id == GLOBAL_ZONEID ||
 	    get_zone_io_cnt(sp->zi_now, iop, &rops, &wops, &lwops) == 0) {
+		mutex_exit(&zpd->zpers_zfs_lock);
 		return (0);
 	}
 
@@ -684,6 +685,8 @@ zfs_zone_wait_adjust_calculate_cb(zone_t *zonep, void *arg)
 	DTRACE_PROBE6(zfs__zone__utilization, uint_t, zonep->zone_id,
 	    uint_t, rops, uint_t, wops, uint_t, lwops,
 	    uint64_t, iop->zpers_io_util, uint16_t, iop->zpers_zfs_io_pri);
+
+	mutex_exit(&zpd->zpers_zfs_lock);
 
 	return (0);
 }
@@ -719,9 +722,9 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 	uint8_t delay;
 	uint_t fairutil = 0;
 
-	ASSERT(MUTEX_HELD(&zpd->zpers_zfs_lock));
 	ASSERT3P(iop, !=, NULL);
 
+	mutex_enter(&zpd->zpers_zfs_lock);
 	delay = iop->zpers_io_delay;
 	iop->zpers_io_util_above_avg = 0;
 
@@ -762,6 +765,8 @@ zfs_zone_wait_adjust_delay_cb(zone_t *zonep, void *arg)
 	DTRACE_PROBE5(zfs__zone__throttle, uintptr_t, zonep->zone_id,
 	    uintptr_t, delay, uintptr_t, iop->zpers_io_delay,
 	    uintptr_t, fairutil, uintptr_t, iop->zpers_io_util);
+
+	mutex_exit(&zpd->zpers_zfs_lock);
 
 	return (0);
 }
