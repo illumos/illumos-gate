@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -23,7 +23,7 @@ PROGS = timer_limit
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-C99MODE = -xc99=%all
+CSTD= $(CSTD_GNU99)
 
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
