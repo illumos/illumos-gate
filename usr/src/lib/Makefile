@@ -233,8 +233,6 @@ SUBDIRS +=				\
 	libvrrpadm	\
 	libvscan	\
 	libw		\
-	libwanboot	\
-	libwanbootutil	\
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
@@ -348,8 +346,6 @@ MSGSUBDIRS=		\
 	libuutil	\
 	libvrrpadm	\
 	libvscan	\
-	libwanboot	\
-	libwanbootutil	\
 	libzfs		\
 	libzonecfg	\
 	madv		\
@@ -480,8 +476,6 @@ HDRSUBDIRS=				\
 	libvolmgt	\
 	libvrrpadm	\
 	libvscan	\
-	libwanboot	\
-	libwanbootutil	\
 	libwrap		\
 	libxcurses2	\
 	libzfs		\
@@ -636,7 +630,7 @@ libnisdb:	libldap5
 libnwam:	libscf libbsm libdladm libipadm
 libpcp:		libumem libdevinfo
 libpctx:	libproc
-libpkg:		libwanboot libscf libadm
+libpkg:		libscf libadm
 libpool:	libscf libexacct
 libpp:		libast
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
@@ -675,7 +669,6 @@ libv12n:	libds libuuid
 libvolmgt:	libadm
 libvrrpadm:	libdladm libscf
 libvscan:	libscf libsecdb
-libwanboot:	libresolv2 libdevinfo libinetutil libdhcputil
 libzfs:		libdevid libgen libuutil libadm libavl libefi libidmap \
 		libumem libtsol libzfs_core libcmdutils
 libzfs_jni:	libdiskmgt libzfs

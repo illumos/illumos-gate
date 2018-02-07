@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/bootconf.h>
 #include <sys/reboot.h>
@@ -38,8 +36,6 @@
 #include "boot_plat.h"
 
 static char default_path_buf[MAXPATHLEN];
-
-char	wanboot_arguments[OBP_MAXPATHLEN];	/* args following "-o" */
 
 char	cmd_line_boot_archive[MAXPATHLEN];
 
@@ -114,18 +110,6 @@ bootflags(char *args, size_t argsz)
 			cmd_line_default_path = default_path_buf;
 			break;
 
-		case 'o':
-			if (params.gos_optarglen >=
-			    sizeof (wanboot_arguments)) {
-				printf("boot: -o argument too long.  "
-				    "Ignoring.\n");
-				break;
-			}
-			(void) strncpy(wanboot_arguments, params.gos_optargp,
-			    params.gos_optarglen);
-			wanboot_arguments[params.gos_optarglen] = '\0';
-			break;
-
 		case 'a':
 			boothowto |= RB_ASKNAME;
 			break;
@@ -157,7 +141,6 @@ bootflags(char *args, size_t argsz)
 			case 'F':
 			case 'I':
 			case 'D':
-			case 'o':
 				printf("boot: -%c flag missing required "
 				    "argument.  Ignoring.\n",
 				    params.gos_last_opt);

@@ -197,7 +197,6 @@ _MANFILES=	Intro.4				\
 		utmp.4				\
 		utmpx.4				\
 		vfstab.4			\
-		wanboot.conf.4			\
 		warn.conf.4			\
 		ypfiles.4			\
 		yppasswdd.4			\

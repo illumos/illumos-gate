@@ -20,8 +20,6 @@ CDDL HEADER END
 Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-ident	"%Z%%M%	%I%	%E% SMI"
-
 
 **  PLEASE NOTE:
 **
@@ -135,7 +133,7 @@ Background
   dhcp_pkt_t is a wrapper for packets to be sent.
 
   The basic PKT structure is used in dhcpagent, inetboot, in.dhcpd,
-  libdhcpagent, libwanboot, libdhcputil, and others.  PKT_LIST is used
+  libdhcpagent, libdhcputil, and others.  PKT_LIST is used
   in a similar set of places, including the kernel NFS modules.
   dhcp_pkt_t is (as the header file implies) limited to dhcpagent.
 

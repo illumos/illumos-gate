@@ -45,7 +45,6 @@ extern int	verbosemode;
 extern char	filename[];
 extern char	*const defname;
 extern char	*const defname64;
-extern char	wanboot_arguments[];
 
 extern int	bootprog(char *, char *, boolean_t);
 extern char	*choose_default_filename(char *, char *);

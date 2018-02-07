@@ -419,13 +419,6 @@ usr/lib/sparcv9/libuutil.so		sparc
 #
 usr/include/sys/multidata_impl.h
 #
-# The following files are used by wanboot.
-# They contain interfaces which are currently private.
-#
-usr/include/sys/wanboot_impl.h
-usr/include/wanboot
-usr/include/wanbootutil.h
-#
 # Even though all the objects built under usr/src/stand are later glommed
 # together into a couple of second-stage boot loaders, we dump the static
 # archives and lint libraries into $(ROOT)/stand for intermediate use

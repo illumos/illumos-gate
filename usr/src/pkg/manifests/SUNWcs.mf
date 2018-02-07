@@ -369,7 +369,6 @@ file path=etc/inet/netmasks group=sys preserve=true
 file path=etc/inet/networks group=sys preserve=true
 file path=etc/inet/protocols group=sys preserve=true
 file path=etc/inet/services group=sys preserve=true
-file path=etc/inet/wanboot.conf.sample group=sys mode=0444
 file path=etc/init.d/PRESERVE group=sys mode=0744 preserve=true
 file path=etc/init.d/README group=sys preserve=true
 file path=etc/init.d/sysetup group=sys mode=0744 preserve=true

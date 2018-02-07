@@ -55,7 +55,6 @@ _MANFILES=	6to4relay.1m		\
 		beadm.1m		\
 		boot.1m			\
 		bootadm.1m		\
-		bootconfchk.1m		\
 		busstat.1m		\
 		captoinfo.1m		\
 		catman.1m		\
@@ -174,7 +173,6 @@ _MANFILES=	6to4relay.1m		\
 		halt.1m			\
 		hextoalabel.1m		\
 		hostconfig.1m		\
-		ickey.1m		\
 		id.1m			\
 		idmap.1m		\
 		idmapd.1m		\
@@ -527,10 +525,6 @@ _MANFILES=	6to4relay.1m		\
 		vscanadm.1m		\
 		vscand.1m		\
 		wall.1m			\
-		wanboot_keygen.1m	\
-		wanboot_keymgmt.1m	\
-		wanboot_p12split.1m	\
-		wanbootutil.1m		\
 		whodo.1m		\
 		wificonfig.1m		\
 		wpad.1m			\
