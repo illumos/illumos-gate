@@ -175,5 +175,4 @@ is returned.
 .Xr iport 9 ,
 .Xr iportmap 9 ,
 .Xr attach 9E ,
-.Xr detach 9E ,
 .Xr detach 9E

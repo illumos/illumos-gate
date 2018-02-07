@@ -64,7 +64,7 @@ CERRWARN += -_gcc=-Wno-parentheses
 APIMAP = ../../../libtopo/common/topo_mod.map
 MAPFILES =		# use APIMAP instead
 
-C99MODE  = $(C99_ENABLE)
+CSTD  = $(CSTD_GNU99)
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG)
 

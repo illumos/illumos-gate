@@ -46,7 +46,7 @@ LDLIBS +=	-lc -lm -ldbus-1 -ldbus-glib-1 -lglib-2.0 -lgobject-2.0 \
 all install $(PROG) :=	LDLIBS += -lexpat
 
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
-C99MODE =	$(C99_ENABLE)
+CSTD =	$(CSTD_GNU99)
 
 CLOBBERFILES += hald_marshal.c hald_marshal.h
 

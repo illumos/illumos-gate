@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG = vscanadm
 SRCS = vscanadm.c
@@ -35,7 +33,7 @@ LDLIBS += -L$(ROOT)/usr/lib/vscan -lvscan
 LDFLAGS += -R/usr/lib/vscan
 CFLAGS += $(CCVERBOSE)
 
-C99MODE =       -xc99=%all
+CSTD =       $(CSTD_GNU99)
 C99LMODE =      -Xc99=%all
 
 .KEEP_STATE:

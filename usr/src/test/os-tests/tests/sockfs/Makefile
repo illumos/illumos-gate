@@ -22,7 +22,7 @@ PROG = conn dgram drop_priv nosignal sockpair
 LINTS = $(PROGS:%=%.ln)
 
 LDLIBS += -lsocket
-C99MODE = -xc99=%all
+CSTD = $(CSTD_GNU99)
 CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
 
 nosignal := LDLIBS += -lnsl

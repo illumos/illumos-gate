@@ -37,7 +37,7 @@ $(ROOTETC)/inet/$(CFGFILES):= FILEMODE= 644
 $(ROOTETC)/inet/$(CFGFILES):= OWNER= root 
 $(ROOTETC)/inet/$(CFGFILES):= GROUP= sys 
 
-C99MODE=		$(C99_ENABLE)
+CSTD=		$(CSTD_GNU99)
 
 #
 # We need access to the ancillary data features which are only available

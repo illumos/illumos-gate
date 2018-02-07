@@ -310,7 +310,7 @@ include ../../Makefile.lib
 # There should be a mapfile here
 MAPFILES =
 
-C99MODE=	$(C99_DISABLE)
+CSTD=	$(CSTD_GNU89)
 
 #
 # The BCP include files depend on old preprocessor semantics.

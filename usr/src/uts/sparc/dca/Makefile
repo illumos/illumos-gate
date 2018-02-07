@@ -62,7 +62,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE) 
-CFLAGS += $(C99_ENABLE) 
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -135,12 +135,12 @@ Otherwise, if an error occurred
 is returned.
 .Pp
 The
-.Fn scsi_device_hba_private_set
-function returns a data value registered via the
 .Fn scsi_device_hba_private_get
+function returns a data value registered via the
+.Fn scsi_device_hba_private_set
 function.
 If the
-.Fn scsi_device_hba_private_get
+.Fn scsi_device_hba_private_set
 was never called,
 .Dv NULL
 is returned.

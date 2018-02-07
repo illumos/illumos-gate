@@ -37,7 +37,7 @@ PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYSOLFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
 
-C99MODE=        -xc99=%all
+CSTD=        $(CSTD_GNU99)
 C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)

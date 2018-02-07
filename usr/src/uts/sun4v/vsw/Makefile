@@ -75,17 +75,6 @@ CFLAGS += $(CCVERBOSE)
 LDFLAGS += -dy -Nmisc/ldc -Nmisc/mac -Nmisc/platsvc
 
 #
-# Re-enable C99 compilation to use stack allocation of variable-sized arrays.
-# According to usr/src/uts/Makefile.uts, C99 is disabled until a problem seen
-# on x86 machines can be fully diagnosed; presumably a sun4v (i.e., SPARC)
-# module should be "safe".  Furthermore, only the variable-sized array
-# extension is needed/used.
-#
-# C99 mode also gives us macros such as __func__
-#
-C99MODE = $(99_ENABLE)
-
-#
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.
 # Please do not carry these forward to new Makefiles.

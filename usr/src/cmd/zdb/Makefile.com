@@ -40,7 +40,7 @@ INCS +=	-I../../../common/zfs
 
 LDLIBS += -lzpool -lumem -lnvpair -lzfs -lavl -lcmdutils -lfakekernel
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 CFLAGS += $(CCVERBOSE)

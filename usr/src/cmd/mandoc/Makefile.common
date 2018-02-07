@@ -76,7 +76,7 @@ OBJS=		att.o		\
 OBJS +=		compat_ohash.o
 
 CFLAGS +=	$(CC_VERBOSE)
-C99MODE =	$(C99_ENABLE)
+CSTD =	$(CSTD_GNU99)
 
 CPPFLAGS +=	-DOSNAME="\"illumos\""
 

@@ -43,7 +43,7 @@ $(XPG4) := CFLAGS += -D_XOPEN_SOURCE -I$(SRC)/lib/libc/inc
 # XPG6MODE:  Depending on the version of the compiler, the value of
 # __STDC_VERSION__ may differ even in the presence of the same compilation
 # options. The default compilation mode for Sun compilers that support the
-# C99 standard is -xc99=all,no_lib. C99MODE= is equivalent to -xc99=all,no_lib.
+# C99 standard is -xc99=all,no_lib. CSTD= is equivalent to -xc99=all,no_lib.
 # This translates to C99 semantics without the C99 library specific behaviors
 # and dependencies.
 #
@@ -53,8 +53,8 @@ $(XPG4) := CFLAGS += -D_XOPEN_SOURCE -I$(SRC)/lib/libc/inc
 # maintain source compatibility. Neither of these cases results in the 
 # importing of /usr/lib/values-xpg6.o, so we need to either manually import 
 # it via linking with a local version of the object, or set -xc99=%all which
-# by default imports /usr/lib/values-xpg6.o. C99MODE=C99_ENABLE is equivalent
-# to -xc99=all. If C99_ENABLE is defined and we also attempt to link with a 
+# by default imports /usr/lib/values-xpg6.o. CSTD=CSTD_GNU99 is equivalent
+# to -xc99=all. If CSTD_GNU99 is defined and we also attempt to link with a
 # local version of values-xpg6.o, an error will occur due to multiple 
 # definitions for __xpg4 and __xpg6. Because /usr/lib/values-xpg6.o was
 # delivered in Solaris 10 and is a stable interface, there is no need to
@@ -66,8 +66,8 @@ $(XPG4) := CFLAGS += -D_XOPEN_SOURCE -I$(SRC)/lib/libc/inc
 # the compiler only imports this by default (from /usr/lib/values-xpg4.o)
 # if we use the c89 utility as opposed to cc.
 
-XPG6MODE = $(C99_ENABLE)
-$(XPG6) := C99MODE = $(XPG6MODE)
+XPG6MODE = $(CSTD_GNU99)
+$(XPG6) := CSTD = $(XPG6MODE)
 $(XPG6) := CFLAGS += -D_XOPEN_SOURCE=600 -I$(SRC)/lib/libc/inc
 
 .KEEP_STATE:

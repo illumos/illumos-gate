@@ -39,7 +39,7 @@ SRCDIR =	../common
 
 INCS += -I$(SRCDIR)
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lnvpair -lstmf -luuid -lnsl -lscf
 CPPFLAGS +=	$(INCS) -D_REENTRANT

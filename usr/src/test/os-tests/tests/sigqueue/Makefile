@@ -21,7 +21,7 @@ PROG = sigqueue_queue_size
 OBJS = $(PROG:%=%.o)
 SRCS = $(OBJS:%.o=%.c)
 
-C99MODE = -xc99=%all
+CSTD = $(CSTD_GNU99)
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests/sigqueue

@@ -41,12 +41,12 @@ ARCH =		$($(MACH)_ARCH)
 
 # Setting DEBUG = -DDEBUG (or "make DEBUG=-DDEBUG ...") enables ASSERT()
 # checking.  This is automatically enabled for DEBUG builds, not for non-debug
-# builds.  Unset the global C99_DISABLE flag to insure we uncover all compiler
+# builds.  Unset the global CSTD_GNU89 flag to insure we uncover all compiler
 # warnings/errors.
 DEBUG =
 $(NOT_RELEASE_BUILD)DEBUG = -DDEBUG
 
-C99_DISABLE =	$(C99_ENABLE)
+CSTD_GNU89 =	$(CSTD_GNU99)
 
 CFLAGS +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 CFLAGS64 +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)

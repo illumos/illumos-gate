@@ -59,7 +59,6 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 LDFLAGS		+= -dy -Ndrv/fct -Ndrv/stmf
 CFLAGS		+= -DUNIQUE_FW_NAME
 
-C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 #

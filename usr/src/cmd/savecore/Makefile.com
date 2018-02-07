@@ -28,7 +28,7 @@ OBJS= savecore.o compress.o
 
 include ../../Makefile.cmd
 
-C99MODE = $(C99_ENABLE)
+CSTD = $(CSTD_GNU99)
 
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
