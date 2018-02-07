@@ -1074,18 +1074,18 @@ help_getnext(int fd, char **topic, char **subtopic, char **desc)
 		if (fgetstr(line, 80, fd) < 0)
 			return (0);
 
-		if ((strlen(line) < 3) || (line[0] != '#') || (line[1] != ' '))
+		if (strlen(line) < 3 || line[0] != '#' || line[1] != ' ')
 			continue;
 
 		*topic = *subtopic = *desc = NULL;
 		cp = line + 2;
-		while ((cp != NULL) && (*cp != 0)) {
+		while (cp != NULL && *cp != 0) {
 			ep = strchr(cp, ' ');
-			if ((*cp == 'T') && (*topic == NULL)) {
+			if (*cp == 'T' && *topic == NULL) {
 				if (ep != NULL)
 					*ep++ = 0;
 				*topic = strdup(cp + 1);
-			} else if ((*cp == 'S') && (*subtopic == NULL)) {
+			} else if (*cp == 'S' && *subtopic == NULL) {
 				if (ep != NULL)
 					*ep++ = 0;
 				*subtopic = strdup(cp + 1);
@@ -1178,18 +1178,18 @@ command_help(int argc, char *argv[])
 		} else {
 			/* topic matched */
 			matched = 1;
-			if (((subtopic == NULL) && (s == NULL)) ||
-			    ((subtopic != NULL) && (s != NULL) &&
+			if ((subtopic == NULL && s == NULL) ||
+			    (subtopic != NULL && s != NULL &&
 			    strcmp(subtopic, s) == 0)) {
 				/* exact match, print text */
-				while ((fgetstr(buf, 80, hfd) >= 0) &&
-				    (buf[0] != '#')) {
+				while (fgetstr(buf, 80, hfd) >= 0 &&
+				    buf[0] != '#') {
 					if (pager_output(buf))
 						break;
 					if (pager_output("\n"))
 						break;
 				}
-			} else if ((subtopic == NULL) && (s != NULL)) {
+			} else if (subtopic == NULL && s != NULL) {
 				/* topic match, list subtopics */
 				if (help_emitsummary(t, s, d))
 					break;
@@ -1231,7 +1231,7 @@ command_commandlist(int argc __unused, char *argv[] __unused)
 	STAILQ_FOREACH(cmdp, &commands, next) {
 		if (res)
 			break;
-		if ((cmdp->c_name != NULL) && (cmdp->c_desc != NULL)) {
+		if (cmdp->c_name != NULL && cmdp->c_desc != NULL) {
 			snprintf(name, sizeof (name), "  %-15s  ",
 			    cmdp->c_name);
 			pager_output(name);
