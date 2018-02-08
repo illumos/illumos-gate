@@ -30,7 +30,7 @@ ROOTBIN =	$(ROOTBRANDDIR)
 CLOBBERFILES =	$(OBJS) $(ROOTPROG)
 
 CPPFLAGS +=	-I$(SRC)/cmd/fs.d/nfs/lib
-C99MODE =	$(C99_ENABLE)
+CSTD =		$(CSTD_GNU99)
 LDLIBS +=	-lnsl -lsocket
 
 CERRWARN += -_gcc=-Wno-parentheses
