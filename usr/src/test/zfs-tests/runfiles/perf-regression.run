@@ -26,5 +26,5 @@ outputdir = /var/tmp/test_results
 [/opt/zfs-tests/tests/perf/regression]
 tests = ['sequential_writes', 'sequential_reads', 'sequential_reads_arc_cached',
     'sequential_reads_arc_cached_clone', 'sequential_reads_dbuf_cached',
-    'random_reads', 'random_writes', 'random_readwrite']
+    'random_reads', 'random_writes', 'random_readwrite', 'random_writes_zil']
 post =

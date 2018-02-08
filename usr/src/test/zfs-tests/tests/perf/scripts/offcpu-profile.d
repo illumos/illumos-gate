@@ -19,17 +19,23 @@
  * @stacks: The number of times a stack has been recorded
  */
 
-profile-997
-/ arg0 /
+sched:::off-cpu
 {
-	@stacks[stack()] = count();
+	self->ts = timestamp;
+}
+
+sched:::on-cpu
+/ self->ts != 0 /
+{
+	@stacks[stack()] = sum(timestamp - self->ts);
+	self->ts = 0;
 }
 
 ERROR
 {
-    trace(arg1);
-    trace(arg2);
-    trace(arg3);
-    trace(arg4);
-    trace(arg5);
+	trace(arg1);
+	trace(arg2);
+	trace(arg3);
+	trace(arg4);
+	trace(arg5);
 }
