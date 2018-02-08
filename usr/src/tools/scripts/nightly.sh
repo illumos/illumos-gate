@@ -25,7 +25,7 @@
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
-# Copyright 2013 (c) Joyent, Inc.  All rights reserved.
+# Copyright 2018 (c) Joyent, Inc.  All rights reserved.
 # Copyright (c) 2017 by Delphix. All rights reserved.
 #
 # Based on the nightly script from the integration folks,
@@ -1716,9 +1716,9 @@ if [[ "$t_FLAG" = "y" ]]; then
 		GENOFFSETS=${TOOLS_PROTO}/opt/onbld/bin/genoffsets
 		export GENOFFSETS
 
-		CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert
+		CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert-altexec
 		export CTFCONVERT
-		CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge
+		CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge-altexec
 		export CTFMERGE
 
 		PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
