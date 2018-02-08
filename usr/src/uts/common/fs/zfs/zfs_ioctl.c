@@ -3739,11 +3739,14 @@ zfs_ioc_rollback(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 
 	(void) nvlist_lookup_string(innvl, "target", &target);
 	if (target != NULL) {
-		int fslen = strlen(fsname);
+		const char *cp = strchr(target, '@');
 
-		if (strncmp(fsname, target, fslen) != 0)
-			return (SET_ERROR(EINVAL));
-		if (target[fslen] != '@')
+		/*
+		 * The snap name must contain an @, and the part after it must
+		 * contain only valid characters.
+		 */
+		if (cp == NULL ||
+		    zfs_component_namecheck(cp + 1, NULL, NULL) != 0)
 			return (SET_ERROR(EINVAL));
 	}
 
@@ -3793,9 +3796,12 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 	boolean_t recursive = zc->zc_cookie & 1;
 	char *at;
 
+	/* "zfs rename" from and to ...%recv datasets should both fail */
+	zc->zc_name[sizeof (zc->zc_name) - 1] = '\0';
 	zc->zc_value[sizeof (zc->zc_value) - 1] = '\0';
-	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
-	    strchr(zc->zc_value, '%'))
+	if (dataset_namecheck(zc->zc_name, NULL, NULL) != 0 ||
+	    dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
+	    strchr(zc->zc_name, '%') || strchr(zc->zc_value, '%'))
 		return (SET_ERROR(EINVAL));
 
 	at = strchr(zc->zc_name, '@');
@@ -4817,6 +4823,11 @@ zfs_ioc_promote(zfs_cmd_t *zc)
 	char origin[ZFS_MAX_DATASET_NAME_LEN];
 	char *cp;
 	int error;
+
+	zc->zc_name[sizeof (zc->zc_name) - 1] = '\0';
+	if (dataset_namecheck(zc->zc_name, NULL, NULL) != 0 ||
+	    strchr(zc->zc_name, '%'))
+		return (SET_ERROR(EINVAL));
 
 	error = dsl_pool_hold(zc->zc_name, FTAG, &dp);
 	if (error != 0)
@@ -5935,7 +5946,7 @@ zfs_ioctl_init(void)
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_NONE);
 
 	zfs_ioctl_register_pool(ZFS_IOC_CLEAR, zfs_ioc_clear,
-	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_NONE);
+	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_READONLY);
 	zfs_ioctl_register_pool(ZFS_IOC_POOL_REOPEN, zfs_ioc_pool_reopen,
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_SUSPENDED);
 

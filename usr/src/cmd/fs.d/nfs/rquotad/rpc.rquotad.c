@@ -79,7 +79,7 @@ void getquota();
 int  hasquota();
 void log_cant_reply();
 void setupfs();
-static void zexit();
+static void zexit(int) __NORETURN;
 
 static libzfs_handle_t *(*_libzfs_init)(void);
 static void (*_libzfs_fini)(libzfs_handle_t *);

@@ -118,6 +118,7 @@ init_isa_regex(void)
 		case '}':
 		case '\\':
 			regexpr[len++] = '\\';
+			/* FALLTHROUGH */
 		default:
 			regexpr[len++] = *p;
 			break;

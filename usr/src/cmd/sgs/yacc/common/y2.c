@@ -1187,8 +1187,8 @@ begin:
 		case L'=':	return (PREC);
 		case L'{':	return (LCURLY);
 		default:	reserve = 1;
-			}
-
+		}
+		/* FALLTHROUGH */
 	default:
 
 		if (iswdigit(c)) { /* number */

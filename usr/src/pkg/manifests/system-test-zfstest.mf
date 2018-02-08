@@ -944,6 +944,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_013_pos \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_014_pos \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_rename/zfs_rename.cfg \
@@ -1250,6 +1253,9 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool/zpool_002_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool/zpool_003_pos \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_add/add_nested_replacing_spare \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add.cfg \
@@ -1293,6 +1299,9 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/zpool_clear_003_neg \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/zpool_clear_readonly \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/cleanup \
     mode=0555

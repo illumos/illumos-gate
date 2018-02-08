@@ -28,7 +28,6 @@
 PROG=		pfexecd
 MANIFEST=	pfexecd.xml
 SRCS=		$(PROG:%=%.c)
-lint:	lint_SRCS
 
 include ../Makefile.cmd
 

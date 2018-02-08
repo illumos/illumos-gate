@@ -159,7 +159,7 @@ tests = ['zfs_receive_001_pos', 'zfs_receive_002_pos', 'zfs_receive_003_pos',
     'zfs_receive_005_neg', 'zfs_receive_006_pos',
     'zfs_receive_007_neg', 'zfs_receive_008_pos', 'zfs_receive_009_neg',
     'zfs_receive_010_pos', 'zfs_receive_011_pos', 'zfs_receive_012_pos',
-    'zfs_receive_013_pos']
+    'zfs_receive_013_pos', 'zfs_receive_014_pos']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_rename]
 tests = ['zfs_rename_001_pos', 'zfs_rename_002_pos', 'zfs_rename_003_pos',
@@ -224,13 +224,15 @@ tests = ['zpool_001_neg', 'zpool_002_pos', 'zpool_003_pos']
 [/opt/zfs-tests/tests/functional/cli_root/zpool_add]
 tests = ['zpool_add_001_pos', 'zpool_add_002_pos', 'zpool_add_003_pos',
     'zpool_add_004_pos', 'zpool_add_005_pos', 'zpool_add_006_pos',
-    'zpool_add_007_neg', 'zpool_add_008_neg', 'zpool_add_009_neg']
+    'zpool_add_007_neg', 'zpool_add_008_neg', 'zpool_add_009_neg',
+    'add_nested_replacing_spare']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_attach]
 tests = ['zpool_attach_001_neg']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_clear]
-tests = ['zpool_clear_001_pos', 'zpool_clear_002_neg', 'zpool_clear_003_neg']
+tests = ['zpool_clear_001_pos', 'zpool_clear_002_neg', 'zpool_clear_003_neg',
+    'zpool_clear_readonly']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_create]
 tests = ['zpool_create_001_pos', 'zpool_create_002_pos',

@@ -1592,7 +1592,7 @@ restart:
 		}
 	}
 
-	assert(mf->mf_next == '\0');
+	assert(*mf->mf_next == '\0');
 	return (TRUE);
 
 	/*
