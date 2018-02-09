@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\"  Copyright 1989 AT&T  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GROUPMOD 1M "Feb 25, 2017"
+.TH GROUPMOD 1M "Jan 7, 2018"
 .SH NAME
 groupmod \- modify a group definition on the system
 .SH SYNOPSIS
@@ -27,8 +28,8 @@ The following options are supported:
 .RS 11n
 Specify the new group \fBID\fR for the group. This group \fBID\fR must be a
 non-negative decimal integer less than \fBMAXUID\fR, as defined in
-\fB<param.h>\fR\&. The group \fBID\fR defaults to the next available (unique)
-number above 99. (Group IDs from 0-99 are reserved by SunOS for future
+\fB<sys/param.h>\fR\&. The group \fBID\fR defaults to the next available
+(unique) number above 99. (Group IDs from 0-99 are reserved for future
 applications.)
 .RE
 
@@ -41,7 +42,7 @@ applications.)
 Specify the new name for the group.  The \fIname\fR argument is a string of no
 more than eight bytes consisting of characters from the set of lower case
 alphabetic characters and numeric characters.  A warning message will be
-written if these restrictions are not met.  A future Solaris release may refuse
+written if these restrictions are not met.  A future release may refuse
 to accept group fields that do not meet these requirements.  The \fIname\fR
 argument must contain at least one character and must not include a colon
 (\fB:\fR) or \fBNEWLINE\fR (\fB\en\fR).
@@ -146,7 +147,7 @@ group file
 
 .SH SEE ALSO
 .LP
-\fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBlogins\fR(1M),
+\fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBlogins\fR(1M),
 \fBuseradd\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M), \fBgroup\fR(4),
 \fBattributes\fR(5)
 .SH NOTES

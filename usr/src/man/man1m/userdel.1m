@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USERDEL 1M "Feb 25, 2017"
+.TH USERDEL 1M "Jan 7, 2018"
 .SH NAME
 userdel \- delete a user's login from the system
 .SH SYNOPSIS
@@ -112,7 +112,7 @@ Cannot remove or otherwise modify the home directory.
 \fB\fB/etc/default/useradd\fR\fR
 .ad
 .RS 18n
-useradd, usermod and userdel configuration file
+configuration file for user and role administrative commands
 .RE
 
 .sp
@@ -130,7 +130,7 @@ system password file
 \fB\fB/etc/shadow\fR\fR
 .ad
 .RS 18n
-system file contain users' encrypted passwords and related information
+system file containing users' encrypted passwords and related information
 .RE
 
 .sp
@@ -154,10 +154,10 @@ system file containing additional user attributes
 .SH SEE ALSO
 .LP
 \fBauths\fR(1), \fBpasswd\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
-\fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
-\fBlogins\fR(1M), \fBroleadd\fR(1M), \fBrolemod\fR(1M), \fBuseradd\fR(1M),
-\fBuserdel\fR(1M), \fBusermod\fR(1M), \fBpasswd\fR(4), \fBprof_attr\fR(4),
-\fBuser_attr\fR(4), \fBattributes\fR(5), \fBzfs\fR(1M)
+\fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
+\fBlogins\fR(1M), \fBroleadd\fR(1M), \fBroledel\fR(1M), \fBrolemod\fR(1M),
+\fBuseradd\fR(1M), \fBusermod\fR(1M), \fBzfs\fR(1M), \fBpasswd\fR(4),
+\fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
 .SH NOTES
 .LP
 The \fBuserdel\fR utility only deletes an account definition that is in the
