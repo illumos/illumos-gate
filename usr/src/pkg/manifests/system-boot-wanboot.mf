@@ -22,41 +22,9 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/boot/wanboot@$(PKGVERS)
-set name=pkg.description value="Solaris WAN boot support"
-set name=pkg.summary value="WAN boot support"
-set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-dir path=usr group=sys
-dir path=usr/lib
-dir path=usr/lib/abi
-dir path=usr/lib/inet
-dir path=usr/lib/inet/wanboot
-dir path=usr/sbin
-dir path=usr/share/man/man1m
-file path=usr/lib/$(ARCH64)/libwanboot.so.1
-file path=usr/lib/$(ARCH64)/libwanbootutil.so.1
-file path=usr/lib/inet/wanboot/bootlog-cgi mode=0555
-file path=usr/lib/inet/wanboot/encr mode=0555
-file path=usr/lib/inet/wanboot/hmac mode=0555
-file path=usr/lib/inet/wanboot/ickey mode=0555
-file path=usr/lib/inet/wanboot/keygen mode=0555
-file path=usr/lib/inet/wanboot/keymgmt mode=0555
-file path=usr/lib/inet/wanboot/netbootinfo mode=0555
-file path=usr/lib/inet/wanboot/p12split mode=0555
-file path=usr/lib/inet/wanboot/wanboot-cgi mode=0555
-file path=usr/lib/libwanboot.so.1
-file path=usr/lib/libwanbootutil.so.1
-file path=usr/sbin/bootconfchk mode=0555
-file path=usr/sbin/wanbootutil mode=0555
-file path=usr/share/man/man1m/bootconfchk.1m
-file path=usr/share/man/man1m/ickey.1m
-file path=usr/share/man/man1m/wanboot_keygen.1m
-file path=usr/share/man/man1m/wanboot_keymgmt.1m
-file path=usr/share/man/man1m/wanboot_p12split.1m
-file path=usr/share/man/man1m/wanbootutil.1m
-legacy pkg=SUNWwbsup desc="Solaris WAN boot support" name="WAN boot support"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL

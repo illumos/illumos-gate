@@ -102,7 +102,6 @@ file path=usr/share/man/man4/user_attr.4
 file path=usr/share/man/man4/utmp.4
 file path=usr/share/man/man4/utmpx.4
 file path=usr/share/man/man4/vfstab.4
-file path=usr/share/man/man4/wanboot.conf.4
 file path=usr/share/man/man4/zoneinfo.4
 link path=usr/share/man/man4/devid_cache.4 target=devices.4
 link path=usr/share/man/man4/devname_cache.4 target=devices.4

@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.
  */
 
 #ifndef _SYS_XDF_H
@@ -243,7 +244,7 @@ typedef struct xdf {
 	boolean_t	xdf_flush_supported;
 	boolean_t	xdf_media_req_supported;
 	boolean_t	xdf_wce;
-	boolean_t	xdf_cmbl_reattach;
+	boolean_t	xdf_cmlb_reattach;
 	char		*xdf_flush_mem;
 	char		*xdf_cache_flush_block;
 	int		xdf_evtchn;

@@ -26,8 +26,6 @@
 #ifndef _SYS_BOOTSYMS_H
 #define	_SYS_BOOTSYMS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This header file should not exist.
  *
@@ -117,11 +115,6 @@ extern int global_pages;
  * From psm/stand/boot/sparc/common/fsconf.c:
  */
 extern char *bootp_response;
-
-/*
- * From psm/stand/boot/sparc/common/wanboot.c:
- */
-extern char *bootcfg;
 #endif /* __sparc */
 
 #ifdef __cplusplus

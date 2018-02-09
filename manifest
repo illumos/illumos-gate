@@ -2652,9 +2652,6 @@ d usr/include/audio 0755 root bin
 f usr/include/audio/au.h 0644 root bin
 f usr/include/auth_attr.h 0644 root bin
 f usr/include/auth_list.h 0644 root bin
-f usr/include/boot_http.h 0644 root bin
-f usr/include/bootinfo.h 0644 root bin
-f usr/include/bootlog.h 0644 root bin
 d usr/include/bsm 0755 root bin
 f usr/include/bsm/adt.h 0644 root bin
 f usr/include/bsm/adt_event.h 0644 root bin
@@ -3036,7 +3033,6 @@ f usr/include/net/sppptun.h 0644 root bin
 f usr/include/net/trill.h 0644 root bin
 f usr/include/net/vjcompress.h 0644 root bin
 f usr/include/net/wpa.h 0644 root bin
-f usr/include/netboot_paths.h 0644 root bin
 f usr/include/netconfig.h 0644 root bin
 f usr/include/netdb.h 0644 root bin
 f usr/include/netdir.h 0644 root bin
@@ -3121,11 +3117,7 @@ f usr/include/nss_netdir.h 0644 root bin
 f usr/include/nsswitch.h 0644 root bin
 f usr/include/nvfru.h 0644 root bin
 f usr/include/ofmt.h 0644 root bin
-f usr/include/p12access.h 0644 root bin
-f usr/include/p12aux.h 0644 root bin
-f usr/include/p12err.h 0644 root bin
 f usr/include/panel.h 0644 root bin
-f usr/include/parseURL.h 0644 root bin
 f usr/include/passwdutil.h 0644 root bin
 f usr/include/paths.h 0644 root bin
 f usr/include/pcsample.h 0644 root bin
@@ -4476,7 +4468,6 @@ f usr/include/sys/vuid_store.h 0644 root bin
 f usr/include/sys/vuid_wheel.h 0644 root bin
 f usr/include/sys/wait.h 0644 root bin
 f usr/include/sys/waitq.h 0644 root bin
-f usr/include/sys/wanboot_impl.h 0644 root bin
 f usr/include/sys/watchpoint.h 0644 root bin
 f usr/include/sys/winlockio.h 0644 root bin
 f usr/include/sys/x86_archext.h 0644 root bin
@@ -4552,12 +4543,6 @@ f usr/include/vm/vpage.h 0644 root bin
 f usr/include/vm/vpm.h 0644 root bin
 f usr/include/volmgt.h 0644 root bin
 f usr/include/wait.h 0644 root bin
-d usr/include/wanboot 0755 root bin
-f usr/include/wanboot/key_util.h 0644 root bin
-f usr/include/wanboot/key_xdr.h 0644 root bin
-f usr/include/wanboot/wbio.h 0644 root bin
-f usr/include/wanboot_conf.h 0644 root bin
-f usr/include/wanbootutil.h 0644 root bin
 f usr/include/wchar.h 0644 root bin
 f usr/include/wchar_impl.h 0644 root bin
 f usr/include/wctype.h 0644 root bin
@@ -6504,8 +6489,6 @@ f usr/lib/libvrrpadm.so.1 0755 root bin
 s usr/lib/libvrrpadm.so=libvrrpadm.so.1
 s usr/lib/libw.so.1=../../lib/libw.so.1
 s usr/lib/libw.so=../../lib/libw.so.1
-f usr/lib/libwanboot.so.1 0755 root bin
-s usr/lib/libwanboot.so=libwanboot.so.1
 f usr/lib/libwrap.so.1.0 0755 root bin
 s usr/lib/libwrap.so.1=libwrap.so.1.0
 s usr/lib/libwrap.so=libwrap.so.1.0

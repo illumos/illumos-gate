@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2017 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 if [[ `id -u` -ne 0 ]]; then
@@ -62,7 +62,7 @@ if [[ $? != 0 ]]; then
 fi
 echo "Passed IKEv1 32-bit KMC test."
 
-# Test that once set, an IKEv1 KMC cannot be changed once set
+# Test that once set, an IKEv1 KMC cannot be changed
 $TESTPATH/kmc-updater -e $EINVAL -k 0x12345 0x2112
 if [[ $? != 0 ]]; then
     echo "IKEv1 32-bit KMC update test failed."
