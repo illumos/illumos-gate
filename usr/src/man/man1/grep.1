@@ -1,518 +1,418 @@
-'\" te
-.\" Copyright 2017 Nexenta Systems, Inc. All rights reserved.
-.\" Copyright 1989 AT&T
-.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
-.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to reproduce portions of its copyrighted documentation. Original documentation from The Open Group can be obtained online at
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
 .\" http://www.opengroup.org/bookstore/.
-.\" The Institute of Electrical and Electronics Engineers and The Open Group, have given us permission to reprint portions of their documentation. In the following statement, the phrase "this text" refers to portions of the system documentation. Portions of this text are reprinted and reproduced in electronic form in the Sun OS Reference Manual, from IEEE Std 1003.1, 2004 Edition, Standard for Information Technology -- Portable Operating System Interface (POSIX), The Open Group Base Specifications Issue 6, Copyright (C) 2001-2004 by the Institute of Electrical and Electronics Engineers, Inc and The Open Group. In the event of any discrepancy between these versions and the original IEEE and The Open Group Standard, the original IEEE and The Open Group Standard is the referee document. The original Standard can be obtained online at http://www.opengroup.org/unix/online.html.
-.\"  This notice shall appear on any product containing this material.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GREP 1 "Nov 28, 2017"
-.SH NAME
-grep \- search a file for a pattern
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] \fB-e\fR \fIpattern_list\fR... [\fB-f\fR \fIpattern_file\fR]...
-    [\fIfile\fR]...
-.fi
-
-.LP
-.nf
-\fB/usr/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] [\fB-e\fR \fIpattern_list\fR]... \fB-f\fR \fIpattern_file\fR...
-    [\fIfile\fR]...
-.fi
-
-.LP
-.nf
-\fB/usr/bin/grep\fR [\fB-E\fR | \fB-F\fR] [\fB-c\fR | \fB-l\fR | \fB-q\fR] [\fB-r\fR | \fB-R\fR]
-    [\fB-bHhinsvwx\fR] [\fB-A\fR \fInumber\fR] [\fB-B\fR \fInumber\fR] [\fB-C\fR \fInumber\fR | \fB-\fR\fInumber\fR] \fIpattern\fR [\fIfile\fR]...
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBgrep\fR utility searches text files for a pattern and prints all lines
-that contain that pattern.  It uses a compact non-deterministic algorithm.
-.sp
-.LP
-Be careful using the characters \fB$\fR, \fB*\fR, \fB[\fR, \fB^\fR, \fB|\fR,
-\fB(\fR, \fB)\fR, and \fB\e\fR in the \fIpattern_list\fR because they are also
-meaningful to the shell. It is safest to enclose the entire \fIpattern_list\fR
-in single quotes \fB\'\fR\&...\fB\'\fR\&.
-.sp
-.LP
-If no files are specified, \fBgrep\fR assumes standard input. Normally, each
-line found is copied to standard output. The file name is printed before each
-line found if there is more than one input file.
-.LP
-The options \fB-E\fR and \fB-F\fR affect the way \fBgrep\fR
-interprets \fIpattern_list\fR. If \fB-E\fR is specified,
-\fBgrep\fR interprets \fIpattern_list\fR as a full regular
-expression (see \fB-E\fR for description).  If \fB-F\fR is specified,
-\fBgrep\fR interprets \fIpattern_list\fR as a fixed string. If neither are
-specified, \fBgrep\fR interprets \fIpattern_list\fR as a basic regular
-expression as described on \fBregex\fR(5) manual page.
-.SH OPTIONS
-.LP
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open
+.\" Group, have given us permission to reprint portions of their
+.\" documentation.
+.\"
+.\" In the following statement, the phrase ``this text'' refers to portions
+.\" of the system documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form
+.\" in the SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition,
+.\" Standard for Information Technology -- Portable Operating System
+.\" Interface (POSIX), The Open Group Base Specifications Issue 6,
+.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
+.\" Engineers, Inc and The Open Group.  In the event of any discrepancy
+.\" between these versions and the original IEEE and The Open Group
+.\" Standard, the original IEEE and The Open Group Standard is the referee
+.\" document.  The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd February 10, 2018
+.Dt GREP 1
+.Os
+.Sh NAME
+.Nm grep ,
+.Nm egrep ,
+.Nm fgrep
+.Nd search a file for a pattern
+.Sh SYNOPSIS
+.Nm grep
+.Op Fl E Ns | Ns Fl F
+.Op Fl bchHilnrRsqvwx
+.Op Fl A Ar num
+.Op Fl B Ar num
+.Op Fl C Ar num Ns | Ns Fl Ns Ar num
+.Oo Fl e Ar pattern_list Oc Ns ...
+.Oo Fl f Ar pattern_file Oc Ns ...
+.Op Ar pattern_list
+.Oo Ar file Oc Ns ...
+.Sh DESCRIPTION
+The
+.Nm
+utility searches text files for a pattern and prints all lines that contain that
+pattern.
+If no files are specified,
+.Nm
+assumes standard input.
+Normally, each line found is copied to standard output.
+The file name is printed before each line found if there is more than one input
+file.
+.Pp
+.Nm
+handles patterns as basic regular expressions (BREs);
+.Nm egrep
+.Pq same as Nm Fl E
+handles patterns as extended regular expressions (EREs);
+.Nm fgrep
+.Pq same as Nm Fl F
+handles patterns as fixed strings.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-A\fR \fInumber\fR\fR
-.ad
-.RS 6n
-Prints \fInumber\fR input lines of context after each matching line. If there
-are multiple matching lines, their context lines are separated by a \fB--\fR
+.Bl -tag -width Ds
+.It Fl A Ar num
+Prints
+.Ar num
+input lines of context after each matching line.
+If there are multiple matching lines, their context lines are separated by a
+.Ql --
 delimiter line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-b\fR\fR
-.ad
-.RS 6n
-Precedes each line by the block number on which it was found. This can be
-useful in locating block numbers by context (first block is 0).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-B\fR \fInumber\fR\fR
-.ad
-.RS 6n
-Prints \fInumber\fR input lines of context before each matching line. If there
-are multiple matching lines, their context lines are separated by a \fB--\fR
+.It Fl b
+Precedes each line by the block number on which it was found.
+This can be useful in locating block numbers by context (first block is 0).
+.It Fl B Ar num
+Prints
+.Ar num
+input lines of context before each matching line.
+If there are multiple matching lines, their context lines are separated by a
+.Ql --
 delimiter line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-c\fR\fR
-.ad
-.RS 6n
+.It Fl c
 Prints only a count of the lines that contain the pattern.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-H\fR\fR
-.ad
-.RS 6n
-Precedes each line by the name of the file containing the matching line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-e\fR \fIpattern_list\fR\fR
-.ad
-.RS 6n
-Specifies one or more patterns to be used during the search for input. Patterns
-in \fIpattern_list\fR must be separated by a NEWLINE character. A null pattern
-can be specified by two adjacent newline characters in \fIpattern_list\fR.
-Unless the \fB-E\fR or \fB-F\fR option is also specified, each pattern is
-treated as a basic regular expression.  Multiple \fB-e\fR and \fB-f\fR options
-are accepted by \fBgrep\fR. All of the specified patterns are used when
-matching lines, but the order of evaluation is unspecified.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-E\fR\fR
-.ad
-.RS 6n
-Matches using full regular expressions. Treats each pattern specified as a full
-regular expression. If any entire full regular expression pattern matches an
-input line, the line is matched. A null full regular expression matches every
-line. Each pattern is interpreted as a full regular expression as described on
-the \fBregex\fR(5) manual page, except for \fB\e(\fR and \fB\e)\fR, and
-including:
-.RS +4
-.TP
-1.
-A full regular expression followed by \fB+\fR that matches one or more
-occurrences of the full regular expression.
-.RE
-.RS +4
-.TP
-2.
-A full regular expression followed by \fB?\fR that matches 0 or 1
-occurrences of the full regular expression.
-.RE
-.RS +4
-.TP
-3.
-Full regular expressions separated by | or by a new-line that match strings
-that are matched by any of the expressions.
-.RE
-.RS +4
-.TP
-4.
-A full regular expression that is enclosed in parentheses \fB()\fR for
-grouping.
-.RE
-The order of precedence of operators is \fB[\|]\fR, then \fB*\|?\|+\fR, then
-concatenation, then | and new-line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-f\fR \fIpattern_file\fR\fR
-.ad
-.RS 6n
+Overrides
+.Fl l .
+.It Fl C Ar num Ns \&, Fl Ns Ar num
+Prints
+.Ar num
+input lines of context before and
+.Ar number
+input lines of context after each matching line.
+If there are multiple matching lines, their context lines are separated by a
+.Ql --
+delimiter line.
+.It Fl e Ar pattern_list
+Specifies one or more patterns to be used during the search for input.
+Patterns in
+.Ar pattern_list
+must be separated by a NEWLINE character.
+A null pattern can be specified by two adjacent newline characters in
+.Ar pattern_list .
+Unless the
+.Fl E
+or
+.Fl F
+option is also specified, each pattern is treated as a BRE, as described in
+.Xr regex 5 .
+.It Fl E
+Matches using extended regular expressions.
+Treats each pattern specified as an ERE, as described in
+.Xr regex 5 .
+If any entire ERE pattern matches an input line, the line is matched.
+A null ERE matches every line.
+.It Fl f Ar pattern_file
 Reads one or more patterns from the file named by the path name
-\fIpattern_file\fR. Patterns in \fIpattern_file\fR are terminated by a NEWLINE
-character. A null pattern can be specified by an empty line in
-\fIpattern_file\fR. Unless the \fB-E\fR or \fB-F\fR option is also specified,
-each pattern is treated as a basic regular expression.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-F\fR\fR
-.ad
-.RS 6n
-Matches using fixed strings. Treats each pattern specified as a string instead
-of a regular expression. If an input line contains any of the patterns as a
-contiguous sequence of bytes, the line is matched. A null string matches every
-line. See \fBfgrep\fR(1) for more information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-h\fR\fR
-.ad
-.RS 6n
+.Ar pattern_file .
+Patterns in
+.Ar pattern_file
+are terminated by a NEWLINE character.
+A null pattern can be specified by an empty line in
+.Ar pattern_file .
+Unless the
+.Fl E
+or
+.Fl F
+option is also specified, each pattern is treated as a BRE, as described in
+.Xr regex 5 .
+.It Fl F
+Matches using fixed strings.
+Treats each pattern specified as a string instead of a regular expression.
+If an input line contains any of the patterns as a contiguous sequence of bytes,
+the line is matched.
+A null string matches every line.
+.It Fl h
 Prevents the name of the file containing the matching line from being prepended
-to that line.  Used when searching multiple files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR\fR
-.ad
-.RS 6n
+to that line.
+Used when searching multiple files.
+.It Fl H
+Precedes each line by the name of the file containing the matching line.
+.It Fl i
 Ignores upper/lower case distinction during comparisons.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR\fR
-.ad
-.RS 6n
+.It Fl l
 Prints only the names of files with matching lines, separated by NEWLINE
-characters.  Does not repeat the names of files when the pattern is found more
-than once.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR\fR
-.ad
-.RS 6n
+characters.
+Does not repeat the names of files when the pattern is found more than once.
+Overrides
+.Fl H .
+.It Fl n
 Precedes each line by its line number in the file (first line is 1).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-r\fR\fR
-.ad
-.RS 6n
-Read all files under each directory, recursively. Follow symbolic links on
-the command line, but skip symlinks that are encountered recursively. If file
-is a device, FIFO, or socket, skip it.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-R\fR\fR
-.ad
-.RS 6n
+.It Fl q
+Quiet.
+Does not write anything to the standard output, regardless of matching lines.
+Exits with zero status if an input line is selected.
+Overrides
+.Fl c
+and
+.Fl l .
+.It Fl r
+Read all files under each directory, recursively.
+Follow symbolic links on the command line, but skip symlinks that are
+encountered recursively.
+If file is a device, FIFO, or socket, skip it.
+.It Fl R
 Read all files under each directory, recursively, following all symbolic links.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-q\fR\fR
-.ad
-.RS 6n
-Quiet. Does not write anything to the standard output, regardless of matching
-lines. Exits with zero status if an input line is selected.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-\fR\fInumber\fR\fR
-.ad
-.br
-.na
-\fB\fB-C\fR \fInumber\fR\fR
-.ad
-.RS 6n
-Prints \fInumber\fR input lines of context before and \fInumber\fR input lines
-of context after each matching line. If there are multiple matching lines,
-their context lines are separated by a \fB--\fR delimiter line.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR\fR
-.ad
-.RS 6n
+.It Fl s
 Suppresses error messages about nonexistent or unreadable files.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-v\fR\fR
-.ad
-.RS 6n
+.It Fl v
 Prints all lines except those that contain the pattern.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-w\fR\fR
-.ad
-.RS 6n
-Searches for the expression as a word as if surrounded by \fB\e<\fR and
-\fB\e>\fR\&.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-x\fR\fR
-.ad
-.RS 6n
+.It Fl w
+Searches for the expression as a word as if surrounded by
+.Ql \e<
+and
+.Ql \e> .
+.It Fl x
 Considers only input lines that use all characters in the line to match an
 entire fixed string or regular expression to be matching lines.
-.RE
-
-.SH OPERANDS
-.LP
+.El
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fIfile\fR\fR
-.ad
-.RS 8n
-A path name of a file to be searched for the patterns. If no \fIfile\fR
+.Bl -tag -width Ds
+.It Ar file
+A path name of a file to be searched for the patterns.
+If no
+.Ar file
 operands are specified, the standard input is used.
-.RE
-
-.ne 2
-.na
-\fB\fIpattern\fR\fR
-.ad
-.RS 8n
-Specifies one or more patterns to be used during the search for input. This
-operand is treated as if it were specified as \fB-e\fR \fIpattern_list\fR.
-.RE
-
-.SH USAGE
-.LP
-The \fB-e\fR \fIpattern_list\fR option has the same effect as the
-\fIpattern_list\fR operand, but is useful when \fIpattern_list\fR begins with
-the hyphen delimiter. It is also useful when it is more convenient to provide
-multiple patterns as separate arguments.
-.sp
-.LP
-Multiple \fB-e\fR and \fB-f\fR options are accepted and \fBgrep\fR uses all of
-the patterns it is given while matching input text lines. Notice that the order
-of evaluation is not specified. If an implementation finds a null string as a
-pattern, it is allowed to use that pattern first, matching every line, and
-effectively ignore any other patterns.
-.sp
-.LP
-The \fB-q\fR option provides a means of easily determining whether or not a
-pattern (or string) exists in a group of files. When searching several files,
-it provides a performance improvement (because it can quit as soon as it finds
-the first match) and requires less care by the user in choosing the set of
-files to supply as arguments (because it exits zero if it finds a match even if
-\fBgrep\fR detected an access or read error on earlier file operands).
-.SS "Large File Behavior"
-.LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBgrep\fR when
-encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRFinding All Uses of a Word
-.sp
-.LP
-To find all uses of the word "\fBPosix\fR" (in any case) in the file
-\fBtext.mm\fR, and write with line numbers:
-
-.sp
-.in +2
-.nf
-example% \fB/usr/bin/grep -i -n posix text.mm\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRFinding All Empty Lines
-.sp
-.LP
-To find all empty lines in the standard input:
-
-.sp
-.in +2
-.nf
-example% \fB/usr/bin/grep ^$\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.It Ar pattern_list
+Specifies one or more patterns to be used during the search for input.
+This operand is treated as if it were specified as
+.Fl e Ar pattern_list .
+Should not be specified if either
+.Fl e
 or
-
-.sp
-.in +2
-.nf
-example% \fB/usr/bin/grep -v .\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRFinding Lines Containing Strings
-.sp
-.LP
-All of the following commands print all lines containing strings \fBabc\fR or
-\fBdef\fR or both:
-
-.sp
-.in +2
-.nf
-example% \fB/usr/bin/grep 'abc
-def'\fR
-example% \fB/usr/bin/grep -e 'abc
-def'\fR
-example% \fB/usr/bin/grep -e 'abc' -e 'def'\fR
-example% \fB/usr/bin/grep -E 'abc|def'\fR
-example% \fB/usr/bin/grep -E -e 'abc|def'\fR
-example% \fB/usr/bin/grep -E -e 'abc' -e 'def'\fR
-example% \fB/usr/bin/grep -E 'abc
-def'\fR
-example% \fB/usr/bin/grep -E -e 'abc
-def'\fR
-example% \fB/usr/bin/grep -F -e 'abc' -e 'def'\fR
-example% \fB/usr/bin/grep -F 'abc
-def'\fR
-example% \fB/usr/bin/grep -F -e 'abc
-def'\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 4 \fRFinding Lines with Matching Strings
-.sp
-.LP
-Both of the following commands print all lines matching exactly \fBabc\fR or
-\fBdef\fR:
-
-.sp
-.in +2
-.nf
-example% \fB/usr/bin/grep -E '^abc$
-^def$'\fR
-example% \fB/usr/bin/grep -F -x 'abc
-def'\fR
-.fi
-.in -2
-.sp
-
-.SH ENVIRONMENT VARIABLES
-.LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBgrep\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.SH EXIT STATUS
-.LP
+.Fl f
+is specified.
+.El
+.Sh USAGE
+Be careful using the characters
+.Ql $ ,
+.Ql * ,
+.Ql \&[ ,
+.Ql ^ ,
+.Ql | ,
+.Ql \&( ,
+.Ql \&) ,
+and
+.Ql \e
+in the
+.Ar pattern_list
+because they are also meaningful to the shell.
+It is safest to enclose the entire
+.Ar pattern_list
+in single quotes:
+.Li '...' .
+.Pp
+The
+.Fl e Ar pattern
+option has the same effect as the
+.Ar pattern
+operand, but is useful when
+.Ar pattern
+begins with the hyphen delimiter.
+It is also useful when it is more convenient to provide multiple patterns as
+separate arguments.
+.Pp
+Multiple
+.Fl e
+and
+.Fl f
+options are accepted and
+.Nm
+uses all of the patterns it is given while matching input text lines.
+Notice that the order of evaluation is not specified.
+If an implementation finds a null string as a pattern, it is allowed to use that
+pattern first, matching every line, and effectively ignore any other patterns.
+.Pp
+The
+.Fl q
+option provides a means of easily determining whether or not a pattern (or
+string) exists in a group of files.
+When searching several files, it provides a performance improvement (because it
+can quit as soon as it finds the first match) and requires less care by the user
+in choosing the set of files to supply as arguments (because it exits zero if it
+finds a match even if
+.Nm
+detected an access or read error on earlier file operands).
+.Ss Large File Behavior
+See
+.Xr largefile 5
+for the description of the behavior of
+.Nm
+when encountering files greater than or equal to 2 Gbyte (2^31 bytes).
+.Sh EXIT STATUS
 The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 5n
+.Bl -tag -width Ds
+.It Sy 0
 One or more matches were found.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR\fR
-.ad
-.RS 5n
+.It Sy 1
 No matches were found.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB2\fR\fR
-.ad
-.RS 5n
+.It Sy 2
 Syntax errors or inaccessible files (even if matches were found).
-.RE
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-_
-Interface Stability	Committed
-_
-Standard	See \fBstandards\fR(5).
-.TE
-
-.SH SEE ALSO
-.LP
-\fBegrep\fR(1), \fBfgrep\fR(1), \fBsed\fR(1), \fBsh\fR(1), \fBattributes\fR(5),
-\fBenviron\fR(5), \fBlargefile\fR(5), \fBregex\fR(5), \fBregexp\fR(5),
-\fBstandards\fR(5)
-.SH NOTES
-.LP
+.El
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Finding All Uses of a Word
+To find all uses of the word
+.Ql Posix
+(in any case) in the file
+.Pa text.mm ,
+and write with line numbers:
+.Bd -literal
+$ grep -i -n posix text.mm
+.Ed
+.It Sy Example 2 No Finding All Empty Lines
+To find all empty lines in the standard input:
+.Bd -literal
+$ grep ^$
+.Ed
+.Pp
+or
+.Bd -literal
+$ grep -v .
+.Ed
+.It Sy Example 3 No Finding Lines Containing Strings
+All of the following commands print all lines containing strings
+.Ql abc
+or
+.Ql def
+or both:
+.Bd -literal
+$ grep 'abc
+def'
+$ grep -e 'abc
+def'
+$ grep -e 'abc' -e 'def'
+$ grep -E 'abc|def'
+$ grep -E -e 'abc|def'
+$ grep -E -e 'abc' -e 'def'
+$ grep -E 'abc
+def'
+$ grep -E -e 'abc
+def'
+$ grep -F -e 'abc' -e 'def'
+$ grep -F 'abc
+def'
+$ grep -F -e 'abc
+def'
+.Ed
+.It Sy Example 4 No Finding Lines with Matching Strings
+Both of the following commands print all lines matching exactly
+.Ql abc
+or
+.Ql def :
+.Bd -literal
+$ grep -E '^abc$
+^def$'
+$ grep -F -x 'abc
+def'
+.Ed
+.El
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 5
+for descriptions of the following environment variables that affect the
+execution of
+.Nm :
+.Ev LANG , LC_ALL , LC_COLLATE , LC_CTYPE , LC_MESSAGES ,
+and
+.Ev NLSPATH .
+.Sh CODE SET INDEPENDENCE
+.Sy Enabled
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr sed 1 ,
+.Xr sh 1 ,
+.Xr attributes 5 ,
+.Xr environ 5 ,
+.Xr largefile 5 ,
+.Xr regex 5 ,
+.Xr standards 5
+.Sh STANDARDS
+The
+.Nm
+utility is compliant with the
+.St -p1003.1-2008
+specification with the exception of
+.Fl s
+option being the same as
+.Fl q
+in current implementation for historic reasons.
+The flags
+.Op Fl AbBChHrRw
+are extensions to that specification.
+.Sh NOTES
 The results are unspecified if input files contain lines longer than
-\fBLINE_MAX\fR bytes or contain binary data. \fBLINE_MAX\fR is defined in
-\fB/usr/include/limits.h\fR.
-.LP
-In the past the behavior of \fB/usr/xpg4/bin/grep\fR and
-\fB/usr/bin/grep\fR utilities was different. Now \fB/usr/bin/grep\fR
-is replaced by \fB/usr/xpg4/bin/grep\fR.
+.Dv LINE_MAX
+bytes or contain binary data.
+.Dv LINE_MAX
+is defined in
+.In limits.h .
+.Pp
+Portable applications should use
+.Nm Fl E
+and
+.Nm Fl F
+instead of
+.Nm egrep
+and
+.Nm fgrep ,
+respectively.
+.Sh HISTORY
+The
+.Nm grep
+command first appeared in
+.At v6 .
+.Pp
+In the past
+.Pa /usr/bin/grep ,
+.Pa /usr/bin/egrep ,
+and
+.Pa /usr/bin/fgrep
+were separate implementations, and were not standard conforming, with standard
+conforming ones installed as
+.Pa /usr/xpg4/bin/grep ,
+.Pa /usr/xpg4/bin/egrep ,
+and
+.Pa /usr/xpg4/bin/fgrep ,
+respectively.
+Now all non-conforming implementations are removed, and the ones previously
+found in
+.Pa /usr/xpg4/bin
+are installed in
+.Pa /usr/bin .
