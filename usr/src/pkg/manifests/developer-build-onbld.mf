@@ -236,8 +236,6 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE \
     license=usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE
-license usr/src/tools/onbld/THIRDPARTYLICENSE \
-    license=usr/src/tools/onbld/THIRDPARTYLICENSE
 link path=opt/onbld/bin/$(ARCH)/dmake target=make
 link path=opt/onbld/bin/git-nits target=git-pbchk
 link path=opt/onbld/lib/python target=python$(PYTHON_VERSION)
