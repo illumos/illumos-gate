@@ -183,11 +183,6 @@ BIGPICS =	$(GOTHOGS:%=pics/%)
 $(BIGPICS) :=	sparc_C_PICFLAGS = $(C_BIGPICFLAGS)
 $(BIGPICS) :=	i386_C_PICFLAGS = $(C_BIGPICFLAGS)
 
-# Compile C++ code without exceptions to avoid a dependence on libC.
-NOEXCEPTIONS= -noex
-CCFLAGS += $(NOEXCEPTIONS)
-CCFLAGS64 += $(NOEXCEPTIONS)
-
 CPPFLAGS +=	-I$(SRC)/lib/libnsl/include -D_REENTRANT
 CPPFLAGS +=	-I$(SRC)/lib/libnsl/dial
 

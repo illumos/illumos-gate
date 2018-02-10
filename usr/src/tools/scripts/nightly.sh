@@ -123,21 +123,21 @@ function normal_build {
 #
 # usage: run_hook HOOKNAME ARGS...
 #
-# If variable "$HOOKNAME" is defined, insert a section header into 
+# If variable "$HOOKNAME" is defined, insert a section header into
 # our logs and then run the command with ARGS
 #
 function run_hook {
 	HOOKNAME=$1
-    	eval HOOKCMD=\$$HOOKNAME
+	eval HOOKCMD=\$$HOOKNAME
 	shift
 
-	if [ -n "$HOOKCMD" ]; then 
-	    	(
+	if [ -n "$HOOKCMD" ]; then
+		(
 			echo "\n==== Running $HOOKNAME command: $HOOKCMD ====\n"
-		    	( $HOOKCMD "$@" 2>&1 )
+			( $HOOKCMD "$@" 2>&1 )
 			if [ "$?" -ne 0 ]; then
-			    	# Let exit status propagate up
-			    	touch $TMPDIR/abort
+				# Let exit status propagate up
+				touch $TMPDIR/abort
 			fi
 		) | tee -a $mail_msg_file >> $LOGFILE
 
@@ -285,9 +285,7 @@ function build {
 			| egrep -v '^Zero Signature length:' \
 			| egrep -v '^Note \(probably harmless\):' \
 			| egrep -v '::' \
-			| egrep -v -- '-xcache' \
 			| egrep -v '^\+' \
-			| egrep -v '^cc1: note: -fwritable-strings' \
 			| egrep -v 'svccfg-native -s svc:/' \
 			| sort | uniq >$SRC/${NOISE}.out
 		if [ ! -f $SRC/${NOISE}.ref ]; then
@@ -404,7 +402,7 @@ function dolint {
 	#
 	rm -f Nothing_to_remove \
 	    `find . \( -name SCCS -o -name .hg -o -name .svn -o -name .git \) \
-	    	-prune -o -type f -name '*.ln' -print `
+		-prune -o -type f -name '*.ln' -print `
 
 	/bin/time $MAKE -ek lint 2>&1 | \
 	    tee -a $LINTOUT >> $LOGFILE
@@ -724,7 +722,7 @@ unset ONBLD_TOOLS
 #
 if [ -f /etc/nightly.conf ]; then
 	. /etc/nightly.conf
-fi    
+fi
 
 if [ -f $1 ]; then
 	if [[ $1 = */* ]]; then
@@ -903,7 +901,7 @@ if [[ -z "$MAKE" ]]; then
 	MAKE=dmake
 elif [[ ! -x "$MAKE" ]]; then
 	echo "\$MAKE is set to garbage in the environment"
-	exit 1	
+	exit 1
 fi
 export PATH
 export MAKE
@@ -1031,9 +1029,9 @@ PKGARCHIVE_ORIG=$PKGARCHIVE
 #
 
 function logshuffle {
-    	LLOG="$ATLOG/log.`date '+%F.%H:%M'`"
+	LLOG="$ATLOG/log.`date '+%F.%H:%M'`"
 	if [ -f $LLOG -o -d $LLOG ]; then
-	    	LLOG=$LLOG.$$
+		LLOG=$LLOG.$$
 	fi
 
 	rm -f "$ATLOG/latest" 2>/dev/null
@@ -1048,7 +1046,7 @@ function logshuffle {
 	        fi
 
 		if [ -f $TMPDIR/wsdiff.results ]; then
-		    	mv $TMPDIR/wsdiff.results $LLOG
+			mv $TMPDIR/wsdiff.results $LLOG
 		fi
 
 		if [ -f $TMPDIR/wsdiff-nd.results ]; then
@@ -1066,7 +1064,7 @@ function logshuffle {
 
 	exec >>$LOGFILE 2>&1
 	if [ -s $build_noise_file ]; then
-	    	echo "\n==== Nightly build noise ====\n" |
+		echo "\n==== Nightly build noise ====\n" |
 		    tee -a $LOGFILE >>$mail_msg_file
 		cat $build_noise_file >>$LOGFILE
 		cat $build_noise_file >>$mail_msg_file
@@ -1082,7 +1080,7 @@ function logshuffle {
 			state=Interrupted
 			;;
 		*)
-	    		state=Failed
+			state=Failed
 			;;
 	esac
 
@@ -1108,13 +1106,13 @@ function logshuffle {
 	cat $build_time_file $build_environ_file $mail_msg_file \
 	    > ${LLOG}/mail_msg
 	if [ "$m_FLAG" = "y" ]; then
-	    	cat ${LLOG}/mail_msg | /usr/bin/mailx ${mailx_r} -s \
+		cat ${LLOG}/mail_msg | /usr/bin/mailx ${mailx_r} -s \
 	"Nightly ${MACH} Build of `basename ${CODEMGR_WS}` ${state}." \
 			${MAILTO}
 	fi
 
 	if [ "$u_FLAG" = "y" -a "$build_ok" = "y" ]; then
-	    	staffer cp ${LLOG}/mail_msg $PARENT_WS/usr/src/mail_msg-${MACH}
+		staffer cp ${LLOG}/mail_msg $PARENT_WS/usr/src/mail_msg-${MACH}
 		staffer cp $LOGFILE $PARENT_WS/usr/src/nightly-${MACH}.log
 	fi
 
@@ -1127,7 +1125,7 @@ function logshuffle {
 #	Remove the locks and temporary files on any exit
 #
 function cleanup {
-    	logshuffle
+	logshuffle
 
 	[ -z "$lockfile" ] || staffer rm -f $lockfile
 	[ -z "$atloglockfile" ] || rm -f $atloglockfile
@@ -1143,7 +1141,7 @@ function cleanup {
 }
 
 function cleanup_signal {
-    	build_ok=i
+	build_ok=i
 	# this will trigger cleanup(), above.
 	exit 1
 }
@@ -1362,7 +1360,7 @@ function parent_wstype {
 		else
 			scm_type="none"
 		fi
-	fi    
+	fi
 
 	# fold both unsupported and unrecognized results into "none"
 	case "$scm_type" in
@@ -1864,7 +1862,7 @@ if [ "$U_FLAG" = "y" -a "$build_ok" = "y" ]; then
 		mkdir -p $NIGHTLY_PARENT_TOOLS_ROOT
 		if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
 			( cd $TOOLS_PROTO; tar cf - . |
-			    ( cd $NIGHTLY_PARENT_TOOLS_ROOT; 
+			    ( cd $NIGHTLY_PARENT_TOOLS_ROOT;
 			    umask 0; tar xpf - ) ) 2>&1 |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
@@ -1893,7 +1891,7 @@ if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 	find_elf -fr $checkroot > $elf_ddir/object_list
 
 	if [[ $A_FLAG = y ]]; then
-	       	echo "\n==== Check versioning and ABI information ====\n"  | \
+		echo "\n==== Check versioning and ABI information ====\n"  | \
 		    tee -a $LOGFILE >> $mail_msg_file
 
 		# Produce interface description for the proto. Report errors.
@@ -1914,7 +1912,7 @@ if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 		       	echo "\n==== Compare versioning and ABI information" \
 			    "to baseline ====\n"  | \
 			    tee -a $LOGFILE >> $mail_msg_file
-		       	echo "Baseline:  $base_ifile\n" >> $LOGFILE
+			echo "Baseline:	 $base_ifile\n" >> $LOGFILE
 
 			if [[ -f $base_ifile ]]; then
 				interface_cmp -d -o $base_ifile \
@@ -1927,7 +1925,7 @@ if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 					build_extras_ok=n
 				fi
 			else
-			       	echo "baseline not available. comparison" \
+				echo "baseline not available. comparison" \
                                     "skipped" | \
 				    tee -a $LOGFILE >> $mail_msg_file
 			fi
@@ -1953,7 +1951,7 @@ if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 			build_extras_ok=n
 		fi
 
-		# check_rtime -I output needs to be sorted in order to 
+		# check_rtime -I output needs to be sorted in order to
 		# compare it to that from previous builds.
 		sort $elf_ddir/runtime.attr.raw > $elf_ddir/runtime.attr
 		rm $elf_ddir/runtime.attr.raw
@@ -1994,7 +1992,7 @@ if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 		# These files are used asynchronously by other builds for ABI
 		# verification, as above for the -A option. As such, we require
 		# the file replacement to be atomic. Copy the data to a temp
-		# file in the same filesystem and then rename into place. 
+		# file in the same filesystem and then rename into place.
 		(
 			cd $elf_ddir
 			for elf_dfile in *; do
