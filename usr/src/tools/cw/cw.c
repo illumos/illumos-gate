@@ -39,7 +39,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"3.0"
+#define	CW_VERSION	"4.0"
 
 /*
  * -#		Verbose mode
@@ -217,7 +217,6 @@
  * -xCC				ignore
  * -xchip=<c>			table
  * -xcode=<c>			table
- * -xdebugformat=<format>	ignore (always use dwarf-2 for gcc)
  * -xcrossfile[=<n>]		ignore
  * -xe				error
  * -xF				error
@@ -762,9 +761,6 @@ do_gcc(cw_ictx_t *ctx)
 			}
 			error(arg);
 			break;
-		case 'g':
-			newae(ctx->i_ae, "-gdwarf-2");
-			break;
 		case 'E':
 			if (arglen == 1) {
 				newae(ctx->i_ae, "-xc");
@@ -792,6 +788,7 @@ do_gcc(cw_ictx_t *ctx)
 			error(arg);
 			break;
 		case 'A':
+		case 'g':
 		case 'h':
 		case 'I':
 		case 'i':
@@ -1102,11 +1099,6 @@ do_gcc(cw_ictx_t *ctx)
 					break;
 				}
 				if (strncmp(arg, "-xcrossfile", 11) == 0)
-					break;
-				error(arg);
-				break;
-			case 'd':
-				if (strncmp(arg, "-xdebugformat=", 14) == 0)
 					break;
 				error(arg);
 				break;

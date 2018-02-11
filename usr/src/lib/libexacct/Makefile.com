@@ -35,18 +35,18 @@ SRCS=		$(COMMON_OBJS:%.o=../../../common/exacct/%.c) \
 		$(LIB_OBJS:%.o=../common/%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS += 	-lc
+LDLIBS +=	-lc
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-CFLAGS += 	$(CCVERBOSE)
+CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 
 debug :=	CPPFLAGS += -DLIBEXACCT_DEBUG
-debug :=	COPTFLAG = -g
-debug :=	COPTFLAG64 = -g
+debug :=	COPTFLAG = $(CCGDEBUG)
+debug :=	COPTFLAG64 = $(CCGDEBUG)
 
 .KEEP_STATE:
 

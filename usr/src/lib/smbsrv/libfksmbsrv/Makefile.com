@@ -187,9 +187,9 @@ include ../../../Makefile.lib
 include ../../Makefile.lib
 
 # Force SOURCEDEBUG
-CSOURCEDEBUGFLAGS	= -g
-CCSOURCEDEBUGFLAGS	= -g
-STRIP_STABS 	= :
+CSOURCEDEBUGFLAGS	= $(CCGDEBUG)
+CCSOURCEDEBUGFLAGS	= $(CCGDEBUG)
+STRIP_STABS	= :
 
 
 # Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.

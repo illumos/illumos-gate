@@ -501,17 +501,22 @@ CGLOBALSTATIC= -W0,-xglobalstatic
 CALLSYMS=	-W0,-xdbggen=no%usedonly
 
 #
-# Default debug format for Sun Studio 11 is dwarf, so force it to
-# generate stabs.
+# We force the compilers to generate the debugging information best understood
+# by the CTF tools.  With Sun Studio this is stabs due to bugs in the Studio
+# compilers.  With GCC this is DWARF v2.
 #
-DEBUGFORMAT=	-xdebugformat=stabs
+DEBUGFORMAT=	-_cc=-xdebugformat=stabs -_gcc=-gdwarf-2
 
 #
-# Flags used to build in debug mode for ctf generation.  Bugs in the Devpro
-# compilers currently prevent us from building with cc-emitted DWARF.
+# Ask the compiler to include debugging information
 #
-CTF_FLAGS_sparc	= -g -Wc,-Qiselect-T1 $(CSTD) $(CNOGLOBAL) $(CDWARFSTR)
-CTF_FLAGS_i386	= -g $(CSTD) $(CNOGLOBAL) $(CDWARFSTR)
+CCGDEBUG= -g $(DEBUGFORMAT)
+
+#
+# Flags used to build in debug mode for ctf generation.
+#
+CTF_FLAGS_sparc	= $(CCGDEBUG) -Wc,-Qiselect-T1 $(CSTD) $(CNOGLOBAL)
+CTF_FLAGS_i386	= $(CCGDEBUG) $(CSTD) $(CNOGLOBAL)
 
 CTF_FLAGS_sparcv9	= $(CTF_FLAGS_sparc)
 CTF_FLAGS_amd64		= $(CTF_FLAGS_i386)
@@ -519,20 +524,22 @@ CTF_FLAGS_amd64		= $(CTF_FLAGS_i386)
 # Sun Studio produces broken userland code when saving arguments.
 $(__GNUC)CTF_FLAGS_amd64 += $(SAVEARGS)
 
-CTF_FLAGS_32	= $(CTF_FLAGS_$(MACH)) $(DEBUGFORMAT)
-CTF_FLAGS_64	= $(CTF_FLAGS_$(MACH64)) $(DEBUGFORMAT)
+CTF_FLAGS_32	= $(CTF_FLAGS_$(MACH))
+CTF_FLAGS_64	= $(CTF_FLAGS_$(MACH64))
 CTF_FLAGS	= $(CTF_FLAGS_32)
 
 #
 # Flags used with genoffsets
 #
-GOFLAGS = $(CALLSYMS) $(CDWARFSTR)
+GENOFFSETS_FLAGS = $(CALLSYMS)
 
 OFFSETS_CREATE = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
-	$(CW) --noecho $(CW_CC_COMPILERS) -- $(GOFLAGS) $(CFLAGS) $(CPPFLAGS)
+	$(CW) --noecho $(CW_CC_COMPILERS) -- $(GENOFFSETS_FLAGS) \
+	$(CFLAGS) $(CPPFLAGS)
 
 OFFSETS_CREATE64 = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
-	$(CW) --noecho $(CW_CC_COMPILERS) -- $(GOFLAGS) $(CFLAGS64) $(CPPFLAGS)
+	$(CW) --noecho $(CW_CC_COMPILERS) -- $(GENOFFSETS_FLAGS) \
+	$(CFLAGS64) $(CPPFLAGS)
 
 #
 # tradeoff time for space (smaller is better)
@@ -587,8 +594,8 @@ CCUSERFLAGS64		= $(CCUSERFLAGS)
 
 CSOURCEDEBUGFLAGS	=
 CCSOURCEDEBUGFLAGS	=
-$(SRCDBGBLD)CSOURCEDEBUGFLAGS	= -g -xs
-$(SRCDBGBLD)CCSOURCEDEBUGFLAGS	= -g -xs
+$(SRCDBGBLD)CSOURCEDEBUGFLAGS	= $(CCGDEBUG) -xs
+$(SRCDBGBLD)CCSOURCEDEBUGFLAGS	= $(CCGDEBUG) -xs
 
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(CSTD) $(CCUNBOUND) $(IROPTFLAG) \

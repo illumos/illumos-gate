@@ -59,12 +59,6 @@ SMATCH=off
 # Debugging
 ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
 
-# uncomment these for dbx debugging
-#COPTFLAG = -g
-#CTF_FLAGS =
-#CTFCONVERT_O=
-#CTFMERGE_LIB=
-
 # disable some of the less important lint
 LINTFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTFLAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2

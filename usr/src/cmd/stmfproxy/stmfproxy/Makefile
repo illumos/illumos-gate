@@ -57,11 +57,6 @@ CCVERBOSE	=
 LDLIBS += -lnsl -lstmf -lstmfproxy
 CPPFLAGS += -I. -I$(COMMONBASE)/cmdparse
 
-# Uncomment the following to help with debugging
-#CFLAGS += -g 
-#i386_COPTFLAG=
-#i386_CCOPTFLAG=
-
 .KEEP_STATE:
 
 $(PROG): $(OBJS)

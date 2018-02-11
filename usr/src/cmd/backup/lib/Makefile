@@ -77,7 +77,7 @@ GLIB=		libdump_g.a
 DEBUGS=		$(OBJECTS:%=.debug/%)
 $(GLIB):=	AROBJS = $(DEBUGS)
 $(GLIB):=	DIR = .debug
-$(GLIB):=	CFLAGS= -g $(XESS) -DDEBUG -DYYDEBUG ${SBFLAGS}
+$(GLIB):=	CFLAGS= $(CCGDEBUG) $(XESS) -DDEBUG -DYYDEBUG ${SBFLAGS}
 
 .KEEP_STATE:
 
@@ -120,4 +120,4 @@ check:	$(HDRS)
 # include library targets
 include ../../../lib/Makefile.targ
 
-_msg: 		$(POFILE)
+_msg:		$(POFILE)

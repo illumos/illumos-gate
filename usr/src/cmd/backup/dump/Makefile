@@ -88,7 +88,7 @@ FILEMODE=	04555
 
 .KEEP_STATE:
 
-all:		$(PRODUCT) 
+all:		$(PRODUCT)
 
 $(PROG):	$(OBJECTS) $$(LIBDUMP)
 	$(LINK.c) -o $@ $(OBJECTS) $(LDLIBS)
@@ -137,11 +137,6 @@ $(UFSROOTLINK):
 roll_log.o:
 	cd $(ROLLDIR) ; pwd ; $(MAKE)
 	cp $(ROLLOBJS) .
-	pwd
-
-.debug/roll_log.o:
-	cd $(ROLLDIR) ; pwd ; $(MAKE) CFLAGS=-g
-	cp $(ROLLOBJS) .debug
 	pwd
 
 $(ROLLPOFILES): $(ROLLSRCS)
