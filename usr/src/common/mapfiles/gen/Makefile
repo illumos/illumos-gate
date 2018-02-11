@@ -92,10 +92,10 @@ $(MACH64)_gcc_map.noexeglobs :=	LINK =	$(LINK64.c)
 # global.
 
 %map.noexeglobs:main.c $(TEMPLATE1) $(TEMPLATE2)
-	$(LINK) -o $(MAIN1) -M$(TEMPLATE1) main.c
+	$(LINK) -o $(MAIN1) -Wl,-M$(TEMPLATE1) main.c
 	$(ELFDUMP) -s -N.dynsym $(MAIN1) | $(EGREP) "WEAK|GLOB" | \
 	    $(GREP) -v UNDEF | $(AWK) '{print $$9 }' | $(SORT) > $(SYMS1)
-	$(LINK) -o $(MAIN2) -M$(TEMPLATE2) main.c
+	$(LINK) -o $(MAIN2) -Wl,-M$(TEMPLATE2) main.c
 	$(ELFDUMP) -s -N.dynsym $(MAIN2) | $(EGREP) "WEAK|GLOB" | \
 	    $(GREP) -v UNDEF | $(AWK) '{print $$9 }' | $(SORT) > $(SYMS2)
 	$(ECHO) "# GENERATED FILE - DO NOT EDIT"	>  $@

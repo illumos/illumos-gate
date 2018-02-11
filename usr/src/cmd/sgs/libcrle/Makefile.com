@@ -42,7 +42,7 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
 
-ZGUIDANCE = 	-zguidance=nounused
+ZGUIDANCE =	-Wl,-zguidance=nounused
 
 LDLIBS +=	$(ZRECORD) -lmapmalloc $(DLLIB) -lc
 

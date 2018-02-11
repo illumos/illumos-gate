@@ -50,7 +50,7 @@ CFLAGS +=	$(C_PICFLAGS)
 
 SMOFF += indenting
 
-ZGUIDANCE =	-zguidance=nounused
+ZGUIDANCE =	-Wl,-zguidance=nounused
 
 LDLIBS +=	$(ZRECORD) -lmapmalloc -lc $(DLLIB)
 

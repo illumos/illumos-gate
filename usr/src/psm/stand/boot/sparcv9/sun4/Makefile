@@ -53,7 +53,7 @@ LDFLAGS +=	-L$(TOPDIR)/psm/stand/lib/promif/$(TARG_MACH)/$(PROMVERS)/common
 LIBPLAT_DIR =	$(TOPDIR)/psm/stand/lib/promif/$(TARG_MACH)/$(PROMVERS)/$(PLATFORM)
 LIBPLAT_LIBS =  libplat.a
 LIBPLAT_L_LIBS=	$(LIBPLAT_LIBS:lib%.a=llib-l%.ln)
-LIBPLAT_DEP = 	$(LIBPLAT_DIR)/$(LIBPLAT_LIBS)
+LIBPLAT_DEP =	$(LIBPLAT_DIR)/$(LIBPLAT_LIBS)
 LIBPLAT_DEP_L =	$(LIBPLAT_DIR)/$(LIBPLAT_L_LIBS)
 
 #
@@ -66,18 +66,9 @@ include ../Makefile.com
 
 CPPINCS		+= -I$(TOPDIR)/psm/stand/boot/sparc/sun4
 
-#
-# Set the choice of compiler. 
-
 include $(TOPDIR)/psm/Makefile.psm.64
 
 CFLAGS64	+= -xchip=ultra $(CCABS32)
-
-#
-# XXX this totally sucks since it effectively turns off -errchk=longptr64,
-# which we really should be using.
-#
-LINTFLAGS64 = $(LINTFLAGS) -m64
 
 #
 # Cross-reference customization: include all boot-related source files.
@@ -108,7 +99,7 @@ NFS_DIRS        += $(LIBPLAT_DIR:%=-L%) $(LIBPROM_DIR:%=-L%)
 # Loader flags used to build inetboot
 #
 NFS_MAPFILE	= $(MACH_DIR)/mapfile
-NFS_LDFLAGS	= -dn -M $(NFS_MAPFILE) -e _start $(NFS_DIRS)
+NFS_LDFLAGS	= -Wl,-dn -Wl,-M$(NFS_MAPFILE) -e _start $(NFS_DIRS)
 NFS_L_LDFLAGS	= $(NFS_DIRS)
 
 #
@@ -138,11 +129,6 @@ $(NFSBOOT): $(NFS_MAPFILE) $(NFS_SRT0) $(NFS_OBJS) $(LIBDEPS)
 	$(MCS) -c $@
 	$(STRIP) $@
 
-$(NFSBOOT)_lint: $(NFS_L_OBJS) $(L_LIBDEPS)
-	@echo ""
-	@echo inetboot lint: global crosschecks:
-	$(LINT.c) $(NFS_L_LDFLAGS) $(NFS_L_OBJS) $(NFS_LIBS)
-
 $(USR_PLAT_SUN4U_LIB_FS_NFS):
 	$(INS.dir)
 
@@ -159,7 +145,7 @@ $(STRIPALIGN): $(CMN_DIR)/$$(@).c
 	$(NATIVECC) -o $@ $(CMN_DIR)/$@.c
 
 clean:
-	$(RM) make.out lint.out
+	$(RM) make.out
 	$(RM) $(OBJS) $(CONF_OBJS) $(MISC_OBJS) $(SRT0_OBJ)
 	$(RM) $(NFSBOOT_OBJS)
 	$(RM) $(L_OBJS) $(CONF_L_OBJS) $(MISC_L_OBJS) $(SRT0_L_OBJ)
@@ -167,5 +153,3 @@ clean:
 
 clobber: clean
 	$(RM) $(NFSBOOT) $(STRIPALIGN)
-
-lint: $(NFSBOOT)_lint

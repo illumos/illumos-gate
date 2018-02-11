@@ -50,7 +50,7 @@ include	../../../Makefile.cmd
 CPPFLAGS += -I. -I$(SRC)/common/net/dhcp \
 	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 LDLIBS += -ldhcputil -ldlpi -lsocket -lnsl -ltsol
-LDFLAGS += $(MAPFILE.NGB:%=-M%)
+LDFLAGS += $(MAPFILE.NGB:%=-Wl,-M%)
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += $(CNOWARN_UNINIT)
@@ -78,7 +78,5 @@ install:	all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include	../../../Makefile.targ

@@ -34,16 +34,13 @@ include		../../Makefile.fstype
 # still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
 # to local scope.
 MAPFILES +=	$(MAPFILE.INT) $(MAPFILE.LEX) $(MAPFILE.NGB)
-MAPOPTS =	$(MAPFILES:%=-M%)
+MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
 
 CPPFLAGS +=	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 CPPFLAGS +=	-I../fstyp
 LDLIBS +=	-lmalloc -ll -ladm
 LDFLAGS +=	$(MAPOPTS)
 YFLAGS =	"-d"
-
-LINTFLAGS +=	-erroff=E_STATIC_UNUSED
-LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-unused-label
@@ -105,12 +102,3 @@ $(POFILE):      $(CATSRCS) ../fstyp/ud_lib.h
 	$(XGETTEXT) $(XGETFLAGS)        $(POFILE).i
 	$(SED) "/^domain/d" messages.po >  $@
 	$(RM) $(POFILE).i messages.po
-
-lint: y.tab.c lex.yy.c ud_lib.c ud_lib.h
-	$(LINT.c) -mu $(SRCS)
-
-putback :
-	-cstyle -p fsdb.c
-	-keywords fsdb.c
-	-keywords Makefile
-

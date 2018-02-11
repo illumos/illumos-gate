@@ -225,12 +225,12 @@ pics/%.o: ../$(MACH)/%.s
 	$(POST_PROCESS_O)
 
 $(DRTIOBJ): $(DRTIOBJS)
-	$(LD) -o $@ -r -Blocal -Breduce $(DRTIOBJS)
+	$(LD) -o $@ -r $(BLOCAL) $(BREDUCE) $(DRTIOBJS)
 	$(POST_PROCESS_O)
 
 $(LIBDAUDIT): $(LIBDAUDITOBJS)
 	$(LINK.c) -o $@ $(GSHARED) -h$(LIBDAUDIT) $(ZTEXT) $(ZDEFS) $(BDIRECT) \
-	    $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%) $(LIBDAUDITOBJS) \
+	    $(MAPFILE.PGA:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%) $(LIBDAUDITOBJS) \
 	    $(LIBDAUDITLIBS)
 	$(POST_PROCESS_SO)
 

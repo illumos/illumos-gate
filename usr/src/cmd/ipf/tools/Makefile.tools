@@ -58,7 +58,7 @@ include ../../../Makefile.cmd
 include ../../Makefile.ipf
 
 LDLIBS		+= $(LIBBPF)
-LDFLAGS		+= $(MAPFILE.NGB:%=-M%)
+LDFLAGS		+= $(MAPFILE.NGB:%=-Wl,-M%)
 
 CPPFLAGS	+= -I. -DIPFILTER_LOOKUP -DIPFILTER_LOG
 
@@ -244,17 +244,15 @@ ippool_l.o: ../ippool_l.c $(COMMONIPF)/netinet/ip_pool.h ../ippool_l.h
 CLEANFILES += ../ippool_l.c ../ippool_l.h
 
 ipftest:	$(IPFTEST_OBJS) $(LIBIPF) $(MAPFILE.NGB)
-	$(LINK.c) $(ZIGNORE) -o ipftest $(IPFTEST_OBJS) $(LDLIBS)  
+	$(LINK.c) $(ZIGNORE) -o ipftest $(IPFTEST_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 clean:
 	-$(RM) $(CLEANFILES)
 
-lint: 	lint_SRCS
-
 #
 # NOTE: all rules must use relative paths otherwise absolute paths will be
-#       embedded into the binaries making them false positives and 
+#       embedded into the binaries making them false positives and
 #       reported by wsdiff
 #
 

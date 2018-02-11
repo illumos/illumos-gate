@@ -53,10 +53,15 @@ CFLAGS =		$(NATIVE_CFLAGS)
 CPPFLAGS=		-D_TS_ERRNO
 ELFSIGN_O=		$(TRUE)
 LDLIBS=
-LDFLAGS=		$(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) \
-			    $(MAPFILE.PGA:%=-M%) \
+LDFLAGS=		$(MAPFILE.NES:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%) \
+			    $(MAPFILE.PGA:%=-Wl,-M%) \
 			    $(ZASSERTDEFLIB)=libc.so \
 			    $(BDIRECT)
+
+# To work around a bootstrapping problem, we can't rely on cw(1) knowing how
+# to translate -shared as we may be using an older one to build the current
+# tools.
+GSHARED = -_cc=-G -_gcc=-shared
 
 # Unset CW_LINKER so we run the default.  We don't set LD here to avoid taking
 # the journey through LD_ALTEXEC unnecessarily.

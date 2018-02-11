@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -45,14 +43,10 @@ ROOTPROG = $(ROOT)/usr/lib/fm/fmd/schemes/$(PROG)
 ROOTPROG64 = $(ROOT)/usr/lib/fm/fmd/schemes/$(MACH64)/$(PROG)
 MAPFILE = ../../../fmd/common/fmd_fmri.map
 
-LINTFLAGS += -u
-LINTFLAGS64 += -u
-LINTFILES = $(SRCS:%.c=%.ln)
-
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
-CFLAGS += -G $(XREGSFLAG)
+CFLAGS += $(GSHARED) $(XREGSFLAG)
 CFLAGS64 += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
-CFLAGS64 += -G $(XREGSFLAG)
+CFLAGS64 += $(GSHARED) $(XREGSFLAG)
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT -D$(MACH) -I..
-LDFLAGS += $(ZTEXT) $(ZDEFS) $(ZIGNORE) -M$(MAPFILE)
+LDFLAGS += $(ZTEXT) $(ZDEFS) $(ZIGNORE) -Wl,-M$(MAPFILE)
 LDLIBS += -lnvpair -lc

@@ -22,14 +22,11 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the sun4u opl platform
 #	module.
 #
 #	sun4u opl implementation architecture dependent
-#
-# uts/sun4u/opl/platmod/Makefile
 #
 
 #
@@ -89,7 +86,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 install:	$(INSTALL_DEPS)
 
 $(PLATLIB):	$(BINARY)
-	$(LD) -o $(PLATLIB) -G $(BINARY) -h misc/platmod
+	$(LD) -o $(PLATLIB) $(GSHARED) $(BINARY) -h misc/platmod
 
 #
 #	Include common targets.

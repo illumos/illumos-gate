@@ -40,7 +40,7 @@ SGSCOMMONOBJ=	alist.o
 OBJS=		$(BLTOBJ) $(COMOBJ) $(SGSCOMMONOBJ)
 
 MAPFILE=	$(MAPFILE.NGB)
-MAPOPT=		$(MAPFILE:%=-M%)
+MAPOPT=		$(MAPFILE:%=-Wl,-M%)
 
 # not linted
 SMATCH=off

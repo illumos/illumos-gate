@@ -49,7 +49,7 @@ SMATCH=off
 $(XPG4):= CPPFLAGS += -DXPG4
 
 MAPFILE.INT =	../expr/mapfile-intf
-LDFLAGS +=	$(MAPFILE.INT:%=-M%)
+LDFLAGS +=	$(MAPFILE.INT:%=-Wl,-M%)
 
 .KEEP_STATE:
 
@@ -85,8 +85,6 @@ nlobjs.xpg4:
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_PROG
 
 include ../Makefile.targ
 

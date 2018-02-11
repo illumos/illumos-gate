@@ -68,17 +68,11 @@ arch_ROOTCONF = $(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd/plugins/$(CONF)
 plat_ROOTCONF = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/fmd/plugins/$(CONF))
 ROOTCONF = $($(CLASS)_ROOTCONF)
 
-LINTFLAGS += -mu
-LINTFILES = $(SRCS:%.c=%.ln)
-
-DMODLINTTGT = $(DMOD:%=lint_dmod)
-DMODLINTFILES = $(DMOD_SRCS:%.c=%.ln)
-
 APIMAP = $(SRC)/cmd/fm/fmd/common/fmd_api.map
 FMRIMAP = $(SRC)/cmd/fm/fmd/common/fmd_fmri.map
 
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
-CFLAGS += -G $(XREGSFLAG) 
+CFLAGS += $(GSHARED) $(XREGSFLAG)
 
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 LDFLAGS += $(ZDEFS) $(ZTEXT) $(ZIGNORE)
@@ -86,13 +80,13 @@ LDFLAGS += $(ZDEFS) $(ZTEXT) $(ZIGNORE)
 MAPFILE-DMOD = $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
 
 
-$(PROG) := LDFLAGS += -M$(APIMAP) -M$(FMRIMAP)
+$(PROG) := LDFLAGS += -Wl,-M$(APIMAP) -Wl,-M$(FMRIMAP)
 $(PROG) := LDLIBS += -lnvpair -lc
 
 all: $(PROG) $(DMODPROG)
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES) $(DMOD_OBJS) $(DMODLINTFILES)
+.PARALLEL: $(OBJS) $(DMOD_OBJS)
 
 $(PROG): $(OBJS) $(APIMAP)
 	$(LINK.c) $(LINKOBJS) -o $@ $(LDLIBS)
@@ -101,7 +95,7 @@ $(PROG): $(OBJS) $(APIMAP)
 
 $(DMODPROG): $(DMOD_OBJS) $(MAPFILE-DMOD)
 	-@mkdir -p $(@D)
-	$(LINK.c) $(DMOD_OBJS) $(MAPFILE-DMOD:%=-M%) -o $@ $(LDLIBS) -lc
+	$(LINK.c) $(DMOD_OBJS) $(MAPFILE-DMOD:%=-Wl,-M%) -o $@ $(LDLIBS) -lc
 	$(POST_PROCESS)
 
 %.o: %.c
@@ -109,22 +103,10 @@ $(DMODPROG): $(DMOD_OBJS) $(MAPFILE-DMOD)
 	$(CTFCONVERT) $(CTFCVTFLAGS) $(@F)
 
 clean:
-	$(RM) $(OBJS) $(DMOD_OBJS) $(LINTFILES) $(DMODLINTFILES) $(CLEANFILES) \
-	    $(LINKOBJS)
+	$(RM) $(OBJS) $(DMOD_OBJS) $(CLEANFILES) $(LINKOBJS)
 
 clobber: clean
 	$(RM) $(PROG) $(DMODPROG)
-
-%.ln: %.c
-	$(LINT.c) -dirout=$(@D) -c $<
-
-lint_prog: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
-
-lint_dmod: $(DMODLINTFILES)
-	$(LINT) $(LINTFLAGS) $(DMODLINTFILES) $(LDLIBS)
-
-lint: lint_prog $(DMODLINTTGT)
 
 install_h:
 

@@ -36,7 +36,7 @@ include ../../Makefile.cmd-inet
 
 CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP
 LDLIBS +=	-lsocket -lnsl
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 include  $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 LDFLAGS += $(KRUNPATH) -L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
@@ -78,11 +78,5 @@ $(ROOTSYMLINK):
 
 clean:
 	$(RM) $(OBJS) $(KCMDOBJS) $(YOBJS)
-
-lint:
-	$(YACC.y) $(YSRCS)
-	$(LINT.c) $(SRCS) y.tab.c $(LDLIBS)
-	$(RM) y.tab.c
-
 
 include ../../../Makefile.targ

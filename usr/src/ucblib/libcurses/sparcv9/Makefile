@@ -27,7 +27,7 @@ include ../Makefile.com
 include ../../../lib/Makefile.lib.64
 
 DYNFLAGS += $(DYNFLAGS64)
-BUILD.SO= $(CC) $(CFLAGS) -o $@ -G $(DYNFLAGS) $(PICS) \
+BUILD.SO= $(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) \
 	-L $(ROOT)/usr/ucblib/$(MACH64) -L $(ROOT)/usr/lib/$(MACH64) $(LDLIBS)
 
 .KEEP_STATE:

@@ -31,7 +31,7 @@ include ../../Makefile.lib.64
 
 CPPFLAGS += -D_SYSCALL32
 
-BUILD.SO= $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
+BUILD.SO= $(LD) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 
 install: all $(ROOTLIBDIR64) .WAIT $(ROOTLIBS64) $(ROOTLINKS64) \
 	$(ROOTCOMPATLINKS64)

@@ -58,17 +58,15 @@ CPPFLAGS +=	-D_REENTRANT -DTHREADSAFE=1 -DHAVE_USLEEP=1 \
 
 $(PROG): $(OBJS) $(SQLITEHDRDIR)/sqlite.h
 	$(LINK.c) -o $@ $(OBJS) \
-	    $(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) $(LDLIBS)
+	    $(MAPFILE.NES:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%) $(LDLIBS)
 	$(CTFMERGE) -t -L VERSION -o $@ $(OBJS)
 	$(POST_PROCESS)
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTSQLITE)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:
 
 include ../Makefile.targ

@@ -11,7 +11,7 @@ SRCS=		$(OBJS:%.o=%.c)
 include		../../../Makefile.cmd
 
 CPPFLAGS +=	-DSOL2
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 CERRWARN +=	-_gcc=-Wno-unused-value
 CERRWARN +=	-_gcc=-Wno-trigraphs
 
@@ -26,7 +26,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	
 
 include		../../../Makefile.targ

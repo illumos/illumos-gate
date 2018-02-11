@@ -44,7 +44,7 @@ UTSBASE	=	$(SRC)/uts
 #	brand plugin library can use to access a target process are the
 #	proc_service(3PROC) apis.
 #
-DYNFLAGS +=	$(VERSREF) -M$(BRAND_SHARED)/librtld_db/common/mapfile-vers
+DYNFLAGS +=	$(VERSREF) -Wl,-M$(BRAND_SHARED)/librtld_db/common/mapfile-vers
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lrtld_db
 CFLAGS +=	$(CCVERBOSE)

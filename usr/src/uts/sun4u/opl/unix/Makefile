@@ -109,7 +109,7 @@ CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN)
 CLEANLINTFILES	+= $(LINT_LIB)
 
 #
-# lint pass one enforcement 
+# lint pass one enforcement
 # Turn on doubleword alignment for 64 bit counter timer registers
 #
 CFLAGS += $(CCVERBOSE) -dalign
@@ -143,20 +143,20 @@ lint:		$(LINT_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:  	$(INSTALL_DEPS)
+install:	$(INSTALL_DEPS)
 
 symcheck:       $(SYM_DEPS)
 
 $(UNIX_BIN):	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(MAPFILE) $(LIBS) \
-		$(DTRACESTUBS) 
+		$(DTRACESTUBS)
 	$(LD) -dy -b -o $@ -e _start -M $(MAPFILE) \
-	    $(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
+	    $(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
 
-symcheck.targ:	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBS) $(DTRACESTUBS) 
+symcheck.targ:	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBS) $(DTRACESTUBS)
 	$(LD) -dy -b -o $(SYM_MOD) -M $(MAPFILE) \
-	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
+	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS)
 
 $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
 	$(LD) -r -o $@ $(OBJECTS) $(OBJS_DIR)/vers.o
@@ -170,7 +170,7 @@ $(KRTLD_O):	$(KRTLD_OBJECTS)
 #	CPU_OBJ is defined to allow for building multiple CPU_OBJ's
 #
 $(CPULIB):	$(CPU_OBJ)
-	$(LD) -o $@ -G -h 'cpu/$$CPU' $(CPU_OBJ)
+	$(LD) -o $@ $(GSHARED) -h 'cpu/$$CPU' $(CPU_OBJ)
 
 #
 #	The global lint target builds the kernel lint library (llib-lunix.ln)

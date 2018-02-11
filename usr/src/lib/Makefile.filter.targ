@@ -28,7 +28,7 @@
 # Override shared object build rule from Makefile.lib.  This rule uses $(LD)
 # directly to avoid .init and .fini sections being added.
 
-BUILD.SO =	$(LD) $(MAPFILECLASS) -o $@ -G $(DYNFLAGS)
+BUILD.SO =	$(LD) $(MAPFILECLASS) -o $@ $(GSHARED) $(DYNFLAGS)
 
 # Since no OBJECTS are used in this build, turn off CTF.
 

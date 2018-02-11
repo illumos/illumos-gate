@@ -29,7 +29,7 @@ include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
 DYNFLAGS += $(DYNFLAGS64)
-BUILD.SO= $(CC) $(CFLAGS) -o $@ -G $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/lib/$(MACH64) $(LDLIBS)
+BUILD.SO= $(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/lib/$(MACH64) $(LDLIBS)
 
 # amd64-specific rule
 pics/%.o: ../$(MACH)/sys/%.c

@@ -39,9 +39,9 @@ MAPFILE.INT.D=	$(MAPFILE.NGB) mapfile-intf-tcpdchk
 MAPFILE.INT.M=	$(MAPFILE.NGB) mapfile-intf-tcpdmatch
 MAPFILE.INT.F=	$(MAPFILE.NGB) mapfile-intf-tryfrom
 
-tcpdchk :=	LDFLAGS +=$(MAPFILE.INT.D:%=-M%)
-tcpdmatch :=	LDFLAGS +=$(MAPFILE.INT.M:%=-M%)
-try-from :=	LDFLAGS +=$(MAPFILE.INT.F:%=-M%)
+tcpdchk :=	LDFLAGS +=$(MAPFILE.INT.D:%=-Wl,-M%)
+tcpdmatch :=	LDFLAGS +=$(MAPFILE.INT.M:%=-Wl,-M%)
+try-from :=	LDFLAGS +=$(MAPFILE.INT.F:%=-Wl,-M%)
 
 .KEEP_STATE:
 
@@ -51,8 +51,6 @@ install:	all $(ROOTUSRSBINPROG)
 
 clean:
 		$(RM) *.o
-
-lint:		lint_PROG
 
 TCPDMATCH_OBJ=	tcpdmatch.o fakelog.o inetcf.o scaffold.o
 
@@ -95,7 +93,7 @@ NETGROUP	= -DNETGROUP
 # module, which also gives hints on how to add your own extensions.
 # Uncomment the next definition to turn on the language extensions
 # (examples: allow, deny, banners, twist and spawn).
-# 
+#
 STYLE	= -DPROCESS_OPTIONS	# Enable language extensions.
 
 ################################################################
@@ -105,11 +103,11 @@ STYLE	= -DPROCESS_OPTIONS	# Enable language extensions.
 # sendmail transaction logs. See your /etc/syslog.conf file for actual
 # path names of logfiles. The tutorial section in the README file
 # gives a brief introduction to the syslog daemon.
-# 
+#
 # Change the FACILITY definition below if you disagree with the default
 # disposition. Some syslog versions (including Ultrix 4.x) do not provide
 # this flexibility.
-# 
+#
 # If nothing shows up on your system, it may be that the syslog records
 # are sent to a dedicated loghost. It may also be that no syslog daemon
 # is running at all. The README file gives pointers to surrogate syslog
@@ -133,7 +131,7 @@ SEVERITY= LOG_INFO	# LOG_INFO is normally not logged to the console
 # It is a good idea to edit your /etc/rc* files so that they begin with
 # an explicit umask setting.  On our site we use `umask 022' because it
 # does not break anything yet gives adequate protection against tampering.
-# 
+#
 # The following macro specifies the default umask for processes run under
 # control of the daemon wrappers. Comment it out only if you are certain
 # that inetd and its children are started with a safe umask value.
@@ -191,7 +189,7 @@ TABLES	= -DHOSTS_DENY=\"/etc/hosts.deny\" -DHOSTS_ALLOW=\"/etc/hosts.allow\"
 # have someone elses host address. This is relevant for network services
 # whose authentication depends on host names, such as rsh and rlogin,
 # because the network address is used to look up the remote host name.
-# 
+#
 # The protection is to refuse TCP connections with IP source routing
 # options.
 #

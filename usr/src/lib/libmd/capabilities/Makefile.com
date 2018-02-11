@@ -26,7 +26,7 @@
 #include		../../../Makefile.com
 
 MAPFILE-CAP =	../common/mapfile-cap
-MAPOPT-CAP =	$(MAPFILE-CAP:%=-M%)
+MAPOPT-CAP =	$(MAPFILE-CAP:%=-Wl,-M%)
 
 OBJCAP =	pics/objcap.o
 SYMCAP =	pics/symcap.o

@@ -71,20 +71,12 @@ MSGSUBDIRS=	ifconfig ilbadm in.routed in.talkd \
 		inetadm inetconv ipadm ipmpstat ipqosconf ipsecutils \
 		kssl/ksslcfg nwamadm nwamcfg routeadm sppptun snoop wificonfig
 
-# As programs get lint-clean, add them here and to the 'lint' target.
-# Eventually this hack should go away, and all in PROG should be
-# lint-clean.
+# This controls the degree of compiler warnings emitted, and is named for
+# 'lint' for historical reasons.  Eventually this hack should go away, and all
+# in PROG should be clean.
 LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
 		ipaddrsel ndp route \
 		in.rarpd if_mpadm $(SYNCPROG)
-# Likewise, as subdirs get lint-clean, add them here.  Once
-# they're all clean, replace the dependency of the lint target
-# with SUBDIRS.  Also (sigh) deal with the commented-out build lines
-# for the lint rule.
-LINTSUBDIRS=	ilbadm in.rdisc in.routed in.talkd inetadm \
-		inetconv ipmpstat ipqosconf ipsecutils kssl/kssladm \
-		kssl/ksslcfg nwamadm nwamcfg ping routeadm sppptun traceroute \
-		wificonfig
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
 CONSTCLEAN=
@@ -124,7 +116,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 _msg:=		TARGET= _msg
 
 CLOBBERFILES +=	$(ROOTFS_PROG) $(PROG)
@@ -165,7 +156,7 @@ if_mpadm.po		:=	XGETFLAGS += -a
 route			:=	CPPFLAGS += -DNDEBUG
 ndd			:=	LDLIBS += -ldladm -lipadm
 $(RELEASE_BUILD)ndd	:=	CERRWARN += -_gcc=-Wno-unused
-in.comsat		:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
+in.comsat		:=	LDFLAGS += $(MAPFILE.NGB:%=-Wl,-M%)
 
 .KEEP_STATE:
 
@@ -242,39 +233,3 @@ clean_local:
 clobber: $(SUBDIRS) clobber_local
 clobber_local: clean_local
 	$(RM) $(CLOBBERFILES)
-
-lint: $(LINTSUBDIRS)
-	$(LINT.c) 6to4relay.c $(LDLIBS) -lsocket -ldladm
-	$(LINT.c) arp.c $(LDLIBS) -lsocket -lnsl
-	@# $(LINT.c) in.rexecd.c $(LDLIBS) -lbsm -lpam
-	$(LINT.c) -erroff=E_NAME_USED_NOT_DEF2 -erroff=E_NAME_DEF_NOT_USED2 \
-		-I$(SRC)/head -I$(SRC)/uts/common/ \
-		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
-		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
-		-I$(SRC)/lib/pam_modules/krb5 \
-		in.rlogind.c $(COMMONSRCS) $(LDLIBS) -lbsm -lpam -lsocket -lnsl
-	$(LINT.c) -erroff=E_NAME_USED_NOT_DEF2 -erroff=E_NAME_DEF_NOT_USED2 \
-		-I$(SRC)/head -I$(SRC)/uts/common/ \
-		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
-		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
-		-I$(SRC)/lib/pam_modules/krb5 \
-		in.rshd.c $(COMMONSRCS) $(LDLIBS) -lbsm -lpam -lsocket -lnsl
-	$(LINT.c) -erroff=E_NAME_USED_NOT_DEF2 \
-		-erroff=E_GLOBAL_COULD_BE_STATIC2 \
-		-I$(SRC)/head -I$(SRC)/uts/common/ \
-		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
-		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
-		-I$(SRC)/lib/pam_modules/krb5 \
-		in.telnetd.c $(LDLIBS) -lbsm -lpam -lsocket -lnsl
-	$(LINT.c) if_mpadm.c $(LDLIBS) -lsocket -lnsl -lipmp -linetutil
-	$(LINT.c) ipaddrsel.c $(LDLIBS) -lsocket -lnsl
-	$(LINT.c) route.c $(LDLIBS) -lsocket -lnsl -ltsnet
-	$(LINT.c) syncinit.c $(LDLIBS) -ldlpi
-	$(LINT.c) syncloop.c $(LDLIBS) -ldlpi
-	$(LINT.c) syncstat.c $(LDLIBS) -ldlpi
-	$(LINT.c) -erroff=E_NAME_USED_NOT_DEF2 in.rarpd.c $(LDLIBS) \
-	    -lsocket -lnsl
-	$(LINT.c) ndp.c $(LDLIBS) \
-	    -lsocket -lnsl
-	$(LINT.c) in.tftpd.c ../usr.bin/tftp/tftpsubs.c $(LDLIBS) \
-	    -lsocket -lnsl

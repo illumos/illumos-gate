@@ -1639,7 +1639,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/zmod/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/zlib_obj.o:		$(ZLIB_OBJS:%=$(OBJS_DIR)/%)
-	$(LD) -r -Breduce -M$(UTSBASE)/common/zmod/mapfile -o $@ \
+	$(LD) -r $(BREDUCE) -M$(UTSBASE)/common/zmod/mapfile -o $@ \
 	    $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
 	$(CTFMERGE) $(CTFMRGFLAGS) -o $@ $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
 

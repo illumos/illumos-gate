@@ -27,7 +27,7 @@
 PROG =		poolcfg
 OBJS =		poolcfg_lex.o poolcfg_grammar.o
 SRCS =		$(OBJS:%.o=%.c) $(COMMON_SRCS)
-POFILES = 	$(OBJS:.o=.po)
+POFILES =	$(OBJS:.o=.po)
 POFILE =	poolcfg.po
 
 include ../../Makefile.cmd
@@ -37,7 +37,7 @@ include ../Makefile.pools
 # still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
 # to local scope.
 MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
-MAPOPTS =	$(MAPFILES:%=-M%)
+MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
 
 LFLAGS =	-t
 YFLAGS =	-d
@@ -79,10 +79,5 @@ clean:
 
 $(POFILE):	$(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
-
-#
-# We don't do lint of lex- and yacc- generated source files
-#
-lint:
 
 include ../../Makefile.targ

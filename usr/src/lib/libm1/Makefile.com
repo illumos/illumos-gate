@@ -31,7 +31,7 @@ SRCDIR		= ../common/
 
 CPPFLAGS	+= -DLIBM_BUILD
 MAPFILEDIR	= ../common/
-DYNFLAGS	+= -zignore -Wl,-F'libm.so.2'
+DYNFLAGS	+= $(ZIGNORE) -Wl,-F'libm.so.2'
 
 COMPATLINKS	= usr/lib/$(DYNLIB)
 COMPATLINKS64	= usr/lib/$(MACH64)/$(DYNLIB)

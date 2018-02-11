@@ -23,10 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libc/i386_hwcap1/Makefile
-#
 
 LIBCBASE=	../i386
 
@@ -34,7 +30,7 @@ LIBRARY=	libc_hwcap1.a
 
 EXTN_CPPFLAGS=	-D_CMOV_INSN -D_SSE_INSN -D_MMX_INSN -D_SEP_INSN
 EXTN_CFLAGS=	-xtarget=pentium_pro
-EXTN_DYNFLAGS=	-M mapfile
+EXTN_DYNFLAGS=	-Wl,-Mmapfile
 
 # Defining this means build targets will first try to use source from this
 # directory before falling back to unoptimized i386 source.

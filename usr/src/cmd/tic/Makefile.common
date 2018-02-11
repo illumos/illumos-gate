@@ -40,7 +40,7 @@ CPPFLAGS +=	-I$(SRC)/lib/libcurses/screen
 
 LDLIBS +=	-lcurses
 MAPFILES=	$(MAPFILE.INT) $(MAPFILE.NGB)
-LDFLAGS +=	$(MAPFILES:%=-M%)
+LDFLAGS +=	$(MAPFILES:%=-Wl,-M%)
 
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration

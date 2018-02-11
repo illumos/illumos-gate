@@ -72,7 +72,7 @@ CERRWARN	+= -_gcc=-Wno-unused-function
 SMATCH=off
 
 CFLAGS +=	$(CCVERBOSE) -I..
-DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) -znodelete
+DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) $(ZNODELETE)
 LDLIBS +=	-L $(ROOTLIBDIR) -lcrypto -lc
 NATIVE_LIBS +=	libcrypto.so
 

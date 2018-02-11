@@ -30,9 +30,9 @@ include $(TOPDIR)/Makefile.master
 include $(TOPDIR)/Makefile.psm
 include $(TOPDIR)/psm/stand/lib/Makefile.lib
 
-SYSDIR	=  	$(TOPDIR)/uts
-COMDIR	=  	../../common
-STANDDIR = 	$(TOPDIR)/stand
+SYSDIR	=	$(TOPDIR)/uts
+COMDIR	=	../../common
+STANDDIR =	$(TOPDIR)/stand
 
 SALIBDIR =	$(STANDDIR)/lib/sa
 SALIB =		$(SALIBDIR)/libsa.a
@@ -41,13 +41,9 @@ PROMLIB	=	$(PROMLIBDIR)/libprom.a
 
 SALIBS +=	$(SALIB) $(PROMLIB)
 LDLIBS =	-L$(SALIBDIR) -lsa -L$(PROMLIBDIR) -lprom $(LDPLATLIBS)
-LDFLAGS =	-dn -M $(MAPFILE) $(MAP_FLAG)
-
-LINTLIBS =	$(SALIBDIR)/llib-lsa.ln $(PROMLIBDIR)/llib-lprom.ln $(LINTPLATLIBS)
-LINTFLAGS.lib =	-ysxmun
+LDFLAGS =	-Wl,-dn -Wl,-M$(MAPFILE) $(MAP_FLAG)
 
 BOOTLSTOBJ +=	 bootlst.o sasubr.o
-BOOTLSTLINTS =	$(BOOTLSTOBJ:%.o=%.ln)
 
 CPPDEFS =	-D$(ARCH) -D__$(ARCH) -D$(TARG_MACH) -D__$(TARG_MACH)
 CPPDEFS +=	-D_KERNEL -D_MACHDEP -D__ELF
@@ -62,16 +58,12 @@ CPPFLAGS	+= $(CCYFLAG)$(STANDDIR)
 CSTD =	$(CSTD_GNU99)
 CFLAGS =	$(CCVERBOSE) -O $(CSTD)
 
-ASFLAGS = 	-P -D_ASM $(CPPDEFS) -DLOCORE -D_LOCORE -D__STDC__
+ASFLAGS =	-P -D_ASM $(CPPDEFS) -DLOCORE -D_LOCORE -D__STDC__
 AS_CPPFLAGS =	$(CPPINCS) $(CPPFLAGS.master)
 
 # install values
 LSTFILES=	$(ALL:%=$(ROOT_PSM_DIR)/$(ARCH)/%)
 FILEMODE=	644
-
-# lint stuff
-LINTFLAGS += -Dlint
-LOPTS = -hbxn
 
 # install rule
 $(ROOT_PSM_DIR)/$(ARCH)/%: %
@@ -82,22 +74,14 @@ all:	$(ALL)
 
 install: all $(LSTFILES)
 
-
-LINT.c=	$(LINT) $(LINTFLAGS.c) $(LINT_DEFS) $(CPPFLAGS) -c
-LINT.s=	$(LINT) $(LINTFLAGS.s) $(LINT_DEFS) $(CPPFLAGS) -c
-LINT.2= $(LINT) $(LINTFLAGS.c) $(LINT_DEFS) $(CPPFLAGS)
-
 # build rules
 
 %.o: $(COMDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 
-%.ln: $(COMDIR)/%.c
-	@$(LHEAD) $(LINT.c) $< $(LTAIL)
-
 .KEEP_STATE:
 
-.PARALLEL:	$(BOOTLSTOBJ) $(BOOTLSTLINTS)
+.PARALLEL:	$(BOOTLSTOBJ)
 
 bootlst: $(MAPFILE) $(BOOTLSTOBJ) $(SALIBS)
 	$(LD) $(LDFLAGS) -o $@ $(BOOTLSTOBJ) $(LDLIBS)
@@ -106,18 +90,8 @@ bootlst: $(MAPFILE) $(BOOTLSTOBJ) $(SALIBS)
 $(SALIBS): FRC
 	@cd $(@D); $(MAKE) $(MFLAGS)
 
-$(LINTLIBS): FRC
-	@cd $(@D); $(MAKE) $(MFLAGS) $(@F)
-
 $(ROOTDIR):
 	$(INS.dir)
-
-lint: $(BOOTLSTLINTS) $(LINTLIBS)
-	@$(ECHO) "\n$@: global crosschecks:"
-	$(LINT.2) $(BOOTLSTLINTS) $(LINTLIBS)
-
-clean.lint:
-	$(RM) *.ln
 
 clean:
 	$(RM) *.o *.ln
