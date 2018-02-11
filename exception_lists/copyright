@@ -23,6 +23,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 syntax: glob
@@ -99,6 +100,8 @@ usr/src/common/bzip2/decompress.c
 usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
 usr/src/common/ficl/*
+usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.descrip
+usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.tmpl
 usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/grub/grub-0.97/stage2/builtins.c
 usr/src/grub/grub-0.97/stage2/disk_io.c

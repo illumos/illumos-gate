@@ -1,26 +1,28 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FDISK 1M "Sep 10, 2013"
+.TH FDISK 1M "Feb 11, 2018"
 .SH NAME
 fdisk \- create or modify fixed disk partition table
 .SH SYNOPSIS
 .LP
 .nf
 \fBfdisk\fR [\fB-o\fR \fIoffset\fR] [\fB-s\fR \fIsize\fR] [\fB-P\fR \fIfill_patt\fR] [\fB-S\fR \fIgeom_file\fR]
-     [\fB-w\fR | \fB-r\fR | \fB-d\fR | \fB-n\fR | \fB-I\fR | \fB-B\fR | \fB-t\fR | \fB-T\fR | \fB-g\fR | \fB-G\fR | \fB-R\fR | \fB-E\fR]
+     [\fB-w\fR | \fB-r\fR | \fB-d\fR | \fB-n\fR | \fB-I\fR | \fB-B\fR | \fB-t\fR | \fB-T\fR | \fB-g\fR | \fB-G\fR | \fB-R\fR]
      [-\fB-F\fR \fIfdisk_file\fR] [ [\fB-v\fR] \fB-W\fR {\fIfdisk_file\fR | \(mi}]
      [\fB-h\fR] [\fB-b\fR \fImasterboot\fR]
      [\fB-A\fR \fIid\fR : \fIact\fR : \fIbhead\fR : \fIbsect\fR : \fIbcyl\fR : \fIehead\fR : \fIesect\fR :
          \fIecyl\fR : \fIrsect\fR : \fInumsect\fR]
      [\fB-D\fR \fIid\fR : \fIact\fR : \fIbhead:\fR \fIbsect\fR : \fIbcyl\fR : \fIehead:\fR \fIesect\fR :
          \fIecyl\fR : \fIrsect\fR : \fInumsect\fR] \fIrdevice\fR
+     [\fB-E\fR [\fIslot\fR : \fIactive\fR]]
+     \fIrdevice\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This command is used to do the following:
 .RS +4
@@ -97,7 +99,6 @@ partition table, but the allocated disk space is not initialized.
 partition, and \fBformat\fR(1M) is required to write the VTOC or EFI/GPT
 metadata.
 .SS "Menu Options"
-.sp
 .LP
 The menu options for interactive mode given by the \fBfdisk\fR program are:
 .sp
@@ -270,7 +271,6 @@ This option exits without modifying the partition table.
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following options apply to \fBfdisk\fR:
 .sp
@@ -336,11 +336,41 @@ Solaris partition if the \fBfdisk\fR table changes.
 .sp
 .ne 2
 .na
-\fB\fB-E\fR\fR
+\fB-E\fR [\fIslot\fR:\fIactive\fR]
 .ad
 .sp .6
 .RS 4n
 Create an \fBEFI\fR partition that uses the entire disk.
+.sp
+By default this partition entry will be placed into the first slot within the
+partition table and will not be marked active. The remaining slots within the
+table will be zeroed out.
+.sp
+Some broken firmware implementations have issues booting in CSM/Legacy/BIOS
+mode from EFI partitions that are not set active. Others have issues with
+booting from EFI partitions without UEFI if the protective partition table
+entry is in the first slot. To work around these problems, the \fB-E\fR
+option takes an optional argument which can be used to override the defaults
+described above.
+
+.sp
+.ne 2
+.na
+\fB\fIslot\fR\fR
+.ad
+.RS 11n
+Specify the MBR slot into which the EFI partition should be placed. This accepts a value in the range 0 to 3 with the default being 0.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIactive\fR\fR
+.ad
+.RS 11n
+Specify whether the EFI partition entry should be marked active; \fB0\fR specifies not active (the default) and \fB1\fR means active.
+.RE
+
 .RE
 
 .sp
@@ -737,7 +767,6 @@ with the \fB-F\fR option below.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/rdsk/c0t0d0p0\fR\fR
@@ -756,7 +785,6 @@ Default master boot program.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -772,12 +800,10 @@ Architecture	x86 and SPARC
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBuname\fR(1), \fBfmthard\fR(1M), \fBformat\fR(1M), \fBnewfs\fR(1M),
 \fBprtvtoc\fR(1M), \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 Most messages will be self-explanatory. The following may appear immediately
 after starting the program:

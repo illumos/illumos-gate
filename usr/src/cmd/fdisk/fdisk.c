@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -87,20 +88,6 @@
 
 #define	DEFAULT_PATH	"/dev/rdsk/"
 
-/* XXX - should be in fdisk.h, used by sd as well */
-
-/*
- * the MAX values are the maximum usable values for BIOS chs values
- * The MAX_CYL value of 1022 is the maximum usable value
- *   the value of 1023 is a fence value,
- *   indicating no CHS geometry exists for the corresponding LBA value.
- * HEAD range [ 0 .. MAX_HEAD ], so number of heads is (MAX_HEAD + 1)
- * SECT range [ 1 .. MAX_SECT ], so number of sectors is (MAX_SECT)
- */
-#define	MAX_SECT	(63)
-#define	MAX_CYL		(1022)
-#define	MAX_HEAD	(254)
-
 #define	DK_MAX_2TB	UINT32_MAX	/* Max # of sectors in 2TB */
 
 /* for clear_vtoc() */
@@ -159,9 +146,10 @@ static char Usage[] = "Usage: fdisk\n"
 "[ -A id:act:bhead:bsect:bcyl:ehead:esect:ecyl:rsect:numsect ]\n"
 "[ -b masterboot ]\n"
 "[ -D id:act:bhead:bsect:bcyl:ehead:esect:ecyl:rsect:numsect ]\n"
+"[ -E [slot:active] ]\n"
 "[ -F fdisk_file ] [ -h ] [ -o offset ] [ -P fill_patt ] [ -s size ]\n"
 "[ -S geom_file ] [ [ -v ] -W { creat_fdisk_file | - } ]\n"
-"[ -w | r | d | n | I | B | E | g | G | R | t | T ] rdevice";
+"[ -w | r | d | n | I | B | g | G | R | t | T ] rdevice";
 
 static char Usage1[] = "    Partition options:\n"
 "	-A id:act:bhead:bsect:bcyl:ehead:esect:ecyl:rsect:numsect\n"
@@ -180,9 +168,10 @@ static char Usage1[] = "    Partition options:\n"
 "	-b master_boot\n"
 "		Use master_boot as the master boot file.\n"
 "	-B	Create one Solaris partition that uses the entire disk.\n"
-"	-E	Create one EFI partition that uses the entire disk.\n"
 "	-D id:act:bhead:bsect:bcyl:ehead:esect:ecyl:rsect:numsect\n"
 "		Delete a partition. See attribute definitions for -A.\n"
+"	-E [slot:active]\n"
+"		Create an EFI partition that uses the entire disk.\n"
 "	-F fdisk_file\n"
 "		Use fdisk_file to initialize on-line fdisk table.\n"
 "	-I	Forego device checks. Generate a file image of what would go\n"
@@ -303,6 +292,8 @@ static struct mboot BootCod;		/* buffer for master boot record */
 
 static int	io_wholedisk = 0;	/* use whole disk for Solaris (-B) */
 static int	io_EFIdisk = 0;		/* use whole disk for EFI (-E) */
+static int	io_EFIslot = 0;		/* slot in which to place EFI entry */
+static int	io_EFIactive = 0;	/* mark EFI entry as active */
 static int	io_debug = 0;		/* activate verbose mode (-d) */
 static int	io_image = 0;		/* create image using geometry (-I) */
 
@@ -687,6 +678,7 @@ static void clear_vtoc(int table, int part);
 static int lecture_and_query(char *warning, char *devname);
 static void sanity_check_provided_device(char *devname, int fd);
 static char *get_node(char *devname);
+static int efi_create(void);
 
 #ifdef i386
 static void id_to_name(uchar_t sysid, char *buffer);
@@ -714,7 +706,7 @@ static void ext_print_logdrive_layout_debug();
  * This function is called only during the non-interactive mode.
  * It is touchy and does not tolerate any errors. If there are
  * mounted logical drives, changes to the partition table
- * is disallowed.
+ * are disallowed.
  */
 static void
 update_disk_and_exit(boolean_t table_changed)
@@ -778,7 +770,7 @@ main(int argc, char *argv[])
 	setbuf(stdout, 0);
 
 	/* Process the options. */
-	while ((c = getopt(argc, argv, "o:s:P:F:b:A:D:W:S:tTIhwvrndgGRBE"))
+	while ((c = getopt(argc, argv, "o:s:P:F:b:A:D:W:S:tTIhwvrndgGRBE:"))
 	    != EOF) {
 		switch (c) {
 
@@ -816,7 +808,7 @@ main(int argc, char *argv[])
 				continue;
 			case 'T':
 				io_ADJT++;
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case 't':
 				io_adjt++;
 				continue;
@@ -825,6 +817,11 @@ main(int argc, char *argv[])
 				io_fdisk++;
 				continue;
 			case 'E':
+				if (sscanf(optarg, "%d:%d",
+				    &io_EFIslot, &io_EFIactive) != 2) {
+					io_EFIslot = io_EFIactive = 0;
+					optind--;
+				}
 				io_EFIdisk++;
 				io_fdisk++;
 				continue;
@@ -871,7 +868,7 @@ main(int argc, char *argv[])
 				(void) fprintf(stderr, "%s\n", Usage);
 				(void) fprintf(stderr, "%s\n", Usage1);
 				exit(0);
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case 'v':
 				v_flag = 1;
 				continue;
@@ -904,7 +901,6 @@ main(int argc, char *argv[])
 		    "\nDetailed help is available with the -h option.\n");
 		exit(2);
 	}
-
 
 	/* Figure out the correct device node to open */
 	Dfltdev = get_node(argv[optind]);
@@ -1012,7 +1008,7 @@ main(int argc, char *argv[])
 		    disk_geom.dkg_nhead == 0 ||
 		    disk_geom.dkg_nsect == 0 ||
 		    disk_geom.dkg_ncyl > MAX_CYL ||
-		    disk_geom.dkg_nhead > MAX_HEAD ||
+		    disk_geom.dkg_nhead > MAX_HEAD + 1 ||
 		    disk_geom.dkg_nsect > MAX_SECT) {
 
 			/*
@@ -1150,7 +1146,6 @@ main(int argc, char *argv[])
 		fill_patt();	/* will not return */
 	}
 
-
 	/* This is the fdisk edit, the real reason for the program.	*/
 
 	sanity_check_provided_device(Dfltdev, Dev);
@@ -1268,17 +1263,14 @@ main(int argc, char *argv[])
 				Set_Table_CHS_Values(0);
 				update_disk_and_exit(B_TRUE);
 			} else if (io_EFIdisk) {
-				/* create an EFI partition for the whole disk */
-				nulltbl();
-				i = insert_tbl(EFI_PMBR, 0, 0, 0, 0, 0, 0, 0, 1,
-				    (dev_capacity > DK_MAX_2TB) ? DK_MAX_2TB :
-				    (dev_capacity - 1), 0);
-				if (i != 0) {
+				if (efi_create() == 0) {
 					(void) fprintf(stderr,
 					    "Error creating EFI partition\n");
 					exit(1);
 				}
-				update_disk_and_exit(B_TRUE);
+				(void) close(Dev);
+				exit(0);
+				/* NOTREACHED */
 			}
 		}
 	}
@@ -1463,7 +1455,6 @@ dev_mboot_write(off_t sect, char *buff, int bootsiz)
 		}
 	}
 
-
 	/* see if the old table had EFI */
 	for (old_pt = 0; old_pt < FD_NUMPART; old_pt++) {
 		if (Old_Table[old_pt].systid == EFI_PMBR) {
@@ -1481,8 +1472,14 @@ dev_mboot_write(off_t sect, char *buff, int bootsiz)
 			    (Old_Table[old_pt].relsect ==
 			    Table[new_pt].relsect) &&
 			    (Old_Table[old_pt].numsect ==
-			    Table[new_pt].numsect))
+			    Table[new_pt].numsect)) {
+				/*
+				 * New EFI guard partition matches old.
+				 * Do not clear EFI labels in this case.
+				 */
+				clr_efi = -1;
 				break;
+			}
 		}
 
 		/*
@@ -2079,7 +2076,7 @@ load(int funct, char *file)
 		    "	\"%s\"\n",
 		    file);
 		exit(1);
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 
 	case LOADADD:
 
@@ -2251,7 +2248,7 @@ Set_Table_CHS_Values(int ti)
 		 * so store the maximum CHS field values in the CHS fields.
 		 */
 		cy = MAX_CYL + 1;
-		hd = MAX_HEAD;
+		hd = MAX_HEAD + 1;
 		sc = MAX_SECT;
 	} else {
 		cy = lba / hba_sectors / hba_heads;
@@ -2269,7 +2266,7 @@ Set_Table_CHS_Values(int ti)
 	lba = (uint32_t)(Table[ti].relsect + Table[ti].numsect - 1);
 	if (lba >= hba_heads * hba_sectors * MAX_CYL) {
 		cy = MAX_CYL + 1;
-		hd = MAX_HEAD;
+		hd = MAX_HEAD + 1;
 		sc = MAX_SECT;
 	} else {
 		cy = lba / hba_sectors / hba_heads;
@@ -2315,7 +2312,6 @@ insert_tbl(
 		return (-1);
 	}
 
-
 	Table[i].systid = (uchar_t)id;
 	Table[i].bootid = (uchar_t)act;
 	Table[i].numsect = LE_32(numsect);
@@ -2324,18 +2320,30 @@ insert_tbl(
 	if (id == UNUSED) {
 		(void) memset(&Table[i], 0, sizeof (struct ipart));
 	} else if (0 < bsect && bsect <= MAX_SECT &&
-	    0 <= bhead && bhead <= MAX_HEAD &&
+	    0 <= bhead && bhead <= MAX_HEAD + 1 &&
 	    0 < esect && esect <= MAX_SECT &&
-	    0 <= ehead && ehead <= MAX_HEAD) {
+	    0 <= ehead && ehead <= MAX_HEAD + 1) {
 
 		/*
 		 * If we have been called with a valid geometry, use it
 		 * valid means non-zero values that fit in the BIOS fields
 		 */
-		if (bcyl > MAX_CYL)
+		if (bcyl > MAX_CYL) {
+			/*
+			 * bcyl is set to the special fence value indicating
+			 * that the geometry is not representable for the
+			 * start LBA.
+			 * Set all fields to the maximum values.
+			 */
 			bcyl = MAX_CYL + 1;
-		if (ecyl > MAX_CYL)
+			bhead = MAX_HEAD + 1;
+			bsect = MAX_SECT;
+		}
+		if (ecyl > MAX_CYL) {
 			ecyl = MAX_CYL + 1;
+			ehead = MAX_HEAD + 1;
+			esect = MAX_SECT;
+		}
 		Table[i].begcyl = bcyl & 0xff;
 		Table[i].endcyl = ecyl & 0xff;
 		Table[i].beghead = (uchar_t)bhead;
@@ -2764,7 +2772,7 @@ stage0(void)
 				}
 				(void) close(Dev);
 				exit(0);
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 #endif
 #ifdef i386
 			case '7':
@@ -2780,7 +2788,7 @@ stage0(void)
 				}
 				(void) close(Dev);
 				exit(0);
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			default:
 				break;
 		}
@@ -5623,5 +5631,41 @@ nopartdefined()
 	for (i = 0; i < FD_NUMPART; i++)
 		if (Table[i].systid != UNUSED)
 			return (0);
+	return (1);
+}
+
+/* create an EFI partition for the whole disk */
+static int
+efi_create()
+{
+	if (io_EFIslot < 0 || io_EFIslot > 3) {
+		(void) fprintf(stderr,
+		    "EFI partition slot must be between 0 and 3 inclusive.\n");
+		return (0);
+	}
+	if (io_EFIactive != 0 && io_EFIactive != 1) {
+		(void) fprintf(stderr,
+		    "EFI partition active flag must be 0 or 1.\n");
+		return (0);
+	}
+
+	nulltbl();
+	/*
+	 * In the following call, start and end cylinder values are set to one
+	 * above the maximum number of cylinders. This is a special fence
+	 * value which indicates that the geometry for the corresponding LBA
+	 * is not representable. This results in a protective MBR which
+	 * is the same as that created by libefi.
+	 */
+	if (insert_tbl(EFI_PMBR,
+	    io_EFIactive ? ACTIVE : NOTACTIVE,
+	    MAX_HEAD + 1, MAX_SECT, MAX_CYL + 1,
+	    MAX_HEAD + 1, MAX_SECT, MAX_CYL + 1,
+	    1,
+	    (dev_capacity > DK_MAX_2TB) ? DK_MAX_2TB : (dev_capacity - 1),
+	    io_EFIslot) != io_EFIslot)
+		return (0);
+	copy_Table_to_Bootblk();
+	dev_mboot_write(0, Bootsect, sectsiz);
 	return (1);
 }
