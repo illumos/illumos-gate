@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 [DEFAULT]
@@ -39,12 +39,16 @@ tests = ['aes_cbc_32', 'aes_ccm_32', 'aes_cmac_32',
 post = cleanup
 
 [/opt/crypto-tests/tests/digest/pkcs]
-tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32',
-         'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64' ]
+tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32', 'sha512_224_32',
+         'sha512_256_32',
+         'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64', 'sha512_224_64',
+         'sha512_256_64' ]
 
 [/opt/crypto-tests/tests/digest/kcf]
 pre = setup
 user = root
-tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32',
-         'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64' ]
+tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32', 'sha512_224_32',
+         'sha512_256_32',
+         'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64', 'sha512_224_64',
+         'sha512_256_64' ]
 post = cleanup
