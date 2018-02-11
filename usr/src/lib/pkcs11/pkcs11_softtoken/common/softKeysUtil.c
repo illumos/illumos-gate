@@ -934,6 +934,16 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		digest_mech.mechanism = CKM_SHA512;
 		goto common;
 
+	case CKM_SHA512_224_KEY_DERIVATION:
+		hash_size = SHA512_224_DIGEST_LENGTH;
+		digest_mech.mechanism = CKM_SHA512_224;
+		goto common;
+
+	case CKM_SHA512_256_KEY_DERIVATION:
+		hash_size = SHA512_256_DIGEST_LENGTH;
+		digest_mech.mechanism = CKM_SHA512_256;
+		goto common;
+
 common:
 		/*
 		 * Create a new object for secret key. The key type is optional

@@ -128,7 +128,15 @@ static crypto_mech_info_t sha2_mech_info_tab[] = {
 	{SUN_CKM_SHA512_HMAC_GENERAL, SHA512_HMAC_GEN_MECH_INFO_TYPE,
 	    CRYPTO_FG_MAC | CRYPTO_FG_MAC_ATOMIC,
 	    SHA2_HMAC_MIN_KEY_LEN, SHA2_HMAC_MAX_KEY_LEN,
-	    CRYPTO_KEYSIZE_UNIT_IN_BYTES}
+	    CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* SHA512_224 */
+	{SUN_CKM_SHA512_224, SHA512_224_MECH_INFO_TYPE,
+	    CRYPTO_FG_DIGEST | CRYPTO_FG_DIGEST_ATOMIC,
+	    0, 0, CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	/* SHA512_256 */
+	{SUN_CKM_SHA512_256, SHA512_256_MECH_INFO_TYPE,
+	    CRYPTO_FG_DIGEST | CRYPTO_FG_DIGEST_ATOMIC,
+	    0, 0, CRYPTO_KEYSIZE_UNIT_IN_BITS}
 };
 
 static void sha2_provider_status(crypto_provider_handle_t, uint_t *);
@@ -593,6 +601,12 @@ sha2_digest(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *digest,
 	case SHA512_MECH_INFO_TYPE:
 		sha_digest_len = SHA512_DIGEST_LENGTH;
 		break;
+	case SHA512_224_MECH_INFO_TYPE:
+		sha_digest_len = SHA512_224_DIGEST_LENGTH;
+		break;
+	case SHA512_256_MECH_INFO_TYPE:
+		sha_digest_len = SHA512_256_DIGEST_LENGTH;
+		break;
 	default:
 		return (CRYPTO_MECHANISM_INVALID);
 	}
@@ -721,6 +735,12 @@ sha2_digest_final(crypto_ctx_t *ctx, crypto_data_t *digest,
 		break;
 	case SHA512_MECH_INFO_TYPE:
 		sha_digest_len = SHA512_DIGEST_LENGTH;
+		break;
+	case SHA512_224_MECH_INFO_TYPE:
+		sha_digest_len = SHA512_224_DIGEST_LENGTH;
+		break;
+	case SHA512_256_MECH_INFO_TYPE:
+		sha_digest_len = SHA512_256_DIGEST_LENGTH;
 		break;
 	default:
 		return (CRYPTO_MECHANISM_INVALID);
@@ -909,6 +929,19 @@ sha2_mac_init_ctx(sha2_hmac_ctx_t *ctx, void *keyval, uint_t length_in_bytes)
 
 }
 
+static boolean_t
+sha2_is_general_hmech(const crypto_mechanism_t *mechanism)
+{
+	switch (mechanism->cm_type) {
+	case SHA256_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA384_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA512_HMAC_GEN_MECH_INFO_TYPE:
+		return (B_TRUE);
+	default:
+		return (B_FALSE);
+	}
+}
+
 /*
  */
 static int
@@ -979,7 +1012,7 @@ sha2_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	/*
 	 * Get the mechanism parameters, if applicable.
 	 */
-	if (mechanism->cm_type % 3 == 2) {
+	if (sha2_is_general_hmech(mechanism)) {
 		if (mechanism->cm_param == NULL ||
 		    mechanism->cm_param_len != sizeof (ulong_t))
 			ret = CRYPTO_MECHANISM_PARAM_INVALID;
@@ -1214,7 +1247,7 @@ sha2_mac_atomic(crypto_provider_handle_t provider,
 	}
 
 	/* get the mechanism parameters, if applicable */
-	if ((mechanism->cm_type % 3) == 2) {
+	if (sha2_is_general_hmech(mechanism)) {
 		if (mechanism->cm_param == NULL ||
 		    mechanism->cm_param_len != sizeof (ulong_t)) {
 			ret = CRYPTO_MECHANISM_PARAM_INVALID;
@@ -1356,7 +1389,7 @@ sha2_mac_verify_atomic(crypto_provider_handle_t provider,
 	}
 
 	/* get the mechanism parameters, if applicable */
-	if (mechanism->cm_type % 3 == 2) {
+	if (sha2_is_general_hmech(mechanism)) {
 		if (mechanism->cm_param == NULL ||
 		    mechanism->cm_param_len != sizeof (ulong_t)) {
 			ret = CRYPTO_MECHANISM_PARAM_INVALID;
@@ -1592,17 +1625,32 @@ sha2_free_context(crypto_ctx_t *ctx)
 	if (ctx->cc_provider_private == NULL)
 		return (CRYPTO_SUCCESS);
 
-	/*
-	 * We have to free either SHA2 or SHA2-HMAC contexts, which
-	 * have different lengths.
-	 *
-	 * Note: Below is dependent on the mechanism ordering.
-	 */
-
-	if (PROV_SHA2_CTX(ctx)->sc_mech_type % 3 == 0)
+	switch (PROV_SHA2_CTX(ctx)->sc_mech_type) {
+	case SHA256_MECH_INFO_TYPE:
+	case SHA384_MECH_INFO_TYPE:
+	case SHA512_MECH_INFO_TYPE:
+	case SHA512_224_MECH_INFO_TYPE:
+	case SHA512_256_MECH_INFO_TYPE:
 		ctx_len = sizeof (sha2_ctx_t);
-	else
+		break;
+	case SHA256_HMAC_MECH_INFO_TYPE:
+	case SHA256_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA384_HMAC_MECH_INFO_TYPE:
+	case SHA384_HMAC_GEN_MECH_INFO_TYPE:
+	case SHA512_HMAC_MECH_INFO_TYPE:
+	case SHA512_HMAC_GEN_MECH_INFO_TYPE:
 		ctx_len = sizeof (sha2_hmac_ctx_t);
+		break;
+	default:
+		/*
+		 * If we get here, someone forgot to update the above list
+		 * when adding a new mechanism.  Without the correct ctx_len
+		 * we will corrupt the heap when calling kmem_free, so panic
+		 * now and make it easier to identify the problem.
+		 */
+		panic("Unknown SHA2 mechanism %d",
+		    PROV_SHA2_CTX(ctx)->sc_mech_type);
+	}
 
 	bzero(ctx->cc_provider_private, ctx_len);
 	kmem_free(ctx->cc_provider_private, ctx_len);

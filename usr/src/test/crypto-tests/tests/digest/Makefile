@@ -17,7 +17,7 @@ include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 include $(SRC)/cmd/Makefile.ctf
 
-ALGS = sha1 sha256 sha384 sha512
+ALGS = sha1 sha256 sha384 sha512 sha512_224 sha512_256
 CRYPTO = pkcs kcf
 
 PROGS_pkcs_32 = $(ALGS:%=%_32_pkcs)
@@ -41,11 +41,15 @@ $(CRYPTO:%=sha1_32_%)	:= OBJS = sha1.32.o
 $(CRYPTO:%=sha256_32_%)	:= OBJS = sha256.32.o
 $(CRYPTO:%=sha384_32_%)	:= OBJS = sha384.32.o
 $(CRYPTO:%=sha512_32_%)	:= OBJS = sha512.32.o
+$(CRYPTO:%=sha512_224_32_%) := OBJS = sha512_224.32.o
+$(CRYPTO:%=sha512_256_32_%) := OBJS = sha512_256.32.o
 
 $(CRYPTO:%=sha1_64_%)	:= OBJS = sha1.64.o
 $(CRYPTO:%=sha256_64_%)	:= OBJS = sha256.64.o
 $(CRYPTO:%=sha384_64_%)	:= OBJS = sha384.64.o
 $(CRYPTO:%=sha512_64_%)	:= OBJS = sha512.64.o
+$(CRYPTO:%=sha512_224_64_%) := OBJS = sha512_224.64.o
+$(CRYPTO:%=sha512_256_64_%) := OBJS = sha512_256.64.o
 
 $(PROGS_32)		:= OBJS_COMMON = main.32.o $(COMMONDIR)/testfuncs.32.o
 $(PROGS_64)		:= OBJS_COMMON = main.64.o $(COMMONDIR)/testfuncs.64.o
