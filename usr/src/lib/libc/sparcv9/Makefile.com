@@ -1067,11 +1067,11 @@ $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(EXTPICS)
 
 MAPFILES =	$(LIBCDIR)/port/mapfile-vers
 
-sparcv9_C_PICFLAGS= -K PIC
+sparcv9_C_PICFLAGS= $(sparcv9_C_BIGPICFLAGS)
 CFLAGS64 +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I$(LIBCDIR)/inc $(CPPFLAGS.master)
-ASFLAGS=	$(EXTN_ASFLAGS) -K PIC -P -D__STDC__ -D_ASM -D__sparcv9 $(CPPFLAGS) \
+ASFLAGS=	$(EXTN_ASFLAGS) $(AS_BIGPICFLAGS) -P -D__STDC__ -D_ASM -D__sparcv9 $(CPPFLAGS) \
 		$(sparcv9_AS_XARCH)
 
 # As a favor to the dtrace syscall provider, libc still calls the

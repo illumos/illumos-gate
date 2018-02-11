@@ -22,10 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-ASFLAGS=	-K pic -P -D__STDC__ -D_ASM $(amd64_AS_XARCH)
+ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(amd64_AS_XARCH)
 
 include ../Makefile.com
 include ../../Makefile.lib.64

@@ -68,7 +68,7 @@ include		$(SRC)/cmd/sgs/rtld/Makefile.com
 
 CPPFLAGS +=	-I../../../../uts/sparc/krtld -DA_OUT
 CFLAGS +=	-xregs=no%appl
-ASFLAGS +=	-K pic
+ASFLAGS +=	$(AS_PICFLAGS)
 LINTFLAGS +=	-DA_OUT
 ADBGENCFLAGS +=	-erroff=%all
 ADBGENFLAGS +=	-milp32

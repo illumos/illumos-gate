@@ -71,8 +71,6 @@
  * -I<dir>	Add <dir> to preprocessor #include file search path
  * -i		Passed to linker to ignore any LD_LIBRARY_PATH setting
  * -keeptmp	Keep temporary files created during compilation
- * -KPIC	Compile position independent code with 32-bit addresses
- * -Kpic	Compile position independent code
  * -L<dir>	Pass to linker to add <dir> to the library search path
  * -l<name>	Link with library lib<name>.a or lib<name>.so
  * -mc		Remove duplicate strings from .comment section of output files
@@ -180,8 +178,6 @@
  * -I<dir>			pass-thru
  * -i				pass-thru
  * -keeptmp			-save-temps
- * -KPIC			-fPIC
- * -Kpic			-fpic
  * -L<dir>			pass-thru
  * -l<name>			pass-thru
  * -mc				error
@@ -567,7 +563,7 @@ static void
 do_gcc(cw_ictx_t *ctx)
 {
 	int c;
-	int pic = 0, nolibc = 0;
+	int nolibc = 0;
 	int in_output = 0, seen_o = 0, c_files = 0;
 	cw_op_t op = CW_O_LINK;
 	char *model = NULL;
@@ -703,6 +699,14 @@ do_gcc(cw_ictx_t *ctx)
 			}
 			error(arg);
 			break;
+		case 'f':
+			if ((strcmp(arg, "-fpic") == 0) ||
+			    (strcmp(arg, "-fPIC") == 0)) {
+				newae(ctx->i_ae, arg);
+				break;
+			}
+			error(arg);
+			break;
 		case 'g':
 			newae(ctx->i_ae, "-gdwarf-2");
 			break;
@@ -818,27 +822,6 @@ do_gcc(cw_ictx_t *ctx)
 				break;
 			}
 			error(arg);
-			break;
-		case 'K':
-			if (arglen == 1) {
-				if ((arg = *++ctx->i_oldargv) == NULL ||
-				    *arg == '\0')
-					error("-K");
-				ctx->i_oldargc--;
-			} else {
-				arg += 2;
-			}
-			if (strcmp(arg, "pic") == 0) {
-				newae(ctx->i_ae, "-fpic");
-				pic = 1;
-				break;
-			}
-			if (strcmp(arg, "PIC") == 0) {
-				newae(ctx->i_ae, "-fPIC");
-				pic = 1;
-				break;
-			}
-			error("-K");
 			break;
 		case 'm':
 			if (strcmp(arg, "-mt") == 0) {
@@ -986,8 +969,6 @@ do_gcc(cw_ictx_t *ctx)
 			}
 			if (strncmp(arg, "-Wc,-xcode=", 11) == 0) {
 				xlate(ctx->i_ae, arg + 11, xcode_tbl);
-				if (strncmp(arg + 11, "pic", 3) == 0)
-					pic = 1;
 				break;
 			}
 			if (strncmp(arg, "-Wc,-Qiselect", 13) == 0) {
@@ -1064,8 +1045,6 @@ do_gcc(cw_ictx_t *ctx)
 				}
 				if (strncmp(arg, "-xcode=", 7) == 0) {
 					xlate(ctx->i_ae, arg + 7, xcode_tbl);
-					if (strncmp(arg + 7, "pic", 3) == 0)
-						pic = 1;
 					break;
 				}
 				if (strncmp(arg, "-xcrossfile", 11) == 0)
@@ -1288,7 +1267,7 @@ do_gcc(cw_ictx_t *ctx)
 	    (ctx->i_flags & CW_F_SHADOW))
 		exit(0);
 
-	if (model && !pic)
+	if (model != NULL)
 		newae(ctx->i_ae, model);
 	if (!nolibc)
 		newae(ctx->i_ae, "-lc");

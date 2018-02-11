@@ -46,8 +46,8 @@ SRCDIR = ../common
 CPPFLAGS += -I../common -I.
 CPPFLAGS += -I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris
 CPPFLAGS += -I../java/native
-CFLAGS += $(CCVERBOSE) -K PIC
-CFLAGS64 += $(CCVERBOSE) -K PIC
+CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
+CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS64)
 
 CERRWARN += -_gcc=-Wno-uninitialized
 

@@ -23,11 +23,10 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-sparcv9_C_PICFLAGS= -K PIC
+sparcv9_C_PICFLAGS= $(sparcv9_C_BIGPICFLAGS)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)
