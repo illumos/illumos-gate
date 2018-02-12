@@ -1517,7 +1517,6 @@ done:
 	return (ret);
 }
 
-
 /*
  * Note that ioctls that modify links have a NULL di_priv_func(), as
  * privileges can only be checked after we know the class of the link being

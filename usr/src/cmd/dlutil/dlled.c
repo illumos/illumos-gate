@@ -79,7 +79,7 @@ dlled_parse_mode(const char *orig)
 	mac_led_mode_t m = 0;
 
 	mode = strdup(orig);
-	if (orig == NULL) {
+	if (mode == NULL) {
 		fprintf(stderr, "failed to allocate memory to dup led "
 		    "mode: %s\n", strerror(errno));
 		exit(1);
@@ -268,7 +268,7 @@ main(int argc, char *argv[])
 			if ((status = dladm_name2info(dlled_hdl, argv[i],
 			    &linkid, NULL, NULL, NULL)) != DLADM_STATUS_OK) {
 				(void) fprintf(stderr, "failed to get link "
-				    "id for link %s: %s\n", argv[i],
+				    "id for link %s: %s\n", link,
 				    dladm_status2str(status, dlled_dlerrmsg));
 				return (1);
 			}

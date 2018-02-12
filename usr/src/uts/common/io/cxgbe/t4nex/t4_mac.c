@@ -788,7 +788,8 @@ t4_mc_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
 	struct adapter *sc = pi->adapter;
 	int rc;
 	size_t i, maxread;
-	struct fw_ldst_cmd ldst;
+	/* LINTED: E_FUNC_VAR_UNUSED */
+	struct fw_ldst_cmd ldst __unused;
 
 	if (id != 0 || bp == NULL || nbytes == 0 || nread == NULL ||
 	    (page != 0xa0 && page != 0xa2) || offset < 0)
@@ -876,6 +877,7 @@ t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 		}
 		break;
 	}
+
 	case MAC_CAPAB_TRANSCEIVER:
 		mct = data;
 

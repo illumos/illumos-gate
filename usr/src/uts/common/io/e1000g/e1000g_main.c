@@ -3161,7 +3161,6 @@ e1000g_led_blink(void *arg)
 static int
 e1000g_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 {
-	int ret;
 	e1000g_t *e1000g = arg;
 
 	if (flags != 0)
@@ -3175,7 +3174,8 @@ e1000g_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 
 	mutex_enter(&e1000g->e1000g_led_lock);
 
-	if ((mode == MAC_LED_IDENT || mode == MAC_LED_OFF) &&
+	if ((mode == MAC_LED_IDENT || mode == MAC_LED_OFF ||
+	    mode == MAC_LED_ON) &&
 	    !e1000g->e1000g_led_setup) {
 		if (e1000_setup_led(&e1000g->shared) != E1000_SUCCESS) {
 			mutex_exit(&e1000g->e1000g_led_lock);
@@ -3199,7 +3199,7 @@ e1000g_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 			if (e1000_cleanup_led(&e1000g->shared) !=
 			    E1000_SUCCESS) {
 				mutex_exit(&e1000g->e1000g_led_lock);
-				return (ret);
+				return (EIO);
 			}
 			e1000g->e1000g_led_setup = B_FALSE;
 		}
@@ -3226,6 +3226,12 @@ e1000g_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 		break;
 	case MAC_LED_OFF:
 		if (e1000_led_off(&e1000g->shared) != E1000_SUCCESS) {
+			mutex_exit(&e1000g->e1000g_led_lock);
+			return (EIO);
+		}
+		break;
+	case MAC_LED_ON:
+		if (e1000_led_on(&e1000g->shared) != E1000_SUCCESS) {
 			mutex_exit(&e1000g->e1000g_led_lock);
 			return (EIO);
 		}

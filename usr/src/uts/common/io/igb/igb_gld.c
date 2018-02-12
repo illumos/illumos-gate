@@ -891,7 +891,6 @@ igb_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 static int
 igb_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 {
-	int ret;
 	igb_t *igb = arg;
 
 	if (flags != 0)
@@ -914,7 +913,7 @@ igb_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 	case MAC_LED_DEFAULT:
 		if (igb->igb_led_setup) {
 			if (e1000_cleanup_led(&igb->hw) != E1000_SUCCESS)
-				return (ret);
+				return (EIO);
 			igb->igb_led_setup = B_FALSE;
 		}
 		break;
