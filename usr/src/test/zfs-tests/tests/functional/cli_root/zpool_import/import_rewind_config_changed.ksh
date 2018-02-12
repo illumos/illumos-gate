@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2017 by Delphix. All rights reserved.
+# Copyright (c) 2016, 2018 by Delphix. All rights reserved.
 #
 
 . $STF_SUITE/tests/functional/cli_root/zpool_import/zpool_import.kshlib
@@ -49,6 +49,7 @@ function custom_cleanup
 	set_vdev_validate_skip 0
 	cleanup
 	log_must mdb_ctf_set_int vdev_min_ms_count 0t16
+	log_must mdb_ctf_set_int spa_allocators 0t4
 }
 
 log_onexit custom_cleanup
@@ -206,6 +207,10 @@ increase_device_sizes $(( FILE_SIZE * 4 ))
 # Increase the number of metaslabs for small pools temporarily to
 # reduce the chance of reusing a metaslab that holds old MOS metadata.
 log_must mdb_ctf_set_int vdev_min_ms_count 0t150
+
+# Decrease the number of allocators for pools created during this test,
+# to increase the odds that metadata survives from old txgs.
+log_must mdb_ctf_set_int spa_allocators 0t1
 
 # Part of the rewind test is to see how it reacts to path changes
 typeset pathstochange="$VDEV0 $VDEV1 $VDEV2 $VDEV3"
