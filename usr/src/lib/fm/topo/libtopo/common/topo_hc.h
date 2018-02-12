@@ -224,6 +224,7 @@ extern "C" {
 #define	TOPO_DIMM_SLOT_FORM_SODIMM	"SODIMM"
 #define	TOPO_DIMM_SLOT_FORM_FBDIMM	"FBDIMM"
 
+#define	TOPO_PGROUP_DIMM_PROPS		"dimm-properties"
 #define	TOPO_PROP_DIMM_TYPE
 #define	TOPO_DIMM_TYPE_UNKNOWN		"UNKNOWN"
 #define	TOPO_DIMM_TYPE_DDR		"DDR"
@@ -234,6 +235,14 @@ extern "C" {
 #define	TOPO_DIMM_TYPE_LPDDR2		"LPDDR2"
 #define	TOPO_DIMM_TYPE_LPDDR3		"LPDDR3"
 #define	TOPO_DIMM_TYPE_LPDDR4		"LPDDR4"
+
+#define TOPO_PGROUP_MOTHERBOARD		"motherboard-properties"
+#define	TOPO_PROP_MB_MANUFACTURER	"manufacturer"
+#define	TOPO_PROP_MB_PRODUCT		"product-id"
+#define	TOPO_PROP_MB_ASSET		"assert-tag"
+#define	TOPO_PROP_MB_FIRMWARE_VENDOR	"firmware-vendor"
+#define	TOPO_PROP_MB_FIRMWARE_REV	"firmware-revision"
+#define	TOPO_PROP_MB_FIRMWARE_RELDATE	"firmware-release-date"
 
 #ifdef	__cplusplus
 }

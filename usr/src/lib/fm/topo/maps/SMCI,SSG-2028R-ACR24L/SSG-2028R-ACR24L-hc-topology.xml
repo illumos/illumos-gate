@@ -27,7 +27,8 @@ Copyright (c) 2018, Joyent, Inc.
 <topology name='i86pc' scheme='hc'>
 
   <range name='motherboard' min='0' max='0'>
-    <node instance='0'>
+    <enum-method name='smbios' version='1' />
+    <node instance='0' static='true'>
         <fac-enum provider='fac_prov_ipmi' />
         <propgroup name='protocol' version='1'
             name-stability='Private' data-stability='Private' >
