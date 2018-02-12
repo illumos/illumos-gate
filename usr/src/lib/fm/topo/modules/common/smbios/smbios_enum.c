@@ -17,7 +17,9 @@
 #include <fcntl.h>
 #include <fm/libtopo.h>
 #include <fm/topo_mod.h>
+#ifdef	__x86
 #include <sys/mc.h>
+#endif
 #include <sys/fm/protocol.h>
 #include <string.h>
 #include <unistd.h>
@@ -530,6 +532,7 @@ err:
 static boolean_t
 has_mc_driver()
 {
+#ifdef	__x86
 	int mc_fd;
 	mc_snapshot_info_t mcs;
 
@@ -542,6 +545,9 @@ has_mc_driver()
 	}
 	(void) close(mc_fd);
 	return (B_TRUE);
+#else
+	return (B_TRUE);
+#endif
 }
 
 /*ARGSUSED*/
