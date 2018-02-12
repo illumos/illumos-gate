@@ -3634,3 +3634,96 @@ struct vmm_ops vmm_ops_intel = {
 	vmx_vlapic_init,
 	vmx_vlapic_cleanup,
 };
+
+#ifndef __FreeBSD__
+/* Side-effect free HW validation derived from checks in vmx_init. */
+int
+vmx_x86_supported(char **msg)
+{
+	int error;
+	uint64_t basic, feature_control;
+	uint32_t tmp;
+
+	if (!is_x86_feature(x86_featureset, X86FSET_VMX)) {
+		*msg = "processor does not support VMX operation";
+		return (ENXIO);
+	}
+
+	/*
+	 * Verify that MSR_IA32_FEATURE_CONTROL lock and VMXON enable bits
+	 * are set (bits 0 and 2 respectively).
+	 */
+	feature_control = rdmsr(MSR_IA32_FEATURE_CONTROL);
+	if ((feature_control & IA32_FEATURE_CONTROL_LOCK) == 1 &&
+	    (feature_control & IA32_FEATURE_CONTROL_VMX_EN) == 0) {
+		*msg = "VMX operation disabled by BIOS";
+		return (ENXIO);
+	}
+
+	/*
+	 * Verify capabilities MSR_VMX_BASIC:
+	 * - bit 54 indicates support for INS/OUTS decoding
+	 */
+	basic = rdmsr(MSR_VMX_BASIC);
+	if ((basic & (1UL << 54)) == 0) {
+		*msg = "processor does not support desired basic capabilities";
+		return (EINVAL);
+	}
+
+	/* Check support for primary processor-based VM-execution controls */
+	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
+	    MSR_VMX_TRUE_PROCBASED_CTLS, PROCBASED_CTLS_ONE_SETTING,
+	    PROCBASED_CTLS_ZERO_SETTING, &tmp);
+	if (error) {
+		*msg = "processor does not support desired primary "
+		    "processor-based controls";
+		return (error);
+	}
+
+	/* Check support for secondary processor-based VM-execution controls */
+	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
+	    MSR_VMX_PROCBASED_CTLS2, PROCBASED_CTLS2_ONE_SETTING,
+	    PROCBASED_CTLS2_ZERO_SETTING, &tmp);
+	if (error) {
+		*msg = "processor does not support desired secondary "
+		    "processor-based controls";
+		return (error);
+	}
+
+	/* Check support for pin-based VM-execution controls */
+	error = vmx_set_ctlreg(MSR_VMX_PINBASED_CTLS,
+	    MSR_VMX_TRUE_PINBASED_CTLS, PINBASED_CTLS_ONE_SETTING,
+	    PINBASED_CTLS_ZERO_SETTING, &tmp);
+	if (error) {
+		*msg = "processor does not support desired pin-based controls";
+		return (error);
+	}
+
+	/* Check support for VM-exit controls */
+	error = vmx_set_ctlreg(MSR_VMX_EXIT_CTLS, MSR_VMX_TRUE_EXIT_CTLS,
+	    VM_EXIT_CTLS_ONE_SETTING, VM_EXIT_CTLS_ZERO_SETTING, &tmp);
+	if (error) {
+		*msg = "processor does not support desired exit controls";
+		return (error);
+	}
+
+	/* Check support for VM-entry controls */
+	error = vmx_set_ctlreg(MSR_VMX_ENTRY_CTLS, MSR_VMX_TRUE_ENTRY_CTLS,
+	    VM_ENTRY_CTLS_ONE_SETTING, VM_ENTRY_CTLS_ZERO_SETTING, &tmp);
+	if (error) {
+		*msg = "processor does not support desired entry controls";
+		return (error);
+	}
+
+	/* Unrestricted guest is nominally optional, but not for us. */
+	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2, MSR_VMX_PROCBASED_CTLS2,
+	    PROCBASED2_UNRESTRICTED_GUEST, 0, &tmp);
+	if (error) {
+		*msg = "processor does not support desired unrestricted guest "
+		    "controls";
+		return (error);
+	}
+
+	return (0);
+}
+#endif

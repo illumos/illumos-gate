@@ -45,6 +45,7 @@
 #include "io/vhpet.h"
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
+#include "vmm_util.h"
 #include "vm/vm_glue.h"
 
 /*
@@ -72,6 +73,9 @@ static const char *vmmdev_hvm_name = "bhyve";
  */
 #define	VMM_SDEV_ROOT "/dev/vmm"
 static sdev_plugin_hdl_t vmm_sdev_hdl;
+
+/* From uts/i86pc/io/vmm/intel/vmx.c */
+extern int vmx_x86_supported(char **);
 
 /*
  * vmm trace ring
@@ -1680,6 +1684,23 @@ vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 }
 
 static int
+vmm_is_supported(intptr_t arg)
+{
+	int r;
+	char *msg;
+
+	if (!vmm_is_intel())
+		return (ENXIO);
+
+	r = vmx_x86_supported(&msg);
+	if (r != 0 && arg != NULL) {
+		if (copyoutstr(msg, (char *)arg, strlen(msg), NULL) != 0)
+			return (EFAULT);
+	}
+	return (r);
+}
+
+static int
 vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
 {
@@ -1713,6 +1734,8 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			if ((mode & FWRITE) == 0)
 				return (EPERM);
 			return (vmmdev_do_vm_destroy(name, credp));
+		case VMM_VM_SUPPORTED:
+			return (vmm_is_supported(arg));
 		default:
 			/* No other actions are legal on ctl device */
 			return (ENOTTY);

@@ -5094,6 +5094,7 @@ f usr/lib/autofs/automountd 0555 root bin
 d usr/lib/brand 0755 root bin
 d usr/lib/brand/bhyve 0555 root sys
 f usr/lib/brand/bhyve/attach 0555 root sys
+f usr/lib/brand/bhyve/bhhwcompat 0555 root sys
 f usr/lib/brand/bhyve/boot 0555 root sys
 f usr/lib/brand/bhyve/detach 0555 root sys
 f usr/lib/brand/bhyve/uninstall 0555 root sys

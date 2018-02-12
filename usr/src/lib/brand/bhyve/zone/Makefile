@@ -18,9 +18,14 @@ include $(SRC)/cmd/Makefile.cmd.64
 PROGS =		attach detach statechange uninstall
 
 PROG1 =		boot
-PROGS +=	$(PROG1)
+PROG2 =		bhhwcompat
+PROGS +=	$(PROG1) $(PROG2)
 CLEANFILES +=	$(PROGS)
+
 $(PROG1) :=	LDLIBS += -lnvpair
+$(PROG2) :=	CPPFLAGS = -I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
+	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc \
+	-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64
 
 TEMPLATES =	SYSbhyve.xml
 XMLDOCS =	config.xml platform.xml
