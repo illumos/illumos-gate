@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -501,7 +501,7 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *attr,
 
 int
 smb_vop_space(vnode_t *vp, int cmd, flock64_t *bfp, int flags,
-	offset_t offset, cred_t *cr)
+    offset_t offset, cred_t *cr)
 {
 	int error;
 
@@ -529,19 +529,32 @@ smb_vop_access(vnode_t *vp, int mode, int flags, vnode_t *dir_vp, cred_t *cr)
 	if (mode == 0)
 		return (0);
 
-	if ((flags == V_ACE_MASK) && (mode & ACE_DELETE)) {
-		if (dir_vp) {
-			error = VOP_ACCESS(dir_vp, ACE_DELETE_CHILD, flags,
-			    cr, NULL);
+	error = VOP_ACCESS(vp, mode, flags, cr, NULL);
 
-			if (error == 0)
-				mode &= ~ACE_DELETE;
-		}
+	if (error == 0)
+		return (0);
+
+	if ((mode & (ACE_DELETE|ACE_READ_ATTRIBUTES)) == 0 ||
+	    flags != V_ACE_MASK || dir_vp == NULL)
+		return (error);
+
+	if ((mode & ACE_DELETE) != 0) {
+		error = VOP_ACCESS(dir_vp, ACE_DELETE_CHILD, flags,
+		    cr, NULL);
+
+		if (error == 0)
+			mode &= ~ACE_DELETE;
+	}
+	if ((mode & ACE_READ_ATTRIBUTES) != 0) {
+		error = VOP_ACCESS(dir_vp, ACE_LIST_DIRECTORY, flags,
+		    cr, NULL);
+
+		if (error == 0)
+			mode &= ~ACE_READ_ATTRIBUTES;
 	}
 
-	if (mode) {
+	if (mode != 0)
 		error = VOP_ACCESS(vp, mode, flags, cr, NULL);
-	}
 
 	return (error);
 }
@@ -554,7 +567,7 @@ smb_vop_access(vnode_t *vp, int mode, int flags, vnode_t *dir_vp, cred_t *cr)
  * vpp:		looked-up vnode (out)
  * od_name:	on-disk name of file (out).
  *		This parameter is optional.  If a pointer is passed in, it
- * 		must be allocated with MAXNAMELEN bytes
+ *		must be allocated with MAXNAMELEN bytes
  * rootvp:	vnode of the tree root (in)
  *		This parameter is always passed in non-NULL except at the time
  *		of share set up.
