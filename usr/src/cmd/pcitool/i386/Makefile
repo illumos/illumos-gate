@@ -17,14 +17,15 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/pcitool/i386/Makefile
 
 include ../Makefile.com
 
 CPPFLAGS += -I../../../../src/uts/i86pc
 LINTFLAGS 	+= -erroff=E_STATIC_UNUSED
 
-install: all $(ROOTUSRSBINPROG) $(ROOTMAN1MFILES)
+install: all $(ROOTUSRSBINPROG)

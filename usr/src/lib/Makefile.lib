@@ -111,9 +111,6 @@ ROOTFS_LINKSCCC64=	$(ROOTFS_LIBDIR64)/$(LIBLINKSCCC)
 ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
 ROOTFS_LINT=	$(LINTSRC:%=$(ROOTFS_LINTDIR)/%)
 ROOTFS_LINT64=	$(LINTSRC:%=$(ROOTFS_LINTDIR64)/%)
-ROOTMAN3=     $(ROOT)/usr/share/man/man3
-ROOTMAN3FILES=        $(MAN3FILES:%=$(ROOTMAN3)/%)
-$(ROOTMAN3FILES) := FILEMODE= 444
 
 # Demo rules
 DEMOFILES=
@@ -231,9 +228,6 @@ objs/%.o pics/%.o: %.cc
 
 # Define the majority text domain in this directory.
 TEXT_DOMAIN= SUNW_OST_OSLIB
-
-$(ROOTMAN3)/%: %.sunman
-	$(INS.rename)
 
 #
 # For library source code, we expect that some symbols may not be used or
