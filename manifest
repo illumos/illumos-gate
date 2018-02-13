@@ -11489,7 +11489,7 @@ s usr/share/man/man1/dumpkeys.1=loadkeys.1
 f usr/share/man/man1/echo.1 0444 root bin
 f usr/share/man/man1/ed.1 0444 root bin
 s usr/share/man/man1/edit.1=../../../has/man/man1has/edit.1has
-f usr/share/man/man1/egrep.1 0444 root bin
+s usr/share/man/man1/egrep.1=grep.1
 f usr/share/man/man1/eject.1 0444 root bin
 f usr/share/man/man1/elfdump.1 0444 root bin
 f usr/share/man/man1/elfedit.1 0444 root bin
@@ -11517,7 +11517,7 @@ s usr/share/man/man1/false.1=true.1
 s usr/share/man/man1/fc.1=history.1
 f usr/share/man/man1/fdformat.1 0444 root bin
 s usr/share/man/man1/fg.1=jobs.1
-f usr/share/man/man1/fgrep.1 0444 root bin
+s usr/share/man/man1/fgrep.1=grep.1
 f usr/share/man/man1/file.1 0444 root bin
 f usr/share/man/man1/filesync.1 0444 root bin
 f usr/share/man/man1/find.1 0444 root bin

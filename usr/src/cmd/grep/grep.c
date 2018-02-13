@@ -1524,59 +1524,12 @@ out:
 static void
 usage(void)
 {
-	if (egrep || fgrep) {
-		(void) fprintf(stderr, gettext("Usage:\t%s"), cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-	} else {
-		(void) fprintf(stderr, gettext("Usage:\t%s"), cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -E [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -E [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -F [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -F [-c|-l|-q] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-	}
+	(void) fprintf(stderr, gettext("usage: %5s"), cmdname);
+	if (!egrep && !fgrep)
+		(void) fprintf(stderr, gettext(" [-E|-F]"));
+	(void) fprintf(stderr, gettext(" [-bchHilnqrRsvx] [-A num] [-B num] "
+	    "[-C num|-num]\n             [-e pattern_list]... "
+	    "[-f pattern_file]... [pattern_list] [file]...\n"));
 	exit(2);
 	/* NOTREACHED */
 }

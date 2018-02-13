@@ -1408,7 +1408,7 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 			if (strlcpy(probename, p + 3, sizeof (probename)) >=
 			    sizeof (probename))
 				return (dt_link_error(dtp, elf, fd, bufs,
-				    "invalid probe name %s", probename));
+				    "probe name too long %s", probename));
 
 			(void) strhyphenate(probename);
 
