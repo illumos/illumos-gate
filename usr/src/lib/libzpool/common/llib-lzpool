@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
  */
 
 /* LINTLIBRARY */
@@ -39,6 +39,7 @@
 #include <sys/dnode.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
+#include <sys/dsl_scan.h>
 #include <sys/spa.h>
 #include <sys/spa_impl.h>
 #include <sys/space_map.h>
