@@ -72,6 +72,7 @@ MANFILES=	acctcom.1			\
 		clear.1				\
 		cmp.1				\
 		col.1				\
+		column.1			\
 		comm.1				\
 		command.1			\
 		compress.1			\
@@ -85,6 +86,7 @@ MANFILES=	acctcom.1			\
 		csplit.1			\
 		ctags.1				\
 		ctfdiff.1			\
+		ctfdump.1			\
 		ctrun.1				\
 		ctstat.1			\
 		ctwatch.1			\
@@ -216,6 +218,7 @@ MANFILES=	acctcom.1			\
 		m4.1				\
 		mac.1				\
 		mach.1				\
+		machid.1			\
 		madv.so.1.1			\
 		mail.1				\
 		mailcompat.1			\
