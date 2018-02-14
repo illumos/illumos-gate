@@ -1980,7 +1980,7 @@ smb_fsop_lookup(
 	if ((flags & SMB_FOLLOW_LINKS) && (vp->v_type == VLNK) &&
 	    ((attr.sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) == 0)) {
 		rc = smb_pathname(sr, od_name, FOLLOW, root_node, dnode,
-		    &lnk_dnode, &lnk_target_node, cr);
+		    &lnk_dnode, &lnk_target_node, cr, NULL);
 
 		if (rc != 0) {
 			/*

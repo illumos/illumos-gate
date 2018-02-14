@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB Node State Machine
@@ -599,7 +599,7 @@ smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
 	 * so need to use kcred, not zone_kcred().
 	 */
 	error = smb_pathname(NULL, zone->zone_rootpath, 0,
-	    smb_root_node, smb_root_node, NULL, svrootp, kcred);
+	    smb_root_node, smb_root_node, NULL, svrootp, kcred, NULL);
 
 	return (error);
 }
