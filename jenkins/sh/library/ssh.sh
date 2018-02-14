@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2017 by Delphix. All rights reserved.
+# Copyright (c) 2017, 2018 by Delphix. All rights reserved.
 #
 
 source ${JENKINS_DIRECTORY}/sh/library/common.sh
@@ -20,12 +20,7 @@ source ${JENKINS_DIRECTORY}/sh/library/common.sh
 function ssh_log_must() {
 	check_env HOST
 
-	#
-	# We need to be careful not to use "log_must" with "echo" below, as
-	# that could leak the password (print to whatever happened to be
-	# capturing the output of this function; e.g. a Jenkins job log).
-	#
-	echo "root" | log_must sshpass ssh \
+	log_must ssh \
 		-o UserKnownHostsFile=/dev/null \
 		-o StrictHostKeyChecking=no \
 		"root@$HOST" "$@"

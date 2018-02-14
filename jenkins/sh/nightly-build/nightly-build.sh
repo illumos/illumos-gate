@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright (c) 2017 by Delphix. All rights reserved.
+# Copyright (c) 2017, 2018 by Delphix. All rights reserved.
 #
 
 source ${JENKINS_DIRECTORY}/sh/library/common.sh
@@ -145,8 +145,8 @@ else
 	#
 	log_must cp usr/src/tools/env/illumos.sh illumos.sh
 
-	PKGVERS_BRANCH=$(pkg info -r pkg://openindiana.org/SUNWcs \
-		| awk '$1 == "Branch:" {print $2}')
+	PKGVERS_BRANCH=$(log_must pkg info -r pkg://openindiana.org/SUNWcs \
+		| log_must awk '$1 == "Branch:" {print $2}')
 
 	log_must nightly_env_set_var "PKGVERS_BRANCH" "'$PKGVERS_BRANCH'"
 	log_must nightly_env_set_var "ONNV_BUILDNUM" "'$PKGVERS_BRANCH'"

@@ -10,8 +10,10 @@
  */
 
 /*
- * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2017, 2018 by Delphix. All rights reserved.
  */
+
+BASE_IMAGE_ID = 'ami-c5c0a7d3'
 
 def shscript(script, returnStdout, parameters) {
     def ret = null
