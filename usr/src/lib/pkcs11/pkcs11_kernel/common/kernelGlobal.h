@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef _KERNELGLOBAL_H
@@ -33,6 +34,7 @@ extern "C" {
 #include <sys/crypto/common.h>
 #include <security/cryptoki.h>
 #include <security/pkcs11t.h>
+#include <cryptoutil.h>
 #include "kernelObject.h"
 
 typedef struct kmh_elem {
@@ -70,7 +72,6 @@ extern int kernel_fd;
 	(m) == CKM_DES3_ECB || (m) == CKM_DES3_CBC || (m) == CKM_AES_ECB || \
 	(m) == CKM_AES_CBC || (m) == CKM_RC4 || (m) == CKM_BLOWFISH_CBC)
 
-CK_RV crypto2pkcs11_error_number(uint_t);
 CK_RV kernel_mech(CK_MECHANISM_TYPE, crypto_mech_type_t *);
 unsigned char *get_symmetric_key_value(kernel_object_t *);
 CK_RV get_rsa_public_key(kernel_object_t *, crypto_key_t *);

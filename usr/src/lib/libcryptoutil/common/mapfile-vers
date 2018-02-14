@@ -20,6 +20,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting Inc. All rights reserved.
+# Copyright 2018, Joyent, Inc.
 #
 
 #
@@ -41,6 +42,7 @@ $mapfile_version 2
 SYMBOL_VERSION SUNWprivate {
     global:
 	create_umech;
+	crypto2pkcs11_error_number;
 	cryptodebug;
 	cryptodebug_init;
 	cryptoerror;
