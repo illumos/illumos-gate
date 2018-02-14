@@ -23,6 +23,7 @@
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef _CRYPTOUTIL_H
@@ -107,7 +108,7 @@ typedef struct uentry {
 	boolean_t	flag_metaslot_auto_key_migrate;
 	CK_UTF8CHAR	metaslot_ks_slot[SLOT_DESCRIPTION_SIZE + 1];
 	CK_UTF8CHAR	metaslot_ks_token[TOKEN_LABEL_SIZE + 1];
-	int 		count;
+	int		count;
 	boolean_t	flag_fips_enabled;
 } uentry_t;
 
@@ -226,6 +227,8 @@ extern int update_conf(char *conf_file, char *entry);
 
 extern int pkcs11_parse_uri(const char *str, pkcs11_uri_t *uri);
 extern void pkcs11_free_uri(pkcs11_uri_t *uri);
+
+extern CK_RV crypto2pkcs11_error_number(uint_t);
 
 #ifdef __cplusplus
 }
