@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017 by Delphix. All rights reserved.
+ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -156,7 +159,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"pcfs",
 	pcfsinit,
-	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI,
+	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI|VSW_MOUNTDEV,
 	&pcfs_mntopts
 };
 

@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -30,6 +30,8 @@
 #include <sys/dmu_tx.h>
 #include <sys/dsl_synctask.h>
 #include <sys/zap.h>
+#include <sys/abd.h>
+#include <sys/zthr.h>
 
 /*
  * An indirect vdev corresponds to a vdev that has been removed.  Since
@@ -475,7 +477,7 @@ spa_condense_indirect_commit_entry(spa_t *spa,
 
 static void
 spa_condense_indirect_generate_new_mapping(vdev_t *vd,
-    uint32_t *obsolete_counts, uint64_t start_index)
+    uint32_t *obsolete_counts, uint64_t start_index, zthr_t *zthr)
 {
 	spa_t *spa = vd->vdev_spa;
 	uint64_t mapi = start_index;
@@ -490,7 +492,15 @@ spa_condense_indirect_generate_new_mapping(vdev_t *vd,
 	    (u_longlong_t)vd->vdev_id,
 	    (u_longlong_t)mapi);
 
-	while (mapi < old_num_entries && !spa_shutting_down(spa)) {
+	while (mapi < old_num_entries) {
+
+		if (zthr_iscancelled(zthr)) {
+			zfs_dbgmsg("pausing condense of vdev %llu "
+			    "at index %llu", (u_longlong_t)vd->vdev_id,
+			    (u_longlong_t)mapi);
+			break;
+		}
+
 		vdev_indirect_mapping_entry_phys_t *entry =
 		    &old_mapping->vim_entries[mapi];
 		uint64_t entry_size = DVA_GET_ASIZE(&entry->vimep_dst);
@@ -508,18 +518,30 @@ spa_condense_indirect_generate_new_mapping(vdev_t *vd,
 
 		mapi++;
 	}
-	if (spa_shutting_down(spa)) {
-		zfs_dbgmsg("pausing condense of vdev %llu at index %llu",
-		    (u_longlong_t)vd->vdev_id,
-		    (u_longlong_t)mapi);
-	}
 }
 
-static void
-spa_condense_indirect_thread(void *arg)
+/* ARGSUSED */
+static boolean_t
+spa_condense_indirect_thread_check(void *arg, zthr_t *zthr)
 {
-	vdev_t *vd = arg;
-	spa_t *spa = vd->vdev_spa;
+	spa_t *spa = arg;
+
+	return (spa->spa_condensing_indirect != NULL);
+}
+
+/* ARGSUSED */
+static int
+spa_condense_indirect_thread(void *arg, zthr_t *zthr)
+{
+	spa_t *spa = arg;
+	vdev_t *vd;
+
+	ASSERT3P(spa->spa_condensing_indirect, !=, NULL);
+	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
+	vd = vdev_lookup_top(spa, spa->spa_condensing_indirect_phys.scip_vdev);
+	ASSERT3P(vd, !=, NULL);
+	spa_config_exit(spa, SCL_VDEV, FTAG);
+
 	spa_condensing_indirect_t *sci = spa->spa_condensing_indirect;
 	spa_condensing_indirect_phys_t *scip =
 	    &spa->spa_condensing_indirect_phys;
@@ -593,25 +615,24 @@ spa_condense_indirect_thread(void *arg)
 		}
 	}
 
-	spa_condense_indirect_generate_new_mapping(vd, counts, start_index);
+	spa_condense_indirect_generate_new_mapping(vd, counts,
+	    start_index, zthr);
 
 	vdev_indirect_mapping_free_obsolete_counts(old_mapping, counts);
 
 	/*
-	 * We may have bailed early from generate_new_mapping(), if
-	 * the spa is shutting down.  In this case, do not complete
-	 * the condense.
+	 * If the zthr has received a cancellation signal while running
+	 * in generate_new_mapping() or at any point after that, then bail
+	 * early. We don't want to complete the condense if the spa is
+	 * shutting down.
 	 */
-	if (!spa_shutting_down(spa)) {
-		VERIFY0(dsl_sync_task(spa_name(spa), NULL,
-		    spa_condense_indirect_complete_sync, sci, 0,
-		    ZFS_SPACE_CHECK_NONE));
-	}
+	if (zthr_iscancelled(zthr))
+		return (0);
 
-	mutex_enter(&spa->spa_async_lock);
-	spa->spa_condense_thread = NULL;
-	cv_broadcast(&spa->spa_async_cv);
-	mutex_exit(&spa->spa_async_lock);
+	VERIFY0(dsl_sync_task(spa_name(spa), NULL,
+	    spa_condense_indirect_complete_sync, sci, 0, ZFS_SPACE_CHECK_NONE));
+
+	return (0);
 }
 
 /*
@@ -664,9 +685,7 @@ spa_condense_indirect_start_sync(vdev_t *vd, dmu_tx_t *tx)
 	    (u_longlong_t)scip->scip_prev_obsolete_sm_object,
 	    (u_longlong_t)scip->scip_next_mapping_object);
 
-	ASSERT3P(spa->spa_condense_thread, ==, NULL);
-	spa->spa_condense_thread = thread_create(NULL, 0,
-	    spa_condense_indirect_thread, vd, 0, &p0, TS_RUN, minclsyspri);
+	zthr_wakeup(spa->spa_condense_zthr);
 }
 
 /*
@@ -743,24 +762,12 @@ spa_condense_fini(spa_t *spa)
 	}
 }
 
-/*
- * Restart the condense - called when the pool is opened.
- */
 void
-spa_condense_indirect_restart(spa_t *spa)
+spa_start_indirect_condensing_thread(spa_t *spa)
 {
-	vdev_t *vd;
-	ASSERT(spa->spa_condensing_indirect != NULL);
-	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-	vd = vdev_lookup_top(spa,
-	    spa->spa_condensing_indirect_phys.scip_vdev);
-	ASSERT(vd != NULL);
-	spa_config_exit(spa, SCL_VDEV, FTAG);
-
-	ASSERT3P(spa->spa_condense_thread, ==, NULL);
-	spa->spa_condense_thread = thread_create(NULL, 0,
-	    spa_condense_indirect_thread, vd, 0, &p0, TS_RUN,
-	    minclsyspri);
+	ASSERT3P(spa->spa_condense_zthr, ==, NULL);
+	spa->spa_condense_zthr = zthr_create(spa_condense_indirect_thread_check,
+	    spa_condense_indirect_thread, spa);
 }
 
 /*
@@ -845,6 +852,57 @@ rs_alloc(vdev_t *vd, uint64_t offset, uint64_t asize, uint64_t split_offset)
 }
 
 /*
+ * Given an indirect vdev and an extent on that vdev, it duplicates the
+ * physical entries of the indirect mapping that correspond to the extent
+ * to a new array and returns a pointer to it. In addition, copied_entries
+ * is populated with the number of mapping entries that were duplicated.
+ *
+ * Note that the function assumes that the caller holds vdev_indirect_rwlock.
+ * This ensures that the mapping won't change due to condensing as we
+ * copy over its contents.
+ *
+ * Finally, since we are doing an allocation, it is up to the caller to
+ * free the array allocated in this function.
+ */
+vdev_indirect_mapping_entry_phys_t *
+vdev_indirect_mapping_duplicate_adjacent_entries(vdev_t *vd, uint64_t offset,
+    uint64_t asize, uint64_t *copied_entries)
+{
+	vdev_indirect_mapping_entry_phys_t *duplicate_mappings = NULL;
+	vdev_indirect_mapping_t *vim = vd->vdev_indirect_mapping;
+	uint64_t entries = 0;
+
+	ASSERT(RW_READ_HELD(&vd->vdev_indirect_rwlock));
+
+	vdev_indirect_mapping_entry_phys_t *first_mapping =
+	    vdev_indirect_mapping_entry_for_offset(vim, offset);
+	ASSERT3P(first_mapping, !=, NULL);
+
+	vdev_indirect_mapping_entry_phys_t *m = first_mapping;
+	while (asize > 0) {
+		uint64_t size = DVA_GET_ASIZE(&m->vimep_dst);
+
+		ASSERT3U(offset, >=, DVA_MAPPING_GET_SRC_OFFSET(m));
+		ASSERT3U(offset, <, DVA_MAPPING_GET_SRC_OFFSET(m) + size);
+
+		uint64_t inner_offset = offset - DVA_MAPPING_GET_SRC_OFFSET(m);
+		uint64_t inner_size = MIN(asize, size - inner_offset);
+
+		offset += inner_size;
+		asize -= inner_size;
+		entries++;
+		m++;
+	}
+
+	size_t copy_length = entries * sizeof (*first_mapping);
+	duplicate_mappings = kmem_alloc(copy_length, KM_SLEEP);
+	bcopy(first_mapping, duplicate_mappings, copy_length);
+	*copied_entries = entries;
+
+	return (duplicate_mappings);
+}
+
+/*
  * Goes through the relevant indirect mappings until it hits a concrete vdev
  * and issues the callback. On the way to the concrete vdev, if any other
  * indirect vdevs are encountered, then the callback will also be called on
@@ -884,24 +942,42 @@ vdev_indirect_remap(vdev_t *vd, uint64_t offset, uint64_t asize,
 	for (remap_segment_t *rs = rs_alloc(vd, offset, asize, 0);
 	    rs != NULL; rs = list_remove_head(&stack)) {
 		vdev_t *v = rs->rs_vd;
+		uint64_t num_entries = 0;
+
+		ASSERT(spa_config_held(spa, SCL_ALL, RW_READER) != 0);
+		ASSERT(rs->rs_asize > 0);
 
 		/*
-		 * Note: this can be called from open context
-		 * (eg. zio_read()), so we need the rwlock to prevent
-		 * the mapping from being changed by condensing.
+		 * Note: As this function can be called from open context
+		 * (e.g. zio_read()), we need the following rwlock to
+		 * prevent the mapping from being changed by condensing.
+		 *
+		 * So we grab the lock and we make a copy of the entries
+		 * that are relevant to the extent that we are working on.
+		 * Once that is done, we drop the lock and iterate over
+		 * our copy of the mapping. Once we are done with the with
+		 * the remap segment and we free it, we also free our copy
+		 * of the indirect mapping entries that are relevant to it.
+		 *
+		 * This way we don't need to wait until the function is
+		 * finished with a segment, to condense it. In addition, we
+		 * don't need a recursive rwlock for the case that a call to
+		 * vdev_indirect_remap() needs to call itself (through the
+		 * codepath of its callback) for the same vdev in the middle
+		 * of its execution.
 		 */
 		rw_enter(&v->vdev_indirect_rwlock, RW_READER);
 		vdev_indirect_mapping_t *vim = v->vdev_indirect_mapping;
 		ASSERT3P(vim, !=, NULL);
 
-		ASSERT(spa_config_held(spa, SCL_ALL, RW_READER) != 0);
-		ASSERT(rs->rs_asize > 0);
-
 		vdev_indirect_mapping_entry_phys_t *mapping =
-		    vdev_indirect_mapping_entry_for_offset(vim, rs->rs_offset);
+		    vdev_indirect_mapping_duplicate_adjacent_entries(v,
+		    rs->rs_offset, rs->rs_asize, &num_entries);
 		ASSERT3P(mapping, !=, NULL);
+		ASSERT3U(num_entries, >, 0);
+		rw_exit(&v->vdev_indirect_rwlock);
 
-		while (rs->rs_asize > 0) {
+		for (uint64_t i = 0; i < num_entries; i++) {
 			/*
 			 * Note: the vdev_indirect_mapping can not change
 			 * while we are running.  It only changes while the
@@ -910,20 +986,23 @@ vdev_indirect_remap(vdev_t *vd, uint64_t offset, uint64_t asize,
 			 * function is only called for frees, which also only
 			 * happen from syncing context.
 			 */
+			vdev_indirect_mapping_entry_phys_t *m = &mapping[i];
 
-			uint64_t size = DVA_GET_ASIZE(&mapping->vimep_dst);
-			uint64_t dst_offset =
-			    DVA_GET_OFFSET(&mapping->vimep_dst);
-			uint64_t dst_vdev = DVA_GET_VDEV(&mapping->vimep_dst);
+			ASSERT3P(m, !=, NULL);
+			ASSERT3U(rs->rs_asize, >, 0);
+
+			uint64_t size = DVA_GET_ASIZE(&m->vimep_dst);
+			uint64_t dst_offset = DVA_GET_OFFSET(&m->vimep_dst);
+			uint64_t dst_vdev = DVA_GET_VDEV(&m->vimep_dst);
 
 			ASSERT3U(rs->rs_offset, >=,
-			    DVA_MAPPING_GET_SRC_OFFSET(mapping));
+			    DVA_MAPPING_GET_SRC_OFFSET(m));
 			ASSERT3U(rs->rs_offset, <,
-			    DVA_MAPPING_GET_SRC_OFFSET(mapping) + size);
+			    DVA_MAPPING_GET_SRC_OFFSET(m) + size);
 			ASSERT3U(dst_vdev, !=, v->vdev_id);
 
 			uint64_t inner_offset = rs->rs_offset -
-			    DVA_MAPPING_GET_SRC_OFFSET(mapping);
+			    DVA_MAPPING_GET_SRC_OFFSET(m);
 			uint64_t inner_size =
 			    MIN(rs->rs_asize, size - inner_offset);
 
@@ -964,10 +1043,10 @@ vdev_indirect_remap(vdev_t *vd, uint64_t offset, uint64_t asize,
 			rs->rs_offset += inner_size;
 			rs->rs_asize -= inner_size;
 			rs->rs_split_offset += inner_size;
-			mapping++;
 		}
+		VERIFY0(rs->rs_asize);
 
-		rw_exit(&v->vdev_indirect_rwlock);
+		kmem_free(mapping, num_entries * sizeof (*mapping));
 		kmem_free(rs, sizeof (remap_segment_t));
 	}
 	list_destroy(&stack);

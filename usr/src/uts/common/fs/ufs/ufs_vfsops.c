@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -196,7 +197,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"ufs",
 	ufsinit,
-	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI,
+	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI|VSW_MOUNTDEV,
 	&ufs_mntopts
 };
 
@@ -258,8 +259,7 @@ static int mountfs(struct vfs *, enum whymountroot, struct vnode *, char *,
 
 static int
 ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
-	struct cred *cr)
-
+    struct cred *cr)
 {
 	char *data = uap->dataptr;
 	int datalen = uap->datalen;
@@ -796,7 +796,7 @@ int ufs_mount_timeout = 60000;	/* default to 1 minute */
 
 static int
 mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
-	char *path, cred_t *cr, int isroot, void *raw_argsp, int args_len)
+    char *path, cred_t *cr, int isroot, void *raw_argsp, int args_len)
 {
 	dev_t dev = devvp->v_rdev;
 	struct fs *fsp;

@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -121,7 +122,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"udfs",
 	udfinit,
-	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI,
+	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI|VSW_MOUNTDEV,
 	&udfs_mntopts
 };
 
@@ -177,7 +178,7 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing", rootvp))
 #endif
 static int32_t
 udf_mount(struct vfs *vfsp, struct vnode *mvp,
-	struct mounta *uap, struct cred *cr)
+    struct mounta *uap, struct cred *cr)
 {
 	dev_t dev;
 	struct vnode *lvp = NULL;
@@ -489,8 +490,7 @@ udf_sync(struct vfs *vfsp, int16_t flag, struct cred *cr)
 
 /* ARGSUSED */
 static int32_t
-udf_vget(struct vfs *vfsp,
-	struct vnode **vpp, struct fid *fidp)
+udf_vget(struct vfs *vfsp, struct vnode **vpp, struct fid *fidp)
 {
 	int32_t error = 0;
 	struct udf_fid *udfid;
@@ -612,9 +612,8 @@ udf_mountroot(struct vfs *vfsp, enum whymountroot why)
 
 
 static int32_t
-ud_mountfs(struct vfs *vfsp,
-	enum whymountroot why, dev_t dev, char *name,
-	struct cred *cr, int32_t isroot)
+ud_mountfs(struct vfs *vfsp, enum whymountroot why, dev_t dev, char *name,
+    struct cred *cr, int32_t isroot)
 {
 	struct vnode *devvp = NULL;
 	int32_t error = 0;
@@ -1554,7 +1553,7 @@ ud_destroy_fsp(struct udf_vfs *udf_vfsp)
 
 void
 ud_convert_to_superblock(struct udf_vfs *udf_vfsp,
-	struct log_vol_int_desc *lvid)
+    struct log_vol_int_desc *lvid)
 {
 	int32_t i, c;
 	uint32_t *temp;
@@ -1652,7 +1651,7 @@ int32_t ud_sub_count = 4;
  */
 static int32_t
 ud_val_get_vat(struct udf_vfs *udf_vfsp, dev_t dev,
-	daddr_t blkno, struct ud_map *udm)
+    daddr_t blkno, struct ud_map *udm)
 {
 	struct buf *secbp;
 	struct file_entry *fe;
@@ -1776,7 +1775,7 @@ end:
 
 int32_t
 ud_read_sparing_tbls(struct udf_vfs *udf_vfsp,
-	dev_t dev, struct ud_map *map, struct pmap_typ2 *typ2)
+    dev_t dev, struct ud_map *map, struct pmap_typ2 *typ2)
 {
 	int32_t index, valid = 0;
 	uint32_t sz;

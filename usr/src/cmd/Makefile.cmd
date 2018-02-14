@@ -96,10 +96,6 @@ ROOTCMDDIR64=	$(ROOTCMDDIR)/$(MACH64)
 ROOTLIB64=	$(ROOTLIB)/$(MACH64)
 ROOTUSRSBIN32=	$(ROOTUSRSBIN)/$(MACH32)
 ROOTUSRSBIN64=	$(ROOTUSRSBIN)/$(MACH64)
-ROOTMAN=	$(ROOT)/usr/share/man
-ROOTMAN1=	$(ROOTMAN)/man1
-ROOTMAN1M=	$(ROOTMAN)/man1m
-ROOTMAN3=	$(ROOTMAN)/man3
 ROOTVARSMB=	$(ROOT)/var/smb
 
 
@@ -164,12 +160,6 @@ ROOTPROG32=	$(PROG:%=$(ROOTBIN32)/%)
 ROOTCMD64=	$(PROG:%=$(ROOTCMDDIR64)/%)
 ROOTUSRSBINPROG32=	$(PROG:%=$(ROOTUSRSBIN32)/%)
 ROOTUSRSBINPROG64=	$(PROG:%=$(ROOTUSRSBIN64)/%)
-ROOTMAN1FILES=	$(MAN1FILES:%=$(ROOTMAN1)/%)
-$(ROOTMAN1FILES) := FILEMODE= 444
-ROOTMAN1MFILES=	$(MAN1MFILES:%=$(ROOTMAN1M)/%)
-$(ROOTMAN1MFILES) := FILEMODE= 444
-ROOTMAN3FILES=	$(MAN3FILES:%=$(ROOTMAN3)/%)
-$(ROOTMAN3FILES) := FILEMODE= 444
 
 # Symlink rules for /usr/ccs/bin commands. Note, those commands under
 # the rule of the linker area, are controlled by a different set of 
@@ -474,15 +464,6 @@ $(ROOTCCSBINLINKDIR)/%: %
 
 $(ROOTCCSBINLINKDIR64)/%: %
 	$(INS.ccsbinlink64)
-
-$(ROOTMAN1)/%: %.sunman
-	$(INS.rename)
-
-$(ROOTMAN1M)/%: %.sunman
-	$(INS.rename)
-
-$(ROOTMAN3)/%: %.sunman
-	$(INS.rename)
 
 $(ROOTVARSMB)/%: %
 	$(INS.file)
