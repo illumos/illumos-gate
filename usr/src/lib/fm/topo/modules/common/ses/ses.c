@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -2854,9 +2854,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	 * 'product-id', we use a concatenation of 'manufacturer-model'.  We
 	 * also take the numerical serial number and convert it to a string.
 	 */
-	if ((manufacturer = disk_auth_clean(mod, raw_manufacturer)) == NULL ||
-	    (model = disk_auth_clean(mod, raw_model)) == NULL ||
-	    (revision = disk_auth_clean(mod, raw_revision)) == NULL) {
+	if ((manufacturer = topo_mod_clean_str(mod, raw_manufacturer)) ==
+	    NULL || (model = topo_mod_clean_str(mod, raw_model)) == NULL ||
+	    (revision = topo_mod_clean_str(mod, raw_revision)) == NULL) {
 		goto error;
 	}
 

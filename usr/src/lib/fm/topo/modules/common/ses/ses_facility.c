@@ -29,6 +29,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Facility node support for SES enclosures.  We support the following facility
  * nodes, based on the node type:
  *
@@ -930,7 +934,7 @@ ses_add_enclosure_sensors(topo_mod_t *mod, tnode_t *tn, ses_node_t *agg,
 			    "%.*s %llu", len, desc, index);
 		}
 
-		if ((name = disk_auth_clean(mod, rawname)) == NULL)
+		if ((name = topo_mod_clean_str(mod, rawname)) == NULL)
 			return (-1);
 
 		if (ses_add_sensor(mod, tn, nodeid, name, &sd) != 0) {
