@@ -110,7 +110,10 @@ extern "C" {
 
 #define	TOPO_PGROUP_PCI		"pci"
 #define	TOPO_PCI_VENDID		"vendor-id"
+#define	TOPO_PCI_VENDNM		"vendor-name"
+#define	TOPO_PCI_SUBSYSNM	"subsystem-name"
 #define	TOPO_PCI_DEVID		"device-id"
+#define	TOPO_PCI_DEVNM		"device-name"
 #define	TOPO_PCI_EXCAP		"extended-capabilities"
 #define	TOPO_PCI_BDF		"BDF"
 #define	TOPO_PCI_CLASS		"class-code"

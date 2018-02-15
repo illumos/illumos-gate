@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 MODULE = pcibus
@@ -37,6 +37,6 @@ MODULESRCS = $(UTILSRCS) $(PCISRCS) pci_i86pc.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -ldevinfo -lsmbios
+LDLIBS += -ldevinfo -lsmbios -lpcidb
 
 CPPFLAGS += -I$(UTILDIR) -I$(HBDIR) -I $(NICDIR)

@@ -109,6 +109,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_mod_nvalloc;
 	topo_mod_nvdup;
 	topo_mod_nvl2str;
+	topo_mod_pcidb;
 	topo_mod_pkgfmri;
 	topo_mod_prominfo;
 	topo_mod_register;
