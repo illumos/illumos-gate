@@ -152,6 +152,7 @@ struct nvme {
 	int n_error_log_len;
 	boolean_t n_lba_range_supported;
 	boolean_t n_auto_pst_supported;
+	boolean_t n_async_event_supported;
 
 	int n_nssr_supported;
 	int n_doorbell_stride;

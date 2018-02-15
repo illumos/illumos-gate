@@ -40,12 +40,8 @@ struct fs_ops *file_system[] = {
 
 static const boot_module_t *boot_modules[] =
 {
-#ifdef EFI_ZFS_BOOT
 	&zfs_module,
-#endif
-#ifdef EFI_UFS_BOOT
 	&ufs_module
-#endif
 };
 
 #define NUM_BOOT_MODULES	nitems(boot_modules)

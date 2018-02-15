@@ -3157,7 +3157,7 @@ nfs4_ephemeral_zsd_create(zoneid_t zoneid)
 	/*
 	 * This is the default....
 	 */
-	ntg->ntg_mount_to = nfs4_trigger_thread_timer;
+	ntg->ntg_mount_to = nfs4_trigger_mount_to;
 
 	mutex_init(&ntg->ntg_forest_lock, NULL,
 	    MUTEX_DEFAULT, NULL);

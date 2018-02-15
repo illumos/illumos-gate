@@ -49,7 +49,6 @@ CPPFLAGS +=	-I./../../..
 CPPFLAGS +=	-I./../../i386/libi386
 CPPFLAGS +=	-I./../../zfs
 CPPFLAGS +=	-I./../../../cddl/boot/zfs
-CPPFLAGS +=	-DEFI_ZFS_BOOT
 CPPFLAGS +=	-DNO_PCI -DEFI -DTERM_EMU
 
 # Export serial numbers, UUID, and asset tag from loader.
