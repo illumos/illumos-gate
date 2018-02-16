@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  *
  * fme.c -- fault management exercise module
  *
@@ -323,7 +324,7 @@ prune_propagations(const char *e0class, const struct ipath *e0ipp)
 
 static struct fme *
 newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
-	fmd_case_t *fmcase, fmd_event_t *ffep, nvlist_t *nvl)
+    fmd_case_t *fmcase, fmd_event_t *ffep, nvlist_t *nvl)
 {
 	struct cfgdata *cfgdata;
 	int init_size;
@@ -350,6 +351,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 			out(O_ALTFP|O_VERB2, "Unable to map \"%s\" ereport "
 			    "to component path, but silent discard allowed.",
 			    e0class);
+			fmd_case_close(hdl, fmcase);
 		} else {
 			Undiag_reason = UD_VAL_BADEVENTPATH;
 			(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR,
@@ -4153,7 +4155,7 @@ causes_test(struct fme *fmep, struct event *ep,
 
 static enum fme_state
 hypothesise(struct fme *fmep, struct event *ep,
-	unsigned long long at_latest_by, unsigned long long *pdelay)
+    unsigned long long at_latest_by, unsigned long long *pdelay)
 {
 	enum fme_state rtr, otr;
 	unsigned long long my_delay;
