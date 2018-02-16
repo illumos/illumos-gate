@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/corectl.h>
 
 #define	ZHYVE_CMD_FILE	"/var/run/bhyve/zhyve.cmd"
 #define	ZHYVE_LOG_FILE	"/tmp/zhyve.log"
@@ -88,7 +89,7 @@ full_read(int fd, char *buf, size_t len)
  */
 
 static int
-parse_options_file(const char *path, uint *argcp, char ***argvp)
+parse_options_file(const char *path, uint_t *argcp, char ***argvp)
 {
 	int fd = -1;
 	struct stat stbuf;
@@ -127,10 +128,19 @@ mark_provisioned(void)
 	}
 }
 
+/*
+ * Setup to suppress core dumps within the zone.
+ */
+static void
+config_core_dumps()
+{
+	(void) core_set_options(0x0);
+}
+
 int
 main(int argc, char **argv)
 {
-	uint zargc;
+	uint_t zargc;
 	char **zargv;
 	int fd;
 	struct stat stbuf;
@@ -139,6 +149,8 @@ main(int argc, char **argv)
 	if (strcmp(cmdname, "zhyve") != 0) {
 		return (bhyve_main(argc, argv));
 	}
+
+	config_core_dumps();
 
 	fd = open("/dev/null", O_WRONLY);
 	assert(fd >= 0);
