@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -65,7 +65,7 @@ extern "C" {
 #include <stdlib.h>
 #include <ulimit.h>
 #include <wait.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 #endif
 #ifdef VMUNIX
 #include <sys/wait.h>
