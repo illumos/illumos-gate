@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 RackTop Systems.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_CYCLIC_H
@@ -81,6 +82,7 @@ extern cyclic_id_t cyclic_add_omni(cyc_omni_handler_t *);
 extern void cyclic_remove(cyclic_id_t);
 extern void cyclic_bind(cyclic_id_t, cpu_t *, cpupart_t *);
 extern int cyclic_reprogram(cyclic_id_t, hrtime_t);
+extern void cyclic_move_here(cyclic_id_t);
 extern hrtime_t cyclic_getres();
 
 extern int cyclic_offline(cpu_t *cpu);

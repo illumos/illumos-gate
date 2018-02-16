@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent Inc. All rights reserved.
+ * Copyright 2018 Joyent Inc.
  */
 
 /*
@@ -112,6 +112,7 @@
  *      cyclic_remove()      <-- Removes a cyclic
  *      cyclic_bind()        <-- Change a cyclic's CPU or partition binding
  *      cyclic_reprogram()   <-- Reprogram a cyclic's expiration
+ *      cyclic_move_here()   <-- Shuffle cyclic to current CPU
  *
  *  Inter-subsystem Interfaces
  *
@@ -3109,6 +3110,61 @@ cyclic_reprogram(cyclic_id_t id, hrtime_t expiration)
 	kpreempt_enable();
 
 	return (1);
+}
+
+/*
+ *  void cyclic_move_here(cyclic_id_t)
+ *
+ *  Overview
+ *
+ *    cyclic_move_here() attempts to shuffle a cyclic onto the current CPU.
+ *
+ *  Arguments and notes
+ *
+ *    The first argument is a cyclic_id returned from cyclic_add().
+ *    cyclic_move_here() may _not_ be called on a cyclic_id returned from
+ *    cyclic_add_omni() or one bound to a CPU or partition via cyclic_bind().
+ *
+ *    This cyclic shuffling is performed on a best-effort basis.  If for some
+ *    reason the current CPU is unsuitable or the thread migrates between CPUs
+ *    during the call, the function may return with the cyclic residing on some
+ *    other CPU.
+ *
+ *  Return value
+ *
+ *    None; cyclic_move_here() always reports success.
+ *
+ *  Caller's context
+ *
+ *    cpu_lock must be held by the caller, and the caller must not be in
+ *    interrupt context.  The caller may not hold any locks which are also
+ *    grabbed by any cyclic handler.
+ */
+void
+cyclic_move_here(cyclic_id_t id)
+{
+	cyc_id_t *idp = (cyc_id_t *)id;
+	cyc_cpu_t *cc = idp->cyi_cpu;
+	cpu_t *dest = CPU;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+	CYC_PTRACE("move_here", idp, dest);
+	VERIFY3P(cc, !=, NULL);
+	VERIFY3U(cc->cyp_cyclics[idp->cyi_ndx].cy_flags &
+	    (CYF_CPU_BOUND|CYF_PART_BOUND), ==, 0);
+
+	if (cc->cyp_cpu == dest) {
+		return;
+	}
+
+	/* Is the destination CPU suitable for a migration target? */
+	if (dest->cpu_cyclic == NULL ||
+	    dest->cpu_cyclic->cyp_state == CYS_OFFLINE ||
+	    (dest->cpu_flags & CPU_ENABLE) == 0) {
+		return;
+	}
+
+	cyclic_juggle_one_to(idp, dest->cpu_cyclic);
 }
 
 hrtime_t
