@@ -76,27 +76,34 @@ typedef struct eptable_map eptable_map_t;
 	((tbl)->ept_vaddr +					\
 	((idx) << LEVEL_SHIFT((tbl)->ept_level)))
 
-#define	EPT_R	(0x1 << 0)
-#define	EPT_W	(0x1 << 1)
-#define	EPT_X	(0x1 << 2)
-#define	EPT_RWX	(EPT_R|EPT_W|EPT_X)
-#define	EPT_MAP	(0x1 << 7)
+#define	EPT_R		(0x1 << 0)
+#define	EPT_W		(0x1 << 1)
+#define	EPT_X		(0x1 << 2)
+#define	EPT_RWX		(EPT_R|EPT_W|EPT_X)
+#define	EPT_LGPG	(0x1 << 7)
 
 #define	EPT_PAT(attr)	(((attr) & 0x7) << 3)
 
 #define	EPT_PADDR	(0x000ffffffffff000ull)
 
 #define	EPT_IS_ABSENT(pte)	(((pte) & EPT_RWX) == 0)
-#define	EPT_IS_TABLE(pte)	(((pte) & EPT_MAP) == 0)
 #define	EPT_PTE_PFN(pte)	mmu_btop((pte) & EPT_PADDR)
 #define	EPT_PTE_PROT(pte)	((pte) & EPT_RWX)
+#define	EPT_MAPS_PAGE(lvl, pte)				\
+	((lvl) == 0 || ((pte) & EPT_LGPG))
 
 #define	EPT_PTE_ASSIGN_TABLE(pfn)			\
 	((pfn_to_pa(pfn) & EPT_PADDR) | EPT_RWX)
-#define	EPT_PTE_ASSIGN_PAGE(pfn, prot, attr)		\
-	((pfn_to_pa(pfn) & EPT_PADDR) | EPT_MAP |	\
-	((prot) & EPT_RWX) |				\
-	EPT_PAT(attr))
+
+/*
+ * We only assign EPT_LGPG for levels higher than 0: although this bit is
+ * defined as being ignored at level 0, some versions of VMWare fail to honor
+ * this and report such a PTE as an EPT mis-configuration.
+ */
+#define	EPT_PTE_ASSIGN_PAGE(lvl, pfn, prot, attr)	\
+	((pfn_to_pa(pfn) & EPT_PADDR) |			\
+	(((lvl) != 0) ? EPT_LGPG : 0) |			\
+	EPT_PAT(attr) | ((prot) & EPT_RWX))
 
 struct vmspace_mapping {
 	list_node_t	vmsm_node;
@@ -584,7 +591,7 @@ eptable_walk(eptable_map_t *map, uintptr_t va, level_t tgtlvl, uint_t *idxp,
 			entry = EPT_PTE_ASSIGN_TABLE(newept->ept_pfn);
 			ptes[idx] = entry;
 			ept->ept_valid_cnt++;
-		} else if (EPT_IS_TABLE(entry)) {
+		} else if (!EPT_MAPS_PAGE(lvl, entry)) {
 			/* Do lookup in next level of page table */
 			newept = eptable_hash_lookup(map, masked_va, lvl - 1);
 
@@ -597,7 +604,7 @@ eptable_walk(eptable_map_t *map, uintptr_t va, level_t tgtlvl, uint_t *idxp,
 			 * for non-PAGESIZE pages is not yet present, this is a
 			 * surprise.
 			 */
-			panic("unexpected parge page in pte %p", &ptes[idx]);
+			panic("unexpected large page in pte %p", &ptes[idx]);
 		}
 		ept = newept;
 		lvl--;
@@ -632,10 +639,11 @@ eptable_mapin(eptable_map_t *map, uintptr_t va, pfn_t pfn, uint_t lvl,
 	entry = ptes[idx];
 
 	if (!EPT_IS_ABSENT(entry)) {
-		if (EPT_IS_TABLE(entry)) {
-			panic("unexpected table entry %lx in %p[%d]",
+		if (!EPT_MAPS_PAGE(lvl, entry)) {
+			panic("unexpected PT link %lx in %p[%d]",
 			    entry, ept, idx);
 		}
+
 		/*
 		 * XXXJOY: Just clean the entry for now. Assume(!) that
 		 * invalidation is going to occur anyways.
@@ -646,7 +654,7 @@ eptable_mapin(eptable_map_t *map, uintptr_t va, pfn_t pfn, uint_t lvl,
 		map->em_wired -= (pgsize >> PAGESHIFT);
 	}
 
-	entry = EPT_PTE_ASSIGN_PAGE(pfn, prot, attr);
+	entry = EPT_PTE_ASSIGN_PAGE(lvl, pfn, prot, attr);
 	ptes[idx] = entry;
 	ept->ept_valid_cnt++;
 	map->em_wired += (pgsize >> PAGESHIFT);
@@ -680,10 +688,11 @@ eptable_mapout(eptable_map_t *map, uintptr_t va)
 		pfn_t oldpfn;
 		const size_t pagesize = LEVEL_SIZE((uint_t)ept->ept_level);
 
-		if (EPT_IS_TABLE(entry)) {
-			panic("unexpected table entry %lx in %p[%d]",
+		if (!EPT_MAPS_PAGE(ept->ept_level, entry)) {
+			panic("unexpected PT link %lx in %p[%d]",
 			    entry, ept, idx);
 		}
+
 		/*
 		 * XXXJOY: Just clean the entry for now. Assume(!) that
 		 * invalidation is going to occur anyways.
@@ -701,7 +710,7 @@ eptable_mapout(eptable_map_t *map, uintptr_t va)
 		ptes = (x86pte_t *)next->ept_kva;
 
 		entry = ptes[idx];
-		ASSERT(EPT_IS_TABLE(entry));
+		ASSERT(!EPT_MAPS_PAGE(next->ept_level, entry));
 		ASSERT(EPT_PTE_PFN(entry) == ept->ept_pfn);
 
 		ptes[idx] = (x86pte_t)0;
@@ -737,8 +746,8 @@ eptable_find(eptable_map_t *map, uintptr_t va, pfn_t *pfn, uint_t *prot)
 	entry = ptes[idx];
 
 	if (!EPT_IS_ABSENT(entry)) {
-		if (EPT_IS_TABLE(entry)) {
-			panic("unexpected table entry %lx in %p[%d]",
+		if (!EPT_MAPS_PAGE(ept->ept_level, entry)) {
+			panic("unexpected PT link %lx in %p[%d]",
 			    entry, ept, idx);
 		}
 
