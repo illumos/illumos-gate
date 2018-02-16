@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -967,6 +968,8 @@ mac_ring_classify2str(mac_classify_type_t classify)
 		return ("sw");
 	case MAC_HW_CLASSIFIER:
 		return ("hw");
+	case MAC_PASSTHRU_CLASSIFIER:
+		return ("pass");
 	}
 	return ("--");
 }

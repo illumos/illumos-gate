@@ -1457,7 +1457,7 @@ mac_rx_group_unmark(mac_group_t *grp, uint_t flag)
  * used by the aggr driver to access and control the underlying HW Rx group
  * and rings. In this case, the aggr driver has exclusive control of the
  * underlying HW Rx group/rings, it calls the following functions to
- * start/stop the HW Rx rings, disable/enable polling, add/remove mac'
+ * start/stop the HW Rx rings, disable/enable polling, add/remove MAC
  * addresses, or set up the Rx callback.
  */
 /* ARGSUSED */
@@ -1502,8 +1502,9 @@ mac_hwrings_get(mac_client_handle_t mch, mac_group_handle_t *hwgh,
 		ASSERT(B_FALSE);
 		return (-1);
 	}
+
 	/*
-	 * The mac client did not reserve any RX group, return directly.
+	 * The MAC client did not reserve an Rx group, return directly.
 	 * This is probably because the underlying MAC does not support
 	 * any groups.
 	 */
@@ -1512,7 +1513,7 @@ mac_hwrings_get(mac_client_handle_t mch, mac_group_handle_t *hwgh,
 	if (grp == NULL)
 		return (0);
 	/*
-	 * This group must be reserved by this mac client.
+	 * This group must be reserved by this MAC client.
 	 */
 	ASSERT((grp->mrg_state == MAC_GROUP_STATE_RESERVED) &&
 	    (mcip == MAC_GROUP_ONLY_CLIENT(grp)));
@@ -1521,6 +1522,77 @@ mac_hwrings_get(mac_client_handle_t mch, mac_group_handle_t *hwgh,
 		ASSERT(cnt < MAX_RINGS_PER_GROUP);
 		hwrh[cnt] = (mac_ring_handle_t)ring;
 	}
+	if (hwgh != NULL)
+		*hwgh = (mac_group_handle_t)grp;
+
+	return (cnt);
+}
+
+/*
+ * Get the HW ring handles of the given group index. If the MAC
+ * doesn't have a group at this index, or any groups at all, then 0 is
+ * returned and hwgh is set to NULL. This is a private client API. The
+ * MAC perimeter must be held when calling this function.
+ *
+ * mh: A handle to the MAC that owns the group.
+ *
+ * idx: The index of the HW group to be read.
+ *
+ * hwgh: If non-NULL, contains a handle to the HW group on return.
+ *
+ * hwrh: An array of ring handles pointing to the HW rings in the
+ * group. The array must be large enough to hold a handle to each ring
+ * in the group. To be safe, this array should be of size MAX_RINGS_PER_GROUP.
+ *
+ * rtype: Used to determine if we are fetching Rx or Tx rings.
+ *
+ * Returns the number of rings in the group.
+ */
+uint_t
+mac_hwrings_idx_get(mac_handle_t mh, uint_t idx, mac_group_handle_t *hwgh,
+    mac_ring_handle_t *hwrh, mac_ring_type_t rtype)
+{
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	mac_group_t		*grp;
+	mac_ring_t		*ring;
+	uint_t			cnt = 0;
+
+	/*
+	 * The MAC perimeter must be held when accessing the
+	 * mi_{rx,tx}_groups fields.
+	 */
+	ASSERT(MAC_PERIM_HELD(mh));
+	ASSERT(rtype == MAC_RING_TYPE_RX || rtype == MAC_RING_TYPE_TX);
+
+	if (rtype == MAC_RING_TYPE_RX) {
+		grp = mip->mi_rx_groups;
+	} else if (rtype == MAC_RING_TYPE_TX) {
+		grp = mip->mi_tx_groups;
+	}
+
+	while (grp != NULL && grp->mrg_index != idx)
+		grp = grp->mrg_next;
+
+	/*
+	 * If the MAC doesn't have a group at this index or doesn't
+	 * impelement RINGS capab, then set hwgh to NULL and return 0.
+	 */
+	if (hwgh != NULL)
+		*hwgh = NULL;
+
+	if (grp == NULL)
+		return (0);
+
+	ASSERT3U(idx, ==, grp->mrg_index);
+
+	for (ring = grp->mrg_rings; ring != NULL; ring = ring->mr_next, cnt++) {
+		ASSERT3U(cnt, <, MAX_RINGS_PER_GROUP);
+		hwrh[cnt] = (mac_ring_handle_t)ring;
+	}
+
+	/* A group should always have at least one ring. */
+	ASSERT3U(cnt, >, 0);
+
 	if (hwgh != NULL)
 		*hwgh = (mac_group_handle_t)grp;
 
@@ -1540,6 +1612,69 @@ mac_hwring_getinfo(mac_ring_handle_t rh)
 	mac_ring_info_t *info = &ring->mr_info;
 
 	return (info->mri_flags);
+}
+
+/*
+ * Set the passthru callback on the hardware ring.
+ */
+void
+mac_hwring_set_passthru(mac_ring_handle_t hwrh, mac_rx_t fn, void *arg1,
+    mac_resource_handle_t arg2)
+{
+	mac_ring_t *hwring = (mac_ring_t *)hwrh;
+
+	ASSERT3S(hwring->mr_type, ==, MAC_RING_TYPE_RX);
+
+	hwring->mr_classify_type = MAC_PASSTHRU_CLASSIFIER;
+
+	hwring->mr_pt_fn = fn;
+	hwring->mr_pt_arg1 = arg1;
+	hwring->mr_pt_arg2 = arg2;
+}
+
+/*
+ * Clear the passthru callback on the hardware ring.
+ */
+void
+mac_hwring_clear_passthru(mac_ring_handle_t hwrh)
+{
+	mac_ring_t *hwring = (mac_ring_t *)hwrh;
+
+	ASSERT3S(hwring->mr_type, ==, MAC_RING_TYPE_RX);
+
+	hwring->mr_classify_type = MAC_NO_CLASSIFIER;
+
+	hwring->mr_pt_fn = NULL;
+	hwring->mr_pt_arg1 = NULL;
+	hwring->mr_pt_arg2 = NULL;
+}
+
+void
+mac_client_set_flow_cb(mac_client_handle_t mch, mac_rx_t func, void *arg1)
+{
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	flow_entry_t		*flent = mcip->mci_flent;
+
+	mutex_enter(&flent->fe_lock);
+	flent->fe_cb_fn = (flow_fn_t)func;
+	flent->fe_cb_arg1 = arg1;
+	flent->fe_cb_arg2 = NULL;
+	flent->fe_flags &= ~FE_MC_NO_DATAPATH;
+	mutex_exit(&flent->fe_lock);
+}
+
+void
+mac_client_clear_flow_cb(mac_client_handle_t mch)
+{
+	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
+	flow_entry_t		*flent = mcip->mci_flent;
+
+	mutex_enter(&flent->fe_lock);
+	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
+	flent->fe_cb_arg1 = NULL;
+	flent->fe_cb_arg2 = NULL;
+	flent->fe_flags |= FE_MC_NO_DATAPATH;
+	mutex_exit(&flent->fe_lock);
 }
 
 /*
@@ -1614,8 +1749,44 @@ mac_hwring_enable_intr(mac_ring_handle_t rh)
 	return (intr->mi_enable(intr->mi_handle));
 }
 
+/*
+ * Start the HW ring pointed to by rh.
+ *
+ * This is used by special MAC clients that are MAC themselves and
+ * need to exert control over the underlying HW rings of the NIC.
+ */
 int
 mac_hwring_start(mac_ring_handle_t rh)
+{
+	mac_ring_t *rr_ring = (mac_ring_t *)rh;
+	int rv = 0;
+
+	if (rr_ring->mr_state != MR_INUSE)
+		rv = mac_start_ring(rr_ring);
+
+	return (rv);
+}
+
+/*
+ * Stop the HW ring pointed to by rh. Also see mac_hwring_start().
+ */
+void
+mac_hwring_stop(mac_ring_handle_t rh)
+{
+	mac_ring_t *rr_ring = (mac_ring_t *)rh;
+
+	if (rr_ring->mr_state != MR_FREE)
+		mac_stop_ring(rr_ring);
+}
+
+/*
+ * Remove the quiesced flag from the HW ring pointed to by rh.
+ *
+ * This is used by special MAC clients that are MAC themselves and
+ * need to exert control over the underlying HW rings of the NIC.
+ */
+int
+mac_hwring_activate(mac_ring_handle_t rh)
 {
 	mac_ring_t *rr_ring = (mac_ring_t *)rh;
 
@@ -1623,8 +1794,11 @@ mac_hwring_start(mac_ring_handle_t rh)
 	return (0);
 }
 
+/*
+ * Quiesce the HW ring pointed to by rh. Also see mac_hwring_activate().
+ */
 void
-mac_hwring_stop(mac_ring_handle_t rh)
+mac_hwring_quiesce(mac_ring_handle_t rh)
 {
 	mac_ring_t *rr_ring = (mac_ring_t *)rh;
 
@@ -1769,6 +1943,27 @@ mac_has_hw_vlan(mac_handle_t mh)
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
 	return (MAC_GROUP_HW_VLAN(mip->mi_rx_groups));
+}
+
+/*
+ * Get the number of Rx HW groups on this MAC.
+ */
+uint_t
+mac_get_num_rx_groups(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+	return (mip->mi_rx_group_count);
+}
+
+int
+mac_set_promisc(mac_handle_t mh, boolean_t value)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	ASSERT(MAC_PERIM_HELD(mh));
+	return (i_mac_promisc_set(mip, value));
 }
 
 /*
@@ -2466,19 +2661,6 @@ mac_rx_classify(mac_impl_t *mip, mac_resource_handle_t mrh, mblk_t *mp)
 	flow_entry_t	*flent = NULL;
 	uint_t		flags = FLOW_INBOUND;
 	int		err;
-
-	/*
-	 * If the MAC is a port of an aggregation, pass FLOW_IGNORE_VLAN
-	 * to mac_flow_lookup() so that the VLAN packets can be successfully
-	 * passed to the non-VLAN aggregation flows.
-	 *
-	 * Note that there is possibly a race between this and
-	 * mac_unicast_remove/add() and VLAN packets could be incorrectly
-	 * classified to non-VLAN flows of non-aggregation MAC clients. These
-	 * VLAN packets will be then filtered out by the MAC module.
-	 */
-	if ((mip->mi_state_flags & MIS_EXCLUSIVE) != 0)
-		flags |= FLOW_IGNORE_VLAN;
 
 	err = mac_flow_lookup(mip->mi_flow_tab, mp, flags, &flent);
 	if (err != 0) {
@@ -3813,9 +3995,27 @@ mac_start_group_and_rings(mac_group_t *group)
 
 	for (ring = group->mrg_rings; ring != NULL; ring = ring->mr_next) {
 		ASSERT(ring->mr_state == MR_FREE);
+
 		if ((rv = mac_start_ring(ring)) != 0)
 			goto error;
-		ring->mr_classify_type = MAC_SW_CLASSIFIER;
+
+		/*
+		 * When aggr_set_port_sdu() is called, it will remove
+		 * the port client's unicast address. This will cause
+		 * MAC to stop the default group's rings on the port
+		 * MAC. After it modifies the SDU, it will then re-add
+		 * the unicast address. At which time, this function is
+		 * called to start the default group's rings. Normally
+		 * this function would set the classify type to
+		 * MAC_SW_CLASSIFIER; but that will break aggr which
+		 * relies on the passthru classify mode being set for
+		 * correct delivery (see mac_rx_common()). To avoid
+		 * that, we check for a passthru callback and set the
+		 * classify type to MAC_PASSTHRU_CLASSIFIER; as it was
+		 * before the rings were stopped.
+		 */
+		ring->mr_classify_type = (ring->mr_pt_fn != NULL) ?
+		    MAC_PASSTHRU_CLASSIFIER : MAC_SW_CLASSIFIER;
 	}
 	return (0);
 

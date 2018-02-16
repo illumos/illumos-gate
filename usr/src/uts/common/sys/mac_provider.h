@@ -243,16 +243,59 @@ typedef struct mac_callbacks_s {
 /*
  * Virtualization Capabilities
  */
+
 /*
- * The ordering of entries below is important. MAC_HW_CLASSIFIER
- * is the cutoff below which are entries which don't depend on
- * H/W. MAC_HW_CLASSIFIER and entries after that are cases where
- * H/W has been updated through add/modify/delete APIs.
+ * The type of ring classification. This is used by MAC to determine
+ * what, if any, processing it has to do upon receiving traffic on a
+ * particular Rx ring.
+ *
+ * MAC_NO_CLASSIFIER
+ *
+ *	No classification has been set. No traffic should cross an Rx
+ *	ring in this state.
+ *
+ * MAC_SW_CLASSIFIER
+ *
+ *	The driver delivers traffic for multiple clients to this ring.
+ *	All traffic must be software classified by MAC to guarantee
+ *	delivery to the correct client. This classification type may
+ *	be chosen for several reasons.
+ *
+ *	o The driver provides only one group and there are multiple
+ *	  clients using the MAC.
+ *
+ *	o The driver provides some hardware filtering but not enough
+ *	  to fully classify the traffic. E.g., a VLAN VNIC requires L2
+ *	  unicast address filtering as well as VLAN filtering, but
+ *	  some drivers may only support the former.
+ *
+ *	o The ring belongs to the default group. The default group
+ *	  acts as a spillover for all clients that can't reserve an
+ *	  exclusive group. It also handles multicast traffic for all
+ *	  clients. For these reasons, the default group's rings are
+ *	  always software classified.
+ *
+ * MAC_HW_CLASSIFIER
+ *
+ *	The driver delivers traffic for a single MAC client across
+ *	this ring. With this guarantee, MAC can simply pass the
+ *	traffic up the stack or even allow polling of the ring.
+ *
+ * MAC_PASSTHRU_CLASSIFIER
+ *
+ *	The ring is in "passthru" mode. In this mode we bypass all of
+ *	the typical MAC processing and pass the traffic directly to
+ *	the mr_pt_fn callback, see mac_rx_common(). This is used in
+ *	cases where there is another module acting as MAC provider on
+ *	behalf of the driver. E.g., link aggregations use this mode to
+ *	take full control of the port's rings; allowing it to enforce
+ *	LACP protocols and aggregate rings across discrete drivers.
  */
 typedef enum {
 	MAC_NO_CLASSIFIER = 0,
 	MAC_SW_CLASSIFIER,
-	MAC_HW_CLASSIFIER
+	MAC_HW_CLASSIFIER,
+	MAC_PASSTHRU_CLASSIFIER
 } mac_classify_type_t;
 
 typedef	void	(*mac_rx_func_t)(void *, mac_resource_handle_t, mblk_t *,
@@ -365,6 +408,7 @@ typedef struct mac_ring_info_s {
 		mac_ring_poll_t	poll;
 	} mrfunion;
 	mac_ring_stat_t		mri_stat;
+
 	/*
 	 * mri_flags will have some bits set to indicate some special
 	 * property/feature of a ring like serialization needed for a

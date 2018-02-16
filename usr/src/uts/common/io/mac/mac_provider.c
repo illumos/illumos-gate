@@ -702,7 +702,6 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 	mac_ring_t		*mr = (mac_ring_t *)mrh;
 	mac_soft_ring_set_t 	*mac_srs;
 	mblk_t			*bp = mp_chain;
-	boolean_t		hw_classified = B_FALSE;
 
 	/*
 	 * If there are any promiscuous mode callbacks defined for
@@ -714,7 +713,7 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 	if (mr != NULL) {
 		/*
 		 * If the SRS teardown has started, just return. The 'mr'
-		 * continues to be valid until the driver unregisters the mac.
+		 * continues to be valid until the driver unregisters the MAC.
 		 * Hardware classified packets will not make their way up
 		 * beyond this point once the teardown has started. The driver
 		 * is never passed a pointer to a flow entry or SRS or any
@@ -727,11 +726,25 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 			freemsgchain(mp_chain);
 			return;
 		}
-		if (mr->mr_classify_type == MAC_HW_CLASSIFIER) {
-			hw_classified = B_TRUE;
+
+		/*
+		 * The ring is in passthru mode; pass the chain up to
+		 * the pseudo ring.
+		 */
+		if (mr->mr_classify_type == MAC_PASSTHRU_CLASSIFIER) {
 			MR_REFHOLD_LOCKED(mr);
+			mutex_exit(&mr->mr_lock);
+			mr->mr_pt_fn(mr->mr_pt_arg1, mr->mr_pt_arg2, mp_chain,
+			    B_FALSE);
+			MR_REFRELE(mr);
+			return;
 		}
-		mutex_exit(&mr->mr_lock);
+
+		/*
+		 * The passthru callback should only be set when in
+		 * MAC_PASSTHRU_CLASSIFIER mode.
+		 */
+		ASSERT3P(mr->mr_pt_fn, ==, NULL);
 
 		/*
 		 * We check if an SRS is controlling this ring.
@@ -739,19 +752,24 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 		 * routine otherwise we need to go through mac_rx_classify
 		 * to reach the right place.
 		 */
-		if (hw_classified) {
+		if (mr->mr_classify_type == MAC_HW_CLASSIFIER) {
+			MR_REFHOLD_LOCKED(mr);
+			mutex_exit(&mr->mr_lock);
+			ASSERT3P(mr->mr_srs, !=, NULL);
 			mac_srs = mr->mr_srs;
+
 			/*
-			 * This is supposed to be the fast path.
-			 * All packets received though here were steered by
-			 * the hardware classifier, and share the same
-			 * MAC header info.
+			 * This is the fast path. All packets received
+			 * on this ring are hardware classified and
+			 * share the same MAC header info.
 			 */
 			mac_srs->srs_rx.sr_lower_proc(mh,
 			    (mac_resource_handle_t)mac_srs, mp_chain, B_FALSE);
 			MR_REFRELE(mr);
 			return;
 		}
+
+		mutex_exit(&mr->mr_lock);
 		/* We'll fall through to software classification */
 	} else {
 		flow_entry_t *flent;

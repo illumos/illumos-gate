@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -1004,6 +1004,7 @@ void
 mac_ring_stat_create(mac_ring_t *ring)
 {
 	mac_impl_t	*mip = ring->mr_mip;
+	mac_group_t	*grp = (mac_group_t *)ring->mr_gh;
 	char		statname[MAXNAMELEN];
 	char		modname[MAXNAMELEN];
 
@@ -1015,8 +1016,8 @@ mac_ring_stat_create(mac_ring_t *ring)
 
 	switch (ring->mr_type) {
 	case MAC_RING_TYPE_RX:
-		(void) snprintf(statname, sizeof (statname), "mac_rx_ring%d",
-		    ring->mr_index);
+		(void) snprintf(statname, sizeof (statname),
+		    "mac_rx_ring_%d_%d", grp->mrg_index, ring->mr_index);
 		i_mac_rx_ring_stat_create(ring, modname, statname);
 		break;
 

@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -2405,7 +2406,7 @@ vnet_rx_ring_start(mac_ring_driver_t arg, uint64_t mr_gen_num)
 		return (0);
 	}
 
-	err = mac_hwring_start(rx_ringp->hw_rh);
+	err = mac_hwring_activate(rx_ringp->hw_rh);
 	if (err == 0) {
 		rx_ringp->gen_num = mr_gen_num;
 		rx_ringp->state |= VNET_RXRING_STARTED;
@@ -2443,7 +2444,7 @@ vnet_rx_ring_stop(mac_ring_driver_t arg)
 		return;
 	}
 
-	mac_hwring_stop(rx_ringp->hw_rh);
+	mac_hwring_quiesce(rx_ringp->hw_rh);
 	rx_ringp->state &= ~VNET_RXRING_STARTED;
 }
 
@@ -2846,7 +2847,7 @@ vnet_bind_hwrings(vnet_t *vnetp)
 
 		/* Start the hwring if needed */
 		if (rx_ringp->state & VNET_RXRING_STARTED) {
-			rv = mac_hwring_start(rx_ringp->hw_rh);
+			rv = mac_hwring_activate(rx_ringp->hw_rh);
 			if (rv != 0) {
 				mac_hwring_teardown(rx_ringp->hw_rh);
 				rx_ringp->hw_rh = NULL;
@@ -2920,7 +2921,7 @@ vnet_unbind_hwrings(vnet_t *vnetp)
 		rx_ringp = &rx_grp->rings[i + VNET_HYBRID_RXRING_INDEX];
 		if (rx_ringp->hw_rh != NULL) {
 			/* Stop the hwring */
-			mac_hwring_stop(rx_ringp->hw_rh);
+			mac_hwring_quiesce(rx_ringp->hw_rh);
 
 			/* Teardown the hwring */
 			mac_hwring_teardown(rx_ringp->hw_rh);

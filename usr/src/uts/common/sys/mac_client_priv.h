@@ -121,9 +121,17 @@ extern void mac_tx_client_quiesce(mac_client_handle_t);
 extern void mac_tx_client_condemn(mac_client_handle_t);
 extern void mac_tx_client_restart(mac_client_handle_t);
 extern void mac_srs_perm_quiesce(mac_client_handle_t, boolean_t);
+extern uint_t mac_hwrings_idx_get(mac_handle_t, uint_t, mac_group_handle_t *,
+    mac_ring_handle_t *, mac_ring_type_t);
 extern int mac_hwrings_get(mac_client_handle_t, mac_group_handle_t *,
     mac_ring_handle_t *, mac_ring_type_t);
 extern uint_t mac_hwring_getinfo(mac_ring_handle_t);
+extern void mac_hwring_set_passthru(mac_ring_handle_t, mac_rx_t, void *,
+    mac_resource_handle_t);
+extern void mac_hwring_clear_passthru(mac_ring_handle_t);
+extern void mac_client_set_flow_cb(mac_client_handle_t, mac_rx_t, void *);
+extern void mac_client_clear_flow_cb(mac_client_handle_t);
+
 extern void mac_hwring_setup(mac_ring_handle_t, mac_resource_handle_t,
     mac_ring_handle_t);
 extern void mac_hwring_teardown(mac_ring_handle_t);
@@ -131,6 +139,8 @@ extern int mac_hwring_disable_intr(mac_ring_handle_t);
 extern int mac_hwring_enable_intr(mac_ring_handle_t);
 extern int mac_hwring_start(mac_ring_handle_t);
 extern void mac_hwring_stop(mac_ring_handle_t);
+extern int mac_hwring_activate(mac_ring_handle_t);
+extern void mac_hwring_quiesce(mac_ring_handle_t);
 extern mblk_t *mac_hwring_poll(mac_ring_handle_t, int);
 extern mblk_t *mac_hwring_tx(mac_ring_handle_t, mblk_t *);
 extern int mac_hwring_getstat(mac_ring_handle_t, uint_t, uint64_t *);
@@ -148,6 +158,9 @@ extern int mac_hwgroup_addvlan(mac_group_handle_t, uint16_t);
 extern int mac_hwgroup_remvlan(mac_group_handle_t, uint16_t);
 
 extern boolean_t mac_has_hw_vlan(mac_handle_t);
+
+extern uint_t mac_get_num_rx_groups(mac_handle_t);
+extern int mac_set_promisc(mac_handle_t, boolean_t);
 
 extern void mac_set_upper_mac(mac_client_handle_t, mac_handle_t,
     mac_resource_props_t *);

@@ -1988,8 +1988,6 @@ no_softrings:
 }
 
 /*
- * mac_fanout_setup:
- *
  * Calls mac_srs_fanout_init() or modify() depending upon whether
  * the SRS is getting initialized or re-initialized.
  */
@@ -2002,14 +2000,14 @@ mac_fanout_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	int i, rx_srs_cnt;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
-	/*
-	 * This is an aggregation port. Fanout will be setup
-	 * over the aggregation itself.
-	 */
-	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
-		return;
 
+	/*
+	 * Aggr ports do not have SRSes. This function should never be
+	 * called on an aggr port.
+	 */
+	ASSERT3U((mcip->mci_state_flags & MCIS_IS_AGGR_PORT), ==, 0);
 	mac_rx_srs = flent->fe_rx_srs[0];
+
 	/*
 	 * Set up the fanout on the tx side only once, with the
 	 * first rx SRS. The CPU binding, fanout, and bandwidth
@@ -2065,8 +2063,6 @@ mac_fanout_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 }
 
 /*
- * mac_srs_create:
- *
  * Create a mac_soft_ring_set_t (SRS). If soft_ring_fanout_type is
  * SRST_TX, an SRS for Tx side is created. Otherwise an SRS for Rx side
  * processing is created.
@@ -2375,6 +2371,10 @@ mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	mac_rx_srs_group_setup(mcip, flent, link_type);
 	mac_tx_srs_group_setup(mcip, flent, link_type);
 
+	/* Aggr ports don't have SRSes; thus there is no soft ring fanout. */
+	if ((mcip->mci_state_flags & MCIS_IS_AGGR_PORT) != 0)
+		return;
+
 	pool_lock();
 	cpupart = mac_pset_find(mrp, &use_default);
 	mac_fanout_setup(mcip, flent, MCIP_RESOURCE_PROPS(mcip),
@@ -2400,6 +2400,29 @@ mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	uint32_t		fanout_type;
 	mac_group_t		*rx_group = flent->fe_rx_ring_group;
 	boolean_t		no_unicast;
+
+	/*
+	 * If this is an an aggr port, then don't setup Rx SRS and Rx
+	 * soft rings as they won't be used. However, we still need to
+	 * start the rings to receive data on them.
+	 */
+	if (mcip->mci_state_flags & MCIS_IS_AGGR_PORT) {
+		if (rx_group == NULL)
+			return;
+
+		for (ring = rx_group->mrg_rings; ring != NULL;
+		    ring = ring->mr_next) {
+			if (ring->mr_state != MR_INUSE)
+				(void) mac_start_ring(ring);
+		}
+
+		return;
+	}
+
+	/*
+	 * Aggr ports should never have SRSes.
+	 */
+	ASSERT3U((mcip->mci_state_flags & MCIS_IS_AGGR_PORT), ==, 0);
 
 	fanout_type = mac_find_fanout(flent, link_type);
 	no_unicast = (mcip->mci_state_flags & MCIS_NO_UNICAST_ADDR) != 0;
@@ -2489,38 +2512,40 @@ void
 mac_tx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
     uint32_t link_type)
 {
-	int			cnt;
-	int			ringcnt;
-	mac_ring_t		*ring;
-	mac_group_t		*grp;
-
 	/*
-	 * If we are opened exclusively (like aggr does for aggr_ports),
-	 * don't set up Tx SRS and Tx soft rings as they won't be used.
-	 * The same thing has to be done for Rx side also. See bug:
-	 * 6880080
+	 * If this is an exclusive client (e.g. an aggr port), then
+	 * don't setup Tx SRS and Tx soft rings as they won't be used.
+	 * However, we still need to start the rings to send data
+	 * across them.
 	 */
 	if (mcip->mci_state_flags & MCIS_EXCLUSIVE) {
-		/*
-		 * If we have rings, start them here.
-		 */
-		if (flent->fe_tx_ring_group == NULL)
-			return;
+		mac_ring_t		*ring;
+		mac_group_t		*grp;
+
 		grp = (mac_group_t *)flent->fe_tx_ring_group;
-		ringcnt = grp->mrg_cur_count;
-		ring = grp->mrg_rings;
-		for (cnt = 0; cnt < ringcnt; cnt++) {
-			if (ring->mr_state != MR_INUSE) {
+
+		if (grp == NULL)
+			return;
+
+		for (ring = grp->mrg_rings; ring != NULL;
+		    ring = ring->mr_next) {
+			if (ring->mr_state != MR_INUSE)
 				(void) mac_start_ring(ring);
-			}
-			ring = ring->mr_next;
 		}
+
 		return;
 	}
+
+	/*
+	 * Aggr ports should never have SRSes.
+	 */
+	ASSERT3U((mcip->mci_state_flags & MCIS_IS_AGGR_PORT), ==, 0);
+
 	if (flent->fe_tx_srs == NULL) {
 		(void) mac_srs_create(mcip, flent, SRST_TX | link_type,
 		    NULL, mcip, NULL, NULL);
 	}
+
 	mac_tx_srs_setup(mcip, flent);
 }
 
@@ -3188,12 +3213,12 @@ mac_datapath_teardown(mac_client_impl_t *mcip, flow_entry_t *flent,
 		mac_flow_remove(mip->mi_flow_tab, flent, B_FALSE);
 		mac_flow_wait(flent, FLOW_DRIVER_UPCALL);
 
-		/* Now quiesce and destroy all SRS and soft rings */
+		/* Quiesce and destroy all the SRSes. */
 		mac_rx_srs_group_teardown(flent, B_FALSE);
 		mac_tx_srs_group_teardown(mcip, flent, SRST_LINK);
 
-		ASSERT((mcip->mci_flent == flent) &&
-		    (flent->fe_next == NULL));
+		ASSERT3P(mcip->mci_flent, ==, flent);
+		ASSERT3P(flent->fe_next, ==, NULL);
 
 		/*
 		 * Release our hold on the group as well. We need
@@ -4042,8 +4067,8 @@ mac_fanout_recompute_client(mac_client_impl_t *mcip, cpupart_t *cpupart)
 }
 
 /*
- * Walk through the list of mac clients for the MAC.
- * For each active mac client, recompute the number of soft rings
+ * Walk through the list of MAC clients for the MAC.
+ * For each active MAC client, recompute the number of soft rings
  * associated with every client, only if current speed is different
  * from the speed that was previously used for soft ring computation.
  * If the cable is disconnected whlie the NIC is started, we would get
@@ -4066,6 +4091,10 @@ mac_fanout_recompute(mac_impl_t *mip)
 
 	for (mcip = mip->mi_clients_list; mcip != NULL;
 	    mcip = mcip->mci_client_next) {
+		/* Aggr port clients don't have SRSes. */
+		if ((mcip->mci_state_flags & MCIS_IS_AGGR_PORT) != 0)
+			continue;
+
 		if ((mcip->mci_state_flags & MCIS_SHARE_BOUND) != 0 ||
 		    !MCIP_DATAPATH_SETUP(mcip))
 			continue;
@@ -4078,6 +4107,7 @@ mac_fanout_recompute(mac_impl_t *mip)
 		mac_set_pool_effective(use_default, cpupart, mrp, emrp);
 		pool_unlock();
 	}
+
 	i_mac_perim_exit(mip);
 }
 

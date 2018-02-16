@@ -208,9 +208,18 @@ struct mac_ring_s {
 	mac_ring_t		*mr_next;	/* next ring in the chain */
 	mac_group_handle_t	mr_gh;		/* reference to group */
 
-	mac_classify_type_t	mr_classify_type;	/* HW vs SW */
+	mac_classify_type_t	mr_classify_type;
 	struct mac_soft_ring_set_s *mr_srs;	/* associated SRS */
-	mac_ring_handle_t	mr_prh;		/* associated pseudo ring hdl */
+	mac_ring_handle_t	mr_prh;	/* associated pseudo ring hdl */
+
+	/*
+	 * Ring passthru callback and arguments. See the
+	 * MAC_PASSTHRU_CLASSIFIER comment in mac_provider.h.
+	 */
+	mac_rx_t		mr_pt_fn;
+	void			*mr_pt_arg1;
+	mac_resource_handle_t	mr_pt_arg2;
+
 	uint_t			mr_refcnt;	/* Ring references */
 	/* ring generation no. to guard against drivers using stale rings */
 	uint64_t		mr_gen_num;
