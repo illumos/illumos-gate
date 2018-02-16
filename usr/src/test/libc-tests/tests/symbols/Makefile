@@ -11,6 +11,7 @@
 
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2018, Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -49,14 +50,8 @@ EXTRAPROG += $(SYMTESTS)
 
 include ../Makefile.com
 
-#
-# Since we use libcmdutils which is LF64, we need to be LF64 even though we're
-# not using the LF64 related features at the moment, lint catches us otherwise.
-#
-CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
-
-LDLIBS += -lcmdutils
-LDLIBS64 += -lcmdutils
+LDLIBS += -lcustr
+LDLIBS64 += -lcustr
 
 $(SYMTESTS:%=$(TESTDIR)/%): $(TESTDIR)/setup
 	-$(RM) $@

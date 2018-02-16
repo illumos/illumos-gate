@@ -19,12 +19,13 @@
 
 #include <stdlib.h>
 #include <err.h>
+#include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <sys/debug.h>
 
-#include "libcmdutils.h"
+#include "libcustr.h"
 
 typedef enum {
 	CUSTR_FIXEDBUF	= 0x01

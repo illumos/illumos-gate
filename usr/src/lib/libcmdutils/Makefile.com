@@ -21,12 +21,13 @@
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 RackTop Systems.
+# Copyright 2018, Joyent, Inc.
 #
 
 LIBRARY=	libcmdutils.a
 VERS=		.1
 CMD_OBJS=	avltree.o sysattrs.o writefile.o process_xattrs.o uid.o gid.o \
-		custr.o nicenum.o
+		nicenum.o
 COM_OBJS=	list.o
 OBJECTS=	$(CMD_OBJS) $(COM_OBJS)
 

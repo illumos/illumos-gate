@@ -78,7 +78,7 @@
 #include <stddef.h>
 #include <stp_in.h>
 #include <ofmt.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 
 #define	MAXPORT			256
 #define	MAXVNIC			256

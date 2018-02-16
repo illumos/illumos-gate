@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -27,7 +27,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <note.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 #include <sys/wait.h>
 #include "test_common.h"
 

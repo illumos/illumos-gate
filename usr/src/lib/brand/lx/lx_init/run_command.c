@@ -10,18 +10,19 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <err.h>
+#include <errno.h>
 #include <strings.h>
 #include <unistd.h>
 #include <wait.h>
 #include <sys/types.h>
 #include <sys/debug.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 
 #include "run_command.h"
 #include "pipe_stream.h"

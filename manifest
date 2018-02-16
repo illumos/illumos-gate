@@ -1193,6 +1193,7 @@ f lib/amd64/libctf.so.1 0755 root bin
 s lib/amd64/libctf.so=libctf.so.1
 f lib/amd64/libcurses.so.1 0755 root bin
 s lib/amd64/libcurses.so=libcurses.so.1
+f lib/amd64/libcustr.so.1 0755 root bin
 f lib/amd64/libdevice.so.1 0755 root bin
 s lib/amd64/libdevice.so=libdevice.so.1
 f lib/amd64/libdevid.so.1 0755 root bin
@@ -1374,6 +1375,7 @@ f lib/libcmdutils.so.1 0755 root bin
 s lib/libcmdutils.so=libcmdutils.so.1
 f lib/libcontract.so.1 0755 root bin
 s lib/libcontract.so=libcontract.so.1
+f lib/libcustr.so.1 0755 root bin
 f lib/libcryptoutil.so.1 0755 root bin
 s lib/libcryptoutil.so=libcryptoutil.so.1
 f lib/libctf.so.1 0755 root bin

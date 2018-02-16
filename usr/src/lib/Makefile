@@ -22,7 +22,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018, Joyent, Inc.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2015 Gary Mills
@@ -106,6 +106,7 @@ SUBDIRS +=				\
 	libcryptoutil	\
 	libctf		\
 	libcurses	\
+	libcustr	\
 	libdevice	\
 	libdevid	\
 	libdevinfo	\
@@ -387,6 +388,7 @@ HDRSUBDIRS=				\
 	libcryptoutil	\
 	libctf		\
 	libcurses	\
+	libcustr	\
 	libdevice	\
 	libdevid	\
 	libdevinfo	\
@@ -580,7 +582,7 @@ dbusdeps:	libsecdb libtsol libinetutil libscf libuutil libgen libsmbios
 # libc libm libmd libmp libnsl libnvpair libsocket
 abi:		libctf libmapmalloc libproc
 auditd_plugins: libbsm libsecdb libgss libmtmalloc
-brand:		libzonecfg libmapmalloc libipadm libcmdutils libproc librpcsvc
+brand:		libzonecfg libmapmalloc libipadm libcustr libproc librpcsvc
 cfgadm_plugins:	libdevice libdevinfo libhotplug librcm hbaapi libkstat libscf
 fm:		libexacct libipmi libzfs scsi libdevinfo libdevid libcfgadm \
 		libcontract libsysevent ../cmd/sgs/libelf libdladm libsff \
@@ -718,7 +720,7 @@ sun_fc:		libdevinfo libsysevent
 sun_sas:	libdevinfo libsysevent libkstat libdevid
 udapl:		libdevinfo libdladm
 varpd:		libavl libidspace libumem libnsl libnvpair libmd5 librename \
-		libbunyan libcmdutils
+		libbunyan libcustr
 
 #
 # The reason this rule checks for the existence of the

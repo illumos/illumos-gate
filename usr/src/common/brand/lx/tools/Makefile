@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG =			gen_errno
@@ -22,6 +22,11 @@ OBJS =			gen_errno.o
 CLOBBERFILES +=		$(PROG)
 
 NATIVECC_CFLAGS +=	$(CFLAGS) $(CCVERBOSE)
+# As evidenced by the use of the NATIVE_ variables, gen_errno is intended
+# to be able to run on the build host.  We continue to link it against
+# libcmdutils.so instead of libcustr.so in order to allow it to run on
+# older build hosts (relying on the libcmdutil filter entries if run on
+# newer hosts with libcustr.so).
 NATIVECC_LDLIBS +=	-lcmdutils -lnvpair
 
 .KEEP_STATE:

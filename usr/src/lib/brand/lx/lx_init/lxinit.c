@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -54,7 +54,7 @@
 #include <unistd.h>
 #include <libintl.h>
 #include <locale.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 
 #include <netinet/dhcp.h>
 #include <dhcpagent_util.h>

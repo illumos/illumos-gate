@@ -10,33 +10,29 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2018, Joyent, Inc.
 #
 
-LIBRARY =	libvarpd_files.a
+LIBRARY =	libcustr.a
 VERS =		.1
-OBJECTS =	libvarpd_files.o \
-		libvarpd_files_json.o
+OBJECTS =	custr.o
 
-include ../../../Makefile.lib
-include ../../Makefile.plugin
+include $(SRC)/lib/Makefile.lib
 
-LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lumem -lnvpair -lsocket -lnsl -lcustr
-CPPFLAGS +=	-I../common
+# Things out of /sbin like dladm require custr, so it should go into /lib so
+# they can work in case /usr is split
+include $(SRC)/lib/Makefile.rootfs
 
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
-
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
+LIBS =		$(DYNLIB) $(LINTLIB)
+LDLIBS +=	-lc
+CPPFLAGS +=	-D__EXTENSIONS__
 
 SRCDIR =	../common
 
 .KEEP_STATE:
 
-all:	$(LIBS)
+all: $(LIBS)
 
-lint:	lintcheck
+lint: lintcheck
 
-include ../../../Makefile.targ
+include $(SRC)/lib/Makefile.targ

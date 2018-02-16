@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -26,7 +26,7 @@
 #include <errno.h>
 #include <err.h>
 #include <sys/sysmacros.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 #include <libnvpair.h>
 
 nvlist_t *native_errors;

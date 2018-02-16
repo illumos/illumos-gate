@@ -10,14 +10,14 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_LIBVARPD_FILES_JSON_H
 #define	_LIBVARPD_FILES_JSON_H
 
 #include <libnvpair.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 
 #ifdef __cplusplus
 extern "C" {
