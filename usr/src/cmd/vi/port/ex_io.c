@@ -101,7 +101,7 @@ gettext("No current filename"));
 
 		case 'f':
 			edited = 0;
-			/* fall into ... */
+			/* FALLTHROUGH */
 
 		case 'e':
 			if (savedfile[0]) {
@@ -215,7 +215,7 @@ getargs(void)
 		case '\\':
 			if (any(peekchar(), "#%|"))
 				c = getchar();
-			/* fall into... */
+			/* FALLTHROUGH */
 
 		default:
 			if (cp > &genbuf[LBSIZE - 2])
@@ -416,6 +416,7 @@ rop(int c)
 
 	case S_IFBLK:
 		error(gettext(" Block special file"));
+		/* FALLTHROUGH */
 
 	case S_IFCHR:
 		if (isatty(io))
@@ -423,6 +424,7 @@ rop(int c)
 		if (samei(&stbuf, "/dev/null"))
 			break;
 		error(gettext(" Character special file"));
+		/* FALLTHROUGH */
 
 	case S_IFDIR:
 		error(gettext(" Directory"));

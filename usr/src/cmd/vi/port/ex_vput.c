@@ -30,8 +30,6 @@
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ex.h"
 #include "ex_tty.h"
 #include "ex_vis.h"
@@ -1309,7 +1307,7 @@ vputchar(wchar_t c)
 			return (0);
 		}
 		c = ' ' | QUOTE;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 def:
 	default:

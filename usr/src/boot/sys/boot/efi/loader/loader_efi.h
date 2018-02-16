@@ -55,10 +55,6 @@ struct relocator {
 
 int	efi_autoload(void);
 
-int	efi_getdev(void **, const char *, const char **);
-char	*efi_fmtdev(void *);
-int	efi_setcurrdev(struct env_var *, int, const void *);
-
 ssize_t	efi_copyin(const void *, vm_offset_t, const size_t);
 ssize_t	efi_copyout(const vm_offset_t, void *, const size_t);
 ssize_t	efi_readin(const int, vm_offset_t, const size_t);

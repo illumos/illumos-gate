@@ -30,8 +30,6 @@
 
 /* Copyright (c) 1979 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ex.h"
 #include "ex_temp.h"
 #include "ex_tty.h"
@@ -100,6 +98,7 @@ gettext("Incomplete shell escape command - use 'shell' to get a shell"));
 					contread = 1;
 				}
 			}
+			/* FALLTHROUGH */
 		default:
 			if (up >= (unsigned char *)&uxb[UXBSIZE]) {
 tunix:

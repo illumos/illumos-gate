@@ -311,6 +311,7 @@ main(int ac, char *av[])
 					rcvname = (unsigned char *)av[optind];
 					optind++;
 				}
+				/* FALLTHROUGH */
 
 			case 'L':
 				recov++;

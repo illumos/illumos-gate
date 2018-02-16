@@ -1020,12 +1020,14 @@ zop(int hadpr)
 
 	case '^':
 		zweight = 1;
+		/* FALLTHROUGH */
 	case '-':
 	case '+':
 		while (peekchar() == op) {
 			ignchar();
 			zweight++;
 		}
+		/* FALLTHROUGH */
 	case '=':
 	case '.':
 		c = getchar();
@@ -1080,6 +1082,7 @@ zop2(int nlines, int op)
 	case EOF:
 		if (addr2 == dol)
 			error(gettext("\nAt EOF"));
+		/* FALLTHROUGH */
 	case '+':
 		if (addr2 == dol)
 			error(gettext("At EOF"));
@@ -1087,6 +1090,7 @@ zop2(int nlines, int op)
 		if (addr2 > dol)
 			error(gettext("Hit BOTTOM"));
 		addr2++;
+		/* FALLTHROUGH */
 	default:
 		addr1 = addr2;
 		addr2 += nlines-1;
