@@ -22,6 +22,7 @@
  * Copyright (c) 1986, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T	*/
@@ -440,10 +441,26 @@ init_pages_pp_maximum()
 	}
 }
 
+/*
+ * In the past, we limited the maximum pages that could be gotten to essentially
+ * 1/2 of the total pages on the system. However, this is too conservative for
+ * some cases. For example, if we want to host a large virtual machine which
+ * needs to use a significant portion of the system's memory. In practice,
+ * allowing more than 1/2 of the total pages is fine, but becomes problematic
+ * as we approach or exceed 75% of the pages on the system. Thus, we limit the
+ * maximum to 23/32 of the total pages, which is ~72%.
+ */
 void
 set_max_page_get(pgcnt_t target_total_pages)
 {
-	max_page_get = target_total_pages / 2;
+	max_page_get = (target_total_pages >> 5) * 23;
+	ASSERT3U(max_page_get, >, 0);
+}
+
+pgcnt_t
+get_max_page_get()
+{
+	return (max_page_get);
 }
 
 static pgcnt_t pending_delete;
