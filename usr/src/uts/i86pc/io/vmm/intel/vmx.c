@@ -838,19 +838,8 @@ vmx_trigger_hostintr(int vector)
 	func = ((long)gd->gd_hioffset << 16 | gd->gd_looffset);
 	vmx_call_isr(func);
 #else
-	uintptr_t func;
-	gate_desc_t *dp;
-
 	VERIFY(vector >= 32 && vector <= 255);
-	dp = &CPU->cpu_m.mcpu_idt[vector];
-
-	VERIFY(dp->sgd_ist == 0);
-	VERIFY(dp->sgd_p == 1);
-
-	func = (((uint64_t)dp->sgd_hi64offset << 32) |
-	    ((uint64_t)dp->sgd_hioffset << 16) |
-	    dp->sgd_looffset);
-	vmx_call_isr(func);
+	vmx_call_isr(vector - 32);
 #endif /* __FreeBSD__ */
 }
 

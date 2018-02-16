@@ -283,10 +283,10 @@ ALTENTRY(vmx_exit_guest)
 SET_SIZE(vmx_enter_guest)
 
 /*
- * %rdi = interrupt handler entry point
+ * %rdi = trapno
  *
- * Calling sequence described in the "Instruction Set Reference" for the "INT"
- * instruction in Intel SDM, Vol 2.
+ * We need to do enough to convince cmnint - and its iretting tail - that we're
+ * a legit interrupt stack frame.
  */
 ENTRY_NP(vmx_call_isr)
 	pushq	%rbp
@@ -297,8 +297,13 @@ ENTRY_NP(vmx_call_isr)
 	pushq	%r11		/* %rsp */
 	pushfq			/* %rflags */
 	pushq	$KCS_SEL	/* %cs */
+	leaq	.iret_dest(%rip), %rcx
+	pushq	%rcx		/* %rip */
+	pushq	$0		/* err */
+	pushq	%rdi		/* trapno */
 	cli
-	call	*%rdi		/* %rip (and call) */
+	jmp	cmnint		/* %rip (and call) */
+.iret_dest:
 	popq	%rbp
 	ret
 SET_SIZE(vmx_call_isr)
