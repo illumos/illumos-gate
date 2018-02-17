@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -1931,8 +1931,8 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 
 			if (sigprocmask(SIG_BLOCK, &new_set, &oset) < 0) {
 				err = errno;
-				lx_debug("unable to block signal %d: %s", sig,
-				    strerror(err));
+				lx_debug("unable to block signal %d: %d",
+				    sig, err);
 				return (-err);
 			}
 
@@ -1945,8 +1945,8 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 			if (sigaction(sig, NULL, &sa) < 0) {
 				err = errno;
 				lx_debug("sigaction() to get old "
-				    "disposition for signal %d failed: "
-				    "%s", sig, strerror(err));
+				    "disposition for signal %d failed: %d",
+				    sig, err);
 				(void) sigprocmask(SIG_SETMASK, &oset, NULL);
 				return (-err);
 			}
@@ -2003,7 +2003,7 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 					err = errno;
 					lx_debug("sigaction() to set new "
 					    "disposition for signal %d failed: "
-					    "%s", sig, strerror(err));
+					    "%d", sig, err);
 					(void) sigprocmask(SIG_SETMASK, &oset,
 					    NULL);
 					return (-err);
@@ -2028,10 +2028,9 @@ lx_sigaction_common(int lx_sig, struct lx_sigaction *lxsp,
 
 				if (sigaction(sig, &sa, NULL) < 0) {
 					err = errno;
-					lx_debug("sigaction(%d, %s) failed: %s",
+					lx_debug("sigaction(%d, %s) failed: %d",
 					    sig, ((sa.sa_handler == SIG_DFL) ?
-					    "SIG_DFL" : "SIG_IGN"),
-					    strerror(err));
+					    "SIG_DFL" : "SIG_IGN"), err);
 					(void) sigprocmask(SIG_SETMASK, &oset,
 					    NULL);
 					return (-err);

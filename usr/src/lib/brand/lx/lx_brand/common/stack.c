@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -256,8 +256,7 @@ lx_alloc_stack(void **nstack, size_t *nstack_size)
 	if ((stack = mmap(NULL, stacksize, stackprot, MAP_PRIVATE |
 	    MAP_NORESERVE | MAP_ANON, -1, (off_t)0)) == MAP_FAILED) {
 		int en = errno;
-		lx_debug("lx_alloc_stack: failed to allocate stack: %s",
-		    strerror(errno));
+		lx_debug("lx_alloc_stack: failed to allocate stack: %d", errno);
 		errno = en;
 		return (-1);
 	}
