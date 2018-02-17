@@ -60,7 +60,10 @@
   pkg5:
     name:
       - pkg:/archiver/gnu-tar
+      - pkg:/diagnostic/diskinfo
       - pkg:/install/distribution-constructor
+      - pkg:/service/file-system/nfs
+      - pkg:/service/file-system/smb
       - pkg:/system/test/fio
       - pkg:/system/test/libctest
       - pkg:/system/test/ostest

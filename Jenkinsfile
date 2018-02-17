@@ -10,10 +10,10 @@
  */
 
 /*
- * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2017, 2018 by Delphix. All rights reserved.
  */
 
-env.BASE_IMAGE_ID = 'ami-c5c0a7d3'
+env.BASE_IMAGE_ID = 'ami-08cff7376ce420792'
 
 node('master') {
     stage('checkout, verify, stash') {

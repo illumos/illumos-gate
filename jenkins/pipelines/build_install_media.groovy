@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2017, 2018 by Delphix. All rights reserved.
  */
 
 currentBuild.displayName = "#${env.BUILD_NUMBER} ${OPENZFS_REPOSITORY} ${OPENZFS_BRANCH}"
@@ -29,7 +29,7 @@ node('master') {
     try {
         stage('create instance') {
             env.INSTANCE_ID = misc.shscript('aws-request-spot-instances', true, [
-                ['IMAGE_ID', env.BASE_IMAGE_ID],
+                ['IMAGE_ID', misc.BASE_IMAGE_ID],
                 ['INSTANCE_TYPE', 'c4.xlarge'],
                 ['ADD_DISKS_FOR', 'none'],
                 ['SPOT_PRICE', '0.199']

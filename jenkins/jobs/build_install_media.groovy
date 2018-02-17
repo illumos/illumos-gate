@@ -18,7 +18,6 @@ pipelineJob('build-install-media') {
     concurrentBuild(true)
 
     environmentVariables {
-        env('BASE_IMAGE_ID', 'ami-c5c0a7d3')
         env('MEDIA_DIRECTORY', '/rpool/dc/media')
 
         env('OPENZFS_REPOSITORY', System.getenv('OPENZFS_REPOSITORY'))
