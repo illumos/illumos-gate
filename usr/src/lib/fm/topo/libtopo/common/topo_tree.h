@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #ifndef _TOPO_TREE_H
 #define	_TOPO_TREE_H
@@ -122,6 +125,7 @@ struct topo_hdl {
 	ipmi_handle_t *th_ipmi;		/* IPMI handle */
 	pthread_mutex_t th_ipmi_lock;	/* IPMI lock */
 	smbios_hdl_t *th_smbios;	/* SMBIOS handle */
+	pcidb_hdl_t *th_pcidb;		/* libpcidb handle */
 };
 
 #define	TOPO_UUID_SIZE	37	/* libuuid limit + 1 */

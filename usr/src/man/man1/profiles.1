@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROFILES 1 "Feb 11, 2000"
+.TH PROFILES 1 "Jan 7, 2018"
 .SH NAME
 profiles \- print execution profiles for a user
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ profiles \- print execution profiles for a user
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprofiles\fR command prints on standard output the names of the execution
 profiles that have been assigned to you or to the optionally-specified user or
@@ -40,7 +39,6 @@ profiles are added to the list loaded from \fBuser_attr\fR(4). Matching entries
 in \fBprof_attr\fR(4) provide the authorizations list, and matching entries in
 \fBexec_attr\fR(4) provide the commands list.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -55,7 +53,7 @@ such as user and group \fBID\fRs.
 
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRSample Output
+\fBExample 1\fR Sample Output
 .sp
 .LP
 The output of the \fBprofiles\fR command has the following form:
@@ -63,7 +61,8 @@ The output of the \fBprofiles\fR command has the following form:
 .sp
 .in +2
 .nf
-example% \fBprofiles tester01 tester02\fRtester01 : Audit Management, All Commands
+example% \fBprofiles tester01 tester02\fR
+tester01 : Audit Management, All Commands
 tester02 : Device Management, All Commands
 example%
 .fi
@@ -71,11 +70,12 @@ example%
 .sp
 
 .LP
-\fBExample 2 \fRUsing the \fBlist\fR Option
+\fBExample 2\fR Using the \fBlist\fR Option
 .sp
 .in +2
 .nf
-example% \fBprofiles -l tester01 tester02\fRtester01 :
+example% \fBprofiles -l tester01 tester02\fR
+tester01 :
     Audit Management:
       /usr/sbin/audit          euid=root
       /usr/sbin/auditconfig    euid=root    egid=sys
@@ -93,7 +93,6 @@ example%
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -115,7 +114,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .LP
 \fB/etc/security/exec_attr\fR
 .sp
@@ -128,7 +126,6 @@ An error occurred.
 .LP
 \fB/etc/security/policy.conf\fR
 .SH SEE ALSO
-.sp
 .LP
 \fBauths\fR(1), \fBpfexec\fR(1), \fBroles\fR(1), \fBgetprofattr\fR(3SECDB),
 \fBexec_attr\fR(4), \fBpolicy.conf\fR(4), \fBprof_attr\fR(4),

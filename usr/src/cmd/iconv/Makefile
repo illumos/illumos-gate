@@ -23,7 +23,7 @@ OBJS = iconv_main.o iconv_list.o charmap.o parser.tab.o scanner.o
 
 SRCS	= $(OBJS:%.o=%.c)
 
-C99MODE=	$(C99_ENABLE)
+CSTD=	$(CSTD_GNU99)
 LDLIBS		+= -lcmdutils -lavl
 YFLAGS		= -d -b parser
 CPPFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE

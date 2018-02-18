@@ -698,7 +698,7 @@ reread:
 			operate('$', 1);
 appnd:
 			c = 'a';
-			/* fall into ... */
+			/* FALLTHROUGH */
 
 		/*
 		 * a		Appends text after cursor.  Text can continue
@@ -730,7 +730,7 @@ appnd:
 		case 'I':
 			operate('^', 1);
 			c = 'i';
-			/* fall into ... */
+			/* FALLTHROUGH */
 
 		/*
 		 * R		Replace characters, one for one, by input
@@ -743,7 +743,7 @@ appnd:
 		 *		you can't move around within a R, etc.
 		 */
 		case 'R':
-			/* fall into... */
+			/* FALLTHROUGH */
 
 		/*
 		 * i		Insert text to an escape in the buffer.
@@ -789,7 +789,7 @@ insrt:
 			(void) beep();
 			if (initev || peekkey() != ATTN)
 				continue;
-			/* fall into... */
+			/* FALLTHROUGH */
 
 		/*
 		 * ^\		A quit always gets command mode.
@@ -822,7 +822,7 @@ insrt:
 				continue;
 			}
 #endif
-			/* fall into... */
+			/* FALLTHROUGH */
 
 		/*
 		 * Q		Is like q, but always gets to command mode
@@ -1484,7 +1484,7 @@ vzop(bool hadcnt, int cnt, int c)
 
 	case '+':
 		forbid (addr >= dol);
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	case CR:
 	case NL:

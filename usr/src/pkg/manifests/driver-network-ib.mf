@@ -46,17 +46,12 @@ dir path=usr/share/man/man7
 dir path=usr/share/man/man7d
 driver name=ib perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/ib group=sys
-$(i386_ONLY)file path=kernel/drv/ib group=sys
 file path=kernel/drv/ib.conf group=sys original_name=SUNWib:kernel/drv/ib.conf \
     preserve=renameold
 file path=kernel/misc/$(ARCH64)/ibcm group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/ibdm group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/ibmf group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/ibtl group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ibcm group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ibdm group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ibmf group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ibtl group=sys mode=0755
 file path=usr/share/man/man4/ib.4
 file path=usr/share/man/man7/ibmf.7
 file path=usr/share/man/man7d/ib.7d

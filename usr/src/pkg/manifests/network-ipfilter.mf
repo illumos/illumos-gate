@@ -64,7 +64,6 @@ file path=etc/ipf/ipf.conf group=sys original_name=SUNWipf:etc/ipf/ipf.conf \
 file path=lib/svc/manifest/network/ipfilter.xml group=sys mode=0444
 file path=lib/svc/method/ipfilter mode=0555
 file path=usr/kernel/drv/$(ARCH64)/ipf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/ipf group=sys
 file path=usr/kernel/drv/ipf.conf group=sys
 $(i386_ONLY)file path=usr/lib/ipf/$(ARCH32)/ipftest mode=0555
 file path=usr/lib/ipf/$(ARCH64)/ipftest mode=0555

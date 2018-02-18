@@ -322,23 +322,9 @@ file path=kernel/crypto/$(ARCH64)/sha1 group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/sha2 group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/skein group=sys mode=0755
 file path=kernel/crypto/$(ARCH64)/swrand group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/aes group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/arcfour group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/blowfish group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/des group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/ecc group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/edonr group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/md4 group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/md5 group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/rsa group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/sha1 group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/sha2 group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/skein group=sys mode=0755
-$(i386_ONLY)file path=kernel/crypto/swrand group=sys mode=0755
 $(sparc_ONLY)file path=kernel/dacf/$(ARCH64)/consconfig_dacf group=sys \
     mode=0755
 file path=kernel/dacf/$(ARCH64)/net_dacf group=sys mode=0755
-$(i386_ONLY)file path=kernel/dacf/net_dacf group=sys mode=0755
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/acpi_drv group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/acpi_toshiba group=sys
 file path=kernel/drv/$(ARCH64)/aggr group=sys
@@ -423,174 +409,92 @@ file path=kernel/drv/$(ARCH64)/udp6 group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/vgatext group=sys
 file path=kernel/drv/$(ARCH64)/vnic group=sys
 file path=kernel/drv/$(ARCH64)/wc group=sys
-$(i386_ONLY)file path=kernel/drv/acpi_drv group=sys
 $(i386_ONLY)file path=kernel/drv/acpi_drv.conf group=sys
-$(i386_ONLY)file path=kernel/drv/acpi_toshiba group=sys
-$(i386_ONLY)file path=kernel/drv/aggr group=sys
 file path=kernel/drv/aggr.conf group=sys
-$(i386_ONLY)file path=kernel/drv/arp group=sys
 file path=kernel/drv/arp.conf group=sys
-$(i386_ONLY)file path=kernel/drv/bl group=sys
 file path=kernel/drv/bl.conf group=sys
-$(i386_ONLY)file path=kernel/drv/bridge group=sys
 file path=kernel/drv/bridge.conf group=sys
-$(i386_ONLY)file path=kernel/drv/bscbus group=sys
 $(i386_ONLY)file path=kernel/drv/bscbus.conf group=sys
-$(i386_ONLY)file path=kernel/drv/bscv group=sys
 $(i386_ONLY)file path=kernel/drv/bscv.conf group=sys
-$(i386_ONLY)file path=kernel/drv/clone group=sys
 file path=kernel/drv/clone.conf group=sys
-$(i386_ONLY)file path=kernel/drv/cn group=sys
 file path=kernel/drv/cn.conf group=sys
-$(i386_ONLY)file path=kernel/drv/conskbd group=sys
 file path=kernel/drv/conskbd.conf group=sys
-$(i386_ONLY)file path=kernel/drv/consms group=sys
 file path=kernel/drv/consms.conf group=sys
-$(i386_ONLY)file path=kernel/drv/cpuid group=sys
 file path=kernel/drv/cpuid.conf group=sys
-$(i386_ONLY)file path=kernel/drv/cpunex group=sys
-$(i386_ONLY)file path=kernel/drv/crypto group=sys
 file path=kernel/drv/crypto.conf group=sys
-$(i386_ONLY)file path=kernel/drv/cryptoadm group=sys
 file path=kernel/drv/cryptoadm.conf group=sys
 $(sparc_ONLY)file path=kernel/drv/dad.conf group=sys
-$(i386_ONLY)file path=kernel/drv/devinfo group=sys
 file path=kernel/drv/devinfo.conf group=sys
-$(i386_ONLY)file path=kernel/drv/dld group=sys
 file path=kernel/drv/dld.conf group=sys
-$(i386_ONLY)file path=kernel/drv/dlpistub group=sys
 file path=kernel/drv/dlpistub.conf group=sys
-$(i386_ONLY)file path=kernel/drv/i8042 group=sys
-$(i386_ONLY)file path=kernel/drv/icmp group=sys
 file path=kernel/drv/icmp.conf group=sys
-$(i386_ONLY)file path=kernel/drv/icmp6 group=sys
 file path=kernel/drv/icmp6.conf group=sys
-$(i386_ONLY)file path=kernel/drv/intel_nb5000 group=sys
 $(i386_ONLY)file path=kernel/drv/intel_nb5000.conf group=sys
-$(i386_ONLY)file path=kernel/drv/intel_nhm group=sys
 $(i386_ONLY)file path=kernel/drv/intel_nhm.conf group=sys
-$(i386_ONLY)file path=kernel/drv/intel_nhmex group=sys
 $(i386_ONLY)file path=kernel/drv/intel_nhmex.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ip group=sys
 file path=kernel/drv/ip.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ip6 group=sys
 file path=kernel/drv/ip6.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ipnet group=sys
 file path=kernel/drv/ipnet.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ippctl group=sys
 file path=kernel/drv/ippctl.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ipsecah group=sys
 file path=kernel/drv/ipsecah.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ipsecesp group=sys
 file path=kernel/drv/ipsecesp.conf group=sys
-$(i386_ONLY)file path=kernel/drv/iptun group=sys
 file path=kernel/drv/iptun.conf group=sys
-$(i386_ONLY)file path=kernel/drv/iwscn group=sys
 file path=kernel/drv/iwscn.conf group=sys
-$(i386_ONLY)file path=kernel/drv/kb8042 group=sys
-$(i386_ONLY)file path=kernel/drv/keysock group=sys
 file path=kernel/drv/keysock.conf group=sys
-$(i386_ONLY)file path=kernel/drv/kmdb group=sys
 file path=kernel/drv/kmdb.conf group=sys
-$(i386_ONLY)file path=kernel/drv/kssl group=sys
 file path=kernel/drv/kssl.conf group=sys
-$(i386_ONLY)file path=kernel/drv/llc1 group=sys
 file path=kernel/drv/llc1.conf group=sys
-$(i386_ONLY)file path=kernel/drv/lofi group=sys
 file path=kernel/drv/lofi.conf group=sys
-$(i386_ONLY)file path=kernel/drv/log group=sys
 file path=kernel/drv/log.conf group=sys \
     original_name=SUNWckr:kernel/drv/log.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/mc-amd group=sys
 $(i386_ONLY)file path=kernel/drv/mc-amd.conf group=sys
-$(i386_ONLY)file path=kernel/drv/mm group=sys
 file path=kernel/drv/mm.conf group=sys
-$(i386_ONLY)file path=kernel/drv/mouse8042 group=sys
-$(i386_ONLY)file path=kernel/drv/mpt group=sys
 $(i386_ONLY)file path=kernel/drv/mpt.conf group=sys \
     original_name=SUNWckr:kernel/drv/mpt.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/nulldriver group=sys
-$(i386_ONLY)file path=kernel/drv/openeepr group=sys
 file path=kernel/drv/openeepr.conf group=sys
-$(i386_ONLY)file path=kernel/drv/options group=sys
 file path=kernel/drv/options.conf group=sys
-$(i386_ONLY)file path=kernel/drv/pci_pci group=sys
-$(i386_ONLY)file path=kernel/drv/pcieb group=sys
 file path=kernel/drv/pcieb.conf group=sys
-$(i386_ONLY)file path=kernel/drv/physmem group=sys
 file path=kernel/drv/physmem.conf group=sys
-$(i386_ONLY)file path=kernel/drv/poll group=sys
 file path=kernel/drv/poll.conf group=sys
-$(i386_ONLY)file path=kernel/drv/power group=sys
 $(i386_ONLY)file path=kernel/drv/power.conf group=sys
-$(i386_ONLY)file path=kernel/drv/pseudo group=sys
 file path=kernel/drv/pseudo.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ptc group=sys
 file path=kernel/drv/ptc.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ptsl group=sys
 file path=kernel/drv/ptsl.conf group=sys
-$(i386_ONLY)file path=kernel/drv/ramdisk group=sys
 file path=kernel/drv/ramdisk.conf group=sys
-$(i386_ONLY)file path=kernel/drv/random group=sys
 file path=kernel/drv/random.conf group=sys
-$(i386_ONLY)file path=kernel/drv/rts group=sys
 file path=kernel/drv/rts.conf group=sys
-$(i386_ONLY)file path=kernel/drv/sad group=sys
 file path=kernel/drv/sad.conf group=sys
-$(i386_ONLY)file path=kernel/drv/scsi_vhci group=sys
 file path=kernel/drv/scsi_vhci.conf group=sys \
     original_name=SUNWckr:kernel/drv/scsi_vhci.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/sd group=sys
 $(sparc_ONLY)file path=kernel/drv/sd.conf group=sys \
     original_name=SUNWckr:kernel/drv/sd.conf preserve=true
 $(i386_ONLY)file path=kernel/drv/sd.conf group=sys \
     original_name=SUNWos86r:kernel/drv/sd.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/sgen group=sys
 file path=kernel/drv/sgen.conf group=sys \
     original_name=SUNWckr:kernel/drv/sgen.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/simnet group=sys
 file path=kernel/drv/simnet.conf group=sys
-$(i386_ONLY)file path=kernel/drv/smbios group=sys
 $(i386_ONLY)file path=kernel/drv/smbios.conf group=sys
-$(i386_ONLY)file path=kernel/drv/softmac group=sys
 file path=kernel/drv/softmac.conf group=sys
-$(i386_ONLY)file path=kernel/drv/spdsock group=sys
 file path=kernel/drv/spdsock.conf group=sys
-$(i386_ONLY)file path=kernel/drv/st group=sys
 file path=kernel/drv/st.conf group=sys \
     original_name=SUNWckr:kernel/drv/st.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/sy group=sys
 file path=kernel/drv/sy.conf group=sys
-$(i386_ONLY)file path=kernel/drv/sysevent group=sys
 file path=kernel/drv/sysevent.conf group=sys
-$(i386_ONLY)file path=kernel/drv/sysmsg group=sys
 file path=kernel/drv/sysmsg.conf group=sys
-$(i386_ONLY)file path=kernel/drv/tcp group=sys
 file path=kernel/drv/tcp.conf group=sys
-$(i386_ONLY)file path=kernel/drv/tcp6 group=sys
 file path=kernel/drv/tcp6.conf group=sys
-$(i386_ONLY)file path=kernel/drv/tl group=sys
 file path=kernel/drv/tl.conf group=sys
-$(i386_ONLY)file path=kernel/drv/tzmon group=sys
 $(i386_ONLY)file path=kernel/drv/tzmon.conf group=sys
 $(sparc_ONLY)file path=kernel/drv/uata.conf group=sys \
     original_name=SUNWckr:kernel/drv/uata.conf preserve=true
-$(i386_ONLY)file path=kernel/drv/ucode group=sys
 $(i386_ONLY)file path=kernel/drv/ucode.conf group=sys
-$(i386_ONLY)file path=kernel/drv/udp group=sys
 file path=kernel/drv/udp.conf group=sys
-$(i386_ONLY)file path=kernel/drv/udp6 group=sys
 file path=kernel/drv/udp6.conf group=sys
-$(i386_ONLY)file path=kernel/drv/vgatext group=sys
-$(i386_ONLY)file path=kernel/drv/vnic group=sys
 file path=kernel/drv/vnic.conf group=sys
-$(i386_ONLY)file path=kernel/drv/wc group=sys
 file path=kernel/drv/wc.conf group=sys
 $(sparc_ONLY)file path=kernel/exec/$(ARCH64)/aoutexec group=sys mode=0755
 file path=kernel/exec/$(ARCH64)/elfexec group=sys mode=0755
 file path=kernel/exec/$(ARCH64)/intpexec group=sys mode=0755
-$(i386_ONLY)file path=kernel/exec/elfexec group=sys mode=0755
-$(i386_ONLY)file path=kernel/exec/intpexec group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/autofs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/bootfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ctfs group=sys mode=0755
@@ -609,49 +513,18 @@ file path=kernel/fs/$(ARCH64)/sockfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/specfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/tmpfs group=sys mode=0755
 file path=kernel/fs/$(ARCH64)/ufs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/autofs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/bootfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/ctfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/dcfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/dev group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/devfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/fifofs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/hsfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/lofs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/mntfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/namefs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/objfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/procfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/sharefs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/sockfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/specfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/tmpfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/fs/ufs group=sys mode=0755
-$(i386_ONLY)file path=kernel/genunix group=sys mode=0755
 file path=kernel/ipp/$(ARCH64)/ipgpc group=sys mode=0755
-$(i386_ONLY)file path=kernel/ipp/ipgpc group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_emea group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_ja group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_ko group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_sc group=sys mode=0755
 file path=kernel/kiconv/$(ARCH64)/kiconv_tc group=sys mode=0755
-$(i386_ONLY)file path=kernel/kiconv/kiconv_emea group=sys mode=0755
-$(i386_ONLY)file path=kernel/kiconv/kiconv_ja group=sys mode=0755
-$(i386_ONLY)file path=kernel/kiconv/kiconv_ko group=sys mode=0755
-$(i386_ONLY)file path=kernel/kiconv/kiconv_sc group=sys mode=0755
-$(i386_ONLY)file path=kernel/kiconv/kiconv_tc group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_6to4 group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ether group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ib group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ipv4 group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_ipv6 group=sys mode=0755
 file path=kernel/mac/$(ARCH64)/mac_wifi group=sys mode=0755
-$(i386_ONLY)file path=kernel/mac/mac_6to4 group=sys mode=0755
-$(i386_ONLY)file path=kernel/mac/mac_ether group=sys mode=0755
-$(i386_ONLY)file path=kernel/mac/mac_ib group=sys mode=0755
-$(i386_ONLY)file path=kernel/mac/mac_ipv4 group=sys mode=0755
-$(i386_ONLY)file path=kernel/mac/mac_ipv6 group=sys mode=0755
-$(i386_ONLY)file path=kernel/mac/mac_wifi group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/acpica group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/bignum group=sys mode=0755
 $(i386_ONLY)file path=kernel/misc/$(ARCH64)/bootdev group=sys mode=0755
@@ -689,38 +562,6 @@ file path=kernel/misc/$(ARCH64)/strplumb group=sys mode=0755
 $(sparc_ONLY)file path=kernel/misc/$(ARCH64)/swapgeneric group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/tem group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/tlimod group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/acpica group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/bignum group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/bootdev group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/busra group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/cardbus group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/cmlb group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/consconfig group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ctf group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/dls group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/fssnap_if group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/gld group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/hook group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/hpcsvc group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/idmap group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/iommulib group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ipc group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/kbtrans group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/kcf group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/kmdbmod group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ksocket group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/mac group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/mii group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/net80211 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/neti group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/pci_autoconfig group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/pcicfg group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/pcie group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/pcihp group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/pcmcia group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/rpcsec group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/sata group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi group=sys mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_asym_emc group=sys \
     mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_asym_lsi group=sys \
@@ -736,39 +577,12 @@ file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_tape group=sys mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_tpgs group=sys mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_tpgs_tape group=sys \
     mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_asym_emc group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_asym_lsi group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_asym_sun group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_sym group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_sym_emc group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_sym_hds group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_tape group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_tpgs group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/scsi_vhci/scsi_vhci_f_tpgs_tape group=sys \
-    mode=0755
-$(i386_ONLY)file path=kernel/misc/strplumb group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/tem group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/tlimod group=sys mode=0755
 file path=kernel/sched/$(ARCH64)/SDC group=sys mode=0755
 file path=kernel/sched/$(ARCH64)/TS group=sys mode=0755
 file path=kernel/sched/$(ARCH64)/TS_DPTBL group=sys mode=0755
-$(i386_ONLY)file path=kernel/sched/SDC group=sys mode=0755
-$(i386_ONLY)file path=kernel/sched/TS group=sys mode=0755
-$(i386_ONLY)file path=kernel/sched/TS_DPTBL group=sys mode=0755
 file path=kernel/socketmod/$(ARCH64)/ksslf group=sys mode=0755
 file path=kernel/socketmod/$(ARCH64)/socksctp group=sys mode=0755
 file path=kernel/socketmod/$(ARCH64)/trill group=sys mode=0755
-$(i386_ONLY)file path=kernel/socketmod/ksslf group=sys mode=0755
-$(i386_ONLY)file path=kernel/socketmod/socksctp group=sys mode=0755
-$(i386_ONLY)file path=kernel/socketmod/trill group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/bufmod group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/connld group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/dedump group=sys mode=0755
@@ -785,20 +599,6 @@ file path=kernel/strmod/$(ARCH64)/timod group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/tirdwr group=sys mode=0755
 file path=kernel/strmod/$(ARCH64)/ttcompat group=sys mode=0755
 $(sparc_ONLY)file path=kernel/strmod/$(ARCH64)/vuid3ps2 group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/bufmod group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/connld group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/dedump group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/drcompat group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/ldterm group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/pckt group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/pfmod group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/pipemod group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/ptem group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/redirmod group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/rpcmod group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/timod group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/tirdwr group=sys mode=0755
-$(i386_ONLY)file path=kernel/strmod/ttcompat group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/c2audit group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/doorfs group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/inst_sync group=sys mode=0755
@@ -809,16 +609,6 @@ file path=kernel/sys/$(ARCH64)/portfs group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/pset group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/semsys group=sys mode=0755
 file path=kernel/sys/$(ARCH64)/shmsys group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/c2audit group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/doorfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/inst_sync group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/kaio group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/msgsys group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/pipe group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/portfs group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/pset group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/semsys group=sys mode=0755
-$(i386_ONLY)file path=kernel/sys/shmsys group=sys mode=0755
 file path=lib/svc/manifest/system/dumpadm.xml group=sys mode=0444
 file path=lib/svc/manifest/system/intrd.xml group=sys mode=0444
 file path=lib/svc/manifest/system/scheduler.xml group=sys mode=0444
@@ -826,7 +616,6 @@ file path=lib/svc/method/svc-dumpadm mode=0555
 file path=lib/svc/method/svc-intrd mode=0555
 file path=lib/svc/method/svc-scheduler mode=0555
 file path=usr/kernel/drv/$(ARCH64)/signalfd group=sys
-$(i386_ONLY)file path=usr/kernel/drv/signalfd group=sys
 file path=usr/kernel/drv/signalfd.conf group=sys
 $(sparc_ONLY)file path=usr/share/man/man1m/monitor.1m
 $(sparc_ONLY)file path=usr/share/man/man1m/obpsym.1m
@@ -846,11 +635,6 @@ hardlink path=kernel/misc/$(ARCH64)/sha2 \
     target=../../../kernel/crypto/$(ARCH64)/sha2
 hardlink path=kernel/misc/$(ARCH64)/skein \
     target=../../../kernel/crypto/$(ARCH64)/skein
-$(i386_ONLY)hardlink path=kernel/misc/edonr target=../../kernel/crypto/edonr
-$(i386_ONLY)hardlink path=kernel/misc/md5 target=../../kernel/crypto/md5
-$(i386_ONLY)hardlink path=kernel/misc/sha1 target=../../kernel/crypto/sha1
-$(i386_ONLY)hardlink path=kernel/misc/sha2 target=../../kernel/crypto/sha2
-$(i386_ONLY)hardlink path=kernel/misc/skein target=../../kernel/crypto/skein
 hardlink path=kernel/socketmod/$(ARCH64)/icmp \
     target=../../../kernel/drv/$(ARCH64)/icmp
 hardlink path=kernel/socketmod/$(ARCH64)/rts \
@@ -859,10 +643,6 @@ hardlink path=kernel/socketmod/$(ARCH64)/tcp \
     target=../../../kernel/drv/$(ARCH64)/tcp
 hardlink path=kernel/socketmod/$(ARCH64)/udp \
     target=../../../kernel/drv/$(ARCH64)/udp
-$(i386_ONLY)hardlink path=kernel/socketmod/icmp target=../../kernel/drv/icmp
-$(i386_ONLY)hardlink path=kernel/socketmod/rts target=../../kernel/drv/rts
-$(i386_ONLY)hardlink path=kernel/socketmod/tcp target=../../kernel/drv/tcp
-$(i386_ONLY)hardlink path=kernel/socketmod/udp target=../../kernel/drv/udp
 hardlink path=kernel/strmod/$(ARCH64)/arp \
     target=../../../kernel/drv/$(ARCH64)/arp
 hardlink path=kernel/strmod/$(ARCH64)/icmp \
@@ -879,23 +659,10 @@ hardlink path=kernel/strmod/$(ARCH64)/tcp \
     target=../../../kernel/drv/$(ARCH64)/tcp
 hardlink path=kernel/strmod/$(ARCH64)/udp \
     target=../../../kernel/drv/$(ARCH64)/udp
-$(i386_ONLY)hardlink path=kernel/strmod/arp target=../../kernel/drv/arp
-$(i386_ONLY)hardlink path=kernel/strmod/icmp target=../../kernel/drv/icmp
-$(i386_ONLY)hardlink path=kernel/strmod/ip target=../../kernel/drv/ip
-$(i386_ONLY)hardlink path=kernel/strmod/ipsecah \
-    target=../../kernel/drv/ipsecah
-$(i386_ONLY)hardlink path=kernel/strmod/ipsecesp \
-    target=../../kernel/drv/ipsecesp
-$(i386_ONLY)hardlink path=kernel/strmod/keysock \
-    target=../../kernel/drv/keysock
-$(i386_ONLY)hardlink path=kernel/strmod/tcp target=../../kernel/drv/tcp
-$(i386_ONLY)hardlink path=kernel/strmod/udp target=../../kernel/drv/udp
 hardlink path=kernel/sys/$(ARCH64)/autofs \
     target=../../../kernel/fs/$(ARCH64)/autofs
 hardlink path=kernel/sys/$(ARCH64)/rpcmod \
     target=../../../kernel/strmod/$(ARCH64)/rpcmod
-$(i386_ONLY)hardlink path=kernel/sys/autofs target=../../kernel/fs/autofs
-$(i386_ONLY)hardlink path=kernel/sys/rpcmod target=../../kernel/strmod/rpcmod
 legacy pkg=SUNWckr \
     desc="core kernel software for a specific instruction-set architecture" \
     name="Core Solaris Kernel (Root)"
@@ -935,4 +702,3 @@ $(i386_ONLY)link path=boot/solaris/bin/root_archive \
 link path=dev/dld target=../devices/pseudo/dld@0:ctl
 link path=kernel/misc/$(ARCH64)/des \
     target=../../../kernel/crypto/$(ARCH64)/des
-$(i386_ONLY)link path=kernel/misc/des target=../../kernel/crypto/des

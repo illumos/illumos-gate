@@ -46,7 +46,7 @@ SRCDIR =	../common
 INCS += -I$(SRCDIR)
 INCS += -I$(SRC)/cmd/ndmpd/include
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 LIBS=	$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lscf

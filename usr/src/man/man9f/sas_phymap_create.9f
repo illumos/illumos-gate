@@ -1,0 +1,307 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 20, 2017
+.Dt SAS_PHYMAP_CREATE 9F
+.Os
+.Sh NAME
+.Nm sas_phymap_create ,
+.Nm sas_phymap_destroy ,
+.Nm sas_phymap_phy_add ,
+.Nm sas_phymap_phy_rem
+.Nd SAS PHY map functions
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft int
+.Fo sas_phymap_create
+.Fa "dev_info_t *dip"
+.Fa "int settle_usec"
+.Fa "sas_phymap_mode_t mode"
+.Fa "void *mode_argument"
+.Fa "void *phymap_priv"
+.Fa "sas_phymap_activate_cb_t activate_cb"
+.Fa "sas_phymap_deactivate_cb_t deactivate_cb"
+.Fa "sas_phymap_t **phymapout"
+.Fc
+.Ft void
+.Fo sas_phymap_destroy
+.Fa "sas_phymap_t *phymap"
+.Fc
+.Ft int
+.Fo sas_phymap_phy_add
+.Fa "sas_phymap_t *phymap"
+.Fa "int phy"
+.Fa "uint64_t local"
+.Fa "uint64_t remote"
+.Fc
+.Ft int
+.Fo sas_phymap_phy_rem
+.Fa "sas_phymap_t *phymap"
+.Fa "int phy"
+.Fc
+.Ft void
+.Fo (*sas_phymap_activate_cb_t)
+.Fa "void *phymap_priv"
+.Fa "char *ua"
+.Fa "void **ua_privp"
+.Fc
+.Ft void
+.Fo (*sas_phymap_deactivate_cb_t)
+.Fa "void *phymap_priv"
+.Fa "char *ua"
+.Fa "void *ua_priv"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to
+.Vt dev_info
+structure.
+.It Fa settle_usec
+A time in microseconds.
+.It Fa mode
+Mode of operation for the phy map.
+Should be set to
+.Dv PHYMAP_MODE_SIMPLE .
+.It Fa mode_priv
+Drivers should pass
+.Dv NULL .
+.It Fa phymap_priv
+A private argument to be used in callback functions.
+.It Fa activate_cb
+An optional callback that will be called when a new phy is being
+added to the system.
+.It Fa deactivate_cb
+An optional callback that will be called when an existing phys is
+removed from the system.
+.It Fa phymapout
+Pointer where the phy map is stored.
+.It Fa phymap
+Pointer to an allocated phy map.
+.It Fa phy
+A non-negative integer that uniquely identifies a phy on a device.
+.It Fa local
+The World Wide Number (WWN) of the HBA-owned side of the phy.
+.It Fa remote
+The World Wide Number (WWN) of the device that is plugged into the phy.
+.It Fa ua
+A character string that indicates the system generated unit address for
+the logical port.
+.It Fa ua_privp
+A private value that can be stored for the corresponding unit address.
+.It Fa ua_priv
+A private value for the unit address stored into
+.Fa ua_privp .
+.El
+.Sh DESCRIPTION
+The
+.Fn sas_phymap_create
+and
+.Fn sas_phymap_destroy
+functions create and destroy phymaps which are used to manage a set of
+potentially-active SAS phys and the attached devices.
+For more background, see
+.Xr phymap 9 .
+If the driver in question is not a SAS HBA or a similar fabric-like
+device, then do not use this interface.
+.Pp
+The phy map maps one or more phys to a logical port-like construct that
+is represented based on the WWNs in question.
+This logical SAS port has a unit address derived from the two WWNs.
+When the first phy is noted as using these WWNs, then the phymap will
+call any registered callbacks as the port is created.
+If additional phys come online in service of the
+same port, then a new port will not be created.
+.Pp
+To facilitate the mapping between a PHY and the corresponding port unit
+address, the
+.Xr sas_phymap_phy2ua 9F
+and
+.Xr sas_phymap_lookup_ua 9F
+functions are available.
+.Pp
+To create a phy map, the driver uses the
+.Fn sas_phymap_create
+function.
+The resulting phy map will be stored in the
+.Fa phymapout
+argument.
+The value in
+.Fa settle_usec
+indicates the amount of time that the system should wait to quiesce all
+changes and consider the resulting system stable.
+Changes will not be reported until after
+.Fa settle_usec
+have passed.
+.Pp
+If a driver places a function pointer for either the
+.Fa activate_cb
+or
+.Fa deactivate cb
+then those functions will be called when phys are added and removed from
+the phy map.
+.Pp
+The value placed in the
+.Fa phymap_priv
+argument will be passed to both callback functions.
+.Pp
+To destroy a phymap, the driver should call the
+.Fn sas_phymap_destroy
+function.
+A side effect of this is that all existing entries in the phy
+map will be removed and their deactivate callbacks will fire.
+.Ss Callbacks
+The phymap provides a means for receiving callbacks when the addition of
+a phy causes a new logical port to be created or when the phy being
+removed is the last phy that is a member of the port.
+Unlike with the
+.Xr tgtmap 9 ,
+there is no system managed driver that is attached with the phymap.
+For the phymap to be useful to drivers, the callbacks should generally
+be registered.
+.Pp
+It's important to emphasize that the callbacks do not represent phys,
+but instead the logical port that they are bound to.
+This is different
+from the
+.Xr tgtmap 9
+and
+.Xr iportmap 9 .
+Calls to the
+.Fn sas_phymap_phy_add
+and
+.Fn sas_phymap_phy_rem
+functions may not result in anything being created in the system.
+.Pp
+The
+.Fa activate_cb
+callback occurs whenever a new logical port is created because the first
+phy that references that pair of WWNs has been created.
+The
+.Fa phymap_priv
+argument corresponds to the value passed in the
+.Fn sas_phymap_create
+function.
+.Pp
+The
+.Fa ua
+argument is a unit-address string that the system constructs based on
+the WWNs passed in the
+.Fa local
+and
+.Fa remote
+arguments to the
+.Fn sas_phymap_phy_add
+function.
+If this is being used together with an
+.Xr iportmap 9
+then the
+.Fa ua
+should be the name of the added iport.
+.Pp
+The
+.Fa ua_privp
+argument allows for data to be correlated with the unit-address.
+This data is accessible throughout the lifetime of the unit-address
+through the
+.Xr sas_phymap_lookup_uapriv 9F
+function and is also made available during the deactivate callback.
+.Pp
+The
+.Fa deactivate_cb
+callback occurs when the logical port is being removed, because the last
+associated phy has been removed.
+The arguments to this are the same as to the activate callback, with the
+exception that the
+.Fa ua_priv
+argument is the value that was stored in the
+.Fa ua_privp
+argument of the activate callback.
+.Ss Adding and Removing PHYs
+To add a phy to the system, the driver should call the
+.Fn sas_phymap_phy_add
+function.
+The
+.Fa phy
+argument should indicate the phy identifier of the phy that has come up.
+The
+.Fa local
+WWN generally corresponds to the SAS port on the controller, while the
+.Fa remote
+WWN is whatever device is on the other side of the phy.
+The system enforces that a given phy only maps to a single port at any
+time.
+.Pp
+When a phy goes offline, then the driver should call the
+.Fn sas_phymap_phy_rem
+function using the same phy identifier that it used when adding the phy.
+If this is the last phy that was used for this logical port, then the
+corresponding logical port will be removed and the deactivate callback
+function, if registered, will be called.
+.Sh CONTEXT
+The
+.Fn sas_phymap_create
+and
+.Fn sas_phymap_destroy
+functions are generally called during an HBA driver's
+.Xr attach 9E
+and
+.Xr detach 9E
+entry points, though may be called by a driver from
+.Sy user
+or
+.Sy kernel
+context.
+.Pp
+The optional
+.Fn activate_cb
+and
+.Fn deactivate_cb
+functions for a phymap will be called into the driver from
+.Sy kernel
+context.
+.Pp
+The
+.Fn sas_phymap_phy_add
+and
+.Fn sas_phymap_phy_rem
+functions may be called from
+.Sy user
+or
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn sas_phymap_create ,
+.Fn sas_phymap_phy_add ,
+and
+.Fn sas_phymap_phy_rem
+functions return
+.Dv DDI_SUCCESS .
+Otherwise,
+.Dv DDI_FAILURE
+is returned to indicate failure.
+.Sh SEE ALSO
+.Xr iportmap 9 ,
+.Xr phymap 9 ,
+.Xr tgtmap 9 ,
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr sas_phymap_lookup_ua 9F ,
+.Xr sas_phymap_lookup_uapriv 9F ,
+.Xr sas_phymap_phy2ua 9F

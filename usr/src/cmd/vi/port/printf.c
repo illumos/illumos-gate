@@ -37,12 +37,6 @@
  * contributors.
  */
 
-/* The pwb version this is based on */
-static char *printf_id = "@(#) printf.c:2.2 6/5/79";
-/* The local sccs version within ex */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdarg.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -162,7 +156,7 @@ viprintf(unsigned char *fmt, ...)
 			case 'L':
 			case 'l':
 				length = 2;
-				/* no break!! */
+				/* FALLTHROUGH */
 			case 'h':
 			case 'H':
 				length--;
@@ -196,7 +190,7 @@ viprintf(unsigned char *fmt, ...)
 			case 'O':
 				length = 1;
 				fcode = 'o';
-				/* no break */
+				/* FALLTHROUGH */
 			case 'o':
 			case 'X':
 			case 'x':
@@ -245,7 +239,7 @@ viprintf(unsigned char *fmt, ...)
 			case 'I':
 				length = 1;
 				fcode = fcode + 'a' - 'A';
-				/* no break */
+				/* FALLTHROUGH */
 			case 'd':
 			case 'i':
 			case 'u':

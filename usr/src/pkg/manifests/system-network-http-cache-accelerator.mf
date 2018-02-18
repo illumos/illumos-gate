@@ -74,7 +74,6 @@ file path=etc/nca/ncaport.conf group=sys \
 file path=etc/sock2path.d/system%2Fnetwork%2Fhttp%2Fcache%2Faccelerator \
     group=sys
 file path=kernel/drv/$(ARCH64)/nca group=sys
-$(i386_ONLY)file path=kernel/drv/nca group=sys
 file path=kernel/drv/nca.conf group=sys
 file path=usr/bin/ncab2clf mode=0555
 file path=usr/lib/$(ARCH64)/ncad_addr.so.1
@@ -96,7 +95,6 @@ hardlink path=etc/rc2.d/S94ncalogd target=../../etc/init.d/ncalogd
 hardlink path=etc/rcS.d/K34ncalogd target=../../etc/init.d/ncalogd
 hardlink path=kernel/strmod/$(ARCH64)/nca \
     target=../../../kernel/drv/$(ARCH64)/nca
-$(i386_ONLY)hardlink path=kernel/strmod/nca target=../../kernel/drv/nca
 legacy pkg=SUNWncar \
     desc="core components to enable the network cache and accelerator" \
     name="Solaris Network Cache and Accelerator (Root)"

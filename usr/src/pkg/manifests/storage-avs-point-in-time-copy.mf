@@ -70,7 +70,6 @@ driver name=ii devlink=type=ddi_pseudo;name=ii\t\D perms="* 0666 root sys" \
 file path=etc/init.d/ii mode=0744
 file path=etc/init.d/ii.cluster mode=0744
 file path=kernel/kmdb/$(ARCH64)/ii group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/ii group=sys mode=0555
 file path=lib/svc/manifest/system/nws_ii.xml group=sys mode=0444
 file path=usr/bin/iiadm mode=0555
 file path=usr/bin/iiboot mode=0555
@@ -78,11 +77,9 @@ file path=usr/bin/iicpbmp mode=0555
 file path=usr/bin/iicpshd mode=0555
 file path=usr/cluster/sbin/ii mode=0744
 file path=usr/kernel/drv/$(ARCH64)/ii group=sys
-$(i386_ONLY)file path=usr/kernel/drv/ii group=sys
 file path=usr/kernel/drv/ii.conf group=sys \
     original_name=SUNWii:usr/kernel/drv/ii.conf preserve=true
 file path=usr/lib/mdb/kvm/$(ARCH64)/ii.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/ii.so group=sys mode=0555
 file path=usr/share/man/man1m/iiadm.1m
 file path=usr/share/man/man1m/iicpbmp.1m
 file path=usr/share/man/man1m/iicpshd.1m

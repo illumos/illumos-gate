@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (C) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2018, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PF_KEY 7P "May 6, 2008"
+.TH PF_KEY 7P "Jan 12, 2018"
 .SH NAME
 pf_key \- Security association database interface
 .SH SYNOPSIS
@@ -288,7 +289,9 @@ struct sadb_comb {
     uint16_t sadb_comb_auth_maxbits;
     uint16_t sadb_comb_encrypt_minbits;
     uint16_t sadb_comb_encrypt_maxbits;
-    uint32_t sadb_comb_reserved;
+    uint8_t sadb_x_comb_encrypt_saltbits;
+    uint8_t sadb_x_comb_reserved;
+    uint16_t sadb_comb_reserved;
     uint32_t sadb_comb_soft_allocations;
     uint32_t sadb_comb_hard_allocations;
     uint64_t sadb_comb_soft_bytes;
@@ -328,7 +331,7 @@ struct sadb_x_algdesc {
     uint8_t sadb_x_algdesc_satype;  /* ESP, AH, etc. */
     uint8_t sadb_x_algdesc_algtype; /* AUTH, CRYPT, COMPRESS */
     uint8_t sadb_x_algdesc_alg;     /* DES, 3DES, MD5, etc. */
-    uint8_t sadb_x_algdesc_reserved;
+    uint8_t sadb_x_algdesc_saltbits;
     uint16_t sadb_x_algdesc_minbits;        /* Bit strengths. */
     uint16_t sadb_x_algdesc_maxbits;
    };

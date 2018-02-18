@@ -50,7 +50,6 @@ driver name=ath clone_perms="ath 0666 root sys" perms="* 0666 root sys" \
     alias=pciex168c,1c \
     alias=pciex168c,24
 file path=kernel/drv/$(ARCH64)/ath group=sys
-file path=kernel/drv/ath group=sys
 file path=usr/share/man/man7d/ath.7d
 legacy pkg=SUNWatheros desc="Atheros AR52xx 802.11b/g Wireless NIC Driver" \
     name="Atheros 802.11b/g Wireless NIC Driver"

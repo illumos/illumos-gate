@@ -23,28 +23,17 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This Makefile defines file modules in the directory uts/i86pc/i86hvm
-#	and its children. These are the source files which are i86pc/i86hvm
-#	"implementation architecture" dependent.
-#
 
-#
 # Define objects
-#
-HVM_BOOTSTRAP_OBJS	+= hvm_bootstrap.o
-HVM_CMDK_OBJS		+= cmdk.o
-HVM_SD_OBJS		+= sd.o sd_xbuf.o
-PV_CMDK_OBJS		+= pv_cmdk.o xdf_shell.o
-PV_RTLS_OBJS		+= pv_rtls.o
-PV_SD_OBJS		+= pv_sd.o xdf_shell.o
-XDF_OBJS		+= xdf.o
-XNF_OBJS		+= xnf.o
-XPV_OBJS		+= xpv_support.o xvdi.o gnttab.o evtchn.o \
-				xenbus_comms.o xenbus_client.o xenbus_probe.o \
-				xenbus_xs.o
-XPVD_OBJS		+= xpvd.o
+HVM_BOOTSTRAP_OBJS += hvm_bootstrap.o
+PV_CMDK_OBJS +=	cmdk.o
+PV_RTLS_OBJS +=	rtls.o
+PV_SD_OBJS +=	sd.o
+XDF_OBJS +=	xdf.o
+XNF_OBJS +=	xnf.o
+XPV_OBJS +=	xpv_support.o xvdi.o gnttab.o evtchn.o xenbus_comms.o \
+		xenbus_client.o xenbus_probe.o xenbus_xs.o
+XPVD_OBJS +=	xpvd.o
 
-#
 # Include i86hvm header files
-# -I$(UTSBASE)/../common
-INC_PATH        += -I$(UTSBASE)/common/xen -I$(UTSBASE)/i86pc/i86hvm
+INC_PATH +=	-I$(UTSBASE)/common/xen -I$(UTSBASE)/i86pc/i86hvm

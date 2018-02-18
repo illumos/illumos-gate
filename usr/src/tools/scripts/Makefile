@@ -31,12 +31,10 @@ SHFILES= \
 	build_cscope \
 	bringovercheck \
 	checkpaths \
-	checkproto \
 	cstyle \
 	elfcmp \
 	flg.flp \
 	genoffsets \
-	hgsetup \
 	nightly \
 	onu \
 	protocmp.terse \
@@ -66,7 +64,6 @@ PYFILES= \
 	copyrightchk \
 	git-pbchk \
 	hdrchk \
-	hg-active \
 	mapfilechk \
 	validate_pkg \
 	wsdiff
@@ -88,7 +85,6 @@ MAN1ONBLDFILES= \
 	hdrchk.1onbld \
 	interface_check.1onbld \
 	interface_cmp.1onbld \
-	hgsetup.1onbld \
 	jstyle.1onbld \
 	mapfilechk.1onbld \
 	nightly.1onbld \
@@ -107,7 +103,6 @@ MAKEFILES= \
 	xref.mk
 
 ETCFILES= \
-	hgstyle \
 	its.conf \
 	its.reg
 

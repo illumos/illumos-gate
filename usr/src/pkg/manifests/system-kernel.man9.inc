@@ -14,5 +14,9 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 #
 file path=usr/share/man/man9/Intro.9
+file path=usr/share/man/man9/iport.9
 file path=usr/share/man/man9/vmem.9
 link path=usr/share/man/man9/intro.9 target=Intro.9
+link path=usr/share/man/man9/iportmap.9 target=iport.9
+link path=usr/share/man/man9/phymap.9 target=iport.9
+link path=usr/share/man/man9/tgtmap.9 target=iport.9

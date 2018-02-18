@@ -52,14 +52,11 @@ dir path=usr/share/man/man7d
 driver name=ata alias=ide class=dada class=scsi
 driver name=pci-ide
 file path=kernel/drv/$(ARCH64)/ata group=sys
-file path=kernel/drv/ata group=sys
 file path=kernel/drv/ata.conf group=sys \
     original_name=SUNWpsdir:kernel/drv/ata.conf preserve=true
 file path=platform/i86pc/kernel/drv/$(ARCH64)/pci-ide group=sys
-file path=platform/i86pc/kernel/drv/pci-ide group=sys
 file path=platform/i86pc/kernel/drv/pci-ide.conf group=sys
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/pci-ide group=sys
-file path=platform/i86xpv/kernel/drv/pci-ide group=sys
 file path=platform/i86xpv/kernel/drv/pci-ide.conf group=sys
 file path=usr/share/man/man7d/ata.7d
 legacy pkg=SUNWpsdir desc="Platform Support, ISA Bus Device Drivers, (Root)" \

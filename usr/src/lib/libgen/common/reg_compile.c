@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <ctype.h>
 #include <limits.h>
@@ -403,6 +401,7 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 					*ep++ = (char)c;
 					continue;
 				}
+				break;
 			}
 
 	/* Drop through to default to use \ to turn off special chars */

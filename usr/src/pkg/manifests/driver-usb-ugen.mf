@@ -41,7 +41,6 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=ugen perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/ugen group=sys
-$(i386_ONLY)file path=kernel/drv/ugen group=sys
 file path=usr/share/man/man7d/ugen.7d
 legacy pkg=SUNWugen desc="UGEN (USB Generic Driver)" name="USB Generic Driver"
 license cr_Sun license=cr_Sun

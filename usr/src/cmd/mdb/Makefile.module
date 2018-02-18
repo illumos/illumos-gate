@@ -113,7 +113,7 @@ PYLNFLAGS		= -I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)
 kvm_TGTFLAGS		= -D_KERNEL
 proc_TGTFLAGS		= -D_USER
 
-C99MODE			= $(C99_ENABLE)
+CSTD			= $(CSTD_GNU99)
 
 CFLAGS			+= $(CCVERBOSE)
 CFLAGS64		+= $(CCVERBOSE)
@@ -139,7 +139,6 @@ MAPFILE-EXT	= $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
 
 #
 # kmdb is a kernel module, so we'll use the kernel's build flags.
-$(KMODOBJS) := CFLAGS += $(STAND_FLAGS_32)
 $(KMODOBJS) := CFLAGS64 += $(STAND_FLAGS_64)
 
 #

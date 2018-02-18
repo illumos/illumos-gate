@@ -1,19 +1,20 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\" Copyright 1989 AT&T Copyright (c) 2004, 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USERMOD 1M "May 13, 2017"
+.TH USERMOD 1M "Jan 7, 2018"
 .SH NAME
 usermod \- modify a user's login information on the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBusermod\fR [\fB-u\fR \fIuid\fR [\fB-o\fR]] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR [, \fIgroup\fR...]]
+\fBusermod\fR [\fB-u\fR \fIuid\fR [\fB-o\fR]] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]
      [\fB-d\fR \fIdir\fR [\fB-m\fR [\fB-z|-Z\fR]]] [\fB-s\fR \fIshell\fR] [\fB-c\fR \fIcomment\fR] [\fB-l\fR \fInew_name\fR]
      [\fB-f\fR \fIinactive\fR] [\fB-e\fR \fIexpire\fR]
-     [\fB-A\fR \fIauthorization\fR [, \fIauthorization\fR]]
-     [\fB-P\fR \fIprofile\fR [, \fIprofile\fR]] [\fB-R\fR \fIrole\fR [, \fIrole\fR]]
+     [\fB-A\fR \fIauthorization\fR[,\fIauthorization\fR]...]
+     [\fB-P\fR \fIprofile\fR[,\fIprofile\fR]...] [\fB-R\fR \fIrole\fR[,\fIrole\fR]...]
      [\fB-K\fR \fIkey=value\fR] \fIlogin\fR
 .fi
 
@@ -25,7 +26,7 @@ login-related system file and file system changes.
 .sp
 .LP
 The system file entries created with this command have a limit of 512
-characters per line. Specifying long arguments to several options might exceed
+characters per line. Specifying long arguments to several options can exceed
 this limit.
 .SH OPTIONS
 .LP
@@ -40,7 +41,7 @@ The following options are supported:
 One or more comma separated authorizations as defined in \fBauth_attr\fR(4).
 Only a user or role who has \fBgrant\fR rights to the \fBauthorization\fR can
 assign it to an account. This replaces any existing authorization setting. If
-no authorization list is specified, the existing setting is removed.
+an empty authorization list is specified, the existing setting is removed.
 .RE
 
 .sp
@@ -114,10 +115,11 @@ redefines the user's primary group membership.
 .ad
 .sp .6
 .RS 4n
-Specify an existing group's integer "ID" "," or character string name. It
-redefines the user's supplementary group membership. Duplicates between
-\fIgroup\fR with the \fB-g\fR and \fB-G\fR options are ignored. No more than
-\fBNGROUPS_UMAX\fR groups may be specified as defined in \fB<param.h>\fR\&.
+One or more comma-separated existing groups, specified by integer \fBID\fR or
+character-string name. It redefines the user's supplementary group membership.
+Any duplicate groups between the \fB-g\fR and \fB-G\fR options are ignored.
+No more than \fBNGROUPS_UMAX\fR groups may be specified as defined in
+\fB<sys/param.h>\fR\&.
 .RE
 
 .sp
@@ -202,8 +204,8 @@ This option allows the specified \fBUID\fR to be duplicated (non-unique).
 .ad
 .sp .6
 .RS 4n
-One or more comma-separated rights profiles defined in \fBprof_attr\fR(4). This
-replaces any existing profile setting in \fBuser_attr\fR(4). If an empty
+One or more comma-separated execution profiles defined in \fBprof_attr\fR(4).
+This replaces any existing profile setting in \fBuser_attr\fR(4). If an empty
 profile list is specified, the existing setting is removed.
 .RE
 
@@ -215,8 +217,8 @@ profile list is specified, the existing setting is removed.
 .sp .6
 .RS 4n
 One or more comma-separated roles (see \fBroleadd\fR(1M)). This replaces any
-existing role setting. If no role list is specified, the existing setting is
-removed.
+existing role setting. If an empty role list is specified, the existing setting
+is removed.
 .RE
 
 .sp
@@ -238,7 +240,7 @@ login. The value of \fIshell\fR must be a valid executable file.
 .sp .6
 .RS 4n
 Specify a new \fBUID\fR for the user. It must be a non-negative decimal integer
-less than \fBMAXUID\fR as defined in \fB<param.h>\fR\&. The \fBUID\fR
+less than \fBMAXUID\fR as defined in \fB<sys/param.h>\fR\&. The \fBUID\fR
 associated with the user's home directory is not modified with this option; a
 user will not have access to their home directory until the \fBUID\fR is
 manually reassigned using \fBchown\fR(1).
@@ -259,7 +261,7 @@ An existing login name to be modified.
 
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRAssigning Privileges to a User
+\fBExample 1\fR Assigning Privileges to a User
 .sp
 .LP
 The following command adds the privilege that affects high resolution times to
@@ -285,7 +287,7 @@ jdoe::::type=normal;defaultpriv=basic,proc_clock_highres
 .in -2
 
 .LP
-\fBExample 2 \fRRemoving a Privilege from a User's Limit Set
+\fBExample 2\fR Removing a Privilege from a User's Limit Set
 .sp
 .LP
 The following command removes the privilege that allows the specified user to
@@ -311,7 +313,7 @@ jdoe::::type=normal;defaultpriv=basic,limitpriv=all,!sys_linkdir
 .in -2
 
 .LP
-\fBExample 3 \fRRemoving a Privilege from a User's Basic Set
+\fBExample 3\fR Removing a Privilege from a User's Basic Set
 .sp
 .LP
 The following command removes the privilege that allows the specified user to
@@ -337,7 +339,7 @@ jdoe::::type=normal;defaultpriv=basic,!proc_session;limitpriv=all
 .in -2
 
 .LP
-\fBExample 4 \fRAssigning a Role to a User
+\fBExample 4\fR Assigning a Role to a User
 .sp
 .LP
 The following command assigns a role to a user. The role must have been created
@@ -363,11 +365,11 @@ jdoe::::type=normal;roles=mailadm;defaultpriv=basic;limitpriv=all
 .in -2
 
 .LP
-\fBExample 5 \fRRemoving All Profiles from a User
+\fBExample 5\fR Removing All Profiles from a User
 .sp
 .LP
 The following command removes all profiles that were granted to a user
-directly. The user will still have any rights profiles that are granted by
+directly. The user will still have any execution profiles that are granted by
 means of the \fBPROFS_GRANTED\fR key in \fBpolicy.conf\fR(4).
 
 .sp
@@ -494,7 +496,7 @@ Unable to complete the move of the home directory to the new home directory.
 .ad
 .sp .6
 .RS 4n
-useradd, usermod and userdel configuration file
+configuration file for user and role administrative commands
 .RE
 
 .sp
@@ -534,7 +536,8 @@ system password file
 .ad
 .sp .6
 .RS 4n
-system file containing users' encrypted passwords and related information
+system file containing users' and roles' encrypted passwords and related
+information
 .RE
 
 .sp
@@ -564,12 +567,12 @@ Interface Stability	Committed
 
 .SH SEE ALSO
 .LP
-\fBchown\fR(1), \fBpasswd\fR(1), \fBusers\fR(1B), \fBgroupadd\fR(1M),
-\fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBlogins\fR(1M), \fBpwconv\fR(1M),
-\fBroleadd\fR(1M), \fBroledel\fR(1M), \fBrolemod\fR(1M), \fBuseradd\fR(1M),
-\fBuserdel\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4),
+\fBchown\fR(1), \fBpasswd\fR(1), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M),
+\fBgroupmod\fR(1M), \fBlogins\fR(1M), \fBpwconv\fR(1M), \fBroleadd\fR(1M),
+\fBroledel\fR(1M), \fBrolemod\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M),
+\fBzfs\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4),
 \fBpolicy.conf\fR(4), \fBprof_attr\fR(4), \fBuser_attr\fR(4),
-\fBattributes\fR(5), \fBzfs\fR(1M)
+\fBattributes\fR(5)
 .SH NOTES
 .LP
 The \fBusermod\fR utility modifies \fBpasswd\fR definitions only in the local

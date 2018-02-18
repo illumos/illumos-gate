@@ -791,8 +791,9 @@ multiboot2_exec(struct preloaded_file *fp)
 	size_t size;
 	struct bios_smap *smap;
 #if defined (EFI)
-	multiboot_tag_module_t *module;
+	multiboot_tag_module_t *module, *mp;
 	EFI_MEMORY_DESCRIPTOR *map;
+	UINTN map_size, desc_size;
 	struct relocator *relocator;
 	struct chunk_head *head;
 	struct chunk *chunk;
@@ -928,7 +929,7 @@ multiboot2_exec(struct preloaded_file *fp)
 	 * - tmp != mfp->f_addr only in case of EFI.
 	 */
 #if defined (EFI)
-	tmp = roundup2(load_addr + fp->f_size, MULTIBOOT_MOD_ALIGN);
+	tmp = roundup2(load_addr + fp->f_size + 1, MULTIBOOT_MOD_ALIGN);
 	module = (multiboot_tag_module_t *)last_addr;
 #endif
 
@@ -958,9 +959,12 @@ multiboot2_exec(struct preloaded_file *fp)
 		tag->mb_type = MULTIBOOT_TAG_TYPE_MODULE;
 		tag->mb_size = sizeof (*tag) + num;
 #if defined (EFI)
-		tag->mb_mod_start = tmp;
-		tag->mb_mod_end = tmp + mfp->f_size;
-		tmp = roundup2(tag->mb_mod_end + 1, MULTIBOOT_MOD_ALIGN);
+		/*
+		 * We can assign module addresses only after BS have been
+		 * switched off.
+		 */
+		tag->mb_mod_start = 0;
+		tag->mb_mod_end = mfp->f_size;
 #else
 		tag->mb_mod_start = mfp->f_addr;
 		tag->mb_mod_end = mfp->f_addr + mfp->f_size;
@@ -1100,21 +1104,21 @@ multiboot2_exec(struct preloaded_file *fp)
 	/* Leave EFI memmap last as we will also switch off the BS. */
 	{
 		multiboot_tag_efi_mmap_t *tag;
-		UINTN size, desc_size, key;
+		UINTN key;
 		EFI_STATUS status;
 
 		tag = (multiboot_tag_efi_mmap_t *)
 		    mb_malloc(sizeof (*tag));
 
-		size = 0;
-		status = BS->GetMemoryMap(&size,
+		map_size = 0;
+		status = BS->GetMemoryMap(&map_size,
 		    (EFI_MEMORY_DESCRIPTOR *)tag->mb_efi_mmap, &key,
 		    &desc_size, &tag->mb_descr_vers);
 		if (status != EFI_BUFFER_TOO_SMALL) {
 			error = EINVAL;
 			goto error;
 		}
-		status = BS->GetMemoryMap(&size,
+		status = BS->GetMemoryMap(&map_size,
 		    (EFI_MEMORY_DESCRIPTOR *)tag->mb_efi_mmap, &key,
 		    &desc_size, &tag->mb_descr_vers);
 		if (EFI_ERROR(status)) {
@@ -1122,7 +1126,7 @@ multiboot2_exec(struct preloaded_file *fp)
 			goto error;
 		}
 		tag->mb_type = MULTIBOOT_TAG_TYPE_EFI_MMAP;
-		tag->mb_size = sizeof (*tag) + size;
+		tag->mb_size = sizeof (*tag) + map_size;
 		tag->mb_descr_size = (uint32_t) desc_size;
 
 		/*
@@ -1132,7 +1136,7 @@ multiboot2_exec(struct preloaded_file *fp)
 		 * relocator data, trampoline, copy, memmove, stack.
 		 */
 		for (i = 0, map = (EFI_MEMORY_DESCRIPTOR *)tag->mb_efi_mmap;
-		    i < size / desc_size;
+		    i < map_size / desc_size;
 		    i++, map = NextMemoryDescriptor(map, desc_size)) {
 			if (map->PhysicalStart == 0)
 				continue;
@@ -1154,7 +1158,7 @@ multiboot2_exec(struct preloaded_file *fp)
 			}
 		}
 
-		last_addr += size;
+		last_addr += map_size;
 		last_addr = roundup2(last_addr, MULTIBOOT_TAG_ALIGN);
 	}
 #endif
@@ -1191,20 +1195,32 @@ multiboot2_exec(struct preloaded_file *fp)
 
 	STAILQ_INSERT_TAIL(head, chunk, chunk_next);
 
+	mp = module;
 	for (mfp = fp->f_next; mfp != NULL; mfp = mfp->f_next) {
 		chunk = &relocator->rel_chunklist[i++];
 		chunk->chunk_vaddr = mfp->f_addr;
-		chunk->chunk_paddr = module->mb_mod_start;
+
+		/*
+		 * fix the mb_mod_start and mb_mod_end.
+		 */
+		mp->mb_mod_start = efi_physaddr(module, tmp, map,
+		    map_size / desc_size, desc_size, mp->mb_mod_end);
+		if (mp->mb_mod_start == 0)
+			panic("Could not find memory for module\n");
+
+		mp->mb_mod_end += mp->mb_mod_start;
+		chunk->chunk_paddr = mp->mb_mod_start;
 		chunk->chunk_size = mfp->f_size;
 		STAILQ_INSERT_TAIL(head, chunk, chunk_next);
 
-		module = (multiboot_tag_module_t *)
-		    roundup2((uintptr_t)module + module->mb_size,
+		mp = (multiboot_tag_module_t *)
+		    roundup2((uintptr_t)mp + mp->mb_size,
 		    MULTIBOOT_TAG_ALIGN);
 	}
 	chunk = &relocator->rel_chunklist[i++];
 	chunk->chunk_vaddr = (EFI_VIRTUAL_ADDRESS)mbi;
-	chunk->chunk_paddr = tmp;
+	chunk->chunk_paddr = efi_physaddr(module, tmp, map,
+		    map_size / desc_size, desc_size, mbi->mbi_total_size);
 	chunk->chunk_size = mbi->mbi_total_size;
 	STAILQ_INSERT_TAIL(head, chunk, chunk_next);
 

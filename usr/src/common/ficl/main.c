@@ -115,7 +115,7 @@ main(int argc, char **argv)
 
 	if ((vm = bf_init("", NULL)) == NULL)
 		return (ENOMEM);
-	returnValue = ficlVmEvaluate(vm, ".ver .( " __DATE__ " ) cr quit");
+	returnValue = ficlVmEvaluate(vm, ".ver cr quit");
 
 	/*
 	 * load files specified on command-line

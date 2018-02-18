@@ -47,9 +47,7 @@ driver name=pcic class=pcmcia \
 driver name=pcs
 file path=kernel/drv/$(ARCH64)/pcic group=sys
 file path=kernel/drv/$(ARCH64)/pcs group=sys
-$(i386_ONLY)file path=kernel/drv/pcic group=sys
 file path=kernel/drv/pcic.conf group=sys
-$(i386_ONLY)file path=kernel/drv/pcs group=sys
 file path=usr/share/man/man7d/pcic.7d
 file path=usr/share/man/man7d/pcmcia.7d
 legacy pkg=SUNWpcmci \

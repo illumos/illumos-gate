@@ -262,7 +262,6 @@ file path=etc/net-snmp/snmp/mibs/SUN-IREPORT-MIB.mib \
 # driver is global-zone only
 #
 file path=kernel/drv/$(ARCH64)/fm group=sys
-$(i386_ONLY)file path=kernel/drv/fm group=sys
 file path=kernel/drv/fm.conf group=sys
 
 #

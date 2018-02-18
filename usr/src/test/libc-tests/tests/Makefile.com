@@ -27,7 +27,7 @@ $(BUILD64) PROG64= $(PROG).$(MACH64)
 
 $(OBJS_OVERRIDE)SRCS = $(PROG).c ../common/test_common.c
 
-C99MODE = -xc99=%all
+CSTD = $(CSTD_GNU99)
 LINTFLAGS += -I../common -DARCH=\"ARCH\" -DLINT
 CPPFLAGS += -I$(ROOT)/usr/include -I../common
 

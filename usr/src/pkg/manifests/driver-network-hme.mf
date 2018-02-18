@@ -46,7 +46,6 @@ $(sparc_ONLY)driver name=hme alias=SUNW,hme
 $(i386_ONLY)driver name=hme alias=pci108e,1001
 $(sparc_ONLY)file path=kernel/drv/$(ARCH64)/fas group=sys
 file path=kernel/drv/$(ARCH64)/hme group=sys
-$(i386_ONLY)file path=kernel/drv/hme group=sys
 $(sparc_ONLY)file path=usr/share/man/man7d/fas.7d
 file path=usr/share/man/man7d/hme.7d
 legacy pkg=SUNWhmd desc="SunSwift Adapter Drivers" \

@@ -32,6 +32,7 @@ CMDS = $(PROG:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
 
 LDLIBS += -lsocket
+kmc-updater := LDLIBS += -lipsecutil
 
 all: $(PROG)
 

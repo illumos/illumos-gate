@@ -481,6 +481,12 @@ struct mac_impl_s {
 	mac_capab_transceiver_t	mi_transceiver;
 
 	/*
+	 * LED Capability information. SL protected.
+	 */
+	mac_led_mode_t		mi_led_modes;
+	mac_capab_led_t		mi_led;
+
+	/*
 	 * MAC address list. SL protected.
 	 */
 	mac_address_t		*mi_addresses;
@@ -666,17 +672,6 @@ typedef struct mac_notify_task_arg {
 	mac_notify_type_t	mnt_type;
 	mac_ring_t		*mnt_ring;
 } mac_notify_task_arg_t;
-
-/*
- * XXX All MAC_DBG_PRTs must be replaced with call to dtrace probes. For now
- * it may be easier to have these printfs for easier debugging
- */
-#ifdef DEBUG
-extern int mac_dbg;
-#define	MAC_DBG_PRT(a)	if (mac_dbg > 0) {(void) printf a; }
-#else
-#define	MAC_DBG_PRT(a)
-#endif
 
 /*
  * The mac_perim_handle_t is an opaque type that encodes the 'mip' pointer
@@ -928,6 +923,15 @@ extern int mac_transceiver_count(mac_handle_t, uint_t *);
 extern int mac_transceiver_info(mac_handle_t, uint_t, boolean_t *, boolean_t *);
 extern int mac_transceiver_read(mac_handle_t, uint_t, uint_t, void *, size_t,
     off_t, size_t *);
+
+/*
+ * MAC LED related functions
+ */
+#define	MAC_LED_ALL	(MAC_LED_DEFAULT | MAC_LED_OFF | MAC_LED_IDENT | \
+			    MAC_LED_ON)
+extern void mac_led_init(mac_impl_t *);
+extern int mac_led_get(mac_handle_t, mac_led_mode_t *, mac_led_mode_t *);
+extern int mac_led_set(mac_handle_t, mac_led_mode_t);
 
 #ifdef	__cplusplus
 }

@@ -44,7 +44,6 @@ driver name=arn clone_perms="arn 0666 root sys" perms="* 0666 root sys" \
     alias=pciex168c,2a \
     alias=pciex168c,2b
 file path=kernel/drv/$(ARCH64)/arn group=sys
-file path=kernel/drv/arn group=sys
 file path=usr/share/man/man7d/arn.7d
 legacy pkg=SUNWarn desc="Atheros AR9xxx 802.11 Wireless NIC Driver" \
     name="Atheros IEEE 802.11 Wireless NIC Driver"

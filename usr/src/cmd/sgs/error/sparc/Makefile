@@ -41,7 +41,7 @@ CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
-C99MODE=	$(C99_ENABLE)
+CSTD=	$(CSTD_GNU99)
 
 CLEANFILES +=	$(LINTOUT)
 

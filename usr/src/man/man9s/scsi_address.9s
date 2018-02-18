@@ -1,70 +1,111 @@
-'\" te
 .\"  Copyright (c) 2000, Sun Microsystems, Inc.,  All Rights Reserved
+.\" Copyright (c) 2017, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCSI_ADDRESS 9S "Aug 30, 1995"
-.SH NAME
-scsi_address \- SCSI address structure
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/scsi/scsi.h>
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
-Solaris architecture specific (Solaris DDI)
-.SH DESCRIPTION
-.sp
-.LP
-A \fBscsi_address\fR structure defines the addressing components for a
-\fBSCSI\fR target device. The address of the target device is separated into
-two components: target number and logical unit number. The two addressing
-components are used to uniquely identify any type of \fBSCSI\fR device;
-however, most devices can be addressed with the target component of the
+.Dd Apr 23, 2017
+.Dt SCSI_ADDRESS 9S
+.Os
+.Sh NAME
+.Nm scsi_address
+.Nd SCSI address structure
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Sh INTERFACE LEVEL
+illumos architecture specific (illumos DDI)
+.Sh DESCRIPTION
+A
+.Vt scsi_address
+structure defines the addressing components for a
+.Sy SCSI
+target device.
+The address of the target device is separated into two components:
+target number and logical unit number.
+The two addressing components are used to uniquely identify any type of
+.Sy SCSI
+device; however, most devices can be addressed with the target component of the
 address.
-.sp
-.LP
+.Pp
 In the case where only the target component is used to address the device, the
-logical unit should be set to  \fB0\fR. If the \fBSCSI\fR target device
-supports logical units, then the \fBHBA\fR must interpret the logical units
-field of the data structure.
-.sp
-.LP
-The \fBpkt_address\fR member of a \fBscsi_pkt\fR(9S) is initialized by
-\fBscsi_init_pkt\fR(9F).
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
+logical unit should be set to
+.Sy 0 . If the
+.Sy SCSI
+target device supports logical units, then the HBA must interpret the
+logical units field of the data structure.
+.Pp
+The
+.Sy pkt_address
+member of a
+.Xr scsi_pkt 9S
+is initialized by
+.Xr scsi_init_pkt 9F .
+.Ss Complex Addressing
+Drivers may set the flag
+.Dv SCSI_HBA_ADDR_COMPLEX
+in the
+.Fa hba_flags
+argument to
+.Xr scsi_hba_attach_setup 9F .
+When the flag is set, this structure must be treated as opaque.
+Instead of storing a traditional target and LUN, the address is treated
+as the string form of a unit address.
+In addition, rather than storing a pointer to the
+.Xr scsi_hba_tran 9S
+structure, the address structure can store any arbitrary pointer through
+the
+.Xr scsi_device_hba_private_get 9F
+and
+.Xr scsi_device_hba_private_set 9F
+functions.
+.Sh STRUCTURE MEMBERS
+.Bd -literal
 scsi_hba_tran_t   *a_hba_tran;  /* Transport vectors for the SCSI bus */
 ushort_t          a_target;     /* SCSI target id */
 uchar_t           a_lun;        /* SCSI logical unit */
-.fi
-.in -2
-
-.sp
-.LP
-\fBa_hba_tran\fR is a pointer to the controlling \fBHBA\fR's transport vector
-structure. The \fBSCSA\fR interface uses this field to pass any transport
-requests from the \fBSCSI\fR target device drivers to the \fBHBA\fR driver.
-.sp
-.LP
-\fBa_target\fR is the target component of the \fBSCSI\fR address.
-.sp
-.LP
-\fBa_lun\fR is the logical unit component of the \fBSCSI\fR address. The
-logical unit is used to further distinguish a \fBSCSI\fR target device that
-supports multiple logical units from one that does not. The \fBmakecom\fR(9F)
-family of functions use the \fBa_lun\fR field to set the logical unit field in
-the \fBSCSI\fR \fBCDB\fR, for compatibility with \fBSCSI-1\fR.
-.SH SEE ALSO
-.sp
-.LP
-\fBmakecom\fR(9F), \fBscsi_init_pkt\fR(9F), \fBscsi_hba_tran\fR(9S),
-\fBscsi_pkt\fR(9S)
-.sp
-.LP
-\fIWriting Device Drivers\fR
+.Ed
+.Pp
+.Fa a_hba_tran
+is a pointer to the controlling
+.Sy HBA 's
+transport vector
+structure.
+The
+.Sy SCSA
+interface uses this field to pass any transport
+requests from the
+.Sy SCSI
+target device drivers to the
+.Sy HBA
+driver.
+.Pp
+.Fa a_target
+is the target component of the
+.Sy SCSI
+address
+.Pp
+.Fa a_lun
+is the logical unit component of the
+.Sy SCSI
+address.
+The logical unit is used to further distinguish a
+.Sy SCSI
+target device that
+supports multiple logical units from one that does not.
+.Pp
+If the flag,
+.Dv SCSI_HBA_ADDR_COMPLEX
+was set, then the driver
+.Em must not
+dereference any of these fields, the structure contents will have
+changed and should be considered opaque.
+.Sh SEE ALSO
+.Xr scsi_device_hba_private_get 9F ,
+.Xr scsi_device_hba_private_set 9F ,
+.Xr scsi_hba_attach_setup 9F ,
+.Xr scsi_init_pkt 9F ,
+.Xr scsi_hba_tran 9S ,
+.Xr scsi_pkt 9S
+.Pp
+.Rs
+.%T Writing Device Drivers
+.Re

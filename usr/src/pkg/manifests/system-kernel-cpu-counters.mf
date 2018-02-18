@@ -55,7 +55,6 @@ $(sparc_ONLY)dir path=platform/sun4v/kernel/sys group=sys
 $(sparc_ONLY)dir path=platform/sun4v/kernel/sys/$(ARCH64) group=sys
 driver name=cpc perms="shared 0666 root sys"
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/$(ARCH64)/cpc group=sys
-$(i386_ONLY)file path=platform/i86pc/kernel/drv/cpc group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/drv/cpc.conf group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/cpc group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/cpc.conf group=sys
@@ -63,7 +62,6 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/drv/$(ARCH64)/cpc group=sys
 $(sparc_ONLY)file path=platform/sun4v/kernel/drv/cpc.conf group=sys
 $(i386_ONLY)hardlink path=platform/i86pc/kernel/sys/$(ARCH64)/cpc \
     target=../../drv/$(ARCH64)/cpc
-$(i386_ONLY)hardlink path=platform/i86pc/kernel/sys/cpc target=../drv/cpc
 $(sparc_ONLY)hardlink path=platform/sun4u/kernel/sys/$(ARCH64)/cpc \
     target=../../drv/$(ARCH64)/cpc
 $(sparc_ONLY)hardlink path=platform/sun4v/kernel/sys/$(ARCH64)/cpc \

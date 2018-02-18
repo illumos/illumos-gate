@@ -46,7 +46,6 @@ driver name=xge clone_perms="xge 0666 root sys" perms="* 0666 root sys" \
     alias=pci17d5,5831 \
     alias=pci17d5,5832
 file path=kernel/drv/$(ARCH64)/xge group=sys
-$(i386_ONLY)file path=kernel/drv/xge group=sys
 file path=usr/share/man/man7d/xge.7d
 legacy pkg=SUNWxge \
     desc="Neterion Xframe (I/II) 10 Gigabit Ethernet Adapter Driver" \

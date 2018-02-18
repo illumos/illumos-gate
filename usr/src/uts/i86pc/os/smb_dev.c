@@ -83,14 +83,6 @@ smbios_open(const char *file, int version, int flags, int *errp)
 		bioslen = MMU_PAGESIZE;
 		startoff = startaddr & MMU_PAGEOFFSET;
 		startaddr &= MMU_PAGEMASK;
-#if defined(__i386)
-		/* If the address is not good, use memory scan instead. */
-		if (startaddr > UINT32_MAX) {
-			startaddr = SMB_RANGE_START;
-			bioslen = SMB_RANGE_LIMIT - SMB_RANGE_START + 1;
-			startoff = 0;
-		}
-#endif
 	}
 
 	bios = psm_map_phys(startaddr, bioslen, PSM_PROT_READ);
@@ -105,13 +97,12 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	p = bios + startoff;
 	q = bios + bioslen - startoff;
 	while (p < q) {
-#if !defined(__i386)
 		err = strncmp(p, SMB3_ENTRY_EANCHOR, SMB3_ENTRY_EANCHORLEN);
 		if (err == 0) {
 			ep_type = SMBIOS_ENTRY_POINT_30;
 			break;
 		}
-#endif
+
 		if (strncmp(p, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN) == 0)
 			break;
 		p += SMB_SCAN_STEP;

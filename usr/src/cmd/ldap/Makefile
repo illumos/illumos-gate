@@ -2,8 +2,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/ldap/Makefile
 
 include ../Makefile.cmd
@@ -32,7 +30,7 @@ $(POFILES) :=	CFLAGS += -I ../../lib/libldap5/include/ldap \
 			-DNO_LIBLCACHE -DLDAP_REFERRALS -DNET_SSL \
 			-DLDAPSSLIO -DHAVE_SASL_OPTIONS \
 			-DSOLARIS_LDAP_CMD
-$(NS_POFILES) := C99MODE = $(C99_ENABLE)
+$(NS_POFILES) := CSTD = $(CSTD_GNU99)
 
 .KEEP_STATE:
 

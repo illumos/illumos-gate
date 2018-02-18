@@ -45,7 +45,6 @@ driver name=fipe \
     alias=pci8086,25f0 \
     alias=pci8086,360c
 file path=platform/i86pc/kernel/drv/$(ARCH64)/fipe group=sys
-file path=platform/i86pc/kernel/drv/fipe group=sys
 file path=platform/i86pc/kernel/drv/fipe.conf group=sys
 legacy pkg=SUNWfipe desc="Intel 5000/7300 memory power management driver" \
     name="Intel 5000/7300 memory power management driver"

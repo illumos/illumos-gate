@@ -46,7 +46,6 @@ driver name=tavor perms="* 0666 root sys" \
     alias=pciex15b3,6278 \
     alias=pciex15b3,6279
 file path=kernel/drv/$(ARCH64)/tavor group=sys
-$(i386_ONLY)file path=kernel/drv/tavor group=sys
 file path=kernel/drv/tavor.conf group=sys
 legacy pkg=SUNWtavor desc="Tavor HCA driver" name="Sun Tavor HCA driver"
 license cr_Sun license=cr_Sun

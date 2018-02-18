@@ -43,7 +43,6 @@ dir path=usr/share/man/man7d
 driver name=ral alias=pci1814,201 clone_perms="ral 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/ral group=sys
-file path=kernel/drv/ral group=sys
 file path=usr/share/man/man7d/ral.7d
 legacy pkg=SUNWralink desc="Ralink RT2500 802.11b/g Wireless Driver" \
     name="Ralink RT2500 802.11b/g Wireless Driver"

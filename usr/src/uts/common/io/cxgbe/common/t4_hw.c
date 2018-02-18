@@ -348,7 +348,6 @@ int t4_wr_mbox_meat_timeout(struct adapter *adap, int mbox, const void *cmd,
 #ifdef T4_OS_NEEDS_MBOX_LOCKING
 	u16 access = 0;
 #endif
-	u16 execute = 0;
 	u32 v;
 	u64 res;
 	int i, ret;
@@ -509,8 +508,7 @@ int t4_wr_mbox_meat_timeout(struct adapter *adap, int mbox, const void *cmd,
 			T4_OS_MBOX_LOCKING(t4_os_atomic_list_del(&entry,
 								 &adap->mbox_lock));
 
-			execute = i + 1;
-			T4_RECORD_MBOX(adap, cmd_rpl, size, access, execute);
+			T4_RECORD_MBOX(adap, cmd_rpl, size, access, i + 1);
 
 			/*
 			 * XXX It's not clear that we need this anymore now
@@ -519,7 +517,7 @@ int t4_wr_mbox_meat_timeout(struct adapter *adap, int mbox, const void *cmd,
 			CH_DUMP_MBOX(adap, mbox, data_reg, size / 8);
 			CH_MSG(adap, INFO, HW,
 			       "command completed in %d ms (%ssleeping)\n",
-			       execute, sleep_ok ? "" : "non-");
+			       i + 1, sleep_ok ? "" : "non-");
 
 			res = be64_to_cpu(cmd_rpl[0]);
 			if (G_FW_CMD_OP(res >> 32) == FW_DEBUG_CMD) {

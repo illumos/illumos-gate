@@ -52,7 +52,7 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 COMDIR =	../../../common/svc
 
-CFLAGS +=	$(CCVERBOSE) -Wp,-xc99=%all
+CFLAGS +=	$(CCVERBOSE) -Wp,$(CSTD_GNU99)
 CPPFLAGS +=	-I../inc -I../../common/inc -I$(COMDIR) -I$(ROOTHDRDIR)
 $(NOT_RELEASE_BUILD) CPPFLAGS += -DFASTREBOOT_DEBUG
 

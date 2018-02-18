@@ -38,7 +38,7 @@ LDLIBS +=	$(ZIGNORE) -lnetsnmp
 
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../utils -I../../hald
-C99MODE =	$(C99_ENABLE)
+CSTD =	$(CSTD_GNU99)
 
 .KEEP_STATE:
 

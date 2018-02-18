@@ -1,0 +1,489 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 18, 2017
+.Dt SCSI_HBA_TGTMAP_CREATE 9F
+.Os
+.Sh NAME
+.Nm scsi_hba_tgtmap_create ,
+.Nm scsi_hba_tgtmap_destroy ,
+.Nm scsi_hba_tgtmap_set_begin ,
+.Nm scsi_hba_tgtmap_set_add ,
+.Nm scsi_hba_tgtmap_set_end ,
+.Nm scsi_hba_tgtmap_set_flush ,
+.Nm scsi_hba_tgtmap_tgt_add ,
+.Nm scsi_hba_tgtmap_tgt_remove
+.Nd SCSI target map functions
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft int
+.Fo scsi_hba_tgtmap_create
+.Fa "dev_info_t *dip"
+.Fa "scsi_tgtmap_mode_t mode"
+.Fa "int csync_usec"
+.Fa "int settle_usec"
+.Fa "void *tgtmap_priv"
+.Fa "scsi_tgt_activate_cb_t activate_cb"
+.Fa "scsi_tgt_deactivate_cb_t deactivate_cb"
+.Fa "scsi_hba_tgtmap_t *tgtmapout"
+.Fc
+.Ft void
+.Fo scsi_hba_tgtmap_destroy
+.Fa "scsi_hba_tgtmap_t *tgtmap"
+.Fc
+.Ft void
+.Fo (*scsi_tgt_activate_cb_t)
+.Fa "void *tgtmap_priv"
+.Fa "char *tgt_addr"
+.Fa "scsi_tgtmap_tgt_type_t type"
+.Fa "void **tgt_privp"
+.Fc
+.Ft boolean_t
+.Fo (*scsi_tgt_deactivate_cb_t)
+.Fa "void *tgtmap_priv"
+.Fa "char *tgt_addr"
+.Fa "scsi_tgtmap_tgt_type_t type"
+.Fa "void *tgt_priv"
+.Fa "scsi_tgtmap_deact_rsn_t deact"
+.Fc
+.Ft int
+.Fo scsi_hba_tgtmap_set_begin
+.Fa "scsi_hba_tgtmap_t *map"
+.Fc
+.Ft int
+.Fo scsi_hba_tgtmap_set_add
+.Fa "scsi_hba_tgtmap_t *tgtmap"
+.Fa "scsi_tgtmap_tgt_type_t type"
+.Fa "char *tgt_addr"
+.Fa "void *tgt_priv"
+.Fc
+.Ft int
+.Fo scsi_hba_tgtmap_set_end
+.Fa "scsi_hba_tgtmap_t *map"
+.Fc
+.Ft int
+.Fo scsi_hba_tgtmap_set_flush
+.Fa "scsi_hba_tgtmap_t *map"
+.Fc
+.Ft int
+.Fo scsi_hba_tgtmap_tgt_add
+.Fa "scsi_hba_tgtmap_t *tgtmap"
+.Fa "scsi_tgtmap_tgt_type_t type"
+.Fa "char *tgt_addr"
+.Fa "void *tgt_priv"
+.Fc
+.Ft int
+.Fo scsi_hba_tgtmap_tgt_remove
+.Fa "scsi_hba_tgtmap_t *tgtmap"
+.Fa "scsi_tgtmap_tgt_type_t type"
+.Fa "char *tgt_addr"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to
+.Vt dev_info
+structure.
+.It Fa mode
+One of the following values:
+.Bl -tag -width Dv
+.It Dv SCSI_TM_FULLSET
+The target map operates by full-set reporting.
+.It Dv SCSI_TM_PERADDR
+The target map operates by per-address reporting.
+.El
+.It Fa csync_usec
+A time in microseconds.
+.It Fa settle_usec
+A time in microseconds.
+.It Fa tgtmap_priv
+A private value to be passed to callback functions.
+.It Fa activate_cb
+An optional callback that will be called when a new device is being
+added to the system.
+.It Fa deactivate_cb
+An optional callback that will be called when an existing devices is
+removed from the system.
+.It Fa tgtmapout
+Pointer where the target map is stored.
+.It Fa tgtmap
+Pointer to an allocated target map.
+.It Fa tgt_addr
+The address of the target map entry the callback is acting upon.
+.It Fa type
+One of the following values, indicating the type of the target:
+.Bl -tag -width Dv
+.It Dv SCSI_TGT_SCSI_DEVICE
+The target is some form of SCSI device such as a parallel SCSI, SATA,
+SAS, SES, etc.
+.It Dv SCSI_TGT_SMP_DEVICE
+The target is a SCSI Management Protocol device.
+.El
+.It Fa deact
+One of the following values, indicating why the target is being removed:
+.Bl -tag -width Dv
+.It Dv SCSI_TGT_DEACT_RSN_GONE
+The device is being deactivated because it is gone.
+.It Dv SCSI_TGT_DEACT_RSN_CFG_FAIL
+The device is being deactivated because the configuration callback
+failed.
+.It Dv SCSI_TGT_DEACT_RSN_UNSTBL
+The device is being deactivated because it was added and removed during
+the stabilization period and therefore is considered unstable.
+.El
+.El
+.Sh DESCRIPTION
+The
+.Fn scsi_hba_tgtmap_create
+and
+.Fn scsi_hba_tgtmap_destroy
+functions are used to create and destroy target maps.
+A target map is used to manage SCSI and SMP (SCSI Management Protocol)
+devices.
+For more background on target maps, see
+.Xr tgtmap 9 .
+.Pp
+To create a target map, the driver should call the
+.Fn scsi_hba_tgtmap_create
+function.
+Upon successful completion, a pointer to the target map will be placed
+in the
+.Fa tgtmapout
+argument.
+.Pp
+The
+.Fa dip
+argument should correspond to the HBA driver's device node or one of its
+iports.
+.Pp
+The
+.Fa mode
+argument describes how addresses are reported into the target map and
+the functions used to add and remove devices.
+If
+.Fa mode
+is
+.Dv SCSI_TM_FULLSET
+then the driver must always report all the devices that are in the set
+and will be told when the corresponding devices have been removed.
+See
+the section
+.Sx Full-Set Reporting
+for more information.
+.Pp
+Otherwise, the driver should set the
+.Fa mode
+argument to
+.Dv SCSI_TM_PERADDR
+and use the
+.Fn scsi_hba_tgtmap_tgt_add
+and
+.Fn scsi_hba_tgtmap_tgt_destroy
+functions.
+See the section
+.Sx Per-Address Reporting
+for more information.
+.Pp
+The
+.Fa csync_usec
+and
+.Fa settle_usec
+are both times measured in microseconds that control two different
+properties of the target map and how it behaves.
+The value in
+.Fa settle_usec
+indicates the amount of time that the system should wait to quiesce all
+changes and consider the resulting system stable.
+Changes will not be reported until after
+.Fa settle_usec
+have passed.
+.Fa csync_usec
+indicates how much time needs to elapse after creation before an initial
+enumeration has been completed.
+.Pp
+The
+.Fa activate_cb
+and
+.Fa deactivate_cb
+arguments are optional function pointers that will be run in the context
+of devices being added and removed from the system.
+This allows the HBA driver to perform any required operations prior to
+the system attaching a target driver such as
+.Xr sd 7D
+or
+.Xr ses 7D
+in the activate case and after the system has detached the driver, in
+the removal case.
+.Pp
+To destroy a target map, a caller should use the
+.Fn scsi_hba_tgtmap_destroy
+function.
+Destroying a target map causes all currently present devices
+to be deactivated, as though they were removed, prior to the
+final destruction of the target map.
+.Ss Callbacks
+Target maps allow for callbacks to be registered and called when
+devices are being added and removed from the system.
+A driver specifies these when the target map is created by passing in
+function pointers to
+the
+.Fn activate_cb
+and
+.Fn deactivate_cb
+arguments.
+.Pp
+When a new address is registered in a target map and the driver has
+specified a function in the
+.Fa activate_cb
+argument, the driver will eventually have their activation function
+called.
+This call will be asynchronous with respect to the adding and
+removing of entries, regardless of whether the target map is using
+per-address or full-set reporting.
+This call will occur before any driver is bound to the discovered
+address.
+.Pp
+The
+.Fa tgtmap_priv
+argument will point to the optional, private argument that was passed
+to the
+.Fn scsi_hba_tgtmap_create
+function when the target map was created.
+The
+.Fa tgt_addr
+and
+.Fa tgt_type
+will describe the address and type of the new device and will correspond
+with the values passed into either the
+.Fn scsi_hba_tgtmap_set_add
+or
+.Fn scsi_hba_tgtmap_tgt_add
+functions.
+.Pp
+The
+.Fa tgt_privp
+argument is a modifiable private value.
+Initially,
+.Fa tgt_privp
+points to the value passed in as
+.Fa tgt_priv
+to either the
+.Fn scsi_hba_tgtmap_set_add
+or
+.Fn scsi_hba_tgtmap_tgt_add
+functions.
+The driver may change the value as needed.
+It will receive the value stored in
+.Fa tgt_privp
+during the deactivate callback.
+.Pp
+When a target map has been updated to indicate that a device has been
+removed, then the driver will receive a deactivation callback if it
+registered one.
+The deactivate callback will occur after a driver has
+been detached from the corresponding device.
+.Pp
+The
+.Fa tgtmap_priv ,
+.Fa tgt_addr ,
+and
+.Fa type
+arguments to the callback function are the same as for the activate
+case.
+The
+.Fa tgt_priv
+pointer will be set to the value that was passed when the device was
+added and will reflect any updates made during an activate callback, if
+present.
+.Pp
+The
+.Fa deact
+argument gives the driver some amount of information as to why device
+was being removed.
+The deactivation reason provides the driver
+more information about why the address was being removed from the target
+map which can be useful in the cases that it itself did not issue it.
+.Pp
+The return value indicates whether or not some amount of rediscovery of
+the address is desired or not.
+This is only meaningful in the case where the
+.Fa deact
+argument was
+.Dv SCSI_TGT_DEACT_RSN_CFG_FAIL .
+If the driver does wish to attempt rediscovery, then it should return
+.Dv B_TRUE .
+Otherwise, the driver should return
+.Dv B_FALSE .
+If in doubt, use the return value
+.Dv B_FALSE .
+Note, even if the driver returns
+.Dv B_TRUE ,
+no action may be taken by the system.
+.Ss Full-Set Reporting
+Full-Set reporting is one way of managing a target map.
+In full-set reporting, whenever an update is being made, the entire data
+set is reported to the target map.
+The target map then determines which
+addresses are new, which have been removed, and which have stayed the
+same and updates the system state appropriately.
+If devices have been added or removed from the system, then any activate
+and deactivate endpoints will be called.
+.Pp
+To begin a new report, the driver should call the
+.Fn scsi_hba_tgtmap_set_begin
+function.
+Once the report has begun, the driver should add devices by calling the
+.Fn scsi_hba_tgtmap_set_add
+function.
+Once all devices have been added, the driver should call the
+.Fn scsi_hba_tgtmap_set_end
+function to indicate that the target map processing has ended.
+If driver wishes to discard a report that has begun, but not yet
+terminated, then the driver should call the
+.Fn scsi_hba_tgtmap_set_flush
+function.
+.Pp
+When adding entries, the driver should indicate the address of the
+device in
+.Fa tgt_addr .
+This will generally be a world wide number (WWN) in a unit-addressable
+form.
+However, the driver may use its own synthetic numbering.
+This address will be passed to the activate callbacks and will also be
+used as the address of the
+.Xr scsi_device 9S
+in the
+.Xr tran_start 9E
+entry point.
+.Pp
+The
+.Fa type
+argument indicates how the kernel will interpret the type of device.
+At this time, devices are broken into two broad categories.
+Things which are some kind of SCSI device, whether parallel, SCSI, SATA
+behind a SATL, SES, etc. should use the type
+.Dv SCSI_TGT_SCSI_DEVICE .
+The other group,
+.Dv SCSI_TGT_SMP_DEVICE ,
+is for SCSI Management Protocol (SMP) devices.
+.Pp
+The
+.Fa tgt_priv
+argument will be passed to the activate and deactivate callbacks,
+allowing the driver to pass around data corresponding to this address.
+.Ss Per-Address Reporting
+When using a target map with per-address reporting, the driver is
+responsible for indicating what devices have been added and removed.
+This is useful for various hardware configurations where all entries and
+removals are processes in a highly-reliable fashion where hardware
+cannot drop entries.
+.Pp
+To add a new device, the driver should call the
+.Fa scsi_hba_tgtmap_tgt_add
+function.
+The
+.Fa tgt_addr
+and
+.Fa type
+arguments describe the address and what kind of device the address
+corresponds to.
+For more information, see the previous section,
+.Sx Full-Address Reporting .
+The
+.Fa tgt_priv
+argument will be passed along to the activate and deactivate functions,
+allowing the driver to associate a value with the address in question.
+.Pp
+When a device has been removed, the driver should call the
+.Fn scsi_hba_tgtmap_tgt_remove
+function, ensuring that both the
+.Fa tgt_addr
+and
+.Fa type
+arguments match those that were used when calling the
+.Fn scsi_hba_tgtmap_tgt_add
+function.
+.Sh CONTEXT
+The
+.Fn scsi_hba_tgtmap_create
+and
+.Fn scsi_hba_tgtmap_destroy
+functions are generally called from the context of the
+.Xr attach 9E
+and
+.Xr detach 9E
+entry points of HBA drivers and their iports, though may also be called
+from
+.Sy user
+or
+.Sy kernel
+context.
+.Pp
+The optional
+.Fn activate_cb
+and
+.Fn deactivate_cb
+functions for a target map will be called into the driver from
+.Sy kernel
+context.
+.Pp
+The
+.Fn scsi_hba_tgtmap_set_begin ,
+.Fn scsi_hba_tgtmap_set_add ,
+.Fn scsi_hba_tgtmap_set_end ,
+.Fn scsi_hba_tgtmap_set_flush ,
+.Fn scsi_hba_tgtmap_tgt_add ,
+and
+.Fn scsi_hba_tgtmap_tgt_remove
+functions may be called from
+.Sy user
+or
+.Sy kernel
+context.
+It is recommended that device drivers do not call these functions from
+.Sy interrupt
+context and instead should schedule deferred work with a task queue
+or with
+.Xr timeout 9F
+if they receive notifications during an interrupt that causes them to
+need to call these functions.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn scsi_hba_tgtmap_create ,
+.Fn scsi_hba_tgtmap_destroy ,
+.Fn scsi_hba_tgtmap_set_begin ,
+.Fn scsi_hba_tgtmap_set_add ,
+.Fn scsi_hba_tgtmap_set_end ,
+.Fn scsi_hba_tgtmap_set_flush ,
+.Fn scsi_hba_tgtmap_tgt_add ,
+and
+.Fn scsi_hba_tgtmap_tgt_remove
+functions return
+.Dv DDI_SUCCESS .
+Otherwise,
+.Dv DDI_FAILURE
+is returned.
+.Sh SEE ALSO
+.Xr sd 7D ,
+.Xr ses 7D ,
+.Xr tgtmap 9 ,
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr tran_start 9E ,
+.Xr timeout 9F ,
+.Xr scsi_device 9S

@@ -107,8 +107,9 @@ typedef enum {
 	MAC_CAPAB_NO_NATIVEVLAN	= 0x00080000, /* boolean only, no data */
 	MAC_CAPAB_NO_ZCOPY	= 0x00100000, /* boolean only, no data */
 	MAC_CAPAB_LEGACY	= 0x00200000, /* data is mac_capab_legacy_t */
-	MAC_CAPAB_VRRP		= 0x00400000,  /* data is mac_capab_vrrp_t */
-	MAC_CAPAB_TRANSCEIVER	= 0x01000000  /* mac_capab_transciever_t */
+	MAC_CAPAB_VRRP		= 0x00400000, /* data is mac_capab_vrrp_t */
+	MAC_CAPAB_TRANSCEIVER	= 0x01000000, /* mac_capab_transciever_t */
+	MAC_CAPAB_LED		= 0x02000000  /* data is mac_capab_led_t */
 } mac_capab_t;
 
 /*
@@ -445,6 +446,15 @@ typedef struct mac_capab_transceiver {
 	int	(*mct_read)(void *, uint_t, uint_t, void *, size_t, off_t,
 		    size_t *);
 } mac_capab_transceiver_t;
+
+/*
+ * LED capability
+ */
+typedef struct mac_capab_led {
+	uint_t		mcl_flags;
+	mac_led_mode_t	mcl_modes;
+	int		(*mcl_set)(void *, mac_led_mode_t, uint_t);
+} mac_capab_led_t;
 
 /*
  * MAC registration interface

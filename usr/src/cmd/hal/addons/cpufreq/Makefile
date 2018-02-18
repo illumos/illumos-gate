@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG =		hald-addon-cpufreq
 OBJS =		addon-cpufreq.o logger.o adt_data.o
@@ -40,7 +38,7 @@ LDLIBS +=	-lc -ldbus-1 -lhal -lglib-2.0 -ldbus-glib-1 -lpolkit -lbsm
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../hald
 CPPFLAGS +=	-I$(ROOT)/usr/include/libpolkit -g
-C99MODE =	$(C99_ENABLE)
+CSTD =	$(CSTD_GNU99)
 
 .KEEP_STATE:
 

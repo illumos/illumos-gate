@@ -50,7 +50,6 @@ driver name=dnet clone_perms="dnet 0666 root sys" perms="* 0666 root sys" \
     alias=pci1109,2400 \
     alias=pci2646,1
 file path=kernel/drv/$(ARCH64)/dnet group=sys
-file path=kernel/drv/dnet group=sys
 file path=usr/share/man/man7d/dnet.7d
 legacy pkg=SUNWos86r desc="Platform Support, OS Functionality (Root)" \
     name="Platform Support, OS Functionality (Root)"

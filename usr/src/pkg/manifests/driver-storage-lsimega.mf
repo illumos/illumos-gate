@@ -47,7 +47,6 @@ driver name=lsimega class=scsi \
     alias=pci1000,409 \
     alias=pci1028,13
 file path=kernel/drv/$(ARCH64)/lsimega group=sys
-file path=kernel/drv/lsimega group=sys
 file path=kernel/drv/lsimega.conf group=sys
 legacy pkg=SUNWlsimega desc="LSI Hardware RAID HBA Driver" \
     name="LSI Hardware RAID HBA Driver"

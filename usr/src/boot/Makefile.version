@@ -33,4 +33,4 @@ LOADER_VERSION = 1.1
 # Use date like formatting here, YYYY.MM.DD.XX, without leading zeroes.
 # The version is processed from left to right, the version number can only
 # be increased.
-BOOT_VERSION = $(LOADER_VERSION)-2017.9.11.1
+BOOT_VERSION = $(LOADER_VERSION)-2018.2.11.1

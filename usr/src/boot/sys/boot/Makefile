@@ -27,7 +27,15 @@ install	:=	TARGET = install
 
 all clean clobber: $(SUBDIRS)
 
-install: all $(INSTDIRS)
+#
+# The directories in INSTDIRS depend implicitly on SUBDIRS being built already.
+# We use .WAIT instead of explicit dependencies because we only want to make
+# the "install" target in INSTDIRS, not in SUBDIRS.
+#
+# If adding SUBDIRS which are not dependencies of INSTDIRS, "install: all"
+# rules should be added to the Makefiles in those directories.
+#
+install: all .WAIT $(INSTDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)

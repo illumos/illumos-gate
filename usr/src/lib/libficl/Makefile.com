@@ -28,8 +28,13 @@ include $(SRC)/lib/Makefile.lib
 LIBS=	$(DYNLIB) $(LINTLIB)
 
 FICLDIR=	$(SRC)/common/ficl
-C99MODE=	$(C99_ENABLE)
+CSTD=	$(CSTD_GNU99)
 CPPFLAGS +=	-I.. -I$(FICLDIR) -D_LARGEFILE64_SOURCE=1
+
+# As variable "count" is marked volatile, gcc 4.4.4 will complain about
+# function argument. So we switch this warning off
+# for time being, till gcc 4.4.4 will be replaced.
+pics/vm.o := CERRWARN += -_gcc=-Wno-clobbered
 
 LDLIBS +=	-luuid -lc -lm -lumem
 

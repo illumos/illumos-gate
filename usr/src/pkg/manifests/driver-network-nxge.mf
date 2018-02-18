@@ -59,7 +59,6 @@ $(i386_ONLY)driver name=nxge perms="* 0600 root sys" \
     alias=SUNW,niusl \
     alias=pciex108e,abcd
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/nxge group=sys
-$(i386_ONLY)file path=kernel/drv/nxge group=sys
 $(i386_ONLY)file path=kernel/drv/nxge.conf group=sys \
     original_name=SUNWnxge:kernel/drv/nxge.conf preserve=renamenew
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/nxge group=sys

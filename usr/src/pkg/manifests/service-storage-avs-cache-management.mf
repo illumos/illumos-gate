@@ -79,8 +79,6 @@ file path=etc/dscfg_format group=sys mode=0744
 file path=etc/init.d/scm mode=0744
 file path=kernel/kmdb/$(ARCH64)/nsctl group=sys mode=0555
 file path=kernel/kmdb/$(ARCH64)/sdbc group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/nsctl group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/sdbc group=sys mode=0555
 file path=lib/svc/manifest/system/nws_scm.xml group=sys mode=0444
 file path=usr/bin/dsbitmap mode=0555
 file path=usr/bin/dscfg mode=0555
@@ -96,23 +94,16 @@ file path=usr/kernel/drv/$(ARCH64)/ncall group=sys
 file path=usr/kernel/drv/$(ARCH64)/nsctl group=sys
 file path=usr/kernel/drv/$(ARCH64)/nskern group=sys
 file path=usr/kernel/drv/$(ARCH64)/sdbc group=sys
-$(i386_ONLY)file path=usr/kernel/drv/ncall group=sys
 file path=usr/kernel/drv/ncall.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/nsctl group=sys
 file path=usr/kernel/drv/nsctl.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/nskern group=sys
 file path=usr/kernel/drv/nskern.conf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/sdbc group=sys
 file path=usr/kernel/drv/sdbc.conf group=sys
 file path=usr/kernel/misc/$(ARCH64)/spuni group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/misc/spuni group=sys mode=0755
 file path=usr/lib/libdscfg.so.1
 file path=usr/lib/libnsctl.so.1
 file path=usr/lib/libunistat.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/nsctl.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/sdbc.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/nsctl.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/sdbc.so group=sys mode=0555
 file path=usr/share/man/man1m/dsbitmap.1m
 file path=usr/share/man/man1m/dscfg.1m
 file path=usr/share/man/man1m/dscfgadm.1m

@@ -204,7 +204,7 @@ CFLAGS		+= $(CCMODE)
 CFLAGS		+= $(SPACEFLAG)
 CFLAGS		+= $(CERRWARN)
 CFLAGS		+= $(CTF_FLAGS_$(CLASS))
-CFLAGS		+= $(C99MODE)
+CFLAGS		+= $(CSTD)
 CFLAGS		+= $(CCUNBOUND)
 CFLAGS		+= $(CCNOAUTOINLINE)
 CFLAGS		+= $(CCSTATICSYM)
@@ -409,11 +409,6 @@ SCHED_KMODS	+=
 #	File System Modules (/kernel/fs):
 #
 FS_KMODS	+=
-
-#
-#	Streams Modules (/kernel/strmod):
-#
-STRMOD_KMODS	+= kb
 
 #
 #	'System' Modules (/kernel/sys):

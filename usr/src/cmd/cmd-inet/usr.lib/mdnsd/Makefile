@@ -68,7 +68,7 @@ $(PROG): $(OBJS)
 
 include ../Makefile.lib
 
-C99MODE = $(C99_ENABLE)
+CSTD = $(CSTD_GNU99)
 CPPFLAGS += -D_REENTRANT $(MDNSFLAGS) -I$(CMN_DIR)
 LDLIBS += -lsocket -lnsl
 

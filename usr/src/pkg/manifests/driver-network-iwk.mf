@@ -42,7 +42,6 @@ driver name=iwk clone_perms="iwk 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,4229 \
     alias=pciex8086,4230
 file path=kernel/drv/$(ARCH64)/iwk group=sys
-file path=kernel/drv/iwk group=sys
 legacy pkg=SUNWiwk desc="Intel(R) PRO/Wireless 4965AGN driver" \
     name="Intel(R) PRO/Wireless 4965AGN driver"
 license cr_Sun license=cr_Sun

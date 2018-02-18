@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TCP 7P "Apr 27, 2015"
+.TH TCP 7P "Feb 5, 2018"
 .SH NAME
 tcp, TCP \- Internet Transmission Control Protocol
 .SH SYNOPSIS
@@ -133,12 +133,7 @@ and tested with \fBgetsockopt\fR(3SOCKET). The option level for the
 \fBgetprotobyname\fR(3SOCKET).
 .sp
 .LP
-The SO_RCVBUF socket level option can be used to control the window that TCP
-advertises to the peer. IP level options may also be used with TCP. See
-\fBip\fR(7P) and \fBip6\fR(7P).
-.sp
-.LP
-Another socket level option, \fBSO_RCVBUF,\fR can be used to control the window
+The \fBSO_RCVBUF\fR socket level option can be used to control the window
 that \fBTCP\fR advertises to the peer. \fBIP\fR level options may also be used
 with \fBTCP.\fR See \fBip\fR(7P) and \fBip6\fR(7P).
 .sp

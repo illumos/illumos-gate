@@ -38,7 +38,7 @@ PYOBJS=		$(PYSRCS:%.py=$(SRCDIR)/%.pyc)
 PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYBEFILES=  $(PYFILES:%=$(ROOTLIBDIR)/%)
 
-C99MODE=        $(C99_ENABLE)
+CSTD=        $(CSTD_GNU99)
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lbe -lnvpair -lc

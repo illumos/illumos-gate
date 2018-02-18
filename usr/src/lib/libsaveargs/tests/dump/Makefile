@@ -25,7 +25,7 @@ CFLAGS += -m64
 
 LDLIBS64 += -lctf -lelf -lsaveargs
 
-C99MODE = $(C99_ENABLE)
+CSTD = $(CSTD_GNU99)
 
 $(PROG): $(OBJECTS)
 	$(LINK.c) -o $@ $(OBJECTS) $(LDLIBS64)

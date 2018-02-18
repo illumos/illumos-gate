@@ -26,7 +26,7 @@
 # Override this top level flag so the compiler builds in its native
 # C99 mode.  This has been enabled to support the math stuff in the
 # AST tools (including ksh93).
-C99MODE= $(C99_ENABLE) -D_XOPEN_SOURCE=600 -D__EXTENSIONS__=1
+CSTD= $(CSTD_GNU99) -D_XOPEN_SOURCE=600 -D__EXTENSIONS__=1
 
 # silence common AST&co. warnings...
 # ... about |#pragma prototyped| ...

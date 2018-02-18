@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 18, 2017
+.Dt SCSI_HBA_IPORT_UNIT_ADDRESS 9F
+.Os
+.Sh NAME
+.Nm scsi_hba_iport_unit_address
+.Nd Get the unit address of an iport
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft "char *"
+.Fo scsi_hba_iport_unit_address
+.Fa "dev_info_t *dip"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to
+.Vt dev_info
+structure.
+.El
+.Sh DESCRIPTION
+The
+.Fn scsi_hba_iport_unit_address
+function is used to obtain the unit address of an iport.
+For more information on iports, see
+.Xr iport 9 .
+.Pp
+This function can be used to determine whether or not a device node in
+the tree is an iport.
+If the device node corresponds to an iport, then
+the unit address used when it was created either through
+.Xr scsi_hba_iport_register 9F
+or
+.Xr scsi_hba_iportmap_iport_add 9F
+will be returned.
+.Sh CONTEXT
+The
+.Fn scsi_hba_iport_unit_address
+function may be called in
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+If
+.Fa dip
+is an iport, then the unit address string the device was registered with
+is returned.
+Otherwise,
+.Dv NULL
+is returned.
+.Sh SEE ALSO
+.Xr iport 9 ,
+.Xr iportmap 9 ,
+.Xr scsi_hba_iport_register 9F ,
+.Xr scsi_hba_iportmap_iport_add 9F

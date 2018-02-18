@@ -355,6 +355,8 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 
 	mac_transceiver_init(mip);
 
+	mac_led_init(mip);
+
 	/*
 	 * Enforce the virtrualization level registered.
 	 */

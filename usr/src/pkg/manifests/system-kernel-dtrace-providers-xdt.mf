@@ -43,7 +43,6 @@ dir path=platform/i86xpv/kernel/drv group=sys
 dir path=platform/i86xpv/kernel/drv/$(ARCH64) group=sys
 driver name=xdt
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/xdt group=sys
-file path=platform/i86xpv/kernel/drv/xdt group=sys
 file path=platform/i86xpv/kernel/drv/xdt.conf group=sys
 legacy pkg=SUNWxdt \
     desc="DTrace provider for tracing events in the xVM hypervisor" \

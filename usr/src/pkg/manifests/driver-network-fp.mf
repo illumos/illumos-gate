@@ -44,11 +44,9 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=fp perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/fp group=sys
-$(i386_ONLY)file path=kernel/drv/fp group=sys
 file path=kernel/drv/fp.conf group=sys \
     original_name=SUNWfctl:kernel/drv/fp.conf preserve=true
 file path=kernel/misc/$(ARCH64)/fctl group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/fctl group=sys mode=0755
 file path=usr/share/man/man7d/fctl.7d
 file path=usr/share/man/man7d/fp.7d
 legacy pkg=SUNWfctl desc="fctl module and fp device driver" \

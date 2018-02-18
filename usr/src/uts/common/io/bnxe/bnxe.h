@@ -916,6 +916,9 @@ int       BnxeCheckAccHandle(ddi_acc_handle_t handle);
 int       BnxeCheckDmaHandle(ddi_dma_handle_t handle);
 void      BnxeFmErrorReport(um_device_t * pUM, char * detail);
 
+/* bnxe_illumos.c */
+extern boolean_t bnxe_fill_transceiver(um_device_t *, void *);
+
 extern kmutex_t bnxeLoaderMutex;
 extern u32_t    bnxeNumPlumbed;
 

@@ -53,11 +53,9 @@ dir path=usr/share/man
 dir path=usr/share/man/man7
 $(i386_ONLY)driver name=srn
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/srn group=sys
-$(i386_ONLY)file path=kernel/drv/srn group=sys
 $(i386_ONLY)file path=kernel/drv/srn.conf group=sys
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/cpr group=sys \
     mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/misc/cpr group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/cprboot group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/tod group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/tod.conf group=sys

@@ -1,30 +1,32 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\" Copyright (c) 2013 Gary Mills
 .\" Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USERADD 1M "Feb 25, 2017"
+.TH USERADD 1M "Jan 7, 2018"
 .SH NAME
 useradd \- administer a new user login on the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBuseradd\fR [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]]
+\fBuseradd\fR [\fB-A\fR \fIauthorization\fR[,\fIauthorization\fR]...]
      [\fB-b\fR \fIbase_dir\fR] [\fB-c\fR \fIcomment\fR] [\fB-d\fR \fIdir\fR] [\fB-e\fR \fIexpire\fR]
-     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR [,\fIgroup\fR]...]
+     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]
      [\fB-K\fR \fIkey=value\fR] [\fB-m\fR [\fB-z|-Z\fR] [\fB-k\fR \fIskel_dir\fR]] [\fB-p\fR \fIprojname\fR]
-     [\fB-P\fR \fIprofile\fR [,\fIprofile...\fR]] [\fB-R\fR \fIrole\fR [,\fIrole...\fR]]
+     [\fB-P\fR \fIprofile\fR[,\fIprofile\fR]...] [\fB-R\fR \fIrole\fR[,\fIrole\fR]...]
      [\fB-s\fR \fIshell\fR] [\fB-u\fR \fIuid\fR [\fB-o\fR]] \fIlogin\fR
 .fi
 
 .LP
 .nf
-\fBuseradd\fR \fB-D\fR [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]]
-     [\fB-b\fR \fIbase_dir\fR] [\fB-s\fR \fIshell\fR [\fB-k\fR \fIskel_dir\fR]] [\fB-e\fR \fIexpire\fR]
-     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-K\fR \fIkey=value\fR] [\fB-p\fR \fIprojname\fR]
-     [\fB-P\fR \fIprofile\fR [,\fIprofile...\fR]] [\fB-R\fR \fIrole\fR [,\fIrole...\fR]]
+\fBuseradd\fR \fB-D\fR [\fB-A\fR \fIauthorization\fR[,\fIauthorization\fR]...]
+     [\fB-b\fR \fIbase_dir\fR] [\fB-e\fR \fIexpire\fR] [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR]
+     [\fB-k\fR \fIskel_dir\fR] [\fB-K\fR \fIkey=value\fR] [\fB-p\fR \fIprojname\fR]
+     [\fB-P\fR \fIprofile\fR[,\fIprofile\fR]...] [\fB-R\fR \fIrole\fR[,\fIrole\fR]...]
+     [\fB-s\fR \fIshell\fR]
 .fi
 
 .SH DESCRIPTION
@@ -32,7 +34,7 @@ useradd \- administer a new user login on the system
 \fBuseradd\fR adds a new user to the \fB/etc/passwd\fR and \fB/etc/shadow\fR
 and \fB/etc/user_attr\fR files. The \fB-A\fR and \fB-P\fR options respectively
 assign authorizations and profiles to the user. The \fB-R\fR option assigns
-roles to a user. The \fB-p\fR option associates a project with a user. The
+roles to the user. The \fB-p\fR option associates a project with the user. The
 \fB-K\fR option adds a \fIkey=value\fR pair to \fB/etc/user_attr\fR for the
 user. Multiple \fIkey=value\fR pairs may be added with multiple \fB-K\fR
 options.
@@ -44,9 +46,9 @@ if requested. The new login remains locked until the \fBpasswd\fR(1) command is
 executed.
 .sp
 .LP
-Specifying \fBuseradd\fR \fB-D\fR with the \fB-s\fR, \fB-k\fR,\fB-g\fR,
-\fB-b\fR, \fB-f\fR, \fB-e\fR, \fB-A\fR, \fB-P\fR, \fB-p\fR, \fB-R\fR, or
-\fB-K\fR option (or any combination of these options) sets the default values
+Specifying \fBuseradd\fR \fB-D\fR with the \fB-A\fR, \fB-b\fR, \fB-e\fR,
+\fB-f\fR, \fB-g\fR, \fB-k\fR, \fB-K\fR, \fB-p\fR, \fB-P\fR, \fB-R\fR, or
+\fB-s\fR option (or any combination of these options) sets the default values
 for the respective fields. See the \fB-D\fR option, below. Subsequent
 \fBuseradd\fR commands without the \fB-D\fR option use these arguments.
 .sp
@@ -87,8 +89,8 @@ an account.
 .sp .6
 .RS 4n
 The base directory for new login home directories (see the \fB-d\fR option
-below. When a new user account is being created, \fIbase_dir\fR must already
-exist unless the \fB-m\fR option or the \fB-d\fR option is also specified.
+below). The directory named by \fIbase_dir\fR must already exist and be an
+absolute path.
 .RE
 
 .sp
@@ -98,7 +100,7 @@ exist unless the \fB-m\fR option or the \fB-d\fR option is also specified.
 .ad
 .sp .6
 .RS 4n
-Any text string. It is generally a short description of the login, and is
+A text string. It is generally a short description of the login, and is
 currently used as the field for the user's full name. This information is
 stored in the user's \fB/etc/passwd\fR entry.
 .RE
@@ -110,7 +112,7 @@ stored in the user's \fB/etc/passwd\fR entry.
 .ad
 .sp .6
 .RS 4n
-The home directory of the new user. It defaults to
+The home directory of the new user. If not supplied, it defaults to
 \fIbase_dir\fR/\fIaccount_name\fR, where \fIbase_dir\fR is the base directory
 for new login home directories and \fIaccount_name\fR is the new login name.
 .RE
@@ -124,8 +126,8 @@ for new login home directories and \fIaccount_name\fR is the new login name.
 .RS 4n
 Display the default values for \fBgroup\fR, \fBbase_dir\fR, \fBskel_dir\fR,
 \fBshell\fR, \fBinactive\fR, \fBexpire\fR, \fBproj\fR, \fBprojname\fR and
-\fBkey=value\fR pairs. When used with the \fB-g\fR, \fB-b\fR, \fB-f\fR,
-\fB-e\fR, \fB-A\fR, \fB-P\fR, \fB-p\fR, \fB-R\fR, or \fB-K\fR options, the
+\fBkey=value\fR pairs. When used with the \fB-A\fR, \fB-b\fR, \fB-e\fR,
+\fB-f\fR, \fB-g\fR, \fB-P\fR, \fB-p\fR, \fB-R\fR, or \fB-K\fR options, the
 \fB-D\fR option sets the default values for the specified fields. The default
 values are:
 .sp
@@ -231,7 +233,7 @@ null
 .sp
 .ne 2
 .na
-\fBkey=value (pairs defined in \fBuser_attr\fR(4)\fR
+\fBkey=value\fR (pairs defined in \fBuser_attr\fR(4))
 .ad
 .sp .6
 .RS 4n
@@ -291,7 +293,7 @@ An existing group's integer \fBID\fR or character-string name. Without the
 \fB-D\fR option, it defines the new user's primary group membership and
 defaults to the default group. You can reset this default value by invoking
 \fBuseradd\fR \fB-D\fR \fB-g\fR \fIgroup\fR. GIDs 0-99 are reserved for
-allocation by the Solaris Operating System.
+allocation by the Operating System.
 .RE
 
 .sp
@@ -301,26 +303,11 @@ allocation by the Solaris Operating System.
 .ad
 .sp .6
 .RS 4n
-An existing group's integer \fBID\fR or character-string name. It defines the
-new user's supplementary group membership. Duplicates between \fIgroup\fR with
-the \fB-g\fR and \fB-G\fR options are ignored. No more than \fBNGROUPS_MAX\fR
-groups can be specified. GIDs 0-99 are reserved for allocation by the Solaris
-Operating System.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-K\fR \fIkey=value\fR\fR
-.ad
-.sp .6
-.RS 4n
-A \fIkey=value\fR pair to add to the user's attributes. Multiple \fB-K\fR
-options may be used to add multiple \fIkey=value\fR pairs. The generic \fB-K\fR
-option with the appropriate key may be used instead of the specific implied key
-options (\fB-A\fR, \fB-P\fR, \fB-R\fR, \fB-p\fR). See \fBuser_attr\fR(4) for a
-list of valid \fIkey=value\fR pairs. The "type" key is not a valid key for this
-option. Keys may not be repeated.
+One or more comma-separated existing groups, specified by integer \fBID\fR or
+character-string name. It defines the new user's supplementary group
+membership. Any duplicate groups between the \fB-g\fR and \fB-G\fR options are
+ignored. No more than \fBNGROUPS_MAX\fR groups can be specified. GIDs 0-99 are
+reserved for allocation by the Operating System.
 .RE
 
 .sp
@@ -334,6 +321,21 @@ A directory that contains skeleton information (such as \fB\&.profile\fR) that
 can be copied into a new user's home directory. This directory must already
 exist. The system provides the \fB/etc/skel\fR directory that can be used for
 this purpose.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-K\fR \fIkey=value\fR\fR
+.ad
+.sp .6
+.RS 4n
+A \fIkey=value\fR pair to add to the user's attributes. Multiple \fB-K\fR
+options may be used to add multiple \fIkey=value\fR pairs. The generic \fB-K\fR
+option with the appropriate key may be used instead of the specific implied key
+options (\fB-A\fR, \fB-p\fR, \fB-P\fR, \fB-R\fR). See \fBuser_attr\fR(4) for a
+list of valid \fIkey=value\fR pairs. The "type" key is not a valid key for this
+option. Keys cannot be repeated.
 .RE
 
 .sp
@@ -371,16 +373,6 @@ This option allows a \fBUID\fR to be duplicated (non-unique).
 .sp
 .ne 2
 .na
-\fB\fB-P\fR \fIprofile\fR\fR
-.ad
-.sp .6
-.RS 4n
-One or more comma-separated execution profiles defined in \fBprof_attr\fR(4).
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB-p\fR \fIprojname\fR\fR
 .ad
 .sp .6
@@ -392,11 +384,21 @@ Name of the project with which the added user is associated. See the
 .sp
 .ne 2
 .na
+\fB\fB-P\fR \fIprofile\fR\fR
+.ad
+.sp .6
+.RS 4n
+One or more comma-separated execution profiles defined in \fBprof_attr\fR(4).
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-R\fR \fIrole\fR\fR
 .ad
 .sp .6
 .RS 4n
-One or more comma-separated execution profiles defined in \fBuser_attr\fR(4).
+One or more comma-separated roles defined in \fBuser_attr\fR(4).
 Roles cannot be assigned to other roles.
 .RE
 
@@ -424,7 +426,7 @@ integer below \fBMAXUID\fR as defined in \fB<sys/param.h>\fR\&. The \fBUID\fR
 defaults to the next available (unique) number above the highest number
 currently assigned. For example, if \fBUID\fRs 100, 105, and 200 are assigned,
 the next default \fBUID\fR number will be 201. \fBUID\fRs \fB0\fR-\fB99\fR are
-reserved for allocation by the Solaris Operating System.
+reserved for allocation by the Operating System.
 .RE
 
 .SH FILES
@@ -468,11 +470,11 @@ Interface Stability	Committed
 
 .SH SEE ALSO
 .LP
-\fBpasswd\fR(1), \fBprofiles\fR(1), \fBroles\fR(1), \fBusers\fR(1B),
+\fBpasswd\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
 \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBgrpck\fR(1M),
 \fBlogins\fR(1M), \fBpwck\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M),
-\fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4), \fBprof_attr\fR(4),
-\fBproject\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5), \fBzfs\fR(1M)
+\fBzfs\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4),
+\fBprof_attr\fR(4), \fBproject\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
 .SH DIAGNOSTICS
 .LP
 In case of an error, \fBuseradd\fR prints an error message and exits with a
@@ -551,7 +553,7 @@ UX: useradd: ERROR: Cannot update system files - login cannot be created.
 .SH NOTES
 .LP
 The \fBuseradd\fR utility adds definitions to only the local \fB/etc/group\fR,
-\fBetc/passwd\fR, \fB/etc/passwd\fR, \fB/etc/shadow\fR, \fB/etc/project\fR, and
+\fB/etc/passwd\fR, \fB/etc/shadow\fR, \fB/etc/project\fR, and
 \fB/etc/user_attr\fR files. If a network name service
 is being used to supplement the local \fB/etc/passwd\fR file with
 additional entries, \fBuseradd\fR cannot change information supplied by the

@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2017 Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_SOFT_RING_H
@@ -652,7 +653,6 @@ extern cpu_t *mac_srs_bind(mac_soft_ring_set_t *, processorid_t);
 extern void mac_rx_srs_retarget_intr(mac_soft_ring_set_t *, processorid_t);
 extern void mac_tx_srs_retarget_intr(mac_soft_ring_set_t *);
 
-extern void mac_srs_change_upcall(void *, mac_direct_rx_t, void *);
 extern void mac_srs_quiesce_initiate(mac_soft_ring_set_t *);
 extern void mac_srs_client_poll_enable(struct mac_client_impl_s *,
     mac_soft_ring_set_t *);

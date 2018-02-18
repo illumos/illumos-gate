@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\"  Copyright 1989 AT&T  Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GROUPADD 1M "Feb 25, 2017"
+.TH GROUPADD 1M "Jan 7, 2018"
 .SH NAME
 groupadd \- add (create) a new group definition on the system
 .SH SYNOPSIS
@@ -27,11 +28,11 @@ The following options are supported:
 .RS 10n
 Assigns the group id \fIgid\fR for the new group. This group id must be a
 non-negative decimal integer below \fBMAXUID\fR as defined in
-\fB/usr/include/sys/param.h\fR. The group \fBID\fR defaults to the next
+\fB<sys/param.h>\fR. The group \fBID\fR defaults to the next
 available (unique) number above the highest number currently assigned. For
-example, if groups  \fB100\fR, \fB105\fR, and  \fB200\fR are assigned as
-groups, the next default group number will be  \fB201\fR. (Group \fBIDs\fR from
-\fB0\fR\(mi\fB99\fR are reserved by SunOS for future applications.)
+example, if groups \fB100\fR, \fB105\fR, and \fB200\fR are assigned as
+groups, the next default group number will be \fB201\fR. (Group \fBIDs\fR from
+\fB0\fR\(mi\fB99\fR are reserved for future applications.)
 .RE
 
 .sp
@@ -57,7 +58,7 @@ characters and numeric characters. A warning message will be written if the
 string exceeds \fBMAXGLEN,\fR which is usually set at eight characters. The
 \fIgroup\fR field must contain at least one character; it accepts lower case or
 numeric characters or a combination of both, and must not contain a colon
-(\fB:\fR) or  \fBNEWLINE.\fR
+(\fB:\fR) or \fBNEWLINE.\fR
 .RE
 
 .SH EXIT STATUS
@@ -97,7 +98,7 @@ An invalid argument was provided to an option.
 \fB\fB4\fR\fR
 .ad
 .RS 6n
-The \fIgid\fR is not unique (when  \fB-o\fR option is not used).
+The \fIgid\fR is not unique (when \fB-o\fR option is not used).
 .RE
 
 .sp
@@ -115,7 +116,7 @@ The \fIgroup\fR is not unique.
 \fB\fB10\fR\fR
 .ad
 .RS 6n
-The  \fB/etc/group\fR file cannot be updated.
+The \fB/etc/group\fR file cannot be updated.
 .RE
 
 .SH FILES
@@ -133,7 +134,7 @@ The  \fB/etc/group\fR file cannot be updated.
 .RE
 .SH SEE ALSO
 .LP
-\fBusers\fR(1B), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBgrpck\fR(1M),
+\fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBgrpck\fR(1M),
 \fBlogins\fR(1M), \fBpwck\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M),
 \fBusermod\fR(1M), \fBgroup\fR(4), \fBattributes\fR(5)
 .SH NOTES

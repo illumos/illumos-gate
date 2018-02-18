@@ -1,34 +1,37 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\"  Copyright 1989 AT&T Copyright (c) 2006 Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROLEADD 1M "Feb 25, 2017"
+.TH ROLEADD 1M "Jan 7, 2018"
 .SH NAME
 roleadd \- administer a new role account on the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBroleadd\fR [\fB-c\fR \fIcomment\fR] [\fB-d\fR \fIdir\fR] [\fB-e\fR \fIexpire\fR] [\fB-f\fR \fIinactive\fR]
-     [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR [, \fIgroup\fR...]] [\fB-m\fR [\fB-k\fR \fIskel_dir\fR]]
-     [\fB-u\fR \fIuid\fR [\fB-o\fR]] [\fB-s\fR \fIshell\fR]
-     [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]] [\fB-K\fR \fIkey=value\fR] \fIrole\fR
+\fBroleadd\fR [\fB-A\fR \fIauthorization\fR[,\fIauthorization\fR]...]
+     [\fB-b\fR \fIbase_dir\fR] [\fB-c\fR \fIcomment\fR] [\fB-d\fR \fIdir\fR] [\fB-e\fR \fIexpire\fR]
+     [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]
+     [\fB-K\fR \fIkey=value\fR] [\fB-m\fR [\fB-z|-Z\fR] [\fB-k\fR \fIskel_dir\fR]] [\fB-p\fR \fIprojname\fR]
+     [\fB-P\fR \fIprofile\fR[,\fIprofile\fR]...] [\fB-s\fR \fIshell\fR] [\fB-u\fR \fIuid\fR [\fB-o\fR]] \fIrole\fR
 .fi
 
 .LP
 .nf
-\fBroleadd\fR \fB-D\fR [\fB-b\fR \fIbase_dir\fR] [\fB-e\fR \fIexpire\fR] [\fB-f\fR \fIinactive\fR]
-     [\fB-g\fR \fIgroup\fR] [\fB-A\fR \fIauthorization\fR [,\fIauthorization...\fR]]
-     [\fB-P\fR \fIprofile\fR [,\fIprofile...\fR] [\fB-K\fR \fIkey=value\fR]]
+\fBroleadd\fR \fB-D\fR [\fB-A\fR \fIauthorization\fR[,\fIauthorization\fR]...]
+     [\fB-b\fR \fIbase_dir\fR] [\fB-e\fR \fIexpire\fR] [\fB-f\fR \fIinactive\fR] [\fB-g\fR \fIgroup\fR]
+     [\fB-k\fR \fIskel_dir\fR] [\fB-K\fR \fIkey=value\fR] [\fB-p\fR \fIprojname\fR]
+     [\fB-P\fR \fIprofile\fR[,\fIprofile\fR]...] [\fB-s\fR \fIshell\fR]
 .fi
 
 .SH DESCRIPTION
 .LP
 \fBroleadd\fR adds a role entry to the \fB/etc/passwd\fR and \fB/etc/shadow\fR
 and \fB/etc/user_attr\fR files. The \fB-A\fR and \fB-P\fR options respectively
-assign authorizations and profiles to the role. Roles cannot be assigned to
-other roles. The \fB-K\fR option adds a \fIkey=value\fR pair to
-\fB/etc/user_attr\fR for a role. Multiple \fIkey=value\fR pairs can be added
+assign authorizations and profiles to the role. The \fB-p\fR option associates
+a project with the role. The \fB-K\fR option adds a \fIkey=value\fR pair to
+\fB/etc/user_attr\fR for the role. Multiple \fIkey=value\fR pairs can be added
 with multiple \fB-K\fR options.
 .sp
 .LP
@@ -38,9 +41,10 @@ if requested. The new role account remains locked until the \fBpasswd\fR(1)
 command is executed.
 .sp
 .LP
-Specifying \fBroleadd\fR \fB-D\fR with the \fB-g\fR, \fB-b\fR, \fB-f\fR,
-\fB-e\fR, or \fB-K\fR option (or any combination of these option) sets the
-default values for the respective fields. See the \fB-D\fR option. Subsequent
+Specifying \fBroleadd\fR \fB-D\fR with the \fB-A\fR, \fB-b\fR, \fB-e\fR,
+\fB-f\fR, \fB-g\fR, \fB-k\fR, \fB-K\fR, \fB-p\fR, \fB-P\fR, or
+\fB-s\fR option (or any combination of these options) sets the default values
+for the respective fields. See the \fB-D\fR option. Subsequent
 \fBroleadd\fR commands without the \fB-D\fR option use these arguments.
 .sp
 .LP
@@ -49,17 +53,14 @@ characters per line. Specifying long arguments to several options can exceed
 this limit.
 .sp
 .LP
-The role (\fBrole\fR) field accepts a string of no more than eight bytes
-consisting of characters from the set of alphabetic characters, numeric
-characters, period (\fB\&.\fR), underscore (\fB_\fR), and hyphen (\fB-\fR). The
-first character should be alphabetic and the field should contain at least one
-lower case alphabetic character. A warning message is written if these
-restrictions are not met. A future Solaris release might refuse to accept role
-fields that do not meet these requirements.
-.sp
+\fBroleadd\fR requires that usernames be in the format described in
+\fBpasswd\fR(4). A warning message is displayed if these restrictions are not
+met. See \fBpasswd\fR(4) for the requirements for usernames.
 .LP
-The \fBrole\fR field must contain at least one character and must not contain a
-colon (\fB:\fR) or a newline (\fB\en\fR).
+To change the action of \fBroleadd\fR when the traditional login name
+length limit of eight characters is exceeded, edit the file
+\fB/etc/default/useradd\fR by removing the \fB#\fR (pound sign) before the
+appropriate \fBEXCEED_TRAD=\fR entry, and adding it before the others.
 .SH OPTIONS
 .LP
 The following options are supported:
@@ -68,10 +69,11 @@ The following options are supported:
 .na
 \fB\fB-A\fR \fIauthorization\fR\fR
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 One or more comma separated authorizations defined in \fBauth_attr\fR(4). Only
-a user or role who has grant rights to the authorization can assign it to an
-account
+a user or role who has \fBgrant\fR rights to the authorization can assign it to
+a role.
 .RE
 
 .sp
@@ -79,10 +81,11 @@ account
 .na
 \fB\fB-b\fR \fIbase_dir\fR\fR
 .ad
-.RS 20n
-The default base directory for the system if \fB-d\fR\fI dir\fR is not
-specified. \fIbase_dir\fR is concatenated with the account name to define the
-home directory. If the \fB-m\fR option is not used, \fIbase_dir\fR must exist.
+.sp .6
+.RS 4n
+The base directory for new role home directories (see the \fB-d\fR option
+below). The directory named by \fIbase_dir\fR must already exist and be an
+absolute path.
 .RE
 
 .sp
@@ -90,8 +93,9 @@ home directory. If the \fB-m\fR option is not used, \fIbase_dir\fR must exist.
 .na
 \fB\fB-c\fR \fIcomment\fR\fR
 .ad
-.RS 20n
-Any text string. It is generally a short description of the role. This
+.sp .6
+.RS 4n
+A text string. It is generally a short description of the role. This
 information is stored in the role's \fB/etc/passwd\fR entry.
 .RE
 
@@ -100,8 +104,9 @@ information is stored in the role's \fB/etc/passwd\fR entry.
 .na
 \fB\fB-d\fR \fIdir\fR\fR
 .ad
-.RS 20n
-The home directory of the new role. It defaults to
+.sp .6
+.RS 4n
+The home directory of the new role. If not supplied, it defaults to
 \fIbase_dir\fR/\fIaccount_name\fR, where \fIbase_dir\fR is the base directory
 for new login home directories and \fIaccount_name\fR is the new role name.
 .RE
@@ -111,10 +116,12 @@ for new login home directories and \fIaccount_name\fR is the new role name.
 .na
 \fB\fB-D\fR\fR
 .ad
-.RS 20n
-Display the default values for \fIgroup\fR, \fIbase_dir\fR, \fIskel_dir\fR,
-\fIshell\fR, \fIinactive\fR, \fIexpire\fR and \fIkey=value\fR pairs. When used
-with the \fB-g\fR, \fB-b\fR, \fB-f\fR, or \fB-K\fR, options, the \fB-D\fR
+.sp .6
+.RS 4n
+Display the default values for \fBgroup\fR, \fBbase_dir\fR, \fBskel_dir\fR,
+\fBshell\fR, \fBinactive\fR, \fBexpire\fR, \fBproj\fR, \fBprojname\fR and
+\fBkey=value\fR pairs. When used with the \fB-A\fR, \fB-b\fR, \fB-e\fR,
+\fB-f\fR, \fB-g\fR, \fB-P\fR, \fB-p\fR, or \fB-K\fR, options, the \fB-D\fR
 option sets the default values for the specified fields. The default values
 are:
 .sp
@@ -200,7 +207,27 @@ Null
 .sp
 .ne 2
 .na
-\fBkey=value (pairs defined in \fBuser_attr\fR(4)\fR
+\fBproj\fR
+.ad
+.sp .6
+.RS 4n
+\fB3\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBprojname\fR
+.ad
+.sp .6
+.RS 4n
+\fBdefault\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBkey=value\fR (pairs defined in \fBuser_attr\fR(4))
 .ad
 .sp .6
 .RS 4n
@@ -214,10 +241,11 @@ not present
 .na
 \fB\fB-e\fR \fIexpire\fR\fR
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 Specify the expiration date for a role. After this date, no user is able to
-access this role. The expire option argument is a date entered using one of the
-date formats included in the template file \fB/etc/datemsk\fR. See
+access this role. The expire option argument is a date entered using one of
+the date formats included in the template file \fB/etc/datemsk\fR. See
 \fBgetdate\fR(3C).
 .sp
 If the date format that you choose includes spaces, it must be quoted. For
@@ -231,10 +259,11 @@ creating temporary roles.
 .na
 \fB\fB-f\fR \fIinactive\fR\fR
 .ad
-.RS 20n
-The maximum number of days allowed between uses of a role ID before that ID is
-declared invalid. Normal values are positive integers. A value of \fB 0\fR
-defeats the status.
+.sp .6
+.RS 4n
+The maximum number of days allowed between uses of a role ID before that
+\fBID\fR is declared invalid. Normal values are positive integers. A value of
+\fB0\fR defeats the status.
 .RE
 
 .sp
@@ -242,11 +271,13 @@ defeats the status.
 .na
 \fB\fB-g\fR \fIgroup\fR\fR
 .ad
-.RS 20n
-An existing group's integer ID or character-string name. Without the \fB-D\fR
-option, it defines the new role's primary group membership and defaults to the
-default group. You can reset this default value by invoking \fBroleadd
-\fR\fB-D\fR\fB \fR\fB-g\fR\fB \fR\fIgroup.\fR
+.sp .6
+.RS 4n
+An existing group's integer \fBID\fR or character-string name. Without the
+\fB-D\fR option, it defines the new role's primary group membership and
+defaults to the default group. You can reset this default value by invoking
+\fBroleadd\fR \fB-D\fR \fB-g\fR \fIgroup\fR. GIDs 0-99 are reserved for
+allocation by the Operating System.
 .RE
 
 .sp
@@ -254,11 +285,13 @@ default group. You can reset this default value by invoking \fBroleadd
 .na
 \fB\fB-G\fR \fIgroup\fR\fR
 .ad
-.RS 20n
-An existing group's integer \fBID\fR or character-string name. It defines the
-new role's supplementary group membership. Duplicates between \fIgroup\fR with
-the \fB-g\fR and \fB-G\fR options are ignored. No more than \fBNGROUPS_MAX\fR
-groups can be specified.
+.sp .6
+.RS 4n
+One or more comma-separated existing groups, specified by integer \fBID\fR or
+character-string name. It defines the new role's supplementary group
+membership. Any duplicate groups between the \fB-g\fR and \fB-G\fR options are
+ignored. No more than \fBNGROUPS_MAX\fR groups can be specified. GIDs 0-99 are
+reserved for allocation by the Operating System.
 .RE
 
 .sp
@@ -266,7 +299,8 @@ groups can be specified.
 .na
 \fB\fB-k\fR \fIskel_dir\fR\fR
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 A directory that contains skeleton information (such as \fB\&.profile\fR) that
 can be copied into a new role's home directory. This directory must already
 exist. The system provides the \fB/etc/skel\fR directory that can be used for
@@ -278,24 +312,36 @@ this purpose.
 .na
 \fB\fB-K\fR \fIkey=value\fR\fR
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 A \fIkey=value\fR pair to add to the role's attributes. Multiple \fB-K\fR
-options can be used to add multiple \fIkey=value\fR pairs. The generic \fB-K\fR
-option with the appropriate key can be used instead of the specific implied key
-options (\fB-A\fR and \fB-P\fR). See \fBuser_attr\fR(4) for a list of valid
-\fIkey=value\fR pairs. The "type" key is not a valid key for this option. Keys
-can not be repeated.
+options may be used to add multiple \fIkey=value\fR pairs. The generic \fB-K\fR
+option with the appropriate key may be used instead of the specific implied key
+options (\fB-A\fR, \fB-p\fR, \fB-P\fR). See \fBuser_attr\fR(4) for a
+list of valid \fIkey=value\fR pairs. The "type" key is not a valid key for this
+option. Keys cannot be repeated.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-m\fR\fR
+\fB\fB-m\fR\fR [\fB-z|-Z\fR]
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 Create the new role's home directory if it does not already exist. If the
 directory already exists, it must have read, write, and execute permissions by
 \fIgroup\fR, where \fIgroup\fR is the role's primary group.
+.sp
+If the parent directory of the role's home directory is located on a separate
+\fBZFS\fR file system and the \fB/etc/default/useradd\fR file contains the
+parameter \fBMANAGE_ZFS\fR set to the value \fBYES\fR, a new \fBZFS\fR
+file system will be created for the role.
+.sp
+If the \fB-z\fR option is specified, \fBroleadd\fR will always try to create
+a new file system for the home directory.
+.sp
+If the \fB-Z\fR option is specified, a new file system will never be created.
 .RE
 
 .sp
@@ -303,8 +349,20 @@ directory already exists, it must have read, write, and execute permissions by
 .na
 \fB\fB-o\fR\fR
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 This option allows a \fBUID\fR to be duplicated (non-unique).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-p\fR \fIprojname\fR\fR
+.ad
+.sp .6
+.RS 4n
+Name of the project with which the added role is associated. See the
+\fIprojname\fR field as defined in \fBproject\fR(4).
 .RE
 
 .sp
@@ -312,7 +370,8 @@ This option allows a \fBUID\fR to be duplicated (non-unique).
 .na
 \fB\fB-P\fR \fIprofile\fR\fR
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 One or more comma-separated execution profiles defined in \fBprof_attr\fR(4).
 .RE
 
@@ -321,8 +380,9 @@ One or more comma-separated execution profiles defined in \fBprof_attr\fR(4).
 .na
 \fB\fB-s\fR \fIshell\fR\fR
 .ad
-.RS 20n
-Full pathname of the program used as the user's shell on login. It defaults to
+.sp .6
+.RS 4n
+Full pathname of the program used as the role's shell on login. It defaults to
 an empty field causing the system to use \fB/bin/pfsh\fR as the default. The
 value of \fIshell\fR must be a valid executable file.
 .RE
@@ -332,16 +392,20 @@ value of \fIshell\fR must be a valid executable file.
 .na
 \fB\fB-u\fR \fIuid\fR\fR
 .ad
-.RS 20n
+.sp .6
+.RS 4n
 The \fBUID\fR of the new role. This \fBUID\fR must be a non-negative decimal
 integer below \fBMAXUID\fR as defined in \fB<sys/param.h>\fR\&. The \fBUID\fR
 defaults to the next available (unique) number above the highest number
 currently assigned. For example, if \fBUID\fRs 100, 105, and 200 are assigned,
-the next default \fBUID\fR number is 201. (\fBUID\fRs from \fB0\fR-\fB99\fR are
-reserved for possible use in future applications.)
+the next default \fBUID\fR number will be 201. \fBUID\fRs \fB0\fR-\fB99\fR are
+reserved for allocation by the Operating System.
 .RE
 
 .SH FILES
+.LP
+\fB/etc/default/useradd\fR
+.sp
 .LP
 \fB/etc/datemsk\fR
 .sp
@@ -380,10 +444,10 @@ Interface Stability	Evolving
 .SH SEE ALSO
 .LP
 \fBpasswd\fR(1), \fBpfsh\fR(1), \fBprofiles\fR(1), \fBroles\fR(1),
-\fBusers\fR(1B), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
+\fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
 \fBgrpck\fR(1M), \fBlogins\fR(1M), \fBpwck\fR(1M), \fBuserdel\fR(1M),
-\fBusermod\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4),
-\fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
+\fBusermod\fR(1M), \fBzfs\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4),
+\fBpasswd\fR(4), \fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)
 .SH DIAGNOSTICS
 .LP
 In case of an error, \fBroleadd\fR prints an error message and exits with a

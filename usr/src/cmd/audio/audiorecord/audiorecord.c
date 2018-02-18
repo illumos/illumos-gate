@@ -577,7 +577,7 @@ openinput:
 				    ((double)File_hdr.sample_rate / 1000.));
 				break;
 			}		/* if not -f, fall through */
-
+			/* FALLTHROUGH */
 		default:		/* encoding mismatch */
 			(void) audio_enc_to_str(&Dev_hdr, msg);
 			Error(stderr,

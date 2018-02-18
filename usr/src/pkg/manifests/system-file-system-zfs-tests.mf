@@ -48,7 +48,6 @@ $(i386_ONLY)dir path=usr/sbin/$(ARCH32)
 dir path=usr/sbin/$(ARCH64)
 driver name=zut perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/zut group=sys
-$(i386_ONLY)file path=kernel/drv/zut group=sys
 file path=kernel/drv/zut.conf group=sys
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/zlook mode=0555
 $(i386_ONLY)file path=usr/bin/$(ARCH32)/ztest mode=0555

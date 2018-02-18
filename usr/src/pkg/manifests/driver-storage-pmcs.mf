@@ -51,15 +51,11 @@ dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 driver name=pmcs alias=pciex11f8,8001 class=scsi-self-identifying \
     perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/pmcs group=sys
-$(i386_ONLY)file path=kernel/drv/pmcs group=sys
 file path=kernel/drv/pmcs.conf group=sys \
     original_name=SUNWpmcs:kernel/drv/pmcs.conf preserve=true
 file path=kernel/kmdb/$(ARCH64)/pmcs group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/pmcs group=sys mode=0555
 file path=kernel/misc/pmcs/$(ARCH64)/pmcs8001fw group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/pmcs/pmcs8001fw group=sys mode=0755
 file path=usr/lib/mdb/kvm/$(ARCH64)/pmcs.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/pmcs.so group=sys mode=0555
 legacy pkg=SUNWpmcsr desc="PMC-Sierra SAS-2 HBA Driver (root)" \
     name="PMC-Sierra SAS-2 HBA driver (root)"
 legacy pkg=SUNWpmcsu desc="PMC-Sierra SAS-2 HBA driver (usr)" \

@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Common Makefile definitions for smbsrv.
@@ -40,7 +39,7 @@ ROOTLIBDIR64 =	$(ROOT)/usr/lib/smbsrv/$(MACH64)
 SRCDIR=		../common
 NDLDIR=		$(ROOT)/usr/include/smbsrv/ndl
 LIBS=		$(DYNLIB) $(LINTLIB)
-C99MODE =       -xc99=%all
+CSTD =       $(CSTD_GNU99)
 C99LMODE =      -Xc99=%all
 CPPFLAGS +=	-I$(SRCDIR) -I.
 LDLIBS32 +=	-L$(ROOT)/usr/lib/smbsrv

@@ -39,7 +39,7 @@ LDLIBS +=	-ldbus-1 -ldbus-glib-1 -lglib-2.0 -lhal -lhal-storage -lcontract
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS)
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal
 CPPFLAGS +=	-I$(SRC)/cmd/rmvolmgr
-C99MODE =	$(C99_ENABLE)
+CSTD =	$(CSTD_GNU99)
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-unused-variable

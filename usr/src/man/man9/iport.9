@@ -1,0 +1,332 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 18, 2017
+.Dt IPORT 9
+.Os
+.Sh NAME
+.Nm iport ,
+.Nm iportmap ,
+.Nm phymap ,
+.Nm tgtmap
+.Nd SCSI Device Management Concepts
+.Sh DESCRIPTION
+The
+.Sy iport ,
+.Sy iportmap ,
+.Sy phymap ,
+and
+.Sy tgtmap
+abstractions enable host bus adapter (HBA) drivers to represent the
+devices that they are responsible for enumerating, as well as the
+relationships between these devices.
+These interfaces simplify device drivers by taking care of the creation
+and destruction of device nodes in the devices tree for enumerated
+devices as well as performing some amount of hysteresis.
+.Pp
+These abstractions are used in tandem with SCSI complex addressing.
+A device driver that uses these interfaces generally passes both the
+.Dv SCSI_HBA_HBA
+flag and the
+.Dv SCSI_HBA_ADDR_COMPLEX
+in the
+.Fa hba_flags
+argument to
+.Xr scsi_hba_attach_setup 9F .
+.Ss iport
+The
+.Sy iport ,
+or initiator port, abstracts a collection of attached devices.
+One way to view an iport is that each iport maps to a phy on the HBA.
+A phy refers to a physical connector between the HBA and devices.
+A phy may be made up of individual lanes.
+A lane is connected to a device, for example a disk driver.
+Multiple lanes maybe plugged into the same device, for example, an
+expander.
+When a phy connects to a device with a single lane, this is often
+called a
+.Em narrow phy .
+When a phy connects to a device with multiple lanes, this is often
+called a
+.Em wide phy .
+.Pp
+Consider a device that has two physical ports, and thus two phys.
+Each phy has four lanes, thus we describe the phy as having a mask of
+0xf.
+Each bit in the mask corresponds to a specific lane.
+In this example, each phy would be represented in the system by an iport
+and may enumerate a different device for each lane of the phy.
+If an expander is attached to one or more of the lanes of a phy, then
+additional devices will be enumerated under the expander and be added to
+that phy's iport.
+.Pp
+Another example to consider is when each lane of a phy is directly
+connected to a single disk through a passive backplane.
+In this case, each lane may represent its own iport, since the
+management of each is independent, basically there are many devices each
+with a mask of 0x1.
+.Pp
+iports do not need to map to a physical phy.
+Some HBAs support a combination of both physical and virtual devices.
+In that case, the driver may create two different iports, one for the
+physical devices and one for the virtual devices.
+.Pp
+One property of iports is that they're attached separately from the main
+device and therefore have their own
+.Xr scsi_hba_tran 9S
+structure.
+As a result, that means that a driver can provide different
+entry points for each iport, especially if they represent different
+classes of resources, for example one iport for all physical devices and
+one for all virtual devices.
+This allows for a driver to return different capabilities, among other
+behaviors and entry points, for these different iports.
+One specific case of this is that while physical devices may provide a
+means to get to a SCSI WWN, virtual devices may not have a WWN and
+instead must use a different addressing format.
+.Pp
+iports are considered children of the device driver that attach them,
+but they are bound to the same driver.
+This means that when an iport is created, the
+.Xr attach 9E
+and
+.Xr probe 9E
+entry points of the parent driver (usually indicated by passing a
+.Vt dev_info
+structure) will be called.
+Similarly, when an iport is removed from the system, then the driver's
+.Xr detach 9E
+entry point will be called.
+A driver can determine whether an iport is being attached or not by
+calling the
+.Xr scsi_hba_iport_unit_address 9F
+function.
+The value will return
+.Dv NULL
+if the attaching device represents the driver.
+.Pp
+To manage iports, drivers have two different options.
+If the set of iport an HBA supports are static, then they should use the
+.Xr scsi_hba_iport_register 9F
+function to register an iport.
+.Pp
+If instead, the set of iports are dynamic and map to the coming and
+going of phys discovered by the driver (or some other dynamic source),
+then the driver should use the iportmap set of functions.
+See the section
+.Sx phymap and iportmap
+for more information.
+.Ss tgtmap
+The target map represents a set of devices that have been enumerated
+under an iport.
+Each device is represented by a string, which is an address of some
+kind.
+Usually a physical device's WWN is used.
+.Pp
+By using a target map, the operating system will take
+responsibility for notifying the driver when devices have come and gone
+from a target map, once it has settled, and it will also take
+responsibility for having device nodes come and go, meaning that the
+device driver does not need to know anything about the devices tree or
+worry about other parts of being a nexus driver.
+.Pp
+Target maps come in two forms which change how the HBA driver is
+responsible for reporting changes:
+.Bl -enum
+.It
+Full-set
+.It
+Per-address
+.El
+.Pp
+In the full-set mode, the driver always reports the full set of current
+devices that it sees.
+When the driver finishes the report, the operating system will inform
+the driver of addresses that were added and addresses that were removed.
+These addresses correspond to newly found devices and recently removed
+devices, respectively.
+The full-set mode allows for a simpler device driver, particularly if
+addition and removal notifications may be dropped by the hardware.
+.Pp
+When using the per-address mode of a target map, the HBA driver is
+responsible for indicating which addresses have come and gone from the
+system.
+.Pp
+In either mode, the driver will receive two callbacks, if they have been
+registered when the target map was created.
+The first callback fires before a target driver like sd, ses, etc. is
+attached.
+The second callback fires after the corresponding driver has been
+attached.
+These allow the HBA driver to perform any operations that are
+required on the devices.
+.Pp
+Each target map has two different sets of devices that it manages in
+this form.
+The devices are separated into the following groups:
+.Bl -enum
+.It
+SCSI Devices
+.It
+SMP (SCSI Management Protocol) devices
+.El
+.Pp
+All SATA, SCSI, SAS, SES, etc. devices all are considered part of the
+first category.
+.Pp
+Target maps can be created and destroyed with the
+.Xr scsi_hba_tgtmap_create 9F
+and
+.Xr scsi_hba_tgtmap_destroy 9F
+functions.
+.Pp
+The following functions are used to manage target maps operating in
+full-set mode:
+.Bl -dash
+.It
+.Xr scsi_hba_tgtmap_set_begin 9F
+.It
+.Xr scsi_hba_tgtmap_set_add 9F
+.It
+.Xr scsi_hba_tgtmap_set_end 9F
+.It
+.Xr scsi_hba_tgtmap_set_flush 9F
+.El
+.Pp
+The following functions are used to manage target maps operating in
+per-address mode:
+.Bl -dash
+.It
+.Xr scsi_hba_tgtmap_tgt_add 9F
+.It
+.Xr scsi_hba_tgtmap_tgt_remove 9F
+.El
+.Ss phymap and iportmap
+The phymap and iportmap are often used together to represent complex SAS
+topologies.
+The phymap provides a way to see what phys have been grouped together
+under the same SAS port.
+The SAS port is represented by the
+.Dq local
+and
+.Dq remote
+WWNs.
+When additional phys come online, if they end up referring to the
+same WWNs, then they'll map to the same port.
+.Pp
+The iportmap is used to maintain a dynamic set of iports related to a
+device.
+The iports are each identified by an address, which is generally
+a unit address string.
+For example, when a new phy is added to the phymap which represents a
+new SAS port being used, then a corresponding iport will be created and
+associated with that entry from the phymap.
+Once the iport has been created, a normal target map can be created on
+top of it to handle detected SCSI and SMP devices.
+.Pp
+Both the phymap and iportmap operate in a similar fashion to the
+per-address mode of a tgtmap.
+Entries can be added and removed through direct functions.
+The phymap provides callbacks similar to the tgtmap; however, the
+iportmap does not.
+This is because when an iport is added or removed, a new node is added
+to the devices tree and the driver's
+.Xr attach 9E
+entry point is called with a new
+.Vt dev_info_t
+structure representing the iport.
+.Pp
+During the phymap callback, the HBA driver should create a new iport
+with the unit address passed in from the callback function.
+This relationship is important when taking advantage of the ability to
+map between an iport and the set of phys that it represents.
+.Pp
+The following functions are used to manage iportmaps:
+.Bl -dash
+.It
+.Xr scsi_hba_iportmap_create 9F
+.It
+.Xr scsi_hba_iportmap_iport_add 9F
+.It
+.Xr scsi_hba_iportmap_iport_remove 9F
+.It
+.Xr scsi_hba_iportmap_destroy 9F
+.El
+.Pp
+The following functions are used to manage phymaps:
+.Bl -dash
+.It
+.Xr sas_phymap_create 9F
+.It
+.Xr sas_phymap_destroy 9F
+.It
+.Xr sas_phymap_phy_add 9F
+.It
+.Xr sas_phymap_phy_rem 9F
+.El
+.Ss SCSI Complex Addressing
+Traditionally, SCSI devices were represented by a simple structure, the
+.Xr scsi_address 9S .
+This represented devices by a simple target and lun number.
+While this interface is useful for simple devices and traditional
+parallel SCSI devices, it is not as useful for SAS-era devices where the
+SCSI bus is now a fabric.
+A driver may opt into such a complex addressing mode by setting the
+.Dv SCSI_HBA_ADDR_COMPLEX
+flag.
+.Pp
+When this flag is set, the HBA driver must treat the SCSI address
+as an opaque structure.
+Once in this mode, the driver may get and set a private data structure
+on the SCSI device.
+This is facilitated by the
+.Xr scsi_device_hba_private_set 9F
+and
+.Xr scsi_device_hba_private_get 9F
+functions.
+In addition, the system provides a means to map between the
+.Xr scsi_address 9S
+structure and the corresponding
+.Xr scsi_device 9S
+structure.
+This is performed by the
+.Xr scsi_device_unit_address 9F
+function.
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr detach 9E ,
+.Xr sas_phymap_create 9F ,
+.Xr sas_phymap_destroy 9F ,
+.Xr sas_phymap_phy_add 9F ,
+.Xr sas_phymap_phy_rem 9F ,
+.Xr scsi_device_hba_private_get 9F ,
+.Xr scsi_device_hba_private_set 9F ,
+.Xr scsi_device_unit_address 9F ,
+.Xr scsi_hba_attach_setup 9F ,
+.Xr scsi_hba_iport_register 9F ,
+.Xr scsi_hba_iport_unit_address 9F ,
+.Xr scsi_hba_iportmap_create 9F ,
+.Xr scsi_hba_iportmap_destroy 9F ,
+.Xr scsi_hba_iportmap_iport_add 9F ,
+.Xr scsi_hba_iportmap_iport_remove 9F ,
+.Xr scsi_hba_tgtmap_create 9F ,
+.Xr scsi_hba_tgtmap_destroy 9F ,
+.Xr scsi_hba_tgtmap_set_add 9F ,
+.Xr scsi_hba_tgtmap_set_begin 9F ,
+.Xr scsi_hba_tgtmap_set_end 9F ,
+.Xr scsi_hba_tgtmap_set_flush 9F ,
+.Xr scsi_hba_tgtmap_tgt_add 9F ,
+.Xr scsi_hba_tgtmap_tgt_remove 9F ,
+.Xr scsi_address 9S ,
+.Xr scsi_device 9S ,
+.Xr scsi_hba_tran 9S

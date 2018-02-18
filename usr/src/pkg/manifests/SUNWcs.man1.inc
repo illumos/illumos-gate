@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 file path=usr/share/man/man1/Intro.1
@@ -68,7 +68,6 @@ file path=usr/share/man/man1/du.1
 file path=usr/share/man/man1/dumpcs.1
 file path=usr/share/man/man1/echo.1
 file path=usr/share/man/man1/ed.1
-file path=usr/share/man/man1/egrep.1
 file path=usr/share/man/man1/eject.1
 file path=usr/share/man/man1/encrypt.1
 file path=usr/share/man/man1/env.1
@@ -76,7 +75,6 @@ file path=usr/share/man/man1/exec.1
 file path=usr/share/man/man1/exit.1
 file path=usr/share/man/man1/expr.1
 file path=usr/share/man/man1/fdformat.1
-file path=usr/share/man/man1/fgrep.1
 file path=usr/share/man/man1/file.1
 file path=usr/share/man/man1/find.1
 file path=usr/share/man/man1/fmt.1
@@ -221,6 +219,7 @@ link path=usr/share/man/man1/dirname.1 target=basename.1
 link path=usr/share/man/man1/dirs.1 target=cd.1
 link path=usr/share/man/man1/dumpkeys.1 target=loadkeys.1
 link path=usr/share/man/man1/edit.1 target=../../../has/man/man1has/edit.1has
+link path=usr/share/man/man1/egrep.1 target=grep.1
 link path=usr/share/man/man1/errange.1 target=ckrange.1
 link path=usr/share/man/man1/errdate.1 target=ckdate.1
 link path=usr/share/man/man1/errgid.1 target=ckgid.1
@@ -236,6 +235,7 @@ link path=usr/share/man/man1/export.1 target=set.1
 link path=usr/share/man/man1/false.1 target=true.1
 link path=usr/share/man/man1/fc.1 target=history.1
 link path=usr/share/man/man1/fg.1 target=jobs.1
+link path=usr/share/man/man1/fgrep.1 target=grep.1
 link path=usr/share/man/man1/for.1 target=shell_builtins.1
 link path=usr/share/man/man1/foreach.1 target=shell_builtins.1
 link path=usr/share/man/man1/function.1 target=shell_builtins.1

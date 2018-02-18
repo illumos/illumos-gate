@@ -43,6 +43,7 @@ MANFILES=	Intro.9e		\
 		ks_update.9e		\
 		mac.9e			\
 		mac_capab_transceiver.9e	\
+		mac_capab_led.9e	\
 		mc_getcapab.9e		\
 		mc_getprop.9e		\
 		mc_getstat.9e		\
@@ -112,6 +113,7 @@ MANLINKS=	_info.9e		\
 		MAC.9e			\
 		mc_close.9e		\
 		mc_stop.9e		\
+		mcl_set.9e		\
 		mct_info.9e		\
 		mct_read.9e		\
 		intro.9e		\
@@ -150,6 +152,8 @@ gldm_stop.9e			:= LINKSRC = gld.9e
 
 mc_close.9e			:= LINKSRC = mc_open.9e
 mc_stop.9e			:= LINKSRC = mc_start.9e
+
+mcl_set.9e			:= LINKSRC = mac_capab_led.9e
 
 mct_info.9e			:= LINKSRC = mac_capab_transceiver.9e
 mct_read.9e			:= LINKSRC = mac_capab_transceiver.9e

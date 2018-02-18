@@ -43,7 +43,6 @@ dir path=usr/share/man/man7d
 driver name=ipw alias=pci8086,1043 clone_perms="ipw 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/ipw group=sys
-file path=kernel/drv/ipw group=sys
 file path=usr/share/man/man7d/ipw.7d
 legacy pkg=SUNWipw desc="Intel Pro. Wirless 802.11b IPW2100B Driver" \
     name="Intel Pro. Wireless 802.11b IPW2100B Driver"

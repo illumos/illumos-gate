@@ -67,14 +67,10 @@ file path=lib/svc/manifest/network/smb/client.xml group=sys mode=0444
 file path=lib/svc/method/smb-client mode=0555
 file path=usr/bin/smbutil mode=0555
 file path=usr/kernel/drv/$(ARCH64)/nsmb group=sys
-$(i386_ONLY)file path=usr/kernel/drv/nsmb group=sys
 file path=usr/kernel/drv/nsmb.conf group=sys
 file path=usr/kernel/fs/$(ARCH64)/smbfs group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/fs/smbfs group=sys mode=0755
 file path=usr/kernel/kmdb/$(ARCH64)/nsmb group=sys mode=0555
 file path=usr/kernel/kmdb/$(ARCH64)/smbfs group=sys mode=0555
-$(i386_ONLY)file path=usr/kernel/kmdb/nsmb group=sys mode=0555
-$(i386_ONLY)file path=usr/kernel/kmdb/smbfs group=sys mode=0555
 file path=usr/lib/$(ARCH64)/libsmbfs.so.1
 file path=usr/lib/fs/smbfs/$(ARCH64)/libshare_smbfs.so.1
 file path=usr/lib/fs/smbfs/dfshares mode=0555
@@ -86,8 +82,6 @@ file path=usr/lib/fs/smbfs/unshare mode=0555
 file path=usr/lib/libsmbfs.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/nsmb.so mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbfs.so mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/nsmb.so mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/smbfs.so mode=0555
 file path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so.1
 file path=usr/lib/security/pam_smbfs_login.so.1
 file path=usr/lib/smbfs/smbiod mode=0555

@@ -45,7 +45,6 @@ dir path=usr/share/man/man7d
 driver name=atu alias=usb1915,2233 clone_perms="atu 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/atu group=sys
-file path=kernel/drv/atu group=sys
 file path=usr/share/man/man7d/atu.7d
 legacy pkg=SUNWatu \
     desc="Atmel AT76C50x USB IEEE 802.11b Wireless Device Driver" \

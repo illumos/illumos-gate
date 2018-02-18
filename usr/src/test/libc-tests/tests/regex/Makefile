@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -19,48 +19,32 @@ ROOTOPTPKG=	$(ROOT)/opt/libc-tests
 TESTDIR=	$(ROOTOPTPKG)/tests/regex
 DATADIR=	$(TESTDIR)/data
 
-PROG=		h_regex
-OBJS=		main.o \
-		split.o
+PROG=		testregex
 
-SHPROG=		t_regex
+SHPROG=		regex_test
 
-DATA=		anchor.in \
-		backref.in \
-		basic.in \
-		bracket.in \
-		c_comments.in \
-		complex.in \
-		error.in \
-		meta.in \
-		nospec.in \
-		paren.in \
-		regress.in \
-		repet_bounded.in \
-		repet_multi.in \
-		repet_ordinary.in \
-		startend.in \
-		subexp.in \
-		subtle.in \
-		word_bound.in \
-		zero.in
+DATA=		basic.dat basic.out \
+		categorize.dat categorize.out \
+		forcedassoc.dat forcedassoc.out \
+		leftassoc.dat leftassoc.out \
+		nullsubexpr.dat nullsubexpr.out \
+		repetition.dat repetition.out \
+		rightassoc.dat rightassoc.out
 
 include		$(SRC)/cmd/Makefile.cmd
+
+CERRWARN +=	-_gcc=-Wno-parentheses
+CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-_gcc=-Wno-clobbered
 
 CMDS=		$(PROG:%=$(TESTDIR)/%) $(SHPROG:%=$(TESTDIR)/%)
 $(CMDS):=	FILEMODE=0555
 TESTDATA=	$(DATA:%=$(DATADIR)/%)
 $(TESTDATA):=	FILEMODE=0444
 
-CPPFLAGS +=	-I$(SRC)/lib/libc/port/regex
-
 .KEEP_STATE:
 
 all:		$(PROG)
-
-$(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
 
 $(CMDS):	$(TESTDIR)
 
@@ -68,10 +52,7 @@ $(TESTDATA):	$(DATADIR)
 
 install:	all $(CMDS) $(TESTDATA)
 
-clean:
-		$(RM) $(OBJS)
-
-lint:
+clean lint:
 
 $(TESTDIR) $(DATADIR):
 		$(INS.dir)

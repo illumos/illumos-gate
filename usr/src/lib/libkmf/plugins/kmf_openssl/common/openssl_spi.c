@@ -135,8 +135,7 @@ static uchar_t G[] = { 0x00, 0x62, 0x6d, 0x02, 0x78, 0x39, 0xea, 0x0a,
 #define	SET_SYS_ERROR(h, c) h->lasterr.kstype = -1; h->lasterr.errcode = c;
 
 /*
- * Declare some new macros for managing stacks of EVP_PKEYS, similar to
- * what wanboot did.
+ * Declare some new macros for managing stacks of EVP_PKEYS.
  */
 DECLARE_STACK_OF(EVP_PKEY)
 

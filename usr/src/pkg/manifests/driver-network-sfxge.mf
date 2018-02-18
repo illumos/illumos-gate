@@ -47,7 +47,6 @@ driver name=sfxge clone_perms="sfxge 0666 root sys" perms="* 0666 root sys" \
     alias=pci1924,903 \
     alias=pci1924,923
 file path=kernel/drv/$(ARCH64)/sfxge group=sys
-$(i386_ONLY)file path=kernel/drv/sfxge group=sys
 file path=usr/share/man/man7d/sfxge.7d
 license usr/src/uts/common/io/sfxge/THIRDPARTYLICENSE \
     license=usr/src/uts/common/io/sfxge/THIRDPARTYLICENSE

@@ -37,7 +37,6 @@ dir path=usr/share/man/man7d
 driver name=ipmi perms="* 0600 root sys"
 file path=usr/include/sys/ipmi.h
 file path=usr/kernel/drv/amd64/ipmi
-file path=usr/kernel/drv/ipmi
 file path=usr/kernel/drv/ipmi.conf
 file path=usr/share/man/man7d/ipmi.7d
 license lic_CDDL license=lic_CDDL

@@ -50,7 +50,6 @@ file path=usr/bin/$(ARCH64)/prex mode=0555
 file path=usr/bin/$(ARCH64)/tnfxtract mode=0555
 file path=usr/include/tnf/tnfctl.h
 file path=usr/kernel/drv/$(ARCH64)/tnf group=sys
-$(i386_ONLY)file path=usr/kernel/drv/tnf group=sys
 file path=usr/kernel/drv/tnf.conf group=sys
 file path=usr/lib/$(ARCH64)/libtnfctl.so.1
 file path=usr/lib/$(ARCH64)/libtnfprobe.so.1

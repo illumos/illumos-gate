@@ -51,7 +51,6 @@ driver name=rum clone_perms="rum 0666 root sys" perms="* 0666 root sys" \
     alias=usb7d1,3c04 \
     alias=usbb05,1723
 file path=kernel/drv/$(ARCH64)/rum group=sys
-file path=kernel/drv/rum group=sys
 file path=usr/share/man/man7d/rum.7d
 legacy pkg=SUNWrum \
     desc="Ralink RT2501/RT2601/RT73USB 802.11b/g Wireless Driver" \

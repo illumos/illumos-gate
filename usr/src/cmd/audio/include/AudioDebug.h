@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIODEBUG_H
 #define	_MULTIMEDIA_AUDIODEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <audio_types.h>
 #include <Audio.h>
 
@@ -37,7 +35,7 @@ extern "C" {
 #endif
 
 // Declare default message printing routine
-Boolean AudioStderrMsg(const Audio *, AudioError, AudioSeverity, char *);
+Boolean AudioStderrMsg(const Audio *, AudioError, AudioSeverity, const char *);
 
 
 #ifdef DEBUG

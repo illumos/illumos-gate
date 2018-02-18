@@ -90,6 +90,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <pcidb.h>
 #include <sys/param.h>
 #include <sys/utsname.h>
 #include <sys/smbios.h>
@@ -456,7 +457,7 @@ topo_mod_cpufmri(topo_mod_t *mod, int version, uint32_t cpu_id, uint8_t cpumask,
 
 nvlist_t *
 topo_mod_memfmri(topo_mod_t *mod, int version, uint64_t pa, uint64_t offset,
-	const char *unum, int flags)
+    const char *unum, int flags)
 {
 	int err;
 	nvlist_t *args = NULL, *fmri = NULL;
@@ -730,6 +731,17 @@ di_prom_handle_t
 topo_mod_prominfo(topo_mod_t *mod)
 {
 	return (topo_hdl_prominfo(mod->tm_hdl));
+}
+
+pcidb_hdl_t *
+topo_mod_pcidb(topo_mod_t *mod)
+{
+	topo_hdl_t *thp = mod->tm_hdl;
+
+	if (thp->th_pcidb == NULL)
+		thp->th_pcidb = pcidb_open(PCIDB_VERSION);
+
+	return (thp->th_pcidb);
 }
 
 void

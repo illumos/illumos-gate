@@ -1,23 +1,23 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\"  Copyright 1989 AT&T Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROLEMOD 1M "Dec 10, 2008"
+.TH ROLEMOD 1M "Jan 7, 2018"
 .SH NAME
 rolemod \- modify a role's login information on the system
 .SH SYNOPSIS
 .LP
 .nf
-\fBrolemod\fR [\fB-u\fR \fIuid\fR [\fB-o\fR]] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR [, \fIgroup\fR...]]
-     [\fB-d\fR \fIdir\fR [\fB-m\fR]] [\fB-s\fR \fIshell\fR] [\fB-c\fR \fIcomment\fR] [\fB-l\fR \fInew_name\fR]
+\fBrolemod\fR [\fB-u\fR \fIuid\fR [\fB-o\fR]] [\fB-g\fR \fIgroup\fR] [\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]
+     [\fB-d\fR \fIdir\fR [\fB-m\fR [\fB-z|-Z\fR]]] [\fB-s\fR \fIshell\fR] [\fB-c\fR \fIcomment\fR] [\fB-l\fR \fInew_name\fR]
      [\fB-f\fR \fIinactive\fR] [\fB-e\fR \fIexpire\fR]
-     [\fB-A\fR \fIauthorization\fR [, \fIauthorization\fR]]
-     [\fB-P\fR \fIprofile\fR [, \fIprofile\fR]] [\fB-K\fR \fIkey=value\fR] \fIrole\fR
+     [\fB-A\fR \fIauthorization\fR[,\fIauthorization\fR]...]
+     [\fB-P\fR \fIprofile\fR[,\fIprofile\fR]...] [\fB-K\fR \fIkey=value\fR] \fIrole\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrolemod\fR utility modifies a role's login information on the system. It
 changes the definition of the specified login and makes the appropriate
@@ -25,10 +25,9 @@ login-related system file and file system changes.
 .sp
 .LP
 The system file entries created with this command have a limit of 512
-characters per line. Specifying long arguments to several options may exceed
+characters per line. Specifying long arguments to several options can exceed
 this limit.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -38,10 +37,10 @@ The following options are supported:
 .ad
 .sp .6
 .RS 4n
-One or more comma separated authorizations as deined in \fBauth_attr\fR(4).
-Only role with \fBgrant\fR rights to the \fBauthorization\fR can assign it to
-an account. This replaces any existing authorization setting. If no
-authorization list is specified, the existing setting is removed.
+One or more comma separated authorizations as defined in \fBauth_attr\fR(4).
+Only a user or role who has \fBgrant\fR rights to the \fBauthorization\fR can
+assign it to an account. This replaces any existing authorization setting. If
+an empty authorization list is specified, the existing setting is removed.
 .RE
 
 .sp
@@ -53,7 +52,7 @@ authorization list is specified, the existing setting is removed.
 .RS 4n
 Specify a comment string. \fIcomment\fR can be any text string. It is generally
 a short description of the login, and is currently used as the field for the
-user's full name. This information is stored in the user's \fB/etc/passwd\fR
+role's full name. This information is stored in the role's \fB/etc/passwd\fR
 entry.
 .RE
 
@@ -115,10 +114,11 @@ redefines the role's primary group membership.
 .ad
 .sp .6
 .RS 4n
-Specify an existing group's integer ID or character string name. It redefines
-the role's supplementary group membership. Duplicates between \fIgroup\fR with
-the \fB-g\fR and \fB-G\fR options are ignored. No more than \fBNGROUPS_UMAX\fR
-groups may be specified as defined in \fB<param.h>\fR\&.
+One or more comma-separated existing groups, specified by integer \fBID\fR or
+character-string name. It redefines the role's supplementary group membership.
+Any duplicate groups between the \fB-g\fR and \fB-G\fR options are ignored.
+No more than \fBNGROUPS_UMAX\fR groups may be specified as defined in
+\fB<sys/param.h>\fR\&.
 .RE
 
 .sp
@@ -149,12 +149,12 @@ user.
 .sp .6
 .RS 4n
 Specify the new login name for the role. The \fInew_logname\fR argument is a
-string no more than eight bytes consisting of characters from the set of
+string of no more than eight bytes consisting of characters from the set of
 alphabetic characters, numeric characters, period (\fB\&.\fR), underline
-(\fB_\fR), and hypen (\fB\(mi\fR). The first character should be alphabetic and
+(\fB_\fR), and hyphen (\fB\(mi\fR). The first character should be alphabetic and
 the field should contain at least one lower case alphabetic character. A
 warning message will be written if these restrictions are not met. A future
-Solaris release may refuse to accept login fields that do not meet these
+release may refuse to accept login fields that do not meet these
 requirements. The \fInew_logname\fR argument must contain at least one
 character and must not contain a colon (\fB:\fR) or \fBNEWLINE\fR (\fB\en\fR).
 .RE
@@ -162,7 +162,7 @@ character and must not contain a colon (\fB:\fR) or \fBNEWLINE\fR (\fB\en\fR).
 .sp
 .ne 2
 .na
-\fB\fB-m\fR\fR
+\fB\fB-m\fR\fR [\fB-z|-Z\fR]
 .ad
 .sp .6
 .RS 4n
@@ -170,6 +170,20 @@ Move the role's home directory to the new directory specified with the \fB-d\fR
 option. If the directory already exists, it must have permissions
 read/write/execute by \fIgroup\fR, where \fIgroup\fR is the role's primary
 group.
+.sp
+If the role's old home directory was located on a separate \fBZFS\fR file system
+and the \fB/etc/default/useradd\fR file contains the parameter \fBMANAGE_ZFS\fR
+set to the value \fBYES\fR, the file system will be destroyed after the home
+directory is moved. If the parent directory of the role's new home directory is
+located on a separate \fBZFS\fR filesystem and the \fB/etc/default/useradd\fR
+file contains the parameter \fBMANAGE_ZFS\fR set to the value \fBYES\fR, a new
+\fBZFS\fR file system will be created.
+.sp
+If the \fB-z\fR option is specified, \fBrolemod\fR will always try to create a
+new file system for the home directory and destroy the old one.
+.sp
+If the \fB-Z\fR option is specified, a new file system will never be created,
+and the old one will never be destroyed.
 .RE
 
 .sp
@@ -189,9 +203,9 @@ This option allows the specified \fBUID\fR to be duplicated (non-unique).
 .ad
 .sp .6
 .RS 4n
-One or more comma-separated execution profiles defined in \fBauth_attr\fR(4).
-This replaces any existing profile setting. If no profile list is specified,
-the existing setting is removed.
+One or more comma-separated execution profiles defined in \fBprof_attr\fR(4).
+This replaces any existing profile setting. If an empty profile list is
+specified, the existing setting is removed.
 .RE
 
 .sp
@@ -213,14 +227,13 @@ login. The value of \fIshell\fR must be a valid executable file.
 .sp .6
 .RS 4n
 Specify a new \fBUID\fR for the role. It must be a non-negative decimal integer
-less than \fBMAXUID\fR as defined in \fB<param.h>\fR\&. The \fBUID\fR
+less than \fBMAXUID\fR as defined in \fB<sys/param.h>\fR\&. The \fBUID\fR
 associated with the role's home directory is not modified with this option; a
 role will not have access to their home directory until the \fBUID\fR is
 manually reassigned using \fBchown\fR(1).
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -234,7 +247,6 @@ An existing login name to be modified.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 In case of an error, \fBrolemod\fR prints an error message and exits with one
 of the following values:
@@ -344,7 +356,15 @@ Unable to complete the move of the home directory to the new home directory.
 .RE
 
 .SH FILES
-.sp
+.ne 2
+.na
+\fB\fB/etc/default/useradd\fR\fR
+.ad
+.sp .6
+.RS 4n
+configuration file for user and role administrative commands
+.RE
+
 .ne 2
 .na
 \fB\fB/etc/group\fR\fR
@@ -396,7 +416,6 @@ system file containing additional user and role attributes
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -412,10 +431,9 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBchown\fR(1), \fBpasswd\fR(1), \fBusers\fR(1B), \fBgroupadd\fR(1M),
+\fBchown\fR(1), \fBpasswd\fR(1), \fBgroupadd\fR(1M),
 \fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBlogins\fR(1M), \fBpwconv\fR(1M),
 \fBroleadd\fR(1M), \fBroledel\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M),
-\fBusermod\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4), \fBpasswd\fR(4),
-\fBattributes\fR(5)
+\fBusermod\fR(1M), \fBzfs\fR(1M), \fBgetdate\fR(3C), \fBauth_attr\fR(4),
+\fBpasswd\fR(4), \fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5)

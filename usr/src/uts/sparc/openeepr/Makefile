@@ -56,11 +56,6 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-# lint pass one enforcement
-#
-CPPFLAGS +=	-I$(SRC)/common/net/wanboot/crypt
-
 CFLAGS +=	$(CCVERBOSE)
 
 LDFLAGS +=	-dy -Ndacf/consconfig_dacf

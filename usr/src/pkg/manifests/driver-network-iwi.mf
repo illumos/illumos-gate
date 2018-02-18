@@ -51,7 +51,6 @@ driver name=iwi clone_perms="iwi 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,4224.8086.1010 \
     alias=pci8086,4224.8086.1011
 file path=kernel/drv/$(ARCH64)/iwi group=sys
-file path=kernel/drv/iwi group=sys
 file path=usr/share/man/man7d/iwi.7d
 legacy pkg=SUNWiwi \
     desc="Intel Pro. Wirless 802.11a/b/g IPW2200B/G IPW2915A/B/G Driver" \
