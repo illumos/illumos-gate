@@ -128,7 +128,6 @@ $(sparc_ONLY)driver name=bge clone_perms="bge 0666 root sys" \
     alias=pciex14e4,167a \
     alias=pciex14e4,167b
 file path=kernel/drv/$(ARCH64)/bge group=sys
-$(i386_ONLY)file path=kernel/drv/bge group=sys
 file path=kernel/drv/bge.conf group=sys
 file path=usr/share/man/man7d/bge.7d
 legacy pkg=SUNWbge \

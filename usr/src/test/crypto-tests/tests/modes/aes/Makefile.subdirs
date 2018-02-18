@@ -32,7 +32,7 @@ OBJS_KCF = $(OBJS_LOCAL) $(OBJS_COMDIR) $(COMMONDIR)/cryptotest_kcf.o
 SRCS = $(OBJS:%.o=%.c)
 PKCSLIBS = -lpkcs11 -lcryptoutil
 
-C99MODE = -xc99=%all
+CSTD = $(CSTD_GNU99)
 
 CMDS = $(TESTDIR:%=%/$(PROG))
 $(CMDS) := FILEMODE = 0555

@@ -755,11 +755,79 @@ t4_mc_tx(void *arg, mblk_t *m)
 	return (t4_eth_tx(txq, m));
 }
 
+static int
+t4_mc_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
+{
+	struct port_info *pi = arg;
+
+	if (id != 0 || infop == NULL)
+		return (EINVAL);
+
+	switch (pi->mod_type) {
+	case FW_PORT_MOD_TYPE_NONE:
+		mac_transceiver_info_set_present(infop, B_FALSE);
+		break;
+	case FW_PORT_MOD_TYPE_NOTSUPPORTED:
+		mac_transceiver_info_set_present(infop, B_TRUE);
+		mac_transceiver_info_set_usable(infop, B_FALSE);
+		break;
+	default:
+		mac_transceiver_info_set_present(infop, B_TRUE);
+		mac_transceiver_info_set_usable(infop, B_TRUE);
+		break;
+	}
+
+	return (0);
+}
+
+static int
+t4_mc_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
+    size_t nbytes, off_t offset, size_t *nread)
+{
+	struct port_info *pi = arg;
+	struct adapter *sc = pi->adapter;
+	int rc;
+	size_t i, maxread;
+	/* LINTED: E_FUNC_VAR_UNUSED */
+	struct fw_ldst_cmd ldst __unused;
+
+	if (id != 0 || bp == NULL || nbytes == 0 || nread == NULL ||
+	    (page != 0xa0 && page != 0xa2) || offset < 0)
+		return (EINVAL);
+
+	if (nbytes > 256 || offset >= 256 || (offset + nbytes > 256))
+		return (EINVAL);
+
+	rc = begin_synchronized_op(pi, 0, 1);
+	if (rc != 0)
+		return (rc);
+
+	/*
+	 * Firmware has a maximum size that we can read. Don't read more than it
+	 * allows.
+	 */
+	maxread = sizeof (ldst.u.i2c.data);
+	for (i = 0; i < nbytes; i += maxread) {
+		size_t toread = MIN(maxread, nbytes - i);
+		rc = -t4_i2c_rd(sc, sc->mbox, pi->port_id, page, offset, toread,
+		    bp);
+		if (rc != 0)
+			break;
+		offset += toread;
+		bp = (void *)((uintptr_t)bp + toread);
+	}
+	end_synchronized_op(pi, 0);
+	if (rc == 0)
+		*nread = nbytes;
+	return (rc);
+}
+
 static boolean_t
 t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 {
 	struct port_info *pi = arg;
 	boolean_t status = B_TRUE;
+	mac_capab_transceiver_t *mct;
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM:
@@ -809,6 +877,16 @@ t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 		}
 		break;
 	}
+
+	case MAC_CAPAB_TRANSCEIVER:
+		mct = data;
+
+		mct->mct_flags = 0;
+		mct->mct_ntransceivers = 1;
+		mct->mct_info = t4_mc_transceiver_info;
+		mct->mct_read = t4_mc_transceiver_read;
+		break;
+
 	default:
 		status = B_FALSE; /* cap not supported */
 	}

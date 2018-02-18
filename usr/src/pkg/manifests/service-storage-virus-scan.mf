@@ -46,7 +46,6 @@ dir path=usr/sbin
 dir path=usr/share/man/man1m
 driver name=vscan perms="* 0640 root sys"
 file path=kernel/drv/$(ARCH64)/vscan group=sys
-$(i386_ONLY)file path=kernel/drv/vscan group=sys
 file path=kernel/drv/vscan.conf group=sys
 file path=lib/svc/manifest/system/filesystem/vscan.xml group=sys mode=0444
 file path=usr/lib/devfsadm/linkmod/SUNW_vscan_link.so group=sys

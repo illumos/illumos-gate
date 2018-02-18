@@ -36,7 +36,7 @@ CERRWARN += -_gcc=-Wno-uninitialized
 
 CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
 	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
-C99MODE = $(C99_ENABLE)
+CSTD = $(CSTD_GNU99)
 LDLIBS += -lcurses -ldtrace
 all install	:= LDLIBS += -lglib-2.0
 

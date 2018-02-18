@@ -1,0 +1,228 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Feb 21, 2017
+.Dt MAC_CAPAB_LED 9E
+.Os
+.Sh NAME
+.Nm mac_capab_led ,
+.Nm mcl_set
+.Nd MAC LED capability
+.Sh SYNOPSIS
+.In sys/mac_provider.h
+.Vt typedef struct mac_capab_led mac_capab_led_t;
+.Vt typedef enum mac_led_mode mac_led_mode_t;
+.Ft int
+.Fo mcl_set
+.Fa "void *driver"
+.Fa "mac_led_mode_t mode"
+.Fa "uint_t flags"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa driver
+A pointer to the driver's private data that was passed in via the
+.Sy m_pdata
+member of the
+.Xr mac_register 9S
+structure to the
+.Xr mac_register 9F
+function.
+.It Fa mode
+A value that indicates how the driver should drive the LEDs.
+See the
+.Sx LED MODES
+section for a list of supported modes.
+.It Fa flags
+Reserved for future use.
+.El
+.Sh DESCRIPTION
+The
+.Sy MAC_CAPAB_LED
+capability allows GLDv3 device drivers to expose an interface for
+controlling the LEDs on the device.
+This allows the system to control the LEDs to assist system
+administrators in finding and identifying specific physical devices in
+the system.
+.Pp
+Implementing this capability is optional.
+For more information on how to handle capabilities and how to indicate
+that a capability is not supported, see
+.Xr mc_getcapab 9E .
+.Pp
+This capability should be implemented if the device in question provides
+a way to manipulate its LEDs.
+Generally the LEDs on a device default to indicating link status and
+activity.
+However, they can often be turned off or set to a specific pattern for
+identification purposes.
+.Ss LED MODES
+The system has a notion of different LED modes.
+Each LED mode suggests a different way that a device driver should drive
+the indicator LEDs on the device.
+While we generally want all such LED modes to be as uniform
+as possible, there is a limit to such similarities due to the
+capabilities of NICs.
+Each mode is a member of the
+.Vt mac_led_mode_t
+enumeration.
+The currently defined modes are:
+.Bl -tag -width Dv -offset indent
+.It Dv MAC_LED_DEFAULT
+This mode indicates that the device's default behavior should be used.
+This is usually some form of link status and activity.
+It is device specific and usually is the default behavior after a device
+is powered on.
+.It Dv MAC_LED_OFF
+This mode indicates that the device's LEDs should be turned off and not
+emit any light.
+.It Dv MAC_LED_ON
+This mode indicates that the device's LEDs should be turned on and
+remain solid.
+.It Dv MAC_LED_IDENT
+This mode indicates that the driver should emit some form of
+identification pattern.
+We suggest that devices indicate some form of solid blinking light that
+is on and off at alternating units of time, for example, every 200
+milliseconds.
+If it is possible to use an alternate color from the normal link up and
+activity lighting, that is recommended.
+.El
+.Ss MAC Capability Structure
+When the device driver's
+.Xr mc_getcapab 9E
+function entry point is called with the capability set to
+.Dv MAC_CAPAB_LED ,
+then the value of the capability structure is the following structure:
+.Bd -literal -offset indent
+typedef struct mac_capab_led {
+	uint_t		mcl_flags;
+	mac_led_mode_t	mcl_modes;
+	int		(*mcl_set)(void *driver, mac_led_mode_t mode,
+			    uint_t flags);
+} mac_capab_led_t;
+.Ed
+.Pp
+If the driver supports the
+.Dv MAC_CAPAB_LED
+capability, it should fill in this structure, based on the following
+rules:
+.Bl -tag -width Vt
+.It Fa mcl_flags
+The
+.Fa mcl_flags
+member is used to negotiate extensions with the driver.
+MAC will set the value of
+.Fa mcl_flags
+to include all of the currently known extensions.
+The driver should intersect this list with the set that they actually
+support.
+At this time, no such features are defined and the driver should set the
+member to
+.Sy 0 .
+.It Fa mcl_modes
+The
+.Fa mcl_modes
+member represents the support modes of the device driver.
+The device driver should set
+.Vt mcl_modes
+to the bitwise-inclusive-OR of the LED modes listed in
+.Sx LED MODES .
+.Pp
+If the driver does not support anything other than the default behavior
+of
+.Dv MAC_LED_DEFAULT ,
+then the device driver should not indicate that it supports this
+capability.
+.It Fa mcl_set
+The
+.Fa mcl_set
+entry point will be called by the MAC framework when it needs the device
+driver to change how it is driving its LEDs.
+Each call will ask the driver to change the display mode to the
+specified mode.
+The driver does not have to multiplex requests for multiple modes or
+keep track of what has been requested, that is taken care of by the
+system itself.
+.Pp
+The driver should first validate that
+.Fa mode
+is a mode that it supports.
+While the device reports the set of supported modes as a
+bitwise-inclusive-OR, the driver should only receive a single value in
+.Fa mode .
+The value of the
+.Fa flags
+argument is reserved for future use.
+Drivers must check that the value of flags is zero and if not, return
+.Er EINVAL .
+.Pp
+When this entry point is first called on a driver, it should snapshot
+its device registers such that it knows how to restore the default
+behavior.
+Because each method of programming the LEDs is different, it
+is up to the driver itself to take care of this, the broader framework
+cannot take care of it.
+.Pp
+If for some reason the driver is asked to program the same mode that it
+is already driving, then it need not do anything and should simply
+return success.
+.Pp
+Once the driver successfully changes the LED driving mode, it should
+return
+.Sy 0 .
+Otherwise, it should return the appropriate error number.
+For a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EINVAL
+.Fa flag
+contains an unknown value.
+.It Er ENOTSUP
+.Fa mode
+is unsupported.
+.Fa flags
+contains an unsupported or unknown value.
+.It Er EIO
+An I/O error occurred while trying to program the device's registers.
+This could be because a command timed out or an FM-aware driver
+encountered an error.
+.El
+.Pp
+The broader framework will guarantee that only a single call to the
+.Fa mcl_set
+function is ongoing at any time.
+If other parts of the driver refer to the data used by the
+.Fa mcl_set
+function, then the driver must ensure that it is performing sufficient
+locking of its data.
+.El
+.Sh CONTEXT
+The
+.Ft mcl_set
+entry point will only be called from
+.Sy user
+or
+.Sy kernel
+context.
+It will never be called from interrupt context.
+.Sh SEE ALSO
+.Xr Intro 2 ,
+.Xr mac 9E ,
+.Xr mc_getcapab 9E ,
+.Xr mac_register 9F

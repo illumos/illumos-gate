@@ -28,7 +28,7 @@ SRCS= ../$(PROG).c
 
 include ../../Makefile.cmd
 
-C99MODE= -xc99=%all
+CSTD= $(CSTD_GNU99)
 C99LMODE= -Xc99=%all
 CFLAGS += -g $(CCVERBOSE)
 CFLAGS64 += -g $(CCVERBOSE)

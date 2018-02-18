@@ -62,7 +62,6 @@ driver name=iprb clone_perms="iprb 0666 root sys" perms="* 0666 root sys" \
     alias=pci8086,2449 \
     alias=pci8086,27dc
 file path=kernel/drv/$(ARCH64)/iprb group=sys
-file path=kernel/drv/iprb group=sys
 file path=usr/share/man/man7d/iprb.7d
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/common/io/iprb/THIRDPARTYLICENSE \

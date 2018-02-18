@@ -46,7 +46,6 @@ driver name=mxfe clone_perms="mxfe 0666 root sys" perms="* 0666 root sys" \
     alias=pci11ad,c115 \
     alias=pci11fc,9881
 file path=kernel/drv/$(ARCH64)/mxfe group=sys
-$(i386_ONLY)file path=kernel/drv/mxfe group=sys
 file path=usr/share/man/man7d/mxfe.7d
 legacy pkg=SUNWmxfe desc="Macronix Fast Ethernet Network Adapter Driver" \
     name="Macronix Fast Ethernet Driver"

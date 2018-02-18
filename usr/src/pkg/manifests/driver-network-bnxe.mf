@@ -59,7 +59,6 @@ driver name=bnxe perms="* 0666 root sys" \
     alias=pciex14e4,16ab \
     alias=pciex14e4,16ae
 file path=kernel/drv/$(ARCH64)/bnxe group=sys
-$(i386_ONLY)file path=kernel/drv/bnxe group=sys
 file path=kernel/drv/bnxe.conf group=sys \
     original_name=BRCMbnxe:kernel/drv/bnxe.conf preserve=renameold
 file path=usr/share/man/man7d/bnxe.7d

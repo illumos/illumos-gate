@@ -52,7 +52,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTUSRSBINPROG64)
+install: all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)

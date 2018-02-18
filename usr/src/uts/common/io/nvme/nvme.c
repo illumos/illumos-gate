@@ -1060,9 +1060,11 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 	 */
 	case NVME_CQE_SC_GEN_INV_OPC:
 		/* Invalid Command Opcode */
-		dev_err(cmd->nc_nvme->n_dip, CE_PANIC, "programming error: "
-		    "invalid opcode in cmd %p", (void *)cmd);
-		return (0);
+		if (!cmd->nc_dontpanic)
+			dev_err(cmd->nc_nvme->n_dip, CE_PANIC,
+			    "programming error: invalid opcode in cmd %p",
+			    (void *)cmd);
+		return (EINVAL);
 
 	case NVME_CQE_SC_GEN_INV_FLD:
 		/* Invalid Field in Command */
@@ -1431,7 +1433,12 @@ nvme_async_event_task(void *arg)
 	 * Other possible errors are various scenarios where the async request
 	 * was aborted, or internal errors in the device. Internal errors are
 	 * reported to FMA, the command aborts need no special handling here.
+	 *
+	 * And finally, at least qemu nvme does not support async events,
+	 * and will return NVME_CQE_SC_GEN_INV_OPC | DNR. If so, we
+	 * will avoid posting async events.
 	 */
+
 	if (nvme_check_cmd_status(cmd) != 0) {
 		dev_err(cmd->nc_nvme->n_dip, CE_WARN,
 		    "!async event request returned failure, sct = %x, "
@@ -1445,6 +1452,13 @@ nvme_async_event_task(void *arg)
 			ddi_fm_service_impact(cmd->nc_nvme->n_dip,
 			    DDI_SERVICE_LOST);
 		}
+
+		if (cmd->nc_cqe.cqe_sf.sf_sct == NVME_CQE_SCT_GENERIC &&
+		    cmd->nc_cqe.cqe_sf.sf_sc == NVME_CQE_SC_GEN_INV_OPC &&
+		    cmd->nc_cqe.cqe_sf.sf_dnr == 1) {
+			nvme->n_async_event_supported = B_FALSE;
+		}
+
 		nvme_free_cmd(cmd);
 		return;
 	}
@@ -1576,11 +1590,13 @@ nvme_admin_cmd(nvme_cmd_t *cmd, int sec)
 static void
 nvme_async_event(nvme_t *nvme)
 {
-	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	nvme_cmd_t *cmd;
 
+	cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	cmd->nc_sqid = 0;
 	cmd->nc_sqe.sqe_opc = NVME_OPC_ASYNC_EVENT;
 	cmd->nc_callback = nvme_async_event_task;
+	cmd->nc_dontpanic = B_TRUE;
 
 	nvme_submit_admin_cmd(nvme->n_adminq, cmd);
 }
@@ -2376,7 +2392,12 @@ nvme_init(nvme_t *nvme)
 
 	/*
 	 * Post an asynchronous event command to catch errors.
+	 * We assume the asynchronous events are supported as required by
+	 * specification (Figure 40 in section 5 of NVMe 1.2).
+	 * However, since at least qemu does not follow the specification,
+	 * we need a mechanism to protect ourselves.
 	 */
+	nvme->n_async_event_supported = B_TRUE;
 	nvme_async_event(nvme);
 
 	/*
@@ -2604,8 +2625,10 @@ nvme_init(nvme_t *nvme)
 	 * Post more asynchronous events commands to reduce event reporting
 	 * latency as suggested by the spec.
 	 */
-	for (i = 1; i != nvme->n_async_event_limit; i++)
-		nvme_async_event(nvme);
+	if (nvme->n_async_event_supported) {
+		for (i = 1; i != nvme->n_async_event_limit; i++)
+			nvme_async_event(nvme);
+	}
 
 	return (DDI_SUCCESS);
 

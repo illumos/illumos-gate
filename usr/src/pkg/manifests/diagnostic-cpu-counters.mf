@@ -60,11 +60,6 @@ $(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6 group=sys \
     mode=0755
 $(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.15 \
     group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.AuthenticAMD group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.15 group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.6 group=sys mode=0755
-$(i386_ONLY)file path=usr/kernel/pcbe/pcbe.GenuineIntel.6.15 group=sys \
-    mode=0755
 file path=usr/lib/$(ARCH64)/libcpc.so.1
 file path=usr/lib/$(ARCH64)/libpctx.so.1
 file path=usr/lib/$(ARCH64)/llib-lcpc.ln
@@ -107,8 +102,6 @@ $(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.23 target=pcbe.62
 $(sparc_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.4.7 target=pcbe.4.6
 $(i386_ONLY)hardlink path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.5 \
     target=pcbe.GenuineIntel.6
-$(i386_ONLY)hardlink path=usr/kernel/pcbe/pcbe.GenuineIntel.5 \
-    target=pcbe.GenuineIntel.6
 legacy pkg=SUNWcpcu desc="CPU Performance Counter libraries and utilities" \
     name="CPU Performance Counter libraries and utilities"
 license cr_Sun license=cr_Sun
@@ -136,26 +129,6 @@ $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.44 \
 $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.46 \
     target=pcbe.GenuineIntel.6.15
 $(i386_ONLY)link path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.47 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.23 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.26 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.28 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.29 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.30 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.31 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.37 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.44 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.46 \
-    target=pcbe.GenuineIntel.6.15
-$(i386_ONLY)link path=usr/kernel/pcbe/pcbe.GenuineIntel.6.47 \
     target=pcbe.GenuineIntel.6.15
 link path=usr/lib/$(ARCH64)/libcpc.so target=./libcpc.so.1
 link path=usr/lib/$(ARCH64)/libpctx.so target=./libpctx.so.1

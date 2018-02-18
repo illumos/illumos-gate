@@ -23,7 +23,7 @@ SRCS = $(OBJS:%.o=%.c)
 
 poll_test := LDLIBS += -lsocket
 poll_test.ln := LDLIBS += -lsocket
-C99MODE = -xc99=%all
+CSTD = $(CSTD_GNU99)
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests

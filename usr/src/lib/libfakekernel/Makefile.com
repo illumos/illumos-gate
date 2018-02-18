@@ -53,7 +53,7 @@ SRCS=   $(COBJS:%.o=$(SRCDIR)/%.c)
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-C99MODE =       -xc99=%all
+CSTD =       $(CSTD_GNU99)
 C99LMODE =      -Xc99=%all
 
 # Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.

@@ -31,6 +31,5 @@ dir path=kernel/drv/$(ARCH64) group=sys
 driver name=vmxnet3s alias=pci15ad,7b0 clone_perms="vmxnet3s 0666 root sys" \
     perms="* 0666 root sys"
 file path=kernel/drv/$(ARCH64)/vmxnet3s group=sys
-file path=kernel/drv/vmxnet3s group=sys
 file path=kernel/drv/vmxnet3s.conf group=sys
 license lic_CDDL license=lic_CDDL

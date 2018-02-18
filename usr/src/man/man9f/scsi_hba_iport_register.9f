@@ -1,0 +1,88 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 18, 2017
+.Dt SCSI_HBA_IPORT_REGISTER 9F
+.Os
+.Sh NAME
+.Nm scsi_hba_iport_register
+.Nd register a new iport
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft int
+.Fo scsi_hba_iport_register
+.Fa "dev_info_t *dip"
+.Fa "char *port"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to
+.Vt dev_info
+structure.
+.It Fa port
+The name of the iport to add.
+.El
+.Sh DESCRIPTION
+The
+.Fn scsi_hba_iport_register
+function is used to create a new iport.
+For more information on iports and their uses, see
+.Xr iport 9 .
+This interface is generally used then there are a fixed, static set of
+iports that exist in the system.
+If the set of iports is dynamic or related to phys coming online and
+offline, then the driver should instead consider using the
+.Xr iportmap 9
+abstraction.
+.Pp
+The iport will be created as a child of the device represented by
+.Fa dip .
+The iport will be bound to the same driver.
+To distinguish nodes, the driver should use the
+.Xr scsi_hba_iport_unit_address 9F
+function.
+.Pp
+The name of the iport, specified by
+.Fa port ,
+must be unique for a given parent.
+The iport will not be created if the name is already in use.
+While names generally are based on unit addresses, they may be synthetic
+names.
+.Sh CONTEXT
+The
+.Fn scsi_hba_iport_register
+function is generally called during the
+.Xr attach 9E
+entry point and may be called from
+.Sy user
+or
+.Sy kernel
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn scsi_hba_iport_register
+function returns
+.Dv DDI_SUCCESS .
+Otherwise,
+.Dv DDI_FAILURE
+is returned.
+.Sh SEE ALSO
+.Xr iport 9 ,
+.Xr iportmap 9 ,
+.Xr scsi_hba_iportmap_iport_add 9F

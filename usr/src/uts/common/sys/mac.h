@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -241,6 +241,17 @@ typedef enum {
 #define	MAC_PROP_MAP_KSTAT		0x0100
 #define	MAC_PROP_PERM_RW		(MAC_PROP_PERM_READ|MAC_PROP_PERM_WRITE)
 #define	MAC_PROP_FLAGS_RK		(MAC_PROP_PERM_READ|MAC_PROP_MAP_KSTAT)
+
+/*
+ * Valid LED mode bits
+ */
+typedef enum mac_led_mode {
+	MAC_LED_DEFAULT	= (1 << 0),
+	MAC_LED_OFF	= (1 << 1),
+	MAC_LED_IDENT	= (1 << 2),
+	MAC_LED_ON	= (1 << 3)
+} mac_led_mode_t;
+
 
 #ifdef	_KERNEL
 

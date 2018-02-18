@@ -41,7 +41,7 @@ LDLIBS +=	-lxnet -lsocket -lnsl -lm -linetutil
 # These #defines are required to use SUSv3 interfaces
 CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 
 # Setting the above defines to use the UNIX98 ancillary data feature
 # causes lint to output warnings about lint library declarations conflicting

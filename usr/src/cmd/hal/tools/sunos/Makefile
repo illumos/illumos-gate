@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 HAL_PROGS =	hal-system-lcd-set-brightness-sunos \
 		hal-system-lcd-get-brightness-sunos
@@ -43,7 +41,7 @@ $(HAL_PROGS) :=		LDLIBS += -lc $(ZIGNORE) -lglib-2.0
 CPPFLAGS += $(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS += -I$(ROOT)/usr/include/hal
 CPPFLAGS += -I$(ROOT)/usr/include/libpolkit
-C99MODE = $(C99_ENABLE)
+CSTD = $(CSTD_GNU99)
 
 ROOTCMDDIR =		$(ROOTLIB_HAL)/sunos 
 ROOTCMD =		$(HAL_PROGS:%=$(ROOTCMDDIR)/%) \

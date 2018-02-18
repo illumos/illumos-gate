@@ -54,7 +54,6 @@ driver name=afe clone_perms="afe 0666 root sys" perms="* 0666 root sys" \
     alias=pci13d1,ab08 \
     alias=pci1737,ab08
 file path=kernel/drv/$(ARCH64)/afe group=sys
-$(i386_ONLY)file path=kernel/drv/afe group=sys
 file path=usr/share/man/man7d/afe.7d
 legacy pkg=SUNWafe desc="ADMtek/Infineon Fast Ethernet Network Adapter Driver" \
     name="ADMtek Ethernet Driver"

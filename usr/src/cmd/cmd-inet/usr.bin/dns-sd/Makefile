@@ -23,7 +23,7 @@ include ../../Makefile.cmd-inet
 OBJS=		ClientCommon.o dns-sd.o
 SRCS=		ClientCommon.c dns-sd.c
 
-CFLAGS += $(C99_ENABLE)
+CFLAGS += $(CSTD_GNU99)
 CPPFLAGS += -DMDNS_VERSIONSTR_NODTS
 LDLIBS += -lsocket -ldns_sd
 

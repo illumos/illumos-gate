@@ -83,12 +83,8 @@ driver name=amd64_gart alias=pci1022,1103 perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/$(ARCH64)_gart group=sys
 file path=kernel/drv/$(ARCH64)/agpgart group=sys
 file path=kernel/drv/$(ARCH64)/agptarget group=sys
-file path=kernel/drv/$(ARCH64)_gart group=sys
-file path=kernel/drv/agpgart group=sys
 file path=kernel/drv/agpgart.conf group=sys
-file path=kernel/drv/agptarget group=sys
 file path=kernel/misc/$(ARCH64)/agpmaster group=sys mode=0755
-file path=kernel/misc/agpmaster group=sys mode=0755
 file path=usr/share/man/man7i/agpgart_io.7i
 legacy pkg=SUNWagp desc="AGP GART driver for x86 workstations" \
     name="AGP GART Driver"

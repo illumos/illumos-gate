@@ -26,8 +26,6 @@
 /* Copyright (c) 1988 AT&T */
 /* All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dextern.h"
 #include "sgs.h"
 #include <stdio.h>
@@ -1184,8 +1182,8 @@ begin:
 		case L'=':	return (PREC);
 		case L'{':	return (LCURLY);
 		default:	reserve = 1;
-			}
-
+		}
+		/* FALLTHROUGH */
 	default:
 
 		if (iswdigit(c)) { /* number */

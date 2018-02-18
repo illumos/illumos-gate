@@ -47,7 +47,7 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CERRWARN += -_gcc=-Wno-switch
 
 LINTFLAGS += -mu
-C99MODE =       -xc99=%all
+CSTD =       $(CSTD_GNU99)
 C99LMODE =      -Xc99=%all
 
 MANIFEST = vscan.xml

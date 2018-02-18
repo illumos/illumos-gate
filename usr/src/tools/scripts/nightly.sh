@@ -487,61 +487,6 @@ function build_tools {
 	return 0
 }
 
-#
-# Set up to use locally installed tools.
-#
-# usage: use_tools TOOLSROOT
-#
-function use_tools {
-	TOOLSROOT=$1
-
-	#
-	# If we're not building ON workspace, then the TOOLSROOT
-	# settings here are clearly ignored by the workspace
-	# makefiles, prepending nonexistent directories to PATH is
-	# harmless, and we clearly do not wish to override
-	# ONBLD_TOOLS.
-	#
-	# If we're building an ON workspace, then the prepended PATH
-	# elements should supercede the preexisting ONBLD_TOOLS paths,
-	# and we want to override ONBLD_TOOLS to catch the tools that
-	# don't have specific path env vars here.
-	#
-	# So the only conditional behavior is overriding ONBLD_TOOLS,
-	# and we check for "an ON workspace" by looking for
-	# ${TOOLSROOT}/opt/onbld.
-	#
-
-	STABS=${TOOLSROOT}/opt/onbld/bin/${MACH}/stabs
-	export STABS
-	CTFSTABS=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfstabs
-	export CTFSTABS
-	GENOFFSETS=${TOOLSROOT}/opt/onbld/bin/genoffsets
-	export GENOFFSETS
-
-	CTFCONVERT=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfconvert
-	export CTFCONVERT
-	CTFMERGE=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfmerge
-	export CTFMERGE
-
-	PATH="${TOOLSROOT}/opt/onbld/bin/${MACH}:${PATH}"
-	PATH="${TOOLSROOT}/opt/onbld/bin:${PATH}"
-	export PATH
-
-	if [ -d "${TOOLSROOT}/opt/onbld" ]; then
-		ONBLD_TOOLS=${TOOLSROOT}/opt/onbld
-		export ONBLD_TOOLS
-	fi
-
-	echo "\n==== New environment settings. ====\n" >> $LOGFILE
-	echo "STABS=${STABS}" >> $LOGFILE
-	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
-	echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
-	echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
-	echo "PATH=${PATH}" >> $LOGFILE
-	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
-}
-
 function staffer {
 	if [ $ISUSER -ne 0 ]; then
 		"$@"
@@ -1672,6 +1617,21 @@ fi
 [[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
 [[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
 
+if [[ "$t_FLAG" = "y" ]]; then
+	echo "\n==== Bootstrapping cw ====\n" >> $LOGFILE
+	( cd ${TOOLS}
+	  set_non_debug_build_flags
+	  rm -f $TMPDIR/make-state
+	  $MAKE -K $TMPDIR/make-state -e TARGET=install cw 2>&1 >> $LOGFILE
+	  [[ "$?" -ne 0 ]] && fatal_error "Error: could not bootstrap cw"
+	)
+
+	# Switch ONBLD_TOOLS early if -t is specified so that
+	# we could use bootstrapped cw for compiler checks.
+	ONBLD_TOOLS=${TOOLS_PROTO}/opt/onbld
+	export ONBLD_TOOLS
+fi
+
 echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
 
 # System
@@ -1748,7 +1708,29 @@ if [[ "$t_FLAG" = "y" ]]; then
 	if (( $? != 0 )); then
 		build_ok=n
 	else
-		use_tools $TOOLS_PROTO
+		STABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/stabs
+		export STABS
+		CTFSTABS=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfstabs
+		export CTFSTABS
+		GENOFFSETS=${TOOLS_PROTO}/opt/onbld/bin/genoffsets
+		export GENOFFSETS
+
+		CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert
+		export CTFCONVERT
+		CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge
+		export CTFMERGE
+
+		PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
+		PATH="${TOOLS_PROTO}/opt/onbld/bin:${PATH}"
+		export PATH
+
+		echo "\n==== New environment settings. ====\n" >> $LOGFILE
+		echo "STABS=${STABS}" >> $LOGFILE
+		echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
+		echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
+		echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
+		echo "PATH=${PATH}" >> $LOGFILE
+		echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
 	fi
 fi
 

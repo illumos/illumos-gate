@@ -70,16 +70,13 @@ driver name=sv devlink=type=ddi_pseudo;name=sv\t\D perms="* 0666 root sys" \
 file path=etc/init.d/sv mode=0744
 file path=etc/init.d/sv.cluster mode=0744
 file path=kernel/kmdb/$(ARCH64)/sv group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/sv group=sys mode=0555
 file path=lib/svc/manifest/system/nws_sv.xml group=sys mode=0444
 file path=usr/bin/svadm mode=0555
 file path=usr/bin/svboot mode=0555
 file path=usr/cluster/sbin/sv mode=0744
 file path=usr/kernel/drv/$(ARCH64)/sv group=sys
-$(i386_ONLY)file path=usr/kernel/drv/sv group=sys
 file path=usr/kernel/drv/sv.conf group=sys
 file path=usr/lib/mdb/kvm/$(ARCH64)/sv.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/sv.so group=sys mode=0555
 file path=usr/share/man/man1m/svadm.1m
 file path=usr/share/man/man7d/sv.7d
 hardlink path=lib/svc/method/svc-sv target=../../../etc/init.d/sv

@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROJMOD 1M "Feb 22, 2007"
+.TH PROJMOD 1M "Jan 7, 2018"
 .SH NAME
 projmod \- modify a project's information on the system
 .SH SYNOPSIS
@@ -15,20 +16,18 @@ projmod \- modify a project's information on the system
 .LP
 .nf
 \fBprojmod\fR [\fB-n\fR] [\fB-A\fR|\fB-f\fR \fIfilename\fR | -] [\fB-p\fR \fIprojid\fR [\fB-o\fR]]
-     [\fB-c\fR \fIcomment\fR] [\fB-a\fR|\fB-s\fR|\fB-r\fR] [\fB-U\fR \fIuser\fR [,\fIuser\fR]... ]
-     [\fB-G\fR \fIgroup\fR [,\fIgroup\fR]... ]
-     [ [\fB-K\fR \fIname\fR [=\fIvalue\fR [,\fIvalue\fR]...]...]]
+     [\fB-c\fR \fIcomment\fR] [\fB-a\fR|\fB-s\fR|\fB-r\fR] [\fB-U\fR \fIuser\fR[,\fIuser\fR]...]
+     [\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]
+     [\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR]...]]...
      [\fB-l\fR \fInew_projectname\fR] \fIproject\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBprojmod\fR utility modifies a project's definition on the system.
 \fBprojmod\fR changes the definition of the specified project and makes the
 appropriate project-related system file and file system changes.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -79,7 +78,7 @@ modified.
 .sp
 .ne 2
 .na
-\fB\fB-G\fR \fIgroup\fR [,\fIgroup\fR...]\fR
+\fB\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]fR
 .ad
 .RS 29n
 Specify a replacement list of member groups of the project. When used in
@@ -90,7 +89,7 @@ of groups to be added or removed from the project.
 .sp
 .ne 2
 .na
-\fB\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR...]\fR
+\fB\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR]...]\fR
 .ad
 .RS 29n
 Specify a replacement list of project attributes for the project. When used in
@@ -156,8 +155,9 @@ non-unique within the project file.
 .ad
 .RS 29n
 Specify a new project \fBID\fR for the project. It must be a non-negative
-decimal integer less than \fBMAXUID\fR as defined in \fBparam.h\fR. This value
-must be unique within the project file if the \fB-o\fR option is not specified.
+decimal integer less than \fBMAXUID\fR as defined in \fB<sys/param.h>\fR. This
+value must be unique within the project file if the \fB-o\fR option is not
+specified.
 .RE
 
 .sp
@@ -186,7 +186,7 @@ options.
 .sp
 .ne 2
 .na
-\fB\fB-U\fR \fIuser\fR [,\fIuser\fR...]\fR
+\fB\fB-U\fR \fIuser\fR[,\fIuser\fR]...\fR
 .ad
 .RS 29n
 Specify a replacement list of member users of the project. When used in
@@ -195,7 +195,6 @@ of users to be added or removed from the project.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -219,7 +218,7 @@ project.
 
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRUsing the \fB-K\fR Option for Addition of an Attribute Value
+\fBExample 1\fR Using the \fB-K\fR Option for Addition of an Attribute Value
 .sp
 .LP
 Consider the following \fBproject\fR(4) entry:
@@ -275,7 +274,7 @@ task.max-lwps=(priv,100,deny),(priv,1000,signal=KILL)
 .in -2
 
 .LP
-\fBExample 2 \fRUsing the \fB-K\fR Option for the Substitution of an Attribute
+\fBExample 2\fR Using the \fB-K\fR Option for the Substitution of an Attribute
 Value
 .sp
 .LP
@@ -313,7 +312,7 @@ task.max-lwps=(priv,500,signal=SIGSTOP)
 .in -2
 
 .LP
-\fBExample 3 \fRUsing the \fB-K\fR Option for Removal of an Attribute Value
+\fBExample 3\fR Using the \fB-K\fR Option for Removal of an Attribute Value
 .sp
 .LP
 Assume an attributes field in a \fBproject\fR(4) entry for a project
@@ -350,7 +349,7 @@ task.max-lwps=(priv,1000,signal=KILL)
 .in -2
 
 .LP
-\fBExample 4 \fRSpecifying Multiple Attribute Values
+\fBExample 4\fR Specifying Multiple Attribute Values
 .sp
 .LP
 Suppose you want to achieve the following resource controls for the project
@@ -419,7 +418,7 @@ and scaling factors you can use for resource controls are specified in
 \fBresource_controls\fR(5).
 
 .LP
-\fBExample 5 \fRBinding a Pool to a Project
+\fBExample 5\fR Binding a Pool to a Project
 .sp
 .LP
 The following command sets the \fBproject.pool\fR attribute for the project
@@ -433,7 +432,7 @@ The following command sets the \fBproject.pool\fR attribute for the project
 .in -2
 
 .LP
-\fBExample 6 \fREvaluating Input from \fBstdin\fR
+\fBExample 6\fR Evaluating Input from \fBstdin\fR
 .sp
 .LP
 The following command uses the \fB-f\fR option without a project name operand
@@ -447,7 +446,6 @@ to evaluate the contents of an NIS projects map.
 .in -2
 
 .SH EXIT STATUS
-.sp
 .LP
 In case of an error, \fBprojmod\fR prints an error message and exits with one
 of the following values:
@@ -527,7 +525,6 @@ Cannot update the \fB/etc/project\fR file.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/group\fR\fR
@@ -564,7 +561,6 @@ System file containing users' encrypted passwords and related information
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -583,18 +579,16 @@ Interface Stability	See below.
 .LP
 Invocation is evolving. Human readable output is unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M), \fBprojadd\fR(1M),
 \fBprojdel\fR(1M), \fBuseradd\fR(1M), \fBuserdel\fR(1M), \fBusermod\fR(1M),
 \fBpasswd\fR(4), \fBproject\fR(4), \fBattributes\fR(5),
 \fBresource_controls\fR(5)
 .SH NOTES
-.sp
 .LP
 The \fBprojmod\fR utility modifies project definitions only in the local
-\fB/etc/project\fR file. If a network name service such as \fBNIS\fR or
-\fBLDAP\fR is being used to supplement the local files with additional entries,
+\fB/etc/project\fR file. If a network name service
+is being used to supplement the local files with additional entries,
 \fBprojmod\fR cannot change information supplied by the network name service.
 However \fBprojmod\fR verifies the uniqueness of project name and project
 \fBID\fR against the external name service.

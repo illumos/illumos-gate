@@ -85,8 +85,8 @@ XGE_CFLAGS	= $(HAL_CFLAGS) $(TRACE_CFLAGS) $(CCVERBOSE) \
 		-I$(UTSBASE)/common/io/xge/hal/xgehal \
 		-I$(UTSBASE)/common/io/xge/drv -DSOLARIS
 
-CFLAGS		+= $(XGE_CFLAGS) -xO4 -xcrossfile -xc99=%all
-CFLAGS64	+= $(XGE_CFLAGS) -xO4 -xcrossfile -xc99=%all
+CFLAGS		+= $(XGE_CFLAGS) -xO4 -xcrossfile
+CFLAGS64	+= $(XGE_CFLAGS) -xO4 -xcrossfile
 
 #
 #	Driver depends on MAC & IP

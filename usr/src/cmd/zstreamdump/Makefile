@@ -35,7 +35,7 @@ INCS +=	-I../../common/zfs
 
 LDLIBS += -lzfs -lnvpair
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)

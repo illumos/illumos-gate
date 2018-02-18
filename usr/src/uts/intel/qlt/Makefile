@@ -60,7 +60,6 @@ LDFLAGS		+= -dy -Ndrv/fct -Ndrv/stmf
 CFLAGS		+= -DUNIQUE_FW_NAME
 LINTTAGS	+= -DUNIQUE_FW_NAME
 
-C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 #

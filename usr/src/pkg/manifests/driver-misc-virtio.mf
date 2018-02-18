@@ -39,5 +39,4 @@ dir path=kernel group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/virtio group=sys mode=0755
-file path=kernel/misc/virtio group=sys mode=0755
 license lic_CDDL license=lic_CDDL

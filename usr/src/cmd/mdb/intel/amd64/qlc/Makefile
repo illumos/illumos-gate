@@ -41,7 +41,7 @@ CPPFLAGS += -I$(SRC)/uts/common/sys/fibre-channel/impl
 LINTFLAGS64 +=  -erroff=E_STATIC_UNUSED -erroff=E_FUNC_SET_NOT_USED
 LINTFLAGS64 +=  -erroff=E_STATIC_UNUSED -erroff=E_FUNC_ARG_UNUSED
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 CERRWARN +=	-_gcc=-Wno-address

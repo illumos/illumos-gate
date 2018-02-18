@@ -30,8 +30,6 @@
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ex.h"
 #include "ex_re.h"
 #include "ex_tty.h"
@@ -440,7 +438,7 @@ setwind(void)
 	case ONEOPEN:
 		if (auto_right_margin)
 			WCOLS--;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	case HARDOPEN:
 		basWTOP = WTOP = WBOT = WECHO = 0;
@@ -450,7 +448,7 @@ setwind(void)
 
 	case CRTOPEN:
 		basWTOP = lines - 2;
-		/* fall into */
+		/* FALLTHROUGH */
 
 	case VISUAL:
 		ZERO = lines - TUBESIZE / WCOLS;

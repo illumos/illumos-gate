@@ -56,14 +56,8 @@ $(sparc_ONLY)file path=kernel/drv/$(ARCH64)/audiocs group=sys
 file path=kernel/drv/$(ARCH64)/audioens group=sys
 file path=kernel/drv/$(ARCH64)/audiopci group=sys
 file path=kernel/drv/$(ARCH64)/audiots group=sys
-$(i386_ONLY)file path=kernel/drv/audio group=sys
 file path=kernel/drv/audio.conf group=sys
-$(i386_ONLY)file path=kernel/drv/audio1575 group=sys
-$(i386_ONLY)file path=kernel/drv/audioens group=sys
-$(i386_ONLY)file path=kernel/drv/audiopci group=sys
-$(i386_ONLY)file path=kernel/drv/audiots group=sys
 file path=kernel/misc/$(ARCH64)/ac97 group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/ac97 group=sys mode=0755
 file path=usr/share/man/man7d/audio.7d
 file path=usr/share/man/man7d/audio1575.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/audiocs.7d

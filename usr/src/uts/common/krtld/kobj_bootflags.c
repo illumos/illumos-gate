@@ -151,7 +151,7 @@ bootflags(struct bootops *ops)
 			(void) strlcat(initargs, " ", sizeof (initargs));
 			break;
 #if defined(_OBP)
-		/* Ignore argument meant for wanboot standalone */
+		/* Ignore legacy wanboot argument meant for standalone */
 		case 'o':
 			break;
 #endif

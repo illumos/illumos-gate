@@ -11,10 +11,10 @@
 .\"
 .\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
-.\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
 .\"
-.Dd June 16, 2017
+.Dd February 6, 2018
 .Dt IPADM 1M
 .Os
 .Sh NAME
@@ -70,9 +70,9 @@
 .Ic create-addr
 .Op Fl t
 .Fl T Cm dhcp
-.Op Fl w Ar seconds Ns | Ns Cm forever
 .Op Fl 1
 .Op Fl h Ar hostname
+.Op Fl w Bro Ar seconds Ns | Ns Cm forever Brc
 .Ar addrobj
 .Nm
 .Ic create-addr
@@ -182,7 +182,7 @@ or
 .Cm udp .
 .Sh SUBCOMMANDS
 The following subcommands are supported:
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Xo
 .Nm
 .Ic create-if
@@ -193,7 +193,7 @@ Create an IP interface that will handle both IPv4 and IPv6 packets.
 The interface will be enabled as part of the creation process.
 The IPv4 interface will have the address 0.0.0.0.
 The IPv6 interface will have the address ::.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -203,8 +203,8 @@ Temporary, not persistent across reboots.
 .Fl t
 .Ar interface
 .Xc
-Disable an IP interface.
-.Bl -tag -width ""
+Disable the specified IP interface.
+.Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -214,8 +214,8 @@ Temporary, not persistent across reboots.
 .Fl t
 .Ar interface
 .Xc
-Enable an IP interface.
-.Bl -tag -width ""
+Enable the specified IP interface.
+.Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -224,7 +224,7 @@ Temporary, not persistent across reboots.
 .Ic delete-if
 .Ar interface
 .Xc
-Permanently delete an IP interface.
+Permanently delete the specified IP interface.
 .It Xo
 .Nm
 .Ic show-if
@@ -232,7 +232,7 @@ Permanently delete an IP interface.
 .Op Ar interface
 .Xc
 Show the current IP interface configuration.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
 The field value can be one of the following names:
@@ -306,8 +306,8 @@ Print the output in a parsable format.
 .Fl m Ar protocol
 .Ar interface
 .Xc
-Set a property's value(s) on the IP interface.
-.Bl -tag -width ""
+Set a property's value(s) on the specified IP interface.
+.Bl -tag -width Ds
 .It Fl m Ns \&, Ns Fl -module
 Specify which protocol the setting applies to.
 .It Fl p Ns \&, Ns Fl -prop
@@ -348,8 +348,8 @@ Temporary, not persistent across reboots.
 .Fl m Ar protocol
 .Ar interface
 .Xc
-Reset an IP interface's property value to the default.
-.Bl -tag -width ""
+Reset the specified IP interface's property value to the default.
+.Bl -tag -width Ds
 .It Fl m Ns \&, Ns Fl -module
 Specify which protocol the setting applies to.
 .It Fl p Ns \&, Ns Fl -prop
@@ -369,7 +369,7 @@ Temporary, not persistent across reboots.
 .Op Ar interface
 .Xc
 Display the property values for one or all of the IP interfaces.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl c Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
 .It Fl m Ns \&, Ns Fl -module
@@ -415,42 +415,18 @@ subcommand for the list of property names.
 .Fl a Oo Cm local Ns | Ns Cm remote Ns = Oc Ns
 .Ar addr Ns Oo / Ns Ar prefixlen Oc Ns ...
 .Ar addrobj
-.br
-.Nm
-.Ic create-addr
-.Op Fl t
-.Fl T Cm dhcp
-.Op Fl w Ar seconds Ns | Ns Cm forever
-.Op Fl 1
-.Op Fl h Ar hostname
-.Ar addrobj
-.br
-.Nm
-.Ic create-addr
-.Op Fl t
-.Fl T Cm addrconf
-.Op Fl i Ar interface-id
-.Oo Fl p Bro Cm stateful Ns | Ns Cm stateless Brc Ns = Ns
-.Bro Cm yes Ns | Ns Cm no Brc Oc Ns ...
-.Ar addrobj
 .Xc
-Create an address on an IP interface.
+Create an address on the specified IP interface using static configuration.
 The address will be enabled but can disabled using the
 .Nm ipadm Ic disable-addr
 subcommand.
-This subcommand has three different forms, depending on the value of the
-.Fl T
-option.
-.Bl -tag -width ""
-.It Fl T Cm static
-Create a static addrobj.
 Note that
 .Cm addrconf
 address configured on an interface is required to configure
 .Cm static
 IPv6 address on the same interface.
 This takes the following options:
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl a Ns \&, Ns Fl -address
 Specify the address.
 The
@@ -465,17 +441,22 @@ should be omitted and the address should be provided by itself without second
 address.
 .It Fl d Ns \&, Ns Fl -down
 The address is down.
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
 .El
-.It Fl T Cm dhcp
-Obtain the address via DHCP.
+.It Xo
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm dhcp
+.Op Fl 1
+.Op Fl h Ar hostname
+.Op Fl w Bro Ar seconds Ns | Ns Cm forever Brc
+.Ar addrobj
+.Xc
+Create an address on the specified IP interface using DHCP.
 This takes the following options:
-.Bl -tag -width ""
-.It Fl w Ns \&, Ns Fl -wait
-Specify the time, in seconds, that the command should wait to obtain an
-address; or specify
-.Cm forever
-to wait without interruption.
-The default value is 120.
+.Bl -tag -width Ds
 .It Fl 1 Ns \&, Ns Fl -primary
 Specify that the interface is primary.
 One effect will be that
@@ -497,16 +478,32 @@ for
 .Xr dhcpagent 1m .
 N.b. that the DHCP server implementation ultimately determines whether and
 how the client-sent FQDN is used.
+.It Fl t Ns \&, Ns Fl -temporary
+Temporary, not persistent across reboots.
+.It Fl w Ns \&, Ns Fl -wait
+Specify the time, in seconds, that the command should wait to obtain an
+address; or specify
+.Cm forever
+to wait without interruption.
+The default value is 120.
 .El
-.It Fl T Cm addrconf
-Create an auto-configured address.
+.It Xo
+.Nm
+.Ic create-addr
+.Op Fl t
+.Fl T Cm addrconf
+.Op Fl i Ar interface-id
+.Oo Fl p Bro Cm stateful Ns | Ns Cm stateless Brc Ns = Ns
+.Bro Cm yes Ns | Ns Cm no Brc Oc Ns ...
+.Ar addrobj
+.Xc
+Create an auto-configured address on the specified IP interface.
 This takes the following options:
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl i Ns \&, Ns Fl -interface-id
 Specify the interface ID to be used.
 .It Fl p Ns \&, Ns Fl -prop
 Specify which method of auto-configuration should be used.
-.El
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -518,7 +515,7 @@ Temporary, not persistent across reboots.
 .Xc
 Down the address.
 This will stop packets from being sent or received.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -530,7 +527,7 @@ Temporary, not persistent across reboots.
 .Xc
 Up the address.
 This will enable packets to be sent and received.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -541,7 +538,7 @@ Temporary, not persistent across reboots.
 .Ar addrobj
 .Xc
 Disable the address.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -552,7 +549,7 @@ Temporary, not persistent across reboots.
 .Ar addrobj
 .Xc
 Enable the address.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl t Ns \&, Ns Fl -temporary
 Temporary, not persistent across reboots.
 .El
@@ -568,7 +565,7 @@ addresses.
 It also restarts duplicate address detection for
 .Cm static
 addresses.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl i Ns \&, Ns Fl -inform
 Obtain network configuration from DHCP without taking a lease on the address.
 .El
@@ -579,7 +576,7 @@ Obtain network configuration from DHCP without taking a lease on the address.
 .Ar addrobj
 .Xc
 Delete the given address.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl r Ns \&, Ns Fl -release
 Indicate that the DHCP-assigned address should be released.
 .El
@@ -590,7 +587,7 @@ Indicate that the DHCP-assigned address should be released.
 .Op Ar addrobj
 .Xc
 Show the current address properties.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl o Ns \&, Ns Fl -output
 Select which fields will be shown.
 The field value can be one of the following names:
@@ -665,7 +662,7 @@ Print the output in a parsable format.
 .Ar addrobj
 .Xc
 Set a property's value(s) on the addrobj.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name and value(s).
 The property name can be one of the following:
@@ -684,7 +681,7 @@ The address is not advertised to routing
 .Pq Cm on Ns / Ns Cm off .
 .It Cm reqhost
 The host name to send to the DHCP server in order to request an association
-of an FQDN to the interface.
+of the FQDN to the interface.
 For a primary DHCP interface,
 .Xr nodename 4
 is sent if this property is not defined.
@@ -692,7 +689,7 @@ See the
 .Nm
 .Ic create-addr
 .Fl T Cm dhcp
-subcommand for an explanation of how an FQDN is determined.
+subcommand for the explanation of how an FQDN is determined.
 .It Cm transmit
 Packets can be transmitted
 .Pq Cm on Ns / Ns Cm off .
@@ -711,8 +708,8 @@ Temporary, not persistent across reboots.
 .Fl p Ar prop
 .Ar addrobj
 .Xc
-Reset an addrobj's property value to the default.
-.Bl -tag -width ""
+Reset the addrobj's property value to the default.
+.Bl -tag -width Ds
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
@@ -729,7 +726,7 @@ Temporary, not persistent across reboots.
 .Op Ar addrobj
 .Xc
 Display the property values for one or all of the addrobjs.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl c Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
 .It Fl o Ns \&, Ns Fl -output
@@ -770,7 +767,7 @@ subcommand for the list of property names.
 .Ar protocol
 .Xc
 Set a property's value(s) on the protocol.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name and value(s).
 The optional
@@ -838,7 +835,7 @@ Temporary, not persistent across reboots.
 .Ar protocol
 .Xc
 Reset a protocol's property value to the default.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl p Ns \&, Ns Fl -prop
 Specify the property name.
 See the
@@ -855,7 +852,7 @@ Temporary, not persistent across reboots.
 .Op Ar protocol
 .Xc
 Display the property values for one or all of the protocols.
-.Bl -tag -width ""
+.Bl -tag -width Ds
 .It Fl c Ns \&, Ns Fl -parsable
 Print the output in a parsable format.
 .It Fl o Ns \&, Ns Fl -output

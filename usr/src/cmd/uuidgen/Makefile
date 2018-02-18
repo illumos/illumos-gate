@@ -20,7 +20,7 @@ include ../Makefile.cmd
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS += -luuid
 
-C99MODE = $(C99_ENABLE) 
+CSTD = $(CSTD_GNU99) 
 
 .KEEP_STATE:
 

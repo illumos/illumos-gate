@@ -1,0 +1,213 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 20, 2017
+.Dt SAS_PHYMAP_LOOKUP_UA 9F
+.Os
+.Sh NAME
+.Nm sas_phymap_lookup_ua ,
+.Nm sas_phymap_lookup_uapriv ,
+.Nm sas_phymap_phy2ua ,
+.Nm sas_phymap_ua_free ,
+.Nm sas_phymap_uahasphys ,
+.Nm sas_phymap_ua2phys ,
+.Nm sas_phymap_phys_next ,
+.Nm sas_phymap_phys_free
+.Nd SAS phymap utility functions
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft "char *"
+.Fo sas_phymap_lookup_ua
+.Fa "sas_phymap_t *phymap"
+.Fa "uint64_t local"
+.Fa "uint64_t remote"
+.Fc
+.Ft "void *"
+.Fo sas_phymap_lookup_uapriv
+.Fa "sas_phymap_t *phymap"
+.Fa "char *ua"
+.Fc
+.Ft int
+.Fo sas_phymap_uahasphys
+.Fa "sas_phymap_t *phymap"
+.Fa "char *ua"
+.Fc
+.Ft "char *"
+.Fo sas_phymap_phy2ua
+.Fa "sas_phymap_t *phymap"
+.Fa "int phy"
+.Fc
+.Ft void
+.Fo sas_phymap_ua_free
+.Fa "char *ua"
+.Fc
+.Ft "sas_phymap_phys_t *"
+.Fo sas_phymap_ua2phys
+.Fa "sas_phymap_t *phymap"
+.Fa "char *ua"
+.Fc
+.Ft int
+.Fo sas_phymap_phys_next
+.Fa "sas_phymap_phys_t *phys"
+.Fc
+.Ft void
+.Fo sas_phymap_phys_free
+.Fa "sas_phymap_phys_t *phys"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is
+not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa phymap
+Pointer to an allocated phy map.
+.It Fa local
+The World Wide Number (WWN) of the HBA-owned side of the phy.
+.It Fa remote
+The World Wide Number (WWN) of the device that is plugged into the phy.
+.It Fa ua
+A character string that indicates the system generated unit address for
+the logical port.
+.It Fa phy
+A non-negative integer that uniquely identifies a phy on a device.
+.It Fa phys
+An opaque structure that represents a collection of phys on a port.
+.El
+.Sh DESCRIPTION
+The functions described here are all utility functions for operating on
+a phymap and the entities it creates.
+ For more information on phymaps,
+see
+.Xr phymap 9
+and
+.Xr sas_phymap_create 9F .
+.Pp
+The
+.Fn sas_phymap_lookup_ua
+function finds the unit address of the logical port that corresponds to
+the tuple of the
+.Fa local
+and
+.Fa remote
+WWN.
+If a logical port exists for that tuple, then a pointer to its
+system generated unit-address is returned.
+This string is managed by the system and it must not be modified or freed.
+If it cannot be found, then
+.Dv NULL
+is returned.
+.Pp
+The
+.Fn sas_phymap_lookup_uapriv
+function returns the private value that was stored during the activate
+callback of the logical port represented by the unit address
+.Fa ua
+that is a part of the phymap
+.Fa phymap .
+.Pp
+The
+.Fn sas_phymap_uahasphys
+function is used to determine whether or not the logical port
+represented by the unit address specified in
+.Fa ua
+that is a part of the phymap
+.Fa phymap
+has any phys.
+If phys are found, then the function returns
+.Sy 1 .
+.Pp
+The
+.Fn sas_phymap_phy2ua
+function attempts to map a given phy specified by
+.Fa phy
+to its unit-address in the map
+.Fa phymap .
+This function will allocate memory for the character string, thus it can
+be modified.
+The caller must call the
+.Fa sas_phymap_ua_free
+function to release the memory that was allocated.
+The
+.Fa sas_phymap_ua_free
+function should not be used with the string returned from the
+.Fn sas_phymap_lookup_ua
+function.
+.Pp
+The
+.Fn sas_phymap_ua2phys
+function creates a collection of phys that exist on a given logical port
+represented by the unit-address
+.Fa ua
+in the map
+.Fa phymap .
+This set can be iterated by calling the
+.Fn sas_phyap_phys_next
+function.
+Each time the function is called, an entry is returned.
+When the value
+.Sy -1
+is returned it indicates that the set is empty.
+Regardless of whether or not the set has been iterated over, the caller
+must call the
+.Fn sas_phymap_phys_free
+function to release the memory associated with the set.
+.Sh CONTEXT
+All functions may be used in
+.Sy user ,
+.Sy kernel ,
+and
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn sas_phymap_lookup_ua
+and
+.Fn sas_phymap_phy2ua
+function returns a pointer to the unit-address.
+If the port or phy could not be found or another error occurred, then
+the function returns
+.Dv NULL .
+.Pp
+Upon successful completion, the
+.Fn sas_phymap_lookup_uapriv
+function returns a pointer to the port's private data, if any exists.
+Otherwise, if the port could not be found or another error occurred, then
+the function returns
+.Dv NULL .
+Upon successful completion, the
+.Fn sas_phymap_uahasphys
+returns
+.Sy 1
+to indicate that the unit-address has phys.
+If the unit-address has no phys, then it returns
+.Sy 0 .
+If an error occurred or the port doesn't exist, then the function returns
+.Sy 0 .
+.Pp
+Upon successful completion, the
+.Fn sas_phymap_ua2phys
+function returns a pointer to an allocated phy set.
+Otherwise, it returns
+.Dv NULL .
+.Pp
+The
+.Fn sas_phymap_phys_next
+function returns a non-negative integer indicating a present phy or it
+returns
+.Sy -1
+to indicate that no values remain.
+.Sh SEE ALSO
+.Xr phymap 9 ,
+.Xr sas_phymap_create 9F

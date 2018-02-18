@@ -83,7 +83,7 @@ CERRWARN	+= -_gcc=-Wno-unused
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-switch
 
-C99MODE		= $(C99_ENABLE)
+CSTD		= $(CSTD_GNU99)
 
 ctfconvert	:= LDFLAGS += $(DWARFLDFLAGS)
 

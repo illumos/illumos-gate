@@ -81,15 +81,13 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-# This build only 64-bit, but the lint32 below
-# needs corresponding clean/clobber deps.
-clean:		$(CLEAN_DEPS) clean.debug32
+clean:		$(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS) clobber.debug32
+clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS) lint32
+modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 

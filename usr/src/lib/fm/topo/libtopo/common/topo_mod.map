@@ -68,6 +68,7 @@ SYMBOL_SCOPE {
 	topo_mod_walk_init		{ TYPE = FUNCTION; FLAGS = extern };
 
 	topo_mod_smbios			{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_pcidb			{ TYPE = FUNCTION; FLAGS = extern };
 
 	topo_method_register		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_method_unregister		{ TYPE = FUNCTION; FLAGS = extern };

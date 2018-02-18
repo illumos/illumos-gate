@@ -23,6 +23,10 @@
 #
 
 #
+# Copyright (c) 2017, Joyent, Inc.
+#
+
+#
 # MAPFILE HEADER START
 #
 # WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
@@ -41,6 +45,7 @@ $mapfile_version 2
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	ipmi_chassis_identify;
+	ipmi_chassis_status;
 	ipmi_close;
 	ipmi_entity_iter;
 	ipmi_entity_iter_children;

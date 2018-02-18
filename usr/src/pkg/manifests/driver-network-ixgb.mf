@@ -44,7 +44,6 @@ driver name=ixgb perms="* 0666 root root" \
     alias=pci8086,1a48 \
     alias=pci8086,a11f
 file path=kernel/drv/$(ARCH64)/ixgb group=sys
-$(i386_ONLY)file path=kernel/drv/ixgb group=sys
 legacy pkg=SUNWixgb desc="Intel(R) PRO/10G Server Adapter Driver" \
     name="Intel(R) PRO/10G Server Adapter Driver"
 license cr_Sun license=cr_Sun

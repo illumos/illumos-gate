@@ -39,7 +39,7 @@ SRCDIR=	../common
 
 LIBS=	$(DYNLIB) $(LINTLIB)
 
-C99MODE=	$(C99_DISABLE)
+CSTD=	$(CSTD_GNU89)
 
 CPPFLAGS += -I.
 LDLIBS += -lc

@@ -30,7 +30,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=pvscsi alias=pci15ad,7c0 class=scsi-self-identifying
 file path=kernel/drv/$(ARCH64)/pvscsi group=sys
-file path=kernel/drv/pvscsi group=sys
 license lic_CDDL license=lic_CDDL
 license usr/src/uts/intel/io/scsi/adapters/pvscsi/THIRDPARTYLICENSE \
     license=usr/src/uts/intel/io/scsi/adapters/pvscsi/THIRDPARTYLICENSE

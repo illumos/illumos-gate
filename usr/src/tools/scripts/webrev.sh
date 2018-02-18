@@ -1569,8 +1569,6 @@ source_to_html()
 # HTML; if the latter, embedded bugids (sequence of 5 or more digits)
 # are turned into URLs.
 #
-# This is also used with Mercurial and the file list provided by hg-active.
-#
 comments_from_wx()
 {
 	typeset fmt=$1
@@ -1611,10 +1609,7 @@ getcomments()
 	if [[ -n $Nflag ]]; then
 		return
 	fi
-	#
-	# Mercurial support uses a file list in wx format, so this
-	# will be used there, too
-	#
+
 	if [[ -n $wxfile ]]; then
 		comments_from_wx $fmt $p
 	fi
@@ -1795,41 +1790,6 @@ function flist_from_wx
 }
 
 #
-# Call hg-active to get the active list output in the wx active list format
-#
-function hg_active_wxfile
-{
-	typeset child=$1
-	typeset parent=$2
-
-	TMPFLIST=/tmp/$$.active
-	$HG_ACTIVE -w $child -p $parent -o $TMPFLIST
-	wxfile=$TMPFLIST
-}
-
-#
-# flist_from_mercurial
-# Call hg-active to get a wx-style active list, and hand it off to
-# flist_from_wx
-#
-function flist_from_mercurial
-{
-	typeset child=$1
-	typeset parent=$2
-
-	print " File list from: hg-active -p $parent ...\c"
-	if [[ ! -x $HG_ACTIVE ]]; then
-		print		# Blank line for the \c above
-		print -u2 "Error: hg-active tool not found.  Exiting"
-		exit 1
-	fi
-	hg_active_wxfile $child $parent
-
-	# flist_from_wx prints the Done, so we don't have to.
-	flist_from_wx $TMPFLIST
-}
-
-#
 # Transform a specified 'git log' output format into a wx-like active list.
 #
 function git_wxfile
@@ -1979,82 +1939,6 @@ function get_file_mode
 	    ' $1
 }
 
-function build_old_new_mercurial
-{
-	typeset olddir="$1"
-	typeset newdir="$2"
-	typeset old_mode=
-	typeset new_mode=
-	typeset file
-
-	#
-	# Get old file mode, from the parent revision manifest entry.
-	# Mercurial only stores a "file is executable" flag, but the
-	# manifest will display an octal mode "644" or "755".
-	#
-	if [[ "$PDIR" == "." ]]; then
-		file="$PF"
-	else
-		file="$PDIR/$PF"
-	fi
-	file=`echo $file | $SED 's#/#\\\/#g'`
-	# match the exact filename, and return only the permission digits
-	old_mode=`$SED -n -e "/^\\(...\\) . ${file}$/s//\\1/p" \
-	    < $HG_PARENT_MANIFEST`
-
-	#
-	# Get new file mode, directly from the filesystem.
-	# Normalize the mode to match Mercurial's behavior.
-	#
-	new_mode=`get_file_mode $CWS/$DIR/$F`
-	if [[ -n "$new_mode" ]]; then
-		if [[ "$new_mode" = *[1357]* ]]; then
-			new_mode=755
-		else
-			new_mode=644
-		fi
-	fi
-
-	#
-	# new version of the file.
-	#
-	rm -rf $newdir/$DIR/$F
-	if [[ -e $CWS/$DIR/$F ]]; then
-		cp $CWS/$DIR/$F $newdir/$DIR/$F
-		if [[ -n $new_mode ]]; then
-			chmod $new_mode $newdir/$DIR/$F
-		else
-			# should never happen
-			print -u2 "ERROR: set mode of $newdir/$DIR/$F"
-		fi
-	fi
-
-	#
-	# parent's version of the file
-	#
-	# Note that we get this from the last version common to both
-	# ourselves and the parent.  References are via $CWS since we have no
-	# guarantee that the parent workspace is reachable via the filesystem.
-	#
-	if [[ -n $parent_webrev && -e $PWS/$PDIR/$PF ]]; then
-		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
-	elif [[ -n $HG_PARENT ]]; then
-		hg cat -R $CWS -r $HG_PARENT $CWS/$PDIR/$PF > \
-		    $olddir/$PDIR/$PF 2>/dev/null
-
-		if (( $? != 0 )); then
-			rm -f $olddir/$PDIR/$PF
-		else
-			if [[ -n $old_mode ]]; then
-				chmod $old_mode $olddir/$PDIR/$PF
-			else
-				# should never happen
-				print -u2 "ERROR: set mode of $olddir/$PDIR/$PF"
-			fi
-		fi
-	fi
-}
-
 function build_old_new_git
 {
 	typeset olddir="$1"
@@ -2169,9 +2053,7 @@ function build_old_new
 	mkdir -p $olddir/$PDIR
 	mkdir -p $newdir/$DIR
 
-	if [[ $SCM_MODE == "mercurial" ]]; then
-		build_old_new_mercurial "$olddir" "$newdir"
-	elif [[ $SCM_MODE == "git" ]]; then
+	if [[ $SCM_MODE == "git" ]]; then
 		build_old_new_git "$olddir" "$newdir"
 	elif [[ $SCM_MODE == "subversion" ]]; then
 		build_old_new_subversion "$olddir" "$newdir"
@@ -2237,7 +2119,6 @@ PATH=$(/bin/dirname "$(whence $0)"):$PATH
 
 [[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
 [[ -z $WX ]] && WX=`look_for_prog wx`
-[[ -z $HG_ACTIVE ]] && HG_ACTIVE=`look_for_prog hg-active`
 [[ -z $GIT ]] && GIT=`look_for_prog git`
 [[ -z $WHICH_SCM ]] && WHICH_SCM=`look_for_prog which_scm`
 [[ -z $CODEREVIEW ]] && CODEREVIEW=`look_for_prog codereview`
@@ -2310,10 +2191,6 @@ Uflag=
 wflag=
 remote_target=
 
-#
-# NOTE: when adding/removing options it is necessary to sync the list
-#	with usr/src/tools/onbld/hgext/cdm.py
-#
 while getopts "c:C:Dh:i:I:lnNo:Op:t:Uw" opt
 do
 	case $opt in
@@ -2384,32 +2261,8 @@ fi
 # logic.
 #
 $WHICH_SCM | read SCM_MODE junk || exit 1
-if [[ $SCM_MODE == "mercurial" ]]; then
-	#
-	# Mercurial priorities:
-	# 1. hg root from CODEMGR_WS environment variable
-	# 1a. hg root from CODEMGR_WS/usr/closed if we're somewhere under
-	#    usr/closed when we run webrev
-	# 2. hg root from directory of invocation
-	#
-	if [[ ${PWD} =~ "usr/closed" ]]; then
-		testparent=${CODEMGR_WS}/usr/closed
-		# If we're in OpenSolaris mode, we enforce a minor policy:
-		# help to make sure the reviewer doesn't accidentally publish
-		# source which is under usr/closed
-		if [[ -n "$Oflag" ]]; then
-			print -u2 "OpenSolaris output not permitted with" \
-			    "usr/closed changes"
-			exit 1
-		fi
-	else
-		testparent=${CODEMGR_WS}
-	fi
-	[[ -z $codemgr_ws && -n $testparent ]] && \
-	    codemgr_ws=$(hg root -R $testparent 2>/dev/null)
-	[[ -z $codemgr_ws ]] && codemgr_ws=$(hg root 2>/dev/null)
-	CWS=$codemgr_ws
-elif [[ $SCM_MODE == "git" ]]; then
+
+if [[ $SCM_MODE == "git" ]]; then
 	#
 	# Git priorities:
 	# 1. git rev-parse --git-dir from CODEMGR_WS environment variable
@@ -2512,7 +2365,7 @@ fi
 # is in use.
 #
 case "$SCM_MODE" in
-mercurial|git|subversion)
+git|subversion)
 	;;
 unknown)
 	if [[ $flist_mode == "auto" ]]; then
@@ -2570,95 +2423,8 @@ if [[ $# -gt 0 ]]; then
 	print -u2 "WARNING: unused arguments: $*"
 fi
 
-#
-# Before we entered the DO_EVERYTHING loop, we should have already set CWS
-# and CODEMGR_WS as needed.  Here, we set the parent workspace.
-#
-if [[ $SCM_MODE == "mercurial" ]]; then
-	#
-	# Parent can either be specified with -p
-	# Specified with CODEMGR_PARENT in the environment
-	# or taken from hg's default path.
-	#
 
-	if [[ -z $codemgr_parent && -n $CODEMGR_PARENT ]]; then
-		codemgr_parent=$CODEMGR_PARENT
-	fi
-
-	if [[ -z $codemgr_parent ]]; then
-		codemgr_parent=`hg path -R $codemgr_ws default 2>/dev/null`
-	fi
-
-	PWS=$codemgr_parent
-
-	#
-	# If the parent is a webrev, we want to do some things against
-	# the natural workspace parent (file list, comments, etc)
-	#
-	if [[ -n $parent_webrev ]]; then
-		real_parent=$(hg path -R $codemgr_ws default 2>/dev/null)
-	else
-		real_parent=$PWS
-	fi
-
-	#
-	# If hg-active exists, then we run it.  In the case of no explicit
-	# flist given, we'll use it for our comments.  In the case of an
-	# explicit flist given we'll try to use it for comments for any
-	# files mentioned in the flist.
-	#
-	if [[ -z $flist_done ]]; then
-		flist_from_mercurial $CWS $real_parent
-		flist_done=1
-	fi
-
-	#
-	# If we have a file list now, pull out any variables set
-	# therein.  We do this now (rather than when we possibly use
-	# hg-active to find comments) to avoid stomping specifications
-	# in the user-specified flist.
-	#
-	if [[ -n $flist_done ]]; then
-		env_from_flist
-	fi
-
-	#
-	# Only call hg-active if we don't have a wx formatted file already
-	#
-	if [[ -x $HG_ACTIVE && -z $wxfile ]]; then
-		print "  Comments from: hg-active -p $real_parent ...\c"
-		hg_active_wxfile $CWS $real_parent
-		print " Done."
-	fi
-
-	#
-	# At this point we must have a wx flist either from hg-active,
-	# or in general.  Use it to try and find our parent revision,
-	# if we don't have one.
-	#
-	if [[ -z $HG_PARENT ]]; then
-		eval `$SED -e "s/#.*$//" $wxfile | $GREP HG_PARENT=`
-	fi
-
-	#
-	# If we still don't have a parent, we must have been given a
-	# wx-style active list with no HG_PARENT specification, run
-	# hg-active and pull an HG_PARENT out of it, ignore the rest.
-	#
-	if [[ -z $HG_PARENT && -x $HG_ACTIVE ]]; then
-		$HG_ACTIVE -w $codemgr_ws -p $real_parent | \
-		    eval `$SED -e "s/#.*$//" | $GREP HG_PARENT=`
-	elif [[ -z $HG_PARENT ]]; then
-		print -u2 "Error: Cannot discover parent revision"
-		exit 1
-	fi
-
-	pnode=$(trim_digest $HG_PARENT)
-	PRETTY_PWS="${PWS} (at ${pnode})"
-	cnode=$(hg parent -R $codemgr_ws --template '{node|short}' \
-	    2>/dev/null)
-	PRETTY_CWS="${CWS} (at ${cnode})"}
-elif [[ $SCM_MODE == "git" ]]; then
+if [[ $SCM_MODE == "git" ]]; then
 	# Check that "head" revision specified with -c or -h is sane
 	if [[ -n $cflag || -n $hflag ]]; then
 		head_rev=$($GIT rev-parse --verify --quiet "$codemgr_head")
@@ -3075,41 +2841,6 @@ $SED -e "s/#.*$//" -e "/=/d" -e "/^[   ]*$/d" $FLIST > /tmp/$$.flist.clean
 FLIST=/tmp/$$.flist.clean
 
 #
-# For Mercurial, create a cache of manifest entries.
-#
-if [[ $SCM_MODE == "mercurial" ]]; then
-	#
-	# Transform the FLIST into a temporary sed script that matches
-	# relevant entries in the Mercurial manifest as follows:
-	# 1) The script will be used against the parent revision manifest,
-	#    so for FLIST lines that have two filenames (a renamed file)
-	#    keep only the old name.
-	# 2) Escape all forward slashes the filename.
-	# 3) Change the filename into another sed command that matches
-	#    that file in "hg manifest -v" output:  start of line, three
-	#    octal digits for file permissions, space, a file type flag
-	#    character, space, the filename, end of line.
-	# 4) Eliminate any duplicate entries.  (This can occur if a
-	#    file has been used as the source of an hg cp and it's
-	#    also been modified in the same changeset.)
-	#
-	SEDFILE=/tmp/$$.manifest.sed
-	$SED '
-		s#^[^ ]* ##
-		s#/#\\\/#g
-		s#^.*$#/^... . &$/p#
-	' < $FLIST | $SORT -u > $SEDFILE
-
-	#
-	# Apply the generated script to the output of "hg manifest -v"
-	# to get the relevant subset for this webrev.
-	#
-	HG_PARENT_MANIFEST=/tmp/$$.manifest
-	hg -R $CWS manifest -v -r $HG_PARENT |
-	    $SED -n -f $SEDFILE > $HG_PARENT_MANIFEST
-fi
-
-#
 # First pass through the files: generate the per-file webrev HTML-files.
 #
 cat $FLIST | while read LINE
@@ -3423,16 +3154,16 @@ print "<table>"
 #
 # Get the preparer's name:
 #
-# If the SCM detected is Mercurial, and the configuration property
-# ui.username is available, use that, but be careful to properly escape
-# angle brackets (HTML syntax characters) in the email address.
+# If the SCM detected is Git, and the configuration property user.name is
+# available, use that, but be careful to properly escape angle brackets (HTML
+# syntax characters) in the email address.
 #
 # Otherwise, use the current userid in the form "John Doe (jdoe)", but
 # to maintain compatibility with passwd(4), we must support '&' substitutions.
 #
 preparer=
-if [[ "$SCM_MODE" == mercurial ]]; then
-	preparer=`hg showconfig ui.username 2>/dev/null`
+if [[ "$SCM_MODE" == git ]]; then
+	preparer=$(git config user.name 2>/dev/null)
 	if [[ -n "$preparer" ]]; then
 		preparer="$(echo "$preparer" | html_quote)"
 	fi
@@ -3660,8 +3391,7 @@ do
 	    rm $F.count
 	fi
 
-	if [[ $SCM_MODE == "mercurial" ||
-	    $SCM_MODE == "unknown" ]]; then
+	if [[ $SCM_MODE == "unknown" ]]; then
 		# Include warnings for important file mode situations:
 		# 1) New executable files
 		# 2) Permission changes of any kind

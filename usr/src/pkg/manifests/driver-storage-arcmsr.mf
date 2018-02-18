@@ -61,7 +61,6 @@ driver name=arcmsr class=scsi perms="* 0600 root sys" \
     alias=pci17d3,1880 \
     alias=pci17d3,1882
 file path=kernel/drv/$(ARCH64)/arcmsr group=sys
-file path=kernel/drv/arcmsr group=sys
 file path=kernel/drv/arcmsr.conf group=sys
 file path=usr/share/man/man7d/arcmsr.7d
 legacy pkg=SUNWarcmsr desc="SAS/SATA RAID driver" \

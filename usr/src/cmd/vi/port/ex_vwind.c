@@ -206,7 +206,7 @@ vcontext(line *addr, unsigned char where)
 	case '^':
 		addr = vback(addr, basWLINES - vdepth());
 		getaline(*addr);
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	case '-':
 		top = vback(addr, basWLINES - vdepth());

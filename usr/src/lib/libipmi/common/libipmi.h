@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBIPMI_H
@@ -1849,6 +1849,60 @@ typedef struct ipmi_sunoem_fru {
 
 int ipmi_sunoem_update_fru(ipmi_handle_t *, ipmi_sunoem_fru_t *);
 
+/*
+ * See section 28.2
+ */
+#define	IPMI_CMD_GET_CHASSIS_STATUS		0x01
+
+/*
+ * flags for ichs_current_pwr_state field
+ */
+#define	IPMI_CURR_PWR_STATE_ON		0x01
+#define	IPMI_CURR_PWR_STATE_OVERLOAD	0x02
+#define	IPMI_CURR_PWR_STATE_INTERLOCK	0x04
+#define	IPMI_CURR_PWR_STATE_FAULT	0x08
+#define	IPMI_CURR_PWR_STATE_CNTL_FAULT	0x10
+
+/*
+ * flags for ichs_last_pwr_state field
+ */
+#define	IPMI_LAST_PWR_STATE_ACFAILED	0x01
+#define	IPMI_LAST_PWR_STATE_OVERLOAD	0x02
+#define	IPMI_LAST_PWR_STATE_INTERLOCK	0x04
+#define	IPMI_LAST_PWR_STATE_FAULT	0x08
+#define	IPMI_LAST_PWR_STATE_CMD_ON	0x10
+
+/*
+ * flags for the ichs_pwr_restore_policy field
+ */
+#define	IPMI_PWR_POLICY_REMAIN_OFF	0x0
+#define	IPMI_PWR_POLICY_RESTORE		0x1
+#define	IPMI_PWR_POLICY_POWER_ON	0x2
+#define	IPMI_PWR_POLICY_UNKNOWN		0x3
+
+typedef struct ipmi_chassis_status {
+	DECL_BITFIELD3(
+	    ichs_current_pwr_state	:5,
+	    ichs_pwr_restore_policy	:2,
+	    __reserved1			:1);
+	DECL_BITFIELD2(
+	    ichs_last_pwr_state		:5,
+	    __reserved2			:3);
+	DECL_BITFIELD7(
+	    ichs_intrusion_asserted	:1,
+	    ichs_front_panel_disabled	:1,
+	    ichs_drive_fault_asserted	:1,
+	    ichs_fan_fault_asserted	:1,
+	    ichs_identify_state		:2,
+	    ichs_identify_supported	:1,
+	    __reserved3			:1);
+} ipmi_chassis_status_t;
+
+extern ipmi_chassis_status_t *ipmi_chassis_status(ipmi_handle_t *);
+
+/*
+ * See section 28.5
+ */
 #define	IPMI_CMD_CHASSIS_IDENTIFY	0x04
 int ipmi_chassis_identify(ipmi_handle_t *, boolean_t);
 

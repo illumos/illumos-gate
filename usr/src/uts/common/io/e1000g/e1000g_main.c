@@ -25,7 +25,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -1103,6 +1103,11 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 	private_devi_list_t *devi_node;
 	int result;
 
+	if (Adapter->e1000g_blink != NULL) {
+		ddi_periodic_delete(Adapter->e1000g_blink);
+		Adapter->e1000g_blink = NULL;
+	}
+
 	if (Adapter->attach_progress & ATTACH_PROGRESS_ENABLE_INTR) {
 		(void) e1000g_disable_intrs(Adapter);
 	}
@@ -1265,6 +1270,9 @@ e1000g_init_locks(struct e1000g *Adapter)
 
 	mutex_init(&rx_ring->rx_lock, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
+
+	mutex_init(&Adapter->e1000g_led_lock, NULL,
+	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 }
 
 static void
@@ -1272,6 +1280,8 @@ e1000g_destroy_locks(struct e1000g *Adapter)
 {
 	e1000g_tx_ring_t *tx_ring;
 	e1000g_rx_ring_t *rx_ring;
+
+	mutex_destroy(&Adapter->e1000g_led_lock);
 
 	tx_ring = Adapter->tx_ring;
 	mutex_destroy(&tx_ring->tx_lock);
@@ -3132,6 +3142,110 @@ e1000g_fill_group(void *arg, mac_ring_type_t rtype, const int grp_index,
 	mintr->mi_disable = e1000g_rx_group_intr_disable;
 }
 
+static void
+e1000g_led_blink(void *arg)
+{
+	e1000g_t *e1000g = arg;
+
+	mutex_enter(&e1000g->e1000g_led_lock);
+	VERIFY(e1000g->e1000g_emul_blink);
+	if (e1000g->e1000g_emul_state) {
+		(void) e1000_led_on(&e1000g->shared);
+	} else {
+		(void) e1000_led_off(&e1000g->shared);
+	}
+	e1000g->e1000g_emul_state = !e1000g->e1000g_emul_state;
+	mutex_exit(&e1000g->e1000g_led_lock);
+}
+
+static int
+e1000g_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
+{
+	e1000g_t *e1000g = arg;
+
+	if (flags != 0)
+		return (EINVAL);
+
+	if (mode != MAC_LED_DEFAULT &&
+	    mode != MAC_LED_IDENT &&
+	    mode != MAC_LED_OFF &&
+	    mode != MAC_LED_ON)
+		return (ENOTSUP);
+
+	mutex_enter(&e1000g->e1000g_led_lock);
+
+	if ((mode == MAC_LED_IDENT || mode == MAC_LED_OFF ||
+	    mode == MAC_LED_ON) &&
+	    !e1000g->e1000g_led_setup) {
+		if (e1000_setup_led(&e1000g->shared) != E1000_SUCCESS) {
+			mutex_exit(&e1000g->e1000g_led_lock);
+			return (EIO);
+		}
+
+		e1000g->e1000g_led_setup = B_TRUE;
+	}
+
+	if (mode != MAC_LED_IDENT && e1000g->e1000g_blink != NULL) {
+		ddi_periodic_t id = e1000g->e1000g_blink;
+		e1000g->e1000g_blink = NULL;
+		mutex_exit(&e1000g->e1000g_led_lock);
+		ddi_periodic_delete(id);
+		mutex_enter(&e1000g->e1000g_led_lock);
+	}
+
+	switch (mode) {
+	case MAC_LED_DEFAULT:
+		if (e1000g->e1000g_led_setup) {
+			if (e1000_cleanup_led(&e1000g->shared) !=
+			    E1000_SUCCESS) {
+				mutex_exit(&e1000g->e1000g_led_lock);
+				return (EIO);
+			}
+			e1000g->e1000g_led_setup = B_FALSE;
+		}
+		break;
+	case MAC_LED_IDENT:
+		if (e1000g->e1000g_emul_blink) {
+			if (e1000g->e1000g_blink != NULL)
+				break;
+
+			/*
+			 * Note, we use a 200 ms period here as that's what
+			 * section 10.1.3 8254x Intel Manual (PCI/PCI-X Family
+			 * of Gigabit Ethernet Controllers Software Developer's
+			 * Manual) indicates that the optional blink hardware
+			 * operates at.
+			 */
+			e1000g->e1000g_blink =
+			    ddi_periodic_add(e1000g_led_blink, e1000g,
+			    200ULL * (NANOSEC / MILLISEC), DDI_IPL_0);
+		} else if (e1000_blink_led(&e1000g->shared) != E1000_SUCCESS) {
+			mutex_exit(&e1000g->e1000g_led_lock);
+			return (EIO);
+		}
+		break;
+	case MAC_LED_OFF:
+		if (e1000_led_off(&e1000g->shared) != E1000_SUCCESS) {
+			mutex_exit(&e1000g->e1000g_led_lock);
+			return (EIO);
+		}
+		break;
+	case MAC_LED_ON:
+		if (e1000_led_on(&e1000g->shared) != E1000_SUCCESS) {
+			mutex_exit(&e1000g->e1000g_led_lock);
+			return (EIO);
+		}
+		break;
+	default:
+		mutex_exit(&e1000g->e1000g_led_lock);
+		return (ENOTSUP);
+	}
+
+	mutex_exit(&e1000g->e1000g_led_lock);
+	return (0);
+
+}
+
 static boolean_t
 e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
@@ -3172,6 +3286,44 @@ e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		cap_rings->mr_gnum = 1;
 		cap_rings->mr_rget = e1000g_fill_ring;
 		cap_rings->mr_gget = e1000g_fill_group;
+		break;
+	}
+	case MAC_CAPAB_LED: {
+		mac_capab_led_t *cap_led = cap_data;
+
+		cap_led->mcl_flags = 0;
+		cap_led->mcl_modes = MAC_LED_DEFAULT;
+		if (Adapter->shared.mac.ops.blink_led != NULL &&
+		    Adapter->shared.mac.ops.blink_led !=
+		    e1000_null_ops_generic) {
+			cap_led->mcl_modes |= MAC_LED_IDENT;
+		}
+
+		if (Adapter->shared.mac.ops.led_off != NULL &&
+		    Adapter->shared.mac.ops.led_off !=
+		    e1000_null_ops_generic) {
+			cap_led->mcl_modes |= MAC_LED_OFF;
+		}
+
+		if (Adapter->shared.mac.ops.led_on != NULL &&
+		    Adapter->shared.mac.ops.led_on !=
+		    e1000_null_ops_generic) {
+			cap_led->mcl_modes |= MAC_LED_ON;
+		}
+
+		/*
+		 * Some hardware doesn't support blinking natively as they're
+		 * missing the optional blink circuit. If they have both off and
+		 * on then we'll emulate it ourselves.
+		 */
+		if (((cap_led->mcl_modes & MAC_LED_IDENT) == 0) &&
+		    ((cap_led->mcl_modes & MAC_LED_OFF) != 0) &&
+		    ((cap_led->mcl_modes & MAC_LED_ON) != 0)) {
+			cap_led->mcl_modes |= MAC_LED_IDENT;
+			Adapter->e1000g_emul_blink = B_TRUE;
+		}
+
+		cap_led->mcl_set = e1000g_led_set;
 		break;
 	}
 	default:

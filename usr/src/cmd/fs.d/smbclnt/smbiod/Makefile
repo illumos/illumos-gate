@@ -37,7 +37,7 @@ SRCS=	$(TYPEPROG).c
 POFILE=	$(TYPEPROG).po
 
 CFLAGS += $(CCVERBOSE)
-C99MODE= $(C99_ENABLE)
+CSTD= $(CSTD_GNU99)
 
 # This is a multi-thread program but Nevada
 # no longer needs -lthread

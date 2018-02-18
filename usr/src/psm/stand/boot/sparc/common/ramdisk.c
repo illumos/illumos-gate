@@ -26,7 +26,6 @@
 #include <sys/param.h>
 #include <sys/promif.h>
 #include <sys/salib.h>
-#include <bootlog.h>
 #include "ramdisk.h"
 
 #include <sys/param.h>

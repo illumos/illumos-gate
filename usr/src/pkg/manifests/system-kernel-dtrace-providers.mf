@@ -58,21 +58,13 @@ file path=kernel/drv/$(ARCH64)/lockstat group=sys
 file path=kernel/drv/$(ARCH64)/profile group=sys
 file path=kernel/drv/$(ARCH64)/sdt group=sys
 file path=kernel/drv/$(ARCH64)/systrace group=sys
-$(i386_ONLY)file path=kernel/drv/dcpc group=sys
 file path=kernel/drv/dcpc.conf group=sys
-$(i386_ONLY)file path=kernel/drv/dtrace group=sys
 file path=kernel/drv/dtrace.conf group=sys
-$(i386_ONLY)file path=kernel/drv/fasttrap group=sys
 file path=kernel/drv/fasttrap.conf group=sys
-$(i386_ONLY)file path=kernel/drv/fbt group=sys
 file path=kernel/drv/fbt.conf group=sys
-$(i386_ONLY)file path=kernel/drv/lockstat group=sys
 file path=kernel/drv/lockstat.conf group=sys
-$(i386_ONLY)file path=kernel/drv/profile group=sys
 file path=kernel/drv/profile.conf group=sys
-$(i386_ONLY)file path=kernel/drv/sdt group=sys
 file path=kernel/drv/sdt.conf group=sys
-$(i386_ONLY)file path=kernel/drv/systrace group=sys
 file path=kernel/drv/systrace.conf group=sys
 file path=usr/share/man/man7d/dtrace.7d
 file path=usr/share/man/man7d/fasttrap.7d
@@ -95,17 +87,6 @@ hardlink path=kernel/dtrace/$(ARCH64)/sdt \
     target=../../../kernel/drv/$(ARCH64)/sdt
 hardlink path=kernel/dtrace/$(ARCH64)/systrace \
     target=../../../kernel/drv/$(ARCH64)/systrace
-$(i386_ONLY)hardlink path=kernel/dtrace/dcpc target=../../kernel/drv/dcpc
-$(i386_ONLY)hardlink path=kernel/dtrace/fasttrap \
-    target=../../kernel/drv/fasttrap
-$(i386_ONLY)hardlink path=kernel/dtrace/fbt target=../../kernel/drv/fbt
-$(i386_ONLY)hardlink path=kernel/dtrace/lockstat \
-    target=../../kernel/drv/lockstat
-$(i386_ONLY)hardlink path=kernel/dtrace/profile \
-    target=../../kernel/drv/profile
-$(i386_ONLY)hardlink path=kernel/dtrace/sdt target=../../kernel/drv/sdt
-$(i386_ONLY)hardlink path=kernel/dtrace/systrace \
-    target=../../kernel/drv/systrace
 legacy pkg=SUNWdtrp desc="Dynamic Tracing (DTrace) Providers" \
     name="DTrace Providers"
 license cr_Sun license=cr_Sun

@@ -49,7 +49,6 @@ driver name=rwn clone_perms="rwn 0666 root sys" perms="* 0666 root sys" \
     alias=pci1814,781 \
     alias=pci1a3b,1059
 file path=kernel/drv/$(ARCH64)/rwn group=sys
-file path=kernel/drv/rwn group=sys
 file path=usr/share/man/man7d/rwn.7d
 legacy pkg=SUNWrwn \
     desc="Ralink RT2700/RT2800 IEEE802.11 a/b/g/n Wireless Network Device" \

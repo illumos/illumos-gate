@@ -50,7 +50,7 @@ webrev \- Generate HTML codereview materials
 .B webrev
 builds a set of HTML files suitable for performing code review of
 source changes in a web browser.
-It supports Mercurial, Git and Subversion repositories.
+It supports Git and Subversion repositories.
 At its most basic, usage is:
 .nf
         $ webrev
@@ -139,13 +139,6 @@ the environment.
 makes use of
 .BR which_scm (1ONBLD)
 to determine the SCM in use for a given workspace.
-
-.SS Mercurial
-In the case of Mercurial \fBwebrev\fR will attempt to use the output
-from the
-.BR hg (1)
-"hg root" command to identify the workspace root, and the
-"hg path default" command to identify the parent workspace.
 
 .SS Git
 In the case of Git \fBwebrev\fR will attempt to use the output from the
@@ -436,7 +429,6 @@ For the nested directory case it is necessary to specify the full target:
 This will remove just the \fIbugfix.onnv\fR directory.
 
 .SH SEE ALSO
-.BR hg "(1),"
 .BR git "(1),"
 .BR ssh_config "(4),"
 .BR svn "(1),"

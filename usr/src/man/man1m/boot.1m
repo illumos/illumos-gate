@@ -1,11 +1,12 @@
 '\" te
+.\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2015 Nexenta Systems Inc.
 .\" Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BOOT 1M "Aug 18, 2016"
+.TH BOOT 1M "Feb 07, 2018"
 .SH NAME
 boot \- start the system kernel or a standalone program
 .SH SYNOPSIS
@@ -65,7 +66,7 @@ system has been halted.
 .sp
 .LP
 The second level program is either a fileystem-specific boot block (when
-booting from a disk), or \fBinetboot\fR or \fBwanboot\fR (when booting across
+booting from a disk), or \fBinetboot\fR (when booting across
 the network).
 .sp
 .LP
@@ -138,289 +139,7 @@ name appears to be an HTTP URL. If it does not, the PROM downloads
 loads the boot archive, which takes over the machine and releases
 \fBinetboot\fR. Startup scripts then initiate the DHCP agent (see
 \fBdhcpagent\fR(1M)), which implements further DHCP activities.
-.sp
-.LP
-If the file to be loaded is an HTTP URL, the PROM will use HTTP to load the
-referenced file. If the client has been configured with an HMAC SHA-1 key, it
-will check the integrity of the loaded file before proceeding to execute it.
-The file is expected to be the \fBwanboot\fR binary. The WAN boot process can
-be configured to use either DHCP or NVRAM properties to discover the install
-server and router and the proxies needed to connect to it. When \fBwanboot\fR
-begins executing, it determines whether sufficient information is available to
-it to allow it to proceed. If any necessary information is missing, it will
-either exit with an appropriate error or bring up a command interpreter and
-prompt for further configuration information. Once \fBwanboot\fR has obtained
-the necessary information, it loads the boot loader into memory by means of
-HTTP. If an encryption key has been installed on the client, \fBwanboot\fR will
-verify the boot loader's signature and its accompanying hash. Presence of an
-encryption key but no hashing key is an error.
-.sp
-.LP
-The \fBwanboot\fR boot loader can communicate with the client using either HTTP
-or secure HTTP. If the former, and if the client has been configured with an
-HMAC SHA-1 key, the boot loader will perform an integrity check of the root
-file system. Once the root file system has been loaded into memory (and
-possibly had an integrity check performed), the boot archive is transferred
-from the server. If provided with a \fBboot_logger\fR URL by means of the
-\fBwanboot.conf\fR(4) file, \fBwanboot\fR will periodically log its progress.
-.sp
-.LP
-Not all PROMs are capable of consuming URLs. You can determine whether a client
-is so capable using the \fBlist-security-keys\fR OBP command (see
-\fBmonitor\fR(1M)).
-.sp
-.LP
-WAN booting is not currently available on the x86 platform.
-.sp
-.LP
-The \fBwanboot\fR Command Line
-.sp
-.LP
-When the client program is \fBwanboot\fR, it accepts \fBclient-program-args\fR
-of the form:
-.sp
-.in +2
-.nf
-boot ... -o \fIopt1\fR[,\fIopt2\fR[,...]]
-.fi
-.in -2
-.sp
 
-.sp
-.LP
-where each option may be an action:
-.sp
-.ne 2
-.na
-\fB\fBdhcp\fR\fR
-.ad
-.sp .6
-.RS 4n
-Require \fBwanboot\fR to obtain configuration parameters by means of DHCP.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBprompt\fR\fR
-.ad
-.sp .6
-.RS 4n
-Cause \fBwanboot\fR to enter its command interpreter.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fI<cmd>\fR\fR
-.ad
-.sp .6
-.RS 4n
-One of the interpreter commands listed below.
-.RE
-
-.sp
-.LP
-\&...or an assignment, using the interpreter's parameter names listed below.
-.sp
-.LP
-The \fBwanboot\fR Command Interpreter
-.sp
-.LP
-The \fBwanboot\fR command interpreter is invoked by supplying a
-\fBclient-program-args\fR of "\fB-o prompt\fR" when booting. Input consists of
-single commands or assignments, or a comma-separated list of commands or
-assignments. The configuration parameters are:
-.sp
-.ne 2
-.na
-\fB\fBhost-ip\fR\fR
-.ad
-.sp .6
-.RS 4n
-IP address of the client (in dotted-decimal notation)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBrouter-ip\fR\fR
-.ad
-.sp .6
-.RS 4n
-IP address of the default router (in dotted-decimal notation)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsubnet-mask\fR\fR
-.ad
-.sp .6
-.RS 4n
-subnet mask (in dotted-decimal notation)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBclient-id\fR\fR
-.ad
-.sp .6
-.RS 4n
-DHCP client identifier (a quoted ASCII string or hex ASCII)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBhostname\fR\fR
-.ad
-.sp .6
-.RS 4n
-hostname to request in DHCP transactions (ASCII)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBhttp-proxy\fR\fR
-.ad
-.sp .6
-.RS 4n
-HTTP proxy server specification (IPADDR[:PORT])
-.RE
-
-.sp
-.LP
-The key names are:
-.sp
-.ne 2
-.na
-\fB\fB3des\fR\fR
-.ad
-.sp .6
-.RS 4n
-the triple DES encryption key (48 hex ASCII characters)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBaes\fR\fR
-.ad
-.sp .6
-.RS 4n
-the AES encryption key (32 hex ASCII characters)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsha1\fR\fR
-.ad
-.sp .6
-.RS 4n
-the HMAC SHA-1 signature key (40 hex ASCII characters)
-.RE
-
-.sp
-.LP
-Finally, the URL or the WAN boot CGI is referred to by means of:
-.sp
-.ne 2
-.na
-\fB\fBbootserver\fR\fR
-.ad
-.sp .6
-.RS 4n
-URL of WAN boot's CGI (the equivalent of OBP's \fBfile\fR parameter)
-.RE
-
-.sp
-.LP
-The interpreter accepts the following commands:
-.sp
-.ne 2
-.na
-\fB\fBhelp\fR\fR
-.ad
-.sp .6
-.RS 4n
-Print a brief description of the available commands
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fIvar\fR=\fIval\fR\fR\fR
-.ad
-.sp .6
-.RS 4n
-Assign \fIval\fR to \fIvar\fR, where \fIvar\fR is one of the configuration
-parameter names, the key names, or \fBbootserver\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fIvar\fR=\fR\fR
-.ad
-.sp .6
-.RS 4n
-Unset parameter \fIvar\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBlist\fR\fR
-.ad
-.sp .6
-.RS 4n
-List all parameters and their values (key values retrieved by means of OBP are
-never shown).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBprompt\fR\fR
-.ad
-.sp .6
-.RS 4n
-Prompt for values for unset parameters. The name of each parameter and its
-current value (if any) is printed, and the user can accept this value (press
-Return) or enter a new value.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBgo\fR\fR
-.ad
-.sp .6
-.RS 4n
-Once the user is satisfied that all values have been entered, leave the
-interpreter and continue booting.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBexit\fR\fR
-.ad
-.sp .6
-.RS 4n
-Quit the boot interpreter and return to OBP's \fBok\fR prompt.
-.RE
-
-.sp
-.LP
-Any of these assignments or commands can be passed on the command line as part
-of the \fB-o\fR options, subject to the OBP limit of 128 bytes for boot
-arguments. For example, \fB-o\fR \fBlist,go\fR would simply list current
-(default) values of the parameters and then continue booting.
 .SS "iSCSI Boot"
 .LP
 iSCSI boot is currently supported only on x86. The host being booted must be
@@ -601,13 +320,6 @@ depending on the form of the \fBboot\fR command used, reliance upon
 \fIboot-file\fR should be discouraged for most production systems.
 .sp
 .LP
-When executing a WAN boot from a local (CD or DVD) copy of wanboot, one must
-use:
-.sp
-.LP
-ok \fBboot cdrom -F wanboot - install\fR
-.sp
-.LP
 Modern PROMs have enhanced the network boot support package to support the
 following syntax for arguments to be processed by the package:
 .sp
@@ -643,7 +355,7 @@ IP address of the TFTP server
 .ad
 .sp .6
 .RS 4n
-file to download using TFTP or URL for WAN boot
+file to download using TFTP
 .RE
 
 .sp
@@ -788,9 +500,7 @@ The TFTP RRQ is unicast to the server if one is specified as an argument or in
 the DHCP response. Otherwise, the TFTP RRQ is broadcast.
 .sp
 .LP
-\fIfile\fR specifies the file to be loaded by TFTP from the TFTP server, or the
-URL if using HTTP. The use of HTTP is triggered if the file name is a URL, that
-is, the file name starts with \fBhttp:\fR (case-insensitive).
+\fIfile\fR specifies the file to be loaded by TFTP from the TFTP server.
 .sp
 .LP
 When using RARP and TFTP, the default file name is the ASCII hexadecimal
@@ -808,17 +518,6 @@ node's \fBname\fR property, with commas (,) replaced by periods (.).
 .LP
 When specified on the command line, the filename must not contain slashes
 (\fB/\fR).
-.sp
-.LP
-The format of URLs is described in RFC 2396. The HTTP server must be specified
-as an IP address (in standard IPv4 dotted-decimal notation). The optional port
-number is specified in decimal. If a port is not specified, port 80 (decimal)
-is implied.
-.sp
-.LP
-The URL presented must be "safe-encoded", that is, the package does not apply
-escape encodings to the URL presented. URLs containing commas must be presented
-as a quoted string. Quoting URLs is optional otherwise.
 .sp
 .LP
 \fBhost-ip\fR specifies the IP address (in standard IPv4 dotted-decimal
@@ -1002,7 +701,7 @@ exported by the \fBboot\fR program.
 .RS 4n
 Boot using the named object. The object must be either an ELF executable or
 bootable object containing a boot block. The primary use is to boot the
-failsafe or \fBwanboot\fR boot archive.
+failsafe boot archive.
 .RE
 
 .sp
@@ -1243,7 +942,7 @@ To boot the default kernel in single-user interactive mode, respond to the
 .sp
 
 .LP
-\fBExample 2 \fRNetwork Booting with WAN Boot-Capable PROMs
+\fBExample 2 \fRNetwork Booting
 .sp
 .LP
 To illustrate some of the subtle repercussions of various boot command line
@@ -1303,26 +1002,9 @@ boot support package processes arguments in \fBnetwork-boot-arguments\fR.
 .in -2
 .sp
 
-.LP
-\fBExample 3 \fRUsing \fBwanboot\fR with Older PROMs
-.sp
-.LP
-The command below results in the \fBwanboot\fR binary being loaded from DVD or
-CD, at which time \fBwanboot\fR will perform DHCP and then drop into its
-command interpreter to allow the user to enter keys and any other necessary
-configuration.
-
-.sp
-.in +2
-.nf
-\fBboot cdrom -F wanboot -o dhcp,prompt\fR
-.fi
-.in -2
-.sp
-
 .SS "x86"
 .LP
-\fBExample 4 \fRTo Boot the Default Kernel In 64-bit Single-User Interactive
+\fBExample 3 \fRTo Boot the Default Kernel In 64-bit Single-User Interactive
 Mode
 .sp
 .LP
@@ -1417,7 +1099,7 @@ the root pool of your current system.
 \fBinit\fR(1M), \fBinstallboot\fR(1M), \fBkernel\fR(1M), \fBmonitor\fR(1M),
 \fBshutdown\fR(1M), \fBsvcadm\fR(1M), \fBumountall\fR(1M), \fBzpool\fR(1M),
 \fBuadmin\fR(2), \fBbootparams\fR(4), \fBinittab\fR(4), \fBvfstab\fR(4),
-\fBwanboot.conf\fR(4), \fBfilesystem\fR(5)
+\fBfilesystem\fR(5)
 .sp
 .LP
 RFC 903, \fIA Reverse Address Resolution Protocol\fR,

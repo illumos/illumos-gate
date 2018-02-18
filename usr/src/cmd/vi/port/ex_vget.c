@@ -398,6 +398,7 @@ char *cmdstr, *sgn;
 			} else if (cmdstr[1] != 'o') {
 				goto Default;
 			}
+			/* FALLTHROUGH */
 		    case 't':
 			if (cmdstr[1] != '\0')
 				goto Default;

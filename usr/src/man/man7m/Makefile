@@ -34,7 +34,7 @@ _MANFILES = 	bufmod.7m	\
 		usbms.7m	\
 		vuidmice.7m
 
-sparc_MANFILES=	kb.7m
+sparc_MANFILES=
 
 MANLINKS=	vuid2ps2.7m	\
 		vuid3ps2.7m	\

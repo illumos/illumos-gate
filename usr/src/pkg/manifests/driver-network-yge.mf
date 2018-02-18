@@ -51,7 +51,6 @@ driver name=yge perms="* 0666 root sys" \
     alias=pciex11ab,4364 \
     alias=pciex11ab,436a
 file path=kernel/drv/$(ARCH64)/yge group=sys
-$(i386_ONLY)file path=kernel/drv/yge group=sys
 file path=usr/share/man/man7d/yge.7d
 legacy pkg=SUNWyge desc="Marvell Yukon 2 Gigabit Ethernet Controller Driver" \
     name="Marvell Yukon 2 Gigabit Ethernet Driver"

@@ -110,7 +110,10 @@ extern "C" {
 
 #define	TOPO_PGROUP_PCI		"pci"
 #define	TOPO_PCI_VENDID		"vendor-id"
+#define	TOPO_PCI_VENDNM		"vendor-name"
+#define	TOPO_PCI_SUBSYSNM	"subsystem-name"
 #define	TOPO_PCI_DEVID		"device-id"
+#define	TOPO_PCI_DEVNM		"device-name"
 #define	TOPO_PCI_EXCAP		"extended-capabilities"
 #define	TOPO_PCI_BDF		"BDF"
 #define	TOPO_PCI_CLASS		"class-code"
@@ -176,6 +179,19 @@ extern "C" {
 #define	TOPO_PORT_SFF_TRANSCEIVER_PN	"part-number"
 #define	TOPO_PORT_SFF_TRANSCEIVER_REV	"revision"
 #define	TOPO_PORT_SFF_TRANSCEIVER_SN	"serial-number"
+
+/*
+ * These properties will exist on nodes enumerated by the ipmi module. They
+ * are consumed by the fac_prov_ipmi module
+ */
+#define	TOPO_PROP_IPMI_ENTITY_ID	"entity-id"
+#define	TOPO_PROP_IPMI_ENTITY_INST	"entity-instance"
+
+/*
+ * This property can be statically set in a map file and is consumed by the
+ * fac_prov_ipmi module.
+ */
+#define	TOPO_PROP_IPMI_ENTITY_LIST	"entity-list"
 
 #ifdef	__cplusplus
 }

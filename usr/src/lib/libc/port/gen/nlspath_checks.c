@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "mtlib.h"
 #include <string.h>
@@ -626,7 +624,7 @@ clean_env(void)
 	else if (issetugid()) {			/* Found and set-uid, clean */
 		int off = 1;
 
-		for (p++; (p[-off] = p[0]) != '\0'; p++)
+		for (p++; (p[-off] = p[0]) != NULL; p++)
 			if (**p == 'N' && nvmatch("NLSPATH", *p) != NULL)
 				off++;
 

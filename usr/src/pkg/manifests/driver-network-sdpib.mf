@@ -42,11 +42,9 @@ dir path=kernel/strmod group=sys
 dir path=kernel/strmod/$(ARCH64) group=sys
 driver name=sdpib perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/sdpib group=sys
-$(i386_ONLY)file path=kernel/drv/sdpib group=sys
 file path=kernel/drv/sdpib.conf group=sys
 hardlink path=kernel/strmod/$(ARCH64)/sdpib \
     target=../../../kernel/drv/$(ARCH64)/sdpib
-$(i386_ONLY)hardlink path=kernel/strmod/sdpib target=../../kernel/drv/sdpib
 legacy pkg=SUNWibsdpib desc="Sun InfiniBand Sockets Direct Protocol" \
     name="Sun InfiniBand Sockets Direct Protocol"
 license cr_Sun license=cr_Sun

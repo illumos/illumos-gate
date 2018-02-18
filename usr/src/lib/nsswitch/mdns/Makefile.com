@@ -21,8 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/nsswitch/mdns/Makefile.com
 
 LIBRARY =	libnss_mdns.a
@@ -35,7 +33,7 @@ OBJECTS =	gethostent.o	\
 # include common nsswitch library definitions.
 include		../../Makefile.com
 
-C99MODE =       $(C99_ENABLE)
+CSTD =       $(CSTD_GNU99)
 LDLIBS +=	-lnsl -ldns_sd -lscf
 DYNLIB1 =	nss_mdns.so$(VERS)
 

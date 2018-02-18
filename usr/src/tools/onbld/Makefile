@@ -28,7 +28,6 @@ include ../Makefile.tools
 
 SUBDIRS= \
 	Checks	\
-	hgext	\
 	Scm
 
 PYSRCS = \

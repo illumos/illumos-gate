@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROLES 1 "Mar 6, 2017"
+.TH ROLES 1 "Jan 7, 2018"
 .SH NAME
 roles \- print roles granted to a user
 .SH SYNOPSIS
@@ -14,7 +14,7 @@ roles \- print roles granted to a user
 
 .SH DESCRIPTION
 .LP
-The command \fBroles\fR prints on standard output the roles that you or the
+The \fBroles\fR command prints on standard output the roles that you or the
 optionally-specified user have been granted. Roles are special accounts that
 correspond to a functional responsibility rather than to an actual person
 (referred to as a normal user).
@@ -28,7 +28,7 @@ profiles. See \fBauths\fR(1) and \fBprofiles\fR(1).
 .sp
 .LP
 Roles are not allowed to log into a system as a primary user. Instead, a user
-must log in as him\(em or herself and assume the role. The actions of a role
+must first log in as a normal user and assume the role. The actions of a role
 are attributable to the normal user. The audited
 events of the role contain the audit \fBID\fR of the original user who assumed
 the role.
@@ -49,7 +49,7 @@ requires knowledge of the role's password and membership in the role. Role
 assignments are specified in \fBuser_attr\fR(4).
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRSample output
+\fBExample 1\fR Sample output
 .sp
 .LP
 The output of the \fBroles\fR command has the following form:
@@ -57,7 +57,8 @@ The output of the \fBroles\fR command has the following form:
 .sp
 .in +2
 .nf
-example% \fBroles tester01 tester02\fRtester01 : admin
+example% \fBroles tester01 tester02\fR
+tester01 : admin
 tester02 : secadmin, root
 example%
 .fi

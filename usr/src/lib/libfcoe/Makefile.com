@@ -38,7 +38,7 @@ INCS +=		-I$(SRCDIR)
 INCS +=		-I$(SRC)/uts/common/sys/fcoe
 
 LDLIBS +=	-lc -ldladm -lscf
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 

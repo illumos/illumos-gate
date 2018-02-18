@@ -115,7 +115,7 @@ bool show;	/* if true update the screen */
 		vsave();
 		(void) YANKreg('1');
 		notecnt = 0;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	case VMANY:
 	case VMCHNG:

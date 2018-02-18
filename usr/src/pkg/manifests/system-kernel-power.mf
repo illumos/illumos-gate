@@ -63,7 +63,6 @@ file path=lib/svc/manifest/system/power.xml group=sys mode=0444
 file path=lib/svc/method/svc-power mode=0555
 file path=usr/bin/sys-suspend mode=4555
 file path=usr/kernel/drv/$(ARCH64)/pm group=sys
-$(i386_ONLY)file path=usr/kernel/drv/pm group=sys
 file path=usr/kernel/drv/pm.conf group=sys
 file path=usr/lib/power/powerd mode=0555
 file path=usr/sbin/pmconfig mode=4555

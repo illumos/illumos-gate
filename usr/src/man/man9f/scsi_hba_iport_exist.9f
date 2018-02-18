@@ -1,0 +1,98 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2017, Joyent, Inc.
+.\"
+.Dd Apr 18, 2017
+.Dt SCSI_HBA_IPORT_EXIST 9F
+.Os
+.Sh NAME
+.Nm scsi_hba_iport_exist ,
+.Nm scsi_hba_iport_find
+.Nd find and check if an iport exists
+.Sh SYNOPSIS
+.In sys/scsi/scsi.h
+.Ft int
+.Fo scsi_hba_iport_exist
+.Fa "dev_info_t *dip"
+.Fc
+.Ft "dev_info_t *"
+.Fo scsi_hba_iport_find
+.Fa "dev_info_t *dip"
+.Fa "char *ua"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is still evolving in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to
+.Vt dev_info
+structure.
+.It Fa ua
+The unit address of the iport being searched for.
+.El
+.Sh DESCRIPTION
+The
+.Fn scsi_hba_iport_exists
+function is used to determine whether or not
+.Fa dip
+has any child devices that are iports which have been added through
+.Xr scsi_hba_iport_register 9F
+or
+.Xr scsi_hba_iportmap_iport_add 9F .
+For more information on iports, see
+.Xr iport 9 .
+.Pp
+The
+.Fn scsi_hba_iport_find
+function attempts to find a child iport and return its
+.Vt dev_info
+structure if it exists.
+The iport is searched for by its unit address, which is passed in the
+.Fa ua
+argument.
+The unit address for an iport is established when the iport is created.
+.Sh CONTEXT
+The
+.Fn scsi_hba_iport_exist
+and
+.Fn scsi_hba_iport_find
+functions may be called in either
+.Sy user
+or
+.Sy kernel
+context.
+.Sh RETURN VALUES
+The
+.Fn scsi_hba_iport_exists
+function returns
+.Sy 1
+when there is a child iport of
+.Fa dip .
+Otherwise, it returns
+.Sy 0.
+.Pp
+The
+.Fn scsi_hba_iport_find
+function returns a pointer to the iport's
+.Vt dev_info
+structure, if found.
+Otherwise,
+.Dv NULL
+is returned.
+.Sh SEE ALSO
+.Xr iport 9 ,
+.Xr iportmap 9 ,
+.Xr scsi_hba_iport_register 9F ,
+.Xr scsi_hba_iportmap_iport_add 9F

@@ -882,6 +882,13 @@ typedef struct i40e {
 	 */
 	uint64_t	i40e_s_link_status_errs;
 	uint32_t	i40e_s_link_status_lasterr;
+
+	/*
+	 * LED information. Note this state is only modified in
+	 * i40e_gld_set_led() which is protected by MAC's serializer lock.
+	 */
+	uint32_t	i40e_led_status;
+	boolean_t	i40e_led_saved;
 } i40e_t;
 
 /*

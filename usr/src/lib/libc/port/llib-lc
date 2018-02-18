@@ -399,6 +399,26 @@ char *ecvt(double value, int ndigit, int *_RESTRICT_KYWD decpt,
 char *fcvt(double value, int ndigit, int *_RESTRICT_KYWD decpt,
 	int *_RESTRICT_KYWD sign);
 
+/* endian.c */
+uint16_t htole16(uint16_t);
+uint32_t htole32(uint32_t);
+uint64_t htole64(uint64_t);
+uint16_t letoh16(uint16_t);
+uint32_t letoh32(uint32_t);
+uint64_t letoh64(uint64_t);
+uint16_t le16toh(uint16_t);
+uint32_t le32toh(uint32_t);
+uint64_t le64toh(uint64_t);
+uint16_t htobe16(uint16_t);
+uint32_t htobe32(uint32_t);
+uint64_t htobe64(uint64_t);
+uint16_t betoh16(uint16_t);
+uint32_t betoh32(uint32_t);
+uint64_t betoh64(uint64_t);
+uint16_t be16toh(uint16_t);
+uint32_t be32toh(uint32_t);
+uint64_t be64toh(uint64_t);
+
 /* err.c */
 void _errfp(FILE *, int, const char *, ...);
 void _verrfp(FILE *, int, const char *, va_list);

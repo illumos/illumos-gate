@@ -1,27 +1,26 @@
 '\" te
+.\" Copyright (c) 2018 Peter Tribble.
 .\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROJADD 1M "Sep 30, 2004"
+.TH PROJADD 1M "Jan 7, 2018"
 .SH NAME
 projadd \- administer a new project on the system
 .SH SYNOPSIS
 .LP
 .nf
 \fBprojadd\fR [\fB-n\fR] [\fB-f\fR \fIfilename\fR] [\fB-p\fR \fIprojid\fR [\fB-o\fR]] [\fB-c\fR \fIcomment\fR]
-     [\fB-U\fR \fIuser\fR [,\fIuser\fR]... ] [\fB-G\fR \fIgroup\fR [,\fIgroup\fR]... ]
-     [ [\fB-K\fR \fIname\fR [=\fIvalue\fR [,\fIvalue\fR]...]...]] \fIproject\fR
+     [\fB-U\fR \fIuser\fR[,\fIuser\fR]...] [\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...]
+     [\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR]...]]... \fIproject\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBprojadd\fR adds a new project entry to the \fB/etc/project\fR file. If the
 files backend is being used for the project database, the new project is
 available for use immediately upon the completion of the \fBprojadd\fR command.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -51,7 +50,7 @@ system project file, \fB/etc/project\fR, is modified.
 .sp
 .ne 2
 .na
-\fB\fB-G\fR \fIgroup\fR[,group...]\fR
+\fB\fB-G\fR \fIgroup\fR[,\fIgroup\fR]...\fR
 .ad
 .RS 29n
 Specify a group list for the project.
@@ -60,7 +59,7 @@ Specify a group list for the project.
 .sp
 .ne 2
 .na
-\fB\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR...]\fR
+\fB\fB-K\fR \fIname\fR[=\fIvalue\fR[,\fIvalue\fR]...]\fR
 .ad
 .RS 29n
 Specify an attribute list for the project. Multiple \fB-K\fR options can be
@@ -114,20 +113,19 @@ defined in \fBlimits.h\fR. \fIprojid\fR defaults to the next available unique
 number above the highest number currently assigned. For example, if
 \fIprojid\fRs \fB100\fR, \fB105\fR, and \fB200\fR are assigned, the next
 default \fIprojid\fR is \fB201\fR. \fIprojid\fRs between \fB0\fR-\fB99\fR are
-reserved by SunOS.
+reserved.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-U\fR \fIuser\fR[,user...]\fR
+\fB\fB-U\fR \fIuser\fR[,\fIuser\fR]...\fR
 .ad
 .RS 29n
 Specify a user list for the project.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -146,7 +144,7 @@ restrictions are not met.
 
 .SH EXAMPLES
 .LP
-\fBExample 1 \fRAdding a Project
+\fBExample 1\fR Adding a Project
 .sp
 .LP
 The following command creates the project \fBsalesaudit\fR and sets the
@@ -188,7 +186,6 @@ note the effect of the scaling factor in the resource cap
 MB, and scaling factors are specified in \fBresource_controls\fR(5).
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -264,7 +261,6 @@ Cannot update the \fB/etc/project\fR file.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/project\fR\fR
@@ -274,7 +270,6 @@ System project file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -293,20 +288,18 @@ Interface Stability	See below.
 .LP
 Invocation is evolving. Human readable output is unstable.
 .SH SEE ALSO
-.sp
 .LP
 \fBprojects\fR(1), \fBgroupadd\fR(1M), \fBgroupdel\fR(1M), \fBgroupmod\fR(1M),
 \fBgrpck\fR(1M), \fBprojdel\fR(1M), \fBprojmod\fR(1M), \fBuseradd\fR(1M),
 \fBuserdel\fR(1M), \fBusermod\fR(1M), \fBproject\fR(4), \fBattributes\fR(5),
 \fBresource_controls\fR(5)
 .SH NOTES
-.sp
 .LP
 In case of an error, \fBprojadd\fR prints an error message and exits with a
 non-zero status.
 .sp
 .LP
 \fBprojadd\fR adds a project definition only on the local system. If a network
-name service such as NIS or LDAP is being used to supplement the local
+name service is being used to supplement the local
 \fB/etc/project\fR file with additional entries, \fBprojadd\fR cannot change
 information supplied by the network name service.

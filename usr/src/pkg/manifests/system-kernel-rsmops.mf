@@ -40,7 +40,6 @@ dir path=kernel group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/rsmops group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/rsmops group=sys mode=0755
 legacy pkg=SUNWrsmo \
     desc="Support for network specific implementations of RSMPI" \
     name="RSMPI Operations Registration Module"

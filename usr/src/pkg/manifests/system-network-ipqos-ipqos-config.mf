@@ -49,11 +49,6 @@ file path=kernel/ipp/$(ARCH64)/dscpmk group=sys mode=0755
 file path=kernel/ipp/$(ARCH64)/flowacct group=sys mode=0755
 file path=kernel/ipp/$(ARCH64)/tokenmt group=sys mode=0755
 file path=kernel/ipp/$(ARCH64)/tswtclmt group=sys mode=0755
-$(i386_ONLY)file path=kernel/ipp/dlcosmk group=sys mode=0755
-$(i386_ONLY)file path=kernel/ipp/dscpmk group=sys mode=0755
-$(i386_ONLY)file path=kernel/ipp/flowacct group=sys mode=0755
-$(i386_ONLY)file path=kernel/ipp/tokenmt group=sys mode=0755
-$(i386_ONLY)file path=kernel/ipp/tswtclmt group=sys mode=0755
 file path=usr/share/man/man7ipp/dlcosmk.7ipp
 file path=usr/share/man/man7ipp/dscpmk.7ipp
 file path=usr/share/man/man7ipp/flowacct.7ipp

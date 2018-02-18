@@ -1318,6 +1318,10 @@ CHECK_PKT:
 	case QUE_COMMAND:
 		SES_LOG(ssc, SES_CE_DEBUG1, "retrying cmd");
 		if (ssc->ses_retries > SES_NO_RETRY) {
+			clock_t ms_time;
+
+			ms_time =
+			    (err == EBUSY)? SES_BUSY_TIME : SES_RESTART_TIME;
 			ssc->ses_retries -=
 			    (err == EBUSY)? SES_BUSY_RETRY: SES_CMD_RETRY;
 			scmd->uscsi_status = 0;
@@ -1325,8 +1329,7 @@ CHECK_PKT:
 				bzero(pkt->pkt_scbp,
 				    sizeof (struct scsi_arq_status));
 
-			SES_ENABLE_RESTART(
-			    (err == EBUSY)? SES_BUSY_TIME: SES_RESTART_TIME,
+			SES_ENABLE_RESTART(ms_time,
 			    (struct scsi_pkt *)bp->av_back);
 			return;
 		}

@@ -106,7 +106,7 @@ operate(int c, int cnt)
 	case 's':
 		ungetkey(' ');
 		subop++;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	/*
 	 * c		Change operator.
@@ -140,7 +140,7 @@ operate(int c, int cnt)
 	 */
 	case '=':
 		forbid(!value(vi_LISP));
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	/*
 	 * >		Right shift operator.
@@ -269,7 +269,7 @@ nocount:
 	case 'b':
 	case 'B':
 		dir = -1;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	/*
 	 * w		Forward a word.
@@ -304,7 +304,7 @@ ein:
 	 */
 	case '(':
 		dir = -1;
-		/* fall into... */
+		/* FALLTHROUGH */
 
 	/*
 	 * )		Forward an s-expression.
@@ -321,7 +321,7 @@ ein:
 	 */
 	case '{':
 		dir = -1;
-		/* fall into... */
+		/* FALLTHROUGH */
 
 	/*
 	 * }		Forward an s-expression, but don't stop on atoms.
@@ -377,7 +377,7 @@ ein:
 	 */
 	case '[':
 		dir = -1;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	/*
 	 * ]		Forward to next defun, i.e. a ( in column 1.
@@ -451,7 +451,7 @@ ein:
 	case 'F':	/* inverted find */
 	case 'T':
 		dir = -1;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	/*
 	 * f		Find single character following cursor in current line.
@@ -483,6 +483,7 @@ ein:
 
 		case 't':
 			wcursor = lastchr(linebuf, wcursor);
+			/* FALLTHROUGH */
 		case 'f':
 fixup:
 			if (moveop != vmove)
@@ -544,7 +545,7 @@ fixup:
 	case 'h':
 	case CTRL('h'):
 		dir = -1;
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	/*
 	 * space	Forward a character.
@@ -580,7 +581,7 @@ fixup:
 	 */
 	case 'X':
 		dir = -1;
-		/* fall into ... */
+		/* FALLTHROUGH */
 deleteit:
 	/*
 	 * x		Delete character at cursor, leaving cursor where it is.
@@ -611,7 +612,7 @@ errlab:
 			vmacp = 0;
 			return;
 		}
-		/* fall into ... */
+		/* FALLTHROUGH */
 
 	/*
 	 * _		Target for a line or group of lines.

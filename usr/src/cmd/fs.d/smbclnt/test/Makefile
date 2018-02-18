@@ -49,7 +49,7 @@ LINTLIBS= -L$(ROOTLIB) -lsmbfs
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-unused-variable
-C99MODE= $(C99_ENABLE)
+CSTD= $(CSTD_GNU99)
 
 LINTFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 

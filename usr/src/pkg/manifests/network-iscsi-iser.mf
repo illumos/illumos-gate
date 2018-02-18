@@ -51,14 +51,10 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=iser perms="* 0600 root sys"
 file path=kernel/drv/$(ARCH64)/iser group=sys
-$(i386_ONLY)file path=kernel/drv/iser group=sys
 file path=kernel/drv/iser.conf group=sys
 file path=kernel/kmdb/$(ARCH64)/idm group=sys mode=0555
-$(i386_ONLY)file path=kernel/kmdb/idm group=sys mode=0555
 file path=kernel/misc/$(ARCH64)/idm group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/idm group=sys mode=0755
 file path=usr/lib/mdb/kvm/$(ARCH64)/idm.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/idm.so group=sys mode=0555
 file path=usr/share/man/man7d/iser.7d
 legacy pkg=SUNWiscsidmr desc="Sun iSCSI Data Mover (Root)" \
     name="Sun iSCSI Data Mover (Root)"

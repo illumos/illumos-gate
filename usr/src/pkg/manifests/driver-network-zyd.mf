@@ -46,7 +46,6 @@ driver name=zyd clone_perms="zyd 0666 root sys" perms="* 0666 root sys" \
     alias=usbace,1211 \
     alias=usbace,1215
 file path=kernel/drv/$(ARCH64)/zyd group=sys
-file path=kernel/drv/zyd group=sys
 file path=usr/share/man/man7d/zyd.7d
 legacy pkg=SUNWzyd desc="ZyDAS ZD1211 USB 802.11b/g Wireless Driver" \
     name="ZyDAS ZD1211 USB 802.11b/g Wireless Driver"

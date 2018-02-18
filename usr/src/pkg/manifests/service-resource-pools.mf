@@ -63,7 +63,6 @@ file path=lib/svc/method/svc-pools mode=0555 variant.opensolaris.zone=global
 file path=usr/bin/poolstat mode=0555
 file path=usr/include/pool.h
 file path=usr/kernel/drv/$(ARCH64)/pool group=sys
-$(i386_ONLY)file path=usr/kernel/drv/pool group=sys
 file path=usr/kernel/drv/pool.conf group=sys
 file path=usr/lib/$(ARCH64)/libpool.so.1
 file path=usr/lib/$(ARCH64)/llib-lpool.ln

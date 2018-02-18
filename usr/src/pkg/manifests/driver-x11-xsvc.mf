@@ -45,10 +45,8 @@ dir path=platform/i86xpv/kernel/drv group=sys
 dir path=platform/i86xpv/kernel/drv/$(ARCH64) group=sys
 driver name=xsvc devlink=type=ddi_pseudo;name=xsvc\t\M0
 file path=platform/i86pc/kernel/drv/$(ARCH64)/xsvc group=sys
-file path=platform/i86pc/kernel/drv/xsvc group=sys
 file path=platform/i86pc/kernel/drv/xsvc.conf group=sys
 file path=platform/i86xpv/kernel/drv/$(ARCH64)/xsvc group=sys
-file path=platform/i86xpv/kernel/drv/xsvc group=sys
 file path=platform/i86xpv/kernel/drv/xsvc.conf group=sys
 legacy pkg=SUNWxsvc desc="Sun Xserver pseudo driver" \
     name="Sun Xserver pseudo driver" version=11.11.0,REV=2009.11.11

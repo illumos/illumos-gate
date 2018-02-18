@@ -74,7 +74,7 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

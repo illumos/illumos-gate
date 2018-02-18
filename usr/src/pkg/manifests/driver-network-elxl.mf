@@ -58,7 +58,6 @@ driver name=elxl clone_perms="elxl 0666 root sys" perms="* 0666 root sys" \
     alias=pci10b7,9800 \
     alias=pci10b7,9805
 file path=kernel/drv/$(ARCH64)/elxl group=sys
-file path=kernel/drv/elxl group=sys
 file path=usr/share/man/man7d/elxl.7d
 legacy pkg=SUNWelxl desc="3Com Etherlink XL Ethernet Driver" \
     name="3Com Etherlink XL Ethernet Driver"

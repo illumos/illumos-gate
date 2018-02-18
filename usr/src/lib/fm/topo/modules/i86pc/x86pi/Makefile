@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 MODULE	= x86pi
 ARCH	= i86pc
@@ -39,7 +41,7 @@ MODULESRCS	= $(X86PISRCS) $(UTILSRCS)
 
 include ../../Makefile.plugin
 
-LDLIBS += -lsmbios -ldevinfo -luutil
+LDLIBS += -lsmbios -ldevinfo -luutil -lpcidb
 
 CPPFLAGS += -I. -I$(ROOT)/usr/platform/i86pc/include -I$(TOPODIR)
 CPPFLAGS += -I$(UTILDIR) -I$(BRDIR)

@@ -34,9 +34,8 @@
  *
  */
 
-/* Copyright 2017 Nexenta Systems, Inc.  All rights reserved. */
-
 /*
+ * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2013 Damian Bogel. All rights reserved.
  */
 
@@ -284,7 +283,6 @@ main(int argc, char **argv)
 
 		case 'x':	/* POSIX: full line matches */
 			xflag++;
-			regflags |= REG_ANCHOR;
 			break;
 
 		case 'E':	/* POSIX: Extended RE's */
@@ -704,9 +702,7 @@ fixpatterns(void)
 	int	rv, fix_pattern, npatterns;
 
 	/*
-	 * As REG_ANCHOR flag is not supported in the current Solaris,
-	 * need to fix the specified pattern if -x is specified with
-	 * grep or egrep
+	 * Fix the specified pattern if -x is specified.
 	 */
 	fix_pattern = !Fflag && xflag;
 
@@ -1528,59 +1524,12 @@ out:
 static void
 usage(void)
 {
-	if (egrep || fgrep) {
-		(void) fprintf(stderr, gettext("Usage:\t%s"), cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-	} else {
-		(void) fprintf(stderr, gettext("Usage:\t%s"), cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -E [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -E [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -F [-c|-l|-q] [-r|-R] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] pattern_list [file ...]\n"));
-
-		(void) fprintf(stderr, "\t%s", cmdname);
-		(void) fprintf(stderr,
-		    gettext(" -F [-c|-l|-q] "
-		    "[-A num] [-B num] [-C num|-num] "
-		    "[-bhHinsvx] [-e pattern_list]... "
-		    "[-f pattern_file]... [file...]\n"));
-	}
+	(void) fprintf(stderr, gettext("usage: %5s"), cmdname);
+	if (!egrep && !fgrep)
+		(void) fprintf(stderr, gettext(" [-E|-F]"));
+	(void) fprintf(stderr, gettext(" [-bchHilnqrRsvx] [-A num] [-B num] "
+	    "[-C num|-num]\n             [-e pattern_list]... "
+	    "[-f pattern_file]... [pattern_list] [file]...\n"));
 	exit(2);
 	/* NOTREACHED */
 }

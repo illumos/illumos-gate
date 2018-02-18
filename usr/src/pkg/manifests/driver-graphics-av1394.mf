@@ -43,7 +43,6 @@ driver name=av1394 perms="* 0600 root sys" \
     alias=firewire00a02d,010000 \
     alias=firewire00a02d,010001
 file path=kernel/drv/$(ARCH64)/av1394 group=sys
-$(i386_ONLY)file path=kernel/drv/av1394 group=sys
 file path=usr/share/man/man7d/av1394.7d
 legacy pkg=SUNWav1394 desc="IEEE1394 AV Driver" name="IEEE1394 AV Driver"
 license cr_Sun license=cr_Sun

@@ -17,13 +17,14 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/pcitool/sparc/Makefile
 
 include ../Makefile.com
 
 LINTFLAGS 	+= -erroff=E_STATIC_UNUSED
 
-install: all $(ROOTUSRSBINPROG) $(ROOTMAN1MFILES)
+install: all $(ROOTUSRSBINPROG)

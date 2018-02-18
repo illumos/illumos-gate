@@ -69,14 +69,11 @@ driver name=smbsrv perms="* 0640 root sys"
 file path=lib/svc/manifest/network/smb/server.xml group=sys mode=0444
 file path=lib/svc/method/svc-smbd mode=0555
 file path=usr/kernel/drv/$(ARCH64)/smbsrv group=sys
-$(i386_ONLY)file path=usr/kernel/drv/smbsrv group=sys
 file path=usr/kernel/drv/smbsrv.conf group=sys
 file path=usr/kernel/kmdb/$(ARCH64)/smbsrv group=sys mode=0555
-$(i386_ONLY)file path=usr/kernel/kmdb/smbsrv group=sys mode=0555
 file path=usr/lib/fs/smb/$(ARCH64)/libshare_smb.so.1
 file path=usr/lib/fs/smb/libshare_smb.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/smbsrv.so group=sys mode=0555
 file path=usr/lib/reparse/libreparse_smb.so.1
 file path=usr/lib/security/pam_smb_passwd.so.1
 file path=usr/lib/smbsrv/dtrace/smbd-all.d mode=0555

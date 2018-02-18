@@ -437,7 +437,10 @@ file path=usr/share/man/man9f/rmfree.9f
 file path=usr/share/man/man9f/rmvb.9f
 file path=usr/share/man/man9f/rmvq.9f
 file path=usr/share/man/man9f/rwlock.9f
+file path=usr/share/man/man9f/sas_phymap_create.9f
+file path=usr/share/man/man9f/sas_phymap_lookup_ua.9f
 file path=usr/share/man/man9f/scsi_abort.9f
+file path=usr/share/man/man9f/scsi_address_device.9f
 file path=usr/share/man/man9f/scsi_alloc_consistent_buf.9f
 file path=usr/share/man/man9f/scsi_cname.9f
 file path=usr/share/man/man9f/scsi_destroy_pkt.9f
@@ -450,10 +453,15 @@ file path=usr/share/man/man9f/scsi_get_device_type_scsi_options.9f
 file path=usr/share/man/man9f/scsi_get_device_type_string.9f
 file path=usr/share/man/man9f/scsi_hba_attach_setup.9f
 file path=usr/share/man/man9f/scsi_hba_init.9f
+file path=usr/share/man/man9f/scsi_hba_iport_exist.9f
+file path=usr/share/man/man9f/scsi_hba_iport_register.9f
+file path=usr/share/man/man9f/scsi_hba_iport_unit_address.9f
+file path=usr/share/man/man9f/scsi_hba_iportmap_create.9f
 file path=usr/share/man/man9f/scsi_hba_lookup_capstr.9f
 file path=usr/share/man/man9f/scsi_hba_pkt_alloc.9f
 file path=usr/share/man/man9f/scsi_hba_pkt_comp.9f
 file path=usr/share/man/man9f/scsi_hba_probe.9f
+file path=usr/share/man/man9f/scsi_hba_tgtmap_create.9f
 file path=usr/share/man/man9f/scsi_hba_tran_alloc.9f
 file path=usr/share/man/man9f/scsi_ifgetcap.9f
 file path=usr/share/man/man9f/scsi_init_pkt.9f
@@ -471,6 +479,7 @@ file path=usr/share/man/man9f/scsi_transport.9f
 file path=usr/share/man/man9f/scsi_unprobe.9f
 file path=usr/share/man/man9f/scsi_validate_sense.9f
 file path=usr/share/man/man9f/scsi_vu_errmsg.9f
+file path=usr/share/man/man9f/scsi_wwnstr_to_wwn.9f
 file path=usr/share/man/man9f/semaphore.9f
 file path=usr/share/man/man9f/sprintf.9f
 file path=usr/share/man/man9f/stoi.9f
@@ -1255,13 +1264,60 @@ link path=usr/share/man/man9f/rw_read_locked.9f target=rwlock.9f
 link path=usr/share/man/man9f/rw_tryenter.9f target=rwlock.9f
 link path=usr/share/man/man9f/rw_tryupgrade.9f target=rwlock.9f
 link path=usr/share/man/man9f/samestr.9f target=SAMESTR.9f
+link path=usr/share/man/man9f/sas_phymap_destroy.9f \
+    target=sas_phymap_create.9f
+link path=usr/share/man/man9f/sas_phymap_lookup_uapriv.9f \
+    target=sas_phymap_lookup_ua.9f
+link path=usr/share/man/man9f/sas_phymap_phy2ua.9f \
+    target=sas_phymap_lookup_ua.9f
+link path=usr/share/man/man9f/sas_phymap_phy_add.9f \
+    target=sas_phymap_create.9f
+link path=usr/share/man/man9f/sas_phymap_phy_rem.9f \
+    target=sas_phymap_create.9f
+link path=usr/share/man/man9f/sas_phymap_phys_free.9f \
+    target=sas_phymap_lookup_ua.9f
+link path=usr/share/man/man9f/sas_phymap_phys_next.9f \
+    target=sas_phymap_lookup_ua.9f
+link path=usr/share/man/man9f/sas_phymap_ua2phys.9f \
+    target=sas_phymap_lookup_ua.9f
+link path=usr/share/man/man9f/sas_phymap_ua_free.9f \
+    target=sas_phymap_lookup_ua.9f
+link path=usr/share/man/man9f/sas_phymap_uahasphys.9f \
+    target=sas_phymap_lookup_ua.9f
+link path=usr/share/man/man9f/scsi_device_hba_private_get.9f \
+    target=scsi_address_device.9f
+link path=usr/share/man/man9f/scsi_device_hba_private_set.9f \
+    target=scsi_address_device.9f
+link path=usr/share/man/man9f/scsi_device_unit_address.9f \
+    target=scsi_address_device.9f
 link path=usr/share/man/man9f/scsi_dmafree.9f target=scsi_dmaget.9f
 link path=usr/share/man/man9f/scsi_dname.9f target=scsi_cname.9f
+link path=usr/share/man/man9f/scsi_free_wwnstr.9f target=scsi_wwnstr_to_wwn.9f
 link path=usr/share/man/man9f/scsi_hba_detach.9f \
     target=scsi_hba_attach_setup.9f
 link path=usr/share/man/man9f/scsi_hba_fini.9f target=scsi_hba_init.9f
+link path=usr/share/man/man9f/scsi_hba_iport_find.9f \
+    target=scsi_hba_iport_exist.9f
+link path=usr/share/man/man9f/scsi_hba_iportmap_destroy.9f \
+    target=scsi_hba_iportmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_iportmap_iport_add.9f \
+    target=scsi_hba_iportmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_iportmap_iport_remove.9f \
+    target=scsi_hba_iportmap_create.9f
 link path=usr/share/man/man9f/scsi_hba_pkt_free.9f \
     target=scsi_hba_pkt_alloc.9f
+link path=usr/share/man/man9f/scsi_hba_tgtmap_set_add.9f \
+    target=scsi_hba_tgtmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_tgtmap_set_begin.9f \
+    target=scsi_hba_tgtmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_tgtmap_set_end.9f \
+    target=scsi_hba_tgtmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_tgtmap_set_flush.9f \
+    target=scsi_hba_tgtmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_tgtmap_tgt_add.9f \
+    target=scsi_hba_tgtmap_create.9f
+link path=usr/share/man/man9f/scsi_hba_tgtmap_tgt_remove.9f \
+    target=scsi_hba_tgtmap_create.9f
 link path=usr/share/man/man9f/scsi_hba_tran_free.9f \
     target=scsi_hba_tran_alloc.9f
 link path=usr/share/man/man9f/scsi_ifsetcap.9f target=scsi_ifgetcap.9f
@@ -1278,6 +1334,8 @@ link path=usr/share/man/man9f/scsi_sense_info_uint64.9f \
     target=scsi_ext_sense_fields.9f
 link path=usr/share/man/man9f/scsi_sname.9f target=scsi_cname.9f
 link path=usr/share/man/man9f/scsi_unslave.9f target=scsi_unprobe.9f
+link path=usr/share/man/man9f/scsi_wwn_to_wwnstr.9f \
+    target=scsi_wwnstr_to_wwn.9f
 link path=usr/share/man/man9f/sema_destroy.9f target=semaphore.9f
 link path=usr/share/man/man9f/sema_init.9f target=semaphore.9f
 link path=usr/share/man/man9f/sema_p.9f target=semaphore.9f
@@ -1313,12 +1371,12 @@ link path=usr/share/man/man9f/va_copy.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_end.9f target=va_arg.9f
 link path=usr/share/man/man9f/va_start.9f target=va_arg.9f
 link path=usr/share/man/man9f/vcmn_err.9f target=cmn_err.9f
-link path=usr/share/man/man9f/vmem_xalloc.9f target=vmem_alloc.9f
-link path=usr/share/man/man9f/vmem_free.9f target=vmem_alloc.9f
-link path=usr/share/man/man9f/vmem_xfree.9f target=vmem_alloc.9f
-link path=usr/share/man/man9f/vmem_xcreate.9f target=vmem_create.9f
 link path=usr/share/man/man9f/vmem_destroy.9f target=vmem_create.9f
+link path=usr/share/man/man9f/vmem_free.9f target=vmem_alloc.9f
 link path=usr/share/man/man9f/vmem_size.9f target=vmem_walk.9f
+link path=usr/share/man/man9f/vmem_xalloc.9f target=vmem_alloc.9f
+link path=usr/share/man/man9f/vmem_xcreate.9f target=vmem_create.9f
+link path=usr/share/man/man9f/vmem_xfree.9f target=vmem_alloc.9f
 link path=usr/share/man/man9f/vsnprintf.9f target=sprintf.9f
 link path=usr/share/man/man9f/vsprintf.9f target=sprintf.9f
 link path=usr/share/man/man9f/vzcmn_err.9f target=cmn_err.9f

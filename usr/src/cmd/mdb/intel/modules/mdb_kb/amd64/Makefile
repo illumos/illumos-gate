@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = mdb_kb.so
 MDBTGT = kvm
@@ -35,7 +34,7 @@ include ../../../../../Makefile.cmd.64
 include ../../../../intel/Makefile.amd64
 include ../../../../Makefile.module
 
-C99MODE=	-xc99=%all
+CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
 CPPFLAGS += -DMP -D_MACHDEP -D_MDB -D__xpv

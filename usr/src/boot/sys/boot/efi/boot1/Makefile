@@ -40,12 +40,11 @@ CPPFLAGS +=	-I./../../../../include
 CPPFLAGS +=	-I./../../../sys
 CPPFLAGS +=	-I./../../..
 CPPFLAGS +=	-I../../../../lib/libstand
-CPPFLAGS +=	-DEFI_UFS_BOOT -DUFS1_ONLY
+CPPFLAGS +=	-DUFS1_ONLY
 # CPPFLAGS +=	-DEFI_DEBUG
 
 CPPFLAGS +=	-I./../../zfs/
 CPPFLAGS +=	-I./../../../cddl/boot/zfs/
-CPPFLAGS +=	-DEFI_ZFS_BOOT
 
 # Always add MI sources and REGULAR efi loader bits
 CPPFLAGS +=	-I./../../common

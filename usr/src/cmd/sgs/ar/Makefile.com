@@ -39,7 +39,7 @@ LLDFLAGS =	'-R$$ORIGIN/../../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
 CPPFLAGS=	-I. -I../../include $(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(CCVERBOSE)
-C99MODE=	$(C99_ENABLE)
+CSTD=	$(CSTD_GNU99)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) -lsendfile

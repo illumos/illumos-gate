@@ -55,7 +55,6 @@ driver name=urtw clone_perms="urtw 0666 root sys" perms="* 0666 root sys" \
     alias=usbbda,8198 \
     alias=usbdf6,28
 file path=kernel/drv/$(ARCH64)/urtw group=sys
-file path=kernel/drv/urtw group=sys
 file path=usr/share/man/man7d/urtw.7d
 legacy pkg=SUNWurtw desc="RealTek RTL8187L/B USB 802.11b/g Wireless Driver" \
     name="RealTek RTL8187L/B USB 802.11b/g Wireless Driver"

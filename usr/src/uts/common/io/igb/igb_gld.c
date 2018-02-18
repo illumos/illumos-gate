@@ -28,6 +28,7 @@
  * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include "igb_sw.h"
@@ -887,6 +888,54 @@ igb_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 	}
 }
 
+static int
+igb_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
+{
+	igb_t *igb = arg;
+
+	if (flags != 0)
+		return (EINVAL);
+
+	if (mode != MAC_LED_DEFAULT &&
+	    mode != MAC_LED_IDENT &&
+	    mode != MAC_LED_OFF &&
+	    mode != MAC_LED_ON)
+		return (ENOTSUP);
+
+	if (mode != MAC_LED_DEFAULT && !igb->igb_led_setup) {
+		if (e1000_setup_led(&igb->hw) != E1000_SUCCESS)
+			return (EIO);
+
+		igb->igb_led_setup = B_TRUE;
+	}
+
+	switch (mode) {
+	case MAC_LED_DEFAULT:
+		if (igb->igb_led_setup) {
+			if (e1000_cleanup_led(&igb->hw) != E1000_SUCCESS)
+				return (EIO);
+			igb->igb_led_setup = B_FALSE;
+		}
+		break;
+	case MAC_LED_IDENT:
+		if (e1000_blink_led(&igb->hw) != E1000_SUCCESS)
+			return (EIO);
+		break;
+	case MAC_LED_OFF:
+		if (e1000_led_off(&igb->hw) != E1000_SUCCESS)
+			return (EIO);
+		break;
+	case MAC_LED_ON:
+		if (e1000_led_on(&igb->hw) != E1000_SUCCESS)
+			return (EIO);
+		break;
+	default:
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
 /*
  * Obtain the MAC's capabilities and associated data from
  * the driver.
@@ -948,6 +997,27 @@ igb_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		default:
 			break;
 		}
+		break;
+	}
+
+	case MAC_CAPAB_LED: {
+		mac_capab_led_t *cap_led = cap_data;
+
+		cap_led->mcl_flags = 0;
+		cap_led->mcl_modes = MAC_LED_DEFAULT;
+		if (igb->hw.mac.ops.blink_led != NULL &&
+		    igb->hw.mac.ops.blink_led != e1000_null_ops_generic) {
+			cap_led->mcl_modes |= MAC_LED_IDENT;
+		}
+		if (igb->hw.mac.ops.led_off != NULL &&
+		    igb->hw.mac.ops.led_off != e1000_null_ops_generic) {
+			cap_led->mcl_modes |= MAC_LED_OFF;
+		}
+		if (igb->hw.mac.ops.led_on != NULL &&
+		    igb->hw.mac.ops.led_on != e1000_null_ops_generic) {
+			cap_led->mcl_modes |= MAC_LED_ON;
+		}
+		cap_led->mcl_set = igb_led_set;
 		break;
 	}
 

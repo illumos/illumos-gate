@@ -47,7 +47,6 @@ CPPFLAGS += -I$(SRC)/common/ctf -I../../../common -DCTF_OLD_VERSIONS -D_MDB \
 
 #
 # kmdb is a kernel module, so we'll use the kernel's build flags.
-CFLAGS += $(STAND_FLAGS_32)
 CFLAGS64 += $(STAND_FLAGS_64)
 
 LDFLAGS = $(ZNOVERSION) $(BREDUCE) -M $(MAPFILE) -dy -r

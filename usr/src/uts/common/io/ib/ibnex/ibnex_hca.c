@@ -299,7 +299,7 @@ ibnex_hca_bus_unconfig(dev_info_t *parent,
  *	Configures a particular port node for a IP over IB communication
  *	service.
  *	The format of the input string "devname" is
- *		port=x,pkey=y,protocol=ip,<wanboot options>
+ *		port=x,pkey=y,protocol=ip
  *	Thr format of the node name created here is
  *		ibport@<Port#>,<pkey>,<service name>
  *	where pkey = 0 for port communication service nodes
@@ -469,7 +469,7 @@ ibnex_get_cdip_info(dev_info_t *parent,
 
 static int
 ibnex_hca_bus_config_one(dev_info_t *parent, void *devname,
-ddi_bus_config_op_t op, uint_t *flag, dev_info_t **child)
+    ddi_bus_config_op_t op, uint_t *flag, dev_info_t **child)
 {
 	int			ret = IBNEX_SUCCESS, len, circ, need_bus_config;
 	char 			*device_name, *caddr, *cname;

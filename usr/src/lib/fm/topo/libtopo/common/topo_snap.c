@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -234,6 +235,8 @@ topo_close(topo_hdl_t *thp)
 		ipmi_close(thp->th_ipmi);
 	if (thp->th_smbios != NULL)
 		smbios_close(thp->th_smbios);
+	if (thp->th_pcidb != NULL)
+		pcidb_close(thp->th_pcidb);
 
 	/*
 	 * Clean-up snapshot

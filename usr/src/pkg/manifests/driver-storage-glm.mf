@@ -40,7 +40,6 @@ dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
 driver name=glm alias=pci1000,b class=scsi perms="* 0755 root sys"
 file path=kernel/drv/$(ARCH64)/glm group=sys
-file path=kernel/drv/glm group=sys
 file path=kernel/drv/glm.conf group=sys
 legacy pkg=SUNWpd desc="Drivers for the PCI bus" name="PCI Drivers"
 license cr_Sun license=cr_Sun

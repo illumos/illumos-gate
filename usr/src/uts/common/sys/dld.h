@@ -336,6 +336,16 @@ typedef struct dld_ioc_tranio {
 	uint64_t	dti_buf;
 } dld_ioc_tranio_t;
 
+#define	DLDIOC_GETLED		DLDIOC(0x20)
+#define	DLDIOC_SETLED		DLDIOC(0x21)
+
+typedef struct dld_ioc_led {
+	datalink_id_t	dil_linkid;
+	mac_led_mode_t	dil_supported;
+	mac_led_mode_t	dil_active;
+	uint_t		dil_pad;
+} dld_ioc_led_t;
+
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
 #endif

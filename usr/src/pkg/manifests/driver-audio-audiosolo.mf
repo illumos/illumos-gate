@@ -41,7 +41,6 @@ dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=audiosolo alias=pci125d,1969
 file path=kernel/drv/$(ARCH64)/audiosolo group=sys
-file path=kernel/drv/audiosolo group=sys
 file path=usr/share/man/man7d/audiosolo.7d
 legacy pkg=SUNWaudiosolo desc="SunOS audio device driver for ESS Solo-1" \
     name="ESS Solo-1 Audio Driver"

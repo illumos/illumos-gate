@@ -13,7 +13,7 @@
 # Copyright (c) 2017, Joyent, Inc.
 #
 
-PROG= dltraninfo
+PROG= dltraninfo dlled
 LINTPROGS= $(PROG:%=%.ln)
 
 include ../Makefile.cmd
@@ -22,7 +22,9 @@ ROOTCMDDIR = $(ROOTLIB)/dl
 CFLAGS += $(CCVERBOSE)
 
 dltraninfo :=   LDLIBS += -ldladm -lsff -lnvpair
+dlled :=	LDLIBS += -ldladm
 dltraninfo.ln :=   LDLIBS += -ldladm -lsff -lnvpair
+dlled.ln :=	LDLIBS += -ldladm
 
 ROOTLIBDLFILES = $(PROG:%=$(ROOTLIB)/dl/%)
 

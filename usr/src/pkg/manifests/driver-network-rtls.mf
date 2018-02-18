@@ -47,7 +47,6 @@ driver name=rtls clone_perms="rtls 0666 root sys" perms="* 0666 root sys" \
     alias=pci1186,1300 \
     alias=pci1186,1301
 file path=kernel/drv/$(ARCH64)/rtls group=sys
-$(i386_ONLY)file path=kernel/drv/rtls group=sys
 file path=usr/share/man/man7d/rtls.7d
 legacy pkg=SUNWrtls desc="RTL Fast NIC" name="REALTEK Fast NIC"
 license cr_Sun license=cr_Sun

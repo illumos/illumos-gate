@@ -36,13 +36,11 @@ MACH_DIR	= ../../sparc/common
 PLAT_DIR	= sun4
 BOOT_DIR        = $(SRC)/psm/stand/boot
 
-WANBOOT		= wanboot
 NFSBOOT		= inetboot
 
-WANBOOT_SRC	= $(WANBOOT).c
 NFSBOOT_SRC	= $(NFSBOOT).c
 
-CONF_SRC	= nfsconf.c wbfsconf.c wbcli.c
+CONF_SRC	= nfsconf.c
 
 TOP_CMN_C_SRC	= getoptstr.c
 
@@ -53,9 +51,6 @@ CMN_C_SRC	= heap_kmem.c readfile.c
 MACH_C_SRC	= boot_plat.c bootops.c bootprop.c bootflags.c
 MACH_C_SRC	+= machdep.c sun4u_machdep.c sun4v_machdep.c
 MACH_C_SRC	+= get.c
-
-WANBOOT_OBJS	= $(WANBOOT_SRC:%.c=%.o)
-WANBOOT_L_OBJS	= $(WANBOOT_OBJS:%.o=%.ln)
 
 NFSBOOT_OBJS	= $(NFSBOOT_SRC:%.c=%.o)
 NFSBOOT_L_OBJS	= $(NFSBOOT_OBJS:%.o=%.ln)
@@ -86,8 +81,6 @@ CPPINCS		+= -I$(SRC)/uts/$(PLATFORM)
 CPPINCS		+= -I$(SRC)/uts/sparc/$(ARCHVERS)
 CPPINCS		+= -I$(SRC)/uts/sparc
 CPPINCS		+= -I$(SRC)/uts/$(ARCHMMU)
-CPPINCS		+= -I$(SRC)/common/net/wanboot
-CPPINCS		+= -I$(SRC)/common/net/wanboot/crypt
 CPPINCS		+= -I$(ROOT)/usr/platform/$(PLATFORM)/include
 CPPINCS		+= -I$(ROOT)/usr/include/$(ARCHVERS)
 CPPINCS		+= -I$(PSMSYSHDRDIR)
@@ -110,9 +103,6 @@ PSMPROMLIBDIR	= $(PSMSTANDDIR)/lib/promif/$(TARG_MACH)
 #
 # Install targets
 #
-ROOT_PLAT_SUN4U_WANBOOT= $(ROOT_PLAT_DIR)/sun4u/$(WANBOOT)
-ROOT_PLAT_SUN4V_WANBOOT= $(ROOT_PLAT_DIR)/sun4v/$(WANBOOT)
-
 USR_PLAT_SUN4U_LIB=$(USR_PLAT_DIR)/sun4u/lib
 USR_PLAT_SUN4U_LIB_FS=$(USR_PLAT_SUN4U_LIB)/fs
 USR_PLAT_SUN4U_LIB_FS_NFS=$(USR_PLAT_SUN4U_LIB_FS)/nfs
@@ -144,10 +134,10 @@ LIBSYS_DIR      += $(SYSLIBDIR)
 #
 
 .PARALLEL:	$(OBJS) $(CONF_OBJS) $(MISC_OBJS) $(SRT0_OBJ) \
-		$(WANBOOT_OBJS) $(NFSBOOT_OBJS)
+		$(NFSBOOT_OBJS)
 .PARALLEL:	$(L_OBJS) $(CONF_L_OBJS) $(MISC_L_OBJS) $(SRT0_L_OBJ) \
-		$(WANBOOT_L_OBJS) $(NFSBOOT_L_OBJS)
-.PARALLEL:	$(NFSBOOT) $(WANBOOT)
+		$(NFSBOOT_L_OBJS)
+.PARALLEL:	$(NFSBOOT)
 
 #
 # Note that the presumption is that someone has already done a `make

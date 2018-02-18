@@ -612,6 +612,7 @@ usr/src/lib/libsmbfs/smb/derparse.h
 usr/src/lib/libsmbfs/smb/spnego.c
 usr/src/lib/libsmbfs/smb/spnegoparse.c
 usr/src/lib/libsmbfs/smb/spnegoparse.h
+usr/src/test/libc-tests/tests/regex/testregex.c
 usr/src/test/os-tests/tests/sockfs/conn.c
 usr/src/test/os-tests/tests/sockfs/dgram.c
 usr/src/test/os-tests/tests/sockfs/drop_priv.c

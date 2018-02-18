@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 David Höppner. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef _E1000G_SW_H
@@ -983,6 +983,15 @@ typedef struct e1000g {
 	uint16_t phy_1000t_ctrl;	/* contents of PHY_1000T_CTRL */
 	uint16_t phy_1000t_status;	/* contents of PHY_1000T_STATUS */
 	uint16_t phy_lp_able;		/* contents of PHY_LP_ABILITY */
+
+	/*
+	 * LED Controls
+	 */
+	kmutex_t e1000g_led_lock;
+	boolean_t e1000g_led_setup;
+	boolean_t e1000g_emul_blink;
+	boolean_t e1000g_emul_state;
+	ddi_periodic_t e1000g_blink;
 
 	/*
 	 * FMA capabilities

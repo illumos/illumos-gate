@@ -41,8 +41,6 @@ dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
 file path=kernel/misc/$(ARCH64)/usbs49_fw group=sys mode=0755 \
     original_name=SUNWukspfw:kernel/misc/$(ARCH64)/usbs49_fw preserve=true
-$(i386_ONLY)file path=kernel/misc/usbs49_fw group=sys mode=0755 \
-    original_name=SUNWukspfw:kernel/misc/usbs49_fw preserve=true
 legacy pkg=SUNWukspfw desc="USA49WLC firmware for USB Keyspan serial driver" \
     name="USA49WLC firmware for USB Keyspan serial driver"
 license cr_Sun license=cr_Sun

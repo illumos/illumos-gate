@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -819,14 +819,28 @@ ctf_file_t *
 Plmid_to_ctf(struct ps_prochandle *P, Lmid_t lmid, const char *name)
 {
 	map_info_t *mptr;
-	file_info_t *fptr;
+	file_info_t *fptr = NULL;
 
 	if (name == PR_OBJ_EVERY)
 		return (NULL);
 
-	if ((mptr = object_name_to_map(P, lmid, name)) == NULL ||
-	    (fptr = mptr->map_file) == NULL)
-		return (NULL);
+	/*
+	 * While most idle files are all ELF objects, not all of them have
+	 * mapping information available. There's nothing which would make
+	 * sense to fake up for ET_REL. Instead, if we're being asked for their
+	 * executable object and we know that the information is valid and they
+	 * only have a single file, we jump straight to that file pointer.
+	 */
+	if (P->state == PS_IDLE && name == PR_OBJ_EXEC && P->info_valid == 1 &&
+	    P->num_files == 1 && P->mappings == NULL) {
+		fptr = list_next(&P->file_head);
+	}
+
+	if (fptr == NULL) {
+		if ((mptr = object_name_to_map(P, lmid, name)) == NULL ||
+		    (fptr = mptr->map_file) == NULL)
+			return (NULL);
+	}
 
 	return (Pbuild_file_ctf(P, fptr));
 }
@@ -1544,7 +1558,7 @@ optimize_symtab(sym_tbl_t *symtab)
 
 static Elf *
 build_fake_elf(struct ps_prochandle *P, file_info_t *fptr, GElf_Ehdr *ehdr,
-	size_t *nshdrs, Elf_Data **shdata)
+    size_t *nshdrs, Elf_Data **shdata)
 {
 	size_t shstrndx;
 	Elf_Scn *scn;
@@ -2579,7 +2593,7 @@ Pxlookup_by_name(
  */
 int
 Plookup_by_name(struct ps_prochandle *P, const char *object,
-	const char *symbol, GElf_Sym *symp)
+    const char *symbol, GElf_Sym *symp)
 {
 	return (Pxlookup_by_name(P, PR_LMID_EVERY, object, symbol, symp, NULL));
 }
@@ -2677,7 +2691,7 @@ Pobject_iter_resolved(struct ps_prochandle *P, proc_map_f *func, void *cd)
 
 static char *
 i_Pobjname(struct ps_prochandle *P, boolean_t lmresolve, uintptr_t addr,
-	char *buffer, size_t bufsize)
+    char *buffer, size_t bufsize)
 {
 	map_info_t *mptr;
 	file_info_t *fptr;
@@ -2710,7 +2724,7 @@ i_Pobjname(struct ps_prochandle *P, boolean_t lmresolve, uintptr_t addr,
  */
 char *
 Pobjname(struct ps_prochandle *P, uintptr_t addr,
-	char *buffer, size_t bufsize)
+    char *buffer, size_t bufsize)
 {
 	return (i_Pobjname(P, B_FALSE, addr, buffer, bufsize));
 }
@@ -2725,7 +2739,7 @@ Pobjname(struct ps_prochandle *P, uintptr_t addr,
  */
 char *
 Pobjname_resolved(struct ps_prochandle *P, uintptr_t addr,
-	char *buffer, size_t bufsize)
+    char *buffer, size_t bufsize)
 {
 	return (i_Pobjname(P, B_TRUE, addr, buffer, bufsize));
 }

@@ -61,7 +61,6 @@ LDFLAGS		+= -dy -Ndrv/stmf -Nfs/zfs
 
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 
-C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 #

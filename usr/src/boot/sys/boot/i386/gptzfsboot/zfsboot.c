@@ -613,11 +613,16 @@ probe_partition(void *arg, const char *partname,
 		table = ptable_open(&pa, part->end - part->start + 1,
 		    ppa->secsz, parttblread);
 		if (table != NULL) {
-			ret = ptable_iterate(table, &pa, probe_partition);
+			if (ptable_gettype(table) == PTABLE_VTOC8) {
+				ret = ptable_iterate(table, &pa,
+				    probe_partition);
+				ptable_close(table);
+				close(pa.fd);
+				return (ret);
+			}
 			ptable_close(table);
 		}
 		close(pa.fd);
-		return (ret);
 	}
 
 	if (ppa->offset + part->start == start_sector) {
