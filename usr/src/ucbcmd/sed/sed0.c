@@ -27,6 +27,7 @@
 /*	  All Rights Reserved  	*/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/param.h>
 #include "sed.h"
 
@@ -69,8 +70,6 @@ char	TOOBIG[]	= "Suffix too large - 512 max: %s";
 
 extern int sed;	  /* IMPORTANT flag !!! */
 extern char *comple();
-
-extern char *malloc();
 
 static void dechain(void);
 static void fcomp(void);

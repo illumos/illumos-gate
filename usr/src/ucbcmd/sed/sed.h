@@ -30,8 +30,6 @@
 #ifndef	_SED_H
 #define	_SED_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sed -- stream  editor
  */
@@ -49,7 +47,6 @@
 #define PEEKC()		(*sp)
 #define UNGETC(c)	(--sp)
 #define RETURN(c)	cp = sp; return(ep);
-#define ERROR(c)	regerr(c)
 
 #define CEND	16
 #define CLNUM	14
@@ -153,7 +150,9 @@ char    *compsub();
 struct label    *search();
 char    *gline();
 char    *place();
-void comperr(char *);
+void comperr(char *) __NORETURN;
+void regerr(int) __NORETURN;
+#define ERROR(c)	regerr(c)
 void execute(char *);
 
 #endif	/* _SED_H */
