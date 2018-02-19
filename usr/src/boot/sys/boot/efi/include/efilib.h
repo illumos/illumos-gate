@@ -112,4 +112,7 @@ bool efi_str_to_guid(const char *, EFI_GUID *);
 bool efi_name_to_guid(const char *, EFI_GUID *);
 bool efi_guid_to_name(EFI_GUID *, char **);
 
+/* efipart.c */
+int	efipart_inithandles(void);
+
 #endif /* _LOADER_EFILIB_H */
