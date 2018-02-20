@@ -15,7 +15,7 @@
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 #
 
-SUBDIRS = dis dladm iconv libnvpair_json libsff printf xargs bunyan mergeq \
-	workq grep_xpg4
+SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs bunyan \
+	 mergeq workq grep_xpg4
 
 include $(SRC)/test/Makefile.com

@@ -167,11 +167,11 @@ conv_syminfo_boundto_strings(Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_MSG_INIT(SYMINFO_BT_EXTERN, boundto_nf) };
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_boundto_cf), NULL };
-	static const const conv_ds_t	*ds_cfnp[] = {
+	static const conv_ds_t	*ds_cfnp[] = {
 		CONV_DS_ADDR(ds_boundto_cfnp), NULL };
-	static const const conv_ds_t	*ds_nf[] = {
+	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_boundto_nf), NULL };
 
 	/* Select the strings to use */

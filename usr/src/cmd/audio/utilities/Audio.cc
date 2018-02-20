@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -83,7 +81,7 @@ AudioError Audio::
 RaiseError(
 	AudioError	code,			// error code
 	AudioSeverity	sev,			// error severity
-	char		*msg) const		// additional message
+	const char	*msg) const		// additional message
 {
 	if (code == AUDIO_SUCCESS)
 		return (code);

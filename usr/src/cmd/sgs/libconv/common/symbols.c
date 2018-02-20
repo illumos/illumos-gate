@@ -89,11 +89,11 @@ conv_sym_other_vis_strings(Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_MSG_INIT(STV_DEFAULT, vis_nf) };
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_def[] = {
+	static const conv_ds_t	*ds_def[] = {
 		CONV_DS_ADDR(ds_vis_def), NULL };
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_vis_cf), NULL };
-	static const const conv_ds_t	*ds_nf[] = {
+	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_vis_nf), NULL };
 
 	/* Select the strings to use */
@@ -240,11 +240,11 @@ conv_sym_info_bind_strings(Conv_fmt_flags_t fmt_flags)
 
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_def[] = {
+	static const conv_ds_t	*ds_def[] = {
 		CONV_DS_ADDR(ds_binds_def), NULL };
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_binds_cf), NULL };
-	static const const conv_ds_t	*ds_nf[] = {
+	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_binds_nf), NULL };
 
 
@@ -341,13 +341,13 @@ conv_sym_shndx_strings(Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_VD2, SHN_UNDEF, SHN_XINDEX, shn_nf };
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_def[] = {
+	static const conv_ds_t	*ds_def[] = {
 		CONV_DS_ADDR(ds_shn_def), NULL };
-	static const const conv_ds_t	*ds_cf[] = {
+	static const conv_ds_t	*ds_cf[] = {
 		CONV_DS_ADDR(ds_shn_cf), NULL };
-	static const const conv_ds_t	*ds_cfnp[] = {
+	static const conv_ds_t	*ds_cfnp[] = {
 		CONV_DS_ADDR(ds_shn_cfnp), NULL };
-	static const const conv_ds_t	*ds_nf[] = {
+	static const conv_ds_t	*ds_nf[] = {
 		CONV_DS_ADDR(ds_shn_nf), NULL };
 
 	/* Select the strings to use */

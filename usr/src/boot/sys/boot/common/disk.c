@@ -133,14 +133,16 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 		    od->sectorsize) == 0) {
 			table = ptable_open(&dev, part->end - part->start + 1,
 			    od->sectorsize, ptblread);
-			if (table != NULL) {
+			if (table != NULL &&
+			    (ptable_gettype(table) == PTABLE_BSD ||
+			    ptable_gettype(table) == PTABLE_VTOC8)) {
 				sprintf(line, "  %s%s", pa->prefix, pname);
 				bsd.dev = &dev;
 				bsd.prefix = line;
 				bsd.verbose = pa->verbose;
 				ret = ptable_iterate(table, &bsd, ptable_print);
-				ptable_close(table);
 			}
+			ptable_close(table);
 			disk_close(&dev);
 		}
 	}
