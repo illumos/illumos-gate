@@ -26,6 +26,10 @@
  * $FreeBSD$
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #ifndef _VRTC_H_
 #define	_VRTC_H_
 
@@ -46,5 +50,9 @@ int vrtc_addr_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
     uint32_t *val);
 int vrtc_data_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
     uint32_t *val);
+
+#ifndef __FreeBSD__
+void vrtc_localize_resources(struct vrtc *);
+#endif
 
 #endif

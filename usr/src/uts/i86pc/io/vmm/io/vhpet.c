@@ -27,6 +27,10 @@
  * $FreeBSD$
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -762,3 +766,12 @@ vhpet_getcap(struct vm_hpet_cap *cap)
 	cap->capabilities = vhpet_capabilities();
 	return (0);
 }
+#ifndef __FreeBSD__
+void
+vhpet_localize_resources(struct vhpet *vhpet)
+{
+	for (uint_t i = 0; i < VHPET_NUM_TIMERS; i++) {
+		vmm_glue_callout_localize(&vhpet->timer[i].callout);
+	}
+}
+#endif /* __FreeBSD */

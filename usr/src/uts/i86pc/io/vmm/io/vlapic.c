@@ -36,7 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -1687,3 +1687,11 @@ vlapic_set_tmr_level(struct vlapic *vlapic, uint32_t dest, bool phys,
 	VLAPIC_CTR1(vlapic, "vector %d set to level-triggered", vector);
 	vlapic_set_tmr(vlapic, vector, true);
 }
+
+#ifndef __FreeBSD__
+void
+vlapic_localize_resources(struct vlapic *vlapic)
+{
+	vmm_glue_callout_localize(&vlapic->callout);
+}
+#endif /* __FreeBSD */

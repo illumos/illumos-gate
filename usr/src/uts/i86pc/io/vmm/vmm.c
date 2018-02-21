@@ -36,7 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -1735,6 +1735,39 @@ vm_exit_astpending(struct vm *vm, int vcpuid, uint64_t rip)
 	vmm_stat_incr(vm, vcpuid, VMEXIT_ASTPENDING, 1);
 }
 
+#ifndef __FreeBSD__
+/*
+ * Some vmm resources, such as the lapic, may have CPU-specific resources
+ * allocated to them which would benefit from migration onto the host CPU which
+ * is processing the vcpu state.  When running on a host CPU different from
+ * previous activity, attempt to localize resources when possible.
+ */
+static void
+vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
+{
+	if (vcpu->hostcpu == curcpu)
+		return;
+
+	/*
+	 * The cyclic backing the LAPIC timer is nice to have local as
+	 * reprogramming operations would otherwise require a crosscall.
+	 */
+	vlapic_localize_resources(vcpu->vlapic);
+
+	/*
+	 * Localize system-wide resources to the primary boot vCPU.  While any
+	 * of the other vCPUs may access them, it keeps the potential interrupt
+	 * footprint constrained to CPUs involved with this instance.
+	 */
+	if (vcpu == &vm->vcpu[0]) {
+		vhpet_localize_resources(vm->vhpet);
+		vrtc_localize_resources(vm->vrtc);
+	}
+
+}
+#endif /* __FreeBSD */
+
+
 int
 vm_run(struct vm *vm, struct vm_run *vmrun)
 {
@@ -1783,6 +1816,8 @@ restart:
 #endif
 
 #ifndef	__FreeBSD__
+	vm_localize_resources(vm, vcpu);
+
 	installctx(curthread, vcpu, save_guest_fpustate,
 	    restore_guest_fpustate, NULL, NULL, NULL, NULL);
 #endif

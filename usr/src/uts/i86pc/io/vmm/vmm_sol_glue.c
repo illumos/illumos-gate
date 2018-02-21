@@ -36,7 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -259,13 +259,28 @@ mtx_destroy(struct mtx *mtx)
 void
 critical_enter(void)
 {
+	kthread_t *tp = curthread;
+
 	kpreempt_disable();
+	if (tp->t_preempt == 1) {
+		/*
+		 * Avoid extra work when nested calls to this are made and only
+		 * set affinity on the top-level entry.  This also means only
+		 * removing the affinity in critical_exit() when at last call.
+		 */
+		thread_affinity_set(tp, CPU_CURRENT);
+	}
 }
 
 void
 critical_exit(void)
 {
+	kthread_t *tp = curthread;
+
 	kpreempt_enable();
+	if (tp->t_preempt == 0) {
+		thread_affinity_clear(tp);
+	}
 }
 
 struct unrhdr;
@@ -407,6 +422,14 @@ vmm_glue_callout_drain(struct callout *c)
 	mutex_exit(&cpu_lock);
 
 	return (0);
+}
+
+void
+vmm_glue_callout_localize(struct callout *c)
+{
+	mutex_enter(&cpu_lock);
+	cyclic_move_here(c->c_cyc_id);
+	mutex_exit(&cpu_lock);
 }
 
 void

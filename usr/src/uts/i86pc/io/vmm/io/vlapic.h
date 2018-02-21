@@ -26,6 +26,10 @@
  * $FreeBSD$
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #ifndef _VLAPIC_H_
 #define	_VLAPIC_H_
 
@@ -106,4 +110,9 @@ void vlapic_icrtmr_write_handler(struct vlapic *vlapic);
 void vlapic_dcr_write_handler(struct vlapic *vlapic);
 void vlapic_lvt_write_handler(struct vlapic *vlapic, uint32_t offset);
 void vlapic_self_ipi_handler(struct vlapic *vlapic, uint64_t val);
+
+#ifndef __FreeBSD__
+void vlapic_localize_resources(struct vlapic *vlapic);
+#endif
+
 #endif	/* _VLAPIC_H_ */

@@ -24,6 +24,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1017,3 +1021,11 @@ vrtc_cleanup(struct vrtc *vrtc)
 	callout_drain(&vrtc->callout);
 	free(vrtc, M_VRTC);
 }
+
+#ifndef __FreeBSD__
+void
+vrtc_localize_resources(struct vrtc *vrtc)
+{
+	vmm_glue_callout_localize(&vrtc->callout);
+}
+#endif /* __FreeBSD */

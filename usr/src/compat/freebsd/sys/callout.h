@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_CALLOUT_H_
@@ -40,6 +41,9 @@ int	vmm_glue_callout_reset_sbt(struct callout *c, sbintime_t sbt,
     sbintime_t pr, void (*func)(void *), void *arg, int flags);
 int	vmm_glue_callout_stop(struct callout *c);
 int	vmm_glue_callout_drain(struct callout *c);
+
+/* illumos-custom function for resource locality optimization */
+void	vmm_glue_callout_localize(struct callout *c);
 
 static __inline void
 callout_init(struct callout *c, int mpsafe)
