@@ -120,8 +120,8 @@ inet_matchaddr(const void *sa, const char *name)
 			IN6_V4MAPPED_TO_IPADDR(claddr6, ipaddr4);
 			claddr4 = ntohl(ipaddr4);
 		}
-		/*FALLTHROUGH*/
 	}
+	/*FALLTHROUGH*/
 	case AF_INET: {
 		int i;
 		uint32_t hcaddr4 = 0, mask4;

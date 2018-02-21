@@ -324,7 +324,7 @@ prune_propagations(const char *e0class, const struct ipath *e0ipp)
 
 static struct fme *
 newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
-	fmd_case_t *fmcase, fmd_event_t *ffep, nvlist_t *nvl)
+    fmd_case_t *fmcase, fmd_event_t *ffep, nvlist_t *nvl)
 {
 	struct cfgdata *cfgdata;
 	int init_size;
@@ -4155,7 +4155,7 @@ causes_test(struct fme *fmep, struct event *ep,
 
 static enum fme_state
 hypothesise(struct fme *fmep, struct event *ep,
-	unsigned long long at_latest_by, unsigned long long *pdelay)
+    unsigned long long at_latest_by, unsigned long long *pdelay)
 {
 	enum fme_state rtr, otr;
 	unsigned long long my_delay;

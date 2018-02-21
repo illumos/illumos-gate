@@ -895,6 +895,7 @@ ns_sprintrrf(const u_char *msg, size_t msglen,
 				T(addstr(" )", 2, &buf, &buflen));
 		}
 	}
+	/* FALLTHROUGH */
 
 	case ns_t_ipseckey: {
 		int n;
@@ -986,6 +987,7 @@ ns_sprintrrf(const u_char *msg, size_t msglen,
 				T(addstr(" )", 2, &buf, &buflen));
 		}
 	}
+	/* FALLTHROUGH */
 
 	case ns_t_hip: {
 		unsigned int i, hip_len, algorithm, key_len;
