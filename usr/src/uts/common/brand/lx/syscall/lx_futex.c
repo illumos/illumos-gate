@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -366,7 +366,7 @@ futex_hashout(fwaiter_t *fwp)
  */
 static int
 futex_wait(memid_t *memid, caddr_t addr,
-    int val, timespec_t *timeout, uint32_t bits)
+    int val, timespec_t *timeout, uint32_t bits, boolean_t hrtime)
 {
 	kthread_t *t = curthread;
 	lx_lwp_data_t *lwpd = ttolxlwp(t);
@@ -406,8 +406,24 @@ futex_wait(memid_t *memid, caddr_t addr,
 
 	err = 0;
 	while ((fwp->fw_woken == 0) && (err == 0)) {
-		ret = cv_waituntil_sig(&fwp->fw_cv, &futex_hash[index].fh_lock,
-		    timeout, timechanged);
+		/*
+		 * If hrtime is set, we interpret timeout to be absolute and
+		 * CLOCK_MONOTONIC-based; otherwise we treat it as absolute
+		 * and CLOCK_REALTIME-based. (Strictly speaking -- or at least
+		 * in as much as the term "strictly" means anything in the
+		 * semantic shambles that is Linux -- FUTEX_WAIT defines its
+		 * timeout to be CLOCK_MONOTONIC-based but limited by system
+		 * clock interval; we treat these semantics as effectively
+		 * CLOCK_REALTIME.)
+		 */
+		if (hrtime) {
+			ret = cv_timedwait_sig_hrtime(&fwp->fw_cv,
+			    &futex_hash[index].fh_lock, ts2hrt(timeout));
+		} else {
+			ret = cv_waituntil_sig(&fwp->fw_cv,
+			    &futex_hash[index].fh_lock, timeout, timechanged);
+		}
+
 		if (ret < 0) {
 			err = set_errno(ETIMEDOUT);
 		} else if (ret == 0) {
@@ -727,15 +743,20 @@ out:
 }
 
 /*
- * Copy in the timeout provided by the application and convert it
- * to an absolute timeout.  Sadly, this is complicated by the different
- * timeout of semantics of FUTEX_WAIT vs. FUTEX_WAIT_BITSET vs. FUTEX_LOCK_PI
- * (Yes, you read that correctly; all three of these have different timeout
- * semantics; see the block comment at the top of the file for commentary
- * on this inanity.)
+ * Copy in the timeout provided by the application and convert it to an
+ * absolute timeout.  Sadly, this is complicated by the different timeout
+ * semantics of FUTEX_WAIT vs. FUTEX_WAIT_BITSET vs. FUTEX_LOCK_PI. (Yes, you
+ * read that correctly; all three of these have different timeout semantics;
+ * see the block comment at the top of the file for commentary on this
+ * inanity.)  This function doesn't attempt to clean up all of these
+ * differences, however; we will only copy the timer value in, perform some
+ * basic sanity checking, and (if it's an operation operating on a relative
+ * time, which is to say FUTEX_WAIT) adjust it to be absolute.  All other
+ * nuances (namely, the resolution and clock of the timeout) are left up to
+ * the caller.
  */
 static int
-get_timeout(void *lx_timeout, timestruc_t *timeout, int cmd, int clock)
+get_timeout(void *lx_timeout, timestruc_t *timeout, int cmd)
 {
 	timestruc_t now;
 
@@ -762,44 +783,6 @@ get_timeout(void *lx_timeout, timestruc_t *timeout, int cmd, int clock)
 		 */
 		gethrestime(&now);
 		timespecadd(timeout, &now);
-	} else if (cmd == FUTEX_LOCK_PI) {
-		/*
-		 * We've been given an absolute time, nothing to do.
-		 */
-		/* EMPTY */
-	} else {
-		/*
-		 * This is a FUTEX_WAIT_BITSET operation, which (1) specifies
-		 * the timeout as an absolute rather than a relative timeout
-		 * and (2) allows for different clock types to be specified.
-		 * If the clock is CLOCK_REALTIME, we actually have nothing
-		 * to do -- but if this is CLOCK_MONOTONIC, we need to convert
-		 * our absolute time back into a relative time and then add
-		 * it to our current hrestime to get an absolute CLOCK_REALTIME
-		 * timeout.
-		 */
-		if (clock == CLOCK_MONOTONIC) {
-			/*
-			 * Get our current time, and subtract it from our
-			 * timeout to get the relative value.
-			 */
-			hrt2ts(gethrtime(), &now);
-			timespecsub(timeout, &now);
-
-			/*
-			 * If our timeout is in the past, set it to be 0.
-			 */
-			if (timeout->tv_sec < 0) {
-				timeout->tv_sec = 0;
-				timeout->tv_nsec = 0;
-			}
-
-			/*
-			 * Add the relative time back into the current time.
-			 */
-			gethrestime(&now);
-			timespecadd(timeout, &now);
-		}
 	}
 
 	return (0);
@@ -1293,9 +1276,7 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 	/* Copy in the timeout structure from userspace. */
 	if ((cmd == FUTEX_WAIT || cmd == FUTEX_WAIT_BITSET ||
 	    cmd == FUTEX_LOCK_PI) && lx_timeout != NULL) {
-		rval = get_timeout((timespec_t *)lx_timeout, &timeout, cmd,
-		    op & FUTEX_CLOCK_REALTIME ? CLOCK_REALTIME :
-		    CLOCK_MONOTONIC);
+		rval = get_timeout((timespec_t *)lx_timeout, &timeout, cmd);
 
 		if (rval != 0)
 			return (set_errno(rval));
@@ -1348,11 +1329,12 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 	switch (cmd) {
 	case FUTEX_WAIT:
 		rval = futex_wait(&memid, (void *)addr, val,
-		    tptr, FUTEX_BITSET_MATCH_ANY);
+		    tptr, FUTEX_BITSET_MATCH_ANY, B_FALSE);
 		break;
 
 	case FUTEX_WAIT_BITSET:
-		rval = futex_wait(&memid, (void *)addr, val, tptr, val3);
+		rval = futex_wait(&memid, (void *)addr, val, tptr, val3,
+		    (op & FUTEX_CLOCK_REALTIME) ? B_FALSE : B_TRUE);
 		break;
 
 	case FUTEX_WAKE:
