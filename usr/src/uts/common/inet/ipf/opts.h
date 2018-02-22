@@ -12,8 +12,13 @@
 #ifndef	__OPTS_H__
 #define	__OPTS_H__
 
-#ifndef	SOLARIS
-#define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#ifdef	SOLARIS
+#undef	SOLARIS
+#endif
+#if (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#define	SOLARIS	(1)
+#else
+#define	SOLARIS	(0)
 #endif
 #define	OPT_REMOVE	0x000001
 #define	OPT_DEBUG	0x000002
