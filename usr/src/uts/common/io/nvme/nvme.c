@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
@@ -1084,7 +1084,7 @@ nvme_check_generic_cmd_status(nvme_cmd_t *cmd)
 		/* Invalid Namespace or Format */
 		if (!cmd->nc_dontpanic)
 			dev_err(cmd->nc_nvme->n_dip, CE_PANIC,
-			    "programming error: " "invalid NS/format in cmd %p",
+			    "programming error: invalid NS/format in cmd %p",
 			    (void *)cmd);
 		return (EINVAL);
 
@@ -1855,6 +1855,13 @@ nvme_get_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t *res,
 	cmd->nc_sqe.sqe_cdw10 = feature;
 	cmd->nc_sqe.sqe_cdw11 = *res;
 
+	/*
+	 * For some of the optional features there doesn't seem to be a method
+	 * of detecting whether it is supported other than using it.  This will
+	 * cause "Invalid Field in Command" error, which is normally considered
+	 * a programming error.  Set the nc_dontpanic flag to override the panic
+	 * in nvme_check_generic_cmd_status().
+	 */
 	switch (feature) {
 	case NVME_FEAT_ARBITRATION:
 	case NVME_FEAT_POWER_MGMT:
@@ -1865,7 +1872,6 @@ nvme_get_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t *res,
 	case NVME_FEAT_INTR_VECT:
 	case NVME_FEAT_WRITE_ATOM:
 	case NVME_FEAT_ASYNC_EVENT:
-	case NVME_FEAT_PROGRESS:
 		break;
 
 	case NVME_FEAT_WRITE_CACHE:
@@ -1877,18 +1883,10 @@ nvme_get_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t *res,
 		if (!nvme->n_lba_range_supported)
 			goto fail;
 
-		/*
-		 * The LBA Range Type feature is optional. There doesn't seem
-		 * be a method of detecting whether it is supported other than
-		 * using it. This will cause a "invalid field in command" error,
-		 * which is normally considered a programming error and causes
-		 * panic in nvme_check_generic_cmd_status().
-		 */
 		cmd->nc_dontpanic = B_TRUE;
 		cmd->nc_sqe.sqe_nsid = nsid;
 		ASSERT(bufsize != NULL);
 		*bufsize = NVME_LBA_RANGE_BUFSIZE;
-
 		break;
 
 	case NVME_FEAT_AUTO_PST:
@@ -1897,6 +1895,13 @@ nvme_get_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t *res,
 
 		ASSERT(bufsize != NULL);
 		*bufsize = NVME_AUTO_PST_BUFSIZE;
+		break;
+
+	case NVME_FEAT_PROGRESS:
+		if (!nvme->n_progress_supported)
+			goto fail;
+
+		cmd->nc_dontpanic = B_TRUE;
 		break;
 
 	default:
@@ -1933,15 +1938,34 @@ nvme_get_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t *res,
 	nvme_admin_cmd(cmd, nvme_admin_cmd_timeout);
 
 	if ((ret = nvme_check_cmd_status(cmd)) != 0) {
-		if (feature == NVME_FEAT_LBA_RANGE &&
-		    cmd->nc_cqe.cqe_sf.sf_sct == NVME_CQE_SCT_GENERIC &&
-		    cmd->nc_cqe.cqe_sf.sf_sc == NVME_CQE_SC_GEN_INV_FLD)
-			nvme->n_lba_range_supported = B_FALSE;
-		else
+		boolean_t known = B_TRUE;
+
+		/* Check if this is unsupported optional feature */
+		if (cmd->nc_cqe.cqe_sf.sf_sct == NVME_CQE_SCT_GENERIC &&
+		    cmd->nc_cqe.cqe_sf.sf_sc == NVME_CQE_SC_GEN_INV_FLD) {
+			switch (feature) {
+			case NVME_FEAT_LBA_RANGE:
+				nvme->n_lba_range_supported = B_FALSE;
+				break;
+			case NVME_FEAT_PROGRESS:
+				nvme->n_progress_supported = B_FALSE;
+				break;
+			default:
+				known = B_FALSE;
+				break;
+			}
+		} else {
+			known = B_FALSE;
+		}
+
+		/* Report the error otherwise */
+		if (!known) {
 			dev_err(nvme->n_dip, CE_WARN,
 			    "!GET FEATURES %d failed with sct = %x, sc = %x",
 			    feature, cmd->nc_cqe.cqe_sf.sf_sct,
 			    cmd->nc_cqe.cqe_sf.sf_sc);
+		}
+
 		goto fail;
 	}
 
@@ -2519,6 +2543,12 @@ nvme_init(nvme_t *nvme)
 	if (NVME_VERSION_ATLEAST(&nvme->n_version, 1, 1))
 		nvme->n_auto_pst_supported =
 		    nvme->n_idctl->id_apsta.ap_sup == 0 ? B_FALSE : B_TRUE;
+
+	/*
+	 * Assume Software Progress Marker feature is supported.  If it isn't
+	 * this will be set to B_FALSE by nvme_get_features().
+	 */
+	nvme->n_progress_supported = B_TRUE;
 
 	/*
 	 * Identify Namespaces
