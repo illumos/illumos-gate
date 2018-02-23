@@ -22,16 +22,9 @@
 #include <sys/varargs.h>
 #include <sys/zone.h>
 
-/*
- * /dev names:
- *      /dev/vmmctl         - control device
- *      /dev/vmm/<name>     - vm devices
- */
-#define	VMM_DRIVER_NAME		"vmm"
-#define	VMM_CTL_MINOR_NODE	"ctl"
-#define	VMM_CTL_MINOR		0
-
 #ifdef	_KERNEL
+
+#define	VMM_CTL_MINOR	0
 
 /*
  * Rather than creating whole character devices for devmem mappings, they are

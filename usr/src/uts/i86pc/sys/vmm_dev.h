@@ -36,7 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VMM_DEV_H_
@@ -420,6 +420,8 @@ enum {
 #define	VMM_IOC_BASE		(('V' << 16) | ('M' << 8))
 #define	VMM_CREATE_VM		(VMM_IOC_BASE | 0x01)
 #define	VMM_DESTROY_VM		(VMM_IOC_BASE | 0x02)
+
+#define	VMM_CTL_DEV		"/dev/vmmctl"
 
 #endif
 

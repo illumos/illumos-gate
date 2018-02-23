@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -108,10 +109,9 @@ struct vmctx {
 static int
 vm_do_ctl(int cmd, const char *name)
 {
-	const char vmm_ctl[] = "/devices/pseudo/vmm@0:ctl";
 	int ctl_fd;
 
-	ctl_fd = open(vmm_ctl, O_EXCL | O_RDWR);
+	ctl_fd = open(VMM_CTL_DEV, O_EXCL | O_RDWR);
 	if (ctl_fd < 0) {
 		return (-1);
 	}

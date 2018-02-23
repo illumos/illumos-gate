@@ -46,14 +46,23 @@
 #include "vmm_stat.h"
 #include "vm/vm_glue.h"
 
+/*
+ * Locking order:
+ *
+ * vmmdev_mtx (driver holds etc.)
+ *  ->sdev_contents (/dev/vmm)
+ *   vmm_mtx (VM list)
+ */
+
 static dev_info_t *vmm_dip;
 static void *vmm_statep;
 
 static kmutex_t		vmmdev_mtx;
-static list_t		vmmdev_list;
 static id_space_t	*vmmdev_minors;
 static uint_t		vmmdev_inst_count = 0;
 static boolean_t	vmmdev_load_failure;
+static kmutex_t		vmm_mtx;
+static list_t		vmmdev_list;
 
 static const char *vmmdev_hvm_name = "bhyve";
 
@@ -1203,7 +1212,7 @@ vmm_lookup(const char *name)
 	list_t *vml = &vmmdev_list;
 	vmm_softc_t *sc;
 
-	ASSERT(MUTEX_HELD(&vmmdev_mtx));
+	ASSERT(MUTEX_HELD(&vmm_mtx));
 
 	for (sc = list_head(vml); sc != NULL; sc = list_next(vml, sc)) {
 		if (strcmp(sc->vmm_name, name) == 0) {
@@ -1231,8 +1240,11 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		return (ENXIO);
 	}
 
+	mutex_enter(&vmm_mtx);
+
 	/* Look for duplicates names */
 	if (vmm_lookup(name) != NULL) {
+		mutex_exit(&vmm_mtx);
 		vmmdev_mod_decr();
 		mutex_exit(&vmmdev_mtx);
 		return (EEXIST);
@@ -1243,6 +1255,7 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		for (sc = list_head(&vmmdev_list); sc != NULL;
 		    sc = list_next(&vmmdev_list, sc)) {
 			if (sc->vmm_zone == curzone) {
+				mutex_exit(&vmm_mtx);
 				vmmdev_mod_decr();
 				mutex_exit(&vmmdev_mtx);
 				return (EINVAL);
@@ -1277,6 +1290,7 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		vmm_zsd_add_vm(sc);
 
 		list_insert_tail(&vmmdev_list, sc);
+		mutex_exit(&vmm_mtx);
 		mutex_exit(&vmmdev_mtx);
 		return (0);
 	}
@@ -1288,6 +1302,8 @@ fail:
 	if (sc != NULL) {
 		ddi_soft_state_free(vmm_statep, minor);
 	}
+
+	mutex_exit(&vmm_mtx);
 	mutex_exit(&vmmdev_mtx);
 	return (error);
 }
@@ -1509,6 +1525,7 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 	minor_t		minor;
 
 	ASSERT(MUTEX_HELD(&vmmdev_mtx));
+	ASSERT(MUTEX_HELD(&vmm_mtx));
 
 	if (sc->vmm_is_open) {
 		return (EBUSY);
@@ -1544,7 +1561,9 @@ vmm_do_vm_destroy(vmm_softc_t *sc, boolean_t clean_zsd)
 	int 		err;
 
 	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	err = vmm_do_vm_destroy_locked(sc, clean_zsd);
+	mutex_exit(&vmm_mtx);
 	mutex_exit(&vmmdev_mtx);
 
 	return (err);
@@ -1558,13 +1577,16 @@ vmmdev_do_vm_destroy(const char *name, cred_t *cr)
 	int		err;
 
 	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 
 	if ((sc = vmm_lookup(name)) == NULL) {
+		mutex_exit(&vmm_mtx);
 		mutex_exit(&vmmdev_mtx);
 		return (ENOENT);
 	}
 	err = vmm_do_vm_destroy_locked(sc, B_TRUE);
 
+	mutex_exit(&vmm_mtx);
 	mutex_exit(&vmmdev_mtx);
 
 	return (err);
@@ -1731,7 +1753,7 @@ out:
 static sdev_plugin_validate_t
 vmm_sdev_validate(sdev_ctx_t ctx)
 {
-	const char *name;
+	const char *name = sdev_ctx_name(ctx);
 	vmm_softc_t *sc;
 	sdev_plugin_validate_t ret;
 	minor_t minor;
@@ -1741,20 +1763,14 @@ vmm_sdev_validate(sdev_ctx_t ctx)
 
 	VERIFY3S(sdev_ctx_minor(ctx, &minor), ==, 0);
 
-	name = sdev_ctx_name(ctx);
-	if (strcmp(name, VMM_CTL_MINOR_NODE) == 0) {
-		ASSERT3U(minor, ==, VMM_CTL_MINOR);
-		return (SDEV_VTOR_VALID);
-	}
-
-	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	if ((sc = vmm_lookup(name)) == NULL)
 		ret = SDEV_VTOR_INVALID;
 	else if (sc->vmm_minor != minor)
 		ret = SDEV_VTOR_STALE;
 	else
 		ret = SDEV_VTOR_VALID;
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 
 	return (ret);
 }
@@ -1775,12 +1791,7 @@ vmm_sdev_filldir(sdev_ctx_t ctx)
 	if (vmm_dip == NULL)
 		return (0);
 
-	mutex_enter(&vmmdev_mtx);
-
-	ret = sdev_plugin_mknod(ctx, VMM_CTL_MINOR_NODE, S_IFCHR | 0600,
-	    makedevice(ddi_driver_major(vmm_dip), VMM_CTL_MINOR));
-	if (ret != 0 && ret != EEXIST)
-		goto out;
+	mutex_enter(&vmm_mtx);
 
 	for (sc = list_head(&vmmdev_list); sc != NULL;
 	    sc = list_next(&vmmdev_list, sc)) {
@@ -1799,7 +1810,7 @@ vmm_sdev_filldir(sdev_ctx_t ctx)
 	ret = 0;
 
 out:
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 	return (ret);
 }
 
@@ -1854,7 +1865,7 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Create control node.  Other nodes will be created on demand.
 	 */
-	if (ddi_create_minor_node(dip, VMM_CTL_MINOR_NODE, S_IFCHR,
+	if (ddi_create_minor_node(dip, "ctl", S_IFCHR,
 	    VMM_CTL_MINOR, DDI_PSEUDO, 0) != 0) {
 		return (DDI_FAILURE);
 	}
@@ -1890,10 +1901,20 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* Ensure that all resources have been cleaned up */
 	mutex_enter(&vmmdev_mtx);
 
-	if (!list_is_empty(&vmmdev_list) || vmmdev_inst_count != 0) {
+	if (vmmdev_inst_count != 0) {
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
+
+	mutex_enter(&vmm_mtx);
+
+	if (!list_is_empty(&vmmdev_list)) {
+		mutex_exit(&vmm_mtx);
+		mutex_exit(&vmmdev_mtx);
+		return (DDI_FAILURE);
+	}
+
+	mutex_exit(&vmm_mtx);
 
 	/* XXX: This needs updating */
 	if (!vmm_arena_fini()) {
@@ -1908,7 +1929,7 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	vmm_sdev_hdl = NULL;
 
 	/* Remove the control node. */
-	ddi_remove_minor_node(dip, VMM_CTL_MINOR_NODE);
+	ddi_remove_minor_node(dip, "ctl");
 	vmm_dip = NULL;
 	vmm_sol_glue_cleanup();
 	mutex_exit(&vmmdev_mtx);
@@ -1965,6 +1986,7 @@ _init(void)
 	int	error;
 
 	mutex_init(&vmmdev_mtx, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&vmm_mtx, NULL, MUTEX_DRIVER, NULL);
 	list_create(&vmmdev_list, sizeof (vmm_softc_t),
 	    offsetof(vmm_softc_t, vmm_node));
 	vmmdev_minors = id_space_create("vmm_minors", VMM_CTL_MINOR + 1,
@@ -1980,6 +2002,7 @@ _init(void)
 	error = mod_install(&modlinkage);
 	if (error) {
 		ddi_soft_state_fini(&vmm_statep);
+		vmm_zsd_fini();
 	}
 
 	return (error);
