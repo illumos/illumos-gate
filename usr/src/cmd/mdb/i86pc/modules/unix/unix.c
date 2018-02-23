@@ -1010,18 +1010,18 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	cr2 = kmdb_unix_getcr2();
 	cr3 = kmdb_unix_getcr3();
 	cr4 = kmdb_unix_getcr4();
-	mdb_printf("%%cr0 = 0x%08x <%b>\n", cr0, cr0, cr0_flag_bits);
-	mdb_printf("%%cr2 = 0x%08x <%a>\n", cr2, cr2);
+	mdb_printf("%%cr0 = 0x%lx <%b>\n", cr0, cr0, cr0_flag_bits);
+	mdb_printf("%%cr2 = 0x%lx <%a>\n", cr2, cr2);
 
 	if ((cr4 & CR4_PCIDE)) {
-		mdb_printf("%%cr3 = 0x%08x <pfn:0x%lx pcid:%u>\n",
+		mdb_printf("%%cr3 = 0x%lx <pfn:0x%lx pcid:%lu>\n", cr3,
 		    cr3 >> MMU_PAGESHIFT, cr3 & MMU_PAGEOFFSET);
 	} else {
-		mdb_printf("%%cr3 = 0x%08x <pfn:0x%lx flags:%b>\n", cr3,
+		mdb_printf("%%cr3 = 0x%lx <pfn:0x%lx flags:%b>\n", cr3,
 		    cr3 >> MMU_PAGESHIFT, cr3, cr3_flag_bits);
 	}
 
-	mdb_printf("%%cr4 = 0x%08x <%b>\n", cr4, cr4, cr4_flag_bits);
+	mdb_printf("%%cr4 = 0x%lx <%b>\n", cr4, cr4, cr4_flag_bits);
 
 	return (DCMD_OK);
 }

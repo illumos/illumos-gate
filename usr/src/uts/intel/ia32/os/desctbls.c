@@ -1259,9 +1259,6 @@ init_desctbls(void)
 {
 	user_desc_t *gdt;
 	desctbr_t idtr;
-#if defined(__amd64)
-	extern uint64_t kpti_safe_cr3;
-#endif
 
 	/*
 	 * Allocate IDT and TSS structures on unique pages for better

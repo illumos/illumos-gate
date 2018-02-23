@@ -115,7 +115,7 @@ typedef	struct rm_platter {
 struct cpu_tables {
 	/* IST stacks */
 	char		ct_stack1[DEFAULTSTKSZ];	/* dblfault */
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	char		ct_stack2[DEFAULTSTKSZ];	/* nmi */
 	char		ct_stack3[DEFAULTSTKSZ];	/* mce */
 #endif

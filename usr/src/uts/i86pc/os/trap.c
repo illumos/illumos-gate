@@ -1847,7 +1847,7 @@ instr_is_sys_rtt(caddr_t pc)
 {
 	extern void _sys_rtt(), _sys_rtt_end();
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	extern void tr_sysc_ret_start(), tr_sysc_ret_end();
 	extern void tr_intr_ret_start(), tr_intr_ret_end();
 

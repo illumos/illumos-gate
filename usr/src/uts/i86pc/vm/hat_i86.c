@@ -301,10 +301,10 @@ static x86pte_t hati_update_pte(htable_t *ht, uint_t entry, x86pte_t expected,
 	x86pte_t new);
 
 /*
- * The kernel address space exists in all HATs. To implement this the
- * kernel reserves a fixed number of entries in the topmost level(s) of page
- * tables. The values are setup during startup and then copied to every user
- * hat created by hat_alloc(). This means that kernelbase must be:
+ * The kernel address space exists in all non-HAT_COPIED HATs. To implement this
+ * the kernel reserves a fixed number of entries in the topmost level(s) of page
+ * tables. The values are setup during startup and then copied to every user hat
+ * created by hat_alloc(). This means that kernelbase must be:
  *
  *	  4Meg aligned for 32 bit kernels
  *	512Gig aligned for x86_64 64 bit kernel
@@ -376,12 +376,6 @@ struct hatstats hatstat;
  * incorrect.
  */
 int pt_kern;
-
-/*
- * useful stuff for atomic access/clearing/setting REF/MOD/RO bits in page_t's.
- */
-extern void atomic_orb(uchar_t *addr, uchar_t val);
-extern void atomic_andb(uchar_t *addr, uchar_t val);
 
 #ifndef __xpv
 extern pfn_t memseg_get_start(struct memseg *);
@@ -494,7 +488,6 @@ hat_alloc(struct as *as)
 	hat->hat_num_copied = 0;
 	hat->hat_flags = 0;
 #else	/* __xpv */
-#if defined(__amd64)
 
 	/*
 	 * All processes use HAT_COPIED on the 64-bit kernel if KPTI is
@@ -521,17 +514,6 @@ hat_alloc(struct as *as)
 		hat->hat_flags = 0;
 		HATSTAT_INC(hs_hat_normal64);
 	}
-#elif defined(__i386)
-	use_copied = mmu.pae_hat;
-	if (use_copied) {
-		use_hat32_cache = B_TRUE;
-		hat->hat_num_copied = mmu.num_copied_ents;
-		HATSTAT_INC(hs_hat_copied32);
-	} else {
-		use_hat32_cache = B_FALSE;
-		hat->hat_num_copied = 0;
-	}
-#endif
 #endif	/* __xpv */
 	if (use_copied) {
 		hat->hat_flags |= HAT_COPIED;
@@ -830,7 +812,6 @@ mmu_calc_user_slots(void)
 	 */
 	mmu.top_level_uslots = ent + 1;
 
-#if defined(__amd64)
 	/*
 	 * When running 32-bit compatability processes on a 64-bit kernel, we
 	 * will only need to use one slot.
@@ -844,16 +825,6 @@ mmu_calc_user_slots(void)
 	 */
 	mmu.num_copied_ents = mmu.top_level_uslots;
 	mmu.num_copied_ents32 = 4;
-#elif defined(__xpv)
-	/*
-	 *
-	 */
-	if (mmu.pae_hat) {
-		mmu.num_copied_ents = 4;
-	} else {
-		mmu.num_copied_ents = 0;
-	}
-#endif
 }
 
 /*
@@ -875,7 +846,7 @@ mmu_init(void)
 	    (getcr4() & CR4_PGE) != 0)
 		mmu.pt_global = PT_GLOBAL;
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	/*
 	 * The 64-bit x86 kernel has split user/kernel page tables. As such we
 	 * cannot have the global bit set. The simplest way for us to deal with
@@ -1302,8 +1273,6 @@ hat_pcp_teardown(cpu_t *cpu)
 	++r;					\
 }
 
-extern uint64_t kpti_safe_cr3;
-
 /*
  * Finish filling in the kernel hat.
  * Pre fill in all top level kernel page table entries for the kernel's
@@ -1420,9 +1389,10 @@ hat_init_finish(void)
 #endif
 	hat_kmap_init((uintptr_t)segmap_start, size);
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	ASSERT3U(kas.a_hat->hat_htable->ht_pfn, !=, PFN_INVALID);
-	ASSERT3U(kpti_safe_cr3, ==, MAKECR3(kas.a_hat->hat_htable->ht_pfn));
+	ASSERT3U(kpti_safe_cr3, ==,
+	    MAKECR3(kas.a_hat->hat_htable->ht_pfn, PCID_KERNEL));
 #endif
 }
 
@@ -1517,7 +1487,7 @@ hat_pcp_update(cpu_t *cpu, const hat_t *hat)
 }
 
 static void
-reset_kpti(struct kpti_frame *fr, uint64_t kcr3)
+reset_kpti(struct kpti_frame *fr, uint64_t kcr3, uint64_t ucr3)
 {
 	ASSERT3U(fr->kf_tr_flag, ==, 0);
 #if DEBUG
@@ -1533,7 +1503,7 @@ reset_kpti(struct kpti_frame *fr, uint64_t kcr3)
 	    offsetof(struct kpti_frame, kf_unused));
 
 	fr->kf_kernel_cr3 = kcr3;
-	fr->kf_user_cr3 = 0;
+	fr->kf_user_cr3 = ucr3;
 	fr->kf_tr_ret_rsp = (uintptr_t)&fr->kf_tr_rsp;
 
 	fr->kf_lower_redzone = 0xdeadbeefdeadbeef;
@@ -1541,18 +1511,83 @@ reset_kpti(struct kpti_frame *fr, uint64_t kcr3)
 	fr->kf_upper_redzone = 0xdeadbeefdeadbeef;
 }
 
+#ifdef __xpv
+static void
+hat_switch_xen(hat_t *hat)
+{
+	struct mmuext_op t[2];
+	uint_t retcnt;
+	uint_t opcnt = 1;
+	uint64_t newcr3;
+
+	ASSERT(!(hat->hat_flags & HAT_COPIED));
+	ASSERT(!(getcr4() & CR4_PCIDE));
+
+	newcr3 = MAKECR3((uint64_t)hat->hat_htable->ht_pfn, PCID_NONE);
+
+	t[0].cmd = MMUEXT_NEW_BASEPTR;
+	t[0].arg1.mfn = mmu_btop(pa_to_ma(newcr3));
+
+	/*
+	 * There's an interesting problem here, as to what to actually specify
+	 * when switching to the kernel hat.  For now we'll reuse the kernel hat
+	 * again.
+	 */
+	t[1].cmd = MMUEXT_NEW_USER_BASEPTR;
+	if (hat == kas.a_hat)
+		t[1].arg1.mfn = mmu_btop(pa_to_ma(newcr3));
+	else
+		t[1].arg1.mfn = pfn_to_mfn(hat->hat_user_ptable);
+	++opcnt;
+
+	if (HYPERVISOR_mmuext_op(t, opcnt, &retcnt, DOMID_SELF) < 0)
+		panic("HYPERVISOR_mmu_update() failed");
+	ASSERT(retcnt == opcnt);
+}
+#endif /* __xpv */
+
 /*
  * Switch to a new active hat, maintaining bit masks to track active CPUs.
  *
- * On the 32-bit PAE hypervisor, %cr3 is a 64-bit value, on metal it
- * remains a 32-bit value.
+ * With KPTI, all our HATs except kas should be using PCP.  Thus, to switch
+ * HATs, we need to copy over the new user PTEs, then set our trampoline context
+ * as appropriate.
+ *
+ * If lacking PCID, we then load our new cr3, which will flush the TLB: we may
+ * have established userspace TLB entries via kernel accesses, and these are no
+ * longer valid.  We have to do this eagerly, as we just deleted this CPU from
+ * ->hat_cpus, so would no longer see any TLB shootdowns.
+ *
+ * With PCID enabled, things get a little more complicated.  We would like to
+ * keep TLB context around when entering and exiting the kernel, and to do this,
+ * we partition the TLB into two different spaces:
+ *
+ * PCID_KERNEL is defined as zero, and used both by kas and all other address
+ * spaces while in the kernel (post-trampoline).
+ *
+ * PCID_USER is used while in userspace.  Therefore, userspace cannot use any
+ * lingering PCID_KERNEL entries to kernel addresses it should not be able to
+ * read.
+ *
+ * The trampoline cr3s are set not to invalidate on a mov to %cr3. This means if
+ * we take a journey through the kernel without switching HATs, we have some
+ * hope of keeping our TLB state around.
+ *
+ * On a hat switch, rather than deal with any necessary flushes on the way out
+ * of the trampolines, we do them upfront here. If we're switching from kas, we
+ * shouldn't need any invalidation.
+ *
+ * Otherwise, we can have stale userspace entries for both PCID_USER (what
+ * happened before we move onto the kcr3) and PCID_KERNEL (any subsequent
+ * userspace accesses such as ddi_copyin()).  Since setcr3() won't do these
+ * flushes on its own in PCIDE, we'll do a non-flushing load and then
+ * invalidate everything.
  */
 void
 hat_switch(hat_t *hat)
 {
-	uint64_t	newcr3;
-	cpu_t		*cpu = CPU;
-	hat_t		*old = cpu->cpu_current_hat;
+	cpu_t *cpu = CPU;
+	hat_t *old = cpu->cpu_current_hat;
 
 	/*
 	 * set up this information first, so we don't miss any cross calls
@@ -1572,54 +1607,63 @@ hat_switch(hat_t *hat)
 	}
 	cpu->cpu_current_hat = hat;
 
-	/*
-	 * now go ahead and load cr3
-	 */
+#if defined(__xpv)
+	hat_switch_xen(hat);
+#else
+	struct hat_cpu_info *info = cpu->cpu_m.mcpu_hat_info;
+	uint64_t pcide = getcr4() & CR4_PCIDE;
+	uint64_t kcr3, ucr3;
+	pfn_t tl_kpfn;
+	ulong_t	flag;
+
+	EQUIV(kpti_enable, !mmu.pt_global);
+
 	if (hat->hat_flags & HAT_COPIED) {
 		hat_pcp_update(cpu, hat);
-		newcr3 = MAKECR3(cpu->cpu_hat_info->hci_pcp_l3pfn);
+		tl_kpfn = info->hci_pcp_l3pfn;
 	} else {
-		newcr3 = MAKECR3((uint64_t)hat->hat_htable->ht_pfn);
+		IMPLY(kpti_enable, hat == kas.a_hat);
+		tl_kpfn = hat->hat_htable->ht_pfn;
 	}
-#ifdef __xpv
-	{
-		struct mmuext_op t[2];
-		uint_t retcnt;
-		uint_t opcnt = 1;
 
-		t[0].cmd = MMUEXT_NEW_BASEPTR;
-		t[0].arg1.mfn = mmu_btop(pa_to_ma(newcr3));
+	if (pcide) {
+		ASSERT(kpti_enable);
 
-		/*
-		 * There's an interesting problem here, as to what to
-		 * actually specify when switching to the kernel hat.
-		 * For now we'll reuse the kernel hat again.
-		 */
-		t[1].cmd = MMUEXT_NEW_USER_BASEPTR;
-		if (hat == kas.a_hat)
-			t[1].arg1.mfn = mmu_btop(pa_to_ma(newcr3));
-		else
-			t[1].arg1.mfn = pfn_to_mfn(hat->hat_user_ptable);
-		++opcnt;
+		kcr3 = MAKECR3(tl_kpfn, PCID_KERNEL) | CR3_NOINVL_BIT;
+		ucr3 = MAKECR3(info->hci_user_l3pfn, PCID_USER) |
+		    CR3_NOINVL_BIT;
 
-		if (HYPERVISOR_mmuext_op(t, opcnt, &retcnt, DOMID_SELF) < 0)
-			panic("HYPERVISOR_mmu_update() failed");
-		ASSERT(retcnt == opcnt);
+		setcr3(kcr3);
+		if (old != kas.a_hat)
+			mmu_flush_tlb(FLUSH_TLB_ALL, NULL);
+	} else {
+		kcr3 = MAKECR3(tl_kpfn, PCID_NONE);
+		ucr3 = kpti_enable ?
+		    MAKECR3(info->hci_user_l3pfn, PCID_NONE) :
+		    0;
 
+		setcr3(kcr3);
 	}
-#else
-	setcr3(newcr3);
-	reset_kpti(&cpu->cpu_m.mcpu_kpti, newcr3);
-	reset_kpti(&cpu->cpu_m.mcpu_kpti_flt, newcr3);
-	reset_kpti(&cpu->cpu_m.mcpu_kpti_dbg, newcr3);
 
-	if (kpti_enable == 1) {
-		newcr3 = MAKECR3(cpu->cpu_hat_info->hci_user_l3pfn);
-		cpu->cpu_m.mcpu_kpti.kf_user_cr3 = newcr3;
-		cpu->cpu_m.mcpu_kpti_dbg.kf_user_cr3 = newcr3;
-		cpu->cpu_m.mcpu_kpti_flt.kf_user_cr3 = newcr3;
-	}
-#endif
+	/*
+	 * We will already be taking shootdowns for our new HAT, and as KPTI
+	 * invpcid emulation needs to use kf_user_cr3, make sure we don't get
+	 * any cross calls while we're inconsistent.  Note that it's harmless to
+	 * have a *stale* kf_user_cr3 (we just did a FLUSH_TLB_ALL), but a
+	 * *zero* kf_user_cr3 is not going to go very well.
+	 */
+	if (pcide)
+		flag = intr_clear();
+
+	reset_kpti(&cpu->cpu_m.mcpu_kpti, kcr3, ucr3);
+	reset_kpti(&cpu->cpu_m.mcpu_kpti_flt, kcr3, ucr3);
+	reset_kpti(&cpu->cpu_m.mcpu_kpti_dbg, kcr3, ucr3);
+
+	if (pcide)
+		intr_restore(flag);
+
+#endif /* !__xpv */
+
 	ASSERT(cpu == CPU);
 }
 
@@ -2490,29 +2534,17 @@ hat_unlock_region(struct hat *hat, caddr_t addr, size_t len,
 	panic("No shared region support on x86");
 }
 
-/*
- * A range of virtual pages for purposes of demapping.
- */
-typedef struct range_info {
-	uintptr_t	rng_va; 	/* address of page */
-	ulong_t		rng_cnt; 	/* number of pages in range */
-	level_t		rng_level; 	/* page table level */
-} range_info_t;
-
 #if !defined(__xpv)
 /*
  * Cross call service routine to demap a range of virtual
  * pages on the current CPU or flush all mappings in TLB.
  */
-/*ARGSUSED*/
 static int
 hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 {
+	_NOTE(ARGUNUSED(a3));
 	hat_t		*hat = (hat_t *)a1;
-	range_info_t	*range = (range_info_t *)a2;
-	size_t		len = (size_t)a3;
-	caddr_t		addr = (caddr_t)range->rng_va;
-	size_t		pgsz = LEVEL_SIZE(range->rng_level);
+	tlb_range_t	*range = (tlb_range_t *)a2;
 
 	/*
 	 * If the target hat isn't the kernel and this CPU isn't operating
@@ -2521,20 +2553,16 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 	if (hat != kas.a_hat && hat != CPU->cpu_current_hat)
 		return (0);
 
-	/*
-	 * For a normal address, we flush a range of contiguous mappings
-	 */
-	if ((uintptr_t)addr != DEMAP_ALL_ADDR) {
-		for (size_t i = 0; i < len; i += pgsz)
-			mmu_tlbflush_entry(addr + i);
+	if (range->tr_va != DEMAP_ALL_ADDR) {
+		mmu_flush_tlb(FLUSH_TLB_RANGE, range);
 		return (0);
 	}
 
 	/*
-	 * Otherwise we reload cr3 to effect a complete TLB flush.
+	 * We are flushing all of userspace.
 	 *
-	 * A reload of cr3 when using PCP also means we must also recopy in the
-	 * pte values from the struct hat
+	 * When using PCP, we first need to update this CPU's idea of the PCP
+	 * PTEs.
 	 */
 	if (hat->hat_flags & HAT_COPIED) {
 #if defined(__amd64)
@@ -2543,34 +2571,13 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 		reload_pae32(hat, CPU);
 #endif
 	}
-	reload_cr3();
+
+	mmu_flush_tlb(FLUSH_TLB_NONGLOBAL, NULL);
 	return (0);
 }
 
-/*
- * Flush all TLB entries, including global (ie. kernel) ones.
- */
-static void
-flush_all_tlb_entries(void)
-{
-	ulong_t cr4 = getcr4();
-
-	if (cr4 & CR4_PGE) {
-		setcr4(cr4 & ~(ulong_t)CR4_PGE);
-		setcr4(cr4);
-
-		/*
-		 * 32 bit PAE also needs to always reload_cr3()
-		 */
-		if (mmu.max_level == 2)
-			reload_cr3();
-	} else {
-		reload_cr3();
-	}
-}
-
-#define	TLB_CPU_HALTED	(01ul)
-#define	TLB_INVAL_ALL	(02ul)
+#define	TLBIDLE_CPU_HALTED	(0x1UL)
+#define	TLBIDLE_INVAL_ALL	(0x2UL)
 #define	CAS_TLB_INFO(cpu, old, new)	\
 	atomic_cas_ulong((ulong_t *)&(cpu)->cpu_m.mcpu_tlb_info, (old), (new))
 
@@ -2580,7 +2587,8 @@ flush_all_tlb_entries(void)
 void
 tlb_going_idle(void)
 {
-	atomic_or_ulong((ulong_t *)&CPU->cpu_m.mcpu_tlb_info, TLB_CPU_HALTED);
+	atomic_or_ulong((ulong_t *)&CPU->cpu_m.mcpu_tlb_info,
+	    TLBIDLE_CPU_HALTED);
 }
 
 /*
@@ -2597,19 +2605,19 @@ tlb_service(void)
 	 * We only have to do something if coming out of being idle.
 	 */
 	tlb_info = CPU->cpu_m.mcpu_tlb_info;
-	if (tlb_info & TLB_CPU_HALTED) {
+	if (tlb_info & TLBIDLE_CPU_HALTED) {
 		ASSERT(CPU->cpu_current_hat == kas.a_hat);
 
 		/*
 		 * Atomic clear and fetch of old state.
 		 */
 		while ((found = CAS_TLB_INFO(CPU, tlb_info, 0)) != tlb_info) {
-			ASSERT(found & TLB_CPU_HALTED);
+			ASSERT(found & TLBIDLE_CPU_HALTED);
 			tlb_info = found;
 			SMT_PAUSE();
 		}
-		if (tlb_info & TLB_INVAL_ALL)
-			flush_all_tlb_entries();
+		if (tlb_info & TLBIDLE_INVAL_ALL)
+			mmu_flush_tlb(FLUSH_TLB_ALL, NULL);
 	}
 }
 #endif /* !__xpv */
@@ -2619,13 +2627,12 @@ tlb_service(void)
  * all CPUs using a given hat.
  */
 void
-hat_tlb_inval_range(hat_t *hat, range_info_t *range)
+hat_tlb_inval_range(hat_t *hat, tlb_range_t *in_range)
 {
 	extern int	flushes_require_xcalls;	/* from mp_startup.c */
 	cpuset_t	justme;
 	cpuset_t	cpus_to_shootdown;
-	uintptr_t	va = range->rng_va;
-	size_t		len = range->rng_cnt << LEVEL_SHIFT(range->rng_level);
+	tlb_range_t	range = *in_range;
 #ifndef __xpv
 	cpuset_t	check_cpus;
 	cpu_t		*cpup;
@@ -2646,7 +2653,7 @@ hat_tlb_inval_range(hat_t *hat, range_info_t *range)
 	 */
 	if (hat->hat_flags & HAT_SHARED) {
 		hat = kas.a_hat;
-		va = DEMAP_ALL_ADDR;
+		range.tr_va = DEMAP_ALL_ADDR;
 	}
 
 	/*
@@ -2654,15 +2661,16 @@ hat_tlb_inval_range(hat_t *hat, range_info_t *range)
 	 */
 	if (panicstr || !flushes_require_xcalls) {
 #ifdef __xpv
-		if (va == DEMAP_ALL_ADDR) {
+		if (range.tr_va == DEMAP_ALL_ADDR) {
 			xen_flush_tlb();
 		} else {
-			for (size_t i = 0; i < len; i += MMU_PAGESIZE)
-				xen_flush_va((caddr_t)(va + i));
+			for (size_t i = 0; i < TLB_RANGE_LEN(&range);
+			    i += MMU_PAGESIZE) {
+				xen_flush_va((caddr_t)(range.tr_va + i));
+			}
 		}
 #else
-		(void) hati_demap_func((xc_arg_t)hat,
-		    (xc_arg_t)range, (xc_arg_t)len);
+		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)&range, 0);
 #endif
 		return;
 	}
@@ -2696,13 +2704,13 @@ hat_tlb_inval_range(hat_t *hat, range_info_t *range)
 			continue;
 
 		tlb_info = cpup->cpu_m.mcpu_tlb_info;
-		while (tlb_info == TLB_CPU_HALTED) {
-			(void) CAS_TLB_INFO(cpup, TLB_CPU_HALTED,
-			    TLB_CPU_HALTED | TLB_INVAL_ALL);
+		while (tlb_info == TLBIDLE_CPU_HALTED) {
+			(void) CAS_TLB_INFO(cpup, TLBIDLE_CPU_HALTED,
+			    TLBIDLE_CPU_HALTED | TLBIDLE_INVAL_ALL);
 			SMT_PAUSE();
 			tlb_info = cpup->cpu_m.mcpu_tlb_info;
 		}
-		if (tlb_info == (TLB_CPU_HALTED | TLB_INVAL_ALL)) {
+		if (tlb_info == (TLBIDLE_CPU_HALTED | TLBIDLE_INVAL_ALL)) {
 			HATSTAT_INC(hs_tlb_inval_delayed);
 			CPUSET_DEL(cpus_to_shootdown, c);
 		}
@@ -2713,31 +2721,33 @@ hat_tlb_inval_range(hat_t *hat, range_info_t *range)
 	    CPUSET_ISEQUAL(cpus_to_shootdown, justme)) {
 
 #ifdef __xpv
-		if (va == DEMAP_ALL_ADDR) {
+		if (range.tr_va == DEMAP_ALL_ADDR) {
 			xen_flush_tlb();
 		} else {
-			for (size_t i = 0; i < len; i += MMU_PAGESIZE)
-				xen_flush_va((caddr_t)(va + i));
+			for (size_t i = 0; i < TLB_RANGE_LEN(&range);
+			    i += MMU_PAGESIZE) {
+				xen_flush_va((caddr_t)(range.tr_va + i));
+			}
 		}
 #else
-		(void) hati_demap_func((xc_arg_t)hat,
-		    (xc_arg_t)range, (xc_arg_t)len);
+		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)&range, 0);
 #endif
 
 	} else {
 
 		CPUSET_ADD(cpus_to_shootdown, CPU->cpu_id);
 #ifdef __xpv
-		if (va == DEMAP_ALL_ADDR) {
+		if (range.tr_va == DEMAP_ALL_ADDR) {
 			xen_gflush_tlb(cpus_to_shootdown);
 		} else {
-			for (size_t i = 0; i < len; i += MMU_PAGESIZE) {
-				xen_gflush_va((caddr_t)(va + i),
+			for (size_t i = 0; i < TLB_RANGE_LEN(&range);
+			    i += MMU_PAGESIZE) {
+				xen_gflush_va((caddr_t)(range.tr_va + i),
 				    cpus_to_shootdown);
 			}
 		}
 #else
-		xc_call((xc_arg_t)hat, (xc_arg_t)range, (xc_arg_t)len,
+		xc_call((xc_arg_t)hat, (xc_arg_t)&range, 0,
 		    CPUSET2BV(cpus_to_shootdown), hati_demap_func);
 #endif
 
@@ -2751,10 +2761,10 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 	/*
 	 * Create range for a single page.
 	 */
-	range_info_t range;
-	range.rng_va = va;
-	range.rng_cnt = 1; /* one page */
-	range.rng_level = MIN_PAGE_LEVEL; /* pages are MMU_PAGESIZE */
+	tlb_range_t range;
+	range.tr_va = va;
+	range.tr_cnt = 1; /* one page */
+	range.tr_level = MIN_PAGE_LEVEL; /* pages are MMU_PAGESIZE */
 
 	hat_tlb_inval_range(hat, &range);
 }
@@ -2927,17 +2937,17 @@ hat_unload(hat_t *hat, caddr_t addr, size_t len, uint_t flags)
  * for the specified ranges of contiguous pages.
  */
 static void
-handle_ranges(hat_t *hat, hat_callback_t *cb, uint_t cnt, range_info_t *range)
+handle_ranges(hat_t *hat, hat_callback_t *cb, uint_t cnt, tlb_range_t *range)
 {
 	while (cnt > 0) {
 		--cnt;
 		hat_tlb_inval_range(hat, &range[cnt]);
 
 		if (cb != NULL) {
-			cb->hcb_start_addr = (caddr_t)range[cnt].rng_va;
+			cb->hcb_start_addr = (caddr_t)range[cnt].tr_va;
 			cb->hcb_end_addr = cb->hcb_start_addr;
-			cb->hcb_end_addr += range[cnt].rng_cnt <<
-			    LEVEL_SHIFT(range[cnt].rng_level);
+			cb->hcb_end_addr += range[cnt].tr_cnt <<
+			    LEVEL_SHIFT(range[cnt].tr_level);
 			cb->hcb_function(cb);
 		}
 	}
@@ -2967,7 +2977,7 @@ hat_unload_callback(
 	htable_t	*ht = NULL;
 	uint_t		entry;
 	uintptr_t	contig_va = (uintptr_t)-1L;
-	range_info_t	r[MAX_UNLOAD_CNT];
+	tlb_range_t	r[MAX_UNLOAD_CNT];
 	uint_t		r_cnt = 0;
 	x86pte_t	old_pte;
 
@@ -3007,14 +3017,14 @@ hat_unload_callback(
 		 * We'll do the call backs for contiguous ranges
 		 */
 		if (vaddr != contig_va ||
-		    (r_cnt > 0 && r[r_cnt - 1].rng_level != ht->ht_level)) {
+		    (r_cnt > 0 && r[r_cnt - 1].tr_level != ht->ht_level)) {
 			if (r_cnt == MAX_UNLOAD_CNT) {
 				handle_ranges(hat, cb, r_cnt, r);
 				r_cnt = 0;
 			}
-			r[r_cnt].rng_va = vaddr;
-			r[r_cnt].rng_cnt = 0;
-			r[r_cnt].rng_level = ht->ht_level;
+			r[r_cnt].tr_va = vaddr;
+			r[r_cnt].tr_cnt = 0;
+			r[r_cnt].tr_level = ht->ht_level;
 			++r_cnt;
 		}
 
@@ -3032,7 +3042,7 @@ hat_unload_callback(
 		ASSERT(ht->ht_level <= mmu.max_page_level);
 		vaddr += LEVEL_SIZE(ht->ht_level);
 		contig_va = vaddr;
-		++r[r_cnt - 1].rng_cnt;
+		++r[r_cnt - 1].tr_cnt;
 	}
 	if (ht)
 		htable_release(ht);
@@ -3061,14 +3071,14 @@ hat_flush_range(hat_t *hat, caddr_t va, size_t size)
 #ifdef __xpv
 			xen_flush_tlb();
 #else
-			flush_all_tlb_entries();
+			mmu_flush_tlb(FLUSH_TLB_ALL, NULL);
 #endif
 			break;
 		}
 #ifdef __xpv
 		xen_flush_va(va);
 #else
-		mmu_tlbflush_entry(va);
+		mmu_flush_tlb_kpage((uintptr_t)va);
 #endif
 		va += sz;
 	}
@@ -3734,7 +3744,7 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 
 	/*
 	 * flush the TLBs - since we're probably dealing with MANY mappings
-	 * we do just one CR3 reload.
+	 * we just do a full invalidation.
 	 */
 	if (!(hat->hat_flags & HAT_FREEING) && need_demaps)
 		hat_tlb_inval(hat, DEMAP_ALL_ADDR);
@@ -4553,7 +4563,7 @@ hat_mempte_release(caddr_t addr, hat_mempte_t pte_pa)
 			*pteptr = 0;
 		else
 			*(x86pte32_t *)pteptr = 0;
-		mmu_tlbflush_entry(addr);
+		mmu_flush_tlb_kpage((uintptr_t)addr);
 		x86pte_mapout();
 	}
 #endif
@@ -4614,7 +4624,7 @@ hat_mempte_remap(
 			*(x86pte_t *)pteptr = pte;
 		else
 			*(x86pte32_t *)pteptr = (x86pte32_t)pte;
-		mmu_tlbflush_entry(addr);
+		mmu_flush_tlb_kpage((uintptr_t)addr);
 		x86pte_mapout();
 	}
 #endif
@@ -5125,7 +5135,7 @@ hati_cpu_punchin(cpu_t *cpu, uintptr_t va, uint_t attrs)
 	ASSERT3S(kpti_enable, ==, 1);
 	ASSERT3P(cpu_hat, !=, NULL);
 	ASSERT3U(cpu_hat->hat_flags & HAT_PCP, ==, HAT_PCP);
-	ASSERT3U(va & (MMU_PAGESIZE - 1), ==, 0);
+	ASSERT3U(va & MMU_PAGEOFFSET, ==, 0);
 
 	pfn = hat_getpfnum(kas.a_hat, (caddr_t)va);
 	VERIFY3U(pfn, !=, PFN_INVALID);

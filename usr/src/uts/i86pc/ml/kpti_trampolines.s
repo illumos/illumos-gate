@@ -92,6 +92,9 @@
  * We do not do any stack pivoting for syscalls (and we leave SYSENTER's
  * existing %rsp pivot untouched) -- instead we spill registers into
  * %gs:CPU_KPTI_* as we need to.
+ *
+ * Note that the normal %cr3 values do not cause invalidations with PCIDE - see
+ * hat_switch().
  */
 
 /*
@@ -704,6 +707,35 @@ tr_intr_ret_end:
 	MKIVCT(244);	MKIVCT(245);	MKIVCT(246);	MKIVCT(247);
 	MKIVCT(248);	MKIVCT(249);	MKIVCT(250);	MKIVCT(251);
 	MKIVCT(252);	MKIVCT(253);	MKIVCT(254);	MKIVCT(255);
+
+	/*
+	 * We're PCIDE, but we don't have INVPCID.  The only way to invalidate a
+	 * PCID other than the current one, then, is to load its cr3 then
+	 * invlpg.  But loading kf_user_cr3 means we can longer access our
+	 * caller's text mapping (or indeed, its stack).  So this little helper
+	 * has to live within our trampoline text region.
+	 *
+	 * Called as tr_mmu_flush_user_range(addr, len, pgsz, cr3)
+	 */
+	ENTRY_NP(tr_mmu_flush_user_range)
+	push	%rbx
+	/* When we read cr3, it never has the NOINVL bit set. */
+	mov	%cr3, %rax
+	movq	$CR3_NOINVL_BIT, %rbx
+	orq	%rbx, %rax
+
+	mov	%rcx, %cr3
+	add	%rdi, %rsi
+.align	ASM_ENTRY_ALIGN
+1:
+	invlpg	(%rdi)
+	add	%rdx, %rdi
+	cmp	%rsi, %rdi
+	jb	1b
+	mov	%rax, %cr3
+	pop	%rbx
+	retq
+	SET_SIZE(tr_mmu_flush_user_range)
 
 .align MMU_PAGESIZE
 .global kpti_tramp_end

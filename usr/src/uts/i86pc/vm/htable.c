@@ -137,7 +137,7 @@ xen_flush_va(caddr_t va)
 	uint_t count;
 
 	if (IN_XPV_PANIC()) {
-		mmu_tlbflush_entry((caddr_t)va);
+		mmu_flush_tlb_page((uintptr_t)va);
 	} else {
 		t.cmd = MMUEXT_INVLPG_LOCAL;
 		t.arg1.linear_addr = (uintptr_t)va;
@@ -154,7 +154,7 @@ xen_gflush_va(caddr_t va, cpuset_t cpus)
 	uint_t count;
 
 	if (IN_XPV_PANIC()) {
-		mmu_tlbflush_entry((caddr_t)va);
+		mmu_flush_tlb_page((uintptr_t)va);
 		return;
 	}
 
@@ -1989,7 +1989,10 @@ x86pte_mapin(pfn_t pfn, uint_t index, htable_t *ht)
 	 * Disable preemption and grab the CPU's hci_mutex
 	 */
 	kpreempt_disable();
+
 	ASSERT(CPU->cpu_hat_info != NULL);
+	ASSERT(!(getcr4() & CR4_PCIDE));
+
 	mutex_enter(&CPU->cpu_hat_info->hci_mutex);
 	x = PWIN_TABLE(CPU->cpu_id);
 	pteptr = (x86pte_t *)PWIN_PTE_VA(x);
@@ -2024,7 +2027,7 @@ x86pte_mapin(pfn_t pfn, uint_t index, htable_t *ht)
 			else
 				*(x86pte32_t *)pteptr = newpte;
 			XPV_DISALLOW_PAGETABLE_UPDATES();
-			mmu_tlbflush_entry((caddr_t)(PWIN_VA(x)));
+			mmu_flush_tlb_kpage((uintptr_t)PWIN_VA(x));
 		}
 	}
 	return (PT_INDEX_PTR(PWIN_VA(x), index));
@@ -2137,7 +2140,7 @@ x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 				xen_flush_va((caddr_t)addr);
 			else
 #endif
-				mmu_tlbflush_entry((caddr_t)addr);
+				mmu_flush_tlb_page(addr);
 			goto done;
 		}
 
@@ -2380,6 +2383,8 @@ x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
 	} else {
 		uint_t x = PWIN_SRC(CPU->cpu_id);
 
+		ASSERT(!(getcr4() & CR4_PCIDE));
+
 		/*
 		 * Finish defining the src pagetable mapping
 		 */
@@ -2390,7 +2395,7 @@ x86pte_copy(htable_t *src, htable_t *dest, uint_t entry, uint_t count)
 			*pteptr = pte;
 		else
 			*(x86pte32_t *)pteptr = pte;
-		mmu_tlbflush_entry((caddr_t)(PWIN_VA(x)));
+		mmu_flush_tlb_kpage((uintptr_t)PWIN_VA(x));
 	}
 
 	/*

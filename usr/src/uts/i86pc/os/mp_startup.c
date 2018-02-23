@@ -1796,6 +1796,8 @@ mp_startup_common(boolean_t boot)
 	 */
 	cp->cpu_flags &= ~(CPU_POWEROFF | CPU_QUIESCED);
 
+	enable_pcid();
+
 	/*
 	 * Setup this processor for XSAVE.
 	 */

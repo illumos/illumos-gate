@@ -42,7 +42,6 @@ extern void atomic_andb(uint8_t *addr, uint8_t value);
 extern void atomic_orb(uint8_t *addr, uint8_t value);
 extern void atomic_inc16(uint16_t *addr);
 extern void atomic_dec16(uint16_t *addr);
-extern void mmu_tlbflush_entry(caddr_t addr);
 
 /*
  * Each hardware page table has an htable_t describing it.

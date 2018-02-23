@@ -143,11 +143,7 @@ struct kpti_frame {
  *
  * There is a CTASSERT in os/intr.c that checks these numbers.
  */
-#if defined(__amd64)
 #define	MACHCPU_SIZE	(572 + 1584)
-#else
-#define	MACHCPU_SIZE	(452 + 1328)
-#endif
 #define	MACHCPU_PAD	(MMU_PAGESIZE - MACHCPU_SIZE)
 #define	MACHCPU_PAD2	(MMU_PAGESIZE - 16 - 3 * sizeof (struct kpti_frame))
 

@@ -265,13 +265,16 @@ kaif_set_register(const char *regname, kreg_t val)
 static boolean_t
 kaif_toxic_text(uintptr_t addr)
 {
-	static GElf_Sym toxic_syms[1] = { 0, };
+	static GElf_Sym toxic_syms[2] = { 0, };
 	size_t i;
 
 	if (toxic_syms[0].st_name == NULL) {
 		if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
 		    "tr_iret_user", &toxic_syms[0], NULL) != 0)
 			warn("couldn't find tr_iret_user\n");
+		if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+		    "tr_mmu_flush_user_range", &toxic_syms[1], NULL) != 0)
+			warn("couldn't find tr_mmu_flush_user_range\n");
 	}
 
 	for (i = 0; i < ARRAY_SIZE(toxic_syms); i++) {

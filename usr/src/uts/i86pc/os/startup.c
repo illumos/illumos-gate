@@ -2337,12 +2337,18 @@ startup_end(void)
 	xs_domu_init();
 #endif
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	/*
 	 * Intel IOMMU has been setup/initialized in ddi_impl.c
 	 * Start it up now.
 	 */
 	immu_startup();
+
+	/*
+	 * Now that we're no longer going to drop into real mode for a BIOS call
+	 * via bootops, we can enable PCID (which requires CR0.PG).
+	 */
+	enable_pcid();
 #endif
 
 	PRM_POINT("Enabling interrupts");

@@ -22,6 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/debug.h>
@@ -99,7 +101,7 @@ gfxp_map_kernel_space(uint64_t start, size_t size, uint32_t mode)
 	 * The hypervisor doesn't allow r/w mappings to some pages, such as
 	 * page tables, gdt, etc. Detect %cr3 to notify users of this interface.
 	 */
-	if (start == mmu_ptob(mmu_btop(getcr3())))
+	if (start == mmu_ptob(mmu_btop(getcr3_pa())))
 		return (0);
 #endif
 
@@ -318,7 +320,7 @@ gfxp_load_kernel_space(uint64_t start, size_t size,
 	 * The hypervisor doesn't allow r/w mappings to some pages, such as
 	 * page tables, gdt, etc. Detect %cr3 to notify users of this interface.
 	 */
-	if (start == mmu_ptob(mmu_btop(getcr3())))
+	if (start == mmu_ptob(mmu_btop(getcr3_pa())))
 		return;
 #endif
 

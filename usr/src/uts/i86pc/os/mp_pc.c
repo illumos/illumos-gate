@@ -133,10 +133,11 @@ rmp_gdt_init(rm_platter_t *rm)
 
 #if defined(__amd64)
 	/* Use the kas address space for the CPU startup thread. */
-	if (MAKECR3(kas.a_hat->hat_htable->ht_pfn) > 0xffffffffUL)
+	if (mmu_ptob(kas.a_hat->hat_htable->ht_pfn) > 0xffffffffUL) {
 		panic("Cannot initialize CPUs; kernel's 64-bit page tables\n"
 		    "located above 4G in physical memory (@ 0x%lx)",
-		    MAKECR3(kas.a_hat->hat_htable->ht_pfn));
+		    mmu_ptob(kas.a_hat->hat_htable->ht_pfn));
+	}
 
 	/*
 	 * Setup pseudo-descriptors for temporary GDT and IDT for use ONLY
@@ -356,21 +357,17 @@ mach_cpucontext_xalloc(struct cpu *cp, int optype)
 
 	/*
 	 * CPU needs to access kernel address space after powering on.
-	 * When hot-adding CPU at runtime, directly use top level page table
-	 * of kas other than the return value of getcr3(). getcr3() returns
-	 * current process's top level page table, which may be different from
-	 * the one of kas.
 	 */
-	rm->rm_pdbr = MAKECR3(kas.a_hat->hat_htable->ht_pfn);
+	rm->rm_pdbr = MAKECR3(kas.a_hat->hat_htable->ht_pfn, PCID_NONE);
 	rm->rm_cpu = cp->cpu_id;
 
 	/*
-	 * For hot-adding CPU at runtime, Machine Check and Performance Counter
-	 * should be disabled. They will be enabled on demand after CPU powers
-	 * on successfully
+	 * We need to mask off any bits set on our boot CPU that can't apply
+	 * while the subject CPU is initializing.  If appropriate, they are
+	 * enabled later on.
 	 */
 	rm->rm_cr4 = getcr4();
-	rm->rm_cr4 &= ~(CR4_MCE | CR4_PCE);
+	rm->rm_cr4 &= ~(CR4_MCE | CR4_PCE | CR4_PCIDE);
 
 	rmp_gdt_init(rm);
 

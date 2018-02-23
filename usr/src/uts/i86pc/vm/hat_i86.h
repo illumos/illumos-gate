@@ -75,17 +75,10 @@ extern "C" {
  */
 #define	MAX_COPIED_PTES	1
 #else
-#if defined(__amd64)
 /*
  * The 64-bit kernel may have up to 512 PTEs present in it for a given process.
  */
 #define	MAX_COPIED_PTES	512
-#elif defined(__i386)
-/*
- * The 32-bit kernel always uses 4 PTEs for this.
- */
-#define	MAX_COPIED_PTES	4
-#endif	/* __amd64 */
 #endif	/* __xpv */
 
 #define	TOP_LEVEL(h)	(((h)->hat_max_level))
@@ -254,7 +247,6 @@ extern void halt(char *fmt);
 extern void hat_kern_alloc(caddr_t segmap_base, size_t segmap_size,
 	caddr_t ekernelheap);
 extern void hat_kern_setup(void);
-extern void hat_tlb_inval(struct hat *hat, uintptr_t va);
 extern void hat_pte_unmap(htable_t *ht, uint_t entry, uint_t flags,
 	x86pte_t old_pte, void *pte_ptr, boolean_t tlb);
 extern void hat_init_finish(void);
@@ -266,33 +258,34 @@ extern void hat_kmap_init(uintptr_t base, size_t len);
 
 extern hment_t *hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry);
 
-#if defined(__amd64)
-extern void hati_cpu_punchin(cpu_t *cpu, uintptr_t va, uint_t attrs);
 extern void mmu_calc_user_slots(void);
-#endif
-
-#if !defined(__xpv)
-/*
- * routines to deal with delayed TLB invalidations for idle CPUs
- */
-extern void tlb_going_idle(void);
-extern void tlb_service(void);
-#endif
-
-/*
- * Hat switch function invoked to load a new context into %cr3
- */
+extern void hat_tlb_inval(struct hat *hat, uintptr_t va);
 extern void hat_switch(struct hat *hat);
 
-#ifdef __xpv
+#define	TLB_RANGE_LEN(r)	((r)->tr_cnt << LEVEL_SHIFT((r)->tr_level))
+
+/*
+ * A range of virtual pages for purposes of demapping.
+ */
+typedef struct tlb_range {
+	uintptr_t tr_va; 	/* address of page */
+	ulong_t	tr_cnt; 	/* number of pages in range */
+	int8_t	tr_level; 	/* page table level */
+} tlb_range_t;
+
+#if defined(__xpv)
+
+#define	XPV_DISALLOW_MIGRATE()	xen_block_migrate()
+#define	XPV_ALLOW_MIGRATE()	xen_allow_migrate()
+
+#define	mmu_flush_tlb_page(va)	mmu_invlpg((caddr_t)va)
+#define	mmu_flush_tlb_kpage(va)	mmu_invlpg((caddr_t)va)
+
 /*
  * Interfaces to use around code that maps/unmaps grant table references.
  */
 extern void hat_prepare_mapping(hat_t *, caddr_t, uint64_t *);
 extern void hat_release_mapping(hat_t *, caddr_t);
-
-#define	XPV_DISALLOW_MIGRATE()	xen_block_migrate()
-#define	XPV_ALLOW_MIGRATE()	xen_allow_migrate()
 
 #else
 
@@ -301,8 +294,25 @@ extern void hat_release_mapping(hat_t *, caddr_t);
 
 #define	pfn_is_foreign(pfn)	__lintzero
 
-#endif
+typedef enum flush_tlb_type {
+	FLUSH_TLB_ALL = 1,
+	FLUSH_TLB_NONGLOBAL = 2,
+	FLUSH_TLB_RANGE = 3,
+} flush_tlb_type_t;
 
+extern void mmu_flush_tlb(flush_tlb_type_t, tlb_range_t *);
+extern void mmu_flush_tlb_kpage(uintptr_t);
+extern void mmu_flush_tlb_page(uintptr_t);
+
+extern void hati_cpu_punchin(cpu_t *cpu, uintptr_t va, uint_t attrs);
+
+/*
+ * routines to deal with delayed TLB invalidations for idle CPUs
+ */
+extern void tlb_going_idle(void);
+extern void tlb_service(void);
+
+#endif /* !__xpv */
 
 #endif	/* _KERNEL */
 

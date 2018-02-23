@@ -24,6 +24,8 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 	
 #include <sys/asm_linkage.h>
@@ -326,7 +328,7 @@ kernel_cs_code:
 	 * Complete the rest of the setup and call mp_startup().
 	 */
 	movq	%gs:CPU_THREAD, %rax	/* get thread ptr */
-	call	*T_PC(%rax)		/* call mp_startup */
+	call	*T_PC(%rax)		/* call mp_startup_boot */
 	/* not reached */
 	int	$20			/* whoops, returned somehow! */
 
@@ -502,7 +504,7 @@ kernel_cs_code:
 
 	/*
 	 * Before going any farther, enable usage of page table NX bit if 
-	 * that's how our page tables are set up.
+	 * that's how our page tables are set up.  (PCIDE is enabled later on).
 	 */
 	bt	$X86FSET_NX, x86_featureset
 	jnc	1f
