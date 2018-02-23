@@ -43,8 +43,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mpi.h"
 #include "mp_gf2m.h"
 #include "ecl-priv.h"
@@ -280,16 +278,20 @@ ec_GFp_add_3(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 3:
 		a2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		a1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		a0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 3:
 		r2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(b,0);
 	}
@@ -363,20 +365,26 @@ ec_GFp_add_4(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 4:
 		a3 = MP_DIGIT(a,3);
+		/* FALLTHROUGH */
 	case 3:
 		a2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		a1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		a0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 4:
 		r3 = MP_DIGIT(b,3);
+		/* FALLTHROUGH */
 	case 3:
 		r2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(b,0);
 	}
@@ -457,24 +465,32 @@ ec_GFp_add_5(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 5:
 		a4 = MP_DIGIT(a,4);
+		/* FALLTHROUGH */
 	case 4:
 		a3 = MP_DIGIT(a,3);
+		/* FALLTHROUGH */
 	case 3:
 		a2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		a1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		a0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 5:
 		r4 = MP_DIGIT(b,4);
+		/* FALLTHROUGH */
 	case 4:
 		r3 = MP_DIGIT(b,3);
+		/* FALLTHROUGH */
 	case 3:
 		r2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(b,0);
 	}
@@ -534,28 +550,38 @@ ec_GFp_add_6(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 6:
 		a5 = MP_DIGIT(a,5);
+		/* FALLTHROUGH */
 	case 5:
 		a4 = MP_DIGIT(a,4);
+		/* FALLTHROUGH */
 	case 4:
 		a3 = MP_DIGIT(a,3);
+		/* FALLTHROUGH */
 	case 3:
 		a2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		a1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		a0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 6:
 		r5 = MP_DIGIT(b,5);
+		/* FALLTHROUGH */
 	case 5:
 		r4 = MP_DIGIT(b,4);
+		/* FALLTHROUGH */
 	case 4:
 		r3 = MP_DIGIT(b,3);
+		/* FALLTHROUGH */
 	case 3:
 		r2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(b,0);
 	}
@@ -625,16 +651,20 @@ ec_GFp_sub_3(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 3:
 		r2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 3:
 		b2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		b1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		b0 = MP_DIGIT(b,0);
 	}
@@ -709,20 +739,26 @@ ec_GFp_sub_4(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 4:
 		r3 = MP_DIGIT(a,3);
+		/* FALLTHROUGH */
 	case 3:
 		r2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 4:
 		b3 = MP_DIGIT(b,3);
+		/* FALLTHROUGH */
 	case 3:
 		b2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		b1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		b0 = MP_DIGIT(b,0);
 	}
@@ -802,24 +838,32 @@ ec_GFp_sub_5(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 5:
 		r4 = MP_DIGIT(a,4);
+		/* FALLTHROUGH */
 	case 4:
 		r3 = MP_DIGIT(a,3);
+		/* FALLTHROUGH */
 	case 3:
 		r2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 5:
 		b4 = MP_DIGIT(b,4);
+		/* FALLTHROUGH */
 	case 4:
 		b3 = MP_DIGIT(b,3);
+		/* FALLTHROUGH */
 	case 3:
 		b2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		b1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		b0 = MP_DIGIT(b,0);
 	}
@@ -870,28 +914,38 @@ ec_GFp_sub_6(const mp_int *a, const mp_int *b, mp_int *r,
 	switch(MP_USED(a)) {
 	case 6:
 		r5 = MP_DIGIT(a,5);
+		/* FALLTHROUGH */
 	case 5:
 		r4 = MP_DIGIT(a,4);
+		/* FALLTHROUGH */
 	case 4:
 		r3 = MP_DIGIT(a,3);
+		/* FALLTHROUGH */
 	case 3:
 		r2 = MP_DIGIT(a,2);
+		/* FALLTHROUGH */
 	case 2:
 		r1 = MP_DIGIT(a,1);
+		/* FALLTHROUGH */
 	case 1:
 		r0 = MP_DIGIT(a,0);
 	}
 	switch(MP_USED(b)) {
 	case 6:
 		b5 = MP_DIGIT(b,5);
+		/* FALLTHROUGH */
 	case 5:
 		b4 = MP_DIGIT(b,4);
+		/* FALLTHROUGH */
 	case 4:
 		b3 = MP_DIGIT(b,3);
+		/* FALLTHROUGH */
 	case 3:
 		b2 = MP_DIGIT(b,2);
+		/* FALLTHROUGH */
 	case 2:
 		b1 = MP_DIGIT(b,1);
+		/* FALLTHROUGH */
 	case 1:
 		b0 = MP_DIGIT(b,0);
 	}

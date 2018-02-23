@@ -1398,8 +1398,7 @@ inittab_msg(const char *fmt, ...)
 		}
 
 		action = INITTAB_MSG_OUTPUT;
-
-		/* FALLTHRU into INITTAB_MSG_OUTPUT */
+		/* FALLTHROUGH */
 
 	case INITTAB_MSG_OUTPUT:
 

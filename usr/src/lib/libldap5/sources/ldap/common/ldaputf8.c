@@ -1,5 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
@@ -51,10 +49,15 @@ ldap_utf8next (char* s)
     switch (UTF8len [(*next >> 2) & 0x3F]) {
       case 0: /* erroneous: s points to the middle of a character. */
       case 6: if ((*++next & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 5: if ((*++next & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 4: if ((*++next & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 3: if ((*++next & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 2: if ((*++next & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 1: ++next;
     }
     return (char*) next;
@@ -88,10 +91,15 @@ ldap_utf8copy (char* dst, const char* src)
     switch (UTF8len [(*s >> 2) & 0x3F]) {
       case 0: /* erroneous: s points to the middle of a character. */
       case 6: *dst++ = *s++; if ((*s & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 5: *dst++ = *s++; if ((*s & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 4: *dst++ = *s++; if ((*s & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 3: *dst++ = *s++; if ((*s & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 2: *dst++ = *s++; if ((*s & 0xC0) != 0x80) break;
+	/* FALLTHROUGH */
       case 1: *dst   = *s++;
     }
     return s - (const unsigned char*)src;

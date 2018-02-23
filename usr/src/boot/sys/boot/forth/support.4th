@@ -533,8 +533,8 @@ also parser definitions
   line_pointer
   begin
     end_of_line? if 0 else
-      letter? digit? underscore? dot? dash?
-      or or or or
+      letter? digit? underscore? dot? dash? comma?
+      or or or or or
     then
   while
     skip_character
