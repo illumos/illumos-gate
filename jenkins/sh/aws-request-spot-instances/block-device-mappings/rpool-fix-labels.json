@@ -1,0 +1,11 @@
+{
+  "BlockDeviceMappings": [{
+    "DeviceName": "/dev/xvdb",
+    "Ebs": {
+      "VolumeSize": 64,
+      "DeleteOnTermination": true,
+      "VolumeType": "gp2",
+      "Encrypted": false
+    }
+  }]
+}

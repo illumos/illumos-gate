@@ -1,0 +1,71 @@
+--- text_mode_x86.xml	Thu Apr 27 00:00:00 2017
++++ text_mode_x86.xml	Thu Apr 27 00:00:00 2017
+@@ -192,8 +192,8 @@
+ 		-->
+ 		<pkg_repo_default_authority>
+ 			<main
+-				url="http://pkg.openindiana.org/dev"
+-				authname="openindiana.org"/>
++				url="%%REPO%%"
++				authname="on-nightly"/>
+ 			<!--
+ 			     If you want to use one or more  mirrors that are
+ 			     setup for the authority, specify the urls here.
+@@ -210,15 +210,12 @@
+ 		     If you want to use one or more  mirrors that are
+ 		     setup for the authority, specify the urls here.
+ 		-->
+-		<!--
+-		     Uncomment before using.
+ 		<pkg_repo_addl_authority>
+ 			<main
+-				url=""
+-				authname=""/>
++				url="http://pkg.openindiana.org/hipster"
++				authname="openindiana.org"/>
+ 			<mirror url="" />
+ 		</pkg_repo_addl_authority>
+-		-->
+ 		<!--
+ 		     The default preferred authority to be used by the system
+ 		     after it has been installed.
+@@ -229,7 +226,7 @@
+ 		-->
+ 		<post_install_repo_default_authority>
+ 			<main
+-				url="http://pkg.openindiana.org/dev"
++				url="http://pkg.openindiana.org/hipster"
+ 				authname="openindiana.org"/>
+ 			<!--
+ 			     Uncomment before using.
+@@ -243,15 +240,6 @@
+ 		     If you want to use one or more  mirrors that are
+ 		     setup for the authority, specify the urls here.
+ 		-->
+-		<post_install_repo_addl_authority>
+-			<main
+-				url="http://pkg.openindiana.org/legacy"
+-				authname="opensolaris.org"/>
+-			<!--
+-			     Uncomment before using.
+-			<mirror url="" />
+-			-->
+-		</post_install_repo_addl_authority>
+ 		<!--
+ 		     list of packages used to form the installed image
+ 		-->
+@@ -269,6 +257,14 @@
+ 			<pkg name="pkg:/server_install"/>
+ 			<pkg name="pkg:/system/install/text-install"/>
+ 			<pkg name="pkg:/system/install/media/internal"/>
++			<pkg name="pkg:/metapackages/build-essential"/>
++			<pkg name="pkg:/install/distribution-constructor"/>
++			<pkg name="pkg:/archiver/gnu-tar"/>
++			<pkg name="pkg:/system/test/fio"/>
++			<pkg name="pkg:/system/test/libctest"/>
++			<pkg name="pkg:/system/test/ostest"/>
++			<pkg name="pkg:/system/test/utiltest"/>
++			<pkg name="pkg:/system/test/zfstest"/>
+ 		</packages>
+ <!--
+      Items below this line are rarely configured

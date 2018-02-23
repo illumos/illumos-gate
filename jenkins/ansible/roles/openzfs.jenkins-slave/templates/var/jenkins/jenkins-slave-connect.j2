@@ -1,0 +1,29 @@
+#!/bin/bash
+
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2017 by Delphix. All rights reserved.
+#
+
+{{ java_bin_path }} \
+    -jar "{{ jenkins_directory }}/swarm-client.jar" \
+    -name "{{ jenkins_slave_name }}" \
+    -fsroot "{{ jenkins_directory }}/root" \
+    -master "{{ jenkins_master_url }}" \
+    -username "{{ jenkins_master_username }}" \
+    -password "{{ jenkins_master_password }}" \
+    -labels "{{ jenkins_slave_label }}" \
+    -executors "{{ jenkins_slave_executors }}" \
+    -mode "{{ jenkins_slave_mode | lower }}" \
+    -disableClientsUniqueId \
+    -deleteExistingClients

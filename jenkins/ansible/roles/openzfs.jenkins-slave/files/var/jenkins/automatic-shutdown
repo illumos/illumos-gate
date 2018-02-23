@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2017 by Delphix. All rights reserved.
+#
+
+#
+# The purpose of this script is to automatically shutdown the system, to
+# provide some extra assurance that we don't "leak" EC2 resources. Since
+# EC2 Spot instances are being used exclusively (i.e. no other instances
+# types are being used), we can lean on the fact that they will be
+# automatically terminated when they are shutdown. Thus, this script is
+# used as a way to try and ensure the VMs are always shutdown and
+# terminated in a timely manner; e.g. in case the normal mechanism for
+# doing this, fails to do so.
+#
+
+BOOT=$(kstat -n system_misc | awk '/boot_time/ { print $2 }')
+LIMIT=$((12 * 60 * 60))
+
+CURRENT=$(date +%s)
+while [[ $CURRENT -lt $((BOOT + LIMIT)) ]]; do
+	sleep $((RANDOM % 100))
+	CURRENT=$(date +%s)
+done
+
+shutdown -y -g 0 -i 5
+exit 0
