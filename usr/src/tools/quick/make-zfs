@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Use distributed make (dmake) by default.
@@ -29,13 +29,15 @@ cpu=`uname -p`
 case $cpu in
 i386)
 	x=intel
+	kmdb_arch="amd64"
 	mdb_arch="ia32 amd64"
 	arch32=i86
 	arch64=amd64
 	;;
 sparc)
 	x=sparc
-	mdb_arch=v9
+	kmdb_arch=v9
+	mdb_arch="v7 v9"
 	arch32=sparc
 	arch64=sparcv9
 	;;
@@ -225,7 +227,9 @@ esac
 
 # Build the MDB modules, WITH the linktest
 (cd $SRC/cmd/mdb/tools && $make $1)
-for a in $mdb_arch
+
+# kmdb_arch is 64-bit only
+for a in $kmdb_arch
 do
   case $1 in
   install|lint)
@@ -241,6 +245,11 @@ do
   (cd $SRC/cmd/mdb/$x/$a/zfs &&
 	$make $1 KMDB_LINKTEST_ENABLE= )
 
+done
+
+# mdb_arch is both 32-bit & 64-bit
+for a in $mdb_arch
+do
   (cd $SRC/cmd/mdb/$x/$a/libzpool &&
 	$make $1 )
 
@@ -304,11 +313,8 @@ do_tar() {
 	git_rev=`git rev-parse --short=8 HEAD`
 	files="
 kernel/drv/$arch64/zfs
-kernel/drv/zfs
 kernel/fs/$arch64/zfs
-kernel/fs/zfs
 kernel/kmdb/$arch64/zfs
-kernel/kmdb/zfs
 lib/$arch64/libzfs.so.1
 lib/$arch64/libzfs_core.so.1
 lib/libzfs.so.1
@@ -323,7 +329,6 @@ usr/lib/fs/zfs/fstyp.so.1
 usr/lib/libzfs_jni.so.1
 usr/lib/libzpool.so.1
 usr/lib/mdb/kvm/$arch64/zfs.so
-usr/lib/mdb/kvm/zfs.so
 usr/lib/mdb/proc/$arch64/libzpool.so
 usr/lib/mdb/proc/libzpool.so
 sbin/zfs
