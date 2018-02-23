@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  */
 
 #include <regex.h>
@@ -36,6 +36,7 @@
 
 extern int system_labeled;
 
+static int ln_minor_name(di_minor_t minor, di_node_t node);
 static int lp(di_minor_t minor, di_node_t node);
 static int serial_dialout(di_minor_t minor, di_node_t node);
 static int serial(di_minor_t minor, di_node_t node);
@@ -43,12 +44,7 @@ static int diskette(di_minor_t minor, di_node_t node);
 static int vt00(di_minor_t minor, di_node_t node);
 static int kdmouse(di_minor_t minor, di_node_t node);
 static int ipmi(di_minor_t minor, di_node_t node);
-static int smbios(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
-static int xsvc(di_minor_t minor, di_node_t node);
-static int srn(di_minor_t minor, di_node_t node);
-static int ucode(di_minor_t minor, di_node_t node);
-
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "vt00", "ddi_display", NULL,
@@ -61,7 +57,7 @@ static devfsadm_create_t misc_cbt[] = {
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ipmi,
 	},
 	{ "pseudo", "ddi_pseudo", "smbios",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, smbios,
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, ln_minor_name,
 	},
 	/* floppies share the same class, but not link regex, as hard disks */
 	{ "disk",  "ddi_block:diskette", NULL,
@@ -76,17 +72,17 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "serial",  "ddi_serial:dialout,mb", NULL,
 	    TYPE_EXACT, ILEVEL_1, serial_dialout
 	},
-	{ "pseudo", "ddi_pseudo", NULL,
-	    TYPE_EXACT, ILEVEL_0, xsvc
+	{ "pseudo", "ddi_pseudo", "xsvc",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ln_minor_name,
 	},
-	{ "pseudo", "ddi_pseudo", NULL,
-	    TYPE_EXACT, ILEVEL_0, srn
+	{ "pseudo", "ddi_pseudo", "srn",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ln_minor_name,
 	},
 	{ "memory-controller", "ddi_mem_ctrl", NULL,
 	    TYPE_EXACT, ILEVEL_0, mc_node
 	},
 	{ "pseudo", "ddi_pseudo", "ucode",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ucode,
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ln_minor_name,
 	},
 };
 
@@ -117,6 +113,17 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 };
 
 DEVFSADM_REMOVE_INIT_V0(misc_remove_cbt);
+
+/*
+ * Any /dev/foo named named after the minor name such as
+ * /devices/.../driver@0:foo
+ */
+static int
+ln_minor_name(di_minor_t minor, di_node_t node)
+{
+	(void) devfsadm_mklink(di_minor_name(minor), node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
 
 /*
  * Handles minor node type "ddi_display", in addition to generic processing
@@ -305,13 +312,6 @@ ipmi(di_minor_t minor, di_node_t node)
 	return (DEVFSADM_CONTINUE);
 }
 
-static int
-smbios(di_minor_t minor, di_node_t node)
-{
-	(void) devfsadm_mklink("smbios", node, minor, 0);
-	return (DEVFSADM_CONTINUE);
-}
-
 /*
  * /dev/mc/mc<chipid> -> /devices/.../pci1022,1102@<chipid+24>,2:mc-amd
  */
@@ -343,53 +343,5 @@ mc_node(di_minor_t minor, di_node_t node)
 		    minor->dev_minor);
 	}
 	(void) devfsadm_mklink(linkpath, node, minor, 0);
-	return (DEVFSADM_CONTINUE);
-}
-
-/*
- * Creates \M0 devlink for xsvc node
- */
-static int
-xsvc(di_minor_t minor, di_node_t node)
-{
-	char *mn;
-
-	if (strcmp(di_node_name(node), "xsvc") != 0)
-		return (DEVFSADM_CONTINUE);
-
-	mn = di_minor_name(minor);
-	if (mn == NULL)
-		return (DEVFSADM_CONTINUE);
-
-	(void) devfsadm_mklink(mn, node, minor, 0);
-	return (DEVFSADM_CONTINUE);
-}
-
-/*
- * Creates \M0 devlink for srn device
- */
-static int
-srn(di_minor_t minor, di_node_t node)
-{
-	char *mn;
-
-	if (strcmp(di_node_name(node), "srn") != 0)
-		return (DEVFSADM_CONTINUE);
-
-	mn = di_minor_name(minor);
-	if (mn == NULL)
-		return (DEVFSADM_CONTINUE);
-
-	(void) devfsadm_mklink(mn, node, minor, 0);
-	return (DEVFSADM_CONTINUE);
-}
-
-/*
- *	/dev/ucode	->	/devices/pseudo/ucode@0:ucode
- */
-static int
-ucode(di_minor_t minor, di_node_t node)
-{
-	(void) devfsadm_mklink("ucode", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
