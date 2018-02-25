@@ -27,6 +27,10 @@
  * $FreeBSD$
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -163,6 +167,21 @@ lpc_uart_io_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
 			uart_write(sc->uart_softc, offset + 1, *eax >> 8);
 		}
 		break;
+#ifndef __FreeBSD__
+	case 4:
+		if (in) {
+			*eax = uart_read(sc->uart_softc, offset);
+			*eax |= uart_read(sc->uart_softc, offset + 1) << 8;
+			*eax |= uart_read(sc->uart_softc, offset + 2) << 16;
+			*eax |= uart_read(sc->uart_softc, offset + 3) << 24;
+		} else {
+			uart_write(sc->uart_softc, offset, *eax);
+			uart_write(sc->uart_softc, offset + 1, *eax >> 8);
+			uart_write(sc->uart_softc, offset + 2, *eax >> 16);
+			uart_write(sc->uart_softc, offset + 3, *eax >> 24);
+		}
+		break;
+#endif
 	default:
 		return (-1);
 	}
