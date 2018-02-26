@@ -1914,6 +1914,8 @@ static struct {
 	    SB_AUDIGY2VAL | SB_71 | SB_NOEXP },
 	{ 0x8, 0x1021, "SB0610", "Audigy 4",
 	    SB_AUDIGY2VAL | SB_71 | SB_NOEXP },
+	{ 0x8, 0x1024, "SB1550", "Audigy RX",
+	    SB_AUDIGY2VAL | SB_71 | SB_NOEXP },
 	{ 0x8, 0x2001, "SB0530", "Audigy 2 ZS Notebook",
 	    SB_AUDIGY2VAL | SB_71 },
 	{ 0, 0, NULL, NULL, 0 },
