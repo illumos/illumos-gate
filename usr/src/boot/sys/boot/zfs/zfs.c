@@ -516,7 +516,9 @@ zfs_probe_partition(void *arg, const char *partname,
 		table = ptable_open(&pa, part->end - part->start + 1,
 		    ppa->secsz, zfs_diskread);
 		if (table != NULL) {
-			if (ptable_gettype(table) == PTABLE_VTOC8)
+			enum ptable_type pt = ptable_gettype(table);
+
+			if (pt == PTABLE_VTOC8 || pt == PTABLE_VTOC)
 				ptable_iterate(table, &pa, zfs_probe_partition);
 			ptable_close(table);
 		}
