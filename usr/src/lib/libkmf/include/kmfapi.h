@@ -19,6 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  *
  * Constant definitions and function prototypes for the KMF library.
  * Commonly used data types are defined in "kmftypes.h".
@@ -275,6 +276,7 @@ extern KMF_RETURN kmf_get_kmf_error_str(KMF_RETURN, char **);
  * Miscellaneous
  */
 extern KMF_RETURN kmf_dn_parser(char *, KMF_X509_NAME *);
+extern KMF_RETURN kmf_dn_to_string(KMF_X509_NAME *, char **);
 extern KMF_RETURN kmf_read_input_file(KMF_HANDLE_T, char *, KMF_DATA *);
 extern KMF_RETURN kmf_der_to_pem(KMF_OBJECT_TYPE, unsigned char *,
 	int, unsigned char **, int *);

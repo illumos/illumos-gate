@@ -33,6 +33,8 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2018, Joyent, Inc.
+ *
  * File: rdn_parser.c
  */
 
@@ -44,6 +46,7 @@
 #include <rdn_parser.h>
 #include <stdio.h>
 #include <values.h>
+#include <libcustr.h>
 
 /*
  * The order here is important.  The OIDs are arranged in order of
@@ -533,5 +536,220 @@ kmf_dn_parser(char *string, KMF_X509_NAME *name)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	err = ParseDistinguishedName(string, (int)strlen(string), name);
+	return (err);
+}
+
+static const char hexdigits[] = "0123456789abcdef";
+
+static KMF_RETURN
+binvalue_to_string(KMF_DATA *data, custr_t *str)
+{
+	size_t i;
+	uchar_t c;
+
+	if (custr_appendc(str, '#') != 0)
+		return (KMF_ERR_MEMORY);
+
+	for (i = 0; i < data->Length; i++) {
+		c = data->Data[i];
+		if (custr_appendc(str, hexdigits[(c >> 4) & 0xf]) != 0 ||
+		    custr_appendc(str, hexdigits[(c & 0xf)]) != 0) {
+			return (KMF_ERR_MEMORY);
+		}
+	}
+
+	return (KMF_OK);
+}
+
+/*
+ * Convert an RDN value into a printable name with appropriate escaping.
+ * The rules are taken from RFC4514.  While it is dealing with LDAP
+ * distinguished names, both LDAP and x509 certificates are based on the
+ * same underlying ITU standards, and as far as I can determine, the same
+ * rules apply (or at least the rules for LDAP DNs apply the same to x509
+ * DNs).
+ */
+static KMF_RETURN
+value_to_string(KMF_DATA *data, custr_t *str)
+{
+	size_t i;
+	uchar_t c;
+
+	for (i = 0; i < data->Length; i++) {
+		c = data->Data[i];
+
+		/*
+		 * While technically not required, it is suggested that
+		 * printable non-ascii characters (e.g. multi-byte UTF-8
+		 * characters) are converted as escaped hex (as well as
+		 * unprintable characters).  AFAIK there is no one canonical
+		 * string representation (e.g. attribute names are case
+		 * insensitive, so 'CN=foo' and 'cn=foo' convert to the same
+		 * binary representation, but there is nothing to say if
+		 * either string form is canonical), so this shouldn't
+		 * pose a problem.
+		 */
+		if (c < ' ' || c >= 0x7f) {
+			/*
+			 * RFC4514 specifies the hex form in a DN string as
+			 * \{hex}{hex}. OpenSSL uses capitals for A-F so we
+			 * do the same.
+			 */
+			if (custr_append_printf(str, "\\%02hhX", c) != 0)
+				return (KMF_ERR_MEMORY);
+			continue;
+		}
+
+		switch (c) {
+		case '#':
+			/* Escape # if at the start of a value */
+			if (i != 0)
+				break;
+			/* FALLTHROUGH */
+		case ' ':
+			/* Escape ' ' if at the start or end of a value */
+			if (i != 0 && i + 1 != data->Length)
+				break;
+			/* FALLTHROUGH */
+		case '"':
+		case '+':
+		case ',':
+		case ';':
+		case '<':
+		case '>':
+		case '\\':
+			/* Escape these */
+			if (custr_appendc(str, '\\') != 0)
+				return (KMF_ERR_MEMORY);
+		}
+
+		if (custr_appendc(str, c) != 0)
+			return (KMF_ERR_MEMORY);
+	}
+
+	return (KMF_OK);
+}
+
+/*
+ * Translate an attribute/value pair into a string.  If the attribute OID
+ * is a well known OID (in name2kinds) we use the name instead of the OID.
+ */
+static KMF_RETURN
+ava_to_string(KMF_X509_TYPE_VALUE_PAIR *tvp, custr_t *str)
+{
+	KMF_OID *kind_oid;
+	KMF_OID *rdn_oid = &tvp->type;
+	const char *attr = NULL;
+	size_t i;
+	KMF_RETURN ret = KMF_OK;
+	boolean_t found = B_FALSE;
+
+	for (i = 0; name2kinds[i].name != NULL; i++) {
+		kind_oid = name2kinds[i].OID;
+
+		if (!IsEqualOid(kind_oid, rdn_oid))
+			continue;
+
+		attr = name2kinds[i].name;
+		found = B_TRUE;
+		break;
+	}
+
+	if (!found && (attr = kmf_oid_to_string(rdn_oid)) == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto done;
+	}
+	if (custr_append(str, attr) != 0) {
+		ret = KMF_ERR_MEMORY;
+		goto done;
+	}
+	if (custr_appendc(str, '=') != 0) {
+		ret = KMF_ERR_MEMORY;
+		goto done;
+	}
+
+	/*
+	 * RFC4514 indicates that an oid=value pair should have the value
+	 * printed as #xxxxxx.  In addition, we also print as a binary
+	 * value if the BER tag does not indicate the value is some sort
+	 * of printable string.
+	 */
+	switch (tvp->valueType) {
+	case BER_UTF8_STRING:
+	case BER_PRINTABLE_STRING:
+	case BER_T61STRING:
+	case BER_IA5STRING:
+		if (found) {
+			ret = value_to_string(&tvp->value, str);
+			break;
+		}
+		/*FALLTHROUGH*/
+	default:
+		ret = binvalue_to_string(&tvp->value, str);
+		break;
+	}
+
+done:
+	if (!found)
+		free((void *)attr);
+
+	return (ret);
+}
+
+static KMF_RETURN
+rdn_to_string(KMF_X509_RDN *rdn, custr_t *str)
+{
+	KMF_RETURN ret;
+	size_t i;
+
+	for (i = 0; i < rdn->numberOfPairs; i++) {
+		if (i > 0 && custr_appendc(str, '+') != 0)
+			return (KMF_ERR_MEMORY);
+
+		ret = ava_to_string(&rdn->AttributeTypeAndValue[i], str);
+		if (ret != KMF_OK)
+			return (ret);
+	}
+
+	return (KMF_OK);
+}
+
+/*
+ * kmf_dn_to_string
+ *
+ * Take a binary KMF_X509_NAME and convert it into a human readable string.
+ */
+KMF_RETURN
+kmf_dn_to_string(KMF_X509_NAME *name, char **string)
+{
+	custr_t *str = NULL;
+	KMF_RETURN err = KMF_OK;
+	size_t i;
+
+	if (name == NULL || string == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	*string = NULL;
+
+	if (custr_alloc(&str) != 0)
+		return (KMF_ERR_MEMORY);
+
+	for (i = 0; i < name->numberOfRDNs; i++) {
+		KMF_X509_RDN *rdn = &name->RelativeDistinguishedName[i];
+
+		if (i > 0 && custr_append(str, ", ") != 0) {
+			err = KMF_ERR_MEMORY;
+			goto done;
+		}
+
+		if ((err = rdn_to_string(rdn, str)) != KMF_OK)
+			goto done;
+	}
+
+	if ((*string = strdup(custr_cstr(str))) == NULL)
+		err = KMF_ERR_MEMORY;
+
+done:
+	custr_free(str);
 	return (err);
 }

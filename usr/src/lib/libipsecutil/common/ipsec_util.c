@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  * Copyright 2012 Milan Juri. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <unistd.h>
@@ -47,6 +48,8 @@
 #include <setjmp.h>
 #include <libgen.h>
 #include <libscf.h>
+#include <kmfapi.h>
+#include <ber_der.h>
 
 #include "ipsec_util.h"
 #include "ikedoor.h"
@@ -3474,4 +3477,29 @@ ipsecutil_exit(exit_type_t type, char *fmri, FILE *fp, const char *fmt, ...)
 	(void) fflush(fp);
 	(void) fclose(fp);
 	exit(exit_status);
+}
+
+void
+print_asn1_name(FILE *file, const unsigned char *buf, long buflen)
+{
+	KMF_X509_NAME name = { 0 };
+	KMF_DATA data = { 0 };
+	char *str = NULL;
+
+	data.Data = (unsigned char *)buf;
+	data.Length = buflen;
+
+	if (DerDecodeName(&data, &name) != KMF_OK)
+		goto fail;
+
+	if (kmf_dn_to_string(&name, &str) != KMF_OK)
+		goto fail;
+
+	(void) fprintf(file, "%s\n", str);
+	kmf_free_dn(&name);
+	free(str);
+	return;
+fail:
+	kmf_free_dn(&name);
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, "<cannot interpret>\n"));
 }

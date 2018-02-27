@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_IPSEC_UTIL_H
@@ -212,20 +212,6 @@ extern int dbgstr2num(char *);
 
 /* convert a string of debug strings with +|- delimiters to a debug level */
 extern int parsedbgopts(char *);
-
-/*
- * SSL library (OpenSSL)
- */
-#define	LIBSSL	"libssl.so"
-
-void libssl_load(void);
-
-/*
- * crypto library (OpenSSL)
- */
-#define	LIBCRYPTO	"libcrypto.so"
-
-void libcrypto_load(void);
 
 /*
  * functions to manipulate the IKEv1 kmcookie-label mapping file
