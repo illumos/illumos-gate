@@ -28,4 +28,4 @@ REPO="${OPENZFS_DIRECTORY}/packages/i386/nightly"
 [[ "$INSTALL_DEBUG" == "yes" ]] || REPO="${REPO}-nd"
 
 export BE_PRINT_ERR=true
-log_must sudo "${ONU}" -t "openzfs-nightly" -d "${REPO}"
+log_must sudo -E "${ONU}" -v -t "openzfs-nightly" -d "${REPO}"
