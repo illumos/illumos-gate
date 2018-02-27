@@ -145,8 +145,25 @@ else
 	#
 	log_must cp usr/src/tools/env/illumos.sh illumos.sh
 
+	#
+	# According to the "How To Build illumos" documentation, we need
+	# to set PKGVERS_BRANCH in a form of YEAR.MAJOR.0.0, where YEAR
+	# is the current year and MAJOR is more than the one used by
+	# OpenIndiana.
+	#
+	# Thus, we use the following awk-foo to do this, by using the
+	# YEAR and MAJOR used by the package in the OpenIndiana package
+	# repository, and then incrementing the MAJOR by one.
+	#
+	# If we don't set PKGVERS_BRANCH properly, we can wind up in a
+	# situation where the system upgrade orchestrated via ONU, will
+	# silently fail the upgrade the system; not updating the system
+	# with this nightly's build products, and not even reporting an
+	# error when that occurs.
+	#
 	PKGVERS_BRANCH=$(log_must pkg info -r pkg://openindiana.org/SUNWcs \
-		| log_must awk '$1 == "Branch:" {print $2}')
+		| log_must awk '$1 == "Branch:" {print $2}' \
+		| log_must awk -F. '{print $1 "." $2+1 ".0.0"}')
 
 	log_must nightly_env_set_var "PKGVERS_BRANCH" "'$PKGVERS_BRANCH'"
 	log_must nightly_env_set_var "ONNV_BUILDNUM" "'$PKGVERS_BRANCH'"
