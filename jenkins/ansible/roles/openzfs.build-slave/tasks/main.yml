@@ -62,6 +62,7 @@
       - pkg:/archiver/gnu-tar
       - pkg:/diagnostic/diskinfo
       - pkg:/install/distribution-constructor
+      - pkg:/security/sudo
       - pkg:/service/file-system/nfs
       - pkg:/service/file-system/smb
       - pkg:/system/test/fio
