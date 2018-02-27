@@ -19,7 +19,7 @@ source ${JENKINS_DIRECTORY}/sh/library/common.sh
 source ${JENKINS_DIRECTORY}/sh/library/aws.sh
 source ${JENKINS_DIRECTORY}/sh/library/ssh.sh
 
-check_env INSTANCE_ID
+check_env INSTANCE_ID EXPECTED_VERSION
 
 aws_setup_environment
 
@@ -47,3 +47,6 @@ log_must sleep 10
 log_must pushd "$JENKINS_DIRECTORY/ansible" >/dev/null
 ssh_wait_for inventory.txt playbook.yml
 log_must popd >/dev/null
+
+ACTUAL_VERSION=$(ssh_log_must 'uname -v')
+log_must test "$ACTUAL_VERSION" == "$EXPECTED_VERSION"

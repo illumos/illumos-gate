@@ -16,6 +16,7 @@
 env.BASE_IMAGE_ID = 'ami-08cff7376ce420792'
 
 node('master') {
+    def commit = null
     stage('checkout, verify, stash') {
         deleteDir()
         checkout scm
@@ -47,6 +48,10 @@ node('master') {
          * stash such that we can unstash only that directory when running the tests.
          */
         stash(name: 'jenkins', includes: 'jenkins/**')
+
+        commit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+        if (!commit)
+            error ('Could not determine git commit hash.')
     }
 
     try {
@@ -83,6 +88,7 @@ node('master') {
 
                     stage('build') {
                         shscript('nightly-build', false, [
+                            ['BUILD_VERSION', commit],
                             ['BUILD_NONDEBUG', 'yes'],
                             ['BUILD_DEBUG', 'yes'],
                             ['RUN_LINT', 'yes']
@@ -129,6 +135,13 @@ node('master') {
                     ])
                     archive(includes: 'nightly-packages.tar.xz')
                 }
+            }
+
+            stage('reboot') {
+                shscript('reboot-and-verify', false, [
+                    ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
+                    ['EXPECTED_VERSION', commit]
+                ])
             }
         }
 

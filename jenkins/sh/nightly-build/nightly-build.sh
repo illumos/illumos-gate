@@ -18,7 +18,7 @@
 source ${JENKINS_DIRECTORY}/sh/library/common.sh
 source ${JENKINS_DIRECTORY}/sh/library/nightly.sh
 
-check_env OPENZFS_DIRECTORY BUILD_NONDEBUG BUILD_DEBUG RUN_LINT
+check_env OPENZFS_DIRECTORY BUILD_VERSION BUILD_NONDEBUG BUILD_DEBUG RUN_LINT
 
 #
 # Updates the nightly environment file. If there's a default value
@@ -161,18 +161,7 @@ log_must nightly_env_set_var "CODEMGR_WS" "$OPENZFS_DIRECTORY"
 log_must nightly_env_set_var "ON_CLOSED_BINS" "$OPENZFS_DIRECTORY/closed"
 log_must nightly_env_set_var "ENABLE_IPP_PRINTING" "#"
 log_must nightly_env_set_var "ENABLE_SMB_PRINTING" "#"
-
-#
-# While VERSION is already set this way when using the illumos.sh file
-# contained in the OpenZFS repository, that's not the case when building
-# on OmniOS and we start with the illumos.sh file copied out of the
-# "/opt/onbld/env" directory. Thus, to ensure the VERSION is set
-# consistently whether building on OmniOS or OpenIndiana (or any other
-# platform that would use the in-tree illumos.sh file), we explicitly
-# set the value of VERSION here.
-#
-log_must nightly_env_set_var "VERSION" \
-	"$(log_must git describe --long --all HEAD | log_must cut -d/ -f2-)"
+log_must nightly_env_set_var "VERSION" "$BUILD_VERSION"
 
 log_must cp usr/src/tools/scripts/nightly.sh .
 log_must chmod +x nightly.sh

@@ -17,6 +17,7 @@ currentBuild.displayName = "#${env.BUILD_NUMBER} ${OPENZFS_REPOSITORY} ${OPENZFS
 
 node('master') {
     def misc = null
+    def commit = null
 
     stage('checkout, stash repository') {
         checkout([$class: 'GitSCM', changelog: false, poll: false,
@@ -24,6 +25,9 @@ node('master') {
                   branches: [[name: OPENZFS_BRANCH]]])
         stash(name: 'openzfs', useDefaultExcludes: false)
         misc = load('jenkins/pipelines/miscellaneous.groovy')
+        commit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        if (!commit)
+            error ('Could not determine git commit hash.')
     }
 
     try {
@@ -55,6 +59,7 @@ node('master') {
 
             stage('build repository') {
                 misc.shscript('nightly-build', false, [
+                    ['BUILD_VERSION', "openzfs-${commit}"],
                     ['BUILD_NONDEBUG', 'yes'],
                     ['BUILD_DEBUG', 'no'],
                     ['RUN_LINT', 'no']

@@ -79,6 +79,7 @@ node('master') {
                             unstash('openzfs')
 
                             misc.shscript('nightly-build', false, [
+                                ['BUILD_VERSION', commit],
                                 ['BUILD_NONDEBUG', 'no'],
                                 ['BUILD_DEBUG', 'yes'],
                                 ['RUN_LINT', 'no']
@@ -89,7 +90,8 @@ node('master') {
                             ])
                         }
 
-                        misc.shscript('reboot-and-wait', false, [
+                        misc.shscript('reboot-and-verify', false, [
+                            ['EXPECTED_VERSION', commit],
                             ['INSTANCE_ID', instance]
                         ])
                     }
