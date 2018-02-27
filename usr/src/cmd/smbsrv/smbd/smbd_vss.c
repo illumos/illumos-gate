@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Martin Matuska. All rights reserved.
  */
 
@@ -110,11 +110,13 @@ smbd_vss_get_count(const char *path, uint32_t *count)
 	bzero(&vss_count, sizeof (smbd_vss_count_t));
 	*count = 0;
 
-	if (smb_getdataset(path, dataset, MAXPATHLEN) != 0)
-		return (-1);
-
 	if ((libhd = libzfs_init()) == NULL)
 		return (-1);
+
+	if (smb_getdataset(libhd, path, dataset, MAXPATHLEN) != 0) {
+		libzfs_fini(libhd);
+		return (-1);
+	}
 
 	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_DATASET)) == NULL) {
 		libzfs_fini(libhd);
@@ -165,16 +167,18 @@ smbd_vss_get_snapshots(const char *path, uint32_t count,
 	vss_uint64_date.gd_count = count;
 	vss_uint64_date.gd_return_count = 0;
 	vss_uint64_date.gd_gmt_array = malloc(count * sizeof (uint64_t));
+
 	if (vss_uint64_date.gd_gmt_array == NULL)
 		return;
 
-	if (smb_getdataset(path, dataset, MAXPATHLEN) != 0) {
+	if ((libhd = libzfs_init()) == NULL) {
 		free(vss_uint64_date.gd_gmt_array);
 		return;
 	}
 
-	if ((libhd = libzfs_init()) == NULL) {
+	if (smb_getdataset(libhd, path, dataset, MAXPATHLEN) != 0) {
 		free(vss_uint64_date.gd_gmt_array);
+		libzfs_fini(libhd);
 		return;
 	}
 
@@ -251,11 +255,13 @@ smbd_vss_map_gmttoken(const char *path, char *gmttoken, time_t toktime,
 	vss_map_gmttoken.mg_snapname = snapname;
 	*snapname = '\0';
 
-	if (smb_getdataset(path, dataset, MAXPATHLEN) != 0)
-		return (-1);
-
 	if ((libhd = libzfs_init()) == NULL)
 		return (-1);
+
+	if (smb_getdataset(libhd, path, dataset, MAXPATHLEN) != 0) {
+		libzfs_fini(libhd);
+		return (-1);
+	}
 
 	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_DATASET)) == NULL) {
 		libzfs_fini(libhd);

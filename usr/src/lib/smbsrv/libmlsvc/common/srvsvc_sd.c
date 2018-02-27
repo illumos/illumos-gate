@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -59,12 +60,15 @@ srvsvc_shareacl_getpath(smb_share_t *si, char *shr_acl_path)
 	zfs_handle_t *zfshd;
 	int ret = 0;
 
-	ret = smb_getdataset(si->shr_path, dataset, MAXPATHLEN);
-	if (ret != 0)
-		return (ret);
-
 	if ((libhd = libzfs_init()) == NULL)
 		return (-1);
+
+	ret = smb_getdataset(libhd, si->shr_path, dataset, MAXPATHLEN);
+	if (ret != 0) {
+		libzfs_fini(libhd);
+		return (ret);
+	}
+
 
 	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_DATASET)) == NULL) {
 		libzfs_fini(libhd);

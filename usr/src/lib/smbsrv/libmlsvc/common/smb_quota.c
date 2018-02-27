@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <stdio.h>
@@ -1083,11 +1083,13 @@ smb_quota_zfs_init(const char *path, smb_quota_zfs_handle_t *zfs_hdl)
 {
 	char dataset[MAXPATHLEN];
 
-	if (smb_getdataset(path, dataset, MAXPATHLEN) != 0)
-		return (NT_STATUS_INVALID_PARAMETER);
-
 	if ((zfs_hdl->z_lib = libzfs_init()) == NULL)
 		return (NT_STATUS_INTERNAL_ERROR);
+
+	if (smb_getdataset(zfs_hdl->z_lib, path, dataset, MAXPATHLEN) != 0) {
+		libzfs_fini(zfs_hdl->z_lib);
+		return (NT_STATUS_INVALID_PARAMETER);
+	}
 
 	zfs_hdl->z_fs = zfs_open(zfs_hdl->z_lib, dataset, ZFS_TYPE_DATASET);
 	if (zfs_hdl->z_fs == NULL) {

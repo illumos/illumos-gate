@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -2240,11 +2240,13 @@ smb_shr_zfs_add(smb_share_t *si)
 	int ret;
 	char buf[MAXPATHLEN];	/* dataset or mountpoint */
 
-	if (smb_getdataset(si->shr_path, buf, MAXPATHLEN) != 0)
-		return;
-
 	if ((libhd = libzfs_init()) == NULL)
 		return;
+
+	if (smb_getdataset(libhd, si->shr_path, buf, MAXPATHLEN) != 0) {
+		libzfs_fini(libhd);
+		return;
+	}
 
 	if ((zfshd = zfs_open(libhd, buf, ZFS_TYPE_FILESYSTEM)) == NULL) {
 		libzfs_fini(libhd);
@@ -2285,11 +2287,13 @@ smb_shr_zfs_remove(smb_share_t *si)
 	int ret;
 	char buf[MAXPATHLEN];	/* dataset or mountpoint */
 
-	if (smb_getdataset(si->shr_path, buf, MAXPATHLEN) != 0)
-		return;
-
 	if ((libhd = libzfs_init()) == NULL)
 		return;
+
+	if (smb_getdataset(libhd, si->shr_path, buf, MAXPATHLEN) != 0) {
+		libzfs_fini(libhd);
+		return;
+	}
 
 	errno = 0;
 	ret = zfs_smb_acl_remove(libhd, buf, si->shr_path, si->shr_name);
@@ -2318,11 +2322,13 @@ smb_shr_zfs_rename(smb_share_t *from, smb_share_t *to)
 	int ret;
 	char dataset[MAXPATHLEN];
 
-	if (smb_getdataset(from->shr_path, dataset, MAXPATHLEN) != 0)
-		return;
-
 	if ((libhd = libzfs_init()) == NULL)
 		return;
+
+	if (smb_getdataset(libhd, from->shr_path, dataset, MAXPATHLEN) != 0) {
+		libzfs_fini(libhd);
+		return;
+	}
 
 	if ((zfshd = zfs_open(libhd, dataset, ZFS_TYPE_FILESYSTEM)) == NULL) {
 		libzfs_fini(libhd);

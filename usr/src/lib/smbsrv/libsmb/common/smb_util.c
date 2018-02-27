@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <ctype.h>
@@ -627,7 +627,8 @@ smb_netgroup_match(struct nd_hostservlist *clnames, char  *glist, int grc)
  *	-1 = Failure to open /etc/mnttab file or to get ZFS dataset.
  */
 int
-smb_getdataset(const char *path, char *dataset, size_t len)
+smb_getdataset(libzfs_handle_t *libhdl, const char *path, char *dataset,
+    size_t len)
 {
 	char tmppath[MAXPATHLEN];
 	char *cp;
@@ -636,6 +637,33 @@ smb_getdataset(const char *path, char *dataset, size_t len)
 	struct mnttab mntpref;
 	int rc = -1;
 
+	/*
+	 * Optimisation: if the path is the default mountpoint then
+	 * the dataset name can be determined from path.
+	 * Attempt to open dataset by derived name and, if successful,
+	 * check if its mountpoint matches path.
+	 */
+	if (libhdl != NULL) {
+		zfs_handle_t *hdl;
+		char mountpnt[ZFS_MAXPROPLEN];
+		char *dsname = (char *)path + strspn(path, "/");
+
+		hdl = zfs_open(libhdl, dsname, ZFS_TYPE_FILESYSTEM);
+		if (hdl != NULL) {
+			if ((zfs_prop_get(hdl, ZFS_PROP_MOUNTPOINT, mountpnt,
+			    sizeof (mountpnt), NULL, NULL, 0, B_FALSE) == 0) &&
+			    (strcmp(mountpnt, path) == 0)) {
+				zfs_close(hdl);
+				(void) strlcpy(dataset, dsname, len);
+				return (0);
+			}
+			zfs_close(hdl);
+		}
+	}
+
+	/*
+	 * Couldn't find a filesystem optimistically, use mnttab
+	 */
 	if ((fp = fopen(MNTTAB, "r")) == NULL)
 		return (-1);
 
@@ -899,9 +927,9 @@ smb_name_validate_domain(const char *domain)
  * hyphens.
  *
  * It cannot:
- * 	- be blank or longer than 15 chracters
- * 	- contain all numbers
- * 	- be the same as the computer name
+ *	- be blank or longer than 15 chracters
+ *	- contain all numbers
+ *	- be the same as the computer name
  */
 uint32_t
 smb_name_validate_nbdomain(const char *name)
