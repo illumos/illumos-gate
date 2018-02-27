@@ -123,8 +123,6 @@ LFLAGS = -i -s
 
 .KEEP_STATE:
 
-.PARALLEL: $(OBJS) $(INTERMEDIATES)
-
 all: $(YACC_FILES) .WAIT $(PROG)
 
 $(IASL_OBJ_DIR)/aslcompiler.y: $(IASL_SRC_DIR)/aslparser.y
