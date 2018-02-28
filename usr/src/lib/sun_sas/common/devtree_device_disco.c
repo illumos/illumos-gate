@@ -718,7 +718,7 @@ get_attached_paths_info(di_path_t path, struct sun_sas_port *port_ptr)
 				break;
 			}
 		}
-		if (charptr != '\0') {
+		if (*charptr != '\0') {
 			tmpAddr = htonll(strtoll(charptr, NULL, 16));
 			(void) memcpy(&SASAddress.wwn[0], &tmpAddr, 8);
 		} else {

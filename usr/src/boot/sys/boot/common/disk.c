@@ -131,11 +131,16 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 		dev.d_partition = -1;
 		if (disk_open(&dev, part->end - part->start + 1,
 		    od->sectorsize) == 0) {
+			enum ptable_type pt = PTABLE_NONE;
+
 			table = ptable_open(&dev, part->end - part->start + 1,
 			    od->sectorsize, ptblread);
-			if (table != NULL &&
-			    (ptable_gettype(table) == PTABLE_BSD ||
-			    ptable_gettype(table) == PTABLE_VTOC8)) {
+			if (table != NULL)
+				pt = ptable_gettype(table);
+
+			if (pt == PTABLE_BSD ||
+			    pt == PTABLE_VTOC8 ||
+			    pt == PTABLE_VTOC) {
 				sprintf(line, "  %s%s", pa->prefix, pname);
 				bsd.dev = &dev;
 				bsd.prefix = line;

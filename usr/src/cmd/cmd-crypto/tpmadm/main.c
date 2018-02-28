@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -135,7 +136,7 @@ print_error(TSS_RESULT ret, char *msg)
 	case TPM_E_DEACTIVATED:
 	case TPM_E_DISABLED:
 		(void) fprintf(stderr,
-		    gettext("Enable the TPM and restart Solaris.\n"));
+		    gettext("Enable the TPM and reboot.\n"));
 		break;
 	case TSP_ERROR(TSS_E_COMM_FAILURE):
 		(void) fprintf(stderr,
@@ -147,7 +148,7 @@ print_error(TSS_RESULT ret, char *msg)
 
 int
 get_tpm_capability(TSS_HCONTEXT hContext, TSS_HOBJECT hTPM, UINT32 cap,
-UINT32 subcap, void *buf, size_t bufsize)
+    UINT32 subcap, void *buf, size_t bufsize)
 {
 	TSS_RESULT ret;
 	UINT32 datalen;
@@ -179,7 +180,7 @@ UINT32 subcap, void *buf, size_t bufsize)
 
 int
 set_policy_options(TSS_HPOLICY hPolicy, TSS_FLAG mode, char *prompt,
-UINT32 secret_len, BYTE *secret)
+    UINT32 secret_len, BYTE *secret)
 {
 	TSS_RESULT ret;
 	BYTE *unicode_prompt;
@@ -206,7 +207,7 @@ UINT32 secret_len, BYTE *secret)
 
 int
 set_object_policy(TSS_HOBJECT handle, TSS_FLAG mode, char *prompt,
-UINT32 secret_len, BYTE *secret)
+    UINT32 secret_len, BYTE *secret)
 {
 	TSS_HPOLICY hPolicy;
 	TSS_RESULT ret;

@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Use distributed make (dmake) by default.
@@ -32,12 +32,14 @@ cpu=`uname -p`
 case $cpu in
 i386)
 	x=intel
+	kmdb_arch="amd64"
 	mdb_arch="ia32 amd64"
 	arch64=amd64
 	;;
 sparc)
 	x=sparc
-	mdb_arch=v9
+	kmdb_arch=v9
+	mdb_arch="v7 v9"
 	arch64=sparcv9
 	;;
 *)  echo "Huh?" ; exit 1;;
@@ -195,7 +197,9 @@ esac
 
 # Build the MDB modules, WITH the linktest
 (cd $SRC/cmd/mdb/tools && $make $1)
-for a in $mdb_arch
+
+# kmdb_arch is 64-bit only
+for a in $kmdb_arch
 do
   case $1 in
   install|lint)
@@ -207,15 +211,19 @@ do
 	$make -k $1 )
     ;;
   esac
-
   (cd $SRC/cmd/mdb/$x/$a/nsmb &&
 	$make $1 KMDB_LINKTEST_ENABLE= )
   (cd $SRC/cmd/mdb/$x/$a/smbfs &&
 	$make $1 KMDB_LINKTEST_ENABLE= )
   (cd $SRC/cmd/mdb/$x/$a/smbsrv &&
 	$make $1 KMDB_LINKTEST_ENABLE= )
+done
+
+# mdb_arch is both 32-bit & 64-bit
+for a in $mdb_arch
+do
   (cd $SRC/cmd/mdb/$x/$a/libfksmbsrv &&
-	$make $1 KMDB_LINKTEST_ENABLE= )
+	$make $1 )
 
 # We build these libraries (to the proto area), so we need to
 # build the mdb modules too so mdb will load them.
@@ -271,14 +279,11 @@ do_tar() {
 	files="
 lib/svc/manifest/network/smb/server.xml
 usr/kernel/drv/$arch64/smbsrv
-usr/kernel/drv/smbsrv
 usr/kernel/kmdb/$arch64/smbsrv
-usr/kernel/kmdb/smbsrv
 usr/lib/fs/smb/$arch64/libshare_smb.so.1
 usr/lib/fs/smb/libshare_smb.so.1
 usr/lib/libsmbfs.so.1
 usr/lib/mdb/kvm/$arch64/smbsrv.so
-usr/lib/mdb/kvm/smbsrv.so
 usr/lib/reparse/libreparse_smb.so.1
 usr/lib/security/pam_smb_passwd.so.1
 usr/lib/smbsrv/dtrace

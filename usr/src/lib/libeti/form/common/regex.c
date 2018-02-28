@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <sys/types.h>
@@ -173,6 +171,7 @@ __advance(char *alp, char *aep)
 
 	case EGRP|STAR:
 		(void) __xpop(0);
+		/* FALLTHROUGH */
 	case EGRP|PLUS:
 		(void) __xpush(0, ++ep);
 		return ((intptr_t)lp);
@@ -276,17 +275,21 @@ __advance(char *alp, char *aep)
 	case CDOT|PLUS:
 		if (*lp++ == '\0')
 			return (0);
+		/* FALLTHROUGH */
 	case CDOT|STAR:
 		curlp = lp;
-		while (*lp++);
+		while (*lp++)
+			;
 		goto star;
 
 	case CCHR|PLUS:
 		if (*lp++ != *ep)
 			return (0);
+		/* FALLTHROUGH */
 	case CCHR|STAR:
 		curlp = lp;
-		while (*lp++ == *ep);
+		while (*lp++ == *ep)
+			;
 		ep++;
 		goto star;
 
@@ -296,6 +299,7 @@ __advance(char *alp, char *aep)
 	case PGRP|A768:
 		if (!(lp = (char *)__advance(lp, ep+1)))
 			return (0);
+		/* FALLTHROUGH */
 	case SGRP|A768:
 	case SGRP|A512:
 	case SGRP|A256:
@@ -314,11 +318,13 @@ __advance(char *alp, char *aep)
 	case NCCL|PLUS:
 		if (!__cclass(ep, *lp++, ep[-1] == (CCL | PLUS)))
 			return (0);
+		/* FALLTHROUGH */
 	case CCL|STAR:
 	case NCCL|STAR:
 		curlp = lp;
 		while (__cclass(ep, *lp++, ((ep[-1] == (CCL | STAR)) ||
-			(ep[-1] == (CCL | PLUS)))));
+		    (ep[-1] == (CCL | PLUS)))))
+			;
 		ep += *ep;
 		goto star;
 

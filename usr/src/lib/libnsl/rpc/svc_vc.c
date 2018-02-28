@@ -929,7 +929,7 @@ again:
 
 				goto end;
 			}
-			/* else FALL THROUGH TO */
+			/* FALLTHROUGH */
 
 		default:
 			__tli_sys_strerror(errorstr, sizeof (errorstr),
@@ -1828,7 +1828,7 @@ __svc_vc_dup(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz)
 
 int
 __svc_vc_dupdone(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
-				int status)
+    int status)
 {
 	return (__svc_dupdone(req, resp_buf, resp_bufsz, status,
 	    /* LINTED pointer alignment */

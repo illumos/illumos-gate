@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include	"curses_inc.h"
@@ -97,13 +95,13 @@ scr_reset(FILE *filep, int type)
 	}
 
 	/* check magic number */
-	if (fread((char *) &magic, sizeof (short), 1, filep) != 1)
+	if (fread((char *)&magic, sizeof (short), 1, filep) != 1)
 		goto err;
 	if (magic != SVR3_DUMP_MAGIC_NUMBER)
 		goto err;
 
 	/* get modification time of image in file */
-	if (fread((char *) &ttytime, sizeof (time_t), 1, filep) != 1)
+	if (fread((char *)&ttytime, sizeof (time_t), 1, filep) != 1)
 		goto err;
 
 	if ((type != 1) && ((ttyname(cur_term->Filedes) == NULL) ||
@@ -128,13 +126,13 @@ scr_reset(FILE *filep, int type)
 	    ((type == 2) && ((win1 = dupwin(win)) == NULL)) ||
 	    (win->_maxy != curscr->_maxy) || (win->_maxx != curscr->_maxx) ||
 	    /* soft labels */
-	    (fread((char *) &magic, sizeof (int), 1, filep) != 1))
+	    (fread((char *)&magic, sizeof (int), 1, filep) != 1))
 		goto err;
 
 	/*
-	* if soft labels were dumped, we would like either read them
-	* or advance the file pointer pass them
-	*/
+	 * if soft labels were dumped, we would like either read them
+	 * or advance the file pointer pass them
+	 */
 	if (magic) {
 		short	i, labmax, lablen;
 		SLK_MAP	*slk = SP->slk;
@@ -144,10 +142,10 @@ scr_reset(FILE *filep, int type)
 		 */
 		/*
 		 * char	**labdis = SP->slk->_ldis, **labval = SP->slk->_lval;
-		*/
+		 */
 
-		if ((fread((char *) &labmax, sizeof (short), 1, filep) != 1) ||
-		    (fread((char *) &lablen, sizeof (short), 1, filep) != 1)) {
+		if ((fread((char *)&labmax, sizeof (short), 1, filep) != 1) ||
+		    (fread((char *)&lablen, sizeof (short), 1, filep) != 1)) {
 			goto err;
 		}
 
@@ -162,7 +160,7 @@ scr_reset(FILE *filep, int type)
 				 * filep) != lablen) ||
 				 * (fread(labval[i], sizeof (char), lablen,
 				 * filep != lablen))
-				*/
+				 */
 				if ((fread(slk->_ldis[i], sizeof (char),
 				    lablen, filep) != lablen) ||
 				    (fread(slk->_lval[i],
@@ -172,7 +170,7 @@ scr_reset(FILE *filep, int type)
 			}
 			(*_do_slk_tch)();
 		} else {
-			if (fseek(filep, (long) (2 * labmax * lablen *
+			if (fseek(filep, (long)(2 * labmax * lablen *
 			    sizeof (char)), 1) != 0)
 				goto err;
 		}
@@ -180,7 +178,7 @@ scr_reset(FILE *filep, int type)
 
 	/* read the color information(if any) from the file 		*/
 
-	if (fread((char *) &magic, sizeof (int), 1, filep) != 1)
+	if (fread((char *)&magic, sizeof (int), 1, filep) != 1)
 		goto err;
 
 	if (magic) {
@@ -196,15 +194,15 @@ scr_reset(FILE *filep, int type)
 	/* new terminal doesn't support color, in order to know how to   */
 	/* deal with the rest of the file				 */
 
-		if ((fread((char *) &colors, sizeof (int), 1, filep) != 1) ||
-		    (fread((char *) &color_pairs, sizeof (int), 1,
-		    filep) != 1) || (fread((char *) &could_change,
+		if ((fread((char *)&colors, sizeof (int), 1, filep) != 1) ||
+		    (fread((char *)&color_pairs, sizeof (int), 1,
+		    filep) != 1) || (fread((char *)&could_change,
 		    sizeof (char), 1, filep) != 1))
 			goto err;
 
 		if (max_pairs == -1 || cur_term->_pairs_tbl == NULL ||
 		    colors > max_colors || color_pairs > max_pairs) {
-			if (fseek(filep, (long) (colors * sizeof (_Color) +
+			if (fseek(filep, (long)(colors * sizeof (_Color) +
 			    color_pairs * sizeof (_Color_pair)), 1) != 0)
 				goto err;
 		} else {
@@ -237,7 +235,7 @@ scr_reset(FILE *filep, int type)
 		/* the old terminal could modify colors, by the new one */
 		/* cannot skip over color_table info.			*/
 
-					if (fseek(filep, (long) (colors *
+					if (fseek(filep, (long)(colors *
 					    sizeof (_Color)), 1) != 0)
 						goto err;
 				}
@@ -265,7 +263,7 @@ err:
 				if (ptp->init)
 					/* LINTED */
 					(void) init_pair((short)i,
-					     ptp->foreground, ptp->background);
+					    ptp->foreground, ptp->background);
 			}
 			free(save_ptp);
 		}
@@ -289,7 +287,7 @@ err:
 			/* clear the hash table */
 			for (y = curscr->_maxy; y > 0; --y)
 				*hash++ = _NOHASH;
-		/* LINTED */ /* Known fall-through on case statement. */
+			/* FALLTHROUGH */
 		case 0:
 			{
 			int	saveflag = curscr->_flags & _CANT_BE_IMMED;

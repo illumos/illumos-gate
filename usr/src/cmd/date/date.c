@@ -27,7 +27,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -56,7 +56,9 @@
 #include	<unistd.h>
 #include	<sys/time.h>
 #include	<sys/types.h>
+#include	<sys/stat.h>
 #include	<ctype.h>
+#include	<errno.h>
 #include	<utmpx.h>
 #include	<tzfile.h>
 
@@ -70,10 +72,12 @@ static  struct  utmpx wtmpx[2] = {
 	{"", "", NTIME_MSG, 0, NEW_TIME, 0, 0, 0}
 	};
 static char *usage =
-	"usage:\tdate [-u] mmddHHMM[[cc]yy][.SS]\n\tdate [-Ru] [+format]\n"
+	"usage:\tdate [-u] mmddHHMM[[cc]yy][.SS]\n"
+	"\tdate [-Ru] [-r seconds | filename] [+format]\n"
 	"\tdate -a [-]sss[.fff]\n";
 static int uflag = 0;
 static int Rflag = 0;
+static int rflag = 0;
 
 static int get_adj(char *, struct timeval *);
 static int setdate(struct tm *, char *);
@@ -85,7 +89,7 @@ main(int argc, char **argv)
 {
 	struct tm *tp, tm;
 	struct timeval tv;
-	char *fmt;
+	char *fmt, *eptr;
 	char fmtbuf[BUFSIZ];
 	int c, aflag = 0, illflag = 0;
 	struct timespec ts;
@@ -97,7 +101,7 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:uR")) != EOF)
+	while ((c = getopt(argc, argv, "a:uRr:")) != EOF)
 		switch (c) {
 		case 'a':
 			aflag++;
@@ -114,6 +118,36 @@ main(int argc, char **argv)
 		case 'R':
 			Rflag++;
 			break;
+		case 'r':
+
+			/*
+			 * BSD originally used -r to specify a unix time. GNU
+			 * used -r to specify a reference to a file. Now, like
+			 * some BSDs we attempt to parse the time. If we can,
+			 * then we use that, otherwise we fall back and treat it
+			 * like GNU.
+			 */
+			rflag++;
+			errno = 0;
+			ts.tv_sec = strtol(optarg, &eptr, 0);
+			if (errno == EINVAL || *eptr != '\0') {
+				struct stat st;
+				if (stat(optarg, &st) == 0) {
+					ts.tv_sec = st.st_mtime;
+				} else {
+					(void) fprintf(stderr,
+					    gettext("date: failed to get stat "
+					    "information about %s: %s\n"),
+					    optarg, strerror(errno));
+					exit(1);
+				}
+			} else if (errno != 0) {
+				(void) fprintf(stderr,
+				    gettext("date: failed to parse -r "
+				    "argument: %s\n"), optarg);
+				exit(1);
+			}
+			break;
 		default:
 			illflag++;
 		}
@@ -121,10 +155,12 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv  = &argv[optind];
 
-	/* -a is mutually exclusive with -u and -R */
+	/* -a is mutually exclusive with -u, -R, and -r */
 	if (uflag && aflag)
 		illflag++;
 	if (Rflag && aflag)
+		illflag++;
+	if (rflag && aflag)
 		illflag++;
 
 	if (illflag) {
@@ -132,9 +168,11 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
-		perror(gettext("date: Failed to obtain system time"));
-		exit(1);
+	if (rflag == 0) {
+		if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+			perror(gettext("date: Failed to obtain system time"));
+			exit(1);
+		}
 	}
 	clock_val = ts.tv_sec;
 

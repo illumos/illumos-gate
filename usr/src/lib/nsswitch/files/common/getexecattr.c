@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -48,6 +49,19 @@ extern int _doexeclist(nss_XbyY_args_t *);
 extern int _readbufline(char *, int, char *, int, int *);
 extern char *_exec_wild_id(char *, const char *);
 extern void _exec_cleanup(nss_status_t, nss_XbyY_args_t *);
+
+/*
+ * _exec_files_XY_all wants to cache data from the attribute file.
+ */
+static char *exec_f_buf;
+static time_t exec_read_time;
+
+void
+getexecattr_fini(void)
+{
+	free(exec_f_buf);
+	exec_f_buf = NULL;
+}
 
 
 /*
@@ -104,10 +118,8 @@ _exec_files_XY_all(files_backend_ptr_t be,
 	int		exec_fd = 0;
 	int		f_size = 0;
 	time_t		f_time = 0;
-	static time_t	read_time = 0;
 	char		*first;
 	char		*last;
-	static char	*f_buf = NULL;
 	struct stat	f_stat;
 	nss_status_t	res = NSS_NOTFOUND;
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
@@ -132,7 +144,7 @@ _exec_files_XY_all(files_backend_ptr_t be,
 	f_size = f_stat.st_size;
 	f_time = f_stat.st_mtime;
 
-	while (f_time > read_time || f_buf == NULL) {
+	while (f_time > exec_read_time || exec_f_buf == NULL) {
 		/*
 		 * file has been modified since we last read it
 		 * or we never read it or memory allocation
@@ -150,32 +162,35 @@ _exec_files_XY_all(files_backend_ptr_t be,
 			return (NSS_UNAVAIL);
 		}
 		exec_fd = fileno(be->f);
-		if (f_buf != NULL)
-			free(f_buf);
-		if ((f_buf = malloc(f_size)) == NULL) {
+		if (exec_f_buf != NULL)
+			free(exec_f_buf);
+		if ((exec_f_buf = malloc(f_size)) == NULL) {
 			(void) _nss_files_endent(be, 0);
 			(void) rw_unlock(&exec_lock);
 			return (NSS_UNAVAIL);
 		}
-		if (read(exec_fd, f_buf, f_size) < f_size) {
-			free(f_buf);
+		if (read(exec_fd, exec_f_buf, f_size) < f_size) {
+			free(exec_f_buf);
+			exec_f_buf = NULL;
 			(void) _nss_files_endent(be, 0);
 			(void) rw_unlock(&exec_lock);
 			return (NSS_UNAVAIL);
 		}
-		read_time = f_time;
+		exec_read_time = f_time;
 		(void) rw_unlock(&exec_lock);
 		/*
 		 * verify that the file did not change after
 		 * we read it.
 		 */
 		if (rw_rdlock(&exec_lock) != 0) {
-			free(f_buf);
+			free(exec_f_buf);
+			exec_f_buf = NULL;
 			(void) _nss_files_endent(be, 0);
 			return (NSS_UNAVAIL);
 		}
 		if (stat(be->filename, &f_stat) != 0) {
-			free(f_buf);
+			free(exec_f_buf);
+			exec_f_buf = NULL;
 			(void) _nss_files_endent(be, 0);
 			(void) rw_unlock(&exec_lock);
 			return (NSS_UNAVAIL);
@@ -190,7 +205,7 @@ _exec_files_XY_all(files_backend_ptr_t be,
 		int	linelen = 0;
 		char	*instr = be->buf;
 
-		linelen = _readbufline(f_buf, f_size, instr, be->minbuf,
+		linelen = _readbufline(exec_f_buf, f_size, instr, be->minbuf,
 		    &lastlen);
 		if (linelen < 0) {
 			/* End of file */
