@@ -883,7 +883,7 @@ check_propsize(int op, picl_obj_t *propp, size_t sz)
 				return (PICL_VALUETOOBIG);
 			return (PICL_SUCCESS);	/* allow small writes */
 		}
-		/* fall through for reads */
+		/* FALLTHROUGH */
 	default:
 		if (propp->prop_size != sz)
 			return (PICL_INVALIDARG);

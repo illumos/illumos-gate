@@ -177,7 +177,7 @@ __chkflags(char *flags, au_mask_t *mask, boolean_t cont, char **error)
 			flags++;
 		}
 
-		if (flags == '\0') {
+		if (*flags == '\0') {
 			break;
 		}
 		if (error != NULL) {

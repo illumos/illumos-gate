@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecp.h"
 #include "mpi.h"
 #include "mplogic.h"
@@ -90,16 +88,22 @@ ec_GFp_nistp224_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		switch (a_used) {
 		case 14:
 			a6b = MP_DIGIT(a, 13);
+			/* FALLTHROUGH */
 		case 13:
 			a6a = MP_DIGIT(a, 12);
+			/* FALLTHROUGH */
 		case 12:
 			a5b = MP_DIGIT(a, 11);
+			/* FALLTHROUGH */
 		case 11:
 			a5a = MP_DIGIT(a, 10);
+			/* FALLTHROUGH */
 		case 10:
 			a4b = MP_DIGIT(a, 9);
+			/* FALLTHROUGH */
 		case 9:
 			a4a = MP_DIGIT(a, 8);
+			/* FALLTHROUGH */
 		case 8:
 			a3b = MP_DIGIT(a, 7);
 		}
@@ -212,6 +216,7 @@ ec_GFp_nistp224_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 			a6 = MP_DIGIT(a, 6);
 			a6b = a6 >> 32;
 			a6a_a5b = a6 << 32;
+			/* FALLTHROUGH */
 		case 6:
 			a5 = MP_DIGIT(a, 5);
 			a5b = a5 >> 32;
@@ -219,10 +224,12 @@ ec_GFp_nistp224_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 			a5b = a5b << 32;
 			a5a_a4b = a5 << 32;
 			a5a = a5 & 0xffffffff;
+			/* FALLTHROUGH */
 		case 5:
 			a4 = MP_DIGIT(a, 4);
 			a5a_a4b |= a4 >> 32;
 			a4a_a3b = a4 << 32;
+			/* FALLTHROUGH */
 		case 4:
 			a3b = MP_DIGIT(a, 3) >> 32;
 			a4a_a3b |= a3b;

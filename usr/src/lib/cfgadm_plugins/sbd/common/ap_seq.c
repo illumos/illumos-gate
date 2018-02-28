@@ -332,8 +332,8 @@ ap_seq_exec(apd_t *a, int cmd, int first, int last)
 			    SCF_SUCCESS) {
 				fastreboot_disabled = 1;
 			}
-			/* FALLTHROUGH */
 #endif	/* __x86 */
+			/* FALLTHROUGH */
 
 		default:
 			rc = ap_ioctl(a, c);

@@ -983,6 +983,7 @@ cfga_private_func(const char *function, const char *ap_id,
 				return (prt_led_mode(ap_id, repeat, errstring,
 				    msgp));
 			}
+			/* FALLTHROUGH */
 		default:
 			DBG(1, ("default\n"));
 			errno = EINVAL;

@@ -134,7 +134,7 @@ void BnxeLogInfo(void * pDev, char * pFmt, ...);
 void BnxeLogWarn(void * pDev, char * pFmt, ...);
 /* for CE_PANIC use one of the BnxeDbgBreak macros above */
 
-#ifdef DEBUG
+#ifdef DBG
 void BnxeLogDbg(void * pDev, char * pFmt, ...);
 #else
 #define BnxeLogDbg

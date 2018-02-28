@@ -23,6 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2017, Joyent, INc.
+ */
 
 /*
  * Common code and structures used by name-service-switch "files" backends.
@@ -139,6 +142,11 @@ extern int	validate_group_ids(char *line, int *linelenp, int buflen,
 			int extra_chars, files_XY_check_func check);
 extern int	validate_passwd_ids(char *line, int *linelenp, int buflen,
 			int extra_chars);
+
+/*
+ * Destructors used by different bits.
+ */
+extern void getexecattr_fini(void);
 
 #ifdef	__cplusplus
 }

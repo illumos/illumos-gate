@@ -3109,7 +3109,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
  *	Sets isp->is_sym_name to the allocated string. Returns the
  *	string pointer, or NULL on allocation failure.
  */
-const const char *
+const char *
 ld_stt_section_sym_name(Is_desc *isp)
 {
 	const char	*fmt;

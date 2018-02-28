@@ -37,3 +37,4 @@ tests = ['json_00_blank', 'json_01_boolean', 'json_02_numbers',
     'json_06_nested', 'json_07_nested_arrays']
 
 [/opt/util-tests/tests/grep_test]
+[/opt/util-tests/tests/date_test]

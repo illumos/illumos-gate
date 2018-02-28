@@ -136,6 +136,7 @@ get_master_attributes_by_template(
 		case CKO_DATA:
 			/* CKO_DATA has no subtype, just pretend it is found  */
 			found = B_TRUE;
+			break;
 		default:
 			/* unknown object class */
 			return (CKR_ATTRIBUTE_VALUE_INVALID);

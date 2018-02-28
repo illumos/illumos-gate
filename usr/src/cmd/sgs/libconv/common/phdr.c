@@ -154,7 +154,7 @@ error "PT_NUM has grown. Update phdrs[]"
 
 
 	/* Build NULL terminated return arrays for each string style */
-	static const const conv_ds_t	*ds_def[] = {
+	static const conv_ds_t	*ds_def[] = {
 		CONV_DS_ADDR(ds_phdrs_def), CONV_DS_ADDR(ds_phdrs_osabi_def),
 		NULL };
 	static const conv_ds_t	*ds_dmp[] = {

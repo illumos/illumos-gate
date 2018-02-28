@@ -42,8 +42,6 @@
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ecp.h"
 #include "mpi.h"
 #include "mplogic.h"
@@ -87,18 +85,25 @@ ec_GFp_nistp256_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		switch (a_used) {
 		case 16:
 			a15 = MP_DIGIT(a,15);
+			/* FALLTHROUGH */
 		case 15:
 			a14 = MP_DIGIT(a,14);
+			/* FALLTHROUGH */
 		case 14:
 			a13 = MP_DIGIT(a,13);
+			/* FALLTHROUGH */
 		case 13:
 			a12 = MP_DIGIT(a,12);
+			/* FALLTHROUGH */
 		case 12:
 			a11 = MP_DIGIT(a,11);
+			/* FALLTHROUGH */
 		case 11:
 			a10 = MP_DIGIT(a,10);
+			/* FALLTHROUGH */
 		case 10:
 			a9 = MP_DIGIT(a,9);
+			/* FALLTHROUGH */
 		case 9:
 			a8 = MP_DIGIT(a,8);
 		}
@@ -270,10 +275,13 @@ ec_GFp_nistp256_mod(const mp_int *a, mp_int *r, const GFMethod *meth)
 		switch (a_used) {
 		case 8:
 			a7 = MP_DIGIT(a,7);
+			/* FALLTHROUGH */
 		case 7:
 			a6 = MP_DIGIT(a,6);
+			/* FALLTHROUGH */
 		case 6:
 			a5 = MP_DIGIT(a,5);
+			/* FALLTHROUGH */
 		case 5:
 			a4 = MP_DIGIT(a,4);
 		}
