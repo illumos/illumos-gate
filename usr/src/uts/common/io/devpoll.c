@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -405,6 +405,7 @@ repoll:
 					 * about the fd reassignment.
 					 */
 					pdp->pd_fp = fp;
+					pdp->pd_gen = gen;
 				}
 			}
 			/*
