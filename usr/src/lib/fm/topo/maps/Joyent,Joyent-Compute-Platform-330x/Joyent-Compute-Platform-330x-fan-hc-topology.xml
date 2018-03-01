@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright (c) 2018, Joyent, Inc.
+-->
+
+<topology name='fan' scheme='hc'>
+  <range name='fan' min='0' max='5'>
+    <node instance='0'>
+      <fac-enum provider='fac_prov_ipmi' />
+      <propgroup name='protocol' version='1' name-stability='Private'
+          data-stability='Private'>
+          <propval name='label' type='string' value='FAN 1' />
+          <propmethod name='ipmi_fru_fmri' version='0' propname='FRU'
+            proptype='fmri'>
+            <argval name='entity' type='string' value='self' />
+          </propmethod>
+      </propgroup>
+      <propgroup name='ipmi' version='1'
+          name-stability='Private' data-stability='Private' >
+         <propval name='entity-list' type='string_array' >
+           <propitem value='Fan1' />
+         </propval>
+      </propgroup>
+      <enum-method name='ipmi' version='1' />
+    </node>
+    <node instance='1'>
+      <fac-enum provider='fac_prov_ipmi' />
+      <propgroup name='protocol' version='1' name-stability='Private'
+          data-stability='Private'>
+          <propval name='label' type='string' value='FAN 2' />
+          <propmethod name='ipmi_fru_fmri' version='0' propname='FRU'
+            proptype='fmri'>
+            <argval name='entity' type='string' value='self' />
+          </propmethod>
+      </propgroup>
+      <propgroup name='ipmi' version='1'
+          name-stability='Private' data-stability='Private' >
+         <propval name='entity-list' type='string_array' >
+           <propitem value='Fan2' />
+         </propval>
+      </propgroup>
+      <enum-method name='ipmi' version='1' />
+    </node>
+    <node instance='2'>
+      <fac-enum provider='fac_prov_ipmi' />
+      <propgroup name='protocol' version='1' name-stability='Private'
+          data-stability='Private'>
+          <propval name='label' type='string' value='FAN 3' />
+          <propmethod name='ipmi_fru_fmri' version='0' propname='FRU'
+            proptype='fmri'>
+            <argval name='entity' type='string' value='self' />
+          </propmethod>
+      </propgroup>
+      <propgroup name='ipmi' version='1'
+          name-stability='Private' data-stability='Private' >
+         <propval name='entity-list' type='string_array' >
+           <propitem value='Fan3' />
+         </propval>
+      </propgroup>
+      <enum-method name='ipmi' version='1' />
+    </node>
+    <node instance='3'>
+      <fac-enum provider='fac_prov_ipmi' />
+      <propgroup name='protocol' version='1' name-stability='Private'
+          data-stability='Private'>
+          <propval name='label' type='string' value='FAN 4' />
+          <propmethod name='ipmi_fru_fmri' version='0' propname='FRU'
+            proptype='fmri'>
+            <argval name='entity' type='string' value='self' />
+          </propmethod>
+      </propgroup>
+      <propgroup name='ipmi' version='1'
+          name-stability='Private' data-stability='Private' >
+         <propval name='entity-list' type='string_array' >
+           <propitem value='Fan4' />
+         </propval>
+      </propgroup>
+      <enum-method name='ipmi' version='1' />
+    </node>
+    <node instance='4'>
+      <fac-enum provider='fac_prov_ipmi' />
+      <propgroup name='protocol' version='1' name-stability='Private'
+          data-stability='Private'>
+          <propval name='label' type='string' value='FAN 5' />
+          <propmethod name='ipmi_fru_fmri' version='0' propname='FRU'
+            proptype='fmri'>
+            <argval name='entity' type='string' value='self' />
+          </propmethod>
+      </propgroup>
+      <propgroup name='ipmi' version='1'
+          name-stability='Private' data-stability='Private' >
+         <propval name='entity-list' type='string_array' >
+           <propitem value='Fan5' />
+         </propval>
+      </propgroup>
+      <enum-method name='ipmi' version='1' />
+    </node>
+    <node instance='5'>
+      <fac-enum provider='fac_prov_ipmi' />
+      <propgroup name='protocol' version='1' name-stability='Private'
+          data-stability='Private'>
+          <propval name='label' type='string' value='FAN 6' />
+          <propmethod name='ipmi_fru_fmri' version='0' propname='FRU'
+            proptype='fmri'>
+            <argval name='entity' type='string' value='self' />
+          </propmethod>
+      </propgroup>
+      <propgroup name='ipmi' version='1'
+          name-stability='Private' data-stability='Private' >
+         <propval name='entity-list' type='string_array' >
+           <propitem value='Fan6' />
+         </propval>
+      </propgroup>
+      <enum-method name='ipmi' version='1' />
+    </node>
+  </range>
+</topology>

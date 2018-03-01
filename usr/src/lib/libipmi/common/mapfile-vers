@@ -80,6 +80,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ipmi_sdr_lookup_full_sensor;
 	ipmi_sdr_lookup_fru;
 	ipmi_sdr_lookup_generic;
+	ipmi_sdr_lookup_precise;
 	ipmi_sdr_refresh;
 	ipmi_sel_get_entry;
 	ipmi_sel_get_info;

@@ -1,0 +1,251 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright (c) 2018, Joyent, Inc.
+-->
+
+<topology name='i86pc' scheme='hc'>
+
+  <range name='motherboard' min='0' max='0'>
+    <enum-method name='smbios' version='1' />
+    <node instance='0' static='true'>
+        <fac-enum provider='fac_prov_ipmi' />
+        <facility name='3.3V PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='3.3V PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='5V AUX PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='5V AUX PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='1.05V PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='1.05V PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='BP0 5V PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='BP0 5V PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='5V SWITCH PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='5V SWITCH PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='VCCIO PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='VCCIO PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='NDC PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='2.5V AUX PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='1.5V PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='1.5V PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='BP1 5V PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='BP1 5V PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='BP2 5V PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='BP2 5V PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='1.5V AUX PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='1.5V AUX PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='1.05V PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='1.05V PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <facility name='DIMM PG' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private'
+                data-stability='Private' >
+                    <propval name='type' type='uint32' value='269' />
+                    <propval name='sensor-class' type='string' value='discrete' />
+                    <propval name='entity_ref' type='string_array' >
+                        <propitem value='DIMM PG' />
+                    </propval>
+                    <propmethod name='ipmi_sensor_state' version='0'
+                        propname='state' proptype='uint32' >
+                    </propmethod>
+              </propgroup>
+        </facility>
+        <propgroup name='protocol' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='label' type='string' value='MB' />
+        </propgroup>
+        <propgroup name='ipmi' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='entity-id' type='uint32' value='7' />
+            <propval name='entity-instance' type='uint32' value='1' />
+            <propval name='entity-list' type='string_array' >
+                <propitem value='CMOS Battery' />
+                <propitem value='Dedicated NIC' />
+                <propitem value='LCD Cable Pres' />
+                <propitem value='NDC PG' />
+                <propitem value='Riser Config Err' />
+                <propitem value='Riser 2 Presence' />
+                <propitem value='Riser 3 Presence' />
+                <propitem value='USB Cable Pres' />
+                <propitem value='VGA Cable Pres' />
+           </propval>
+        </propgroup>
+
+    </node> <!-- motherboard -->
+
+    <dependents grouping='children'>
+      <range name='chip' min='0' max='1'>
+        <enum-method name='chip' version='1' />
+      </range>
+      <range name='hostbridge' min='0' max='254'>
+        <enum-method name='hostbridge' version='1' />
+      </range>
+      <range name='sp' min='0' max='0'>
+        <enum-method name='ipmi' version='1' />
+      </range>
+      <range name='slot' min='0' max='23'>
+        <enum-method name='smbios' version='1' />
+      </range>
+    </dependents>
+
+  </range>
+
+  <range name='chassis' min='0' max='0'>
+    <propmap name='Joyent-Compute-Platform-330x-chassis' />
+
+    <dependents grouping='children'>
+
+       <range name='psu' min='0' max='1'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='fan' min='0' max='5'>
+          <propmap name='Joyent-Compute-Platform-330x-fan' />
+       </range>
+
+    </dependents>
+
+  </range>
+
+  <range name='ses-enclosure' min='0' max='1'>
+    <enum-method name='ses' version='1' />
+  </range>
+
+</topology>

@@ -23,6 +23,10 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 
 #include <libipmi.h>
 #include <stddef.h>
@@ -83,6 +87,8 @@
 
 typedef struct ipmi_sdr_cache_ent {
 	char				*isc_name;
+	uint8_t				isc_entity_id;
+	uint8_t				isc_entity_inst;
 	struct ipmi_sdr			*isc_sdr;
 	ipmi_hash_link_t		isc_link;
 } ipmi_sdr_cache_ent_t;
@@ -184,7 +190,7 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 	ipmi_sdr_t *sdr;
 	ipmi_sdr_cache_ent_t *ent;
 	size_t namelen;
-	uint8_t type;
+	uint8_t type, e_id = 0, e_inst = 0;
 	char *name;
 	ipmi_sdr_info_t *sip;
 	uint32_t isi_add_ts, isi_erase_ts;
@@ -223,6 +229,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				namelen = glp->is_gl_idlen;
 				type = glp->is_gl_idtype;
 				name = glp->is_gl_idstring;
+				e_id = glp->is_gl_entity;
+				e_inst = glp->is_gl_instance;
 				break;
 			}
 
@@ -234,6 +242,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				namelen = flp->is_fl_idlen;
 				name = flp->is_fl_idstring;
 				type = flp->is_fl_idtype;
+				e_id = flp->is_fl_entity;
+				e_inst = flp->is_fl_instance;
 				break;
 			}
 
@@ -247,6 +257,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				namelen = csp->is_cs_idlen;
 				type = csp->is_cs_idtype;
 				name = csp->is_cs_idstring;
+				e_id = csp->is_cs_entity_id;
+				e_inst = csp->is_cs_entity_instance;
 
 				tmp = LE_IN16(&csp->is_cs_assert_mask);
 				(void) memcpy(&csp->is_cs_assert_mask, &tmp,
@@ -272,6 +284,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				namelen = fsp->is_fs_idlen;
 				type = fsp->is_fs_idtype;
 				name = fsp->is_fs_idstring;
+				e_id = fsp->is_fs_entity_id;
+				e_inst = fsp->is_fs_entity_instance;
 
 				tmp = LE_IN16(&fsp->is_fs_assert_mask);
 				(void) memcpy(&fsp->is_fs_assert_mask, &tmp,
@@ -295,6 +309,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				namelen = esp->is_eo_idlen;
 				type = esp->is_eo_idtype;
 				name = esp->is_eo_idstring;
+				e_id = esp->is_eo_entity_id;
+				e_inst = esp->is_eo_entity_instance;
 				break;
 			}
 
@@ -306,6 +322,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 				namelen = msp->is_ml_idlen;
 				type = msp->is_ml_idtype;
 				name = msp->is_ml_idstring;
+				e_id = msp->is_ml_entity_id;
+				e_inst = msp->is_ml_entity_instance;
 				break;
 			}
 
@@ -334,6 +352,8 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 		}
 
 		ent->isc_sdr = sdr;
+		ent->isc_entity_id = e_id;
+		ent->isc_entity_inst = e_inst;
 
 		if (name != NULL) {
 			if ((ent->isc_name = ipmi_alloc(ihp, namelen + 1)) ==
@@ -407,18 +427,17 @@ ipmi_sdr_hash_compare(const void *a, const void *b)
 		return (-1);
 
 	/*
-	 * While it is strange for a service processor to report multiple
-	 * entries with the same name, we allow it by treating the (name, id)
-	 * as the unique identifier.  When looking up by name, the SDR pointer
-	 * is NULL, and we return the first matching name.
+	 * When looking up only by name we return the first matching name. For
+	 * a more precise match, callers can optionally specify an IPMI entity
+	 * ID and instance that must also match.
 	 */
-	if (ap->isc_sdr == NULL || bp->isc_sdr == NULL)
-		return (0);
-
-	if (ap->isc_sdr->is_id == bp->isc_sdr->is_id)
-		return (0);
-	else
-		return (-1);
+	if (ap->isc_entity_id != IPMI_ET_UNSPECIFIED &&
+	    bp->isc_entity_id != IPMI_ET_UNSPECIFIED) {
+		if (ap->isc_entity_id != bp->isc_entity_id ||
+		    ap->isc_entity_inst != bp->isc_entity_inst)
+			return (-1);
+	}
+	return (0);
 }
 
 int
@@ -564,6 +583,13 @@ ipmi_sdr_iter(ipmi_handle_t *ihp, int (*func)(ipmi_handle_t *,
 ipmi_sdr_t *
 ipmi_sdr_lookup(ipmi_handle_t *ihp, const char *idstr)
 {
+	return (ipmi_sdr_lookup_precise(ihp, idstr, IPMI_ET_UNSPECIFIED, 0));
+}
+
+ipmi_sdr_t *
+ipmi_sdr_lookup_precise(ipmi_handle_t *ihp, const char *idstr, uint8_t e_id,
+    uint8_t e_inst)
+{
 	ipmi_sdr_cache_ent_t *ent, search;
 
 	if (ipmi_hash_first(ihp->ih_sdr_cache) == NULL &&
@@ -572,6 +598,8 @@ ipmi_sdr_lookup(ipmi_handle_t *ihp, const char *idstr)
 
 	search.isc_name = (char *)idstr;
 	search.isc_sdr = NULL;
+	search.isc_entity_id = e_id;
+	search.isc_entity_inst = e_inst;
 	if ((ent = ipmi_hash_lookup(ihp->ih_sdr_cache, &search)) == NULL) {
 		(void) ipmi_set_error(ihp, EIPMI_NOT_PRESENT, NULL);
 		return (NULL);

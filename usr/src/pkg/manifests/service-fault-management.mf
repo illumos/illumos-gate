@@ -749,6 +749,18 @@ $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-hc-topology.xml \
     target=./SSG-2028R-ACR24L-hc-topology.xml
 $(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3301-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3302-hc-topology.xml \
+    target=./Joyent-Compute-Platform-3301-hc-topology.xml
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-chassis-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-330x-fan-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-chassis-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
