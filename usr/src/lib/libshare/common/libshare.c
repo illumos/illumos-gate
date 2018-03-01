@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -1150,6 +1150,20 @@ sa_fini(sa_handle_t handle)
 		free(impl_handle);
 
 	}
+}
+
+/*
+ * sa_service(sa_handle_t handle)
+ *
+ * Returns the service for which the handle is currently initialized.
+ */
+int
+sa_service(sa_handle_t handle)
+{
+	if (handle == NULL)
+		return (0);
+
+	return (((sa_handle_impl_t)handle)->sa_service);
 }
 
 /*

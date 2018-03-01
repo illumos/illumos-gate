@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -171,6 +171,8 @@ typedef struct sa_init_selective_arg sa_init_selective_arg_t;
 extern sa_handle_t sa_init(int);
 extern sa_handle_t sa_init_arg(int, void *);
 extern void sa_fini(sa_handle_t);
+extern int sa_service(sa_handle_t);
+
 extern int sa_update_config(sa_handle_t);
 extern boolean_t sa_needs_refresh(sa_handle_t);
 extern char *sa_errorstr(int);
