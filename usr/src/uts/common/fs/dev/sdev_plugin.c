@@ -548,12 +548,14 @@ sdev_free_vtab(fs_operation_def_t *new)
 sdev_plugin_hdl_t
 sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 {
-	int ret, err;
+	char buf[sizeof ("dev")] = "";
+	struct pathname pn = { 0 };
 	sdev_plugin_t *spp, *iter;
 	vnode_t *vp, *nvp;
 	sdev_node_t *sdp, *slp;
 	timestruc_t now;
 	struct vattr vap;
+	int ret, err;
 
 	/*
 	 * Some consumers don't care about why they failed. To keep the code
@@ -598,14 +600,22 @@ sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 	spp->sp_nnodes = 0;
 
 	/*
-	 * Make sure it's unique, nothing exists with this name already, and add
-	 * it to the list. We also need to go through and grab the sdev
-	 * root node as we cannot grab any sdev node locks once we've grabbed
-	 * the sdev_plugin_lock. We effectively assert that if a directory is
-	 * not present in the GZ's /dev, then it doesn't exist in any of the
-	 * local zones.
+	 * Make sure our /dev entry is unique and install it.  We also need to
+	 * go through and grab the sdev root node as we cannot grab any sdev
+	 * node locks once we've grabbed the sdev_plugin_lock. We effectively
+	 * assert that if a directory is not present in the GZ's /dev, then it
+	 * doesn't exist in any of the local zones.
+	 *
+	 * Note that we may be in NGZ context: during a prof_filldir(".../dev/")
+	 * enumeration, for example. So we have to dig as deep as lookuppnvp()
+	 * to make sure we really get to the global /dev (i.e.  escape both
+	 * CRED() and ->u_rdir).
 	 */
-	ret = vn_openat("/dev", UIO_SYSSPACE, FREAD, 0, &vp, 0, 0, rootdir, -1);
+	pn_get_buf("dev", UIO_SYSSPACE, &pn, buf, sizeof (buf));
+	VN_HOLD(rootdir);
+	ret = lookuppnvp(&pn, NULL, NO_FOLLOW, NULLVPP,
+	    &vp, rootdir, rootdir, kcred);
+
 	if (ret != 0) {
 		*errp = ret;
 		kmem_cache_free(sdev_plugin_cache, spp);
