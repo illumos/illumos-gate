@@ -23,6 +23,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Jason King
  */
 
 #ifndef _TPMTOK_INT_H
@@ -32,8 +33,8 @@
 #include <pthread.h>
 #include <string.h>
 #include <strings.h>
-#include <md5.h>
-#include <sha1.h>
+#include <sys/md5.h>
+#include <sys/sha1.h>
 #include <limits.h>
 #include <syslog.h>
 #include <errno.h>
