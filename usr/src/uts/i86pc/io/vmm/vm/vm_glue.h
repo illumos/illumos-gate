@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_GLUE_
@@ -71,10 +71,10 @@ struct vm_page {
 /* Illumos-specific functions for setup and operation */
 int vm_segmap_obj(struct vmspace *, vm_object_t, struct as *, caddr_t *,
     uint_t, uint_t, uint_t);
-int vm_segmap_space(struct vmspace *, off_t , struct as *, caddr_t *, off_t,
+int vm_segmap_space(struct vmspace *, off_t, struct as *, caddr_t *, off_t,
     uint_t, uint_t, uint_t);
 void *vmspace_find_kva(struct vmspace *, uintptr_t, size_t);
 void vmm_arena_init(void);
-boolean_t vmm_arena_fini(void);
+void vmm_arena_fini(void);
 
 #endif /* _VM_GLUE_ */

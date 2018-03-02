@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  */
 
 
@@ -2314,11 +2314,7 @@ startup_kernel(void)
 	 * Need correct target_kernel_text value
 	 */
 #if defined(_BOOT_TARGET_amd64)
-	target_kernel_text = KERNEL_TEXT_amd64;
-#elif defined(__xpv)
-	target_kernel_text = KERNEL_TEXT_i386_xpv;
-#else
-	target_kernel_text = KERNEL_TEXT_i386;
+	target_kernel_text = KERNEL_TEXT;
 #endif
 	DBG(target_kernel_text);
 

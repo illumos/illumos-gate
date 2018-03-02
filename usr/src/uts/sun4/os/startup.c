@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/machsystm.h>
@@ -2054,7 +2055,7 @@ startup_vm(void)
 
 		(void) seg_attach(&kas, segzio_base, mmu_ptob(segziosize),
 		    &kzioseg);
-		(void) segkmem_zio_create(&kzioseg);
+		(void) segkmem_create(&kzioseg);
 
 		/* create zio area covering new segment */
 		segkmem_zio_init(segzio_base, mmu_ptob(segziosize));
@@ -2438,7 +2439,7 @@ memlist_new(uint64_t start, uint64_t len, struct memlist **memlistp)
  */
 static void
 memlist_add(uint64_t start, uint64_t len, struct memlist **memlistp,
-	struct memlist **curmemlistp)
+    struct memlist **curmemlistp)
 {
 	struct memlist *new = *memlistp;
 

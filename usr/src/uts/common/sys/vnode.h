@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright 2017 RackTop Systems.
  */
@@ -1486,6 +1486,7 @@ extern struct vnode kvps[];
 typedef enum {
 	KV_KVP,		/* vnode for all segkmem pages */
 	KV_ZVP,		/* vnode for all ZFS pages */
+	KV_VVP,		/* vnode for all VMM pages */
 #if defined(__sparc)
 	KV_MPVP,	/* vnode for all page_t meta-pages */
 	KV_PROMVP,	/* vnode for all PROM pages */

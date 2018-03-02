@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 
@@ -140,9 +141,8 @@ static pad_mutex_t	pszc_mutex[PSZC_MTX_TABLE_SIZE];
 	    & (VPH_TABLE_SIZE - 1))
 
 /*
- * Two slots after VPH_TABLE_SIZE are reserved in vph_mutex for kernel vnodes.
- * The lock for kvp is VPH_TABLE_SIZE + 0, and the lock for zvp is
- * VPH_TABLE_SIZE + 1.
+ * Two slots after VPH_TABLE_SIZE are reserved in vph_mutex for kernel vnodes,
+ * one for kvps[KV_ZVP], and one for other kvps[] users.
  */
 
 kmutex_t	vph_mutex[VPH_TABLE_SIZE + 2];
@@ -888,10 +888,10 @@ static int page_vnode_mutex_stress = 0;
 kmutex_t *
 page_vnode_mutex(vnode_t *vp)
 {
-	if (vp == &kvp)
+	if (vp == &kvp || vp == &kvps[KV_VVP])
 		return (&vph_mutex[VPH_TABLE_SIZE + 0]);
 
-	if (vp == &zvp)
+	if (vp == &kvps[KV_ZVP])
 		return (&vph_mutex[VPH_TABLE_SIZE + 1]);
 #ifdef DEBUG
 	if (page_vnode_mutex_stress != 0)

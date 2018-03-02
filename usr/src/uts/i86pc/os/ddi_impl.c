@@ -24,6 +24,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>
  * Copyright 2014 Pluribus Networks, Inc.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -1009,10 +1010,10 @@ page_create_io_wrapper(void *addr, size_t len, int vmflag, void *arg)
 
 #ifdef __xpv
 static void
-segkmem_free_io(vmem_t *vmp, void * ptr, size_t size)
+segkmem_free_io(vmem_t *vmp, void *ptr, size_t size)
 {
 	extern void page_destroy_io(page_t *);
-	segkmem_xfree(vmp, ptr, size, page_destroy_io);
+	segkmem_xfree(vmp, ptr, size, &kvp, page_destroy_io);
 }
 #endif
 

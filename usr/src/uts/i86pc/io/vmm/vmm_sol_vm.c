@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -141,28 +141,36 @@ static void vm_mapping_remove(struct vmspace *, vmspace_mapping_t *);
 static kmutex_t eptable_map_lock;
 static struct eptable_map *eptable_map_head = NULL;
 
-static vmem_t	*vmm_arena = NULL;
+static vmem_t *vmm_alloc_arena = NULL;
 
+static void *
+vmm_arena_alloc(vmem_t *vmp, size_t size, int vmflag)
+{
+	return (segkmem_xalloc(vmp, NULL, size, vmflag, 0,
+	    segkmem_page_create, &kvps[KV_VVP]));
+}
+
+static void
+vmm_arena_free(vmem_t *vmp, void *inaddr, size_t size)
+{
+	segkmem_xfree(vmp, inaddr, size, &kvps[KV_VVP], NULL);
+}
 
 void
 vmm_arena_init(void)
 {
-	/*
-	 * XXXJOY: Hahaha, this is terrible, pls fix, prototype only
-	 */
-	vmm_arena = vmem_create("vmm_arena", NULL, 0, PAGESIZE,
-	    segkmem_zio_alloc, segkmem_zio_free, zio_arena, 0, VM_SLEEP);
+	vmm_alloc_arena = vmem_create("vmm_alloc_arena", NULL, 0, 1024 * 1024,
+	    vmm_arena_alloc, vmm_arena_free, kvmm_arena, 0, VM_SLEEP);
+
+	ASSERT(vmm_alloc_arena != NULL);
 }
 
-boolean_t
+void
 vmm_arena_fini(void)
 {
-	if (vmem_size(vmm_arena, VMEM_ALLOC) != 0) {
-		return (B_FALSE);
-	}
-	vmem_destroy(vmm_arena);
-	vmm_arena = NULL;
-	return (B_TRUE);
+	VERIFY(vmem_size(vmm_alloc_arena, VMEM_ALLOC) == 0);
+	vmem_destroy(vmm_alloc_arena);
+	vmm_alloc_arena = NULL;
 }
 
 struct vmspace *
@@ -941,7 +949,7 @@ vm_object_allocate(objtype_t type, vm_pindex_t psize)
 	switch (type) {
 	case OBJT_DEFAULT: {
 		/* XXXJOY: opt-in to larger pages? */
-		vmo->vmo_data = vmem_alloc(vmm_arena, size, KM_NOSLEEP);
+		vmo->vmo_data = vmem_alloc(vmm_alloc_arena, size, KM_NOSLEEP);
 		if (vmo->vmo_data == NULL) {
 			mutex_destroy(&vmo->vmo_lock);
 			kmem_free(vmo, sizeof (*vmo));
@@ -1001,7 +1009,7 @@ vm_object_deallocate(vm_object_t vmo)
 
 	switch (vmo->vmo_type) {
 	case OBJT_DEFAULT:
-		vmem_free(vmm_arena, vmo->vmo_data, vmo->vmo_size);
+		vmem_free(vmm_alloc_arena, vmo->vmo_data, vmo->vmo_size);
 		break;
 	case OBJT_SG:
 		sglist_free((struct sglist *)vmo->vmo_data);
